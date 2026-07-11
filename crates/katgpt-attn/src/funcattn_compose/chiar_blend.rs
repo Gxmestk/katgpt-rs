@@ -205,6 +205,10 @@ pub fn blend_by_entropy_into(
         let f_row = &funcattn_out[i * d..(i + 1) * d];
         let b_row = &fallback_out[i * d..(i + 1) * d];
         let o_row = &mut out[i * d..(i + 1) * d];
+        // NOTE: out may alias funcattn_out or fallback_out (doc contract).
+        // The per-element form reads both sources before writing output, which
+        // is safe under aliasing. SIMD batch ops would violate this if out
+        // aliases either source, so we keep the scalar loop.
         for j in 0..d {
             o_row[j] = gate * b_row[j] + inv_gate * f_row[j];
         }
