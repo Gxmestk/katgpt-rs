@@ -1,6 +1,5 @@
 //! Shared tournament types for cross-arena competitions.
 
-use std::cmp::Ordering;
 use std::fmt;
 use std::time::Duration;
 
@@ -113,7 +112,7 @@ impl Leaderboard {
     /// Sort rankings by ELO descending.
     pub fn sort(&mut self) {
         self.rankings
-            .sort_by(|a, b| b.elo.partial_cmp(&a.elo).unwrap_or(Ordering::Equal));
+            .sort_by(|a, b| b.elo.total_cmp(&a.elo));
     }
 
     /// Format as markdown table.
@@ -246,7 +245,7 @@ impl TrajectoryPruner {
             .map(|(i, &v)| (i, v))
             .collect();
 
-        indexed.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(Ordering::Equal));
+        indexed.sort_by(|a, b| a.1.total_cmp(&b.1));
 
         indexed
             .into_iter()
