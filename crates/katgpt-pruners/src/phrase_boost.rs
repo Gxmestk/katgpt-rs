@@ -6,9 +6,6 @@
 //!
 //! Feature-gated behind `phrase_boost` (default-OFF until GOAT proves gain).
 
-use std::collections::HashMap;
-use std::sync::RwLock;
-
 use katgpt_speculative::ScreeningPruner;
 
 use super::phrase_trie::PhraseTrie;
@@ -41,7 +38,8 @@ pub struct PhraseBoostPruner<P: ScreeningPruner> {
     /// Raw boost score before normalization.
     boost_score: f32,
     /// Per-path active trie states. Keyed by hash of the parent token sequence.
-    active_states: RwLock<HashMap<u128, Vec<usize>>>,
+    /// Lock-free via papaya — avoids RwLock contention on every relevance() call.
+    active_states: papaya::HashMap<u128, Vec<usize>>,
 }
 
 impl<P: ScreeningPruner> PhraseBoostPruner<P> {
@@ -55,7 +53,7 @@ impl<P: ScreeningPruner> PhraseBoostPruner<P> {
             inner,
             trie,
             boost_score,
-            active_states: RwLock::new(HashMap::new()),
+            active_states: papaya::HashMap::new(),
         }
     }
 
@@ -98,29 +96,22 @@ impl<P: ScreeningPruner> PhraseBoostPruner<P> {
     fn is_boosted(&self, parent_tokens: &[usize], token_idx: usize) -> bool {
         let key = Self::hash_path(parent_tokens);
 
-        // Fast path: cache hit under read lock. Slow path: upgrade to write
-        // lock, walk the trie once, insert into the cache, then fall through
-        // to the same membership test.
-        //
-        // We compute the membership test under the lock so we never clone the
-        // cached Vec<usize> and never allocate the boosted-token set.
-        let read = self.active_states.read().unwrap();
-        match read.get(&key) {
-            Some(active) => self.trie.is_token_boosted(active, token_idx),
-            None => {
-                // Cache miss: drop read, acquire write, re-check, then compute.
-                drop(read);
-                let mut write = self.active_states.write().unwrap();
-                let active = write.entry(key).or_insert_with(|| {
-                    let mut active = vec![0]; // start at root
-                    for &tok in parent_tokens {
-                        active = self.trie.advance(&active, tok);
-                    }
-                    active
-                });
-                self.trie.is_token_boosted(active, token_idx)
-            }
+        // Lock-free cache: pin the HashMap, check for a cached active set.
+        // On miss, walk the trie once and insert — no lock contention.
+        let map = self.active_states.pin();
+        if let Some(active) = map.get(&key) {
+            return self.trie.is_token_boosted(active, token_idx);
         }
+
+        // Cache miss: walk the trie from root, insert, then test.
+        let mut active = vec![0]; // start at root
+        for &tok in parent_tokens {
+            active = self.trie.advance(&active, tok);
+        }
+        // Insert (another thread may have raced — their entry wins, which is fine
+        // since the computation is deterministic).
+        let _ = map.insert(key, active.clone());
+        self.trie.is_token_boosted(&active, token_idx)
     }
 }
 

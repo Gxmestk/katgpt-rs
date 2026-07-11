@@ -405,9 +405,7 @@ pub fn weaver_forward(weights: &WeaverWeights, input: &WeaverInput) -> WeaverOut
             for kj in 0..=qi {
                 let w = scores[kj] * inv_sum;
                 let v_row = &v[kj * h + ho..kj * h + ho + head_dim];
-                for j in 0..head_dim {
-                    out_row[j] += w * v_row[j];
-                }
+                katgpt_core::simd::simd_fused_scale_acc(out_row, v_row, w, head_dim);
             }
         }
     }
@@ -544,14 +542,10 @@ fn silu(x: f32) -> f32 {
     x / (1.0 + (-x).exp())
 }
 
-/// Dot product.
+/// Dot product — delegates to `simd_dot_f32` for NEON/AVX2 dispatch.
 #[inline]
 fn dot(a: &[f32], b: &[f32]) -> f32 {
-    let mut s = 0.0f32;
-    for i in 0..a.len() {
-        s += a[i] * b[i];
-    }
-    s
+    katgpt_core::simd::simd_dot_f32(a, b, a.len().min(b.len()))
 }
 
 // ── Error type ───────────────────────────────────────────────────────────
