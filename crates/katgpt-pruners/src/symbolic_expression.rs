@@ -469,7 +469,7 @@ fn sigmoid(x: f32) -> f32 {
 
 #[inline]
 fn dot(a: &[f32], b: &[f32]) -> f32 {
-    a.iter().zip(b.iter()).map(|(&x, &y)| x * y).sum()
+    katgpt_core::simd::simd_dot_f32(a, b, a.len().min(b.len()))
 }
 
 #[inline]

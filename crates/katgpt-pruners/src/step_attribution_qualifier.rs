@@ -480,15 +480,11 @@ impl StepLocalizer<Vec<f32>, f32> for DotProductLocalizer {
     }
 }
 
-/// Dot product of two equal-length f32 slices.
+/// Dot product of two equal-length f32 slices — delegates to SIMD dispatch.
 #[inline]
 fn dot(a: &[f32], b: &[f32]) -> f32 {
     debug_assert_eq!(a.len(), b.len(), "dot: length mismatch");
-    let mut sum = 0.0_f32;
-    for i in 0..a.len() {
-        sum += a[i] * b[i];
-    }
-    sum
+    katgpt_core::simd::simd_dot_f32(a, b, a.len())
 }
 
 /// Numerically stable sigmoid. Per AGENTS.md: sigmoid not softmax.
