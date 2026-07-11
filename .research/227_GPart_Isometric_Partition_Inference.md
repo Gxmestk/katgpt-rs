@@ -241,16 +241,18 @@ Reasoning:
 
 ## What to Implement
 
-- [ ] `GpartAdapter` struct in `katgpt-core/src/types.rs` (seed, theta, d)
-- [ ] `GpartAdapter::generate_partition()` — seed-based pseudorandom group assignment
-- [ ] `GpartAdapter::apply()` — single-pass O(N) weight delta application
-- [ ] `GpartAdapter::commitment()` — BLAKE3(seed || theta)
-- [ ] `GpartAdapter::verify()` — commitment check
-- [ ] Binary format: `[GPART(5) | version(4) | d(4) | seed(8) | blake3(32) | theta(d×4)]`
-- [ ] Feature gate `gpart_adapter` in `katgpt-core/Cargo.toml`
-- [ ] `GpartPair` (mirroring `LoraPair`) for prefill/decode split
-- [ ] GOAT benchmark `tests/bench_227_gpart_adapter_goat.rs`
-- [ ] Interop: `GpartAdapter` ↔ `LoraAdapter` conversion (lossy: train-side computes θ_d = P⁺ΔW)
+> **Implementation Status (2026-07-11):** All tasks below implemented via [Plan 257](../.plans/257_gpart_adapter_inference.md) — ✅ Complete (14/14 tasks done). Feature gate: `gpart_adapter` (opt-in). The unchecked `- [ ]` markers below are stale; see Plan 257 for completion records.
+
+- [x] `GpartAdapter` struct in `katgpt-core/src/types.rs` (seed, theta, d)
+- [x] `GpartAdapter::generate_partition()` — seed-based pseudorandom group assignment
+- [x] `GpartAdapter::apply()` — single-pass O(N) weight delta application
+- [x] `GpartAdapter::commitment()` — BLAKE3(seed || theta)
+- [x] `GpartAdapter::verify()` — commitment check
+- [x] Binary format: `[GPART(5) | version(4) | d(4) | seed(8) | blake3(32) | theta(d×4)]`
+- [x] Feature gate `gpart_adapter` in `katgpt-core/Cargo.toml`
+- [x] `GpartPair` (mirroring `LoraPair`) for prefill/decode split
+- [x] GOAT benchmark `tests/bench_227_gpart_adapter_goat.rs`
+- [x] Interop: `GpartAdapter` ↔ `LoraAdapter` conversion (lossy: train-side computes θ_d = P⁺ΔW)
 
 ### Not Implementing (Deferred)
 

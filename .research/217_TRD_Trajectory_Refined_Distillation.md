@@ -275,15 +275,17 @@ GOAT-gate: `trd_refined_draft` — OFF by default. Promote to default if GOAT pr
 
 ## Tasks
 
-- [ ] Implement `FailurePoint` struct with entropy-spike + verifier-rejection detection
-- [ ] Implement `TrajectoryRefinedDraft` trait extending `SpeculativeGenerator`
-- [ ] Add single-step re-draft with ConstraintPruner constraints
-- [ ] Integrate ELF SDE noise for re-draft diversity
-- [ ] Add BT Rank pairwise comparison for raw vs refined branches
-- [ ] BanditPruner adaptive refinement budget (skip/1-step/2-step)
-- [ ] GOAT proof: speculative acceptance rate on hard queries
-- [ ] GOAT proof: latency P50/P99 regression check
-- [ ] Feature gate `trd_refined_draft`, promote to default if GOAT passes
+> **Implementation Status (2026-07-11):** All tasks below implemented via [Plan 249](../.plans/249_trd_refined_draft_modelless.md) — ✅ Complete (all phases done, GOAT proof passing). Feature gate: `trd_refined_draft` (DEFAULT-ON). The unchecked `- [ ]` markers below are stale; see Plan 249 for completion records.
+
+- [x] Implement `FailurePoint` struct with entropy-spike + verifier-rejection detection
+- [x] Implement `TrajectoryRefinedDraft` trait extending `SpeculativeGenerator`
+- [x] Add single-step re-draft with ConstraintPruner constraints
+- [x] Integrate ELF SDE noise for re-draft diversity
+- [x] Add BT Rank pairwise comparison for raw vs refined branches
+- [x] BanditPruner adaptive refinement budget (skip/1-step/2-step)
+- [x] GOAT proof: speculative acceptance rate on hard queries
+- [x] GOAT proof: latency P50/P99 regression check
+- [x] Feature gate `trd_refined_draft`, promote to default if GOAT passes
 
 ---
 

@@ -260,11 +260,13 @@ NPC uses these to decide WHEN to dodge/counter, not just WHO to target.
 
 ## Action Items
 
-- [ ] Create GOAT-gated benchmark for Fusion A (Spectral NPC Perception Compression)
+> **Status Update (2026-07-11):** Fusion A implemented via Plan 240 (✅ GOAT PASS, promoted to default). Fusion B remains unevaluated (needs POC). Fusion C already has a plan.
+
+- [x] Create GOAT-gated benchmark for Fusion A (Spectral NPC Perception Compression) — ✅ Done via Plan 240 (GOAT PASS, promoted to default)
 - [ ] Evaluate Fusion B (LatCal Fixed-Point Fourier) — likely overengineering, needs POC
 - [x] Fusion C (LinOSS Modal Threat Prediction) — most promising, warrants plan
-- [ ] No new plans for Gemini pillars 3–6, 8 (already implemented)
-- [ ] No plans for Gemini pillars 1–2 (fundamentally flawed for stated purpose)
+- [x] No new plans for Gemini pillars 3–6, 8 (already implemented) (no action needed — already implemented)
+- [x] No plans for Gemini pillars 1–2 (fundamentally flawed for stated purpose) (no action needed — fundamentally flawed)
 
 ---
 

@@ -266,13 +266,17 @@ The `DynamicPairRouter` should be implemented as an extension to `PolytopeLoraRo
 
 ### katgpt-rs (Plan 232 — `dynamic_rank` feature)
 
-- [ ] **T1: Static ranking diagnostic** — function that takes `dyn ScreeningPruner`, samples N parent contexts, computes argsort of relevance for each, checks if argsort is invariant. ~50 LOC.
-- [ ] **T2: `DynamicRankPruner<P>` wrapper** — wraps any `ScreeningPruner`, runs diagnostic on first call, applies prefix-correction if static detected. ~100 LOC.
-- [ ] **T3: Integration with `BanditPruner`** — add `with_dynamic_rank()` builder method. Forward `relevance()` through wrapper. ~30 LOC.
-- [ ] **T4: GOAT proof test** — `tests/bench_dynamic_rank_goat.rs`. Compare BanditPruner acceptance rate with/without wrapper on bomber arena. Must show ≥2% improvement. ~80 LOC.
-- [ ] **T5: Feature gate** — add `dynamic_rank = []` to Cargo.toml, default-off until proof passes.
+> **Implementation Status (2026-07-11):** All T1–T5 tasks below implemented via [Plan 232](../.plans/232_dynamic_rank_pruner.md) — ✅ Complete (all tasks done, 5/5 GOAT proofs pass). Feature gate: `dynamic_rank` (opt-in). The unchecked `- [ ]` markers below are stale; see Plan 232 for completion records.
+
+- [x] **T1: Static ranking diagnostic** — function that takes `dyn ScreeningPruner`, samples N parent contexts, computes argsort of relevance for each, checks if argsort is invariant. ~50 LOC.
+- [x] **T2: `DynamicRankPruner<P>` wrapper** — wraps any `ScreeningPruner`, runs diagnostic on first call, applies prefix-correction if static detected. ~100 LOC.
+- [x] **T3: Integration with `BanditPruner`** — add `with_dynamic_rank()` builder method. Forward `relevance()` through wrapper. ~30 LOC.
+- [x] **T4: GOAT proof test** — `tests/bench_dynamic_rank_goat.rs`. Compare BanditPruner acceptance rate with/without wrapper on bomber arena. Must show ≥2% improvement. ~80 LOC.
+- [x] **T5: Feature gate** — add `dynamic_rank = []` to Cargo.toml, default-off until proof passes.
 
 ### riir-ai (Plan 090 — `dynamic_pair_routing` feature)
+
+> **Note:** riir-ai Plan 090 status not verified in this pass.
 
 - [ ] **T1: `DynamicPairRouter` trait** — define trait with `route_dynamic(source, target)` and `verify_dynamic()`. ~30 LOC.
 - [ ] **T2: `DynamicPolytopeLoraRouter`** — extend `PolytopeLoraRouter` with target-conditioned scoring. `pair_repr = LeakyReLU(W_pair · [state ‖ target])`. ~200 LOC.

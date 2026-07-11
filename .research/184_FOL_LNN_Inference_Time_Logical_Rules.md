@@ -249,21 +249,23 @@ is Secret B — the proprietary data flywheel. This is exactly the engine/fuel s
 
 ## 7. Tasks
 
-- [ ] **F2:** Implement `extract_prompt_constraints()` — regex + keyword table for Rust FOL constraints
-- [ ] **F2:** Build static Rust Concept Graph (keywords → types → patterns lookup table)
-- [ ] **F2:** Wire prompt constraints into ConstraintPruner pipeline before DDTree search
-- [ ] **F2:** Benchmark: constraint extraction time < 1μs on typical prompts
-- [ ] **F1:** Implement `extract_rules()` — TOP-K DDTree path → LogicalRule conversion
-- [ ] **F1:** Define `LogicalRule` struct with FOL-like serialization format
-- [ ] **F1:** Wire rule extraction into post-DDTree pipeline (after verification pass)
-- [ ] **F1:** GOAT gate: episode hit rate ≥ 30% before default-on
-- [ ] **F3:** Extend EpisodePruner with compilation reward signal dimension
-- [ ] **F3:** Implement `reward_path()` — DDTree path → episode storage with reward weight
-- [ ] **F3:** Wire compilation feedback into BanditPruner update loop
-- [ ] **F3:** Benchmark: reward storage overhead < 50ns per path
-- [ ] **F4:** Implement `decision_trace()` — human-readable DDTree decision explanation
-- [ ] **F4:** Feature-flag as `decision_traces` — opt-in, not default
-- [ ] **F4:** Example: show decision trace for a `match` vs `if-else` choice
+> **Implementation Status (2026-07-11):** All F1–F4 tasks below implemented via [Plan 209](../.plans/209_fol_lnn_logical_rule_inference.md) — ✅ Done (all tasks complete). Feature gates: `fol_constraints` (F2), `rule_extraction` (F1), `reward_mem` (F3, DEFAULT-ON), `decision_trace` (F4, opt-in). The unchecked `- [ ]` markers below are stale; see Plan 209 for completion records.
+
+- [x] **F2:** Implement `extract_prompt_constraints()` — regex + keyword table for Rust FOL constraints
+- [x] **F2:** Build static Rust Concept Graph (keywords → types → patterns lookup table)
+- [x] **F2:** Wire prompt constraints into ConstraintPruner pipeline before DDTree search
+- [x] **F2:** Benchmark: constraint extraction time < 1μs on typical prompts
+- [x] **F1:** Implement `extract_rules()` — TOP-K DDTree path → LogicalRule conversion
+- [x] **F1:** Define `LogicalRule` struct with FOL-like serialization format
+- [x] **F1:** Wire rule extraction into post-DDTree pipeline (after verification pass)
+- [x] **F1:** GOAT gate: episode hit rate ≥ 30% before default-on
+- [x] **F3:** Extend EpisodePruner with compilation reward signal dimension
+- [x] **F3:** Implement `reward_path()` — DDTree path → episode storage with reward weight
+- [x] **F3:** Wire compilation feedback into BanditPruner update loop
+- [x] **F3:** Benchmark: reward storage overhead < 50ns per path
+- [x] **F4:** Implement `decision_trace()` — human-readable DDTree decision explanation
+- [x] **F4:** Feature-flag as `decision_traces` — opt-in, not default
+- [x] **F4:** Example: show decision trace for a `match` vs `if-else` choice
 
 ---
 

@@ -206,7 +206,7 @@ Survey's "gradient-state recurrence = optimization over time" × our `latent_fun
 
 ## 6. Action items
 
-- [ ] **None in this session.** This note is the deliverable. No code, no feature flag, no benchmark — Gain verdict.
+- [x] **None in this session.** This note is the deliverable. No code, no feature flag, no benchmark — Gain verdict.
 - [-] **Deferred:** dKV-Cache primitive (§3.1) — track when dLLM inference hits the product roadmap. Not Super-GOAT; not GOAT; not now.
 - [-] **Deferred:** reestimation-vocabulary bridge addendum (§3.2) — documentation fix in riir-ai, not blocking.
 - [-] **Deferred:** §3.3 fusion idea — file in `.issues/` if pursued; do NOT promote without Q1–Q4 novelty gate.

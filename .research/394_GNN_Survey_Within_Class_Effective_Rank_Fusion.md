@@ -197,28 +197,30 @@ the shipped `effective_rank` (class-agnostic) with the shipped
 `within_class_adjacency` machinery (currently used for Dirichlet-energy
 scoring). Modelless collapse diagnostic for any class-labeled latent state.
 
+> **Implementation Status (2026-07-11):** All Phase 1 + Phase 2 tasks below implemented via [Plan 415](../.plans/415_within_class_effective_rank.md) — ✅ Complete (8/8 tasks done, all gates PASS). The unchecked `- [ ]` markers below are stale; see Plan 415 for completion records.
+
 ## Phase 1 — Primitive (CORE)
-- [ ] T1.1 Add `within_class_effective_rank` to `data_probe/geometry.rs`.
+- [x] T1.1 Add `within_class_effective_rank` to `data_probe/geometry.rs`.
       Reuse the Jacobi eigensolver; replace global-mean centering with
       class-mean centering. ~40 lines.
-- [ ] T1.2 Unit tests: (a) identical-class degenerate case returns ~0;
+- [x] T1.2 Unit tests: (a) identical-class degenerate case returns ~0;
       (b) two well-separated isotropic classes returns ~d; (c) two collapsed
       classes (each rank-1) returns ~1; (d) matches the shipped
       `effective_rank` when all labels are identical (degenerate single-class).
-- [ ] T1.3 Add `WithinClassGeometryReport { within_class_erank, n_classes,
+- [x] T1.3 Add `WithinClassGeometryReport { within_class_erank, n_classes,
       global_erank_for_contrast }` and a `within_class_geometry_report`
       convenience function.
 
 ## Phase 2 — GOAT gate
-- [ ] T2.1 G1 (correctness): synthetic two-class case, verify r_WC ∈ [1, d−1]
+- [x] T2.1 G1 (correctness): synthetic two-class case, verify r_WC ∈ [1, d−1]
       and monotone in within-class variance.
-- [ ] T2.2 G2 (non-redundancy vs shipped `effective_rank`): construct a case
+- [x] T2.2 G2 (non-redundancy vs shipped `effective_rank`): construct a case
       where global `effective_rank` is high but `within_class_effective_rank`
       is low (between-class variance dominates, within-class collapsed) —
       prove the two metrics disagree.
-- [ ] T2.3 G3 (latency): sub-µs per call on dim=64, n=256, C=4 (reuse the
+- [x] T2.3 G3 (latency): sub-µs per call on dim=64, n=256, C=4 (reuse the
       existing Jacobi hot path).
-- [ ] T2.4 G4 (alloc-free hot path): `within_class_effective_rank_into` with
+- [x] T2.4 G4 (alloc-free hot path): `within_class_effective_rank_into` with
       caller-supplied scratch, mirroring the existing `effective_rank` pattern.
 ```
 

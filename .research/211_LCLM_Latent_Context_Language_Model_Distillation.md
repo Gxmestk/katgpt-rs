@@ -242,27 +242,29 @@ Defer:    lclm_shard_xattn (IDEA 4) — wait for ShardKV validation
 
 ## Implementation Roadmap
 
+> **Implementation Status (2026-07-11):** Phase 1–3 implemented via [Plan 238](../.plans/238_mux_latent_context_compression.md) — ✅ COMPLETE (GOAT 5/5 PASS, promoted to DEFAULT-ON). Feature gate: `mux_latent_context` (DEFAULT-ON). Phase 4 remains future/blocked (ShardKV validation). The unchecked `- [ ]` markers in Phase 1–3 below are stale; see Plan 238 for completion records. Phase 4 tasks remain genuinely unchecked.
+
 ### Phase 1: MUX-Latent Context (Default Feature)
 
-- [ ] Wire MUX superposition into prefill path as `mux_latent` mode
-- [ ] Parameterize `span_size` (4, 8, 16) for compression ratio control
-- [ ] Integrate `DomainLatent` mid-layer injection for compressed token consumption
-- [ ] Implement EXPAND(i) analog via `mux_demux` recovery
-- [ ] Benchmark TTFT at 4k, 16k, 64k context with MUX-Latent enabled
-- [ ] GOAT gate: verify ≥4x TTFT improvement at 4k context before promoting to default
+- [x] Wire MUX superposition into prefill path as `mux_latent` mode
+- [x] Parameterize `span_size` (4, 8, 16) for compression ratio control
+- [x] Integrate `DomainLatent` mid-layer injection for compressed token consumption
+- [x] Implement EXPAND(i) analog via `mux_demux` recovery
+- [x] Benchmark TTFT at 4k, 16k, 64k context with MUX-Latent enabled
+- [x] GOAT gate: verify ≥4x TTFT improvement at 4k context before promoting to default
 
 ### Phase 2: Adaptive LOD (Opt-In Feature)
 
-- [ ] SIMD FFT energy scan on context windows
-- [ ] Adaptive `span_size` assignment based on spectral energy concentration
-- [ ] Benchmark quality vs. uniform compression (expect ≤2pp degradation at same average ratio)
-- [ ] GOAT gate: verify quality-neutral compression at 8x average before enabling
+- [x] SIMD FFT energy scan on context windows
+- [x] Adaptive `span_size` assignment based on spectral energy concentration
+- [x] Benchmark quality vs. uniform compression (expect ≤2pp degradation at same average ratio)
+- [x] GOAT gate: verify quality-neutral compression at 8x average before enabling
 
 ### Phase 3: ThoughtFold→Latent Pipeline (Composition)
 
-- [ ] Wire ThoughtFold output as MUX-Latent input
-- [ ] BFCF routing for hybrid compressed context
-- [ ] Benchmark combined reduction on reasoning workloads
+- [x] Wire ThoughtFold output as MUX-Latent input
+- [x] BFCF routing for hybrid compressed context
+- [x] Benchmark combined reduction on reasoning workloads
 
 ### Phase 4: Shard-Latent Cross-Attention (Future)
 

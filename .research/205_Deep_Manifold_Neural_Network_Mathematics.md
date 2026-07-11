@@ -93,10 +93,12 @@ The additive bound is **36% higher** confidence, meaning more branches survive p
 
 ### Implementation Plan
 
-- [ ] Add `union_bound_confidence` feature gate to `Cargo.toml`
-- [ ] Implement `UnionConfidenceScorer` as a `ScreeningPruner` wrapper
-- [ ] Add A/B benchmark: multiplicative vs additive branch survival rates
-- [ ] If GOAT, promote to default and demote multiplicative path
+> **Implementation Status (2026-07-11):** Implemented via Plan 231 — ✅ GOAT 6/6 PASS, promoted to DEFAULT-ON. Feature gates: `union_bound_confidence` (DEFAULT-ON), `pathway_tracker` (DEFAULT-ON). The unchecked `- [ ]` markers below are stale; see Plan 231 for completion records.
+
+- [x] Add `union_bound_confidence` feature gate to `Cargo.toml`
+- [x] Implement `UnionConfidenceScorer` as a `ScreeningPruner` wrapper
+- [x] Add A/B benchmark: multiplicative vs additive branch survival rates
+- [x] If GOAT, promote to default and demote multiplicative path
 
 ### Feature Gate
 
