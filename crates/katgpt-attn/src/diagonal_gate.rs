@@ -91,14 +91,14 @@ impl DiagonalGate for Gdn2DiagonalGate {
     }
 
     /// Apply inverse: target[i] /= alpha[i] (for backward pass).
-    /// Uses multiply by 1/alpha to avoid repeated division.
+    /// Uses reciprocal-multiply (1 div + N muls) instead of N divisions.
     #[inline]
     fn apply_inverse(&self, gate_values: &[f32], target: &mut [f32]) {
         let d = self.dim();
         debug_assert_eq!(gate_values.len(), d);
         debug_assert!(target.len() >= d);
         for i in 0..d {
-            target[i] /= gate_values[i];
+            target[i] *= 1.0 / gate_values[i];
         }
     }
 

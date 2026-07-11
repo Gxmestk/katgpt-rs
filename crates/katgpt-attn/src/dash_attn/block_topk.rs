@@ -88,20 +88,16 @@ impl VortexFlow for BlockTopKRouter {
             return;
         }
 
-        // Compute mean of keys → centroid
+        // Compute mean of keys → centroid (SIMD accumulate + scale)
         let start = block_idx * head_dim;
         let centroid = &mut cache.centroids[start..start + head_dim];
         centroid.fill(0.0);
         for t in 0..block_size {
             let k_start = t * head_dim;
-            for d in 0..head_dim {
-                centroid[d] += keys[k_start + d];
-            }
+            katgpt_core::simd::simd_add_inplace(centroid, &keys[k_start..k_start + head_dim]);
         }
         let inv = 1.0 / block_size as f32;
-        for d in centroid.iter_mut() {
-            *d *= inv;
-        }
+        katgpt_core::simd::simd_scale_inplace(centroid, inv);
 
         cache.n_blocks = cache.n_blocks.max(block_idx + 1);
     }

@@ -618,7 +618,7 @@ fn find_valid_token<P: ConstraintPruner>(
         let min_idx = top_probs
             .iter()
             .enumerate()
-            .min_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
+            .min_by(|(_, a), (_, b)| a.total_cmp(b))
             .map(|(i, _)| i)
             .unwrap();
         if prob > top_probs[min_idx] {

@@ -702,7 +702,7 @@ pub fn inject_sde_noise_into(
             perturbed
                 .iter()
                 .enumerate()
-                .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
+                .max_by(|(_, a), (_, b)| a.total_cmp(b))
                 .map(|(i, _)| i)
         } else {
             None
@@ -1018,7 +1018,7 @@ impl TreeBuilder {
                 let best_token = marginal
                     .iter()
                     .enumerate()
-                    .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
+                    .max_by(|(_, a), (_, b)| a.total_cmp(b))
                     .map(|(i, _)| i);
 
                 let Some(token_idx) = best_token else {
@@ -1400,7 +1400,7 @@ impl TreeBuilder {
                 let best_token = marginal
                     .iter()
                     .enumerate()
-                    .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
+                    .max_by(|(_, a), (_, b)| a.total_cmp(b))
                     .map(|(i, _)| i);
 
                 let Some(token_idx) = best_token else {
@@ -1756,7 +1756,7 @@ impl TreeBuilder {
                 let best_token = marginal
                     .iter()
                     .enumerate()
-                    .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
+                    .max_by(|(_, a), (_, b)| a.total_cmp(b))
                     .map(|(i, _)| i);
 
                 let Some(token_idx) = best_token else {
@@ -2084,7 +2084,7 @@ impl TreeBuilder {
                 let best_token = marginal
                     .iter()
                     .enumerate()
-                    .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
+                    .max_by(|(_, a), (_, b)| a.total_cmp(b))
                     .map(|(i, _)| i);
 
                 let Some(token_idx) = best_token else {
@@ -2415,7 +2415,7 @@ impl TreeBuilder {
                 let best_token = marginal
                     .iter()
                     .enumerate()
-                    .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
+                    .max_by(|(_, a), (_, b)| a.total_cmp(b))
                     .map(|(i, _)| i);
 
                 let Some(token_idx) = best_token else {
@@ -2688,7 +2688,7 @@ impl TreeBuilder {
                 let best_token = marginal
                     .iter()
                     .enumerate()
-                    .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
+                    .max_by(|(_, a), (_, b)| a.total_cmp(b))
                     .map(|(i, _)| i);
 
                 let Some(token_idx) = best_token else {
@@ -3347,7 +3347,7 @@ pub fn best_of_k_rollouts(
             let best_idx = scores
                 .iter()
                 .enumerate()
-                .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
+                .max_by(|(_, a), (_, b)| a.total_cmp(b))
                 .map(|(i, _)| i)
                 .unwrap_or(0);
             paths.into_iter().nth(best_idx).unwrap_or_default()
@@ -3374,14 +3374,14 @@ pub fn best_of_k_rollouts(
                 scores
                     .iter()
                     .enumerate()
-                    .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
+                    .max_by(|(_, a), (_, b)| a.total_cmp(b))
                     .map(|(i, _)| i)
                     .unwrap_or(0)
             } else {
                 final_residuals
                     .iter()
                     .enumerate()
-                    .min_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
+                    .min_by(|(_, a), (_, b)| a.total_cmp(b))
                     .map(|(i, _)| i)
                     .unwrap_or(0)
             };

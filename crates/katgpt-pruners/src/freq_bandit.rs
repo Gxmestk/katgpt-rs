@@ -502,7 +502,7 @@ impl FrequencyBandit {
             _ => {
                 // Sort variances to find quantile
                 let mut sorted = variances;
-                sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+                sorted.sort_by(|a, b| a.total_cmp(b));
                 // (1 - ρ) quantile index
                 let idx = ((1.0 - rho) * 2.0) as usize;
                 sorted[idx.min(2)]

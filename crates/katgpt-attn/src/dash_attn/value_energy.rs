@@ -110,11 +110,8 @@ impl VortexFlow for ValueEnergyRouter {
                 for t in 0..block_size {
                     let k_start = t * head_dim;
                     let v_start = t * head_dim;
-                    // Centroid accumulation (scalar — centroid is consumed
-                    // downstream by another SIMD dot, so the cost is symmetric).
-                    for d in 0..head_dim {
-                        centroid[d] += keys[k_start + d];
-                    }
+                    // Centroid accumulation via SIMD add
+                    katgpt_core::simd::simd_add_inplace(centroid, &keys[k_start..k_start + head_dim]);
                     // Value ‖v‖ via 4-way unrolled sum-of-squares (auto-vectorizes).
                     let mut n0 = 0.0f32;
                     let mut n1 = 0.0f32;
@@ -135,9 +132,7 @@ impl VortexFlow for ValueEnergyRouter {
                     }
                     energy += norm_sq.sqrt();
                 }
-                for d in centroid.iter_mut() {
-                    *d *= inv;
-                }
+                katgpt_core::simd::simd_scale_inplace(centroid, inv);
                 cache.v_energy[block_idx] = energy * inv;
             }
         }

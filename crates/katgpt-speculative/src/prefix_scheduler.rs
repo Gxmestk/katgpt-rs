@@ -388,7 +388,7 @@ impl HardwareAwarePrefixScheduler {
 
         // Global sort descending by a_{r,j}.
         candidates.sort_unstable_by(|(a1, _, _), (a2, _, _)| {
-            a2.partial_cmp(a1).unwrap_or(std::cmp::Ordering::Equal)
+            a2.total_cmp(a1)
         });
 
         // Greedy admission with non-anticipating early-stop.
