@@ -193,7 +193,7 @@ This is the "adaptive" answer: **load N templates from the corpus at startup, ha
 - [x] Write `bench_287_compression_drafter_seal.rs` with G1/G2/G3 on real corpus
 - [x] Run bench — G1 PASS, G2 CATASTROPHIC FAIL (153ms), G3 PASS (caveat)
 - [x] Document honest negative result (this file)
-- [ ] Close `.issues/029` Path A and Path B — both definitively ruled out by real-corpus latency
+- [x] Close `.issues/029` Path A and Path B — both definitively ruled out by real-corpus latency (issue removed in commit `6221be53`)
 - [ ] Optional: small plan for `AdaptiveQuestDrafter` (N templates + hash) if quest variety becomes a product requirement
 
 ---

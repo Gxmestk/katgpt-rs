@@ -136,7 +136,7 @@ All **45 babel_codec tests pass** cleanly under both `--features babel_codec` an
 - [x] **Phase 5 executed**: GOAT bench. G1/G3/G4/G5 PASS, G2 FAIL (1.14× < 2×).
 - [x] **Final demotion**: `babel_codec` stays opt-in. No promotion to default.
 - [x] **Honest negative result documented** (this file).
-- [ ] **Issue #002**: close as moot unless a learned codec (riir-train) raises the ratio above 2× — the 1.14× byte savings will not survive LatCal commitment-gas overhead (BG4 predicted exactly this failure).
+- [x] **Issue #002**: closed as moot (issue removed — the 1.14× byte savings will not survive LatCal commitment-gas overhead, BG4 predicted exactly this failure). A learned codec (riir-train) would need to raise the ratio above 2× to reconsider.
 
 ---
 
