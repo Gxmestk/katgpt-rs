@@ -24,7 +24,7 @@ pub struct IsoQuantLayer {
 }
 
 /// Configuration for IsoQuant KV cache.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct IsoQuantConfig {
     /// Number of transformer layers.
     pub n_layers: usize,
