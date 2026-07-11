@@ -240,9 +240,11 @@ impl<const D: usize, const K: usize> SubspaceSteeringField<D, K> {
         for k in 0..K {
             let a = self.alphas[k];
             // Inner loop is the SAXPY `state[j] += a * block[k][j]`.
+            // Use `mul_add` to match the FMA semantics of `simd_fused_scale_acc`
+            // used by `apply_latent_steering` (Plan 309 parity, T1.8).
             let row = &self.block[k];
             for j in 0..D {
-                state[j] += a * row[j];
+                state[j] = a.mul_add(row[j], state[j]);
             }
         }
     }

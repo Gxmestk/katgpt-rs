@@ -346,59 +346,7 @@ pub fn apply_latent_steering_weighted(state: &mut [f32], steering: &LatentSteeri
 #[inline]
 fn saxpy_inplace(state: &mut [f32], alpha: f32, dir: &[f32]) {
     debug_assert_eq!(state.len(), dir.len());
-    #[cfg(target_arch = "x86_64")]
-    {
-        if std::is_x86_feature_detected!("avx2") {
-            // SAFETY: AVX2 verified above at runtime; `state` and `dir` are
-            // valid, equal-length slices (debug_assert'd).
-            unsafe { saxpy_inplace_avx2(state, alpha, dir) };
-            return;
-        }
-    }
-    saxpy_inplace_scalar(state, alpha, dir);
-}
-
-/// Scalar SAXPY fallback. Written as a chunked loop over 8-lane strides to
-/// keep the shape friendly to LLVM's auto-vectorizer on targets without AVX2
-/// (per AGENTS.md hot-loop rule).
-#[inline]
-fn saxpy_inplace_scalar(state: &mut [f32], alpha: f32, dir: &[f32]) {
-    for (s, d) in state.iter_mut().zip(dir.iter()) {
-        *s += alpha * d;
-    }
-}
-
-/// AVX2 SAXPY: 8 f32 lanes per iteration. Scalar tail handles the remainder
-/// when `len` is not a multiple of 8 (e.g., d=16 is exactly 2 chunks, d=8 is
-/// exactly 1 chunk; arbitrary dims still work).
-///
-/// # Safety
-/// Caller must guarantee AVX2 is available at runtime and that `state` and
-/// `dir` are valid, equal-length slices.
-#[cfg(target_arch = "x86_64")]
-#[inline]
-unsafe fn saxpy_inplace_avx2(state: &mut [f32], alpha: f32, dir: &[f32]) {
-    use std::arch::x86_64::{
-        _mm256_add_ps, _mm256_loadu_ps, _mm256_mul_ps, _mm256_set1_ps, _mm256_storeu_ps,
-    };
-    let len = state.len();
-    let chunks = len / 8;
-    let v_alpha = unsafe { _mm256_set1_ps(alpha) };
-    let mut i = 0;
-    for _ in 0..chunks {
-        let s = unsafe { _mm256_loadu_ps(state.as_ptr().add(i)) };
-        let d = unsafe { _mm256_loadu_ps(dir.as_ptr().add(i)) };
-        let r = unsafe { _mm256_add_ps(s, _mm256_mul_ps(v_alpha, d)) };
-        unsafe { _mm256_storeu_ps(state.as_mut_ptr().add(i), r) };
-        i += 8;
-    }
-    // Scalar tail for the remaining (len % 8) elements.
-    while i < len {
-        unsafe {
-            *state.get_unchecked_mut(i) += alpha * *dir.get_unchecked(i);
-        }
-        i += 1;
-    }
+    crate::simd::simd_fused_scale_acc(state, dir, alpha, state.len());
 }
 
 /// Kernel weight for an entity given support. Returns 0.0 outside support.
@@ -631,62 +579,45 @@ mod tests {
         assert!(e3.iter().all(|x| x.abs() < 1e-9), "e3 no zone, no shift");
     }
 
-    // Plan 309 T3.1 — SIMD vs scalar SAXPY bit-equality.
+    // Plan 309 T3.1 — SAXPY correctness.
     //
     // The SAXPY is element-wise (`state[i] += alpha * dir[i]`) — no cross-lane
-    // reduction — so the AVX2 path and the scalar path MUST produce bit-identical
-    // results. We verify this across d=8 and d=16 on multiple seeded inputs so
-    // any drift between the two backends is caught immediately.
+    // reduction — so the SIMD path and a scalar reference MUST produce
+    // bit-identical results. We verify this across d=8 and d=16 on multiple
+    // seeded inputs so any drift is caught immediately.
     #[test]
     fn saxpy_simd_matches_scalar() {
-        #[cfg(target_arch = "x86_64")]
-        {
-            if !std::is_x86_feature_detected!("avx2") {
-                eprintln!(
-                    "AVX2 not available on this host — skipping SIMD vs scalar equality check"
-                );
-                return;
-            }
-            let dims = [8usize, 16];
-            let alphas = [0.1f32, 0.3, 0.5, 0.9];
-            for &d in &dims {
-                for &alpha in &alphas {
-                    for seed in [0xC40D_u64, 0xDEAD_BEEF, 0x1234_5678] {
-                        let dir = make_unit_direction(d, seed);
-                        let base: Vec<f32> = (0..d)
-                            .map(|i| {
-                                ((seed.wrapping_mul((i as u64) + 1)) >> 33) as f32
-                                    / (1u64 << 31) as f32
-                                    - 1.0
-                            })
-                            .collect();
+        let dims = [8usize, 16];
+        let alphas = [0.1f32, 0.3, 0.5, 0.9];
+        for &d in &dims {
+            for &alpha in &alphas {
+                for seed in [0xC40D_u64, 0xDEAD_BEEF, 0x1234_5678] {
+                    let dir = make_unit_direction(d, seed);
+                    let base: Vec<f32> = (0..d)
+                        .map(|i| {
+                            ((seed.wrapping_mul((i as u64) + 1)) >> 33) as f32
+                                / (1u64 << 31) as f32
+                                - 1.0
+                        })
+                        .collect();
 
-                        let mut simd_state = base.clone();
-                        let mut scalar_state = base.clone();
+                    let mut simd_state = base.clone();
+                    let mut scalar_state = base.clone();
 
-                        // SAFETY: AVX2 verified above.
-                        unsafe { saxpy_inplace_avx2(&mut simd_state, alpha, &dir) };
-                        saxpy_inplace_scalar(&mut scalar_state, alpha, &dir);
-
-                        assert_eq!(
-                            simd_state, scalar_state,
-                            "d={d} alpha={alpha} seed={seed:#x}: SIMD path drifted from scalar",
-                        );
+                    // `saxpy_inplace` delegates to `crate::simd::simd_fused_scale_acc`,
+                    // which dispatches to the platform SIMD backend (NEON/AVX2/scalar).
+                    saxpy_inplace(&mut simd_state, alpha, &dir);
+                    // Scalar reference: element-wise `state[i] += alpha * dir[i]`.
+                    // Use `mul_add` to match the FMA semantics of `simd_fused_scale_acc`.
+                    for (s, &di) in scalar_state.iter_mut().zip(dir.iter()) {
+                        *s = alpha.mul_add(di, *s);
                     }
+
+                    assert_eq!(
+                        simd_state, scalar_state,
+                        "d={d} alpha={alpha} seed={seed:#x}: SIMD path drifted from scalar",
+                    );
                 }
-            }
-        }
-        #[cfg(not(target_arch = "x86_64"))]
-        {
-            // Non-x86_64 targets have no AVX2 backend — the dispatcher is a
-            // scalar passthrough, so there is nothing to compare. Sanity-check
-            // the scalar path is still correct.
-            let dir = make_unit_direction(8, 7);
-            let mut state = vec![0.1f32; 8];
-            saxpy_inplace_scalar(&mut state, 0.3, &dir);
-            for i in 0..8 {
-                let expected = 0.1 + 0.3 * dir[i];
-                assert!((state[i] - expected).abs() < 1e-6);
             }
         }
     }

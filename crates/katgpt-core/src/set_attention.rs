@@ -422,6 +422,24 @@ fn dense_accumulate(
         d <= 16,
         "dense_accumulate: d > 16 needs a larger stack scratch"
     );
+    // Precompute v_proj[j] = W_V · state_j for all j, once.
+    // Without this, v_j would be recomputed n times (once per query i),
+    // turning an O(n·d²) matvec into O(n²·d²).
+    let v_proj: Option<Vec<f32>> = w_v.map(|wv| {
+        let mut vp = vec![0.0f32; n * d];
+        for j in 0..n {
+            let state_j = &states[j * d..(j + 1) * d];
+            let vp_row = &mut vp[j * d..(j + 1) * d];
+            for m in 0..d {
+                let mut v_j_m = 0.0f32;
+                for a in 0..d {
+                    v_j_m += wv[a + m * d] * state_j[a];
+                }
+                vp_row[m] = v_j_m;
+            }
+        }
+        vp
+    });
     for i in 0..n {
         let q_row = &scratch_q[i * k..(i + 1) * k];
         // Compute α_ij for all j into scratch_alpha.
@@ -443,21 +461,16 @@ fn dense_accumulate(
         let mut sum_av = [0.0f32; 16];
         let mut sum_a = 0.0f32;
         let sa = &scratch_alpha[..n];
-        if let Some(wv) = w_v {
+        if let Some(vp) = &v_proj {
             for j in 0..n {
                 let alpha = sa[j];
                 if alpha == 0.0 {
                     continue;
                 }
                 sum_a += alpha;
-                let state_j = &states[j * d..(j + 1) * d];
+                let v_j = &vp[j * d..(j + 1) * d];
                 for m in 0..d {
-                    // v_j[m] = Σ_a W_V[a + m*d] · state_j[a]
-                    let mut v_j_m = 0.0f32;
-                    for a in 0..d {
-                        v_j_m += wv[a + m * d] * state_j[a];
-                    }
-                    sum_av[m] += alpha * v_j_m;
+                    sum_av[m] += alpha * v_j[m];
                 }
             }
         } else {
@@ -509,6 +522,24 @@ fn topk_accumulate(
     // state per-tick for the same caller). For true zero-alloc top-k, the
     // caller can pass an explicit indexed scratch in a future API extension.
     let mut idx: Vec<usize> = (0..n).collect();
+    // Precompute v_proj[j] = W_V · state_j for all j, once.
+    // Without this, v_j would be recomputed per query i (up to n times),
+    // turning an O(n·d²) matvec into O(n²·d²).
+    let v_proj: Option<Vec<f32>> = w_v.map(|wv| {
+        let mut vp = vec![0.0f32; n * d];
+        for j in 0..n {
+            let state_j = &states[j * d..(j + 1) * d];
+            let vp_row = &mut vp[j * d..(j + 1) * d];
+            for m in 0..d {
+                let mut v_j_m = 0.0f32;
+                for a in 0..d {
+                    v_j_m += wv[a + m * d] * state_j[a];
+                }
+                vp_row[m] = v_j_m;
+            }
+        }
+        vp
+    });
     for i in 0..n {
         let q_row = &scratch_q[i * k..(i + 1) * k];
         for j in 0..n {
@@ -541,17 +572,14 @@ fn topk_accumulate(
             if alpha == 0.0 {
                 continue;
             }
-            let state_j = &states[j * d..(j + 1) * d];
             let coeff = gamma_per_peer * alpha;
-            if let Some(wv) = w_v {
+            if let Some(vp) = &v_proj {
+                let v_j = &vp[j * d..(j + 1) * d];
                 for m in 0..d {
-                    let mut v_j_m = 0.0f32;
-                    for a in 0..d {
-                        v_j_m += wv[a + m * d] * state_j[a];
-                    }
-                    out_i[m] += coeff * (v_j_m - state_i[m]);
+                    out_i[m] += coeff * (v_j[m] - state_i[m]);
                 }
             } else {
+                let state_j = &states[j * d..(j + 1) * d];
                 for m in 0..d {
                     out_i[m] += coeff * (state_j[m] - state_i[m]);
                 }
