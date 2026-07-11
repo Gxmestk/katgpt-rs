@@ -716,11 +716,7 @@ pub fn marginal_fusion_blend(
 
     for (src, &alpha) in sources.iter().zip(alpha_weights.iter()) {
         let len = (max_steps * vocab_size).min(src.len());
-        for i in 0..len {
-            unsafe {
-                *output.get_unchecked_mut(i) += alpha * *src.get_unchecked(i);
-            }
-        }
+        katgpt_core::simd::simd_fused_scale_acc(&mut output[..len], &src[..len], alpha, len);
     }
 
     // Re-normalize each position to sum to 1.0

@@ -264,9 +264,8 @@ fn apply_dual_scale_into(
     for i in 0..rows {
         let row_scale = inv_row[i];
         let off = i * cols;
-        for j in 0..cols {
-            cur[off + j] *= row_scale * inv_col[j];
-        }
+        // cur_row *= inv_col * row_scale (SIMD scale-mul)
+        katgpt_core::simd::simd_scale_mul_inplace(&mut cur[off..off + cols], &inv_col[..cols], row_scale);
     }
 }
 
@@ -296,9 +295,8 @@ fn apply_scales_into(
     for i in 0..rows {
         let inv_row = 1.0 / s_row[i];
         let off = i * cols;
-        for j in 0..cols {
-            tile[off + j] *= inv_row * inv_col[j];
-        }
+        // tile_row *= inv_col * inv_row (SIMD scale-mul)
+        katgpt_core::simd::simd_scale_mul_inplace(&mut tile[off..off + cols], &inv_col[..cols], inv_row);
     }
 }
 
