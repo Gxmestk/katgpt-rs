@@ -73,7 +73,7 @@ pub struct TransformerWeights {
     /// Cluster classifier: [num_clusters, n_embd]
     /// Only loaded when vocab_size > mtp_cluster_vocab_threshold.
     pub mtp_cluster_classifier: Option<Vec<f32>>,
-    /// Cluster membership table: [num_clusters] → Vec<usize> (token indices)
+    /// Cluster membership table: `[num_clusters]` → `Vec<usize>` (token indices)
     pub mtp_cluster_map: Option<Vec<Vec<usize>>>,
     // Delta routing weights (Plan 097: Delta Attention Residuals)
     #[cfg(feature = "delta_routing")]
@@ -200,7 +200,7 @@ impl TransformerWeights {
     /// Fold RMSNorm gamma into projection weights (Plan 160: Kog CPU fusion).
     ///
     /// For each projection preceded by RMSNorm with gamma:
-    ///   weight[row * n_embd + col] *= gamma[col]
+    ///   `weight[row * n_embd + col] *= gamma[col]`
     ///
     /// After folding, gamma is set to 1.0 (identity), so runtime rmsnorm_with_gamma
     /// becomes a no-op. This eliminates per-token gamma memory reads.
@@ -234,8 +234,8 @@ impl TransformerWeights {
 
     /// Repack Q/K/V weights into a single contiguous buffer (Plan 160: Kog CPU fusion).
     ///
-    /// Layout: [Q rows | K rows | V rows] × [n_embd], where:
-    ///   Q rows = [n_embd], K rows = [kv_dim], V rows = [kv_dim]
+    /// Layout: [Q rows | K rows | V rows] × `[n_embd]`, where:
+    ///   Q rows = `[n_embd]`, K rows = `[kv_dim]`, V rows = `[kv_dim]`
     ///
     /// The fused weight is stored in `attn_qkv_fused` (Some when populated).
     /// Original weights are preserved — fused is an additional allocation.

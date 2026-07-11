@@ -130,7 +130,7 @@ pub use katgpt_forward::attention_head;
 ///
 /// Prefer `forward_batched` when forwarding ≥ 2 tokens of the same model
 /// back-to-back (e.g. DenseMesh hidden-layer vertex batch, prefill). For a
-/// single token, use [`forward`] — the batched path has no advantage at N=1.
+/// single token, use [`forward()`] — the batched path has no advantage at N=1.
 #[allow(clippy::too_many_arguments)]
 pub fn forward_batched<'a>(
     ctx: &'a mut ForwardContext,

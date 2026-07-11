@@ -546,7 +546,7 @@ impl Default for FrequencyBandit {
 ///
 /// Analyzes token streams via spectral methods and translates the dominant
 /// frequency band into a [`ComputeTier`] recommendation suitable for
-/// [`InferenceRouter`](crate::inference_router::InferenceRouter).
+/// `InferenceRouter`.
 pub struct FreqTierAdapter {
     bandit: FrequencyBandit,
 }

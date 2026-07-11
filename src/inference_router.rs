@@ -201,7 +201,7 @@ pub struct InferenceRouter {
 impl InferenceRouter {
     /// Create a new router.
     ///
-    /// Starts at [`ComputeTier::CpuOnly`] with a [`CpuBackend`].
+    /// Starts at [`ComputeTier::CpuOnly`] with a `CpuBackend`.
     /// GPU backend is initialised if `gpu_available` and the `gpu_inference` feature
     /// is enabled with a Metal device present. ANE backend uses the same pattern.
     pub fn new(

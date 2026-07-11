@@ -98,7 +98,7 @@ pub fn compute_phi(
 /// Numerically stable sigmoid: `1 / (1 + e^{-x})`.
 ///
 /// Per the global rule: use sigmoid (not softmax) for any probabilistic gating
-/// or bounded [0,1] projection.
+/// or bounded `[0,1]` projection.
 #[inline]
 pub fn sigmoid(x: f32) -> f32 {
     1.0 / (1.0 + (-x).exp())

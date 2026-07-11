@@ -13,10 +13,10 @@
 //!
 //! # Relation to existing code
 //!
-//! - [`crate::irrep_pruner::spectral_flatness`] uses **FFT** on **logits** with
+//! - `crate::irrep_pruner::spectral_flatness` uses **FFT** on **logits** with
 //!   Wiener entropy (geometric/arithmetic mean ratio). Different signal, different
 //!   domain. CHIAR's H(x) is Shannon entropy of **DCT** of **embeddings**.
-//! - [`crate::freq_bandit`] uses temporal DFT of token streams. CHIAR uses
+//! - `crate::freq_bandit` uses temporal DFT of token streams. CHIAR uses
 //!   per-embedding DCT — same toolkit, orthogonal axis.
 //!
 //! # Complexity

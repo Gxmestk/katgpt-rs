@@ -71,13 +71,13 @@ pub use katgpt_speculative::dd_tree::*;
 /// DDTree with `PrunerSchedule`-aware screening (Plan 171: Thinking Prune).
 ///
 /// Wraps `screener` based on `schedule` and hop context:
-/// - [`PrunerSchedule::Uniform`]: delegates to [`build_dd_tree_screened`] unchanged
-/// - [`PrunerSchedule::FrozenBaseGuard`]: intermediate hops return relevance 1.0
+/// - `PrunerSchedule::Uniform`: delegates to [`build_dd_tree_screened`] unchanged
+/// - `PrunerSchedule::FrozenBaseGuard`: intermediate hops return relevance 1.0
 ///   (skipping expensive WASM/ConstraintPruner validation), final hop applies
 ///   the full screener
 ///
-/// This is the token-level DDTree analog of [`build_hop_dd_tree_with_schedule`](
-/// crate::spechop::build_hop_dd_tree_with_schedule). The real performance gain comes
+/// This is the token-level DDTree analog of `build_hop_dd_tree_with_schedule`
+/// (crate::spechop::build_hop_dd_tree_with_schedule). The real performance gain comes
 /// when the screener wraps an expensive validator (e.g., `WasmPruner`, `BanditPruner`)
 /// — intermediate hops skip those calls entirely.
 ///
@@ -118,12 +118,12 @@ pub fn build_dd_tree_screened_with_schedule(
 
 /// DDTree with GDSD advantage-guided self-distillation (Plan 169).
 ///
-/// Convenience wrapper that builds a DDTree using a [`GdsdPruner`] wrapper
+/// Convenience wrapper that builds a DDTree using a `GdsdPruner` wrapper
 /// around the given screener. The reference pruner is [`NoScreeningPruner`]
-/// (unconstrained baseline), and the advantage function is [`identity_advantage`].
+/// (unconstrained baseline), and the advantage function is `identity_advantage`.
 ///
 /// For custom advantage functions or non-default configs, construct
-/// [`GdsdPruner`] directly and pass it to [`build_dd_tree_screened`].
+/// `GdsdPruner` directly and pass it to [`build_dd_tree_screened`].
 ///
 /// **Feature gate:** `gdsd_distill`
 #[cfg(feature = "gdsd_distill")]

@@ -28,7 +28,7 @@ pub trait SimpleProgram: Clone + Send + Sync {
 /// `payoffs[i][j]` = mean payoff of strategy `i` vs strategy `j` over
 /// `rounds` rounds. Rankings sorted by average payoff descending.
 pub struct WinMatrix {
-    /// payoffs[i][j] = mean payoff of strategy i vs strategy j.
+    /// `payoffs[i][j]` = mean payoff of strategy i vs strategy j.
     pub payoffs: Vec<Vec<f64>>,
     /// Strategy IDs corresponding to row/column indices.
     pub ids: Vec<u64>,

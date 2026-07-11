@@ -58,7 +58,7 @@
 //! Supplementary Insight 6 (Research 088): Population search with
 //! only 1 generator underperforms the basic setup. The database
 //! only helps when multiple agents contribute asynchronously.
-//! Runtime guard: `should_use_population()` from [`parallelism`] module.
+//! Runtime guard: `should_use_population()` from `parallelism` module.
 //!
 //! # Feature Gate
 //!

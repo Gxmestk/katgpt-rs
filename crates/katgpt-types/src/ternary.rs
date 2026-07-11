@@ -3,8 +3,8 @@
 /// Bit-plane packed ternary weights: each element is {-1, 0, +1}.
 ///
 /// 64 weights per block stored as two u64 bitmasks:
-/// - pos_bits[block] bit k set → weight[row][k] = +1
-/// - neg_bits[block] bit k set → weight[row][k] = -1
+/// - `pos_bits[block]` bit k set → `weight[row][k] = +1`
+/// - `neg_bits[block]` bit k set → `weight[row][k] = -1`
 /// - both zero → weight = 0 (implicit skip, no storage needed)
 ///
 /// `row_scale[r]` rescales the accumulated sum back toward original float magnitudes.
@@ -133,7 +133,7 @@ impl TernaryWeights {
         tw
     }
 
-    /// Compute a checksum over all values (sum of row_scale[r] * sum of signs in row r).
+    /// Compute a checksum over all values (sum of `row_scale[r]` * sum of signs in row r).
     /// Used for cross-implementation verification.
     pub fn checksum(&self) -> f32 {
         let mut total = 0.0f32;

@@ -2,22 +2,22 @@
 //!
 //! This module exposes the Family C implementation of
 //! [`MicroRecurrentBeliefState`] for Plan 276. It reuses the **shared**
-//! leaky-integrator update math that lives in [`crate::leaky_core`] — the
-//! same primitive that [`ReconstructionState::evolve_hla`] delegates to.
+//! leaky-integrator update math that lives in `crate::leaky_core` — the
+//! same primitive that `ReconstructionState::evolve_hla` delegates to.
 //!
 //! # History / scope
 //!
 //! Previously this file carried a standalone **mirror** of the `evolve_hla`
 //! math, with a note that refactoring `evolve_hla` itself to delegate here was
 //! "OUT OF SCOPE / locked". Plan 276 Phase 2 T2.1 has now landed: the math
-//! was lifted into [`crate::leaky_core`] (ungated, so `sense` can depend on it
+//! was lifted into `crate::leaky_core` (ungated, so `sense` can depend on it
 //! without pulling in the `micro_belief` feature). Both callers now share one
 //! update body:
 //!
 //! - [`LeakyIntegrator::step`] computes `total = Σ input[0..dim]` and calls
-//!   [`crate::leaky_core::leaky_step`].
-//! - [`ReconstructionState::evolve_hla`] computes `total = Σ kind_activations[0..6]`
-//!   and calls [`crate::leaky_core::leaky_step`] with the `KIND_MAP`-gathered
+//!   `crate::leaky_core::leaky_step`.
+//! - `ReconstructionState::evolve_hla` computes `total = Σ kind_activations[0..6]`
+//!   and calls `crate::leaky_core::leaky_step` with the `KIND_MAP`-gathered
 //!   8-element input.
 //!
 //! # Why the two callers pass different `total`s
@@ -27,7 +27,7 @@
 //! kinds 0,1). The generic kernel here has no such wrap, so it sums all `dim`
 //! inputs. Both are correct for their respective call sites; the shared core
 //! takes `total` as a parameter precisely so neither quirk leaks into the
-//! primitive. See [`crate::leaky_core`] for the exact formula and rationale.
+//! primitive. See `crate::leaky_core` for the exact formula and rationale.
 //!
 //! # Stable public API (G2.1 benchmark depends on it)
 //!
@@ -88,7 +88,7 @@ impl LeakyIntegrator {
     /// # Plan 306 Phase 4 (G3 — T4.3 caveat)
     ///
     /// `LeakyIntegrator::step` clamps the state to `[-1, 1]` on every tick
-    /// (per-element `.clamp(-1.0, 1.0)` in [`crate::leaky_core::leaky_step`]).
+    /// (per-element `.clamp(-1.0, 1.0)` in `crate::leaky_core::leaky_step`).
     /// It therefore **also classifies as `DepthInvariant`** by construction,
     /// like the attractor. The T4.3 negative control builds an *unclamped*
     /// leaky update inline in the test (no kernel-level support needed) so the
@@ -142,7 +142,7 @@ impl MicroRecurrentBeliefState for LeakyIntegrator {
 
     /// Advance one tick using the leaky-integrator update.
     ///
-    /// Delegates to the shared [`crate::leaky_core::leaky_step`] primitive —
+    /// Delegates to the shared `crate::leaky_core::leaky_step` primitive —
     /// the same body used by `ReconstructionState::evolve_hla`. Here `total` is
     /// `Σ input[0..dim]` (no KIND_MAP wrap); see the module docs for why
     /// `evolve_hla` passes a different `total`.

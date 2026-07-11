@@ -312,8 +312,8 @@ pub fn bench_hla_quality(_config: &Config) -> BenchResult {
 /// SIMD micro-benchmark: matmul, HLA kernels, and end-to-end forward (Plan 060).
 ///
 /// Measures throughput of SIMD-accelerated operations:
-/// - `matmul` [32×32]×[32] (game config n_embd)
-/// - `matmul` [16×16]×[16] (micro config n_embd)
+/// - `matmul` `[32×32]×[32]` (game config n_embd)
+/// - `matmul` `[16×16]×[16]` (micro config n_embd)
 /// - HLA state update hd=4, hd=8
 /// - AHLA step hd=4, hd=8
 /// - End-to-end `forward_hla()` and `forward_ahla()` with micro config

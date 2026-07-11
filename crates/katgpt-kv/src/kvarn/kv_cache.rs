@@ -1,6 +1,6 @@
 //! KVarN KV Cache — dual-scale quantized KV cache with variance normalization (Research 159).
 //!
-//! Implements [`QuantizedKVCache`] with:
+//! Implements `QuantizedKVCache` with:
 //! - Hadamard rotation per tile (absorbed into weights at training time, applied at quantize time)
 //! - Variance normalization per tile (Sinkhorn iterative dual-scaling)
 //! - Asymmetric RTN (round-to-nearest) with dual scales:

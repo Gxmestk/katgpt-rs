@@ -273,12 +273,10 @@ impl AttractorKernel {
     ///
     /// The attractor update applies `(2·σ(·) − 1).clamp(±clamp)`, bounding
     /// magnitude per construction. We therefore **expect** the diagnostic to
-    /// classify as [`DepthInvariant`] on this kernel — the negative control
+    /// classify as `DepthInvariant` on this kernel — the negative control
     /// confirming the classifier does not false-positive on healthy kernels.
     /// The matching `leaky` audit (or an unclamped inline leaky in the test)
     /// provides the positive control.
-    ///
-    /// [`DepthInvariant`]: crate::DepthInvarianceKind::DepthInvariant
     #[cfg(feature = "depth_invariance")]
     pub fn audit_depth_invariance(
         &self,

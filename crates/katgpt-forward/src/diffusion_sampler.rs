@@ -80,7 +80,7 @@ impl SamplerFeatures {
     /// Zero-allocation: tracks top-3 probabilities via branchless comparisons
     /// during the exp/sum pass (order preserved under division by `sum_exp`).
     /// Entropy computed via the identity `Σ p·log(p) = (Σ e·log(e))/sum - log(sum)`
-    /// to avoid per-element division. Previously allocated 2 Vec<f32> of
+    /// to avoid per-element division. Previously allocated 2 `Vec<f32>` of
     /// vocab_size and did a full O(n log n) sort for top-3 mass.
     pub fn from_logits(
         logits_p: &[f32],
@@ -303,11 +303,11 @@ impl LogisticSampler {
 /// medium-scale models where feature interactions matter.
 #[derive(Clone, Debug)]
 pub struct MlpSampler {
-    /// Input → hidden weights [hidden_dim × N_FEATURES].
+    /// Input → hidden weights `[hidden_dim × N_FEATURES]`.
     pub w1: Vec<f32>,
-    /// Hidden bias [hidden_dim].
+    /// Hidden bias `[hidden_dim]`.
     pub b1: Vec<f32>,
-    /// Hidden → output weights [hidden_dim].
+    /// Hidden → output weights `[hidden_dim]`.
     pub w2: Vec<f32>,
     /// Output bias.
     pub b2: f32,

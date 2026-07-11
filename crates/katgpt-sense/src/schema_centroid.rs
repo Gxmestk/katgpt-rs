@@ -16,7 +16,7 @@ use super::octree::KgEmbedding;
 pub struct CentroidStats {
     /// Mean embedding of all entities in this class: v_c = (1/|E_c|) Σ e_i
     pub mean: [f32; 8],
-    /// Per-dimension standard deviation: σ_c[d] = sqrt(Var(e[d]))
+    /// Per-dimension standard deviation: `σ_c[d] = sqrt(Var(e[d]))`
     pub std_dev: [f32; 8],
     /// Number of entities used to compute this centroid
     pub count: usize,

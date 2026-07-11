@@ -304,7 +304,7 @@ impl ConflictClause {
 /// Database of learned conflict clauses for DDTree search acceleration
 /// (Plan 170 F2, CDCL-inspired).
 ///
-/// When a DDTree branch is flagged as conflicted by [`ConflictDetector`],
+/// When a DDTree branch is flagged as conflicted by `ConflictDetector`,
 /// extract the commitment pattern and learn a clause. Future expansions
 /// check against all clauses before exploring — skipping branches known
 /// to lead to conflicts.

@@ -1,7 +1,7 @@
 //! Feature class vocabulary tag (Plan 292 Phase 1, Research 267).
 //!
-//! Re-export shim for [`FeatureClass`] from `katgpt-core`. The enum lives next
-//! to the [`ScreeningPruner`] trait in `katgpt-core/src/traits.rs` because the
+//! Re-export shim for `FeatureClass` from `katgpt-core`. The enum lives next
+//! to the `ScreeningPruner` trait in `katgpt-core/src/traits.rs` because the
 //! trait's default method needs it; this module gives the path the plan called
 //! out (`katgpt_rs::pruners::feature_class::FeatureClass`) without duplicating
 //! the type definition.
@@ -10,8 +10,8 @@
 //!
 //! | Class | What it reads | Safe use | Example primitives |
 //! |-------|---------------|----------|--------------------|
-//! | [`FeatureClass::Detection`] | Behavior *already realized* in generated text | Monitor, intervene downstream of the read | `EmotionDirections` (Plan 162), CNA (Plan 087), `FaithfulnessProbe` (Plan 278), `RegimeTransition` (Plan 215) |
-//! | [`FeatureClass::Prediction`] | Probability of *future* behavior from intermediate state | Non-invasive steering via candidate selection | `FutureBehaviorProbe` (Plan 292 Phase 2) |
+//! | `FeatureClass::Detection` | Behavior *already realized* in generated text | Monitor, intervene downstream of the read | `EmotionDirections` (Plan 162), CNA (Plan 087), `FaithfulnessProbe` (Plan 278), `RegimeTransition` (Plan 215) |
+//! | `FeatureClass::Prediction` | Probability of *future* behavior from intermediate state | Non-invasive steering via candidate selection | `FutureBehaviorProbe` (Plan 292 Phase 2) |
 //!
 //! The distinction matters because detection-side directions are a *different
 //! linear subspace* from prediction-side directions. Treating them as the same

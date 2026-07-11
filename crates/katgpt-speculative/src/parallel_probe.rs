@@ -490,7 +490,7 @@ impl<A: Clone + Eq + Hash> ParallelProbeController<A> {
 // ── ParallelProbeVerifier (Plan 133 T3) ──────────────────────
 
 /// Wrapper that layers parallel-probe consensus/pruning on top of any
-/// [`SpeculativeVerifier`](crate::verifier_trait::SpeculativeVerifier).
+/// [`SpeculativeVerifier`].
 ///
 /// On each speculative step, the verifier extracts answers from all active branches
 /// using the injected [`AnswerExtractor`](crate::answer_extract::AnswerExtractor), feeds

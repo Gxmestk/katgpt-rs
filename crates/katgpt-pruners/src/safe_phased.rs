@@ -7,7 +7,7 @@
 //! # Architecture
 //!
 //! - [`SafePhasedState`] — tracks phase, delay estimate, gap accumulation, mixing
-//! - Integration with [`BanditStrategy::SafePhased`] in the bandit module
+//! - Integration with `BanditStrategy::SafePhased` in the bandit module
 //!
 //! # Delay-Calibrated Slack
 //!

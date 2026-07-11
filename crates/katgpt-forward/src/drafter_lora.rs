@@ -28,9 +28,9 @@ const DRAFTER_LORA_N_ADAPTERS: u32 = 6;
 /// preserves the base model at initialization.
 ///
 /// At rank-4 on Config::draft() (n_embd=4, kv_dim=4, mlp_hidden=16):
-/// - Q,K,V,O: 32 params each (A[16] + B[16])
-/// - MLP1: 80 params (A[16] + B[64])
-/// - MLP2: 80 params (A[64] + B[16])
+/// - Q,K,V,O: 32 params each (`A[16] + B[16]`)
+/// - MLP1: 80 params (`A[16] + B[64]`)
+/// - MLP2: 80 params (`A[64] + B[16]`)
 /// - Total: 288 params
 pub struct DrafterLoraWeights {
     pub q_lora: LoraAdapter,

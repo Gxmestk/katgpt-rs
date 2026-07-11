@@ -38,7 +38,7 @@ pub const DEFAULT_WINDOW_SIZE: usize = 256;
 ///
 /// # Cold start
 ///
-/// Until `min_samples` observations, [`tau_lo`] / [`tau_hi`] return the
+/// Until `min_samples` observations, [`tau_lo`](Self::tau_lo) / [`tau_hi`](Self::tau_hi) return the
 /// paper's defaults ([`DEFAULT_TAU_LO`] / [`DEFAULT_TAU_HI`]).
 pub struct StreamingTauCalibrator {
     /// Circular buffer of recent samples (insertion order).

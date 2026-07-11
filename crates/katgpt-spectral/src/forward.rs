@@ -126,7 +126,7 @@ pub fn attention_spectralquant(
 ///
 /// # Relationship to TurboQuant (Research 20)
 ///
-/// [`maxsim_score_turboquant`](katgpt_transformer::forward::maxsim_score_turboquant)
+/// `maxsim_score_turboquant` (in `katgpt_transformer`)
 /// is the same pattern for TurboQuant's random-rotation + uniform-bit path.
 /// This SpectralQuant version uses calibrated eigenbasis + water-fill + selective QJL,
 /// giving higher fidelity at the same compression ratio. Both share the same

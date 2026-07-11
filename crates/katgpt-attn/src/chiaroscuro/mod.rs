@@ -99,7 +99,7 @@ pub use tau::{DEFAULT_MIN_SAMPLES, DEFAULT_TAU_HI, DEFAULT_TAU_LO, StreamingTauC
 // tier-routing signal). Instead, this hook exposes CHIAR utilization stats
 // via RouterStats so callers can observe KV strategy distribution and regime.
 
-/// Snapshot of CHIAR signals exposed via [`crate::inference_router::RouterStats`].
+/// Snapshot of CHIAR signals exposed via `crate::inference_router::RouterStats`.
 ///
 /// All fields are `None` when no keys have been observed yet (cold start).
 #[derive(Clone, Debug, Default)]

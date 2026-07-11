@@ -334,7 +334,7 @@ impl OffPrincipalIndex {
     ///
     /// Both `query_emb` and `adapter_emb` are projected off the principal
     /// subspace, then dotted. A scratch buffer of size `2 * (k + d)` is
-    /// allocated per call — for hot paths prefer [`project`] with a reused
+    /// allocated per call — for hot paths prefer `project` with a reused
     /// scratch and an explicit `simd_dot_f32`.
     ///
     /// **Paper §5.2**: this score is ≥5pp more discriminative than raw cosine

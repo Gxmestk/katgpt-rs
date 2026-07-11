@@ -14,7 +14,7 @@
 #[derive(Clone, Debug, Default)]
 #[repr(u8)]
 pub enum AdvantageMode {
-    /// Raw Q-value delta: advantage_i = teacher_q[i] - student_q[i]
+    /// Raw Q-value delta: `advantage_i = teacher_q[i] - student_q[i]`
     /// Simplest oracle signal. No distribution assumption.
     RawDelta,
     /// Per-arm sigmoid: advantage_i = σ(teacher/τ) - σ(student/τ)
@@ -28,7 +28,7 @@ pub enum AdvantageMode {
 
 /// Compute centered log-ratio advantage for each arm.
 ///
-/// Returns Vec<f32> of advantages. Positive = student underestimates arm
+/// Returns `Vec<f32>` of advantages. Positive = student underestimates arm
 /// relative to oracle (should explore more). Negative = overestimates.
 pub fn centered_log_ratio(student_q: &[f32], teacher_q: &[f32], temperature: f32) -> Vec<f32> {
     assert_eq!(student_q.len(), teacher_q.len());
@@ -71,7 +71,7 @@ pub fn centered_log_ratio(student_q: &[f32], teacher_q: &[f32], temperature: f32
 
 /// Per-arm sigmoid advantage — independent arm credit without cross-arm normalization.
 ///
-/// For each arm: advantage_i = σ(teacher_q[i] / τ) - σ(student_q[i] / τ)
+/// For each arm: `advantage_i = σ(teacher_q[i] / τ) - σ(student_q[i] / τ)`
 ///
 /// Per AGENTS.md rule: "Use sigmoid not softmax" — sigmoid gives per-arm signal
 /// without requiring cross-arm normalization. No KL needed, no sum-to-1 constraint.
@@ -103,7 +103,7 @@ fn sigmoid(x: f32) -> f32 {
 
 /// Raw Q-value delta advantage — simplest possible teacher signal.
 ///
-/// advantage_i = teacher_q[i] - student_q[i]
+/// `advantage_i = teacher_q[i] - student_q[i]`
 ///
 /// No normalization, no temperature, no distribution assumption.
 /// Direct difference: if teacher knows arm i is better, advantage is positive.

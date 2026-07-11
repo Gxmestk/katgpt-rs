@@ -19,7 +19,7 @@
 //! ## When the bridge is exact
 //!
 //! When the GDN2 layer is configured in "paper-compatible" mode:
-//! - `decay_alpha` is **uniform** across all channels (α[0] == α[1] == … )
+//! - `decay_alpha` is **uniform** across all channels (`α[0] == α[1] == …` )
 //! - `erase_b` is all **1.0** (no erase gate)
 //! - `write_w_scalar` is **1.0** (scalar write = 1.0, which is the GDN2 default)
 //! - `gate_config` is `Kda` or `EraseOnly`

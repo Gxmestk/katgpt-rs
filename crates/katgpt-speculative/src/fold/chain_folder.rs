@@ -18,7 +18,7 @@ use super::types::{FoldContext, FoldDecision, FoldResult, StepBoundary};
 
 /// Main chain folder — prunes redundant reasoning steps.
 ///
-/// Implements [`ScreeningPruner`] for DDTree integration. The relevance
+/// Implements `ScreeningPruner` for DDTree integration. The relevance
 /// score is derived from per-step attention importance: essential and
 /// anchor steps get `1.0`, foldable steps get `0.0`.
 #[derive(Debug, Clone)]

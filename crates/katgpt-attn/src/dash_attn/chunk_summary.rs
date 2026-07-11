@@ -67,7 +67,7 @@ impl ChunkSummaryQuery {
     /// Check if head_cls is effectively zero (mean-pooling mode).
     ///
     /// Returns a cached bool — O(1) instead of scanning the entire vector.
-    /// Call [`recompute_zero_init_cache`] after any direct mutation of `head_cls`.
+    /// Call [`recompute_zero_init_cache`](Self::recompute_zero_init_cache) after any direct mutation of `head_cls`.
     #[inline]
     pub fn is_zero_init(&self) -> bool {
         self.zero_init_cache

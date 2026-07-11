@@ -64,7 +64,7 @@ impl std::error::Error for GpuDispatchError {}
 /// Attempt to compute the score matrix `S = Q·K^T · inv_sqrt_d` on GPU.
 ///
 /// This is the entry point invoked by
-/// [`crate::compact::dispatch_score_matrix`] when the router
+/// `crate::compact::dispatch_score_matrix` when the router
 /// selects `SolverBackend::Gpu`. On success, `out` is fully written. On
 /// failure, `out` is left untouched and the caller falls back to the
 /// rayon-parallel CPU kernel.

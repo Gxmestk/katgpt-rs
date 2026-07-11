@@ -55,7 +55,7 @@ pub const SNAPSHOT_VERSION: u64 = 1;
 /// # Const generic `N`
 ///
 /// The snapshot carries the full `[f32; N]` weight array directly (unlike
-/// [`MicroRecurrentKernelSnapshot`] which uses a `Vec<u8>` blob, because
+/// `MicroRecurrentKernelSnapshot` which uses a `Vec<u8>` blob, because
 /// attractor weights are variable-size `dim × dim`). Personality weights are
 /// fixed-size `N` so a fixed array is simpler and allocation-free.
 ///

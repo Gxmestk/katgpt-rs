@@ -12,8 +12,8 @@
 //! # How It Works
 //!
 //! 1. Build the WASM interpreter's computation graph in **specialized mode**
-//!    (passing the program to [`interpreter::build`])
-//! 2. The interpreter uses [`PiecewiseLookup`](interpreter::PiecewiseLookup) instead of
+//!    (passing the program to `interpreter::build`)
+//! 2. The interpreter uses `PiecewiseLookup` instead of
 //!    attention-based instruction fetch — the program counter indexes a table of
 //!    precomputed opcode properties via ReGLU step functions
 //! 3. Schedule the specialized graph via MILP (usually fewer layers)

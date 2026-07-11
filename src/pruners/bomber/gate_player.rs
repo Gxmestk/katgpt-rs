@@ -1,7 +1,7 @@
 //! GatePlayer — bomber player backed by InferenceRouter for routed inference.
 //!
 //! Encodes heuristic game-state features as token inputs, routes each forward
-//! pass through the [`InferenceRouter`] / [`TriggerGate`] tier system, and
+//! pass through the [`InferenceRouter`] / `TriggerGate` tier system, and
 //! maps the resulting logits back to action scores.
 //!
 //! This proves the gate routing pipeline works inside the bomber arena loop:

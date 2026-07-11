@@ -460,7 +460,7 @@ impl Runner {
     /// fewer layers.
     ///
     /// # Arguments
-    /// * `program` — The WASM program to specialize (list of [`ProgramInstruction`]).
+    /// * `program` — The WASM program to specialize (list of `ProgramInstruction`).
     /// * `max_layers` — Optional maximum number of transformer layers.
     ///
     /// # Returns

@@ -304,7 +304,7 @@ impl HardwareAwarePrefixScheduler {
 
     /// Schedule from raw per-token acceptance probabilities `c_k` instead of
     /// pre-computed `a_{r,j}`. Computes `a_{r,j} = Π_{i≤j} c_{r,i}` internally
-    /// via [`cumprod`] and delegates to [`schedule_with_scratch`].
+    /// via [`cumprod`] and delegates to [`Self::schedule_with_scratch`].
     ///
     /// # Arguments
     /// * `token_probs` - One slice per request, indexed `[r][k]`. Each value

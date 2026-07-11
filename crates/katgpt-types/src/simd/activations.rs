@@ -56,7 +56,7 @@ pub fn simd_exp_inplace(x: &mut [f32]) {
 
 /// Fused in-place exp + horizontal sum: `x[i] = exp(x[i])` and returns `Σ x[i]`.
 ///
-/// Combines [`simd_exp_inplace`] + [`simd_sum_f32`] into one buffer traversal,
+/// Combines [`simd_exp_inplace`] + [`simd_sum_f32`](crate::simd::simd_sum_f32) into one buffer traversal,
 /// saving one full read+write pass. Used by softmax/softmax_scaled to fuse the
 /// exp and denominator-computation passes — for vocab=256k this eliminates
 /// ~1MB of memory traffic per token decode.

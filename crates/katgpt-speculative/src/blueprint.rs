@@ -11,7 +11,7 @@ pub struct BlueprintPass;
 impl BlueprintPass {
     /// Generate a cheap argmax plan from marginals.
     /// O(depth * vocab) — no tree search, just greedy argmax at each depth.
-    /// Returns Vec<usize> where result[d] = argmax of marginals[d].
+    /// Returns `Vec<usize>` where `result[d] = argmax of marginals[d]`.
     pub fn generate(marginals: &[&[f32]]) -> Vec<usize> {
         marginals
             .iter()
@@ -27,7 +27,7 @@ impl BlueprintPass {
 
     /// Score a token against the blueprint plan.
     /// Returns bonus for compatibility, 0.0 for deviation.
-    /// If blueprint[d] == token_idx → returns bonus (default 0.1).
+    /// If `blueprint[d] == token_idx` → returns bonus (default 0.1).
     /// Otherwise → 0.0.
     pub fn compatibility(depth: usize, token_idx: usize, blueprint: &[usize], bonus: f32) -> f32 {
         match blueprint.get(depth) {

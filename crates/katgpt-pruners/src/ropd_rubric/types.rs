@@ -15,7 +15,7 @@
 //!
 //! ROPD ablation (Table 6) shows m=4→m=1 costs −17.94 pts — the single biggest impact.
 //! Single reference over-anchors rubric to one solution trajectory.
-//! [`gap_vs_references`] uses `max(reference_scores)` per criterion to prevent collapse.
+//! [`gap_vs_references`](RubricVector::gap_vs_references) uses `max(reference_scores)` per criterion to prevent collapse.
 
 use serde::{Deserialize, Serialize};
 
@@ -239,11 +239,11 @@ impl RubricVector {
     /// Per-criterion gap vector — all gaps, not filtered.
     ///
     /// Returns `Vec<f32>` where `gap[i] = max(reference.scores[i] - self.scores[i], 0.0)`.
-    /// Unlike [`gap_criteria()`] which filters and sorts, this preserves the full
+    /// Unlike [`gap_criteria()`](Self::gap_criteria) which filters and sorts, this preserves the full
     /// criterion index mapping for reward computation.
     ///
     /// Use this when you need the raw gap vector for per-criterion reward signals.
-    /// Use [`gap_criteria()`] when you need sorted/filtered gaps for targeting.
+    /// Use [`gap_criteria()`](Self::gap_criteria) when you need sorted/filtered gaps for targeting.
     pub fn per_criterion_gaps(&self, reference: &RubricVector) -> Vec<f32> {
         let n = self.scores.len().min(reference.scores.len());
         (0..n)
@@ -253,7 +253,7 @@ impl RubricVector {
 
     /// Quadratic weighted gap reward — fixes scalar collapse (Issue 061).
     ///
-    /// Unlike [`to_scalar_delta()`] which collapses via `Σ(w_i × gap_i) / Σ(w_i)`,
+    /// Unlike [`to_scalar_delta()`](Self::to_scalar_delta) which collapses via `Σ(w_i × gap_i) / Σ(w_i)`,
     /// this uses `Σ(w_i × gap_i²) / Σ(w_i)` — a **quadratic** weighted sum.
     /// The quadratic form breaks permutation symmetry: concentrated gaps in one
     /// criterion score higher than spread gaps across multiple criteria, even when

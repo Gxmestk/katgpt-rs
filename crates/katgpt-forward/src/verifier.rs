@@ -196,7 +196,7 @@ impl<'a> LeviathanVerifier<'a> {
         self.drafter_lora.is_some()
     }
 
-    /// Attach an [`AcceptanceForecast`] for entropy-bounded adaptive γ
+    /// Attach an `AcceptanceForecast` for entropy-bounded adaptive γ
     /// (Issue 023). No-op when the `adaptive_gamma_forecast` feature is OFF.
     ///
     /// When attached, each `speculate()` step:

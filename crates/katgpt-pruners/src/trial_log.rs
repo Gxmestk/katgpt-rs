@@ -105,8 +105,8 @@ pub struct TrialSummary {
 
 /// Append-only binary trial log for persistent episode history.
 ///
-/// Each call to [`append`] writes one serialized [`TrialRecord`] as a
-/// length-prefixed binary record. Buffered for throughput — call [`flush`]
+/// Each call to [`append`](TrialLog::append) writes one serialized [`TrialRecord`] as a
+/// length-prefixed binary record. Buffered for throughput — call [`flush`](TrialLog::flush)
 /// to ensure durability.
 pub struct TrialLog {
     writer: BufWriter<File>,

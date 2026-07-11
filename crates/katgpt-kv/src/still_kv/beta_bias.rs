@@ -105,7 +105,7 @@ pub fn compute_beta_mass_matching(original_len: usize, compact_len: usize) -> Be
 ///
 /// # Formula
 /// For each latent i:
-///   concentration_i = max_j(attn[i,j])   // how peaked is this latent's attention
+///   `concentration_i = max_j(attn[i,j])`   // how peaked is this latent's attention
 ///   expected_uniform = 1.0 / T            // uniform baseline
 ///   deviation_i = sigmoid((concentration_i - expected_uniform) * T * 0.5)
 ///   beta_i = log(T/t) * deviation_i

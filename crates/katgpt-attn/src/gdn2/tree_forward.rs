@@ -3,7 +3,7 @@
 //! Processes ALL tree nodes through the full transformer stack in one pass,
 //! using GDN rollback-free tree verification ([`verify_gdn2_tree_layer`]) at
 //! each recurrent layer. The committed state S₀ is **never speculatively
-//! written** — only [`commit_gdn2_tree_layer`] writes back along the accepted
+//! written** — only [`commit_gdn2_tree_layer`](super::tree_verify_bridge::commit_gdn2_tree_layer) writes back along the accepted
 //! path after verification picks a leaf.
 //!
 //! # Architecture
@@ -59,7 +59,7 @@ use super::tree_verify_bridge::verify_gdn2_tree_layer;
 /// each layer. Returns per-node logits `[T * vocab_size]` (node-major).
 ///
 /// The GDN2 cache is **read-only** during this call — S₀ is not modified.
-/// Use [`commit_gdn2_tree_layer`] to write the accepted path back after
+/// Use [`commit_gdn2_tree_layer`](super::tree_verify_bridge::commit_gdn2_tree_layer) to write the accepted path back after
 /// verification.
 ///
 /// # Arguments

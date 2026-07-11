@@ -31,7 +31,7 @@ use crate::types::{Config, Rng, softmax_scaled};
 ///
 /// Uses [`forward_tree_gdn2`] to verify all draft tree nodes in one pass,
 /// then applies p/q rejection sampling along the best path. The accepted path
-/// is committed to the GDN2 cache via [`commit_gdn2_tree_layer`].
+/// is committed to the GDN2 cache via `commit_gdn2_tree_layer`.
 ///
 /// # Arguments
 /// * `draft_sctx` — Draft speculative context (marginals buffer + scratch).

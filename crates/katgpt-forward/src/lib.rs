@@ -53,7 +53,7 @@ pub struct ForwardContext {
     pub logits: Vec<f32>,       // [vocab_size] output logits
     pub cdf: Vec<f32>,          // [vocab_size] pre-allocated CDF for sampling
     pub hidden_state: Vec<f32>, // [n_embd] final hidden state (Plan 009 compat)
-    /// LoRA intermediate buffer [lora_rank]. Pre-allocated, zero alloc in hot path.
+    /// LoRA intermediate buffer `[lora_rank]`. Pre-allocated, zero alloc in hot path.
     pub lora_buf: Vec<f32>,
     // CNA: contrastive neuron attribution runtime modulator (Plan 087)
     #[cfg(feature = "cna_steering")]
@@ -263,7 +263,7 @@ impl ForwardContext {
         self.dequant_pos.fill(0);
     }
 
-    /// Backward-compat alias for [`reset_dequant`].
+    /// Backward-compat alias for [`Self::reset_dequant`].
     #[cfg(feature = "turboquant")]
     pub fn reset_tq_dequant(&mut self) {
         self.reset_dequant();

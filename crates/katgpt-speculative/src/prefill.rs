@@ -251,7 +251,7 @@ pub fn block_compression_ratio(block_scores: &[f32], alpha: f32) -> f32 {
 
 /// Full block-selection with per-(q_block, k_block, head) score grid.
 ///
-/// `score`: [M][N][H] row-major (M=q_blocks, N=k_blocks, H=heads).
+/// `score`: `[M][N][H]` row-major (M=q_blocks, N=k_blocks, H=heads).
 /// Returns selected indices per (q_block, head) and counts.
 pub fn block_select_grid(
     score: &[f32],

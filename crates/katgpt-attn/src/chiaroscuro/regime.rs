@@ -83,7 +83,7 @@ impl WelfordVariance {
 /// Operating regime gate — decides whether to apply CHIAR spectral preprocessing.
 ///
 /// Combines prompt length and H(x) variance into a single boolean decision.
-/// Integrates with [`crate::breakeven`] and [`crate::trigger_gate`] — the gate's
+/// Integrates with `crate::breakeven` and `crate::trigger_gate` — the gate's
 /// output feeds into the cost-aware tier matrix.
 pub struct ChiarRegimeGate {
     /// Tokens seen in the current prompt.

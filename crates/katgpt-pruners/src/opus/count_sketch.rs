@@ -68,7 +68,7 @@ impl CountSketch {
 
     /// Unbiased inner product estimate via sketch dot product.
     ///
-    /// E[estimate] = ⟨a, b⟩. Variance ≈ O(2/m) · ‖a‖² · ‖b‖².
+    /// `E[estimate]` = ⟨a, b⟩. Variance ≈ O(2/m) · ‖a‖² · ‖b‖².
     pub fn inner_product_estimate(&self, a: &[f32], b: &[f32]) -> f32 {
         // Sketch both vectors into a single allocation to avoid two heap allocs
         let mut buf = vec![0.0f32; self.sketch_dim * 2];

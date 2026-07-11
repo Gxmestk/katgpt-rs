@@ -11,9 +11,9 @@
 //! # Architecture
 //!
 //! - [`IntervalMask`] — boolean validity mask with interval-closure operations.
-//! - [`IntervalPruner`] — wraps any [`ConstraintPruner`] and enforces interval
+//! - [`IntervalPruner`] — wraps any `ConstraintPruner` and enforces interval
 //!   closure on its batch output.
-//! - [`simd`] — SIMD-accelerated interval operations with adaptive routing.
+//! - `simd` — SIMD-accelerated interval operations with adaptive routing.
 //!
 //! # Adaptive Backend (Plan 252 Phase 5)
 //!

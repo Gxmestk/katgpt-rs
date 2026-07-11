@@ -3,7 +3,7 @@
 //! Defines the [`InferenceBackend`] trait that decouples the high-level generate
 //! loop from the concrete compute backend (CPU, Apple Neural Engine, etc.).
 //!
-//! The default [`CpuBackend`] delegates to [`katgpt_forward::forward`].
+//! The default [`CpuBackend`] delegates to [`katgpt_forward::forward()`].
 //!
 //! _Extracted to this leaf crate (Issue 413)._ Previously root-resident per
 //! Issue 033 §C's circular-dependency argument ("the trait cannot move without

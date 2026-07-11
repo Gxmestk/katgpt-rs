@@ -15,7 +15,7 @@ pub struct LloydMaxCodebook {
 /// Result of offline calibration per (layer, head, kv_type).
 /// Computed once, serialized with model weights.
 ///
-/// Field order: Vec (24B, 8-aligned) → usize (8B) → Option<f32> (8B) → f32 (4B)
+/// Field order: Vec (24B, 8-aligned) → usize (8B) → `Option<f32>` (8B) → f32 (4B)
 /// eliminates inter-field padding between usize and f32.
 #[derive(Debug, Clone)]
 pub struct SpectralQuantCalibration {
@@ -41,7 +41,7 @@ pub struct SpectralQuantCalibration {
 
 /// Water-fill bit allocation result.
 ///
-/// Field order: Vec (24B, 8-aligned) → usize (8B) → Option<Vec<u8>> (24B) → u8/bool (packed).
+/// Field order: Vec (24B, 8-aligned) → usize (8B) → `Option<Vec<u8>>` (24B) → u8/bool (packed).
 #[derive(Debug, Clone)]
 pub struct WaterfillAllocation {
     /// First d_eff eigenvalues (used for marginal gain computation).
@@ -80,7 +80,7 @@ pub struct SpectralQuantLayer {
     pub per_dim_semantic_codebooks: Option<Vec<LloydMaxCodebook>>,
     /// Per-dim semantic bits (v2 water-fill path, None for v1).
     pub semantic_bits_per_dim: Option<Vec<u8>>,
-    /// Precomputed full [kv_dim] bits-per-dim array (semantic + tail).
+    /// Precomputed full `[kv_dim]` bits-per-dim array (semantic + tail).
     /// Built once at construction so per-token store/dequantize paths avoid rebuilding it.
     pub packed_bits: Vec<u8>,
     /// Effective dimensionality (integer ceiling of d_eff).

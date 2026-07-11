@@ -36,7 +36,7 @@ pub struct HalfSpace {
     pub dim: u16,
     /// Threshold value.
     pub threshold: f32,
-    /// `true` = logit[dim] >= threshold, `false` = logit[dim] < threshold.
+    /// `true` = `logit[dim]` >= threshold, `false` = `logit[dim]` < threshold.
     pub above: bool,
 }
 
@@ -262,7 +262,7 @@ impl BFCP {
 /// Values are stored in a dense Vec indexed by region — O(1) lookup and update.
 #[derive(Clone, Debug)]
 pub struct PWCValueFunction {
-    /// Direct-indexed values: region_values[region_idx] = value.
+    /// Direct-indexed values: `region_values[region_idx]` = value.
     pub region_values: Vec<f64>,
 }
 

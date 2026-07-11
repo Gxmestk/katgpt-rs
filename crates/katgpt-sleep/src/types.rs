@@ -104,7 +104,7 @@ pub struct AnticipatedSlot<const D: usize> {
     pub dir: AnticipatedQueryDir<D>,
     /// The precomputed latent answer z_i (sleep-time compute output).
     pub precomputed: [f32; D],
-    /// Predictability score p_i ∈ [0,1]. Higher = more predictable = more
+    /// Predictability score p_i ∈ `[0,1]`. Higher = more predictable = more
     /// sleep-time compute was warranted for this direction.
     pub predictability: f32,
 }

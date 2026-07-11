@@ -15,8 +15,8 @@
 //! loader in riir-ai.
 //!
 //! - [`spectral_concentration`] — top-k energy ratio in `[0, 1]`.
-//! - [`adaptive_rank`] — sigmoid-mapped rank in `[min_rank, max_rank]`.
-//! - [`cot_budget_from_concentration`] — adaptive CoT length bonus.
+//! - `adaptive_rank` — sigmoid-mapped rank in `[min_rank, max_rank]`.
+//! - `cot_budget_from_concentration` — adaptive CoT length bonus.
 //!
 //! # Paper grounding
 //!

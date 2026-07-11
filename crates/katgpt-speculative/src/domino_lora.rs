@@ -21,8 +21,8 @@ const DOMINO_VERSION: u32 = 1;
 /// Minimal GRU cell (inference-only, no save/load needed).
 ///
 /// Standard GRU with 6 weights and 6 biases:
-/// - reset gate:    z = σ(Wz·[x,h] + bz)
-/// - update gate:   r = σ(Wr·[x,h] + br)
+/// - reset gate:    z = σ(Wz·`[x,h]` + bz)
+/// - update gate:   r = σ(Wr·`[x,h]` + br)
 /// - new gate:      n = tanh(Wn·[x, r⊙h] + bn)
 /// - output:        h' = (1-z)⊙h + z⊙n
 pub struct DominoGRU {

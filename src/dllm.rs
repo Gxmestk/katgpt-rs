@@ -87,7 +87,7 @@ impl NoiseSchedule {
 /// Adaptive noise schedule that equalizes per-step denoising difficulty.
 ///
 /// RePlaid Prop 1: "there exists a unique noise schedule γ* such that
-/// ℓ_θ,γ*(t) ≡ κ for all t, and consequently Var_t[ℓ] = 0."
+/// `ℓ_θ,γ*(t)` ≡ κ for all t, and consequently `Var_t[ℓ]` = 0."
 ///
 /// We adapt this to discrete D2F: track per-step reconstruction accuracy,
 /// then adjust mask ratios so each step contributes equal difficulty.
@@ -1500,7 +1500,7 @@ pub fn train_mini_dllm(
 /// This is the set-causal counterpart of [`train_mini_dllm`]. Each training
 /// step samples a generation ordering σ from the [`PositionOffsetSchedule`],
 /// converts it to generation steps, runs a set-causal forward pass via
-/// [`forward_save_set_causal`], computes the NELBO loss (mean cross-entropy
+/// `forward_save_set_causal`, computes the NELBO loss (mean cross-entropy
 /// over ALL positions — the all-L-conditionals estimator, Eq. 9), and runs
 /// backprop + SGD update.
 ///
@@ -1636,7 +1636,7 @@ pub fn train_mini_set_causal(
 ///
 /// Samples one ordering per test sequence (matching the training distribution)
 /// and computes the mean NELBO. Allocates its own forward context — use
-/// [`evaluate_set_causal_nelbo_internal`] in hot paths to reuse a context.
+/// `evaluate_set_causal_nelbo_internal` in hot paths to reuse a context.
 ///
 /// Used by the GOAT gate test for cross-model comparison (set-causal vs
 /// bidirectional models at various schedule endpoints).

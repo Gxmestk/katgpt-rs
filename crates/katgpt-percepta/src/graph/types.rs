@@ -1168,7 +1168,7 @@ impl GraphBuilder {
 
     /// Cumulative sum of a single value.
     ///
-    /// Convenience wrapper around [`fetch_sum`] for a single value.
+    /// Convenience wrapper around [`fetch_sum`](Self::fetch_sum) for a single value.
     pub fn fetch_sum_single(&mut self, value: Expression) -> Expression {
         self.fetch_sum(vec![value])
             .into_iter()

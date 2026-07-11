@@ -25,7 +25,7 @@ impl SimHashFingerprint {
     /// dot product of projection column with logits, sign → bit.
     ///
     /// `projection` has one row per logit dimension, each row has 64 entries.
-    /// For bit j: sum projection[i][j] * logits[i] for all i, sign → bit j.
+    /// For bit j: sum `projection[i][j] * logits[i]` for all i, sign → bit j.
     pub fn from_logits(logits: &[f32], projection: &[[f32; 64]]) -> Self {
         // Row-major iteration: outer loop over logits, accumulate all 64 dots
         // in one pass for cache-friendly access to projection rows.

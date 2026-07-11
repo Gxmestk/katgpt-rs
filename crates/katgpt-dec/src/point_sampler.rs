@@ -500,7 +500,7 @@ pub fn local_coordinate_tri(lambda: [f32; 3]) -> [f32; 3] {
 /// components.
 ///
 /// `sorted_lambda` must be sorted descending: `sorted_lambda[0] ≥ [1] ≥ [2]`.
-/// Use [`sort_descending_3`] (re-exported as needed) or equivalent.
+/// Use `sort_descending_3` (re-exported as needed) or equivalent.
 ///
 /// # Panics (debug)
 ///

@@ -29,12 +29,12 @@ fn sigmoid(x: f32) -> f32 {
 ///
 /// # Arguments
 /// * `weights` - Predictor weights for one layer
-/// * `h` - Hidden state vector [d_model] (post-RMSNorm, pre-attention)
+/// * `h` - Hidden state vector `[d_model]` (post-RMSNorm, pre-attention)
 /// * `d_model` - Model embedding dimension
 /// * `hidden` - Predictor hidden dimension
 /// * `n_kv_heads` - Number of KV heads (GQA groups)
-/// * `buf` - Pre-allocated scratch buffer [hidden] for intermediate activations
-/// * `out` - Output buffer [n_kv_heads] for utilities
+/// * `buf` - Pre-allocated scratch buffer `[hidden]` for intermediate activations
+/// * `out` - Output buffer `[n_kv_heads]` for utilities
 ///
 /// # Layout
 /// ```text

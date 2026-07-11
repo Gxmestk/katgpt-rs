@@ -176,11 +176,11 @@ pub fn dual_path_draft(
 /// Compute per-position ternary consensus code and accepted token.
 ///
 /// For each position:
-///   - ternary = 0  if h_tokens[i] == v_tokens[i] (AGREE)
-///   - ternary = +1 if h_tokens[i] != v_tokens[i] AND h_conf[i] > v_conf[i] (H wins)
-///   - ternary = -1 if h_tokens[i] != v_tokens[i] AND v_conf[i] >= h_conf[i] (V wins)
+///   - ternary = 0  if `h_tokens[i] == v_tokens[i]` (AGREE)
+///   - ternary = +1 if `h_tokens[i] != v_tokens[i]` AND `h_conf[i] > v_conf[i]` (H wins)
+///   - ternary = -1 if `h_tokens[i] != v_tokens[i]` AND `v_conf[i] >= h_conf[i]` (V wins)
 ///
-/// Accepted token is h_tokens[i] if ternary >= 0, else v_tokens[i].
+/// Accepted token is `h_tokens[i]` if ternary >= 0, else `v_tokens[i]`.
 pub fn compute_ternary_consensus(
     h_tokens: &[usize],
     v_tokens: &[usize],

@@ -230,7 +230,7 @@ impl<P: ScreeningPruner> RubricBanditPruner<P> {
     /// Feed rubric with multiple references — uses best reference for reward.
     ///
     /// Selects the reference with the highest weighted score as the comparison baseline.
-    /// This is the multi-reference analog of single-reference [`observe_rubric`].
+    /// This is the multi-reference analog of single-reference `observe_rubric`.
     ///
     /// # Arguments
     ///

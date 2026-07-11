@@ -120,7 +120,7 @@ pub fn soft_reject_decide(reject_confidence: f32, cfg: &SoftRejectConfig) -> Sof
 ///
 /// # Zero-allocation contract
 ///
-/// Implementations MUST NOT allocate inside [`retry`]. Use the `scratch` slice
+/// Implementations MUST NOT allocate inside [`retry`](Self::retry). Use the `scratch` slice
 /// for any temporary state — it is owned by the caller and reused across calls.
 pub trait RelaxationStrategy {
     /// Re-evaluate `token_idx` at `depth` against a *relaxed* constraint set.

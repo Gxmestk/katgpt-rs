@@ -92,14 +92,14 @@ impl OctopusConfig {
 /// Paired codebook for one side (key or value) of OCTOPUS compression.
 ///
 /// Contains separate scalar codebooks for:
-/// - **Norm** ρ ∈ [0,1] — Beta(3/2, (d-3)/2) marginal, `b-1` bits
+/// - **Norm** ρ ∈ `[0,1]` — Beta(3/2, (d-3)/2) marginal, `b-1` bits
 /// - **Oct-direction** (ξ, η) ∈ [-1,1] — triangular marginal, `b+1` bits
 ///
 /// The non-uniform bit split (b+1 for direction, b-1 for norm) is MSE-optimal
-/// because direction errors dominate: E[ρ²] = 3/d → 0 while direction variance is O(1).
+/// because direction errors dominate: `E[ρ²]` = 3/d → 0 while direction variance is O(1).
 #[derive(Debug, Clone)]
 pub struct OctopusCodebook {
-    /// Codebook for triplet norm ρ ∈ [0,1].
+    /// Codebook for triplet norm ρ ∈ `[0,1]`.
     pub norm: ScalarCodebook,
     /// Codebook for oct-coordinate (ξ or η) ∈ [-1,1].
     pub oct: ScalarCodebook,

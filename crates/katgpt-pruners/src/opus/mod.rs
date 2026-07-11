@@ -7,7 +7,7 @@
 //!
 //! - [`CountSketch`] — O(d) → O(m) dimensionality reduction with unbiased inner-product estimation
 //! - [`boltzmann_sample`] / [`boltzmann_sample_batch`] — temperature-controlled softmax sampling
-//! - [`OpusBanditPruner`] — wraps [`BanditPruner`] with redundancy penalty + Boltzmann selection
+//! - [`OpusBanditPruner`] — wraps `BanditPruner` with redundancy penalty + Boltzmann selection
 //! - [`OpusConfig`] — configuration with paper defaults (τ=0.9, m=8192, ρ=0.5)
 //!
 //! # Module Structure

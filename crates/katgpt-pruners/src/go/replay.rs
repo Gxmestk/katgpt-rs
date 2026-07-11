@@ -291,7 +291,7 @@ impl GoReplay {
     /// Matches the pattern established in
     /// `src/pruners/bomber/replay.rs` (Issue 011). Prefer this over `to_json`.
     ///
-    /// Routes through [`GoReplayBin`] because postcard cannot serialize the
+    /// Routes through `GoReplayBin` because postcard cannot serialize the
     /// internally-tagged enums (`#[serde(tag = ...)]`) used for the JSON shape;
     /// the binary shadow uses externally-tagged enums (postcard's native form).
     pub fn to_bytes(&self) -> Vec<u8> {

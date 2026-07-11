@@ -2,7 +2,7 @@
 //!
 //! Both GDN2's per-channel decay (Diag(α)) and Wall's per-dimension
 //! prefix-sum gate (Diag(g_t)) are instances of the same primitive:
-//! a diagonal [d]-dimensional vector applied to attention state.
+//! a diagonal `[d]`-dimensional vector applied to attention state.
 //!
 //! This trait provides a unified interface for:
 //! - Computing gate values from projections
@@ -46,7 +46,7 @@ pub trait DiagonalGate {
 /// matrix S at each timestep: `S *= Diag(α)`. The decay values are
 /// fixed (not projected from input) and default to 0.99.
 pub struct Gdn2DiagonalGate {
-    /// Per-channel decay values [dim].
+    /// Per-channel decay values `[dim]`.
     pub alpha: Vec<f32>,
 }
 
@@ -81,7 +81,7 @@ impl DiagonalGate for Gdn2DiagonalGate {
         out[..d].copy_from_slice(&self.alpha);
     }
 
-    /// Apply decay: target[i] *= alpha[i].
+    /// Apply decay: `target[i] *= alpha[i]`.
     #[inline]
     fn apply(&self, gate_values: &[f32], target: &mut [f32]) {
         let d = self.dim();
@@ -90,7 +90,7 @@ impl DiagonalGate for Gdn2DiagonalGate {
         simd_scale_mul_inplace(&mut target[..d], gate_values, 1.0);
     }
 
-    /// Apply inverse: target[i] /= alpha[i] (for backward pass).
+    /// Apply inverse: `target[i] /= alpha[i]` (for backward pass).
     /// Uses reciprocal-multiply (1 div + N muls) instead of N divisions.
     #[inline]
     fn apply_inverse(&self, gate_values: &[f32], target: &mut [f32]) {
@@ -119,7 +119,7 @@ impl DiagonalGate for Gdn2DiagonalGate {
 /// - Query rescale: `q̃ = exp(P) ⊙ q`
 /// - Key rescale: `k̃ = exp(-P) ⊙ k`
 pub struct WallDiagonalGate {
-    /// Per-dimension prefix sums [dim].
+    /// Per-dimension prefix sums `[dim]`.
     pub prefix: Vec<f32>,
     /// Gate max clamp value (default 0.87).
     pub gate_max: f32,
@@ -201,7 +201,7 @@ impl DiagonalGate for WallDiagonalGate {
         self.compute_gate_from_projection(input, weights, bias, out);
     }
 
-    /// Apply query rescale: target[i] *= exp(gate_values[i]).
+    /// Apply query rescale: `target[i] *= exp(gate_values[i])`.
     ///
     /// Zero-allocation. Processes 32-lane chunks through the SIMD Cephes exp
     /// kernel via a stack scratch buffer (avoids the per-element libm `exp`
@@ -212,7 +212,7 @@ impl DiagonalGate for WallDiagonalGate {
         apply_exp_rescale(gate_values, target, false);
     }
 
-    /// Apply key rescale: target[i] *= exp(-gate_values[i]).
+    /// Apply key rescale: `target[i] *= exp(-gate_values[i])`.
     #[inline]
     fn apply_inverse(&self, gate_values: &[f32], target: &mut [f32]) {
         apply_exp_rescale(gate_values, target, true);

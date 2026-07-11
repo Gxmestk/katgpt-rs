@@ -71,8 +71,8 @@
 //!
 //! # References
 //!
-//! - Plan: [`katgpt-rs/.plans/334_sleep_time_query_anticipator_primitive.md`]
-//! - Research: [`katgpt-rs/.research/318_Sleep_Time_Compute_Offline_Query_Anticipation.md`]
+//! - Plan: `katgpt-rs/.plans/334_sleep_time_query_anticipator_primitive.md`
+//! - Research: `katgpt-rs/.research/318_Sleep_Time_Compute_Offline_Query_Anticipation.md`
 //! - Source paper: [arXiv:2504.13171](https://arxiv.org/abs/2504.13171) —
 //!   Lin et al. 2025, *Sleep-time Compute: Beyond Inference Scaling at Test-time*.
 //! - Private runtime: `riir-ai/.plans/341_npc_sleep_time_anticipation_runtime.md`.

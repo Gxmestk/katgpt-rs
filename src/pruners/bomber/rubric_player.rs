@@ -1,6 +1,6 @@
 //! ROPD Rubric-based bomber player — multi-criteria reward replaces scalar δ.
 //!
-//! Same architecture as [`GZeroPlayer`] but uses [`RubricBanditPruner`] and
+//! Same architecture as `GZeroPlayer` but uses [`RubricBanditPruner`] and
 //! [`RubricGatedAbsorbCompress`] instead of scalar δ bandit/absorb.
 //!
 //! # Architecture

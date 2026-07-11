@@ -26,8 +26,8 @@
 //!
 //! # Zero-alloc hot path
 //!
-//! [`FpcgSelector::step`] pre-allocates `Vec::with_capacity(num_candidates)`
-//! once in [`FpcgSelector::new`] and `clear()`s + reuses across calls. The
+//! `FpcgSelector::step` pre-allocates `Vec::with_capacity(num_candidates)`
+//! once in `FpcgSelector::new` and `clear()`s + reuses across calls. The
 //! G5 GOAT gate asserts `Vec::capacity` stays stable across 1000 steps.
 //!
 //! # Atomic unit: sentence

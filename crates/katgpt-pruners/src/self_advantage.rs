@@ -14,14 +14,14 @@
 //!
 //! | Primitive | Math | Operation |
 //! |-----------|------|----------|
-//! | [`self_advantage`] | `A(a) = log π+(a) − log π̂(a)` | Log-ratio of post/pre log-softmax |
-//! | [`self_advantage_margin`] | `A(y*) − E_{a∼π+}[A(a)]` | Dead-compute detector (Eq. 18) |
-//! | [`product_policy_log`] | `(1−w)·log π̂ + w·log π+` | Product-policy interpolation (Eq. 16) |
+//! | `self_advantage` | `A(a) = log π+(a) − log π̂(a)` | Log-ratio of post/pre log-softmax |
+//! | `self_advantage_margin` | `A(y*) − E_{a∼π+}[A(a)]` | Dead-compute detector (Eq. 18) |
+//! | `product_policy_log` | `(1−w)·log π̂ + w·log π+` | Product-policy interpolation (Eq. 16) |
 //!
 //! # Zero allocation
 //!
 //! All functions write into caller-provided scratch buffers. The scratch layout
-//! for [`self_advantage`] / [`self_advantage_margin`] is `[pre_lsm | post_lsm |
+//! for `self_advantage` / `self_advantage_margin` is `[pre_lsm | post_lsm |
 //! advantage]`, each of length `n = logits.len()`. Total: `3 * n`.
 
 // ── Private helpers ─────────────────────────────────────────────

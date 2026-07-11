@@ -202,7 +202,7 @@ impl JsonlGoSample {
     /// Matches the pattern from `src/pruners/bomber/replay.rs` (Issue 011).
     /// Prefer this over `serde_json::to_string` for new writers.
     ///
-    /// Routes through [`JsonlGoSampleBin`] because (a) postcard cannot serialize
+    /// Routes through `JsonlGoSampleBin` because (a) postcard cannot serialize
     /// the internally-tagged `GoActionType` (`#[serde(tag = "type")]`) used for
     /// the JSONL shape, and (b) the binary shadow stores `checksum` as raw
     /// `[u8; 32]` (32 bytes) instead of a hex string (64 bytes).

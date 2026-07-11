@@ -12,7 +12,7 @@
 //!
 //! Given an initial [`CochainField`] `h₀` and the motor-gated propagation
 //! operator `A = -I + Δ + diag(motor)` (the continuous limit of
-//! [`evolve_motor_gated_field`] with the ReLU gate removed), the field state
+//! `evolve_motor_gated_field` with the ReLU gate removed), the field state
 //! at horizon `t` is:
 //!
 //! `h(t) = exp(t·A)·h₀`
@@ -56,7 +56,7 @@
 //!
 //! - Plan 359 (this primitive), Research 365 (PhysiFormer distillation).
 //! - Plan 251 — DEC operators (`d`, `δ`, `Δ`).
-//! - Plan 357 — [`evolve_motor_gated_field`] (the Euler baseline).
+//! - Plan 357 — `evolve_motor_gated_field` (the Euler baseline).
 
 use crate::hodge::hodge_eigendecomposition_full;
 use crate::types::{CellComplex, CochainField};
@@ -133,7 +133,7 @@ impl DecEigendecomposition {
     /// A reasonable default is `max_iter = 200` for well-separated spectra,
     /// `max_iter = 500` for clustered spectra. The eigensolver does NOT
     /// allocate inside the iteration loop (reuses pre-allocated cochain
-    /// scratch — see [`hodge_eigendecomposition_full`]).
+    /// scratch — see `hodge_eigendecomposition_full`).
     #[inline]
     pub fn compute(cx: &CellComplex, rank: u8, k: usize, max_iter: usize) -> Self {
         let k_capped = k.min(K_MAX);
@@ -205,7 +205,7 @@ impl DecEigendecomposition {
 ///   [`DecEigendecomposition::compute`]). The `rank` must match `h0.rank`.
 /// - `h0` — The initial field at `t = 0`.
 /// - `motor_vec` — Per-channel motor gain rates (same convention as
-///   [`evolve_motor_gated_field`]): `motor_vec[d]` multiplies channel `d` by
+///   `evolve_motor_gated_field`: `motor_vec[d]` multiplies channel `d` by
 ///   `(1 + dt·motor[d])` per Euler step. Channels `d ≥ motor_dim` get
 ///   `motor[d] = 0` (pure diffusion-decay).
 /// - `motor_dim` — Number of motor-gated channels (must be `≤ h0.dim`).
@@ -401,7 +401,7 @@ use crate::operators::{graph_laplacian_into, hodge_laplacian};
 ///   path).
 /// - `motor_dim` — Number of motor-gated channels (must be `≤ h0.dim`).
 /// - `t` — The prediction horizon.
-/// - `k` — Krylov subspace dimension. Capped at [`KRYLOV_K_MAX`] (64) and
+/// - `k` — Krylov subspace dimension. Capped at [`K_MAX`] (64) and
 ///   `h0.n_cells()`. Typical: `k = 20–30` for stable configurations, `k = 40–50`
 ///   for stiff/unstable.
 ///

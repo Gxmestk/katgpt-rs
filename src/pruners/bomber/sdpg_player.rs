@@ -1,7 +1,7 @@
 //! SDPG Bandit bomber player — oracle-informed self-distilled policy gradient.
 //!
-//! Same architecture as [`SdarPlayer`] but uses [`SdpgBanditPruner`] instead of
-//! [`SdarBanditPruner`]. SDPG's centered log-ratio advantage provides dense
+//! Same architecture as `SdarPlayer` but uses [`SdpgBanditPruner`] instead of
+//! `SdarBanditPruner`. SDPG's centered log-ratio advantage provides dense
 //! per-arm credit assignment informed by oracle teacher Q-values.
 //!
 //! # Architecture

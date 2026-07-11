@@ -111,7 +111,7 @@ impl SpeculativeContext {
 
     /// Get populated marginals as slice-of-slices (borrowed view).
     /// Returns a Vec of borrowed slices for compatibility with existing APIs.
-    /// Prefer [`marginals_into`] for hot paths (zero-alloc).
+    /// Prefer `marginals_into` for hot paths (zero-alloc).
     pub fn marginals_view(&self, vocab_size: usize) -> Vec<&[f32]> {
         (0..self.steps_populated)
             .map(|step| self.marginal_slice(step, vocab_size))

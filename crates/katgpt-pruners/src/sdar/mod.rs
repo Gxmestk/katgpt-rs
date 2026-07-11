@@ -15,7 +15,7 @@
 //!
 //! - [`SdarBanditPruner`] — bandit with sigmoid-gated reward updates
 //! - [`SdarGatedAbsorbCompress`] — absorb-compress with soft sigmoid gate
-//! - [`sdar_gate`] — core sigmoid gate function (re-exported from parent module)
+//! - `sdar_gate` — core sigmoid gate function (re-exported from parent module)
 //!
 //! # Asymmetric Trust Principle
 //!

@@ -108,7 +108,7 @@ impl OnlineCompactor {
     /// * `d` — head dimension.
     /// * `n` — number of reference queries.
     /// * `config` — AM compaction config. `compact_size` is honored as-is; if
-    ///   it's ≥ prefix length, it's clamped down (see [`clamp_compact_size`]).
+    ///   it's ≥ prefix length, it's clamped down (see `clamp_compact_size`).
     pub fn maybe_compact(
         &self,
         kv_keys: &[f32],

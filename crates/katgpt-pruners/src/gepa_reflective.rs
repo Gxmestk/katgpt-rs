@@ -215,7 +215,7 @@ struct FrontierEntry {
 
 /// Fixed-size Pareto frontier of configuration variants.
 ///
-/// Maintains up to [`MAX_CONFIGS`] non-dominated `(ConfigVariant, reward, cost)`
+/// Maintains up to `MAX_CONFIGS` non-dominated `(ConfigVariant, reward, cost)`
 /// triples. A new variant dominates an existing one if it has equal-or-better
 /// reward AND strictly lower cost, or strictly better reward AND equal-or-lower
 /// cost. Variants that are dominated by any existing entry are rejected.
@@ -398,7 +398,7 @@ pub struct ReflectiveBanditPruner<P: ScreeningPruner> {
 impl<P: ScreeningPruner> ReflectiveBanditPruner<P> {
     /// Create a new reflective bandit pruner wrapping the given bandit.
     ///
-    /// The inner bandit should already be configured with [`BanditStrategy::Ucb1`]
+    /// The inner bandit should already be configured with `BanditStrategy::Ucb1`
     /// and `NUM_ARMS` arms for best results, but any strategy works.
     pub fn new(bandit: BanditPruner<P>) -> Self {
         Self {

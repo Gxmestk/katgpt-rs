@@ -22,7 +22,7 @@ use katgpt_types::Config;
 use katgpt_types::{kv_dim, matmul, matmul_relu, rmsnorm};
 
 /// Set-causal attention forward pass — generalizes
-/// [`forward_block_causal_positions`] to arbitrary position-set orderings.
+/// `forward_block_causal_positions` to arbitrary position-set orderings.
 ///
 /// This is the CPU reference for the SW-SetDLM (Set Diffusion) training
 /// objective (Arriola & Kuleshov, arXiv:2607.01775, Research 376). The GPU
@@ -48,7 +48,7 @@ use katgpt_types::{kv_dim, matmul, matmul_relu, rmsnorm};
 ///
 /// When `position_order[p] = p / block_size`, positions in the same block share
 /// a generation step and the eligibility rule reduces to the prefix
-/// `[0..end_of_current_block]` — exactly [`forward_block_causal_positions`]
+/// `[0..end_of_current_block]` — exactly `forward_block_causal_positions`
 /// with `causal_block_size = block_size`. The test
 /// `test_set_causal_matches_block_causal_when_block_ordered` (still in root,
 /// because it also needs `forward_block_causal_positions`) verifies
@@ -74,7 +74,7 @@ use katgpt_types::{kv_dim, matmul, matmul_relu, rmsnorm};
 /// Weights to ineligible positions (`position_order[t] > position_order[q]`)
 /// are exactly 0.0.
 ///
-/// This matches the flat layout of [`forward_bidirectional_positions`] for
+/// This matches the flat layout of `forward_bidirectional_positions` for
 /// API consistency (Plan 401 originally shipped nested; flat eliminates
 /// `seq_len` separate inner-heap allocations per output buffer).
 pub fn forward_set_causal_positions(

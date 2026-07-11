@@ -97,7 +97,7 @@ impl BoundaryPenalty {
     /// Higher score = more penalty (closer to boundaries).
     ///
     /// Computes the per-instance invariants **once** and threads them through
-    /// [`Self::proximity_with`] — avoids re-deriving `inv_scale`,
+    /// `Self::proximity_with` — avoids re-deriving `inv_scale`,
     /// `half_scale`, `near_threshold`, and `inv_scale * 20.0` for every logit.
     pub fn compute_boundary_score(&self, token_logits: &[f32]) -> f32 {
         if token_logits.is_empty() {

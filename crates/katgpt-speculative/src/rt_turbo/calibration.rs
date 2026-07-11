@@ -349,7 +349,7 @@ pub fn calibrate_from_causal_scores(
 /// * `ov_output_norm` — per-head `||OV · attn(·, t_readout)||` norm (caller-
 ///   supplied from a real transformer forward). Same length as `attention_mass`.
 /// * `suspect_causal_scores` — per-suspect causal IE, **parallel to the suspect
-///   indices** yielded by [`suspect_indices`] (ascending head index).
+///   indices** yielded by `suspect_indices` (ascending head index).
 /// * `tau_suspect` — escalation threshold. No universal default; tune via G1.
 /// * `config` — RTPurbo config (uses `retrieval_head_ratio`).
 #[cfg(feature = "adaptive_causal_calibration")]

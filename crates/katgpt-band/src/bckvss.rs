@@ -23,7 +23,7 @@
 //! - [`SegmentSelector`] — trait (SRP: KV retention is distinct from
 //!   [`katgpt_core::ConstraintPruner`], which validates token structure).
 //! - [`BandConditionerSelector`] — the paper-faithful impl.
-//! - [`select_batch`] — zero-alloc hot path using caller-provided scratch.
+//! - `select_batch` — zero-alloc hot path using caller-provided scratch.
 //! - [`route_ci_test`] — CPU/SIMD/GPU routing reusing
 //!   [`crate::band_conditioner::ComputeTarget`].
 //!

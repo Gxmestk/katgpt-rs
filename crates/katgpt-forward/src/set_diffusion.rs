@@ -70,7 +70,7 @@ use katgpt_types::Rng;
 
 /// Configuration for set-diffusion decoding.
 ///
-/// Mirrors [`crate::speculative::d2f::D2fDecodeConfig`] but for the
+/// Mirrors `crate::speculative::d2f::D2fDecodeConfig` but for the
 /// set-causal generalization. The key difference: instead of a fixed
 /// `block_size`, the decode region's position ordering is specified
 /// per-call via `gen_steps` (the output of `PositionOffsetSchedule`'s

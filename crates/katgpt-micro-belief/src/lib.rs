@@ -13,8 +13,8 @@
 //!   the refactor that wires `ReconstructionState::evolve_hla` to delegate to
 //!   it is Plan 276 Phase 2 T2.1, out of scope for Phase 1).
 //! - ✅ [`MicroRecurrentKernelSnapshot`] — BLAKE3-committed freeze/thaw artifact.
-//! - ✅ Bridge: [`project_to_scalars`](bridge::project_to_scalars).
-//! - ✅ G1.1–G1.5 GOAT-gate tests in [`tests`].
+//! - ✅ Bridge: [`project_to_scalars`].
+//! - ✅ G1.1–G1.5 GOAT-gate tests in `tests`.
 //! - ✅ G1.6 (K=1 reduces to Family A) test in [`latent_thought`].
 //! - ✅ [`LatentThoughtKernel`] — Family B (Phase 3 T3.1).
 //! - ✅ G2.1 coherence benchmark — Phase 5 T5.0, see [`coherence_bench`].
@@ -39,9 +39,9 @@
 //!
 //! # References
 //!
-//! - Plan: [`katgpt-rs/.plans/276_micro_recurrent_belief_state.md`]
-//! - Research: [`katgpt-rs/.research/242_Topological_State_Tracking_Recurrent_Belief.md`]
-//! - Private guide: [`riir-ai/.research/127_Implicit_Microcognition_Crowd_NPC_Guide.md`]
+//! - Plan: `katgpt-rs/.plans/276_micro_recurrent_belief_state.md`
+//! - Research: `katgpt-rs/.research/242_Topological_State_Tracking_Recurrent_Belief.md`
+//! - Private guide: `riir-ai/.research/127_Implicit_Microcognition_Crowd_NPC_Guide.md`
 //! - Source paper: [arXiv:2604.17121](https://arxiv.org/abs/2604.17121) — Mozer et al., DeepMind, Jun 2026.
 
 pub mod attractor;

@@ -12,8 +12,8 @@ use super::types::WaterfillAllocation;
 /// Operates on pre-rotated vectors where first d_eff coords are semantic
 /// (high-energy) and the rest are tail regime.
 ///
-/// Field order: Vec / Option<Vec> (24B+, 8-aligned) → usize/u64 scalars (8B)
-/// → f32 (4B) → packed u8/bool/Option<u8> tail. Removes inter-field padding
+/// Field order: Vec / `Option<Vec>` (24B+, 8-aligned) → usize/u64 scalars (8B)
+/// → f32 (4B) → packed u8/bool/`Option<u8>` tail. Removes inter-field padding
 /// in the scalar/small-type region.
 pub struct NonUniformQuantizer {
     // ── 8-aligned, large first ──

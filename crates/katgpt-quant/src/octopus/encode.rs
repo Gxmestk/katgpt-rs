@@ -1,7 +1,7 @@
 //! Triplet encoder with joint 3×3 rounding for OCTOPUS KV cache.
 //!
 //! Encoding pipeline for a rotated KV vector:
-//! 1. Decompose into ⌈d/3⌉ triplets via [`triplet::decompose`]
+//! 1. Decompose into ⌈d/3⌉ triplets via `triplet::decompose`
 //! 2. For each triplet: encode direction via octahedral map, quantize (ξ, η, ρ)
 //! 3. Joint 3×3 rounding: search 9 direction candidates to maximize
 //!    alignment `s = t · n(ξ,η)`, then pick norm nearest to `s`

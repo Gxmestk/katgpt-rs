@@ -13,14 +13,14 @@
 //!
 //! Mirrors `EmotionDirections::project` (Plan 162) but returns a sigmoid
 //! probability of *future* behavior rather than a projection of *current*
-//! state. The crucial difference is the [`FeatureClass`] tag: this primitive
-//! returns [`FeatureClass::Prediction`], which marks it as safe to use as a
+//! state. The crucial difference is the `FeatureClass` tag: this primitive
+//! returns `FeatureClass::Prediction`, which marks it as safe to use as a
 //! non-invasive steering target via candidate selection (FPCG, Plan 292 Phase 3).
 //!
 //! # Freeze / thaw
 //!
-//! The direction vector is a BLAKE3-committed artifact. [`FutureBehaviorProbe`]
-//! supports atomic hot-swap via [`FutureBehaviorProbe::swap_direction`]: readers
+//! The direction vector is a BLAKE3-committed artifact. `FutureBehaviorProbe`
+//! supports atomic hot-swap via `FutureBehaviorProbe::swap_direction`: readers
 //! never see torn state. The interior uses `RwLock<Arc<ProbeData>>` (matching
 //! the `HotSwapPruner` convention in this crate); the read path holds the lock
 //! only long enough to clone the `Arc` (nanoseconds), then operates on the
@@ -28,8 +28,8 @@
 //!
 //! # Zero-alloc hot path
 //!
-//! [`FutureBehaviorProbe::forecast`] is `#[inline(always)]` and performs a single
-//! [`simd_dot_f32`] over `d_model` plus one sigmoid. No allocation on the read
+//! `FutureBehaviorProbe::forecast` is `#[inline(always)]` and performs a single
+//! `simd_dot_f32` over `d_model` plus one sigmoid. No allocation on the read
 //! path. The Arc clone in the lock window is reference-count bump, not alloc.
 
 use std::sync::{Arc, RwLock};

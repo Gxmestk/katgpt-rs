@@ -1,7 +1,7 @@
 //! Lloyd-Max scalar quantizers for OCTOPUS triplet components.
 //!
 //! Two marginals:
-//! 1. **Triplet norm** ρ = ||t_i||₂ ∈ [0,1] — Beta-derived distribution
+//! 1. **Triplet norm** ρ = ||t_i||₂ ∈ `[0,1]` — Beta-derived distribution
 //!    (concentrated near √(3/d), fewer bits via b-1 split)
 //! 2. **Oct-coordinate** ξ,η ∈ [-1,1] — triangular marginal from
 //!    equal-area octahedral map (more bits via b+1 split)
@@ -23,7 +23,7 @@ pub struct ScalarCodebook {
 ///
 /// After rotation of a d-dimensional unit vector, the norm of each
 /// contiguous 3-block (triplet) has distribution:
-///   f(ρ) = 2ρ² · (1-ρ²)^((d-5)/2) / B(3/2, (d-3)/2)   for ρ ∈ [0,1]
+///   f(ρ) = 2ρ² · (1-ρ²)^((d-5)/2) / B(3/2, (d-3)/2)   for ρ ∈ `[0,1]`
 ///
 /// Derived from ρ² ~ Beta(3/2, (d-3)/2) via change of variables.
 pub fn build_norm_codebook(dim: usize, nrm_bits: u8) -> ScalarCodebook {

@@ -275,7 +275,7 @@ pub fn forward_bidirectional_positions_into(
 }
 
 /// Safe bidirectional attention for one query position.
-/// Returns (attn_output[n_embd], attn_weights[n_head * seq_len]).
+/// Returns (`attn_output[n_embd]`, `attn_weights[n_head * seq_len]`).
 ///
 /// Plan 402 (2026-07-06): moved from root `src/dllm.rs`. The `_into` variant
 /// (in `crate::d2f_context`) is the zero-alloc hot-path kernel shared across

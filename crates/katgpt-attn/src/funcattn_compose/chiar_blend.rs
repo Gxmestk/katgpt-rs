@@ -25,9 +25,9 @@
 //! # CHIAR trait integration
 //!
 //! [`FuncAttnChiaroscuroOp`] implements CHIAR's [`ChiaroscuroOp`] trait so
-//! FUNCATTN plugs into CHIAR's [`ChiaroscuroRouter`] for utilization tracking
+//! FUNCATTN plugs into CHIAR's [`ChiaroscuroRouter`](crate::chiaroscuro::ChiaroscuroRouter) for utilization tracking
 //! and collapse discovery (Plan 269 Fusion B/C). It is a **routing anchor** —
-//! like CHIAR's own [`FullAttnOp`], its `forward_token` is an identity copy
+//! like CHIAR's own [`FullAttnOp`](crate::chiaroscuro::FullAttnOp), its `forward_token` is an identity copy
 //! because the real FUNCATTN operator runs cross-token. The actual per-token
 //! routing decision is the [`blend_by_entropy_into`] gate above.
 //!

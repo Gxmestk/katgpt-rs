@@ -459,7 +459,7 @@ pub fn build_dd_tree_adaptive(marginals: &[&[f32]], config: &Config) -> (Vec<Tre
 
 /// Build DDTree with adaptive budget + MUX-RCD residual (Plan 258 Task 4.2).
 ///
-/// Composes [`build_dd_tree_adaptive`] with [`compute_mux_residual`] to produce
+/// Composes [`build_dd_tree_adaptive`] with `compute_mux_residual` to produce
 /// a path-score-weighted residual embedding for the specified position. Tree
 /// nodes at `depth == position` serve as hypothesis path endpoints; their
 /// `score` field weights each path's contribution to the blended residual.

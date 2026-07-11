@@ -242,7 +242,7 @@ impl TripleEvidence {
     /// The HLA is 8-dimensional but only 6 SenseKinds feed it, so dims 6 and 7
     /// reuse kinds 0 and 1. This is the **single source of truth** for that
     /// gather — used by both [`ReconstructionState::evolve_hla`] and
-    /// [`ReconstructionState::evolve_hla_simd`] via [`kind_activations_padded`].
+    /// [`ReconstructionState::evolve_hla_simd`] via `kind_activations_padded`.
     ///
     /// (Plan 276 T2.1 — do NOT duplicate this constant elsewhere.)
     pub const KIND_MAP: [usize; 8] = [0, 1, 2, 3, 4, 5, 0, 1];
@@ -254,7 +254,7 @@ impl TripleEvidence {
     /// leaky-integrator core ([`katgpt_types::leaky_core::leaky_step`]).
     ///
     /// NOTE: the normalization `total` is NOT `Σ padded` — it is `Σ padded[..6]`
-    /// (the 6 distinct source activations). See [`evolve_hla`] and the
+    /// (the 6 distinct source activations). See `evolve_hla` and the
     /// `leaky_core` module docs for why `total` is supplied separately.
     #[inline]
     pub fn kind_activations_padded(&self) -> [f32; 8] {

@@ -121,7 +121,7 @@ fn softmax_scores_into(scores: &[f32], out: &mut [f32]) {
 ///
 /// # Arguments
 ///
-/// * scores - Raw relevance scores over candidate positions [seq_len].
+/// * scores - Raw relevance scores over candidate positions `[seq_len]`.
 ///   Higher = more relevant. Typically dot-product scores from low-dim projection.
 /// * top_p - Cumulative probability threshold (e.g., 0.9).
 ///   Must be in [0.0, 1.0]. Values outside this range are clamped.
@@ -215,7 +215,7 @@ pub fn select_top_p(scores: &[f32], top_p: f32) -> DynamicTopPResult {
 ///
 /// # Arguments
 ///
-/// * scores - Raw relevance scores [seq_len].
+/// * scores - Raw relevance scores `[seq_len]`.
 /// * top_p - Cumulative probability threshold (applied at both stages).
 /// * block_size - Block size for coarse stage (e.g., 64, matching DashAttn chunk).
 ///

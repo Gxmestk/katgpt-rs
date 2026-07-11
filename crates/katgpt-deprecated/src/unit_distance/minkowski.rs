@@ -17,7 +17,7 @@ use super::types::C64;
 /// matching the number of conjugate pairs of Archimedean embeddings.
 ///
 /// The lattice lives in C^f ≅ R^(2f) and is parameterized by:
-/// - `dim`: complex dimension f = [L:Q] where K = L(i)
+/// - `dim`: complex dimension f = `[L:Q]` where K = L(i)
 /// - `min_sep`: minimum separation δ in sup-norm between distinct lattice points
 /// - `covol`: covolume = |det(Λ)| (normalized by disc(K)^(1/2))
 #[derive(Clone, Debug)]
@@ -117,7 +117,7 @@ impl MinkowskiLattice {
         v.iter().map(|z| z.norm_sq()).fold(0.0_f64, f64::max)
     }
 
-    /// Compute lattice point: sum of basis[i] * integer_coeffs[i].
+    /// Compute lattice point: sum of `basis[i] * integer_coeffs[i]`.
     ///
     /// Evaluates Λ(a) = Σ a_i · b_i where b_i are basis vectors.
     pub fn lattice_point(&self, coeffs: &[i64]) -> Vec<C64> {
@@ -324,7 +324,7 @@ impl MinkowskiLattice {
     /// for all embeddings σ), the expected number of unit-distance pairs in
     /// a random coset a + Λ projected to C is:
     ///
-    /// E[ν] = |U| · |Λ ∩ B_R| / covol(Λ) · scaling
+    /// `E[ν] = |U| · |Λ ∩ B_R| / covol(Λ) · scaling`
     ///
     /// This is the key averaging argument from Lemma 2.1.
     pub fn coset_average_unit_pairs(&self, unit_set: &[C64], radius: f64) -> f64 {
@@ -354,12 +354,12 @@ impl MinkowskiLattice {
     }
 }
 
-/// Gaussian integer lattice Λ = Z[i] in C.
+/// Gaussian integer lattice `Λ = Z[i]` in C.
 ///
 /// The simplest lattice for the Erdős grid construction.
 /// dim=1, basis={(1,0)}, min_sep=1.0, covol=1.0.
 impl MinkowskiLattice {
-    /// The standard Gaussian integer lattice Z[i].
+    /// The standard Gaussian integer lattice `Z[i]`.
     pub fn gaussian() -> Self {
         Self {
             dim: 1,

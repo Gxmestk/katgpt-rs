@@ -73,7 +73,7 @@ impl IdeaDivergence {
 
     /// Add a new arm's score vector.
     ///
-    /// Call this after confirming novelty via [`is_novel()`].
+    /// Call this after confirming novelty via `is_novel()`.
     pub fn add_arm(&mut self, scores: Vec<f32>) {
         self.arm_scores.push(scores);
     }

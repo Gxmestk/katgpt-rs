@@ -11,7 +11,7 @@
 //! [`compose_into`](PersonalityWeightedComposition::compose_into) is the
 //! per-tick hot path. It costs `O(N · D)` multiplies — for `N=9, D=32` that's
 //! 288 FMAs, trivially SIMD-able. The inner loop delegates to
-//! [`simd_fused_scale_acc`](katgpt_types::simd::simd_fused_scale_acc) so NEON/AVX2/FMA
+//! [`simd_fused_scale_acc`] so NEON/AVX2/FMA
 //! is used when available, with a scalar fallback otherwise.
 
 use crate::sigmoid::sigmoid;

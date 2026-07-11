@@ -1,4 +1,4 @@
-//! G2 arena harness for [`BoMSampler`](crate::BoMSampler)
+//! G2 arena harness for [`BoMSampler`]
 //! (Plan 281 Phase 2, task T2.3).
 //!
 //! This module provides the **engine-side** arena structure: traits that
@@ -49,8 +49,8 @@
 //!
 //! # References
 //!
-//! - Plan: [`katgpt-rs/.plans/281_bom_single_pass_diverse_sampling.md`]
-//! - Research: [`katgpt-rs/.research/248_DeltaTok_DeltaWorld_BoM_Single_Pass_Diverse_Sampling.md`]
+//! - Plan: `katgpt-rs/.plans/281_bom_single_pass_diverse_sampling.md`
+//! - Research: `katgpt-rs/.research/248_DeltaTok_DeltaWorld_BoM_Single_Pass_Diverse_Sampling.md`
 //! - Source paper: [arXiv:2604.04913](https://arxiv.org/abs/2604.04913)
 
 use crate::{AttractorKernel, BoMSampler, LeakyIntegrator, NoiseQueryConfig};
@@ -176,7 +176,7 @@ pub trait ArenaEnvironment {
 ///
 /// This is the trait that distinguishes the G2 comparison arms. The
 /// deterministic baseline ([`DeterministicPlanner`]) only uses
-/// [`MicroRecurrentBeliefState::step`]; the BoM arms ([`BoMMinimaxPlanner`],
+/// `MicroRecurrentBeliefState::step`; the BoM arms ([`BoMMinimaxPlanner`],
 /// [`BoMMeanPlanner`]) use [`BoMSampler::sample_k_states`] +
 /// [`BoMSampler::select_best`].
 ///
@@ -224,7 +224,7 @@ pub trait EnvHint {
 
 /// Baseline: deterministic single-belief planning.
 ///
-/// Uses [`MicroRecurrentBeliefState::step`] to advance the belief, then picks
+/// Uses `MicroRecurrentBeliefState::step` to advance the belief, then picks
 /// the action whose evade vector has the highest dot-product with the belief's
 /// first two dims (a synthetic "most-aligned evade" policy). This is the arm
 /// the BoM planner must beat.

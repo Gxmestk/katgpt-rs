@@ -65,7 +65,7 @@ pub struct Term {
 
 // ── Symbolic Expression ────────────────────────────────────────
 
-/// Compact symbolic expression: sum of basis terms + bias, wrapped in sigmoid for [0,1].
+/// Compact symbolic expression: sum of basis terms + bias, wrapped in sigmoid for `[0,1]`.
 #[derive(Clone, Debug)]
 pub struct SymbolicExpression {
     pub terms: Vec<Term>,

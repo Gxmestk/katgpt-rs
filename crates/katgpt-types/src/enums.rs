@@ -413,7 +413,7 @@ impl SdpaOutputGate {
 
     /// Apply sigmoid-gated projection to attention output.
     ///
-    /// Computes: gate[i] = sigmoid(W_gate[i] · attn_out), then attn_out[i] *= gate[i].
+    /// Computes: `gate[i] = sigmoid(W_gate[i] · attn_out)`, then `attn_out[i] *= gate[i]`.
     /// Zero-init weights produce sigmoid(0) = 0.5 for all (neutral half-pass).
     /// Paper reference: +0.3–0.5 avg points on zero-shot benchmarks.
     pub fn forward(&self, attn_out: &mut [f32], dim: usize, temp: &mut [f32]) {
@@ -578,7 +578,7 @@ impl ConfiguratorContext {
 
 /// Selection strategy for width-scaled rollouts (EqR convergence-based selection).
 ///
-/// Maps to [`WidthSelectionMode`](crate::speculative::dd_tree::WidthSelectionMode) at runtime.
+/// Maps to `WidthSelectionMode` (in `crate::speculative::dd_tree`) at runtime.
 /// This enum lives in `katgpt-core` so Config can reference it without depending on
 /// the speculative decode module.
 ///

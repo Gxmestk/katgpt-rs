@@ -246,7 +246,7 @@ impl BfcpLfuShard {
         self.cache.decay(lambda);
     }
 
-    /// Feed reward signal to the tier bandit (hit=1.0, miss=0.0, or any [0,1]).
+    /// Feed reward signal to the tier bandit (hit=1.0, miss=0.0, or any `[0,1]`).
     ///
     /// Only available with `freq_bandit` feature. No-op otherwise.
     #[cfg(feature = "freq_bandit")]

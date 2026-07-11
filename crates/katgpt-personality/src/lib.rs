@@ -64,7 +64,7 @@
 //! # Module layout
 //!
 //! - [`types`] — `PersonalityConfig`, `ArchetypeLabel`.
-//! - [`sigmoid`] — numerically stable branching sigmoid.
+//! - [`sigmoid()`] — numerically stable branching sigmoid.
 //! - [`trait_def`] — `LayerDirectionSource` (file named to avoid the `trait`
 //!   keyword, which Rust reserves as a module path component).
 //! - [`kernel`] — `PersonalityWeightedComposition` (compose + drift + snapshot
@@ -73,10 +73,10 @@
 //!
 //! # References
 //!
-//! - Plan: [`katgpt-rs/.plans/297_personality_weighted_composition.md`]
-//! - Research: [`katgpt-rs/.research/276_Personality_Weighted_Latent_Layer_Composition.md`]
-//! - Private guide: [`riir-ai/.research/146_Entity_Cognition_Stack_Guide.md`]
-//! - Companion plan (riir-ai runtime wiring): [`riir-ai/.plans/327_entity_cognition_stack_runtime.md`]
+//! - Plan: `katgpt-rs/.plans/297_personality_weighted_composition.md`
+//! - Research: `katgpt-rs/.research/276_Personality_Weighted_Latent_Layer_Composition.md`
+//! - Private guide: `riir-ai/.research/146_Entity_Cognition_Stack_Guide.md`
+//! - Companion plan (riir-ai runtime wiring): `riir-ai/.plans/327_entity_cognition_stack_runtime.md`
 
 pub mod kernel;
 pub mod sigmoid;

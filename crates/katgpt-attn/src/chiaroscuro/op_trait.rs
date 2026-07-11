@@ -69,7 +69,7 @@ pub trait ChiaroscuroOp: Send + Sync {
 ///
 /// # Utilization tracking
 ///
-/// Each `route()` call increments a per-op counter. [`utilization_entropy`]
+/// Each `route()` call increments a per-op counter. [`utilization_entropy`](ChiaroscuroRouter::utilization_entropy)
 /// exposes the normalized entropy for collapse detection.
 pub struct ChiaroscuroRouter {
     ops: Vec<Box<dyn ChiaroscuroOp>>,
@@ -326,7 +326,7 @@ impl ChiaroscuroOp for DctMixOp {
 
 /// Reference "full attention" operator placeholder.
 ///
-/// In practice this delegates to the existing [`crate::attention`] tiled
+/// In practice this delegates to the existing `crate::attention` tiled
 /// implementation. For routing purposes, it serves as the high-cost anchor
 /// that all high-entropy tokens fall back to.
 pub struct FullAttnOp {

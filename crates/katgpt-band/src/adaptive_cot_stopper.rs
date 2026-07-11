@@ -19,8 +19,8 @@
 //! # Architecture
 //!
 //! - [`AdaptiveCoTStopper`] — tracks unresolved segment pairs.
-//! - [`should_continue`] — true iff any pair remains.
-//! - [`uncertainty`] — sigmoid-bounded residual structure uncertainty ∈ `[0,1]`.
+//! - `should_continue` — true iff any pair remains.
+//! - `uncertainty` — sigmoid-bounded residual structure uncertainty ∈ `[0,1]`.
 //!
 //! All scores are **sigmoid-bounded** (project rule: never softmax).
 
@@ -37,7 +37,7 @@ pub struct AdaptiveCoTConfig {
     pub lambda: f32,
     /// Uncertainty threshold τ below which thinking stops. Default `0.1`.
     ///
-    /// When `uncertainty() < τ`, [`should_continue`] returns `false`.
+    /// When `uncertainty() < τ`, `should_continue` returns `false`.
     pub tau: f32,
 }
 

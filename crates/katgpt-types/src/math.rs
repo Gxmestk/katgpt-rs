@@ -68,7 +68,7 @@ pub fn rmsnorm(x: &mut [f32]) {
 
 /// GeGLU activation: hidden = gelu(gate) * up (elementwise).
 /// Uses approximate GELU: gelu(x) ≈ x * sigmoid(1.702 * x).
-/// `gate` and `up` are [mlp_hidden], output goes to `hidden`.
+/// `gate` and `up` are `[mlp_hidden]`, output goes to `hidden`.
 ///
 /// SIMD-accelerated: exp() computed via `simd_exp_inplace` on stack buffers.
 #[inline(always)]
@@ -104,7 +104,7 @@ pub fn gegelu(hidden: &mut [f32], gate: &[f32], up: &[f32]) {
 
 /// GeGLU with tanh GELU approximation (Gemma 2 activation).
 /// tanh GELU: 0.5 * x * (1 + tanh(sqrt(2/π) * (x + 0.044715 * x³)))
-/// hidden[i] = gelu_tanh(gate[i]) * up[i]
+/// `hidden[i] = gelu_tanh(gate[i]) * up[i]`
 ///
 /// SIMD-accelerated: exp() for tanh approximation computed via `simd_exp_inplace`.
 #[inline(always)]
@@ -177,7 +177,7 @@ pub fn silu(x: &mut [f32]) {
 
 /// SwiGLU activation: SiLU(gate) * up.
 /// Used in LLaMA-family models (gate_proj and up_proj are separate weights).
-/// Result stored in `hidden`: hidden[i] = silu(gate[i]) * up[i]
+/// Result stored in `hidden`: `hidden[i] = silu(gate[i]) * up[i]`
 ///
 /// SIMD-accelerated: exp() computed via `simd_exp_inplace` on stack buffers.
 #[inline(always)]
@@ -213,7 +213,7 @@ pub fn swiglu(hidden: &mut [f32], gate: &[f32], up: &[f32]) {
 /// RMSNorm with learnable gamma (gain) vector.
 /// Gemma 2 stores gamma as (gamma-1), so +1 is added during load.
 /// `x` is normalized in-place then scaled by `gamma[i]`:
-///   x[i] = gamma[i] * x[i] / sqrt(mean_sq + eps)
+///   `x[i] = gamma[i] * x[i] / sqrt(mean_sq + eps)`
 #[inline(always)]
 pub fn rmsnorm_with_gamma(x: &mut [f32], gamma: &[f32]) {
     rmsnorm_with_gamma_eps(x, gamma, 1e-5)

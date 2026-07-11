@@ -11,7 +11,7 @@
 //!   turn) and arrive with explicit global positions. We un-rotate RoPE at the
 //!   chunk's `start_pos`, compact in position-free space, and re-rotate at the
 //!   compacted position. This preserves long-range positional structure at the
-//!   cost of needing [`PositionFreeCompactor`] (requires the `still_kv` feature).
+//!   cost of needing `PositionFreeCompactor` (requires the `still_kv` feature).
 //!
 //! Both modes return a [`ChunkedCompactOutput`] — the concatenated `(Ck, β, Cv)`
 //! plus per-chunk metadata so callers can inspect boundary reconstruction
@@ -379,7 +379,7 @@ impl ChunkedCompactOutput {
 /// `new_pos`. This effectively "moves" the keys from one position to another
 /// without changing their semantic content (modulo f16 round-trip precision).
 ///
-/// Requires the `still_kv` feature for [`PositionFreeCompactor`]. When
+/// Requires the `still_kv` feature for `PositionFreeCompactor`. When
 /// `still_kv` is off, this returns `keys.to_vec()` unchanged — RoPE
 /// preservation is then the caller's responsibility (e.g. via an external
 /// RoPE-aware KV cache).
@@ -477,7 +477,7 @@ fn infer_d(chunks: &[TextChunk]) -> Result<usize, CompactError> {
     ))
 }
 
-/// Thin f32 adapter around [`PositionFreeCompactor`] (which is f16↔f32).
+/// Thin f32 adapter around `PositionFreeCompactor` (which is f16↔f32).
 ///
 /// Encapsulates the conversion so callers stay in f32 land.
 #[cfg(feature = "still_kv")]

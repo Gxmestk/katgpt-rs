@@ -832,7 +832,7 @@ impl BeliefDrafter {
     /// (Xavier init bounds FC3 output) — informative either way. See Plan 306
     /// §T3.2 doc for the random-init caveat.
     ///
-    /// Returns [`DepthInvarianceDiagnostic::kind`] == [`Insufficient`] if
+    /// Returns `DepthInvarianceDiagnostic::kind` == `Insufficient` if
     /// `max_depth + 1 < cfg.min_samples`.
     ///
     /// [`DepthSpecificRefinement`]: katgpt_core::DepthInvarianceKind::DepthSpecificRefinement

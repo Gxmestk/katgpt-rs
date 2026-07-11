@@ -34,8 +34,8 @@ fn softplus(x: f32) -> f32 {
 /// SigLIP-style sigmoid margin loss: softplus(t · (score − b) · sign).
 ///
 /// For each (query, doc) pair in the [N × n] score matrix:
-///   - positive pairs (adjacency[i,j] = 1): loss = softplus(−t·(score−b)), pushes score above bias
-///   - negative pairs (adjacency[i,j] = 0): loss = softplus(+t·(score−b)), pushes score below bias
+///   - positive pairs (`adjacency[i,j] = 1`): loss = softplus(−t·(score−b)), pushes score above bias
+///   - negative pairs (`adjacency[i,j] = 0`): loss = softplus(+t·(score−b)), pushes score below bias
 ///
 /// Global minimizers coincide with max-margin embeddings (Prop 7, arXiv 2605.23556).
 /// The paper proves this loss achieves O(k log n) dimension scaling vs InfoNCE's O(n^{1/3}).

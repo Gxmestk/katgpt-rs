@@ -42,7 +42,7 @@
 //!
 //! # Layering Note
 //!
-//! [`EntropyGatedScheduler`](scheduler::EntropyGatedScheduler) operates *within a search tree*
+//! [`EntropyGatedScheduler`] operates *within a search tree*
 //! (UCT vs Elite selection). It composes with — does not conflict with — `BreakevenComplexityRouter`
 //! (Research 218), which routes *across inference strategies* (plasma/hot/warm).
 //!

@@ -17,7 +17,7 @@
 //!   around a closed vertex loop (Stokes: ∮F = ∬curl F; Plan 317).
 //!
 //! All five are pure wrappers over the shipped DEC operators ([`codifferential`],
-//! [`exterior_derivative`], [`hodge_decompose`], and the coboundary index on
+//! `exterior_derivative`, `hodge_decompose`, and the coboundary index on
 //! [`CellComplex`]). No new DEC machinery.
 //!
 //! # Constraint checklist (AGENTS.md)

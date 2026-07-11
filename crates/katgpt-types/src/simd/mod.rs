@@ -27,15 +27,15 @@
 //! # Module layout
 //!
 //! This file is the dispatcher surface. Backends live in sibling files:
-//! - [`dot`] — dot products, outer-product, matvec, matmul
-//! - [`sparse`] — sparse dot / sparse matmul
-//! - [`elementwise`] — scale / add / sum / max / fused ops
-//! - [`activations`] — exp / sigmoid / tanh-clamp / reciprocal / fast_sigmoid
-//! - [`argmax`] — single-pass argmax
-//! - [`maxsim`] — ColBERT-style late-interaction scoring
-//! - [`ternary`] — bit-plane ternary matvec (`plasma_path`)
-//! - [`research`] — sigmoid margin, retrieval margin, Gram, entropy, norms
-//! - [`horizontal`] — shared AVX2 horizontal reducers (`pub(super)`)
+//! - `dot` — dot products, outer-product, matvec, matmul
+//! - `sparse` — sparse dot / sparse matmul
+//! - `elementwise` — scale / add / sum / max / fused ops
+//! - `activations` — exp / sigmoid / tanh-clamp / reciprocal / fast_sigmoid
+//! - `argmax` — single-pass argmax
+//! - `maxsim` — ColBERT-style late-interaction scoring
+//! - `ternary` — bit-plane ternary matvec (`plasma_path`)
+//! - `research` — sigmoid margin, retrieval margin, Gram, entropy, norms
+//! - `horizontal` — shared AVX2 horizontal reducers (`pub(super)`)
 
 // Submodule backends. Each file owns its NEON/AVX2/scalar impls verbatim;
 // only `is_avx2_fma_available` (below) and `horizontal::*` are shared.

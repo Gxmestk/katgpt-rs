@@ -16,7 +16,7 @@
 //! ## Verification (T27)
 //!
 //! Unlike token-level verification (exact logit match), hop-level uses
-//! [`ObservationVerifier`](super::verifier::ObservationVerifier) which supports
+//! [`ObservationVerifier`] which supports
 //! fuzzy matching (Jaccard similarity, refusal detection, numeric consistency).
 
 use std::collections::BinaryHeap;
@@ -337,7 +337,7 @@ pub fn build_hop_dd_tree(marginals: &[HopMarginal], config: &HopTreeConfig) -> V
 /// intermediate hops relax the confidence floor to 0.0 (accept all candidates),
 /// while the final hop uses the full `confidence_floor` from config.
 ///
-/// When `schedule` is [`SpechopSchedule::Uniform`], delegates to [`build_hop_dd_tree`]
+/// When `schedule` is `SpechopSchedule::Uniform`, delegates to [`build_hop_dd_tree`]
 /// unchanged. When `SpechopSchedule::FrozenBaseGuard`, intermediate hops skip
 /// the confidence-based pruning, reserving it for the final hop only.
 ///

@@ -17,7 +17,7 @@ use super::horizontal::horizontal_sum_256;
 #[cfg(feature = "plasma_path")]
 use crate::TernaryWeights;
 
-/// Scalar reference ternary matvec: y[r] = row_scale[r] * Σ(col → sign(pos_bit, neg_bit) * x[col])
+/// Scalar reference ternary matvec: `y[r] = row_scale[r] * Σ(col → sign(pos_bit, neg_bit) * x[col])`
 #[cfg(feature = "plasma_path")]
 #[allow(clippy::needless_range_loop)]
 pub fn ternary_matvec_scalar(w: &TernaryWeights, x: &[f32], y: &mut [f32]) {
@@ -523,7 +523,7 @@ pub fn simd_ternary_matvec(w: &TernaryWeights, x: &[f32], y: &mut [f32]) {
     }
 }
 
-/// Batched ternary matmul: for each batch[i], compute y[i] = W × batch[i].
+/// Batched ternary matmul: for each `batch[i]`, compute `y[i] = W × batch[i]`.
 #[cfg(feature = "plasma_path")]
 #[inline]
 pub fn simd_ternary_matmul_batch(w: &TernaryWeights, x: &[f32], batch: usize, y: &mut [f32]) {

@@ -1363,7 +1363,7 @@ impl TreeBuilder {
 
     /// Build DDTree with graded relevance screening (Plan 021).
     ///
-    /// Like [`build()`] but uses [`ScreeningPruner`] for continuous relevance
+    /// Like `build()` but uses [`ScreeningPruner`] for continuous relevance
     /// instead of binary [`ConstraintPruner`]. The relevance score `R ∈ [0.0, 1.0]`
     /// is blended into log-prob space: `score += ln(P_llm) + ln(R)`.
     ///
@@ -1688,7 +1688,7 @@ impl TreeBuilder {
 
     /// Build DDTree with GFlowNet backward-weighted scoring (Plan 052).
     ///
-    /// Generalization of [`build_screened`] with tunable backward weight
+    /// Generalization of [`Self::build_screened`] with tunable backward weight
     /// and flow bonus. The paper's `single_state_beam_search` scores beams
     /// using ONLY backward logits. We blend because our WASM `relevance()`
     /// is coarser than a trained neural P_B.
@@ -2024,12 +2024,12 @@ impl TreeBuilder {
 
     /// Build DDTree with progressive per-depth budget allocation (Plan 174 Task 3b).
     ///
-    /// Like [`build_screened`] but distributes `tree_budget` unevenly
-    /// across depths using [`PositionWeightedBudget`]. Early depths get more
+    /// Like [`Self::build_screened`] but distributes `tree_budget` unevenly
+    /// across depths using `PositionWeightedBudget`. Early depths get more
     /// nodes (higher weight), later depths get fewer (exponential decay).
     ///
     /// When `budget_config` is `None` or `budget_config.enabled == false`,
-    /// delegates to [`build_screened`] unchanged (zero overhead).
+    /// delegates to [`Self::build_screened`] unchanged (zero overhead).
     ///
     /// The total node count stays within `config.tree_budget` regardless of
     /// the per-depth allocation.
@@ -2368,8 +2368,8 @@ impl TreeBuilder {
 
     /// Build DDTree with externally-provided per-depth budget caps (Plan 200).
     ///
-    /// Identical to [`build_screened_progressive`] but accepts pre-computed
-    /// `depth_budgets` directly instead of computing them from [`PositionWeightedBudget`].
+    /// Identical to [`Self::build_screened_progressive`] but accepts pre-computed
+    /// `depth_budgets` directly instead of computing them from `PositionWeightedBudget`.
     ///
     /// This is the integration point for `CorrelationBudgetAllocator` — the allocator
     /// produces `depth_budgets` from EMA-tracked agreement rates, and this method
@@ -2638,7 +2638,7 @@ impl TreeBuilder {
 
     /// Build DDTree with graded relevance screening AND RecFM cross-scale consistency.
     ///
-    /// Identical to [`build_screened`] but additionally filters branches whose
+    /// Identical to [`Self::build_screened`] but additionally filters branches whose
     /// probability velocity violates cross-scale consistency (RecFM Theorem 3.1).
     ///
     /// Branches are pruned when `|v₂ − α·v₁| > threshold`, where:
@@ -2646,7 +2646,7 @@ impl TreeBuilder {
     /// - `v₂` = velocity at current depth
     /// - `α` = scale factor from [`CrossScaleConfig::scale_alpha`]
     ///
-    /// When `recfm_config.enable == false`, delegates to [`build_screened`] (zero overhead).
+    /// When `recfm_config.enable == false`, delegates to [`Self::build_screened`] (zero overhead).
     #[cfg(feature = "recfm")]
     pub fn build_screened_recfm(
         &mut self,
@@ -3109,7 +3109,7 @@ impl WidthScaleConfig {
     }
 }
 
-/// Convert Config-level [`ConvergenceSelector`] to runtime [`WidthSelectionMode`].
+/// Convert Config-level `ConvergenceSelector` to runtime [`WidthSelectionMode`].
 ///
 /// `MajorityVote` maps to `MostFrequent` (same semantics, different naming convention).
 /// `BtRank` falls back to `BestQ` when `bt_rank` feature is off.
@@ -3696,7 +3696,7 @@ where
 
 // ── SpeculativeGenerator Integration (Plan 193 T5) ──────────────────
 
-/// Build DDTree using [`SpeculativeGenerator`] for candidate generation.
+/// Build DDTree using `SpeculativeGenerator` for candidate generation.
 ///
 /// For each depth, the generator produces candidates from the marginal
 /// distribution, the pruner filters invalid ones, and the surviving
@@ -3775,7 +3775,7 @@ fn belief_sigmoid(x: f32) -> f32 {
 
 /// Build DDTree from belief-state draft tokens.
 ///
-/// Uses [`BeliefDrafter`] to produce variable-length draft candidates from
+/// Uses `BeliefDrafter` to produce variable-length draft candidates from
 /// the current hidden state `h_t`, then constructs a DDTree from the
 /// draft token marginals.
 ///
@@ -3985,7 +3985,7 @@ pub fn build_dd_tree_screened_progressive(
 
 /// DDTree with correlation-based per-depth budget allocation (Plan 200).
 ///
-/// Uses [`CorrelationBudgetAllocator`] to distribute `tree_budget` across depths
+/// Uses `CorrelationBudgetAllocator` to distribute `tree_budget` across depths
 /// proportional to empirical draft↔target agreement rates. Higher agreement → more nodes.
 #[cfg(feature = "corr_budget")]
 pub fn build_dd_tree_screened_corr(
@@ -4009,7 +4009,7 @@ pub fn build_dd_tree_screened_corr(
 
 /// DDTree with flow-score-based per-depth budget allocation (Plan 229 T4).
 ///
-/// Uses [`FlowBudgetAllocator`] to distribute `tree_budget` across depths
+/// Uses `FlowBudgetAllocator` to distribute `tree_budget` across depths
 /// proportional to per-depth flow scores. High-flow-score branches get more
 /// speculative depth; low-score branches get early termination.
 #[cfg(feature = "nf_flow_budget")]

@@ -192,7 +192,7 @@ impl D2fDecodeConfig {
 
 /// Compute DPM-Solver++(2M) step-size ratios from schedule timesteps.
 ///
-/// Given denoising timesteps `t_0 < t_1 < ... < t_{N-1}` in [0,1], computes
+/// Given denoising timesteps `t_0 < t_1 < ... < t_{N-1}` in `[0,1]`, computes
 /// `r_i = h_{i-1} / h_i` where `h_i = λ_i - λ_{i+1}` and `λ = logit(t)`
 /// is the log-SNR (logit of mask probability).
 ///

@@ -62,9 +62,9 @@ use katgpt_types::simd::simd_sigmoid_tanh_clamp_inplace;
 /// # Layout
 ///
 /// Fields are ordered `k` (usize, 8B) → `sigma` (f32, 4B) → `seed_strategy`
-/// (u8, 1B) → `qmc_method` (Option<u8>, 2B) to keep the tail compact. Total:
-/// 16B (the Option<QmcMethod> fits in the padding after `seed_strategy` on
-/// 64-bit — the struct is already 8B-aligned for `k`, so the u8 + Option<u8>
+/// (u8, 1B) → `qmc_method` (`Option<u8>`, 2B) to keep the tail compact. Total:
+/// 16B (the `Option<QmcMethod>` fits in the padding after `seed_strategy` on
+/// 64-bit — the struct is already 8B-aligned for `k`, so the u8 + `Option<u8>`
 /// trio packs into the 4B tail slot).
 #[derive(Clone, Copy, Debug, serde::Serialize, serde::Deserialize)]
 pub struct NoiseQueryConfig {
@@ -426,7 +426,7 @@ impl BoMSampler for LeakyIntegrator {
     /// Single-pass K-hypothesis sampling for Family C.
     ///
     /// Computes the shared normalization scalars (`total`, `scale`,
-    /// `half_total`) once — mirroring [`crate::leaky_core::leaky_step`] — then
+    /// `half_total`) once — mirroring `crate::leaky_core::leaky_step` — then
     /// perturbs the pre-clamp delta elementwise for each of K queries.
     ///
     /// # G1.3 (σ=0 degeneracy)

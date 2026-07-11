@@ -12,9 +12,9 @@
 //!
 //! # Module layout
 //!
-//! - [`decoder`]     — WASM MVP binary decoder (opcode + immediate parsing)
-//! - [`lower`]       — Lower unsupported ops to supported sequences
-//! - [`interpreter`] — WASM interpreter as computation graph (circle-point dispatch, byte-serial ALU)
+//! - `decoder`     — WASM MVP binary decoder (opcode + immediate parsing)
+//! - `lower`       — Lower unsupported ops to supported sequences
+//! - `interpreter` — WASM interpreter as computation graph (circle-point dispatch, byte-serial ALU)
 //!
 //! # Usage
 //!

@@ -114,7 +114,7 @@ impl CollapseDiscoveryHarness {
     ///
     /// Returns `Some(OpPromotion)` if U < threshold and not already reported,
     /// else `None`. Once collapse is detected, subsequent calls return `None`
-    /// unless [`reset`] is called.
+    /// unless [`reset`](Self::reset) is called.
     pub fn check_collapse(&mut self) -> Option<OpPromotion> {
         if self.collapsed_reported {
             return None;

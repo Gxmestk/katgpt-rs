@@ -26,7 +26,7 @@
 //! The sheaf Laplacian `L_F z = Σ_e F_{i→e}^T (F_{i→e} z_i − F_{j→e} z_j)` is
 //! computed here from the explicit restriction maps. When `F_{i→e}` IS the
 //! coboundary incidence entry (identity maps with `d_e = d_v`),
-//! [`sheaf_laplacian_via_maps`] reduces bit-for-bit to
+//! `sheaf_laplacian_via_maps` reduces bit-for-bit to
 //! [`graph_laplacian`](crate::operators::graph_laplacian) on every dim — the
 //! DEC identity from Research 384 §1.3 (the test
 //! `sheaf_laplacian_identity_matches_graph_laplacian_first_de_dims` guards
@@ -43,7 +43,7 @@
 //!
 //! Skeleton: API surface + correct explicit-maps math + identity fast path +
 //! unit tests. The identity fast path (Plan 407 T2.4) is implemented: when
-//! `maps.is_identity`, [`sheaf_laplacian_via_maps`] computes the graph
+//! `maps.is_identity`, `sheaf_laplacian_via_maps` computes the graph
 //! Laplacian on the first `d_e` dims directly, bypassing the explicit `F^T F`
 //! matvec. The general explicit-maps path is reserved for heterogeneous
 //! consensus where maps differ per edge / per endpoint.

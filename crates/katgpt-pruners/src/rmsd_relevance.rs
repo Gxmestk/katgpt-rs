@@ -349,7 +349,7 @@ impl TeacherContinuation {
 /// `rmsd_loss = Σ_{i∈selected} sdar_gate(Δ_i) * reverse_kl_i`
 ///
 /// In modelless path, this operates on action-level Q-values:
-/// - Δ_i = teacher_q[i] - student_q[i]
+/// - `Δ_i = teacher_q[i] - student_q[i]`
 /// - reverse_kl_i approximated by |Δ_i|
 /// - sdar_gate from existing `sdar_gate` module
 pub fn rmsd_loss(selected: &[usize], teacher_q: &[f32], student_q: &[f32], beta: f32) -> f32 {

@@ -1,13 +1,13 @@
 //! Forward pass helpers using OCTOPUS compressed KV cache.
 //!
 //! Provides dequantize-to-flat-buffer helpers and attention scoring
-//! for the OCTOPUS path. The main [`forward_octopus`] function lives
+//! for the OCTOPUS path. The main `forward_octopus` function lives
 //! in the katgpt-rs root `transformer` module (ForwardContext fields are
 //! private to that module).
 //!
 //! Architecture:
 //! 1. Standard embedding + RMSNorm + QKV projection (same as baseline)
-//! 2. Store K,V via [`OctopusKVCache::store_key`] / [`store_value`]
+//! 2. Store K,V via [`OctopusKVCache::store_key`] / `store_value`
 //! 3. Dequantize K,V on-the-fly during attention scoring
 //! 4. Standard MLP + residual (same as baseline)
 

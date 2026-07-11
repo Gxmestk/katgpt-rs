@@ -16,7 +16,7 @@
 //! The classical solution uses SVD: form `M = B^T A`, take SVD `M = U Σ V^T`,
 //! then `R* = U V^T`. This module avoids LAPACK by observing that **the
 //! Procrustes solution `R* = U V^T` is exactly the orthogonal polar factor
-//! of `M`**, which [`newton_schulz`] computes in 5 fixed-point iterations
+//! of `M`**, which `newton_schulz` computes in 5 fixed-point iterations
 //! with no eigensolver. The algorithm:
 //!
 //! 1. (Optional) Center `A` and `B` by subtracting their column means.

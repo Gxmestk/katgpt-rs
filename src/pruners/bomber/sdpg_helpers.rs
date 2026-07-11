@@ -13,7 +13,7 @@ use super::replay::ReplaySample;
 /// Load teacher Q-values from a replay JSONL file.
 ///
 /// Aggregates quality scores by action (template) index.
-/// For each template: teacher_q[i] = mean(quality where action == i).
+/// For each template: `teacher_q[i] = mean(quality where action == i)`.
 /// Templates with no samples get 0.0.
 pub fn load_teacher_q_from_replay(path: &Path, num_arms: usize) -> std::io::Result<Vec<f32>> {
     let contents = std::fs::read(path)?;

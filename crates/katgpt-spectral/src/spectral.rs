@@ -483,7 +483,7 @@ pub fn marginal_gain(eigenvalues: &[f64], bits: &[u8]) -> Vec<f64> {
 /// 2. Update centroids as mean of assigned samples.
 /// 3. Repeat until convergence.
 ///
-/// Field order: Option<Vec> (24B, 8-aligned) → usize/u64 scalars (8B) → f32 (4B)
+/// Field order: `Option<Vec>` (24B, 8-aligned) → usize/u64 scalars (8B) → f32 (4B)
 /// → packed u8/bool tail. Saves 16 bytes/instance vs declaration order — matters
 /// because this struct is stored in `Vec<LloydMaxQuantizer>` for per-dim
 /// semantic codebooks (water-fill path).

@@ -597,7 +597,7 @@ pub fn forward_sp_kv<'a>(
 ///
 /// ## Architecture
 ///
-/// Mirrors [`forward_sp_kv`] but replaces raw `SpKvCache` with [`SpKvQuantCache`]:
+/// Mirrors [`forward_sp_kv`] but replaces raw `SpKvCache` with `SpKvQuantCache`:
 /// - `SpKvQuantCache.meta[]` tracks utilities + retained bitfield (which positions to keep)
 /// - `SpKvQuantCache.quant` stores compressed KV for retained positions only
 ///

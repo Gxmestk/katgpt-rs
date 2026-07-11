@@ -20,21 +20,21 @@
 //!
 //! # Module layout
 //!
-//! - [`enums`] — small config enums (DepthTier, HlaMode, AttentionMode, …)
+//! - `enums` — small config enums (DepthTier, HlaMode, AttentionMode, …)
 //!   plus WallConfig / ThinkingBudget
-//! - [`config`] — the `Config` struct (~1.5k lines), `InferenceOverrides`,
+//! - `config` — the `Config` struct (~1.5k lines), `InferenceOverrides`,
 //!   and `kv_dim`
-//! - [`rng`] — XorShift64 PRNG
-//! - [`math`] — SIMD-accelerated softmax / rmsnorm / matmul / sample_token
+//! - `rng` — XorShift64 PRNG
+//! - `math` — SIMD-accelerated softmax / rmsnorm / matmul / sample_token
 //!   (legacy home; candidates for relocation to `katgpt-simd::`)
-//! - [`lora`] — CPU-side LoRA adapter
-//! - [`gpart`] — GPart Isometric Partition adapter (Research 227)
-//! - [`domain`] — DomainLatent embedding (Plan 038)
-//! - [`inference`] — InferenceResult, TaskType, ProposerTask, DataGate
-//! - [`looping`] — Training-Free Loop types (Plan 136)
-//! - [`ternary`] — Bit-plane ternary weights (`plasma_path`)
-//! - [`hydra`] — Hydra Adaptive Layer Budget types
-//! - [`sense`] — ShardEmbedding + sense composition types
+//! - `lora` — CPU-side LoRA adapter
+//! - `gpart` — GPart Isometric Partition adapter (Research 227)
+//! - `domain` — DomainLatent embedding (Plan 038)
+//! - `inference` — InferenceResult, TaskType, ProposerTask, DataGate
+//! - `looping` — Training-Free Loop types (Plan 136)
+//! - `ternary` — Bit-plane ternary weights (`plasma_path`)
+//! - `hydra` — Hydra Adaptive Layer Budget types
+//! - `sense` — ShardEmbedding + sense composition types
 //!
 //! Test modules live alongside their topic (e.g. `rng::tests_rng`) or in
 //! `tests_types.rs` for cross-cutting tests.

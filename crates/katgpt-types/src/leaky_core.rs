@@ -8,10 +8,10 @@
 //! removed).
 //!
 //! Two callers, one math:
-//! - [`crate::sense::reconstruction::ReconstructionState::evolve_hla`] passes
+//! - `crate::sense::reconstruction::ReconstructionState::evolve_hla` passes
 //!   `total = Σ kind_activations[0..6]` (the 6 source SenseKind activations)
 //!   and an 8-element `input` gathered via `KIND_MAP = [0,1,2,3,4,5,0,1]`.
-//! - [`crate::micro_belief::leaky::LeakyIntegrator::step`] passes
+//! - `crate::micro_belief::leaky::LeakyIntegrator::step` passes
 //!   `total = Σ input[0..dim]` and a flat `dim`-element `input`.
 //!
 //! # Why `total` is a parameter, not computed inside

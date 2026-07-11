@@ -23,7 +23,7 @@
 //!
 //! ## What this module provides
 //!
-//! - [`compact_with_fixed_beta`] — identical to [`compact`](super::compact)
+//! - [`compact_with_fixed_beta`] — identical to [`compact`](super::compact())
 //!   except it skips Stage 2 (NNLS β fitting) and uses the given scalar β for
 //!   all tokens. Always-available (no feature gate).
 //! - [`BETA_MID`] / [`BETA_MIN`] / [`BETA_MAX`] — the canonical β bounds.
@@ -67,7 +67,7 @@ pub const BETA_MID: f32 = (BETA_MIN + BETA_MAX) * 0.5;
 /// Compact a single head with a pre-computed β scalar — the simplified
 /// AM fast path (Issue 305).
 ///
-/// Identical to [`compact`](super::compact) except it skips Stage 2 (NNLS β
+/// Identical to [`compact`](super::compact()) except it skips Stage 2 (NNLS β
 /// fitting) and uses `fixed_beta` for all `t` tokens. The caller typically
 /// passes [`BETA_MID`], which is provably as accurate as NNLS's per-token β
 /// on cross-query evaluation while being ~250× faster.

@@ -13,9 +13,9 @@
 //! ΔW⊥ = ΔW − ΔW*          (off-manifold residual)
 //! ```
 //!
-//! The rewiring matrix M is compact (r×r). Its off-diagonal elements M[i][j]
+//! The rewiring matrix M is compact (r×r). Its off-diagonal elements `M[i][j]`
 //! (i≠j) represent cross-skill "rewiring" — many-to-one logical synthesis.
-//! Its diagonal elements M[i][i] represent in-skill strength modulation.
+//! Its diagonal elements `M[i][i]` represent in-skill strength modulation.
 //!
 //! # Modelless
 //!
@@ -636,7 +636,7 @@ pub struct RewiringDiagnostics {
 
 /// Compute [`RewiringDiagnostics`] for a row-major `rank × rank` rewiring
 /// matrix `M`, using the default negligibility threshold
-/// ([`DEFAULT_SPARSITY_REL_THRESHOLD`], 1% of the max-magnitude entry).
+/// (`DEFAULT_SPARSITY_REL_THRESHOLD`, 1% of the max-magnitude entry).
 ///
 /// For a custom threshold, use [`rewiring_matrix_diagnostics_with_threshold`].
 ///
