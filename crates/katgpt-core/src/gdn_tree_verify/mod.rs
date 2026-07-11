@@ -709,6 +709,7 @@ mod tests {
 
     /// Reference: sequential per-branch GDN2 verify — replay the delta-rule
     /// from root to each node through its ancestors, then read the output.
+    #[allow(clippy::too_many_arguments)] // test helper mirrors algorithm's natural parameter set
     fn reference_verify(
         parents: &[usize],
         keys: &[f32],

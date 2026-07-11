@@ -1358,7 +1358,6 @@ mod tests {
         let k = 8;
         let r = 2;
         let pool = make_pool(k, d, 42);
-        let x = vec![0.5; d];
         let mut scratch = ManceScratch::with_capacity(d, k, r);
 
         let indices: Vec<usize> = (0..k).collect();
@@ -1759,7 +1758,7 @@ mod tests {
         let info1 = manifold_erasure_step_cached_into(
             &x1, &gradient, &pool, n, &config, &mut scratch, &mut cache, &mut out,
         ).unwrap();
-        assert!(!cache.valid == false, "Cache should be valid after first step");
+        assert!(cache.valid, "Cache should be valid after first step");
 
         // Step 2: same x — cache hit, same result.
         let mut out2 = vec![0.0; d];

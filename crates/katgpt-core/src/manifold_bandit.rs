@@ -2075,7 +2075,7 @@ mod tests {
     fn test_build_blake3_stable_across_rebuilds() {
         let embeddings = gen_clustered_embeddings(64, 4, 16, 99);
         let config = LatentTaskTreeConfig::default();
-        let tree1 = LatentTaskTree::build(&embeddings, config.clone());
+        let tree1 = LatentTaskTree::build(&embeddings, config);
         let tree2 = LatentTaskTree::build(&embeddings, config);
         assert_eq!(
             tree1.blake3_root(),
@@ -2089,7 +2089,7 @@ mod tests {
         let e1 = gen_clustered_embeddings(64, 4, 16, 1);
         let e2 = gen_clustered_embeddings(64, 4, 16, 2);
         let config = LatentTaskTreeConfig::default();
-        let t1 = LatentTaskTree::build(&e1, config.clone());
+        let t1 = LatentTaskTree::build(&e1, config);
         let t2 = LatentTaskTree::build(&e2, config);
         assert_ne!(
             t1.blake3_root(),

@@ -328,7 +328,7 @@ fn verify_determinism_skips_uncached_pairs() {
 
     // Audit includes the cached pair PLUS an uncached pair.
     let samples = vec![
-        (s.clone(), a),
+        (s, a),
         (ToyState { v: 2 }, InferenceAction::new(2, 0)), // uncached
     ];
 

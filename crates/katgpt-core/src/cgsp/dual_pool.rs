@@ -1972,7 +1972,7 @@ mod tests {
         let mut cfg = DualPoolConfig::default();
         cfg.growth_enabled = true;
         cfg.promotion_threshold = 0.05;
-        let mut dp_gated = DualPoolBandit::with_config(e_gated, x_gated, cfg.clone());
+        let mut dp_gated = DualPoolBandit::with_config(e_gated, x_gated, cfg);
 
         // Reward ALL arms (live and dead).
         dp_gated.begin_cycle();
