@@ -344,16 +344,20 @@ pub fn weaver_forward(weights: &WeaverWeights, input: &WeaverInput) -> WeaverOut
     }
 
     // ── Step 1: Conditioning sequence u[0..seq_len] ──
+    // Pre-allocate scratch buffers reused across all positions — avoids
+    // per-position Vec allocations (5 * seq_len allocs eliminated).
     let mut u_cond = vec![0.0f32; seq_len * h];
+    let mut normed_buf = vec![0.0f32; h];
+    let mut post_buf = vec![0.0f32; h];
     for pos in 0..seq_len {
         let raw = if pos == 0 {
             input.h_verifier
         } else {
             input.h_dflash[pos - 1]
         };
-        let normed = rmsnorm(raw, &weights.norm_cond, eps);
+        rmsnorm_into(raw, &weights.norm_cond, eps, &mut normed_buf);
         let u_row = &mut u_cond[pos * h..(pos + 1) * h];
-        matmul_vec(&normed, &weights.w_c, h, h, u_row);
+        matmul_vec(&normed_buf, &weights.w_c, h, h, u_row);
         if pos > 0 {
             let pe = &weights.pos_emb[(pos - 1) * h..pos * h];
             for j in 0..h {
@@ -415,9 +419,10 @@ pub fn weaver_forward(weights: &WeaverWeights, input: &WeaverInput) -> WeaverOut
         let o_row = &attn_out[pos * h..(pos + 1) * h];
         matmul_vec(o_row, &weights.w_o, h, h, &mut tmp);
         let u = &u_cond[pos * h..(pos + 1) * h];
-        let post: Vec<f32> = (0..h).map(|j| u[j] + tmp[j]).collect();
-        let normed = rmsnorm(&post, &weights.norm_attn, eps);
-        u_attn_normed[pos * h..(pos + 1) * h].copy_from_slice(&normed);
+        for j in 0..h {
+            post_buf[j] = u[j] + tmp[j];
+        }
+        rmsnorm_into(&post_buf, &weights.norm_attn, eps, &mut u_attn_normed[pos * h..(pos + 1) * h]);
     }
 
     // ── Step 5: SwiGLU MLP + residual + post-MLP RMSNorm ──
@@ -434,9 +439,10 @@ pub fn weaver_forward(weights: &WeaverWeights, input: &WeaverInput) -> WeaverOut
             act[j] = silu(gate[j]) * up[j];
         }
         matmul_vec(&act, &weights.w_down, d_ff, h, &mut down);
-        let post: Vec<f32> = (0..h).map(|j| u_row[j] + down[j]).collect();
-        let normed = rmsnorm(&post, &weights.norm_mlp, eps);
-        u_final[pos * h..(pos + 1) * h].copy_from_slice(&normed);
+        for j in 0..h {
+            post_buf[j] = u_row[j] + down[j];
+        }
+        rmsnorm_into(&post_buf, &weights.norm_mlp, eps, &mut u_final[pos * h..(pos + 1) * h]);
     }
 
     // ── Steps 6 + 7: Top-K gather + residual add + softmax over K ──
@@ -516,18 +522,20 @@ fn matmul_vec(input: &[f32], weight: &[f32], in_dim: usize, out_dim: usize, outp
 }
 
 /// RMSNorm: `output = x / sqrt(mean(x²) + eps) · scale`.
+///
+/// Writes into `output` — zero allocation. The caller must ensure `output`
+/// has the same length as `x` and `scale`.
 #[inline]
-fn rmsnorm(x: &[f32], scale: &[f32], eps: f32) -> Vec<f32> {
+fn rmsnorm_into(x: &[f32], scale: &[f32], eps: f32, output: &mut [f32]) {
     let n = x.len();
     let mut sum_sq = 0.0f32;
     for &v in x {
         sum_sq += v * v;
     }
     let inv_rms = 1.0 / (sum_sq / n as f32 + eps).sqrt();
-    x.iter()
-        .zip(scale.iter())
-        .map(|(&v, &s)| v * inv_rms * s)
-        .collect()
+    for (o, (&v, &s)) in output.iter_mut().zip(x.iter().zip(scale.iter())) {
+        *o = v * inv_rms * s;
+    }
 }
 
 /// SiLU / Swish activation: `x / (1 + e^{-x})`.
@@ -927,7 +935,8 @@ mod tests {
     fn rmsnorm_unit_scale_preserves_direction() {
         let x = vec![3.0, 4.0]; // ||x|| = 5, mean(x²) = 12.5
         let scale = vec![1.0, 1.0];
-        let out = rmsnorm(&x, &scale, 1e-6);
+        let mut out = vec![0.0, 0.0];
+        rmsnorm_into(&x, &scale, 1e-6, &mut out);
         // RMS = sqrt(12.5 + eps) ≈ 3.536
         let rms = (12.5f32 + 1e-6).sqrt();
         assert!((out[0] - 3.0 / rms).abs() < 1e-4);

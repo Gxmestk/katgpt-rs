@@ -2076,11 +2076,7 @@ pub fn select_arms_top_p(q_values: &[f32], ucb_bonus: &[f32], p: f32) -> Vec<usi
 
     // Sort by score descending
     let mut indices: Vec<usize> = (0..n).collect();
-    indices.sort_by(|&a, &b| {
-        scores[b]
-            .partial_cmp(&scores[a])
-            .unwrap_or(std::cmp::Ordering::Equal)
-    });
+    indices.sort_by(|&a, &b| scores[b].total_cmp(&scores[a]));
 
     let total: f32 = scores.iter().map(|s| s.max(0.0)).sum();
     if total <= 0.0 {

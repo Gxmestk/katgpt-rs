@@ -207,7 +207,7 @@ pub fn calibrate_from_scores(scores: &[f32], config: &RtTurboConfig) -> HeadCali
 
     // Create indexed pairs (head_idx, score), sort by score descending
     let mut indexed: Vec<(usize, f32)> = scores.iter().copied().enumerate().collect();
-    indexed.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+    indexed.sort_by(|a, b| b.1.total_cmp(&a.1));
 
     // Threshold = score of the last retrieval head
     let threshold = indexed[n_retrieval - 1].1;

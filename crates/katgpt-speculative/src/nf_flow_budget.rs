@@ -68,11 +68,7 @@ pub fn normalize_budget(raw: &[f32], total: usize) -> Vec<usize> {
     let mut remaining = total - allocated;
     if remaining > 0 {
         let mut indices: Vec<usize> = (0..remainders.len()).collect();
-        indices.sort_by(|&a, &b| {
-            remainders[b]
-                .partial_cmp(&remainders[a])
-                .unwrap_or(std::cmp::Ordering::Equal)
-        });
+        indices.sort_by(|&a, &b| remainders[b].total_cmp(&remainders[a]));
         for &i in &indices {
             if remaining == 0 {
                 break;

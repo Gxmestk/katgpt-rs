@@ -35,13 +35,10 @@ pub fn vocab_coreset(marginals: &[&[f32]], p: f32, coreset: &mut [bool]) -> usiz
         }
     }
 
-    // Sort by score descending
+    // Sort by score descending. `total_cmp` is branch-free and NaN-deterministic
+    // vs `partial_cmp().unwrap_or(Equal)`.
     let mut indices: Vec<usize> = (0..vocab_size).collect();
-    indices.sort_by(|&a, &b| {
-        max_scores[b]
-            .partial_cmp(&max_scores[a])
-            .unwrap_or(std::cmp::Ordering::Equal)
-    });
+    indices.sort_by(|&a, &b| max_scores[b].total_cmp(&max_scores[a]));
 
     let total: f32 = max_scores.iter().map(|s| s.max(0.0)).sum();
     if total <= 0.0 {
