@@ -2,7 +2,7 @@
 
 > **Date:** 2026-07-11
 > **Severity:** MEDIUM — self-healing mechanisms produce unvalidated results
-> **Status:** OPEN
+> **Status:** RESOLVED (2026-07-11) — both impls + wiring done, GOAT gate passed
 > **Related:** Plan 088 (LDT, DEFAULT-ON), Plan 316 (neighbor_heal, DEFAULT-ON),
 > Proposal 013 P1 (feeling_brain), Research 050 (LDT), Research 152 (LDT Phase 2)
 
@@ -122,12 +122,13 @@ into both self-healing mechanisms as a post-heal validation gate.
 
 ## Implementation Scope
 
-- [ ] `ShardConflictDetector` impl in `riir-neuron-db/src/neighbor_heal.rs`
-- [ ] `HlaConflictDetector` impl in `riir-games/src/civ/emotion/feeling_brain.rs`
-- [ ] Wire `ShardConflictDetector` into `MapeKLoop::plan_with_index`
-- [ ] Wire `HlaConflictDetector` into `evolve_feeling_brain`
-- [ ] G1-G6 GOAT gate
-- [ ] Feature gate (reuse `lattice_deduction` or new `heal_validation`)
+- [x] `ShardConflictDetector` impl in `riir-neuron-db/src/neighbor_heal.rs` (done, gated `heal_validation`)
+- [x] `HlaConflictDetector` impl in `riir-games/src/civ/emotion/feeling_brain.rs` (done 2026-07-11)
+- [x] Wire `ShardConflictDetector` into `MapeKLoop::plan_with_index` (done)
+- [x] Wire `HlaConflictDetector` into `evolve_feeling_brain` (done 2026-07-11 — `resolve_heal_conflicts` called at end of `evolve_feeling_brain` under `#[cfg(feature = "heal_validation")]`)
+- [x] G1-G6 GOAT gate (G1 detects PoC conflict, G2 no false positives, G3 48/48 tests pass, G4 zero-alloc stack-only, G5 modelless, G6 behind `heal_validation` feature)
+- [x] Feature gate (`heal_validation` in both `katgpt-core` and `riir-games`)
+- [x] Fix: `riir-neuron-db/src/neighbor_heal.rs:245` — gate `HealConflictDetector` import behind `#[cfg(feature = "heal_validation")]` (was unconditional, broke default build)
 
 **Estimated effort:** 4-6 files. The `ConflictDetector` trait already
 ships — this is adding impls + wiring, not new infrastructure.
