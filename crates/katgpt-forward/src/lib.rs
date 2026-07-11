@@ -413,12 +413,7 @@ impl katgpt_speculative::dflash::DflashCtx<TransformerWeights> for ForwardContex
         vocab_size: usize,
     ) {
         let n = n_embd.min(mtp_ctx.len());
-        for i in 0..n {
-            // safety: i < n <= n_embd == hidden_state.len() and i < mtp_ctx.len()
-            unsafe {
-                *self.hidden_state.get_unchecked_mut(i) += *mtp_ctx.get_unchecked(i);
-            }
-        }
+        katgpt_core::simd::simd_add_inplace(&mut self.hidden_state[..n], &mtp_ctx[..n]);
         katgpt_types::matmul(
             &mut self.logits,
             &weights.lm_head,

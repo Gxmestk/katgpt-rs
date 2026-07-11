@@ -320,9 +320,11 @@ fn forward_drafter_with_lora(
     // 1. Embedding: x = wte[token] + wpe[pos]
     let tok_off = token * n;
     let pos_off = pos * n;
-    for i in 0..n {
-        x[i] = weights.wte[tok_off + i] + weights.wpe[pos_off + i];
-    }
+    katgpt_core::simd::simd_add_into(
+        &mut x[..n],
+        &weights.wte[tok_off..tok_off + n],
+        &weights.wpe[pos_off..pos_off + n],
+    );
 
     // 2. Pre-attention: RMSNorm → save residual → RMSNorm (matches forward_base)
     rmsnorm(&mut x[..n]);
@@ -358,10 +360,7 @@ fn forward_drafter_with_lora(
         let mut max_score = f32::NEG_INFINITY;
         for t in 0..t_n {
             let k_off = t * kvd + kv_off;
-            let mut dot = 0.0f32;
-            for d in 0..hd {
-                dot += q[q_off + d] * key_cache[k_off + d];
-            }
+            let dot = katgpt_core::simd::simd_dot_f32(&q[q_off..q_off + hd], &key_cache[k_off..k_off + hd], hd);
             let score = dot * scale;
             scores[t] = score;
             max_score = max_score.max(score);
@@ -375,13 +374,11 @@ fn forward_drafter_with_lora(
         }
         let inv_sum = 1.0 / sum;
 
-        // Pass 3: weighted value accumulation
-        for d in 0..hd {
-            let mut val = 0.0f32;
-            for t in 0..t_n {
-                val += scores[t] * inv_sum * value_cache[t * kvd + kv_off + d];
-            }
-            attn_out[q_off + d] = val;
+        // Pass 3: weighted value accumulation (t-outer, d-inner → contiguous value reads)
+        for t in 0..t_n {
+            let weight = scores[t] * inv_sum;
+            let v_off = t * kvd + kv_off;
+            katgpt_core::simd::simd_fused_scale_acc(&mut attn_out[q_off..q_off + hd], &value_cache[v_off..v_off + hd], weight, hd);
         }
     }
 
@@ -389,9 +386,7 @@ fn forward_drafter_with_lora(
     matmul(&mut x[..n], &layer_weights.attn_wo, &attn_out[..n], n, n);
     lora_apply(&mut x[..n], &lora.o_lora, &attn_out[..n], lora_buf);
 
-    for i in 0..n {
-        x[i] += xr[i];
-    }
+    katgpt_core::simd::simd_add_inplace(&mut x[..n], &xr[..n]);
 
     // 7. MLP: save residual → RMSNorm → MLP with LoRA → residual
     xr2[..n].copy_from_slice(&x[..n]);
@@ -417,9 +412,7 @@ fn forward_drafter_with_lora(
     );
 
     // Residual
-    for i in 0..n {
-        x[i] += xr2[i];
-    }
+    katgpt_core::simd::simd_add_inplace(&mut x[..n], &xr2[..n]);
 
     // Note: no final rmsnorm here — forward_base applies lm_head directly
     // after the MLP residual without an additional norm step.
