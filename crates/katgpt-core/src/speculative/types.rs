@@ -1011,6 +1011,54 @@ fn compute_entropy(probs: &[f32]) -> f32 {
         .sum()
 }
 
+// ── Heal Conflict Detector (Issue 133 — post-heal validation) ───────
+
+/// Post-heal conflict detector — validates that a healed state is semantically
+/// coherent.
+///
+/// This is the heal-path analog of LDT's [`ConflictDetector`] (Plan 088).
+/// Where `ConflictDetector` checks token candidate sets for satisfiability
+/// (signature: `marginals`, `pruned_count`, `total_candidates`), this trait
+/// checks **healed runtime state** for semantic consistency.
+///
+/// The signature is intentionally different from `ConflictDetector`: healed
+/// state is a flat `&[f32]` (style_weights for shards, emotion axes for HLA),
+/// not token distributions. Forcing the token-specific `ConflictDetector`
+/// signature onto heal validation would abuse its parameters (Interface
+/// Segregation — the "I" in SOLID).
+///
+/// # Implementations
+///
+/// - `ShardConflictDetector` (riir-neuron-db) — checks healed `style_weights`
+///   for degenerate blends (NaN, L2 norm range, variance, archetype distance).
+/// - `HlaConflictDetector` (riir-games) — checks healed emotion axes for
+///   cross-axis impossibilities (anger+calm both > 0.7, etc.).
+///
+/// # Contract
+///
+/// All implementations MUST be:
+/// - **Zero-allocation** on the check path (`is_heal_conflicted` takes `&[f32]`).
+/// - **Modelless** (pure threshold checks, no training/backprop).
+/// - **Stack-only** (no heap allocation in the hot path).
+///
+/// # Feature Gate
+///
+/// `heal_validation` — opt-in until the GOAT gate (G1–G6) passes.
+/// See `katgpt-rs/.issues/133_post_heal_conflict_detection_gap.md`.
+#[cfg(feature = "heal_validation")]
+pub trait HealConflictDetector: Send + Sync {
+    /// Check if the healed state is semantically conflicted.
+    ///
+    /// `healed_state` — the healed values as a flat slice:
+    /// - For shards: `style_weights` (`STYLE_DIM` values, typically 64).
+    /// - For HLA: emotion axes in `EmotionAxis::ALL` order (6 values:
+    ///   valence, arousal, desperation, calm, fear, anger).
+    ///
+    /// Returns `true` when the healed state violates semantic constraints
+    /// (degenerate vector, impossible emotion combination, etc.).
+    fn is_heal_conflicted(&self, healed_state: &[f32]) -> bool;
+}
+
 // ── Routing Overlap Diagnostic (Plan 096, Research 59) ───────
 
 /// Diagnostic: Raven slot routing overlap across K+1 tokens.
