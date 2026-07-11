@@ -376,7 +376,7 @@ impl SessionKnowledge {
         }
 
         // Sort by score descending
-        rule_stats.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        rule_stats.sort_by(|a, b| b.1.total_cmp(&a.1));
 
         // Fill fixed-size array with rules having positive score
         let mut result = [None; 5];

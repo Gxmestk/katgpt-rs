@@ -201,9 +201,7 @@ pub fn identify_positions_adaptive_into(
             buf.sort_by(|&a, &b| {
                 let affinity_a = k.position_affinity(a);
                 let affinity_b = k.position_affinity(b);
-                affinity_b
-                    .partial_cmp(&affinity_a)
-                    .unwrap_or(std::cmp::Ordering::Equal)
+                affinity_b.total_cmp(&affinity_a)
             });
         }
         _ => {
@@ -258,9 +256,7 @@ pub fn identify_positions_adaptive_with_entropy_into(
             indices.sort_by(|&a, &b| {
                 let affinity_a = k.position_affinity(positions_buf[a]);
                 let affinity_b = k.position_affinity(positions_buf[b]);
-                affinity_b
-                    .partial_cmp(&affinity_a)
-                    .unwrap_or(std::cmp::Ordering::Equal)
+                affinity_b.total_cmp(&affinity_a)
             });
 
             // Apply permutation to both buffers via temp storage

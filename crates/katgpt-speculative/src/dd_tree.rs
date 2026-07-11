@@ -634,11 +634,7 @@ pub fn merge_retrieved_branches(
     // Copy + Eq and downstream consumers only rely on score ordering, not on
     // tie-stability. Unstable sort avoids the O(N) auxiliary allocation that
     // stable sort incurs on large inputs.
-    tree.sort_unstable_by(|a, b| {
-        b.score
-            .partial_cmp(&a.score)
-            .unwrap_or(std::cmp::Ordering::Equal)
-    });
+    tree.sort_unstable_by(|a, b| b.score.total_cmp(&a.score));
     tree.truncate(config.tree_budget);
 }
 

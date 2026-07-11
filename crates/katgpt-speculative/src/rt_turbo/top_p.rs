@@ -170,11 +170,7 @@ pub fn select_top_p(scores: &[f32], top_p: f32) -> DynamicTopPResult {
     for (idx, &prob) in probs.iter().enumerate() {
         indexed.push(IndexedScore { idx, prob });
     }
-    indexed.sort_unstable_by(|a, b| {
-        b.prob
-            .partial_cmp(&a.prob)
-            .unwrap_or(std::cmp::Ordering::Equal)
-    });
+    indexed.sort_unstable_by(|a, b| b.prob.total_cmp(&a.prob));
 
     // Accumulate until cumulative mass >= threshold
     let mut cumsum = 0.0f32;
@@ -272,11 +268,7 @@ pub fn select_top_p_blockwise(scores: &[f32], top_p: f32, block_size: usize) -> 
     for (idx, &prob) in block_probs.iter().enumerate() {
         block_indexed.push(IndexedScore { idx, prob });
     }
-    block_indexed.sort_unstable_by(|a, b| {
-        b.prob
-            .partial_cmp(&a.prob)
-            .unwrap_or(std::cmp::Ordering::Equal)
-    });
+    block_indexed.sort_unstable_by(|a, b| b.prob.total_cmp(&a.prob));
 
     // Accumulate block probabilities until threshold
     let threshold = top_p.clamp(0.0, 1.0);
@@ -350,11 +342,7 @@ pub fn select_top_p_blockwise(scores: &[f32], top_p: f32, block_size: usize) -> 
     for (idx, &prob) in candidate_probs.iter().enumerate() {
         candidate_indexed.push(IndexedScore { idx, prob });
     }
-    candidate_indexed.sort_unstable_by(|a, b| {
-        b.prob
-            .partial_cmp(&a.prob)
-            .unwrap_or(std::cmp::Ordering::Equal)
-    });
+    candidate_indexed.sort_unstable_by(|a, b| b.prob.total_cmp(&a.prob));
 
     let mut cumsum = 0.0f32;
     let mut selected_indices = Vec::with_capacity(candidate_len);

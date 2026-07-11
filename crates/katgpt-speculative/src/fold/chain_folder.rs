@@ -93,7 +93,7 @@ impl ChainFolder {
         // importance scores do not need stable ordering for the downstream
         // `take(fold_count)` + `verify_fold` logic.
         let mut indexed: Vec<(usize, f32)> = importance.iter().copied().enumerate().collect();
-        indexed.sort_unstable_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
+        indexed.sort_unstable_by(|a, b| a.1.total_cmp(&b.1));
 
         // Binary search: how many of the least-important steps can we fold?
         let mut lo = 0_usize;
