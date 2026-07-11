@@ -86,10 +86,12 @@ fn topological_sort(certificates: &[ProofCertificate]) -> Vec<&ProofCertificate>
         .collect();
 
     let mut result = Vec::with_capacity(certificates.len());
-    let mut result_indices = Vec::with_capacity(certificates.len());
+    // Track which indices have been added to `result` — used to append
+    // cycle-participants at the end without a second pass over the Vec.
+    let mut added = vec![false; certificates.len()];
     while let Some(i) = queue.pop_front() {
         result.push(&certificates[i]);
-        result_indices.push(i);
+        added[i] = true;
         for &j in &adj[i] {
             in_degree[j] -= 1;
             if in_degree[j] == 0 {
@@ -98,11 +100,7 @@ fn topological_sort(certificates: &[ProofCertificate]) -> Vec<&ProofCertificate>
         }
     }
 
-    // Add any remaining (cycle) items — O(n) with bool vec instead of HashSet
-    let mut added = vec![false; certificates.len()];
-    for &idx in &result_indices {
-        added[idx] = true;
-    }
+    // Add any remaining (cycle) items.
     for (i, cert) in certificates.iter().enumerate() {
         if !added[i] {
             result.push(cert);

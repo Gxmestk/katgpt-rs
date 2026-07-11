@@ -150,14 +150,6 @@ impl CaStrategy {
             out[i] = (rule >> neighborhood) & 1;
         }
     }
-
-    /// Single CA step: apply rule to each cell's neighborhood (wrap-around).
-    fn step(tape: &[u8], rule: u8) -> Vec<u8> {
-        let n = tape.len();
-        let mut new_tape = vec![0u8; n];
-        Self::step_into(tape, rule, &mut new_tape);
-        new_tape
-    }
 }
 
 impl SimpleProgram for CaStrategy {
@@ -174,7 +166,10 @@ impl SimpleProgram for CaStrategy {
         let mut tape = vec![0u8; w];
         if opponent_history.is_empty() {
             // All-zeros tape → apply rule and read center.
-            let new_tape = Self::step(&tape, self.rule);
+            // Use step_into into a stack buffer to avoid the heap allocation
+            // that Self::step would incur.
+            let mut new_tape = vec![0u8; w];
+            Self::step_into(&tape, self.rule, &mut new_tape);
             return new_tape[w / 2];
         }
 
@@ -185,8 +180,9 @@ impl SimpleProgram for CaStrategy {
             tape[start + hist_len - 1 - i] = if action > 0 { 1 } else { 0 };
         }
 
-        // Apply CA rule once.
-        let new_tape = Self::step(&tape, self.rule);
+        // Apply CA rule once into a reused buffer.
+        let mut new_tape = vec![0u8; w];
+        Self::step_into(&tape, self.rule, &mut new_tape);
 
         // Return center cell.
         new_tape[w / 2]

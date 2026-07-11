@@ -217,13 +217,16 @@ impl FsmEnumerator {
         let mut distinct: Vec<FsmStrategy> = Vec::with_capacity(raw.len());
 
         let mut fingerprint = Vec::with_capacity(n_sequences * test_horizon);
+        // Hoisted out of the seq_idx loop — avoids n_sequences * raw.len()
+        // allocations of a Vec<u8> per behavioral fingerprint test.
+        let mut history: Vec<u8> = Vec::with_capacity(test_horizon);
 
         for mut fsm in raw {
             fingerprint.clear();
 
             for seq_idx in 0..n_sequences {
                 fsm.reset();
-                let mut history: Vec<u8> = Vec::with_capacity(test_horizon);
+                history.clear();
 
                 for bit in 0..test_horizon {
                     let input = ((seq_idx >> bit) & 1) as u8;
@@ -283,6 +286,11 @@ impl FsmEnumerator {
         let n = strategies.len();
         let mut payoffs = vec![vec![0.0f64; n]; n];
 
+        // Hoisted out of the i/j pair loop — cleared per pair instead of
+        // re-allocated n*(n-1) times.
+        let mut history_i: Vec<u8> = Vec::with_capacity(rounds as usize);
+        let mut history_j: Vec<u8> = Vec::with_capacity(rounds as usize);
+
         for i in 0..n {
             for j in 0..n {
                 if i == j {
@@ -294,8 +302,8 @@ impl FsmEnumerator {
                 si.reset();
                 sj.reset();
 
-                let mut history_i: Vec<u8> = Vec::with_capacity(rounds as usize);
-                let mut history_j: Vec<u8> = Vec::with_capacity(rounds as usize);
+                history_i.clear();
+                history_j.clear();
 
                 let mut total_payoff = 0.0f64;
 
