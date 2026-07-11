@@ -99,25 +99,7 @@ impl<const SQRT_N: usize, const K: usize> Default for PkmScratch<SQRT_N, K> {
 #[inline]
 pub fn score_dot(q_half: &[f32], key_half: &[f32]) -> f32 {
     debug_assert_eq!(q_half.len(), key_half.len());
-    let mut acc = 0.0f32;
-    // Manual unroll-by-4 to help LLVM auto-vectorize. The loop is branch-free
-    // inside the chunk (no early exit); the remainder tail is scalar.
-    let n = q_half.len();
-    let chunks = n / 4;
-    let main_end = chunks * 4;
-    let mut i = 0;
-    while i < main_end {
-        acc += q_half[i] * key_half[i];
-        acc += q_half[i + 1] * key_half[i + 1];
-        acc += q_half[i + 2] * key_half[i + 2];
-        acc += q_half[i + 3] * key_half[i + 3];
-        i += 4;
-    }
-    while i < n {
-        acc += q_half[i] * key_half[i];
-        i += 1;
-    }
-    acc
+    crate::simd::simd_dot_f32(q_half, key_half, q_half.len())
 }
 
 /// IDW score: `−log(ε + ‖q_half − key_half‖²)` (paper §A.2).
@@ -132,25 +114,7 @@ pub fn score_idw(q_half: &[f32], key_half: &[f32], epsilon: f32) -> f32 {
         epsilon > 0.0 && epsilon.is_finite(),
         "IDW epsilon must be > 0"
     );
-    let n = q_half.len();
-    // Sum of squared differences, unrolled by 4 for auto-vectorization.
-    let chunks = n / 4;
-    let main_end = chunks * 4;
-    let mut ssd = 0.0f32;
-    let mut i = 0;
-    while i < main_end {
-        let d0 = q_half[i] - key_half[i];
-        let d1 = q_half[i + 1] - key_half[i + 1];
-        let d2 = q_half[i + 2] - key_half[i + 2];
-        let d3 = q_half[i + 3] - key_half[i + 3];
-        ssd += d0 * d0 + d1 * d1 + d2 * d2 + d3 * d3;
-        i += 4;
-    }
-    while i < n {
-        let d = q_half[i] - key_half[i];
-        ssd += d * d;
-        i += 1;
-    }
+    let ssd = crate::simd::simd_dist_sq(q_half, key_half, q_half.len());
     // −log(ε + ssd). The logf32 is the cold-path cost per codebook row; the
     // √N scoring loop pays it √N times per codebook (acceptable per Plan 408
     // G1 budget — log is ~5ns, √N=1000 → 5µs per codebook, well under the
