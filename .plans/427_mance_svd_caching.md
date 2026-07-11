@@ -1,6 +1,6 @@
 # Plan 427 — MANCE SVD Caching Optimization
 
-> **Implements:** Issue 132 (`.issues/132_mance_svd_caching_optimization.md`)
+> **Implements:** Issue 132 (closed, removed — implemented in commit `2042dd4b`)
 > **Date:** 2026-07-11
 > **Status:** COMPLETE
 > **Feature gate:** `manifold_erasure` (already default-on)
