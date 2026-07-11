@@ -810,9 +810,9 @@ pub enum ActingMode {
     /// Default mode, sweep winner on Craftax.
     #[default]
     Lc,
-    /// LEO-only ablation: Q = Q_LEO[:,:,g].
+    /// LEO-only ablation: Q = `Q_LEO[:,:,g]`.
     LeoOnly,
-    /// UVFA-only ablation: Q = Q_UVFA[:,g].
+    /// UVFA-only ablation: Q = `Q_UVFA[:,g]`.
     UvfaOnly,
     /// Optimistic combining: Q = max(Q_LEO, Q_UVFA).
     Max,
@@ -940,7 +940,7 @@ pub trait DualLeoMixer {
         out
     }
 
-    /// Zero-alloc variant of [`combine`]: writes into a pre-allocated buffer.
+    /// Zero-alloc variant of [`combine`](Self::combine): writes into a pre-allocated buffer.
     fn combine_into(&self, out: &mut [f32], q_leo: &[f32], q_uvfa: &[f32], alpha: f32) {
         match self.acting_mode() {
             ActingMode::Lc => self.mix_into(out, q_leo, q_uvfa, alpha),

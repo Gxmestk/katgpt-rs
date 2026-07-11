@@ -7,7 +7,7 @@
 //! conservatism (a lower bound, not a point estimate) is the right risk
 //! posture.
 //!
-//! Complements [`sample_beta`](crate::) Thompson sampling (EXPLORATION) with
+//! Complements `sample_beta` Thompson sampling (EXPLORATION) with
 //! a conservative EXPLOITATION / SELECTION counterpart: Thompson draws a
 //! random sample from Beta(1+S, 1+F) for exploration; `best_belief_score`
 //! returns the ε-quantile lower bound `I⁻¹_ε(1+S, 1+F)` for exploitation.

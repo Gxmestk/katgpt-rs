@@ -310,7 +310,7 @@ impl<F: PointForecaster> ConformalIntervalCalibrator<F> {
     /// residual pool for `channel`.
     ///
     /// Computes `r = actual − forecast`, indexes the horizon bucket via
-    /// [`horizon_lag`], pushes into the ring buffer tagged with the current
+    /// `horizon_lag`, pushes into the ring buffer tagged with the current
     /// `global_tick`. The exponential recency weight `w = exp(−λ · age)` is
     /// applied at *quantile read time* (not storage), keeping the write path
     /// simple and zero-alloc.
@@ -375,7 +375,7 @@ impl<F: PointForecaster> ConformalIntervalCalibrator<F> {
         out.alpha = alpha;
     }
 
-    /// As [`interval_into`] but with a caller-supplied point forecast. Use this
+    /// As [`interval_into`](Self::interval_into) but with a caller-supplied point forecast. Use this
     /// when the caller has already computed `ŷ` (e.g. KARC's `forecast_into`
     /// produces a full `D`-channel vector in one call).
     pub fn interval_from_point_into(

@@ -17,7 +17,7 @@
 //!    and indexed for O(log) adjacency.
 //! 2. [`BisimulationQuotient`] — partition of states into equivalence classes
 //!    via Paige-Tarjan partition refinement (O((S+E) log S)).
-//! 3. [`OperatorSchema`](crate::bisimulation::operator::OperatorSchema) —
+//! 3. [`OperatorSchema`] —
 //!    one abstract operator per edge-label, with preconditions (src classes)
 //!    and effects ((src, dst) class pairs).
 //! 4. A BFS [`planner`](crate::bisimulation::planner::plan) over the quotient
@@ -91,12 +91,12 @@
 //!
 //! # References
 //!
-//! - Plan: [`katgpt-rs/.plans/324_bisimulation_operator_inference.md`]
-//! - Research: [`katgpt-rs/.research/308_NSM_VLA_Price_Is_Not_Right_Bisimulation_Operator_Inference.md`]
+//! - Plan: `katgpt-rs/.plans/324_bisimulation_operator_inference.md`
+//! - Research: `katgpt-rs/.research/308_NSM_VLA_Price_Is_Not_Right_Bisimulation_Operator_Inference.md`
 //! - Source paper: [arXiv:2602.19260](https://arxiv.org/pdf/2602.19260)
 //! - Underlying NSM method: [arXiv:2508.21501](https://arxiv.org/abs/2508.21501)
 //! - Closest cousin: [`crate::induced_cwm`] (Plan 296, Research 275)
-//! - Gap closed: [`katgpt-rs/.research/264_Compositional_Open_Ended_Intelligence_Framework.md`] §2.2
+//! - Gap closed: `katgpt-rs/.research/264_Compositional_Open_Ended_Intelligence_Framework.md` §2.2
 
 pub mod graph;
 pub mod operator;

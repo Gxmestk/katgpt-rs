@@ -39,12 +39,12 @@
 //!   time (topology + initial priors); runtime mutations are tracked separately.
 //! - **Zero allocations after construction.** [`LatentTaskTree::sample`] and
 //!   [`LatentTaskTree::observe`] are allocation-free. The arm→path lookup uses a
-//!   stack-allocated [`ArmPath`] (Copy) to avoid the borrow-checker conflict
+//!   stack-allocated `ArmPath` (Copy) to avoid the borrow-checker conflict
 //!   between reading the path and mutating the tree.
 //!
 //! # DRY note
 //!
-//! The Beta sampler ([`sample_beta`]) is a private helper using the Gamma-ratio
+//! The Beta sampler (`sample_beta`) is a private helper using the Gamma-ratio
 //! method (Marsaglia-Tsang gamma + Box-Muller normal). The same algorithm is used
 //! in `katgpt-rs/src/dense_mesh/edge_bandit.rs` (with a rough normal
 //! approximation). Other copies (`katgpt-pruners/src/bandit.rs`,
@@ -431,7 +431,7 @@ impl LatentTaskTree {
     /// iterates all children at each level.
     ///
     /// Zero allocations (the path is copied from the pre-computed lookup as a
-    /// stack-local [`ArmPath`]).
+    /// stack-local `ArmPath`).
     ///
     /// # Panics
     /// Panics if `arm_id` is not present in the tree.

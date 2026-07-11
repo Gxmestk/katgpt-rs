@@ -52,7 +52,7 @@
 //! | `InducedCwmSlot.inner` | — | NO (slot is process-local; the *commitment* is the syncable artifact) |
 //!
 //! The slot itself does not cross the sync boundary. The
-//! [`CwmCommitment`](crate::induced_cwm::CwmCommitment) it returns does.
+//! [`crate::induced_cwm::CwmCommitment`] it returns does.
 //!
 //! # Hot-path vs cold-path
 //!

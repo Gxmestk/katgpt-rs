@@ -34,8 +34,8 @@
 //!
 //! # References
 //!
-//! - Plan: [`katgpt-rs/.plans/296_induced_cwm_kernel_primitive.md`]
-//! - Research: [`katgpt-rs/.research/275_Code_World_Model_Induced_Forward_Model.md`]
+//! - Plan: `katgpt-rs/.plans/296_induced_cwm_kernel_primitive.md`
+//! - Research: `katgpt-rs/.research/275_Code_World_Model_Induced_Forward_Model.md`
 //! - Source paper: [arxiv 2510.04542](https://arxiv.org/pdf/2510.04542)
 
 use crate::traits::GameState;
@@ -57,7 +57,7 @@ use crate::traits::GameState;
 /// [`commitment`](InducedCwmKernel::commitment) usable as a chain-consensus
 /// commitment in riir-ai Plan 326. Non-deterministic serialisation (e.g.
 /// `HashMap` iteration order leaking into bytes) breaks quorum — see the test
-/// `canonical_bytes_determinism` in [`crate::induced_cwm::tests`].
+/// `canonical_bytes_determinism` in `crate::induced_cwm::tests`.
 pub trait InducedCwmKernel: GameState {
     /// Canonical byte representation of the *kernel* (not the state).
     ///

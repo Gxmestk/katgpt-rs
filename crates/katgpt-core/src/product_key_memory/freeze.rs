@@ -75,7 +75,7 @@
 //!
 //! # References
 //!
-//! - Plan: [`katgpt-rs/.plans/408_Product_Key_Memory_Primitive.md`] §Phase 4
+//! - Plan: `katgpt-rs/.plans/408_Product_Key_Memory_Primitive.md` §Phase 4
 //! - Precedent (katgpt-core): [`crate::induced_cwm::InducedCwmSlot`]
 //!   (`induced_cwm/hot_swap.rs`) — the `Arc<RwLock<Option<...>>>` pattern
 //!   this module generalizes to √N×√N tables.
@@ -142,7 +142,7 @@ pub struct FrozenProductKeyMemory<const SQRT_N: usize, const D_K: usize, const D
     ///
     /// Wrapped in `Arc` so clones of the slot share the counter (the
     /// "fan-out" pattern — see [`Clone`]). The counter is advisory (audit /
-    /// sync logging); the torn-read guarantee comes from the RwLock<Arc>
+    /// sync logging); the torn-read guarantee comes from the `RwLock<Arc>`
     /// table swap, not from this counter, so it does NOT need to be
     /// atomically consistent with the table swap. Readers may briefly observe
     /// `version = N` alongside a table installed by commit `N+1` — this is

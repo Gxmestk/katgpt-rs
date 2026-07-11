@@ -2,7 +2,7 @@
 //!
 //! Per AGENTS.md ("Use `types.rs` for decoupled structs/impls"): all POD types
 //! and pure helper methods live here. Behaviour that requires a backing store
-//! lives in [`crate::content_store::r#trait`] / [`crate::content_store::in_memory`].
+//! lives in `crate::content_store::r#trait` / `crate::content_store::in_memory`.
 
 use bytemuck::{Pod, Zeroable};
 
@@ -55,7 +55,7 @@ impl From<BlobId> for [u8; 32] {
     }
 }
 
-/// A byte range within a blob — used by [`super::r#trait::ChunkFetcher`] for
+/// A byte range within a blob — used by `ChunkFetcher` for
 /// partial / sparse hydration (e.g. fetch only LOD-0 of a multi-LOD asset).
 ///
 /// `length: u32` caps a single range at 4 GiB, which exceeds any single chunk

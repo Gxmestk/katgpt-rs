@@ -26,7 +26,7 @@
 //! # K=1 parity contract (the load-bearing gate)
 //!
 //! `SubspaceSteeringField<D, 1>` with a Plan 309 direction + alpha must produce
-//! bit-identical output to [`apply_latent_steering`]. This is verified by the
+//! bit-identical output to [`crate::latent_steering::apply_latent_steering`]. This is verified by the
 //! `k1_parity_with_plan_309` unit test and is the foundation of the GOAT gate
 //! (Plan 412 Phase 4 T4.5 expands it to 100 random pairs).
 //!

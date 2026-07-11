@@ -621,9 +621,9 @@ pub fn staleness_weight(k_npc: u8, lambda: f32) -> f32 {
 /// Decision returned by [`KnpcSelector::observe_cycle`].
 ///
 /// The selector runs across cycles (each CGSP cycle = one halter loop
-/// iteration). While the halter hasn't fired, it returns [`Continue`] and
+/// iteration). While the halter hasn't fired, it returns [`Continue`](Self::Continue) and
 /// the NPC runs CGSP every tick (k_npc = 1 — no staleness correction). When
-/// the halter fires, it returns [`PlanInterval`] with the planned interval
+/// the halter fires, it returns [`PlanInterval`](Self::PlanInterval) with the planned interval
 /// until the next deep cycle. The caller should:
 ///
 /// 1. Set `config.k_npc = k_npc` for the staleness weight on the next cycle.
@@ -646,7 +646,7 @@ pub enum KnpcDecision {
 
 /// Per-NPC variable-duration `k_npc` selector (Issue 364 T4).
 ///
-/// Wraps [`GainCostLoopHalter`] to produce a per-NPC planning horizon `k_npc`
+/// Wraps [`GainCostLoopHalter`](crate::gain_cost_halt::GainCostLoopHalter) to produce a per-NPC planning horizon `k_npc`
 /// from per-cycle observables. The selector accumulates evidence across cycles:
 /// each call to [`observe_cycle`](Self::observe_cycle) feeds the cycle's
 /// (gain, cost, cos_theta) to the halter. When the halter fires `Halt`, the
@@ -673,7 +673,7 @@ pub enum KnpcDecision {
 ///
 /// # Behind feature `gain_cost_halt`
 ///
-/// This primitive composes [`GainCostLoopHalter`] (Plan 304, opt-in) with
+/// This primitive composes [`GainCostLoopHalter`](crate::gain_cost_halt::GainCostLoopHalter) (Plan 304, opt-in) with
 /// the CGSP variable-duration story (Issue 365/364). It compiles only when
 /// both the `cgsp` and `gain_cost_halt` features are enabled. When
 /// `gain_cost_halt` is off, the selector is absent and `k_npc` stays at its

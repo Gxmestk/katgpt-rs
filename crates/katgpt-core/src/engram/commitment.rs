@@ -28,7 +28,7 @@
 //!
 //! # TODO (Phase 5 follow-on, deferred)
 //!
-//! - T5.1–T5.4 `EngramHotSwap` — AtomicPtr<Box<dyn EngramTable>> + reader
+//! - T5.1–T5.4 `EngramHotSwap` — `AtomicPtr<Box<dyn EngramTable>>` + reader
 //!   closure. Mirror `sense/hotswap.rs`. Deferred — file when first
 //!   consumer needs runtime table replacement.
 //! - T5.7–T5.8 unit tests for hot-swap atomicity + G5 concurrent reader /

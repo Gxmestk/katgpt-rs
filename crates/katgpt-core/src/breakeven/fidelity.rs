@@ -178,7 +178,7 @@ impl FidelityMatcher {
     /// Decision logic:
     /// 1. If not calibrated → return `Bit4` (stub behavior)
     /// 2. If calibrated but no sweep data → return `Bit8` (safe default)
-    /// 3. If calibrated + swept → find highest compression where delta[pos] <= target_delta.
+    /// 3. If calibrated + swept → find highest compression where `delta[pos] <= target_delta`.
     ///    Positions beyond calibration length extrapolate using the last known value.
     pub fn error_matched_level(&self, pos: usize) -> CompressionLevel {
         if !self.is_calibrated() {

@@ -48,10 +48,10 @@
 //!
 //! # References
 //!
-//! - Plan: [`katgpt-rs/.plans/329_non_interference_memory_branches.md`]
-//! - Research: [`katgpt-rs/.research/310_RIZZ_Non_Interference_Memory_Branches.md`]
+//! - Plan: `katgpt-rs/.plans/329_non_interference_memory_branches.md`
+//! - Research: `katgpt-rs/.research/310_RIZZ_Non_Interference_Memory_Branches.md`
 //! - Source paper: [arXiv:2606.20638](https://arxiv.org/abs/2606.20638)
-//! - Private guide: [`riir-ai/.research/161_Per_NPC_Cognitive_Branch_Continual_Adaptation_Guide.md`]
+//! - Private guide: `riir-ai/.research/161_Per_NPC_Cognitive_Branch_Continual_Adaptation_Guide.md`
 //! - Fusion cousins: Plan 236 (BAKE), Plan 284/316 (CLR), progressive_mcgs/,
 //!   Plan 299 (Engram), Plan 327 (ARG), Plan 290 (closure-instrument),
 //!   Plan 303 (Salience)

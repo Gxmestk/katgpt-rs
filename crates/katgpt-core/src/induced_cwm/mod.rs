@@ -8,7 +8,7 @@
 //!
 //! This module ships the **generic, IP-free half** of that idea:
 //!
-//! - [`InducedCwmKernel`] — marker trait over [`GameState`] for forward models
+//! - [`InducedCwmKernel`] — marker trait over `GameState` for forward models
 //!   that are verifiable (pass auto-generated transition tests), committable
 //!   (BLAKE3), and hot-swappable (Phase 4 slot).
 //! - [`CwmCommitment`] — the BLAKE3-committed induction-event artifact.
@@ -55,8 +55,8 @@
 //!
 //! # References
 //!
-//! - Plan: [`katgpt-rs/.plans/296_induced_cwm_kernel_primitive.md`]
-//! - Research: [`katgpt-rs/.research/275_Code_World_Model_Induced_Forward_Model.md`]
+//! - Plan: `katgpt-rs/.plans/296_induced_cwm_kernel_primitive.md`
+//! - Research: `katgpt-rs/.research/275_Code_World_Model_Induced_Forward_Model.md`
 //! - Source paper: [arxiv 2510.04542](https://arxiv.org/pdf/2510.04542)
 //! - Direct ancestor: Plan 056 (`GameState` forward model + generic MCTS)
 //! - Private Super-GOAT guide: `riir-ai/.research/145_CWM_Runtime_Induced_Game_Rules_Guide.md`

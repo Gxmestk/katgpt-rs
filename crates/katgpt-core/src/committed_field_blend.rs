@@ -33,10 +33,10 @@
 //!
 //! - Reuses [`sigmoid`] from `personality_composition` (numerically stable,
 //!   branching on sign of `x` to avoid `e^{-x}` overflow).
-//! - Reuses [`simd_fused_scale_acc`](crate::simd::simd_fused_scale_acc) for the
+//! - Reuses [`crate::simd::simd_fused_scale_acc`] for the
 //!   inner `dz_out[j] += gate · f_k(z)[j]` FMA loop — the same SIMD primitive
 //!   `PersonalityWeightedComposition::compose_into` uses.
-//! - Reuses [`simd_dot_f32`](crate::simd::simd_dot_f32) for the commit-time
+//! - Reuses [`crate::simd::simd_dot_f32`] for the commit-time
 //!   `pi_k = dot(summary, dir_k)` projection.
 //!
 //! # Sync boundary (AGENTS.md)
@@ -57,8 +57,8 @@
 //!
 //! # References
 //!
-//! - Plan: [`katgpt-rs/.plans/321_sampling_invariant_per_entity_moe_primitive.md`]
-//! - Research: [`katgpt-rs/.research/302_FAME_Sampling_Invariant_Per_Entity_MoE.md`]
+//! - Plan: `katgpt-rs/.plans/321_sampling_invariant_per_entity_moe_primitive.md`
+//! - Research: `katgpt-rs/.research/302_FAME_Sampling_Invariant_Per_Entity_MoE.md`
 //! - Source paper: arxiv 2510.00621 — FAME (Gao/Chen/Zhang, NeurIPS 2025)
 //! - Closest shipped cousin (per-layer, drifting): Plan 297
 //!   (`PersonalityWeightedComposition`)

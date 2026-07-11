@@ -226,7 +226,7 @@ impl ZonePoset {
 /// ```
 ///
 /// The cubical nerve functor ⊞ sends a distributive meet-semilattice L
-/// to a cubical set ⊞[L] whose geometric realization is a CAT(0) cube
+/// to a cubical set `⊞[L]` whose geometric realization is a CAT(0) cube
 /// complex, guaranteeing unique geodesics for navigation.
 pub trait DistributiveMeetSemilattice {
     type Elem;

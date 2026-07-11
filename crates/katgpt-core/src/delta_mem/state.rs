@@ -6,7 +6,7 @@
 //! Core formula (per-row, coupled gates):
 //!   read_t  = S · q_t
 //!   pred_t  = S · k_t
-//!   S'[i,:] = (1-β[i]) · S[i,:] - β[i] · pred_t[i] · k_t + β[i] · v_t[i] · k_t
+//!   `S'[i,:] = (1-β[i]) · S[i,:] - β[i] · pred_t[i] · k_t + β[i] · v_t[i] · k_t`
 //!
 //! With normalize_qk=True (default), keys and queries are L2-normalized
 //! after tanh, keeping them on the unit sphere to prevent state explosion.
@@ -148,7 +148,7 @@ impl DeltaMemoryState {
     ///
     /// Per-row update, verified from `_memory_affine_scan_torch` L1923-1929:
     ///   pred_t = S · k_t              (prediction)
-    ///   S'[i,:] = (1-β[i])·S[i,:] - β[i]·pred_t[i]·k + β[i]·v[i]·k
+    ///   `S'[i,:] = (1-β[i])·S[i,:] - β[i]·pred_t[i]·k + β[i]·v[i]·k`
     ///
     /// Key/value MUST be L2-normalized before calling (see FeatureHasher).
     pub fn write(&mut self, key: &[f32], value: &[f32]) {

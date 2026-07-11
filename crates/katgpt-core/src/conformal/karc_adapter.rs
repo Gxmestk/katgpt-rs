@@ -58,7 +58,7 @@ use crate::karc::{KarcBasis, KarcForecaster};
 /// KARC adapter that exposes one channel of a [`KarcForecaster`] as a
 /// single-channel [`PointForecaster`].
 ///
-/// See the [module docs](self) for the integration pattern and the rationale
+/// See the [module docs](crate::conformal) for the integration pattern and the rationale
 /// for the adapter (arity + `&mut self`).
 ///
 /// Holds a pre-allocated `D`-length scratch for the full KARC output vector —

@@ -535,7 +535,7 @@ where
 
 // ─── One-sided Jacobi SVD (portable, no native-lapack dep) ─────────────────
 
-/// Pre-allocated scratch for [`thin_svd`] / [`one_sided_jacobi_svd`]. Reuse
+/// Pre-allocated scratch for [`thin_svd`] / `one_sided_jacobi_svd`. Reuse
 /// across calls to avoid per-call allocation. Allocate once with
 /// [`SvdScratch::with_capacity`] for the largest `(m, n)` you will factor.
 //

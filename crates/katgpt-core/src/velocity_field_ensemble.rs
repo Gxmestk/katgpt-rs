@@ -67,7 +67,7 @@
 //!
 //! Gated behind the `velocity_field_ensemble` Cargo feature. Opt-in until
 //! the GOAT gate (G1–G4, Plan 376 Phase 3) passes. See
-//! [`katgpt-rs/.plans/376_velocity_field_ensemble_primitive.md`].
+//! `katgpt-rs/.plans/376_velocity_field_ensemble_primitive.md`.
 //!
 //! # References
 //!
@@ -237,7 +237,7 @@ where
 /// Zero-allocation scratch buffer for [`VelocityFieldEnsemble::fit_into`].
 ///
 /// Allocate once (via [`Self::new``]), reuse across fits. The `P×P` buffers
-/// (`gram`, `gram_reg`, `chol`) are `Vec<f32>` because stable Rust does not
+/// (`gram`, `gram_reg`, `chol`) are ``Vec<f32>`` because stable Rust does not
 /// allow `P * P` in array types when `P` is a const-generic parameter (would
 /// require the `generic_const_exprs` nightly feature). The Vec is allocated
 /// exactly once at construction; the hot path (`fit_into`, `eval_into`)

@@ -1,6 +1,6 @@
 //! QuestBench — Underspecification scoring for modelless architecture.
 //!
-//! Computes a normalized entropy score from [`ScreeningPruner::relevance()`] output.
+//! Computes a normalized entropy score from `ScreeningPruner::relevance()` output.
 //! Score ∈ [0, 1]: 0 = fully specified (one dominant token), 1 = fully underspecified (uniform).
 //!
 //! Reference: QuestBench paper §3, Research 008.

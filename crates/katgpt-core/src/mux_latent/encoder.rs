@@ -153,7 +153,7 @@ impl MuxLatentEncoder {
     /// Compute the superposition logit vector for a span (for MUX verification).
     ///
     /// This produces the vocabulary-space representation:
-    ///   logit[v] = Σ weights[j] for all j where tokens[j] == v
+    ///   `logit[v] = Σ weights[j] for all j where tokens[j] == v`
     ///
     /// Useful for integration with existing MUX verification infrastructure.
     pub fn superposition_logits(&self, tokens: &[u32], vocab_size: usize) -> Vec<f32> {

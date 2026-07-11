@@ -256,7 +256,7 @@ pub fn compute_cdg(
 ///
 /// where `M_X` is the multiset of canonical subgraph hashes discovered in
 /// corpus `X` by a single round of motif enumeration (1-, 2-, and 3-node
-/// chain motifs — see [`crate::motif`]). Range `[0, 1]`:
+/// chain motifs — see [`crate::closure::motif`]). Range `[0, 1]`:
 /// - `1.0` — every motif in baseline reappears with the same multiplicity in
 ///   perturbed (perfect recomposition).
 /// - `0.0` — no motif overlap.

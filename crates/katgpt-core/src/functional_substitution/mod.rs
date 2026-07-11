@@ -32,7 +32,7 @@
 //!
 //! Substitution decisions use a two-stage cadence:
 //!
-//! 1. **Cheap proxy (per-call)**: [`iou`] between the real head's attention
+//! 1. **Cheap proxy (per-call)**: [`iou()`] between the real head's attention
 //!    row and the surrogate. Below `tau_iou`, reject immediately. This is the
 //!    paper's headline empirical finding — IoU is a fast, well-correlated
 //!    proxy for the expensive causal substitution cost.
@@ -42,14 +42,14 @@
 //!    causally load-bearing under any intervention variant, substitution is
 //!    rejected.
 //!
-//! This split is the [Plan 287 SinkAware] pattern applied to head substitution:
+//! This split is the "Plan 287 SinkAware" pattern applied to head substitution:
 //! expensive diagnostics run on a slow cadence and feed a cheap hot-path
 //! decision. The hot path
 //! ([`HeadSubstitutionGate::should_substitute`]) is alloc-free and branch-light.
 //!
 //! ## GOAT verdict (Gain-tier)
 //!
-//! - **G1 (correctness)**: PASS — [`iou`] hand-computed cases (identity,
+//! - **G1 (correctness)**: PASS — [`iou()`] hand-computed cases (identity,
 //!   disjoint, partial-overlap, all-zero) + gate decision cases (identity
 //!   accept, disjoint reject, partial-overlap boundary, faithfulness veto).
 //! - **G2 (IoU→delta correlation, synthetic)**: PASS — Spearman ρ ≤ −0.9
@@ -82,7 +82,6 @@
 //! the conservative reading: if **any** disruption produces a large behavioral
 //! delta, the head is causally load-bearing and substitution is vetoed.
 //!
-//! [Plan 287 SinkAware]: crate::sink_aware_attn
 //! [`FaithfulnessProfile<D>`]: crate::faithfulness::types::FaithfulnessProfile
 //! [`FaithfulnessProfile`]: crate::faithfulness::types::FaithfulnessProfile
 

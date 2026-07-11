@@ -11,7 +11,7 @@
 //!   needless suppression of the residual stream.
 //! - **Broadcast**: sink token has `‖v_s‖ ≈ content`. The resulting update
 //!   `O ≈ a_s · v_s^T` is a rank-1 broadcast carrying load-bearing global
-//!   information (e.g. [CLS] aggregation in ViT). It should be PRESERVED, not
+//!   information (e.g. `[CLS]` aggregation in ViT). It should be PRESERVED, not
 //!   gated.
 //!
 //! The intervention: classify per-head, gate only NOPs (via existing sigmoid
@@ -92,7 +92,7 @@ pub enum SinkKind {
 /// Per-position sink diagnostic.
 ///
 /// All fields `pub` so callers can build aggregate layer summaries
-/// ([`LayerSinkSummary`] in the sibling `geometry` module) without
+/// (`LayerSinkSummary` in the sibling `geometry` module) without
 /// re-running the classifier.
 #[derive(Debug, Clone, Copy)]
 pub struct SinkDiagnostic {

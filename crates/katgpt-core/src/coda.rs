@@ -236,7 +236,7 @@ fn moa_activate(k: usize, x: f32, activations: &[MoaActivation; 7]) -> f32 {
 
 /// Token-adaptive bi-MoA SwiGLU forward pass.
 ///
-/// Computes: hidden[i] = (Σ_k ρ_k σ_k(gate_proj[i])) * (Σ_ℓ π_ℓ σ_ℓ(up_proj[i]))
+/// Computes: `hidden[i] = (Σ_k ρ_k σ_k(gate_proj[i])) * (Σ_ℓ π_ℓ σ_ℓ(up_proj[i]))`
 ///
 /// where ρ_k = sigmoid(u_k^T input), π_ℓ = sigmoid(v_ℓ^T input) are
 /// token-adaptive gating weights computed from the input.

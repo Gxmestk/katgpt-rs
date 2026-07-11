@@ -901,7 +901,7 @@ pub trait ConflictDetector: Send + Sync {
 
     /// Check conflict with depth-aware escalation (Plan 170 F4).
     ///
-    /// Default implementation delegates to [`is_conflicted`].
+    /// Default implementation delegates to [`is_conflicted`](Self::is_conflicted).
     /// Implementors that support depth-adaptive thresholds should
     /// override this method to tighten detection at deeper search depths.
     ///

@@ -3,7 +3,7 @@
 //! Distillation of nathan.rs/gzip-lm: the compressor IS the model. The corpus
 //! encodes "what's likely next" via LZ77 match length (no neural weights, no
 //! training). Promotion/update = append bytes to corpus, which is exactly
-//! freeze/thaw snapshot semantics on a Vec<u8>.
+//! freeze/thaw snapshot semantics on a `Vec<u8>`.
 //!
 //! Plan 285 (Research 256, revised to GOAT).
 

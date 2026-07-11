@@ -71,8 +71,8 @@
 //!
 //! # References
 //!
-//! - Plan: [`katgpt-rs/.plans/335_paired_loss_gap_diagnostic_primitive.md`]
-//! - Research: [`katgpt-rs/.research/319_Paired_Token_Loss_Gap_Discourse_State_Diagnostic.md`]
+//! - Plan: `katgpt-rs/.plans/335_paired_loss_gap_diagnostic_primitive.md`
+//! - Research: `katgpt-rs/.research/319_Paired_Token_Loss_Gap_Discourse_State_Diagnostic.md`
 //! - Source paper: [arXiv:2606.20936](https://arxiv.org/abs/2606.20936) —
 //!   Li & Merrill, AI2, Jun 2026.
 //! - Theoretical predecessor: Research 242 (Mozer et al. 2026,

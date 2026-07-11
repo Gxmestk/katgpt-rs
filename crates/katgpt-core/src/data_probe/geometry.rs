@@ -10,7 +10,7 @@
 //! ## Sink-aware aggregation (Plan 287, Research 258)
 //!
 //! [`LayerSinkSummary`] bridges the per-sink classifier
-//! ([`super::sink_classify`]) with the whole-layer [`GeometryReport`].
+//! (`sink_classify`) with the whole-layer [`GeometryReport`].
 //! The classifier is the *mechanism locator* (NOP vs Broadcast per sink
 //! column); `effective_rank` is the *aggregate symptom*. `LayerSinkSummary`
 //! aggregates the per-sink verdicts across all heads in a layer.

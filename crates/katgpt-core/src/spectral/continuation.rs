@@ -111,7 +111,7 @@ impl Default for FcConfig {
 
 /// Pre-allocated scratch for hot-path callers.
 ///
-/// **Current algorithm (C¹-linear extrapolation + x[0] wrap target):
+/// **Current algorithm (C¹-linear extrapolation + `x[0]` wrap target):
 /// performs no heap allocation and needs no scratch buffers.** This struct
 /// is kept in the public API as a placeholder for the future FC-Gram
 /// band-limited continuation variant, which will populate it with

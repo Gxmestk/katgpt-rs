@@ -22,7 +22,7 @@ pub fn per_capability_score(ie_receiver: f32, ie_sender: f32, task_consistency: 
 
 /// Fuse per-capability scores into a single head ranking (paper Eq 12).
 ///
-/// Min-max normalizes each capability's scores to [0,1] (per-capability drops
+/// Min-max normalizes each capability's scores to `[0,1]` (per-capability drops
 /// differ in scale), then takes the weighted mean across capabilities with
 /// equal weights by default (equal prior over capabilities when no task pref).
 ///

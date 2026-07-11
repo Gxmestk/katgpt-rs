@@ -1746,7 +1746,7 @@ impl<B: KarcBasis<M>, const D: usize, const M: usize, const K: usize> KarcForeca
     /// the accumulated first-order feature buffer (paper Eq. 47).
     ///
     /// Builds `G = XᵀX` (f64) and `Cov = XᵀY` (f64) from
-    /// [`Self::features_buf`] / [`Self::targets_buf`] (mirroring [`Self::fit_ridge`]'s
+    /// `Self::features_buf` / `Self::targets_buf` (mirroring [`Self::fit_ridge`]'s
     /// Gram accumulation), then calls [`low_rank_fit`] with rank `r`, ridge `λ`,
     /// and convergence `max_iters`/`tol`. On success, stores `A` (`D × r`, f32)
     /// in [`Self::a_low_rank`] and `B` (`r × d_h`, f32) in [`Self::b_low_rank`],

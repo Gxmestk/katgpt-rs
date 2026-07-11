@@ -3,7 +3,7 @@
 //! Distilled from Jin et al., *"Reasoning Quality Emerges Early: Data Curation
 //! for Reasoning Models"* ([arXiv:2606.26797](https://arxiv.org/abs/2606.26797),
 //! ICML 2026). Research note:
-//! [`katgpt-rs/.research/323_TEMP_Perturbed_Loss_Vector_Fingerprint.md`].
+//! `katgpt-rs/.research/323_TEMP_Perturbed_Loss_Vector_Fingerprint.md`.
 //!
 //! # The primitive
 //!
@@ -196,7 +196,7 @@ fn blake3_noise(seed: u64, sigma: f32) -> f32 {
 ///
 /// # Quorum reproducibility
 ///
-/// A [`QmcSource`] constructed from a fixed seed (e.g. [`LatticeQmc::new`])
+/// A [`QmcSource`](crate::speculative::QmcSource) constructed from a fixed seed (e.g. [`LatticeQmc::new`])
 /// is deterministic: the same `(seed, lambda_schedule, s0, s1, noise_sigma)`
 /// produces bit-identical snapshots across nodes and runs. This preserves the
 /// G4 quorum-reproducibility contract of the BLAKE3 variant.

@@ -21,7 +21,7 @@
 //! a^{Ḡ}_L = (Σ_{t∉G}   α_t · v_t) · W_O    # distractor-derived fraction
 //! ```
 //!
-//! [`gold_share`] returns `‖a^G_L‖ / ‖a_L‖` ∈ [0, 1]. It is 1.0 at small N
+//! `gold_share` returns `‖a^G_L‖ / ‖a_L‖` ∈ [0, 1]. It is 1.0 at small N
 //! (output is gold-dominated) and → 0 at large N (diluted — paper's Table 1
 //! shows gold_share drops 0.91 → 0.01 as N grows 500 → 10k, while `‖a_L‖`
 //! shrinks only ~36%). This is the **content-specific** diagnostic — it tells
@@ -30,12 +30,12 @@
 //!
 //! # How it complements existing diagnostics
 //!
-//! - [`super::geometry::effective_rank`] is **content-agnostic**: it detects
+//! - `effective_rank` is **content-agnostic**: it detects
 //!   *aggregate* collapse of hidden states across tokens, but cannot tell gold
 //!   from distractor.
-//! - [`super::sink_classify::stable_rank_update_into`] is **per-sink**: it
+//! - `stable_rank_update_into` is **per-sink**: it
 //!   detects NOP vs Broadcast degeneracy of individual sink columns.
-//! - [`gold_share`] is **content-specific**: it tells you the *fraction* of the
+//! - `gold_share` is **content-specific**: it tells you the *fraction* of the
 //!   layer's output that came from the tokens you actually care about (the gold
 //!   set), regardless of whether the aggregate geometry looks healthy.
 //!
@@ -56,7 +56,7 @@
 //! # Allocation discipline (G4)
 //!
 //! All scratch lives in [`GoldShareScratch`], pre-allocated once and reused
-//! across calls. [`gold_share`] and [`gold_share_flat`] perform no heap
+//! across calls. `gold_share` and `gold_share_flat` perform no heap
 //! allocation after warmup. The two output buffers (`total_out`, `gold_out`)
 //! are `d_model`-length; the per-head accumulator is `n_heads * d_head`-length.
 //!

@@ -22,7 +22,7 @@
 //!    onto a frozen direction vector `n`. Population analog of
 //!    `ict::BranchingDetector::last_population_mean`, but over **NPCs** (not
 //!    trajectories) and onto a **learned direction** (not action probabilities).
-//! 2. **[`HopfBoundary`]** (free function [`hopf_boundary`] + companion
+//! 2. **`HopfBoundary`** (free function [`hopf_boundary`] + companion
 //!    [`static_boundary`]) — closed-form 2×2 Jacobian eigenvalue check on
 //!    `(κ, κ_a)` for oscillatory instability. **Extends** Plan 301's
 //!    [`crate::subspace_phase_gate`] from *real-eigenvalue* phase transitions

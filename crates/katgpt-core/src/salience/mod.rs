@@ -29,7 +29,7 @@
 //!   gate's Silent/Speak sequence is bit-identical to a speak/silent-only
 //!   reference over 100 deterministic pseudo-random inputs.
 //!
-//! Both gates are implemented as `#[test]`s in [`gate::tests`].
+//! Both gates are implemented as `#[test]`s in `gate::tests`.
 //!
 //! ## API surface
 //! - [`SalienceTriGate`] — the gate itself.

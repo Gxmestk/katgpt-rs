@@ -86,7 +86,7 @@ impl CubicalComplex {
 // cubical_nerve — main construction
 // ---------------------------------------------------------------------------
 
-/// Construct the cubical nerve ⊞[L] from a distributive meet-semilattice.
+/// Construct the cubical nerve `⊞[L]` from a distributive meet-semilattice.
 ///
 /// # Algorithm
 ///
@@ -99,7 +99,7 @@ impl CubicalComplex {
 ///
 /// # Adaptive Backend
 ///
-/// For lattices with ≥ [`NERVE_SIMD_THRESHOLD`] (64) elements, the covering-edge
+/// For lattices with ≥ `NERVE_SIMD_THRESHOLD` (64) elements, the covering-edge
 /// construction uses an optimized algorithm that reduces redundant `leq` calls
 /// by pre-computing the cover relation matrix. Below the threshold, the scalar
 /// O(n³) algorithm is used directly.
@@ -114,7 +114,7 @@ where
 ///
 /// This is the adaptive-routing entry point (Plan 252 T30).
 /// When `cubical_nerve` feature is also enabled, callers can use
-/// [`crate::interval_pruner::AdaptiveConfig`] to provide the threshold.
+/// `crate::interval_pruner::AdaptiveConfig` to provide the threshold.
 ///
 /// * `nerve_threshold` — minimum zone count for the optimized backend.
 ///   Below this, scalar O(n³) is used. Above, the bitset-optimized algorithm.

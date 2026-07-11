@@ -69,7 +69,7 @@
 //!
 //! The coherence-term SiLU gate uses a **branchless Padé [2/2] tanh
 //! approximation** (Issue 003 perf unblock) — no `exp()` in the hot path, enabling
-//! full NEON/AVX2 auto-vectorisation. See [`silu`] for the error bound.
+//! full NEON/AVX2 auto-vectorisation. See `silu` for the error bound.
 //!
 //! For cold-path callers that only need the structural wedge (shard retrieval,
 //! CGSP curiosity), [`geometric_product_wedge_into`] skips the dot/SiLU path

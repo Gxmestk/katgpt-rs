@@ -86,7 +86,7 @@ pub struct ZoneManifoldReport<'a> {
 pub struct ZoneManifoldScratch {
     /// `(D, D)` row-major covariance matrix. Deflated in place across the `k`
     /// components during power iteration; the caller sees the *deflated*
-    /// covariance after the call — use [`Self::restore_cov`] if you need the
+    /// covariance after the call — use `Self::restore_cov` if you need the
     /// original for explained-variance diagnostics (the report already carries
     /// `explained_variance_ratio`, so most callers never need this).
     pub cov: Vec<f32>,

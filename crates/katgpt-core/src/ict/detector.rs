@@ -84,7 +84,7 @@ pub struct BranchingDetector {
 
     /// EMA of β across calls. `ema_beta = (1 - ema_decay) · ema_beta + ema_decay · β(t)`.
     /// Read by downstream consumers (Bebop, Curiosity Pulse) as a smoothed
-    /// concentration signal. Updated every [`observe_and_detect`] call.
+    /// concentration signal. Updated every `observe_and_detect` call.
     pub ema_beta: f32,
     /// EMA of population-mean action probability (max over actions). Read by
     /// downstream consumers as a smoothed "decisiveness" signal.

@@ -4,7 +4,7 @@
 //!
 //! # What this is
 //!
-//! A [`Rubric<4>`](super::Rubric) implementing the SelfCompact (arXiv:2606.23525)
+//! A `Rubric<4>` implementing the SelfCompact (arXiv:2606.23525)
 //! Appendix-B search rubric. The paper's four predicates are computed from
 //! scalar features the caller supplies — **not** by LLM-judging verbatim
 //! quotes. This is the mandatory latent reframing (per AGENTS.md: latent-to-
@@ -50,7 +50,7 @@
 //! Every predicate is a deterministic sigmoid of a deterministic scalar. No
 //! training, no backprop, no gradient descent. The β/τ parameters are
 //! configured at gate construction (paper defaults available via
-//! [`SearchRubric::paper_defaults`]). A caller that disagrees with the paper's
+//! [`SearchRubricConfig::paper_defaults`]). A caller that disagrees with the paper's
 //! thresholds can tune them — the rubric is a generic projection gate.
 //!
 //! # Audit-trail obligation
@@ -255,7 +255,7 @@ impl SearchFeatures {
 
 /// The paper's search rubric — C1/C2/C3/N1 over caller-supplied scalars.
 ///
-/// Arity 4. Default fire rule: [`FireRule::search_rule_4`].
+/// Arity 4. Default fire rule: [`FireRule::search_rule_4`](super::super::fire_rule::FireRule::search_rule_4).
 /// Default config: [`SearchRubricConfig::paper_defaults`].
 ///
 /// The rubric is **stateless** (it stores only its config). Per-probe state

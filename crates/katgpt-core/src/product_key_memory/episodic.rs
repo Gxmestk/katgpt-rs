@@ -80,7 +80,7 @@
 //!
 //! # References
 //!
-//! - Plan: [`katgpt-rs/.plans/408_Product_Key_Memory_Primitive.md`] §Phase 5
+//! - Plan: `katgpt-rs/.plans/408_Product_Key_Memory_Primitive.md` §Phase 5
 //! - δ-Mem substrate: [`crate::delta_mem`] (the rank-r associative memory this
 //!   primitive scales to √N slots)
 //! - Freeze/thaw wrapper: [`crate::product_key_memory::FrozenProductKeyMemory`]

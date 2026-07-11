@@ -36,7 +36,7 @@ use rustfft::{FftPlanner, num_complex::Complex32};
 /// Compute spectral flatness of a logit vector via 1D FFT.
 ///
 /// Spectral flatness = geometric_mean(spectrum) / arithmetic_mean(spectrum)
-/// computed on the magnitude spectrum |X[k]|² for k=1..N/2 (DC excluded).
+/// computed on the magnitude spectrum `|X[k]|²` for k=1..N/2 (DC excluded).
 ///
 /// - Range: [0, 1]
 /// - **High (~1.0)**: FFT magnitude is spread uniformly → logit vector has sharp features → **converged**
@@ -132,7 +132,7 @@ pub struct IrrepPruner {
     /// Used for top-k gating when uncertain.
     sorted_indices: Vec<usize>,
     /// Bitset for O(1) top-k membership checks.
-    /// Each u64 word holds 64 bits. 8× denser than Vec<bool> — fills are
+    /// Each u64 word holds 64 bits. 8× denser than `Vec<bool>` — fills are
     /// 8× fewer cachelines touched, and 256K vocab fits in 4KB vs 256KB.
     top_k_bits: Vec<u64>,
     /// Current spectral flatness (updated by set_logits).

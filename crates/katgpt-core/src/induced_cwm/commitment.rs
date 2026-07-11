@@ -12,7 +12,7 @@
 //!   Two kernels with identical canonical bytes MUST produce identical `blake3`.
 //! - `version` is a caller-managed monotonic counter for the *contents ordinal*
 //!   of a personality. NOT part of the BLAKE3 input — see the
-//!   [`micro_belief::MicroRecurrentKernelSnapshot`] precedent: two snapshots
+//!   `micro_belief::MicroRecurrentKernelSnapshot` precedent: two snapshots
 //!   with identical bytes but different versions are the *same* kernel at
 //!   different points in time.
 //! - `created_at_tick` is the GameState tick at which the induction event
@@ -33,7 +33,7 @@
 //!
 //! # References
 //!
-//! - Plan: [`katgpt-rs/.plans/296_induced_cwm_kernel_primitive.md`] §Phase 4
+//! - Plan: `katgpt-rs/.plans/296_induced_cwm_kernel_primitive.md` §Phase 4
 //! - Precedent: `katgpt-rs/crates/katgpt-core/src/micro_belief/snapshot.rs`
 //! - AGENTS.md rule cited: "Use `Uuid::now_v7()` not `Uuid::new_v4()`"
 

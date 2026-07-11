@@ -245,7 +245,7 @@ where
     /// the oracle's own self-reported [`QGradientOracle::confidence`], the
     /// caller supplies an empirically-measured variance probe
     /// (e.g. `&TvpSignal` from katgpt-pruners) which is bridged to a
-    /// confidence via [`confidence_from_disagreement`].
+    /// confidence via `confidence_from_disagreement`.
     ///
     /// **Why a separate method.** The oracle's confidence is a *prior* on
     /// the critic's trustworthiness (e.g. 1.0 for cached LeoHead, 0.3 for
@@ -373,7 +373,7 @@ where
 
     /// One-shot convenience: generate, project, tilt, sample.
     ///
-    /// Chains `generate_guided` + [`project_one_step`] + [`tilt_logits`].
+    /// Chains `generate_guided` + [`project_one_step`] + `tilt_logits`.
     /// Useful when the caller wants the full QGF pipeline in a single call
     /// and owns the logits/gradient buffers.
     ///

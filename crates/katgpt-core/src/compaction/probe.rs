@@ -22,15 +22,15 @@
 //! # G3 invariant
 //!
 //! Probe latency is independent of `L` (the trajectory length) — only the
-//! appended instruction pays prefill. The [`probe_append`] operation is
-//! `O(1)` (it records the byte offset); [`revert`] is `O(k)` where `k` is
+//! appended instruction pays prefill. The [`CacheReuseProbe::probe_append`] operation is
+//! `O(1)` (it records the byte offset); [`CacheReuseProbe::revert`] is `O(k)` where `k` is
 //! the probe length, NOT `O(L)`. The G3 test asserts this by timing
 //! `probe_append` + `revert` at L = 1k, 10k, 100k and checking the latency
 //! is within ±10%.
 //!
 //! # Byte-clean contract
 //!
-//! After a CONTINUE decision, [`ProbeToken::revert`] truncates the trajectory
+//! After a CONTINUE decision, [`CacheReuseProbe::revert`] truncates the trajectory
 //! back to its pre-probe length. The rolling cache MUST be uncontaminated:
 //! subsequent generation from the reverted trajectory matches a no-probe
 //! baseline byte-for-byte (modulo KV-cache indexing, which the caller's

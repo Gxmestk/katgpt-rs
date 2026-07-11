@@ -215,7 +215,7 @@ pub fn hub_spoke(hub: RegionId, spokes: &[RegionId]) -> CanvasTopology {
 /// `(r, r)`, and for each `k ≥ 1` the connection `Connection(r_k, r_{k-1})` —
 /// i.e. `r_k` queries `r_{k-1}`. Because information flows `dst → src` (the
 /// key-value region influences the querier; see
-/// [`reachability`](crate::canvas::reachability)), the resulting information-flow
+/// [`crate::canvas::reachability`]), the resulting information-flow
 /// arcs are `r_{k-1} → r_k`, i.e. `r0 → r1 → … → rn`.
 ///
 /// This direction is what makes Plan 419 T3.6 hold: for `causal_chain([A,B,C])`,

@@ -60,7 +60,7 @@ pub trait PlasmaDraft {
 }
 
 /// Hot-tier transport-operator rederive. Produces a future (associated type
-/// `Fut`, no bound at the trait level) that resolves to a [`TransportOperator`]
+/// `Fut`, no bound at the trait level) that resolves to a [`TransportOperator`](super::TransportOperator)
 /// when the work completes. The ASOC cascade joins 3 of these per tick
 /// (`C_boss`, `C_quest`, `C_player`).
 ///
@@ -92,7 +92,7 @@ pub trait PlasmaDraft {
 ///   impl owns its own entity-state source (see [`ComposerCtx`] shape contract).
 pub trait RederiveOp {
     /// The future type. NO `GpuFuture` bound here — applied at the impl site
-    /// in riir-engine. Resolves to a [`TransportOperator`] when the work
+    /// in riir-engine. Resolves to a [`TransportOperator`](super::TransportOperator) when the work
     /// completes.
     type Fut;
 

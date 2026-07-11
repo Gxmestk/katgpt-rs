@@ -26,11 +26,11 @@
 //! (K, V, Q, α, β per node), and committed prefix state S₀:
 //!
 //! 1. Build topology: ancestor bitmasks + cumulative log-decay + topo order.
-//! 2. Build interaction matrix X[i][j] = 𝟙[j≺i]·(aᵢ/aⱼ)·βᵢ·kᵢᵀkⱼ.
-//! 3. Compute folded RHS: RHS[i] = βᵢvᵢ − βᵢaᵢ(kᵢᵀS₀).
+//! 2. Build interaction matrix `X[i][j] = 𝟙[j≺i]·(aᵢ/aⱼ)·βᵢ·kᵢᵀkⱼ`.
+//! 3. Compute folded RHS: `RHS[i] = βᵢvᵢ − βᵢaᵢ(kᵢᵀS₀)`.
 //! 4. Forward substitution: solve `(I+X)U' = RHS` → U'.
-//! 5. Compute outputs: O[i] = (1/√dₖ)(aᵢqᵢᵀS₀ + Σ_{j⪯i} Y[i][j]·U'[j]),
-//!    where Y[i][j] = 𝟙[j⪯i]·(aᵢ/aⱼ)·qᵢᵀkⱼ.
+//! 5. Compute outputs: `O[i] = (1/√dₖ)(aᵢqᵢᵀS₀ + Σ_{j⪯i} Y[i][j]·U'[j])`,
+//!    where `Y[i][j] = 𝟙[j⪯i]·(aᵢ/aⱼ)·qᵢᵀkⱼ`.
 //!
 //! # Promotion
 //!

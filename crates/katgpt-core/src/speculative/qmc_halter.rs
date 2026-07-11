@@ -209,7 +209,7 @@ impl QmcHalter {
     ///
     /// # Evaluation order
     /// 1. **k_min floor** — if `k < k_min`, return [`RefusedFloor`].
-    /// 2. **k_max cap** — if `k >= k_max`, return [`Halt`] with [`KMaxReached`].
+    /// 2. **k_max cap** — if `k >= k_max`, return [`Halt`](QmcHaltDecision::Halt) with [`KMaxReached`](QmcHaltReason::KMaxReached).
     /// 3. **Hit observed** — if `n_hits > 0`, return [`Halt`] with
     ///    [`HitObserved`] (early termination — pass@k objective met).
     /// 4. **Ceiling saturated** — if `ceiling ≥ 1.0`, return [`Halt`] with

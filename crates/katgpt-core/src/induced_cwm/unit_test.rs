@@ -23,7 +23,7 @@ use crate::induced_cwm::InducedCwmKernel;
 /// legal-action check.
 ///
 /// Construct by hand or via
-/// [`make_transition_tests_from_trajectory`](make_transition_tests_from_trajectory),
+/// [`make_transition_tests_from_trajectory`],
 /// which walks an observed trajectory and emits one test per step.
 #[derive(Clone, Debug)]
 pub struct TransitionUnitTest<S: crate::traits::GameState> {

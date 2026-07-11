@@ -72,7 +72,7 @@
 //!   release (matches the `simd::simd_dot_f32` convention).
 //! - The scalar phase path uses libm `cos`/`sin` (single evaluation — well under
 //!   the latency budget).
-//! - The per-channel path uses [`phase_safe_cos_sin`]: libm `sin` + Pythagorean
+//! - The per-channel path uses `phase_safe_cos_sin`: libm `sin` + Pythagorean
 //!   `sqrt(1 - sin²)` recovery. This forces the G1-critical identity
 //!   `cos²α + sin²α = 1` to hold bit-by-bit (independent libm cos+sin drifts
 //!   by ~1e-7 per call, which compounds across the G1 1000-point sweep). The
@@ -344,7 +344,7 @@ pub fn compute_phase_from_projection(
 /// (e.g. shard retrieval: the spectral half and spatial half may rotate at
 /// different rates depending on which channel dominates the query).
 ///
-/// Each channel's `(cos, sin)` is evaluated via [`phase_safe_cos_sin`]
+/// Each channel's `(cos, sin)` is evaluated via `phase_safe_cos_sin`
 /// (libm `sin` + Pythagorean `sqrt` recovery), which forces the G1-critical
 /// `cos²α + sin²α = 1` identity to hold bit-by-bit. If a future hot path
 /// needs to beat the libm-sin latency floor (Phase 3 SIMD/LUT work), a new

@@ -10,11 +10,11 @@
 //! - [`markov`]           — Dirichlet-sampled Markov chain generator (always-on)
 //! - [`nll`]              — NLL computation against known chain (always-on)
 //! - [`typical_set`]      — Three-way regime classification (always-on)
-//! - [`dirichlet_energy`] — Dirichlet Energy structural alignment diagnostic (always-on)
+//! - [`dirichlet_energy()`] — Dirichlet Energy structural alignment diagnostic (always-on)
 //! - [`claim`]            — Claim card infrastructure for formal C1–C4 validation (always-on)
 //! - [`geometry`]         — Representation geometry diagnostics (Plan 151) — gated `sink_aware_attn`
-//! - [`sink_classify`]    — Per-head NOP/Broadcast sink classifier (Plan 287) — gated `sink_aware_attn`
-//! - [`gold_share`]       — Content-specific output-fraction diagnostic (Plan 411) — gated `gold_share_probe`
+//! - `sink_classify`    — Per-head NOP/Broadcast sink classifier (Plan 287) — gated `sink_aware_attn`
+//! - `gold_share`       — Content-specific output-fraction diagnostic (Plan 411) — gated `gold_share_probe`
 //!
 //! # Always-on vs feature-gated split
 //!
@@ -26,15 +26,15 @@
 //!
 //! # Mechanism locator vs aggregate symptom
 //!
-//! [`sink_classify`] is the **mechanism locator**: it identifies *which*
+//! `sink_classify` is the **mechanism locator**: it identifies *which*
 //! sink columns in an attention map are Adaptive NOPs vs Broadcasts.
-//! [`geometry::effective_rank`] is the **aggregate symptom**: it measures
+//! `geometry::effective_rank` is the **aggregate symptom**: it measures
 //! how collapsed the resulting hidden states are across the whole layer.
 //! Broadcast sinks reduce `effective_rank` across tokens (Fesser et al.
 //! Lemma 4); the classifier tells you *why*. Phase 4's `LayerSinkSummary`
-//! (in [`geometry`]) bridges the two.
+//! (in `geometry`) bridges the two.
 //!
-//! [`gold_share`] (Plan 411, Research 392) adds the **content-specific**
+//! `gold_share` (Plan 411, Research 392) adds the **content-specific**
 //! view: it tells you whether the layer's output still carries the *gold*
 //! signal or has been rewritten to carry aggregate noise — orthogonal to
 //! both `effective_rank` (content-agnostic) and `stable_rank_update`
@@ -67,7 +67,7 @@ pub mod claim;
 // ── Feature-gated submodules (sink-aware attention intervention) ────────
 
 /// Representation geometry diagnostics (Plan 151, Research 113).
-/// Gated `sink_aware_attn` because it depends on [`sink_classify`] types.
+/// Gated `sink_aware_attn` because it depends on `sink_classify` types.
 #[cfg(feature = "sink_aware_attn")]
 pub mod geometry;
 

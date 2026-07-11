@@ -6,9 +6,9 @@
 /// LinOSS cell parameters. Pre-allocated in constructor, zero alloc on hot path.
 #[derive(Clone, Debug)]
 pub struct LinOSSCell {
-    /// Angular frequency squared per hidden dimension: ω² [H].
+    /// Angular frequency squared per hidden dimension: `ω² [H]`.
     pub omega_sq: Vec<f32>,
-    /// Damping coefficient per hidden dimension: β [H].
+    /// Damping coefficient per hidden dimension: `β [H]`.
     pub beta: Vec<f32>,
     hidden_dim: usize,
 }
@@ -16,9 +16,9 @@ pub struct LinOSSCell {
 /// LinOSS hidden state (phase-space: position y, velocity z).
 #[derive(Clone, Debug)]
 pub struct LinOSSState {
-    /// Position coordinate [H].
+    /// Position coordinate `[H]`.
     pub y: Vec<f32>,
-    /// Velocity coordinate [H].
+    /// Velocity coordinate `[H]`.
     pub z: Vec<f32>,
 }
 
@@ -115,9 +115,9 @@ impl LinOSSCell {
     /// Zero-alloc parallel scan using pre-allocated scratch buffers.
     /// Reuse `ParallelScanScratch` across calls to avoid repeated allocation.
     ///
-    /// This is a back-compat wrapper: it calls [`parallel_scan_into_flat`] (which writes flat
+    /// This is a back-compat wrapper: it calls [`parallel_scan_into_flat`](Self::parallel_scan_into_flat) (which writes flat
     /// `n*h` result buffers into scratch, zero per-call allocation), then materializes them
-    /// into `Vec<LinOSSState>`. Prefer [`parallel_scan_into_flat`] on hot paths.
+    /// into `Vec<LinOSSState>`. Prefer [`parallel_scan_into_flat`](Self::parallel_scan_into_flat) on hot paths.
     pub fn parallel_scan_with_scratch(
         &self,
         initial: &LinOSSState,
@@ -356,7 +356,7 @@ pub struct ParallelScanScratch {
 }
 
 impl ParallelScanScratch {
-    /// Create empty scratch buffers. Call [`ensure_capacity`] before first use.
+    /// Create empty scratch buffers. Call `ensure_capacity` before first use.
     pub fn new() -> Self {
         Self {
             a: Vec::new(),
@@ -526,7 +526,7 @@ impl VocabFourierBasis {
         }
     }
 
-    /// Reconstruct: token ≈ Σ_k coefficient[k] * mode[k]
+    /// Reconstruct: `token ≈ Σ_k coefficient[k] * mode[k]`
     ///
     /// Allocating version — see `reconstruct_into` for zero-alloc alternative.
     #[inline]
@@ -600,7 +600,7 @@ impl ModalSpecDrafter {
     /// Create a new ModalSpecDrafter.
     ///
     /// - `hidden_dim`: LinOSS hidden dimension (typically 64–256).
-    /// - `vocab_embeddings`: vocabulary embedding vectors [vocab_size][vocab_dim].
+    /// - `vocab_embeddings`: vocabulary embedding vectors `[vocab_size][vocab_dim]`.
     /// - `n_modes`: number of Fourier modes to extract (typically 8–32).
     #[inline]
     pub fn new(hidden_dim: usize, vocab_embeddings: &[&[f32]], n_modes: usize) -> Self {

@@ -510,7 +510,7 @@ impl SlodOperator {
 
 /// Compute heat kernel weights for all nodes given a query point.
 ///
-/// w_i(σ) = Σ_k exp(-λ_k σ) ⟨φ_k, query⟩² · φ_k[i]
+/// `w_i(σ) = Σ_k exp(-λ_k σ) ⟨φ_k, query⟩² · φ_k[i]`
 pub fn heat_kernel_weights(
     eigenvalues: &[f32],
     eigenvectors: &[f32],

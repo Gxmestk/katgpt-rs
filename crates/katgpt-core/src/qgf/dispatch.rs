@@ -11,7 +11,7 @@
 //! dispatch therefore uses **trait delegates**:
 //!
 //! - The **CPU SIMD path** is implemented concretely here (reuses
-//!   [`simd::dot_f32_i8`] + [`simd::fast_sigmoid`] via the oracle's own
+//!   `simd::dot_f32_i8` + `simd::fast_sigmoid` via the oracle's own
 //!   `q_gradient_into`, plus a rayon-parallel batch loop).
 //! - The **GPU batch path** is a trait ([`QgfGpuDelegate`]) that the upper
 //!   layer (`riir-gpu`) implements. katgpt-core provides the dispatch slot
@@ -20,7 +20,7 @@
 //!   layer (`npc_ane_backend`) implements. Same fallback discipline.
 //!
 //! This is the same decoupling pattern used by [`QGradientOracle`] and
-//! [`QgfVarianceSignal`]: katgpt-core defines the abstraction + the math,
+//! `QgfVarianceSignal`: katgpt-core defines the abstraction + the math,
 //! the upper layer supplies the measurement / kernel.
 //!
 //! # When dispatch is a no-op

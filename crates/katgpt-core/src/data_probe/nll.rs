@@ -36,8 +36,8 @@ pub fn average_nll(chain: &MarkovChain, sequence: &[usize]) -> f32 {
 
 /// Full NLL profile: per-position negative log-probabilities.
 ///
-/// Position 0 uses the stationary distribution π[x₀].
-/// Position t > 0 uses the transition P[x_{t-1}][x_t].
+/// Position 0 uses the stationary distribution `π[x₀]`.
+/// Position t > 0 uses the transition `P[x_{t-1}][x_t]`.
 /// Returns -ln(p) for each position.
 pub fn nll_profile(chain: &MarkovChain, sequence: &[usize]) -> Vec<f32> {
     let mut out = vec![0.0f32; sequence.len()];

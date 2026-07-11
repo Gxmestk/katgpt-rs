@@ -39,7 +39,7 @@
 //!   future wake-phase PTGs can emit as single compressed nodes — the
 //!   closed loop.
 //!
-//! [`MotifMiner::mine_batch`]: katgpt_core::closure::MotifMiner::mine_batch
+//! [`MotifMiner::mine_batch`]: crate::closure::MotifMiner::mine_batch
 
 use crate::closure::{
     CdgScore, GateResult, Motif, MotifAdmitter, MotifMiner, PriScores, PrimitiveTransitionGraph,
@@ -72,7 +72,7 @@ pub struct SleepCycleClosureReport {
 ///
 /// **Does not** mutate the miner (mining is `&self`). The caller is
 /// responsible for `miner.observe(ptg)` calls during the wake phase — see
-/// [`katgpt_pruners::closure_wire::PtgTracedPruner::finish_episode`] (wake-phase
+/// `katgpt_pruners::closure_wire::PtgTracedPruner::finish_episode` (wake-phase
 /// decorator; lives in katgpt-pruners per Proposal 003 Phase 8, moved from the
 /// katgpt-rs root crate).
 ///
@@ -159,7 +159,7 @@ fn count_distinct_task_families(corpus: &[PrimitiveTransitionGraph]) -> u32 {
 ///
 /// `success_rate` is the fraction of this cycle's episodes whose depth
 /// exceeded the previous max-train-depth *and* succeeded. See
-/// [`katgpt_core::closure::compute_cdg`] for the EMA formula.
+/// [`crate::compute_cdg`] for the EMA formula.
 #[inline]
 #[must_use]
 pub fn fold_cdg_at_sleep_cycle(

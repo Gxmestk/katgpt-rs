@@ -5,7 +5,7 @@
 //! **gSpan-lite** enumeration that walks each recent PTG and hashes every
 //! connected subgraph of bounded size into a canonical structural key. The
 //! same key observed across many task families ⇒ high PRI ⇒ the
-//! [`crate::admit::MotifAdmitter`] may promote it to a composite primitive.
+//! [`crate::closure::admit::MotifAdmitter`] may promote it to a composite primitive.
 //!
 //! **Canonicalization is structural only** — node kinds + edge operator kinds,
 //! sorted. Ticks and per-node `blake3_in` commitments are intentionally
@@ -184,7 +184,7 @@ impl Motif {
     /// Primitive Reuse Index: fraction of `total_task_families` that contain
     /// this motif.
     ///
-    /// Clamped to `[0, 1]`. Drives the admission gate ([`crate::admit`]).
+    /// Clamped to `[0, 1]`. Drives the admission gate ([`crate::closure::admit`]).
     #[inline]
     #[must_use]
     pub fn primitive_reuse_index(&self, total_task_families: u32) -> f32 {
@@ -381,7 +381,7 @@ impl Default for MotifMiner {
 
 /// Enumerate the **multiset of canonical subgraph hashes** for a single PTG.
 ///
-/// Public so other modules (e.g. [`crate::metrics::compute_tar_score`]) can
+/// Public so other modules (e.g. [`crate::closure::metrics::compute_tar_score`]) can
 /// reuse the same enumeration without re-running the accumulator. Returns
 /// one hash per observed subgraph occurrence (so duplicates are intentional
 /// — they encode multiplicity for Jaccard-multiset comparisons).

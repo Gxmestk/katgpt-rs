@@ -2,8 +2,8 @@
 //! the same operator, measure drift as a verifier-free correctness score.
 //!
 //! Distilled from Flow Reasoning Models (Helbling et al., arXiv:2606.29150).
-//! Research note: [`katgpt-rs/.research/369_Flow_Reasoning_Models_Renoise_CE_Self_Verifier.md`].
-//! Plan: [`katgpt-rs/.plans/406_renoise_ce_self_verifier.md`].
+//! Research note: `katgpt-rs/.research/369_Flow_Reasoning_Models_Renoise_CE_Self_Verifier.md`.
+//! Plan: `katgpt-rs/.plans/406_renoise_ce_self_verifier.md`.
 //!
 //! # What this is
 //!

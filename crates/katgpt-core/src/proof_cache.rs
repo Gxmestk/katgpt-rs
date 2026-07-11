@@ -348,7 +348,7 @@ impl ProofGoalCache {
 
     /// Estimate memory usage in bytes.
     ///
-    /// Approximate: 32 bytes per hash + size_of::<GoalResult>() per entry.
+    /// Approximate: 32 bytes per hash + `size_of::<GoalResult>()` per entry.
     /// Used for GOAT metric reporting and capacity planning.
     pub fn estimated_memory_bytes(&self) -> usize {
         // GoalHash: 32 bytes (blake3::Hash)

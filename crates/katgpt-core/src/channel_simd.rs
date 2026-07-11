@@ -9,7 +9,7 @@ const CACHE_LINE: usize = 64;
 /// Each row is padded to a multiple of CACHE_LINE bytes.
 #[derive(Debug, Clone)]
 pub struct AlignedWeightMatrix {
-    /// Padded data. Row i starts at offsets[i].
+    /// Padded data. Row `i` starts at `offsets[i]`.
     pub data: Vec<f32>,
     /// Row offsets into data (for O(1) row access).
     pub offsets: Vec<usize>,

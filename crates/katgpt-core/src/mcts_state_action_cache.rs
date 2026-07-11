@@ -5,7 +5,7 @@
 //! masked diffusion via deterministic action branching. This module is the
 //! open, modelless, game-IP-free half of the primitive: a lock-free
 //! `StateActionCache` keyed on `(blake3::Hash, InferenceAction)` pairs, plus a
-//! generic [`mcts_search_with_state_action_cache`] entry point that
+//! generic `mcts_search_with_state_action_cache` entry point that
 //! consults/inserts the cache at Expand time.
 //!
 //! # Why this exists (vs the shipped `mcts` substrate)
@@ -30,7 +30,7 @@
 //! Violations cause stale cache hits: a later visit to `(s, a)` reads the
 //! `(s', r)` recorded by an earlier visit, even though re-applying `a` to `s`
 //! would now produce a different result. The Phase 2 debug-mode re-check
-//! ([`StateActionCache::verify_determinism`]) detects such drift empirically,
+//! (`StateActionCache::verify_determinism`) detects such drift empirically,
 //! but the contract itself is trusted in release builds (the re-check is a
 //! diagnostic, not a correctness backstop).
 //!
@@ -481,7 +481,7 @@ pub struct SearchScratch {
 
 impl SearchScratch {
     /// Construct scratch with capacity hints. `node_capacity` should be ≥ the
-    /// expected tree size (use [`MAX_TREE_SIZE`] for the safe default).
+    /// expected tree size (use `MAX_TREE_SIZE` for the safe default).
     #[must_use]
     pub fn with_capacity(node_capacity: usize) -> Self {
         Self {

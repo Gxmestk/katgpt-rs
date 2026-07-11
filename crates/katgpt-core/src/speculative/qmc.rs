@@ -215,7 +215,7 @@ impl SobolQmc {
     ///
     /// `dim` is clamped to [`SOBOL_MAX_DIM`]. Each dimension uses a distinct
     /// primitive polynomial over GF(2), computed at construction via the
-    /// [`find_primitive_poly`] search.
+    /// `find_primitive_poly` search.
     ///
     /// The trait method [`QmcSource::draw`] outputs only dimension 0 (for
     /// 1D compatibility). Use [`draw_nd`](Self::draw_nd) for multi-dimensional
@@ -743,7 +743,7 @@ pub fn fill_noise_queries_gaussian_qmc(
 }
 
 /// Convenience wrapper: fill `queries` with QMC Gaussian noise, then call
-/// [`BoMSampler::sample_k_states`].
+/// [`BoMSampler::sample_k_states`](crate::BoMSampler::sample_k_states).
 ///
 /// This is the one-call "QMC BoM" path — composes
 /// [`fill_noise_queries_gaussian_qmc`] with the kernel's `sample_k_states`.

@@ -7,7 +7,7 @@
 
 /// A Markov chain with known transition matrix and computed properties.
 pub struct MarkovChain {
-    /// Transition matrix P[i][j] = Pr(next=j | current=i).
+    /// Transition matrix `P[i][j] = Pr(next=j | current=i)`.
     pub transition: Vec<Vec<f32>>,
     /// Stationary distribution π.
     pub stationary: Vec<f32>,

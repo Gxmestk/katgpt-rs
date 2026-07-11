@@ -60,10 +60,10 @@
 //! single entry point composing the parallax forward with the dual-policy
 //! NOP/Broadcast classifier from [`crate::data_probe`] (Plan 287, Research 258).
 //!
-//! - [`SinkAwarePolicy::Uniform`] short-circuits to vanilla
+//! - [`SinkAwarePolicy::Uniform`](crate::data_probe::SinkAwarePolicy::Uniform) short-circuits to vanilla
 //!   [`tiled_attention_parallax_forward`] (zero-cost contract: ≤5% overhead,
 //!   measured within noise across n ∈ {64, 128, 256}).
-//! - [`SinkAwarePolicy::DualPolicy`] runs the retained-attention forward into
+//! - [`SinkAwarePolicy::DualPolicy`](crate::data_probe::SinkAwarePolicy::DualPolicy) runs the retained-attention forward into
 //!   a caller-owned `o_temp`, then applies the flat dual-policy gate to produce
 //!   the final output. Caller owns scratch via [`SinkAwareParallaxScratch`] —
 //!   one struct bundles `attn_matrix`, `o_temp`, classifier scratch, and an
@@ -239,7 +239,7 @@ pub fn parallax_correction(sigma_kv: &[f32], rho: &[f32], out: &mut [f32]) {
 pub struct ParallaxScratch {
     /// ρ = W_R · x, length `head_dim`
     pub rho: Vec<f32>,
-    /// Column sums c[j] = Σ_i softmax(i,j), length `seq_len`
+    /// Column sums `c[j] = Σ_i softmax(i,j)`, length `seq_len`
     pub col_sums: Vec<f32>,
     /// Per-row score buffer, length `seq_len`
     pub scores: Vec<f32>,
@@ -587,8 +587,8 @@ pub fn tiled_attention_parallax_forward_retaining(
 /// * `o_temp` — `n×d` buffer that receives the parallax forward output before
 ///   the gate consumes it. The flat gate API is out-of-place (`o: &[f32]`,
 ///   `out: &mut [f32]`) — this buffer is the `o` side.
-/// * `classifier` — [`StableRankScratch`] for the power-iteration kernel.
-/// * `cached` — when `Some`, the wrapper uses [`apply_dual_policy_gate_cached_flat`]
+/// * `classifier` — [`StableRankScratch`](crate::data_probe::StableRankScratch) for the power-iteration kernel.
+/// * `cached` — when `Some`, the wrapper uses [`apply_dual_policy_gate_cached_flat`](crate::data_probe::apply_dual_policy_gate_cached_flat)
 ///   to amortize classifier cost across calls (Plan 287 Issue 001 mitigation).
 ///   `None` runs the classifier every call.
 ///
@@ -660,12 +660,12 @@ impl SinkAwareParallaxScratch {
 ///
 /// # Behavior
 ///
-/// * [`SinkAwarePolicy::Uniform`] — calls vanilla
+/// * [`SinkAwarePolicy::Uniform`](crate::data_probe::SinkAwarePolicy::Uniform) — calls vanilla
 ///   [`tiled_attention_parallax_forward`] directly into `output`. **Zero
 ///   overhead** vs the vanilla path: no attention matrix is retained, no
 ///   temporary buffer is touched, no classifier runs. Returns
-///   [`SinkKind::None`].
-/// * [`SinkAwarePolicy::DualPolicy(_)`] — runs the retained forward into
+///   [`SinkKind::None`](crate::data_probe::SinkKind::None).
+/// * [`SinkAwarePolicy::DualPolicy(_)`](crate::data_probe::SinkAwarePolicy::DualPolicy) — runs the retained forward into
 ///   `sink_scratch.o_temp` while writing the full `n×n` attention matrix into
 ///   `sink_scratch.attn_matrix`, then applies the flat dual-policy gate
 ///   (`o_temp → output`). When `sink_scratch.cached` is `Some`, uses the
@@ -675,8 +675,8 @@ impl SinkAwareParallaxScratch {
 ///
 /// * `q`, `k`, `v`, `output`, `seq_len`, `head_dim`, `scale`, `r`, `x`,
 ///   `parallax_config`, `scratch` — see [`tiled_attention_parallax_forward`].
-/// * `policy`        — [`SinkAwarePolicy::Uniform`] for the zero-cost path;
-///   [`SinkAwarePolicy::DualPolicy`] to invoke the classifier + gate.
+/// * `policy`        — [`SinkAwarePolicy::Uniform`](crate::data_probe::SinkAwarePolicy::Uniform) for the zero-cost path;
+///   [`SinkAwarePolicy::DualPolicy`](crate::data_probe::SinkAwarePolicy::DualPolicy) to invoke the classifier + gate.
 /// * `gate_scale`    — pre-sigmoid logit for the NOP gate. `σ(gate_scale)` is
 ///   the scale applied to NOP-classified output rows. Pass `0.0` for
 ///   σ(0)=0.5 (half-suppression) or a large negative for near-zero.
@@ -686,7 +686,7 @@ impl SinkAwareParallaxScratch {
 ///
 /// # Returns
 ///
-/// The dominant sink's [`SinkKind`] (`None` for Uniform path, or the
+/// The dominant sink's [`SinkKind`](crate::data_probe::SinkKind) (`None` for Uniform path, or the
 /// classifier verdict for DualPolicy path).
 ///
 /// # Feature gates
