@@ -57,16 +57,13 @@
 //!
 //! # Feature gate
 //!
-//! Gated behind `ptg_functor_edges` (implies `closure_instrument`). Opt-in
-//! until the GOAT gate (G1–G4) passes.
+//! Gated behind `ptg_functor_edges` (implies `closure_instrument`). DEFAULT-ON
+//! (Issue 040 GOAT gate G1–G4 ALL PASS, 2026-07-04).
 //!
 //! # References
 //!
-//! - **Issue:** `katgpt-rs/.issues/040_ptg_latent_functor_edge_composition.md`
 //! - **PTG substrate:** `katgpt-rs/crates/katgpt-core/src/closure/mod.rs` (Plan 290)
 //! - **latent_functor (riir-ai):** `riir-engine/src/latent_functor/arithmetic.rs` (Plan 273)
-//! - **Sibling:** Issue 039 — `FunctorEdgeParams.direction_set` can be included
-//!   in the architecture root once this ships.
 
 use crate::closure::PrimitiveTransitionGraph;
 use crate::sigmoid;

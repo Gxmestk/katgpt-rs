@@ -82,9 +82,9 @@
 //! - Precedent (riir-ai): `LoRAWeightVersion` (Issue 354) — the
 //!   `concurrent_lora_no_torn_read` stress test this module's T4.2 test
 //!   generalizes.
-//! - Cross-repo FV coordinator: `katgpt-rs/.issues/012_*` (the freeze/thaw
-//!   reader invariant Lean theorem T2 lives in `riir-ai/.proofs/`; this
-//!   wrapper is its Rust-side spec-match target).
+//! - Cross-repo FV: the freeze/thaw reader invariant Lean theorem T2 lives
+//!   in `riir-ai/.proofs/RiirAiProof/Runtime/FreezeThaw.lean`; this wrapper
+//!   is its Rust-side spec-match target (Issue 348 T2, closed).
 
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, RwLock};

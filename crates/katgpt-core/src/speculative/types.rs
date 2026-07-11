@@ -1043,8 +1043,10 @@ fn compute_entropy(probs: &[f32]) -> f32 {
 ///
 /// # Feature Gate
 ///
-/// `heal_validation` — opt-in until the GOAT gate (G1–G6) passes.
-/// See `katgpt-rs/.issues/133_post_heal_conflict_detection_gap.md`.
+/// `heal_validation` — DEFAULT-ON (Issue 133 GOAT gate G1–G6 ALL PASS, 2026-07-12).
+/// Trait is passive — zero behavior change unless consumers implement it.
+/// Both consumer impls pass GOAT: `ShardConflictDetector` (riir-neuron-db, 30ns),
+/// `HlaConflictDetector` (riir-games, 2ns), both < 50ns target.
 #[cfg(feature = "heal_validation")]
 pub trait HealConflictDetector: Send + Sync {
     /// Check if the healed state is semantically conflicted.

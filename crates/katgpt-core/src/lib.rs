@@ -62,8 +62,8 @@ pub mod linking_fold;
 // best_belief — ε-quantile Beta lower bound for conservative selection
 // (Plan 336, Research 320, RQGM arXiv:2606.26294 Prop. 4). Complements
 // `sample_beta` (Thompson sampling for EXPLORATION) with a conservative
-// EXPLOITATION / SELECTION counterpart. Opt-in until the G1+G2+G4 GOAT gate
-// passes.
+// EXPLOITATION / SELECTION counterpart. DEFAULT-ON (Phase 2 G2-unblock,
+// 2026-06-28): LUT hot path 3.38ns, G1 3.099e-5<1e-4, G4 0 allocs.
 #[cfg(feature = "best_belief")]
 pub mod best_belief;
 #[cfg(feature = "best_belief")]
@@ -165,7 +165,8 @@ pub mod shard_embedding;
 // attention dilution at large N. Default `s_L = 1.0` is truly modelless.
 // Composes with parallax_attn (sigmoid) and attention.rs (SDPA); does NOT
 // apply to funcattn (Research 261 closed negative: basis-mode has no (n,n)
-// attention matrix → no dilution). Opt-in until G1+G2 GOAT gate passes.
+// attention matrix → no dilution). DEFAULT-ON (Plan 411 Phase 5, 2026-07-07):
+// G1+G2+G3+G4+G5 ALL PASS.
 #[cfg(feature = "ssmax_temperature")]
 pub mod ssmax;
 // Position-Offset Reveal-Time Schedule for Set Diffusion (Research 376).
@@ -365,7 +366,7 @@ pub use hga::{GroupSummaryCache, MixedRopeSummarizer};
 // same operator, measure drift as a verifier-free correctness score (Plan 406,
 // Research 369, arxiv 2606.29150). Third orthogonal self-eval signal alongside
 // CLR (claim-vote) and CoE (trajectory-shape). Operator-agnostic trait over any
-// state->state map. Opt-in until G1+G2 GOAT gate passes. NOT a UQ primitive
+// state->state map. DEFAULT-ON (Phase 10, 2026-07-04). NOT a UQ primitive
 // (raw ranking signal; conformal wrapping required for any UQ claim).
 #[cfg(feature = "renoise_ce")]
 pub mod renoise_ce;
@@ -550,7 +551,9 @@ pub mod irrep_pruner;
 // Jacobian SVD via forward differences (Plan 301, Research 279). Pure numeric,
 // no game/shard/chain semantics. Consumers (riir-neuron-db Plan 002, future
 // riir-ai HLA self-discovery plan) apply these to their own maps.
-// Opt-in until G1 GOAT gate passes.
+// DEFAULT-ON (Plan 301 Phase 5 T5.1, 2026-07-02): G1 PASS + G3-precursor PASS
+// + T3.4 latency PASS + G4 PASS. Transitively enabled via viable_manifold_graph
+// + tucker_factorization (both default-on).
 #[cfg(feature = "subspace_phase_gate")]
 pub mod subspace_phase_gate;
 
@@ -581,7 +584,9 @@ pub mod latent_trajectory_geometry;
 // `log det(J_f^T J_f)` (via Plan 301's `jacobian_svd_at`), filters a latent
 // sample to a discrete safe-manifold subgraph, and runs A* / random-walk
 // navigation that stays inside the viable set by construction. Game / shard /
-// chain wiring lives in riir-ai (R154). Opt-in until G1–G6 GOAT gates pass.
+// chain wiring lives in riir-ai (R154). DEFAULT-ON (Plan 312 Phase 5,
+// 2026-06-24): G1-G7 PASS + perf bench PASS (CSR adjacency, manifold_random_walk
+// 7.10 ns/step).
 #[cfg(feature = "viable_manifold_graph")]
 pub mod viable_manifold_graph;
 
@@ -856,7 +861,8 @@ pub use functional_substitution::{HeadSubstitutionGate, iou, worst_case_behavior
 // Research 291, arxiv 2605.31559). Generalizes FUNCATTN to d_src ≠ d_dst,
 // enabling train-on-small-deploy-on-large latent transfer without retraining.
 // Open primitive: frozen BLAKE3-committed bases + zero-alloc transport.
-// Opt-in until G1–G4 GOAT gate passes.
+// DEFAULT-ON (Plan 310 Phase 4, 2026-06-23): G1 mean cos 0.8944>=0.85, G2-A rank
+// preservation, G3 elbow k=8, G4 0 allocs.
 #[cfg(feature = "cross_resolution_transport")]
 pub mod cross_resolution;
 #[cfg(feature = "cross_resolution_transport")]
@@ -871,7 +877,8 @@ pub use cross_resolution::{
 // fourth quadrant: CNA mutates neurons, EmotionDirections is read-only, FPCG
 // refuses mutation — this injects directly into the latent state on the hot
 // path. Zero-alloc SIMD SAXPY + sigmoid-falloff localized support.
-// Opt-in until G1–G5 GOAT gate passes (G2 make-or-break: rank preservation ≥0.95).
+// DEFAULT-ON (Plan 309 Phase 4, 2026-06-23): G1-G5 ALL PASS (G2 mean cos 0.9958,
+// G4 19.2us<1ms, G5 0 allocs).
 #[cfg(feature = "latent_field_steering")]
 pub mod latent_steering;
 #[cfg(feature = "latent_field_steering")]
@@ -947,8 +954,8 @@ pub use phase_rotation::{
 // *toward* a target outside the input's direction (Slerp identity holds for all
 // θ ∈ (0,π)). vMF gate reduces to sigmoid via Eq 17:
 // `δ = -tanh(κ·s_T) = 1 − 2·sigmoid(2κ·s_T)`. §3.5 modelless Path 3 (closed-form
-// trig + sigmoid; no training). Opt-in until G1–G6 GOAT gate passes (G1
-// norm-preservation <1e-4 is the kill switch, mirroring Plan 322's G1).
+// trig + sigmoid; no training). DEFAULT-ON (Plan 405 Phase 2, 2026-07-06):
+// G1-G5 ALL PASS.
 #[cfg(feature = "spherical_steering")]
 pub mod spherical_steering;
 #[cfg(feature = "spherical_steering")]
@@ -1005,8 +1012,9 @@ pub use content_store::{
 
 // Closure-Expansion Instrument (CEI) — PTG recorder + motif miner + PRI/CDG/TaR metrics
 // (Plan 290, Research 264, arxiv 2606.15386, Momennejad & Raileanu). Open measurement
-// layer: turns open-ended inference into observable metrics. Opt-in until G1–G4 GOAT
-// gate passes; G5 demotes to opt-in diagnostic if metrics don't correlate with quality.
+// layer: turns open-ended inference into observable metrics. DEFAULT-ON
+// (Plan 290 T4.7 + G4 fix, 2026-06-26): G1 67us<100us, G2 638us<5ms, G3
+// synthetic-proxy monotone, G4 0.296MB<1MB. 55/55 tests green.
 #[cfg(feature = "closure_instrument")]
 pub mod closure;
 #[cfg(feature = "closure_instrument")]

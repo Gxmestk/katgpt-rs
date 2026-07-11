@@ -51,8 +51,9 @@
 //! # Feature gate
 //!
 //! Gated behind the `committed_field_blend` Cargo feature (implies
-//! `personality_composition` for sigmoid reuse). Opt-in until the GOAT gate
-//! (G1–G5) passes. See `katgpt-rs/.plans/321_sampling_invariant_per_entity_moe_primitive.md`.
+//! `personality_composition` for sigmoid reuse). DEFAULT-ON (2026-06-28, Issue
+//! 005 executed): Plan 321 G1–G5 + riir-ai Plan 336 G6a–G6e + G7a ALL PASS.
+//! See `katgpt-rs/.plans/321_sampling_invariant_per_entity_moe_primitive.md`.
 //!
 //! # References
 //!
