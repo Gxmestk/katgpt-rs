@@ -67,7 +67,7 @@ impl SpeculativeGenerator for MarginalTokenGenerator {
 
         let mut indexed: Vec<(usize, f32)> =
             condition.marginals.iter().copied().enumerate().collect();
-        indexed.sort_unstable_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        indexed.sort_unstable_by(|a, b| b.1.total_cmp(&a.1));
 
         Ok(indexed
             .into_iter()

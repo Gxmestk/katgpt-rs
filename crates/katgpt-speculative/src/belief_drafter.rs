@@ -453,7 +453,7 @@ fn greedy_sample(logits: &[f32]) -> (usize, f32) {
     let (idx, &val) = logits
         .iter()
         .enumerate()
-        .max_by(|a, b| a.1.partial_cmp(b.1).unwrap_or(std::cmp::Ordering::Equal))
+        .max_by(|a, b| a.1.total_cmp(b.1))
         .unwrap_or((0, &0.0f32));
     (idx, val)
 }
