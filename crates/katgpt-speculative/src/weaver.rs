@@ -506,16 +506,17 @@ pub fn weaver_forward(weights: &WeaverWeights, input: &WeaverInput) -> WeaverOut
 
 /// Matrix-vector multiply: `output[j] = Σ_i input[i] · weight[i · out_dim + j]`.
 ///
-/// The weight matrix is `[in_dim, out_dim]` row-major.
+/// The weight matrix is `[in_dim, out_dim]` row-major. Uses AXPY iteration
+/// (for each input element, scale-add the weight row into output) which is
+/// cache-friendly for this layout. The inner AXPY delegates to
+/// `simd_fused_scale_acc` for NEON/AVX2 dispatch.
 #[inline]
 fn matmul_vec(input: &[f32], weight: &[f32], in_dim: usize, out_dim: usize, output: &mut [f32]) {
     output[..out_dim].fill(0.0);
     for i in 0..in_dim {
         let xi = input[i];
         let row = &weight[i * out_dim..(i + 1) * out_dim];
-        for j in 0..out_dim {
-            output[j] += xi * row[j];
-        }
+        katgpt_core::simd::simd_fused_scale_acc(output, row, xi, out_dim);
     }
 }
 
