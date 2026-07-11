@@ -168,37 +168,32 @@ fn sdpa(query: &[f32], ws: &WorkingSet, d: usize) -> Vec<f32> {
         return vec![0.0; d];
     }
 
-    let sqrt_d = (d as f32).sqrt();
+    let inv_sqrt_d = 1.0 / (d as f32).sqrt();
     let n = ws.n_tokens;
 
-    // Compute logits.
+    // Compute logits with pre-computed inv_sqrt_d (multiply, not divide).
     let mut logits = vec![0.0f32; n];
-    let mut max_logit = f32::NEG_INFINITY;
     for (j, logit) in logits.iter_mut().enumerate().take(n) {
         let k = &ws.keys[j * d..(j + 1) * d];
-        *logit = simd_dot_f32(query, k, d) / sqrt_d;
-        if *logit > max_logit {
-            max_logit = *logit;
-        }
+        *logit = simd_dot_f32(query, k, d) * inv_sqrt_d;
     }
 
-    // Softmax (numerically stable).
-    let mut sum_exp = 0.0f32;
-    for logit in logits.iter_mut().take(n) {
-        *logit = (*logit - max_logit).exp();
-        sum_exp += *logit;
-    }
+    // Max-shift via SIMD reduction (branch-free horizontal max).
+    let max_logit = katgpt_core::simd::simd_max_f32(&logits[..n]);
 
-    // Weighted sum of values.
+    // Shifted exp + sum via SIMD primitives.
+    katgpt_core::simd::simd_add_scalar_inplace(&mut logits[..n], -max_logit);
+    katgpt_core::simd::simd_exp_inplace(&mut logits[..n]);
+    let sum_exp = katgpt_core::simd::simd_sum_f32(&logits[..n]);
+
+    // Weighted sum of values: fuse inv into each weight, then SIMD scale-acc.
     let mut out = vec![0.0f32; d];
     if sum_exp > 0.0 {
         let inv = 1.0 / sum_exp;
         for (j, &weight_unscaled) in logits.iter().enumerate().take(n) {
             let weight = weight_unscaled * inv;
             let v = &ws.values[j * d..(j + 1) * d];
-            for i in 0..d {
-                out[i] += weight * v[i];
-            }
+            katgpt_core::simd::simd_fused_scale_acc(&mut out[..d], v, weight, d);
         }
     }
 

@@ -341,15 +341,13 @@ pub fn summarize_chunk_into_with_entropy(
     }
     *entropy_out = entropy;
 
-    // Weighted sum of keys → summary
+    // Weighted sum of keys → summary (SIMD scale-acc inner loop)
     out[..hd].fill(0.0);
     for (score, key_chunk) in scores_buf[..chunk_size]
         .iter()
         .zip(chunk_keys.chunks_exact(hd))
     {
-        for d in 0..hd {
-            out[d] += score * key_chunk[d];
-        }
+        katgpt_core::simd::simd_fused_scale_acc(&mut out[..hd], key_chunk, *score, hd);
     }
 }
 
@@ -367,21 +365,19 @@ fn mean_pool_keys_into(chunk_keys: &[f32], chunk_size: usize, head_dim: usize, o
     if chunk_size == 0 {
         return;
     }
-    // Accumulate all tokens
+    // Accumulate all tokens via SIMD add
     for t in 0..chunk_size {
         let k_start = t * head_dim;
-        for d in 0..head_dim {
-            out[d] += chunk_keys[k_start + d];
-        }
+        katgpt_core::simd::simd_add_inplace(&mut out[..head_dim], &chunk_keys[k_start..k_start + head_dim]);
     }
     // Scale once at the end
     let inv = 1.0 / chunk_size as f32;
-    for d in out[..head_dim].iter_mut() {
-        *d *= inv;
-    }
+    katgpt_core::simd::simd_scale_inplace(&mut out[..head_dim], inv);
 }
 
 /// In-place softmax with max subtraction for numerical stability.
+///
+/// Uses reciprocal-multiply (1 division + N multiplies) instead of N divisions.
 fn softmax_inplace(scores: &mut [f32]) {
     if scores.is_empty() {
         return;
@@ -393,8 +389,9 @@ fn softmax_inplace(scores: &mut [f32]) {
         sum_exp += *s;
     }
     if sum_exp > 0.0 {
+        let inv_sum = 1.0 / sum_exp;
         for s in scores.iter_mut() {
-            *s /= sum_exp;
+            *s *= inv_sum;
         }
     }
 }

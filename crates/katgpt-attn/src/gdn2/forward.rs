@@ -90,12 +90,11 @@ pub fn forward_gdn2<'a>(
     // 1. Embedding: x = wte[token] + wpe[pos]
     let tok_off = token * n;
     let pos_off = pos * n;
-    for i in 0..n {
-        unsafe {
-            *ctx.x.get_unchecked_mut(i) =
-                *weights.wte.get_unchecked(tok_off + i) + *weights.wpe.get_unchecked(pos_off + i);
-        }
-    }
+    katgpt_core::simd::simd_add_into(
+        &mut ctx.x[..n],
+        &weights.wte[tok_off..tok_off + n],
+        &weights.wpe[pos_off..pos_off + n],
+    );
 
     // 2. Layer loop
     for (layer_idx, layer_weights) in weights.layers.iter().enumerate() {
@@ -157,11 +156,7 @@ pub fn forward_gdn2<'a>(
 
         // Output projection + residual
         types::matmul(&mut ctx.x, &layer_weights.attn_wo, &ctx.attn_out, n, n);
-        for i in 0..n {
-            unsafe {
-                *ctx.x.get_unchecked_mut(i) += *ctx.xr.get_unchecked(i);
-            }
-        }
+        katgpt_core::simd::simd_add_inplace(&mut ctx.x[..n], &ctx.xr[..n]);
 
         // MLP: save residual → RMSNorm → MLP → residual
         ctx.xr2[..n].copy_from_slice(&ctx.x[..n]);
@@ -203,11 +198,7 @@ pub fn forward_gdn2<'a>(
             n,
             config.mlp_hidden,
         );
-        for i in 0..n {
-            unsafe {
-                *ctx.x.get_unchecked_mut(i) += *ctx.xr2.get_unchecked(i);
-            }
-        }
+        katgpt_core::simd::simd_add_inplace(&mut ctx.x[..n], &ctx.xr2[..n]);
     }
 
     // Snapshot hidden state

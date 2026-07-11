@@ -32,11 +32,7 @@ impl RatBridgeState {
     /// Uses sigmoid (not softmax) per project constraints.
     /// Returns the computed gate value in [0, 1].
     pub fn compute_gate(&mut self, query: &[f32], gdn2_readout: &[f32]) -> f32 {
-        let dot: f32 = query
-            .iter()
-            .zip(gdn2_readout.iter())
-            .map(|(q, r)| q * r)
-            .sum();
+        let dot = katgpt_core::simd::simd_dot_f32(query, gdn2_readout, query.len());
         // sigmoid, not softmax
         self.alpha = 1.0 / (1.0 + (-dot).exp());
         self.alpha
