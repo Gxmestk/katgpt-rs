@@ -118,7 +118,7 @@ into both self-healing mechanisms as a post-heal validation gate.
 | G3 — No regression | Existing neighbor_heal + feeling_brain tests pass unchanged | All existing tests green |
 | G4 — Zero-allocation | `is_conflicted` uses stack-only, no heap | criterion bench: < 50 ns per check |
 | G5 — Modelless | No training, no backprop — pure threshold checks | API surface has no training types |
-| G6 — Feature gate | Behind `lattice_deduction` (already exists) or new `heal_validation` gate | Default build unchanged |
+| G6 — Feature gate | Behind new `heal_validation` gate (opt-in in katgpt-core, riir-neuron-db, riir-games) | Default build unchanged |
 
 ## Implementation Scope
 
@@ -130,8 +130,9 @@ into both self-healing mechanisms as a post-heal validation gate.
 - [x] Feature gate (`heal_validation` in both `katgpt-core` and `riir-games`)
 - [x] Fix: `riir-neuron-db/src/neighbor_heal.rs:245` — gate `HealConflictDetector` import behind `#[cfg(feature = "heal_validation")]` (was unconditional, broke default build)
 
-**Estimated effort:** 4-6 files. The `ConflictDetector` trait already
-ships — this is adding impls + wiring, not new infrastructure.
+**Estimated effort:** 4-6 files. A new `HealConflictDetector` trait
+(heal-path analog of LDT's `ConflictDetector`, Plan 088) ships in
+`katgpt-core` — the impls + wiring are the main work.
 
 ## Why This Matters
 
@@ -143,20 +144,22 @@ that persists for 5+ ticks. The `neighbor_heal` gap means a healed
 shard can be semantically invalid (non-sensical archetype blend)
 without any check catching it.
 
-The fix is cheap: the `ConflictDetector` trait already exists (Plan 088,
-DEFAULT-ON), and the impls are simple threshold checks (cross-axis
-constraints for emotions, manifold distance for shards). The gain is
-provable: the PoC demonstrates a real failure mode that the current
-code doesn't catch.
+The fix is cheap: a new `HealConflictDetector` trait (heal-path analog
+of LDT's `ConflictDetector`, Plan 088) ships in `katgpt-core` with a
+heal-appropriate signature (`&[f32]` instead of token marginals —
+Interface Segregation). The impls are simple threshold checks
+(cross-axis constraints for emotions, manifold distance + norm +
+variance for shards). The gain is provable: the PoC demonstrates a real
+failure mode that the current code doesn't catch.
 
 ## Cross-References
 
-- `katgpt-rs/crates/katgpt-core/src/speculative/types.rs` — `ConflictDetector` trait (Plan 088)
+- `katgpt-rs/crates/katgpt-core/src/speculative/types.rs` — `HealConflictDetector` trait (Issue 133) + `ConflictDetector` trait (Plan 088)
 - `katgpt-rs/.research/050_LDT_Lattice_Deduction_Transformer.md` — LDT distillation
 - `katgpt-rs/.research/152_LDT_Phase2_Lattice_State_Fusion.md` — LDT Phase 2 (ConflictClauseDB)
-- `riir-neuron-db/src/neighbor_heal.rs` — `neighbor_heal_delta_into` (no validation)
+- `riir-neuron-db/src/neighbor_heal.rs` — `ShardConflictDetector` impl + `neighbor_heal_delta_into` (wire point)
 - `riir-neuron-db/src/mape_k.rs` — `MapeKLoop::plan_with_index` (wire point)
-- `riir-ai/crates/riir-games/src/civ/emotion/feeling_brain.rs` — `evolve_feeling_brain` (wire point)
+- `riir-ai/crates/riir-games/src/civ/emotion/feeling_brain.rs` — `HlaConflictDetector` impl + `evolve_feeling_brain` (wire point)
 - `riir-ai/crates/riir-poc/benches/feeling_brain_goat.rs` — existing feeling_brain PoC
 
 ## TL;DR
@@ -164,8 +167,11 @@ code doesn't catch.
 Two DEFAULT-ON self-healing mechanisms (`neighbor_heal`, `feeling_brain`)
 heal damaged state without validating the result. PoC proves
 `feeling_brain` produces an impossible emotional state (anger + calm
-both > 0.7) that persists for 5+ ticks. LDT's `ConflictDetector` trait
-(Plan 088, already shipped, DEFAULT-ON) can fill this gap with two
-simple impls (`ShardConflictDetector`, `HlaConflictDetector`) wired
-into the heal paths. The fix is cheap (trait exists, impls are threshold
-checks) and the gain is provable (PoC demonstrates the failure mode).
+both > 0.7) that persists for 5+ ticks. A new `HealConflictDetector`
+trait (heal-path analog of LDT's `ConflictDetector`, Plan 088) fills
+this gap with two simple impls (`ShardConflictDetector`,
+`HlaConflictDetector`) wired into the heal paths. The trait uses a
+heal-appropriate signature (`&[f32]`) instead of forcing the
+token-specific `ConflictDetector` signature onto heal validation
+(Interface Segregation). Feature-gated behind `heal_validation` (opt-in)
+until GOAT gate passes.
