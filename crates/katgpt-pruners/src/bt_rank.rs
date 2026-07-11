@@ -107,8 +107,7 @@ impl BtScores {
         let mut ranked: Vec<usize> = (0..self.scores.len()).collect();
         ranked.sort_by(|&a, &b| {
             self.scores[b]
-                .partial_cmp(&self.scores[a])
-                .unwrap_or(std::cmp::Ordering::Equal)
+                .total_cmp(&self.scores[a])
                 .then(a.cmp(&b))
         });
         ranked
