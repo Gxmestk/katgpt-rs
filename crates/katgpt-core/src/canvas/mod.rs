@@ -20,7 +20,7 @@
 //!
 //! This ships on structural/correctness merits, like the DEC `d∘d=0` identity
 //! (Plan 251). The *behavioral* gain (paper §5's 1.73× parameter efficiency)
-//! is training-dependent and tracked separately in `.issues/043`.
+//! is training-dependent and tracked separately in Issue 043 (resolved + removed).
 //!
 //! ## Quick start
 //!
@@ -86,7 +86,7 @@
 //! operators. A systematically biased topology can be *declared* and *verified*
 //! modellessly; only *exploiting* it for a behavioral gain needs riir-train.
 //!
-//! ## Fusion (the Super-GOAT angle, tracked in `.issues/043`)
+//! ## Fusion (the Super-GOAT angle, tracked in Issue 043 — resolved + removed)
 //!
 //! - **F1**: Canvas compiler × DEC reachability → declared causal topology on
 //!   latent positions with graph-theoretic independence guarantees.

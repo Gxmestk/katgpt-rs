@@ -2,7 +2,7 @@
 //!
 //! Defends the structural/correctness contract of the canvas schema compiler.
 //! The GOAT here is **not** a behavioral claim (the paper's 1.73× parameter
-//! efficiency is training-dependent — see `.issues/043`); it is:
+//! efficiency is training-dependent — see Issue 043, resolved + removed); it is:
 //!
 //! - **G1** — Reachability soundness (THE LOAD-BEARING GATE): for a binary
 //!   mask, an absent edge ⟹ `can_reach == false` for all horizons. This is

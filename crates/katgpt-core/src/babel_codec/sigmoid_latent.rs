@@ -56,7 +56,7 @@ pub fn sigmoid(x: f32) -> f32 {
 /// in place.
 ///
 /// `#[repr(C)]` + `Copy` so it can cross FFI / sync boundaries as a POD blob
-/// (relevant for the future LatCal commitment bridge, `.issues/002`).
+/// (relevant for the future LatCal commitment bridge, Issue 002 — resolved + removed).
 #[derive(Clone, Copy, Debug)]
 #[repr(C)]
 pub struct CompressedLatent<const K: usize> {

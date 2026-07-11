@@ -4,7 +4,8 @@
 //! math. It is compiled UNGATED (no `micro_belief` feature required) so that
 //! `sense::reconstruction::ReconstructionState::evolve_hla` can delegate to it
 //! without forcing the opt-in `micro_belief` feature on whenever `sense`
-//! compiles — preserving the G1.4 latency gate decision (`.issues/024_*`).
+//! compiles — preserving the G1.4 latency gate decision (Issue 024, resolved +
+//! removed).
 //!
 //! Two callers, one math:
 //! - [`crate::sense::reconstruction::ReconstructionState::evolve_hla`] passes

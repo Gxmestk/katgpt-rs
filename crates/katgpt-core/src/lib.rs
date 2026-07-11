@@ -796,7 +796,7 @@ pub use compression_drafter::{CompressionDrafter, Lz4FlexDrafter};
 // text codec, the modelless subset of BabelTele), (3) `SigmoidLatentCodec<D>`
 // (generic-trait facade over existing DensityBudget infrastructure, latent-level
 // analog — value is API uniformity, NOT new capability), plus BLAKE3 commitment
-// for the future LatCal chain bridge (.issues/002). Sigmoid, not softmax.
+// for the future LatCal chain bridge (Issue 002, resolved + removed). Sigmoid, not softmax.
 // Opt-in until the G1–G5 GOAT gate passes — the same G2 (≥ 2× on real corpus)
 // gate that killed CompressionDrafter twice.
 #[cfg(feature = "babel_codec")]
