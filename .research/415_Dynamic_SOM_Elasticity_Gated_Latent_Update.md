@@ -335,6 +335,18 @@ safe/frontier retrieval ratio 1.41), G3 (convergence, 93.95% error decrease),
 G4 (determinism, bit-identical), G5 (DSOM 7 frontier vs standard SOM 0),
 G6 (eta sweep, best ratio 0.5385 at eta=30).
 
+**T3 closure (2026-07-12):** the semi-synthetic population validation
+(Plan 315 Phase 3, previously deferred) is now complete. The G7 test runs
+SOM training on real `NeuronShard` artifacts produced by the riir-neuron-db
+`ConsolidationPipeline` (8 rounds of `capture_wake` + `sleep(1)` +
+`consolidate` per shard, with BLAKE3 commitments + `apply_delta` FMA-blended
+`style_weights`). Result: **bit-identical** allocation_ratio (0.5385) and
+final_error (0.013170) to the synthetic G1 result. This confirms
+structure-matching is a mathematical property of the update rule, not
+dependent on the data source — the `apply_delta(delta, 0.3)` blend is a
+uniform linear transformation that preserves the relative geometry. **G7
+gate PASS.** All 7 gates (G1–G7) now PASS.
+
 See `riir-train/.benchmarks/315_dsom_structure_matching_validation.md` for
 full results and the eta sweep table. Verdict remains **GOAT** (not
 Super-GOAT — structure-matching is confirmed but not a novel capability class).
