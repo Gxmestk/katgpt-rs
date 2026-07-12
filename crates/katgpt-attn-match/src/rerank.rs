@@ -11,16 +11,25 @@
 
 use katgpt_core::simd::{maxsim_score, simd_add_inplace, simd_dot_f32, simd_scale_inplace};
 
+#[cfg(feature = "smooth_min_rerank")]
+use katgpt_core::smooth_min_similarity;
+
 // ── Types ─────────────────────────────────────────────────────
 
 /// Reranking method for scoring query–document pairs.
 #[repr(u8)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum RerankMethod {
     /// Cosine similarity on mean-pooled token embeddings.
     Cosine,
     /// MaxSim late-interaction: `Σ_i max_j dot(q_i, d_j)`.
     MaxSim,
+    /// Smooth-Min aggregation of per-token-pair cosines (Issue 041, Research 385).
+    /// Computes `cos(q_i, d_j)` for all token pairs, then aggregates via
+    /// `smooth_min_similarity` — penalizes documents with low-cosine token pairs
+    /// more than plain mean, improving discrimination on multi-token queries.
+    #[cfg(feature = "smooth_min_rerank")]
+    SmoothMin { beta: f32 },
 }
 
 /// A document with its reranking score and original index.
@@ -63,10 +72,20 @@ pub fn rerank(
 
     // Pre-allocate scratch buffers for cosine rerank (avoids per-doc allocation).
     // MaxSim path doesn't need these — skip 2 heap allocations.
-    let (mut q_mean, mut d_mean) = match method {
-        RerankMethod::Cosine => (vec![0.0f32; dim], vec![0.0f32; dim]),
-        RerankMethod::MaxSim => (Vec::new(), Vec::new()),
+    // SmoothMin reuses the d_norms scratch from cosine_score_into.
+    let (mut q_mean, mut d_mean, mut d_norms, mut sm_scratch) = match method {
+        RerankMethod::Cosine => (vec![0.0f32; dim], vec![0.0f32; dim], Vec::<f32>::new(), Vec::<f32>::new()),
+        RerankMethod::MaxSim => (Vec::new(), Vec::new(), Vec::<f32>::new(), Vec::<f32>::new()),
+        #[cfg(feature = "smooth_min_rerank")]
+        RerankMethod::SmoothMin { .. } => {
+            let max_ld = doc_lengths.iter().copied().max().unwrap_or(0);
+            (Vec::new(), Vec::new(), vec![0.0f32; max_ld], vec![0.0f32; lq])
+        }
     };
+
+    // Suppress unused-variable warnings when smooth_min_rerank is off.
+    let _ = &mut d_norms;
+    let _ = &mut sm_scratch;
 
     // Cosine path: mean-pool the query ONCE and reuse across all docs.
     //
@@ -104,6 +123,10 @@ pub fn rerank(
                     &mut d_mean,
                 ),
                 RerankMethod::MaxSim => maxsim_score(query, doc_data, lq, ld, dim),
+                #[cfg(feature = "smooth_min_rerank")]
+                RerankMethod::SmoothMin { beta } => {
+                    smooth_min_score_into(query, doc_data, lq, ld, dim, beta, &mut d_norms, &mut sm_scratch)
+                }
             };
             RerankedDoc {
                 doc_index: i,
@@ -234,6 +257,91 @@ pub fn cosine_score_into(
 pub fn cosine_score(queries: &[f32], documents: &[f32], lq: usize, ld: usize, dim: usize) -> f32 {
     let mut d_norms = vec![0.0f32; ld];
     cosine_score_into(queries, documents, lq, ld, dim, &mut d_norms)
+}
+
+/// Smooth-Min score for multi-token retrieval reranking (Issue 041, Research 385).
+///
+/// For each query token `q_i`, finds the best-matching document token `d_j` (max
+/// cosine), then aggregates the `lq` per-position max-cosines via
+/// [`smooth_min_similarity`] with sharpness `beta`.
+///
+/// This is a hybrid of MaxSim (per-position max) and smooth-min (penalizing
+/// low-cosine positions). Unlike [`cosine_score_into`] (which averages ALL
+/// `lq × ld` cosines), this computes only `lq` cosines — one per query position —
+/// and penalizes positions where even the best match is poor. This improves
+/// discrimination on multi-token queries where distractors accidentally match
+/// at a few positions but have no good match at others.
+///
+/// `d_norms` is caller-owned scratch (length `>= ld`). It's filled each call.
+///
+/// # Arguments
+/// - `query` — flat buffer `[Lq × dim]`
+/// - `doc` — flat buffer `[Ld × dim]`
+/// - `lq` / `ld` — token counts
+/// - `dim` — embedding dimension
+/// - `beta` — smooth-min sharpness (paper uses 1e4; higher = stricter, lower = lenient)
+/// - `d_norms` — scratch buffer for document norms (length `>= ld`)
+/// - `max_cosines` — scratch buffer for per-position max cosines (length `>= lq`)
+#[cfg(feature = "smooth_min_rerank")]
+#[allow(clippy::too_many_arguments)]
+pub fn smooth_min_score_into(
+    query: &[f32],
+    doc: &[f32],
+    lq: usize,
+    ld: usize,
+    dim: usize,
+    beta: f32,
+    d_norms: &mut [f32],
+    max_cosines: &mut [f32],
+) -> f32 {
+    if lq == 0 || ld == 0 || dim == 0 {
+        return 0.0;
+    }
+
+    // Pre-compute document norms once into caller-provided buffer.
+    for j in 0..ld {
+        let d_row = &doc[j * dim..(j + 1) * dim];
+        d_norms[j] = simd_dot_f32(d_row, d_row, dim).sqrt();
+    }
+
+    // For each query token, find the max cosine across all doc tokens.
+    // This gives lq per-position cosines (one per query position).
+    // Reuse caller-provided scratch to avoid per-doc allocation.
+    debug_assert!(max_cosines.len() >= lq);
+    for c in &mut max_cosines[..lq] {
+        *c = f32::NEG_INFINITY;
+    }
+
+    for i in 0..lq {
+        let q_row = &query[i * dim..(i + 1) * dim];
+        let q_norm = simd_dot_f32(q_row, q_row, dim).sqrt();
+        if q_norm < 1e-12 {
+            max_cosines[i] = 0.0;
+            continue;
+        }
+        let inv_q_norm = 1.0 / q_norm;
+        for j in 0..ld {
+            let d_row = &doc[j * dim..(j + 1) * dim];
+            let d_norm = d_norms[j];
+            if d_norm < 1e-12 {
+                continue;
+            }
+            let dot = simd_dot_f32(q_row, d_row, dim);
+            let cos = dot * (inv_q_norm * (1.0 / d_norm));
+            if cos > max_cosines[i] {
+                max_cosines[i] = cos;
+            }
+        }
+    }
+
+    // Replace any -inf (all doc tokens were zero-norm) with 0.
+    for c in &mut max_cosines[..lq] {
+        if !c.is_finite() {
+            *c = 0.0;
+        }
+    }
+
+    smooth_min_similarity(&max_cosines[..lq], beta)
 }
 
 /// Compute mean cosine similarity between two multi-vector embeddings.
@@ -520,6 +628,145 @@ mod tests {
         assert!(
             approx_eq(cs, mcs, 1e-6),
             "mean_cosine_similarity should match cosine_score: {cs} vs {mcs}"
+        );
+    }
+
+    // ── SmoothMin tests (Issue 041, Research 385) ──────────────────
+
+    #[cfg(feature = "smooth_min_rerank")]
+    #[test]
+    fn smooth_min_identical_vectors() {
+        let dim = 4;
+        let q = vec![1.0, 0.0, 0.0, 0.0];
+        let d = vec![1.0, 0.0, 0.0, 0.0];
+        let mut d_norms = vec![0.0f32; 1];
+        let mut max_cos = vec![0.0f32; 1];
+        let score = smooth_min_score_into(&q, &d, 1, 1, dim, 1e4, &mut d_norms, &mut max_cos);
+        assert!(
+            approx_eq(score, 1.0, 1e-4),
+            "identical vectors should give 1.0, got {score}"
+        );
+    }
+
+    #[cfg(feature = "smooth_min_rerank")]
+    #[test]
+    fn smooth_min_empty_returns_zero() {
+        let mut d_norms = vec![];
+        let mut max_cos = vec![];
+        let score = smooth_min_score_into(&[], &[], 0, 0, 4, 1e4, &mut d_norms, &mut max_cos);
+        assert!(approx_eq(score, 0.0, 1e-5));
+    }
+
+    #[cfg(feature = "smooth_min_rerank")]
+    #[test]
+    fn smooth_min_penalizes_mixed_cosines() {
+        // Correct doc: all positions have a moderate match (cos≈0.707)
+        // Distractor: position 0 has exact match (cos=1.0), position 1 has NO match (cos=0.0)
+        // Plain MaxSim: distractor wins (1.0 + 0.0 = 1.0 > 0.707 + 0.707 = 1.414... wait, MaxSim sums)
+        // SmoothMin: correct wins because it penalizes the zero-cosine position.
+        let dim = 2;
+        // q0=[1,0], q1=[0,1]
+        let q = vec![1.0, 0.0, 0.0, 1.0];
+
+        // Correct doc: both tokens = [0.5, 0.5] (cos ≈ 0.707 with both q0 and q1)
+        let correct = vec![0.5, 0.5, 0.5, 0.5];
+        // Distractor: d0=[1,0] (exact match q0, cos=0 with q1), d1=[0,0] (zero, cos=0 with all)
+        // max_cosines for distractor = [1.0, 0.0] — the 0.0 kills it under smooth-min
+        let distractor = vec![1.0, 0.0, 0.0, 0.0];
+
+        let mut d_norms_c = vec![0.0f32; 2];
+        let mut d_norms_d = vec![0.0f32; 2];
+        let mut max_cos_c = vec![0.0f32; 2];
+        let mut max_cos_d = vec![0.0f32; 2];
+        let score_correct = smooth_min_score_into(&q, &correct, 2, 2, dim, 1e4, &mut d_norms_c, &mut max_cos_c);
+        let score_distractor = smooth_min_score_into(&q, &distractor, 2, 2, dim, 1e4, &mut d_norms_d, &mut max_cos_d);
+
+        assert!(
+            score_correct > score_distractor,
+            "all-moderate ({score_correct}) should beat mixed ({score_distractor})"
+        );
+    }
+
+    #[cfg(feature = "smooth_min_rerank")]
+    #[test]
+    fn rerank_smooth_min_orders_by_similarity() {
+        let dim = 4;
+        let query: Vec<f32> = vec![1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0]; // 2 tokens
+
+        // Doc 0: aligned with both query tokens
+        let doc0: Vec<f32> = vec![1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0];
+        // Doc 1: orthogonal to both query tokens
+        let doc1: Vec<f32> = vec![0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0];
+
+        let docs = vec![doc0, doc1];
+        let doc_lengths = vec![2, 2];
+
+        let ranked = rerank(
+            &query,
+            &docs,
+            &doc_lengths,
+            dim,
+            RerankMethod::SmoothMin { beta: 1e4 },
+        );
+        assert_eq!(
+            ranked[0].doc_index, 0,
+            "doc0 should rank first (more similar)"
+        );
+        assert!(ranked[0].score > ranked[1].score);
+    }
+
+    #[cfg(feature = "smooth_min_rerank")]
+    #[test]
+    fn smooth_min_beats_cosine_on_mixed_match_distractor() {
+        // The canonical scenario from the PoC (Issue 041):
+        // Correct doc: all-moderate cosines (no exact match, but all positions close)
+        // Distractor: 2 exact matches + 2 orthogonal positions
+        // Plain cosine (mean-pooled) ties them; smooth-min correctly prefers the correct doc.
+        let dim = 4;
+        // Query tokens (unit vectors along axes):
+        let query = vec![
+            1.0, 0.0, 0.0, 0.0, // q0
+            0.0, 1.0, 0.0, 0.0, // q1
+            0.0, 0.0, 1.0, 0.0, // q2
+            0.0, 0.0, 0.0, 1.0, // q3
+        ];
+
+        // Correct doc: all cosines = 0.5 (each token is 0.5 along the matching axis)
+        let half_sqrt3 = 0.5 * 3.0f32.sqrt();
+        let correct = vec![
+            0.5, half_sqrt3, 0.0, 0.0, // cos(q0,d0) = 0.5
+            0.0, 0.5, half_sqrt3, 0.0, // cos(q1,d1) = 0.5
+            0.0, 0.0, 0.5, half_sqrt3, // cos(q2,d2) = 0.5
+            half_sqrt3, 0.0, 0.0, 0.5, // cos(q3,d3) = 0.5
+        ];
+
+        // Distractor: 2 exact (cos=1.0) + 2 orthogonal (cos=0.0)
+        // d0=q0 (exact), d1=q0 (orthogonal to q1), d2=q0 (orthogonal to q2), d3=q3 (exact)
+        let distractor = vec![
+            1.0, 0.0, 0.0, 0.0, // cos(q0,d0) = 1.0 (exact)
+            1.0, 0.0, 0.0, 0.0, // cos(q1,d1) = 0.0 (orthogonal to q1=[0,1,0,0])
+            1.0, 0.0, 0.0, 0.0, // cos(q2,d2) = 0.0 (orthogonal to q2=[0,0,1,0])
+            0.0, 0.0, 0.0, 1.0, // cos(q3,d3) = 1.0 (exact)
+        ];
+
+        let docs = vec![correct, distractor];
+        let doc_lengths = vec![4, 4];
+
+        // Plain cosine (mean-pooled): both docs give mean cosine ≈ 0.5 (tie).
+        // Smooth-min: correct doc (all-0.5) beats distractor (1,0,0,1) because
+        // smooth-min penalizes the zero-cosine positions.
+        let smooth_ranked = rerank(
+            &query,
+            &docs,
+            &doc_lengths,
+            dim,
+            RerankMethod::SmoothMin { beta: 1e4 },
+        );
+
+        assert_eq!(
+            smooth_ranked[0].doc_index, 0,
+            "smooth-min should rank correct doc first, got score {} vs {}",
+            smooth_ranked[0].score, smooth_ranked[1].score
         );
     }
 }

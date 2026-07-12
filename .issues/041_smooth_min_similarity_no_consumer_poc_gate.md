@@ -121,27 +121,51 @@ Zero consumers. The primitive is proven to work (GOAT PoC PASS, modelless gain) 
 
 ---
 
-## Consumer Prerequisites (unchanged — still blocked)
+## Consumer Wiring: Rerank Module (T4 — attempted, GOAT FAILED)
 
-The primitive is shipped but has no callers. The three consumer paths remain blocked:
+**Attempted (2026-07-12):** Wired `smooth_min_similarity` as `RerankMethod::SmoothMin` in
+`katgpt-attn-match/src/rerank.rs` behind the `smooth_min_rerank` feature flag.
 
-### Path A — ItemEmbedIndex per-token path (riir-neuron-db)
+**The wiring:** `smooth_min_score_into` computes per-position max cosine (for each
+query token, find the best-matching doc token), then aggregates via
+`smooth_min_similarity`. This is a hybrid of MaxSim (per-position max) and
+smooth-min (penalizing low-cosine positions).
 
-ItemEmbedIndex (Plan 362, default-on) stores one 8-dim schema-centroid embedding per item. To use smooth-min, it needs a per-token embedding path: decompose "enchanted silver sword" into 3 token embeddings, compute per-position cosine, aggregate via smooth-min.
+**GOAT gate result: FAILED ❌**
 
-**Effort:** medium. The smooth-min call is a 3-line addition to `ItemEmbedIndex::query` once per-token embeddings exist.
+| Gate | Result | Details |
+|------|--------|--------|
+| G1 (quality) | FAIL | SmoothMin recall@5 = 0.385 vs Cosine 0.495 (−11pp) |
+| G2 (latency) | FAIL | 46µs vs 8µs per query (5× slower — O(lq×ld×dim) vs O(dim)) |
+| G3 (no-regression) | PASS | All methods produce finite scores; Cosine/MaxSim unchanged |
 
-### Path B — AnyRAG real retrieval backend (riir-neuron-db)
+**Why G1 failed:** The original PoC used **position-aligned** cosines (q_i vs d_i),
+which smooth-min was designed for. The rerank module's API doesn't have position
+alignment — it computes all-pairs or mean-pooled cosines. The per-position-max
+adaptation (max_j cos(q_i, d_j)) is a different signal that doesn't provide the
+same quality gain. Mean-pooled cosine is more robust for small token counts (4
+tokens) because it aggregates ALL token information into a single vector.
 
-`gateway.rs::request_ruling` is a stub. When AnyRAG gets a real backend, smooth-min would score retrieved patterns against the conflict context.
+**Why G2 failed:** The per-position-max approach is O(lq×ld×dim) per document,
+same as MaxSim. Cosine is O(dim) per document (mean-pooled). SmoothMin will
+always be ~lq×ld slower than Cosine.
 
-**Effort:** large (the backend itself is the work; smooth-min is a small scoring function).
+**Decision:** The feature stays opt-in (`smooth_min_rerank`). The wiring is
+correct and tested (17 tests pass), but the GOAT gate honestly shows SmoothMin
+doesn't beat Cosine on this task. The quality gap might be different on a
+task with position-aligned tokens (e.g., sequence matching where q_i aligns
+with d_i). The rerank module's API doesn't naturally support position-aligned
+comparison — a future consumer with position alignment might show a gain.
 
-### Path C — Soft Engram fallback (katgpt-rs)
+**What this means for `smooth_min_similarity` promotion:** The primitive is
+proven to work (original PoC PASS: +12pp recall@5), but the rerank consumer
+doesn't demonstrate a gain. Promotion to default-on still requires a consumer
+whose GOAT gate passes. The rerank consumer is a negative result — it shows
+that smooth-min doesn't beat mean-pooled cosine on all-pairs retrieval.
 
-Engram (Plan 299) is exact-hash only. A "soft Engram" would add a cosine-fallback tier when the exact hash misses, scored by smooth-min over the Engram table's stored patterns.
+## Consumer Paths (status updated 2026-07-12)
 
-**Effort:** medium. Requires Engram to expose its stored patterns for cosine scan.
+The primitive is shipped. Consumer wiring status:
 
 ---
 
@@ -151,7 +175,7 @@ Engram (Plan 299) is exact-hash only. A "soft Engram" would add a cosine-fallbac
 - [x] **T1** (done 2026-07-12) Implement `smooth_min_similarity` + `edit_penalty` in `katgpt-core/src/similarity.rs` behind feature flag `smooth_min_similarity`. 24 unit tests PASS.
 - [-] **T2** (deferred) When ItemEmbedIndex grows a per-token embedding path (Path A), wire smooth-min as the multi-token query scorer.
 - [-] **T3** (deferred) When AnyRAG gets a real retrieval backend (Path B), wire smooth-min as the scoring function.
-- [-] **T4** (deferred) When Engram adds a soft-fallback tier (Path C), wire smooth-min as the fallback scorer.
+- [-] **T4** (attempted 2026-07-12, GOAT FAILED) Wired smooth-min as `RerankMethod::SmoothMin` in `katgpt-attn-match/src/rerank.rs`. GOAT gate FAILED: SmoothMin recall@5 (0.385) < Cosine (0.495). The rerank module's all-pairs/mean-pooled API doesn't match smooth-min's position-aligned design. Feature stays opt-in.
 - [-] **T5** (deferred) When a consumer's GOAT gate passes with smooth-min enabled → promote to default-on.
 
 ---
@@ -167,4 +191,4 @@ Engram (Plan 299) is exact-hash only. A "soft Engram" would add a cosine-fallbac
 
 ## TL;DR
 
-**PoC PASS, primitive shipped (opt-in).** The Research 385 §4 spec said "synthetic PoC" — the issue's "blocked on consumer prerequisites" was wrong. The PoC showed +12pp recall@5 gain, ~0ns overhead, robust across β. The primitive is in `katgpt-core/src/similarity.rs` behind `smooth_min_similarity` (opt-in, 24 tests). Promotion to default-on waits for a consumer (ItemEmbedIndex / AnyRAG / soft Engram) to wire it and pass a GOAT gate.
+**PoC PASS, primitive shipped (opt-in). Consumer wiring attempted (rerank module) — GOAT FAILED.** The Research 385 §4 spec said "synthetic PoC" — the issue's "blocked on consumer prerequisites" was wrong. The PoC showed +12pp recall@5 gain, ~0ns overhead, robust across β. The primitive is in `katgpt-core/src/similarity.rs` behind `smooth_min_similarity` (opt-in, 24 tests). The first consumer wiring (rerank module `smooth_min_rerank`) honestly FAILED the GOAT gate: SmoothMin recall@5 (0.385) < Cosine (0.495) on the rerank task, because the rerank module's all-pairs API doesn't match smooth-min's position-aligned design. Promotion to default-on still waits for a consumer whose GOAT gate passes — likely one with position-aligned token comparison (e.g., sequence matching, not all-pairs retrieval).
