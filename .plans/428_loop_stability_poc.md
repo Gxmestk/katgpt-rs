@@ -1,0 +1,116 @@
+# Plan 428: Loop Stability PoC — Parameter-Free Architectural Fixes for T-pass
+
+**Date:** 2026-07-12
+**Research:** [katgpt-rs/.research/414_Fully_Looped_Transformer_Readout_Blind_Spot.md](../.research/414_Fully_Looped_Transformer_Readout_Blind_Spot.md)
+**Source papers:** [arXiv:2605.18797](https://arxiv.org/abs/2605.18797) (Fully Looped Transformer) + [arXiv:2606.24898](https://arxiv.org/abs/2606.24898) (Readout Blind Spot)
+**Target:** `katgpt-rs/benches/loop_stability_poc.rs` (PoC benchmark) + `katgpt-rs/src/transformer.rs` (implementation behind feature flag)
+**Status:** Active — Phase 1 (PoC)
+
+---
+
+## Goal
+
+Empirically validate whether three parameter-free architectural fixes improve T-pass (LT2) loop stability without training. The PoC follows the §3.6 defend-wrong protocol: test multiple competitors head-to-head on a controlled toy benchmark, print a verdict table, and honestly report which fixes work and which don't.
+
+**The claim to defend:** "Inter-loop RMSNorm, Fully Looped Architecture, and Attention Injection reduce residual explosion and improve output stability in looped transformers, without gradient descent."
+
+**Competitors:**
+1. **Baseline** — vanilla looped transformer (current T-pass behavior, no fixes)
+2. **Inter-loop RMSNorm** — normalize hidden state between loop iterations
+3. **FLA-res** — Fully Looped Architecture via direct residual addition of prev_h to each layer
+4. **Attention Injection** — route prev_h as cross-attention Query in each layer
+5. **Combined** — inter-loop RMSNorm + FLA-res (best of architectural fixes)
+6. **Fixed decay gate** — set per-loop residual gate to 0.8 decay (model-based path improvement)
+
+**Metrics:**
+- **G1: Residual norm growth** — `||h^(τ)||` per loop iteration τ. Target: fixes keep norm < 10× initial; baseline explodes > 100×.
+- **G2: Output stability** — KL divergence between loop τ and loop τ-1 output distributions. Target: fixes maintain KL < 1.0; baseline diverges.
+- **G3: Latency overhead** — per-loop time. Target: < 5% overhead per fix.
+- **G4: Convergence** — does the hidden state reach a fixed point (step size → 0)? Target: fixes converge; baseline doesn't.
+
+## Phase 1 — PoC (defend-wrong benchmark)
+
+### Tasks
+
+- [x] **T1.1** Create `examples/loop_stability_poc.rs` — standalone toy looped transformer benchmark (self-contained, std-only)
+  - Small transformer: 6 layers, d_model=256, 4 heads, vocab=256
+  - Random weights (seeded for reproducibility) — tests structural stability, not task performance
+  - T=12 loop iterations (where instability manifests per the FLT paper)
+  - Input: single token, position 0
+  - No KV cache (single-token, single-position — simplifies to pure loop dynamics)
+  - Measure: hidden-state RMS norm per loop, logit KL divergence vs previous loop, step size (||h^τ - h^(τ-1)||), wall-clock per loop
+- [x] **T1.2** Implement Baseline competitor — vanilla looped transformer (RMSNorm per layer, no inter-loop norm, prev_h only for post-loop gate)
+- [x] **T1.3** Implement Inter-loop RMSNorm competitor — add `rmsnorm(&mut ctx.x)` between loop iterations (after inner layer loop, before residual gate)
+- [x] **T1.4** Implement FLA-res competitor — add `prev_h` to each layer's residual (direct addition before RMSNorm)
+- [x] **T1.5** Implement Attention Injection competitor — use `prev_h` as Q in attention when τ > 0 (K, V from current layer)
+- [x] **T1.6** Implement Combined competitor — inter-loop RMSNorm + FLA-res
+- [x] **T1.7** Implement Fixed decay gate competitor — set residual gate to 0.8 (deterministic, not learned)
+- [x] **T1.8** Run all competitors, collect metrics, print verdict table
+- [x] **T1.9** Honest reporting — if any fix DOESN'T improve stability, report it honestly (defend-wrong)
+
+### PoC Results (2026-07-12)
+
+**File:** `examples/loop_stability_poc.rs` (529 lines, std-only, clippy-clean)
+
+**Key findings (defend-wrong verdict):**
+
+| Competitor | G1 Ratio | G2 KL | G3 OH | G4 Step | Verdict |
+|---|---|---|---|---|---|
+| Baseline | 11.19x | 0.0128 | 0% | 6.85 | Norm barely explodes (11x); no convergence |
+| InterNorm | **3.34x** | **0.0008** | -1.2% | 2.05 | **Only fix that controls norm**; best KL; converging |
+| FLA-res | 2.2B x | 0.0000* | 0.4% | 12.8B | **CATASTROPHIC explosion** — adding prev_h at every layer amplifies |
+| AttnInj | 11.19x | 0.0128 | -0.6% | 6.85 | **No-op** — Q irrelevant for single-pos attention (softmax(1)=1.0) |
+| Combined | 589M x | 0.0000* | -1.0% | 3.3B | FLA-res dominates; InterNorm can't compensate |
+| DecayGate | 1309x | 0.0046 | -0.7% | 3914 | 0.8 decay accumulates; norm explodes |
+
+*KL=0.0000 for FLA-res/Combined is a **false pass** — logits are so large that softmax saturates to a degenerate one-hot distribution that doesn't change between loops.
+
+**Honest assessment:**
+- **Inter-loop RMSNorm is the only fix that works.** It controls norm growth (3.34x vs 11.19x baseline), produces the lowest KL (0.0008), and shows a decreasing step-size trend (14.9 → 2.05). It should be promoted to Phase 2 implementation.
+- **FLA-res is actively harmful.** Direct residual addition of prev_h at every layer causes catastrophic norm explosion (~7x growth per loop). The FLA paper likely uses a different injection mechanism (gated, not direct addition). Direct residual addition is the wrong approach.
+- **Attention Injection is a no-op for single-position attention.** Q doesn't affect the output because softmax of a single element is always 1.0. This fix requires multi-position attention to have any effect.
+- **Combined fails because FLA-res dominates.** Inter-loop RMSNorm between loops cannot compensate for 6 intra-loop additions of prev_h.
+- **Fixed decay gate (0.8) causes accumulation explosion.** The 0.8 factor is too high — each loop's state persists at 80%, causing geometric growth. A much smaller decay (e.g., 0.1) might work but would need tuning.
+- **G2 (KL < 1.0) is too lenient** — all competitors pass, including the exploding ones (via softmax saturation). A better G2 would check logit norm or entropy.
+- **G4 (convergence) fails for all** at T=12 with this init scale. InterNorm shows the best trend (step decreasing 14.9 → 2.05) but doesn't reach < 0.1.
+
+**Phase 2 recommendation:** Implement only Inter-loop RMSNorm behind `loop_stability_fix` feature flag. Drop FLA-res (direct addition is wrong) and AttnInj (no-op for single position). The Combined variant is moot if FLA-res is dropped.
+
+### Verdict table format
+
+```
+┌────────────────────────────┬──────────┬──────────┬──────────┬──────────┬──────────┐
+│ Competitor                 │ G1 Norm  │ G2 KL    │ G3 Lat   │ G4 Conv  │ Verdict  │
+│                            │ τ=12     │ τ=12     │ %/loop   │ step@12  │          │
+├────────────────────────────┼──────────┼──────────┼──────────┼──────────┼──────────┤
+│ Baseline (vanilla)         │          │          │          │          │          │
+│ Inter-loop RMSNorm         │          │          │          │          │          │
+│ FLA-res                    │          │          │          │          │          │
+│ Attention Injection        │          │          │          │          │          │
+│ Combined (norm + FLA)      │          │          │          │          │          │
+│ Fixed decay gate (0.8)     │          │          │          │          │          │
+└────────────────────────────┴──────────┴──────────┴──────────┴──────────┴──────────┘
+```
+
+## Phase 2 — Implementation (if PoC passes)
+
+### Tasks
+
+- [ ] **T2.1** Add `loop_stability_fix` feature flag to `katgpt-rs/Cargo.toml`
+- [ ] **T2.2** Implement inter-loop RMSNorm in `forward_looped` (behind feature flag, byte-identical when off)
+- [ ] **T2.3** Implement FLA in `forward_looped` (behind feature flag)
+- [ ] **T2.4** Implement Attention Injection in `forward_looped` (behind feature flag)
+- [ ] **T2.5** Add `LoopStabilityMode` enum: `None`, `InterLoopNorm`, `FLARes`, `AttentionInjection`, `Combined`
+- [ ] **T2.6** Wire into `Config` (opt-in, zero cost when `None`)
+- [ ] **T2.7** Run existing LT2 GOAT tests (Plan 108) — verify byte-identical when feature is off
+- [ ] **T2.8** GOAT gate: G1 (norm control), G2 (no quality regression), G3 (latency < 5%), G4 (convergence)
+
+## Phase 3 — Model-based path notes (for riir-train)
+
+### Tasks
+
+- [ ] **T3.1** Document model-based improvements for riir-train:
+  - Train with FLT fixes (weights adapted to looped architecture)
+  - Explicit norm penalty in training loss (Readout Blind Spot's training fix)
+  - Stochastic loop count during training (2606.29983)
+- [ ] **T3.2** Note in Proposal 018 §7.3 that the modelless path (Phase 2) should be exhausted before any riir-train deferral
