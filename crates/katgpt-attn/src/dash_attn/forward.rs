@@ -114,6 +114,14 @@ pub fn forward_dash_attn_prefill(
 
             ctx.xr2[..n].copy_from_slice(&ctx.x[..n]);
             types::rmsnorm(&mut ctx.x);
+            #[cfg(feature = "gated_mlp")]
+            {
+                // SwiGLU: SiLU(W_gate·h) ⊙ W_up·h → W_down·hidden
+                types::matmul(&mut ctx.hidden, &layer_weights.mlp_w1, &ctx.x, config.mlp_hidden, n);
+                types::matmul(&mut ctx.hidden2, &layer_weights.mlp_w_up, &ctx.x, config.mlp_hidden, n);
+                types::swiglu_inplace(&mut ctx.hidden, &ctx.hidden2);
+            }
+            #[cfg(not(feature = "gated_mlp"))]
             types::matmul_relu(
                 &mut ctx.hidden,
                 &layer_weights.mlp_w1,
@@ -239,6 +247,14 @@ pub fn forward_dash_attn_decode<'a>(
 
         ctx.xr2[..n].copy_from_slice(&ctx.x[..n]);
         types::rmsnorm(&mut ctx.x);
+        #[cfg(feature = "gated_mlp")]
+        {
+            // SwiGLU: SiLU(W_gate·h) ⊙ W_up·h → W_down·hidden
+            types::matmul(&mut ctx.hidden, &layer_weights.mlp_w1, &ctx.x, config.mlp_hidden, n);
+            types::matmul(&mut ctx.hidden2, &layer_weights.mlp_w_up, &ctx.x, config.mlp_hidden, n);
+            types::swiglu_inplace(&mut ctx.hidden, &ctx.hidden2);
+        }
+        #[cfg(not(feature = "gated_mlp"))]
         types::matmul_relu(
             &mut ctx.hidden,
             &layer_weights.mlp_w1,

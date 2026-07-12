@@ -101,3 +101,9 @@ hippocampal_cache = ["katgpt-core/hippocampal_cache"]
 # chunk selection + katgpt_core::hga::GroupSummaryCache for group selection +
 # katgpt_kv::tiered_kv::TieredKvStore for route-and-fetch.
 hga = ["katgpt-core/hga"]
+
+# Gated MLP (SwiGLU) — LLaMA-style gated MLP variant (Issue 377).
+# Forwards to katgpt-forward so ForwardContext.hidden2 resolves, and to
+# katgpt-transformer so LayerWeights.mlp_w_up resolves. Gates the SwiGLU
+# MLP path in gdn2/forward.rs, gdn2/tree_forward.rs, and dash_attn/forward.rs.
+gated_mlp = ["katgpt-forward/gated_mlp", "katgpt-transformer/gated_mlp"]

@@ -210,6 +210,17 @@ pub fn swiglu(hidden: &mut [f32], gate: &[f32], up: &[f32]) {
     }
 }
 
+/// SwiGLU in-place: `hidden[j] = silu(hidden[j]) * up[j]`.
+///
+/// The [`swiglu`] implementation copies `gate` into a local SIMD buffer before
+/// writing to `hidden`, so it is safe for `hidden` to alias the gate input.
+/// This wrapper provides that aliasing without `unsafe` at call sites.
+#[inline(always)]
+pub fn swiglu_inplace(hidden: &mut [f32], up: &[f32]) {
+    let gate = unsafe { core::slice::from_raw_parts(hidden.as_ptr(), hidden.len()) };
+    swiglu(hidden, gate, up);
+}
+
 /// RMSNorm with learnable gamma (gain) vector.
 /// Gemma 2 stores gamma as (gamma-1), so +1 is added during load.
 /// `x` is normalized in-place then scaled by `gamma[i]`:

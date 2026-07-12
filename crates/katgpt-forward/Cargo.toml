@@ -272,6 +272,11 @@ tri_mode = []
 # through katgpt_core + this crate.
 dmax_spd = []
 
+# Gated MLP (SwiGLU) — LLaMA-style gated MLP variant (Issue 377).
+# Gates: ForwardContext.hidden2 buffer (the "up" projection scratch).
+# Forwards to katgpt-transformer so LayerWeights.mlp_w_up resolves.
+gated_mlp = ["katgpt-transformer/gated_mlp"]
+
 # ── Plan 400 (2026-07-05): features consumed by the moved flashar cluster ──
 # (`flashar_anchor.rs`, `flashar_consensus.rs` moved from root
 # `src/speculative/`). Each is a tracking flag here — it gates a cfg block in

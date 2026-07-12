@@ -50,6 +50,12 @@ pub struct ForwardContext {
     pub attn_out: Vec<f32>,     // [n_embd] attention output
     pub scores: Vec<f32>,       // [block_size] attention scores (max possible)
     pub hidden: Vec<f32>,       // [mlp_hidden] MLP hidden
+    // Gated MLP (Issue 377): second hidden buffer for the "up" projection.
+    // When `gated_mlp` is enabled, the forward path computes
+    // gate = W_gate·h into `hidden`, up = W_up·h into `hidden2`,
+    // then applies swiglu(hidden, hidden, hidden2).
+    #[cfg(feature = "gated_mlp")]
+    pub hidden2: Vec<f32>, // [mlp_hidden] MLP up-projection scratch
     pub logits: Vec<f32>,       // [vocab_size] output logits
     pub cdf: Vec<f32>,          // [vocab_size] pre-allocated CDF for sampling
     pub hidden_state: Vec<f32>, // [n_embd] final hidden state (Plan 009 compat)
@@ -164,6 +170,8 @@ impl ForwardContext {
             attn_out: vec![0.0; config.n_embd],
             scores: vec![0.0; config.block_size],
             hidden: vec![0.0; config.mlp_hidden],
+            #[cfg(feature = "gated_mlp")]
+            hidden2: vec![0.0; config.mlp_hidden],
             logits: vec![0.0; config.vocab_size],
             cdf: vec![0.0; config.vocab_size],
             hidden_state: vec![0.0; config.n_embd],

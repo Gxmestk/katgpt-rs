@@ -479,6 +479,14 @@ pub fn forward_looped<'a>(
             // MLP: save residual → RMSNorm → MLP → residual
             ctx.xr2[..n].copy_from_slice(&ctx.x[..n]);
             crate::types::rmsnorm(&mut ctx.x);
+            #[cfg(feature = "gated_mlp")]
+            {
+                // SwiGLU: SiLU(W_gate·h) ⊙ W_up·h → W_down·hidden
+                crate::types::matmul(&mut ctx.hidden, &layer_weights.mlp_w1, &ctx.x, config.mlp_hidden, n);
+                crate::types::matmul(&mut ctx.hidden2, &layer_weights.mlp_w_up, &ctx.x, config.mlp_hidden, n);
+                crate::types::swiglu_inplace(&mut ctx.hidden, &ctx.hidden2);
+            }
+            #[cfg(not(feature = "gated_mlp"))]
             crate::types::matmul_relu(
                 &mut ctx.hidden,
                 &layer_weights.mlp_w1,
@@ -964,6 +972,14 @@ fn forward_single_layer(
     // MLP: save residual → RMSNorm → MLP → residual
     ctx.xr2[..n].copy_from_slice(&ctx.x[..n]);
     types::rmsnorm(&mut ctx.x);
+    #[cfg(feature = "gated_mlp")]
+    {
+        // SwiGLU: SiLU(W_gate·h) ⊙ W_up·h → W_down·hidden
+        types::matmul(&mut ctx.hidden, &layer_weights.mlp_w1, &ctx.x, config.mlp_hidden, n);
+        types::matmul(&mut ctx.hidden2, &layer_weights.mlp_w_up, &ctx.x, config.mlp_hidden, n);
+        types::swiglu_inplace(&mut ctx.hidden, &ctx.hidden2);
+    }
+    #[cfg(not(feature = "gated_mlp"))]
     types::matmul_relu(
         &mut ctx.hidden,
         &layer_weights.mlp_w1,
@@ -1462,6 +1478,14 @@ pub fn forward_prefill<'a>(
             // MLP: residual → RMSNorm → MLP → residual
             ctx.xr2[..n].copy_from_slice(&ctx.x[..n]);
             crate::types::rmsnorm(&mut ctx.x);
+            #[cfg(feature = "gated_mlp")]
+            {
+                // SwiGLU: SiLU(W_gate·h) ⊙ W_up·h → W_down·hidden
+                crate::types::matmul(&mut ctx.hidden, &layer_weights.mlp_w1, &ctx.x, config.mlp_hidden, n);
+                crate::types::matmul(&mut ctx.hidden2, &layer_weights.mlp_w_up, &ctx.x, config.mlp_hidden, n);
+                crate::types::swiglu_inplace(&mut ctx.hidden, &ctx.hidden2);
+            }
+            #[cfg(not(feature = "gated_mlp"))]
             crate::types::matmul_relu(
                 &mut ctx.hidden,
                 &layer_weights.mlp_w1,
@@ -1986,6 +2010,14 @@ pub fn forward_paged<'a>(
         // MLP: save residual → RMSNorm → MLP → residual
         ctx.xr2[..n].copy_from_slice(&ctx.x[..n]);
         rmsnorm(&mut ctx.x);
+        #[cfg(feature = "gated_mlp")]
+        {
+            // SwiGLU: SiLU(W_gate·h) ⊙ W_up·h → W_down·hidden
+            types::matmul(&mut ctx.hidden, &layer_weights.mlp_w1, &ctx.x, config.mlp_hidden, n);
+            types::matmul(&mut ctx.hidden2, &layer_weights.mlp_w_up, &ctx.x, config.mlp_hidden, n);
+            types::swiglu_inplace(&mut ctx.hidden, &ctx.hidden2);
+        }
+        #[cfg(not(feature = "gated_mlp"))]
         types::matmul_relu(
             &mut ctx.hidden,
             &layer_weights.mlp_w1,
@@ -1993,7 +2025,7 @@ pub fn forward_paged<'a>(
             config.mlp_hidden,
             n,
         );
-        // MLP w2: sparse when feature enabled and sparsity is high enough (Plan 022)
+        // MLP w2 (W_down): sparse when feature enabled and sparsity is high enough (Plan 022)
         #[cfg(feature = "sparse_mlp")]
         {
             let alive = types::sparse_matmul(
@@ -2496,6 +2528,14 @@ pub fn forward_raven<'a>(
         // MLP: save residual → RMSNorm → MLP → residual
         ctx.xr2[..n].copy_from_slice(&ctx.x[..n]);
         rmsnorm(&mut ctx.x);
+        #[cfg(feature = "gated_mlp")]
+        {
+            // SwiGLU: SiLU(W_gate·h) ⊙ W_up·h → W_down·hidden
+            types::matmul(&mut ctx.hidden, &layer_weights.mlp_w1, &ctx.x, config.mlp_hidden, n);
+            types::matmul(&mut ctx.hidden2, &layer_weights.mlp_w_up, &ctx.x, config.mlp_hidden, n);
+            types::swiglu_inplace(&mut ctx.hidden, &ctx.hidden2);
+        }
+        #[cfg(not(feature = "gated_mlp"))]
         types::matmul_relu(
             &mut ctx.hidden,
             &layer_weights.mlp_w1,
@@ -2503,7 +2543,7 @@ pub fn forward_raven<'a>(
             config.mlp_hidden,
             n,
         );
-        // MLP w2: sparse when feature enabled and sparsity is high enough (Plan 022)
+        // MLP w2 (W_down): sparse when feature enabled and sparsity is high enough (Plan 022)
         #[cfg(feature = "sparse_mlp")]
         {
             let alive = types::sparse_matmul(
@@ -2702,6 +2742,14 @@ pub fn forward_quantized<'a, C: types::QuantizedKVCache>(
         // MLP: save residual → RMSNorm → MLP → residual
         ctx.xr2[..n].copy_from_slice(&ctx.x[..n]);
         rmsnorm(&mut ctx.x);
+        #[cfg(feature = "gated_mlp")]
+        {
+            // SwiGLU: SiLU(W_gate·h) ⊙ W_up·h → W_down·hidden
+            types::matmul(&mut ctx.hidden, &layer_weights.mlp_w1, &ctx.x, config.mlp_hidden, n);
+            types::matmul(&mut ctx.hidden2, &layer_weights.mlp_w_up, &ctx.x, config.mlp_hidden, n);
+            types::swiglu_inplace(&mut ctx.hidden, &ctx.hidden2);
+        }
+        #[cfg(not(feature = "gated_mlp"))]
         types::matmul_relu(
             &mut ctx.hidden,
             &layer_weights.mlp_w1,
@@ -2709,7 +2757,7 @@ pub fn forward_quantized<'a, C: types::QuantizedKVCache>(
             config.mlp_hidden,
             n,
         );
-        // MLP w2: sparse when feature enabled and sparsity is high enough (Plan 022)
+        // MLP w2 (W_down): sparse when feature enabled and sparsity is high enough (Plan 022)
         #[cfg(feature = "sparse_mlp")]
         {
             let alive = types::sparse_matmul(

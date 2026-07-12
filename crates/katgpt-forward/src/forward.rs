@@ -555,6 +555,14 @@ pub fn forward_base<'a>(
         types::rmsnorm_with_gamma(&mut ctx.x[..n], &layer_weights.mlp_norm_gamma);
         #[cfg(not(feature = "kog_cpu_fusion"))]
         rmsnorm(&mut ctx.x);
+        #[cfg(feature = "gated_mlp")]
+        {
+            // SwiGLU: SiLU(W_gate·h) ⊙ W_up·h → W_down·hidden
+            matmul(&mut ctx.hidden, &layer_weights.mlp_w1, &ctx.x, config.mlp_hidden, n);
+            matmul(&mut ctx.hidden2, &layer_weights.mlp_w_up, &ctx.x, config.mlp_hidden, n);
+            types::swiglu_inplace(&mut ctx.hidden, &ctx.hidden2);
+        }
+        #[cfg(not(feature = "gated_mlp"))]
         types::matmul_relu(
             &mut ctx.hidden,
             &layer_weights.mlp_w1,

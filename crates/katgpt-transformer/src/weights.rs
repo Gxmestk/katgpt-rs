@@ -22,6 +22,11 @@ pub struct LayerWeights {
     pub attn_wo: Vec<f32>, // [n_embd, n_embd]
     pub mlp_w1: Vec<f32>,  // [mlp_hidden, n_embd]
     pub mlp_w2: Vec<f32>,  // [n_embd, mlp_hidden]
+    // Gated MLP (Issue 377): the "up" projection for SwiGLU.
+    // When `gated_mlp` is enabled, mlp_w1 becomes W_gate, mlp_w_up is W_up,
+    // and mlp_w2 becomes W_down. Forward: SiLU(W_gate·h) ⊙ W_up·h → W_down·.
+    #[cfg(feature = "gated_mlp")]
+    pub mlp_w_up: Vec<f32>, // [mlp_hidden, n_embd]
     // Kog CPU fusion (Plan 160): RMSNorm gamma vectors — only present when the
     // consumer enables `kog_cpu_fusion`. Consumers that don't use Kog fusion
     // (e.g. riir-engine) get the compact 6-field struct and avoid ~2×n
@@ -136,6 +141,13 @@ impl TransformerWeights {
                 },
                 mlp_w2: {
                     let len = n * config.mlp_hidden;
+                    let mut v = Vec::with_capacity(len);
+                    v.extend((0..len).map(|_| rng.normal() * layer_scale));
+                    v
+                },
+                #[cfg(feature = "gated_mlp")]
+                mlp_w_up: {
+                    let len = config.mlp_hidden * n;
                     let mut v = Vec::with_capacity(len);
                     v.extend((0..len).map(|_| rng.normal() * layer_scale));
                     v

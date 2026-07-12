@@ -381,7 +381,7 @@ pub fn forward_sp_kv<'a>(
     gate_mode: crate::sp_kv::types::SpKvGateMode,
     #[cfg(feature = "domain_latent")] domain_latent: Option<&crate::types::DomainLatent>,
 ) -> &'a mut [f32] {
-    use crate::types::{kv_dim, matmul, matmul_relu, rmsnorm};
+    use crate::types::{kv_dim, matmul, matmul_relu, rmsnorm, swiglu_inplace};
 
     let n = config.n_embd;
     let hd = config.head_dim;
@@ -515,6 +515,14 @@ pub fn forward_sp_kv<'a>(
         // MLP: save residual → RMSNorm → MLP → residual
         ctx.xr2[..n].copy_from_slice(&ctx.x[..n]);
         rmsnorm(&mut ctx.x);
+        #[cfg(feature = "gated_mlp")]
+        {
+            // SwiGLU: SiLU(W_gate·h) ⊙ W_up·h → W_down·hidden
+            matmul(&mut ctx.hidden, &layer_weights.mlp_w1, &ctx.x, config.mlp_hidden, n);
+            matmul(&mut ctx.hidden2, &layer_weights.mlp_w_up, &ctx.x, config.mlp_hidden, n);
+            swiglu_inplace(&mut ctx.hidden, &ctx.hidden2);
+        }
+        #[cfg(not(feature = "gated_mlp"))]
         matmul_relu(
             &mut ctx.hidden,
             &layer_weights.mlp_w1,
@@ -526,7 +534,7 @@ pub fn forward_sp_kv<'a>(
             crate::types::lora_apply(&mut ctx.hidden, lora, &ctx.x, &mut ctx.lora_buf);
         }
 
-        // MLP w2: sparse when feature enabled and sparsity is high enough
+        // MLP w2 (W_down): sparse when feature enabled and sparsity is high enough
         #[cfg(feature = "sparse_mlp")]
         {
             let alive = crate::types::sparse_matmul(
@@ -624,7 +632,7 @@ pub fn forward_sp_kv_quant<'a, C: crate::types::QuantizedKVCache>(
     gate_mode: crate::sp_kv::types::SpKvGateMode,
     #[cfg(feature = "domain_latent")] domain_latent: Option<&crate::types::DomainLatent>,
 ) -> &'a mut [f32] {
-    use crate::types::{kv_dim, matmul, matmul_relu, rmsnorm};
+    use crate::types::{kv_dim, matmul, matmul_relu, rmsnorm, swiglu_inplace};
 
     let n = config.n_embd;
     let hd = config.head_dim;
@@ -763,6 +771,14 @@ pub fn forward_sp_kv_quant<'a, C: crate::types::QuantizedKVCache>(
         // MLP: save residual → RMSNorm → MLP → residual
         ctx.xr2[..n].copy_from_slice(&ctx.x[..n]);
         rmsnorm(&mut ctx.x);
+        #[cfg(feature = "gated_mlp")]
+        {
+            // SwiGLU: SiLU(W_gate·h) ⊙ W_up·h → W_down·hidden
+            matmul(&mut ctx.hidden, &layer_weights.mlp_w1, &ctx.x, config.mlp_hidden, n);
+            matmul(&mut ctx.hidden2, &layer_weights.mlp_w_up, &ctx.x, config.mlp_hidden, n);
+            swiglu_inplace(&mut ctx.hidden, &ctx.hidden2);
+        }
+        #[cfg(not(feature = "gated_mlp"))]
         matmul_relu(
             &mut ctx.hidden,
             &layer_weights.mlp_w1,
@@ -774,7 +790,7 @@ pub fn forward_sp_kv_quant<'a, C: crate::types::QuantizedKVCache>(
             crate::types::lora_apply(&mut ctx.hidden, lora, &ctx.x, &mut ctx.lora_buf);
         }
 
-        // MLP w2: sparse when feature enabled and sparsity is high enough
+        // MLP w2 (W_down): sparse when feature enabled and sparsity is high enough
         #[cfg(feature = "sparse_mlp")]
         {
             let alive = crate::types::sparse_matmul(
