@@ -614,6 +614,69 @@ pub fn simd_matmul_rmsnorm_swiglu(
     }
 }
 
+/// Split-weight variant of [`simd_matmul_rmsnorm_swiglu`] for when gate and up
+/// projections are stored as separate weight matrices (matching the
+/// `LayerWeights { mlp_w1, mlp_w_up }` layout used by the `gated_mlp` feature).
+///
+/// This avoids the need to concatenate gate and up weights into a single
+/// buffer — both slices are read in-place with the same row-major stride.
+///
+/// # Weight Layout
+///
+/// Both `gate_weight` and `up_weight` have shape `[output_dim, input_dim]`
+/// in row-major order (same layout as `mlp_w1` / `mlp_w_up`).
+///
+/// # Arguments
+///
+/// * `output` - Output buffer `[output_dim]`
+/// * `gate_weight` - Gate projection weight `[output_dim * input_dim]`
+/// * `up_weight` - Up projection weight `[output_dim * input_dim]`
+/// * `input` - Input vector (gamma-scaled O from previous kernel) `[input_dim]`
+/// * `rstd` - Inverse RMS scale from [`compute_rstd`]
+/// * `activation` - Gate activation function (SiLU for SwiGLU)
+/// * `output_dim` - Number of output elements (weight rows)
+/// * `input_dim` - Input dimension (weight cols)
+#[inline(always)]
+#[allow(clippy::too_many_arguments)]
+pub fn simd_matmul_rmsnorm_swiglu_split(
+    output: &mut [f32],
+    gate_weight: &[f32],
+    up_weight: &[f32],
+    input: &[f32],
+    rstd: f32,
+    activation: GateActivation,
+    output_dim: usize,
+    input_dim: usize,
+) {
+    debug_assert!(output.len() >= output_dim, "output too short");
+    debug_assert!(
+        gate_weight.len() >= output_dim * input_dim,
+        "gate_weight too short"
+    );
+    debug_assert!(
+        up_weight.len() >= output_dim * input_dim,
+        "up_weight too short"
+    );
+    debug_assert!(input.len() >= input_dim, "input too short");
+
+    for i in 0..output_dim {
+        let row_off = i * input_dim;
+        let gate_val = simd_dot_f32(
+            unsafe { gate_weight.get_unchecked(row_off..row_off + input_dim) },
+            input,
+            input_dim,
+        ) * rstd;
+        let up_val = simd_dot_f32(
+            unsafe { up_weight.get_unchecked(row_off..row_off + input_dim) },
+            input,
+            input_dim,
+        ) * rstd;
+        unsafe {
+            *output.get_unchecked_mut(i) = activation.activate(gate_val) * up_val;
+        }
+    }
+}
+
 // ---------------------------------------------------------------------------
 // T5b: Fused matmul + delayed RMS scale + activation (non-gated MLP)
 // ---------------------------------------------------------------------------
@@ -992,6 +1055,90 @@ mod tests {
             "SwiGLU mismatch at 0: got {}, expected {expected}",
             output[0]
         );
+    }
+
+    #[test]
+    fn test_matmul_rmsnorm_swiglu_split_equivalence() {
+        // simd_matmul_rmsnorm_swiglu_split with the two halves of a combined
+        // weight must produce identical output to simd_matmul_rmsnorm_swiglu.
+        let output_dim = 8;
+        let input_dim = 4;
+        let weight: Vec<f32> = (0..2 * output_dim * input_dim)
+            .map(|i| i as f32 * 0.1 - 0.5)
+            .collect();
+        let input: Vec<f32> = (0..input_dim).map(|i| (i + 1) as f32).collect();
+        let rstd = 0.8;
+
+        let (gate_weight, up_weight) = weight.split_at(output_dim * input_dim);
+
+        let mut output_combined = vec![0.0; output_dim];
+        let mut output_split = vec![0.0; output_dim];
+
+        simd_matmul_rmsnorm_swiglu(
+            &mut output_combined,
+            &weight,
+            &input,
+            rstd,
+            GateActivation::Silu,
+            output_dim,
+            input_dim,
+        );
+        simd_matmul_rmsnorm_swiglu_split(
+            &mut output_split,
+            gate_weight,
+            up_weight,
+            &input,
+            rstd,
+            GateActivation::Silu,
+            output_dim,
+            input_dim,
+        );
+
+        for i in 0..output_dim {
+            assert!(
+                (output_combined[i] - output_split[i]).abs() < 1e-6,
+                "split vs combined mismatch at {i}: got {} vs {}",
+                output_split[i],
+                output_combined[i]
+            );
+        }
+    }
+
+    #[test]
+    fn test_matmul_rmsnorm_swiglu_split_correctness() {
+        // Verify the split kernel manually for a small case.
+        let output_dim = 2;
+        let input_dim = 3;
+        let gate_weight: Vec<f32> = vec![0.1, 0.2, 0.3, 0.4, 0.5, 0.6]; // [2, 3]
+        let up_weight: Vec<f32> = vec![0.7, 0.8, 0.9, 1.0, 1.1, 1.2]; // [2, 3]
+        let input: Vec<f32> = vec![1.0, 2.0, 3.0];
+        let rstd = 1.0;
+
+        let mut output = vec![0.0; output_dim];
+        simd_matmul_rmsnorm_swiglu_split(
+            &mut output,
+            &gate_weight,
+            &up_weight,
+            &input,
+            rstd,
+            GateActivation::Silu,
+            output_dim,
+            input_dim,
+        );
+
+        // Row 0: gate = 0.1*1 + 0.2*2 + 0.3*3 = 1.4, up = 0.7*1 + 0.8*2 + 0.9*3 = 5.0
+        let gate_val_0: f32 = 0.1 * 1.0 + 0.2 * 2.0 + 0.3 * 3.0;
+        let up_val_0: f32 = 0.7 * 1.0 + 0.8 * 2.0 + 0.9 * 3.0;
+        let silu_0 = gate_val_0 / (1.0 + (-gate_val_0).exp());
+        let expected_0 = silu_0 * up_val_0;
+        assert!((output[0] - expected_0).abs() < 1e-5, "row 0 mismatch");
+
+        // Row 1: gate = 0.4*1 + 0.5*2 + 0.6*3 = 3.2, up = 1.0*1 + 1.1*2 + 1.2*3 = 6.8
+        let gate_val_1: f32 = 0.4 * 1.0 + 0.5 * 2.0 + 0.6 * 3.0;
+        let up_val_1: f32 = 1.0 * 1.0 + 1.1 * 2.0 + 1.2 * 3.0;
+        let silu_1 = gate_val_1 / (1.0 + (-gate_val_1).exp());
+        let expected_1 = silu_1 * up_val_1;
+        assert!((output[1] - expected_1).abs() < 1e-5, "row 1 mismatch");
     }
 
     #[test]

@@ -381,7 +381,11 @@ pub fn forward_sp_kv<'a>(
     gate_mode: crate::sp_kv::types::SpKvGateMode,
     #[cfg(feature = "domain_latent")] domain_latent: Option<&crate::types::DomainLatent>,
 ) -> &'a mut [f32] {
-    use crate::types::{kv_dim, matmul, matmul_relu, rmsnorm, swiglu_inplace};
+    use crate::types::{kv_dim, matmul, rmsnorm};
+    #[cfg(not(feature = "gated_mlp"))]
+    use crate::types::matmul_relu;
+    #[cfg(feature = "gated_mlp")]
+    use crate::types::swiglu_inplace;
 
     let n = config.n_embd;
     let hd = config.head_dim;
@@ -632,7 +636,11 @@ pub fn forward_sp_kv_quant<'a, C: crate::types::QuantizedKVCache>(
     gate_mode: crate::sp_kv::types::SpKvGateMode,
     #[cfg(feature = "domain_latent")] domain_latent: Option<&crate::types::DomainLatent>,
 ) -> &'a mut [f32] {
-    use crate::types::{kv_dim, matmul, matmul_relu, rmsnorm, swiglu_inplace};
+    use crate::types::{kv_dim, matmul, rmsnorm};
+    #[cfg(not(feature = "gated_mlp"))]
+    use crate::types::matmul_relu;
+    #[cfg(feature = "gated_mlp")]
+    use crate::types::swiglu_inplace;
 
     let n = config.n_embd;
     let hd = config.head_dim;

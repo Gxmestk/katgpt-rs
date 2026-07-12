@@ -456,7 +456,7 @@ pub use types::sparse_matmul;
 pub use coda::{
     GateActivation, MoaConfig, compute_rstd, simd_matmul_residual,
     simd_matmul_residual_partial_rms, simd_matmul_rmsnorm_activation, simd_matmul_rmsnorm_rope,
-    simd_matmul_rmsnorm_swiglu,
+    simd_matmul_rmsnorm_swiglu, simd_matmul_rmsnorm_swiglu_split,
 };
 
 #[cfg(all(feature = "coda_fusion", feature = "moa_inference"))]

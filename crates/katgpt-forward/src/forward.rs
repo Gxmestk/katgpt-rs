@@ -962,6 +962,7 @@ pub fn forward_coda<'a>(
         // ── CODA FUSED KERNEL 2: MLP matmul + delayed RMS + activation ─
         // Replaces: rmsnorm(x) + matmul_relu(hidden, w1, x)
         // hidden[i] = activation(dot(w1[i], O) * rstd)  — delayed RMS scale
+        #[cfg(not(feature = "gated_mlp"))]
         katgpt_core::coda::simd_matmul_rmsnorm_activation(
             &mut ctx.hidden,                         // output
             &layer_weights.mlp_w1,                   // weight
@@ -970,6 +971,19 @@ pub fn forward_coda<'a>(
             katgpt_core::coda::GateActivation::Relu, // matches baseline matmul_relu
             config.mlp_hidden,                       // rows
             n,                                       // cols
+        );
+        // SwiGLU gated MLP: SiLU(W_gate·h) ⊙ W_up·h — fused gate+up+activation
+        // in a single kernel, no intermediate hidden2 buffer needed.
+        #[cfg(feature = "gated_mlp")]
+        katgpt_core::coda::simd_matmul_rmsnorm_swiglu_split(
+            &mut ctx.hidden,                             // output
+            &layer_weights.mlp_w1,                        // gate weight
+            &layer_weights.mlp_w_up,                      // up weight
+            &ctx.x[..n],                                 // input (O from kernel 1)
+            rstd,                                        // delayed RMS scale
+            katgpt_core::coda::GateActivation::Silu,      // SwiGLU = SiLU gate
+            config.mlp_hidden,                           // output_dim
+            n,                                           // input_dim
         );
 
         // LoRA perturbation for MLP up projection: add to hidden
