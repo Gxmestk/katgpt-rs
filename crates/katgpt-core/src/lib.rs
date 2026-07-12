@@ -169,6 +169,15 @@ pub mod shard_embedding;
 // G1+G2+G3+G4+G5 ALL PASS.
 #[cfg(feature = "ssmax_temperature")]
 pub mod ssmax;
+// Smooth-min soft pattern matching — modelless latent-space utility for
+// fuzzy multi-token retrieval (Research 385, SoftMatcha 2, Issue 041).
+// GOAT PoC PASS: +12pp recall@5 over plain cosine, ~0ns overhead.
+// Opt-in — zero consumers today; promote when ItemEmbedIndex/AnyRAG/Engram
+// adds a multi-token retrieval path.
+#[cfg(feature = "smooth_min_similarity")]
+pub mod similarity;
+#[cfg(feature = "smooth_min_similarity")]
+pub use similarity::{edit_penalty, smooth_min_similarity};
 // Position-Offset Reveal-Time Schedule for Set Diffusion (Research 376).
 // Canonical source for `PositionOffsetSchedule` — pure math (CDF/inverse-CDF/
 // ordering), RNG-agnostic via closure-based sampling. No feature gate because
