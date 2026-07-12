@@ -337,7 +337,11 @@ the headline GOAT gain. **Verdict remains: GOAT.**
 
 **Tests (6, all PASS):** G1 zero-error→zero-output, G2 high-error≈uniform, G3 error-gating asymmetry, G4 determinism 100/100 bit-identical, G5 mixed-errors partial diffusion, G6 linear-function zero Laplacian (equal weights). Clippy clean (default / both-features / all-features). 1486 default tests pass (0 regression).
 
-**T5.2 DEFERRED:** the plan's T5.2 says "Depends on Research 298 frozen LOD backup" but Research 298 is about Bellman inversion (`P̂ = M⁺Q`), not a "frozen LOD backup" primitive. The dependency reference is incorrect — the frozen-LOD-backup concept does not exist in Research 298 as described. T5.2 needs either the correct dependency identified or a new research note defining the frozen LOD backup primitive.
+**T5.2 COMPLETE.** The plan's T5.2 says "Depends on Research 298 frozen LOD backup." The previous session deferred this, believing Research 298 was about Bellman inversion. That was a **per-repo number collision**: both `katgpt-rs` and `riir-neuron-db` have a `.research/298_*` file, but about different topics. The actual dependency — `riir-neuron-db/.research/298_nca_neighborhood_heal_structure_preserving.md` §2.5 "Frozen LOD backup as the attractor reference (the cheaper primary path)" — contains exactly the frozen LOD backup concept T5.2 references.
+
+Furthermore, the three-tier dispatch was **already shipped** as `plan_two_tier` (Plan 316 T1b.4): frozen backup (O(1)) → k-NN (O(n)) → global-mean (O(1)). T5.2's remaining work was to make the frozen tier **DSOM-aware**: when `eta` is set, the frozen tier's step is error-scaled (`step = α · error`, same formula as the DSOM tier) instead of the fixed `alpha = 0.1`. The error is `compute_error(state, backup_reconstruction, support_diameter)` — the normalized L2 distance between the current state and the frozen backup reconstruction. Zero-error guard: when `error < 1e-8`, step = 0 (no heal needed). Backward-compatible: when `eta` is `None`, the fixed `alpha = 0.1` is unchanged.
+
+**Tests (5, all PASS):** G1 error-scaled step matches `α · error` formula, G2 zero-error guard (step = 0 when state == backup reconstruction), G3 backward compat (fixed 0.1 when `eta = None`), G4 determinism 100/100 bit-identical, G5 larger drift → larger step (monotonic). Clippy clean (default / all-features / no-default-features+neighbor_heal). 314 default tests pass (0 regression).
 
 ---
 
