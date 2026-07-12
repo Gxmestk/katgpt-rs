@@ -179,6 +179,20 @@ pub mod ssmax;
 pub mod similarity;
 #[cfg(feature = "smooth_min_similarity")]
 pub use similarity::{edit_penalty, smooth_min_similarity};
+// Elasticity-Gated Update — DSOM error-scaled neighborhood update primitive
+// (Plan 429, Research 415, Rougier & Boniface 2010 ⟨inria-00495827⟩).
+// Time-invariant, error-scaled latent update: step scales with error,
+// neighborhood weights are error-gated Gaussian. Pure modelless (exp +
+// weighted average). Zero-alloc (stack [f32;32] weights, &mut [f32] output).
+// Opt-in until GOAT gate G1–G6 pass. Primary consumer: riir-neuron-db
+// neighbor_heal (error-scaled shard heal).
+#[cfg(feature = "elasticity_gated_update")]
+pub mod elasticity_gated_update;
+#[cfg(feature = "elasticity_gated_update")]
+pub use elasticity_gated_update::{
+    ElasticityConfig, compute_error, effective_neighborhood_size,
+    elasticity_gated_update_into, neighborhood_weight,
+};
 // Position-Offset Reveal-Time Schedule for Set Diffusion (Research 376).
 // Canonical source for `PositionOffsetSchedule` — pure math (CDF/inverse-CDF/
 // ordering), RNG-agnostic via closure-based sampling. No feature gate because

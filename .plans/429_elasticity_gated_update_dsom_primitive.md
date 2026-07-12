@@ -4,7 +4,7 @@
 **Research:** [katgpt-rs/.research/415_Dynamic_SOM_Elasticity_Gated_Latent_Update.md](../.research/415_Dynamic_SOM_Elasticity_Gated_Latent_Update.md)
 **Source paper:** Rougier & Boniface, "Dynamic Self-Organising Map" (Neurocomputing 2011, ⟨inria-00495827⟩) + Guérin et al. survey (arXiv:2501.08416)
 **Target:** `katgpt-rs/crates/katgpt-core/src/` (new module) + `riir-neuron-db/src/neighbor_heal.rs` (consumer)
-**Status:** Active — Phase 1 not started
+**Status:** Active — Phase 1 complete (T1.1–T1.4 done)
 
 ---
 
@@ -24,22 +24,22 @@ The primary consumer is `riir-neuron-db`'s `neighbor_heal` (error-scaled shard h
 
 ### Tasks
 
-- [ ] **T1.1** Create `katgpt-rs/crates/katgpt-core/src/elasticity_gated_update.rs` — the open primitive module.
+- [x] **T1.1** Create `katgpt-rs/crates/katgpt-core/src/elasticity_gated_update.rs` — the open primitive module.
   - `ElasticityConfig { eta: f32, epsilon: f32, support_diameter: f32 }` — config POD.
   - `elasticity_gated_update_into(state: &[f32], target: &[f32], neighbors: &[(&[f32], f32)], config: &ElasticityConfig, out: &mut [f32])` — the core function.
   - Pure closed-form math: error = normalized L2 distance, step = ε · error, weight = exp(−d²/(η²·error²)), delta = step · Σ(weight · (neighbor − state)) / Σweight.
   - Zero-allocation: all scratch on stack, `&mut [f32]` output buffer.
   - Feature gate: `elasticity_gated_update` (opt-in).
 
-- [ ] **T1.2** Add `elasticity_gated_update` feature to `katgpt-core/Cargo.toml` (opt-in, no default).
+- [x] **T1.2** Add `elasticity_gated_update` feature to `katgpt-core/Cargo.toml` (opt-in, no default).
 
-- [ ] **T1.3** Unit tests:
+- [x] **T1.3** Unit tests (20 tests, all PASS):
   - Error-scaled step: `step(δ=0.5) / step(δ=0.01) ≈ 50` (within 5%).
   - Neighborhood expansion: `effective_k(error=0.01) ≤ 2`, `effective_k(error=0.5) ≥ 5`.
   - Zero-error guard: when `error < 1e-8`, output is all zeros (no heal needed).
   - Determinism: same input → bit-identical output (100/100 runs).
 
-- [ ] **T1.4** `cargo clippy` clean. `cargo test -p katgpt-core --features elasticity_gated_update --lib` passes.
+- [x] **T1.4** `cargo clippy` clean (default+feature, --all-features, --no-default-features+feature all clean). `cargo test -p katgpt-core --features elasticity_gated_update --lib` passes (1506 passed, 0 failed, 3 ignored).
 
 ---
 
