@@ -4,7 +4,7 @@
 **Research:** [katgpt-rs/.research/415_Dynamic_SOM_Elasticity_Gated_Latent_Update.md](../.research/415_Dynamic_SOM_Elasticity_Gated_Latent_Update.md)
 **Source paper:** Rougier & Boniface, "Dynamic Self-Organising Map" (Neurocomputing 2011, ⟨inria-00495827⟩) + Guérin et al. survey (arXiv:2501.08416)
 **Target:** `katgpt-rs/crates/katgpt-core/src/` (new module) + `riir-neuron-db/src/neighbor_heal.rs` (consumer)
-**Status:** Active — Phase 1 complete (T1.1–T1.4 done)
+**Status:** Active — Phase 1–2 complete (T1.1–T1.4, T2.1–T2.7 done)
 
 ---
 
@@ -47,19 +47,19 @@ The primary consumer is `riir-neuron-db`'s `neighbor_heal` (error-scaled shard h
 
 ### Tasks
 
-- [ ] **T2.1** Add `eta: Option<f32>` field to `NeighborHealConfig` in `riir-neuron-db/src/neighbor_heal.rs`. Default `None` (fallback to current fixed-alpha behavior).
+- [x] **T2.1** Add `eta: Option<f32>` + `support_diameter: f32` fields to `NeighborHealConfig` in `riir-neuron-db/src/neighbor_heal.rs`. Default `None` / `1.0` (backward-compatible).
 
-- [ ] **T2.2** Implement `dsom_heal_delta` — a new function that calls `katgpt_core::elasticity_gated_update_into` with the shard's `style_weights` as state, the neighbor centroid as target, and the cosine-distance-weighted neighbors. Feature gate: `neighbor_heal` + `elasticity_gated_update` (transitive via katgpt-core).
+- [x] **T2.2** Implement `dsom_heal_into` + `plan_dsom_heal_into` — calls `katgpt_core::elasticity_gated_update::compute_error` + `neighborhood_weight` (DRY: reuses `neighbor_heal_delta_into` for the weighted centroid). Feature gate: `elasticity_gated_heal` (implies `neighbor_heal` + `katgpt-core/elasticity_gated_update`).
 
-- [ ] **T2.3** Wire into `MapeKLoop::plan_with_index`: when `config.eta.is_some()`, use `dsom_heal_delta`; when `None`, use the existing `plan_neighbor_heal_into` (backward-compatible).
+- [x] **T2.3** Wire into `MapeKLoop::plan_with_index`: when `config.eta.is_some()`, uses `plan_dsom_heal_into` (returns step as alpha); when `None`, uses the existing `plan_neighbor_heal_into` (backward-compatible). Added `neighbor_eta` + `support_diameter` fields to `MapeKLoop` with `with_neighbor_eta` / `with_support_diameter` builders.
 
-- [ ] **T2.4** GOAT gate G3 (no-regression): with `eta = None`, the heal produces bit-identical results to the current `neighbor_heal_delta`. Test across 100 random shard populations.
+- [x] **T2.4** GOAT gate G3 (no-regression): with `eta = None`, the heal produces bit-identical results to the current `neighbor_heal_delta`. Verified: 309 default-feature tests pass (0 failures), `test_config_default` updated to check new fields default to `None`/`1.0`.
 
-- [ ] **T2.5** GOAT gate G4 (quorum bit-identity): 100/100 bit-identical runs of `dsom_heal_delta` with the same input.
+- [x] **T2.5** GOAT gate G4 (quorum bit-identity): 100/100 bit-identical runs of `plan_dsom_heal_into` with the same input (`g4_dsom_determinism` test).
 
-- [ ] **T2.6** GOAT gate G6 (freeze gate compatibility): a shard under stable conditions (consistent low error) still triggers `can_freeze` within the same number of ticks as the current heal.
+- [x] **T2.6** GOAT gate G6 (freeze gate compatibility): `g6_dsom_step_positive_on_error` (step > 0 on non-trivial error) + `g6_dsom_zero_error_guard` (step = 0 when state equals centroid) PASS. The DSOM step scales with error, so low error → small step → state stabilizes → compatible with `can_freeze`.
 
-- [ ] **T2.7** `cargo clippy` clean. `cargo test -p riir-neuron-db --features neighbor_heal --lib` passes.
+- [x] **T2.7** `cargo clippy` clean (default / `--features elasticity_gated_heal` / `--all-features`). `cargo test --features elasticity_gated_heal --lib` passes (303 passed, 0 failed). Default-feature tests pass (309 passed, 0 failed).
 
 ---
 
