@@ -112,6 +112,14 @@ pub struct Config {
     /// Whether W_R starts zeroed (true = recover exact softmax at init).
     pub parallax_zero_init: bool,
 
+    // --- Loop Stability Fix (Plan 428, Research 414) ---
+    /// Inter-loop stabilization mode for weight-shared looped inference.
+    /// `None` = byte-identical to pre-Plan-428 behavior (zero cost).
+    /// `InterLoopNorm` = normalize hidden state between loop iterations.
+    /// Only effective when `loop_mode` is `WeightShared` and `loop_count > 1`.
+    #[cfg(feature = "loop_stability_fix")]
+    pub loop_stability_mode: super::LoopStabilityMode,
+
     // --- Hydra Adaptive Layer Budget (Research 148, Plan 165) ---
     /// Per-layer Hydra importance profiles. Empty = disabled.
     /// Populated from calibration data via `calibrate_profiles()`.
@@ -288,6 +296,8 @@ impl Config {
             parallax_gate_scale: 0.0,
             emotion_desperation_threshold: 0.5,
             parallax_zero_init: true,
+            #[cfg(feature = "loop_stability_fix")]
+            loop_stability_mode: super::LoopStabilityMode::None,
             #[cfg(feature = "hydra_budget")]
             hydra_profiles: Vec::new(),
             #[cfg(feature = "deltanet_inference")]
@@ -420,6 +430,8 @@ impl Config {
             parallax_gate_scale: 0.0,
             emotion_desperation_threshold: 0.5,
             parallax_zero_init: true,
+            #[cfg(feature = "loop_stability_fix")]
+            loop_stability_mode: super::LoopStabilityMode::None,
             #[cfg(feature = "hydra_budget")]
             hydra_profiles: Vec::new(),
             #[cfg(feature = "deltanet_inference")]
@@ -524,6 +536,8 @@ impl Config {
             parallax_gate_scale: 0.0,
             emotion_desperation_threshold: 0.5,
             parallax_zero_init: true,
+            #[cfg(feature = "loop_stability_fix")]
+            loop_stability_mode: super::LoopStabilityMode::None,
             #[cfg(feature = "hydra_budget")]
             hydra_profiles: Vec::new(),
             #[cfg(feature = "deltanet_inference")]
@@ -638,6 +652,8 @@ impl Config {
             parallax_gate_scale: 0.0,
             emotion_desperation_threshold: 0.5,
             parallax_zero_init: true,
+            #[cfg(feature = "loop_stability_fix")]
+            loop_stability_mode: super::LoopStabilityMode::None,
             #[cfg(feature = "hydra_budget")]
             hydra_profiles: Vec::new(),
             #[cfg(feature = "deltanet_inference")]
@@ -732,6 +748,8 @@ impl Config {
             parallax_gate_scale: 0.0,
             emotion_desperation_threshold: 0.5,
             parallax_zero_init: true,
+            #[cfg(feature = "loop_stability_fix")]
+            loop_stability_mode: super::LoopStabilityMode::None,
             #[cfg(feature = "hydra_budget")]
             hydra_profiles: Vec::new(),
             #[cfg(feature = "deltanet_inference")]
@@ -827,6 +845,8 @@ impl Config {
             parallax_gate_scale: 0.0,
             emotion_desperation_threshold: 0.5,
             parallax_zero_init: true,
+            #[cfg(feature = "loop_stability_fix")]
+            loop_stability_mode: super::LoopStabilityMode::None,
             #[cfg(feature = "hydra_budget")]
             hydra_profiles: Vec::new(),
             #[cfg(feature = "deltanet_inference")]
@@ -920,6 +940,8 @@ impl Config {
             parallax_gate_scale: 0.0,
             emotion_desperation_threshold: 0.5,
             parallax_zero_init: true,
+            #[cfg(feature = "loop_stability_fix")]
+            loop_stability_mode: super::LoopStabilityMode::None,
             #[cfg(feature = "hydra_budget")]
             hydra_profiles: Vec::new(),
             #[cfg(feature = "deltanet_inference")]
@@ -1015,6 +1037,8 @@ impl Config {
             parallax_gate_scale: 0.0,
             emotion_desperation_threshold: 0.5,
             parallax_zero_init: true,
+            #[cfg(feature = "loop_stability_fix")]
+            loop_stability_mode: super::LoopStabilityMode::None,
             #[cfg(feature = "hydra_budget")]
             hydra_profiles: Vec::new(),
             #[cfg(feature = "deltanet_inference")]
@@ -1109,6 +1133,8 @@ impl Config {
             parallax_gate_scale: 0.0,
             emotion_desperation_threshold: 0.5,
             parallax_zero_init: true,
+            #[cfg(feature = "loop_stability_fix")]
+            loop_stability_mode: super::LoopStabilityMode::None,
             #[cfg(feature = "hydra_budget")]
             hydra_profiles: Vec::new(),
             #[cfg(feature = "deltanet_inference")]
@@ -1205,6 +1231,8 @@ impl Config {
             parallax_gate_scale: 0.0,
             emotion_desperation_threshold: 0.5,
             parallax_zero_init: true,
+            #[cfg(feature = "loop_stability_fix")]
+            loop_stability_mode: super::LoopStabilityMode::None,
             #[cfg(feature = "hydra_budget")]
             hydra_profiles: Vec::new(),
             #[cfg(feature = "deltanet_inference")]
@@ -1309,6 +1337,8 @@ impl Config {
             parallax_gate_scale: 0.0,
             emotion_desperation_threshold: 0.5,
             parallax_zero_init: true,
+            #[cfg(feature = "loop_stability_fix")]
+            loop_stability_mode: super::LoopStabilityMode::None,
             #[cfg(feature = "hydra_budget")]
             hydra_profiles: Vec::new(),
             layer_types,

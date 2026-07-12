@@ -439,6 +439,8 @@ pub use types::{
     matmul_f16, matmul_f16_parallel, matmul_parallel, matmul_relu, rmsnorm, sample_token_into,
     softmax, softmax_scaled,
 };
+#[cfg(feature = "loop_stability_fix")]
+pub use types::LoopStabilityMode;
 
 #[cfg(feature = "domain_latent")]
 pub use types::DomainLatent;

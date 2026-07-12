@@ -97,8 +97,9 @@ pub use enums::ThinkingBudget;
 pub use enums::WallConfig;
 pub use enums::{
     AttentionMode, AttentionProjection, CacheLayout, CalibrationMode, ConvergenceSelector,
-    DashAttnConfig, DepthTier, HlaMode, HybridPattern, LoopMode, ModelArchitecture, ResidualGate,
-    RetrievalHeadRole, RtTurboConfig, SdpaOutputGate, WeightDtype,
+    DashAttnConfig, DepthTier, HlaMode, HybridPattern, LoopMode, LoopStabilityMode,
+    ModelArchitecture, ResidualGate, RetrievalHeadRole, RtTurboConfig, SdpaOutputGate,
+    WeightDtype,
 };
 #[cfg(feature = "sr2am_configurator")]
 pub use enums::{ConfiguratorContext, PlanningDecision};

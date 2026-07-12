@@ -394,6 +394,29 @@ pub enum HybridPattern {
     Bookend,
 }
 
+/// Loop stability mode for weight-shared looped inference (Plan 428).
+///
+/// Parameter-free architectural fixes for T-pass loop stability, validated
+/// via the §3.6 defend-wrong PoC benchmark.
+///
+/// **Only `InterLoopNorm` ships** — the PoC proved it's the sole fix that
+/// controls residual norm growth. FLA-res (direct residual addition of
+/// `prev_h` at every layer) caused catastrophic norm explosion (~2.2B× at
+/// T=12), and Attention Injection was a no-op for single-position attention
+/// (softmax of 1 element = 1.0, so Q doesn't affect the output). Both were
+/// dropped per the defend-wrong verdict.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[repr(u8)]
+pub enum LoopStabilityMode {
+    /// No inter-loop stabilization (byte-identical to pre-Plan-428 behavior).
+    #[default]
+    None,
+    /// Inter-loop RMSNorm: normalize the hidden state between loop iterations
+    /// (tau > 0), before the inner layer pass. PoC: norm ratio 3.34× vs
+    /// baseline 11.19×, KL 0.0008, step-size trend converging (14.9 → 2.05).
+    InterLoopNorm,
+}
+
 /// Head-specific sigmoid gate after SDPA, before Wo.
 /// Zero-initialized → starts at sigmoid(0) = 0.5 (neutral multiplicative identity).
 #[derive(Clone)]

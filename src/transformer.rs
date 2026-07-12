@@ -375,6 +375,17 @@ pub fn forward_looped<'a>(
 
     // 2. Outer loop: T passes over all layers
     for tau in 0..loop_count {
+        // Plan 428 — Inter-loop RMSNorm: normalize the carry-over hidden state
+        // before it enters this loop iteration's layer pass. Applied for tau > 0
+        // (the first iteration uses the embedding directly). This controls
+        // residual norm growth in weight-shared looped inference — the PoC
+        // benchmark (examples/loop_stability_poc.rs) validated 3.34× norm ratio
+        // vs 11.19× baseline at T=12. Zero cost when LoopStabilityMode::None.
+        #[cfg(feature = "loop_stability_fix")]
+        if tau > 0 && config.loop_stability_mode == crate::types::LoopStabilityMode::InterLoopNorm {
+            crate::types::rmsnorm(&mut ctx.x[..n]);
+        }
+
         // Save h^(τ-1) for residual gate
         ctx.prev_h[..n].copy_from_slice(&ctx.x[..n]);
 
