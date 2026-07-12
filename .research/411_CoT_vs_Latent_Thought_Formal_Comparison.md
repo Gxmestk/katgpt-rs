@@ -236,8 +236,8 @@ Re-cast the paper's core mechanism as a latent-to-latent operation on the seven 
 | Artifact | Destination | Status |
 |---|---|---|
 | Research note (this file) | `katgpt-rs/.research/411_*.md` | ✅ Created |
-| Complexity-class-gated routing fusion | `katgpt-rs/.issues/` follow-up | Track only — requires a complexity-class classifier not provided by the paper |
-| FPRAS routing criterion for BoM/QuasiMoTTo | `katgpt-rs/.issues/` follow-up | Track only — needs a self-reducibility detector |
+| Complexity-class-gated routing fusion | `.issues/134_complexity_class_gated_routing_fusion.md` | ✅ Filed (P3 track-only — requires a complexity-class classifier not provided by the paper) |
+| FPRAS routing criterion for BoM/QuasiMoTTo | `.issues/135_fpras_routing_criterion.md` | ✅ Filed (P3 track-only — needs a self-reducibility detector; sub-component of Issue 134, can ship independently) |
 | Experimental training (looped TF / CoT training) | → riir-train | Out of scope (training-side validation of theoretical results) |
 
 ---
@@ -289,8 +289,8 @@ Re-cast the paper's core mechanism as a latent-to-latent operation on the seven 
 - [x] **T4:** Latent-space reframing on 7 Super-GOAT factory modules. DONE — lands on existing machinery (HLA, latent_functor, DEC, classify_chain); FPRAS is the one genuinely novel insight.
 - [x] **T5:** Novelty gate Q1–Q4. DONE — Q2 fails (no new capability class); verdict Gain.
 - [x] **T6:** MOAT gate (katgpt-rs domain). DONE — in scope, partially strengthens moat, no primitive to ship.
-- [-] **T7 (deferred):** File `.issues/` entry for the complexity-class-gated routing fusion (SwiR × Breakeven × k_selector × DEC × BoM). Requires a complexity-class classifier not provided by the paper. Track only.
-- [-] **T8 (deferred):** File `.issues/` entry for the FPRAS routing criterion (route self-reducible #P problems to BoM/QuasiMoTTo stochastic sampling). Requires a self-reducibility detector. Track only.
+- [x] **T7:** File `.issues/` entry for the complexity-class-gated routing fusion (SwiR × Breakeven × k_selector × DEC × BoM). DONE — `.issues/134_complexity_class_gated_routing_fusion.md` (P3 track-only; implementation deferred within the issue, blocked on a complexity-class classifier).
+- [x] **T8:** File `.issues/` entry for the FPRAS routing criterion (route self-reducible #P problems to BoM/QuasiMoTTo stochastic sampling). DONE — `.issues/135_fpras_routing_criterion.md` (P3 track-only; sub-component of Issue 134, can ship independently; implementation deferred within the issue, blocked on a self-reducibility detector).
 - [ ] **T9 (optional):** If a future plan wants to add a complexity-class classifier to SwiR, cite this note + Research 344 as the theoretical foundation. The classifier would detect whether the current problem is TC^K-parallelizable (→ latent iteration) or #P-self-reducible (→ stochastic sampling). Out of scope for this session.
 
 ---
