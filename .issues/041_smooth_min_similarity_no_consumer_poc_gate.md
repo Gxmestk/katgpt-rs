@@ -2,7 +2,7 @@
 
 > **Spawned from:** Research 385 (SoftMatcha 2 smooth-min soft pattern matching — Gain)
 > **Date:** 2026-07-07
-> **Status:** IMPLEMENTED (opt-in `smooth_min_similarity` feature) — GOAT PoC PASS, consumer GOAT PASS (T6 SmoothMinAligned), all-pairs consumer FAILED (T4 SmoothMin)
+> **Status:** IMPLEMENTED (DEFAULT-ON `smooth_min_similarity` feature) — GOAT PoC PASS, consumer GOAT PASS (T6 SmoothMinAligned), primitive promoted to DEFAULT-ON. All-pairs consumer FAILED (T4 SmoothMin, opt-in `smooth_min_rerank` stays opt-in).
 > **Updated:** 2026-07-12 — PoC resolved the Research 385 §4 vs Issue 041 contradiction
 
 ---
@@ -113,11 +113,17 @@ Forwarded in root `Cargo.toml` as `smooth_min_similarity = ["katgpt-core/smooth_
 - PoC scenario (correct item beats distractor — the exact PoC assertion)
 - edit_penalty properties (monotonicity, boundaries)
 
-### Why not default-on
+### Promotion (done 2026-07-12)
 
-Zero consumers. The primitive is proven to work (GOAT PoC PASS, modelless gain) but has no callers. Per the feature flag discipline: opt-in until a consumer demonstrates real-world value. Promotion to default-on requires:
-1. A consumer wires the primitive (ItemEmbedIndex, AnyRAG, or soft Engram)
-2. The consumer's GOAT gate passes with the primitive enabled
+`smooth_min_similarity` is now DEFAULT-ON in katgpt-core and root Cargo.toml.
+Promotion followed the feature flag discipline: PoC GOAT PASS (G1-G3) +
+consumer GOAT PASS (T6 SmoothMinAligned: +50.5pp recall@5, modelless gain).
+
+The `smooth_min_rerank` consumer feature stays opt-in because the all-pairs
+T4 variant is a negative result (SmoothMin recall@5 0.385 < Cosine 0.495).
+The aligned variant (T6) is task-specific (position-aligned retrieval).
+Users who need the rerank integration enable `smooth_min_rerank`; the
+primitive itself is always available.
 
 ---
 
@@ -233,7 +239,7 @@ The primitive is shipped. Consumer wiring status:
 - [-] **T3** (deferred) When AnyRAG gets a real retrieval backend (Path B), wire smooth-min as the scoring function.
 - [-] **T4** (attempted 2026-07-12, GOAT FAILED) Wired smooth-min as `RerankMethod::SmoothMin` in `katgpt-attn-match/src/rerank.rs`. GOAT gate FAILED: SmoothMin recall@5 (0.385) < Cosine (0.495). The rerank module's all-pairs/mean-pooled API doesn't match smooth-min's position-aligned design. Feature stays opt-in.
 - [x] **T6** (done 2026-07-12) Added `RerankMethod::SmoothMinAligned` — position-aligned variant computing `cos(q_i, d_i)` at each aligned position. GOAT gate ALL PASS: recall@5 = 1.000 vs Cosine 0.495 (+50.5pp), latency 2.34× Cosine (<3× target), no-regression PASS. First consumer with a passing GOAT gate.
-- [-] **T5** (deferred) When a consumer's GOAT gate passes with smooth-min enabled → promote to default-on.
+- [x] **T5** (done 2026-07-12) Consumer GOAT gate passes (T6 SmoothMinAligned) with modelless gain → `smooth_min_similarity` promoted to DEFAULT-ON in katgpt-core + root Cargo.toml. The `smooth_min_rerank` consumer feature stays opt-in (the all-pairs T4 variant is a negative result; the aligned variant is task-specific).
 
 ---
 
@@ -248,4 +254,4 @@ The primitive is shipped. Consumer wiring status:
 
 ## TL;DR
 
-**PoC PASS, primitive shipped (opt-in). Consumer wiring: T4 (all-pairs) GOAT FAILED, T6 (position-aligned) GOAT PASS.** The Research 385 §4 spec said "synthetic PoC" — the issue's "blocked on consumer prerequisites" was wrong. The PoC showed +12pp recall@5 gain, ~0ns overhead, robust across β. The primitive is in `katgpt-core/src/similarity.rs` behind `smooth_min_similarity` (opt-in, 24 tests). The first consumer wiring (T4, rerank `SmoothMin` all-pairs) FAILED: SmoothMin recall@5 (0.385) < Cosine (0.495) on the rerank task, because all-pairs max dilutes the position-aligned signal. The second consumer wiring (T6, rerank `SmoothMinAligned` position-aligned) PASSED: recall@5 = 1.000 vs Cosine 0.495 (+50.5pp), latency 2.34× Cosine (<3× target). The position-aligned variant matches the primitive's PoC design — comparing `cos(q_i, d_i)` at matching positions, not `max_j cos(q_i, d_j)` across all positions. Promotion to default-on now has a passing consumer GOAT gate.
+**PoC PASS, primitive shipped (DEFAULT-ON). Consumer wiring: T4 (all-pairs) GOAT FAILED, T6 (position-aligned) GOAT PASS.** The Research 385 §4 spec said "synthetic PoC" — the issue's "blocked on consumer prerequisites" was wrong. The PoC showed +12pp recall@5 gain, ~0ns overhead, robust across β. The primitive is in `katgpt-core/src/similarity.rs` (24 tests). The first consumer wiring (T4, rerank `SmoothMin` all-pairs) FAILED: SmoothMin recall@5 (0.385) < Cosine (0.495) on the rerank task, because all-pairs max dilutes the position-aligned signal. The second consumer wiring (T6, rerank `SmoothMinAligned` position-aligned) PASSED: recall@5 = 1.000 vs Cosine 0.495 (+50.5pp), latency 2.34× Cosine (<3× target). The position-aligned variant matches the primitive's PoC design — comparing `cos(q_i, d_i)` at matching positions, not `max_j cos(q_i, d_j)` across all positions. `smooth_min_similarity` promoted to DEFAULT-ON (2026-07-12) after T6 consumer GOAT gate passed with modelless gain.
