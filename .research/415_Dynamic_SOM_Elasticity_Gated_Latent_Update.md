@@ -325,7 +325,23 @@ the headline GOAT gain. **Verdict remains: GOAT.**
 
 ---
 
-## 10. References
+## 10. Phase 5 T5.1 Update: Error-Weighted Graph Laplacian (2026-07-12)
+
+**T5.1 COMPLETE.** Added `error_weighted_graph_laplacian_into` + `error_weighted_graph_laplacian` to `katgpt-core/src/elasticity_gated_update.rs`. This is the DSOM × DEC fusion: the standard `graph_laplacian` (uniform ±1 edge weights) gets an error-weighted variant where each edge's contribution is gated by the DSOM neighborhood function `exp(−1/(η²·error²))`.
+
+**Design decision:** the plan originally said "add in `katgpt-core/src/dec/`" but that path is the `katgpt_dec` re-export shim (`pub use katgpt_dec as dec;`). The `katgpt-dec` crate has **zero dependencies by design** (it's a pure-math substrate) and cannot import `neighborhood_weight` from `katgpt-core` (cyclic dependency). The fusion function lives in `katgpt-core/src/elasticity_gated_update.rs` where both `katgpt_dec::{CellComplex, CochainField}` types and the DSOM `neighborhood_weight` function are visible. Feature gate: `#[cfg(all(feature = "dec_operators", feature = "elasticity_gated_update"))]`.
+
+**Math:** `Δ₀^w[v] = Σ_{e incident to v} w_e · (potential[v] − potential[neighbor])`, where `w_e = neighborhood_weight(1.0, edge_errors[e], eta)`. Lattice distance defaults to 1.0 (adjacent vertices on a regular grid).
+
+**Behavior:** high-error edges → weight → 1 (full diffusion, approaches uniform `graph_laplacian`). Low-error edges → weight → 0 (no diffusion, preserves local structure). Zero-error edges → weight = 0 (no contribution).
+
+**Tests (6, all PASS):** G1 zero-error→zero-output, G2 high-error≈uniform, G3 error-gating asymmetry, G4 determinism 100/100 bit-identical, G5 mixed-errors partial diffusion, G6 linear-function zero Laplacian (equal weights). Clippy clean (default / both-features / all-features). 1486 default tests pass (0 regression).
+
+**T5.2 DEFERRED:** the plan's T5.2 says "Depends on Research 298 frozen LOD backup" but Research 298 is about Bellman inversion (`P̂ = M⁺Q`), not a "frozen LOD backup" primitive. The dependency reference is incorrect — the frozen-LOD-backup concept does not exist in Research 298 as described. T5.2 needs either the correct dependency identified or a new research note defining the frozen LOD backup primitive.
+
+---
+
+## 11. References
 
 - Rougier & Boniface, "Dynamic Self-Organising Map", Neurocomputing 74(11):1840–1847, 2011. ⟨inria-00495827⟩
 - Guérin, Chauvet, Saubion, "A Survey on Recent Advances in Self-Organizing Maps", arXiv:2501.08416, 2024.

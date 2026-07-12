@@ -193,6 +193,13 @@ pub use elasticity_gated_update::{
     ElasticityConfig, compute_error, effective_neighborhood_size,
     elasticity_gated_update_into, neighborhood_weight,
 };
+// Plan 429 Phase 5 T5.1: Error-weighted graph Laplacian — DSOM neighborhood
+// weights composed with the DEC graph Laplacian. Requires both
+// `dec_operators` and `elasticity_gated_update` features.
+#[cfg(all(feature = "dec_operators", feature = "elasticity_gated_update"))]
+pub use elasticity_gated_update::{
+    error_weighted_graph_laplacian, error_weighted_graph_laplacian_into,
+};
 // Position-Offset Reveal-Time Schedule for Set Diffusion (Research 376).
 // Canonical source for `PositionOffsetSchedule` — pure math (CDF/inverse-CDF/
 // ordering), RNG-agnostic via closure-based sampling. No feature gate because

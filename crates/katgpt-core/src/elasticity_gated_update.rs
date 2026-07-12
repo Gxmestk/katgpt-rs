@@ -335,6 +335,164 @@ pub fn elasticity_gated_update_into(
     }
 }
 
+// ─── DEC Fusion: Error-Weighted Graph Laplacian (Plan 429 Phase 5 T5.1) ───
+//
+// Composes the DSOM neighborhood weight with the DEC graph Laplacian. The
+// standard `graph_laplacian` uses uniform ±1 edge weights (sign-only from
+// boundary entries). This variant replaces the uniform weight with the DSOM
+// neighborhood function `exp(−d²/(η²·error²))`, where `error` is a per-edge
+// signal provided by the caller.
+//
+// Math: `Δ₀^w[v] = Σ_{e incident to v} w_e · (potential[v] − potential[neighbor])`
+//
+// where `w_e = neighborhood_weight(1.0, edge_errors[e], eta)`.
+//
+// Lattice distance defaults to 1.0 (adjacent vertices on a regular grid). For
+// non-grid complexes with non-unit lattice distances, the caller can encode the
+// distance into the error signal (since weight depends on `d²/error²`).
+//
+// Lives in katgpt-core (not katgpt-dec) because katgpt-dec has zero dependencies
+// by design and cannot depend on the `neighborhood_weight` function. The plan's
+// path `katgpt-core/src/dec/` refers to the `katgpt_dec` re-export; this fusion
+// composes both substrates and must live where both are visible.
+
+#[cfg(all(feature = "dec_operators", feature = "elasticity_gated_update"))]
+pub use katgpt_dec::{CellComplex, CochainField};
+
+/// Compute the error-weighted graph Laplacian `Δ₀^w` for rank-0 cochains.
+///
+/// This is the DSOM-neighborhood-weighted variant of [`katgpt_dec::graph_laplacian`].
+/// Each edge's contribution is gated by the DSOM neighborhood function
+/// `exp(−1/(η²·error²))`, where `error` is the per-edge error signal.
+///
+/// # Math
+///
+/// ```text
+/// w_e     = exp(−1 / (η² · edge_errors[e]²))
+/// Δ₀^w[v] = Σ_{e incident to v} w_e · (potential[v] − potential[neighbor])
+/// ```
+///
+/// # Behavior
+///
+/// - **High-error edges** (large `edge_errors[e]`): weight → 1, full diffusion
+///   (approaches the standard graph Laplacian).
+/// - **Low-error edges** (small `edge_errors[e]`): weight → 0, no diffusion
+///   (preserves local structure where vertices agree).
+/// - **Zero-error edges** (`edge_errors[e] < 1e-8`): weight = 0, no contribution.
+///
+/// This is the error-gated diffusion primitive: belief/information spreads along
+/// edges where there's local discrepancy, and is preserved where there's
+/// agreement. Useful for belief-mass conservation with non-uniform diffusion,
+/// or for DEC-based healing where the heal strength is modulated by local error.
+///
+/// # Arguments
+///
+/// - `cx` — The cell complex (must have edges).
+/// - `potential` — Rank-0 cochain (vertex values).
+/// - `edge_errors` — Per-edge error signal, length = `cx.n_edges()`. All values
+///   must be `≥ 0`. The caller computes these (e.g. L2 distance between adjacent
+///   vertex values, or an external error signal).
+/// - `eta` — Elasticity parameter (`> 0`). Controls the plasticity-stability
+///   tradeoff: higher η → wider neighborhood (more diffusion), lower η → tighter
+///   (less diffusion).
+/// - `output` — Output rank-0 cochain, same dim as `potential`. Zero-filled then
+///   accumulated.
+///
+/// # Feature gate
+///
+/// Requires both `dec_operators` and `elasticity_gated_update` features.
+#[cfg(all(feature = "dec_operators", feature = "elasticity_gated_update"))]
+pub fn error_weighted_graph_laplacian_into(
+    cx: &CellComplex,
+    potential: &CochainField,
+    edge_errors: &[f32],
+    eta: f32,
+    output: &mut CochainField,
+) {
+    debug_assert_eq!(potential.rank, 0, "error_weighted_graph_laplacian requires rank-0 cochain");
+    debug_assert_eq!(output.rank, 0, "output must be rank-0");
+    debug_assert_eq!(potential.dim, output.dim, "potential and output dim mismatch");
+    debug_assert_eq!(
+        edge_errors.len(),
+        cx.n_edges(),
+        "edge_errors length must equal n_edges ({})",
+        cx.n_edges()
+    );
+    debug_assert!(eta > 0.0, "eta must be positive");
+
+    let dim = potential.dim;
+    output.data.fill(0.0);
+
+    // Boundary entries come in pairs: (v_tail, e, -1), (v_head, e, +1) per edge.
+    // The edge index `e` is the same in both entries of the pair.
+    let entries = cx.boundary_entries(0);
+    let chunks = dim / 4;
+    let remainder = dim % 4;
+
+    for pair in entries.chunks_exact(2) {
+        let (v_tail, edge_idx, _sign_t) = pair[0];
+        let (v_head, _e2, _sign_h) = pair[1];
+        debug_assert_eq!(
+            edge_idx, _e2,
+            "boundary entry pair edge indices must match"
+        );
+
+        let error = edge_errors[edge_idx];
+        let weight = neighborhood_weight(1.0, error, eta);
+
+        // Zero-weight edges contribute nothing (early exit for this edge).
+        if weight == 0.0 {
+            continue;
+        }
+
+        let tail_start = v_tail * dim;
+        let head_start = v_head * dim;
+
+        for c in 0..chunks {
+            let off = c * 4;
+            let diff0 = (potential.data[tail_start + off] - potential.data[head_start + off]) * weight;
+            let diff1 =
+                (potential.data[tail_start + off + 1] - potential.data[head_start + off + 1]) * weight;
+            let diff2 =
+                (potential.data[tail_start + off + 2] - potential.data[head_start + off + 2]) * weight;
+            let diff3 =
+                (potential.data[tail_start + off + 3] - potential.data[head_start + off + 3]) * weight;
+            output.data[tail_start + off] += diff0;
+            output.data[head_start + off] -= diff0;
+            output.data[tail_start + off + 1] += diff1;
+            output.data[head_start + off + 1] -= diff1;
+            output.data[tail_start + off + 2] += diff2;
+            output.data[head_start + off + 2] -= diff2;
+            output.data[tail_start + off + 3] += diff3;
+            output.data[head_start + off + 3] -= diff3;
+        }
+        for d in 0..remainder {
+            let off = chunks * 4 + d;
+            let diff =
+                (potential.data[tail_start + off] - potential.data[head_start + off]) * weight;
+            output.data[tail_start + off] += diff;
+            output.data[head_start + off] -= diff;
+        }
+    }
+}
+
+/// Allocating variant of [`error_weighted_graph_laplacian_into`].
+///
+/// Allocates and returns a new rank-0 cochain. Prefer the `_into` variant for
+/// hot paths.
+#[cfg(all(feature = "dec_operators", feature = "elasticity_gated_update"))]
+pub fn error_weighted_graph_laplacian(
+    cx: &CellComplex,
+    potential: &CochainField,
+    edge_errors: &[f32],
+    eta: f32,
+) -> CochainField {
+    debug_assert_eq!(potential.rank, 0, "error_weighted_graph_laplacian requires rank-0 cochain");
+    let mut output = CochainField::zeros(0, cx.n_vertices(), potential.dim);
+    error_weighted_graph_laplacian_into(cx, potential, edge_errors, eta, &mut output);
+    output
+}
+
 // ─── Tests ────────────────────────────────────────────────────────────────
 
 #[cfg(test)]
@@ -775,5 +933,248 @@ mod tests {
             w_large,
             w_small
         );
+    }
+
+    // ── DEC Fusion: Error-Weighted Graph Laplacian (T5.1) ───────────────
+    //
+    // These tests require both `dec_operators` and `elasticity_gated_update`
+    // features. They verify the DSOM-neighborhood-weighted graph Laplacian
+    // composes correctly with the DEC substrate.
+
+    #[cfg(all(feature = "dec_operators", feature = "elasticity_gated_update"))]
+    mod dec_fusion {
+        use super::*;
+        use katgpt_dec::{CellComplex, CochainField, graph_laplacian};
+
+        /// Helper: build a 3×2 grid (6 vertices, 7 edges).
+        fn grid_3x2() -> CellComplex {
+            CellComplex::grid_2d(3, 2)
+        }
+
+        /// Helper: build a rank-0 cochain with the given per-vertex scalar
+        /// (dim=1) values.
+        fn vertex_cochain(cx: &CellComplex, values: &[f32]) -> CochainField {
+            assert_eq!(values.len(), cx.n_vertices());
+            let mut cf = CochainField::zeros(0, cx.n_vertices(), 1);
+            cf.data.copy_from_slice(values);
+            cf
+        }
+
+        /// T5.1-G1: Zero-error → zero output.
+        ///
+        /// When all edge errors are below ZERO_ERROR_THRESHOLD, all weights are
+        /// 0, so the output is all zeros (no diffusion).
+        #[test]
+        fn t51_g1_zero_error_produces_zero_output() {
+            let cx = grid_3x2();
+            let potential = vertex_cochain(&cx, &[1.0, 2.0, 3.0, 4.0, 5.0, 6.0]);
+            let edge_errors = vec![0.0f32; cx.n_edges()];
+            let mut output = CochainField::zeros(0, cx.n_vertices(), 1);
+
+            error_weighted_graph_laplacian_into(&cx, &potential, &edge_errors, 1.0, &mut output);
+
+            for v in &output.data {
+                assert_eq!(*v, 0.0, "zero-error edges should produce zero output");
+            }
+        }
+
+        /// T5.1-G2: High-error → approaches uniform graph Laplacian.
+        ///
+        /// When all edge errors are very large, weights → 1 (since
+        /// `exp(−1/(η²·large²)) → exp(0) = 1`). The output should match the
+        /// standard `graph_laplacian` (uniform ±1 weights) within a tight
+        /// tolerance.
+        #[test]
+        fn t51_g2_high_error_matches_uniform_graph_laplacian() {
+            let cx = grid_3x2();
+            let potential = vertex_cochain(&cx, &[1.0, 2.0, 3.0, 4.0, 5.0, 6.0]);
+            // Very large error → weight ≈ 1.0 for all edges.
+            let edge_errors = vec![100.0f32; cx.n_edges()];
+            let eta = 1.0;
+
+            let weighted =
+                error_weighted_graph_laplacian(&cx, &potential, &edge_errors, eta);
+            let uniform = graph_laplacian(&cx, &potential);
+
+            // With error=100, weight = exp(-1/(1*10000)) = exp(-0.0001) ≈ 0.99990.
+            // So the weighted result should be within 0.01% of the uniform result.
+            for (w, u) in weighted.data.iter().zip(uniform.data.iter()) {
+                let rel_diff = if u.abs() > 1e-6 {
+                    (w - u).abs() / u.abs()
+                } else {
+                    w.abs()
+                };
+                assert!(
+                    rel_diff < 0.001,
+                    "high-error weighted ({w}) should match uniform ({u}) within 0.1%"
+                );
+            }
+        }
+
+        /// T5.1-G3: Error-gating asymmetry.
+        ///
+        /// On a 2-vertex, 1-edge complex (a single edge), the output at each
+        /// vertex is `w · (potential[v] - potential[neighbor])`. With a small
+        /// error, the weight is small → small output. With a large error, the
+        /// weight is large → large output. The ratio of outputs should equal
+        /// the ratio of weights.
+        #[test]
+        fn t51_g3_error_gating_asymmetry() {
+            // 2-vertex grid: grid_2d(2,1) → 2 vertices, 1 edge.
+            let cx = CellComplex::grid_2d(2, 1);
+            assert_eq!(cx.n_vertices(), 2);
+            assert_eq!(cx.n_edges(), 1);
+
+            let potential = vertex_cochain(&cx, &[0.0, 1.0]);
+            let eta = 1.0;
+
+            // Small error vs large error.
+            let small_errors = vec![0.05f32];
+            let large_errors = vec![0.5f32];
+
+            let small_out =
+                error_weighted_graph_laplacian(&cx, &potential, &small_errors, eta);
+            let large_out =
+                error_weighted_graph_laplacian(&cx, &potential, &large_errors, eta);
+
+            // Vertex 0: output = w * (0.0 - 1.0) = -w
+            // Vertex 1: output = w * (1.0 - 0.0) = +w
+            let small_w = neighborhood_weight(1.0, 0.05, eta);
+            let large_w = neighborhood_weight(1.0, 0.5, eta);
+
+            assert!(
+                (small_out.data[0] - (-small_w)).abs() < 1e-5,
+                "small-error vertex 0: expected {}, got {}",
+                -small_w,
+                small_out.data[0]
+            );
+            assert!(
+                (large_out.data[0] - (-large_w)).abs() < 1e-5,
+                "large-error vertex 0: expected {}, got {}",
+                -large_w,
+                large_out.data[0]
+            );
+            assert!(
+                large_w > small_w,
+                "large error should have higher weight: {large_w} vs {small_w}"
+            );
+            assert!(
+                large_out.data[0].abs() > small_out.data[0].abs(),
+                "large-error output should have larger magnitude"
+            );
+        }
+
+        /// T5.1-G4: Determinism — same input → bit-identical output (100 runs).
+        ///
+        /// Mirrors the G4 determinism gate from the DSOM primitive.
+        #[test]
+        fn t51_g4_determinism() {
+            let cx = grid_3x2();
+            let potential = vertex_cochain(&cx, &[1.0, 2.0, 3.0, 4.0, 5.0, 6.0]);
+            let edge_errors: Vec<f32> = (0..cx.n_edges()).map(|i| 0.1 + 0.01 * i as f32).collect();
+
+            let mut first = CochainField::zeros(0, cx.n_vertices(), 1);
+            error_weighted_graph_laplacian_into(&cx, &potential, &edge_errors, 1.0, &mut first);
+
+            for run in 0..100 {
+                let mut again = CochainField::zeros(0, cx.n_vertices(), 1);
+                error_weighted_graph_laplacian_into(&cx, &potential, &edge_errors, 1.0, &mut again);
+                for (a, b) in first.data.iter().zip(again.data.iter()) {
+                    assert_eq!(
+                        a.to_bits(),
+                        b.to_bits(),
+                        "determinism violated on run {run}: {a} vs {b}"
+                    );
+                }
+            }
+        }
+
+        /// T5.1-G5: Mixed errors — only high-error edges contribute.
+        ///
+        /// On a 3-vertex line (grid_2d(3,1) → 3 vertices, 2 edges), set edge 0
+        /// to high error and edge 1 to zero error. Only edge 0 should
+        /// contribute — vertices 1 and 2 should have zero output from edge 1.
+        #[test]
+        fn t51_g5_mixed_errors_partial_diffusion() {
+            // grid_2d(3,1): vertices 0-1-2, edges 0=(0,1), 1=(1,2).
+            let cx = CellComplex::grid_2d(3, 1);
+            assert_eq!(cx.n_vertices(), 3);
+            assert_eq!(cx.n_edges(), 2);
+
+            let potential = vertex_cochain(&cx, &[0.0, 1.0, 2.0]);
+            // Edge 0: high error (diffuses). Edge 1: zero error (no diffusion).
+            let edge_errors = vec![0.5f32, 0.0];
+
+            let output =
+                error_weighted_graph_laplacian(&cx, &potential, &edge_errors, 1.0);
+
+            let w0 = neighborhood_weight(1.0, 0.5, 1.0);
+            // Vertex 0: only edge 0 contributes. diff = 0.0 - 1.0 = -1.0.
+            // output[0] = w0 * (-1.0) = -w0.
+            assert!(
+                (output.data[0] - (-w0)).abs() < 1e-5,
+                "vertex 0: expected {}, got {}",
+                -w0,
+                output.data[0]
+            );
+            // Vertex 1: edge 0 contributes +w0 (diff = 1.0-0.0 = +1.0).
+            // Edge 1 contributes 0 (zero error → zero weight).
+            // output[1] = w0 * (+1.0) + 0 = w0.
+            assert!(
+                (output.data[1] - w0).abs() < 1e-5,
+                "vertex 1: expected {}, got {}",
+                w0,
+                output.data[1]
+            );
+            // Vertex 2: edge 1 has zero error → zero weight → zero contribution.
+            assert_eq!(
+                output.data[2], 0.0,
+                "vertex 2: zero-error edge should produce zero output, got {}",
+                output.data[2]
+            );
+        }
+
+        /// T5.1-G6: Linear function → zero Laplacian (interior vertices).
+        ///
+        /// The graph Laplacian of a linear function vanishes at interior
+        /// vertices (this is a fundamental identity: Δ(linear) = 0). With
+        /// uniform weights, this holds exactly. With error-weighted weights,
+        /// it holds only if all edge weights are equal. We verify the identity
+        /// holds when all edge errors are equal (→ equal weights).
+        #[test]
+        fn t51_g6_linear_function_zero_laplacian_equal_weights() {
+            // 5×3 grid: enough interior vertices to test.
+            let cx = CellComplex::grid_2d(5, 3);
+            let dim = 1;
+
+            // Linear function: potential[x, y] = x + 2*y.
+            let mut potential = CochainField::zeros(0, cx.n_vertices(), dim);
+            for y in 0..3 {
+                for x in 0..5 {
+                    potential.data[y * 5 + x] = (x as f32) + 2.0 * (y as f32);
+                }
+            }
+
+            // All edges have the same error → all weights equal → the weighted
+            // Laplacian is a scalar multiple of the uniform Laplacian. Since
+            // Δ(linear) = 0 under uniform weights, it's also 0 under equal
+            // weights.
+            let edge_errors = vec![0.3f32; cx.n_edges()];
+
+            let output =
+                error_weighted_graph_laplacian(&cx, &potential, &edge_errors, 1.0);
+
+            // Interior vertices should have zero Laplacian.
+            for y in 1..2 {
+                for x in 1..4 {
+                    let v = y * 5 + x;
+                    assert!(
+                        output.data[v].abs() < 1e-5,
+                        "interior vertex ({x},{y}) = idx {v}: Laplacian should be ~0, got {}",
+                        output.data[v]
+                    );
+                }
+            }
+        }
     }
 }

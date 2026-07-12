@@ -4,7 +4,7 @@
 **Research:** [katgpt-rs/.research/415_Dynamic_SOM_Elasticity_Gated_Latent_Update.md](../.research/415_Dynamic_SOM_Elasticity_Gated_Latent_Update.md)
 **Source paper:** Rougier & Boniface, "Dynamic Self-Organising Map" (Neurocomputing 2011, ⟨inria-00495827⟩) + Guérin et al. survey (arXiv:2501.08416)
 **Target:** `katgpt-rs/crates/katgpt-core/src/` (new module) + `riir-neuron-db/src/neighbor_heal.rs` (consumer)
-**Status:** Active — Phase 1–4 complete (T1.1–T1.4, T2.1–T2.7, T3.1–T3.3, T4.1–T4.4 done). G1–G6 ALL PASS. `elasticity_gated_heal` PROMOTED to default-on.
+**Status:** Active — Phase 1–4 complete (T1.1–T1.4, T2.1–T2.7, T3.1–T3.3, T4.1–T4.4 done). Phase 5 T5.1 done, T5.2 deferred (dependency mismatch). G1–G6 ALL PASS. `elasticity_gated_heal` PROMOTED to default-on.
 
 ---
 
@@ -97,9 +97,9 @@ The primary consumer is `riir-neuron-db`'s `neighbor_heal` (error-scaled shard h
 
 ### Tasks
 
-- [ ] **T5.1** Error-weighted `graph_laplacian` in `katgpt-core/src/dec/` — add an `error_weighted_graph_laplacian` variant that takes per-edge error signals and uses the DSOM neighborhood function as edge weights. Feature gate: `dec_operators` + `elasticity_gated_update`.
+- [x] **T5.1** Error-weighted `graph_laplacian` — added `error_weighted_graph_laplacian_into` + `error_weighted_graph_laplacian` to `katgpt-core/src/elasticity_gated_update.rs` (NOT `katgpt-core/src/dec/` as originally planned — that path is the `katgpt_dec` re-export shim, and `katgpt-dec` has zero dependencies by design so cannot import `neighborhood_weight`). The function lives in katgpt-core where both `katgpt_dec` types and the DSOM `neighborhood_weight` are visible. Feature gate: `#[cfg(all(feature = "dec_operators", feature = "elasticity_gated_update"))]`. Re-exported from `lib.rs` under the same gate. 6 tests (G1 zero-error, G2 high-error≈uniform, G3 error-gating asymmetry, G4 determinism 100/100, G5 mixed-errors partial diffusion, G6 linear-function zero Laplacian) — all PASS. Clippy clean (default / both-features / all-features). 1486 default tests pass (0 regression).
 
-- [ ] **T5.2** Three-tier heal routing in `MapeKLoop::plan_with_index`: frozen backup (O(1), stability) → DSOM neighborhood (O(n), plasticity) → global mean (O(1), fallback). Error signal routes between tiers. Depends on Research 298 frozen LOD backup.
+- [-] **T5.2** Three-tier heal routing in `MapeKLoop::plan_with_index`: frozen backup (O(1), stability) → DSOM neighborhood (O(n), plasticity) → global mean (O(1), fallback). Error signal routes between tiers. **DEFERRED**: the plan says "Depends on Research 298 frozen LOD backup" but Research 298 is about Bellman inversion (`P̂ = M⁺Q`), not a "frozen LOD backup" primitive. The dependency reference is incorrect — the frozen-LOD-backup concept does not exist in Research 298 as described. This task needs either (a) the correct dependency identified, or (b) a new research note defining the frozen LOD backup primitive before implementation can proceed.
 
 ---
 
