@@ -254,6 +254,59 @@ Not applicable — this is not a gate deferral. The DSOM update rule is pure clo
 
 ---
 
+## 8a. PoC Addendum — Structure-Matching (Plan 429 Phase 3, 2026-07-12)
+
+The §3.6 defend-wrong PoC was run on a 90%/10% safe/frontier shard population
+(90 safe + 10 frontier shards, STYLE_DIM=64). Each cluster had one shard
+damaged (style_weights moved away from the cluster centroid by 3.0 per lane).
+Both fixed-alpha heal and DSOM error-scaled heal were run for 20 cycles.
+
+### Results
+
+| Method | Safe heal fraction | Frontier heal fraction | Coverage ratio |
+|---|---|---|---|
+| Fixed-alpha (alpha=0.1, tau=0.5) | 0.1749 | 0.9176 | 5.2451 |
+| DSOM (eta=1.0, epsilon=0.1, Ω=30.0) | 0.0401 | 0.9348 | 23.3124 |
+
+### G5 gate: **PASS**
+
+`dsom_coverage_ratio = 23.31 ≥ 0.5` → the structure-matching property holds.
+
+### Interpretation
+
+Both methods heal frontier (rare) shards BETTER than safe (common) shards
+(coverage ratios > 1.0). This is because the k-nearest neighbors of a
+damaged frontier shard are all frontier shards (tight cluster), so the heal
+moves it back toward the frontier centroid effectively. The safe cluster
+has more variation (90 shards with different style_seeds), so the heal is
+less focused.
+
+The DSOM's coverage ratio (23.31) is ~4.4× higher than the fixed-alpha
+heal's (5.25). This is consistent with the structure-matching property:
+the DSOM gives rare regions at least as much representation as common
+regions. The error-scaled step + error-gated neighborhood does not
+disadvantage the frontier.
+
+### Honest caveat
+
+The coverage ratio > 1.0 means the frontier heals BETTER than safe, not
+"equal representation" (which would be ratio ≈ 1.0). The PoC does not
+prove exact structure-matching (ratio = 1.0); it proves that the DSOM does
+NOT under-represent rare regions (ratio ≥ 0.5). The structure-matching
+property in the DSOM paper's sense (equal allocation of neurons to rare vs
+common regions) would require a full SOM training run, not just a heal PoC.
+
+### Verdict impact
+
+The G5 PASS does NOT auto-elevate to Super-GOAT. The novelty gate Q1–Q4
+would need to be re-run with this PoC evidence. The structure-matching
+property is confirmed in the heal context (rare regions are not
+disadvantaged), but it's not the novel capability the Super-GOAT bar
+requires (Q2 = "new class of behavior"). The error-scaled step is still
+the headline GOAT gain. **Verdict remains: GOAT.**
+
+---
+
 ## 9. References
 
 - Rougier & Boniface, "Dynamic Self-Organising Map", Neurocomputing 74(11):1840–1847, 2011. ⟨inria-00495827⟩
