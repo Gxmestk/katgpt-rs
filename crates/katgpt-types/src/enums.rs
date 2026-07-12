@@ -456,6 +456,60 @@ impl ResidualGate {
             gates: vec![0.0; loop_count * dim],
         }
     }
+
+    /// Deterministic loop-stable residual gates (Plan 483 T2.1, §3.5 path 2).
+    ///
+    /// Sets gates to a constant `decay` factor for τ > 0, enabling information
+    /// carry-forward between T passes. The first loop (τ=0) has zero gates
+    /// (no previous state to carry forward).
+    ///
+    /// This is a **modelless** construction — no training, no gradient descent.
+    /// The `decay` factor controls the trade-off between carry-forward strength
+    /// and stability. Conservative values (0.1–0.3) are safe for most weight
+    /// matrices; larger values risk divergence.
+    ///
+    /// Rationale: the zero-init default (`new()`) makes every T-pass effectively
+    /// independent — no hidden state carries forward between loops. This
+    /// undermines the LT2 paper's "effective depth T×n_layer" claim. A non-zero
+    /// deterministic gate restores the residual connection across loops without
+    /// requiring trained gate parameters.
+    ///
+    /// # Arguments
+    /// * `loop_count` - Number of T-passes (T)
+    /// * `dim` - Hidden dimension (n_embd)
+    /// * `decay` - Constant gate value for τ > 0 (e.g., 0.1 = conservative)
+    #[inline]
+    pub fn new_loop_stable(loop_count: usize, dim: usize, decay: f32) -> Self {
+        let mut gates = vec![0.0f32; loop_count * dim];
+        // τ=0: zero (no previous state). τ>0: constant decay.
+        for tau in 1..loop_count {
+            let offset = tau * dim;
+            gates[offset..offset + dim].fill(decay);
+        }
+        Self { gates }
+    }
+
+    /// Deterministic loop-stable residual gates with exponential decay
+    /// (Plan 483 T2.1, §3.5 path 2 variant).
+    ///
+    /// ρ_τ = `base`^(τ-1) for τ > 0 — later loops contribute exponentially less.
+    /// This schedule mirrors the spectral-radius-based stabilization where the
+    /// residual contribution decays as the hidden state converges.
+    ///
+    /// # Arguments
+    /// * `loop_count` - Number of T-passes (T)
+    /// * `dim` - Hidden dimension (n_embd)
+    /// * `base` - Decay base (e.g., 0.5 → ρ_1=1.0, ρ_2=0.5, ρ_3=0.25, ...)
+    #[inline]
+    pub fn new_loop_stable_exp_decay(loop_count: usize, dim: usize, base: f32) -> Self {
+        let mut gates = vec![0.0f32; loop_count * dim];
+        for tau in 1..loop_count {
+            let offset = tau * dim;
+            let val = base.powi((tau - 1) as i32);
+            gates[offset..offset + dim].fill(val);
+        }
+        Self { gates }
+    }
 }
 
 // ---------------------------------------------------------------------------
