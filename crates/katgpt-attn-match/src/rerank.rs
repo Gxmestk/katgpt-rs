@@ -30,6 +30,15 @@ pub enum RerankMethod {
     /// more than plain mean, improving discrimination on multi-token queries.
     #[cfg(feature = "smooth_min_rerank")]
     SmoothMin { beta: f32 },
+    /// Position-aligned Smooth-Min: computes `cos(q_i, d_i)` at each aligned
+    /// position, then aggregates via `smooth_min_similarity`. Unlike
+    /// [`SmoothMin`](Self::SmoothMin) which uses all-pairs max (`max_j cos(q_i, d_j)`),
+    /// this variant compares tokens at matching positions — matching the
+    /// primitive's design (Issue 041 PoC: +12pp recall@5 over cosine).
+    /// Requires `lq == ld` (truncates to `min(lq, ld)` if unequal).
+    /// O(lq·dim) per document — same cost as [`Cosine`](Self::Cosine).
+    #[cfg(feature = "smooth_min_rerank")]
+    SmoothMinAligned { beta: f32 },
 }
 
 /// A document with its reranking score and original index.
@@ -81,6 +90,12 @@ pub fn rerank(
             let max_ld = doc_lengths.iter().copied().max().unwrap_or(0);
             (Vec::new(), Vec::new(), vec![0.0f32; max_ld], vec![0.0f32; lq])
         }
+        #[cfg(feature = "smooth_min_rerank")]
+        RerankMethod::SmoothMinAligned { .. } => {
+            // Aligned variant needs min(lq, ld) cosines (scratch) + lq query norms
+            // (pre-computed once, reused per-doc).
+            (Vec::new(), vec![0.0f32; lq], Vec::<f32>::new(), vec![0.0f32; lq])
+        }
     };
 
     // Suppress unused-variable warnings when smooth_min_rerank is off.
@@ -108,6 +123,17 @@ pub fn rerank(
         0.0
     };
 
+    // SmoothMinAligned: pre-compute per-token query norms ONCE (O(lq·dim))
+    // and reuse across all docs. Without this hoist, each doc recomputes
+    // q_norm for every aligned position — N× redundant work.
+    #[cfg(feature = "smooth_min_rerank")]
+    if matches!(method, RerankMethod::SmoothMinAligned { .. }) && lq > 0 {
+        for t in 0..lq {
+            let q_row = &query[t * dim..(t + 1) * dim];
+            d_mean[t] = simd_dot_f32(q_row, q_row, dim).sqrt();
+        }
+    }
+
     let mut results: Vec<RerankedDoc> = docs
         .iter()
         .enumerate()
@@ -126,6 +152,10 @@ pub fn rerank(
                 #[cfg(feature = "smooth_min_rerank")]
                 RerankMethod::SmoothMin { beta } => {
                     smooth_min_score_into(query, doc_data, lq, ld, dim, beta, &mut d_norms, &mut sm_scratch)
+                }
+                #[cfg(feature = "smooth_min_rerank")]
+                RerankMethod::SmoothMinAligned { beta } => {
+                    smooth_min_aligned_score_into(query, doc_data, lq, ld, dim, beta, &d_mean, &mut sm_scratch)
                 }
             };
             RerankedDoc {
@@ -342,6 +372,56 @@ pub fn smooth_min_score_into(
     }
 
     smooth_min_similarity(&max_cosines[..lq], beta)
+}
+
+/// Position-aligned smooth-min scoring (Issue 041 T6).
+///
+/// Computes `cos(q_i, d_i)` for each aligned position `i` (up to `min(lq, ld)`),
+/// then aggregates via [`smooth_min_similarity`]. This matches the primitive's
+/// PoC design — query token i is compared to document token i at the same
+/// position, not to the best-matching document token.
+///
+/// Unlike [`smooth_min_score_into`] which uses all-pairs max (`O(lq·ld·dim)`),
+/// this is `O(lq·dim)` per document — same cost as mean-pooled cosine.
+///
+/// `q_norms` must have length `>= min(lq, ld)` — pre-computed per-token query
+/// norms (passed from [`rerank`] to avoid N× recomputation across documents).
+/// `cos_scratch` must have length `>= min(lq, ld)`; reused across calls to
+/// avoid per-doc allocation.
+#[cfg(feature = "smooth_min_rerank")]
+#[allow(clippy::too_many_arguments)]
+pub fn smooth_min_aligned_score_into(
+    query: &[f32],
+    doc: &[f32],
+    lq: usize,
+    ld: usize,
+    dim: usize,
+    beta: f32,
+    q_norms: &[f32],
+    cos_scratch: &mut [f32],
+) -> f32 {
+    if lq == 0 || ld == 0 || dim == 0 {
+        return 0.0;
+    }
+
+    let n = lq.min(ld);
+    debug_assert!(cos_scratch.len() >= n);
+    debug_assert!(q_norms.len() >= n);
+
+    for i in 0..n {
+        let q_row = &query[i * dim..(i + 1) * dim];
+        let d_row = &doc[i * dim..(i + 1) * dim];
+        let q_norm = q_norms[i];
+        let d_norm = simd_dot_f32(d_row, d_row, dim).sqrt();
+        if q_norm < 1e-12 || d_norm < 1e-12 {
+            cos_scratch[i] = 0.0;
+        } else {
+            let dot = simd_dot_f32(q_row, d_row, dim);
+            cos_scratch[i] = dot / (q_norm * d_norm);
+        }
+    }
+
+    smooth_min_similarity(&cos_scratch[..n], beta)
 }
 
 /// Compute mean cosine similarity between two multi-vector embeddings.
@@ -767,6 +847,118 @@ mod tests {
             smooth_ranked[0].doc_index, 0,
             "smooth-min should rank correct doc first, got score {} vs {}",
             smooth_ranked[0].score, smooth_ranked[1].score
+        );
+    }
+
+    // ── SmoothMinAligned tests (Issue 041 T6 — position-aligned variant) ──
+
+    #[cfg(feature = "smooth_min_rerank")]
+    #[test]
+    fn smooth_min_aligned_identical_vectors() {
+        let dim = 4;
+        let q = vec![1.0, 0.0, 0.0, 0.0];
+        let d = vec![1.0, 0.0, 0.0, 0.0];
+        let q_norms = vec![1.0f32];
+        let mut cos_scratch = vec![0.0f32; 1];
+        let score = smooth_min_aligned_score_into(&q, &d, 1, 1, dim, 1e4, &q_norms, &mut cos_scratch);
+        assert!(
+            approx_eq(score, 1.0, 1e-4),
+            "identical vectors should give 1.0, got {score}"
+        );
+    }
+
+    #[cfg(feature = "smooth_min_rerank")]
+    #[test]
+    fn smooth_min_aligned_empty_returns_zero() {
+        let q_norms = vec![];
+        let mut cos_scratch = vec![];
+        let score = smooth_min_aligned_score_into(&[], &[], 0, 0, 4, 1e4, &q_norms, &mut cos_scratch);
+        assert!(approx_eq(score, 0.0, 1e-5));
+    }
+
+    #[cfg(feature = "smooth_min_rerank")]
+    #[test]
+    fn smooth_min_aligned_penalizes_mixed_cosines() {
+        // Same scenario as smooth_min_penalizes_mixed_cosines, but position-aligned.
+        // Correct doc: both positions cos≈0.707; distractor: pos0 cos=1.0, pos1 cos=0.0.
+        let dim = 2;
+        let q = vec![1.0, 0.0, 0.0, 1.0];
+        let correct = vec![0.5, 0.5, 0.5, 0.5];
+        let distractor = vec![1.0, 0.0, 0.0, 0.0]; // d1=[0,0] → cos(q1,d1)=0
+
+        // Pre-compute query norms: |q0|=1, |q1|=1.
+        let q_norms = vec![1.0f32, 1.0f32];
+        let mut cos_c = vec![0.0f32; 2];
+        let mut cos_d = vec![0.0f32; 2];
+        let score_correct =
+            smooth_min_aligned_score_into(&q, &correct, 2, 2, dim, 1e4, &q_norms, &mut cos_c);
+        let score_distractor =
+            smooth_min_aligned_score_into(&q, &distractor, 2, 2, dim, 1e4, &q_norms, &mut cos_d);
+
+        assert!(
+            score_correct > score_distractor,
+            "all-moderate ({score_correct}) should beat mixed ({score_distractor})"
+        );
+    }
+
+    #[cfg(feature = "smooth_min_rerank")]
+    #[test]
+    fn smooth_min_aligned_beats_cosine_on_mixed_distractor() {
+        // The canonical PoC scenario: correct doc has all-moderate aligned cosines,
+        // distractor has 2 exact + 2 orthogonal aligned cosines.
+        let dim = 4;
+        let query = vec![
+            1.0, 0.0, 0.0, 0.0, // q0
+            0.0, 1.0, 0.0, 0.0, // q1
+            0.0, 0.0, 1.0, 0.0, // q2
+            0.0, 0.0, 0.0, 1.0, // q3
+        ];
+        let half_sqrt3 = 0.5 * 3.0f32.sqrt();
+        let correct = vec![
+            0.5, half_sqrt3, 0.0, 0.0, // cos(q0,d0) = 0.5
+            0.0, 0.5, half_sqrt3, 0.0, // cos(q1,d1) = 0.5
+            0.0, 0.0, 0.5, half_sqrt3, // cos(q2,d2) = 0.5
+            half_sqrt3, 0.0, 0.0, 0.5, // cos(q3,d3) = 0.5
+        ];
+        let distractor = vec![
+            1.0, 0.0, 0.0, 0.0, // cos(q0,d0) = 1.0
+            0.0, 0.0, 0.0, 1.0, // cos(q1,d1) = 0.0
+            0.0, 0.0, 0.0, 1.0, // cos(q2,d2) = 0.0
+            0.0, 0.0, 0.0, 1.0, // cos(q3,d3) = 1.0
+        ];
+        let docs = vec![correct, distractor];
+        let doc_lengths = vec![4, 4];
+
+        let ranked = rerank(
+            &query,
+            &docs,
+            &doc_lengths,
+            dim,
+            RerankMethod::SmoothMinAligned { beta: 1e4 },
+        );
+        assert_eq!(
+            ranked[0].doc_index, 0,
+            "aligned smooth-min should rank correct doc first: {} vs {}",
+            ranked[0].score, ranked[1].score
+        );
+    }
+
+    #[cfg(feature = "smooth_min_rerank")]
+    #[test]
+    fn smooth_min_aligned_truncates_unequal_lengths() {
+        // lq=4, ld=2: only 2 aligned positions are compared.
+        let dim = 2;
+        let q = vec![1.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0]; // 4 tokens
+        // d0=[1,0] → cos(q0,d0)=1.0; d1=[1,0] → cos(q1,d1)=cos([0,1],[1,0])=0.0
+        let d = vec![1.0, 0.0, 1.0, 0.0]; // 2 tokens → cos = [1.0, 0.0]
+        // Pre-compute query norms: |q0|=1, |q1|=1.
+        let q_norms = vec![1.0f32, 1.0f32, 1.0f32, 1.0f32];
+        let mut cos_scratch = vec![0.0f32; 4];
+        let score = smooth_min_aligned_score_into(&q, &d, 4, 2, dim, 1e4, &q_norms, &mut cos_scratch);
+        // smooth_min([1.0, 0.0]) penalizes the 0.0 → score < 0.5
+        assert!(
+            score < 0.5,
+            "aligned with one zero-cosine should be < 0.5, got {score}"
         );
     }
 }

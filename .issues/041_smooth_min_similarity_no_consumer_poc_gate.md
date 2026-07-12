@@ -2,7 +2,7 @@
 
 > **Spawned from:** Research 385 (SoftMatcha 2 smooth-min soft pattern matching — Gain)
 > **Date:** 2026-07-07
-> **Status:** IMPLEMENTED (opt-in `smooth_min_similarity` feature) — GOAT PoC PASS, zero consumers
+> **Status:** IMPLEMENTED (opt-in `smooth_min_similarity` feature) — GOAT PoC PASS, consumer GOAT PASS (T6 SmoothMinAligned), all-pairs consumer FAILED (T4 SmoothMin)
 > **Updated:** 2026-07-12 — PoC resolved the Research 385 §4 vs Issue 041 contradiction
 
 ---
@@ -152,8 +152,8 @@ always be ~lq×ld slower than Cosine.
 
 **Decision:** The feature stays opt-in (`smooth_min_rerank`). The wiring is
 correct and tested (17 tests pass), but the GOAT gate honestly shows SmoothMin
-doesn't beat Cosine on this task. The quality gap might be different on a
-task with position-aligned tokens (e.g., sequence matching where q_i aligns
+doesn't beat Cosine on this task. The quality gap might be different on a task
+with position-aligned tokens (e.g., sequence matching where q_i aligns
 with d_i). The rerank module's API doesn't naturally support position-aligned
 comparison — a future consumer with position alignment might show a gain.
 
@@ -162,6 +162,62 @@ proven to work (original PoC PASS: +12pp recall@5), but the rerank consumer
 doesn't demonstrate a gain. Promotion to default-on still requires a consumer
 whose GOAT gate passes. The rerank consumer is a negative result — it shows
 that smooth-min doesn't beat mean-pooled cosine on all-pairs retrieval.
+
+## Consumer Wiring: Position-Aligned Rerank (T6 — GOAT PASS ✅)
+
+**Implemented (2026-07-12):** The T4 all-pairs consumer FAILED because the task
+IS position-aligned (query token i comes from the same cluster as document
+token i), but `smooth_min_score_into` uses all-pairs max (`max_j cos(q_i, d_j)`)
+which inflates distractor scores by finding spurious matches at wrong positions.
+
+**The fix:** Added `RerankMethod::SmoothMinAligned { beta }` — a position-aligned
+variant that computes `cos(q_i, d_i)` for each aligned position i (up to
+`min(lq, ld)`), then aggregates via `smooth_min_similarity`. This matches the
+primitive's PoC design exactly.
+
+**Key difference from T4 (all-pairs):**
+- T4 `SmoothMin`: `max_j cos(q_i, d_j)` — finds the best match for each query token
+  across ALL document positions. A distractor with one exact match at any position
+  gets a high score for that query position.
+- T6 `SmoothMinAligned`: `cos(q_i, d_i)` — compares tokens at MATCHING positions.
+  A distractor with an exact match at position 0 but zero cosine at position 1
+  is correctly penalized.
+
+**Optimization:** Query norms are pre-computed once in the `rerank` function
+(reused across all docs), avoiding N× redundant computation. Per-doc cost is
+O(lq·dim) — same theoretical complexity as Cosine's O(dim·(lq+ld)).
+
+**GOAT gate result: ALL PASS ✅**
+
+| Gate | Result | Details |
+|------|--------|--------|
+| G1 (quality) | PASS | SmoothMinAligned recall@5 = 1.000 vs Cosine 0.495 (+50.5pp) |
+| G2 (latency) | PASS | 2.34× Cosine latency (target: <3× — O(lq·dim) vs O(dim·(lq+ld))) |
+| G3 (no-regression) | PASS | All methods produce finite scores; Cosine/MaxSim/SmoothMin unchanged |
+
+**G1 details — recall@k:**
+
+| k | Cosine | MaxSim | SmoothMin (all-pairs) | SmoothMinAligned |
+|---|---|---|---|---|
+| 1 | 0.150 | 0.080 | 0.115 | **0.820** |
+| 3 | 0.365 | 0.205 | 0.245 | **1.000** |
+| 5 | 0.495 | 0.295 | 0.385 | **1.000** |
+| 10 | 0.650 | 0.515 | 0.575 | **1.000** |
+| 20 | 0.825 | 0.725 | 0.805 | **1.000** |
+
+SmoothMinAligned achieves perfect recall@3+ — it always finds the correct
+document. The position-aligned signal is so strong on this task that the
+smooth-min aggregation perfectly discriminates correct docs from distractors.
+
+**Why the gain is so large:** The task generates queries where each query token
+i comes from the same cluster as document token i (but a different word).
+Position-aligned comparison directly measures this relationship. All-pairs max
+(T4) dilutes the signal by finding spurious cross-position matches. Mean-pooled
+cosine (Cosine) loses positional information entirely.
+
+**This is a modelless gain.** No training required — the position-aligned cosine
++ smooth-min aggregation is parameter-free at inference (β=10⁴ is a constant
+from the paper).
 
 ## Consumer Paths (status updated 2026-07-12)
 
@@ -176,6 +232,7 @@ The primitive is shipped. Consumer wiring status:
 - [-] **T2** (deferred) When ItemEmbedIndex grows a per-token embedding path (Path A), wire smooth-min as the multi-token query scorer.
 - [-] **T3** (deferred) When AnyRAG gets a real retrieval backend (Path B), wire smooth-min as the scoring function.
 - [-] **T4** (attempted 2026-07-12, GOAT FAILED) Wired smooth-min as `RerankMethod::SmoothMin` in `katgpt-attn-match/src/rerank.rs`. GOAT gate FAILED: SmoothMin recall@5 (0.385) < Cosine (0.495). The rerank module's all-pairs/mean-pooled API doesn't match smooth-min's position-aligned design. Feature stays opt-in.
+- [x] **T6** (done 2026-07-12) Added `RerankMethod::SmoothMinAligned` — position-aligned variant computing `cos(q_i, d_i)` at each aligned position. GOAT gate ALL PASS: recall@5 = 1.000 vs Cosine 0.495 (+50.5pp), latency 2.34× Cosine (<3× target), no-regression PASS. First consumer with a passing GOAT gate.
 - [-] **T5** (deferred) When a consumer's GOAT gate passes with smooth-min enabled → promote to default-on.
 
 ---
@@ -191,4 +248,4 @@ The primitive is shipped. Consumer wiring status:
 
 ## TL;DR
 
-**PoC PASS, primitive shipped (opt-in). Consumer wiring attempted (rerank module) — GOAT FAILED.** The Research 385 §4 spec said "synthetic PoC" — the issue's "blocked on consumer prerequisites" was wrong. The PoC showed +12pp recall@5 gain, ~0ns overhead, robust across β. The primitive is in `katgpt-core/src/similarity.rs` behind `smooth_min_similarity` (opt-in, 24 tests). The first consumer wiring (rerank module `smooth_min_rerank`) honestly FAILED the GOAT gate: SmoothMin recall@5 (0.385) < Cosine (0.495) on the rerank task, because the rerank module's all-pairs API doesn't match smooth-min's position-aligned design. Promotion to default-on still waits for a consumer whose GOAT gate passes — likely one with position-aligned token comparison (e.g., sequence matching, not all-pairs retrieval).
+**PoC PASS, primitive shipped (opt-in). Consumer wiring: T4 (all-pairs) GOAT FAILED, T6 (position-aligned) GOAT PASS.** The Research 385 §4 spec said "synthetic PoC" — the issue's "blocked on consumer prerequisites" was wrong. The PoC showed +12pp recall@5 gain, ~0ns overhead, robust across β. The primitive is in `katgpt-core/src/similarity.rs` behind `smooth_min_similarity` (opt-in, 24 tests). The first consumer wiring (T4, rerank `SmoothMin` all-pairs) FAILED: SmoothMin recall@5 (0.385) < Cosine (0.495) on the rerank task, because all-pairs max dilutes the position-aligned signal. The second consumer wiring (T6, rerank `SmoothMinAligned` position-aligned) PASSED: recall@5 = 1.000 vs Cosine 0.495 (+50.5pp), latency 2.34× Cosine (<3× target). The position-aligned variant matches the primitive's PoC design — comparing `cos(q_i, d_i)` at matching positions, not `max_j cos(q_i, d_j)` across all positions. Promotion to default-on now has a passing consumer GOAT gate.
