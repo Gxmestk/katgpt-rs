@@ -1,7 +1,7 @@
 # Issue 136: Demote `flashar_consensus` from default-on — GOAT G1 FAIL (quality)
 
 > **Created:** 2026-07-12
-> **Status:** Open
+> **Status:** CLOSED (2026-07-12) — demotion verified across full 5-repo quintet
 > **Priority:** P1
 > **Blocked:** No
 > **Depends:** Plan 485 benchmark (complete)
@@ -92,11 +92,33 @@ architecture as a katgpt-rs feature.
 
 ## Acceptance Criteria
 
-- [ ] `flashar_consensus` removed from `default` in `katgpt-rs/Cargo.toml`
-- [ ] `cargo check` passes (fix downstream breakage or add explicit features)
-- [ ] Downstream crates that need FlashAR add `features = ["flashar_consensus"]`
-- [ ] GOAT gate verdict documented in this issue
-- [ ] Issue 453 (consolidation proof) cross-referenced
+- [x] `flashar_consensus` removed from `default` in `katgpt-rs/Cargo.toml`
+- [x] `cargo check` passes across the full 5-repo quintet (see Verification below)
+- [x] Downstream crates that need FlashAR add `features = ["flashar_consensus"]` — only `riir-poc` uses it; it already has `features = ["dllm", "flashar_consensus"]` explicitly
+- [x] GOAT gate verdict documented in this issue (G1 FAIL, G3 FAIL above)
+- [x] Issue 453 (consolidation proof) cross-referenced (Related header + Root Cause §3)
+
+## Verification (2026-07-12)
+
+Workspace-wide `cargo check` after demoting `flashar_consensus` from default-on:
+
+| Repo | Scope | Result |
+|------|-------|--------|
+| `katgpt-rs` | `cargo check --lib` (default features) | ✅ 23.65s |
+| `riir-ai` | `cargo check --workspace` (15 crates) | ✅ 46.16s |
+| `riir-train` | `cargo check --workspace` (3 crates) | ✅ 34.41s |
+| `riir-chain` | `cargo check --workspace` (2 crates) | ✅ 20.90s |
+| `riir-neuron-db` | `cargo check` | ✅ 16.38s |
+
+Source-grep for `flashar_consensus|FlashARConsensus` across all `.rs` files
+in the quintet: all matches are confined to `katgpt-rs/` itself (source,
+re-exports, feature-gated tests) and `riir-ai/crates/riir-poc/` (which
+explicitly enables the feature). **No other downstream crate references
+FlashAR symbols**, confirming the demotion is safe with zero downstream
+breakage.
+
+The `katgpt-rs` lib test suite was previously verified (200/200 pass) in
+the demotion commit `3ce36046`.
 
 ## References
 
