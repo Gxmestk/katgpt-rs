@@ -172,8 +172,9 @@ pub mod ssmax;
 // Smooth-min soft pattern matching — modelless latent-space utility for
 // fuzzy multi-token retrieval (Research 385, SoftMatcha 2, Issue 041).
 // GOAT PoC PASS: +12pp recall@5 over plain cosine, ~0ns overhead.
-// Opt-in — zero consumers today; promote when ItemEmbedIndex/AnyRAG/Engram
-// adds a multi-token retrieval path.
+// Consumer GOAT PASS (T6 SmoothMinAligned): recall@5 = 1.000 vs Cosine 0.495
+// (+50.5pp) on position-aligned multi-token retrieval.
+// DEFAULT-ON (2026-07-12): first consumer GOAT gate passes with modelless gain.
 #[cfg(feature = "smooth_min_similarity")]
 pub mod similarity;
 #[cfg(feature = "smooth_min_similarity")]

@@ -34,10 +34,10 @@
 //!
 //! ## Feature gate
 //!
-//! Opt-in via `smooth_min_similarity`. Not default-on because there are zero
-//! consumers today (Issue 041 tracks consumer wiring). Promote to default-on
-//! when a consumer (ItemEmbedIndex, AnyRAG, soft Engram) demonstrates
-//! real-world value.
+//! DEFAULT-ON (2026-07-12, Issue 041 T6). Promoted after the first consumer
+//! GOAT gate passed: `RerankMethod::SmoothMinAligned` in katgpt-attn-match
+//! achieved recall@5 = 1.000 vs Cosine 0.495 (+50.5pp) on position-aligned
+//! multi-token retrieval.
 
 /// Smooth-minimum similarity for variable-length soft pattern matching.
 ///
