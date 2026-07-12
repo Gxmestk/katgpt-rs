@@ -858,7 +858,7 @@ PLASMA → HOT → WARM → COLD transitions are driven by consensus confidence.
 
 | Metric | Value |
 |--------|-------|
-| Feature flag | `flashar_consensus` (default-on, requires `tri_mode`, `plasma_path`) |
+| Feature flag | `flashar_consensus` (**DEMOTED** from default-on, Issue 136 — KL 2.9-6.5 vs Leviathan 0.03; opt-in only) |
 | Paths | Path H (AR/MTP), Path V (D2F block) |
 | Thermal states | PLASMA / HOT / WARM / COLD |
 
@@ -1038,7 +1038,7 @@ All seventeen techniques compose without conflicts:
 | GEPA-D Config Evolution | — | ✅ config mutation | `gepa_reflective` (default, requires `bandit`, `memo_reflections`) |
 | PhraseBoost | — | ✅ phrase screening | `phrase_boost` (default) |
 | Hydra Budget | ✅ layer importance | ✅ layer skipping | `hydra_budget` (default) |
-| FlashAR Consensus | — | ✅ thermal routing | `flashar_consensus` (default, requires `tri_mode`, `plasma_path`) |
+| FlashAR Consensus | — | ✅ thermal routing | `flashar_consensus` (**DEMOTED** from default, Issue 136 — requires `tri_mode`, `plasma_path`) |
 | Budget Adaptation | — | ✅ budget scaling | `budget_adaptation` (default) |
 | Dual-Pool Router | — | ✅ CGSP bandit wrap | `cgsp_dual_pool` (opt-in, requires `cgsp`) |
 | ManifoldPruner Soft Validity | — | ✅ soft sigmoid pruning | `manifold_pruner` (opt-in, Plan 234) |
