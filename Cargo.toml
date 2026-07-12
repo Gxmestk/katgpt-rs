@@ -632,6 +632,12 @@ required-features = ["and_or_dtree"]
 name = "issue_036_bandit_bench"
 required-features = ["bandit"]
 
+# Issue 038 HOLA cache consumer wiring GOAT PoC — wires read_cache_into into
+# the GDN2 forward pass and benchmarks needle retrieval: bare vs cache-augmented.
+[[example]]
+name = "issue_038_hola_cache_consumer_goat"
+required-features = ["hippocampal_cache"]
+
 [[example]]
 name = "bandit_01_basic"
 required-features = ["bandit"]

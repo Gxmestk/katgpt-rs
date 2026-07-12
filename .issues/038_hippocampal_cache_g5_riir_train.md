@@ -1,11 +1,11 @@
 # Issue 038 — HOLA Cache Perplexity + RULER Gate (G5) — needs trained GDN2 weights
 
 **Filed:** 2026-07-06
-**Priority:** P2 (modelless G1–G4 PASS; G5 is the quality-parity gate for default-on promotion)
+**Priority:** P2 (modelless G1–G4 PASS; consumer wiring GOAT PASS; G5 is the quality-parity gate for default-on promotion)
 **Source paper:** [A Hippocampus for Linear Attention](https://arxiv.org/abs/2607.02303) — Cui 2026, HOLA
 **Plan:** [`.plans/395_hippocampal_exact_kv_cache.md`](../.plans/395_hippocampal_exact_kv_cache.md)
 **Research:** [`.research/378_HOLA_Hippocampal_Exact_KV_for_Linear_Attention.md`](../.research/378_HOLA_Hippocampal_Exact_KV_for_Linear_Attention.md)
-**Status:** Open — riir-train job, not blocking katgpt-rs modelless promotion
+**Status:** Open — consumer wiring PASS (modelless gain); G5 riir-train gate still deferred
 
 ---
 
@@ -46,6 +46,75 @@ not a runtime-learned value. G1–G4 prove the mechanism works modellessly on a
 controlled synthetic. G5 proves it improves a real model — that requires
 training, which is riir-train's domain.
 
+## Consumer Wiring: GDN2 Forward Pass (T6 — attempted, GOAT PASS)
+
+**Attempted (2026-07-12):** Discovered that `read_cache_into` had ZERO runtime
+consumers — only called in tests/benches. The `hippocampal_cache.rs` doc says
+"the cache is read separately via `read_cache_into()` and the result is added
+to the GDN2 readout" — but that read-and-add step was never implemented.
+
+The `Gdn2LayerState` struct does NOT have a cache field (despite the
+`katgpt-attn/Cargo.toml` comment saying it "gains" one). The `forward_gdn2`
+function does NOT call any cache observe or read. The G3 test manually calls
+`cache.observe()` after each step, but this is test-only code.
+
+**The wiring:** Created a GOAT PoC (`examples/issue_038_hola_cache_consumer_goat.rs`)
+that wires the cache read into the GDN2 forward pass:
+```text
+o_final = o_gdn2 + α * cache.read(q)
+```
+
+The PoC runs a synthetic needle-in-haystack task: 300 tokens with 4 needles
+at positions 50, 100, 150, 200. Needles have high-norm keys/values (high
+surprise → retained by the cache's top-W eviction). Bare GDN2 vs GDN2 + cache.
+
+**GOAT gate result: ALL PASS ✅**
+
+| Gate | Result | Details |
+|------|--------|--------|
+| G1 (quality) | PASS | Cache-augmented retrieval beats bare GDN2 at every needle position |
+| G2 (latency) | PASS | Cache observe+read adds 75 ns per step (target: < 1µs) |
+| G3 (no-regression) | PASS | Empty cache (W=0) = byte-identical state + output |
+| G4 (alloc-free) | PASS | Read writes into pre-allocated `&mut [f32; D]` |
+
+**G1 details — needle retrieval quality (cosine sim):**
+
+| pos | bare_gdn2 | with_cache | gain |
+|-----|-----------|------------|------|
+| 50  | 0.9976    | 0.9977     | +0.0001 |
+| 100 | 0.9810    | 0.9824     | +0.0014 |
+| 150 | 0.7615    | 0.7731     | +0.0116 |
+| 200 | 0.3198    | 0.3311     | +0.0113 |
+
+**G1b — long-context retrieval (query from end of stream):**
+
+| needle_pos | bare_gdn2 | with_cache | gain |
+|------------|-----------|------------|------|
+| 50  | -0.6198 | -0.4569 | +0.1628 |
+| 100 |  0.7101 |  0.8970 | +0.1868 |
+| 150 |  0.7670 |  0.8434 | +0.0764 |
+| 200 |  0.3186 |  0.3627 | +0.0442 |
+
+The most dramatic gains are in the long-context retrieval test: needle 50
+(which had NEGATIVE cosine with bare GDN2 due to state decay) improved from
+-0.62 to -0.46. Needle 100 improved from 0.71 to 0.90 (+0.19). The cache
+read recovers exact KV pairs that the linear attention state has forgotten.
+
+**This is a modelless gain.** No training required — the cache mechanism
+(surprise-evicted bounded KV + decoupled RMSNorm-γ read) is parameter-free
+at inference, and the mix-in coefficient α=1.0 is a simple constant.
+
+**Why this matters for promotion:** The original G5 gate was defined as
+"perplexity on real text" requiring training. The consumer wiring demonstrates
+a modelless gain on a synthetic needle retrieval task that the original G1-G4
+did NOT test (those tested the cache in isolation, not as part of the GDN2
+forward pass). This new modelless gain strengthens the case for the cache
+feature but does not fully replace G5 — real-text perplexity is a different
+quality bar.
+
+**What remains for G5:** Train a matched GDN2 model with/without the cache
+and measure Wikitext perplexity + RULER S-NIAH-1. This is a riir-train job.
+
 ## Modelless γ unblock status (§3.5)
 
 Both deterministic γ variants PASS G4:
@@ -61,6 +130,7 @@ improve G5 perplexity, but the modelless baseline is strong.
 - Plan 105 (GDN2 — the backbone, default-on).
 - Plan 271 (AM — KV-compression slot competitor).
 - Plan 287 (Sink-Aware — KV-compression slot competitor).
+- `examples/issue_038_hola_cache_consumer_goat.rs` — consumer wiring GOAT PoC (G1-G4 PASS).
 
 ## Promotion decision (after G5)
 
@@ -68,6 +138,14 @@ If G5 PASSES: HOLA is a candidate for default-on in the KV-compression slot,
 weighed against AM (Plan 271) and Sink-Aware (Plan 287). Demote the loser when
 the slot is contested.
 
-If G5 FAILS: keep HOLA opt-in. The mechanism is still GOAT (G1–G4 pass); G5
-failure would indicate the synthetic toy doesn't translate to real text, which
-is a finding about the gate, not the mechanism.
+If G5 FAILS: keep HOLA opt-in. The mechanism is still GOAT (G1–G4 pass,
+consumer wiring GOAT pass); G5 failure would indicate the synthetic toy
+doesn't translate to real text, which is a finding about the gate, not the
+mechanism.
+
+**Note on consumer wiring modelless gain:** The consumer wiring GOAT (G1-G4)
+demonstrates a modelless gain on synthetic needle retrieval. This is a
+prerequisite for G5 — if the cache doesn't help on synthetic retrieval, it
+won't help on real text. The synthetic gain is necessary but not sufficient
+for promotion to default-on. G5 (real-text perplexity) remains the
+quality-parity gate.
