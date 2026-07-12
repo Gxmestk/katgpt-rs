@@ -350,6 +350,15 @@ pub mod hippocampal_cache;
 #[cfg(feature = "hippocampal_cache")]
 pub use hippocampal_cache::{HippocampalCache, SortedSlotCache};
 
+// HOLA dynamic (runtime D/W) variant — the production consumer for forward_gdn2
+// which uses runtime config.head_dim. Same algorithm as HippocampalCache<D,W>
+// but Vec-based for runtime dimensions. Alloc-free read path (pre-allocated
+// scratch). Plan 395 Phase 5 (Issue 038 production wiring).
+#[cfg(feature = "hippocampal_cache")]
+pub mod hippocampal_cache_dyn;
+#[cfg(feature = "hippocampal_cache")]
+pub use hippocampal_cache_dyn::HippocampalCacheDyn;
+
 // Tiered Hot/Warm/Cold K/V Store — the route-and-fetch substrate for sparse
 // long-context attention (Plan 397, Research 379, arxiv 2606.30709). Generic
 // trait + in-memory reference impl. Always-on (no feature gate) because it's

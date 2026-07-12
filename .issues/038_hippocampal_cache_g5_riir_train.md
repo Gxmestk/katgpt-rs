@@ -5,7 +5,7 @@
 **Source paper:** [A Hippocampus for Linear Attention](https://arxiv.org/abs/2607.02303) — Cui 2026, HOLA
 **Plan:** [`.plans/395_hippocampal_exact_kv_cache.md`](../.plans/395_hippocampal_exact_kv_cache.md)
 **Research:** [`.research/378_HOLA_Hippocampal_Exact_KV_for_Linear_Attention.md`](../.research/378_HOLA_Hippocampal_Exact_KV_for_Linear_Attention.md)
-**Status:** Open — consumer wiring PASS (modelless gain); G5 riir-train gate still deferred
+**Status:** Open — consumer wiring + production wiring PASS (modelless gain); G5 riir-train gate still deferred
 
 ---
 
@@ -115,6 +115,52 @@ quality bar.
 **What remains for G5:** Train a matched GDN2 model with/without the cache
 and measure Wikitext perplexity + RULER S-NIAH-1. This is a riir-train job.
 
+## Production Wiring (T7 — forward_gdn2 integration, PASS)
+
+**Implemented (2026-07-12):** The consumer wiring GOAT PoC proved the modelless
+gain, but it used a standalone `gdn2_recurrent_step` — not the production
+`forward_gdn2` function. The production wiring integrates the cache directly
+into the forward pass.
+
+**The const-generic challenge:** `HippocampalCache<const D: usize, const W: usize>`
+requires compile-time D and W, but `forward_gdn2` uses runtime `config.head_dim`.
+For realistic dimensions (D=64–256, W=64), the const-generic arrays would also
+overflow the stack (256×64×4 = 64KB per array × 4 arrays = 256KB).
+
+**Solution:** Created `HippocampalCacheDyn` (`katgpt-core/src/hippocampal_cache_dyn.rs`)
+— a Vec-based dynamic variant that supports any runtime D and W. The read path
+is truly alloc-free (pre-allocated internal scratch buffers for query/key
+normalization; output written into caller-provided `&mut [f32]`; null-sink
+contribution computed without allocating a zero vector). The heap helpers
+(`pack`, `unpack`, `sift_up`, `sift_down`) are shared from the const-generic
+version (DRY). The streaming-softmax helper is duplicated because the types
+differ (`&mut [f32]` vs `&mut [f32; D]`) — the logic is identical.
+
+**Integration:** `Gdn2LayerState` now carries:
+- `hippocampal_caches: Vec<HippocampalCacheDyn>` (one per KV head, empty = disabled)
+- `cache_scratch: Vec<f32>` (output buffer for cache read)
+- `cache_alpha: f32` (mix-in coefficient, default 1.0)
+
+`MultiLayerGdn2Cache::with_hippocampal_cache(config, w)` creates caches for all
+layers. In `forward_gdn2`:
+1. After `gdn2_state_update`, the cache observes `(k, v, β·‖delta‖)`
+2. After `gdn2_state_readout`, the cache read is added: `o += α * cache.read(q)`
+
+**G3 no-regression gate (production):** `forward_gdn2_cache_w0_no_regression`
+test proves W=0 (zero capacity) produces byte-identical logits to no-cache.
+
+**Tests:** 11 forward_gdn2 tests (6 existing + 5 new cache wiring) all PASS.
+8 `HippocampalCacheDyn` unit tests (including parity with const-generic version)
+all PASS. 22 combined hippocampal_cache tests all PASS.
+
+**Files changed:**
+- `katgpt-core/src/hippocampal_cache_dyn.rs` — new (587 lines)
+- `katgpt-core/src/hippocampal_cache.rs` — heap helpers made `pub(crate)`
+- `katgpt-core/src/lib.rs` — module + re-export
+- `katgpt-attn/src/gdn2/types.rs` — cache fields + constructor
+- `katgpt-attn/src/gdn2/forward.rs` — observe + read wiring + tests
+- `Cargo.toml` (root + katgpt-attn + katgpt-core) — feature comments updated
+
 ## Modelless γ unblock status (§3.5)
 
 Both deterministic γ variants PASS G4:
@@ -131,6 +177,9 @@ improve G5 perplexity, but the modelless baseline is strong.
 - Plan 271 (AM — KV-compression slot competitor).
 - Plan 287 (Sink-Aware — KV-compression slot competitor).
 - `examples/issue_038_hola_cache_consumer_goat.rs` — consumer wiring GOAT PoC (G1-G4 PASS).
+- `katgpt-core/src/hippocampal_cache_dyn.rs` — production dynamic cache (runtime D/W).
+- `katgpt-attn/src/gdn2/forward.rs` — production wiring (observe + read in forward_gdn2).
+- `katgpt-attn/src/gdn2/types.rs` — Gdn2LayerState cache fields + with_hippocampal_cache constructor.
 
 ## Promotion decision (after G5)
 

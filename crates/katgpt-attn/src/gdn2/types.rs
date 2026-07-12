@@ -23,6 +23,11 @@
 
 use katgpt_core::types::Config;
 
+// Re-export the dynamic hippocampal cache for use in Gdn2LayerState.
+// Only available when the `hippocampal_cache` feature is enabled.
+#[cfg(feature = "hippocampal_cache")]
+use katgpt_core::HippocampalCacheDyn;
+
 // ── Gate Configuration ────────────────────────────────────────
 
 /// Gate configuration controlling which gates are active.
@@ -101,6 +106,22 @@ pub struct Gdn2LayerState {
 
     /// Gate configuration for this layer.
     pub gate_config: Gdn2GateConfig,
+
+    // ── HOLA Hippocampal Cache (Plan 395, Issue 038) ──
+    // One cache per KV head. Empty vec = cache disabled (zero overhead).
+    // When non-empty, each KV head's cache observes (k, v, β·‖delta‖) after
+    // the state update, and the cache read is added to the GDN2 readout:
+    //   o_final = o_gdn2 + cache_alpha * cache.read(q)
+    #[cfg(feature = "hippocampal_cache")]
+    pub hippocampal_caches: Vec<HippocampalCacheDyn>,
+    /// Scratch buffer for cache read output `[head_dim]`. Pre-allocated to
+    /// avoid per-token allocation in the readout loop.
+    #[cfg(feature = "hippocampal_cache")]
+    pub cache_scratch: Vec<f32>,
+    /// Mix-in coefficient α for combining cache read with GDN2 readout.
+    /// `o_final = o_gdn2 + cache_alpha * cache.read(q)`. Default: 1.0.
+    #[cfg(feature = "hippocampal_cache")]
+    pub cache_alpha: f32,
 }
 
 impl Gdn2LayerState {
@@ -121,6 +142,12 @@ impl Gdn2LayerState {
             decay_alpha: vec![0.99; dk],
             write_w_channel: vec![1.0; dv],
             delta: vec![0.0; dv],
+            #[cfg(feature = "hippocampal_cache")]
+            hippocampal_caches: Vec::new(), // empty = disabled
+            #[cfg(feature = "hippocampal_cache")]
+            cache_scratch: vec![0.0; dv],
+            #[cfg(feature = "hippocampal_cache")]
+            cache_alpha: 1.0,
         }
     }
 
@@ -128,9 +155,14 @@ impl Gdn2LayerState {
     ///
     /// Only resets the head state matrices; scratch buffers are zeroed
     /// on each use so they don't need resetting here.
+    /// HOLA caches are also reset (heap_len → 0) when present.
     pub fn reset(&mut self) {
         for h in &mut self.heads {
             h.reset();
+        }
+        #[cfg(feature = "hippocampal_cache")]
+        for cache in &mut self.hippocampal_caches {
+            cache.reset();
         }
     }
 
@@ -184,6 +216,25 @@ impl MultiLayerGdn2Cache {
                 .collect(),
             eps: 1e-6,
         }
+    }
+
+    /// Allocate with HOLA hippocampal cache enabled for all layers.
+    ///
+    /// Each KV head in each layer gets a `HippocampalCacheDyn` with capacity
+    /// `w` and head dimension `config.head_dim`. The cache observes
+    /// (k, v, β·‖delta‖) after each state update and the read is added to the
+    /// GDN2 readout via `forward_gdn2`.
+    ///
+    /// Only available when the `hippocampal_cache` feature is enabled.
+    #[cfg(feature = "hippocampal_cache")]
+    pub fn with_hippocampal_cache(config: &Config, w: usize) -> Self {
+        let mut cache = Self::new(config);
+        for layer in &mut cache.layers {
+            layer.hippocampal_caches = (0..config.n_kv_head)
+                .map(|_| HippocampalCacheDyn::new_with_ones_gamma(config.head_dim, w))
+                .collect();
+        }
+        cache
     }
 
     /// Reset all layers to zeroed state (reuse allocations).
