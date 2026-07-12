@@ -106,6 +106,10 @@ pub use conformal::{
 pub mod coda;
 #[cfg(feature = "dec_operators")]
 pub use katgpt_dec as dec;
+#[cfg(feature = "dec_operators")]
+pub mod dec_freeze;
+#[cfg(feature = "dec_operators")]
+pub use dec_freeze::CochainFreezeEnvelope;
 pub mod delta_mem;
 // Higher-order Linear Attention (HLA) substrate — cache types + streaming
 // kernels. Spun out to the `katgpt-hla` crate (Issue 007 Phase E Tier 2 #4)
