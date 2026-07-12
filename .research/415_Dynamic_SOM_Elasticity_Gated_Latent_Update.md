@@ -305,6 +305,40 @@ disadvantaged), but it's not the novel capability the Super-GOAT bar
 requires (Q2 = "new class of behavior"). The error-scaled step is still
 the headline GOAT gain. **Verdict remains: GOAT.**
 
+### SOM Training Validation (Issue 379 / Plan 315, 2026-07-12)
+
+The §8a caveat ("full structure-matching would need a SOM training run") is
+now **CLOSED**. A genuine SOM training loop was run in `riir-train` using
+`katgpt_core::elasticity_gated_update::compute_error` + `neighborhood_weight`
+as the neuron update rule, with a 1D ring lattice (fixed topology).
+
+**Result:** allocation_ratio = **0.5385** (13 safe / 7 frontier neurons) on
+the same 90%/10% safe/frontier population — **G1 gate PASS** (≥ 0.5).
+
+The frontier (10% of data) gets 35% of the neurons — significantly more than
+the density-proportional 10% (magnification law prediction: ratio ≈ 0.11).
+This directly confirms the structure-matching property in the SOM-training
+sense, complementing the heal-cycle PoC's indirect confirmation (coverage
+ratio 23.31).
+
+**Key finding — eta regime sensitivity:** structure-matching only emerges at
+eta ∈ [30, 40] for this data distribution (20 neurons, STYLE_DIM=64,
+support_diameter auto-computed). At eta=1.0 (the heal config default), the
+neighborhood is too tight for SOM-training structure-matching (ratio = 0.05).
+This is NOT a bug — the heal topology moves one shard at a time (tight
+neighborhood suffices), while the SOM topology moves all neurons per sample
+(wider neighborhood needed). This is the topology-dependent parameter tuning
+noted in §8.1.
+
+**All 6 gates PASS:** G1 (allocation_ratio 0.5385), G2 (no over-allocation,
+safe/frontier retrieval ratio 1.41), G3 (convergence, 93.95% error decrease),
+G4 (determinism, bit-identical), G5 (DSOM 7 frontier vs standard SOM 0),
+G6 (eta sweep, best ratio 0.5385 at eta=30).
+
+See `riir-train/.benchmarks/315_dsom_structure_matching_validation.md` for
+full results and the eta sweep table. Verdict remains **GOAT** (not
+Super-GOAT — structure-matching is confirmed but not a novel capability class).
+
 ---
 
 ## 9. Phase 4 Update: G2 Latency Gate + Promotion (2026-07-12)
