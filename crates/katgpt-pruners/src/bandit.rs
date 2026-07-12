@@ -192,10 +192,31 @@ impl fmt::Display for BanditStrategy {
 
 // ── Stats ───────────────────────────────────────────────────────
 
+/// Welford online variance tracking — lazily allocated only when
+/// `BanditStrategy::VarianceEpsilon` is used.
+///
+/// Extracted from `BanditStats` to eliminate 48 bytes of struct bloat
+/// (2 × `Vec<f32>`) from the hot-path `update()` call for strategies
+/// that never read variance data (Ucb1, EpsilonGreedy, ThompsonSampling).
+/// See Issue 036 cache-line analysis.
+struct WelfordStats {
+    /// Running M2 for Welford variance (per arm).
+    reward_m2: Vec<f32>,
+    /// Running mean reward for variance tracking (per arm).
+    reward_mean: Vec<f32>,
+}
+
 /// Shared arm tracking state: Q-values, visit counts, scoring.
 ///
 /// Used by both [`BanditPruner`] and [`BanditSession`] to avoid duplication.
 /// All methods are O(1) including [`BanditStats::best_arm`] (cached).
+///
+/// Welford variance tracking (`reward_m2`, `reward_mean`) is lazily
+/// allocated behind `Option<Box<WelfordStats>>` — `None` by default,
+/// only allocated via [`enable_variance_tracking`](Self::enable_variance_tracking)
+/// when `VarianceEpsilon` strategy is used. This keeps `BanditStats` at
+/// 80 bytes (fits in ~2 cache lines) instead of 120 bytes (3 cache lines)
+/// for the common case.
 pub struct BanditStats {
     q_values: Vec<f32>,
     visits: Vec<u32>,
@@ -203,14 +224,20 @@ pub struct BanditStats {
     num_arms: usize,
     /// Cached index of the arm with highest Q-value.
     best_arm_idx: usize,
-    /// Running M2 for Welford variance (per arm).
-    reward_m2: Vec<f32>,
-    /// Running mean reward for variance tracking (per arm).
-    reward_mean: Vec<f32>,
+    /// Lazily-allocated Welford variance tracking.
+    ///
+    /// `None` for Ucb1/EpsilonGreedy/ThompsonSampling (the common case) —
+    /// `update()` skips the Welford arithmetic entirely (0 heap accesses).
+    /// `Some` only when `VarianceEpsilon` strategy is used.
+    welford: Option<Box<WelfordStats>>,
 }
 
 impl BanditStats {
     /// Create zero-initialized stats for `num_arms` arms.
+    ///
+    /// Welford variance tracking is **not** allocated by default.
+    /// Call [`enable_variance_tracking`](Self::enable_variance_tracking)
+    /// if the strategy needs reward variance data (e.g. `VarianceEpsilon`).
     pub fn new(num_arms: usize) -> Self {
         Self {
             q_values: vec![0.0; num_arms],
@@ -218,8 +245,26 @@ impl BanditStats {
             total_pulls: 0,
             num_arms,
             best_arm_idx: num_arms.saturating_sub(1),
-            reward_m2: vec![0.0; num_arms],
-            reward_mean: vec![0.0; num_arms],
+            welford: None,
+        }
+    }
+
+    /// Enable Welford variance tracking.
+    ///
+    /// Allocates `reward_m2` and `reward_mean` Vecs. After this call,
+    /// `update()` will maintain running variance statistics, and
+    /// `reward_variance()` / `mean_reward_variance()` will return
+    /// meaningful values.
+    ///
+    /// Only needed for `BanditStrategy::VarianceEpsilon`. Other strategies
+    /// (Ucb1, EpsilonGreedy, ThompsonSampling) never read variance data
+    /// and should leave this disabled (the default) for zero overhead.
+    pub fn enable_variance_tracking(&mut self) {
+        if self.welford.is_none() {
+            self.welford = Some(Box::new(WelfordStats {
+                reward_m2: vec![0.0; self.num_arms],
+                reward_mean: vec![0.0; self.num_arms],
+            }));
         }
     }
 
@@ -250,12 +295,18 @@ impl BanditStats {
         }
 
         // Welford's online algorithm for reward variance tracking.
-        // `n` already holds visits[arm] as f32 from the Q-value update above;
-        // reuse it instead of re-indexing and re-casting.
-        let old_mean = self.reward_mean[arm];
-        let new_mean = old_mean + (reward - old_mean) / n;
-        self.reward_m2[arm] += (reward - old_mean) * (reward - new_mean);
-        self.reward_mean[arm] = new_mean;
+        // Only executed when variance tracking is enabled (VarianceEpsilon
+        // strategy). For Ucb1/EpsilonGreedy/ThompsonSampling, `welford` is
+        // `None` and this entire block is skipped — 0 heap accesses, 0
+        // extra arithmetic (Issue 036 cache-line optimization).
+        if let Some(w) = self.welford.as_mut() {
+            // `n` already holds visits[arm] as f32 from the Q-value update above;
+            // reuse it instead of re-indexing and re-casting.
+            let old_mean = w.reward_mean[arm];
+            let new_mean = old_mean + (reward - old_mean) / n;
+            w.reward_m2[arm] += (reward - old_mean) * (reward - new_mean);
+            w.reward_mean[arm] = new_mean;
+        }
     }
 
     /// UCB1 score: `Q(a) + sqrt(2 * ln(N) / n(a))`.
@@ -340,19 +391,27 @@ impl BanditStats {
 
     /// Welford variance for a single arm.
     ///
-    /// Returns 0.0 for unvisited arms or arms with fewer than 2 samples.
+    /// Returns 0.0 for unvisited arms, arms with fewer than 2 samples,
+    /// or when variance tracking is not enabled (non-`VarianceEpsilon` strategies).
     #[inline]
     pub fn reward_variance(&self, arm: usize) -> f32 {
         if arm >= self.num_arms || self.visits[arm] < 2 {
             return 0.0;
         }
-        self.reward_m2[arm] / (self.visits[arm] - 1) as f32
+        match &self.welford {
+            Some(w) => w.reward_m2[arm] / (self.visits[arm] - 1) as f32,
+            None => 0.0,
+        }
     }
 
     /// Mean reward variance across all visited arms.
     ///
     /// Arms with fewer than 2 samples are excluded from the average.
+    /// Returns 0.0 when variance tracking is not enabled.
     pub fn mean_reward_variance(&self) -> f32 {
+        let Some(w) = &self.welford else {
+            return 0.0;
+        };
         let mut sum = 0.0f32;
         let mut count = 0u32;
         // Inline reward_variance computation: we already know i < num_arms
@@ -360,7 +419,7 @@ impl BanditStats {
         for i in 0..self.num_arms {
             let n = self.visits[i];
             if n >= 2 {
-                sum += self.reward_m2[i] / (n - 1) as f32;
+                sum += w.reward_m2[i] / (n - 1) as f32;
                 count += 1;
             }
         }
@@ -448,15 +507,27 @@ pub struct BanditPruner<P: ScreeningPruner> {
     soft_route_weights: Option<Mutex<Vec<f32>>>,
 }
 
+/// Create `BanditStats` with variance tracking enabled if the strategy needs it.
+/// Only `VarianceEpsilon` reads reward variance; other strategies skip it
+/// for zero overhead (Issue 036 cache-line optimization).
+fn make_stats(num_arms: usize, strategy: &BanditStrategy) -> BanditStats {
+    let mut stats = BanditStats::new(num_arms);
+    if matches!(strategy, BanditStrategy::VarianceEpsilon { .. }) {
+        stats.enable_variance_tracking();
+    }
+    stats
+}
+
 impl<P: ScreeningPruner> BanditPruner<P> {
     /// Create a new bandit pruner wrapping an inner pruner.
     ///
     /// `num_arms` is the vocabulary size (number of discrete actions).
     pub fn new(inner: P, strategy: BanditStrategy, num_arms: usize) -> Self {
+        let stats = make_stats(num_arms, &strategy);
         Self {
             inner,
             strategy,
-            stats: BanditStats::new(num_arms),
+            stats,
             thompson_cache: vec![0.0; num_arms],
             #[cfg(feature = "bandit")]
             shared_stats: None,
@@ -488,10 +559,11 @@ impl<P: ScreeningPruner> BanditPruner<P> {
         num_arms: usize,
         stats: Arc<SharedBanditStats>,
     ) -> Self {
+        let bandit_stats = make_stats(num_arms, &strategy);
         Self {
             inner,
             strategy,
-            stats: BanditStats::new(num_arms),
+            stats: bandit_stats,
             thompson_cache: vec![0.0; num_arms],
             shared_stats: Some(stats),
             dual_cutoff: 0.0,
@@ -522,10 +594,11 @@ impl<P: ScreeningPruner> BanditPruner<P> {
         num_arms: usize,
         scorer: Box<dyn katgpt_core::PartialScorer>,
     ) -> Self {
+        let stats = make_stats(num_arms, &strategy);
         Self {
             inner,
             strategy,
-            stats: BanditStats::new(num_arms),
+            stats,
             thompson_cache: vec![0.0; num_arms],
             #[cfg(feature = "bandit")]
             shared_stats: None,
@@ -557,10 +630,11 @@ impl<P: ScreeningPruner> BanditPruner<P> {
         num_arms: usize,
         threshold: f32,
     ) -> Self {
+        let stats = make_stats(num_arms, &strategy);
         Self {
             inner,
             strategy,
-            stats: BanditStats::new(num_arms),
+            stats,
             thompson_cache: vec![0.0; num_arms],
             #[cfg(feature = "bandit")]
             shared_stats: None,
@@ -1443,10 +1517,11 @@ impl<E: BanditEnv> BanditSession<E> {
             )),
             _ => None,
         };
+        let stats = make_stats(num_arms, &strategy);
         Self {
             env,
             strategy,
-            stats: BanditStats::new(num_arms),
+            stats,
             cumulative_reward: 0.0,
             cumulative_regret: 0.0,
             review_metrics: None,

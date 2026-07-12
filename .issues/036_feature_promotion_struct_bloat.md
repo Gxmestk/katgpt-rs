@@ -147,8 +147,93 @@ condition is met.
 The benchmark example (`examples/issue_036_bandit_bench.rs`) is kept for
 future re-evaluation on dedicated hardware.
 
+## Cache-line analysis correction (2026-07-12, second pass)
+
+The cache-line analysis in point 3 above was **incorrect**. `BanditStats` is
+**NOT** 48 bytes (2 × Vec). It has 4 Vecs + 2 usizes + 1 u32 = **120 bytes**:
+
+```text
+BanditStats layout (120 bytes):
+  q_values:     Vec<f32>   24 bytes  (offset 0-23)
+  visits:       Vec<u32>   24 bytes  (offset 24-47)
+  total_pulls:  u32         4 bytes  (offset 48-51)
+  padding:                  4 bytes  (offset 52-55)
+  num_arms:     usize       8 bytes  (offset 56-63)
+  best_arm_idx: usize       8 bytes  (offset 64-71)
+  reward_m2:    Vec<f32>   24 bytes  (offset 72-95)   ← Welford
+  reward_mean:  Vec<f32>   24 bytes  (offset 96-119)  ← Welford
+```
+
+`BanditStats::update()` accesses **ALL** fields, including the Welford
+fields (`reward_m2[arm]`, `reward_mean[arm]`) on every call — 2 heap reads
++ 2 heap writes that are only needed by `VarianceEpsilon` strategy.
+
+In `BanditPruner` (with `P = NoScreeningPruner` ZST, `strategy` = 16 bytes):
+- `BanditStats` at offset 16-135 (3 cache lines: 0-63, 64-127, 128-191)
+- `shared_stats` at offset ~160 (cache line 3, already loaded for `reward_mean`)
+
+So `update()` loads 3 cache lines regardless of `Box<Extensions>`. The
+`Box<Extensions>` refactor would not change the cache-line access pattern.
+
+## Alternative optimization: lazy Welford tracking (implemented 2026-07-12)
+
+Instead of `Box<Extensions>`, extracted the Welford fields into
+`Option<Box<WelfordStats>>` — lazily allocated only when `VarianceEpsilon`
+strategy is used. This reduces `BanditStats` from 120 → **80 bytes**:
+
+```text
+New BanditStats layout (80 bytes):
+  q_values:     Vec<f32>                   24 bytes  (offset 0-23)
+  visits:       Vec<u32>                   24 bytes  (offset 24-47)
+  total_pulls:  u32                         4 bytes  (offset 48-51)
+  padding:                                  4 bytes  (offset 52-55)
+  num_arms:     usize                       8 bytes  (offset 56-63)
+  best_arm_idx: usize                       8 bytes  (offset 64-71)
+  welford:      Option<Box<WelfordStats>>   8 bytes  (offset 72-79)
+```
+
+Key findings:
+1. `reward_variance()` has **zero call sites** in the codebase.
+2. `mean_reward_variance()` is called only by `BanditSession::select_variance_epsilon()`
+   and `examples/bandit_05_rps.rs` — both exclusively for `VarianceEpsilon`.
+3. All other strategies (Ucb1, EpsilonGreedy, ThompsonSampling) pay the
+   Welford update cost (4 heap accesses per `update()`) but never read it.
+
+**Benchmark result**: 374M mean (5 runs, post-optimization) vs 370M mean
+(pre-optimization) — within noise, **no measurable improvement**.
+
+**Root cause**: The CPU's out-of-order execution was already hiding the
+Welford latency. The 4 Welford heap accesses (2 reads + 2 writes to
+`reward_m2[arm]` and `reward_mean[arm]`) are independent of the Q-value
+update and can be executed in parallel. They were not on the critical path,
+so eliminating them doesn't improve single-threaded throughput.
+
+**Decision: keep the optimization.** Even though G2 (perf) is not met by
+the benchmark, the optimization is a net positive:
+- Struct size provably reduced (120 → 80 bytes, verified via `size_of`)
+- Welford heap accesses provably eliminated for non-VarianceEpsilon
+- Cleaner design (lazy allocation only when needed)
+- Reduces memory bandwidth (beneficial for multi-core scaling)
+- Reduces cache footprint (beneficial for multi-instance workloads)
+
+The `Box<Extensions>` refactor remains deferred — the corrected cache-line
+analysis confirms it would not help.
+
 ## TL;DR
 
 Feature promotions (May 29 → June 12) bloated `BanditPruner` from 3 → 13
-fields, causing cache-line sprawl. Fix: group cold fields behind
-`Box<Extensions>`. Deferred as P2 — the acute regressions are fixed in Bench 372.
+fields, causing cache-line sprawl. The proposed fix (`Box<Extensions>`)
+was confirmed **not helpful** — the corrected cache-line analysis shows
+`BanditStats` is 120 bytes (not 48 as previously claimed), spanning 3
+cache lines regardless of cold-field grouping.
+
+An alternative optimization was implemented: **lazy Welford variance
+tracking** (`Option<Box<WelfordStats>>`) reduces `BanditStats` from 120 →
+80 bytes and eliminates 4 heap accesses per `update()` for non-`VarianceEpsilon`
+strategies. The benchmark shows no measurable improvement (374M vs 370M,
+within noise) because the CPU's out-of-order execution was already hiding
+the Welford latency — the accesses were not on the critical path.
+
+The optimization is kept (correct, cleaner, less memory bandwidth) but
+G2 (perf) is not met by the benchmark. The `Box<Extensions>` refactor
+remains deferred.
