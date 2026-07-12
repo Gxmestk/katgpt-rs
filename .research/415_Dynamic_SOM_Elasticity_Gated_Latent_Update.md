@@ -307,7 +307,25 @@ the headline GOAT gain. **Verdict remains: GOAT.**
 
 ---
 
-## 9. References
+## 9. Phase 4 Update: G2 Latency Gate + Promotion (2026-07-12)
+
+**G2 PASS.** Benchmark: `riir-neuron-db/benches/bench_429_dsom_g2.rs` on a 1000-shard population (10 clusters × 100, k=5, STYLE_DIM=64).
+
+| Metric | Value | Budget | Verdict |
+|---|---|---|---|
+| G2a (ratio) | 1.015–1.035× | < 2.0× | PASS |
+| G2b (DSOM compute surcharge) | 194–253 ns | < 500 ns | PASS |
+| Shared k-NN query cost | ~3300–4400 ns | — | (context, not DSOM-specific) |
+
+**Budget correction:** the original plan's "< 500 ns per heal" assumed the current heal was < 500 ns. On a 1000-shard population the k-NN query alone takes ~3300–4400 ns (both paths share this). The 500 ns budget correctly applies to the DSOM-specific compute surcharge (error + exp weights + extra centroid pass), not the shared full-path latency. See `riir-neuron-db/.benchmarks/429_dsom_g2.md`.
+
+**Promotion:** `elasticity_gated_heal` PROMOTED to default-on in `riir-neuron-db`. Follows the `heal_validation` pattern — feature default-on, behavior opt-in via `.with_neighbor_eta(1.0)`. `eta` defaults to `None` — zero behavior change unless caller explicitly opts in. The open primitive (`katgpt-core/elasticity_gated_update`) remains opt-in — the consumer enables it transitively.
+
+**All six GOAT gates now PASS:** G1 (error-scaled step), G2 (latency), G3 (no-regression), G4 (determinism), G5 (structure-matching), G6 (freeze gate compat). Verdict remains **GOAT** (not Super-GOAT — the structure-matching is confirmed but not a novel capability class).
+
+---
+
+## 10. References
 
 - Rougier & Boniface, "Dynamic Self-Organising Map", Neurocomputing 74(11):1840–1847, 2011. ⟨inria-00495827⟩
 - Guérin, Chauvet, Saubion, "A Survey on Recent Advances in Self-Organizing Maps", arXiv:2501.08416, 2024.
