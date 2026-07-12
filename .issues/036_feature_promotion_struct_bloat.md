@@ -104,6 +104,49 @@ concerns* (the working tree is currently dirty with unrelated sibling WIP in
 
 **Re-evaluation trigger:** revisit if profiling on non-thermal-throttled hardware (e.g., a dedicated benchmark machine with consistent cooling) shows Bandit update() consistently below 420M across 5+ runs. Until then, the expected gain is within measurement noise and the refactor risk is not justified.
 
+## Verification attempt (2026-07-12)
+
+Ran the re-evaluation trigger check via `cargo run --release --example
+issue_036_bandit_bench --features bandit` (5 runs, 5000 iters, 100 arms,
+matching the `bench_bandit()` harness in `src/benchmark/distillation.rs`):
+
+| Run | Throughput (ops/s) |
+|-----|-------------------:|
+| 1   |          363,636,364 |
+| 2   |          375,009,375 |
+| 3   |          370,370,370 |
+| 4   |          369,221,681 |
+| 5   |          375,009,375 |
+| **Mean** |  **370,649,433** |
+
+All 5 runs are below 420M → the re-evaluation trigger's *numeric*
+condition is met.
+
+**However, decision: stay deferred.** Reasons:
+1. **Thermal caveat unmet.** The trigger explicitly requires
+   "non-thermal-throttled hardware." This Mac (Apple Silicon) cannot
+   guarantee that — the 370M mean is below the 415M post-fix number from
+   Bench 372, consistent with thermal throttling rather than a new
+   regression.
+2. **Within documented variance.** The 370M mean falls squarely within the
+   321M–415M variance range documented in the issue (25% spread on the
+   *same binary*). No new regression is demonstrated.
+3. **Cache-line analysis suggests minimal gain.** With `P = NoScreeningPruner`
+   (ZST, the benchmark config), `BanditStats` (48 bytes: 2 × Vec) starts at
+   offset ~1 and fits within the first 64-byte cache line. The cold fields
+   start at offset ~73 (second cache line) but `update()` never accesses
+   them, so the second cache line is not loaded. Grouping cold fields behind
+   `Box<Extensions>` replaces 10 fields with one 8-byte pointer at offset 73
+   — this does not change the first-cache-line layout that `update()`
+   depends on.
+4. **No new struct bloat since Bench 372.** Git log confirms no new fields
+   were added to `BanditPruner` since commit `92c8f90f` (Bench 372, 2026-07-03).
+   The commits since are perf optimizations and file-splitting refactors, not
+   field additions.
+
+The benchmark example (`examples/issue_036_bandit_bench.rs`) is kept for
+future re-evaluation on dedicated hardware.
+
 ## TL;DR
 
 Feature promotions (May 29 → June 12) bloated `BanditPruner` from 3 → 13

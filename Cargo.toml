@@ -625,6 +625,11 @@ required-features = ["and_or_dtree"]
 
 # ── Bandit (RL / Game Theory) ─────────────────────────────────
 
+# Issue 036 re-evaluation trigger check (5-run Bandit update() throughput).
+[[example]]
+name = "issue_036_bandit_bench"
+required-features = ["bandit"]
+
 [[example]]
 name = "bandit_01_basic"
 required-features = ["bandit"]
