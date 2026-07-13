@@ -3,10 +3,13 @@
 > **Spawned from:** `riir-train/.plans/314_weaver_adapter_training.md` Phase 6
 >   ("Open as a katgpt-rs issue when Phase 6 passes" — Phase 6 passed 2026-07-10)
 > **Date:** 2026-07-10
-> **Status:** BLOCKED — awaiting trained Weaver weights from the riir-train 300k
->   completion training run (which itself requires a frozen trained DFlash
->   drafter + verifier — see "Blocker chain" below)
-> **Priority:** Low (deferred until weights exist)
+> **Status:** UNBLOCKED-PATH-IDENTIFIED (2026-07-13 update) — the original "no
+>   base model weights" blocker (below) was REFUTED: 4 verifier GGUFs exist in
+>   `riir-train/data/`, and DFlash LoRA training methodology ships as Plan 143.
+>   The real remaining work is RUNNING the pipeline (precompute + training),
+>   not sourcing methodology or weights. See "§ Unblock path (2026-07-13
+>   revision)" below.
+> **Priority:** Medium (was Low — upgraded because the blocker was refuted)
 > **Feature gate (proposed):** `weaver_runtime` (opt-in)
 
 ## TL;DR
@@ -58,10 +61,23 @@ Trained verifier (base LLM) weights ──────────────�
                               THIS ISSUE (katgpt-rs runtime integration)
 ```
 
-**No trained DFlash/verifier transformer weights exist in any of the 5 repos**
-(audited 2026-07-10: only LoRA artifacts + bandit states found, no base model
-weights). The precompute and training produce garbage without real frozen
-targets. This is the fundamental blocker — not a code problem.
+**~~No trained DFlash/verifier transformer weights exist in any of the 5 repos~~**
+**REFUTED 2026-07-13.** The original audit (above) was wrong or out-of-date.
+The actual state of `riir-train/data/` (verified 2026-07-13):
+
+| File | Size | Role |
+|---|---|---|
+| `gemma-2-2b-it-f16.gguf` | 5.2 GB | Verifier candidate (Gemma 2 2B IT, f16) |
+| `MiniCPM5-1B-F16.gguf` | 2.1 GB | Verifier candidate (MiniCPM5 1B, f16) |
+| `llama-3.2-3b-instruct-q8_0.gguf` | 3.4 GB | Verifier candidate (Llama 3.2 3B, q8_0, added Jul 13) |
+| `qwen2.5-3b-instruct-q8_0.gguf` | 3.6 GB | Verifier candidate (Qwen 2.5 3B, q8_0, added Jul 13) |
+
+**4 verifier candidates exist.** The DFlash drafter training methodology
+ships as **Plan 143** (`dflash_training` feature, COMPLETE, all 8 tasks
+T1-T8 done). Proposal 018 §3.2 confirms: "DFlash ✅ Plan 143 — No gap".
+
+The real remaining work is **running the pipeline**, not sourcing weights
+or methodology. See the revised unblock path below.
 
 The Weaver adapter's value proposition (distilling the verifier's top-K
 distribution into the drafter's marginal) requires a real verifier→drafter
@@ -199,6 +215,67 @@ This is a legitimate riir-train dependency. The modelless mandate
 (AGENTS.md §3.5) does not apply — the modelless path was never the question
 for Weaver (unlike Research 400 / Issue 428, where the modelless path was
 prematurely declared exhausted).
+
+## Unblock path (2026-07-13 revision)
+
+The original blocker chain (above) assumed weights + methodology were missing.
+Both assumptions are now refuted. The revised unblock path:
+
+### What EXISTS (no work needed)
+
+1. **Verifier weights** — 4 GGUFs in `riir-train/data/` (gemma-2-2b-it,
+   MiniCPM5-1B, llama-3.2-3b, qwen2.5-3b). Pick one as the frozen verifier.
+2. **DFlash drafter training methodology** — Plan 143 (`dflash_training`,
+   COMPLETE). Trains LoRA adapters for the DFlash bidirectional draft model
+   conditioned on target hidden states.
+3. **Weaver training methodology** — riir-train Plan 314 (`weaver_adapter_training`,
+   COMPLETE incl. synthetic GOAT gate). LK loss + Muon + top-K=512 vocabulary
+   projection constraint.
+4. **Weaver checkpoint format** — `weaver_v1.safetensors` writer in
+   `riir-train-engine/src/weaver_train.rs` (`weights_to_safetensors_bytes`).
+5. **katgpt-rs DFlash inference** — `dflash_predict_with` in
+   `katgpt-speculative/src/dflash.rs` (the integration point).
+
+### What NEEDS DOING (the actual work)
+
+| Step | Task | Owner repo | Dependency |
+|---|---|---|---|
+| **S1** | Pick verifier (recommend MiniCPM5-1B — smallest, fastest training) | riir-train | none |
+| **S2** | Warm-start DFlash base from verifier weights (standard EAGLE/DFlash practice — initialize draft Wq/Wk/Wv/MLP from verifier) | riir-train | S1 |
+| **S3** | Run Plan 143 (`dflash_training`) to train DFlash LoRA adapter on the warm-started base | riir-train | S2 |
+| **S4** | Produce frozen DFlash drafter checkpoint (BLAKE3-hashed) | riir-train | S3 |
+| **S5** | Run 300k-completion precompute (Plan 314 T4.1 real) — generate verifier logits + DFlash lookaheads on 300k completions | riir-train | S1 + S4 |
+| **S6** | Run Weaver training (Plan 314 Phase 5) on the precomputed data | riir-train | S5 |
+| **S7** | Produce `weaver_v1.safetensors` checkpoint (BLAKE3-hashed) | riir-train | S6 |
+| **S8** | **THIS ISSUE** — katgpt-rs runtime integration (T1-T4 below) | katgpt-rs | S7 |
+
+### Why the original audit was wrong
+
+The 2026-07-10 audit found "only LoRA artifacts + bandit states" and concluded
+"no base model weights". This missed the 4 GGUF files in `riir-train/data/`
+(which were already present — gemma-2-2b-it and MiniCPM5-1B since May 2026).
+The audit likely searched for `.safetensors` or weight-tensor files, not GGUF
+quantized model files. GGUF is the canonical runtime format for these models
+(loadable via `gguf_loader.rs` in riir-engine).
+
+### Risk: scale mismatch
+
+The paper's gain (+77% MAL, +32% over DDTree) is measured on Qwen3.6-27B
+(production scale). Our verifier candidates are 1B-3B (game-domain scale).
+The verifier→drafter quality gap may be smaller at this scale, reducing
+Weaver's correction magnitude. **Mitigation:** the synthetic GOAT gate
+(riir-train Plan 314 Phase 6, +134%) validates the methodology; the real-data
+gate (S8 G2) confirms the gain transfers. If it doesn't transfer, the
+runtime integration is still correct (just lower gain) — no regression.
+
+### Revised priority
+
+**Medium** (was Low). The blocker is refuted; the path is clear. The work is
+GPU-training-bound (S3, S5, S6 are multi-hour GPU jobs), not code-blocked.
+Once S7 produces a checkpoint, S8 (this issue) is ~2 days of code work
+(T1-T4 in "Proposed task breakdown" below).
+
+---
 
 ## Non-goals
 
