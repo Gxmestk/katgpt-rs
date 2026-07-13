@@ -44,6 +44,7 @@ use katgpt_core::gdn_tree_verify::{
     GdnMultiHeadParams, GdnTreeVerifier, TreeTopology, commit_accepted_multihead,
     verify_gdn_tree_multihead,
 };
+use katgpt_core::hippocampal_cache_dyn::HippocampalCacheDyn;
 use katgpt_core::types::Config;
 
 use super::types::{Gdn2LayerState, MultiLayerGdn2Cache};
@@ -226,7 +227,128 @@ pub fn commit_gdn2_tree_layer(
     commit_accepted_multihead(topo, accepted_leaf, &params, &mut s0_per_head, d_k, d_v);
 }
 
-// ── Tests ─────────────────────────────────────────────────────
+// ── Dual-path (GDN × HOLA) bridge — Plan 430 ──────────────────
+//
+// When the `hippocampal_cache` feature is active and the GDN2 layer has
+// non-empty `hippocampal_caches`, the tree verify can use the dual-path
+// algorithm (GDN masked solve + HOLA ancestor-masked softmax read). These
+// bridge functions wire the `MultiLayerGdn2Cache` to the dual-path primitives.
+
+/// Dual-path tree verify for a single GDN2 layer with HOLA caches.
+///
+/// Wraps [`verify_gdn_hola_tree_multihead`] with the GDN2 cache's per-head
+/// state and per-head hippocampal caches. When `hippocampal_caches` is empty,
+/// the caller should use [`verify_gdn2_tree_layer`] instead (the dual-path
+/// adds no value without a cache).
+///
+/// # Arguments
+/// * `verifier` — Pre-allocated dual-path verify scratch.
+/// * `topo` — Tree topology.
+/// * `cache` — GDN2 multi-layer cache (read-only; S₀ and caches not modified).
+/// * `layer_idx` — Which layer to verify.
+/// * `keys` / `values` / `queries` — Per-node QKV `[n_kv_heads * T * hd]`, head-major.
+/// * `config` — Model config.
+///
+/// # Returns
+/// `[n_kv_heads * T * d_v]` head-major, topo-indexed within each head.
+/// `O[i] = O_gdn[i] + O_hola[i]` (residual-add complement).
+#[cfg(feature = "hippocampal_cache")]
+#[allow(clippy::too_many_arguments)]
+pub fn verify_gdn2_hola_tree_layer(
+    verifier: &mut katgpt_core::gdn_tree_verify::hola_fusion::GdnHolaTreeVerifier,
+    topo: &TreeTopology,
+    cache: &mut MultiLayerGdn2Cache,
+    layer_idx: usize,
+    keys: &[f32],
+    values: &[f32],
+    queries: &[f32],
+    config: &Config,
+) -> Vec<f32> {
+    use katgpt_core::gdn_tree_verify::hola_fusion::{
+        GdnHolaMultiHeadParams, verify_gdn_hola_tree_multihead,
+    };
+
+    let d_k = config.head_dim;
+    let n_kv_heads = config.n_kv_head;
+    let t = topo.n_nodes;
+
+    let layer = &mut cache.layers[layer_idx];
+    let alphas = build_alphas(layer, t);
+    let betas = build_betas(layer, t);
+
+    let gdn_params = GdnMultiHeadParams {
+        keys,
+        values,
+        queries,
+        alphas: &alphas,
+        betas: &betas,
+        n_kv_heads,
+    };
+
+    let s0_per_head: Vec<&[f32]> = layer.heads.iter().map(|h| h.s.as_slice()).collect();
+
+    // Gather mutable references to per-head hippocampal caches.
+    let mut cache_refs: Vec<&mut HippocampalCacheDyn> =
+        layer.hippocampal_caches.iter_mut().collect();
+
+    let mut params = GdnHolaMultiHeadParams {
+        gdn: gdn_params,
+        caches: &mut cache_refs,
+    };
+
+    verify_gdn_hola_tree_multihead(verifier, topo, &mut params, &s0_per_head, d_k, d_k)
+}
+
+/// Dual-path commit for a single GDN2 layer with HOLA caches.
+///
+/// Wraps [`commit_accepted_dual_multihead`] with the GDN2 cache's per-head
+/// state and per-head hippocampal caches. Updates S₀ (delta-rule replay) AND
+/// observes accepted-path tokens into the cache (β·‖e‖ surprise score).
+#[cfg(feature = "hippocampal_cache")]
+#[allow(clippy::too_many_arguments)]
+pub fn commit_gdn2_hola_tree_layer(
+    topo: &TreeTopology,
+    accepted_leaf: usize,
+    cache: &mut MultiLayerGdn2Cache,
+    layer_idx: usize,
+    keys: &[f32],
+    values: &[f32],
+    queries: &[f32],
+    config: &Config,
+) {
+    use katgpt_core::gdn_tree_verify::hola_fusion::commit_accepted_dual_multihead;
+
+    let d_k = config.head_dim;
+    let n_kv_heads = config.n_kv_head;
+    let t = topo.n_nodes;
+
+    let alpha = gdn2_scalar_alpha(&cache.layers[layer_idx]);
+    let beta = gdn2_scalar_beta(&cache.layers[layer_idx]);
+    let alphas = vec![alpha; t];
+    let betas = vec![beta; t];
+
+    let params = GdnMultiHeadParams {
+        keys,
+        values,
+        queries,
+        alphas: &alphas,
+        betas: &betas,
+        n_kv_heads,
+    };
+
+    let layer = &mut cache.layers[layer_idx];
+    let heads = &mut layer.heads;
+    let mut s0_per_head: Vec<&mut [f32]> =
+        heads.iter_mut().map(|h| h.s.as_mut_slice()).collect();
+    let mut cache_refs: Vec<&mut HippocampalCacheDyn> =
+        layer.hippocampal_caches.iter_mut().collect();
+
+    commit_accepted_dual_multihead(
+        topo, accepted_leaf, &params, &mut s0_per_head, &mut cache_refs, d_k, d_k,
+    );
+}
+
+// ── Tests ──────────────────────────────────────────────────────
 
 #[cfg(test)]
 mod tests {

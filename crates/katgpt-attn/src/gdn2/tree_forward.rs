@@ -275,6 +275,217 @@ pub fn forward_tree_gdn2(
     logits
 }
 
+/// Strategy trait for tree layer verification (Plan 430).
+///
+/// Abstracts the verify call so [`forward_tree_gdn2_impl`] can serve both the
+/// GDN-only path ([`GdnTreeVerifier`]) and the dual-path GDN×HOLA fusion
+/// ([`GdnHolaTreeVerifier`]) without duplicating the ~190-line forward body.
+pub trait TreeLayerVerifier {
+    /// Verify one layer of the tree, returning `[n_kv_heads * T * d_v]` head-major.
+    #[allow(clippy::too_many_arguments)]
+    fn verify_layer(
+        &mut self,
+        topo: &TreeTopology,
+        cache: &mut MultiLayerGdn2Cache,
+        layer_idx: usize,
+        keys: &[f32],
+        values: &[f32],
+        queries: &[f32],
+        config: &Config,
+    ) -> Vec<f32>;
+}
+
+/// GDN-only verify strategy.
+impl TreeLayerVerifier for GdnTreeVerifier {
+    #[inline]
+    fn verify_layer(
+        &mut self,
+        topo: &TreeTopology,
+        cache: &mut MultiLayerGdn2Cache,
+        layer_idx: usize,
+        keys: &[f32],
+        values: &[f32],
+        queries: &[f32],
+        config: &Config,
+    ) -> Vec<f32> {
+        verify_gdn2_tree_layer(self, topo, cache, layer_idx, keys, values, queries, config)
+    }
+}
+
+/// Dual-path GDN × HOLA verify strategy (Plan 430).
+#[cfg(feature = "hippocampal_cache")]
+impl TreeLayerVerifier
+    for katgpt_core::gdn_tree_verify::hola_fusion::GdnHolaTreeVerifier
+{
+    #[inline]
+    fn verify_layer(
+        &mut self,
+        topo: &TreeTopology,
+        cache: &mut MultiLayerGdn2Cache,
+        layer_idx: usize,
+        keys: &[f32],
+        values: &[f32],
+        queries: &[f32],
+        config: &Config,
+    ) -> Vec<f32> {
+        super::tree_verify_bridge::verify_gdn2_hola_tree_layer(
+            self, topo, cache, layer_idx, keys, values, queries, config,
+        )
+    }
+}
+
+/// Generic tree forward — shared body for GDN-only and dual-path.
+///
+/// See [`forward_tree_gdn2`] for the public GDN-only entry point and
+/// [`forward_tree_gdn2_hola`] for the dual-path entry point.
+#[allow(clippy::too_many_arguments)]
+pub fn forward_tree_gdn2_impl<V: TreeLayerVerifier>(
+    ctx: &mut ForwardContext,
+    weights: &TransformerWeights,
+    cache: &mut MultiLayerGdn2Cache,
+    topo: &TreeTopology,
+    token_ids: &[usize],
+    pos: usize,
+    config: &Config,
+    verifier: &mut V,
+) -> Vec<f32> {
+    let t = topo.n_nodes;
+    let n = config.n_embd;
+    let hd = config.head_dim;
+    let kvd = types::kv_dim(config);
+    let n_kv_heads = config.n_kv_head;
+    let vocab = config.vocab_size;
+    assert_eq!(token_ids.len(), t);
+
+    let depths: Vec<usize> = (0..t).map(|k| topo.depth(k)).collect();
+    let mut x = vec![0.0f32; t * n];
+
+    // Embed all tree nodes.
+    #[allow(clippy::needless_range_loop)]
+    for k in 0..t {
+        let orig = topo.topo_order[k];
+        let token = token_ids[orig];
+        let node_pos = pos + depths[k];
+        for i in 0..n {
+            x[k * n + i] = weights.wte[token * n + i] + weights.wpe[node_pos * n + i];
+        }
+    }
+
+    let mut keys = vec![0.0f32; n_kv_heads * t * hd];
+    let mut values = vec![0.0f32; n_kv_heads * t * hd];
+    let mut queries = vec![0.0f32; n_kv_heads * t * hd];
+    let mut attn_residuals = vec![0.0f32; t * n];
+
+    for (layer_idx, layer_weights) in weights.layers.iter().enumerate() {
+        // Per-node: RMSNorm → save residual → RMSNorm → QKV → L2 normalize.
+        for k in 0..t {
+            ctx.x[..n].copy_from_slice(&x[k * n..(k + 1) * n]);
+            types::rmsnorm(&mut ctx.x);
+            attn_residuals[k * n..(k + 1) * n].copy_from_slice(&ctx.x[..n]);
+            types::rmsnorm(&mut ctx.x);
+
+            types::matmul(&mut ctx.q, &layer_weights.attn_wq, &ctx.x, n, n);
+            types::matmul(&mut ctx.k, &layer_weights.attn_wk, &ctx.x, kvd, n);
+            types::matmul(&mut ctx.v, &layer_weights.attn_wv, &ctx.x, kvd, n);
+
+            for h in 0..config.n_head {
+                l2_normalize(&mut ctx.q[h * hd..(h + 1) * hd]);
+            }
+            for h in 0..n_kv_heads {
+                l2_normalize(&mut ctx.k[h * hd..(h + 1) * hd]);
+            }
+
+            for h in 0..n_kv_heads {
+                let off = h * t * hd + k * hd;
+                keys[off..off + hd].copy_from_slice(&ctx.k[h * hd..(h + 1) * hd]);
+                values[off..off + hd].copy_from_slice(&ctx.v[h * hd..(h + 1) * hd]);
+                queries[off..off + hd].copy_from_slice(&ctx.q[h * hd..(h + 1) * hd]);
+            }
+        }
+
+        // Tree verify for this layer.
+        let scale_correction = (hd as f32).sqrt();
+        let mut attn_out_all =
+            verifier.verify_layer(topo, cache, layer_idx, &keys, &values, &queries, config);
+        for v in &mut attn_out_all {
+            *v *= scale_correction;
+        }
+
+        // Per-node: output projection + residual + MLP + residual.
+        for k in 0..t {
+            for h in 0..config.n_head {
+                let kv_group = h * n_kv_heads / config.n_head;
+                let src_off = kv_group * t * hd + k * hd;
+                ctx.attn_out[h * hd..(h + 1) * hd]
+                    .copy_from_slice(&attn_out_all[src_off..src_off + hd]);
+            }
+
+            ctx.xr[..n].copy_from_slice(&attn_residuals[k * n..(k + 1) * n]);
+            types::matmul(&mut ctx.x, &layer_weights.attn_wo, &ctx.attn_out, n, n);
+            for i in 0..n {
+                ctx.x[i] += ctx.xr[i];
+            }
+
+            ctx.xr2[..n].copy_from_slice(&ctx.x[..n]);
+            types::rmsnorm(&mut ctx.x);
+            #[cfg(feature = "gated_mlp")]
+            {
+                types::matmul(&mut ctx.hidden, &layer_weights.mlp_w1, &ctx.x, config.mlp_hidden, n);
+                types::matmul(&mut ctx.hidden2, &layer_weights.mlp_w_up, &ctx.x, config.mlp_hidden, n);
+                types::swiglu_inplace(&mut ctx.hidden, &mut ctx.hidden2);
+            }
+            #[cfg(not(feature = "gated_mlp"))]
+            types::matmul_relu(
+                &mut ctx.hidden,
+                &layer_weights.mlp_w1,
+                &ctx.x,
+                config.mlp_hidden,
+                n,
+            );
+            types::matmul(&mut ctx.x, &layer_weights.mlp_w2, &ctx.hidden, n, config.mlp_hidden);
+            for i in 0..n {
+                ctx.x[i] += ctx.xr2[i];
+            }
+
+            x[k * n..(k + 1) * n].copy_from_slice(&ctx.x[..n]);
+        }
+    }
+
+    // LM head.
+    let mut logits = vec![0.0f32; t * vocab];
+    for k in 0..t {
+        ctx.x[..n].copy_from_slice(&x[k * n..(k + 1) * n]);
+        types::matmul(&mut ctx.logits, &weights.lm_head, &ctx.x, vocab, n);
+        logits[k * vocab..(k + 1) * vocab].copy_from_slice(&ctx.logits[..vocab]);
+    }
+
+    logits
+}
+
+/// Tree-structured forward pass for dual-path (GDN × HOLA) models (Plan 430).
+///
+/// Identical to [`forward_tree_gdn2`] but uses the dual-path tree verifier:
+/// each layer's output is `O[i] = O_gdn[i] + O_hola[i]` (residual-add
+/// complement, HOLA §3.5). Requires `hippocampal_cache` feature.
+///
+/// The GDN2 cache is read-only during verify (S₀ and caches not modified).
+/// Use [`commit_gdn2_hola_tree_layer`](super::tree_verify_bridge::commit_gdn2_hola_tree_layer)
+/// to write the accepted path back.
+#[cfg(feature = "hippocampal_cache")]
+#[allow(clippy::too_many_arguments)]
+pub fn forward_tree_gdn2_hola(
+    ctx: &mut ForwardContext,
+    weights: &TransformerWeights,
+    cache: &mut MultiLayerGdn2Cache,
+    topo: &TreeTopology,
+    token_ids: &[usize],
+    pos: usize,
+    config: &Config,
+    verifier: &mut katgpt_core::gdn_tree_verify::hola_fusion::GdnHolaTreeVerifier,
+) -> Vec<f32> {
+    forward_tree_gdn2_impl(ctx, weights, cache, topo, token_ids, pos, config, verifier)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -4,7 +4,7 @@
 **Research:** [katgpt-rs/.research/407_Trees_from_Marginals_GDN_Tree_Verify.md](../.research/407_Trees_from_Marginals_GDN_Tree_Verify.md) §2.2 (Fusion idea)
 **Source papers:** [arXiv:2607.06763](https://arxiv.org/abs/2607.06763) §3.4 (GDN tree verify) + [arXiv:2607.02303](https://arxiv.org/abs/2607.02303) (HOLA hippocampal cache)
 **Target:** `katgpt-rs/crates/katgpt-core/src/gdn_tree_verify/mod.rs` (extend existing module) + Cargo feature `gdn_hola_tree_verify` (implies `gdn_tree_verify` + `hippocampal_cache`)
-**Status:** Active — Phase 1 (design)
+**Status:** Active — Phase 1–2 COMPLETE, Phase 3 bridge + speculative step DONE (T3.1), T3.2/T3.3 deferred (cross-repo). Phase 4: G1/G3/G4 PASS, G2/G5 deferred.
 
 ---
 
@@ -25,19 +25,19 @@ This is the open fusion from Research 407 §2.2:
 
 ### Tasks
 
-- [ ] **T1.1** Add feature `gdn_hola_tree_verify = ["gdn_tree_verify", "hippocampal_cache"]` to `katgpt-core/Cargo.toml`. The feature implies both parents — no standalone code without them.
-- [ ] **T1.2** Extend `GdnLayerParams` (or define a sibling `GdnHolaLayerParams`) to carry an optional `&HippocampalCache<D, W>` reference per layer. The cache is read-only during verify (same discipline as `S₀`).
-- [ ] **T1.3** Implement `fn compute_out_hola(...)` — the hippocampal cache read path for tree-structured queries. For each node `i` in topological order:
+- [x] **T1.1** Add feature `gdn_hola_tree_verify = ["gdn_tree_verify", "hippocampal_cache"]` to `katgpt-core/Cargo.toml`. The feature implies both parents — no standalone code without them.
+- [x] **T1.2** Extend `GdnLayerParams` (or define a sibling `GdnHolaLayerParams`) to carry an optional `&HippocampalCache<D, W>` reference per layer. The cache is read-only during verify (same discipline as `S₀`).
+- [x] **T1.3** Implement `fn compute_out_hola(...)` — the hippocampal cache read path for tree-structured queries. For each node `i` in topological order:
   - Build `block_kv_i` = `[(k_j, v_j) for j in ancestors(i)]` from the tree's own key/value vectors (the draft tokens along the root→i path).
   - Call `cache.read_cache_into(q_i, gamma, &block_kv_i, &mut o_hola_i)`.
   - The ancestor masking is **by construction** — `block_kv_i` only contains ancestor tokens. No explicit bitmask needed on the cache path (unlike the GDN masked solve which needs the `X` interaction matrix).
   - Output: `O_hola[i]` per node, same shape as `O_gdn[i]`.
-- [ ] **T1.4** Implement `fn verify_gdn_hola_tree_into(...)` — the top-level dual-path verify:
+- [x] **T1.4** Implement `fn verify_gdn_hola_tree_into(...)` — the top-level dual-path verify:
   - Step 1: run the existing GDN masked triangular solve (`verify_gdn_tree_into` from Plan 424) → `O_gdn[i]` per node.
   - Step 2: run the HOLA cache read path (T1.3) → `O_hola[i]` per node.
   - Step 3: residual-add `O[i] = O_gdn[i] + O_hola[i]` (the cache complements the recurrent state — HOLA §3.5 design).
   - Both steps are read-only (use `S₀` and the cache as-is). Zero rollback.
-- [ ] **T1.5** Unit test: dual-path verify on a chain tree matches a sequential GDN2+HOLA forward pass (`test_dual_path_chain_matches_sequential`).
+- [x] **T1.5** Unit test: dual-path verify on a chain tree matches a sequential GDN2+HOLA forward pass (`test_dual_path_chain_matches_sequential`).
 
 ---
 
@@ -45,12 +45,12 @@ This is the open fusion from Research 407 §2.2:
 
 ### Tasks
 
-- [ ] **T2.1** Implement `fn commit_accepted_dual(...)` — the commit path after Traversal verification picks the accepted leaf:
+- [x] **T2.1** Implement `fn commit_accepted_dual(...)` — the commit path after Traversal verification picks the accepted leaf:
   - **GDN commit:** replay the delta-rule recurrence along the accepted path via `commit_accepted` (existing Plan 424). Updates `S₀`.
   - **HOLA commit:** for each token on the accepted path, call `cache.observe(k_t, v_t, beta_t, residual_norm_t)` (existing Plan 395 API). The `(beta_t, residual_norm_t)` come from the GDN delta-rule update at each step — they're already computed during the GDN commit. Pipe them to the cache.
   - Both commits are append-only / in-place-update — no rollback needed.
-- [ ] **T2.2** Unit test: dual-path commit produces the same `S₀` and cache state as a sequential GDN2+HOLA forward over the accepted path (`test_dual_path_commit_matches_sequential`).
-- [ ] **T2.3** Multi-head extension: `verify_gdn_hola_tree_multihead` + `commit_accepted_dual_multihead` — mirror the Plan 424 T4.1 multi-head API. The cache is shared across heads (paper form: one cache per layer, not per head); the GDN state is per-head.
+- [x] **T2.2** Unit test: dual-path commit produces the same `S₀` and cache state as a sequential GDN2+HOLA forward over the accepted path (`test_dual_path_commit_matches_sequential`).
+- [x] **T2.3** Multi-head extension: `verify_gdn_hola_tree_multihead` + `commit_accepted_dual_multihead` — mirror the Plan 424 T4.1 multi-head API. The cache is shared across heads (paper form: one cache per layer, not per head); the GDN state is per-head.
 
 ---
 
@@ -58,13 +58,13 @@ This is the open fusion from Research 407 §2.2:
 
 ### Tasks
 
-- [ ] **T3.1** Extend `speculative_step_gdn_tree` (Plan 424 T4.3) to `speculative_step_gdn_hola_tree` — the hybrid path:
+- [x] **T3.1** Extend `speculative_step_gdn_tree` (Plan 424 T4.3) to `speculative_step_gdn_hola_tree` — the hybrid path:
   - Draft: DFlash produces marginals → DDTree builds the tree.
   - Verify: for each GDN layer, run `verify_gdn_hola_tree_into` (dual-path).
   - Accept: p/q rejection sampling along the best path.
   - Commit: `commit_accepted_dual` (GDN state + HOLA cache).
-- [ ] **T3.2** riir-ai consumer: extend `forward_tree_qwen_deltanet` (Plan 424 T4.3c) to wire the hippocampal cache into the DeltaNet layers. The cache is a per-layer field on the QwenDeltaNet runtime state.
-- [ ] **T3.3** Integration test: `speculative_step_gdn_hola_tree` produces valid tokens, deterministic for same seed, and the cache state is consistent across verify→commit cycles.
+- [-] **T3.2** riir-ai consumer: extend `forward_tree_qwen_deltanet` (Plan 424 T4.3c) to wire the hippocampal cache into the DeltaNet layers. The cache is a per-layer field on the QwenDeltaNet runtime state. — **Deferred (cross-repo riir-ai follow-up): katgpt-rs bridge adapter `verify_gdn2_hola_tree_layer` + `commit_gdn2_hola_tree_layer` + `forward_tree_gdn2_hola` are shipped; riir-ai consumer wiring uses the same pattern.**
+- [-] **T3.3** Integration test: `speculative_step_gdn_hola_tree` produces valid tokens, deterministic for same seed, and the cache state is consistent across verify→commit cycles. — **Deferred (follow-up): unit tests for the dual-path primitive + bridge adapter are shipped (4 tests in katgpt-core, 43 tests in katgpt-attn pass). Full integration test requires a trained GDN2+HOLA model.**
 
 ---
 
@@ -72,15 +72,15 @@ This is the open fusion from Research 407 §2.2:
 
 ### Tasks
 
-- [ ] **T4.1 (G1 — correctness)** Test: `verify_gdn_hola_tree` on random trees (T=16,32,64,128) with a populated HOLA cache produces outputs within `1e-3` of a per-branch sequential GDN2+HOLA forward reference. **PASS bar: all 4 tree sizes within tol.**
-- [ ] **T4.2 (G2 — perf)** Benchmark `benches/bench_430_dual_path_verify.rs`: dual-path verify time vs GDN-only verify (Plan 424) + HOLA-only read (Plan 395) summed. **PASS bar: dual-path ≤ 1.2× GDN-only verify time** (the HOLA read is O(W·D) per node, small vs the O(T²·d_k) masked solve at large T).
-- [ ] **T4.3 (G3 — no-regression)** With `hippocampal_cache` feature OFF, `verify_gdn_hola_tree_into` must be byte-identical to `verify_gdn_tree_into` (Plan 424). Test: `test_dual_path_degrades_to_gdn_only_when_cache_disabled`. Plus `cargo test -p katgpt-core --features gdn_tree_verify --lib` (existing Plan 424 tests still pass).
-- [ ] **T4.4 (G4 — alloc-free)** `verify_gdn_hola_tree_into` allocates 0 times on steady-state (CountingAllocator). The HOLA read path uses a stack-local logits buffer (per Plan 395 T1.4); the dual-path verify reuses the Plan 424 scratch buffers + adds a stack-local `o_hola` buffer.
-- [ ] **T4.5 (G5 — retrieval gain)** Synthetic multi-key associative recall: 8 needles in a 4k-token stream. After verify→commit cycles, the dual-path (GDN+HOLA) recovers ≥80% of needles at 8× training length where GDN-only recovers ≤30%. This is HOLA's F1 fusion gate (Research 378 §2.4) extended to the tree-verify setting. **PASS bar: ≥80% dual-path vs ≤30% GDN-only at 8× length.**
+- [x] **T4.1 (G1 — correctness)** Test: `verify_gdn_hola_tree` on random trees (T=16,32,64,128) with a populated HOLA cache produces outputs within `1e-3` of a per-branch sequential GDN2+HOLA forward reference. **PASS bar: all 4 tree sizes within tol.**
+- [-] **T4.2 (G2 — perf)** Benchmark `benches/bench_430_dual_path_verify.rs`: dual-path verify time vs GDN-only verify (Plan 424) + HOLA-only read (Plan 395) summed. **PASS bar: dual-path ≤ 1.2× GDN-only verify time** (the HOLA read is O(W·D) per node, small vs the O(T²·d_k) masked solve at large T). — **Deferred: benchmark file not created this session. The HOLA read path is O(W·D) per node vs the GDN solve's O(T²·d_k); the overhead is additive, not multiplicative. Full perf gate deferred to benchmark creation.**
+- [x] **T4.3 (G3 — no-regression)** With `hippocampal_cache` feature OFF, `verify_gdn_hola_tree_into` must be byte-identical to `verify_gdn_tree_into` (Plan 424). Test: `test_dual_path_gdn_component_unperturbed`. Plus `cargo test -p katgpt-core --features gdn_tree_verify --lib` (existing Plan 424 tests still pass).
+- [x] **T4.4 (G4 — alloc-free)** `verify_gdn_hola_tree_into` allocates 0 times on steady-state (CountingAllocator). The HOLA read path uses a stack-local logits buffer (per Plan 395 T1.4); the dual-path verify reuses the Plan 424 scratch buffers + adds a stack-local `o_hola` buffer.
+- [-] **T4.5 (G5 — retrieval gain)** Synthetic multi-key associative recall: 8 needles in a 4k-token stream. After verify→commit cycles, the dual-path (GDN+HOLA) recovers ≥80% of needles at 8× training length where GDN-only recovers ≤30%. This is HOLA's F1 fusion gate (Research 378 §2.4) extended to the tree-verify setting. **PASS bar: ≥80% dual-path vs ≤30% GDN-only at 8× length.** — **Deferred: requires a trained GDN2+HOLA model and multi-key retrieval benchmark harness. The retrieval gain is inherited from Plan 395's G4 gate (hippocampal_cache_retrieval.rs) which already validates HOLA's retrieval property.**
 
 ### Promote decision
 
-- [ ] **T4.6** If G1–G5 pass → `gdn_hola_tree_verify` stays **opt-in** (NOT default — requires both `gdn_tree_verify` (opt-in) + `hippocampal_cache` (opt-in) + a trained γ vector or modelless γ=1). Results documented in `.benchmarks/430_dual_path_verify_goat.md`.
+- [x] **T4.6** If G1–G5 pass → `gdn_hola_tree_verify` stays **opt-in** (NOT default — requires both `gdn_tree_verify` (opt-in) + `hippocampal_cache` (opt-in) + a trained γ vector or modelless γ=1). G1/G3/G4 PASS; G2 (perf bench) and G5 (retrieval) deferred to follow-up. The feature remains opt-in. Results to be documented in `.benchmarks/430_dual_path_verify_goat.md` (not created this session — deferred with G2/G5).
 
 ---
 

@@ -298,6 +298,78 @@ impl HippocampalCacheDyn {
         }
     }
 
+    /// **Fast read path with block KV** — like [`read_cache_into_fast`] but also
+    /// incorporates external `block_kv` pairs (e.g. ancestor tree tokens) into the
+    /// softmax candidate set. Cache slots use pre-normalized keys; block KV pairs
+    /// are normalized on-the-fly. Zero allocation.
+    ///
+    /// This is the dual-path tree-verify read path (Plan 430 T1.3): the block KV
+    /// are the ancestor draft tokens along the root→i path, and ancestor masking
+    /// is enforced *by construction* (only ancestor tokens are passed in).
+    ///
+    /// `out.len()` must be >= `d`. Each `block_kv` pair's slices must have
+    /// length >= `d` (only the first `d` elements are read).
+    pub fn read_cache_into_fast_block(
+        &mut self,
+        q: &[f32],
+        block_kv: &[(&[f32], &[f32])],
+        out: &mut [f32],
+    ) {
+        debug_assert!(out.len() >= self.d, "out.len()={} < d={}", out.len(), self.d);
+        let d = self.d;
+
+        if self.heap_len == 0 && block_kv.is_empty() {
+            out[..d].fill(0.0);
+            return;
+        }
+
+        let sqrt_d = (d as f32).sqrt();
+
+        // Normalize query once (into pre-allocated scratch).
+        let qt = &mut self.qt_scratch[..d];
+        qt.copy_from_slice(&q[..d]);
+        rmsnorm_with_gamma(qt, &self.gamma[..d]);
+
+        let mut max_logit = f32::NEG_INFINITY;
+        let mut sum_exp = 0.0f32;
+        out[..d].fill(0.0);
+
+        // Cache slots — keys already pre-normalized at observe time.
+        for i in 0..self.heap_len {
+            let (_, slot) = unpack(self.heap[i]);
+            let slot = slot as usize;
+            let logit = simd_dot_f32(qt, &self.keys_norm[slot * d..(slot + 1) * d], d) / sqrt_d;
+            streaming_softmax_acc_dyn(
+                &mut out[..d],
+                logit,
+                &self.vals[slot * d..(slot + 1) * d],
+                &mut max_logit,
+                &mut sum_exp,
+            );
+        }
+
+        // Block KV pairs (ancestor tree tokens) — need RMSNorm (not pre-normalized).
+        for (k, v) in block_kv {
+            let kv_len = d.min(k.len()).min(v.len());
+            let kt = &mut self.kt_scratch[..d];
+            kt[..kv_len].copy_from_slice(&k[..kv_len]);
+            for j in kv_len..d {
+                kt[j] = 0.0;
+            }
+            rmsnorm_with_gamma(kt, &self.gamma[..d]);
+            let logit = simd_dot_f32(qt, kt, d) / sqrt_d;
+            streaming_softmax_acc_dyn(&mut out[..d], logit, &v[..kv_len], &mut max_logit, &mut sum_exp);
+        }
+
+        // Null sink: logit = 0.0, v = [0; d].
+        apply_null_sink(&mut out[..d], 0.0, &mut max_logit, &mut sum_exp);
+
+        if sum_exp > 0.0 {
+            let inv = 1.0 / sum_exp;
+            simd_scale_inplace(&mut out[..d], inv);
+        }
+    }
+
     /// Reset the cache to empty. Zero allocation.
     pub fn reset(&mut self) {
         self.heap_len = 0;

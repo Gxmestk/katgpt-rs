@@ -225,8 +225,9 @@ pub struct GdnTreeVerifier {
     scratch_rhs: Vec<f32>,
     /// Solution U': `[max_t × d_v]`.
     scratch_u: Vec<f32>,
-    /// Output buffer: `[max_t × d_v]`.
-    scratch_out: Vec<f32>,
+    /// Output buffer: `[max_t × d_v]`. `pub(super)` so the dual-path fusion
+    /// (Plan 430 `hola_fusion` submodule) can residual-add into it.
+    pub(super) scratch_out: Vec<f32>,
 }
 
 impl GdnTreeVerifier {
@@ -534,7 +535,7 @@ impl<'a> GdnMultiHeadParams<'a> {
     ///
     /// K and Q use the same head stride (both indexed by key heads);
     /// V uses the value-head stride. With MHA (H_k == H_v) both are equal.
-    fn head_params(&self, h: usize, t: usize, d_k: usize, d_v: usize) -> GdnLayerParams<'a> {
+    pub(super) fn head_params(&self, h: usize, t: usize, d_k: usize, d_v: usize) -> GdnLayerParams<'a> {
         let k_stride = t * d_k;
         let v_stride = t * d_v;
         GdnLayerParams {
@@ -690,6 +691,13 @@ pub fn build_topology_from_tree_nodes(
     let topo = build_topology(&parents, &alphas);
     (topo, token_ids)
 }
+
+// ── Dual-path GDN × HOLA fusion (Plan 430) ───────────────────
+// Gated on `gdn_hola_tree_verify` which implies both `gdn_tree_verify`
+// and `hippocampal_cache`. See `hola_fusion.rs` for the dual-path verify
+// and commit primitives.
+#[cfg(feature = "gdn_hola_tree_verify")]
+pub mod hola_fusion;
 
 // ── Tests ──────────────────────────────────────────────────────
 

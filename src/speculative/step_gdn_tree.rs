@@ -319,6 +319,214 @@ fn commit_accepted_path_sequential(
     }
 }
 
+/// Speculative step with dual-path (GDN × HOLA) tree verification (Plan 430 T3.1).
+///
+/// Identical to [`speculative_step_gdn_tree`] but uses the dual-path tree
+/// verifier ([`forward_tree_gdn2_hola`]). Each layer's output is `O_gdn + O_hola`
+/// (residual-add complement). The commit path is the same sequential replay via
+/// [`forward_gdn2`] (which already integrates HOLA observe+read when caches are
+/// non-empty).
+///
+/// # Arguments
+/// Same as [`speculative_step_gdn_tree`], except:
+/// * `target_cache` — Must have hippocampal caches populated
+///   (`MultiLayerGdn2Cache::with_hippocampal_cache`). The forward mutates cache
+///   scratch (read path) but not persistent state.
+/// * `verifier` — A [`GdnHolaTreeVerifier`] (dual-path scratch).
+#[cfg(feature = "gdn_hola_tree_verify")]
+#[allow(clippy::too_many_arguments)]
+pub fn speculative_step_gdn_hola_tree(
+    draft_sctx: &mut SpeculativeContext,
+    tree_builder: &mut TreeBuilder,
+    draft_weights: &TransformerWeights,
+    draft_config: &Config,
+    target_weights: &TransformerWeights,
+    target_config: &Config,
+    target_ctx: &mut ForwardContext,
+    target_cache: &mut MultiLayerGdn2Cache,
+    verifier: &mut katgpt_core::gdn_tree_verify::hola_fusion::GdnHolaTreeVerifier,
+    token: usize,
+    pos: usize,
+    rng: &mut Rng,
+) -> (Vec<usize>, usize) {
+    use katgpt_attn::gdn2::tree_forward::forward_tree_gdn2_hola;
+
+    let vocab_size = draft_config.vocab_size;
+
+    // 1. Draft marginals via DFlash
+    let _num_steps = dflash_predict_with(draft_sctx, draft_weights, draft_config, token, pos);
+    let steps_populated = draft_sctx.steps_populated;
+    let marginals_flat = &draft_sctx.marginals_flat;
+
+    let mut marginals_buf: [&[f32]; 64] = [&[]; 64];
+    let count = steps_populated.min(64);
+    for (i, slot) in marginals_buf.iter_mut().enumerate().take(count) {
+        let start = i * vocab_size;
+        let end = start + vocab_size;
+        *slot = if end <= marginals_flat.len() && i < steps_populated {
+            &marginals_flat[start..end]
+        } else {
+            &[]
+        };
+    }
+    let marginals = &marginals_buf[..count];
+
+    // 2. Build DDTree
+    let tree = tree_builder.build(marginals, draft_config, &NoPruner, false);
+
+    if tree.is_empty() {
+        let fallback = sample_from_distribution(
+            marginals.first().copied().unwrap_or(&[1.0]),
+            rng,
+        );
+        return (vec![fallback], 1);
+    }
+
+    // 3. Build tree topology
+    let alpha = target_cache
+        .layers
+        .first()
+        .and_then(|l| l.decay_alpha.first().copied())
+        .unwrap_or(0.99);
+
+    let (topo, token_ids) = build_topology_from_tree_nodes(tree, alpha);
+    let t = topo.n_nodes;
+
+    // 4. Forward all tree nodes through the target GDN2 model (dual-path verify)
+    let tree_logits = forward_tree_gdn2_hola(
+        target_ctx,
+        target_weights,
+        target_cache,
+        &topo,
+        &token_ids,
+        pos,
+        target_config,
+        verifier,
+    );
+
+    // 5. Find the best path and apply p/q rejection
+    let paths = katgpt_forward::step::extract_ddtree_paths(tree);
+
+    if paths.is_empty() {
+        let root_logits = &tree_logits[0..vocab_size];
+        let mut probs = root_logits.to_vec();
+        softmax_scaled(&mut probs, 1.0 / target_config.temperature);
+        let fallback = sample_from_distribution(&probs, rng);
+        return (vec![fallback], 1);
+    }
+
+    // 6. Try each candidate path with p/q rejection
+    let mut residual_buf: Vec<f32> = Vec::new();
+
+    for path in &paths {
+        let mut accepted = Vec::with_capacity(path.len());
+        let mut all_accepted = true;
+
+        let mut current_path_prefix: u128 = 0;
+
+        for (depth, &draft_tok) in path.iter().enumerate() {
+            current_path_prefix = if depth == 0 {
+                draft_tok as u128
+            } else {
+                (current_path_prefix << 16) | (draft_tok as u128)
+            };
+
+            let target_logits: Option<Vec<f32>> = (0..t).find_map(|k| {
+                let orig = topo.topo_order[k];
+                let node = &tree[orig];
+                if node.depth == depth && node.parent_path == current_path_prefix {
+                    let logits = &tree_logits[k * vocab_size..(k + 1) * vocab_size];
+                    Some(logits.to_vec())
+                } else {
+                    None
+                }
+            });
+
+            let Some(node_logits) = target_logits else {
+                all_accepted = false;
+                break;
+            };
+
+            let mut probs = node_logits;
+            softmax_scaled(&mut probs, 1.0 / target_config.temperature);
+
+            let q_dist = marginals.get(depth).copied().unwrap_or(&[]);
+            let q_i = q_dist.get(draft_tok).copied().unwrap_or(0.0);
+            let p_i = probs.get(draft_tok).copied().unwrap_or(0.0);
+
+            let acceptance_prob = if q_i > 0.0 { (p_i / q_i).min(1.0) } else { 1.0 };
+
+            if rng.uniform() <= acceptance_prob {
+                accepted.push(draft_tok);
+            } else {
+                residual_buf.clear();
+                residual_buf.resize(probs.len(), 0.0);
+                let replacement =
+                    sample_residual_distribution_into(&probs, q_dist, &mut residual_buf, rng);
+                accepted.push(replacement);
+                all_accepted = false;
+                break;
+            }
+        }
+
+        // Bonus token if all accepted
+        if all_accepted && !accepted.is_empty() {
+            let last_depth = path.len() - 1;
+            let last_prefix = path.iter().take(last_depth + 1).enumerate().fold(0u128, |acc, (d, &tok)| {
+                if d == 0 { tok as u128 } else { (acc << 16) | (tok as u128) }
+            });
+            let bonus_logits: Option<Vec<f32>> = (0..t).find_map(|k| {
+                let orig = topo.topo_order[k];
+                let node = &tree[orig];
+                if node.depth == last_depth && node.parent_path == last_prefix {
+                    let logits = &tree_logits[k * vocab_size..(k + 1) * vocab_size];
+                    Some(logits.to_vec())
+                } else {
+                    None
+                }
+            });
+
+            if let Some(mut bl) = bonus_logits {
+                softmax_scaled(&mut bl, 1.0 / target_config.temperature);
+                let bonus = sample_from_distribution(&bl, rng);
+                accepted.push(bonus);
+            }
+        }
+
+        if !accepted.is_empty() {
+            // 7. Commit the accepted path via sequential replay (same as GDN-only).
+            // forward_gdn2 already integrates HOLA observe+read when caches are active.
+            let accepted_len = accepted.len().saturating_sub(1);
+            commit_accepted_path_sequential(
+                target_ctx,
+                target_weights,
+                target_cache,
+                &accepted[..accepted_len],
+                token,
+                pos,
+                target_config,
+            );
+
+            let len = accepted.len();
+            return (accepted, len);
+        }
+    }
+
+    // All paths exhausted
+    let logits = forward_gdn2(
+        target_ctx,
+        target_weights,
+        target_cache,
+        token,
+        pos,
+        target_config,
+    );
+    let mut probs = logits.to_vec();
+    softmax_scaled(&mut probs, 1.0 / target_config.temperature);
+    let fallback = sample_from_distribution(&probs, rng);
+    (vec![fallback], 1)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
