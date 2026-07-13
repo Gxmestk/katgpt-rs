@@ -1306,6 +1306,153 @@ unsafe fn avx2_fused_scale_acc(dst: &mut [f32], src: &[f32], scale: f32, len: us
     }
 }
 
+// ── f16×f32 AXPY: dst[i] += scale * f16_src[i] ───────────────────────────
+//
+// Sibling to `simd_fused_scale_acc` but with f16 source weights. Converts
+// f16→f32 during the FMA accumulation — halves the memory bandwidth for
+// weight reads while maintaining f32 precision in the accumulator.
+//
+// This is the AXPY complement to `simd_dot_f16_f32` (which is the dot-product
+// pattern). Used by Weaver's `matmul_vec` column-major AXPY loop when weights
+// are stored as f16 (Issue 136, Weaver f16 weight optimization).
+
+/// SIMD fused scale-accumulate with f16 source: `dst[i] = dst[i] + scale * f16_src[i]`.
+///
+/// Converts each f16 element to f32 during the FMA, halving the weight-read
+/// bandwidth vs the f32 version. NEON uses `vcvt_f32_f16` (1 cycle for 4
+/// elements). The scalar fallback mirrors `scalar_fused_scale_acc` with
+/// `half::f16::to_f32()` widening.
+#[inline]
+pub fn simd_fused_scale_acc_f16(
+    dst: &mut [f32],
+    src_f16: &[half::f16],
+    scale: f32,
+    len: usize,
+) {
+    #[cfg(target_arch = "aarch64")]
+    {
+        unsafe { neon_fused_scale_acc_f16(dst, src_f16, scale, len) }
+    }
+    #[cfg(target_arch = "x86_64")]
+    {
+        if is_avx2_fma_available() {
+            unsafe { avx2_fused_scale_acc_f16(dst, src_f16, scale, len) }
+        } else {
+            scalar_fused_scale_acc_f16(dst, src_f16, scale, len)
+        }
+    }
+    #[cfg(not(any(target_arch = "aarch64", target_arch = "x86_64")))]
+    {
+        scalar_fused_scale_acc_f16(dst, src_f16, scale, len)
+    }
+}
+
+#[inline(always)]
+#[allow(dead_code)]
+pub(super) fn scalar_fused_scale_acc_f16(
+    dst: &mut [f32],
+    src_f16: &[half::f16],
+    scale: f32,
+    len: usize,
+) {
+    for i in 0..len {
+        unsafe {
+            // f16→f32 widening is exact (no precision loss); FMA preserves
+            // single-rounding parity with the f32 path.
+            let s = (*src_f16.get_unchecked(i)).to_f32();
+            *dst.get_unchecked_mut(i) = scale.mul_add(s, *dst.get_unchecked(i));
+        }
+    }
+}
+
+#[cfg(target_arch = "aarch64")]
+#[inline]
+unsafe fn neon_fused_scale_acc_f16(
+    dst: &mut [f32],
+    src_f16: &[half::f16],
+    scale: f32,
+    len: usize,
+) {
+    use core::arch::aarch64::{vdupq_n_f32, vfmaq_f32, vld1q_f32, vst1q_f32};
+
+    unsafe {
+        let scale_vec = vdupq_n_f32(scale);
+        let mut i = 0;
+        let chunks = len / 4;
+
+        for _ in 0..chunks {
+            // Convert 4 f16 → f32 via scalar (compiles to hardware fcvt on
+            // Apple Silicon — mirrors `neon_dot_f16_f32` in dot.rs). The
+            // unstable `vcvt_f32_f16` / `vld1_f16` intrinsics are not used
+            // to avoid the `stdarch_neon_f16` feature gate.
+            let s32 = [
+                (*src_f16.get_unchecked(i)).to_f32(),
+                (*src_f16.get_unchecked(i + 1)).to_f32(),
+                (*src_f16.get_unchecked(i + 2)).to_f32(),
+                (*src_f16.get_unchecked(i + 3)).to_f32(),
+            ];
+            let s = vld1q_f32(s32.as_ptr());
+            let d = vld1q_f32(dst.as_ptr().add(i));
+            let acc = vfmaq_f32(d, s, scale_vec);
+            vst1q_f32(dst.as_mut_ptr().add(i), acc);
+            i += 4;
+        }
+
+        // Scalar tail.
+        while i < len {
+            let s = (*src_f16.get_unchecked(i)).to_f32();
+            *dst.get_unchecked_mut(i) += scale * s;
+            i += 1;
+        }
+    }
+}
+
+#[cfg(target_arch = "x86_64")]
+#[target_feature(enable = "avx2,fma")]
+#[inline]
+unsafe fn avx2_fused_scale_acc_f16(
+    dst: &mut [f32],
+    src_f16: &[half::f16],
+    scale: f32,
+    len: usize,
+) {
+    use core::arch::x86_64::{
+        _mm256_fmadd_ps, _mm256_loadu_ps, _mm256_set1_ps, _mm256_storeu_ps,
+    };
+
+    unsafe {
+        let scale_vec = _mm256_set1_ps(scale);
+        let mut i = 0;
+        let chunks = len / 8;
+
+        for _ in 0..chunks {
+            // Convert 8 f16 → 8 f32 via scalar conversion (compiles to vcvtph2ps
+            // on x86 with F16C, or scalar fcvt otherwise). Then FMA into dst.
+            let f32_vals = [
+                (*src_f16.get_unchecked(i)).to_f32(),
+                (*src_f16.get_unchecked(i + 1)).to_f32(),
+                (*src_f16.get_unchecked(i + 2)).to_f32(),
+                (*src_f16.get_unchecked(i + 3)).to_f32(),
+                (*src_f16.get_unchecked(i + 4)).to_f32(),
+                (*src_f16.get_unchecked(i + 5)).to_f32(),
+                (*src_f16.get_unchecked(i + 6)).to_f32(),
+                (*src_f16.get_unchecked(i + 7)).to_f32(),
+            ];
+            let s = _mm256_loadu_ps(f32_vals.as_ptr());
+            let d = _mm256_loadu_ps(dst.as_ptr().add(i));
+            let acc = _mm256_fmadd_ps(scale_vec, s, d);
+            _mm256_storeu_ps(dst.as_mut_ptr().add(i), acc);
+            i += 8;
+        }
+
+        while i < len {
+            let s = (*src_f16.get_unchecked(i)).to_f32();
+            *dst.get_unchecked_mut(i) += scale * s;
+            i += 1;
+        }
+    }
+}
+
 /// SIMD-accelerated Gram matrix computation: G = X·Xᵀ where X is (seq_len × d_h).
 ///
 /// For each pair (i, j), G[i*seq_len + j] = dot(X_row_i, X_row_j).

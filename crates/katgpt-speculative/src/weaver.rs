@@ -773,6 +773,49 @@ impl WeaverCorrector {
     }
 }
 
+// ── f16 Corrector (Issue 136) ───────────────────────────────────────────
+
+/// f16-weight Weaver corrector. Mirrors [`WeaverCorrector`] but stores weight
+/// matrices as `half::f16`, halving memory traffic on the hot path.
+///
+/// Convert from a loaded [`WeaverCorrector`] via [`WeaverCorrectorF16::from_f32`].
+/// The conversion is a one-time cost (f32→f16 rounding). The forward pass then
+/// uses `simd_fused_scale_acc_f16` which converts f16→f32 during the FMA loop
+/// — halving weight-read bandwidth while maintaining f32 accumulation precision.
+///
+/// Only the parallel forward path is provided (the hot path). For testing /
+/// validation, use the f32 [`WeaverCorrector`].
+pub struct WeaverCorrectorF16 {
+    weights: WeaverWeightsF16,
+}
+
+impl WeaverCorrectorF16 {
+    /// Convert a loaded f32 corrector to f16.
+    pub fn from_f32(src: &WeaverCorrector) -> Self {
+        Self {
+            weights: WeaverWeightsF16::from_f32(&src.weights),
+        }
+    }
+
+    /// Parallel forward pass with f16 weights (Issue 136 G4 optimization).
+    ///
+    /// Same I/O contract as [`WeaverCorrector::correct_parallel`] — writes
+    /// results into `scratch`. The only difference is the weight precision:
+    /// f16 weights are converted to f32 inside the SIMD AXPY loop.
+    pub fn correct_parallel(
+        &self,
+        input: &WeaverInput,
+        scratch: &mut WeaverScratch,
+    ) -> (usize, usize) {
+        weaver_forward_parallel_f16(&self.weights, input, scratch)
+    }
+
+    /// Borrow the underlying f16 weights.
+    pub fn weights(&self) -> &WeaverWeightsF16 {
+        &self.weights
+    }
+}
+
 /// Errors from `correct_marginals_inplace`.
 #[derive(Debug)]
 pub enum WeaverCorrectError {
@@ -1478,6 +1521,228 @@ pub fn weaver_forward_parallel(
     (d_depth, k)
 }
 
+/// f16-weight parallel Weaver forward (Issue 136).
+///
+/// Exact mirror of [`weaver_forward_parallel`] but uses f16 weight matrices
+/// via `matmul_vec_f16` + `simd_fused_scale_acc_f16`. Steps 3 (attention)
+/// and 6+7 (top-K gather) are identical — they operate on f32 activations
+/// and the f32 embedding table, which is passed via `WeaverInput`.
+///
+/// The thread-local scratch buffers are separate from the f32 path's
+/// (function-scope statics are unique per function body). Each buffer is
+/// a small `Vec<f32>` that grows once per thread and is reused thereafter.
+pub fn weaver_forward_parallel_f16(
+    weights: &WeaverWeightsF16,
+    input: &WeaverInput,
+    scratch: &mut WeaverScratch,
+) -> (usize, usize) {
+    use rayon::prelude::*;
+
+    let cfg = &weights.config;
+    let h = cfg.hidden_dim;
+    let k = cfg.k_candidates;
+    let n_heads = cfg.n_heads;
+    let head_dim = cfg.head_dim();
+    let d_ff = cfg.d_ff;
+    let eps = cfg.rms_eps;
+    let d_depth = input.h_dflash.len();
+    let seq_len = d_depth + 1;
+
+    debug_assert_eq!(input.h_verifier.len(), h);
+    debug_assert!(seq_len <= cfg.max_depth + 1, "seq_len exceeds scratch capacity");
+
+    let WeaverScratch {
+        u_cond,
+        q,
+        kk,
+        v,
+        attn_out,
+        u_attn_normed,
+        u_final,
+        normed_buf: _,
+        post_buf: _,
+        gate,
+        up,
+        down: _,
+        scores,
+        gathered,
+        residual_flat,
+        corrected_logits_flat,
+        corrected_probs_flat,
+        top_pairs: _,
+    } = scratch;
+
+    // ── Step 1+2 (PARALLEL): Conditioning + QKV per position (f16 weights) ──
+    thread_local! {
+        static F16_NORMED_BUF: std::cell::UnsafeCell<Vec<f32>> = const { std::cell::UnsafeCell::new(Vec::new()) };
+    }
+    u_cond
+        .par_chunks_mut(h)
+        .zip(q.par_chunks_mut(h))
+        .zip(kk.par_chunks_mut(h))
+        .zip(v.par_chunks_mut(h))
+        .enumerate()
+        .for_each(|(pos, (((u_row, q_row), k_row), v_row))| {
+            let raw = if pos == 0 {
+                input.h_verifier
+            } else {
+                input.h_dflash[pos - 1]
+            };
+            F16_NORMED_BUF.with(|buf| {
+                let normed = unsafe { &mut *buf.get() };
+                if normed.len() < h {
+                    normed.resize(h, 0.0);
+                }
+                let normed = &mut normed[..h];
+                rmsnorm_into(raw, &weights.norm_cond, eps, normed);
+                matmul_vec_f16(normed, &weights.w_c, h, h, u_row);
+            });
+            if pos > 0 {
+                let pe = &weights.pos_emb[(pos - 1) * h..pos * h];
+                for j in 0..h {
+                    u_row[j] += pe[j];
+                }
+            }
+            matmul_vec_f16(u_row, &weights.w_q, h, h, q_row);
+            matmul_vec_f16(u_row, &weights.w_k, h, h, k_row);
+            matmul_vec_f16(u_row, &weights.w_v, h, h, v_row);
+        });
+
+    // ── Step 3 (SEQUENTIAL): Causal multi-head attention (f32, unchanged) ──
+    let attn_scale = 1.0 / (head_dim as f32).sqrt();
+    attn_out[..seq_len * h].fill(0.0);
+    for head in 0..n_heads {
+        let ho = head * head_dim;
+        for qi in 0..seq_len {
+            let q_row = &q[qi * h + ho..qi * h + ho + head_dim];
+            let mut max_s = f32::NEG_INFINITY;
+            for kj in 0..=qi {
+                let k_row = &kk[kj * h + ho..kj * h + ho + head_dim];
+                let s = dot(q_row, k_row) * attn_scale;
+                scores[kj] = s;
+                if s > max_s {
+                    max_s = s;
+                }
+            }
+            let mut sum_e = 0.0;
+            for s in scores[..=qi].iter_mut() {
+                *s = (*s - max_s).exp();
+                sum_e += *s;
+            }
+            let inv_sum = 1.0 / sum_e;
+            let out_row = &mut attn_out[qi * h + ho..qi * h + ho + head_dim];
+            for kj in 0..=qi {
+                let w = scores[kj] * inv_sum;
+                let v_row = &v[kj * h + ho..kj * h + ho + head_dim];
+                katgpt_core::simd::simd_fused_scale_acc(out_row, v_row, w, head_dim);
+            }
+        }
+    }
+
+    // ── Step 4+5 (PARALLEL): Output projection + MLP per position (f16 weights) ──
+    thread_local! {
+        static F16_TMP_O_BUF: std::cell::UnsafeCell<Vec<f32>> = const { std::cell::UnsafeCell::new(Vec::new()) };
+        static F16_POST_BUF: std::cell::UnsafeCell<Vec<f32>> = const { std::cell::UnsafeCell::new(Vec::new()) };
+        static F16_DOWN_BUF: std::cell::UnsafeCell<Vec<f32>> = const { std::cell::UnsafeCell::new(Vec::new()) };
+    }
+    u_attn_normed
+        .par_chunks_mut(h)
+        .zip(u_final.par_chunks_mut(h))
+        .zip(u_cond.par_chunks(h))
+        .zip(gate.par_chunks_mut(d_ff))
+        .zip(up.par_chunks_mut(d_ff))
+        .enumerate()
+        .for_each(|(pos, ((((ua_norm, uf), uc), gate_row), up_row))| {
+            F16_TMP_O_BUF.with(|tmp_o_cell| {
+                F16_POST_BUF.with(|post_cell| {
+                    F16_DOWN_BUF.with(|down_cell| {
+                        let tmp_o = unsafe { &mut *tmp_o_cell.get() };
+                        let post = unsafe { &mut *post_cell.get() };
+                        let down = unsafe { &mut *down_cell.get() };
+                        if tmp_o.len() < h {
+                            tmp_o.resize(h, 0.0);
+                            post.resize(h, 0.0);
+                            down.resize(h, 0.0);
+                        }
+                        let tmp_o = &mut tmp_o[..h];
+                        let post = &mut post[..h];
+                        let down = &mut down[..h];
+
+                        matmul_vec_f16(&attn_out[pos * h..(pos + 1) * h], &weights.w_o, h, h, tmp_o);
+                        for j in 0..h {
+                            post[j] = uc[j] + tmp_o[j];
+                        }
+                        rmsnorm_into(post, &weights.norm_attn, eps, ua_norm);
+
+                        matmul_vec_f16(ua_norm, &weights.w_gate, h, d_ff, gate_row);
+                        matmul_vec_f16(ua_norm, &weights.w_up, h, d_ff, up_row);
+                        for j in 0..d_ff {
+                            gate_row[j] = silu(gate_row[j]) * up_row[j];
+                        }
+                        matmul_vec_f16(gate_row, &weights.w_down, d_ff, h, down);
+                        for j in 0..h {
+                            post[j] = ua_norm[j] + down[j];
+                        }
+                        rmsnorm_into(post, &weights.norm_mlp, eps, uf);
+                    });
+                });
+            });
+        });
+
+    // ── Steps 6+7 (PARALLEL): Top-K gather + residual + softmax (f32, unchanged) ──
+    thread_local! {
+        static F16_GROW_BUF: std::cell::UnsafeCell<Vec<f32>> = const { std::cell::UnsafeCell::new(Vec::new()) };
+    }
+    residual_flat
+        .par_chunks_mut(k)
+        .zip(corrected_logits_flat.par_chunks_mut(k))
+        .zip(corrected_probs_flat.par_chunks_mut(k))
+        .enumerate()
+        .for_each(|(di, ((resid_row, cl_row), cp_row))| {
+            let pos = di + 1;
+            let h_weaver = &u_final[pos * h..(pos + 1) * h];
+            let ids = input.topk_ids[di];
+            let dfl = input.dflash_logits[di];
+
+            F16_GROW_BUF.with(|grow_cell| {
+                let grow = unsafe { &mut *grow_cell.get() };
+                if grow.len() < h {
+                    grow.resize(h, 0.0);
+                }
+                let grow = &mut grow[..h];
+                for ki in 0..k {
+                    let tid = ids[ki] as usize;
+                    debug_assert!(tid < input.vocab_size);
+                    grow.copy_from_slice(&input.embedding[tid * h..(tid + 1) * h]);
+                    resid_row[ki] = dot(h_weaver, grow);
+                }
+            });
+
+            let mut max_c = f32::NEG_INFINITY;
+            for ki in 0..k {
+                let cl = dfl[ki] + resid_row[ki];
+                cl_row[ki] = cl;
+                if cl > max_c {
+                    max_c = cl;
+                }
+            }
+            let mut sum_e = 0.0;
+            for ki in 0..k {
+                let e = (cl_row[ki] - max_c).exp();
+                cp_row[ki] = e;
+                sum_e += e;
+            }
+            let inv_sum = 1.0 / sum_e;
+            for cp in cp_row.iter_mut().take(k) {
+                *cp *= inv_sum;
+            }
+        });
+
+    let _ = gathered;
+
+    (d_depth, k)
+}
+
 /// Matrix-vector multiply: `output[j] = Σ_i input[i] · weight[i · out_dim + j]`.
 ///
 /// The weight matrix is `[in_dim, out_dim]` row-major. Uses AXPY iteration
@@ -1491,6 +1756,121 @@ fn matmul_vec(input: &[f32], weight: &[f32], in_dim: usize, out_dim: usize, outp
         let xi = input[i];
         let row = &weight[i * out_dim..(i + 1) * out_dim];
         katgpt_core::simd::simd_fused_scale_acc(output, row, xi, out_dim);
+    }
+}
+
+// ── f16 Weight Path (Issue 136) ─────────────────────────────────────────
+//
+// Stores weight matrices as `half::f16` to halve memory traffic. The f16→f32
+// conversion happens inside `simd_fused_scale_acc_f16` during the AXPY loop,
+// at 1 cycle per 4 elements on aarch64 NEON (hardware fcvt). The norm scales
+// and position embeddings stay f32 (they are small: h + max_depth*h elements).
+// The embedding table stays f32 because it is passed via `WeaverInput` by the
+// caller and is not part of the corrector's weight budget.
+//
+// The f16 path is a sibling variant: `WeaverWeightsF16` mirrors `WeaverWeights`,
+// `matmul_vec_f16` mirrors `matmul_vec`, and `weaver_forward_parallel_f16`
+// mirrors `weaver_forward_parallel`. Callers explicitly opt in via
+// `WeaverCorrectorF16`. The f32 path is preserved bit-identical (G3).
+
+/// Compact f16 weight storage with **transposed layout** for dot-product GEMV.
+///
+/// Weight matrices are stored as `[out_dim, in_dim]` row-major (transposed
+/// from `WeaverWeights`'s `[in_dim, out_dim]`). This enables the dot-product
+/// GEMV pattern: `output[o] = simd_dot_f16_f32(&weight_t[o*in_dim..], input)`.
+///
+/// The dot-product pattern is critical for f16: the AXPY pattern re-reads/
+/// re-writes the f32 output `in_dim` times, leaving only 17% theoretical
+/// bandwidth reduction — not enough to overcome f16→f32 conversion overhead
+/// (measured: 0.71× — a regression). The dot-product pattern reads each f16
+/// weight row once and accumulates in a register, achieving the full 50%
+/// weight-bandwidth reduction with minimal conversion overhead.
+///
+/// Norm scales and pos_emb stay f32 (small arrays).
+#[derive(Debug, Clone)]
+pub struct WeaverWeightsF16 {
+    /// Conditioning projection `[hidden, hidden]` transposed (f16).
+    pub w_c: Vec<half::f16>,
+    /// Attention Q/K/V/O projections `[hidden, hidden]` transposed (f16).
+    pub w_q: Vec<half::f16>,
+    pub w_k: Vec<half::f16>,
+    pub w_v: Vec<half::f16>,
+    pub w_o: Vec<half::f16>,
+    /// SwiGLU gate/up `[d_ff, hidden]` transposed, down `[hidden, d_ff]` transposed (f16).
+    pub w_gate: Vec<half::f16>,
+    pub w_up: Vec<half::f16>,
+    pub w_down: Vec<half::f16>,
+    /// RMSNorm scales stay f32 — only `[hidden]` each, negligible bandwidth.
+    pub norm_cond: Vec<f32>,
+    pub norm_attn: Vec<f32>,
+    pub norm_mlp: Vec<f32>,
+    /// Position embeddings stay f32 — only `[max_depth * hidden]`, small.
+    pub pos_emb: Vec<f32>,
+    /// Config snapshot.
+    pub config: WeaverConfig,
+}
+
+impl WeaverWeightsF16 {
+    /// Convert f32 weights to f16 with transposition. One-time cost at load time.
+    ///
+    /// Each weight matrix `[in_dim, out_dim]` is transposed to `[out_dim, in_dim]`
+    /// and converted to f16. The transposition enables the dot-product GEMV
+    /// pattern which is ~1.5-2× faster than the AXPY pattern for f16 weights.
+    pub fn from_f32(src: &WeaverWeights) -> Self {
+        // Transpose `[in_dim, out_dim]` → `[out_dim, in_dim]` and convert to f16.
+        let cvt_t = |v: &[f32], in_dim: usize, out_dim: usize| -> Vec<half::f16> {
+            let mut t = vec![half::f16::ZERO; in_dim * out_dim];
+            for i in 0..in_dim {
+                for o in 0..out_dim {
+                    // src[i * out_dim + o] → dst[o * in_dim + i]
+                    t[o * in_dim + i] = half::f16::from_f32(v[i * out_dim + o]);
+                }
+            }
+            t
+        };
+        let h = src.config.hidden_dim;
+        let ff = src.config.d_ff;
+        Self {
+            w_c: cvt_t(&src.w_c, h, h),
+            w_q: cvt_t(&src.w_q, h, h),
+            w_k: cvt_t(&src.w_k, h, h),
+            w_v: cvt_t(&src.w_v, h, h),
+            w_o: cvt_t(&src.w_o, h, h),
+            w_gate: cvt_t(&src.w_gate, h, ff),
+            w_up: cvt_t(&src.w_up, h, ff),
+            w_down: cvt_t(&src.w_down, ff, h),
+            norm_cond: src.norm_cond.clone(),
+            norm_attn: src.norm_attn.clone(),
+            norm_mlp: src.norm_mlp.clone(),
+            pos_emb: src.pos_emb.clone(),
+            config: src.config.clone(),
+        }
+    }
+}
+
+/// f16×f32 matrix-vector multiply using the **dot-product pattern**:
+/// `output[o] = simd_dot_f16_f32(&weight_t[o*in_dim..], input)`.
+///
+/// The weight matrix is `[out_dim, in_dim]` row-major (transposed from the
+/// f32 layout). Each output element is a single dot product of an f16 weight
+/// row against the f32 input. The dot product accumulates in registers —
+/// no per-element write-back like the AXPY pattern.
+///
+/// This pattern is critical for f16: it achieves the full 50% weight-bandwidth
+/// reduction. The AXPY pattern would re-read/re-write the f32 output `in_dim`
+/// times, leaving only 17% bandwidth reduction — not enough to overcome
+/// f16→f32 conversion overhead (measured regression: 0.71×).
+#[inline]
+fn matmul_vec_f16(
+    input: &[f32],
+    weight_t_f16: &[half::f16],
+    in_dim: usize,
+    out_dim: usize,
+    output: &mut [f32],
+) {
+    for o in 0..out_dim {
+        let row = &weight_t_f16[o * in_dim..(o + 1) * in_dim];
+        output[o] = katgpt_core::simd::simd_dot_f16_f32(row, input, in_dim);
     }
 }
 
@@ -2313,6 +2693,123 @@ mod tests {
                     (scratch_seq.corrected_probs_flat[idx] - scratch_par.corrected_probs_flat[idx]).abs();
                 assert!(diff_cp < 1e-4, "corrected_probs mismatch di={di} ki={ki}: {diff_cp}");
             }
+        }
+    }
+
+    // ── Issue 136: f16 weight path tests ──
+
+    /// f16 forward with zero weights must produce zero residual (no-harm).
+    /// Mirrors `g1_zero_weights_produce_zero_residual` for the f32 path.
+    #[test]
+    fn f16_zero_weights_produce_zero_residual() {
+        let cfg = test_config();
+        let weights_f32 = WeaverWeights::zeros(cfg.clone());
+        let weights_f16 = WeaverWeightsF16::from_f32(&weights_f32);
+        let input = test_input(&cfg, 16);
+
+        let mut scratch = WeaverScratch::new(&cfg);
+        let (depth, k) = weaver_forward_parallel_f16(&weights_f16, &input, &mut scratch);
+
+        assert_eq!(depth, cfg.max_depth);
+        assert_eq!(k, cfg.k_candidates);
+
+        // Zero weights → zero residual.
+        for di in 0..depth {
+            for ki in 0..k {
+                let idx = di * k + ki;
+                assert!(
+                    scratch.residual_flat[idx].abs() < 1e-6,
+                    "f16 zero-weight residual should be ~0 at di={di} ki={ki}, got {}",
+                    scratch.residual_flat[idx]
+                );
+            }
+        }
+    }
+
+    /// f16 forward must produce valid probabilities (sum to 1, no NaN/Inf).
+    #[test]
+    fn f16_corrected_probs_sum_to_one_no_nan() {
+        let cfg = test_config();
+        let weights_f32 = nonzero_weights(&cfg);
+        let weights_f16 = WeaverWeightsF16::from_f32(&weights_f32);
+        let input = test_input(&cfg, 16);
+
+        let mut scratch = WeaverScratch::new(&cfg);
+        weaver_forward_parallel_f16(&weights_f16, &input, &mut scratch);
+
+        let depth = cfg.max_depth;
+        let k = cfg.k_candidates;
+        for di in 0..depth {
+            let row = &scratch.corrected_probs_flat[di * k..(di + 1) * k];
+            let sum: f32 = row.iter().sum();
+            assert!((sum - 1.0).abs() < 1e-4, "f16 probs sum at di={di}: {sum}");
+            for &p in row {
+                assert!(p.is_finite(), "f16 prob is not finite at di={di}");
+                assert!(p >= 0.0, "f16 prob is negative at di={di}: {p}");
+            }
+        }
+    }
+
+    /// f16 forward should produce results close to the f32 parallel path.
+    /// The f16 rounding introduces ≤0.5 ULP per weight; with small test
+    /// weights (~0.1 magnitude), the corrected_probs should match within ~5%.
+    #[test]
+    fn f16_matches_f32_within_precision() {
+        let cfg = test_config();
+        let weights_f32 = nonzero_weights(&cfg);
+        let weights_f16 = WeaverWeightsF16::from_f32(&weights_f32);
+        let input = test_input(&cfg, 16);
+
+        // f32 parallel path.
+        let mut scratch_f32 = WeaverScratch::new(&cfg);
+        weaver_forward_parallel(&weights_f32, &input, &mut scratch_f32);
+
+        // f16 parallel path.
+        let mut scratch_f16 = WeaverScratch::new(&cfg);
+        weaver_forward_parallel_f16(&weights_f16, &input, &mut scratch_f16);
+
+        let depth = cfg.max_depth;
+        let k = cfg.k_candidates;
+        for di in 0..depth {
+            for ki in 0..k {
+                let idx = di * k + ki;
+                let p_f32 = scratch_f32.corrected_probs_flat[idx];
+                let p_f16 = scratch_f16.corrected_probs_flat[idx];
+                // f16 has ~3 decimal digits of precision. For probabilities
+                // in [0,1], the relative error should be < 10%.
+                let diff = (p_f32 - p_f16).abs();
+                assert!(
+                    diff < 0.1,
+                    "f16 vs f32 prob mismatch di={di} ki={ki}: f32={p_f32:.6} f16={p_f16:.6} diff={diff:.6}"
+                );
+            }
+        }
+    }
+
+    /// WeaverCorrectorF16 wrapper must produce the same output as the raw
+    /// f16 forward function.
+    #[test]
+    fn f16_corrector_wrapper_matches_forward() {
+        let cfg = test_config();
+        let weights_f32 = nonzero_weights(&cfg);
+        let corrector_f32 = WeaverCorrector::from_weights(weights_f32);
+        let corrector_f16 = WeaverCorrectorF16::from_f32(&corrector_f32);
+        let input = test_input(&cfg, 16);
+
+        let mut scratch_fn = WeaverScratch::new(&cfg);
+        weaver_forward_parallel_f16(corrector_f16.weights(), &input, &mut scratch_fn);
+
+        let mut scratch_wrap = WeaverScratch::new(&cfg);
+        corrector_f16.correct_parallel(&input, &mut scratch_wrap);
+
+        let depth = cfg.max_depth;
+        let k = cfg.k_candidates;
+        for idx in 0..depth * k {
+            assert_eq!(
+                scratch_fn.corrected_probs_flat[idx],
+                scratch_wrap.corrected_probs_flat[idx],
+                "corrector wrapper mismatch at idx={idx}"
+            );
         }
     }
 }

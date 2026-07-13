@@ -101,8 +101,9 @@ pub use elementwise::{
 #[cfg(feature = "maxsim")]
 pub use maxsim::{maxsim_score, maxsim_score_packed};
 pub use research::{
-    coincidence_score, entropy_f32, simd_dist_sq, simd_fused_scale_acc, simd_fused_sub_acc,
-    simd_gram_f32, simd_l_inf_distance_f32, simd_sum_abs_f32, simd_sum_sq, simd_sum_sq_quartic,
+    coincidence_score, entropy_f32, simd_dist_sq, simd_fused_scale_acc,
+    simd_fused_scale_acc_f16, simd_fused_sub_acc, simd_gram_f32, simd_l_inf_distance_f32,
+    simd_sum_abs_f32, simd_sum_sq, simd_sum_sq_quartic,
 };
 #[cfg(feature = "sigmoid_margin")]
 pub use research::{compute_retrieval_margin, dim_sufficiency_bound, sigmoid_margin_loss};
