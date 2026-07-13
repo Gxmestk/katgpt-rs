@@ -363,12 +363,14 @@ Does position-weighted DDTree expansion budget improve acceptance length?
 ## Tasks
 
 - [x] (D2) Implement `dflare_fusion` feature gate — multi-conditioning marginal blend with K=2 sources → Plan 174 Task 1 ✅
-- [ ] (D2) Benchmark: acceptance length with K=2 vs K=1 conditioning, α ∈ {0.3, 0.5, 0.7}
+- [x] (D2) Benchmark: acceptance length with K=2 vs K=1 conditioning, α ∈ {0.3, 0.5, 0.7} — **RAN (Plan 174 T4), 🪦 IMPROVEMENT GOAT FAILED: no measurable acceptance gain.** Feature stays opt-in / research-only.
 - [x] (D3) Implement `dflare_kv_routing` feature gate — pruner-confidence-based KV source selection → Plan 174 Task 2 ✅
-- [ ] (D3) Benchmark: per-position acceptance by pruner confidence quartile, with and without routing
+- [x] (D3) Benchmark: per-position acceptance by pruner confidence quartile, with and without routing — **RAN (Plan 174 T5), 🪦 IMPROVEMENT GOAT FAILED: no gain over static routing.** Feature stays opt-in / research-only.
 - [x] (D4) Implement `dflare_progressive_budget` feature gate — `PositionWeightedBudget` struct for DDTree → Plan 174 Task 3 ✅
-- [ ] (D4) Benchmark: acceptance length distribution with uniform vs weighted budget
-- [ ] (D1, D5) Document existing mechanisms as DFlare analogs in code comments (no code change needed)
+- [x] (D4) Benchmark: acceptance length distribution with uniform vs weighted budget — **RAN (Plan 174 T6), 🪦 IMPROVEMENT GOAT FAILED: no gain over uniform budget.** Feature stays opt-in / research-only.
+- [x] (D1, D5) Document existing mechanisms as DFlare analogs in code comments (no code change needed)
+
+> **Verdict (recorded in Plan 174 + `Cargo.toml` feature comments):** all three DFlare ideas shipped structurally (Structural GOAT ✅ — the code compiles, the math is correct, the feature gates are zero-cost when off), but the Improvement GOAT failed on all three — none produced a measurable acceptance-length gain over the baseline. The features remain opt-in for research reproduction; they are **not** candidates for default-on promotion. This is an honest negative result: the modelless instantiations of DFlare's layer-wise fusion, KV routing, and progressive budget ideas do not transfer to acceptance-length gains on this stack's draft model.
 
 ---
 
