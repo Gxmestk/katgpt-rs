@@ -2,9 +2,9 @@
 
 > **Source:** [Towards Mechanistically Understanding Why Memorized Knowledge Fails to Generalize in Large Language Model Finetuning](https://arxiv.org/abs/2607.08393) — Lu Dai, Ziyang Rao, Yili Wang, Hanqing Wang, Hao Liu, Hui Xiong (HKUST-GZ / HKUST, NeurIPS 2026 submission, 2026-07-09)
 > **Date:** 2026-07-13
-> **Status:** Active — GOAT (open primitive candidate). Diagnostic half ships clean; operator half needs a PoC against the existing latent-steering family before promotion.
+> **Status:** SHIPPED via Plan 431 (2026-07-13) — opt-in behind `cross_stage_relocation` feature. Diagnostic half + CUSTOM relocation operator both landed. Fixed-pair `LateEarly` default REFUTED by defend-wrong PoC (CLOBBERS in 2/4 clean configs); production path is diagnostic-guided `RelocatePair::Custom`. Stays opt-in until a real-game-domain PoC lands.
 > **Related Research:** 259 (QK-Restore — closest cousin, Super-GOAT), 362 (HydraHead — activation-patching scorer, shipped), 313 (Thinking-to-Recall PASS — coherence-driven re-estimation is the latent analog), 290 (Latent Field Steering — direction-vector injection), 276 (PersonalityWeightedComposition — sigmoid-gated layer composition), 244 (FaithfulnessProbe — causal-intervention substrate), 388 (Jacobian-Lens — single-layer SVD readout, REFUTED as prefilter but the SVD concept readout survives)
-> **Related Plans:** 431 (open primitive, this note's execution)
+> **Related Plans:** 431 (SHIPPED — Phase 1–4 COMPLETE, primitive stays opt-in per PoC verdict)
 > **Classification:** Public
 
 ---
@@ -196,39 +196,41 @@ QK-Restore preserves *routing geometry* at the weight level. Cross-stage relocat
 
 ## 4. Plan (sketch — full plan at `.plans/431_cross_stage_residual_relocation_primitive.md`)
 
+> **STATUS (2026-07-13): Plan 431 SHIPPED — Phase 1–4 COMPLETE.** All sketch items below were expanded into Plan 431 T1.1–T4.8 (full plan has finer task granularity than this sketch). Plan 431's defend-wrong PoC REFUTED the fixed-pair `LateEarly` default (see §"PoC Addendum" below for raw numbers); the mechanism itself works via diagnostic-guided CUSTOM relocation. Primitive stays opt-in behind `cross_stage_relocation`. Items marked `[x]` reflect Plan 431 completion; see the plan file for full evidence.
+
 ### Phase 1 — Permeation-Map Diagnostic (the safe half)
 
 Ship `permeation_scan` as a thin extension of `causal_head_importance`'s scorer. Reuses `direct_effect_importance` as the cell score; adds the 2D `(l_src, l_dst)` scan loop. **No forward-pass machinery of its own** — the caller supplies the patched-forward closure (same contract as Plan 358). Zero new sync-boundary data.
 
-- [ ] T1.1 `PermeationMap { rows: Vec<Vec<f32>>, n_src: usize, n_dst: usize }` struct + `scan_into` method.
-- [ ] T1.2 Two-cluster detection: simple max-loc + quadrant classification (early/mid/late).
-- [ ] T1.3 G1 correctness test on a synthetic 4-stage chain with a known-stranded representation.
-- [ ] T1.4 G3 latency: full scan ≤ `n_src × n_dst × forward_pass_cost` (no overhead beyond the closure calls).
-- [ ] T1.5 G4 zero-alloc (caller-supplied scratch buffer for the matrix).
+- [x] T1.1 `PermeationMap { rows: Vec<Vec<f32>>, n_src: usize, n_dst: usize }` struct + `scan_into` method. → Plan 431 T1.2 (struct uses flat `cells: Vec<f32>` row-major + `n_src`/`n_dst` for cache friendliness).
+- [x] T1.2 Two-cluster detection: simple max-loc + quadrant classification (early/mid/late). → Plan 431 T1.4 (`ClusterClass` enum + `classify_two_cluster`).
+- [x] T1.3 G1 correctness test on a synthetic 4-stage chain with a known-stranded representation. → Plan 431 T1.5.
+- [x] T1.4 G3 latency: full scan ≤ `n_src × n_dst × forward_pass_cost` (no overhead beyond the closure calls). → Plan 431 T1.7 (PASS — 10–25% FASTER than hand-rolled loop).
+- [x] T1.5 G4 zero-alloc (caller-supplied scratch buffer for the matrix). → Plan 431 T1.6.
 
 ### Phase 2 — Cross-Stage Relocation Operator (the risky half)
 
 Ship `RelocateOp { src_stage, dst_stage, anchor_token_idx }` + `RelocatePair::LateEarly` default. The operator's `apply` method snapshots the anchor's state at `src_stage` and overwrites at `dst_stage` during a forward pass.
 
-- [ ] T2.1 `RelocateOp` struct + `apply_into` method (zero-alloc, `#[inline]`).
-- [ ] T2.2 `RelocatePair::LateEarly` constant: `(0.82, 0.45)` + `(0.10, 0.45)` per the paper.
-- [ ] T2.3 Trait integration: `RelocatingForward` trait that the host's forward pass implements (snapshot + overwrite hooks).
-- [ ] T2.4 G1 unit test: relocate on a synthetic stranded-state case recovers the answer.
+- [x] T2.1 `RelocateOp` struct + `apply_into` method (zero-alloc, `#[inline]`). → Plan 431 T2.1–T2.2.
+- [x] T2.2 `RelocatePair::LateEarly` constant: `(0.82, 0.45)` + `(0.10, 0.45)` per the paper. → Plan 431 T2.2 (also adds `Custom { src_a, src_b, dst }` variant — the production path per the PoC).
+- [x] T2.3 Trait integration: `RelocatingForward` trait that the host's forward pass implements (snapshot + overwrite hooks). → Plan 431 T2.3.
+- [x] T2.4 G1 unit test: relocate on a synthetic stranded-state case recovers the answer. → Plan 431 T2.5.
 
 ### Phase 3 — Defend-Wrong PoC (MANDATORY before any promotion)
 
 Per §3.6, ship a PoC in `riir-ai/crates/riir-poc/benches/cross_stage_relocation_modelless_goat.rs` with three competitors:
 
-- [ ] T3.1 **Paper's heuristic** (two fixed pairs) on a controlled toy domain (synthetic stranded-representation chain).
-- [ ] T3.2 **No-relocation baseline** (standard forward pass).
-- [ ] T3.3 **Shipped latent_functor re-estimation** (R313) — the existing modelless analog.
-- [ ] T3.4 Print verdict table. **If the heuristic doesn't beat both baselines, the GOAT gate FAILS** and the operator stays opt-in diagnostic-only.
+- [x] T3.1 **Paper's heuristic** (two fixed pairs) on a controlled toy domain (synthetic stranded-representation chain). → Plan 431 T3.1–T3.2 (4 placement configs × 16 seeds + noise sweep).
+- [x] T3.2 **No-relocation baseline** (standard forward pass). → Plan 431 T3.3 (competitor b).
+- [x] T3.3 **Shipped latent_functor re-estimation** (R313) — the existing modelless analog. → Plan 431 T3.3 (competitor c, CohReest).
+- [x] T3.4 Print verdict table. **If the heuristic doesn't beat both baselines, the GOAT gate FAILS** and the operator stays opt-in diagnostic-only. → Plan 431 T3.4–T3.5. **VERDICT: REFUTE fixed-pair `LateEarly`** (CLOBBERS in 2/4 clean configs); see §"PoC Addendum" below.
 
 ### Phase 4 — GOAT Gate + Promote/Demote
 
-- [ ] T4.1 G1 (correctness), G2 (perf vs no-relocation overhead ≤ 5%), G3 (no-regression on existing tests), G4 (zero-alloc), G5 (feature-isolated), G6 (modelless — no training dep).
-- [ ] T4.2 If G1–G6 PASS and PoC confirms gain → consider promotion. Default **opt-in** until a real-game-domain PoC lands in riir-ai (deferred to riir-ai follow-up, not a katgpt-rs blocker).
-- [ ] T4.3 Record promote/demote per the §1.6 per-stack ledger. Stack slot: **intervention/diagnostic** (alongside `causal_head_importance`).
+- [x] T4.1 G1 (correctness), G2 (perf vs no-relocation overhead ≤ 5%), G3 (no-regression on existing tests), G4 (zero-alloc), G5 (feature-isolated), G6 (modelless — no training dep). → Plan 431 T4.1–T4.6 (all PASS for katgpt-rs scope).
+- [x] T4.2 If G1–G6 PASS and PoC confirms gain → consider promotion. Default **opt-in** until a real-game-domain PoC lands in riir-ai (deferred to riir-ai follow-up, not a katgpt-rs blocker). → Plan 431 T4.7. **DECISION: stays OPT-IN** (PoC refuted the fixed default; real-domain PoC deferred).
+- [x] T4.3 Record promote/demote per the §1.6 per-stack ledger. Stack slot: **intervention/diagnostic** (alongside `causal_head_importance`). → Plan 431 T4.8 (recorded; README + overview.md updated).
 
 ---
 
