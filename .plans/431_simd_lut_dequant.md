@@ -4,7 +4,7 @@
 **Research:** [katgpt-rs/.research/418_StreamDQ_SIMD_LUT_DeQuant.md](../.research/418_StreamDQ_SIMD_LUT_DeQuant.md)
 **Source paper:** [arxiv 2607.08993](https://arxiv.org/abs/2607.08993) — StreamDQ (Jeong et al., SK Hynix, 2026-07-09)
 **Target:** `katgpt-rs/crates/katgpt-core/src/simd_lut_dequant.rs` (new module) + Cargo feature `simd_lut_dequant`
-**Status:** Active — Phase 1 COMPLETE + Phase 2 COMPLETE (NEON + AVX2 + scalar, 18 tests PASS). Phase 3 (fused DeQuant + Dot) is next.
+**Status:** Active — Phase 1 + 2 + 3 COMPLETE (scalar + NEON + AVX2 + fused dequant+dot, 24 tests PASS). Phase 4 (GOAT Gate) is next.
 
 ---
 
@@ -91,16 +91,16 @@ Distill StreamDQ's "shared FP32 ALU + format-specific type-cast" pattern (paper 
 
 ### Tasks
 
-- [ ] **T3.1** Add `dequant_dot_via_lut<L>(codes, lut, x: &[f32], shift, mask) -> f32`:
+- [x] **T3.1** Add `dequant_dot_via_lut<L>(codes, lut, x: &[f32], shift, mask) -> f32`:
   - Fuses dequant + dot product (paper's "fused DQ-GEMM" analog)
   - Dequant happens in registers, never spills to L1
   - Inner loop: gather → load `x[i]` → FMA → next iteration
 
-- [ ] **T3.2** NEON impl using `vfmaq_f32` (FMA), AVX2 impl using `_mm256_fmadd_ps`.
+- [x] **T3.2** NEON impl using `vfmaq_f32` (FMA), AVX2 impl using `_mm256_fmadd_ps`.
 
-- [ ] **T3.3** Scalar reference for testing.
+- [x] **T3.3** Scalar reference for testing.
 
-**Exit:** Fused path passes bit-exact dot vs `(dequant then simd_dot_f32)` two-step.
+**Exit:** Fused path passes bit-exact dot vs `(dequant then simd_dot_f32)` two-step. ✅ DONE (2026-07-13): Fused dequant+dot kernel shipped with NEON (4 independent float32x4_t accumulators, 16-element unroll, vfmaq_f32) + AVX2 (2 independent __m256 accumulators, _mm256_fmadd_ps) + scalar (4-accumulator mul_add matching simd::scalar_dot_f32 pattern). 24 unit tests PASS (18 from Phase 1+2 + 6 new fused tests). clippy clean. Fused path verified close to two-step (rel_diff < 1e-5, not bit-exact due to FMA reordering — documented). Fused SIMD path verified close to fused scalar path across all alignment boundaries (1, 3, 4, 7, 8, 15, 16, 17, 31, 32, 33 elements). The fused kernel avoids the intermediate buffer allocation entirely — dequantized values stay in registers and are FMA'd into the accumulator immediately.
 
 ---
 

@@ -413,6 +413,288 @@ unsafe fn dequant_via_lut_avx2(
 }
 
 // ──────────────────────────────────────────────────────────────────────────
+// Fused DeQuant + Dot (Phase 3 — the strongest fusion candidate)
+// ──────────────────────────────────────────────────────────────────────────
+// The fused kernel avoids spilling dequantized values to memory. Instead of
+// `dequant_via_lut → out[]` then `simd_dot_f32(out, x)`, we gather the LUT value
+// into a register and immediately FMA it with `x[i]` into the accumulator.
+// This is the software analog of the paper's fused DQ-GEMM kernel.
+
+/// Generic fused LUT dequantize + dot product.
+///
+/// Computes `Σ lut[(codes[i] >> shift) & mask] × x[i]` without spilling the
+/// dequantized values to memory. The LUT already contains the affine
+/// `(code − zero) · scale`, so this is `Σ ((code_i − zero) · scale) × x_i` — the
+// fused dequantize-dot kernel.
+///
+/// Returns `0.0` for empty inputs. Processes `min(codes.len(), x.len())` elements.
+///
+/// # Allocation discipline
+///
+/// Zero allocations. All intermediate values stay in registers (SIMD paths) or
+/// a single stack accumulator (scalar path).
+///
+/// # Example
+///
+/// ```
+/// use katgpt_core::simd_lut_dequant::{UInt4Lut, QuantLut, dequant_dot_via_lut};
+///
+/// let lut = UInt4Lut::build(1.0, 0.0); // lut[i] = i
+/// let codes = [0x02_u8, 0x03]; // low nibbles: 2, 3
+/// let x = [10.0_f32, 20.0];
+/// let dot = dequant_dot_via_lut(&codes, &lut, &x, 0, 0x0F);
+/// assert_eq!(dot, 2.0 * 10.0 + 3.0 * 20.0); // 80.0
+/// ```
+#[inline]
+#[allow(clippy::needless_return)] // return is needed for cfg-gated arch dispatch
+pub fn dequant_dot_via_lut<L: QuantLut>(
+    codes: &[u8],
+    lut: &L,
+    x: &[f32],
+    shift: u32,
+    mask: u8,
+) -> f32 {
+    let lut_slice = lut.as_f32_slice();
+    #[cfg(target_arch = "aarch64")]
+    {
+        return unsafe { dequant_dot_via_lut_neon(codes, lut_slice, x, shift, mask) };
+    }
+    #[cfg(all(target_arch = "x86_64", target_feature = "avx2"))]
+    {
+        return unsafe { dequant_dot_via_lut_avx2(codes, lut_slice, x, shift, mask) };
+    }
+    #[cfg(not(any(
+        target_arch = "aarch64",
+        all(target_arch = "x86_64", target_feature = "avx2")
+    )))]
+    {
+        dequant_dot_via_lut_scalar(codes, lut_slice, x, shift, mask)
+    }
+}
+
+/// Scalar fused dequant+dot — portable reference and correctness oracle.
+///
+/// Uses 4 independent accumulators with `mul_add` to match the SIMD path's
+/// FMA semantics (single-rounding), same pattern as `simd::scalar_dot_f32`.
+#[inline]
+pub fn dequant_dot_via_lut_scalar(
+    codes: &[u8],
+    lut_slice: &[f32],
+    x: &[f32],
+    shift: u32,
+    mask: u8,
+) -> f32 {
+    let n = codes.len().min(x.len());
+    let mask_len = lut_slice.len();
+    let mut acc = [0.0_f32; 4];
+    let chunks = n / 4;
+    let mut i = 0;
+    for _ in 0..chunks {
+        unsafe {
+            let idx0 = ((codes[i] >> shift) & mask) as usize & (mask_len - 1);
+            let idx1 = ((codes[i + 1] >> shift) & mask) as usize & (mask_len - 1);
+            let idx2 = ((codes[i + 2] >> shift) & mask) as usize & (mask_len - 1);
+            let idx3 = ((codes[i + 3] >> shift) & mask) as usize & (mask_len - 1);
+            acc[0] = lut_slice.get_unchecked(idx0).mul_add(*x.get_unchecked(i), acc[0]);
+            acc[1] = lut_slice.get_unchecked(idx1).mul_add(*x.get_unchecked(i + 1), acc[1]);
+            acc[2] = lut_slice.get_unchecked(idx2).mul_add(*x.get_unchecked(i + 2), acc[2]);
+            acc[3] = lut_slice.get_unchecked(idx3).mul_add(*x.get_unchecked(i + 3), acc[3]);
+        }
+        i += 4;
+    }
+    let mut sum = acc.iter().sum::<f32>();
+    while i < n {
+        let idx = ((codes[i] >> shift) & mask) as usize & (mask_len - 1);
+        unsafe {
+            sum = lut_slice.get_unchecked(idx).mul_add(*x.get_unchecked(i), sum);
+        }
+        i += 1;
+    }
+    sum
+}
+
+// ── NEON fused dequant+dot ─────────────────────────────────────────────
+
+#[cfg(target_arch = "aarch64")]
+#[inline]
+unsafe fn dequant_dot_via_lut_neon(
+    codes: &[u8],
+    lut_slice: &[f32],
+    x: &[f32],
+    shift: u32,
+    mask: u8,
+) -> f32 {
+    use core::arch::aarch64::{
+        vaddq_f32, vdup_n_s8, vdup_n_u8, vdupq_n_f32, vfmaq_f32, vget_lane_u8, vld1q_f32,
+        vld1_u8, vand_u8, vshl_u8,
+    };
+
+    unsafe {
+        let n = codes.len().min(x.len());
+        let neg_shift = (shift as i8).wrapping_neg();
+        let shift_vec = vdup_n_s8(neg_shift);
+        let mask_vec = vdup_n_u8(mask);
+        let mask_bits = lut_slice.len().trailing_zeros() as u8;
+        let idx_mask: u8 = if mask_bits >= 8 { 0xFF } else { (1u8 << mask_bits) - 1 };
+
+        // 4 independent accumulators (float32x4_t each) to hide FMA latency.
+        let mut acc0 = vdupq_n_f32(0.0);
+        let mut acc1 = vdupq_n_f32(0.0);
+        let mut acc2 = vdupq_n_f32(0.0);
+        let mut acc3 = vdupq_n_f32(0.0);
+
+        let mut i = 0;
+        // Process 16 elements per iteration (4× float32x4_t FMA).
+        while i + 16 <= n {
+            for &off in &[0, 4, 8, 12] {
+                let code_vec = vld1_u8(codes.as_ptr().add(i + off));
+                let shifted = vshl_u8(code_vec, shift_vec);
+                let masked = vand_u8(shifted, mask_vec);
+                // Scalar gather into [f32;4] — NEON has no gather.
+                let gathered = [
+                    *lut_slice.get_unchecked((vget_lane_u8(masked, 0) & idx_mask) as usize),
+                    *lut_slice.get_unchecked((vget_lane_u8(masked, 1) & idx_mask) as usize),
+                    *lut_slice.get_unchecked((vget_lane_u8(masked, 2) & idx_mask) as usize),
+                    *lut_slice.get_unchecked((vget_lane_u8(masked, 3) & idx_mask) as usize),
+                ];
+                let dequant_vec = vld1q_f32(gathered.as_ptr());
+                let x_vec = vld1q_f32(x.as_ptr().add(i + off));
+                match off {
+                    0 => acc0 = vfmaq_f32(acc0, dequant_vec, x_vec),
+                    4 => acc1 = vfmaq_f32(acc1, dequant_vec, x_vec),
+                    8 => acc2 = vfmaq_f32(acc2, dequant_vec, x_vec),
+                    12 => acc3 = vfmaq_f32(acc3, dequant_vec, x_vec),
+                    _ => unreachable!(),
+                }
+            }
+            i += 16;
+        }
+
+        // Reduce 4 accumulators to 1.
+        let mut acc = vaddq_f32(acc0, acc1);
+        acc = vaddq_f32(acc, acc2);
+        acc = vaddq_f32(acc, acc3);
+
+        // Process remaining 4-element chunks.
+        while i + 4 <= n {
+            let code_vec = vld1_u8(codes.as_ptr().add(i));
+            let shifted = vshl_u8(code_vec, shift_vec);
+            let masked = vand_u8(shifted, mask_vec);
+            let gathered = [
+                *lut_slice.get_unchecked((vget_lane_u8(masked, 0) & idx_mask) as usize),
+                *lut_slice.get_unchecked((vget_lane_u8(masked, 1) & idx_mask) as usize),
+                *lut_slice.get_unchecked((vget_lane_u8(masked, 2) & idx_mask) as usize),
+                *lut_slice.get_unchecked((vget_lane_u8(masked, 3) & idx_mask) as usize),
+            ];
+            let dequant_vec = vld1q_f32(gathered.as_ptr());
+            let x_vec = vld1q_f32(x.as_ptr().add(i));
+            acc = vfmaq_f32(acc, dequant_vec, x_vec);
+            i += 4;
+        }
+
+        // Horizontal sum of float32x4_t.
+        let mut sum = core::arch::aarch64::vaddvq_f32(acc);
+
+        // Tail (1–3 remaining elements): scalar.
+        while i < n {
+            let idx = ((codes[i] >> shift) & mask) as usize & (lut_slice.len() - 1);
+            sum = lut_slice
+                .get_unchecked(idx)
+                .mul_add(*x.get_unchecked(i), sum);
+            i += 1;
+        }
+        sum
+    }
+}
+
+// ── AVX2 fused dequant+dot ─────────────────────────────────────────────
+
+#[cfg(all(target_arch = "x86_64", target_feature = "avx2"))]
+#[inline]
+#[target_feature(enable = "avx2", enable = "fma")]
+unsafe fn dequant_dot_via_lut_avx2(
+    codes: &[u8],
+    lut_slice: &[f32],
+    x: &[f32],
+    shift: u32,
+    mask: u8,
+) -> f32 {
+    use core::arch::x86_64::{
+        _mm256_add_ps, _mm256_and_si256, _mm256_castsi128_si256, _mm256_fmadd_ps,
+        _mm256_i32gather_ps, _mm256_loadu_ps, _mm256_set1_epi32, _mm256_setzero_ps,
+        _mm256_srli_epi32, _mm_cvtepu8_epi32, _mm_loadl_epi64,
+    };
+
+    unsafe {
+        let n = codes.len().min(x.len());
+        let lut_ptr = lut_slice.as_ptr();
+        let mask_vec = _mm256_set1_epi32(mask as i32);
+
+        // 2 independent accumulators (float32x8_t each) to hide FMA latency.
+        let mut acc0 = _mm256_setzero_ps();
+        let mut acc1 = _mm256_setzero_ps();
+
+        let mut i = 0;
+        // Process 16 elements per iteration (2× float32x8_t FMA).
+        while i + 16 <= n {
+            for (slot, &off) in [0, 8].iter().enumerate() {
+                let raw = _mm_cvtepu8_epi32(_mm_loadl_epi64(
+                    codes.as_ptr().add(i + off) as *const _,
+                ));
+                let idx256 = _mm256_castsi128_si256(raw);
+                let shifted = _mm256_srli_epi32(idx256, shift as i32);
+                let masked = _mm256_and_si256(shifted, mask_vec);
+                let gathered = _mm256_i32gather_ps(lut_ptr, masked, 4);
+                let x_vec = _mm256_loadu_ps(x.as_ptr().add(i + off));
+                match slot {
+                    0 => acc0 = _mm256_fmadd_ps(gathered, x_vec, acc0),
+                    1 => acc1 = _mm256_fmadd_ps(gathered, x_vec, acc1),
+                    _ => unreachable!(),
+                }
+            }
+            i += 16;
+        }
+
+        // Process remaining 8-element chunk.
+        let mut acc = _mm256_add_ps(acc0, acc1);
+        if i + 8 <= n {
+            let raw = _mm_cvtepu8_epi32(_mm_loadl_epi64(
+                codes.as_ptr().add(i) as *const _,
+            ));
+            let idx256 = _mm256_castsi128_si256(raw);
+            let shifted = _mm256_srli_epi32(idx256, shift as i32);
+            let masked = _mm256_and_si256(shifted, mask_vec);
+            let gathered = _mm256_i32gather_ps(lut_ptr, masked, 4);
+            let x_vec = _mm256_loadu_ps(x.as_ptr().add(i));
+            acc = _mm256_fmadd_ps(gathered, x_vec, acc);
+            i += 8;
+        }
+
+        // Horizontal sum of __m256.
+        let mut sum = {
+            let lo = core::arch::x86_64::_mm256_castps256_ps128(acc);
+            let hi = core::arch::x86_64::_mm256_extractf128_ps(acc, 1);
+            let sum128 = core::arch::x86_64::_mm_add_ps(lo, hi);
+            let shuf = core::arch::x86_64::_mm_movehdup_ps(sum128);
+            let sums = core::arch::x86_64::_mm_add_ps(sum128, shuf);
+            let shuf2 = core::arch::x86_64::_mm_movehl_ps(sums, sums);
+            let total = core::arch::x86_64::_mm_add_ss(sums, shuf2);
+            core::arch::x86_64::_mm_cvtss_f32(total)
+        };
+
+        // Tail (1–7 remaining elements): scalar.
+        while i < n {
+            let idx = ((codes[i] >> shift) & mask) as usize & (lut_slice.len() - 1);
+            sum = lut_slice
+                .get_unchecked(idx)
+                .mul_add(*x.get_unchecked(i), sum);
+            i += 1;
+        }
+        sum
+    }
+}
+
+// ──────────────────────────────────────────────────────────────────────────
 // Scalar reference arithmetic dequantize — the "current path" comparator.
 ///
 /// Computes `(signed(code) − zero) · scale` per element, matching the arithmetic
@@ -735,6 +1017,110 @@ mod tests {
             dequant_via_lut(&codes, &lut, 0, 0x0F, &mut out_simd);
             dequant_via_lut_scalar(&codes, lut_slice, 0, 0x0F, &mut out_scalar);
             assert_eq!(out_simd, out_scalar, "mismatch at n={}", n);
+        }
+    }
+
+    // ── Fused DeQuant + Dot (Phase 3 T3.1–T3.3) ───────────────────────────
+
+    #[test]
+    fn test_dequant_dot_basic() {
+        let lut = UInt4Lut::build(1.0, 0.0); // lut[i] = i
+        let codes = [0x02_u8, 0x03];
+        let x = [10.0_f32, 20.0];
+        let dot = dequant_dot_via_lut(&codes, &lut, &x, 0, 0x0F);
+        assert_eq!(dot, 2.0 * 10.0 + 3.0 * 20.0);
+    }
+
+    #[test]
+    fn test_dequant_dot_empty() {
+        let lut = UInt4Lut::build(1.0, 0.0);
+        let codes: [u8; 0] = [];
+        let x: [f32; 0] = [];
+        assert_eq!(dequant_dot_via_lut(&codes, &lut, &x, 0, 0x0F), 0.0);
+    }
+
+    #[test]
+    fn test_dequant_dot_with_scale_zero() {
+        // lut[i] = (i - 5) * 2 = {−10,−8,−6,...,4}
+        let lut = UInt4Lut::build(2.0, 5.0);
+        let codes = [0x00_u8, 0x01, 0x02, 0x03];
+        let x = [1.0_f32, 2.0, 3.0, 4.0];
+        let dot = dequant_dot_via_lut(&codes, &lut, &x, 0, 0x0F);
+        // Manual: (−10)(1) + (−8)(2) + (−6)(3) + (−4)(4) = −10 − 16 − 18 − 16 = −60
+        assert_eq!(dot, -60.0);
+    }
+
+    /// Fused dequant+dot must produce the same result as the two-step path:
+    /// (1) dequant codes into buffer, (2) dot product of buffer with x.
+    /// Due to FMA reordering the result may not be bit-exact, but should be
+    /// within f32 precision (~1e-5 relative).
+    #[test]
+    fn test_fused_vs_two_step_close() {
+        let lut = UInt4Lut::build(0.03, 4.2);
+        let lut_slice = lut.as_f32_slice();
+        let codes: Vec<u8> = (0..128u32).map(|i| (i * 17) as u8).collect();
+        let x: Vec<f32> = (0..128).map(|i| (i as f32 * 0.1 - 6.4).sin()).collect();
+
+        // Two-step: dequant then scalar dot.
+        let mut buf = vec![0.0_f32; 128];
+        dequant_via_lut_scalar(&codes, lut_slice, 0, 0x0F, &mut buf);
+        let two_step: f32 = buf.iter().zip(&x).map(|(b, xi)| b * xi).sum();
+
+        // Fused.
+        let fused = dequant_dot_via_lut(&codes, &lut, &x, 0, 0x0F);
+
+        // Should be very close (FMA can differ by ~1 ULP per accumulation).
+        let rel_diff = (fused - two_step).abs() / two_step.abs().max(1e-10);
+        assert!(
+            rel_diff < 1e-5,
+            "fused={} two_step={} rel_diff={}",
+            fused,
+            two_step,
+            rel_diff
+        );
+    }
+
+    /// Fused SIMD path must match the fused scalar path within f32 precision.
+    #[test]
+    fn test_fused_simd_vs_scalar_close() {
+        let lut = Int8Lut::build(0.01, 100.0);
+        let lut_slice = lut.as_f32_slice();
+        // 300 elements: exercises 16-element loop + 8-element chunk + tail.
+        let codes: Vec<u8> = (0..300u32).map(|i| (i * 7) as u8).collect();
+        let x: Vec<f32> = (0..300).map(|i| (i as f32 * 0.03).cos()).collect();
+
+        let scalar = dequant_dot_via_lut_scalar(&codes, lut_slice, &x, 0, 0xFF);
+        let simd = dequant_dot_via_lut(&codes, &lut, &x, 0, 0xFF);
+
+        let rel_diff = (simd - scalar).abs() / scalar.abs().max(1e-10);
+        assert!(
+            rel_diff < 1e-5,
+            "simd={} scalar={} rel_diff={}",
+            simd,
+            scalar,
+            rel_diff
+        );
+    }
+
+    /// Fused path at exact SIMD-width boundaries (16, 8, 4, tail).
+    #[test]
+    fn test_fused_alignment_boundaries() {
+        let lut = UInt4Lut::build(0.5, 3.0);
+        let lut_slice = lut.as_f32_slice();
+        for &n in &[1usize, 3, 4, 7, 8, 15, 16, 17, 31, 32, 33] {
+            let codes: Vec<u8> = (0..n as u32).map(|i| (i * 11) as u8).collect();
+            let x: Vec<f32> = (0..n).map(|i| (i as f32 * 0.2).sin()).collect();
+            let scalar = dequant_dot_via_lut_scalar(&codes, lut_slice, &x, 0, 0x0F);
+            let simd = dequant_dot_via_lut(&codes, &lut, &x, 0, 0x0F);
+            let rel_diff = (simd - scalar).abs() / scalar.abs().max(1e-10);
+            assert!(
+                rel_diff < 1e-5 || simd.abs() < 1e-10,
+                "n={}: simd={} scalar={} rel_diff={}",
+                n,
+                simd,
+                scalar,
+                rel_diff
+            );
         }
     }
 }
