@@ -8,6 +8,7 @@
 - Phase 4 (heterogeneous-D) → SHIPPED opt-in behind `velocity_field_ensemble_heterogeneous` (2026-07-04).
 - Phase 5 (LatCal commitment) → `riir-chain/.issues/003_velocity_field_ensemble_latcal_commitment.md` (deferred — belongs to riir-chain).
 - Phase 6 (UQ conformal floor) → SHIPPED (2026-07-04). Benchmark at `.benchmarks/376_uq_floor.md`; verdict BEATS FLOOR. Primitive still ships as non-UQ — the benchmark pre-validates the gate for any future UQ-bearing caller.
+  - **Update (2026-07-13, post-Plan-432-Phase-2):** The anticipated future UQ-bearing caller — VFD (Plan 432) — ran its own G2 UQ floor gate and FAILED (optimal λ*=0 on both AR(1) + bimodal corpora; VFD's epistemic scaling adds zero calibrated-UQ value). VFD did NOT promote to default-on and does NOT activate this ensemble's UQ gate. The ensemble's UQ claim stands independently (Plan 376 Phase 6); VFD does not upgrade it. Canonical record: `.benchmarks/432_vfd_goat.md`. The hypothetical "future UQ-bearing caller" gate remains open — VFD was a candidate that did not clear it.
 
 ---
 

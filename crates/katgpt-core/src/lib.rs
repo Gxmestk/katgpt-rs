@@ -1661,11 +1661,20 @@ pub use velocity_field_ensemble::{
     accumulate_pair_into, stochastic_interpolant_step_into,
 };
 
-// VFD — Velocity-Field Disagreement epistemic UQ estimator (Plan 432, Research 420).
+// VFD — Velocity-Field Disagreement score (Plan 432, Research 420).
 // Modelless: consumes the same M frozen velocity fields as VelocityFieldEnsemble,
 // but integrates each member independently and measures pairwise disagreement
-// weighted by kappa_s = s/(1-s). Activates Plan 376 Phase 6 G7 deferred UQ gate.
-// Opt-in until Phase 2 GOAT gate (G2 UQ floor per Issue 010) passes.
+// weighted by kappa_s = s/(1-s).
+//
+// Ships as an OPT-IN NON-UQ disagreement score. Phase 2 GOAT gate ran on
+// 2026-07-13 (G1✅ G2❌ G3✅ G4✅ G5✅) — the make-or-break G2 UQ floor
+// (per Issue 010) FAILED: optimal λ*=0 on both AR(1) + bimodal corpora means
+// VFD's epistemic scaling adds zero calibrated-UQ value over the conformal-naive
+// floor. VFD does NOT activate Plan 376 Phase 6's deferred UQ gate — the
+// ensemble remains UQ-bearing on its own (Plan 376 Phase 6); VFD does not
+// upgrade it. Useful for CLR L1 gating, sleep-time prioritization, and runtime
+// failure detection (paper §6.4), but carries NO calibrated-UQ claim. Canonical
+// GOAT record: `.benchmarks/432_vfd_goat.md`.
 #[cfg(feature = "velocity_field_disagreement")]
 pub mod velocity_field_disagreement;
 #[cfg(feature = "velocity_field_disagreement")]

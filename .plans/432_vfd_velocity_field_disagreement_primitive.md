@@ -4,7 +4,7 @@
 **Research:** [katgpt-rs/.research/420_VFD_Velocity_Field_Disagreement_Epistemic_UQ.md](../.research/420_VFD_Velocity_Field_Disagreement_Epistemic_UQ.md)
 **Source paper:** [arxiv 2606.18043](https://arxiv.org/abs/2606.18043) — Römer et al., *Uncertainty Quantification for Flow-Based Vision-Language-Action Models*, §4 (VFD estimator + Theorem 4.1). The SAVE half (§5) is a training method → riir-train, out of scope.
 **Target:** `katgpt-rs/crates/katgpt-core/src/velocity_field_disagreement.rs` (new module) + Cargo feature `velocity_field_disagreement`
-**Status:** Active — Phase 1 DONE (T1.1–T1.9); Phase 2 DONE (T2.1–T2.5: G1✅ G2❌ G3✅ G4✅ G5✅); Phase 3 DONE (T3.1–T3.3: stays opt-in non-UQ; T3.4–T3.5 deferred doc cleanup). **Verdict: VFD does NOT promote to default-on** — ships as opt-in non-UQ disagreement score. See `.benchmarks/432_vfd_goat.md`.
+**Status:** COMPLETE — Phase 1 DONE (T1.1–T1.9); Phase 2 DONE (T2.1–T2.5: G1✅ G2❌ G3✅ G4✅ G5✅); Phase 3 DONE (T3.1–T3.5 all closed). **Verdict: VFD does NOT promote to default-on** — ships as opt-in non-UQ disagreement score. See `.benchmarks/432_vfd_goat.md`.
 
 ---
 
@@ -164,9 +164,9 @@ Phase 1 shipped at commit `feat: VFD velocity-field disagreement primitive (Plan
 
 - [x] **T3.3** G2 FAILS → keep `velocity_field_disagreement` **opt-in** (no change to `default = [...]`). Document in `.benchmarks/432_vfd_goat.md` that the primitive ships as a **non-UQ disagreement score** (still useful for CLR L1 gating, sleep-time prioritization, runtime failure detection per paper §6.4 — but no calibrated-UQ claim). Update Research 420 §4 verdict.
 
-- [ ] **T3.4** Update `crates/katgpt-core/src/lib.rs` doc comment on the velocity-field ensemble module to note VFD's status: opt-in non-UQ disagreement score that does NOT upgrade the ensemble's UQ claim. (Deferred — low priority doc cleanup; the module docstrings already describe VFD as a separate primitive, and the floor benchmark doc is the canonical record.)
+- [x] **T3.4** Updated `crates/katgpt-core/src/lib.rs` doc comment on the VFD module (lines 1664-1676) to reflect the Phase 2 GOAT gate outcome: G2 FAILED, ships as opt-in non-UQ disagreement score, does NOT activate Plan 376 Phase 6's deferred UQ gate, links `.benchmarks/432_vfd_goat.md` as canonical record.
 
-- [ ] **T3.5** Update Plan 376 Phase 6 G7 status from "deferred" to **"still deferred — Plan 432 VFD did NOT promote to default-on (G2 UQ floor failed for VFD's epistemic-UQ claim; the ensemble itself remains UQ-bearing per Plan 376 Phase 6)"**. (Deferred — Plan 376 is a closed plan; a note in `.benchmarks/432_vfd_goat.md` suffices for the canonical record.)
+- [x] **T3.5** Updated Plan 376 Phase 6 (`.plans/376_*.md` line 11) with a post-Plan-432-Phase-2 note: the anticipated future UQ-bearing caller (VFD) ran its G2 gate and FAILED; VFD did not promote to default-on and does not activate the ensemble's UQ gate. The ensemble's UQ claim stands independently. The hypothetical "future UQ-bearing caller" gate remains open.
 
 ---
 
