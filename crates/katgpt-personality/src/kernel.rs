@@ -267,6 +267,18 @@ impl<const N: usize, const D: usize> PersonalityWeightedComposition<N, D> {
         self.w = w;
     }
 
+    /// Restore `r_expected` from a frozen snapshot.
+    ///
+    /// Counterpart to [`restore_w`](Self::restore_w) for the reward EMA.
+    /// Used by the migration bundle thaw path (Issue 456 Phase 2) to fully
+    /// reconstruct the composition from frozen bytes without losing reward
+    /// history. Not used by the hot-swap layer (which keeps `r_expected`
+    /// continuous across the swap).
+    #[inline]
+    pub fn restore_r_expected(&mut self, r_expected: [f32; N]) {
+        self.r_expected = r_expected;
+    }
+
     /// Reset `r_expected` to zero (clears reward memory).
     ///
     /// Used after a hot-swap if the host wants the new personality to start
@@ -275,6 +287,80 @@ impl<const N: usize, const D: usize> PersonalityWeightedComposition<N, D> {
     #[inline]
     pub fn reset_r_expected(&mut self) {
         self.r_expected = [0.0; N];
+    }
+
+    /// Serialize the composition to a flat byte buffer.
+    ///
+    /// Wire format (all little-endian f32):
+    /// ```text
+    /// w (N f32) || config.tau || config.alpha || config.w_max || config.ema_decay || r_expected (N f32)
+    /// ```
+    ///
+    /// Total size: `8*N + 16` bytes (e.g. 88 bytes for N=9). The const
+    /// generic `D` (direction dim) is NOT serialized — it's an output-sizing
+    /// constant, not runtime state. The format is stable across `D` values.
+    ///
+    /// This is the freeze format for NPC migration (Issue 456 Phase 2) and
+    /// cold-tier persistence. Deterministic: same state → same bytes.
+    pub fn to_bytes(&self) -> Vec<u8> {
+        let total = N * 4 + 16 + N * 4;
+        let mut buf = Vec::with_capacity(total);
+        for &wi in &self.w {
+            buf.extend_from_slice(&wi.to_le_bytes());
+        }
+        buf.extend_from_slice(&self.config.tau.to_le_bytes());
+        buf.extend_from_slice(&self.config.alpha.to_le_bytes());
+        buf.extend_from_slice(&self.config.w_max.to_le_bytes());
+        buf.extend_from_slice(&self.config.ema_decay.to_le_bytes());
+        for &r in &self.r_expected {
+            buf.extend_from_slice(&r.to_le_bytes());
+        }
+        debug_assert_eq!(buf.len(), total);
+        buf
+    }
+
+    /// Deserialize from a flat byte buffer produced by [`to_bytes`](Self::to_bytes).
+    ///
+    /// Returns `None` if the buffer is the wrong length. This is a structural
+    /// check only — no cryptographic integrity. Callers needing tamper
+    /// detection wrap the bytes in a `MerkleFrozenEnvelope` (the migration
+    /// bundle path does this at the outer layer).
+    ///
+    /// Reconstructs the config from the buffer — the caller does NOT need to
+    /// pass it in. This ensures the thawed composition matches the frozen one
+    /// bit-for-bit (no config drift from caller defaults).
+    pub fn from_bytes(buf: &[u8]) -> Option<Self> {
+        let expected_len = N * 4 + 16 + N * 4;
+        if buf.len() != expected_len {
+            return None;
+        }
+        let mut w = [0.0f32; N];
+        let mut r_expected = [0.0f32; N];
+        let read_f32 = |offset: &mut usize| -> f32 {
+            let mut tmp = [0u8; 4];
+            tmp.copy_from_slice(&buf[*offset..*offset + 4]);
+            *offset += 4;
+            f32::from_le_bytes(tmp)
+        };
+        let mut offset = 0;
+        for slot in &mut w {
+            *slot = read_f32(&mut offset);
+        }
+        let config = PersonalityConfig {
+            tau: read_f32(&mut offset),
+            alpha: read_f32(&mut offset),
+            w_max: read_f32(&mut offset),
+            ema_decay: read_f32(&mut offset),
+        };
+        for slot in &mut r_expected {
+            *slot = read_f32(&mut offset);
+        }
+        debug_assert_eq!(offset, expected_len);
+        Some(Self {
+            w,
+            config,
+            r_expected,
+        })
     }
 }
 
@@ -340,5 +426,52 @@ pub(crate) mod tests {
         assert_eq!(k.w_snapshot(), &[0.1, -0.2, 0.3]);
         assert_eq!(k.config().tau, 1.0);
         assert_eq!(k.r_expected(), &[0.0; 3]);
+    }
+
+    #[test]
+    fn to_bytes_from_bytes_roundtrip_preserves_all_fields() {
+        let config = PersonalityConfig {
+            tau: 0.75,
+            alpha: 0.02,
+            w_max: 4.0,
+            ema_decay: 0.9,
+        };
+        let w = [0.5, -1.2, 2.3, 0.0, -0.7, 1.1, -2.0, 0.9, 0.3];
+        let mut k = PersonalityWeightedComposition::<9, 32>::new(config, w);
+        // Set non-zero r_expected to verify it round-trips.
+        k.restore_r_expected([0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]);
+
+        let bytes = k.to_bytes();
+        assert_eq!(bytes.len(), 9 * 4 + 16 + 9 * 4, "wire size must be 8N+16");
+
+        let thawed = PersonalityWeightedComposition::<9, 32>::from_bytes(&bytes)
+            .expect("from_bytes must succeed on correct-length input");
+        assert_eq!(thawed.w, k.w, "w must round-trip");
+        assert_eq!(thawed.config(), &config, "config must round-trip");
+        assert_eq!(thawed.r_expected(), k.r_expected(), "r_expected must round-trip");
+    }
+
+    #[test]
+    fn from_bytes_rejects_wrong_length() {
+        let k = PersonalityWeightedComposition::<3, 32>::new(
+            PersonalityConfig::default(),
+            [0.1, -0.2, 0.3],
+        );
+        let bytes = k.to_bytes();
+        // Truncate by one byte.
+        assert!(PersonalityWeightedComposition::<3, 32>::from_bytes(&bytes[..bytes.len() - 1]).is_none());
+        // Expand by one byte.
+        let mut expanded = bytes.clone();
+        expanded.push(0);
+        assert!(PersonalityWeightedComposition::<3, 32>::from_bytes(&expanded).is_none());
+    }
+
+    #[test]
+    fn to_bytes_is_deterministic() {
+        let config = PersonalityConfig { tau: 1.5, alpha: 0.03, w_max: 6.0, ema_decay: 0.88 };
+        let w = [0.1, 0.2, 0.3];
+        let k1 = PersonalityWeightedComposition::<3, 32>::new(config, w);
+        let k2 = PersonalityWeightedComposition::<3, 32>::new(config, w);
+        assert_eq!(k1.to_bytes(), k2.to_bytes(), "same state must produce identical bytes");
     }
 }
