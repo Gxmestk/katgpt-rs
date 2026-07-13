@@ -145,10 +145,9 @@ This is the load-bearing modelless gate. The paper trains GDN2 + HOLA end-to-end
 ### Tasks
 
 - [x] **T5.1** GOAT gate summary table at the bottom of this plan filled in. If G1–G4 all PASS → primitive is **modelless-GOAT**, opt-in default stays OFF (not promoted to default until G5).
-- [x] **T5.2** Create `.issues/038_hippocampal_cache_g5_riir_train.md`:
-  - Title: "HOLA cache perplexity + RULER gate (G5) — needs trained GDN2 weights".
-  - Body: train a matched GDN2 model at 46M (smallest paper scale) on FineWeb-Edu 0.5B tokens (paper's 46M config, App. A) with and without HOLA cache. Report Wikitext PPL and a 4k-context needle probe. This is a riir-train job; not blocking the katgpt-rs modelless promotion.
-  - Cross-link Research 378 §3 MOAT gate (G5 deferred).
+- [x] **T5.2** Created `.issues/038_hippocampal_cache_g5_riir_train.md` (RESOLVED + REMOVED 2026-07-13).
+  - katgpt-rs modelless work COMPLETE: G1-G4 PASS, consumer wiring GOAT PASS, production wiring in `forward_gdn2` PASS (31 gdn2 + 23 hippocampal tests green).
+  - G5 (real-text perplexity + RULER) is a riir-train job — tracked there, not in katgpt-rs. Canonical record: this plan + `.research/378_*` §3 MOAT gate. Recover the removed issue via `git show HEAD^:.issues/038_*.md` if needed.
 - [x] **T5.3** README.md "Feature Showcase" entry for `hippocampal_cache` (one paragraph + paper link + GOAT gate status). Update `katgpt-rs/.docs/01_overview.md` Feature Flags table.
 - [-] **T5.4** Cross-reference: add a one-line entry to `.research/070_Gated_DeltaNet_2_*.md` §Relationship noting HOLA cache as a pluggable complement to GDN2 (the "Phase 4 alternative to SWA" identified in Research 070 §Verdict).
 - [-] **T5.5** Cross-reference: add a one-line entry to `.research/243_Temporal_Derivative_Kernel_*.md` §Fusion noting HOLA's β·‖e‖ as a *second* (instantaneous, per-token) surprise channel alongside temporal_deriv's dual-fast/slow EMA — the F2 fusion-potential.
@@ -164,7 +163,7 @@ This is the load-bearing modelless gate. The paper trains GDN2 + HOLA end-to-end
 | **G2** — Latency | observe ≤ 100 ns (W=64), ≤ 30 ns (micro); read ≤ 1 µs (W=64) | ⚠️ **PARTIAL PASS** (Phase 2) — observe 28.7 ns (W=64) / 1.75 ns (micro) ✅; read 2.87 µs (W=64, D=256, fast path) — 2.9× over target (compute-bound at D=256); micro read 86 ns ✅. T2.3: heap wins over sorted-vec 4.3× at W=64 |
 | **G3** — No-regression | GDN2 state byte-identical with/without cache observer; W=0 == bare GDN2 | ✅ **PASS** (Phase 3) — byte-identical state+output with `cache.observe()` after each step; feature-gate isolation verified |
 | **G4** — Retrieval (modelless) | HOLA ≥ 6/8 needles (cosine ≥ 0.8); baselines ≤ 4/8 | ✅ **PASS** (Phase 4) — HOLA softmax 8/8 (cosine ≈ 1.0); HOLA per-key-rescale 8/8; recency baseline 0/8; sigmoid-gated 0/8 (documented: not competitive) |
-| **G5** — Perplexity + RULER (riir-train) | ≥ −10% Wikitext PPL vs bare GDN2 at 46M; S-NIAH-1 @ 4k ≥ 0.7 | ⏳ Deferred (Issue 038, Phase 5) |
+| **G5** — Perplexity + RULER (riir-train) | ≥ −10% Wikitext PPL vs bare GDN2 at 46M; S-NIAH-1 @ 4k ≥ 0.7 | ⏳ Deferred (riir-train job; Issue 038 resolved+removed from katgpt-rs 2026-07-13 — modelless G1-G4 + production wiring complete) |
 
 ### G2 latency detail
 
