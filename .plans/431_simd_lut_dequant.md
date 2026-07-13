@@ -4,7 +4,7 @@
 **Research:** [katgpt-rs/.research/418_StreamDQ_SIMD_LUT_DeQuant.md](../.research/418_StreamDQ_SIMD_LUT_DeQuant.md)
 **Source paper:** [arxiv 2607.08993](https://arxiv.org/abs/2607.08993) — StreamDQ (Jeong et al., SK Hynix, 2026-07-09)
 **Target:** `katgpt-rs/crates/katgpt-core/src/simd_lut_dequant.rs` (new module) + Cargo feature `simd_lut_dequant`
-**Status:** Active — Phase 1 unblocking skeleton
+**Status:** Active — Phase 1 COMPLETE (scalar reference shipped + clippy clean + 14 tests PASS). Phase 2 (SIMD inner loops) is next.
 
 ---
 
@@ -26,8 +26,8 @@ Distill StreamDQ's "shared FP32 ALU + format-specific type-cast" pattern (paper 
 
 ### Tasks
 
-- [ ] **T1.1** Create `katgpt-rs/crates/katgpt-core/src/simd_lut_dequant.rs` (feature-gated on `simd_lut_dequant`)
-- [ ] **T1.2** Define the format-tag enum + LUT trait:
+- [x] **T1.1** Create `katgpt-rs/crates/katgpt-core/src/simd_lut_dequant.rs` (feature-gated on `simd_lut_dequant`)
+- [x] **T1.2** Define the format-tag enum + LUT trait:
   ```rust
   pub trait QuantLut {
       const LUT_LEN: usize;
@@ -42,7 +42,7 @@ Distill StreamDQ's "shared FP32 ALU + format-specific type-cast" pattern (paper 
   pub struct UInt4Lut([f32; 16]);      // for unsigned nibble formats (Q4_K low nibble)
   ```
 
-- [ ] **T1.3** Define the generic shared-FP32-ALU dequantize primitive:
+- [x] **T1.3** Define the generic shared-FP32-ALU dequantize primitive:
   ```rust
   pub fn dequant_via_lut<L: QuantLut>(
       codes: &[u8],    // packed quant codes (nibble-packed or byte-aligned per format)
@@ -54,11 +54,11 @@ Distill StreamDQ's "shared FP32 ALU + format-specific type-cast" pattern (paper 
   ```
   The LUT bakes in `(x - z) * s` per code value; the inner loop is pure lookup, no FP32 ALU per element.
 
-- [ ] **T1.4** Scalar reference impl: builds the LUT, iterates `codes`, writes `lut.lookup((code >> shift) & mask)` to `out`. No SIMD yet.
-- [ ] **T1.5** Wire into `katgpt-core/src/lib.rs` behind `#[cfg(feature = "simd_lut_dequant")]`.
-- [ ] **T1.6** Add `simd_lut_dequant = []` to `katgpt-core/Cargo.toml` `[features]` table.
+- [x] **T1.4** Scalar reference impl: builds the LUT, iterates `codes`, writes `lut.lookup((code >> shift) & mask)` to `out`. No SIMD yet.
+- [x] **T1.5** Wire into `katgpt-core/src/lib.rs` behind `#[cfg(feature = "simd_lut_dequant")]`.
+- [x] **T1.6** Add `simd_lut_dequant = []` to `katgpt-core/Cargo.toml` `[features]` table.
 
-**Exit:** `cargo clippy -p katgpt-core --features simd_lut_dequant` clean. Scalar reference test passes.
+**Exit:** `cargo clippy -p katgpt-core --features simd_lut_dequant` clean. Scalar reference test passes. ✅ DONE (2026-07-13): clippy clean, 14 unit tests + 1 doctest PASS, default-feature clippy also clean (feature isolation). Added `dequant_arithmetic_ref` as the G1 correctness oracle (the comparator the Phase 4 G1 gate will call against). LUT convention: `lut[i] = (signed(i) - zero) * scale` where `zero` is in code units (standard asymmetric-quantization form). Q4_K caller converts FP-space `m0_val` to code units via `zero = m0_val / d_sc0` at build time.
 
 ---
 

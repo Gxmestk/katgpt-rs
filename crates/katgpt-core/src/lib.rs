@@ -173,6 +173,17 @@ pub mod shard_embedding;
 // G1+G2+G3+G4+G5 ALL PASS.
 #[cfg(feature = "ssmax_temperature")]
 pub mod ssmax;
+// SIMD LUT Dequantization — software analog of StreamDQ near-memory DQ
+// (Plan 431, Research 418, arXiv:2607.08993 Jeong et al. SK Hynix 2026). Generic
+// format-parameterized dequantize primitive that replaces the per-element
+// integer-arithmetic INT→FP cast with a pre-computed f32 LUT lookup. INT4 LUT
+// is [f32;16] = one cache line; INT8 is [f32;256] = 1 KB. Phase 1 ships the
+// scalar reference; NEON/AVX2 inner loops land in Phase 2; fused dequant+dot
+// in Phase 3. Opt-in until the GOAT gate (Phase 4 G1 bit-exact + G2 latency)
+// settles the promote/demote decision. Realistic target 1.0-1.5x (the paper's
+// 7x is hardware-only). Pure modelless (LUT build + indexed reads).
+#[cfg(feature = "simd_lut_dequant")]
+pub mod simd_lut_dequant;
 // Smooth-min soft pattern matching — modelless latent-space utility for
 // fuzzy multi-token retrieval (Research 385, SoftMatcha 2, Issue 041; Issue 041 removed, see git history).
 // GOAT PoC PASS: +12pp recall@5 over plain cosine, ~0ns overhead.
