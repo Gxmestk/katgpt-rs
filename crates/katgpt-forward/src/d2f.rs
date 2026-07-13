@@ -1632,6 +1632,9 @@ pub fn d2f_decode_block_soft(
     // to avoid allocating `current_top1` and `masked_positions` every step.
     let mut current_top1: Vec<usize> = vec![0usize; block_len];
     let mut masked_positions: Vec<usize> = Vec::with_capacity(block_len);
+    // Vocab-sized softmax scratch — reused across all positions and steps.
+    // Avoids per-position iterator-chain allocation for the sum_exp computation.
+    let mut softmax_scratch: Vec<f32> = vec![0.0f32; vocab_size];
 
     let max_steps = decode_config.denoise_steps;
 
@@ -1663,7 +1666,16 @@ pub fn d2f_decode_block_soft(
 
             // Confidence via softmax max probability.
             // best_val == max_val → exp(0) == 1, so conf = 1 / sum_exp.
-            let sum_exp: f32 = logits.iter().map(|&v| (v - max_val).exp()).sum();
+            // SIMD-accelerated: copy logits into scratch, subtract max (in-place),
+            // then fused exp+sum via simd_exp_sum_inplace.
+            softmax_scratch[..vocab_size].copy_from_slice(logits);
+            katgpt_core::simd::simd_add_scalar_inplace(
+                &mut softmax_scratch[..vocab_size],
+                -max_val,
+            );
+            let sum_exp: f32 = katgpt_core::simd::simd_exp_sum_inplace(
+                &mut softmax_scratch[..vocab_size],
+            );
             let conf = if sum_exp > 0.0 {
                 1.0 / sum_exp
             } else {
