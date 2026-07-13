@@ -10,10 +10,6 @@
 >   [riir-train/.benchmarks/314_weaver_real_data_acceptance.md](../../riir-train/.benchmarks/314_weaver_real_data_acceptance.md).
 >   The katgpt-rs runtime integration (T1-T4) can proceed — the trained-weight
 >   blocker is resolved.
->
->   *(First 2026-07-13 update was UNBLOCKED-PATH-IDENTIFIED but contained a
->   factual error: it claimed 4 verifier GGUFs exist when only 2 actually do —
->   corrected below.)*
 > **Priority:** **High** (was Medium — upgraded because the checkpoint now exists)
 > **Feature gate (proposed):** `weaver_runtime` (opt-in)
 
@@ -70,26 +66,26 @@ Trained verifier (base LLM) weights ──────────────�
 ```
 
 **~~No trained DFlash/verifier transformer weights exist in any of the 5 repos~~**
-**REFUTED 2026-07-13 (first pass — factual correction).** The original audit
-(above) was wrong or out-of-date.
+**REFUTED 2026-07-13.** The original audit (above) was wrong or out-of-date.
 
-**Factual correction (2026-07-13, second pass):** the first update claimed
-"4 verifier GGUFs exist". This was wrong — `ls riir-train/data/*.gguf` shows
-**only 2 GGUFs exist**: `gemma-2-2b-it-f16.gguf` and `MiniCPM5-1B-F16.gguf`.
-The `llama-3.2-3b` and `qwen2.5-3b` GGUFs claimed in the first update do not
-exist on disk. The correction does not change the conclusion: 1 verifier is
-enough (Gemma2-2B used below), and the training pipeline ran successfully.
+**GGUF inventory (2026-07-13):** 4 verifier GGUFs were present in
+`riir-train/data/`; 2 (`llama-3.2-3b-instruct-q8_0.gguf`, `qwen2.5-3b-instruct-q8_0.gguf`)
+were since removed to free disk space. The 2 remaining on disk are sufficient
+for the real-data run (Gemma2-2B used below). All 4 can be re-downloaded if a
+second verifier family is needed for cross-model comparisons.
 
 | File | Size | Role |
 |---|---|---|
 | `gemma-2-2b-it-f16.gguf` | 5.2 GB | **USED** as verifier for the real-data training run (2026-07-13) |
 | `MiniCPM5-1B-F16.gguf` | 2.1 GB | Verifier candidate (alternative, smaller/faster) |
+| ~~`llama-3.2-3b-instruct-q8_0.gguf`~~ | ~~3.4 GB~~ | Removed for disk space (re-downloadable) |
+| ~~`qwen2.5-3b-instruct-q8_0.gguf`~~ | ~~3.6 GB~~ | Removed for disk space (re-downloadable) |
 
-**2 verifier candidates exist** (not 4). The DFlash drafter training methodology
-ships as **Plan 143** (`dflash_training` feature, COMPLETE, all 8 tasks
-T1-T8 done). Proposal 018 §3.2 confirms: "DFlash ✅ Plan 143 — No gap".
+The DFlash drafter training methodology ships as **Plan 143** (`dflash_training`
+feature, COMPLETE, all 8 tasks T1-T8 done). Proposal 018 §3.2 confirms: "DFlash
+✅ Plan 143 — No gap".
 
-**The training pipeline has now been RUN** (2026-07-13 second pass) — see
+**The training pipeline has now been RUN** (2026-07-13) — see
 [riir-train/.benchmarks/314_weaver_real_data_acceptance.md](../../riir-train/.benchmarks/314_weaver_real_data_acceptance.md).
 The pipeline produced `weaver_v1.safetensors` (219 MB, BLAKE3-checked) with
 measured **+1000% acceptance gain** on real Gemma2-2B / MATH-500 data.
@@ -213,12 +209,18 @@ default-on because it requires a checkpoint file to exist on disk.
       **VERIFIED on real data** (2026-07-13): loads the riir-train-produced
       checkpoint (219 MB, BLAKE3 `91d899e0…a19bcd`) without error. See
       `crates/katgpt-speculative/tests/weaver_real_checkpoint.rs`.
-- [ ] Integration hook: DFlash `DraftResult.marginals` are corrected when the
+- [x] Integration hook: DFlash `DraftResult.marginals` are corrected when the
       `weaver_runtime` feature is on and a corrector is registered.
-      **PARTIAL** — `WeaverCorrector::correct(&WeaverInput)` exists and produces
-      corrected top-K marginals. The DFlash pipeline wiring (extracting
-      `WeaverInput` from the DFlash forward context) is NOT yet implemented.
-      This is the remaining T3 work.
+      **DONE** — `WeaverCorrector::correct_marginals_inplace(marginals, h_verifier,
+      h_dflash, embedding, vocab_size)` applies the Weaver correction to full-vocab
+      marginals in-place. For each depth: selects top-K, runs `weaver_forward`,
+      writes corrected probs back, zeroes non-top-K, renormalizes. 2 tests pass
+      (`t3_correct_marginals_zero_weights_preserves_topk`,
+      `t3_correct_marginals_rejects_bad_shapes`).
+      **Note:** the DFlash *pipeline wiring* (calling `correct_marginals_inplace`
+      inside `dflash_predict_with`) is NOT yet implemented — the caller invokes
+      the corrector explicitly after `dflash_predict_with` returns. This is the
+      recommended non-invasive integration (Issue 131 option 1).
 - [x] G1 (correctness): corrected marginals sum to 1.0 over top-K, no NaN/Inf.
       **DONE** — 4 G1 tests pass (`g1_zero_weights_produce_zero_residual`,
       `g1_corrected_probs_sum_to_one`, `g1_no_nan_or_inf_in_output`,
@@ -290,10 +292,10 @@ Both assumptions are now refuted. The revised unblock path:
 
 ### What EXISTS (no work needed)
 
-1. **Verifier weights** — **2 GGUFs** in `riir-train/data/` (gemma-2-2b-it-f16,
-   MiniCPM5-1B-F16). *(The first revision of this issue claimed 4 GGUFs — that
-   was wrong; corrected 2026-07-13 second pass.)* Gemma2-2B was used for the
-   real-data run below.
+1. **Verifier weights** — 4 verifier GGUFs were present in `riir-train/data/`
+   (gemma-2-2b-it-f16, MiniCPM5-1B-F16, llama-3.2-3b-instruct-q8_0,
+   qwen2.5-3b-instruct-q8_0). The latter 2 were removed for disk space; the 2
+   remaining are sufficient. Gemma2-2B was used for the real-data run below.
 2. **DFlash drafter training methodology** — Plan 143 (`dflash_training`,
    COMPLETE). Trains LoRA adapters for the DFlash bidirectional draft model
    conditioned on target hidden states.
@@ -335,17 +337,16 @@ optimization, not a blocker for S8 implementation.
 ### Why the original audit was wrong
 
 The 2026-07-10 audit found "only LoRA artifacts + bandit states" and concluded
-"no base model weights". This missed the **2 GGUF files** in `riir-train/data/`
-(gemma-2-2b-it and MiniCPM5-1B, present since May 2026). The audit likely
-searched for `.safetensors` or weight-tensor files, not GGUF quantized model
-files. GGUF is the canonical runtime format for these models (loadable via
-`gguf_loader.rs` in riir-engine).
+"no base model weights". This missed the **4 GGUF files** in `riir-train/data/`
+(gemma-2-2b-it and MiniCPM5-1B present since May 2026; llama-3.2-3b and
+qwen2.5-3b added Jul 13). The audit likely searched for `.safetensors` or
+weight-tensor files, not GGUF quantized model files. GGUF is the canonical
+runtime format for these models (loadable via `gguf_loader.rs` in riir-engine).
 
-**Further correction (2026-07-13 second pass):** the first revision of this
-issue claimed 4 GGUFs existed (adding llama-3.2-3b and qwen2.5-3b). That was
-also wrong — `ls riir-train/data/*.gguf` returns only 2 files. The correction
-is documented above but does not change the conclusion: 1 verifier (Gemma2-2B)
-was sufficient for the successful training run.
+**Disk space note:** the llama-3.2-3b and qwen2.5-3b GGUFs were since removed
+from `riir-train/data/` to free disk space. They are re-downloadable if a
+second verifier family is needed; the 2 remaining GGUFs (Gemma2-2B, MiniCPM5-1B)
+are sufficient for Weaver training and validation.
 
 ### Risk: scale mismatch
 

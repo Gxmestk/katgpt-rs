@@ -315,7 +315,220 @@ impl WeaverCorrector {
     pub fn weights(&self) -> &WeaverWeights {
         &self.weights
     }
+
+    /// Apply the Weaver correction to full-vocabulary DFlash marginals (T3).
+    ///
+    /// This is the **marginal corrector** integration point (Issue 131 option 1).
+    /// After `dflash_predict_with` produces full-vocab marginals, the caller
+    /// invokes this method to apply the Weaver residual correction over the
+    /// top-K candidates at each draft depth.
+    ///
+    /// ## What it does
+    ///
+    /// For each draft depth `d ∈ [0, depth)`:
+    /// 1. Select the top-K=32 token ids from `marginals[d*vocab..(d+1)*vocab]`
+    ///    (by probability mass).
+    /// 2. Build a `WeaverInput` from the top-K ids + drafter logits + hidden
+    ///    states + shared embedding.
+    /// 3. Run `weaver_forward` → corrected top-K probabilities.
+    /// 4. Write the corrected probabilities back to `marginals`, zeroing all
+    ///    non-top-K positions and renormalizing.
+    ///
+    /// ## No-harm contract
+    ///
+    /// When the corrector holds zero-init weights, the Weaver residual is zero,
+    /// so the corrected top-K probabilities equal the drafter's top-K
+    /// probabilities. After zeroing non-top-K and renormalizing over K, the
+    /// result is a **truncated** version of the original marginal — the top-K
+    /// mass is preserved but redistributed. This is a minor change (the top-K
+    /// typically captures >99% of the probability mass), and the tree builder
+    /// only consumes the top-K anyway.
+    ///
+    /// ## Arguments
+    ///
+    /// - `marginals` — full-vocab marginals, shape `[depth * vocab_size]`,
+    ///   row-major (depth-outer). Modified in-place.
+    /// - `h_verifier` — verifier hidden state at the prefix position, `[hidden_dim]`.
+    /// - `h_dflash` — drafter hidden states per depth, `[depth][hidden_dim]`.
+    /// - `embedding` — shared token embedding, `[vocab_size * hidden_dim]`.
+    /// - `vocab_size` — vocabulary size.
+    ///
+    /// ## Returns
+    ///
+    /// `Ok(())` on success, or an error if the shapes are inconsistent.
+    pub fn correct_marginals_inplace(
+        &self,
+        marginals: &mut [f32],
+        h_verifier: &[f32],
+        h_dflash: &[&[f32]],
+        embedding: &[f32],
+        vocab_size: usize,
+    ) -> Result<(), WeaverCorrectError> {
+        let cfg = &self.weights.config;
+        let k = cfg.k_candidates;
+        let h = cfg.hidden_dim;
+        let depth = h_dflash.len();
+
+        if marginals.len() != depth * vocab_size {
+            return Err(WeaverCorrectError::MarginalsShape {
+                expected: depth * vocab_size,
+                actual: marginals.len(),
+            });
+        }
+        if h_verifier.len() != h {
+            return Err(WeaverCorrectError::HiddenShape {
+                context: "h_verifier",
+                expected: h,
+                actual: h_verifier.len(),
+            });
+        }
+        if embedding.len() < vocab_size * h {
+            return Err(WeaverCorrectError::EmbeddingShape {
+                expected: vocab_size * h,
+                actual: embedding.len(),
+            });
+        }
+        for (di, h_d) in h_dflash.iter().enumerate() {
+            if h_d.len() != h {
+                return Err(WeaverCorrectError::HiddenShape {
+                    context: "h_dflash[di]",
+                    expected: h,
+                    actual: h_d.len(),
+                });
+            }
+            let _ = di; // index not needed for the check
+        }
+        if depth > cfg.max_depth {
+            return Err(WeaverCorrectError::DepthExceedsConfig {
+                depth,
+                max_depth: cfg.max_depth,
+            });
+        }
+        if k > vocab_size {
+            // Can't select K candidates from fewer than K tokens. Correct
+            // nothing — leave marginals unchanged (safe no-op).
+            return Ok(());
+        }
+
+        // ── Per-depth: select top-K, correct, write back ──
+        // Reuse scratch buffers across depths to avoid per-depth allocation.
+        // We process one depth at a time (depth is typically 4-8), building a
+        // fresh single-depth WeaverInput per iteration.
+        let mut topk_ids: Vec<u32> = vec![0; k];
+        let mut topk_logits: Vec<f32> = vec![0.0; k];
+
+        for di in 0..depth {
+            let marg_row = &marginals[di * vocab_size..(di + 1) * vocab_size];
+
+            // Select top-K token ids by probability mass.
+            // Use partial selection sort (same as precompute_weaver_real_data).
+            let mut top: Vec<(usize, f32)> = Vec::with_capacity(k + 1);
+            for (vid, &p) in marg_row.iter().enumerate() {
+                if !p.is_finite() {
+                    continue;
+                }
+                let pos = top.partition_point(|&(_, v)| v > p);
+                if pos < k {
+                    top.insert(pos, (vid, p));
+                    if top.len() > k {
+                        top.pop();
+                    }
+                }
+            }
+            // Fill topk_ids + topk_logits (log-space for the Weaver residual).
+            for (ki, &(vid, p)) in top.iter().enumerate().take(k) {
+                topk_ids[ki] = vid as u32;
+                // Recover approximate logits from probs (Weaver adds residual
+                // to logits, then softmaxes). Use log(p) clamped to avoid -inf.
+                topk_logits[ki] = if p > 1e-30 { p.ln() } else { -69.07 }; // ln(1e-30)
+            }
+            // If fewer than K valid tokens, pad with zeros (id=0, logit=-69).
+            for ki in top.len()..k {
+                topk_ids[ki] = 0;
+                topk_logits[ki] = -69.07;
+            }
+
+            // Build WeaverInput for this single depth.
+            let h_dflash_slice: &[&[f32]] = &h_dflash[di..di + 1];
+            let topk_ids_slice: &[&[u32]] = &[&topk_ids[..]];
+            let topk_logits_slice: &[&[f32]] = &[&topk_logits[..]];
+
+            let input = WeaverInput {
+                h_verifier,
+                h_dflash: h_dflash_slice,
+                topk_ids: topk_ids_slice,
+                dflash_logits: topk_logits_slice,
+                embedding,
+                vocab_size,
+            };
+
+            let out = weaver_forward(&self.weights, &input);
+
+            // Write back: zero the full-vocab row, then write corrected top-K.
+            let out_row = &out.corrected_probs[0]; // depth 0 of the single-depth input
+            let marg_out = &mut marginals[di * vocab_size..(di + 1) * vocab_size];
+            for v in marg_out.iter_mut() {
+                *v = 0.0;
+            }
+            for (ki, &(vid, _)) in top.iter().enumerate().take(k) {
+                marg_out[vid] = out_row[ki];
+            }
+            // marg_out already sums to ~1.0 (Weaver softmaxes over K), but
+            // renormalize for safety (floating-point drift).
+            let sum: f32 = marg_out.iter().sum();
+            if sum > 1e-30 {
+                let inv = 1.0 / sum;
+                for v in marg_out.iter_mut() {
+                    *v *= inv;
+                }
+            }
+        }
+
+        Ok(())
+    }
 }
+
+/// Errors from `correct_marginals_inplace`.
+#[derive(Debug)]
+pub enum WeaverCorrectError {
+    /// `marginals.len()` != `depth * vocab_size`.
+    MarginalsShape { expected: usize, actual: usize },
+    /// A hidden-state slice had the wrong length.
+    HiddenShape {
+        context: &'static str,
+        expected: usize,
+        actual: usize,
+    },
+    /// `embedding.len()` < `vocab_size * hidden_dim`.
+    EmbeddingShape { expected: usize, actual: usize },
+    /// Draft depth exceeds the Weaver config's `max_depth`.
+    DepthExceedsConfig { depth: usize, max_depth: usize },
+}
+
+impl std::fmt::Display for WeaverCorrectError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::MarginalsShape { expected, actual } => write!(
+                f,
+                "marginals shape mismatch: expected {expected} (= depth*vocab), got {actual}"
+            ),
+            Self::HiddenShape { context, expected, actual } => write!(
+                f,
+                "{context} shape mismatch: expected {expected}, got {actual}"
+            ),
+            Self::EmbeddingShape { expected, actual } => write!(
+                f,
+                "embedding shape mismatch: expected >={expected}, got {actual}"
+            ),
+            Self::DepthExceedsConfig { depth, max_depth } => write!(
+                f,
+                "draft depth {depth} exceeds Weaver max_depth {max_depth}"
+            ),
+        }
+    }
+}
+
+impl std::error::Error for WeaverCorrectError {}
 
 // ── Forward pass ─────────────────────────────────────────────────────────
 
@@ -936,5 +1149,138 @@ mod tests {
         let rms = (12.5f32 + 1e-6).sqrt();
         assert!((out[0] - 3.0 / rms).abs() < 1e-4);
         assert!((out[1] - 4.0 / rms).abs() < 1e-4);
+    }
+
+    // ── T3: correct_marginals_inplace (marginal corrector integration) ──
+
+    /// Build a tiny WeaverConfig + WeaverCorrector for the marginal-corrector test.
+    fn corrector_config() -> WeaverConfig {
+        WeaverConfig {
+            hidden_dim: 16,
+            n_heads: 2,
+            k_candidates: 4,
+            n_layer: 1,
+            d_ff: 32,
+            rms_eps: 1e-6,
+            max_depth: 2,
+        }
+    }
+
+    #[test]
+    fn t3_correct_marginals_zero_weights_preserves_topk() {
+        // With zero-init weights, the Weaver residual is zero, so the corrected
+        // top-K probabilities equal the drafter's top-K probabilities (after
+        // renorm over K). Non-top-K positions are zeroed.
+        let cfg = corrector_config();
+        let corrector = WeaverCorrector::from_weights(WeaverWeights::zeros(cfg.clone()));
+
+        let h = cfg.hidden_dim;
+        let k = cfg.k_candidates;
+        let depth = cfg.max_depth;
+        let vocab = 32usize; // > k so top-K selection is meaningful
+
+        // Build marginals: each depth has a peaked distribution with 5 peaks
+        // (> k=4 so top-K selection is meaningful and pads correctly).
+        let mut marginals = vec![0.0f32; depth * vocab];
+        for di in 0..depth {
+            marginals[di * vocab + di] = 0.5; // peak at token `di`
+            marginals[di * vocab + (vocab - 1)] = 0.2; // second peak
+            marginals[di * vocab + 10] = 0.15; // third peak
+            marginals[di * vocab + 11] = 0.1; // fourth peak
+            marginals[di * vocab + 12] = 0.05; // fifth peak (below K, gets zeroed)
+            // rest is 0
+        }
+
+        // Save the original top-K for comparison.
+        let mut orig_topk: Vec<(usize, f32)> = Vec::new();
+        for di in 0..depth {
+            let row = &marginals[di * vocab..(di + 1) * vocab];
+            let mut sorted: Vec<(usize, f32)> =
+                row.iter().cloned().enumerate().filter(|(_, p)| *p > 0.0).collect();
+            sorted.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+            orig_topk.extend(sorted.into_iter().take(k));
+        }
+
+        // Hidden states + embedding (arbitrary non-degenerate values).
+        let h_verifier: Vec<f32> = vec![0.5; h];
+        let h_dflash_owned: Vec<Vec<f32>> = (0..depth).map(|di| {
+            (0..h).map(|j| 0.3 + 0.01 * (di * h + j) as f32).collect()
+        }).collect();
+        let h_dflash: Vec<&[f32]> = h_dflash_owned.iter().map(|v| v.as_slice()).collect();
+        let embedding: Vec<f32> = vec![0.1; vocab * h];
+
+        corrector
+            .correct_marginals_inplace(&mut marginals, &h_verifier, &h_dflash, &embedding, vocab)
+            .expect("correction should succeed");
+
+        // After correction: exactly K non-zero entries per depth (the top-K).
+        for di in 0..depth {
+            let row = &marginals[di * vocab..(di + 1) * vocab];
+            let nonzero_count = row.iter().filter(|&&p| p > 1e-10).count();
+            assert_eq!(
+                nonzero_count, k,
+                "depth {di}: expected exactly {k} non-zero entries, got {nonzero_count}"
+            );
+            // Probabilities must sum to 1.0 (renormalized over K).
+            let sum: f32 = row.iter().sum();
+            assert!((sum - 1.0).abs() < 1e-4, "depth {di}: probs sum to {sum}");
+            // No NaN/Inf.
+            for &p in row {
+                assert!(p.is_finite(), "depth {di}: NaN/Inf in probs");
+            }
+        }
+
+        // The top-K token ids should be preserved (the same tokens that had
+        // mass before still have mass after, with zero weights). The top-4 by
+        // mass are: di (0.5), vocab-1 (0.2), 10 (0.15), 11 (0.1). Token 12
+        // (0.05) is rank 5 — below K, gets zeroed.
+        for di in 0..depth {
+            let row = &marginals[di * vocab..(di + 1) * vocab];
+            assert!(row[di] > 1e-6, "depth {di}: original peak at {di} lost mass");
+            assert!(row[vocab - 1] > 1e-6, "depth {di}: original peak at {} lost mass", vocab - 1);
+            assert!(row[10] > 1e-6, "depth {di}: original peak at 10 lost mass");
+            assert!(row[11] > 1e-6, "depth {di}: original peak at 11 lost mass");
+            // Token 12 was rank 5 — below K=4, should be zeroed.
+            assert!(row[12] < 1e-10, "depth {di}: rank-5 token at 12 should be zeroed");
+        }
+    }
+
+    #[test]
+    fn t3_correct_marginals_rejects_bad_shapes() {
+        let cfg = corrector_config();
+        let corrector = WeaverCorrector::from_weights(WeaverWeights::zeros(cfg.clone()));
+
+        let h = cfg.hidden_dim;
+        let depth = cfg.max_depth;
+        let vocab = 32usize;
+
+        let h_verifier = vec![0.5f32; h];
+        let h_dflash_owned: Vec<Vec<f32>> = (0..depth).map(|_| vec![0.3; h]).collect();
+        let h_dflash: Vec<&[f32]> = h_dflash_owned.iter().map(|v| v.as_slice()).collect();
+        let embedding = vec![0.1f32; vocab * h];
+
+        // Wrong marginals length (depth * vocab + 1).
+        let mut bad_marginals = vec![0.0f32; depth * vocab + 1];
+        let err = corrector
+            .correct_marginals_inplace(&mut bad_marginals, &h_verifier, &h_dflash, &embedding, vocab)
+            .unwrap_err();
+        assert!(matches!(err, super::WeaverCorrectError::MarginalsShape { .. }));
+
+        // Wrong h_verifier length.
+        let mut marginals = vec![0.0f32; depth * vocab];
+        let bad_h = vec![0.5f32; h + 1];
+        let err = corrector
+            .correct_marginals_inplace(&mut marginals, &bad_h, &h_dflash, &embedding, vocab)
+            .unwrap_err();
+        assert!(matches!(err, super::WeaverCorrectError::HiddenShape { .. }));
+
+        // Depth exceeds max_depth.
+        let too_deep_owned: Vec<Vec<f32>> = (0..(depth + 1)).map(|_| vec![0.3; h]).collect();
+        let too_deep: Vec<&[f32]> = too_deep_owned.iter().map(|v| v.as_slice()).collect();
+        let mut deep_marginals = vec![0.0f32; (depth + 1) * vocab];
+        let err = corrector
+            .correct_marginals_inplace(&mut deep_marginals, &h_verifier, &too_deep, &embedding, vocab)
+            .unwrap_err();
+        assert!(matches!(err, super::WeaverCorrectError::DepthExceedsConfig { .. }));
     }
 }
