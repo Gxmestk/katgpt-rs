@@ -95,3 +95,7 @@ history shows was already allocated.
 
 `develop` is the working branch. Don't create feature branches; commit
 directly on `develop` per the global rule.
+
+## Models
+- riir-train/data/gemma-2-2b-it-f16.gguf
+- riir-train/data/MiniCPM5-1B-F16.gguf
