@@ -175,6 +175,15 @@ Distill into:
 
 Fetch via `https://r.jina.ai/https://arxiv.org/pdf/{ID}` (per AGENTS.md). Ask: *is the value in the training loop, or in a latent-space / inference / routing insight?* If training-only → report "→ riir-train" in conversation and stop. No files.
 
+**Hardware / accelerator / NMP / ASIC papers are NOT automatically PASS.** This is the R418 lesson (StreamDQ, arxiv 2607.08993): a paper framed in HBM / RTL / 12nm CMOS / NMP / D2D PHY / thermal-sim vocabulary was initially PASS-ed as "hardware-only, not software-distillable" — wrong. The paper's *value* was the **technique** (LUT INT→FP, shared FP32 ALU, sideband-tag dispatch, S/Z co-location), which is substrate-independent. Our codebase explicitly **simulates hardware dequant via software SIMD** (Research 110 Ciot — Plasma tier = ternary SIMD, Cold tier = Q4_K dequant-on-read). The revised verdict was Gain; the implementation shipped 2.3× speedup (vs a pessimistic 1.0-1.5× prediction).
+
+**Hard rule — substrate ≠ value:** Before PASS-ing on ANY paper whose abstract contains hardware vocabulary (HBM, ASIC, RTL, NMP, PE, DQB, tensor-core, TPU, FPGA, accelerator, near-memory, in-memory compute, Processing-In-Memory, PIM), you MUST:
+1. Ask: "What is the *technique* here, stripped of the hardware substrate?" (e.g., "LUT-based type conversion", "shared ALU across formats", "co-located metadata buffer", "runtime dispatch tag").
+2. Grep the codebase for the software-SIMD analog: `simd_*`, `ternary`, `Plasma`, `Cold tier`, `Q4_K`, `quant/`, `LUT`, `gather`, `shuffle`, `bit_cast`, `from_bits`. **Research 110 (Ciot) is the canonical proof we simulate hardware techniques in software — grep it explicitly.**
+3. Only if BOTH (a) the technique has no software SIMD analog AND (b) the codebase has no existing simulation pattern → PASS with explicit documentation of both checks.
+
+The same rule applies to **system / kernel / scheduler / OS papers** — the substrate (Linux kernel, io_uring, DPDK, RDMA) is not the value; the technique (lock-free queue, batching, zero-copy, prefetch hint) often is. Translate the substrate before PASS-ing.
+
 ### 1. Distill fundamentally — fuse, don't just direct-map
 
 Don't direct-map the paper to our code. Find the transferable primitive: the geometric, spectral, or information-theoretic insight that works without the paper's training setup. **Then look for fusion opportunities**: cross-pollinate this paper's insight with existing `.research/` notes, `.plans/`, and shipped primitives to synthesize a *novel* combination. The highest-value Super-GOATs in freeze/thaw runtime and self-learn/adaptive CoT almost always come from **fusing** 2–3 papers, not from a single-paper direct mapping.
@@ -235,6 +244,26 @@ Don't direct-map the paper to our code. Find the transferable primitive: the geo
    - "LLM judges/verifies/critiques a claim" → CLR vote + SalienceTriGate + Claim Rubric L1/L2/L3
    - "LLM reviews trajectory + rewrites code/prompts" → Raven/δ-Mem consolidation + MAPE-K self-healing (architectural analog; quality parity needs PoC per §3.6)
    - "meta-LLM generates novel semantic content" → **NO modelless analog** — genuine NO-GAIN if the value IS the generation
+
+   **Standing substrate-translation vocabulary (MANDATORY for hardware / accelerator / NMP / PIM / ASIC / system papers — the R418 lesson):** Papers framed in hardware vocabulary (HBM, RTL, CMOS, NMP, PE, DQB, TPU, FPGA, accelerator) describe techniques whose *implementation substrate* is hardware, but whose *value* is substrate-independent. Our codebase explicitly **simulates hardware dequant / accelerator techniques in software SIMD** (Research 110 Ciot — Plasma tier = ternary SIMD, Cold tier = Q4_K dequant-on-read). ALWAYS translate the substrate, not just the semantic name. Before PASS-ing on a hardware paper, grep BOTH vocabulary sets:
+   - "DeQuantization Block (DQB)" / "near-memory processing unit" / "processing element" → "SIMD dequantize function", `dequant_via_lut`, "LUT lookup", `simd_lut_dequant`
+   - "HBM base die" / "pseudo-channel" / "memory controller" → "L1 cache", "register file", "SIMD lane"
+   - "pseudo-channel-aware layout" / "channel-interleaved" → "cache-line-aligned layout", `AlignedWeightMatrix`, `channel_simd`, "struct-of-arrays", "64-byte rows"
+   - "wire-mapping FP-to-FP" / "2:1 mux type conversion" → "bit-cast", `f16::from_bits`, `from_bits`, "SIMD shuffle/permute", `vrev32`, `_mm_shuffle_epi32`
+   - "LUT-based INT-to-FP" / "sign-bit extension" / "zero-padded LUT" → "pre-computed lookup table", `[f32; 16]`, `[f32; 256]`, "SIMD gather", `_mm_i32gather_ps`
+   - "sideband tag" / "3-bit tag" / "dequantization mode select" → `QuantFormat` enum, "runtime dispatch", "function pointer", `match` on format
+   - "S/Z buffer" / "scaling-factor cache" / "group-index calculator" → "L1-resident scale cache", `BlockQ4K { d, dmin, scales, qs }`, "per-group scale"
+   - "fused DQ-GEMM kernel" → "fused dequantize-matmul", `simd_dot_f16_f32`, "dequant-in-register"
+   - "split DQ-GEMM kernel" → "two-step dequant + dot", `dequantize_row_q4_k` + `simd_dot_f32`
+   - "kernel selection" / "batch threshold" → "breakeven routing", `breakeven/`, Plan 218, "memory-bound vs compute-bound"
+   - "tensor core" / "CUDA core" / "SM" → "CPU SIMD lane", "FPU", "NEON/AVX2 lane" (the *role*, not the hardware)
+   - "io_uring" / "DPDK" / "RDMA" / "zero-copy kernel bypass" → "zero-allocation hot path", `_buf` pattern, `pool.rs`
+   - "TPU systolic array" / "PE mesh" → "blocked matmul", `simd_matmul_rows`, "tiled GEMM"
+
+   **Decision rule — hardware-as-substrate vs technique-as-mechanism (prevents false-PASS, the R418 root cause):**
+   - If the paper's value is the **technique** (LUT lookup, shared ALU, co-located layout, dispatch tag, batching strategy, zero-copy pattern) → the hardware is one *instantiation* of implementing that technique → translate to our software SIMD substrate → GOAT/Gain candidate. **Canonical: StreamDQ R418** — LUT INT→FP + shared FP32 ALU is the technique; DQB-in-HBM is the paper's instantiation, SIMD dequant function is ours. Shipped 2.3× speedup.
+   - If the paper's value is the **hardware-fabrication advance itself** (new transistor geometry, new die-stacking process, new photolithography, new packaging) → no software analog → PASS.
+   - When you see "hardware paper", the FIRST question is: "what *technique* does the hardware implement?" — not "we don't have hardware, PASS".
 
    **Decision rule — LLM-as-implementation vs LLM-as-mechanism (prevents false-PASS, the R368 root cause):**
    - If the paper's value is the **decision structure** (what to decide, when, in what order) → the LLM call is one *instantiation* of computing that decision → translate to our substrate → GOAT candidate. **Canonical: AutoMem R368** — LOG/PLAN is a decision structure; LLM is the paper's instantiation, probe/draft/pruner is ours.
@@ -560,4 +589,4 @@ Reinforce these when designing game systems or chain state:
 
 **Hard rules:** modelless-first (translate compute units — LLM-as-implementation ≠ LLM-as-mechanism; when you see "N LLM calls/step", ask "what decision is each call computing?" first, not "violates 20Hz budget, NO-GAIN"); latent-to-latent with sigmoid (never softmax); freeze/thaw over fine-tuning; 5-repo discipline; raw scalars at sync boundary; fusion-first mindset.
 
-**Failure-mode prophylactics:** vocabulary translation blocks below (semantic + compute-unit + DEC/Stokes + per-NPC runtime); read-the-hits rule (grep hit touching per-NPC+memory+personality+swap → `read_file` TL;DR before claiming novelty); 7 Super-GOAT factory modules; R169 false-trigger guard (decision-structure ≠ LLM-dependent process). **Parity / "already ships" quality claims need a defend-wrong PoC in `riir-ai/crates/riir-poc/` (§3.6) — architectural coverage ≠ quality parity; a PASS backed only by architectural reasoning is the #1 false-PASS failure mode.**
+**Failure-mode prophylactics:** vocabulary translation blocks below (semantic + compute-unit + DEC/Stokes + per-NPC runtime + **substrate-translation for hardware papers**); read-the-hits rule (grep hit touching per-NPC+memory+personality+swap → `read_file` TL;DR before claiming novelty); 7 Super-GOAT factory modules; R169 false-trigger guard (decision-structure ≠ LLM-dependent process); **R418 hardware-paper guard (substrate ≠ value — hardware / NMP / ASIC / PIM papers MUST translate the technique to software SIMD before PASS; grep Research 110 Ciot Plasma/Cold tier explicitly; prediction ≠ ceiling — do not anchor perf ceilings pessimistically, mark them as pending the GOAT gate)**. **Parity / "already ships" quality claims need a defend-wrong PoC in `riir-ai/crates/riir-poc/` (§3.6) — architectural coverage ≠ quality parity; a PASS backed only by architectural reasoning is the #1 false-PASS failure mode.**
