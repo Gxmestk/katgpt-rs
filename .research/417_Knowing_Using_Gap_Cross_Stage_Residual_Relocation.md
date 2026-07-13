@@ -247,3 +247,69 @@ Per §3.6, ship a PoC in `riir-ai/crates/riir-poc/benches/cross_stage_relocation
 ## TL;DR
 
 **Verdict: GOAT.** The paper's modelless crown jewel is a **deterministic, fixed-pair cross-stage residual state relocation operator** (source ≈0.8L or ≈0.1L → target ≈0.5L, recovers 58–75% of oracle headroom on the KU Gap benchmark) plus a **permeation-map diagnostic** that scans `(source_stage, target_stage)` pairs to locate stranded representations. Both are modelless; both are genuinely unshipped in our quintet (Plan 358 ships activation patching as a *scorer*; R259 ships *weight-level* per-matrix composites; R290 ships *frozen-direction* injection — none ships runtime *activation relocation*). Not Super-GOAT: Q1 partial (closest cousins ship strongly), Q2 marginal (no new capability class), Q3 weak (no fine-tuned-LLM-in-hot-path product angle), Q4 limited (fusions produce more general operators, not new pillars). MOAT gate routes to `katgpt-rs` (public engine, intervention/diagnostic stack slot). Plan 431 ships both halves behind a feature flag; **Phase 3 defend-wrong PoC in `riir-poc/` is MANDATORY before any promotion** — the 58–75% recovery is a quality claim on the paper's substrate, not ours. Training-time analysis (saturation epochs, gradient locality, alignment-aware training) → riir-train.
+
+---
+
+## PoC Addendum (2026-07-13 — Plan 431 Phase 3, honest recording per §3.6)
+
+**Verdict: REFUTE the fixed-pair `LateEarly` default. The mechanism transfers; the fixed default is brittle.**
+
+The PoC ran 4 competitors × 4 placement configs × 16 seeds + a noise sweep (5 levels × 16 seeds) in `riir-ai/crates/riir-poc/benches/cross_stage_relocation_modelless_goat.rs`. Raw numbers:
+
+### Clean configs (noise_std = 0, cosine recovery to answer)
+
+| Config | (b) baseline | (a) LateEarly | (a') Late-only | (c) CohReest | Verdict |
+|---|---|---|---|---|---|
+| PlanDomain {2,7} | 0.0000 | **0.0000** | 1.0000 | 1.0000 | CLOBBER |
+| HeuristicMatch {1,7} | 0.0000 | 1.0000 | 1.0000 | 1.0000 | LE<CR (tie) |
+| BroadCluster {1,2,6,7} | 0.0000 | 1.0000 | 1.0000 | 1.0000 | LE<CR (tie) |
+| LateOnly {6,7} | 0.0000 | **0.0000** | 1.0000 | 1.0000 | CLOBBER |
+
+**Tally: 0 CONFIRM / 2 CLOBBER / 2 LE<CR.**
+
+### Noise sweep (HeuristicMatch placement, cosine recovery)
+
+| noise_std | (b) baseline | (a) LateEarly | (a') Late-only | (c) CohReest |
+|---|---|---|---|---|
+| 0.0 | 0.0000 | 1.0000 | 1.0000 | 1.0000 |
+| 0.1 | 0.0927 | 0.9692 | 0.9626 | 0.9240 |
+| 0.2 | 0.0927 | 0.9001 | 0.8701 | 0.8831 |
+| 0.3 | 0.0927 | 0.8220 | 0.7652 | 0.8359 |
+| 0.5 | 0.0927 | 0.6839 | 0.5964 | 0.7478 |
+
+Under noise, (a) LateEarly is competitive with (a') and (c) within the HeuristicMatch config — the second op is harmless because both sources have the answer. But this only holds when the domain matches the fixed fractions.
+
+### Latency (criterion-benched, per episode)
+
+| Competitor | Time |
+|---|---|
+| baseline_read | 17 ns |
+| late_early_both_ops | 25 ns |
+| late_only_single_op | 25 ns |
+| coherence_reest_scan | 35 ns |
+
+The heuristic (25 ns) is ~1.4× faster than the coherence scan (35 ns). But the speed advantage is moot when the heuristic clobbers.
+
+### Why the heuristic fails (the clobbering mechanism)
+
+For L=8, the heuristic targets: op_a = (src=7, dst=4), op_b = (src=1, dst=4). Both hard-overwrite stage 4. Applied in the shipped order (op_a first, op_b second):
+
+1. **op_a** snapshots stage 7 (which has the answer in PlanDomain) → overwrites stage 4 with the answer. Stage 4 now holds the answer. Recovery = 1.0.
+2. **op_b** snapshots stage 1 (which is EMPTY in PlanDomain) → overwrites stage 4 with zeros. Stage 4 is now empty. Recovery = 0.0.
+
+The second op CLOBBERS the first. In the paper's LLM substrate, both source layers (0.82L and 0.10L) contain the knowledge because the two-cluster pattern guarantees it. On our synthetic substrate, the answer placement is NOT guaranteed to match the fixed fractions — hence the clobbering.
+
+### What works: single-op relocation + diagnostic
+
+The (a') late-only variant (apply ONLY op_a, skip op_b) recovers in all 4 clean configs. This confirms the **mechanism** (activation relocation) transfers — it's the **fixed two-pair default** that fails. The production path is: use the permeation-map diagnostic (Phase 1) to find which stage holds the answer, then apply a CUSTOM `RelocateOp` from that stage to the readout stage. This is `RelocatePair::Custom { src_a, src_b, dst }` where the fractions are derived from the diagnostic, not fixed.
+
+### Implication for promotion
+
+- **`RelocatePair::LateEarly` should NOT be promoted to default-on.** It clobbers in 2/4 clean configs.
+- **The diagnostic half (`PermeationMap` + `permeation_scan_into`) is useful regardless** — it's a clean Plan 358 extension that locates stranded representations.
+- **The operator half (`RelocateOp` + `RelocatePair::Custom`) is the production path** — the caller uses the diagnostic to pick the right source stage, then applies a custom single-op relocation.
+- **Real-domain PoC deferred.** The synthetic PoC shows the mechanism works but the fixed default is brittle. A real-game-domain PoC (e.g., in `riir-games` NPC cognition) would test whether the diagnostic-guided custom relocation produces measurable behavioral gains. This is a follow-up, not a blocker for the opt-in primitive.
+
+### Honest caveat
+
+The synthetic domain is deliberately minimal (independent vectors per stage, no residual accumulation, no attention/MLP dynamics). A richer domain with actual residual accumulation MIGHT avoid the clobbering (if the residual at stage 1 happens to carry forward from earlier injection). But the burden of proof is on the promoter — the synthetic PoC shows the fixed default is NOT safe to promote as-is. The diagnostic + custom path is the honest recommendation.

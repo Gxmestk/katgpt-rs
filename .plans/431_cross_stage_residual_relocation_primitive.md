@@ -4,7 +4,7 @@
 **Research:** [katgpt-rs/.research/417_Knowing_Using_Gap_Cross_Stage_Residual_Relocation.md](../.research/417_Knowing_Using_Gap_Cross_Stage_Residual_Relocation.md)
 **Source paper:** [arxiv 2607.08393](https://arxiv.org/abs/2607.08393) — Dai, Rao, Wang et al., "Towards Mechanistically Understanding Why Memorized Knowledge Fails to Generalize in LLM Finetuning" (HKUST-GZ / HKUST, NeurIPS 2026 submission)
 **Target:** `katgpt-rs/crates/katgpt-core/src/cross_stage_relocation/` (new module) + Cargo feature `cross_stage_relocation`
-**Status:** Phase 1–2 COMPLETE (34 unit tests PASS, clippy clean). Phase 4 GOAT gate G1–G6 ALL PASS for katgpt-rs scope (see `.benchmarks/431_cross_stage_relocation_goat.md`). Phase 3 defend-wrong PoC DEFERRED (cross-repo: `riir-ai/crates/riir-poc/`). Primitive ships opt-in behind `cross_stage_relocation`; promotion to default blocked on Phase 3 PoC confirming the transfer.
+**Status:** Phase 1–4 COMPLETE. Phase 1–2 shipped (34 unit tests PASS, clippy clean). Phase 4 GOAT gate G1–G6 ALL PASS for katgpt-rs scope (see `.benchmarks/431_cross_stage_relocation_goat.md`). Phase 3 defend-wrong PoC DONE — verdict: **REFUTE the fixed-pair `LateEarly` default** (CLOBBERS in 2/4 clean configs because op_b overwrites op_a's recovery); the mechanism itself (single-op relocation) works. Primitive stays opt-in behind `cross_stage_relocation`; promotion to default blocked on a real-domain PoC with CUSTOM relocation (not the fixed default).
 
 ---
 
@@ -146,17 +146,20 @@ Per Research 417 §3.6, the operator's quality claim ("relocate recovers capabil
 
 ### Tasks
 
-- [-] **T3.1** Create `riir-ai/crates/riir-poc/benches/cross_stage_relocation_modelless_goat.rs`. Use `CARGO_TARGET_DIR=/tmp/cross_stage_poc` per AGENTS.md. **DEFERRED — cross-repo (`riir-ai`).**
-- [-] **T3.2** Construct a controlled toy domain: a synthetic 8-stage residual stream where stage 2 and stage 7 contain the answer representation but stage 4 (the reasoning circuit) reads from stage 4 alone. Standard forward pass fails. **DEFERRED — cross-repo (`riir-ai`).**
-- [-] **T3.3** Run three competitors head-to-head:
-  - **(a) Paper's heuristic** — `RelocatePair::LateEarly` with the toy domain's stage count.
+- [x] **T3.1** Created `riir-ai/crates/riir-poc/benches/cross_stage_relocation_modelless_goat.rs` + `riir-ai/crates/riir-poc/src/cross_stage_relocation_poc.rs`. Used `CARGO_TARGET_DIR=/tmp/cross_stage_poc` per AGENTS.md. **DONE — cross-repo (`riir-ai`).**
+- [x] **T3.2** Constructed a controlled toy domain: 8-stage residual stream, 4 placement configs (PlanDomain {2,7} per plan text, HeuristicMatch {1,7} = exact heuristic targets, BroadCluster {1,2,6,7}, LateOnly {6,7}). The reasoning circuit reads from stage 4 (⌊0.45L⌉ for L=8). Standard forward pass fails when stage 4 is empty. **DONE.**
+- [x] **T3.3** Ran four competitors head-to-head:
+  - **(a) Paper's heuristic** — `RelocatePair::LateEarly` (both ops, as shipped).
+  - **(a') Late-only single op** — apply only op_a (src=7), skip the clobbering op_b.
   - **(b) No-relocation baseline** — standard forward pass.
-  - **(c) Shipped latent_functor re-estimation** — the existing modelless analog (R313, `latent_functor/reestimation.rs`).
-  **DEFERRED — cross-repo (`riir-ai`).**
-- [-] **T3.4** Print verdict table: per-competitor readout accuracy / cosine recovery / latency overhead. **DEFERRED — cross-repo (`riir-ai`).**
-- [-] **T3.5** **Honest recording:** if (a) doesn't beat both (b) and (c), record the raw numbers as a §"PoC Addendum" in Research 417 and **do not silently revise the verdict**. The operator stays opt-in diagnostic-only; the follow-up is tracked in `.issues/`. **DEFERRED — cross-repo (`riir-ai`).**
+  - **(c) Distilled coherence-triggered re-estimation** (R313 analog) — scan all 8 stages when coherence < tau_reest.
+  **DONE.**
+- [x] **T3.4** Printed verdict table: per-competitor cosine recovery (clean + noise sweep) + latency overhead. **DONE.**
+- [x] **T3.5** **Honest recording:** the fixed-pair `LateEarly` heuristic does NOT beat both (b) and (c) — it CLOBBERS in 2/4 clean configs (PlanDomain, LateOnly) because op_b (src=1) overwrites op_a's recovery with an empty stage. The mechanism itself works (the single-op (a') variant recovers in all 4 configs), but the fixed two-pair default is too brittle for our substrate. Verdict recorded as "PoC Addendum" in Research 417. The operator stays opt-in diagnostic-only; `LateEarly` should NOT be promoted to default. **DONE.**
 
-**Phase 3 exit criterion:** verdict table printed; raw numbers recorded in Research 417 §"PoC Addendum" (whether confirming or refuting).
+**Phase 3 exit criterion:** verdict table printed; raw numbers recorded in Research 417 §"PoC Addendum". **DONE.**
+
+**Phase 3 verdict: REFUTE the fixed-pair `LateEarly` default.** The mechanism transfers (single-op relocation works), but the paper's fixed two-pair heuristic is brittle to misalignment on our substrate. The diagnostic half (permeation map) + CUSTOM relocation (where the caller uses the diagnostic to pick the right source stage) is the production path.
 
 ---
 
@@ -171,7 +174,7 @@ Per Research 417 §3.6, the operator's quality claim ("relocate recovers capabil
 - [x] **T4.5** **G5 (feature-isolated)** — `cargo check` (default features) unchanged; the feature compiles standalone. **PASS — `--no-default-features --features cross_stage_relocation` compiles clean; implies `causal_head_importance`.**
 - [x] **T4.6** **G6 (modelless)** — no `riir-train` dep, no gradient descent, no training-time analysis leaked into the public repo. The saturation-epoch / gradient-locality findings stay in Research 417's §1 only. **PASS — verified by inspection.**
 - [x] **T4.7** **Promote/demote per the §1.6 per-stack ledger:**
-  - **DECISION: stays OPT-IN.** G1–G6 PASS for katgpt-rs scope, but Phase 3 PoC is not yet run (cross-repo `riir-ai/crates/riir-poc/`). The paper's 58–75% recovery is a quality claim on LLMs; our substrate doesn't have the same early/late MLP structure. Promotion blocked on Phase 3 PoC confirming the transfer.
+  - **DECISION: stays OPT-IN.** G1–G6 PASS for katgpt-rs scope, Phase 3 PoC is now COMPLETE — verdict **REFUTE the fixed-pair `LateEarly` default**: the heuristic CLOBBERS in 2/4 clean configs (PlanDomain, LateOnly) because op_b (src=1) overwrites op_a's recovery. The mechanism itself works (single-op variant recovers in all 4 configs), but the paper's fixed two-pair default is too brittle for our substrate (latent functors / HLA / neuron shards don't have the same early/late MLP structure that the paper's two-cluster pattern relies on). **Promotion blocked.** The diagnostic half (permeation map) + CUSTOM relocation (where the caller uses the diagnostic to pick the right source stage) is the production path. See Research 417 §“PoC Addendum” for raw numbers.
 - [x] **T4.8** Record stack slot: **intervention/diagnostic** (alongside `causal_head_importance`, `faithfulness_probe`). Update `katgpt-rs/README.md` Feature Showcase + `katgpt-rs/.docs/01_orientation/overview.md` Feature Flags table. **DONE** — both updated.
 
 **Phase 4 exit criterion:** GOAT gate recorded in `.benchmarks/431_cross_stage_relocation_goat.md` with promote/demote decision and per-stack ledger entry.
@@ -217,4 +220,4 @@ Default: **off** (opt-in). Promotion gated by Phase 4 T4.7.
 
 ## TL;DR
 
-Ship two modelless primitives from arxiv 2607.08393 (Knowing-Using Gap): (1) **`permeation_scan`** — a 2D `(src_stage, dst_stage)` intervention heatmap reusing `direct_effect_importance` (Plan 358) as the cell score, plus two-cluster classification; (2) **`RelocateOp`** — an applied operator that snapshots an anchor's state at one stage and overwrites at another, with the paper's `(0.82L→0.45L) + (0.10L→0.45L)` fixed default. Both behind `cross_stage_relocation` feature flag, opt-in. **Phase 3 defend-wrong PoC in `riir-poc/` is MANDATORY** before any promotion — the 58–75% recovery is a quality claim on the paper's LLM substrate, not ours; our latent functors don't have the same early/late MLP structure. If the PoC refutes the transfer, the diagnostic half survives (it's a clean Plan 358 extension) and the operator half stays opt-in. GOAT, not Super-GOAT (per Research 417 §3 verdict).
+Ship two modelless primitives from arxiv 2607.08393 (Knowing-Using Gap): (1) **`permeation_scan`** — a 2D `(src_stage, dst_stage)` intervention heatmap reusing `direct_effect_importance` (Plan 358) as the cell score, plus two-cluster classification; (2) **`RelocateOp`** — an applied operator that snapshots an anchor's state at one stage and overwrites at another, with the paper's `(0.82L→0.45L) + (0.10L→0.45L)` fixed default. Both behind `cross_stage_relocation` feature flag, opt-in. **Phase 3 defend-wrong PoC DONE (2026-07-13)** — verdict: **REFUTE the fixed-pair `LateEarly` default**; the mechanism transfers (single-op relocation recovers in all 4 configs) but the fixed two-pair default CLOBBERS in 2/4 clean configs because op_b overwrites op_a's recovery. The diagnostic half survives (clean Plan 358 extension); the operator half stays opt-in. Production path: permeation-map diagnostic + CUSTOM relocation (not the fixed default). GOAT, not Super-GOAT (per Research 417 §3 verdict).
