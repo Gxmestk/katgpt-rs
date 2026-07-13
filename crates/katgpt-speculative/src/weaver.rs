@@ -1286,8 +1286,12 @@ pub fn weaver_forward_parallel(
     // Reads 5 weight matrices (w_c, w_q, w_k, w_v) per position. With rayon,
     // all `seq_len` positions compute in parallel.
     //
-    // We need per-position scratch for the RMSNorm + post_buf. Use stack-local
-    // buffers inside the closure (cheap for h=2304: 18 KB each).
+    // Per-thread scratch avoids a heap allocation per rayon iteration.
+    // Safety: thread_local guarantees exclusive per-thread access; rayon's
+    // work-stealing ensures each closure runs on one thread at a time.
+    thread_local! {
+        static NORMED_BUF: std::cell::UnsafeCell<Vec<f32>> = const { std::cell::UnsafeCell::new(Vec::new()) };
+    }
     u_cond
         .par_chunks_mut(h)
         .zip(q.par_chunks_mut(h))
@@ -1301,9 +1305,15 @@ pub fn weaver_forward_parallel(
                 input.h_dflash[pos - 1]
             };
             // RMSNorm + W_c into u_row.
-            let mut normed = vec![0.0f32; h];
-            rmsnorm_into(raw, &weights.norm_cond, eps, &mut normed);
-            matmul_vec(&normed, &weights.w_c, h, h, u_row);
+            NORMED_BUF.with(|buf| {
+                let normed = unsafe { &mut *buf.get() };
+                if normed.len() < h {
+                    normed.resize(h, 0.0);
+                }
+                let normed = &mut normed[..h];
+                rmsnorm_into(raw, &weights.norm_cond, eps, normed);
+                matmul_vec(normed, &weights.w_c, h, h, u_row);
+            });
             if pos > 0 {
                 let pe = &weights.pos_emb[(pos - 1) * h..pos * h];
                 for j in 0..h {
@@ -1352,6 +1362,13 @@ pub fn weaver_forward_parallel(
     // ── Step 4+5 (PARALLEL): Output projection + MLP per position ──
     // Each position independently: W_o → (+ residual) → RMSNorm → SwiGLU → (+ residual) → RMSNorm.
     // Reads 4 weight matrices (w_o, w_gate, w_up, w_down) per position.
+    // Per-thread scratch (3 buffers: tmp_o, post, down) — avoids 3 heap
+    // allocations per rayon iteration.
+    thread_local! {
+        static TMP_O_BUF: std::cell::UnsafeCell<Vec<f32>> = const { std::cell::UnsafeCell::new(Vec::new()) };
+        static POST_BUF: std::cell::UnsafeCell<Vec<f32>> = const { std::cell::UnsafeCell::new(Vec::new()) };
+        static DOWN_BUF: std::cell::UnsafeCell<Vec<f32>> = const { std::cell::UnsafeCell::new(Vec::new()) };
+    }
     u_attn_normed
         .par_chunks_mut(h)
         .zip(u_final.par_chunks_mut(h))
@@ -1360,34 +1377,53 @@ pub fn weaver_forward_parallel(
         .zip(up.par_chunks_mut(d_ff))
         .enumerate()
         .for_each(|(pos, ((((ua_norm, uf), uc), gate_row), up_row))| {
-            // W_o into a per-position scratch, then add residual.
-            let mut tmp_o = vec![0.0f32; h];
-            matmul_vec(&attn_out[pos * h..(pos + 1) * h], &weights.w_o, h, h, &mut tmp_o);
-            // post = u_cond + tmp_o; RMSNorm → ua_norm.
-            let mut post = vec![0.0f32; h];
-            for j in 0..h {
-                post[j] = uc[j] + tmp_o[j];
-            }
-            rmsnorm_into(&post, &weights.norm_attn, eps, ua_norm);
+            TMP_O_BUF.with(|tmp_o_cell| {
+                POST_BUF.with(|post_cell| {
+                    DOWN_BUF.with(|down_cell| {
+                        let tmp_o = unsafe { &mut *tmp_o_cell.get() };
+                        let post = unsafe { &mut *post_cell.get() };
+                        let down = unsafe { &mut *down_cell.get() };
+                        if tmp_o.len() < h {
+                            tmp_o.resize(h, 0.0);
+                            post.resize(h, 0.0);
+                            down.resize(h, 0.0);
+                        }
+                        let tmp_o = &mut tmp_o[..h];
+                        let post = &mut post[..h];
+                        let down = &mut down[..h];
 
-            // SwiGLU: gate = silu(W_gate · ua_norm) * (W_up · ua_norm).
-            matmul_vec(ua_norm, &weights.w_gate, h, d_ff, gate_row);
-            matmul_vec(ua_norm, &weights.w_up, h, d_ff, up_row);
-            for j in 0..d_ff {
-                gate_row[j] = silu(gate_row[j]) * up_row[j];
-            }
-            // W_down · gate.
-            let mut down = vec![0.0f32; h];
-            matmul_vec(gate_row, &weights.w_down, d_ff, h, &mut down);
-            // post = ua_norm + down; RMSNorm → uf.
-            for j in 0..h {
-                post[j] = ua_norm[j] + down[j];
-            }
-            rmsnorm_into(&post, &weights.norm_mlp, eps, uf);
+                        // W_o into a per-position scratch, then add residual.
+                        matmul_vec(&attn_out[pos * h..(pos + 1) * h], &weights.w_o, h, h, tmp_o);
+                        // post = u_cond + tmp_o; RMSNorm → ua_norm.
+                        for j in 0..h {
+                            post[j] = uc[j] + tmp_o[j];
+                        }
+                        rmsnorm_into(post, &weights.norm_attn, eps, ua_norm);
+
+                        // SwiGLU: gate = silu(W_gate · ua_norm) * (W_up · ua_norm).
+                        matmul_vec(ua_norm, &weights.w_gate, h, d_ff, gate_row);
+                        matmul_vec(ua_norm, &weights.w_up, h, d_ff, up_row);
+                        for j in 0..d_ff {
+                            gate_row[j] = silu(gate_row[j]) * up_row[j];
+                        }
+                        // W_down · gate.
+                        matmul_vec(gate_row, &weights.w_down, d_ff, h, down);
+                        // post = ua_norm + down; RMSNorm → uf.
+                        for j in 0..h {
+                            post[j] = ua_norm[j] + down[j];
+                        }
+                        rmsnorm_into(post, &weights.norm_mlp, eps, uf);
+                    });
+                });
+            });
         });
 
     // ── Steps 6+7 (PARALLEL): Top-K gather + residual + softmax per depth ──
-    // Each depth is independent.
+    // Each depth is independent. Per-thread `grow` buffer avoids a heap
+    // allocation per rayon iteration.
+    thread_local! {
+        static GROW_BUF: std::cell::UnsafeCell<Vec<f32>> = const { std::cell::UnsafeCell::new(Vec::new()) };
+    }
     residual_flat
         .par_chunks_mut(k)
         .zip(corrected_logits_flat.par_chunks_mut(k))
@@ -1400,13 +1436,19 @@ pub fn weaver_forward_parallel(
             let dfl = input.dflash_logits[di];
 
             // Gather K embedding rows + compute residual logits.
-            let mut grow = vec![0.0f32; h];
-            for ki in 0..k {
-                let tid = ids[ki] as usize;
-                debug_assert!(tid < input.vocab_size);
-                grow.copy_from_slice(&input.embedding[tid * h..(tid + 1) * h]);
-                resid_row[ki] = dot(h_weaver, &grow);
-            }
+            GROW_BUF.with(|grow_cell| {
+                let grow = unsafe { &mut *grow_cell.get() };
+                if grow.len() < h {
+                    grow.resize(h, 0.0);
+                }
+                let grow = &mut grow[..h];
+                for ki in 0..k {
+                    let tid = ids[ki] as usize;
+                    debug_assert!(tid < input.vocab_size);
+                    grow.copy_from_slice(&input.embedding[tid * h..(tid + 1) * h]);
+                    resid_row[ki] = dot(h_weaver, grow);
+                }
+            });
 
             // Corrected = dflash + residual; softmax over K.
             let mut max_c = f32::NEG_INFINITY;

@@ -90,10 +90,10 @@ pub fn smooth_min_similarity(cosines: &[f32], beta: f32) -> f32 {
 
     let log_beta = beta.ln();
     // Σ(β^(1-c_i) - 1) + 1
-    // Using mul_add for numerical stability: (1-c) * ln(β)
+    // mul_add for FMA fusion: (1-c) * ln(β) computed in one instruction.
     let sum = cosines
         .iter()
-        .map(|&c| ((1.0 - c) * log_beta).exp() - 1.0)
+        .map(|&c| (1.0f32 - c).mul_add(log_beta, 0.0).exp() - 1.0)
         .sum::<f32>()
         + 1.0;
 

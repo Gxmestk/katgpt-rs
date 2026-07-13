@@ -29,6 +29,7 @@ use crate::d2f::{D2fDecodeConfig, d2f_decode_block_with_prompt_with};
 use crate::d2f_context::D2fContext;
 use crate::{ForwardContext, forward};
 use katgpt_core::speculative::sampling::sample_from_distribution;
+use katgpt_core::simd::simd_max_f32;
 use katgpt_core::traits::{NoPruner, NoScreeningPruner};
 use katgpt_speculative::SpeculativeVerifier;
 use katgpt_transformer::{MultiLayerKVCache, TransformerWeights};
@@ -441,7 +442,7 @@ impl SpeculativeVerifier for FlashARConsensusVerifier<'_> {
             if logits_offset + draft_config.vocab_size <= self.d2f_ctx.logits_flat.len() {
                 let logits_p = &self.d2f_ctx.logits_flat
                     [logits_offset..logits_offset + draft_config.vocab_size];
-                let max_logit = logits_p.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
+                let max_logit = simd_max_f32(logits_p);
                 // Fused pass: accumulate sum_exp and track top1 prob.
                 let mut sum_exp = 0.0f32;
                 let mut top1 = 0.0f32;

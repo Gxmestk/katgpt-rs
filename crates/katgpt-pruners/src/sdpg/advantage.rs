@@ -118,22 +118,33 @@ pub fn raw_delta_advantage(student_q: &[f32], teacher_q: &[f32], _temperature: f
 }
 
 /// Softmax with temperature scaling.
+///
+/// Two-pass stable softmax: max-subtract then exp. Hoists `1/temperature` out
+/// of the per-element loop (division → multiply) and uses `mul_add` for FMA
+/// fusion of the `(v - max) * inv_temp` term. Single allocation: builds the
+/// exps Vec and normalizes in place rather than producing a second Vec.
 pub fn softmax_scaled(logits: &[f32], temperature: f32) -> Vec<f32> {
     if logits.is_empty() {
-        return vec![];
+        return Vec::new();
     }
-    let max_val = logits.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
-    let exps: Vec<f32> = logits
+    let inv_temp = 1.0 / temperature;
+    let max_val = katgpt_types::simd::simd_max_f32(logits);
+    let mut exps: Vec<f32> = logits
         .iter()
-        .map(|&v| ((v - max_val) / temperature).exp())
+        .map(|&v| (v - max_val).mul_add(inv_temp, 0.0).exp())
         .collect();
-    let sum: f32 = exps.iter().sum();
+    let sum: f32 = katgpt_types::simd::simd_sum_f32(&exps);
     if sum == 0.0 {
         // Degenerate: uniform
         let n = logits.len() as f32;
-        return vec![1.0 / n; logits.len()];
+        exps.fill(1.0 / n);
+        return exps;
     }
-    exps.iter().map(|&e| e / sum).collect()
+    let inv_sum = 1.0 / sum;
+    for e in &mut exps {
+        *e *= inv_sum;
+    }
+    exps
 }
 
 #[cfg(test)]

@@ -26,6 +26,7 @@
 // `crate::types::*` → `katgpt_types::*`.
 
 use crate::d2f_context::{D2fContext, denoising_accuracy, forward_block_causal_with};
+use katgpt_core::simd::simd_max_f32;
 use katgpt_core::traits::{ConstraintPruner, ScreeningPruner};
 use katgpt_transformer::TransformerWeights;
 use katgpt_types::Config;
@@ -637,7 +638,7 @@ pub fn d2f_decode_block_with_prompt_with(
             let logits_start = p * vocab;
             let logits_end = logits_start + vocab;
             let logits_p = &dctx.logits_flat[logits_start..logits_end];
-            let max_logit = logits_p.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
+            let max_logit = simd_max_f32(logits_p);
 
             // Depth and parent tokens relative to block start
             let depth = p - block_start;
@@ -835,7 +836,7 @@ pub fn d2f_decode_block_with_prompt_with_sampler(
             let logits_start = p * vocab;
             let logits_end = logits_start + vocab;
             let logits_p = &dctx.logits_flat[logits_start..logits_end];
-            let max_logit = logits_p.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
+            let max_logit = simd_max_f32(logits_p);
 
             let depth = p - block_start;
             let parent_tokens = &tokens[block_start..p];
@@ -1300,7 +1301,7 @@ impl<'a> D2fPipeline<'a> {
                     let logits_start = p * vocab;
                     let logits_end = logits_start + vocab;
                     let logits_p = &ctx.logits_flat[logits_start..logits_end];
-                    let max_logit = logits_p.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
+                    let max_logit = simd_max_f32(logits_p);
                     let depth = p - block_start;
                     let parent_tokens = &seq_tokens[block_start..p];
 
