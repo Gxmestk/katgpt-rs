@@ -4,7 +4,7 @@
 **Research:** [katgpt-rs/.research/418_StreamDQ_SIMD_LUT_DeQuant.md](../.research/418_StreamDQ_SIMD_LUT_DeQuant.md)
 **Source paper:** [arxiv 2607.08993](https://arxiv.org/abs/2607.08993) — StreamDQ (Jeong et al., SK Hynix, 2026-07-09)
 **Target:** `katgpt-rs/crates/katgpt-core/src/simd_lut_dequant.rs` (new module) + Cargo feature `simd_lut_dequant`
-**Status:** Active — Phase 1+2+3+4 COMPLETE (ALL GOAT GATES PASS, fused dequant+dot 4.583x win, PROMOTED to default-on). Phase 5 (Q4_K integration in riir-ai) is conditional next step.
+**Status:** COMPLETE — Phases 1+2+3+4+5 all done. ALL GOAT GATES PASS. `simd_lut_dequant` PROMOTED to default-on in katgpt-core (Phase 4); `simd_lut_q4k` PROMOTED to default-on in riir-engine (Phase 5 / Plan 486).
 
 ---
 
@@ -144,11 +144,11 @@ Distill StreamDQ's "shared FP32 ALU + format-specific type-cast" pattern (paper 
 
 ### Tasks
 
-- [ ] **T5.1** Open `riir-ai/.plans/NNN_q4k_lut_integration.md` (separate plan in private repo)
-- [ ] **T5.2** Refactor `riir-ai/crates/riir-engine/src/quant/q4k.rs::dequantize_row_q4_k` to optionally use `katgpt_core::simd_lut_dequant::dequant_via_lut` when feature is enabled
-- [ ] **T5.3** Add a feature gate in riir-engine that pulls `katgpt-core/simd_lut_dequant`
-- [ ] **T5.4** Re-run the GOAT bench in riir-engine context (with real Q4_K blocks from a model file)
-- [ ] **T5.5** If riir-engine bench confirms the win: promote in riir-engine too. Else: keep opt-in in riir-engine.
+- [x] **T5.1** Open `riir-ai/.plans/NNN_q4k_lut_integration.md` (separate plan in private repo). ✅ DONE as [riir-ai/.plans/486_q4k_lut_integration.md](../../riir-ai/.plans/486_q4k_lut_integration.md).
+- [-] **T5.2** ~~Refactor `riir-ai/crates/riir-engine/src/quant/q4k.rs::dequantize_row_q4_k` to optionally use `katgpt_core::simd_lut_dequant::dequant_via_lut` when feature is enabled~~ **SUPERSEDED by Plan 486's reality check** (2026-07-13): Plan 486's premise audit proved T5.2's original premise was wrong on two counts — (1) wrong function (Phase 4 proved plain LUT dequant is 0.286× on NEON; replacing `dequantize_row_q4_k` would be a regression), and (2) wrong slot (no production CPU Q4_K consumer exists; all production GEMV runs through CubeCL on GPU). Plan 486 instead ships a NEW fused `gemv_q4_k_row_lut` function and leaves `dequantize_row_q4_k` as the arithmetic GOAT. This is the correct course correction.
+- [x] **T5.3** Add a feature gate in riir-engine that pulls `katgpt-core/simd_lut_dequant`. ✅ DONE via Plan 486 T2.1 (`simd_lut_q4k = ["katgpt-core/simd_lut_dequant"]` in riir-engine Cargo.toml).
+- [x] **T5.4** Re-run the GOAT bench in riir-engine context (with real Q4_K blocks from a model file). ✅ DONE via Plan 486 Phase 3 (`bench_487_q4k_lut_gemv_goat.rs` — 120 random Q4_K blocks, 100 single-block + 20 four-block rows).
+- [x] **T5.5** If riir-engine bench confirms the win: promote in riir-engine too. Else: keep opt-in in riir-engine. ✅ DONE — GOAT PASS, `simd_lut_q4k` PROMOTED to default-on in riir-engine (Plan 486 T3.3). Multi-block 2.300× / full-GEMV 1.971× / single-block 2.027× — all three PASS the ≥1.2× target.
 
 ---
 
