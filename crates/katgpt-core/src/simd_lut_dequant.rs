@@ -76,6 +76,13 @@ pub trait QuantLut: Sized {
     /// may mask internally as a safety net, so passing an un-masked nibble is
     /// still correct — only the low `log2(LUT_LEN)` bits are used.
     fn lookup(&self, code: u8) -> f32;
+
+    /// Raw f32 slice of the LUT, for SIMD gather paths (Phase 2). Length == `LUT_LEN`.
+    ///
+    /// The SIMD backends (NEON scalar-gather, AVX2 `_mm_i32gather_ps`) need the
+    /// raw f32 pointer to do indexed reads. This method exposes it without
+    /// breaking the trait abstraction.
+    fn as_f32_slice(&self) -> &[f32];
 }
 
 // ──────────────────────────────────────────────────────────────────────────
@@ -118,6 +125,11 @@ impl QuantLut for UInt4Lut {
         // argument to `dequant_via_lut`, but this keeps direct LUT use safe.
         self.0[(code as usize) & 0x0F]
     }
+
+    #[inline(always)]
+    fn as_f32_slice(&self) -> &[f32] {
+        &self.0
+    }
 }
 
 impl QuantLut for Int4Lut {
@@ -140,6 +152,11 @@ impl QuantLut for Int4Lut {
     fn lookup(&self, code: u8) -> f32 {
         self.0[(code as usize) & 0x0F]
     }
+
+    #[inline(always)]
+    fn as_f32_slice(&self) -> &[f32] {
+        &self.0
+    }
 }
 
 impl QuantLut for Int8Lut {
@@ -160,6 +177,11 @@ impl QuantLut for Int8Lut {
     fn lookup(&self, code: u8) -> f32 {
         self.0[code as usize]
     }
+
+    #[inline(always)]
+    fn as_f32_slice(&self) -> &[f32] {
+        &self.0
+    }
 }
 
 // ──────────────────────────────────────────────────────────────────────────
@@ -172,6 +194,13 @@ impl QuantLut for Int8Lut {
 /// and writes `lut.lookup(index)` to the corresponding slot in `out`. The LUT
 /// already contains the full affine `(code − zero) · scale`, so the inner loop
 /// is a single lookup — no per-element multiply, no integer-to-float cast.
+///
+/// Dispatches to NEON (aarch64), AVX2 (x86_64 + compile-time AVX2 feature), or
+/// scalar fallback based on the target architecture. On NEON the gather is
+/// scalar (NEON has no native gather — the plan acknowledges this); on AVX2 the
+/// hardware `_mm256_i32gather_ps` instruction does the gather natively. On WASM,
+/// the scalar fallback is used — WASM SIMD128 has no gather instruction, and
+/// the scalar path is already efficient for the LUT lookup pattern.
 ///
 /// # Arguments
 ///
@@ -203,6 +232,7 @@ impl QuantLut for Int8Lut {
 /// assert_eq!(out, [(2.0 - 8.0) * 0.5, (4.0 - 8.0) * 0.5]); // [-3.0, -2.0]
 /// ```
 #[inline]
+#[allow(clippy::needless_return)] // return is needed for cfg-gated arch dispatch
 pub fn dequant_via_lut<L: QuantLut>(
     codes: &[u8],
     lut: &L,
@@ -210,16 +240,180 @@ pub fn dequant_via_lut<L: QuantLut>(
     mask: u8,
     out: &mut [f32],
 ) {
+    let lut_slice = lut.as_f32_slice();
+    #[cfg(target_arch = "aarch64")]
+    {
+        unsafe { dequant_via_lut_neon(codes, lut_slice, shift, mask, out) }
+        return;
+    }
+    #[cfg(all(target_arch = "x86_64", target_feature = "avx2"))]
+    {
+        unsafe { dequant_via_lut_avx2(codes, lut_slice, shift, mask, out) }
+        return;
+    }
+    #[cfg(not(any(
+        target_arch = "aarch64",
+        all(target_arch = "x86_64", target_feature = "avx2")
+    )))]
+    {
+        dequant_via_lut_scalar(codes, lut_slice, shift, mask, out);
+    }
+}
+
+/// Scalar LUT dequantize — the portable fallback and Phase 1 reference.
+///
+/// Also used as the correctness oracle by the Phase 4 GOAT gate G1 test.
+/// Exposed publicly so consumers on platforms without SIMD can call it directly,
+/// and so tests can verify the SIMD paths are bit-exact against it.
+#[inline]
+pub fn dequant_via_lut_scalar(
+    codes: &[u8],
+    lut_slice: &[f32],
+    shift: u32,
+    mask: u8,
+    out: &mut [f32],
+) {
     let n = codes.len().min(out.len());
     let mut i = 0;
     while i < n {
-        let idx = (codes[i] >> shift) & mask;
-        out[i] = lut.lookup(idx);
+        let idx = ((codes[i] >> shift) & mask) as usize;
+        out[i] = lut_slice[idx & (lut_slice.len() - 1)];
         i += 1;
     }
 }
 
-/// Scalar reference arithmetic dequantize — the "current path" comparator.
+// ──────────────────────────────────────────────────────────────────────────
+// NEON backend (aarch64)
+// ──────────────────────────────────────────────────────────────────────────
+// NEON has no native gather instruction. The shift+mask is vectorized (8 bytes
+// at a time), but the LUT gather is scalar extraction. The store is vectorized
+// (2× float32x4_t per 8 elements). This is the honest implementation — the win
+// on NEON comes from the pre-computed LUT (no per-element multiply), not from
+// vectorized gather (which doesn't exist). The GOAT gate (Phase 4) settles
+// whether this is enough.
+
+#[cfg(target_arch = "aarch64")]
+#[inline]
+unsafe fn dequant_via_lut_neon(
+    codes: &[u8],
+    lut_slice: &[f32],
+    shift: u32,
+    mask: u8,
+    out: &mut [f32],
+) {
+    use core::arch::aarch64::{
+        vand_u8, vdup_n_s8, vdup_n_u8, vget_lane_u8, vld1q_f32, vld1_u8, vshl_u8, vst1q_f32,
+    };
+
+    unsafe {
+        let n = codes.len().min(out.len());
+        // NEON right-shift = vshl by negative amount.
+        let neg_shift = (shift as i8).wrapping_neg();
+        let shift_vec = vdup_n_s8(neg_shift);
+        let mask_vec = vdup_n_u8(mask);
+        let mask_bits = lut_slice.len().trailing_zeros() as u8; // log2(LUT_LEN): 4 for INT4, 8 for INT8
+        // For INT8 (256 entries, mask_bits=8), all u8 values are valid indices.
+        // For INT4 (16 entries, mask_bits=4), mask to prevent OOB from stray bits.
+        // `1u8 << 8` overflows, so cap at 8 and use 0xFF as the index mask.
+        let idx_mask: u8 = if mask_bits >= 8 { 0xFF } else { (1u8 << mask_bits) - 1 };
+
+        // Process 8 bytes at a time: load 8 codes, shift+mask, scalar gather, NEON store.
+        let mut i = 0;
+        while i + 8 <= n {
+            // Load 8 packed code bytes.
+            let code_vec = vld1_u8(codes.as_ptr().add(i));
+            // Shift right by `shift`, then mask.
+            let shifted = vshl_u8(code_vec, shift_vec);
+            let masked = vand_u8(shifted, mask_vec);
+            // Scalar gather: extract 8 lanes and index into the LUT.
+            // vget_lane_u8 requires a compile-time constant lane index, so we
+            // unroll all 8 extractions explicitly.
+            let gathered = [
+                *lut_slice.get_unchecked((vget_lane_u8(masked, 0) & idx_mask) as usize),
+                *lut_slice.get_unchecked((vget_lane_u8(masked, 1) & idx_mask) as usize),
+                *lut_slice.get_unchecked((vget_lane_u8(masked, 2) & idx_mask) as usize),
+                *lut_slice.get_unchecked((vget_lane_u8(masked, 3) & idx_mask) as usize),
+                *lut_slice.get_unchecked((vget_lane_u8(masked, 4) & idx_mask) as usize),
+                *lut_slice.get_unchecked((vget_lane_u8(masked, 5) & idx_mask) as usize),
+                *lut_slice.get_unchecked((vget_lane_u8(masked, 6) & idx_mask) as usize),
+                *lut_slice.get_unchecked((vget_lane_u8(masked, 7) & idx_mask) as usize),
+            ];
+            // Store 8 f32 via 2× float32x4_t.
+            let lo = vld1q_f32(gathered.as_ptr());
+            let hi = vld1q_f32(gathered.as_ptr().add(4));
+            vst1q_f32(out.as_mut_ptr().add(i), lo);
+            vst1q_f32(out.as_mut_ptr().add(i + 4), hi);
+            i += 8;
+        }
+        // Tail (1–7 remaining elements): scalar fallback.
+        while i < n {
+            let idx = ((codes[i] >> shift) & mask) as usize;
+            out[i] = *lut_slice.get_unchecked(idx & (lut_slice.len() - 1));
+            i += 1;
+        }
+    }
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// AVX2 backend (x86_64 + target_feature = "avx2")
+// ──────────────────────────────────────────────────────────────────────────
+// AVX2 has native gather: `_mm_i32gather_ps`. This is the software analog of
+// the paper's hardware gather in the DQB's shared FP32 ALU. The gather takes
+// 8 i32 indices and reads 8 f32 values from the LUT base in a single
+// instruction. This is where the real win is expected (if any).
+//
+// Approach: load 8 bytes → zero-extend to 8× i32 → shift+mask on i32 lanes →
+// gather 8× f32 from LUT → store. The shift+mask on i32 (not byte) avoids the
+// byte-level shift complication (AVX2 `_mm_srli_epi32` operates on 32-bit lanes).
+
+#[cfg(all(target_arch = "x86_64", target_feature = "avx2"))]
+#[inline]
+#[target_feature(enable = "avx2")]
+unsafe fn dequant_via_lut_avx2(
+    codes: &[u8],
+    lut_slice: &[f32],
+    shift: u32,
+    mask: u8,
+    out: &mut [f32],
+) {
+    use core::arch::x86_64::{
+        _mm256_and_si256, _mm256_castsi128_si256, _mm256_i32gather_ps, _mm256_set1_epi32,
+        _mm256_srli_epi32, _mm256_storeu_ps, _mm_cvtepu8_epi32, _mm_loadl_epi64,
+    };
+
+    unsafe {
+        let n = codes.len().min(out.len());
+        let lut_ptr = lut_slice.as_ptr();
+        let mask_vec = _mm256_set1_epi32(mask as i32);
+
+        // Process 8 bytes at a time using AVX2 gather.
+        let mut i = 0;
+        while i + 8 <= n {
+            // Load 8 bytes (low 64 bits of __m128i), zero-extend to 8× i32.
+            let raw_bytes = _mm_cvtepu8_epi32(_mm_loadl_epi64(
+                codes.as_ptr().add(i) as *const _,
+            ));
+            // Widen to 256-bit, shift right + mask on i32 lanes.
+            let idx256 = _mm256_castsi128_si256(raw_bytes);
+            let shifted = _mm256_srli_epi32(idx256, shift as i32);
+            let masked = _mm256_and_si256(shifted, mask_vec);
+            // Gather 8× f32 from LUT base using the masked indices.
+            // Scale = 4 (sizeof(f32)); indices are byte offsets = idx * 4.
+            let gathered = _mm256_i32gather_ps(lut_ptr, masked, 4);
+            _mm256_storeu_ps(out.as_mut_ptr().add(i), gathered);
+            i += 8;
+        }
+        // Tail (1–7 remaining elements): scalar fallback.
+        while i < n {
+            let idx = ((codes[i] >> shift) & mask) as usize;
+            out[i] = *lut_slice.get_unchecked(idx & (lut_slice.len() - 1));
+            i += 1;
+        }
+    }
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// Scalar reference arithmetic dequantize — the "current path" comparator.
 ///
 /// Computes `(signed(code) − zero) · scale` per element, matching the arithmetic
 /// cast path in `q4k.rs` today. Used by the GOAT gate (Plan 431 Phase 4 G1) to
@@ -479,6 +673,68 @@ mod tests {
             let high = d_sc0 * (qs[i] >> 4) as f32 - m0_val;
             assert_eq!(dst_low[i], low, "low nibble {} mismatch", i);
             assert_eq!(dst_high[i], high, "high nibble {} mismatch", i);
+        }
+    }
+
+    // ── SIMD vs scalar bit-exact (Phase 2 T2.1–T2.3) ──────────────────────
+
+    /// Verify the SIMD path (NEON/AVX2 dispatch) is bit-exact against the
+    /// scalar reference path on a large input that exercises the unrolled
+    /// loop (multiples of 8) AND the tail (non-multiple of 8).
+    #[test]
+    fn test_simd_vs_scalar_bit_exact_uint4_large() {
+        let scale = 0.123_f32;
+        let zero = 3.7_f32;
+        let lut = UInt4Lut::build(scale, zero);
+        let lut_slice = lut.as_f32_slice();
+        // 100 elements: 12×8=96 in the unrolled loop + 4 tail.
+        let codes: Vec<u8> = (0..100u32).map(|i| (i * 7) as u8).collect();
+        let mut out_simd = vec![0.0_f32; 100];
+        let mut out_scalar = vec![0.0_f32; 100];
+        dequant_via_lut(&codes, &lut, 0, 0x0F, &mut out_simd);
+        dequant_via_lut_scalar(&codes, lut_slice, 0, 0x0F, &mut out_scalar);
+        assert_eq!(out_simd, out_scalar, "SIMD path must be bit-exact vs scalar");
+    }
+
+    #[test]
+    fn test_simd_vs_scalar_bit_exact_int8_large() {
+        let scale = 0.05_f32;
+        let zero = 100.0_f32;
+        let lut = Int8Lut::build(scale, zero);
+        let lut_slice = lut.as_f32_slice();
+        // 300 elements: 37×8=296 in the unrolled loop + 4 tail.
+        let codes: Vec<u8> = (0..300u32).map(|i| (i * 3) as u8).collect();
+        let mut out_simd = vec![0.0_f32; 300];
+        let mut out_scalar = vec![0.0_f32; 300];
+        dequant_via_lut(&codes, &lut, 0, 0xFF, &mut out_simd);
+        dequant_via_lut_scalar(&codes, lut_slice, 0, 0xFF, &mut out_scalar);
+        assert_eq!(out_simd, out_scalar, "SIMD path must be bit-exact vs scalar");
+    }
+
+    #[test]
+    fn test_simd_vs_scalar_bit_exact_high_nibble() {
+        let lut = UInt4Lut::build(0.9, 2.0);
+        let lut_slice = lut.as_f32_slice();
+        let codes: Vec<u8> = (0..200u32).map(|i| (i * 13) as u8).collect();
+        let mut out_simd = vec![0.0_f32; 200];
+        let mut out_scalar = vec![0.0_f32; 200];
+        dequant_via_lut(&codes, &lut, 4, 0x0F, &mut out_simd);
+        dequant_via_lut_scalar(&codes, lut_slice, 4, 0x0F, &mut out_scalar);
+        assert_eq!(out_simd, out_scalar);
+    }
+
+    #[test]
+    fn test_simd_vs_scalar_exact_alignment_boundary() {
+        // Test at exact 8-element boundaries: 8, 16, 24 elements (no tail).
+        let lut = UInt4Lut::build(1.0, 0.0);
+        let lut_slice = lut.as_f32_slice();
+        for &n in &[8usize, 16, 24, 7, 9, 15] {
+            let codes: Vec<u8> = (0..n as u32).map(|i| (i | 0x80) as u8).collect();
+            let mut out_simd = vec![0.0_f32; n];
+            let mut out_scalar = vec![0.0_f32; n];
+            dequant_via_lut(&codes, &lut, 0, 0x0F, &mut out_simd);
+            dequant_via_lut_scalar(&codes, lut_slice, 0, 0x0F, &mut out_scalar);
+            assert_eq!(out_simd, out_scalar, "mismatch at n={}", n);
         }
     }
 }

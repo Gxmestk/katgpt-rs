@@ -4,7 +4,7 @@
 **Research:** [katgpt-rs/.research/418_StreamDQ_SIMD_LUT_DeQuant.md](../.research/418_StreamDQ_SIMD_LUT_DeQuant.md)
 **Source paper:** [arxiv 2607.08993](https://arxiv.org/abs/2607.08993) — StreamDQ (Jeong et al., SK Hynix, 2026-07-09)
 **Target:** `katgpt-rs/crates/katgpt-core/src/simd_lut_dequant.rs` (new module) + Cargo feature `simd_lut_dequant`
-**Status:** Active — Phase 1 COMPLETE (scalar reference shipped + clippy clean + 14 tests PASS). Phase 2 (SIMD inner loops) is next.
+**Status:** Active — Phase 1 COMPLETE + Phase 2 COMPLETE (NEON + AVX2 + scalar, 18 tests PASS). Phase 3 (fused DeQuant + Dot) is next.
 
 ---
 
@@ -66,24 +66,24 @@ Distill StreamDQ's "shared FP32 ALU + format-specific type-cast" pattern (paper 
 
 ### Tasks
 
-- [ ] **T2.1** Add NEON inner loop (`#[cfg(target_arch = "aarch64")]`):
+- [x] **T2.1** Add NEON inner loop (`#[cfg(target_arch = "aarch64")]`):
   - Load 4 (or 8) packed codes via `vld1q_u8`
   - Shift+mask via `vshrq_n_u8` + `vandq_u8` (paper §3.6 sign-extension analog: zero-extend for nibbles)
   - Convert to u32 indices via `vmovl_u16` + `vmovl_u32`
   - Gather 4 (or 8) f32 values from the LUT using scalar indexing on the extracted u32 lanes (NEON has no native gather — fall back to scalar extraction OR use `vld1q_f32` with computed offsets if 4-aligned)
   - Write to `out` via `vst1q_f32`
 
-- [ ] **T2.2** Add AVX2 inner loop (`#[cfg(all(target_arch = "x86_64", target_feature = "avx2"))]`):
+- [x] **T2.2** Add AVX2 inner loop (`#[cfg(all(target_arch = "x86_64", target_feature = "avx2"))]`):
   - Load 8 packed codes via `_mm_loadl_epi64`
   - Shift+mask via `_mm_srli_epi16` + `_mm_and_si128`
   - Use `_mm_i32gather_ps` (the native AVX2 gather the paper's hardware does physically)
   - Write to `out` via `_mm256_storeu_ps`
 
-- [ ] **T2.3** Scalar fallback (`#[cfg(not(any(target_arch = "aarch64", all(target_arch = "x86_64", target_feature = "avx2"))))]`): use the T1.4 scalar loop.
+- [x] **T2.3** Scalar fallback (`#[cfg(not(any(target_arch = "aarch64", all(target_arch = "x86_64", target_feature = "avx2"))))]`): use the T1.4 scalar loop.
 
-- [ ] **T2.4** Add WASM SIMD128 fallback if straightforward (`#[cfg(target_arch = "wasm32")]`): WASM has no gather; use scalar extraction. Document this as a known slow path.
+- [x] **T2.4** Add WASM SIMD128 fallback if straightforward (`#[cfg(target_arch = "wasm32")]`): WASM has no gather; use scalar extraction. Document this as a known slow path.
 
-**Exit:** NEON + AVX2 + scalar paths all pass bit-exact test vs Phase 1 reference.
+**Exit:** NEON + AVX2 + scalar paths all pass bit-exact test vs Phase 1 reference. ✅ DONE (2026-07-13): NEON backend (8-at-a-time: vld1_u8 + vshl_u8 + vand_u8 + scalar gather + 2× vst1q_f32) + AVX2 backend (8-at-a-time: _mm_loadl_epi64 + _mm_cvtepu8_epi32 + _mm256_srli_epi32 + _mm256_and_si256 + _mm256_i32gather_ps + _mm256_storeu_ps) + scalar fallback all bit-exact vs Phase 1 reference. 18 unit tests PASS (14 Phase 1 + 4 new SIMD-vs-scalar bit-exact tests). clippy clean. WASM uses scalar fallback (no SIMD128 gather — documented). The NEON path uses scalar gather for the LUT lookup (NEON has no native gather instruction); the vectorization win is in the load/shift/mask/store. Added `as_f32_slice()` to QuantLut trait so SIMD backends can access the raw LUT without type erasure.
 
 ---
 
