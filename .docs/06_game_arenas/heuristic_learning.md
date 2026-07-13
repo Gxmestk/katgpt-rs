@@ -22,7 +22,7 @@
 >
 > **Status (Plan 165, Research 148):** Hydra-Aware Adaptive Layer Budget — emergent self-repair layer skipping inspired by Hydra Effect (arXiv:2307.15771). Two modes: modelless (pre-computed profiles) and model-based (logit lens scoring). 34.4% compute savings, 100% profile stability across seeds. Behind `--features hydra_budget`. GOAT 4/4 proved. **Default-on.**
 >
-> **Status (Plan 166, Research 149):** FlashAR Consensus Tri-Mode — dual-path ternary thermal routing for consensus tri-mode. Plasma hit rate 4.4%, Hot 45.5%, Warm 19.8%, Cold 30.4%. Behind `--features flashar_consensus` (requires `tri_mode`, `plasma_path`). GOAT 9/9 proved. **DEMOTED from default-on** (Issue 136, 2026-07-12): Plan 485 benchmark showed KL 2.9-6.5 (100× worse than Leviathan baseline 0.03) — G1 quality FAIL. DSpark entropy-skip hybrid dominates on both axes. Opt-in only.
+> **Status (Plan 166, Research 149):** FlashAR Consensus Tri-Mode — dual-path ternary thermal routing for consensus tri-mode. Plasma hit rate 4.4%, Hot 45.5%, Warm 19.8%, Cold 30.4%. Behind `--features flashar_consensus` (requires `tri_mode`, `plasma_path`). GOAT 9/9 proved. **DEMOTED from default-on** (Issue 136, 2026-07-12, removed, see git history): Plan 485 benchmark showed KL 2.9-6.5 (100× worse than Leviathan baseline 0.03) — G1 quality FAIL. DSpark entropy-skip hybrid dominates on both axes. Opt-in only.
 >
 > **Status (Plan 167, Research R050):** Budget Adaptation — compression-adaptive decode budget: PFlash ratio scales DDTree budget [0.5×, 2.0×]. Simple prompts → less search, Complex → more. ~1.3µs overhead. Behind `--features budget_adaptation`. GOAT 8/8 proved. **Default-on.**
 >

@@ -6,7 +6,7 @@
 //! providing better discrimination than plain-cosine (mean) on multi-token
 //! queries with partial mismatches.
 //!
-//! ## GOAT gate (Issue 041 PoC, 2026-07-12)
+//! ## GOAT gate (Issue 041 PoC, 2026-07-12; Issue 041 removed, see git history)
 //!
 //! The PoC (`examples/issue_041_smooth_min_poc.rs`) uses synthetic per-token
 //! embeddings — 200 items, 200 queries with all 4 tokens mismatched (same

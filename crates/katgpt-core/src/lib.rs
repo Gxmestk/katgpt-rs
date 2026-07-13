@@ -174,7 +174,7 @@ pub mod shard_embedding;
 #[cfg(feature = "ssmax_temperature")]
 pub mod ssmax;
 // Smooth-min soft pattern matching — modelless latent-space utility for
-// fuzzy multi-token retrieval (Research 385, SoftMatcha 2, Issue 041).
+// fuzzy multi-token retrieval (Research 385, SoftMatcha 2, Issue 041; Issue 041 removed, see git history).
 // GOAT PoC PASS: +12pp recall@5 over plain cosine, ~0ns overhead.
 // Consumer GOAT PASS (T6 SmoothMinAligned): recall@5 = 1.000 vs Cosine 0.495
 // (+50.5pp) on position-aligned multi-token retrieval.

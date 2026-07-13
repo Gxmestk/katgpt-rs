@@ -858,7 +858,7 @@ PLASMA → HOT → WARM → COLD transitions are driven by consensus confidence.
 
 | Metric | Value |
 |--------|-------|
-| Feature flag | `flashar_consensus` (**DEMOTED** from default-on, Issue 136 — KL 2.9-6.5 vs Leviathan 0.03; opt-in only) |
+| Feature flag | `flashar_consensus` (**DEMOTED** from default-on, Issue 136, removed, see git history — KL 2.9-6.5 vs Leviathan 0.03; opt-in only) |
 | Paths | Path H (AR/MTP), Path V (D2F block) |
 | Thermal states | PLASMA / HOT / WARM / COLD |
 

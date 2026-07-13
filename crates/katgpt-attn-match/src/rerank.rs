@@ -24,7 +24,7 @@ pub enum RerankMethod {
     Cosine,
     /// MaxSim late-interaction: `Σ_i max_j dot(q_i, d_j)`.
     MaxSim,
-    /// Smooth-Min aggregation of per-token-pair cosines (Issue 041, Research 385).
+    /// Smooth-Min aggregation of per-token-pair cosines (Issue 041, Research 385; Issue 041 removed, see git history).
     /// Computes `cos(q_i, d_j)` for all token pairs, then aggregates via
     /// `smooth_min_similarity` — penalizes documents with low-cosine token pairs
     /// more than plain mean, improving discrimination on multi-token queries.

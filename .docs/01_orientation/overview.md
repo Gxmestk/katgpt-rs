@@ -642,7 +642,7 @@ src/
 | `datrie_vocab` | — | Double-array trie vocab lookup — zero-alloc trie for ToaST tokenizer (Research 137, opt-in, pending benchmark) |
 | `kog_cpu_fusion` | — | Kog AI monokernel CPU fusion — RMSNorm gamma folding + QKV interleaving (Plan 160, Research 139, opt-in) |
 | `flashar_anchor` | `dllm` | FlashAR strided anchor-then-fill D2F decoding (Plan 166 T11, opt-in) |
-| `flashar_consensus` | `tri_mode`, `plasma_path` | FlashAR consensus tri-mode with ternary thermal paths (Plan 166). **DEMOTED from default-on** (Issue 136, 2026-07-12): Plan 485 benchmark showed KL 2.9-6.5 (100× worse than Leviathan baseline 0.03). DSpark entropy-skip hybrid dominates on both axes. Opt-in. |
+| `flashar_consensus` | `tri_mode`, `plasma_path` | FlashAR consensus tri-mode with ternary thermal paths (Plan 166). **DEMOTED from default-on** (Issue 136, 2026-07-12, removed, see git history): Plan 485 benchmark showed KL 2.9-6.5 (100× worse than Leviathan baseline 0.03). DSpark entropy-skip hybrid dominates on both axes. Opt-in. |
 | `budget_adaptation` | — | Compression-adaptive decode budget (Plan 167, default-on) |
 | `ilc_distill` | — | ILC iterative latent clustering distillation — synonym-aware DDTree pruning (opt-in) |
 | `hydra_budget` | — | Hydra-aware adaptive layer budget — emergent self-repair layer skipping (Plan 165, default-on) |

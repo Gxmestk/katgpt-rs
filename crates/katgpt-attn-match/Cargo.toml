@@ -48,7 +48,7 @@ still_kv = ["dep:katgpt-kv", "katgpt-kv/still_kv", "dep:half"]
 # Pulls in katgpt-core for the SIMD scoring primitives.
 maxsim = ["dep:katgpt-core"]
 
-# Smooth-Min reranking method (Issue 041, Research 385). Adds `RerankMethod::SmoothMin`
+# Smooth-Min reranking method (Issue 041, Research 385; Issue 041 removed, see git history). Adds `RerankMethod::SmoothMin`
 # — per-token-pair cosine aggregation via `smooth_min_similarity` instead of plain
 # mean. Requires `maxsim` (for the rerank module) + `katgpt-core/smooth_min_similarity`.
 # The first real consumer of the smooth-min primitive.
