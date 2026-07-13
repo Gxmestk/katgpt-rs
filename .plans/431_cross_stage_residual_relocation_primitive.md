@@ -4,7 +4,7 @@
 **Research:** [katgpt-rs/.research/417_Knowing_Using_Gap_Cross_Stage_Residual_Relocation.md](../.research/417_Knowing_Using_Gap_Cross_Stage_Residual_Relocation.md)
 **Source paper:** [arxiv 2607.08393](https://arxiv.org/abs/2607.08393) — Dai, Rao, Wang et al., "Towards Mechanistically Understanding Why Memorized Knowledge Fails to Generalize in LLM Finetuning" (HKUST-GZ / HKUST, NeurIPS 2026 submission)
 **Target:** `katgpt-rs/crates/katgpt-core/src/cross_stage_relocation/` (new module) + Cargo feature `cross_stage_relocation`
-**Status:** Active — Phase 1 (diagnostic skeleton)
+**Status:** Phase 1–2 COMPLETE (34 unit tests PASS, clippy clean). Phase 4 GOAT gate G1–G6 ALL PASS for katgpt-rs scope (see `.benchmarks/431_cross_stage_relocation_goat.md`). Phase 3 defend-wrong PoC DEFERRED (cross-repo: `riir-ai/crates/riir-poc/`). Primitive ships opt-in behind `cross_stage_relocation`; promotion to default blocked on Phase 3 PoC confirming the transfer.
 
 ---
 
@@ -28,8 +28,8 @@ The safe half. Reuses Plan 358's `direct_effect_importance` as the cell score; a
 
 ### Tasks
 
-- [ ] **T1.1** Create `katgpt-rs/crates/katgpt-core/src/cross_stage_relocation/mod.rs` with module docstring citing Research 417 + arxiv 2607.08393.
-- [ ] **T1.2** Define `PermeationMap` struct:
+- [x] **T1.1** Create `katgpt-rs/crates/katgpt-core/src/cross_stage_relocation/mod.rs` with module docstring citing Research 417 + arxiv 2607.08393.
+- [x] **T1.2** Define `PermeationMap` struct:
   ```rust
   /// L_src × L_dst matrix of `direct_effect_importance` cell scores.
   /// Cell `(i, j) > 0` means: snapshotting the anchor's state at source stage `i`
@@ -42,7 +42,7 @@ The safe half. Reuses Plan 358's `direct_effect_importance` as the cell score; a
       pub n_dst: usize,
   }
   ```
-- [ ] **T1.3** Define `permeation_scan_into` — the zero-alloc scan loop:
+- [x] **T1.3** Define `permeation_scan_into` — the zero-alloc scan loop:
   ```rust
   /// Scan all (src_stage, dst_stage) pairs, calling `patched_readout` for each.
   /// `patched_readout(src_stage, dst_stage)` must run the forward pass with the
@@ -59,7 +59,7 @@ The safe half. Reuses Plan 358's `direct_effect_importance` as the cell score; a
   ) where
       F: FnMut(usize, usize) -> f32;
   ```
-- [ ] **T1.4** Define `ClusterClass` enum + `classify_two_cluster` method on `PermeationMap`:
+- [x] **T1.4** Define `ClusterClass` enum + `classify_two_cluster` method on `PermeationMap`:
   ```rust
   #[derive(Clone, Copy, Debug, PartialEq, Eq)]
   pub enum ClusterClass { EarlyToMid, LateToMid, Both, None }
@@ -72,9 +72,9 @@ The safe half. Reuses Plan 358's `direct_effect_importance` as the cell score; a
       pub fn classify_two_cluster(&self) -> ClusterClass { /* ... */ }
   }
   ```
-- [ ] **T1.5** G1 correctness test: synthetic 4-stage chain with a known-stranded representation. Construct a `PermeationMap` by hand, verify `classify_two_cluster` returns the expected class.
-- [ ] **T1.6** G4 zero-alloc test: `permeation_scan_into` writes into a pre-allocated `PermeationMap` without growing any `Vec`.
-- [ ] **T1.7** G3 latency test (criterion bench, opt-in): scan with a no-op `patched_readout` closure — overhead must be ≤ 5% vs a hand-rolled loop.
+- [x] **T1.5** G1 correctness test: synthetic 4-stage chain with a known-stranded representation. Construct a `PermeationMap` by hand, verify `classify_two_cluster` returns the expected class.
+- [x] **T1.6** G4 zero-alloc test: `permeation_scan_into` writes into a pre-allocated `PermeationMap` without growing any `Vec`.
+- [x] **T1.7** G3 latency test (criterion bench, opt-in): scan with a no-op `patched_readout` closure — overhead must be ≤ 5% vs a hand-rolled loop. **PASS — scan is 10–25% FASTER than hand-rolled loop with closure + IE arithmetic** (see `.benchmarks/431_cross_stage_relocation_goat.md`).
 
 **Phase 1 exit criterion:** the module compiles standalone, `permeation_scan_into` is instantiable in a unit test, `classify_two_cluster` is correct on hand-constructed cases.
 
@@ -86,7 +86,7 @@ The applied operator. **Cannot ship without Phase 3 PoC confirmation** that the 
 
 ### Tasks
 
-- [ ] **T2.1** Define `RelocateOp`:
+- [x] **T2.1** Define `RelocateOp`:
   ```rust
   /// A single cross-stage residual relocation. During a forward pass with this
   /// op active, the anchor token's state at `src_stage` is snapshotted and
@@ -101,7 +101,7 @@ The applied operator. **Cannot ship without Phase 3 PoC confirmation** that the 
       pub anchor_token_idx: usize,
   }
   ```
-- [ ] **T2.2** Define `RelocatePair` enum with the paper's fixed default:
+- [x] **T2.2** Define `RelocatePair` enum with the paper's fixed default:
   ```rust
   #[derive(Clone, Copy, Debug)]
   pub enum RelocatePair {
@@ -118,7 +118,7 @@ The applied operator. **Cannot ship without Phase 3 PoC confirmation** that the 
       pub fn to_ops(&self, n_stages: usize, anchor_token_idx: usize) -> [RelocateOp; 2] { /* ... */ }
   }
   ```
-- [ ] **T2.3** Define `RelocatingForward` trait (the host contract):
+- [x] **T2.3** Define `RelocatingForward` trait (the host contract):
   ```rust
   /// Host's forward pass with snapshot/overwrite hooks. The primitive itself
   /// does NOT own forward-pass machinery — same contract as Plan 358's
@@ -132,9 +132,9 @@ The applied operator. **Cannot ship without Phase 3 PoC confirmation** that the 
       fn n_stages(&self) -> usize;
   }
   ```
-- [ ] **T2.4** `RelocateOp::apply_into<F: RelocatingForward>` method that orchestrates snapshot → forward-to-dst → overwrite → continue-forward. **No new sync-boundary data** — operates on local activation buffers only.
-- [ ] **T2.5** G1 unit test: synthetic 4-stage `RelocatingForward` impl where stage 1 holds the answer but stage 3 (the readout) reads from stage 2 (empty). `RelocateOp{ src: 1, dst: 2 }` recovers the answer.
-- [ ] **T2.6** G4 zero-alloc test: `apply_into` uses a caller-supplied scratch buffer for the snapshot; no `Vec` growth.
+- [x] **T2.4** `RelocateOp::apply_into<F: RelocatingForward>` method that orchestrates snapshot → forward-to-dst → overwrite → continue-forward. **No new sync-boundary data** — operates on local activation buffers only.
+- [x] **T2.5** G1 unit test: synthetic 4-stage `RelocatingForward` impl where stage 1 holds the answer but stage 3 (the readout) reads from stage 2 (empty). `RelocateOp{ src: 1, dst: 2 }` recovers the answer.
+- [x] **T2.6** G4 zero-alloc test: `apply_into` uses a caller-supplied scratch buffer for the snapshot; no `Vec` growth.
 
 **Phase 2 exit criterion:** the operator compiles, applies correctly on the synthetic 4-stage test, zero-alloc.
 
@@ -146,14 +146,15 @@ Per Research 417 §3.6, the operator's quality claim ("relocate recovers capabil
 
 ### Tasks
 
-- [ ] **T3.1** Create `riir-ai/crates/riir-poc/benches/cross_stage_relocation_modelless_goat.rs`. Use `CARGO_TARGET_DIR=/tmp/cross_stage_poc` per AGENTS.md.
-- [ ] **T3.2** Construct a controlled toy domain: a synthetic 8-stage residual stream where stage 2 and stage 7 contain the answer representation but stage 4 (the reasoning circuit) reads from stage 4 alone. Standard forward pass fails.
-- [ ] **T3.3** Run three competitors head-to-head:
+- [-] **T3.1** Create `riir-ai/crates/riir-poc/benches/cross_stage_relocation_modelless_goat.rs`. Use `CARGO_TARGET_DIR=/tmp/cross_stage_poc` per AGENTS.md. **DEFERRED — cross-repo (`riir-ai`).**
+- [-] **T3.2** Construct a controlled toy domain: a synthetic 8-stage residual stream where stage 2 and stage 7 contain the answer representation but stage 4 (the reasoning circuit) reads from stage 4 alone. Standard forward pass fails. **DEFERRED — cross-repo (`riir-ai`).**
+- [-] **T3.3** Run three competitors head-to-head:
   - **(a) Paper's heuristic** — `RelocatePair::LateEarly` with the toy domain's stage count.
   - **(b) No-relocation baseline** — standard forward pass.
   - **(c) Shipped latent_functor re-estimation** — the existing modelless analog (R313, `latent_functor/reestimation.rs`).
-- [ ] **T3.4** Print verdict table: per-competitor readout accuracy / cosine recovery / latency overhead.
-- [ ] **T3.5** **Honest recording:** if (a) doesn't beat both (b) and (c), record the raw numbers as a §"PoC Addendum" in Research 417 and **do not silently revise the verdict**. The operator stays opt-in diagnostic-only; the follow-up is tracked in `.issues/`.
+  **DEFERRED — cross-repo (`riir-ai`).**
+- [-] **T3.4** Print verdict table: per-competitor readout accuracy / cosine recovery / latency overhead. **DEFERRED — cross-repo (`riir-ai`).**
+- [-] **T3.5** **Honest recording:** if (a) doesn't beat both (b) and (c), record the raw numbers as a §"PoC Addendum" in Research 417 and **do not silently revise the verdict**. The operator stays opt-in diagnostic-only; the follow-up is tracked in `.issues/`. **DEFERRED — cross-repo (`riir-ai`).**
 
 **Phase 3 exit criterion:** verdict table printed; raw numbers recorded in Research 417 §"PoC Addendum" (whether confirming or refuting).
 
@@ -163,16 +164,15 @@ Per Research 417 §3.6, the operator's quality claim ("relocate recovers capabil
 
 ### Tasks
 
-- [ ] **T4.1** **G1 (correctness)** — Phase 1 T1.5 + Phase 2 T2.5 unit tests pass.
-- [ ] **T4.2** **G2 (perf)** — `RelocateOp::apply_into` overhead ≤ 5% vs unpatched forward pass (criterion bench). The snapshot+overwrite is two `memcpy`s; should be near-zero.
-- [ ] **T4.3** **G3 (no-regression)** — `cargo test --features cross_stage_relocation` clean; `cargo check --all-features` clean.
-- [ ] **T4.4** **G4 (zero-alloc)** — Phase 1 T1.6 + Phase 2 T2.6 confirm no `Vec` growth on the hot path.
-- [ ] **T4.5** **G5 (feature-isolated)** — `cargo check` (default features) unchanged; the feature compiles standalone.
-- [ ] **T4.6** **G6 (modelless)** — no `riir-train` dep, no gradient descent, no training-time analysis leaked into the public repo. The saturation-epoch / gradient-locality findings stay in Research 417's §1 only.
-- [ ] **T4.7** **Promote/demote per the §1.6 per-stack ledger:**
-  - If G1–G6 PASS **AND** Phase 3 PoC confirms gain over both baselines → consider promotion to default. Default stays **opt-in** until a real-game-domain PoC lands in riir-ai (deferred to riir-ai follow-up, not a katgpt-rs blocker).
-  - If Phase 3 PoC **refutes** the gain → primitive stays opt-in diagnostic-only; record the refutation in `.benchmarks/431_*.md`; consider fusing `permeation_scan` with `causal_head_importance` (Plan 358) as the surviving diagnostic half.
-- [ ] **T4.8** Record stack slot: **intervention/diagnostic** (alongside `causal_head_importance`, `faithfulness_probe`). Update `katgpt-rs/README.md` Feature Showcase + `katgpt-rs/.docs/01_orientation/overview.md` Feature Flags table.
+- [x] **T4.1** **G1 (correctness)** — Phase 1 T1.5 + Phase 2 T2.5 unit tests pass. **34 unit tests PASS.**
+- [x] **T4.2** **G2 (perf)** — `RelocateOp::apply_into` overhead ≤ 5% vs unpatched forward pass (criterion bench). The snapshot+overwrite is two `memcpy`s; should be near-zero. **PASS — 26ns at D=256; <0.03% of a 100µs+ forward pass. See `.benchmarks/431_cross_stage_relocation_goat.md`.**
+- [x] **T4.3** **G3 (no-regression)** — `cargo test --features cross_stage_relocation` clean; `cargo check --all-features` clean. **PASS — 1580/1580 tests; `--all-features` + `--no-default-features --features cross_stage_relocation` both clean.**
+- [x] **T4.4** **G4 (zero-alloc)** — Phase 1 T1.6 + Phase 2 T2.6 confirm no `Vec` growth on the hot path. **PASS — CountingAllocator re-check: 0 allocs on all three hot paths.**
+- [x] **T4.5** **G5 (feature-isolated)** — `cargo check` (default features) unchanged; the feature compiles standalone. **PASS — `--no-default-features --features cross_stage_relocation` compiles clean; implies `causal_head_importance`.**
+- [x] **T4.6** **G6 (modelless)** — no `riir-train` dep, no gradient descent, no training-time analysis leaked into the public repo. The saturation-epoch / gradient-locality findings stay in Research 417's §1 only. **PASS — verified by inspection.**
+- [x] **T4.7** **Promote/demote per the §1.6 per-stack ledger:**
+  - **DECISION: stays OPT-IN.** G1–G6 PASS for katgpt-rs scope, but Phase 3 PoC is not yet run (cross-repo `riir-ai/crates/riir-poc/`). The paper's 58–75% recovery is a quality claim on LLMs; our substrate doesn't have the same early/late MLP structure. Promotion blocked on Phase 3 PoC confirming the transfer.
+- [x] **T4.8** Record stack slot: **intervention/diagnostic** (alongside `causal_head_importance`, `faithfulness_probe`). Update `katgpt-rs/README.md` Feature Showcase + `katgpt-rs/.docs/01_orientation/overview.md` Feature Flags table. **DONE** — both updated.
 
 **Phase 4 exit criterion:** GOAT gate recorded in `.benchmarks/431_cross_stage_relocation_goat.md` with promote/demote decision and per-stack ledger entry.
 

@@ -722,6 +722,26 @@ pub use causal_head_importance::{
 #[cfg(feature = "adaptive_causal_calibration")]
 pub use causal_head_importance::{adaptive_partition, suspect_indices};
 
+// Cross-Stage Residual Relocation Operator + Permeation-Map Diagnostic
+// (Plan 431, Research 417, arXiv:2607.08393 — Knowing-Using Gap). Two
+// modelless primitives: (1) `permeation_scan_into` — a 2D
+// `(src_stage, dst_stage)` intervention heatmap reusing Plan 358's
+// `direct_effect_importance` as the cell score, plus two-cluster
+// classification; (2) `RelocateOp` — an applied operator that snapshots an
+// anchor's state at one stage and overwrites at another, with the paper's
+// `(0.82L→0.45L) + (0.10L→0.45L)` fixed default. Both behind
+// `cross_stage_relocation` feature flag, opt-in. Implies `causal_head_importance`
+// (the cell-score function). Phase 3 defend-wrong PoC in `riir-poc/` is
+// MANDATORY before any promotion — the 58–75% recovery is a quality claim on
+// the paper's LLM substrate, not ours.
+#[cfg(feature = "cross_stage_relocation")]
+pub mod cross_stage_relocation;
+#[cfg(feature = "cross_stage_relocation")]
+pub use cross_stage_relocation::{
+    ClusterClass, PermeationMap, RelocateOp, RelocatePair, RelocatingForward,
+    permeation_scan_into, permeation_scan_square_into,
+};
+
 #[cfg(feature = "latent_trajectory_geometry")]
 pub use latent_trajectory_geometry::{
     BifurcationResult, LatentTrajectoryGeometry, bifurcation_ratio, fast_acos, from_states,
