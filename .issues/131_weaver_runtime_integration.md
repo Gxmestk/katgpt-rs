@@ -49,6 +49,19 @@ The actual `speculative_step_qwen_deltanet_tree` call-site wiring (passing
 verifier hidden + embedding + corrector through the spec step signature)
 remains deferred — see Plan 433 "Out of scope".
 
+**Update 2026-07-14 (Plan 434):** the call-site wiring landed in
+`riir-ai/crates/riir-engine/src/deltanet/tree_forward.rs` as a new sibling
+`speculative_step_qwen_deltanet_tree_with_weaver(...)` (gated `weaver_runtime`).
+The base `speculative_step_qwen_deltanet_tree` signature is unchanged (zero
+churn for existing callers); the post-draft pipeline was extracted into a
+private `spec_step_deltanet_post_draft` helper that both variants delegate
+to (no DRY violation). The weaver variant sources `h_verifier` from
+`target_scratch.hidden_copy[..n_embd]` (the aliasing-avoidance copy populated
+by `forward_qwen_deltanet`; zeros on cold-start, handled by Weaver's no-harm
+contract) and `embedding` from `target_weights.wte`. 2 unit tests verify:
+zero-weight Weaver matches the base path bit-identically (T4), and cold-start
+runs without panic (T5). Plan 433's deferred follow-up is now closed.
+
 ### Why katgpt-rs (not riir-ai)
 
 Per Research 402 §4: katgpt-rs ships the **top-K constrained projection +
