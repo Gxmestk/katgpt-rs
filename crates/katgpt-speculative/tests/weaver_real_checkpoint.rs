@@ -171,7 +171,53 @@ fn real_checkpoint_loads_and_produces_nonzero_residual() {
 
     eprintln!("✅ PASS — real checkpoint loads, format compatible, residuals non-zero.");
     eprintln!(
-        "   This confirms riir-train's safetensors writer and katgpt-rs's reader \
-         are format-compatible, and the trained weights carry real signal."
+        "   This confirms riir-train's safetensors writer and katgpt-rs's reader\
+    are format-compatible, and the trained weights carry real signal."
+    );
+
+    // ── G4 (latency): measure Weaver forward pass time on the real config ──
+    //
+    // The forward pass does: conditioning (2× RMSNorm + matmul), single-head
+    // causal attention over D+1=5 positions, SwiGLU MLP, top-K=32 gather
+    // projection (reads 32×2304×4 = 288 KB of embedding), residual add, softmax.
+    //
+    // We measure the median of N runs to get a stable latency number.
+    const WARMUP_RUNS: usize = 3;
+    const MEASURED_RUNS: usize = 20;
+
+    for _ in 0..WARMUP_RUNS {
+        let _ = corrector.correct(&input);
+    }
+
+    let mut times_us: Vec<f64> = Vec::with_capacity(MEASURED_RUNS);
+    for _ in 0..MEASURED_RUNS {
+        let t0 = std::time::Instant::now();
+        let _ = corrector.correct(&input);
+        times_us.push(t0.elapsed().as_secs_f64() * 1e6);
+    }
+    times_us.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    let median_us = times_us[times_us.len() / 2];
+    let p99_idx = ((times_us.len() as f64 - 1.0) * 0.99) as usize;
+    let p99_us = times_us[p99_idx];
+
+    eprintln!();
+    eprintln!("── G4 Latency (Weaver forward, real config) ──");
+    eprintln!("  Config: hidden=2304, K=32, depth=4, heads=8");
+    eprintln!("  Median: {:.1} µs ({:.2} ms)", median_us, median_us / 1000.0);
+    eprintln!("  P99:    {:.1} µs ({:.2} ms)", p99_us, p99_us / 1000.0);
+    eprintln!("  Runs:   {} (warmup: {})", MEASURED_RUNS, WARMUP_RUNS);
+    eprintln!();
+    eprintln!(
+        "  Context: a single DFlash draft step produces D=4 lookahead positions."
+    );
+    eprintln!(
+        "  This latency is added per draft step when the weaver_runtime feature is on."
+    );
+    eprintln!(
+        "  For reference, a Gemma2-2B forward pass (26 layers, 2B params) takes ~3-5 ms"
+    );
+    eprintln!(
+        "  per token on CPU. The Weaver overhead is {:.1}% of a single verifier step.",
+        median_us / 3000.0 * 100.0
     );
 }

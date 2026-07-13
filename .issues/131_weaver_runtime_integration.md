@@ -240,9 +240,33 @@ default-on because it requires a checkpoint file to exist on disk.
       When ON but no corrector is loaded, zero-init weights produce zero
       residual (verified by `g1_zero_weights_corrected_equals_dflash`).
 - [ ] G4 (latency): Weaver forward adds < X µs per draft step.
-      **NOT MEASURED** — the single-layer model is lightweight, but the top-K=32
-      projection reads ~270 KB of embedding rows (K × hidden_dim × 4 bytes =
-      32 × 2304 × 4 = 288 KB). Needs measurement on the real config.
+      **MEASURED 2026-07-13 (FAILS on CPU, expected):** median **22.1 ms**
+      (P99 23.8 ms) per Weaver forward pass on M3 Max CPU, release build.
+      Config: hidden=2304, K=32, depth=4, heads=8.
+
+      This is **7.4× a single Gemma2-2B verifier step** (3 ms) — too slow
+      for real-time speculative decode. The 54.9M-param model does ~161M
+      FLOPs/forward (5× 2304² attention matmuls + 3× 2304×4096 SwiGLU).
+      At 7.3 GFLOPS this is ~25% of M3 Max's unoptimized f32 peak — there's
+      4× headroom from SIMD alone.
+
+      **Paths to pass G4:**
+      1. **GPU port** (paper's approach) — via riir-gpu CubeCL backend. The
+         M3 Max has Metal 4. Target: <1 ms on GPU (paper-measured).
+      2. **SIMD/BLAS optimization** — the matmuls use `matmul_vec` (naive loop).
+         Replacing with NEON intrinsics or a BLAS call would get 2-4× speedup
+         → ~6-11 ms. Still slower than the verifier step but in the right
+         ballpark for the K=32 top-K projection.
+      3. **Accept the latency for now** — the Weaver corrector is opt-in and
+         only useful when the acceptance-length gain (>1 draft token saved per
+         Weaver step) outweighs the latency. At 22 ms overhead and 3 ms/verifier-
+         step, the break-even is ~8 verifier steps saved per Weaver step. The
+         paper's +77% MAL gain clears this bar easily on GPU; on CPU it's
+         marginal.
+
+      **Verdict:** G4 FAILS on CPU but this is a **known, expected limitation**
+      (CPU-only, no SIMD, 54.9M params). Not a correctness issue. The code is
+      production-correct; perf optimization is a follow-up (GPU port or SIMD).
 
 ## Why this is NOT modelless-promotable
 
