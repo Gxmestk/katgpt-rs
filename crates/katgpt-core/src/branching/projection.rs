@@ -238,6 +238,16 @@ impl<const D: usize> NonInterferenceProjection<D> {
         self.orthogonal_epsilon
     }
 
+    /// ε above which `assign_direction` rejects an assignment.
+    ///
+    /// Migration-relevant: persisted alongside the direction matrix so a
+    /// thawed projection uses the same acceptance threshold as the source.
+    #[inline]
+    #[must_use]
+    pub const fn assign_max_interference(&self) -> f32 {
+        self.assign_max_interference
+    }
+
     /// Borrow the direction for `branch_id`, or `None` if out of range or
     /// unassigned (all-zeros sentinel).
     #[inline]
@@ -423,6 +433,108 @@ impl<const D: usize> NonInterferenceProjection<D> {
             .filter(|dir| !dir.iter().all(|&v| v == 0.0))
             .count()
     }
+
+    // ── Migration serialization (Issue 456 Phase 2: npc_branch_runtimes) ──
+    //
+    // `NonInterferenceProjection` accumulates per-NPC learned direction
+    // vectors beyond the seeded 8: `pipeline::step1_resolve_spawn` calls
+    // `assign_direction(id, hla_embedding)` for every dynamically-spawned
+    // branch, so this projection MUST be migrated. The thresholds
+    // (`orthogonal_epsilon`, `assign_max_interference`) are config-derived
+    // but trivially cheap (4 bytes each) — serializing them avoids the caller
+    // needing to remember which threshold constructor was used.
+    //
+    // Wire format (all LE):
+    //   version(u64) || dim(u32) || rows_len(u32)
+    //     || [rows × [f32; D]]  (D known from the const generic)
+    //     || orthogonal_epsilon(f32) || assign_max_interference(f32)
+    //
+    // `dim` is included as a cross-check against the const generic `D` at
+    // decode time — mismatch returns None.
+
+    /// Serialize this projection's full state (direction matrix + thresholds)
+    /// into a deterministic LE byte buffer.
+    #[must_use]
+    pub fn to_bytes(&self) -> Vec<u8> {
+        use crate::branching::types::BRANCH_TYPES_WIRE_VERSION;
+        let rows = self.directions.len();
+        let mut out = Vec::with_capacity(8 + 4 + 4 + rows * D * 4 + 8);
+        out.extend_from_slice(&BRANCH_TYPES_WIRE_VERSION.to_le_bytes());
+        out.extend_from_slice(&(D as u32).to_le_bytes());
+        out.extend_from_slice(&(rows as u32).to_le_bytes());
+        for row in &self.directions {
+            for x in row {
+                out.extend_from_slice(&x.to_le_bytes());
+            }
+        }
+        out.extend_from_slice(&self.orthogonal_epsilon.to_le_bytes());
+        out.extend_from_slice(&self.assign_max_interference.to_le_bytes());
+        out
+    }
+
+    /// Deserialize a `NonInterferenceProjection<D>` from `bytes`. Returns
+    /// `None` on any structural failure (truncated header, unknown version,
+    /// dimension mismatch with `D`, row-count mismatch, or trailing bytes).
+    #[must_use]
+    pub fn from_bytes(bytes: &[u8]) -> Option<Self> {
+        use crate::branching::types::BRANCH_TYPES_WIRE_VERSION;
+        // Header: version(8) + dim(4) + rows_len(4) = 16 bytes.
+        let (version, rest) = read_u64_le_proj(bytes)?;
+        if version != BRANCH_TYPES_WIRE_VERSION {
+            return None;
+        }
+        let (dim, rest) = read_u32_le_proj(rest)?;
+        if dim as usize != D {
+            return None;
+        }
+        let (rows_len, rest) = read_u32_le_proj(rest)?;
+        let rows_len = rows_len as usize;
+        let need = rows_len.checked_mul(D)?.checked_mul(4)?;
+        if rest.len() < need + 8 {
+            return None;
+        }
+        let mut directions: Vec<[f32; D]> = Vec::with_capacity(rows_len);
+        let mut tail = rest;
+        for _ in 0..rows_len {
+            let mut row = [0.0f32; D];
+            for slot in &mut row {
+                let (x, t) = read_f32_le_proj(tail)?;
+                *slot = x;
+                tail = t;
+            }
+            directions.push(row);
+        }
+        let (orthogonal_epsilon, tail) = read_f32_le_proj(tail)?;
+        let (assign_max_interference, tail) = read_f32_le_proj(tail)?;
+        if !tail.is_empty() {
+            return None;
+        }
+        Some(Self {
+            directions,
+            orthogonal_epsilon,
+            assign_max_interference,
+        })
+    }
+}
+
+// Local read helpers (not public API).
+
+#[inline]
+fn read_u32_le_proj(bytes: &[u8]) -> Option<(u32, &[u8])> {
+    let (head, tail) = bytes.split_first_chunk::<4>()?;
+    Some((u32::from_le_bytes(*head), tail))
+}
+
+#[inline]
+fn read_u64_le_proj(bytes: &[u8]) -> Option<(u64, &[u8])> {
+    let (head, tail) = bytes.split_first_chunk::<8>()?;
+    Some((u64::from_le_bytes(*head), tail))
+}
+
+#[inline]
+fn read_f32_le_proj(bytes: &[u8]) -> Option<(f32, &[u8])> {
+    let (head, tail) = bytes.split_first_chunk::<4>()?;
+    Some((f32::from_le_bytes(*head), tail))
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────
@@ -771,5 +883,91 @@ mod tests {
         // Manually set second direction to bypass the assign-interference gate.
         p.directions[1] = d2;
         assert!(!p.is_non_interfering(BranchId::new(0), BranchId::new(1)));
+    }
+
+    // ── Migration serialization tests (Issue 456 Phase 2) ──────────────
+
+    #[test]
+    fn projection_migration_empty_round_trip() {
+        let p: NonInterferenceProjection<4> = NonInterferenceProjection::new(8);
+        let bytes = p.to_bytes();
+        let decoded = NonInterferenceProjection::<4>::from_bytes(&bytes).expect("decode");
+        assert_eq!(decoded.capacity(), p.capacity());
+        assert_eq!(decoded.n_assigned(), p.n_assigned());
+        assert_eq!(decoded.orthogonal_epsilon(), p.orthogonal_epsilon());
+    }
+
+    #[test]
+    fn projection_migration_with_assigned_directions_round_trip() {
+        let mut p: NonInterferenceProjection<4> = NonInterferenceProjection::new(4);
+        let d0 = [1.0, 0.0, 0.0, 0.0];
+        let d1 = [0.0, 1.0, 0.0, 0.0];
+        assert!(p.assign_direction(BranchId::new(0), &d0).is_ok());
+        assert!(p.assign_direction(BranchId::new(1), &d1).is_ok());
+
+        let bytes = p.to_bytes();
+        let decoded = NonInterferenceProjection::<4>::from_bytes(&bytes).expect("decode");
+
+        assert_eq!(decoded.capacity(), 4);
+        assert_eq!(decoded.n_assigned(), 2);
+        // Verify the assigned directions round-trip exactly.
+        let orig_d0 = p.direction(BranchId::new(0)).copied();
+        let decoded_d0 = decoded.direction(BranchId::new(0)).copied();
+        assert_eq!(orig_d0, decoded_d0);
+        let orig_d1 = p.direction(BranchId::new(1)).copied();
+        let decoded_d1 = decoded.direction(BranchId::new(1)).copied();
+        assert_eq!(orig_d1, decoded_d1);
+    }
+
+    #[test]
+    fn projection_migration_preserves_custom_thresholds() {
+        let p: NonInterferenceProjection<4> =
+            NonInterferenceProjection::with_thresholds(4, 0.05, 0.3);
+        let bytes = p.to_bytes();
+        let decoded = NonInterferenceProjection::<4>::from_bytes(&bytes).expect("decode");
+        assert!((decoded.orthogonal_epsilon() - 0.05).abs() < 1e-6);
+        assert!((decoded.assign_max_interference() - 0.3).abs() < 1e-6);
+    }
+
+    #[test]
+    fn projection_migration_deterministic_same_state_same_bytes() {
+        let mut p_a: NonInterferenceProjection<4> = NonInterferenceProjection::new(4);
+        let mut p_b: NonInterferenceProjection<4> = NonInterferenceProjection::new(4);
+        let d = [1.0, 0.0, 0.0, 0.0];
+        assert!(p_a.assign_direction(BranchId::new(0), &d).is_ok());
+        assert!(p_b.assign_direction(BranchId::new(0), &d).is_ok());
+        assert_eq!(p_a.to_bytes(), p_b.to_bytes());
+    }
+
+    #[test]
+    fn projection_migration_rejects_dimension_mismatch() {
+        // Encode as D=4, decode as D=8 — dimension header check must fail.
+        let p: NonInterferenceProjection<4> = NonInterferenceProjection::new(2);
+        let bytes = p.to_bytes();
+        assert!(NonInterferenceProjection::<8>::from_bytes(&bytes).is_none());
+    }
+
+    #[test]
+    fn projection_migration_rejects_unknown_version() {
+        let p: NonInterferenceProjection<4> = NonInterferenceProjection::new(2);
+        let mut bytes = p.to_bytes();
+        bytes[0] = 0xff; // corrupt version
+        assert!(NonInterferenceProjection::<4>::from_bytes(&bytes).is_none());
+    }
+
+    #[test]
+    fn projection_migration_rejects_truncated_header() {
+        let p: NonInterferenceProjection<4> = NonInterferenceProjection::new(2);
+        let bytes = p.to_bytes();
+        // Header is 16 bytes; cut to 8.
+        assert!(NonInterferenceProjection::<4>::from_bytes(&bytes[..8]).is_none());
+    }
+
+    #[test]
+    fn projection_migration_rejects_trailing_bytes() {
+        let p: NonInterferenceProjection<4> = NonInterferenceProjection::new(2);
+        let mut bytes = p.to_bytes();
+        bytes.push(0xff);
+        assert!(NonInterferenceProjection::<4>::from_bytes(&bytes).is_none());
     }
 }

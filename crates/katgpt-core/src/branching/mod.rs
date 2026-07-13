@@ -86,8 +86,8 @@ pub use router::{
     BranchRouter, DEFAULT_TAU_JACCARD, DEFAULT_TAU_SNAP, DEFAULT_TAU_SPAWN, RouteMode, RouteResult,
 };
 pub use types::{
-    BranchId, BranchLifecycle, BranchStats, CognitiveBranch, EpisodicEntry, FailureEntry,
-    ProceduralRule,
+    BranchId, BranchLifecycle, BranchStats, CognitiveBranch, EpisodicCodec, EpisodicEntry,
+    FailureEntry, ProceduralRule, BRANCH_TYPES_WIRE_VERSION,
 };
 pub use verifier::{
     DEFAULT_QUARANTINE_CENTROID_THRESH, DEFAULT_TAU_CURIOSITY, DEFAULT_TAU_WRITE, VerifierGate,

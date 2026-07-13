@@ -19,7 +19,10 @@
 //!
 //! The hot read-path (`active_branches`) allocates nothing.
 
-use crate::branching::types::{BranchId, BranchLifecycle, CognitiveBranch};
+use crate::branching::types::{
+    decode_lifecycle, encode_lifecycle, BranchId, BranchLifecycle, CognitiveBranch, EpisodicCodec,
+    BRANCH_TYPES_WIRE_VERSION,
+};
 use std::collections::HashSet;
 
 /// Default maximum active branches. Matches the G2 perf target (router < 1µs
@@ -447,6 +450,178 @@ impl<E: Clone> Clone for BranchBank<E> {
     }
 }
 
+// ─── Migration serialization (Issue 456 Phase 2: npc_branch_runtimes) ──────
+//
+// `BranchBank<E>` is the bounded slot array holding the per-NPC cognitive
+// branch memory. The wire format (all LE) is:
+//
+// ```text
+//   version(u64) || max_branches(u64) || slots_len(u32)
+//     || [for each slot in 0..slots_len:
+//          lifecycle(u8)
+//          if lifecycle != Removed:
+//            CognitiveBranch<E> bytes (self-framed via length-prefixed Vecs)
+//        ]
+//     || free_slots_len(u32) || free_slots(u32 × free_slots_len)
+//     || n_active(u64)
+// ```
+//
+// Removed slots emit ONLY the `lifecycle` byte (no branch body) — they're
+// inert capacity that will be overwritten on the next `spawn` reusing the
+// slot. This keeps the wire format compact for banks that have been through
+// many prune/spawn cycles. On decode, removed slots are reconstructed as
+// default empty branches with `lifecycle = Removed` (the body is rebuilt on
+// reuse).
+//
+// # Determinism
+//
+// The slot array is iterated in its natural `Vec` order (slot index ==
+// `BranchId.0`), the free-list is iterated in LIFO order (the canonical
+// order used by the spawn path). No HashMap / papaya. G4 determinism holds.
+//
+// # Cross-version compat
+//
+// The `version` field is `BRANCH_TYPES_WIRE_VERSION` from `types.rs`.
+// Reserved for future use; bumped on any incompatible change. The decoder
+// rejects unknown versions for forwards-compat.
+
+impl<E: Clone + EpisodicCodec> BranchBank<E> {
+    /// Serialize this bank's full state (slot array + free-list + counts) into
+    /// a deterministic LE byte buffer. See the module docs above for the wire
+    /// format. `n_active` is included as a trailing checksum — the decoder
+    /// verifies it matches the count of non-Removed slots.
+    #[must_use]
+    pub fn to_bytes(&self) -> Vec<u8> {
+        let mut out = Vec::with_capacity(8 + 8 + 4 + self.branches.len() * 64);
+        out.extend_from_slice(&BRANCH_TYPES_WIRE_VERSION.to_le_bytes());
+        out.extend_from_slice(&(self.max_branches as u64).to_le_bytes());
+        out.extend_from_slice(&(self.branches.len() as u32).to_le_bytes());
+        for branch in &self.branches {
+            // Removed slots emit only the lifecycle byte — the body will be
+            // rebuilt on the next spawn that reuses this slot.
+            encode_lifecycle(&mut out, branch.lifecycle);
+            if !matches!(branch.lifecycle, BranchLifecycle::Removed) {
+                branch.encode_to(&mut out);
+            }
+        }
+        out.extend_from_slice(&(self.free_slots.len() as u32).to_le_bytes());
+        for slot in &self.free_slots {
+            out.extend_from_slice(&slot.to_le_bytes());
+        }
+        out.extend_from_slice(&(self.n_active as u64).to_le_bytes());
+        out
+    }
+
+    /// Deserialize a `BranchBank<E>` from `bytes`. Returns `None` on any
+    /// structural failure (truncated header, unknown version, lifecycle byte
+    /// mismatch with non-Removed branch body, free-list length mismatch,
+    /// `n_active` checksum mismatch, or trailing bytes).
+    ///
+    /// The resulting bank has `max_branches` capacity but the branches Vec is
+    /// allocated to exactly `slots_len` (no padding) — `spawn` will push new
+    /// slots up to `max_branches` if needed.
+    #[must_use]
+    pub fn from_bytes(bytes: &[u8]) -> Option<Self> {
+        // Header: version(8) + max_branches(8) + slots_len(4) = 20 bytes.
+        let (version, rest) = read_u64_le_local(bytes)?;
+        if version != BRANCH_TYPES_WIRE_VERSION {
+            return None;
+        }
+        let (max_branches, rest) = read_u64_le_local(rest)?;
+        let max_branches = max_branches as usize;
+        let (slots_len, mut rest) = read_u32_le_local(rest)?;
+        let slots_len = slots_len as usize;
+
+        let mut branches: Vec<CognitiveBranch<E>> = Vec::with_capacity(slots_len);
+        for slot_idx in 0..slots_len {
+            let (lc, t) = decode_lifecycle(rest)?;
+            rest = t;
+            if matches!(lc, BranchLifecycle::Removed) {
+                // Reconstruct an inert removed slot. The body will be
+                // overwritten on the next spawn reusing this slot index.
+                // Id is set to match the slot index so `BranchId` stays
+                // consistent with the dense slot position.
+                branches.push(CognitiveBranch {
+                    id: BranchId(slot_idx as u32),
+                    spawn_anchor: Vec::new(),
+                    token_signature: Vec::new(),
+                    episodic: Vec::new(),
+                    procedural: Vec::new(),
+                    failures: Vec::new(),
+                    scope_ctx: None,
+                    stats: crate::branching::types::BranchStats::default(),
+                    lifecycle: BranchLifecycle::Removed,
+                });
+            } else {
+                let (branch, t) = CognitiveBranch::<E>::from_bytes_tail(rest)?;
+                // The decoded branch's `id` should match the slot index.
+                // Trust the wire (the source bank's invariant).
+                if branch.id.0 != slot_idx as u32 {
+                    return None;
+                }
+                // Verify the lifecycle byte matches the branch body's
+                // lifecycle. If the encoder wrote `Removed` but the branch
+                // body says otherwise (or vice versa), reject — that's a
+                // structural inconsistency indicating either tampering or
+                // an encoder bug.
+                if branch.lifecycle != lc {
+                    return None;
+                }
+                branches.push(branch);
+                rest = t;
+            }
+        }
+
+        let (free_len, mut rest) = read_u32_le_local(rest)?;
+        let free_len = free_len as usize;
+        if rest.len() < free_len.checked_mul(4)? {
+            return None;
+        }
+        let mut free_slots = Vec::with_capacity(free_len);
+        for _ in 0..free_len {
+            let (slot, t) = read_u32_le_local(rest)?;
+            free_slots.push(slot);
+            rest = t;
+        }
+
+        let (n_active, rest) = read_u64_le_local(rest)?;
+        if !rest.is_empty() {
+            return None;
+        }
+        let n_active = n_active as usize;
+
+        // Checksum: n_active must match the count of routable slots.
+        let computed_n_active = branches
+            .iter()
+            .filter(|b| b.lifecycle.is_routable())
+            .count();
+        if computed_n_active != n_active {
+            return None;
+        }
+
+        Some(Self {
+            branches,
+            free_slots,
+            max_branches,
+            n_active,
+        })
+    }
+}
+
+// Local read helpers (mirrors types.rs helpers; not public API).
+
+#[inline]
+fn read_u32_le_local(bytes: &[u8]) -> Option<(u32, &[u8])> {
+    let (head, tail) = bytes.split_first_chunk::<4>()?;
+    Some((u32::from_le_bytes(*head), tail))
+}
+
+#[inline]
+fn read_u64_le_local(bytes: &[u8]) -> Option<(u64, &[u8])> {
+    let (head, tail) = bytes.split_first_chunk::<8>()?;
+    Some((u64::from_le_bytes(*head), tail))
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────
 
 /// Dot product of two f32 slices. Zero-alloc, auto-vectorizable inner loop.
@@ -743,5 +918,147 @@ mod tests {
         let s = format!("{:?}", bank);
         assert!(s.contains("max_branches: 4"));
         assert!(s.contains("n_active: 1"));
+    }
+
+    // ── Migration serialization tests (Issue 456 Phase 2) ──────────────
+
+    /// Mock codec wrapping a `u32` — 4 bytes LE, no length prefix (fixed size).
+    #[derive(Clone, Debug, Default, PartialEq)]
+    struct U32CodecBank(u32);
+
+    impl EpisodicCodec for U32CodecBank {
+        fn encode_to(&self, out: &mut Vec<u8>) {
+            out.extend_from_slice(&self.0.to_le_bytes());
+        }
+        fn decode_from(bytes: &[u8]) -> Option<(Self, &[u8])> {
+            let (head, tail) = bytes.split_first_chunk::<4>()?;
+            Some((Self(u32::from_le_bytes(*head)), tail))
+        }
+    }
+
+    #[test]
+    fn bank_migration_empty_round_trip() {
+        let bank: BranchBank<()> = BranchBank::new(8);
+        let bytes = bank.to_bytes();
+        let decoded = BranchBank::<()>::from_bytes(&bytes).expect("decode empty bank");
+        assert_eq!(decoded.max_branches(), bank.max_branches());
+        assert_eq!(decoded.n_active(), bank.n_active());
+        assert_eq!(decoded.slots(), bank.slots());
+    }
+
+    #[test]
+    fn bank_migration_seeded_round_trip_preserves_memory() {
+        let mut bank: BranchBank<U32CodecBank> = BranchBank::new(8);
+        let id0 = bank.spawn(vec![1.0, 0.0]).unwrap();
+        let id1 = bank.spawn(vec![0.0, 1.0]).unwrap();
+
+        // Write some content into both branches.
+        bank.write_episodic(id0, vec![0.1, 0.2], U32CodecBank(100), 0.8, Some(7), 42);
+        bank.write_episodic(id1, vec![0.3, 0.4], U32CodecBank(200), 0.6, None, 43);
+        bank.get_mut(id0).unwrap().push_token(15);
+
+        let bytes = bank.to_bytes();
+        let decoded = BranchBank::<U32CodecBank>::from_bytes(&bytes).expect("decode");
+
+        // Verify capacity + counts.
+        assert_eq!(decoded.max_branches(), bank.max_branches());
+        assert_eq!(decoded.n_active(), bank.n_active());
+        assert_eq!(decoded.slots(), bank.slots());
+
+        // Verify the content of each slot.
+        for slot in 0..bank.slots() {
+            let original = bank.get(BranchId(slot as u32)).unwrap();
+            let decoded_slot = decoded.get(BranchId(slot as u32)).unwrap();
+            assert_eq!(decoded_slot.id, original.id, "slot {slot} id mismatch");
+            assert_eq!(decoded_slot.spawn_anchor, original.spawn_anchor);
+            assert_eq!(decoded_slot.token_signature, original.token_signature);
+            assert_eq!(decoded_slot.episodic.len(), original.episodic.len());
+            for (i, e) in original.episodic.iter().enumerate() {
+                assert_eq!(decoded_slot.episodic[i].payload, e.payload, "slot {slot} ep {i}");
+                assert_eq!(decoded_slot.episodic[i].tick, e.tick);
+            }
+            assert_eq!(decoded_slot.stats, original.stats);
+            assert_eq!(decoded_slot.lifecycle, original.lifecycle);
+        }
+    }
+
+    #[test]
+    fn bank_migration_preserves_free_list_reuse_order() {
+        // Spawn 3, prune the middle one, then decode — the free-list must
+        // round-trip so a subsequent `spawn` on the decoded bank reuses the
+        // same slot index.
+        let mut bank: BranchBank<()> = BranchBank::new(8);
+        let _a = bank.spawn(vec![1.0]).unwrap();
+        let b = bank.spawn(vec![0.0]).unwrap();
+        let _c = bank.spawn(vec![1.0]).unwrap();
+        bank.prune(b);
+        assert_eq!(bank.slots(), 3);
+        assert_eq!(bank.n_active(), 2);
+
+        let bytes = bank.to_bytes();
+        let mut decoded = BranchBank::<()>::from_bytes(&bytes).expect("decode");
+
+        // Slots + active count + free-list length match.
+        assert_eq!(decoded.slots(), 3);
+        assert_eq!(decoded.n_active(), 2);
+
+        // Spawning on the decoded bank should reuse slot 1 (the pruned one).
+        let reused = decoded.spawn(vec![0.5]).unwrap();
+        assert_eq!(reused, BranchId(1), "decoded bank must reuse the pruned slot");
+    }
+
+    #[test]
+    fn bank_migration_deterministic_same_state_same_bytes() {
+        // G4 determinism gate: same logical state → same bytes.
+        let mut bank_a: BranchBank<U32CodecBank> = BranchBank::new(8);
+        let mut bank_b: BranchBank<U32CodecBank> = BranchBank::new(8);
+        let id_a = bank_a.spawn(vec![1.0]).unwrap();
+        let id_b = bank_b.spawn(vec![1.0]).unwrap();
+        assert_eq!(id_a, id_b);
+        bank_a.write_episodic(id_a, vec![0.5], U32CodecBank(7), 0.5, None, 10);
+        bank_b.write_episodic(id_b, vec![0.5], U32CodecBank(7), 0.5, None, 10);
+
+        let bytes_a = bank_a.to_bytes();
+        let bytes_b = bank_b.to_bytes();
+        assert_eq!(bytes_a, bytes_b, "same state must serialize identically");
+    }
+
+    #[test]
+    fn bank_migration_rejects_unknown_version() {
+        let bank: BranchBank<()> = BranchBank::new(4);
+        let mut bytes = bank.to_bytes();
+        // Stomp the version byte to something invalid.
+        bytes[0] = 0xff;
+        assert!(BranchBank::<()>::from_bytes(&bytes).is_none());
+    }
+
+    #[test]
+    fn bank_migration_rejects_truncated_header() {
+        let bank: BranchBank<()> = BranchBank::new(4);
+        let bytes = bank.to_bytes();
+        // Cut to 5 bytes (< 20-byte header).
+        assert!(BranchBank::<()>::from_bytes(&bytes[..5]).is_none());
+    }
+
+    #[test]
+    fn bank_migration_rejects_trailing_bytes() {
+        let bank: BranchBank<()> = BranchBank::new(4);
+        let mut bytes = bank.to_bytes();
+        bytes.push(0xff); // one trailing byte
+        assert!(BranchBank::<()>::from_bytes(&bytes).is_none());
+    }
+
+    #[test]
+    fn bank_migration_rejects_n_active_checksum_mismatch() {
+        let mut bank: BranchBank<()> = BranchBank::new(8);
+        bank.spawn(vec![1.0]);
+        bank.spawn(vec![0.0]);
+        // n_active is at the very end (last 8 bytes). Flip the low byte to
+        // corrupt the count without changing the slot array.
+        let mut bytes = bank.to_bytes();
+        let last = bytes.len() - 1;
+        bytes[last] ^= 0x01; // toggle low bit of the high byte of n_active
+        assert!(BranchBank::<()>::from_bytes(&bytes).is_none(),
+            "n_active checksum mismatch must be rejected");
     }
 }
