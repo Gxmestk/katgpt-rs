@@ -38,13 +38,9 @@ fn log_softmax_into(logits: &[f32], out: &mut [f32]) {
         return;
     }
 
-    // Pass 1: find max for numerical stability.
-    let mut max_val = f32::NEG_INFINITY;
-    for &v in logits {
-        if v > max_val {
-            max_val = v;
-        }
-    }
+    // Pass 1: find max for numerical stability (SIMD-accelerated).
+    use katgpt_types::simd::simd_max_f32;
+    let max_val = simd_max_f32(logits);
     // Guard against all-NEG_INFINITY (shouldn't happen with real logits).
     if max_val == f32::NEG_INFINITY {
         let ln_n = (n as f32).ln();
@@ -226,22 +222,27 @@ pub fn product_policy_log(pre_logits: &[f32], post_logits: &[f32], w: f32, out: 
     let one_minus_w = 1.0 - w;
 
     // Compute log partition functions for both distributions.
-    let pre_max = pre_logits.iter().copied().fold(f32::NEG_INFINITY, f32::max);
-    let post_max = post_logits
-        .iter()
-        .copied()
-        .fold(f32::NEG_INFINITY, f32::max);
+    // SIMD-accelerated max + sum (NEON/AVX2) — vocab-sized slices benefit.
+    use katgpt_types::simd::{simd_max_f32, simd_sum_f32};
+    let pre_max = simd_max_f32(pre_logits);
+    let post_max = simd_max_f32(post_logits);
 
-    let pre_lse: f32 = pre_logits
-        .iter()
-        .map(|&v| (v - pre_max).exp())
-        .sum::<f32>()
-        .ln();
-    let post_lse: f32 = post_logits
-        .iter()
-        .map(|&v| (v - post_max).exp())
-        .sum::<f32>()
-        .ln();
+    // Fused exp+sum via a single pass: write shifted exp into `out` temporarily,
+    // then sum. Saves a separate allocation.
+    // Use chunk-4 exp accumulator (lets LLVM auto-vectorize the exp loop).
+    let pre_lse: f32 = {
+        for (i, slot) in out.iter_mut().enumerate() {
+            *slot = (pre_logits[i] - pre_max).exp();
+        }
+        simd_sum_f32(out).ln()
+    };
+    let post_lse: f32 = {
+        // Reuse `out` as scratch again — its final value is overwritten below.
+        for (i, slot) in out.iter_mut().enumerate() {
+            *slot = (post_logits[i] - post_max).exp();
+        }
+        simd_sum_f32(out).ln()
+    };
 
     let pre_log_z = pre_max + pre_lse; // log Σ exp(pre)
     let post_log_z = post_max + post_lse;
@@ -456,13 +457,17 @@ impl ProductPolicySharpen {
     /// probability distribution directly.
     pub fn sharpen_normalized(&self, pre_logits: &[f32], post_logits: &[f32], out: &mut [f32]) {
         product_policy_log(pre_logits, post_logits, self.w, out);
-        // Softmax in-place.
-        let max_val = out.iter().copied().fold(f32::NEG_INFINITY, f32::max);
-        let sum: f32 = out.iter().map(|&v| (v - max_val).exp()).sum();
+        // Softmax in-place (SIMD-accelerated max + sum).
+        use katgpt_types::simd::{simd_max_f32, simd_sum_f32};
+        let max_val = simd_max_f32(out);
+        for v in out.iter_mut() {
+            *v = (*v - max_val).exp();
+        }
+        let sum: f32 = simd_sum_f32(out);
         if sum > 0.0 {
-            let log_sum = sum.ln();
+            let inv_sum = 1.0 / sum;
             for v in out.iter_mut() {
-                *v = (*v - max_val - log_sum).exp();
+                *v *= inv_sum;
             }
         }
     }
