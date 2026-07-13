@@ -248,6 +248,14 @@ pub use set_diffusion::{
     set_diffusion_decode_scheduled,
 };
 
+// ── Weaver marginal corrector re-export (Plan 436, feature: weaver_runtime) ──
+// Re-exports the Weaver types so the GPU backend (`riir-gpu/weaver_gpu` feature,
+// Plan 436 Phase 1) can reach `WeaverWeights` / `WeaverConfig` / `WeaverScratch`
+// through the root path `katgpt_rs::speculative::weaver::*`. Mirrors the
+// set_diffusion_decoder cross-repo pattern.
+#[cfg(feature = "weaver_runtime")]
+pub use katgpt_speculative::weaver;
+
 // ── D2F Drafter Verifier Re-exports (Plan 089, Tri-Mode) ───
 #[cfg(feature = "tri_mode")]
 pub use d2f_verifier::D2fDrafterVerifier;
