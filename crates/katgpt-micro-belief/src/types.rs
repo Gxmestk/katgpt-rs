@@ -56,6 +56,23 @@ pub enum RecurrenceFamily {
     DeltaRule = 2,
 }
 
+impl RecurrenceFamily {
+    /// Deserialize from a raw `u8` discriminant.
+    ///
+    /// Returns `None` for unknown values. Used by
+    /// `MicroRecurrentKernelSnapshot::from_bytes` (Issue 456 Phase 2 — FreezeTrigger
+    /// migration). Symmetric with the `#[repr(u8)]` cast `family as u8`.
+    #[inline]
+    pub const fn from_u8(b: u8) -> Option<Self> {
+        match b {
+            0 => Some(Self::Attractor),
+            1 => Some(Self::LatentThought),
+            2 => Some(Self::DeltaRule),
+            _ => None,
+        }
+    }
+}
+
 /// The core per-entity belief-state kernel trait.
 ///
 /// Each NPC / agent holds one kernel (frozen at spawn, hot-swappable via

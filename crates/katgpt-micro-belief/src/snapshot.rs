@@ -149,6 +149,67 @@ impl MicroRecurrentKernelSnapshot {
         let recomputed = *hasher.finalize().as_bytes();
         recomputed == self.blake3
     }
+
+    /// Serialize to a flat byte buffer (Issue 456 Phase 2 — FreezeTrigger
+    /// migration artifact).
+    ///
+    /// Layout (all LE, length-prefixed because `weights_blob` is variable):
+    /// `family (1) || dim (8) || weights_blob_len (8) || weights_blob (N) ||
+    /// blake3 (32) || version (8)` = `57 + N` bytes.
+    ///
+    /// Deterministic by construction: no pointers, no padding, no implicit
+    /// struct layout. The outer `MerkleFrozenEnvelope` provides tamper
+    /// detection at the bundle level; the per-block `verify()` is the
+    /// integrity check at the snapshot level.
+    pub fn to_bytes(&self) -> Vec<u8> {
+        let mut buf =
+            Vec::with_capacity(1 + 8 + 8 + self.weights_blob.len() + 32 + 8);
+        buf.push(self.family as u8);
+        buf.extend_from_slice(&(self.dim as u64).to_le_bytes());
+        buf.extend_from_slice(&(self.weights_blob.len() as u64).to_le_bytes());
+        buf.extend_from_slice(&self.weights_blob);
+        buf.extend_from_slice(&self.blake3);
+        buf.extend_from_slice(&self.version.to_le_bytes());
+        buf
+    }
+
+    /// Deserialize from a flat byte buffer produced by [`to_bytes`](Self::to_bytes).
+    ///
+    /// Returns `None` on any structural malformation:
+    /// - Truncated header (< 17 bytes for family + dim + length)
+    /// - Truncated `weights_blob` (declared length exceeds remaining bytes)
+    /// - Truncated tail (< 40 bytes after blob for blake3 + version)
+    /// - Unknown `family` discriminant
+    ///
+    /// Does NOT re-verify the BLAKE3 — call [`verify`](Self::verify) afterwards
+    /// to check integrity.
+    pub fn from_bytes(buf: &[u8]) -> Option<Self> {
+        // Header: family (1) + dim (8) + blob_len (8) = 17 bytes minimum.
+        if buf.len() < 17 {
+            return None;
+        }
+        let family = RecurrenceFamily::from_u8(buf[0])?;
+        let dim = u64::from_le_bytes(buf[1..9].try_into().ok()?) as usize;
+        let blob_len = u64::from_le_bytes(buf[9..17].try_into().ok()?) as usize;
+        // Need blob_len + 32 (blake3) + 8 (version) after the 17-byte header.
+        let needed = 17 + blob_len + 32 + 8;
+        if buf.len() != needed {
+            return None;
+        }
+        let weights_blob = buf[17..17 + blob_len].to_vec();
+        let blake3: [u8; 32] =
+            buf[17 + blob_len..17 + blob_len + 32].try_into().ok()?;
+        let version = u64::from_le_bytes(
+            buf[17 + blob_len + 32..17 + blob_len + 32 + 8].try_into().ok()?,
+        );
+        Some(Self {
+            family,
+            dim,
+            weights_blob,
+            blake3,
+            version,
+        })
+    }
 }
 
 #[cfg(test)]
@@ -248,5 +309,122 @@ mod tests {
         );
         assert!(snap.verify());
         assert_eq!(snap.blake3, expected_hash);
+    }
+
+    // ── Issue 456 Phase 2: to_bytes / from_bytes round-trip ──────────
+
+    #[test]
+    fn bytes_roundtrip_preserves_all_fields() {
+        let k = AttractorKernel::from_seed(42, 32);
+        let snap =
+            MicroRecurrentKernelSnapshot::from_kernel(&k, k.to_snapshot_blob(), 7);
+        let bytes = snap.to_bytes();
+        let back =
+            MicroRecurrentKernelSnapshot::from_bytes(&bytes).expect("deserialize");
+        assert_eq!(back.family, snap.family);
+        assert_eq!(back.dim, snap.dim);
+        assert_eq!(back.weights_blob, snap.weights_blob);
+        assert_eq!(back.blake3, snap.blake3);
+        assert_eq!(back.version, snap.version);
+        assert!(back.verify(), "deserialised snapshot must still verify");
+    }
+
+    #[test]
+    fn bytes_roundtrip_empty_blob() {
+        // Degenerate case: zero-length weights_blob. The length prefix must
+        // round-trip correctly.
+        let snap = MicroRecurrentKernelSnapshot::from_parts(
+            RecurrenceFamily::DeltaRule,
+            0,
+            Vec::new(),
+            [0u8; 32],
+            3,
+        );
+        let bytes = snap.to_bytes();
+        // family(1) + dim(8) + blob_len(8) + blob(0) + blake3(32) + version(8) = 57
+        assert_eq!(bytes.len(), 57);
+        let back =
+            MicroRecurrentKernelSnapshot::from_bytes(&bytes).expect("deserialize");
+        assert_eq!(back.family, RecurrenceFamily::DeltaRule);
+        assert_eq!(back.dim, 0);
+        assert!(back.weights_blob.is_empty());
+        assert_eq!(back.version, 3);
+    }
+
+    #[test]
+    fn from_bytes_rejects_truncated_header() {
+        // 16 bytes — one short of the 17-byte minimum header.
+        let bytes = [0u8; 16];
+        assert!(MicroRecurrentKernelSnapshot::from_bytes(&bytes).is_none());
+    }
+
+    #[test]
+    fn from_bytes_rejects_truncated_blob() {
+        let k = AttractorKernel::from_seed(42, 32);
+        let snap =
+            MicroRecurrentKernelSnapshot::from_kernel(&k, k.to_snapshot_blob(), 1);
+        let bytes = snap.to_bytes();
+        // Clip the tail — declares a blob_len that the remaining bytes can't satisfy.
+        let truncated = &bytes[..bytes.len() - 1];
+        assert!(MicroRecurrentKernelSnapshot::from_bytes(truncated).is_none());
+    }
+
+    #[test]
+    fn from_bytes_rejects_unknown_family() {
+        let k = AttractorKernel::from_seed(42, 32);
+        let snap =
+            MicroRecurrentKernelSnapshot::from_kernel(&k, k.to_snapshot_blob(), 1);
+        let mut bytes = snap.to_bytes();
+        bytes[0] = 99; // Invalid family discriminant.
+        assert!(MicroRecurrentKernelSnapshot::from_bytes(&bytes).is_none());
+    }
+
+    #[test]
+    fn bytes_format_is_le_and_length_prefixed() {
+        // Structural sanity: the byte layout must match the documented format.
+        // family(1) || dim(8) || blob_len(8) || blob(N) || blake3(32) || version(8)
+        let k = AttractorKernel::from_seed(42, 16);
+        let blob = k.to_snapshot_blob();
+        let snap = MicroRecurrentKernelSnapshot::from_kernel(&k, blob.clone(), 5);
+        let bytes = snap.to_bytes();
+
+        assert_eq!(bytes[0], RecurrenceFamily::Attractor as u8);
+        let dim = u64::from_le_bytes(bytes[1..9].try_into().unwrap());
+        assert_eq!(dim as usize, snap.dim);
+        let blob_len = u64::from_le_bytes(bytes[9..17].try_into().unwrap());
+        assert_eq!(blob_len as usize, blob.len());
+        let tail_offset = 17 + blob.len();
+        assert_eq!(&bytes[tail_offset..tail_offset + 32], &snap.blake3);
+        let version = u64::from_le_bytes(
+            bytes[tail_offset + 32..tail_offset + 40].try_into().unwrap(),
+        );
+        assert_eq!(version, snap.version);
+        assert_eq!(bytes.len(), 17 + blob.len() + 32 + 8);
+    }
+
+    #[test]
+    fn bytes_roundtrip_is_deterministic() {
+        let k = AttractorKernel::from_seed(42, 32);
+        let snap =
+            MicroRecurrentKernelSnapshot::from_kernel(&k, k.to_snapshot_blob(), 1);
+        let b1 = snap.to_bytes();
+        for _ in 0..100 {
+            let b2 = snap.to_bytes();
+            assert_eq!(b1, b2, "to_bytes must be deterministic");
+        }
+    }
+
+    #[test]
+    fn recurrence_family_from_u8_round_trips_all_variants() {
+        for variant in [
+            RecurrenceFamily::Attractor,
+            RecurrenceFamily::LatentThought,
+            RecurrenceFamily::DeltaRule,
+        ] {
+            let back = RecurrenceFamily::from_u8(variant as u8)
+                .expect("known variant must round-trip");
+            assert_eq!(back, variant);
+        }
+        assert!(RecurrenceFamily::from_u8(99).is_none());
     }
 }
