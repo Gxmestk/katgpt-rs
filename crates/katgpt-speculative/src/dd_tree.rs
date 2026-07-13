@@ -3800,17 +3800,15 @@ pub fn build_dd_tree_belief(
     let mut marginals = Vec::with_capacity(drafts.len());
 
     for draft_token in &drafts {
-        let mut marginal = vec![0.0f32; vocab_size];
-        // The drafted token gets dominant probability
+        // Initialize the whole marginal to `residual`, then stamp the
+        // drafted token's slot — avoids a redundant zero-init pass followed
+        // by a full overwrite pass.
+        //
+        // Compute residual up front (does not depend on the per-slot index).
         let confidence = (draft_token.log_prob.exp()).max(0.5);
-        marginal[draft_token.token_idx] = confidence;
-        // Spread remaining mass uniformly
         let residual = (1.0 - confidence) / (vocab_size - 1).max(1) as f32;
-        for (j, m) in marginal.iter_mut().enumerate() {
-            if j != draft_token.token_idx {
-                *m = residual;
-            }
-        }
+        let mut marginal = vec![residual; vocab_size];
+        marginal[draft_token.token_idx] = confidence;
         marginals.push(marginal);
     }
 
