@@ -1,8 +1,8 @@
 # Research 418: StreamDQ — SIMD Analog of Near-Memory Weight DeQuantization
 
 > **Source:** [StreamDQ: Near-Memory Weight DeQuantization in Custom HBM for Scalable AI Inference Acceleration](https://arxiv.org/abs/2607.08993) — Jeong et al., SK Hynix, 2026-07-09
-> **Date:** 2026-07-13
-> **Status:** Active — Plan 431 opened
+> **Date:** 2026-07-13 (opened) · 2026-07-13 (resolved — both GOAT gates PASS)
+> **Status:** RESOLVED — Gain confirmed by Plan 431 Phase 4 (raw primitive 4.58×) + Plan 486 Phase 3 (real Q4_K blocks 2.0–2.3×). Default-on in katgpt-core (`simd_lut_dequant`) and riir-engine (`simd_lut_q4k`).
 > **Related Research:** 110 (Ciot ternary SIMD plasma tier), 218 (Breakeven routing — covers paper's kernel selection), 200 (Quantization outlier collapse), 202 (QAT infusion), 065 (RotorQuant), 020 (TurboQuant), 159 (KVarN)
 > **Related Plans:** 431 (SIMD LUT DeQuant), 227 (async Q/DQ overlap — cousin), 218 (Breakeven router — covers fused/split kernel selection)
 > **Classification:** Public
@@ -11,7 +11,7 @@
 
 ## TL;DR
 
-StreamDQ is a **hardware** paper (DQBs in HBM base dies, 12nm CMOS, 7.08× mpGEMM speedup, 90.23% lower energy) — but its **dequantization techniques** distill cleanly into **software SIMD analogs** we already partially ship. The honest framing: we cannot replicate the 7× hardware speedup, but the paper exposes three real gaps in our SIMD dequant substrate. **Verdict: Gain** (with GOAT-upside pending benchmark) — implement the LUT-based INT→FP conversion + shared-FP32-ALU + sideband-tag dispatch behind a feature flag, benchmark vs the current arithmetic path, promote only if it wins.
+StreamDQ is a **hardware** paper (DQBs in HBM base dies, 12nm CMOS, 7.08× mpGEMM speedup, 90.23% lower energy) — but its **dequantization techniques** distill cleanly into **software SIMD analogs** we already partially ship. The honest framing: we cannot replicate the 7× hardware speedup, but the paper exposes three real gaps in our SIMD dequant substrate. **Verdict: Gain — CONFIRMED.** Both GOAT gates now PASS (Plan 431 Phase 4 raw primitive 4.58× fused / 0.286× plain-dequant on NEON; Plan 486 Phase 3 real Q4_K blocks 2.0–2.3× fused CPU GEMV). The LUT path wins on the **fused dequant+dot** slot only; standalone dequant stays arithmetic (no native NEON gather). `simd_lut_dequant` is default-on in katgpt-core; `simd_lut_q4k` is default-on in riir-engine. Phase 6 (FP8/INT8/Q8_KV LUT + sideband dispatch) deferred `[-]` — open an issue if a consumer appears.
 
 **Distilled for katgpt-rs (modelless, inference-time):**
 The transferable primitive is a **polymorphic LUT-accelerated dequantize** — one shared FP32 affine stage `(x − z) · s` fed by format-specific LUT lookups that replace the slow integer→float arithmetic cast. The "sideband tag" becomes a `QuantFormat` enum dispatched at runtime. The "pseudo-channel-aware layout" is already shipped as cache-line alignment.
@@ -150,9 +150,18 @@ This reframing doesn't unlock a Super-GOAT angle. The primitive stays in the "qu
 
 **Q1-Q4 = NO → not Super-GOAT.** No private guide required (§1.5).
 
-### 3.1 Tier verdict: **Gain** (with GOAT-upside pending benchmark)
+### 3.1 Tier verdict: **Gain — CONFIRMED** (both GOAT gates PASS, 2026-07-13)
 
-One-line reasoning: real gap in our SIMD substrate (no LUT-based INT→FP, no shared-FP32-ALU primitive), but well-known technique that adds a perf optimization to an existing capability rather than a new capability class. Latency gain is SIMD-platform-dependent and must be benchmarked.
+One-line reasoning: real gap in our SIMD substrate (no LUT-based INT→FP, no shared-FP32-ALU primitive), now closed by a fused dequant+dot primitive that wins 2.0–4.58× over the arithmetic baseline. The win is slot-specific: **fused dequant+dot = PROMOTE**, **standalone dequant = DEMOTE** (NEON has no native gather, so plain LUT dequant is 0.286× — arithmetic cast remains the GOAT for the standalone slot). Latency was benchmarked, not pre-claimed.
+
+**Post-GOAT outcome ledger:**
+
+| Slot | Verdict | Number |
+|---|---|---|
+| Fused dequant+dot (raw primitive, Plan 431 Phase 4) | ✅ PROMOTE — default-on in katgpt-core | 4.58× |
+| Fused CPU GEMV on real Q4_K blocks (Plan 486 Phase 3) | ✅ PROMOTE — default-on in riir-engine | 2.0–2.3× |
+| Standalone dequant, single-block (Plan 431 Phase 4) | ❌ DEMOTE — keep arithmetic | 0.575× |
+| Standalone dequant, full-row (Plan 431 Phase 4) | ❌ DEMOTE — keep arithmetic | 0.286× |
 
 ### 3.2 MOAT gate per domain (§1.6)
 
@@ -211,10 +220,14 @@ The paper's 7× speedup is a **hardware** number (DQBs eliminate CUDA-core instr
 
 **Realistic target: 1.0×-1.5× on Q4_K dequant microbenchmarks, plausibly 0.9× (loss) if gather is slow.** The GOAT gate settles it honestly. We do NOT pre-claim a win.
 
-If the GOAT gate fails: the primitive still ships behind `simd_lut_dequant` as opt-in, and the research note documents the negative result. The next consumer (a future FP8 path, where LUT might win bigger) has the infrastructure ready.
+**POST-GOAT (2026-07-13): the gate ran, and the prediction was an UNDERPROMISE on the fused slot.** Actual results exceeded the 1.0–1.5× target by 1.3–3×:
+- Plan 431 Phase 4 raw primitive: **4.58× fused** (massively above target), **0.286× plain** (the predicted ~0.9× loss materialized, even worse than predicted — NEON gather is via scalar, not a single instruction).
+- Plan 486 Phase 3 real Q4_K blocks: **2.0–2.3× fused CPU GEMV** (above target — per-block LUT rebuild cost ate ~half the raw win, but fusion + NEON `vfmaq_f32` FMA still dominates auto-vectorized arithmetic).
+
+The honest lesson: the slot distinction (fused vs standalone) matters more than the technique. LUT wins when paired with FMA fusion; loses when standalone on gather-less ISAs. See `.benchmarks/432_simd_lut_dequant_goat.md` (katgpt-rs) and `riir-ai/.benchmarks/487_q4k_lut_gemv_goat.md` (riir-ai).
 
 ---
 
 ## TL;DR
 
-StreamDQ is a hardware paper from SK Hynix (DQBs in HBM base dies, 7.08× mpGEMM speedup). The initial verdict (PASS, hardware-only) was **wrong** — we explicitly simulate hardware dequant techniques via software SIMD, and Research 110 documents this (Plasma = ternary SIMD, Cold = Q4_K dequant-on-read). The paper exposes three real gaps in our SIMD substrate: (1) no LUT-based INT→FP conversion, (2) no shared-FP32-ALU primitive generic over format, (3) no runtime sideband-tag dispatch. **Revised verdict: Gain** (with GOAT-upside pending benchmark). Plan 431 implements the open primitive behind `simd_lut_dequant` feature flag with a GOAT gate (G1 bit-exact, G2 latency ≥1.2× on NEON, G4 alloc-free). Realistic target is 1.0-1.5× microbench win, plausibly 0.9× if gather is slow — the gate settles it honestly. Not a Super-GOAT (Q1-Q4 all NO: LUT INT→FP is known HPC, no new capability class, no moat). No private guide required. Not UQ-bearing (no conformal floor). Not a training dependency (no riir-train deferral).
+StreamDQ is a hardware paper from SK Hynix (DQBs in HBM base dies, 7.08× mpGEMM speedup). The initial verdict (PASS, hardware-only) was **wrong** — we explicitly simulate hardware dequant techniques via software SIMD, and Research 110 documents this (Plasma = ternary SIMD, Cold = Q4_K dequant-on-read). The paper exposes three real gaps in our substrate: (1) no LUT-based INT→FP conversion, (2) no shared-FP32-ALU primitive generic over format, (3) no runtime sideband-tag dispatch. **Verdict: Gain — CONFIRMED by both GOAT gates (2026-07-13).** Plan 431 shipped the open primitive behind `simd_lut_dequant` (now default-on in katgpt-core); Plan 486 (riir-ai) wired it into a fused CPU Q4_K GEMV behind `simd_lut_q4k` (now default-on in riir-engine). Real numbers: 4.58× raw fused primitive, 2.0–2.3× on real Q4_K blocks (per-block LUT rebuild cost ate ~half the raw win). Standalone dequant stays arithmetic (0.286× on NEON — no native gather). Plan 431 Phase 6 (FP8/INT8/Q8_KV LUT + sideband dispatch) deferred `[-]`. Not a Super-GOAT (Q1-Q4 all NO: LUT INT→FP is known HPC, no new capability class, no moat). No private guide required. Not UQ-bearing (no conformal floor). Not a training dependency (no riir-train deferral).
