@@ -224,6 +224,112 @@ fn random_matrix_f32(rows: usize, cols: usize, seed: u64) -> Vec<f32> {
     m
 }
 
+/// Train a linear projection P [d × D] (row-major) via SGD on KL divergence.
+///
+/// Minimizes Σ_i KL(softmax(target_logits_i), softmax(draft_lm_head @ P @ h_target_i))
+/// with `draft_lm_head` fixed (the draft model's output projection is not trained).
+///
+/// Returns the trained P [d × D].
+///
+/// Gradient derivation (see Issue 378 acceptance criterion 2):
+///   projected_logits[j] = Σ_a Σ_b lm_head[j*d+a] * P[a*D+b] * h_target[b]
+///   dKL/dlogit_j = y_p_j - y_t_j   (standard softmax-KL result)
+///   dKL/dP[a,b]  = h_target[b] * Σ_j (y_p_j - y_t_j) * lm_head[j*d+a]
+/// i.e. an outer product of h_target with a draft-dim gradient vector.
+struct SgdConfig<'a> {
+    h_targets_train: &'a [Vec<f32>],
+    target_logits_train: &'a [Vec<f32>],
+    draft_lm_head: &'a [f32], // [vocab × d], row-major
+    vocab: usize,
+    d: usize,  // draft_n_embd (output dim of P)
+    dd: usize, // target_n_embd (input dim of P)
+    epochs: usize,
+    lr: f32,
+    init_p: Option<Vec<f32>>, // optional warm-start (e.g. from Procrustes)
+    seed: u64,
+}
+
+// Index-based loops are required here because we write to indexed elements of
+// mutable scratch buffers (h_proj, logits, grad_logits, grad_h_proj, P) —
+// `.iter().enumerate()` does not support in-place mutation patterns cleanly.
+#[allow(clippy::needless_range_loop)]
+fn train_sgd_projection(cfg: SgdConfig<'_>) -> Vec<f32> {
+    // Initialize P (warm-start from Procrustes if provided, else Xavier random)
+    let mut p = cfg.init_p.unwrap_or_else(|| random_matrix_f32(cfg.d, cfg.dd, cfg.seed));
+
+    let n = cfg.h_targets_train.len();
+    let mut epoch_kl = 0.0f32;
+
+    for epoch in 0..cfg.epochs {
+        let mut total_kl = 0.0f32;
+
+        for i in 0..n {
+            let h_t = &cfg.h_targets_train[i];
+            let target_logits = &cfg.target_logits_train[i];
+            let y_t = softmax(target_logits);
+
+            // Forward: projected_logits[j] = Σ_a Σ_b lm_head[j*d+a] * P[a*D+b] * h_t[b]
+            // Step 1: h_proj[a] = Σ_b P[a*D+b] * h_t[b]
+            let mut h_proj = vec![0.0f32; cfg.d];
+            for a in 0..cfg.d {
+                let mut sum = 0.0f32;
+                for b in 0..cfg.dd {
+                    sum += p[a * cfg.dd + b] * h_t[b];
+                }
+                h_proj[a] = sum;
+            }
+
+            // Step 2: logits[j] = Σ_a lm_head[j*d+a] * h_proj[a]
+            let mut logits = vec![0.0f32; cfg.vocab];
+            for j in 0..cfg.vocab {
+                let mut sum = 0.0f32;
+                for a in 0..cfg.d {
+                    sum += cfg.draft_lm_head[j * cfg.d + a] * h_proj[a];
+                }
+                logits[j] = sum;
+            }
+
+            let y_p = softmax(&logits);
+
+            // KL for monitoring
+            let kl = kl_divergence(&y_t, &y_p);
+            total_kl += kl;
+
+            // Backward: grad_logits[j] = y_p[j] - y_t[j]
+            let mut grad_logits = vec![0.0f32; cfg.vocab];
+            for j in 0..cfg.vocab {
+                grad_logits[j] = y_p[j] - y_t[j];
+            }
+
+            // grad_h_proj[a] = Σ_j grad_logits[j] * lm_head[j*d+a]
+            let mut grad_h_proj = vec![0.0f32; cfg.d];
+            for a in 0..cfg.d {
+                let mut sum = 0.0f32;
+                for j in 0..cfg.vocab {
+                    sum += grad_logits[j] * cfg.draft_lm_head[j * cfg.d + a];
+                }
+                grad_h_proj[a] = sum;
+            }
+
+            // grad_P[a,b] = grad_h_proj[a] * h_t[b]  (outer product)
+            // Update: P -= lr * grad_P
+            for a in 0..cfg.d {
+                for b in 0..cfg.dd {
+                    p[a * cfg.dd + b] -= cfg.lr * grad_h_proj[a] * h_t[b];
+                }
+            }
+        }
+
+        epoch_kl = total_kl / n as f32;
+        if epoch < 5 || epoch % 50 == 0 || epoch == cfg.epochs - 1 {
+            println!("    [SGD] epoch {:>4}/{}: train KL = {:.6}", epoch + 1, cfg.epochs, epoch_kl);
+        }
+    }
+
+    println!("    [SGD] final train KL = {:.6} (lr={}, epochs={})", epoch_kl, cfg.lr, cfg.epochs);
+    p
+}
+
 // ── Benchmark variants ──────────────────────────────────────────────────────
 
 struct ProjVariant {
@@ -323,6 +429,43 @@ fn bench_378_cross_dim_procrustes() {
 
     let procrustes_p = compute_procrustes(&cross_cov, draft_n_embd, target_n_embd);
 
+    // ── Step 2b: Train SGD projection on KL divergence (Issue 378 task 2) ──
+    println!("── SGD Projection Training (Issue 378 acceptance criterion 2) ──");
+    println!("  Training on {} paired samples, {} epochs, lr=0.1", n_train, 500);
+    println!();
+    let draft_lm_head_ref = &draft_weights.lm_head;
+    let sgd_p = train_sgd_projection(SgdConfig {
+        h_targets_train: &h_targets[..n_train],
+        target_logits_train: &target_logits_all[..n_train],
+        draft_lm_head: draft_lm_head_ref,
+        vocab,
+        d: draft_n_embd,
+        dd: target_n_embd,
+        epochs: 500,
+        lr: 0.1,
+        init_p: None, // cold start (random init)
+        seed: 12345,
+    });
+    println!();
+
+    // ── Step 2c: SGD warm-started from Procrustes (refinement pass) ─────
+    println!("── SGD Warm-Start from Procrustes (refinement) ──");
+    println!("  {} epochs, lr=0.05 (smaller for refinement)", 300);
+    println!();
+    let sgd_warm_p = train_sgd_projection(SgdConfig {
+        h_targets_train: &h_targets[..n_train],
+        target_logits_train: &target_logits_all[..n_train],
+        draft_lm_head: draft_lm_head_ref,
+        vocab,
+        d: draft_n_embd,
+        dd: target_n_embd,
+        epochs: 300,
+        lr: 0.05, // smaller lr for refinement
+        init_p: Some(procrustes_p.clone()),
+        seed: 12345,
+    });
+    println!();
+
     // ── Step 3: Build projection variants ───────────────────────────────
     let variants: Vec<ProjVariant> = vec![
         ProjVariant {
@@ -332,6 +475,14 @@ fn bench_378_cross_dim_procrustes() {
         ProjVariant {
             name: "Procrustes (SVD)",
             weights: Some(procrustes_p.clone()),
+        },
+        ProjVariant {
+            name: "SGD (cold start)",
+            weights: Some(sgd_p.clone()),
+        },
+        ProjVariant {
+            name: "SGD (warm Procrustes)",
+            weights: Some(sgd_warm_p.clone()),
         },
         ProjVariant {
             name: "Random (control)",
@@ -439,31 +590,39 @@ fn bench_378_cross_dim_procrustes() {
 
     let procrustes_result = results.iter().find(|r| r.name.starts_with("Procrustes")).unwrap();
     let truncate_result = results.iter().find(|r| r.name.starts_with("None")).unwrap();
+    let sgd_cold_result = results.iter().find(|r| r.name.starts_with("SGD (cold")).unwrap();
+    let sgd_warm_result = results.iter().find(|r| r.name.starts_with("SGD (warm")).unwrap();
+    let random_result = results.iter().find(|r| r.name.starts_with("Random")).unwrap();
 
-    let g1_pass = procrustes_result.kl_div <= g1_threshold;
-    let g1_beats_truncate = procrustes_result.kl_div < truncate_result.kl_div;
-    let g1_beats_random = results
+    // Pick the best of all trained variants for the GOAT gate
+    let best_trained = [procrustes_result, sgd_cold_result, sgd_warm_result]
         .iter()
-        .find(|r| r.name.starts_with("Random"))
-        .map(|r| procrustes_result.kl_div < r.kl_div)
-        .unwrap_or(true);
-    let g3_pass = procrustes_result.cosine_sim >= 0.5;
+        .copied()
+        .min_by(|a, b| a.kl_div.partial_cmp(&b.kl_div).unwrap())
+        .unwrap();
 
-    println!("── GOAT Gate ─────────────────────────────────────────────────");
+    let g1_pass = best_trained.kl_div <= g1_threshold;
+    let g1_beats_truncate = best_trained.kl_div < truncate_result.kl_div;
+    let g1_beats_random = best_trained.kl_div < random_result.kl_div;
+    let g3_pass = best_trained.cosine_sim >= 0.5;
+
+    println!("── GOAT Gate (best trained variant: {}) ─────────", best_trained.name);
     println!(
-        "  G1 (quality): Procrustes avg KL ≤ {:.2}? → {:.6} {}",
+        "  G1 (quality): best trained KL ≤ {:.2}? → {:.6} {}",
         g1_threshold,
-        procrustes_result.kl_div,
+        best_trained.kl_div,
         if g1_pass { "✅ PASS" } else { "❌ FAIL" }
     );
     println!(
-        "  G1b (vs truncate): Procrustes KL < truncate/pad KL? → {:.6} < {:.6} {}",
-        procrustes_result.kl_div,
+        "  G1b (vs truncate): best trained KL < truncate/pad KL? → {:.6} < {:.6} {}",
+        best_trained.kl_div,
         truncate_result.kl_div,
         if g1_beats_truncate { "✅ PASS" } else { "❌ FAIL" }
     );
     println!(
-        "  G1c (vs random): Procrustes KL < random KL? → {}",
+        "  G1c (vs random): best trained KL < random KL? → {:.6} < {:.6} {}",
+        best_trained.kl_div,
+        random_result.kl_div,
         if g1_beats_random { "✅ PASS" } else { "❌ FAIL" }
     );
     println!(
@@ -472,36 +631,49 @@ fn bench_378_cross_dim_procrustes() {
     );
     println!(
         "  G3 (info preservation): cosine sim ≥ 0.5? → {:.6} {}",
-        procrustes_result.cosine_sim,
+        best_trained.cosine_sim,
         if g3_pass { "✅ PASS" } else { "❌ FAIL" }
     );
+    println!();
+    println!("  Per-variant KL comparison:");
+    println!("    Procrustes (SVD):   {:.6}", procrustes_result.kl_div);
+    println!("    SGD (cold start):   {:.6}", sgd_cold_result.kl_div);
+    println!("    SGD (warm Procr.):  {:.6}", sgd_warm_result.kl_div);
+    println!("    truncate/pad:       {:.6}", truncate_result.kl_div);
+    println!("    random control:     {:.6}", random_result.kl_div);
     println!();
 
     // ── Step 7: Verdict ─────────────────────────────────────────────────
     println!("── Verdict ───────────────────────────────────────────────────");
     if g1_pass && g1_beats_truncate {
-        println!("  Procrustes alignment PASSES the GOAT gate.");
-        println!("  Cross-dim MTP projection is MODELLESS-CLOSED.");
-        println!("  No training needed — the closed-form SVD projection");
-        println!("  recovers the optimal linear map from paired samples.");
+        println!("  A trained/Procrustes projection PASSES the GOAT gate.");
+        println!("  Cross-dim MTP projection is closed (KL ≤ {:.2}).", g1_threshold);
         println!();
-        println!("  → Issue 378 acceptance criterion 1 (Procrustes suffices): MET");
-        println!("  → Issue 378 can be closed as modelless-closed");
+        println!("  → Issue 378 acceptance criterion 3 (GOAT gate): MET by {}", best_trained.name);
     } else if g1_beats_truncate {
-        println!("  Procrustes BEATS truncate/pad but doesn't meet KL ≤ {:.2}.", g1_threshold);
-        println!("  Procrustes KL = {:.6} vs truncate/pad KL = {:.6}",
-            procrustes_result.kl_div, truncate_result.kl_div);
-        println!("  Partial improvement — may need trained projection for full closure.");
+        println!("  Best trained projection ({}) BEATS truncate/pad but doesn't meet KL ≤ {:.2}.",
+            best_trained.name, g1_threshold);
+        println!("  Best trained KL = {:.6} vs truncate/pad KL = {:.6}",
+            best_trained.kl_div, truncate_result.kl_div);
+        println!("  vs random control KL = {:.6}", random_result.kl_div);
         println!();
-        println!("  → Issue 378 acceptance criterion 1 (Procrustes suffices): NOT MET");
-        println!("  → Cross-dim case likely requires trained projection (→ riir-train)");
+        println!("  Root cause (rank deficiency): draft_lm_head [{v}×{d}] @ P [{d}×{D}]",
+            v = vocab, d = draft_n_embd, D = target_n_embd);
+        println!("  has rank ≤ {d}, but target_lm_head [{v}×{D}] has rank up to {D}.",
+            d = draft_n_embd, v = vocab, D = target_n_embd);
+        println!("  KL=0 is mathematically impossible when target rank > draft rank.");
+        println!("  This is fundamental for random-init models with dim mismatch.");
+        println!("  Same-family trained models (e.g. Gemma-2-2B + pruned Gemma)");
+        println!("  may have correlated hidden spaces that close the gap further.");
+        println!();
+        println!("  → Issue 378 acceptance criterion 2 (SGD training): IMPLEMENTED");
+        println!("  → Issue 378 acceptance criterion 3 (GOAT gate): ❌ FAIL on random models");
+        println!("  → Needs real trained model pairs to evaluate properly");
     } else {
-        println!("  Procrustes does NOT beat truncate/pad.");
-        println!("  Procrustes KL = {:.6} vs truncate/pad KL = {:.6}",
-            procrustes_result.kl_div, truncate_result.kl_div);
-        println!("  Cross-dim case requires trained projection (→ riir-train).");
+        println!("  Best trained projection ({}) does NOT beat truncate/pad.",
+            best_trained.name);
         println!();
-        println!("  → Issue 378 acceptance criterion 1 (Procrustes suffices): NOT MET");
+        println!("  → Issue 378 acceptance criterion 3 (GOAT gate): ❌ FAIL");
     }
     println!();
 
