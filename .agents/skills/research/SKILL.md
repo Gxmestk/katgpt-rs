@@ -173,7 +173,7 @@ Distill into:
 
 ### 0. Read & classify the paper
 
-Fetch via `https://r.jina.ai/https://arxiv.org/pdf/{ID}` (per AGENTS.md). Ask: *is the value in the training loop, or in a latent-space / inference / routing insight?* If training-only → note "→ riir-train", stop.
+Fetch via `https://r.jina.ai/https://arxiv.org/pdf/{ID}` (per AGENTS.md). Ask: *is the value in the training loop, or in a latent-space / inference / routing insight?* If training-only → append one row to `katgpt-rs/.research/PASS_REGISTRY.md` (reason: "training-only → riir-train", quality-claim: "N/A") and stop. No numbered note is created.
 
 ### 1. Distill fundamentally — fuse, don't just direct-map
 
@@ -306,7 +306,7 @@ Don't direct-map the paper to our code. Find the transferable primitive: the geo
 | **Super-GOAT** | Novel mechanism (no prior art) + new capability class + product selling point + force multiplier (≥2 pillars). Creates a moat. | Open primitive → katgpt-rs. **Architectural guide → riir-ai/.research/ (game runtime) OR riir-chain/.research/ (chain/LatCal) OR riir-neuron-db/.research/ (shards/freeze/consolidation/AnyRAG/vibe/Merkle)**. Plans → appropriate repo(s) as needed. |
 | **GOAT** | Provable gain (latency/quality/security) over existing approach, but not a new class of capability. Promotes to default if it wins. | Plan + implement → appropriate repo. Feature flag + benchmark. |
 | **Gain** | Incremental improvement, useful but not headline-worthy. | Plan only, behind feature flag. |
-| **Pass** | Not relevant to modelless/latent/freeze-thaw/runtime, OR training-only (→ riir-train note, stop). | One-line note. No files created in this session. |
+| **Pass** | Not relevant to modelless/latent/freeze-thaw/runtime, OR training-only (→ riir-train), OR LLM-orchestration class (R133/R169/R289/R416 — every mechanism ships, paper's value is its LLM-dependent process). | **Zero new `.md` files.** Append ONE row to `katgpt-rs/.research/PASS_REGISTRY.md` (arxiv ID + one-line reason + closest shipped cousin + quality-claim marker). No numbered note, no plan, no guide. The registry row IS the verdict record and the re-evaluation guard. See §3.6 "PASS verdict output contract" for the full rule. |
 
 **One-line reasoning required for each verdict.** For Super-GOAT: state the selling point explicitly.
 
@@ -495,6 +495,17 @@ Gate/mechanism appears to need training
 
 **Canonical example (Research 360, AdaJEPA, 2026-07-01):** the verdict claimed "parity" between the shipped `ReestimationScheduler` and AdaJEPA's per-MPC-step GD loop, based on architectural coverage alone. The PoC at `riir-ai/crates/riir-poc/benches/adajepa_modelless_goat.rs` confirmed latency parity (~940 ns/replan) and architectural coverage, but **refuted quality parity** — the coherence trigger was too conservative for mild shifts (0 updates at a mild shift), and all adaptation strategies diverged on overshoot shifts. The verdict was honestly revised in a §9 PoC Addendum; the follow-ups are tracked in `riir-ai/.issues/363`. This is the canonical "architectural coverage ≠ quality parity" lesson — grep proved the loop existed, the PoC proved it didn't perform.
 
+**PASS verdict output contract (refined 2026-07-13):** PASS creates **ZERO new `.md` files** — no numbered note, no plan, no guide. The verdict is recorded as **ONE row** in `katgpt-rs/.research/PASS_REGISTRY.md` (arxiv ID, one-line reason, closest shipped cousin, quality-claim marker). The registry row IS the re-evaluation guard: a future agent grepping the registry finds the verdict without re-running pre-flight.
+
+**The registry row's `quality claim` column MUST be honest:**
+- `"architectural-only"` — the default for "already ships" PASSes. Means "the mechanism class ships, but I did NOT verify quality parity with the paper's numbers." A future agent may upgrade this to a full note + PoC if they want to claim parity.
+- `"PoC-confirmed parity"` — rare. Means "I ran a head-to-head PoC in `riir-poc` and the shipped primitive matches/beats the paper." Required if the PASS verdict is the basis for a downstream decision.
+- `"N/A"` — for training-only redirects (→ riir-train) or out-of-scope papers where quality parity is not the question.
+
+**Pre-flight is still mandatory.** PASS = zero files applies to OUTPUT, not PROCESS. The full mandatory pre-flight (4 READMEs, 4 `.research/` listings, 4 src trees, 7 Super-GOAT factory modules) + 5-repo fusion search + vocabulary translation MUST still run before a PASS verdict. A PASS without pre-flight is invalid — zero files does not mean zero diligence.
+
+**Legacy PASS notes (R133, R169, R289):** these were written before the zero-file rule and remain as full numbered notes. They are ALSO indexed in `PASS_REGISTRY.md` (rows 1–3) with a `trace` column pointing to the note. New PASSes are registry-only. Do not retroactively delete the legacy notes — they predate the rule and are already in git history; removing them is a separate task.
+
 ### 4. Search if curious
 
 Keyword search arxiv:
@@ -560,4 +571,4 @@ Reinforce these when designing game systems or chain state:
 
 **Hard rules:** modelless-first (translate compute units — LLM-as-implementation ≠ LLM-as-mechanism; when you see "N LLM calls/step", ask "what decision is each call computing?" first, not "violates 20Hz budget, NO-GAIN"); latent-to-latent with sigmoid (never softmax); freeze/thaw over fine-tuning; 5-repo discipline; raw scalars at sync boundary; fusion-first mindset.
 
-**Failure-mode prophylactics:** vocabulary translation blocks below (semantic + compute-unit + DEC/Stokes + per-NPC runtime); read-the-hits rule (grep hit touching per-NPC+memory+personality+swap → `read_file` TL;DR before claiming novelty); 7 Super-GOAT factory modules; R169 false-trigger guard (decision-structure ≠ LLM-dependent process). **Parity / "already ships" quality claims need a defend-wrong PoC in `riir-ai/crates/riir-poc/` (§3.6) — architectural coverage ≠ quality parity; a PASS backed only by architectural reasoning is the #1 false-PASS failure mode.**
+**Failure-mode prophylactics:** vocabulary translation blocks below (semantic + compute-unit + DEC/Stokes + per-NPC runtime); read-the-hits rule (grep hit touching per-NPC+memory+personality+swap → `read_file` TL;DR before claiming novelty); 7 Super-GOAT factory modules; R169 false-trigger guard (decision-structure ≠ LLM-dependent process). **Parity / "already ships" quality claims need a defend-wrong PoC in `riir-ai/crates/riir-poc/` (§3.6) — architectural coverage ≠ quality parity; a PASS backed only by architectural reasoning is the #1 false-PASS failure mode.** **PASS = zero new files: append one row to `katgpt-rs/.research/PASS_REGISTRY.md` (§3.6 "PASS verdict output contract"); the full pre-flight still runs first — zero files ≠ zero diligence.**
