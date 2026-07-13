@@ -128,8 +128,18 @@ the weights onto the GPU and verify round-trip.
 The 40 matmul dispatches dominate Weaver's compute. Porting them to GPU
 `gemv_plane_f32` (already exists) is the single biggest win.
 
-- [ ] T2.1: Batched GEMV variant — extend or wrap `gemv_plane_f32` to handle
+- [x] T2.1: Batched GEMV variant — extend or wrap `gemv_plane_f32` to handle
       the `matmul_vec_batched` pattern (one weight read, batch=5 outputs)
+      **DONE 2026-07-14.** New kernel `gemv_batched_plane_f32` + `GemvBatchedCubeCL`
+      launcher in `gemv_cubecl.rs`. Weight layout: GPU stores `[out_dim, in_dim]`
+      (transpose of CPU `[in_dim, out_dim]`) — `transpose_weight()` helper added
+      to `weaver_gpu.rs`, `GpuWeaverWeights::upload`/`download` now transpose /
+      un-transpose. 2 parity tests pass on M3 Max (square 5×128×128 + rect
+      5×128×256), max_err < 6e-6. Phase 1 round-trip tests still pass (G3).
+      **Reuse discovered for subsequent tasks:** `rmsnorm_residual_batched_f32`
+      in `norm_residual_cubecl.rs` covers T2.2 (batched RMSNorm + residual).
+      `swiglu_f32` / `SwigluCubeCL` in `coda_primitives_cubecl.rs` covers the
+      T2.6 SwiGLU activation. Both can be adapted rather than written from scratch.
 - [ ] T2.2: `rmsnorm` CubeCL kernel (new) — elementwise, trivially parallel
 - [ ] T2.3: Conditioning step (Step 1) — RMSNorm + batched GEMV + pos_emb add
 - [ ] T2.4: QKV projections (Step 2) — 3 batched GEMVs
