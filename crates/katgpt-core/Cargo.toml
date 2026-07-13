@@ -1303,3 +1303,13 @@ required-features = ["tilr_invariant_subspace"]
 name = "bench_426_manifold_erasure_goat"
 harness = false
 required-features = ["manifold_erasure"]
+
+# Issue 455 — CochainFreezeEnvelope GOAT gate. G2 (freeze/thaw latency < 1ms at
+# 3 cochain sizes) + G4 (determinism: 100 freezes bit-identical) + G5 (tamper
+# sensitivity: 1-ULP input change → different commitment + verify latency).
+# Cold-path serialization (BLAKE3 + Vec build/parse); the 7 unit tests in
+# dec_freeze::tests cover G1 correctness (roundtrip, tamper, NaN, malformation).
+[[bench]]
+name = "bench_455_cochain_freeze_goat"
+harness = false
+required-features = ["dec_operators"]
