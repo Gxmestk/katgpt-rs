@@ -52,7 +52,9 @@ Weaver is off.
   riir-engine equivalent. Fix before commit.
 - [x] **T9 (G3 no-regression):** `weaver_runtime` OFF still compiles + tests pass
   in both repos.
-- [ ] **T10 (commit):** `docs:` for the plan, `feat:` for the wiring.
+- [x] **T10 (commit):** `docs:` for the plan, `feat:` for the wiring.
+  - katgpt-rs develop: `1e92a496 feat: Plan 433 — Weaver ↔ DFlash pipeline wiring (dflash_predict_with_weaver)`
+  - riir-ai develop:    `e46a1f06 feat: Plan 433 — mirror Weaver ↔ DFlash pipeline wiring in riir-engine`
 
 ## Out of scope (explicitly deferred)
 
@@ -69,3 +71,6 @@ Add `dflash_predict_with_capture` (hidden-state-capturing variant) to the
 shared core, then a `_weaver` wrapper at the katgpt-forward and riir-engine
 layers that combines predict + correct_marginals. Zero-churn for existing
 callers; opt-in via the `weaver_runtime` feature.
+
+**DONE 2026-07-14** — all 10 tasks complete. Both repos committed on
+`develop` (not pushed).
