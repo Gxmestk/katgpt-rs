@@ -413,6 +413,11 @@ impl katgpt_speculative::dflash::DflashCtx<TransformerWeights> for ForwardContex
         &self.logits
     }
 
+    #[inline]
+    fn hidden_state_slice(&self) -> &[f32] {
+        &self.hidden_state
+    }
+
     fn apply_mtp_conditioning(
         &mut self,
         weights: &TransformerWeights,

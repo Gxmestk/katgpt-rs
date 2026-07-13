@@ -309,3 +309,11 @@ plasma_path = ["katgpt-core/plasma_path"]
 # symbols (`TransformerWeights`, `Config`, `kv_dim`/`matmul`/`matmul_relu`/
 # `rmsnorm`, `katgpt_core::simd::*`) resolve through existing deps.
 set_diffusion = []
+
+# Weaver inference-only logit corrector (Issue 131, Plan 433). Gates the
+# `dflash_predict_with_weaver` wrapper that combines DFlash predict + Weaver
+# marginal correction in a single call. Forwards to katgpt-speculative so the
+# WeaverCorrector + WeaverScratch + WeaverInput types resolve. Default-off —
+# requires a trained checkpoint to produce non-trivial gain; zero weights are a
+# safe no-op.
+weaver_runtime = ["katgpt-speculative/weaver_runtime"]

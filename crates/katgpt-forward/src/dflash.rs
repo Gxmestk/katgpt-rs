@@ -134,6 +134,157 @@ pub fn dflash_predict_with(
     steps
 }
 
+/// Hidden-state-capturing variant of [`dflash_predict_with`] (Plan 433).
+///
+/// Identical to [`dflash_predict_with`] but additionally snapshots the
+/// drafter's final hidden state after each forward step into
+/// `h_dflash_captured`. Used by the Weaver marginal corrector integration
+/// (`dflash_predict_with_weaver`), which needs `h_dflash[step]` (one slice
+/// per draft depth).
+///
+/// # Layout
+///
+/// `h_dflash_captured` is `[max_steps * n_embd]`, row-major. Step `i`'s
+/// hidden state occupies `[i * n_embd .. (i + 1) * n_embd]`.
+///
+/// # Behavior preservation
+///
+/// Marginals written to `sctx.marginals_flat` are bit-identical to
+/// [`dflash_predict_with`] — the only addition is the per-step hidden-state
+/// snapshot.
+pub fn dflash_predict_with_capture(
+    sctx: &mut SpeculativeContext,
+    draft_weights: &TransformerWeights,
+    draft_config: &Config,
+    token: usize,
+    pos: usize,
+    h_dflash_captured: &mut [f32],
+) -> usize {
+    let mut cache = CacheAdapter(&mut sctx.cache);
+    let steps = katgpt_speculative::dflash::dflash_predict_with_capture(
+        &mut sctx.ctx,
+        &mut cache,
+        draft_weights,
+        forward_via_adapter,
+        &mut sctx.probs_buf,
+        &mut sctx.marginals_flat,
+        h_dflash_captured,
+        draft_config,
+        token,
+        pos,
+    );
+    sctx.steps_populated = steps;
+    steps
+}
+
+// ── Weaver-corrected DFlash (Plan 433, gated `weaver_runtime`) ──
+//
+// Combines `dflash_predict_with_capture` + `WeaverCorrector::correct_marginals_with_scratch`
+// in a single call so the spec decode loop can opt into Weaver correction by
+// passing `Some(&weaver_corrector)`. When the corrector holds zero-init
+// weights the Weaver residual is zero and the top-K correction is a no-op
+// modulo the (typically <1%) mass lost to non-top-K truncation.
+//
+// This is the "transparent wiring" called out as the remaining riir-ai task
+// in Issue 131's TL;DR — provided here in the public engine so both katgpt-rs
+// and riir-engine consumers can call it without duplicating the wiring.
+
+/// DFlash predict + Weaver marginal correction in one call (Plan 433).
+///
+/// Runs [`dflash_predict_with_capture`] to produce marginals + per-step
+/// drafter hidden states, then applies
+/// [`WeaverCorrector::correct_marginals_with_scratch`] to correct the
+/// marginals in-place over the top-K candidates at each draft depth.
+///
+/// # What it does
+///
+/// 1. Calls `dflash_predict_with_capture` → fills `sctx.marginals_flat`
+///    (`[depth * vocab_size]`) and `h_dflash_captured` (`[depth * n_embd]`).
+/// 2. Slices `h_dflash_captured` into a `&[&[f32]]` view (one slice per depth).
+/// 3. Calls `weaver.correct_marginals_with_scratch(sctx.marginals_flat, …)`
+///    to overwrite the top-K positions with Weaver-corrected probabilities.
+///
+/// # No-harm contract
+///
+/// Zero-init Weaver weights produce zero residuals; the only change to the
+/// marginals is the top-K truncation/renormalization (typically <1% mass).
+/// Callers that need bit-exact no-op should call `dflash_predict_with` directly.
+///
+/// # Arguments
+///
+/// * `sctx` — drafter speculative context (marginals written in-place).
+/// * `draft_weights`, `draft_config` — drafter model.
+/// * `token`, `pos` — current token and position.
+/// * `h_dflash_captured` — caller-allocated `[max_steps * n_embd]` scratch.
+///   Reuse across calls (allocate once per drafter).
+/// * `weaver` — the Weaver marginal corrector (typically loaded once from a
+///   `weaver_v1.safetensors` checkpoint).
+/// * `h_verifier` — verifier/target hidden state at the prefix position,
+///   `[hidden_dim]`. The caller obtains this from the target model's last
+///   forward pass.
+/// * `embedding` — shared vocab embedding `[vocab_size * hidden_dim]`. The
+///   caller obtains this from the target weights' `wte`.
+/// * `scratch` — Weaver forward scratch (allocate once via `WeaverScratch::new`).
+///
+/// # Returns
+///
+/// `Ok(steps)` on success, or `Err(WeaverCorrectError)` if shape checks fail.
+#[cfg(feature = "weaver_runtime")]
+// hot-path leaf: drafter + Weaver wiring
+#[allow(clippy::too_many_arguments)]
+pub fn dflash_predict_with_weaver(
+    sctx: &mut SpeculativeContext,
+    draft_weights: &TransformerWeights,
+    draft_config: &Config,
+    token: usize,
+    pos: usize,
+    h_dflash_captured: &mut [f32],
+    weaver: &katgpt_speculative::weaver::WeaverCorrector,
+    h_verifier: &[f32],
+    embedding: &[f32],
+    scratch: &mut katgpt_speculative::weaver::WeaverScratch,
+) -> Result<usize, katgpt_speculative::weaver::WeaverCorrectError> {
+    // 1. Draft marginals + capture per-step hidden states.
+    let steps = dflash_predict_with_capture(
+        sctx,
+        draft_weights,
+        draft_config,
+        token,
+        pos,
+        h_dflash_captured,
+    );
+    if steps == 0 {
+        return Ok(0);
+    }
+
+    // 2. Slice `h_dflash_captured` into a `&[&[f32]]` view (stack array, max 64).
+    //    Mirrors the `marginals_buf` pattern in `speculative_step_qwen_deltanet_tree`.
+    let n_embd = draft_config.n_embd;
+    let mut h_dflash_slices: [&[f32]; 64] = [&[]; 64];
+    let count = steps.min(64);
+    for (i, slot) in h_dflash_slices.iter_mut().enumerate().take(count) {
+        let start = i * n_embd;
+        let end = start + n_embd;
+        *slot = if end <= h_dflash_captured.len() {
+            &h_dflash_captured[start..end]
+        } else {
+            &[]
+        };
+    }
+    let h_dflash = &h_dflash_slices[..count];
+
+    // 3. Apply Weaver correction in-place.
+    weaver.correct_marginals_with_scratch(
+        &mut sctx.marginals_flat,
+        h_verifier,
+        h_dflash,
+        embedding,
+        draft_config.vocab_size,
+        scratch,
+    )?;
+    Ok(steps)
+}
+
 /// Zero-alloc variant of `dflash_predict_ar`.
 ///
 /// Reuses pre-allocated buffers from `SpeculativeContext`.
@@ -954,6 +1105,151 @@ mod tests {
             assert_eq!(slice.len(), vocab_size);
             let sum: f32 = slice.iter().sum();
             assert!((sum - 1.0).abs() < 1e-4, "step {step} sum = {sum}");
+        }
+    }
+
+    /// Plan 433 T3: `dflash_predict_with_capture` writes marginals that are
+    /// bit-identical to `dflash_predict_with`, and populates the hidden-state
+    /// capture buffer with non-trivial data.
+    #[test]
+    fn test_dflash_predict_with_capture_matches_no_capture() {
+        let (weights, config) = make_draft();
+        let vocab_size = config.vocab_size;
+        let n_embd = config.n_embd;
+
+        // Run the no-capture path.
+        let mut sctx_plain = SpeculativeContext::new(&config);
+        let steps_plain = dflash_predict_with(&mut sctx_plain, &weights, &config, 0, 0);
+        let marginals_plain = sctx_plain.marginals_flat.clone();
+
+        // Run the capture path.
+        let mut sctx_cap = SpeculativeContext::new(&config);
+        let mut h_captured = vec![0.0f32; config.draft_lookahead * n_embd];
+        let steps_cap =
+            dflash_predict_with_capture(&mut sctx_cap, &weights, &config, 0, 0, &mut h_captured);
+
+        // Same step count.
+        assert_eq!(steps_plain, steps_cap, "step count mismatch");
+
+        // Bit-identical marginals.
+        assert_eq!(
+            sctx_cap.marginals_flat.len(),
+            marginals_plain.len(),
+            "marginal buffer length mismatch"
+        );
+        for (i, (a, b)) in sctx_cap
+            .marginals_flat
+            .iter()
+            .zip(marginals_plain.iter())
+            .enumerate()
+        {
+            assert_eq!(a, b, "marginal[{i}] differs between capture and no-capture");
+        }
+
+        // Hidden states populated: each step's slice is non-trivial (not all zero).
+        for step in 0..steps_cap {
+            let h = &h_captured[step * n_embd..(step + 1) * n_embd];
+            let max_abs = h.iter().fold(0.0f32, |m, &v| m.max(v.abs()));
+            assert!(
+                max_abs > 0.0,
+                "step {step} hidden state is all-zero — capture didn't run"
+            );
+        }
+
+        // Sanity: at least one step's hidden state differs from another
+        // (otherwise the drafter is doing nothing interesting across positions).
+        if steps_cap >= 2 {
+            let h0 = &h_captured[0..n_embd];
+            let h1 = &h_captured[n_embd..2 * n_embd];
+            let mut any_diff = false;
+            for (a, b) in h0.iter().zip(h1.iter()) {
+                if (a - b).abs() > 1e-6 {
+                    any_diff = true;
+                    break;
+                }
+            }
+            assert!(any_diff, "hidden states identical across steps (unexpected)");
+        }
+
+        // Vocab_size used to silence unused-var lint if draft_lookahead == 0.
+        let _ = vocab_size;
+    }
+
+    /// Plan 433 T5: `dflash_predict_with_weaver` with zero-init Weaver weights
+    /// preserves G1 (sum-to-1, finite) and produces marginals that match the
+    /// capture-only path modulo the top-K truncation/renormalization.
+    ///
+    /// On the tiny draft config (vocab=256, n_embd=64), Weaver's K from the
+    /// config may exceed the vocab — in that case `correct_marginals_with_scratch`
+    /// early-returns (k > vocab_size) and the marginals are bit-identical. We
+    /// test the no-op path here; the trained-checkpoint path is exercised by
+    /// the `weaver_real_checkpoint` integration test.
+    #[cfg(feature = "weaver_runtime")]
+    #[test]
+    fn test_dflash_predict_with_weaver_zero_weights_preserves_g1() {
+        use katgpt_speculative::weaver::{WeaverConfig, WeaverCorrector, WeaverScratch, WeaverWeights};
+
+        let (weights, config) = make_draft();
+        let n_embd = config.n_embd;
+        let vocab_size = config.vocab_size;
+
+        // Build a zero-weight Weaver corrector whose K exceeds vocab_size, so
+        // `correct_marginals_with_scratch` takes the k > vocab_size early-return
+        // path → marginals unchanged → bit-equiv to the capture path.
+        let weaver_cfg = WeaverConfig {
+            hidden_dim: n_embd,
+            n_heads: 4,
+            k_candidates: vocab_size + 100, // K > V → early return
+            n_layer: 1,
+            d_ff: n_embd * 4,
+            rms_eps: 1e-6,
+            max_depth: config.draft_lookahead,
+        };
+        let corrector = WeaverCorrector::from_weights(WeaverWeights::zeros(weaver_cfg.clone()));
+        let mut scratch = WeaverScratch::new(&weaver_cfg);
+
+        // Capture-path marginals (the reference).
+        let mut sctx_ref = SpeculativeContext::new(&config);
+        let mut h_ref = vec![0.0f32; config.draft_lookahead * n_embd];
+        let steps_ref =
+            dflash_predict_with_capture(&mut sctx_ref, &weights, &config, 0, 0, &mut h_ref);
+        let marginals_ref = sctx_ref.marginals_flat.clone();
+
+        // Weaver path.
+        let mut sctx = SpeculativeContext::new(&config);
+        let mut h = vec![0.0f32; config.draft_lookahead * n_embd];
+        let h_verifier: Vec<f32> = vec![0.5; n_embd];
+        let embedding: Vec<f32> = vec![0.1; vocab_size * n_embd];
+        let steps = dflash_predict_with_weaver(
+            &mut sctx,
+            &weights,
+            &config,
+            0,
+            0,
+            &mut h,
+            &corrector,
+            &h_verifier,
+            &embedding,
+            &mut scratch,
+        )
+        .expect("zero-weight Weaver with K>V should not error");
+
+        assert_eq!(steps, steps_ref);
+
+        // Bit-identical marginals (k > vocab_size → early return → unchanged).
+        assert_eq!(
+            sctx.marginals_flat, marginals_ref,
+            "Weaver with K > V should leave marginals unchanged"
+        );
+
+        // G1: sum-to-1, finite.
+        for step in 0..steps {
+            let slice = sctx.marginal_slice(step, vocab_size);
+            let sum: f32 = slice.iter().sum();
+            assert!((sum - 1.0).abs() < 1e-4, "step {step} sum = {sum}");
+            for &v in slice {
+                assert!(v.is_finite(), "NaN/Inf in marginal[{step}]");
+            }
         }
     }
 

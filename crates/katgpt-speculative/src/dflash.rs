@@ -78,6 +78,13 @@ pub trait DflashCtx<Weights: ?Sized> {
     /// generic-fn-returning-a-borrow lifetime problem.
     fn logits_slice(&self) -> &[f32];
 
+    /// Read the final hidden state `[n_embd]` after a `forward` pass.
+    ///
+    /// Used by [`dflash_predict_with_capture`] (Plan 433) to snapshot
+    /// per-step drafter hidden states for downstream consumers (notably
+    /// the Weaver marginal corrector, which needs `h_dflash[step]`).
+    fn hidden_state_slice(&self) -> &[f32];
+
     /// MTP (Multi-Token-Prediction) conditioning: add `mtp_ctx[..n_embd]`
     /// into the hidden state on the first AR step, then recompute logits
     /// via `lm_head` matmul. Each backend implements this with direct
@@ -148,6 +155,94 @@ where
             cache.invalidate_position(pos + step - 1, kvd);
         }
         forward_fn(ctx, weights, cache, token, pos + step, draft_config);
+        let logits = ctx.logits_slice();
+        probs_buf[..vocab_size].copy_from_slice(&logits[..vocab_size]);
+        softmax_scaled(&mut probs_buf[..vocab_size], 1.0 / temperature);
+        let start = step * vocab_size;
+        marginals_flat[start..start + vocab_size].copy_from_slice(&probs_buf[..vocab_size]);
+    }
+
+    max_steps
+}
+
+/// Hidden-state-capturing variant of [`dflash_predict_with`] (Plan 433).
+///
+/// Identical to [`dflash_predict_with`] but additionally snapshots the
+/// drafter's final hidden state after each `forward_fn` call into
+/// `h_dflash_captured`. Used by the Weaver marginal corrector integration,
+/// which needs `h_dflash[step]` (one hidden-state slice per draft depth).
+///
+/// # Layout
+///
+/// `h_dflash_captured` is `[max_steps * n_embd]`, row-major (step-outer).
+/// Step `i`'s hidden state occupies `[i * n_embd .. (i + 1) * n_embd]`.
+/// The caller is responsible for sizing this buffer (typically
+/// `draft_config.draft_lookahead * draft_config.n_embd`).
+///
+/// # Behavior preservation
+///
+/// Marginal outputs are bit-identical to [`dflash_predict_with`] — the only
+/// addition is the per-step `hidden_state_slice()` copy. The hidden-state
+/// read happens between the forward call and the logits→marginal copy, so it
+/// captures the post-forward, pre-next-step state.
+///
+/// # Arguments
+///
+/// Same as [`dflash_predict_with`] plus:
+/// * `h_dflash_captured` — output `[max_steps * n_embd]`, step `i` occupies
+///   `[i * n_embd .. (i + 1) * n_embd]`. Must be at least
+///   `max_steps * draft_config.n_embd` long; extra trailing data is left
+///   untouched.
+#[allow(clippy::too_many_arguments)]
+pub fn dflash_predict_with_capture<Ctx, Cache, Weights, F>(
+    ctx: &mut Ctx,
+    cache: &mut Cache,
+    weights: &Weights,
+    forward_fn: F,
+    probs_buf: &mut [f32],
+    marginals_flat: &mut [f32],
+    h_dflash_captured: &mut [f32],
+    draft_config: &Config,
+    token: usize,
+    pos: usize,
+) -> usize
+where
+    Ctx: DflashCtx<Weights>,
+    Cache: DflashCache,
+    F: Fn(&mut Ctx, &Weights, &mut Cache, usize, usize, &Config),
+{
+    let max_steps = draft_config
+        .draft_lookahead
+        .min(draft_config.block_size.saturating_sub(pos));
+    let vocab_size = draft_config.vocab_size;
+    let temperature = draft_config.temperature;
+    let kvd = kv_dim(draft_config);
+    let n_embd = draft_config.n_embd;
+
+    // Full reset before the loop to clear any stale data from prior calls.
+    cache.reset();
+    for step in 0..max_steps {
+        if step > 0 {
+            cache.invalidate_position(pos + step - 1, kvd);
+        }
+        forward_fn(ctx, weights, cache, token, pos + step, draft_config);
+
+        // Snapshot the drafter's final hidden state for this step.
+        // Read before logits_slice to avoid holding a borrow across the matmul.
+        let hidden = ctx.hidden_state_slice();
+        let h_start = step * n_embd;
+        let h_end = h_start + n_embd;
+        if h_end <= h_dflash_captured.len() {
+            let n_copy = hidden.len().min(n_embd);
+            h_dflash_captured[h_start..h_start + n_copy]
+                .copy_from_slice(&hidden[..n_copy]);
+            // If hidden_state is somehow shorter than n_embd, zero-pad.
+            // (Shouldn't happen in well-formed configs, but defensive.)
+            if n_copy < n_embd {
+                h_dflash_captured[h_start + n_copy..h_end].fill(0.0);
+            }
+        }
+
         let logits = ctx.logits_slice();
         probs_buf[..vocab_size].copy_from_slice(&logits[..vocab_size]);
         softmax_scaled(&mut probs_buf[..vocab_size], 1.0 / temperature);

@@ -37,6 +37,18 @@ T4 (feature gate), G1 (correctness), G2 (gain), G3 (no-regression), G4
 half is complete; the remaining work is the riir-ai speculative decode loop
 integration (a riir-ai task, not this issue).
 
+**Update 2026-07-14 (Plan 433):** the DFlash ↔ Weaver pipeline wiring landed
+in both `katgpt-rs/crates/katgpt-forward/src/dflash.rs` and
+`riir-ai/crates/riir-engine/src/dflash.rs` as a new
+`dflash_predict_with_weaver(...)` wrapper (gated `weaver_runtime`). It calls
+`dflash_predict_with_capture` (new sibling variant that snapshots per-step
+drafter hidden states) + `WeaverCorrector::correct_marginals_with_scratch`
+in a single call. The spec decode loop can now opt into Weaver correction by
+swapping `dflash_predict_with(...)` for `dflash_predict_with_weaver(...)`.
+The actual `speculative_step_qwen_deltanet_tree` call-site wiring (passing
+verifier hidden + embedding + corrector through the spec step signature)
+remains deferred — see Plan 433 "Out of scope".
+
 ### Why katgpt-rs (not riir-ai)
 
 Per Research 402 §4: katgpt-rs ships the **top-K constrained projection +
