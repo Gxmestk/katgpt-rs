@@ -215,20 +215,24 @@ Per `AGENTS.md` feature-flag discipline. Note: `dash_attn` is **already
 default-on at root** today, so the gate here is a *no-regression* gate on
 the move, not a fresh-promotion gate.
 
-- [ ] **G1 correctness** — all existing `dash_attn/tests.rs` integration
+> **⚠️ SUPERSEDED by Proposal 003** — items below are moot, kept for historical reference.
+> The narrow `katgpt-dash-attn` was widened to the full attention stack (`katgpt-attn`)
+> as Phase 2 of the master `src/` consolidation.
+
+- [-] **G1 correctness** — all existing `dash_attn/tests.rs` integration
       tests pass unchanged against the re-exported crate (prefill → decode
       round-trip, chunk-summary caching, vortex decode path).
-- [ ] **G2 perf** — entmax-1.5 routing wall time and VortexFlow router
+- [-] **G2 perf** — entmax-1.5 routing wall time and VortexFlow router
       selection latency unchanged (±2%) vs in-tree baseline. The crate
       boundary must not add an indirection cost on the hot path.
-- [ ] **G3 no-regression** — `cargo check --workspace --all-features`
+- [-] **G3 no-regression** — `cargo check --workspace --all-features`
       clean. The full feature matrix (`vortex_flow` × `msa_*` ×
       `cache_prune`) compiles. This is the combo-regression guard.
-- [ ] **G4 alloc-free hot path** — entmax threshold search, routing
+- [-] **G4 alloc-free hot path** — entmax threshold search, routing
       scratch reuse (`RoutingScratch`, `VortexScratch`), and chunk-summary
       `summarize_chunk_into` stay zero-alloc. No new `Vec` inside the
       routing kernels (scratch buffers passed as `&mut [T]`).
-- [ ] **G5 feature-matrix CI** — new `ci_feature_guard.sh` entry for the
+- [-] **G5 feature-matrix CI** — new `ci_feature_guard.sh` entry for the
       crate runs `--all-features` to catch the `merkle_root`-class bug
       (a field forgotten in one feature combo).
 
@@ -237,36 +241,41 @@ competition. The gate is purely no-regression on the move.
 
 ## Phased rollout
 
-- [ ] **Phase 0 — decide the two boundary calls.**
+> **⚠️ SUPERSEDED by Proposal 003** — phases below were never executed as-is;
+> the dash_attn primitives were consolidated into `katgpt-attn` as Phase 2 of
+> the master `src/` consolidation (Plan 404 endgame audit, 2026-07-06). Items
+> kept for historical reference.
+
+- [-] **Phase 0 — decide the two boundary calls.**
       1. `sat_analysis.rs` ↔ `crate::cache_prune::SummedAreaTable`: gate
          behind a root shim OR move `SummedAreaTable` into
          `katgpt-pruners`. Prefer the shim (smaller blast radius).
       2. `forward.rs` / `tests.rs`: confirm they stay in root under a
          `dash_attn_forward` module. Document the seam.
-- [ ] **Phase 1 — scaffold crate.** Create `crates/katgpt-dash-attn/`,
+- [-] **Phase 1 — scaffold crate.** Create `crates/katgpt-dash-attn/`,
       copy the 13 primitive files verbatim, rewrite `use crate::dash_attn::`
       → `crate::` (intra-crate), `use crate::types::DashAttnConfig` →
       `use katgpt_types::DashAttnConfig`, `use crate::pruners::bandit::`
       → `use katgpt_pruners::bandit::`. `cargo check -p katgpt-dash-attn
       --all-features` clean.
-- [ ] **Phase 2 — root re-export + forward retention.** Add crate to
+- [-] **Phase 2 — root re-export + forward retention.** Add crate to
       root `Cargo.toml`; replace `pub mod dash_attn;` with the re-export
       + retained-forward pattern above. Move `forward.rs` + `tests.rs`
       into `src/dash_attn_forward.rs` (or keep the dir, gut the primitives).
       `cargo check --workspace` clean.
-- [ ] **Phase 3 — update reverse consumer.** Verify
+- [-] **Phase 3 — update reverse consumer.** Verify
       `src/speculative/prefill.rs` L324 still resolves via the re-export.
       Run `cargo test -p katgpt-rs --features spec_pruner` (or whichever
       feature gates that path) — green.
-- [ ] **Phase 4 — delete in-tree primitive copies.** Remove the 13
+- [-] **Phase 4 — delete in-tree primitive copies.** Remove the 13
       primitive files from `src/dash_attn/`. Only `forward.rs` /
       `tests.rs` (now under `dash_attn_forward`) remain in-tree.
       `cargo check --workspace --all-features` clean.
-- [ ] **Phase 5 — GOAT no-regression gate.** Run G1–G5. Existing
+- [-] **Phase 5 — GOAT no-regression gate.** Run G1–G5. Existing
       `dash_attn/tests.rs` integration tests pass unchanged.
-- [ ] **Phase 6 — CI guard.** Add the crate to
+- [-] **Phase 6 — CI guard.** Add the crate to
       `scripts/ci_feature_guard.sh` with `--all-features`.
-- [ ] **Phase 7 — commit + record.** Commit on `develop` with `feat:`
+- [-] **Phase 7 — commit + record.** Commit on `develop` with `feat:`
       prefix. Update this proposal status to **done**. Cross-link from
       `katgpt-attn-match` README (sibling primitive-promotion precedent).
 

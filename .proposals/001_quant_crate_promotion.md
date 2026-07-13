@@ -135,18 +135,21 @@ etc.) so no external consumer breaks.
 
 ## GOAT gate (must pass before default-on promotion)
 
+> **⚠️ SUPERSEDED by Proposal 003** — items below are moot, kept for historical reference.
+> The quant promotion was absorbed into the master `src/` consolidation with wider scope.
+
 Per `AGENTS.md` feature-flag discipline:
 
-- [ ] **G1 correctness** — each variant's dequantized output matches the
+- [-] **G1 correctness** — each variant's dequantized output matches the
       f32 reference within its documented MSE bound on the standard KV
       fixture. No silent correctness regression vs the in-tree baseline.
-- [ ] **G2 perf** — benchmark each variant's encode/decode FMAs and wall
+- [-] **G2 perf** — benchmark each variant's encode/decode FMAs and wall
       time against TurboQuant (the baseline). planar/iso/hybrid must beat
       TurboQuant on rotation cost; octopus must beat on MSE at equal bits.
-- [ ] **G3 no-regression** — `cargo check --all-features` clean; the
+- [-] **G3 no-regression** — `cargo check --all-features` clean; the
       existing `turboquant`/`planar_quant`/etc root tests pass unchanged
       against the re-exported crate.
-- [ ] **G4 alloc-free hot path** — encode/decode inner loops stay
+- [-] **G4 alloc-free hot path** — encode/decode inner loops stay
       allocation-free (scratch buffers passed as `&mut [T]`, per the
       hot-loop rules). No new `Vec` allocations inside the quant kernels.
 
@@ -156,27 +159,31 @@ win on different d), keep both opt-in and document the decision matrix.
 
 ## Phased rollout
 
-- [ ] **Phase 0 — verify closure.** Grep for any *other* consumer of
+> **⚠️ SUPERSEDED by Proposal 003** — phases below were never executed as-is;
+> the quant modules were consolidated as part of the master `src/` cleanup
+> (Plan 404 endgame audit, 2026-07-06). Items kept for historical reference.
+
+- [-] **Phase 0 — verify closure.** Grep for any *other* consumer of
       these five modules outside the closure (e.g. `benchmark/`, `examples/`).
       Update call sites to the new crate path. Confirm no surprise dep.
-- [ ] **Phase 1 — scaffold crate.** Create `crates/katgpt-quant/`, copy
+- [-] **Phase 1 — scaffold crate.** Create `crates/katgpt-quant/`, copy
       the five modules verbatim, fix `use crate::` → `use katgpt_quant::`
       + adjust the inter-module paths. `cargo check -p katgpt-quant
       --all-features` clean.
-- [ ] **Phase 2 — root re-export.** Add `katgpt-quant` to root
+- [-] **Phase 2 — root re-export.** Add `katgpt-quant` to root
       `Cargo.toml` deps; replace `mod turboquant;` etc in `src/lib.rs`
       with `pub use katgpt_quant::turboquant;`. All existing root tests
       and examples compile unchanged.
-- [ ] **Phase 3 — delete in-tree copies.** Remove `src/turboquant/`,
+- [-] **Phase 3 — delete in-tree copies.** Remove `src/turboquant/`,
       `src/planar_quant/`, `src/iso_quant/`, `src/hybrid_oct_pq/`,
       `src/octopus/`. `cargo check --workspace --all-features` clean.
-- [ ] **Phase 4 — GOAT benchmark.** Add a bench comparing all five
+- [-] **Phase 4 — GOAT benchmark.** Add a bench comparing all five
       variants on the standard KV fixture (rotation FMAs, encode/decode
       wall time, dequant MSE). Run G1–G4.
-- [ ] **Phase 5 — promote GOAT to default.** If a variant wins on perf
+- [-] **Phase 5 — promote GOAT to default.** If a variant wins on perf
       with no MSE regression, promote to `default`. Demote losers to
       opt-in with a one-line rationale in `Cargo.toml`.
-- [ ] **Phase 6 — commit + record.** Commit on `develop` with
+- [-] **Phase 6 — commit + record.** Commit on `develop` with
       `feat:` prefix. Update this proposal status to **done**. Cross-link
       from `katgpt-spectral`'s README (the `turboquant = []` tracking flag
       in its Cargo.toml can now point here).
