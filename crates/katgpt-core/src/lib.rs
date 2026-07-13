@@ -1661,6 +1661,16 @@ pub use velocity_field_ensemble::{
     accumulate_pair_into, stochastic_interpolant_step_into,
 };
 
+// VFD — Velocity-Field Disagreement epistemic UQ estimator (Plan 432, Research 420).
+// Modelless: consumes the same M frozen velocity fields as VelocityFieldEnsemble,
+// but integrates each member independently and measures pairwise disagreement
+// weighted by kappa_s = s/(1-s). Activates Plan 376 Phase 6 G7 deferred UQ gate.
+// Opt-in until Phase 2 GOAT gate (G2 UQ floor per Issue 010) passes.
+#[cfg(feature = "velocity_field_disagreement")]
+pub mod velocity_field_disagreement;
+#[cfg(feature = "velocity_field_disagreement")]
+pub use velocity_field_disagreement::{VfdScore, VfdScratch, VfdVarianceSignal, vfd_score_into};
+
 // ── Phase 10 absorption (Proposal 003, 2026-07-04): modules moved from katgpt-rs/src/.
 // Always-on (no feature gate):
 pub mod alloc; // Debug-only TrackingAllocator (consumer gates via #[cfg(debug_assertions)])
