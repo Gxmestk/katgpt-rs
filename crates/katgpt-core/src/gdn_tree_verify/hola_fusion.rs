@@ -42,6 +42,7 @@ use super::{
     verify_gdn_tree_into, GdnLayerParams, GdnMultiHeadParams, GdnTreeVerifier, TreeTopology,
 };
 use crate::hippocampal_cache_dyn::HippocampalCacheDyn;
+use crate::types::rmsnorm_with_gamma;
 
 // ── Dual-path verifier (pre-allocated scratch) ─────────────────
 
@@ -73,6 +74,11 @@ pub struct GdnHolaTreeVerifier {
     /// Reusable ancestor path buffer (topo indices, root first).
     /// Pre-sized to `max_depth`; `clear()` + `push()` within capacity is alloc-free.
     ancestor_path_scratch: Vec<usize>,
+    /// Pre-normalized tree keys `[max_t × d]`, topo-indexed. Computed once per
+    /// `verify_gdn_hola_tree_into` call using the cache's gamma. Avoids
+    /// redundant per-node RMSNorm of ancestor keys (a chain tree at T=N
+    /// normalizes the root key N times without this). The G2 perf fix.
+    tree_keys_norm: Vec<f32>,
     /// `max_t` from construction (for bounds checking).
     max_t: usize,
 }
@@ -91,6 +97,7 @@ impl GdnHolaTreeVerifier {
             block_kv_ptrs: Vec::with_capacity(max_depth.max(1)),
             block_kv_typed: Vec::with_capacity(max_depth.max(1)),
             ancestor_path_scratch: Vec::with_capacity(max_depth.max(1)),
+            tree_keys_norm: vec![0.0; max_t.saturating_mul(d_v)],
             max_t,
         }
     }
@@ -117,6 +124,9 @@ impl GdnHolaTreeVerifier {
 /// * `o_hola_buf` — output buffer `[max_t × d_v]`, only `[0..t*d_v]` written.
 /// * `block_kv_ptrs` — raw (k_ptr, v_ptr) pairs, cleared + refilled per node.
 /// * `ancestor_path_scratch` — topo indices of ancestors, cleared + refilled per node.
+/// * `tree_keys_norm` — pre-normalized tree keys buffer `[max_t × d]`,
+///   topo-indexed. Filled once at the start of this call using the cache's
+///   gamma. Avoids redundant per-node RMSNorm of ancestor keys.
 /// * `topo` — tree topology.
 /// * `params` — GDN layer params (original-indexed; used for keys/values/queries).
 /// * `cache` — the per-layer HOLA cache (read-only; `&mut` for scratch only).
@@ -127,12 +137,26 @@ fn compute_out_hola(
     block_kv_ptrs: &mut Vec<(*const f32, *const f32)>,
     block_kv_typed: &mut Vec<(&'static [f32], &'static [f32])>,
     ancestor_path_scratch: &mut Vec<usize>,
+    tree_keys_norm: &mut [f32],
     topo: &TreeTopology,
     params: &GdnLayerParams,
     cache: &mut HippocampalCacheDyn,
     d: usize,
 ) {
     let t = topo.n_nodes;
+
+    // Pre-normalize all tree keys once using the cache's gamma. This avoids
+    // redundant per-node RMSNorm of ancestor keys: a chain tree at T=N would
+    // normalize the root key N times without this. The pre-normalized keys are
+    // topo-indexed (node i's key is at tree_keys_norm[i*d..(i+1)*d]).
+    let gamma = cache.gamma();
+    for i in 0..t {
+        let orig_i = topo.topo_order[i];
+        let k_src = &params.keys[orig_i * d..(orig_i + 1) * d];
+        let k_dst = &mut tree_keys_norm[i * d..(i + 1) * d];
+        k_dst.copy_from_slice(k_src);
+        rmsnorm_with_gamma(k_dst, gamma);
+    }
 
     for i in 0..t {
         let orig_i = topo.topo_order[i];
@@ -147,35 +171,35 @@ fn compute_out_hola(
         }
         ancestor_path_scratch.reverse();
 
-        // Collect raw pointers for ancestor keys/values.
-        // Safe because params slices outlive this function call and we clear()
-        // before each use. The reconstructed slices below are only used within
-        // the cache.read_cache_into_fast_block call (same scope).
+        // Collect raw pointers: keys from tree_keys_norm (pre-normalized,
+        // topo-indexed), values from params (orig-indexed).
+        // Safe because tree_keys_norm and params slices outlive this function
+        // call and we clear() before each use.
         block_kv_ptrs.clear();
         for &ancestor_k in ancestor_path_scratch.iter() {
+            let k_norm_j = &tree_keys_norm[ancestor_k * d..(ancestor_k + 1) * d];
             let orig_j = topo.topo_order[ancestor_k];
-            let k_j = &params.keys[orig_j * d..(orig_j + 1) * d];
             let v_j = &params.values[orig_j * d..(orig_j + 1) * d];
-            block_kv_ptrs.push((k_j.as_ptr(), v_j.as_ptr()));
+            block_kv_ptrs.push((k_norm_j.as_ptr(), v_j.as_ptr()));
         }
 
         // Reconstruct typed slice references from raw pointers for the cache read.
-        // Safe: pointers come from params slices that outlive this call; all slices
-        // have length d (= d_k = d_v = cache.d). The typed buffer is pre-allocated
-        // in the verifier struct and reused via clear() + push() — zero allocation.
+        // Safe: pointers come from tree_keys_norm / params which outlive this call;
+        // all slices have length d. The typed buffer is pre-allocated in the verifier
+        // struct and reused via clear() + push() — zero allocation.
         block_kv_typed.clear();
         for &(k_ptr, v_ptr) in block_kv_ptrs.iter() {
-            // SAFETY: k_ptr/v_ptr point into params.keys/values which outlive this
-            // call; length d is correct (all ancestor slices are d-wide).
+            // SAFETY: k_ptr points into tree_keys_norm; v_ptr into params.values.
+            // Both outlive this call; length d is correct (all slices are d-wide).
             let k_slice = unsafe { core::slice::from_raw_parts(k_ptr, d) };
             let v_slice = unsafe { core::slice::from_raw_parts(v_ptr, d) };
             block_kv_typed.push((k_slice, v_slice));
         }
 
-        // Read cache into o_hola[i].
+        // Read cache into o_hola[i] using the pre-normalized block_kv path.
         let out_i = i * d;
         let o_hola_i = &mut o_hola_buf[out_i..out_i + d];
-        cache.read_cache_into_fast_block(q_i, block_kv_typed, o_hola_i);
+        cache.read_cache_into_fast_block_prenorm(q_i, block_kv_typed, o_hola_i);
     }
 }
 
@@ -243,7 +267,8 @@ pub fn verify_gdn_hola_tree_into<'a>(
         let block_kv_ptrs = &mut verifier.block_kv_ptrs;
         let block_kv_typed = &mut verifier.block_kv_typed;
         let ancestor_path = &mut verifier.ancestor_path_scratch;
-        compute_out_hola(o_hola, block_kv_ptrs, block_kv_typed, ancestor_path, topo, params, cache, d);
+        let tree_keys_norm = &mut verifier.tree_keys_norm[..t * d];
+        compute_out_hola(o_hola, block_kv_ptrs, block_kv_typed, ancestor_path, tree_keys_norm, topo, params, cache, d);
     }
 
     // Step 3: residual-add O[i] = O_gdn[i] + O_hola[i] into the inner scratch_out.

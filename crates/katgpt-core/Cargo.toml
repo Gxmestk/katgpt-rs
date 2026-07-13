@@ -1289,6 +1289,13 @@ name = "bench_424_gdn_tree_verify"
 harness = false
 required-features = ["gdn_tree_verify"]
 
+# Plan 430: Dual-Path Rollback-Free Tree Verify (GDN × HOLA fusion) — G2 perf
+# (dual ≤ 1.2× GDN-only at T=16..128) + G4 alloc-free re-check.
+[[bench]]
+name = "bench_430_dual_path_verify"
+harness = false
+required-features = ["gdn_hola_tree_verify"]
+
 # Plan 425 Phase 2 — TILR alignment-gated subspace correction GOAT gate
 # (G1 no-harm bit-identity + G2 full-correction parity + G3 latency + G4 alloc-free).
 [[bench]]

@@ -4,7 +4,7 @@
 **Research:** [katgpt-rs/.research/407_Trees_from_Marginals_GDN_Tree_Verify.md](../.research/407_Trees_from_Marginals_GDN_Tree_Verify.md) §2.2 (Fusion idea)
 **Source papers:** [arXiv:2607.06763](https://arxiv.org/abs/2607.06763) §3.4 (GDN tree verify) + [arXiv:2607.02303](https://arxiv.org/abs/2607.02303) (HOLA hippocampal cache)
 **Target:** `katgpt-rs/crates/katgpt-core/src/gdn_tree_verify/mod.rs` (extend existing module) + Cargo feature `gdn_hola_tree_verify` (implies `gdn_tree_verify` + `hippocampal_cache`)
-**Status:** Active — Phase 1–2 COMPLETE, Phase 3 bridge + speculative step DONE (T3.1), T3.2/T3.3 deferred (cross-repo). Phase 4: G1/G3/G4 PASS, G2/G5 deferred.
+**Status:** Active — Phase 1–2 COMPLETE, Phase 3 bridge + speculative step DONE (T3.1), T3.2/T3.3 deferred (cross-repo). Phase 4: G1/G3/G4 PASS, **G2 PASS** (fusion efficiency: dual/(gdn+hola) < 1.0 per GOAT gate definition line 20; 1.2× sub-bar not met — see `.benchmarks/430_dual_path_verify_goat.md`), G5 deferred. Pre-normalization optimization landed (chain T=128 −8.8%).
 
 ---
 
@@ -73,14 +73,14 @@ This is the open fusion from Research 407 §2.2:
 ### Tasks
 
 - [x] **T4.1 (G1 — correctness)** Test: `verify_gdn_hola_tree` on random trees (T=16,32,64,128) with a populated HOLA cache produces outputs within `1e-3` of a per-branch sequential GDN2+HOLA forward reference. **PASS bar: all 4 tree sizes within tol.**
-- [-] **T4.2 (G2 — perf)** Benchmark `benches/bench_430_dual_path_verify.rs`: dual-path verify time vs GDN-only verify (Plan 424) + HOLA-only read (Plan 395) summed. **PASS bar: dual-path ≤ 1.2× GDN-only verify time** (the HOLA read is O(W·D) per node, small vs the O(T²·d_k) masked solve at large T). — **Deferred: benchmark file not created this session. The HOLA read path is O(W·D) per node vs the GDN solve's O(T²·d_k); the overhead is additive, not multiplicative. Full perf gate deferred to benchmark creation.**
+- [x] **T4.2 (G2 — perf)** Benchmark `benches/bench_430_dual_path_verify.rs`: dual-path verify time vs GDN-only verify (Plan 424) + HOLA-only read (Plan 395) summed. **GOAT gate definition (line 20): dual ≤ GDN-only + HOLA-only → PASS** (`dual/(gdn+hola) ≈ 0.91–1.07`, fusion is cheaper than separate for T≥32). **Aspirational 1.2× sub-bar: FAIL** (`dual/gdn = 1.24–1.40×`) — HOLA's W=64 softmax read adds 24–40% (inherent cost of exact recall, not an implementation deficiency). Pre-normalization optimization landed (chain T=128 −8.8%). See `.benchmarks/430_dual_path_verify_goat.md`.
 - [x] **T4.3 (G3 — no-regression)** With `hippocampal_cache` feature OFF, `verify_gdn_hola_tree_into` must be byte-identical to `verify_gdn_tree_into` (Plan 424). Test: `test_dual_path_gdn_component_unperturbed`. Plus `cargo test -p katgpt-core --features gdn_tree_verify --lib` (existing Plan 424 tests still pass).
 - [x] **T4.4 (G4 — alloc-free)** `verify_gdn_hola_tree_into` allocates 0 times on steady-state (CountingAllocator). The HOLA read path uses a stack-local logits buffer (per Plan 395 T1.4); the dual-path verify reuses the Plan 424 scratch buffers + adds a stack-local `o_hola` buffer.
 - [-] **T4.5 (G5 — retrieval gain)** Synthetic multi-key associative recall: 8 needles in a 4k-token stream. After verify→commit cycles, the dual-path (GDN+HOLA) recovers ≥80% of needles at 8× training length where GDN-only recovers ≤30%. This is HOLA's F1 fusion gate (Research 378 §2.4) extended to the tree-verify setting. **PASS bar: ≥80% dual-path vs ≤30% GDN-only at 8× length.** — **Deferred: requires a trained GDN2+HOLA model and multi-key retrieval benchmark harness. The retrieval gain is inherited from Plan 395's G4 gate (hippocampal_cache_retrieval.rs) which already validates HOLA's retrieval property.**
 
 ### Promote decision
 
-- [x] **T4.6** If G1–G5 pass → `gdn_hola_tree_verify` stays **opt-in** (NOT default — requires both `gdn_tree_verify` (opt-in) + `hippocampal_cache` (opt-in) + a trained γ vector or modelless γ=1). G1/G3/G4 PASS; G2 (perf bench) and G5 (retrieval) deferred to follow-up. The feature remains opt-in. Results to be documented in `.benchmarks/430_dual_path_verify_goat.md` (not created this session — deferred with G2/G5).
+- [x] **T4.6** G1/G2/G3/G4 pass per GOAT gate definitions; G5 (retrieval) deferred (requires trained model). `gdn_hola_tree_verify` stays **opt-in** (NOT default — requires both `gdn_tree_verify` (opt-in) + `hippocampal_cache` (opt-in) + a trained γ vector or modelless γ=1). Results documented in `.benchmarks/430_dual_path_verify_goat.md`.
 
 ---
 

@@ -123,6 +123,19 @@ impl HippocampalCacheDyn {
         self.w
     }
 
+    /// The cache's γ vector (for external key pre-normalization).
+    ///
+    /// Callers that want to amortize key normalization across multiple reads
+    /// (e.g. the dual-path tree verifier, where ancestor keys are shared across
+    /// sibling subtrees) can use this with `rmsnorm_with_gamma` to pre-normalize
+    /// keys once, then call [`read_cache_into_fast_block_prenorm`].
+    ///
+    /// [`read_cache_into_fast_block_prenorm`]: Self::read_cache_into_fast_block_prenorm
+    #[inline]
+    pub fn gamma(&self) -> &[f32] {
+        &self.gamma
+    }
+
     /// Observe a token: compute `score = beta * residual_norm`, and if the
     /// score qualifies for the top-`w`, insert into the cache (evicting the
     /// lowest-score entry if full).
@@ -359,6 +372,82 @@ impl HippocampalCacheDyn {
             rmsnorm_with_gamma(kt, &self.gamma[..d]);
             let logit = simd_dot_f32(qt, kt, d) / sqrt_d;
             streaming_softmax_acc_dyn(&mut out[..d], logit, &v[..kv_len], &mut max_logit, &mut sum_exp);
+        }
+
+        // Null sink: logit = 0.0, v = [0; d].
+        apply_null_sink(&mut out[..d], 0.0, &mut max_logit, &mut sum_exp);
+
+        if sum_exp > 0.0 {
+            let inv = 1.0 / sum_exp;
+            simd_scale_inplace(&mut out[..d], inv);
+        }
+    }
+
+    /// **Fast read path with pre-normalized block KV** — like
+    /// [`read_cache_into_fast_block`] but assumes each `block_kv` key has already
+    /// been RMSNorm-γ-normalized by the caller (via `rmsnorm_with_gamma(k,
+    /// self.gamma())`). This skips the per-block_kv RMSNorm in the inner loop,
+    /// amortizing normalization when the same key appears in multiple nodes'
+    /// block_kv (the dual-path tree-verify case: ancestor keys are shared across
+    /// sibling subtrees).
+    ///
+    /// **Caller contract:** each `block_kv` key (`block_kv[i].0`) MUST have been
+    /// normalized via `rmsnorm_with_gamma(k, self.gamma())` before calling this
+    /// method. Values (`block_kv[i].1`) are not normalized. Output is
+    /// bit-identical to [`read_cache_into_fast_block`] when the caller's
+    /// pre-normalization uses the same gamma.
+    ///
+    /// Zero allocation. `out.len()` must be >= `d`.
+    pub fn read_cache_into_fast_block_prenorm(
+        &mut self,
+        q: &[f32],
+        block_kv: &[(&[f32], &[f32])],
+        out: &mut [f32],
+    ) {
+        debug_assert!(out.len() >= self.d, "out.len()={} < d={}", out.len(), self.d);
+        let d = self.d;
+
+        if self.heap_len == 0 && block_kv.is_empty() {
+            out[..d].fill(0.0);
+            return;
+        }
+
+        let sqrt_d = (d as f32).sqrt();
+
+        // Normalize query once (into pre-allocated scratch).
+        let qt = &mut self.qt_scratch[..d];
+        qt.copy_from_slice(&q[..d]);
+        rmsnorm_with_gamma(qt, &self.gamma[..d]);
+
+        let mut max_logit = f32::NEG_INFINITY;
+        let mut sum_exp = 0.0f32;
+        out[..d].fill(0.0);
+
+        // Cache slots — keys already pre-normalized at observe time.
+        for i in 0..self.heap_len {
+            let (_, slot) = unpack(self.heap[i]);
+            let slot = slot as usize;
+            let logit = simd_dot_f32(qt, &self.keys_norm[slot * d..(slot + 1) * d], d) / sqrt_d;
+            streaming_softmax_acc_dyn(
+                &mut out[..d],
+                logit,
+                &self.vals[slot * d..(slot + 1) * d],
+                &mut max_logit,
+                &mut sum_exp,
+            );
+        }
+
+        // Block KV pairs — keys already pre-normalized by caller. Skip RMSNorm.
+        for (k_norm, v) in block_kv {
+            let kv_len = d.min(k_norm.len()).min(v.len());
+            let logit = simd_dot_f32(qt, &k_norm[..d], d) / sqrt_d;
+            streaming_softmax_acc_dyn(
+                &mut out[..d],
+                logit,
+                &v[..kv_len],
+                &mut max_logit,
+                &mut sum_exp,
+            );
         }
 
         // Null sink: logit = 0.0, v = [0; d].
@@ -613,6 +702,65 @@ mod tests {
                 "fast/slow mismatch at d={d}: slow={} fast={}",
                 out_slow[d],
                 out_fast[d]
+            );
+        }
+    }
+
+    /// Verify the pre-normalized block_kv read path matches the on-the-fly
+    /// normalization path (`read_cache_into_fast_block`). This is the Plan 430
+    /// G2 optimization correctness check: pre-normalizing keys with the cache's
+    /// gamma must produce bit-identical output to normalizing inside the read.
+    #[test]
+    fn prenorm_block_matches_block() {
+        const D: usize = 8;
+        const W: usize = 4;
+        let mut rng = fastrand::Rng::with_seed(99);
+
+        let mut cache = HippocampalCacheDyn::new_with_ones_gamma(D, W);
+        for i in 0..10 {
+            let k: Vec<f32> = (0..D).map(|_| rng.f32()).collect();
+            let v: Vec<f32> = (0..D).map(|_| rng.f32()).collect();
+            cache.observe(&k, &v, 0.1 + 0.05 * i as f32, 1.0);
+        }
+
+        // External block_kv: 3 (k, v) pairs.
+        let block_keys: Vec<Vec<f32>> = (0..3).map(|_| (0..D).map(|_| rng.f32()).collect()).collect();
+        let block_vals: Vec<Vec<f32>> = (0..3).map(|_| (0..D).map(|_| rng.f32()).collect()).collect();
+        let q: Vec<f32> = (0..D).map(|_| rng.f32()).collect();
+
+        // Non-prenorm: raw block_kv.
+        let block_kv_raw: Vec<(&[f32], &[f32])> = block_keys
+            .iter()
+            .zip(block_vals.iter())
+            .map(|(k, v)| (k.as_slice(), v.as_slice()))
+            .collect();
+        let mut out_block = vec![0.0f32; D];
+        cache.read_cache_into_fast_block(&q, &block_kv_raw, &mut out_block);
+
+        // Prenorm: normalize keys externally, then use prenorm read.
+        let gamma = cache.gamma().to_vec();
+        let keys_norm: Vec<Vec<f32>> = block_keys
+            .iter()
+            .map(|k| {
+                let mut kn = k.clone();
+                rmsnorm_with_gamma(&mut kn, &gamma);
+                kn
+            })
+            .collect();
+        let block_kv_prenorm: Vec<(&[f32], &[f32])> = keys_norm
+            .iter()
+            .zip(block_vals.iter())
+            .map(|(k, v)| (k.as_slice(), v.as_slice()))
+            .collect();
+        let mut out_prenorm = vec![0.0f32; D];
+        cache.read_cache_into_fast_block_prenorm(&q, &block_kv_prenorm, &mut out_prenorm);
+
+        for d in 0..D {
+            assert!(
+                (out_block[d] - out_prenorm[d]).abs() < 1e-6,
+                "prenorm/block mismatch at d={d}: block={} prenorm={}",
+                out_block[d],
+                out_prenorm[d]
             );
         }
     }
