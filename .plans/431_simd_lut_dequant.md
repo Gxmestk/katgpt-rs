@@ -4,7 +4,7 @@
 **Research:** [katgpt-rs/.research/418_StreamDQ_SIMD_LUT_DeQuant.md](../.research/418_StreamDQ_SIMD_LUT_DeQuant.md)
 **Source paper:** [arxiv 2607.08993](https://arxiv.org/abs/2607.08993) — StreamDQ (Jeong et al., SK Hynix, 2026-07-09)
 **Target:** `katgpt-rs/crates/katgpt-core/src/simd_lut_dequant.rs` (new module) + Cargo feature `simd_lut_dequant`
-**Status:** Active — Phase 1 + 2 + 3 COMPLETE (scalar + NEON + AVX2 + fused dequant+dot, 24 tests PASS). Phase 4 (GOAT Gate) is next.
+**Status:** Active — Phase 1+2+3+4 COMPLETE (ALL GOAT GATES PASS, fused dequant+dot 4.583x win, PROMOTED to default-on). Phase 5 (Q4_K integration in riir-ai) is conditional next step.
 
 ---
 
@@ -108,13 +108,13 @@ Distill StreamDQ's "shared FP32 ALU + format-specific type-cast" pattern (paper 
 
 ### Tasks
 
-- [ ] **T4.1** **G1 correctness bench** — `katgpt-rs/benches/simd_lut_dequant_goat.rs`:
+- [x] **T4.1** **G1 correctness bench** — `katgpt-rs/benches/simd_lut_dequant_goat.rs`:
   - Generate random Q4_K blocks (use `riir-ai`-compatible block layout OR inline the block decode)
   - Decode via (a) current arithmetic path, (b) new LUT path
   - Assert max abs diff == 0.0 (bit-exact)
   - PASS required for promotion.
 
-- [ ] **T4.2** **G2 latency bench** — criterion microbench:
+- [x] **T4.2** **G2 latency bench** — criterion microbench:
   - Workloads: single-block dequant (256 elements), full-row dequant (4096 elements), fused dequant+dot (4096 elements)
   - Compare: arithmetic path vs LUT path vs fused LUT+dot
   - Targets (aarch64 NEON, release build):
@@ -124,17 +124,17 @@ Distill StreamDQ's "shared FP32 ALU + format-specific type-cast" pattern (paper 
   - If G2 FAILS on all three: document negative result, keep opt-in, do NOT promote. Honest.
   - If G2 PASSES on full-row or fused: promote to default-on for that path.
 
-- [ ] **T4.3** **G3 no-regression** — `cargo clippy --workspace --all-features` clean + `cargo test -p katgpt-core --all-features` clean.
+- [x] **T4.3** **G3 no-regression** — `cargo clippy --workspace --all-features` clean + `cargo test -p katgpt-core --all-features` clean.
 
-- [ ] **T4.4** **G4 alloc-free** — verify via `#[track_allocator]` or manual inspection: LUT is stack `[f32; N]`, hot loop has zero `Vec`/`Box`/`String`. Document in code comment.
+- [x] **T4.4** **G4 alloc-free** — verify via `#[track_allocator]` or manual inspection: LUT is stack `[f32; N]`, hot loop has zero `Vec`/`Box`/`String`. Document in code comment.
 
-- [ ] **T4.5** **G5 SIMD-level report** — print NEON instruction count (via `cargo asm` or godbolt) for the inner loop. Report whether the LUT lookup lowered to `vld1q_f32` (best case) or scalar extraction (fallback).
+- [x] **T4.5** **G5 SIMD-level report** — print NEON instruction count (via `cargo asm` or godbolt) for the inner loop. Report whether the LUT lookup lowered to `vld1q_f32` (best case) or scalar extraction (fallback).
 
-- [ ] **T4.6** **G6 feature isolation** — `cargo check --features simd_lut_dequant` clean without affecting default paths. The feature is purely additive.
+- [x] **T4.6** **G6 feature isolation** — `cargo check --features simd_lut_dequant` clean without affecting default paths. The feature is purely additive.
 
-- [ ] **T4.7** Write `.benchmarks/431_simd_lut_dequant_goat.md` with the gate result + decision (promote / demote / keep opt-in).
+- [x] **T4.7** Write `.benchmarks/431_simd_lut_dequant_goat.md` with the gate result + decision (promote / demote / keep opt-in).
 
-**Exit:** GOAT gate documented. If promote: bump `simd_lut_dequant` to default feature in `katgpt-core/Cargo.toml`.
+**Exit:** GOAT gate documented. If promote: bump `simd_lut_dequant` to default feature in `katgpt-core/Cargo.toml`. ✅ DONE (2026-07-13): ALL GATES PASS. G1 bit-exact (0.0 diff). G2: fused dequant+dot **4.583×** win (PASS, target ≥1.3×); plain LUT dequant **0.286×** (FAIL, NEON has no gather). G3 clippy --all-features clean. G4 0 allocs/100 calls both paths. G5 aarch64 NEON (scalar gather). G6 0 mismatches/100 calls. **Split promotion**: `simd_lut_dequant` PROMOTED to default-on (fused kernel is the value-add). Plain `dequant_via_lut` should NOT replace arithmetic path in Q4_K (Phase 5 guidance: use `dequant_dot_via_lut` for fused matmul only). See `.benchmarks/432_simd_lut_dequant_goat.md`.
 
 ---
 
