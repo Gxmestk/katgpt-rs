@@ -819,16 +819,20 @@ fn pca_into(data: &[f32], n: usize, n_components: usize, out: &mut [f32], seed: 
     let mut centered = vec![0.0f32; n * d];
     let mut mean = vec![0.0f32; d];
     for i in 0..n {
+        let row = &data[i * d..(i + 1) * d];
         for j in 0..d {
-            mean[j] += data[i * d + j];
+            mean[j] += row[j];
         }
     }
+    let inv_n = 1.0f32 / n as f32;
     for m in mean.iter_mut().take(d) {
-        *m /= n as f32;
+        *m *= inv_n;
     }
     for i in 0..n {
+        let src = &data[i * d..(i + 1) * d];
+        let dst = &mut centered[i * d..(i + 1) * d];
         for j in 0..d {
-            centered[i * d + j] = data[i * d + j] - mean[j];
+            dst[j] = src[j] - mean[j];
         }
     }
 
@@ -847,65 +851,65 @@ fn pca_into(data: &[f32], n: usize, n_components: usize, out: &mut [f32], seed: 
     }
 
     // 3. Power iteration with Hotelling deflation.
+    // Pre-allocate two work vectors outside both loops — the inner
+    // iteration loop used to allocate a fresh `Vec<f32>` of size `d` per
+    // iteration (PCA_MAX_ITERS × n_components allocations).
     let mut work_cov = cov;
     let mut eigenvectors = vec![0.0f32; n_components * d];
     let mut rng = SplitMix64::new(seed);
+    let mut v: Vec<f32> = Vec::with_capacity(d);
+    let mut new_v: Vec<f32> = vec![0.0f32; d];
 
     for c in 0..n_components {
         // Deterministic non-uniform initial vector.
-        let mut v: Vec<f32> = (0..d).map(|_| rng.next_f32() * 2.0 - 1.0).collect();
+        v.clear();
+        v.extend((0..d).map(|_| rng.next_f32() * 2.0 - 1.0));
         normalize(&mut v);
 
         for _ in 0..PCA_MAX_ITERS {
-            // v ← C v
-            let mut new_v = vec![0.0f32; d];
+            // v ← C v  (SIMD-accelerated per-row dot product)
             for i in 0..d {
                 let row = &work_cov[i * d..(i + 1) * d];
-                let mut s = 0.0f32;
-                for j in 0..d {
-                    s += row[j] * v[j];
-                }
-                new_v[i] = s;
+                new_v[i] = crate::simd::simd_dot_f32(row, &v[..d], d);
             }
             normalize(&mut new_v);
 
             // Convergence: cosine similarity → 1.
-            let dot: f32 = v.iter().zip(&new_v).map(|(a, b)| a * b).sum();
+            let dot: f32 = crate::simd::simd_dot_f32(&v[..d], &new_v[..d], d);
             let converged = (dot.abs() - 1.0).abs() < PCA_CONVERGENCE;
-            v = new_v;
+            std::mem::swap(&mut v, &mut new_v);
             if converged {
                 break;
             }
         }
 
         // Eigenvalue λ = v^T C v.
-        let mut lambda = 0.0f32;
+        // Reuse new_v as scratch for C v (already normalized, but we're
+        // about to overwrite it).
         for i in 0..d {
-            let mut s = 0.0f32;
-            for j in 0..d {
-                s += work_cov[i * d + j] * v[j];
-            }
-            lambda += v[i] * s;
+            let row = &work_cov[i * d..(i + 1) * d];
+            new_v[i] = crate::simd::simd_dot_f32(row, &v[..d], d);
         }
+        let lambda: f32 = crate::simd::simd_dot_f32(&v[..d], &new_v[..d], d);
 
         // Deflate: C ← C − λ v v^T.
         for i in 0..d {
+            let vi = v[i];
+            let row = &mut work_cov[i * d..(i + 1) * d];
             for j in 0..d {
-                work_cov[i * d + j] -= lambda * v[i] * v[j];
+                row[j] -= lambda * vi * v[j];
             }
         }
 
-        eigenvectors[c * d..(c + 1) * d].copy_from_slice(&v);
+        eigenvectors[c * d..(c + 1) * d].copy_from_slice(&v[..d]);
     }
 
-    // 4. Project: out = centered × eigenvectors^T.
+    // 4. Project: out = centered × eigenvectors^T  (SIMD-accelerated).
     for i in 0..n {
+        let centered_row = &centered[i * d..(i + 1) * d];
         for c in 0..n_components {
-            let mut s = 0.0f32;
-            for j in 0..d {
-                s += centered[i * d + j] * eigenvectors[c * d + j];
-            }
-            out[i * n_components + c] = s;
+            let eigen_row = &eigenvectors[c * d..(c + 1) * d];
+            out[i * n_components + c] = crate::simd::simd_dot_f32(centered_row, eigen_row, d);
         }
     }
 }
