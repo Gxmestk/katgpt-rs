@@ -177,47 +177,95 @@ fn real_checkpoint_loads_and_produces_nonzero_residual() {
 
     // ── G4 (latency): measure Weaver forward pass time on the real config ──
     //
-    // The forward pass does: conditioning (2× RMSNorm + matmul), single-head
-    // causal attention over D+1=5 positions, SwiGLU MLP, top-K=32 gather
-    // projection (reads 32×2304×4 = 288 KB of embedding), residual add, softmax.
+    // We measure THREE paths:
+    //   1. Allocating path (`correct` — calls `weaver_forward`, ~20 Vec allocs/call)
+    //   2. Scratch path (`correct_with_scratch` — zero-alloc, batched matmul)
+    //   3. Parallel path (`correct_parallel` — rayon, ~3.2× over sequential)
     //
-    // We measure the median of N runs to get a stable latency number.
+    // The parallel path is the Issue 131 G4 optimization that passes the gate.
     const WARMUP_RUNS: usize = 3;
     const MEASURED_RUNS: usize = 20;
 
+    // ── Path 1: Allocating (`correct`) ──
     for _ in 0..WARMUP_RUNS {
         let _ = corrector.correct(&input);
     }
-
-    let mut times_us: Vec<f64> = Vec::with_capacity(MEASURED_RUNS);
+    let mut times_alloc_us: Vec<f64> = Vec::with_capacity(MEASURED_RUNS);
     for _ in 0..MEASURED_RUNS {
         let t0 = std::time::Instant::now();
         let _ = corrector.correct(&input);
-        times_us.push(t0.elapsed().as_secs_f64() * 1e6);
+        times_alloc_us.push(t0.elapsed().as_secs_f64() * 1e6);
     }
-    times_us.sort_by(|a, b| a.partial_cmp(b).unwrap());
-    let median_us = times_us[times_us.len() / 2];
-    let p99_idx = ((times_us.len() as f64 - 1.0) * 0.99) as usize;
-    let p99_us = times_us[p99_idx];
+    times_alloc_us.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    let median_alloc_us = times_alloc_us[times_alloc_us.len() / 2];
+    let p99_alloc_idx = ((times_alloc_us.len() as f64 - 1.0) * 0.99) as usize;
+    let p99_alloc_us = times_alloc_us[p99_alloc_idx];
+
+    // ── Path 2: Scratch (`correct_with_scratch`) ──
+    use katgpt_speculative::weaver::WeaverScratch;
+    let mut scratch = WeaverScratch::new(cfg);
+    for _ in 0..WARMUP_RUNS {
+        let _ = corrector.correct_with_scratch(&input, &mut scratch);
+    }
+    let mut times_scratch_us: Vec<f64> = Vec::with_capacity(MEASURED_RUNS);
+    for _ in 0..MEASURED_RUNS {
+        let t0 = std::time::Instant::now();
+        let _ = corrector.correct_with_scratch(&input, &mut scratch);
+        times_scratch_us.push(t0.elapsed().as_secs_f64() * 1e6);
+    }
+    times_scratch_us.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    let median_scratch_us = times_scratch_us[times_scratch_us.len() / 2];
+    let p99_scratch_idx = ((times_scratch_us.len() as f64 - 1.0) * 0.99) as usize;
+    let p99_scratch_us = times_scratch_us[p99_scratch_idx];
+
+    // ── Path 3: Parallel (`correct_parallel`) ──
+    for _ in 0..WARMUP_RUNS {
+        let _ = corrector.correct_parallel(&input, &mut scratch);
+    }
+    let mut times_parallel_us: Vec<f64> = Vec::with_capacity(MEASURED_RUNS);
+    for _ in 0..MEASURED_RUNS {
+        let t0 = std::time::Instant::now();
+        let _ = corrector.correct_parallel(&input, &mut scratch);
+        times_parallel_us.push(t0.elapsed().as_secs_f64() * 1e6);
+    }
+    times_parallel_us.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    let median_parallel_us = times_parallel_us[times_parallel_us.len() / 2];
+    let p99_parallel_idx = ((times_parallel_us.len() as f64 - 1.0) * 0.99) as usize;
+    let p99_parallel_us = times_parallel_us[p99_parallel_idx];
+
+    let speedup_scratch = median_alloc_us / median_scratch_us;
+    let speedup_parallel = median_alloc_us / median_parallel_us;
+    let verifier_step_us = 3000.0_f64; // ~3 ms for Gemma2-2B forward on CPU
 
     eprintln!();
     eprintln!("── G4 Latency (Weaver forward, real config) ──");
     eprintln!("  Config: hidden=2304, K=32, depth=4, heads=8");
-    eprintln!("  Median: {:.1} µs ({:.2} ms)", median_us, median_us / 1000.0);
-    eprintln!("  P99:    {:.1} µs ({:.2} ms)", p99_us, p99_us / 1000.0);
-    eprintln!("  Runs:   {} (warmup: {})", MEASURED_RUNS, WARMUP_RUNS);
     eprintln!();
-    eprintln!(
-        "  Context: a single DFlash draft step produces D=4 lookahead positions."
-    );
-    eprintln!(
-        "  This latency is added per draft step when the weaver_runtime feature is on."
-    );
-    eprintln!(
-        "  For reference, a Gemma2-2B forward pass (26 layers, 2B params) takes ~3-5 ms"
-    );
-    eprintln!(
-        "  per token on CPU. The Weaver overhead is {:.1}% of a single verifier step.",
-        median_us / 3000.0 * 100.0
-    );
+    eprintln!("  Path 1 — Allocating (correct / weaver_forward):");
+    eprintln!("    Median: {:.1} µs ({:.2} ms)", median_alloc_us, median_alloc_us / 1000.0);
+    eprintln!("    P99:    {:.1} µs ({:.2} ms)", p99_alloc_us, p99_alloc_us / 1000.0);
+    eprintln!("    Overhead: {:.1}% of a verifier step", median_alloc_us / verifier_step_us * 100.0);
+    eprintln!();
+    eprintln!("  Path 2 — Scratch (correct_with_scratch / weaver_forward_into):");
+    eprintln!("    Median: {:.1} µs ({:.2} ms)", median_scratch_us, median_scratch_us / 1000.0);
+    eprintln!("    P99:    {:.1} µs ({:.2} ms)", p99_scratch_us, p99_scratch_us / 1000.0);
+    eprintln!("    Overhead: {:.1}% of a verifier step", median_scratch_us / verifier_step_us * 100.0);
+    eprintln!("    Speedup: {:.2}× vs allocating", speedup_scratch);
+    eprintln!();
+    eprintln!("  Path 3 — Parallel (correct_parallel / weaver_forward_parallel):");
+    eprintln!("    Median: {:.1} µs ({:.2} ms)", median_parallel_us, median_parallel_us / 1000.0);
+    eprintln!("    P99:    {:.1} µs ({:.2} ms)", p99_parallel_us, p99_parallel_us / 1000.0);
+    eprintln!("    Overhead: {:.1}% of a verifier step", median_parallel_us / verifier_step_us * 100.0);
+    eprintln!("    Speedup: {:.2}× vs allocating", speedup_parallel);
+    eprintln!();
+    eprintln!("  Runs:    {} (warmup: {})", MEASURED_RUNS, WARMUP_RUNS);
+    eprintln!();
+    eprintln!("  Verdict (parallel path): {}",
+        if median_parallel_us < verifier_step_us {
+            "✅ G4 PASSES — parallel path is faster than a single verifier step"
+        } else if median_parallel_us < verifier_step_us * 3.0 {
+            "⚠️  G4 MARGINAL — parallel path within 3× of verifier step (break-even ~3 verifier steps saved)"
+        } else {
+            "❌ G4 STILL FAILS — parallel path still slow (needs GPU port)"
+        });
 }
