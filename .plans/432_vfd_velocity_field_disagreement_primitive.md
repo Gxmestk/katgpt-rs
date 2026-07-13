@@ -4,7 +4,7 @@
 **Research:** [katgpt-rs/.research/420_VFD_Velocity_Field_Disagreement_Epistemic_UQ.md](../.research/420_VFD_Velocity_Field_Disagreement_Epistemic_UQ.md)
 **Source paper:** [arxiv 2606.18043](https://arxiv.org/abs/2606.18043) — Römer et al., *Uncertainty Quantification for Flow-Based Vision-Language-Action Models*, §4 (VFD estimator + Theorem 4.1). The SAVE half (§5) is a training method → riir-train, out of scope.
 **Target:** `katgpt-rs/crates/katgpt-core/src/velocity_field_disagreement.rs` (new module) + Cargo feature `velocity_field_disagreement`
-**Status:** Active — Phase 1 DONE (T1.1–T1.9 complete, 20/20 tests pass); Phase 2 GOAT gate next
+**Status:** Active — Phase 1 DONE (T1.1–T1.9); Phase 2 DONE (T2.1–T2.5: G1✅ G2❌ G3✅ G4✅ G5✅); Phase 3 DONE (T3.1–T3.3: stays opt-in non-UQ; T3.4–T3.5 deferred doc cleanup). **Verdict: VFD does NOT promote to default-on** — ships as opt-in non-UQ disagreement score. See `.benchmarks/432_vfd_goat.md`.
 
 ---
 
@@ -138,19 +138,19 @@ Phase 1 shipped at commit `feat: VFD velocity-field disagreement primitive (Plan
 
 ### Tasks
 
-- [ ] **T2.1** **G1 (mechanics)** — Run `test_vfd_approximates_known_kl_2d_gaussian` from T1.5. PASS criterion: VFD approximates the analytic KL on the 2D Gaussian toy within tolerance. Failure means a math wiring bug, not a fundamental issue.
+- [x] **T2.1** **G1 (mechanics)** — Run `test_vfd_score_constant_disagreement_matches_analytic` from Phase 1 (stronger than the plan's loose KL=0.5 test — it asserts the exact analytic VFD for constant-disagreement fields). **PASS**: 20/20 Phase 1 tests pass, including the exact analytic match across multiple N_s, B, and schedule choices.
 
-- [ ] **T2.2** **G2 (UQ floor — MANDATORY per Issue 010 / "Report the Floor" rule)** — Benchmark VFD-calibrated prediction intervals against `ConformalIntervalCalibrator<SeasonalNaiveForecaster>` (Plan 340, m=1) on:
+- [x] **T2.2** **G2 (UQ floor — MANDATORY per Issue 010 / "Report the Floor" rule)** — Benchmark VFD-calibrated prediction intervals against `ConformalIntervalCalibrator<SeasonalNaiveForecaster>` (Plan 340, m=1) on:
   - (a) The same AR(1) corpus Plan 376 Phase 6 used (CRPS / coverage / Winkler).
-  - (b) A 2D flow-matching toy (bimodal Gaussian target, M=2 members trained on different modes) — the paper's Appendix C.1 setup.
-  
-  PASS criterion: VFD beats the conformal-naive floor on **at least 2 of 3 metrics** on at least one corpus. Document verdict in `.benchmarks/432_vfd_uq_floor.md`. **If VFD cannot beat the floor → drop the UQ claim** (the primitive still ships as a non-UQ disagreement score for downstream consumers like CLR L1 gating, but no calibrated-UQ claim).
+  - (b) A 1D bimodal flow-matching toy (markov-switching between ±2, M=2 fixed-attractor members) — simplified from the paper's 2D Appendix C.1 setup because the floor harness handles scalar trajectories.
 
-- [ ] **T2.3** **G3 (no regression)** — `cargo check --features velocity_field_disagreement` (single feature) adds zero warnings; `cargo check --all-features` (combo check per AGENTS.md) passes; `cargo clippy -D warnings` clean.
+  **RESULT: ⚠️ MIXED — G2 FAILS for VFD's epistemic-UQ claim.** The harness returns `BeatsFloor` on AR(1) and `LosesToFloor` on bimodal, but the AR(1) win is entirely inherited from the ensemble's point-forecast advantage (Plan 376 Phase 6 already demonstrated this) — VFD's epistemic scaling contributes zero (optimal λ\*=0 on both corpora). Documented in `.benchmarks/432_vfd_uq_floor.md`. **Per T3.3 below: VFD ships as opt-in non-UQ disagreement score; no calibrated-UQ claim; no promotion to default-on.**
 
-- [ ] **T2.4** **G4 (latency)** — Microbench: M=2, D=8, N_s=10, B=5 → `vfd_score_into` ≤ 50µs. Justification: plasma-tier budget. If VFD exceeds this, document the actual perf and propose mitigations (smaller N_s, async off-hot-path computation, per-NPC throttling). Failure here does NOT block ship — it constrains the deployment regime.
+- [x] **T2.3** **G3 (no regression)** — `cargo clippy -p katgpt-core --features velocity_field_disagreement --lib -- -D warnings` clean (single feature); `cargo clippy -p katgpt-core --all-features --lib -- -D warnings` clean (combo check per AGENTS.md). G3 alloc-free re-verified in the bench (`bench_432_vfd_goat` G3 gate: 0 allocs / 0 deallocs on the score path).
 
-- [ ] **T2.5** **G5 (QGF integration smoke)** — `VfdVarianceSignal` impl + a smoke test: feed a synthetic VFD score into `adaptive_guidance_weight(signal_confidence)` and verify the weight responds. Closes the docstring open item.
+- [x] **T2.4** **G4 (latency)** — Microbench M=2, D=8, N_s=10, B=5 → `vfd_score_into` p50 = **10.43 µs** (target ≤ 50 µs; 4.8× margin). G4 PASS. See `benches/bench_432_vfd_goat.rs`.
+
+- [x] **T2.5** **G5 (QGF integration smoke)** — `VfdVarianceSignal` impl + a smoke test: feed a synthetic VFD score into `adaptive_guidance_weight(signal_confidence)` and verify the weight responds. Already implemented as a Phase 1 unit test (passes when `qgf_adaptive` enabled).
 
 ---
 
@@ -158,15 +158,15 @@ Phase 1 shipped at commit `feat: VFD velocity-field disagreement primitive (Plan
 
 ### Tasks
 
-- [ ] **T3.1** Aggregate G1–G5 verdicts into `.benchmarks/432_vfd_goat.md`. Document per-gate PASS/FAIL with raw numbers.
+- [x] **T3.1** Aggregate G1–G5 verdicts into `.benchmarks/432_vfd_goat.md`. Document per-gate PASS/FAIL with raw numbers.
 
-- [ ] **T3.2** If all gates PASS (especially G2 UQ floor): promote `velocity_field_disagreement` to `default = [...]` in `crates/katgpt-core/Cargo.toml`. This **closes Plan 376 Phase 6 G7 deferred gate** — the velocity-field ensemble primitive becomes UQ-bearing.
+- [x] **T3.2** If all gates PASS (especially G2 UQ floor): promote `velocity_field_disagreement` to `default = [...]` in `crates/katgpt-core/Cargo.toml`. **NOT EXECUTED** — G2 failed for VFD's epistemic-UQ claim (optimal λ\*=0 on both corpora means VFD's epistemic scaling does not add calibrated UQ value). The AR(1) `BeatsFloor` verdict is inherited from the ensemble's point-forecast advantage, not from VFD.
 
-- [ ] **T3.3** If G2 FAILS (VFD does not beat the floor): keep `velocity_field_disagreement` opt-in. Document in `.benchmarks/432_vfd_goat.md` that the primitive ships as a non-UQ disagreement score (still useful for CLR L1 gating, sleep-time prioritization, runtime failure detection — but no calibrated-UQ claim). Update Research 420 §4 verdict accordingly.
+- [x] **T3.3** G2 FAILS → keep `velocity_field_disagreement` **opt-in** (no change to `default = [...]`). Document in `.benchmarks/432_vfd_goat.md` that the primitive ships as a **non-UQ disagreement score** (still useful for CLR L1 gating, sleep-time prioritization, runtime failure detection per paper §6.4 — but no calibrated-UQ claim). Update Research 420 §4 verdict.
 
-- [ ] **T3.4** Update `crates/katgpt-core/src/lib.rs` doc comment on the velocity-field ensemble module to note that VFD activates its UQ axis (cross-link to Research 420 + Plan 432).
+- [ ] **T3.4** Update `crates/katgpt-core/src/lib.rs` doc comment on the velocity-field ensemble module to note VFD's status: opt-in non-UQ disagreement score that does NOT upgrade the ensemble's UQ claim. (Deferred — low priority doc cleanup; the module docstrings already describe VFD as a separate primitive, and the floor benchmark doc is the canonical record.)
 
-- [ ] **T3.5** Update Plan 376 Phase 6 G7 status from "deferred" to "ACTIVATED by Plan 432" (or "still deferred — VFD did not promote" if G2 fails).
+- [ ] **T3.5** Update Plan 376 Phase 6 G7 status from "deferred" to **"still deferred — Plan 432 VFD did NOT promote to default-on (G2 UQ floor failed for VFD's epistemic-UQ claim; the ensemble itself remains UQ-bearing per Plan 376 Phase 6)"**. (Deferred — Plan 376 is a closed plan; a note in `.benchmarks/432_vfd_goat.md` suffices for the canonical record.)
 
 ---
 
@@ -239,9 +239,11 @@ crates/katgpt-core/src/velocity_field_disagreement.rs   ~600-800 lines (target <
 - [x] `cargo clippy -p katgpt-core --features velocity_field_disagreement --lib -- -D warnings` clean (0 warnings).
 - [x] `cargo clippy -p katgpt-core --all-features --lib` clean (combo-regression check per AGENTS.md — PASS).
 - [x] `cargo clippy -p katgpt-core --features velocity_field_disagreement,qgf_adaptive --lib -- -D warnings` clean (QGF bridge compiles + G5 smoke test passes).
-- [ ] Phase 2 G2 verdict recorded in `.benchmarks/432_vfd_uq_floor.md`.
-- [ ] Phase 3 GOAT gate verdict recorded in `.benchmarks/432_vfd_goat.md`.
-- [ ] **If promoted to default:** update `Cargo.toml` `default = [...]`; re-run `cargo test -p katgpt-core --lib velocity_field_disagreement` (default features) passes.
+- [x] Phase 2 G2 verdict recorded in `.benchmarks/432_vfd_uq_floor.md` — **G2 FAILS for VFD's epistemic-UQ claim** (λ\*=0 on both corpora; AR(1) `BeatsFloor` is inherited from ensemble point forecast, not VFD).
+- [x] Phase 3 GOAT gate verdict recorded in `.benchmarks/432_vfd_goat.md` — **G1/G3/G4/G5 PASS; G2 FAILS (epistemic-UQ claim) → no promotion to default-on.**
+- [x] **NOT promoted to default** — `velocity_field_disagreement` stays opt-in per T3.3. No `Cargo.toml` change required.
+- [x] UQ floor test file: `cargo test -p katgpt-core --features velocity_field_disagreement,conformal_predictive_intervals --test velocity_field_disagreement_uq_floor -- --ignored --nocapture` runs both AR(1) + bimodal comparisons and prints verdicts.
+- [x] Latency + alloc bench: `bench_432_vfd_goat` (G3 alloc-free + G4 ≤ 50µs) PASS.
 
 ---
 
@@ -271,4 +273,4 @@ crates/katgpt-core/src/velocity_field_disagreement.rs   ~600-800 lines (target <
 
 ## TL;DR
 
-Phase 1 ships `VfdScore` + `VfdScratch<M, D>` + `vfd_score_into` + `VfdVarianceSignal` (closes the QGF "ensemble KL" open item) behind `velocity_field_disagreement` feature. Phase 2 runs the GOAT gate — especially G2 (UQ floor per Issue 010) which is the make-or-break. Phase 3 promotes to default-on if G2 passes (closes Plan 376 Phase 6 G7 deferred gate — the velocity-field ensemble Super-GOAT becomes UQ-bearing). Phases 4–6 (heterogeneous-d, LatCal commitment, riir-ai runtime integration) deferred. SAVE (the paper's active-fine-tuning half) → riir-train, out of scope.
+Phase 1 ships `VfdScore` + `VfdScratch<M, D>` + `vfd_score_into` + `VfdVarianceSignal` (closes the QGF "ensemble KL" open item) behind `velocity_field_disagreement` feature. **Phase 2 GOAT gate result: G1✅ G2❌ G3✅ G4✅ G5✅.** The make-or-break G2 UQ floor FAILED for VFD's epistemic-UQ claim (optimal λ\*=0 on both AR(1) + bimodal corpora means VFD's epistemic scaling does not add calibrated UQ value; the AR(1) `BeatsFloor` verdict is inherited from the ensemble's point-forecast advantage, not VFD). **Phase 3 decision: VFD stays opt-in, ships as a non-UQ disagreement score** — no calibrated-UQ claim, no promotion to default-on. The velocity-field ensemble (Plan 376) remains UQ-bearing on its own; VFD does not upgrade it. Phases 4–6 (heterogeneous-d, LatCal commitment, riir-ai runtime integration) deferred. SAVE (the paper's active-fine-tuning half) → riir-train, out of scope.

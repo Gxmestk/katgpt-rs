@@ -1340,3 +1340,11 @@ required-features = ["dec_operators"]
 name = "bench_432_simd_lut_dequant_goat"
 harness = false
 required-features = ["simd_lut_dequant"]
+
+# Plan 432 Phase 2 T2.4 — VFD velocity-field disagreement GOAT gate G4
+# (latency ≤ 50µs for vfd_score_into at M=2 D=8 N_s=10 B=5) + G3 alloc-free
+# re-check.
+[[bench]]
+name = "bench_432_vfd_goat"
+harness = false
+required-features = ["velocity_field_disagreement"]

@@ -179,6 +179,19 @@ Before any riir-train deferral (note: only the SAVE half of the paper goes to ri
 
 **Why not Super-GOAT (honest demotion):** the Super-GOAT bar requires "new capability class". VFD's capability — ensemble-disagreement epistemic UQ — exists in the codebase in sibling form (BoMSampler, the QgfVarianceSignal slot). The contribution is a NEW MECHANISM (κ_s-weighted velocity-field pairwise disagreement with KL-bound guarantee) for an EXISTING CAPABILITY applied to a SPECIFIC SUBSTRATE (flow-matching / velocity-field ensemble). The moat was already created by R375/P376; VFD strengthens it on the UQ axis. Per the verdict tier definitions, this is GOAT, not Super-GOAT.
 
+### Update (2026-07-13, post-Plan-432-Phase-2-GOAT-gate)
+
+**The GOAT gate FAILED on G2 (UQ floor).** Plan 432 Phase 2 ran the mandatory "Report the Floor" benchmark (Issue 010) comparing VFD-calibrated prediction intervals against `ConformalIntervalCalibrator<SeasonalNaiveForecaster>` on two corpora: AR(1) and a 1D bimodal flow-matching toy. The optimal λ (epistemic scaling factor) was **0 on both corpora** — meaning VFD's epistemic scaling does NOT add calibrated UQ value on these corpora. The AR(1) `BeatsFloor` verdict is entirely inherited from the ensemble's point-forecast advantage (the same mechanism Plan 376 Phase 6 demonstrated), NOT from VFD.
+
+**Implication for the verdict:**
+- VFD ships as an **opt-in non-UQ disagreement score** (no calibrated-UQ claim, no promotion to default-on).
+- The Q3 product selling point ("calibrated epistemic-UQ scalar") is **downgraded** to "heuristic disagreement score" — still useful for CLR L1 gating, sleep-time prioritization, and runtime failure detection (paper §6.4), but with no probability-distribution claim.
+- **Plan 376 Phase 6 G7 remains deferred** — VFD did not activate the ensemble's UQ axis. The ensemble IS UQ-bearing on its own (Plan 376 Phase 6 proved this); VFD does not upgrade it.
+
+**Why the paper's claim didn't transfer:** the paper evaluates VFD on actual flow-matching VLAs (large neural networks with genuine train-time variability between ensemble members). Our toy corpora use linear velocity fields where member disagreement is either constant (bimodal toy) or uncorrelated with actual prediction error (AR(1) homoscedastic residuals). VFD's calibrated-UQ value emerges when member disagreement genuinely tracks error structure — which requires either (a) real trained neural network members with meaningful train-time variance, or (b) a corpus where the error structure is heteroscedastic and tracks the members' misspecification. Neither was the plan-specified corpus. The benchmark result is honest: on the tested corpora, VFD's epistemic scaling does not beat the conformal-naive floor.
+
+**See:** [`.benchmarks/432_vfd_goat.md`](../.benchmarks/432_vfd_goat.md) + [`.benchmarks/432_vfd_uq_floor.md`](../.benchmarks/432_vfd_uq_floor.md).
+
 ### MOAT gate per domain
 
 | Domain | Verdict | Reason |
