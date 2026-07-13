@@ -4,6 +4,10 @@ checkpoints/
 output/
 .logs
 
+# Training checkpoint artifacts (PoC runs, should not ship)
+/go_lora*.bin
+/domino_lora*.bin
+
 # Trained model artifacts — must never ship in public MIT repo.
 # Trained weights belong in riir-train (source) / riir-ai/assets (runtime).
 *.mlpackage/
