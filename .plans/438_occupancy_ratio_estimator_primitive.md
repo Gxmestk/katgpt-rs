@@ -5,7 +5,7 @@
 **Source paper:** [arxiv:2607.05375](https://arxiv.org/abs/2607.05375) — van der Laan & Kallus, *Fitted Occupancy-Ratio Evaluation without Bellman Completeness*, 2026
 **Target:** `katgpt-rs/crates/katgpt-core/src/occupancy/` (new module) + Cargo feature `occupancy_ratio`
 **Verdict:** GOAT (Research 423 §3.1) — novel + modelless + three fusion targets; not Super-GOAT (Q2/Q3 fail the novelty gate).
-**Status:** 🔲 NOT STARTED
+**Status:** 🟡 Phase 1 ✅ COMPLETE (T1.1–T1.7). Phase 2 🔲 BLOCKED on paper Algorithm 1 verification.
 
 ---
 
@@ -50,14 +50,14 @@ otherwise stays opt-in as an engine primitive consumers can opt into.
 
 ### Tasks
 
-- [ ] **T1.1** Create `katgpt-core/src/occupancy/mod.rs`. Gate behind
+- [x] **T1.1** Create `katgpt-core/src/occupancy/mod.rs`. Gate behind
   `occupancy_ratio = []` feature in `katgpt-core/Cargo.toml`. Add to
   `[features]` block alongside other opt-in primitives (e.g.
   `cochain_point_sampler`).
-- [ ] **T1.2** Define `OccupancyRatioEstimator<H: LogRatioClass>` struct:
+- [x] **T1.2** Define `OccupancyRatioEstimator<H: LogRatioClass>` struct:
   `log_ratio_class: H`, `gamma: f32`, `k_iterations: usize`. Constructor
   `new(h, gamma, k_iterations) -> Self` with `gamma ∈ [0, 1)` asserted.
-- [ ] **T1.3** Define `LogRatioClass` trait (generic over the supervised
+- [x] **T1.3** Define `LogRatioClass` trait (generic over the supervised
   learner — substrate-independent):
   ```rust
   pub trait LogRatioClass {
@@ -73,16 +73,19 @@ otherwise stays opt-in as an engine primitive consumers can opt into.
       ) -> Self::Params;
   }
   ```
-- [ ] **T1.4** Define `TransitionBatch<'a>` (borrow-only, zero-copy):
+- [x] **T1.4** Define `TransitionBatch<'a>` (borrow-only, zero-copy):
   `states: &'a [f32]` (flattened `[n * state_dim]`), `successors: &'a [f32]`,
-  `rewards: Option<&'a [f32]>`, `n: usize`, `state_dim: usize`.
-- [ ] **T1.5** Define `InitialMoments<'a>` (the `P̂_0 h` estimator input —
-  empirical initial-state distribution moments). Keep generic: a slice of
-  feature extractors applied to the initial-state subsample.
-- [ ] **T1.6** Define `KlProjectionScratch` (pre-allocated work buffers:
-  `target_weights: Vec<f32>`, `design_rows: Vec<f32>`, `normal_eq_rhs: Vec<f32>`,
-  etc.). Reused across iterations via `clear()` — never grown inside the loop.
-- [ ] **T1.7** Define the theorem-statement module `pub mod kl_contraction`
+  `rewards: Option<&'a [f32]>`, `n: usize`, `state_dim: usize`. Also added
+  `state(i)` / `successor(i)` slice accessors for ergonomic per-transition reads.
+- [x] **T1.5** Define `InitialMoments<'a>` (the `P̂_0 h` estimator input —
+  empirical initial-state distribution moments). Kept as simple borrow-only
+  container: `initial_states`, `initial_ratio`, `n_init`, `state_dim`.
+  Fields may be refined in Phase 2 once Algorithm 1 `P̂_0 h` is verified.
+- [x] **T1.6** Define `KlProjectionScratch` (pre-allocated work buffers:
+  `target_weights: Vec<f32>`, `design_rows: Vec<f32>`, `normal_eq_rhs: Vec<f32>`).
+  Reused across iterations via `clear()` — never grown inside the loop.
+  Constructor `new(n, feature_dim)` + `clear()` both shipped.
+- [x] **T1.7** Define the theorem-statement module `pub mod kl_contraction`
   (doc-only, no impl) documenting Lemma 3.1:
   ```
   D_ν(B^γ_π ω ∥ B^γ_π ω̃)  ≤  γ · D_ν(ω ∥ ω̃)
