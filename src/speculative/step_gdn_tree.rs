@@ -35,8 +35,13 @@ use crate::types::{Config, Rng, softmax_scaled};
 /// Mirrors the pattern in `speculative_step_rollback_with` and
 /// `speculative_step_qwen_deltanet_tree`. Returns the slice count (may be <
 /// `steps_populated` if capped at 64).
+///
+/// Plan 436 T4.8: made `pub` so riir-gpu's GPU-corrector speculative step
+/// (`speculative_step_gdn_tree_with_weaver_gpu`) can reuse the exact same
+/// marginals-slicing logic. The GPU orchestration lives in riir-gpu due to
+/// the cross-repo cycle (riir-gpu → katgpt-rs, never the reverse).
 #[allow(clippy::needless_range_loop)]
-fn build_marginals_view(
+pub fn build_marginals_view(
     marginals_flat: &[f32],
     steps_populated: usize,
     vocab_size: usize,
@@ -70,8 +75,13 @@ fn build_marginals_view(
 /// - Bonus token on full acceptance
 /// - Sequential commit via `commit_accepted_path_sequential`
 /// - Fallback sampling when no path is accepted
+///
+/// Plan 436 T4.8: made `pub` so riir-gpu's GPU-corrector speculative step
+/// can reuse the exact same post-verify pipeline (p/q rejection + sequential
+/// commit). The only alternative was duplicating ~120 lines of rejection
+/// logic in riir-gpu — a DRY violation with a real divergence risk.
 #[allow(clippy::too_many_arguments)]
-fn gdn_tree_post_verify(
+pub fn gdn_tree_post_verify(
     tree_logits: &[f32],
     tree: &[TreeNode],
     topo: &TreeTopology,

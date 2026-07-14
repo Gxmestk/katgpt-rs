@@ -44,6 +44,10 @@ use katgpt_core::gdn_tree_verify::{
     GdnMultiHeadParams, GdnTreeVerifier, TreeTopology, commit_accepted_multihead,
     verify_gdn_tree_multihead,
 };
+// HippocampalCacheDyn is only used by the HOLA tree-verify functions below,
+// which are gated on `hippocampal_cache`. Gate the import to match so
+// `gdn_tree_verify` alone (without `hippocampal_cache`) compiles.
+#[cfg(feature = "hippocampal_cache")]
 use katgpt_core::hippocampal_cache_dyn::HippocampalCacheDyn;
 use katgpt_core::types::Config;
 

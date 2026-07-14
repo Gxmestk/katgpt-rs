@@ -161,6 +161,12 @@ pub mod gdn2 {
     };
     #[cfg(feature = "gdn_tree_verify")]
     pub use katgpt_attn::gdn2::tree_verify_bridge;
+    // Plan 436 T4.8: re-export `forward_tree_gdn2` so riir-gpu can build the
+    // GPU-corrector speculative step without a direct katgpt-attn dep (cycle
+    // safety: the GPU orchestration lives in riir-gpu, which reaches the tree
+    // forward via this re-export under the `gdn_tree_verify` feature).
+    #[cfg(feature = "gdn_tree_verify")]
+    pub use katgpt_attn::gdn2::tree_forward::forward_tree_gdn2;
 }
 
 // ── HLA module-scoped re-export ────────────────────────────────────────────
