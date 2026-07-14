@@ -137,6 +137,138 @@ pub fn edit_penalty(norm_sq: f32, gamma: f32) -> f32 {
     (-norm_sq / gamma).exp()
 }
 
+// ── recos — Rearrangement-Inequality Cosine Similarity ───────────────────
+// Distilled from Ai (2026), arXiv:2602.05266 "Beyond Cosine Similarity"
+// (Research 421, Plan 437). Gated on `recos` (which implies
+// `smooth_min_similarity` so this module compiles under --no-default-features).
+//
+// recos saturates at 1.0 under ORDINAL CONCORDANCE (any monotonic
+// relationship) — a strictly wider capture range than cosine, which requires
+// LINEAR dependence. Always |recos| >= |cos| in absolute value (Corollary 2);
+// unlike decos, recos does NOT collapse to cosine on unit-norm vectors
+// (Corollary 3) — important because the pipeline unit-normalizes embeddings.
+
+/// Dot product on fixed 8-dim vectors (HLA dimension).
+///
+/// Local to this module because `riir-neuron-db`'s `dot_8` is private and
+/// lives in a different crate. Kept simple (no FMA) so recos stays
+/// bit-deterministic across platforms — the Phase 2 GOAT G1 gate depends on it.
+#[cfg(feature = "recos")]
+#[inline]
+fn dot_8(a: &[f32; 8], b: &[f32; 8]) -> f32 {
+    a.iter().zip(b.iter()).map(|(&x, &y)| x * y).sum()
+}
+
+/// Rearrangement-inequality-based cosine similarity (recos).
+///
+/// Distilled from Ai (2026), arXiv:2602.05266 (Research 421). Saturates at 1.0
+/// under ordinal concordance (any monotonic relationship) — a strictly wider
+/// capture range than cosine (which requires linear dependence). Always
+/// `|recos| >= |cos|` in absolute value (Corollary 2).
+///
+/// Cost: O(d log d) — one sort per vector. For d=8 this is ~24 comparisons + 8
+/// FMA. The sort is the dominant cost vs cosine's 8 FMA + pre-computed-norm
+/// shortcut (which recos structurally cannot reuse — the rearrangement bound
+/// is a function of sorted order, not norm; see Plan 437 §"Critical subtlety").
+///
+/// Use when embeddings are known to have nonlinear-but-consistent relationships
+/// (consolidated style_weights, trained direction vectors, schema-centroid item
+/// embeddings). Use cosine when embeddings are already linearly aligned with
+/// the query (raw text embeddings from a sentence transformer).
+///
+/// # Zero-vector guard
+///
+/// If either vector is all zeros, the rearrangement bound is zero; returns 0.0
+/// (no NaN, no panic). NaN inputs will panic inside `sort_by` — that's a caller
+/// bug.
+#[cfg(feature = "recos")]
+#[inline]
+pub fn recos_sim(a: &[f32; 8], b: &[f32; 8]) -> f32 {
+    let dot = dot_8(a, b);
+    // Rearrangement bound: sort both, dot the sorted.
+    // For dot >= 0: u↑·v↑ (both ascending) = max permutation dot.
+    // For dot <  0: u↑·v↓ (b descending) = min permutation dot (negative),
+    //               and dot/bound is negative/negative = positive in [0,1].
+    let mut a_sorted = *a;
+    let mut b_sorted = *b;
+    a_sorted.sort_by(|x, y| x.partial_cmp(y).unwrap());
+    if dot >= 0.0 {
+        b_sorted.sort_by(|x, y| x.partial_cmp(y).unwrap());
+    } else {
+        b_sorted.sort_by(|x, y| y.partial_cmp(x).unwrap());
+    }
+    let bound = dot_8(&a_sorted, &b_sorted);
+    if bound.abs() < 1e-12 {
+        0.0
+    } else {
+        dot / bound
+    }
+}
+
+/// recos ranking score — preserves ordering, returns `(dot/bound)²` copysigned
+/// by `dot` (so negative-recos ranks below positive). Use for top-k selection
+/// where only the ORDER matters. Mirrors `cosine_sim_ranking`'s squared
+/// convention (squaring widens the gap between similar/dissimilar without
+/// changing the order on each side of zero).
+///
+/// NOTE: unlike `cosine_sim_ranking_scaled`, this does NOT take a pre-computed
+/// `norm_a_sq` — the rearrangement bound is not a function of norm alone. The
+/// `ShardIndex::query` consumer (Plan 437 Phase 4) must call this 3× without the
+/// norm fold; this is why the G2 latency gate measures the full 3-candidate
+/// rerank, not single-pair recos-vs-cosine.
+#[cfg(feature = "recos")]
+#[inline]
+pub fn recos_sim_ranking(a: &[f32; 8], b: &[f32; 8]) -> f32 {
+    let dot = dot_8(a, b);
+    let mut a_sorted = *a;
+    let mut b_sorted = *b;
+    a_sorted.sort_by(|x, y| x.partial_cmp(y).unwrap());
+    if dot >= 0.0 {
+        b_sorted.sort_by(|x, y| x.partial_cmp(y).unwrap());
+    } else {
+        b_sorted.sort_by(|x, y| y.partial_cmp(x).unwrap());
+    }
+    let bound = dot_8(&a_sorted, &b_sorted);
+    if bound.abs() < 1e-12 {
+        0.0
+    } else {
+        (dot / bound).powi(2).copysign(dot)
+    }
+}
+
+/// recos on arbitrary-length slices (generic dim). Used by MAG transfer scoring
+/// (d=64 style_weights) and any variable-dimension consumer. Same algorithm as
+/// [`recos_sim`] but heap-backed sorts via `sort_unstable_by` (cheaper than the
+/// stable sort; ties don't carry meaning here since we only read the dot of the
+/// sorted arrays).
+///
+/// `to_vec()` allocates — acceptable for the cold MAG path. The d=8 variants
+/// sort stack arrays and are alloc-free.
+#[cfg(feature = "recos")]
+#[inline]
+pub fn recos_sim_slice(a: &[f32], b: &[f32]) -> f32 {
+    debug_assert_eq!(a.len(), b.len());
+    let dot: f32 = a.iter().zip(b.iter()).map(|(&x, &y)| x * y).sum();
+    let mut a_sorted = a.to_vec();
+    let mut b_sorted = b.to_vec();
+    a_sorted.sort_unstable_by(|x, y| x.partial_cmp(y).unwrap());
+    if dot >= 0.0 {
+        b_sorted.sort_unstable_by(|x, y| x.partial_cmp(y).unwrap());
+    } else {
+        b_sorted.sort_unstable_by(|x, y| y.partial_cmp(x).unwrap());
+    }
+    let bound: f32 = a_sorted
+        .iter()
+        .zip(b_sorted.iter())
+        .map(|(&x, &y)| x * y)
+        .sum();
+    if bound.abs() < 1e-12 {
+        0.0
+    } else {
+        dot / bound
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -336,5 +468,187 @@ mod tests {
         assert!(sim.is_finite(), "large token count should give finite result");
         // With 64 tokens at cosine 0.3-0.93, sim is dominated by the low end
         // and the large m offset. Just check it's finite and ordered correctly.
+    }
+
+    // ── recos: Rearrangement-Inequality Cosine Similarity (Plan 437) ──
+    //
+    // Covers Corollaries 2 & 3, the zero-vector guard, and slice/d=8
+    // consistency. Gated on `recos` (implied feature on during these tests).
+
+    #[cfg(feature = "recos")]
+    fn cosine_sim(a: &[f32; 8], b: &[f32; 8]) -> f32 {
+        let dot = dot_8(a, b);
+        let na = dot_8(a, a).sqrt();
+        let nb = dot_8(b, b).sqrt();
+        if na < 1e-12 || nb < 1e-12 {
+            0.0
+        } else {
+            dot / (na * nb)
+        }
+    }
+
+    #[cfg(feature = "recos")]
+    fn normalize(a: [f32; 8]) -> [f32; 8] {
+        let n = dot_8(&a, &a).sqrt();
+        if n < 1e-12 {
+            return a;
+        }
+        let mut out = a;
+        for x in &mut out {
+            *x /= n;
+        }
+        out
+    }
+
+    #[cfg(feature = "recos")]
+    #[test]
+    fn recos_ordinal_concordant_is_one() {
+        // Both strictly increasing → perfect ordinal concordance → recos = 1.0
+        // exactly. We use a monotonic-but-NONLINEAR pair (b = a²) so that
+        // cosine stays strictly < 1.0 while recos saturates — this is the
+        // wider-capture-range property (Corollary 2) demonstrated without
+        // the trivial linear case b = k·a where cosine also hits 1.0.
+        let a = [1.0f32, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0];
+        let b = [1.0f32, 4.0, 9.0, 16.0, 25.0, 36.0, 49.0, 64.0]; // b = a²
+        let r = recos_sim(&a, &b);
+        assert!((r - 1.0).abs() < 1e-5, "ordinal concordant should be 1.0, got {r}");
+        let c = cosine_sim(&a, &b);
+        // recos == 1.0, cosine < 1.0 — demonstrates the wider capture range.
+        assert!(c < 1.0 - 1e-4, "cosine {c} should be < 1.0 here (nonlinear pair)");
+    }
+
+    #[cfg(feature = "recos")]
+    #[test]
+    fn recos_discordant_below_one() {
+        // Shuffled b (non-monotonic w.r.t. a) → recos < 1.0.
+        let a = [1.0f32, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0];
+        // b is NOT monotonic in the same order as a: high where a is low.
+        let b = [80.0f32, 10.0, 70.0, 20.0, 60.0, 30.0, 50.0, 40.0];
+        let r = recos_sim(&a, &b);
+        assert!(r < 1.0 - 1e-4, "discordant recos should be < 1.0, got {r}");
+        assert!(r.is_finite(), "recos should be finite, got {r}");
+    }
+
+    #[cfg(feature = "recos")]
+    #[test]
+    fn recos_gte_cos_abs() {
+        // Corollary 2: |recos| >= |cos| - eps for all pairs. Fuzz 1000 pairs.
+        // Use a fixed seed for determinism (the GOAT G1 gate depends on this).
+        // Simple LCG — no dep on a PRNG crate.
+        let mut state: u64 = 0x9E37_79B9_7F4A_7C15;
+        let mut next = || {
+            // xorshift64
+            state ^= state << 13;
+            state ^= state >> 7;
+            state ^= state << 17;
+            // Map to f32 in [-5, 5].
+            ((state >> 40) as f32) / ((1u64 << 24) as f32) * 10.0 - 5.0
+        };
+        const EPS: f32 = 1e-4;
+        for _ in 0..1000 {
+            let a: [f32; 8] = std::array::from_fn(|_| next());
+            let b: [f32; 8] = std::array::from_fn(|_| next());
+            let r = recos_sim(&a, &b);
+            let c = cosine_sim(&a, &b);
+            assert!(
+                r.abs() >= c.abs() - EPS,
+                "Corollary 2 violated: |recos| {} < |cos| {} - {}",
+                r.abs(),
+                c.abs(),
+                EPS
+            );
+        }
+    }
+
+    #[cfg(feature = "recos")]
+    #[test]
+    fn recos_distinct_from_cos_unit_norm() {
+        // Corollary 3: on unit-norm vectors decos collapses to cos, but recos
+        // stays distinct. The critical property for our pipeline, which
+        // unit-normalizes embeddings. Construct a monotonic-but-nonlinear pair
+        // (b = a^2): recos = 1.0 (ordinal concordance), cos < 1.0 (nonlinear).
+        let a_raw = [1.0f32, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0];
+        let b_raw = [1.0f32, 4.0, 9.0, 16.0, 25.0, 36.0, 49.0, 64.0];
+        let a = normalize(a_raw);
+        let b = normalize(b_raw);
+        let r = recos_sim(&a, &b);
+        let c = cosine_sim(&a, &b);
+        assert!((r - 1.0).abs() < 1e-4, "unit-norm recos should saturate at 1.0, got {r}");
+        assert!(c < 1.0 - 1e-3, "unit-norm cosine should stay < 1.0 (nonlinear), got {c}");
+        assert!(r > c, "recos {r} should beat cosine {c} on monotonic-nonlinear");
+    }
+
+    #[cfg(feature = "recos")]
+    #[test]
+    fn recos_zero_vector_guard() {
+        // Zero vector → bound is zero → return 0.0 (no NaN, no panic).
+        let zero = [0.0f32; 8];
+        let b = [1.0f32, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0];
+        let r = recos_sim(&zero, &b);
+        assert!(r == 0.0 && r.is_finite(), "zero-vector recos should be 0.0, got {r}");
+        let r2 = recos_sim(&b, &zero);
+        assert!(r2 == 0.0 && r2.is_finite(), "zero-vector recos (b,zero) should be 0.0, got {r2}");
+        // Ranking variant too.
+        let r3 = recos_sim_ranking(&zero, &b);
+        assert!(r3 == 0.0 && r3.is_finite(), "zero-vector ranking should be 0.0, got {r3}");
+    }
+
+    #[cfg(feature = "recos")]
+    #[test]
+    fn recos_negative_dot_returns_positive_in_unit() {
+        // When dot < 0: bound (min permutation dot) is also negative, so
+        // dot/bound is positive in [0,1]. Sign-flipped concordant vectors
+        // (b = -k·a, k>0) have strictly negative dot but remain ordinally
+        // concordant after the sign flip — recos saturates at +1.0.
+        let a = [1.0f32, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0];
+        let b = [-10.0f32, -20.0, -30.0, -40.0, -50.0, -60.0, -70.0, -80.0];
+        let dot = dot_8(&a, &b);
+        assert!(dot < 0.0, "precondition: dot should be negative, got {dot}");
+        let r = recos_sim(&a, &b);
+        assert!((r - 1.0).abs() < 1e-4, "sign-flipped concordant recos should be +1.0, got {r}");
+    }
+
+    #[cfg(feature = "recos")]
+    #[test]
+    fn recos_sim_slice_matches_d8() {
+        // recos_sim_slice on an 8-len slice must equal recos_sim on [f32;8].
+        let a: [f32; 8] = [0.3, -1.2, 4.5, 2.2, -0.7, 3.1, 1.9, -2.4];
+        let b: [f32; 8] = [1.1, 0.4, -2.8, 3.3, 1.7, -0.9, 2.5, 0.6];
+        let fixed = recos_sim(&a, &b);
+        let slice = recos_sim_slice(&a, &b);
+        assert!((fixed - slice).abs() < 1e-5, "slice {slice} should match d8 {fixed}");
+    }
+
+    #[cfg(feature = "recos")]
+    #[test]
+    fn ranking_preserves_order() {
+        // For non-negative-recos cases, recos_sim_ranking orders the same as
+        // recos_sim (squaring is monotonic on [0,1]).
+        let a = [1.0f32, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0];
+        // Three candidates with increasing ordinal concordance.
+        let b_perfect = [10.0f32, 20.0, 30.0, 40.0, 50.0, 60.0, 70.0, 80.0];
+        let b_mid = [10.0f32, 30.0, 20.0, 50.0, 40.0, 70.0, 60.0, 80.0];
+        let b_low = [80.0f32, 10.0, 70.0, 20.0, 60.0, 30.0, 50.0, 40.0];
+
+        let r_perf = recos_sim(&a, &b_perfect);
+        let r_mid = recos_sim(&a, &b_mid);
+        let r_low = recos_sim(&a, &b_low);
+        let k_perf = recos_sim_ranking(&a, &b_perfect);
+        let k_mid = recos_sim_ranking(&a, &b_mid);
+        let k_low = recos_sim_ranking(&a, &b_low);
+
+        // Same ordering under both scorers.
+        assert!(r_perf >= r_mid && r_mid >= r_low, "recos order: {r_perf} >= {r_mid} >= {r_low}");
+        assert!(k_perf >= k_mid && k_mid >= k_low, "ranking order: {k_perf} >= {k_mid} >= {k_low}");
+    }
+
+    #[cfg(feature = "recos")]
+    #[test]
+    fn recos_deterministic() {
+        let a = [0.3f32, -1.2, 4.5, 2.2, -0.7, 3.1, 1.9, -2.4];
+        let b = [1.1f32, 0.4, -2.8, 3.3, 1.7, -0.9, 2.5, 0.6];
+        let x = recos_sim(&a, &b);
+        let y = recos_sim(&a, &b);
+        assert!((x - y).abs() < f32::EPSILON, "recos should be deterministic");
     }
 }

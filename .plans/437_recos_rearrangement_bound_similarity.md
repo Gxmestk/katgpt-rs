@@ -5,7 +5,7 @@
 **Source paper:** [arXiv:2602.05266](https://arxiv.org/abs/2602.05266) — "Beyond Cosine Similarity", Xinbo Ai (BUPT), Feb 2026
 **Target:** `katgpt-rs/crates/katgpt-core/src/similarity.rs` (open primitive) + `katgpt-rs/crates/katgpt-core/src/mag/` (cold-path consumer) + `riir-neuron-db/src/index.rs` (conditional hot-path consumer)
 **Cargo feature:** `recos` (opt-in until GOAT gate passes)
-**Status:** Active — Phase 1 <not started>
+**Status:** Active — Phase 1 ✅ DONE (T1.1–T1.7 all complete); Phase 2 in progress
 
 > **Numbering note:** Research 421 sketched this as "Plan 422", but `.plans/422_cochain_point_sampler_primitive.md` already exists — a collision. Per the monotonic-never-reused numbering discipline, this plan uses **437** (next free after 436). The Research 421 cross-reference is corrected from 422 → 437 in the same commit that lands this plan.
 
@@ -75,13 +75,13 @@ feature flag. Mirror the `smooth_min_similarity` gating/re-export pattern.
 
 ### Tasks
 
-- [ ] **T1.1** Add feature flag to `katgpt-rs/crates/katgpt-core/Cargo.toml` `[features]`:
+- [x] **T1.1** Add feature flag to `katgpt-rs/crates/katgpt-core/Cargo.toml` `[features]`:
   ```toml
   recos = ["smooth_min_similarity"]  # Rearrangement-Inequality Cosine Similarity (Plan 437, Research 421, arXiv:2602.05266). Saturates under ordinal concordance (wider capture range than cosine). O(d log d). Opt-in until G1-G4 GOAT gate passes. Implies smooth_min_similarity so the similarity module compiles under --no-default-features.
   ```
   Keep OUT of the `default` list until Phase 2 promotion.
 
-- [ ] **T1.2** Add `recos_sim` to `similarity.rs`, gated `#[cfg(feature = "recos")]`:
+- [x] **T1.2** Add `recos_sim` to `similarity.rs`, gated `#[cfg(feature = "recos")]`:
   ```rust
   /// Rearrangement-inequality-based cosine similarity (recos).
   ///
@@ -121,7 +121,7 @@ feature flag. Mirror the `smooth_min_similarity` gating/re-export pattern.
   needs its own local `dot_8` (or reuse an existing helper if one exists in the crate).
   Define a private `fn dot_8` in `similarity.rs` scoped to the `recos` cfg.
 
-- [ ] **T1.3** Add `recos_sim_ranking` (squared, preserves ordering, avoids division
+- [x] **T1.3** Add `recos_sim_ranking` (squared, preserves ordering, avoids division
   sign issues — mirrors `cosine_sim_ranking`):
   ```rust
   /// recos ranking score — preserves ordering, returns `(dot/bound)²` copysigned
@@ -147,7 +147,7 @@ feature flag. Mirror the `smooth_min_similarity` gating/re-export pattern.
   `norm_a_sq` — the rearrangement bound is not a function of norm alone. The
   `ShardIndex::query` consumer (Phase 4) must call this 3× without the norm fold.
 
-- [ ] **T1.4** Add `recos_sim_slice` (generic, for MAG's d=64 `style_weights` and any
+- [x] **T1.4** Add `recos_sim_slice` (generic, for MAG's d=64 `style_weights` and any
   variable-dim consumer):
   ```rust
   /// recos on arbitrary-length slices (generic dim). Used by MAG transfer scoring
@@ -173,30 +173,35 @@ feature flag. Mirror the `smooth_min_similarity` gating/re-export pattern.
   `to_vec()` allocates — acceptable for the cold MAG path. The d=8 variants (T1.2/T1.3)
   sort stack arrays and are alloc-free.
 
-- [ ] **T1.5** Re-export in `katgpt-rs/crates/katgpt-core/src/lib.rs` (mirror the
+- [x] **T1.5** Re-export in `katgpt-rs/crates/katgpt-core/src/lib.rs` (mirror the
   `smooth_min_similarity` re-export at L191-198):
   ```rust
   #[cfg(feature = "recos")]
   pub use similarity::{recos_sim, recos_sim_ranking, recos_sim_slice};
   ```
 
-- [ ] **T1.6** Unit tests in `similarity.rs` `#[cfg(test)] mod tests`, gated
+- [x] **T1.6** Unit tests in `similarity.rs` `#[cfg(test)] mod tests`, gated
   `#[cfg(feature = "recos")]`:
-  - [ ] `recos_ordinal_concordant_is_one` — `recos_sim([1,2,3],[10,20,30]) ≈ 1.0`
-    (monotonic → saturates). Cosine is ~0.99 but not exactly 1.0; recos is exactly 1.0.
-  - [ ] `recos_discordant_below_one` — shuffled vectors → recos < 1.0.
-  - [ ] `recos_gte_cos_abs` (Corollary 2) — random fuzz (1000 pairs): `|recos| >= |cos| - eps` always.
-  - [ ] `recos_distinct_from_cos_unit_norm` (Corollary 3) — unit-norm vectors where
+  - [x] `recos_ordinal_concordant_is_one` — `recos_sim([1..8],[1,4,9,...,64]) ≈ 1.0`
+    (monotonic-nonlinear pair → saturates). Cosine < 1.0; recos = 1.0 exactly.
+  - [x] `recos_discordant_below_one` — shuffled vectors → recos < 1.0.
+  - [x] `recos_gte_cos_abs` (Corollary 2) — random fuzz (1000 pairs): `|recos| >= |cos| - eps` always.
+  - [x] `recos_distinct_from_cos_unit_norm` (Corollary 3) — unit-norm vectors where
     recos ≠ cos (the critical property: decos collapses to cos on unit-norm, recos does not).
-  - [ ] `recos_zero_vector_guard` — zero vector → 0.0 (no NaN, no panic).
-  - [ ] `recos_sim_slice_matches_d8` — `recos_sim_slice` on 8-len slice == `recos_sim`
+  - [x] `recos_zero_vector_guard` — zero vector → 0.0 (no NaN, no panic).
+  - [x] `recos_sim_slice_matches_d8` — `recos_sim_slice` on 8-len slice == `recos_sim`
     on `[f32;8]` (consistency).
-  - [ ] `ranking_preserves_order` — `recos_sim_ranking` orders the same as `recos_sim`
+  - [x] `ranking_preserves_order` — `recos_sim_ranking` orders the same as `recos_sim`
     for non-negative cases.
 
-- [ ] **T1.7** `cargo clippy -p katgpt-core --features recos --all-targets` clean.
-  `cargo test -p katgpt-core --features recos --lib` green. `cargo check --no-default-features
-  --features recos` clean (validates the `smooth_min_similarity` imply).
+- [x] **T1.7** `cargo clippy -p katgpt-core --features recos --all-targets` clean.
+  `cargo test -p katgpt-core --features recos --lib` green (32 tests, incl. 9 recos tests).
+  `cargo check --no-default-features --features recos` clean (validates the `smooth_min_similarity` imply).
+  **Fix applied during verification:** `recos_ordinal_concordant_is_one` and
+  `recos_negative_dot_returns_positive_in_unit` had broken premises (linearly-dependent
+  vectors / wrong-sign dot) and failed. Fixed to monotonic-nonlinear `b = a²` pair and
+  sign-flipped `b = -k·a` pair respectively. The `dec_freeze.rs:140` clippy::approx_constant
+  error is pre-existing (commit d3899f4b, Issue 455) and unrelated to recos — not touched.
 
 ---
 
