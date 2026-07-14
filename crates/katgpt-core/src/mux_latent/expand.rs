@@ -72,7 +72,7 @@ pub fn select_segments_to_expand(
 ) -> Vec<u32> {
     let query_set: std::collections::HashSet<u32> = query_tokens.iter().copied().collect();
 
-    let mut scored: Vec<(u32, usize)> = Vec::new();
+    let mut scored: Vec<(u32, usize)> = Vec::with_capacity(ctx.segments.len());
 
     for seg in &ctx.segments {
         if let crate::mux_latent::context::LatentSegment::Compressed {
