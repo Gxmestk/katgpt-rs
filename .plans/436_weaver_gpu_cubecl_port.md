@@ -2,7 +2,7 @@
 
 > **Spawned from:** Issue 131 G4 (latency) — "GPU port via riir-gpu CubeCL" path
 > **Date:** 2026-07-14
-> **Status:** Phase 1 COMPLETE. Phase 2 COMPLETE (8/8 tasks — GEMV+RMSNorm+SwiGLU kernels + all 4 step helpers + parity + benchmark). Phase 3 (attention + top-K) next.
+> **Status:** Phase 1 COMPLETE. Phase 2 COMPLETE (8/8 tasks). Phase 3 COMPLETE (5/5 tasks — causal MHA + embedding gather + dot_per_row + softmax_k + full forward parity). Phase 4 (integration + GOAT gate) next.
 > **Target:** <1 ms Weaver forward (paper's GPU-measured target)
 
 ## TL;DR
@@ -216,11 +216,31 @@ The 40 matmul dispatches dominate Weaver's compute. Porting them to GPU
 
 ### Phase 3 — Attention + top-K kernels
 
-- [ ] T3.1: `weaver_causal_mha` CubeCL kernel — seq_len=5, 8 heads, causal
-- [ ] T3.2: `embedding_gather` kernel — K=32 indirect row gather
-- [ ] T3.3: `dot_per_row` + `softmax_k` kernels — residual + correction
-- [ ] T3.4: Full forward composition — all 7 steps chained
-- [ ] T3.5: Full forward parity test — CPU `weaver_forward_into` vs GPU
+- [x] T3.1: `weaver_causal_mha` CubeCL kernel — seq_len=5, 8 heads, causal.
+      **Done.** Custom kernel (`weaver_causal_mha_f32`): one workgroup per
+      (head, query_pos) pair, 3-phase (cooperative scoring → sequential softmax
+      on thread 0 → strided output accumulation). Precomputed `scale` on CPU
+      to avoid the NativeExpand u32→f32 cast bug. Parity: max_err 8.9e-8.
+      **Key lesson:** `ABSOLUTE_POS` is `usize` in CubeCL v0.10 — mixing with
+      `u32` params causes type errors. Workaround: use `CUBE_POS_X * 256 +
+      UNIT_POS` (both u32). Also: compound assignment (`*=`) on array elements
+      triggers the NativeExpand macro bug — must use `= x * y`.
+- [x] T3.2: `embedding_gather` kernel — K=32 indirect row gather.
+      **Done.** Each thread copies one f32 element: `gathered[tid] =
+      embedding[id * h + j]`. Topk ids encoded as f32 (safe for vocab < 2²⁴).
+      Parity: max_err 0 (bit-identical).
+- [x] T3.3: `dot_per_row` + `softmax_k` kernels — residual + correction.
+      **Done.** `dot_per_row`: one thread per (di, ki) output, loops over h.
+      `softmax_k`: one workgroup per depth, thread 0 does sequential softmax
+      over K values. Parity: dot_per_row max_err 4.8e-7, softmax_k max_err 6.0e-8.
+- [x] T3.4: Full forward composition — all 7 steps chained.
+      **Done.** `full_forward_gpu()` chains conditioning → QKV → attention →
+      output proj → SwiGLU MLP → embedding gather → dot_per_row → softmax_k.
+      Total dispatches: 3+3+1+3+6+1+1+1 = 19.
+- [x] T3.5: Full forward parity test — CPU `weaver_forward_into` vs GPU.
+      **Done.** End-to-end test from raw inputs through corrected_probs.
+      Parity: max_err 1.8e-5 (f32 accumulation differences through 7 steps).
+      Probs sum to 1.0 within 1e-3 per depth. All 12 weaver_gpu tests pass.
 
 ### Phase 4 — Integration + GOAT gate
 
