@@ -33,9 +33,22 @@ fn bench_decode_latency_per_dilation() {
 
     for d in dilations {
         let mut state = RatBridgeState::new(d, dim);
+        // Pre-allocate the decode output buffer once and reuse it across
+        // iterations via rat_decode_step_into. The allocating rat_decode_step
+        // wrapper would add a per-iteration heap alloc that dominates the
+        // measurement at small dim and misrepresents production latency
+        // (production callers use the _into variant).
+        let mut out_buf = vec![0.0f32; dim];
         let start = std::time::Instant::now();
         for _ in 0..100 {
-            let _ = rat_decode_step(&mut state, &query, &keys, &vals, &gdn2);
+            let _ = katgpt_attn::rat_bridge::rat_decode_step_into(
+                &mut state,
+                &query,
+                &keys,
+                &vals,
+                &gdn2,
+                &mut out_buf,
+            );
         }
         let elapsed = start.elapsed();
         let per_decode = elapsed / 100;
