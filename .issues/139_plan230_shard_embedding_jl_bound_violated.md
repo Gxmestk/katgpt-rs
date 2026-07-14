@@ -3,7 +3,7 @@
 **Status:** OPEN (diagnostic complete; fix path requires design decision)
 **Opened:** 2026-07-14
 **Parent:** `katgpt-rs/.plans/230_shard_embedding_projection.md` (G1 FAIL since 2026-06-09)
-**Related:** `katgpt-rs/.issues/138_jl_backdoor_shard_provenance_poc.md` (CLOSED — surfaced this root cause as the prerequisite for any two-matrix salvage path)
+**Related:** Issue 138 (CLOSED 2026-07-14, removed for noise — fusion SHELVED on G1, see Research 422 §6) surfaced this root cause as the prerequisite for any two-matrix salvage path.
 
 ---
 
@@ -275,9 +275,9 @@ measurement, not more theory.
 ## Cross-references
 
 - `katgpt-rs/.plans/230_shard_embedding_projection.md` — the broken primitive
-- `katgpt-rs/.issues/138_jl_backdoor_shard_provenance_poc.md` — CLOSED, but
-  its "salvage path" footnote (two-matrix architecture) is blocked on this
-  issue being resolved first
+- Issue 138 (CLOSED 2026-07-14, removed for noise — fusion SHELVED on G1,
+  see Research 422 §6) — its "salvage path" footnote (two-matrix
+  architecture) is blocked on this issue being resolved first
 - `katgpt-rs/crates/katgpt-core/src/shard_embedding.rs` — current impl
 - `katgpt-rs/tests/bench_230_shard_embedding_goat.rs` — current G1 test
   (assertion threshold is 30% release / 3% debug, not the documented 90%)
