@@ -718,9 +718,11 @@ impl WeaverCorrector {
                 }
             }
             // Sort descending by probability. O(vocab · log vocab) per depth.
+            // total_cmp: NaN-deterministic, branch-free. Non-finite probs were
+            // already filtered at L716, so total_cmp is strictly equivalent here.
             scratch
                 .top_pairs
-                .sort_unstable_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(core::cmp::Ordering::Equal));
+                .sort_unstable_by(|a, b| b.1.total_cmp(&a.1));
 
             // Fill topk_ids + topk_logits.
             let n_valid = scratch.top_pairs.len();

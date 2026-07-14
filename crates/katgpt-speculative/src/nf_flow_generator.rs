@@ -97,18 +97,21 @@ where
             .map_err(FlowScoredError::InnerError)?;
 
         // Build selected trajectory for each candidate: parent tokens + this candidate.
-        let mut scored: Vec<ScoredToken> = candidates
-            .into_iter()
-            .map(|token| {
-                let mut selected: Vec<usize> = condition.parent_tokens.clone();
-                selected.push(token.token_idx);
-                let fs = self.scorer.score(marginals_history, &selected);
-                ScoredToken {
-                    token,
-                    flow_score: fs,
-                }
-            })
-            .collect();
+        // Hoist the `selected` buffer out of the per-candidate loop — clear +
+        // extend + push reuses one allocation across all candidates instead
+        // of cloning parent_tokens per candidate.
+        let mut scored: Vec<ScoredToken> = Vec::with_capacity(candidates.len());
+        let mut selected: Vec<usize> = Vec::with_capacity(condition.parent_tokens.len() + 1);
+        for token in candidates {
+            selected.clear();
+            selected.extend_from_slice(&condition.parent_tokens);
+            selected.push(token.token_idx);
+            let fs = self.scorer.score(marginals_history, &selected);
+            scored.push(ScoredToken {
+                token,
+                flow_score: fs,
+            });
+        }
 
         // Sort by descending flow score.
         scored.sort_unstable_by(|a, b| b.flow_score.total_cmp(&a.flow_score));
