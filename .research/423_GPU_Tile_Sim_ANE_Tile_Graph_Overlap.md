@@ -164,6 +164,14 @@ This note captures the angle but does NOT open a plan. Revisit when ANY of these
 
 Until then: **noted, not planned.** Plan 379's roofline is sufficient for current ANE dispatch needs.
 
+### 4.1 Metal (Apple GPU) — not in scope
+
+A parallel question arose during Plan 439 Phase 1 review: should we build a Metal-specific roofline alongside the ANE one? **Decision: no.** The generic `roofline_cost` (Plan 159, `katgpt-core/src/roofline.rs`) already covers Apple GPU compute — it ships `HardwarePeaks::apple_m1()` through `apple_m4_pro()` with calibrated GFLOP/s + bandwidth + launch overhead.
+
+The ANE got its own model (Plan 379) because it has three structural cost axes that make the generic GPU model produce **wrong routing decisions**: a 2 MB working-set cliff, a 0.23 ms dispatch floor (4.6× the GPU's), and a family-floor capability gate. Apple's Metal GPU has none of these for compute workloads — TBDR tile memory is a rendering concern, unified memory simplifies (no transfer cost), and Metal shaders run on all supported GPUs (no family gate). The GTSim tile-graph technique doesn't change this: it would add accuracy for fused Metal compute kernels, but we don't control kernel fusion (Burn/CubeCL does), and the `NpcBrainRouter` doesn't route to GPU today.
+
+**Reopen trigger:** same bar as the ANE — we'd need (a) a structural cost axis the generic model gets wrong, (b) calibration data, and (c) an active GPU routing decision that's being misrouted. None of these hold today.
+
 ---
 
 ## 5. What this paper is genuinely valuable for (not us)
