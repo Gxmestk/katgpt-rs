@@ -107,21 +107,12 @@ pub fn lasso(phi: &[Vec<f32>], y: &[f32], alpha: f32, n_iter: usize) -> Vec<f32>
 
 /// Soft-thresholding (proximal) operator: `sign(rho) · max(|rho| − alpha, 0)`.
 ///
-/// Prefer match over chained `if`s per house style. Branchless on sign except
-/// for the `|rho| <= alpha` shrink-to-zero band.
+/// Branchless: `signum * (|rho| − alpha).max(0)`. NaN-deterministic (returns 0.0
+/// for NaN input via f32::max preferring the non-NaN operand), matching the
+/// prior `partial_cmp` match's `_ => 0.0` fallback.
 #[inline(always)]
 fn soft_threshold(rho: f32, alpha: f32) -> f32 {
-    match rho.partial_cmp(&alpha) {
-        Some(std::cmp::Ordering::Greater) => rho - alpha,
-        Some(std::cmp::Ordering::Less) => {
-            // rho < alpha. If rho < -alpha → rho + alpha; else (|rho|<=alpha) → 0.
-            match rho.partial_cmp(&-alpha) {
-                Some(std::cmp::Ordering::Less) => rho + alpha,
-                _ => 0.0,
-            }
-        }
-        _ => 0.0,
-    }
+    rho.signum() * (rho.abs() - alpha).max(0.0)
 }
 
 #[cfg(test)]

@@ -49,11 +49,7 @@ impl PrecisionBudget {
 
         // Sort heads by sensitivity (descending)
         let mut indices: Vec<usize> = (0..total).collect();
-        indices.sort_by(|&a, &b| {
-            sensitivity[b]
-                .partial_cmp(&sensitivity[a])
-                .unwrap_or(std::cmp::Ordering::Equal)
-        });
+        indices.sort_by(|&a, &b| sensitivity[b].total_cmp(&sensitivity[a]));
 
         // Greedy allocation: min 1 bit, max 8 bits per head
         let mut head_bits = vec![1u8; total];
