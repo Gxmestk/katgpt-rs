@@ -2,7 +2,7 @@
 
 > **Spawned from:** Issue 131 G4 (latency) — "GPU port via riir-gpu CubeCL" path
 > **Date:** 2026-07-14
-> **Status:** Phase 1 COMPLETE — weight upload infrastructure landed. Phase 2 (kernels) next.
+> **Status:** Phase 1 COMPLETE. Phase 2 COMPLETE (8/8 tasks — GEMV+RMSNorm+SwiGLU kernels + all 4 step helpers + parity + benchmark). Phase 3 (attention + top-K) next.
 > **Target:** <1 ms Weaver forward (paper's GPU-measured target)
 
 ## TL;DR
@@ -140,14 +140,79 @@ The 40 matmul dispatches dominate Weaver's compute. Porting them to GPU
       in `norm_residual_cubecl.rs` covers T2.2 (batched RMSNorm + residual).
       `swiglu_f32` / `SwigluCubeCL` in `coda_primitives_cubecl.rs` covers the
       T2.6 SwiGLU activation. Both can be adapted rather than written from scratch.
-- [ ] T2.2: `rmsnorm` CubeCL kernel (new) — elementwise, trivially parallel
-- [ ] T2.3: Conditioning step (Step 1) — RMSNorm + batched GEMV + pos_emb add
-- [ ] T2.4: QKV projections (Step 2) — 3 batched GEMVs
-- [ ] T2.5: Output projection (Step 4 partial) — GEMV + residual add + RMSNorm
-- [ ] T2.6: SwiGLU MLP (Step 5) — 2 GEMVs + `swish_fused` kernel + GEMV + residual
-- [ ] T2.7: Parity test — CPU vs GPU for steps 1-2 + 4-5 (skip attention for now,
+- [x] T2.2: `rmsnorm` CubeCL kernel (new) — elementwise, trivially parallel
+      **DONE 2026-07-14.** No new kernel needed — the existing
+      `RmsNormBatchedCubeCL` in `norms_cubecl.rs` (lines 284-372, written for
+      Plan 482 T4 but never tested) computes exactly what Weaver needs:
+      `output[row, j] = input[row, j] * inv_rms_row * gamma[j]` for
+      `[seq_len × dim]` input. This is plain batched RMSNorm with scale — no
+      residual. It matches Weaver's CPU `rmsnorm_into(x, scale, eps, output)`
+      bit-for-bit. **The fused `rmsnorm_residual_batched_f32` kernel CANNOT be
+      reused** because it computes `rmsnorm(input) + residual` (Gemma 2
+      post-norm order), whereas Weaver does `rmsnorm(input + residual)` (add
+      first, then normalize) for Steps 4-5, and plain `rmsnorm(input)` for
+      Step 1. Two parity tests added to `norms_cubecl.rs`: identity gamma
+      + non-trivial gamma (0.5), seq_len=5, dim=128. Both pass on M3 Max
+      (max_err < 1e-5). G3 no-regression: all 11 prior RMSNorm/residual/GEMV/
+      round-trip tests still pass.
+- [x] T2.3: Conditioning step (Step 1) — RMSNorm + batched GEMV + pos_emb add
+      **DONE 2026-07-14.** New `add_pos_emb_batched_f32` kernel +
+      `AddPosEmbBatchedCubeCL` launcher in `weaver_gpu.rs` (in-place pos_emb
+      add to rows 1..seq_len, row 0 unchanged). New `conditioning_step()`
+      helper chaining 3 dispatches: `RmsNormBatchedCubeCL` →
+      `GemvBatchedCubeCL` → `AddPosEmbBatchedCubeCL`. Parity test
+      `test_conditioning_step_parity` (seq_len=5, h=128): max_err **3.8e-6** ✓.
+      G3 no-regression: all 13 prior tests still pass.
+      **Key design decision:** the pos_emb add is a dedicated in-place kernel
+      (not `AddCubeCL` with zero-padded pos_emb) because it avoids handle
+      aliasing concerns and handles the row-0-skip cleanly via `CUBE_POS_X`.
+      **Import fix:** `GemvBatchedCubeCL` is not exported at crate root (only
+      `GemvCubeCL` is); accessed via `crate::gemv_cubecl::GemvBatchedCubeCL`.
+- [x] T2.4: QKV projections (Step 2) — 3 batched GEMVs
+      **DONE 2026-07-14.** New `qkv_projections()` helper chaining 3
+      `GemvBatchedCubeCL` dispatches (w_q, w_k, w_v), all reading `u_cond`.
+      No new kernels — pure composition of T2.1. Parity test
+      `test_qkv_projections_parity`: Q/K/V all max_err **3.8e-6** ✓.
+- [x] T2.5: Output projection (Step 4 partial) — GEMV + residual add + RMSNorm
+      **DONE 2026-07-14.** New `output_projection_step()` helper chaining 3
+      dispatches: `GemvBatchedCubeCL` (w_o) → `ResidualAddCubeCL` (u_cond +
+      w_o_out) → `RmsNormBatchedCubeCL` (norm_attn). All existing kernels,
+      no new code. Parity test `test_output_projection_step_parity`:
+      max_err **1.2e-6** ✓. Uses a `[seq_len × h]` temp buffer (`post_batched`)
+      for the residual-add output before RMSNorm overwrites `u_attn_normed`.
+- [x] T2.6: SwiGLU MLP (Step 5) — 2 GEMVs + `swish_fused` kernel + GEMV + residual
+      **DONE 2026-07-14.** New `swiglu_batched_f32` kernel +
+      `SwigluBatchedCubeCL` launcher (multi-workgroup variant of the existing
+      single-workgroup `SwigluCubeCL`, needed for `[seq_len × d_ff]` buffers).
+      New `swiglu_mlp_step()` helper chaining 6 dispatches: 2 batched GEMVs
+      (w_gate, w_up: h→d_ff) → SwiGLU elementwise → batched GEMV (w_down:
+      d_ff→h) → batched residual add → batched RMSNorm.
+      **Key optimization vs the plan:** w_down IS batched (not 5 single GEMVs
+      as planned) because SwiGLU is computed for all positions first. This
+      reduces dispatches from planned 10 to 6.
+      Parity test `test_swiglu_mlp_step_parity` (seq_len=5, h=64, d_ff=128):
+      max_err **9.5e-7** ✓. G3: all 16 prior tests still pass.
+- [x] T2.7: Parity test — CPU vs GPU for steps 1-2 + 4-5 (skip attention for now,
       feed known u_cond from CPU to skip step 3)
-- [ ] T2.8: Latency micro-benchmark for the GEMV-heavy steps
+      **DONE 2026-07-14.** New `test_steps_1245_composed_parity` chains all
+      four step helpers: conditioning → QKV → (skip attention) → output proj →
+      SwiGLU MLP. Compares final `u_final` against CPU reference (which composes
+      the same step CPU references). max_err **1.8e-6** ✓. Validates that
+      intermediate buffers are correctly passed between steps.
+- [x] T2.8: Latency micro-benchmark for the GEMV-heavy steps
+      **DONE 2026-07-14.** New `bench_weaver_gpu_436` benchmark measures
+      the full steps 1-2+4-5 chain (excludes attention + top-K).
+      **Production dims (h=2048, d_ff=5824, seq_len=5) on M3 Max GPU:**
+      - GPU steps 1-2+4-5: **2.508 ms**
+      - CPU 1-thread same steps: 487.2 ms → **194× speedup**
+      - CPU parallel baseline (Issue 131, full forward): 7.05 ms
+      - **GPU is already 2.8× faster than CPU parallel** for just steps 1-2+4-5.
+      - The <1 ms target is aspirational for M3 Max (as noted in caveats).
+        Full GPU forward (with attention) will likely be 3-4 ms — still a
+        significant win over the 7.05 ms CPU baseline.
+      - Small dims (h=128): GPU 0.57 ms vs CPU 0.44 ms → GPU slower (launch
+        overhead dominates at small sizes). Confirms the GPU advantage scales
+        with problem size — exactly as expected for compute-bound GEMV.
 
 ### Phase 3 — Attention + top-K kernels
 
