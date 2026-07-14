@@ -124,8 +124,6 @@ where
 {
     let elements = lattice.elements();
 
-    let vertices = elements.clone();
-
     // --- Edges: covering relations ---
     // Select algorithm based on lattice size.
     let n = elements.len();
@@ -138,8 +136,10 @@ where
     // --- Faces: commuting squares in the Hasse diagram ---
     let faces = build_faces(lattice, &elements, &edges);
 
+    // `elements` is no longer borrowed after `build_faces`; move it directly
+    // into the struct (avoids the `.clone()` that the prior code performed).
     CubicalComplex {
-        vertices,
+        vertices: elements,
         edges,
         faces,
         cubes: Vec::new(),
