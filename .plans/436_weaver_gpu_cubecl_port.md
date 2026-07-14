@@ -244,19 +244,56 @@ The 40 matmul dispatches dominate Weaver's compute. Porting them to GPU
 
 ### Phase 4 — Integration + GOAT gate
 
-- [ ] T4.1: `GpuWeaverCorrector` struct with `correct_marginals` method
-      (matches CPU `WeaverCorrector::correct_marginals_with_scratch` signature)
+- [x] T4.1: `GpuWeaverCorrector` struct with `correct_marginals` method
+      (matches CPU `WeaverCorrector::correct_marginals_with_scratch` signature).
+      **DONE** — lives in new module `riir-gpu/src/weaver_gpu_corrector.rs`
+      (split from `weaver_gpu.rs` to respect the 2048-line guideline).
+      `GpuWeaverBatchedScratch` + `GpuWeaverCorrector` with `new`,
+      `set_embedding`, `correct_marginals`. API deviation: embedding is
+      cached via `set_embedding` (uploaded once), not passed per call — a
+      256k×2048 embedding is ~2 GB, uploading per call would dominate
+      latency. See module-level docs for the deviation rationale.
+      **Critical semantic fix:** the corrector runs the GPU forward
+      **per-depth** (seq_len=2, d_depth=1) in a loop, NOT batched. The
+      batched `full_forward_gpu` from Phase 3 lets deeper query positions
+      attend to shallower drafter positions via causal MHA, mixing
+      information across depths — this does NOT match the CPU
+      `correct_marginals_with_scratch`, which slices `h_dflash[di..di+1]`
+      per depth (seq_len=2 each). The per-depth loop matches the CPU
+      semantic exactly. Cost: `depth` GPU passes instead of 1, but each
+      pass is cheaper (seq_len=2 vs seq_len=depth+1).
 - [ ] T4.2: Feature-gated call site in `dflash_predict_with_weaver` —
-      riir-ai side, chooses CPU or GPU corrector based on `weaver_gpu` feature
-- [ ] T4.3: G1 correctness — GPU corrected probs sum to 1.0, no NaN/Inf
-- [ ] T4.4: G1 no-harm — GPU zero weights produce zero residual
-- [ ] T4.5: G3 no-regression — `weaver_gpu` OFF → CPU path unchanged
+      riir-ai side, chooses CPU or GPU corrector based on `weaver_gpu` feature.
+      **BLOCKED by cycle constraint:** `riir-engine` does NOT depend on
+      `riir-gpu` (cycle: riir-gpu → riir-engine). The parallel
+      `dflash_predict_with_weaver_gpu` orchestration must live in
+      `riir-gpu`, not in `riir-engine/src/dflash.rs`. Deferred to next
+      session.
+- [x] T4.3: G1 correctness — GPU corrected probs sum to 1.0, no NaN/Inf.
+      **DONE** — `test_g1_correctness_sums_to_one`: all depths sum to 1.0
+      within 1e-4, all probs finite and in [0,1], ≤K non-zero per row.
+- [x] T4.4: G1 no-harm — GPU zero weights produce zero residual.
+      **DONE** — `test_g1_no_harm_zero_weights`: GPU output matches CPU
+      zero-weight output within 1e-4 (both paths zero the row outside
+      top-K and renormalize the top-K to sum to 1.0).
+- [ ] T4.5: G3 no-regression — `weaver_gpu` OFF → CPU path unchanged.
+      Trivially true by construction (the feature gate compiles out the
+      GPU module entirely). Explicit test deferred to next session.
 - [ ] T4.6: **G2 latency** — GPU forward <1 ms (the paper target). Benchmark
-      on M3 Max GPU.
-- [ ] T4.7: G3 precision — GPU marginals match CPU within fp tolerance (<1%
-      abs diff on non-top-K, bit-identical ranking on top-K)
+      on M3 Max GPU. **Deferred to next session** — requires extending the
+      Phase 2 benchmark (`bench_weaver_gpu_436.rs`) to measure the
+      per-depth corrector path. Note: with the per-depth fix, the forward
+      is now `depth × (19 dispatches at seq_len=2)` instead of 1 batched
+      pass. Realistic target is 2-5 ms on M3 Max (vs 7.05 ms CPU parallel).
+- [x] T4.7: G3 precision — GPU marginals match CPU within fp tolerance (<1%
+      abs diff on non-top-K, bit-identical ranking on top-K).
+      **DONE** — `test_g3_precision_matches_cpu`: top-K ranking
+      bit-identical (same vids in same descending order), per-element
+      abs diff < 1e-3 on all top-K entries. Non-zero weights used so the
+      Weaver residual is non-trivial.
 - [ ] T4.8: End-to-end acceptance test — `speculative_step_*_with_weaver` on
-      GPU corrector, verify ≥1 accepted token
+      GPU corrector, verify ≥1 accepted token. **Deferred to next session**
+      (blocked by T4.2 cycle constraint).
 
 ## GOAT gate (promotion criteria)
 
