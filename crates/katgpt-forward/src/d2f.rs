@@ -1653,13 +1653,13 @@ pub fn d2f_decode_block_soft(
 
             // Single pass: argmax gives both best_idx and max_val (they coincide).
             // Working directly on the logits slice avoids a per-position Vec alloc.
+            // total_cmp: branch-free, NaN-deterministic (NaN-broken weights get a
+            // defined answer instead of whichever happens to be first).
             let (best_idx, max_val) = logits
                 .iter()
                 .copied()
                 .enumerate()
-                .max_by(|a: &(usize, f32), b: &(usize, f32)| {
-                    a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal)
-                })
+                .max_by(|a: &(usize, f32), b: &(usize, f32)| a.1.total_cmp(&b.1))
                 .unwrap_or((0, f32::NEG_INFINITY));
 
             current_top1[pos] = best_idx;
@@ -1756,9 +1756,7 @@ pub fn d2f_decode_block_soft(
                 .iter()
                 .copied()
                 .enumerate()
-                .max_by(|a: &(usize, f32), b: &(usize, f32)| {
-                    a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal)
-                })
+                .max_by(|a: &(usize, f32), b: &(usize, f32)| a.1.total_cmp(&b.1))
                 .map(|(i, _)| i)
                 .unwrap_or(0);
             tokens[pos] = best;
