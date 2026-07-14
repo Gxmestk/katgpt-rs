@@ -431,7 +431,7 @@ fn main() {
     println!("   cargo check                                            clean ✓ (informational)");
     println!("   cargo check --features ane_fused_chain                 clean ✓ (informational)");
     println!("   cargo check --all-features                             clean ✓ (informational)");
-    println!("   Feature is opt-in; default path unchanged. ane_fused_chain implies ane_roofline.");
+    println!("   Feature is DEFAULT-ON (promoted 2026-07-14); ane_fused_chain implies ane_roofline.");
     println!("   Result:                PASS ✓ (verified separately)");
     println!();
 

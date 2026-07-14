@@ -4,7 +4,7 @@
 **Research:** [katgpt-rs/.research/423_GPU_Tile_Sim_ANE_Tile_Graph_Overlap.md](../.research/423_GPU_Tile_Sim_ANE_Tile_Graph_Overlap.md)
 **Source paper:** [arXiv:2607.11262](https://arxiv.org/abs/2607.11262) — Ding et al., *GPU-Tile-Sim*, MICRO 2026
 **Target:** `katgpt-rs/crates/katgpt-core/src/ane_roofline.rs` (extend) + Cargo feature `ane_fused_chain` (opt-in, gated on `ane_roofline`)
-**Status:** Active — Phase 1 DONE (T1.1–T1.8 shipped). Phase 2 DONE (T2.1–T2.7 shipped, G1–G5 all PASS). Promotion audit next.
+**Status:** Active — Phase 1 DONE (T1.1–T1.8 shipped). Phase 2 DONE (T2.1–T2.7 shipped, G1–G5 all PASS). **PROMOTED to default-on** (2026-07-14, Phase 18 in `katgpt-core/Cargo.toml` `default` list). Phase 2.5/3/4 pending.
 
 ---
 
@@ -240,6 +240,39 @@ bound.
 **Promotion candidate:** G1–G5 all PASS → `ane_fused_chain` is eligible for
 promotion to default-on (it implies `ane_roofline` which is already
 default). See Promotion step below.
+
+### Promotion to default-on (DONE 2026-07-14)
+
+Per the GOAT Gate §Promotion rule ("If G1–G5 all PASS → promote
+`ane_fused_chain` to default"), `ane_fused_chain` was promoted to the
+`default` feature list in `katgpt-rs/crates/katgpt-core/Cargo.toml`
+(Phase 18 entry, 2026-07-14).
+
+- [x] Re-ran `bench_439_ane_fused_goat` to self-verify G1–G5 still PASS
+      post-Phase-2-commit (G1 ✓ G2 ✓ G3 ✓ G4 ✓ G4-alloc ✓ G5 ✓,
+      `all_pass = true`; G4 latency re-measured at 83 ns / 8-op chain,
+      12× under the 1 µs target — within run-to-run variance of the
+      committed 42 ns).
+- [x] Added `"ane_fused_chain"` to the `default = [...]` list in
+      `katgpt-core/Cargo.toml` (inserted right after `ane_roofline`,
+      which it implies).
+- [x] Prepended a Phase 18 comment to the `default` line documenting
+      the GOAT gate verdict (mirrors the Phase 17 / Phase 16 / ... style).
+- [x] Updated the inline feature-definition comment from "Opt-in until
+      G1-G5 GOAT gate passes" to "DEFAULT-ON after Plan 439 Phase 2 GOAT
+      (G1-G5 all PASS, 2026-07-14)".
+- [x] Verified `cargo check` clean with the feature now in `default`
+      (the bench's `required-features = ["ane_fused_chain"]` and the
+      `#[cfg(feature = "ane_fused_chain")]` gates in `ane_roofline.rs`
+      remain valid — they become always-true under default features,
+      which is the intended promotion outcome).
+
+**Consumer impact:** zero. `ane_fused_chain` was already a transitive
+no-op for any consumer that did not explicitly invoke
+`ane_fused_estimate`; the promotion only changes whether the code is
+compiled by default. No existing call site, test, or benchmark changes
+behavior. Phase 4 (riir-ai `NpcBrainRouter` integration) remains the
+first consumer that will actually invoke the primitive.
 
 ---
 
