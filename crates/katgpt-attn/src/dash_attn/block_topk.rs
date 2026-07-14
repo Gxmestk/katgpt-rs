@@ -743,10 +743,14 @@ impl VortexFlow for PerGroupTopKRouter {
         // Partition blocks into groups (round-robin assignment)
         // Group g owns blocks where block_idx % n_groups == g
         let mut decision = RoutingDecision::with_capacity(total_budget);
-        let mut group_indices = Vec::new();
-        let mut group_pairs = Vec::new();
-        let mut group_scores = Vec::new();
-        let mut local_indices = Vec::new();
+        // Pre-size per-group scratch: each group holds at most ceil(n_blocks/n_groups)
+        // blocks. Avoids the 1-3 reallocs per group that `Vec::new()` + push
+        // triggers as the allocator walks 8/16/32-byte doublings.
+        let group_cap = n_blocks.div_ceil(self.n_groups);
+        let mut group_indices: Vec<(usize, f32)> = Vec::with_capacity(group_cap);
+        let mut group_pairs: Vec<(usize, f32)> = Vec::with_capacity(group_cap);
+        let mut group_scores: Vec<f32> = Vec::with_capacity(group_cap);
+        let mut local_indices: Vec<usize> = Vec::with_capacity(per_group_k);
 
         for g in 0..self.n_groups {
             // Collect scores for blocks belonging to this group

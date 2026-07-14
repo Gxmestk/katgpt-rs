@@ -68,6 +68,15 @@ pub struct CcePrimalDual {
     pub eta: f32,
     /// Euclidean Bregman potential (Phase 2 only; KL reserved for Phase 3).
     _potential: Euclidean,
+    // ── Reusable scratch (hoisted out of the per-step hot loop) ──
+    /// Gradient buffer `grad[na]`, reused across steps.
+    grad_scratch: Vec<f32>,
+    /// Pre-projection buffer `ρ_temp[na]`, reused across steps.
+    rho_temp_scratch: Vec<f32>,
+    /// Sort buffer for `project_onto_simplex_into` (mutated in place).
+    simplex_sorted_scratch: Vec<f32>,
+    /// Output buffer for `project_onto_simplex_into` (cleared + refilled).
+    simplex_out_scratch: Vec<f32>,
 }
 
 impl CcePrimalDual {
@@ -84,6 +93,10 @@ impl CcePrimalDual {
             n_iter: 0,
             eta: 0.1,
             _potential: Euclidean,
+            grad_scratch: vec![0.0; na],
+            rho_temp_scratch: vec![0.0; na],
+            simplex_sorted_scratch: Vec::with_capacity(na),
+            simplex_out_scratch: Vec::with_capacity(na),
         }
     }
 
@@ -124,7 +137,9 @@ impl CcePrimalDual {
         let rho_view = OccupationMeasure::<N, A>::from_entries_trusted(self.rho.clone());
 
         // Compute gradient: grad[m] = gamma0_coeff(m) + λ · linear_derivative(m).
-        let mut grad = vec![0.0_f32; na];
+        // Reuse the hoisted gradient scratch — zero alloc after the first step.
+        let grad = &mut self.grad_scratch;
+        debug_assert_eq!(grad.len(), na);
         for s in 0..N {
             for a in 0..A {
                 let m = s * A + a;
@@ -134,17 +149,24 @@ impl CcePrimalDual {
             }
         }
 
-        // Gradient step: ρ_temp = ρ - η · grad.
+        // Gradient step: ρ_temp = ρ - η · grad. Write into the reusable buffer.
         let eta = self.eta;
-        let rho_temp: Vec<f32> = self
-            .rho
-            .iter()
-            .zip(grad.iter())
-            .map(|(&r, &g)| r - eta * g)
-            .collect();
+        let rho_temp = &mut self.rho_temp_scratch;
+        debug_assert_eq!(rho_temp.len(), na);
+        for m in 0..na {
+            rho_temp[m] = self.rho[m] - eta * grad[m];
+        }
 
-        // Project onto the simplex.
-        let rho_new = project_onto_simplex(&rho_temp);
+        // Project onto the simplex — zero-alloc into variant. The projection
+        // lands in `simplex_out_scratch`; we borrow it for the regret/gamma0
+        // evaluations and the rho_avg update, then swap it into `self.rho` at
+        // commit time (old `self.rho` lands in the scratch, to be cleared next step).
+        project_onto_simplex_into(
+            &mut self.simplex_sorted_scratch,
+            &mut self.simplex_out_scratch,
+            rho_temp,
+        );
+        let rho_new = &self.simplex_out_scratch;
 
         // --- Dual: λⁿ = max(0, λⁿ⁻¹ + (1/√n) · ER(ρⁿ)) ---
         let rho_new_view = OccupationMeasure::<N, A>::from_entries_trusted(rho_new.clone());
@@ -159,9 +181,11 @@ impl CcePrimalDual {
             *rho_avg_i = w_old * *rho_avg_i + w_new * rho_new_i;
         }
 
-        // Commit.
+        // Commit: swap the projection into `self.rho`. The old `self.rho`
+        // lands in `simplex_out_scratch`, where it will be cleared + refilled
+        // by next iteration's `project_onto_simplex_into` — zero steady-state alloc.
         let gamma0_new = p.gamma0(&rho_new_view);
-        self.rho = rho_new;
+        std::mem::swap(&mut self.rho, &mut self.simplex_out_scratch);
 
         StepReport {
             n,
@@ -240,7 +264,8 @@ impl CcePrimalDual {
 
         // --- Primal: projected gradient step on γ₀(ρ) + λ · ER_hetero(ρ) ---
         let inv_p = 1.0 / n_players.max(1) as f32;
-        let mut grad = vec![0.0_f32; na];
+        let grad = &mut self.grad_scratch;
+        debug_assert_eq!(grad.len(), na);
         for s in 0..N {
             for a in 0..A {
                 let m = s * A + a;
@@ -256,17 +281,22 @@ impl CcePrimalDual {
             }
         }
 
-        // Gradient step: ρ_temp = ρ - η · grad.
+        // Gradient step: ρ_temp = ρ - η · grad. Write into the reusable buffer.
         let eta = self.eta;
-        let rho_temp: Vec<f32> = self
-            .rho
-            .iter()
-            .zip(grad.iter())
-            .map(|(&r, &g)| r - eta * g)
-            .collect();
+        let rho_temp = &mut self.rho_temp_scratch;
+        debug_assert_eq!(rho_temp.len(), na);
+        for m in 0..na {
+            rho_temp[m] = self.rho[m] - eta * grad[m];
+        }
 
-        // Project onto the simplex.
-        let rho_new = project_onto_simplex(&rho_temp);
+        // Project onto the simplex — zero-alloc into variant (see `step` for
+        // the borrow-then-swap pattern).
+        project_onto_simplex_into(
+            &mut self.simplex_sorted_scratch,
+            &mut self.simplex_out_scratch,
+            rho_temp,
+        );
+        let rho_new = &self.simplex_out_scratch;
 
         // --- Dual: λⁿ = max(0, λⁿ⁻¹ + (1/√n) · ER_hetero(ρⁿ)) ---
         let rho_new_view = OccupationMeasure::<N, A>::from_entries_trusted(rho_new.clone());
@@ -281,9 +311,9 @@ impl CcePrimalDual {
             *rho_avg_i = w_old * *rho_avg_i + w_new * rho_new_i;
         }
 
-        // Commit.
+        // Commit: swap the projection into `self.rho` (see `step`).
         let gamma0_new = game.gamma0(&rho_new_view);
-        self.rho = rho_new;
+        std::mem::swap(&mut self.rho, &mut self.simplex_out_scratch);
 
         StepReport {
             n,
@@ -345,6 +375,9 @@ pub struct ConvergenceReportRaw<const N: usize, const A: usize> {
 /// `O(d log d)` for a `d`-dimensional vector. Returns `x_i = max(0, v_i - θ)`
 /// where `θ = (Σ_{j≤k} v_j - 1) / k` for the largest `k` with `v_(k) > θ`
 /// (`v_(k)` is the `k`-th largest entry).
+///
+/// Kept for the unit tests below; production code uses [`project_onto_simplex_into`].
+#[cfg(test)]
 fn project_onto_simplex(v: &[f32]) -> Vec<f32> {
     let d = v.len();
     if d == 0 {
@@ -369,6 +402,46 @@ fn project_onto_simplex(v: &[f32]) -> Vec<f32> {
 
     // Project: x_i = max(0, v_i - θ).
     v.iter().map(|&x| (x - theta).max(0.0)).collect()
+}
+
+/// Zero-allocation variant of [`project_onto_simplex`].
+///
+/// Sorts `sorted_scratch` in place (caller fills it with a copy of `v` first),
+/// computes θ, then writes the projection into `out` (cleared + extended).
+/// Both scratch buffers are reused across calls by `CcePrimalDual::step`.
+fn project_onto_simplex_into(
+    sorted_scratch: &mut Vec<f32>,
+    out: &mut Vec<f32>,
+    v: &[f32],
+) {
+    let d = v.len();
+    if d == 0 {
+        out.clear();
+        return;
+    }
+    // Copy v into the reusable sort buffer, then sort descending.
+    sorted_scratch.clear();
+    sorted_scratch.extend_from_slice(v);
+    sorted_scratch.sort_by(|a, b| b.total_cmp(a));
+
+    // Find θ = the last (Σ_{j≤k} v_j - 1) / k for which v_(k) > θ_k.
+    let mut cumsum = 0.0_f32;
+    let mut theta = 0.0_f32;
+    for (i, &val) in sorted_scratch.iter().enumerate() {
+        cumsum += val;
+        let k = (i + 1) as f32;
+        let theta_k = (cumsum - 1.0) / k;
+        if val > theta_k {
+            theta = theta_k;
+        }
+    }
+
+    // Project: x_i = max(0, v_i - θ). Write into the reusable output buffer.
+    out.clear();
+    out.reserve(d);
+    for &x in v {
+        out.push((x - theta).max(0.0));
+    }
 }
 
 #[cfg(test)]
