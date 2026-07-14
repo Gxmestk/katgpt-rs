@@ -16,7 +16,7 @@ pub struct PartialParser {
 }
 
 impl PartialParser {
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self {
             paren_depth: 0,
             brace_depth: 0,

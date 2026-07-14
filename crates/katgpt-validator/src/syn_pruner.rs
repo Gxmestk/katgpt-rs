@@ -3,8 +3,20 @@ use super::types::PruneResult;
 use katgpt_core::ConstraintPruner;
 use katgpt_tokenizer::BpeTokenizer;
 use katgpt_tokenizer::BpeTokenizerImpl;
+use std::cell::RefCell;
 use std::sync::Arc;
-use std::sync::Mutex;
+
+// Per-thread scratch for the hot path.
+//
+// `parser` calls `reset()` at the start of every `is_valid()`, so it has no
+// persistent state — sharing one instance per thread via `thread_local!` is
+// safe and removes all lock contention between rayon workers building the
+// DDTree in parallel. `scratch_tokens` is purely a transient token buffer;
+// same reasoning.
+thread_local! {
+    static PARSER: RefCell<PartialParser> = const { RefCell::new(PartialParser::new()) };
+    static SCRATCH_TOKENS: RefCell<Vec<usize>> = RefCell::new(Vec::with_capacity(64));
+}
 
 /// Two-tier syntax pruner for Validator.
 ///
@@ -12,28 +24,18 @@ use std::sync::Mutex;
 /// Tier 1: `syn` parse attempt — accurate, but expensive. Only called if Tier 0 passes.
 pub struct SynPruner {
     tokenizer: Arc<BpeTokenizer>,
-    parser: Mutex<PartialParser>,
-    scratch_tokens: Mutex<Vec<usize>>,
 }
 
 impl SynPruner {
     pub fn new(tokenizer: Arc<BpeTokenizer>) -> Self {
-        Self {
-            tokenizer,
-            parser: Mutex::new(PartialParser::new()),
-            scratch_tokens: Mutex::new(Vec::with_capacity(64)),
-        }
+        Self { tokenizer }
     }
 
     /// Validate a complete code string through both tiers.
     pub fn validate(&self, code: &str) -> PruneResult {
         // Tier 0: Bracket balance
-        if !self
-            .parser
-            .lock()
-            .expect("parser mutex poisoned")
-            .is_valid(code)
-        {
+        let tier0_ok = PARSER.with(|p| p.borrow_mut().is_valid(code));
+        if !tier0_ok {
             return PruneResult {
                 is_valid: false,
                 error_kind: super::types::ErrorKind::UnbalancedBrackets,
@@ -55,50 +57,50 @@ impl SynPruner {
 
     /// Quick Tier 0 check only (for DDTree hot path).
     pub fn is_valid_quick(&self, code: &str) -> bool {
-        self.parser
-            .lock()
-            .expect("parser mutex poisoned")
-            .is_valid(code)
+        PARSER.with(|p| p.borrow_mut().is_valid(code))
     }
 }
 
 impl ConstraintPruner for SynPruner {
     fn is_valid(&self, _depth: usize, token_idx: usize, parent_tokens: &[usize]) -> bool {
-        let mut all_tokens = self
-            .scratch_tokens
-            .lock()
-            .expect("scratch_tokens mutex poisoned");
-        all_tokens.clear();
-        all_tokens.extend_from_slice(parent_tokens);
-        all_tokens.push(token_idx);
-
-        let code = BpeTokenizerImpl::decode(&self.tokenizer, &all_tokens);
+        // Build the token sequence in thread-local scratch, decode to an owned
+        // `code` String, then release the scratch borrow BEFORE touching the
+        // parser. This drops one Mutex (scratch) entirely and removes the
+        // previous nested-lock pattern (scratch held while acquiring parser).
+        let code = SCRATCH_TOKENS.with(|s| {
+            let mut s = s.borrow_mut();
+            s.clear();
+            s.extend_from_slice(parent_tokens);
+            s.push(token_idx);
+            BpeTokenizerImpl::decode(&self.tokenizer, &s)
+        });
 
         // Only do Tier 0 (bracket balance) in the hot path.
         // Tier 1 (syn) is too expensive for every DDTree node.
-        // Reuse the existing parser via Mutex to avoid per-call allocation.
-        let mut parser = self.parser.lock().expect("parser mutex poisoned");
-        parser.is_valid(&code)
+        // Thread-local parser: no lock contention between rayon workers.
+        // `PartialParser::is_valid` calls `reset()` at entry, so sharing one
+        // instance per thread is safe (no persistent state across calls).
+        PARSER.with(|p| p.borrow_mut().is_valid(&code))
     }
 
     #[cfg(feature = "hoare_pruner")]
     fn propagate(&mut self, _depth: usize, token_idx: usize, parent_tokens: &[usize]) -> bool {
-        let mut all_tokens = self
-            .scratch_tokens
-            .lock()
-            .expect("scratch_tokens mutex poisoned");
-        all_tokens.clear();
-        all_tokens.extend_from_slice(parent_tokens);
-        all_tokens.push(token_idx);
+        let code = SCRATCH_TOKENS.with(|s| {
+            let mut s = s.borrow_mut();
+            s.clear();
+            s.extend_from_slice(parent_tokens);
+            s.push(token_idx);
+            BpeTokenizerImpl::decode(&self.tokenizer, &s)
+        });
 
-        let code = BpeTokenizerImpl::decode(&self.tokenizer, &all_tokens);
+        PARSER.with(|p| {
+            let mut parser = p.borrow_mut();
+            parser.reset();
+            let valid = parser.is_valid(&code);
 
-        let mut parser = self.parser.lock().expect("parser mutex poisoned");
-        parser.reset();
-        let valid = parser.is_valid(&code);
-
-        const MAX_BRACKET_DEPTH: i32 = 32;
-        valid && parser.total_depth() <= MAX_BRACKET_DEPTH
+            const MAX_BRACKET_DEPTH: i32 = 32;
+            valid && parser.total_depth() <= MAX_BRACKET_DEPTH
+        })
     }
 }
 
