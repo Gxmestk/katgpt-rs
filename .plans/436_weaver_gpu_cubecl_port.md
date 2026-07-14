@@ -262,13 +262,17 @@ The 40 matmul dispatches dominate Weaver's compute. Porting them to GPU
       per depth (seq_len=2 each). The per-depth loop matches the CPU
       semantic exactly. Cost: `depth` GPU passes instead of 1, but each
       pass is cheaper (seq_len=2 vs seq_len=depth+1).
-- [ ] T4.2: Feature-gated call site in `dflash_predict_with_weaver` —
-      riir-ai side, chooses CPU or GPU corrector based on `weaver_gpu` feature.
-      **BLOCKED by cycle constraint:** `riir-engine` does NOT depend on
-      `riir-gpu` (cycle: riir-gpu → riir-engine). The parallel
-      `dflash_predict_with_weaver_gpu` orchestration must live in
-      `riir-gpu`, not in `riir-engine/src/dflash.rs`. Deferred to next
-      session.
+- [x] T4.2: Feature-gated call site — `dflash_predict_with_weaver_gpu`
+      in riir-gpu (NOT riir-engine, due to cycle constraint).
+      **DONE** — lives in new module `riir-gpu/src/weaver_gpu_dflash.rs`.
+      Calls `riir_engine::dflash::dflash_predict_with_capture` (pub,
+      reachable via the path dep) for the draft step, then applies
+      `GpuWeaverCorrector::correct_marginals`. Mirrors the CPU
+      `dflash_predict_with_weaver` slicing logic verbatim (stack array,
+      max 64) so the two paths are byte-comparable. API deviation: no
+      `embedding` arg (cached on the corrector). Wiring test
+      `test_dflash_gpu_wiring_compiles` proves the cross-crate symbol
+      resolution + CubeCL runtime construction.
 - [x] T4.3: G1 correctness — GPU corrected probs sum to 1.0, no NaN/Inf.
       **DONE** — `test_g1_correctness_sums_to_one`: all depths sum to 1.0
       within 1e-4, all probs finite and in [0,1], ≤K non-zero per row.
@@ -276,24 +280,46 @@ The 40 matmul dispatches dominate Weaver's compute. Porting them to GPU
       **DONE** — `test_g1_no_harm_zero_weights`: GPU output matches CPU
       zero-weight output within 1e-4 (both paths zero the row outside
       top-K and renormalize the top-K to sum to 1.0).
-- [ ] T4.5: G3 no-regression — `weaver_gpu` OFF → CPU path unchanged.
-      Trivially true by construction (the feature gate compiles out the
-      GPU module entirely). Explicit test deferred to next session.
-- [ ] T4.6: **G2 latency** — GPU forward <1 ms (the paper target). Benchmark
-      on M3 Max GPU. **Deferred to next session** — requires extending the
-      Phase 2 benchmark (`bench_weaver_gpu_436.rs`) to measure the
-      per-depth corrector path. Note: with the per-depth fix, the forward
-      is now `depth × (19 dispatches at seq_len=2)` instead of 1 batched
-      pass. Realistic target is 2-5 ms on M3 Max (vs 7.05 ms CPU parallel).
+- [x] T4.5: G3 no-regression — `weaver_gpu` OFF → CPU path unchanged.
+      **DONE** — trivially true by construction: the `#[cfg(feature =
+      "weaver_gpu")]` gate on `pub mod weaver_gpu_dflash` (and
+      `weaver_gpu_corrector`, `weaver_gpu`) compiles the entire GPU
+      module out when the feature is off. The CPU `dflash_predict_with_weaver`
+      in `riir-engine/src/dflash.rs` is gated on `weaver_runtime`
+      (not `weaver_gpu`), so the two are independently switchable. No
+      shared mutable state, no feature interaction. The 19 Phase 1-4
+      tests all live under `#[cfg(all(test, feature = "cubecl_runtime"))]`
+      and don't even compile without the feature.
+- [x] T4.6: **G2 latency** — GPU forward <1 ms (the paper target).
+      **DONE (measurement), GOAT GATE FAILED.** Benchmark extended in
+      `bench_weaver_gpu_436.rs` with a new `bench_corrector_full()` that
+      measures `GpuWeaverCorrector::correct_marginals` end-to-end at
+      production dims (h=2048, K=32, depth=4, vocab=4096).
+      **Measured: 13.04 ms / call** vs **7.05 ms CPU parallel** (Issue
+      131 G4) — a **0.54× slowdown (regression)**. Per-depth breakdown:
+      ~3.26 ms/depth, of which ~0.2 ms is actual compute and ~3 ms is
+      sync + alloc overhead (4 sequential `read_one` barriers + 12
+      `create_from_slice` buffer allocations per call). The T2.8 batched
+      forward (seq_len=5, single pass) is 2.59 ms — confirming the GPU
+      compute is fast; the per-depth loop's sync pattern is the problem.
+      **Follow-up:** Issue 468 (`riir-ai/.issues/468_*`) captures the
+      optimization paths (P0: batch the readback, P1: persistent input
+      buffers, P2: reconsider per-depth semantic constraint).
 - [x] T4.7: G3 precision — GPU marginals match CPU within fp tolerance (<1%
       abs diff on non-top-K, bit-identical ranking on top-K).
       **DONE** — `test_g3_precision_matches_cpu`: top-K ranking
       bit-identical (same vids in same descending order), per-element
       abs diff < 1e-3 on all top-K entries. Non-zero weights used so the
       Weaver residual is non-trivial.
-- [ ] T4.8: End-to-end acceptance test — `speculative_step_*_with_weaver` on
-      GPU corrector, verify ≥1 accepted token. **Deferred to next session**
-      (blocked by T4.2 cycle constraint).
+- [ ] T4.8: End-to-end acceptance test — `speculative_step_*_with_weaver`
+      on GPU corrector, verify ≥1 accepted token. **Unblocked** by T4.2
+      (the orchestration now exists). Still **deferred** because the GOAT
+      gate (T4.6) failed on latency — there is no production win to
+      validate end-to-end until Issue 468 P0/P1 land. The test itself is
+      straightforward once the latency is competitive: it would call
+      `dflash_predict_with_weaver_gpu` (from `weaver_gpu_dflash.rs`)
+      inside a `speculative_step_*` loop and assert ≥1 accepted token,
+      mirroring the CPU `speculative_step_*_with_weaver` test.
 
 ## GOAT gate (promotion criteria)
 
@@ -304,9 +330,15 @@ weights). The feature stays opt-in under `weaver_gpu`. Promotion criteria:
 - [x] **G1 no-harm** — zero weights → zero residual (T4.4)
 - [x] **G3 no-regression** — feature OFF → CPU path bit-identical (T4.5)
 - [x] **G3 precision** — GPU matches CPU within fp tolerance (T4.7)
-- [ ] **G2 latency** — <1 ms forward (T4.6) — **THE GATE**
+- [-] **G2 latency** — <1 ms forward (T4.6) — **FAILED: 13.04 ms vs 7.05 ms
+      CPU parallel (0.54× slowdown).** Measurement done, root cause
+      identified (per-depth sync overhead), optimization paths captured
+      in Issue 468. The gate fails on raw latency today; P0 (batch the
+      readback) is the highest-leverage fix and is pure engineering.
 - [ ] **G2 acceptance** — corrected marginals produce acceptance length
       within 5% of CPU-corrected marginals on real checkpoint (T4.8)
+      — deferred pending Issue 468 P0/P1 (no production win to validate
+      until latency is competitive)
 
 **Promotion decision:** `weaver_gpu` is an optimization of a trained artifact.
 It stays opt-in (like `weaver_runtime`). Default-on promotion is N/A — the
