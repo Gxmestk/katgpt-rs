@@ -4,7 +4,7 @@
 > **Date:** 2026-07-14
 > **Status:** Active
 > **Related Research:** 385 (SoftMatcha2 smooth-min — closest cousin, also a similarity variant that shipped DEFAULT-ON), 144 (Functional Emotions Linear Representations — direction-vector ranking), 296 (Stokes/DEC vocabulary crosswalk — bound-hierarchy framing)
-> **Related Plans:** 422 (recos open primitive — to be opened)
+> **Related Plans:** 437 (recos open primitive — [katgpt-rs/.plans/437_recos_rearrangement_bound_similarity.md](../.plans/437_recos_rearrangement_bound_similarity.md); originally sketched as 422 but that number collided with the cochain_point_sampler plan)
 > **Classification:** Public
 
 ---
@@ -302,7 +302,7 @@ If G2 fails (recos too slow for hot path), **downgrade Fusion A to cold-path onl
 
 ---
 
-## 4. Plan sketch (Plan 422)
+## 4. Plan sketch (Plan 437)
 
 **Target:** `katgpt-rs/crates/katgpt-core/src/similarity.rs` (add `recos_sim`,
 `recos_sim_ranking`, `recos_sim_slice`) + feature flag `recos` (opt-in).
@@ -367,4 +367,7 @@ in `katgpt-rs/crates/katgpt-core/src/similarity.rs` alongside `smooth_min_simila
 (not Super-GOAT). Closest cousin `smooth_min_similarity` shipped DEFAULT-ON; recos
 follows the same path (feature flag → GOAT gate → promote if wins). Strongest
 fusion: recos rerank in `ShardIndex::query` (conditional on d=8 latency gate) and
-recos as 5th MAG transfer metric (cold-path, low-risk). Plan 422 to follow.
+recos as 9th MAG transfer metric (cold-path, low-risk). **Plan 437 opened** —
+[katgpt-rs/.plans/437_recos_rearrangement_bound_similarity.md](../.plans/437_recos_rearrangement_bound_similarity.md).
+(Originally sketched as 422; renumbered to 437 after a collision with the
+cochain_point_sampler plan.)
