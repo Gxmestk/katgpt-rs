@@ -2,7 +2,7 @@
 
 > **Spawned from:** Issue 131 G4 (latency) — "GPU port via riir-gpu CubeCL" path
 > **Date:** 2026-07-14
-> **Status:** Phase 1 COMPLETE. Phase 2 COMPLETE (8/8 tasks). Phase 3 COMPLETE (5/5 tasks — causal MHA + embedding gather + dot_per_row + softmax_k + full forward parity). Phase 4 (integration + GOAT gate) next.
+> **Status:** **DONE** ✅ (2026-07-14) — Phase 1 COMPLETE. Phase 2 COMPLETE (8/8 tasks). Phase 3 COMPLETE (5/5 tasks — causal MHA + embedding gather + dot_per_row + softmax_k + full forward parity). Phase 4 COMPLETE (8/8 tasks — integration + GOAT gate ALL PASS via Issue 468 P2 batched forward: 4.4–7.0 ms vs 7.05 ms CPU parallel = 1.01×–1.59× faster; top-K overlap = 1.000 → identical acceptance).
 > **Target:** <1 ms Weaver forward (paper's GPU-measured target)
 
 ## TL;DR
@@ -410,8 +410,9 @@ feature is a backend choice, not a primitive gate.
 
 ## Cross-references
 
-- [Issue 131](../.issues/131_weaver_runtime_integration.md) — parent (G4
-  latency criterion lists GPU port as path #1)
+- Issue 131 (CLOSED 2026-07-14, removed for noise) — parent (G4
+  latency criterion listed GPU port as path #1); see Plan 433/434/435
+  for the runtime integration history.
 - [Issue 136](../.issues/136_weaver_f16_weight_optimization.md) — f16 CPU
   GOAT FAIL (motivates GPU path)
 - [Plan 433](433_weaver_dflash_pipeline_wiring.md) — DFlash ↔ Weaver wiring

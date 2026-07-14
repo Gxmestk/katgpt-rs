@@ -121,8 +121,9 @@ itself requires trained weights (Issue 131 §"Why this is NOT modelless-promotab
 
 ## Cross-references
 
-- [Issue 131](131_weaver_runtime_integration.md) — the parent integration (G4
-  latency criterion lists f16 as path #3)
+- Issue 131 (CLOSED 2026-07-14, removed for noise) — the parent integration
+  (G4 latency criterion listed f16 as path #3); history preserved in
+  Plan 433/434/435/436.
 - [Plan 433](../.plans/433_weaver_dflash_pipeline_wiring.md) — DFlash ↔ Weaver
   pipeline wiring (DONE)
 - [Plan 434](../.plans/434_spec_step_weaver_call_site_wiring.md) — spec step

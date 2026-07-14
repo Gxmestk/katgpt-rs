@@ -1,10 +1,13 @@
 # Plan 433 — Weaver ↔ DFlash Pipeline Wiring
 
 > **Date:** 2026-07-13
+> **Status:** **DONE** ✅ (2026-07-14) — all 10 tasks complete in both repos.
 > **Spawned from:** Issue 131 (katgpt-rs) — runtime half complete, this is the
-> "remaining riir-ai integration" the issue's TL;DR calls out.
+>   "remaining riir-ai integration" the issue's TL;DR calls out.
 > **Scope:** make Weaver correction transparent when `weaver_runtime` is on by
 > providing a wrapper that combines DFlash predict + Weaver correct_marginals.
+> **Follow-ups (all resolved):** Plan 434 (spec_step wiring), Plan 436 (GPU
+> port), Issue 136 (f16 — GOAT FAIL, honest negative).
 
 ## Context
 
