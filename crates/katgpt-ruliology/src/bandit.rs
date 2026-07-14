@@ -425,7 +425,7 @@ impl RuliologyAbsorbCompress {
             .max_by(|&&a, &&b| {
                 let pa = self.bandit.arms()[a].payoff();
                 let pb = self.bandit.arms()[b].payoff();
-                pa.partial_cmp(&pb).unwrap_or(std::cmp::Ordering::Equal)
+                pa.total_cmp(&pb)
             })
             .copied()
     }

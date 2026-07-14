@@ -58,7 +58,7 @@ impl WinMatrix {
             })
             .collect();
 
-        rankings.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        rankings.sort_by(|a, b| b.1.total_cmp(&a.1));
 
         Self {
             payoffs,
@@ -92,23 +92,26 @@ impl WinMatrix {
 
         let mut front: Vec<(u64, f64, f32)> = Vec::with_capacity(n);
 
-        for &(.., payoff_i, cx_i) in &id_to_idx {
+        // Pareto dominance: strategy i is dominated if some j has strictly
+        // higher payoff AND strictly lower complexity. O(n²) — acceptable for
+        // the small strategy counts ruliology enumerates.
+        //
+        // Note: `id` is destructured directly here; the prior code dropped `id`
+        // from the pattern and then did an O(n) `.find()` to recover it by
+        // matching on complexity equality — which was both slower (O(n³) total)
+        // and incorrect when two strategies shared the same complexity value
+        // (the find returned the first match, not necessarily the current i).
+        for &(_i, id, payoff_i, cx_i) in &id_to_idx {
             let dominated = id_to_idx
                 .iter()
-                .any(|&(.., payoff_j, cx_j)| payoff_j > payoff_i && cx_j < cx_i);
+                .any(|&(_, _, payoff_j, cx_j)| payoff_j > payoff_i && cx_j < cx_i);
             if !dominated {
-                // Find the ID for this index.
-                if let Some((_, id, _, _)) = id_to_idx
-                    .iter()
-                    .find(|(idx, _, _, c)| *idx < n && *c == cx_i)
-                {
-                    front.push((*id, payoff_i, cx_i));
-                }
+                front.push((id, payoff_i, cx_i));
             }
         }
 
         // Sort descending by payoff.
-        front.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        front.sort_by(|a, b| b.1.total_cmp(&a.1));
         front
     }
 
@@ -213,6 +216,36 @@ mod tests {
         assert_eq!(front.len(), 1);
         assert_eq!(front[0].0, 10);
         assert!((front[0].1 - 5.0).abs() < 1e-9);
+    }
+
+    /// Regression test for the complexity-collision bug fixed alongside this
+    /// scan pass. The prior `pareto_front` recovered the strategy ID via an
+    /// O(n) `.find()` matching on complexity equality; when two non-dominated
+    /// strategies shared the same complexity value, the find returned the
+    /// FIRST match's ID for BOTH strategies — producing a front with duplicate
+    /// IDs and dropping the second strategy entirely.
+    #[test]
+    fn test_pareto_front_complexity_collision_returns_correct_ids() {
+        // Two strategies with identical complexity but different payoffs and IDs.
+        // Neither dominates the other (same complexity → dominance requires
+        // STRICTLY lower complexity, which neither has).
+        let payoffs = vec![
+            vec![0.0, 5.0], // strategy 0: avg 5.0
+            vec![0.0, 3.0], // strategy 1: avg 3.0
+        ];
+        let ids = vec![111, 222];
+        let wm = WinMatrix::new(payoffs, ids);
+
+        // Same complexity for both → no dominance → both on the front.
+        let complexities = vec![2.0, 2.0];
+        let front = wm.pareto_front(&complexities);
+
+        assert_eq!(front.len(), 2, "both non-dominated strategies must appear");
+        // IDs must be distinct (the old bug returned 111 for both).
+        assert_ne!(front[0].0, front[1].0, "IDs must be distinct");
+        // Both IDs 111 and 222 must be present (in payoff-descending order).
+        assert_eq!(front[0].0, 111, "higher-payoff strategy comes first");
+        assert_eq!(front[1].0, 222, "lower-payoff strategy comes second");
     }
 
     #[test]
