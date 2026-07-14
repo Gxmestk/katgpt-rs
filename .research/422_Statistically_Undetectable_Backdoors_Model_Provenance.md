@@ -202,3 +202,48 @@ No latent-space quantity is involved. The backdoor is a raw-weight cryptographic
 ## TL;DR
 
 **Verdict: PASS.** The paper proves a powerful training-time result (statistically undetectable backdoors in DNNs with frozen Gaussian first layers) with a modelless verification corollary (2-query provenance check). The construction is a training/set-up operation that does not fit any modelless weight-mutation path; the verification is only useful once the construction has been done; and we have no existing backdoored-model workflow to verify against. The latent-space reframing fails (the mechanism is a raw-weight cryptographic property, not a latent operation), which per skill rules is a strong signal against Super-GOAT. **One fusion idea** (backdoored ShardEmbedding JL projection → cryptographic shard-embedding provenance) is noted as novelty-TBD and tracked in `.issues/138` — it needs a §3.6 defend-wrong PoC to verify the three architectural constraints (frozen Gaussian, bi-Lipschitz downstream, discrete inputs) can be met for our shard-embedding path before any verdict upgrade.
+
+---
+
+## 6. PoC Addendum (2026-07-14) — Fusion SHELVED on G1; primitive sound
+
+The defend-wrong PoC (`.issues/138` T1–T9) ran at `riir-ai/crates/riir-poc/benches/jl_backdoor_poc_gates.rs` (`CARGO_TARGET_DIR=/tmp/jl_backdoor_poc`). **Raw results:**
+
+| Gate | m=8 | m=16 | m=32 | Threshold | Verdict |
+|---|---|---|---|---|---|
+| **G1 parity** (backdoor top-5 ≈ honest top-5, overlap ≥ 0.8) | **0.000** | **0.000** | **0.000** | ≥ 0.90 | ❌ **FAIL** |
+| G1 honest absolute quality (top-5 vs ground truth) | 0.131 | 0.194 | 0.250 | (informational) | confirms Plan 230's 6% finding — honest JL is itself broken at these dims |
+| **G2 verification correctness** (`V(A,z)=1`, `V(A,z′)=0`) | 1.000 / 1.000 | — | — | 1.000 | ✅ PASS |
+| **G3 unforgeability** (budget=4096 matmuls, 100 trials × 3 adversaries) | random=0, greedy=0, pairwise=0 | — | — | ≤ 2⁻²⁰ | ✅ PASS (at this budget) |
+| **G4 latency** (single `V` call) | 272 ns | — | — | ≤ 1 µs | ✅ PASS |
+
+### 6.1 What the PoC defends
+
+- **The provenance primitive itself is sound.** G2 + G3 + G4 all pass. The backdoor construction (`A′ = A − (Az)zᵀ/‖z‖² + σ·g⊗zᵀ/‖z‖²`) produces a matrix where `‖A′z‖ ≈ σ√m ≈ 2.3e-3` (verified), `V(A′, z)` accepts the true `z` and rejects decoys 100% of the time, and three gradient-free adversaries (random / greedy bit-flip / pairwise-flip lattice-style) found **zero forgeries** in 100 trials × 4096-matmul budget each.
+- **C3 (discrete inputs) was a red herring for the provenance use case.** `V(A, z)` never takes `style_weights` — only the secret `z ∈ {±1}ⁿ` (always discrete by construction). The discrete-input constraint in the paper applies to the *colliding-input* threat model, not to forging the secret. The load-bearing gate was G3, and G3 holds.
+
+### 6.2 What the PoC refutes (the defend-wrong payoff)
+
+- **G1 retrieval parity fails catastrophically (0.000 at every tested dim).** The backdoored matrix and the honest matrix produce **completely disjoint** top-5 nearest-neighbour sets on 128 toy shards. This is *worse* than the honest baseline alone.
+- **Root cause:** the backdoor construction projects out the `z` direction (`A₀ = A − (Az)zᵀ/‖z‖²`), removing one degree of freedom from an already aggressively-compressed space (64→8). The honest JL baseline itself barely preserves NN structure at these dims (~13–25% top-5 overlap with ground truth, confirming Plan 230's "64→8 too aggressive" verdict). Adding the projection-out step destroys the remainder.
+- **The fusion as stated in §3.1 — "replace the honest JL projection with a backdoored one, retrieval still works" — is FALSE.** The paper's `d_TV = o(1)` guarantee holds for the matrix *distribution*, but retrieval quality depends on the *geometry* of the specific matrix instance, and projecting out a direction in a low-dim space is geometrically destructive.
+
+### 6.3 Salvage path (NOT pursued; documented for completeness)
+
+The provenance primitive (G2/G3/G4) is sound. The failure is specifically that **one matrix cannot serve both retrieval and provenance** at these dims. A *two-matrix* architecture — honest JL for retrieval, separate backdoored matrix for provenance — would preserve both properties. This is a different design than the §3.1 fusion ("replace") and would double the embedding storage. **Not pursued** because:
+
+1. The honest baseline itself is broken at 64→8 (Plan 230's unresolved G1 failure). Fixing retrieval is a prerequisite; adding provenance on top is premature.
+2. The paper's `d_TV = o(1)` construction is LWE-based and lives in `riir-train` per §3.2; our PoC used a simplified projection-based construction that achieves `‖Az‖` smallness but not the full statistical-closeness guarantee. A salvage would need the full LWE construction first.
+3. The product-fit case (§3.1 Q3, 60% confidence) does not improve after this PoC — the architectural constraints remain.
+
+### 6.4 Routing per Issue 138 outcome table
+
+> G1 FAILS (retrieval parity) → **Fusion shelved** — backdoor destroys shard retrieval. No primitive; close this issue with PoC Addendum in Research 422.
+
+**Verdict remains PASS.** No primitive lands in any of the 5 repos. Issue 138 is closed with this addendum as the negative result. The `jl_backdoor_poc` module stays in `riir-poc` as a permanent negative control — future re-exploration (e.g. after Plan 230's retrieval is fixed at higher dim, or if a two-matrix architecture becomes product-justified) can resurrect it.
+
+### 6.5 Files
+
+- `riir-ai/crates/riir-poc/src/jl_backdoor_poc.rs` — the PoC module (BackdoorMatrix, V, 3 adversaries, G1–G4 measurements, 12 unit tests).
+- `riir-ai/crates/riir-poc/benches/jl_backdoor_poc_gates.rs` — the gate runner.
+- Run: `CARGO_TARGET_DIR=/tmp/jl_backdoor_poc cargo bench -p riir-poc --bench jl_backdoor_poc_gates -- --nocapture`

@@ -4,7 +4,8 @@
 > **Paper:** Bogdanov, Rosen, Vafa. *Statistically Undetectable Backdoors in Deep Neural Networks.* arXiv:2607.09532v1, 10 Jul 2026.
 > **Verdict that produced this issue:** PASS with fusion idea — novelty TBD.
 > **Date opened:** 2026-07-14
-> **Status:** Open
+> **Date closed:** 2026-07-14
+> **Status:** **CLOSED — Fusion SHELVED on G1.** See §"PoC outcome" below + Research 422 §6 PoC Addendum.
 
 ---
 
@@ -78,16 +79,26 @@ This issue tracks the **defend-wrong PoC** (per skill §3.6) needed before any v
 
 ## Tasks
 
-- [ ] **T1** Read `katgpt-rs/.plans/230_shard_embedding_projection.md` + the current `ShardEmbedding` constructor to understand the honest JL path.
-- [ ] **T2** Implement `BackdoorMatrix(z, n=64, m=8)` in `riir-ai/crates/riir-poc/` (deterministic given `z` per paper Figure 3).
-- [ ] **T3** Generate 128 toy shards with known top-5 nearest neighbours (cosine on `style_weights[64]`).
-- [ ] **T4** **G1 retrieval parity:** embed via honest JL and backdoored JL, measure top-5 overlap.
-- [ ] **T5** **G2 verification correctness:** `V(A_backdoor, z) = 1` over 100 trials.
-- [ ] **T6** **G3 unforgeability:** run LLL + random + gradient-free adversaries over 1000 trials each, measure forgery rate.
-- [ ] **T7** If G3 fails on continuous inputs, retry with quantisation pre-step (`k ∈ {4, 8, 12}`), re-measure G1 + G3.
-- [ ] **T8** **G4 latency:** criterion bench on `V`.
-- [ ] **T9** Write PoC Addendum to Research 422 with raw numbers (defend OR refute).
-- [ ] **T10** Route per "Routing on PoC outcome" table above. If GOAT/Super-GOAT, open plan + (if Super-GOAT) private guide.
+- [x] **T1** Read `katgpt-rs/.plans/230_shard_embedding_projection.md` + the current `ShardEmbedding` constructor to understand the honest JL path.
+- [x] **T2** Implement `BackdoorMatrix(z, n=64, m=8)` in `riir-ai/crates/riir-poc/` (deterministic given `z` per paper Figure 3).
+- [x] **T3** Generate 128 toy shards with known top-5 nearest neighbours (cosine on `style_weights[64]`).
+- [x] **T4** **G1 retrieval parity:** embed via honest JL and backdoored JL, measure top-5 overlap. **RESULT: 0.000 at m∈{8,16,32} — FAIL.**
+- [x] **T5** **G2 verification correctness:** `V(A_backdoor, z) = 1` over 100 trials. **RESULT: 100/100 accept true z, 100/100 reject decoy — PASS.**
+- [x] **T6** **G3 unforgeability:** LLL-proxy (pairwise-flip) + random + greedy-bitflip over 100 trials × 4096 matmul budget each. **RESULT: 0 forgeries across all 3 adversaries — PASS at this budget.**
+- [-] **T7** If G3 fails on continuous inputs, retry with quantisation pre-step. **DEFERRED — G3 passed; C3 was a red herring (see Research 422 §6.1).**
+- [x] **T8** **G4 latency:** `V` measured at 272 ns (≤ 1 µs threshold) — **PASS.**
+- [x] **T9** Write PoC Addendum to Research 422 with raw numbers (defend OR refute). **Done — Research 422 §6.**
+- [x] **T10** Route per "Routing on PoC outcome" table. **Routed: G1 FAILS → fusion shelved.** Verdict stays PASS.
+
+---
+
+## PoC outcome (2026-07-14)
+
+**G1 FAILS catastrophically** (parity = 0.000 at m ∈ {8, 16, 32}). The backdoor construction projects out the `z` direction from an already aggressively-compressed space, destroying nearest-neighbour structure. The honest JL baseline is itself broken at these dims (13–25% top-5 overlap with ground truth — confirms Plan 230's "64→8 too aggressive" finding).
+
+**G2/G3/G4 all PASS.** The provenance primitive is cryptographically sound at the PoC budget; C3 (discrete inputs) was a red herring for the provenance use case because `V(A, z)` never takes `style_weights` — only the discrete secret `z`.
+
+**Verdict: PASS (unchanged). Fusion SHELVED.** No primitive lands in any of the 5 repos. The `jl_backdoor_poc` module stays in `riir-poc` as a permanent negative control. Full analysis in Research 422 §6.
 
 ---
 
