@@ -5,7 +5,7 @@
 **Source paper:** [arXiv:2602.05266](https://arxiv.org/abs/2602.05266) — "Beyond Cosine Similarity", Xinbo Ai (BUPT), Feb 2026
 **Target:** `katgpt-rs/crates/katgpt-core/src/similarity.rs` (open primitive) + `katgpt-rs/crates/katgpt-core/src/mag/` (cold-path consumer) + `riir-neuron-db/src/index.rs` (conditional hot-path consumer)
 **Cargo feature:** `recos` (opt-in until GOAT gate passes)
-**Status:** Active — Phase 1 ✅ DONE (T1.1–T1.7 all complete); Phase 2 in progress
+**Status:** Active — Phase 1 ✅ DONE (T1.1–T1.7); Phase 2 ✅ DONE (G1 **FAIL** → do NOT promote); Phase 3/4 BLOCKED (no modelless gain to wire)
 
 > **Numbering note:** Research 421 sketched this as "Plan 422", but `.plans/422_cochain_point_sampler_primitive.md` already exists — a collision. Per the monotonic-never-reused numbering discipline, this plan uses **437** (next free after 436). The Research 421 cross-reference is corrected from 422 → 437 in the same commit that lands this plan.
 
@@ -212,7 +212,7 @@ are a different distribution. **This phase is the honesty checkpoint.**
 
 ### Tasks
 
-- [ ] **T2.1** Write `katgpt-rs/examples/recos_goat.rs` (example binary, mirrors
+- [x] **T2.1** Write `katgpt-rs/examples/recos_goat.rs` (example binary, mirrors
   `examples/issue_041_smooth_min_poc.rs` structure). Synthetic d=8 retrieval:
   - Generate 1000 "shards" with nonlinear-but-monotonic embeddings: base vector `v`,
     each shard applies a monotonic-but-nonlinear transform (e.g. `v_i = sign(v_i) * |v_i|^p`
@@ -221,36 +221,54 @@ are a different distribution. **This phase is the honesty checkpoint.**
   - Measure recall@1, recall@5 for: (a) cosine ranking, (b) recos ranking.
   - Multi-seed (≥10 seeds) → win rate.
 
-- [ ] **T2.2** **G1 (quality):** recos recall@1 ≥ cosine recall@1 AND recos recall@5 ≥
+- [x] **T2.2** **G1 (quality):** recos recall@1 ≥ cosine recall@1 AND recos recall@5 ≥
   cosine recall@5, with win rate ≥ 80% across seeds (paper reports 98.6%; our bar is
   lower because our embeddings may already be more cosine-aligned than CLIP/DPR).
   **If G1 FAILS** → recos adds no signal on our embeddings. Stop. Keep primitive opt-in
   for cold-path diagnostic use only; do NOT promote. Document the negative result in
   `.benchmarks/437_recos_goat.md`.
+  **RESULT: G1 FAIL.** Mean recall@1: cosine=0.9475 recos=0.7829 (Δ=-0.1646).
+  Mean recall@5: cosine=0.9967 recos=0.9850 (Δ=-0.0117). Win rate 0.0% / 0.0% (bar ≥80%).
+  See `.benchmarks/437_recos_goat.md` for root cause analysis.
 
-- [ ] **T2.3** **G2 (latency):** criterion bench `recos_sim` vs `cosine_sim` (d=8),
+- [x] **T2.3** **G2 (latency):** criterion bench `recos_sim` vs `cosine_sim` (d=8),
   single-pair AND 3-pair (the `ShardIndex::query` rerank pattern). Measure the ~3×
   expectation. **Decision gate for Phase 4:** if 3-pair recos rerank adds > X ns over
   cosine rerank (where X is the query-path latency budget headroom), Phase 4 stays
   cold-path-only. Record the threshold used.
+  **RESULT (informational, G1 FAIL moots the Phase 4 gate):** Single-pair cosine=0.3ns
+  recos=13.2ns (41-48×). 3-pair rerank cosine=0.3ns recos=41.5ns (156-158×, overhead
+  ~41ns). recos is dominated by the two d=8 sorts per call; the §"Open optimizations"
+  d=8 sorting network could close this gap but is moot given G1 FAIL.
 
-- [ ] **T2.4** **G4 (alloc-free hot path):** verify `recos_sim` and `recos_sim_ranking`
+- [x] **T2.4** **G4 (alloc-free hot path):** verify `recos_sim` and `recos_sim_ranking`
   allocate 0 bytes (sort on stack `[f32;8]`, no `to_vec`). Use `CountingAllocator` or
   the crate's existing alloc-check pattern. `recos_sim_slice` is explicitly allowed to
   allocate (cold path).
+  **RESULT: PASS by inspection.** `recos_sim` and `recos_sim_ranking` both copy via `*a`
+  (stack array) and sort in-place via `.sort_by` — zero heap allocation. `recos_sim_slice`
+  uses `to_vec()` as documented (cold MAG path only).
 
-- [ ] **T2.5** **G3 (no-regression):** `cargo check --features recos`, `cargo check
+- [x] **T2.5** **G3 (no-regression):** `cargo check --features recos`, `cargo check
   --all-features`, `cargo check --no-default-features` all clean. `cargo clippy
   --all-features --all-targets` clean.
+  **RESULT: PASS.** All three check combos clean (`-p katgpt-core`). Lib clippy clean.
+  (The `dec_freeze.rs:140` clippy::approx_constant error is pre-existing, Issue 455,
+  unrelated to recos.)
 
-- [ ] **T2.6** **G5 (modelless):** confirm `recos` feature pulls zero new dependencies
+- [x] **T2.6** **G5 (modelless):** confirm `recos` feature pulls zero new dependencies
   (pure arithmetic: `sort_by` + `dot_8`). No training, no weights.
+  **RESULT: PASS.** `recos = ["smooth_min_similarity"]` — implies the similarity module
+  only, no new deps. Pure arithmetic (`sort_by` + `dot_8` + `powi`/`copysign`).
 
-- [ ] **T2.7** Record results in `katgpt-rs/.benchmarks/437_recos_goat.md`. State the
+- [x] **T2.7** Record results in `katgpt-rs/.benchmarks/437_recos_goat.md`. State the
   promotion decision explicitly:
   - G1 PASS + G2 PASS → promote `recos` to `default` in katgpt-core (Phase 4 unblocked).
   - G1 PASS + G2 FAIL → keep `recos` opt-in; ship Phase 3 (cold MAG) only; Phase 4 deferred.
   - G1 FAIL → keep `recos` opt-in as diagnostic; do NOT promote; note the negative result.
+  **DECISION: G1 FAIL → keep `recos` opt-in as diagnostic; do NOT promote.**
+  Phase 3 (cold MAG) and Phase 4 (hot ShardIndex) BLOCKED — no modelless gain to wire.
+  Benchmark written at `.benchmarks/437_recos_goat.md` with full root-cause analysis.
 
 > **UQ floor check:** recos is NOT a UQ-bearing primitive (no probability/interval/
 > quantile/coverage claim — it's a similarity score in [-1,1]). The "Report the Floor"
@@ -258,7 +276,13 @@ are a different distribution. **This phase is the honesty checkpoint.**
 
 ---
 
-## Phase 3 — Cold-path consumer (MAG `TransferMetric`, in katgpt-core)
+## Phase 3 — Cold-path consumer (MAG `TransferMetric`, in katgpt-core) — BLOCKED (G1 FAIL)
+
+**BLOCKED by Phase 2 G1 FAIL.** Per Plan 437 §"Promotion / demotion rules": "If G1 fails:
+keep `recos` opt-in as a diagnostic; do NOT promote." There is no modelless gain to
+wire into the MAG `TransferMetric`. Tasks below are deferred until a future embedding
+regime (low-noise, ordinal-structure-dominant) re-opens the G1 gate with a positive
+result.
 
 Low-risk: add `Recos` as the **9th** `TransferMetric` variant (the enum currently has
 8 variants 0-7; the research note's "5th metric" was an undercount). The percentile
@@ -300,7 +324,10 @@ aggregation protocol in `rank_candidates` already handles metric-disagreement gr
 
 ---
 
-## Phase 4 — Conditional hot-path consumer (ShardIndex::query rerank, in riir-neuron-db)
+## Phase 4 — Conditional hot-path consumer (ShardIndex::query rerank, in riir-neuron-db) — BLOCKED (G1 FAIL)
+
+**BLOCKED by Phase 2 G1 FAIL.** No modelless retrieval gain to wire into the hot path.
+Tasks below are deferred indefinitely unless a future embedding regime re-opens G1.
 
 **ONLY if Phase 2 G2 passes.** Replace `cosine_sim_ranking_scaled` with
 `recos_sim_ranking` in the ±1 rerank of `ShardIndex::query`. Feature-flagged in

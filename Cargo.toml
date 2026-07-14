@@ -175,6 +175,7 @@ ssmax_adaptive = ["katgpt-core/ssmax_adaptive"]  # SSMax built-in rolling-Δ est
 gold_share_probe = ["data_probe", "katgpt-core/gold_share_probe"]  # GoldShare — content-specific output-fraction diagnostic `‖a^G_L‖ / ‖a_L‖` (Plan 411, Research 392, arxiv 2607.01538 Gollapudi et al.). Decomposes a layer's attention output into gold-derived vs distractor-derived fractions; detects when output has been rewritten from gold-content to aggregate-noise at comparable magnitude (the paper's recall-generation gap diagnostic). Complements `effective_rank` (content-agnostic) and `stable_rank_update` (per-sink). Opt-in diagnostic; implies data_probe + sink_aware_attn.
 smooth_min_similarity = ["katgpt-core/smooth_min_similarity"]  # Smooth-Min Soft Similarity — modelless latent-space utility for fuzzy multi-token retrieval (Research 385, SoftMatcha 2, Issue 041, removed, see git history). GOAT PoC PASS: +12pp recall@5, ~0ns overhead. Consumer GOAT PASS (T6 SmoothMinAligned): recall@5 = 1.000 vs Cosine 0.495 (+50.5pp). DEFAULT-ON (2026-07-12). First consumer: katgpt-attn-match/smooth_min_rerank.
 smooth_min_rerank = ["maxsim", "katgpt-attn-match/smooth_min_rerank"]  # Smooth-Min reranking method — wires `smooth_min_similarity` as a `RerankMethod::SmoothMin` variant in the rerank module (Issue 041, Research 385). First real consumer of the smooth-min primitive.
+recos = ["katgpt-core/recos"]  # Rearrangement-Inequality Cosine Similarity (Plan 437, Research 421, arXiv:2602.05266). Forwards katgpt-core's `recos` feature for example/bench access. Opt-in until the Plan 437 Phase 2 GOAT gate settles promote/demote.
 depth_invariance = ["katgpt-core/depth_invariance", "katgpt-speculative/depth_invariance"]  # Depth-Invariance Diagnostic + MagnitudeRegularizedResidual — root-cause counterpart to BeliefRankPruner / GainCostLoopHalter / latent_functor/reestimation / micro_belief/coherence_bench (Plan 306, Research 286, arXiv:2605.09992). Detects DepthSpecificRefinement / Collapsed / DepthInvariant on flattened &[f32] state chains. Disambiguation: different paper + mechanism than sink_aware_attn (Plan 287 / arXiv:2606.08105) — drafter-side magnitude accumulation vs target-side sink classification. DEFAULT-ON (Plan 306 T7.4, 2026-06-23): G1/G2/G3 PASS; G4 re-spec'd to absolute-latency at HLA scale (all PASS with headroom); SIMD inner-loop landed. Zero runtime cost unless a caller invokes classify_chain / apply_magnitude_regularization. Plan 386: also forwards to katgpt-speculative so belief_drafter's audit_depth_invariance compiles.
 dash_attn = ["katgpt-attn/dash_attn"]  # DashAttention adaptive sparse hierarchical attention via α-entmax routing (Plan 106, Research 68). Phase 2: clean core (entmax/routing/chunk_summary) + forward composition moved to katgpt-attn. Phase 12 (2026-07-04): VortexFlow cluster (vortex_flow/block_topk/channel_aware/entmax_router/kv_outer_prefill/msa_distill/value_energy/adaptive_k/meta_router/sat_analysis) also moved to katgpt-attn — root is now a pure re-export shim. The leaf's dash_attn feature pulls katgpt-pruners (meta_router bandit dep) + katgpt-kv (sat_analysis SummedAreaTable dep).
 vortex_flow = ["dash_attn", "katgpt-attn/vortex_flow"]  # VortexFlow composable sparse routing (Plan 196 GOAT 72/72, default-ON). Phase 12 (2026-07-04): primitives moved to katgpt-attn; root forwards.
@@ -582,6 +583,12 @@ full = ["sudoku", "sudoku_mrv", "sudoku_cp", "validator", "ppot", "domain_latent
 [[example]]
 name = "cs_kv_probe_demo"
 required-features = ["cs_kv_probe"]
+
+# ── recos GOAT gate (Plan 437 Phase 2) ───────────────────────────
+
+[[example]]
+name = "recos_goat"
+required-features = ["recos"]
 
 [[test]]
 name = "bench_280_cs_kv_probe_goat"
