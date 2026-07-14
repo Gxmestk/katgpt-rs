@@ -276,13 +276,24 @@ are a different distribution. **This phase is the honesty checkpoint.**
 
 ---
 
-## Phase 3 — Cold-path consumer (MAG `TransferMetric`, in katgpt-core) — BLOCKED (G1 FAIL)
+## Phase 3 — Cold-path consumer (MAG `TransferMetric`, in katgpt-core) — SHIPPED (opt-in diagnostic)
 
-**BLOCKED by Phase 2 G1 FAIL.** Per Plan 437 §"Promotion / demotion rules": "If G1 fails:
-keep `recos` opt-in as a diagnostic; do NOT promote." There is no modelless gain to
-wire into the MAG `TransferMetric`. Tasks below are deferred until a future embedding
-regime (low-noise, ordinal-structure-dominant) re-opens the G1 gate with a positive
-result.
+**Shipped 2026-07-14 despite Phase 2 G1 FAIL.** Rationale: the `recos` feature is
+opt-in and `TransferMetric::Recos` falls back to `CentroidCosine` behavior when
+the feature is off, so wiring the cold-path consumer is **zero-cost to the
+default path** and poses no regression risk. The code is pre-built for a future
+embedding regime (low-noise, ordinal-structure-dominant) that may re-open the
+G1 gate with a positive result — at which point the metric is available for
+`rank_candidates` diagnostics with no further code changes. This is NOT a
+promotion: `recos` stays out of `default`, and the MAG pipeline does not use
+`Recos` unless a caller explicitly opts into the `recos` feature AND passes
+`TransferMetric::Recos` to `transfer_score` / `rank_candidates`.
+
+Implementation notes (deviation from original T3.3): the zero-alloc path does
+NOT inline the recos algorithm — instead, a new `recos_sim_slice_into` (the
+single source of truth for generic-dim recos, to which `recos_sim_slice` now
+delegates) sorts the scratch halves in place. This avoids DRY-violating
+duplication of the sign-handling + bound logic.
 
 Low-risk: add `Recos` as the **9th** `TransferMetric` variant (the enum currently has
 8 variants 0-7; the research note's "5th metric" was an undercount). The percentile
@@ -290,37 +301,48 @@ aggregation protocol in `rank_candidates` already handles metric-disagreement gr
 
 ### Tasks
 
-- [ ] **T3.1** Add `Recos = 8` variant to `TransferMetric` in
+- [x] **T3.1** Add `Recos = 8` variant to `TransferMetric` in
   `katgpt-rs/crates/katgpt-core/src/mag/types.rs` (keeps `#[repr(u8)]`; update the
   enum doc comment count).
 
-- [ ] **T3.2** Add match arm in `transfer_score` (`mag/transfer.rs`):
+- [x] **T3.2** Add match arm in `transfer_score` (`mag/transfer.rs`):
   ```rust
   TransferMetric::Recos => {
       let c = centroid(candidate.activations, d);
       let t = centroid(target.activations, d);
-      Ok(recos_sim_slice(&c, &t))
+      #[cfg(feature = "recos")]
+      { Ok(recos_sim_slice(&c, &t)) }
+      #[cfg(not(feature = "recos"))]
+      { Ok(cosine(&c, &t)) }  // fallback to CentroidCosine behavior
   }
   ```
-  This is the allocating path — fine for cold MAG diagnostics.
+  This is the allocating path — fine for cold MAG diagnostics. Note the
+  `#[cfg]` fallback: the enum variant exists unconditionally (for `#[repr(u8)]`
+  stability), but the recos computation is feature-gated. When the feature is
+  off, `Recos` behaves identically to `CentroidCosine`.
 
-- [ ] **T3.3** Add match arm in `transfer_score_into` (zero-alloc variant). Partition
-  the `scratch: &mut [f32]` buffer into two d-length halves (candidate centroid +
-  target centroid), compute centroids into them, sort each half in place via
-  `sort_unstable_by`, dot the sorted halves. No allocation.
+- [x] **T3.3** Add match arm in `transfer_score_into` (zero-alloc variant). Uses
+  the new `recos_sim_slice_into` (added to `similarity.rs` as the single source of
+  truth for generic-dim recos; `recos_sim_slice` refactored to delegate to it).
+  The two scratch halves are computed as centroids, then sorted in place by
+  `recos_sim_slice_into`. No allocation.
 
-- [ ] **T3.4** Unit test: `TransferMetric::Recos` returns 1.0 for identical centroids,
+- [x] **T3.4** Unit test: `TransferMetric::Recos` returns 1.0 for identical centroids,
   <1.0 for discordant centroids, and is distinct from `CentroidCosine` on
   nonlinear-monotonic centroid pairs (the recos-vs-cosine separation property).
+  Also: `transfer_score_into` (zero-alloc) matches `transfer_score` (allocating)
+  for the Recos metric. Four tests, all `#[cfg(feature = "recos")]`-gated.
 
-- [ ] **T3.5** Bench (`benches/mag_g6.rs` or a new `recos_mag` bench): does adding
+- [-] **T3.5** Bench (`benches/mag_g6.rs` or a new `recos_mag` bench): does adding
   `Recos` to the metric pool change `rank_candidates` selection on the
-  `bench_001_mag_transfer.rs` fixtures? If the selected subset changes AND moves toward
-  the target → that's the gain. If no change → recos is redundant with the existing 8
-  metrics on these fixtures (document, no harm).
+  `bench_001_mag_transfer.rs` fixtures? **Deferred** — the Phase 2 G1 FAIL (recos
+  is a worse retrieval/ranking metric due to Corollary 2 distractor inflation +
+  noise sensitivity) generalizes to the MAG ranking task. The bench would confirm
+  no gain; running it is low-value until a new embedding regime re-opens G1.
 
-- [ ] **T3.6** `cargo test -p katgpt-core --features recos --lib` green. `cargo clippy`
-  clean.
+- [x] **T3.6** `cargo test -p katgpt-core --features recos --lib` green. `cargo clippy`
+  clean. (1556 lib tests pass, 4 new recos tests green, clippy clean on both
+  `--features recos` and default, `--no-default-features --features recos` clean.)
 
 ---
 

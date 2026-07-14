@@ -200,7 +200,7 @@ pub use similarity::{edit_penalty, smooth_min_similarity};
 // smooth_min_similarity; `recos` implies smooth_min_similarity so the module
 // compiles under --no-default-features). Opt-in until the Phase 2 GOAT gate.
 #[cfg(feature = "recos")]
-pub use similarity::{recos_sim, recos_sim_ranking, recos_sim_slice};
+pub use similarity::{recos_sim, recos_sim_ranking, recos_sim_slice, recos_sim_slice_into};
 // Elasticity-Gated Update — DSOM error-scaled neighborhood update primitive
 // (Plan 429, Research 415, Rougier & Boniface 2010 ⟨inria-00495827⟩).
 // Time-invariant, error-scaled latent update: step scales with error,

@@ -243,23 +243,40 @@ pub fn recos_sim_ranking(a: &[f32; 8], b: &[f32; 8]) -> f32 {
 /// sorted arrays).
 ///
 /// `to_vec()` allocates — acceptable for the cold MAG path. The d=8 variants
-/// sort stack arrays and are alloc-free.
+/// sort stack arrays and are alloc-free. For the zero-alloc hot path, use
+/// [`recos_sim_slice_into`].
 #[cfg(feature = "recos")]
 #[inline]
 pub fn recos_sim_slice(a: &[f32], b: &[f32]) -> f32 {
+    let mut a_owned = a.to_vec();
+    let mut b_owned = b.to_vec();
+    recos_sim_slice_into(&mut a_owned, &mut b_owned)
+}
+
+/// Zero-alloc variant of [`recos_sim_slice`] — sorts `a` and `b` **in place**.
+///
+/// The core recos algorithm on mutable slices. Both buffers are sorted in
+/// place (ascending for `a`; ascending-or-descending for `b` depending on the
+/// sign of the dot product). The caller must not rely on buffer order after
+/// this call.
+///
+/// Used by `transfer_score_into` (MAG zero-alloc hot path, Plan 437 Phase 3)
+/// where the caller owns the scratch buffers. Single source of truth for the
+/// generic-dim recos algorithm — [`recos_sim_slice`] delegates here.
+#[cfg(feature = "recos")]
+#[inline]
+pub fn recos_sim_slice_into(a: &mut [f32], b: &mut [f32]) -> f32 {
     debug_assert_eq!(a.len(), b.len());
     let dot: f32 = a.iter().zip(b.iter()).map(|(&x, &y)| x * y).sum();
-    let mut a_sorted = a.to_vec();
-    let mut b_sorted = b.to_vec();
-    a_sorted.sort_unstable_by(|x, y| x.partial_cmp(y).unwrap());
+    a.sort_unstable_by(|x, y| x.partial_cmp(y).unwrap());
     if dot >= 0.0 {
-        b_sorted.sort_unstable_by(|x, y| x.partial_cmp(y).unwrap());
+        b.sort_unstable_by(|x, y| x.partial_cmp(y).unwrap());
     } else {
-        b_sorted.sort_unstable_by(|x, y| y.partial_cmp(x).unwrap());
+        b.sort_unstable_by(|x, y| y.partial_cmp(x).unwrap());
     }
-    let bound: f32 = a_sorted
+    let bound: f32 = a
         .iter()
-        .zip(b_sorted.iter())
+        .zip(b.iter())
         .map(|(&x, &y)| x * y)
         .sum();
     if bound.abs() < 1e-12 {
