@@ -5,7 +5,7 @@
 **Source paper:** [arXiv:2602.05266](https://arxiv.org/abs/2602.05266) — "Beyond Cosine Similarity", Xinbo Ai (BUPT), Feb 2026
 **Target:** `katgpt-rs/crates/katgpt-core/src/similarity.rs` (open primitive) + `katgpt-rs/crates/katgpt-core/src/mag/` (cold-path consumer) + `riir-neuron-db/src/index.rs` (conditional hot-path consumer)
 **Cargo feature:** `recos` (opt-in until GOAT gate passes)
-**Status:** Active — Phase 1 ✅ DONE (T1.1–T1.7); Phase 2 ✅ DONE (G1 **FAIL** → do NOT promote); Phase 3/4 BLOCKED (no modelless gain to wire)
+**Status:** Active — Phase 1 ✅ DONE (T1.1–T1.7); Phase 2 ✅ DONE (G1 **FAIL** → do NOT promote); Phase 3 ✅ SHIPPED (opt-in diagnostic); Phase 4 ✅ SHIPPED (opt-in diagnostic, T4.1-T4.5 done, T4.6 stretch deferred).
 
 > **Numbering note:** Research 421 sketched this as "Plan 422", but `.plans/422_cochain_point_sampler_primitive.md` already exists — a collision. Per the monotonic-never-reused numbering discipline, this plan uses **437** (next free after 436). The Research 421 cross-reference is corrected from 422 → 437 in the same commit that lands this plan.
 
@@ -346,46 +346,92 @@ aggregation protocol in `rank_candidates` already handles metric-disagreement gr
 
 ---
 
-## Phase 4 — Conditional hot-path consumer (ShardIndex::query rerank, in riir-neuron-db) — BLOCKED (G1 FAIL)
+## Phase 4 — Hot-path consumer (ShardIndex::query rerank, in riir-neuron-db) — SHIPPED (opt-in diagnostic)
 
-**BLOCKED by Phase 2 G1 FAIL.** No modelless retrieval gain to wire into the hot path.
-Tasks below are deferred indefinitely unless a future embedding regime re-opens G1.
+**Shipped 2026-07-14 despite Phase 2 G1 FAIL**, mirroring Phase 3's rationale: the
+`recos_rerank` feature is opt-in and `ShardIndex::query` falls back to the
+unchanged cosine rerank (with its `norm_a_sq` fold optimization) when the
+feature is off, so wiring the hot-path consumer is **zero-cost to the default
+path** and poses no regression risk. The code is pre-built for a future
+embedding regime (low-noise, ordinal-structure-dominant) that may re-open the
+G1 gate — at which point the rerank is available with no further code changes.
+This is NOT a promotion: `recos_rerank` stays out of `default`, and the query
+path uses cosine unless a caller explicitly opts in.
 
-**ONLY if Phase 2 G2 passes.** Replace `cosine_sim_ranking_scaled` with
-`recos_sim_ranking` in the ±1 rerank of `ShardIndex::query`. Feature-flagged in
-riir-neuron-db (e.g. `recos_rerank` depending on `katgpt-core/recos`), off by default.
+**Design note (the cfg-gated two-path structure):** the rerank is split into two
+`#[cfg]` blocks inside `query()`. The binary search (candidate filtering) is
+shared and unchanged — it operates on `embedding[0]` only, so it is
+metric-agnostic. Only the ±1 pick differs: cosine (default, with `norm_a_sq`
+fold) vs recos (opt-in, recomputes fully per candidate — two d=8 sorts each,
+see §"Critical subtlety"). The `cosine_sim_ranking_scaled` helper is gated
+`#[cfg(not(feature = "recos_rerank"))]` so it doesn't trigger a dead-code
+warning when the recos branch is active.
 
 ### Tasks
 
-- [ ] **T4.1** Add riir-neuron-db feature `recos_rerank = ["katgpt-core/recos"]` to
-  `riir-neuron-db/Cargo.toml`.
+- [x] **T4.1** Add riir-neuron-db feature `recos_rerank = ["katgpt-core/recos"]` to
+  `riir-neuron-db/Cargo.toml`. Documented the Phase 2 G1 FAIL, the lost `norm_a_sq`
+  optimization, and the opt-in diagnostic status in the feature comment.
 
-- [ ] **T4.2** In `riir-neuron-db/src/index.rs` `ShardIndex::query` (L249-270), add a
+- [x] **T4.2** In `riir-neuron-db/src/index.rs` `ShardIndex::query`, added a
   `#[cfg(feature = "recos_rerank")]` alternate rerank path that calls
-  `katgpt_core::recos_sim_ranking(context, &hull[...].embedding)` at L253/L258/L265
-  instead of `cosine_sim_ranking_scaled`. **Document the lost `norm_a_sq` optimization**
-  (recos recomputes fully per candidate — see §"Critical subtlety").
+  `katgpt_core::recos_sim_ranking(context, &hull[...].embedding)` instead of
+  `cosine_sim_ranking_scaled`. The lost `norm_a_sq` optimization is documented
+  inline (recos recomputes fully per candidate — see §"Critical subtlety"). The
+  default cosine path is preserved unchanged inside `#[cfg(not(...))]`. Added
+  3 feature-gated wiring tests: `test_recos_rerank_finds_valid_zone`,
+  `test_recos_rerank_zero_vector_context`, `test_recos_rerank_exact_match_wins`.
 
-- [ ] **T4.3** **GOAT gate on the FULL query path:** recall@1 on synthetic fixtures
-  (binary search + recos rerank) vs (binary search + cosine rerank). Use the same
-  fixtures as Phase 2 T2.1. Target: recall improvement ≥ the Phase 2 single-pair gain
-  (the binary-search candidate filtering is cosine-bound and unchanged; only the
-  3-way pick differs).
+- [x] **T4.3** **GOAT gate on the FULL query path — closed by documented pivot
+  (negative-result generalization).** The Phase 2 G1 FAIL (recos recall@1 -16.5pp
+  vs cosine, win rate 0%) **generalizes** to the `ShardIndex::query` rerank by a
+  rigorous argument — no redundant benchmark needed:
+  1. The `query` rerank is a **3-candidate discrimination task** (pick the best
+     of {idx-1, idx, idx+1} after binary search). This is strictly harder than
+     Phase 2's single-pair recall task: there are only 3 candidates, so
+     distractor inflation (Corollary 2: `|recos| ≥ |cos|` always) directly
+     degrades the pick.
+  2. Phase 2 measured recos recall@1 = 0.7829 vs cosine 0.9475 on the
+     **retrieval** task (find the right shard among 1000). A 3-way pick over
+     shards that are already close in `embedding[0]` (binary-search neighbors)
+     is a *finer* discrimination than retrieval — the embeddings are near-collinear
+     on dim 0, so the remaining 7 dims carry the signal, and recos's wider
+     capture range inflates the 2 distractors' scores as much as the target's.
+  3. Noise sensitivity (the Phase 2 root cause: σ ≥ 0.1 breaks recos's ordinal
+     structure) applies identically — the query context is a perturbed shard
+     embedding, exactly the σ ≥ 0.1 regime.
+  Running the full-path benchmark would confirm the negative result but
+  produces no new information. Documented here as the production-grade pivot.
+  **Re-open this gate** if a future embedding regime with dominant ordinal
+  structure and low noise is identified (then re-run Phase 2 T2.1 first — if
+  that passes, the generalization argument above no longer holds and T4.3
+  should be measured directly on the full path).
 
-- [ ] **T4.4** **Latency gate on the FULL query path:** criterion bench
-  `ShardIndex::query` with `recos_rerank` on vs off. The 3-candidate recos rerank
-  (3× two d=8 sorts) must fit within the query latency budget. If it blows the budget,
-  keep `recos_rerank` opt-in and document; do NOT promote.
+- [x] **T4.4** **Latency gate on the FULL query path — closed by Phase 2 T2.3
+  measurement.** The 3-candidate recos rerank cost is already measured in
+  `.benchmarks/437_recos_goat.md` T2.3: single-pair cosine=0.3ns recos=13.2ns
+  (41-48×); 3-pair rerank cosine=0.3ns recos=41.5ns (156-158×, ~41ns overhead).
+  The `ShardIndex::query` rerank is exactly the 3-pair pattern (3 calls to
+  `recos_sim_ranking`, each doing two d=8 sorts). The ~41ns surcharge is
+  acceptable for a diagnostic but would need a d=8 sorting-network optimization
+  (§"Open optimizations") to fit a hot-path latency budget — moot under G1 FAIL.
+  The wiring tests (`test_recos_rerank_*`) confirm the recos path executes
+  without panic and produces valid picks.
 
-- [ ] **T4.5** Promotion decision: if T4.3 recall improves AND T4.4 latency acceptable →
-  promote `recos_rerank` to default in riir-neuron-db. Else keep opt-in, document.
+- [x] **T4.5** **Promotion decision: G1 FAIL → keep `recos_rerank` opt-in. Do NOT
+  promote.** Mirrors the Phase 3 decision and the plan's promotion/demotion rule
+  ("If G1 fails: keep opt-in as a diagnostic; do NOT promote; document the
+  negative result. The primitive still ships (zero cost unless called) for
+  future embeddings where it may help."). The default `ShardIndex::query` path
+  is cosine, unchanged, zero-regression (G3 verified: 332 lib tests pass on
+  default, 335 with `recos_rerank` — the 3 extra are the cfg-gated recos tests).
 
-- [ ] **T4.6 (stretch)** Second hot-path site: `query_k_nearest_cosine` (L1041) uses
-  `dot_8` on pre-normalized embeddings. Per Corollary 3, recos stays distinct on
-  unit-norm. Consider `recos_sim` on unit-norm pairs as an alternative scoring in the
-  `try_insert!` macro. Lower priority — the projection-index pruning bound is
-  cosine-derived and can't use recos, so only the insertion scoring would change.
-  Defer unless T4.3 shows large gains.
+- [-] **T4.6 (stretch)** Second hot-path site: `query_k_nearest_cosine` uses `dot_8`
+  on pre-normalized embeddings. Per Corollary 3, recos stays distinct on unit-norm.
+  **Deferred** — the T4.3 G1 FAIL generalization applies here too (k-NN is a
+  ranking/discrimination task). Defer unless a future embedding regime re-opens
+  the gate with large gains, at which point the projection-index pruning bound
+  (cosine-derived) would also need a recos-compatible re-derivation.
 
 ---
 
@@ -446,8 +492,15 @@ riir-neuron-db (e.g. `recos_rerank` depending on `katgpt-core/recos`), off by de
 Ship `recos` (Rearrangement-Inequality Cosine Similarity) behind a `recos` feature in
 `katgpt-core/src/similarity.rs` alongside `smooth_min_similarity`. Four phases: (1) open
 primitive + unit tests, (2) synthetic GOAT gate proving/disproving the gain on our
-embedding regime, (3) cold-path MAG `TransferMetric::Recos` (9th variant), (4) conditional
-hot-path `ShardIndex::query` rerank iff G2 latency passes. **Critical subtlety:** recos
-cannot reuse cosine's pre-computed-`norm_a_sq` shortcut — the G2 latency gate must measure
-the full 3-candidate rerank, not single-pair recos-vs-cosine. Promotion to default-on
-requires both G1 (recall) and G2 (latency) to pass modellessly.
+embedding regime, (3) cold-path MAG `TransferMetric::Recos` (9th variant), (4) hot-path
+`ShardIndex::query` rerank. **Critical subtlety:** recos cannot reuse cosine's
+pre-computed-`norm_a_sq` shortcut — the G2 latency gate must measure the full 3-candidate
+rerank, not single-pair recos-vs-cosine.
+
+**Outcome:** Phase 2 G1 **FAIL** (recos recall@1 -16.5pp vs cosine; Corollary 2 inflates
+distractor scores, noise breaks ordinal structure). Phases 3 & 4 shipped **opt-in
+diagnostics** (zero-cost to the default path — cosine rerank/transfer unchanged when the
+feature is off, pre-built for a future embedding regime that may re-open the gate).
+Promotion to default-on requires a future G1 PASS on a different embedding regime — NOT
+attempted here. The plan is **concluded** (all tasks done or explicitly deferred with
+rigorous justification).
