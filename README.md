@@ -629,31 +629,31 @@ The dual-policy gate then applies the sigmoid gate only to NOP heads, preserving
          attn column   values V     update O = AV
            │             │             │
            ▼             ▼             ▼
-     ┌─────────────────────────────────────┐
-     │   classify_sink_at(pos, col, V, O) │
-     │                                     │
-     │  strength = mean(col)               │
-     │  ratio   = ‖v_pos‖ / mean(‖v_i‖)   │
-     │  srank  = power_iter(Oᵀ·O, 5)      │
-     │         (cosine probe O[0]∥O[n-1]   │
-     │          for rank-1 fast path)      │
-     │                                     │
-     │  strength ≤ τ_sink        → None   │
-     │  ratio    ≤ nop_max       → Nop    │
-     │  ratio ∈ [b_min, b_max] ∧  → Broadcast
-     │    srank ≤ b_srank_max             │
-     └────────────┬────────────────────────┘
+     ┌──────────────────────────────────────┐
+     │   classify_sink_at(pos, col, V, O)   │
+     │                                      │
+     │  strength = mean(col)                │
+     │  ratio   = ‖v_pos‖ / mean(‖v_i‖)     │
+     │  srank  = power_iter(Oᵀ·O, 5)        │
+     │         (cosine probe O[0]∥O[n-1]    │
+     │          for rank-1 fast path)       │
+     │                                      │
+     │  strength ≤ τ_sink        → None     │
+     │  ratio    ≤ nop_max       → Nop      │
+     │  ratio ∈ [b_min, b_max] ∧ → Broadcast│
+     │    srank ≤ b_srank_max               │
+     └────────────┬─────────────────────────┘
                   │ kind
                   ▼
-     ┌─────────────────────────────────────┐
-     │ apply_dual_policy_gate[_cached]     │
-     │   Nop        → out = O · σ(g)       │
-     │   Broadcast  → out = O   (preserve) │
-     │   None       → out = O   (default)  │
-     │                                     │
-     │   cached: skip classify on          │
-     │   non-audit calls (cadence=16)      │
-     └─────────────────────────────────────┘
+     ┌──────────────────────────────────────┐
+     │ apply_dual_policy_gate[_cached]      │
+     │   Nop        → out = O · σ(g)        │
+     │   Broadcast  → out = O   (preserve)  │
+     │   None       → out = O   (default)   │
+     │                                      │
+     │   cached: skip classify on           │
+     │   non-audit calls (cadence=16)       │
+     └──────────────────────────────────────┘
 ```
 
 | Metric | Value |
@@ -689,7 +689,7 @@ Two modelless primitives distilled from Gollapudi et al. *Can Language Models Ac
         ▼                          ▼
   ┌─────────────────┐    ┌─────────────────────────────────────┐
   │ apply_ssmax     │    │ gold_share(attn, values, gold_mask) │
-  │  s̃ = s_L·log(N)│    │  a^G = (Σ_{t∈G} α_t·v_t)·W_O        │
+  │  s̃ = s_L·log(N) │    │  a^G = (Σ_{t∈G} α_t·v_t)·W_O        │
   │       ·s        │    │  a   = (Σ_t      α_t·v_t)·W_O       │
   │                 │    │  share = ‖a^G‖ / ‖a‖ ∈ [0,1]        │
   │ s_L=1.0 fixed   │    │                                     │
