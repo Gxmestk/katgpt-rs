@@ -570,17 +570,26 @@ pub fn sigmoid(x: f32) -> f32 {
 /// Shannon entropy (nats) of a probability-like vector.
 ///
 /// Used for collapse detection: low entropy = degenerate priority table.
+///
+/// Inner loop is branch-free: `p.max(1e-10).ln()` compiles to `fmax`, so LLVM
+/// can auto-vectorize over the priority table without a data-dependent branch
+/// per arm. Matches the pattern in `dllm_solver::shannon_entropy` and
+/// `mux::dd_tree::shannon_entropy_with_total`. Bit-identical to the previous
+/// `if w > 0.0` form for non-negative weights (the only valid input here).
 pub fn entropy_nats(weights: &[f32]) -> f32 {
     let total: f32 = weights.iter().copied().sum();
     if total <= 0.0 || weights.is_empty() {
         return 0.0;
     }
+    let inv_total = 1.0 / total;
     let mut h = 0.0f32;
     for &w in weights {
-        if w > 0.0 {
-            let p = w / total;
-            h -= p * p.ln();
-        }
+        let p = w * inv_total;
+        // `p.max(1e-10).ln()`: when p == 0, this yields ln(1e-10) ≈ -23.03,
+        // and `p * ln(1e-10) == 0 * -23.03 == 0` — no contribution to h,
+        // matching the previous `if w > 0.0` skip.
+        let lp = p.max(1e-10).ln();
+        h -= p * lp;
     }
     h
 }

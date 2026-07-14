@@ -180,10 +180,19 @@ pub fn neighborhood_weight(lattice_distance: f32, error: f32, eta: f32) -> f32 {
 ///
 /// Useful for diagnosing neighborhood expansion: a higher `effective_k` means
 /// more neighbors are contributing meaningfully.
+///
+/// Fused single-pass accumulation: `sum` and `sum_sq` are updated in the same
+/// loop, so we touch each weight once instead of twice. Bit-identical to the
+/// previous two-pass `.iter().copied().sum()` + `.iter().map(|w| w*w).sum()`
+/// form (same addition order, same rounding).
 #[inline]
 pub fn effective_neighborhood_size(weights: &[f32]) -> f32 {
-    let sum: f32 = weights.iter().copied().sum();
-    let sum_sq: f32 = weights.iter().map(|w| w * w).sum();
+    let mut sum = 0.0f32;
+    let mut sum_sq = 0.0f32;
+    for &w in weights {
+        sum += w;
+        sum_sq += w * w;
+    }
     if sum_sq < ZERO_WEIGHT_THRESHOLD {
         0.0
     } else {
