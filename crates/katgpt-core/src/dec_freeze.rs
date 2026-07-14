@@ -137,7 +137,7 @@ mod tests {
     /// Freeze a CochainField, thaw it, assert bit-identical reconstruction.
     #[test]
     fn freeze_thaw_roundtrip() {
-        let cf = CochainField::from_vec(1, 3, vec![1.0, 2.5, -3.14, 0.0, 42.0, -0.001]);
+        let cf = CochainField::from_vec(1, 3, vec![1.0, 2.5, -3.7, 0.0, 42.0, -0.001]);
         let env = CochainFreezeEnvelope::freeze(&cf);
         let thawed = env.thaw().expect("thaw should succeed on a valid envelope");
 
