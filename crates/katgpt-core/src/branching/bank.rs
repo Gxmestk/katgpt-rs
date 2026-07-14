@@ -624,17 +624,10 @@ fn read_u64_le_local(bytes: &[u8]) -> Option<(u64, &[u8])> {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────
 
-/// Dot product of two f32 slices. Zero-alloc, auto-vectorizable inner loop.
-/// Mismatched lengths use the shorter (caller should pre-normalize dimensions).
-#[inline]
-fn dot(a: &[f32], b: &[f32]) -> f32 {
-    let n = a.len().min(b.len());
-    let mut sum = 0.0f32;
-    for i in 0..n {
-        sum += a[i] * b[i];
-    }
-    sum
-}
+/// Dot product re-exported from [`crate::branching::util`] — see that module
+/// for the rationale (single canonical implementation shared with `router`
+/// and `projection`).
+use crate::branching::util::dot;
 
 /// Sorted-union of two sorted, deduplicated `u64` slices. O(|a| + |b|).
 /// Returns a new sorted, deduplicated Vec.

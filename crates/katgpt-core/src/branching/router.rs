@@ -250,18 +250,10 @@ impl BranchRouter {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────
 
-/// Dot product of two f32 slices. Zero-alloc, auto-vectorizable inner loop.
-/// Uses the shorter length when dimensions mismatch (caller should
-/// pre-normalize dimensions).
-#[inline]
-fn dot(a: &[f32], b: &[f32]) -> f32 {
-    let n = a.len().min(b.len());
-    let mut sum = 0.0f32;
-    for i in 0..n {
-        sum += a[i] * b[i];
-    }
-    sum
-}
+/// Dot product re-exported from [`crate::branching::util`] — single canonical
+/// implementation shared with `bank` and `projection` (was duplicated here
+/// verbatim; the DRY violation is now eliminated).
+use crate::branching::util::dot;
 
 /// Jaccard similarity of two sorted, deduplicated `u64` slices.
 /// Returns `0.0` if either slice is empty. O(|a| + |b|) merge-walk, zero alloc.

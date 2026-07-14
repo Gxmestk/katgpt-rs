@@ -63,6 +63,7 @@ mod composition;
 pub mod projection;
 pub mod router;
 pub mod types;
+pub(crate) mod util;
 pub mod verifier;
 
 // ── Public API re-exports ─────────────────────────────────────────────────

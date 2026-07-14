@@ -539,18 +539,9 @@ fn read_f32_le_proj(bytes: &[u8]) -> Option<(f32, &[u8])> {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────
 
-/// Dot product of a fixed-size `D`-array with a (possibly shorter) slice.
-/// Uses the shorter length when `vector.len() < D` (caller should
-/// pre-normalize dimensions). Auto-vectorizable inner loop, zero allocation.
-#[inline]
-fn dot_fixed<const D: usize>(a: &[f32; D], b: &[f32]) -> f32 {
-    let n = D.min(b.len());
-    let mut sum = 0.0f32;
-    for i in 0..n {
-        sum += a[i] * b[i];
-    }
-    sum
-}
+/// Dot product re-exported from [`crate::branching::util`] — single canonical
+/// const-generic implementation shared with `bank` and `router`.
+use crate::branching::util::dot_fixed;
 
 /// Free-function alias for the hard orthogonal-branch limit at dimension `D`.
 /// Same as [`NonInterferenceProjection::<D>::max_orthogonal_branches`].
