@@ -277,14 +277,19 @@ fn evaluate_vs_opponents(
     let mut total = 0.0f64;
     let mut count = 0usize;
 
+    // Hoisted out of the `for opp in opponents` loop — `clear()` + reuse per
+    // opponent instead of `n_opponents` × 2 allocations of `Vec<u8>`.
+    let mut hist_s: Vec<u8> = Vec::with_capacity(rounds as usize);
+    let mut hist_o: Vec<u8> = Vec::with_capacity(rounds as usize);
+
     for opp in opponents {
         let mut s = strategy.clone();
         let mut o = opp.clone();
         s.reset();
         o.reset();
 
-        let mut hist_s: Vec<u8> = Vec::with_capacity(rounds as usize);
-        let mut hist_o: Vec<u8> = Vec::with_capacity(rounds as usize);
+        hist_s.clear();
+        hist_o.clear();
         let mut payoff = 0.0f64;
 
         for _ in 0..rounds {

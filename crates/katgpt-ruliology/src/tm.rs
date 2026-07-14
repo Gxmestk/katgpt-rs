@@ -38,6 +38,11 @@ pub struct TmStrategy {
     n_states: u8,
     /// Complexity (cached at construction).
     complexity: f32,
+    /// Cached blake3 id (computed once at construction).
+    ///
+    /// Eliminates blake3 calls from `PartialEq`/`Hash`/`id()` — these are
+    /// called per `HashSet` lookup in tournament/bandit hot loops.
+    id: u64,
 }
 
 impl TmStrategy {
@@ -49,6 +54,7 @@ impl TmStrategy {
     /// `tape_width` = initial tape size.
     pub fn new(transitions: [(u8, u8, u8); 2], n_states: u8, tape_width: usize) -> Self {
         let complexity = Self::compute_complexity(&transitions, n_states);
+        let id = Self::compute_id(&transitions, n_states);
         let w = tape_width.max(3);
         Self {
             transitions,
@@ -57,6 +63,7 @@ impl TmStrategy {
             state: 0,
             n_states,
             complexity,
+            id,
         }
     }
 
@@ -111,6 +118,20 @@ impl TmStrategy {
             return 0.0;
         }
         distinct / max_distinct
+    }
+
+    /// Blake3 hash of transition table → u64 ID. Computed once at construction
+    /// and cached in `self.id` to avoid blake3 calls on every `HashSet` lookup
+    /// (was 2 blake3 invocations per `contains`/`insert`).
+    fn compute_id(transitions: &[(u8, u8, u8); 2], n_states: u8) -> u64 {
+        let mut hasher = blake3::Hasher::new();
+        for &(w, d, ns) in transitions {
+            hasher.update(&[w, d, ns]);
+        }
+        hasher.update(&[n_states]);
+        let hash = hasher.finalize();
+        let bytes: [u8; 8] = hash.as_bytes()[..8].try_into().unwrap_or([0u8; 8]);
+        u64::from_le_bytes(bytes)
     }
 
     /// Enumerate all 1-state, 2-symbol Turing machines.
@@ -219,17 +240,10 @@ impl SimpleProgram for TmStrategy {
         write
     }
 
-    /// Blake3 hash of transition table → u64 ID.
+    /// Blake3 hash of transition table → u64 ID (cached at construction).
+    #[inline]
     fn id(&self) -> u64 {
-        let mut hasher = blake3::Hasher::new();
-        for &(w, d, ns) in &self.transitions {
-            hasher.update(&[w, d, ns]);
-        }
-        hasher.update(&[self.n_states]);
-
-        let hash = hasher.finalize();
-        let bytes: [u8; 8] = hash.as_bytes()[..8].try_into().unwrap_or([0u8; 8]);
-        u64::from_le_bytes(bytes)
+        self.id
     }
 
     /// Complexity score (cached at construction).
@@ -240,15 +254,17 @@ impl SimpleProgram for TmStrategy {
 }
 
 impl PartialEq for TmStrategy {
+    #[inline]
     fn eq(&self, other: &Self) -> bool {
-        self.id() == other.id()
+        self.id == other.id
     }
 }
 impl Eq for TmStrategy {}
 
 impl std::hash::Hash for TmStrategy {
+    #[inline]
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.id().hash(state);
+        self.id.hash(state);
     }
 }
 

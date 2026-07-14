@@ -23,7 +23,11 @@ const DEFAULT_TAPE_WIDTH: usize = 7;
 /// 1. Reads the opponent's recent moves as initial tape
 /// 2. Applies the rule once to produce a new tape
 /// 3. Returns the center cell as the output action
-#[derive(Clone, Copy, Debug)]
+///
+/// `tape` and `new_tape` are owned instance scratch buffers reused across
+/// `next_action` calls to avoid per-call heap allocation (was 2 × `Vec<u8>`
+/// per call; this is the same pattern as `TmStrategy`).
+#[derive(Clone, Debug)]
 pub struct CaStrategy {
     /// Rule number (0–255 for elementary CAs).
     rule: u8,
@@ -31,6 +35,15 @@ pub struct CaStrategy {
     tape_width: usize,
     /// Complexity (cached at construction).
     complexity: f32,
+    /// Cached blake3 id (computed once at construction).
+    ///
+    /// Eliminates blake3 calls from `PartialEq`/`Hash`/`id()` — these are
+    /// called per `HashSet` lookup in tournament/bandit hot loops.
+    id: u64,
+    /// Reusable tape buffer (sized `tape_width`).
+    tape: Vec<u8>,
+    /// Reusable output tape buffer (sized `tape_width`).
+    new_tape: Vec<u8>,
 }
 
 impl CaStrategy {
@@ -40,10 +53,15 @@ impl CaStrategy {
     #[inline]
     pub fn new(rule: u8, tape_width: usize) -> Self {
         let complexity = Self::compute_complexity(rule);
+        let w = tape_width.max(3);
+        let id = Self::compute_id(rule);
         Self {
             rule,
-            tape_width: tape_width.max(3),
+            tape_width: w,
             complexity,
+            id,
+            tape: vec![0u8; w],
+            new_tape: vec![0u8; w],
         }
     }
 
@@ -74,6 +92,14 @@ impl CaStrategy {
     /// Measures how many of the 8 possible neighborhood outputs are "on".
     fn compute_complexity(rule: u8) -> f32 {
         rule.count_ones() as f32 / 8.0
+    }
+
+    /// Blake3 hash of rule byte → u64 ID. Computed once at construction and
+    /// cached in `self.id` to avoid blake3 calls on every `HashSet` lookup.
+    fn compute_id(rule: u8) -> u64 {
+        let hash = blake3::hash(&[rule]);
+        let bytes: [u8; 8] = hash.as_bytes()[..8].try_into().unwrap_or([0u8; 8]);
+        u64::from_le_bytes(bytes)
     }
 
     /// Enumerate all 256 elementary CA rules.
@@ -159,40 +185,36 @@ impl SimpleProgram for CaStrategy {
     /// 2. Otherwise, take last `tape_width` opponent moves as tape (padded with 0s if shorter).
     /// 3. Apply the CA rule once to produce a new tape.
     /// 4. Return the center cell of the new tape.
+    ///
+    /// Zero-allocation: reuses `self.tape` / `self.new_tape` scratch buffers
+    /// instead of allocating two `Vec<u8>` per call.
     fn next_action(&mut self, opponent_history: &[u8]) -> u8 {
         let w = self.tape_width;
+        debug_assert_eq!(self.tape.len(), w);
+        debug_assert_eq!(self.new_tape.len(), w);
 
-        // Build initial tape from opponent history.
-        let mut tape = vec![0u8; w];
-        if opponent_history.is_empty() {
-            // All-zeros tape → apply rule and read center.
-            // Use step_into into a stack buffer to avoid the heap allocation
-            // that Self::step would incur.
-            let mut new_tape = vec![0u8; w];
-            Self::step_into(&tape, self.rule, &mut new_tape);
-            return new_tape[w / 2];
+        // Build initial tape from opponent history (zero-filled).
+        self.tape.fill(0);
+        if !opponent_history.is_empty() {
+            // Fill tape: most recent moves go to the right side.
+            let hist_len = opponent_history.len().min(w);
+            let start = w - hist_len;
+            for (i, &action) in opponent_history.iter().rev().take(w).enumerate() {
+                self.tape[start + hist_len - 1 - i] = if action > 0 { 1 } else { 0 };
+            }
         }
 
-        // Fill tape: most recent moves go to the right side.
-        let hist_len = opponent_history.len().min(w);
-        let start = w - hist_len;
-        for (i, &action) in opponent_history.iter().rev().take(w).enumerate() {
-            tape[start + hist_len - 1 - i] = if action > 0 { 1 } else { 0 };
-        }
-
-        // Apply CA rule once into a reused buffer.
-        let mut new_tape = vec![0u8; w];
-        Self::step_into(&tape, self.rule, &mut new_tape);
+        // Apply CA rule once into the reusable output buffer.
+        Self::step_into(&self.tape, self.rule, &mut self.new_tape);
 
         // Return center cell.
-        new_tape[w / 2]
+        self.new_tape[w / 2]
     }
 
-    /// Blake3 hash of rule byte → u64 ID.
+    /// Blake3 hash of rule byte → u64 ID (cached at construction).
+    #[inline]
     fn id(&self) -> u64 {
-        let hash = blake3::hash(&[self.rule]);
-        let bytes: [u8; 8] = hash.as_bytes()[..8].try_into().unwrap_or([0u8; 8]);
-        u64::from_le_bytes(bytes)
+        self.id
     }
 
     /// Complexity score (cached at construction).
@@ -203,15 +225,17 @@ impl SimpleProgram for CaStrategy {
 }
 
 impl PartialEq for CaStrategy {
+    #[inline]
     fn eq(&self, other: &Self) -> bool {
-        self.id() == other.id()
+        self.id == other.id
     }
 }
 impl Eq for CaStrategy {}
 
 impl std::hash::Hash for CaStrategy {
+    #[inline]
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.id().hash(state);
+        self.id.hash(state);
     }
 }
 
