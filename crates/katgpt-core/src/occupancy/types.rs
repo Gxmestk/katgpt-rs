@@ -116,10 +116,17 @@ pub struct KlProjectionScratch {
     pub successor_weighted_sum: Vec<f32>,
     /// `[feature_dim]` gradient `∇L` (Newton residual).
     pub gradient: Vec<f32>,
-    /// `[feature_dim²]` Hessian `Cov̂_{ω_θ}(φ(X))`, overwritten with Cholesky `L`.
+    /// `[feature_dim²]` Hessian `Cov̂_{ω_θ}(φ(X))`, preserved across LM retries.
+    /// The damped copy (H + λI) lives in [`Self::hessian_damped`]; Cholesky
+    /// overwrites that, leaving this buffer intact for retries with different λ.
     pub hessian: Vec<f32>,
+    /// `[feature_dim²]` damped Hessian copy `H + λI` — Cholesky overwrites this,
+    /// leaving `hessian` intact for LM retries with different λ.
+    pub hessian_damped: Vec<f32>,
     /// `[feature_dim]` Newton step `Δθ` (the solve target).
     pub newton_step: Vec<f32>,
+    /// `[feature_dim]` trial θ for LM line-search loss evaluation.
+    pub params_trial: Vec<f32>,
     /// `[feature_dim]` triangular-solve scratch for `cholesky_solve_into`.
     pub y_buf: Vec<f32>,
     /// `[feature_dim]` accumulator for `Σ_i ω_θ(Xi) φ(Xi)` (gradient/Hessian shared).
@@ -142,7 +149,9 @@ impl KlProjectionScratch {
             successor_weighted_sum: vec![0.0; feature_dim],
             gradient: vec![0.0; feature_dim],
             hessian: vec![0.0; feature_dim * feature_dim],
+            hessian_damped: vec![0.0; feature_dim * feature_dim],
             newton_step: vec![0.0; feature_dim],
+            params_trial: vec![0.0; feature_dim],
             y_buf: vec![0.0; feature_dim],
             weighted_feature_sum: vec![0.0; feature_dim],
             n,
@@ -198,7 +207,13 @@ impl KlProjectionScratch {
         for slot in &mut self.hessian {
             *slot = 0.0;
         }
+        for slot in &mut self.hessian_damped {
+            *slot = 0.0;
+        }
         for slot in &mut self.newton_step {
+            *slot = 0.0;
+        }
+        for slot in &mut self.params_trial {
             *slot = 0.0;
         }
         for slot in &mut self.y_buf {

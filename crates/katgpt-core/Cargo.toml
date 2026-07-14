@@ -1137,6 +1137,16 @@ name = "bench_439_ane_fused_goat"
 harness = false
 required-features = ["ane_fused_chain"]
 
+# Plan 438 — FORE Fitted Occupancy-Ratio Estimator GOAT gate.
+# G2 perf: n=10000, state_dim=8, K=20 < 100ms (cold-tier budget).
+# G4 alloc-free: CountingAllocator on fit_and_evaluate inner loop (0/100 calls).
+# G1 correctness lives in tests/occupancy_baird_mrp.rs (independent test binary
+# — the Baird-MRP fixture is too heavy for a bench harness).
+[[bench]]
+name = "bench_438_occupancy_ratio_goat"
+harness = false
+required-features = ["occupancy_ratio"]
+
 # Plan 395 — HOLA Hippocampal Exact KV Cache GOAT gate G2 latency + T2.3 heap-vs-sorted.
 # observe ≤ 100 ns (W=64) / ≤ 30 ns (micro); read ≤ 1 µs (W=64, D=256).
 [[bench]]
