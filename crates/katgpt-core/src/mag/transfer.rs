@@ -262,10 +262,15 @@ pub fn rank_candidates<S: AsRef<[f32]>>(
 
     // Convert to percentile ranks per metric (fraction of candidates beaten).
     let mut percentiles = vec![0.0_f32; n_cand * n_metrics];
+    // Hoisted outside the metric loop — clear() + reuse per metric instead
+    // of `n_metrics` × allocations of `Vec<(f32, usize)>`.
+    let mut ranked: Vec<(f32, usize)> = Vec::with_capacity(n_cand);
     for m in 0..n_metrics {
-        let mut ranked: Vec<(f32, usize)> =
-            (0..n_cand).map(|i| (scores[i * n_metrics + m], i)).collect();
-        ranked.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
+        ranked.clear();
+        ranked.extend((0..n_cand).map(|i| (scores[i * n_metrics + m], i)));
+        // total_cmp: transfer scores are non-NaN by construction (cosine,
+        // euclidean, pearson-with-zero-denom-guard all return finite f32).
+        ranked.sort_by(|a, b| a.0.total_cmp(&b.0));
         let denom = (n_cand - 1).max(1) as f32;
         for (rank, &(_, idx)) in ranked.iter().enumerate() {
             percentiles[idx * n_metrics + m] = rank as f32 / denom;
@@ -289,11 +294,9 @@ pub fn rank_candidates<S: AsRef<[f32]>>(
         })
         .collect();
 
-    entries.sort_by(|a, b| {
-        b.mean_percentile
-            .partial_cmp(&a.mean_percentile)
-            .unwrap_or(std::cmp::Ordering::Equal)
-    });
+    // mean_percentile is sum of [0,1] values / n_metrics → non-NaN by
+    // construction. total_cmp is branch-free and NaN-deterministic.
+    entries.sort_by(|a, b| b.mean_percentile.total_cmp(&a.mean_percentile));
 
     Ok(entries)
 }
