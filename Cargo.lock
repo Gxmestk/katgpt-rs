@@ -1756,6 +1756,7 @@ version = "0.1.0"
 dependencies = [
  "coreml-native",
  "coreml-proto",
+ "katgpt-core",
  "katgpt-forward",
  "katgpt-transformer",
  "katgpt-types",

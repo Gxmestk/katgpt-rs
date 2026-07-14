@@ -20,6 +20,11 @@ katgpt-transformer = { path = "../katgpt-transformer" }  # TransformerWeights, M
 katgpt-types = { path = "../katgpt-types" }              # Config, kv_dim
 log = "0.4"  # auto_backend() logs the selected device
 
+# Dev-only: needed for examples that call katgpt-core primitives
+# (e.g. bench_439_phase25 calls ane_fused_estimate).
+[dev-dependencies]
+katgpt-core = { path = "../katgpt-core" }
+
 # macOS-only optional device deps. Moved here from root's
 # `[target.'cfg(target_os = "macos")'.dependencies]` as part of Issue 413 (resolved).
 # Root `ane` / `gpu_inference` features forward to this crate's features.
@@ -37,3 +42,7 @@ default = []
 ane = ["dep:coreml-native", "dep:coreml-proto", "dep:prost"]
 # GPU inference backend (Metal compute). Enables gpu.rs.
 gpu_inference = ["dep:metal"]
+
+[[example]]
+name = "bench_439_phase25_ane_fused_validation"
+required-features = ["ane"]
