@@ -5,7 +5,7 @@
 **Source paper:** [arxiv:2607.05375](https://arxiv.org/abs/2607.05375) — van der Laan & Kallus, *Fitted Occupancy-Ratio Evaluation without Bellman Completeness*, 2026
 **Target:** `katgpt-rs/crates/katgpt-core/src/occupancy/` (new module) + Cargo feature `occupancy_ratio`
 **Verdict:** GOAT (Research 423 §3.1) — novel + modelless + three fusion targets; not Super-GOAT (Q2/Q3 fail the novelty gate).
-**Status:** 🟡 Phase 1 ✅ COMPLETE (T1.1–T1.7). Phase 2 🔲 BLOCKED on paper Algorithm 1 verification.
+**Status:** 🟡 Phase 1 ✅ COMPLETE (T1.1–T1.7). Phase 2 🟢 UNBLOCKED — Algorithm 1 verified 2026-07-14 (see §"Algorithm 1 Verification" below).
 
 ---
 
@@ -93,45 +93,80 @@ otherwise stays opt-in as an engine primitive consumers can opt into.
   Cross-reference the candidate Lean 4 formalization target (deferred per
   Research 423 §5 caveat #4 — isomorphism is a hypothesis, not a theorem).
 
+## Algorithm 1 Verification (2026-07-14)
+
+Fetched and verified the paper's Algorithm 1 directly from
+[arXiv:2607.05375](https://arxiv.org/pdf/2607.05375). **CRITICAL CORRECTION:**
+the original T2.3 formula below was **my derivation** and does NOT appear in
+the paper. The paper's Algorithm 1 has **no per-sample target weights** `w_i`.
+Instead, it solves a **single-level convex KL projection** in `h ∈ H`:
+
+```text
+ĥ_{k+1} ∈ arg min_{h∈H} {
+    log( 1/n Σ_i e^{h(X_i)} )                              // Λ̂_ν(h): log-partition
+  − (1−γ) · P̂_0(h)                                        // initial-state moment
+  − γ · ( Σ_i ω̂^(k)(X_i) · h(X^+_i) ) / ( Σ_i ω̂^(k)(X_i) )  // self-normalized successor avg
+}
+```
+
+For linear `h_θ(x) = θ^T φ(x)`, this is convex in θ with gradient
+`Ê_ν[ω_θ(X) φ(X)] − m` and PSD Hessian `Cov̂_{ω_θ}(φ(X))`, where
+`m = (1−γ) P̂_0(φ) + γ P̂^+_{n,ω̂^(k)}(φ)` is fixed per iteration. Solve via
+**Newton's method** on the convex loss (not normal equations — the loss is
+convex but not quadratic because of the log-partition term).
+
+**G1 anchor values (verified, more precise than the original plan):**
+- `ω_π,γ(upper) = 0.2211217321` (six symmetric upper states)
+- `ω_π,γ(lower) = 15.7986870897` (single lower state)
+- `θ⋆ = 4.7432986067` (log-ratio coefficient)
+- `γ = 0.95` (NOT 0.9 — corrected from original T3.4)
+- FORE contraction multiplier at θ⋆: `0.1425`
+
+**Baird-MRP parameters (Appendix G.1, verified):**
+- State space: `X = {u_1,...,u_6, ℓ}` (7 states)
+- `ν(u_j) = 0.95/6`, `ν(ℓ) = 0.05`; `d_0(u_j) = 1/6`, `d_0(ℓ) = 0`
+- Transitions: `P(u_j, u_m) = 0.05/6`, `P(u_j, ℓ) = 0.95`, `P(ℓ, u_m) = 0.20/6`, `P(ℓ, ℓ) = 0.80`
+- Feature: `φ(u_j) = 0.1`, `φ(ℓ) = 1.0` (scalar)
+- Reward: `r = φ − γPφ` ⟹ `Q_π = φ`, `V_π = 0.1`
+
+---
+
 ## Phase 2 — Linear Log-Ratio Class + KL-Projection Fit Loop
 
 The paper instantiates the supervised learner as any class rich enough to
 realize `log ω_π,γ`. For the G1/G2 gates we ship a **linear** class
-`h_θ(x) = θ · φ(x)` with configurable feature map `φ`. The KL projection
-then reduces to a weighted least-squares problem solved via normal equations
-(closed-form, no iterative GD — keeps G5 trivially satisfied and G2 in
-budget).
+`h_θ(x) = θ · φ(x)` with identity feature map (`state_dim = feature_dim`).
+The KL projection solves a **convex** problem (log-sum-exp minus linear) via
+Newton's method — G5 is trivially satisfied (no gradient descent through any
+base weight, only through the class's own θ).
 
 ### Tasks
 
-- [ ] **T2.1** Define `LinearLogRatioClass { feature_dim: usize }` implementing
-  `LogRatioClass` with `type Params = Vec<f32>` (the θ vector).
-- [ ] **T2.2** Default feature map `phi_identity(x) = x` (state_dim =
-  feature_dim). Plug-in point for nonlinear feature maps (Fourier features,
-  Random Kitchen Sinks) — out of scope for this plan, but the trait allows it.
-- [ ] **T2.3** Implement `fit_kl_projection` for `LinearLogRatioClass`:
-  1. Compute target weights `w_i = (1−γ) · P̂_0(X_i) + γ · ω̂^(k)(X^+_i) · ν(X^+_i|X_i) / ν(X_i)`
-     — the adjoint-Bellman image of the current ratio (paper Eq. pre-Algorithm 1).
-  2. Build the weighted normal equations `(Φᵀ W Φ) θ = Φᵀ W (log w_i)` where
-     `Φ` is the `[n × feature_dim]` design matrix.
-  3. Solve via Cholesky decomposition (reuse `katgpt-core/src/linalg/` if a
-     Cholesky impl exists; otherwise add a minimal `cholesky_solve` helper in
-     `occupancy/linalg.rs` — do NOT pull an external linear-algebra dep).
-- [ ] **T2.4** Implement `OccupancyRatioEstimator::fit`:
-  ```rust
-  pub fn fit(&self, transitions: &TransitionBatch<'_>, initial_moments: &InitialMoments<'_>)
-      -> Vec<f32>  // ω_fit(X_i) at each transition
-  ```
-  Loop K times: (a) evaluate current ratio at each `X_i`, (b) call
-  `fit_kl_projection` to get new θ, (c) renormalize via
-  `ω̂^(k+1)(X_i) = exp(h_θ(X_i)) / (1/n) Σ_j exp(h_θ(X_j))` (the log-partition
-  `Λ_ν(h)` is the sample mean of exponentiated scores — paper Eq. for the
-  normalized exponential class). Reuse `KlProjectionScratch` across iterations.
-- [ ] **T2.5** Implement `value_estimate(ratio: &[f32], rewards: &[f32]) -> f32`:
-  `V̂^π = (1/n) Σ ω(X_i) · r_i` (the doubly-robust-friendly downstream quantity).
-- [ ] **T2.6** Verify G5 modelless-ness by inspection: `LinearLogRatioClass`
-  mutates only its own `Params` (`Vec<f32>` θ); no `NeuronShard`, no
-  `LoRAWeightVersion`, no `SenseModule` handle appears anywhere in the module.
+- [x] **T2.1** Define `LinearLogRatioClass { feature_dim: usize }` implementing
+  `LogRatioClass` with `type Params = Vec<f32>` (the θ vector). Identity
+  feature map: the raw state slice IS the feature vector. Plug-in point for
+  nonlinear feature maps (Fourier features, Random Kitchen Sinks) — out of
+  scope for this plan, but the trait allows it.
+- [x] **T2.2** Self-contained Cholesky helpers in `occupancy/solve.rs`:
+  `cholesky_inplace(&mut [f32], dim) -> bool` and
+  `cholesky_solve_into(l, b, dim, y_buf, x)`. Mirrors the proven pattern in
+  `crate::funcattn` but kept private to this module (no cross-module dep).
+  Jitter fallback on PD failure (defense against numerical drift). Two unit
+  tests (known SPD system, indefinite rejection) shipped.
+- [x] **T2.3** Implement `fit_and_evaluate` for `LinearLogRatioClass` via
+  **Newton's method** on the verified Algorithm 1 objective. Includes
+  log-sum-exp trick for stability, warm-start from previous FORE θ, jitter
+  fallback on singular Hessian. Alloc-free inner loop (G4).
+- [x] **T2.4** Implement `OccupancyRatioEstimator::fit`: K-iteration loop with
+  early-exit on relative-θ convergence (< FORE_THETA_TOL = 1e-6). Reuses
+  scratch + params + ratio buffers across iterations (G4).
+- [x] **T2.5** Implement `value_estimate(ratio, rewards) -> f32` as a free
+  function (no class state needed). Two unit tests shipped.
+- [x] **T2.6** Smoke test `smoke_fit_produces_finite_nonneg_ratios` in
+  `occupancy/mod.rs`: 2-state MRP, K=20, asserts all outputs finite,
+  non-negative, normalized (mean ≈ 1.0), non-degenerate (states get
+  different ratios). G5 modelless-ness verified by inspection — the only
+  mutable state in the module is `θ: Vec<f32>`.
 
 ## Phase 3 — Baird-MRP Test Fixture (G1 Known-Answer)
 
@@ -142,19 +177,19 @@ as specified.
 ### Tasks
 
 - [ ] **T3.1** Construct the Baird-style MRP state space and transition kernel
-  in `tests/occupancy_baird_mrp.rs`. State space: `state_dim = 8`, two
-  absorbing-like regions ("upper" and "lower") with the paper's transition
-  probabilities. Use a fixed seed (`StdRng::seed_from_u64(423)`) for
+  in `tests/occupancy_baird_mrp.rs`. State space: `X = {u_1,...,u_6, ℓ}` (7
+  states), encoded as `state_dim = 1` with scalar feature `φ(u_j) = 0.1`,
+  `φ(ℓ) = 1.0`. Use a fixed seed (`StdRng::seed_from_u64(423)`) for
   reproducibility.
-- [ ] **T3.2** Compute the analytical `ω_π,γ(upper) = 0.2211` and
-  `ω_π,γ(lower) = 15.7987` independently in the test (solve the linear system
-  `(I − γ P_π) d^π = (1−γ) d_0` directly) — this cross-checks the paper's
-  numbers against our own MRP construction.
+- [ ] **T3.2** Compute the analytical `ω_π,γ(upper) = 0.2211217321` and
+  `ω_π,γ(lower) = 15.7986870897` independently in the test (solve the linear
+  system `(I − γ P_π) d^π = (1−γ) d_0` directly with `γ = 0.95`) — this
+  cross-checks the paper's numbers against our own MRP construction.
 - [ ] **T3.3** Sample `n = 10000` transitions `(X_i, X^+_i)` from the
   behavior policy `ν` over the constructed MRP.
-- [ ] **T3.4** Run `OccupancyRatioEstimator::fit` with `K = 20`, `gamma = 0.9`
-  (paper's setting). Assert the fitted ratios at the upper/lower anchor states
-  are within 1% relative error of the analytical values.
+- [ ] **T3.4** Run `OccupancyRatioEstimator::fit` with `K = 20`, `gamma = 0.95`
+  (paper's setting, corrected). Assert the fitted ratios at the upper/lower
+  anchor states are within 1% relative error of the analytical values.
 
 ## Phase 4 — GOAT Gate
 

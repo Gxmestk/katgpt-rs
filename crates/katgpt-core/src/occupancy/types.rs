@@ -13,6 +13,10 @@
 /// `(next-state, target-policy-action)` pairs (see module-level limitation
 /// note).
 ///
+/// For `LinearLogRatioClass`, the raw state slice IS the feature vector
+/// (`state_dim = feature_dim`, identity feature map). Consumers with nonlinear
+/// features (Fourier, RKS) pre-compute them and pass the result as `states`.
+///
 /// `rewards` is optional; present when the caller intends to compute the
 /// downstream value estimate `V̂^π = mean(ω · r)`.
 #[derive(Debug, Clone, Copy)]
@@ -57,22 +61,21 @@ impl<'a> TransitionBatch<'a> {
     }
 }
 
-/// Empirical initial-state distribution moments for the `P̂_0` term.
+/// Independent initial-state sample for the `P̂_0(h)` term (paper §3.3).
 ///
-/// The adjoint Bellman operator is `B^γ_π ω = (1−γ)ω_0 + γ · d((ων)P_π)/dν`,
-/// where `ω_0 = d^π_0 / d^ν_0` is the ratio of the target policy's initial
-/// distribution to the behavior policy's initial distribution. This struct
-/// supplies the `ω_0` estimates at the initial-state subsample.
+/// The paper's Algorithm 1 requires `P̂_0(h) = (1/m) Σ_j h(X0_j)` where
+/// `X0_j ∼ d_0` is an **independent** sample from the target initial state-
+/// action distribution (not a subsample of the offline data). For linear
+/// `h_θ(x) = θ^T φ(x)`, the FORE inner loop only needs the mean feature
+/// vector `P̂_0(φ) = (1/m) Σ_j φ(X0_j)`, which is precomputed once by
+/// [`KlProjectionScratch::compute_initial_mean`] and reused across iterations.
 ///
-/// **Phase 1**: simple container. The exact fields may be refined in Phase 2
-/// once the paper's Algorithm 1 `P̂_0 h` estimator has been verified.
+/// `initial_states` is the flattened `[n_init * state_dim]` buffer of `X0_j`.
 #[derive(Debug, Clone, Copy)]
 pub struct InitialMoments<'a> {
-    /// Flattened `[n_init * state_dim]` initial states drawn from `d^ν_0`.
+    /// Flattened `[n_init * state_dim]` initial samples `X0_j ∼ d_0`.
     pub initial_states: &'a [f32],
-    /// `ω_0(X_i) = d^π_0(X_i) / d^ν_0(X_i)` at each initial state.
-    pub initial_ratio: &'a [f32],
-    /// Number of initial states.
+    /// Number of initial samples.
     pub n_init: usize,
     /// Dimension of each state vector (must match [`TransitionBatch::state_dim`]).
     pub state_dim: usize,
@@ -80,42 +83,129 @@ pub struct InitialMoments<'a> {
 
 /// Pre-allocated scratch buffers for the KL-projection inner loop.
 ///
-/// Constructed once before the fitted-iteration loop and reused via `clear()`
-/// on every iteration to keep the inner loop allocation-free (G4). The fields
-/// are sized to `n` (the transition count) or `feature_dim` (the log-ratio
-/// class parameter dimension) at construction time.
+/// Constructed once before the fitted-iteration loop and reused on every
+/// iteration to keep the inner loop allocation-free (G4). The fields are sized
+/// to `n` (the transition count) or `feature_dim` (the log-ratio class
+/// parameter dimension) at construction time.
 ///
-/// **Phase 1**: placeholder fields. The exact buffer set is finalized in
-/// Phase 2 when the KL-projection solver (weighted normal equations) lands.
+/// # Buffer layout (Algorithm 1 Newton step)
+///
+/// The KL projection for `LinearLogRatioClass` solves the convex objective
+/// `L(θ) = log(1/n Σ e^{θ·φ(Xi)}) − θ^T m` via Newton's method. Each Newton
+/// step needs:
+/// - `exp_buf[n]` — `e^{θ·φ(Xi)}` per transition (reused for normalization)
+/// - `theta[feature_dim]` — current Newton iterate (written into `Params`)
+/// - `gradient[feature_dim]` — `∇L = Ê_ν[ω_θ(X)φ(X)] − m`
+/// - `hessian[feature_dim²]` — `Cov̂_{ω_θ}(φ(X))` (PSD, Cholesky-factored)
+/// - `cholesky[feature_dim²]` — Cholesky factor `L` (overwrites Hessian in place)
+/// - `newton_step[feature_dim]` — `Δθ = H^{-1} ∇L` (the solve target)
+/// - `y_buf[feature_dim]` — triangular solve scratch
+/// - `moment[feature_dim]` — fixed moment `m = (1−γ)P̂_0(φ) + γP̂^+_{n,ω}(φ)`
+/// - `initial_mean[feature_dim]` — precomputed `P̂_0(φ)`, set once before the loop
+/// - `successor_weighted_sum[feature_dim]` — `(Σ_i ω(Xi)φ(X^+_i))` accumulator
+/// - `weighted_feature_sum[feature_dim]` — `Σ_i ω_θ(Xi)φ(Xi)` for gradient/Hessian
 #[derive(Debug, Clone)]
 pub struct KlProjectionScratch {
-    /// `[n]` target weights from the adjoint-Bellman image of the current ratio.
-    pub target_weights: Vec<f32>,
-    /// `[n * feature_dim]` flattened design-matrix rows `Φ` (one row per transition).
-    pub design_rows: Vec<f32>,
-    /// `[feature_dim]` right-hand side of the weighted normal equations.
-    pub normal_eq_rhs: Vec<f32>,
+    /// `[n]` exponentiated scores `e^{θ·φ(Xi)}` per transition.
+    pub exp_buf: Vec<f32>,
+    /// `[feature_dim]` fixed moment vector `m` for the current iteration.
+    pub moment: Vec<f32>,
+    /// `[feature_dim]` precomputed `P̂_0(φ)` — mean feature over initial sample.
+    pub initial_mean: Vec<f32>,
+    /// `[feature_dim]` weighted successor-feature sum (numerator of P̂^+_{n,ω}).
+    pub successor_weighted_sum: Vec<f32>,
+    /// `[feature_dim]` gradient `∇L` (Newton residual).
+    pub gradient: Vec<f32>,
+    /// `[feature_dim²]` Hessian `Cov̂_{ω_θ}(φ(X))`, overwritten with Cholesky `L`.
+    pub hessian: Vec<f32>,
+    /// `[feature_dim]` Newton step `Δθ` (the solve target).
+    pub newton_step: Vec<f32>,
+    /// `[feature_dim]` triangular-solve scratch for `cholesky_solve_into`.
+    pub y_buf: Vec<f32>,
+    /// `[feature_dim]` accumulator for `Σ_i ω_θ(Xi) φ(Xi)` (gradient/Hessian shared).
+    pub weighted_feature_sum: Vec<f32>,
+    /// Cached `n` (transition count) and `feature_dim` for asserts.
+    pub n: usize,
+    pub feature_dim: usize,
 }
 
 impl KlProjectionScratch {
     /// Allocate scratch buffers sized for `n` transitions and `feature_dim`
-    /// parameters. The vectors are allocated once here and `clear()`-reused
-    /// inside the fitted-iteration loop.
+    /// parameters. The vectors are allocated once here and reused inside the
+    /// fitted-iteration loop (G4 alloc-free inner loop).
     #[must_use]
     pub fn new(n: usize, feature_dim: usize) -> Self {
         Self {
-            target_weights: Vec::with_capacity(n),
-            design_rows: Vec::with_capacity(n * feature_dim),
-            normal_eq_rhs: Vec::with_capacity(feature_dim),
+            exp_buf: vec![0.0; n],
+            moment: vec![0.0; feature_dim],
+            initial_mean: vec![0.0; feature_dim],
+            successor_weighted_sum: vec![0.0; feature_dim],
+            gradient: vec![0.0; feature_dim],
+            hessian: vec![0.0; feature_dim * feature_dim],
+            newton_step: vec![0.0; feature_dim],
+            y_buf: vec![0.0; feature_dim],
+            weighted_feature_sum: vec![0.0; feature_dim],
+            n,
+            feature_dim,
         }
     }
 
-    /// Reset all buffers to empty (capacity preserved) for the next iteration.
-    /// This is the allocation-free reuse path — no grow, no shrink.
+    /// Precompute `P̂_0(φ) = (1/m) Σ_j φ(X0_j)` from the independent initial
+    /// sample. Called **once** before the fitted-iteration loop; the result
+    /// is reused across all K iterations (the initial distribution does not
+    /// change).
+    ///
+    /// For `LinearLogRatioClass`, `state_dim == feature_dim` and the raw
+    /// initial state IS the feature vector, so this is a plain column mean.
+    pub fn compute_initial_mean(&mut self, initial: &InitialMoments<'_>) {
+        debug_assert_eq!(initial.state_dim, self.feature_dim);
+        debug_assert_eq!(self.initial_mean.len(), self.feature_dim);
+        for slot in &mut self.initial_mean {
+            *slot = 0.0;
+        }
+        if initial.n_init == 0 {
+            return;
+        }
+        for j in 0..initial.n_init {
+            let row = &initial.initial_states[j * self.feature_dim..(j + 1) * self.feature_dim];
+            for (slot, &val) in self.initial_mean.iter_mut().zip(row.iter()) {
+                *slot += val;
+            }
+        }
+        let inv = 1.0 / (initial.n_init as f32);
+        for slot in &mut self.initial_mean {
+            *slot *= inv;
+        }
+    }
+
+    /// Reset all per-iteration buffers to zero (capacity preserved). Called at
+    /// the top of each KL-projection iteration. `initial_mean` is NOT reset —
+    /// it persists across iterations (computed once by `compute_initial_mean`).
     #[inline]
-    pub fn clear(&mut self) {
-        self.target_weights.clear();
-        self.design_rows.clear();
-        self.normal_eq_rhs.clear();
+    pub fn clear_iteration(&mut self) {
+        for slot in &mut self.exp_buf {
+            *slot = 0.0;
+        }
+        for slot in &mut self.moment {
+            *slot = 0.0;
+        }
+        for slot in &mut self.successor_weighted_sum {
+            *slot = 0.0;
+        }
+        for slot in &mut self.gradient {
+            *slot = 0.0;
+        }
+        for slot in &mut self.hessian {
+            *slot = 0.0;
+        }
+        for slot in &mut self.newton_step {
+            *slot = 0.0;
+        }
+        for slot in &mut self.y_buf {
+            *slot = 0.0;
+        }
+        for slot in &mut self.weighted_feature_sum {
+            *slot = 0.0;
+        }
     }
 }
