@@ -5,7 +5,7 @@
 **Source paper:** [arxiv:2607.05375](https://arxiv.org/abs/2607.05375) — van der Laan & Kallus, *Fitted Occupancy-Ratio Evaluation without Bellman Completeness*, 2026
 **Target:** `katgpt-rs/crates/katgpt-core/src/occupancy/` (new module) + Cargo feature `occupancy_ratio`
 **Verdict:** GOAT (Research 423 §3.1) — novel + modelless + three fusion targets; not Super-GOAT (Q2/Q3 fail the novelty gate).
-**Status:** 🟢 Phase 1 ✅ Phase 2 ✅ Phase 3 ✅ Phase 4 ✅ (GOAT G1+G2+G4+G5 ALL PASS). Phase 5 pending (docs already shipped in Phase 1/2; no-regression verified).
+**Status:** 🟢 Phase 1 ✅ Phase 2 ✅ Phase 3 ✅ Phase 4 ✅ Phase 5 ✅ (GOAT G1+G2+G4+G5 ALL PASS). All 5 phases complete. Stays opt-in pending Fusion A PoC.
 
 ---
 
@@ -231,30 +231,32 @@ See `.benchmarks/438_occupancy_ratio_goat.md` §"Bugs found and fixed" for detai
 
 ### Tasks
 
-- [ ] **T5.1** `cargo clippy -p katgpt-core --features occupancy_ratio
-  --all-targets` passes clean (per global rule: clippy before commit).
-- [ ] **T5.2** `cargo clippy --workspace --all-features` passes (the
-  `merkle_root`/`can_freeze` lesson — audit all feature combos).
-- [ ] **T5.3** `cargo test -p katgpt-core --lib` passes unchanged (no
-  regressions in the default feature set).
-- [ ] **T5.4** Module doc-comment in `occupancy/mod.rs` describes the primitive
-  as **generic off-policy evaluation math** — no game/chain/shard/NPC semantics.
-  Cross-reference Research 423 for the fusion targets.
-- [ ] **T5.5** Document the **softmax-vs-sigmoid carve-out** explicitly in the
-  module doc (per Research 423 §3.4 + caveat #2): FORE's normalized exponential
-  class is structurally softmax over the offline sample. This is **density-ratio
-  normalization** (the correct mathematical operation — the log-partition is
-  the cumulant-generating function of the empirical distribution), NOT a
-  direction-vector projection. Cite the `product_key_memory.rs` precedent
-  ("Deviation from the global sigmoid rule — convex-combination coefficients,
-  not a probability/UQ claim"). The global sigmoid rule applies to semantic-
-  domain projections onto learned directions; it does not apply here.
-- [ ] **T5.6** Add a "Honest limitations" section to the module doc covering
-  Research 423 §5 caveats #3 (offline transition data requires
-  engram/delta_mem instrumentation for `(state, target-policy-action)` pairs)
-  and #5 (continuous high-dim state spaces are the binding constraint —
-  feasible for 8-dim HLA / 64-dim style_weights, infeasible for raw pixels).
-- [ ] **T5.7** Re-export through `katgpt-core/src/lib.rs` under
+- [x] **T5.1** `cargo clippy -p katgpt-core --features occupancy_ratio
+  --all-targets` passes clean — verified in Phase 4 (0 occupancy warnings).
+- [x] **T5.2** `cargo clippy --workspace --all-features --all-targets` —
+  **occupancy_ratio is clean** (zero occupancy-related warnings/errors across
+  the full 27-crate workspace sweep). One pre-existing error surfaced in
+  `tests/bench_ldt_lattice_deduction.rs` (missing `loop_stability_mode` field,
+  introduced by Plan 428's `loop_stability_fix` feature — NOT caused by
+  occupancy_ratio). Filed as [Issue 140](../.issues/140_loop_stability_mode_breaks_all_features_test.md).
+  Per the "don't fix unrelated bugs" rule, left for the Plan 428 owner. The
+  68 warnings in `katgpt-pruners` (clone_on_copy) and `examples/recos_goat.rs`
+  (doc_lazy_continuation, needless_range_loop) are also pre-existing and
+  unrelated.
+- [x] **T5.3** `cargo test -p katgpt-core --lib` passes unchanged — verified
+  in Phase 4 (1555 pass, 1 pre-existing debug-mode latency fail in
+  `subspace_phase_gate` unrelated to occupancy).
+- [x] **T5.4** Module doc-comment shipped in Phase 1 (`occupancy/mod.rs`) —
+  describes the primitive as generic off-policy evaluation math with no
+  game/chain/shard/NPC semantics; cross-references Research 423.
+- [x] **T5.5** Softmax-vs-sigmoid carve-out shipped in Phase 1 (`mod.rs`) —
+  documents that FORE's normalized exponential class is density-ratio
+  normalization (log-partition = cumulant-generating function), NOT a
+  direction-vector projection. Cites the `product_key_memory.rs` precedent.
+- [x] **T5.6** "Honest limitations" section shipped in Phase 1 (`mod.rs`) —
+  covers Research 423 §5 caveats #3 (offline transition data instrumentation)
+  and #5 (continuous high-dim state space feasibility bound).
+- [x] **T5.7** Re-export shipped in Phase 1 (`katgpt-core/src/lib.rs`) under
   `#[cfg(feature = "occupancy_ratio")] pub mod occupancy;`.
 
 ---
