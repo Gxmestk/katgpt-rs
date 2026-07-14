@@ -4,7 +4,7 @@
 **Research:** [katgpt-rs/.research/423_GPU_Tile_Sim_ANE_Tile_Graph_Overlap.md](../.research/423_GPU_Tile_Sim_ANE_Tile_Graph_Overlap.md)
 **Source paper:** [arXiv:2607.11262](https://arxiv.org/abs/2607.11262) — Ding et al., *GPU-Tile-Sim*, MICRO 2026
 **Target:** `katgpt-rs/crates/katgpt-core/src/ane_roofline.rs` (extend) + Cargo feature `ane_fused_chain` (opt-in, gated on `ane_roofline`)
-**Status:** Active — Phase 1 DONE (T1.1–T1.8 shipped). Phase 2 DONE (T2.1–T2.7 shipped, G1–G5 all PASS). **PROMOTED to default-on** (2026-07-14, Phase 18 in `katgpt-core/Cargo.toml` `default` list). Phase 2.5/3/4 pending.
+**Status:** Active — Phase 1 DONE (T1.1–T1.8 shipped). Phase 2 DONE (T2.1–T2.7 shipped, G1–G5 all PASS). **PROMOTED to default-on** (2026-07-14, Phase 18 in `katgpt-core/Cargo.toml` `default` list). Phase 4 DONE (T4.1–T4.3 shipped, consumer integration landed in `riir-engine`). Phase 2.5/3 pending.
 
 ---
 
@@ -316,9 +316,13 @@ Goal: wire `ane_fused_estimate` into `NpcBrainRouter` so fused CoreML model chai
 
 ### Tasks
 
-- [ ] **T4.1** In `riir-ai/crates/riir-engine/src/npc_brain_router.rs`, add a method that accepts a fused chain (list of op shapes + deps) and consults `ane_fused_estimate` instead of summing individual `ane_estimate` calls.
-- [ ] **T4.2** The `npc_brain.mlpackage` (Plan 255, shipped) is a 3-fused-op CoreML ML Program (sense/emotion/zone projection). Model it as a 3-op chain with 2 data deps and use `ane_fused_estimate` to get a fusion-aware routing threshold.
-- [ ] **T4.3** Benchmark: compare the old threshold (sum of 3 individual estimates) vs the new fused estimate. The fused estimate should predict lower latency → potentially shift the ANE-vs-GPU threshold.
+- [x] **T4.1** In `riir-ai/crates/riir-engine/src/npc_brain_router.rs`, add a method that accepts a fused chain (list of op shapes + deps) and consults `ane_fused_estimate` instead of summing individual `ane_estimate` calls.
+  - **DONE.** Added `ane_fused_batch_threshold()` (public, feature-gated on `ane_fused_chain`) which models the NPC brain as a 3-op fused chain and divides the fused per-dispatch runtime by `3 × SIMD_NS_PER_NPC` (the CPU-side cost of running 3 sequential projections). Added `BackendChoice::route_for_count_fused()` + `NpcBrainRouter::choice_for_count_fused()` as the fusion-aware routing API. Falls back to legacy `ane_batch_threshold()` when `ane_fused_chain` is off.
+  - Also added `ane_fused_chain` feature passthrough in `riir-engine/Cargo.toml` (`ane_fused_chain = ["ane_roofline", "katgpt-core/ane_fused_chain"]`) and promoted it to the `default` list.
+- [x] **T4.2** The `npc_brain.mlpackage` (Plan 255, shipped) is a 3-fused-op CoreML ML Program (sense/emotion/zone projection). Model it as a 3-op chain with 2 data deps and use `ane_fused_estimate` to get a fusion-aware routing threshold.
+  - **DONE.** Added `npc_brain_fused_chain()` returning `([AneOpShape; 3], [AneDataDep; 2])`. Each op is `GEMV(m=8, k=8, F32)` modeling one module's projection of the 8-dim HLA state onto 8 ternary directions. The 2 deps carry `intermediate_bytes = 32` (the `[f32; 8]` HLA re-read eliminated by fusion — fits the 2 MiB M1 working set trivially).
+- [x] **T4.3** Benchmark: compare the old threshold (sum of 3 individual estimates) vs the new fused estimate. The fused estimate should predict lower latency → potentially shift the ANE-vs-GPU threshold.
+  - **DONE.** Shipped `bench_439_ane_fused_router_threshold.rs`. On M1 (A13): legacy total = 3 × 0.23 ms = 0.69 ms (each op pays its own dispatch floor); fused = 0.23 ms (single dispatch floor + 64 bytes eliminated). **Fusion savings 0.46 ms/dispatch (66.7%)**. Legacy threshold 3067 NPCs → fused threshold **1023 NPCs** (ANE profitable at 1/3 the NPC count). G1 (fusion never hurts) + G2 (fused ≤ legacy) both PASS. `all_pass = true`.
 
 ---
 
