@@ -1128,6 +1128,15 @@ name = "bench_379_ane_roofline_goat"
 harness = false
 required-features = ["ane_roofline"]
 
+# Plan 439 — ANE Fused-Chain Cost Model GOAT gate (G1 two reference chains:
+# Conv→ReLU fits + GEMM→Bias exceeds; G2 three routing classes; G3 single-op
+# chain parity; G4 latency <1µs for 8-op chain; G4-alloc 0 allocs/1000 calls).
+# Pure modelless arithmetic. Distilled from GTSim arXiv:2607.11262 §7.1.
+[[bench]]
+name = "bench_439_ane_fused_goat"
+harness = false
+required-features = ["ane_fused_chain"]
+
 # Plan 395 — HOLA Hippocampal Exact KV Cache GOAT gate G2 latency + T2.3 heap-vs-sorted.
 # observe ≤ 100 ns (W=64) / ≤ 30 ns (micro); read ≤ 1 µs (W=64, D=256).
 [[bench]]
