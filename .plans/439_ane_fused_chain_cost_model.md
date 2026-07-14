@@ -4,7 +4,7 @@
 **Research:** [katgpt-rs/.research/423_GPU_Tile_Sim_ANE_Tile_Graph_Overlap.md](../.research/423_GPU_Tile_Sim_ANE_Tile_Graph_Overlap.md)
 **Source paper:** [arXiv:2607.11262](https://arxiv.org/abs/2607.11262) — Ding et al., *GPU-Tile-Sim*, MICRO 2026
 **Target:** `katgpt-rs/crates/katgpt-core/src/ane_roofline.rs` (extend) + Cargo feature `ane_fused_chain` (opt-in, gated on `ane_roofline`)
-**Status:** Active — Phase 1 DONE (T1.1–T1.8 shipped). Phase 2 DONE (T2.1–T2.7 shipped, G1–G5 all PASS). **PROMOTED to default-on** (2026-07-14, Phase 18 in `katgpt-core/Cargo.toml` `default` list). Phase 4 DONE (T4.1–T4.3 shipped, consumer integration landed in `riir-engine`). Phase 2.5 DONE (T2.5.1–T2.5.4 VALIDATED on Apple M3 Max). Phase 3 pending (deferred `[-]`).
+**Status:** **CLOSED** (2026-07-14) — Phase 1 DONE. Phase 2 DONE. **PROMOTED to default-on** (2026-07-14). Phase 4 DONE (consumer integration in `riir-engine`). Phase 2.5 DONE (VALIDATED on Apple M3 Max, 0.94× savings ratio PASS). Phase 3 GATE CHECK DONE (Benchmark 439): **Phase 3 permanently deferred** — the ANE compute-bound fused regime is untestable with current tooling (F32 conv chains fall back to CPU; F16 ML Programs require `coreml-native` F16 support not available). No dispatch bottleneck exists. See `.benchmarks/439_ane_fused_chain_phase3_gate_check.md`.
 
 ---
 
@@ -309,13 +309,31 @@ Goal: validate the fused-chain model against real ANE measurements on M1/M2/M3. 
 
 Goal: the FULL GTSim distillation — model cross-op tile-level pipeline overlap, not just eliminated DRAM traffic. This is the speculative part from Research 423.
 
-**This phase is DEFERRED `[-]`** — it requires modeling the ANE firmware's tile scheduling behavior, which is opaque. Ship Phases 1–2 first; revisit Phase 3 if the eliminated-traffic model (Phase 1) is insufficient for routing decisions.
+**PERMANENTLY DEFERRED `[-]`** (2026-07-14, after gate check Benchmark 439). The T3.3 gate check on Apple M3 Max revealed that **CoreML dispatches large F32 conv chains to CPU, not ANE** — making the ANE cost model irrelevant for this regime. The compute-bound ANE fused regime (Phase 3's target) requires F16 ML Programs, which are outside the current pure-Rust `coreml-native` 0.2 + `coreml-proto` 0.1 toolchain. Additionally, no dispatch bottleneck exists: the NPC brain router routes small GEMV ops (dispatch-bound, validated in Phase 2.5), not large conv chains.
+
+### Gate check result (Benchmark 439)
+
+Ran T3.3 as a gate check: 3× Conv2d(3×3, SAME) Cin=Cout=192, H=W=32, F32 on Apple M3 Max.
+
+- **ANE residency: CPU FALLBACK** — fused 6,490 µs vs 3×single-op ANE compute 627 µs (10.3× slower → CPU)
+- **G1 (fusion never hurts): PASS** — fused 6,490 < unfused 9,380 µs
+- **G2/G3: FAIL** — model under-predicts (792 µs predicted vs 6,490 µs measured), but this is a device-placement mismatch (CoreML chose CPU), NOT tile-level overlap
+- **Verdict:** Phase 3's premise (compute-bound ANE fused chains with tile-level overlap) is **untestable** with current tooling and **not relevant** to the actual use case (small GEMV ops).
 
 ### Deferred tasks
 
-- [-] **T3.1** Model DMA↔MAC overlap at tile granularity: when op A's tile[i] finishes computing, op B's tile[i] can start if the intermediate tile is on-chip. This requires a tile-graph DAG (GTSim's full abstraction) rather than the aggregate-FLOPs approach of Phase 1.
-- [-] **T3.2** Model double-buffer occupancy: N-buffer pipelining in the 2 MB working set. This is GTSim's WS 2-buffer / WS 3-stage analysis applied to the ANE.
-- [-] **T3.3** Validate against real ANE measurements on multi-stage fused kernels (conv→bn→relu→pool, 4-stage).
+- [-] **T3.1** Model DMA↔MAC overlap at tile granularity: requires tile-graph DAG (GTSim's full abstraction). **Permanently deferred** — untestable regime.
+- [-] **T3.2** Model double-buffer occupancy: N-buffer pipelining in the 2 MB working set. **Permanently deferred** — untestable regime.
+- [-] **T3.3** Validate against real ANE measurements on multi-stage fused kernels. **DONE as gate check** (Benchmark 439) — result: CoreML routes F32 conv chains to CPU, making ANE model validation impossible for this regime.
+
+### Reopen conditions (unchanged from Research 423 §4)
+
+Phase 3 may be revisited if ALL of:
+1. `coreml-native` gains F16 ML Program support (enabling ANE execution of compute-bound chains)
+2. Evidence that `NpcBrainRouter` routes compute-bound fused chains (not just small GEMV)
+3. ANE kernel fusion prediction becomes a real dispatch bottleneck
+
+None hold today.
 
 ---
 

@@ -46,3 +46,7 @@ gpu_inference = ["dep:metal"]
 [[example]]
 name = "bench_439_phase25_ane_fused_validation"
 required-features = ["ane"]
+
+[[example]]
+name = "bench_439_phase3_gate_check"
+required-features = ["ane"]
