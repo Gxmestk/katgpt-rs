@@ -390,6 +390,16 @@ feature is a backend choice, not a primitive gate.
    cores are a Phase 5+ optimization once the f32 path is validated. The
    `gemv_f16_cubecl.rs` kernel already exists for reuse.
 
+6. **MHA shared-memory seq_len limit raised (post-Phase-4 follow-up,
+   2026-07-14).** The `weaver_causal_mha_f32` kernel's shared-memory scores
+   buffer was originally hardcoded to 8 slots (`SharedMemory::new(8)`),
+   capping `seq_len <= 8` (i.e. `draft_lookahead <= 7`). This forced tests to
+   override `Config::micro()`'s default `draft_lookahead = 8` down to 4.
+   The buffer is now sized to `WEAVER_MHA_MAX_SEQ_LEN = 16`, supporting
+   `draft_lookahead` up to 15. The default config (`seq_len = 9`) now runs
+   without override. Cost: 64 bytes of shared memory per workgroup (was 32).
+   The assert at the launcher still fires for `seq_len > 16`.
+
 ## Non-goals
 
 - Training (stays in riir-train)
