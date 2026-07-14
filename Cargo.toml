@@ -584,6 +584,15 @@ full = ["sudoku", "sudoku_mrv", "sudoku_cp", "validator", "ppot", "domain_latent
 name = "cs_kv_probe_demo"
 required-features = ["cs_kv_probe"]
 
+# ── Issue 041 SmoothMin rerank GOAT gate ────────────────────────
+# Registered with required-features so Cargo skips it when the feature is
+# off; the file's #![cfg(feature)] gate would otherwise strip `main` and
+# break `cargo build --examples` / `cargo clippy --all-targets`.
+
+[[example]]
+name = "issue_041_smooth_min_rerank_goat"
+required-features = ["smooth_min_rerank"]
+
 # ── recos GOAT gate (Plan 437 Phase 2) ───────────────────────────
 
 [[example]]
