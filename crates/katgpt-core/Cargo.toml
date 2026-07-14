@@ -128,6 +128,7 @@ sigmoid_margin = ["maxsim", "katgpt-types/sigmoid_margin"]  # Sigmoid margin los
 dual_gram_pca = []  # Dual-Gram PCA routing for short-sequence calibration (Research R130, Plan 159)
 roofline_cost = []  # Roofline cost model for GPU operator runtime prediction (Research R130, Plan 159)
 ane_roofline = []  # ANE-aware roofline cost model — Bryngelson arXiv:2606.22283 (Research 377, Plan 379). Extends roofline_cost with ANE-specific axes (2MB working-set cliff, 0.23ms dispatch floor, family-floor capability gate) and per-chip peaks for M1-M5. DEFAULT-ON after Plan 379 Phase 2 GOAT (G1-G5 all PASS): pure modelless arithmetic, zero runtime cost unless ane_estimate is invoked.
+ane_fused_chain = ["ane_roofline"]  # ANE Fused-Chain Cost Model — dependency-aware overlap prediction (Plan 439, Research 423, GTSim arXiv:2607.11262). Extends ane_estimate with ane_fused_estimate: models eliminated intermediate DRAM traffic + single dispatch floor for fused CoreML op chains. Pure modelless arithmetic (aggregate FLOPs + subtract eliminated bytes). Opt-in until G1-G5 GOAT gate passes; implies ane_roofline.
 moa_inference = []  # MoA Mixture of Activations — token-adaptive activation mixing (Research 126, Plan 158)
 sia_feedback = ["sr2am_configurator", "katgpt-types/sia_feedback"]  # FeedbackBandit — harness + weight co-evolution (Plan 163, Research 033)
 hydra_budget = ["katgpt-types/hydra_budget"]  # Hydra-Aware Adaptive Layer Budget types (Research 148, Plan 165)

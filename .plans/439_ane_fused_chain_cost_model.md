@@ -4,7 +4,7 @@
 **Research:** [katgpt-rs/.research/423_GPU_Tile_Sim_ANE_Tile_Graph_Overlap.md](../.research/423_GPU_Tile_Sim_ANE_Tile_Graph_Overlap.md)
 **Source paper:** [arXiv:2607.11262](https://arxiv.org/abs/2607.11262) — Ding et al., *GPU-Tile-Sim*, MICRO 2026
 **Target:** `katgpt-rs/crates/katgpt-core/src/ane_roofline.rs` (extend) + Cargo feature `ane_fused_chain` (opt-in, gated on `ane_roofline`)
-**Status:** Active — Phase 0 (skeleton)
+**Status:** Active — Phase 1 DONE (T1.1–T1.8 shipped). Phase 2 GOAT gate next.
 
 ---
 
@@ -51,9 +51,9 @@ Goal: a compiling, tested, feature-gated extension of `ane_roofline.rs` that imp
 
 ### Tasks
 
-- [ ] **T1.1** Add feature flag `ane_fused_chain = ["ane_roofline"]` to `katgpt-rs/crates/katgpt-core/Cargo.toml` `[features]` section. Implies `ane_roofline` (Plan 379).
-- [ ] **T1.2** Add `#[cfg(feature = "ane_fused_chain")] pub use fused_chain::*;` re-export from the `ane_roofline` module (or inline the code under `#[cfg]` — pick whichever keeps the file < 2048 lines per AGENTS.md).
-- [ ] **T1.3** Implement `AneDataDep` struct — a directed data dependency between two ops in a chain:
+- [x] **T1.1** Add feature flag `ane_fused_chain = ["ane_roofline"]` to `katgpt-rs/crates/katgpt-core/Cargo.toml` `[features]` section. Implies `ane_roofline` (Plan 379).
+- [x] **T1.2** Add `#[cfg(feature = "ane_fused_chain")] pub use fused_chain::*;` re-export from the `ane_roofline` module (or inline the code under `#[cfg]` — pick whichever keeps the file < 2048 lines per AGENTS.md).
+- [x] **T1.3** Implement `AneDataDep` struct — a directed data dependency between two ops in a chain:
   ```rust
   /// A producer→consumer edge: `from_op`'s output feeds `to_op`'s input.
   /// `intermediate_bytes` is the size of the intermediate tensor.
@@ -66,7 +66,7 @@ Goal: a compiling, tested, feature-gated extension of `ane_roofline.rs` that imp
       pub intermediate_bytes: u64,  // size of the intermediate tensor
   }
   ```
-- [ ] **T1.4** Implement `AneFusedCost` struct — the output of the fused estimator (extends `AneCost` with fusion metadata):
+- [x] **T1.4** Implement `AneFusedCost` struct — the output of the fused estimator (extends `AneCost` with fusion metadata):
   ```rust
   #[derive(Clone, Copy, Debug)]
   pub struct AneFusedCost {
@@ -78,7 +78,7 @@ Goal: a compiling, tested, feature-gated extension of `ane_roofline.rs` that imp
       pub fusion_savings_ms: f64,     // sequential - fused (must be ≥ 0)
   }
   ```
-- [ ] **T1.5** Implement the core fused estimator `ane_fused_estimate`:
+- [x] **T1.5** Implement the core fused estimator `ane_fused_estimate`:
   ```rust
   /// Dependency-aware fused-chain ANE cost model.
   ///
@@ -161,9 +161,9 @@ Goal: a compiling, tested, feature-gated extension of `ane_roofline.rs` that imp
       }
   }
   ```
-- [ ] **T1.6** Implement `AneCost::zero()` and `AneCost + AneCost` (element-wise sum for the sequential baseline). These are internal helpers for `ane_fused_estimate`. Mark `#[inline(always)]`.
-- [ ] **T1.7** Implement convenience constructor `AneDataDep::chain(ops: &[AneOpShape]) -> Vec<AneDataDep>` — builds a simple linear chain (op[0]→op[1]→...→op[n]) where each intermediate is the output of the previous op. The caller provides intermediate sizes via a separate slice or the constructor infers them from `bytes_moved` deltas.
-- [ ] **T1.8** Write unit tests in `ane_roofline.rs` under `#[cfg(all(test, feature = "ane_fused_chain"))]`:
+- [x] **T1.6** Implement `AneCost::zero()` and `AneCost + AneCost` (element-wise sum for the sequential baseline). These are internal helpers for `ane_fused_estimate`. Mark `#[inline(always)]`.
+- [x] **T1.7** Implement convenience constructor `AneDataDep::chain(ops: &[AneOpShape]) -> Vec<AneDataDep>` — builds a simple linear chain (op[0]→op[1]→...→op[n]) where each intermediate is the output of the previous op. The caller provides intermediate sizes via a separate slice or the constructor infers them from `bytes_moved` deltas.
+- [x] **T1.8** Write unit tests in `ane_roofline.rs` under `#[cfg(all(test, feature = "ane_fused_chain"))]`:
   - **T1.8a** Single-op chain (no deps): `ane_fused_estimate(&[op], &[], ...)` returns the same `base` as `ane_estimate(op, ...)`. (G3 hook.)
   - **T1.8b** Two-op chain, intermediate fits: `eliminated_bytes == intermediate_bytes`, `fusion_savings_ms > 0`. (G1 hook.)
   - **T1.8c** Two-op chain, intermediate exceeds working set: `eliminated_bytes == 0`, `fusion_savings_ms == 0.0`, falls back to sequential. (G1 negative case.)
@@ -175,11 +175,11 @@ Goal: a compiling, tested, feature-gated extension of `ane_roofline.rs` that imp
 
 ### Phase 1 Exit Criteria
 
-- `cargo clippy -p katgpt-core --features ane_fused_chain` compiles clean.
-- `cargo test -p katgpt-core --features ane_fused_chain --lib ane_roofline` passes (Plan 379's 23 tests + new fused tests).
-- `cargo test -p katgpt-core --lib ane_roofline` still passes (Plan 379 tests, no `ane_fused_chain` feature).
-- `cargo check --all-features` clean (combo-regression check).
-- `ane_fused_estimate` is `#[inline(always)]`, zero-alloc.
+- [x] `cargo clippy -p katgpt-core --features ane_fused_chain` compiles clean.
+- [x] `cargo test -p katgpt-core --features ane_fused_chain --lib ane_roofline` passes (Plan 379's 23 tests + 13 new fused tests = 36 total).
+- [x] `cargo test -p katgpt-core --lib ane_roofline` still passes (Plan 379's 23 tests, no `ane_fused_chain` feature — G3 no-regression).
+- [x] `cargo check --all-features` clean (combo-regression check).
+- [x] `ane_fused_estimate` is `#[inline(always)]`, zero-alloc.
 
 ---
 

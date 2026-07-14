@@ -684,6 +684,254 @@ pub fn ane_conv3x3_cost(
 }
 
 // ---------------------------------------------------------------------------
+// Fused-chain estimator (Plan 439, gated on `ane_fused_chain`)
+//
+// Extends the single-op `ane_estimate` with a dependency-aware fused-chain
+// cost model. Distilled from GTSim (arXiv:2607.11262) §7.1 insight: kernel
+// performance is governed by dependency structure, not individual instruction
+// latency. The full tile-graph DAG is Phase 3 stretch; this module ships the
+// minimal dependency-aware overlap — modeling eliminated intermediate DRAM
+// traffic + single dispatch floor.
+// ---------------------------------------------------------------------------
+
+#[cfg(feature = "ane_fused_chain")]
+impl AneCost {
+    /// Zero cost — the identity element for [`std::ops::Add`].
+    ///
+    /// Internal helper for [`ane_fused_estimate`]'s sequential-baseline fold.
+    /// Bound is `Dispatch` (zero work is trivially below the floor).
+    #[inline(always)]
+    pub(crate) const fn zero() -> Self {
+        Self {
+            runtime_ms: 0.0,
+            bound: AneBound::Dispatch,
+            flops: 0,
+            bytes_moved: 0,
+            working_set_bytes: 0,
+        }
+    }
+}
+
+#[cfg(feature = "ane_fused_chain")]
+impl std::ops::Add for AneCost {
+    type Output = Self;
+
+    /// Element-wise sum for the sequential-baseline fold.
+    ///
+    /// - `runtime_ms`, `flops`, `bytes_moved`: summed.
+    /// - `working_set_bytes`: max (peak live operand across sequential ops).
+    /// - `bound`: taken from the operand with the larger `runtime_ms`
+    ///   (the dominant op in sequential execution).
+    #[inline(always)]
+    fn add(self, rhs: Self) -> Self {
+        let bound = if self.runtime_ms >= rhs.runtime_ms {
+            self.bound
+        } else {
+            rhs.bound
+        };
+        Self {
+            runtime_ms: self.runtime_ms + rhs.runtime_ms,
+            bound,
+            flops: self.flops + rhs.flops,
+            bytes_moved: self.bytes_moved + rhs.bytes_moved,
+            working_set_bytes: self.working_set_bytes.max(rhs.working_set_bytes),
+        }
+    }
+}
+
+/// A producer→consumer data dependency between two ops in a fused chain.
+///
+/// `from_op`'s output feeds `to_op`'s input. `intermediate_bytes` is the size
+/// of the intermediate tensor. If the intermediate fits in the ANE's on-chip
+/// working set ([`AnePeaks::working_set_bytes`]), it is eliminated from DRAM
+/// traffic in the fused estimate.
+///
+/// Part of Plan 439's fused-chain cost model (GTSim distillation).
+#[cfg(feature = "ane_fused_chain")]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct AneDataDep {
+    /// Index into the `ops` slice passed to [`ane_fused_estimate`].
+    pub from_op: usize,
+    /// Index into the `ops` slice passed to [`ane_fused_estimate`].
+    pub to_op: usize,
+    /// Size of the intermediate tensor in bytes.
+    pub intermediate_bytes: u64,
+}
+
+#[cfg(feature = "ane_fused_chain")]
+impl AneDataDep {
+    /// Build a linear chain of data deps: `op[0] → op[1] → ... → op[n-1]`.
+    ///
+    /// `intermediate_bytes[i]` is the size of the intermediate tensor between
+    /// `op[i]` and `op[i+1]`. Requires `intermediate_bytes.len() + 1 ==
+    /// ops.len()`.
+    ///
+    /// Allocates a `Vec` — use this for setup, not on the hot path. The hot
+    /// path ([`ane_fused_estimate`]) takes `&[AneDataDep]` and is zero-alloc.
+    pub fn chain(ops: &[AneOpShape], intermediate_bytes: &[u64]) -> Vec<Self> {
+        assert!(
+            intermediate_bytes.len() + 1 == ops.len(),
+            "chain: need exactly ops.len()-1 intermediates, got {} for {} ops",
+            intermediate_bytes.len(),
+            ops.len()
+        );
+        intermediate_bytes
+            .iter()
+            .enumerate()
+            .map(|(i, &bytes)| Self {
+                from_op: i,
+                to_op: i + 1,
+                intermediate_bytes: bytes,
+            })
+            .collect()
+    }
+}
+
+/// Result of a fused-chain ANE cost estimate (Plan 439).
+///
+/// Extends [`AneCost`] with fusion metadata. The `base` field is the cost of
+/// the fused chain treated as a single aggregate op (with eliminated
+/// intermediate bytes subtracted). Compare `base.runtime_ms` against
+/// `sequential_runtime_ms` to see the fusion benefit.
+///
+/// # The "fusion never hurts" invariant
+///
+/// `base.runtime_ms <= sequential_runtime_ms` (i.e., `fusion_savings_ms >=
+/// 0`), because:
+/// 1. Eliminated bytes reduce memory time (monotonic).
+/// 2. Single dispatch floor <= N dispatch floors.
+/// 3. `max(sum_C, sum_M) <= sum(max(C_i, M_i))` — the max of sums is always
+///    <= the sum of maxes.
+///
+/// The one exception: if the fused op is [`AneBound::FamilyGated`],
+/// `fusion_savings_ms` is set to 0.0 (the chip can't run the chain at all,
+/// so fusion benefit is meaningless).
+#[cfg(feature = "ane_fused_chain")]
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct AneFusedCost {
+    /// The fused-chain cost (treated as one aggregate op).
+    pub base: AneCost,
+    /// Number of ops in the chain.
+    pub n_ops: usize,
+    /// Number of data deps whose intermediates fit the working set.
+    pub n_fused_deps: usize,
+    /// Total DRAM traffic eliminated by fusion (bytes).
+    pub eliminated_bytes: u64,
+    /// What N independent `ane_estimate` calls would predict (sequential).
+    pub sequential_runtime_ms: f64,
+    /// `sequential_runtime_ms - base.runtime_ms`, clamped to >= 0.
+    pub fusion_savings_ms: f64,
+}
+
+/// Dependency-aware fused-chain ANE cost model (Plan 439).
+///
+/// Takes a chain of ops + their data dependencies and returns a single cost
+/// estimate that accounts for:
+/// 1. **Eliminated intermediate DRAM traffic** — on-chip intermediates are
+///    subtracted from the total bytes.
+/// 2. **Single dispatch overhead** — one `dispatch_floor_ms`, not N.
+///
+/// Falls back to the sum of individual [`ane_estimate`] calls (sequential)
+/// when no intermediates fit the working set.
+///
+/// Distilled from GTSim (arXiv:2607.11262) §7.1: kernel performance is
+/// governed by dependency structure, not individual instruction latency.
+///
+/// Zero-allocation, `#[inline(always)]`, <=1 µs CPU on M1 Pro for <=8-op
+/// chains (same budget as [`ane_estimate`]).
+#[cfg(feature = "ane_fused_chain")]
+#[inline(always)]
+pub fn ane_fused_estimate(
+    ops: &[AneOpShape],
+    deps: &[AneDataDep],
+    dtype: Dtype,
+    peaks: &AnePeaks,
+) -> AneFusedCost {
+    // 0. Degenerate case: empty chain.
+    if ops.is_empty() {
+        return AneFusedCost {
+            base: AneCost::zero(),
+            n_ops: 0,
+            n_fused_deps: 0,
+            eliminated_bytes: 0,
+            sequential_runtime_ms: 0.0,
+            fusion_savings_ms: 0.0,
+        };
+    }
+
+    // 1. Sequential baseline: sum of individual ane_estimate calls.
+    //    This is what the current router would predict treating each op
+    //    independently (the status quo before this plan).
+    let sequential_cost: AneCost = ops
+        .iter()
+        .copied()
+        .map(|op| ane_estimate(op, dtype, peaks))
+        .fold(AneCost::zero(), |acc, c| acc + c);
+
+    // 2. Check which intermediates fit in the working set.
+    let working_set_budget = peaks.working_set_bytes;
+    let mut total_intermediate: u64 = 0;
+    let mut eliminated_bytes: u64 = 0;
+    let mut n_fused = 0usize;
+    for dep in deps {
+        // The intermediate fits only if it's individually small enough AND
+        // the cumulative on-chip footprint stays within budget.
+        if dep.intermediate_bytes <= working_set_budget
+            && total_intermediate.saturating_add(dep.intermediate_bytes) <= working_set_budget
+        {
+            total_intermediate += dep.intermediate_bytes;
+            eliminated_bytes += dep.intermediate_bytes;
+            n_fused += 1;
+        }
+    }
+
+    // 3. If NO intermediates fit, return the sequential baseline (no fusion).
+    if n_fused == 0 {
+        return AneFusedCost {
+            base: sequential_cost,
+            n_ops: ops.len(),
+            n_fused_deps: 0,
+            eliminated_bytes: 0,
+            sequential_runtime_ms: sequential_cost.runtime_ms,
+            fusion_savings_ms: 0.0,
+        };
+    }
+
+    // 4. Model the fused chain: aggregate FLOPs and bytes, subtract eliminated.
+    let total_flops: u64 = ops.iter().map(|o| o.flops).sum();
+    let total_bytes_raw: u64 = ops.iter().map(|o| o.bytes_moved).sum();
+    let total_bytes_fused: u64 = total_bytes_raw.saturating_sub(eliminated_bytes);
+    let largest_operand: u64 = ops.iter().map(|o| o.largest_operand_bytes).max().unwrap_or(0);
+    // The chain is gated by the highest family requirement of any op.
+    let min_family: AneFamily = ops
+        .iter()
+        .map(|o| o.min_family)
+        .max()
+        .unwrap_or(AneFamily::A13);
+
+    // 5. Build a single fused AneOpShape and estimate it as one op.
+    let fused_op = AneOpShape::new(total_flops, total_bytes_fused, largest_operand, min_family);
+    let fused_cost = ane_estimate(fused_op, dtype, peaks);
+
+    // 6. Compute fusion savings. Guard against INFINITY - INFINITY = NaN
+    //    when the fused op is FamilyGated (the chain can't run on this chip).
+    let fusion_savings_ms = if fused_cost.bound == AneBound::FamilyGated {
+        0.0
+    } else {
+        (sequential_cost.runtime_ms - fused_cost.runtime_ms).max(0.0)
+    };
+
+    AneFusedCost {
+        base: fused_cost,
+        n_ops: ops.len(),
+        n_fused_deps: n_fused,
+        eliminated_bytes,
+        sequential_runtime_ms: sequential_cost.runtime_ms,
+        fusion_savings_ms,
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -977,5 +1225,287 @@ mod tests {
             derived_ridge,
             m1.ridge_flop_per_byte
         );
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Fused-chain estimator tests (Plan 439 T1.8)
+// ---------------------------------------------------------------------------
+
+#[cfg(all(test, feature = "ane_fused_chain"))]
+mod fused_tests {
+    use super::*;
+
+    // ── T1.8a: Single-op chain parity (G3 hook) ──────────────────────────
+
+    #[test]
+    fn test_single_op_chain_matches_ane_estimate() {
+        let op = AneOpShape::gemm(512, 512, 512, Dtype::F16);
+        let peaks = AnePeaks::m1();
+        let single = ane_estimate(op, Dtype::F16, &peaks);
+        let fused = ane_fused_estimate(&[op], &[], Dtype::F16, &peaks);
+        assert_eq!(fused.base, single, "single-op chain must match ane_estimate");
+        assert_eq!(fused.n_ops, 1);
+        assert_eq!(fused.n_fused_deps, 0);
+        assert_eq!(fused.fusion_savings_ms, 0.0);
+    }
+
+    // ── T1.8b: Two-op chain, intermediate fits (G1 hook) ─────────────────
+
+    #[test]
+    fn test_two_op_chain_intermediate_fits() {
+        // conv_3x3(64, 64, 8, 8) → elementwise ReLU.
+        // Intermediate = conv output = 64*8*8*2 = 8192 bytes, fits in 2 MB.
+        let peaks = AnePeaks::m1();
+        let conv = AneOpShape::conv_3x3(64, 64, 8, 8, Dtype::F16);
+        let relu = AneOpShape::elementwise(64 * 8 * 8, Dtype::F16);
+        let intermediate = 64 * 8 * 8 * 2; // 8192 bytes
+        assert!(intermediate <= peaks.working_set_bytes, "test setup: must fit");
+        let deps = vec![AneDataDep {
+            from_op: 0,
+            to_op: 1,
+            intermediate_bytes: intermediate,
+        }];
+        let fused = ane_fused_estimate(&[conv, relu], &deps, Dtype::F16, &peaks);
+        assert_eq!(fused.n_ops, 2);
+        assert_eq!(fused.n_fused_deps, 1);
+        assert_eq!(fused.eliminated_bytes, intermediate);
+        // Fusion savings must be positive: the sequential path pays 2 dispatch
+        // floors (0.23 + 0.23 = 0.46 ms), the fused path pays 1 (0.23 ms).
+        assert!(
+            fused.fusion_savings_ms > 0.0,
+            "fusion must save time, got {}",
+            fused.fusion_savings_ms
+        );
+        assert!(fused.base.runtime_ms <= fused.sequential_runtime_ms);
+    }
+
+    // ── T1.8c: Two-op chain, intermediate exceeds working set ────────────
+
+    #[test]
+    fn test_two_op_chain_intermediate_exceeds_working_set() {
+        let peaks = AnePeaks::m1();
+        let gemm = AneOpShape::gemm(1024, 1024, 1024, Dtype::F16);
+        let bias = AneOpShape::elementwise(1024 * 1024, Dtype::F16);
+        let intermediate = 3 * 1024 * 1024; // 3 MB > 2 MB working set
+        assert!(
+            intermediate > peaks.working_set_bytes,
+            "test setup: must exceed"
+        );
+        let deps = vec![AneDataDep {
+            from_op: 0,
+            to_op: 1,
+            intermediate_bytes: intermediate,
+        }];
+        let fused = ane_fused_estimate(&[gemm, bias], &deps, Dtype::F16, &peaks);
+        assert_eq!(fused.n_fused_deps, 0, "oversize intermediate must not be eliminated");
+        assert_eq!(fused.eliminated_bytes, 0);
+        assert_eq!(fused.fusion_savings_ms, 0.0, "no fusion when intermediates don't fit");
+    }
+
+    // ── T1.8d: Three-op chain, two of three intermediates fit ───────────
+
+    #[test]
+    fn test_three_op_chain_partial_fit() {
+        let peaks = AnePeaks::m1();
+        let op0 = AneOpShape::elementwise(1024, Dtype::F16);
+        let op1 = AneOpShape::elementwise(1024, Dtype::F16);
+        let op2 = AneOpShape::elementwise(1024, Dtype::F16);
+        let small = 1024 * 2; // 2 KB, fits
+        let big = 3 * 1024 * 1024; // 3 MB, doesn't fit
+        let deps = vec![
+            AneDataDep { from_op: 0, to_op: 1, intermediate_bytes: small },
+            AneDataDep { from_op: 1, to_op: 2, intermediate_bytes: small },
+            // Non-linear dep (skip connection) with a big intermediate.
+            AneDataDep { from_op: 0, to_op: 2, intermediate_bytes: big },
+        ];
+        let fused = ane_fused_estimate(&[op0, op1, op2], &deps, Dtype::F16, &peaks);
+        assert_eq!(fused.n_fused_deps, 2, "two small intermediates fit, one big doesn't");
+        assert_eq!(fused.eliminated_bytes, small * 2);
+    }
+
+    // ── T1.8e: Tiny fused chain below dispatch floor (G2 hook) ───────────
+
+    #[test]
+    fn test_tiny_fused_chain_below_dispatch_floor() {
+        let peaks = AnePeaks::m1();
+        let op0 = AneOpShape::gemm(64, 64, 64, Dtype::F16);
+        let op1 = AneOpShape::elementwise(64 * 64, Dtype::F16);
+        let intermediate = 64 * 64 * 2; // 8 KB, fits
+        let deps = vec![AneDataDep {
+            from_op: 0,
+            to_op: 1,
+            intermediate_bytes: intermediate,
+        }];
+        let fused = ane_fused_estimate(&[op0, op1], &deps, Dtype::F16, &peaks);
+        assert_eq!(
+            fused.base.bound,
+            AneBound::Dispatch,
+            "tiny aggregate must be below the dispatch floor"
+        );
+        // Even the fused chain benefits from single dispatch: sequential pays
+        // 2 floors, fused pays 1.
+        assert!(fused.fusion_savings_ms > 0.0);
+    }
+
+    // ── T1.8f: Family-gated chain ────────────────────────────────────────
+
+    #[test]
+    fn test_family_gated_chain() {
+        // One op requires A14, target is M1 (A13) → chain is family-gated.
+        let peaks = AnePeaks::m1();
+        let op0 = AneOpShape::elementwise(1024, Dtype::F16);
+        let op1 = AneOpShape::elementwise(1024, Dtype::F16).with_min_family(AneFamily::A14);
+        let intermediate = 1024 * 2;
+        let deps = vec![AneDataDep {
+            from_op: 0,
+            to_op: 1,
+            intermediate_bytes: intermediate,
+        }];
+        let fused = ane_fused_estimate(&[op0, op1], &deps, Dtype::F16, &peaks);
+        assert_eq!(fused.base.bound, AneBound::FamilyGated);
+        assert_eq!(fused.fusion_savings_ms, 0.0, "family-gated: no fusion benefit");
+        assert!(!fused.fusion_savings_ms.is_nan(), "must not be NaN");
+    }
+
+    // ── T1.8g: Determinism ───────────────────────────────────────────────
+
+    #[test]
+    fn test_fused_determinism() {
+        let peaks = AnePeaks::m1();
+        let op0 = AneOpShape::conv_3x3(64, 64, 8, 8, Dtype::F16);
+        let op1 = AneOpShape::elementwise(64 * 8 * 8, Dtype::F16);
+        let deps = AneDataDep::chain(&[op0, op1], &[64 * 8 * 8 * 2]);
+        let a = ane_fused_estimate(&[op0, op1], &deps, Dtype::F16, &peaks);
+        let b = ane_fused_estimate(&[op0, op1], &deps, Dtype::F16, &peaks);
+        assert_eq!(a, b);
+    }
+
+    // ── T1.8h: Empty ops slice ───────────────────────────────────────────
+
+    #[test]
+    fn test_empty_ops_slice() {
+        let peaks = AnePeaks::m1();
+        let fused = ane_fused_estimate(&[], &[], Dtype::F16, &peaks);
+        assert_eq!(fused.n_ops, 0);
+        assert_eq!(fused.n_fused_deps, 0);
+        assert_eq!(fused.eliminated_bytes, 0);
+        assert_eq!(fused.fusion_savings_ms, 0.0);
+        assert_eq!(fused.base.runtime_ms, 0.0);
+    }
+
+    // ── AneDataDep::chain constructor ────────────────────────────────────
+
+    #[test]
+    fn test_chain_constructor() {
+        let ops = [
+            AneOpShape::elementwise(100, Dtype::F16),
+            AneOpShape::elementwise(200, Dtype::F16),
+            AneOpShape::elementwise(300, Dtype::F16),
+        ];
+        let deps = AneDataDep::chain(&ops, &[1000, 2000]);
+        assert_eq!(deps.len(), 2);
+        assert_eq!(deps[0], AneDataDep { from_op: 0, to_op: 1, intermediate_bytes: 1000 });
+        assert_eq!(deps[1], AneDataDep { from_op: 1, to_op: 2, intermediate_bytes: 2000 });
+    }
+
+    #[test]
+    #[should_panic(expected = "need exactly ops.len()-1 intermediates")]
+    fn test_chain_constructor_wrong_count_panics() {
+        let ops = [
+            AneOpShape::elementwise(100, Dtype::F16),
+            AneOpShape::elementwise(200, Dtype::F16),
+        ];
+        // Need 1 intermediate for 2 ops, but passing 2.
+        let _ = AneDataDep::chain(&ops, &[1000, 2000]);
+    }
+
+    // ── AneCost arithmetic helpers ───────────────────────────────────────
+
+    #[test]
+    fn test_ane_cost_zero_is_identity() {
+        let zero = AneCost::zero();
+        assert_eq!(zero.runtime_ms, 0.0);
+        assert_eq!(zero.flops, 0);
+        assert_eq!(zero.bytes_moved, 0);
+        assert_eq!(zero.working_set_bytes, 0);
+
+        // zero + cost == cost (identity for Add).
+        let cost = ane_estimate(
+            AneOpShape::gemm(512, 512, 512, Dtype::F16),
+            Dtype::F16,
+            &AnePeaks::m1(),
+        );
+        let sum = AneCost::zero() + cost;
+        assert_eq!(sum.runtime_ms, cost.runtime_ms);
+        assert_eq!(sum.flops, cost.flops);
+        assert_eq!(sum.bound, cost.bound);
+    }
+
+    #[test]
+    fn test_ane_cost_add_elementwise() {
+        let a = AneCost {
+            runtime_ms: 1.0,
+            bound: AneBound::Compute,
+            flops: 100,
+            bytes_moved: 200,
+            working_set_bytes: 50,
+        };
+        let b = AneCost {
+            runtime_ms: 2.0,
+            bound: AneBound::Memory,
+            flops: 300,
+            bytes_moved: 400,
+            working_set_bytes: 80,
+        };
+        let sum = a + b;
+        assert_eq!(sum.runtime_ms, 3.0);
+        assert_eq!(sum.flops, 400);
+        assert_eq!(sum.bytes_moved, 600);
+        assert_eq!(sum.working_set_bytes, 80); // max, not sum
+        // b has larger runtime → b's bound wins.
+        assert_eq!(sum.bound, AneBound::Memory);
+    }
+
+    // ── Fusion never hurts invariant (cross-cutting) ─────────────────────
+
+    #[test]
+    fn test_fusion_never_hurts_across_regimes() {
+        // For every chain where intermediates fit, fused <= sequential.
+        let peaks = AnePeaks::m1();
+        let test_chains: &[(&[AneOpShape], u64)] = &[
+            // Compute-bound chain.
+            (&[
+                AneOpShape::conv_3x3(128, 128, 8, 8, Dtype::F16),
+                AneOpShape::conv_3x3(128, 128, 8, 8, Dtype::F16),
+            ], 128 * 8 * 8 * 2),
+            // Memory-bound chain.
+            (&[
+                AneOpShape::elementwise(100_000, Dtype::F16),
+                AneOpShape::elementwise(100_000, Dtype::F16),
+            ], 100_000 * 2),
+            // Dispatch-bound chain.
+            (&[
+                AneOpShape::gemm(32, 32, 32, Dtype::F16),
+                AneOpShape::gemm(32, 32, 32, Dtype::F16),
+            ], 32 * 32 * 2),
+        ];
+        for (ops, intermediate) in test_chains {
+            let deps = vec![AneDataDep {
+                from_op: 0,
+                to_op: 1,
+                intermediate_bytes: *intermediate,
+            }];
+            let fused = ane_fused_estimate(ops, &deps, Dtype::F16, &peaks);
+            if fused.n_fused_deps > 0 {
+                assert!(
+                    fused.base.runtime_ms <= fused.sequential_runtime_ms + 1e-9,
+                    "fusion never hurts: fused {} > sequential {} for chain",
+                    fused.base.runtime_ms,
+                    fused.sequential_runtime_ms
+                );
+                assert!(fused.fusion_savings_ms >= 0.0);
+            }
+        }
     }
 }
