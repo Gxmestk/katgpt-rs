@@ -803,10 +803,12 @@ pub fn extract_ddtree_paths(tree: &[katgpt_core::speculative::types::TreeNode]) 
     // For each node at depth > 0, index by (parent_path >> 16) so we can
     // look up children by the parent's parent_path value.
     let mut max_depth: usize = 0;
-    let mut roots: Vec<&katgpt_core::speculative::types::TreeNode> = Vec::new();
-    // Index: (depth, parent_path >> 16) → best node (highest score)
+    let mut roots: Vec<&katgpt_core::speculative::types::TreeNode> =
+        Vec::with_capacity(tree.len().min(16));
+    // Index: (depth, parent_path >> 16) → best node (highest score).
+    // Pre-sized to tree.len() — every non-root node inserts exactly once.
     let mut child_index: HashMap<(usize, u128), &katgpt_core::speculative::types::TreeNode> =
-        HashMap::new();
+        HashMap::with_capacity(tree.len());
 
     for node in tree.iter() {
         if node.depth > max_depth {
