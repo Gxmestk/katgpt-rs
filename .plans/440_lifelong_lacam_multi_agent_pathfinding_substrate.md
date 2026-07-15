@@ -165,15 +165,29 @@ the exact algorithmic gaps that need upgrading.
 
 ### Tasks
 
-- [ ] **T3.1** Document `LocalGuidanceSource<P>` trait as the primary
+- [x] **T3.1** Document `LocalGuidanceSource<P>` trait as the primary
       extension point. Include a stub `HlaProjectedGuidance` example in
       doc comments (the actual impl lives in riir-ai/489).
-- [ ] **T3.2** Document `CostFn<P>` trait. Include stub examples for
+- [x] **T3.2** Document `CostFn<P>` trait. Include stub examples for
       heightfield slope, threat cochain, faction zone penalty.
-- [ ] **T3.3** Document `WarmStartScheme` enum and how a consumer can add
+- [x] **T3.3** Document `WarmStartScheme` enum and how a consumer can add
       a custom scheme (e.g., personality-weighted blend).
-- [ ] **T3.4** Document `HindranceEstimator` trait (extract from the
+- [x] **T3.4** Document `HindranceEstimator` trait (extract from the
       default impl). Include stub for affect-aware hindrance.
+
+### Implementation notes
+
+- All four traits now have compile-checked rustdoc examples (verified via
+  `cargo test --doc -p katgpt-core --features multi_agent_path` — 7/7 pass).
+- The stubs use `GridPos` (the substrate's default position type) so they
+  compile without consumer-only types.
+- **Bonus fix:** the module-level example in `mod.rs` had a pre-existing
+  doctest failure (closure captured `map` by reference but `with_neighbors`
+  requires `'static`). Fixed by leaking the map into a `&'static` reference
+  and using a `move` closure, with an explanatory comment that a real
+  consumer would store the map in a long-lived struct field.
+- The G3 no-regression gate still passes: `cargo clippy --all-features` clean,
+  1578/1578 lib tests pass (the plan doc's 1556 count was stale).
 
 ### Acceptance
 

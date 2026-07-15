@@ -49,7 +49,81 @@ pub type Guidance<P> = Vec<Vec<P>>;
 
 /// Trait for producing the per-agent local guidance field `Φ`.
 ///
-/// Pluggable seam #2. The default impl is [`SpaceTimeGuidance`].
+/// Pluggable seam #2. The default impl is [`SpaceTimeGuidance`] (paper-faithful
+/// space-time A* with uniform collision penalty `α`).
+///
+/// # Primary extension point (Super-GOAT fusion hook)
+///
+/// A private consumer (riir-ai/318 Extension A) replaces the uniform `α` with
+/// a per-NPC **HLA-projected** penalty so that crowded cells cost more for
+/// stressed NPCs. The collision term `α·Ind[χ>0]` from Eq. 1 becomes:
+///
+/// ```text
+/// α_i = α_base · (1 + β · σ(dot(HLA_i, D_frustration)))
+/// ```
+///
+/// where `HLA_i` is agent `i`'s 5-scalar affect vector (valence, arousal,
+/// desperation, calm, fear), `D_frustration` is a learned direction vector,
+/// and `σ` is the sigmoid bridge. This is **entirely modelless** — the
+/// direction vector is freeze/thaw-swapped, not trained.
+///
+/// # Example: a custom HLA-projected guidance source
+///
+/// ```no_run
+/// use katgpt_core::multi_agent_path::*;
+/// use katgpt_core::multi_agent_path::position::*;
+///
+/// /// Per-NPC HLA projection (the latent→raw bridge).
+/// ///
+/// /// In the real runtime this reads from the NPC's `HlaCacheProxy`; here we
+/// /// stub a lookup table indexed by `AgentId`. The bridge is a dot-product
+/// /// projection onto a pre-computed `D_frustration` direction vector, gated
+/// /// by sigmoid (never softmax — per AGENTS.md).
+/// struct HlaProjectedGuidance {
+///     /// Base collision penalty shared by all agents (paper `α`).
+///     alpha_base: f32,
+///     /// Per-agent frustration scalar in `[0, 1]`, computed once per tick
+///     /// from `σ(dot(HLA_i, D_frustration))`. Higher = more collision-averse.
+///     frustration: Vec<f32>,
+///     /// Delegate: the underlying space-time guidance we layer onto.
+///     inner: SpaceTimeGuidance<GridPos>,
+/// }
+///
+/// impl LocalGuidanceSource<GridPos> for HlaProjectedGuidance {
+///     fn compute_guidance(
+///         &mut self,
+///         config: &JointConfig<GridPos>,
+///         goals: &[GridPos],
+///         out: &mut Guidance<GridPos>,
+///     ) {
+///         // The simplest correct fusion: scale `α` per-agent by frustration,
+///         // then run the paper-faithful space-time A*. A richer impl could
+///         // also bias the goal heuristic by curiosity (valence direction),
+///         // but that lives in the private runtime — the substrate only
+///         // requires the trait method to be implemented.
+///         let n = config.n_agents();
+///         for i in 0..n {
+///             let per_agent_alpha = self.alpha_base * (1.0 + self.frustration[i]);
+///             // In a full impl you'd thread `per_agent_alpha` into `inner.cfg`;
+///             // the stub here just demonstrates the trait shape.
+///             let _ = per_agent_alpha;
+///         }
+///         self.inner.compute_guidance(config, goals, out);
+///     }
+///
+///     fn set_warm_start(&mut self, warm_start: Vec<Vec<GridPos>>) {
+///         // Delegate to the paper-faithful inner source.
+///         self.inner.set_warm_start(warm_start);
+///     }
+/// }
+/// ```
+///
+/// # Latent / raw boundary
+///
+/// The guidance field `Φ` is **latent** (local, not synced). Only the
+/// executed first step `Π_t[1]` crosses the sync boundary as a raw `TxDelta`.
+/// The HLA projection itself never leaves the NPC's local cognition — the
+/// sync layer sees only the resulting move.
 pub trait LocalGuidanceSource<P: Position> {
     /// Compute the guidance field `Φ` for all agents.
     ///

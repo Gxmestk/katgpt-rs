@@ -50,8 +50,11 @@
 //! let goals = vec![GridPos::new(9, 9), GridPos::new(0, 0)];
 //!
 //! let guidance_cfg = GuidanceConfig::default();
+//! // `with_neighbors` requires `'static`, so leak the map into a reference
+//! // (a consumer would normally store the map in a long-lived struct field).
+//! let map_ref: &'static GridMap = Box::leak(Box::new(map));
 //! let mut guidance = SpaceTimeGuidance::new(guidance_cfg)
-//!     .with_neighbors(|p| map.passable_neighbors(p));
+//!     .with_neighbors(move |p| map_ref.passable_neighbors(p));
 //! let mut hindrance = BlockingCount::new();
 //! let mut warm_start = WarmStartCache::new(WarmStartScheme::default(), guidance_cfg.w_phi);
 //! let mut rng = fastrand::Rng::with_seed(42);
@@ -101,6 +104,82 @@ pub use warm_start::{WarmStartCache, WarmStartScheme};
 /// - **Economy toll** — path through a toll gate costs gold.
 ///
 /// All of these are modelless (closed-form, no training).
+///
+/// # Examples
+///
+/// ## Heightfield slope cost
+///
+/// Uphill moves cost more; downhill moves cost less. Uses the canonical
+/// [`soft_cost`] raw→latent bridge (sigmoid-gated).
+///
+/// ```no_run
+/// use katgpt_core::multi_agent_path::*;
+/// use katgpt_core::multi_agent_path::position::*;
+///
+/// /// Heightfield-aware transition cost. `slope_at(pos)` returns the raw
+/// /// terrain gradient magnitude at `pos` (caller-supplied).
+/// struct HeightfieldCost<F: Fn(&GridPos) -> f32> {
+///     slope_at: F,
+///     beta: f32,
+/// }
+///
+/// impl<F: Fn(&GridPos) -> f32> CostFn<GridPos> for HeightfieldCost<F> {
+///     fn cost(&self, from: &GridPos, to: &GridPos) -> f32 {
+///         // Uphill (slope > 0) costs more; downhill (slope < 0) costs less.
+///         // `soft_cost` returns `sigmoid(slope * beta)` ∈ (0, 1).
+///         1.0 + soft_cost((self.slope_at)(to), self.beta)
+///     }
+/// }
+/// ```
+///
+/// ## Faction zone penalty
+///
+/// Moves into enemy territory cost more — the penalty is a closed-form
+/// scalar lookup, not a learned value.
+///
+/// ```no_run
+/// use katgpt_core::multi_agent_path::*;
+/// use katgpt_core::multi_agent_path::position::*;
+/// use std::collections::HashMap;
+///
+/// /// Per-cell faction ownership penalty. `penalty[pos]` is 0.0 in friendly
+/// /// territory, higher in enemy territory (caller populates from the
+/// /// social-domain KG triples).
+/// struct FactionZoneCost {
+///     penalty: HashMap<GridPos, f32>,
+/// }
+///
+/// impl CostFn<GridPos> for FactionZoneCost {
+///     fn cost(&self, _from: &GridPos, to: &GridPos) -> f32 {
+///         1.0 + self.penalty.get(to).copied().unwrap_or(0.0)
+///     }
+/// }
+/// ```
+///
+/// ## Threat cochain cost (DEC fusion)
+///
+/// A consumer that ships the DEC substrate (Plan 219) reads the codifferential
+/// `δ` of the threat cochain at `to` and adds it as a latent cost. The stub
+/// below shows the shape; the actual `δ` computation lives in
+/// `katgpt_core::dec::codifferential`.
+///
+/// ```no_run
+/// use katgpt_core::multi_agent_path::*;
+/// use katgpt_core::multi_agent_path::position::*;
+///
+/// /// Threat-field-aware cost. `threat_density(pos)` is the magnitude of the
+/// /// DEC codifferential of the threat cochain at `pos` — a latent scalar.
+/// struct ThreatCochainCost<F: Fn(&GridPos) -> f32> {
+///     threat_density: F,
+/// }
+///
+/// impl<F: Fn(&GridPos) -> f32> CostFn<GridPos> for ThreatCochainCost<F> {
+///     fn cost(&self, _from: &GridPos, to: &GridPos) -> f32 {
+///         // High threat density → high cost. Clamped at a sensible ceiling.
+///         1.0 + (self.threat_density)(to).min(10.0)
+///     }
+/// }
+/// ```
 pub trait CostFn<P: Position> {
     /// Cost of moving from `from` to `to`. Must be ≥ 0.
     fn cost(&self, from: &P, to: &P) -> f32;

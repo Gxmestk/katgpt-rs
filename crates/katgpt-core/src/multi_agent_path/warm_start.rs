@@ -24,7 +24,49 @@ use super::position::Position;
 
 /// Warm-start strategy for the guidance field.
 ///
-/// Pluggable seam #3.
+/// Pluggable seam #3. The enum is closed (three paper-faithful variants),
+/// but a consumer can compose it per-agent based on personality — the
+/// canonical fusion pattern (riir-ai/318 Extension C).
+///
+/// # Example: per-personality scheme selection
+///
+/// Curious NPCs use [`WarmStartScheme::LllgEmpty`] (explore new paths),
+/// while conservative NPCs use [`WarmStartScheme::LllgPi`] (stick to the
+/// plan). The selection is a closed-form sigmoid gate on the NPC's
+/// curiosity direction vector — no training, just a freeze/thaw-swapped
+/// direction.
+///
+/// ```no_run
+/// use katgpt_core::multi_agent_path::*;
+/// use katgpt_core::multi_agent_path::position::*;
+///
+/// /// Per-NPC warm-start scheme selector. The curiosity scalar is computed
+/// /// once per tick from `σ(dot(HLA_i, D_curiosity))` — a latent projection,
+/// /// not a learned weight.
+/// fn scheme_for_agent(curiosity: f32) -> WarmStartScheme {
+///     // Curious NPCs (curiosity > 0.5) recompute from scratch; conservative
+///     // NPCs reuse the previous solution suffix.
+///     if curiosity > 0.5 {
+///         WarmStartScheme::LllgEmpty
+///     } else {
+///         WarmStartScheme::LllgPi
+///     }
+/// }
+///
+/// // A consumer that wants per-agent schemes runs one `LifelongLaCam`
+/// // instance per scheme and routes agents by personality. The substrate
+/// // itself is single-scheme-per-instance (paper-faithful); the composition
+/// // is the consumer's responsibility.
+/// let _curious_scheme = scheme_for_agent(0.8);
+/// let _conservative_scheme = scheme_for_agent(0.2);
+/// ```
+///
+/// # Runtime scheme changes
+///
+/// The scheme can be changed at runtime via
+/// [`WarmStartCache::set_scheme`](super::WarmStartCache::set_scheme) — useful
+/// for A/B ablation or for switching a zone from exploration (`LllgEmpty`)
+/// to steady-state (`LllgPi`) once the layout is learned.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
 pub enum WarmStartScheme {
     /// Initialize `Φ_t` from the suffix `Π_{t-1}[2:w_Φ]` of the previous

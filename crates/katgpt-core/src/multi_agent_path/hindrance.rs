@@ -20,7 +20,52 @@ use super::position::Position;
 
 /// Trait for hindrance estimation — pluggable seam #4.
 ///
-/// See module docs.
+/// See module docs. The default impl is [`BlockingCount`] (raw sibling
+/// count). For affect-aware hindrance (fearful NPCs count more), use
+/// [`WeightedBlockingCount`] with a per-agent weight closure.
+///
+/// # Example: affect-aware hindrance (HLA fusion)
+///
+/// A fearful NPC blocking your path is a bigger cost than a calm NPC doing
+/// the same — the social-cost extension from riir-ai/318 Extension D. The
+/// weight is a closed-form sigmoid projection of the NPC's fear scalar,
+/// not a learned value.
+///
+/// ```no_run
+/// use katgpt_core::multi_agent_path::*;
+/// use katgpt_core::multi_agent_path::position::*;
+///
+/// /// Per-agent fear weight table. In the real runtime this is populated
+/// /// from each NPC's `HlaCacheProxy` fear scalar (the 5th HLA component):
+/// /// `weight_i = 1 + γ · fear_i`.
+/// ///
+/// /// Fearful blockers cost more to displace, so agents route around them.
+/// /// The base weight is 1.0 (paper-faithful when all `fear_i = 0`).
+/// struct FearTable {
+///     fear: Vec<f32>,
+///     gamma: f32,
+/// }
+///
+/// impl FearTable {
+///     fn hindrance_estimator(&self) -> WeightedBlockingCount<impl Fn(AgentId) -> f32 + '_> {
+///         let fear = &self.fear;
+///         let gamma = self.gamma;
+///         WeightedBlockingCount::new(move |agent: AgentId| {
+///             let i = usize::from(agent);
+///             // Base 1.0 (paper-faithful) + fear-scaled social cost.
+///             1.0 + gamma * fear.get(i).copied().unwrap_or(0.0)
+///         })
+///     }
+/// }
+/// ```
+///
+/// # Custom estimator shape
+///
+/// A consumer that wants a fully custom estimator (e.g. one that reads the
+/// DEC codifferential of the crowd flow at `target`) implements the trait
+/// directly. The only constraint is that the return value is non-negative
+/// and deterministic — the same `(agent, target, config)` triple must always
+/// produce the same cost, to preserve deterministic replay.
 pub trait HindranceEstimator<P: Position> {
     /// Estimate the hindrance cost of agent `agent` moving to `target` at `t+1`,
     /// given the current joint configuration `config`.
