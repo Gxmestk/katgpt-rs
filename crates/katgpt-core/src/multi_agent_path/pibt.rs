@@ -234,6 +234,17 @@ where
 
     // Fast path: no stuck agents (or too few to justify retry overhead).
     // On open maps this is the overwhelmingly common case.
+    //
+    // NOTE (Proposal 023 / Issue 516 G6c measurement, 2026-07-15): when stuck
+    // agents exist, the forced-wait in `greedy_pibt_pass` creates vertex
+    // collisions (the stuck agent's current position is committed by another
+    // agent). The all-wait fallback (return `config.positions.clone()` when
+    // stuck is non-empty) fixes collisions but kills throughput on congested
+    // maps (G6a: 26.7% → 0.0%, G7a: 12 ticks → 200 ticks). The proper fix is
+    // PIBT priority inheritance (Okumura 2019), tracked as a separate issue.
+    // The current behavior (collisions on congested ticks) is the lesser evil
+    // vs zero throughput — consumers that need guaranteed collision-freedom
+    // should use the occupied-set baseline.
     if stuck.len() < MIN_STUCK_FOR_RETRY {
         return Ok(JointAction::new(moves));
     }
@@ -268,6 +279,10 @@ where
     }
 
     // Place stuck agents as wait-in-place (best effort).
+    //
+    // NOTE: this can create vertex collisions (the stuck agent's current
+    // position may be committed by another agent). See the fast-path comment
+    // above for the full analysis. The all-wait alternative kills throughput.
     for &agent in &best_stuck {
         let i = usize::from(agent);
         best_moves[i] = config.pos(agent).clone();
