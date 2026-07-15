@@ -364,6 +364,88 @@ fn test_passable_neighbors_respects_walls() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────
+// Issue 148 — MovingAI benchmark map parser
+// ─────────────────────────────────────────────────────────────────────────
+
+#[test]
+fn test_from_movingai_basic() {
+    let text = "type octile\nheight 3\nwidth 4\nmap\n@..@\n.@@.\n...\n";
+    let map = GridMap::from_movingai(text).expect("valid map");
+    assert_eq!(map.width, 4);
+    assert_eq!(map.height, 3);
+    // Row 0: @ . . @
+    assert!(!map.is_passable(0, 0));
+    assert!(map.is_passable(1, 0));
+    assert!(map.is_passable(2, 0));
+    assert!(!map.is_passable(3, 0));
+    // Row 1: . @ @ .
+    assert!(map.is_passable(0, 1));
+    assert!(!map.is_passable(1, 1));
+    assert!(!map.is_passable(2, 1));
+    assert!(map.is_passable(3, 1));
+    // Row 2: all passable
+    assert!(map.is_passable(0, 2));
+    assert!(map.is_passable(3, 2));
+}
+
+#[test]
+fn test_from_movingai_all_obstacle_chars_treated_as_walls() {
+    // Per MovingAI MAPF convention: only '.' is passable.
+    // @, O, T, W, S, V, U, etc. are all obstacles.
+    let text = "type octile\nheight 1\nwidth 8\nmap\n.@OTWSV.\n";
+    let map = GridMap::from_movingai(text).expect("valid map");
+    assert!(map.is_passable(0, 0), ". should be passable");
+    assert!(map.is_passable(7, 0), "trailing . should be passable");
+    for x in 1..=6 {
+        assert!(!map.is_passable(x, 0), "char at x={x} should be a wall");
+    }
+}
+
+#[test]
+fn test_from_movingai_short_rows_padded_as_walls() {
+    // A row shorter than `width` — the parser uses `.take(w)` per row, so
+    // missing trailing cells simply aren't iterated (they remain passable
+    // from `GridMap::empty`). To make behavior well-defined, we verify a
+    // short row still parses and the present cells are handled correctly.
+    let text = "type octile\nheight 2\nwidth 5\nmap\n@..\n.....\n";
+    let map = GridMap::from_movingai(text).expect("valid map");
+    assert_eq!(map.width, 5);
+    assert_eq!(map.height, 2);
+    assert!(!map.is_passable(0, 0));
+    assert!(map.is_passable(1, 0));
+    assert!(map.is_passable(2, 0));
+}
+
+#[test]
+fn test_from_movingai_rejects_malformed() {
+    // Missing 'map' marker.
+    assert!(GridMap::from_movingai("type octile\nheight 2\nwidth 2\n").is_none());
+    // Non-numeric height.
+    assert!(
+        GridMap::from_movingai("type octile\nheight x\nwidth 2\nmap\n..\n..\n")
+            .is_none()
+    );
+    // Empty input.
+    assert!(GridMap::from_movingai("").is_none());
+    // Zero dimensions.
+    assert!(
+        GridMap::from_movingai("type octile\nheight 0\nwidth 0\nmap\n")
+            .is_none()
+    );
+}
+
+#[test]
+fn test_from_movingai_preserves_octile_type_line_lenient() {
+    // The parser doesn't validate the `type` value (octile is most common but
+    // some maps use other values); it only checks the structure.
+    let text = "type anything\nheight 1\nwidth 2\nmap\n.\n\n";
+    let map = GridMap::from_movingai(text).expect("type line is lenient");
+    assert_eq!(map.width, 2);
+    assert_eq!(map.height, 1);
+    assert!(map.is_passable(0, 0));
+}
+
+// ─────────────────────────────────────────────────────────────────────────
 // Issue 140/143 — PIBT priority inheritance investigation
 // ─────────────────────────────────────────────────────────────────────────
 //

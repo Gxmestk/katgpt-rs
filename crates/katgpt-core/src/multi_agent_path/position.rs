@@ -121,6 +121,72 @@ impl GridMap {
         x < self.width && y < self.height && !self.walls[y][x]
     }
 
+    /// Parse a MovingAI benchmark map file (the standard 2D pathfinding
+    /// format from https://movingai.com/benchmarks/grids.html).
+    ///
+    /// Format:
+    /// ```text
+    /// type octile
+    /// height H
+    /// width W
+    /// map
+    /// <H rows of W characters each>
+    /// ```
+    ///
+    /// Per the MovingAI MAPF benchmark convention, only `.` is passable.
+    /// All other characters (`@`, `O`, `T`, `W`, `S`, `V`, `U`, ...) are
+    /// treated as walls. This matches how the LaCAM / LLLG papers configure
+    /// these maps (4-connected, ground-traversable cells only).
+    ///
+    /// This is a reusable leaf primitive — any consumer or test loading a
+    /// MovingAI map needs it, and the substrate itself is grid-format-
+    /// agnostic (it works over `Position`). Returns `None` on malformed input
+    /// so callers can fall back to a synthetic generator if a download fails.
+    ///
+    /// # Plan 440 Issue 148
+    /// Added to load the real `ht_chantry.map` (162×141, Dragon Age: Origins)
+    /// for a fair G1 comparison against the paper, replacing the synthetic
+    /// `ht_chantry_approx` whose tight maze corridors capped throughput at
+    /// ~1.5 (2× the real map's corridor density).
+    pub fn from_movingai(text: &str) -> Option<Self> {
+        let mut lines = text.lines();
+
+        // Header: 4 lines. Be lenient about the `type` value (octile is by far
+        // the most common, but the parser doesn't depend on it).
+        let _type_line = lines.next()?;
+        let height_line = lines.next()?;
+        let width_line = lines.next()?;
+        let map_marker = lines.next()?;
+
+        if !height_line.starts_with("height") {
+            return None;
+        }
+        if !width_line.starts_with("width") {
+            return None;
+        }
+        if map_marker.trim() != "map" {
+            return None;
+        }
+
+        let h: usize = height_line.split_whitespace().nth(1)?.parse().ok()?;
+        let w: usize = width_line.split_whitespace().nth(1)?.parse().ok()?;
+
+        if h == 0 || w == 0 {
+            return None;
+        }
+
+        let mut map = GridMap::empty(w, h);
+        for (y, row) in lines.take(h).enumerate() {
+            for (x, c) in row.chars().take(w).enumerate() {
+                // Only `.` is passable in the MAPF benchmark convention.
+                if c != '.' {
+                    map.set_wall(x, y);
+                }
+            }
+        }
+        Some(map)
+    }
+
     /// Clamp a [`GridPos`] to passable neighbors of `pos`.
     ///
     /// Returns only neighbors that are in-bounds and non-wall. Used by

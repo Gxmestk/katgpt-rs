@@ -6,7 +6,7 @@
 **Private runtime plan:** [riir-ai/.plans/489_lifelong_lacam_crowd_coordination_runtime.md](../../riir-ai/.plans/489_lifelong_lacam_crowd_coordination_runtime.md)
 **Source paper:** [arXiv:2605.16855](https://arxiv.org/abs/2605.16855) — Arita & Okumura, "Lifelong LaCAM with Local Guidance for Lifelong MAPF", AAAI 2026.
 **Target:** `katgpt-rs/crates/katgpt-core/src/multi_agent_path/` (new module) + Cargo feature `multi_agent_path`
-**Status:** Active — Phase 1 COMPLETE, Phase 2 (GOAT gate) PARTIAL — G3/G4 PASS, G1 3/4 maps PASS (empty, random, warehouse), G2 FAIL (warm-start non-consumable), Phase 3 COMPLETE (fusion hooks documented), Phase 4 COMPLETE (README + research cross-refs + overview feature table), Phase 5 COMPLETE (promotion decision: KEEP OPT-IN, Issue 143 LaCAM escalation landed)
+**Status:** Active — Phase 1 COMPLETE, Phase 2 (GOAT gate) PARTIAL — G3/G4 PASS, G1 2/4 real maps PASS (empty, random), warehouse 0.41 and ht_chantry 0.27 FAIL on real MovingAI maps (Issue 148), G2 FAIL (warm-start non-consumable), Phase 3 COMPLETE (fusion hooks documented), Phase 4 COMPLETE (README + research cross-refs + overview feature table), Phase 5 COMPLETE (promotion decision: KEEP OPT-IN, Issue 143 LaCAM escalation landed)
 
 ---
 
@@ -110,10 +110,10 @@ See `.benchmarks/440_lllg_paper_repro_goat.md` for full results.
 
 | Gate | Status | Detail |
 |---|---|---|
-| G1 (throughput) | **PARTIAL (3/4)** | empty-48-48 ratio 0.69 ✅, random-64-64-10 ratio 0.69 ✅, warehouse ratio 0.42 ✅, ht_chantry ratio 0.09 ❌ (improved from 0.01 via Issue 147 connectivity fix; remaining gap is map fidelity) |
+| G1 (throughput) | **PARTIAL (2/4 real)** | empty-48-48 ratio 0.68 ✅, random-64-64-10 ratio 0.68 ✅, warehouse ratio 0.41 ❌, ht_chantry ratio 0.27 ❌ (MARGINAL). Issue 148 upgraded all 4 maps to real MovingAI files; ht_chantry improved 0.09→0.27 but genuine ~4× algorithmic gap remains; warehouse unchanged on 5× larger real map (not size-limited) |
 | G2 (congestion) | **FAIL** | Warm-start occupancy-seeding confirmed harmful even with full A* (Issue 142). LllgPi = LllgEmpty |
-| G3 (no-regression) | **PASS** | 1583 tests pass (with feature), 1556/1556 (without). Clippy clean on all-features |
-| G4 (latency) | **PASS** | 234ms median at 1000 agents (target <500ms, stretch <100ms). Paper: 210-260ms |
+| G3 (no-regression) | **PASS** | 1590 tests pass (5 new parser tests from Issue 148). Clippy clean on all-features |
+| G4 (latency) | **PASS** | 222ms median at 1000 agents (target <500ms, stretch <100ms). Paper: 210-260ms |
 
 ### Substrate upgrades applied during Phase 2
 
@@ -153,25 +153,29 @@ See `.benchmarks/440_lllg_paper_repro_goat.md` for full results.
 
 ### Blocking items for G1/G2 full pass
 
-1. **ht_chantry (G1)** — **Issue 147 (2026-07-15) found the root cause:**
-   the synthetic `ht_chantry_approx` map generator created **37 disconnected
-   components**. Only 24% of passable cells were in the largest component.
-   Agents in small components could never reach their goals (BFS returned
-   `f32::MAX`). The `ensure_connected` post-processing fix improved throughput
-   from 0.15 → 1.47 (10×). The remaining gap (ratio 0.09 vs paper ~17) is
-   **map fidelity**: the synthetic maze has extreme bottlenecks (177 corridor
-   cells, 5.9% density) that saturate at ~1.4 throughput regardless of
-   algorithm. Counter-flow Guided-PIBT was tested (negative result — hindrance
-   is 3rd tiebreak, too low-priority to matter). The next step is to download
-   the real MovingAI ht_chantry map for a fair comparison.
+1. **ht_chantry (G1)** — **Issue 148 (2026-07-15) exhausted the map-fidelity
+   hypothesis.** Issue 147 found the synthetic map had 37 disconnected
+   components and fixed it (10× improvement to ratio 0.09). Issue 148
+   downloaded the real MovingAI `ht_chantry.map` (162×141, 7461 passable,
+   2.9% corridor cells vs synthetic 5.9%) — throughput improved 3× to ratio
+   **0.27** but is still below the 0.30 PASS threshold. A genuine ~4×
+   algorithmic gap remains (4.51 vs paper ~17). **Full Guided-PIBT (flow
+   direction assignment) is now genuinely warranted** — the map-fidelity
+   excuse is exhausted. The `CounterFlowHindrance` infrastructure (Issue 147)
+   is available but needs promotion from the 3rd PIBT tiebreak to a
+   higher-priority cost term.
 2. **Warm-start consumption (G2)** — needs LaCAM escalation to keep PIBT
    deviations rare so warm-start forecasts stay accurate. The current LaCAM
    retry (priority shuffle) doesn't reduce deviations enough. Issue 144's
    swap technique also didn't reduce deviations (infrastructure-only), so
    the warm-start re-eval (T4) was not re-tested. The paper's full LaCAM
    (configuration tree search) would, but that's a much heavier implementation.
-3. **Real MovingAI maps** — synthetic approximations may differ from the
-   actual warehouse/ht_chantry topology.
+3. **Real MovingAI maps** — **RESOLVED by Issue 148 (2026-07-15).** All 4
+   paper maps now use real MovingAI benchmark files
+   (`benches/data/*.map` + `GridMap::from_movingai` parser). ht_chantry
+   improved 3× on the real map; warehouse was unchanged (proving its gap
+   is algorithmic, not map-size). The synthetic approximations are kept as
+   diagnostic comparisons.
 
 ### Acceptance
 

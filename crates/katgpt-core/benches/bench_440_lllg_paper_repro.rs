@@ -14,14 +14,18 @@
 //! - **G4 (latency)** — per-tick planning time at 1000 agents. Target < 500 ms;
 //!   stretch < 100 ms. Paper reports 210–260 ms/step on M1 Ultra.
 //!
-//! # Map approximations
+//! # Maps
 //!
-//! The paper uses MovingAI MAPF benchmark maps. We generate synthetic
-//! approximations:
+//! The paper uses MovingAI MAPF benchmark maps:
 //! - `empty-48-48`: exact (48×48 empty grid).
 //! - `random-64-64-10`: 64×64 grid with 10% random obstacles (seeded).
 //! - `warehouse-10-20-10-2-2`: synthetic warehouse with shelf blocks + aisles.
-//! - `ht_chantry`: synthetic maze with bottlenecks (approximation).
+//! - `ht_chantry`: **real MovingAI map** (162×141, Dragon Age: Origins)
+//!   loaded via [`GridMap::from_movingai`] from `data/ht_chantry.map`
+//!   (Issue 148). Replaces the synthetic `ht_chantry_approx` whose tight
+//!   maze corridors (5.9% corridor cells) capped throughput at ~1.5;
+//!   the real map has only 2.9% corridor cells and 77.5% fully-open cells.
+//!   The synthetic approx is still generated for diagnostic comparison.
 //!
 //! # Run
 //!
@@ -65,14 +69,63 @@ impl GateResult {
 
 // ─── Map generators ─────────────────────────────────────────────────────────
 
-/// Generate the 4 paper benchmark maps (synthetic approximations).
+/// Generate the 4 real MovingAI paper benchmark maps for the G1 gate, plus
+/// the synthetic approximations kept as diagnostic comparisons (Issue 148).
+///
+/// The G1 gate iterates this list and matches names against `paper_targets`.
+/// Maps suffixed `-real` are canonical paper maps (loaded from `data/*.map`);
+/// maps suffixed `-approx` have no paper target and are skipped by the gate
+/// (only printed for contrast to document the map-fidelity gap).
+///
+/// **empty-48-48-real:** identical to the synthetic (48×48 empty grid is
+/// exact by construction) — loaded for symmetry, same result as `empty_map`.
+/// **random-64-64-10-real:** 3687 passable cells vs synthetic 3704 (17-cell
+/// drift from obstacle seeding; negligible).
+/// **warehouse-10-20-10-2-2-real:** 170×84 / 9776 passable vs synthetic
+/// 63×45 / 1971 — **5× more passable cells**. The synthetic's tiny size
+/// caused artificial congestion; the real warehouse has wide aisles.
+/// **ht_chantry-real:** 162×141 / 7461 passable vs synthetic 71×53 / 3015.
+/// Real map has 2.9% corridor cells vs synthetic 5.9% (2× denser maze).
 fn generate_maps() -> Vec<(&'static str, GridMap)> {
     vec![
-        ("empty-48-48", empty_map(48, 48)),
-        ("random-64-64-10", random_map(64, 64, 0.10, 42)),
-        ("warehouse-10-20-10-2-2", warehouse_map(63, 45)),
+        (
+            "empty-48-48-real",
+            load_real("data/empty-48-48.map").unwrap_or_else(|| empty_map(48, 48)),
+        ),
+        (
+            "random-64-64-10-real",
+            load_real("data/random-64-64-10.map")
+                .unwrap_or_else(|| random_map(64, 64, 0.10, 42)),
+        ),
+        (
+            "warehouse-10-20-10-2-2-real",
+            load_real("data/warehouse-10-20-10-2-2.map")
+                .unwrap_or_else(|| warehouse_map(63, 45)),
+        ),
+        (
+            "ht_chantry-real",
+            load_real("data/ht_chantry.map").unwrap_or_else(|| ht_chantry_approx(71, 53)),
+        ),
+        // Diagnostics — NOT in paper_targets, so the G1 gate skips them.
+        // Kept to document the map-fidelity gap (Issue 147 root cause) and
+        // to confirm empty/random synthetics match the real maps.
+        ("empty-48-48-approx", empty_map(48, 48)),
+        ("random-64-64-10-approx", random_map(64, 64, 0.10, 42)),
+        ("warehouse-10-20-10-2-2-approx", warehouse_map(63, 45)),
         ("ht_chantry-approx", ht_chantry_approx(71, 53)),
     ]
+}
+
+/// Load a real MovingAI benchmark map embedded at compile time.
+/// Returns `None` only if the embedded file is malformed (build-time bug).
+fn load_real(path: &str) -> Option<GridMap> {
+    GridMap::from_movingai(match path {
+        "data/empty-48-48.map" => include_str!("data/empty-48-48.map"),
+        "data/random-64-64-10.map" => include_str!("data/random-64-64-10.map"),
+        "data/warehouse-10-20-10-2-2.map" => include_str!("data/warehouse-10-20-10-2-2.map"),
+        "data/ht_chantry.map" => include_str!("data/ht_chantry.map"),
+        _ => return None,
+    })
 }
 
 fn empty_map(w: usize, h: usize) -> GridMap {
@@ -642,10 +695,16 @@ fn main() {
     // to fewer concurrent tasks. We use the paper's 1000-agent numbers as the
     // upper bound and accept 10% within as "same order of magnitude."
     let paper_targets: &[(&str, f64)] = &[
-        ("empty-48-48", 27.3),
-        ("random-64-64-10", 21.1),
-        ("ht_chantry-approx", 17.0), // estimated from +81% gain
-        ("warehouse-10-20-10-2-2", 18.0), // estimated
+        // Issue 148: all 4 paper maps now use the REAL MovingAI benchmark
+        // map files (downloaded from movingai.com/benchmarks/mapf/).
+        ("empty-48-48-real", 27.3),
+        ("random-64-64-10-real", 21.1),
+        // Real warehouse is 170×84 / 9776 passable (5× the synthetic). Paper
+        // reports ~30% gain over PIBT ≈ 18 throughput units.
+        ("warehouse-10-20-10-2-2-real", 18.0),
+        // Real ht_chantry is 162×141 / 7461 passable. Paper reports +81%
+        // vs RHCR ≈ 17–19 throughput.
+        ("ht_chantry-real", 17.0),
     ];
 
     let n_agents_g1 = 800;
@@ -664,12 +723,22 @@ fn main() {
             continue;
         }
 
-        let metrics = run_simulation(map, n, steps_g1, 42);
-        let target = paper_targets
+        // Maps not in paper_targets are diagnostic-only (e.g. ht_chantry-approx).
+        // Run them and print for contrast, but don't count toward the gate.
+        let Some((_, target)) = paper_targets
             .iter()
             .find(|(n, _)| *n == *map_name)
-            .map(|(_, t)| *t)
-            .unwrap_or(15.0);
+            .copied()
+        else {
+            let metrics = run_simulation(map, n, steps_g1, 42);
+            println!(
+                "  {map_name:<30}: throughput={:>7.2} (DIAGNOSTIC, no paper target, n={}, completions={})",
+                metrics.throughput, n, metrics.completions
+            );
+            continue;
+        };
+
+        let metrics = run_simulation(map, n, steps_g1, 42);
 
         // Throughput at 800 agents is expected to be somewhat lower than at 1000.
         // Gate: within 50% of the paper's 1000-agent number (generous; we're
@@ -754,9 +823,9 @@ fn main() {
     });
 
     // ─── G2: Congestion mitigation (LLLG_Π vs LllgEmpty) ─────────────────────
-    println!("─── G2: Congestion mitigation — empty-48-48, 1000 agents ───\n");
+    println!("─── G2: Congestion mitigation — empty-48-48-real, 1000 agents ───\n");
 
-    let empty_map = &maps[0].1; // empty-48-48
+    let empty_map = &maps[0].1; // empty-48-48-real
     let n_agents_g2 = 1000_usize.min(count_passable(empty_map) / 2);
     let steps_g2 = 100;
 
@@ -801,7 +870,7 @@ fn main() {
     });
 
     // ─── G4: Latency at 1000 agents ─────────────────────────────────────────
-    println!("─── G4: Latency — empty-48-48, 1000 agents, 200 steps ───\n");
+    println!("─── G4: Latency — empty-48-48-real, 1000 agents, 200 steps ───\n");
 
     let n_agents_g4 = 1000_usize.min(count_passable(empty_map) / 2);
     let steps_g4 = 100;
@@ -867,9 +936,11 @@ fn main() {
         println!("The substrate has algorithmic gaps that need upgrading before");
         println!("promotion. See FAIL details above for specific issues.");
         println!();
-        println!("G1: 3/4 maps pass (A* guidance + LaCAM retry, Issues 142+143).");
-        println!("    ht_chantry improved 10× (0.01→0.09) via Issue 147 connectivity fix.");
-        println!("    Remaining gap is map fidelity (synthetic bottlenecks saturate).");
+        println!("G1: 2/4 real paper maps pass (empty, random). warehouse (0.41) and");
+        println!("    ht_chantry (0.27) FAIL — now confirmed genuine algorithmic gaps,");
+        println!("    not map-fidelity artifacts (Issue 148 real-map upgrade).");
+        println!("    warehouse: 5× bigger real map, same throughput → not size-limited.");
+        println!("    ht_chantry: 3× better on real map (0.09→0.27) but ~4× gap remains.");
         println!("G2: warm-start consumption confirmed harmful without LaCAM (Issue 142).");
         println!("The GOAT gate honestly identifies the remaining gaps.");
     }

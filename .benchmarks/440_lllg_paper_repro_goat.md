@@ -1,10 +1,11 @@
 # Benchmark 440: LLLG Paper Reproduction GOAT Gate
 
-**Date:** 2026-07-15 (updated Issue 147)
+**Date:** 2026-07-15 (updated Issue 148)
 **Plan:** [440](../.plans/440_lifelong_lacam_multi_agent_pathfinding_substrate.md)
 **Research:** [424](../.research/424_Lifelong_LaCAM_Local_Guidance_Multi_Agent_Pathfinding.md)
 **Paper:** [arXiv:2605.16855](https://arxiv.org/abs/2605.16855) — Arita & Okumura, AAAI 2026
-**Issue:** [147](../.issues/147_guided_pibt_maze_routing_exploration.md) — ht_chantry connectivity fix (10× improvement) + counter-flow Guided-PIBT (negative result)
+**Issue:** [148](../.issues/148_real_movingai_maps.md) — real MovingAI benchmark maps (map-fidelity hypothesis test)
+**Prior issue:** [147](../.issues/147_guided_pibt_maze_routing_exploration.md) — ht_chantry connectivity fix (10× improvement) + counter-flow Guided-PIBT (negative result)
 **Prior issue:** [144](../.issues/144_lacam_escalation_swap_warmstart_followup.md) — swap technique (negative result, infrastructure-only)
 **Prior issue:** [143](../.issues/143_lacam_escalation_full_pibt.md) — LaCAM escalation (greedy PIBT + priority shuffle retry)
 **Prior issue:** [142](../.issues/142_full_space_time_astar_guidance_upgrade.md) — full space-time A* upgrade
@@ -15,40 +16,119 @@
 ## TL;DR
 
 **G3 (no-regression): PASS. G4 (latency): PASS. G1 (throughput): PARTIAL
-(3/4 maps). G2 (congestion): FAIL (warm-start not consumable — confirmed
+(2/4 real maps). G2 (congestion): FAIL (warm-start not consumable — confirmed
 by Issue 142 even with full A*).**
 
-**Issue 147 root-cause finding:** the ht_chantry G1 failure (throughput 0.01)
-was **~90% a map-generator bug**, not an algorithmic gap. The synthetic
-`ht_chantry_approx` created **37 disconnected components** — only 24% of
-passable cells were in the largest component. Agents placed in small
-components could never reach their goals (BFS returned `f32::MAX`).
+**Issue 148 finding (the map-fidelity hypothesis test):** Issue 147 hypothesized
+the remaining ht_chantry gap (ratio 0.09 on the synthetic approx) was "map
+fidelity" and predicted the real MovingAI map would close it. Issue 148
+downloaded the **real MovingAI benchmark maps** for all 4 paper scenarios
+and tested that hypothesis. Result: **partially correct.**
 
-The fix (`ensure_connected` post-processing — punch holes to merge all
-components) improved ht_chantry throughput from **0.15 → 1.47 (10× improvement)**.
-The remaining gap (1.47 vs paper's ~17) is **map fidelity**: our synthetic
-maze has extreme bottlenecks (177 corridor cells out of 3015 = 5.9%) that
-saturate at ~1.4 throughput regardless of algorithm. Config tuning (w_Φ,
-α) provides at most +16%.
+- **ht_chantry improved 3×** (ratio 0.09 → 0.27) on the real map — confirming
+  3× of the prior ~12× gap was indeed map fidelity (synthetic had 5.9% corridor
+  cells vs real 2.9%, 2× denser maze).
+- **But a genuine ~4× algorithmic gap remains** (4.51 vs paper ~17). The
+  remaining gap is no longer attributable to map fidelity — Guided-PIBT (full
+  flow direction assignment) is now genuinely warranted for maze topology.
+- **warehouse is unchanged** on the real map (7.34 vs 7.57 synthetic) despite
+  the real map being **5× larger** (9776 vs 1971 passable cells). This proves
+  warehouse congestion is **not** size-limited — it's a genuine algorithmic
+  limit on shelf-aisle topology. Low max_stops=8 confirms agents aren't stuck;
+  they just complete tasks too slowly.
 
-The counter-flow Guided-PIBT variant (`CounterFlowHindrance` estimator)
-was also tested and produced **zero improvement** — the hindrance term is
-the 3rd PIBT tiebreak, too low-priority to influence decisions when agents
-have clear goal-direction gradients. Same lesson as the swap technique
-(Issue 144): modifying a low-priority tiebreak doesn't change behavior.
+| Map | Synthetic (Issue 147) | **Real (Issue 148)** | Change | Verdict |
+|---|---|---|---|---|
+| empty-48-48 | 18.52 (0.68) | **18.52 (0.68)** | identical | PASS |
+| random-64-64-10 | 14.57 (0.69) | **14.37 (0.68)** | -1.4% | PASS |
+| warehouse | 7.57 (0.42) | **7.34 (0.41)** | -3.0% | FAIL |
+| ht_chantry | 1.47 (0.09) | **4.51 (0.27)** | **+207%** | FAIL (MARGINAL) |
 
-| Map | Issue 144 | **Issue 147 (connectivity fix)** | Change |
-|---|---|---|---|
-| empty-48-48 | 18.52 (ratio 0.68) | **18.52 (ratio 0.68)** | no change |
-| random-64-64-10 | 14.57 (ratio 0.69) | **14.57 (ratio 0.69)** | no change |
-| warehouse | 7.57 (ratio 0.42) | **7.57 (ratio 0.42)** | no change |
-| ht_chantry | 0.15 (ratio 0.01) | **1.47 (ratio 0.09)** | **+880%** |
+**Promotion decision: KEEP OPT-IN.** Unchanged. The real-map upgrade closed
+the map-fidelity portion of the gap but confirmed genuine algorithmic gaps
+on warehouse and maze topologies. The substrate works correctly on 2/4 real
+paper maps (open + random). Full Guided-PIBT (flow direction assignment) and
+warehouse-specific routing are now the documented next steps.
 
-**Promotion decision: KEEP OPT-IN.** Unchanged. ht_chantry improved 10×
-but is still below the 0.15 ratio MARGINAL threshold (now at 0.09). The
-remaining gap is map fidelity (synthetic approximation vs real MovingAI
-map), not algorithmic. The substrate works correctly on 3/4 maps and the
-ht_chantry limitation is documented as a known benchmark constraint.
+---
+
+## Issue 148 results (2026-07-15) — real MovingAI benchmark maps
+
+### What was done
+
+Downloaded the real MovingAI MAPF benchmark maps from
+https://movingai.com/benchmarks/mapf/mapf-map.zip for all 4 paper scenarios:
+`empty-48-48.map`, `random-64-64-10.map`, `warehouse-10-20-10-2-2.map`,
+`ht_chantry.map`. Embedded them in `benches/data/*.map` and added a
+`GridMap::from_movingai(text)` parser (reusable leaf primitive, with 5 unit
+tests in `tests.rs`). The G1 gate now runs against the real maps; the
+synthetic approximations are kept as diagnostic comparisons.
+
+### Map topology comparison
+
+| Map | Synthetic dims | Real dims | Real passable | Real corridor% |
+|---|---|---|---|---|
+| empty-48-48 | 48×48 / 2304 | 48×48 / 2304 | 2304 (100%) | 0.2% |
+| random-64-64-10 | 64×64 / 4096 | 64×64 / 4096 | 3687 (90%) | 6.5% |
+| warehouse | 63×45 / 2835 | **170×84 / 14280** | **9776 (68.5%)** | **0.0%** |
+| ht_chantry | 71×53 / 3763 | **162×141 / 22842** | **7461 (32.7%)** | **2.9%** |
+
+The synthetic warehouse and ht_chantry were both dramatically smaller than
+the real maps. The real warehouse has 5× more passable cells; the real
+ht_chantry has 2.5× more. Both real maps are single connected components
+(verified via flood-fill).
+
+### Result: map-fidelity hypothesis partially confirmed
+
+**ht_chantry (the Issue 147 hypothesis):**
+- Synthetic ratio 0.09 → Real ratio **0.27** (3× improvement).
+- The synthetic's 5.9% corridor density (vs real 2.9%) was capping throughput
+  at ~1.5; the real map's more open topology allows 4.51.
+- **But 0.27 is still below the 0.30 PASS threshold.** A genuine ~4×
+  algorithmic gap remains (4.51 vs paper ~17). Guided-PIBT (full flow
+  direction assignment) is now genuinely warranted — this is no longer
+  deferrable on map-fidelity grounds.
+
+**warehouse (unexpected finding):**
+- Synthetic ratio 0.42 → Real ratio **0.41** (essentially unchanged).
+- The real warehouse is 5× larger (9776 vs 1971 passable cells) with wider
+  aisles, yet throughput is identical. **Warehouse congestion is not
+  size-limited — it's a genuine algorithmic limit on shelf-aisle topology.**
+- Diagnostic: real warehouse max_stops=8 (agents rarely stuck), but
+  throughput 7.34 means agents complete ~7 tasks/step vs paper's ~18. The
+  gap is task-completion rate, not deadlock.
+
+**empty/random (sanity check):**
+- empty-48-48: identical (synthetic is exact by construction).
+- random-64-64-10: -1.4% (17 fewer passable cells in real map; negligible).
+
+### GOAT gate status (updated)
+
+| Gate | Status | Detail |
+|---|---|---|
+| **G1** | **PARTIAL 2/4** | empty 0.68 ✅, random 0.68 ✅, warehouse 0.41 ❌, ht_chantry 0.27 ❌ (MARGINAL). All 4 maps now real MovingAI files. |
+| **G2** | **FAIL** | Warm-start non-consumable (ratio 1.00). Unchanged. |
+| **G3** | **PASS** | 1590 tests pass (5 new parser tests). Clippy clean. |
+| **G4** | **PASS** | 222ms median at 1000 agents (<500ms target). |
+
+### What this changes for next steps
+
+1. **Full Guided-PIBT is now un-deferrable for ht_chantry.** The map-fidelity
+   excuse is exhausted — the real map confirms a genuine ~4× algorithmic gap
+   on maze topology. The `CounterFlowHindrance` infrastructure from Issue 147
+   is available but needs to be promoted from the 3rd PIBT tiebreak to a
+   higher-priority cost term (ahead of `goal_dist`), changing the algorithm's
+   character. This is the algorithmic upgrade the paper recommends for mazes.
+
+2. **Warehouse needs a different fix than size.** The 5× larger real warehouse
+   gave zero improvement, ruling out map-size scaling as the cause. The gap
+   is task-completion rate on shelf-aisle structure — likely needs intersection
+   reservation or shelf-aware goal assignment, not global routing.
+
+3. **riir-ai/489 fusion remains pragmatic.** The substrate works correctly on
+   2/4 real maps (open + random topologies). The warehouse/maze gaps are
+   documented algorithmic limits, not runtime bugs. Consumers with open/random
+   topologies can consume the substrate as-is.
 
 ---
 
