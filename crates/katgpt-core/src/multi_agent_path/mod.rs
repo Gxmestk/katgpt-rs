@@ -193,10 +193,12 @@ impl<P: Position> LifelongLaCam<P> {
     /// One tick of LLLG planning.
     ///
     /// The full pipeline per tick:
-    /// 1. Compute the guidance field `Φ` via the guidance source (pluggable).
-    /// 2. Apply the warm-start scheme to seed `Φ` (if not `LllgEmpty`).
-    /// 3. Run PIBT to produce the collision-free joint action `Π_t[1]`.
-    /// 4. Record `Φ` and the full windowed plan `Π_t` into the warm-start cache.
+    /// 1. Compute the warm-start initialization from the previous tick's data.
+    /// 2. Pass it to the guidance source via [`set_warm_start`](LocalGuidanceSource::set_warm_start).
+    /// 3. Compute the guidance field `Φ` via the guidance source (pluggable).
+    /// 4. Run PIBT to produce the collision-free joint action `Π_t[1]`.
+    /// 5. Record the executed action + `Φ` into the warm-start cache for the
+    ///    next tick.
     ///
     /// # Arguments
     ///
@@ -221,18 +223,20 @@ impl<P: Position> LifelongLaCam<P> {
         G: LocalGuidanceSource<P>,
         H: HindranceEstimator<P>,
     {
-        // 1. Compute guidance field Φ.
+        // 1. Produce warm-start initialization for this tick.
+        let warm = self.warm_start.warm_start();
+
+        // 2. Pass it to the guidance source. The source consumes it inside
+        //    `compute_guidance` (default sources ignore it via the trait's
+        //    no-op `set_warm_start`).
+        if !warm.is_empty() {
+            guidance.set_warm_start(warm);
+        }
+
+        // 3. Compute guidance field Φ.
         guidance.compute_guidance(config, goals, &mut self.guidance_scratch);
 
-        // 2. Warm-start seeding (the warm-start data is consumed inside the
-        //    guidance source if it supports it; for the default
-        //    SpaceTimeGuidance the warm-start is a separate concern handled
-        //    by the caller passing a warm-start-aware guidance impl. For the
-        //    Phase 1 skeleton, we just compute Φ fresh — the warm-start
-        //    cache records for the *next* tick's consumer if needed).
-        let _ = self.warm_start.warm_start(); // no-op for LllgEmpty; consumed by custom impls
-
-        // 3. Run PIBT with wall-aware neighbors (if set).
+        // 4. Run PIBT with wall-aware neighbors (if set).
         let action = pibt_step(
             config,
             &self.guidance_scratch,
@@ -251,10 +255,19 @@ impl<P: Position> LifelongLaCam<P> {
             JointAction::from_wait(config)
         });
 
-        // 4. Record for next tick's warm-start.
-        //    The "solution" is the guidance path (the windowed plan); the
-        //    "guidance" is Φ. Both get cached.
-        let solution = self.guidance_scratch.clone();
+        // 5. Record the executed action + Φ for the next tick's warm-start.
+        //    The "solution" prepends the executed PIBT action so the suffix
+        //    extraction in `WarmStartCache::prev_solution_suffix` correctly
+        //    skips the executed step (not the guidance's preferred first
+        //    step, which may differ from the executed action — Issue 140 T2.6).
+        let n = config.n_agents();
+        let mut solution: Vec<Vec<P>> = Vec::with_capacity(n);
+        for i in 0..n {
+            let mut path = Vec::with_capacity(self.guidance_scratch[i].len() + 1);
+            path.push(action.moves[i].clone());
+            path.extend(self.guidance_scratch[i].iter().cloned());
+            solution.push(path);
+        }
         self.warm_start
             .record(solution, self.guidance_scratch.clone());
 

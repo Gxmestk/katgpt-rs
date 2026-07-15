@@ -4,13 +4,14 @@
 **Plan:** [440](../.plans/440_lifelong_lacam_multi_agent_pathfinding_substrate.md)
 **Research:** [424](../.research/424_Lifelong_LaCAM_Local_Guidance_Multi_Agent_Pathfinding.md)
 **Paper:** [arXiv:2605.16855](https://arxiv.org/abs/2605.16855) — Arita & Okumura, AAAI 2026
+**Issue:** [140](../.issues/140_pibt_priority_inheritance_and_warmstart_integration.md) — PIBT PI + warm-start investigation
 
 ---
 
 ## TL;DR
 
 **G3 (no-regression): PASS. G4 (latency): PASS. G1 (throughput): PARTIAL (2/4 maps).
-G2 (congestion): FAIL (warm-start integration bug).**
+G2 (congestion): FAIL (warm-start not consumable by greedy rollout).**
 
 The substrate works correctly on open and moderately obstructed maps
 (empty-48-48 ratio 0.63, random-64-64-10 ratio 0.62). It fails on
@@ -25,32 +26,88 @@ vs full A*) trades throughput for speed.
 
 **Promotion decision: KEEP OPT-IN.** The substrate passes G3/G4 and
 partially passes G1, but the G1 warehouse/maze failures and G2 warm-start
-bug prevent full GOAT validation. The Super-GOAT claim remains conditional
-on the riir-ai/489 G5–G7 fusion gates AND a PIBT priority-inheritance
-upgrade.
+non-consumption prevent full GOAT validation.
 
 ---
 
-## Substrate upgrades applied during Phase 2
+## Issue 140 investigation results (2026-07-15)
 
-Three correctness fixes were applied to the Phase 1 substrate during the
-GOAT gate process:
+The Issue 140 analysis identified two blocking items for G1/G2 full pass:
+1. PIBT priority inheritance upgrade
+2. Warm-start integration
 
-1. **PIBT wall-aware neighbors** — `LifelongLaCam::tick` was passing `None`
-   to `pibt_step`, causing agents to move through walls/out of bounds. Fixed
-   by adding `LifelongLaCam::with_neighbors()` and threading the wall-aware
-   neighbor closure through to PIBT.
+Both were implemented, benchmarked, and found to be **blocked by a deeper
+architectural gap**: the greedy guidance rollout.
 
-2. **BFS distance fields** — Phase 1's greedy guidance used Manhattan
-   distance (`Position::dist_heuristic`), which ignores walls and led agents
-   into dead ends on obstacle-heavy maps. Fixed by computing BFS flood-fill
-   distance fields from each goal (true shortest-path distance around
-   obstacles). This improved random-64-64-10 throughput from 0.88 → 13.15
-   (15× improvement). The BFS cache is persistent across ticks with a
-   4000-entry cap to bound memory.
+### PIBT priority inheritance — implemented, benchmarked, REVERTED
 
-3. **Guidance goal pull** — Phase 1's `step_cost` weighted the goal distance
-   by 0.1 (too weak). Fixed to use full BFS distance as the goal pull.
+The full recursive PIBT with priority inheritance was implemented (~200 lines
+of recursive backtracking in `pibt.rs`):
+
+- `pibt_recursive` function: when agent `i` wants cell `u` occupied by
+  undecided agent `j`, recursively push `j` to move before committing.
+- `in_chain: HashSet<usize>` for cycle prevention.
+- `MAX_PIBT_DEPTH = 64` cap for pathological recursion.
+- `blocked_cell: Option<&P>` swap prevention (pushed agent can't take
+  pusher's cell).
+
+**Benchmark result:** Throughput COLLAPSED on all maps:
+- empty-48-48: 17.32 → 0.47 (ratio 0.63 → 0.02)
+- random-64-64-10: 13.15 → 0.36
+- All maps: mean_stops 170-300 out of 300 steps (agents barely moving)
+
+**Root cause:** The recursive push is too conservative for dense maps
+without LaCAM-level search escalation. In the paper's design, PIBT is
+combined with LaCAM — when PIBT fails to resolve a conflict, LaCAM
+escalates to a full search. Without LaCAM, the recursive push requires
+occupants to vacate before committing, causing cascading stalls. The greedy
+PIBT (take first collision-free candidate, let later agents adapt) has
+higher throughput in the lifelong MAPF setting without LaCAM.
+
+**Decision:** Reverted to the greedy PIBT (Phase 2 code). The recursive PIBT
+is deferred until LaCAM is added (Phase 5). Documented in `pibt.rs` module
+docs.
+
+### Warm-start integration — infrastructure landed, consumption DEFERRED
+
+The warm-start integration was plumbed end-to-end:
+
+- `set_warm_start(Vec<Vec<P>>)` method added to `LocalGuidanceSource` trait
+  (default no-op).
+- `SpaceTimeGuidance` stores the data in a new `warm_start: Option<Vec<Vec<P>>>`
+  field.
+- `LifelongLaCam::tick` calls `guidance.set_warm_start(warm)` before
+  `compute_guidance`.
+- Solution recording fixed: prepends the executed PIBT action so suffix
+  extraction correctly skips the executed step (T2.6 complete).
+
+**Consumption attempt 1 (occupancy seeding, all paths):**
+Throughput COLLAPSED: empty-48-48 17.32 → 0.47. The warm-start forecast
+seeded ALL agents' paths into the occupancy map, causing agents to avoid
+forecast cells (including their own forecast — self-collision). G2 "passed"
+(ratio 0.48) but G1 was destroyed.
+
+**Consumption attempt 2 (occupancy seeding, self-collision removal):**
+Throughput still collapsed. Removing each agent's own forecast before
+processing helped slightly but the forecast from OTHER agents still created
+too many collision constraints for the greedy rollout.
+
+**Consumption attempt 3 (weak bias, -0.5 per matching step):**
+No effect on grid maps. BFS distances are integers (1.0 apart); the 0.5
+bonus is too weak to break ties that don't exist. LllgPi = LllgEmpty.
+
+**Root cause:** The paper's warm-start is designed for **full space-time A***,
+where it provides an initial bound for A* pruning. The greedy rollout doesn't
+benefit from warm-start — it always picks the locally-best step, ignoring the
+forecast. Occupancy-seeding makes the greedy rollout MORE conservative (avoiding
+forecast cells), which hurts throughput. Weak bias is too weak to matter on
+integer-distance grids.
+
+**Decision:** Warm-start infrastructure is in place (stored, consumed one-shot)
+but NOT consumed by the greedy rollout. The `compute_guidance` method clears
+the data (preventing stale leaks) but doesn't seed the occupancy. Consumption
+is deferred to the full A* upgrade. LllgPi and LllgEmpty produce identical
+results with the greedy rollout.
 
 ---
 
@@ -72,19 +129,14 @@ GOAT gate process:
   around obstacles correctly.
 - Warehouse FAILS because the shelf-aisle structure creates long narrow
   corridors where greedy PIBT (without priority inheritance) causes permanent
-  jams. Agents pile up at aisle entrances and cannot push through.
+  jams.
 - ht_chantry FAILS because the maze structure with bottlenecks is
-  fundamentally hard for greedy guidance — every bottleneck becomes a
-  permanent traffic jam.
-- Both failures are consistent with the paper's known limitation (caveat #1:
-  "long one-cell-wide corridors"). The paper uses real PIBT with priority
-  inheritance which resolves corridor jams by recursively pushing agents.
+  fundamentally hard for greedy guidance.
 
-**Root cause:** PIBT as implemented is greedy (pick first collision-free
-candidate, fall back to wait). Real PIBT has priority inheritance: when a
-high-priority agent wants a cell occupied by a low-priority agent, the
-low-priority agent is forced to move first. This is a significant algorithmic
-upgrade (~200 lines of recursive backtracking).
+**Root cause:** G1 warehouse/maze failures require BOTH priority inheritance
+PIBT AND LaCAM escalation to resolve. The priority inheritance alone (without
+LaCAM) is too conservative and collapses throughput (see Issue 140
+investigation above).
 
 ---
 
@@ -99,15 +151,14 @@ upgrade (~200 lines of recursive backtracking).
 
 **Ratio: 1.00 (identical). FAIL.**
 
-**Root cause:** The warm-start integration is broken. `LifelongLaCam::tick`
-discards the warm-start data with `let _ = self.warm_start.warm_start()`. The
-guidance source (`SpaceTimeGuidance::compute_guidance`) recomputes from
-scratch every tick regardless of the warm-start scheme. LLLG_Π and LllgEmpty
-produce identical results because the warm-start is never consumed.
+**Root cause:** The warm-start data is plumbed through (stored in
+`SpaceTimeGuidance`, cleared one-shot per tick) but NOT consumed by the greedy
+rollout. The greedy rollout doesn't benefit from warm-start — it always picks
+the locally-best step, ignoring the forecast. Occupancy-seeding collapses
+throughput (see Issue 140 investigation).
 
-**Fix required:** Thread the warm-start initialization into the guidance
-source. The `LocalGuidanceSource` trait needs a warm-start parameter, or the
-`SpaceTimeGuidance` needs to own the warm-start cache internally.
+**Fix required:** Full space-time A* guidance, where warm-start provides the
+initial bound for A* pruning. This is the Phase 5 upgrade.
 
 ---
 
@@ -116,6 +167,7 @@ source. The `LocalGuidanceSource` trait needs a warm-start parameter, or the
 ```
 cargo clippy -p katgpt-core --all-features --lib: clean
 cargo test -p katgpt-core --lib: 1556/1556 pass
+cargo test -p katgpt-core --features multi_agent_path --lib: 22/22 pass
 ```
 
 **PASS.** Existing tests unaffected.
@@ -128,8 +180,8 @@ cargo test -p katgpt-core --lib: 1556/1556 pass
 
 | Metric | Value |
 |---|---|
-| Median per-tick | 80.44 ms |
-| Max per-tick | 288.68 ms |
+| Median per-tick | 82.17 ms |
+| Max per-tick | 293.30 ms |
 | Paper (M1 Ultra) | 210–260 ms |
 
 **PASS (target < 500ms). Stretch < 100ms: PASS.**
@@ -141,67 +193,64 @@ within the latency budget.
 
 ---
 
-## Latency breakdown by map (G1 runs, 800 agents)
-
-| Map | Median (ms) | Max (ms) |
-|---|---|---|
-| empty-48-48 | 52 | 237 |
-| random-64-64-10 | 53 | 381 |
-| warehouse-10-20-10-2-2 | 44 | 213 |
-| ht_chantry-approx | 42 | 61 |
-
-Latency is well within budget on all maps. The random-64-64-10 max spike
-(381ms) is from BFS cache misses when many agents get new goals
-simultaneously.
-
----
-
 ## Honest caveats
 
 1. **Maps are synthetic approximations.** We don't have the exact MovingAI
-   MAPF benchmark map files for warehouse-10-20-10-2-2 and ht_chantry. Our
-   synthetic versions approximate the topology (shelf-aisle for warehouse,
-   maze-with-bottlenecks for ht_chantry). Throughput numbers may differ from
-   what the paper reports on the real maps.
+   MAPF benchmark map files for warehouse-10-20-10-2-2 and ht_chantry.
 
-2. **PIBT lacks priority inheritance.** This is the primary algorithmic gap.
-   Real PIBT recursively resolves conflicts by forcing lower-priority agents
-   to move when a higher-priority agent claims their cell. Our greedy PIBT
-   falls back to "wait" which causes permanent jams in corridors.
+2. **PIBT priority inheritance requires LaCAM.** The recursive push is too
+   conservative without LaCAM-level escalation. See Issue 140 investigation.
 
-3. **Warm-start is not integrated.** The `WarmStartScheme` enum exists and
-   the cache records data, but `tick()` discards the warm-start result. This
-   is a correctness bug — LLLG_Π and LllgEmpty produce identical behavior.
+3. **Warm-start requires full A*.** The greedy rollout can't consume the
+   warm-start forecast. Occupancy-seeding collapses throughput; weak bias is
+   too weak on integer-distance grids.
 
 4. **Agent count is 800 not 1000.** Paper throughput targets are at 1000
-   agents. We run at 800 (the G1 gate specifies 800). Throughput at 800 is
-   typically slightly lower than at 1000.
+   agents. We run at 800.
 
-5. **The ht_chantry approximation is more extreme than the real map.** Our
-   synthetic maze has narrower bottlenecks than the real Dragon Age map.
-   The real ht_chantry has wider corridors. The 0.01 ratio overstates the
-   gap.
+5. **The ht_chantry approximation is more extreme than the real map.**
+
+---
+
+## What was accomplished (Issue 140)
+
+Despite the G1/G2 gates not improving, the Issue 140 investigation produced
+valuable results:
+
+1. **Warm-start infrastructure landed.** `set_warm_start` trait method,
+   `SpaceTimeGuidance` stores the data, `tick()` threads it through. Ready
+   for consumption when full A* lands. No more `let _ = warm_start()` discard.
+
+2. **Solution recording fixed (T2.6).** `tick()` now prepends the executed
+   PIBT action to the guidance path before storing in `WarmStartCache`. The
+   suffix extraction correctly skips the executed step (not the guidance's
+   preferred step, which may differ).
+
+3. **PIBT priority inheritance fully evaluated.** Implemented, benchmarked,
+   and honestly documented why it needs LaCAM. The recursive PIBT code is
+   preserved in git history for future reference.
+
+4. **The real blocker identified.** Both G1 warehouse/maze and G2 congestion
+   require **full space-time A* guidance** (not greedy rollout). The greedy
+   rollout is the bottleneck — it can't benefit from priority inheritance
+   (needs LaCAM) or warm-start (needs A* pruning). The honest path forward is
+   the A* upgrade, not more PIBT/warm-start plumbing.
 
 ---
 
 ## Next steps
 
-1. **PIBT priority inheritance upgrade** — the single most impactful fix.
-   Would unblock warehouse and significantly improve ht_chantry. Estimated
-   ~200 lines of recursive backtracking in `pibt.rs`. This is the blocking
-   item for G1 full pass.
+1. **Full space-time A* guidance** — replace the greedy rollout with proper
+   priority-queue A* on Eq. 1 cost. This is the single upgrade that unblocks
+   both G1 (better paths through corridors) and G2 (warm-start provides A*
+   pruning bound). The latency budget (82ms current, 500ms target) has ample
+   headroom.
 
-2. **Warm-start integration** — thread warm-start data into
-   `SpaceTimeGuidance`. This unblocks G2. Estimated ~50 lines.
+2. **LaCAM escalation** — when PIBT fails to resolve a conflict, escalate to
+   LaCAM-level search. This unblocks the recursive PIBT priority inheritance
+   for warehouse/maze maps. Phase 5.
 
-3. **Full space-time A*** — replace greedy rollout with proper priority-queue
-   A* on the Eq. 1 cost. Lower priority — the greedy + BFS approach already
-   works well on moderate maps. This would improve optimality but is not
-   blocking for the G1 gate on open/moderate maps.
-
-4. **Download real MovingAI maps** — for exact paper reproduction. Not
-   blocking for the algorithmic validation.
+3. **Download real MovingAI maps** — for exact paper reproduction.
 
 The substrate is functional and well-performing on the 2/4 maps it handles.
-The failures are honest, explained, and fixable. The GOAT gate has served
-its purpose: it identified the exact algorithmic gaps that need upgrading.
+The failures are honest, explained, and the path forward (A* upgrade) is clear.

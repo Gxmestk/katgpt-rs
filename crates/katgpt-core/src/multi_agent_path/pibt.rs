@@ -14,6 +14,23 @@
 //! I.e. PIBT first prefers moves consistent with the guidance, then
 //! goal-direction, then low hindrance, then random tiebreak.
 //!
+//! # Implementation note (Issue 140 T1)
+//!
+//! The full PIBT algorithm includes recursive priority inheritance: when a
+//! high-priority agent wants a cell occupied by a lower-priority undecided
+//! agent, the lower-priority agent is recursively forced to move. However,
+//! the recursive push is only effective when combined with LaCAM-level search
+//! escalation (the paper's design). Without LaCAM, the recursive push is too
+//! conservative — it requires occupants to vacate before committing, causing
+//! cascading stalls on dense maps.
+//!
+//! This implementation uses the **greedy PIBT** variant: agents are processed
+//! in priority order, each taking the first collision-free candidate. Later
+//! agents see earlier agents' committed positions and adapt. This is more
+//! aggressive but has higher throughput in the lifelong MAPF setting without
+//! LaCAM escalation. The full recursive PIBT is deferred until LaCAM is added
+//! (tracked in the plan's Phase 5).
+//!
 //! # Collision constraints
 //!
 //! - **Vertex**: no two agents occupy the same cell at `t+1`.

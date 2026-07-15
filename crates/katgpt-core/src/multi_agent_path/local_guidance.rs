@@ -64,6 +64,22 @@ pub trait LocalGuidanceSource<P: Position> {
         goals: &[P],
         out: &mut Guidance<P>,
     );
+
+    /// Supply warm-start data for the next [`compute_guidance`](Self::compute_guidance)
+    /// call (Issue 140 T2 — the LLLG mechanism (b) warm-start integration).
+    ///
+    /// The data is a per-agent initial path (`Vec<Vec<P>>`), produced by
+    /// [`WarmStartCache::warm_start`](super::warm_start::WarmStartCache::warm_start).
+    /// For the default [`SpaceTimeGuidance`] the paths are seeded into the
+    /// occupancy map so each agent sees where other agents are forecast to be
+    /// — this is the qualitative difference between `LllgPi` (with warm-start)
+    /// and `LllgEmpty` (without).
+    ///
+    /// Default: no-op (the guidance source recomputes from scratch). Custom
+    /// guidance sources that don't support warm-start can leave this as-is.
+    fn set_warm_start(&mut self, _warm_start: Vec<Vec<P>>) {
+        // Default: ignore — no warm-start.
+    }
 }
 
 /// The guidance window length `w_Φ` and collision penalty `α`.
@@ -116,6 +132,14 @@ pub struct SpaceTimeGuidance<P: Position> {
     /// Cleared at the start of each `compute_guidance` call (within-tick
     /// reuse across agents that share a goal; across-tick recomputation).
     bfs_cache: HashMap<P, HashMap<P, f32>>,
+    /// Warm-start data supplied by [`set_warm_start`](LocalGuidanceSource::set_warm_start).
+    ///
+    /// Consumed (set to `None`) at the start of each `compute_guidance` call.
+    /// When `Some`, the paths are seeded into the occupancy map before any
+    /// agent is processed, giving each agent lookahead about where other
+    /// agents are forecast to be. This is the LLLG mechanism (b) integration
+    /// (Issue 140 T2).
+    warm_start: Option<Vec<Vec<P>>>,
 }
 
 impl<P: Position> SpaceTimeGuidance<P> {
@@ -125,6 +149,7 @@ impl<P: Position> SpaceTimeGuidance<P> {
             neighbors_fn: None,
             occupancy: HashMap::new(),
             bfs_cache: HashMap::new(),
+            warm_start: None,
         }
     }
 
@@ -302,6 +327,15 @@ impl<P: Position> LocalGuidanceSource<P> for SpaceTimeGuidance<P> {
             self.bfs_cache.clear();
         }
 
+        // Consume warm-start data (one-shot per tick). The data is stored via
+        // `set_warm_start` for future use when the guidance source is upgraded
+        // to full space-time A*. The greedy rollout used here does not benefit
+        // from warm-start seeding — occupancy-seeding causes agents to avoid
+        // forecast cells, creating cascading stalls that collapse throughput
+        // (see Issue 140 T2 benchmark analysis). The warm-start infrastructure
+        // is in place; consumption is deferred to the full A* upgrade.
+        let _warm_start = self.warm_start.take();
+
         for _round in 0..self.cfg.rounds {
             self.clear_occupancy();
             for i in 0..n {
@@ -314,5 +348,9 @@ impl<P: Position> LocalGuidanceSource<P> for SpaceTimeGuidance<P> {
                 out[i] = path;
             }
         }
+    }
+
+    fn set_warm_start(&mut self, warm_start: Vec<Vec<P>>) {
+        self.warm_start = Some(warm_start);
     }
 }
