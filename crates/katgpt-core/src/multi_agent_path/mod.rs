@@ -126,6 +126,9 @@ impl<P: Position> CostFn<P> for UniformCost {
 // Orchestrator (Plan 440 T1.2)
 // ─────────────────────────────────────────────────────────────────────
 
+/// Type alias for the neighbor-supplying closure stored in the orchestrator.
+type NeighborClosure<P> = Box<dyn Fn(&P) -> Vec<P> + Send + Sync>;
+
 /// The LLLG orchestrator: one tick of receding-horizon windowed planning.
 ///
 /// Generic over the position type `P`. Holds the warm-start cache and the
@@ -144,6 +147,10 @@ pub struct LifelongLaCam<P: Position> {
     guidance_scratch: Guidance<P>,
     /// Scratch: priority weights (uniform by default).
     priorities: Vec<f32>,
+    /// Wall-aware neighbor function. When `None`, PIBT uses `Position::neighbors()`
+    /// directly (no wall/bounds checking). Consumers with walls or bounded maps
+    /// MUST set this via [`with_neighbors`](Self::with_neighbors).
+    neighbors_fn: Option<NeighborClosure<P>>,
 }
 
 impl<P: Position> LifelongLaCam<P> {
@@ -151,12 +158,29 @@ impl<P: Position> LifelongLaCam<P> {
     ///
     /// The guidance config is owned by the [`LocalGuidanceSource`] you pass to
     /// [`tick`](Self::tick); the orchestrator does not hold a separate copy.
+    /// Use [`with_neighbors`](Self::with_neighbors) to set a wall-aware neighbor
+    /// function if your map has walls or bounds.
     pub fn new(warm_start: WarmStartCache<P>) -> Self {
         Self {
             warm_start,
             guidance_scratch: Vec::new(),
             priorities: Vec::new(),
+            neighbors_fn: None,
         }
+    }
+
+    /// Set a wall-aware neighbor function.
+    ///
+    /// When set, PIBT uses this instead of `Position::neighbors()` to generate
+    /// candidate moves, ensuring agents never move through walls or out of
+    /// bounds. The guidance source should be configured independently with the
+    /// same wall-aware function.
+    pub fn with_neighbors<F>(mut self, f: F) -> Self
+    where
+        F: Fn(&P) -> Vec<P> + Send + Sync + 'static,
+    {
+        self.neighbors_fn = Some(Box::new(f));
+        self
     }
 
     /// Set per-agent priorities (higher = processed first by PIBT).
@@ -208,14 +232,14 @@ impl<P: Position> LifelongLaCam<P> {
         //    cache records for the *next* tick's consumer if needed).
         let _ = self.warm_start.warm_start(); // no-op for LllgEmpty; consumed by custom impls
 
-        // 3. Run PIBT.
+        // 3. Run PIBT with wall-aware neighbors (if set).
         let action = pibt_step(
             config,
             &self.guidance_scratch,
             goals,
             &self.priorities,
             hindrance,
-            None,
+            self.neighbors_fn.as_deref(),
             rng,
         )
         .unwrap_or_else(|deadlock| {

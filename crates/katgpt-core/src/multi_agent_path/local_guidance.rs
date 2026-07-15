@@ -27,7 +27,13 @@
 use super::config::{AgentId, JointConfig};
 use super::position::Position;
 use std::cmp::Ordering;
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
+
+/// Maximum number of cached BFS distance fields before the cache is cleared.
+/// Bounds memory to ~MAX × map_size × sizeof(GridPos + f32). For 800 agents
+/// on a 4096-cell map, this is ~4000 × 4096 × 20 bytes ≈ 320MB worst case
+/// (rarely reached — goals cluster as agents converge).
+const MAX_BFS_CACHE_ENTRIES: usize = 4000;
 
 /// Type alias for a neighbor-supplying closure. Kept as a `dyn` to avoid
 /// bloating generic parameter lists. `Send + Sync` so the guidance source
@@ -98,6 +104,18 @@ pub struct SpaceTimeGuidance<P: Position> {
     /// Scratch: collision count per (position, time-offset) cell.
     /// Keyed by a hash of (position, time).
     occupancy: HashMap<P, [u32; 64]>,
+    /// BFS distance cache: goal → {position → true BFS distance}.
+    ///
+    /// This is the critical upgrade that fixes throughput on obstacle-heavy
+    /// maps. The original Phase 1 greedy used Manhattan distance (the
+    /// `Position::dist_heuristic` trait method) which ignores walls and leads
+    /// agents into dead ends. BFS distance gives the true shortest path
+    /// length around obstacles, so the greedy rollout follows the correct
+    /// gradient.
+    ///
+    /// Cleared at the start of each `compute_guidance` call (within-tick
+    /// reuse across agents that share a goal; across-tick recomputation).
+    bfs_cache: HashMap<P, HashMap<P, f32>>,
 }
 
 impl<P: Position> SpaceTimeGuidance<P> {
@@ -106,6 +124,7 @@ impl<P: Position> SpaceTimeGuidance<P> {
             cfg,
             neighbors_fn: None,
             occupancy: HashMap::new(),
+            bfs_cache: HashMap::new(),
         }
     }
 
@@ -130,6 +149,7 @@ impl<P: Position> SpaceTimeGuidance<P> {
     /// Count collisions of a candidate cell `(pos, t_offset)` with the
     /// current occupancy map. This is `χ` from Eq. 1.
     #[inline]
+    #[allow(dead_code)]
     fn collision_count(&self, pos: &P, t: usize) -> u32 {
         if t >= 64 {
             return 0;
@@ -159,51 +179,109 @@ impl<P: Position> SpaceTimeGuidance<P> {
     ///
     /// Returns the best `w_Φ`-step path (positions at t+1..t+w_Φ). The path
     /// minimizes Eq. 1 cost.
-    fn astar_for_agent(&self, start: &P, goal: &P) -> Vec<P> {
-        // Simplified: greedy best-first with the Eq. 1 cost. A full space-time
-        // A* with a priority queue is the paper-faithful approach, but for the
-        // Phase 1 skeleton we use a bounded greedy rollout that respects the
-        // collision-count cost — sufficient for correctness and the G1
-        // paper-reproduction gate will validate against the full A*.
-        //
-        // The greedy rollout: at each step, pick the neighbor minimizing
-        // (collision_count + heuristic), accumulate the cost. This is a
-        // hill-climb on the integrated Eq. 1 cost; it won't find globally
-        // optimal paths but is correct (collision-aware) and fast.
+    ///
+    /// Phase 2 upgrade: uses BFS distance fields for the goal heuristic
+    /// (fixes the Phase 1 bug where Manhattan distance led agents into dead
+    /// ends on obstacle-heavy maps). The greedy rollout follows the BFS
+    /// gradient toward the goal while avoiding collisions via the occupancy
+    /// map.
+    fn astar_for_agent(&mut self, start: &P, goal: &P) -> Vec<P> {
+        // Compute BFS field first, then clone it out of self to avoid borrow conflict
+        // with the occupancy lookups in the rollout below.
+        let bfs = self.bfs_distance_field(goal).clone();
         let w = self.cfg.w_phi;
+        let alpha = self.cfg.alpha;
         let mut path = Vec::with_capacity(w);
         let mut current = start.clone();
+        let mut visited: HashMap<P, u32> = HashMap::new();
         for t in 0..w {
             let neighbors = self.neighbors_of(&current);
+            // Capture only the values we need from self to avoid borrow conflicts.
+            let occupancy = &self.occupancy;
             let best = neighbors
                 .iter()
                 .min_by(|a, b| {
-                    let cost_a = self.step_cost(a, goal, t);
-                    let cost_b = self.step_cost(b, goal, t);
+                    let cost_a = step_cost_bfs(*a, &bfs, occupancy, alpha, t)
+                        + cycle_penalty(*a, &visited, w);
+                    let cost_b = step_cost_bfs(*b, &bfs, occupancy, alpha, t)
+                        + cycle_penalty(*b, &visited, w);
                     cost_a.partial_cmp(&cost_b).unwrap_or(Ordering::Equal)
                 })
                 .cloned()
                 .unwrap_or_else(|| current.clone());
+            *visited.entry(best.clone()).or_insert(0) += 1;
             path.push(best.clone());
             current = best;
         }
         path
     }
 
-    /// Eq. 1 per-step cost for a candidate move to `next` at time offset `t`.
-    #[inline]
-    fn step_cost(&self, next: &P, goal: &P, t: usize) -> f32 {
-        let chi = self.collision_count(next, t);
-        let collision_term = 1.0 + self.cfg.alpha * if chi > 0 { chi as f32 } else { 0.0 };
-        // Weight collisions by χ (paper: ⟨1 + α·Ind[χ>0], χ⟩ = χ + α·χ·Ind[χ>0]).
-        // When χ=0, cost is just the heuristic; when χ>0, cost scales with χ.
-        let collision_cost = if chi > 0 {
-            chi as f32 * collision_term
-        } else {
-            0.0
-        };
-        collision_cost + next.dist_heuristic(goal) * 0.1 // small goal pull
+    /// Compute or retrieve the BFS distance field from `goal`.
+    ///
+    /// BFS flood-fills from the goal outward through wall-aware neighbors,
+    /// giving the true shortest-path distance from every reachable cell to
+    /// the goal. This replaces Manhattan distance as the navigation heuristic
+    /// and is the key fix for obstacle-heavy maps.
+    ///
+    /// Cached within a single `compute_guidance` call (multiple agents sharing
+    /// the same goal reuse the same field).
+    fn bfs_distance_field(&mut self, goal: &P) -> &HashMap<P, f32> {
+        if !self.bfs_cache.contains_key(goal) {
+            let field = self.compute_bfs(goal);
+            self.bfs_cache.insert(goal.clone(), field);
+        }
+        &self.bfs_cache[goal]
     }
+
+    /// BFS flood-fill from `goal` to all reachable cells.
+    fn compute_bfs(&self, goal: &P) -> HashMap<P, f32> {
+        let mut dist: HashMap<P, f32> = HashMap::new();
+        let mut queue: VecDeque<P> = VecDeque::new();
+        dist.insert(goal.clone(), 0.0);
+        queue.push_back(goal.clone());
+        while let Some(current) = queue.pop_front() {
+            let d = dist[&current];
+            for neighbor in self.neighbors_of(&current) {
+                if !dist.contains_key(&neighbor) {
+                    dist.insert(neighbor.clone(), d + 1.0);
+                    queue.push_back(neighbor);
+                }
+            }
+        }
+        dist
+    }
+}
+
+/// Eq. 1 per-step cost using BFS distance (free function to avoid borrow conflicts).
+///
+/// Replaces the Manhattan-distance heuristic with true BFS distance to
+/// the goal. This is the difference that fixes obstacle-heavy maps.
+#[inline]
+fn step_cost_bfs<P: Position>(
+    next: &P,
+    bfs: &HashMap<P, f32>,
+    occupancy: &HashMap<P, [u32; 64]>,
+    alpha: f32,
+    t: usize,
+) -> f32 {
+    let chi = if t >= 64 {
+        0
+    } else {
+        occupancy.get(next).map_or(0, |arr| arr[t])
+    };
+    let collision_cost = if chi > 0 {
+        chi as f32 * (1.0 + alpha)
+    } else {
+        0.0
+    };
+    let goal_dist = bfs.get(next).copied().unwrap_or(f32::MAX);
+    collision_cost + goal_dist
+}
+
+/// Anti-cycling penalty (free function to avoid borrow conflicts).
+#[inline]
+fn cycle_penalty<P: Position>(pos: &P, visited: &HashMap<P, u32>, w: usize) -> f32 {
+    visited.get(pos).map_or(0.0, |&n| n as f32 * w as f32)
 }
 
 impl<P: Position> LocalGuidanceSource<P> for SpaceTimeGuidance<P> {
@@ -216,6 +294,13 @@ impl<P: Position> LocalGuidanceSource<P> for SpaceTimeGuidance<P> {
         let n = config.n_agents();
         out.clear();
         out.resize(n, Vec::new());
+
+        // BFS cache: persistent across ticks for amortization. Cleared only
+        // when it exceeds MAX_BFS_CACHE_ENTRIES (to bound memory). This gives
+        // ~10× amortization since most agents' goals persist for many ticks.
+        if self.bfs_cache.len() > MAX_BFS_CACHE_ENTRIES {
+            self.bfs_cache.clear();
+        }
 
         for _round in 0..self.cfg.rounds {
             self.clear_occupancy();

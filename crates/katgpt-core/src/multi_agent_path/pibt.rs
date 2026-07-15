@@ -37,8 +37,9 @@ use super::position::Position;
 use std::cmp::Ordering;
 
 /// Type alias mirroring [`super::local_guidance::NeighborFn`] for the
-/// neighbor-supplying callback in [`pibt_step`].
-type NeighborFn<P> = dyn Fn(&P) -> Vec<P>;
+/// neighbor-supplying callback in [`pibt_step`]. Includes `Send + Sync` to
+/// match the orchestrator's stored closure type.
+type NeighborFn<P> = dyn Fn(&P) -> Vec<P> + Send + Sync;
 
 /// Error: no collision-free joint action could be found for some agent.
 ///

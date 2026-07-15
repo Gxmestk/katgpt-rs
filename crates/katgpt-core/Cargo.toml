@@ -1372,3 +1372,11 @@ required-features = ["simd_lut_dequant"]
 name = "bench_432_vfd_goat"
 harness = false
 required-features = ["velocity_field_disagreement"]
+
+# Plan 440 Phase 2 — LLLG Multi-Agent Pathfinding paper-reproduction GOAT
+# gate (G1 throughput, G2 congestion mitigation, G4 latency). G3 (no-regression)
+# is verified externally. 4 maps, 800 agents, 500 steps.
+[[bench]]
+name = "bench_440_lllg_paper_repro"
+harness = false
+required-features = ["multi_agent_path"]
