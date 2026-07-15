@@ -1,4 +1,4 @@
-# Plan 189: Oscillatory State-Space Modelless Distillation — Phase 1 (FreqBandit)
+# Plan 447: Oscillatory State-Space Modelless Distillation — Phase 1 (FreqBandit)
 
 ## Status: ✅ Phase 1 Complete (GOAT, Default On)
 

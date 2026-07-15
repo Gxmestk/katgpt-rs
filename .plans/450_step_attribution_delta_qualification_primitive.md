@@ -1,4 +1,4 @@
-# Plan 381: Step-Attribution Δ-Qualification Primitive
+# Plan 450: Step-Attribution Δ-Qualification Primitive
 
 **Date:** 2026-07-06
 **Research:** [katgpt-rs/.research/381_SkillAdaptor_Step_Level_Fault_Attribution_Delta_Qualification.md](../.research/381_SkillAdaptor_Step_Level_Fault_Attribution_Delta_Qualification.md)

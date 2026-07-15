@@ -2160,7 +2160,7 @@ ANE-aware roofline cost model with a third axis (working-set size, beyond the cl
 
 `StepAttributionQualifier` — commits a step only if `Δ ≥ 0` (SkillAdaptor eq.8), plus a `StepLocalizer` trait that fuses `Localize` + `Link` (attribute the improvement to the right step in a multi-step rollout). Guards against silent regression when composing inference-time operators.
 
-**G1 14/14 commit-gate tests; G2 81.6% drift reduction (riir-ai PoC); G4 13ns aggregate @ W=64.** Feature gate: `step_attribution_qualifier` (**default-ON**). 📖 Plan: [`.plans/381_step_attribution_delta_qualification_primitive.md`](.plans/381_step_attribution_delta_qualification_primitive.md), Benchmark: [`.benchmarks/381_step_attribution_qualifier_goat.md`](.benchmarks/381_step_attribution_qualifier_goat.md), Paper: [arXiv:2606.01311](https://arxiv.org/abs/2606.01311).
+**G1 14/14 commit-gate tests; G2 81.6% drift reduction (riir-ai PoC); G4 13ns aggregate @ W=64.** Feature gate: `step_attribution_qualifier` (**default-ON**). 📖 Plan: [`.plans/450_step_attribution_delta_qualification_primitive.md`](.plans/450_step_attribution_delta_qualification_primitive.md), Benchmark: [`.benchmarks/381_step_attribution_qualifier_goat.md`](.benchmarks/381_step_attribution_qualifier_goat.md), Paper: [arXiv:2606.01311](https://arxiv.org/abs/2606.01311).
 
 ---
 
@@ -3053,7 +3053,7 @@ Docs are grouped into numbered folders by primitive class — see
 - [Velocity Field Ensemble](.plans/376_velocity_field_ensemble_primitive.md)
 - [Local Branch Routing](.plans/377_local_branch_routing_post_candidate_router.md)
 - [ANE Roofline Cost Model](.plans/379_ane_aware_roofline_cost_model.md)
-- [Step Attribution Qualifier](.plans/381_step_attribution_delta_qualification_primitive.md)
+- [Step Attribution Qualifier](.plans/450_step_attribution_delta_qualification_primitive.md)
 - [HOLA Hippocampal Exact KV Cache](.plans/395_hippocampal_exact_kv_cache.md)
 - [Spherical Geodesic Steering](.plans/405_spherical_steering_geodesic_primitive.md)
 - [Renoise-CE Self-Verifier](.plans/406_renoise_ce_self_verifier.md)

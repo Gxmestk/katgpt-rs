@@ -1,4 +1,4 @@
-# Plan 164: PhraseBoost — Context Trie Phrase Boosting for DDTree
+# Plan 446: PhraseBoost — Context Trie Phrase Boosting for DDTree
 
 > **Research:** 147 (Parakeet Context Trie Phrase Boosting)
 > **Source:** [Frikallo/parakeet.cpp](https://github.com/Frikallo/parakeet.cpp) — `phrase_boost.hpp`

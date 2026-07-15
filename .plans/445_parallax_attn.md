@@ -1,4 +1,4 @@
-# Plan 135: Parallax Parameterized Local Linear Attention
+# Plan 445: Parallax Parameterized Local Linear Attention
 
 **Research:** [135_Parallax_Parameterized_Local_Linear_Attention](../.research/135_Parallax_Parameterized_Local_Linear_Attention.md)
 **Status:** ✅ COMPLETE (infrastructure ready, awaiting Muon-trained weights)

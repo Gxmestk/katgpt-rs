@@ -321,7 +321,7 @@ The public primitive is the **dedup-chunked Merkle store**. Lore's contribution 
 | **P2** | GOAT gate benchmark suite (G1–G7) | Required before promoting to default. |
 | **P3** | `NetChunkFetcher` (HTTP/IPFS pluggable transport) | Optional; deployers can implement the trait. |
 
-See `katgpt-rs/.plans/272_chunked_asset_merkle_store.md` for the execution plan.
+See `katgpt-rs/.plans/448_chunked_asset_merkle_store.md` for the execution plan.
 
 ---
 

@@ -1,4 +1,4 @@
-# Plan 390: State-Action Pair Cache for MCTS over Deterministic Inference Actions (UnMaskFork)
+# Plan 451: State-Action Pair Cache for MCTS over Deterministic Inference Actions (UnMaskFork)
 
 **Date:** 2026-07-07
 **Research:** [katgpt-rs/.research/386_UnMaskFork_Deterministic_Action_Branching_MCTS.md](../.research/386_UnMaskFork_Deterministic_Action_Branching_MCTS.md)

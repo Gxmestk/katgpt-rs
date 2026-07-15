@@ -60,7 +60,7 @@ No new dependencies were added to `crates/katgpt-pruners/Cargo.toml`. The module
 
 ## Cross-references
 
-- **Plan:** `.plans/381_step_attribution_delta_qualification_primitive.md`
+- **Plan:** `.plans/450_step_attribution_delta_qualification_primitive.md`
 - **Research:** `.research/381_SkillAdaptor_Step_Level_Fault_Attribution_Delta_Qualification.md`
 - **Private guide (riir-ai):** `riir-ai/.research/313_Step_Level_Fault_Attribution_Commit_Gate_Guide.md`
 - **Runtime wiring (riir-ai):** `riir-ai/.plans/313_step_attribution_branch_wiring.md`

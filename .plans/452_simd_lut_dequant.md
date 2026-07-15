@@ -1,4 +1,4 @@
-# Plan 431: SIMD LUT DeQuantization — Software Analog of StreamDQ Near-Memory DQ
+# Plan 452: SIMD LUT DeQuantization — Software Analog of StreamDQ Near-Memory DQ
 
 **Date:** 2026-07-13
 **Research:** [katgpt-rs/.research/418_StreamDQ_SIMD_LUT_DeQuant.md](../.research/418_StreamDQ_SIMD_LUT_DeQuant.md)

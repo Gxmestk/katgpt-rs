@@ -2,7 +2,7 @@
 
 **Feature:** `chunked_content_store` (opt-in)
 **Research:** [262 — Lore Chunked Asset Merkle Store Modelless](../.research/262_Lore_Chunked_Asset_Merkle_Store_Modelless.md)
-**Plan:** [272](../.plans/272_chunked_asset_merkle_store.md)
+**Plan:** [448](../.plans/448_chunked_asset_merkle_store.md)
 **Date:** 2026-06-25
 
 ## G1–G7 Gate Table (from Research 262 §6)

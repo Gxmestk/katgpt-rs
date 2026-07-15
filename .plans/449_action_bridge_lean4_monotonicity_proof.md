@@ -1,4 +1,4 @@
-# Plan 293: ActionBridge Lean 4 Monotonicity Proof
+# Plan 449: ActionBridge Lean 4 Monotonicity Proof
 
 **Date:** 2026-06-23
 **Research:** [katgpt-rs/.research/292_Bridge_Neuro_Symbolic_Formal_Verification_Gap.md](../.research/292_Bridge_Neuro_Symbolic_Formal_Verification_Gap.md)

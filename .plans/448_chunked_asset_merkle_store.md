@@ -1,4 +1,4 @@
-# Plan 272: Chunked Content-Addressed Merkle Store (Open Primitive)
+# Plan 448: Chunked Content-Addressed Merkle Store (Open Primitive)
 
 **Date:** 2026-06-18
 **Research:** [katgpt-rs/.research/262_Lore_Chunked_Asset_Merkle_Store_Modelless.md](../.research/262_Lore_Chunked_Asset_Merkle_Store_Modelless.md)

@@ -120,7 +120,7 @@ The core idea (learned covariance correction) is sound and theoretically grounde
 
 **Recommendation:** `newton_schulz` is now default-on. Re-evaluate Parallax when a Muon-trained model is available. The post-training adaptation path (W_R = 0 init + LoRA fine-tune) is viable for future LoRA distillation targets.
 
-**Plan:** [`.plans/135_parallax_attn.md`](../.plans/135_parallax_attn.md)
+**Plan:** [`.plans/445_parallax_attn.md`](../.plans/445_parallax_attn.md)
 
 ---
 

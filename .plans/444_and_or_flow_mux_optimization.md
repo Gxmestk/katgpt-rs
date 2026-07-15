@@ -1,4 +1,4 @@
-# Plan 054: and_or / flow / mux Optimization
+# Plan 444: and_or / flow / mux Optimization
 
 ## Modules
 - `and_or/` — AND-OR tree for hierarchical goal decomposition

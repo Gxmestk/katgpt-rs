@@ -1,4 +1,4 @@
-# Plan 003: StillKV Heuristic β Optimization
+# Plan 443: StillKV Heuristic β Optimization
 
 **Date:** 2026-06-11
 **Status:** Done
