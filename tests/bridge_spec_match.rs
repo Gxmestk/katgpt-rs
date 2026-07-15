@@ -10,7 +10,7 @@
 //! Run: `cargo test --features action_bridge --test bridge_spec_match`
 //!
 //! Cross-references:
-//! - Plan: `.plans/293_action_bridge_lean4_monotonicity_proof.md`
+//! - Plan: `.plans/449_action_bridge_lean4_monotonicity_proof.md`
 //! - Research: `.research/292_Bridge_Neuro_Symbolic_Formal_Verification_Gap.md`
 //! - Lean proof: `.proofs/KatgptProof/Bridge/RankingPreserved.lean`
 //! - Empirical test (complementary): `micro_belief/tests.rs::g1_3_bridge_ranking_preservation`
@@ -273,7 +273,7 @@ fn proofs_directory_exists() {
     assert!(
         proofs_dir.exists(),
         ".proofs/ directory is missing — Lean 4 ranking-preservation proof is gone. \
-         See .plans/293_action_bridge_lean4_monotonicity_proof.md"
+         See .plans/449_action_bridge_lean4_monotonicity_proof.md"
     );
     assert!(
         proofs_dir.join("KatgptProof/Bridge/Basic.lean").exists(),

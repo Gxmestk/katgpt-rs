@@ -35,7 +35,7 @@
 //! allocations by construction.
 //!
 //! See: `katgpt-rs/.research/418_StreamDQ_SIMD_LUT_DeQuant.md`
-//! See: `katgpt-rs/.plans/431_simd_lut_dequant.md`
+//! See: `katgpt-rs/.plans/452_simd_lut_dequant.md`
 
 // ──────────────────────────────────────────────────────────────────────────
 // Phase 1: scalar reference. SIMD inner loops land in Phase 2.

@@ -150,7 +150,7 @@ This is the load-bearing modelless gate. The paper trains GDN2 + HOLA end-to-end
   - G5 (real-text perplexity + RULER) is a riir-train job — tracked there, not in katgpt-rs. Canonical record: this plan + `.research/378_*` §3 MOAT gate. Recover the removed issue via `git show HEAD^:.issues/038_*.md` if needed.
 - [x] **T5.3** README.md "Feature Showcase" entry for `hippocampal_cache` (one paragraph + paper link + GOAT gate status). Update `katgpt-rs/.docs/01_overview.md` Feature Flags table.
 - [-] **T5.4** Cross-reference: add a one-line entry to `.research/070_Gated_DeltaNet_2_*.md` §Relationship noting HOLA cache as a pluggable complement to GDN2 (the "Phase 4 alternative to SWA" identified in Research 070 §Verdict).
-- [-] **T5.5** Cross-reference: add a one-line entry to `.research/243_Temporal_Derivative_Kernel_*.md` §Fusion noting HOLA's β·‖e‖ as a *second* (instantaneous, per-token) surprise channel alongside temporal_deriv's dual-fast/slow EMA — the F2 fusion-potential.
+- [-] **T5.5** Cross-reference: add a one-line entry to `.research/435_Temporal_Derivative_Kernel_*.md` §Fusion noting HOLA's β·‖e‖ as a *second* (instantaneous, per-token) surprise channel alongside temporal_deriv's dual-fast/slow EMA — the F2 fusion-potential.
 - [x] **T5.6** Commit on `develop` per global rule. `feat:` prefix (new primitive).
 
 ---
