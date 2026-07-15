@@ -1787,6 +1787,14 @@ pub use manifold_erasure::{
     manifold_erasure_step_into,
 };
 
+// Lifelong LaCAM Multi-Agent Pathfinding Substrate (Plan 440, Research 424,
+// arXiv:2605.16855). Paper-faithful LLLG with four pluggable seams
+// (CostFn, LocalGuidanceSource, WarmStartScheme, HindranceEstimator) for the
+// Super-GOAT fusion (riir-ai/318: HLA × Crowd MCGS × P350). Pure modelless
+// (heuristic only, no training). Opt-in until GOAT gate G1–G4 pass.
+#[cfg(feature = "multi_agent_path")]
+pub mod multi_agent_path;
+
 // Test-only `#[global_allocator]` so `alloc::tests::*` pass when running
 // `cargo test -p katgpt-core --lib`. Downstream consumers (katgpt-rs root,
 // riir-engine, etc.) install their OWN `#[global_allocator]`; this static is

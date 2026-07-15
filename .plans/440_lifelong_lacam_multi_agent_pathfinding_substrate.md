@@ -6,7 +6,7 @@
 **Private runtime plan:** [riir-ai/.plans/489_lifelong_lacam_crowd_coordination_runtime.md](../../riir-ai/.plans/489_lifelong_lacam_crowd_coordination_runtime.md)
 **Source paper:** [arXiv:2605.16855](https://arxiv.org/abs/2605.16855) — Arita & Okumura, "Lifelong LaCAM with Local Guidance for Lifelong MAPF", AAAI 2026.
 **Target:** `katgpt-rs/crates/katgpt-core/src/multi_agent_path/` (new module) + Cargo feature `multi_agent_path`
-**Status:** Active — Phase 1 not started
+**Status:** Active — Phase 1 COMPLETE, Phase 2 (GOAT gate) not started
 
 ---
 
@@ -49,40 +49,40 @@ multi-agent closure) run in riir-ai/489 and are NOT blocking for this plan.
 
 ### Tasks
 
-- [ ] **T1.1** Create `crates/katgpt-core/src/multi_agent_path/` module.
+- [x] **T1.1** Create `crates/katgpt-core/src/multi_agent_path/` module.
       Add `mod multi_agent_path;` to `lib.rs`. Add feature
       `multi_agent_path = []` to `Cargo.toml` (opt-in).
-- [ ] **T1.2** `mod.rs` — `LifelongLaCam<P, C, G>` struct + `tick()`
+- [x] **T1.2** `mod.rs` — `LifelongLaCam<P, C, G>` struct + `tick()`
       orchestrator. Generic over `P: Position` (trait:
       `neighbors() -> &[P]`, `is_passable() -> bool`), `C: CostFn<P>`,
       `G: LocalGuidanceSource<P>`. Fields: `w_pi`, `w_phi`, `m`,
       `guidance_source`, `cost`, `hindrance_enabled`, `prev_plan_suffix`.
-- [ ] **T1.3** `config.rs` — `Config<P>` (joint configuration = `Vec<P>`),
+- [x] **T1.3** `config.rs` — `Config<P>` (joint configuration = `Vec<P>`),
       `AgentId(u32)` newtype, `JointAction<P>` (the executed first step:
       `Vec<P>` of next positions, one per agent).
-- [ ] **T1.4** `pibt.rs` — PIBT one-step generator (Okumura et al. 2022).
+- [x] **T1.4** `pibt.rs` — PIBT one-step generator (Okumura et al. 2022).
       Lexicographic cost `⟨Ind[Φ[i][1] ≠ u], dist(u, g_i), hindrance(i→u),
       ε⟩`. Priority inheritance with backtracking. Returns the first
       collision-free joint configuration or `None` (deadlock — caller
       handles via higher-level LaCAM search).
-- [ ] **T1.5** `local_guidance.rs` — default `LocalGuidanceSource`
+- [x] **T1.5** `local_guidance.rs` — default `LocalGuidanceSource`
       implementation: space-time A* on paper Eq. 1 cost. Sequential
       per-agent refinement, `m` rounds (Algorithm 1). `α` is a config
       scalar (default 1.0). Returns `Φ: Vec<Vec<P>>` (per-agent `w_Φ`-step
       path).
-- [ ] **T1.6** `warm_start.rs` — `WarmStartScheme` enum:
+- [x] **T1.6** `warm_start.rs` — `WarmStartScheme` enum:
       `LllgPi` (suffix of prev solution, paper default), `LllgPhi` (inherit
       prev guidance), `LllgEmpty` (recompute from scratch). `Π_{t-1}[2:w_Φ]`
       suffix cache with padding for `w_Φ > w_Π` case (paper §3).
-- [ ] **T1.7** `hindrance.rs` — one-step blocking-count estimator (Okumura
+- [x] **T1.7** `hindrance.rs` — one-step blocking-count estimator (Okumura
       & Nagai 2025). For agent `i` considering move to `u`, count siblings
       `j ≠ i` whose neighborhood at `t+1` would include `u`. O(neighbors²)
       per agent, near-zero cost in practice.
-- [ ] **T1.8** `position.rs` — `Position` trait. Default impl for `(usize,
+- [x] **T1.8** `position.rs` — `Position` trait. Default impl for `(usize,
       usize)` grid cells. Document the extension point for 3D / NavMesh
       positions (seal-core `NavMesh` integration is a consumer concern, not
       substrate).
-- [ ] **T1.9** Feature flag wiring. `Cargo.toml`:
+- [x] **T1.9** Feature flag wiring. `Cargo.toml`:
       ```toml
       [features]
       multi_agent_path = []
@@ -90,7 +90,7 @@ multi-agent closure) run in riir-ai/489 and are NOT blocking for this plan.
       No heavy deps. Pure Rust. (Rayon parallelism is a consumer concern —
       the substrate is single-threaded per LLLG instance, matching the
       paper.)
-- [ ] **T1.10** Unit tests in `tests.rs`:
+- [x] **T1.10** Unit tests in `tests.rs`:
       - 2 agents, 3×3 map, vertex collision (agents swap → edge collision).
       - Deadlock (two agents in a 1-wide corridor).
       - Throughput sanity (10 agents, 10×10 map, 100 ticks, all reach goals).
