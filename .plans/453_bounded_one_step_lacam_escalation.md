@@ -264,27 +264,28 @@ search doesn't improve collision-freedom but starts hurting latency.
 
 ## 3. Phased Implementation
 
-### Phase 1 — Research distillation (paper → concrete spec)
+### Phase 1 — Research distillation (paper → concrete spec) ✅ DONE
 
-- [ ] **T1.1** Fetch and distill the LaCAM paper (Okumura 2023, AAAI). Source:
+- [x] **T1.1** Fetch and distill the LaCAM paper (Okumura 2023, AAAI). Source:
       [project page](https://kei18.github.io/lacam/),
       [reference code](https://github.com/Kei18/lacam/blob/master/lacam/src/planner.cpp).
       Focus: §3 (the two-level search), §4.1 (`get_new_config`), §4.2
-      (`funcPIBT`). Output: a `.research/441_lacam_constraint_tree_distillation.md`
-      note documenting the algorithm shape, data structures, and the
+      (`funcPIBT`). Output: [`.research/441_lacam_constraint_tree_distillation.md`](../.research/441_lacam_constraint_tree_distillation.md)
+      documenting the algorithm shape, data structures, and the
       constraint-tree → recursive-PIBT composition. Cross-ref Research 424
-      §1.5 (the LaCAM* anytime-refinement negative result — confirm our
-      one-step scope avoids it).
-- [ ] **T1.2** Vocabulary-translate the paper against the codebase. Grep
+      §1.5 (the LaCAM* anytime-refinement negative result — confirmed our
+      one-step scope avoids it, see Research 441 §2.3).
+- [x] **T1.2** Vocabulary-translate the paper against the codebase. Grep
       `crates/katgpt-core/src/` for: `constraint`, `backtrack`, `recursive`,
-      `priority inheritance`, `search_tree`, `constraint_tree`. Confirm the
-      constraint tree is NOT already shipped under a different name (the
-      R296 lesson — paper vocabulary may differ from code vocabulary).
-- [ ] **T1.3** Document the prior-art distinction: PI alone (Issues 140/143,
-      reverted) vs PI + constraint tree (LaCAM, this plan). Update Issue 154
-      to reference this plan as the non-PI path forward. The key sentence:
+      `priority inheritance`, `search_tree`, `constraint_tree`. Result:
+      `constraint` appears only in `arg/policy.rs` (`PolicyConstraints` —
+      governance, unrelated to MAPF). The constraint tree is NOT shipped
+      under any name (Research 441 §3 documents the full vocabulary table).
+- [x] **T1.3** Document the prior-art distinction: PI alone (Issues 140/143,
+      reverted) vs PI + constraint tree (LaCAM, this plan). Issue 154 updated
+      with cross-ref to Plan 453 (commit `a6cf51c2`). The key sentence:
       "PI is prior art; LaCAM is PI + constraint tree, and only the PI half
-      was tried."
+      was tried." Research 441 §5 has the full prior-art comparison table.
 
 ### Phase 2 — Implement bounded one-step LaCAM
 
