@@ -1,4 +1,4 @@
-# Plan 431 — SIMD LUT DeQuant GOAT Gate Results
+# Benchmark 432 — SIMD LUT DeQuant GOAT Gate Results (Plan 452)
 
 **Date:** 2026-07-13
 **Platform:** aarch64-apple-darwin (Apple Silicon, NEON)

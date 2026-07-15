@@ -132,7 +132,7 @@ Distill StreamDQ's "shared FP32 ALU + format-specific type-cast" pattern (paper 
 
 - [x] **T4.6** **G6 feature isolation** — `cargo check --features simd_lut_dequant` clean without affecting default paths. The feature is purely additive.
 
-- [x] **T4.7** Write `.benchmarks/431_simd_lut_dequant_goat.md` with the gate result + decision (promote / demote / keep opt-in).
+- [x] **T4.7** Write `.benchmarks/432_simd_lut_dequant_goat.md` with the gate result + decision (promote / demote / keep opt-in).
 
 **Exit:** GOAT gate documented. If promote: bump `simd_lut_dequant` to default feature in `katgpt-core/Cargo.toml`. ✅ DONE (2026-07-13): ALL GATES PASS. G1 bit-exact (0.0 diff). G2: fused dequant+dot **4.583×** win (PASS, target ≥1.3×); plain LUT dequant **0.286×** (FAIL, NEON has no gather). G3 clippy --all-features clean. G4 0 allocs/100 calls both paths. G5 aarch64 NEON (scalar gather). G6 0 mismatches/100 calls. **Split promotion**: `simd_lut_dequant` PROMOTED to default-on (fused kernel is the value-add). Plain `dequant_via_lut` should NOT replace arithmetic path in Q4_K (Phase 5 guidance: use `dequant_dot_via_lut` for fused matmul only). See `.benchmarks/432_simd_lut_dequant_goat.md`.
 
@@ -173,7 +173,7 @@ Per the §1.6 MOAT-gate discipline, this primitive lands in the **transformer-st
 | Q4_K fused dequant+dot | split (dequant + simd_dot) | fused LUT+dot | TBD (strongest candidate) |
 | INT8/FP8 dequant | (no current path) | LUT | N/A — LUT becomes the default when these ship |
 
-If the LUT path loses on all slots: keep opt-in, document the negative result in `.benchmarks/431_*.md`. The infrastructure still serves future FP8 work.
+If the LUT path loses on all slots: keep opt-in, document the negative result in `.benchmarks/432_*.md`. The infrastructure still serves future FP8 work.
 
 ---
 
