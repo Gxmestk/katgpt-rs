@@ -61,12 +61,41 @@ For each collision, the deterministic fix is:
 
 ## Acceptance criteria
 
-- [ ] T1: Resolve all 13 `.research/` collisions (renumber + update references)
-- [ ] T2: Resolve all 11 `.plans/` collisions (renumber + update references)
-- [ ] T3: Update `.research/.highwater` and `.plans/.highwater` to final values
-- [ ] T4: `grep -rn` verification: zero stale references to any renumbered file
-- [ ] T5: `cargo clippy` clean (in case any `.rs` doc-comments reference old numbers)
-- [ ] T6: Update `.issues/.highwater` (done: 153)
+- [x] T1: Resolve all 13 `.research/` collisions (renumber + update references) — commit `12db995b`
+- [x] T2: Resolve all 11 `.plans/` collisions (renumber + update references) — commit `f98f7b51`
+- [x] T3: Update `.research/.highwater` (427→440) and `.plans/.highwater` (441→452) to final values
+- [x] T4: `grep -rn` verification: zero stale `.md` references to any renumbered file (24/24 clean)
+- [ ] T5: `cargo clippy` clean — **DEFERRED**. 5 `.rs` files have stale doc-comments referencing old numbers (see §"Residual `.rs` doc-comments" below). These are non-functional comments only; clippy will pass (comments don't affect compilation). A follow-up doc-sync pass can update them.
+- [x] T6: Update `.issues/.highwater` (done: 153)
+
+## Residual `.rs` doc-comments (stale but non-functional — NOT edited per task rule)
+
+These 5 `.rs` files contain `//!`/comment references to old plan/research numbers. Per the
+batch-resolve task rule ("DO NOT touch any `.rs` files"), they were left as-is. A future
+doc-sync pass should update them:
+
+| File | Old ref | Should become |
+|---|---|---|
+| `crates/katgpt-types/src/temporal.rs:5` | `.research/243_Temporal_Derivative_...` | `.research/435_Temporal_Derivative_...` |
+| `crates/katgpt-core/src/temporal_deriv.rs:5` | `.research/243_Temporal_Derivative_...` | `.research/435_Temporal_Derivative_...` |
+| `crates/katgpt-core/src/content_store/mod.rs:5` | Plan 272 (`.plans/272_chunked_asset_...`) | Plan 448 (`.plans/448_chunked_asset_...`) |
+| `tests/bridge_spec_match.rs:13,276` | `.plans/293_action_bridge_...` | `.plans/449_action_bridge_...` |
+| `crates/katgpt-core/src/simd_lut_dequant.rs:38` | `.plans/431_simd_lut_dequant.md` | `.plans/452_simd_lut_dequant.md` |
+
+Note: `tests/bench_135_parallax_attn.rs` is a `.rs` *filename* (not a doc-comment reference)
+that still uses the 135 number. Renaming test files is out of scope for this mechanical
+refactor; the plan was renumbered but the test file keeps its name.
+
+## Ambiguous first-created determinations (timestamps identical)
+
+Three collisions had identical `git log --diff-filter=A` timestamps (same commit). The
+alphabetical tiebreaker (first alphabetically keeps the number) was applied:
+
+| Collision | Files | Same commit | Keeper | Renumbered |
+|---|---|---|---|---|
+| `.research/156` | Speculative vs Weight_Isolate | `5383d1cb` | Speculative (S<W) | Weight_Isolate → 432 |
+| `.research/228` | RCD vs TwinProp | `f0b1a935` | RCD (R<T) | TwinProp → 434 |
+| `.plans/164` | gepa vs phrase_boost | `aa4c1fa8` | gepa (g<p) | phrase_boost → 446 |
 
 ## Priority
 
