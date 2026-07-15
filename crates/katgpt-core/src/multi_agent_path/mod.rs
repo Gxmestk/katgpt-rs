@@ -18,7 +18,7 @@
 //! | Guidance source | [`LocalGuidanceSource<P>`] | Space-time A* on collision count | HLA-projected guidance (per-NPC emotional congestion avoidance) |
 //! | Warm-start scheme | [`WarmStartScheme`] | `LllgPi` (prev solution suffix) | Personality-weighted blend |
 //! | Hindrance estimator | [`HindranceEstimator<P>`] | Raw blocking count | Affect-aware blocking (fearful NPCs count more) |
-//! | Flow field (Issue 149) | [`FlowField<P>`] | [`NoFlow`] (no corridor enforcement) | [`GridFlowField`] (1-wide corridor direction assignment) |
+//! | Flow field (Issue 149 + 150) | [`FlowField<P>`] | [`NoFlow`] (no corridor enforcement) | [`GridFlowField`] (1-wide + 2-wide corridor direction assignment) |
 //!
 //! A consumer that uses all five defaults gets the paper's LLLG verbatim.
 //!

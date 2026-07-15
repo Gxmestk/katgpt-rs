@@ -10,17 +10,24 @@
 //! bounded and often can't resolve it).
 //!
 //! The paper's solution: **assign a canonical one-way direction to each
-//! corridor segment** so that traffic flows in only one direction within a
-//! corridor. Agents moving against the assigned direction incur a flow-mismatch
+//! corridor segment** so that traffic flows in only one direction within
+//! a corridor. Agents moving against the assigned direction incur a flow-mismatch
 //! penalty in the PIBT cost tuple. On open maps (no corridors), the flow field
 //! is empty — zero penalty — so open-map throughput is unaffected.
 //!
 //! # Mechanism
 //!
-//! 1. **Corridor detection:** a cell is a corridor cell if it has exactly 2
-//!    passable neighbors and those neighbors are on opposite sides (horizontal
-//!    pair or vertical pair). Dead-end cells (1 neighbor) and junction cells
-//!    (3+ neighbors) are NOT corridors — they have no directionality to enforce.
+//! 1. **Corridor detection (Issue 149 + 150):** a cell is a corridor cell if it
+//!    is part of a narrow passage flanked by walls:
+//!    - **1-wide corridor** (Issue 149): the cell has exactly 2 passable
+//!      neighbors on opposite sides (horizontal pair or vertical pair).
+//!    - **2-wide corridor** (Issue 150): the cell is part of an adjacent pair
+//!      flanked by walls — e.g., cells `(x,y)` and `(x,y+1)` with walls at
+//!      `(x,y-1)` and `(x,y+2)` form a 2-wide horizontal corridor. Each such
+//!      cell has 3 passable neighbors (left, right, partner).
+//!    - 3+ wide passages are NOT corridors (agents can freely pass each other).
+//!    - Dead-end cells (1 neighbor) and junction cells (4+ neighbors) are NOT
+//!      corridors — they have no directionality to enforce.
 //! 2. **Direction assignment:** each corridor cell gets a direction `(axis, sign)`.
 //!    The axis is the corridor's orientation (Horizontal/Vertical). The sign is
 //!    +1 (positive direction: right for horizontal, down for vertical). This
@@ -64,15 +71,21 @@ pub enum CorridorAxis {
     Vertical,
 }
 
-/// The direction assigned to a single corridor cell: axis + sign.
+/// The direction assigned to a single corridor cell: axis + sign + width.
 ///
 /// `sign` is +1 (positive direction along axis: right for Horizontal, down for
 /// Vertical) or -1 (negative direction: left/up).
+///
+/// `width` is the corridor width (1 or 2). It does NOT affect the mismatch
+/// computation — it's purely informational for diagnostics and consumers that
+/// want to know the corridor topology.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct FlowDirection {
     pub axis: CorridorAxis,
     /// +1 or -1. Encoded as i8 for compactness.
     pub sign: i8,
+    /// Corridor width: 1 (1-wide passage) or 2 (2-wide passage). Issue 150.
+    pub width: u8,
 }
 
 impl FlowDirection {
@@ -157,23 +170,34 @@ impl<P> FlowField<P> for NoFlow {
     }
 }
 
-/// Grid flow field — precomputed one-way direction assignment for 1-wide
-/// corridors.
+/// Grid flow field — precomputed one-way direction assignment for 1-wide and
+/// 2-wide corridors.
 ///
 /// Built once from a [`GridMap`] via [`GridFlowField::from_map`]. Stores a
 /// direction per corridor cell in a `Vec<Option<FlowDirection>>` indexed by
 /// `y * width + x`. Non-corridor cells store `None`.
 ///
-/// # Corridor definition
+/// # Corridor definitions
 ///
-/// A cell `(x, y)` is a corridor cell if:
+/// **1-wide corridor** (Issue 149): a cell `(x, y)` is a 1-wide corridor cell
+/// if:
 /// - It is passable.
 /// - It has exactly 2 passable neighbors among the 4-connected cells.
 /// - Those 2 neighbors are on opposite sides: `(x-1, y)` and `(x+1, y)`
 ///   (horizontal corridor), or `(x, y-1)` and `(x, y+1)` (vertical corridor).
 ///
-/// Cells with 1 neighbor (dead-ends), 3+ neighbors (junctions), or 2
-/// non-opposite neighbors (corners) are NOT corridors.
+/// **2-wide corridor** (Issue 150): a cell `(x, y)` is a 2-wide corridor cell
+/// if it is part of a pair of adjacent passable cells flanked by walls:
+/// - **2-wide horizontal:** cells `(x, y)` and `(x, y+1)` are both passable,
+///   with walls (or OOB) at `(x, y-1)` and `(x, y+2)`. Both cells get
+///   `axis=Horizontal`. The flow runs left-right.
+/// - **2-wide vertical:** cells `(x, y)` and `(x+1, y)` are both passable,
+///   with walls (or OOB) at `(x-1, y)` and `(x+2, y)`. Both cells get
+///   `axis=Vertical`. The flow runs up-down.
+///
+/// 3+ wide passages are NOT corridors (agents can freely pass each other).
+/// Cells classified as BOTH 2-wide horizontal and 2-wide vertical are junctions
+/// — left unclassified.
 ///
 /// # Direction assignment
 ///
@@ -188,13 +212,20 @@ pub struct GridFlowField {
 }
 
 impl GridFlowField {
-    /// Build a flow field from a grid map. Detects corridors and assigns
-    /// one-way directions (sign=+1 for all corridors).
+    /// Build a flow field from a grid map. Detects 1-wide and 2-wide corridors
+    /// and assigns one-way directions (sign=+1 for all corridors).
+    ///
+    /// 1-wide corridors are detected first and take priority. Then 2-wide
+    /// corridors are detected on remaining cells. Cells classified as both
+    /// 2-wide-H and 2-wide-V (junctions) are left unclassified.
     pub fn from_map(map: &GridMap) -> Self {
         let w = map.width;
         let h = map.height;
         let mut directions: Vec<Option<FlowDirection>> = vec![None; w * h];
 
+        // Pass 1: 1-wide corridor detection (Issue 149).
+        // A cell is a 1-wide corridor cell if it has exactly 2 passable neighbors
+        // on opposite sides.
         for y in 0..h {
             for x in 0..w {
                 if !map.is_passable(x, y) {
@@ -217,15 +248,63 @@ impl GridFlowField {
                     directions[idx] = Some(FlowDirection {
                         axis: CorridorAxis::Horizontal,
                         sign: 1,
+                        width: 1,
                     });
                 } else if up && down && !left && !right {
                     // Vertical corridor: up-down pair.
                     directions[idx] = Some(FlowDirection {
                         axis: CorridorAxis::Vertical,
                         sign: 1,
+                        width: 1,
                     });
                 }
                 // else: corner (2 non-opposite neighbors) — not a corridor.
+            }
+        }
+
+        // Pass 2: 2-wide corridor detection (Issue 150).
+        // A cell `(x, y)` is part of a 2-wide horizontal corridor if there exists
+        // a vertical partner `(x, y+dy)` such that both are passable and the pair
+        // is flanked by walls on the vertical sides:
+        //   - `(x, y-dy)` is blocked (the wall on the opposite side from the partner)
+        //   - `(x, y+2*dy)` is blocked (the wall on the far side of the partner)
+        // The axis is Horizontal (flow runs left-right).
+        //
+        // Similarly for 2-wide vertical corridors with a horizontal partner.
+        for y in 0..h {
+            for x in 0..w {
+                let idx = y * w + x;
+                // Skip cells already classified as 1-wide corridors.
+                if directions[idx].is_some() {
+                    continue;
+                }
+                if !map.is_passable(x, y) {
+                    continue;
+                }
+
+                // Check 2-wide horizontal: partner above (dy=-1) or below (dy=+1).
+                let h2 = is_2wide_corridor_h(map, x, y, w, h);
+                // Check 2-wide vertical: partner left (dx=-1) or right (dx=+1).
+                let v2 = is_2wide_corridor_v(map, x, y, w, h);
+
+                // If both H and V 2-wide conditions hold, this is a junction — skip.
+                if h2 && v2 {
+                    continue;
+                }
+
+                if h2 {
+                    directions[idx] = Some(FlowDirection {
+                        axis: CorridorAxis::Horizontal,
+                        sign: 1,
+                        width: 2,
+                    });
+                } else if v2 {
+                    directions[idx] = Some(FlowDirection {
+                        axis: CorridorAxis::Vertical,
+                        sign: 1,
+                        width: 2,
+                    });
+                }
             }
         }
 
@@ -244,9 +323,25 @@ impl GridFlowField {
         self.directions.get(idx).copied().flatten()
     }
 
-    /// Number of corridor cells detected.
+    /// Number of corridor cells detected (1-wide + 2-wide).
     pub fn corridor_cell_count(&self) -> usize {
         self.directions.iter().filter(|d| d.is_some()).count()
+    }
+
+    /// Number of 1-wide corridor cells detected.
+    pub fn corridor_1wide_count(&self) -> usize {
+        self.directions
+            .iter()
+            .filter(|d| d.map(|d| d.width == 1).unwrap_or(false))
+            .count()
+    }
+
+    /// Number of 2-wide corridor cells detected (Issue 150).
+    pub fn corridor_2wide_count(&self) -> usize {
+        self.directions
+            .iter()
+            .filter(|d| d.map(|d| d.width == 2).unwrap_or(false))
+            .count()
     }
 }
 
@@ -260,4 +355,108 @@ impl FlowField<GridPos> for GridFlowField {
         };
         dir.mismatch(from, to)
     }
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// 2-wide corridor detection helpers (Issue 150)
+// ─────────────────────────────────────────────────────────────────────
+
+/// Check if `(x, y)` is out of bounds or a wall (i.e., "blocked" for corridor
+/// purposes). Cells outside the map are treated as walls.
+#[inline]
+fn is_blocked(map: &GridMap, x: i32, y: i32, w: usize, h: usize) -> bool {
+    if x < 0 || y < 0 || x as usize >= w || y as usize >= h {
+        return true;
+    }
+    !map.is_passable(x as usize, y as usize)
+}
+
+/// Check if cell `(x, y)` is part of a 2-wide **horizontal** corridor (Issue 150).
+///
+/// A 2-wide horizontal corridor is a pair of vertically-adjacent passable cells
+/// flanked by walls above and below. The cell `(x, y)` qualifies if there exists
+/// a vertical partner at offset `dy \in {-1, +1}` such that:
+/// - `(x, y + dy)` is passable (the partner)
+/// - `(x, y - dy)` is blocked (wall/OOB on the opposite side)
+/// - `(x, y + 2*dy)` is blocked (wall/OOB on the far side of the partner)
+///
+/// Returns `true` if either the above-partner or below-partner configuration
+/// matches. Additionally, BOTH the cell and its partner must have at least one
+/// passable horizontal neighbor (left or right) — this prevents false positives
+/// on dead-ends and corners where the pair doesn't actually extend horizontally.
+#[inline]
+fn is_2wide_corridor_h(map: &GridMap, x: usize, y: usize, w: usize, h: usize) -> bool {
+    let xi = x as i32;
+    let yi = y as i32;
+
+    // Helper: does cell (cx, cy) have at least one passable horizontal neighbor?
+    let has_h_neighbor = |cx: usize, cy: usize| -> bool {
+        (cx > 0 && map.is_passable(cx - 1, cy)) || (cx + 1 < w && map.is_passable(cx + 1, cy))
+    };
+
+    // Partner below (dy = +1): wall above, passable below, wall below-partner.
+    let partner_below =
+        yi + 1 < h as i32
+        && map.is_passable(x, y + 1)
+        && is_blocked(map, xi, yi - 1, w, h)
+        && is_blocked(map, xi, yi + 2, w, h)
+        && has_h_neighbor(x, y)
+        && has_h_neighbor(x, y + 1);
+
+    if partner_below {
+        return true;
+    }
+
+    // Partner above (dy = -1): wall below, passable above, wall above-partner.
+    yi >= 1
+        && map.is_passable(x, y - 1)
+        && is_blocked(map, xi, yi + 1, w, h)
+        && is_blocked(map, xi, yi - 2, w, h)
+        && has_h_neighbor(x, y)
+        && has_h_neighbor(x, y - 1)
+}
+
+/// Check if cell `(x, y)` is part of a 2-wide **vertical** corridor (Issue 150).
+///
+/// A 2-wide vertical corridor is a pair of horizontally-adjacent passable cells
+/// flanked by walls left and right. The cell `(x, y)` qualifies if there exists
+/// a horizontal partner at offset `dx \in {-1, +1}` such that:
+/// - `(x + dx, y)` is passable (the partner)
+/// - `(x - dx, y)` is blocked (wall/OOB on the opposite side)
+/// - `(x + 2*dx, y)` is blocked (wall/OOB on the far side of the partner)
+///
+/// Returns `true` if either the right-partner or left-partner configuration
+/// matches. Additionally, BOTH the cell and its partner must have at least one
+/// passable vertical neighbor (up or down) — this prevents false positives on
+/// dead-ends and corners where the pair doesn't actually extend vertically.
+#[inline]
+fn is_2wide_corridor_v(map: &GridMap, x: usize, y: usize, w: usize, h: usize) -> bool {
+    let xi = x as i32;
+    let yi = y as i32;
+
+    // Helper: does cell (cx, cy) have at least one passable vertical neighbor?
+    let has_v_neighbor = |cx: usize, cy: usize| -> bool {
+        (cy > 0 && map.is_passable(cx, cy - 1)) || (cy + 1 < h && map.is_passable(cx, cy + 1))
+    };
+
+    // Partner right (dx = +1): wall left, passable right, wall right-partner.
+    let partner_right =
+        xi + 1 < w as i32
+        && map.is_passable(x + 1, y)
+        && is_blocked(map, xi - 1, yi, w, h)
+        && is_blocked(map, xi + 2, yi, w, h)
+        && has_v_neighbor(x, y)
+        && has_v_neighbor(x + 1, y);
+
+    if partner_right {
+        return true;
+    }
+
+    // Partner left (dx = -1): wall right, passable left, wall left-partner.
+    x >= 1
+        && map.is_passable(x - 1, y)
+        && is_blocked(map, xi + 1, yi, w, h)
+        && is_blocked(map, xi - 2, yi, w, h)
+        && has_v_neighbor(x, y)
+        && has_v_neighbor(x - 1, y)
 }

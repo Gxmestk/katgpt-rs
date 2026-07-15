@@ -678,13 +678,15 @@ fn main() {
         let np = count_passable(map);
         let flow = GridFlowField::from_map(map);
         println!(
-            "  {name:<30}: {:>3}×{:>3} = {:>5} cells, {:>5} passable ({:.1}% open), {:>5} corridors",
+            "  {name:<30}: {:>3}×{:>3} = {:>5} cells, {:>5} passable ({:.1}% open), {:>5} corridors ({:>3} 1-wide + {:>3} 2-wide)",
             map.width,
             map.height,
             map.width * map.height,
             np,
             np as f64 / (map.width * map.height) as f64 * 100.0,
-            flow.corridor_cell_count()
+            flow.corridor_cell_count(),
+            flow.corridor_1wide_count(),
+            flow.corridor_2wide_count()
         );
     }
     println!();
@@ -946,8 +948,9 @@ fn main() {
         println!();
         println!("G1: 2/4 real paper maps pass (empty, random). warehouse and");
         println!("    ht_chantry FAIL — Guided-PIBT flow direction assignment (Issue 149)");
-        println!("    adds one-way corridor lanes. Measure corridor counts and throughput");
-        println!("    change to assess the flow_mismatch cost term's effect.");
+        println!("    + 2-wide corridor detection (Issue 150) adds one-way corridor lanes.");
+        println!("    Measure corridor counts and throughput change to assess the");
+        println!("    flow_mismatch cost term's effect on real game maps.");
         println!("G2: warm-start consumption confirmed harmful without LaCAM (Issue 142).");
         println!("The GOAT gate honestly identifies the remaining gaps.");
     }

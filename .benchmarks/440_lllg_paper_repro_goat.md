@@ -1,10 +1,11 @@
 # Benchmark 440: LLLG Paper Reproduction GOAT Gate
 
-**Date:** 2026-07-15 (updated Issue 149)
+**Date:** 2026-07-15 (updated Issue 150)
 **Plan:** [440](../.plans/440_lifelong_lacam_multi_agent_pathfinding_substrate.md)
 **Research:** [424](../.research/424_Lifelong_LaCAM_Local_Guidance_Multi_Agent_Pathfinding.md)
 **Paper:** [arXiv:2605.16855](https://arxiv.org/abs/2605.16855) — Arita & Okumura, AAAI 2026
-**Issue:** [149](../.issues/149_guided_pibt_flow_direction_assignment.md) — Guided-PIBT flow direction assignment (mechanism correct, near-zero effect due to corridor-definition mismatch)
+**Issue:** [150](../.issues/150_2wide_corridor_detection.md) — 2-wide corridor detection (mechanism correct, still near-zero effect — the cost-term tiebreak position is too weak)
+**Prior issue:** [149](../.issues/149_guided_pibt_flow_direction_assignment.md) — 1-wide corridor detection (near-zero effect due to corridor-definition mismatch)
 **Prior issue:** [148](../.issues/148_real_movingai_maps.md) — real MovingAI benchmark maps (map-fidelity hypothesis test)
 **Prior issue:** [147](../.issues/147_guided_pibt_maze_routing_exploration.md) — ht_chantry connectivity fix (10× improvement) + counter-flow Guided-PIBT (negative result)
 **Prior issue:** [144](../.issues/144_lacam_escalation_swap_warmstart_followup.md) — swap technique (negative result, infrastructure-only)
@@ -20,34 +21,102 @@
 (2/4 real maps). G2 (congestion): FAIL (warm-start not consumable — confirmed
 by Issue 142 even with full A*).**
 
-**Issue 149 finding (Guided-PIBT flow direction assignment):** Implemented the
-`FlowField` mechanism — a static, topology-aware flow field that assigns
-one-way directions to 1-wide corridor cells. The mechanism is **correct and
-tested** (11 unit tests), but has **near-zero effect** on the real maps because
-the corridor definition (exactly 2 opposite passable neighbors) is too strict:
+**Issue 150 finding (2-wide corridor detection):** Broadened the corridor
+ detector to also catch 2-wide passages (pairs of adjacent passable cells
+ flanked by walls). The 2-wide detection finds **significantly more corridors**:
 
-- `ht_chantry`: only **8 corridor cells** out of 7461 passable (0.1%)
-- `warehouse`: **0 corridor cells** (wide aisles, not narrow passages)
-- `empty`: **0 corridors**, `random`: 63 corridors
+- `ht_chantry`: 8 → **110** corridor cells (13.75× more)
+- `warehouse`: 0 → **4920** corridor cells (50% of passable cells!)
+- `random`: 63 → **245** (3.9× more)
 
-The real game-map corridors are **2-wide or wider**, not the strict 1-wide
-passages the detector catches. The `flow_mismatch` cost term fires on almost
-no cells. Throughput is unchanged (within noise) on all 4 maps.
+But throughput is **still unchanged** (within noise) on all 4 maps. The
+`flow_mismatch` cost term is a tiebreak at position 2 in the lexicographic tuple —
+it only fires when `guidance_mismatch` is tied. Even with 4920 corridor cells on
+warehouse, the term's effect is negligible because the guidance source
+(space-time A*) already steers agents well, and the flow tiebreak rarely changes
+the selected candidate. The gap is **not corridor detection** — it's the
+**strength of the flow enforcement mechanism**.
 
-The good news: **zero regression on open maps** — the "safe promotion" design
-works exactly as intended. The `FlowField` pluggable seam is shipped and ready
-for consumers with genuine 1-wide corridor maps.
-
-| Map | Issue 148 (no flow) | Issue 149 (with flow) | Corridors | Change |
+| Map | Issue 149 (1-wide only) | Issue 150 (1+2-wide) | Corridors | Change |
 |---|---|---|---|---|
-| empty-48-48 | 18.52 (0.68) | **18.52 (0.68)** | 0 | identical |
-| random-64-64-10 | 14.37 (0.68) | **14.65 (0.69)** | 63 | +2% (noise) |
-| warehouse | 7.34 (0.41) | **7.34 (0.41)** | 0 | identical |
-| ht_chantry | 4.51 (0.27) | **4.61 (0.27)** | 8 | +2% (noise) |
+| empty-48-48 | 18.52 (0.68) | **18.52 (0.68)** | 0 → 0 | identical |
+| random-64-64-10 | 14.65 (0.69) | **14.56 (0.69)** | 63 → 245 | -0.6% (noise) |
+| warehouse | 7.34 (0.41) | **7.33 (0.41)** | 0 → 4920 | -0.1% (noise) |
+| ht_chantry | 4.61 (0.27) | **4.66 (0.27)** | 8 → 110 | +1% (noise) |
 
-**Promotion decision: KEEP OPT-IN.** Unchanged. The flow direction assignment
-mechanism is correct but the corridor definition needs broadening to 2-wide
-passages to match real game-map topology.
+---
+
+## Issue 150 results (2026-07-15) — 2-wide corridor detection
+
+### What was done
+
+Broadened `GridFlowField::from_map` to detect both 1-wide and 2-wide corridors.
+A 2-wide corridor is a pair of adjacent passable cells flanked by walls on both
+sides perpendicular to the adjacency axis. Each cell in the pair gets the same
+`FlowDirection` (sign=+1).
+
+Added a `width: u8` field to `FlowDirection` (1 or 2) for diagnostics. Added
+`corridor_1wide_count()` and `corridor_2wide_count()` diagnostic methods. 7 new
+unit tests covering 2-wide horizontal/vertical detection, flow mismatch, 3-wide
+exclusion, junction exclusion, open-map no-regression, and mixed 1+2-wide
+coexistence.
+
+### Result: corridor detection now covers real maps, but throughput unchanged
+
+The 2-wide detector finds **dramatically more corridors** on real game maps:
+
+| Map | 1-wide (Issue 149) | 2-wide (Issue 150) | Total | Coverage |
+|---|---|---|---|---|
+| empty-48-48 | 0 | 0 | 0 | 0.0% |
+| random-64-64-10 | 63 | 182 | 245 | 6.6% |
+| warehouse | 0 | **4920** | **4920** | **50.3%** |
+| ht_chantry | 8 | 102 | 110 | 1.5% |
+
+**Warehouse now has 4920 corridor cells (50% of passable cells!)** — the entire
+aisle structure is 2-wide. ht_chantry went from 8 to 110 corridor cells.
+
+But throughput is **still unchanged** (within noise) on all 4 maps:
+
+| Map | Issue 149 | Issue 150 | Change |
+|---|---|---|---|
+| empty-48-48 | 18.52 (0.68) | **18.52 (0.68)** | identical |
+| random-64-64-10 | 14.65 (0.69) | **14.56 (0.69)** | -0.6% (noise) |
+| warehouse | 7.34 (0.41) | **7.33 (0.41)** | -0.1% (noise) |
+| ht_chantry | 4.61 (0.27) | **4.66 (0.27)** | +1% (noise) |
+
+### Root cause: the tiebreak position is too weak
+
+The `flow_mismatch` cost term sits at **position 2** in the 5-tuple:
+
+```text
+⟨ guidance_mismatch, flow_mismatch, goal_dist, hindrance, ε ⟩
+```
+
+It only breaks ties between candidates with the same `guidance_mismatch` (0 or 1).
+In practice, the guidance source (space-time A* on collision-count cost) steers
+agents well enough that `guidance_mismatch` is almost always 0 for the preferred
+move. When guidance_mismatch is 0 for multiple candidates (e.g., wait + move
+forward are both guidance-consistent), the flow term does influence selection —
+but this rarely changes the final collision-free choice because the
+collision-checking loop tries candidates in sorted order and the first
+collision-free one wins regardless of flow.
+
+**The bottleneck is not corridor detection — it's the enforcement mechanism.**
+The flow direction is a soft hint, not a hard constraint. To actually improve
+throughput on warehouse/ht_chantry, the flow direction needs to influence the
+**guidance source** (space-time A* should prefer routes aligned with the flow
+field), not just the PIBT tiebreak.
+
+### GOAT gate status (unchanged)
+
+| Gate | Status | Detail |
+|---|---|---|
+| **G1** | **PARTIAL 2/4** | empty 0.68 ✅, random 0.69 ✅, warehouse 0.41 ❌, ht_chantry 0.27 ❌. Unchanged. |
+| **G2** | **FAIL** | Warm-start non-consumable (ratio 1.00). Unchanged. |
+| **G3** | **PASS** | 1611 tests pass (7 new 2-wide tests). Clippy clean. |
+| **G4** | **PASS** | 225ms median at 1000 agents (<500ms target). |
+
+**Promotion decision: KEEP OPT-IN** (unchanged).
 
 ---
 

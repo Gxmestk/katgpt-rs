@@ -245,10 +245,13 @@ fn test_grid_flow_field_detects_horizontal_corridor() {
     // (they're at the edge), so they're dead-ends, not corridors.
     // Only x=1,2,3 are corridors.
     assert_eq!(ff.corridor_cell_count(), 3);
+    assert_eq!(ff.corridor_1wide_count(), 3);
+    assert_eq!(ff.corridor_2wide_count(), 0);
     // Check direction at corridor cells.
     let dir = ff.direction_at(2, 1).expect("(2,1) is a corridor");
     assert_eq!(dir.axis, CorridorAxis::Horizontal);
     assert_eq!(dir.sign, 1);
+    assert_eq!(dir.width, 1);
 }
 
 #[test]
@@ -268,9 +271,11 @@ fn test_grid_flow_field_detects_vertical_corridor() {
     let ff = GridFlowField::from_map(&map);
     // Only y=1,2,3 are corridors (endpoints y=0 and y=4 are dead-ends).
     assert_eq!(ff.corridor_cell_count(), 3);
+    assert_eq!(ff.corridor_1wide_count(), 3);
     let dir = ff.direction_at(1, 2).expect("(1,2) is a corridor");
     assert_eq!(dir.axis, CorridorAxis::Vertical);
     assert_eq!(dir.sign, 1);
+    assert_eq!(dir.width, 1);
 }
 
 #[test]
@@ -324,6 +329,8 @@ fn test_flow_field_junction_not_corridor() {
     // Actually no: (0,1) and (2,1) are passable, (1,0) and (1,2) are walls.
     // So (1,1) has exactly 2 passable neighbors (left, right) → corridor.
     assert_eq!(ff.corridor_cell_count(), 1); // only (1,1)
+    assert_eq!(ff.corridor_1wide_count(), 1);
+    assert_eq!(ff.corridor_2wide_count(), 0);
 }
 
 #[test]
@@ -339,6 +346,8 @@ fn test_flow_field_dead_end_not_corridor() {
     // Cell (0,0) has neighbor (0,1) only → 1 neighbor → dead-end, not corridor.
     // Cell (0,1) has neighbor (0,0) only → 1 neighbor → dead-end, not corridor.
     assert_eq!(ff.corridor_cell_count(), 0);
+    assert_eq!(ff.corridor_1wide_count(), 0);
+    assert_eq!(ff.corridor_2wide_count(), 0);
 }
 
 #[test]
@@ -353,6 +362,7 @@ fn test_flow_field_corner_not_corridor() {
     // Cell (0,0) has neighbors (1,0) and (0,1) → 2 neighbors but NOT opposite
     // (they form an L-corner) → NOT a corridor.
     assert_eq!(ff.corridor_cell_count(), 0);
+    assert_eq!(ff.corridor_2wide_count(), 0);
 }
 
 #[test]
@@ -407,6 +417,156 @@ fn test_corridor_direction_assignment_deterministic() {
             assert_eq!(ff1.direction_at(x, y), ff2.direction_at(x, y));
         }
     }
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// 2-wide corridor detection tests (Issue 150)
+// ─────────────────────────────────────────────────────────────────────
+
+#[test]
+fn test_2wide_horizontal_corridor_detected() {
+    // A 2-wide horizontal corridor at y=1..2, flanked by walls.
+    //
+    //   #####
+    //   .....   <- y=1 (corridor, partner below)
+    //   .....   <- y=2 (corridor, partner above)
+    //   #####
+    let mut map = GridMap::empty(5, 4);
+    for x in 0..5 {
+        map.set_wall(x, 0);
+        map.set_wall(x, 3);
+    }
+    let ff = GridFlowField::from_map(&map);
+    // All cells at y=1 and y=2 are 2-wide corridor cells.
+    // Total: 5 * 2 = 10 cells, all width=2.
+    assert_eq!(ff.corridor_cell_count(), 10);
+    assert_eq!(ff.corridor_1wide_count(), 0);
+    assert_eq!(ff.corridor_2wide_count(), 10);
+    let dir = ff.direction_at(2, 1).expect("(2,1) is a 2-wide corridor");
+    assert_eq!(dir.axis, CorridorAxis::Horizontal);
+    assert_eq!(dir.sign, 1);
+    assert_eq!(dir.width, 2);
+    let dir2 = ff.direction_at(2, 2).expect("(2,2) is a 2-wide corridor");
+    assert_eq!(dir2.axis, CorridorAxis::Horizontal);
+    assert_eq!(dir2.width, 2);
+}
+
+#[test]
+fn test_2wide_vertical_corridor_detected() {
+    // A 2-wide vertical corridor at x=1..2, flanked by walls.
+    //
+    //   #..#
+    //   #..#
+    //   #..#
+    //   #..#
+    //   #..#
+    let mut map = GridMap::empty(4, 5);
+    for y in 0..5 {
+        map.set_wall(0, y);
+        map.set_wall(3, y);
+    }
+    let ff = GridFlowField::from_map(&map);
+    assert_eq!(ff.corridor_cell_count(), 10);
+    assert_eq!(ff.corridor_2wide_count(), 10);
+    let dir = ff.direction_at(1, 2).expect("(1,2) is a 2-wide corridor");
+    assert_eq!(dir.axis, CorridorAxis::Vertical);
+    assert_eq!(dir.sign, 1);
+    assert_eq!(dir.width, 2);
+}
+
+#[test]
+fn test_2wide_flow_mismatch_horizontal() {
+    // 2-wide horizontal corridor (sign=+1, flow = right/+x).
+    let mut map = GridMap::empty(5, 4);
+    for x in 0..5 {
+        map.set_wall(x, 0);
+        map.set_wall(x, 3);
+    }
+    let ff = GridFlowField::from_map(&map);
+
+    // Moving right (aligned) → mismatch 0.
+    assert_eq!(ff.mismatch(&GridPos::new(1, 1), &GridPos::new(2, 1)), 0);
+    // Moving left (against) → mismatch 1.
+    assert_eq!(ff.mismatch(&GridPos::new(2, 1), &GridPos::new(1, 1)), 1);
+    // Moving down within the pair (orthogonal to flow axis) → mismatch 0.
+    assert_eq!(ff.mismatch(&GridPos::new(2, 1), &GridPos::new(2, 2)), 0);
+    // Waiting → mismatch 0.
+    assert_eq!(ff.mismatch(&GridPos::new(2, 1), &GridPos::new(2, 1)), 0);
+}
+
+#[test]
+fn test_3wide_passage_not_corridor() {
+    // A 3-wide passage should NOT be detected as corridors.
+    //
+    //   #####
+    //   .....   <- y=1
+    //   .....   <- y=2
+    //   .....   <- y=3
+    //   #####
+    let mut map = GridMap::empty(5, 5);
+    for x in 0..5 {
+        map.set_wall(x, 0);
+        map.set_wall(x, 4);
+    }
+    let ff = GridFlowField::from_map(&map);
+    assert_eq!(ff.corridor_cell_count(), 0);
+    assert_eq!(ff.corridor_1wide_count(), 0);
+    assert_eq!(ff.corridor_2wide_count(), 0);
+}
+
+#[test]
+fn test_2wide_junction_not_classified() {
+    // A 2x2 open block surrounded by walls on all 4 sides — each cell qualifies
+    // as BOTH 2-wide-H and 2-wide-V, so none are classified.
+    //
+    //   ####
+    //   #..#
+    //   #..#
+    //   ####
+    let mut map = GridMap::empty(4, 4);
+    for x in 0..4 {
+        map.set_wall(x, 0);
+        map.set_wall(x, 3);
+    }
+    for y in 0..4 {
+        map.set_wall(0, y);
+        map.set_wall(3, y);
+    }
+    let ff = GridFlowField::from_map(&map);
+    assert_eq!(ff.corridor_cell_count(), 0);
+}
+
+#[test]
+fn test_2wide_no_corridors_on_open_map() {
+    let map = GridMap::empty(8, 8);
+    let ff = GridFlowField::from_map(&map);
+    assert_eq!(ff.corridor_cell_count(), 0);
+    assert_eq!(ff.corridor_1wide_count(), 0);
+    assert_eq!(ff.corridor_2wide_count(), 0);
+}
+
+#[test]
+fn test_mixed_1wide_and_2wide_corridors() {
+    // Map layout:
+    //   Row 0: walls (all)
+    //   Row 1-3: x=0,1 = 2-wide V corridor; x=2 = wall; x=3 = 1-wide V corridor; x=4 = wall
+    //   Row 4: walls (all)
+    let mut map = GridMap::empty(5, 5);
+    for x in 0..5 {
+        map.set_wall(x, 0);
+        map.set_wall(x, 4);
+    }
+    for y in 1..4 {
+        map.set_wall(2, y);
+        map.set_wall(4, y);
+    }
+    let ff = GridFlowField::from_map(&map);
+    // 2-wide: x=0,1 at y=1,2,3 = 6 cells.
+    // 1-wide: only (3,2) is a 1-wide V corridor (endpoints (3,1) and (3,3) are
+    // dead-ends with only 1 passable neighbor each).
+    assert_eq!(ff.corridor_2wide_count(), 6);
+    assert_eq!(ff.corridor_1wide_count(), 1);
+    assert_eq!(ff.corridor_cell_count(), 7);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
