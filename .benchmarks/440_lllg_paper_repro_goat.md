@@ -254,3 +254,60 @@ valuable results:
 
 The substrate is functional and well-performing on the 2/4 maps it handles.
 The failures are honest, explained, and the path forward (A* upgrade) is clear.
+
+---
+
+## Promotion Decision (Phase 5, T5.1/T5.2)
+
+**Decision: KEEP OPT-IN.** Reaffirms the T2.6 decision recorded in the TL;DR above.
+
+### T5.1 Considerations (all four weighed)
+
+1. **Modelless?** ✅ Yes — the substrate is entirely heuristic (PIBT greedy
+   selection + BFS distance field + warm-start suffix reuse + blocking-count
+   hindrance). No training, no backprop, no gradient descent. **Promotion is
+   *allowed* by AGENTS.md's modelless mandate** — the rule permits default-on
+   for modelless gains.
+
+2. **Heavy / leaf-clean?** ❌ Multi-agent pathfinding is **not** a leaf-clean
+   primitive. The substrate is ~1000 LOC across 8 files (mod, config, pibt,
+   local_guidance, warm_start, hindrance, position, tests) plus the bench
+   harness. Consumers that don't need crowd pathfinding would pay the compile
+   cost. Keeping it opt-in avoids bloating the default build — mirrors the
+   `cgsp` (Plan 274) and `induced_cwm` (Plan 296) precedent for heavier
+   substrates.
+
+3. **GOAT gate status?** ❌ **Not fully passed.** G3 (no-regression) and G4
+   (latency) PASS, but G1 (throughput) is only PARTIAL (2/4 maps) and G2
+   (congestion) FAILS. The modelless mandate's promotion rule requires a
+   *modelless gain* — a perf gain on a biased/incorrect result is explicitly
+   NOT a modelless gain (AGENTS.md Feature Flag Discipline). G1's warehouse/maze
+   failures mean the substrate produces measurably wrong answers on those map
+   classes; promoting a 2/4-correct primitive to default-on would violate the
+   quality-gate rule even though the primitive itself is modelless.
+
+4. **Super-GOAT claim validated?** ❌ **No.** The Super-GOAT selling point
+   rests on the riir-ai/489 fusion gates G5–G7 (HLA projection per-NPC
+   personality modulation, Crowd MCGS physical layer, P350 multi-agent
+   closure). Those gates have **not run yet**. Promoting the substrate to
+   default before the fusion is validated is premature — if G5–G7 fail, the
+   substrate stays a standalone pathfinder with no Super-GOAT upside, and the
+   default-on promotion would have been wasted build cost.
+
+### Rationale (why opt-in is correct now)
+
+The substrate is shipped, documented (Phase 3 fusion hooks with compile-checked
+rustdoc examples), and available to any consumer that wants it via the
+`multi_agent_path` feature flag. Promotion to default-on is deferred until
+**both** of these hold:
+
+- **G1/G2 unblocked** — the Phase 5 full space-time A* upgrade (replacing the
+  greedy rollout) is the single change that unblocks both gates: A* benefits
+  from warm-start (G2) and produces better paths through warehouse/maze
+  corridors (G1). The latency budget has ample headroom (82ms current vs 500ms
+  target).
+- **Super-GOAT validated** — riir-ai/489 G5–G7 pass, confirming the HLA ×
+  Crowd MCGS × P350 fusion produces emergent crowd coordination beyond what
+  either primitive alone achieves.
+
+Until then, the substrate is opt-in and the Super-GOAT claim is conditional.

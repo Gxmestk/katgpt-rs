@@ -6,7 +6,7 @@
 **Private runtime plan:** [riir-ai/.plans/489_lifelong_lacam_crowd_coordination_runtime.md](../../riir-ai/.plans/489_lifelong_lacam_crowd_coordination_runtime.md)
 **Source paper:** [arXiv:2605.16855](https://arxiv.org/abs/2605.16855) — Arita & Okumura, "Lifelong LaCAM with Local Guidance for Lifelong MAPF", AAAI 2026.
 **Target:** `katgpt-rs/crates/katgpt-core/src/multi_agent_path/` (new module) + Cargo feature `multi_agent_path`
-**Status:** Active — Phase 1 COMPLETE, Phase 2 (GOAT gate) PARTIAL — G3/G4 PASS, G1 2/4 maps PASS, G2 FAIL (warm-start bug)
+**Status:** Active — Phase 1 COMPLETE, Phase 2 (GOAT gate) PARTIAL — G3/G4 PASS, G1 2/4 maps PASS, G2 FAIL (warm-start bug), Phase 3 COMPLETE (fusion hooks documented), Phase 4 COMPLETE (README + research cross-refs + overview feature table), Phase 5 COMPLETE (promotion decision: KEEP OPT-IN)
 
 ---
 
@@ -199,12 +199,12 @@ guidance source without reading the paper.
 
 ### Tasks
 
-- [ ] **T4.1** Add LLLG entry to `katgpt-rs/README.md` feature showcase
+- [x] **T4.1** Add LLLG entry to `katgpt-rs/README.md` feature showcase
       (following the existing format — see e.g. the Set Attention entry).
-- [ ] **T4.2** Cross-ref from `katgpt-rs/.research/219` (DEC substrate —
+- [x] **T4.2** Cross-ref from `katgpt-rs/.research/219` (DEC substrate —
       note the `χ`-as-codifferential reframing) and `katgpt-rs/.research/354`
       (Set Attention — note the latent-domain analog).
-- [ ] **T4.3** Update `katgpt-rs/.docs/01_orientation/overview.md` feature
+- [x] **T4.3** Update `katgpt-rs/.docs/01_orientation/overview.md` feature
       flag table.
 
 ### Acceptance
@@ -215,7 +215,7 @@ README + docs reflect the new feature. Cross-refs are bidirectional.
 
 ### Tasks
 
-- [ ] **T5.1** If G1–G4 pass: decide promote-to-default vs keep-opt-in.
+- [x] **T5.1** If G1–G4 pass: decide promote-to-default vs keep-opt-in.
       Considerations:
       - The substrate is modelless → promotion is allowed by AGENTS.md.
       - The substrate is heavy (multi-agent pathfinding is not a leaf-clean
@@ -224,10 +224,15 @@ README + docs reflect the new feature. Cross-refs are bidirectional.
       - The riir-ai fusion (G5–G7) hasn't run yet → the Super-GOAT claim is
         unconfirmed. Promoting the substrate to default before the fusion
         is validated is premature.
-      - **Recommendation:** keep opt-in until riir-ai/489 G5–G7 pass. The
-        substrate ships opt-in; consumers opt in via feature flag.
-- [ ] **T5.2** Record the decision in `.benchmarks/440_*.md` with
-      reasoning.
+      - **Decision (recorded in `.benchmarks/440_*.md`): KEEP OPT-IN.** The
+        substrate is modelless (promotion allowed), but the G1/G2 GOAT gates
+        are not fully passed (G1 2/4 maps, G2 FAIL) and the Super-GOAT claim
+        is unvalidated (riir-ai/489 G5–G7 not yet run). Promotion is deferred
+        until both the Phase 5 A* upgrade unblocks G1/G2 AND the fusion gates
+        validate the Super-GOAT claim.
+- [x] **T5.2** Record the decision in `.benchmarks/440_*.md` with
+      reasoning. (Done — "Promotion Decision (Phase 5)" section appended,
+      enumerating all four T5.1 considerations and the two deferral conditions.)
 
 ## References
 

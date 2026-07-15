@@ -220,6 +220,8 @@ the codebase. None of these fusions are solo-novel; the combination is.
 - **R290 Latent Field Steering** (Plan 309) — top-down *broadcast*: designer injects a direction vector into every NPC's latent. NPT is *peer-to-peer*: each NPC attends over its peers' latents. Different direction of information flow.
 - **R303 Transolver / FUNCATTN** — physics-set attention, the predecessor lineage. Noted as crowd-scale reframing candidate in R303 §2.3. Same family of mechanism, different application (physics nodes vs. NPC beliefs).
 
+> **Cross-ref to Plan 440 (Lifelong LaCAM LLLG) — the physical-space twin.** Set Attention (this note) is the **latent-domain** crowd primitive: each NPC attends over peers' HLA beliefs in latent space, sigmoid-gated, permutation-equivariant, zero raw sync crosses. Plan 440's Lifelong LaCAM LLLG is the **physical-domain** twin: each agent avoids peers' cells at `t+1` via PIBT over per-agent space-time A* guidance, operating entirely on raw `MapPos` that MUST stay raw/synced/replayed (anti-cheat, deterministic replay, quorum). The two compose — the private fusion (riir-ai/489) runs LLLG for physical collision-free motion and Set Attention for latent belief refinement in the same tick, bridged by the existing 5-scalar emotion bridge (`compute_animal_emotions()`). Set Attention's `HlaProjectedGuidance` seam (Plan 440 T3.1) is the literal fuse point: `α_i = α_base · (1 + β · σ(dot(HLA_i, D_frustration)))` modulates an agent's LLLG collision penalty using the Set-Attention-refined HLA state.
+
 **The fusion idea (write into §Distillation as a Fusion subsection):**
 
 > NPT × Mind-Reading × Latent Functor = **Crowd Joint Inference**: each NPC's

@@ -2489,6 +2489,25 @@ No new feature flag — perf optimization on the already DEFAULT-ON `manifold_er
 
 ---
 
+### 🛤️ Lifelong LaCAM Local Guidance Substrate (Plan 440, arXiv:2605.16855)
+
+Paper-faithful **Lifelong LaCAM with Local Guidance (LLLG)** — a modelless, training-free, receding-horizon windowed multi-agent pathfinder distilled from Arita & Okumura AAAI 2026. `LifelongLaCam<P, C, G>` orchestrates a PIBT one-step generator (greedy collision-free joint action selection) over a per-agent space-time A* guidance field (BFS distance-to-goal), with warm-start scheme reuse (LLLG_Π / LLLG_Φ / LLLG_∅) and a one-step blocking-count hindrance estimator (Okumura & Nagai 2025). Entirely heuristic — no training, no backprop, no gradient descent.
+
+**Four pluggable seams (the Super-GOAT fusion surface):** `CostFn<P>` (uniform/heightfield/threat-cochain/faction-zone), `LocalGuidanceSource<P>` (space-time A* / HLA-projected), `WarmStartScheme` (prev-solution-suffix / prev-guidance / recompute / per-personality blend), `HindranceEstimator<P>` (raw count / affect-weighted). Each seam ships with compile-checked rustdoc examples so a consumer plugs in without reading the paper. Private consumers (riir-ai/489) fuse LLLG with HLA per-NPC personality modulation, Crowd MCGS physical layer, and P350 multi-agent closure via these seams.
+
+| Gate | Target | Result | Verdict |
+|------|--------|--------|---------|
+| **G1** (throughput) | 4 maps within 10% of paper | empty-48-48 ratio 0.63 ✅, random-64-64-10 ratio 0.62 ✅, warehouse 0.35 ❌, ht_chantry 0.01 ❌ | **PARTIAL (2/4)** |
+| **G2** (congestion) | LLLG_Π beats LllgEmpty baseline | ratio 1.00 (identical) — warm-start data plumbed but not consumable by greedy rollout | **FAIL** |
+| **G3** (no-regression) | all-features clippy clean + lib tests pass | 1578/1578 pass, clippy `--all-features` clean | **PASS** |
+| **G4** (latency) | <500ms median @ 1000 agents (stretch <100ms) | 82ms median (2.6× faster than paper's M1 Ultra 210-260ms) | **PASS** |
+
+The two G1 failures (warehouse / maze) and G2 failure are honest and root-caused: the greedy PIBT lacks priority inheritance (recursive conflict resolution needs LaCAM-level escalation — implemented + benchmarked + reverted because it collapses throughput without LaCAM), and the warm-start forecast can't be consumed by a greedy rollout (it benefits only full space-time A* pruning). The perf headroom (82ms current vs 500ms target) is ample for the Phase 5 A* upgrade that unblocks both gates. **Promotion: KEEP OPT-IN** — substrate is modelless (promotion allowed) but G1/G2 gaps and unvalidated Super-GOAT claim (pending riir-ai/489 G5–G7 fusion) make promotion premature.
+
+Feature gate: `multi_agent_path` (**opt-in**). 📖 Plan: [`.plans/440_lifelong_lacam_multi_agent_pathfinding_substrate.md`](.plans/440_lifelong_lacam_multi_agent_pathfinding_substrate.md), Research: [`.research/424_Lifelong_LaCAM_Local_Guidance_Multi_Agent_Pathfinding.md`](.research/424_Lifelong_LaCAM_Local_Guidance_Multi_Agent_Pathfinding.md), Benchmark: [`.benchmarks/440_lllg_paper_repro_goat.md`](.benchmarks/440_lllg_paper_repro_goat.md), Paper: [arXiv:2605.16855](https://arxiv.org/abs/2605.16855). Cross-refs: [Research 219](.research/219_Topological_Neural_Operators_DEC_Inference.md) (hindrance ≈ codifferential reframing), [Research 354](.research/354_Cross_Datapoint_Set_Attention_NPT.md) (latent-domain analog).
+
+---
+
 ## 🔧 KV Compression
 
 Default: **Hybrid OCT+PQ** (OCTOPUS triplet encoding + PlanarQuant 2D Givens rotation). Best MSE + 64× fewer rotation FMAs.
