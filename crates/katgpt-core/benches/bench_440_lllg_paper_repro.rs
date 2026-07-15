@@ -440,6 +440,7 @@ fn run_simulation(
         w_phi: 5,
         alpha: 1.0,
         rounds: 2,
+        max_expansions: 0,
     };
     let map_clone = map.clone();
     let mut guidance = SpaceTimeGuidance::new(cfg)
@@ -567,6 +568,7 @@ fn run_no_guidance_baseline(
         w_phi: 5,
         alpha: 1.0,
         rounds: 2,
+        max_expansions: 0,
     };
     let map_clone = map.clone();
     let mut guidance = SpaceTimeGuidance::new(cfg)

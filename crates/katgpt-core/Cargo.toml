@@ -1382,3 +1382,12 @@ required-features = ["velocity_field_disagreement"]
 name = "bench_440_lllg_paper_repro"
 harness = false
 required-features = ["multi_agent_path"]
+
+# Plan 453 Phase 3 — Bounded one-step LaCAM escalation GOAT gate.
+# G6c collision-freedom delta (60 agents, 20×20, 6-cell gap) + latency sweep
+# (max_nodes ∈ {100, 500, 1000, 5000}). G1 throughput is measured by re-running
+# bench_440_lllg_paper_repro with --features lacam_escalation.
+[[bench]]
+name = "bench_453_lacam_escalation_goat"
+harness = false
+required-features = ["lacam_escalation"]

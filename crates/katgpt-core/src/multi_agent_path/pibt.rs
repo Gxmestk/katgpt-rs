@@ -105,15 +105,18 @@ const DEFAULT_LACAM_RETRIES: usize = 2;
 /// resolve naturally next tick. The threshold ensures retries only fire on
 /// genuinely congested maps (maze, dense warehouse) where stuck agents are
 /// systemic and the retry is likely to break deadlocks.
+#[cfg_attr(feature = "lacam_escalation", allow(dead_code))]
 const MIN_STUCK_FOR_RETRY: usize = 20;
 
 /// Type alias mirroring [`super::local_guidance::NeighborFn`] for the
 /// neighbor-supplying callback in [`pibt_step`]. Includes `Send + Sync` to
 /// match the orchestrator's stored closure type.
 ///
-/// `pub(super)` so the LaCAM escalation module (`lacam.rs`) can share the
-/// same neighbor-fn plumbing (Plan 453).
-pub(super) type NeighborFn<P> = dyn Fn(&P) -> Vec<P> + Send + Sync;
+/// `pub` so benchmark harnesses (Plan 453 T3.3) can call
+/// [`lacam_escalation_step`] and [`pibt_step`] directly with wall-aware
+/// neighbors. The orchestrator's [`LifelongLaCam::with_neighbors`] is the
+/// consumer-facing API; this type is the lower-level plumbing.
+pub type NeighborFn<P> = dyn Fn(&P) -> Vec<P> + Send + Sync;
 
 /// Candidate move for an agent, with its lexicographic cost components.
 ///
@@ -271,7 +274,18 @@ where
     // The current behavior (collisions on congested ticks) is the lesser evil
     // vs zero throughput — consumers that need guaranteed collision-freedom
     // should use the occupied-set baseline.
-    if stuck.len() < MIN_STUCK_FOR_RETRY {
+    //
+    // Plan 453 (lacam_escalation): the threshold is lowered to 1 when the
+    // feature is ON. The constraint tree resolves even a single stuck agent
+    // collision-free via recursive PIBT — unlike the shuffled retry which
+    // needed 20+ stuck agents to justify its overhead. The greedy fast path
+    // (zero stuck agents) is unaffected, so open-map throughput is preserved.
+    #[cfg(feature = "lacam_escalation")]
+    const MIN_STUCK_FOR_LACAM_GATE: usize = 1;
+    #[cfg(not(feature = "lacam_escalation"))]
+    const MIN_STUCK_FOR_LACAM_GATE: usize = MIN_STUCK_FOR_RETRY;
+
+    if stuck.len() < MIN_STUCK_FOR_LACAM_GATE {
         return Ok(JointAction::new(moves));
     }
 

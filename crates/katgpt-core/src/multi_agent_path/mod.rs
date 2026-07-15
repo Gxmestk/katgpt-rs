@@ -85,12 +85,12 @@ pub use hindrance::{BlockingCount, CounterFlowHindrance, HindranceEstimator, Wei
 pub use local_guidance::{
     Guidance, GuidanceConfig, LocalGuidanceSource, SpaceTimeGuidance,
 };
-pub use pibt::{pibt_step, Deadlock};
+pub use pibt::{pibt_step, Deadlock, NeighborFn};
 pub use position::{soft_cost, GridMap, GridPos, Position};
 pub use warm_start::{WarmStartCache, WarmStartScheme};
 
 #[cfg(feature = "lacam_escalation")]
-pub use lacam::EscalationBudget;
+pub use lacam::{lacam_escalation_step, EscalationBudget};
 
 // ─────────────────────────────────────────────────────────────────────
 // CostFn trait — pluggable seam #1 (Plan 440 T1.2)

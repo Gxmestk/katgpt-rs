@@ -166,8 +166,13 @@ struct ConstraintRejected;
 /// exhausted.
 ///
 /// Returns `Ok(JointAction)` always — same API contract as `pibt_step`.
+///
+/// Marked `pub` so benchmark harnesses (e.g. Plan 453 T3.3 latency sweep)
+/// can call it directly with a custom [`EscalationBudget`]. The orchestrator
+/// [`LifelongLaCam::tick`](super::LifelongLaCam::tick) calls this via
+/// [`pibt_step`](super::pibt::pibt_step) with `EscalationBudget::default()`.
 #[allow(clippy::too_many_arguments)]
-pub(crate) fn lacam_escalation_step<P, H>(
+pub fn lacam_escalation_step<P, H>(
     config: &JointConfig<P>,
     guidance: &Guidance<P>,
     goals: &[P],
