@@ -154,16 +154,20 @@ See `.benchmarks/440_lllg_paper_repro_goat.md` for full results.
 ### Blocking items for G1/G2 full pass
 
 1. **ht_chantry (G1)** — the maze topology requires **global routing**
-   (Guided-PIBT from the paper), not local priority-shuffle retry. The w_Φ=5
-   window can't see far enough through the maze corridors, and local retry
-   can't resolve head-on corridor conflicts where both agents must back up.
-   The paper's own caveat #1 documents this: long one-cell-wide corridors are
-   LLLG's known limitation. This is an algorithmic ceiling, not a bug.
+   (Guided-PIBT from the paper), not local priority-shuffle retry or swap.
+   The w_Φ=5 window can't see far enough through the maze corridors, and
+   local retry can't resolve head-on corridor conflicts. Issue 144 confirmed
+   the swap technique (Okumura 2023a) also doesn't help: the synthetic maze
+   uses 2-wide corridors where agents sidestep naturally, and the swap
+   pattern rarely fires. The paper's own caveat #1 documents this: long
+   one-cell-wide corridors are LLLG's known limitation. This is an
+   algorithmic ceiling, not a bug.
 2. **Warm-start consumption (G2)** — needs LaCAM escalation to keep PIBT
    deviations rare so warm-start forecasts stay accurate. The current LaCAM
-   retry (priority shuffle) doesn't reduce deviations enough. The paper's
-   full LaCAM (configuration tree search) would, but that's a much heavier
-   implementation.
+   retry (priority shuffle) doesn't reduce deviations enough. Issue 144's
+   swap technique also didn't reduce deviations (infrastructure-only), so
+   the warm-start re-eval (T4) was not re-tested. The paper's full LaCAM
+   (configuration tree search) would, but that's a much heavier implementation.
 3. **Real MovingAI maps** — synthetic approximations may differ from the
    actual warehouse/ht_chantry topology.
 

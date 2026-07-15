@@ -14,12 +14,19 @@
 //! I.e. PIBT first prefers moves consistent with the guidance, then
 //! goal-direction, then low hindrance, then random tiebreak.
 //!
-//! # Implementation: greedy PIBT + LaCAM escalation (Issue 143)
+//! # Implementation: greedy PIBT + swap technique + LaCAM escalation
 //!
 //! The inner loop is the **greedy PIBT**: agents are processed in priority
 //! order, each taking the first collision-free candidate. Later agents see
 //! earlier agents' committed positions and adapt. This is aggressive (agents
 //! don't wait for undecided occupants) and has high throughput on open maps.
+//!
+//! Issue 144 adds the **swap technique** (Okumura 2023a, arXiv:2309.02425):
+//! when two agents face a head-on corridor deadlock (agent i wants j's cell,
+//! j wants i's cell), the lower-priority agent uses reverse scoring to back
+//! up, letting the higher-priority agent pass. This directly targets the
+//! ht_chantry maze-map deadlock where local priority shuffling cannot help
+//! because someone must yield.
 //!
 //! Issue 143 adds **LaCAM escalation** as an outer loop: when the greedy PIBT
 //! produces stuck agents (deadlocks on maze maps), the escalation retries with
@@ -162,8 +169,37 @@ where
     let n = config.n_agents();
     let order = compute_priority_order(n, priorities);
 
+    // Empty backer set — the swap technique (Issue 144) is infrastructure-only.
+    //
+    // Issue 144 benchmarked the swap technique (Okumura 2023a) and found it
+    // does NOT improve any GOAT-gate map:
+    //   - ht_chantry (target): 0.01 → 0.01 (unchanged — the synthetic maze
+    //     uses 2-wide corridors, not 1-wide; agents sidestep naturally and
+    //     the swap pattern rarely fires)
+    //   - warehouse: 0.42 → 0.24 (REGRESSED — forced back-ups in aisles reduce
+    //     sustained throughput; fewer stuck agents ≠ higher throughput)
+    //   - empty/random: unchanged (swap gated behind congestion threshold)
+    //
+    // The swap technique is the right algorithm for 1-wide corridor maps
+    // (Okumura's warehouse-20-40-10-2-1), but our benchmark maps don't have
+    // that topology. The infrastructure (detect_swap_backers + the
+    // greedy_pibt_pass swap_backers parameter) is kept for consumers with
+    // 1-wide-corridor maps who can opt in via a custom escalation path.
+    // This mirrors the recursive-PIBT finding (Issue 143): forcing agents to
+    // move away from their goals hurts lifelong MAPF throughput.
+    let no_backers = vec![false; n];
+
     // First pass: greedy PIBT with the given priority order.
-    let (moves, stuck) = greedy_pibt_pass(config, guidance, goals, hindrance, neighbors_fn, rng, &order);
+    let (moves, stuck) = greedy_pibt_pass(
+        config,
+        guidance,
+        goals,
+        hindrance,
+        neighbors_fn,
+        rng,
+        &order,
+        &no_backers,
+    );
 
     // Fast path: no stuck agents (or too few to justify retry overhead).
     // On open maps this is the overwhelmingly common case.
@@ -179,8 +215,16 @@ where
 
     for _attempt in 0..DEFAULT_LACAM_RETRIES {
         let shuffled = shuffle_order(&best_stuck, &order, rng);
-        let (moves, stuck) =
-            greedy_pibt_pass(config, guidance, goals, hindrance, neighbors_fn, rng, &shuffled);
+        let (moves, stuck) = greedy_pibt_pass(
+            config,
+            guidance,
+            goals,
+            hindrance,
+            neighbors_fn,
+            rng,
+            &shuffled,
+            &no_backers,
+        );
 
         if stuck.is_empty() {
             return Ok(JointAction::new(moves));
@@ -203,6 +247,12 @@ where
 /// One greedy PIBT pass: process agents in `order`, each taking the first
 /// collision-free candidate.
 ///
+/// Agents in `swap_backers` (Issue 144) use **reverse scoring**: guidance is
+/// discarded, and `−dist(v, g_i)` sorts candidates so the agent backs up
+/// (moves to the cell farthest from its goal), breaking head-on corridor
+/// deadlocks. Backers are processed before non-backers so their committed
+/// back-up move clears the path for the forward agent.
+///
 /// Returns `(moves, stuck_agents)`. The `moves` vector has one entry per agent.
 /// Stuck agents have their move set to wait (current position) — they're also
 /// listed in the returned `stuck` vec for the LaCAM escalation.
@@ -215,6 +265,7 @@ fn greedy_pibt_pass<P, H>(
     neighbors_fn: Option<&NeighborFn<P>>,
     rng: &mut fastrand::Rng,
     order: &[usize],
+    swap_backers: &[bool],
 ) -> (Vec<P>, Vec<AgentId>)
 where
     P: Position,
@@ -225,10 +276,25 @@ where
     let mut occupied: Vec<bool> = vec![false; n];
     let mut stuck = Vec::new();
 
+    // Swap-aware ordering: backers first (so their back-up commits before the
+    // forward agent is processed), then the rest in priority order.
+    let mut ordered: Vec<usize> = Vec::with_capacity(n);
     for &i in order {
+        if swap_backers.get(i).copied().unwrap_or(false) {
+            ordered.push(i);
+        }
+    }
+    for &i in order {
+        if !swap_backers.get(i).copied().unwrap_or(false) {
+            ordered.push(i);
+        }
+    }
+
+    for &i in &ordered {
         let agent = AgentId(i as u32);
         let current = config.pos(agent).clone();
         let goal = &goals[i];
+        let is_backer = swap_backers.get(i).copied().unwrap_or(false);
 
         // Generate candidates.
         let neighbors: Vec<P> = if let Some(f) = neighbors_fn {
@@ -238,18 +304,35 @@ where
         };
 
         // Build candidates with lexicographic cost.
+        //
+        // Backer agents (Issue 144) use reverse scoring per Okumura 2023a:
+        // discard guidance (guidance_mismatch = 0) and negate goal_dist so the
+        // agent prefers the cell farthest from its goal (backs up). Hindrance
+        // is also dropped (the reverse tuple is ⟨0, −dist, ε⟩).
         let preferred = guidance.get(i).and_then(|g| g.first());
         let mut candidates: Vec<Candidate<P>> = neighbors
             .iter()
-            .map(|next| Candidate {
-                next: next.clone(),
-                guidance_mismatch: match &preferred {
-                    Some(p) => (**p != *next) as u8,
-                    None => 0,
-                },
-                goal_dist: next.dist_heuristic(goal),
-                hindrance: hindrance.hindrance(agent, next, config),
-                epsilon: rng.f32(),
+            .map(|next| {
+                if is_backer {
+                    Candidate {
+                        next: next.clone(),
+                        guidance_mismatch: 0,
+                        goal_dist: -next.dist_heuristic(goal),
+                        hindrance: 0.0,
+                        epsilon: rng.f32(),
+                    }
+                } else {
+                    Candidate {
+                        next: next.clone(),
+                        guidance_mismatch: match &preferred {
+                            Some(p) => (**p != *next) as u8,
+                            None => 0,
+                        },
+                        goal_dist: next.dist_heuristic(goal),
+                        hindrance: hindrance.hindrance(agent, next, config),
+                        epsilon: rng.f32(),
+                    }
+                }
             })
             .collect();
 
@@ -382,6 +465,95 @@ fn shuffle_order(stuck: &[AgentId], order: &[usize], rng: &mut fastrand::Rng) ->
 
     front.extend(back);
     front
+}
+
+/// Detect swap-pair deadlocks (Issue 144, Okumura 2023a arXiv:2309.02425).
+///
+/// A swap deadlock occurs when agent `i`'s guidance-preferred next cell is
+/// agent `j`'s current position, AND agent `j`'s guidance-preferred next cell
+/// is agent `i`'s current position (a head-on corridor exchange). The greedy
+/// PIBT cannot resolve this: both agents are blocked by the other's current
+/// cell, and no priority ordering makes either move.
+///
+/// The swap technique resolves it by marking the lower-priority agent as a
+/// **backer**. The backer uses reverse scoring `⟨0, −dist(v, g_i), ε⟩` so it
+/// backs up (moves to the cell farthest from its goal), clearing the path for
+/// the higher-priority forward agent.
+///
+/// Returns a `Vec<bool>` indexed by agent index: `true` means the agent is a
+/// swap backer and should use reverse scoring in [`greedy_pibt_pass`].
+///
+/// # Infrastructure-only (Issue 144 negative result)
+///
+/// This function is benchmarked but NOT wired into the default `pibt_step`
+/// escalation path. The swap technique does not improve any GOAT-gate map:
+/// ht_chantry uses 2-wide corridors (agents sidestep naturally), and warehouse
+/// regresses (forced back-ups reduce sustained throughput). The infrastructure
+/// is kept for consumers with 1-wide corridor maps who can call this + pass
+/// the result to `greedy_pibt_pass` directly.
+///
+/// # Complexity
+///
+/// O(n²) — for each agent, scan all agents for the swap partner. For n=1000
+/// this is ~1M position comparisons, which completes in microseconds.
+#[allow(dead_code)]
+fn detect_swap_backers<P: Position>(
+    config: &JointConfig<P>,
+    guidance: &Guidance<P>,
+    order: &[usize],
+) -> Vec<bool> {
+    let n = config.n_agents();
+    if n == 0 {
+        return Vec::new();
+    }
+
+    // Rank map: agent index → position in `order` (lower = higher priority).
+    let mut rank = vec![0usize; n];
+    for (pos, &agent) in order.iter().enumerate() {
+        if agent < n {
+            rank[agent] = pos;
+        }
+    }
+
+    let mut is_backer = vec![false; n];
+    let mut paired = vec![false; n];
+
+    for i in 0..n {
+        if paired[i] {
+            continue;
+        }
+        let current_i = config.pos(AgentId(i as u32));
+        let preferred_i = match guidance.get(i).and_then(|g| g.first()) {
+            Some(p) => p,
+            None => continue,
+        };
+
+        // Scan for agent j at preferred_i whose preferred cell is current_i.
+        for j in 0..n {
+            if j == i || paired[j] {
+                continue;
+            }
+            let pos_j = config.pos(AgentId(j as u32));
+            if *pos_j != *preferred_i {
+                continue;
+            }
+            let preferred_j = guidance.get(j).and_then(|g| g.first());
+            if let Some(pj) = preferred_j
+                && *pj == *current_i
+            {
+                // Swap pair (i, j). Mark the lower-priority (later in
+                // order) agent as the backer so the higher-priority agent
+                // advances.
+                let backer = if rank[i] < rank[j] { j } else { i };
+                is_backer[backer] = true;
+                paired[i] = true;
+                paired[j] = true;
+                break;
+            }
+        }
+    }
+
+    is_backer
 }
 
 /// Error: no collision-free joint action could be found for some agent.

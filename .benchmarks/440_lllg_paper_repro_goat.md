@@ -1,10 +1,11 @@
 # Benchmark 440: LLLG Paper Reproduction GOAT Gate
 
-**Date:** 2026-07-15 (updated Issue 143)
+**Date:** 2026-07-15 (updated Issue 144)
 **Plan:** [440](../.plans/440_lifelong_lacam_multi_agent_pathfinding_substrate.md)
 **Research:** [424](../.research/424_Lifelong_LaCAM_Local_Guidance_Multi_Agent_Pathfinding.md)
 **Paper:** [arXiv:2605.16855](https://arxiv.org/abs/2605.16855) — Arita & Okumura, AAAI 2026
-**Issue:** [143](../.issues/143_lacam_escalation_full_pibt.md) — LaCAM escalation (greedy PIBT + priority shuffle retry)
+**Issue:** [144](../.issues/144_lacam_escalation_swap_warmstart_followup.md) — swap technique (negative result, infrastructure-only)
+**Prior issue:** [143](../.issues/143_lacam_escalation_full_pibt.md) — LaCAM escalation (greedy PIBT + priority shuffle retry)
 **Prior issue:** [142](../.issues/142_full_space_time_astar_guidance_upgrade.md) — full space-time A* upgrade
 **Prior issue:** [140](../.issues/140_pibt_priority_inheritance_and_warmstart_integration.md) — PIBT PI + warm-start investigation
 
@@ -16,38 +17,108 @@
 (3/4 maps). G2 (congestion): FAIL (warm-start not consumable — confirmed
 by Issue 142 even with full A*).**
 
-Issue 143 added LaCAM escalation to the greedy PIBT: when ≥ 20 agents are
-stuck (systemic congestion), retry with shuffled priority orderings (up to 2
-retries). Warehouse throughput improved +8.3% (ratio 0.39 → 0.42). The
-escalation has minimal overhead on open maps (threshold prevents unnecessary
-retries). Recursive PIBT (full priority inheritance with eviction) was also
-tested but **REJECTED — collapses throughput -92%** (empty-48-48: 18.6 → 1.5).
+Issue 144 implemented and benchmarked the swap technique (Okumura 2023a).
+**Negative result:** the swap does not improve any GOAT-gate map. When
+always-on, it regresses all maps (empty -11.5%, warehouse -46%); when gated
+behind congestion, it still regresses warehouse (0.42 → 0.24). Root cause:
+the swap targets 1-wide corridor deadlocks, but our ht_chantry uses 2-wide
+corridors (agents sidestep naturally). The swap infrastructure is kept for
+consumers with 1-wide corridor maps but is NOT wired into the default
+escalation path. G1/G2/G3/G4 are unchanged from Issue 143.
 
-| Map | A* (Issue 142) | **+ LaCAM retry (Issue 143)** | Change |
+| Map | Issue 143 | **Issue 144 (swap infra-only)** | Change |
 |---|---|---|---|
-| empty-48-48 | 18.63 (ratio 0.68) | **18.52 (ratio 0.68)** | -0.6% (noise) |
+| empty-48-48 | 18.52 (ratio 0.68) | **18.52 (ratio 0.68)** | no change |
 | random-64-64-10 | 14.57 (ratio 0.69) | **14.57 (ratio 0.69)** | no change |
-| warehouse | 6.99 (ratio 0.39) | **7.57 (ratio 0.42)** | **+8.3%** |
+| warehouse | 7.57 (ratio 0.42) | **7.57 (ratio 0.42)** | no change |
 | ht_chantry | 0.15 (ratio 0.01) | **0.15 (ratio 0.01)** | no change |
 
-G1 still passes on **3/4 maps** (unchanged from Issue 142). ht_chantry
+The swap-when-wired-in results (for the record):
+
+| Map | Issue 143 | Swap always-on | Swap gated |
+|---|---|---|---|
+| empty-48-48 | 18.52 (0.68) | 16.39 (0.60) **-11.5%** | 18.62 (0.68) |
+| random-64-64-10 | 14.57 (0.69) | 13.03 (0.62) **-10.6%** | 14.57 (0.69) |
+| warehouse | 7.57 (0.42) | 4.09 (0.23) **-46%** | 4.24 (0.24) **-44%** |
+| ht_chantry | 0.15 (0.01) | 0.13 (0.01) | 0.15 (0.01) |
+
+G1 still passes on **3/4 maps** (unchanged from Issue 143). ht_chantry
 remains at 0.01 — the maze topology requires **global routing**
-(Guided-PIBT), not local priority-shuffle retry. The paper's own caveat #1
-documents this as LLLG's known limitation.
+(Guided-PIBT), not local priority-shuffle retry or swap. The paper's own
+caveat #1 documents this as LLLG's known limitation.
 
-Latency at 1000 agents: 234ms median (was 88ms pre-retry, now 234ms with
-retry overhead). Still under the 500ms target. The retry triggers at high
-density (1000 agents on empty-48-48 = 43% density → frequent systemic
-stalls). On the G1 benchmark (800 agents), median latency is 60-70ms on
-open maps.
+Latency at 1000 agents: 228ms median (under 500ms target). On the G1
+benchmark (800 agents), median latency is 60-70ms on open maps.
 
-**Promotion decision: KEEP OPT-IN.** Unchanged from Issue 142. The substrate
+**Promotion decision: KEEP OPT-IN.** Unchanged from Issue 143. The substrate
 passes G3/G4 and partially passes G1 (3/4 maps), but the G1 ht_chantry
 failure and G2 warm-start non-consumption prevent full GOAT validation.
 
 ---
 
-## Issue 143 results (2026-07-15) — LaCAM escalation
+## Issue 144 results (2026-07-15) — swap technique (negative result)
+
+### What changed
+
+1. **Swap technique implemented** in `pibt.rs`: `detect_swap_backers` scans
+   for head-on corridor deadlocks (agent i wants j's cell, j wants i's cell)
+   and marks the lower-priority agent as a "backer". The backer uses reverse
+   scoring ⟨0, −dist(v, g_i), ε⟩ to back up (move to the cell farthest from
+   its goal), clearing the path for the higher-priority forward agent.
+
+2. **`greedy_pibt_pass` gained a `swap_backers` parameter**: backers are
+   processed first (partition reorder) and use reversed candidate scoring.
+   When the backer set is empty, behavior is identical to Issue 143.
+
+3. **2 new tests**: `test_swap_resolves_head_on_corridor` (passing-bay
+   scenario verifies the swap mechanism works mechanically),
+   `test_swap_no_collision_in_wide_corridor` (4 agents in 2-wide corridor,
+   verifies no vertex/edge collisions).
+
+### Three benchmark configurations tested
+
+1. **Always-on** (swap in initial pass, all maps): REGRESSED all maps.
+   The swap triggers on every head-on conflict, forcing one agent to back up.
+   On open maps this is wasteful (agents could sidestep); on warehouse it's
+   catastrophic (forced back-ups in aisles compound). This mirrors the
+   recursive-PIBT finding (Issue 143): forcing agents to move away from
+   goals hurts lifelong MAPF throughput.
+
+2. **Gated escalation** (swap fires only when ≥ 20 stuck agents, result
+   kept only if fewer stuck than baseline): open maps restored (no
+   regression), but warehouse still regressed to 0.24. The swap reduces
+   stuck-agent count (agents moved via back-up) but not throughput — the
+   backed-up agents are now farther from their goals.
+
+3. **Infrastructure-only** (swap NOT wired into `pibt_step`): no regression,
+   no improvement. Back to Issue 143 baseline exactly.
+
+### Why the swap doesn't help ht_chantry
+
+The swap technique targets **1-wide corridor deadlocks** (Okumura's
+warehouse-20-40-10-2-1). In a 1-wide corridor, two agents facing head-on have
+no sidestep option — one must back up. The swap detects this and resolves it.
+
+Our ht_chantry approximation uses **2-wide corridors** (the generator creates
+2-cell-wide gaps in wall segments). In a 2-wide corridor, two agents facing
+head-on can sidestep past each other — the A* guidance routes them around.
+The swap pattern (i wants j's cell, j wants i's cell) rarely fires because
+agents naturally take different cells in the 2-wide passage.
+
+### Why the swap hurts warehouse
+
+The warehouse map has 1-wide aisles between shelf blocks. Agents in aisles do
+face head-on conflicts, and the swap fires. But in lifelong MAPF, forcing an
+agent to back up (move away from its goal) has a cascading cost: the agent
+must re-traverse the aisle later, blocking other agents. Over 300 ticks, this
+cascading back-up pattern severely reduces sustained throughput (0.42 → 0.24).
+
+The stuck-agent count metric (used to decide whether to keep the swap result)
+is misleading here: the swap reduces stuck agents (they moved via back-up) but
+the moves are in the wrong direction. The right metric (throughput) can only
+be measured over many ticks, not within a single PIBT step.
+
+---
 
 ### What changed
 

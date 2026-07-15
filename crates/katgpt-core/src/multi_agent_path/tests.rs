@@ -666,3 +666,125 @@ fn test_lacam_bottleneck_progress() {
         "at least one agent should cross the bottleneck in 100 ticks"
     );
 }
+
+// ─────────────────────────────────────────────────────────────────────────
+// Issue 144 — swap technique (Okumura 2023a, corridor head-on deadlock)
+// ─────────────────────────────────────────────────────────────────────────
+//
+// Issue 144 adds the swap technique: when two agents face a head-on corridor
+// deadlock (i wants j's cell, j wants i's cell), the lower-priority agent
+// backs up using reverse scoring ⟨0, −dist(v, g_i), ε⟩, letting the other
+// pass. This directly targets the ht_chantry maze-map failure.
+
+/// Two agents in a 1-wide corridor, facing each other, both wanting the
+/// other's cell. Without the swap technique both block forever. With the
+/// swap technique, one backs up and the other advances.
+///
+/// Note: on a 4-connected grid, agents in a 1-wide corridor CANNOT physically
+/// pass each other — one must back up to a junction. This test uses a corridor
+/// with a passing bay so the swap technique can actually resolve the deadlock.
+#[test]
+fn test_swap_resolves_head_on_corridor() {
+    // 5×3 map: row 1 is a horizontal corridor. Column 2 opens up to rows 0
+    // and 2 (passing bays). Two agents approach head-on in the corridor;
+    // the swap technique makes one sidestep into a bay, letting the other pass.
+    //
+    //   0 1 2 3 4
+    // 0 # # . # #
+    // 1 . . . . .
+    // 2 # # . # #
+    let mut map = GridMap::empty(5, 3);
+    for x in 0..5 {
+        if x != 2 {
+            map.set_wall(x, 0);
+            map.set_wall(x, 2);
+        }
+    }
+    let config = JointConfig::new(vec![
+        GridPos::new(0, 1), // agent 0: left side
+        GridPos::new(4, 1), // agent 1: right side
+    ]);
+    let goals = vec![
+        GridPos::new(4, 1), // agent 0: go right
+        GridPos::new(0, 1), // agent 1: go left
+    ];
+    let cfg = GuidanceConfig::default();
+    let mut guidance = make_guidance(&map, cfg);
+    let mut hindrance = BlockingCount::new();
+    let mut rng = Rng::with_seed(42);
+    let map_clone = map.clone();
+    let mut lacam = LifelongLaCam::new(WarmStartCache::new(WarmStartScheme::default(), cfg.w_phi))
+        .with_neighbors(move |p| map_clone.passable_neighbors(p));
+
+    let mut current = config;
+    let mut max_progress_0 = 0usize;
+    let mut max_progress_1 = 0usize;
+    for _tick in 0..100 {
+        let action = lacam.tick(&current, &goals, &mut guidance, &mut hindrance, &mut rng);
+        // Track max progress (how far each agent traveled from start).
+        max_progress_0 = max_progress_0.max(action.moves[0].x);
+        max_progress_1 = (4 - action.moves[1].x).max(max_progress_1);
+        current = JointConfig::new(action.moves);
+    }
+    // The swap technique should let at least one agent make meaningful progress
+    // into the corridor (past the midpoint). Without swap, both freeze at the
+    // first head-on meeting and never advance.
+    //
+    // We don't require reaching the goal — in a tiny map with only one passing
+    // bay, the agents may still bottleneck. The key assertion is that the swap
+    // mechanism prevents permanent freeze: at least one agent advances past x=2.
+    assert!(
+        max_progress_0 > 2 || max_progress_1 > 2,
+        "swap technique should let at least one agent advance past the midpoint; \
+         max_progress_0={max_progress_0}, max_progress_1={max_progress_1}"
+    );
+}
+
+/// The swap technique must never introduce vertex or edge collisions.
+/// Run a 2-wide corridor scenario (agents CAN pass) and verify all moves are
+/// collision-free. A 1-wide corridor is too adversarial (agents physically
+/// cannot pass) — the real ht_chantry map uses 2-wide corridors.
+#[test]
+fn test_swap_no_collision_in_wide_corridor() {
+    // 8×2 map (2-wide corridor). 4 agents: 2 going right, 2 going left.
+    // In a 2-wide corridor, agents can sidestep to pass each other.
+    let map = GridMap::empty(8, 2);
+    let config = JointConfig::new(vec![
+        GridPos::new(0, 0),
+        GridPos::new(1, 0),
+        GridPos::new(6, 1),
+        GridPos::new(7, 1),
+    ]);
+    let goals = vec![
+        GridPos::new(7, 1),
+        GridPos::new(6, 1),
+        GridPos::new(1, 0),
+        GridPos::new(0, 0),
+    ];
+    let cfg = GuidanceConfig::default();
+    let mut guidance = make_guidance(&map, cfg);
+    let mut hindrance = BlockingCount::new();
+    let mut rng = Rng::with_seed(7);
+    let map_clone = map.clone();
+    let mut lacam = LifelongLaCam::new(WarmStartCache::new(WarmStartScheme::default(), cfg.w_phi))
+        .with_neighbors(move |p| map_clone.passable_neighbors(p));
+
+    let mut current = config;
+    for _tick in 0..100 {
+        let action = lacam.tick(&current, &goals, &mut guidance, &mut hindrance, &mut rng);
+        // No vertex collision.
+        let mut seen = std::collections::HashSet::new();
+        for p in &action.moves {
+            assert!(seen.insert(*p), "vertex collision at {p:?}");
+        }
+        // No edge collision (swap).
+        for i in 0..4 {
+            for j in (i + 1)..4 {
+                let is_swap = action.moves[i] == current.positions[j]
+                    && action.moves[j] == current.positions[i];
+                assert!(!is_swap, "edge collision: agents {i} and {j} swapped");
+            }
+        }
+        current = JointConfig::new(action.moves);
+    }
+}

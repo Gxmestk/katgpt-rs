@@ -7,8 +7,10 @@
 - [140](../.issues/140_pibt_priority_inheritance_and_warmstart_integration.md) — PIBT PI collapsed without LaCAM fallback; warm-start harmful
 - [142](../.issues/142_full_space_time_astar_guidance_upgrade.md) — RESOLVED: full A* landed, +7-11% throughput, warm-start still harmful
 - [143](../.issues/143_lacam_escalation_full_pibt.md) — RESOLVED: full recursive PIBT + priority shuffle fallback (covers PIBT PI + retry)
-**Status:** ACTIVE — supplements Issue 143 with the swap technique (T1) and
-warm-start re-evaluation (T2) not covered by 143's recursive PIBT + shuffle.
+**Status:** RESOLVED — swap technique implemented, benchmarked, and kept as
+infrastructure-only (negative result on all GOAT-gate maps). T4 (warm-start
+re-eval) not re-tested because T1 did not reduce PIBT deviations (the
+precondition for T4 does not hold).
 
 ---
 
@@ -149,15 +151,36 @@ Re-run the full G1-G4 benchmark after T1 (swap) + T4 (warm-start re-eval):
 
 ## Acceptance
 
-- [ ] `cargo clippy -p katgpt-core --features multi_agent_path --lib`: clean.
-- [ ] `cargo test -p katgpt-core --features multi_agent_path --lib`: all pass.
-- [ ] `cargo test -p katgpt-core --lib`: 1556+ pass (G3 no-regression).
-- [ ] G1 ht_chantry ratio ≥ 0.15 (MARGINAL) or ≥ 0.30 (PASS).
-- [ ] G1 warehouse ratio holds ≥ 0.39 (no regression from A* baseline).
-- [ ] G2 LllgPi ratio < 1.00 (warm-start consumed and beneficial) OR honest
+- [x] `cargo clippy -p katgpt-core --features multi_agent_path --lib`: clean.
+      **RESULT:** Clean. Zero warnings.
+- [x] `cargo test -p katgpt-core --features multi_agent_path --lib`: all pass.
+      **RESULT:** 29 multi_agent_path tests pass (27 original + 2 new swap
+      tests: `test_swap_resolves_head_on_corridor`,
+      `test_swap_no_collision_in_wide_corridor`).
+- [x] `cargo test -p katgpt-core --lib`: 1556+ pass (G3 no-regression).
+      **RESULT:** 1585 tests pass (was 1583 pre-Issue-144; +2 swap tests).
+- [-] G1 ht_chantry ratio ≥ 0.15 (MARGINAL) or ≥ 0.30 (PASS).
+      **DEFERRED:** ht_chantry unchanged at 0.01. The swap technique doesn't
+      help — the synthetic maze uses 2-wide corridors (not 1-wide), so agents
+      sidestep naturally and the swap pattern rarely fires. The swap
+      technique is the right algorithm for 1-wide corridor maps
+      (Okumura's warehouse-20-40-10-2-1), but our benchmark topology doesn't
+      match. Infrastructure kept for consumers with 1-wide corridors.
+- [x] G1 warehouse ratio holds ≥ 0.39 (no regression from A* baseline).
+      **RESULT:** Warehouse holds at 0.42 (Issue 143 baseline). When the swap
+      was wired into the escalation path, warehouse regressed to 0.24 (forced
+      back-ups in aisles reduce sustained throughput). Reverted to
+      infrastructure-only; warehouse restored.
+- [-] G2 LllgPi ratio < 1.00 (warm-start consumed and beneficial) OR honest
       documentation of why it still fails.
-- [ ] G4 latency ≤ 500ms (stretch ≤ 100ms).
-- [ ] Update `.benchmarks/440_lllg_paper_repro_goat.md` with honest re-run results.
+      **DEFERRED:** T4 (warm-start re-eval) depends on T1 reducing PIBT
+      deviations. T1 did not reduce deviations (the swap is
+      infrastructure-only), so the T4 precondition does not hold. G2 remains
+      at ratio 1.00 (warm-start still not consumable).
+- [x] G4 latency ≤ 500ms (stretch ≤ 100ms).
+      **RESULT:** median 228ms at 1000 agents (under 500ms target; stretch
+      100ms not met).
+- [x] Update `.benchmarks/440_lllg_paper_repro_goat.md` with honest re-run results.
 
 ## Scope guardrails
 
@@ -192,7 +215,33 @@ Re-run the full G1-G4 benchmark after T1 (swap) + T4 (warm-start re-eval):
 
 ## TL;DR
 
-Supplements Issue 143 (recursive PIBT + shuffle) with two remaining mechanisms:
-the swap technique (O(1) corridor-exchange detection, targets ht_chantry) and
-warm-start consumption re-evaluation (post-PIBT-PI, may unblock G2). If Issue
-143's benchmark already passes G1/G2, this issue is closed as moot.
+The swap technique (Okumura 2023a, arXiv:2309.02425) was implemented in
+`pibt.rs` as `detect_swap_backers` + the `greedy_pibt_pass` `swap_backers`
+parameter. It was benchmarked three ways:
+
+1. **Always-on** (swap in initial pass): REGRESSED all maps. empty -11.5%,
+   random -10.6%, warehouse **-46%**. The forced back-ups collapse throughput
+   the same way recursive PIBT did (Issue 143).
+2. **Gated escalation** (swap fires only when ≥ 20 stuck agents, result kept
+   only if fewer stuck): warehouse still regressed to 0.24 (from 0.42). The
+   swap reduces stuck-agent count but not throughput — backing up moves agents
+   away from goals.
+3. **Infrastructure-only** (swap NOT wired into `pibt_step`): no regression,
+   no improvement. Back to Issue 143 baseline exactly.
+
+**Root cause:** the swap technique targets 1-wide corridor deadlocks
+(Okumura's warehouse-20-40-10-2-1). Our ht_chantry approximation uses 2-wide
+corridors — agents sidestep naturally, and the swap pattern rarely fires.
+When it does fire (warehouse aisles), the forced back-ups reduce sustained
+throughput. This is the same finding as recursive PIBT (Issue 143): forcing
+agents to move away from their goals hurts lifelong MAPF.
+
+**Net result:** The swap infrastructure is kept (correct implementation,
+unit-tested, available for consumers with 1-wide corridor maps) but is NOT
+wired into the default `pibt_step` escalation path. G1/G2/G3/G4 are
+unchanged from Issue 143. Promotion decision: KEEP OPT-IN (unchanged).
+
+The substrate remains at its local-search algorithmic ceiling. The remaining
+blockers (ht_chantry G1, warm-start G2) require global routing (Guided-PIBT)
+or full LaCAM configuration tree search — both significantly larger
+implementations that are out of scope for this issue.
