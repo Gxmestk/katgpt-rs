@@ -57,8 +57,11 @@
 //!   vertex collision. This is a deliberate throughput tradeoff documented
 //!   below (§"Why not recursive priority inheritance?") and measured in
 //!   `riir-ai/.benchmarks/516_g6c_collision_freedom_delta.md` (62.5% of
-//!   congested-map ticks have vertex collisions on the G6 scenario). Issue 154
-//!   tracks the full analysis.
+//!   congested-map ticks have vertex collisions on the G6 scenario). Plan 453
+//!   (bounded one-step LaCAM escalation, behind the `lacam_escalation` feature)
+//!   resolves this — the constraint tree + recursive PIBT eliminates vertex
+//!   collisions entirely (G-col = 0.0%); the original Issue 154 analysis is
+//!   closed as fixed by Plan 453.
 //! - **Edge collisions (swaps)**: PREVENTED by construction. The greedy pass
 //!   explicitly checks `A→B` and `B→A` simultaneously and rejects swap moves.
 //!

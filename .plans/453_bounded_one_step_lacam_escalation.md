@@ -1,14 +1,15 @@
-# Plan 453 — Bounded One-Step LaCAM Escalation (Phase 5)
+# Plan 453 — Bounded One-Step LaCAM Escalation (DONE)
 
 **Date:** 2026-07-15
-**Status:** OPEN
+**Status:** ✅ DONE (all 5 phases complete; feature stays opt-in per T5.3)
 **Repo:** katgpt-rs (substrate)
-**Feature flag:** `lacam_escalation` (opt-in; promotion candidate)
-**Blocks:** Issue 154 (DEFERRED → this plan), riir-ai Issue 516 T5, riir-ai Proposal 023
-**Research:** [424](../.research/424_Lifelong_LaCAM_Local_Guidance_Multi_Agent_Pathfinding.md) (LLLG), this plan Phase 1 (LaCAM paper distillation)
-**Prior art:** Issues [140](../.issues/140_pibt_priority_inheritance_and_warmstart_integration.md) (PI revert), [143](../.issues/143_lacam_escalation_full_pibt.md) (shuffled retry), [154](../.issues/154_pibt_vertex_collisions_priority_inheritance.md) (PI prior-art finding)
+**Feature flag:** `lacam_escalation` (opt-in; T5.3 decision: stay opt-in)
+**Resolves:** ~~Issue 154~~ (closed as fixed — G-col = 0.0%, vertex collisions eliminated)
+**Consumer gates:** riir-ai Issue 516 T5 (unblocked for opt-in use), riir-ai Proposal 023 (stays REJECTED — substrate not default-on)
+**Research:** [424](../.research/424_Lifelong_LaCAM_Local_Guidance_Multi_Agent_Pathfinding.md) (LLLG), [441](../.research/441_lacam_constraint_tree_distillation.md) (Phase 1 distillation)
+**Prior art:** Issues 140 (PI revert, removed), 143 (shuffled retry, removed), 154 (PI prior-art finding, closed as fixed by this plan)
 **Paper:** Okumura 2023, "LaCAM: Search-Based Algorithm for Quick Multi-Agent Pathfinding", AAAI 2023 — [project page](https://kei18.github.io/lacam/), [code](https://github.com/Kei18/lacam)
-**Benchmark:** [440](../.benchmarks/440_lllg_paper_repro_goat.md) (substrate G1–G4 gate; Phase 5 next steps §lines 743–766)
+**Benchmark:** [440](../.benchmarks/440_lllg_paper_repro_goat.md) (substrate G1–G4 gate), [453](../.benchmarks/453_lacam_escalation_goat.md) (this plan's GOAT gate)
 
 ---
 
@@ -345,51 +346,65 @@ search doesn't improve collision-freedom but starts hurting latency.
       results: G6c table, G1 table, latency sweep, GOAT gate summary, and
       Phase 5 promotion decision (stay opt-in — defer to multi-step LaCAM).
 
-### Phase 4 — GOAT gate
+### Phase 4 — GOAT gate ✅ DONE (2026-07-15)
 
-- [ ] **T4.1** **G1 (throughput):** all 4 maps ≥ 0.30 ratio. Target: ht_chantry
-      improves from 0.01 → ≥ 0.30 (the maze case). If ht_chantry stays at
-      0.01, LaCAM didn't help G1 — document why (constraint tree may not
-      resolve multi-step corridor deadlocks in one step).
-- [ ] **T4.2** **G-col (collision-freedom, NEW gate):** vertex collision rate
-      ≤ 10% on the G6c scenario (vs current 62.5%). Target: G6c delta ≥ 0.50
-      (the riir-ai Proposal 023 threshold). If collision rate stays > 50%,
-      the constraint tree can't resolve the bottleneck in one step —
-      document the physics (genuine bottleneck, no collision-free config
-      exists without throughput collapse).
-- [ ] **T4.3** **G3 (no-regression):** `cargo test -p katgpt-core --all-features`
-      passes; `cargo clippy -p katgpt-core --all-features` clean. All
-      existing PIBT tests pass with `lacam_escalation` ON (the feature
-      replaces the shuffled retry, not the greedy fast path).
-- [ ] **T4.4** **G4 (latency):** median per-tick ≤ 500ms on empty-48-48 (1000
-      agents). Stretch: ≤ 100ms. The constraint tree adds overhead only when
-      stuck agents exist; on open maps, the fast path is unchanged.
-- [ ] **T4.5** **G-PI (no throughput collapse):** explicitly verify the
-      Issue 140/143 failure mode does NOT recur. empty-48-48 throughput
-      ratio stays ≥ 0.60 (vs the 0.02 collapse in Issue 140). This is the
-      gate that proves the constraint tree makes recursive PI safe.
+All data collected in Phase 3; formally marked here. Full results in
+`.benchmarks/453_lacam_escalation_goat.md`.
 
-### Phase 5 — Promotion decision
+- [x] **T4.1** **G1 (throughput):** ⚠ **3/4 maps PASS** (ht_chantry marginal).
+      empty 0.69 ✅, random 0.69 ✅, warehouse 0.40 ✅, ht_chantry **0.28 ❌**
+      (target ≥ 0.30). ht_chantry improved 0.01 → 0.28 (28×) but one-step
+      LaCAM cannot plan multi-step maze detours — exactly the §4.3 limitation.
+- [x] **T4.2** **G-col (collision-freedom, NEW gate):** ✅ **PASS.** Vertex
+      collision rate = **0.0%** (target ≤ 10%); G6c delta = **1.000** (target
+      ≥ 0.50). The constraint tree resolves the bottleneck collision-free via
+      recursive PIBT priority inheritance — no genuine physics constraint,
+      just the missing constraint-tree half.
+- [x] **T4.3** **G3 (no-regression):** ✅ **PASS.** `cargo test --features
+      lacam_escalation`: 1616/1616. `cargo test --features multi_agent_path`:
+      1611/1611. `cargo clippy` clean on both feature sets.
+- [x] **T4.4** **G4 (latency):** ✅ **PASS.** Median 14-19ms at 800 agents
+      (target ≤ 500ms, stretch ≤ 100ms met). Latency sweep at 60 agents is
+      budget-insensitive (flat ~40µs across `max_nodes ∈ {100,500,1000,5000}`)
+      — the constraint tree converges in the first few nodes.
+- [x] **T4.5** **G-PI (no throughput collapse):** ✅ **PASS.** empty-48-48
+      throughput ratio = **0.69** (target ≥ 0.60; Issue 140 collapsed to
+      0.02). This is the gate that confirms the Plan 453 thesis: the
+      constraint tree is the missing half that makes recursive PIBT safe.
 
-- [ ] **T5.1** If G1 + G-col + G3 + G4 + G-PI all PASS: promote
-      `lacam_escalation` to default-on. Update `Cargo.toml` default features.
-      Update `pibt.rs` module docs (remove the "Collision profile" caveat —
-      collisions are now prevented by construction when the budget suffices).
-      Re-open riir-ai Proposal 023 → re-run G6c → promote `crowd_motion_lllg`.
-- [ ] **T5.2** If G-col FAILS (collision rate still high): the substrate
-      genuinely can't guarantee collision-freedom in this regime. Stay
-      opt-in. Document the negative result. The riir-ai consumer should use
-      the occupied-set baseline for guaranteed collision-freedom. Close
-      Issue 154 as "won't fix — physics constraint".
-- [ ] **T5.3** If G1 FAILS (ht_chantry still 0.01): LaCAM one-step can't
-      resolve multi-step corridor deadlocks. Document and defer to a
-      future multi-step LaCAM plan (the full high-level config search).
-      The collision-freedom improvement (G-col) may still stand on its own.
-- [ ] **T5.4** If G-PI FAILS (throughput collapse recurs): the constraint
-      tree did NOT make recursive PI safe. This would be a surprising
-      negative result — document the root cause. Stay opt-in. This would
-      confirm that lifelong MAPF fundamentally trades collision-freedom
-      for throughput on congested maps.
+### Phase 5 — Promotion decision ✅ DONE (2026-07-15)
+
+**T5.3 applies:** G1 marginally FAILS on ht_chantry (0.28 < 0.30). The
+other four gates (G-col, G-PI, G3, G4) all PASS, and the collision-freedom
+improvement stands on its own as a genuine win. Per the AGENTS.md promotion
+rule, modelless gain requires all gating criteria to pass — ht_chantry is
+2pp under the G1 threshold, so the feature cannot be promoted to default-on
+in this cycle.
+
+- [-] **T5.1** (NOT REACHED) — G1 did not fully pass, so promotion is blocked.
+- [-] **T5.2** (NOT REACHED) — G-col passed.
+- [x] **T5.3** **G1 FAILS marginally (ht_chantry 0.28 < 0.30):** LaCAM
+      one-step can't resolve multi-step corridor deadlocks. **Decision:
+      STAY OPT-IN.** The constraint tree is a genuine improvement over the
+      legacy shuffled retry:
+      - Collision-freedom: 37.5% → 100% (G6c scenario; G-col = 0.0%)
+      - ht_chantry throughput: 0.01 → 0.28 (28×)
+      - No throughput collapse (G-PI PASS — the Issue 140/143 failure mode
+        is fixed by construction)
+      Defer ht_chantry G1 parity (0.28 → ≥ 0.30) to a future **multi-step
+      LaCAM plan** building on Plan 453's one-step constraint tree
+      foundation. The collision-freedom improvement (G-col) stands on its
+      own; Issue 154 is closed as fixed (the remaining throughput gap is a
+      multi-step planning problem, not a collision-freedom problem).
+- [-] **T5.4** (NOT REACHED) — G-PI passed (the Plan 453 thesis confirmed).
+
+**Re-opening riir-ai Proposal 023** (G6c gate, originally rejected at
+G6c = 0.360) is **NOT triggered** by T5.3: Proposal 023 gates on the
+consumer-side `crowd_motion_lllg` feature promotion, which depends on
+`lacam_escalation` being default-on in the substrate. Since the substrate
+stays opt-in, the consumer feature stays opt-in. Proposal 023 can be
+re-opened once the future multi-step LaCAM plan closes the ht_chantry G1
+gap and `lacam_escalation` promotes to default-on.
 
 ---
 

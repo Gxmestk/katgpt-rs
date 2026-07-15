@@ -244,10 +244,12 @@ But it doesn't meet the full G1 gate. Defer to a future multi-step LaCAM plan
 The one-step constraint tree is the correct foundation — multi-step LaCAM
 builds on top of it.
 
-**Issue 154 status:** the vertex collision problem is RESOLVED by the
-constraint tree (G-col = 0.0%). Issue 154 can be closed as "fixed by Plan 453"
-once the feature is promoted. The remaining throughput gap is a different
-problem (multi-step planning, not collision-freedom).
+**Issue 154 status:** RESOLVED — the vertex collision problem is eliminated
+by the constraint tree (G-col = 0.0%). Issue 154 is closed as "fixed by
+Plan 453" (the issue file was removed per the noise-reduction rule; the
+resolution is recorded in `.plans/453_*` and this benchmark). The remaining
+throughput gap is a different problem (multi-step planning, not collision-
+freedom) and is deferred to a future multi-step LaCAM plan.
 
 ## Reproduction
 
