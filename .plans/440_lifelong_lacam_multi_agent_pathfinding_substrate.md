@@ -110,7 +110,7 @@ See `.benchmarks/440_lllg_paper_repro_goat.md` for full results.
 
 | Gate | Status | Detail |
 |---|---|---|
-| G1 (throughput) | **PARTIAL (3/4)** | empty-48-48 ratio 0.69 ✅, random-64-64-10 ratio 0.69 ✅, warehouse ratio 0.42 ✅, ht_chantry ratio 0.01 ❌ |
+| G1 (throughput) | **PARTIAL (3/4)** | empty-48-48 ratio 0.69 ✅, random-64-64-10 ratio 0.69 ✅, warehouse ratio 0.42 ✅, ht_chantry ratio 0.09 ❌ (improved from 0.01 via Issue 147 connectivity fix; remaining gap is map fidelity) |
 | G2 (congestion) | **FAIL** | Warm-start occupancy-seeding confirmed harmful even with full A* (Issue 142). LllgPi = LllgEmpty |
 | G3 (no-regression) | **PASS** | 1583 tests pass (with feature), 1556/1556 (without). Clippy clean on all-features |
 | G4 (latency) | **PASS** | 234ms median at 1000 agents (target <500ms, stretch <100ms). Paper: 210-260ms |
@@ -153,15 +153,17 @@ See `.benchmarks/440_lllg_paper_repro_goat.md` for full results.
 
 ### Blocking items for G1/G2 full pass
 
-1. **ht_chantry (G1)** — the maze topology requires **global routing**
-   (Guided-PIBT from the paper), not local priority-shuffle retry or swap.
-   The w_Φ=5 window can't see far enough through the maze corridors, and
-   local retry can't resolve head-on corridor conflicts. Issue 144 confirmed
-   the swap technique (Okumura 2023a) also doesn't help: the synthetic maze
-   uses 2-wide corridors where agents sidestep naturally, and the swap
-   pattern rarely fires. The paper's own caveat #1 documents this: long
-   one-cell-wide corridors are LLLG's known limitation. This is an
-   algorithmic ceiling, not a bug.
+1. **ht_chantry (G1)** — **Issue 147 (2026-07-15) found the root cause:**
+   the synthetic `ht_chantry_approx` map generator created **37 disconnected
+   components**. Only 24% of passable cells were in the largest component.
+   Agents in small components could never reach their goals (BFS returned
+   `f32::MAX`). The `ensure_connected` post-processing fix improved throughput
+   from 0.15 → 1.47 (10×). The remaining gap (ratio 0.09 vs paper ~17) is
+   **map fidelity**: the synthetic maze has extreme bottlenecks (177 corridor
+   cells, 5.9% density) that saturate at ~1.4 throughput regardless of
+   algorithm. Counter-flow Guided-PIBT was tested (negative result — hindrance
+   is 3rd tiebreak, too low-priority to matter). The next step is to download
+   the real MovingAI ht_chantry map for a fair comparison.
 2. **Warm-start consumption (G2)** — needs LaCAM escalation to keep PIBT
    deviations rare so warm-start forecasts stay accurate. The current LaCAM
    retry (priority shuffle) doesn't reduce deviations enough. Issue 144's

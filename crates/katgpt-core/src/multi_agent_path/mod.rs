@@ -76,7 +76,7 @@ pub mod warm_start;
 mod tests;
 
 pub use config::{AgentId, GoalAssignment, JointAction, JointConfig, UniformGoals};
-pub use hindrance::{BlockingCount, HindranceEstimator, WeightedBlockingCount};
+pub use hindrance::{BlockingCount, CounterFlowHindrance, HindranceEstimator, WeightedBlockingCount};
 pub use local_guidance::{
     Guidance, GuidanceConfig, LocalGuidanceSource, SpaceTimeGuidance,
 };
