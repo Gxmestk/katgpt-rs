@@ -89,6 +89,11 @@ use std::cmp::Ordering;
 /// real-time perf — the paper's LaCAM does a full configuration search, but
 /// for lifelong MAPF the bounded retry captures most of the benefit at a
 /// fraction of the cost.
+///
+/// Only used by the legacy shuffled-retry path (`legacy_shuffled_retry`,
+/// Issue 143). When `lacam_escalation` is ON (Plan 453), the real LaCAM
+/// constraint tree is used instead and this constant is unused.
+#[cfg(not(feature = "lacam_escalation"))]
 const DEFAULT_LACAM_RETRIES: usize = 2;
 
 /// Minimum number of stuck agents before LaCAM escalation triggers.
@@ -105,7 +110,10 @@ const MIN_STUCK_FOR_RETRY: usize = 20;
 /// Type alias mirroring [`super::local_guidance::NeighborFn`] for the
 /// neighbor-supplying callback in [`pibt_step`]. Includes `Send + Sync` to
 /// match the orchestrator's stored closure type.
-type NeighborFn<P> = dyn Fn(&P) -> Vec<P> + Send + Sync;
+///
+/// `pub(super)` so the LaCAM escalation module (`lacam.rs`) can share the
+/// same neighbor-fn plumbing (Plan 453).
+pub(super) type NeighborFn<P> = dyn Fn(&P) -> Vec<P> + Send + Sync;
 
 /// Candidate move for an agent, with its lexicographic cost components.
 ///
@@ -129,25 +137,27 @@ type NeighborFn<P> = dyn Fn(&P) -> Vec<P> + Send + Sync;
 /// the paper-faithful ordering. On maze maps, `flow_mismatch` creates
 /// directional lanes that eliminate head-on corridor deadlocks.
 #[derive(Clone)]
-struct Candidate<P: Position + Clone> {
-    next: P,
+/// `pub(super)` so the LaCAM recursive PIBT (`lacam.rs`) reuses the same
+/// cost tuple as greedy PIBT (Plan 453).
+pub(super) struct Candidate<P: Position + Clone> {
+    pub(super) next: P,
     /// Cost component 1: Ind[Φ[i][0] ≠ u] (0 if guidance-consistent, 1 else).
-    guidance_mismatch: u8,
+    pub(super) guidance_mismatch: u8,
     /// Cost component 2: flow_mismatch (0 if aligned with corridor direction, 1 if against).
     /// Zero on non-corridor maps — see [`super::flow`].
-    flow_mismatch: u8,
+    pub(super) flow_mismatch: u8,
     /// Cost component 3: dist(u, g_i) heuristic.
-    goal_dist: f32,
+    pub(super) goal_dist: f32,
     /// Cost component 4: hindrance(i→u).
-    hindrance: f32,
+    pub(super) hindrance: f32,
     /// Cost component 5: random tiebreak ε ∈ [0, 1).
-    epsilon: f32,
+    pub(super) epsilon: f32,
 }
 
 impl<P: Position + Clone> Candidate<P> {
     /// Lexicographic comparison:
     /// guidance_mismatch → flow_mismatch → goal_dist → hindrance → ε.
-    fn lexicographic_cmp(&self, other: &Self) -> Ordering {
+    pub(super) fn lexicographic_cmp(&self, other: &Self) -> Ordering {
         self.guidance_mismatch
             .cmp(&other.guidance_mismatch)
             .then_with(|| self.flow_mismatch.cmp(&other.flow_mismatch))
@@ -265,14 +275,61 @@ where
         return Ok(JointAction::new(moves));
     }
 
-    // LaCAM escalation: retry with shuffled orders. Only triggers when stuck
-    // agents are systemic (≥ MIN_STUCK_FOR_RETRY), indicating a genuinely
-    // congested map where the retry is likely to help.
-    let mut best_moves = moves;
-    let mut best_stuck = stuck;
+    // LaCAM escalation. When the `lacam_escalation` feature is ON (Plan 453),
+    // delegate to the real LaCAM constraint-tree search + recursive PIBT.
+    // When OFF, use the legacy shuffled-priority retry (Issue 143 — NOT real
+    // LaCAM, kept as the GOAT-gate baseline).
+    #[cfg(feature = "lacam_escalation")]
+    {
+        Ok(super::lacam::lacam_escalation_step(
+            config,
+            guidance,
+            goals,
+            priorities,
+            hindrance,
+            flow_field,
+            neighbors_fn,
+            rng,
+            super::lacam::EscalationBudget::default(),
+        ))
+    }
 
+    // Legacy path: shuffled-priority retry (Issue 143). Used when
+    // `lacam_escalation` is OFF.
+    #[cfg(not(feature = "lacam_escalation"))]
+    legacy_shuffled_retry(
+        config, guidance, goals, hindrance, flow_field, neighbors_fn, rng, &order, &no_backers,
+        moves, stuck,
+    )
+}
+
+/// Legacy LaCAM escalation: shuffled-priority retry (Issue 143).
+///
+/// This is NOT real LaCAM — it just shuffles priority orderings and picks
+/// the result with fewest stuck agents. Kept as the GOAT-gate baseline
+/// (the `lacam_escalation` OFF path). When `lacam_escalation` is ON,
+/// `pibt_step` delegates to the real constraint-tree search instead.
+#[cfg(not(feature = "lacam_escalation"))]
+#[allow(clippy::too_many_arguments)]
+fn legacy_shuffled_retry<P, H>(
+    config: &JointConfig<P>,
+    guidance: &Guidance<P>,
+    goals: &[P],
+    hindrance: &mut H,
+    flow_field: &dyn FlowField<P>,
+    neighbors_fn: Option<&NeighborFn<P>>,
+    rng: &mut fastrand::Rng,
+    order: &[usize],
+    no_backers: &[bool],
+    mut best_moves: Vec<P>,
+    mut best_stuck: Vec<AgentId>,
+) -> Result<JointAction<P>, Deadlock>
+where
+    P: Position,
+    H: HindranceEstimator<P>,
+{
     for _attempt in 0..DEFAULT_LACAM_RETRIES {
-        let shuffled = shuffle_order(&best_stuck, &order, rng);
+        let shuffled = shuffle_order(&best_stuck, order, rng);
         let (moves, stuck) = greedy_pibt_pass(
             config,
             guidance,
@@ -282,7 +339,7 @@ where
             neighbors_fn,
             rng,
             &shuffled,
-            &no_backers,
+            no_backers,
         );
 
         if stuck.is_empty() {
@@ -298,7 +355,8 @@ where
     //
     // NOTE: this can create vertex collisions (the stuck agent's current
     // position may be committed by another agent). See the fast-path comment
-    // above for the full analysis. The all-wait alternative kills throughput.
+    // in `pibt_step` for the full analysis. The all-wait alternative kills
+    // throughput.
     for &agent in &best_stuck {
         let i = usize::from(agent);
         best_moves[i] = config.pos(agent).clone();
@@ -320,7 +378,7 @@ where
 /// Stuck agents have their move set to wait (current position) — they're also
 /// listed in the returned `stuck` vec for the LaCAM escalation.
 #[allow(clippy::too_many_arguments)]
-fn greedy_pibt_pass<P, H>(
+pub(super) fn greedy_pibt_pass<P, H>(
     config: &JointConfig<P>,
     guidance: &Guidance<P>,
     goals: &[P],
@@ -498,7 +556,7 @@ where
 
 /// Compute the agent processing order from priorities (descending priority,
 /// ties broken by agent id for determinism).
-fn compute_priority_order(n: usize, priorities: &[f32]) -> Vec<usize> {
+pub(super) fn compute_priority_order(n: usize, priorities: &[f32]) -> Vec<usize> {
     let mut order: Vec<usize> = (0..n).collect();
     if !priorities.is_empty() && priorities.len() == n {
         order.sort_by(|&a, &b| {
@@ -515,6 +573,10 @@ fn compute_priority_order(n: usize, priorities: &[f32]) -> Vec<usize> {
 ///
 /// Elevates stuck agents (moves them earlier in the order) and perturbs
 /// the rest slightly to break symmetric deadlocks.
+///
+/// Only used by the legacy shuffled-retry path (Issue 143). When
+/// `lacam_escalation` is ON (Plan 453), the real constraint tree is used.
+#[cfg(not(feature = "lacam_escalation"))]
 fn shuffle_order(stuck: &[AgentId], order: &[usize], rng: &mut fastrand::Rng) -> Vec<usize> {
     let stuck_set: Vec<bool> = {
         let mut s = vec![false; order.len()];

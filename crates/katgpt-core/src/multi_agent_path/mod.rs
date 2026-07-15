@@ -70,6 +70,8 @@ pub mod config;
 pub mod flow;
 pub mod hindrance;
 pub mod local_guidance;
+#[cfg(feature = "lacam_escalation")]
+pub(crate) mod lacam;
 pub mod pibt;
 pub mod position;
 pub mod warm_start;
@@ -86,6 +88,9 @@ pub use local_guidance::{
 pub use pibt::{pibt_step, Deadlock};
 pub use position::{soft_cost, GridMap, GridPos, Position};
 pub use warm_start::{WarmStartCache, WarmStartScheme};
+
+#[cfg(feature = "lacam_escalation")]
+pub use lacam::EscalationBudget;
 
 // ─────────────────────────────────────────────────────────────────────
 // CostFn trait — pluggable seam #1 (Plan 440 T1.2)

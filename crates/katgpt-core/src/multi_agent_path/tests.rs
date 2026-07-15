@@ -1332,3 +1332,182 @@ fn test_swap_no_collision_in_wide_corridor() {
         current = JointConfig::new(action.moves);
     }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Plan 453 — Bounded one-step LaCAM escalation (T2.6)
+//
+// These tests verify the constraint-tree search resolves stuck agents that
+// greedy PIBT can't. They only run when `lacam_escalation` is ON — the legacy
+// shuffled-retry path (feature OFF) is tested by the existing T1.10 tests.
+// ─────────────────────────────────────────────────────────────────────────────
+
+#[cfg(feature = "lacam_escalation")]
+mod lacam_escalation_tests {
+    use super::*;
+    use super::lacam::EscalationBudget;
+
+    /// Helper: run N ticks, return the number of ticks with vertex collisions.
+    fn count_vertex_collisions(
+        map: &GridMap,
+        starts: Vec<GridPos>,
+        goals: &[GridPos],
+        n_ticks: usize,
+        seed: u64,
+    ) -> usize {
+        let config = JointConfig::new(starts);
+        let cfg = GuidanceConfig::default();
+        let mut guidance = make_guidance(map, cfg);
+        let mut hindrance = BlockingCount::new();
+        let mut rng = Rng::with_seed(seed);
+        let map_clone = map.clone();
+        let mut lacam =
+            LifelongLaCam::new(WarmStartCache::new(WarmStartScheme::default(), cfg.w_phi))
+                .with_neighbors(move |p| map_clone.passable_neighbors(p));
+
+        let mut current = config;
+        let mut collisions = 0;
+        for _ in 0..n_ticks {
+            let action = lacam.tick(&current, goals, &mut guidance, &mut hindrance, &mut rng);
+            let mut seen = std::collections::HashSet::new();
+            let mut had_collision = false;
+            for p in &action.moves {
+                if !seen.insert(*p) {
+                    had_collision = true;
+                }
+            }
+            if had_collision {
+                collisions += 1;
+            }
+            current = JointConfig::new(action.moves);
+        }
+        collisions
+    }
+
+    /// T2.6a: LaCAM resolves stuck agents — greedy PIBT would produce vertex
+    /// collisions on this scenario, but LaCAM should find collision-free configs.
+    ///
+    /// The scenario: 4 agents in a 5×5 grid, converging on the center. This
+    /// creates enough congestion to trigger stuck agents. LaCAM's constraint
+    /// tree should resolve them collision-free.
+    #[test]
+    fn test_lacam_resolves_stuck_agent() {
+        let map = GridMap::empty(5, 5);
+        // 4 agents at corners, all targeting the center (2,2).
+        let starts = vec![
+            GridPos::new(0, 0),
+            GridPos::new(4, 0),
+            GridPos::new(0, 4),
+            GridPos::new(4, 4),
+        ];
+        let goals = vec![GridPos::new(2, 2); 4];
+
+        let collisions = count_vertex_collisions(&map, starts, &goals, 50, 42);
+        // LaCAM should keep collisions low. On this small scenario it should
+        // often achieve 0 collisions, but we allow a small margin for the
+        // budget-exhaustion fallback path.
+        assert!(
+            collisions <= 5,
+            "LaCAM should resolve most stuck agents; got {collisions}/50 collision ticks"
+        );
+    }
+
+    /// T2.6b: budget fallback — the constraint tree should not panic when
+    /// it exhausts its budget. With a genuine bottleneck, the budget may be
+    /// exhausted and we fall back to greedy PIBT (collisions may occur, but
+    /// no panic).
+    #[test]
+    fn test_lacam_budget_fallback() {
+        let map = GridMap::empty(5, 5);
+        let starts = vec![
+            GridPos::new(0, 0),
+            GridPos::new(4, 0),
+            GridPos::new(0, 4),
+            GridPos::new(4, 4),
+        ];
+        let config = JointConfig::new(starts);
+        let goals = vec![GridPos::new(2, 2); 4];
+        let cfg = GuidanceConfig::default();
+        let mut guidance = make_guidance(&map, cfg);
+        let mut hindrance = BlockingCount::new();
+        let mut rng = Rng::with_seed(99);
+        let map_clone = map.clone();
+        let mut lacam =
+            LifelongLaCam::new(WarmStartCache::new(WarmStartScheme::default(), cfg.w_phi))
+                .with_neighbors(move |p| map_clone.passable_neighbors(p));
+
+        let mut current = config;
+        // Run 20 ticks — should not panic regardless of budget.
+        for _ in 0..20 {
+            let action = lacam.tick(&current, &goals, &mut guidance, &mut hindrance, &mut rng);
+            assert_eq!(action.moves.len(), 4, "JointAction has one move per agent");
+            current = JointConfig::new(action.moves);
+        }
+    }
+
+    /// T2.6c: no regression on open map — the LaCAM fast path (greedy PIBT
+    /// when no stuck agents) should produce zero collisions on an open map
+    /// with well-separated agents.
+    #[test]
+    fn test_lacam_no_regression_on_open_map() {
+        let map = GridMap::empty(10, 10);
+        // 4 agents well-separated on a 10×10 map — no congestion expected.
+        let starts = vec![
+            GridPos::new(0, 0),
+            GridPos::new(9, 0),
+            GridPos::new(0, 9),
+            GridPos::new(9, 9),
+        ];
+        let goals = vec![
+            GridPos::new(9, 9),
+            GridPos::new(0, 0),
+            GridPos::new(9, 0),
+            GridPos::new(0, 9),
+        ];
+
+        let collisions = count_vertex_collisions(&map, starts, &goals, 100, 7);
+        assert_eq!(
+            collisions, 0,
+            "open map with well-separated agents should have 0 collisions"
+        );
+    }
+
+    /// T2.6d: recursive PIBT terminates — construct a synthetic deadlock
+    /// (1-wide corridor with opposing agents) and verify the recursion doesn't
+    /// hang. The constraint tree should either resolve it or fall back within
+    /// the budget.
+    #[test]
+    fn test_func_pibt_recursive_bounded() {
+        // 1×5 corridor: agent 0 at (0,0), agent 1 at (4,0), goals swapped.
+        // This is a classic corridor deadlock. LaCAM should not hang.
+        let map = GridMap::empty(5, 1);
+        let starts = vec![GridPos::new(0, 0), GridPos::new(4, 0)];
+        let goals = vec![GridPos::new(4, 0), GridPos::new(0, 0)];
+        let config = JointConfig::new(starts);
+        let cfg = GuidanceConfig::default();
+        let mut guidance = make_guidance(&map, cfg);
+        let mut hindrance = BlockingCount::new();
+        let mut rng = Rng::with_seed(13);
+        let map_clone = map.clone();
+        let mut lacam =
+            LifelongLaCam::new(WarmStartCache::new(WarmStartScheme::default(), cfg.w_phi))
+                .with_neighbors(move |p| map_clone.passable_neighbors(p));
+
+        let mut current = config;
+        // Run 50 ticks — the deadlock likely persists (agents can't pass in
+        // a 1-wide corridor), but the function must terminate each tick.
+        for _tick in 0..50 {
+            let action = lacam.tick(&current, &goals, &mut guidance, &mut hindrance, &mut rng);
+            current = JointConfig::new(action.moves);
+        }
+        // If we reached here, the recursion terminates. No assertion needed
+        // — the test passes by not hanging.
+    }
+
+    /// T2.6e: EscalationBudget default is sensible (non-zero max_nodes + time).
+    #[test]
+    fn test_escalation_budget_default() {
+        let b = EscalationBudget::default();
+        assert!(b.max_nodes > 0, "default max_nodes should be positive");
+        assert!(b.time_budget_us > 0, "default time_budget_us should be positive");
+    }
+}
