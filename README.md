@@ -2494,18 +2494,38 @@ No new feature flag — perf optimization on the already DEFAULT-ON `manifold_er
 
 Paper-faithful **Lifelong LaCAM with Local Guidance (LLLG)** — a modelless, training-free, receding-horizon windowed multi-agent pathfinder distilled from Arita & Okumura AAAI 2026. `LifelongLaCam<P, C, G>` orchestrates a PIBT one-step generator (greedy collision-free joint action selection) over a per-agent space-time A* guidance field (BFS distance-to-goal), with warm-start scheme reuse (LLLG_Π / LLLG_Φ / LLLG_∅) and a one-step blocking-count hindrance estimator (Okumura & Nagai 2025). Entirely heuristic — no training, no backprop, no gradient descent.
 
-**Four pluggable seams (the Super-GOAT fusion surface):** `CostFn<P>` (uniform/heightfield/threat-cochain/faction-zone), `LocalGuidanceSource<P>` (space-time A* / HLA-projected), `WarmStartScheme` (prev-solution-suffix / prev-guidance / recompute / per-personality blend), `HindranceEstimator<P>` (raw count / affect-weighted). Each seam ships with compile-checked rustdoc examples so a consumer plugs in without reading the paper. Private consumers (riir-ai/489) fuse LLLG with HLA per-NPC personality modulation, Crowd MCGS physical layer, and P350 multi-agent closure via these seams.
+**Five pluggable seams (the Super-GOAT fusion surface):** `CostFn<P>` (uniform/heightfield/threat-cochain/faction-zone), `LocalGuidanceSource<P>` (space-time A* / HLA-projected), `WarmStartScheme` (prev-solution-suffix / prev-guidance / recompute / per-personality blend), `HindranceEstimator<P>` (raw count / affect-weighted), `FlowField<P>` (Issue 149 — 1-wide corridor one-way direction assignment). Each seam ships with compile-checked rustdoc examples so a consumer plugs in without reading the paper. Private consumers (riir-ai/489) fuse LLLG with HLA per-NPC personality modulation, Crowd MCGS physical layer, and P350 multi-agent closure via these seams.
 
 | Gate | Target | Result | Verdict |
 |------|--------|--------|---------|
-| **G1** (throughput) | 4 maps within 10% of paper | empty-48-48 ratio 0.63 ✅, random-64-64-10 ratio 0.62 ✅, warehouse 0.35 ❌, ht_chantry 0.01 ❌ | **PARTIAL (2/4)** |
-| **G2** (congestion) | LLLG_Π beats LllgEmpty baseline | ratio 1.00 (identical) — warm-start data plumbed but not consumable by greedy rollout | **FAIL** |
-| **G3** (no-regression) | all-features clippy clean + lib tests pass | 1578/1578 pass, clippy `--all-features` clean | **PASS** |
-| **G4** (latency) | <500ms median @ 1000 agents (stretch <100ms) | 82ms median (2.6× faster than paper's M1 Ultra 210-260ms) | **PASS** |
+| **G1** (throughput) | 4 real MovingAI maps within 10% of paper | empty-48-48 ratio 0.68 ✅, random-64-64-10 ratio 0.69 ✅, warehouse 0.41 ❌, ht_chantry 0.27 ❌ | **PARTIAL (2/4)** |
+| **G2** (congestion) | LLLG_Π beats LllgEmpty baseline | ratio 1.00 (identical) — warm-start data plumbed but not consumable by greedy rollout (confirmed even with full space-time A*, Issue 142) | **FAIL** |
+| **G3** (no-regression) | all-features clippy clean + lib tests pass | 1601/1601 pass (incl. 11 flow-field tests, Issue 149), clippy `--all-features` clean | **PASS** |
+| **G4** (latency) | <500ms median @ 1000 agents (stretch <100ms) | 467ms median on real MovingAI maps (ht_chantry is 162×141 = 10× larger than synthetic) | **PASS** |
 
-The two G1 failures (warehouse / maze) and G2 failure are honest and root-caused: the greedy PIBT lacks priority inheritance (recursive conflict resolution needs LaCAM-level escalation — implemented + benchmarked + reverted because it collapses throughput without LaCAM), and the warm-start forecast can't be consumed by a greedy rollout (it benefits only full space-time A* pruning). The perf headroom (82ms current vs 500ms target) is ample for the Phase 5 A* upgrade that unblocks both gates. **Promotion: KEEP OPT-IN** — substrate is modelless (promotion allowed) but G1/G2 gaps and unvalidated Super-GOAT claim (pending riir-ai/489 G5–G7 fusion) make promotion premature.
+**Five pluggable seams** (the Super-GOAT fusion surface): `CostFn<P>`, `LocalGuidanceSource<P>`, `WarmStartScheme`, `HindranceEstimator<P>`, and the new **`FlowField<P>`** (Issue 149 — static topology-aware one-way direction assignment for 1-wide corridor cells, zero regression on open maps). Real MovingAI benchmark maps landed via Issue 148 (ht_chantry improved 0.09→0.27 on the real 162×141 map vs the synthetic approximation). The two G1 failures (warehouse / ht_chantry) are honest and root-caused: the greedy PIBT lacks priority inheritance, and real game-map corridors are 2-wide (only 8 of 7461 ht_chantry cells match the strict 1-wide corridor detector — broadening to 2-wide passage detection is the documented next step). **Promotion: KEEP OPT-IN** — substrate is modelless (promotion allowed) but G1/G2 gaps and unvalidated Super-GOAT claim (pending riir-ai/489 G5–G7 fusion) make promotion premature.
 
-Feature gate: `multi_agent_path` (**opt-in**). 📖 Plan: [`.plans/440_lifelong_lacam_multi_agent_pathfinding_substrate.md`](.plans/440_lifelong_lacam_multi_agent_pathfinding_substrate.md), Research: [`.research/424_Lifelong_LaCAM_Local_Guidance_Multi_Agent_Pathfinding.md`](.research/424_Lifelong_LaCAM_Local_Guidance_Multi_Agent_Pathfinding.md), Benchmark: [`.benchmarks/440_lllg_paper_repro_goat.md`](.benchmarks/440_lllg_paper_repro_goat.md), Paper: [arXiv:2605.16855](https://arxiv.org/abs/2605.16855). Cross-refs: [Research 219](.research/219_Topological_Neural_Operators_DEC_Inference.md) (hindrance ≈ codifferential reframing), [Research 354](.research/354_Cross_Datapoint_Set_Attention_NPT.md) (latent-domain analog).
+Feature gate: `multi_agent_path` (**opt-in**). 📖 Plan: [`.plans/440_lifelong_lacam_multi_agent_pathfinding_substrate.md`](.plans/440_lifelong_lacam_multi_agent_pathfinding_substrate.md), Research: [`.research/424_Lifelong_LaCAM_Local_Guidance_Multi_Agent_Pathfinding.md`](.research/424_Lifelong_LaCAM_Local_Guidance_Multi_Agent_Pathfinding.md), Benchmark: [`.benchmarks/440_lllg_paper_repro_goat.md`](.benchmarks/440_lllg_paper_repro_goat.md), Issues: [148](.issues/148_real_movingai_maps.md) (real MovingAI maps) · [149](.issues/149_guided_pibt_flow_direction_assignment.md) (Guided-PIBT flow field), Paper: [arXiv:2605.16855](https://arxiv.org/abs/2605.16855). Cross-refs: [Research 219](.research/219_Topological_Neural_Operators_DEC_Inference.md) (hindrance ≈ codifferential reframing), [Research 354](.research/354_Cross_Datapoint_Set_Attention_NPT.md) (latent-domain analog).
+
+---
+
+### 🧪 Lean Spec Self-Testing on Concrete Instances (Plan 441, Research 425)
+
+Distills the cheapest gain from SymCrypt's verified-crypto methodology: **execute the Lean 4 spec itself on concrete instances** (SymCrypt calls this "running the spec on test vectors"). This closes a real gap in the C1–C6 formal-verification pattern (Research 351): previously we proved the spec against itself (Lean theorems) and tested Rust against the spec (`spec_match.rs` — finite samples), but never tested the spec against **known-good values from the source paper**. A spec transcription error (e.g., `N^c` instead of `N^(-c)` in `alphaGold`) would make the proof prove the wrong property AND the spec-match test pass (Rust has the same typo, written by the same person). Only concrete-instance tests catch this — the paper's published values are the independent authority.
+
+**The convention (C6 extension):** each Lean spec ships a paired `SpecTests.lean` with concrete instances from the source paper. Two files shipped:
+
+- `KatgptProof/Bridge/SpecTests.lean` — 6 concrete instances: `dot ![1,0] ![1,0] = 1` (self-dot), `dot ![1,1] ![1,-1] = 0` (orthogonal), `dot ![2,3] ![4,5] = 23` (non-trivial), `Real.sigmoid 0 = 1/2`, `Real.sigmoid 1 > 1/2`, `Real.sigmoid (-1) < 1/2`.
+- `KatgptProof/Ssmax/SpecTests.lean` — 5 `alphaGold` instances from arXiv:2607.01538 §2 dilution curve: `alphaGold 2 0 = 1/2`, `alphaGold 2 1 = 2/3` (requires correct `N^(-c)` sign), `alphaGold 10 0 = 1/10`, `alphaGold 10 1 = 10/19` (the paper's motivating regime), `alphaGold 100 0 = 1/100`.
+
+| Gate | Target | Result | Verdict |
+|------|--------|--------|---------|
+| **G1** | Spec matches known paper values | 11/11 examples compile (3 dot + 3 sigmoid + 5 alphaGold), 2283 lake jobs | ✅ PASS |
+| **G2** | Negative test: injected typo FAILS | Flipped `N^(-c)`→`N^c`: ALL 5 Ssmax examples FAIL with "Tactic rewrite failed" | ✅ PASS |
+| **G3** | Existing proofs still build | `action_bridge_ranking_preserved` still depends only on `{propext, Classical.choice, Quot.sound}`; 2283 vs 2281 baseline jobs | ✅ PASS |
+| **G4** | Zero Rust-side cost | No Rust files modified — Lean-only, gated by `lake build` | ✅ PASS |
+
+No new feature flag — convention + Lean files only. 📖 Plan: [`.plans/441_lean_spec_self_testing_concrete_instances.md`](.plans/441_lean_spec_self_testing_concrete_instances.md), Research: [`.research/425_symcrypt_verifiedcrypto_aeneas_methodology.md`](.research/425_symcrypt_verifiedcrypto_aeneas_methodology.md), Cross-repo follow-ups: [riir-chain Plan 016](../riir-chain/.plans/) + [riir-neuron-db Plan 318](../riir-neuron-db/.plans/) (both shipped their own `SpecTests.lean` instances).
 
 ---
 
@@ -2590,6 +2610,8 @@ Default: **Hybrid OCT+PQ** (OCTOPUS triplet encoding + PlanarQuant 2D Givens rot
 | **Cochain Point Sampler** (`cochain_point_sampler`) | Continuous field queries with local-coordinate conditioning — Whitney/de-Rham reconstruction from discrete `CochainField` to continuously-queryable field (Plan 422, arXiv:2506.22899). G5 11.2ns/call. | Opt-in (in `katgpt-dec`) — substrate-completeness primitive. |
 | **Spectral Rewiring** (`spectral_rewire`) | Weight delta purification via base SVD projection — SAR kernel extracting compact rewiring matrix M + purified ΔW* (Plan 423). G1a recovery ~8e-6; G5 0.41µs NPC-scale. | Opt-in — G1b spectral concentration unvalidated without real training deltas (Issue 123). |
 | **GDN Tree Verification** (`gdn_tree_verify`) | Rollback-free tree verification for delta-rule speculative trees via masked triangular solve (Plan 424, arXiv:2607.06763). Chain speedup 7.09× at T=128 (matches paper B200 GPU on CPU). G4 0 allocs. | Opt-in — only relevant for `QwenDeltaNet` / GDN-layer configs. |
+| **FORE Occupancy-Ratio Estimator** (`occupancy_ratio`) | Adjoint-Bellman KL-contraction occupancy-ratio estimator — modelless probe computing `η(x) = ⟨η_x⟩` via Bellman-adjoint residual (Plan 438, arxiv 2607.05375). Phase 5 CLOSED: all tasks complete, FORE stays opt-in (no promotion — Baird-MRP G1 PASS but downstream consumer not yet wired). Ships `OccupancyRatioEstimator` + KL-projection fit loop (Algorithm 1) + recos MAG `TransferMetric` cold-path diagnostic (Plan 437). | Opt-in — Phase 5 closure; diagnostic/probe, no default-promotion path yet. |
+| **ANE Fused-Chain Cost Model** (`ane_fused_chain`) | Dependency-aware overlap cost model for ANE fused-chain execution — estimates wall-clock for chained ANE operations accounting for DMA/Port/Kernel overlap (Plan 439, arxiv 2606.22283). Real M3 Max validation landed (Phase 2.5). Consumer integration (riir-engine) shipped in Phase 4. | **DEFAULT-ON** (Plan 439 Phase 2 GOAT G1–G5 PASS) — promoted 2026-07-14. |
 
 📖 **Full detail for ALL opt-in features + complete feature flag reference:** [`.docs/09_feature_catalog/opt_in_features.md`](.docs/09_feature_catalog/opt_in_features.md) and [`Cargo.toml`](Cargo.toml).
 
@@ -3035,6 +3057,8 @@ Docs are grouped into numbered folders by primitive class — see
 - [HOLA Hippocampal Exact KV Cache](.plans/395_hippocampal_exact_kv_cache.md)
 - [Spherical Geodesic Steering](.plans/405_spherical_steering_geodesic_primitive.md)
 - [Renoise-CE Self-Verifier](.plans/406_renoise_ce_self_verifier.md)
+- [Lifelong LaCAM Multi-Agent Pathfinding](.plans/440_lifelong_lacam_multi_agent_pathfinding_substrate.md)
+- [Lean Spec Self-Testing on Concrete Instances (Plan 441)](.plans/441_lean_spec_self_testing_concrete_instances.md)
 - [Proposal 003 — src/ consolidation master (Phases 0–12)](.proposals/003_src_consolidation_master.md)
 - [Sigmoid-not-Softmax: The Universality-Class Escape (Research 315, Liu & Gore 2606.25008)](.docs/04_calibration/universality_class_escape.md)
 
