@@ -4,7 +4,7 @@
 **Origin:** Research 406 §8.3 Fusion F (addendum)
 **Related Research:** [406 (SAR)](../.research/406_Spectral_Rewiring_Weight_Delta_Purification.md), [367 (QuasiMoTTo)](../.research/367_QuasiMoTTo.md)
 **Related Plans:** [423 (spectral_rewire)](../.plans/423_spectral_rewire_primitive.md), [367 (qmc_sampling)](../.plans/367_quasimotto_qmc_sampling.md)
-**Status:** Open — needs PoC before plan/super-GOAT commitment
+**Status:** CLOSED (2026-07-15) — Phase 1 PoC REFUTED concentration at 1.5B scale. See §"Phase 1 PoC result" below.
 
 ## TL;DR
 
@@ -272,3 +272,72 @@ The PoC now has **two concrete blockers** (both answered):
 If the compound gain is super-additive, escalate to Path C (randomized SVD
 primitive + Rust PoC). Path B is a fallback if external weight extraction
 proves blocked.
+
+## Phase 1 PoC result (2026-07-15) — CONCENTRATION REFUTED, ISSUE CLOSED
+
+**PoC location:** `riir-train/.scratch/sar_qmc_fusion_poc/`
+**Result file:** `riir-train/.scratch/sar_qmc_fusion_poc/PHASE1_RESULTS.md`
+
+### What was tested
+
+Path A Phase 1 (concentration analysis) was executed on the correct model
+pair:
+
+| Role | Model |
+|------|-------|
+| W_base | `deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B` |
+| W_RL | `agentica-org/DeepScaleR-1.5B-Preview` (GRPO RL on top of the base) |
+
+DeepScaleR's README confirms: `base_model: deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B`.
+The GRPO RL delta is tiny (|ΔW|/|W_base| ≈ 0.001 across all layers).
+
+### Result: SAR concentration DOES NOT HOLD at 1.5B scale
+
+on_manifold_fraction = ‖ΔW*‖²_F / ‖ΔW‖²_F where ΔW* is the projection of the RL
+delta onto the base's top-r SVD subspace:
+
+| Rank | Mean | Median | Max | Layers > 0.8 |
+|------|------|--------|-----|-------------|
+| 32 | 0.003 | 0.001 | 0.041 | **0/196 (0.0%)** |
+| 64 | 0.010 | 0.004 | 0.077 | **0/196 (0.0%)** |
+| 128 | 0.029 | 0.012 | 0.191 | **0/196 (0.0%)** |
+
+**Zero layers exceed the 0.8 concentration threshold at any tested rank.**
+The maximum fraction (0.191 at rank 128) is less than a quarter of the
+threshold. SAR purification would discard >97% of the RL delta's energy —
+effectively reverting the model to the base.
+
+### Verdict
+
+**The SAR × QuasiMoTTo fusion is DEAD at 1.5B scale.** The concentration
+precondition fails empirically, same as the NPC-scale test (bench 423 G1b:
+fractions in [0.27, 0.58]). The SAR paper's LLM-scale concentration claim does
+not replicate on this GRPO-trained model pair.
+
+Phase 2 (Pass@k experiment) is **not worth running** — the SAR-purified model
+would be ~identical to the base, and the compound gain test would trivially
+fail.
+
+### What this means for the SAR primitive
+
+`spectral_rewire` stays OPT-IN as a cold-tier tool (its mechanism is correct —
+bench 423 G1a/G2/G3/G4/G5/G6 all PASS). But the concentration phenomenon that
+makes it *useful* does not hold at either NPC scale (≤64×64) or 1.5B LLM scale.
+
+The SAR paper's concentration claim may require:
+- Larger models (7B+) where training dynamics produce different delta structure
+- A different RL method (the paper's setup vs GRPO)
+- bf16/fp32 training precision (our models are stored as fp16)
+- Different rank selection (the paper may use much higher ranks)
+
+These are open questions for future investigation, not blockers for the current
+fusion hypothesis.
+
+### Corrective note on initial run
+
+The first Phase 1 run used the wrong base model (`Qwen/Qwen2.5-Math-1.5B`) and
+produced higher fractions (mean=0.113 at rank 128). This was because the delta
+mixed two training stages (DeepSeek distillation + GRPO RL). The corrected run
+with DeepSeek-R1-Distill-Qwen-1.5B as the base shows even **lower**
+concentration (mean=0.029 at rank 128) — the pure GRPO delta is less
+concentrated, not more.
