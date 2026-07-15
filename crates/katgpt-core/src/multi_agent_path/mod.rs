@@ -225,7 +225,9 @@ type FlowFieldBox<P> = Box<dyn FlowField<P> + Send + Sync>;
 ///
 /// 1. Construct once per zone (or per crowd) with the desired config.
 /// 2. Call [`tick`](Self::tick) each game tick with the current config + goals.
-/// 3. The returned [`JointAction`] is the collision-free first step.
+/// 3. The returned [`JointAction`] is the first step of the windowed plan
+///    (edge-collision-free; vertex collisions may occur on congested maps —
+///    see [`JointAction`] and `pibt.rs` module docs).
 pub struct LifelongLaCam<P: Position> {
     warm_start: WarmStartCache<P>,
     /// Scratch: per-agent guidance field `Φ`.
@@ -304,7 +306,8 @@ impl<P: Position> LifelongLaCam<P> {
     /// 1. Compute the warm-start initialization from the previous tick's data.
     /// 2. Pass it to the guidance source via [`set_warm_start`](LocalGuidanceSource::set_warm_start).
     /// 3. Compute the guidance field `Φ` via the guidance source (pluggable).
-    /// 4. Run PIBT to produce the collision-free joint action `Π_t[1]`.
+    /// 4. Run PIBT to produce the joint action `Π_t[1]` (edge-collision-free;
+    ///    vertex collisions may occur on congested maps).
     /// 5. Record the executed action + `Φ` into the warm-start cache for the
     ///    next tick.
     ///
@@ -318,7 +321,8 @@ impl<P: Position> LifelongLaCam<P> {
     ///
     /// # Returns
     ///
-    /// The collision-free [`JointAction`] `Π_t[1]`.
+    /// The [`JointAction`] `Π_t[1]` — edge-collision-free; vertex collisions
+    /// may occur on congested maps (see [`JointAction`] struct doc).
     pub fn tick<G, H>(
         &mut self,
         config: &JointConfig<P>,

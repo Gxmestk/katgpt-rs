@@ -80,8 +80,22 @@ impl<P: Position> std::ops::IndexMut<AgentId> for JointConfig<P> {
 /// is the only step actually committed. It is **raw** and synced (the move
 /// committed to the chain as a `TxDelta`).
 ///
-/// Collision-free by construction: PIBT guarantees no two agents share a cell
-/// and no two agents swap positions (edge collision).
+/// Collision profile (see `pibt.rs` module docs for the full analysis):
+///
+/// - **Edge collisions (swaps) are prevented by construction.**
+/// - **Vertex collisions are prevented on uncongested maps**, but CAN occur on
+///   congested maps: when an agent is "stuck" (no collision-free move AND its
+///   current cell is committed by a higher-priority agent), it is forced to
+///   wait in place, producing a vertex collision. This is a deliberate
+///   throughput tradeoff — the alternatives (all-wait fallback, recursive
+///   priority inheritance) both collapse throughput (Issues 140, 143; see
+///   `pibt.rs` module docs §"Why not recursive priority inheritance?"). The
+///   real fix is LaCAM-level search escalation (Phase 5).
+///
+/// Consumers that require guaranteed collision-freedom should inspect the
+/// returned action for vertex collisions (the bench harness at
+/// `riir-ai/crates/riir-poc/benches/lllg_crowd_mcgs_goal_bridge_goat.rs`
+/// shows the detection pattern) or use an occupied-set baseline.
 #[derive(Clone, Debug)]
 pub struct JointAction<P: Position> {
     pub moves: Vec<P>,
@@ -100,8 +114,10 @@ impl<P: Position> JointAction<P> {
 
     /// Apply this action to a config, producing the next-tick config.
     ///
-    /// The result is collision-free by PIBT's guarantee (caller's
-    /// responsibility to have run PIBT; this fn does not re-check).
+    /// Edge-collision-free by PIBT's swap check; vertex collisions may be
+    /// present on congested maps (see the [`JointAction`] struct doc and the
+    /// `pibt.rs` module docs for the tradeoff analysis). This fn does not
+    /// re-check.
     pub fn apply_to(&self, config: &JointConfig<P>) -> JointConfig<P> {
         debug_assert_eq!(self.moves.len(), config.n_agents());
         JointConfig::new(self.moves.clone())

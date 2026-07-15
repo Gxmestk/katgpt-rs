@@ -1,9 +1,10 @@
 # Issue 154 — PIBT Vertex Collisions on Congested Maps (Lacks Priority Inheritance)
 
 **Date:** 2026-07-15
-**Status:** OPEN (poc/optimization)
+**Status:** DEFERRED to Phase 5 (LaCAM escalation). PI is prior art — already
+tried and reverted twice (Issues 140, 143). Doc correction landed this session.
 **Discovered by:** Proposal 023 / Issue 516 G6c measurement
-**Severity:** Medium (substrate guarantee is overstated; throughput workaround exists)
+**Severity:** Medium (substrate guarantee was overstated; docs now corrected)
 
 ## Problem
 
@@ -79,7 +80,59 @@ ticks) is the lesser evil vs zero throughput.
 
 The revert adds documentation comments in `pibt.rs` explaining the tradeoff.
 
-## Proposed Fix: PIBT Priority Inheritance
+## Update (2026-07-15, follow-up session): PI is prior art — already tried, REVERTED twice
+
+**The proposed fix below (recursive priority inheritance) was already
+implemented and benchmarked TWICE and reverted both times.** This issue was
+opened based on the G6c measurement without reading the PI revert section of
+`.benchmarks/440_lllg_paper_repro_goat.md` (lines 537-565) or the `pibt.rs`
+module docs (§"Why not recursive priority inheritance?").
+
+- **Issue 140** (`8a9e42d0`, closed+removed): recursive PIBT with priority
+  inheritance implemented (~200 lines). Result: throughput COLLAPSED on all
+  maps. empty-48-48: 18.6 → 0.47 (ratio 0.68 → 0.02). All maps: mean_stops
+  170-300 out of 300 steps (agents barely moving). Reverted.
+- **Issue 143** (`737788ae`, closed+removed): PI tried again with LaCAM
+  escalation (shuffled-priority retries). Same result. Reverted.
+- **pibt.rs module docs** (written BEFORE this issue was opened) explicitly
+  document: "Issue 140 and Issue 143 both tested recursive priority
+  inheritance... Both found it collapses throughput (empty-48-48 dropped from
+  18.6 → 1.5, -92%). The greedy variant — which lets agents compromise by
+  taking their next-best cell — has dramatically higher collective throughput
+  in the lifelong MAPF setting. The recursive variant is the right algorithm
+  for one-shot MAPF (where finding ANY solution is the goal), but wrong for
+  lifelong MAPF (where sustained throughput is the goal)."
+
+The "Expected impact" claims below are based on stale data and are WRONG:
+- G1 is now 3/4 maps PASS (Issue 142 full-A* upgrade), not 2/4 as claimed
+- PI does NOT improve G1/G6c/G6a — it collapses throughput, making them WORSE
+
+### What this issue got right
+
+The G6c measurement (0.360, FAIL) is correct and reproducible. The root-cause
+analysis (stuck agents forced to wait at committed positions) is correct. The
+all-wait fix analysis (kills throughput) is correct. The false
+"Collision-free by construction" claim in `config.rs` WAS a real doc bug —
+now fixed in this session (see commits below).
+
+### The actual path forward
+
+The only known fix for collision-freedom that doesn't collapse throughput is
+**LaCAM-level search escalation** (a full configuration search, not just
+shuffled-priority retries). This is Phase 5 work per `.benchmarks/440_*` §"Next
+steps". The current "LaCAM escalation" in the code (`DEFAULT_LACAM_RETRIES = 2`)
+is just shuffled retries, NOT real LaCAM. Real LaCAM is a significant effort.
+
+Until LaCAM ships, the collision tradeoff stands: greedy PIBT has vertex
+collisions on congested maps as the lesser evil vs throughput collapse. The
+docs now accurately describe this (corrected in this session).
+
+**Status: DEFERRED to Phase 5 (LaCAM escalation). Not actionable as a
+standalone PI implementation — PI is prior art that was reverted.**
+
+---
+
+## Original Proposed Fix (prior art — already tried, see update above)
 
 Implement the PI mechanism from Okumura et al. 2019 §4:
 
@@ -91,7 +144,7 @@ Implement the PI mechanism from Okumura et al. 2019 §4:
 This resolves stuck agents WITHOUT all-wait. With PI, both collision-free
 (G6c) AND convergence (G6a) can pass simultaneously.
 
-### Expected impact
+### Expected impact (STALE — contradicted by Issues 140/143 benchmarks)
 
 - **G1 (substrate gate):** 2/4 maps → potentially 3-4/4 (PI resolves the
   greedy PIBT failures on warehouse and ht_chantry)
@@ -117,11 +170,19 @@ Phase 2: benchmark, Phase 3: GOAT gate re-run).
 - riir-ai Issue 516 (the consumer-side issue tracking G6c)
 - riir-ai Benchmark 516 G6c (the full measurement + root-cause analysis)
 - `katgpt-rs/.benchmarks/440_lllg_paper_repro_goat.md` (substrate G1-G4 gate,
-  documents the PI gap)
+  **lines 537-565 document the PI revert that this issue originally missed**)
+- `katgpt-rs/crates/katgpt-core/src/multi_agent_path/pibt.rs` module docs
+  §"Why not recursive priority inheritance?" (written before this issue;
+  documents the PI collapse)
+- git: `8a9e42d0` (Issue 140 PI revert), `737788ae` (Issue 143 PI retry),
+  `9fc9647c` (issues 140/142/143/144 closed+removed for noise reduction)
 
 ## TL;DR
 
 PIBT has vertex collisions on 62.5% of congested-map ticks because stuck agents
 are forced to wait at positions committed by others. The all-wait fix corrects
-collisions but kills throughput (rejected). The proper fix is PIBT priority
-inheritance (Okumura 2019). This is a dedicated plan, not a quick patch.
+collisions but kills throughput (rejected). **The originally-proposed fix
+(recursive PI) was already implemented and reverted TWICE (Issues 140, 143) —
+it collapses throughput (-92% on empty-48-48).** The docs now accurately
+describe the collision tradeoff (corrected this session). The real fix is
+LaCAM-level search escalation (Phase 5). **Status: DEFERRED to Phase 5.**

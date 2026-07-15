@@ -3,7 +3,10 @@
 //! Distilled from Okumura et al. 2022 (*PIBT: Scalable and Prioritization
 //! Planning for Multi-Agent Pathfinding*). PIBT is a one-step collision-free
 //! joint action generator: given the current joint configuration and per-agent
-//! guidance, produce a collision-free next-position for every agent.
+//! guidance, produce a next-position for every agent. Edge collisions (swaps)
+//! are prevented by construction; vertex collisions are prevented on
+//! uncongested maps but may occur on congested maps (see §"Collision profile"
+//! below for the tradeoff analysis).
 //!
 //! The lexicographic cost for agent `i` considering move to `u`:
 //!
@@ -46,16 +49,27 @@
 //! the goal), but wrong for lifelong MAPF (where sustained throughput is the
 //! goal).
 //!
-//! # Collision constraints
+//! # Collision profile
 //!
-//! - **Vertex**: no two agents occupy the same cell at `t+1`.
-//! - **Edge**: no two agents swap positions (`A→B` and `B→A` simultaneously).
+//! - **Vertex collisions**: PREVENTED on uncongested maps. On congested maps,
+//!   stuck agents (no collision-free move AND current cell committed by a
+//!   higher-priority agent) are forced to wait in place, which can produce a
+//!   vertex collision. This is a deliberate throughput tradeoff documented
+//!   below (§"Why not recursive priority inheritance?") and measured in
+//!   `riir-ai/.benchmarks/516_g6c_collision_freedom_delta.md` (62.5% of
+//!   congested-map ticks have vertex collisions on the G6 scenario). Issue 154
+//!   tracks the full analysis.
+//! - **Edge collisions (swaps)**: PREVENTED by construction. The greedy pass
+//!   explicitly checks `A→B` and `B→A` simultaneously and rejects swap moves.
 //!
 //! # Output
 //!
-//! Returns `Ok(JointAction)` — always succeeds (stuck agents wait in place).
-//! The caller may inspect the result for congestion and escalate further if
-//! needed. For lifelong MAPF, temporary stalls are tolerated.
+//! Returns `Ok(JointAction)` — always succeeds. Stuck agents wait in place
+//! (which may vertex-collide on congested maps; see above). The caller may
+//! inspect the result for collisions and congestion, and escalate further if
+//! needed. For lifelong MAPF, temporary stalls and rare vertex collisions
+//! are tolerated as the lesser evil vs the throughput collapse caused by
+//! all-wait or recursive priority inheritance.
 //!
 //! # Determinism
 //!
@@ -160,7 +174,9 @@ impl<P: Position + Clone> Candidate<P> {
 /// The greedy PIBT processes agents in priority order, each taking the first
 /// collision-free candidate (vertex + edge). When the greedy pass produces
 /// stuck agents (true deadlocks), the LaCAM escalation retries with shuffled
-/// priority orderings to break symmetric deadlocks.
+/// priority orderings to break symmetric deadlocks. Note: on congested maps,
+/// stuck agents forced to wait in place may vertex-collide — see the module
+/// docs §"Collision profile" for the full tradeoff analysis.
 ///
 /// # Arguments
 ///
