@@ -33,7 +33,7 @@ User correctly pushed back on Plan 285: "do bench from 17k seal, it's our prod t
 **Run command:**
 ```bash
 cd riir-ai
-cargo test -p riir-games --features quest_compression_draft \
+cargo test -p riir-games-quest --features quest_compression_draft \
   --test bench_287_compression_drafter_seal --release -- --nocapture
 ```
 
