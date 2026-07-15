@@ -2,7 +2,7 @@
 //!
 //! Distilled from [Epic Games Lore](https://github.com/EpicGames/lore) into a
 //! modelless open primitive. See:
-//! - **Plan 272** (`katgpt-rs/.plans/272_chunked_asset_merkle_store.md`)
+//! - **Plan 448** (`katgpt-rs/.plans/448_chunked_asset_merkle_store.md`)
 //! - **Research 262** (`katgpt-rs/.research/262_Lore_Chunked_Asset_Merkle_Store_Modelless.md`)
 //!
 //! ## What this is
@@ -15,7 +15,7 @@
 //!
 //! ## What this is NOT — boundary statement
 //!
-//! Per Plan 272 §"Out of Scope" and Research 262 §7:
+//! Per Plan 448 §"Out of Scope" and Research 262 §7:
 //! - **No game IP.** No `ItemAsset`, `NPCAppearanceAsset`, `AssetRecord`, no
 //!   quorum-scoped visibility tiers, no `AssetVisibilityGate`, no
 //!   `PromoteAssetIx` / `InstallAsset` / `UnlockShopSlot` / `MintAssetNft`
@@ -31,7 +31,7 @@
 //!
 //! ## GOAT gate
 //!
-//! Default-off until G1–G7 pass (Plan 272 §Phase 4). G4 (light-client verify)
+//! Default-off until G1–G7 pass (Plan 448 §Phase 4). G4 (light-client verify)
 //! is enforced structurally: [`ChunkedContentStore::verify_proof`] is an
 //! associated fn that takes only the proof + leaf hash — no `&self`.
 

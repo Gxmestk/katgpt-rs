@@ -1,6 +1,6 @@
 //! Spec-match test for the ActionBridge Lean 4 ranking-preservation proof.
 //!
-//! **Plan 293 / G3.** This test asserts that the Rust `ActionBridge::select_action`
+//! **Plan 449 / G3.** This test asserts that the Rust `ActionBridge::select_action`
 //! and `simd::fast_sigmoid` match the Lean 4 spec at
 //! `katgpt-rs/.proofs/KatgptProof/Bridge/Basic.lean` + `RankingPreserved.lean`.
 //!
@@ -96,7 +96,7 @@ fn spec_fast_sigmoid_saturation_boundary() {
 /// Static call-graph check: `ActionBridge::select_action` must route through
 /// `crate::simd::fast_sigmoid`, never through any softmax variant.
 ///
-/// This is the G3 contract from Plan 293: the Lean proof assumes the bridge
+/// This is the G3 contract from Plan 449: the Lean proof assumes the bridge
 /// projects via the (strictly-monotone) sigmoid. If a future change swaps in a
 /// softmax (which is NOT strictly monotone in the per-action sense — it
 /// introduces inter-action competition), the ranking-preservation theorem no

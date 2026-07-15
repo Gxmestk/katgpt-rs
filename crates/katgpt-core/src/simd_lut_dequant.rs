@@ -14,7 +14,7 @@
 //! | Shared FP32 ALU + format type-cast    | `QuantLut` trait, generic over format      |
 //! | LUT-based INT→FP conversion           | `Int4Lut` / `UInt4Lut` / `Int8Lut`         |
 //! | S/Z co-located buffer                 | `build(scale, zero)` bakes affine into LUT |
-//! | Sideband tag dispatch                 | (deferred — see Plan 431 Phase 6)          |
+//! | Sideband tag dispatch                 | (deferred — see Plan 452 Phase 6)          |
 //!
 //! The LUT for INT4 is `[f32; 16]` = 64 bytes = exactly one cache line. It fits
 //! in L1 for the duration of a block decode, and the inner loop becomes pure
@@ -698,7 +698,7 @@ unsafe fn dequant_dot_via_lut_avx2(
 // Scalar reference arithmetic dequantize — the "current path" comparator.
 ///
 /// Computes `(signed(code) − zero) · scale` per element, matching the arithmetic
-/// cast path in `q4k.rs` today. Used by the GOAT gate (Plan 431 Phase 4 G1) to
+/// cast path in `q4k.rs` today. Used by the GOAT gate (Plan 452 Phase 4 G1) to
 /// verify the LUT path is bit-exact. This is NOT the hot path — it exists to be
 /// the correctness oracle.
 ///
@@ -835,7 +835,7 @@ mod tests {
         assert_eq!(out, [0.0, 127.0, -128.0, -1.0]);
     }
 
-    // ── Bit-exact: LUT path == arithmetic path (Plan 431 Phase 4 G1) ─────
+    // ── Bit-exact: LUT path == arithmetic path (Plan 452 Phase 4 G1) ─────
 
     #[test]
     fn test_lut_bit_exact_vs_arithmetic_uint4() {

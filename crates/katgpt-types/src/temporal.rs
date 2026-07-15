@@ -2,7 +2,7 @@
 //!
 //! Distilled from O'Reilly 2026, "This is how the Neocortex Learns"
 //! ([arXiv:2606.08720](https://arxiv.org/abs/2606.08720)). Research note:
-//! [`katgpt-rs/.research/243_Temporal_Derivative_Kernel_Neocortical_Learning.md`](../.research/243_Temporal_Derivative_Kernel_Neocortical_Learning.md).
+//! [`katgpt-rs/.research/435_Temporal_Derivative_Kernel_Neocortical_Learning.md`](../.research/435_Temporal_Derivative_Kernel_Neocortical_Learning.md).
 //!
 //! Turns any streaming latent scalar (or fixed-size vector) into a signed
 //! "surprise" signal — the implicit prediction-error channel the neocortex
