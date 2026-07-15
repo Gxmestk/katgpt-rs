@@ -70,7 +70,7 @@ Evidence:
 
 ### Why this is NOT the Phase 3 trigger
 
-Phase 3's trigger condition (Research 423 §4) is: "ANE kernel fusion becomes a
+Phase 3's trigger condition (Research 427 §4) is: "ANE kernel fusion becomes a
 dispatch bottleneck — if `NpcBrainRouter` starts making wrong ANE-vs-GPU
 decisions because the model overestimates fused-kernel latency."
 
@@ -143,5 +143,5 @@ CARGO_TARGET_DIR=/tmp/plan439_p3 cargo run --release \
 
 - [Plan 439](../.plans/439_ane_fused_chain_cost_model.md) — the plan being closed
 - [Benchmark 438](438_ane_fused_chain_phase25_validation.md) — Phase 2.5 validation (GEMV)
-- [Research 423](../.research/423_GPU_Tile_Sim_ANE_Tile_Graph_Overlap.md) — Phase 3 trigger conditions
+- [Research 427](../.research/427_GPU_Tile_Sim_ANE_Tile_Graph_Overlap.md) — Phase 3 trigger conditions
 - [Research 224](../.research/224_coremltools_Public_API_ANE_Distillation_Verdict.md) — MLComputePlan is Python-only

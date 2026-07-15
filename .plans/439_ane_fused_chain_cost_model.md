@@ -1,7 +1,7 @@
 # Plan 439: ANE Fused-Chain Cost Model — Dependency-Aware Overlap Prediction
 
 **Date:** 2026-07-14
-**Research:** [katgpt-rs/.research/423_GPU_Tile_Sim_ANE_Tile_Graph_Overlap.md](../.research/423_GPU_Tile_Sim_ANE_Tile_Graph_Overlap.md)
+**Research:** [katgpt-rs/.research/427_GPU_Tile_Sim_ANE_Tile_Graph_Overlap.md](../.research/427_GPU_Tile_Sim_ANE_Tile_Graph_Overlap.md)
 **Source paper:** [arXiv:2607.11262](https://arxiv.org/abs/2607.11262) — Ding et al., *GPU-Tile-Sim*, MICRO 2026
 **Target:** `katgpt-rs/crates/katgpt-core/src/ane_roofline.rs` (extend) + Cargo feature `ane_fused_chain` (opt-in, gated on `ane_roofline`)
 **Status:** **CLOSED** (2026-07-14) — Phase 1 DONE. Phase 2 DONE. **PROMOTED to default-on** (2026-07-14). Phase 4 DONE (consumer integration in `riir-engine`). Phase 2.5 DONE (VALIDATED on Apple M3 Max, 0.94× savings ratio PASS). Phase 3 GATE CHECK DONE (Benchmark 439): **Phase 3 permanently deferred** — the ANE compute-bound fused regime is untestable with current tooling (F32 conv chains fall back to CPU; F16 ML Programs require `coreml-native` F16 support not available). No dispatch bottleneck exists. See `.benchmarks/439_ane_fused_chain_phase3_gate_check.md`.
@@ -307,7 +307,7 @@ Goal: validate the fused-chain model against real ANE measurements on M1/M2/M3. 
 
 ## Phase 3 — Stretch: Tile-Level Cross-Op Overlap (GTSim full distillation)
 
-Goal: the FULL GTSim distillation — model cross-op tile-level pipeline overlap, not just eliminated DRAM traffic. This is the speculative part from Research 423.
+Goal: the FULL GTSim distillation — model cross-op tile-level pipeline overlap, not just eliminated DRAM traffic. This is the speculative part from Research 427.
 
 **PERMANENTLY DEFERRED `[-]`** (2026-07-14, after gate check Benchmark 439). The T3.3 gate check on Apple M3 Max revealed that **CoreML dispatches large F32 conv chains to CPU, not ANE** — making the ANE cost model irrelevant for this regime. The compute-bound ANE fused regime (Phase 3's target) requires F16 ML Programs, which are outside the current pure-Rust `coreml-native` 0.2 + `coreml-proto` 0.1 toolchain. Additionally, no dispatch bottleneck exists: the NPC brain router routes small GEMV ops (dispatch-bound, validated in Phase 2.5), not large conv chains.
 
@@ -326,7 +326,7 @@ Ran T3.3 as a gate check: 3× Conv2d(3×3, SAME) Cin=Cout=192, H=W=32, F32 on Ap
 - [-] **T3.2** Model double-buffer occupancy: N-buffer pipelining in the 2 MB working set. **Permanently deferred** — untestable regime.
 - [-] **T3.3** Validate against real ANE measurements on multi-stage fused kernels. **DONE as gate check** (Benchmark 439) — result: CoreML routes F32 conv chains to CPU, making ANE model validation impossible for this regime.
 
-### Reopen conditions (unchanged from Research 423 §4)
+### Reopen conditions (unchanged from Research 427 §4)
 
 Phase 3 may be revisited if ALL of:
 1. `coreml-native` gains F16 ML Program support (enabling ANE execution of compute-bound chains)
@@ -405,7 +405,7 @@ rm -rf /tmp/plan439
 
 ## References
 
-- [Research 423](../.research/423_GPU_Tile_Sim_ANE_Tile_Graph_Overlap.md) — the distillation note (Gain → GOAT after this plan)
+- [Research 427](../.research/427_GPU_Tile_Sim_ANE_Tile_Graph_Overlap.md) — the distillation note (Gain → GOAT after this plan)
 - [Plan 379](379_ane_aware_roofline_cost_model.md) — the single-op ANE roofline being extended
 - [Research 377](../.research/377_Apple_Neural_Engine_Architecture_Programming_Performance.md) — ANE architecture (the substrate)
 - [arXiv:2607.11262](https://arxiv.org/abs/2607.11262) — GTSim paper (the source technique)
