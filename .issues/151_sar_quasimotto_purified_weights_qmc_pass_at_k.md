@@ -109,7 +109,88 @@ complements. Document in Research 406 §8 addendum as a refuted fusion.
 - [ ] Does riir-train have a reasoning-model training setup that produces a
       W_RL we can SAR-purify at LLM scale? (Issue 374 was ≤64×64 synthetic; we
       need real 4096×4096 weights, or at minimum a 512×512 reasoning toy.)
-- [ ] Is the one-sided Jacobi SVD at 4096 cols tractable for one-shot cold-tier
-      purification? (bench 423 says 128×128 is the practical bound; 4096×4096
-      may need a different SVD algorithm — randomized SVD, or a
-            riir-train-owned GPU SVD.)
+- [x] **Is the one-sided Jacobi SVD at 4096 cols tractable for one-shot
+      cold-tier purification?** — **ANSWERED: INTRACTABLE. See §"SVD
+      tractability analysis" below.** Needs randomized SVD (Halko et al. 2011)
+      as the LLM-scale algorithm; Jacobi stays for NPC-scale.
+
+## SVD tractability analysis (2026-07-15)
+
+**Source:** `katgpt-core/src/subspace_phase_gate.rs::one_sided_jacobi_svd_into`
+(L678–910), called via `thin_svd_into` from `spectral_rewire_into`.
+
+### Algorithm complexity
+
+The one-sided Jacobi SVD iterates up to `max_sweeps = 60` sweeps (L732, L765).
+Per sweep, it visits O(n²) column pairs (L774: `for p in 0..n, for q in
+(p+1)..n`), each doing O(m) work for the dot products (L780–786) + O(m) for
+the A-column rotation (L808–813) + O(n) for the V-column rotation (L814–819).
+
+**Total: O(60 · n² · (m + n))** for an m×n matrix.
+
+### Measured baseline (bench 423)
+
+| Scale (m×n) | SVD path latency | Implied throughput |
+|---|---|---|
+| 64×64 | 2ms | ~4.6 GFLOP/s (cached-scale) |
+| 512×64 | 14ms | ~3.9 GFLOP/s (cached-scale) |
+
+Bench 423 explicitly warns: "512×512 would take minutes per call (O(n²) pairs
+× 60 sweeps). 128×128 is the practical cold-tier bound."
+
+### Extrapolation to 4096×4096 (LLM scale)
+
+**Per-sweep flop count:** 4096²/2 · (5·4096 + 2·4096) ≈ **241 billion flops**.
+
+**Memory footprint:** `work.a` (m·n = 64MB) + `work.v` (n² = 64MB) = **128MB
+working set** — far exceeds L3 cache (8–32MB typical). Effective throughput
+drops to **~0.5–1 GFLOP/s** (memory-bound, ~5–10× worse than cached-scale).
+
+**Wall-clock estimate:**
+
+| Sweeps to converge | At 1 GFLOP/s | At 0.5 GFLOP/s |
+|---|---|---|
+| 10 (optimistic) | ~40 min | ~80 min |
+| 60 (worst case) | ~4 hr | ~8 hr |
+
+**Verdict: INTRACTABLE.** Even the optimistic estimate (40 min for a single
+SVD of one 4096×4096 weight matrix) is unacceptable for a cold-tier
+purification step that runs per-layer per-model. A 32-layer transformer would
+need ~21 hours (optimistic) to ~11 days (pessimistic) just for the SVDs.
+
+### The unblocker: randomized SVD (Halko-Martinsson-Tropp 2011)
+
+Randomized truncated SVD computes only the top-k singular triples in
+**O(m·n·k)** where k = target rank + oversampling:
+
+1. Draw n×(k+p) Gaussian Ω (p ≈ 10 oversampling)
+2. Y = A·Ω — O(m·n·(k+p))
+3. QR: Y = QR — O(m·(k+p)²)
+4. B = QᵀA — O(m·n·(k+p))
+5. Small SVD of (k+p)×n B — O((k+p)²·n)
+6. U = Q·U_B — O(m·(k+p)²)
+
+**For 4096×4096 with r=32, k+p=42:** ~704M flops → **~140ms (cached) to
+~700ms (memory-bound)**. That's a **100–1000× speedup** over Jacobi at this
+scale. A 32-layer transformer purifies in ~5–22 seconds (one-shot cold-tier).
+
+### Recommendation
+
+**Two-track approach for the Issue 151 PoC:**
+
+1. **PoC validation track (fast):** Use an external SVD (numpy/scipy
+   `scipy.sparse.linalg.svds`) for the cold-tier purification step. This lets
+   the PoC validate the compound Pass@k gain without blocking on a new
+   katgpt-spectral primitive. The PoC is about the *fusion*, not the SVD
+   algorithm.
+
+2. **Primitive track (if PoC passes):** Implement randomized SVD in
+   `katgpt-spectral` as a feature-gated (`randomized_svd`) primitive — the
+   LLM-scale complement to the NPC-scale Jacobi SVD. Same `SvdResult`
+   output shape so `spectral_rewire_into` can use either backend. This is a
+   pure linear-algebra primitive (modelless — no training, no gradients), so
+   it belongs in the public engine. **File as a sub-issue of 151 if/when the
+   PoC passes; not worth implementing until the compound gain is confirmed.**
+
+The Jacobi SVD stays the default for NPC-scale (≤128×128) — it's deterministic,
+zero-alloc, and correct at that scale. Randomized SVD is the LLM-scale path.
