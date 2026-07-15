@@ -218,18 +218,60 @@ The refactor targets only the **transformer weight** plasma path:
 
 ### Phase 3 — Consumer migration (deferred until Phase 2 lands)
 
-- [ ] **T3.1** `katgpt-speculative/src/distill/trd.rs` — evaluate whether the
+- [x] **T3.1** `katgpt-speculative/src/distill/trd.rs` — evaluate whether the
       TRD drafter benefits from binary (speed) or ternary (quality for
       speculative decode acceptance rate). The 89.5% vs 94.6% quality gap
       may matter for acceptance length.
-- [ ] **T3.2** `katgpt-forward/src/flashar_consensus.rs::ternary_fusion_gate`
+      **VERDICT: NOT APPLICABLE.** The TRD drafter never used ternary weights.
+      Its `#[cfg(feature = "plasma_path")]` gates in trd.rs are a misnamed
+      proxy for generic SIMD helpers (`simd_argmax_f32`, `simd_sum_f32`) —
+      those are unconditional in katgpt-core, not gated behind `plasma_path`.
+      The TRD code does probability-vector argmax and sum reduction, not
+      weight-matrix matvec. There is no `TernaryWeights` or
+      `simd_ternary_matvec` consumption to migrate. The `plasma_path = []`
+      in katgpt-speculative/Cargo.toml is literally an empty tracking flag
+      for dead-code stubs (per the Cargo.toml comment at line 144-152).
+      Nothing to migrate.
+- [x] **T3.2** `katgpt-forward/src/flashar_consensus.rs::ternary_fusion_gate`
       — evaluate binary fusion gate. Currently opt-in (demoted from default
       in Issue 136); binary may or may not change the verdict.
-- [ ] **T3.3** `riir-core-wasm` — the WASM edge gateway currently re-exports
+      **VERDICT: NO VALUE.** The `ternary_fusion_gate` operates on a 1×6
+      weight matrix (6 SamplerFeatures per position). At this scale: (a)
+      SIMD doesn't engage (below 4-8 elements → scalar path for both binary
+      and ternary), (b) storage saving is 6 bits per position (48 bytes per
+      64-position batch — negligible), (c) the FlashAR consensus feature is
+      already DEMOTED from default-on (Issue 136: KL 2.9-6.5 vs Leviathan
+      0.03). Adding a binary variant to a broken opt-in feature with a tiny
+      gate matrix adds no value. No migration.
+- [x] **T3.3** `riir-core-wasm` — the WASM edge gateway currently re-exports
       `plasma_path` (ternary). Binary is a better fit for edge (smaller
       binary size, simpler WASM-SIMD128 kernel). Evaluate re-exporting both.
-- [ ] **T3.4** `riir-examples/examples/` — the `plasma` feature gates
+      **VERDICT: IMPLEMENTED.** Added `binary_plasma` feature to
+      `riir-core-wasm` re-exporting `BinaryWeights` + `simd_binary_matvec` +
+      `binary_matvec_scalar`. Mini-GOAT: G1 correctness (binary scalar vs
+      SIMD parity, smoke test passes), G2 storage (1.82× smaller — the edge
+      value proposition), G3 no-regression (plasma_path ternary re-export
+      unchanged), G4 zero-alloc (structural), G5 modelless (PTQ). The
+      binary smoke test verifies SIMD matches scalar reference on a known
+      2×4 brain (all-positive row → 4.0, balanced row → 0.0).
+      Also fixed a pre-existing feature-combination bug: `BinaryWeights::
+      from_ternary_no_zeros` referenced `crate::TernaryWeights` unconditionally,
+      breaking `binary_plasma`-alone builds (without `plasma_path`). Fixed by
+      gating the method + its test behind `plasma_path` (the cross-format
+      bridge is only meaningful when both formats are available). This was
+      masked in Phase 1 because tests always ran with both features.
+- [x] **T3.4** `riir-examples/examples/` — the `plasma` feature gates
       PlasmaPath ternary draft models. Add a binary variant example.
+      **VERDICT: IMPLEMENTED.** Added `binary_plasma_demo.rs` example +
+      `plasma_binary` feature in riir-examples/Cargo.toml. Three-way
+      comparison: FP32 reference vs ternary (Hot) vs binary (Plasma) on
+      synthetic matrices at 256²/1024²/2048². Self-contained (no game draft
+      models — those would require BinaryDraftModel variants in riir-games,
+      which is out of scope for Issue 145). Reproduces Phase 1 GOAT numbers:
+      1024² binary=102.4µs vs ternary=125.1µs = 1.22× faster; storage ratio
+      0.554×. Shows quality tradeoff: binary cosine 0.70 vs ternary 0.81
+      (matches Bonsai's 89.5% vs 94.6% gap). Run:
+      `cargo run --example binary_plasma_demo --features plasma_binary --release`
 
 ## Decision gates
 

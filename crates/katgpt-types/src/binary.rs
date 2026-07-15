@@ -89,6 +89,13 @@ impl BinaryWeights {
     /// bit-identical to the ternary matvec (used by the T0.1 property test).
     ///
     /// Returns `None` if the ternary weights contain zeros (not a binary subset).
+    ///
+    /// Gated behind `plasma_path` in addition to `binary_plasma` because it
+    /// references `TernaryWeights` (the ternary substrate). A binary-only
+    /// consumer (e.g. WASM edge with `binary_plasma` alone) has no ternary
+    /// weights to convert from; this cross-format bridge is only meaningful
+    /// when both formats are available.
+    #[cfg(feature = "plasma_path")]
     pub fn from_ternary_no_zeros(
         ternary: &crate::TernaryWeights,
     ) -> Option<Self> {
@@ -280,6 +287,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "plasma_path")]
     fn test_from_ternary_no_zeros_rejects_zeros() {
         // Construct a ternary weights with a zero
         let mut tw = crate::TernaryWeights::new(1, 64);
