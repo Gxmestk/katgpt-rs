@@ -318,9 +318,8 @@ impl<P: Position> SpaceTimeGuidance<P> {
     /// can plan multi-step detours around collisions. The heuristic
     /// `h(pos,d) = BFS_dist(pos, goal)` is admissible (each remaining transition
     /// costs ≥ 1, so it never overestimates the true remaining cost).
-    fn astar_for_agent(&mut self, start: &P, goal: &P) -> Vec<P> {
+    fn astar_for_agent(&mut self, start: &P, goal: &P, alpha: f32) -> Vec<P> {
         let w = self.cfg.w_phi;
-        let alpha = self.cfg.alpha;
 
         // Compute BFS field first, then clone it out of self to avoid a borrow
         // conflict with the occupancy / neighbor lookups inside the search loop.
@@ -448,6 +447,92 @@ impl<P: Position> SpaceTimeGuidance<P> {
         }
         dist
     }
+
+    /// Compute guidance with a **per-agent** collision penalty `alpha`.
+    ///
+    /// This is the Super-GOAT fusion extension point (Plan 489 Phase 2 /
+    /// riir-ai/318 Extension A). Identical to
+    /// [`compute_guidance`](LocalGuidanceSource::compute_guidance) except each
+    /// agent `i` uses `alphas[i]` instead of the uniform `self.cfg.alpha`. The
+    /// occupancy / BFS cache / refinement-rounds logic is shared with the
+    /// uniform path — only the cost of collisions varies per agent.
+    ///
+    /// A private consumer (riir-ai's `HlaProjectedGuidance`) computes
+    /// `alphas[i] = alpha_base * (1 + beta * sigmoid(dot(HLA_i, D_frustration)))`
+    /// so frustrated NPCs take wider detours around occupied cells while calm
+    /// NPCs push through — the behavioral signature the G5 gate measures.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `alphas.len() != config.n_agents()`.
+    pub fn compute_guidance_per_agent_alpha(
+        &mut self,
+        config: &JointConfig<P>,
+        goals: &[P],
+        alphas: &[f32],
+        out: &mut Guidance<P>,
+    ) {
+        let n = config.n_agents();
+        assert_eq!(
+            alphas.len(),
+            n,
+            "compute_guidance_per_agent_alpha: alphas.len()={} but n_agents={}",
+            alphas.len(),
+            n
+        );
+        self.run_refinement(config, goals, out, move |i| alphas[i]);
+    }
+
+    /// Shared refinement-loop body for both the uniform-alpha trait impl and
+    /// the per-agent-alpha fusion method. `alpha_of(i)` returns the collision
+    /// penalty for agent `i`.
+    ///
+    /// This is the paper's sequential per-agent refinement (Algorithm 1):
+    /// `rounds` passes, each iterating all agents in order. Each agent's A*
+    /// sees the already-updated paths of earlier-in-the-round agents (via the
+    /// occupancy map). Between rounds, each agent's previous path is unrecorded
+    /// before re-planning so round 1+ improves on round 0.
+    fn run_refinement<F: Fn(usize) -> f32>(
+        &mut self,
+        config: &JointConfig<P>,
+        goals: &[P],
+        out: &mut Guidance<P>,
+        alpha_of: F,
+    ) {
+        let n = config.n_agents();
+        out.clear();
+        out.resize(n, Vec::new());
+
+        // BFS cache: persistent across ticks for amortization. Cleared only
+        // when it exceeds MAX_BFS_CACHE_ENTRIES (to bound memory).
+        if self.bfs_cache.len() > MAX_BFS_CACHE_ENTRIES {
+            self.bfs_cache.clear();
+        }
+
+        // Consume warm-start data (one-shot per tick). NOT seeded into the
+        // occupancy — Issue 142 found that warm-start forecasts HURT throughput
+        // because PIBT deviations invalidate them on dense maps.
+        let _warm_start = self.warm_start.take();
+
+        self.clear_occupancy();
+
+        let mut prev_paths: Vec<Vec<P>> = vec![Vec::new(); n];
+
+        for _round in 0..self.cfg.rounds {
+            for i in 0..n {
+                let agent = AgentId(i as u32);
+                let start = config.pos(agent).clone();
+                let goal = &goals[i];
+                let alpha = alpha_of(i);
+
+                self.unrecord_path(&prev_paths[i]);
+                let path = self.astar_for_agent(&start, goal, alpha);
+                self.record_path(&path);
+                prev_paths[i] = path.clone();
+                out[i] = path;
+            }
+        }
+    }
 }
 
 /// A* search node. Ordered so the `BinaryHeap` (max-heap) pops the
@@ -494,60 +579,12 @@ impl<P: Position> LocalGuidanceSource<P> for SpaceTimeGuidance<P> {
         goals: &[P],
         out: &mut Guidance<P>,
     ) {
-        let n = config.n_agents();
-        out.clear();
-        out.resize(n, Vec::new());
-
-        // BFS cache: persistent across ticks for amortization. Cleared only
-        // when it exceeds MAX_BFS_CACHE_ENTRIES (to bound memory). This gives
-        // ~10× amortization since most agents' goals persist for many ticks.
-        if self.bfs_cache.len() > MAX_BFS_CACHE_ENTRIES {
-            self.bfs_cache.clear();
-        }
-
-        // Consume warm-start data (one-shot per tick).
-        //
-        // Issue 142 finding: occupancy-seeding with warm-start forecasts HURTS
-        // throughput, even with the full A*. The forecast is invalidated when
-        // PIBT deviates from the guidance (common on dense maps), creating
-        // misleading phantom collision constraints that the A* routes around.
-        // LllgEmpty (no seeding) consistently outperforms LllgPi on our maps.
-        //
-        // The warm-start data is consumed (taken) to prevent stale leaks, but
-        // NOT seeded into the occupancy. This is the same finding as Issue 140
-        // but now confirmed with the full A*: the problem isn't the greedy
-        // rollout, it's that warm-start forecasts are too stale on dense maps.
-        // The paper's positive warm-start result likely depends on LaCAM
-        // escalation keeping forecasts accurate (fewer PIBT deviations).
-        let _warm_start = self.warm_start.take();
-
-        // Clear occupancy once. The refinement rounds below use
-        // unrecord/re-record so round 1+ actually improves on round 0 (the
-        // previous implementation cleared each round, making rounds no-ops).
-        self.clear_occupancy();
-
-        // `prev_paths` tracks what to unrecord for each agent before
-        // recomputing. Initialized empty (no warm-start seeding).
-        let mut prev_paths: Vec<Vec<P>> = vec![Vec::new(); n];
-
-        for _round in 0..self.cfg.rounds {
-            for i in 0..n {
-                let agent = AgentId(i as u32);
-                let start = config.pos(agent).clone();
-                let goal = &goals[i];
-
-                // Remove this agent's previous path so the A* doesn't see its
-                // own forecast/previous-round path as a collision.
-                self.unrecord_path(&prev_paths[i]);
-
-                let path = self.astar_for_agent(&start, goal);
-
-                // Record into occupancy (so later agents / later rounds see it).
-                self.record_path(&path);
-                prev_paths[i] = path.clone();
-                out[i] = path;
-            }
-        }
+        // Paper-faithful uniform alpha — delegates to the shared refinement
+        // loop with a constant closure. The closure captures `self.cfg.alpha`
+        // by copy (f32 is Copy), avoiding any borrow conflict with the mutable
+        // `self` methods called inside the loop.
+        let uniform_alpha = self.cfg.alpha;
+        self.run_refinement(config, goals, out, move |_i| uniform_alpha);
     }
 
     fn set_warm_start(&mut self, warm_start: Vec<Vec<P>>) {
