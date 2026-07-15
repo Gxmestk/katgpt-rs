@@ -16,6 +16,19 @@
 //! already-updated guidance) and repeated `m` rounds to reduce agent-order
 //! bias (paper default `m=2`).
 //!
+//! # Implementation (Issue 142)
+//!
+//! The per-agent search is a proper space-time A* over the `(position, depth)`
+//! state space with BFS-distance heuristic. This replaced a greedy rollout
+//! (Issue 140) that committed at each depth without backtracking and could
+//! neither plan multi-step detours nor consume the warm-start forecast.
+//!
+//! The multi-round refinement is implemented as unrecord/re-record: each
+//! agent removes its previous path from the shared occupancy, computes a fresh
+//! A* path seeing all other agents' most-recent paths, then records the new
+//! path. This makes `rounds > 1` actually improve results (round 1 agent 0
+//! sees round-0 paths of agents 1..n-1).
+//!
 //! # Pluggable seam
 //!
 //! [`LocalGuidanceSource`] is the primary extension point for the Super-GOAT
@@ -27,7 +40,7 @@
 use super::config::{AgentId, JointConfig};
 use super::position::Position;
 use std::cmp::Ordering;
-use std::collections::{HashMap, VecDeque};
+use std::collections::{BinaryHeap, HashMap, HashSet, VecDeque};
 
 /// Maximum number of cached BFS distance fields before the cache is cleared.
 /// Bounds memory to ~MAX × map_size × sizeof(GridPos + f32). For 800 agents
@@ -248,7 +261,6 @@ impl<P: Position> SpaceTimeGuidance<P> {
     /// Count collisions of a candidate cell `(pos, t_offset)` with the
     /// current occupancy map. This is `χ` from Eq. 1.
     #[inline]
-    #[allow(dead_code)]
     fn collision_count(&self, pos: &P, t: usize) -> u32 {
         if t >= 64 {
             return 0;
@@ -267,6 +279,23 @@ impl<P: Position> SpaceTimeGuidance<P> {
         }
     }
 
+    /// Remove an agent's path from the occupancy map (inverse of `record_path`).
+    ///
+    /// Used by the unrecord/re-record refinement loop so each agent sees the
+    /// most-recent paths of all *other* agents (and its own previous path is
+    /// removed to avoid self-collision). Saturating subtraction keeps counts
+    /// non-negative so a stray double-unrecord is a no-op rather than panic.
+    fn unrecord_path(&mut self, path: &[P]) {
+        for (t, pos) in path.iter().enumerate() {
+            if t >= 64 {
+                break;
+            }
+            if let Some(slot) = self.occupancy.get_mut(pos) {
+                slot[t] = slot[t].saturating_sub(1);
+            }
+        }
+    }
+
     /// Clear occupancy for a fresh round.
     fn clear_occupancy(&mut self) {
         for arr in self.occupancy.values_mut() {
@@ -274,45 +303,115 @@ impl<P: Position> SpaceTimeGuidance<P> {
         }
     }
 
-    /// Space-time A* for a single agent.
+    /// Space-time A* for a single agent (Issue 142).
     ///
-    /// Returns the best `w_Φ`-step path (positions at t+1..t+w_Φ). The path
-    /// minimizes Eq. 1 cost.
+    /// Searches the `(position, depth)` state space with BFS-distance heuristic.
+    /// Returns the best `w_Φ`-step path (positions at t+1..t+w_Φ) minimizing
+    /// Eq. 1 cost:
     ///
-    /// Phase 2 upgrade: uses BFS distance fields for the goal heuristic
-    /// (fixes the Phase 1 bug where Manhattan distance led agents into dead
-    /// ends on obstacle-heavy maps). The greedy rollout follows the BFS
-    /// gradient toward the goal while avoiding collisions via the occupancy
-    /// map.
+    /// ```text
+    /// cost(π) = Σ_t (1 + α·χ(π[t], t))   // transition cost (collisions penalized)
+    ///         + dist(π[w_Φ], goal)        // goal-reach term (h at depth w)
+    /// ```
+    ///
+    /// Unlike the greedy rollout it replaces, the A* has w-step lookahead and
+    /// can plan multi-step detours around collisions. The heuristic
+    /// `h(pos,d) = BFS_dist(pos, goal)` is admissible (each remaining transition
+    /// costs ≥ 1, so it never overestimates the true remaining cost).
     fn astar_for_agent(&mut self, start: &P, goal: &P) -> Vec<P> {
-        // Compute BFS field first, then clone it out of self to avoid borrow conflict
-        // with the occupancy lookups in the rollout below.
-        let bfs = self.bfs_distance_field(goal).clone();
         let w = self.cfg.w_phi;
         let alpha = self.cfg.alpha;
-        let mut path = Vec::with_capacity(w);
-        let mut current = start.clone();
-        let mut visited: HashMap<P, u32> = HashMap::new();
-        for t in 0..w {
-            let neighbors = self.neighbors_of(&current);
-            // Capture only the values we need from self to avoid borrow conflicts.
-            let occupancy = &self.occupancy;
-            let best = neighbors
-                .iter()
-                .min_by(|a, b| {
-                    let cost_a = step_cost_bfs(*a, &bfs, occupancy, alpha, t)
-                        + cycle_penalty(*a, &visited, w);
-                    let cost_b = step_cost_bfs(*b, &bfs, occupancy, alpha, t)
-                        + cycle_penalty(*b, &visited, w);
-                    cost_a.partial_cmp(&cost_b).unwrap_or(Ordering::Equal)
-                })
-                .cloned()
-                .unwrap_or_else(|| current.clone());
-            *visited.entry(best.clone()).or_insert(0) += 1;
-            path.push(best.clone());
-            current = best;
+
+        // Compute BFS field first, then clone it out of self to avoid a borrow
+        // conflict with the occupancy / neighbor lookups inside the search loop.
+        let bfs = self.bfs_distance_field(goal).clone();
+
+        // Unreachable goal: no BFS entry for start. Wait in place.
+        let start_h = bfs.get(start).copied().unwrap_or(f32::MAX);
+        if start_h == f32::MAX {
+            return vec![start.clone(); w];
         }
-        path
+
+        let mut g_score: HashMap<(P, u8), f32> = HashMap::new();
+        let mut came_from: HashMap<(P, u8), (P, u8)> = HashMap::new();
+        let mut open: BinaryHeap<AstarNode<P>> = BinaryHeap::new();
+        let mut closed: HashSet<(P, u8)> = HashSet::new();
+
+        g_score.insert((start.clone(), 0), 0.0);
+        open.push(AstarNode {
+            f: start_h,
+            depth: 0,
+            pos: start.clone(),
+        });
+
+        let w_u8 = w as u8;
+        let mut best_goal: Option<(P, u8)> = None;
+
+        while let Some(node) = open.pop() {
+            let depth = node.depth;
+            let pos = node.pos.clone();
+
+            // Skip already-expanded states.
+            if !closed.insert((pos.clone(), depth)) {
+                continue;
+            }
+
+            // Goal test: reached the planning horizon.
+            if depth == w_u8 {
+                best_goal = Some((pos, depth));
+                break;
+            }
+
+            // g must exist (we pushed the node with this g).
+            let g = g_score[&(pos.clone(), depth)];
+
+            for neighbor in self.neighbors_of(&pos) {
+                let new_depth = depth + 1;
+                let key = (neighbor.clone(), new_depth);
+
+                if closed.contains(&key) {
+                    continue;
+                }
+
+                let h = bfs.get(&neighbor).copied().unwrap_or(f32::MAX);
+                if h == f32::MAX {
+                    continue; // unreachable neighbor
+                }
+
+                let chi = self.collision_count(&neighbor, depth as usize);
+                let tentative_g = g + 1.0 + alpha * chi as f32;
+
+                let known_g = g_score.get(&key).copied().unwrap_or(f32::MAX);
+                if tentative_g < known_g {
+                    g_score.insert(key.clone(), tentative_g);
+                    came_from.insert(key.clone(), (pos.clone(), depth));
+                    open.push(AstarNode {
+                        f: tentative_g + h,
+                        depth: new_depth,
+                        pos: neighbor,
+                    });
+                }
+            }
+        }
+
+        match best_goal {
+            Some((end_pos, end_depth)) => {
+                let mut path = Vec::with_capacity(w);
+                let mut current = (end_pos, end_depth);
+                while current.1 > 0 {
+                    path.push(current.0.clone());
+                    let prev = came_from.get(&current).expect("came_from chain must be complete");
+                    current = prev.clone();
+                }
+                path.reverse();
+                // Pad to w in the pathological case the search returned early.
+                while path.len() < w {
+                    path.push(path.last().cloned().unwrap_or_else(|| start.clone()));
+                }
+                path
+            }
+            None => vec![start.clone(); w],
+        }
     }
 
     /// Compute or retrieve the BFS distance field from `goal`.
@@ -351,36 +450,41 @@ impl<P: Position> SpaceTimeGuidance<P> {
     }
 }
 
-/// Eq. 1 per-step cost using BFS distance (free function to avoid borrow conflicts).
+/// A* search node. Ordered so the `BinaryHeap` (max-heap) pops the
+/// smallest `f` first, breaking ties toward shallower depth (progress).
 ///
-/// Replaces the Manhattan-distance heuristic with true BFS distance to
-/// the goal. This is the difference that fixes obstacle-heavy maps.
-#[inline]
-fn step_cost_bfs<P: Position>(
-    next: &P,
-    bfs: &HashMap<P, f32>,
-    occupancy: &HashMap<P, [u32; 64]>,
-    alpha: f32,
-    t: usize,
-) -> f32 {
-    let chi = if t >= 64 {
-        0
-    } else {
-        occupancy.get(next).map_or(0, |arr| arr[t])
-    };
-    let collision_cost = if chi > 0 {
-        chi as f32 * (1.0 + alpha)
-    } else {
-        0.0
-    };
-    let goal_dist = bfs.get(next).copied().unwrap_or(f32::MAX);
-    collision_cost + goal_dist
+/// Position `P` is intentionally excluded from the `Ord` comparison: the
+/// heap never needs to compare positions (only `f`/`depth` drive ordering),
+/// and excluding `P` lets this work for any `Position` without an `Ord` bound.
+struct AstarNode<P> {
+    f: f32,
+    depth: u8,
+    pos: P,
 }
 
-/// Anti-cycling penalty (free function to avoid borrow conflicts).
-#[inline]
-fn cycle_penalty<P: Position>(pos: &P, visited: &HashMap<P, u32>, w: usize) -> f32 {
-    visited.get(pos).map_or(0.0, |&n| n as f32 * w as f32)
+impl<P> PartialEq for AstarNode<P> {
+    fn eq(&self, other: &Self) -> bool {
+        self.f == other.f && self.depth == other.depth
+    }
+}
+impl<P> Eq for AstarNode<P> {}
+
+impl<P> PartialOrd for AstarNode<P> {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl<P> Ord for AstarNode<P> {
+    fn cmp(&self, other: &Self) -> Ordering {
+        // BinaryHeap is a max-heap: reverse the natural f/depth comparisons so
+        // the smallest f (then smallest depth) bubbles to the top.
+        other
+            .f
+            .partial_cmp(&self.f)
+            .unwrap_or(Ordering::Equal)
+            .then_with(|| other.depth.cmp(&self.depth))
+    }
 }
 
 impl<P: Position> LocalGuidanceSource<P> for SpaceTimeGuidance<P> {
@@ -401,24 +505,46 @@ impl<P: Position> LocalGuidanceSource<P> for SpaceTimeGuidance<P> {
             self.bfs_cache.clear();
         }
 
-        // Consume warm-start data (one-shot per tick). The data is stored via
-        // `set_warm_start` for future use when the guidance source is upgraded
-        // to full space-time A*. The greedy rollout used here does not benefit
-        // from warm-start seeding — occupancy-seeding causes agents to avoid
-        // forecast cells, creating cascading stalls that collapse throughput
-        // (see Issue 140 T2 benchmark analysis). The warm-start infrastructure
-        // is in place; consumption is deferred to the full A* upgrade.
+        // Consume warm-start data (one-shot per tick).
+        //
+        // Issue 142 finding: occupancy-seeding with warm-start forecasts HURTS
+        // throughput, even with the full A*. The forecast is invalidated when
+        // PIBT deviates from the guidance (common on dense maps), creating
+        // misleading phantom collision constraints that the A* routes around.
+        // LllgEmpty (no seeding) consistently outperforms LllgPi on our maps.
+        //
+        // The warm-start data is consumed (taken) to prevent stale leaks, but
+        // NOT seeded into the occupancy. This is the same finding as Issue 140
+        // but now confirmed with the full A*: the problem isn't the greedy
+        // rollout, it's that warm-start forecasts are too stale on dense maps.
+        // The paper's positive warm-start result likely depends on LaCAM
+        // escalation keeping forecasts accurate (fewer PIBT deviations).
         let _warm_start = self.warm_start.take();
 
+        // Clear occupancy once. The refinement rounds below use
+        // unrecord/re-record so round 1+ actually improves on round 0 (the
+        // previous implementation cleared each round, making rounds no-ops).
+        self.clear_occupancy();
+
+        // `prev_paths` tracks what to unrecord for each agent before
+        // recomputing. Initialized empty (no warm-start seeding).
+        let mut prev_paths: Vec<Vec<P>> = vec![Vec::new(); n];
+
         for _round in 0..self.cfg.rounds {
-            self.clear_occupancy();
             for i in 0..n {
                 let agent = AgentId(i as u32);
                 let start = config.pos(agent).clone();
                 let goal = &goals[i];
+
+                // Remove this agent's previous path so the A* doesn't see its
+                // own forecast/previous-round path as a collision.
+                self.unrecord_path(&prev_paths[i]);
+
                 let path = self.astar_for_agent(&start, goal);
-                // Record into occupancy (so later agents see this path).
+
+                // Record into occupancy (so later agents / later rounds see it).
                 self.record_path(&path);
+                prev_paths[i] = path.clone();
                 out[i] = path;
             }
         }

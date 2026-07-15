@@ -704,9 +704,8 @@ fn main() {
         println!("The substrate has algorithmic gaps that need upgrading before");
         println!("promotion. See FAIL details above for specific issues.");
         println!();
-        println!("This is the expected outcome for Phase 2's first benchmark run —");
-        println!("the substrate uses greedy guidance (not full space-time A*) and");
-        println!("greedy PIBT (not priority inheritance with backtracking).");
-        println!("The GOAT gate honestly identifies these gaps.");
+        println!("G1: 3/4 maps pass (A* guidance, Issue 142). ht_chantry needs LaCAM.");
+        println!("G2: warm-start consumption confirmed harmful without LaCAM (Issue 142).");
+        println!("The GOAT gate honestly identifies the remaining gaps.");
     }
 }

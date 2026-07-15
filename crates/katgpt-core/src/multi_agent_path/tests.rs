@@ -426,25 +426,26 @@ fn test_pibt_chain_push_in_line() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────
-// Issue 140 T2 — Warm-start integration (infrastructure landed, consumption deferred)
+// Issue 140/142 — Warm-start infrastructure + consumption findings
 // ─────────────────────────────────────────────────────────────────────────
 //
-// The warm-start integration was implemented (set_warm_start trait method,
-// SpaceTimeGuidance stores the data, tick() threads it through). However,
-// benchmark testing revealed that consuming the warm-start by seeding the
-// occupancy map COLLAPSES throughput (from 17.3 to 0.47 on empty-48-48) —
-// the greedy rollout can't handle the forecast collision constraints.
+// The warm-start infrastructure (set_warm_start trait method, storage,
+// tick() threading) was landed in Issue 140. Issue 142 confirmed via the full
+// space-time A* that occupancy-seeding with warm-start forecasts HURTS
+// throughput even with proper A* lookahead — the forecast is invalidated
+// when PIBT deviates from the guidance (common on dense maps), creating
+// misleading phantom collision constraints. LllgEmpty consistently
+// outperforms LllgPi on our synthetic maps. The paper's positive result
+// likely depends on LaCAM escalation keeping forecasts accurate.
 //
-// The warm-start infrastructure is in place for when the guidance source is
-// upgraded to full space-time A* (where warm-start provides the initial bound
-// for pruning). Until then, the data is stored but not consumed. LllgPi and
-// LllgEmpty produce identical results with the greedy rollout.
+// The data is consumed (taken/cleared) to prevent stale leaks but NOT seeded
+// into the occupancy. LllgPi and LllgEmpty produce identical results.
 
 /// The warm-start integration must actually accept the data on the guidance
 /// source. Verifies that `set_warm_start` stores the data and that
 /// `compute_guidance` consumes it (one-shot). The data is consumed (cleared)
-/// even though the greedy rollout doesn't use it — this ensures no stale data
-/// leaks across ticks.
+/// even though it's not seeded into the occupancy (Issue 142 finding) — this
+/// ensures no stale data leaks across ticks.
 #[test]
 fn test_set_warm_start_consumed_once() {
     let map = GridMap::empty(5, 5);
@@ -473,4 +474,83 @@ fn test_set_warm_start_consumed_once() {
         baseline_len, after_len,
         "warm-start should be one-shot — second compute_guidance without set should match baseline"
     );
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Issue 142 — Space-time A* guidance (replaces greedy rollout)
+// ─────────────────────────────────────────────────────────────────────────
+
+/// The A* guidance must produce valid w_Φ-length paths for each agent.
+/// Each path should have exactly w_Φ entries (positions at t+1..t+w_Φ).
+#[test]
+fn test_astar_guidance_path_length() {
+    let map = GridMap::empty(10, 10);
+    let cfg = GuidanceConfig { w_phi: 5, alpha: 1.0, rounds: 2 };
+    let mut guidance = make_guidance(&map, cfg);
+    let config = JointConfig::new(vec![
+        GridPos::new(0, 0),
+        GridPos::new(9, 9),
+    ]);
+    let goals = vec![GridPos::new(9, 9), GridPos::new(0, 0)];
+    let mut out = Vec::new();
+    guidance.compute_guidance(&config, &goals, &mut out);
+
+    assert_eq!(out.len(), 2, "one path per agent");
+    for (i, path) in out.iter().enumerate() {
+        assert_eq!(
+            path.len(),
+            cfg.w_phi,
+            "agent {i} path must be exactly w_Φ={} steps, got {}",
+            cfg.w_phi,
+            path.len()
+        );
+    }
+}
+
+/// The A* guidance should navigate toward the goal: the last position of each
+/// agent's path should be closer (BFS distance) to the goal than the start.
+#[test]
+fn test_astar_guidance_moves_toward_goal() {
+    let map = GridMap::empty(10, 10);
+    let cfg = GuidanceConfig { w_phi: 5, alpha: 1.0, rounds: 1 };
+    let mut guidance = make_guidance(&map, cfg);
+    let start_a = GridPos::new(0, 0);
+    let goal_a = GridPos::new(9, 9);
+    let config = JointConfig::new(vec![start_a]);
+    let goals = vec![goal_a];
+    let mut out = Vec::new();
+    guidance.compute_guidance(&config, &goals, &mut out);
+
+    let path = &out[0];
+    assert!(!path.is_empty());
+    let end = path.last().unwrap();
+    let start_dist = start_a.dist_heuristic(&goal_a);
+    let end_dist = end.dist_heuristic(&goal_a);
+    assert!(
+        end_dist < start_dist,
+        "A* should move toward goal: start dist={start_dist}, end dist={end_dist}"
+    );
+}
+
+/// The A* must respect walls: no path position should be a wall cell.
+#[test]
+fn test_astar_guidance_respects_walls() {
+    let mut map = GridMap::empty(10, 10);
+    // Wall at (5, 0) — blocks the direct path from (0,0) to (9,0).
+    map.set_wall(5, 0);
+    map.set_wall(5, 1);
+    map.set_wall(5, 2);
+    let cfg = GuidanceConfig::default();
+    let mut guidance = make_guidance(&map, cfg);
+    let config = JointConfig::new(vec![GridPos::new(0, 0)]);
+    let goals = vec![GridPos::new(9, 0)];
+    let mut out = Vec::new();
+    guidance.compute_guidance(&config, &goals, &mut out);
+
+    for (t, pos) in out[0].iter().enumerate() {
+        assert!(
+            map.is_passable(pos.x, pos.y),
+            "path position at t={t} is a wall: {pos:?}"
+        );
+    }
 }

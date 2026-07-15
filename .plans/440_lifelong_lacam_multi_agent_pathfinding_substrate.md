@@ -110,18 +110,21 @@ See `.benchmarks/440_lllg_paper_repro_goat.md` for full results.
 
 | Gate | Status | Detail |
 |---|---|---|
-| G1 (throughput) | **PARTIAL (2/4)** | empty-48-48 ratio 0.63 ✅, random-64-64-10 ratio 0.62 ✅, warehouse ratio 0.35 ❌, ht_chantry ratio 0.01 ❌ |
-| G2 (congestion) | **FAIL** | Warm-start not integrated — LLLG_Π and LllgEmpty produce identical results |
-| G3 (no-regression) | **PASS** | 1556/1556 tests pass, clippy clean on all-features |
-| G4 (latency) | **PASS** | 80ms median at 1000 agents (target <500ms, stretch <100ms). Paper: 210-260ms |
+| G1 (throughput) | **PARTIAL (3/4)** | empty-48-48 ratio 0.68 ✅, random-64-64-10 ratio 0.69 ✅, warehouse ratio 0.39 ✅, ht_chantry ratio 0.01 ❌ |
+| G2 (congestion) | **FAIL** | Warm-start occupancy-seeding confirmed harmful even with full A* (Issue 142). LllgPi = LllgEmpty |
+| G3 (no-regression) | **PASS** | 1578/1578 tests pass (with feature), 1556/1556 (without). Clippy clean on all-features |
+| G4 (latency) | **PASS** | 87.83ms median at 1000 agents (target <500ms, stretch <100ms). Paper: 210-260ms |
 
 ### Substrate upgrades applied during Phase 2
 
 1. **PIBT wall-aware neighbors** — fixed `tick()` passing `None` to PIBT.
 2. **BFS distance fields** — replaced Manhattan distance with BFS flood-fill
-   for true shortest-path distance around obstacles. 15× throughput
-   improvement on random-64-64-10.
-3. **Guidance goal pull** — fixed 0.1→ full distance.
+   for true shortest-path distance around obstacles.
+3. **Full space-time A*** (Issue 142) — replaced the greedy rollout with a
+   proper priority-queue A* over `(position, depth)` state space with
+   BFS-distance heuristic. Throughput improved +7-11% across all maps.
+4. **Multi-round refinement fixed** (Issue 142) — unrecord/re-record instead
+   of clear-each-round, making `rounds > 1` actually improve results.
 
 ### Tasks
 
@@ -146,12 +149,13 @@ See `.benchmarks/440_lllg_paper_repro_goat.md` for full results.
 
 ### Blocking items for G1/G2 full pass
 
-1. **PIBT priority inheritance** — the single most impactful fix for warehouse/
-   ht_chantry. Real PIBT recursively resolves conflicts by forcing
-   lower-priority agents to move when a higher-priority agent claims their
-   cell. ~200 lines of recursive backtracking in `pibt.rs`.
-2. **Warm-start integration** — thread warm-start data into
-   `SpaceTimeGuidance::compute_guidance`. ~50 lines.
+1. **LaCAM escalation** (Phase 5) — the single blocker for ht_chantry (G1)
+   and warm-start consumption (G2). When PIBT fails to resolve a conflict,
+   LaCAM escalates to a full search. This also unblocks PIBT priority
+   inheritance (Issue 140 showed recursive push collapses throughput
+   without LaCAM fallback).
+2. **Real MovingAI maps** — synthetic approximations may differ from the
+   actual warehouse/ht_chantry topology.
 
 ### Acceptance
 
