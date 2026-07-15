@@ -67,7 +67,7 @@ path.
 
 These are **NOT** the same as the various `lora_final.bin` files scattered
 across `riir-ai/output/`. Per
-`riir-train/.docs/09_training_data_pipeline.md:376`
+`riir-train/.docs/02_pipelines/training_data_pipeline.md:376`
 (`cp output/lora_final.bin raw/game_lora.bin`), the convention is:
 
 ```
