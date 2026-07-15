@@ -59,6 +59,11 @@ sparse_mlp = []
 # Bit-plane ternary weights for multiplication-free inference (Plan 148).
 plasma_path = []
 
+# Binary {−1,+1} plasma tier — single bit-plane, group-wise FP16 scale (Issue 145).
+# Strict subset of ternary encoding (pos_bits = sign_bits, neg_bits = !sign_bits).
+# The new Plasma tier; ternary moves to Hot. Opt-in until GOAT gate passes.
+binary_plasma = []
+
 # MaxSim late-interaction scoring (Plan 080, Research 073).
 maxsim = []
 

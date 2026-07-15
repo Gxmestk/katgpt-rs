@@ -6,7 +6,10 @@ use rayon::prelude::*;
 // / `MultiLayerKVCache` / `PagedKVCache` / `RavenKVCache` / `PrefillContext`
 // / `WallPrefixState` / `GateStatistics` / `MtpProjection` / `load_mtp_projection`
 // / `project_target_activation` / `preload_kv_cache` / `ContiguousWeights`
-// / `load_ternary_bits` / `DecodeStage` callers resolve unchanged.
+// / `load_ternary_bits` / `load_binary_bits` (Issue 145) / `DecodeStage`
+// callers resolve unchanged.
+#[cfg(feature = "binary_plasma")]
+pub use katgpt_transformer::load_binary_bits;
 pub use katgpt_transformer::{
     ContiguousWeights, DecodeStage, GateStatistics, KVCache, KVLayerSnapshot, KVSnapshot,
     LayerWeights, MtpProjection, MultiLayerKVCache, PagedKVCache, PrefillContext, RavenKVCache,

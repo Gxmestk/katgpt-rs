@@ -525,6 +525,11 @@ pub use simd::{simd_ternary_matmul_batch, simd_ternary_matvec, ternary_matvec_sc
 #[cfg(feature = "plasma_path")]
 pub use types::TernaryWeights;
 
+#[cfg(feature = "binary_plasma")]
+pub use simd::{binary_matvec_scalar, simd_binary_matmul_batch, simd_binary_matvec};
+#[cfg(feature = "binary_plasma")]
+pub use types::{BinaryWeights, GROUP_SIZE as BINARY_GROUP_SIZE};
+
 #[cfg(feature = "peira_distill")]
 pub mod peira;
 #[cfg(feature = "peira_distill")]

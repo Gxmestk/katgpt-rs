@@ -79,6 +79,9 @@ pub mod simd;
 pub mod slod;
 pub mod temporal;
 mod ternary;
+/// Binary `{-1,+1}` bit-plane packed weights (Issue 145, `binary_plasma` feature).
+#[cfg(feature = "binary_plasma")]
+pub mod binary;
 
 #[cfg(test)]
 mod tests_types;
@@ -133,6 +136,8 @@ pub use slod::ScaleBoundary;
 pub use temporal::{TemporalDerivativeKernel, sigmoid_surprise_gate};
 #[cfg(feature = "plasma_path")]
 pub use ternary::TernaryWeights;
+#[cfg(feature = "binary_plasma")]
+pub use binary::{BinaryWeights, GROUP_SIZE};
 
 // Internal helpers (read_u32_le / read_f32_le / read_u16_le) live in
 // `domain.rs` and are crate-private — not re-exported here. If other modules

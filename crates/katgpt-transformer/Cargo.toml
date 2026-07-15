@@ -22,6 +22,8 @@ bytemuck = { version = "1", features = ["derive", "extern_crate_alloc"] }  # ext
 arrayvec = "0.7"
 # Phase 9: dense_mesh's edge_bandit + edge_projection use fastrand.
 fastrand = "2"
+# Issue 145: load_binary_bits constructs half::f16 group scales directly.
+half = "2"
 
 [features]
 # All features default-on to match the historical katgpt-rs root behavior —
@@ -50,6 +52,10 @@ decode_specialize = []
 # Bit-plane ternary SIMD matvec loader (Plan 148, Research 110).
 # Gates: load_ternary_bits function in contiguous.rs.
 plasma_path = []
+
+# Binary plasma loader (Issue 145, Bonsai 27B). Gates: load_binary_bits in contiguous.rs.
+# Forwards to katgpt-core so BinaryWeights resolves.
+binary_plasma = ["katgpt-core/binary_plasma"]
 
 # ── Phase 9 absorptions (Proposal 003) — modules moved from katgpt-rs root ──
 

@@ -48,6 +48,9 @@ mod maxsim;
 mod research;
 mod sparse;
 mod ternary;
+/// Binary matvec kernels (`binary_plasma` feature, Issue 145).
+#[cfg(feature = "binary_plasma")]
+pub mod binary;
 
 #[cfg(test)]
 mod tests;
@@ -109,6 +112,8 @@ pub use research::{
 pub use research::{compute_retrieval_margin, dim_sufficiency_bound, sigmoid_margin_loss};
 pub use sparse::{simd_sparse_dot_f32, simd_sparse_matmul_rows};
 pub use ternary::simd_ternary_dot_f32;
+#[cfg(feature = "binary_plasma")]
+pub use binary::{binary_matvec_scalar, simd_binary_matmul_batch, simd_binary_matvec};
 #[cfg(feature = "plasma_path")]
 pub use ternary::{
     project_ternary_simd, project_ternary_simd_scalar, simd_ternary_matmul_batch,

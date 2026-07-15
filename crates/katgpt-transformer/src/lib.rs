@@ -47,6 +47,10 @@ pub use weights::{LayerWeights, TransformerWeights};
 #[cfg(feature = "plasma_path")]
 pub use contiguous::load_ternary_bits;
 
+// Contiguous binary loader (Issue 145, gated `binary_plasma`).
+#[cfg(feature = "binary_plasma")]
+pub use contiguous::load_binary_bits;
+
 // Decode stage for specialized forward paths (Plan 102: TileRT pipeline).
 /// Different stages have different optimization opportunities:
 /// - Draft: can skip screening, reduced KV writes, approximate attention
