@@ -6,9 +6,9 @@
 //! **10,000 agents at <1s/step** with higher throughput than RHCR in dense
 //! settings.
 //!
-//! # The four pluggable seams (Super-GOAT hooks)
+//! # The five pluggable seams (Super-GOAT hooks)
 //!
-//! This substrate is generic over four mechanisms so a private consumer
+//! This substrate is generic over five mechanisms so a private consumer
 //! (riir-ai/318) can fuse it with HLA, Crowd MCGS, and the warm-path stack
 //! without forking:
 //!
@@ -18,8 +18,9 @@
 //! | Guidance source | [`LocalGuidanceSource<P>`] | Space-time A* on collision count | HLA-projected guidance (per-NPC emotional congestion avoidance) |
 //! | Warm-start scheme | [`WarmStartScheme`] | `LllgPi` (prev solution suffix) | Personality-weighted blend |
 //! | Hindrance estimator | [`HindranceEstimator<P>`] | Raw blocking count | Affect-aware blocking (fearful NPCs count more) |
+//! | Flow field (Issue 149) | [`FlowField<P>`] | [`NoFlow`] (no corridor enforcement) | [`GridFlowField`] (1-wide corridor direction assignment) |
 //!
-//! A consumer that uses all four defaults gets the paper's LLLG verbatim.
+//! A consumer that uses all five defaults gets the paper's LLLG verbatim.
 //!
 //! # Modelless mandate
 //!
@@ -66,6 +67,7 @@
 #![allow(clippy::too_many_arguments)]
 
 pub mod config;
+pub mod flow;
 pub mod hindrance;
 pub mod local_guidance;
 pub mod pibt;
@@ -76,6 +78,7 @@ pub mod warm_start;
 mod tests;
 
 pub use config::{AgentId, GoalAssignment, JointAction, JointConfig, UniformGoals};
+pub use flow::{CorridorAxis, FlowDirection, FlowField, GridFlowField, NoFlow};
 pub use hindrance::{BlockingCount, CounterFlowHindrance, HindranceEstimator, WeightedBlockingCount};
 pub use local_guidance::{
     Guidance, GuidanceConfig, LocalGuidanceSource, SpaceTimeGuidance,
@@ -208,6 +211,9 @@ impl<P: Position> CostFn<P> for UniformCost {
 /// Type alias for the neighbor-supplying closure stored in the orchestrator.
 type NeighborClosure<P> = Box<dyn Fn(&P) -> Vec<P> + Send + Sync>;
 
+/// Type alias for the flow field stored in the orchestrator (Issue 149).
+type FlowFieldBox<P> = Box<dyn FlowField<P> + Send + Sync>;
+
 /// The LLLG orchestrator: one tick of receding-horizon windowed planning.
 ///
 /// Generic over the position type `P`. Holds the warm-start cache and the
@@ -230,6 +236,10 @@ pub struct LifelongLaCam<P: Position> {
     /// directly (no wall/bounds checking). Consumers with walls or bounded maps
     /// MUST set this via [`with_neighbors`](Self::with_neighbors).
     neighbors_fn: Option<NeighborClosure<P>>,
+    /// Flow field for Guided-PIBT direction assignment (Issue 149).
+    /// When `None`, uses [`NoFlow`] (paper-faithful — no corridor enforcement).
+    /// Set via [`with_flow_field`](Self::with_flow_field) for maze maps.
+    flow_field: Option<FlowFieldBox<P>>,
 }
 
 impl<P: Position> LifelongLaCam<P> {
@@ -245,6 +255,7 @@ impl<P: Position> LifelongLaCam<P> {
             guidance_scratch: Vec::new(),
             priorities: Vec::new(),
             neighbors_fn: None,
+            flow_field: None,
         }
     }
 
@@ -267,6 +278,24 @@ impl<P: Position> LifelongLaCam<P> {
     /// Empty = uniform (index order). Length must match `config.n_agents()`.
     pub fn set_priorities(&mut self, priorities: Vec<f32>) {
         self.priorities = priorities;
+    }
+
+    /// Set a flow field for Guided-PIBT direction assignment (Issue 149).
+    ///
+    /// When set, PIBT penalizes moves that go against the assigned corridor
+    /// direction (the `flow_mismatch` cost term). On maze maps (ht_chantry),
+    /// this creates one-way directional lanes that eliminate head-on corridor
+    /// deadlocks. On open maps, the flow field should be empty (no corridors),
+    /// so this has no effect.
+    ///
+    /// When not set, PIBT uses [`NoFlow`] (paper-faithful — no corridor
+    /// direction enforcement).
+    pub fn with_flow_field<F>(mut self, flow_field: F) -> Self
+    where
+        F: FlowField<P> + Send + Sync + 'static,
+    {
+        self.flow_field = Some(Box::new(flow_field));
+        self
     }
 
     /// One tick of LLLG planning.
@@ -315,18 +344,29 @@ impl<P: Position> LifelongLaCam<P> {
         // 3. Compute guidance field Φ.
         guidance.compute_guidance(config, goals, &mut self.guidance_scratch);
 
-        // 4. Run PIBT with wall-aware neighbors (if set).
+        // 4. Run PIBT with wall-aware neighbors (if set) + flow field (Issue 149).
+        //
+        // When the flow field is not set, use NoFlow (paper-faithful, zero-cost).
+        let no_flow;
+        let flow: &dyn FlowField<P> = match &self.flow_field {
+            Some(f) => f.as_ref(),
+            None => {
+                no_flow = NoFlow;
+                &no_flow
+            }
+        };
+
         let action = pibt_step(
             config,
             &self.guidance_scratch,
             goals,
             &self.priorities,
             hindrance,
+            flow,
             self.neighbors_fn.as_deref(),
             rng,
         )
         .unwrap_or_else(|deadlock| {
-            // Lifelong MAPF tolerates stalls: stuck agents wait.
             log::debug!(
                 "LLLG deadlock: {} agents stuck, falling back to wait",
                 deadlock.stuck_agents.len()

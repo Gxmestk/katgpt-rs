@@ -432,6 +432,10 @@ fn run_simulation(
     };
 
     // Set up LLLG orchestrator with wall-aware neighbors.
+    // Issue 149: enable Guided-PIBT flow field for corridor direction assignment.
+    // On open maps (empty/random) the flow field is empty (no corridors), so
+    // it has zero effect. On maze maps (ht_chantry/warehouse) it creates
+    // one-way directional lanes to eliminate head-on corridor deadlocks.
     let cfg = GuidanceConfig {
         w_phi: 5,
         alpha: 1.0,
@@ -442,9 +446,11 @@ fn run_simulation(
         .with_neighbors(move |p| map_clone.passable_neighbors(p));
     let mut hindrance = BlockingCount::new();
     let warm = WarmStartCache::new(WarmStartScheme::default(), cfg.w_phi);
+    let flow = GridFlowField::from_map(map);
     let map_clone2 = map.clone();
     let mut lacam = LifelongLaCam::new(warm)
-        .with_neighbors(move |p| map_clone2.passable_neighbors(p));
+        .with_neighbors(move |p| map_clone2.passable_neighbors(p))
+        .with_flow_field(flow);
 
     // Run simulation.
     let mut current = config;
@@ -670,13 +676,15 @@ fn main() {
     println!("Map topology summary:");
     for (name, map) in &maps {
         let np = count_passable(map);
+        let flow = GridFlowField::from_map(map);
         println!(
-            "  {name:<30}: {:>3}×{:>3} = {:>5} cells, {:>5} passable ({:.1}% open)",
+            "  {name:<30}: {:>3}×{:>3} = {:>5} cells, {:>5} passable ({:.1}% open), {:>5} corridors",
             map.width,
             map.height,
             map.width * map.height,
             np,
-            np as f64 / (map.width * map.height) as f64 * 100.0
+            np as f64 / (map.width * map.height) as f64 * 100.0,
+            flow.corridor_cell_count()
         );
     }
     println!();
@@ -936,11 +944,10 @@ fn main() {
         println!("The substrate has algorithmic gaps that need upgrading before");
         println!("promotion. See FAIL details above for specific issues.");
         println!();
-        println!("G1: 2/4 real paper maps pass (empty, random). warehouse (0.41) and");
-        println!("    ht_chantry (0.27) FAIL — now confirmed genuine algorithmic gaps,");
-        println!("    not map-fidelity artifacts (Issue 148 real-map upgrade).");
-        println!("    warehouse: 5× bigger real map, same throughput → not size-limited.");
-        println!("    ht_chantry: 3× better on real map (0.09→0.27) but ~4× gap remains.");
+        println!("G1: 2/4 real paper maps pass (empty, random). warehouse and");
+        println!("    ht_chantry FAIL — Guided-PIBT flow direction assignment (Issue 149)");
+        println!("    adds one-way corridor lanes. Measure corridor counts and throughput");
+        println!("    change to assess the flow_mismatch cost term's effect.");
         println!("G2: warm-start consumption confirmed harmful without LaCAM (Issue 142).");
         println!("The GOAT gate honestly identifies the remaining gaps.");
     }

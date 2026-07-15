@@ -1,10 +1,11 @@
 # Benchmark 440: LLLG Paper Reproduction GOAT Gate
 
-**Date:** 2026-07-15 (updated Issue 148)
+**Date:** 2026-07-15 (updated Issue 149)
 **Plan:** [440](../.plans/440_lifelong_lacam_multi_agent_pathfinding_substrate.md)
 **Research:** [424](../.research/424_Lifelong_LaCAM_Local_Guidance_Multi_Agent_Pathfinding.md)
 **Paper:** [arXiv:2605.16855](https://arxiv.org/abs/2605.16855) — Arita & Okumura, AAAI 2026
-**Issue:** [148](../.issues/148_real_movingai_maps.md) — real MovingAI benchmark maps (map-fidelity hypothesis test)
+**Issue:** [149](../.issues/149_guided_pibt_flow_direction_assignment.md) — Guided-PIBT flow direction assignment (mechanism correct, near-zero effect due to corridor-definition mismatch)
+**Prior issue:** [148](../.issues/148_real_movingai_maps.md) — real MovingAI benchmark maps (map-fidelity hypothesis test)
 **Prior issue:** [147](../.issues/147_guided_pibt_maze_routing_exploration.md) — ht_chantry connectivity fix (10× improvement) + counter-flow Guided-PIBT (negative result)
 **Prior issue:** [144](../.issues/144_lacam_escalation_swap_warmstart_followup.md) — swap technique (negative result, infrastructure-only)
 **Prior issue:** [143](../.issues/143_lacam_escalation_full_pibt.md) — LaCAM escalation (greedy PIBT + priority shuffle retry)
@@ -19,36 +20,108 @@
 (2/4 real maps). G2 (congestion): FAIL (warm-start not consumable — confirmed
 by Issue 142 even with full A*).**
 
-**Issue 148 finding (the map-fidelity hypothesis test):** Issue 147 hypothesized
-the remaining ht_chantry gap (ratio 0.09 on the synthetic approx) was "map
-fidelity" and predicted the real MovingAI map would close it. Issue 148
-downloaded the **real MovingAI benchmark maps** for all 4 paper scenarios
-and tested that hypothesis. Result: **partially correct.**
+**Issue 149 finding (Guided-PIBT flow direction assignment):** Implemented the
+`FlowField` mechanism — a static, topology-aware flow field that assigns
+one-way directions to 1-wide corridor cells. The mechanism is **correct and
+tested** (11 unit tests), but has **near-zero effect** on the real maps because
+the corridor definition (exactly 2 opposite passable neighbors) is too strict:
 
-- **ht_chantry improved 3×** (ratio 0.09 → 0.27) on the real map — confirming
-  3× of the prior ~12× gap was indeed map fidelity (synthetic had 5.9% corridor
-  cells vs real 2.9%, 2× denser maze).
-- **But a genuine ~4× algorithmic gap remains** (4.51 vs paper ~17). The
-  remaining gap is no longer attributable to map fidelity — Guided-PIBT (full
-  flow direction assignment) is now genuinely warranted for maze topology.
-- **warehouse is unchanged** on the real map (7.34 vs 7.57 synthetic) despite
-  the real map being **5× larger** (9776 vs 1971 passable cells). This proves
-  warehouse congestion is **not** size-limited — it's a genuine algorithmic
-  limit on shelf-aisle topology. Low max_stops=8 confirms agents aren't stuck;
-  they just complete tasks too slowly.
+- `ht_chantry`: only **8 corridor cells** out of 7461 passable (0.1%)
+- `warehouse`: **0 corridor cells** (wide aisles, not narrow passages)
+- `empty`: **0 corridors**, `random`: 63 corridors
 
-| Map | Synthetic (Issue 147) | **Real (Issue 148)** | Change | Verdict |
+The real game-map corridors are **2-wide or wider**, not the strict 1-wide
+passages the detector catches. The `flow_mismatch` cost term fires on almost
+no cells. Throughput is unchanged (within noise) on all 4 maps.
+
+The good news: **zero regression on open maps** — the "safe promotion" design
+works exactly as intended. The `FlowField` pluggable seam is shipped and ready
+for consumers with genuine 1-wide corridor maps.
+
+| Map | Issue 148 (no flow) | Issue 149 (with flow) | Corridors | Change |
 |---|---|---|---|---|
-| empty-48-48 | 18.52 (0.68) | **18.52 (0.68)** | identical | PASS |
-| random-64-64-10 | 14.57 (0.69) | **14.37 (0.68)** | -1.4% | PASS |
-| warehouse | 7.57 (0.42) | **7.34 (0.41)** | -3.0% | FAIL |
-| ht_chantry | 1.47 (0.09) | **4.51 (0.27)** | **+207%** | FAIL (MARGINAL) |
+| empty-48-48 | 18.52 (0.68) | **18.52 (0.68)** | 0 | identical |
+| random-64-64-10 | 14.37 (0.68) | **14.65 (0.69)** | 63 | +2% (noise) |
+| warehouse | 7.34 (0.41) | **7.34 (0.41)** | 0 | identical |
+| ht_chantry | 4.51 (0.27) | **4.61 (0.27)** | 8 | +2% (noise) |
 
-**Promotion decision: KEEP OPT-IN.** Unchanged. The real-map upgrade closed
-the map-fidelity portion of the gap but confirmed genuine algorithmic gaps
-on warehouse and maze topologies. The substrate works correctly on 2/4 real
-paper maps (open + random). Full Guided-PIBT (flow direction assignment) and
-warehouse-specific routing are now the documented next steps.
+**Promotion decision: KEEP OPT-IN.** Unchanged. The flow direction assignment
+mechanism is correct but the corridor definition needs broadening to 2-wide
+passages to match real game-map topology.
+
+---
+
+## Issue 149 results (2026-07-15) — Guided-PIBT flow direction assignment
+
+### What was done
+
+Implemented the `FlowField<P>` trait + `GridFlowField` impl in a new `flow.rs`
+module. The flow field detects 1-wide corridor cells (cells with exactly 2
+passable neighbors on opposite sides) and assigns a canonical one-way direction
+(+1 sign: right for horizontal corridors, down for vertical). A new
+`flow_mismatch` cost term was inserted into the PIBT candidate tuple at
+position 2 (between `guidance_mismatch` and `goal_dist`):
+
+```text
+⟨ guidance_mismatch, flow_mismatch, goal_dist, hindrance, ε ⟩
+```
+
+The `LifelongLaCam` orchestrator gained a `.with_flow_field()` builder.
+11 unit tests cover corridor detection, direction assignment, flow mismatch
+computation, and orchestrator integration.
+
+### Result: mechanism correct, near-zero effect on real maps
+
+The flow direction assignment mechanism is **correctly implemented and tested**
+(proven by 11 unit tests on synthetic 1-wide corridors), but it has **near-zero
+effect** on the real benchmark maps. The root cause is a **corridor-definition
+mismatch**: the detector catches strict 1-wide passages, but real game-map
+corridors are 2-wide or wider.
+
+| Map | Passable cells | Corridor cells (detected) | Corridor % | Throughput change |
+|---|---|---|---|---|
+| empty-48-48 | 2304 | 0 | 0.0% | identical |
+| random-64-64-10 | 3687 | 63 | 1.7% | +2% (noise) |
+| warehouse | 9776 | 0 | 0.0% | identical |
+| ht_chantry | 7461 | **8** | **0.1%** | +2% (noise) |
+
+The real ht_chantry (Dragon Age: Origins) has only **8 strict 1-wide corridor
+cells** — game-map corridors are wider. The warehouse has **0 corridors** (wide
+aisles between shelf blocks). The flow_mismatch term fires on almost no cells,
+so throughput is unchanged.
+
+### No regression on open maps
+
+The "safe promotion" design was verified: on open maps (empty/random), the flow
+field has 0 or few corridors, so `flow_mismatch` is almost always 0, and the
+cost tuple degenerates to the paper-faithful ordering. Empty-48-48 throughput
+is bit-identical (18.52 → 18.52).
+
+### What this means for the roadmap
+
+The flow field mechanism is **correct but insufficient** for real game maps.
+The corridor definition needs broadening to catch 2-wide passages (the actual
+topology of game-map corridors like ht_chantry). This is a more complex
+detection problem:
+
+- A 2-wide horizontal corridor: two adjacent rows of passable cells, both
+  flanked by walls above/below. Each cell has 3 passable neighbors (left, right,
+  and the paired row), so the strict "exactly 2 neighbors" detector misses them.
+- Detection needs to identify **passage width** — groups of cells where the
+  passage is narrow (≤ 2 wide) relative to the surrounding open area.
+
+The `FlowField` pluggable seam is shipped and ready for consumers who want to
+implement a broader corridor detector. The default `GridFlowField` handles
+the 1-wide case correctly.
+
+### GOAT gate status (unchanged)
+
+| Gate | Status | Detail |
+|---|---|---|
+| **G1** | **PARTIAL 2/4** | empty 0.68 ✅, random 0.69 ✅, warehouse 0.41 ❌, ht_chantry 0.27 ❌. Unchanged. |
+| **G2** | **FAIL** | Warm-start non-consumable (ratio 1.00). Unchanged. |
+| **G3** | **PASS** | 1601 tests pass (11 new flow field tests). Clippy clean. |
+| **G4** | **PASS** | 467ms median at 1000 agents (<500ms target). |
 
 ---
 

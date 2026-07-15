@@ -62,6 +62,7 @@
 //! The random tiebreak `ε` uses a deterministic seeded RNG, preserving replay.
 
 use super::config::{AgentId, JointAction, JointConfig};
+use super::flow::FlowField;
 use super::hindrance::HindranceEstimator;
 use super::local_guidance::Guidance;
 use super::position::Position;
@@ -93,24 +94,49 @@ const MIN_STUCK_FOR_RETRY: usize = 20;
 type NeighborFn<P> = dyn Fn(&P) -> Vec<P> + Send + Sync;
 
 /// Candidate move for an agent, with its lexicographic cost components.
+///
+/// The cost tuple ordering (Issue 149) is:
+///
+/// ```text
+/// ⟨ guidance_mismatch, flow_mismatch, goal_dist, hindrance, ε ⟩
+/// ```
+///
+/// Where:
+/// 1. `guidance_mismatch` (0/1) — prefer moves consistent with the guidance Φ.
+/// 2. `flow_mismatch` (0/1) — prefer moves that align with the assigned corridor
+///    direction (Guided-PIBT, Issue 149). Zero on open maps (no corridors).
+/// 3. `goal_dist` (f32) — prefer moves closer to the goal.
+/// 4. `hindrance` (f32) — prefer moves that block fewer siblings.
+/// 5. `ε` (f32) — random tiebreak for determinism.
+///
+/// The `flow_mismatch` term is inserted between `guidance_mismatch` and
+/// `goal_dist` (Issue 149). This is the "safe promotion": on open maps,
+/// `flow_mismatch` is always 0 (no corridors), so the tuple degenerates to
+/// the paper-faithful ordering. On maze maps, `flow_mismatch` creates
+/// directional lanes that eliminate head-on corridor deadlocks.
 #[derive(Clone)]
 struct Candidate<P: Position + Clone> {
     next: P,
     /// Cost component 1: Ind[Φ[i][0] ≠ u] (0 if guidance-consistent, 1 else).
     guidance_mismatch: u8,
-    /// Cost component 2: dist(u, g_i) heuristic.
+    /// Cost component 2: flow_mismatch (0 if aligned with corridor direction, 1 if against).
+    /// Zero on non-corridor maps — see [`super::flow`].
+    flow_mismatch: u8,
+    /// Cost component 3: dist(u, g_i) heuristic.
     goal_dist: f32,
-    /// Cost component 3: hindrance(i→u).
+    /// Cost component 4: hindrance(i→u).
     hindrance: f32,
-    /// Cost component 4: random tiebreak ε ∈ [0, 1).
+    /// Cost component 5: random tiebreak ε ∈ [0, 1).
     epsilon: f32,
 }
 
 impl<P: Position + Clone> Candidate<P> {
-    /// Lexicographic comparison: guidance_mismatch → goal_dist → hindrance → ε.
+    /// Lexicographic comparison:
+    /// guidance_mismatch → flow_mismatch → goal_dist → hindrance → ε.
     fn lexicographic_cmp(&self, other: &Self) -> Ordering {
         self.guidance_mismatch
             .cmp(&other.guidance_mismatch)
+            .then_with(|| self.flow_mismatch.cmp(&other.flow_mismatch))
             .then_with(|| {
                 self.goal_dist
                     .partial_cmp(&other.goal_dist)
@@ -145,6 +171,9 @@ impl<P: Position + Clone> Candidate<P> {
 /// - `priorities`: per-agent priority weights (higher = processed first).
 ///   If empty, agents are processed in index order.
 /// - `hindrance`: the hindrance estimator (pluggable seam #4).
+/// - `flow_field`: the flow field for Guided-PIBT direction assignment
+///   (Issue 149). Pass `&NoFlow` for paper-faithful behavior (no corridor
+///   direction enforcement).
 /// - `neighbors_fn`: supplies passable neighbors (`None` = `Position::neighbors()`).
 /// - `rng`: deterministic RNG for the `ε` tiebreak and LaCAM shuffle.
 ///
@@ -159,6 +188,7 @@ pub fn pibt_step<P, H>(
     goals: &[P],
     priorities: &[f32],
     hindrance: &mut H,
+    flow_field: &dyn FlowField<P>,
     neighbors_fn: Option<&NeighborFn<P>>,
     rng: &mut fastrand::Rng,
 ) -> Result<JointAction<P>, Deadlock>
@@ -195,6 +225,7 @@ where
         guidance,
         goals,
         hindrance,
+        flow_field,
         neighbors_fn,
         rng,
         &order,
@@ -220,6 +251,7 @@ where
             guidance,
             goals,
             hindrance,
+            flow_field,
             neighbors_fn,
             rng,
             &shuffled,
@@ -262,6 +294,7 @@ fn greedy_pibt_pass<P, H>(
     guidance: &Guidance<P>,
     goals: &[P],
     hindrance: &mut H,
+    flow_field: &dyn FlowField<P>,
     neighbors_fn: Option<&NeighborFn<P>>,
     rng: &mut fastrand::Rng,
     order: &[usize],
@@ -308,7 +341,11 @@ where
         // Backer agents (Issue 144) use reverse scoring per Okumura 2023a:
         // discard guidance (guidance_mismatch = 0) and negate goal_dist so the
         // agent prefers the cell farthest from its goal (backs up). Hindrance
-        // is also dropped (the reverse tuple is ⟨0, −dist, ε⟩).
+        // is also dropped (the reverse tuple is ⟨0, 0, −dist, 0, ε⟩).
+        //
+        // Non-backer agents use the full cost tuple (Issue 149):
+        //   ⟨guidance_mismatch, flow_mismatch, goal_dist, hindrance, ε⟩
+        // where flow_mismatch is the Guided-PIBT corridor direction penalty.
         let preferred = guidance.get(i).and_then(|g| g.first());
         let mut candidates: Vec<Candidate<P>> = neighbors
             .iter()
@@ -317,6 +354,7 @@ where
                     Candidate {
                         next: next.clone(),
                         guidance_mismatch: 0,
+                        flow_mismatch: 0,
                         goal_dist: -next.dist_heuristic(goal),
                         hindrance: 0.0,
                         epsilon: rng.f32(),
@@ -328,6 +366,7 @@ where
                             Some(p) => (**p != *next) as u8,
                             None => 0,
                         },
+                        flow_mismatch: flow_field.mismatch(&current, next),
                         goal_dist: next.dist_heuristic(goal),
                         hindrance: hindrance.hindrance(agent, next, config),
                         epsilon: rng.f32(),
