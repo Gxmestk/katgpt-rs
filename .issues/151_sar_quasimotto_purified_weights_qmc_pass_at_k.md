@@ -106,9 +106,11 @@ complements. Document in Research 406 §8 addendum as a refuted fusion.
 
 ## Open questions
 
-- [ ] Does riir-train have a reasoning-model training setup that produces a
-      W_RL we can SAR-purify at LLM scale? (Issue 374 was ≤64×64 synthetic; we
-      need real 4096×4096 weights, or at minimum a 512×512 reasoning toy.)
+- [x] **Does riir-train have a reasoning-model training setup that produces a
+      W_RL we can SAR-purify at LLM scale?** — **ANSWERED: NO. See §"riir-train
+      reasoning-model audit" below.** The PoC must source external reasoning
+      weights (HuggingFace) or validate the compound mechanism on
+      constructed on-manifold deltas at medium scale.
 - [x] **Is the one-sided Jacobi SVD at 4096 cols tractable for one-shot
       cold-tier purification?** — **ANSWERED: INTRACTABLE. See §"SVD
       tractability analysis" below.** Needs randomized SVD (Halko et al. 2011)
@@ -194,3 +196,79 @@ scale. A 32-layer transformer purifies in ~5–22 seconds (one-shot cold-tier).
 
 The Jacobi SVD stays the default for NPC-scale (≤128×128) — it's deterministic,
 zero-alloc, and correct at that scale. Randomized SVD is the LLM-scale path.
+
+## riir-train reasoning-model audit (2026-07-15)
+
+**Question:** Can riir-train produce a W_RL (reasoning-trained weight delta)
+at LLM scale for the SAR × QuasiMoTTo PoC?
+
+**Answer: NO.** riir-train has no reasoning-model training setup.
+
+### What riir-train has
+
+| Asset | Status | Relevance to PoC |
+|---|---|---|
+| `data/gemma-2-2b-it-f16.gguf` | Instruction-tuned, not reasoning | Wrong model type (no RL reasoning delta) |
+| `data/MiniCPM5-1B-F16.gguf` | Instruction-tuned, not reasoning | Wrong model type |
+| `data/math-500/` | Math eval set (MATH-500 benchmark) | Eval harness only, not a training pipeline |
+| RePPO training (R375, `remax_ppo.rs`) | **CLOSED NEGATIVE** — m>1 exploration quintuple-confirmed to not hold | No reasoning RL pipeline; the only RL experiment is a closed negative |
+| Issue 374 (SAR concentration test) | Produced ≤64×64 synthetic LoRA deltas only | NPC-scale synthetic, not LLM-scale real |
+| Research corpus (~95 notes) | Entirely LoRA training methods | No GRPO/DeepScaleR-style reasoning training |
+
+### What's missing
+
+- **No GRPO/PPO/RL training pipeline for reasoning.** The RePPO experiment
+  (R375) is the closest, but it was quintuple-confirmed to NOT show
+  exploration gains across 5 regimes (tabular → NN, MLP → ConvNet, chain MDP →
+  gridworld → MinAtar Breakout) and is CLOSED.
+- **No reasoning-trained model weights.** Both GGUF files on disk are
+  instruction-tuned, not RL-reasoning-trained (no DeepScaleR/QwQ-style model).
+- **No LLM-scale weight delta production.** Issue 374's LoRA deltas were
+  ≤64×64 synthetic — the SAR concentration failure (G1b) was measured on
+  exactly these.
+
+### Impact on the PoC
+
+The PoC now has **two concrete blockers** (both answered):
+
+1. **No LLM-scale reasoning delta** (Q1, this audit) — needs external weights.
+2. **No LLM-scale SVD** (Q2, SVD tractability analysis) — needs randomized SVD.
+
+### Revised PoC paths (ranked by speed to validation)
+
+**Path A — External weights + external SVD (fastest, recommended):**
+- Source DeepScaleR-1.5B (or similar reasoning model) from HuggingFace as
+  W_RL, with its base model (DeepScaleR uses Qwen2.5-Math-1.5B) as W_base.
+- Compute ΔW = W_RL − W_base per layer.
+- SAR-purify using scipy's `svds` (truncated SVD, external to katgpt-rs).
+- Run QMC sampling (`katgpt-core::speculative::qmc`) vs i.i.d. on
+  SAR-purified vs unpurified weights.
+- Measure Pass@k on MATH-500 (already in riir-train/data).
+- **Effort:** Python PoC script (~1-2 days), no katgpt-rs code changes.
+- **Risk:** GGUF → numpy weight extraction is fiddly but mechanical.
+
+**Path B — Medium-scale constructed delta (medium, validates mechanism only):**
+- Use a 512×512 or 1024×1024 weight matrix from an open model layer.
+- Construct a synthetic on-manifold delta (trivially concentrated by
+  construction — bench 423 G1a showed >0.999 recovery).
+- SAR-purify with the existing Jacobi SVD (tractable at 512×512, ~seconds).
+- Run QMC vs i.i.d. Pass@k.
+- **Effort:** Rust PoC in katgpt-spectral (~2-3 days).
+- **Risk:** Validates the *compound mechanism* but NOT the SAR precondition
+  (real deltas concentrating). Necessary but not sufficient for the fusion
+  to matter on real models. A constructed on-manifold delta trivially
+  benefits from SAR; the question is whether real deltas do.
+
+**Path C — Full LLM-scale (slowest, definitive):**
+- Implement randomized SVD in katgpt-spectral.
+- Source external reasoning weights.
+- Run the full PoC in Rust.
+- **Effort:** ~1 week (randomized SVD implementation + weight pipeline + PoC).
+- **Risk:** Premature — if Path A shows the mechanisms are substitutes (not
+  complements), Path C's investment is wasted. **Always validate via Path A
+  first.**
+
+**Recommendation:** Path A first (Python + external weights + scipy SVD).
+If the compound gain is super-additive, escalate to Path C (randomized SVD
+primitive + Rust PoC). Path B is a fallback if external weight extraction
+proves blocked.
