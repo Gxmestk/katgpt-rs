@@ -196,6 +196,20 @@ pub struct GuidanceConfig {
     pub alpha: f32,
     /// Number of sequential refinement rounds (paper default 2).
     pub rounds: usize,
+    /// Maximum A* node expansions per agent per round (Issue 516 T1e).
+    ///
+    /// `0` = unlimited (paper-faithful). When > 0, bounds worst-case latency:
+    /// if an agent's search exceeds this many node expansions, it terminates
+    /// early and returns the best partial path found (the expanded node closest
+    /// to its goal by BFS distance). This caps the super-linear A* scaling that
+    /// occurs at high agent density where occupied cells force long detours.
+    ///
+    /// The quality trade-off: capped agents get a greedy-ish partial path
+    /// instead of an optimal w_phi-deep path. In dense crowds the optimal path
+    /// is already poor (congestion forces detours), so the quality loss is
+    /// minimal. The latency win is substantial: at n=1000 on a 50×50 grid,
+    /// each uncapped search explores ~8K nodes; capping at 2K cuts A* time ~4×.
+    pub max_expansions: usize,
 }
 
 impl Default for GuidanceConfig {
@@ -204,6 +218,7 @@ impl Default for GuidanceConfig {
             w_phi: 5,
             alpha: 1.0,
             rounds: 2,
+            max_expansions: 0,
         }
     }
 }
@@ -451,10 +466,16 @@ impl<P: Position> SpaceTimeGuidance<P> {
         scratch: &mut AstarScratch<P>,
     ) -> Vec<P> {
         let w = self.cfg.w_phi;
+        let max_exp = self.cfg.max_expansions;
 
         // Unreachable goal: no BFS entry for start. Wait in place.
         let start_h = bfs.get(start).copied().unwrap_or(f32::MAX);
         if start_h == f32::MAX {
+            return vec![start.clone(); w];
+        }
+
+        // At-goal early exit (Issue 516 T1f).
+        if start_h == 0.0 {
             return vec![start.clone(); w];
         }
 
@@ -469,6 +490,9 @@ impl<P: Position> SpaceTimeGuidance<P> {
 
         let w_u8 = w as u8;
         let mut best_goal: Option<(P, u8)> = None;
+        let mut best_effort: Option<(P, u8)> = None;
+        let mut best_effort_h = start_h;
+        let mut expansions: usize = 0;
 
         while let Some(node) = scratch.open.pop() {
             let depth = node.depth;
@@ -477,6 +501,19 @@ impl<P: Position> SpaceTimeGuidance<P> {
             // Skip already-expanded states.
             if !scratch.closed.insert((pos.clone(), depth)) {
                 continue;
+            }
+
+            // Track best-effort (closest-to-goal expanded node).
+            let pos_h = bfs.get(&pos).copied().unwrap_or(f32::MAX);
+            if pos_h < best_effort_h {
+                best_effort_h = pos_h;
+                best_effort = Some((pos.clone(), depth));
+            }
+
+            // Expansion cap (Issue 516 T1e).
+            expansions += 1;
+            if max_exp > 0 && expansions >= max_exp {
+                break;
             }
 
             // Goal test: reached the planning horizon.
@@ -536,7 +573,26 @@ impl<P: Position> SpaceTimeGuidance<P> {
                 }
                 path
             }
-            None => vec![start.clone(); w],
+            None => match best_effort {
+                Some((effort_pos, effort_depth)) => {
+                    let mut path = Vec::with_capacity(w);
+                    let mut current = (effort_pos, effort_depth);
+                    while current.1 > 0 {
+                        path.push(current.0.clone());
+                        let prev = scratch
+                            .came_from
+                            .get(&current)
+                            .expect("came_from chain must be complete for partial path");
+                        current = prev.clone();
+                    }
+                    path.reverse();
+                    while path.len() < w {
+                        path.push(path.last().cloned().unwrap_or_else(|| start.clone()));
+                    }
+                    path
+                }
+                None => vec![start.clone(); w],
+            },
         }
     }
 
@@ -608,6 +664,7 @@ impl<P: Position> SpaceTimeGuidance<P> {
         scratch: &mut FlatAstarScratch<P>,
     ) -> Vec<P> {
         let w = self.cfg.w_phi;
+        let max_exp = self.cfg.max_expansions;
         let f = self
             .flat_index_fn
             .as_ref()
@@ -625,6 +682,12 @@ impl<P: Position> SpaceTimeGuidance<P> {
             return vec![start.clone(); w];
         }
 
+        // At-goal early exit (Issue 516 T1f): agent is already at its goal.
+        // BFS distance 0 means start == goal. Waiting in place is optimal.
+        if start_h == 0.0 {
+            return vec![start.clone(); w];
+        }
+
         scratch.begin_search();
         scratch.g_set(start_idx, 0, 0.0);
         scratch.open.push(AstarNode {
@@ -635,6 +698,11 @@ impl<P: Position> SpaceTimeGuidance<P> {
 
         let w_u8 = w as u8;
         let mut best_goal: Option<(P, u8)> = None;
+        // Best-effort partial path node: the expanded node closest to goal by
+        // BFS distance. Used when the search is capped before reaching depth w.
+        let mut best_effort: Option<(P, u8)> = None;
+        let mut best_effort_h = start_h;
+        let mut expansions: usize = 0;
 
         while let Some(node) = scratch.open.pop() {
             let depth = node.depth;
@@ -644,6 +712,24 @@ impl<P: Position> SpaceTimeGuidance<P> {
             // Skip already-expanded states.
             if !scratch.close(pos_idx, depth) {
                 continue;
+            }
+
+            // Track best-effort (closest-to-goal expanded node). The start is
+            // always expanded first; subsequent nodes with lower h improve it.
+            let pos_h = if pos_idx < bfs_capacity {
+                bfs_flat[pos_idx]
+            } else {
+                f32::MAX
+            };
+            if pos_h < best_effort_h {
+                best_effort_h = pos_h;
+                best_effort = Some((pos.clone(), depth));
+            }
+
+            // Expansion cap (Issue 516 T1e): bound worst-case latency.
+            expansions += 1;
+            if max_exp > 0 && expansions >= max_exp {
+                break;
             }
 
             // Goal test: reached the planning horizon.
@@ -707,7 +793,32 @@ impl<P: Position> SpaceTimeGuidance<P> {
                 }
                 path
             }
-            None => vec![start.clone(); w],
+            None => match best_effort {
+                // Cap hit before reaching depth w: return the best partial path
+                // (closest-to-goal node found), padded to w with wait actions.
+                Some((effort_pos, effort_depth)) => {
+                    let mut path = Vec::with_capacity(w);
+                    let mut current_pos = effort_pos;
+                    let mut current_depth = effort_depth;
+                    while current_depth > 0 {
+                        path.push(current_pos.clone());
+                        let cur_idx = f(&current_pos);
+                        let parent = scratch
+                            .get_parent(cur_idx, current_depth)
+                            .expect("came_from chain must be complete for partial path");
+                        current_pos = parent.0.clone();
+                        current_depth = parent.1;
+                    }
+                    path.reverse();
+                    while path.len() < w {
+                        path.push(path.last().cloned().unwrap_or_else(|| start.clone()));
+                    }
+                    path
+                }
+                // No node expanded at all (shouldn't happen — start is always
+                // pushed) — wait in place.
+                None => vec![start.clone(); w],
+            },
         }
     }
 

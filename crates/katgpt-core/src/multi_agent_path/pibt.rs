@@ -306,7 +306,35 @@ where
 {
     let n = config.n_agents();
     let mut moves: Vec<Option<P>> = vec![None; n];
-    let mut occupied: Vec<bool> = vec![false; n];
+
+    // Issue 516 T1g: O(1) collision detection structures (replaces O(n) scan).
+    //
+    // The original `is_collision_free` scanned all n agents for each candidate,
+    // making PIBT O(n²) per pass. At n=1000 with LaCAM retries (3 passes),
+    // that's ~15M comparisons. These two maps reduce it to O(n) per pass.
+    //
+    // `current_to_agent`: position → agent index. Built once from config.
+    // Used for edge-collision (swap) detection: when agent i at A wants to
+    // move to B, we check if the agent at B (if any) is moving to A.
+    //
+    // `committed_dests`: the set of destinations already committed by
+    // higher-priority agents. Used for vertex-collision detection: no two
+    // agents can have the same destination.
+    let mut current_to_agent: std::collections::HashMap<P, usize> =
+        std::collections::HashMap::with_capacity(n);
+    for (i, pos) in config.positions.iter().enumerate() {
+        // First agent at a position wins (valid configs have distinct positions).
+        current_to_agent.entry(pos.clone()).or_insert(i);
+    }
+    let mut committed_dests: std::collections::HashSet<P> =
+        std::collections::HashSet::with_capacity(n);
+
+    // Issue 516 T1g: pre-compute hindrance data structures for O(1) lookups.
+    // For `BlockingCount`, this builds a `reach_count` map that eliminates the
+    // O(n²) scan in `hindrance()`. No-op for estimators that don't override
+    // `prepare`.
+    hindrance.prepare(config);
+
     let mut stuck = Vec::new();
 
     // Swap-aware ordering: backers first (so their back-up commits before the
@@ -325,13 +353,13 @@ where
 
     for &i in &ordered {
         let agent = AgentId(i as u32);
-        let current = config.pos(agent).clone();
+        let current = config.pos(agent);
         let goal = &goals[i];
         let is_backer = swap_backers.get(i).copied().unwrap_or(false);
 
         // Generate candidates.
         let neighbors: Vec<P> = if let Some(f) = neighbors_fn {
-            f(&current)
+            f(current)
         } else {
             current.neighbors()
         };
@@ -366,7 +394,7 @@ where
                             Some(p) => (**p != *next) as u8,
                             None => 0,
                         },
-                        flow_mismatch: flow_field.mismatch(&current, next),
+                        flow_mismatch: flow_field.mismatch(current, next),
                         goal_dist: next.dist_heuristic(goal),
                         hindrance: hindrance.hindrance(agent, next, config),
                         epsilon: rng.f32(),
@@ -379,21 +407,43 @@ where
         candidates.sort_by(|a, b| a.lexicographic_cmp(b));
 
         // Select the first collision-free candidate.
+        // Issue 516 T1g: O(1) collision check via committed_dests +
+        // current_to_agent (replaces the O(n) is_collision_free scan).
         let mut placed = false;
         for cand in &candidates {
-            if is_collision_free(i, &cand.next, config, &moves, &occupied) {
-                moves[i] = Some(cand.next.clone());
-                occupied[i] = true;
-                placed = true;
-                break;
+            let next = &cand.next;
+            // Vertex collision: destination already taken.
+            if committed_dests.contains(next) {
+                continue;
             }
+            // Edge collision (swap): the agent currently at `next` (if any)
+            // is committed to moving to my current position.
+            if let Some(&j) = current_to_agent.get(next)
+                && j != i
+                    && let Some(their_next) = &moves[j]
+                        && their_next == current {
+                            continue; // swap collision
+                        }
+            committed_dests.insert(next.clone());
+            moves[i] = Some(next.clone());
+            placed = true;
+            break;
         }
 
         if !placed {
             // Fallback: wait in place (if not itself a collision).
-            if is_collision_free(i, &current, config, &moves, &occupied) {
-                moves[i] = Some(current);
-                occupied[i] = true;
+            let can_wait = !committed_dests.contains(current);
+            let can_wait = can_wait && {
+                // Edge collision check for wait-in-place.
+                if let Some(&j) = current_to_agent.get(current) {
+                    j == i || !matches!(&moves[j], Some(their_next) if their_next == current)
+                } else {
+                    true
+                }
+            };
+            if can_wait {
+                committed_dests.insert(current.clone());
+                moves[i] = Some(current.clone());
             } else {
                 stuck.push(agent);
             }
@@ -413,41 +463,6 @@ where
         .collect();
 
     (final_moves, stuck)
-}
-
-/// Check if agent `i` moving to `next` is collision-free given the moves
-/// already committed for other agents.
-///
-/// - **Vertex**: `next` must not be the committed move of any other agent.
-/// - **Edge**: no agent `j ≠ i` where `moves[j] == current_pos[i]` AND
-///   `next == current_pos[j]` (swap).
-#[inline]
-fn is_collision_free<P: Position>(
-    agent_idx: usize,
-    next: &P,
-    config: &JointConfig<P>,
-    moves: &[Option<P>],
-    occupied: &[bool],
-) -> bool {
-    let my_current = config.pos(AgentId(agent_idx as u32));
-
-    for (j, m) in moves.iter().enumerate() {
-        if j == agent_idx || !occupied[j] {
-            continue;
-        }
-        if let Some(their_next) = m {
-            // Vertex collision: same destination.
-            if their_next == next {
-                return false;
-            }
-            // Edge collision: swap (I go to their current, they go to my current).
-            let their_current = config.pos(AgentId(j as u32));
-            if their_next == my_current && next == their_current {
-                return false;
-            }
-        }
-    }
-    true
 }
 
 /// Compute the agent processing order from priorities (descending priority,

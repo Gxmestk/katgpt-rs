@@ -78,6 +78,19 @@ pub trait HindranceEstimator<P: Position> {
         target: &P,
         config: &super::config::JointConfig<P>,
     ) -> f32;
+
+    /// Pre-compute per-tick data structures for O(1) hindrance lookups
+    /// (Issue 516 T1g).
+    ///
+    /// Called once at the start of each PIBT pass, before any `hindrance`
+    /// calls. The default impl is a no-op (backward compatible — estimators
+    /// that don't need precomputation are unaffected).
+    ///
+    /// `BlockingCount` overrides this to build a `reach_count` map:
+    /// position → number of agents whose neighborhood includes it. This
+    /// transforms `hindrance()` from O(n) per call to O(1), eliminating the
+    /// O(n²) PIBT bottleneck at high agent density (n=1000).
+    fn prepare(&mut self, _config: &super::config::JointConfig<P>) {}
 }
 
 /// Paper-default hindrance: count siblings whose `t+1` neighborhood includes
@@ -86,11 +99,23 @@ pub trait HindranceEstimator<P: Position> {
 /// Each sibling `j ≠ i` contributes 1 if `target` is in `neighbors(config[j])`.
 /// This is the raw collision-count proxy — a discrete approximation to the DEC
 /// codifferential of the joint flow field (see Research 424 §2.3).
-pub struct BlockingCount;
+///
+/// Issue 516 T1g: uses a precomputed `reach_count` map (built in `prepare`)
+/// for O(1) lookups instead of the original O(n) scan. The `prepare` method
+/// is called once per PIBT pass by `greedy_pibt_pass`, eliminating the O(n²)
+/// scaling that dominated latency at n ≥ 500.
+pub struct BlockingCount {
+    /// Cached reach counts: position → number of agents whose neighborhood
+    /// includes it. Built by `prepare()`. Empty = not prepared (fallback to
+    /// O(n) scan for correctness).
+    reach_count: std::collections::HashMap<GridPos, u32>,
+}
 
 impl BlockingCount {
     pub fn new() -> Self {
-        Self
+        Self {
+            reach_count: std::collections::HashMap::new(),
+        }
     }
 }
 
@@ -100,24 +125,43 @@ impl Default for BlockingCount {
     }
 }
 
-impl<P: Position> HindranceEstimator<P> for BlockingCount {
+impl HindranceEstimator<GridPos> for BlockingCount {
+    fn prepare(&mut self, config: &super::config::JointConfig<GridPos>) {
+        self.reach_count.clear();
+        self.reach_count.reserve(config.n_agents() * 5);
+        for pos in &config.positions {
+            for n in pos.neighbors() {
+                *self.reach_count.entry(n).or_insert(0) += 1;
+            }
+        }
+    }
+
     fn hindrance(
         &mut self,
         agent: AgentId,
-        target: &P,
-        config: &super::config::JointConfig<P>,
+        target: &GridPos,
+        config: &super::config::JointConfig<GridPos>,
     ) -> f32 {
+        // Fast path: precomputed reach counts from `prepare()`.
+        if !self.reach_count.is_empty() {
+            let total = self.reach_count.get(target).copied().unwrap_or(0);
+            // Subtract 1 if the agent itself can reach `target` (we skip j==me).
+            let my_pos = &config.positions[usize::from(agent)];
+            let my_reaches = my_pos.neighbors().iter().any(|n| n == target) as u32;
+            return (total - my_reaches) as f32;
+        }
+
+        // Fallback: O(n) scan (pre-T1g path, used if `prepare` wasn't called).
         let me = usize::from(agent);
         let mut count = 0u32;
         for (j, pos) in config.positions.iter().enumerate() {
             if j == me {
                 continue;
             }
-            // Does sibling j's neighborhood include target?
             for n in pos.neighbors() {
                 if &n == target {
                     count += 1;
-                    break; // count each sibling once
+                    break;
                 }
             }
         }

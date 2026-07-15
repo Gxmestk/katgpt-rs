@@ -32,6 +32,7 @@ fn test_two_agents_no_vertex_collision() {
         w_phi: 3,
         alpha: 1.0,
         rounds: 1,
+        max_expansions: 0,
     };
     let mut guidance = make_guidance(&map, cfg);
     let mut hindrance = BlockingCount::new();
@@ -114,6 +115,7 @@ fn test_throughput_sanity() {
         w_phi: 5,
         alpha: 2.0,
         rounds: 2,
+        max_expansions: 0,
     };
     let mut guidance = make_guidance(&map, cfg);
     let mut hindrance = BlockingCount::new();
@@ -936,7 +938,7 @@ fn test_set_warm_start_consumed_once() {
 #[test]
 fn test_astar_guidance_path_length() {
     let map = GridMap::empty(10, 10);
-    let cfg = GuidanceConfig { w_phi: 5, alpha: 1.0, rounds: 2 };
+    let cfg = GuidanceConfig { w_phi: 5, alpha: 1.0, rounds: 2, max_expansions: 0 };
     let mut guidance = make_guidance(&map, cfg);
     let config = JointConfig::new(vec![
         GridPos::new(0, 0),
@@ -963,7 +965,7 @@ fn test_astar_guidance_path_length() {
 #[test]
 fn test_astar_guidance_moves_toward_goal() {
     let map = GridMap::empty(10, 10);
-    let cfg = GuidanceConfig { w_phi: 5, alpha: 1.0, rounds: 1 };
+    let cfg = GuidanceConfig { w_phi: 5, alpha: 1.0, rounds: 1, max_expansions: 0 };
     let mut guidance = make_guidance(&map, cfg);
     let start_a = GridPos::new(0, 0);
     let goal_a = GridPos::new(9, 9);
@@ -1034,7 +1036,7 @@ fn test_lacam_no_collision_on_dense_map() {
         .map(|i| GridPos::new((i + 50) % 10, (i + 50) / 10 % 10))
         .collect();
     let config = JointConfig::new(starts);
-    let cfg = GuidanceConfig { w_phi: 5, alpha: 1.0, rounds: 2 };
+    let cfg = GuidanceConfig { w_phi: 5, alpha: 1.0, rounds: 2, max_expansions: 0 };
     let mut guidance = make_guidance(&map, cfg);
     let mut hindrance = BlockingCount::new();
     let map_clone = map.clone();
@@ -1080,7 +1082,7 @@ fn test_flat_occupancy_produces_identical_guidance_as_hashmap() {
     // The flat-array occupancy path MUST produce bit-identical guidance paths
     // to the HashMap path. This is the correctness gate for T1a.
     let map = GridMap::empty(10, 10);
-    let cfg = GuidanceConfig { w_phi: 5, alpha: 3.0, rounds: 2 };
+    let cfg = GuidanceConfig { w_phi: 5, alpha: 3.0, rounds: 2, max_expansions: 0 };
     let config = JointConfig::new(vec![
         GridPos::new(0, 0),
         GridPos::new(9, 9),
@@ -1133,7 +1135,7 @@ fn test_flat_occupancy_multi_round_refinement_identical() {
     // Multi-round refinement (unrecord/re-record) must also be identical.
     // This exercises the flat-array record_path/unrecord_path/clear_occupancy.
     let map = GridMap::empty(8, 8);
-    let cfg = GuidanceConfig { w_phi: 5, alpha: 2.0, rounds: 3 }; // 3 rounds!
+    let cfg = GuidanceConfig { w_phi: 5, alpha: 2.0, rounds: 3, max_expansions: 0 }; // 3 rounds!
     let config = JointConfig::new(vec![
         GridPos::new(0, 0),
         GridPos::new(7, 7),
