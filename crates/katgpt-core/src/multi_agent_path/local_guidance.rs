@@ -716,11 +716,10 @@ impl<P: Position> SpaceTimeGuidance<P> {
 
             // Track best-effort (closest-to-goal expanded node). The start is
             // always expanded first; subsequent nodes with lower h improve it.
-            let pos_h = if pos_idx < bfs_capacity {
-                bfs_flat[pos_idx]
-            } else {
-                f32::MAX
-            };
+            // pos_idx is guaranteed < bfs_capacity: the start is bounds-checked
+            // at the top of this function, and all neighbors pushed to the open
+            // list pass the bounds guard in the expansion loop below.
+            let pos_h = bfs_flat[pos_idx];
             if pos_h < best_effort_h {
                 best_effort_h = pos_h;
                 best_effort = Some((pos.clone(), depth));
@@ -744,15 +743,19 @@ impl<P: Position> SpaceTimeGuidance<P> {
                 let new_depth = depth + 1;
                 let n_idx = f(&neighbor);
 
+                // Bounds check BEFORE any scratch access (Issue 516 T4 hotfix):
+                // neighbors_of can return positions outside the map whose
+                // flat_index exceeds the scratch array capacity. Skipping them
+                // here is equivalent to treating them as walls/unreachable.
+                if n_idx >= bfs_capacity {
+                    continue;
+                }
+
                 if scratch.is_closed(n_idx, new_depth) {
                     continue;
                 }
 
-                let h = if n_idx < bfs_capacity {
-                    bfs_flat[n_idx]
-                } else {
-                    f32::MAX
-                };
+                let h = bfs_flat[n_idx];
                 if h == f32::MAX {
                     continue; // unreachable neighbor
                 }
@@ -1097,14 +1100,15 @@ impl<P: Position> AstarScratch<P> {
 /// The `open` BinaryHeap still stores positions (it needs them for neighbor
 /// expansion and path reconstruction). Only the map/set structures are flat.
 struct FlatAstarScratch<P: Position> {
-    /// g_score[flat_idx * w_phi + depth] = best known cost-to-reach.
+    /// g_score[flat_idx * stride + depth] = best known cost-to-reach.
+    /// `stride = w_phi + 1` to accommodate goal-depth nodes (depth == w_phi).
     g_score: Vec<f32>,
     /// Generation when g_score entry was last written.
     g_gen: Vec<u32>,
     /// Generation when the cell was closed (expanded). 0 = never (unless
     /// current_gen wraps to 0, handled by overflow reset).
     closed_gen: Vec<u32>,
-    /// came_from[flat_idx * w_phi + depth] = (parent position, parent depth).
+    /// came_from[flat_idx * stride + depth] = (parent position, parent depth).
     /// Read during path reconstruction.
     came_from: Vec<Option<(P, u8)>>,
     /// Priority queue. Same AstarNode type as HashMap mode — the heap can't
@@ -1112,13 +1116,18 @@ struct FlatAstarScratch<P: Position> {
     open: BinaryHeap<AstarNode<P>>,
     /// Current generation for this search. Incremented per `begin_search`.
     current_gen: u32,
-    /// Planning window (from `GuidanceConfig::w_phi`).
-    w_phi: usize,
+    /// Array stride = w_phi + 1. Depth ranges 0..=w_phi (goal nodes sit at
+    /// depth == w_phi), so we need w_phi + 1 slots per cell to avoid OOB.
+    stride: usize,
 }
 
 impl<P: Position> FlatAstarScratch<P> {
     fn new(map_cells: usize, w_phi: usize) -> Self {
-        let total = map_cells * w_phi;
+        // Issue 516 T4 hotfix: stride must be w_phi + 1 because goal-depth
+        // nodes (depth == w_phi) are pushed to the open list and get
+        // close()/is_closed() called on them before the goal-test break.
+        let stride = w_phi + 1;
+        let total = map_cells * stride;
         Self {
             g_score: vec![f32::MAX; total],
             g_gen: vec![0; total],
@@ -1126,7 +1135,7 @@ impl<P: Position> FlatAstarScratch<P> {
             came_from: vec![None; total],
             open: BinaryHeap::new(),
             current_gen: 1, // gen 0 = unvisited sentinel
-            w_phi,
+            stride,
         }
     }
 
@@ -1146,7 +1155,7 @@ impl<P: Position> FlatAstarScratch<P> {
     /// Flat index into the scratch arrays for `(flat_idx, depth)`.
     #[inline(always)]
     fn slot(&self, flat_idx: usize, depth: u8) -> usize {
-        flat_idx * self.w_phi + depth as usize
+        flat_idx * self.stride + depth as usize
     }
 
     /// Get g_score for `(flat_idx, depth)` if visited in the current search.
