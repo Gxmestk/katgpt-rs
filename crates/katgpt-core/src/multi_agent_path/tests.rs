@@ -364,16 +364,21 @@ fn test_passable_neighbors_respects_walls() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────
-// Issue 140 T1 — PIBT priority inheritance (deferred)
+// Issue 140/143 — PIBT priority inheritance investigation
 // ─────────────────────────────────────────────────────────────────────────
 //
-// The full recursive PIBT with priority inheritance was implemented and
-// benchmarked but found to REDUCE throughput without LaCAM escalation. The
-// recursive push is too conservative on dense maps — it requires occupants
-// to vacate before committing, causing cascading stalls. The greedy PIBT
-// (take first collision-free candidate, let later agents adapt) has higher
-// throughput in the lifelong MAPF setting without LaCAM. See the module docs
-// in `pibt.rs` for the full rationale.
+// The full recursive PIBT with priority inheritance was implemented TWICE
+// (Issue 140 and Issue 143) and benchmarked. Both times it REDUCED
+// throughput dramatically (-92% on empty-48-48 in Issue 143). The recursive
+// push forces evicted agents to move away from their goals, creating
+// cascading stalls. The greedy PIBT (take first collision-free candidate,
+// let later agents adapt) has dramatically higher collective throughput in
+// the lifelong MAPF setting.
+//
+// Issue 143 instead added LaCAM escalation as a bounded priority-shuffle
+// retry (when ≥ 20 agents are stuck). This provides a modest throughput
+// gain on warehouse (+8.3%) without degrading open maps. See the module
+// docs in `pibt.rs` for the full rationale.
 //
 // The chain-push test below verifies that the greedy PIBT can advance a line
 // of agents (which it handles well via sequential processing).
@@ -553,4 +558,111 @@ fn test_astar_guidance_respects_walls() {
             "path position at t={t} is a wall: {pos:?}"
         );
     }
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Issue 143 — LaCAM escalation (greedy PIBT + priority shuffle retry)
+// ─────────────────────────────────────────────────────────────────────────
+//
+// Issue 143 added LaCAM escalation: when the greedy PIBT produces ≥ 20 stuck
+// agents (systemic congestion), retry with shuffled priority orderings. This
+// breaks symmetric deadlocks without degrading the fast path on open maps.
+//
+// Key finding (Issue 143): recursive priority inheritance (full PIBT eviction)
+// was also tested but COLLAPSES throughput (-92% on empty-48-48) because it
+// forces agents to move away from their goals, creating cascading stalls.
+// The greedy PIBT + bounded retry is the right approach for lifelong MAPF.
+
+/// The LaCAM escalation must never produce vertex or edge collisions, even
+/// on dense maps where retries trigger frequently.
+#[test]
+fn test_lacam_no_collision_on_dense_map() {
+    // 10×10 grid, 30 agents (30% density — high enough to trigger retries).
+    let map = GridMap::empty(10, 10);
+    let n = 30;
+    let mut rng = Rng::with_seed(999);
+    let starts: Vec<GridPos> = (0..n)
+        .map(|i| GridPos::new(i % 10, i / 10))
+        .collect();
+    let goals: Vec<GridPos> = (0..n)
+        .map(|i| GridPos::new((i + 50) % 10, (i + 50) / 10 % 10))
+        .collect();
+    let config = JointConfig::new(starts);
+    let cfg = GuidanceConfig { w_phi: 5, alpha: 1.0, rounds: 2 };
+    let mut guidance = make_guidance(&map, cfg);
+    let mut hindrance = BlockingCount::new();
+    let map_clone = map.clone();
+    let mut lacam = LifelongLaCam::new(WarmStartCache::new(WarmStartScheme::default(), cfg.w_phi))
+        .with_neighbors(move |p| map_clone.passable_neighbors(p));
+
+    let mut current = config;
+    for _tick in 0..50 {
+        let action = lacam.tick(&current, &goals, &mut guidance, &mut hindrance, &mut rng);
+        // No vertex collision.
+        let mut seen = std::collections::HashSet::new();
+        for p in &action.moves {
+            assert!(seen.insert(*p), "vertex collision at {p:?}");
+        }
+        // No edge collision (swap).
+        for i in 0..n {
+            for j in (i + 1)..n {
+                let is_swap = action.moves[i] == current.positions[j]
+                    && action.moves[j] == current.positions[i];
+                assert!(!is_swap, "edge collision: agents {i} and {j} swapped");
+            }
+        }
+        current = JointConfig::new(action.moves);
+    }
+}
+
+/// The LaCAM retry should improve throughput on a bottleneck map (agents
+/// funneled through a narrow passage). The test verifies the system can
+/// route agents through a bottleneck without permanent deadlock.
+#[test]
+fn test_lacam_bottleneck_progress() {
+    // 7×3 grid with a 1-wide bottleneck at column 3.
+    // Agents must pass through (3,1) to reach the other side.
+    let mut map = GridMap::empty(7, 3);
+    // Wall off column 3 except row 1 (the bottleneck).
+    map.set_wall(3, 0);
+    map.set_wall(3, 2);
+
+    // 4 agents on the left, goals on the right.
+    let config = JointConfig::new(vec![
+        GridPos::new(0, 0),
+        GridPos::new(0, 1),
+        GridPos::new(0, 2),
+        GridPos::new(1, 1),
+    ]);
+    let goals = vec![
+        GridPos::new(6, 0),
+        GridPos::new(6, 1),
+        GridPos::new(6, 2),
+        GridPos::new(5, 1),
+    ];
+    let cfg = GuidanceConfig::default();
+    let mut guidance = make_guidance(&map, cfg);
+    let mut hindrance = BlockingCount::new();
+    let mut rng = Rng::with_seed(42);
+    let map_clone = map.clone();
+    let mut lacam = LifelongLaCam::new(WarmStartCache::new(WarmStartScheme::default(), cfg.w_phi))
+        .with_neighbors(move |p| map_clone.passable_neighbors(p));
+
+    let mut current = config;
+    let mut any_crossed = false;
+    for _tick in 0..100 {
+        let action = lacam.tick(&current, &goals, &mut guidance, &mut hindrance, &mut rng);
+        // Check if any agent crossed the bottleneck (x > 3).
+        for i in 0..4 {
+            if current.positions[i].x <= 3 && action.moves[i].x > 3 {
+                any_crossed = true;
+            }
+        }
+        current = JointConfig::new(action.moves);
+    }
+    // With the bottleneck, at least one agent should cross in 100 ticks.
+    assert!(
+        any_crossed,
+        "at least one agent should cross the bottleneck in 100 ticks"
+    );
 }

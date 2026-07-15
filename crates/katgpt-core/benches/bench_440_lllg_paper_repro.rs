@@ -704,7 +704,8 @@ fn main() {
         println!("The substrate has algorithmic gaps that need upgrading before");
         println!("promotion. See FAIL details above for specific issues.");
         println!();
-        println!("G1: 3/4 maps pass (A* guidance, Issue 142). ht_chantry needs LaCAM.");
+        println!("G1: 3/4 maps pass (A* guidance + LaCAM retry, Issues 142+143).");
+        println!("    ht_chantry needs global routing (Guided-PIBT), not local retry.");
         println!("G2: warm-start consumption confirmed harmful without LaCAM (Issue 142).");
         println!("The GOAT gate honestly identifies the remaining gaps.");
     }

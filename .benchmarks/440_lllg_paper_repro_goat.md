@@ -1,10 +1,11 @@
 # Benchmark 440: LLLG Paper Reproduction GOAT Gate
 
-**Date:** 2026-07-15 (updated Issue 142)
+**Date:** 2026-07-15 (updated Issue 143)
 **Plan:** [440](../.plans/440_lifelong_lacam_multi_agent_pathfinding_substrate.md)
 **Research:** [424](../.research/424_Lifelong_LaCAM_Local_Guidance_Multi_Agent_Pathfinding.md)
 **Paper:** [arXiv:2605.16855](https://arxiv.org/abs/2605.16855) — Arita & Okumura, AAAI 2026
-**Issue:** [142](../.issues/142_full_space_time_astar_guidance_upgrade.md) — full space-time A* upgrade
+**Issue:** [143](../.issues/143_lacam_escalation_full_pibt.md) — LaCAM escalation (greedy PIBT + priority shuffle retry)
+**Prior issue:** [142](../.issues/142_full_space_time_astar_guidance_upgrade.md) — full space-time A* upgrade
 **Prior issue:** [140](../.issues/140_pibt_priority_inheritance_and_warmstart_integration.md) — PIBT PI + warm-start investigation
 
 ---
@@ -15,34 +16,86 @@
 (3/4 maps). G2 (congestion): FAIL (warm-start not consumable — confirmed
 by Issue 142 even with full A*).**
 
-Issue 142 replaced the greedy rollout with a proper space-time A* (priority
-queue, g/h/f scores, path reconstruction) and fixed the broken multi-round
-refinement (unrecord/re-record instead of clear-each-round). The A*
-improves throughput on **all 4 maps** vs the greedy baseline:
+Issue 143 added LaCAM escalation to the greedy PIBT: when ≥ 20 agents are
+stuck (systemic congestion), retry with shuffled priority orderings (up to 2
+retries). Warehouse throughput improved +8.3% (ratio 0.39 → 0.42). The
+escalation has minimal overhead on open maps (threshold prevents unnecessary
+retries). Recursive PIBT (full priority inheritance with eviction) was also
+tested but **REJECTED — collapses throughput -92%** (empty-48-48: 18.6 → 1.5).
 
-| Map | Greedy (Issue 140) | **A* (Issue 142)** | Change |
+| Map | A* (Issue 142) | **+ LaCAM retry (Issue 143)** | Change |
 |---|---|---|---|
-| empty-48-48 | 17.32 (ratio 0.63) | **18.63 (ratio 0.68)** | +7.6% |
-| random-64-64-10 | 13.15 (ratio 0.62) | **14.57 (ratio 0.69)** | +10.8% |
-| warehouse | 6.30 (ratio 0.35) | **6.99 (ratio 0.39)** | +11.0% |
-| ht_chantry | 0.11 (ratio 0.01) | **0.15 (ratio 0.01)** | marginal |
+| empty-48-48 | 18.63 (ratio 0.68) | **18.52 (ratio 0.68)** | -0.6% (noise) |
+| random-64-64-10 | 14.57 (ratio 0.69) | **14.57 (ratio 0.69)** | no change |
+| warehouse | 6.99 (ratio 0.39) | **7.57 (ratio 0.42)** | **+8.3%** |
+| ht_chantry | 0.15 (ratio 0.01) | **0.15 (ratio 0.01)** | no change |
 
-G1 now passes on **3/4 maps** (was 2/4). Warehouse crossed the 0.30 threshold
-(0.35→0.39). ht_chantry remains at 0.01 — the maze topology requires LaCAM
-escalation (Phase 5), not just better guidance.
+G1 still passes on **3/4 maps** (unchanged from Issue 142). ht_chantry
+remains at 0.01 — the maze topology requires **global routing**
+(Guided-PIBT), not local priority-shuffle retry. The paper's own caveat #1
+documents this as LLLG's known limitation.
 
-**Warm-start consumption (Issue 142 finding):** Occupancy-seeding with warm-start
-forecasts HURTS throughput even with the full A* (empty-48-48: 18.60 without
-seeding vs 14.73 with seeding). The forecast is invalidated when PIBT deviates
-from the guidance (common on dense maps), creating misleading phantom collision
-constraints. LllgEmpty consistently outperforms LllgPi on our synthetic maps.
-The paper's positive warm-start result likely depends on LaCAM escalation
-keeping forecasts accurate (fewer PIBT deviations). Warm-start data is consumed
-(cleared) but NOT seeded into the occupancy.
+Latency at 1000 agents: 234ms median (was 88ms pre-retry, now 234ms with
+retry overhead). Still under the 500ms target. The retry triggers at high
+density (1000 agents on empty-48-48 = 43% density → frequent systemic
+stalls). On the G1 benchmark (800 agents), median latency is 60-70ms on
+open maps.
 
-**Promotion decision: KEEP OPT-IN.** The substrate passes G3/G4 and partially
-passes G1 (3/4 maps), but the G1 ht_chantry failure and G2 warm-start
-non-consumption prevent full GOAT validation.
+**Promotion decision: KEEP OPT-IN.** Unchanged from Issue 142. The substrate
+passes G3/G4 and partially passes G1 (3/4 maps), but the G1 ht_chantry
+failure and G2 warm-start non-consumption prevent full GOAT validation.
+
+---
+
+## Issue 143 results (2026-07-15) — LaCAM escalation
+
+### What changed
+
+1. **LaCAM escalation** added to `pibt.rs`: when the greedy PIBT produces
+   ≥ 20 stuck agents (systemic congestion), retry with shuffled priority
+   orderings (up to 2 retries). The stuck agents are elevated to high
+   priority, and non-stuck agents are randomly perturbed. The result with
+   the fewest stuck agents is returned.
+
+2. **Recursive PIBT tested and REJECTED.** The full recursive priority
+   inheritance (agent i evicts undecided agent j from its cell, recursively)
+   was implemented and benchmarked. Result: **throughput collapses -92%**
+   (empty-48-48: 18.6 → 1.5). The eviction forces agents to move away from
+   their goals, creating cascading stalls. The greedy PIBT — which lets
+   agents compromise by taking their next-best cell — has dramatically
+   higher collective throughput in the lifelong MAPF setting. The recursive
+   variant is right for one-shot MAPF (finding ANY solution), wrong for
+   lifelong MAPF (sustained throughput).
+
+3. **Stuck-agent threshold** (MIN_STUCK_FOR_RETRY = 20): prevents retry
+   overhead on open maps where occasional stuck agents (1-5) resolve
+   naturally next tick. Retries only fire on genuinely congested maps.
+
+### Latency analysis
+
+The LaCAM retry adds overhead on dense maps:
+- **800 agents, empty/random**: median 60-70ms (retries rarely trigger — too
+  few stuck agents). Comparable to pre-retry baseline (~88ms).
+- **800 agents, warehouse**: median 134ms (retries trigger — warehouse has
+  systemic shelf-aisle congestion). The +8.3% throughput gain justifies the
+  cost.
+- **1000 agents, empty-48-48 (G4)**: median 234ms (retries trigger at 43%
+  density). Under the 500ms target but above the 100ms stretch goal.
+
+### ht_chantry — why local retry doesn't help
+
+The maze topology creates head-on corridor conflicts: two agents meet in a
+1-wide passage, both want to pass. Neither can move forward (vertex
+conflict), neither can wait (the other is blocking), and backing up requires
+one agent to reverse direction — which the greedy PIBT doesn't consider (it
+prefers goal-directed moves). The priority shuffle doesn't help because the
+issue isn't WHO goes first, it's that SOMEONE must back up, and no priority
+ordering makes that happen with local decisions.
+
+The fix is **global routing** (Guided-PIBT from the paper): pre-compute
+flow directions for corridors and route agents accordingly. This is a
+significantly larger implementation and is the paper's own recommended
+approach for long-corridor maps (caveat #1).
 
 ---
 

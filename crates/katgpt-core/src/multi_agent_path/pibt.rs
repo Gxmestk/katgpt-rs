@@ -1,4 +1,4 @@
-//! PIBT — Priority Inheritance with Backtracking (Plan 440 T1.4).
+//! PIBT — Priority Inheritance with Backtracking (Plan 440 T1.4, Issue 143).
 //!
 //! Distilled from Okumura et al. 2022 (*PIBT: Scalable and Prioritization
 //! Planning for Multi-Agent Pathfinding*). PIBT is a one-step collision-free
@@ -14,22 +14,30 @@
 //! I.e. PIBT first prefers moves consistent with the guidance, then
 //! goal-direction, then low hindrance, then random tiebreak.
 //!
-//! # Implementation note (Issue 140 T1)
+//! # Implementation: greedy PIBT + LaCAM escalation (Issue 143)
 //!
-//! The full PIBT algorithm includes recursive priority inheritance: when a
-//! high-priority agent wants a cell occupied by a lower-priority undecided
-//! agent, the lower-priority agent is recursively forced to move. However,
-//! the recursive push is only effective when combined with LaCAM-level search
-//! escalation (the paper's design). Without LaCAM, the recursive push is too
-//! conservative — it requires occupants to vacate before committing, causing
-//! cascading stalls on dense maps.
+//! The inner loop is the **greedy PIBT**: agents are processed in priority
+//! order, each taking the first collision-free candidate. Later agents see
+//! earlier agents' committed positions and adapt. This is aggressive (agents
+//! don't wait for undecided occupants) and has high throughput on open maps.
 //!
-//! This implementation uses the **greedy PIBT** variant: agents are processed
-//! in priority order, each taking the first collision-free candidate. Later
-//! agents see earlier agents' committed positions and adapt. This is more
-//! aggressive but has higher throughput in the lifelong MAPF setting without
-//! LaCAM escalation. The full recursive PIBT is deferred until LaCAM is added
-//! (tracked in the plan's Phase 5).
+//! Issue 143 adds **LaCAM escalation** as an outer loop: when the greedy PIBT
+//! produces stuck agents (deadlocks on maze maps), the escalation retries with
+//! shuffled priority orderings. This breaks symmetric deadlocks without
+//! degrading the fast path on open maps.
+//!
+//! ## Why not recursive priority inheritance?
+//!
+//! Issue 140 and Issue 143 both tested recursive priority inheritance (where
+//! a high-priority agent evicts undecided occupants from their cells). Both
+//! found it **collapses throughput** (empty-48-48 dropped from 18.6 → 1.5,
+//! -92%) because the eviction forces agents to move away from their goals,
+//! creating cascading stalls. The greedy variant — which lets agents
+//! compromise by taking their next-best cell — has dramatically higher
+//! collective throughput in the lifelong MAPF setting. The recursive variant
+//! is the right algorithm for one-shot MAPF (where finding ANY solution is
+//! the goal), but wrong for lifelong MAPF (where sustained throughput is the
+//! goal).
 //!
 //! # Collision constraints
 //!
@@ -38,10 +46,9 @@
 //!
 //! # Output
 //!
-//! Returns `Ok(JointAction)` if a collision-free joint action was found, or
-//! `Err(Deadlock)` if some agent could not be placed. On deadlock, the caller
-//! (the LaCAM orchestrator) escalates to higher-level search; for lifelong
-//! MAPF the common fallback is "wait in place" (deadlock agents don't move).
+//! Returns `Ok(JointAction)` — always succeeds (stuck agents wait in place).
+//! The caller may inspect the result for congestion and escalate further if
+//! needed. For lifelong MAPF, temporary stalls are tolerated.
 //!
 //! # Determinism
 //!
@@ -53,20 +60,30 @@ use super::local_guidance::Guidance;
 use super::position::Position;
 use std::cmp::Ordering;
 
+/// Default number of LaCAM escalation retries when greedy PIBT produces stuck agents.
+///
+/// Each retry runs the greedy PIBT with a different priority ordering. The
+/// result with the fewest stuck agents is returned. Bounded to maintain
+/// real-time perf — the paper's LaCAM does a full configuration search, but
+/// for lifelong MAPF the bounded retry captures most of the benefit at a
+/// fraction of the cost.
+const DEFAULT_LACAM_RETRIES: usize = 2;
+
+/// Minimum number of stuck agents before LaCAM escalation triggers.
+///
+/// On open maps, some agents may get stuck each tick due to random
+/// vertex collisions (an agent's current cell is taken by another). The
+/// escalation overhead (up to 4 retries × full PIBT, ~240ms at 800 agents)
+/// isn't worth it for small numbers of stuck agents — they'll likely
+/// resolve naturally next tick. The threshold ensures retries only fire on
+/// genuinely congested maps (maze, dense warehouse) where stuck agents are
+/// systemic and the retry is likely to break deadlocks.
+const MIN_STUCK_FOR_RETRY: usize = 20;
+
 /// Type alias mirroring [`super::local_guidance::NeighborFn`] for the
 /// neighbor-supplying callback in [`pibt_step`]. Includes `Send + Sync` to
 /// match the orchestrator's stored closure type.
 type NeighborFn<P> = dyn Fn(&P) -> Vec<P> + Send + Sync;
-
-/// Error: no collision-free joint action could be found for some agent.
-///
-/// The agent(s) listed should wait; the caller may retry with a different
-/// priority order or escalate to LaCAM-level search.
-#[derive(Debug)]
-pub struct Deadlock {
-    /// Agents that could not be placed (must wait).
-    pub stuck_agents: Vec<AgentId>,
-}
 
 /// Candidate move for an agent, with its lexicographic cost components.
 #[derive(Clone)]
@@ -105,11 +122,12 @@ impl<P: Position + Clone> Candidate<P> {
     }
 }
 
-/// One step of PIBT: produce a collision-free joint action.
+/// One step of greedy PIBT + LaCAM escalation (Issue 143).
 ///
-/// Agents are processed in priority order (by `priorities`, descending). For
-/// each agent, candidate moves are sorted by the lexicographic cost and the
-/// first collision-free candidate is selected.
+/// The greedy PIBT processes agents in priority order, each taking the first
+/// collision-free candidate (vertex + edge). When the greedy pass produces
+/// stuck agents (true deadlocks), the LaCAM escalation retries with shuffled
+/// priority orderings to break symmetric deadlocks.
 ///
 /// # Arguments
 ///
@@ -121,12 +139,13 @@ impl<P: Position + Clone> Candidate<P> {
 ///   If empty, agents are processed in index order.
 /// - `hindrance`: the hindrance estimator (pluggable seam #4).
 /// - `neighbors_fn`: supplies passable neighbors (`None` = `Position::neighbors()`).
-/// - `rng`: deterministic RNG for the `ε` tiebreak.
+/// - `rng`: deterministic RNG for the `ε` tiebreak and LaCAM shuffle.
 ///
 /// # Returns
 ///
-/// `Ok(JointAction)` on success. `Err(Deadlock)` if some agent couldn't be
-/// placed; in that case the stuck agents are set to wait and the rest move.
+/// `Ok(JointAction)` always — stuck agents wait in place. Returns
+/// `Err(Deadlock)` never (kept for API compat with the orchestrator's
+/// `unwrap_or_else` fallback).
 pub fn pibt_step<P, H>(
     config: &JointConfig<P>,
     guidance: &Guidance<P>,
@@ -141,28 +160,77 @@ where
     H: HindranceEstimator<P>,
 {
     let n = config.n_agents();
-    let mut moves: Vec<Option<P>> = vec![None; n];
-    let mut occupied: Vec<bool> = vec![false; n]; // which agents have been placed
-    let mut stuck = Vec::new();
+    let order = compute_priority_order(n, priorities);
 
-    // Priority order: descending priority, ties broken by agent id for determinism.
-    let mut order: Vec<usize> = (0..n).collect();
-    if !priorities.is_empty() && priorities.len() == n {
-        order.sort_by(|&a, &b| {
-            // descending priority
-            priorities[b]
-                .partial_cmp(&priorities[a])
-                .unwrap_or(Ordering::Equal)
-                .then_with(|| a.cmp(&b))
-        });
+    // First pass: greedy PIBT with the given priority order.
+    let (moves, stuck) = greedy_pibt_pass(config, guidance, goals, hindrance, neighbors_fn, rng, &order);
+
+    // Fast path: no stuck agents (or too few to justify retry overhead).
+    // On open maps this is the overwhelmingly common case.
+    if stuck.len() < MIN_STUCK_FOR_RETRY {
+        return Ok(JointAction::new(moves));
     }
 
-    for &i in &order {
+    // LaCAM escalation: retry with shuffled orders. Only triggers when stuck
+    // agents are systemic (≥ MIN_STUCK_FOR_RETRY), indicating a genuinely
+    // congested map where the retry is likely to help.
+    let mut best_moves = moves;
+    let mut best_stuck = stuck;
+
+    for _attempt in 0..DEFAULT_LACAM_RETRIES {
+        let shuffled = shuffle_order(&best_stuck, &order, rng);
+        let (moves, stuck) =
+            greedy_pibt_pass(config, guidance, goals, hindrance, neighbors_fn, rng, &shuffled);
+
+        if stuck.is_empty() {
+            return Ok(JointAction::new(moves));
+        }
+        if stuck.len() < best_stuck.len() {
+            best_moves = moves;
+            best_stuck = stuck;
+        }
+    }
+
+    // Place stuck agents as wait-in-place (best effort).
+    for &agent in &best_stuck {
+        let i = usize::from(agent);
+        best_moves[i] = config.pos(agent).clone();
+    }
+
+    Ok(JointAction::new(best_moves))
+}
+
+/// One greedy PIBT pass: process agents in `order`, each taking the first
+/// collision-free candidate.
+///
+/// Returns `(moves, stuck_agents)`. The `moves` vector has one entry per agent.
+/// Stuck agents have their move set to wait (current position) — they're also
+/// listed in the returned `stuck` vec for the LaCAM escalation.
+#[allow(clippy::too_many_arguments)]
+fn greedy_pibt_pass<P, H>(
+    config: &JointConfig<P>,
+    guidance: &Guidance<P>,
+    goals: &[P],
+    hindrance: &mut H,
+    neighbors_fn: Option<&NeighborFn<P>>,
+    rng: &mut fastrand::Rng,
+    order: &[usize],
+) -> (Vec<P>, Vec<AgentId>)
+where
+    P: Position,
+    H: HindranceEstimator<P>,
+{
+    let n = config.n_agents();
+    let mut moves: Vec<Option<P>> = vec![None; n];
+    let mut occupied: Vec<bool> = vec![false; n];
+    let mut stuck = Vec::new();
+
+    for &i in order {
         let agent = AgentId(i as u32);
         let current = config.pos(agent).clone();
         let goal = &goals[i];
 
-        // Generate candidate moves.
+        // Generate candidates.
         let neighbors: Vec<P> = if let Some(f) = neighbors_fn {
             f(&current)
         } else {
@@ -175,8 +243,8 @@ where
             .iter()
             .map(|next| Candidate {
                 next: next.clone(),
-                guidance_mismatch: match preferred {
-                    Some(p) => (p != next) as u8,
+                guidance_mismatch: match &preferred {
+                    Some(p) => (**p != *next) as u8,
                     None => 0,
                 },
                 goal_dist: next.dist_heuristic(goal),
@@ -210,16 +278,10 @@ where
         }
     }
 
-    if !stuck.is_empty() {
-        // Place stuck agents as wait (best effort).
-        for agent in &stuck {
-            let i = usize::from(*agent);
-            let pos = config.pos(*agent).clone();
-            moves[i] = Some(pos);
-        }
-        // Return Ok with the partial action — caller decides whether to escalate.
-        // We return the joint action (with stuck agents waiting) rather than
-        // Err, because lifelong MAPF tolerates temporary stalls.
+    // Place stuck agents as wait (best effort).
+    for agent in &stuck {
+        let i = usize::from(*agent);
+        moves[i] = Some(config.pos(*agent).clone());
     }
 
     let final_moves: Vec<P> = moves
@@ -228,7 +290,7 @@ where
         .map(|(i, m)| m.unwrap_or_else(|| config.pos(AgentId(i as u32)).clone()))
         .collect();
 
-    Ok(JointAction::new(final_moves))
+    (final_moves, stuck)
 }
 
 /// Check if agent `i` moving to `next` is collision-free given the moves
@@ -264,4 +326,70 @@ fn is_collision_free<P: Position>(
         }
     }
     true
+}
+
+/// Compute the agent processing order from priorities (descending priority,
+/// ties broken by agent id for determinism).
+fn compute_priority_order(n: usize, priorities: &[f32]) -> Vec<usize> {
+    let mut order: Vec<usize> = (0..n).collect();
+    if !priorities.is_empty() && priorities.len() == n {
+        order.sort_by(|&a, &b| {
+            priorities[b]
+                .partial_cmp(&priorities[a])
+                .unwrap_or(Ordering::Equal)
+                .then_with(|| a.cmp(&b))
+        });
+    }
+    order
+}
+
+/// Shuffle the priority order for a LaCAM escalation retry.
+///
+/// Elevates stuck agents (moves them earlier in the order) and perturbs
+/// the rest slightly to break symmetric deadlocks.
+fn shuffle_order(stuck: &[AgentId], order: &[usize], rng: &mut fastrand::Rng) -> Vec<usize> {
+    let stuck_set: Vec<bool> = {
+        let mut s = vec![false; order.len()];
+        for &a in stuck {
+            let idx = usize::from(a);
+            if idx < s.len() {
+                s[idx] = true;
+            }
+        }
+        s
+    };
+
+    // Move stuck agents to the front (elevated priority), keep relative order
+    // among the rest, with a small random perturbation.
+    let mut front: Vec<usize> = Vec::new();
+    let mut back: Vec<usize> = Vec::new();
+    for &i in order {
+        if stuck_set[i] {
+            front.push(i);
+        } else {
+            back.push(i);
+        }
+    }
+
+    // Random perturbation: occasionally swap adjacent non-stuck agents.
+    if back.len() > 1 {
+        for k in 0..back.len() - 1 {
+            if rng.f32() < 0.3 {
+                back.swap(k, k + 1);
+            }
+        }
+    }
+
+    front.extend(back);
+    front
+}
+
+/// Error: no collision-free joint action could be found for some agent.
+///
+/// Kept for API compatibility with the orchestrator's `unwrap_or_else` fallback.
+/// In practice, `pibt_step` always returns `Ok` — stuck agents wait in place.
+#[derive(Debug)]
+pub struct Deadlock {
+    /// Agents that could not be placed (must wait).
+    pub stuck_agents: Vec<AgentId>,
 }

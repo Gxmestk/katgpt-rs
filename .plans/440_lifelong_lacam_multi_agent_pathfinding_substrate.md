@@ -6,7 +6,7 @@
 **Private runtime plan:** [riir-ai/.plans/489_lifelong_lacam_crowd_coordination_runtime.md](../../riir-ai/.plans/489_lifelong_lacam_crowd_coordination_runtime.md)
 **Source paper:** [arXiv:2605.16855](https://arxiv.org/abs/2605.16855) — Arita & Okumura, "Lifelong LaCAM with Local Guidance for Lifelong MAPF", AAAI 2026.
 **Target:** `katgpt-rs/crates/katgpt-core/src/multi_agent_path/` (new module) + Cargo feature `multi_agent_path`
-**Status:** Active — Phase 1 COMPLETE, Phase 2 (GOAT gate) PARTIAL — G3/G4 PASS, G1 2/4 maps PASS, G2 FAIL (warm-start bug), Phase 3 COMPLETE (fusion hooks documented), Phase 4 COMPLETE (README + research cross-refs + overview feature table), Phase 5 COMPLETE (promotion decision: KEEP OPT-IN)
+**Status:** Active — Phase 1 COMPLETE, Phase 2 (GOAT gate) PARTIAL — G3/G4 PASS, G1 3/4 maps PASS (empty, random, warehouse), G2 FAIL (warm-start non-consumable), Phase 3 COMPLETE (fusion hooks documented), Phase 4 COMPLETE (README + research cross-refs + overview feature table), Phase 5 COMPLETE (promotion decision: KEEP OPT-IN, Issue 143 LaCAM escalation landed)
 
 ---
 
@@ -110,10 +110,10 @@ See `.benchmarks/440_lllg_paper_repro_goat.md` for full results.
 
 | Gate | Status | Detail |
 |---|---|---|
-| G1 (throughput) | **PARTIAL (3/4)** | empty-48-48 ratio 0.68 ✅, random-64-64-10 ratio 0.69 ✅, warehouse ratio 0.39 ✅, ht_chantry ratio 0.01 ❌ |
+| G1 (throughput) | **PARTIAL (3/4)** | empty-48-48 ratio 0.69 ✅, random-64-64-10 ratio 0.69 ✅, warehouse ratio 0.42 ✅, ht_chantry ratio 0.01 ❌ |
 | G2 (congestion) | **FAIL** | Warm-start occupancy-seeding confirmed harmful even with full A* (Issue 142). LllgPi = LllgEmpty |
-| G3 (no-regression) | **PASS** | 1578/1578 tests pass (with feature), 1556/1556 (without). Clippy clean on all-features |
-| G4 (latency) | **PASS** | 87.83ms median at 1000 agents (target <500ms, stretch <100ms). Paper: 210-260ms |
+| G3 (no-regression) | **PASS** | 1583 tests pass (with feature), 1556/1556 (without). Clippy clean on all-features |
+| G4 (latency) | **PASS** | 234ms median at 1000 agents (target <500ms, stretch <100ms). Paper: 210-260ms |
 
 ### Substrate upgrades applied during Phase 2
 
@@ -125,6 +125,10 @@ See `.benchmarks/440_lllg_paper_repro_goat.md` for full results.
    BFS-distance heuristic. Throughput improved +7-11% across all maps.
 4. **Multi-round refinement fixed** (Issue 142) — unrecord/re-record instead
    of clear-each-round, making `rounds > 1` actually improve results.
+5. **LaCAM escalation** (Issue 143) — greedy PIBT + bounded priority-shuffle
+   retry when stuck agents ≥ 20. Warehouse improved +8.3% (ratio 0.39 → 0.42).
+   Recursive PIBT was tested and REJECTED (-92% throughput on empty-48-48).
+   ht_chantry unchanged (needs global routing, not local retry).
 
 ### Tasks
 
@@ -149,12 +153,18 @@ See `.benchmarks/440_lllg_paper_repro_goat.md` for full results.
 
 ### Blocking items for G1/G2 full pass
 
-1. **LaCAM escalation** (Phase 5) — the single blocker for ht_chantry (G1)
-   and warm-start consumption (G2). When PIBT fails to resolve a conflict,
-   LaCAM escalates to a full search. This also unblocks PIBT priority
-   inheritance (Issue 140 showed recursive push collapses throughput
-   without LaCAM fallback).
-2. **Real MovingAI maps** — synthetic approximations may differ from the
+1. **ht_chantry (G1)** — the maze topology requires **global routing**
+   (Guided-PIBT from the paper), not local priority-shuffle retry. The w_Φ=5
+   window can't see far enough through the maze corridors, and local retry
+   can't resolve head-on corridor conflicts where both agents must back up.
+   The paper's own caveat #1 documents this: long one-cell-wide corridors are
+   LLLG's known limitation. This is an algorithmic ceiling, not a bug.
+2. **Warm-start consumption (G2)** — needs LaCAM escalation to keep PIBT
+   deviations rare so warm-start forecasts stay accurate. The current LaCAM
+   retry (priority shuffle) doesn't reduce deviations enough. The paper's
+   full LaCAM (configuration tree search) would, but that's a much heavier
+   implementation.
+3. **Real MovingAI maps** — synthetic approximations may differ from the
    actual warehouse/ht_chantry topology.
 
 ### Acceptance
