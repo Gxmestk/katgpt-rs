@@ -502,6 +502,7 @@ graph LR
 | **TILR** (`tilr_invariant_subspace`) | 425 | G1–G4 ✅ | Trajectory-Invariant Latent Refinement — alignment-gated subspace-projected correction with bit-identical γ→0 no-harm contract. 24.7ns/call HLA scale, 0 allocs. Default-on. |
 | **MANCE SVD Caching** | 427 | G1–G5 ✅ | Pure perf: cache tangent basis `{B,σ}` keyed on k-NN neighbor indices. ~5× loop speedup (skip ~9 of 10 SVDs). No new flag — optimization on DEFAULT-ON `manifold_erasure` (Plan 426). |
 | **Cross-Stage Residual Relocation** (`cross_stage_relocation`) | 431 | G1–G6 ✅ / G7 ⏳ | Knowing-Using Gap (arxiv 2607.08393) — `permeation_scan_into` 2D `(src,dst)` intervention heatmap reusing Plan 358's `direct_effect_importance` + two-cluster classification; `RelocateOp` applied operator with paper's fixed `(0.82L→0.45L)+(0.10L→0.45L)` default (`RelocatePair::LateEarly`, 58–75% oracle recovery). Scan **10–25% faster** than hand-rolled; operator **<0.03%** of forward pass; 0 allocs. **Opt-in** — G7 (58–75% recovery transfer to our substrate) deferred to Phase 3 PoC in `riir-poc/`; our latent functors/HLA don't have the paper's early/late MLP structure. |
+| **SIMD LUT Fused Dequant+Dot** (`simd_lut_dequant`) | 452 | G1–G4 ✅ (split) | Software SIMD LUT-accelerated dequant distilled from StreamDQ's hardware DQB (arxiv 2607.11262 §2.3). **Split decision:** the fused `dequant_dot_via_lut` kernel wins **4.58×** over the two-step path (NEON FMA + no buffer spill) → **default-on**; the plain `dequant_via_lut` is **3.5× slower** than the arithmetic cast on NEON (scalar gather, no native instruction) → stays opt-in infrastructure for future FP8/INT8. Cross-repo: `simd_lut_q4k` promoted to default-on in riir-engine (Plan 486 T3.3, multi-block 2.300× / full-GEMV 1.971× / single-block 2.027×). |
 
 **GOAT failures / negative results this session (kept opt-in, documented):** Plan 397 HGA (Hierarchical Global Attention, G2-proxy FAIL 2/12 vs DashAttention — same failure mode as MSA R225); Plan 374 ReMax (`argmax_a EI_m = argmax_a q` theorem — no modelless exploration, exploration → riir-train); Plan 375 Factorized Action (G2b+G3 FAIL — trained GateNetwork + VQ-VAE needed).
 
@@ -2529,6 +2530,48 @@ No new feature flag — convention + Lean files only. 📖 Plan: [`.plans/441_le
 
 ---
 
+### ⚡ SIMD LUT Fused Dequant+Dot (Plan 452, arXiv:2607.11262)
+
+Software SIMD LUT-accelerated dequantize primitive distilled from StreamDQ's hardware **Decompression-Quantization Buffer (DQB)** design (Research 418 §2.3). The paper eliminates CUDA-core overhead + HBM write-back on hardware; this is the **software analog** — LUT INT→FP conversion + shared FP32 ALU. The honest expectation (documented up front): the win is platform-dependent, bounded by SIMD gather latency vs CVT instruction latency, and the plain LUT dequant may regress on slow-gather platforms (Apple Silicon NEON has no native gather).
+
+**Split GOAT decision (the honest outcome):**
+
+| Gate | Target | Result | Verdict |
+|------|--------|--------|---------|
+| **G1** | Bit-exact vs arithmetic `dequant_arithmetic_ref` | identical (LUT convention `lut[i] = (signed(i) - zero) * scale`) | ✅ PASS |
+| **G2** | ≥1.3× latency on aarch64 NEON | Fused dequant+dot **4.583×** ✅; plain LUT dequant **0.286×** ❌ | **SPLIT** |
+| **G3** | No regression (all-features + default clean) | clean | ✅ PASS |
+| **G4** | Alloc-free hot path | 0 allocs/100 calls (stack `[f32; N]` LUT, caller-owned `&mut [f32]` out) | ✅ PASS |
+
+The **fused kernel** `dequant_dot_via_lut` wins 4.58× because it (1) skips the 4096-element f32 buffer spill of the two-step path and (2) uses NEON FMA (`vfmaq_f32`) with 4 independent accumulators. The **plain dequant** `dequant_via_lut` loses 3.5× because the gather is scalar on NEON.
+
+**Promotion: split.** `dequant_dot_via_lut` (fused) → **default-on** (4.58× modelless gain — pure SIMD fusion, zero allocations). `dequant_via_lut` (plain) → **opt-in infrastructure** for future FP8/INT8 consumers + AVX2 (which may make the gather competitive; unbenchmarked on Apple Silicon). Phase 6 (FP8, INT8, runtime dispatch) deferred until a real consumer appears. Cross-repo: `simd_lut_q4k` promoted to default-on in riir-engine (Plan 486 T3.3 — multi-block 2.300× / full-GEMV 1.971× / single-block 2.027×).
+
+Feature gate: `simd_lut_dequant` (**default-ON** for the fused kernel; plain dequant stays opt-in). 📖 Plan: [`.plans/452_simd_lut_dequant.md`](.plans/452_simd_lut_dequant.md), Benchmark: [`.benchmarks/432_simd_lut_dequant_goat.md`](.benchmarks/432_simd_lut_dequant_goat.md), Paper: [arXiv:2607.11262](https://arxiv.org/abs/2607.11262).
+
+---
+
+### 🛤️ Bounded One-Step LaCAM Escalation (Plan 453, arXiv:2310.05955)
+
+Replaces the **fake "LaCAM escalation"** (shuffled-priority retries of greedy PIBT, `DEFAULT_LACAM_RETRIES = 2`) with **real bounded one-step LaCAM** — the constraint-tree search from Okumura 2023, applied to a single tick. The critical insight from reading the reference implementation (`Kei18/lacam/src/planner.cpp`): LaCAM **does** use recursive PIBT with priority inheritance, but it does NOT collapse throughput (the failure mode of Issues 140/143) because the **constraint tree** bounds the recursion and provides systematic backtracking. **LaCAM = recursive PIBT + constraint tree**, and only the recursive PIBT half was tried before. Plan 453 ships the constraint tree — the missing half. Research 441 distills this distinction; Issue 154 corrects the false "collision-free by construction" claim.
+
+| Gate | Target | Result | Verdict |
+|------|--------|--------|---------|
+| **G6c** | Collision-freedom delta ≥ 0.50 | **1.000** (200/200 collision-free vs Naive 0/200) | ✅ PASS |
+| **G-col** | Vertex collision rate ≤ 10% | **0.0%** (Issue 154's vertex collisions eliminated) | ✅ PASS |
+| **G1** | Throughput ≥ 0.30 on all 4 maps | empty 0.69 ✅, random 0.69 ✅, warehouse 0.40 ✅, ht_chantry 0.28 ❌ | ⚠ 3/4 (ht_chantry marginal) |
+| **G-PI** | No throughput collapse (≥ 0.60 empty) | **0.69** (Issue 140/143 guard) | ✅ PASS |
+| **G3** | No regression | 1616/1616 + clippy clean | ✅ PASS |
+| **G4** | Latency ≤ 500ms median | 14–19ms @ 800 agents | ✅ PASS |
+
+**The headline result:** the constraint tree fixes the vertex collision problem perfectly (37.5% → 100% collision-free, G6c scenario) and improves ht_chantry throughput **28×** (0.01 → 0.28, from "system broken" to "system works, just not optimal"). But ht_chantry still marginally fails G1 (0.28 < 0.30) because one-step LaCAM resolves single-tick collisions but cannot plan multi-step maze detours.
+
+**Promotion: keep opt-in.** The collision-freedom gain (G6c, G-col) and ht_chantry 28× stand on their own, but the full G1 gate is not met. The one-step constraint tree is the correct foundation — a future multi-step LaCAM plan builds on top of it for maze throughput parity. (Research 424 §1.5's LaCAM* anytime-refinement *degradation* finding applies to multi-step plan optimization, not one-step collision-freedom — a different objective.)
+
+Feature gate: `lacam_escalation` (**opt-in**, implies `multi_agent_path`). 📖 Plan: [`.plans/453_bounded_one_step_lacam_escalation.md`](.plans/453_bounded_one_step_lacam_escalation.md), Research: [`.research/441_lacam_constraint_tree_distillation.md`](.research/441_lacam_constraint_tree_distillation.md), Benchmark: [`.benchmarks/453_lacam_escalation_goat.md`](.benchmarks/453_lacam_escalation_goat.md), Issue 154 (PIBT vertex collisions, closed as fixed by Plan 453 — file removed per noise-reduction rule). Paper: [arXiv:2310.05955](https://arxiv.org/abs/2310.05955).
+
+---
+
 ## 🔧 KV Compression
 
 Default: **Hybrid OCT+PQ** (OCTOPUS triplet encoding + PlanarQuant 2D Givens rotation). Best MSE + 64× fewer rotation FMAs.
@@ -2573,6 +2616,7 @@ Default: **Hybrid OCT+PQ** (OCTOPUS triplet encoding + PlanarQuant 2D Givens rot
 | **Hippocampal Cache** (`hippocampal_cache`) | HOLA surprise-evicted bounded exact KV cache on GDN2 backbone (Plan 395, arxiv 2607.02303) | Opt-in — G1–G4 modelless PASS (8/8 retrieval cosine≈1.0), G5 deferred to riir-train (Issue 038). Top-w by β·‖e‖ + decoupled RMSNorm-γ sharpened read. Competes for KV-compression slot alongside AM (Plan 271) + Sink-Aware (Plan 287). |
 | **LinOSS Threat** (`linoss_threat`) | Oscillation dynamics for anticipatory NPC threat prediction | Opt-in — pending benchmark |
 | **Fourier Flow** (`flow_field_nav`) | FFT-smoothed shared flow fields for O(1) crowd navigation | GOAT PASS 46.9%, opt-in |
+| **LaCAM Escalation** (`lacam_escalation`) | Bounded one-step LaCAM constraint-tree search replacing fake shuffled-priority retries (Plan 453, implies `multi_agent_path`) | Opt-in — G6c/G-col/G-PI/G3/G4 PASS (collision-freedom 37.5%→100%, ht_chantry 28×); G1 3/4 maps (ht_chantry 0.28 marginal); multi-step LaCAM deferred |
 | **StillKV** (`still_kv`) | Perceiver-based KV compaction with heuristic query banks | Opt-in — pending GOAT proof |
 | **ECHO Predictor** (`echo_predictor`) | Inference-time prediction scoring for policy quality | Opt-in — pending GOAT proof |
 | **Merkle Octree** (`merkle_octree`) | Node-tier curator consensus with BLAKE3 commitment | Opt-in — modelless verification |
@@ -2635,7 +2679,7 @@ cargo clippy --all-targets --all-features --quiet   # Lint
 
 ### Feature Flags
 
-**373 feature flags** with **155 default-on** (all GOAT-proved). Default features include: `sparse_mlp`, `domain_latent`, `ppot`, `bandit`, `bt_rank`, `spectral_quant`, `hybrid_oct_pq`, `elf_sde`, `cna_steering`, `deep_manifold`, `federation`, `gdn2_attention`, `dash_attn`, `lt2_looped`, `kv_share`, `kvarn`, `belief_drafter`, `bfcf_lfu_shard`, `mux_latent_context`, `collapse_aware_thinking`, `slod`, `schema_centroid`, `union_bound_confidence`, `pathway_tracker`, `federation_composer`, **`posterior_evolution`**, **`spectral_pruner`**, **`breakeven_routing`**, **`substrate_gate`**, **`regime_transition`**, `rcd_residual`, `lattice_operad`, `spec_pruner`, `caddtree_budget`, `ssd_block`, `ss_pruner`, `dendritic_gate`, `sparse_task_vector`, `off_principal_retrieval`, `spectral_rank`, `module_energy_route`, `gauge_invariant`, `chiaroscuro`, `attn_match`, **`manifold_power_iter_router`** (Plan 279 GOAT 9/9), **`triggered_injection`** (Plan 278 G3 PASS), **`temporal_deriv`** (Plan 277 4/4 fusions PASS), **`self_advantage_gate`** (Plan 283 GOAT 4/4 PASS), **`clr`** (Plan 284), **`personality_composition`** (Plan 297 G4+G5 PASS), **`cce_moderator`** (Plan 295+300 GOAT), **`complexity_prior_sampler`** (Plan 305 Phase 2 GOAT), **`salience_tri_gate`** (Plan 303 Phase 5 GOAT), **`claim_rubric`** (Plan 307 T3.3 GOAT 17/17), **`depth_invariance`** (Plan 306 T7.4 GOAT), **`cross_resolution_transport`** (Plan 310 Phase 4 GOAT), **`latent_field_steering`** (Plan 309 Phase 4 GOAT), **`viable_manifold_graph`** (Plan 312 Phase 5 GOAT post-CSR), **`ac_prefix`** (Plan 313 GOAT via §3.5 modelless unblock), **`tropical_algebra`** (Plan 337 Super-GOAT), **`temp_loss_fingerprint`** (Plan 341), **`zone_density_routing`** (Plan 351), **`set_attention`** (Plan 354), **`heat_kernel_trajectory`** (Plan 359), **`qmc_sampling`** (Plan 367), **`manifold_bandit`** (Plan 370), **`mean_field_regime`** (Plan 371), **`velocity_field_ensemble`** (Plan 376), **`local_branch_routing`** (Plan 377), **`ane_roofline`** (Plan 379), **`step_attribution_qualifier`** (Plan 381), **`spherical_steering`** (Plan 405), **`renoise_ce`** (Plan 406), and 74 more.
+**373 feature flags** with **155 default-on** (all GOAT-proved). Default features include: `sparse_mlp`, `domain_latent`, `ppot`, `bandit`, `bt_rank`, `spectral_quant`, `hybrid_oct_pq`, `elf_sde`, `cna_steering`, `deep_manifold`, `federation`, `gdn2_attention`, `dash_attn`, `lt2_looped`, `kv_share`, `kvarn`, `belief_drafter`, `bfcf_lfu_shard`, `mux_latent_context`, `collapse_aware_thinking`, `slod`, `schema_centroid`, `union_bound_confidence`, `pathway_tracker`, `federation_composer`, **`posterior_evolution`**, **`spectral_pruner`**, **`breakeven_routing`**, **`substrate_gate`**, **`regime_transition`**, `rcd_residual`, `lattice_operad`, `spec_pruner`, `caddtree_budget`, `ssd_block`, `ss_pruner`, `dendritic_gate`, `sparse_task_vector`, `off_principal_retrieval`, `spectral_rank`, `module_energy_route`, `gauge_invariant`, `chiaroscuro`, `attn_match`, **`manifold_power_iter_router`** (Plan 279 GOAT 9/9), **`triggered_injection`** (Plan 278 G3 PASS), **`temporal_deriv`** (Plan 277 4/4 fusions PASS), **`self_advantage_gate`** (Plan 283 GOAT 4/4 PASS), **`clr`** (Plan 284), **`personality_composition`** (Plan 297 G4+G5 PASS), **`cce_moderator`** (Plan 295+300 GOAT), **`complexity_prior_sampler`** (Plan 305 Phase 2 GOAT), **`salience_tri_gate`** (Plan 303 Phase 5 GOAT), **`claim_rubric`** (Plan 307 T3.3 GOAT 17/17), **`depth_invariance`** (Plan 306 T7.4 GOAT), **`cross_resolution_transport`** (Plan 310 Phase 4 GOAT), **`latent_field_steering`** (Plan 309 Phase 4 GOAT), **`viable_manifold_graph`** (Plan 312 Phase 5 GOAT post-CSR), **`ac_prefix`** (Plan 313 GOAT via §3.5 modelless unblock), **`tropical_algebra`** (Plan 337 Super-GOAT), **`temp_loss_fingerprint`** (Plan 341), **`zone_density_routing`** (Plan 351), **`set_attention`** (Plan 354), **`heat_kernel_trajectory`** (Plan 359), **`qmc_sampling`** (Plan 367), **`manifold_bandit`** (Plan 370), **`mean_field_regime`** (Plan 371), **`velocity_field_ensemble`** (Plan 376), **`local_branch_routing`** (Plan 377), **`ane_roofline`** (Plan 379), **`step_attribution_qualifier`** (Plan 381), **`spherical_steering`** (Plan 405), **`renoise_ce`** (Plan 406), **`simd_lut_dequant`** (Plan 452 fused dequant+dot, default-on split decision), and 73 more.
 
 📖 **Full feature flag table (373 flags):** [`.docs/09_feature_catalog/opt_in_features.md`](.docs/09_feature_catalog/opt_in_features.md) and [`Cargo.toml`](Cargo.toml).
 
@@ -3058,6 +3102,8 @@ Docs are grouped into numbered folders by primitive class — see
 - [Spherical Geodesic Steering](.plans/405_spherical_steering_geodesic_primitive.md)
 - [Renoise-CE Self-Verifier](.plans/406_renoise_ce_self_verifier.md)
 - [Lifelong LaCAM Multi-Agent Pathfinding](.plans/440_lifelong_lacam_multi_agent_pathfinding_substrate.md)
+- [SIMD LUT Fused Dequant+Dot](.plans/452_simd_lut_dequant.md)
+- [Bounded One-Step LaCAM Escalation](.plans/453_bounded_one_step_lacam_escalation.md)
 - [Lean Spec Self-Testing on Concrete Instances (Plan 441)](.plans/441_lean_spec_self_testing_concrete_instances.md)
 - [Proposal 003 — src/ consolidation master (Phases 0–12)](.proposals/003_src_consolidation_master.md)
 - [Sigmoid-not-Softmax: The Universality-Class Escape (Research 315, Liu & Gore 2606.25008)](.docs/04_calibration/universality_class_escape.md)

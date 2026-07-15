@@ -535,6 +535,8 @@ The modelless SAR kernel: project a weight delta onto the base matrix's SVD subs
 
 **Stays opt-in** because the spectral concentration assumption (G1b) is unvalidated without real training deltas — a generic delta is NOT concentrated (0.12–0.18). Promotion to default is blocked on Issue 123 (real-delta test). The SVD 64-col cap (Issue 124) blocks 128×128/512×512. The cached-index path (`SpectralRewireIndex`) is the recommended hot-loop API.
 
+**LLM-scale escape hatch CLOSED (Issue 151, 2026-07-15).** The SAR concentration phenomenon was the foundational assumption for the SAR × QuasiMoTTo Pass@k fusion (Issue 151) — the hypothesis was that concentration holds at LLM scale (4096×4096 weight matrices) even though it failed at NPC scale (Issue 123). A 1.5B-scale Phase 1 PoC **refuted** concentration: 0/196 layers exceeded the 0.8 `on_manifold_fraction` threshold. The LLM-scale regime does NOT rescue the concentration assumption. See negative_results §10.
+
 | Gate | Target | Result | Verdict |
 |------|--------|--------|---------|
 | **G1a** | SVD recovery | ~8e-6 | ✅ PASS |

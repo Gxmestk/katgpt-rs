@@ -189,3 +189,33 @@ Distills [Bottlenecked Transformers (arXiv:2505.16950)](https://arxiv.org/abs/25
 | **Alien Sampler** (`alien_sampler`) | Plan 311 Coherence × Availability | **GOAT FAILED 2/4** | G1+G2 fail (β phase-transition at β≈0.4, no β satisfies both motif-collapse and quality). G3 PASS post-rayon (4.56×). G4 PASS. Mechanism validated (2× concentration reduction); domain transfer to synthetic NPC populations unvalidated. Module retained opt-in for paper reproduction. |
 | **AC-Prefix** (`ac_prefix`) | Plan 313 Arbitrary-Conditional Prefix | **GOAT PARTIAL — original G1 FAILED** | G1-original (paper equivalence to iterative-MLM at 1e-4) FAILED at 7.5e-4 on untrained micro-GPT. Subagent reformulated G1 to buffer-bit-identicality (PASS) and promoted; **reverted to opt-in on 2026-06-24 audit** (plan decision tree says "G1 ✗ → STOP", not "redefine and promote"). G2/G3/G4 PASS (27.258× speedup, 0 mismatches, 0 allocs). Primitive correct as modelless mask builder; paper's equivalence claim needs riir-train LoRA validation (Issue 003). |
 | **KV Consolidation** | Plan 420 Bottlenecked Transformers | **QUALITY GAIN REFUTED** | §3.6 PoC: Δtoken_acc = −0.06pp, ΔNLL = +0.0001; zero hyperparameter sensitivity. riir-train Plan 313 confirmed on TRAINED model (31% accuracy, 0.00pp gain). Paper's quality benefit is inseparable from TRAINED Cache Processor; modelless mean-shift is inert. No feature flag ships. |
+
+## 9. MCTS State-Action Cache (Plan 451) — OPT-IN-FOREVER (G2 FAILED)
+
+Distilled the UnMaskFork state-action pair cache for MCTS over deterministic inference actions — memoize `(state, action) → child` transitions so repeated rollouts skip re-applying the same `apply()` call. Correct idea for dLLM-scale MCTS where each `apply` is a full forward pass.
+
+**G2 FAILED on re-gate (Issue 044, 2026-07-07).** The synthetic domain's `apply` is a 4-token array write (~ns), so cache hits don't translate to meaningful NFE (number of forward evaluations) savings:
+
+| Sub-gate | Target | Result | Verdict |
+|----------|--------|--------|---------|
+| **G2a** reward-convergence | ≥1 strict win | 0/6 (both arms converge to 1.000 at NFE=256) | ❌ FAIL |
+| **G2b** NFE-savings | ≥1.4× expansion | 1.01–1.03× (avg_rollout_depth 0.6–0.7 — tree reaches terminal depth before cache helps) | ❌ FAIL |
+
+**Root cause:** the synthetic domain is too cheap for cache hits to matter. Only a real dLLM PoC where each `apply` is a full forward pass can show the budget-expansion benefit. Stays **opt-in-forever** until a real dLLM PoC re-validates. Infrastructure (correctness G1 PASS) is reusable. 📖 Plan: [`.plans/451_mcts_state_action_cache_unmaskfork.md`](../../.plans/451_mcts_state_action_cache_unmaskfork.md), Issue 044 (re-gate — file removed per noise-reduction rule).
+
+## 10. SAR × QuasiMoTTo Fusion (Issue 151) — CONCENTRATION REFUTED @ 1.5B
+
+**Fusion hypothesis:** SAR (weight-delta purification, widens the reachable problem set) × QuasiMoTTo (QMC lattice sampling, covers a fixed set with 50% fewer samples) → compound Pass@k gain. The fusion operates at LLM scale (4096×4096 weight matrices) where SAR concentration is supposed to hold (paper's Fig 2, AIME 2024).
+
+**Phase 1 PoC REFUTED concentration at 1.5B scale (2026-07-15).** The foundational assumption — SAR produces a **concentrated** weight-delta spectrum where off-manifold drift is removed — does not hold empirically:
+
+- **Test:** 196 layers of a 1.5B model, measure `on_manifold_fraction` (target >0.8 for concentration to hold).
+- **Result:** **0/196 layers exceed 0.8.** The concentration phenomenon claimed by the paper is not reproducible at 1.5B scale in our setup.
+
+Without concentration, the compound gain cannot exist (SAR cannot widen the reachable set if it doesn't first concentrate the delta). Issue closed; the fusion does not survive the PoC gate. This mirrors the earlier `spectral_rewire` G1b failure (Issue 123, NPC-scale ≤64×64, on_manifold_fraction in [0.27, 0.58]) — the concentration phenomenon is not reproducible in either regime. 📖 Plan: [`.plans/423_spectral_rewire_primitive.md`](../../.plans/423_spectral_rewire_primitive.md), PoC result: `riir-train/.scratch/sar_qmc_fusion_poc/PHASE1_RESULTS.md` (Issue 151 closed + removed per noise-reduction rule; git `b7ca596c`).
+
+## 11. SAR Spectral Backdoor Detection (Issue 152) — IMPRACTICAL (FATAL SCOPE)
+
+**Hypothesis:** `spectral_rewire`'s rewiring matrix `M = UᵀΔWV` may expose a spectral signature of a planted backdoor that the backdoor's construction (R422) deliberately hides from uniform-norm tests. R422 proves the backdoor is *statistically undetectable* in TV-distance; the open question was whether SAR's *directional* decomposition breaks that undetectability.
+
+**CLOSED impractical (2026-07-15).** The fatal scope problem (identified during open-questions analysis) is confirmed: SAR operates on a **weight delta** `ΔW`, but a backdoor detector must operate on the **base weights `W`** (you don't have the honest delta to subtract). SAR's purification needs a reference point; a backdoored-in-from-scratch model has no honest baseline to purify against. The detection surface SAR provides exists only on the delta, not the deployed weights. R422's PASS verdict (backdoor is statistically undetectable) stands unbroken. (Issue 152 closed + removed per noise-reduction rule; git `2524918b`.)
