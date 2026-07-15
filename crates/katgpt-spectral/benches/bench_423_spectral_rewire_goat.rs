@@ -55,7 +55,7 @@
 //!     [`SpectralRewireIndex`] ONCE, then per-delta does only the four
 //!     matmuls. THIS is the gated path: 512×64 at rank-32 mean `< 1ms`;
 //!     64×64 at rank-8 mean `< 10µs`.
-//!   `std::time::Instant` (criterion is not a katgpt-rs dev-dep).
+//!     `std::time::Instant` (criterion is not a katgpt-rs dev-dep).
 //! - **G6 (feature isolation):** validated via `cargo check` combos outside
 //!   this binary (see Plan 423 Phase 3 notes); this binary compiling cleanly
 //!   under `--features spectral_rewire` is itself part of G6.
@@ -153,10 +153,10 @@ fn build_on_manifold_delta(
     for i in 0..d_out {
         for j in 0..d_in {
             let mut acc = 0.0f32;
-            for k in 0..rank {
+            for (k, &m_diag_k) in m_diag.iter().enumerate().take(rank) {
                 let u_k = svd_result.left_singular_vector(k);
                 let v_k = svd_result.right_singular_vector(k);
-                acc += u_k[i] * m_diag[k] * v_k[j];
+                acc += u_k[i] * m_diag_k * v_k[j];
             }
             delta[i * d_in + j] = acc;
         }
@@ -256,9 +256,9 @@ fn g2_singular_direction_preservation(d_out: usize, d_in: usize, rank: usize) ->
     thin_svd_into(&w1, d_out, d_in, &mut svd1, &mut work1);
 
     let mut min_cos = 1.0f32;
-    for k in 0..rank {
+    for (k, v0_top_k) in v0_top.iter().enumerate().take(rank) {
         let v1_k = svd1.right_singular_vector(k);
-        let c = cosine(&v0_top[k], v1_k);
+        let c = cosine(v0_top_k, v1_k);
         // Singular directions can flip sign (v and -v are the same direction).
         let aligned = c.abs();
         if aligned < min_cos {

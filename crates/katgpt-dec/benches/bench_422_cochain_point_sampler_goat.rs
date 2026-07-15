@@ -93,8 +93,8 @@ fn build_quad_workload() -> (CellComplex, CochainField, [f32; 8]) {
     let mut rng = SplitMix64::new(0x4220_0710_2026); // 422, 2026-07-10
     for v in 0..gw * gh {
         let features = field.cell_features_mut(v);
-        for d in 0..dim {
-            features[d] = rng.next_u01() * 2.0 - 1.0;
+        for feat in features.iter_mut().take(dim) {
+            *feat = rng.next_u01() * 2.0 - 1.0;
         }
     }
     let out = [0.0f32; 8];
@@ -113,8 +113,8 @@ fn build_tri_workload() -> (
     let mut rng = SplitMix64::new(0x4221_0710_2026);
     for v in 0..3 {
         let features = field.cell_features_mut(v);
-        for d in 0..dim {
-            features[d] = rng.next_u01() * 2.0 - 1.0;
+        for feat in features.iter_mut().take(dim) {
+            *feat = rng.next_u01() * 2.0 - 1.0;
         }
     }
     let tri_pos = [[0.0f32, 0.0], [4.0, 0.0], [0.0, 4.0]];

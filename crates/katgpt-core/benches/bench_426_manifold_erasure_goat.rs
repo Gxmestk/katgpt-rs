@@ -355,13 +355,11 @@ fn g4_alloc_free_hot_path() {
         let _ = manifold_erasure_step_into(&x, &gradient, &pool, n, &config, &mut scratch, &mut out);
     }
 
-    let (result, allocs) = alloc_delta(|| {
+    let (_, allocs) = alloc_delta(|| {
         for _ in 0..100 {
             let _ = manifold_erasure_step_into(&x, &gradient, &pool, n, &config, &mut scratch, &mut out);
         }
     });
-
-    let _ = result; // suppress unused
 
     if allocs > 0 {
         fail("G4", &format!("{} allocs over 100 calls (expected 0)", allocs));
@@ -507,13 +505,11 @@ fn g4c_cached_loop_alloc_free() {
     // Note: the loop allocates grad_buf + current per round (matching the uncached
     // loop pattern). The cache optimization itself adds 0 allocs. We measure the
     // cached step's alloc count separately to verify the cache is alloc-free.
-    let (result, allocs) = alloc_delta(|| {
+    let (_, allocs) = alloc_delta(|| {
         for _ in 0..100 {
             let _ = manifold_erasure_loop_cached_into(&x, &gf, &pool, n, &config, 10, &mut scratch, &mut cache, &mut out);
         }
     });
-
-    let _ = result;
 
     // The loop's per-round allocations (grad_buf + current) are inherited from
     // the uncached loop. The cache itself adds 0. We report the total and note
@@ -539,13 +535,11 @@ fn g4d_cached_step_alloc_free() {
         let _ = manifold_erasure_step_cached_into(&x, &gradient, &pool, n, &config, &mut scratch, &mut cache, &mut out);
     }
 
-    let (result, allocs) = alloc_delta(|| {
+    let (_, allocs) = alloc_delta(|| {
         for _ in 0..100 {
             let _ = manifold_erasure_step_cached_into(&x, &gradient, &pool, n, &config, &mut scratch, &mut cache, &mut out);
         }
     });
-
-    let _ = result;
 
     if allocs > 0 {
         fail("G4d", &format!("{} allocs over 100 cached step calls (expected 0)", allocs));

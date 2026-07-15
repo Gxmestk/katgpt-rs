@@ -799,7 +799,7 @@ mod tests {
                 &target_weights,
                 &config,
                 d2f_config,
-                consensus_config.clone(),
+                consensus_config,
                 4,
             );
             verifier.speculate(

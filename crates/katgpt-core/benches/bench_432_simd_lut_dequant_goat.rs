@@ -15,6 +15,7 @@
 //!       (no regression — LUT build cost may dominate at small sizes).
 //!     - Full-row dequant (4096 elements): LUT vs arithmetic. Target: ≥ 1.2×.
 //!     - Fused dequant+dot (4096 elements): fused vs two-step. Target: ≥ 1.3×.
+//!
 //!   If G2 FAILS on all three: document negative result, keep opt-in, do NOT
 //!   promote to default. The plan's realistic target is 1.0–1.5× (the paper's
 //!   7× is hardware-only).
@@ -77,26 +78,6 @@ impl Rng {
     }
     fn next_f32(&mut self) -> f32 {
         (self.next_u32() as f32) / (u32::MAX as f32) * 2.0 - 1.0
-    }
-    fn fill_u8(&mut self, v: &mut [u8]) {
-        let mut i = 0;
-        while i + 4 <= v.len() {
-            let r = self.next_u32();
-            v[i] = r as u8;
-            v[i + 1] = (r >> 8) as u8;
-            v[i + 2] = (r >> 16) as u8;
-            v[i + 3] = (r >> 24) as u8;
-            i += 4;
-        }
-        while i < v.len() {
-            v[i] = self.next_u32() as u8;
-            i += 1;
-        }
-    }
-    fn fill_f32(&mut self, v: &mut [f32]) {
-        for x in v.iter_mut() {
-            *x = self.next_f32();
-        }
     }
 }
 

@@ -295,9 +295,9 @@ mod tests {
         let mut cal = RewardGatedCalibrator::new(AllowAll);
         let key = make_key(0, 0, 0);
 
-        cal.record_reward(key.clone(), 0.5);
-        cal.record_reward(key.clone(), 0.7);
-        cal.record_reward(key.clone(), 0.9);
+        cal.record_reward(key, 0.5);
+        cal.record_reward(key, 0.7);
+        cal.record_reward(key, 0.9);
 
         let stats = cal.param_stats.get(&key).unwrap();
         assert_eq!(stats.visits, 3);
@@ -339,10 +339,10 @@ mod tests {
         );
         let key = make_key(0, 0, 0);
 
-        cal.record_reward(key.clone(), 0.5);
+        cal.record_reward(key, 0.5);
 
         // Bandit update with very high reward
-        let step = cal.bandit_update(key.clone(), 100.0).unwrap();
+        let step = cal.bandit_update(key, 100.0).unwrap();
         let delta = step.new_value - step.old_value;
         assert!(
             delta <= 0.1 + 1e-6,
@@ -350,8 +350,8 @@ mod tests {
         );
 
         // Bandit update with very low reward
-        cal.record_reward(key.clone(), 0.5);
-        let step = cal.bandit_update(key.clone(), -100.0).unwrap();
+        cal.record_reward(key, 0.5);
+        let step = cal.bandit_update(key, -100.0).unwrap();
         let delta = step.new_value - step.old_value;
         assert!(
             delta >= 0.0 - 1e-6,
@@ -373,7 +373,7 @@ mod tests {
 
         // Feed identical rewards — variance = 0
         for _ in 0..10 {
-            cal.record_reward(key.clone(), 0.5);
+            cal.record_reward(key, 0.5);
         }
 
         assert!(
@@ -396,7 +396,7 @@ mod tests {
 
         // Feed high-variance rewards
         for i in 0..10 {
-            cal.record_reward(key.clone(), if i % 2 == 0 { 0.0 } else { 1.0 });
+            cal.record_reward(key, if i % 2 == 0 { 0.0 } else { 1.0 });
         }
 
         assert!(
@@ -468,8 +468,8 @@ mod tests {
         let mut cal = RewardGatedCalibrator::new(AllowAll);
         let key = make_key(0, 0, 0);
 
-        cal.record_reward(key.clone(), 0.5);
-        cal.bandit_update(key.clone(), 0.8).unwrap();
+        cal.record_reward(key, 0.5);
+        cal.bandit_update(key, 0.8).unwrap();
 
         assert_eq!(cal.calibration_log().len(), 1);
         assert_eq!(cal.calibration_log()[0].parameter_id, key);
@@ -488,9 +488,9 @@ mod tests {
         let mut cal = RewardGatedCalibrator::new(AllowAll);
         let key = make_key(0, 0, 0);
 
-        cal.record_reward(key.clone(), 0.5);
-        cal.bandit_update(key.clone(), 0.8).unwrap();
-        cal.bandit_update(key.clone(), 0.9).unwrap();
+        cal.record_reward(key, 0.5);
+        cal.bandit_update(key, 0.8).unwrap();
+        cal.bandit_update(key, 0.9).unwrap();
         assert_eq!(cal.calibration_log().len(), 2);
 
         let step = cal.rollback_last();
@@ -541,7 +541,7 @@ mod tests {
         fn test_verify_regression_all_pass() {
             let mut cal = RewardGatedCalibrator::new(AllowAll);
             let key = make_key(0, 0, 0);
-            cal.record_reward(key.clone(), 0.5);
+            cal.record_reward(key, 0.5);
             cal.bandit_update(key, 0.8).unwrap();
             assert_eq!(cal.calibration_log().len(), 1);
 
@@ -557,7 +557,7 @@ mod tests {
         fn test_verify_regression_rollback_on_failure() {
             let mut cal = RewardGatedCalibrator::new(AllowAll);
             let key = make_key(0, 0, 0);
-            cal.record_reward(key.clone(), 0.5);
+            cal.record_reward(key, 0.5);
             cal.bandit_update(key, 0.8).unwrap();
             assert_eq!(cal.calibration_log().len(), 1);
 

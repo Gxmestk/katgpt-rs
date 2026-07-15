@@ -1077,7 +1077,7 @@ fn gate_g4_latency() -> GateResult {
     // ── Build a tree with non-trivial posteriors (avoid Beta(1,1) fast path) ──
     // Apply observations so internal nodes have non-uniform Beta posteriors.
     let (root, n_arms) = build_deep_tree(DEPTH_G4, BRANCHING_G4, 0.0);
-    let mut tree = LatentTaskTree::from_root(root, config.clone());
+    let mut tree = LatentTaskTree::from_root(root, config);
     let mut rng = fastrand::Rng::with_seed(42);
     for i in 0..5_000 {
         let arm = tree.sample(&mut rng);
@@ -1185,8 +1185,8 @@ fn gate_g5_reproducibility() -> GateResult {
     // Two independently-constructed identical trees.
     let (root_a, _) = build_deep_tree(DEPTH_G4, BRANCHING_G4, 0.0);
     let (root_b, _) = build_deep_tree(DEPTH_G4, BRANCHING_G4, 0.0);
-    let tree_a = LatentTaskTree::from_root(root_a, config.clone());
-    let tree_b = LatentTaskTree::from_root(root_b, config.clone());
+    let tree_a = LatentTaskTree::from_root(root_a, config);
+    let tree_b = LatentTaskTree::from_root(root_b, config);
 
     // BLAKE3 match.
     let blake3_match = tree_a.blake3_root() == tree_b.blake3_root();
@@ -1209,8 +1209,8 @@ fn gate_g5_reproducibility() -> GateResult {
     // Identical sample sequences after identical observation sequences.
     let (root_a, n_arms) = build_deep_tree(DEPTH_G4, BRANCHING_G4, 0.0);
     let (root_b, _) = build_deep_tree(DEPTH_G4, BRANCHING_G4, 0.0);
-    let mut tree_a = LatentTaskTree::from_root(root_a, config.clone());
-    let mut tree_b = LatentTaskTree::from_root(root_b, config.clone());
+    let mut tree_a = LatentTaskTree::from_root(root_a, config);
+    let mut tree_b = LatentTaskTree::from_root(root_b, config);
 
     // Apply identical observation sequence.
     for step in 0..1_000 {

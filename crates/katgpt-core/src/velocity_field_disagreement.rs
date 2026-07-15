@@ -863,9 +863,7 @@ mod tests {
         // and finiteness).
         const D: usize = 2;
         let f0 = ClosureField::new(0, |x: &[f32], out: &mut [f32; D]| {
-            for k in 0..D {
-                out[k] = x[k];
-            }
+            out.copy_from_slice(&x[..D]);
         });
         let f1 = ClosureField::new(1, |x: &[f32], out: &mut [f32; D]| {
             for k in 0..D {

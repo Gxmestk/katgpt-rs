@@ -909,13 +909,18 @@ mod tests {
         let result = spectral_rewire(&w0, &delta, d_out, d_in, r);
 
         // delta_star + residual == delta
-        for idx in 0..d_out * d_in {
-            let recon = result.delta_star[idx] + result.residual[idx];
-            let rel = (recon - delta[idx]).abs() / delta[idx].abs().max(1e-10);
+        for (idx, ((&delta_star, &residual), &delta)) in result
+            .delta_star
+            .iter()
+            .zip(result.residual.iter())
+            .zip(delta.iter())
+            .enumerate()
+        {
+            let recon = delta_star + residual;
+            let rel = (recon - delta).abs() / delta.abs().max(1e-10);
             assert!(
                 rel < 1e-5,
-                "reconstruction failed at idx {idx}: ΔW_on+ΔW_off={recon:.6e}, ΔW={:.6e}, rel={rel:.2e}",
-                delta[idx]
+                "reconstruction failed at idx {idx}: ΔW_on+ΔW_off={recon:.6e}, ΔW={delta:.6e}, rel={rel:.2e}"
             );
         }
     }
@@ -1198,10 +1203,10 @@ mod tests {
         for i in 0..d_out {
             for j in 0..d_in {
                 let mut acc = 0.0;
-                for k in 0..r {
+                for (k, &m_true_k) in m_true.iter().enumerate().take(r) {
                     let u_k = svd_result.left_singular_vector(k);
                     let v_k = svd_result.right_singular_vector(k);
-                    acc += u_k[i] * m_true[k] * v_k[j];
+                    acc += u_k[i] * m_true_k * v_k[j];
                 }
                 delta[i * d_in + j] = acc;
             }
@@ -1328,9 +1333,9 @@ mod tests {
         for i in 0..d_out {
             for j in 0..d_in {
                 let mut acc = 0.0;
-                for k in 0..r {
+                for (k, &m_diag_k) in m_diag.iter().enumerate().take(r) {
                     acc += svd_result.left_singular_vector(k)[i]
-                        * m_diag[k]
+                        * m_diag_k
                         * svd_result.right_singular_vector(k)[j];
                 }
                 delta_on[i * d_in + j] = acc;

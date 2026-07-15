@@ -360,6 +360,14 @@ mod tests {
     use katgpt_core::gdn_tree_verify::build_topology;
     use katgpt_core::types::Config;
 
+    /// Key/value head dimensions bundled as one parameter to stay under
+    /// clippy's `too_many_arguments` threshold on the reference helpers below.
+    #[derive(Copy, Clone)]
+    struct HeadDims {
+        d_k: usize,
+        d_v: usize,
+    }
+
     /// Build a GDN2 cache with paper-compatible config:
     /// uniform decay_alpha, erase_b = 1.0.
     fn paper_compatible_cache(config: &Config, alpha: f32) -> MultiLayerGdn2Cache {
@@ -380,9 +388,10 @@ mod tests {
         alpha: f32,
         beta: f32,
         s0: &mut [f32],
-        d_k: usize,
-        d_v: usize,
+        dims: HeadDims,
     ) -> Vec<f32> {
+        let d_k = dims.d_k;
+        let d_v = dims.d_v;
         let t = keys.len() / d_k;
         let mut outputs = vec![0.0f32; t * d_v];
         let scale = 1.0 / (d_k as f32).sqrt();
@@ -519,8 +528,7 @@ mod tests {
                 alpha,
                 beta,
                 &mut s0_seq,
-                d_k,
-                d_v,
+                HeadDims { d_k, d_v },
             );
 
             // Compare tree verify output (topo-indexed) to sequential.
@@ -580,8 +588,7 @@ mod tests {
                 alpha,
                 1.0,
                 &mut seq_s0[head],
-                d_k,
-                d_v,
+                HeadDims { d_k, d_v },
             );
         }
 
@@ -599,15 +606,12 @@ mod tests {
         );
 
         // Compare S₀ after commit vs sequential
-        for head in 0..n_kv_heads {
+        for (head, sequential) in seq_s0.iter().enumerate() {
             let committed = &cache_commit.layers[0].heads[head].s;
-            let sequential = &seq_s0[head];
-            for i in 0..d_k * d_v {
+            for (i, (&c, &s)) in committed.iter().zip(sequential.iter()).enumerate() {
                 assert!(
-                    (committed[i] - sequential[i]).abs() < 1e-3,
-                    "head {head} S[{i}]: committed={:.6} sequential={:.6}",
-                    committed[i],
-                    sequential[i],
+                    (c - s).abs() < 1e-3,
+                    "head {head} S[{i}]: committed={c:.6} sequential={s:.6}",
                 );
             }
         }
@@ -677,8 +681,7 @@ mod tests {
                 head_queries,
                 &alphas_arr,
                 &betas_arr,
-                d_k,
-                d_v,
+                HeadDims { d_k, d_v },
             );
 
             // Tree output is topo-indexed; gather to original order
@@ -707,9 +710,10 @@ mod tests {
         queries: &[f32],
         alphas: &[f32],
         betas: &[f32],
-        d_k: usize,
-        d_v: usize,
+        dims: HeadDims,
     ) -> Vec<f32> {
+        let d_k = dims.d_k;
+        let d_v = dims.d_v;
         let t = parents.len();
         let mut outputs = vec![0.0f32; t * d_v];
         let scale = 1.0 / (d_k as f32).sqrt();

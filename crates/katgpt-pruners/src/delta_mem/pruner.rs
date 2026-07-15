@@ -620,7 +620,7 @@ mod tests {
 
         let mut pruner_reuse = MemorySteeredPruner::new(
             NoScreeningPruner,
-            cfg.clone(),
+            cfg,
             2.0,
             CorrectionMode::OutputSide,
             WriteGranularity::Segment,

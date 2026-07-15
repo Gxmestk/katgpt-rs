@@ -7,8 +7,6 @@
 //! 4. Warm-start cache correctness.
 //! 5. Hindrance estimator correctness.
 
-#![cfg(test)]
-
 use super::*;
 use super::position::*;
 use fastrand::Rng;
@@ -647,7 +645,7 @@ fn test_uniform_goals_reassigns_on_reach() {
     // Force agent 0 to be at its goal — should get a new goal.
     // We don't know the exact initial goal (seeded RNG), but after reaching
     // it, goal_for returns a different candidate.
-    let initial = goals.current_goal(AgentId(0)).unwrap().clone();
+    let initial = *goals.current_goal(AgentId(0)).unwrap();
     let reassigned = goals.goal_for(AgentId(0), &initial);
     // After reaching, a new goal is assigned — must be one of the candidates.
     assert!(candidates.contains(&reassigned));
@@ -657,7 +655,7 @@ fn test_uniform_goals_reassigns_on_reach() {
 fn test_uniform_goals_keeps_when_not_at_goal() {
     let candidates = vec![GridPos::new(5, 5), GridPos::new(7, 7)];
     let mut goals = UniformGoals::new(candidates, 1, 42);
-    let initial = goals.current_goal(AgentId(0)).unwrap().clone();
+    let initial = *goals.current_goal(AgentId(0)).unwrap();
     // Agent is NOT at goal → goal_for returns the same goal.
     let elsewhere = GridPos::new(0, 0);
     let g = goals.goal_for(AgentId(0), &elsewhere);

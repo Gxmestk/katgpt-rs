@@ -212,7 +212,7 @@ mod tests {
     #[test]
     fn test_config_clones_independently() {
         let a = DreamerConfig::default();
-        let mut b = a.clone();
+        let mut b = a;
         b.cadence = 99;
         assert_eq!(a.cadence, 10);
         assert_eq!(b.cadence, 99);

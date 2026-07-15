@@ -192,7 +192,7 @@ mod tests {
             lr: 10.0, // very high lr to push out of bounds
             ..Default::default()
         };
-        let mut vm = VarianceMinimizer::new(config.clone());
+        let mut vm = VarianceMinimizer::new(config);
 
         // Push param to lower boundary.
         for _ in 0..100 {

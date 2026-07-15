@@ -5,10 +5,10 @@
 //! are a different distribution. **This PoC is the honesty checkpoint.**
 //!
 //! Synthetic d=8 retrieval mirroring the HLA embedding regime:
-//! - 1000 "shards" with nonlinear-but-monotonic embeddings: base vector `v`,
-//!   each shard applies `v_i = sign(v_i) * |v_i|^p` for random `p ∈ [0.5, 2.0]`
-//!   + Gaussian noise. This models the "consolidated style_weights" regime where
-//!   the ordinal structure is preserved but the magnitude relationship is nonlinear.
+//!
+//! - 1000 "shards" with nonlinear-but-monotonic embeddings: base vector `v`.
+//!
+//!   Each shard applies `v_i = sign(v_i) * |v_i|^p` for random `p ∈ [0.5, 2.0]` + Gaussian noise. This models the "consolidated style_weights" regime where the ordinal structure is preserved but the magnitude relationship is nonlinear.
 //! - 200 queries = perturbed versions of known-correct shards (extra Gaussian
 //!   noise on top of the shard's transformed embedding).
 //! - Measure recall@1, recall@5 for: (a) cosine ranking, (b) recos ranking.
@@ -142,9 +142,9 @@ impl ShardGen {
     /// the 8 components).
     fn shard(&self, rng: &mut Rng, _i: usize, noise_std: f32) -> [f32; EMBED_DIM] {
         let mut emb = [0.0f32; EMBED_DIM];
-        for j in 0..EMBED_DIM {
+        for emb_j in emb.iter_mut() {
             // Base components in [-2, 2] — non-trivial magnitude spread.
-            emb[j] = rng.range(-2.0, 2.0) + rng.gauss() * noise_std;
+            *emb_j = rng.range(-2.0, 2.0) + rng.gauss() * noise_std;
         }
         emb
     }

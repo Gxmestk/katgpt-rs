@@ -271,6 +271,7 @@ fn main() {
             w_phi: *w_phi,
             alpha: *alpha,
             rounds: *rounds,
+            max_expansions: 0,
         };
         let start = Instant::now();
         let (throughput, max_stops) = run_sim(&map, n_agents, steps, 42, cfg);

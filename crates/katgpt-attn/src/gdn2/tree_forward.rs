@@ -432,7 +432,7 @@ pub fn forward_tree_gdn2_impl<V: TreeLayerVerifier>(
             {
                 types::matmul(&mut ctx.hidden, &layer_weights.mlp_w1, &ctx.x, config.mlp_hidden, n);
                 types::matmul(&mut ctx.hidden2, &layer_weights.mlp_w_up, &ctx.x, config.mlp_hidden, n);
-                types::swiglu_inplace(&mut ctx.hidden, &mut ctx.hidden2);
+                types::swiglu_inplace(&mut ctx.hidden, &ctx.hidden2);
             }
             #[cfg(not(feature = "gated_mlp"))]
             types::matmul_relu(
@@ -708,8 +708,8 @@ mod tests {
             .enumerate()
             .map(|(i, &tok)| {
                 let mut path: u128 = 0;
-                for j in 0..=i {
-                    path = (path << 16) | (tokens[j] as u128);
+                for &t_j in tokens.iter().take(i + 1) {
+                    path = (path << 16) | (t_j as u128);
                 }
                 katgpt_core::speculative::types::TreeNode {
                     depth: i,
@@ -804,8 +804,8 @@ mod tests {
             .enumerate()
             .map(|(i, &tok)| {
                 let mut path: u128 = 0;
-                for j in 0..=i {
-                    path = (path << 16) | (tokens[j] as u128);
+                for &t_j in tokens.iter().take(i + 1) {
+                    path = (path << 16) | (t_j as u128);
                 }
                 katgpt_core::speculative::types::TreeNode {
                     depth: i,
