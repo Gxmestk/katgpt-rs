@@ -3,7 +3,7 @@
 **Opened:** 2026-07-15
 **Origin:** Research 406 §8.3 Fusion G (addendum)
 **Related Research:** [406 (SAR)](../.research/406_Spectral_Rewiring_Weight_Delta_Purification.md), [422 (Backdoors)](../.research/422_Statistically_Undetectable_Backdoors_Model_Provenance.md)
-**Status:** Open — needs PoC; highly speculative
+**Status:** CLOSED — 2026-07-15, impractical (fatal scope problem, see verdict below)
 
 ## TL;DR
 
@@ -118,20 +118,63 @@ addendum + Research 422 as a refuted fusion. R422's PASS verdict (backdoor
 construction is training-side, modelless verification is a corollary) stands
 unchallenged.
 
+## Verdict — CLOSED impractical (2026-07-15)
+
+The fatal scope problem identified in §"Open questions" is confirmed as a
+hard blocker, not merely an inconvenience.
+
+**The scope problem is architectural, not merely operational.**
+
+SAR's mechanism operates on `ΔW = W_backdoored − W_honest`. Computing this
+delta presupposes access to a trusted honest reference. Two threat-model
+cases:
+
+1. **Exact honest reference available.** If we have the *exact* honest model
+   the backdoor was planted into, SAR is unnecessary — a direct weight
+   comparison `‖W_suspect − W_honest‖` reveals the backdoor delta with no
+   spectral machinery. SAR adds nothing.
+
+2. **No honest reference (the realistic threat model).** We have a suspect
+   model and no honest twin. SAR has no delta to decompose. The "spectral
+   signature in M" never gets computed because `ΔW` is undefined.
+
+A third hypothetical case — "we have a *different* honest model of the same
+family" — collapses into existing differential backdoor detection (compare
+fine-tune deltas across known-good vs suspect models). That is not a SAR
+contribution; SAR would be a post-processing layer on a technique that
+already works (or doesn't) without it.
+
+**Even if the scope problem were waived**, the empirical evidence from
+Issue 151's Phase 1 PoC (closed negative) shows that RL fine-tune deltas at
+1.5B scale have `on_manifold_fraction ∈ [0.001, 0.191]` — far below the
+concentration threshold SAR relies on. A backdoor delta planted as a
+low-rank perturbation (R422 §1.5) would behave similarly to other
+fine-tune deltas in the SVD-coordinate lens: it lands mostly in the
+off-manifold residual, where SAR's `M` doesn't see it. SAR is the wrong
+lens for this signal.
+
+**Outcome for R422:** R422's verdict stands unchallenged. The backdoor
+construction is training-side; modelless verification is a corollary of
+having the construction secret. SAR does not break the TV-distance
+undetectability. No further PoC work.
+
+**Outcome for `spectral_rewire`:** unchanged. The primitive stays OPT-IN.
+This fusion did not add a capability.
+
 ## Open questions
 
-- [ ] R422's construction is for a FEEDFORWARD DNN with frozen Gaussian first
+- [-] R422's construction is for a FEEDFORWARD DNN with frozen Gaussian first
       layer. Our transformers don't have this architecture. Does the spectral
-      signature generalize to transformer weight deltas? (Probably not directly
-      — this PoC is specifically on R422's setup, not our models.)
-- [ ] Is this even the right framing? R422 says the backdoor is undetectable
+      signature generalize to transformer weight deltas? **DEFERRED — moot
+      given the scope verdict above.**
+- [x] Is this even the right framing? R422 says the backdoor is undetectable
       *given the weights*. SAR operates on weight deltas between two models.
       We would need BOTH the honest and backdoored model to compute the delta —
       which means we already have the honest reference. The realistic threat
       model is "we have a suspect model, no honest reference" — and there SAR
-      has no delta to decompose. **This may be a fatal scope problem.**
+      has no delta to decompose. **YES — confirmed fatal scope problem.**
 
-## Honest assessment
+## Honest assessment (preserved from filing)
 
 **This fusion is the weakest of the three new ones (E/F/G).** The scope problem
 (need both models to compute the delta) may make it impractical even if the
