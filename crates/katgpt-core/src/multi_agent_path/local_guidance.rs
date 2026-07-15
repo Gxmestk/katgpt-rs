@@ -325,7 +325,11 @@ impl<P: Position> SpaceTimeGuidance<P> {
             return 0;
         }
         if let (Some(occ), Some(f)) = (&self.flat_occupancy, &self.flat_index_fn) {
-            return occ[f(pos)][t];
+            let idx = f(pos);
+            // Bounds check: out-of-bounds positions (e.g. agents at the grid
+            // edge whose neighbors include x=width) return 0 collisions.
+            // This matches the HashMap path's `.get(pos).map_or(0, ...)` behavior.
+            return occ.get(idx).map_or(0, |arr| arr[t]);
         }
         self.occupancy.get(pos).map_or(0, |arr| arr[t])
     }
@@ -340,7 +344,10 @@ impl<P: Position> SpaceTimeGuidance<P> {
                     break;
                 }
                 let idx = f(pos);
-                occ[idx][t] = occ[idx][t].saturating_add(1);
+                // Bounds check: skip out-of-bounds positions (matches HashMap no-entry behavior).
+                if let Some(arr) = occ.get_mut(idx) {
+                    arr[t] = arr[t].saturating_add(1);
+                }
             }
         } else {
             for (t, pos) in path.iter().enumerate() {
@@ -366,7 +373,9 @@ impl<P: Position> SpaceTimeGuidance<P> {
                     break;
                 }
                 let idx = f(pos);
-                occ[idx][t] = occ[idx][t].saturating_sub(1);
+                if let Some(arr) = occ.get_mut(idx) {
+                    arr[t] = arr[t].saturating_sub(1);
+                }
             }
         } else {
             for (t, pos) in path.iter().enumerate() {
