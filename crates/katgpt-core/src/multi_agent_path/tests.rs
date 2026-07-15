@@ -205,9 +205,394 @@ fn test_warm_start_lllg_empty() {
     assert!(ws.is_empty());
 }
 
-// ─────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// T1.11 — Flow field (Guided-PIBT, Issue 149)
+// ─────────────────────────────────────────────────────────────────────────────
+
+#[test]
+fn test_noflow_always_zero() {
+    let nf = NoFlow;
+    assert_eq!(nf.mismatch(&GridPos::new(0, 0), &GridPos::new(1, 0)), 0);
+    assert_eq!(nf.mismatch(&GridPos::new(5, 5), &GridPos::new(5, 5)), 0);
+}
+
+#[test]
+fn test_grid_flow_field_no_corridors_on_open_map() {
+    // An entirely open map has NO corridor cells (every cell has 4 neighbors).
+    let map = GridMap::empty(5, 5);
+    let ff = GridFlowField::from_map(&map);
+    assert_eq!(ff.corridor_cell_count(), 0, "open map has no corridors");
+    // All moves should return 0 mismatch.
+    assert_eq!(ff.mismatch(&GridPos::new(0, 0), &GridPos::new(1, 0)), 0);
+    assert_eq!(ff.mismatch(&GridPos::new(2, 2), &GridPos::new(2, 3)), 0);
+}
+
+#[test]
+fn test_grid_flow_field_detects_horizontal_corridor() {
+    // A 1-wide horizontal corridor at y=1, flanked by walls at y=0 and y=2.
+    //
+    //   #####
+    //   .....   <- corridor (all cells have left+right neighbors only)
+    //   #####
+    let mut map = GridMap::empty(5, 3);
+    for x in 0..5 {
+        map.set_wall(x, 0);
+        map.set_wall(x, 2);
+    }
+    let ff = GridFlowField::from_map(&map);
+    // All 5 cells at y=1 are corridor cells (left+right, no up/down).
+    // But the two endpoints (x=0 and x=4) have only 1 passable neighbor each
+    // (they're at the edge), so they're dead-ends, not corridors.
+    // Only x=1,2,3 are corridors.
+    assert_eq!(ff.corridor_cell_count(), 3);
+    // Check direction at corridor cells.
+    let dir = ff.direction_at(2, 1).expect("(2,1) is a corridor");
+    assert_eq!(dir.axis, CorridorAxis::Horizontal);
+    assert_eq!(dir.sign, 1);
+}
+
+#[test]
+fn test_grid_flow_field_detects_vertical_corridor() {
+    // A 1-wide vertical corridor at x=1, flanked by walls.
+    //
+    //   #.#
+    //   #.#
+    //   #.#
+    //   #.#
+    //   #.#
+    let mut map = GridMap::empty(3, 5);
+    for y in 0..5 {
+        map.set_wall(0, y);
+        map.set_wall(2, y);
+    }
+    let ff = GridFlowField::from_map(&map);
+    // Only y=1,2,3 are corridors (endpoints y=0 and y=4 are dead-ends).
+    assert_eq!(ff.corridor_cell_count(), 3);
+    let dir = ff.direction_at(1, 2).expect("(1,2) is a corridor");
+    assert_eq!(dir.axis, CorridorAxis::Vertical);
+    assert_eq!(dir.sign, 1);
+}
+
+#[test]
+fn test_flow_mismatch_horizontal_corridor() {
+    // Horizontal corridor (sign=+1, direction = right/+x).
+    let mut map = GridMap::empty(5, 3);
+    for x in 0..5 {
+        map.set_wall(x, 0);
+        map.set_wall(x, 2);
+    }
+    let ff = GridFlowField::from_map(&map);
+
+    // Moving right (aligned with +1 sign) → mismatch 0.
+    assert_eq!(ff.mismatch(&GridPos::new(1, 1), &GridPos::new(2, 1)), 0);
+    // Moving left (against +1 sign) → mismatch 1.
+    assert_eq!(ff.mismatch(&GridPos::new(2, 1), &GridPos::new(1, 1)), 1);
+    // Waiting → mismatch 0.
+    assert_eq!(ff.mismatch(&GridPos::new(2, 1), &GridPos::new(2, 1)), 0);
+}
+
+#[test]
+fn test_flow_mismatch_vertical_corridor() {
+    // Vertical corridor (sign=+1, direction = down/+y).
+    let mut map = GridMap::empty(3, 5);
+    for y in 0..5 {
+        map.set_wall(0, y);
+        map.set_wall(2, y);
+    }
+    let ff = GridFlowField::from_map(&map);
+
+    // Moving down (aligned with +1 sign) → mismatch 0.
+    assert_eq!(ff.mismatch(&GridPos::new(1, 1), &GridPos::new(1, 2)), 0);
+    // Moving up (against +1 sign) → mismatch 1.
+    assert_eq!(ff.mismatch(&GridPos::new(1, 2), &GridPos::new(1, 1)), 1);
+}
+
+#[test]
+fn test_flow_field_junction_not_corridor() {
+    // A junction cell (3+ passable neighbors) is NOT a corridor.
+    //
+    //   .#.
+    //   ...
+    //   .#.
+    let mut map = GridMap::empty(3, 3);
+    map.set_wall(1, 0);
+    map.set_wall(1, 2);
+    let ff = GridFlowField::from_map(&map);
+    // Cell (1,1) has 3 neighbors (left, right, itself) — wait, actually
+    // (1,1) has left(0,1), right(2,1) = 2 neighbors, plus up/down are walls.
+    // So (1,1) IS a horizontal corridor cell.
+    // Actually no: (0,1) and (2,1) are passable, (1,0) and (1,2) are walls.
+    // So (1,1) has exactly 2 passable neighbors (left, right) → corridor.
+    assert_eq!(ff.corridor_cell_count(), 1); // only (1,1)
+}
+
+#[test]
+fn test_flow_field_dead_end_not_corridor() {
+    // A dead-end cell (1 passable neighbor) is NOT a corridor.
+    //
+    //   ##
+    //   .#
+    let mut map = GridMap::empty(2, 2);
+    map.set_wall(1, 0);
+    map.set_wall(1, 1);
+    let ff = GridFlowField::from_map(&map);
+    // Cell (0,0) has neighbor (0,1) only → 1 neighbor → dead-end, not corridor.
+    // Cell (0,1) has neighbor (0,0) only → 1 neighbor → dead-end, not corridor.
+    assert_eq!(ff.corridor_cell_count(), 0);
+}
+
+#[test]
+fn test_flow_field_corner_not_corridor() {
+    // A corner cell (2 non-opposite neighbors) is NOT a corridor.
+    //
+    //   ..
+    //   .#
+    let mut map = GridMap::empty(2, 2);
+    map.set_wall(1, 1);
+    let ff = GridFlowField::from_map(&map);
+    // Cell (0,0) has neighbors (1,0) and (0,1) → 2 neighbors but NOT opposite
+    // (they form an L-corner) → NOT a corridor.
+    assert_eq!(ff.corridor_cell_count(), 0);
+}
+
+#[test]
+fn test_lacam_with_flow_field_no_regression() {
+    // Verify the orchestrator works with a flow field set. On an open map,
+    // the flow field has no corridors, so behavior should be identical to
+    // NoFlow (no regression).
+    let map = GridMap::empty(10, 10);
+    let starts = vec![GridPos::new(0, 0), GridPos::new(9, 9)];
+    let config = JointConfig::new(starts);
+    let goals = vec![GridPos::new(9, 9), GridPos::new(0, 0)];
+
+    let cfg = GuidanceConfig::default();
+    let map_clone = map.clone();
+    let mut guidance = SpaceTimeGuidance::new(cfg)
+        .with_neighbors(move |p| map_clone.passable_neighbors(p));
+    let mut hindrance = BlockingCount::new();
+    let mut rng = Rng::with_seed(42);
+
+    let flow = GridFlowField::from_map(&map);
+    let map_clone2 = map.clone();
+    let mut lacam = LifelongLaCam::new(WarmStartCache::new(WarmStartScheme::default(), cfg.w_phi))
+        .with_neighbors(move |p| map_clone2.passable_neighbors(p))
+        .with_flow_field(flow);
+
+    let mut current = config;
+    for _tick in 0..20 {
+        let action = lacam.tick(&current, &goals, &mut guidance, &mut hindrance, &mut rng);
+        // No vertex collision.
+        let mut seen = std::collections::HashSet::new();
+        for p in &action.moves {
+            assert!(seen.insert(*p), "vertex collision at {p:?}");
+        }
+        current = JointConfig::new(action.moves);
+    }
+}
+
+#[test]
+fn test_corridor_direction_assignment_deterministic() {
+    // The same map must always produce the same flow field.
+    let mut map = GridMap::empty(7, 3);
+    for x in 0..7 {
+        map.set_wall(x, 0);
+        map.set_wall(x, 2);
+    }
+    let ff1 = GridFlowField::from_map(&map);
+    let ff2 = GridFlowField::from_map(&map);
+    assert_eq!(ff1.corridor_cell_count(), ff2.corridor_cell_count());
+    // Check all cells match.
+    for y in 0..3 {
+        for x in 0..7 {
+            assert_eq!(ff1.direction_at(x, y), ff2.direction_at(x, y));
+        }
+    }
+assert!(ws.is_empty());
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// T1.11 — Flow field (Guided-PIBT, Issue 149)
+// ─────────────────────────────────────────────────────────────────────────────
+
+#[test]
+fn test_noflow_always_zero() {
+let nf = NoFlow;
+assert_eq!(nf.mismatch(&GridPos::new(0, 0), &GridPos::new(1, 0)), 0);
+assert_eq!(nf.mismatch(&GridPos::new(5, 5), &GridPos::new(5, 5)), 0);
+}
+
+#[test]
+fn test_grid_flow_field_no_corridors_on_open_map() {
+// An entirely open map has NO corridor cells (every cell has 4 neighbors).
+let map = GridMap::empty(5, 5);
+let ff = GridFlowField::from_map(&map);
+assert_eq!(ff.corridor_cell_count(), 0, "open map has no corridors");
+// All moves should return 0 mismatch.
+assert_eq!(ff.mismatch(&GridPos::new(0, 0), &GridPos::new(1, 0)), 0);
+assert_eq!(ff.mismatch(&GridPos::new(2, 2), &GridPos::new(2, 3)), 0);
+}
+
+#[test]
+fn test_grid_flow_field_detects_horizontal_corridor() {
+// A 1-wide horizontal corridor at y=1, flanked by walls at y=0 and y=2.
+//
+//   #####
+//   .....   <- corridor (cells have left+right neighbors only)
+//   #####
+let mut map = GridMap::empty(5, 3);
+for x in 0..5 {
+    map.set_wall(x, 0);
+    map.set_wall(x, 2);
+}
+let ff = GridFlowField::from_map(&map);
+// Only x=1,2,3 are corridors (x=0 and x=4 are dead-ends at the edge).
+assert_eq!(ff.corridor_cell_count(), 3);
+let dir = ff.direction_at(2, 1).expect("(2,1) is a corridor");
+assert_eq!(dir.axis, CorridorAxis::Horizontal);
+assert_eq!(dir.sign, 1);
+}
+
+#[test]
+fn test_grid_flow_field_detects_vertical_corridor() {
+// A 1-wide vertical corridor at x=1, flanked by walls.
+//
+//   #.#
+//   #.#
+//   #.#
+//   #.#
+//   #.#
+let mut map = GridMap::empty(3, 5);
+for y in 0..5 {
+    map.set_wall(0, y);
+    map.set_wall(2, y);
+}
+let ff = GridFlowField::from_map(&map);
+// Only y=1,2,3 are corridors (endpoints y=0 and y=4 are dead-ends).
+assert_eq!(ff.corridor_cell_count(), 3);
+let dir = ff.direction_at(1, 2).expect("(1,2) is a corridor");
+assert_eq!(dir.axis, CorridorAxis::Vertical);
+assert_eq!(dir.sign, 1);
+}
+
+#[test]
+fn test_flow_mismatch_horizontal_corridor() {
+// Horizontal corridor (sign=+1, direction = right/+x).
+let mut map = GridMap::empty(5, 3);
+for x in 0..5 {
+    map.set_wall(x, 0);
+    map.set_wall(x, 2);
+}
+let ff = GridFlowField::from_map(&map);
+
+// Moving right (aligned with +1 sign) → mismatch 0.
+assert_eq!(ff.mismatch(&GridPos::new(1, 1), &GridPos::new(2, 1)), 0);
+// Moving left (against +1 sign) → mismatch 1.
+assert_eq!(ff.mismatch(&GridPos::new(2, 1), &GridPos::new(1, 1)), 1);
+// Waiting → mismatch 0.
+assert_eq!(ff.mismatch(&GridPos::new(2, 1), &GridPos::new(2, 1)), 0);
+}
+
+#[test]
+fn test_flow_mismatch_vertical_corridor() {
+// Vertical corridor (sign=+1, direction = down/+y).
+let mut map = GridMap::empty(3, 5);
+for y in 0..5 {
+    map.set_wall(0, y);
+    map.set_wall(2, y);
+}
+let ff = GridFlowField::from_map(&map);
+
+// Moving down (aligned with +1 sign) → mismatch 0.
+assert_eq!(ff.mismatch(&GridPos::new(1, 1), &GridPos::new(1, 2)), 0);
+// Moving up (against +1 sign) → mismatch 1.
+assert_eq!(ff.mismatch(&GridPos::new(1, 2), &GridPos::new(1, 1)), 1);
+}
+
+#[test]
+fn test_flow_field_dead_end_not_corridor() {
+// A dead-end cell (1 passable neighbor) is NOT a corridor.
+//
+//   ##
+//   .#
+let mut map = GridMap::empty(2, 2);
+map.set_wall(1, 0);
+map.set_wall(1, 1);
+let ff = GridFlowField::from_map(&map);
+// Cell (0,0) has neighbor (0,1) only → 1 neighbor → dead-end.
+// Cell (0,1) has neighbor (0,0) only → 1 neighbor → dead-end.
+assert_eq!(ff.corridor_cell_count(), 0);
+}
+
+#[test]
+fn test_flow_field_corner_not_corridor() {
+// A corner cell (2 non-opposite neighbors) is NOT a corridor.
+//
+//   ..
+//   .#
+let mut map = GridMap::empty(2, 2);
+map.set_wall(1, 1);
+let ff = GridFlowField::from_map(&map);
+// Cell (0,0) has neighbors (1,0) and (0,1) → 2 neighbors but NOT opposite
+// (they form an L-corner) → NOT a corridor.
+assert_eq!(ff.corridor_cell_count(), 0);
+}
+
+#[test]
+fn test_lacam_with_flow_field_no_regression() {
+// Verify the orchestrator works with a flow field set. On an open map,
+// the flow field has no corridors, so behavior should be identical to
+// NoFlow (no regression).
+let map = GridMap::empty(10, 10);
+let starts = vec![GridPos::new(0, 0), GridPos::new(9, 9)];
+let config = JointConfig::new(starts);
+let goals = vec![GridPos::new(9, 9), GridPos::new(0, 0)];
+
+let cfg = GuidanceConfig::default();
+let map_clone = map.clone();
+let mut guidance = SpaceTimeGuidance::new(cfg)
+    .with_neighbors(move |p| map_clone.passable_neighbors(p));
+let mut hindrance = BlockingCount::new();
+let mut rng = Rng::with_seed(42);
+
+let flow = GridFlowField::from_map(&map);
+let map_clone2 = map.clone();
+let mut lacam = LifelongLaCam::new(WarmStartCache::new(WarmStartScheme::default(), cfg.w_phi))
+    .with_neighbors(move |p| map_clone2.passable_neighbors(p))
+    .with_flow_field(flow);
+
+let mut current = config;
+for _tick in 0..20 {
+    let action = lacam.tick(&current, &goals, &mut guidance, &mut hindrance, &mut rng);
+    // No vertex collision.
+    let mut seen = std::collections::HashSet::new();
+    for p in &action.moves {
+        assert!(seen.insert(*p), "vertex collision at {p:?}");
+    }
+    current = JointConfig::new(action.moves);
+}
+}
+
+#[test]
+fn test_corridor_direction_assignment_deterministic() {
+// The same map must always produce the same flow field.
+let mut map = GridMap::empty(7, 3);
+for x in 0..7 {
+    map.set_wall(x, 0);
+    map.set_wall(x, 2);
+}
+let ff1 = GridFlowField::from_map(&map);
+let ff2 = GridFlowField::from_map(&map);
+assert_eq!(ff1.corridor_cell_count(), ff2.corridor_cell_count());
+for y in 0..3 {
+    for x in 0..7 {
+        assert_eq!(ff1.direction_at(x, y), ff2.direction_at(x, y));
+    }
+}
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // T1.10.5 — Hindrance estimator correctness
-// ─────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
 
 #[test]
 fn test_blocking_count_known() {
@@ -694,6 +1079,102 @@ fn test_lacam_no_collision_on_dense_map() {
             }
         }
         current = JointConfig::new(action.moves);
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Issue 516 T1a — flat-array occupancy equivalence + correctness
+// ─────────────────────────────────────────────────────────────────────
+
+/// Helper: make guidance with flat-array occupancy configured.
+fn make_flat_guidance(map: &GridMap, cfg: GuidanceConfig) -> SpaceTimeGuidance<GridPos> {
+    let width = map.width;
+    let height = map.height;
+    let map = map.clone();
+    SpaceTimeGuidance::new(cfg)
+        .with_neighbors(move |p| map.passable_neighbors(p))
+        .with_flat_occupancy(width * height, move |p: &GridPos| p.y * width + p.x)
+}
+
+#[test]
+fn test_flat_occupancy_produces_identical_guidance_as_hashmap() {
+    // The flat-array occupancy path MUST produce bit-identical guidance paths
+    // to the HashMap path. This is the correctness gate for T1a.
+    let map = GridMap::empty(10, 10);
+    let cfg = GuidanceConfig { w_phi: 5, alpha: 3.0, rounds: 2 };
+    let config = JointConfig::new(vec![
+        GridPos::new(0, 0),
+        GridPos::new(9, 9),
+        GridPos::new(0, 9),
+        GridPos::new(9, 0),
+    ]);
+    let goals = vec![
+        GridPos::new(9, 9),
+        GridPos::new(0, 0),
+        GridPos::new(9, 0),
+        GridPos::new(0, 9),
+    ];
+
+    let mut guidance_hash = make_guidance(&map, cfg);
+    let mut guidance_flat = make_flat_guidance(&map, cfg);
+
+    let mut out_hash = Vec::new();
+    let mut out_flat = Vec::new();
+    guidance_hash.compute_guidance(&config, &goals, &mut out_hash);
+    guidance_flat.compute_guidance(&config, &goals, &mut out_flat);
+
+    assert_eq!(out_hash.len(), out_flat.len(), "output length mismatch");
+    for (i, (path_h, path_f)) in out_hash.iter().zip(out_flat.iter()).enumerate() {
+        assert_eq!(path_h, path_f, "agent {i}: flat-array path differs from HashMap path");
+    }
+}
+
+#[test]
+fn test_flat_occupancy_respects_walls() {
+    let mut map = GridMap::empty(10, 10);
+    map.set_wall(5, 0);
+    map.set_wall(5, 1);
+    map.set_wall(5, 2);
+    let cfg = GuidanceConfig::default();
+    let mut guidance = make_flat_guidance(&map, cfg);
+    let config = JointConfig::new(vec![GridPos::new(0, 0)]);
+    let goals = vec![GridPos::new(9, 0)];
+    let mut out = Vec::new();
+    guidance.compute_guidance(&config, &goals, &mut out);
+    assert_eq!(out.len(), 1);
+    assert_eq!(out[0].len(), cfg.w_phi);
+    // Should NOT pass through the wall at x=5.
+    for pos in &out[0] {
+        assert!(pos.x != 5 || pos.y > 2, "path passes through wall at (5, {})", pos.y);
+    }
+}
+
+#[test]
+fn test_flat_occupancy_multi_round_refinement_identical() {
+    // Multi-round refinement (unrecord/re-record) must also be identical.
+    // This exercises the flat-array record_path/unrecord_path/clear_occupancy.
+    let map = GridMap::empty(8, 8);
+    let cfg = GuidanceConfig { w_phi: 5, alpha: 2.0, rounds: 3 }; // 3 rounds!
+    let config = JointConfig::new(vec![
+        GridPos::new(0, 0),
+        GridPos::new(7, 7),
+        GridPos::new(3, 3),
+    ]);
+    let goals = vec![
+        GridPos::new(7, 7),
+        GridPos::new(0, 0),
+        GridPos::new(0, 7),
+    ];
+
+    let mut gh = make_guidance(&map, cfg);
+    let mut gf = make_flat_guidance(&map, cfg);
+    let mut oh = Vec::new();
+    let mut of = Vec::new();
+    gh.compute_guidance(&config, &goals, &mut oh);
+    gf.compute_guidance(&config, &goals, &mut of);
+
+    for (i, (ph, pf)) in oh.iter().zip(of.iter()).enumerate() {
+        assert_eq!(ph, pf, "agent {i}: multi-round refinement diverged");
     }
 }
 
