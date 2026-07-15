@@ -1,4 +1,4 @@
-# Research 050: PFlash Distillation — Compression as Complexity Signal
+# Research 428: PFlash Distillation — Compression as Complexity Signal
 
 > **Source:** [Luce PFlash](https://github.com/Luce-Org/lucebox-hub) — speculative prefill compression (128K→2.6K, 10.4× TTFT reduction)
 > **Date:** 2026-06-01

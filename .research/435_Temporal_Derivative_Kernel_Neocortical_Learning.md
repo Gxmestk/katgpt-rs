@@ -1,4 +1,4 @@
-# Research 243: Temporal Derivative Kernel — Neocortical Learning Distilled
+# Research 435: Temporal Derivative Kernel — Neocortical Learning Distilled
 
 > **Source:** Randall C. O'Reilly, "This is how the Neocortex Learns", arXiv:2606.08720 (Jun 2026).
 > Companion experimental paper: Jang, Flores, Zito & O'Reilly, "Synaptic Plasticity as a Function of the Temporal Derivative", bioRxiv 2026.06.05.730489.

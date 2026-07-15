@@ -10,7 +10,7 @@
 
 **Date:** 2026-06-16
 **Plan:** [277_temporal_derivative_kernel.md](../.plans/277_temporal_derivative_kernel.md)
-**Research:** [243_Temporal_Derivative_Kernel_Neocortical_Learning.md](../.research/243_Temporal_Derivative_Kernel_Neocortical_Learning.md)
+**Research:** [435_Temporal_Derivative_Kernel_Neocortical_Learning.md](../.research/435_Temporal_Derivative_Kernel_Neocortical_Learning.md)
 **Source:** [arXiv:2606.08720](https://arxiv.org/abs/2606.08720) — O'Reilly, "This is how the Neocortex Learns" (Jun 2026)
 
 ---

@@ -1,4 +1,4 @@
-# Research 258: FlashMemory-DeepSeek-V4 — Lookahead Periodic Sparse Attention
+# Research 436: FlashMemory-DeepSeek-V4 — Lookahead Periodic Sparse Attention
 
 > **Source:** [FlashMemory-DeepSeek-V4: Lightning Index Ultra-Long Context via Lookahead Sparse Attention](https://arxiv.org/abs/2606.09079) — Yan Wang, Qifan Zhang, Jiachen Yu, Tian Liang, et al. (Tencent / HKUST-GZ / Tsinghua), 2026-06-07
 > **Date:** 2026-06-17

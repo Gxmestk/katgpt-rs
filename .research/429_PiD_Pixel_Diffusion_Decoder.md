@@ -1,4 +1,4 @@
-# Research Verdict 119: PiD — Fast and High-Resolution Latent Decoding with Pixel Diffusion
+# Research Verdict 429: PiD — Fast and High-Resolution Latent Decoding with Pixel Diffusion
 
 > **Paper:** [arXiv 2605.23902](https://arxiv.org/abs/2605.23902) — Lu, Wu, Wu, Wang, Ling, Fidler, Ren (NVIDIA, Toronto), May 2026
 > **Code:** https://github.com/NVIDIA/PiD

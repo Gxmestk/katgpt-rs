@@ -1,4 +1,4 @@
-# Research 265: CoFRe / FP-MGM — Fixed-Point Masked Generative Modeling
+# Research 437: CoFRe / FP-MGM — Fixed-Point Masked Generative Modeling
 
 > **Source:** "Fixed-Point Masked Generative Modeling" — Miele, Qin, Carballo-Castro, Deschenaux, Frossard (EPFL). [arXiv:2605.31215](https://arxiv.org/abs/2605.31215). May 2026.
 > **Reference impl:** https://github.com/andreamiele/fp-mgm (`fp-mdlm`, `fp-maskgit` branches)

@@ -1,7 +1,7 @@
 # Plan 407: Sheaf-ADMM Coordination Primitive — `sheaf_admm_step` on `CellComplex`
 
 **Date:** 2026-07-06
-**Research:** [katgpt-rs/.research/384](../.research/384_Sheaf_ADMM_Multi_Agent_Coordination.md)
+**Research:** [katgpt-rs/.research/438](../.research/438_Sheaf_ADMM_Multi_Agent_Coordination.md)
 **Source paper:** [arXiv:2605.31005](https://arxiv.org/abs/2605.31005) — Seely, Cupiał, Jones, "Learning Multi-Agent Coordination via Sheaf-ADMM", ICML 2026
 **Target:** `katgpt-rs/crates/katgpt-dec/src/sheaf_admm.rs` (new module) + Cargo feature `sheaf_admm`
 **Status:** ✅ CLOSED (2026-07-07). Phase 2 (GOAT gate) COMPLETE — promoted to default-on. All G1–G6 PASS. Phase 3 (T3.1+T3.2+T3.3) COMPLETE — all three amplification gates PASS (implemented in-session; Issues 045/046/047 resolved-and-removed).

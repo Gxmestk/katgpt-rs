@@ -1,4 +1,4 @@
-# Research 145: Wall Attention — Data-Dependent Diagonal Forget Gates as RoPE Replacement
+# Research 431: Wall Attention — Data-Dependent Diagonal Forget Gates as RoPE Replacement
 
 > **Blog:** [Wall Attention](https://www.tilde.com/blog/wall-attention) — Tilde Research, 2026
 > **Date:** 2026-06, distilled 2026-06

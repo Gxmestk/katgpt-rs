@@ -1,4 +1,4 @@
-# Research 410: NVFP4 RL — Dequantized Backward + 4/6 Adaptive Block Scaling
+# Research 439: NVFP4 RL — Dequantized Backward + 4/6 Adaptive Block Scaling
 
 > **Source:** "The 4-bitter Lesson: Balancing Stability and Performance in NVFP4 RL" — Ziang Li & humans& ai, July 10, 2026. https://humansand.ai/blog/nvfp4-rl?v=3
 > **Date:** 2026-07-11

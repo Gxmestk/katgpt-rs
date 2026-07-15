@@ -1,4 +1,4 @@
-# Research 156: Weight-Isolate Extension Protocol
+# Research 432: Weight-Isolate Extension Protocol
 
 **Date:** 2026-06
 **Source:** Internal — distillation of LoRA + WASM weight-isolation into modelless context

@@ -360,7 +360,7 @@ Per `003_Commercial_Open_Source_Strategy_Verdict.md`:
   - `katgpt-rs/.research/240_SGS_Curiosity_Guided_Self_Play.md` — curiosity host for Learning-Potential
   - `katgpt-rs/.research/247_Dense_Latent_Heterogeneous_Communication_CS_Probe.md` + `riir-ai/.research/133_NPC_Mind_Reading_Adaptive_Bandwidth_Guide.md` — fusion target F1
   - `katgpt-rs/.research/218_Breakeven_Complexity_Inference_Router.md` — fusion target F4
-  - `katgpt-rs/.research/243_Temporal_Derivative_Kernel_Neocortical_Learning.md` — curiosity cousin (derivative vs Learning-Potential)
+  - `katgpt-rs/.research/435_Temporal_Derivative_Kernel_Neocortical_Learning.md` — curiosity cousin (derivative vs Learning-Potential)
 - **Self-consistency ancestry:** Wang et al., "Self-Consistency Improves Chain of Thought Reasoning in Language Models" (arXiv:2203.11171, ICLR 2023) — the linear ancestor of CLR's nonlinear reliability
 - **→ riir-train redirect:** the post-training recipe (SFT + MGPO RL + offline self-distillation + Instruct RL + Diversity-Exploring Distillation) is training-only. One-line note, no files created in this session.
 

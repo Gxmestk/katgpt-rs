@@ -1,7 +1,7 @@
 # Plan 291: D2F Three-State Warm-Start (3SR × LT2-Looped × RCD Fusion)
 
 **Date:** 2026-06-18
-**Research:** [katgpt-rs/.research/265_CoFRe_FP_MGM_Three_State_Reuse.md](../.research/265_CoFRe_FP_MGM_Three_State_Reuse.md)
+**Research:** [katgpt-rs/.research/437_CoFRe_FP_MGM_Three_State_Reuse.md](../.research/437_CoFRe_FP_MGM_Three_State_Reuse.md)
 **Source paper:** [arXiv:2605.31215](https://arxiv.org/abs/2605.31215) — Miele et al., "Fixed-Point Masked Generative Modeling" (CoFRe)
 **Target:** `katgpt-rs/src/dllm.rs` (extend `denoise_loop_rcd` family) + Cargo feature `d2f_3sr_warm_start` (depends on `rcd_residual` + `lt2_looped` + `dllm`)
 **Status:** Active — Phase 1 not started
@@ -82,7 +82,7 @@ These are real training contributions; route to `riir-train/.research/` if itera
 
 ## References
 
-- Research: `.research/265_CoFRe_FP_MGM_Three_State_Reuse.md`
+- Research: `.research/437_CoFRe_FP_MGM_Three_State_Reuse.md`
 - Closest shipped cousin: Plan 258 (RCD) — `.plans/258_rcd_residual_context_diffusion.md`, `src/dllm.rs::denoise_loop_rcd`
 - FP-MGM primitive (shipped): Plan 108 (LT2 Looped) — `LoopMode::WeightShared`, `forward_looped`
 - Masked diffusion (shipped): Plan 066 (D2F), Plan 109 (DMax SPD)

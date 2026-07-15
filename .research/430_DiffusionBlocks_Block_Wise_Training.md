@@ -1,4 +1,4 @@
-# Research 131: DiffusionBlocks — Block-Wise Neural Network Training via Diffusion Interpretation
+# Research 430: DiffusionBlocks — Block-Wise Neural Network Training via Diffusion Interpretation
 
 > **Paper:** [arXiv:2506.14202](https://arxiv.org/pdf/2506.14202) — Shing, Koyama, Akiba (Sakana AI / UT Tokyo), ICLR 2026
 > **Date:** 2026-05-28 | **Re-visited:** 2026-06-12

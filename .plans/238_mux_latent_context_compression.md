@@ -2,7 +2,7 @@
 
 **Status:** ✅ COMPLETE — GOAT model 5/5 PASS (14-29× TTFT reduction proven with real forward_prefill), promoted to default
 **Date:** 2026-06-10
-**Research:** `.research/211_LCLM_Latent_Context_Language_Model_Distillation.md`
+**Research:** `.research/433_LCLM_Latent_Context_Language_Model_Distillation.md`
 **Feature Gate:** `mux_latent_context` (GOAT PROVED — G1 14× X8 / 29× X16 TTFT reduction, promoted to default)
 **Depends On:** Existing `mux_demux.rs` (MUX superposition), `domain_latent` (mid-layer injection), `MuxDdTree` (speculative decoding)
 **GOAT Criteria:** TTFT reduction > 2× at 16k context with < 5% quality loss (perplexity)

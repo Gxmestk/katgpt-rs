@@ -3,7 +3,7 @@
 **Date**: 2026-06-12
 **Status**: ✅ COMPLETE (GOAT PASS — promoted to default)
 **Feature**: `dendritic_gate`
-**Research**: `.research/228_TwinProp_Dendritic_Inference_Compute.md`
+**Research**: `.research/434_TwinProp_Dendritic_Inference_Compute.md`
 
 ---
 

@@ -1,4 +1,4 @@
-# Research 384: Sheaf-ADMM Multi-Agent Coordination → Modelless Primal/Consensus/Dual Triple
+# Research 438: Sheaf-ADMM Multi-Agent Coordination → Modelless Primal/Consensus/Dual Triple
 
 > **Source:** Seely, Cupiał, Jones — "Learning Multi-Agent Coordination via Sheaf-ADMM" (ICML 2026), [arXiv:2605.31005](https://arxiv.org/abs/2605.31005)
 > **Date:** 2026-07-06

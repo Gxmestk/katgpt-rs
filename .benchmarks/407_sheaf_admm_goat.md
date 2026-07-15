@@ -2,7 +2,7 @@
 
 **Date:** 2026-07-07
 **Plan:** [katgpt-rs/.plans/407](../.plans/407_sheaf_admm_coordination_primitive.md)
-**Research:** [katgpt-rs/.research/384](../.research/384_Sheaf_ADMM_Multi_Agent_Coordination.md) §7
+**Research:** [katgpt-rs/.research/438](../.research/438_Sheaf_ADMM_Multi_Agent_Coordination.md) §7
 **Status:** ✅ **ALL 6 GATES PASS — promoted to DEFAULT-ON**
 
 ---
@@ -183,7 +183,7 @@ cargo test -p katgpt-dec --features sheaf_admm --no-default-features \
 
 ## Cross-references
 
-- [Research 384](../.research/384_Sheaf_ADMM_Multi_Agent_Coordination.md) §7 — GOAT gate criteria
+- [Research 438](../.research/438_Sheaf_ADMM_Multi_Agent_Coordination.md) §7 — GOAT gate criteria
 - [Plan 407](../.plans/407_sheaf_admm_coordination_primitive.md) — Phase 2 task breakdown
 - Plan 251 — DEC operators (`graph_laplacian` identity reduction substrate)
 - Plan 357 — Motor-gated field GOAT (bench file template)

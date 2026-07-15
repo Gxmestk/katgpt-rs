@@ -1,4 +1,4 @@
-# Research 211: LCLM — Latent Context Language Model Distillation
+# Research 433: LCLM — Latent Context Language Model Distillation
 
 > **Paper:** [End-to-End Context Compression at Scale](https://arxiv.org/abs/2606.09659) — Li, McLeish, Chen, Kalra, Chen, Gazizov, Morisetty, Kailkhura, Menon, Liu, Bartoldson, Goldstein, Lotfi, Goldblum, Izmailov (Maryland, NIH, NYU), June 2026
 > **Distilled for:** katgpt-rs modelless (inference-time only, no LLM training)

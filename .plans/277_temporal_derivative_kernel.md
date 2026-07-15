@@ -8,7 +8,7 @@
 > `-p riir-engine --bench reconstruction_bench --features reconstruction_bench`.
 
 **Date:** 2026-06-16
-**Research:** [katgpt-rs/.research/243_Temporal_Derivative_Kernel_Neocortical_Learning.md](../.research/243_Temporal_Derivative_Kernel_Neocortical_Learning.md)
+**Research:** [katgpt-rs/.research/435_Temporal_Derivative_Kernel_Neocortical_Learning.md](../.research/435_Temporal_Derivative_Kernel_Neocortical_Learning.md)
 **Source paper:** [arXiv:2606.08720](https://arxiv.org/abs/2606.08720) — O'Reilly, "This is how the Neocortex Learns" (Jun 2026)
 **Target:** `crates/katgpt-core/src/temporal_deriv.rs` (new module) + fusion hooks into `sense/reconstruction.rs` (HLA), `DeltaMemoryState` (Plan 053), `CollapseDetector` (Plan 212), CGSP curiosity (Plan 274)
 **Cargo feature:** `temporal_deriv` (opt-in until GOAT gate passes)
@@ -208,7 +208,7 @@ Target: extend `crates/katgpt-core/src/cgsp/` (Plan 274). Adds a derivative-driv
 
 ## Cross-References
 
-- **Research:** [243_Temporal_Derivative_Kernel_Neocortical_Learning](../.research/243_Temporal_Derivative_Kernel_Neocortical_Learning.md)
+- **Research:** [435_Temporal_Derivative_Kernel_Neocortical_Learning](../.research/435_Temporal_Derivative_Kernel_Neocortical_Learning.md)
 - **Prior art (HLA):** [242_Topological_State_Tracking_Recurrent_Belief](../.research/242_Topological_State_Tracking_Recurrent_Belief.md), [Plan 276](276_micro_recurrent_belief_state.md), [Plan 221](221_kg_latent_octree_sense_composition.md)
 - **Prior art (δ-Mem):** [Plan 053](053_delta_mem_modelless.md)
 - **Prior art (collapse):** [Plan 212](212_collapse_aware_adaptive_thinking.md), [Benchmark 212](../.benchmarks/212_collapse_aware_goat.md)

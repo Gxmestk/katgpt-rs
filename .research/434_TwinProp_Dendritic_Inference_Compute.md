@@ -1,4 +1,4 @@
-# Research: TwinProp — Dendritic Computation for Inference-Time Adaptive Compute
+# Research 434: TwinProp — Dendritic Computation for Inference-Time Adaptive Compute
 
 **Paper**: "What can a neuron compute" — Aizenbud, Beniaguev, Pnueli, Segev & London (bioRxiv 2026.06.08.730984)
 **Date**: 2026-06-12

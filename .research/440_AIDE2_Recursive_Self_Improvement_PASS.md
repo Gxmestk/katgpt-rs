@@ -1,4 +1,4 @@
-# Research 425: AIDE² — First Evidence of Recursive Self-Improvement (PASS)
+# Research 440: AIDE² — First Evidence of Recursive Self-Improvement (PASS)
 
 > **Source:** [AIDE²: The First Evidence of Recursive Self-Improvement](https://www.weco.ai/blog/first-evidence-of-recursive-self-improvement) — Weco AI team, 2026-07-14. Companion: "4 Levels of Recursive Self-Improvement" (Weco, 2026-07-10). Full PDF technical report pending at time of distillation.
 > **Date:** 2026-07-15
