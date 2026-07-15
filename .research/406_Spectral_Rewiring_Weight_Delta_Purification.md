@@ -279,3 +279,168 @@ pub struct SpectralRewireResult {
 4. **The SOPTV tension.** Research 231 found OPD deltas are off-principal. SAR finds RL deltas' reasoning component is on-principal. These study different training regimes (distillation vs RL). For our modelless deltas (freeze/thaw, LoRA), the geometric signature is unknown — could be either. Fusion B (two-component decomposition) hedges this.
 
 5. **Precision sensitivity.** The paper notes SAR is sensitive to numerical precision (FP32 for SVD, FP16 for storage). Our runtime uses mixed precision. The GOAT gate must check precision robustness.
+
+---
+
+## 8. Addendum (2026-07-15) — GOAT Gate Result + Post-406 Fusions
+
+This addendum was added when the paper was re-requested. The original note
+(2026-07-10) predated (a) the GOAT gate run and (b) several post-406 research
+notes that are direct fusion cousins. Both are captured here.
+
+### 8.1 GOAT Gate Run — G1b CONCENTRATION FAILED at NPC scale
+
+The GOAT gate has run ([`.benchmarks/423_spectral_rewire_goat.md`](../.benchmarks/423_spectral_rewire_goat.md), 2026-07-10). Caveat #1 (scale mismatch) is now **empirically resolved — in the negative direction**:
+
+| Gate | Result |
+|---|---|
+| G1a numerical stability | **PASS** — on-manifold deltas recovered, fraction >0.999, rel err ~8e-6 at 64×64 / 512×64 |
+| G2 singular-direction preservation | **PASS** — cosine = 1.000000 |
+| G3 determinism | **PASS** — bit-identical across 100 runs |
+| G4 alloc-free | **PASS** — 0 bytes / 1000 calls |
+| G5 latency (cached-index) | **PASS** — 8×8 r=4 = 0.41µs (NPC `style_weights[64]`→8×8); 512×64 r=32 = 947µs; 64×64 r=8 = 29µs |
+| G6 feature isolation | **PASS** |
+| **G1b concentration (the make-or-break)** | **REPORT — concentration does NOT hold at NPC scale** |
+
+**Issue 123 CLOSED (2026-07-10):** riir-train Issue 374 produced trained LoRA
+adders via gradient descent across 12 scenarios (d=16/32/64, r=4/8/16, linear +
+nonlinear + pretrained). All scenarios produce `on_manifold_fraction` in
+**[0.27, 0.58]** — far below the SAR threshold (> 0.8). The linear baseline
+shows the SAME fraction as nonlinear scenarios, confirming the elevated
+fraction is a LoRA-training artifact (rank-r overlap with r-dim subspace), NOT
+the SAR phenomenon. **The SAR concentration requires LLM-scale (4096×4096)
+weight matrices; it does NOT transfer to ≤64×64 NPC-scale matrices.**
+
+This is a **§3.6 defend-wrong PoC result**: architectural coverage + latency
+parity confirmed, quality claim (concentration at NPC scale) **refuted**.
+`spectral_rewire` stays OPT-IN as a cold-tier tool; it is NOT promoted to
+default. The primitive is correct machinery in search of an NPC-scale
+application it does not have.
+
+**Revised verdict:** Still **GOAT** (the mechanism is novel, correct, fast,
+zero-alloc, and ships as a cold-tier tool). NOT Super-GOAT — Q3 (product
+selling point for NPC-scale deltas) is now **empirically NEGATIVE**, not merely
+"unvalidated." The Super-GOAT promotion path via NPC-scale concentration is
+**closed**. Any future Super-GOAT claim must come from a fusion that does NOT
+depend on NPC-scale concentration (see §8.3).
+
+### 8.2 Post-406 fusion cousins (the corpus 406 couldn't see)
+
+Four research notes landed after 2026-07-10 that are direct geometric cousins:
+
+| Note | Primitive | Relationship to SAR |
+|---|---|---|
+| **R408 / Plan 425 (TILR)** | Alignment-gated subspace correction (γ = ‖Πd‖/‖d‖ modulates step size; bit-identical no-harm at γ=0) | **Family sibling** — `katgpt-rs/.docs/05_adaptation/tilr_subspace_family.md` tabulates the 4-member subspace-projection family: `subspace_steering` (ungated, per-axis α) / `spectral_rewire` (ungated, projection) / `tilr` (γ-gated) / `river_valley` (diagnostic). SAR is the decomposition member; TILR is the alignment-gated injection member. |
+| **R409 / Plan 426 (MANCE)** | Local k-NN tangent + spectral weighting (σ^α) + per-sample trust region (ε·r_i) | **Local vs global axis.** MANCE estimates a LOCAL per-sample tangent basis from natural neighbors; SAR uses a GLOBAL pre-computed W₀ SVD. `manifold_erasure.rs` tabulates this in its family table. |
+| **R367 / Plan 367 (QuasiMoTTo)** | QMC lattice sampler — Pass@k champion (50% sample reduction, K_qmc=8 vs K_iid=16) | **Orthogonal Pass@k mechanism.** SAR widens the reachable set by removing off-manifold drift (deterministic, weight-space); QMC covers a fixed reachable set more efficiently (stochastic, sample-space). Compound effect possible. |
+| **R422 (Backdoors)** | Statistically undetectable backdoor in frozen Gaussian first layer; 2-query black-box provenance verification | **Spectral backdoor signature.** A planted backdoor's `z` vector is constructed so `‖Az‖∞` is cryptographically small — a spectral anomaly. SAR's `on_manifold_fraction` + `rewiring_matrix` diagnostics could expose this. |
+
+### 8.3 Fusion E/F/G (NEW — survived the concentration-failure filter)
+
+The original fusions A–D (§2.3) all implicitly assumed NPC-scale
+concentration; with G1b refuted, they are weakened. The fusions below are the
+post-406 additions that either (i) do NOT depend on NPC-scale concentration,
+or (ii) reframe SAR as a diagnostic rather than a purification step.
+
+#### Fusion E: SAR × MANCE — Global-to-Local Manifold Decomposition
+
+Decompose any latent edit into THREE components:
+```
+Δx = Δx_global_on_principal (SAR, global W₀ SVD)
+   + Δx_local_tangent      (MANCE, local k-NN tangent)
+   + Δx_residual            (off both manifolds)
+```
+MANCE's note (R409 §1.2) already identifies the global-vs-local axis as the
+family differentiator. The fusion — using BOTH a global pre-computed basis
+AND a local per-sample tangent — is documented as a family relationship but
+NOT shipped as a combined primitive. **However:** both SAR and MANCE fail the
+NPC-scale concentration test in different ways (SAR's concentration is
+LLM-scale-only; MANCE's local tangent is validated for concept erasure, not
+weight deltas). This fusion is **blocked at NPC scale** — it only makes sense
+at LLM scale, which routes to riir-train. **Verdict: documented as family
+relationship, not a katgpt-rs plan.**
+
+#### Fusion F: SAR × QuasiMoTTo — Purified-Weights × Low-Discrepancy Sampling
+
+**This is the strongest NEW fusion.** The paper's headline Pass@k improvement
+(SAR removes off-manifold drift → wider reachable set, Fig 2) is **orthogonal**
+to QuasiMoTTo's mechanism (QMC lattice → more efficient coverage of a fixed
+reachable set):
+
+```
+Reachable-set widening (SAR, weight-space, deterministic)
+  ×
+Coverage efficiency (QMC, sample-space, stochastic)
+  = Compound Pass@k gain neither alone provides
+```
+
+- SAR alone: widens the set of problems reachable by repeated sampling, but
+  each sample is i.i.d. (potentially redundant coverage).
+- QMC alone: covers a fixed reachable set with 50% fewer samples, but cannot
+  reach problems outside the set.
+- **SAR + QMC: widen the set AND cover it efficiently.**
+
+Critically, this fusion **does NOT depend on NPC-scale concentration** — it
+depends on the LLM-scale path (4096×4096 weight matrices), which is exactly
+where Pass@k matters (reasoning models, the riir-ai Reasoning Pack pillar).
+The modelless residue (QMC sampling on a SAR-purified weight set) is
+inference-time. The SAR purification itself is a one-time cold-tier op on a
+trained delta (riir-train produces the delta; katgpt-rs purifies;
+riir-ai/riir-train consumes the purified weights with QMC sampling).
+
+**Novelty gate (§1.5):**
+- Q1 prior art: NO primitive combines weight-delta purification with
+  low-discrepancy sampling. QuasiMoTTo (R367) is sample-space only; SAR is
+  weight-space only.
+- Q2 new class: YES — "purified-weights × low-discrepancy sampling" is a new
+  compound capability (compound Pass@k gain).
+- Q3 product selling point: PARTIAL — "our reasoning pack covers more problems
+  with fewer samples by combining spectral weight purification with QMC
+  sampling." Needs a PoC to validate the compound gain is super-additive.
+- Q4 force multiplier: YES — connects Reasoning Pack (P8) + test-time scaling
+  (SimpleTES/BoM/CLR family).
+
+**Q3 is the gate.** This is a **fusion idea — novelty TBD, needs a PoC before
+Super-GOAT commitment** (per skill §1.5 "no candidate escape hatch"). The PoC
+would run on a real reasoning model (riir-train produces a trained delta;
+katgpt-rs purifies; measure Pass@k with i.i.d. vs QMC on purified vs unpurified).
+File as an issue, not a plan, until the PoC validates super-additive gain.
+
+#### Fusion G: SAR × Statistically-Undetectable Backdoors — Spectral Backdoor Detection
+
+R422 plants a backdoor in a frozen Gaussian first-layer matrix `A` via a secret
+`z ∈ {±1}^n` so that `‖Az‖∞` is cryptographically small. SAR decomposes a
+weight delta into on-manifold (ΔW*) + off-manifold (ΔW⊥) components relative
+to the base SVD.
+
+**Fusion hypothesis:** a backdoored model's delta (backdoored vs honest)
+should have **anomalously structured off-manifold energy** — the backdoor's
+`z` is constructed to be invisible in `‖Az‖∞` (a uniform-norm test), but SAR's
+`rewiring_matrix` M = UᵀΔWV exposes the *directional* structure of the delta
+in the base's singular coordinates. A planted `z` aligned with a specific
+low-σ singular direction would show up as an anomalous spike in a specific
+row/column of M, even when uniform-norm tests miss it.
+
+This is genuinely novel (R422's prior-art audit found zero modelless backdoor
+detectors; SAR adds a spectral lens). It is modelless (SAR is deterministic
+SVD + matmul). It does NOT depend on NPC-scale concentration — it depends on
+the backdoor's spectral signature, which is a different property.
+
+**But:** this is speculative. R422 proves the backdoor is *statistically
+undetectable* in the TV-distance sense; whether SAR's rewiring matrix breaks
+that undetectability is an open question. The honest verdict is **fusion idea
+— novelty TBD, needs a PoC** (can SAR's M distinguish backdoored vs honest
+deltas on R422's Fashion-MNIST proof-of-concept setup?). File as an issue
+referencing both R406 and R422.
+
+### 8.4 Revised routing (post-addendum)
+
+| Item | Status | Owner |
+|---|---|---|
+| `spectral_rewire` primitive | SHIPPED, OPT-IN, GOAT gate PASS (mechanism), G1b FAIL (concentration at NPC scale) | katgpt-rs |
+| Issue 123 (NPC-scale concentration) | CLOSED (negative result) | riir-train Issue 374 |
+| Issue 124 (SVD 64-col cap) | RESOLVED | katgpt-rs |
+| Fusion A–D (original, §2.3) | WEAKENED — all assume NPC-scale concentration, now refuted | — |
+| Fusion E (SAR × MANCE global-local) | Documented as family relationship; blocked at NPC scale | — |
+| **Fusion F (SAR × QuasiMoTTo Pass@k)** | **NEW — file as issue, needs PoC for super-additive gain** | katgpt-rs + riir-train |
+| **Fusion G (SAR × Backdoors detection)** | **NEW — file as issue, needs PoC for spectral signature** | katgpt-rs |
