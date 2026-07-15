@@ -442,5 +442,18 @@ referencing both R406 and R422.
 | Issue 124 (SVD 64-col cap) | RESOLVED | katgpt-rs |
 | Fusion A–D (original, §2.3) | WEAKENED — all assume NPC-scale concentration, now refuted | — |
 | Fusion E (SAR × MANCE global-local) | Documented as family relationship; blocked at NPC scale | — |
-| **Fusion F (SAR × QuasiMoTTo Pass@k)** | **NEW — file as issue, needs PoC for super-additive gain** | katgpt-rs + riir-train |
-| **Fusion G (SAR × Backdoors detection)** | **NEW — file as issue, needs PoC for spectral signature** | katgpt-rs |
+| **Fusion F (SAR × QuasiMoTTo Pass@k)** | **CLOSED — Issue 151 (negative result).** Phase 1 PoC on DeepSeek-R1-Distill-Qwen-1.5B → DeepScaleR-1.5B-Preview showed on_manifold_fraction ∈ [0.001, 0.191] across 196 layers × 3 ranks — SAR would discard >97% of the RL delta. Concentration precondition refuted at 1.5B scale. | katgpt-rs (commit b7ca596c) |
+| **Fusion G (SAR × Backdoors detection)** | **CLOSED — Issue 152 (impractical).** Fatal scope problem: SAR operates on ΔW = W_backdoored − W_honest, presupposing a trusted honest reference. With it, direct weight comparison suffices; without it (the realistic threat model), ΔW is undefined. R422 verdict stands unchallenged. | katgpt-rs (commit 2524918b) |
+
+### 8.5 SAR concentration verdict — evidence ledger (3 scales)
+
+| Scale | Concentration (on_manifold_fraction) | Verdict | Source |
+|---|---|---|---|
+| NPC (≤64×64, trained LoRA) | [0.27, 0.58] | REFUTED | bench 423 G1b, Issue 123 |
+| LLM 1.5B (GRPO RL delta) | [0.001, 0.191], 0/196 layers exceed 0.8 | REFUTED | Issue 151 Phase 1 PoC |
+| LLM 7B+ | untested | OPEN | — (needs larger models / GPU resources) |
+
+The `spectral_rewire` primitive stays OPT-IN — its mechanism is correct
+(G1a-G6 pass), but the concentration phenomenon doesn't hold at any
+accessible scale. Fusions F and G both closed; no further SAR-fusion work
+planned unless a 7B+ opportunity arises.
