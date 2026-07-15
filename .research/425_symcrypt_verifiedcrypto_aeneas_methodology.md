@@ -2,15 +2,16 @@
 
 > **Source:** [microsoft/SymCrypt `feature/verifiedcrypto` README-VERIFIEDCRYPTO.md](https://github.com/microsoft/SymCrypt/blob/feature/verifiedcrypto/README-VERIFIEDCRYPTO.md) (Microsoft, 2026 branch)
 > **Date:** 2026-07-15
-> **Status:** Done
+> **Status:** Done (GOAT proven via Plan 441)
 > **Related Research:** 351 (cross-repo Lean 4 FV pattern — the canonical counterpart), 292 (gap analysis), 198 (Lean4Agent — different FV angle)
+> **Related Plans:** 441 (Lean spec self-testing on concrete instances — the proven GOAT gain)
 > **Classification:** Public
 
 ---
 
 ## TL;DR
 
-Microsoft's SymCrypt `feature/verifiedcrypto` branch ships Lean 4 proofs of **functional correctness and panic freedom** for selected Rust crypto primitives (SHA-3/SHAKE, ML-KEM, hardware intrinsics). Three primitives, ~58K LOC of Lean proofs over ~5.5K LOC of Rust, full re-verification in ~15 minutes via `lake build`. **Verdict: Gain.** It is a methodology cross-check against our own cross-repo FV pattern (Research 351), not a new primitive. Three genuinely new techniques surface that our C1–C6 conventions don't yet name: (1) **Aeneas/Charon Rust→Lean extraction** (vs our hand-translated `Basic.lean`), (2) **external-spec-authority model** (FIPS/NIST spec independent of implementation interpretation), (3) **`"verify"` feature shims** for verification-only intrinsics models + C-FFI exclusion. All three are YAGNI for us today (79 theorems in 7 days without them), but Aeneas is the credible future tool if hand-translation becomes a bottleneck.
+Microsoft's SymCrypt `feature/verifiedcrypto` branch ships Lean 4 proofs of **functional correctness and panic freedom** for selected Rust crypto primitives (SHA-3/SHAKE, ML-KEM, hardware intrinsics). Three primitives, ~58K LOC of Lean proofs over ~5.5K LOC of Rust, full re-verification in ~15 minutes via `lake build`. **Verdict: GOAT (proven gain via Plan 441 G1-G4).** The gain is concrete: SymCrypt's "spec tested on vectors" methodology (§4) closes a real gap in our C1–C6 FV pattern — spec transcription errors that neither the proof (spec-against-itself) nor the Rust spec-match test (shared-typos) can catch. Plan 441 implemented this for `KatgptProof` (11 concrete-instance `example` proofs across `Bridge/SpecTests.lean` + `Ssmax/SpecTests.lean`), G2 confirmed the error-catching power (injected `N^(-c)`→`N^c` typo breaks all 5 Ssmax tests). The Aeneas extraction and `"verify"` feature shims remain YAGNI (documented in §2 for future reference).
 
 **Distilled for katgpt-rs (process refinement, not a primitive):**
 The SymCrypt work validates our Research 351 pattern — same Lean 4 toolchain (`v4.31.0`, matching three of our four instances), same `lean-toolchain` pin, same `lake build` invocation, same axiom-budget discipline (only standard foundation), same "spec-match test catches what Lean's ℝ can't" intuition (their Intrinsics/Axioms vs our spec-match tests on f32/NaN/edge-cases), same "Lean kernel independently re-checks" framing. The delta is the *extraction* approach: SymCrypt auto-extracts; we hand-translate. Our pattern is cheaper for abstract proofs (the freeze/thaw proof abstracts matrices to a `Matrix : Type` token — Aeneas would extract concrete `Vec<f32>`, hurting that proof); SymCrypt's pattern is cheaper for concrete-algorithm proofs (SHA-3, ML-KEM) where the spec IS a published standard.
@@ -87,13 +88,13 @@ The SymCrypt framing that **the reviewer need not re-check the bulk of Lean proo
 | **Gain** | Incremental improvement, useful but not headline-worthy | **← THIS** |
 | **Pass** | Not relevant, OR training-only, OR LLM-orchestration class | — |
 
-**Gain.** Useful process refinements, not a new primitive. The three genuinely-new techniques (Aeneas extraction, external-spec-authority framing, `"verify"` feature shims) are documented here for future reference; none warrants a plan today.
+**GOAT (proven gain via Plan 441).** The "spec tested on vectors" methodology from SymCrypt §4 closes a real gap in our FV pattern — spec transcription errors that neither the proof theorems (spec-against-itself) nor the Rust spec-match test (shared-typos) can catch. Plan 441 implemented concrete-instance spec tests for `KatgptProof` (11 examples across Bridge + Ssmax), and the G2 negative test confirmed the error-catching power (injected sign-typo breaks all 5 Ssmax tests at `lake build` time). The Aeneas extraction and `"verify"` feature shims remain YAGNI (§2).
 
-**One-line reasoning:** Our Research 351 pattern (C1–C6 conventions, 79 theorems across 4 instances, spec-match test as the two-way gate) already covers the load-bearing methodology; SymCrypt's contributions are (a) extraction tooling we don't currently need, (b) a spec-authority framing that is a documentation-discipline addition rather than a tool, (c) a Rust-side convention that is YAGNI given our spec-match test pattern.
+**One-line reasoning:** Spec self-tests on concrete instances catch transcription errors that the proof (spec vs itself) and the Rust spec-match test (Rust vs spec, same-author shared typos) both miss — the only independent authority is the source paper's published values.
 
-**Routing:** This note stays in `katgpt-rs/.research/` (public process IP). No private guide — there is no Super-GOAT selling point. No plan — YAGNI on all three techniques. No issue — nothing to track as a PoC.
+**Routing:** Plan 441 shipped in `katgpt-rs/.proofs/KatgptProof/`. The spec-test convention documented in `.proofs/README.md` is a C6 extension (each spec ships paired `SpecTests.lean`). Future FV instances in riir-ai/riir-chain/riir-neuron-db should adopt the same convention.
 
-**MOAT gate (§1.6):** Neutral. This is process refinement to an existing moat (Research 351), not a new pillar candidate. Stays in `katgpt-rs/.research/` as a sibling note to 351.
+**MOAT gate (§1.6):** Neutral-to-positive. Strengthens the existing FV moat (Research 351) by closing the spec-authority gap. Stays in `katgpt-rs/.research/` + `katgpt-rs/.proofs/` (public process IP + public open primitive).
 
 ## 5. When to revisit (the trigger conditions)
 
@@ -120,4 +121,4 @@ None of these is currently on the roadmap. The note is a marker for the future, 
 
 ## TL;DR
 
-SymCrypt's verified-crypto branch is a methodology cross-check against our Research 351 FV pattern. Same Lean 4 toolchain, same axiom discipline, same spec-match intuition, same "Lean kernel is the trust anchor" framing. The three genuinely-new techniques (Aeneas Rust→Lean extraction, external-spec-authority model, `"verify"` feature shims) are documented but YAGNI — our hand-translation + spec-match test pattern produced 79 theorems in 7 days, including one that found a real concurrency bug (Issue 354). Aeneas would *hurt* three of our four existing proofs because they depend on deliberate abstraction (token `Matrix : Type`, abstract injective `hashFn`); it would only help for a future "verify concrete Rust matches an external standard" instance, which is not on the roadmap. **Gain — useful marker, no plan, no guide, no commitment.**
+SymCrypt's verified-crypto branch yielded a proven GOAT gain: the "spec tested on vectors" methodology (§4) closes the spec-authority gap in our C1–C6 FV pattern. Plan 441 shipped 11 concrete-instance `example` proofs across `Bridge/SpecTests.lean` + `Ssmax/SpecTests.lean` in `KatgptProof`. The G2 negative test confirmed the error-catching power: an injected sign-typo (`N^(-c)` → `N^c`) breaks all 5 Ssmax spec tests at `lake build` time, while the existing monotonicity theorems still type-check and the Rust spec-match test still passes (shared-author typos). The Aeneas extraction and `"verify"` feature shims remain YAGNI — documented in §2 for the trigger conditions in §5. **GOAT — proven gain, Plan 441 shipped, spec-test convention added to C6.**

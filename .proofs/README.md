@@ -78,7 +78,12 @@ No `sorry`. No `sorryAx`. Verified by `#print axioms`. These are the same axioms
     └── Ssmax/
         ├── Basic.lean                  # Spec: alphaGold dilution bound + monotonicity of N^c (Plan 411 S3)
         ├── DilutionBound.lean           # Theorems: alphaGold strictMono in c + ssmax_dominates_base (Plan 411 S3)
-        └── Asymptotic.lean              # Theorem: alphaGold → 1 as N → ∞ (Plan 411 S3 asymptotic follow-up)
+        ├── Asymptotic.lean              # Theorem: alphaGold → 1 as N → ∞ (Plan 411 S3 asymptotic follow-up)
+        └── SpecTests.lean               # Spec self-tests on concrete dilution-curve instances (Plan 441)
+    └── Bridge/
+        ├── Basic.lean                  # Spec: dot product + sigmoid (Mathlib's Real.sigmoid)
+        ├── RankingPreserved.lean        # Theorems: ranking + argmax preservation (Plan 293)
+        └── SpecTests.lean               # Spec self-tests on concrete dot/sigmoid instances (Plan 441)
 ```
 
 ## The f32 caveat (and why it doesn't break the theorem)
@@ -146,6 +151,26 @@ cd katgpt-rs/.proofs && lake build    # → Build completed successfully (2281 j
 cd katgpt-rs && cargo test -p katgpt-core --test ssmax_spec_match  # → 8 passed
 cd katgpt-rs && cargo test -p katgpt-core --test bridge_spec_match --features action_bridge  # → 6 passed
 ```
+
+## Spec self-tests (Plan 441 — the "spec tested on vectors" convention)
+
+Each `Basic.lean` spec ships a paired `SpecTests.lean` with concrete-instance
+`example` proofs testing the spec against independently-known values. This is
+distilled from SymCrypt `feature/verifiedcrypto` §4 ("Running the Lean spec on
+test vectors") and closes the spec-authority gap in C3:
+
+- The proof theorems prove the spec against itself — they don't catch spec
+  authoring errors.
+- The Rust spec-match test tests Rust against the spec — if both have the
+  same typo (written by the same author), the test passes.
+- The spec self-test tests the spec against known-good values from the source
+  paper or mathematical definition — the independent authority.
+
+**The sign-typo case study (Plan 441 G2):** if `alphaGold`'s `N^(-c)` is
+mistranscribed as `N^c`, all 5 Ssmax spec test examples fail at `lake build`
+time. The monotonicity theorems still type-check (they prove monotonicity of
+whatever formula is transcribed); the Rust spec-match test still passes (Rust
+likely has the same typo). Only the spec self-test catches it.
 
 ## License
 
