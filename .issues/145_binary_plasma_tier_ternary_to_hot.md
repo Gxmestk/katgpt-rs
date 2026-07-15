@@ -169,22 +169,52 @@ The refactor targets only the **transformer weight** plasma path:
 
 ### Phase 2 — Tier reclassification (if G2 passes)
 
-- [ ] **T2.1** Rename `plasma_path` documentation to reflect: plasma =
+- [x] **T2.1** Rename `plasma_path` documentation to reflect: plasma =
       binary, hot = ternary. The feature flag `plasma_path` stays (it gates
       the ternary SIMD substrate, which becomes the Hot-tier CPU path); a new
       `binary_plasma` flag gates the new Plasma tier.
       - **Alternative:** rename `plasma_path` → `ternary_hot` and make
         `binary_plasma` → `plasma_path`. Higher churn, cleaner long-term
         naming. Decide at Phase 2 based on consumer count.
-- [ ] **T2.2** Update Research 110 (Ciot note) with a §"Binary Plasma
+      - **DECISION (2026-07-15): Option A — keep both flag names.** Renaming
+        `plasma_path` → `ternary_hot` would touch 7+ Cargo.toml files, ~15
+        `#[cfg(feature = "plasma_path")]` sites in `katgpt-speculative/trd.rs`,
+        the `riir-core-wasm` re-export, and `riir-examples`'s `plasma` feature.
+        Per Gate B ("Prefer minimal churn unless rename clarifies the
+        architecture for downstream consumers"), the docstring clarification
+        suffices — the flag name `plasma_path` is mildly misleading
+        post-reclassification (it gates the Hot-tier ternary, not Plasma-tier
+        binary), but the Cargo.toml comments now carry the tier semantics.
+- [x] **T2.2** Update Research 110 (Ciot note) with a §"Binary Plasma
       Refinement" addendum: binary is the new plasma, ternary moves to hot,
       sense octree keeps ternary (domain exception).
-- [ ] **T2.3** Update the five-tier hierarchy docs everywhere it appears
+      **DONE:** §"Binary Plasma Refinement (Issue 145, 2026-07-15)" addendum
+      appended after References; Five-Tier Compute Hierarchy table updated
+      to reflect Plasma=binary / Hot=ternary.
+- [x] **T2.3** Update the five-tier hierarchy docs everywhere it appears
       (README, Research 110, AGENTS.md references).
-- [ ] **T2.4** If `binary_plasma` wins G2 decisively (≥1.5× latency, ≥1.5×
+      **DONE:** Research 110 hierarchy table updated; Plan 148 Five-Tier
+      Hierarchy got a forward-note pointing to the reclassification;
+      README.md PlasmaPath row updated to mention both tiers + bit widths.
+      Not touched (intentionally): `.docs/05_adaptation` FlashAR
+      PLASMA→HOT→WARM→COLD references — those are *verification-aggressiveness*
+      thermal routing states in FlashAR (Plan 166), a pre-existing name
+      collision with the weight-precision tier vocabulary, NOT the same
+      concept. Updating them would conflate two different semantics.
+- [x] **T2.4** If `binary_plasma` wins G2 decisively (≥1.5× latency, ≥1.5×
       storage), promote `binary_plasma` to DEFAULT-ON and demote the ternary
       path to opt-in (or keep both default-on if the use cases are distinct
       enough — weights vs sparse layers).
+      **DECISION (2026-07-15): binary_plasma STAYS OPT-IN.** The promotion
+      threshold requires BOTH ≥1.5× latency AND ≥1.5× storage. Measured:
+      1.22× latency (FAILS the 1.5× bar) + 1.82× storage (PASSES). Since the
+      conjunction fails, no promotion. Binary remains a consumer-selectable
+      opt-in for memory-constrained edge deployments (WASM, mobile) where the
+      1.82× storage win matters more than the sub-threshold latency win.
+      Ternary (`plasma_path`) stays DEFAULT-ON as the Hot-tier CPU path.
+      Re-evaluate promotion if a future kernel improvement (e.g. AVX-512
+      vpshufbit-wide gather, or WASM-SIMD128 i8x16.swizzle specialization)
+      lifts the latency ratio above 1.5×.
 
 ### Phase 3 — Consumer migration (deferred until Phase 2 lands)
 

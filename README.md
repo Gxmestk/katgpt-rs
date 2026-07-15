@@ -406,7 +406,8 @@ graph LR
 | **Federation** | Symmetric KL coupling between domain experts | `federation` |
 | **SimpleTES** | RPUCG graph-based bandit loop | `tes_loop` |
 | **Stability Metrics** | P50/P99/CV per-step latency instrumentation | `stability_metrics` |
-| **PlasmaPath** | Bit-plane ternary SIMD matvec, 1.58 bits/weight | `plasma_path` |
+| **PlasmaPath (Hot)** | Bit-plane ternary SIMD matvec, 1.71 bits/weight — the Hot-tier CPU path (Issue 145 reclassified binary to Plasma, ternary to Hot) | `plasma_path` |
+| **BinaryPlasma (Plasma)** | Single bit-plane ±scale SIMD matvec, 1.125 bits/weight — the fastest tier (opt-in; 1.22× faster + 1.82× smaller than ternary) | `binary_plasma` |
 | **MoA Inference** | Token-adaptive Mixture-of-Activations SwiGLU | `moa_inference` |
 | **Newton-Schulz** | Cubic fixed-point orthogonalization + Muon momentum | `newton_schulz` |
 | **Spectral Hierarchy** | Eigenspace alignment, Haar wavelets, Cauchy interlacing | `spectral_hierarchy` |

@@ -88,13 +88,20 @@ All SIMD checksums match scalar reference — **bit-exact equivalence**.
 
 ### Five-Tier Compute Hierarchy (aligned with Issue 014 Four-Tier Memory)
 
+> **Updated 2026-07-15 (Issue 145):** Plasma tier reclassified — binary is
+> now the fastest (Plasma) tier; ternary (this document's original subject)
+> moved down to Hot. See the §"Binary Plasma Refinement" addendum at the
+> end of this file. The table below reflects the post-reclassification
+> state; the original Ciot ternary kernel is now the Hot-tier CPU path
+> (feature flag `plasma_path`, still DEFAULT-ON).
+
 ```
 Tier       Compute                          Memory             Latency
 ────────   ─────────────────────────────── ───────────────── ──────────
-Plasma     Ternary SIMD (add/sub only)     1.58 bits/weight   ~0.3ms/1024²
-Hot        FP16 SIMD (FMA)                 16 bits/weight     ~0.5ms/1024²
-Warm       SpectralQuant eigenbasis         3-4 bits/weight   ~0.8ms/1024²
-Cold       Q4_K dequantize-on-read          4 bits/weight     ~1.2ms/1024²
+Plasma     Binary SIMD (±scale add/sub)     1.125 bits/weight  ~0.10ms/1024²
+Hot        Ternary SIMD (add/sub only)      1.71 bits/weight   ~0.13ms/1024²
+Warm       SpectralQuant / Q4_K             3-4 bits/weight    ~0.8ms/1024²
+Cold       FP16 dequantize-on-read          16 bits/weight     ~1.2ms/1024²
 Freeze     Disk-backed (Turso/DB)           Variable          ~10ms+
 ```
 
@@ -215,3 +222,98 @@ These stay in riir-ai as private implementation details.
 - Ciot benchmarks: `.raw/ciot/BENCHMARK_REPORT.md` (8.01 Gop/s on ARM NEON)
 - Issue 014: Four-Tier Memory Cold Tier (aligns tier naming)
 - Docs 27: MMO GOAT Pillars Decision Matrix (secondary bet classification)
+- Issue 145: Binary Plasma Tier reclassification (binary → Plasma, ternary → Hot)
+- Plan 148: PlasmaPath — the original ternary SIMD matvec (now Hot-tier CPU path)
+
+---
+
+## Binary Plasma Refinement (Issue 145, 2026-07-15)
+
+**Spawned from:** PrismML Bonsai 27B review (1-bit/binary and 2-bit/ternary
+builds of Qwen3.6-27B, 2026-07-14). Binary `{-1,+1}` achieves 89.5% of FP16
+quality at 3.9GB; ternary `{-1,0,+1}` achieves 94.6% at 5.9GB.
+
+### Reclassification
+
+The Plasma tier (the fastest µs-level CPU/SIMD compute tier) moves from
+**ternary** (this document's original subject, Ciot-derived) to **binary**:
+
+| Tier | Before Issue 145 | After Issue 145 | Bits/weight | Feature flag |
+|---|---|---|---|---|
+| **Plasma** | ternary `{-1,0,+1}` | **binary `{-1,+1}`** | 1.125 | `binary_plasma` (opt-in) |
+| **Hot** | FP16 SIMD (FMA) | **ternary `{-1,0,+1}`** | 1.71 | `plasma_path` (DEFAULT-ON) |
+| Warm | Q4_K / SpectralQuant | (unchanged) | 3-4 | (unchanged) |
+| Cold | FP16 | (unchanged) | 16 | (unchanged) |
+
+### Why binary is a strict subset (the encoding argument)
+
+Binary `{-1,+1}` is a strict subset of ternary `{-1,0,+1}`: the ternary
+encoding uses two bit-planes (`pos_bits`, `neg_bits`) where both-zero means
+weight = 0. Binary has no zero state, so `pos_bits = sign_bits` and
+`neg_bits = !sign_bits` (XOR = all_ones). Property test `test_binary_subset_of_ternary`
+verifies binary matvec matches ternary within 1e-3 on no-zero matrices.
+
+### Why one-format-per-tier (not multi-format dispatch)
+
+The GPU side already does format-as-dispatch-tag (`CubeCLWeightFormat { F32,
+F16, Q4K }`). The same pattern *could* work for binary + ternary in plasma.
+But **one format per tier avoids the ambiguity entirely:**
+
+- Format = tier (no dispatch, no format tag in commitment)
+- Deterministic replay is trivial — tier implies format (quorum nodes can't
+  disagree on binary-vs-ternary if the tier is fixed)
+- Simpler mental model, simpler anti-cheat reasoning
+
+This is the same discipline the sync-boundary rule enforces for scalar
+outputs: one canonical encoding per crossing.
+
+### GOAT gate results (Plan 145 Phase 1)
+
+Benchmark: `katgpt-rs/tests/bench_145_binary_plasma_goat.rs`
+
+| Gate | Result |
+|---|---|
+| G1 correctness | binary matches ternary on no-zero subsets (max_diff < 1e-3) |
+| G2 latency (1024×1024, release) | ternary=125.6µs, binary=103.2µs, **1.22× faster** |
+| G2 storage | ratio **0.50–0.56×** ternary size (1.82× smaller) |
+| G3 no-regression | 12 existing `bench_148` plasma tests still pass |
+| G4 zero-alloc | structural (borrowed-slice signature) |
+| G5 modelless | deterministic PTQ quantization, no training |
+
+### Kernel design insight (why naive binary was slower)
+
+The initial binary kernel reset accumulators per group (every 128 elements),
+causing OoO pipeline stalls at group boundaries → **0.73× speed** (binary
+slower than ternary). The fix folds the group scale directly INTO the sign
+vector (`scaled_sign = fma(neg_2scale, bit_set_f, neg_scale) → ±scale`),
+letting the 4 SIMD accumulators span the entire row identically to ternary's
+proven pattern. Result: 1.22× speedup in release mode.
+
+### Promotion verdict (Issue 145 T2.4)
+
+Binary_plasma **stays opt-in**. The promotion threshold requires BOTH ≥1.5×
+latency AND ≥1.5× storage. Measured: 1.22× latency (FAILS the 1.5× bar) +
+1.82× storage (PASSES). Since the conjunction fails, no promotion. Binary
+remains a consumer-selectable opt-in for memory-constrained edge deployments
+(WASM, mobile) where the 1.82× storage win matters more than the
+sub-threshold latency win.
+
+### Sense octree exception (NOT touched by Issue 145)
+
+`katgpt-sense/src/octree.rs` uses `TernaryDir` for KG embeddings where the
+zero state means "this dimension doesn't matter for this concept." That is a
+**different domain** — KG embedding sparsity, not weight quantization. Ternary
+stays there regardless of the weight-tier reclassification. This is the same
+raw-vs-latent discipline: KG embedding zero state is semantic, weight zero
+state is a quantization artifact.
+
+### Naming-decision rationale (Issue 145 T2.1)
+
+The feature flag `plasma_path` is mildly misleading post-reclassification —
+it gates the Hot-tier ternary CPU path, not the Plasma-tier binary. Renaming
+`plasma_path` → `ternary_hot` was considered and rejected: it would touch 7+
+Cargo.toml files, ~15 `#[cfg(feature = "plasma_path")]` sites in
+`katgpt-speculative/trd.rs`, the `riir-core-wasm` re-export, and
+`riir-examples`'s `plasma` feature. Per Gate B ("Prefer minimal churn unless
+rename clarifies the architecture for downstream consumers"), the Cargo.toml
+comments now carry the tier semantics and the rename is deferred.

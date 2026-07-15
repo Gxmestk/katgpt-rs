@@ -26,6 +26,15 @@ Distill the core technique from [Cintu07/ciot](https://github.com/Cintu07/ciot) 
 
 ## Five-Tier Hierarchy (aligned with Issue 014)
 
+> **Forward-note (Issue 145, 2026-07-15):** This plan shipped ternary as the
+> Plasma tier. Issue 145 has since reclassified the tiers: **binary is now
+> the Plasma tier** (feature `binary_plasma`, opt-in), and **ternary (this
+> plan's substrate) moved down to Hot** (feature `plasma_path`, still
+> DEFAULT-ON). The table below is the historical state at plan-completion;
+> see Research 110 §"Binary Plasma Refinement" for the current state. The
+> `plasma_path` feature flag name is retained for minimal churn — it now
+> gates the Hot-tier ternary CPU path, not the Plasma-tier binary.
+
 ```
 Tier       Compute                          Memory             Latency
 ────────   ─────────────────────────────── ───────────────── ──────────
