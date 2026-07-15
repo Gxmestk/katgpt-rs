@@ -238,6 +238,17 @@ pub struct SpaceTimeGuidance<P: Position> {
     /// Closure mapping `P` → flat index into `flat_occupancy`. Present iff
     /// `flat_occupancy` is present.
     flat_index_fn: Option<Box<FlatIndexFn<P>>>,
+    /// Flat-array BFS distance cache: goal → flat distance field.
+    ///
+    /// When `Some`, this replaces `bfs_cache`'s `HashMap<P, f32>` values with
+    /// `Vec<f32>` indexed by flat position. This gives O(1) heuristic lookups
+    /// during A* instead of HashMap O(log n). Only used when `flat_occupancy`
+    /// is active (grid domain).
+    flat_bfs_cache: HashMap<P, Vec<f32>>,
+    /// Flat-array A* scratch (Issue 516 T1d). Present iff `flat_occupancy` is.
+    /// Eliminates HashMap operations on the hot A* path by indexing g_score /
+    /// closed / came_from by (flat_idx, depth) with generation counters.
+    flat_scratch: Option<FlatAstarScratch<P>>,
     /// BFS distance cache: goal → {position → true BFS distance}.
     ///
     /// This is the critical upgrade that fixes throughput on obstacle-heavy
@@ -249,6 +260,10 @@ pub struct SpaceTimeGuidance<P: Position> {
     ///
     /// Cleared at the start of each `compute_guidance` call (within-tick
     /// reuse across agents that share a goal; across-tick recomputation).
+    ///
+    /// Only used when `flat_occupancy` is `None` (non-grid domain fallback).
+    /// For grid domains with `flat_occupancy` active, `flat_bfs_cache` is used
+    /// instead.
     bfs_cache: HashMap<P, HashMap<P, f32>>,
     /// Warm-start data supplied by [`set_warm_start`](LocalGuidanceSource::set_warm_start).
     ///
@@ -268,6 +283,8 @@ impl<P: Position> SpaceTimeGuidance<P> {
             occupancy: HashMap::new(),
             flat_occupancy: None,
             flat_index_fn: None,
+            flat_bfs_cache: HashMap::new(),
+            flat_scratch: None,
             bfs_cache: HashMap::new(),
             warm_start: None,
         }
@@ -302,6 +319,8 @@ impl<P: Position> SpaceTimeGuidance<P> {
     {
         self.flat_occupancy = Some(vec![[0u32; 64]; capacity]);
         self.flat_index_fn = Some(Box::new(index_fn));
+        // Issue 516 T1d: also allocate flat A* scratch for O(1) search lookups.
+        self.flat_scratch = Some(FlatAstarScratch::new(capacity, self.cfg.w_phi));
         self
     }
 
@@ -539,6 +558,159 @@ impl<P: Position> SpaceTimeGuidance<P> {
         dist
     }
 
+    /// Flat-array BFS flood-fill from `goal` to all reachable cells (T1c).
+    ///
+    /// Writes into a pre-sized `Vec<f32>` indexed by `(flat_index_fn)(pos)`.
+    /// `f32::MAX` = unreachable / uninitialized. O(1) lookup vs HashMap O(log n)
+    /// during A* heuristic evaluation.
+    ///
+    /// Requires `flat_index_fn` to be set (grid domain).
+    fn compute_bfs_flat(&self, goal: &P, capacity: usize) -> Vec<f32> {
+        let f = self
+            .flat_index_fn
+            .as_ref()
+            .expect("compute_bfs_flat requires flat_index_fn to be set");
+        let mut dist = vec![f32::MAX; capacity];
+        let mut queue: VecDeque<P> = VecDeque::new();
+        let goal_idx = f(goal);
+        if goal_idx < capacity {
+            dist[goal_idx] = 0.0;
+            queue.push_back(goal.clone());
+        }
+        while let Some(current) = queue.pop_front() {
+            let cur_idx = f(&current);
+            let d = dist[cur_idx];
+            for neighbor in self.neighbors_of(&current) {
+                let n_idx = f(&neighbor);
+                if n_idx < capacity && dist[n_idx] == f32::MAX {
+                    dist[n_idx] = d + 1.0;
+                    queue.push_back(neighbor);
+                }
+            }
+        }
+        dist
+    }
+
+    /// Flat-array space-time A* for a single agent (Issue 516 T1d).
+    ///
+    /// Same algorithm as [`astar_for_agent`] but uses [`FlatAstarScratch`] for
+    /// O(1) g_score / closed / came_from lookups. The BFS heuristic is read
+    /// from a flat `&[f32]` (O(1)) instead of `&HashMap<P, f32>` (O(log n)).
+    ///
+    /// This is the hot-path A* for grid domains — called once per agent per
+    /// refinement round.
+    fn astar_for_agent_flat(
+        &mut self,
+        start: &P,
+        bfs_flat: &[f32],
+        bfs_capacity: usize,
+        alpha: f32,
+        scratch: &mut FlatAstarScratch<P>,
+    ) -> Vec<P> {
+        let w = self.cfg.w_phi;
+        let f = self
+            .flat_index_fn
+            .as_ref()
+            .expect("astar_for_agent_flat requires flat_index_fn");
+
+        let start_idx = f(start);
+
+        // Unreachable goal: no BFS entry for start. Wait in place.
+        let start_h = if start_idx < bfs_capacity {
+            bfs_flat[start_idx]
+        } else {
+            f32::MAX
+        };
+        if start_h == f32::MAX {
+            return vec![start.clone(); w];
+        }
+
+        scratch.begin_search();
+        scratch.g_set(start_idx, 0, 0.0);
+        scratch.open.push(AstarNode {
+            f: start_h,
+            depth: 0,
+            pos: start.clone(),
+        });
+
+        let w_u8 = w as u8;
+        let mut best_goal: Option<(P, u8)> = None;
+
+        while let Some(node) = scratch.open.pop() {
+            let depth = node.depth;
+            let pos = node.pos.clone();
+            let pos_idx = f(&pos);
+
+            // Skip already-expanded states.
+            if !scratch.close(pos_idx, depth) {
+                continue;
+            }
+
+            // Goal test: reached the planning horizon.
+            if depth == w_u8 {
+                best_goal = Some((pos, depth));
+                break;
+            }
+
+            let g = scratch.g_get(pos_idx, depth);
+
+            for neighbor in self.neighbors_of(&pos) {
+                let new_depth = depth + 1;
+                let n_idx = f(&neighbor);
+
+                if scratch.is_closed(n_idx, new_depth) {
+                    continue;
+                }
+
+                let h = if n_idx < bfs_capacity {
+                    bfs_flat[n_idx]
+                } else {
+                    f32::MAX
+                };
+                if h == f32::MAX {
+                    continue; // unreachable neighbor
+                }
+
+                let chi = self.collision_count(&neighbor, depth as usize);
+                let tentative_g = g + 1.0 + alpha * chi as f32;
+
+                let known_g = scratch.g_get(n_idx, new_depth);
+                if tentative_g < known_g {
+                    scratch.g_set(n_idx, new_depth, tentative_g);
+                    scratch.set_parent(n_idx, new_depth, pos.clone(), depth);
+                    scratch.open.push(AstarNode {
+                        f: tentative_g + h,
+                        depth: new_depth,
+                        pos: neighbor,
+                    });
+                }
+            }
+        }
+
+        match best_goal {
+            Some((end_pos, end_depth)) => {
+                let mut path = Vec::with_capacity(w);
+                let mut current_pos = end_pos;
+                let mut current_depth = end_depth;
+                while current_depth > 0 {
+                    path.push(current_pos.clone());
+                    let cur_idx = f(&current_pos);
+                    let parent = scratch
+                        .get_parent(cur_idx, current_depth)
+                        .expect("came_from chain must be complete");
+                    current_pos = parent.0.clone();
+                    current_depth = parent.1;
+                }
+                path.reverse();
+                while path.len() < w {
+                    path.push(path.last().cloned().unwrap_or_else(|| start.clone()));
+                }
+                path
+            }
+            None => vec![start.clone(); w],
+        }
+    }
+
     /// Compute guidance with a **per-agent** collision penalty `alpha`.
     ///
     /// This is the Super-GOAT fusion extension point (Plan 489 Phase 2 /
@@ -594,12 +766,6 @@ impl<P: Position> SpaceTimeGuidance<P> {
         out.clear();
         out.resize(n, Vec::new());
 
-        // BFS cache: persistent across ticks for amortization. Cleared only
-        // when it exceeds MAX_BFS_CACHE_ENTRIES (to bound memory).
-        if self.bfs_cache.len() > MAX_BFS_CACHE_ENTRIES {
-            self.bfs_cache.clear();
-        }
-
         // Consume warm-start data (one-shot per tick). NOT seeded into the
         // occupancy — Issue 142 found that warm-start forecasts HURT throughput
         // because PIBT deviations invalidate them on dense maps.
@@ -607,16 +773,36 @@ impl<P: Position> SpaceTimeGuidance<P> {
 
         self.clear_occupancy();
 
+        // Dispatch between flat-array (grid) and HashMap (generic) paths.
+        // The flat path uses O(1) lookups for BFS heuristic + A* scratch.
+        if self.flat_occupancy.is_some() {
+            self.run_refinement_flat(config, goals, out, alpha_of, n);
+        } else {
+            self.run_refinement_hashmap(config, goals, out, alpha_of, n);
+        }
+    }
+
+    /// HashMap-path refinement loop (non-grid fallback). This is the original
+    /// T1b path, unchanged except for being split out from `run_refinement`.
+    fn run_refinement_hashmap<F: Fn(usize) -> f32>(
+        &mut self,
+        config: &JointConfig<P>,
+        goals: &[P],
+        out: &mut Guidance<P>,
+        alpha_of: F,
+        n: usize,
+    ) {
+        // BFS cache: persistent across ticks for amortization. Cleared only
+        // when it exceeds MAX_BFS_CACHE_ENTRIES (to bound memory).
+        if self.bfs_cache.len() > MAX_BFS_CACHE_ENTRIES {
+            self.bfs_cache.clear();
+        }
+
         // Issue 516 T1b — move bfs_cache out to a local so we can hold
         // references to its entries while mutating self.occupancy / calling
-        // self.collision_count inside the search loop. This avoids cloning
-        // the BFS distance field per agent (which was O(map_cells) per clone).
-        //
-        // compute_bfs only reads self.neighbors_fn (not self.bfs_cache), so
-        // it still works with bfs_cache moved out.
+        // self.collision_count inside the search loop.
         let mut bfs_cache = std::mem::take(&mut self.bfs_cache);
 
-        // Pre-compute any missing BFS fields (bfs_cache is local now).
         for goal in goals.iter().take(n) {
             if !bfs_cache.contains_key(goal) {
                 let field = self.compute_bfs(goal);
@@ -624,9 +810,68 @@ impl<P: Position> SpaceTimeGuidance<P> {
             }
         }
 
-        // Pre-allocate A* frontier scratch ONCE, reused across all agents and rounds.
-        // For 1000 NPCs × 2 rounds this eliminates 8000 HashMap allocations per tick.
         let mut scratch = AstarScratch::<P>::new();
+        let mut prev_paths: Vec<Vec<P>> = vec![Vec::new(); n];
+
+        for _round in 0..self.cfg.rounds {
+            for i in 0..n {
+                let agent = AgentId(i as u32);
+                let start = config.pos(agent).clone();
+                let goal = &goals[i];
+                let alpha = alpha_of(i);
+
+                self.unrecord_path(&prev_paths[i]);
+                let bfs = &bfs_cache[goal];
+                let path = self.astar_for_agent(&start, bfs, alpha, &mut scratch);
+                self.record_path(&path);
+                prev_paths[i] = path.clone();
+                out[i] = path;
+            }
+        }
+
+        self.bfs_cache = bfs_cache;
+    }
+
+    /// Flat-array refinement loop (Issue 516 T1c+T1d — grid domain fast path).
+    ///
+    /// Uses `flat_bfs_cache` (Vec<f32> per goal) and `flat_scratch`
+    /// (FlatAstarScratch with generation counters) for O(1) lookups throughout
+    /// the A* inner loop. This is the production path for grid-based games.
+    fn run_refinement_flat<F: Fn(usize) -> f32>(
+        &mut self,
+        config: &JointConfig<P>,
+        goals: &[P],
+        out: &mut Guidance<P>,
+        alpha_of: F,
+        n: usize,
+    ) {
+        // Flat BFS cache capacity = flat_occupancy length (map_cells).
+        let bfs_cap = self
+            .flat_occupancy
+            .as_ref()
+            .expect("run_refinement_flat requires flat_occupancy")
+            .len();
+
+        // Bound flat BFS cache memory (same threshold as HashMap cache).
+        if self.flat_bfs_cache.len() > MAX_BFS_CACHE_ENTRIES {
+            self.flat_bfs_cache.clear();
+        }
+
+        // Move flat_bfs_cache + flat_scratch out to avoid borrow conflicts
+        // with the &mut self methods (collision_count, record_path, etc.).
+        let mut flat_bfs_cache = std::mem::take(&mut self.flat_bfs_cache);
+        let mut flat_scratch = self
+            .flat_scratch
+            .take()
+            .expect("run_refinement_flat requires flat_scratch");
+
+        // Pre-compute missing flat BFS fields.
+        for goal in goals.iter().take(n) {
+            if !flat_bfs_cache.contains_key(goal) {
+                let field = self.compute_bfs_flat(goal, bfs_cap);
+                flat_bfs_cache.insert(goal.clone(), field);
+            }
+        }
 
         let mut prev_paths: Vec<Vec<P>> = vec![Vec::new(); n];
 
@@ -638,17 +883,18 @@ impl<P: Position> SpaceTimeGuidance<P> {
                 let alpha = alpha_of(i);
 
                 self.unrecord_path(&prev_paths[i]);
-                // bfs is a local reference — no borrow conflict with self.
-                let bfs = &bfs_cache[goal];
-                let path = self.astar_for_agent(&start, bfs, alpha, &mut scratch);
+                let bfs = &flat_bfs_cache[goal];
+                let path =
+                    self.astar_for_agent_flat(&start, bfs, bfs_cap, alpha, &mut flat_scratch);
                 self.record_path(&path);
                 prev_paths[i] = path.clone();
                 out[i] = path;
             }
         }
 
-        // Restore bfs_cache for the next tick (persistent cache amortizes BFS cost).
-        self.bfs_cache = bfs_cache;
+        // Restore caches for the next tick.
+        self.flat_bfs_cache = flat_bfs_cache;
+        self.flat_scratch = Some(flat_scratch);
     }
 }
 
@@ -726,6 +972,124 @@ impl<P: Position> AstarScratch<P> {
     }
 }
 
+/// Flat-array A* scratch for grid domains (Issue 516 T1d).
+///
+/// Replaces [`AstarScratch`]'s HashMap-based g_score / came_from / closed with
+/// flat arrays indexed by `(flat_idx * w_phi + depth)`. This gives O(1)
+/// lookups instead of HashMap O(log n), and eliminates hashing overhead.
+///
+/// Clearing between agent searches is zero-cost via generation counters:
+/// each search increments `current_gen`, and a cell's entry is valid only if
+/// its stored generation matches. On generation overflow (every ~4 billion
+/// searches), the arrays are actually cleared.
+///
+/// The `open` BinaryHeap still stores positions (it needs them for neighbor
+/// expansion and path reconstruction). Only the map/set structures are flat.
+struct FlatAstarScratch<P: Position> {
+    /// g_score[flat_idx * w_phi + depth] = best known cost-to-reach.
+    g_score: Vec<f32>,
+    /// Generation when g_score entry was last written.
+    g_gen: Vec<u32>,
+    /// Generation when the cell was closed (expanded). 0 = never (unless
+    /// current_gen wraps to 0, handled by overflow reset).
+    closed_gen: Vec<u32>,
+    /// came_from[flat_idx * w_phi + depth] = (parent position, parent depth).
+    /// Read during path reconstruction.
+    came_from: Vec<Option<(P, u8)>>,
+    /// Priority queue. Same AstarNode type as HashMap mode — the heap can't
+    /// be flat-indexed.
+    open: BinaryHeap<AstarNode<P>>,
+    /// Current generation for this search. Incremented per `begin_search`.
+    current_gen: u32,
+    /// Planning window (from `GuidanceConfig::w_phi`).
+    w_phi: usize,
+}
+
+impl<P: Position> FlatAstarScratch<P> {
+    fn new(map_cells: usize, w_phi: usize) -> Self {
+        let total = map_cells * w_phi;
+        Self {
+            g_score: vec![f32::MAX; total],
+            g_gen: vec![0; total],
+            closed_gen: vec![0; total],
+            came_from: vec![None; total],
+            open: BinaryHeap::new(),
+            current_gen: 1, // gen 0 = unvisited sentinel
+            w_phi,
+        }
+    }
+
+    /// Start a new search: bump generation (zero-cost clear) + clear the heap.
+    #[inline]
+    fn begin_search(&mut self) {
+        self.current_gen = self.current_gen.wrapping_add(1);
+        if self.current_gen == 0 {
+            // Generation overflow (~4 billion searches). Actually clear.
+            self.g_gen.fill(0);
+            self.closed_gen.fill(0);
+            self.current_gen = 1;
+        }
+        self.open.clear();
+    }
+
+    /// Flat index into the scratch arrays for `(flat_idx, depth)`.
+    #[inline(always)]
+    fn slot(&self, flat_idx: usize, depth: u8) -> usize {
+        flat_idx * self.w_phi + depth as usize
+    }
+
+    /// Get g_score for `(flat_idx, depth)` if visited in the current search.
+    #[inline]
+    fn g_get(&self, flat_idx: usize, depth: u8) -> f32 {
+        let s = self.slot(flat_idx, depth);
+        if self.g_gen[s] == self.current_gen {
+            self.g_score[s]
+        } else {
+            f32::MAX
+        }
+    }
+
+    /// Set g_score for `(flat_idx, depth)`. Marks the generation.
+    #[inline]
+    fn g_set(&mut self, flat_idx: usize, depth: u8, val: f32) {
+        let s = self.slot(flat_idx, depth);
+        self.g_score[s] = val;
+        self.g_gen[s] = self.current_gen;
+    }
+
+    /// Mark `(flat_idx, depth)` as closed. Returns true if it was NOT already
+    /// closed in this search (i.e., this is the first close).
+    #[inline]
+    fn close(&mut self, flat_idx: usize, depth: u8) -> bool {
+        let s = self.slot(flat_idx, depth);
+        if self.closed_gen[s] == self.current_gen {
+            false
+        } else {
+            self.closed_gen[s] = self.current_gen;
+            true
+        }
+    }
+
+    /// Check if `(flat_idx, depth)` is closed in this search.
+    #[inline]
+    fn is_closed(&self, flat_idx: usize, depth: u8) -> bool {
+        self.closed_gen[self.slot(flat_idx, depth)] == self.current_gen
+    }
+
+    /// Record the parent of `(flat_idx, depth)`.
+    #[inline]
+    fn set_parent(&mut self, flat_idx: usize, depth: u8, parent: P, parent_depth: u8) {
+        let s = self.slot(flat_idx, depth);
+        self.came_from[s] = Some((parent, parent_depth));
+    }
+
+    /// Get the recorded parent of `(flat_idx, depth)`.
+    #[inline]
+    fn get_parent(&self, flat_idx: usize, depth: u8) -> Option<&(P, u8)> {
+        self.came_from[self.slot(flat_idx, depth)].as_ref()
+    }
+}
+
 impl<P: Position> LocalGuidanceSource<P> for SpaceTimeGuidance<P> {
     fn compute_guidance(
         &mut self,
@@ -759,6 +1123,12 @@ impl<P: Position> LocalGuidanceSource<P> for SpaceTimeGuidance<P> {
                      non-grid positions should not call this method",
                 )
             }));
+            // Issue 516 T1d: allocate flat A* scratch for this map size.
+            // Indexed by (flat_idx * w_phi + depth), using generation counters
+            // for zero-cost clearing between agent searches.
+            self.flat_scratch = Some(FlatAstarScratch::new(needed, self.cfg.w_phi));
+            // Clear flat BFS cache — dimensions changed, old fields are stale.
+            self.flat_bfs_cache.clear();
         }
     }
 }
