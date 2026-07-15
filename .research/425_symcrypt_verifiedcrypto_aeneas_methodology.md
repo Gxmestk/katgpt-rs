@@ -92,7 +92,7 @@ The SymCrypt framing that **the reviewer need not re-check the bulk of Lean proo
 
 **One-line reasoning:** Spec self-tests on concrete instances catch transcription errors that the proof (spec vs itself) and the Rust spec-match test (Rust vs spec, same-author shared typos) both miss — the only independent authority is the source paper's published values.
 
-**Routing:** Plan 441 shipped in `katgpt-rs/.proofs/KatgptProof/`. The spec-test convention documented in `.proofs/README.md` is a C6 extension (each spec ships paired `SpecTests.lean`). Future FV instances in riir-ai/riir-chain/riir-neuron-db should adopt the same convention.
+**Routing:** Plan 441 shipped in `katgpt-rs/.proofs/KatgptProof/`. The spec-test convention documented in `.proofs/README.md` is a C6 extension (each spec ships paired `SpecTests.lean`). **Follow-up COMPLETE (2026-07-15):** all three sibling FV instances adopted the convention — `riir-ai/.plans/490` (RiirAiProof Hla, 14 examples), `riir-chain/.plans/016` (RiirChainProof LatCal+Economics+Crypto+Shard, 33 examples; Consensus skipped — opaque functions), `riir-neuron-db/.plans/318` (NeuronDbProof Shard+Consolidation+Merkle, 34 examples). Total: 81 new concrete-instance `example` proofs across the quintet (11 katgpt-rs + 14 riir-ai + 33 riir-chain + 34 riir-neuron-db — note riir-train is excluded, training properties are not invariant-shaped). All four FV instances now ship paired `SpecTests.lean` files; `lake build` passes in all four repos.
 
 **MOAT gate (§1.6):** Neutral-to-positive. Strengthens the existing FV moat (Research 351) by closing the spec-authority gap. Stays in `katgpt-rs/.research/` + `katgpt-rs/.proofs/` (public process IP + public open primitive).
 
