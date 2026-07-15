@@ -115,6 +115,8 @@ fn bench_ldt_lattice_deduction_goat_proof() {
             belief_drafter_path: None,
             #[cfg(feature = "belief_drafter")]
             belief_drafter_entropy_threshold: 2.0,
+            #[cfg(feature = "loop_stability_fix")]
+            loop_stability_mode: katgpt_rs::types::LoopStabilityMode::None,
         }
     }
 
