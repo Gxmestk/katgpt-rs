@@ -171,6 +171,18 @@ pub trait LocalGuidanceSource<P: Position> {
     fn set_warm_start(&mut self, _warm_start: Vec<Vec<P>>) {
         // Default: ignore — no warm-start.
     }
+
+    /// Notify the guidance source of the current grid dimensions (Issue 516 T1a).
+    ///
+    /// The default [`SpaceTimeGuidance`] uses this to (re)allocate its flat-array
+    /// occupancy when the dimensions change. Called by the consumer (e.g.
+    /// `CrowdMotionBridge`) at tick boundaries when the map is updated.
+    ///
+    /// Default: no-op. Guidance sources that don't support flat-array occupancy
+    /// (or non-grid domains) leave this as-is.
+    fn ensure_flat_occupancy(&mut self, _width: usize, _height: usize) {
+        // Default: no-op.
+    }
 }
 
 /// The guidance window length `w_Φ` and collision penalty `α`.
@@ -722,5 +734,22 @@ impl<P: Position> LocalGuidanceSource<P> for SpaceTimeGuidance<P> {
 
     fn set_warm_start(&mut self, warm_start: Vec<Vec<P>>) {
         self.warm_start = Some(warm_start);
+    }
+
+    fn ensure_flat_occupancy(&mut self, width: usize, height: usize) {
+        let needed = width * height;
+        let needs_realloc = match &self.flat_occupancy {
+            None => true,
+            Some(occ) => occ.len() != needed,
+        };
+        if needs_realloc {
+            self.flat_occupancy = Some(vec![[0u32; 64]; needed]);
+            self.flat_index_fn = Some(Box::new(move |p: &P| {
+                p.flat_index(width).expect(
+                    "ensure_flat_occupancy: Position::flat_index returned None — \
+                     non-grid positions should not call this method",
+                )
+            }));
+        }
     }
 }

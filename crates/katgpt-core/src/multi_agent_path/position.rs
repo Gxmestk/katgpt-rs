@@ -38,6 +38,21 @@ pub trait Position: Eq + std::hash::Hash + Clone + std::fmt::Debug {
         let _ = goal;
         0.0
     }
+
+    /// Flat index for O(1) occupancy lookups (Issue 516 T1a).
+    ///
+    /// Returns `Some(index)` if this position can be mapped to a flat array
+    /// index given the grid `width`. For 2D grids this is `y * width + x`.
+    /// Non-grid positions (NavMesh, 3D) return `None` — the HashMap path is
+    /// used instead.
+    ///
+    /// The index MUST be stable for a given position + width (deterministic).
+    /// Consumers configure flat occupancy via
+    /// [`SpaceTimeGuidance::with_flat_occupancy`] or
+    /// [`LocalGuidanceSource::ensure_flat_occupancy`].
+    fn flat_index(&self, _width: usize) -> Option<usize> {
+        None
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -82,6 +97,11 @@ impl Position for GridPos {
         let dx = (self.x as isize - goal.x as isize).unsigned_abs() as f32;
         let dy = (self.y as isize - goal.y as isize).unsigned_abs() as f32;
         dx + dy // Manhattan
+    }
+
+    #[inline]
+    fn flat_index(&self, width: usize) -> Option<usize> {
+        Some(self.y * width + self.x)
     }
 }
 
