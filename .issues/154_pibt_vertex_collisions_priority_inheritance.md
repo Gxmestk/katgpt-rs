@@ -130,6 +130,18 @@ docs now accurately describe this (corrected in this session).
 **Status: DEFERRED to Phase 5 (LaCAM escalation). Not actionable as a
 standalone PI implementation — PI is prior art that was reverted.**
 
+**Update (2026-07-15, Plan 453 opened):** the Phase 5 LaCAM escalation is
+now tracked as [Plan 453](../.plans/453_bounded_one_step_lacam_escalation.md).
+The critical insight from reading the LaCAM reference implementation
+(`Kei18/lacam/src/planner.cpp`): LaCAM **does** use recursive PIBT (the PI
+piece Issues 140/143 tried and reverted), but it works because the
+**constraint tree** bounds the recursion and provides backtracking. Issues
+140/143 collapsed throughput because they used recursive PI **without** the
+constraint tree. This is why "PI is prior art" (this issue) and "LaCAM is
+not prior art" (Plan 453) can both be true: LaCAM = recursive PIBT +
+constraint tree, and only the recursive PIBT half was tried. Plan 453
+ships the constraint tree — the missing half.
+
 ---
 
 ## Original Proposed Fix (prior art — already tried, see update above)
