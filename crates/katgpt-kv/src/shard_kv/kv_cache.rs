@@ -42,6 +42,9 @@ use katgpt_spectral::types::LloydMaxCodebook;
 pub struct ShardKVCache {
     // ── Position tracking (usize — group together for alignment) ──
     pos: usize,
+    /// Number of layers (structural metadata; offsets are computed from flat
+    /// buffer sizes, not from this field post-init).
+    #[allow(dead_code)]
     n_layers: usize,
     kv_dim: usize,
     #[allow(dead_code)]
@@ -61,22 +64,24 @@ pub struct ShardKVCache {
     /// Pre-allocated RoPE frequencies for undo/reapply (avoids Vec alloc per call).
     rope_freqs: RopeFreqs,
 
-    // ── Compressed storage for interior tokens ──
-    /// Packed K indices: [layer][position] → variable-bit packed bytes.
-    /// Inner Vecs are pre-allocated with `kv_dim` capacity to avoid decode-path allocation.
-    key_indices: Vec<Vec<Vec<u8>>>,
-    /// Per-position K norms.
-    key_norms: Vec<Vec<f32>>,
-    /// Packed V indices.
-    val_indices: Vec<Vec<Vec<u8>>>,
-    /// Per-position V norms.
-    val_norms: Vec<Vec<f32>>,
+    // ── Compressed storage for interior tokens (flat buffers) ──
+    /// Packed K indices: flat `[layer * max_seq_len + pos] * kv_dim` byte array.
+    /// Stride is `kv_dim` per (layer, pos) slot; prefill positions may use fewer
+    /// valid bytes (zero-padded to stride). Eliminates ~24K inner Vecs at init.
+    key_indices: Vec<u8>,
+    /// Per-position K norms: flat `[layer * max_seq_len + pos]` array.
+    key_norms: Vec<f32>,
+    /// Packed V indices: same flat layout as `key_indices`.
+    val_indices: Vec<u8>,
+    /// Per-position V norms: same flat layout as `key_norms`.
+    val_norms: Vec<f32>,
 
-    // ── Sink + window (raw f32 storage) ──
-    /// FP16-equivalent sink + window K storage: [layer][position][dim].
-    key_raw: Vec<Vec<Vec<f32>>>,
-    /// FP16-equivalent sink + window V storage.
-    val_raw: Vec<Vec<Vec<f32>>>,
+    // ── Sink + window (raw f32 storage, flat) ──
+    /// FP16-equivalent sink + window K storage: flat
+    /// `[layer * raw_slots + slot] * kv_dim` array.
+    key_raw: Vec<f32>,
+    /// FP16-equivalent sink + window V storage: flat layout.
+    val_raw: Vec<f32>,
 
     // ── Scratch buffers (zero-alloc hot path) ──
     scratch_normalized: Vec<f32>,
@@ -312,32 +317,19 @@ impl ShardKVCache {
             layer.decode_v_codebook.centroids = decode_q.centroids().to_vec();
         }
 
-        // Allocate storage — inner Vecs pre-sized with `kv_dim` capacity to avoid
-        // allocation on the decode hot path (decode always writes exactly `kv_dim` bytes).
-        let key_indices = (0..n_layers)
-            .map(|_| {
-                (0..max_seq_len)
-                    .map(|_| Vec::with_capacity(kv_dim))
-                    .collect()
-            })
-            .collect();
-        let key_norms = (0..n_layers).map(|_| vec![0.0f32; max_seq_len]).collect();
-        let val_indices = (0..n_layers)
-            .map(|_| {
-                (0..max_seq_len)
-                    .map(|_| Vec::with_capacity(kv_dim))
-                    .collect()
-            })
-            .collect();
-        let val_norms = (0..n_layers).map(|_| vec![0.0f32; max_seq_len]).collect();
+        // Allocate flat storage — single Vec per field instead of
+        // Vec<Vec<Vec<u8>>> (eliminates ~n_layers * max_seq_len inner Vecs).
+        // Stride is `kv_dim` per (layer, pos) slot; prefill positions zero-pad
+        // unused bytes, decode positions use the full stride.
+        let total_slots = n_layers * max_seq_len;
+        let key_indices = vec![0u8; total_slots * kv_dim];
+        let key_norms = vec![0.0f32; total_slots];
+        let val_indices = vec![0u8; total_slots * kv_dim];
+        let val_norms = vec![0.0f32; total_slots];
 
         let raw_slots = sink_tokens + window_tokens;
-        let key_raw = (0..n_layers)
-            .map(|_| (0..raw_slots).map(|_| vec![0.0f32; kv_dim]).collect())
-            .collect();
-        let val_raw = (0..n_layers)
-            .map(|_| (0..raw_slots).map(|_| vec![0.0f32; kv_dim]).collect())
-            .collect();
+        let key_raw = vec![0.0f32; n_layers * raw_slots * kv_dim];
+        let val_raw = vec![0.0f32; n_layers * raw_slots * kv_dim];
 
         let k_rotations: Vec<SpectralRotation> = k_calibrations
             .iter()
@@ -390,6 +382,25 @@ impl ShardKVCache {
         }
     }
 
+    /// Byte offset into `key_indices`/`val_indices` for (layer, pos).
+    /// Stride is `kv_dim` per slot; prefill positions zero-pad unused bytes.
+    #[inline]
+    fn idx_off(&self, layer: usize, pos: usize) -> usize {
+        (layer * self.max_seq_len + pos) * self.kv_dim
+    }
+
+    /// Index into `key_norms`/`val_norms` for (layer, pos).
+    #[inline]
+    fn norm_off(&self, layer: usize, pos: usize) -> usize {
+        layer * self.max_seq_len + pos
+    }
+
+    /// Byte offset into `key_raw`/`val_raw` for (layer, slot).
+    #[inline]
+    fn raw_off(&self, layer: usize, slot: usize) -> usize {
+        (layer * (self.sink_tokens + self.window_tokens) + slot) * self.kv_dim
+    }
+
     /// Store a key vector at given layer and position.
     ///
     /// K path (prefill): normalize → undo RoPE → PCA rotate → quantize → pack.
@@ -401,18 +412,21 @@ impl ShardKVCache {
         // Sink + window: raw f32 storage
         if self.is_raw_slot(pos) {
             let slot = self.raw_slot_index(pos);
-            self.key_raw[layer][slot].copy_from_slice(key);
-            self.key_norms[layer][pos] = simd_norm(key);
+            let off = self.raw_off(layer, slot);
+            self.key_raw[off..off + self.kv_dim].copy_from_slice(key);
+            let n_off = self.norm_off(layer, pos);
+            self.key_norms[n_off] = simd_norm(key);
             return;
         }
 
         // 1. Compute and store norm
         let norm = simd_norm(key);
+        let n_off = self.norm_off(layer, pos);
         if norm < 1e-8 {
-            self.key_norms[layer][pos] = 0.0;
+            self.key_norms[n_off] = 0.0;
             return;
         }
-        self.key_norms[layer][pos] = norm;
+        self.key_norms[n_off] = norm;
 
         // 2. Normalize
         let inv_norm = 1.0 / norm;
@@ -429,11 +443,11 @@ impl ShardKVCache {
             for (i, &v) in self.scratch_normalized.iter().enumerate() {
                 self.scratch_indices[i] = quantize_to_idx(v, &cb.centroids);
             }
-            // Store as raw bytes (8 bits = 1 byte per index)
-            // No allocation: inner Vec was pre-allocated with `kv_dim` capacity.
-            let buf = &mut self.key_indices[layer][pos];
-            buf.clear();
-            buf.extend_from_slice(&self.scratch_indices[..self.kv_dim]);
+            // Store as raw bytes (8 bits = 1 byte per index) into flat slot.
+            // No allocation: write directly into pre-sized stride.
+            let off = self.idx_off(layer, pos);
+            self.key_indices[off..off + self.kv_dim]
+                .copy_from_slice(&self.scratch_indices[..self.kv_dim]);
         } else {
             // Prefill: undo RoPE → PCA → quantize → pack
             let layer_state = &self.layers[layer];
@@ -467,7 +481,7 @@ impl ShardKVCache {
                 self.scratch_indices[i] = quantize_to_idx(v, &tail_cb.centroids);
             }
 
-            // 6. Build bits array and pack
+            // 6. Build bits array and pack into flat slot
             if let Some(ref bits) = layer_state.k_bits_per_dim {
                 self.scratch_bits[..d_eff].copy_from_slice(&bits[..d_eff.min(bits.len())]);
             } else {
@@ -475,10 +489,13 @@ impl ShardKVCache {
             }
             self.scratch_bits[d_eff..self.kv_dim].fill(k_b_low);
 
-            pack_variable_bits(
+            let off = self.idx_off(layer, pos);
+            // Zero the slot first (prefill packed length may be < stride).
+            self.key_indices[off..off + self.kv_dim].fill(0);
+            pack_variable_bits_into(
                 &self.scratch_indices[..self.kv_dim],
                 &self.scratch_bits[..self.kv_dim],
-                &mut self.key_indices[layer][pos],
+                &mut self.key_indices[off..off + self.kv_dim],
             );
         }
     }
@@ -494,8 +511,10 @@ impl ShardKVCache {
         // Sink + window: raw f32 storage
         if self.is_raw_slot(pos) {
             let slot = self.raw_slot_index(pos);
-            self.val_raw[layer][slot].copy_from_slice(value);
-            self.val_norms[layer][pos] = simd_norm(value);
+            let off = self.raw_off(layer, slot);
+            self.val_raw[off..off + self.kv_dim].copy_from_slice(value);
+            let n_off = self.norm_off(layer, pos);
+            self.val_norms[n_off] = simd_norm(value);
             return;
         }
 
@@ -503,11 +522,12 @@ impl ShardKVCache {
 
         // 1. Compute and store norm
         let norm = simd_norm(value);
+        let n_off = self.norm_off(layer, pos);
         if norm < 1e-8 {
-            self.val_norms[layer][pos] = 0.0;
+            self.val_norms[n_off] = 0.0;
             return;
         }
-        self.val_norms[layer][pos] = norm;
+        self.val_norms[n_off] = norm;
 
         // 2. Normalize
         let inv_norm = 1.0 / norm;
@@ -526,11 +546,10 @@ impl ShardKVCache {
             for (i, &v) in self.scratch_normalized.iter().enumerate() {
                 self.scratch_indices[i] = quantize_to_idx(v, &cb.centroids);
             }
-            // Store as raw bytes (8 bits = 1 byte per index)
-            // No allocation: inner Vec was pre-allocated with `kv_dim` capacity.
-            let buf = &mut self.val_indices[layer][pos];
-            buf.clear();
-            buf.extend_from_slice(&self.scratch_indices[..self.kv_dim]);
+            // Store as raw bytes (8 bits = 1 byte per index) into flat slot.
+            let off = self.idx_off(layer, pos);
+            self.val_indices[off..off + self.kv_dim]
+                .copy_from_slice(&self.scratch_indices[..self.kv_dim]);
         } else {
             // Prefill VQ: K-means VQ on groups of `group_size` channels
             let cb = &layer_state.v_vq_codebook;
@@ -555,10 +574,12 @@ impl ShardKVCache {
                 self.scratch_vq_indices[g] = best_idx;
             }
 
-            // No allocation: inner Vec was pre-allocated with `kv_dim` capacity.
-            let buf = &mut self.val_indices[layer][pos];
-            buf.clear();
-            buf.extend_from_slice(&self.scratch_vq_indices[..n_groups]);
+            // No allocation: write into pre-sized flat slot. Zero first since
+            // VQ packed length (n_groups) may be < kv_dim stride.
+            let off = self.idx_off(layer, pos);
+            self.val_indices[off..off + self.kv_dim].fill(0);
+            self.val_indices[off..off + n_groups]
+                .copy_from_slice(&self.scratch_vq_indices[..n_groups]);
         }
     }
 
@@ -573,11 +594,12 @@ impl ShardKVCache {
         // Sink + window: raw f32 copy
         if self.is_raw_slot(pos) {
             let slot = self.raw_slot_index(pos);
-            out.copy_from_slice(&self.key_raw[layer][slot]);
+            let off = self.raw_off(layer, slot);
+            out.copy_from_slice(&self.key_raw[off..off + self.kv_dim]);
             return;
         }
 
-        let norm = self.key_norms[layer][pos];
+        let norm = self.key_norms[self.norm_off(layer, pos)];
 
         if norm < 1e-8 {
             out.fill(0.0);
@@ -589,7 +611,8 @@ impl ShardKVCache {
         if is_decode {
             // Decode streaming dequant: byte indices → Lloyd-Max lookup → inverse Hadamard
             let cb = &self.layers[layer].decode_v_codebook;
-            let indices = &self.key_indices[layer][pos];
+            let off = self.idx_off(layer, pos);
+            let indices = &self.key_indices[off..off + self.kv_dim];
             for (i, byte) in indices.iter().enumerate().take(self.kv_dim) {
                 self.scratch_rotated[i] = dequantize_idx(*byte, &cb.centroids);
             }
@@ -613,8 +636,9 @@ impl ShardKVCache {
             self.scratch_bits[d_eff..self.kv_dim].fill(k_b_low);
 
             // Unpack
+            let off = self.idx_off(layer, pos);
             unpack_variable_bits(
-                &self.key_indices[layer][pos],
+                &self.key_indices[off..off + self.kv_dim],
                 &self.scratch_bits[..self.kv_dim],
                 self.kv_dim,
                 &mut self.scratch_indices,
@@ -663,12 +687,13 @@ impl ShardKVCache {
         // Sink + window: raw f32 copy
         if self.is_raw_slot(pos) {
             let slot = self.raw_slot_index(pos);
-            out.copy_from_slice(&self.val_raw[layer][slot]);
+            let off = self.raw_off(layer, slot);
+            out.copy_from_slice(&self.val_raw[off..off + self.kv_dim]);
             return;
         }
 
         let layer_state = &self.layers[layer];
-        let norm = self.val_norms[layer][pos];
+        let norm = self.val_norms[self.norm_off(layer, pos)];
 
         if norm < 1e-8 {
             out.fill(0.0);
@@ -680,7 +705,8 @@ impl ShardKVCache {
         if is_decode {
             // Decode streaming dequant: byte indices → Lloyd-Max lookup
             let cb = &layer_state.decode_v_codebook;
-            let indices = &self.val_indices[layer][pos];
+            let off = self.idx_off(layer, pos);
+            let indices = &self.val_indices[off..off + self.kv_dim];
             for (i, byte) in indices.iter().enumerate().take(self.kv_dim) {
                 self.scratch_rotated[i] = dequantize_idx(*byte, &cb.centroids);
             }
@@ -688,8 +714,10 @@ impl ShardKVCache {
             // Prefill VQ dequant: VQ group indices → centroid lookup
             let cb = &layer_state.v_vq_codebook;
             let gs = cb.group_size;
-            let indices = &self.val_indices[layer][pos];
-            let n_groups = indices.len().min(self.kv_dim / gs);
+            let off = self.idx_off(layer, pos);
+            let indices = &self.val_indices[off..off + self.kv_dim];
+            // Length is deterministic: prefill V stores exactly `kv_dim / gs` bytes.
+            let n_groups = self.kv_dim / gs;
             // stride math: `g` drives both `indices[g]` and `base = g * gs`
             #[allow(clippy::needless_range_loop)]
             for g in 0..n_groups {
@@ -712,18 +740,13 @@ impl ShardKVCache {
     /// Reset cache for a new sequence.
     pub fn reset(&mut self) {
         self.pos = 0;
-        for layer in 0..self.n_layers {
-            for p in 0..self.max_seq_len {
-                self.key_indices[layer][p].clear();
-                self.key_norms[layer][p] = 0.0;
-                self.val_indices[layer][p].clear();
-                self.val_norms[layer][p] = 0.0;
-            }
-            for slot in 0..self.sink_tokens + self.window_tokens {
-                self.key_raw[layer][slot].fill(0.0);
-                self.val_raw[layer][slot].fill(0.0);
-            }
-        }
+        // Flat fill — replaces nested loop over inner Vecs.
+        self.key_indices.fill(0);
+        self.key_norms.fill(0.0);
+        self.val_indices.fill(0);
+        self.val_norms.fill(0.0);
+        self.key_raw.fill(0.0);
+        self.val_raw.fill(0.0);
     }
 
     /// Mark that prefill has completed at this position.
@@ -961,20 +984,16 @@ fn kmeans_fit(
     centroids
 }
 
-/// Pack variable-bit indices into bytes (LSB-first).
+/// Pack variable-bit indices into a fixed-size slice (zero-alloc variant).
+///
+/// Caller MUST zero `out` beforehand and ensure `out.len() >= total_bits.div_ceil(8)`.
+/// Writes only the valid packed bytes; trailing bytes in `out` are left untouched.
 /// `bits_per_dim.len()` must be `>= indices.len()` (callers always pass a full-length array).
-fn pack_variable_bits(indices: &[u8], bits_per_dim: &[u8], out: &mut Vec<u8>) {
-    out.clear();
-    // Pre-reserve to avoid reallocation in the push loop. Inner Vecs were pre-sized
-    // with `kv_dim` capacity at construction; reserve keeps us within that capacity.
-    let total_bits: usize = bits_per_dim
-        .iter()
-        .take(indices.len())
-        .map(|&b| b as usize)
-        .sum();
-    out.reserve(total_bits.div_ceil(8));
+/// The caller's stride should be `kv_dim` (>= max packed output length).
+fn pack_variable_bits_into(indices: &[u8], bits_per_dim: &[u8], out: &mut [u8]) {
     let mut bit_buffer = 0u64;
     let mut bits_in_buffer = 0u32;
+    let mut byte_idx = 0usize;
 
     for (i, &idx) in indices.iter().enumerate() {
         let bits = bits_per_dim[i] as u32;
@@ -982,13 +1001,17 @@ fn pack_variable_bits(indices: &[u8], bits_per_dim: &[u8], out: &mut Vec<u8>) {
         bits_in_buffer += bits;
 
         while bits_in_buffer >= 8 {
-            out.push((bit_buffer & 0xFF) as u8);
+            if byte_idx >= out.len() {
+                return;
+            }
+            out[byte_idx] = (bit_buffer & 0xFF) as u8;
+            byte_idx += 1;
             bit_buffer >>= 8;
             bits_in_buffer -= 8;
         }
     }
-    if bits_in_buffer > 0 {
-        out.push((bit_buffer & 0xFF) as u8);
+    if bits_in_buffer > 0 && byte_idx < out.len() {
+        out[byte_idx] = (bit_buffer & 0xFF) as u8;
     }
 }
 
@@ -1285,8 +1308,9 @@ mod tests {
         let bits = vec![4u8; dims];
         let indices: Vec<u8> = (0..dims).map(|i| (i % 16) as u8).collect();
 
-        let mut packed = Vec::new();
-        pack_variable_bits(&indices, &bits, &mut packed);
+        // Flat slot of stride `dims` (mirrors the cache layout).
+        let mut packed = vec![0u8; dims];
+        pack_variable_bits_into(&indices, &bits, &mut packed);
 
         let mut unpacked = vec![0u8; dims];
         unpack_variable_bits(&packed, &bits, dims, &mut unpacked);
