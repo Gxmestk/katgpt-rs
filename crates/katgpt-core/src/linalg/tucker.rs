@@ -474,7 +474,13 @@ impl TuckerResultScratch {
         let mut shape = [0usize; MAX_MODES];
         let mut ranks = [0usize; MAX_MODES];
         let mut factor_offsets = [0usize; MAX_MODES];
-        let mut factors_flat = Vec::new();
+        // Pre-compute total capacity to avoid reallocation during extend.
+        // (Cold-tier reload path, but a single reserve is cheaper than up to
+        // MAX_MODES reallocations and keeps the cold path tidy.)
+        let total_factor_len: usize = (0..nmodes)
+            .map(|n| result.factor_shapes[n].0 * result.factor_shapes[n].1)
+            .sum();
+        let mut factors_flat = Vec::with_capacity(total_factor_len);
         let mut acc = 0usize;
         for n in 0..nmodes {
             let (i_n, r_n) = result.factor_shapes[n];

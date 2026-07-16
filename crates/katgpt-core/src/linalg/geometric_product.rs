@@ -150,10 +150,10 @@ pub fn cyclic_shift_into(src: &[f32], dim: usize, shift: usize, out: &mut [f32])
         out.len(),
         dim
     );
-    let s = if dim == 0 { 0 } else { shift % dim };
     if dim == 0 {
         return;
     }
+    let s = shift % dim;
     // out[c] = src[(c + s) mod dim] — split into two contiguous copies so LLVM
     // sees a memcpy-style pair and the caller can reuse `out` as a scratch without
     // aliasing `src`.

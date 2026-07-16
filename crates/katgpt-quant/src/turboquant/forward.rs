@@ -230,6 +230,8 @@ pub fn maxsim_score_turboquant(
         for t in pos_range.clone() {
             // Lazy dequantize into pre-allocated buffer: O(dim) peak memory,
             // zero heap allocation per position. Matches maxsim.metal streaming pattern.
+            // (.clone() is required: Range<usize> is not Copy and the inner
+            // `for` consumes it via into_iter() on each outer iteration.)
             cache.dequantize_key_into(layer, t, &mut key_buf);
             let dot = katgpt_core::simd::simd_dot_f32(q_row, &key_buf[..dim], dim);
             my_max = my_max.max(dot);

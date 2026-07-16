@@ -220,19 +220,20 @@ impl NonUniformQuantizer {
         if self.use_water_fill {
             let quantizers = self.per_dim_semantic_quantizers.as_ref().unwrap();
             for (i, q) in quantizers.iter().enumerate() {
-                let idx = q.quantize(&[x[i]])[0];
-                semantic_indices.push(idx);
+                // Scalar path: avoids allocating a Vec<u32> of len 1 per channel.
+                // (head_dim=128 → 128 avoided allocations per compress call.)
+                semantic_indices.push(q.quantize_one(x[i]));
             }
         } else {
             let q = self.semantic_quantizer.as_ref().unwrap();
             for &v in x.iter().take(self.d_eff_int) {
-                semantic_indices.push(q.quantize(&[v])[0]);
+                semantic_indices.push(q.quantize_one(v));
             }
         }
 
         let tail_q = self.tail_quantizer.as_ref().unwrap();
         for &v in x.iter().skip(self.d_eff_int) {
-            tail_indices.push(tail_q.quantize(&[v])[0]);
+            tail_indices.push(tail_q.quantize_one(v));
         }
 
         let actual_bits = if self.use_water_fill {
@@ -271,19 +272,20 @@ impl NonUniformQuantizer {
             let quantizers = self.per_dim_semantic_quantizers.as_ref().unwrap();
             for (i, q) in quantizers.iter().enumerate() {
                 if i < compressed.semantic_indices.len() {
-                    result[i] = q.dequantize(&[compressed.semantic_indices[i]])[0];
+                    // Scalar path: avoids allocating a Vec<f32> of len 1 per channel.
+                    result[i] = q.dequantize_one(compressed.semantic_indices[i]);
                 }
             }
         } else {
             let q = self.semantic_quantizer.as_ref().unwrap();
             for (i, &idx) in compressed.semantic_indices.iter().enumerate() {
-                result[i] = q.dequantize(&[idx])[0];
+                result[i] = q.dequantize_one(idx);
             }
         }
 
         let tail_q = self.tail_quantizer.as_ref().unwrap();
         for (i, &idx) in compressed.tail_indices.iter().enumerate() {
-            result[self.d_eff_int + i] = tail_q.dequantize(&[idx])[0];
+            result[self.d_eff_int + i] = tail_q.dequantize_one(idx);
         }
 
         result

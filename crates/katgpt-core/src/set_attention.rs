@@ -418,7 +418,9 @@ fn dense_accumulate(
     // one subtract per (i, j, m) in the naive form — a ~N× speedup on the
     // inner product. The stack scratch `sum_av` is bounded at d=16 (covers
     // HLA d=8 and most latents; larger d would need a heap scratch).
-    debug_assert!(
+    // Release-checked OOB guard: sum_av is a fixed [f32; 16] stack array,
+    // so d > 16 would write past the end. Must fire in release, not just debug.
+    assert!(
         d <= 16,
         "dense_accumulate: d > 16 needs a larger stack scratch"
     );
@@ -602,9 +604,11 @@ fn topk_accumulate(
 /// inference requires.
 #[inline(always)]
 fn sigmoid(x: f32) -> f32 {
-    // Branch-free stable form: avoids overflow for large negative x (the
-    // naive 1/(1+e^-x) overflows there). Uses std `f32::exp` (libm on std,
-    // compiler-builtins on no_std); no extra crate dep.
+    // Numerically stable form (not branch-free — the branch selects which of
+    // two overflow-safe formulations to use). Avoids overflow for large
+    // negative x (the naive 1/(1+e^-x) overflows there). Uses std `f32::exp`
+    // (libm on std, compiler-builtins on no_std); no extra crate dep.
+    // LLVM typically lowers the branch to a branchless `select` after inline.
     if x >= 0.0 {
         1.0 / (1.0 + (-x).exp())
     } else {

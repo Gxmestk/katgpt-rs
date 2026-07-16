@@ -212,6 +212,8 @@ pub fn maxsim_score_octopus(
         let mut my_max = f32::NEG_INFINITY;
         for t in pos_range.clone() {
             // Zero-alloc lazy dequantize into reusable buffer.
+            // (.clone() is required: Range<usize> is not Copy and the inner
+            // `for` consumes it via into_iter() on each outer iteration.)
             cache.dequantize_key_into(layer, t, &mut key_buf);
             let dot = katgpt_core::simd::simd_dot_f32(q_row, &key_buf, dim);
             my_max = my_max.max(dot);

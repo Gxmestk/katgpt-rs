@@ -676,6 +676,21 @@ impl LloydMaxQuantizer {
             .collect()
     }
 
+    /// Scalar quantize: single value → single index.
+    ///
+    /// Zero-allocation alternative to `quantize(&[v])[0]` for per-element hot
+    /// paths (e.g. `NonUniformQuantizer::compress`). Reuses the same sorted-
+    /// centroid binary search as the batch path — O(log n_levels).
+    ///
+    /// # Panics
+    ///
+    /// Panics if not fitted.
+    #[inline]
+    pub fn quantize_one(&self, v: f32) -> u32 {
+        let centroids = self.centroids.as_ref().expect("not fitted");
+        self.nearest_centroid(v, centroids) as u32
+    }
+
     /// Dequantize indices back to centroid values.
     ///
     /// # Panics
@@ -687,6 +702,20 @@ impl LloydMaxQuantizer {
             .iter()
             .map(|&idx| centroids.get(idx as usize).copied().unwrap_or(0.0))
             .collect()
+    }
+
+    /// Scalar dequantize: single index → single centroid value.
+    ///
+    /// Zero-allocation alternative to `dequantize(&[idx])[0]` for per-element
+    /// hot paths (e.g. `NonUniformQuantizer::decompress`). O(1) indexed read.
+    ///
+    /// # Panics
+    ///
+    /// Panics if not fitted.
+    #[inline]
+    pub fn dequantize_one(&self, idx: u32) -> f32 {
+        let centroids = self.centroids.as_ref().expect("not fitted");
+        centroids.get(idx as usize).copied().unwrap_or(0.0)
     }
 
     /// Get fitted centroids.
