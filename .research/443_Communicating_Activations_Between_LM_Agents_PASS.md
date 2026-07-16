@@ -5,6 +5,7 @@
 > **Status:** Done — PASS-with-gains
 > **Classification:** Public (katgpt-rs/MIT)
 > **Related Research:** 247 (CS-KV Probe / NPC Mind-Reading — the Super-GOAT that subsumes this), 167 (riir-ai Crowd Joint Inference), 289 (RecursiveMAS PASS — identical verdict pattern), 357 (Neural Procedural Memory Activation Steering), 402 (Latent Bridge Slow-Fast — identical "cross-model projection already ships" finding)
+> **Cross-ref (riir-ai):** Research 319 (riir-ai cross-ref note — the runtime angle; all three subsuming modules + issues 523-525 live in riir-ai)
 > **Related Plans:** 311 (Mind-Reading runtime), 355 (Crowd Attention runtime), 391 (Latent Steering Bridge)
 > **Verdict: PASS-with-gains.** The activation-communication mechanism is a **strict subset** of what already ships across three runtime modules. Cherry-pickable design insights recorded in §2.2.
 
