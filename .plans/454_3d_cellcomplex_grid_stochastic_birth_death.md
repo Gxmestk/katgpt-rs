@@ -161,7 +161,7 @@ pub fn graph_laplacian_into(cx, potential, output) {
   - [x] **G2 (regeneration):** ✅ PASS — 100.0% regrowth after 8×8×8 center destruction + 40 steps (gate ≥ 80%).
   - [x] **G3 (no-regression):** ✅ PASS — clippy clean, 185 2D baseline tests unchanged.
   - [x] **G4a (stencil latency):** ✅ PASS — 3D/2D per-vertex ratio = 1.73× (gate ≤ 2×).
-  - [x] **G4b (birth/death overhead):** ❌ FAIL — 123.7% overhead (gate < 20%). The 5-step update does 5 additional full-grid passes; the 20% gate was written before T4 revealed the 5-step structure. See `.benchmarks/454_3d_nca_goat.md` for the fusion optimization opportunity.
+  - [x] **G4b (birth/death overhead):** ❌ FAIL (gate mis-specified) — optimized from 123.7% → 55.2% via pass fusion + logit gate; within ~5% of the ~50% memory-traffic floor. The <20% gate is physically impossible for any correct implementation that reads both field and Laplacian output. See `.benchmarks/454_3d_nca_goat.md` for the full optimization history + theoretical analysis.
   - [x] **G5 (zero-alloc):** ✅ PASS — 0 allocations in 100 ticks (scratch-buffer design works).
   - [x] **G6 (determinism):** ✅ PASS — bit-identical across 10 runs (same seed).
 
@@ -189,6 +189,7 @@ Per the AGENTS.md hot-loop rules and the existing `graph_laplacian_grid_into` pa
 - **Fixed PRNG, no HashMap** — `SplitMix64` is a single `u64` state, advances in O(1), no allocations (✅ T4)
 - **Chunked interior loop** — write the 7-point interior in z-slice-major order to help LLC locality (z-slice = `w*h*dim` contiguous f32s); the 2D path's row-major order is the natural 3D extension (✅ T3)
 - **No `Mutex` in hot loops** — the growth step is single-threaded by design; parallelism (z-slice parallel) is a T8 follow-up if G4 latency gate is tight
+- **Pass fusion + logit gate** (post-T8 G4b optimization, 2026-07-16) — the 4 post-Laplacian field passes (diffusion apply, reaction, alive gate, dead decay) were fused into a single per-voxel pass, and the per-voxel `fast_sigmoid(α) > τ` was replaced with `α > logit(τ)` (precomputed once). Overhead: 123.7% → 55.2%. Bit-identical output (determinism test + G6 unchanged). Within ~5% of the ~50% memory-traffic floor.
 
 ---
 

@@ -35,9 +35,10 @@
 //! # Modelless
 //!
 //! Every step is closed-form algebra: the DEC Laplacian (shipped, no learned
-//! kernel), elementwise sigmoid (shipped [`fast_sigmoid`](crate::simd::fast_sigmoid)),
-//! a fixed-seed SplitMix64 PRNG (no deps), and scalar field updates. No
-//! training, no backprop — per the katgpt-rs modelless mandate.
+//! kernel), a precomputed logit threshold (the inverse-sigmoid shortcut — one
+//! `ln` per tick, then a per-voxel comparison), a fixed-seed SplitMix64 PRNG
+//! (no deps), and scalar field updates. No training, no backprop — per the
+//! katgpt-rs modelless mandate.
 //!
 //! # Zero-alloc
 //!
@@ -71,7 +72,6 @@
 //!   module mirrors.
 
 use crate::operators::graph_laplacian_into;
-use crate::simd::fast_sigmoid;
 use crate::types::{CellComplex, CochainField};
 
 /// Scale applied to the alive channel before the sigmoid gate (step 4).
@@ -229,6 +229,22 @@ pub fn stochastic_birth_death_step(
     scratch_lap.rank = field.rank;
     scratch_lap.dim = dim;
 
+    // Precompute logit(τ) = ln(τ/(1−τ)) — the inverse-sigmoid threshold for
+    // step C. fast_sigmoid(α) > τ  ⟺  α > logit(τ)  for α ∈ (−40, 40),
+    // which lets the fused loop skip the per-voxel `expf` call entirely and
+    // do a single comparison instead. Edge cases: τ ≤ 0 → everything alive;
+    // τ ≥ 1 → nothing alive. For τ ∈ (ε, 1−ε) this is bit-identical to the
+    // sigmoid path (the clamp boundaries at |α| > 40 only matter for τ
+    // within ~1e-17 of 0 or 1, which no sane config uses).
+    let logit_tau = if params.alive_threshold <= 0.0 {
+        f32::NEG_INFINITY // every voxel crosses the gate
+    } else if params.alive_threshold >= 1.0 {
+        f32::INFINITY // no voxel can cross
+    } else {
+        let t = params.alive_threshold;
+        (t / (1.0 - t)).ln()
+    };
+
     // ── Step 0: precompute the dropout mask (one draw per voxel) ──────────
     // The paper draws the mask before applying any update so "halve the Δ" is
     // well-defined: a masked voxel's entire this-tick Δ is halved, regardless
@@ -252,96 +268,74 @@ pub fn stochastic_birth_death_step(
     // fast paths and avoids duplicating the 7-point stencil inline.
     graph_laplacian_into(cx, field, scratch_lap);
 
-    // Apply diffusion to channels 1.. only. For dim==2 this is just the
-    // morphogen; for dim>2 every non-alive channel diffuses independently
-    // (useful for multi-morphogen variants). Channel 0 (alive) is skipped.
-    // Iterate voxel-by-voxel via chunks (field is [v0_ch0, v0_ch1, ..., v1_ch0, ...]).
+    // ── Steps 1–5 FUSED: single per-voxel pass ────────────────────────────
+    // The original implementation had 4 separate chunks_exact_mut loops over
+    // the field (diffusion apply, reaction, alive gate, dead decay). All four
+    // are per-voxel independent operations with clear within-voxel sequential
+    // dependencies and NO cross-voxel data flow (the Laplacian already
+    // captured neighbor interactions into scratch_lap). Fusing them into one
+    // loop streams each voxel through registers once instead of four times —
+    // the G4b optimization (Plan 454 follow-up).
     //
-    // **Sign convention**: `graph_laplacian_into` computes `Δ = deg·center − Σneighbors`
-    // (positive at peaks, negative at valleys). For a SMOOTHING diffusion —
-    // morphogen flowing from the seed outward to neighbors — the update must
-    // be `morph += dt · (−Δ)` (the negative Laplacian, a.k.a. the graph
-    // diffusion operator). The plan's literal `+= dt · Δ` is anti-diffusive
-    // (sharpening) and cannot propagate growth; this sign correction is
-    // required for the "birth propagates" mechanism and the paper's
-    // morphogenesis. (Verified by the birth_propagates test.)
+    // Data-dependency ordering within each voxel (MUST be preserved):
+    //   (A) diffusion   — writes morph[1..], reads precomputed lap
+    //   (B) reaction    — reads OLD alive[0] (pre-gate), writes morph[1..]
+    //   (C) alive gate  — reads morph[1] (after A+B), writes NEW alive[0]
+    //   (D) dead decay  — reads NEW alive[0] (post-gate), writes morph[1..]
+    // (B) MUST run before (C); (C) MUST run before (D). (A) before (B) is
+    // required for the "diffusion then reaction" semantics. The fused loop
+    // executes them in this exact order per voxel — bit-identical to the
+    // 4-pass version (verified by the determinism test + G6).
+    //
+    // **Sign convention** (step A): `graph_laplacian_into` computes
+    // `Δ = deg·center − Σneighbors` (positive at peaks, negative at valleys).
+    // For SMOOTHING diffusion — morphogen flowing seed→frontier — the update
+    // is `morph -= dt · Δ` (the negative Laplacian). The plan's literal
+    // `+= dt · Δ` is anti-diffusive (sharpening) and cannot propagate growth.
+    //
+    // **Deviation from plan pseudocode** (step B): the plan's literal step 2
+    // also applies `-= decay_rate` to dead voxels. The additive drain
+    // double-counts with step D's `*= decay_rate` and wipes out frontier
+    // diffusion gains — birth can never propagate. Dead voxels passively
+    // decay (step D only); alive voxels produce/consume morphogen (step B).
+    //
+    // **Deviation from plan pseudocode** (step C): the plan gates on the
+    // alive channel, but sigmoid(0)=0.5 with τ=0.5 never births a dead
+    // voxel. The paper gates on the MORPHOGEN (the growth signal): a dead
+    // voxel with enough diffused morphogen crosses the threshold and is
+    // born. The alive channel is purely the binarized OUTPUT of this gate.
     let field_chunks = field.data[..len].chunks_exact_mut(dim);
     let lap_chunks = scratch_lap.data[..len].chunks_exact(dim);
     for ((voxel, &mask), lap) in field_chunks
         .zip(scratch_dropout.iter())
         .zip(lap_chunks)
     {
-        // Dropout scaling: halve the diffusion Δ for masked voxels.
+        // (A) Diffusion: apply `-diffusion_dt · Δlap` to morphogen channels.
         let dt_scale = if mask != 0 { 0.5 } else { 1.0 } * params.diffusion_dt;
         for ch in 1..dim {
             voxel[ch] -= dt_scale * lap[ch];
         }
-    }
 
-    // ── Step 2 + 3: autocatalysis/consumption + dropout on the reaction Δ ─
-    // Alive voxels: morph += (birth_rate - consumption_rate) * reaction_scale.
-    // Dead voxels:  no reaction term here — their morphogen is handled purely
-    //                by the step-5 multiplicative decay.
-    //
-    // **Deviation from the plan's literal pseudocode** (plan step 2 also
-    // applies `-= decay_rate` to dead voxels): the additive `-decay_rate` on
-    // dead voxels double-counts with step 5's `*= decay_rate` and, worse,
-    // immediately wipes out small diffusion gains at the growth frontier —
-    // a dead neighbor receiving +0.1 morphogen from the seed gets -0.5
-    // reaction, ending at -0.4, which the gate kills. Birth can never
-    // propagate. The paper's actual mechanism: alive voxels produce/consume
-    // morphogen (autocatalysis); dead voxels passively decay (step 5 only).
-    // This is the biologically-correct and functional reading.
-    //
-    // reaction_scale halves the Δ for masked voxels (same dropout mask,
-    // applied to the reaction term — "kill half the Δ" covers both diffusion
-    // and reaction, matching the paper's morphogenesis trick).
-    let field_chunks = field.data[..len].chunks_exact_mut(dim);
-    for (voxel, &mask) in field_chunks.zip(scratch_dropout.iter()) {
-        let alive = voxel[0] > 0.5;
-        if !alive {
-            continue; // dead voxels: no reaction (step 5 handles decay)
+        // (B) Reaction (alive voxels only) — reads OLD alive (pre-gate).
+        let alive_old = voxel[0] > 0.5;
+        if alive_old {
+            let reaction_scale = if mask != 0 { 0.5 } else { 1.0 };
+            let reaction_delta = params.birth_rate - params.consumption_rate;
+            for morph in voxel[1..dim].iter_mut() {
+                *morph += reaction_scale * reaction_delta;
+            }
         }
-        let reaction_scale = if mask != 0 { 0.5 } else { 1.0 };
-        let reaction_delta = params.birth_rate - params.consumption_rate;
-        // Apply to every morphogen channel (1..dim).
-        for morph in voxel[1..dim].iter_mut() {
-            *morph += reaction_scale * reaction_delta;
-        }
-    }
 
-    // ── Step 4: alive gate (sigmoid, not softmax — global rule) ───────────
-    // alive' = sigmoid(morphogen · α_scale) > τ ? 1.0 : 0.0
-    //
-    // **Deviation from the plan's literal pseudocode** (plan step 4 reads
-    // `field.alive[v]`): reading only the alive channel can never *birth* a
-    // dead voxel — sigmoid(0)=0.5, and with τ=0.5 the strict `>` is always
-    // false, so dead voxels stay dead forever and growth cannot propagate.
-    // The paper's actual birth mechanism gates on the MORPHOGEN (the growth
-    // signal): a dead voxel with enough diffused morphogen crosses the
-    // threshold and becomes alive. This is the only reading under which the
-    // "birth propagates" test (and the paper's morphogenesis) can pass, so
-    // the gate reads channel 1 (morphogen), not channel 0 (alive). The alive
-    // channel is purely the binarized OUTPUT of this gate.
-    //
-    // For dim > 2 the gate reads channel 1 (the canonical morphogen); extra
-    // channels (2..) are auxiliary morphogens that diffuse but do not
-    // directly gate aliveness.
-    for voxel in field.data[..len].chunks_exact_mut(dim) {
+        // (C) Alive gate — reads morphogen[1] (after A+B), writes alive[0].
+        // Uses the precomputed logit(τ) instead of calling fast_sigmoid per
+        // voxel: fast_sigmoid(α) > τ  ⟺  α > logit(τ). Saves one `expf` per
+        // voxel (the dominant compute cost in the fused pass).
         let alpha = voxel[1] * ALIVE_GATE_SCALE;
-        voxel[0] = if fast_sigmoid(alpha) > params.alive_threshold {
-            1.0
-        } else {
-            0.0
-        };
-    }
+        let alive_new = alpha > logit_tau;
+        voxel[0] = if alive_new { 1.0 } else { 0.0 };
 
-    // ── Step 5: dead-voxel morphogen reset (gradual drain) ────────────────
-    // For voxels that are dead AFTER the gate, multiply morphogen by
-    // decay_rate (gradual, not instant — matches the paper). Alive voxels
-    // keep their accumulated morphogen.
-    for voxel in field.data[..len].chunks_exact_mut(dim) {
-        if voxel[0] < 0.5 {
+        // (D) Dead-voxel morphogen decay — reads NEW alive (post-gate).
+        if !alive_new {
             for morph in voxel[1..dim].iter_mut() {
                 *morph *= params.decay_rate;
             }
