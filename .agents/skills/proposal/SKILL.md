@@ -38,7 +38,7 @@ non-negotiable per the canonical proposals in `katgpt-rs/.proposals/`.
 - **Cross-repo GOAT cherry-pick audit** → use the `goat-audit` skill.
 - **Bug fixes with no architectural angle.**
 
-## Repos in scope (the 5-repo quintet)
+## Repos in scope (the 7-repo stack)
 
 Same layout as the `research` and `goat-audit` skills:
 
@@ -47,7 +47,11 @@ katgpt-rs          ← public engine (default target for generic primitives)
 riir-ai            ← private runtime/game (cognitive, freeze/thaw, HLA, ...)
 riir-chain         ← private chain (LatCal, quorum, sync-boundary bridge)
 riir-neuron-db     ← private neuron-shard leaf (Pod, freeze, consolidation, AnyRAG)
-riir-train         ← private training vault (OUT OF SCOPE — training-only)
+riir-train         ← private training vault (training-only methods — research-only routing)
+riir-game-sdk      ← private game-vocabulary facade + dev-tool workspace
+                      (consumers: poc-maxman, seal-online-remaster; vocabulary source is
+                      riir-games-shared in riir-ai workspace, re-exported via facade)
+riir-armageddon    ← private arena/game-product domain types
 ```
 
 **Target-repo routing rule:** pick the repo that *owns the surface being
@@ -55,8 +59,9 @@ changed*. A primitive that ships in `katgpt-core` → proposal in
 `katgpt-rs/.proposals/`. A runtime composition change → `riir-ai/.proposals/`.
 A sync-boundary / LatCal / commitment bridge → `riir-chain/.proposals/`. A
 shard / freeze / consolidation / AnyRAG mechanism → `riir-neuron-db/.proposals/`.
-If the proposal spans repos, file it in the repo that owns the primary
-surface and cross-reference from the others.
+A game-vocabulary / SDK facade / backend abstraction change →
+`riir-game-sdk/.proposals/`. If the proposal spans repos, file it in the repo
+that owns the primary surface and cross-reference from the others.
 
 ## Pre-flight (MANDATORY before any grep)
 
@@ -67,7 +72,7 @@ Run all of these in parallel:
    use `max(existing NNN) + 1`. **Always write the new highwater back** after
    creating the proposal (per global AGENTS.md numbering discipline — numbers
    are monotonic and never reused).
-2. **`list_directory` `.proposals/` in ALL FIVE repos.** These are the
+2. **`list_directory` `.proposals/` in ALL SEVEN repos.** These are the
    existing proposals you must not duplicate and must reason about.
 3. **`read_file` the 1–2 closest existing proposals** (by filename match to
    the topic) — these set the bar for prose style, caveats, and rigor. Match
@@ -97,7 +102,7 @@ Write (in your own working, not into the file yet):
 
 This is where the proposal skill differs from `research`: the grep is
 **scoped to the proposal topic**, not the full corpus. Run these in parallel,
-all five repos, all four document layers + code:
+all seven repos, all four document layers + code:
 
 ```
 # Layer A — prior proposals (strongest precedent, MUST reason about each hit)

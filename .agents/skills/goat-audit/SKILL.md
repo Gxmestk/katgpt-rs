@@ -1,6 +1,6 @@
 ---
 name: goat-audit
-description: Audit cross-repo GOAT/gain primitive cherry-pick status across the 5-repo quintet (katgpt-rs → riir-ai / riir-chain / riir-neuron-db). Detects stalls (default-on in katgpt-rs for ≥7 days with zero runtime wiring in riir-*), DRY violations (duplicated substrate in riir-* that should consume katgpt-core), and SOLID violations. Use when auditing primitive cherry-pick coverage, before opening a plan that consumes a katgpt-rs primitive, or quarterly as a hygiene gate.
+description: Audit cross-repo GOAT/gain primitive cherry-pick status across the 7-repo stack (katgpt-rs → riir-ai / riir-chain / riir-neuron-db; riir-game-sdk + riir-armageddon are downstream consumers, typically out of cherry-pick scope). Detects stalls (default-on in katgpt-rs for ≥7 days with zero runtime wiring in riir-*), DRY violations (duplicated substrate in riir-* that should consume katgpt-core), and SOLID violations. Use when auditing primitive cherry-pick coverage, before opening a plan that consumes a katgpt-rs primitive, or quarterly as a hygiene gate.
 ---
 
 # goat-audit — Cross-Repo GOAT/Gain Cherry-Pick Audit
@@ -25,7 +25,7 @@ Use this skill when auditing whether the riir-* private repos have consumed the 
 - Single-repo refactors with no cross-repo angle.
 - Bug fixes with no architectural impact.
 
-## Repos in scope (the 5-repo quintet)
+## Repos in scope (the 7-repo stack — audit focuses on the 4 cherry-pick targets)
 
 ```
 katgpt-rs          ← public engine (substrate: katgpt-core + 16 leaf crates + root)
@@ -33,7 +33,20 @@ riir-ai            ← private runtime/game (cognitive, ARG, CLR, HLA, karc, cwm
 riir-chain         ← private chain (LatCal, quorum, asset lifecycle)
 riir-neuron-db     ← private neuron-shard leaf (Pod, freeze, consolidation, AnyRAG)
 riir-train         ← private training vault (OUT OF SCOPE — training-only methods)
+riir-game-sdk      ← private game-vocabulary facade + dev-tool workspace (OUT OF SCOPE —
+                      consumes vocabulary from riir-games-shared in riir-ai, not katgpt-rs
+                      engine primitives directly; transitively reaches katgpt-core only via
+                      the always-on path dep, no feature-flag-gated primitives to audit)
+riir-armageddon    ← private arena/game-product domain types (OUT OF SCOPE — domain types,
+                      no engine primitives)
 ```
+
+**Why SDK + armageddon are out of scope:** this audit tracks katgpt-rs default-on
+primitives (feature-flag-gated, GOAT-validated) consumed in riir-* runtimes. The
+SDK is a facade over `riir-games-shared` (in riir-ai workspace) — its primitives
+are vocabulary types, not katgpt-rs engine features. Armageddon carries
+product-domain types. Neither ships feature-flag-gated katgpt-rs primitives
+that need cherry-pick tracking.
 
 ## Workflow
 
@@ -201,7 +214,7 @@ The 7-day window gives the open primitive time to land its bench evidence before
 ## Cross-references
 
 - `katgpt-rs/AGENTS.md` — Feature Flag Discipline (the GOAT gate contract).
-- `katgpt-rs/.agents/skills/research/SKILL.md` — research workflow (paper → 5-repo routing).
+- `katgpt-rs/.agents/skills/research/SKILL.md` — research workflow (paper → 7-repo routing).
 - `riir-ai/.issues/003_cross_repo_goat_cherry_pick_audit.md` — the canonical audit (2026-07-03). **Compromised** by the Layer 3 gap — substrate-side primitives marked WIRED in this audit need re-verification per Issue 019.
 - `riir-ai/.issues/019_riir_engine_substrate_de_fork.md` — the LLM-substrate de-fork plan (2026-07-04). Documents the fork-drift failure class and the Layer 3 fix.
 - `katgpt-rs/.plans/008_katgpt_core_substrate_extraction.md` — the cross-repo DRY closure record (cognitive substrate: hla/types/tokenizer/dd_tree).

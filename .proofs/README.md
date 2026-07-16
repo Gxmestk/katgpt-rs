@@ -1,6 +1,6 @@
 # KatgptProof — Lean 4 formal verification for the sigmoid ranking-preservation property
 
-Second Lean 4 formal-verification instance in the 5-repo quintet (katgpt-rs / riir-ai / riir-chain / riir-neuron-db / riir-train), and the **first in the public MIT repo** (`katgpt-rs`). The first instance is `riir-chain/.proofs/RiirChainProof` (Plan 004 — LatCal fixed-point round-trip).
+Second Lean 4 formal-verification instance in the 7-repo stack (katgpt-rs / riir-ai / riir-chain / riir-neuron-db / riir-train / riir-game-sdk / riir-armageddon), and the **first in the public MIT repo** (`katgpt-rs`). The first instance is `riir-chain/.proofs/RiirChainProof` (Plan 004 — LatCal fixed-point round-trip).
 
 ## What this proves
 
