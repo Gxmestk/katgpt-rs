@@ -81,7 +81,7 @@ A from-scratch Rust implementation of a GPT-2 style transformer with speculative
 - SLoD Spectral Level-of-Detail Pruner: Poincaré ball hyperbolic geometry + heat diffusion on kNN Laplacians for multi-scale KG resolution control (Plan 235, default-ON, GOAT G1–G6)
 - Schema Centroid: Per-class embedding centroids for informed KG entity initialization with controlled perturbation (Plan 237, default-ON, GOAT 7/7)
 - BAKE Precision-Gated Bayesian Embedding: Per-dimension precision tracking for KG embeddings with O(8) arithmetic, zero-alloc (Plan 236, opt-in, GOAT 10/10 but marginal drift 4.7%)
-- Shard Embedding: Johnson-Lindenstrauss random orthogonal projection [f32;64]→[f32;8] for O(1) cosine similarity shard lookup (Plan 230)
+- Shard Embedding: Johnson-Lindenstrauss random orthogonal projection [f32;64]→[f32;8] for O(1) cosine similarity shard lookup (Plan 230) — **🪦 DEPRECATED (Issue 139):** m=8 violates JL lower bound 200×; marked `#[deprecated]`, zero runtime consumers
 - NFCoT FlowScore Drafter: Inference-time normalizing flow density scoring for speculative candidates, zero training (Plan 229)
 - Union Bound Confidence: Additive branch confidence via Boole's inequality (Plan 231, default-ON, GOAT 6/6)
 - PathwayTracker: Intrinsic pathway stability detection (Plan 231, default-ON, GOAT 7/7)
@@ -132,7 +132,7 @@ crates/
       serialize.rs      SNSE binary format with BLAKE3 verification
       bake.rs           BAKE precision-gated Bayesian embedding update (behind "bake_precision" feature)
       schema_centroid.rs  SchemaCentroidCache — per-class centroid init (behind "schema_centroid" feature)
-    shard_embedding.rs  JL random orthogonal projection [f32;64]→[f32;8] — ShardEmbedding with cosine similarity (Plan 230)
+    shard_embedding.rs  🪦 DEPRECATED (Issue 139): JL random orthogonal projection [f32;64]→[f32;8] — violates JL bound at m=8, marked #[deprecated] (Plan 230)
     slod.rs             SLoD Spectral Level-of-Detail Pruner — Poincaré ball + heat diffusion + tier routing (Plan 235, behind "slod" feature)
     and_or/          AND-OR tree module — AndOrNode<G,S> generic AND-OR tree for hierarchical goal decomposition (behind "and_or_dtree" feature)
       mod.rs        Module root, re-exports AndOrNode
@@ -662,7 +662,7 @@ src/
 | `hardware_aware_scheduler` | — | Hardware-Aware Prefix Scheduler — multi-request verification budget allocator (Plan 339, Issue 003, DSpark §3.2.2). Global sort + greedy admission + non-anticipating early-stop (Appendix A correctness theorem). Opt-in until a real multi-request batch caller exercises the synthetic GOAT gate. |
 | `manifold_pruner` | — | ManifoldPruner — ManifoldE point-to-manifold soft validity scoring + kernel-tricked relevance for ScreeningPruner (Plan 234, opt-in, GOAT G1 FAIL) |
 | `sense_composition` | `katgpt-core/sense_composition` | KG Latent Octree NPC sense modules — ternary bit-plane projection, GM override, hot-swap, bandit feedback (Plan 221, opt-in) |
-| `shard_embedding` | — | (always-on) JL random orthogonal projection [f32;64]→[f32;8] for O(1) cosine similarity shard lookup (Plan 230) |
+| `shard_embedding` | — | 🪦 **DEPRECATED (Issue 139)** — JL random orthogonal projection [f32;64]→[f32;8] for O(1) cosine similarity shard lookup (Plan 230). Violates JL lower bound 200× at m=8; marked `#[deprecated]`, zero runtime consumers. |
 | `slod` | `katgpt-core/slod`, `spectral_hierarchy` | SLoD Spectral Level-of-Detail Pruner — Poincaré ball hyperbolic geometry + heat diffusion tier routing (Plan 235, default-on, GOAT G1–G6) |
 | `schema_centroid` | `katgpt-core/schema_centroid`, `dep:papaya` | Schema Centroid — per-class embedding centroids for informed KG entity init (Plan 237, default-on, GOAT 7/7) |
 | `bake_precision` | `katgpt-core/bake_precision`, `dep:papaya`, `sense_composition` | BAKE Precision-Gated Bayesian Embedding — per-dimension precision tracking, O(8) arithmetic (Plan 236, opt-in, GOAT 10/10 but marginal) |

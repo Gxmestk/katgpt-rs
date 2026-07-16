@@ -1879,9 +1879,21 @@ Feature gate: `sense_composition` (opt-in, requires `plasma_path`, `domain_laten
 
 ---
 
-## Shard Embedding (Plan 230)
+## Shard Embedding (Plan 230) — 🪦 DEPRECATED (Issue 139)
 
-Johnson-Lindenstrauss random orthogonal projection for O(1) cosine similarity shard lookup.
+> **DEPRECATED 2026-07-16 (Issue 139):** JL projection at m=8 is mathematically
+> unsound — violates the Johnson-Lindenstrauss lower bound by over 200× (needs
+> m ≥ 554 for eps=0.5, n=100; uses m=8). Empirically measures 1.4–6% NN
+> preservation vs the documented 90% target. Zero runtime consumers: SenseModule
+> uses TernaryDir, BFCF uses region centroids. `JlProjectionMatrix` +
+> `ShardEmbedding` are marked `#[deprecated]`; re-exports wrapped in
+> `#[allow(deprecated)]` for back-compat. PCA rescue (Option B) deferred —
+> requires a real-data intrinsic-rank measurement that cannot be done
+> modellessly without the corpus existing (per the §3.5 modelless-unblock
+> protocol). The close-out note preserving empirical evidence lives in
+> [`.plans/230_shard_embedding_projection.md`](../../.plans/230_shard_embedding_projection.md).
+
+Johnson-Lindenstrauss random orthogonal projection for O(1) cosine similarity shard lookup (historical reference — do not use in new code).
 
 ```rust
 /// 64→8 random orthogonal projection matrix

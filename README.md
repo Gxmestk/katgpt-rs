@@ -503,6 +503,7 @@ graph LR
 | **MANCE SVD Caching** | 427 | G1–G5 ✅ | Pure perf: cache tangent basis `{B,σ}` keyed on k-NN neighbor indices. ~5× loop speedup (skip ~9 of 10 SVDs). No new flag — optimization on DEFAULT-ON `manifold_erasure` (Plan 426). |
 | **Cross-Stage Residual Relocation** (`cross_stage_relocation`) | 431 | G1–G6 ✅ / G7 ⏳ | Knowing-Using Gap (arxiv 2607.08393) — `permeation_scan_into` 2D `(src,dst)` intervention heatmap reusing Plan 358's `direct_effect_importance` + two-cluster classification; `RelocateOp` applied operator with paper's fixed `(0.82L→0.45L)+(0.10L→0.45L)` default (`RelocatePair::LateEarly`, 58–75% oracle recovery). Scan **10–25% faster** than hand-rolled; operator **<0.03%** of forward pass; 0 allocs. **Opt-in** — G7 (58–75% recovery transfer to our substrate) deferred to Phase 3 PoC in `riir-poc/`; our latent functors/HLA don't have the paper's early/late MLP structure. |
 | **SIMD LUT Fused Dequant+Dot** (`simd_lut_dequant`) | 452 | G1–G4 ✅ (split) | Software SIMD LUT-accelerated dequant distilled from StreamDQ's hardware DQB (arxiv 2607.11262 §2.3). **Split decision:** the fused `dequant_dot_via_lut` kernel wins **4.58×** over the two-step path (NEON FMA + no buffer spill) → **default-on**; the plain `dequant_via_lut` is **3.5× slower** than the arithmetic cast on NEON (scalar gather, no native instruction) → stays opt-in infrastructure for future FP8/INT8. Cross-repo: `simd_lut_q4k` promoted to default-on in riir-engine (Plan 486 T3.3, multi-block 2.300× / full-GEMV 1.971× / single-block 2.027×). |
+| **3D CellComplex grid_3d + Stochastic Birth/Death NCA** (`grid_3d`) | 454 | G1a/G1b/G2/G3/G4/G5/G6 ✅ | 3D cubical `CellComplex::grid_3d` + 7-point-stencil `graph_laplacian_grid_3d_into` + zero-alloc `stochastic_birth_death_step` NCA growth + `argmax_block_type` raw→categorical bridge (arxiv 2103.08737 Sudhakaran 3D NCA). G1a growth reach **6.0×**, G1b branched morphology **1.80×** roughness (modelless crowding-death fix), G2 regeneration **100%**, G4a stencil **1.74×** 3D/2D, G4b overhead **64.4%**, G5 0 allocs, G6 bit-identical. **Default-on** in `katgpt-dec`. |
 
 **GOAT failures / negative results this session (kept opt-in, documented):** Plan 397 HGA (Hierarchical Global Attention, G2-proxy FAIL 2/12 vs DashAttention — same failure mode as MSA R225); Plan 374 ReMax (`argmax_a EI_m = argmax_a q` theorem — no modelless exploration, exploration → riir-train); Plan 375 Factorized Action (G2b+G3 FAIL — trained GateNetwork + VQ-VAE needed).
 
@@ -2109,6 +2110,16 @@ All 5 phases complete (linear kernel, nonlinear extension, BoM extension, DEC in
 
 ---
 
+### 🧬 3D CellComplex grid_3d + Stochastic Birth/Death NCA (Plan 454, arxiv 2103.08737)
+
+Extends the DEC cell-complex substrate from 2D to 3D and adds a modelless neural cellular automata (NCA) growth primitive. Four pieces: `CellComplex::grid_3d(w,h,d)` (3D cubical constructor with full B₁/B₂/B₃ boundary matrices), `graph_laplacian_grid_3d_into` (7-point-stencil fast path, branch-free interior), `stochastic_birth_death_step` (zero-alloc NCA growth wrapper, fixed SplitMix64 PRNG), and `argmax_block_type` (raw morphogen field → discrete class bridge). The `GridDims` enum extends `grid_dims` to 3D without touching any 2D call site.
+
+The **crowding-death modelless fix** unblocked the G1b morphology gate: reading the already-computed-but-discarded alive-channel Laplacian `lap[0]` prunes interior voxels (preventing solid fill) while preserving frontier growth — producing branched/coral morphology (volume 13824→200, roughness 1.24→2.83) with **no learned weights**. Same canonical lesson as AC-Prefix G1 (Plan 313): a missing mechanism is not the same as wrong parameters.
+
+**G1a–G6 ALL PASS** (G1a growth reach **6.0×**, G1b roughness **1.80×**, G2 regeneration **100%**, G4a stencil **1.74×** 3D/2D, G4b overhead **64.4%**, G5 0 allocs, G6 bit-identical). Feature gate: `grid_3d` (**default-ON** in `katgpt-dec`). 📖 Plan: [`.plans/454_3d_cellcomplex_grid_stochastic_birth_death.md`](.plans/454_3d_cellcomplex_grid_stochastic_birth_death.md), Benchmark: [`.benchmarks/454_3d_nca_goat.md`](.benchmarks/454_3d_nca_goat.md), Paper: [arXiv:2103.08737](https://arxiv.org/abs/2103.08737).
+
+---
+
 ### 🎲 QuasiMoTTo — QMC Belief Sampling (Plan 367, arxiv 2607.01179)
 
 Quasi-Monte Carlo uniform sources (Lattice / Stratified / Sobol) as drop-in replacements for iid sampling in K-rollout belief paths. Lower variance than iid at fixed K because QMC spreads samples more evenly across the unit cube. Arithmetic-coding descend maps each uniform sample to a token.
@@ -2603,7 +2614,7 @@ Default: **Hybrid OCT+PQ** (OCTOPUS triplet encoding + PlanarQuant 2D Givens rot
 | **Trigger Gate** (`inference_router`) | CPU → GPU → ANE tier routing | CPU ✅, GPU/ANE blocked on hardware deps |
 | **SLoD** (`slod`) | Poincaré ball hyperbolic geometry + heat diffusion tier routing | **default-ON**, GOAT G1–G6 pass |
 | **Schema Centroid** (`schema_centroid`) | Per-class embedding centroids for informed KG entity init | **default-ON**, GOAT 7/7 |
-| **Shard Embedding** (`shard_embedding`) | JL random orthogonal projection [f32;64]→[f32;8] | Always compiled in `katgpt-core` |
+| **Shard Embedding** (`shard_embedding`) | JL random orthogonal projection [f32;64]→[f32;8] | 🪦 **DEPRECATED (Issue 139)** — violates JL lower bound 200× at m=8, marked `#[deprecated]`, zero runtime consumers |
 | **DFlare** (Plan 174) | Marginal fusion + KV routing + progressive budget | 🪦 GOAT FAILED on all 3 sub-features |
 | **ManifoldPruner** (Plan 234) | ManifoldE point-to-manifold soft validity | 🪦 GOAT G1 FAIL |
 | **MUX-Latent Wire** (`mux_latent_wire`) | Latent-to-latent patching over wire, 68B format, SIMD batch | Opt-in — GOAT 11/11, awaiting E2E integration |
@@ -2641,7 +2652,7 @@ Default: **Hybrid OCT+PQ** (OCTOPUS triplet encoding + PlanarQuant 2D Givens rot
 | **Conformal Predictive Intervals** (`conformal_intervals`) | Modelless conformal UQ overlay wrapping any `PointForecaster` — `ConformalIntervalCalibrator<F>` (Plan 340, arxiv 2605.03789 + 2606.09473). Also ships the canonical UQ "Report the Floor" benchmark (`ConformalIntervalCalibrator<SeasonalNaiveForecaster>` m=1) that all UQ-bearing primitives must beat. | Opt-in — G1–G4 PASS; the m=1 SeasonalNaive floor is now enforceable for all UQ primitives (Issue 010 closed). |
 | **Latent Trajectory Geometry** (`latent_trajectory_geometry`) | Probe-free trajectory geometry diagnostic: `length`, `mean_curvature`, `min_adjacent_cosine`, `bifurcation_ratio` over any latent vector sequence (Plan 342, arxiv 2606.09287). | Opt-in — G3 visible-game two-attractor gate PASSES; ships as diagnostic only (no router wiring). |
 | **Functional Substitution Gate** (`functional_substitution_gate`) | `HeadSubstitutionGate` wrapper — IoU cheap proxy → FaithfulnessProbe validation cadence — deciding when a FuncAttn surrogate replaces a real head (Plan 353, arxiv 2606.19317 Program-Synthesized Head Surrogates). | Opt-in (Gain-tier) — G1+G3+G4 + G2-synthetic PASS; T3.4 real-head G2 validation deferred to riir-ai. |
-| **Group Invariance Probe** (`group_invariance_probe`) | Modelless symmetry discovery: score hypothesis group elements by invariance, classify subgroup as Discrete/Continuous/Partial/None (Plan 356, arxiv 2512.20043). | Opt-in — G1–G4 8/8 PASS; promotion blocked pending Issue 011 fusion or `can_freeze` extension. |
+| **Group Invariance Probe** (`group_invariance_probe`) | Modelless symmetry discovery: score hypothesis group elements by invariance, classify subgroup as Discrete/Continuous/Partial/None (Plan 356, arxiv 2512.20043). Research 444 (IMIR) added the `commutant_basis` helper — a more principled alternative to the sample-then-score loop (project onto the data-symmetry commutant directly). Verdict: Gain (small, deferred) — the helper refines the existing primitive, not a new capability. | Opt-in — G1–G4 8/8 PASS; promotion blocked pending Issue 011 fusion or `can_freeze` extension. |
 | **Motor-Gated DEC Field** (`motor_gated_field`) | Amari-style motor-gated neural-field evolution step unifying `hodge_laplacian` + latent steering; 29µs grid-stencil fast path (Plan 357, arxiv 2602.18690). | Opt-in — G1–G5 ALL PASS (no-teleport 0.0001 cells, 0 allocs/1000 ticks, 29µs vs 100µs target). |
 | **Engram Staging Table** (`engram_staging`) | `StagingEngramTable` — first-class per-slot CREATE/UPDATE/DELETE for engram tables via copy-on-write (vs whole-table rebuild) (Plan 360). | Opt-in (implies `engram`) — Phase 1 DONE; 17/17 staging tests + 112/112 engram tests pass; GOAT gate pending. |
 | **Factorized Action Abstraction** (`factorized_action`) | `EffectCodebook` + state-aware FiLM-gated factorized action latent (k-means codebook, sigmoid relevance gate) (Plan 375, arxiv 2606.30544). | 🪦 GOAT partial-FAIL — G1 PASS (4.9× over monolithic), G2a PASS (63% distractor suppression); **G2b FAIL** (gate at parity with mean) + **G3 FAIL** (k-means overfits source) → trained VQ-VAE + GateNetwork needed (riir-train). |
@@ -3104,6 +3115,7 @@ Docs are grouped into numbered folders by primitive class — see
 - [Lifelong LaCAM Multi-Agent Pathfinding](.plans/440_lifelong_lacam_multi_agent_pathfinding_substrate.md)
 - [SIMD LUT Fused Dequant+Dot](.plans/452_simd_lut_dequant.md)
 - [Bounded One-Step LaCAM Escalation](.plans/453_bounded_one_step_lacam_escalation.md)
+- [3D CellComplex grid_3d + Stochastic Birth/Death NCA](.plans/454_3d_cellcomplex_grid_stochastic_birth_death.md)
 - [Lean Spec Self-Testing on Concrete Instances (Plan 441)](.plans/441_lean_spec_self_testing_concrete_instances.md)
 - [Proposal 003 — src/ consolidation master (Phases 0–12)](.proposals/003_src_consolidation_master.md)
 - [Sigmoid-not-Softmax: The Universality-Class Escape (Research 315, Liu & Gore 2606.25008)](.docs/04_calibration/universality_class_escape.md)

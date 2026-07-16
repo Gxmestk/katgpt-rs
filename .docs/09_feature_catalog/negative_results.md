@@ -219,3 +219,15 @@ Without concentration, the compound gain cannot exist (SAR cannot widen the reac
 **Hypothesis:** `spectral_rewire`'s rewiring matrix `M = UᵀΔWV` may expose a spectral signature of a planted backdoor that the backdoor's construction (R422) deliberately hides from uniform-norm tests. R422 proves the backdoor is *statistically undetectable* in TV-distance; the open question was whether SAR's *directional* decomposition breaks that undetectability.
 
 **CLOSED impractical (2026-07-15).** The fatal scope problem (identified during open-questions analysis) is confirmed: SAR operates on a **weight delta** `ΔW`, but a backdoor detector must operate on the **base weights `W`** (you don't have the honest delta to subtract). SAR's purification needs a reference point; a backdoored-in-from-scratch model has no honest baseline to purify against. The detection surface SAR provides exists only on the delta, not the deployed weights. R422's PASS verdict (backdoor is statistically undetectable) stands unbroken. (Issue 152 closed + removed per noise-reduction rule; git `2524918b`.)
+
+## 12. Shard Embedding / JL Projection (Plan 230) — DEPRECATED (Issue 139)
+
+**Hypothesis:** Johnson-Lindenstrauss random orthogonal projection `[f32;64]→[f32;8]` provides O(1) cosine similarity shard lookup at ~90% NN preservation (the JL guarantee).
+
+**DEPRECATED 2026-07-16 (Issue 139).** The projection dimension m=8 is **mathematically unsound** — it violates the Johnson-Lindenstrauss lower bound by over 200×:
+
+- JL requires m ≥ (8·ln n)/ε² for n points at distortion ε. For n=100, ε=0.5: **m ≥ 554**; the code uses **m=8**.
+- Empirically measures **1.4–6% NN preservation** vs the documented 90% target.
+- **Zero runtime consumers** at deprecation time: SenseModule uses TernaryDir, BFCF uses region centroids.
+
+Option D (deprecate, mark `#[deprecated]`) was chosen over Option B (PCA rescue) because PCA requires a real-data intrinsic-rank measurement that cannot be done modellessly without the corpus existing (per the §3.5 modelless-unblock protocol — a training-dependent measurement path is not a clean modelless gain). `JlProjectionMatrix` + `ShardEmbedding` are kept for back-compat but emit deprecation warnings; bench_230 + diag_230 tests removed. 📖 Plan: [`.plans/230_shard_embedding_projection.md`](../../.plans/230_shard_embedding_projection.md) (close-out note preserves empirical evidence). (Issue 139 closed + removed per noise-reduction rule; git `3e33d7d8`.)

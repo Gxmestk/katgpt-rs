@@ -30,3 +30,4 @@
 
 - [`../01_orientation/architecture.md`](../01_orientation/architecture.md) — where each inference primitive plugs into the core pipeline
 - [`../09_feature_catalog/opt_in_features.md`](../09_feature_catalog/opt_in_features.md) — the opt-in feature-flag reference
+- [Research 442 (LOTUS)](../../.research/442_LOTUS_Looped_Parallel_CoT_Supervision_PASS.md) — **PASS** verdict validating the `lt2_looped` architecture: LOTUS's looped padded Transformer + per-position latent-block supervision is the training-recipe counterpart to our shipped weight-shared T-pass loop. Architecture ships; supervision recipe → riir-train. Cherry-pickable gains (Any-Time property, config-default trap) captured + closed (Issue 156).

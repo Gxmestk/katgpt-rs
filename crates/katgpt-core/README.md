@@ -39,7 +39,7 @@ katgpt-core = { version = "0.2", features = ["viable_manifold_graph", "ac_prefix
 | `types` | `Config`, `Rng`, math utilities, `LoraAdapter`, `DomainLatent`, `ShardEmbedding`, `DataGate` |
 | `traits` | 18+ shared traits for game AI and speculative decoding (`ConstraintPruner`, `ScreeningPruner`, `SpeculativeGenerator`, `GameState`, `RolloutPolicy`, ...) |
 | `simd` | NEON / AVX2 accelerated linear-algebra kernels (incl. `simd_sigmoid`) |
-| `shard_embedding` | JL random orthogonal projection `[f32;64] → [f32;8]` |
+| `shard_embedding` | 🪦 **DEPRECATED (Issue 139)** — JL random orthogonal projection `[f32;64] → [f32;8]`. Violates JL lower bound 200× at m=8; marked `#[deprecated]`, zero runtime consumers. |
 | `leaky_core` | Leaky integrator baseline kernel |
 
 ### Attention variants (feature-gated)
