@@ -93,7 +93,7 @@ Currently both read post-loop. This is a tunable composition gain for a future p
 
 ## Tasks
 
-- [ ] **T1** Audit `rim_tokens_per_block` doc comment — add the M≥5 floor note for reasoning tasks (high confidence, low risk, doc-only).
+- [x] **T1** Audit `rim_tokens_per_block` doc comment — add the M≥5 floor note for reasoning tasks. **DONE 2026-07-16** (`crates/katgpt-types/src/config.rs` L158-167). Doc-only; cargo clippy clean.
 - [ ] **T2** Run the Any-Time LT2 PoC at `/tmp/issue156_anytime_lt2/` — record raw numbers below. If Any-Time property holds → open plan for per-dispatch elastic `loop_count`. If it fails → revise Research 273 ELT's Gain claim.
 - [ ] **F1** (noted, no action) PCL design principle — referenced from Research 442 §2.3 for future screening-composition plans.
 - [ ] **F2** (noted, no action) Per-iter vs post-loop readout schedule — referenced from Research 442 §2.3 for future BoMSampler × LT2 fusion plan.

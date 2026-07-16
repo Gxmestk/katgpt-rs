@@ -156,6 +156,12 @@ pub struct Config {
     #[cfg(feature = "rim_slots")]
     pub rim_block_count: usize,
     /// Tokens per buffer block (M in RiM paper). Default 2.
+    ///
+    /// The M=2 default suits the RiM paper's pause-token use case. For reasoning
+    /// tasks (LOTUS-style latent CoT), LOTUS Table 7 proves an M≥5 floor: M=1→5
+    /// is a +17.8pp cliff on GSM8K and quality saturates at M≥25. Callers
+    /// enabling RiM for reasoning should set M≥5 (ideally ≥25); see
+    /// `.issues/156` T1 and `.research/442` §2.4.
     #[cfg(feature = "rim_slots")]
     pub rim_tokens_per_block: usize,
     /// Token ID used for buffer positions (default: bos_token, reused as buffer).
