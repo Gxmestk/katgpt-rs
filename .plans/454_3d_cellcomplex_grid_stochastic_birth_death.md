@@ -134,15 +134,15 @@ pub fn graph_laplacian_into(cx, potential, output) {
 - [ ] **Zero-alloc G5 test deferred to T7 GOAT gate** (the `GlobalAlloc` counter harness belongs in the bench, not the unit test module)
 
 ### T5: `argmax_block_type` — discrete-class bridge
-- [ ] New fn in `birth_death.rs` (or `bridge.rs` if the module grows) behind `#[cfg(feature = "grid_3d")]`
-- [ ] **Signature**: `pub fn argmax_block_type(field: &CochainField, n_classes: usize, out: &mut [u8])`
-- [ ] For each voxel, `out[v] = argmax over channels of field.data[v*dim + c]` — threshold the continuous field into categorical block classes (air/dirt/stone/water/...). The civ engine's `CIV_SPECS` consumes categorical block types, not continuous morphogen values.
-- [ ] Unit tests: known field → known block classes; ties broken by lowest channel index (deterministic)
+- [x] New fn in `birth_death.rs` (or `bridge.rs` if the module grows) behind `#[cfg(feature = "grid_3d")]`
+- [x] **Signature**: `pub fn argmax_block_type(field: &CochainField, n_classes: usize, out: &mut [u8])`
+- [x] For each voxel, `out[v] = argmax over channels 0..n_classes of field.data[v*dim + c]` — NaN-safe (init from `NEG_INFINITY`), tie-break by lowest channel index (strict `>`).
+- [x] Unit tests (8 total): basic argmax, ties → lowest index, n_classes=1 → always 0, n_classes < dim ignores trailing channels, NaN-safe, deterministic across calls, all-negative values, integration with birth_death (valid range + determinism + growth propagated). **Key finding documented**: alive voxels do NOT always map to class 0 — the morphogen channel is unbounded and can exceed the alive channel's binarized 1.0, legitimately winning the argmax. The class→semantics mapping is the civ engine's job (T9).
 
 ### T6: Feature flag + Cargo.toml
 - [x] Add `grid_3d = []` to `[features]` in `katgpt-dec/Cargo.toml` (default-OFF — single-line, mirrors `motor_gated_field` / `cochain_point_sampler`)
 - [x] Gate T2 (`grid_3d` constructor) + T3 (`graph_laplacian_grid_3d_into` + dispatch `Dim3` arm + unreachable fallback arm) code with `#[cfg(feature = "grid_3d")]`
-- [ ] Gate T4/T5 code with `#[cfg(feature = "grid_3d")]` (pending T4/T5)
+- [x] Gate T4/T5 code with `#[cfg(feature = "grid_3d")]` — `birth_death` module is feature-gated in `lib.rs` (`#[cfg(feature = "grid_3d")] pub mod birth_death;`), covering both `stochastic_birth_death_step` (T4) and `argmax_block_type` (T5). All re-exports in `lib.rs` are under the same gate.
 - [x] Do NOT add to `default` — promotion requires the GOAT gate below
 
 ### T7: GOAT gate — replace SA/V with size-normalized roughness ratio

@@ -52,6 +52,16 @@
 //! quorum-safety gate: two nodes running the same seed and same `field` must
 //! produce byte-identical results.
 //!
+//! # Discrete-class bridge
+//!
+//! [`argmax_block_type`] thresholds the continuous multi-channel cochain
+//! (the alive + morphogen channels produced by the growth step, or a
+//! caller-arranged class-activation layout) into a categorical `u8` block
+//! class per voxel. The civ engine's `CIV_SPECS` consumes categorical block
+//! types (air / dirt / stone / water / ...) rather than continuous morphogen
+//! values; this is the raw → categorical bridge function. Generic — the
+//! caller picks which channels count as classes via the `n_classes` bound.
+//!
 //! # References
 //!
 //! - Plan 454 (this primitive), Issue 155 (the 3D NCA gap).
@@ -336,6 +346,83 @@ pub fn stochastic_birth_death_step(
                 *morph *= params.decay_rate;
             }
         }
+    }
+}
+
+/// Threshold a continuous multi-channel cochain into categorical block classes.
+/// Plan 454 T5 — the raw → categorical bridge consumed by the civ engine's
+/// `CIV_SPECS` (Issue 155 T4, deferred to T9).
+///
+/// For each cell `v`, writes `out[v] = argmax over channels 0..n_classes of
+/// field.data[v*dim + c]`. Ties are broken by lowest channel index
+/// (deterministic — strict `>` keeps the first maximum). NaN channels never
+/// win (the scan starts from `NEG_INFINITY`, so any finite value beats NaN
+/// at the comparison).
+///
+/// This is the discrete-class counterpart to the continuous growth step
+/// [`stochastic_birth_death_step`]: the growth step evolves the morphogen
+/// field in continuous space, and this fn collapses it into the categorical
+/// block-type space the civ engine consumes. Generic over which channels
+/// count as classes — pass `n_classes = dim` to consider every channel, or a
+/// smaller value to ignore trailing channels.
+///
+/// # Layout
+///
+/// `field` is a flat `[n_cells × dim]` row-major cochain (channel `c` of cell
+/// `v` lives at `field.data[v*dim + c]`). `out` receives one `u8` per cell.
+///
+/// # Arguments
+///
+/// * `field` — the continuous cochain to classify.
+/// * `n_classes` — number of leading channels to scan (1..=min(dim, 256)).
+/// * `out` — output buffer, length >= `field.n_cells()`. Written in place.
+///
+/// # Panics (debug only)
+///
+/// Debug-asserts `1 <= n_classes <= dim`, `n_classes <= 256`, and
+/// `out.len() >= field.n_cells()`.
+///
+/// # Determinism
+///
+/// Bit-identical given the same `field` and `n_classes` (pure scan, no RNG,
+/// no allocation). The strict-`>` tie-break makes the output a pure function
+/// of the input.
+#[inline]
+pub fn argmax_block_type(field: &CochainField, n_classes: usize, out: &mut [u8]) {
+    let dim = field.dim;
+    let n = field.n_cells();
+
+    debug_assert!(
+        n_classes >= 1,
+        "argmax_block_type requires n_classes >= 1, got {n_classes}"
+    );
+    debug_assert!(
+        n_classes <= dim,
+        "argmax_block_type: n_classes {n_classes} > field dim {dim}"
+    );
+    debug_assert!(
+        n_classes <= 256,
+        "argmax_block_type: n_classes {n_classes} > 256 (u8 output limit)"
+    );
+    debug_assert!(
+        out.len() >= n,
+        "argmax_block_type: out len {} < n_cells {n}",
+        out.len()
+    );
+
+    // NaN-safe argmax: init from NEG_INFINITY so any finite value beats the
+    // initial sentinel, and NaN never satisfies `val > best_val` so it never
+    // wins. Strict `>` keeps the first (lowest-index) maximum on ties.
+    for (v, voxel) in field.data[..n * dim].chunks_exact(dim).enumerate() {
+        let mut best_idx: u8 = 0;
+        let mut best_val = f32::NEG_INFINITY;
+        for (c, &val) in voxel.iter().enumerate().take(n_classes) {
+            if val > best_val {
+                best_val = val;
+                best_idx = c as u8;
+            }
+        }
+        out[v] = best_idx;
     }
 }
 
@@ -632,5 +719,197 @@ mod tests {
                 );
             }
         }
+    }
+
+    // ── T5: argmax_block_type ────────────────────────────────────────────
+
+    #[test]
+    fn argmax_block_type_basic() {
+        // Known field → known block classes. dim=3, 4 voxels.
+        let dim = 3usize;
+        let mut field = CochainField::zeros(0, 4, dim);
+        // voxel 0: channel 2 wins
+        field.data[0] = 0.1;
+        field.data[1] = 0.2;
+        field.data[2] = 0.9;
+        // voxel 1: channel 0 wins
+        field.data[3] = 0.8;
+        field.data[4] = 0.1;
+        field.data[5] = 0.1;
+        // voxel 2: channel 1 wins
+        field.data[6] = 0.0;
+        field.data[7] = 0.7;
+        field.data[8] = 0.3;
+        // voxel 3: channel 0 wins (negative values)
+        field.data[9] = -0.1;
+        field.data[10] = -0.5;
+        field.data[11] = -0.9;
+
+        let mut out = [0u8; 4];
+        argmax_block_type(&field, dim, &mut out);
+        assert_eq!(out, [2, 0, 1, 0], "basic argmax mismatch");
+    }
+
+    #[test]
+    fn argmax_block_type_ties_lowest_index() {
+        // Ties broken by lowest channel index (strict `>`).
+        let dim = 3usize;
+        let mut field = CochainField::zeros(0, 2, dim);
+        // voxel 0: channels 0,1,2 all equal → class 0 wins
+        field.data[0] = 0.5;
+        field.data[1] = 0.5;
+        field.data[2] = 0.5;
+        // voxel 1: channels 1,2 tied at 0.9, channel 0 at 0.1 → class 1 wins
+        field.data[3] = 0.1;
+        field.data[4] = 0.9;
+        field.data[5] = 0.9;
+
+        let mut out = [0u8; 2];
+        argmax_block_type(&field, dim, &mut out);
+        assert_eq!(out, [0, 1], "tie-break should pick lowest index");
+    }
+
+    #[test]
+    fn argmax_block_type_n_classes_1_always_zero() {
+        // With n_classes=1, only channel 0 is scanned → every voxel gets 0.
+        let dim = 4usize;
+        let mut field = CochainField::zeros(0, 3, dim);
+        for v in 0..3 {
+            for c in 0..dim {
+                field.data[v * dim + c] = (c as f32) * 0.3;
+            }
+        }
+        let mut out = [99u8; 3];
+        argmax_block_type(&field, 1, &mut out);
+        assert_eq!(out, [0, 0, 0], "n_classes=1 should always return class 0");
+    }
+
+    #[test]
+    fn argmax_block_type_n_classes_less_than_dim() {
+        // n_classes < dim should ignore trailing channels. Set channel 3 very
+        // high but n_classes=2 → channel 3 is ignored.
+        let dim = 4usize;
+        let mut field = CochainField::zeros(0, 1, dim);
+        field.data[0] = 0.1;
+        field.data[1] = 0.9;
+        field.data[2] = 0.2;
+        field.data[3] = 999.0; // would win if scanned, but n_classes=2 skips it
+
+        let mut out = [99u8; 1];
+        argmax_block_type(&field, 2, &mut out);
+        assert_eq!(out, [1], "n_classes=2 should pick channel 1, ignoring channel 3");
+    }
+
+    #[test]
+    fn argmax_block_type_nan_safe() {
+        // NaN channels never win (init from NEG_INFINITY, NaN > x is always false).
+        let dim = 3usize;
+        let mut field = CochainField::zeros(0, 2, dim);
+        // voxel 0: channel 0 NaN, channel 1 = 0.5 → class 1 wins (NaN loses)
+        field.data[0] = f32::NAN;
+        field.data[1] = 0.5;
+        field.data[2] = 0.1;
+        // voxel 1: all NaN → class 0 (the fallback best_idx=0)
+        field.data[3] = f32::NAN;
+        field.data[4] = f32::NAN;
+        field.data[5] = f32::NAN;
+
+        let mut out = [99u8; 2];
+        argmax_block_type(&field, dim, &mut out);
+        assert_eq!(out[0], 1, "NaN channel should lose to finite 0.5");
+        assert_eq!(out[1], 0, "all-NaN voxel should fall back to class 0");
+    }
+
+    #[test]
+    fn argmax_block_type_deterministic_across_calls() {
+        // Pure scan — same input must produce same output across calls.
+        let dim = 3usize;
+        let mut field = CochainField::zeros(0, 8, dim);
+        let mut rng = SplitMix64::new(42);
+        for v in 0..8 {
+            for c in 0..dim {
+                field.data[v * dim + c] = (rng.next_u32() as f32) / (u32::MAX as f32);
+            }
+        }
+        let mut out_a = [0u8; 8];
+        let mut out_b = [0u8; 8];
+        argmax_block_type(&field, dim, &mut out_a);
+        argmax_block_type(&field, dim, &mut out_b);
+        assert_eq!(out_a, out_b, "same field → same classes (pure scan)");
+    }
+
+    #[test]
+    fn argmax_block_type_after_birth_death() {
+        // Integration test: run a few birth/death ticks, then classify.
+        //
+        // NOTE: alive voxels do NOT always map to class 0. The alive channel
+        // is binarized to exactly 1.0, but the morphogen channel is UNBOUNDED
+        // — alive voxels gain `birth_rate - consumption_rate = 0.2` morphogen
+        // per tick, so after 10 ticks a seed voxel's morphogen can reach ~3.0,
+        // which beats the alive channel's 1.0 and wins class 1. This is
+        // expected: the argmax picks the dominant signal. The specific
+        // class→semantics mapping (alive → air, high-morphogen → stone, etc.)
+        // is the civ engine's job (T9), not T5's. T5 only guarantees: valid
+        // output range + deterministic scan.
+        let (w, h, d) = (4usize, 4usize, 4usize);
+        let cx = CellComplex::grid_3d(w, h, d);
+        let dim = 2usize;
+        let params = BirthDeathParams::paper_defaults();
+
+        let mut field = zero_field_3d(&cx, dim);
+        let seed = vidx(2, 2, 2, w, h);
+        field.data[seed * dim] = 1.0;
+        field.data[seed * dim + 1] = 1.0;
+
+        let mut scratch_lap = zero_field_3d(&cx, dim);
+        let mut dropout = vec![0u8; cx.n_vertices()];
+        let mut rng = SplitMix64::new(7);
+
+        for _ in 0..10 {
+            stochastic_birth_death_step(
+                &cx, &mut field, &params, &mut rng,
+                &mut scratch_lap, &mut dropout,
+            );
+        }
+
+        let mut out = vec![99u8; cx.n_vertices()];
+        argmax_block_type(&field, dim, &mut out);
+
+        // (1) Every voxel must get a valid class in [0, dim).
+        for (v, &class) in out.iter().enumerate() {
+            assert!(
+                (class as usize) < dim,
+                "voxel {v}: class {class} out of range [0, {dim})"
+            );
+        }
+
+        // (2) Determinism: same field → same classes (pure scan, no RNG).
+        let mut out_again = vec![99u8; cx.n_vertices()];
+        argmax_block_type(&field, dim, &mut out_again);
+        assert_eq!(out, out_again, "same field should produce same classes");
+
+        // (3) At least one voxel should be non-zero (growth happened, so some
+        //     morphogen channel won somewhere). If all voxels were class 0,
+        //     either growth didn't propagate or the argmax is broken.
+        let non_zero = out.iter().filter(|&&c| c != 0).count();
+        assert!(
+            non_zero > 0,
+            "expected at least one voxel with morphogen > alive channel (class != 0), \
+             got all zeros — growth may not have propagated"
+        );
+    }
+
+    #[test]
+    fn argmax_block_type_all_negative_values() {
+        // All-negative field: argmax still picks the least-negative channel.
+        let dim = 3usize;
+        let mut field = CochainField::zeros(0, 1, dim);
+        field.data[0] = -5.0;
+        field.data[1] = -1.0; // least negative
+        field.data[2] = -9.0;
+
+        let mut out = [99u8; 1];
+        argmax_block_type(&field, dim, &mut out);
+        assert_eq!(out, [1], "argmax should pick the least-negative value");
     }
 }

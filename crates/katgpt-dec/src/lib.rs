@@ -99,8 +99,12 @@ pub use motor_gated::{evolve_motor_gated_field, relu_gate_into};
 // Laplacian (7-point stencil via the `grid_3d` fast path) with a fixed-seed
 // SplitMix64 PRNG and a sigmoid alive gate. Zero-alloc, bit-identical under
 // a fixed seed (G6 quorum-safety).
+//
+// Plan 454 T5 — `argmax_block_type` raw → categorical bridge: thresholds the
+// continuous cochain into a `u8` block-class per cell. Consumed downstream by
+// the civ engine's `CIV_SPECS` (T9, deferred).
 #[cfg(feature = "grid_3d")]
-pub use birth_death::{BirthDeathParams, SplitMix64, stochastic_birth_death_step};
+pub use birth_death::{BirthDeathParams, SplitMix64, argmax_block_type, stochastic_birth_death_step};
 
 #[cfg(feature = "heat_kernel_trajectory")]
 pub use heat_kernel::{
