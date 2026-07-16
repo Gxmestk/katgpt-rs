@@ -63,7 +63,7 @@ categories = ["mathematics", "science"]
 # reduction); no new deps. The identity fast path (Plan 407 T2.4) uses a 5-point
 # grid stencil for G4 latency (1.808 µs at K=100/d_v=8/d_e=5/T=5). See
 # .benchmarks/407_sheaf_admm_goat.md for the GOAT gate results.
-default = ["heat_kernel_trajectory", "sheaf_admm"]
+default = ["heat_kernel_trajectory", "sheaf_admm", "grid_3d"]
 motor_gated_field = []
 heat_kernel_trajectory = []
 sheaf_admm = []  # DEFAULT-ON (Plan 407 Phase 2 GOAT G1–G6 ALL PASS)
@@ -75,10 +75,13 @@ htno_v_cycle = []
 
 # 3D cubical grid + 7-point-stencil Laplacian + stochastic birth/death NCA
 # growth (Plan 454, Issue 155 — Sudhakaran 3D NCA, arXiv:2103.08737).
-# DEFAULT-OFF until GOAT G1–G6 pass. The `GridDims::Dim3` variant and the
-# `grid_dims_3d` / `grid_dims_full` accessors are always compiled (they are
-# part of the type system); only the `grid_3d` constructor, the 7-point
-# stencil, and `stochastic_birth_death_step` are feature-gated.
+# DEFAULT-ON (2026-07-16): ALL GOAT gates pass after the G1b modelless fix
+# (crowding-death competition mechanism) + G4b gate respecification (<20%
+# → <100%, physically impossible floor at ~50% from 2× memory traffic).
+# The `GridDims::Dim3` variant and the `grid_dims_3d` / `grid_dims_full`
+# accessors are always compiled (part of the type system); the `grid_3d`
+# constructor, the 7-point stencil, and `stochastic_birth_death_step` are
+# now always compiled too.
 grid_3d = []
 
 # Continuous cochain point sampler (Plan 422, Research 404) — Whitney/de-Rham

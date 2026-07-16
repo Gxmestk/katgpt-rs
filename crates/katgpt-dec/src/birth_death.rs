@@ -40,6 +40,14 @@
 //! (no deps), and scalar field updates. No training, no backprop — per the
 //! katgpt-rs modelless mandate.
 //!
+//! The crowding-death mechanism (step C*, Plan 454 G1b modelless fix) is
+//! likewise modelless: it reads the alive-channel Laplacian `Δ(alive)` —
+//! already computed by step 1 and previously discarded — to identify voxels
+//! in dense neighborhoods and kill them. This adds the competition mechanism
+//! the bare threshold gate lacks, producing branched/sponge morphology
+//! without any learned weights. One scalar parameter (`crowding_threshold`),
+//! zero extra memory traffic, zero extra Laplacian calls.
+//!
 //! # Zero-alloc
 //!
 //! All scratch is caller-owned. [`stochastic_birth_death_step`] borrows
@@ -101,6 +109,19 @@ pub struct BirthDeathParams {
     pub dropout_prob: f32,
     /// Morphogen decay rate for dead voxels (step 5 multiplier). Typical ~0.5.
     pub decay_rate: f32,
+    /// **Crowding-death threshold** (step C* — the G1b modelless competition
+    /// mechanism). Alive voxels whose alive-channel Laplacian `Δ(alive)` falls
+    /// below this value are killed (set dead). `Δ(alive) ≈ 0` for interior
+    /// voxels (all neighbors alive), `> 0` for frontier voxels (some dead
+    /// neighbors). So a threshold of `0.5` kills only fully-interior voxels;
+    /// higher values prune more aggressively.
+    ///
+    /// Set to [`f32::NEG_INFINITY`] to disable crowding death entirely (the
+    /// original behavior before the G1b modelless fix — growth fills the grid
+    /// solid). The G1b GOAT gate sweeps this parameter to find the branched
+    /// regime; `paper_defaults()` keeps it disabled for back-compat with the
+    /// G1a/G2/G5/G6 gates (which need dense, stable growth).
+    pub crowding_threshold: f32,
 }
 
 impl BirthDeathParams {
@@ -116,6 +137,7 @@ impl BirthDeathParams {
             consumption_rate: 0.1,
             dropout_prob: 0.5,
             decay_rate: 0.5,
+            crowding_threshold: f32::NEG_INFINITY, // disabled — G1a/G2/G5/G6 back-compat
         }
     }
 }
@@ -331,7 +353,22 @@ pub fn stochastic_birth_death_step(
         // voxel: fast_sigmoid(α) > τ  ⟺  α > logit(τ). Saves one `expf` per
         // voxel (the dominant compute cost in the fused pass).
         let alpha = voxel[1] * ALIVE_GATE_SCALE;
-        let alive_new = alpha > logit_tau;
+        let mut alive_new = alpha > logit_tau;
+
+        // (C*) Crowding death — the G1b modelless competition mechanism.
+        // Reads lap[0] (the alive-channel Laplacian, already computed by step 1
+        // and previously discarded). For an alive voxel: lap[0] ≈ 0 in the
+        // interior (all neighbors alive), > 0 at the frontier (some dead
+        // neighbors). Killing voxels with lap[0] < crowding_threshold prunes
+        // the interior, preventing solid-grid filling and producing
+        // branched/sponge morphology (high surface/volume ratio = high
+        // roughness). Only applies to voxels that were ALREADY alive
+        // (alive_old) — newly-born frontier voxels get a grace tick so growth
+        // can propagate. Disabled when crowding_threshold = NEG_INFINITY.
+        if alive_old && alive_new && lap[0] < params.crowding_threshold {
+            alive_new = false;
+        }
+
         voxel[0] = if alive_new { 1.0 } else { 0.0 };
 
         // (D) Dead-voxel morphogen decay — reads NEW alive (post-gate).
@@ -533,6 +570,7 @@ mod tests {
             consumption_rate: 0.05,
             dropout_prob: 0.0, // no dropout — deterministic growth
             decay_rate: 0.5,
+            crowding_threshold: f32::NEG_INFINITY, // disabled
         };
 
         let mut field = zero_field_3d(&cx, dim);
@@ -577,6 +615,7 @@ mod tests {
             consumption_rate: 0.0,
             dropout_prob: 0.0,
             decay_rate: 0.5,
+            crowding_threshold: f32::NEG_INFINITY, // disabled
         };
 
         let mut field = zero_field_3d(&cx, dim);
@@ -669,6 +708,7 @@ mod tests {
             consumption_rate: 0.0,
             dropout_prob: 0.0, // will override per run
             decay_rate: 1.0,   // no decay
+            crowding_threshold: f32::NEG_INFINITY, // disabled
         };
 
         // Run with no dropout.
@@ -716,6 +756,109 @@ mod tests {
     }
 
     // ── T5: argmax_block_type ────────────────────────────────────────────
+
+    #[test]
+    fn stochastic_birth_death_crowding_kills_interior() {
+        // Crowding death (step C*) prunes interior voxels: an alive voxel
+        // surrounded by alive neighbors has lap[0] ≈ 0, which falls below
+        // crowding_threshold → it dies. An alive voxel at the frontier
+        // (some dead neighbors) has lap[0] > threshold → it survives.
+        //
+        // Setup: a 3×3×3 grid with the center voxel and all 6 face-neighbors
+        // alive, but the 8 corners + 12 edge-neighbors dead. The center voxel
+        // has all 6 neighbors alive → lap[0] = 0 → crowded → should die.
+        // The face-neighbors have 1 alive neighbor (the center) → lap[0] = 5
+        // → not crowded → should survive (threshold = 2.5).
+        let (w, h, d) = (3usize, 3usize, 3usize);
+        let cx = CellComplex::grid_3d(w, h, d);
+        let dim = 2usize;
+        let params = BirthDeathParams {
+            diffusion_dt: 0.0, // no diffusion — isolate crowding
+            alive_threshold: 0.5,
+            birth_rate: 0.0,
+            consumption_rate: 0.0,
+            dropout_prob: 0.0,
+            decay_rate: 1.0, // no decay
+            crowding_threshold: 2.5, // kill if lap[0] < 2.5
+        };
+
+        let mut field = zero_field_3d(&cx, dim);
+        // Center voxel + 6 face-neighbors alive with high morphogen.
+        let center = vidx(1, 1, 1, w, h);
+        field.data[center * dim] = 1.0;
+        field.data[center * dim + 1] = 5.0;
+        let neighbors = [
+            vidx(0, 1, 1, w, h), vidx(2, 1, 1, w, h), // ±x
+            vidx(1, 0, 1, w, h), vidx(1, 2, 1, w, h), // ±y
+            vidx(1, 1, 0, w, h), vidx(1, 1, 2, w, h), // ±z
+        ];
+        for &n in &neighbors {
+            field.data[n * dim] = 1.0;
+            field.data[n * dim + 1] = 5.0;
+        }
+
+        let mut scratch_lap = zero_field_3d(&cx, dim);
+        let mut dropout = vec![0u8; cx.n_vertices()];
+        let mut rng = SplitMix64::new(1);
+
+        stochastic_birth_death_step(
+            &cx, &mut field, &params, &mut rng, &mut scratch_lap, &mut dropout,
+        );
+
+        // Center voxel: all 6 neighbors alive → lap[0] = 6 - 6 = 0 < 2.5 → KILLED.
+        assert_eq!(
+            field.data[center * dim], 0.0,
+            "center voxel (fully surrounded) should be killed by crowding death"
+        );
+        // Face-neighbors: 1 alive neighbor (center) → lap[0] = 6 - 1 = 5 >= 2.5 → SURVIVE.
+        for &n in &neighbors {
+            assert_eq!(
+                field.data[n * dim], 1.0,
+                "face-neighbor {n} (exposed) should survive crowding death"
+            );
+        }
+    }
+
+    #[test]
+    fn stochastic_birth_death_crowding_disabled_by_default() {
+        // With crowding_threshold = NEG_INFINITY, the mechanism is disabled —
+        // the center voxel should survive even when fully surrounded.
+        let (w, h, d) = (3usize, 3usize, 3usize);
+        let cx = CellComplex::grid_3d(w, h, d);
+        let dim = 2usize;
+        let params = BirthDeathParams {
+            diffusion_dt: 0.0,
+            alive_threshold: 0.5,
+            birth_rate: 0.0,
+            consumption_rate: 0.0,
+            dropout_prob: 0.0,
+            decay_rate: 1.0,
+            crowding_threshold: f32::NEG_INFINITY, // disabled
+        };
+
+        let mut field = zero_field_3d(&cx, dim);
+        let center = vidx(1, 1, 1, w, h);
+        field.data[center * dim] = 1.0;
+        field.data[center * dim + 1] = 5.0;
+        for &n in &[vidx(0, 1, 1, w, h), vidx(2, 1, 1, w, h), vidx(1, 0, 1, w, h),
+                     vidx(1, 2, 1, w, h), vidx(1, 1, 0, w, h), vidx(1, 1, 2, w, h)] {
+            field.data[n * dim] = 1.0;
+            field.data[n * dim + 1] = 5.0;
+        }
+
+        let mut scratch_lap = zero_field_3d(&cx, dim);
+        let mut dropout = vec![0u8; cx.n_vertices()];
+        let mut rng = SplitMix64::new(1);
+
+        stochastic_birth_death_step(
+            &cx, &mut field, &params, &mut rng, &mut scratch_lap, &mut dropout,
+        );
+
+        assert_eq!(
+            field.data[center * dim], 1.0,
+            "center should survive when crowding death is disabled"
+        );
+    }
 
     #[test]
     fn argmax_block_type_basic() {
