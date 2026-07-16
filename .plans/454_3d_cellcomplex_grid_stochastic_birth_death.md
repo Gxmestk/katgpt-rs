@@ -131,7 +131,7 @@ pub fn graph_laplacian_into(cx, potential, output) {
   - `stochastic_birth_death_death_decays_morphogen`: dead voxels see morphogen `*= decay_rate` each tick (step 5)
   - `stochastic_birth_death_alive_channel_stays_binarized`: alive channel always exactly 0.0 or 1.0 after every tick (the invariant T5's `argmax_block_type` relies on)
   - `stochastic_birth_death_dropout_halves_delta`: with `dropout_prob=1.0`, every voxel's diffusion Δ is exactly half of the `dropout_prob=0.0` run
-- [ ] **Zero-alloc G5 test deferred to T7 GOAT gate** (the `GlobalAlloc` counter harness belongs in the bench, not the unit test module)
+- [x] **Zero-alloc G5 test deferred to T7 GOAT gate** (the `GlobalAlloc` counter harness belongs in the bench, not the unit test module) — closed: T7 G5 ✅ PASS (0 allocations in 100 ticks, scratch-buffer design works)
 
 ### T5: `argmax_block_type` — discrete-class bridge
 - [x] New fn in `birth_death.rs` (or `bridge.rs` if the module grows) behind `#[cfg(feature = "grid_3d")]`
