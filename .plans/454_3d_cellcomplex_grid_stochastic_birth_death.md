@@ -112,38 +112,26 @@ pub fn graph_laplacian_into(cx, potential, output) {
   - `graph_laplacian_grid_3d_mirror_symmetry`: `Δ` at `(x,y,z)` equals `Δ` at the grid-reflected point when the potential is mirror-symmetric (validates uniform boundary handling)
 
 ### T4: `stochastic_birth_death_step` — NCA growth wrapper
-- [ ] New module `birth_death.rs` behind `#[cfg(feature = "grid_3d")]`
-- [ ] **Signature** (zero-alloc, `_into` convention — mirrors `evolve_motor_gated_field`):
-  ```rust
-  pub fn stochastic_birth_death_step(
-      cx: &CellComplex,
-      field: &mut CochainField,          // [alive, morphogen, ...] — channel 0 = alive, channel 1 = morphogen
-      params: &BirthDeathParams,
-      rng: &mut SplitMix64,               // fixed-seed PRNG — modelless, no training
-      scratch_lap: &mut CochainField,     // reused across ticks (G5 zero-alloc)
-      scratch_dropout: &mut [u8],         // reusable dropout mask buffer, len = n_vertices
-  )
-  ```
-- [ ] **`BirthDeathParams`** (plain struct, `Copy`):
-  - `diffusion_dt: f32` — morphogen diffusion timestep (feeds `graph_laplacian_grid_3d_into`)
-  - `alive_threshold: f32` — sigmoid gate threshold τ (alive iff `sigmoid(α) > τ`)
-  - `birth_rate: f32` — autocatalytic morphogen gain for alive voxels
-  - `consumption_rate: f32` — morphogen drain for alive voxels (the paper's consumption term)
-  - `dropout_prob: f32` — per-tick stochastic dropout probability (paper: ~0.5 — kill half the Δ)
-  - `decay_rate: f32` — morphogen decay for dead voxels
-- [ ] **Algorithm** (per tick, per voxel — branch-free interior where possible):
-  1. Diffuse morphogen: `scratch_lap = graph_laplacian_grid_3d(field.morphogen)`; `field.morphogen += diffusion_dt * scratch_lap`
-  2. Autocatalysis + consumption on alive voxels: `field.morphogen[v] += birth_rate - consumption_rate` if alive, else `-= decay_rate`
-  3. Stochastic dropout: for each voxel, draw `r = rng.next_u32() as f32 / u32::MAX as f32`; if `r < dropout_prob`, halve the Δ applied this tick (the paper's morphogenesis trick — write the half-updated value). Reusable mask buffer.
-  4. Alive gate: `field.alive[v] = sigmoid(field.alive[v] * α_scale) > alive_threshold ? 1.0 : 0.0` (sigmoid, NOT softmax per the global rule)
-  5. Dead-voxel reset: if `!alive`, `field.morphogen[v] *= decay_rate` (gradual, not instant — matches the paper)
-- [ ] **PRNG choice**: `SplitMix64` (a single `u64` state, deterministic, no deps). Seed once at the start of the growth run; advance once per voxel per tick. Bit-identical across runs (G6 determinism).
-- [ ] **No allocations**: all scratch buffers passed in by the caller; the function borrows `&mut`. The growth loop pre-allocates once and reuses across all ticks.
-- [ ] Unit tests:
-  - Determinism: same seed → bit-identical field after N ticks (the quorum-safety gate)
-  - Birth propagates: a single seed voxel grows to >1 voxel after N ticks (the core mechanism)
-  - Death resets morphogen: a voxel that drops below `alive_threshold` sees its morphogen decay toward 0
-  - Zero-alloc: `GlobalAlloc` counter stable across 100 ticks (G5)
+- [x] New module `birth_death.rs` behind `#[cfg(feature = "grid_3d")]`
+- [x] **Signature** (zero-alloc, `_into` convention — mirrors `evolve_motor_gated_field`): as specified
+- [x] **`BirthDeathParams`** (plain struct, `Copy`) with all 6 fields as specified + `paper_defaults()` const constructor
+- [x] **Algorithm** (per tick, per voxel) — with **three justified deviations from the plan's literal pseudocode** (each documented inline with a "Deviation" comment; all required for the mechanism to function):
+  1. **Diffuse morphogen** — `scratch_lap = graph_laplacian_into(cx, field, scratch_lap)`; apply `field.morphogen -= diffusion_dt * scratch_lap` to channels 1.. **DEVIATION: sign flip** (`-=` not `+=`). The plan's `+= dt·Δ` is anti-diffusive (sharpening); `-= dt·Δ` gives the smoothing operator (morphogen flows seed→neighbor). Required for birth to propagate (verified by `birth_propagates` test).
+  2. **Autocatalysis on alive voxels** — `field.morphogen[v] += (birth_rate - consumption_rate) * reaction_scale` if alive. **DEVIATION: dead voxels skip this step entirely** (the plan adds `-= decay_rate` to dead voxels here; that double-counts with step 5 AND wipes out frontier diffusion gains — a dead neighbor receiving +0.1 morphogen gets -0.5 reaction, ending at -0.4, which the gate kills). Dead-voxel decay is handled purely by step 5.
+  3. **Stochastic dropout** — precompute mask into `scratch_dropout` (one draw per voxel in vertex-index order, G6 determinism); halve BOTH the diffusion Δ (step 1) and the reaction Δ (step 2) for masked voxels.
+  4. **Alive gate** — `alive' = sigmoid(morphogen · α_scale) > alive_threshold ? 1.0 : 0.0`. **DEVIATION: reads morphogen (channel 1), not alive (channel 0)**. The plan's `sigmoid(field.alive[v])` can never birth a dead voxel (`sigmoid(0)=0.5`, strict `> 0.5` is false). The paper gates on the growth signal (morphogen); the alive channel is purely the binarized output. `ALIVE_GATE_SCALE` baked as const `1.0` (promote to param if GOAT needs tuning).
+  5. **Dead-voxel reset** — if `!alive`, `field.morphogen[v] *= decay_rate` (gradual drain, as specified)
+- [x] **PRNG choice**: `SplitMix64` (single `u64` state, deterministic, zero deps, standard Steele/Lea 2014 constants). Seed once; advance once per voxel per tick. Bit-identical across runs (G6 determinism).
+- [x] **No allocations**: all scratch passed in by the caller; the function borrows `&mut`. Reuses `graph_laplacian_into` (DRY — no 7-point stencil duplication).
+- [x] **Unit tests** (7 total, all pass):
+  - `splitmix64_determinism`: same seed → same sequence; different seed → different output
+  - `splitmix64_next_u32_uses_high_bits`: next_u32 is high 32 bits of next_u64
+  - `stochastic_birth_death_determinism`: same seed + same field → bit-identical after 10 ticks (the G6 quorum-safety gate)
+  - `stochastic_birth_death_birth_propagates`: single seed voxel → >1 alive voxel after 20 ticks (the core NCA growth mechanism)
+  - `stochastic_birth_death_death_decays_morphogen`: dead voxels see morphogen `*= decay_rate` each tick (step 5)
+  - `stochastic_birth_death_alive_channel_stays_binarized`: alive channel always exactly 0.0 or 1.0 after every tick (the invariant T5's `argmax_block_type` relies on)
+  - `stochastic_birth_death_dropout_halves_delta`: with `dropout_prob=1.0`, every voxel's diffusion Δ is exactly half of the `dropout_prob=0.0` run
+- [ ] **Zero-alloc G5 test deferred to T7 GOAT gate** (the `GlobalAlloc` counter harness belongs in the bench, not the unit test module)
 
 ### T5: `argmax_block_type` — discrete-class bridge
 - [ ] New fn in `birth_death.rs` (or `bridge.rs` if the module grows) behind `#[cfg(feature = "grid_3d")]`
