@@ -78,29 +78,23 @@ pub fn graph_laplacian_into(cx, potential, output) {
 - [x] Existing 2D tests must pass unchanged (regression guard) — **185 lib tests + 4 sheaf_admm GOAT tests ALL PASS**; clippy clean on both default + `--all-features`; katgpt-core (the re-exporter) compiles clean
 
 ### T2: `CellComplex::grid_3d(w, h, d)` constructor
-- [ ] New constructor behind `#[cfg(feature = "grid_3d")]` in `types.rs`
-- [ ] **Cell counts** (cubical grid topology):
+- [x] New constructor behind `#[cfg(feature = "grid_3d")]` in `types.rs`
+- [x] **Cell counts** (cubical grid topology):
   - Vertices: `w * h * d`
   - Edges: x-aligned `(w-1)*h*d` + y-aligned `w*(h-1)*d` + z-aligned `w*h*(d-1)`
   - Faces: xy-planes `(w-1)*(h-1)*d` + xz-planes `(w-1)*h*(d-1)` + yz-planes `w*(h-1)*(d-1)`
   - Volumes: `(w-1)*(h-1)*(d-1)`
-- [ ] **Vertex indexing**: `vidx(x, y, z) = (z * h + y) * w + x` (row-major, z-slowest — matches `CochainField` flat layout)
-- [ ] **Edge indexing** (3 orientations, contiguous ranges):
-  - x-edges: `e_x(x, y, z) = (z * h + y) * (w - 1) + x` for `x ∈ [0, w-1)`
-  - y-edges: `e_y(x, y, z) = n_x_edges + (z * (h - 1) + y) * w + x` for `y ∈ [0, h-1)`
-  - z-edges: `e_z(x, y, z) = n_x_edges + n_y_edges + (z * w + y) * w + x` — **wait, z-edges connect `(x,y,z) ↔ (x,y,z+1)`, so the index is over `z ∈ [0, d-1)` and the stride is `w*h` per z-slice: `e_z(x, y, z) = n_x_edges + n_y_edges + z * (w * h) + y * w + x`**
-- [ ] **Face indexing** (3 orientations, contiguous ranges):
-  - xy-faces (normal = z): `f_xy(x, y, z) = (z * (h - 1) + y) * (w - 1) + x` for `x ∈ [0, w-1), y ∈ [0, h-1), z ∈ [0, d)`
-  - xz-faces (normal = y): offset by `n_xy_faces`, indexed over `x ∈ [0, w-1), y ∈ [0, h), z ∈ [0, d-1)`
-  - yz-faces (normal = x): offset by `n_xy_faces + n_xz_faces`, indexed over `x ∈ [0, w), y ∈ [0, h-1), z ∈ [0, d-1)`
-- [ ] **Volume indexing**: `vol(x, y, z) = (z * (h - 1) + y) * (w - 1) + x` for `x ∈ [0, w-1), y ∈ [0, h-1), z ∈ [0, d-1)`
-- [ ] **B₁ (vertex→edge)**: for each edge, push `(tail, e, -1)` and `(head, e, +1)` — orientation convention: tail = lower-index corner, head = higher-index corner (matches `grid_2d`)
-- [ ] **B₂ (edge→face)**: each face is bounded by 4 edges in a consistent orientation; pick the right-handed normal convention (xy-faces normal = +z, etc.). Push 4 entries per face with `±1` signs matching the orientation.
-- [ ] **B₃ (face→volume)**: each volume is bounded by 6 faces; push 6 entries per volume with `±1` signs. **This is the new rank-3 boundary matrix — `grid_2d` leaves it empty, `grid_3d` populates it.**
-- [ ] Pre-allocate boundary vectors to exact capacity (`reserve_exact`) — mirrors the `grid_2d` no-realloc pattern
-- [ ] Set `grid_dims = Some(GridDims::Dim3 { w, h, d })`
-- [ ] **Assert** `w >= 2 && h >= 2 && d >= 2` (a 1-cell-thick grid has zero volumes — degenerate; mirror the implicit `grid_2d` contract where `w=1` produces zero faces)
-- [ ] Unit tests: cell counts match closed-form for `(3,3,3)` and `(4,3,2)`; B₁ entries per vertex match the 7-point stencil neighbor count (3 at corner, 4 at edge, 5 at face, 6 at interior); `boundary_entries(0)` length = `2 * n_edges`; B₃ populated
+- [x] **Vertex indexing**: `vidx(x, y, z) = (z * h + y) * w + x` (row-major, z-slowest — matches `CochainField` flat layout)
+- [x] **Edge indexing** (3 orientations, contiguous ranges) — corrected z-edge stride per the self-correction in the original spec
+- [x] **Face indexing** (3 orientations, contiguous ranges)
+- [x] **Volume indexing**: `vol(x, y, z) = (z * (h - 1) + y) * (w - 1) + x`
+- [x] **B₁ (vertex→edge)**: tail = lower-index corner, head = higher-index corner (matches `grid_2d`)
+- [x] **B₂ (edge→face)**: CCW orientation per right-hand-rule normal (xy→+z, xz→+y, yz→+x); 4 entries per face
+- [x] **B₃ (face→volume)**: 6 entries per volume, outward-normal signs (−face = −1, +face = +1). **Populated — grid_2d leaves it empty.**
+- [x] Pre-allocate boundary vectors to exact capacity (`reserve_exact`)
+- [x] Set `grid_dims = Some(GridDims::Dim3 { w, h, d })`
+- [x] **Assert** `w >= 2 && h >= 2 && d >= 2`
+- [x] Unit tests: cell counts for (3,3,3) + (4,3,2); B₁/B₂/B₃ entry counts; 7-point stencil degrees (3/4/5/6); **B₁·B₂=0 + B₂·B₃=0 DEC identities** (the load-bearing orientation correctness gate); accessor roundtrip; degenerate panic (3 cases). 10 tests total, all pass.
 
 ### T3: `graph_laplacian_grid_3d_into` — 7-point stencil fast path
 - [ ] New private fn in `operators.rs` behind `#[cfg(feature = "grid_3d")]`

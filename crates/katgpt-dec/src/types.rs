@@ -208,6 +208,161 @@ impl CellComplex {
         cx
     }
 
+    /// Create a 3D regular cubical (grid) cell complex.
+    ///
+    /// Grid has `w` columns, `h` rows, and `d` depth-slices of vertices.
+    /// - Vertices: `w * h * d`
+    /// - Edges: x-aligned `(w-1)*h*d` + y-aligned `w*(h-1)*d` + z-aligned `w*h*(d-1)`
+    /// - Faces: xy-planes `(w-1)*(h-1)*d` + xz-planes `(w-1)*h*(d-1)` + yz-planes `w*(h-1)*(d-1)`
+    /// - Volumes: `(w-1)*(h-1)*(d-1)`
+    ///
+    /// Vertex layout is row-major with z-slowest (matches [`CochainField`] flat
+    /// layout): `vidx(x, y, z) = (z * h + y) * w + x`. Edges and faces are
+    /// grouped by orientation into contiguous index ranges so the 7-point
+    /// stencil (T3) can dispatch by orientation.
+    ///
+    /// Boundary matrices use canonical cubical orientation:
+    /// - B₁ (vertex→edge): tail = lower-index corner, head = higher-index corner
+    ///   (matches [`grid_2d`](Self::grid_2d))
+    /// - B₂ (edge→face): each face oriented counterclockwise viewed from its
+    ///   positive normal (xy→+z, xz→+y, yz→+x via the right-hand rule)
+    /// - B₃ (face→volume): each face signed by outward-normal convention
+    ///   (negative face = −1, positive face = +1)
+    ///
+    /// The DEC identities `B₁·B₂ = 0` and `B₂·B₃ = 0` hold by construction —
+    /// verified by `grid_3d_b1_b2_composition_zero` / `grid_3d_b2_b3_composition_zero`.
+    ///
+    /// # Panics
+    /// If `w < 2 || h < 2 || d < 2` — a grid thinner than 2 along any axis has
+    /// zero volumes (degenerate). Mirrors the implicit `grid_2d` contract where
+    /// `w=1` produces zero faces.
+    #[cfg(feature = "grid_3d")]
+    pub fn grid_3d(w: usize, h: usize, d: usize) -> Self {
+        assert!(w >= 2, "grid_3d: w={w} < 2 (degenerate, zero volumes)");
+        assert!(h >= 2, "grid_3d: h={h} < 2 (degenerate, zero volumes)");
+        assert!(d >= 2, "grid_3d: d={d} < 2 (degenerate, zero volumes)");
+
+        // --- Cell counts (cubical grid topology) ---
+        let n_x_edges = (w - 1) * h * d;
+        let n_y_edges = w * (h - 1) * d;
+        let n_z_edges = w * h * (d - 1);
+        let n_edges = n_x_edges + n_y_edges + n_z_edges;
+        let n_xy_faces = (w - 1) * (h - 1) * d;
+        let n_xz_faces = (w - 1) * h * (d - 1);
+        let n_yz_faces = w * (h - 1) * (d - 1);
+        let n_faces = n_xy_faces + n_xz_faces + n_yz_faces;
+        let n_volumes = (w - 1) * (h - 1) * (d - 1);
+
+        let mut cx = Self::new(w * h * d, n_edges, n_faces, n_volumes);
+        cx.grid_dims = Some(GridDims::Dim3 { w, h, d });
+
+        // Pre-allocate boundary vectors to exact capacity — no re-allocs during push.
+        cx.boundaries[0].reserve_exact(2 * n_edges);
+        cx.boundaries[1].reserve_exact(4 * n_faces);
+        cx.boundaries[2].reserve_exact(6 * n_volumes);
+
+        // --- Indexing helpers (inlined by the compiler; capture grid dims) ---
+        let vidx = |x: usize, y: usize, z: usize| (z * h + y) * w + x;
+        let e_x = |x: usize, y: usize, z: usize| (z * h + y) * (w - 1) + x;
+        let e_y = |x: usize, y: usize, z: usize| n_x_edges + (z * (h - 1) + y) * w + x;
+        let e_z = |x: usize, y: usize, z: usize| n_x_edges + n_y_edges + z * (w * h) + y * w + x;
+        let f_xy = |x: usize, y: usize, z: usize| (z * (h - 1) + y) * (w - 1) + x;
+        let f_xz =
+            |x: usize, y: usize, z: usize| n_xy_faces + (y * (d - 1) + z) * (w - 1) + x;
+        let f_yz = |x: usize, y: usize, z: usize| {
+            n_xy_faces + n_xz_faces + (x * (d - 1) + z) * (h - 1) + y
+        };
+        let vol = |x: usize, y: usize, z: usize| (z * (h - 1) + y) * (w - 1) + x;
+
+        // --- B₁: vertex→edge incidence (2 entries per edge) ---
+        // x-edges: (x,y,z) ↔ (x+1,y,z)
+        for z in 0..d {
+            for y in 0..h {
+                for x in 0..(w - 1) {
+                    let e = e_x(x, y, z);
+                    cx.boundaries[0].push((vidx(x, y, z), e, -1));
+                    cx.boundaries[0].push((vidx(x + 1, y, z), e, 1));
+                }
+            }
+        }
+        // y-edges: (x,y,z) ↔ (x,y+1,z)
+        for z in 0..d {
+            for y in 0..(h - 1) {
+                for x in 0..w {
+                    let e = e_y(x, y, z);
+                    cx.boundaries[0].push((vidx(x, y, z), e, -1));
+                    cx.boundaries[0].push((vidx(x, y + 1, z), e, 1));
+                }
+            }
+        }
+        // z-edges: (x,y,z) ↔ (x,y,z+1)
+        for z in 0..(d - 1) {
+            for y in 0..h {
+                for x in 0..w {
+                    let e = e_z(x, y, z);
+                    cx.boundaries[0].push((vidx(x, y, z), e, -1));
+                    cx.boundaries[0].push((vidx(x, y, z + 1), e, 1));
+                }
+            }
+        }
+
+        // --- B₂: edge→face incidence (4 entries per face) ---
+        // xy-faces (normal = +z), CCW loop: bottom(+1) → right(+1) → top(−1) → left(−1)
+        for z in 0..d {
+            for y in 0..(h - 1) {
+                for x in 0..(w - 1) {
+                    let f = f_xy(x, y, z);
+                    cx.boundaries[1].push((e_x(x, y, z), f, 1)); // bottom
+                    cx.boundaries[1].push((e_y(x + 1, y, z), f, 1)); // right
+                    cx.boundaries[1].push((e_x(x, y + 1, z), f, -1)); // top (reversed)
+                    cx.boundaries[1].push((e_y(x, y, z), f, -1)); // left (reversed)
+                }
+            }
+        }
+        // xz-faces (normal = +y), CCW loop in (z,x): z-fwd → x-fwd → z-bwd → x-bwd
+        for y in 0..h {
+            for z in 0..(d - 1) {
+                for x in 0..(w - 1) {
+                    let f = f_xz(x, y, z);
+                    cx.boundaries[1].push((e_z(x, y, z), f, 1)); // front z-edge
+                    cx.boundaries[1].push((e_x(x, y, z + 1), f, 1)); // back x-edge
+                    cx.boundaries[1].push((e_z(x + 1, y, z), f, -1)); // right z-edge (reversed)
+                    cx.boundaries[1].push((e_x(x, y, z), f, -1)); // front x-edge (reversed)
+                }
+            }
+        }
+        // yz-faces (normal = +x), CCW loop in (y,z): y-fwd → z-fwd → y-bwd → z-bwd
+        for x in 0..w {
+            for z in 0..(d - 1) {
+                for y in 0..(h - 1) {
+                    let f = f_yz(x, y, z);
+                    cx.boundaries[1].push((e_y(x, y, z), f, 1)); // bottom y-edge
+                    cx.boundaries[1].push((e_z(x, y + 1, z), f, 1)); // top z-edge
+                    cx.boundaries[1].push((e_y(x, y, z + 1), f, -1)); // back y-edge (reversed)
+                    cx.boundaries[1].push((e_z(x, y, z), f, -1)); // front z-edge (reversed)
+                }
+            }
+        }
+
+        // --- B₃: face→volume incidence (6 entries per volume) ---
+        // Outward-normal signs: negative face = −1, positive face = +1.
+        for z in 0..(d - 1) {
+            for y in 0..(h - 1) {
+                for x in 0..(w - 1) {
+                    let v = vol(x, y, z);
+                    cx.boundaries[2].push((f_xy(x, y, z), v, -1)); // bottom (z−)
+                    cx.boundaries[2].push((f_xy(x, y, z + 1), v, 1)); // top (z+)
+                    cx.boundaries[2].push((f_xz(x, y, z), v, -1)); // front (y−)
+                    cx.boundaries[2].push((f_xz(x, y + 1, z), v, 1)); // back (y+)
+                    cx.boundaries[2].push((f_yz(x, y, z), v, -1)); // left (x−)
+                    cx.boundaries[2].push((f_yz(x + 1, y, z), v, 1)); // right (x+)
+                }
+            }
+        }
+
+        cx
+    }
+
     /// Number of cells at a given rank.
     #[inline]
     pub fn n_cells(&self, rank: u8) -> usize {
@@ -1075,5 +1230,175 @@ mod tests {
     fn test_coboundary_index_build_panics_at_max_rank() {
         let mut cx = CellComplex::grid_2d(4, 4);
         cx.build_coboundary_index(MAX_RANK); // k=3 has no B₄
+    }
+
+    // -----------------------------------------------------------------------
+    // Plan 454 T2: CellComplex::grid_3d (3D cubical grid)
+    // -----------------------------------------------------------------------
+
+    /// Build a dense i8 matrix from sparse triplets (row, col, sign).
+    #[cfg(feature = "grid_3d")]
+    fn dense_from_triplets(
+        n_rows: usize,
+        n_cols: usize,
+        triplets: &[(usize, usize, i8)],
+    ) -> Vec<Vec<i8>> {
+        let mut m = vec![vec![0i8; n_cols]; n_rows];
+        for &(r, c, s) in triplets {
+            m[r][c] += s;
+        }
+        m
+    }
+
+    /// Multiply two dense i8 matrices → dense i32 result.
+    #[cfg(feature = "grid_3d")]
+    fn matmul_i8(a: &[Vec<i8>], b: &[Vec<i8>]) -> Vec<Vec<i32>> {
+        let n_rows = a.len();
+        let n_inner = if n_rows > 0 { a[0].len() } else { 0 };
+        let n_cols = if n_inner > 0 { b[0].len() } else { 0 };
+        let mut c = vec![vec![0i32; n_cols]; n_rows];
+        for i in 0..n_rows {
+            for k in 0..n_inner {
+                if a[i][k] != 0 {
+                    for j in 0..n_cols {
+                        c[i][j] += a[i][k] as i32 * b[k][j] as i32;
+                    }
+                }
+            }
+        }
+        c
+    }
+
+    #[cfg(feature = "grid_3d")]
+    #[test]
+    fn grid_3d_cell_counts() {
+        // (3, 3, 3): Euler χ = V − E + F − C = 27 − 54 + 36 − 8 = 1 (3-ball)
+        let cx = CellComplex::grid_3d(3, 3, 3);
+        assert_eq!(cx.n_vertices(), 27);
+        assert_eq!(cx.n_edges(), 54); // 18 + 18 + 18
+        assert_eq!(cx.n_faces(), 36); // 12 + 12 + 12
+        assert_eq!(cx.n_volumes(), 8); // 2*2*2
+
+        // (4, 3, 2): χ = 24 − 46 + 29 − 6 = 1
+        let cx = CellComplex::grid_3d(4, 3, 2);
+        assert_eq!(cx.n_vertices(), 24);
+        assert_eq!(cx.n_edges(), 46); // 18 + 16 + 12
+        assert_eq!(cx.n_faces(), 29); // 12 + 9 + 8
+        assert_eq!(cx.n_volumes(), 6); // 3*2*1
+    }
+
+    #[cfg(feature = "grid_3d")]
+    #[test]
+    fn grid_3d_boundary_entry_counts() {
+        let cx = CellComplex::grid_3d(3, 3, 3);
+        // B₁: 2 entries per edge
+        assert_eq!(cx.boundary_entries(0).len(), 2 * 54);
+        // B₂: 4 entries per face
+        assert_eq!(cx.boundary_entries(1).len(), 4 * 36);
+        // B₃: 6 entries per volume (this is the new rank-3 matrix grid_2d leaves empty)
+        assert_eq!(cx.boundary_entries(2).len(), 6 * 8);
+    }
+
+    #[cfg(feature = "grid_3d")]
+    #[test]
+    fn grid_3d_b3_is_populated() {
+        // grid_2d leaves B₃ empty (zero volumes); grid_3d must populate it.
+        let cx_2d = CellComplex::grid_2d(4, 4);
+        assert!(cx_2d.boundary_entries(2).is_empty(),
+            "grid_2d B₃ must be empty (sanity check)");
+
+        let cx_3d = CellComplex::grid_3d(3, 3, 3);
+        assert!(!cx_3d.boundary_entries(2).is_empty(),
+            "grid_3d B₃ must be populated (the rank-3 boundary matrix)");
+    }
+
+    #[cfg(feature = "grid_3d")]
+    #[test]
+    fn grid_3d_vertex_degree_7_point_stencil() {
+        // On a 3D grid, each vertex's degree matches the 7-point stencil neighbor
+        // count: corner = 3, edge = 4, face = 5, interior = 6.
+        let cx = CellComplex::grid_3d(3, 3, 3);
+        let b1 = cx.boundary_entries(0);
+
+        // Count how many times each vertex appears in B₁ (as tail or head).
+        let mut degree = vec![0usize; cx.n_vertices()];
+        for &(v, _edge, _sign) in b1 {
+            degree[v] += 1;
+        }
+
+        // vidx(x,y,z) = (z*3+y)*3 + x for a 3×3×3 grid
+        let vidx = |x: usize, y: usize, z: usize| (z * 3 + y) * 3 + x;
+
+        // Corner (0,0,0): 3 neighbors (+x, +y, +z)
+        assert_eq!(degree[vidx(0, 0, 0)], 3, "corner vertex degree");
+        // Edge (1,0,0): 4 neighbors (±x, +y, +z)
+        assert_eq!(degree[vidx(1, 0, 0)], 4, "edge vertex degree");
+        // Face (1,1,0): 5 neighbors (±x, ±y, +z)
+        assert_eq!(degree[vidx(1, 1, 0)], 5, "face vertex degree");
+        // Interior (1,1,1): 6 neighbors (±x, ±y, ±z)
+        assert_eq!(degree[vidx(1, 1, 1)], 6, "interior vertex degree");
+    }
+
+    #[cfg(feature = "grid_3d")]
+    #[test]
+    fn grid_3d_b1_b2_composition_zero() {
+        // DEC identity: B₁ · B₂ = 0 (boundary of boundary is zero — d∘d = 0).
+        let cx = CellComplex::grid_3d(3, 3, 3);
+        let b1 = dense_from_triplets(cx.n_vertices(), cx.n_edges(), cx.boundary_entries(0));
+        let b2 = dense_from_triplets(cx.n_edges(), cx.n_faces(), cx.boundary_entries(1));
+        let prod = matmul_i8(&b1, &b2);
+        for (i, row) in prod.iter().enumerate() {
+            for (j, &val) in row.iter().enumerate() {
+                assert_eq!(val, 0, "B₁·B₂ != 0 at ({i},{j}) — orientation is inconsistent");
+            }
+        }
+    }
+
+    #[cfg(feature = "grid_3d")]
+    #[test]
+    fn grid_3d_b2_b3_composition_zero() {
+        // DEC identity: B₂ · B₃ = 0 (boundary of boundary is zero — d∘d = 0).
+        let cx = CellComplex::grid_3d(3, 3, 3);
+        let b2 = dense_from_triplets(cx.n_edges(), cx.n_faces(), cx.boundary_entries(1));
+        let b3 = dense_from_triplets(cx.n_faces(), cx.n_volumes(), cx.boundary_entries(2));
+        let prod = matmul_i8(&b2, &b3);
+        for (i, row) in prod.iter().enumerate() {
+            for (j, &val) in row.iter().enumerate() {
+                assert_eq!(val, 0, "B₂·B₃ != 0 at ({i},{j}) — orientation is inconsistent");
+            }
+        }
+    }
+
+    #[cfg(feature = "grid_3d")]
+    #[test]
+    fn grid_3d_grid_dims_accessors() {
+        let cx = CellComplex::grid_3d(4, 3, 2);
+        // grid_dims_3d returns the 3D dims
+        assert_eq!(cx.grid_dims_3d(), Some((4, 3, 2)));
+        // grid_dims (2D accessor) returns None for 3D grids (back-compat contract)
+        assert_eq!(cx.grid_dims(), None);
+        // grid_dims_full returns the discriminated enum
+        assert_eq!(cx.grid_dims_full(), Some(GridDims::Dim3 { w: 4, h: 3, d: 2 }));
+    }
+
+    #[cfg(feature = "grid_3d")]
+    #[test]
+    #[should_panic(expected = "degenerate, zero volumes")]
+    fn grid_3d_panics_on_w_too_small() {
+        let _ = CellComplex::grid_3d(1, 3, 3);
+    }
+
+    #[cfg(feature = "grid_3d")]
+    #[test]
+    #[should_panic(expected = "degenerate, zero volumes")]
+    fn grid_3d_panics_on_h_too_small() {
+        let _ = CellComplex::grid_3d(3, 1, 3);
+    }
+
+    #[cfg(feature = "grid_3d")]
+    #[test]
+    #[should_panic(expected = "degenerate, zero volumes")]
+    fn grid_3d_panics_on_d_too_small() {
+        let _ = CellComplex::grid_3d(3, 3, 1);
     }
 }
