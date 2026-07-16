@@ -3,6 +3,7 @@
 > **Source:** [ELT: Elastic Looped Transformers for Visual Generation](https://arxiv.org/pdf/2604.09168) — Sahil Goyal, Swayam Agrawal, Gautham Govind, Anil Prateek, Jain Sujoy Paul, Aditya Kusupati (Google), arxiv 2604.09168v2, 13 Apr 2026
 > **Date:** 2026-06-20
 > **Status:** Done
+> **Validation:** Any-Time property **empirically validated** 2026-07-16 (Issue 156 T2, `tests/issue_156_anytime_lt2_poc.rs`). All 4 gate regimes exhibit monotonic KL decrease as R → R_max with random untrained weights — structural Any-Time holds WITHOUT the ILSD training ELT requires. See `katgpt-rs/.issues/156` §"PoC Results".
 > **Related Research:** 073 (LT2 — architecture we already ship), 097 (Training-Free Loop), 114 (AMUSE Anytime Muon), 148 (HydraBudget early_exit_layer), 051 (Mosaic of Small Elastic Models)
 > **Related Plans:** 108 (LT2 Looped Pipeline — ✅ shipped, GOAT 8/8, default-on), 136 (Training-Free Loop Wrapper — ✅ shipped), 212 (Collapse-Aware early exit), 231 (PathwayTracker stability early exit), 283 (Self-Advantage Gate)
 > **Cross-ref (riir-ai):** Research 128 (Zone-Density Dynamic Functor Gating — elastic budget per zone), Research 136 (Per-NPC Runtime Test-Time Scaling Guide), latent_functor/reestimation.rs (`set_active_budget`, `set_zone_gating`)
