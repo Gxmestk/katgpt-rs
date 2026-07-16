@@ -732,9 +732,10 @@ pub use subspace_phase_gate::{
 
 #[cfg(feature = "group_invariance_probe")]
 pub use group_invariance_probe::{
-    GroupAction, SubgroupClass, SubgroupReport, classify_subgroup, classify_subgroup_with,
-    discover_subgroup, discover_subgroup_into, invariance_score, score_concentration,
-    score_variance,
+    GroupAction, Matrix, SubgroupClass, SubgroupReport, classify_subgroup,
+    classify_subgroup_with, commutant_basis, commutant_binary_association,
+    commutant_of_matrices, commutant_shift, discover_subgroup,
+    discover_subgroup_into, invariance_score, score_concentration, score_variance,
 };
 
 #[cfg(feature = "causal_head_importance")]

@@ -189,6 +189,8 @@ The IMIR's position-selection basis `P = {I⁽ᵖ⁾, M, M², …, Mᵏ⁻¹}` i
 
 → **Gain.** A small, tracked enhancement to `group_invariance_probe.rs`: add a `commutant_basis` helper for permutation + shift groups as a more principled alternative to MC sampling. Behind the existing `group_invariance_probe` feature flag. No full plan; tracked in `.issues/157`.
 
+> **Update (2026-07-16):** Issue 157 is **CLOSED — all tasks done.** The helper shipped as `commutant_basis<U: GroupAction>` + `commutant_of_matrices` (core solver) + `commutant_binary_association` + `commutant_shift` (closed-form constructors) + 10 unit tests. See the module doc's "Commutant basis" section for usage guidance. Issue file removed per the noise-reduction rule.
+
 ### MOAT gate per domain (§1.6)
 
 | Domain | In scope? | MOAT contribution |
@@ -243,7 +245,7 @@ A single opt-in helper added to `katgpt-rs/crates/katgpt-core/src/group_invarian
 pub fn commutant_basis<U: GroupAction>(group: &U, d: usize) -> Vec<Vec<Vec<f32>>> { ... }
 ```
 
-**No benchmark, no GOAT gate.** The helper is a more-principled alternative to MC sampling; it does not claim a provable gain. It lands behind the existing feature flag and is documented as an alternative construction. Tracked in `.issues/157`.
+**No benchmark, no GOAT gate.** The helper is a more-principled alternative to MC sampling; it does not claim a provable gain. It lands behind the existing feature flag and is documented as an alternative construction. ~~Tracked in `.issues/157`.~~ **Shipped 2026-07-16** (Issue 157 closed + removed).
 
 **What does NOT ship (documented as speculative in §2.4):**
 - IMIR position-basis × DEC `exterior_derivative` bridge (vocabulary only, no code change)
@@ -279,3 +281,5 @@ pub fn commutant_basis<U: GroupAction>(group: &U, d: usize) -> Vec<Vec<Vec<f32>>
 ## TL;DR
 
 Musat et al. prove that transformers trained on inductive tasks have weights confined to a low-dimensional Invariant Manifold (IMIR) spanned by interpretable basis matrices — the **commutant of the data-symmetry group** (token automorphisms + position shifts). Most of the paper (Theorems 1-3, lottery ticket) is training-dynamics theory → riir-train. The modelless residue (§5 circuit detection + §3.2 commutant-basis construction) is a **refinement** of two already-shipped primitives: `group_invariance_probe` (Plan 355, sample-then-score) and `subspace_phase_gate` (Plan 301, SVD-based subspace ID). The actionable piece is small — add a `commutant_basis(group_action) -> Vec<Matrix>` helper for permutation + shift groups as a closed-form alternative to MC sampling. **Verdict: Gain (deferred, tracked in `.issues/157`).** The commutant vocabulary is genuinely absent from the corpus (zero grep hits); the closest cousin is LieFlow's `group_invariance_probe`; the runtime ICL/IWL analog already ships as `latent_functor/reestimation.rs` coherence-trigger. No Super-GOAT (Q2/Q3 fail — no new capability class, no product selling point on our substrate); no GOAT (the construction is one-paragraph linear algebra on top of existing primitives, with no obvious non-trivial-symmetry target in our latent states).
+
+> **Update (2026-07-16):** Gain **shipped**. Issue 157 closed + removed. `commutant_basis` + `commutant_of_matrices` + `commutant_binary_association` + `commutant_shift` landed behind `group_invariance_probe` with 10 unit tests (all pass). `cargo clippy` clean.
