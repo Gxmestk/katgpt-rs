@@ -335,7 +335,7 @@ Don't direct-map the paper to our code. Find the transferable primitive: the geo
 | **Super-GOAT** | Novel mechanism (no prior art) + new capability class + product selling point + force multiplier (≥2 pillars). Creates a moat. | Open primitive → katgpt-rs. **Architectural guide → riir-ai/.research/ (game runtime) OR riir-chain/.research/ (chain/LatCal) OR riir-neuron-db/.research/ (shards/freeze/consolidation/AnyRAG/vibe/Merkle)**. Plans → appropriate repo(s) as needed. |
 | **GOAT** | Provable gain (latency/quality/security) over existing approach, but not a new class of capability. Promotes to default if it wins. | Plan + implement → appropriate repo. Feature flag + benchmark. |
 | **Gain** | Incremental improvement, useful but not headline-worthy. | Plan only, behind feature flag. |
-| **Pass** | Not relevant to modelless/latent/freeze-thaw/runtime, OR training-only (→ riir-train), OR LLM-orchestration class (R133/R169/R289 — every mechanism ships, paper's value is its LLM-dependent process). | **Run §1.55 value-extraction scan first.** If zero cherry-pickable gains → no files, report verdict + one-line reason + closest shipped cousin in conversation only. **If cherry-pickable gains exist** → short PASS-with-gains research note (for ref) + `.issues/` entries for actionable gains (PoC/optimization/config tasks). Pre-flight still mandatory before the verdict — zero diligence ≠ zero files. |
+| **Pass** | Not relevant to modelless/latent/freeze-thaw/runtime, OR training-only (→ riir-train), OR LLM-orchestration class (R133/R169/R289 — every mechanism ships, paper's value is its LLM-dependent process). | **Default: no files.** Run §1.55 value-extraction scan (apply the gain threshold strictly). Most "already ships" papers produce only observations → **pure PASS: verdict + one-line reason + closest shipped cousin in conversation only, NO note, NO issues**. If ≥1 gain meets ALL three threshold criteria (concrete + evidence-backed + actionable) → short note (only if cross-ref needed) + `.issues/` entries. Pre-flight still mandatory before the verdict. |
 
 **One-line reasoning required for each verdict.** For Super-GOAT: state the selling point explicitly.
 
@@ -376,29 +376,54 @@ Before planning, score novelty. Ask all four:
 >
 > If you are NOT confident enough to commit all 4 YES right now, **do not write "Super-GOAT candidate"**. Write "fusion idea — novelty TBD, needs Q1–Q4 check before verdict" and create an issue in `.issues/` to track the follow-up. "Candidate" is not a deferred-commitment escape hatch — it either triggers the guide now, or it gets downgraded to an issue.
 
-### 1.55. Value extraction — mandatory even on Pass (the R442 lesson)
+### 1.55. Value extraction — the gain threshold (fixing the PASS-with-gains overuse)
 
-**Hard rule:** before issuing ANY verdict (including Pass), you MUST scan the paper for **cherry-pickable gains** — transferable insights that improve our stack regardless of whether the paper's main mechanism ships. "Architecture already ships" does NOT mean "nothing to learn." A lazy Pass that skips value extraction is the #1 missed-gain failure mode.
+**Problem this section fixes (the R443 lesson, 2026-07-16):** the original R442 amendment (§1.55 v1) was meant to prevent lazy PASSes by requiring a value-extraction scan. It backfired. The six questions were too permissive — almost any paper has a "design principle" or "validation target" if you squint — so every PASS became a PASS-with-gains that creates a note + issues. This made PASS **too attractive**: the agent avoids the harder GOAT/Super-GOAT search because PASS still produces files and feels productive. A streak of 5+ consecutive PASS-with-gains verdicts (R289, R361, R368, R372, R390, R402, R410, R439, R442, R443) proved the pattern: the skill was rewarding the lazy path. **The fix: raise the gain threshold so most "already ships" papers get pure PASS (no files).**
 
-**The R442 lesson (LOTUS, arxiv 2606.31779, 2026-07-16):** the initial verdict was Pass with the reasoning "architecture shipped as LT2+RiM, training → riir-train, insights validate existing design." This was correct on prior-art but **lazy on value extraction** — a push-back revealed three real cherry-pickable gains: (1) RiM slot width M=2 is in the failure regime for reasoning tasks (LOTUS Table 7 proves M≥5 needed), (2) the PCL factorization is a modelless design principle for our screening stack, (3) per-iteration vs post-loop readout schedule is a composition gain for BoMSampler vs CLR. None of these are "new primitives" but all three are real improvements the initial Pass missed.
+**Hard rule:** before issuing ANY verdict (including Pass), scan the paper for cherry-pickable gains — transferable insights that improve our stack regardless of whether the paper's main mechanism ships. But apply the **gain threshold** below. Most scans will produce only observations, not gains. That is correct — most "already ships" papers have nothing actionable.
 
-**The value-extraction scan (run this BEFORE the verdict, for every tier):**
+**The gain threshold — a gain must meet ALL three criteria:**
 
-Ask these six questions. Any "yes" is a cherry-pickable gain that MUST be recorded — in the research note (for reference) and/or as an `.issues/` entry (for PoC/optimization tasks):
+1. **Concrete**: points to a specific config field, shipped primitive, known blocker, or open issue in the codebase — not a general "insight" or "principle". You must be able to name the file or issue it touches.
+2. **Evidence-backed**: the paper provides **data** (table / figure / proof / ablation) that **contradicts** or **extends** the current shipped state — not just "this is an interesting idea" or "this validates our design". "Validates our design" is NOT a gain — the design stands without it.
+3. **Actionable**: resolving it would **change code** — a config default, a feature flag, an unblocked deferred task, or a proven failure mode in shipped code that has NO existing mitigation.
 
-1. **Config tuning:** does the paper's ablation data suggest a different default for an existing config field? (Canonical: LOTUS Table 7 → RiM `rim_tokens_per_block` M=2 is too narrow for reasoning; M≥5 escapes the cliff.) Grep `Config` structs and `*_goat.md` benchmarks for the current default; if the paper's evidence contradicts it, that's a gain.
-2. **Design principle:** does the paper provide a *theoretical lens* that explains why our shipped composition works — and suggests how to simplify or tune it? (Canonical: LOTUS §3.3.2 PCL factorization explains why per-position independent screening + jointly-computed looped latents → globally coherent answers; the transferable principle is "trust the jointly-computed latent, do per-position screening independently.")
-3. **Composition schedule:** does the paper's ablation reveal that different consumers of the same substrate prefer different readout schedules? (Canonical: LOTUS found auxiliary decoders prefer per-iteration readout; direct LM-head readout prefers post-loop. Maps to: BoMSampler = auxiliary → per-iter; CLR vote = direct → post-loop.)
-4. **Empirical validation target:** does the paper prove a property we *claimed* but never *measured*? (Canonical: LOTUS Table 6 proves R is tunable at inference; Research 273 ELT claimed this Gain-tier but never validated it on our LT2. The paper provides the evidence template; we need to run it on our stack.)
-5. **Failure-mode exposure:** does the paper's mechanism expose a failure mode in our shipped primitive that we haven't addressed? (Canonical: LOTUS's `L_step` supervision empirically demonstrates the Readout Blind Spot residual-explosion issue — which Plan 428 already addresses, but the paper confirms the failure mode is real and load-bearing.)
-6. **Benchmark domain / regime insight:** does the paper's experimental setup reveal which regime our primitives should target? (Canonical: LOTUS's 6.9× speedup is on natural-language CoT, not compact math — suggesting our game-AI latency wins are in the verbose-reasoning regime, which is where NPC internal monologue lives.)
+**If all three pass → actionable gain → `.issues/NNN_*.md` + short note (only if cross-ref needed per §1.55 routing below).**
+**If any fail → observation, NOT a gain → no file created for it.** Record in conversation only, or in the note IF a note is warranted for other reasons.
 
-**Output discipline per cherry-pickable gain:**
-- **Immediate config change** (high confidence, low risk) → do it in a Plan or Issue with a GOAT re-gate.
-- **PoC / proof task** (speculative, needs validation) → `.issues/NNN_*.md` per AGENTS.md ("Create issue at .issues for poc, proof, optimization or refactor task, do not create plan").
-- **Design principle / composition insight** (conceptual, no code change yet) → record in the research note's §Distillation for future reference.
+**What is NOT a gain (do NOT create files for these):**
+- "Design principle" / "theoretical lens" / "validates our architecture" → observation. Interesting but doesn't change code.
+- "Empirical validation target" without a current **contradicted** claim → observation. We have many unvalidated claims; the paper doesn't create urgency unless it **contradicts** one.
+- "Composition schedule" / "regime insight" → observation. Doesn't change a shipped decision.
+- "Single-step sufficiency validates our design" → observation. The design is already shipped and working.
+- "Compute savings formula is evidence for our claim" → observation. The claim stands without it.
+- "Could inform a future config default" (speculative, no current contradiction) → observation.
 
-**The Pass tier is NOT "no files" — it is "no new primitive, no plan, no Super-GOAT guide."** If cherry-pickable gains exist, a **short PASS-with-gains research note** is mandatory (for cross-reference when the gain is later consumed), plus `.issues/` entries for the actionable gains. See the amended Pass tier in §3 below.
+**The six-question scan (still run it, but apply the gain threshold strictly):**
+
+1. **Config tuning:** does the paper's ablation data **contradict** a current default? You must grep the `Config` struct, find the current value, and show the paper's data conflicts. (Canonical: LOTUS Table 7 → RiM `rim_tokens_per_block` M=2 is in the failure regime; M≥5 escapes the cliff. The current default was M=2; the paper proves it's wrong. **This is a gain.**)
+2. **Design principle:** does the paper provide a theoretical lens? → almost always an **observation**, not a gain. Only a gain if it reveals a **simplification** that removes code.
+3. **Composition schedule:** does the ablation reveal different consumers prefer different schedules? → observation unless it **contradicts** a current wiring choice.
+4. **Empirical validation target:** does the paper prove a property we claimed but never measured? → observation unless the paper **contradicts** our claim (proves our claim is wrong). "Proves we were right" is NOT a gain.
+5. **Failure-mode exposure:** does the paper expose a failure mode in shipped code with **no existing mitigation**? If Plan/Issue already addresses it → observation. If no mitigation exists AND the paper proves the failure is real → **gain**.
+6. **Benchmark domain / regime insight:** → almost always an observation.
+
+**Most "yes" answers will be observations, not gains.** A paper that only produces observations → **pure PASS, no files**. This is the correct and expected outcome for most "already ships" papers.
+
+**PASS routing (strict):**
+
+| Outcome | Files created |
+|---|---|
+| **Pure PASS** (mechanism ships, scan produces only observations — the common case) | **NONE.** Verdict + one-line reason + closest shipped cousin, **in conversation only**. The paper is closed. |
+| **PASS-with-gains** (mechanism ships, ≥1 gain meets ALL three threshold criteria) | Short note (for cross-ref) **only if the gain will be consumed in a repo other than where the verdict is reported** + `.issues/` entries for each actionable gain. |
+
+**Anti-streak rule (MANDATORY):** if the last 3+ consecutive research notes (across ALL repos) were PASS or PASS-with-gains, the agent MUST escalate before issuing another PASS:
+1. Re-attempt the latent-space reframing (§Workflow step 3) **in writing** — show the reframe attempt and why it failed.
+2. Attempt at least one fusion combination (§Workflow step 5) **in writing** — name the 2-3 notes/primitives you tried to fuse and why the combination doesn't produce a new capability.
+3. Explicitly document why GOAT/Gain/Super-GOAT failed.
+If both attempts genuinely fail, PASS is justified. **If the agent cannot articulate why the fusion failed, default to Gain** (create a plan behind a feature flag — let the GOAT gate kill it if it's truly nothing).
+
+**The original R442 lesson still holds (don't skip the scan):** the LOTUS paper genuinely produced gains (M=2 config contradiction, failure-mode exposure). The fix is NOT to skip the scan — it's to **apply the threshold strictly** so that "validates our design" observations don't masquerade as gains and trigger file creation.
 
 ### 1.6. MOAT gate per domain
 
@@ -613,4 +638,4 @@ Reinforce these when designing game systems or chain state:
 
 **Hard rules:** modelless-first (translate compute units — LLM-as-implementation ≠ LLM-as-mechanism; when you see "N LLM calls/step", ask "what decision is each call computing?" first, not "violates 20Hz budget, NO-GAIN"); latent-to-latent with sigmoid (never softmax); freeze/thaw over fine-tuning; 5-repo discipline; raw scalars at sync boundary; fusion-first mindset.
 
-**Failure-mode prophylactics:** vocabulary translation blocks below (semantic + compute-unit + DEC/Stokes + per-NPC runtime + **substrate-translation for hardware papers**); read-the-hits rule (grep hit touching per-NPC+memory+personality+swap → `read_file` TL;DR before claiming novelty); 7 Super-GOAT factory modules; R169 false-trigger guard (decision-structure ≠ LLM-dependent process); **R418 hardware-paper guard (substrate ≠ value — hardware / NMP / ASIC / PIM papers MUST translate the technique to software SIMD before PASS; grep Research 110 Ciot Plasma/Cold tier explicitly; prediction ≠ ceiling — do not anchor perf ceilings pessimistically, mark them as pending the GOAT gate)**. **Parity / "already ships" quality claims need a defend-wrong PoC in `riir-ai/crates/riir-poc/` (§3.6) — architectural coverage ≠ quality parity; a PASS backed only by architectural reasoning is the #1 false-PASS failure mode.** **R442 value-extraction rule (§1.55) — Pass is not "no files"; scan for cherry-pickable gains (config tuning, design principles, composition schedules, validation targets, failure-mode exposures, regime insights) BEFORE the verdict; if gains exist, short PASS-with-gains note + issues are mandatory. A lazy Pass that skips value extraction is the #1 missed-gain failure mode.**
+**Failure-mode prophylactics:** vocabulary translation blocks below (semantic + compute-unit + DEC/Stokes + per-NPC runtime + **substrate-translation for hardware papers**); read-the-hits rule (grep hit touching per-NPC+memory+personality+swap → `read_file` TL;DR before claiming novelty); 7 Super-GOAT factory modules; R169 false-trigger guard (decision-structure ≠ LLM-dependent process); **R418 hardware-paper guard (substrate ≠ value — hardware / NMP / ASIC / PIM papers MUST translate the technique to software SIMD before PASS; grep Research 110 Ciot Plasma/Cold tier explicitly; prediction ≠ ceiling — do not anchor perf ceilings pessimistically, mark them as pending the GOAT gate)**. **Parity / "already ships" quality claims need a defend-wrong PoC in `riir-ai/crates/riir-poc/` (§3.6) — architectural coverage ≠ quality parity; a PASS backed only by architectural reasoning is the #1 false-PASS failure mode.** **R443 gain-threshold rule (§1.55) — Pass defaults to NO files. Scan for gains, but apply the three-part threshold strictly (concrete + evidence-backed + actionable). "Validates our design" / "design principle" / "validation target" are observations, NOT gains. Only genuine config contradictions, unblockers, or unmitigated failure modes trigger files. Anti-streak rule: 3+ consecutive PASSes → must attempt latent reframe + fusion in writing before PASSing again.**
