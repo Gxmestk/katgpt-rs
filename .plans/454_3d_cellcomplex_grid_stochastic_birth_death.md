@@ -146,35 +146,33 @@ pub fn graph_laplacian_into(cx, potential, output) {
 - [x] Do NOT add to `default` — promotion requires the GOAT gate below
 
 ### T7: GOAT gate — replace SA/V with size-normalized roughness ratio
-- [ ] New bench `benches/bench_454_3d_nca_goat.rs` behind `required-features = ["grid_3d"]`
-- [ ] **Four competitors** (the §3.6 minimum is 3; run 4 for the ablation, mirroring the Issue 155 PoC):
+- [x] New bench `benches/bench_454_3d_nca_goat.rs` behind `required-features = ["grid_3d"]`
+- [x] **Four competitors** (frozen + det3D + NCA3D for the ablation table; det2D folded into the G4a stencil-ratio comparison):
   1. Frozen baseline (seed only, no evolution — lower bound)
-  2. Deterministic 2D diffusion (`grid_2d` + 5-point stencil — the incumbent)
+  2. Deterministic 2D diffusion — folded into G4a (2D stencil timing baseline)
   3. Deterministic 3D diffusion (`grid_3d` + 7-point stencil, NO birth/death — isolates the birth/death contribution)
   4. Full 3D NCA (`grid_3d` + 7-point stencil + `stochastic_birth_death_step`)
-- [ ] **Grid**: 24×24×24 = 13,824 voxels (matches the Issue 155 PoC — comparability)
-- [ ] **Steps**: 100 (matches the PoC)
-- [ ] **Gates** (all must pass to promote to default-on):
+- [x] **Grid**: 24×24×24 = 13,824 voxels (matches the Issue 155 PoC — comparability)
+- [x] **Steps**: 100 (matches the PoC)
+- [x] **Gates** — see `.benchmarks/454_3d_nca_goat.md` for full results:
 
-  - [ ] **G1a (growth reach):** competitor 4 reach ≥ 3× competitor 3 reach (deterministic 3D diffusion). PoC showed 6× (12 vs 2). **PASS threshold: ≥ 3×.** Reach = max Chebyshev distance from seed after N ticks.
-  - [ ] **G1b (structural complexity — corrected metric):** competitor 4 **size-normalized roughness ratio** ≥ 1.5× competitor 3. **This replaces the size-dependent SA/V metric that was INCONCLUSIVE in the PoC.** The corrected metric:
-    - `roughness = actual_surface_area / sphere_surface_area_of_same_volume`
-    - where `sphere_surface_area = 4π · r²` and `r = (3·volume / (4π))^(1/3)`
-    - A solid block has `roughness ≈ 1.0` (minimal surface for its volume — a sphere is the theoretical min, a cube is ~1.24×). A branched/coral structure has `roughness >> 1.0`. **Size-normalized**: comparing roughness across competitors controls for total volume, so a 13793-voxel solid block (PoC run 1) and a 33-voxel blob (competitor 3) are compared on shape, not size.
-    - **PASS threshold: ≥ 1.5×.** If competitor 4 fills the grid solidly (PoC run 1: roughness ≈ 0.8× competitor 3 because the block is bigger and smoother), the gate FAILS — parameter tuning is needed (lower `birth_rate`, higher `consumption_rate`, or higher `dropout_prob`) to hit the branched regime. The PoC's run 2 (consumption-balanced) is the parameter target.
-  - [ ] **G2 (regeneration after damage):** destroy an 8×8×8 region at the center of a converged competitor-4 structure, run 40 re-growth steps, measure `% of originally-alive voxels regrown`. PoC showed 100%. **PASS threshold: ≥ 80%.** Competitor 3 (deterministic diffusion) cannot regenerate — it only smooths the damage (PASS requires competitor 4 >> competitor 3).
-  - [ ] **G3 (no-regression):** `cargo clippy --all-targets --features grid_3d` clean in katgpt-dec; existing 2D tests + the `GridDims` back-compat accessor tests pass unchanged.
-  - [ ] **G4 (latency):** 3D 7-point stencil per-vertex latency within 2× of the 2D 5-point stencil per-vertex (the 7-point does 6 neighbor reads vs 5-point's 4; expect ~1.5×). Birth/death step adds < 20% overhead on top of the Laplacian. Measure with `criterion` on a 32³ grid.
-  - [ ] **G5 (zero-alloc):** `stochastic_birth_death_step` scratch buffers reused across 100+ ticks — 0 bytes steady-state allocation (use the `GlobalAlloc` counter pattern from the `evolve_motor_gated_field` zero-alloc test).
-  - [ ] **G6 (determinism):** fixed-seed `SplitMix64` → bit-identical `field.data` across 10 runs (the quorum-safety gate — the whole point of modelless + fixed PRNG).
+  - [x] **G1a (growth reach):** ✅ PASS — competitor 4 reach = 12 vs competitor 3 reach = 2, ratio = 6.0× (gate ≥ 3×). Matches the PoC.
+  - [x] **G1b (structural complexity):** ❌ FAIL — best ratio = 0.83× across a 420-combo sweep (birth×consumption×dropout×threshold). No parameter regime produces branched morphology — the modelless update rule either fills the grid solid or kills growth. Branched morphology needs a learned update rule (→ riir-train follow-up).
+  - [x] **G2 (regeneration):** ✅ PASS — 100.0% regrowth after 8×8×8 center destruction + 40 steps (gate ≥ 80%).
+  - [x] **G3 (no-regression):** ✅ PASS — clippy clean, 185 2D baseline tests unchanged.
+  - [x] **G4a (stencil latency):** ✅ PASS — 3D/2D per-vertex ratio = 1.73× (gate ≤ 2×).
+  - [x] **G4b (birth/death overhead):** ❌ FAIL — 123.7% overhead (gate < 20%). The 5-step update does 5 additional full-grid passes; the 20% gate was written before T4 revealed the 5-step structure. See `.benchmarks/454_3d_nca_goat.md` for the fusion optimization opportunity.
+  - [x] **G5 (zero-alloc):** ✅ PASS — 0 allocations in 100 ticks (scratch-buffer design works).
+  - [x] **G6 (determinism):** ✅ PASS — bit-identical across 10 runs (same seed).
 
-- [ ] **Verdict rule:** G1a + G1b + G2 + G6 must ALL pass for the Gain to hold. G3/G4/G5 are engineering gates (must pass for promotion, but don't refute the gain if they fail — they just block promotion). If G1b FAILS at the default parameters, sweep `birth_rate ∈ [0.01, 0.20]` × `consumption_rate ∈ [0.0, 0.10]` × `dropout_prob ∈ [0.0, 0.5]` to find the branched regime before declaring the gain refuted. The PoC proved the mechanism class; the morphology is parameter-tuning-dependent.
+- [x] **Verdict:** GAIN FAILS (G1b blocks). G1a ✅ + G2 ✅ + G6 ✅ confirm the mechanism class (reach + regeneration); G1b ❌ refutes the branched-morphology claim under the modelless constraint. The sweep was expanded beyond the plan's 3-parameter spec (added `alive_threshold`) — still no branched regime found.
 
 ### T8: Promotion decision (post-GOAT)
-- [ ] If G1a + G1b + G2 + G3 + G4 + G5 + G6 ALL pass → add `grid_3d` to `default` in `katgpt-dec/Cargo.toml`
-- [ ] Update `katgpt-dec/Cargo.toml` feature-flag comment with the GOAT result
-- [ ] Update `katgpt-dec/README.md` with a 3D-grid section
-- [ ] If G1b cannot be made to pass (no parameter regime produces branched structures) → keep `grid_3d` opt-in, note in the Cargo.toml comment that morphology needs a learned update rule (→ riir-train Issue 004 follow-up). The reach + regeneration gain still holds; only the branched-morphology claim is refuted.
+- [x] G1a + G1b + G2 + G3 + G4 + G5 + G6 do NOT all pass (G1b + G4b fail) → do NOT add `grid_3d` to `default`
+- [x] G1b fallback path taken: keep `grid_3d` opt-in. Morphology needs a learned update rule (→ riir-train follow-up). The reach (6×) + regeneration (100%) gains hold; only the branched-morphology claim is refuted.
+- [x] Results recorded in `.benchmarks/454_3d_nca_goat.md`
+- [-] Update `katgpt-dec/Cargo.toml` feature-flag comment — deferred (the existing comment already says "DEFAULT-OFF until GOAT G1–G6 pass"; G1b+G4b fail so it stays off, which the comment already reflects)
+- [-] Update `katgpt-dec/README.md` with a 3D-grid section — deferred (no promotion, no README change needed)
 
 ### T9 (deferred — out of scope for this plan): civ engine wiring
 - [ ] **Tracked in Issue 155 T4, NOT here.** Wire `grid_3d` + `stochastic_birth_death_step` into the civ engine's `CIV_SPECS` city-growth demand cochains (`riir-ai/crates/riir-engine/...`). The civ engine consumes `argmax_block_type` output (categorical block classes) as the spatial dynamics for `city_found` / `city_develop` / `city_specialize`. This is a consumer-side change in `riir-ai`, gated on T8 promotion.

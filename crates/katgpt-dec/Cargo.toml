@@ -103,3 +103,8 @@ required-features = ["sheaf_admm"]
 name = "bench_422_cochain_point_sampler_goat"
 harness = false
 required-features = ["cochain_point_sampler"]
+
+[[bench]]
+name = "bench_454_3d_nca_goat"
+harness = false
+required-features = ["grid_3d"]
