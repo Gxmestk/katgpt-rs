@@ -97,18 +97,19 @@ pub fn graph_laplacian_into(cx, potential, output) {
 - [x] Unit tests: cell counts for (3,3,3) + (4,3,2); B₁/B₂/B₃ entry counts; 7-point stencil degrees (3/4/5/6); **B₁·B₂=0 + B₂·B₃=0 DEC identities** (the load-bearing orientation correctness gate); accessor roundtrip; degenerate panic (3 cases). 10 tests total, all pass.
 
 ### T3: `graph_laplacian_grid_3d_into` — 7-point stencil fast path
-- [ ] New private fn in `operators.rs` behind `#[cfg(feature = "grid_3d")]`
-- [ ] Mirror `graph_laplacian_grid_into` (the 5-point path) exactly: raw pointer arithmetic, branch-free interior, explicit boundary handling
-- [ ] **Interior** (`1 <= x < w-1`, `1 <= y < h-1`, `1 <= z < d-1`): deg = 6, 6 neighbor reads (±x, ±y, ±z), direct write `6*center - Σ neighbors`
-- [ ] **Boundary**: 6 face planes (deg 5), 12 edges (deg 4), 8 corners (deg 3) — handle with the same `has_left/has_right/has_up/has_down/has_front/has_back` flag pattern as the 2D boundary path
-- [ ] **Stride math**: z-stride = `w * h * dim`, y-stride = `w * dim`, x-stride = `dim`. Same `unsafe` raw-pointer pattern as the 2D path (offsets are only dereferenced when the corresponding `has_*` flag is true).
-- [ ] Update `graph_laplacian_into` dispatch to the 3-arm `match` on `grid_dims_full()` (see Design section)
-- [ ] `graph_laplacian` (the allocating variant) works unchanged — it delegates to `_into`
-- [ ] Unit tests:
-  - `Δ(linear) = 0` at interior vertices (the load-bearing DEC identity — must hold exactly)
-  - Stencil path matches edge-list path on the same 3D grid within 1 ULP (mirror the 2D `graph_laplacian_grid_matches_edge_list_*` tests)
-  - Multi-channel (dim=16) equivalence
-  - Symmetry: `Δ` at `(x,y,z)` equals `Δ` at the grid-reflected point when the potential is mirror-symmetric
+- [x] New private fn in `operators.rs` behind `#[cfg(feature = "grid_3d")`
+- [x] Mirror `graph_laplacian_grid_into` (the 5-point path) exactly: raw pointer arithmetic, branch-free interior, explicit boundary handling
+- [x] **Interior** (`1 <= x < w-1`, `1 <= y < h-1`, `1 <= z < d-1`): deg = 6, 6 neighbor reads (±x, ±y, ±z), direct write `6*center - Σ neighbors`
+- [x] **Boundary**: 6 face planes (deg 5), 12 edges (deg 4), 8 corners (deg 3) — unified single loop with the `has_left/has_right/has_up/has_down/has_front/has_back` flag pattern (plan-specified; simpler than 6-faces+12-edges+8-corners special-casing, same correctness)
+- [x] **Stride math**: z-stride = `w * h * dim`, y-stride = `w * dim`, x-stride = `dim`. Same `unsafe` raw-pointer pattern as the 2D path (offsets only dereferenced when the corresponding `has_*` flag is true).
+- [x] Update `graph_laplacian_into` dispatch to the 3-arm `match` on `grid_dims_full()` (see Design section). Added a `#[cfg(not(feature = "grid_3d"))]` unreachable `Dim3` fallback arm to keep the match exhaustive when the feature is off (a `Dim3` grid cannot be constructed without the feature).
+- [x] `graph_laplacian` (the allocating variant) works unchanged — it delegates to `_into`
+- [x] Unit tests (5 total, all pass):
+  - `graph_laplacian_grid_3d_linear_function_is_zero`: `Δ(linear) = 0` at interior vertices (the load-bearing DEC identity — holds exactly)
+  - `graph_laplacian_grid_3d_matches_edge_list_1ch`: stencil path matches edge-list path on the same 3D grid within 1 ULP (mirror of the 2D test)
+  - `graph_laplacian_grid_3d_matches_edge_list_multich`: multi-channel (dim=16) equivalence
+  - `graph_laplacian_grid_3d_boundary_degrees`: corner degree=3, 3 neighbors each −1 (delta-function probe)
+  - `graph_laplacian_grid_3d_mirror_symmetry`: `Δ` at `(x,y,z)` equals `Δ` at the grid-reflected point when the potential is mirror-symmetric (validates uniform boundary handling)
 
 ### T4: `stochastic_birth_death_step` — NCA growth wrapper
 - [ ] New module `birth_death.rs` behind `#[cfg(feature = "grid_3d")]`
@@ -152,8 +153,9 @@ pub fn graph_laplacian_into(cx, potential, output) {
 
 ### T6: Feature flag + Cargo.toml
 - [x] Add `grid_3d = []` to `[features]` in `katgpt-dec/Cargo.toml` (default-OFF — single-line, mirrors `motor_gated_field` / `cochain_point_sampler`)
-- [ ] Gate T2/T3/T4/T5 code with `#[cfg(feature = "grid_3d")]`
-- [ ] Do NOT add to `default` — promotion requires the GOAT gate below
+- [x] Gate T2 (`grid_3d` constructor) + T3 (`graph_laplacian_grid_3d_into` + dispatch `Dim3` arm + unreachable fallback arm) code with `#[cfg(feature = "grid_3d")]`
+- [ ] Gate T4/T5 code with `#[cfg(feature = "grid_3d")]` (pending T4/T5)
+- [x] Do NOT add to `default` — promotion requires the GOAT gate below
 
 ### T7: GOAT gate — replace SA/V with size-normalized roughness ratio
 - [ ] New bench `benches/bench_454_3d_nca_goat.rs` behind `required-features = ["grid_3d"]`

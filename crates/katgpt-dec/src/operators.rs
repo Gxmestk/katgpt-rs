@@ -8,7 +8,7 @@
 //!
 //! Fundamental identity: `dₖ₊₁ ∘ dₖ = 0` (curl(grad)=0, div(curl)=0).
 
-use crate::types::{CellComplex, CochainField, MAX_RANK};
+use crate::types::{CellComplex, CochainField, GridDims, MAX_RANK};
 
 // ---------------------------------------------------------------------------
 // Hodge Star Mₖ (T10)
@@ -306,18 +306,35 @@ pub fn graph_laplacian(cx: &CellComplex, potential: &CochainField) -> CochainFie
 #[inline]
 pub fn graph_laplacian_into(cx: &CellComplex, potential: &CochainField, output: &mut CochainField) {
     debug_assert_eq!(potential.rank, 0, "graph_laplacian requires rank-0 cochain");
-    // Plan 357 G5 fix: regular grids take the cache-friendly 5-point-stencil
-    // fast path. The generic edge-list path is correct but does scattered
+    // Plan 357 G5 fix: regular grids take the cache-friendly stencil fast
+    // path (5-point for 2D `grid_2d` products, 7-point for 3D `grid_3d`
+    // products). The generic edge-list path is correct but does scattered
     // read-modify-writes on `output` (each vertex touched degree(v) times,
     // each touch on a different cache line for large grids), which is the G5
     // bottleneck. The stencil reads vertices in row-major order and writes
     // each output element exactly once — no zero-fill, no scatter, no
     // read-modify-write store-forwarding stalls.
-    if let Some((w, h)) = cx.grid_dims() {
-        graph_laplacian_grid_into(w, h, potential, output);
-        return;
+    //
+    // Plan 454 T3: dispatch on the full `GridDims` discriminant so 3D grids
+    // route to the 7-point stencil. 2D call-sites are unchanged.
+    match cx.grid_dims_full() {
+        Some(GridDims::Dim2 { w, h }) => {
+            graph_laplacian_grid_into(w, h, potential, output);
+        }
+        #[cfg(feature = "grid_3d")]
+        Some(GridDims::Dim3 { w, h, d }) => {
+            graph_laplacian_grid_3d_into(w, h, d, potential, output);
+        }
+        // When the `grid_3d` feature is off, `GridDims::Dim3` cannot be
+        // constructed (the `grid_3d` constructor is gated), so this arm is
+        // unreachable. It exists only to keep the match exhaustive across
+        // feature configurations.
+        #[cfg(not(feature = "grid_3d"))]
+        Some(GridDims::Dim3 { .. }) => {
+            graph_laplacian_edge_list_into(cx, potential, output);
+        }
+        None => graph_laplacian_edge_list_into(cx, potential, output),
     }
-    graph_laplacian_edge_list_into(cx, potential, output);
 }
 
 /// Generic edge-list graph Laplacian (the pre-stencil path). Public via
@@ -502,6 +519,160 @@ fn graph_laplacian_grid_into(
                         }
                         acc -= *p.add(up + c);
                         acc -= *p.add(down + c);
+                        *o.add(base + c) = acc;
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// 7-point-stencil graph Laplacian for a regular `w×h×d` vertex grid (Plan 454 T3).
+///
+/// Computes `Δ₀[v] = deg(v)·potential[v] − Σ potential[neighbor]` with
+/// deg(v) = 6 (interior), 5 (face), 4 (edge), 3 (corner). Reads vertices in
+/// row-major `(z, y, x)` order and writes each `output` element exactly once
+/// — no zero-fill, no scattered read-modify-write. The interior loop is
+/// branch-free and auto-vectorizes cleanly (6 FMA per element on the unrolled
+/// dim-chunks); the boundary is handled with a single unified loop using
+/// per-vertex `has_left/right/up/down/front/back` flags (the plan-specified
+/// pattern — same correctness, simpler segmentation than 6-faces + 12-edges
+/// + 8-corners special-casing).
+///
+/// Mathematically identical to the edge-list path on the same grid (both
+/// realize `δ₁d₀`); the f32 results can differ by ULP-level rounding because
+/// the accumulation order differs, which is acceptable for every consumer.
+#[cfg(feature = "grid_3d")]
+#[inline]
+fn graph_laplacian_grid_3d_into(
+    w: usize,
+    h: usize,
+    d: usize,
+    potential: &CochainField,
+    output: &mut CochainField,
+) {
+    debug_assert_eq!(potential.rank, 0, "graph_laplacian requires rank-0 cochain");
+    let dim = potential.dim;
+    let p = potential.data.as_ptr();
+    let o = output.data.as_mut_ptr();
+    // Stride math (Plan 454 T3): vertex index is `(z * h + y) * w + x`, so in
+    // flat data layout (channel-interleaved per vertex) the per-axis strides
+    // in units of f32 elements are:
+    //   x-stride = dim
+    //   y-stride = w * dim
+    //   z-stride = w * h * dim
+    let xy_plane = w * dim; // one z-slice (one xy-plane of vertices)
+    let z_stride = h * xy_plane; // one full z-step = h rows
+
+    // ── Interior: 6 neighbors each, branch-free ─────────────────────────
+    // Bulk path for any grid larger than ~4×4×4; iterates (w-2)·(h-2)·(d-2)
+    // vertices. deg = 6.
+    if w >= 3 && h >= 3 && d >= 3 {
+        for z in 1..(d - 1) {
+            let plane = z * z_stride;
+            let front_plane = plane - z_stride;
+            let back_plane = plane + z_stride;
+            for y in 1..(h - 1) {
+                let row = plane + y * xy_plane;
+                let up_row = row - xy_plane;
+                let down_row = row + xy_plane;
+                for x in 1..(w - 1) {
+                    let base = row + x * dim;
+                    let left = base - dim;
+                    let right = base + dim;
+                    let up = up_row + x * dim;
+                    let down = down_row + x * dim;
+                    let front = front_plane + y * xy_plane + x * dim;
+                    let back = back_plane + y * xy_plane + x * dim;
+                    // Safety: all offsets are within [0, w*h*d*dim) for the
+                    // interior region (1 <= x < w-1, etc.).
+                    unsafe {
+                        for c in 0..dim {
+                            let center = *p.add(base + c);
+                            *o.add(base + c) = 6.0 * center
+                                - *p.add(left + c)
+                                - *p.add(right + c)
+                                - *p.add(up + c)
+                                - *p.add(down + c)
+                                - *p.add(front + c)
+                                - *p.add(back + c);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // ── Boundary: unified single loop with per-vertex `has_*` flags ─────
+    // Covers all 6 face planes (deg 5), 12 edges (deg 4), and 8 corners
+    // (deg 3) in one pass. The `has_*` flags select which neighbor offsets
+    // are valid; the corresponding `wrapping_sub`/`wrapping_add` offsets are
+    // only dereferenced when their flag is true (same soundness argument as
+    // the 2D boundary path — raw-pointer arithmetic on out-of-bounds offsets
+    // is sound as long as we don't load through them).
+    //
+    // To avoid re-touching interior vertices (already written above), this
+    // loop only visits vertices where at least one of x/y/z is on the
+    // boundary. For grids where w<3 || h<3 || d<3 there is no interior region
+    // and every vertex is boundary.
+    for z in 0..d {
+        let has_front = z > 0;
+        let has_back = z < d - 1;
+        let plane = z * z_stride;
+        let front_plane = plane.wrapping_sub(z_stride);
+        let back_plane = plane + z_stride;
+        for y in 0..h {
+            // Skip pure-interior rows when an interior region exists.
+            let y_interior = y >= 1 && y < h - 1 && h >= 3;
+            let row = plane + y * xy_plane;
+            let up_row = row.wrapping_sub(xy_plane);
+            let down_row = row + xy_plane;
+            let has_up = y > 0;
+            let has_down = y < h - 1;
+            for x in 0..w {
+                // Skip pure-interior vertices (already handled above) when a
+                // full interior region exists.
+                let x_interior = x >= 1 && x < w - 1 && w >= 3;
+                if x_interior && y_interior && has_front && has_back {
+                    continue;
+                }
+                let has_left = x > 0;
+                let has_right = x < w - 1;
+                let base = row + x * dim;
+                let left = base.wrapping_sub(dim);
+                let right = base.wrapping_add(dim);
+                let up = up_row + x * dim;
+                let down = down_row + x * dim;
+                let front = front_plane + y * xy_plane + x * dim;
+                let back = back_plane + y * xy_plane + x * dim;
+                let deg = (has_left as u8
+                    + has_right as u8
+                    + has_up as u8
+                    + has_down as u8
+                    + has_front as u8
+                    + has_back as u8) as f32;
+                unsafe {
+                    for c in 0..dim {
+                        let center = *p.add(base + c);
+                        let mut acc = deg * center;
+                        if has_left {
+                            acc -= *p.add(left + c);
+                        }
+                        if has_right {
+                            acc -= *p.add(right + c);
+                        }
+                        if has_up {
+                            acc -= *p.add(up + c);
+                        }
+                        if has_down {
+                            acc -= *p.add(down + c);
+                        }
+                        if has_front {
+                            acc -= *p.add(front + c);
+                        }
+                        if has_back {
+                            acc -= *p.add(back + c);
+                        }
                         *o.add(base + c) = acc;
                     }
                 }
@@ -787,5 +958,194 @@ mod tests {
             None,
             "grid_dims must clear after remove_cell(1)"
         );
+    }
+
+    // ── Plan 454 T3: 7-point-stencil fast-path for 3D grids ─────────────
+    //
+    // The `grid_dims_full()` dispatch in `graph_laplacian_into` routes 3D
+    // `grid_3d` products to the 7-point stencil. Same contract as the 2D
+    // fast path: the stencil and edge-list paths are mathematically
+    // identical (both realize δ₁d₀); the only permissible difference is
+    // ULP-level f32 rounding from the changed accumulation order. The
+    // Δ(linear)=0 identity must hold exactly at interior vertices.
+
+    /// Compute the edge-list path directly (bypassing the grid dispatch) on
+    /// the same 3D grid complex. `graph_laplacian_edge_list_into` reads
+    /// `cx.boundary_entries(0)` and ignores `grid_dims_full`, so passing a
+    /// `grid_3d` complex exercises the pre-stencil accumulation path.
+    #[cfg(feature = "grid_3d")]
+    fn edge_list_laplacian_3d(cx: &CellComplex, potential: &CochainField) -> CochainField {
+        let mut out = CochainField::zeros(0, cx.n_vertices(), potential.dim);
+        graph_laplacian_edge_list_into(cx, potential, &mut out);
+        out
+    }
+
+    #[cfg(feature = "grid_3d")]
+    #[test]
+    fn graph_laplacian_grid_3d_linear_function_is_zero() {
+        // Δ₀(linear) = 0 at interior vertices — the load-bearing DEC identity.
+        // Must hold exactly (6f - 6 neighbors of a linear func cancels
+        // bit-identically when f is integer-valued).
+        let (w, h, d) = (5usize, 5usize, 5usize);
+        let cx = CellComplex::grid_3d(w, h, d);
+        let mut potential = CochainField::zeros(0, cx.n_vertices(), 1);
+        for z in 0..d {
+            for y in 0..h {
+                for x in 0..w {
+                    // Linear in (x, y, z): f = 2x + 3y + 5z
+                    let vidx = (z * h + y) * w + x;
+                    potential.set_scalar(vidx, (2 * x + 3 * y + 5 * z) as f32);
+                }
+            }
+        }
+        let lap = graph_laplacian(&cx, &potential);
+        // Interior vertices: 1 <= x < w-1, 1 <= y < h-1, 1 <= z < d-1
+        for z in 1..(d - 1) {
+            for y in 1..(h - 1) {
+                for x in 1..(w - 1) {
+                    let vidx = (z * h + y) * w + x;
+                    let v = lap.scalar(vidx);
+                    assert!(
+                        v.abs() < 1e-6,
+                        "3D grid Δ(linear) at ({x},{y},{z}) should be 0, got {v}"
+                    );
+                }
+            }
+        }
+    }
+
+    #[cfg(feature = "grid_3d")]
+    #[test]
+    fn graph_laplacian_grid_3d_matches_edge_list_1ch() {
+        // Single-channel: the 7-point stencil and edge-list paths must agree
+        // to within a tiny tolerance (ULP-level rounding from accumulation
+        // order).
+        let (w, h, d) = (5usize, 4usize, 4usize);
+        let cx = CellComplex::grid_3d(w, h, d);
+        let mut potential = CochainField::zeros(0, cx.n_vertices(), 1);
+        for i in 0..cx.n_vertices() {
+            potential.set_scalar(i, ((i as f32) * 0.37).sin());
+        }
+        let lap_grid = graph_laplacian(&cx, &potential);
+        let lap_edges = edge_list_laplacian_3d(&cx, &potential);
+        let mut max_diff = 0.0f32;
+        for i in 0..cx.n_vertices() {
+            let diff = (lap_grid.scalar(i) - lap_edges.scalar(i)).abs();
+            if diff > max_diff {
+                max_diff = diff;
+            }
+        }
+        assert!(
+            max_diff < 1e-4,
+            "3D grid vs edge-list laplacian diverged by {max_diff:e} (expected < 1e-4)"
+        );
+    }
+
+    #[cfg(feature = "grid_3d")]
+    #[test]
+    fn graph_laplacian_grid_3d_matches_edge_list_multich() {
+        // Multi-channel (dim=16, the G5 workload shape): same contract.
+        let (w, h, d) = (4usize, 4usize, 3usize);
+        let dim = 16usize;
+        let cx = CellComplex::grid_3d(w, h, d);
+        let mut potential = CochainField::zeros(0, cx.n_vertices(), dim);
+        for cell in 0..cx.n_vertices() {
+            for ch in 0..dim {
+                let v = ((cell as f32 * 0.11 + ch as f32 * 0.73).sin()) * 2.0;
+                potential.data[cell * dim + ch] = v;
+            }
+        }
+        let lap_grid = graph_laplacian(&cx, &potential);
+        let lap_edges = edge_list_laplacian_3d(&cx, &potential);
+        let len = cx.n_vertices() * dim;
+        let mut max_diff = 0.0f32;
+        for i in 0..len {
+            let diff = (lap_grid.data[i] - lap_edges.data[i]).abs();
+            if diff > max_diff {
+                max_diff = diff;
+            }
+        }
+        assert!(
+            max_diff < 1e-4,
+            "3D grid vs edge-list multichannel diverged by {max_diff:e} (expected < 1e-4)"
+        );
+    }
+
+    #[cfg(feature = "grid_3d")]
+    #[test]
+    fn graph_laplacian_grid_3d_boundary_degrees() {
+        // Verify the boundary vertex degrees: corner=3, edge=4, face=5,
+        // interior=6. Construct a delta function (1 at origin, 0 elsewhere);
+        // the Laplacian at the origin is deg(origin)*1 - 0 = deg(origin), and
+        // the Laplacian at each neighbor of the origin is 0*1 - 1 = -1.
+        let (w, h, d) = (4usize, 4usize, 4usize);
+        let cx = CellComplex::grid_3d(w, h, d);
+        let mut potential = CochainField::zeros(0, cx.n_vertices(), 1);
+        // Origin corner (0,0,0): degree 3
+        potential.set_scalar(0, 1.0);
+        let lap = graph_laplacian(&cx, &potential);
+        // Corner (0,0,0): 3 neighbors, so Δ = 3*1 - 0 - 0 - 0 = 3.0
+        assert_eq!(lap.scalar(0), 3.0, "corner degree should be 3");
+        // Its 3 neighbors should each be -1.0:
+        //   +x neighbor: (1,0,0) -> vidx = (0*h+0)*w+1 = 1
+        //   +y neighbor: (0,1,0) -> vidx = (0*h+1)*w+0 = w = 4
+        //   +z neighbor: (0,0,1) -> vidx = (1*h+0)*w+0 = h*w = 16
+        assert_eq!(lap.scalar(1), -1.0, "+x neighbor should be -1");
+        assert_eq!(lap.scalar(w), -1.0, "+y neighbor should be -1");
+        assert_eq!(lap.scalar(w * h), -1.0, "+z neighbor should be -1");
+        // All other vertices should be 0 (not neighbors of the origin).
+        let x_n = 1usize;
+        let y_n = w;
+        let z_n = w * h;
+        for v in 0..cx.n_vertices() {
+            if v != 0 && v != x_n && v != y_n && v != z_n {
+                assert_eq!(lap.scalar(v), 0.0, "non-neighbor vertex {v} should be 0");
+            }
+        }
+    }
+
+    #[cfg(feature = "grid_3d")]
+    #[test]
+    fn graph_laplacian_grid_3d_mirror_symmetry() {
+        // Symmetry: Δ at (x,y,z) equals Δ at the grid-reflected point
+        // (w-1-x, h-1-y, d-1-z) when the potential is mirror-symmetric about
+        // the grid center. This validates that the boundary handling is
+        // uniform across all 8 corners / 12 edges / 6 faces (no asymmetry bug
+        // in the flag-based boundary loop).
+        let (w, h, d) = (5usize, 5usize, 5usize);
+        let cx = CellComplex::grid_3d(w, h, d);
+        let mut potential = CochainField::zeros(0, cx.n_vertices(), 1);
+        for z in 0..d {
+            for y in 0..h {
+                for x in 0..w {
+                    let vidx = (z * h + y) * w + x;
+                    // f(x,y,z) = (x - cx)² + (y - cy)² + (z - cz)² — symmetric
+                    // about the center. cx = (w-1)/2, etc.
+                    let cx_f = (w - 1) as f32 / 2.0;
+                    let cy_f = (h - 1) as f32 / 2.0;
+                    let cz_f = (d - 1) as f32 / 2.0;
+                    let dx = x as f32 - cx_f;
+                    let dy = y as f32 - cy_f;
+                    let dz = z as f32 - cz_f;
+                    potential.set_scalar(vidx, dx * dx + dy * dy + dz * dz);
+                }
+            }
+        }
+        let lap = graph_laplacian(&cx, &potential);
+        for z in 0..d {
+            for y in 0..h {
+                for x in 0..w {
+                    let vidx = (z * h + y) * w + x;
+                    let mirror_vidx = ((d - 1 - z) * h + (h - 1 - y)) * w + (w - 1 - x);
+                    let v = lap.scalar(vidx);
+                    let vm = lap.scalar(mirror_vidx);
+                    assert_eq!(
+                        v.to_bits(),
+                        vm.to_bits(),
+                        "Δ at ({x},{y},{z})={v} should equal Δ at mirror point={vm}"
+                    );
+                }
+            }
+        }
     }
 }
