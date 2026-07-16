@@ -66,9 +66,9 @@ Q3 + Q4 fail → Gain, not Super-GOAT. No private guide created. Plan-only if pu
 ## Tasks
 
 - [x] **T1** Run the PoC (§3.6) — results recorded below. Gain CONFIRMED on reach (6×) + regeneration (100%); morphology INCONCLUSIVE (parameter sweet spot narrow).
-- [ ] **T2** G1a+G2 PASS → spec `CellComplex::grid_3d` + `graph_laplacian_grid_3d_into` + `stochastic_birth_death_step` in a Plan. The plan's GOAT gate should replace the SA/V metric with a size-normalized roughness ratio (actual_surface / sphere_surface_of_same_volume).
-- [ ] **T3** (deferred to plan) Implement behind `grid_3d` feature flag in `katgpt-dec`.
-- [ ] **T4** (deferred to plan) Wire into civ engine `CIV_SPECS` city-growth demand cochains.
+- [x] **T2** G1a+G2 PASS → spec `CellComplex::grid_3d` + `graph_laplacian_grid_3d_into` + `stochastic_birth_death_step` in a Plan. The plan's GOAT gate replaces the SA/V metric with a size-normalized roughness ratio (actual_surface / sphere_surface_of_same_volume). **Plan 454 written** (`katgpt-rs/.plans/454_3d_cellcomplex_grid_stochastic_birth_death.md`).
+- [ ] **T3** (deferred to Plan 454 T1-T6) Implement behind `grid_3d` feature flag in `katgpt-dec`.
+- [ ] **T4** (deferred to Plan 454 T9) Wire into civ engine `CIV_SPECS` city-growth demand cochains.
 
 ## PoC Results (T1 — run 2026-07-16, §3.6 defend-wrong)
 
