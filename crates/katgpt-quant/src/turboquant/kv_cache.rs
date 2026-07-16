@@ -19,14 +19,16 @@ pub struct TurboQuantKVCache {
     // ── Vec fields first (24 bytes, 8-byte aligned) ──
     /// Per-layer quantization state (rotation matrix + codebooks).
     pub layers: Vec<TurboQuantLayer>,
-    /// Bit-packed key indices: layers × positions × packed_coords.
-    key_indices: Vec<Vec<Vec<u8>>>,
-    /// Per-position key norms (for reconstruction).
-    key_norms: Vec<Vec<f32>>,
-    /// Bit-packed value indices.
-    val_indices: Vec<Vec<Vec<u8>>>,
-    /// Per-position value norms.
-    val_norms: Vec<Vec<f32>>,
+    /// Bit-packed key indices: flat `[n_layers * max_seq_len * key_packed_len]`.
+    /// Layer-major layout: element `(layer, pos)` is at
+    /// `(layer * max_seq_len + pos) * key_packed_len`.
+    key_indices: Vec<u8>,
+    /// Per-position key norms (for reconstruction): `[n_layers * max_seq_len]`.
+    key_norms: Vec<f32>,
+    /// Bit-packed value indices: flat `[n_layers * max_seq_len * val_packed_len]`.
+    val_indices: Vec<u8>,
+    /// Per-position value norms: `[n_layers * max_seq_len]`.
+    val_norms: Vec<f32>,
     // ── Scratch buffers for zero-alloc hot path (Plan 051) ──
     /// Normalized input: [kv_dim]. Reused across store/dequantize calls.
     scratch_normalized: Vec<f32>,
@@ -46,6 +48,10 @@ pub struct TurboQuantKVCache {
     /// Maximum sequence length.
     #[allow(dead_code)]
     max_seq_len: usize,
+    /// Packed bytes per key position: `packed_len(kv_dim, key_bits)`.
+    key_packed_len: usize,
+    /// Packed bytes per value position: `packed_len(kv_dim, val_bits)`.
+    val_packed_len: usize,
     // ── u8 fields last (packed together, no inter-field padding) ──
     /// Key bits per coordinate.
     key_bits: u8,
@@ -54,6 +60,24 @@ pub struct TurboQuantKVCache {
 }
 
 impl TurboQuantKVCache {
+    /// Byte offset of key data for `(layer, pos)` in the flat `key_indices`.
+    #[inline]
+    fn key_off(&self, layer: usize, pos: usize) -> usize {
+        (layer * self.max_seq_len + pos) * self.key_packed_len
+    }
+
+    /// Byte offset of value data for `(layer, pos)` in the flat `val_indices`.
+    #[inline]
+    fn val_off(&self, layer: usize, pos: usize) -> usize {
+        (layer * self.max_seq_len + pos) * self.val_packed_len
+    }
+
+    /// Flat index of key norm for `(layer, pos)`.
+    #[inline]
+    fn norm_idx(&self, layer: usize, pos: usize) -> usize {
+        layer * self.max_seq_len + pos
+    }
+
     /// Create a new compressed KV cache from config.
     pub fn new(config: &types::Config, key_bits: u8, val_bits: u8) -> Self {
         let n_layers = config.n_layer;
@@ -81,10 +105,10 @@ impl TurboQuantKVCache {
 
         Self {
             layers,
-            key_indices: vec![vec![vec![0u8; packed_key_len]; max_seq_len]; n_layers],
-            key_norms: vec![vec![0.0f32; max_seq_len]; n_layers],
-            val_indices: vec![vec![vec![0u8; packed_val_len]; max_seq_len]; n_layers],
-            val_norms: vec![vec![0.0f32; max_seq_len]; n_layers],
+            key_indices: vec![0u8; n_layers * max_seq_len * packed_key_len],
+            key_norms: vec![0.0f32; n_layers * max_seq_len],
+            val_indices: vec![0u8; n_layers * max_seq_len * packed_val_len],
+            val_norms: vec![0.0f32; n_layers * max_seq_len],
             pos: 0,
             max_used_pos: 0,
             n_layers,
@@ -92,6 +116,8 @@ impl TurboQuantKVCache {
             key_bits,
             val_bits,
             max_seq_len,
+            key_packed_len: packed_key_len,
+            val_packed_len: packed_val_len,
             scratch_normalized: vec![0.0f32; kv_dim],
             scratch_rotated: vec![0.0f32; kv_dim],
             scratch_indices: vec![0u8; kv_dim],
@@ -130,15 +156,13 @@ impl TurboQuantKVCache {
         Self {
             layers,
             key_indices: vec![
-                vec![vec![0u8; packed_key_len]; tq_config.max_seq_len];
-                tq_config.n_layers
+                0u8; tq_config.n_layers * tq_config.max_seq_len * packed_key_len
             ],
-            key_norms: vec![vec![0.0f32; tq_config.max_seq_len]; tq_config.n_layers],
+            key_norms: vec![0.0f32; tq_config.n_layers * tq_config.max_seq_len],
             val_indices: vec![
-                vec![vec![0u8; packed_val_len]; tq_config.max_seq_len];
-                tq_config.n_layers
+                0u8; tq_config.n_layers * tq_config.max_seq_len * packed_val_len
             ],
-            val_norms: vec![vec![0.0f32; tq_config.max_seq_len]; tq_config.n_layers],
+            val_norms: vec![0.0f32; tq_config.n_layers * tq_config.max_seq_len],
             pos: 0,
             max_used_pos: 0,
             n_layers: tq_config.n_layers,
@@ -146,6 +170,8 @@ impl TurboQuantKVCache {
             key_bits: tq_config.key_bits,
             val_bits: tq_config.val_bits,
             max_seq_len: tq_config.max_seq_len,
+            key_packed_len: packed_key_len,
+            val_packed_len: packed_val_len,
             scratch_normalized: vec![0.0f32; tq_config.kv_dim],
             scratch_rotated: vec![0.0f32; tq_config.kv_dim],
             scratch_indices: vec![0u8; tq_config.kv_dim],
@@ -160,7 +186,8 @@ impl TurboQuantKVCache {
 
         // Compute norm via SIMD (avoids scalar iteration)
         let norm = simd_sum_sq(key, self.kv_dim).sqrt();
-        self.key_norms[layer][pos] = norm;
+        let ni = self.norm_idx(layer, pos);
+        self.key_norms[ni] = norm;
 
         if norm < 1e-8 {
             return;
@@ -187,10 +214,11 @@ impl TurboQuantKVCache {
         }
 
         // Pack into existing buffer (zero-alloc)
+        let off = self.key_off(layer, pos);
         pack_indices_into(
             &self.scratch_indices,
             self.key_bits,
-            &mut self.key_indices[layer][pos],
+            &mut self.key_indices[off..off + self.key_packed_len],
         );
     }
 
@@ -202,7 +230,8 @@ impl TurboQuantKVCache {
 
         // Compute norm via SIMD (avoids scalar iteration)
         let norm = simd_sum_sq(value, self.kv_dim).sqrt();
-        self.val_norms[layer][pos] = norm;
+        let ni = self.norm_idx(layer, pos);
+        self.val_norms[ni] = norm;
 
         if norm < 1e-8 {
             return;
@@ -229,22 +258,29 @@ impl TurboQuantKVCache {
         }
 
         // Pack into existing buffer (zero-alloc)
+        let off = self.val_off(layer, pos);
         pack_indices_into(
             &self.scratch_indices,
             self.val_bits,
-            &mut self.val_indices[layer][pos],
+            &mut self.val_indices[off..off + self.val_packed_len],
         );
     }
 
     /// Dequantize key at position. Returns reconstructed key vector.
     pub fn dequantize_key(&self, layer: usize, pos: usize) -> Vec<f32> {
         let layer_state = &self.layers[layer];
-        let norm = self.key_norms[layer][pos];
+        let ni = self.norm_idx(layer, pos);
+        let norm = self.key_norms[ni];
         if norm < 1e-8 {
             return vec![0.0; self.kv_dim];
         }
 
-        let indices = unpack_indices(&self.key_indices[layer][pos], self.key_bits, self.kv_dim);
+        let off = self.key_off(layer, pos);
+        let indices = unpack_indices(
+            &self.key_indices[off..off + self.key_packed_len],
+            self.key_bits,
+            self.kv_dim,
+        );
         let rotated: Vec<f32> = indices
             .iter()
             .map(|&i| layer_state.key_codebook.dequantize(i))
@@ -258,12 +294,18 @@ impl TurboQuantKVCache {
     /// Dequantize value at position. Returns reconstructed value vector.
     pub fn dequantize_value(&self, layer: usize, pos: usize) -> Vec<f32> {
         let layer_state = &self.layers[layer];
-        let norm = self.val_norms[layer][pos];
+        let ni = self.norm_idx(layer, pos);
+        let norm = self.val_norms[ni];
         if norm < 1e-8 {
             return vec![0.0; self.kv_dim];
         }
 
-        let indices = unpack_indices(&self.val_indices[layer][pos], self.val_bits, self.kv_dim);
+        let off = self.val_off(layer, pos);
+        let indices = unpack_indices(
+            &self.val_indices[off..off + self.val_packed_len],
+            self.val_bits,
+            self.kv_dim,
+        );
         let rotated: Vec<f32> = indices
             .iter()
             .map(|&i| layer_state.val_codebook.dequantize(i))
@@ -279,7 +321,8 @@ impl TurboQuantKVCache {
     pub fn dequantize_key_into(&mut self, layer: usize, pos: usize, out: &mut [f32]) {
         debug_assert_eq!(out.len(), self.kv_dim);
         let layer_state = &self.layers[layer];
-        let norm = self.key_norms[layer][pos];
+        let ni = self.norm_idx(layer, pos);
+        let norm = self.key_norms[ni];
 
         if norm < 1e-8 {
             out.fill(0.0);
@@ -287,8 +330,9 @@ impl TurboQuantKVCache {
         }
 
         // Unpack in-place into scratch_indices
+        let off = self.key_off(layer, pos);
         unpack_indices_into(
-            &self.key_indices[layer][pos],
+            &self.key_indices[off..off + self.key_packed_len],
             self.key_bits,
             self.kv_dim,
             &mut self.scratch_indices,
@@ -323,7 +367,8 @@ impl TurboQuantKVCache {
     pub fn dequantize_value_into(&mut self, layer: usize, pos: usize, out: &mut [f32]) {
         debug_assert_eq!(out.len(), self.kv_dim);
         let layer_state = &self.layers[layer];
-        let norm = self.val_norms[layer][pos];
+        let ni = self.norm_idx(layer, pos);
+        let norm = self.val_norms[ni];
 
         if norm < 1e-8 {
             out.fill(0.0);
@@ -331,8 +376,9 @@ impl TurboQuantKVCache {
         }
 
         // Unpack in-place into scratch_indices
+        let off = self.val_off(layer, pos);
         unpack_indices_into(
-            &self.val_indices[layer][pos],
+            &self.val_indices[off..off + self.val_packed_len],
             self.val_bits,
             self.kv_dim,
             &mut self.scratch_indices,
@@ -363,14 +409,15 @@ impl TurboQuantKVCache {
     /// Reset cache for new sequence.
     pub fn reset(&mut self) {
         let used = self.max_used_pos;
-        for layer in 0..self.n_layers {
-            for pos in 0..used {
-                self.key_indices[layer][pos].fill(0);
-                self.key_norms[layer][pos] = 0.0;
-                self.val_indices[layer][pos].fill(0);
-                self.val_norms[layer][pos] = 0.0;
-            }
-        }
+        // Flat buffers: the first `n_layers * used` positions are contiguous,
+        // so we can clear them with two `fill` calls instead of a nested loop.
+        let key_bytes = self.n_layers * used * self.key_packed_len;
+        let val_bytes = self.n_layers * used * self.val_packed_len;
+        self.key_indices[..key_bytes].fill(0);
+        self.val_indices[..val_bytes].fill(0);
+        let norm_count = self.n_layers * used;
+        self.key_norms[..norm_count].fill(0.0);
+        self.val_norms[..norm_count].fill(0.0);
         self.pos = 0;
         self.max_used_pos = 0;
     }
@@ -839,7 +886,7 @@ mod tests {
         let mut cache = TurboQuantKVCache::new(&config, 4, 4);
         let key = vec![1.0f32; cache.kv_dim];
         cache.store_key(0, 0, &key);
-        assert!(cache.key_norms[0][0] > 0.0);
+        assert!(cache.key_norms[0] > 0.0);
 
         cache.reset();
         let recon = cache.dequantize_key(0, 0);
@@ -984,17 +1031,22 @@ mod tests {
         // Verify structural dimensions
         assert_eq!(cache.kv_dim, kv_dim);
         assert_eq!(cache.max_seq_len, max_seq_len);
-        assert_eq!(cache.key_indices.len(), n_layers);
-        assert_eq!(cache.key_norms.len(), n_layers);
+        // Flat buffers: key_indices is one contiguous Vec of packed bytes.
         assert_eq!(
-            cache.key_norms[0].len(),
+            cache.key_indices.len(),
+            n_layers * max_seq_len * cache.key_packed_len
+        );
+        // Flat norm buffers: total length = n_layers * max_seq_len.
+        assert_eq!(cache.key_norms.len(), n_layers * max_seq_len);
+        assert_eq!(
+            cache.key_norms.len() / n_layers,
             max_seq_len,
-            "key_norms positions must be max_seq_len"
+            "key_norms per-layer count must be max_seq_len"
         );
         assert_eq!(
-            cache.val_norms[0].len(),
+            cache.val_norms.len() / n_layers,
             max_seq_len,
-            "val_norms positions must be max_seq_len"
+            "val_norms per-layer count must be max_seq_len"
         );
 
         // Store at position kv_dim (would OOB if max_seq_len was wrongly set to kv_dim)
@@ -1032,7 +1084,8 @@ mod tests {
         assert_eq!(cache_new.n_layers, cache_cfg.n_layers);
         assert_eq!(cache_new.key_bits, cache_cfg.key_bits);
         assert_eq!(cache_new.val_bits, cache_cfg.val_bits);
-        assert_eq!(cache_new.key_norms[0].len(), cache_cfg.key_norms[0].len());
-        assert_eq!(cache_new.val_norms[0].len(), cache_cfg.val_norms[0].len());
+        // Flat norm buffers: total length = n_layers * max_seq_len.
+        assert_eq!(cache_new.key_norms.len(), cache_cfg.key_norms.len());
+        assert_eq!(cache_new.val_norms.len(), cache_cfg.val_norms.len());
     }
 }
