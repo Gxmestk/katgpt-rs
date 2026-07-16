@@ -17,7 +17,7 @@ Close the one narrow gap surfaced by the 5-paper verdict. The `katgpt-dec` subst
 1. `CellComplex::grid_3d(w, h, d)` — 3D cubical grid constructor (vertices + 3 edge orientations + 3 face orientations + volumes). Mirrors `grid_2d` exactly; the rank-4 substrate (`MAX_RANK = 3`) already exists.
 2. `graph_laplacian_grid_3d_into` — 7-point-stencil fast path keyed on the 3D grid dims. Mirrors the 5-point path.
 3. `stochastic_birth_death_step` — wraps `graph_laplacian` with (a) an alive-channel sigmoid gate, (b) per-tick fixed-PRNG stochastic dropout of half the Δ (the paper's morphogenesis trick — no training), (c) dead-voxel reset to air. Zero-alloc via pre-allocated scratch + a modelless PRNG (SplitMix64 seeded once).
-4. `argmax_block_type` — discrete-class bridge: threshold the continuous field into categorical block classes (the alive-mask → block-class step the civ engine's `CIV_SPECS` consumes).
+4. `argmax_block_type` — discrete-class bridge: threshold the continuous field into categorical block classes (the alive-mask → block-class step a future civ-engine city-growth consumer would consume; see T9 caveat — no such consumer exists today).
 
 All four are modelless (no gradient descent, no learned weights — just a fixed PRNG mask and a sigmoid gate). The growth mechanism is a deterministic function of the seed and the parameters, which keeps G6 (determinism / quorum-safety) tractable.
 
@@ -174,8 +174,16 @@ pub fn graph_laplacian_into(cx, potential, output) {
 - [x] Update `katgpt-dec/Cargo.toml` — `grid_3d` added to `default` feature list (2026-07-16)
 - [-] Update `katgpt-dec/README.md` with a 3D-grid section — deferred (follow-up doc task)
 
-### T9 (deferred — out of scope for this plan): civ engine wiring
-- [ ] **Tracked in Issue 155 T4, NOT here.** Wire `grid_3d` + `stochastic_birth_death_step` into the civ engine's `CIV_SPECS` city-growth demand cochains (`riir-ai/crates/riir-engine/...`). The civ engine consumes `argmax_block_type` output (categorical block classes) as the spatial dynamics for `city_found` / `city_develop` / `city_specialize`. This is a consumer-side change in `riir-ai`. **Now unblocked** — `grid_3d` is promoted to default-on (T8 complete).
+### T9 (deferred with corrected scope — premise did not hold): civ engine consumer
+- [-] **Scope hallucination discovered 2026-07-16** during T9 investigation. The T9 task as specified — "wire `grid_3d` + `stochastic_birth_death_step` into the civ engine's `CIV_SPECS` city-growth demand cochains" — rests on a premise that does **not hold**:
+  - **`CIV_SPECS` is a flat label array, not a cochain substrate.** `riir-engine/src/cgsp_runtime/templates.rs::CIV_SPECS: [GameDirectionSpec; 48]` is an array of `{ label: &'static str, anchor: HlaCuriosityDirection }` — HLA curiosity direction labels for cross-game transfer learning (per `cross_game_transfer.rs`). The labels `city_found` / `city_develop` / `city_specialize` are just strings anchored on `HlaCuriosityDirection::Ambition`. There is **no spatial dynamics, no cochain, no grid, no 3D mechanism** attached to these labels.
+  - **Zero consumers of `katgpt_dec` in `riir-ai` exist for this primitive.** The only `katgpt_dec` consumer in `cgsp_runtime/` is `stokes_validator.rs` (Plan 334 — 2D HLA emotion belief-mass divergence on a 32×32 Valence×Arousal projection; unrelated to city growth).
+  - **No city-growth cochain substrate exists in `riir-engine`.** A grep for `city_growth|growth_cochain|demand_cochain|NcaCityGrowth|block_type` returns zero hits in `riir-ai/crates/riir-engine/src/cgsp_runtime/`.
+  - **Issue 155 T4** (the original source of the T9 spec) carried the same hallucination forward — it claimed "3D voxel growth is a capability the civ engine's `CIV_SPECS` demands" in its `## Why this is Gain` section. The labels **demand** nothing spatially; they are pure HLA goal-direction vocabulary.
+
+  **What T9 actually requires (and why it is NOT a wiring task):** Designing a brand-new city-growth cochain runtime in `riir-engine/` — a `CityGrowthField` substrate that consumes `stochastic_birth_death_step` + `argmax_block_type`, attaches spatial semantics to (some subset of) the `CIV_SPECS` labels, and integrates with the civ engine's tick loop. That is a **new feature requiring a Proposal** (per the global rule: "Proposal md is at .proposals" for design decisions), not a consumer-side wiring change. The primitive (`grid_3d` + `stochastic_birth_death_step` + `argmax_block_type`) is shipped, GOAT-validated, and promoted to default-on — it is **ready to consume**; the consumer just does not exist yet.
+
+  **Plan 454 is effectively complete.** All in-scope tasks (T1–T8 + G4b + G1b) ship. T9 is a separate-repo Proposal-scoped task, not a Plan 454 deliverable. Re-open as a new riir-ai Proposal if/when a city-growth NCA consumer is actually desired.
 
 ---
 

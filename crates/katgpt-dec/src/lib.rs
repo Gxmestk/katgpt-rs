@@ -101,8 +101,9 @@ pub use motor_gated::{evolve_motor_gated_field, relu_gate_into};
 // a fixed seed (G6 quorum-safety).
 //
 // Plan 454 T5 — `argmax_block_type` raw → categorical bridge: thresholds the
-// continuous cochain into a `u8` block-class per cell. Consumed downstream by
-// the civ engine's `CIV_SPECS` (T9, deferred).
+// continuous cochain into a `u8` block-class per cell. Intended for a future
+// civ-engine city-growth consumer (T9 caveat: no such consumer exists today —
+// see birth_death.rs docs).
 #[cfg(feature = "grid_3d")]
 pub use birth_death::{BirthDeathParams, SplitMix64, argmax_block_type, stochastic_birth_death_step};
 

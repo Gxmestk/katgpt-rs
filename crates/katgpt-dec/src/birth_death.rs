@@ -66,10 +66,13 @@
 //! [`argmax_block_type`] thresholds the continuous multi-channel cochain
 //! (the alive + morphogen channels produced by the growth step, or a
 //! caller-arranged class-activation layout) into a categorical `u8` block
-//! class per voxel. The civ engine's `CIV_SPECS` consumes categorical block
-//! types (air / dirt / stone / water / ...) rather than continuous morphogen
-//! values; this is the raw → categorical bridge function. Generic — the
-//! caller picks which channels count as classes via the `n_classes` bound.
+//! class per voxel. A future civ-engine city-growth consumer would consume
+//! categorical block types (air / dirt / stone / water / ...) rather than
+//! continuous morphogen values; this is the raw → categorical bridge function
+//! that such a consumer would call. **No such consumer exists today** (Plan
+//! 454 T9 caveat — the `CIV_SPECS` labels in `riir-engine` are pure HLA
+//! goal-direction vocabulary, not a cochain substrate). Generic — the caller
+//! picks which channels count as classes via the `n_classes` bound.
 //!
 //! # References
 //!
@@ -381,8 +384,10 @@ pub fn stochastic_birth_death_step(
 }
 
 /// Threshold a continuous multi-channel cochain into categorical block classes.
-/// Plan 454 T5 — the raw → categorical bridge consumed by the civ engine's
-/// `CIV_SPECS` (Issue 155 T4, deferred to T9).
+/// Plan 454 T5 — the raw → categorical bridge. Intended for a future civ-engine
+/// city-growth consumer (Plan 454 T9 caveat: no such consumer exists today —
+/// the `CIV_SPECS` labels in `riir-engine` are HLA goal-direction vocabulary,
+/// not a cochain substrate).
 ///
 /// For each cell `v`, writes `out[v] = argmax over channels 0..n_classes of
 /// field.data[v*dim + c]`. Ties are broken by lowest channel index
@@ -392,10 +397,10 @@ pub fn stochastic_birth_death_step(
 ///
 /// This is the discrete-class counterpart to the continuous growth step
 /// [`stochastic_birth_death_step`]: the growth step evolves the morphogen
-/// field in continuous space, and this fn collapses it into the categorical
-/// block-type space the civ engine consumes. Generic over which channels
-/// count as classes — pass `n_classes = dim` to consider every channel, or a
-/// smaller value to ignore trailing channels.
+/// field in continuous space, and this fn collapses it into a categorical
+/// block-type space. Generic over which channels count as classes — pass
+/// `n_classes = dim` to consider every channel, or a smaller value to ignore
+/// trailing channels.
 ///
 /// # Layout
 ///
