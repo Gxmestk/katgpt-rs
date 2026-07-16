@@ -14,7 +14,7 @@
 
 LOTUS is a **training recipe** for latent CoT: a looped padded Transformer processes K learnable latent blocks of c tokens in parallel for R iterations, with a per-position cross-entropy loss (`L_step`) on each latent position's gold CoT-step token routed through the base LM head. At 3B scale it is the first latent method to bridge the gap to explicit CoT on GSM8K (within 1.5pp) while cutting thought-phase latency 2.5× (compact math) to 6.9× (natural-language CoT). Post-loop latents recover gold CoT tokens (70.9% top-1) AND surface unseen-but-valid alternative chains (15.3% top-1).
 
-**Verdict: Pass (with cherry-pickable gains)** — the architecture is shipped, the supervision recipe → riir-train, and the empirical findings validate existing design decisions rather than add a new inference primitive. **However, the §1.55 value-extraction scan surfaces four cherry-pickable gains** (one config default trap, one Any-Time validation target, two composition design principles) — tracked in `katgpt-rs/.issues/156_lotus_cherry_pickable_gains_rim_width_anytime_lt2.md`.
+**Verdict: Pass (with cherry-pickable gains)** — the architecture is shipped, the supervision recipe → riir-train, and the empirical findings validate existing design decisions rather than add a new inference primitive. **The §1.55 value-extraction scan surfaced four cherry-pickable gains** (one config default trap, one Any-Time validation target, two composition design principles) — all resolved: T1 ✅ DONE (doc commit `7a8320ef`), T2 ✅ DONE (Any-Time property CONFIRMED, test `tests/issue_156_anytime_lt2_poc.rs`), F1/F2 noted-only in §2.3 below. Issue 156 removed per noise-reduction rule.
 
 **Distilled for katgpt-rs (modelless, inference-time):** No new primitive. But four cherry-pickable gains below — the architecture ships, the insights still improve our stack.
 
@@ -117,13 +117,13 @@ Per the workflow §1 step 3, the seven Super-GOAT factory modules were checked f
 
 ### 2.4 Cherry-pickable gains (the §1.55 value-extraction scan)
 
-The initial Pass was correct on prior-art but lazy on value extraction. The §1.55 scan (added to the research skill this session, see SKILL.md §1.55) surfaces four cherry-pickable gains — tracked in `katgpt-rs/.issues/156_lotus_cherry_pickable_gains_rim_width_anytime_lt2.md`.
+The initial Pass was correct on prior-art but lazy on value extraction. The §1.55 scan (added to the research skill this session, see SKILL.md §1.55) surfaced four cherry-pickable gains — originally tracked in Issue 156 (now resolved and removed). T1/T2 are DONE; F1/F2 are noted in §2.3 below.
 
-**T1 — RiM slot width M=2 is a latent trap for reasoning callers (config audit, Issue 156 T1)**
+**T1 — RiM slot width M=2 is a latent trap for reasoning callers (config audit) — ✅ DONE 2026-07-16** (commit `7a8320ef`, doc-only in `crates/katgpt-types/src/config.rs` L158-167)
 
 LOTUS Table 7 sweeps per-block width c ∈ {1, 5, 10, 25, 30} at K=6 fixed: c=1 → 49.7%, c=5 → 67.5% (+17.8pp cliff), c=25 → 70.0% (saturation). Our `Config::rim_tokens_per_block` default is M=2 (from the RiM paper's pause-token use case). M=2 is in the cliff regime for reasoning. **Current state:** all Config presets ship `rim_block_count: 0` (RiM disabled), so this is NOT a current misconfiguration — it's a latent trap for future callers who enable RiM for reasoning. Action: document the M≥5 floor in the `rim_tokens_per_block` doc comment.
 
-**T2 — Any-Time LT2 validation (PoC, Issue 156 T2)**
+**T2 — Any-Time LT2 validation (PoC) — ✅ DONE 2026-07-16** (commit `6070e5d9`, Any-Time property CONFIRMED across all 4 gate regimes; permanent regression guard at `tests/issue_156_anytime_lt2_poc.rs`; validation note in Research 273)
 
 LOTUS Table 6 proves R is tunable at inference on a model trained at R=6: accuracy climbs monotonically from R=1 (22.7%) to R=6 (70.0%), dips at R=7 (69.3%). Research 273 ELT §2.3 claimed this Gain-tier property for our LT2 by architectural analogy — but **we never validated it**. The PoC must show our LT2 exhibits the same monotonic-stability property. Closes the Research 273 follow-up with real evidence either way.
 
@@ -158,7 +158,7 @@ The closest cousin fusion candidates, all of which produce capabilities that alr
 
 **Tier: Pass (with cherry-pickable gains)**
 
-**One-line reasoning:** LOTUS's three ingredients — (1) looped padded Transformer architecture, (2) parallel cross-entropy supervision on gold CoT tokens, (3) empirical findings on CoT-aligned latents — decompose as: architecture shipped (Plan 108 LT2 + Plan 172 RiM, both DEFAULT-ON, GOAT 8/8 + zero-decode-cost), supervision recipe → riir-train (genuine gradient descent through R iterations, §3.5 modelless paths all fail), and findings validate existing design decisions rather than introduce a new inference primitive. **Per §1.55 value-extraction scan: four cherry-pickable gains (RiM width trap, Any-Time LT2 validation, PCL design principle, per-iter vs post-loop readout schedule) are tracked in Issue 156.**
+**One-line reasoning:** LOTUS's three ingredients — (1) looped padded Transformer architecture, (2) parallel cross-entropy supervision on gold CoT tokens, (3) empirical findings on CoT-aligned latents — decompose as: architecture shipped (Plan 108 LT2 + Plan 172 RiM, both DEFAULT-ON, GOAT 8/8 + zero-decode-cost), supervision recipe → riir-train (genuine gradient descent through R iterations, §3.5 modelless paths all fail), and findings validate existing design decisions rather than introduce a new inference primitive. **Per §1.55 value-extraction scan: four cherry-pickable gains (RiM width trap, Any-Time LT2 validation, PCL design principle, per-iter vs post-loop readout schedule) were tracked in Issue 156 — all resolved (T1/T2 DONE, F1/F2 noted); issue removed per noise-reduction rule.**
 
 **Tiers (high → low):**
 
@@ -171,7 +171,7 @@ The closest cousin fusion candidates, all of which produce capabilities that alr
 
 **§3.5 modelless-unblock check:** All three paths fail for the supervision recipe. → riir-train (genuine gradient descent dependency, documented above).
 
-**§3.6 defend-wrong PoC requirement:** N/A for the Pass verdict itself (no parity claim — only architectural redirect). **However, T2 (Any-Time LT2 validation) is a PoC task** — Research 273 ELT's Any-Time claim was made by architectural analogy and never validated. Issue 156 T2 runs the PoC. This is the honest acknowledgment that "architecture ships" ≠ "property holds" for the Any-Time claim specifically.
+**§3.6 defend-wrong PoC requirement:** N/A for the Pass verdict itself (no parity claim — only architectural redirect). **However, T2 (Any-Time LT2 validation) is a PoC task** — Research 273 ELT's Any-Time claim was made by architectural analogy and never validated. Issue 156 T2 ran the PoC (✅ DONE 2026-07-16, Any-Time CONFIRMED; issue removed). This is the honest acknowledgment that "architecture ships" ≠ "property holds" for the Any-Time claim specifically.
 
 **MOAT gate (katgpt-rs):** Out of scope for moat contribution. The architecture is shipped; the supervision recipe is training (riir-train); the insights don't add a new inference primitive. Recording the verdict for prior-art hygiene only.
 
@@ -204,6 +204,6 @@ The closest cousin fusion candidates, all of which produce capabilities that alr
 
 ## TL;DR
 
-LOTUS = LT2 (Plan 108, DEFAULT-ON, GOAT 8/8) + RiM Reasoning Buffer Slots (Plan 172, DEFAULT-ON, zero-decode-cost GOAT) + a training recipe (`L_step` parallel CE on gold CoT tokens, λ_step curriculum, LOTUS-aux auxiliary decoder) → riir-train. The PCL factorization insight (§3.3.2) is a conceptual lens explaining why per-position independent supervision + jointly-computed looped latents produces globally coherent answers — it documents the mechanism behind our shipped RiM + LT2 + per-position screening composition. Empirical findings (first latent CoT to bridge at 3B; 2.5-6.9× latency reduction; post-loop latents carry unseen-but-valid alternatives; R tunable at inference) validate existing design decisions rather than introduce new inference primitives. Verdict: **Pass (with cherry-pickable gains)** — architecture shipped, supervision → riir-train, insights validate, BUT four cherry-pickable gains surfaced by the §1.55 scan are tracked in Issue 156: T1 (RiM M≥5 floor doc), T2 (Any-Time LT2 validation PoC), F1 (PCL design principle), F2 (per-iter vs post-loop readout schedule). The loop-stability exposure (residual explosion under `L_step`) is the same Readout Blind Spot addressed by Plan 428's parameter-free fixes.
+LOTUS = LT2 (Plan 108, DEFAULT-ON, GOAT 8/8) + RiM Reasoning Buffer Slots (Plan 172, DEFAULT-ON, zero-decode-cost GOAT) + a training recipe (`L_step` parallel CE on gold CoT tokens, λ_step curriculum, LOTUS-aux auxiliary decoder) → riir-train. The PCL factorization insight (§3.3.2) is a conceptual lens explaining why per-position independent supervision + jointly-computed looped latents produces globally coherent answers — it documents the mechanism behind our shipped RiM + LT2 + per-position screening composition. Empirical findings (first latent CoT to bridge at 3B; 2.5-6.9× latency reduction; post-loop latents carry unseen-but-valid alternatives; R tunable at inference) validate existing design decisions rather than introduce new inference primitives. Verdict: **Pass (with cherry-pickable gains)** — architecture shipped, supervision → riir-train, insights validate, BUT four cherry-pickable gains surfaced by the §1.55 scan were tracked in Issue 156 (removed; T1 ✅ DONE, T2 ✅ DONE Any-Time CONFIRMED, F1/F2 noted): T1 (RiM M≥5 floor doc), T2 (Any-Time LT2 validation PoC), F1 (PCL design principle), F2 (per-iter vs post-loop readout schedule). The loop-stability exposure (residual explosion under `L_step`) is the same Readout Blind Spot addressed by Plan 428's parameter-free fixes.
 
 **The R442 lesson:** the initial verdict was correct on prior-art but lazy on value extraction. A push-back revealed the four gains above. This led to the §1.55 value-extraction scan being added to the research skill (SKILL.md §1.55) — Pass is no longer "no files"; cherry-pickable gains mandate a short PASS-with-gains note + issues.
