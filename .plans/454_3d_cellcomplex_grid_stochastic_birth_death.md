@@ -67,15 +67,15 @@ pub fn graph_laplacian_into(cx, potential, output) {
 ## Tasks
 
 ### T1: `GridDims` enum + `grid_dims` back-compat accessors
-- [ ] Add `pub enum GridDims { Dim2 { w, h }, Dim3 { w, h, d } }` to `types.rs` (derive `Clone, Copy, Debug, PartialEq, Eq`)
-- [ ] Change `CellComplex::grid_dims` field type from `Option<(usize, usize)>` to `Option<GridDims>`
-- [ ] Update `CellComplex::new` to initialize `grid_dims: None` (one-line change)
-- [ ] Update `grid_2d` to set `grid_dims = Some(GridDims::Dim2 { w, h })`
-- [ ] Keep `grid_dims() -> Option<(usize, usize)>` signature: returns `Some((w, h))` for `Dim2`, `None` otherwise (back-compat — zero 2D call-site changes)
-- [ ] Add `grid_dims_3d() -> Option<(usize, usize, usize)>`: returns `Some((w, h, d))` for `Dim3`, `None` otherwise
-- [ ] Add `grid_dims_full() -> Option<GridDims>`: the full discriminated accessor
-- [ ] Update `invalidate_coboundary_cache` (still sets `grid_dims = None` — no change needed beyond the field type)
-- [ ] Existing 2D tests must pass unchanged (regression guard)
+- [x] Add `pub enum GridDims { Dim2 { w, h }, Dim3 { w, h, d } }` to `types.rs` (derive `Clone, Copy, Debug, PartialEq, Eq`)
+- [x] Change `CellComplex::grid_dims` field type from `Option<(usize, usize)>` to `Option<GridDims>`
+- [x] Update `CellComplex::new` to initialize `grid_dims: None` (one-line change)
+- [x] Update `grid_2d` to set `grid_dims = Some(GridDims::Dim2 { w, h })`
+- [x] Keep `grid_dims() -> Option<(usize, usize)>` signature: returns `Some((w, h))` for `Dim2`, `None` otherwise (back-compat — zero 2D call-site changes)
+- [x] Add `grid_dims_3d() -> Option<(usize, usize, usize)>`: returns `Some((w, h, d))` for `Dim3`, `None` otherwise
+- [x] Add `grid_dims_full() -> Option<GridDims>`: the full discriminated accessor
+- [x] Update `invalidate_coboundary_cache` (still sets `grid_dims = None` — no change needed beyond the field type)
+- [x] Existing 2D tests must pass unchanged (regression guard) — **185 lib tests + 4 sheaf_admm GOAT tests ALL PASS**; clippy clean on both default + `--all-features`; katgpt-core (the re-exporter) compiles clean
 
 ### T2: `CellComplex::grid_3d(w, h, d)` constructor
 - [ ] New constructor behind `#[cfg(feature = "grid_3d")]` in `types.rs`
@@ -157,7 +157,7 @@ pub fn graph_laplacian_into(cx, potential, output) {
 - [ ] Unit tests: known field → known block classes; ties broken by lowest channel index (deterministic)
 
 ### T6: Feature flag + Cargo.toml
-- [ ] Add `grid_3d = []` to `[features]` in `katgpt-dec/Cargo.toml` (default-OFF — single-line, mirrors `motor_gated_field` / `cochain_point_sampler`)
+- [x] Add `grid_3d = []` to `[features]` in `katgpt-dec/Cargo.toml` (default-OFF — single-line, mirrors `motor_gated_field` / `cochain_point_sampler`)
 - [ ] Gate T2/T3/T4/T5 code with `#[cfg(feature = "grid_3d")]`
 - [ ] Do NOT add to `default` — promotion requires the GOAT gate below
 

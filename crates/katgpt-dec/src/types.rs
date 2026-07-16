@@ -51,6 +51,37 @@ impl CoboundaryIndex {
     }
 }
 
+/// Regular-grid dimensionality tag for a [`CellComplex`] produced by
+/// [`grid_2d`](CellComplex::grid_2d) or [`grid_3d`](CellComplex::grid_3d).
+///
+/// Carries the grid dimensions and discriminates the stencil fast path used
+/// by `graph_laplacian_into`: 2D grids take the 5-point stencil, 3D grids take
+/// the 7-point stencil. Set at construction; cleared (`grid_dims = None`) on
+/// any topology mutation by `invalidate_coboundary_cache` per the `merkle_root`
+/// lesson — a grid with a removed cell is no longer regular.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum GridDims {
+    /// 2D regular grid (produced by [`CellComplex::grid_2d`]).
+    Dim2 {
+        /// Number of vertex columns (x-axis).
+        w: usize,
+        /// Number of vertex rows (y-axis).
+        h: usize,
+    },
+    /// 3D regular cubical grid (produced by [`CellComplex::grid_3d`]).
+    ///
+    /// Feature-gated behind `grid_3d`; the variant is always compiled (it is
+    /// part of the enum) but only constructed under the feature.
+    Dim3 {
+        /// Number of vertex columns (x-axis).
+        w: usize,
+        /// Number of vertex rows (y-axis).
+        h: usize,
+        /// Number of vertex depth-slices (z-axis).
+        d: usize,
+    },
+}
+
 /// A regular cell complex: vertices, edges, faces, and volumes with oriented incidence.
 ///
 /// Cells are indexed per-rank: cell (rank=0, idx=5) is the 6th vertex.
@@ -80,13 +111,14 @@ pub struct CellComplex {
     /// (all 5 paths in `remove_face` / `remove_cell` × 4 ranks) per the
     /// `merkle_root` lesson.
     coboundaries: [Option<CoboundaryIndex>; MAX_RANK as usize],
-    /// Regular-grid dimensions `(w, h)` if this complex was produced by
-    /// [`grid_2d`](Self::grid_2d) and has not been mutated since. Enables the
-    /// cache-friendly 5-point-stencil fast path in `graph_laplacian_into`
-    /// (Plan 357 G5 fix). `None` for non-grid complexes or after any topology
-    /// mutation (remove_face/remove_cell) — a grid with a missing face is no
-    /// longer a regular grid, so the stencil would be wrong at the gap.
-    grid_dims: Option<(usize, usize)>,
+    /// Regular-grid dimensions if this complex was produced by
+    /// [`grid_2d`](Self::grid_2d) / [`grid_3d`](Self::grid_3d) and has not been
+    /// mutated since. Enables the cache-friendly stencil fast path in
+    /// `graph_laplacian_into` (Plan 357 G5 fix for 2D; Plan 454 for 3D).
+    /// `None` for non-grid complexes or after any topology mutation
+    /// (remove_face/remove_cell) — a grid with a missing face is no longer a
+    /// regular grid, so the stencil would be wrong at the gap.
+    grid_dims: Option<GridDims>,
 }
 
 impl CellComplex {
@@ -121,7 +153,7 @@ impl CellComplex {
         let mut cx = Self::new(n_vertices, n_edges, n_faces, 0);
         // Mark as a regular grid so graph_laplacian_into can take the 5-point-
         // stencil fast path (Plan 357 G5 latency fix). Cleared by any mutation.
-        cx.grid_dims = Some((w, h));
+        cx.grid_dims = Some(GridDims::Dim2 { w, h });
 
         // Pre-allocate boundary vectors to exact capacity — avoids re-allocations during push.
         cx.boundaries[0].reserve_exact(2 * n_edges);
@@ -319,11 +351,43 @@ impl CellComplex {
     }
 
     /// Regular-grid dimensions `(w, h)` if this complex is an unmutated
-    /// [`grid_2d`](Self::grid_2d) product. `None` for arbitrary complexes or
-    /// after any topology mutation. The graph Laplacian uses this to take a
+    /// [`grid_2d`](Self::grid_2d) product. `None` for arbitrary complexes,
+    /// 3D grids (use [`grid_dims_3d`](Self::grid_dims_3d)), or after any
+    /// topology mutation. The graph Laplacian uses this to take a
     /// cache-friendly 5-point-stencil fast path when available (Plan 357 G5).
+    ///
+    /// Returns `None` for 3D grids to preserve the 2D-only contract of this
+    /// accessor — callers that need to dispatch on dimensionality should use
+    /// [`grid_dims_full`](Self::grid_dims_full) instead.
     #[inline]
     pub fn grid_dims(&self) -> Option<(usize, usize)> {
+        match self.grid_dims {
+            Some(GridDims::Dim2 { w, h }) => Some((w, h)),
+            _ => None,
+        }
+    }
+
+    /// Regular-grid dimensions `(w, h, d)` if this complex is an unmutated
+    /// [`grid_3d`](Self::grid_3d) product. `None` for arbitrary complexes, 2D
+    /// grids, or after any topology mutation.
+    #[inline]
+    pub fn grid_dims_3d(&self) -> Option<(usize, usize, usize)> {
+        match self.grid_dims {
+            Some(GridDims::Dim3 { w, h, d }) => Some((w, h, d)),
+            _ => None,
+        }
+    }
+
+    /// Full discriminated regular-grid dimensions, if this complex is an
+    /// unmutated `grid_2d` or `grid_3d` product. `None` for arbitrary complexes
+    /// or after any topology mutation.
+    ///
+    /// This is the accessor new code should use when it needs to dispatch on
+    /// grid dimensionality. The single-feature-gated consumers (`grid_3d`
+    /// stencil dispatch) match on the [`GridDims::Dim3`] variant; legacy 2D
+    /// consumers keep using [`grid_dims`](Self::grid_dims).
+    #[inline]
+    pub fn grid_dims_full(&self) -> Option<GridDims> {
         self.grid_dims
     }
 
