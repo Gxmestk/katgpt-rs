@@ -11,14 +11,14 @@
 // ── Helpers ──────────────────────────────────────────────────────
 
 /// Dot product of two vectors.
-#[cfg(any(feature = "river_valley", test))]
+#[cfg(feature = "river_valley")]
 #[inline]
 fn dot(a: &[f32], b: &[f32]) -> f32 {
     katgpt_core::simd::simd_dot_f32(a, b, a.len())
 }
 
 /// L2 norm of a vector.
-#[cfg(any(feature = "river_valley", test))]
+#[cfg(feature = "river_valley")]
 #[inline]
 fn l2_norm(v: &[f32]) -> f32 {
     dot(v, v).sqrt()
@@ -300,7 +300,10 @@ pub fn update_cosine_similarity(updates: &[Vec<f32>]) -> f32 {
 
 // ── Tests ────────────────────────────────────────────────────────
 
-#[cfg(test)]
+// Tests require the `river_valley` feature: the public diagnostic functions
+// (`subspace_ratios`, `effective_rank`, `update_cosine_similarity`) are gated
+// behind it, so the test module must match.
+#[cfg(all(test, feature = "river_valley"))]
 mod tests {
     use super::*;
 
