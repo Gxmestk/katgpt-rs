@@ -239,18 +239,30 @@ impl TrajectoryPruner {
         let kill_count = ((propagated_values.len() as f32 * self.kill_fraction) as usize)
             .min(propagated_values.len().saturating_sub(1));
 
-        let mut indexed: Vec<(usize, f32)> = propagated_values
-            .iter()
-            .enumerate()
-            .map(|(i, &v)| (i, v))
-            .collect();
+        if kill_count == 0 {
+            return Vec::new();
+        }
 
-        indexed.sort_by(|a, b| a.1.total_cmp(&b.1));
+        // Pre-allocate the exact output size — avoids Vec reallocation growth.
+        let mut indexed: Vec<(usize, f32)> = Vec::with_capacity(propagated_values.len());
+        indexed.extend(
+            propagated_values
+                .iter()
+                .enumerate()
+                .map(|(i, &v)| (i, v)),
+        );
+
+        // Partial sort: O(n) partition to bring the `kill_count` lowest-scoring
+        // items to the front, then sort just that prefix O(k log k). Cheaper
+        // than a full O(n log n) sort when kill_count ≪ n.
+        let prefix_len = kill_count - 1;
+        let _ = indexed.select_nth_unstable_by(prefix_len, |a, b| a.1.total_cmp(&b.1));
+        indexed[..prefix_len].sort_unstable_by(|a, b| a.1.total_cmp(&b.1));
 
         indexed
-            .into_iter()
+            .iter()
             .take(kill_count)
-            .map(|(i, _)| i)
+            .map(|(i, _)| *i)
             .collect()
     }
 }

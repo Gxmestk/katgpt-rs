@@ -8,7 +8,9 @@ pub struct Matchup {
 
 /// Generates all round-robin pairs from N players.
 pub fn round_robin_pairs(n: usize) -> Vec<Matchup> {
-    let mut matchups = Vec::new();
+    // Pre-allocate: n*(n-1)/2 matchups, each holding a 2-element vec.
+    let count = n.saturating_sub(1).saturating_mul(n) / 2;
+    let mut matchups = Vec::with_capacity(count);
     for i in 0..n {
         for j in (i + 1)..n {
             matchups.push(Matchup {
@@ -28,7 +30,8 @@ pub fn full_field_matchups(n: usize, field_size: usize) -> Vec<Matchup> {
             player_indices: (0..n).collect(),
         }],
         n => {
-            let mut matchups = Vec::new();
+            // n matchups, each holding `field_size` indices.
+            let mut matchups = Vec::with_capacity(n);
             for start in 0..n {
                 let indices: Vec<usize> = (0..field_size).map(|i| (start + i) % n).collect();
                 matchups.push(Matchup {

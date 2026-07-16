@@ -249,17 +249,15 @@ impl MuxDdTree {
         let child_len = peaks.len().min(self.k);
         let child_weights: Arc<[f32]> = Arc::from(&peaks[..child_len]);
         node.children.reserve(effective_width);
-        let mut child_token_buf = vec![0u32; child_len];
         for i in 0..effective_width {
-            // Distribute peaks across children: each child gets a shifted view
+            // Distribute peaks across children: each child gets a shifted view.
+            // Build the token Vec directly (avoids an intermediate buffer + clone).
             let offset = (i * self.k / effective_width).min(peaks.len());
-            for (j, slot) in child_token_buf.iter_mut().enumerate() {
-                *slot = (offset + j) as u32;
+            let mut tokens = Vec::with_capacity(child_len);
+            for j in 0..child_len {
+                tokens.push((offset + j) as u32);
             }
-            node.children.push(MuxNode::new(
-                child_token_buf.clone(),
-                Arc::clone(&child_weights),
-            ));
+            node.children.push(MuxNode::new(tokens, Arc::clone(&child_weights)));
         }
 
         // Track maximum depth

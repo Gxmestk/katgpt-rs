@@ -61,10 +61,13 @@ pub fn forward_prefill_with_compression(seq: &MixedPrefillSequence) -> Compresse
     let token_ids = LatentPrefillAdapter::raw_token_ids(seq);
     let token_ids_usize: Vec<usize> = token_ids.iter().map(|&t| t as usize).collect();
 
-    let mut latent_indices = Vec::new();
-    let mut original_token_counts = Vec::new();
-    let mut segment_ids = Vec::new();
-    let mut weights = Vec::new();
+    // Upper bound on latent entries is the total entry count; pre-allocate
+    // once to avoid the Vec grow-and-realloc dance.
+    let n_entries = seq.entries.len();
+    let mut latent_indices = Vec::with_capacity(n_entries);
+    let mut original_token_counts = Vec::with_capacity(n_entries);
+    let mut segment_ids = Vec::with_capacity(n_entries);
+    let mut weights = Vec::with_capacity(n_entries);
 
     for (i, entry) in seq.entries.iter().enumerate() {
         if let PrefillEntry::Latent {

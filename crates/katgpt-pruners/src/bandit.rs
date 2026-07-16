@@ -2102,21 +2102,22 @@ pub fn spectral_discordance(performance_matrix: &[Vec<f32>]) -> f32 {
     if m <= 1 || n == 0 {
         return 0.0;
     }
-    // For each arm, compute variance across tasks
-    let variances: Vec<f32> = performance_matrix
-        .iter()
-        .map(|row| {
-            if row.len() <= 1 {
-                return 0.0;
-            }
-            let mean = row.iter().sum::<f32>() / row.len() as f32;
-            row.iter().map(|x| (x - mean).powi(2)).sum::<f32>() / row.len() as f32
-        })
-        .collect();
+    // For each arm, compute variance across tasks and accumulate average in one
+    // pass — avoids materializing a `variances: Vec<f32>` allocation.
     // Normalize: max variance = 0.25 (for binary 0/1 with p=0.5)
-    let max_var = 0.25_f32;
-    let avg_normalized_var = variances.iter().sum::<f32>() / variances.len() as f32 / max_var;
-    avg_normalized_var.min(1.0)
+    let inv_max_var = 4.0_f32; // 1 / 0.25
+    let mut sum_normalized_var = 0.0f32;
+    for row in performance_matrix {
+        let var = if row.len() <= 1 {
+            0.0
+        } else {
+            let n = row.len() as f32;
+            let mean = row.iter().sum::<f32>() / n;
+            row.iter().map(|x| (x - mean).powi(2)).sum::<f32>() / n
+        };
+        sum_normalized_var += var * inv_max_var;
+    }
+    (sum_normalized_var / n as f32).min(1.0)
 }
 
 // ---------------------------------------------------------------------------

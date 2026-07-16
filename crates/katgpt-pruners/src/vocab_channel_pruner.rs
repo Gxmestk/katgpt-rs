@@ -230,7 +230,7 @@ fn topk_indices(values: &[f32], k: usize) -> Vec<usize> {
 
     // For small k, use partial selection via a min-heap approach
     let mut top: Vec<(usize, f32)> = (0..k).map(|i| (i, values[i])).collect();
-    top.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+    top.sort_by(|a, b| b.1.total_cmp(&a.1));
 
     for (i, &val) in values.iter().enumerate().skip(k) {
         if val > top.last().map(|&(_, v)| v).unwrap_or(f32::NEG_INFINITY) {

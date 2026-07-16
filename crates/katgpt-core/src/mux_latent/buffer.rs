@@ -91,8 +91,14 @@ impl LatentContextBuffer {
         let windows: Vec<&[u32]> = tokens.chunks(window_size).collect();
         let adaptive = slod.adaptive_ratios(&windows, config.compression_ratio);
 
-        // Re-encode with adaptive ratios per window
-        let mut segments = Vec::new();
+        // Re-encode with adaptive ratios per window. Upper bound on segments:
+        // sum over windows of ceil(window_len / window_span) + 1 raw window.
+        let max_segments = adaptive
+            .iter()
+            .map(|(w, r)| w.len().div_ceil(r.span_size().max(1)))
+            .sum::<usize>()
+            + 1;
+        let mut segments = Vec::with_capacity(max_segments);
         let mut segment_id = 0u32;
         let mut pos = 0;
 

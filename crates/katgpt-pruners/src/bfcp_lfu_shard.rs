@@ -213,21 +213,19 @@ impl BfcpLfuShard {
         #[cfg(not(feature = "freq_bandit"))]
         let tier = static_tier;
 
-        let assignments: Vec<(usize, FreqTier)> = partition
-            .regions
-            .iter()
-            .map(|region| {
-                let shard = self.shard_map.assign_shard(region.label, tier);
-                (shard, tier)
-            })
-            .collect();
+        let mut assignments: Vec<(usize, FreqTier)> = Vec::with_capacity(partition.regions.len());
+        for region in &partition.regions {
+            let shard = self.shard_map.assign_shard(region.label, tier);
+            assignments.push((shard, tier));
+        }
 
         (partition, assignments)
     }
 
     /// Batch accept tokens from partition regions (up to `max_tokens`).
     pub fn batch_process(&self, partition: &BFCP, max_tokens: usize) -> Vec<usize> {
-        let regions: Vec<&BorelRegion> = partition.regions.iter().collect();
+        let mut regions: Vec<&BorelRegion> = Vec::with_capacity(partition.regions.len());
+        regions.extend(partition.regions.iter());
         self.batcher.batch_accept(&regions, max_tokens)
     }
 

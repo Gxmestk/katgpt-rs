@@ -52,7 +52,10 @@ impl MuxLatentEncoder {
         };
         let original_count = tokens.len();
 
-        let mut segments = Vec::new();
+        // Upper bound on segment count: ceil(tokens.len() / span_size) + 1
+        // (the +1 covers the optional preserve_instructions raw window).
+        let max_segments = tokens.len().div_ceil(span_size.max(1)) + 1;
+        let mut segments = Vec::with_capacity(max_segments);
         let mut segment_id: u32 = 0;
         let mut pos = 0;
 
