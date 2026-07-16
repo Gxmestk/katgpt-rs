@@ -78,8 +78,15 @@ is NOT a modelless gain — it's a speedup of a wrong result. The quality gate
 ## Research Workflow
 
 See `.agents/skills/research/SKILL.md` for the full research workflow:
-paper classification, 5-repo routing, fusion-first distillation, novelty gate,
+paper classification, 7-repo routing, fusion-first distillation, novelty gate,
 GOAT gate, and the mandatory modelless-unblock protocol (§3.5).
+
+> **Repo count:** 7 repos total — `katgpt-rs` (public) + `riir-ai`, `riir-chain`,
+> `riir-neuron-db`, `riir-train`, `riir-game-sdk`, `riir-armageddon` (private).
+> The historical "5-repo quintet" terminology referred to the 5 distillation
+> targets (katgpt-rs + 4 riir-* siblings); `riir-game-sdk` (game vocabulary
+> facade + dev-tool workspace) and `riir-armageddon` (arena/game-product domain
+> types) were added later. See Research 003 for the canonical boundary.
 
 ## Numbering Discipline
 

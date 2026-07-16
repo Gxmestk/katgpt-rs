@@ -1,6 +1,6 @@
 # Commercial Strategy — Public Routing Rules (trimmed)
 
-**Date:** 2026-06 (revised 2026-06-29 — added Benchmark Domain Exception; revised 2026-06-27 — sensitive content moved to private)
+**Date:** 2026-06 (revised 2026-07-17 — added `riir-game-sdk` + `riir-armageddon` to Boundary table, 7-repo count; revised 2026-06-29 — added Benchmark Domain Exception; revised 2026-06-27 — sensitive content moved to private)
 **Status:** Active (public subset)
 **Purpose:** Let public-research agents self-govern the public/private boundary without needing the sensitive moat doc.
 
@@ -10,7 +10,7 @@
 
 ## The Boundary
 
-Five repos. The split is absolute.
+Seven repos. The split is absolute.
 
 | Repo | License | Role |
 |------|---------|------|
@@ -19,8 +19,18 @@ Five repos. The split is absolute.
 | `riir-chain` | Private (internal) | **Neuro-symbolic chain transport** — co-located AI+wallet state, LatCal encoding, chain economics, `riir-chaind` daemon, `catchup/` persistence. Re-exports `riir-neuron-db` under its `neuron_db` feature. |
 | `riir-neuron-db` | Private (internal) | **Neuron-shard leaf crate** — `NeuronShard` weight blob, `ShardIndex`, generic `MerkleTree`/`MerkleProof`, `MerkleFrozenEnvelope`, MAPE-K self-healing, Raven/δ-Mem consolidation, AnyRAG gateway, vibe KG triples. No chain dependency. |
 | `riir-train` | Private (internal) | **Training research** — adapter training methods, training data, trained weights. Know-how vault. |
+| `riir-game-sdk` | Private (internal) | **Game-vocabulary SDK** — facade over `riir-games-shared` (Layer 0 vocabulary) + `riir-games` systems; dev-tool workspace hosting `crates/riir-viz` + `crates/riir-gm-tool`. Consumed by `seal-online-remaster`, `poc-maxman`. The dev entry point for the game stack — see `riir-game-sdk/AGENTS.md` facade constraint. |
+| `riir-armageddon` | Private (internal) | **Arena/game-product domain types** — raw-vs-latent boundary for the game-product domain (the arena). Read its README; do not put research, chain code, or training data here. |
 
 **Rule: anything `riir-*` is internal. No exceptions.**
+
+> **Historical note:** the original "5-repo quintet" terminology referred to
+> the 5 distillation targets (`katgpt-rs` + `riir-ai` + `riir-chain` +
+> `riir-neuron-db` + `riir-train`). `riir-game-sdk` (game vocabulary facade
+> + dev-tool workspace) and `riir-armageddon` (arena/game-product domain
+> types) were added later as the stack grew consumer-facing tooling and a
+> product-domain boundary. The "quintet" framing is retained only in
+> historical documents and revision histories.
 
 ### Benchmark Domain Exception (toy games ≠ product IP)
 
