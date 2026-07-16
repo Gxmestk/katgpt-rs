@@ -315,15 +315,27 @@ pub fn compute_basis_into(
     // independent, so fusing keeps the `out[i*k..]` row hot in L1 between the
     // projection write and the normalize read instead of streaming all of `out`
     // through cache twice. Bit-identical to the previous two-loop form.
-    for i in 0..n {
-        let x_row = &x[i * d..(i + 1) * d];
-        let out_row = &mut out[i * k..(i + 1) * k];
-        simd::simd_matmul_rows(out_row, w, x_row, k, d);
-        if !bias.is_empty() {
-            simd::simd_add_inplace(out_row, bias);
+    //
+    // The bias branch is hoisted outside the row loop (loop-invariant) so the
+    // no-bias hot path — the common case for identity-V and calibrated-basis
+    // configs — is fully branch-free per row.
+    if bias.is_empty() {
+        for i in 0..n {
+            let x_row = &x[i * d..(i + 1) * d];
+            let out_row = &mut out[i * k..(i + 1) * k];
+            simd::simd_matmul_rows(out_row, w, x_row, k, d);
+            simd::simd_scale_inplace(out_row, inv_temp);
+            normalize_basis_row(out_row, kind);
         }
-        simd::simd_scale_inplace(out_row, inv_temp);
-        normalize_basis_row(out_row, kind);
+    } else {
+        for i in 0..n {
+            let x_row = &x[i * d..(i + 1) * d];
+            let out_row = &mut out[i * k..(i + 1) * k];
+            simd::simd_matmul_rows(out_row, w, x_row, k, d);
+            simd::simd_add_inplace(out_row, bias);
+            simd::simd_scale_inplace(out_row, inv_temp);
+            normalize_basis_row(out_row, kind);
+        }
     }
 }
 
@@ -595,10 +607,9 @@ fn gram_schmidt_rows(w: &mut [f32], k: usize, d: usize) {
     for i in 0..k {
         // Subtract projections onto all previous (already-orthonormal) rows.
         for j in 0..i {
-            let mut dot = 0.0f32;
-            for l in 0..d {
-                dot += w[i * d + l] * w[j * d + l];
-            }
+            // SIMD dot product — same arithmetic result as the scalar loop,
+            // O(d/SIMD_WIDTH) instead of O(d). Init-time only, but k² calls.
+            let dot = simd::simd_dot_f32(&w[i * d..(i + 1) * d], &w[j * d..(j + 1) * d], d);
             for l in 0..d {
                 w[i * d + l] -= dot * w[j * d + l];
             }
