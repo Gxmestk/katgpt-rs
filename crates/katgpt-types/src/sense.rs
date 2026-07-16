@@ -3,15 +3,31 @@
 // ---------------------------------------------------------------------------
 // Shard Embedding — JL Random Orthogonal Projection (Plan 230)
 // ---------------------------------------------------------------------------
+// DEPRECATED (Issue 139, 2026-07-16): The JL projection at m=8 violates the
+// Johnson-Lindenstrauss lower bound by over 200× (needs m ≥ 554 for ε=0.5, n=100;
+// uses m=8). Empirically measures 1.4-6% NN preservation vs the documented
+// 90% target. Zero runtime consumers — BFCF uses region centroids, SenseModule
+// uses TernaryDir. The primitive is mathematically unsound as specified.
+// Option D (deprecate) chosen over Option B (PCA rescue) because PCA requires
+// a real-data intrinsic-rank measurement that cannot be done modellessly.
 
 /// Low-dimensional projection of NeuronShard style_weights for fast similarity search.
 /// Produced by Johnson-Lindenstrauss random orthogonal projection.
 /// 8 × f32 = 32 bytes — fits in cache line, suitable for SIMD cosine similarity.
 ///
 /// Plan 230: Shard Embedding Projection — modelless linear weight-to-vector.
+///
+/// # Deprecated
+///
+/// Mathematically unsound at m=8 — violates the JL lower bound by over 200×.
+/// See Issue 139 / Plan 230 close-out note.
+#[deprecated(
+    note = "JL projection at m=8 is mathematically unsound (Issue 139). Zero runtime consumers. Use region centroids for shard similarity."
+)]
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct ShardEmbedding(pub [f32; 8]);
 
+#[allow(deprecated)]
 impl ShardEmbedding {
     pub const ZERO: Self = Self([0.0; 8]);
     pub const DIM: usize = 8;
@@ -39,6 +55,7 @@ impl ShardEmbedding {
     }
 }
 
+#[allow(deprecated)]
 impl Default for ShardEmbedding {
     fn default() -> Self {
         Self::ZERO
@@ -46,6 +63,7 @@ impl Default for ShardEmbedding {
 }
 
 // Hash for use as HashMap key (bit-level, NOT semantic hash)
+#[allow(deprecated)]
 impl std::hash::Hash for ShardEmbedding {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         // Single write of all 32 bytes — fewer virtual calls than four write_u64.
@@ -53,6 +71,7 @@ impl std::hash::Hash for ShardEmbedding {
     }
 }
 
+#[allow(deprecated)]
 impl Eq for ShardEmbedding {}
 
 // ---------------------------------------------------------------------------

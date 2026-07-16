@@ -446,14 +446,17 @@ pub use traits::{
 pub use traits::{AllGoalsUpdate, LeoHead, sigmoid_bounded_q};
 
 // Re-export key types at crate root for convenience
+#[allow(deprecated)]
 pub use shard_embedding::{EMBED_DIM, JlProjectionMatrix, STYLE_DIM as JL_STYLE_DIM};
 #[allow(deprecated)]
 pub use types::sample_token;
+#[allow(deprecated)]
+pub use types::ShardEmbedding;
 pub use types::{
     AttentionMode, AttentionProjection, CacheLayout, CalibrationMode, Config, ConvergenceSelector,
     DashAttnConfig, DilationConfig, HlaMode, HybridPattern, InferenceOverrides, InferenceResult,
     LoopMode, LoraAdapter, LoraPair, ModelArchitecture, ResidualGate, RetrievalHeadRole, Rng,
-    RtTurboConfig, SdpaOutputGate, ShardEmbedding, WeightDtype, kv_dim, lora_apply, matmul,
+    RtTurboConfig, SdpaOutputGate, WeightDtype, kv_dim, lora_apply, matmul,
     matmul_f16, matmul_f16_parallel, matmul_parallel, matmul_relu, rmsnorm, sample_token_into,
     softmax, softmax_scaled,
 };

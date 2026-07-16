@@ -34,7 +34,7 @@
 //! - `looping` — Training-Free Loop types (Plan 136)
 //! - `ternary` — Bit-plane ternary weights (`plasma_path`)
 //! - `hydra` — Hydra Adaptive Layer Budget types
-//! - `sense` — ShardEmbedding + sense composition types
+//! - `sense` — ShardEmbedding (DEPRECATED, Issue 139) + sense composition types
 //!
 //! Test modules live alongside their topic (e.g. `rng::tests_rng`) or in
 //! `tests_types.rs` for cross-cutting tests.
@@ -131,7 +131,9 @@ pub use merkle::{
     MERKLE_OCTREE_LEAVES, MERKLE_OCTREE_NODES, MerkleOctree, MerkleProof,
 };
 pub use rng::Rng;
-pub use sense::{DilationConfig, SenseKind, SenseModule, ShardEmbedding, TernaryDir};
+pub use sense::{DilationConfig, SenseKind, SenseModule, TernaryDir};
+#[allow(deprecated)]
+pub use sense::ShardEmbedding;
 pub use slod::ScaleBoundary;
 pub use temporal::{TemporalDerivativeKernel, sigmoid_surprise_gate};
 #[cfg(feature = "plasma_path")]

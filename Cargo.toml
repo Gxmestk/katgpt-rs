@@ -540,7 +540,7 @@ step_attribution_qualifier = ["katgpt-pruners/step_attribution_qualifier"]  # DE
 workflow_lattice = ["hoare_pruner", "katgpt-pruners/workflow_lattice"]  # Opt-in: sigmoid-graded relevance (Plan 223)
 wasm_proof_witness = ["proof_cert", "katgpt-proof-cert/wasm_proof_witness"]  # Opt-in: proof certificates (Plan 223). Phase 12 (2026-07-04): module moved to katgpt-proof-cert; root forwards (implies proof_cert).
 posterior_evolution = ["bandit", "katgpt-pruners/posterior_evolution"]  # Posterior-Guided Pruner Evolution — BAKE precision + MUSE lifecycle (Plan 239, Research 211, GOAT 8/8, default-ON)
-shard_embedding = []  # Shard Embedding Projection — JL random orthogonal projection for shard similarity (Plan 230, GOAT candidate)
+shard_embedding = []  # DEPRECATED (Issue 139, 2026-07-16): JL projection at m=8 is mathematically unsound (violates JL lower bound by >200×). Zero runtime consumers. Scheduled for removal.
 breakeven_routing = ["katgpt-transformer/breakeven_routing", "katgpt-core/breakeven_routing"]  # Breakeven complexity cost-aware inference routing (Plan 250 GOAT 7/7, Research 218) — default-ON. Phase 9: also forwards to katgpt-transformer (dense_mesh adaptive_width BreakevenBandit path). Phase 12 (2026-07-04): also forwards to katgpt-core so the moved root module compiles.
 lattice_operad = ["katgpt-pruners/lattice_operad"]  # LatticeOperad canonical AND/OR pruner composition (Plan 252 Phase 2, Research 220, Plan 278 GOAT proved T26-T27, default-ON). Phase 12 (2026-07-04): module moved to katgpt-pruners; root forwards.
 interval_pruner = ["katgpt-pruners/interval_pruner"]  # IntervalPruner interval-closure for valid token sets (Plan 252 Phase 1, Research 220). Phase 12 (2026-07-04): module moved to katgpt-pruners; root forwards.
