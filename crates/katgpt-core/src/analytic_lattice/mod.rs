@@ -17,7 +17,7 @@
 //! It does NOT ship `ComposerTick` (the `GpuFuture` impl) or `Join3` — those
 //! live in `riir-engine/src/analytic_lattice/asoc.rs` because they need
 //! `riir-gpu-async`, which is private to riir-ai. Adding that dep here would
-//! invert the 5-repo commercial boundary (katgpt-core is the leaf crate; it
+//! invert the 7-repo commercial boundary (katgpt-core is the leaf crate; it
 //! must not depend on riir-ai's private runtime).
 //!
 //! # Constraints (per AGENTS.md + Plan 330)

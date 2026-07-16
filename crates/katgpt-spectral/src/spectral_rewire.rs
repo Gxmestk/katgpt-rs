@@ -1231,7 +1231,7 @@ mod tests {
     //
     // The make-or-break for Issue 123 (Fusion B promotion) is whether REAL
     // training deltas are concentrated. That requires riir-train (no trained
-    // weights exist in the 5-repo quintet). But we CAN validate the MEASUREMENT
+    // weights exist in the 7-repo stack). But we CAN validate the MEASUREMENT
     // is trustworthy: construct deltas with KNOWN on/off mixing ratios and
     // verify the primitive measures the correct fraction. When real deltas
     // eventually arrive, this test guarantees the diagnostic is calibrated.

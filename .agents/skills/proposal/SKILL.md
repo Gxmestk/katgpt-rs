@@ -362,13 +362,13 @@ dictionary. Always grep both sets (paper vocab AND codebase vocab).
 
 **Pre-flight (mandatory):** `read_file` the target repo's
 `.proposals/.highwater` (or scan for max NNN); `list_directory` `.proposals/`
-in all 5 repos; `read_file` the 1–2 closest existing proposals to match style;
-if the topic touches sync/freeze/bridge, `read_file` the AGENTS.md boundary
-rules.
+across all 7 repos; `read_file` the 1–2 closest existing proposals to match
+style; if the topic touches sync/freeze/bridge, `read_file` the AGENTS.md
+boundary rules.
 
 **Workflow:** topic decomposition (one-sentence should-question + 3–5 terms +
 scoped vocabulary translation) → **focused 5-layer grep** (proposals /
-research / plans / issues / code, across all 5 repos, with per-hit reasoning:
+research / plans / issues / code, across all 7 repos, with per-hit reasoning:
 precedent / contradiction / complement / substrate / duplicate) → prior-art
 search (2–3 arxiv keyword variants + web for non-ML topics + fetch ≤3 papers)
 → reasoning (gap, design, domain classification, caveats, fusion lineage) →

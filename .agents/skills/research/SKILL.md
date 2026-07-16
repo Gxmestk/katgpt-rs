@@ -440,7 +440,7 @@ The global verdict tiers (Super-GOAT / GOAT / Gain / Pass) measure *how strong* 
 **MOAT verdict (per contribution):**
 - **Strengthens moat** (in-scope pillar-level / Super-GOAT / fusion-GOAT connecting ≥2 pillars) → promote aggressively; if Super-GOAT, capture the private guide now (§1.5).
 - **Neutral GOAT/Gain** (in-scope but not pillar-level) → ship behind feature flag, track promote/demote, do NOT overclaim moat in the note.
-- **Out-of-scope** → reroute to the correct repo (5-repo discipline). A great primitive in the wrong repo dilutes the moat — e.g. a generic attention kernel merged into `riir-ai` instead of `katgpt-rs` leaks nothing privately valuable but starves the public adoption funnel.
+- **Out-of-scope** → reroute to the correct repo (7-repo discipline). A great primitive in the wrong repo dilutes the moat — e.g. a generic attention kernel merged into `riir-ai` instead of `katgpt-rs` leaks nothing privately valuable but starves the public adoption funnel.
 
 **`katgpt-rs` promote/demote tracking (per stack):** every primitive that lands in the public engine gets a feature flag + benchmark + GOAT gate, and the verdict note MUST record the per-stack outcome — which transformer stack slot (attention / KV / sampling / speculative / pruning) and whether it promoted to default or stayed opt-in. Re-gate on feature touch. Demote the loser when a newer primitive wins the same slot. This per-stack ledger is the engine's quality contract.
 
@@ -632,7 +632,7 @@ Reinforce these when designing game systems or chain state:
 
 **Pre-flight (mandatory, before any verdict):** `read_file` 4 READMEs (`katgpt-rs`, `riir-ai`, `riir-chain`, `riir-neuron-db`) + `riir-ai/.docs/README.md` (read `03_pillars/README.md` + `04_supergoat_candidates/README.md` before any Super-GOAT gate); `list_directory` all 4 `.research/` folders + 4 runtime src trees + 7 Super-GOAT factory modules (§Primary focus).
 
-**Workflow:** read paper → classify (training-only? → riir-train, stop) → distill + fuse (vocabulary-translate BOTH semantic names AND compute units per the standing blocks below, then grep BOTH layers — notes+plans+docs AND src+crates — across all 5 repos, using BOTH paper vocab AND codebase vocab) → **latent-space reframe before verdict** (adapter routing / KV compression / speculative decode are GOAT-tier fallbacks, NOT primary) → **§1.55 value-extraction scan (mandatory even on Pass)** → novelty gate (Q1–Q4, §1.5) → MOAT gate per domain (§1.6) → plan + GOAT gate.
+**Workflow:** read paper → classify (training-only? → riir-train, stop) → distill + fuse (vocabulary-translate BOTH semantic names AND compute units per the standing blocks below, then grep BOTH layers — notes+plans+docs AND src+crates — across all 7 repos, using BOTH paper vocab AND codebase vocab) → **latent-space reframe before verdict** (adapter routing / KV compression / speculative decode are GOAT-tier fallbacks, NOT primary) → **§1.55 value-extraction scan (mandatory even on Pass)** → novelty gate (Q1–Q4, §1.5) → MOAT gate per domain (§1.6) → plan + GOAT gate.
 
 **Hard rules:** modelless-first (translate compute units — LLM-as-implementation ≠ LLM-as-mechanism; when you see "N LLM calls/step", ask "what decision is each call computing?" first, not "violates 20Hz budget, NO-GAIN"); latent-to-latent with sigmoid (never softmax); freeze/thaw over fine-tuning; 7-repo discipline; raw scalars at sync boundary; fusion-first mindset.
 

@@ -11,7 +11,7 @@
 //! `RederiveOp::Fut` has NO bound at the trait level. The
 //! `GpuFuture<Output = TransportOperator>` bound is applied at the impl site
 //! in `riir-engine`. This keeps the leaf crate (`katgpt-core`) free of the
-//! `riir-gpu-async` dependency — adding it here would invert the 5-repo
+//! `riir-gpu-async` dependency — adding it here would invert the 7-repo
 //! commercial boundary (R311 §6: "Generic math, no game IP" stays in katgpt-rs).
 //!
 //! # Per-tick cascade flow (the contract these traits support)
@@ -67,7 +67,7 @@ pub trait PlasmaDraft {
 /// # The `Fut` bound (critical for layering)
 ///
 /// `Fut` has **NO** `GpuFuture` bound at the trait level — that would require
-/// importing `riir-gpu-async` into katgpt-core, inverting the 5-repo commercial
+/// importing `riir-gpu-async` into katgpt-core, inverting the 7-repo commercial
 /// boundary. Instead, the `GpuFuture<Output = TransportOperator>` bound is
 /// applied at the **impl site** in `riir-engine` (Phase 1b):
 ///
