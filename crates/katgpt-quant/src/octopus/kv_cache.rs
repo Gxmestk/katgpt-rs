@@ -31,14 +31,16 @@ use super::types::{OctopusCodebook, OctopusConfig, OctopusLayer, TripletIndices}
 pub struct OctopusKVCache {
     /// Per-layer rotation matrices + dual codebooks.
     pub layers: Vec<OctopusLayer>,
-    /// Packed key triplet indices: [layer][pos][packed_bytes].
-    key_packed: Vec<Vec<Vec<u8>>>,
-    /// Per-position key L2 norms: [layer][pos].
-    key_norms: Vec<Vec<f32>>,
-    /// Packed value triplet indices: [layer][pos][packed_bytes].
-    val_packed: Vec<Vec<Vec<u8>>>,
-    /// Per-position value L2 norms: [layer][pos].
-    val_norms: Vec<Vec<f32>>,
+    /// Packed key triplet indices: flat `[n_layers * max_seq_len * key_packed_len]`.
+    /// Layer-major layout: element `(layer, pos)` is at
+    /// `(layer * max_seq_len + pos) * key_packed_len`.
+    key_packed: Vec<u8>,
+    /// Per-position key L2 norms: `[n_layers * max_seq_len]`.
+    key_norms: Vec<f32>,
+    /// Packed value triplet indices: flat `[n_layers * max_seq_len * val_packed_len]`.
+    val_packed: Vec<u8>,
+    /// Per-position value L2 norms: `[n_layers * max_seq_len]`.
+    val_norms: Vec<f32>,
     // ── Scratch buffers for hot path ──
     /// [kv_dim] — normalized vector / inverse rotation output.
     scratch_normalized: Vec<f32>,
@@ -62,6 +64,10 @@ pub struct OctopusKVCache {
     max_seq_len: usize,
     /// Number of triplets: ⌈kv_dim/3⌉.
     n_triplets: usize,
+    /// Packed bytes per key position: `packed_triplet_len(n_triplets, key_bits)`.
+    key_packed_len: usize,
+    /// Packed bytes per value position: `packed_triplet_len(n_triplets, val_bits)`.
+    val_packed_len: usize,
     // ── Small fields at end to minimize padding ──
     /// Nominal bits per key coordinate.
     key_bits: u8,
@@ -72,6 +78,24 @@ pub struct OctopusKVCache {
 }
 
 impl OctopusKVCache {
+    /// Byte offset of key data for `(layer, pos)` in the flat `key_packed`.
+    #[inline]
+    fn key_off(&self, layer: usize, pos: usize) -> usize {
+        (layer * self.max_seq_len + pos) * self.key_packed_len
+    }
+
+    /// Byte offset of value data for `(layer, pos)` in the flat `val_packed`.
+    #[inline]
+    fn val_off(&self, layer: usize, pos: usize) -> usize {
+        (layer * self.max_seq_len + pos) * self.val_packed_len
+    }
+
+    /// Flat index of key norm for `(layer, pos)`.
+    #[inline]
+    fn norm_idx(&self, layer: usize, pos: usize) -> usize {
+        layer * self.max_seq_len + pos
+    }
+
     /// Create a new OCTOPUS KV cache from transformer config.
     ///
     /// Uses the same rotation matrix for all layers (deterministic from seed 42).
@@ -120,10 +144,10 @@ impl OctopusKVCache {
 
         Self {
             layers,
-            key_packed: vec![vec![vec![0u8; packed_key_len]; cfg.max_seq_len]; cfg.n_layers],
-            key_norms: vec![vec![0.0f32; cfg.max_seq_len]; cfg.n_layers],
-            val_packed: vec![vec![vec![0u8; packed_val_len]; cfg.max_seq_len]; cfg.n_layers],
-            val_norms: vec![vec![0.0f32; cfg.max_seq_len]; cfg.n_layers],
+            key_packed: vec![0u8; cfg.n_layers * cfg.max_seq_len * packed_key_len],
+            key_norms: vec![0.0f32; cfg.n_layers * cfg.max_seq_len],
+            val_packed: vec![0u8; cfg.n_layers * cfg.max_seq_len * packed_val_len],
+            val_norms: vec![0.0f32; cfg.n_layers * cfg.max_seq_len],
             pos: 0,
             max_used_pos: 0,
             n_layers: cfg.n_layers,
@@ -133,6 +157,8 @@ impl OctopusKVCache {
             max_seq_len: cfg.max_seq_len,
             use_joint_rounding: cfg.use_joint_rounding,
             n_triplets: n_tri,
+            key_packed_len: packed_key_len,
+            val_packed_len: packed_val_len,
             scratch_normalized: vec![0.0f32; cfg.kv_dim],
             scratch_workspace: vec![0.0f32; n_tri * 3],
             scratch_triplets: Vec::with_capacity(n_tri),
@@ -146,10 +172,12 @@ impl OctopusKVCache {
         self.max_used_pos = self.max_used_pos.max(pos + 1);
         // SIMD norm computation (avoids scalar iteration)
         let norm = katgpt_core::simd::simd_sum_sq(key, self.kv_dim).sqrt();
-        self.key_norms[layer][pos] = norm;
+        let ni = self.norm_idx(layer, pos);
+        self.key_norms[ni] = norm;
 
         if norm < 1e-8 {
-            self.key_packed[layer][pos].fill(0);
+            let off = self.key_off(layer, pos);
+            self.key_packed[off..off + self.key_packed_len].fill(0);
             return;
         }
 
@@ -178,11 +206,12 @@ impl OctopusKVCache {
             &mut self.scratch_indices,
         );
         // Pack into pre-allocated buffer (zero-alloc)
+        let off = self.key_off(layer, pos);
         pack_triplet_indices_into(
             &self.scratch_indices,
             cb.dir_bits,
             cb.nrm_bits,
-            &mut self.key_packed[layer][pos],
+            &mut self.key_packed[off..off + self.key_packed_len],
         );
     }
 
@@ -192,10 +221,12 @@ impl OctopusKVCache {
         self.max_used_pos = self.max_used_pos.max(pos + 1);
         // SIMD norm computation (avoids scalar iteration)
         let norm = katgpt_core::simd::simd_sum_sq(value, self.kv_dim).sqrt();
-        self.val_norms[layer][pos] = norm;
+        let ni = self.norm_idx(layer, pos);
+        self.val_norms[ni] = norm;
 
         if norm < 1e-8 {
-            self.val_packed[layer][pos].fill(0);
+            let off = self.val_off(layer, pos);
+            self.val_packed[off..off + self.val_packed_len].fill(0);
             return;
         }
 
@@ -222,24 +253,27 @@ impl OctopusKVCache {
             &mut self.scratch_indices,
         );
         // Pack into pre-allocated buffer (zero-alloc)
+        let off = self.val_off(layer, pos);
         pack_triplet_indices_into(
             &self.scratch_indices,
             cb.dir_bits,
             cb.nrm_bits,
-            &mut self.val_packed[layer][pos],
+            &mut self.val_packed[off..off + self.val_packed_len],
         );
     }
 
     /// Dequantize key at position. Returns reconstructed key vector.
     pub fn dequantize_key(&self, layer: usize, pos: usize) -> Vec<f32> {
-        let norm = self.key_norms[layer][pos];
+        let ni = self.norm_idx(layer, pos);
+        let norm = self.key_norms[ni];
         if norm < 1e-8 {
             return vec![0.0; self.kv_dim];
         }
 
         let cb = &self.layers[layer].key_codebook;
+        let off = self.key_off(layer, pos);
         let indices = unpack_triplet_indices(
-            &self.key_packed[layer][pos],
+            &self.key_packed[off..off + self.key_packed_len],
             self.n_triplets,
             cb.dir_bits,
             cb.nrm_bits,
@@ -254,14 +288,16 @@ impl OctopusKVCache {
 
     /// Dequantize value at position. Returns reconstructed value vector.
     pub fn dequantize_value(&self, layer: usize, pos: usize) -> Vec<f32> {
-        let norm = self.val_norms[layer][pos];
+        let ni = self.norm_idx(layer, pos);
+        let norm = self.val_norms[ni];
         if norm < 1e-8 {
             return vec![0.0; self.kv_dim];
         }
 
         let cb = &self.layers[layer].val_codebook;
+        let off = self.val_off(layer, pos);
         let indices = unpack_triplet_indices(
-            &self.val_packed[layer][pos],
+            &self.val_packed[off..off + self.val_packed_len],
             self.n_triplets,
             cb.dir_bits,
             cb.nrm_bits,
@@ -279,7 +315,8 @@ impl OctopusKVCache {
     /// Uses internal scratch buffers — requires `&mut self`.
     pub fn dequantize_key_into(&mut self, layer: usize, pos: usize, out: &mut [f32]) {
         debug_assert_eq!(out.len(), self.kv_dim);
-        let norm = self.key_norms[layer][pos];
+        let ni = self.norm_idx(layer, pos);
+        let norm = self.key_norms[ni];
 
         if norm < 1e-8 {
             out.fill(0.0);
@@ -287,8 +324,9 @@ impl OctopusKVCache {
         }
 
         let cb = &self.layers[layer].key_codebook;
+        let off = self.key_off(layer, pos);
         unpack_triplet_indices_into(
-            &self.key_packed[layer][pos],
+            &self.key_packed[off..off + self.key_packed_len],
             self.n_triplets,
             cb.dir_bits,
             cb.nrm_bits,
@@ -313,7 +351,8 @@ impl OctopusKVCache {
     /// Dequantize value into pre-allocated buffer. Zero-alloc hot path.
     pub fn dequantize_value_into(&mut self, layer: usize, pos: usize, out: &mut [f32]) {
         debug_assert_eq!(out.len(), self.kv_dim);
-        let norm = self.val_norms[layer][pos];
+        let ni = self.norm_idx(layer, pos);
+        let norm = self.val_norms[ni];
 
         if norm < 1e-8 {
             out.fill(0.0);
@@ -321,8 +360,9 @@ impl OctopusKVCache {
         }
 
         let cb = &self.layers[layer].val_codebook;
+        let off = self.val_off(layer, pos);
         unpack_triplet_indices_into(
-            &self.val_packed[layer][pos],
+            &self.val_packed[off..off + self.val_packed_len],
             self.n_triplets,
             cb.dir_bits,
             cb.nrm_bits,
@@ -344,14 +384,15 @@ impl OctopusKVCache {
     /// Reset cache for a new sequence.
     pub fn reset(&mut self) {
         let used = self.max_used_pos;
-        for layer in 0..self.n_layers {
-            for pos in 0..used {
-                self.key_packed[layer][pos].fill(0);
-                self.key_norms[layer][pos] = 0.0;
-                self.val_packed[layer][pos].fill(0);
-                self.val_norms[layer][pos] = 0.0;
-            }
-        }
+        // Flat buffers: the first `n_layers * used` positions are contiguous,
+        // so we can clear them with `fill` calls instead of a nested loop.
+        let key_bytes = self.n_layers * used * self.key_packed_len;
+        let val_bytes = self.n_layers * used * self.val_packed_len;
+        self.key_packed[..key_bytes].fill(0);
+        self.val_packed[..val_bytes].fill(0);
+        let norm_count = self.n_layers * used;
+        self.key_norms[..norm_count].fill(0.0);
+        self.val_norms[..norm_count].fill(0.0);
         self.pos = 0;
         self.max_used_pos = 0;
     }
@@ -701,11 +742,11 @@ mod tests {
         let mut cache = make_cache(64, 2, 2);
         let key: Vec<f32> = (0..64).map(|i| (i as f32 * 0.1).sin()).collect();
         cache.store_key(0, 0, &key);
-        assert!(cache.key_norms[0][0] > 0.0);
+        assert!(cache.key_norms[0] > 0.0);
 
         cache.reset();
         assert_eq!(cache.pos, 0);
-        assert!(cache.key_norms[0][0].abs() < 1e-6);
+        assert!(cache.key_norms[0].abs() < 1e-6);
     }
 
     // ── Multi-layer independence ─────────────────────────────

@@ -121,14 +121,16 @@ impl TileMeta {
 /// asymmetric RTN with dual scales.
 pub struct KVarNKVCache {
     // ── Storage fields (Vec: 24 bytes each, pointer-aligned) ──
-    /// Quantized key data: [layer][tile][packed_bytes].
-    key_quantized: Vec<Vec<Vec<u8>>>,
+    /// Quantized key data: flat `[n_layers * n_tiles * key_tile_packed_len]`.
+    /// Layer-tile-major layout: element `(layer, tile)` is at
+    /// `(layer * n_tiles + tile) * key_tile_packed_len`.
+    key_quantized: Vec<u8>,
     /// Key tile metadata: [layer][tile].
     key_tiles: Vec<Vec<TileMeta>>,
     /// Key tile buffer: [kv_dim * tile_size] — accumulates raw data for current tile.
     key_buffer: Vec<f32>,
-    /// Quantized value data: [layer][tile][packed_bytes].
-    val_quantized: Vec<Vec<Vec<u8>>>,
+    /// Quantized value data: flat `[n_layers * n_tiles * val_tile_packed_len]`.
+    val_quantized: Vec<u8>,
     /// Value tile metadata: [layer][tile].
     val_tiles: Vec<Vec<TileMeta>>,
     /// Value tile buffer: [tile_size * kv_dim].
@@ -178,6 +180,10 @@ pub struct KVarNKVCache {
     /// Bytes per row for packed quantized data.
     #[allow(dead_code)] // computed at construction for fast path access
     bytes_per_row: usize,
+    /// Packed bytes per key tile: `bytes_per_row * kv_dim`.
+    key_tile_packed_len: usize,
+    /// Packed bytes per value tile: `packed_bytes_per_row(kv_dim, bits) * tile_size`.
+    val_tile_packed_len: usize,
     // ── Small fields at end ──
     /// Bits per element.
     bits: u8,
@@ -199,6 +205,18 @@ pub struct KVarNKVCache {
 }
 
 impl KVarNKVCache {
+    /// Byte offset of key tile `(layer, tile_idx)` in the flat `key_quantized`.
+    #[inline]
+    fn key_tile_off(&self, layer: usize, tile_idx: usize) -> usize {
+        (layer * self.n_tiles + tile_idx) * self.key_tile_packed_len
+    }
+
+    /// Byte offset of value tile `(layer, tile_idx)` in the flat `val_quantized`.
+    #[inline]
+    fn val_tile_off(&self, layer: usize, tile_idx: usize) -> usize {
+        (layer * self.n_tiles + tile_idx) * self.val_tile_packed_len
+    }
+
     /// Create a new KVarN KV cache from config.
     pub fn with_config(cfg: &KVarNConfig) -> Self {
         let n_tiles = cfg.max_seq_len.div_ceil(cfg.tile_size);
@@ -212,10 +230,12 @@ impl KVarNKVCache {
         let val_tile_cols = cfg.kv_dim;
 
         let bytes_per_row = packed_bytes_per_row(tile_size, cfg.bits);
+        let key_tile_packed_len = bytes_per_row * cfg.kv_dim;
+        let val_tile_packed_len = packed_bytes_per_row(cfg.kv_dim, cfg.bits) * tile_size;
 
-        // Initialize per-layer, per-tile storage
+        // Initialize per-layer, per-tile storage (flat: one contiguous allocation)
         let key_quantized =
-            vec![vec![vec![0u8; bytes_per_row * cfg.kv_dim]; n_tiles]; cfg.n_layers];
+            vec![0u8; cfg.n_layers * n_tiles * key_tile_packed_len];
         let key_tiles: Vec<Vec<TileMeta>> = (0..cfg.n_layers)
             .map(|_| {
                 (0..n_tiles)
@@ -225,10 +245,7 @@ impl KVarNKVCache {
             .collect();
 
         let val_quantized =
-            vec![
-                vec![vec![0u8; packed_bytes_per_row(cfg.kv_dim, cfg.bits) * tile_size]; n_tiles];
-                cfg.n_layers
-            ];
+            vec![0u8; cfg.n_layers * n_tiles * val_tile_packed_len];
         let val_tiles: Vec<Vec<TileMeta>> = (0..cfg.n_layers)
             .map(|_| {
                 (0..n_tiles)
@@ -273,6 +290,8 @@ impl KVarNKVCache {
             tile_size,
             n_tiles,
             bytes_per_row,
+            key_tile_packed_len,
+            val_tile_packed_len,
             bits: cfg.bits,
             hadamard: cfg.hadamard,
             skip_varn: cfg.bits <= 2,
@@ -369,7 +388,8 @@ impl KVarNKVCache {
         let bpr = packed_bytes_per_row(actual_cols, self.bits);
         let kv_dim = self.kv_dim;
 
-        let quantized = &self.key_quantized[layer][tile_idx];
+        let quantized_off = self.key_tile_off(layer, tile_idx);
+        let quantized = &self.key_quantized[quantized_off..quantized_off + self.key_tile_packed_len];
 
         // Precompute column-scale constant (same for all channels)
         let var_col = tile.var_scales.s_col[pos_in_tile];
@@ -465,7 +485,8 @@ impl KVarNKVCache {
         let bpr = packed_bytes_per_row(kv_dim, self.bits);
 
         let row_off = pos_in_tile * bpr;
-        let packed_row = &self.val_quantized[layer][tile_idx][row_off..row_off + bpr];
+        let tile_off = self.val_tile_off(layer, tile_idx);
+        let packed_row = &self.val_quantized[tile_off + row_off..tile_off + row_off + bpr];
 
         // Precompute row-scale constant (same for all channels in this row)
         let var_row = tile.var_scales.s_row[pos_in_tile];
@@ -643,12 +664,12 @@ impl KVarNKVCache {
         self.pos = 0;
         self.key_buffer.fill(0.0);
         self.val_buffer.fill(0.0);
+        self.key_quantized.fill(0);
+        self.val_quantized.fill(0);
         for layer in 0..self.n_layers {
             for t in 0..self.n_tiles {
                 self.key_tiles[layer][t].count = 0;
                 self.val_tiles[layer][t].count = 0;
-                self.key_quantized[layer][t].fill(0);
-                self.val_quantized[layer][t].fill(0);
             }
         }
     }
@@ -797,12 +818,14 @@ impl KVarNKVCache {
         meta.rtn_scales = rtn_scales;
         meta.rtn_zp = rtn_zp;
 
-        let quantized = &mut self.key_quantized[layer][tile_idx];
+        let off = self.key_tile_off(layer, tile_idx);
+        let quantized = &mut self.key_quantized[off..off + self.key_tile_packed_len];
         let expected_len = rows * bpr;
-        if quantized.len() != expected_len {
-            quantized.resize(expected_len, 0);
-        }
-        quantized.copy_from_slice(&packed);
+        // Zero the entire slot first, then write the packed data at the front.
+        // The slot is pre-sized for a full tile (tile_size cols); actual packed
+        // data may be shorter for partial tiles.
+        quantized.fill(0);
+        quantized[..expected_len].copy_from_slice(&packed);
     }
 
     /// Quantize a value tile: [tile_size, kv_dim] with variance normalization.
@@ -927,12 +950,14 @@ impl KVarNKVCache {
         meta.rtn_scales = rtn_scales;
         meta.rtn_zp = rtn_zp;
 
-        let quantized = &mut self.val_quantized[layer][tile_idx];
+        let off = self.val_tile_off(layer, tile_idx);
+        let quantized = &mut self.val_quantized[off..off + self.val_tile_packed_len];
         let expected_len = rows * bpr;
-        if quantized.len() != expected_len {
-            quantized.resize(expected_len, 0);
-        }
-        quantized.copy_from_slice(&packed);
+        // Zero the entire slot first, then write the packed data at the front.
+        // The slot is pre-sized for a full tile (tile_size rows); actual packed
+        // data may be shorter for partial tiles.
+        quantized.fill(0);
+        quantized[..expected_len].copy_from_slice(&packed);
     }
 }
 
@@ -1587,17 +1612,7 @@ mod tests {
         }
 
         // Calculate quantized data bytes
-        let mut quantized_bytes: usize = 0;
-        for layer in &cache.key_quantized {
-            for tile in layer {
-                quantized_bytes += tile.len();
-            }
-        }
-        for layer in &cache.val_quantized {
-            for tile in layer {
-                quantized_bytes += tile.len();
-            }
-        }
+        let quantized_bytes = cache.key_quantized.len() + cache.val_quantized.len();
 
         // Approximate scale overhead per tile (conservative)
         let n_tiles = config.max_seq_len.div_ceil(config.tile_size);

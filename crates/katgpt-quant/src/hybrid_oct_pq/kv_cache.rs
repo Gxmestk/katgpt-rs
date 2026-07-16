@@ -41,14 +41,16 @@ pub struct HybridOctPqKVCache {
     // ── Storage fields (Vec: 24 bytes each, pointer-aligned) ──
     /// Per-layer PQ rotations + OCT codebooks.
     pub layers: Vec<HybridOctPqLayer>,
-    /// Packed key triplet indices: [layer][pos][packed_bytes].
-    key_packed: Vec<Vec<Vec<u8>>>,
-    /// Per-position key L2 norms: [layer][pos].
-    key_norms: Vec<Vec<f32>>,
-    /// Packed value triplet indices: [layer][pos][packed_bytes].
-    val_packed: Vec<Vec<Vec<u8>>>,
-    /// Per-position value L2 norms: [layer][pos].
-    val_norms: Vec<Vec<f32>>,
+    /// Packed key triplet indices: flat `[n_layers * max_seq_len * key_packed_len]`.
+    /// Layer-major layout: element `(layer, pos)` is at
+    /// `(layer * max_seq_len + pos) * key_packed_len`.
+    key_packed: Vec<u8>,
+    /// Per-position key L2 norms: `[n_layers * max_seq_len]`.
+    key_norms: Vec<f32>,
+    /// Packed value triplet indices: flat `[n_layers * max_seq_len * val_packed_len]`.
+    val_packed: Vec<u8>,
+    /// Per-position value L2 norms: `[n_layers * max_seq_len]`.
+    val_norms: Vec<f32>,
     // ── Scratch buffers for zero-alloc hot path ──
     /// [kv_dim_padded] — normalized vector / PQ rotation input.
     scratch_normalized: Vec<f32>,
@@ -76,6 +78,10 @@ pub struct HybridOctPqKVCache {
     n_triplets: usize,
     /// Highest position ever written (for efficient reset).
     max_used_pos: usize,
+    /// Packed bytes per key position: `packed_triplet_len(n_triplets, key_bits)`.
+    key_packed_len: usize,
+    /// Packed bytes per value position: `packed_triplet_len(n_triplets, val_bits)`.
+    val_packed_len: usize,
     // ── Small fields at end (packed, 3 bytes + 5 padding) ──
     /// Nominal bits per key coordinate.
     key_bits: u8,
@@ -86,6 +92,24 @@ pub struct HybridOctPqKVCache {
 }
 
 impl HybridOctPqKVCache {
+    /// Byte offset of key data for `(layer, pos)` in the flat `key_packed`.
+    #[inline]
+    fn key_off(&self, layer: usize, pos: usize) -> usize {
+        (layer * self.max_seq_len + pos) * self.key_packed_len
+    }
+
+    /// Byte offset of value data for `(layer, pos)` in the flat `val_packed`.
+    #[inline]
+    fn val_off(&self, layer: usize, pos: usize) -> usize {
+        (layer * self.max_seq_len + pos) * self.val_packed_len
+    }
+
+    /// Flat index of key norm for `(layer, pos)`.
+    #[inline]
+    fn norm_idx(&self, layer: usize, pos: usize) -> usize {
+        layer * self.max_seq_len + pos
+    }
+
     /// Create from explicit config.
     ///
     /// Per-layer PQ rotations are generated with deterministic seed offsets.
@@ -121,10 +145,10 @@ impl HybridOctPqKVCache {
 
         Self {
             layers,
-            key_packed: vec![vec![vec![0u8; packed_key_len]; cfg.max_seq_len]; cfg.n_layers],
-            key_norms: vec![vec![0.0f32; cfg.max_seq_len]; cfg.n_layers],
-            val_packed: vec![vec![vec![0u8; packed_val_len]; cfg.max_seq_len]; cfg.n_layers],
-            val_norms: vec![vec![0.0f32; cfg.max_seq_len]; cfg.n_layers],
+            key_packed: vec![0u8; cfg.n_layers * cfg.max_seq_len * packed_key_len],
+            key_norms: vec![0.0f32; cfg.n_layers * cfg.max_seq_len],
+            val_packed: vec![0u8; cfg.n_layers * cfg.max_seq_len * packed_val_len],
+            val_norms: vec![0.0f32; cfg.n_layers * cfg.max_seq_len],
             scratch_normalized: vec![0.0f32; kv_dim_padded],
             scratch_rotated: vec![0.0f32; kv_dim_padded],
             scratch_workspace: vec![0.0f32; n_tri * 3],
@@ -137,6 +161,8 @@ impl HybridOctPqKVCache {
             max_seq_len: cfg.max_seq_len,
             n_triplets: n_tri,
             max_used_pos: 0,
+            key_packed_len: packed_key_len,
+            val_packed_len: packed_val_len,
             key_bits: cfg.key_bits,
             val_bits: cfg.val_bits,
             use_joint_rounding: cfg.use_joint_rounding,
@@ -152,10 +178,12 @@ impl HybridOctPqKVCache {
             self.max_used_pos = pos;
         }
         let norm = katgpt_core::simd::simd_sum_sq(key, key.len()).sqrt();
-        self.key_norms[layer][pos] = norm;
+        let ni = self.norm_idx(layer, pos);
+        self.key_norms[ni] = norm;
 
         if norm < 1e-8 {
-            self.key_packed[layer][pos].fill(0);
+            let off = self.key_off(layer, pos);
+            self.key_packed[off..off + self.key_packed_len].fill(0);
             return;
         }
 
@@ -190,11 +218,12 @@ impl HybridOctPqKVCache {
         );
 
         // 5. Bit-pack triplet indices directly into packed buffer
+        let off = self.key_off(layer, pos);
         pack_triplet_indices_into(
             &self.scratch_indices,
             cb.dir_bits,
             cb.nrm_bits,
-            &mut self.key_packed[layer][pos],
+            &mut self.key_packed[off..off + self.key_packed_len],
         );
     }
 
@@ -205,10 +234,12 @@ impl HybridOctPqKVCache {
             self.max_used_pos = pos;
         }
         let norm = katgpt_core::simd::simd_sum_sq(value, value.len()).sqrt();
-        self.val_norms[layer][pos] = norm;
+        let ni = self.norm_idx(layer, pos);
+        self.val_norms[ni] = norm;
 
         if norm < 1e-8 {
-            self.val_packed[layer][pos].fill(0);
+            let off = self.val_off(layer, pos);
+            self.val_packed[off..off + self.val_packed_len].fill(0);
             return;
         }
 
@@ -237,24 +268,27 @@ impl HybridOctPqKVCache {
             &mut self.scratch_indices,
         );
 
+        let off = self.val_off(layer, pos);
         pack_triplet_indices_into(
             &self.scratch_indices,
             cb.dir_bits,
             cb.nrm_bits,
-            &mut self.val_packed[layer][pos],
+            &mut self.val_packed[off..off + self.val_packed_len],
         );
     }
 
     /// Dequantize key at position. Returns reconstructed key vector.
     pub fn dequantize_key(&self, layer: usize, pos: usize) -> Vec<f32> {
-        let norm = self.key_norms[layer][pos];
+        let ni = self.norm_idx(layer, pos);
+        let norm = self.key_norms[ni];
         if norm < 1e-8 {
             return vec![0.0; self.kv_dim];
         }
 
         let cb = &self.layers[layer].key_codebook;
+        let off = self.key_off(layer, pos);
         let indices = unpack_triplet_indices(
-            &self.key_packed[layer][pos],
+            &self.key_packed[off..off + self.key_packed_len],
             self.n_triplets,
             cb.dir_bits,
             cb.nrm_bits,
@@ -276,14 +310,16 @@ impl HybridOctPqKVCache {
 
     /// Dequantize value at position. Returns reconstructed value vector.
     pub fn dequantize_value(&self, layer: usize, pos: usize) -> Vec<f32> {
-        let norm = self.val_norms[layer][pos];
+        let ni = self.norm_idx(layer, pos);
+        let norm = self.val_norms[ni];
         if norm < 1e-8 {
             return vec![0.0; self.kv_dim];
         }
 
         let cb = &self.layers[layer].val_codebook;
+        let off = self.val_off(layer, pos);
         let indices = unpack_triplet_indices(
-            &self.val_packed[layer][pos],
+            &self.val_packed[off..off + self.val_packed_len],
             self.n_triplets,
             cb.dir_bits,
             cb.nrm_bits,
@@ -305,7 +341,8 @@ impl HybridOctPqKVCache {
     /// Uses internal scratch buffers — requires `&mut self`.
     pub fn dequantize_key_into(&mut self, layer: usize, pos: usize, out: &mut [f32]) {
         debug_assert_eq!(out.len(), self.kv_dim);
-        let norm = self.key_norms[layer][pos];
+        let ni = self.norm_idx(layer, pos);
+        let norm = self.key_norms[ni];
 
         if norm < 1e-8 {
             out.fill(0.0);
@@ -313,8 +350,9 @@ impl HybridOctPqKVCache {
         }
 
         let cb = &self.layers[layer].key_codebook;
+        let off = self.key_off(layer, pos);
         unpack_triplet_indices_into(
-            &self.key_packed[layer][pos],
+            &self.key_packed[off..off + self.key_packed_len],
             self.n_triplets,
             cb.dir_bits,
             cb.nrm_bits,
@@ -348,7 +386,8 @@ impl HybridOctPqKVCache {
     /// Dequantize value into pre-allocated buffer. Zero-alloc hot path.
     pub fn dequantize_value_into(&mut self, layer: usize, pos: usize, out: &mut [f32]) {
         debug_assert_eq!(out.len(), self.kv_dim);
-        let norm = self.val_norms[layer][pos];
+        let ni = self.norm_idx(layer, pos);
+        let norm = self.val_norms[ni];
 
         if norm < 1e-8 {
             out.fill(0.0);
@@ -356,8 +395,9 @@ impl HybridOctPqKVCache {
         }
 
         let cb = &self.layers[layer].val_codebook;
+        let off = self.val_off(layer, pos);
         unpack_triplet_indices_into(
-            &self.val_packed[layer][pos],
+            &self.val_packed[off..off + self.val_packed_len],
             self.n_triplets,
             cb.dir_bits,
             cb.nrm_bits,
@@ -385,15 +425,16 @@ impl HybridOctPqKVCache {
     /// Reset cache for new sequence.
     pub fn reset(&mut self) {
         // Only clear positions that were actually used.
-        let limit = self.max_used_pos + 1;
-        for layer in 0..self.n_layers {
-            for pos in 0..limit {
-                self.key_packed[layer][pos].fill(0);
-                self.key_norms[layer][pos] = 0.0;
-                self.val_packed[layer][pos].fill(0);
-                self.val_norms[layer][pos] = 0.0;
-            }
-        }
+        let used = self.max_used_pos + 1;
+        // Flat buffers: the first `n_layers * used` positions are contiguous,
+        // so we can clear them with `fill` calls instead of a nested loop.
+        let key_bytes = self.n_layers * used * self.key_packed_len;
+        let val_bytes = self.n_layers * used * self.val_packed_len;
+        self.key_packed[..key_bytes].fill(0);
+        self.val_packed[..val_bytes].fill(0);
+        let norm_count = self.n_layers * used;
+        self.key_norms[..norm_count].fill(0.0);
+        self.val_norms[..norm_count].fill(0.0);
         self.pos = 0;
         self.max_used_pos = 0;
     }
@@ -697,11 +738,11 @@ mod tests {
 
         let key = make_random_vec(config.kv_dim, 42);
         cache.store_key(0, 0, &key);
-        assert!(cache.key_norms[0][0] > 0.0);
+        assert!(cache.key_norms[0] > 0.0);
 
         cache.reset();
         assert_eq!(cache.pos(), 0);
-        assert_eq!(cache.key_norms[0][0], 0.0);
+        assert_eq!(cache.key_norms[0], 0.0);
     }
 
     #[test]

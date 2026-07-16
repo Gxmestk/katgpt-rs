@@ -28,14 +28,16 @@ pub struct SpectralQuantKVCache {
     // ── Vec fields first (24 bytes, 8-byte aligned) ──
     /// Per-layer calibration + codebooks.
     pub layers: Vec<SpectralQuantLayer>,
-    /// Packed key indices: [layer][position] → variable-bit packed bytes.
-    key_indices: Vec<Vec<Vec<u8>>>,
-    /// Per-position key norms.
-    key_norms: Vec<Vec<f32>>,
-    /// Packed value indices.
-    val_indices: Vec<Vec<Vec<u8>>>,
-    /// Per-position value norms.
-    val_norms: Vec<Vec<f32>>,
+    /// Packed key indices: flat `[n_layers * max_seq_len * key_packed_len]`.
+    /// Layer-major layout: element `(layer, pos)` is at
+    /// `(layer * max_seq_len + pos) * key_packed_len`.
+    key_indices: Vec<u8>,
+    /// Per-position key norms (for reconstruction): `[n_layers * max_seq_len]`.
+    key_norms: Vec<f32>,
+    /// Packed value indices: flat `[n_layers * max_seq_len * val_packed_len]`.
+    val_indices: Vec<u8>,
+    /// Per-position value norms: `[n_layers * max_seq_len]`.
+    val_norms: Vec<f32>,
     // ── Scratch buffers (zero-alloc hot path) ──
     scratch_normalized: Vec<f32>,
     scratch_rotated: Vec<f32>,
@@ -46,9 +48,15 @@ pub struct SpectralQuantKVCache {
     // ── usize fields (8-byte aligned, no padding between them) ──
     /// Current write position.
     pos: usize,
+    /// Number of layers (retained for capacity reasoning; reset uses flat fills).
+    #[allow(dead_code)]
     n_layers: usize,
     kv_dim: usize,
     max_seq_len: usize,
+    /// Packed bytes per key position: conservative `kv_dim` (1 byte/dim).
+    key_packed_len: usize,
+    /// Packed bytes per value position: conservative `kv_dim` (1 byte/dim).
+    val_packed_len: usize,
 }
 
 /// Per-thread scratch buffers for parallel dequantize operations.
@@ -86,6 +94,24 @@ enum StoreTarget {
 }
 
 impl SpectralQuantKVCache {
+    /// Byte offset of key data for `(layer, pos)` in the flat `key_indices`.
+    #[inline]
+    fn key_off(&self, layer: usize, pos: usize) -> usize {
+        (layer * self.max_seq_len + pos) * self.key_packed_len
+    }
+
+    /// Byte offset of value data for `(layer, pos)` in the flat `val_indices`.
+    #[inline]
+    fn val_off(&self, layer: usize, pos: usize) -> usize {
+        (layer * self.max_seq_len + pos) * self.val_packed_len
+    }
+
+    /// Flat index of norm for `(layer, pos)`.
+    #[inline]
+    fn norm_idx(&self, layer: usize, pos: usize) -> usize {
+        layer * self.max_seq_len + pos
+    }
+
     /// Create from pre-computed calibration data and config.
     ///
     /// **Prefer `from_keys()` for new code** — it auto-calibrates from actual data
@@ -329,14 +355,16 @@ impl SpectralQuantKVCache {
 
         Self {
             layers,
-            key_indices: vec![vec![vec![0u8; max_packed]; max_seq_len]; n_layers],
-            key_norms: vec![vec![0.0f32; max_seq_len]; n_layers],
-            val_indices: vec![vec![vec![0u8; max_packed]; max_seq_len]; n_layers],
-            val_norms: vec![vec![0.0f32; max_seq_len]; n_layers],
+            key_indices: vec![0u8; n_layers * max_seq_len * max_packed],
+            key_norms: vec![0.0f32; n_layers * max_seq_len],
+            val_indices: vec![0u8; n_layers * max_seq_len * max_packed],
+            val_norms: vec![0.0f32; n_layers * max_seq_len],
             pos: 0,
             n_layers,
             kv_dim,
             max_seq_len,
+            key_packed_len: max_packed,
+            val_packed_len: max_packed,
             scratch_normalized: vec![0.0f32; kv_dim],
             scratch_rotated: vec![0.0f32; kv_dim],
             scratch_unrotated: vec![0.0f32; kv_dim],
@@ -411,27 +439,35 @@ impl SpectralQuantKVCache {
         debug_assert_eq!(vec.len(), self.kv_dim);
         let layer_state = &self.layers[layer];
         let d_eff = layer_state.d_eff;
-
-        // Select the destination norm + packed-indices slots once so the rest of
-        // the body stays branch-free on `target` (one select instead of 3 matches).
-        let (norm_slot, packed_slot): (&mut f32, &mut Vec<u8>) = match target {
-            StoreTarget::Key => (
-                &mut self.key_norms[layer][pos],
-                &mut self.key_indices[layer][pos],
-            ),
-            StoreTarget::Value => (
-                &mut self.val_norms[layer][pos],
-                &mut self.val_indices[layer][pos],
-            ),
-        };
+        // Compute flat-storage offsets before any mutable borrows below.
+        let ni = self.norm_idx(layer, pos);
+        let key_off = self.key_off(layer, pos);
+        let val_off = self.val_off(layer, pos);
+        let key_packed_len = self.key_packed_len;
+        let val_packed_len = self.val_packed_len;
 
         // Compute norm
         let norm = simd_norm(vec);
         if norm < 1e-8 {
-            *norm_slot = 0.0;
+            // Zero norm → zero norm slot + zero packed data
+            match target {
+                StoreTarget::Key => {
+                    self.key_norms[ni] = 0.0;
+                    self.key_indices[key_off..key_off + key_packed_len].fill(0);
+                }
+                StoreTarget::Value => {
+                    self.val_norms[ni] = 0.0;
+                    self.val_indices[val_off..val_off + val_packed_len].fill(0);
+                }
+            }
             return;
         }
-        *norm_slot = norm;
+
+        // Store norm
+        match target {
+            StoreTarget::Key => self.key_norms[ni] = norm,
+            StoreTarget::Value => self.val_norms[ni] = norm,
+        }
 
         // Normalize into scratch buffer
         let inv_norm = 1.0 / norm;
@@ -476,12 +512,21 @@ impl SpectralQuantKVCache {
         all_indices[..d_eff].copy_from_slice(&self.scratch_semantic_indices[..d_eff]);
         all_indices[d_eff..self.kv_dim].copy_from_slice(&self.scratch_tail_indices[..tail_len]);
 
-        // Pack variable bits into storage using precomputed packed_bits
-        pack_variable_bits(
-            &all_indices[..self.kv_dim],
-            &layer_state.packed_bits,
-            packed_slot,
-        );
+        // Pack variable bits into flat storage using precomputed packed_bits.
+        // The slot is pre-zeroed so trailing bytes beyond the actual packed
+        // length are clean for subsequent unpack reads.
+        match target {
+            StoreTarget::Key => {
+                let slot = &mut self.key_indices[key_off..key_off + key_packed_len];
+                slot.fill(0);
+                pack_variable_bits(&all_indices[..self.kv_dim], &layer_state.packed_bits, slot);
+            }
+            StoreTarget::Value => {
+                let slot = &mut self.val_indices[val_off..val_off + val_packed_len];
+                slot.fill(0);
+                pack_variable_bits(&all_indices[..self.kv_dim], &layer_state.packed_bits, slot);
+            }
+        }
     }
 
     /// Dequantize a key at position into a new vector.
@@ -490,7 +535,7 @@ impl SpectralQuantKVCache {
         // We need &mut self for scratch buffers, so use a temporary approach
         // by reconstructing directly without scratch
         let layer_state = &self.layers[layer];
-        let norm = self.key_norms[layer][pos];
+        let norm = self.key_norms[self.norm_idx(layer, pos)];
         if norm < 1e-8 {
             return out;
         }
@@ -498,8 +543,9 @@ impl SpectralQuantKVCache {
         let d_eff = layer_state.d_eff;
 
         let mut all_indices = vec![0u8; self.kv_dim];
+        let off = self.key_off(layer, pos);
         unpack_variable_bits(
-            &self.key_indices[layer][pos],
+            &self.key_indices[off..off + self.key_packed_len],
             &layer_state.packed_bits,
             self.kv_dim,
             &mut all_indices,
@@ -536,7 +582,7 @@ impl SpectralQuantKVCache {
     /// Dequantize a value at position into a new vector.
     pub fn dequantize_value(&self, layer: usize, pos: usize) -> Vec<f32> {
         let layer_state = &self.layers[layer];
-        let norm = self.val_norms[layer][pos];
+        let norm = self.val_norms[self.norm_idx(layer, pos)];
         if norm < 1e-8 {
             return vec![0.0f32; self.kv_dim];
         }
@@ -544,8 +590,9 @@ impl SpectralQuantKVCache {
         let d_eff = layer_state.d_eff;
 
         let mut all_indices = vec![0u8; self.kv_dim];
+        let off = self.val_off(layer, pos);
         unpack_variable_bits(
-            &self.val_indices[layer][pos],
+            &self.val_indices[off..off + self.val_packed_len],
             &layer_state.packed_bits,
             self.kv_dim,
             &mut all_indices,
@@ -582,7 +629,11 @@ impl SpectralQuantKVCache {
     pub fn dequantize_key_into(&mut self, layer: usize, pos: usize, out: &mut [f32]) {
         debug_assert_eq!(out.len(), self.kv_dim);
         let layer_state = &self.layers[layer];
-        let norm = self.key_norms[layer][pos];
+        let ni = self.norm_idx(layer, pos);
+        let off = self.key_off(layer, pos);
+        let packed_len = self.key_packed_len;
+        let kv_dim = self.kv_dim;
+        let norm = self.key_norms[ni];
 
         if norm < 1e-8 {
             out.fill(0.0);
@@ -594,9 +645,9 @@ impl SpectralQuantKVCache {
         // Unpack variable bits into scratch using precomputed packed_bits
         let all_indices = &mut self.scratch_all_indices;
         unpack_variable_bits(
-            &self.key_indices[layer][pos],
+            &self.key_indices[off..off + packed_len],
             &layer_state.packed_bits,
-            self.kv_dim,
+            kv_dim,
             all_indices,
         );
 
@@ -637,7 +688,11 @@ impl SpectralQuantKVCache {
     pub fn dequantize_value_into(&mut self, layer: usize, pos: usize, out: &mut [f32]) {
         debug_assert_eq!(out.len(), self.kv_dim);
         let layer_state = &self.layers[layer];
-        let norm = self.val_norms[layer][pos];
+        let ni = self.norm_idx(layer, pos);
+        let off = self.val_off(layer, pos);
+        let packed_len = self.val_packed_len;
+        let kv_dim = self.kv_dim;
+        let norm = self.val_norms[ni];
 
         if norm < 1e-8 {
             out.fill(0.0);
@@ -648,9 +703,9 @@ impl SpectralQuantKVCache {
 
         let all_indices = &mut self.scratch_all_indices;
         unpack_variable_bits(
-            &self.val_indices[layer][pos],
+            &self.val_indices[off..off + packed_len],
             &layer_state.packed_bits,
-            self.kv_dim,
+            kv_dim,
             all_indices,
         );
 
@@ -683,54 +738,14 @@ impl SpectralQuantKVCache {
 
     /// Reset cache for a new sequence.
     ///
-    /// Parallelized across layers via rayon when `n_layers` is large enough
-    /// to amortize thread-pool scheduling cost (~5µs per task). For small
-    /// layer counts the inner `fill` work is plain memset and runs faster
-    /// sequentially. The per-position `Vec<u8>::fill(0)` reduces to a single
-    /// `memset` call in release builds.
+    /// All flat storage buffers are cleared via `fill(0)` / `fill(0.0)` —
+    /// a single contiguous memset per buffer instead of per-position loops.
     pub fn reset(&mut self) {
         self.pos = 0;
-        let layers = self.n_layers;
-        let seq_len = self.max_seq_len;
-
-        // Treat the per-layer buckets as parallel slices so we can clear them
-        // in parallel without mutable aliasing across layers.
-        let (key_indices, val_indices, key_norms, val_norms) = (
-            self.key_indices.as_mut_slice(),
-            self.val_indices.as_mut_slice(),
-            self.key_norms.as_mut_slice(),
-            self.val_norms.as_mut_slice(),
-        );
-
-        // Sequential path beats rayon below this layer count — the inner work
-        // is memset-bound, so thread-pool overhead dominates parallel benefit.
-        const PARALLEL_LAYERS_MIN: usize = 4;
-
-        if layers < PARALLEL_LAYERS_MIN {
-            for li in 0..layers {
-                for p in 0..seq_len {
-                    key_indices[li][p].fill(0);
-                    val_indices[li][p].fill(0);
-                    key_norms[li][p] = 0.0;
-                    val_norms[li][p] = 0.0;
-                }
-            }
-            return;
-        }
-
-        key_indices
-            .par_iter_mut()
-            .zip(val_indices.par_iter_mut())
-            .zip(key_norms.par_iter_mut())
-            .zip(val_norms.par_iter_mut())
-            .for_each(|(((ki, vi), kn), vn)| {
-                for p in 0..seq_len {
-                    ki[p].fill(0);
-                    vi[p].fill(0);
-                    kn[p] = 0.0;
-                    vn[p] = 0.0;
-                }
-            });
+        self.key_indices.fill(0);
+        self.val_indices.fill(0);
+        self.key_norms.fill(0.0);
+        self.val_norms.fill(0.0);
     }
 
     /// Current write position.
@@ -783,7 +798,7 @@ impl SpectralQuantKVCache {
     ) {
         debug_assert_eq!(out.len(), self.kv_dim);
         let layer_state = &self.layers[layer];
-        let norm = self.key_norms[layer][pos];
+        let norm = self.key_norms[self.norm_idx(layer, pos)];
 
         if norm < 1e-8 {
             out.fill(0.0);
@@ -793,8 +808,9 @@ impl SpectralQuantKVCache {
         let d_eff = layer_state.d_eff;
 
         let all_indices = &mut scratch.all_indices;
+        let off = self.key_off(layer, pos);
         unpack_variable_bits(
-            &self.key_indices[layer][pos],
+            &self.key_indices[off..off + self.key_packed_len],
             &layer_state.packed_bits,
             self.kv_dim,
             all_indices,
@@ -842,7 +858,7 @@ impl SpectralQuantKVCache {
     ) {
         debug_assert_eq!(out.len(), self.kv_dim);
         let layer_state = &self.layers[layer];
-        let norm = self.val_norms[layer][pos];
+        let norm = self.val_norms[self.norm_idx(layer, pos)];
 
         if norm < 1e-8 {
             out.fill(0.0);
@@ -852,8 +868,9 @@ impl SpectralQuantKVCache {
         let d_eff = layer_state.d_eff;
 
         let all_indices = &mut scratch.all_indices;
+        let off = self.val_off(layer, pos);
         unpack_variable_bits(
-            &self.val_indices[layer][pos],
+            &self.val_indices[off..off + self.val_packed_len],
             &layer_state.packed_bits,
             self.kv_dim,
             all_indices,
@@ -1203,11 +1220,11 @@ fn dequantize_idx(idx: u8, centroids: &[f32]) -> f32 {
 ///
 /// Each index uses `bits_per_dim[i]` bits. Output is written LSB-first.
 ///
-/// Writes directly into pre-allocated slots in `out` rather than `push`ing
-/// — callers `clear()` and `reserve()` upfront, so the per-byte capacity
-/// check inside `Vec::push` is pure overhead in this hot path.
-fn pack_variable_bits(indices: &[u8], bits_per_dim: &[u8], out: &mut Vec<u8>) {
-    out.clear();
+/// Writes directly into `out` (a pre-zeroed slice). The caller MUST zero
+/// `out` before calling — this function only writes the bytes that carry
+/// packed bits; trailing bytes within the slot remain zero from the caller's
+/// pre-zero.
+fn pack_variable_bits(indices: &[u8], bits_per_dim: &[u8], out: &mut [u8]) {
     // Callers always pass a full-length bits_per_dim (see store/dequantize sites),
     // so we can sum the leading `indices.len()` entries directly instead of
     // the prior enumerate+get+unwrap_or pattern (which redundantly bounds-checked).
@@ -1217,7 +1234,12 @@ fn pack_variable_bits(indices: &[u8], bits_per_dim: &[u8], out: &mut Vec<u8>) {
         .map(|&b| b as usize)
         .sum();
     let total_bytes = total_bits.div_ceil(8);
-    out.resize(total_bytes, 0);
+    debug_assert!(
+        out.len() >= total_bytes,
+        "out too small: {} < {}",
+        out.len(),
+        total_bytes
+    );
 
     let mut bit_buffer = 0u64;
     let mut bits_in_buffer = 0u32;
@@ -1327,7 +1349,7 @@ mod tests {
     fn test_pack_unpack_roundtrip_2bit() {
         let indices = vec![0u8, 1, 2, 3, 0, 2, 1, 3];
         let bits = vec![2u8; 8];
-        let mut packed = Vec::new();
+        let mut packed = vec![0u8; 8];
         pack_variable_bits(&indices, &bits, &mut packed);
         let mut unpacked = vec![0u8; 8];
         unpack_variable_bits(&packed, &bits, 8, &mut unpacked);
@@ -1338,7 +1360,7 @@ mod tests {
     fn test_pack_unpack_roundtrip_variable() {
         let indices = vec![3u8, 7, 15, 1, 0];
         let bits = vec![2u8, 3, 4, 1, 1];
-        let mut packed = Vec::new();
+        let mut packed = vec![0u8; 5];
         pack_variable_bits(&indices, &bits, &mut packed);
         let mut unpacked = vec![0u8; 5];
         unpack_variable_bits(&packed, &bits, 5, &mut unpacked);
@@ -1349,7 +1371,7 @@ mod tests {
     fn test_pack_unpack_roundtrip_1bit() {
         let indices = vec![1u8, 0, 1, 1, 0, 0, 1, 0];
         let bits = vec![1u8; 8];
-        let mut packed = Vec::new();
+        let mut packed = vec![0u8; 8];
         pack_variable_bits(&indices, &bits, &mut packed);
         let mut unpacked = vec![0u8; 8];
         unpack_variable_bits(&packed, &bits, 8, &mut unpacked);
@@ -1441,12 +1463,12 @@ mod tests {
 
         let key: Vec<f32> = (0..kv_dim).map(|i| (i as f32 + 1.0).sin()).collect();
         cache.store_key(0, 0, &key);
-        assert!(cache.key_norms[0][0] > 0.0);
+        assert!(cache.key_norms[0] > 0.0);
 
         cache.reset();
         assert_eq!(cache.pos(), 0);
-        assert_eq!(cache.key_norms[0][0], 0.0);
-        assert_eq!(cache.val_norms[0][0], 0.0);
+        assert_eq!(cache.key_norms[0], 0.0);
+        assert_eq!(cache.val_norms[0], 0.0);
     }
 
     #[test]
@@ -1462,7 +1484,7 @@ mod tests {
 
         let zero_key = vec![0.0f32; kv_dim];
         cache.store_key(0, 0, &zero_key);
-        assert_eq!(cache.key_norms[0][0], 0.0);
+        assert_eq!(cache.key_norms[0], 0.0);
 
         let mut recovered = vec![1.0f32; kv_dim];
         cache.dequantize_key_into(0, 0, &mut recovered);
