@@ -142,15 +142,20 @@ with their real decode paths — see the cross-references below.
 ### Cross-repo audit reports (2026-07-17)
 
 - [`riir-ai/.benchmarks/517_emotion_scalars_interpolation_geometry_audit.md`](../../../../riir-ai/.benchmarks/517_emotion_scalars_interpolation_geometry_audit.md) — `NpcEmotionScalars` audit. Decode = `curiosity_drive()` (the existing sigmoid-blended λ-modulation scalar). iMAUVE=0.9962 on 50 anchors (5 archetype clusters × σ=0.1). Intervention battery: `latent_is_causal(10.0)` PASS. Honest caveat: high score depends on tight archetype clustering — a population straddling the sigmoid's steepest region would diverge more.
-- [`riir-neuron-db/.benchmarks/459_style_weights_interpolation_geometry_audit.md`](../../../../riir-neuron-db/.benchmarks/459_style_weights_interpolation_geometry_audit.md) — `NeuronShard::style_weights[64]` audit. Decode = identity (v1 geometric-structure audit). iMAUVE GOOD=0.9693 vs BAD=0.6994 (margin 0.27 — the metric discriminates). Intervention battery: `latent_is_causal(5.0)` PASS. Honest caveat: v2 richer-decode audit (LoRA routing projection, KARC ridge readout) is a non-blocking follow-up; the substrate's geometric foundation is sound.
+- [`riir-neuron-db/.benchmarks/459_style_weights_interpolation_geometry_audit.md`](../../../../riir-neuron-db/.benchmarks/459_style_weights_interpolation_geometry_audit.md) — `NeuronShard::style_weights[64]` audit. **v1** identity decode: iMAUVE GOOD=0.9693 vs BAD=0.6994 (margin 0.27 — the metric discriminates). **v2** runtime affect-scalar decode (`sigmoid((1/STYLE_DIM) · dot)`, mirroring `project_compacted_to_scalars`): iMAUVE=0.9984 on high-signal clustered population; intervention battery `latent_is_causal(5.0)` PASS under a high-signal anchor (matched=0, shuffled=0.20, zero=0.56, mean=0.13, noise=0.56). This answers Issue 158 three-pressure audit Q2 in the affirmative for `style_weights`. Low-signal regime documented as expected sigmoid behavior.
 
 ## Three-pressure audit (paper §1.3)
 
 For each substrate, the audit checks whether the latent summarizes-vs-routes,
 whether the runtime depends on it, and whether context stays local. These
 are documented in [Issue 158](../../.issues/158_latent_interpolation_geometry_evaluation.md)
-§"Three-pressure audit". The audit requires the real decode path and is
-therefore part of the riir-side follow-up, not this primitive.
+§"Three-pressure audit". The audit requires the real decode path.
+
+**Status (2026-07-17):**
+- **Q2 (runtime-depends-on-latent)** is **CLOSED** for both primary substrates:
+  - `NpcEmotionScalars`: `curiosity_drive()` is itself a runtime bridge — Q2 implicit.
+  - `NeuronShard::style_weights`: v2 audit (`StyleWeightsScalarSpace`) confirms `latent_is_causal(5.0)` under the runtime affect-scalar decode.
+- **Q1 (summarize-vs-route)** and **Q3 (local-context-vs-bypass)** remain `[ ]` open — they require per-substrate runtime trace infrastructure (subsampled-trajectory tests for Q1, attention-window audit for Q3). Non-blocking follow-ups.
 
 ## See also
 
