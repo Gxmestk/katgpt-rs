@@ -3,7 +3,7 @@
 **Research:** [232_Task_Relevant_Identifiability_Specialist.md](../.research/232_Task_Relevant_Identifiability_Specialist.md)
 **Paper:** arXiv 2605.12733 — From Generalist to Specialist Representation (Zheng et al., ICML 2026)
 **Date:** 2026-06-14
-**Status:** 🟢 Phase 0 complete (14 unit tests + 1 doc-test pass). Phases 1-5 pending. Unblocks Plan 264 Phase 2 and riir-ai Plan 300 Phase 0.
+**Status:** ✅ COMPLETE (2026-07-02) — All phases done, all gates PASS (G0a/G0b Phase 0; G1–G3 Fusion A BCKVSS; G4–G6 Fusion B SPLAT; G7–G9 Fusion C CCCP; G10 Phase 4 adaptive CoT). T5.3 promotion DONE 2026-07-02: `band_conditioner`, `specialist_projection`, `collider_consistency` all DEFAULT-ON in root `Cargo.toml` (modules moved to `katgpt-band` / `katgpt-sparse` crates in Phase 11, 2026-07-04). `bckvss` (Fusion A) remains opt-in — not part of T5.3 promotion scope.
 **Feature Gates:** `band_conditioner` (Fusion A), `specialist_projection` (Fusion B), `collider_consistency` (Fusion C). All opt-in until GOAT-proven.
 **Constraints:**
 - Modelless only — no LLM training (constraint 1).

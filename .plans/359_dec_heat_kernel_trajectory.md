@@ -4,7 +4,7 @@
 **Research:** [katgpt-rs/.research/365_PhysiFormer_Single_Shot_Trajectory_Heat_Kernel_DEC.md](../.research/365_PhysiFormer_Single_Shot_Trajectory_Heat_Kernel_DEC.md)
 **Source paper:** [arXiv:2606.27364](https://arxiv.org/abs/2606.27364) — PhysiFormer (Chen/Lan/Vedaldi, VGG Oxford)
 **Target:** `katgpt-rs/crates/katgpt-dec/src/heat_kernel.rs` + Cargo feature `heat_kernel_trajectory` (passthrough: katgpt-core → root)
-**Status:** Active — Phase 1 DONE, Phase 2 DONE, Phase 3 DONE, Phase 4 DONE, Phase 5 DONE (2026-07-02). `heat_kernel_trajectory` PROMOTED to DEFAULT-ON in katgpt-dec. All phases complete.
+**Status:** ✅ COMPLETE (2026-07-02) — Phase 1–5 ALL DONE. `heat_kernel_trajectory` PROMOTED to DEFAULT-ON in katgpt-dec.
 
 ---
 

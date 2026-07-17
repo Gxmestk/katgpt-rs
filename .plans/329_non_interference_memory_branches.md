@@ -4,7 +4,7 @@
 **Research:** [katgpt-rs/.research/310_RIZZ_Non_Interference_Memory_Branches.md](../.research/310_RIZZ_Non_Interference_Memory_Branches.md)
 **Source paper:** [arxiv 2606.20638](https://arxiv.org/abs/2606.20638) — RIZZ (Goel et al., Oxford, Jun 2026)
 **Target:** `katgpt-rs/crates/katgpt-core/src/branching/` (new module) + Cargo feature `non_interference_branches`
-**Status:** Active — Phase 0 (this plan). Super-GOAT fusion of BAKE × CLR × MCGS × Engram × ARG × closure-instrument × Salience.
+**Status:** ✅ COMPLETE (2026-06-26) — Phases 1–4 all done (Phase 1: 56 tests; Phase 2: 101 tests; Phase 3: gates PASS, promoted; Phase 4: 20 composition tests). `non_interference_branches` DEFAULT-ON with pure modelless gain (structural geometric orthogonality, not learned). riir-ai runtime wiring deferred to Plan 338.
 
 ---
 

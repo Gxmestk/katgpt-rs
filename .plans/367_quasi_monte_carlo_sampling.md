@@ -4,7 +4,7 @@
 **Research:** [katgpt-rs/.research/367_QuasiMoTTo_QMC_Test_Time_Scaling.md](../.research/367_QuasiMoTTo_QMC_Test_Time_Scaling.md)
 **Source paper:** [arXiv:2607.01179](https://arxiv.org/abs/2607.01179) — Li, Zhan, Gandhi, Goodman, Fox (Stanford), 2026-07-01
 **Target:** `katgpt-rs/crates/katgpt-core/src/speculative/qmc.rs` (new module) + Cargo feature `qmc_sampling` (opt-in until GOAT gate)
-**Status:** Active — Phase 1 + 2 + 3 + 4 + 5 + 6 ALL COMPLETE (850/850 lib tests pass with qmc_sampling, 26 new bootstrap tests, G5 latency bench PASS, GOAT gate PASS and promoted to DEFAULT-ON). Plan fully shipped; remaining work is in separate downstream-fusion plans.
+**Status:** ✅ COMPLETE — Phase 1 + 2 + 3 + 4 + 5 + 6 ALL COMPLETE (850/850 lib tests pass with qmc_sampling, 26 new bootstrap tests, G5 latency bench PASS, GOAT gate PASS). `qmc_sampling` PROMOTED to DEFAULT-ON. Plan fully shipped; remaining work is in separate downstream-fusion plans.
 
 ---
 

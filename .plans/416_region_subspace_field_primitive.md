@@ -4,7 +4,7 @@
 **Research:** [katgpt-rs/.research/396_MFA_Region_Conditioned_Factor_Analyzer.md](../.research/396_MFA_Region_Conditioned_Factor_Analyzer.md)
 **Source paper:** [arXiv:2602.02464](https://arxiv.org/abs/2602.02464) — Shafran et al., "From Directions to Regions: Decomposing Activations in Language Models via Local Geometry"
 **Target:** `katgpt-rs/crates/katgpt-core/src/region_subspace.rs` (new module) + Cargo feature `region_subspace_steering`
-**Status:** Active — Phase 5 COMPLETE (DEFAULT-ON, 2026-07-09)
+**Status:** ✅ COMPLETE (2026-07-09) — Phase 5 COMPLETE. `region_subspace_steering` PROMOTED to DEFAULT-ON.
 
 ---
 

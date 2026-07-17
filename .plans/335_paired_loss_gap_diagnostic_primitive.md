@@ -4,7 +4,7 @@
 **Research:** [katgpt-rs/.research/319_Paired_Token_Loss_Gap_Discourse_State_Diagnostic.md](../.research/319_Paired_Token_Loss_Gap_Discourse_State_Diagnostic.md)
 **Source paper:** [arxiv 2606.20936](https://arxiv.org/abs/2606.20936) — Li & Merrill, "Comparing Transformers and Hybrid Models at the Token Level", AI2, Jun 2026
 **Target:** `katgpt-rs/crates/katgpt-core/src/paired_loss/` (new module) + Cargo feature `paired_loss_diagnostic`
-**Status:** Active — Phase 3 COMPLETE (T3.1–T3.3 done, examples run, Proposition 1 annotation works)
+**Status:** ✅ COMPLETE — Phases 1–4 all done. Phase 3 (T3.1–T3.3) mechanism + examples + Proposition 1 annotation. Phase 4 (T4.1–T4.3) riir-ai integration shipped as Plans 344 (HLA paired-loss harness, G4 1.667× amplification PASS) + 345 (curiosity class routing, deferred pending user sign-off on SenseKind reframe). `paired_loss_diagnostic` stays opt-in (measurement harness, not a runtime mechanism).
 
 ---
 

@@ -5,7 +5,7 @@
 **Private Super-GOAT guide:** [riir-ai/.research/154_viable_manifold_graph_game_runtime_guide.md](../../../riir-ai/.research/154_viable_manifold_graph_game_runtime_guide.md)
 **Source paper:** [arxiv 2206.00106](https://arxiv.org/abs/2206.00106) — González-Duque et al., *Mario Plays on a Manifold*, 2022
 **Target:** `katgpt-rs/crates/katgpt-core/src/viable_manifold_graph.rs` (new module) + Cargo feature `viable_manifold_graph`
-**Status:** Active — Phase 0 complete (research + guide + this plan created in same session per Super-GOAT mandatory-output rule)
+**Status:** ✅ COMPLETE (2026-06-24) — PROMOTED to DEFAULT-ON. All gates (G1–G7 correctness + perf bench) PASS after the CSR adjacency fix closed the perf gate (7.10 ns/step ≤ 100 ns/step). `viable_manifold_graph` in `default = [...]` of both Cargo.toml files.
 
 ---
 

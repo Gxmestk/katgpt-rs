@@ -4,7 +4,7 @@
 **Research:** [katgpt-rs/.research/321_Tropical_Semiring_Equivariant_Operators.md](../.research/321_Tropical_Semiring_Equivariant_Operators.md)
 **Source paper:** [arXiv:2403.04807](https://arxiv.org/abs/2403.04807) — Smets, *Mathematics of Neural Networks*, Ch. 3 §3.5 (tropical operators).
 **Target:** `katgpt-rs/crates/katgpt-core/src/algebra/tropical.rs` (new module) + Cargo feature `tropical_algebra`
-**Status:** Active — Phase 1 (skeleton), gate-pending.
+**Status:** ✅ COMPLETE (2026-06-28) — 3/3 G1 non-redundancy substrates PASS (DEC cochain, HLA pairs, path). `tropical_algebra` DEFAULT-ON (Phase 3 Super-GOAT promotion, all G1–G5 gates PASS) after NEON specialization unblocked G2. Research 321 amended GOAT → Super-GOAT; riir-ai Guide 164 created. Two Phase 4 fusion primitives stay opt-in pending empirical G6 (downstream-value) gates.
 
 ---
 
