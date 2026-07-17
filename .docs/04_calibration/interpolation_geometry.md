@@ -152,10 +152,12 @@ are documented in [Issue 158](../../.issues/158_latent_interpolation_geometry_ev
 §"Three-pressure audit". The audit requires the real decode path.
 
 **Status (2026-07-17):**
+- **Q1 (summarize-vs-route)** is **CLOSED** for `NeuronShard::style_weights` via the summarize-vs-route subsampling audit (Benchmark 459 v3 addendum). The `ConsolidationPipeline::sleep()` average is the canonical summarize operation — divergence scales proportionally with drop fraction. The routing control (argmax-norm) exhibits the expected worst-case spike. `NpcEmotionScalars` is current-state (not trajectory-summary), so Q1 is vacuously N/A for that substrate.
 - **Q2 (runtime-depends-on-latent)** is **CLOSED** for both primary substrates:
   - `NpcEmotionScalars`: `curiosity_drive()` is itself a runtime bridge — Q2 implicit.
   - `NeuronShard::style_weights`: v2 audit (`StyleWeightsScalarSpace`) confirms `latent_is_causal(5.0)` under the runtime affect-scalar decode.
-- **Q1 (summarize-vs-route)** and **Q3 (local-context-vs-bypass)** remain `[ ]` open — they require per-substrate runtime trace infrastructure (subsampled-trajectory tests for Q1, attention-window audit for Q3). Non-blocking follow-ups.
+- **Q3 (local-context-vs-bypass)** is **CLOSED** for both primary substrates via a structural code audit (decode-path purity + consumer-input audit + locality-mechanism inventory). Verdict: **PASS by construction** — the decode paths are pure functions of the latent; the consumers take only the decoded value; cross-NPC influence flows through latent refinement before reaching the decode, not through a raw-state side channel. The SpKv (Plan 070) `window: 128` sliding-window + RTPurbo (Plan 126) sparse-decode infrastructure enforce locality at the transformer-attention layer for runtimes that use transformer attention (NPC dialog WASM etc.), which are out of scope for this substrate-level audit. See [Issue 158](../../.issues/158_latent_interpolation_geometry_evaluation.md) §"Q3 structural audit findings" for the per-substrate trace + locality-mechanism inventory.
+- **All three three-pressure audit questions are now CLOSED** for the two primary substrates. The four remaining private substrates (`ArchetypeBlendShard` π, `KarcShard` weights, `ZoneGeometryPod`, `MerkleFrozenEnvelope`) are non-blocking follow-ups — each plugs into the same audit templates (Q1: `audit_summarize_vs_route`; Q2: `intervention_battery`; Q3: structural code audit) with its own decode/trajectory operations.
 
 ## See also
 

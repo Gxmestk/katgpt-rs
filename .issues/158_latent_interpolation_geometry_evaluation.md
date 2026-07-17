@@ -86,14 +86,83 @@ on their realistic operating distributions.
 
 **Issue 158 verdict: CLOSE.** All four phases complete. The generic `LatentSpace` trait + the two real-substrate impls + the audit reports close the loop: the protocol correctly distinguishes good from bad geometry, and both committed-latent substrates pass on their operational distributions. The four remaining private substrates are non-blocking follow-ups.
 
+## Q3 structural audit findings (2026-07-17)
+
+Q3 asks: *does the runtime's attention to the committed latent stay local, or
+does raw global context bypass it?* The audit is structural (code-trace, not
+runtime-test) and decomposes into three checks per substrate:
+
+1. **Decode purity** — is the decode a pure function of the latent, or does
+   it accept a global-state parameter that could leak raw context in?
+2. **Consumer-input audit** — do the direct consumers of the decoded value
+   take ONLY the decoded value, or do they also accept raw global state?
+3. **Locality-mechanism inventory** — what architectural invariant prevents
+   global-attention bypass for this substrate?
+
+### Substrate 1: `NpcEmotionScalars` (riir-engine) — PASS
+
+| Check | Finding |
+|---|---|
+| Decode purity | `fn curiosity_drive(self) -> f32` — pure function of `self` (the 5 emotion scalars). No global-state parameter exists. Formula: `sigmoid(4.0 * (0.30·arousal + 0.25·valence + 0.20·calm − 0.15·fear − 0.10·desperation − 0.25))`. File: `riir-engine/src/cgsp_runtime/types.rs:215`. |
+| Consumer-input audit | Two consumers: (a) `GameQualityGuide::with_emotion` / `update_emotion` — takes only `NpcEmotionScalars`, produces `lambda_eff` via `rubric.lambda_eff(drive)`. The rubric is per-NPC config, not global state. File: `riir-engine/src/cgsp_runtime/guide.rs:181-203`. (b) `post_action_router::adaptive_width` — maps drive scalar to candidate count `K ∈ [1, max_k]` via sigmoid projection. Pure function of the drive scalar. File: `riir-engine/src/post_action_router.rs:42-48`. |
+| Locality mechanism | (i) `post_action_router` is explicitly documented as per-NPC, local, never synced — "No new sync data is introduced" (`post_action_router.rs:50-57`). (ii) Cross-NPC interaction happens via `CrowdAttentionStep::tick_into`, which refines HLA over **visible peers within a zone radius** — local by construction, not global. Crowd attention output still flows through the same `compute_animal_emotions()` bridge to produce the 5 synced affect scalars (`post_action_router.rs:26`). (iii) The host's action enumeration provides raw candidate actions, but selection among them uses ONLY the latent via `route_argmax(parent_hidden, candidates_hidden)` — both args are HLA hidden states (latent), not raw global state. |
+
+**Verdict: no global-state bypass.** The latent is consumed in local context;
+cross-NPC influence flows through the HLA refinement (still latent) before
+reaching the decode, not through a raw-state side channel.
+
+### Substrate 2: `NeuronShard::style_weights[64]` (riir-neuron-db) — PASS
+
+| Check | Finding |
+|---|---|
+| Decode purity | `fn project_compacted_to_scalars(compacted: &[NeuronShard], direction_vectors: &[[f32; STYLE_DIM]], out: &mut [f32])` — pure function of `compacted` (the shards) + `direction_vectors` (a trained private asset, fixed at runtime). No global-state parameter exists. Formula: `sigmoid(dot(mean(compacted.style_weights), dir_i) · (1/M · 1/STYLE_DIM))`. File: `riir-neuron-db/src/shard_compactor.rs:864-924`. |
+| Consumer-input audit | The decoded 5-scalar affect vector crosses the sync boundary (per AGENTS.md sync rule) and is consumed by the same `NpcEmotionScalars` runtime path as Substrate 1. The shard query itself (`ShardIndex::get`) is per-entity local — no cross-entity attention over shards exists. |
+| Locality mechanism | (i) `ShardIndex` is a per-entity `papaya::HashMap` (lock-free, zone→shard lookup) — shards are local to the entity, not a globally-attended pool. File: `riir-neuron-db/src/index.rs:112`. (ii) The compaction pipeline (`ShardCompactor::compact`) operates on a per-entity shard set, not a global shard pool. (iii) No transformer attention over shards — the substrate is structurally a local key-value store, not an attention cache. SpKv / RTPurbo (which DO govern transformer attention locality) are not directly involved here, but the substrate's locality invariant is stronger: it's local by data-layout, not by attention-window policy. |
+
+**Verdict: no global-state bypass.** The substrate is local by construction
+(per-entity shard store); there is no global-attention path that could bypass it.
+
+### Locality-mechanism inventory (cross-cutting)
+
+The 7-repo stack enforces the locality invariant at three layers, all of
+which the two audited substrates either satisfy directly or are exempt from:
+
+| Layer | Mechanism | Plan / Source | Applies to |
+|---|---|---|---|
+| **Transformer KV-cache** | SpKv `window: 128` ("Local sliding window always retained; positions within `window` of the current token are never gated out") + hard-gating at inference | [Plan 070](../.plans/070_sp_kv_self_pruned_attention.md), `katgpt-kv/src/sp_kv/types.rs:25-26` | Transformer-attention runtimes (NPC dialog WASM, etc.) — NOT the two audited substrates, which don't go through transformer attention |
+| **Retrieval-head sparse decode** | RTPurbo `calibrate_from_scores` (attention-mass scoring) + `HeadCalibration` critical/convertible split | [Plan 126](../.plans/126_rt_turbo_retrieval_head_sparse_decode.md) | Transformer-attention runtimes — same exemption as SpKv |
+| **Cross-NPC attention** | `CrowdAttentionStep` operates over **visible peers within a zone radius** — local by construction, not global | `riir-engine/src/cce_runtime/crowd_attention_bridge.rs`, `cognitive_branches_runtime/crowd_attention_bridge.rs` | Substrate 1 (`NpcEmotionScalars`) — crowd attention refines HLA (latent), then the same decode path runs. The latent is still the runtime dependency. |
+| **Per-entity shard store** | `ShardIndex` is a per-entity lock-free HashMap; no cross-entity attention over shards exists | `riir-neuron-db/src/index.rs` | Substrate 2 (`NeuronShard::style_weights`) — local by data-layout, not by attention-window policy |
+| **Sync-boundary rule** | Raw state crosses sync (deterministic, quorum-committed); latent stays local (per AGENTS.md) | `AGENTS.md` §"Sync Boundary Rule" | All six committed-latent substrates — the rule is the architectural invariant that prevents latent bypass via raw state |
+
+### Q3 verdict
+
+**Both primary substrates PASS Q3 by construction.** The decode paths are
+pure functions of the latent; the consumers take only the decoded value; the
+cross-NPC influence (when present) flows through latent refinement before
+reaching the decode, not through a raw-state side channel. The SpKv / RTPurbo
+sliding-window infrastructure enforces locality at the transformer-attention
+layer for runtimes that DO use transformer attention (dialog WASM etc.) —
+those are out of scope for this substrate-level audit but are covered by the
+existing primitives' GOAT gates.
+
+**Non-blocking follow-up:** the four remaining private substrates
+(`ArchetypeBlendShard` π, `KarcShard` weights, `ZoneGeometryPod`,
+`MerkleFrozenEnvelope`) each plug into the same three-check audit template
+with their own decode path. None is expected to fail — all four are per-entity
+committed state by construction — but the formal audit lands when each
+substrate's real decode path is wired into the `LatentSpace` trait.
+
 ## Three-pressure audit (bundled)
 
 For each substrate, run the audit checklist derived from Research 445 §1.3:
 
-- [ ] **Audit Q1 — summarize or route?** Does the latent summarize the underlying trajectory, or is it a lookup key? Test: subsample the trajectory (MAE-drop analog — sparse observations under fog-of-war), recompute the latent, measure latent divergence. A summarizing latent is stable under subsampling; a routing latent diverges.
+- [x] **Audit Q1 — summarize or route?** Does the latent summarize the underlying trajectory, or is it a lookup key? Test: subsample the trajectory (MAE-drop analog — sparse observations under fog-of-war), recompute the latent, measure latent divergence. A summarizing latent is stable under subsampling; a routing latent diverges.
+  - **Resolution (2026-07-17):** CLOSED for `NeuronShard::style_weights` via the Q1 summarize-vs-route audit (Benchmark 459 v3 addendum). The `ConsolidationPipeline::sleep()` average is the canonical summarize operation — divergence under subsampling scales proportionally with the drop fraction, both in mean (10%→0.028, 30%→0.047, 50%→0.069) and worst case (10%→0.077, 30%→0.162, 50%→0.226). The routing control (argmax-norm on a unique-outlier trajectory) exhibits the expected routing signature (worst-case spike to ~0.77 at low drop fractions), proving the audit discriminates. The average is also robust to outliers — dropping a 10×-magnitude outlier event from a 60-event trajectory shifts the average by at most `outlier/60`. **`NpcEmotionScalars`** (riir-engine) is current-state, not trajectory-summary — the Q1 question doesn't apply directly (the latent IS the current observation, not a trajectory summary). Q1 for that substrate is vacuously N/A. **The four remaining private substrates** (`ArchetypeBlendShard` π, `KarcShard` weights, `ZoneGeometryPod`, `MerkleFrozenEnvelope`) are non-blocking follow-ups — each plugs into the same `audit_summarize_vs_route` template with its own trajectory-summary operation.
 - [x] **Audit Q2 — runtime depends on latent?** Does the runtime behavior actually use the committed latent, or does it bypass via raw state? Test: zero/shuffle the latent (intervention battery), measure behavior delta. FaithfulnessProbe (Plan 278) already does this for injected memory; extend to per-entity committed state.
   - **Resolution (2026-07-17):** CLOSED for `NeuronShard::style_weights` via the v2 runtime-decode audit (Benchmark 459 v2 addendum). The v2 `StyleWeightsScalarSpace` uses the canonical `sigmoid((1/STYLE_DIM) · dot)` decode (exactly mirroring `project_compacted_to_scalars`) and confirms `latent_is_causal(5.0)` under a high-signal anchor: matched=0, shuffled=0.20, zero=0.56, mean=0.13, noise=0.56. The low-signal regime (small projections → sigmoid ≈ 0.5) is documented as expected sigmoid behavior, not a defect. **`NpcEmotionScalars`** (riir-engine) implicitly answers Q2 via its existing `curiosity_drive()` decode (already a runtime bridge). **The four remaining private substrates** (`ArchetypeBlendShard` π, `KarcShard` weights, `ZoneGeometryPod`, `MerkleFrozenEnvelope`) are non-blocking follow-ups — each plugs into the `LatentSpace` trait with its own runtime decode when needed.
-- [ ] **Audit Q3 — local context or full bypass?** Does the runtime's attention to the latent stay local, or does raw context bypass it? Already addressed by SpKv (Plan 070) and RTPurbo (Plan 126) sliding-window infrastructure; audit confirms no substrate accidentally bypasses via global attention.
+- [x] **Audit Q3 — local context or full bypass?** Does the runtime's attention to the latent stay local, or does raw context bypass it? Already addressed by SpKv (Plan 070) and RTPurbo (Plan 126) sliding-window infrastructure; audit confirms no substrate accidentally bypasses via global attention.
+  - **Resolution (2026-07-17):** CLOSED for the two primary substrates via a structural code audit (decode-path purity + consumer-input audit + locality-mechanism inventory). The audit answer is **PASS by construction** — the latent is consumed in local context; no global-state side channel exists in the decode path or its direct consumers. See §"Q3 structural audit findings" below for the per-substrate trace + locality-mechanism inventory. The four remaining private substrates (`ArchetypeBlendShard` π, `KarcShard` weights, `ZoneGeometryPod`, `MerkleFrozenEnvelope`) are non-blocking follow-ups — each plugs into the same audit template with its own decode path.
 
 ## Non-goals
 
