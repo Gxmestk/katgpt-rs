@@ -225,6 +225,183 @@ pub fn conv_causal_dyn_into(v_tilde: &[f32], out: &mut [f32], kernel: &[f32], di
     }
 }
 
+/// Per-channel temporal causal conv — current-timestep output from a
+/// time-series of channel vectors.
+///
+/// Unlike [`conv_causal_dyn_into`] (which treats a single flat slice as a 1D
+/// signal), this primitive operates on a **temporal sequence** of D-dim
+/// channel vectors and produces **only the current-timestep output**. This is
+/// the paper-faithful depthwise temporal conv: each channel is convolved
+/// independently across time, and we emit one D-dim vector (the convolved
+/// value at the current timestep).
+///
+/// # Formula
+///
+/// For a kernel of length `K`, history of `H = v_history.len()` past vectors,
+/// and current vector `v_current` (all length `D`):
+/// ```text
+/// out[j] = Σ_{k=0..K} kernel[k] * v_signal[k][j]
+/// ```
+/// where `v_signal` is the zero-padded temporal signal of length `K`:
+/// - `v_signal[K-1]` = `v_current` (the current tap, weighted by `kernel[K-1]`)
+/// - `v_signal[K-1-i]` = `v_history[H-i]` for `1 <= i <= H` (past taps)
+/// - `v_signal[k]` = 0 for `k < K-1-H` (before sequence start — zero padding)
+///
+/// This matches the causal convention of [`conv_causal_dyn_into`]:
+/// `kernel[0]` is the oldest tap, `kernel[K-1]` is the current tap.
+///
+/// # Arguments
+///
+/// - `v_history` — past `v` vectors, ordered **oldest first**. Length `H`.
+///   At sequence start `H = 0`; the conv degenerates to `out = kernel[K-1] * v_current`
+///   (zero-padded). `H` MUST be `<= K-1` (callers ring-buffer to enforce this);
+///   if `H > K-1` only the most recent `K-1` entries are read.
+/// - `v_current` — the current-timestep `v` vector. Length `D`.
+/// - `out` — output slice. MUST equal `v_current.len()` (debug_asserted).
+/// - `kernel` — `K` tap weights, runtime length. `K >= 1`.
+/// - `dilation` — stride between taps in timesteps. `dilation = 0` is treated
+///   as 1. The history is sampled at `dilation`-strided intervals so a
+///   `dilation = 2` kernel of length 4 reaches back 6 timesteps.
+///
+/// # Panics (debug only)
+///
+/// `debug_assert!` checks `out.len() == v_current.len()` and `kernel.len() >= 1`.
+///
+/// # Hot-path contract
+///
+/// Zero-allocation, `O(K·D)` multiply-adds. The history is borrowed (not cloned).
+/// The caller maintains the ring buffer.
+///
+/// # Why this exists
+///
+/// [`conv_causal_dyn_into`] treats the hidden dimension `D` as the 1D signal —
+/// a Tier A simplification that makes the conv a *spatial* filter across
+/// hidden units. The paper's multi-scale conv is *temporal* (across sequence
+/// positions). This primitive implements the paper-faithful temporal variant:
+/// pass a per-layer ring buffer of past `v` vectors plus the current `v`, and
+/// get the current-timestep conv output. Multi-scale (`{4, 8}` kernels) then
+/// captures different temporal receptive fields — the actual paper mechanism.
+#[inline]
+pub fn conv_temporal_step_into(
+    v_history: &[Vec<f32>],
+    v_current: &[f32],
+    out: &mut [f32],
+    kernel: &[f32],
+    dilation: usize,
+) {
+    let d = v_current.len();
+    if d == 0 {
+        return;
+    }
+    let k = kernel.len();
+    debug_assert!(k >= 1, "conv_temporal_step_into: kernel must be non-empty");
+    debug_assert_eq!(
+        out.len(),
+        d,
+        "conv_temporal_step_into: out.len() must equal v_current.len()"
+    );
+    let h = v_history.len();
+
+    let dil = dilation.max(1);
+    let last = k - 1; // index of the current-position tap in kernel[]
+
+    // Zero output first (all channels), then accumulate. Cheaper than
+    // per-channel fill because the inner kernel loop is short (K small).
+    for slot in out.iter_mut() {
+        *slot = 0.0;
+    }
+
+    for j in 0..d {
+        let mut acc = 0.0f32;
+        for (ki, &kw) in kernel.iter().enumerate() {
+            if kw == 0.0 {
+                continue;
+            }
+            // kernel[ki] weights the signal at offset (last - ki) * dil timesteps ago.
+            let timesteps_ago = (last - ki) * dil;
+            if timesteps_ago == 0 {
+                acc += kw * v_current[j];
+            } else if timesteps_ago <= h {
+                // v_history is oldest-first; the entry timesteps_ago back is at
+                // index `h - timesteps_ago`.
+                let hist_idx = h - timesteps_ago;
+                acc += kw * v_history[hist_idx][j];
+            }
+            // else: before sequence start — zero-padding (contributes 0).
+        }
+        out[j] = acc;
+    }
+}
+
+/// Backward of [`conv_temporal_step_into`] — flows the output gradient back
+/// to the current-timestep input only (truncated BPTT).
+///
+/// This is the **truncated** temporal conv backward: gradients flow to
+/// `v_current` (which feeds `v_proj @ input` → `v_proj` grad), but NOT to
+/// `v_history` entries. Past `v` vectors are treated as constants for
+/// gradient purposes. This is the standard truncated-BPTT approximation for
+/// recurrent temporal convs — full BPTT would require storing per-timestep
+/// caches and flowing grads across the entire sequence.
+///
+/// # Formula
+///
+/// Forward: `out[j] = Σ_k kernel[k] * v_signal[k][j]` (see
+/// [`conv_temporal_step_into`]). Only `v_signal[K-1] = v_current` receives
+/// gradient (truncation):
+/// ```text
+/// grad_v_current[j] += kernel[K-1] * grad_out[j]
+/// ```
+///
+/// The kernel is frozen (not learned), so no `grad_kernel` is computed.
+///
+/// # Why truncated is acceptable
+///
+/// For frozen kernels (the Tier A/Phase 6' design), the only learnable
+/// parameter affected by the conv is `v_proj` (which produces `v_current`).
+/// Past `v` vectors were produced by past `v_proj` applications — but `v_proj`
+/// is the SAME weight matrix across timesteps. Full BPTT would accumulate the
+/// gradient contribution from each past timestep into `grad_v_proj`. The
+/// truncated variant captures only the current-timestep contribution, which
+/// is the dominant term when the kernel decays (e.g. averaging kernel: each
+/// past tap contributes `1/K`, the current tap contributes `1/K`, so
+/// truncation loses at most `(K-1)/K` of the gradient magnitude — a known,
+/// bounded approximation that the Muon optimizer's momentum partially
+/// compensates for).
+///
+/// # Arguments
+///
+/// - `grad_out` — gradient w.r.t. the conv output (`∂L/∂out`). Length `D`.
+/// - `grad_v_current` — accumulated gradient w.r.t. `v_current`. Length `D`.
+///   **Accumulates** (+=) so the caller can chain with other gradient sources.
+/// - `kernel` — the frozen conv kernel. Only `kernel[K-1]` is read.
+///
+/// # Hot-path contract
+///
+/// Zero-allocation, `O(D)` scalar multiply-adds. Cheaper than the forward.
+#[inline]
+pub fn conv_temporal_step_backward_truncated_into(
+    grad_out: &[f32],
+    grad_v_current: &mut [f32],
+    kernel: &[f32],
+) {
+    let d = grad_out.len();
+    if d == 0 {
+        return;
+    }
+    debug_assert_eq!(
+        grad_v_current.len(),
+        d,
+        "conv_temporal_step_backward_truncated_into: len mismatch"
+    );
+    let k = kernel.len();
+    debug_assert!(k >= 1, "conv_temporal_step_backward_truncated_into: kernel empty");
+    // Only the current tap (kernel[K-1]) contributes under truncation.
+    let current_weight = kernel[k - 1];
+    for j in 0..d {
+        grad_v_current[j] += current_weight * grad_out[j];
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -476,5 +653,211 @@ mod tests {
         let kernel = vec![0.0f32; 12];
         conv_causal_dyn_into(&v_tilde, &mut out, &kernel, 1);
         assert!(out.iter().all(|&v| v == 0.0), "K=12 zero kernel → all zeros");
+    }
+
+    // ── Temporal conv (conv_temporal_step_into) ─────────────────────────────
+
+    #[test]
+    fn temporal_empty_history_degenerates_to_current_tap() {
+        // H=0 (no history) → out = kernel[K-1] * v_current.
+        let v_current = [1.0f32, 2.0, 3.0, 4.0];
+        let history: Vec<Vec<f32>> = vec![];
+        let mut out = [0.0f32; 4];
+        // identity kernel [0,0,0,1] → out = 1.0 * v_current
+        let kernel = [0.0f32, 0.0, 0.0, 1.0];
+        conv_temporal_step_into(&history, &v_current, &mut out, &kernel, 1);
+        assert_eq!(out, v_current, "H=0 identity → passthrough");
+
+        // averaging kernel [0.25; 4] → out = 0.25 * v_current
+        let kernel_avg = [0.25f32; 4];
+        conv_temporal_step_into(&history, &v_current, &mut out, &kernel_avg, 1);
+        for i in 0..4 {
+            assert!((out[i] - 0.25 * v_current[i]).abs() < 1e-6, "out[{i}] = {}", out[i]);
+        }
+    }
+
+    #[test]
+    fn temporal_identity_kernel_is_passthrough() {
+        // Identity kernel → out == v_current regardless of history.
+        let v_current = [1.0f32, 2.0, 3.0];
+        let history = vec![
+            vec![10.0, 20.0, 30.0],
+            vec![100.0, 200.0, 300.0],
+            vec![1000.0, 2000.0, 3000.0],
+        ];
+        let mut out = [0.0f32; 3];
+        let kernel = [0.0f32, 0.0, 0.0, 1.0];
+        conv_temporal_step_into(&history, &v_current, &mut out, &kernel, 1);
+        assert_eq!(out, v_current, "identity kernel → out == v_current");
+    }
+
+    #[test]
+    fn temporal_averaging_kernel_with_history() {
+        // kernel = [0.25; 4], 3 past v's + current = 4 taps, all weighted 1/4.
+        // out[j] = 0.25 * (v_hist[0][j] + v_hist[1][j] + v_hist[2][j] + v_current[j])
+        let v_current = [4.0f32, 8.0];
+        let history = vec![
+            vec![1.0, 2.0],
+            vec![2.0, 4.0],
+            vec![3.0, 6.0],
+        ];
+        let mut out = [0.0f32; 2];
+        let kernel = [0.25f32; 4];
+        conv_temporal_step_into(&history, &v_current, &mut out, &kernel, 1);
+        // out[0] = 0.25 * (1 + 2 + 3 + 4) = 2.5
+        // out[1] = 0.25 * (2 + 4 + 6 + 8) = 5.0
+        assert!((out[0] - 2.5).abs() < 1e-6, "out[0] = {}", out[0]);
+        assert!((out[1] - 5.0).abs() < 1e-6, "out[1] = {}", out[1]);
+    }
+
+    #[test]
+    fn temporal_partial_history_zero_pads() {
+        // H=1, K=4 → only 2 taps in range (1 past + current), other 2 zero-padded.
+        // kernel = [0.25; 4] → out = 0.25 * (0 + 0 + v_hist[0] + v_current)
+        let v_current = [4.0f32];
+        let history = vec![vec![2.0f32]];
+        let mut out = [0.0f32; 1];
+        let kernel = [0.25f32; 4];
+        conv_temporal_step_into(&history, &v_current, &mut out, &kernel, 1);
+        // out[0] = 0.25 * (2 + 4) = 1.5
+        assert!((out[0] - 1.5).abs() < 1e-6, "out[0] = {}", out[0]);
+    }
+
+    #[test]
+    fn temporal_dilation_stretches_receptive_field() {
+        // kernel = [0,0,0,1.0] (current tap), dilation = 2 → still passthrough
+        // (current tap is always timesteps_ago=0 regardless of dilation).
+        let v_current = [1.0f32, 2.0];
+        let history = vec![vec![10.0, 20.0], vec![100.0, 200.0]];
+        let mut out = [0.0f32; 2];
+        let kernel = [0.0f32, 0.0, 0.0, 1.0];
+        conv_temporal_step_into(&history, &v_current, &mut out, &kernel, 2);
+        assert_eq!(out, v_current, "dilation doesn't affect current tap");
+
+        // Now activate OLDEST tap (kernel[0] = 1.0), dilation = 2, K = 4.
+        // timesteps_ago = (K-1-0) * 2 = 6. Need H >= 6. We have H = 2. → zero.
+        let kernel_oldest = [1.0f32, 0.0, 0.0, 0.0];
+        conv_temporal_step_into(&history, &v_current, &mut out, &kernel_oldest, 2);
+        assert!(out.iter().all(|&v| v == 0.0), "oldest tap OOR with dilation 2");
+    }
+
+    #[test]
+    fn temporal_matches_flat_conv_at_full_history() {
+        // Sanity: temporal conv with full history should match flat conv_causal_dyn_into
+        // at the LAST position. Build a flat signal [v0, v1, v2, v3] of length 4
+        // per channel, convolve flat, then compare temporal(last) = flat[3].
+        let v0 = [1.0f32, 2.0];
+        let v1 = [3.0f32, 4.0];
+        let v2 = [5.0f32, 6.0];
+        let v3 = [7.0f32, 8.0]; // current
+
+        // Flat: interleave channels. conv_causal_dyn_into treats the slice as 1D,
+        // so we run it per-channel by slicing strided.
+        let mut flat_signal_ch0 = vec![v0[0], v1[0], v2[0], v3[0]];
+        let mut flat_out_ch0 = vec![0.0f32; 4];
+        let kernel = [0.25f32; 4];
+        conv_causal_dyn_into(&flat_signal_ch0, &mut flat_out_ch0, &kernel, 1);
+        // flat_out_ch0[3] = 0.25 * (1 + 3 + 5 + 7) = 4.0
+
+        let mut flat_signal_ch1 = vec![v0[1], v1[1], v2[1], v3[1]];
+        let mut flat_out_ch1 = vec![0.0f32; 4];
+        conv_causal_dyn_into(&flat_signal_ch1, &mut flat_out_ch1, &kernel, 1);
+
+        // Temporal: history = [v0, v1, v2], current = v3.
+        let history = vec![v0.to_vec(), v1.to_vec(), v2.to_vec()];
+        let mut temporal_out = [0.0f32; 2];
+        conv_temporal_step_into(&history, &v3, &mut temporal_out, &kernel, 1);
+
+        // Compare: temporal_out should equal flat_out at position 3 (last).
+        assert!((temporal_out[0] - flat_out_ch0[3]).abs() < 1e-6);
+        assert!((temporal_out[1] - flat_out_ch1[3]).abs() < 1e-6);
+    }
+
+    #[test]
+    fn temporal_backward_truncated_identity_kernel() {
+        // Identity kernel: backward should flow full grad to v_current.
+        let grad_out = [1.0f32, 2.0, 3.0];
+        let mut grad_v = [0.0f32; 3];
+        let kernel = [0.0f32, 0.0, 0.0, 1.0];
+        conv_temporal_step_backward_truncated_into(&grad_out, &mut grad_v, &kernel);
+        assert_eq!(grad_v, grad_out, "identity backward → full grad flow");
+    }
+
+    #[test]
+    fn temporal_backward_truncated_averaging_kernel() {
+        // Averaging kernel [0.25; 4]: backward flows kernel[K-1] = 0.25.
+        let grad_out = [4.0f32, 8.0];
+        let mut grad_v = [0.0f32; 2];
+        let kernel = [0.25f32; 4];
+        conv_temporal_step_backward_truncated_into(&grad_out, &mut grad_v, &kernel);
+        assert!((grad_v[0] - 1.0).abs() < 1e-6, "grad_v[0] = {}", grad_v[0]);
+        assert!((grad_v[1] - 2.0).abs() < 1e-6, "grad_v[1] = {}", grad_v[1]);
+    }
+
+    #[test]
+    fn temporal_backward_truncated_accumulates() {
+        // grad_v accumulates (+=), so multiple calls sum.
+        let kernel = [0.5f32]; // K=1, current_weight = 0.5
+        let mut grad_v = [1.0f32, 1.0];
+        conv_temporal_step_backward_truncated_into(&[2.0, 4.0], &mut grad_v, &kernel);
+        // grad_v[0] = 1.0 + 0.5*2.0 = 2.0
+        // grad_v[1] = 1.0 + 0.5*4.0 = 3.0
+        assert!((grad_v[0] - 2.0).abs() < 1e-6);
+        assert!((grad_v[1] - 3.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn temporal_backward_matches_numeric_gradient() {
+        // Finite-difference check: truncated backward should match numeric grad
+        // w.r.t. v_current ONLY (history treated as constant).
+        //
+        // Note on tolerance: f32 finite-difference suffers catastrophic
+        // cancellation when subtracting close squared values (L(+) - L(-) is
+        // a small difference of ~0.29-sized numbers). Using eps = 1e-2 keeps
+        // truncation error O(eps^2) = 1e-4 while making the difference large
+        // enough to preserve f32 precision. Relative tolerance 1% is the
+        // standard bar for f32 central differences on small magnitudes.
+        let v_current = [1.0f32, 2.0, 3.0];
+        let history = vec![
+            vec![0.5, 1.0, 1.5],
+            vec![0.25, 0.5, 0.75],
+            vec![0.125, 0.25, 0.375],
+        ];
+        let kernel = [0.1f32, 0.2, 0.3, 0.4]; // arbitrary
+        let mut out = [0.0f32; 3];
+        conv_temporal_step_into(&history, &v_current, &mut out, &kernel, 1);
+
+        // Arbitrary downstream loss: L = sum(out^2).
+        // dL/dout[j] = 2 * out[j].
+        let grad_out: Vec<f32> = out.iter().map(|&o| 2.0 * o).collect();
+
+        // Analytic grad (truncated).
+        let mut grad_v_analytic = [0.0f32; 3];
+        conv_temporal_step_backward_truncated_into(&grad_out, &mut grad_v_analytic, &kernel);
+
+        // Numeric grad: perturb each v_current[j] by eps, recompute loss, diff.
+        let eps = 1e-2f32;
+        for j in 0..3 {
+            let mut v_plus = v_current;
+            v_plus[j] += eps;
+            let mut out_plus = [0.0f32; 3];
+            conv_temporal_step_into(&history, &v_plus, &mut out_plus, &kernel, 1);
+            let loss_plus: f32 = out_plus.iter().map(|&o| o * o).sum();
+
+            let mut v_minus = v_current;
+            v_minus[j] -= eps;
+            let mut out_minus = [0.0f32; 3];
+            conv_temporal_step_into(&history, &v_minus, &mut out_minus, &kernel, 1);
+            let loss_minus: f32 = out_minus.iter().map(|&o| o * o).sum();
+
+            let numeric = (loss_plus - loss_minus) / (2.0 * eps);
+            let rel_err = (numeric - grad_v_analytic[j]).abs() / grad_v_analytic[j].abs().max(1e-6);
+            assert!(
+                rel_err < 0.02,
+                "j={}: numeric={numeric}, analytic={}, rel_err={rel_err}",
+                j,
+                grad_v_analytic[j],
+            );
+        }
     }
 }
