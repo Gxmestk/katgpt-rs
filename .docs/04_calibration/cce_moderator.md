@@ -3,7 +3,7 @@
 **Plan:** [295](../../.plans/295_lp_cce_moderator_primitive.md)
 **Research:** [274](../../.research/274_Optimal_CCE_Moderator_LP_No_Regret.md)
 **Paper:** [arxiv 2606.20062](https://arxiv.org/pdf/2606.20062) — Campi, Cannerozzi, Tzouanas 2026
-**Feature gate:** `cce_moderator` (default-off; promote pending G1+G2 GOAT gate)
+**Feature gate:** `cce_moderator` (**default-on**, Plan 295 + Plan 300)
 **Crate:** `katgpt-rs/src/cce/`
 
 ---

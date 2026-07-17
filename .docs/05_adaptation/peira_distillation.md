@@ -1,6 +1,6 @@
 # PEIRA Modelless Distillation
 
-**Feature flag:** `peira_distill` (not default-on)
+**Feature flag:** `peira_distill` (default-on, Plan 153 GOAT 7/7)
 **Plan:** 153 · **Research:** 115 · **Source:** arXiv:2605.17671
 
 ## Overview

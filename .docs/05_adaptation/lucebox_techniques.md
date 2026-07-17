@@ -746,7 +746,7 @@ that continue from the current context remain active. Zero training cost —
 phrases are provided at call site.
 
 **Key property:** Modeled after parakeet.cpp's phrase boosting, adapted to our
-DDTree pipeline. Feature-gated behind `phrase_boost` (default-OFF until GOAT
-proves gain).
+DDTree pipeline. Feature-gated behind `phrase_boost` (default-on, Plan 164
+GOAT 7/7).
 
 **Source:** `pruners/phrase_boost.rs`, `pruners/phrase_trie.rs`

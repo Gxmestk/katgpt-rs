@@ -1082,7 +1082,7 @@ pub struct MoaConfig {
 | `moa_swiglu(hidden, gate_proj, up_proj, input, moa)` | Token-adaptive bi-MoA SwiGLU: Σ_k ρ_k σ_k(y) ⊙ Σ_ℓ π_ℓ σ_ℓ(z) |
 | `simd_matmul_moa(...)` | Fused kernel: matmul + delayed RMSNorm + MoA mixing |
 
-**Feature gate:** `moa_inference` (opt-in)
+**Feature gate:** `moa_inference` (**default-on**, Plan 158 GOAT 3/3)
 
 ## Tiled Attention (`crates/katgpt-core/src/attention.rs`, Plan 115)
 
@@ -1658,8 +1658,9 @@ arXiv:2606.08105). The two are frequently confused:
 | Diagnostic | `magnitude_slope` on the hidden-state chain | `value_norm_ratio` + `stable_rank_of_update` per attention head |
 | Fix | Post-norm on the recursive residual (retrain for BeliefDrafter) | Dual-policy attention (sigmoid gate for NOP heads, regular for Broadcast) |
 
-Feature gate: `depth_invariance` (opt-in). Promotion to default is a
-deliberate parent decision pending — G1–G3 pass, G4 is aspirational.
+Feature gate: `depth_invariance` (**DEFAULT-ON** since Plan 306 T7.4,
+2026-06-23). G1–G3 pass, G4 re-spec to absolute-latency at HLA scale
+(all PASS); SIMD inner-loop landed. Zero runtime cost unless invoked.
 
 ## SkillOpt (`src/skill_opt/`, Plan 144)
 
