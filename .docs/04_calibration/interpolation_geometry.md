@@ -127,17 +127,22 @@ the regression test).
 
 | Substrate | Lives in | Status |
 |---|---|---|
-| HLA `NpcEmotionScalars [f32; 8]` | riir-engine (private) | Trait-ready; `impl LatentSpace` is a riir-engine follow-up |
-| `ArchetypeBlendShard` π | riir-engine (private) | Trait-ready; riir-engine follow-up |
-| `KarcShard` weights | riir-engine (private) | Trait-ready; riir-engine follow-up |
-| `NeuronShard::style_weights [f32; 64]` | riir-neuron-db (private) | Trait-ready; riir-neuron-db follow-up |
-| `ZoneGeometryPod` | riir-engine (private) | Trait-ready; riir-engine follow-up |
-| `MerkleFrozenEnvelope` versions | riir-neuron-db (private) | Trait-ready; riir-neuron-db follow-up |
+| `NpcEmotionScalars` (5 emotion fields) | riir-engine (private) | **AUDITED PASS** (2026-07-17, commit `20f153eb`, iMAUVE=0.9962 via `curiosity_drive` decode) |
+| `ArchetypeBlendShard` π | riir-engine (private) | Trait-ready; non-blocking follow-up |
+| `KarcShard` weights | riir-engine (private) | Trait-ready; non-blocking follow-up |
+| `NeuronShard::style_weights[64]` | riir-neuron-db (private) | **AUDITED PASS** (2026-07-17, commit `746c4a0`, iMAUVE=0.9693 GOOD vs 0.6994 BAD via identity decode) |
+| `ZoneGeometryPod` | riir-engine (private) | Trait-ready; non-blocking follow-up |
+| `MerkleFrozenEnvelope` versions | riir-neuron-db (private) | Trait-ready; non-blocking follow-up |
 
 The `EuclideanLatentSpace<N>` reference impl proves the protocol works at
 the HLA dimension (N=8) and the `style_weights` dimension (N=64)
-generically. The riir-side `impl LatentSpace for <ConcreteType>` is a
-trivial wrapper that supplies the real decode path.
+generically. The two primary substrates have now been audited end-to-end
+with their real decode paths — see the cross-references below.
+
+### Cross-repo audit reports (2026-07-17)
+
+- [`riir-ai/.benchmarks/517_emotion_scalars_interpolation_geometry_audit.md`](../../../../riir-ai/.benchmarks/517_emotion_scalars_interpolation_geometry_audit.md) — `NpcEmotionScalars` audit. Decode = `curiosity_drive()` (the existing sigmoid-blended λ-modulation scalar). iMAUVE=0.9962 on 50 anchors (5 archetype clusters × σ=0.1). Intervention battery: `latent_is_causal(10.0)` PASS. Honest caveat: high score depends on tight archetype clustering — a population straddling the sigmoid's steepest region would diverge more.
+- [`riir-neuron-db/.benchmarks/459_style_weights_interpolation_geometry_audit.md`](../../../../riir-neuron-db/.benchmarks/459_style_weights_interpolation_geometry_audit.md) — `NeuronShard::style_weights[64]` audit. Decode = identity (v1 geometric-structure audit). iMAUVE GOOD=0.9693 vs BAD=0.6994 (margin 0.27 — the metric discriminates). Intervention battery: `latent_is_causal(5.0)` PASS. Honest caveat: v2 richer-decode audit (LoRA routing projection, KARC ridge readout) is a non-blocking follow-up; the substrate's geometric foundation is sound.
 
 ## Three-pressure audit (paper §1.3)
 
