@@ -25,6 +25,7 @@
 | [`cce_moderator.md`](cce_moderator.md) | CCE Moderator — API reference & worked examples |
 | [`causal_head_importance.md`](causal_head_importance.md) | CausalHeadImportance — causal head-importance calibration + scale-normalized fusion |
 | [`faithfulness_probe.md`](faithfulness_probe.md) | FaithfulnessProbe — causal-intervention diagnostic for injected memory (Plan 278) |
+| [`interpolation_geometry.md`](interpolation_geometry.md) | iMAUVE + 5-way intervention probe for committed latent substrates (Issue 158, Research 445) |
 | [`salience_tri_gate.md`](salience_tri_gate.md) | Salience Tri-Gate — per-tick `Speak` / `Silent` / `Delegate` (Plan 303) |
 | [`universality_class_escape.md`](universality_class_escape.md) | Sigmoid-not-softmax: the universality-class escape (Research 315, Liu & Gore 2606.25008) |
 

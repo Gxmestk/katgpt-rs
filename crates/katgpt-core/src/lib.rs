@@ -649,6 +649,21 @@ pub mod group_invariance_probe;
 #[cfg(feature = "latent_trajectory_geometry")]
 pub mod latent_trajectory_geometry;
 
+// Interpolation Geometry — iMAUVE + 5-way intervention probe for committed
+// latent substrates (Issue 158, Research 445 — Prabhudesai & Geng, *Latent
+// Thought Flows with Text Compression*, Jun 2026). Generic `LatentSpace`
+// trait abstracting over HLA [f32;8] / style_weights[64] / archetype-blend
+// π / KarcShard / ZoneGeometryPod / MerkleFrozenEnvelope — the six substrates
+// cataloged in Research 445 §2.6. Two protocols: `imauve_score` (nearest-
+// neighbor midpoint coherence — the paper's headline metric, Pearson r=0.99
+// with downstream quality) + `intervention_battery` (matched/shuffled/zero/
+// mean/noise 5-way probe extending Plan 278's FaithfulnessProbe to per-entity
+// committed state). Pure modelless evaluation methodology — NOT a training
+// primitive. Opt-in until the PoC reports interpolation geometry across the
+// substrates (Phase 4 decision branch in `.issues/158_*`).
+#[cfg(feature = "interpolation_geometry")]
+pub mod interpolation_geometry;
+
 // Viable Manifold Graph — discrete safe-manifold navigation primitive.
 // Distillation of arXiv:2206.00106 (González-Duque et al., *Mario Plays on a
 // Manifold*, 2022). Generic over any smooth map `f: R^n → R^m` (closure) and
@@ -772,6 +787,12 @@ pub use cross_stage_relocation::{
 #[cfg(feature = "latent_trajectory_geometry")]
 pub use latent_trajectory_geometry::{
     BifurcationResult, LatentTrajectoryGeometry, bifurcation_ratio, fast_acos, from_states,
+};
+
+#[cfg(feature = "interpolation_geometry")]
+pub use interpolation_geometry::{
+    EuclideanLatentSpace, FixtureRng, GaussianMixtureSpace, ImauveScore, InterventionReport,
+    LatentSpace, imauve_score, intervention_battery,
 };
 
 #[cfg(feature = "viable_manifold_graph")]

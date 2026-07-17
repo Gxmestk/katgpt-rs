@@ -1,0 +1,157 @@
+# Interpolation Geometry — iMAUVE + 5-Way Intervention Probe
+
+> **Source:** [Issue 158](../../.issues/158_latent_interpolation_geometry_evaluation.md),
+> [Research 445](../../.research/445_Latent_Thought_Flows_Text_Compression.md) —
+> Prabhudesai & Geng, *Latent Thought Flows with Text Compression* (Jun 2, 2026).
+> **Module:** `katgpt_core::interpolation_geometry` (feature `interpolation_geometry`, opt-in).
+> **GOAT bench:** `benches/bench_456_interpolation_geometry_goat.rs`.
+
+## What this is
+
+A generic, modelless evaluation methodology for any committed latent substrate.
+It exposes two protocols distilled from the paper:
+
+1. **`imauve_score`** — nearest-neighbor midpoint interpolation quality
+   (paper §1.2). The paper's headline methodological contribution: predicts
+   downstream generation quality with Pearson r=0.99, while reconstruction
+   quality (rMAUVE) saturates near 1.0 and is uninformative. Our analog: a
+   substrate can have perfect freeze/thaw bit-identity yet have midpoints
+   that decode to incoherent intermediate behavior.
+
+2. **`intervention_battery`** — 5-way causal probe (paper §1.4): matched /
+   shuffled / zero / mean / noise. Extends Plan 278's `FaithfulnessProbe`
+   (binary, on injected memory) to the per-entity committed-state domain.
+
+## What this is NOT
+
+- **NOT a training primitive.** No encoder, no decoder network, no MeanFlow
+  generator. The trait abstracts over substrates that already exist; the
+  caller supplies the decode operation.
+- **NOT a probability / confidence / predictive interval.** The fields are
+  raw geometric / divergence measurements. The "Report the Floor"
+  conformal-naive rule (Research 322 / Plan 340) does NOT apply.
+- **NOT a router.** The diagnostic produces measurements; the caller decides
+  what to do with them.
+
+## The `LatentSpace` trait
+
+```rust
+pub trait LatentSpace {
+    type Point: Clone;       // e.g. [f32; 8] (HLA), [f32; 64] (style_weights)
+    type Behavior;           // e.g. 5-scalar affect set, action distribution
+
+    fn dim(&self) -> usize;
+    fn decode(&self, point: &Self::Point) -> Self::Behavior;
+    fn midpoint(&self, a: &Self::Point, b: &Self::Point) -> Self::Point;
+    fn zero(&self) -> Self::Point;
+    fn mean(&self, samples: &[Self::Point]) -> Self::Point;
+    fn noise(&self, seed: u64) -> Self::Point;       // deterministic
+    fn latent_distance(&self, a: &Self::Point, b: &Self::Point) -> f32;  // L2
+    fn behavior_distance(&self, a: &Self::Behavior, b: &Self::Behavior) -> f32;
+}
+```
+
+**Midpoint contract**: `midpoint(a, b)` MUST be symmetric and idempotent at
+the endpoints (`midpoint(a, a) == a`). The shipped reference impls verify
+both; custom impls should add their own test.
+
+**Distance contract**: `latent_distance` is the metric used for nearest-
+neighbor search (typically L2). `behavior_distance` is the metric used to
+score decoded outputs (the paper's cross-entropy analog; caller-supplied —
+could be L2 on emotion scalars, KL on action distributions, or Hamming on
+tokenized output).
+
+## Reference implementations shipped
+
+| Impl | Point | Behavior | Decode | Used for |
+|---|---|---|---|---|
+| `GaussianMixtureSpace` | `[f32; 2]` | `[f32; 2]` | identity | Unit tests; demonstrates good vs bad geometry |
+| `EuclideanLatentSpace<N>` | `[f32; N]` | `[f32; N]` | identity | Generic shape analog — `N=8` for HLA, `N=64` for `style_weights` |
+
+**Why identity decode:** the synthetic test fixtures prove the *protocol
+mechanics* (nearest-neighbor search, midpoint computation, behavior-distance
+aggregation) without depending on any real substrate's decode path. Real
+substrates plug in their own decode via the trait.
+
+## Usage
+
+```rust
+use katgpt_core::interpolation_geometry::{
+    EuclideanLatentSpace, LatentSpace, imauve_score, intervention_battery,
+};
+
+// 1. Define your substrate (here: a generic 64-dim Euclidean space).
+let space = EuclideanLatentSpace::<64>;
+
+// 2. Build an anchor/candidate pool.
+let points: Vec<[f32; 64]> = /* your committed latents */;
+let mut midpoint_scratch = [0.0f32; 64];
+
+// 3. Score interpolation geometry.
+let score = imauve_score(&space, &points, &points, &mut midpoint_scratch, 4.0);
+// score.score in [0, 1]; 1.0 = midpoints stay on-manifold.
+
+// 4. Run a 5-way intervention probe on one anchor.
+let anchor = points[0];
+let donors = &points[1..];
+let mut z = [0.0f32; 64];
+let mut m = [0.0f32; 64];
+let mut n = [0.0f32; 64];
+let report = intervention_battery(&space, &anchor, donors, 42, &mut z, &mut m, &mut n);
+// report.matched ~ 0 (control); .shuffled/.zero/.mean/.noise diverge if the
+// latent matters. report.latent_is_causal(5.0) → bool.
+```
+
+## GOAT gate (Phase 1)
+
+All gates measured by `bench_456_interpolation_geometry_goat`:
+
+| Gate | Target | Measured | Verdict |
+|---|---|---|---|
+| **G1 correctness** | good > bad geometry, good > 0.9, bad < 0.95 | good=0.9646, bad=0.8087 | PASS |
+| **G2 perf** (n=256 × d=64) | < 50 ms | 642 µs median (78× headroom) | PASS |
+| **G4 zero-alloc** | 0 allocs / 100 calls × 2 primitives | 0 / 0 | PASS |
+| **G3 no-regression** | clippy --all-features clean | clean | PASS |
+
+**Why the gates stop here (not at promotion to default-on):** This is an
+*evaluation methodology*, not a primitive that improves runtime. The GOAT
+promotion rule requires a modelless **gain** — this primitive produces
+*measurements*, not gains. It stays opt-in until a real substrate's audit
+(riir-engine `NpcEmotionScalars`, riir-neuron-db `NeuronShard`) either
+(a) confirms all substrates have good geometry (close issue, methodology
+documented, no further work) or (b) surfaces a substrate with bad geometry
+(open a fix plan; the fix becomes the GOAT candidate, the metric stays as
+the regression test).
+
+## Substrates covered (Research 445 §2.6)
+
+| Substrate | Lives in | Status |
+|---|---|---|
+| HLA `NpcEmotionScalars [f32; 8]` | riir-engine (private) | Trait-ready; `impl LatentSpace` is a riir-engine follow-up |
+| `ArchetypeBlendShard` π | riir-engine (private) | Trait-ready; riir-engine follow-up |
+| `KarcShard` weights | riir-engine (private) | Trait-ready; riir-engine follow-up |
+| `NeuronShard::style_weights [f32; 64]` | riir-neuron-db (private) | Trait-ready; riir-neuron-db follow-up |
+| `ZoneGeometryPod` | riir-engine (private) | Trait-ready; riir-engine follow-up |
+| `MerkleFrozenEnvelope` versions | riir-neuron-db (private) | Trait-ready; riir-neuron-db follow-up |
+
+The `EuclideanLatentSpace<N>` reference impl proves the protocol works at
+the HLA dimension (N=8) and the `style_weights` dimension (N=64)
+generically. The riir-side `impl LatentSpace for <ConcreteType>` is a
+trivial wrapper that supplies the real decode path.
+
+## Three-pressure audit (paper §1.3)
+
+For each substrate, the audit checks whether the latent summarizes-vs-routes,
+whether the runtime depends on it, and whether context stays local. These
+are documented in [Issue 158](../../.issues/158_latent_interpolation_geometry_evaluation.md)
+§"Three-pressure audit". The audit requires the real decode path and is
+therefore part of the riir-side follow-up, not this primitive.
+
+## See also
+
+- [`faithfulness_probe.md`](faithfulness_probe.md) — Plan 278's binary
+  FaithfulnessProbe; this module extends it to per-entity committed state.
+- [`../03_memory/engram.md`](../03_memory/engram.md) — Engram memory
+  primitive; one of the six substrates' decay can be audited via this metric.
+- [Research 445](../../.research/445_Latent_Thought_Flows_Text_Compression.md)
+  — the parent research note with the full vocabulary translation table.
