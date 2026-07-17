@@ -17,20 +17,11 @@ Cross-repo code-smell sweep over `katgpt-rs`. Two files exceed the **3200-line h
 
 ## Critical (>3200 lines — hard limit violation)
 
-### C1. `src/transformer.rs` — 5672 lines
+### C1. `src/transformer.rs` — 5672 lines ✅ DONE (Issue 164)
 
 Mixes RiM slots, forward passes (7 variants), generators, raven router, depth routing, paged + quantized paths in a single file. The top re-export block (lines 1–80) already shows the public API is a façade — the split is mechanical.
 
-**Plan needed:**
-- Split into `transformer/` module folder:
-  - `forward.rs` — forward-pass variants
-  - `generators.rs` — generators
-  - `raven.rs` — raven router
-  - `depth_route.rs` — depth routing
-  - `paged.rs` — paged path
-  - `quantized.rs` — quantized path
-- Preserve the existing public API via `mod.rs` re-exports after split.
-- GOAT gate: G1 (no behavior change — bit-identical `cargo test`), G3 (no perf regression on existing benchmarks).
+**Resolved 2026-07-17 (Issue 164):** split into `transformer/` module folder with 8 sub-modules (`mod.rs` + `variants.rs` + `tf_loop.rs` + `prefill.rs` + `generators.rs` + `paged.rs` + `raven.rs` + `quantized.rs` + `tests.rs`). Public API preserved 1:1 via `mod.rs` re-exports. GOAT gate G1 + G3 PASS: 200/200 default tests bit-identical, clippy clean workspace-wide. Module naming differs slightly from the original proposal (batched-forward module is `variants.rs` not `forward.rs` to avoid collision with the re-exported `forward` fn; depth routing lives in `tf_loop.rs` with its sole caller `forward_training_free_loop`).
 
 ### C2. `crates/katgpt-speculative/src/dd_tree.rs` — 4207 lines
 
