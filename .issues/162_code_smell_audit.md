@@ -27,7 +27,7 @@ Mixes RiM slots, forward passes (7 variants), generators, raven router, depth ro
 
 Mixes dd-tree builders, `TreeBuilder` impl (lines 912→3006 — a **2100-line** impl block), SDE variants, residual/cross-scale trackers.
 
-**Resolved 2026-07-17 (Issue 165):** converted to `dd_tree/` module folder with `TreeBuilder` extracted to `tree_builder.rs` (2091 lines). The scale-config structs (`LodestarConfig`, `WidthScaleConfig`, `CrossScaleConfig`, `ResidualTracker`) were NOT split into a separate `scale_config.rs` — they're tightly coupled to their builder functions and small enough to stay in `mod.rs`. Test file `dd_tree_tests.rs` moved into the module folder as `tests.rs`. Both `mod.rs` (2125) and `tree_builder.rs` (2091) are now under the 3200 hard limit (down from Critical); both remain in the 2048–3200 soft-limit band (High). GOAT gate G1 + G3 PASS: 305/305 + 200/200 + 1079/1079 (`--all-features`) tests pass.
+**Resolved 2026-07-17 (Issue 165, commit `a4c6cbdb`):** converted to `dd_tree/` module folder with `TreeBuilder` extracted to `tree_builder.rs` (2091 lines). The scale-config structs (`LodestarConfig`, `WidthScaleConfig`, `CrossScaleConfig`, `ResidualTracker`) were NOT split into a separate `scale_config.rs` — they're tightly coupled to their builder functions and small enough to stay in `mod.rs`. Test file `dd_tree_tests.rs` moved into the module folder as `tests.rs`. Both `mod.rs` (2125) and `tree_builder.rs` (2091) are now under the 3200 hard limit (down from Critical); both remain in the 2048–3200 soft-limit band (High). GOAT gate G1 + G3 PASS: 305/305 + 200/200 + 1079/1079 (`--all-features`) tests pass. **Sibling-validated 2026-07-17:** the follow-on GRAPE feature re-test (`cargo test -p katgpt-core --lib --features grapem_rodrigues,position_group_action,grape_ap_vector`) returned **1605 passed / 0 failed / 3 ignored** — up from 1561 in the default-features run, confirming the opt-in GRAPE features added by Issues 159/160/161 compile and pass under the split. The sibling's self-admitted broken test from `dc192b3b` (fixed in the same push) is certified closed.
 
 ---
 
@@ -73,7 +73,10 @@ Stale signature — parameter is no longer consumed.
 
 Engram is `opt-in` feature-gated.
 
-**Action:** confirm Phase status, or convert to a tracked issue with a concrete next step.
+**Status:** **VERIFIED ACTIVE 2026-07-17 — keep.** Both TODOs document concrete deferred Plan 299 subtasks with explicit "file when first consumer needs it" guidance:
+- `commitment.rs:29` — T5.1–T5.4 `EngramHotSwap` (AtomicPtr<Box<dyn EngramTable>> + reader closure, mirroring `sense/hotswap.rs`) + T5.7–T5.8 unit tests for hot-swap atomicity + G5 concurrent reader/writer gate.
+- `kernel.rs:33` — T3.6 multi-branch `sigmoid_fuse_multi_branch_into` (M distinct gates sharing one `v`; default M=1, mHC backbone uses M=4) + T3.7 depthwise causal conv `conv_causal_into` (paper §2.3 eq 5).
+These are well-scoped future-work notes with concrete acceptance criteria, NOT stale. Same verdict class as the 3 riir-ai TODOs verified ACTIVE in Issue 530.
 
 ### M4. `crates/katgpt-core/src/linalg/` — three consolidation TODOs
 
@@ -83,7 +86,7 @@ Engram is `opt-in` feature-gated.
 
 All three reference "unify with peira's f64 path" / Plan 319 §Risks zero-pad variant.
 
-**Action:** consolidate into a single decision (one plan or one canonical note).
+**Status:** **VERIFIED ACTIVE 2026-07-17 — keep, consolidated note below.** All three TODOs reference the same deferral: unifying the f32 linalg path with PEIRA's f64 path risks breaking PEIRA's bit-identical Plan 153 G4 reproducibility, and is correctly gated on a generic-over-`T: Float` Cholesky being proven bit-identical to the current f64 specialization. The `mod.rs:13` note is the canonical summary; `ridge_solve.rs:8` and `geometric_product.rs:62` (Plan 319 §Risks zero-pad variant) are local reminders pointing at the same future work. The three TODOs are consistent — NOT in conflict, NOT stale. **Consolidated decision:** leave in place; reopen as a plan if/when a concrete consumer needs the unified path (e.g. a new ridge-solver caller that wants both f32 perf and f64 numerical robustness from one entry point).
 
 ---
 
@@ -96,6 +99,16 @@ Most softmax usage is mathematically required (token sampling, attention weights
 - `crates/katgpt-quant/src/octopus/forward.rs:438`
 
 **Action:** audit each. If the softmax is over a direction-vector projection (latent domain), convert to sigmoid per global rule. If it's over logits or attention weights, leave in place with a one-line comment citing the exception.
+
+**Status: ALL 3 SITES AUDITED 2026-07-17 — KEEP, all are canonical logit/attention-domain softmax.**
+
+1. **`swir/strategy_adapter.rs:106, 192`** — `softmax_into_scratch` converts **token logits → probability distribution** for soft-embedding accumulation (`EmitSoftEmbedding` path mixes vocab probabilities against the embedding matrix). Canonical logit-domain softmax. The doc comment at L99-105 explicitly justifies keeping it as a helper for SIMD drop-in. Not a latent projection.
+
+2. **`katgpt-sense/src/reconstruction.rs:1236, 1237, 1264`** — `advantage_margin_hla` (Eq. 18, arxiv:2511.16886) computes `KL(π+ ‖ π̂)` via `log_softmax`. This is **information-theoretic KL divergence between two action distributions**, which mathematically requires log-softmax (KL = E_post[log π+ − log π̂]). The 6-element input is treated as logits over an action set, not as a latent embedding. Feature-gated under `self_advantage_gate`. Per AGENTS.md sigmoid-rule scope ("applies to latent-space projection / gating, not to logit sampling"), this is correctly softmax.
+
+3. **`katgpt-quant/src/octopus/forward.rs:438`** — the cited line is a test-assertion message string (inside `#[test] fn test_attention_weights_normalized`), NOT a production softmax site. The production softmax is in `attention_octopus` (L88) — canonical softmax-over-keys for attention weights. KEEP.
+
+No conversion to sigmoid needed at any of the 3 sites. The audit's flag was correct to surface them (the rule is non-obvious), but the verdict is uniformly KEEP with documented rationale.
 
 ---
 
