@@ -170,7 +170,7 @@ close to anchors, confirming the latent geometry is sound. The intervention
 battery confirms the decode causally depends on the latent (all interventions
 move the decoded behavior away from matched).
 
-### Q1 verdicts — mostly N/A (no trajectory summary operation)
+### Q1 verdicts — `KarcShard.wout` PASS (empirically confirmed), rest N/A
 
 Q1 asks: does the latent summarize an underlying trajectory, or is it a
 lookup key? The audit requires a trajectory-summary operation (the latent as
@@ -179,14 +179,14 @@ a function of a sequence of events). Of the four remaining substrates:
 | Substrate | Trajectory operation | Q1 verdict |
 |---|---|---|
 | `ArchetypeBlendShard.pi` | One-shot commit via `set_blend_state` from `CommittedFieldBlend::commit`. No trajectory of events — pi is set in a single atomic commit from the field blend. | **N/A** (not a trajectory summary) |
-| `KarcShard.wout` | Ridge-regression fit on a (reservoir_state, target) trajectory. IS a trajectory summary (closed-form least squares). | **Applicable but deferred** — the ridge fit lives in `riir-engine::karc_bridge` / `katgpt-core::karc::KarcForecaster::fit`, not in `riir-neuron-db`. A Q1 audit would generalize `audit_summarize_vs_route` to the ridge-fit trajectory (drop training events, re-fit, measure wout divergence). Non-blocking — ridge regression is by construction a summarize operation (the closed-form solution is the unique minimizer of the squared error over the trajectory, so dropping events moves the solution by O(drop_fraction) under regularity conditions). |
+| `KarcShard.wout` | Ridge-regression fit on a (reservoir_state, target) trajectory. IS a trajectory summary (closed-form least squares). | **PASS** (empirically confirmed, 2026-07-17 continuation) — `audit_karc_wout_summarize_vs_route` measures the ridge-fit Wout divergence under subsampling. At drop=30%, mean_rel=0.047, worst_rel=0.066 (well under the drop×2.0=0.6 bound). The routing control (single-pair degenerate fit) has worst_rel=1.33 (fails the bound). The ridge fit's divergence scales proportionally with drop_fraction (0.02→0.05→0.07 mean across 10/30/50%), confirming the summarize signature. See `.benchmarks/459` v5 addendum. |
 | `ZoneGeometryPod` | Regenerated from chain-committed NeuronShard + raw info-brain state. Not a trajectory summary — single-source derivation. | **N/A** (derived artifact, not trajectory summary) |
 | `MerkleFrozenEnvelope` | `freeze(data_blocks)` computes a Merkle root over the blocks. Not a trajectory summary — cryptographic commitment over a static block set. | **N/A** (cryptographic commitment, not trajectory summary) |
 
-**Q1 verdict: no remaining substrate requires the summarize-vs-route audit
-today.** `KarcShard.wout` is the only one with a real trajectory operation
-(ridge fit), and it is deferred as non-blocking because ridge regression is
-structurally a summarize operation.
+**Q1 verdict: `KarcShard.wout` PASS (empirically confirmed).** The
+previously-deferred Q1 audit is now implemented — the ridge-fit Wout is
+confirmed as a summarizing latent, not a routing key. The other three
+remaining substrates have no trajectory-summary operation (N/A).
 
 ### Q3 structural verdicts — all four PASS by construction
 
@@ -228,20 +228,21 @@ learnable latent decode path:
 | Substrate | Q1 | Q2 | Q3 |
 |---|---|---|---|
 | `ArchetypeBlendShard.pi` | N/A (one-shot commit) | **PASS** (runtime audit, iMAUVE=0.9917) | **PASS** (structural) |
-| `KarcShard.wout` | Deferred (ridge fit; structurally summarize) | **PASS** (runtime audit, iMAUVE=0.9773) | **PASS** (structural) |
+| `KarcShard.wout` | **PASS** (empirical, mean_rel=0.047 @ 30% drop) | **PASS** (runtime audit, iMAUVE=0.9773) | **PASS** (structural) |
 | `ZoneGeometryPod` | N/A (derived artifact) | N/A (no learnable latent) | **PASS** (structural) |
 | `MerkleFrozenEnvelope` | N/A (cryptographic commitment) | N/A (no decode path) | **PASS** (vacuous — no decode to bypass) |
 
-**All four remaining substrates are now audited.** Two PASS the runtime Q2
-audit with real numbers; two are vacuously N/A for Q2 (no learnable latent);
-all four PASS Q3 by construction. Q1 is N/A or deferred for all four.
+**All four remaining substrates are now fully audited.** Two PASS the
+runtime Q2 audit with real numbers; two are vacuously N/A for Q2 (no
+learnable latent); all four PASS Q3 by construction. Q1 is PASS for
+`KarcShard.wout` (empirically confirmed) and N/A for the other three.
 
 ## Three-pressure audit (bundled)
 
 For each substrate, run the audit checklist derived from Research 445 §1.3:
 
 - [x] **Audit Q1 — summarize or route?** Does the latent summarize the underlying trajectory, or is it a lookup key? Test: subsample the trajectory (MAE-drop analog — sparse observations under fog-of-war), recompute the latent, measure latent divergence. A summarizing latent is stable under subsampling; a routing latent diverges.
-  - **Resolution (2026-07-17):** CLOSED for `NeuronShard::style_weights` via the Q1 summarize-vs-route audit (Benchmark 459 v3 addendum). The `ConsolidationPipeline::sleep()` average is the canonical summarize operation — divergence under subsampling scales proportionally with the drop fraction, both in mean (10%→0.028, 30%→0.047, 50%→0.069) and worst case (10%→0.077, 30%→0.162, 50%→0.226). The routing control (argmax-norm on a unique-outlier trajectory) exhibits the expected routing signature (worst-case spike to ~0.77 at low drop fractions), proving the audit discriminates. The average is also robust to outliers — dropping a 10×-magnitude outlier event from a 60-event trajectory shifts the average by at most `outlier/60`. **`NpcEmotionScalars`** (riir-engine) is current-state, not trajectory-summary — the Q1 question doesn't apply directly (the latent IS the current observation, not a trajectory summary). Q1 for that substrate is vacuously N/A. **The four remaining private substrates** (`ArchetypeBlendShard` π, `KarcShard` weights, `ZoneGeometryPod`, `MerkleFrozenEnvelope`) are closed in the continuation session: 3 are N/A (no trajectory-summary operation), `KarcShard.wout` is deferred as non-blocking (ridge regression is structurally a summarize operation by closed-form least-squares construction). See §"Remaining-substrate Q1/Q2/Q3 verdicts" below.
+  - **Resolution (2026-07-17):** CLOSED for `NeuronShard::style_weights` via the Q1 summarize-vs-route audit (Benchmark 459 v3 addendum). The `ConsolidationPipeline::sleep()` average is the canonical summarize operation — divergence under subsampling scales proportionally with the drop fraction, both in mean (10%→0.028, 30%→0.047, 50%→0.069) and worst case (10%→0.077, 30%→0.162, 50%→0.226). The routing control (argmax-norm on a unique-outlier trajectory) exhibits the expected routing signature (worst-case spike to ~0.77 at low drop fractions), proving the audit discriminates. The average is also robust to outliers — dropping a 10×-magnitude outlier event from a 60-event trajectory shifts the average by at most `outlier/60`. **`NpcEmotionScalars`** (riir-engine) is current-state, not trajectory-summary — the Q1 question doesn't apply directly (the latent IS the current observation, not a trajectory summary). Q1 for that substrate is vacuously N/A. **The four remaining private substrates** (`ArchetypeBlendShard` π, `KarcShard` weights, `ZoneGeometryPod`, `MerkleFrozenEnvelope`) are closed in the continuation sessions: 3 are N/A (no trajectory-summary operation); **`KarcShard.wout` is PASS** (empirically confirmed in Benchmark 459 v5 — `audit_karc_wout_summarize_vs_route` measures the ridge-fit Wout divergence under subsampling; at drop=30%, mean_rel=0.047, worst_rel=0.066; the routing control fails at worst_rel=1.33; divergence scales proportionally with drop_fraction, confirming the summarize signature). See §"Remaining-substrate Q1/Q2/Q3 verdicts" below.
 - [x] **Audit Q2 — runtime depends on latent?** Does the runtime behavior actually use the committed latent, or does it bypass via raw state? Test: zero/shuffle the latent (intervention battery), measure behavior delta. FaithfulnessProbe (Plan 278) already does this for injected memory; extend to per-entity committed state.
   - **Resolution (2026-07-17):** CLOSED for `NeuronShard::style_weights` via the v2 runtime-decode audit (Benchmark 459 v2 addendum). The v2 `StyleWeightsScalarSpace` uses the canonical `sigmoid((1/STYLE_DIM) · dot)` decode (exactly mirroring `project_compacted_to_scalars`) and confirms `latent_is_causal(5.0)` under a high-signal anchor: matched=0, shuffled=0.20, zero=0.56, mean=0.13, noise=0.56. The low-signal regime (small projections → sigmoid ≈ 0.5) is documented as expected sigmoid behavior, not a defect. **`NpcEmotionScalars`** (riir-engine) implicitly answers Q2 via its existing `curiosity_drive()` decode (already a runtime bridge). **The four remaining private substrates** are closed in the continuation session: `ArchetypeBlendShard.pi` PASSES (iMAUVE=0.9917, all interventions diverge: 0.90/0.47/0.49/0.41) and `KarcShard.wout` PASSES (iMAUVE=0.9773, all interventions diverge: 4.67/4.29/3.46/9.00) via `riir-neuron-db/src/substrate_geometry_audits.rs`; `ZoneGeometryPod` and `MerkleFrozenEnvelope` are vacuously N/A (no learnable latent decode path). See §"Remaining-substrate Q1/Q2/Q3 verdicts" below.
 - [x] **Audit Q3 — local context or full bypass?** Does the runtime's attention to the latent stay local, or does raw context bypass it? Already addressed by SpKv (Plan 070) and RTPurbo (Plan 126) sliding-window infrastructure; audit confirms no substrate accidentally bypasses via global attention.
