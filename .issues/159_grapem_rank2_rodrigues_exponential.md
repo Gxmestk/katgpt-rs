@@ -48,12 +48,12 @@ impl Rank2Plane {
 
 ## Tasks
 
-- [ ] **T1** Implement `grapem_apply_into` + `Rank2Plane` in `katgpt-core/src/grapem.rs` (or extend `phase_rotation.rs`).
-- [ ] **T2** Implement the reference `expm` (scaling-squaring) for test comparison — keep it test-only, not in the public API.
-- [ ] **T3** Write the GOAT gate tests (G1–G4 above).
-- [ ] **T4** Add the feature gate `grapem_rodrigues` to `katgpt-core/Cargo.toml`.
-- [ ] **T5** Document the math in the module doc-comment (Rodrigues formula + the `O(d)` application derivation).
-- [ ] **T6** GOAT verdict: promote to default-on if G1–G4 all PASS.
+- [x] **T1** Implement `grapem_apply_into` + `Rank2Plane` in `katgpt-core/src/grapem.rs` (or extend `phase_rotation.rs`).
+- [x] **T2** Implement the reference `expm` (scaling-squaring) for test comparison — keep it test-only, not in the public API.
+- [x] **T3** Write the GOAT gate tests (G1–G4 above).
+- [x] **T4** Add the feature gate `grapem_rodrigues` to `katgpt-core/Cargo.toml`.
+- [x] **T5** Document the math in the module doc-comment (Rodrigues formula + the `O(d)` application derivation).
+- [-] **T6** GOAT verdict: promote to default-on if G1–G4 all PASS. — **DEFERRED**: G1–G4 all PASS (see [.benchmarks/457](../.benchmarks/457_grapem_rodrigues_goat.md)), but promotion is deferred because the gain is a new capability (arbitrary-plane rotation), not a perf/quality gain on an existing primitive. Re-evaluate when a concrete consumer lands.
 
 ## Acceptance criteria
 

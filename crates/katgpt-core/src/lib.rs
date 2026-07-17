@@ -1059,6 +1059,21 @@ pub use phase_rotation::{
     compute_phase_per_channel_into, phase_rotation_gate_into,
 };
 
+// GRAPE-M — Rank-2 Rodrigues Exponential for arbitrary plane (a, b).
+// Distilled from Zhang et al. *GRAPE* (arXiv:2512.07805, ICLR 2026 §2.3).
+// O(d) closed-form application of `exp(n·ω·L)·x` where `L = abᵀ − baᵀ` (rank-2
+// skew) — two dot products + one FMA triad, never materialises the d×d matrix
+// (beats LieRE's O(d³) torch.matrix_exp). Subsumes phase_rotation's scalar
+// 2D rotation as the canonical-basis special case `a = e_i, b = e_{i+D/2}`;
+// the new capability is rotation in a *learned* plane (per-NPC HLA personality
+// rotation, per-shard rotation in MerkleFrozenEnvelope — see Issue 159).
+// Pure modelless float arithmetic; learning the plane is → riir-train.
+// Opt-in until the G1–G4 GOAT gate passes (Issue 159 T6).
+#[cfg(feature = "grapem_rodrigues")]
+pub mod grapem;
+#[cfg(feature = "grapem_rodrigues")]
+pub use grapem::{GrapemError, Rank2Plane, grapem_apply_into};
+
 // Spherical Steering — single-target geodesic Slerp rotation
 // `sin((1−t)θ)/sin θ · ĥ + sin(tθ)/sin θ · μ_T` toward a unit-norm target
 // direction on S^{d-1}, with sigmoid-translated vMF confidence gate (Plan 405,
