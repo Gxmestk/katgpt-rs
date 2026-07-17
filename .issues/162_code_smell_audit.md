@@ -164,9 +164,9 @@ verifying structural seams).
 - ~~`crates/katgpt-dec/src/sheaf_admm.rs` (2109)~~ ✅ DONE (Issue 176 T4): mod.rs lands at 1222, tests.rs at 889 (file was 42% tests). PASS 20/20 `sheaf_admm::tests::*` (DEFAULT-ON).
 - ~~`crates/katgpt-percepta/src/graph/types.rs` (2055)~~ ✅ DONE (Issue 176 T5): mod.rs lands at 1333, tests.rs at 724 (file was 35% tests). PASS 54/54 `graph::types::tests::*` under `percepta_graph`.
 
-**Functional split (Issue 177, PENDING):**
+**Functional split (Issue 177, DONE):**
 
-- `crates/katgpt-pruners/src/bandit.rs` (2178) — 14 `// ──` delimiters mark natural seams (Strategy / Stats / Pruner / Beta sampling / Environment / Session / SharedBanditStats / RandOpt). Same functional-split pattern as Issue 175.
+- ~~`crates/katgpt-pruners/src/bandit.rs` (2178)~~ ✅ DONE (Issue 177): 14 `// ──` delimiters marked natural seams (Strategy / Stats / Pruner / Beta sampling / Environment / Session / SharedBanditStats / RandOpt). Same functional-split pattern as Issue 175. Split to `bandit/` module folder — mod.rs (1289) + environment.rs (162) + session.rs (499) + shared_stats.rs (172) + randopt.rs (101). All under 2048 ✓. PASS 43/43 `bandit::tests::*` + 197/197 katgpt-pruners under `bandit` + workspace sweep 6519/0.
 
 **Post-split growth / investigation (Issue 178, PENDING):**
 
