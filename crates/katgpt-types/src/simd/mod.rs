@@ -195,6 +195,11 @@ pub(super) fn is_avx2_fma_available() -> bool {
         use std::sync::atomic::{AtomicBool, Ordering};
         static CACHED: AtomicBool = AtomicBool::new(false);
         static INIT: std::sync::Once = std::sync::Once::new();
+        // `__cpuid` became safe in Rust 1.93 (returns a Copy struct, no memory
+        // dereference). The `unsafe` wrappers remain for older Rust; this
+        // block-level allow silences the unnecessary-unsafe-block lint under
+        // `-D warnings` on 1.93+ without affecting the inner statements.
+        #[allow(unused_unsafe)]
         INIT.call_once(|| {
             let cpuid1 = unsafe { core::arch::x86_64::__cpuid(1) };
             let has_avx = (cpuid1.ecx & (1 << 28)) != 0;
