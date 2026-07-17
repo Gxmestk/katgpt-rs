@@ -141,3 +141,11 @@ name = "bench_423_spectral_rewire_goat"
 path = "benches/bench_423_spectral_rewire_goat.rs"
 required-features = ["spectral_rewire"]
 harness = false
+
+# Plan 455 Phase 2 — Quantile Balancing MoE Router N/M/k sweep benchmark.
+# std::time::Instant + harness=false (matches Plan 279 bench convention).
+[[bench]]
+name = "quantile_balance_router_bench"
+path = "benches/quantile_balance_router_bench.rs"
+required-features = ["quantile_balance_router"]
+harness = false
