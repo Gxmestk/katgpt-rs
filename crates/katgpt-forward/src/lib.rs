@@ -486,8 +486,9 @@ pub mod forward;
 #[cfg(feature = "coda_fusion")]
 pub use forward::forward_coda;
 pub use forward::{
-    attention_head, cluster_map_from_embeddings, cluster_map_round_robin, clustered_lm_head,
-    forward, forward_base, select_topk_indices, select_topk_indices_into_buf, standard_lm_head,
+    CPU_FORWARD_USES_DEVICE_BASE_PATH, attention_head, cluster_map_from_embeddings,
+    cluster_map_round_robin, clustered_lm_head, forward, forward_base, select_topk_indices,
+    select_topk_indices_into_buf, standard_lm_head,
 };
 
 // DenseMesh `node_transformer` — Plan 385 (2026-07-05).

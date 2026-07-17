@@ -127,6 +127,28 @@ pub unsafe fn attention_head(
     }
 }
 
+/// `true` when `forward()` compiles to the unmodified base transformer path
+/// (standard RMSNorm + RoPE attention + standard MLP), with only the optional
+/// `kog_cpu_fusion` gamma folding that device backends also implement.
+///
+/// Device backends (GPU Metal kernels, ANE CoreML) implement this exact path.
+/// When any forward-altering feature is enabled (sparse/gated MLP, wall attention,
+/// coda fusion, MLS aggregate, etc.), the CPU forward diverges from what the
+/// device kernels compute, and correctness comparison tests should skip.
+///
+/// See `katgpt-backend/src/gpu.rs` tests for the canonical usage.
+pub const CPU_FORWARD_USES_DEVICE_BASE_PATH: bool = !cfg!(any(
+    feature = "coda_fusion",
+    feature = "cna_steering",
+    feature = "delta_routing",
+    feature = "domain_latent",
+    feature = "gated_mlp",
+    feature = "hydra_budget",
+    feature = "mls_aggregate",
+    feature = "sparse_mlp",
+    feature = "wall_attention",
+));
+
 /// Causal decode: single token forward with optional LoRA adapter.
 /// Backward-compatible wrapper that passes `None` for LoRA.
 ///
