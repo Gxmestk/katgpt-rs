@@ -4,7 +4,7 @@
 **Research:** [katgpt-rs/.research/374_OTF_LAM_Factorized_Transition_Primitives.md](../.research/374_OTF_LAM_Factorized_Transition_Primitives.md)
 **Source paper:** [arXiv:2606.30544](https://arxiv.org/abs/2606.30544) — Nam et al., *Latent Actions from Factorized Transition Effects under Agent Ambiguity*, Brown, 2026-06-30
 **Target:** `katgpt-rs/crates/katgpt-core/src/factorized_action/` (new module) + Cargo feature `factorized_action`
-**Status:** Active — Phase 1 + Phase 2 + Phase 3 complete. GOAT gate executed 2026-07-04: G1+G2a+G4+G5+G6 PASS, G2b+G3 FAIL (documented "trained GateNetwork needed" outcome). Primitive stays opt-in. See [.benchmarks/375_factorized_action_goat.md](../.benchmarks/375_factorized_action_goat.md) for full results.
+**Status:** ✅ COMPLETE, OPT-IN (honest FAIL: G2b/G3 need trained GateNetwork → riir-train) — Phase 1 + Phase 2 + Phase 3 complete. GOAT gate executed 2026-07-04: G1+G2a+G4+G5+G6 PASS, G2b+G3 FAIL (documented "trained GateNetwork needed" outcome). Primitive stays opt-in. See [.benchmarks/375_factorized_action_goat.md](../.benchmarks/375_factorized_action_goat.md) for full results.
 
 ---
 

@@ -6,7 +6,7 @@
 - [arxiv 2202.11322](https://arxiv.org/abs/2202.11322) — *Efficient CDF Approximations for Normalizing Flows* (TMLR 2022) — "leverage the divergence theorem to estimate the CDF over a closed region in target space"
 - [NeurIPS 2020](https://papers.nips.cc/paper/2020/hash/cbf8710b43df3f2c1553e649403426df-Abstract.html) — *Neural Manifold Ordinary Differential Equations* (Lou et al.) — `d/dt log p = -div(f)` instantaneous change-of-variables
 **Target:** `katgpt-rs/crates/katgpt-core/src/dec/stokes_calculus.rs` (new file) + Cargo feature `stokes_calculus` (under `dec_operators`)
-**Status:** Active — Phase 1 + 2 + 3 COMPLETE (2026-06-24); `stokes_calculus` stays opt-in (G-B PASS, G-C structural fail, **G-A FAIL in riir-ai Plan 334**). Phase 4 filed as riir-ai Plan 334 (2026-06-24); **G-A gate ran 2026-06-24 and FAILED** (candidate 9.5× slower + 36% lower F1 than JS-divergence baseline at `action_dim=8`). See `riir-ai/.benchmarks/334_stokes_validator_g_a.md`.
+**Status:** ✅ COMPLETE, OPT-IN (honest FAIL: G-A 9.5× slower, G-C structural rank-1 limit) — Phase 1 + 2 + 3 COMPLETE (2026-06-24); `stokes_calculus` stays opt-in (G-B PASS, G-C structural fail, **G-A FAIL in riir-ai Plan 334**). Phase 4 filed as riir-ai Plan 334 (2026-06-24); **G-A gate ran 2026-06-24 and FAILED** (candidate 9.5× slower + 36% lower F1 than JS-divergence baseline at `action_dim=8`). See `riir-ai/.benchmarks/334_stokes_validator_g_a.md`.
 
 ---
 

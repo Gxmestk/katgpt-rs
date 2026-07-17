@@ -4,7 +4,7 @@
 **Research:** [katgpt-rs/.research/249_DecentMem_DualPool_Reachable_Router.md](../.research/249_DecentMem_DualPool_Reachable_Router.md)
 **Source paper:** [arXiv:2605.22721](https://arxiv.org/pdf/2605.22721) — Hao, Long, Zhao 2026, "Self-Evolving MAS via Decentralized Memory"
 **Target:** `crates/katgpt-core/src/cgsp/dual_pool.rs` (new module) + Cargo feature `cgsp_dual_pool`
-**Status:** Active — Phase 4 complete (G3 E-pool growth + G4 faithfulness gate); Phase 5 (G5 CGSP integration) **MIGRATED + COMPLETE in [riir-ai Plan 312](../../riir-ai/.plans/312_dual_pool_cgsp_runtime_integration.md)** — G5.2 FLAT, G5.3 PASS (161 ns overhead), G5.4 PASS; Phase 6 (docs + GOAT decision) complete — feature stays opt-in (G1–G4 + G5.3/G5.4 PASS, G5.2 FLAT — reachability guarantee alone justifies the feature, not personality divergence).
+**Status:** ✅ COMPLETE, OPT-IN (cgsp_dual_pool) — Phase 4 complete (G3 E-pool growth + G4 faithfulness gate); Phase 5 (G5 CGSP integration) **MIGRATED + COMPLETE in [riir-ai Plan 312](../../riir-ai/.plans/312_dual_pool_cgsp_runtime_integration.md)** — G5.2 FLAT, G5.3 PASS (161 ns overhead), G5.4 PASS; Phase 6 (docs + GOAT decision) complete — feature stays opt-in (G1–G4 + G5.3/G5.4 PASS, G5.2 FLAT — reachability guarantee alone justifies the feature, not personality divergence).
 
 ---
 

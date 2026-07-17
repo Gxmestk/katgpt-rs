@@ -6,7 +6,7 @@
 **Companion runtime plan:** [riir-ai/.plans/355_crowd_joint_inference_runtime.md](../../riir-ai/.plans/355_crowd_joint_inference_runtime.md)
 **Source paper:** [arXiv:2106.02584](https://arxiv.org/pdf/2106.02584) — Kossen et al., NeurIPS 2021 (Non-Parametric Transformers)
 **Target:** `katgpt-rs/crates/katgpt-core/src/set_attention/` (new module) + Cargo feature `set_attention`
-**Status:** Active — Phase 1+2 complete (GOAT gate PASS, G3-NPC SIMD deferred), Phase 3 complete (T3.1 code shipped, T3.2 benchmark FAILED honestly — exact top-k cannot beat O(N²) scoring, T3.3 LSH deferred until N>100 use case emerges).
+**Status:** ✅ COMPLETE, DEFAULT-ON (set_attention promoted 2026-07-01 after Plan 355 G6/G7/G9 PASS) — Phase 1+2 complete (GOAT gate PASS, G3-NPC SIMD deferred), Phase 3 complete (T3.1 code shipped, T3.2 benchmark FAILED honestly — exact top-k cannot beat O(N²) scoring, T3.3 LSH deferred until N>100 use case emerges).
 
 ---
 
