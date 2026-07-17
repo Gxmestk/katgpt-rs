@@ -19,7 +19,16 @@
 #![allow(clippy::needless_range_loop, clippy::too_many_arguments)]
 
 #[cfg(feature = "binary_plasma")]
-use super::{SimdLevel, simd_level};
+use super::simd_level;
+// `SimdLevel` is only referenced inside target_arch-gated match arms (NEON/
+// AVX2). On targets where none of those arms compile (e.g. wasm32, or scalar
+// fallbacks), the bare import would trigger an unused-import warning under
+// `-D warnings`. Gate it to match the arms.
+#[cfg(all(
+    feature = "binary_plasma",
+    any(target_arch = "aarch64", target_arch = "x86_64"),
+))]
+use super::SimdLevel;
 
 #[cfg(all(feature = "binary_plasma", target_arch = "x86_64"))]
 use super::horizontal::horizontal_sum_256;
