@@ -23,37 +23,19 @@
 
 #![cfg(feature = "cochain_point_sampler")]
 
+// Shared CountingAllocator macro (mirrors katgpt-core Issue 044 T3).
+#[path = "../tests/common/counting_allocator.rs"]
+mod counting_allocator;
+
 use katgpt_dec::{
     CellComplex, CochainField, LocalCoordEncode, PointSamplerScratch,
     sample_cochain_at_point_quad_into, sample_point_quad_into, sample_point_tri_into,
 };
-use std::alloc::{GlobalAlloc, Layout, System};
 use std::hint::black_box;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::Ordering;
 use std::time::Instant;
 
-// ---------------------------------------------------------------------------
-// Inline CountingAllocator (katgpt-dec benches inline the pattern per Plan 407)
-// ---------------------------------------------------------------------------
-
-struct CountingAllocator;
-
-static ALLOC_COUNT: AtomicUsize = AtomicUsize::new(0);
-static DEALLOC_COUNT: AtomicUsize = AtomicUsize::new(0);
-
-unsafe impl GlobalAlloc for CountingAllocator {
-    unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
-        ALLOC_COUNT.fetch_add(1, Ordering::Relaxed);
-        unsafe { System.alloc(layout) }
-    }
-    unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
-        DEALLOC_COUNT.fetch_add(1, Ordering::Relaxed);
-        unsafe { System.dealloc(ptr, layout) }
-    }
-}
-
-#[global_allocator]
-static A: CountingAllocator = CountingAllocator;
+counting_allocator!();
 
 // ---------------------------------------------------------------------------
 // SplitMix64 PRNG (deterministic, no external dep)

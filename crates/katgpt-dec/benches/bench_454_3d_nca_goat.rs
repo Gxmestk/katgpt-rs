@@ -25,35 +25,19 @@
 
 #![cfg(feature = "grid_3d")]
 
+// Shared CountingAllocator macro (mirrors katgpt-core Issue 044 T3).
+#[path = "../tests/common/counting_allocator.rs"]
+mod counting_allocator;
+
 use katgpt_dec::{
     BirthDeathParams, CellComplex, CochainField, SplitMix64,
     operators::graph_laplacian_into, stochastic_birth_death_step,
 };
-use std::alloc::{GlobalAlloc, Layout, System};
 use std::hint::black_box;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::Ordering;
 use std::time::Instant;
 
-// ===========================================================================
-// CountingAllocator (G5 zero-alloc gate)
-// ===========================================================================
-
-struct CountingAllocator;
-
-static ALLOC_COUNT: AtomicUsize = AtomicUsize::new(0);
-
-unsafe impl GlobalAlloc for CountingAllocator {
-    unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
-        ALLOC_COUNT.fetch_add(1, Ordering::Relaxed);
-        unsafe { System.alloc(layout) }
-    }
-    unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
-        unsafe { System.dealloc(ptr, layout) }
-    }
-}
-
-#[global_allocator]
-static A: CountingAllocator = CountingAllocator;
+counting_allocator!();
 
 // ===========================================================================
 // Constants — match the Issue 155 PoC (24³ grid, 100 steps)
