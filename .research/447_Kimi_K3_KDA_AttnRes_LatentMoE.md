@@ -381,9 +381,9 @@ Not required — no parity claim is made. The verdict is "architectural coverage
 
 ### (a) Quantile Balancing router sibling — **plan candidate**
 
-Create `.plans/447_quantile_balancing_router_primitive.md` (number per `.highwater` check). Skeleton:
+Create `.plans/455_quantile_balancing_router_primitive.md` (per `.highwater` check; originally proposed as 447 in an earlier draft of this note but that number was already in use by `447_freq_bandit_phase1.md` — re-issued as 455 = `.plans/.highwater` 454 + 1, 2026-07-17). Skeleton:
 
-> **Plan 447: Quantile Balancing Router — Sibling to Plan 279 Manifold Power Iteration Router**
+> **Plan 455: Quantile Balancing Router — Sibling to Plan 279 Manifold Power Iteration Router**
 >
 > Distills Research 447 §2.4. Ship `quantile_balance_router` as a sibling to `manifold_power_iter_router` (Plan 279). Same signature shape, same snapshot-swap application point, same GOAT gate structure (8 gates).
 >
@@ -410,7 +410,7 @@ Create `.plans/447_quantile_balancing_router_primitive.md` (number per `.highwat
 
 ### (b) KDA `a=b=k` binding for GDN2 — **issue-tracked**
 
-Create `.issues/165_kda_abk_binding_for_gdn2.md` (number per `.highwater` check). Tracking issue:
+Create `.issues/179_kda_abk_binding_for_gdn2.md` (per `.highwater` check; originally proposed as 165 in an earlier draft of this note but that number was already in use by `165_dd_tree_file_split_c2.md` — re-issued as 179 = `.issues/.highwater` 178 + 1, 2026-07-17). Tracking issue:
 
 > **KDA `a=b=k` DPLR binding for GDN2 SIMD kernel**
 >
@@ -429,4 +429,4 @@ Create `.issues/165_kda_abk_binding_for_gdn2.md` (number per `.highwater` check)
 
 ## TL;DR (one-line)
 
-Kimi K3's three architectural primitives (KDA, AttnRes, Stable LatentMoE 16/896) map onto existing shipped cousins — KDA → GDN2 Plan 105 (parameterization ships as `EraseOnly`; the unique KDA trick is the DPLR `a=b=k` binding that gives ~2× kernel speedup, issue-tracked for CPU SIMD GOAT gate); AttnRes → Hydra Budget Plan 165 + Cross-Stage Residual Relocation Plan 431 + PersonalityWeightedComposition Plan 297; Stable LatentMoE → CommittedFieldBlend Plan 321 + dMoE + MPI Router + Raven RSM. The **two actionable items** are: (a) KDA `a=b=k` binding for GDN2 SIMD kernel (issue-tracked, await bandwidth), (b) **Quantile Balancing** as a sibling to Plan 279 (algorithm fully specified in Jianlin Su's Feb 2026 blog + validated by Marin at 32B-A5B / 1e22 FLOPs — **plan candidate**, not gated on tech report). The KDA paper (arxiv 2510.26692) is the primary source — its 1.16× KDA-only scaling law punctures the 2.5× "combined K3" marketing claim. **Verdict: Gain, two actionable items, one plan candidate + one issue-tracked, no Super-GOAT.** Paper-search lesson: always grep arxiv + cited-source blogs before writing a blog-only verdict.
+Kimi K3's three architectural primitives (KDA, AttnRes, Stable LatentMoE 16/896) map onto existing shipped cousins — KDA → GDN2 Plan 105 (parameterization ships as `EraseOnly`; the unique KDA trick is the DPLR `a=b=k` binding that gives ~2× kernel speedup, **Issue 179**-tracked for CPU SIMD GOAT gate); AttnRes → Hydra Budget Plan 165 + Cross-Stage Residual Relocation Plan 431 + PersonalityWeightedComposition Plan 297; Stable LatentMoE → CommittedFieldBlend Plan 321 + dMoE + MPI Router + Raven RSM. The **two actionable items** are: (a) KDA `a=b=k` binding for GDN2 SIMD kernel (**Issue 179**-tracked, await bandwidth), (b) **Quantile Balancing** as a sibling to Plan 279 (algorithm fully specified in Jianlin Su's Feb 2026 blog + validated by Marin at 32B-A5B / 1e22 FLOPs — **Plan 455** skeleton created, not gated on tech report). The KDA paper (arxiv 2510.26692) is the primary source — its 1.16× KDA-only scaling law punctures the 2.5× "combined K3" marketing claim. **Verdict: Gain, two actionable items, one plan skeleton + one issue-tracked, no Super-GOAT.** Paper-search lesson: always grep arxiv + cited-source blogs before writing a blog-only verdict. **Both follow-ups re-numbered 2026-07-17** (447→455 plan, 165→179 issue) after a `.highwater` check found the originally-proposed numbers were already in use; the katgpt-rs numbering-discipline rule forbids reuse.
