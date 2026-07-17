@@ -45,7 +45,7 @@ Mixes dd-tree builders, `TreeBuilder` impl (lines 912→3006 — a **2100-line**
 - `crates/katgpt-forward/src/d2f.rs` (2268)
 - `crates/katgpt-percepta/src/wasm/lower.rs` (2248)
 - `crates/katgpt-core/src/traits.rs` (2203)
-- `crates/katgpt-core/src/manifold_bandit.rs` (2196)
+- ~~`crates/katgpt-core/src/manifold_bandit.rs` (2196)~~ ✅ DONE (Issue 171, 2026-07-17): split to `manifold_bandit/` module folder — `mod.rs` (1290, well under 2048 ✓ — the file was 41% tests, not functional-split-required as the prior session's summary incorrectly stated) + `tests.rs` (906, tests exempt). Single-axis tests extraction. Single `#[cfg(test)] mod tests` block, single `use super::*;`, zero `pub(super)` helpers, no path corrections. G1+G3 PASS: 34/34 manifold_bandit tests under feature + 1558/1558 katgpt-core lib; clippy clean (lib + tests + workspace). Same class of prior-session verdict error as Issue 170 (qmc.rs).
 
 (tests/benches/examples in the same band are lower priority — single-file fixtures; split only if they impede review.)
 
