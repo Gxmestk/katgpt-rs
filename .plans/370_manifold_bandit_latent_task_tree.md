@@ -5,7 +5,7 @@
 **Source paper:** [arXiv:2606.19750](https://arxiv.org/abs/2606.19750) — McKenzie, Hansen, Wang, *Manifold Bandits: Bayesian Curriculum Learning over the Latent Geometry of Large Language Models*, UCSD, 2026
 **Code:** [github.com/DarrienMcKenzie/manifold-bandits](https://github.com/DarrienMcKenzie/manifold-bandits) (MIT)
 **Target:** `katgpt-rs/crates/katgpt-core/src/manifold_bandit.rs` (new module) + Cargo feature `manifold_bandit`
-**Status:** Active — Phase 1 + Phase 2 + Phase 3 + Phase 4 COMPLETE. GOAT gate PASS (G1/G3/G4/G5), G2 FAIL is plan-level expectation error. PROMOTED to default-on. Phase 3 (real PCA/UMAP-substitute/HDBSCAN-substitute construction) COMPLETE — G1-real confirms structural advantage holds with real-constructed trees (ratio 0.740 vs hand-built 0.723). Phase 4 (DEC-cochain fusion exploration) COMPLETE — Super-GOAT candidacy DROPPED (cochain-dec is 12× slower + breaks G5 reproducibility); the R279 N≥d phase gate (T4.2) is a net win (11% faster G1 convergence at d=2) and ships as an opt-in config field; the GOAT from Phase 2 stands.
+**Status:** ✅ COMPLETE, DEFAULT-ON (2026-07-03) — Phase 1 + Phase 2 + Phase 3 + Phase 4 COMPLETE. GOAT gate PASS (G1/G3/G4/G5), G2 FAIL is plan-level expectation error. PROMOTED to default-on. Phase 3 (real PCA/UMAP-substitute/HDBSCAN-substitute construction) COMPLETE — G1-real confirms structural advantage holds with real-constructed trees (ratio 0.740 vs hand-built 0.723). Phase 4 (DEC-cochain fusion exploration) COMPLETE — Super-GOAT candidacy DROPPED (cochain-dec is 12× slower + breaks G5 reproducibility); the R279 N≥d phase gate (T4.2) is a net win (11% faster G1 convergence at d=2) and ships as an opt-in config field; the GOAT from Phase 2 stands.
 
 ---
 

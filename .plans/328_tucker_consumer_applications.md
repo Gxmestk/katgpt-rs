@@ -3,7 +3,7 @@
 **Date:** 2026-06-25
 **Primitive:** [Plan 326](326_tucker_hosvd_factorization.md) — `katgpt-core/linalg::tucker` (DEFAULT-ON, G1–G4 PASS)
 **Research:** `.research/307_FNO_Practical_Perspective_Spectral_Primitives_Survey.md` (§3 candidate #3)
-**Status:** Active — consumer applications phase
+**Status:** ✅ COMPLETE — both consumers shipped (Chain collusion G1–G4 PASS, Game RMT anomaly G1–G4 PASS with honest caveats documented in G2 notes); T3.1–T3.4 all done; benchmark record `.benchmarks/328_tucker_consumer_applications.md`. Plan 326 primitive already DEFAULT-ON (orthogonal to `riir-neuron-db/.issues/002` wrapper soak window).
 **Motivation:** Plan 326 shipped a generic N-mode HOSVD primitive with zero consumers. Plan 328 finds the obvious-shine consumers — the ones where 3-mode tensor factorization is *self-evidently* the right tool, not a stretch.
 
 ---

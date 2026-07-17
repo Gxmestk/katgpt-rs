@@ -6,7 +6,7 @@
 **Private runtime plan:** [riir-ai/.plans/489_lifelong_lacam_crowd_coordination_runtime.md](../../riir-ai/.plans/489_lifelong_lacam_crowd_coordination_runtime.md)
 **Source paper:** [arXiv:2605.16855](https://arxiv.org/abs/2605.16855) — Arita & Okumura, "Lifelong LaCAM with Local Guidance for Lifelong MAPF", AAAI 2026.
 **Target:** `katgpt-rs/crates/katgpt-core/src/multi_agent_path/` (new module) + Cargo feature `multi_agent_path`
-**Status:** Active — Phase 1 COMPLETE, Phase 2 (GOAT gate) PARTIAL — G3/G4 PASS, G1 2/4 real maps PASS (empty, random), warehouse 0.41 and ht_chantry 0.27 FAIL on real MovingAI maps (Issue 148), G2 FAIL (warm-start non-consumable), Phase 3 COMPLETE (fusion hooks documented), Phase 4 COMPLETE (README + research cross-refs + overview feature table), Phase 5 COMPLETE (promotion decision: KEEP OPT-IN, Issue 143 LaCAM escalation landed)
+**Status:** ✅ COMPLETE, OPT-IN (G1/G2 honest FAIL on real MovingAI maps) — Phase 1 COMPLETE, Phase 2 (GOAT gate) PARTIAL — G3/G4 PASS, G1 2/4 real maps PASS (empty, random), warehouse 0.41 and ht_chantry 0.27 FAIL on real MovingAI maps (Issue 148), G2 FAIL (warm-start non-consumable), Phase 3 COMPLETE (fusion hooks documented), Phase 4 COMPLETE (README + research cross-refs + overview feature table), Phase 5 COMPLETE (promotion decision: KEEP OPT-IN, Issue 143 LaCAM escalation landed)
 
 ---
 

@@ -4,7 +4,7 @@
 **Research:** [katgpt-rs/.research/391_Low_Dimensional_Topology_Linking_Number.md](../.research/391_Low_Dimensional_Topology_Linking_Number.md)
 **Source paper:** [arXiv:2606.31856](https://arxiv.org/abs/2606.31856) — Ren & Lim, *Low-dimensional topology of deep neural networks*, ICML 2026 (PMLR 306)
 **Target:** `katgpt-rs/crates/katgpt-core/src/linking_fold.rs` (new module) + Cargo feature `linking_fold`
-**Status:** Active — Phase 1 ✅, Phase 2 ✅, Phase 3 ✅, Phase 4 ✅ (G2 detector PASS under audit-cadence budget 500 ms @ n=2×200, Issue 050 Option A resolved 2026-07-07; promotion via Option C feature split — fold default-on, detector opt-in), Phase 5 ✅.
+**Status:** ✅ COMPLETE (Phase 1–5 all ✅); Option C feature split — `linking_fold_fold` DEFAULT-ON (2026-07-07), `linking_fold_detector` OPT-IN. G2 detector PASS under audit-cadence budget 500 ms @ n=2×200, Issue 050 Option A resolved 2026-07-07.
 
 **GOAT gate summary (verified 2026-07-07, bench + alloc test run):**
 | Gate | Status | Evidence |

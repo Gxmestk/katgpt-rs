@@ -4,7 +4,7 @@
 **Research:** [katgpt-rs/.research/415_Dynamic_SOM_Elasticity_Gated_Latent_Update.md](../.research/415_Dynamic_SOM_Elasticity_Gated_Latent_Update.md)
 **Source paper:** Rougier & Boniface, "Dynamic Self-Organising Map" (Neurocomputing 2011, ⟨inria-00495827⟩) + Guérin et al. survey (arXiv:2501.08416)
 **Target:** `katgpt-rs/crates/katgpt-core/src/` (new module) + `riir-neuron-db/src/neighbor_heal.rs` (consumer)
-**Status:** Active — Phase 1–4 complete (T1.1–T1.4, T2.1–T2.7, T3.1–T3.3, T4.1–T4.4 done). Phase 5 complete (T5.1 + T5.2 done). G1–G6 ALL PASS. `elasticity_gated_heal` PROMOTED to default-on.
+**Status:** ✅ COMPLETE — Phase 1–4 complete (T1.1–T1.4, T2.1–T2.7, T3.1–T3.3, T4.1–T4.4 done). Phase 5 complete (T5.1 + T5.2 done). G1–G6 ALL PASS. Consumer feature `elasticity_gated_heal` PROMOTED to default-on in riir-neuron-db (behavior opt-in via `.with_neighbor_eta(1.0)`); the katgpt-core primitive `elasticity_gated_update` stays opt-in (consumer enables transitively).
 
 ---
 

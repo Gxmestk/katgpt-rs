@@ -5,7 +5,7 @@
 **Source paper:** [arXiv:2602.05266](https://arxiv.org/abs/2602.05266) — "Beyond Cosine Similarity", Xinbo Ai (BUPT), Feb 2026
 **Target:** `katgpt-rs/crates/katgpt-core/src/similarity.rs` (open primitive) + `katgpt-rs/crates/katgpt-core/src/mag/` (cold-path consumer) + `riir-neuron-db/src/index.rs` (conditional hot-path consumer)
 **Cargo feature:** `recos` (opt-in until GOAT gate passes)
-**Status:** Active — Phase 1 ✅ DONE (T1.1–T1.7); Phase 2 ✅ DONE (G1 **FAIL** → do NOT promote); Phase 3 ✅ SHIPPED (opt-in diagnostic); Phase 4 ✅ SHIPPED (opt-in diagnostic, T4.1-T4.5 done, T4.6 stretch deferred).
+**Status:** ✅ COMPLETE, OPT-IN (G1 honest FAIL → no promotion) — Phase 1 ✅ DONE (T1.1–T1.7); Phase 2 ✅ DONE (G1 **FAIL** → do NOT promote); Phase 3 ✅ SHIPPED (opt-in diagnostic); Phase 4 ✅ SHIPPED (opt-in diagnostic, T4.1-T4.5 done, T4.6 stretch deferred).
 
 > **Numbering note:** Research 421 sketched this as "Plan 422", but `.plans/422_cochain_point_sampler_primitive.md` already exists — a collision. Per the monotonic-never-reused numbering discipline, this plan uses **437** (next free after 436). The Research 421 cross-reference is corrected from 422 → 437 in the same commit that lands this plan.
 
