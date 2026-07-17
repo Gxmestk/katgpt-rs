@@ -4,6 +4,16 @@
 > **Plan:** 049 (G-Zero Self-Play Distillation, Phase 1)
 > **Feature:** `--features g_zero` (implies `bandit`)
 > **Command:** `cargo test --features g_zero --test bench_g_zero --release -- --nocapture`
+>
+> **Artifact note (added 2026-07-18 doc-sync):** the `bench_g_zero`
+> test target referenced above is not present in the current tree
+> (no git history of `tests/bench_g_zero.rs` exists). The G-Zero
+> components themselves still ship under
+> `crates/katgpt-pruners/src/g_zero/`; this benchmark captured the
+> Phase 1 throughput characterization and is preserved as the
+> historical record of that measurement. The numbers above remain
+> valid as captured at the time; the command is not currently
+> runnable as written.
 
 ## Components Benchmarked
 
