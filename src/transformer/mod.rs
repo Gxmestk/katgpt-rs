@@ -147,19 +147,40 @@ mod tf_loop;
 
 // Re-export all public items so `crate::transformer::*` callers resolve
 // unchanged. Each sub-module's public API is preserved 1:1.
-pub use variants::{forward_batched, forward_looped, forward_with_domain_latent};
-pub use generators::{
-    generate, generate_batch, generate_into, generate_with_collapse_detection,
-    generate_with_prefill, generate_with_prefill_and_domain_latent,
-};
+//
+// Feature-gated items must be re-exported with a matching `#[cfg]` guard —
+// otherwise downstream consumers that pull this crate with `default-features =
+// false` (e.g. riir-engine) hit E0432 because the item was configured out.
+// The unconditional items (forward_batched, generate*, forward_paged,
+// forward_prefill, forward_quantized, raven::*) compile under all feature
+// combinations.
+pub use variants::forward_batched;
+#[cfg(feature = "lt2_looped")]
+pub use variants::forward_looped;
+#[cfg(feature = "domain_latent")]
+pub use variants::forward_with_domain_latent;
+
+pub use generators::{generate, generate_batch, generate_into, generate_with_prefill};
+#[cfg(feature = "domain_latent")]
+pub use generators::generate_with_prefill_and_domain_latent;
+#[cfg(feature = "collapse_aware_thinking")]
+pub use generators::generate_with_collapse_detection;
+
 pub use paged::forward_paged;
 pub use prefill::forward_prefill;
-pub use quantized::{forward_quantized, forward_turboquant};
+pub use quantized::forward_quantized;
+#[cfg(feature = "turboquant")]
+pub use quantized::forward_turboquant;
+
 pub use raven::{
     forward_raven, raven_compute_router, raven_compute_router_into, raven_readout,
     raven_readout_into, raven_update, tokens_to_string,
 };
-pub use tf_loop::{depth_route_weights, forward_training_free_loop};
+
+#[cfg(feature = "tf_loop")]
+pub use tf_loop::forward_training_free_loop;
+#[cfg(feature = "delta_routing")]
+pub use tf_loop::depth_route_weights;
 
 // `depth_route` is a test-only helper (private impl, exercised by the norm-
 // stability test). Re-exported at `pub(crate)` visibility so the in-module test
