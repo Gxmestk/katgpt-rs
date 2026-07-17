@@ -68,7 +68,7 @@ Lines 56, 192, 237, 241 — "sparse KV block selection TODO (Plan 173 Task 6)" a
 
 Stale signature — parameter is no longer consumed.
 
-**Action:** remove the parameter (update call sites). Trivial.
+**Status:** **DONE 2026-07-17** (commit `5d3324ec`). Removed `model_path: Option<&Path>` from `auto_backend` and `_model_path` from `try_ane_backend`. All 4 call sites (which already passed `None`) updated. TODO comment deleted. Validation: 2 lib tests + 11 bench/goat tests PASS.
 
 ### M3. `crates/katgpt-core/src/engram/commitment.rs:29` + `kernel.rs:33` — Phase X deferral
 
@@ -106,6 +106,7 @@ Most softmax usage is mathematically required (token sampling, attention weights
 
 - **L1.** `crates/katgpt-core/src/cgsp/types.rs:546–550` — hand-rolled UUID-v4-ish generator using `fastrand::u8(..)`. Consider `Uuid::now_v7().to_bytes_le()` if determinism permits (note: v7 is time-ordered; if the caller needs deterministic seeds, the fastrand path may be intentional — verify before changing).
 - **L2.** `benches/cgsp_hint_receptivity_bench.rs:150` + `benches/sudoku_speculate_bench.rs:346` — `partial_cmp(...).unwrap()` on `f32`. Silent NaN bug risk (returns `Equal` ordering on NaN). Replace with an explicit NaN-handling comparator or assert `is_finite()` upstream.
+  - **Status:** **DONE 2026-07-17** (commit `317534ec`). Replaced with `f32::total_cmp` (Rust 1.62+) which provides a total ordering. NaN now sorts as largest rather than silently comparing equal. No behavior change for the non-NaN inputs the benches actually produce. Validation: `cargo clippy --benches` → 0 warnings.
 - **L3.** Sampling DRY — `softmax_scaled(logits, 1.0/temp); sample_token_into(...)` appears 5+ times across call sites. Extract `sample_next_token(ctx, logits, temp, rng)` helper.
 
 ---
