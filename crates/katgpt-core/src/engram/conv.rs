@@ -753,13 +753,13 @@ mod tests {
 
         // Flat: interleave channels. conv_causal_dyn_into treats the slice as 1D,
         // so we run it per-channel by slicing strided.
-        let mut flat_signal_ch0 = vec![v0[0], v1[0], v2[0], v3[0]];
+        let flat_signal_ch0 = vec![v0[0], v1[0], v2[0], v3[0]];
         let mut flat_out_ch0 = vec![0.0f32; 4];
         let kernel = [0.25f32; 4];
         conv_causal_dyn_into(&flat_signal_ch0, &mut flat_out_ch0, &kernel, 1);
         // flat_out_ch0[3] = 0.25 * (1 + 3 + 5 + 7) = 4.0
 
-        let mut flat_signal_ch1 = vec![v0[1], v1[1], v2[1], v3[1]];
+        let flat_signal_ch1 = vec![v0[1], v1[1], v2[1], v3[1]];
         let mut flat_out_ch1 = vec![0.0f32; 4];
         conv_causal_dyn_into(&flat_signal_ch1, &mut flat_out_ch1, &kernel, 1);
 
