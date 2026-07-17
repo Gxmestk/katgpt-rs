@@ -51,7 +51,7 @@ katgpt-micro-belief = { path = "../katgpt-micro-belief", version = "0.1.1", opti
 # as `katgpt_core::hla` for backwards compatibility. The composition layer
 # moved from root `src/hla/forward.rs` into katgpt-hla now that ForwardContext
 # lives in katgpt-forward.
-katgpt-hla = { path = "../katgpt-hla", version = "0.1.1" }
+katgpt-hla = { path = "../katgpt-hla", version = "0.1.2" }
 # katgpt-personality houses the Personality-Weighted Latent Layer Composition
 # substrate (sigmoid + kernel + snapshot + types) spun out of
 # katgpt-core::personality_composition (Issue 007 Phase E Tier 2 #5). Optional

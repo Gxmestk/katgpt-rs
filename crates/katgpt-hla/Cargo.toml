@@ -1,6 +1,6 @@
 [package]
 name = "katgpt-hla"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2024"
 license = "MIT"
 description = "Higher-order Linear Attention (HLA) substrate — O(1) inference cache types and streaming kernels. Pure substrate, depends only on katgpt-types (Config + SIMD)."
@@ -24,11 +24,23 @@ categories = ["algorithms", "science"]
 # layer lives in katgpt-forward instead (Issue 007 Phase F.4b, 2026-07-02).
 katgpt-types = { path = "../katgpt-types", version = "0.1.1" }
 
+# Optional serde support (Issue 532 T1). Off by default so the substrate
+# stays dependency-light for consumers that only need the math. Enable with
+# `features = ["serde"]` to get `#[derive(Serialize, Deserialize)]` on every
+# cache state struct. The riir-engine snapshot path (gated by `turso_cold`)
+# uses this to bincode-serialize `MultiLayerHlaCache` for Cold Tier storage.
+serde = { version = "1", features = ["derive"], optional = true }
+
 [features]
 # katgpt-hla compiles its entire substrate (types + kernel) unconditionally.
-# No feature flags — HLA substrate is always-on inside katgpt-core (mirrors
-# the pre-promotion behavior where `pub mod hla;` was unconditional). The
-# composition layer (`forward_hla` / `forward_ahla`) lives in katgpt-forward
-# (Issue 007 Phase F.4b); the cognitive extensions (`*_role_aware`,
-# `ThirdOrderMoment`) stay in riir-engine because they depend on `role_transport`.
+# HLA substrate is always-on inside katgpt-core (mirrors the pre-promotion
+# behavior where `pub mod hla;` was unconditional). The composition layer
+# (`forward_hla` / `forward_ahla`) lives in katgpt-forward (Issue 007 Phase
+# F.4b); the cognitive extensions (`*_role_aware`, `ThirdOrderMoment`) stay
+# in riir-engine because they depend on `role_transport`.
+#
+# `serde` (opt-in, Issue 532 T1): adds `#[derive(Serialize, Deserialize)]` on
+# every cache state struct. Required by riir-engine's snapshot module
+# (bincode-based Cold Tier persistence, gated by `turso_cold`).
 default = []
+serde = ["dep:serde"]

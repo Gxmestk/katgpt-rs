@@ -35,6 +35,7 @@ use katgpt_types::Config;
 ///
 /// State size per head: 3 × (hd × hd) + 2 × hd = 3hd² + 2hd floats.
 #[derive(Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct HlaQHeadState {
     /// Query-value cross moment: Σ q_i v_iᵀ ∈ R^{hd × hd}
     pub cqv: Vec<f32>,
@@ -75,6 +76,7 @@ impl HlaQHeadState {
 ///
 /// Total state per layer: n_kv × hd² + n_head × (3hd² + 2hd).
 #[derive(Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct HlaLayerState {
     /// Key second moment per KV group: Σ k_i k_iᵀ ∈ R^{hd × hd}
     /// Shared across Q heads that map to the same KV group.
@@ -122,6 +124,7 @@ impl HlaLayerState {
 ///
 /// With exponential decay γ, all accumulators are scaled: `A_t = γ·A_{t-1} + Δ`.
 #[derive(Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct MultiLayerHlaCache {
     /// Per-layer state.
     pub layers: Vec<HlaLayerState>,
@@ -189,6 +192,7 @@ impl MultiLayerHlaCache {
 ///
 /// State size per head: hd² + hd = hd(hd+1) floats.
 #[derive(Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct AhlaQHeadState {
     /// Routed accumulation: Σ k_i (q_iᵀ PKV_i) ∈ R^{hd × hd}
     pub e: Vec<f32>,
@@ -222,6 +226,7 @@ impl AhlaQHeadState {
 /// Total state per layer: n_kv × (hd² + hd) + n_head × (hd² + hd).
 /// Smaller than symmetric HLA when n_head > n_kv_head (typical GQA).
 #[derive(Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct AhlaLayerState {
     /// Key-value prefix per KV group: Σ k_j v_jᵀ ∈ R^{hd × hd}
     pub pkv: Vec<Vec<f32>>,
@@ -277,6 +282,7 @@ impl AhlaLayerState {
 /// AHLA routes value through key index i: left-cascaded A·A·V,
 /// providing second-order interactions at linear attention cost.
 #[derive(Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct MultiLayerAhlaCache {
     /// Per-layer state.
     pub layers: Vec<AhlaLayerState>,
@@ -386,6 +392,7 @@ impl HlaVariant {
 /// State size per head: 2 × hd² + 2 × hd = 2hd² + 2hd floats.
 /// This is O(d²) per head, the same order as AHLA's existing E matrix.
 #[derive(Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ParallaxAhlaQHeadState {
     /// Softmax-weighted KV cross-covariance: Σ p_ij (v_j − v̄)(k_j − k̄)ᵀ ∈ R^{hd × hd}
     /// where p_ij are softmax attention weights.
@@ -423,6 +430,7 @@ impl ParallaxAhlaQHeadState {
 ///
 /// GQA-aware: covariance heads align with Q heads (each Q head tracks its own Σ_KV).
 #[derive(Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ParallaxAhlaLayerState {
     /// Per-Q-head covariance state.
     pub heads: Vec<ParallaxAhlaQHeadState>,
@@ -455,6 +463,7 @@ impl ParallaxAhlaLayerState {
 ///
 /// Final readout: correction = sigma_kv · ρ (where ρ = W_R · x from Parallax R projection)
 #[derive(Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct MultiLayerParallaxAhlaCache {
     /// Per-layer state.
     pub layers: Vec<ParallaxAhlaLayerState>,

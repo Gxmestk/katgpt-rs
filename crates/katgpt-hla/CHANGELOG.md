@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `serde` feature (opt-in, Issue 532 T1): gates `#[derive(Serialize, Deserialize)]`
+  on every cache state struct (`HlaQHeadState`, `HlaLayerState`, `MultiLayerHlaCache`,
+  `AhlaQHeadState`, `AhlaLayerState`, `MultiLayerAhlaCache`, Parallax variants).
+  Required by `riir-engine`'s snapshot module (bincode-based Cold Tier persistence,
+  gated by `turso_cold`).
+
 ## [0.1.1](https://github.com/katopz/katgpt-rs/compare/katgpt-hla-v0.1.0...katgpt-hla-v0.1.1) - 2026-07-11
 
 ### Fixed
