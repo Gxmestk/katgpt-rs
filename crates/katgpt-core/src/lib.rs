@@ -1074,6 +1074,22 @@ pub mod grapem;
 #[cfg(feature = "grapem_rodrigues")]
 pub use grapem::{GrapemError, Rank2Plane, grapem_apply_into};
 
+// PositionGroupAction — unified trait (RoPE / ALiBi / FoX / Wall / NoPE /
+// GRAPE-M) per GRAPE §2.2 + §4.1. Vocabulary bridge for position-encoding-
+// agnostic tooling (KV compaction, attention matching). Every positional
+// encoding is an instance of G(n) = exp(n·ω·L); the trait abstracts over
+// where the generator L lives (SO(d) multiplicative vs GL(d+2) additive
+// homogeneous lift). Hot-path code keeps using PositionFreeCompactor /
+// WallDiagonalGate directly; the trait is for cold-path interop.
+// Implies grapem_rodrigues (GrapeMAction wraps Rank2Plane).
+// Opt-in until G1–G4 GOAT gate passes (Issue 160 T4).
+#[cfg(feature = "position_group_action")]
+pub mod position_group_action;
+#[cfg(feature = "position_group_action")]
+pub use position_group_action::{
+    AlibiAction, FoxAction, GrapeMAction, NopeAction, PositionGroupAction, RopeAction, WallAction,
+};
+
 // Spherical Steering — single-target geodesic Slerp rotation
 // `sin((1−t)θ)/sin θ · ĥ + sin(tθ)/sin θ · μ_T` toward a unit-norm target
 // direction on S^{d-1}, with sigmoid-translated vMF confidence gate (Plan 405,

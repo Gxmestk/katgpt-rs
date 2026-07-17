@@ -60,12 +60,13 @@ Plus adapters that let `PositionFreeCompactor` and `WallDiagonalGate` be constru
 
 ## Tasks
 
-- [ ] **T1** Define `PositionGroupAction` trait in `katgpt-core/src/position_group_action.rs` (or extend `group_invariance_probe.rs`).
-- [ ] **T2** Implement `RopeAction` — wraps `PositionFreeCompactor`'s math.
-- [ ] **T3** Implement `AlibiAction`, `FoxAction`, `WallAction` (the additive family — straightforward from the nilpotent closed form).
-- [ ] **T4** GOAT gate tests G1–G4.
-- [ ] **T5** Add the feature gate `position_group_action` to `katgpt-core/Cargo.toml`.
-- [ ] **T6** Document the math: the `G(n) = exp(n·ω·L)` unification + the homogeneous-lift construction for the additive family.
+- [x] **T1** Define `PositionGroupAction` trait in `katgpt-core/src/position_group_action.rs` (or extend `group_invariance_probe.rs`).
+- [x] **T2** Implement `RopeAction` — wraps `PositionFreeCompactor`'s math. (Direct implementation of the per-pair 2D rotation; `GrapeMAction` wraps `Rank2Plane` for the general rank-2 case.)
+- [x] **T3** Implement `AlibiAction`, `FoxAction`, `WallAction` (the additive family — straightforward from the nilpotent closed form). Plus `NopeAction` (trivial action) and `GrapeMAction` (GRAPE-M bridge).
+- [x] **T4** GOAT gate tests G1–G4. (19 unit tests in-crate; gate results in [.benchmarks/458](../.benchmarks/458_position_group_action_goat.md).)
+- [x] **T5** Add the feature gate `position_group_action` to `katgpt-core/Cargo.toml`. (Implies `grapem_rodrigues`.)
+- [x] **T6** Document the math: the `G(n) = exp(n·ω·L)` unification + the homogeneous-lift construction for the additive family. (Module doc + per-impl doc comments.)
+- [-] **Promotion**: deferred — no hot-path consumer today. Re-evaluate when a position-encoding-agnostic tool lands.
 
 ## Acceptance criteria
 
