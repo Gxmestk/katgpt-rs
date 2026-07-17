@@ -40,7 +40,7 @@ Mixes dd-tree builders, `TreeBuilder` impl (lines 912→3006 — a **2100-line**
 - `crates/katgpt-speculative/src/weaver.rs` (2817)
 - `crates/katgpt-core/src/karc.rs` (2597)
 - `crates/katgpt-forward/src/dd_tree.rs` (2566)
-- `crates/katgpt-core/src/parallax_attn.rs` (2524)
+- ~~`crates/katgpt-core/src/parallax_attn.rs` (2524)~~ ✅ DONE (Issue 167, 2026-07-17): split to `parallax_attn/` module folder — `mod.rs` (973, well under 2048 ✓) + `tests.rs` (1559, tests exempt). Single-axis tests-extraction split (implementation is cohesive Parallax attention). 4 feature-gated test sections preserved with corrected cfg gates. G1+G3 PASS: 1558/1558 katgpt-core default + 24/24 `parallax_attn,sink_aware_attn,ssmax_temperature` tests pass; clippy clean.
 - `crates/katgpt-core/src/speculative/qmc.rs` (2516)
 - `crates/katgpt-forward/src/d2f.rs` (2268)
 - `crates/katgpt-percepta/src/wasm/lower.rs` (2248)
