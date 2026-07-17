@@ -8,7 +8,7 @@
 > - [Auxiliary-Loss-Free Load Balancing Strategy for Mixture-of-Experts](https://arxiv.org/abs/2408.15664) (DeepSeek, Wang et al. 2024, 160 citations) — the predecessor QB improves on.
 >
 > **Date:** 2026-07-17 (revised after paper-search: original verdict was blog-only; KDA paper + QB blog materially upgrade the distillation)
-> **Status:** Done — **Gain upgraded to two actionable items**: (a) KDA channel-wise-gating GDN2 variant (algorithmic refinement, candidate SIMD kernel optimization), (b) Quantile Balancing as a sibling algorithm to Plan 279 Manifold Power Iteration Router (algorithm fully specified — promotable now, not gated on tech report). **Update 2026-07-17 (post-Plan 455 Phase 3):** item (b) COMPLETE — Plan 455 GOAT gate G1–G8 all green (G8.B honestly REPORTED as regime boundary) + Phase 3 head-to-head is **Case C** (composition with MPI strictly Pareto-dominates either alone: MPI fixes alignment λ 0.65→0.99, QB fixes balance MaxVio 1.84→0.03, composed 0.99/0.00). `quantile_balance_router` promoted to DEFAULT-ON at root `Cargo.toml`. See `.benchmarks/461_quantile_balance_router_phase2_goat.md` (Phase 2 GOAT) and `.benchmarks/462_quantile_balance_router_phase3_head_to_head.md` (Phase 3 head-to-head). Item (a) KDA `a=b=k` binding remains Issue 179-tracked (await bandwidth).
+> **Status:** Done — **Gain upgraded to two actionable items**: (a) KDA channel-wise-gating GDN2 variant (algorithmic refinement, candidate SIMD kernel optimization), (b) Quantile Balancing as a sibling algorithm to Plan 279 Manifold Power Iteration Router (algorithm fully specified — promotable now, not gated on tech report). **Update 2026-07-17 (post-Plan 455 Phase 3):** item (b) COMPLETE — Plan 455 GOAT gate G1–G8 all green (G8.B honestly REPORTED as regime boundary) + Phase 3 head-to-head is **Case C** (composition with MPI strictly Pareto-dominates either alone: MPI fixes alignment λ 0.65→0.99, QB fixes balance MaxVio 1.84→0.03, composed 0.99/0.00). `quantile_balance_router` promoted to DEFAULT-ON at root `Cargo.toml`. See `.benchmarks/461_quantile_balance_router_phase2_goat.md` (Phase 2 GOAT) and `.benchmarks/462_quantile_balance_router_phase3_head_to_head.md` (Phase 3 head-to-head). **Update 2026-07-17 (post-Issue 179 closure):** item (a) **CLOSED as GOAT FAIL (close as PASS, honest outcome)** — Issue 179 investigation revealed the KDA `a=b=k` binding optimizes the **chunkwise parallel algorithm**, which **does not exist** on our substrate (katgpt-rs ships only the per-token recurrent decoder; grep evidence: no `chunk*` / `inter_chunk` / `parallel_form` / `WY` symbols in `crates/katgpt-attn/src/`). The paper's GPU tensor-core speedup has no transfer path to a CPU-SIMD substrate with no chunking to skip. The existing `Gdn2GateConfig::EraseOnly` variant already implements `Diag(α_t)` channel-wise decay (matches KDA's recurrence math) and is strictly **more expressive** than KDA (channel-wise erase `b_t` vs KDA's scalar `β_t`). No new variant needed; no plan written. Issue file removed per noise-reduction rule; the verdict is preserved in this status line + the historical `.issues/179_kda_abk_binding_for_gdn2.md` commit. Both actionable items from this research note are now CLOSED — (b) PASS+promoted, (a) PASS+no-transfer.
 > **Related Research:** 070 (GDN2 — closest cousin to KDA, ships `Kda` gate config), 161 (dMoE block-level expert routing), 246 (Manifold Power Iteration MoE Router — closest cousin to QB), 276 (PersonalityWeightedComposition), 286 (depth invariance), 302 (FAME CommittedFieldBlend — closest cousin to Stable LatentMoE), 417 (Cross-Stage Residual Relocation — closest cousin to AttnRes)
 > **Related Plans:** 105 (GDN2 — has `Kda` gate config, candidate for channel-wise-gating extension), 165 (Hydra Budget — closest shipped analog to AttnRes), 181 (dMoE adaptive top-p bandit), 279 (Manifold Power Iteration MoE Router — QB sibling candidate), 321 (CommittedFieldBlend), 431 (Cross-Stage Residual Relocation)
 > **Classification:** Public
@@ -332,7 +332,7 @@ Not applicable — no gate failure to unblock. The paper describes training-side
 
 **Q4 (force multiplier?):** **Marginal.** QB sibling could extend Plan 279's router-conditioning family; KDA binding extends Plan 105's GDN2 family. Neither multiplies across ≥2 pillars.
 
-**Verdict: Gain.** Two actionable items — (a) KDA `a=b=k` binding (issue-tracked, await bandwidth), (b) QB router sibling (plan candidate — algorithm fully specified).
+**Verdict: Gain.** Two actionable items, **both CLOSED 2026-07-17** — (a) KDA `a=b=k` binding **CLOSED as PASS+no-transfer** (Issue 179 removed; the binding optimizes the chunkwise parallel algorithm, which does not exist on our recurrent-decoder-only substrate), (b) QB router sibling **CLOSED as PASS+promoted** (Plan 455 Phase 1+2+3 done, Case C confirmed in Phase 3 head-to-head, `quantile_balance_router` promoted to DEFAULT-ON).
 
 ### MOAT gate per domain (§1.6)
 
@@ -388,45 +388,42 @@ Create `.plans/455_quantile_balancing_router_primitive.md` (per `.highwater` che
 > Distills Research 447 §2.4. Ship `quantile_balance_router` as a sibling to `manifold_power_iter_router` (Plan 279). Same signature shape, same snapshot-swap application point, same GOAT gate structure (8 gates).
 >
 > **Phase 1 — Primitive**
-> - [ ] T1: `quantile_balance_router` in `crates/katgpt-core/src/quantile_balance.rs` behind `quantile_balance_router` feature
-> - [ ] T2: implement the alternating-coordinate descent (5 iterations of `α = quantile(s − β, 1 − k/n, per-row)`, `β = quantile(s − α, 1 − k/n, per-col)`)
-> - [ ] T3: causality-preserving variant (use old β to select, then update)
-> - [ ] T4: unit tests on synthetic expert pool
+> - [x] T1: `quantile_balance_router` in `crates/katgpt-core/src/quantile_balance.rs` behind `quantile_balance_router` feature — **DONE** (Plan 455 Phase 1, `crates/katgpt-spectral/src/quantile_balance_router.rs`)
+> - [x] T2: implement the alternating-coordinate descent (5 iterations of `α = quantile(s − β, 1 − k/n, per-row)`, `β = quantile(s − α, 1 − k/n, per-col)`) — **DONE**
+> - [x] T3: causality-preserving variant (use old β to select, then update) — **DONE**
+> - [x] T4: unit tests on synthetic expert pool — **DONE**
 >
 > **Phase 2 — GOAT gate**
-> - [ ] T5: G1 mechanics — output is deterministic, `β` shape matches input `n`
-> - [ ] T6: G2 perf — sub-ms for game-scale pool (N=8, D=256)
-> - [ ] T7: G3 no-regression on Plan 279 MPI Router tests
-> - [ ] T8: G4 zero-alloc on hot path
-> - [ ] T9: G5 byte-identical across runs (deterministic, sync-safe)
-> - [ ] T10: G6 sigmoid constraint (no softmax)
-> - [ ] T11: G7 head-to-head vs Plan 279 MPI Router on the same synthetic pool — λ + MaxVio comparison
-> - [ ] T12: G8 1-iteration sufficiency (1 iter captures ≥90% of 5-iter λ gain)
+> - [x] T5: G1 mechanics — output is deterministic, `β` shape matches input `n` — **DONE**
+> - [x] T6: G2 perf — sub-ms for game-scale pool (N=8, D=256) — **DONE** (0.131ms)
+> - [x] T7: G3 no-regression on Plan 279 MPI Router tests — **DONE**
+> - [x] T8: G4 zero-alloc on hot path — **DONE**
+> - [x] T9: G5 byte-identical across runs (deterministic, sync-safe) — **DONE**
+> - [x] T10: G6 sigmoid constraint (no softmax) — **DONE**
+> - [x] T11: G7 head-to-head vs Plan 279 MPI Router on the same synthetic pool — λ + MaxVio comparison — **DONE** (deferred to Phase 3, see bench 462)
+> - [x] T12: G8 1-iteration sufficiency (1 iter captures ≥90% of 5-iter λ gain) — **DONE**
 >
 > **Phase 3 — Promotion**
-> - [ ] T13: if QB beats MPI on λ/MaxVio → promote QB to default-on, demote MPI to opt-in
-> - [ ] T14: if MPI beats QB → keep QB opt-in, document the regime where QB wins (skewed distributions)
-> - [ ] T15: if tie → ship both as siblings, let consumer pick via feature flag
+> - [x] T13: if QB beats MPI on λ/MaxVio → promote QB to default-on, demote MPI to opt-in — **N/A (Case C, not A)**
+> - [x] T14: if MPI beats QB → keep QB opt-in, document the regime where QB wins (skewed distributions) — **N/A (Case C, not B)**
+> - [x] T15: if tie → ship both as siblings, let consumer pick via feature flag — **CLOSED as Case C** (composition strictly beats either alone): both promoted to DEFAULT-ON, composed pipeline `R'=MPI(R) → β=QB(X·R'^T) → top-k(s−β)` is the recommended snapshot-swap reconditioning. See `.benchmarks/462_quantile_balance_router_phase3_head_to_head.md`.
 
-### (b) KDA `a=b=k` binding for GDN2 — **issue-tracked**
+### (b) KDA `a=b=k` binding for GDN2 — **CLOSED 2026-07-17 (GOAT FAIL, close as PASS)**
 
-Create `.issues/179_kda_abk_binding_for_gdn2.md` (per `.highwater` check; originally proposed as 165 in an earlier draft of this note but that number was already in use by `165_dd_tree_file_split_c2.md` — re-issued as 179 = `.issues/.highwater` 178 + 1, 2026-07-17). Tracking issue:
+Originally `.issues/179_kda_abk_binding_for_gdn2.md` (per `.highwater` check; originally proposed as 165 in an earlier draft of this note but that number was already in use by `165_dd_tree_file_split_c2.md` — re-issued as 179 = `.issues/.highwater` 178 + 1, 2026-07-17). **Issue file removed 2026-07-17 per noise-reduction rule; verdict preserved in this section + the status line at the top of this research note.**
 
-> **KDA `a=b=k` DPLR binding for GDN2 SIMD kernel**
+> **Verdict: GOAT FAIL — close as PASS, honest outcome.**
 >
-> Distills Research 447 §2.3. The KDA paper (arxiv 2510.26692 §6.2) shows that binding `a = b = k` in the DPLR transition matrix removes 2 secondary chunking steps + 3 matmuls, giving ~2× kernel speedup on GPU (paper Figure 2).
+> The three anticipated outcomes pre-supposed a CPU-SIMD kernel existed that could be optimized (promote / keep-opt-in / no-transfer). The actual finding is stronger: **the optimization target does not exist on our substrate.**
 >
-> Open question: does this transfer to CPU SIMD (our `simd_*` kernels in `katgpt-core/src/simd.rs`)?
+> The KDA `a=b=k` binding's ~2× kernel speedup (paper Figure 2) applies to the **chunkwise parallel algorithm** — the form used during training and long-sequence prefill where the WY representation + inter-chunk matmuls dominate. katgpt-rs ships only the **per-token recurrent decoder** (`forward_gdn2`, `gdn2_recurrent_step`) — no chunkwise prefill, no WY, no inter-chunk matmuls. Grep evidence: no `chunk*` / `inter_chunk` / `parallel_form` / `WY` symbols in `crates/katgpt-attn/src/`.
 >
-> When bandwidth allows:
-> - [ ] Implement `Gdn2GateConfig::KdaBound` variant in `katgpt-attn/src/gdn2/`
-> - [ ] Benchmark vs `EraseOnly` and `Full` variants on CPU SIMD
-> - [ ] If ≥1.5× speedup: promote to default-on
-> - [ ] If speedup only on large seq: keep opt-in, document threshold
-> - [ ] If no speedup: close as PASS, ship channel-wise variant as `EraseOnly` extension only
+> Additionally: the existing `Gdn2GateConfig::EraseOnly` variant already implements `Diag(α_t)` channel-wise decay (matches KDA's recurrence math) and is strictly **more expressive** than KDA (channel-wise erase `b_t` vs KDA's scalar `β_t`). The KDA binding would be a *regression* on the recurrent path, not an optimization.
+>
+> Would re-open only if katgpt-rs ships a chunkwise prefill path (Plan 105 Phase N extension with WY representation) — currently no such code exists. The negative finding is load-bearing.
 
 ---
 
 ## TL;DR (one-line)
 
-Kimi K3's three architectural primitives (KDA, AttnRes, Stable LatentMoE 16/896) map onto existing shipped cousins — KDA → GDN2 Plan 105 (parameterization ships as `EraseOnly`; the unique KDA trick is the DPLR `a=b=k` binding that gives ~2× kernel speedup, **Issue 179**-tracked for CPU SIMD GOAT gate); AttnRes → Hydra Budget Plan 165 + Cross-Stage Residual Relocation Plan 431 + PersonalityWeightedComposition Plan 297; Stable LatentMoE → CommittedFieldBlend Plan 321 + dMoE + MPI Router + Raven RSM. The **two actionable items** are: (a) KDA `a=b=k` binding for GDN2 SIMD kernel (**Issue 179**-tracked, await bandwidth), (b) **Quantile Balancing** as a sibling to Plan 279 (algorithm fully specified in Jianlin Su's Feb 2026 blog + validated by Marin at 32B-A5B / 1e22 FLOPs — **Plan 455** skeleton created, not gated on tech report). The KDA paper (arxiv 2510.26692) is the primary source — its 1.16× KDA-only scaling law punctures the 2.5× "combined K3" marketing claim. **Verdict: Gain, two actionable items, one plan skeleton + one issue-tracked, no Super-GOAT.** Paper-search lesson: always grep arxiv + cited-source blogs before writing a blog-only verdict. **Both follow-ups re-numbered 2026-07-17** (447→455 plan, 165→179 issue) after a `.highwater` check found the originally-proposed numbers were already in use; the katgpt-rs numbering-discipline rule forbids reuse.
+Kimi K3's three architectural primitives (KDA, AttnRes, Stable LatentMoE 16/896) map onto existing shipped cousins — KDA → GDN2 Plan 105 (parameterization ships as `EraseOnly`; the unique KDA trick is the DPLR `a=b=k` binding that gives ~2× kernel speedup on GPU tensor cores — **Issue 179 CLOSED 2026-07-17 as GOAT FAIL/close-as-PASS**: the binding optimizes the **chunkwise parallel algorithm**, which does not exist on our recurrent-decoder-only substrate); AttnRes → Hydra Budget Plan 165 + Cross-Stage Residual Relocation Plan 431 + PersonalityWeightedComposition Plan 297; Stable LatentMoE → CommittedFieldBlend Plan 321 + dMoE + MPI Router + Raven RSM. The **two actionable items** are now **both CLOSED**: (a) KDA `a=b=k` binding for GDN2 SIMD kernel — **CLOSED as PASS+no-transfer** (Issue 179 removed; verdict preserved here, no code change needed since `EraseOnly` already covers the recurrence and is strictly more expressive than KDA); (b) **Quantile Balancing** as a sibling to Plan 279 — **CLOSED as PASS+promoted** (Plan 455 Phase 1+2+3 done, Case C confirmed in Phase 3 head-to-head, `quantile_balance_router` promoted to DEFAULT-ON, composed pipeline `R'=MPI(R) → β=QB(X·R'^T) → top-k(s−β)` is the recommended snapshot-swap reconditioning). The KDA paper (arxiv 2510.26692) is the primary source — its 1.16× KDA-only scaling law punctures the 2.5× "combined K3" marketing claim. **Verdict: Gain, two actionable items, both closed (one PASS+promoted, one PASS+no-transfer), no Super-GOAT.** Paper-search lesson: always grep arxiv + cited-source blogs before writing a blog-only verdict. Substrate-fit lesson (Issue 179): always grep the codebase for the optimization target before assuming a paper's kernel speedup transfers — the KDA chunkwise form doesn't exist on our recurrent-only substrate, so the GPU win had no transfer path. **Both follow-ups re-numbered 2026-07-17** (447→455 plan, 165→179 issue) after a `.highwater` check found the originally-proposed numbers were already in use; the katgpt-rs numbering-discipline rule forbids reuse.
