@@ -5,7 +5,7 @@
 **Private guide:** [riir-ai/.research/136_Per_NPC_Runtime_Test_Time_Scaling_Guide.md](../../riir-ai/.research/136_Per_NPC_Runtime_Test_Time_Scaling_Guide.md)
 **Source paper:** [arxiv 2606.16140](https://arxiv.org/pdf/2606.16140) — Xu et al., "VibeThinker-3B" (Sina Weibo Inc.), 15 Jun 2026
 **Target:** `katgpt-rs/src/clr/` (new module) + Cargo feature `clr` (opt-in until GOAT G1–G5 pass)
-**Status:** Active — Phase 1-5 complete. All GOAT gates G1–G5 pass; `clr` promoted to default-on (Phase 5 T5.6).
+**Status:** ✅ COMPLETE, DEFAULT-ON (root, Phase 5 T5.6) — Phase 1-5 complete. All GOAT gates G1–G5 pass; `clr` promoted to default-on in katgpt-rs/Cargo.toml.
 **Depends On:** existing SIMD helpers (`simd_dot_f32`, `simd_sum_f32`, `simd_exp_inplace` from `crates/katgpt-core/src/simd.rs`), `ConstraintPruner` trait (existing, for the fallback binary verifier path)
 **GOAT Criteria:** G1 (CLR-vote ≥ +3pp over best-of-N majority on synthetic suite), G2 (verifier sigmoid ECE ≤ 0.10), G3 (≤200µs/call at K=32, M=5, 8-dim direction vectors — target ≤50µs), G4 (zero heap allocation on the vote path), G5 (feature isolation — compiles with/without `clr`, zero overhead when disabled)
 

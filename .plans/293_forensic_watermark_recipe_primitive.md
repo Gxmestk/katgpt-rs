@@ -6,7 +6,7 @@
 **Industry prior art:** Tardos 2008, Boneh–Shaw 1998, AACS / Widevine / PlayReady forensic watermarking.
 **Target:** `katgpt-rs/crates/katgpt-core/src/forensic/` (new module)
 **Cargo feature:** `forensic_watermark` (opt-in, default OFF — promote to opt-in only after G1–G4 pass)
-**Status:** Active — Phases 1-6 ✓ (31/31 unit tests green), Phase 7 ✓ (T7.1 bench harness + T7.2-T7.5 mechanism-level gates covered by primitive unit tests in `riir-chain/src/forensic/` — see note below; scale-up to N=1000/real-assets is Plan 322 integration-level, tracked in `riir-chain/tests/goat_322_asset_fingerprinting.rs`), Phase 8 ✓ (T8.1, T8.3; T8.2 README deferred until Plan 322 G1-G7 pass). Default-OFF until Plan 322 integration-level GOAT gate passes.
+**Status:** ✅ COMPLETE, OPT-IN (pending Plan 322 integration GOAT) — Phases 1-6 ✓ (31/31 unit tests green), Phase 7 ✓ (T7.1 bench harness + T7.2-T7.5 mechanism-level gates covered by primitive unit tests in `riir-chain/src/forensic/` — see note below; scale-up to N=1000/real-assets is Plan 322 integration-level, tracked in `riir-chain/tests/goat_322_asset_fingerprinting.rs`), Phase 8 ✓ (T8.1, T8.3; T8.2 README deferred until Plan 322 G1-G7 pass). Default-OFF until Plan 322 integration-level GOAT gate passes.
 
 > **Note on T7.2-T7.5 (2026-07-02):** the forensic module was relocated to `riir-chain/src/forensic/` (commit `f4ca6ea7`, OPSEC move — forensic value depends on deployment secrecy). The primitive-level mechanism tests — which cover the same properties as T7.2-T7.5 — ship as unit tests there:
 > - **G1 attribution:** `recover::tests::end_to_end_correct_recipient_high_confidence` + `wrong_recipient_low_confidence`.

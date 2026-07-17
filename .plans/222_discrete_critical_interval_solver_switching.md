@@ -1,7 +1,7 @@
 # Plan 222: Discrete Critical Interval Solver Switching
 
 **Date:** 2026-06
-**Status:** Active
+**Status:** ✅ COMPLETE, DEFAULT-ON (`critical_interval_gate` in katgpt root default) — entropy-triggered solver switching shipped; opt-in siblings (q_sample_solver, mbr_tree_select, self_cond_draft) remain feature-gated.
 **Research:** R197 Discrete Critical Interval Solver Switching
 **GOAT:** Default-on for CriticalIntervalGate, feature-gated for Q-Sample/SelfCond/MBR
 

@@ -5,7 +5,7 @@
 **Source paper:** [arxiv 2510.04542](https://arxiv.org/pdf/2510.04542) — Lehrach et al., Code World Models for General Game Playing (DeepMind, Oct 2025)
 **Target:** `katgpt-rs/crates/katgpt-core/src/induced_cwm/` (new module, open) + re-export through `katgpt-rs/src/lib.rs`
 **Cargo features:** `induced_cwm` (katgpt-core, **opt-in**); `induced_cwm_ismcts` (depends on `induced_cwm` + `game_state`)
-**Status:** Active — Phase 1 ✅ + Phase 2 ✅ + Phase 3 ✅ + Phase 4 ✅ + Phase 5 ✅ ALL SHIPPED (2026-06-21). Plan 296 COMPLETE — ready for downstream consumption (riir-ai Plan 326).
+**Status:** ✅ COMPLETE, OPT-IN (induced_cwm stays opt-in pending G1–G4) — Phase 1 ✅ + Phase 2 ✅ + Phase 3 ✅ + Phase 4 ✅ + Phase 5 ✅ ALL SHIPPED (2026-06-21). Plan 296 COMPLETE — ready for downstream consumption (riir-ai Plan 326).
 
 ---
 

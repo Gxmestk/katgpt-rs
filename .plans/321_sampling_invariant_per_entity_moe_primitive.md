@@ -4,7 +4,7 @@
 **Research:** [302_FAME_Sampling_Invariant_Per_Entity_MoE](../.research/302_FAME_Sampling_Invariant_Per_Entity_MoE.md)
 **Source paper:** [arxiv 2510.00621](https://arxiv.org/abs/2510.00621) — FAME: Adaptive Functional Attention with Expert Routing for Function-on-Function Regression (Gao/Chen/Zhang, NeurIPS 2025)
 **Target:** `crates/katgpt-core/src/committed_field_blend.rs` (new module) + Cargo feature `committed_field_blend`
-**Status:** Active — Phase 1 ✅ + Phase 2 GOAT G1–G5 ✅ PASSED (2026-06-25)
+**Status:** ✅ COMPLETE, DEFAULT-ON (committed_field_blend in katgpt-core default) — Phase 1 ✅ + Phase 2 GOAT G1–G5 ✅ PASSED (2026-06-25)
 **Tier:** Super-GOAT (open primitive half; private guide at `riir-ai/.research/158_*.md`)
 
 ---

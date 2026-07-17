@@ -5,7 +5,7 @@
 **Source paper:** [openreview 48NnVTsirb](https://openreview.net/forum?id=48NnVTsirb) — Kortukov et al., NeurIPS 2026 / Mech Interp Workshop at ICML 2026
 **Reference impl:** <https://github.com/kortukov/future_probes>
 **Target:** `katgpt-rs/src/pruners/future_probe.rs` (new module) + `katgpt-rs/src/pruners/feature_class.rs` (vocabulary tag) + Cargo features `future_probe`, `fpcg_selector`
-**Status:** Active — Phase 1 ✓ / Phase 2 ✓ / Phase 3 ✓ / Phase 4 ✓ (G1–G7 all PASS at the mechanism level via the modelless mean-difference probe path + synthetic corpus; G1–G4 real-model run remains a riir-train/riir-ai follow-up per issue 032) / Phase 5 ✓ DECIDED (features stay opt-in pending real-model evidence; Phase 1 vocabulary tag always-on)
+**Status:** ✅ COMPLETE — Phase 1 ✓ / Phase 2 ✓ / Phase 3 ✓ / Phase 4 ✓ (G1–G7 all PASS at the mechanism level via the modelless mean-difference probe path + synthetic corpus; G1–G4 real-model run remains a riir-train/riir-ai follow-up per issue 032) / Phase 5 ✓ DECIDED (features stay opt-in pending real-model evidence; Phase 1 vocabulary tag always-on)
 
 ---
 

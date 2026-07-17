@@ -6,7 +6,7 @@
 **Source paper:** [arXiv:2601.07372](https://arxiv.org/pdf/2601.07372) — Engram, Cheng et al. 2026 (DeepSeek-AI / Peking U.)
 **Target:** `katgpt-rs/crates/katgpt-core/src/engram/` (new module)
 **Cargo feature:** `engram` (opt-in, default OFF — promote to default-on after G1–G7 GOAT gate passes; per AGENTS.md GOAT gate rule)
-**Status:** Active — Phases 1-8 complete. T1.7 proptest + T2.6 micro-bench landed. G1/G2/G4 GOAT gates PASS (48 ns/retrieval, ρ=1.0, bit-deterministic commitment). G3 (T6.6, Zipf workload) + G6 (T7.6, effective depth) deferred to riir-ai integration; feature stays opt-in until G6 lands.
+**Status:** ✅ COMPLETE, OPT-IN (pending G6 riir-ai integration) — Phases 1-8 complete. T1.7 proptest + T2.6 micro-bench landed. G1/G2/G4 GOAT gates PASS (48 ns/retrieval, ρ=1.0, bit-deterministic commitment). G3 (T6.6, Zipf workload) + G6 (T7.6, effective depth) deferred to riir-ai integration; feature stays opt-in until G6 lands.
 
 ---
 

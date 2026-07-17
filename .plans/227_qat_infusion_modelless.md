@@ -1,7 +1,7 @@
 # Plan 227: QAT Infusion — Modelless Inference-Time Quantization Awareness
 
 **Date:** 2026-06-08
-**Status:** Active
+**Status:** ✅ MOSTLY COMPLETE — 5/6 phases DEFAULT-ON (SCT, TPB, Modality, PASD, Async Q/DQ all GOAT-proved + promoted in katgpt root default); Phase 5 Channel SIMD BLOCKED pending release benchmark (1.02× debug only).
 **Research:** `.research/202_QAT_Infusion_Inference_Time_Quantization_Awareness.md`
 **Feature Flags:** `static_cal_tables`, `targeted_precision`, `modality_pruned_load`, `precision_aware_draft`, `channel_simd_align`, `async_qdq_overlap`
 **GOAT Policy:** All opt-in until benchmarked, then default-ON if gain + no perf hurt

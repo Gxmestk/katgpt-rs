@@ -1,7 +1,7 @@
 # Plan 250: Breakeven Complexity Inference Routing
 
 **Date:** 2026-06
-**Status:** Active
+**Status:** ✅ COMPLETE, DEFAULT-ON (`breakeven_routing` in katgpt root default) — BreakevenTracker + BreakevenBandit + FidelityMatcher shipped.
 **Research:** 218_Breakeven_Complexity_Inference_Router.md
 **Feature Flag:** `breakeven_routing`
 

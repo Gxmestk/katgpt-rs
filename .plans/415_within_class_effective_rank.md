@@ -4,7 +4,7 @@
 **Research:** [katgpt-rs/.research/394_GNN_Survey_Within_Class_Effective_Rank_Fusion.md](../.research/394_GNN_Survey_Within_Class_Effective_Rank_Fusion.md)
 **Source paper:** [arXiv:2412.19419](https://arxiv.org/abs/2412.19419) §5.3.1 + Supplementary S.1.2 — Tanis et al., MITRE/NCI GNN survey
 **Target:** `crates/katgpt-core/src/data_probe/geometry.rs` (extend) — inherits the existing `sink_aware_attn` feature gate (same as the sibling `effective_rank`)
-**Status:** Active — Phase 1 COMPLETE (all gates PASS)
+**Status:** ✅ COMPLETE, OPT-IN (extends sink_aware_attn) — Phase 1 COMPLETE (all gates PASS)
 
 ## Goal
 
