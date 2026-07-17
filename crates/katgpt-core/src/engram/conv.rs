@@ -146,6 +146,85 @@ pub fn conv_causal_into(v_tilde: &[f32], out: &mut [f32], kernel: [f32; 4], dila
     }
 }
 
+/// Apply a depthwise causal 1D convolution with a **runtime-length** kernel.
+///
+/// This is the generalization of [`conv_causal_into`] to kernel sizes other
+/// than 4. It exists to unblock multi-scale conv write-backs (paper §A
+/// Table 6 uses kernels `{4, 8, 12}`) without forcing every caller to pay for
+/// a heap allocation when they only need the common `k=4` case.
+///
+/// # Formula
+///
+/// For a kernel of length `K`, for each position `t ∈ [0, n)`:
+/// ```text
+/// out[t] = Σ_{j=0..K} kernel[j] * v_tilde[t - (K-1 - j) * δ]
+/// ```
+/// where `δ = max(dilation, 1)` and out-of-range indices contribute 0.
+/// `kernel[K-1]` is the current-position tap; `kernel[0]` is the oldest
+/// (`(K-1) × dilation` positions back). This convention matches
+/// [`conv_causal_into`] exactly when `K == 4`.
+///
+/// # Identity kernels for arbitrary `K`
+///
+/// There is no `IDENTITY_KERNEL_K8` / `IDENTITY_KERNEL_K12` constant — the
+/// identity kernel of length `K` is `&[0.0; K-1] + &[1.0]` (all zeros with a
+/// trailing 1 at position `K-1`). For `K=4` this reduces to
+/// [`IDENTITY_KERNEL`] = `[0, 0, 0, 1]`. Callers building multi-scale convs
+/// should construct each scale's identity kernel inline, e.g.:\
+/// `let id_k8: Vec<f32> = (0..8).map(|i| if i == 7 { 1.0 } else { 0.0 }).collect();`
+///
+/// # Equivalence with `conv_causal_into` at `K=4`
+///
+/// For `kernel.len() == 4` this function is bit-identical to
+/// [`conv_causal_into`] with the same kernel values and dilation. The test
+/// `dyn_matches_static_at_k4` verifies this on random inputs.
+///
+/// # Arguments
+///
+/// - `v_tilde` — input slice. Treated as a 1D signal of length `n`.
+/// - `out` — output slice. MUST equal `v_tilde.len()` (debug_asserted).
+/// - `kernel` — `K` tap weights, runtime length. `K` must be `>= 1`.
+/// - `dilation` — stride between taps. `dilation = 0` is treated as 1.
+///
+/// # Panics (debug only)
+///
+/// `debug_assert!` checks `out.len() == v_tilde.len()` and `kernel.len() >= 1`.
+/// Zero-length input is a no-op. Zero-length kernel is a panic (debug only).
+///
+/// # Hot-path contract
+///
+/// Same as [`conv_causal_into`]: zero-allocation, `O(K·n)` multiply-adds.
+#[inline]
+pub fn conv_causal_dyn_into(v_tilde: &[f32], out: &mut [f32], kernel: &[f32], dilation: usize) {
+    let n = v_tilde.len();
+    if n == 0 {
+        return;
+    }
+    let k = kernel.len();
+    debug_assert!(k >= 1, "conv_causal_dyn_into: kernel must be non-empty");
+    debug_assert_eq!(
+        out.len(),
+        n,
+        "conv_causal_dyn_into: out.len() must equal v_tilde.len()"
+    );
+
+    let dil = dilation.max(1) as isize;
+    let last = (k - 1) as isize; // index of the current-position tap
+    for (t, out_slot) in out.iter_mut().enumerate().take(n) {
+        let mut acc = 0.0f32;
+        // kernel[0] = oldest tap (t - (K-1)·δ); kernel[K-1] = current (t - 0·δ).
+        // Out-of-range taps contribute 0 (zero-padding at the left edge).
+        for (j, &kw) in kernel.iter().enumerate() {
+            let offset = (last - j as isize) * dil;
+            let tap_t = t as isize - offset;
+            if tap_t >= 0 {
+                acc += kw * v_tilde[tap_t as usize];
+            }
+        }
+        *out_slot = acc;
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -277,5 +356,125 @@ mod tests {
                 expected[i]
             );
         }
+    }
+
+    // ── Tests for conv_causal_dyn_into (runtime-length kernel) ───────────────
+
+    /// Build the identity kernel of length K: all zeros with a trailing 1 at
+    /// position K-1. Matches [`IDENTITY_KERNEL`] when K=4.
+    fn identity_kernel_dyn(k: usize) -> Vec<f32> {
+        let mut v = vec![0.0; k];
+        if k > 0 {
+            v[k - 1] = 1.0;
+        }
+        v
+    }
+
+    #[test]
+    fn dyn_matches_static_at_k4() {
+        // For kernel.len() == 4, conv_causal_dyn_into MUST be bit-identical to
+        // conv_causal_into. This is the core equivalence guarantee.
+        let v_tilde: Vec<f32> = (0..32).map(|i| (i as f32).sin() * 3.0).collect();
+        let kernel_static = [0.1, -0.2, 0.3, 0.9];
+        let kernel_dyn: Vec<f32> = kernel_static.to_vec();
+
+        for &dil in &[0usize, 1, 2, 3] {
+            let mut out_static = vec![0.0f32; v_tilde.len()];
+            let mut out_dyn = vec![0.0f32; v_tilde.len()];
+            conv_causal_into(&v_tilde, &mut out_static, kernel_static, dil);
+            conv_causal_dyn_into(&v_tilde, &mut out_dyn, &kernel_dyn, dil);
+            assert_eq!(
+                out_static, out_dyn,
+                "dyn must match static at K=4 (dilation={})",
+                dil
+            );
+        }
+    }
+
+    #[test]
+    fn dyn_identity_k8_is_passthrough() {
+        // Identity kernel of length 8: out == v_tilde for any input.
+        let v_tilde = [1.0f32, 2.0, 3.0, 4.0, 5.0, 7.0, 11.0, 13.0, 17.0, 19.0];
+        let mut out = [0.0f32; 10];
+        let kernel = identity_kernel_dyn(8);
+        conv_causal_dyn_into(&v_tilde, &mut out, &kernel, 1);
+        assert_eq!(out, v_tilde, "K=8 identity → out == v_tilde");
+
+        // Identity holds for any dilation (current tap always in range).
+        let mut out2 = [0.0f32; 10];
+        conv_causal_dyn_into(&v_tilde, &mut out2, &kernel, 3);
+        assert_eq!(out2, v_tilde, "K=8 identity holds for any dilation");
+    }
+
+    #[test]
+    fn dyn_k1_is_scalar_multiply() {
+        // Kernel of length 1: out[t] = kernel[0] * v[t]. Pure scalar multiply.
+        let v_tilde = [1.0f32, 2.0, 3.0, 4.0, 5.0];
+        let mut out = [0.0f32; 5];
+        let kernel = [0.5f32];
+        conv_causal_dyn_into(&v_tilde, &mut out, &kernel, 1);
+        let expected = [0.5f32, 1.0, 1.5, 2.0, 2.5];
+        for i in 0..5 {
+            assert!((out[i] - expected[i]).abs() < 1e-6, "out[{i}] = {}", out[i]);
+        }
+    }
+
+    #[test]
+    fn dyn_k8_known_convolution() {
+        // 8-tap averaging kernel over a ramp input.
+        // kernel = [0.125; 8], v = [1, 2, 3, ...], dilation = 1.
+        // At t < 7: partial window, out[t] = 0.125 * sum(v[0..=t]).
+        // At t >= 7: full window, out[t] = 0.125 * sum(v[t-7..=t]).
+        let v_tilde: Vec<f32> = (1..=12).map(|i| i as f32).collect();
+        let mut out = vec![0.0f32; v_tilde.len()];
+        let kernel = vec![0.125f32; 8];
+        conv_causal_dyn_into(&v_tilde, &mut out, &kernel, 1);
+
+        // t=0: window [1] → 0.125 * 1 = 0.125
+        assert!((out[0] - 0.125).abs() < 1e-6, "out[0] = {}", out[0]);
+        // t=6: window [1..=7] → 0.125 * 28 = 3.5
+        assert!((out[6] - 3.5).abs() < 1e-6, "out[6] = {}", out[6]);
+        // t=7: window [1..=8] → 0.125 * 36 = 4.5
+        assert!((out[7] - 4.5).abs() < 1e-6, "out[7] = {}", out[7]);
+        // t=11: window [5..=12] → 0.125 * (5+6+7+8+9+10+11+12) = 0.125 * 68 = 8.5
+        assert!((out[11] - 8.5).abs() < 1e-6, "out[11] = {}", out[11]);
+    }
+
+    #[test]
+    fn dyn_k8_dilation_stretches_receptive_field() {
+        // kernel = [1.0, 0, 0, 0, 0, 0, 0, 0] (OLDEST tap activated), dilation = 2
+        //   → out[t] = v[t - (K-1)*δ] = v[t - 7*2] = v[t-14].
+        // At t < 14: tap out of range → out[t] = 0.
+        //
+        // Note: an identity kernel [0,...,0,1.0] (CURRENT tap) would give
+        // out[t] = v[t] regardless of dilation — the "receptive field stretching"
+        // only shows up when a non-current tap is activated. This test activates
+        // the oldest tap to make the dilation effect visible.
+        let v_tilde: Vec<f32> = (0..32).map(|i| (i + 1) as f32).collect();
+        let mut out = vec![0.0f32; v_tilde.len()];
+        let mut kernel = vec![0.0f32; 8];
+        kernel[0] = 1.0; // oldest tap
+        conv_causal_dyn_into(&v_tilde, &mut out, &kernel, 2);
+        // out[14] should equal v[0] = 1; out[15] = v[1] = 2; etc.
+        assert!(out[0] == 0.0 && out[13] == 0.0, "t < 14 → zero");
+        assert!((out[14] - 1.0).abs() < 1e-6, "out[14] = {}", out[14]);
+        assert!((out[31] - 18.0).abs() < 1e-6, "out[31] = {}", out[31]);
+    }
+
+    #[test]
+    fn dyn_empty_input_is_noop() {
+        let v_tilde: [f32; 0] = [];
+        let mut out: [f32; 0] = [];
+        let kernel = [1.0f32; 8];
+        conv_causal_dyn_into(&v_tilde, &mut out, &kernel, 1); // must not panic
+    }
+
+    #[test]
+    fn dyn_zero_kernel_is_zero_output() {
+        let v_tilde = [1.0f32, 2.0, 3.0, 4.0, 5.0];
+        let mut out = [99.0f32; 5];
+        let kernel = vec![0.0f32; 12];
+        conv_causal_dyn_into(&v_tilde, &mut out, &kernel, 1);
+        assert!(out.iter().all(|&v| v == 0.0), "K=12 zero kernel → all zeros");
     }
 }
