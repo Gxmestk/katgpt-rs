@@ -459,6 +459,7 @@ graph LR
 | **CHIAR Chiaroscuro Attention** (`chiaroscuro`) | 269 | 9/9 ✅ | Per-token DCT spectral entropy KV strategy (3.03× compression), operator routing, collapse discovery |
 | **Attention Matching** (`attn_match`) | 271 | 9/9 ✅ | Modelless KV compaction `(K,V)→(Ck,β,Cv)`: β-recovery 1e-6, Cv Frobenius 0.0, 3.01× SIMD, blocked Cholesky (32×32), adaptive router (scalar/SIMD/rayon/GPU/ANE) |
 | **Manifold Power Iteration MoE Router** (`manifold_power_iter_router`) | 279 | 9/9 ✅ | One-shot router-row conditioning at snapshot swap, sub-ms swap (0.076ms N=8 D=256), byte-identical determinism |
+| **Quantile Balancing MoE Router** (`quantile_balance_router`) | 455 | G1–G8 12/12 ✅ | One-shot per-expert bias β at snapshot swap via alternating-coordinate descent on the balanced-assignment LP (Su blog + Marin 32B validation). MaxVio 3.000→0.0625 (48× at M=64), 0.131ms swap (N=8 M=256). Sibling to MPI router (bias vs rows; balance MaxVio vs alignment λ). Opt-in — Phase 3 head-to-head vs Plan 279 pending |
 | **Temporal Derivative Kernel** (`temporal_deriv`) | 277 | 4/4 fusions ✅ | Dual fast/slow EMA surprise signal — state-vector companion, surprise-gated writes, collapse detection, curiosity signal |
 | **Triggered Injection Gate** (`triggered_injection`) | 278 | G1/G2/G3/G8 ✅ | Sigmoid-thresholded inject/skip gate — 50% skips w/ 0.63% quality parity in saturated regime |
 | **FaithfulnessProbe** (`faithfulness_probe`) | 278 | G1/G2/G8 ✅ | Causal intervention diagnostic — 100%/100% detection, IG surrogate Spearman ρ=1.0, audit cadence |
@@ -1290,6 +1291,16 @@ Distills Redesign MoE Routers with Manifold Power Iteration (arXiv:2606.12397, R
 **GOAT gate:** G1 (λ alignment gain, `λ(R') ≥ 0.5·λ(R_optimal)`) ✅, G2 (MaxVio reduction `≤ 0.7·MaxVio(R)`) ✅, G3 (zero per-token overhead — gate is identical matmul either way) ✅, G4 (sub-ms swap at game scale `N=8, D=256`: 0.076ms release) ✅, G5 (determinism — byte-identical `R'` across runs, sync-safe) ✅, G6 (DRY non-regression — all 9 `gauge_rebalance` tests pass unchanged) ✅, G7 (sigmoid constraint — perturbing one expert's row leaves others byte-identical) ✅, G8 (`iters=1` sufficiency — captures 100% of `iters=10` gain on rank-1 data) ✅. **9/9 green** (release-build GOAT bench, commit `306cc047`). **Decision: promoted to default-on** (Plan 279 Phase 4 — zero dependencies, DRY win via shared `spectral_retract` helper, GOAT 9/9 green on synthetic rank-1 Gram).
 
 Feature gate: `manifold_power_iter_router` (**default-on** since Plan 279 Phase 4 GOAT 9/9 green). 📖 Plan: [`.plans/279_manifold_power_iter_router.md`](.plans/279_manifold_power_iter_router.md), Research: [`.research/246_Manifold_Power_Iteration_MoE_Router.md`](.research/246_Manifold_Power_Iteration_MoE_Router.md).
+
+### ⚖️ Quantile Balancing MoE Router (Plan 455)
+
+Distills the [Su blog Feb 2026](https://spaces.ac.cn/archives/11619) quantile-balancing algorithm (+ [Marin 32B-A5B / 1e22-FLOPs JAX validation](https://openathena.ai/blog/quantile-balancing/)) into a **modelless, one-shot per-expert bias computation** at freeze/thaw snapshot swap. Given a frozen router score matrix `s ∈ ℝ^{m×n}` (m calibration tokens, n experts), compute a per-expert bias vector `β ∈ ℝⁿ` via alternating-coordinate descent on the balanced-assignment LP, then route as `top-k(s − β)`. **Sibling to Plan 279 MPI** — not a replacement: MPI fixes router **rows** (alignment λ), QB fixes **bias** (balance MaxVio). The two operate on orthogonal axes and compose (Phase 3 will run both on the same pool).
+
+**Inference-only reframing:** QB is published as a per-step training algorithm. The distillation reframes it as a snapshot-swap one-shot: when the expert pool changes, run QB once on a calibration batch, compute `β`, ship `β` alongside the snapshot. The LP formulation transfers faithfully; the GOAT G8 gate (snapshot-swap revalidation) guards the application-point shift.
+
+**GOAT gate (G1–G8, 12/12 PASS):** G1 mechanics ✅, G2 MaxVio reduction 3.000→0.0625 (48× at M=64) ✅, G3 no-degradation on balanced input ✅, G4 sub-ms swap 0.131ms (N=8 M=256 k=2, 7.6× headroom) ✅, G5 determinism ✅, G6 sigmoid constraint (independent per-expert bias, never softmax) ✅, G7 iters=5 sufficiency (MaxVio delta=0.0000) ✅, G8.A stationary 10× reduction ✅, G8.B reversed-drift **honestly reported** (ratio 1.000 — beta_cal mis-specified by construction; right fix is per-step recompute in riir-train) ✅, G8.C mild-drift 2× reduction ✅.
+
+Feature gate: `quantile_balance_router` (**opt-in** — Phase 3 head-to-head vs Plan 279 MPI pending; predicted outcome per Research 447 §2.4 is Case C: composition strictly beats either alone). 📖 Plan: [`.plans/455_quantile_balancing_router_primitive.md`](.plans/455_quantile_balancing_router_primitive.md), Research: [`.research/447_Kimi_K3_KDA_AttnRes_LatentMoE.md`](.research/447_Kimi_K3_KDA_AttnRes_LatentMoE.md).
 
 ### 📡 CS-KV-Importance Probe + Density-Budget Interpolator (Plan 280)
 
