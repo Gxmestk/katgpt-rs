@@ -18,7 +18,7 @@ use std::time::Instant;
 use katgpt_backend::InferenceBackend;
 use crate::transformer::{ForwardContext, MultiLayerKVCache, TransformerWeights};
 use katgpt_core::trigger_gate::{ComputeTier, TriggerGate, TriggerGateConfig};
-use crate::types::{Config, Rng, sample_token_into, softmax_scaled};
+use crate::types::{Config, Rng};
 
 #[cfg(feature = "rv_gated_routing")]
 use crate::pruners::acceptance_variance::AcceptanceVarianceTracker;
@@ -866,9 +866,8 @@ impl InferenceRouter {
 
             self.record_queue_depth(1);
             self.forward(ctx, weights, cache, token, pos);
-            softmax_scaled(&mut ctx.logits, 1.0 / self.config.temperature);
 
-            let next_token = sample_token_into(&ctx.logits, rng, &mut ctx.cdf);
+            let next_token = ctx.sample_next_token(self.config.temperature, rng);
             tokens.push(next_token);
 
             if next_token == self.config.bos_token {

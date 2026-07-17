@@ -21,7 +21,7 @@
 //! of the in-root era was an artifact of same-crate access; once the type crosses
 //! the crate boundary the forward-pass callers need `pub` access.
 
-use katgpt_types::{Config, DepthTier, kv_dim};
+use katgpt_types::{Config, DepthTier, Rng, kv_dim, sample_token_into, softmax_scaled};
 // SIMD kernels (re-exported from katgpt_types as katgpt_types::simd, and by
 // katgpt_core as katgpt_core::simd). We keep the katgpt_core::simd path used by
 // the original delta-routing code so the move is byte-for-byte structural.
@@ -275,6 +275,36 @@ impl ForwardContext {
     #[cfg(feature = "turboquant")]
     pub fn reset_tq_dequant(&mut self) {
         self.reset_dequant();
+    }
+
+    /// Fused temperature-scaled softmax + categorical sample.
+    ///
+    /// Applies `softmax_scaled(&mut self.logits, 1.0 / temperature)` in place,
+    /// then samples a token id from the resulting categorical via
+    /// [`sample_token_into`] using `self.cdf` as scratch. Returns the sampled
+    /// token id.
+    ///
+    /// This fuses the two-line pattern that appeared 7+ times across the
+    /// generator call sites (`softmax_scaled(logits, 1.0/temp);
+    /// sample_token_into(&ctx.logits, rng, &mut ctx.cdf)`) into one intent-
+    /// revealing call. Behavior is identical to the inlined sequence.
+    ///
+    /// # Pre-condition
+    ///
+    /// `self.logits` must hold the output of a preceding `forward_*` call
+    /// (i.e. `forward_base` / `forward_hla` / `forward_ahla` / `forward_gdn2`
+    /// / `self.forward(...)` on `InferenceRouter`). Those functions return a
+    /// `&mut [f32]` that is exactly `&mut self.logits` — the softmax below
+    /// mutates the same buffer the sampler then reads.
+    ///
+    /// # Zero-allocation
+    ///
+    /// Both `softmax_scaled` and `sample_token_into` operate in place on the
+    /// pre-allocated `logits` / `cdf` buffers; no allocation on the hot path.
+    #[inline]
+    pub fn sample_next_token(&mut self, temperature: f32, rng: &mut Rng) -> usize {
+        softmax_scaled(&mut self.logits, 1.0 / temperature);
+        sample_token_into(&self.logits, rng, &mut self.cdf)
     }
 
     /// Perform delta routing using pre-allocated index buffer (avoids Vec::new() per call).

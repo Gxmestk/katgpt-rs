@@ -280,9 +280,8 @@ pub fn generate_gdn2_into(
     let mut token = config.bos_token;
 
     for pos in 0..n_tokens {
-        let logits = forward_gdn2(ctx, weights, cache, token, pos, config);
-        types::softmax_scaled(logits, 1.0 / config.temperature);
-        let next_token = types::sample_token_into(&ctx.logits, rng, &mut ctx.cdf);
+        let _ = forward_gdn2(ctx, weights, cache, token, pos, config);
+        let next_token = ctx.sample_next_token(config.temperature, rng);
         tokens.push(next_token);
         token = next_token;
     }

@@ -16,7 +16,7 @@ pub fn generate_with_prefill(
     #[cfg(feature = "domain_latent")] domain_latent: Option<&crate::types::DomainLatent>,
 ) -> Vec<usize> {
     // 1. Bidirectional prefill with reader LoRA
-    let logits = {
+    let _ = {
         #[cfg(not(feature = "domain_latent"))]
         {
             forward_prefill(
@@ -44,10 +44,8 @@ pub fn generate_with_prefill(
         }
     };
 
-    // 2. Sample first generation token from prefill output
-    // softmax_scaled fuses temperature + softmax in-place, avoiding logits.to_vec() allocation
-    crate::types::softmax_scaled(logits, 1.0 / config.temperature);
-    let mut token = crate::types::sample_token_into(&ctx.logits, rng, &mut ctx.cdf);
+    // 2. Sample first generation token from prefill output (fused softmax + sample).
+    let mut token = ctx.sample_next_token(config.temperature, rng);
 
     let mut generated = Vec::with_capacity(max_gen_tokens);
     generated.push(token);
@@ -59,7 +57,7 @@ pub fn generate_with_prefill(
             break;
         }
 
-        let logits = {
+        let _ = {
             #[cfg(not(feature = "domain_latent"))]
             {
                 forward_base(
@@ -86,10 +84,7 @@ pub fn generate_with_prefill(
                 )
             }
         };
-        // softmax_scaled fuses temperature division + softmax, saving one pass vs manual divide
-        crate::types::softmax_scaled(logits, 1.0 / config.temperature);
-
-        token = crate::types::sample_token_into(&ctx.logits, rng, &mut ctx.cdf);
+        token = ctx.sample_next_token(config.temperature, rng);
         generated.push(token);
         pos += 1;
 
@@ -195,7 +190,7 @@ pub fn generate_with_collapse_detection(
     };
 
     // 1. Prefill phase — same as generate_with_prefill
-    let logits = {
+    let _ = {
         #[cfg(not(feature = "domain_latent"))]
         {
             forward_prefill(
@@ -222,8 +217,7 @@ pub fn generate_with_collapse_detection(
             )
         }
     };
-    crate::types::softmax_scaled(logits, 1.0 / config.temperature);
-    let mut token = crate::types::sample_token_into(&ctx.logits, rng, &mut ctx.cdf);
+    let mut token = ctx.sample_next_token(config.temperature, rng);
 
     let mut generated = Vec::with_capacity(max_gen_tokens);
     generated.push(token);
@@ -258,7 +252,7 @@ pub fn generate_with_collapse_detection(
         }
 
         // Forward pass.
-        let logits = {
+        let _ = {
             #[cfg(not(feature = "domain_latent"))]
             {
                 forward_base(
@@ -285,8 +279,7 @@ pub fn generate_with_collapse_detection(
                 )
             }
         };
-        crate::types::softmax_scaled(logits, 1.0 / config.temperature);
-        token = crate::types::sample_token_into(&ctx.logits, rng, &mut ctx.cdf);
+        token = ctx.sample_next_token(config.temperature, rng);
         generated.push(token);
         pos += 1;
 
@@ -323,11 +316,10 @@ pub fn generate_into(
         }
 
         {
-            let logits = forward(ctx, weights, cache, token, pos, config);
-            softmax_scaled(logits, 1.0 / config.temperature);
+            let _ = forward(ctx, weights, cache, token, pos, config);
         }
 
-        let next_token = sample_token_into(&ctx.logits, rng, &mut ctx.cdf);
+        let next_token = ctx.sample_next_token(config.temperature, rng);
         tokens.push(next_token);
 
         if next_token == config.bos_token {
