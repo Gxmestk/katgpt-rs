@@ -54,10 +54,12 @@
 //!   `s ∈ ℝ^{m×n}` for a calibration batch. Improves the uniformity of
 //!   expert-selection counts.
 //!
-//! Plan 455 Phase 3 runs both on a deliberately-hard synthetic pool and
-//! promotes whichever wins the joint `(λ, MaxVio)` Pareto comparison. The
-//! predicted outcome (Research 447 §2.4) is **Case C — composition strictly
-//! beats either alone** because the two axes are orthogonal.
+//! Plan 455 Phase 3 ran both on a deliberately-hard synthetic pool (N=8,
+//! D=256, M=256, k=2) and confirmed **Case C — composition strictly beats
+//! either alone** (2026-07-17). The composed pipeline `R' = MPI(R, grams)`
+//! then `β = QB(X·R'^T, k)` achieves λ=0.99 AND MaxVio=0.00, strictly
+//! Pareto-dominating either alternative. Both primitives are DEFAULT-ON.
+//! See `.benchmarks/462_quantile_balance_router_phase3_head_to_head.md`.
 //!
 //! # Inference-Only Reframing (Honest Caveat)
 //!

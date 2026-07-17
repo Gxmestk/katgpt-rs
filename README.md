@@ -459,7 +459,7 @@ graph LR
 | **CHIAR Chiaroscuro Attention** (`chiaroscuro`) | 269 | 9/9 ✅ | Per-token DCT spectral entropy KV strategy (3.03× compression), operator routing, collapse discovery |
 | **Attention Matching** (`attn_match`) | 271 | 9/9 ✅ | Modelless KV compaction `(K,V)→(Ck,β,Cv)`: β-recovery 1e-6, Cv Frobenius 0.0, 3.01× SIMD, blocked Cholesky (32×32), adaptive router (scalar/SIMD/rayon/GPU/ANE) |
 | **Manifold Power Iteration MoE Router** (`manifold_power_iter_router`) | 279 | 9/9 ✅ | One-shot router-row conditioning at snapshot swap, sub-ms swap (0.076ms N=8 D=256), byte-identical determinism |
-| **Quantile Balancing MoE Router** (`quantile_balance_router`) | 455 | G1–G8 12/12 ✅ | One-shot per-expert bias β at snapshot swap via alternating-coordinate descent on the balanced-assignment LP (Su blog + Marin 32B validation). MaxVio 3.000→0.0625 (48× at M=64), 0.131ms swap (N=8 M=256). Sibling to MPI router (bias vs rows; balance MaxVio vs alignment λ). Opt-in — Phase 3 head-to-head vs Plan 279 pending |
+| **Quantile Balancing MoE Router** (`quantile_balance_router`) | 455 | G1–G8 12/12 ✅ + Phase 3 Case C ✅ | One-shot per-expert bias β at snapshot swap via alternating-coordinate descent on the balanced-assignment LP (Su blog + Marin 32B validation). MaxVio 3.000→0.0625 (48× at M=64), 0.131ms swap (N=8 M=256). Phase 3 head-to-head vs MPI: Case C — composed pipeline strictly Pareto-dominates either alone (λ 0.65→0.99 from MPI, MaxVio 1.84→0.00 from QB on orthogonal axes). **DEFAULT-ON** since Plan 455 Phase 3 (2026-07-17) |
 | **Temporal Derivative Kernel** (`temporal_deriv`) | 277 | 4/4 fusions ✅ | Dual fast/slow EMA surprise signal — state-vector companion, surprise-gated writes, collapse detection, curiosity signal |
 | **Triggered Injection Gate** (`triggered_injection`) | 278 | G1/G2/G3/G8 ✅ | Sigmoid-thresholded inject/skip gate — 50% skips w/ 0.63% quality parity in saturated regime |
 | **FaithfulnessProbe** (`faithfulness_probe`) | 278 | G1/G2/G8 ✅ | Causal intervention diagnostic — 100%/100% detection, IG surrogate Spearman ρ=1.0, audit cadence |
@@ -1300,7 +1300,18 @@ Distills the [Su blog Feb 2026](https://spaces.ac.cn/archives/11619) quantile-ba
 
 **GOAT gate (G1–G8, 12/12 PASS):** G1 mechanics ✅, G2 MaxVio reduction 3.000→0.0625 (48× at M=64) ✅, G3 no-degradation on balanced input ✅, G4 sub-ms swap 0.131ms (N=8 M=256 k=2, 7.6× headroom) ✅, G5 determinism ✅, G6 sigmoid constraint (independent per-expert bias, never softmax) ✅, G7 iters=5 sufficiency (MaxVio delta=0.0000) ✅, G8.A stationary 10× reduction ✅, G8.B reversed-drift **honestly reported** (ratio 1.000 — beta_cal mis-specified by construction; right fix is per-step recompute in riir-train) ✅, G8.C mild-drift 2× reduction ✅.
 
-Feature gate: `quantile_balance_router` (**opt-in** — Phase 3 head-to-head vs Plan 279 MPI pending; predicted outcome per Research 447 §2.4 is Case C: composition strictly beats either alone). 📖 Plan: [`.plans/455_quantile_balancing_router_primitive.md`](.plans/455_quantile_balancing_router_primitive.md), Research: [`.research/447_Kimi_K3_KDA_AttnRes_LatentMoE.md`](.research/447_Kimi_K3_KDA_AttnRes_LatentMoE.md).
+**Phase 3 head-to-head vs Plan 279 MPI (Case C, 2026-07-17):** ran both routers on a deliberately-hard synthetic fixture (N=8, D=256, M=256, k=2) with *both* low λ (router rows misaligned with expert Gram principal directions by θ=1 rad) and high MaxVio (input batch hot-direction signal systematically favoring experts 0,1). The composed pipeline `R' = MPI(R, grams)` then `β = QB(s_with_R', cal_batch)` then route as `top-k(x·R'^T − β)` strictly Pareto-dominates either alternative:
+
+| Variant | λ ↑ | MaxVio_load ↓ | Verdict |
+|---|---|---|---|
+| Vanilla | 0.6529 | 1.8438 | baseline (both axes broken) |
+| MPI only | **0.9918** | 2.6719 | fixes λ (+0.339); MaxVio *worsens* (retraction preserves hot-direction bias) |
+| QB only | 0.6529 | **0.0312** | fixes MaxVio 59×; λ unchanged (orthogonality holds bit-exactly) |
+| Composed (MPI+QB) | **0.9918** | **0.0000** | strictly Pareto-dominates all alternatives |
+
+The decision matrix confirms Research 447 §2.4's prediction: MPI and QB operate on orthogonal axes (alignment vs balance) and compose cleanly. **Honest finding (beyond the prediction):** MPI alone *worsens* MaxVio on skewed distributions — retraction toward `e_i` preserves the input-batch bias that drives imbalance. This strengthens the Case C argument: MPI is *not* a substitute for QB on skewed expert-affinity distributions; QB is required for balance. Test: `crates/katgpt-spectral/tests/bench_455_phase3_head_to_head.rs` (6 structural assertions, all PASS).
+
+Feature gate: `quantile_balance_router` (**DEFAULT-ON** since Plan 455 Phase 3, 2026-07-17 — Case C confirmed: composed with `manifold_power_iter_router` strictly Pareto-dominates either alone; MPI fixes alignment λ, QB fixes balance MaxVio on orthogonal axes). 📖 Plan: [`.plans/455_quantile_balancing_router_primitive.md`](.plans/455_quantile_balancing_router_primitive.md), Research: [`.research/447_Kimi_K3_KDA_AttnRes_LatentMoE.md`](.research/447_Kimi_K3_KDA_AttnRes_LatentMoE.md), Phase 2 GOAT: [`.benchmarks/461_quantile_balance_router_phase2_goat.md`](.benchmarks/461_quantile_balance_router_phase2_goat.md), Phase 3 head-to-head: [`.benchmarks/462_quantile_balance_router_phase3_head_to_head.md`](.benchmarks/462_quantile_balance_router_phase3_head_to_head.md).
 
 ### 📡 CS-KV-Importance Probe + Density-Budget Interpolator (Plan 280)
 

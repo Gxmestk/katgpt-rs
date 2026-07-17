@@ -82,8 +82,10 @@ manifold_power_iter_router = ["blake3"]
 # manifold_power_iter_router. One-shot per-expert bias `β` computation at
 # freeze/thaw snapshot swap via alternating-coordinate descent on the
 # balanced-assignment LP (Su blog Feb 2026 + Marin 32B-A5B validation). No
-# deps — quantile via std::slice::select_nth_unstable. Opt-in until GOAT
-# gate G1–G8 + Phase 3 head-to-head vs Plan 279 MPI land.
+# deps — quantile via std::slice::select_nth_unstable. Promoted to
+# DEFAULT-ON at root (2026-07-17) after Plan 455 Phase 3 Case C: composition
+# with manifold_power_iter_router strictly beats either alone (MPI fixes
+# alignment λ, QB fixes balance MaxVio on orthogonal axes).
 quantile_balance_router = []
 
 # Off-Principal Task Vector Retrieval (Plan 264 Phase 2, Research 231).
@@ -149,3 +151,11 @@ name = "quantile_balance_router_bench"
 path = "benches/quantile_balance_router_bench.rs"
 required-features = ["quantile_balance_router"]
 harness = false
+
+# Plan 455 Phase 3 — Head-to-head: QB (Plan 455) vs MPI (Plan 279) vs composed.
+# Integration test (not a bench) — asserts orthogonality of the two axes and
+# prints the decision matrix used for the T3.6 promotion verdict.
+[[test]]
+name = "bench_455_phase3_head_to_head"
+path = "tests/bench_455_phase3_head_to_head.rs"
+required-features = ["quantile_balance_router", "manifold_power_iter_router"]
