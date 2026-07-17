@@ -345,7 +345,7 @@ where
             .max_by(|a, b| {
                 a.depth
                     .cmp(&b.depth)
-                    .then(a.score.partial_cmp(&b.score).unwrap())
+                    .then(a.score.total_cmp(&b.score))
             })
             .unwrap();
         let path = extract_parent_tokens(best.parent_path, best.depth + 1);

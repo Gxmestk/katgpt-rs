@@ -149,7 +149,7 @@ fn speculate_one_round(first_digit: u8) -> usize {
         .max_by(|a, b| {
             a.depth
                 .cmp(&b.depth)
-                .then(a.score.partial_cmp(&b.score).unwrap())
+                .then(a.score.total_cmp(&b.score))
         })
         .unwrap();
 
