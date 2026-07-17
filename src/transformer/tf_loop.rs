@@ -1,4 +1,6 @@
+#[cfg(feature = "tf_loop")]
 use crate::types::{self};
+#[cfg(feature = "tf_loop")]
 use super::*;
 
 // ---------------------------------------------------------------------------
