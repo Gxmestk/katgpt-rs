@@ -176,6 +176,8 @@ Three issues opened (per AGENTS.md — "Create issue at .issues for poc, proof, 
 
 A fourth item (composition: `GL(d+2)` block-diagonal joint lift — Appendix E) is deferred until Issues 159 + 160 + 161 land; it has no standalone value without them.
 
+**Update 2026-07-17:** Issue 163 landed the joint lift (commit on `develop`). G1–G4 GOAT gate passed; promotion deferred. See [`.benchmarks/460`](../.benchmarks/460_grape_joint_lift_goat.md).
+
 ### Cross-repo follow-ups (for downstream guides, not this note)
 
 - `riir-ai`: HLA per-NPC learned rotation planes — fusion candidate, needs separate novelty gate.
