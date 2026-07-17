@@ -53,7 +53,8 @@ use super::chunk_summary::{
 ///
 /// 1. Chunk summarization over K at chunk boundaries
 /// 2. Entmax routing via chunk summaries
-/// 3. Dense attention (MVP — sparse on active chunks TODO)
+/// 3. Dense attention (sparse routing lives in `EntmaxRouter` / VortexFlow,
+///    Plan 196 — not wired into this prefill function directly)
 /// 4. Store chunk summaries to cache
 #[allow(clippy::too_many_arguments)]
 pub fn forward_dash_attn_prefill(
@@ -188,13 +189,16 @@ pub fn forward_dash_attn_prefill(
 /// # Dead routing elimination (perf)
 ///
 /// The per-layer entmax routing call (`score_blocks_entmax_with_entropy_into`)
-/// was computed but its result was bound to `_routing` and never consumed —
-/// the TODO to wire `routing.active_indices` into sparse KV block selection
-/// (Plan 173 Task 6) has not been implemented. The dead call ran n_layer
-/// entmax scoring + sorting operations per decode step, all discarded.
+/// was computed but its result was bound to `_routing` and never consumed.
 /// Removed to eliminate dead compute; the `dash_config`, `summary_query`,
-/// and `summary_cache` params are retained (prefixed `_`) for API stability
-/// and future TODO wiring.
+/// and `summary_cache` params are retained (prefixed `_`) for API stability.
+///
+/// Block-level routing via `routing.active_indices` is implemented elsewhere
+/// — see `EntmaxRouter` (Plan 196 / VortexFlow feature gate), which composes
+/// `score_blocks_entmax` into a `VortexFlow` router consumed by the
+/// VortexFlow dispatcher. The Plan 173 Task 6 sparse-KV-block-selection
+/// milestone is complete via that path; this decode function does not need
+/// to re-wire routing inline.
 #[allow(clippy::too_many_arguments)]
 pub fn forward_dash_attn_decode<'a>(
     ctx: &'a mut ForwardContext,
@@ -235,11 +239,9 @@ pub fn forward_dash_attn_decode<'a>(
             n,
         );
 
-        // NOTE: Entmax routing was previously computed here but the result
-        // (_routing) was never consumed — the sparse KV block selection TODO
-        // (Plan 173 Task 6) is not yet implemented. See function-level doc
-        // comment for the full rationale. Re-add routing here when wiring
-        // routing.active_indices into the attention path.
+        // Routing lives in `EntmaxRouter` (VortexFlow feature, Plan 196) —
+        // see the function-level doc comment for the full rationale. This
+        // decode function uses dense attention directly.
 
         types::matmul(&mut ctx.attn_out, &layer_weights.attn_wo, &ctx.q, n, n);
         simd::simd_add_inplace(&mut ctx.x[..n], &ctx.attn_out[..n]);

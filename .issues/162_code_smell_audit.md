@@ -60,7 +60,7 @@ Mixes dd-tree builders, `TreeBuilder` impl (lines 912→3006 — a **2100-line**
 
 Lines 56, 192, 237, 241 — "sparse KV block selection TODO (Plan 173 Task 6)" appears 4×. Doc-comment at L192–198 says "the dead call ran `n_layer`…" — likely dead code left in place.
 
-**Action:** verify Plan 173 status. If abandoned, remove the dead routing call + the TODO.
+**Status:** **RESOLVED 2026-07-17** (commit pending). Re-audit confirmed: the routing call itself was already removed (dead-compute elimination); what remained was 4 stale comments claiming "Plan 173 Task 6 is not yet implemented." Plan 173 Task 6 IS implemented — via `EntmaxRouter` (Plan 196 / `vortex_flow` feature gate), which composes `score_blocks_entmax` into a `VortexFlow` router. The block-level sparse KV selection lives in the VortexFlow dispatcher, not in this decode function. Updated the comments to point to `EntmaxRouter` and removed the stale "not yet implemented" claim.
 
 ### M2. `crates/katgpt-backend/src/lib.rs:184` — stale `model_path` parameter
 
@@ -104,7 +104,8 @@ Most softmax usage is mathematically required (token sampling, attention weights
 
 ## Low
 
-- **L1.** `crates/katgpt-core/src/cgsp/types.rs:546–550` — hand-rolled UUID-v4-ish generator using `fastrand::u8(..)`. Consider `Uuid::now_v7().to_bytes_le()` if determinism permits (note: v7 is time-ordered; if the caller needs deterministic seeds, the fastrand path may be intentional — verify before changing).
+- **L1.** `crates/katgpt-core/src/cgsp/types.rs:546–550` — hand-rolled UUID generator using `fastrand::u8(..)`.
+  - **Status:** **VERIFIED ACTIVE 2026-07-17 — keep.** Re-audit corrected two mischaracterizations in the original entry: (1) this is a UUID**v7** generator (timestamp-prefixed, version=0x7, RFC 4122 variant) — NOT v4 as the original entry stated; (2) the `fastrand` choice is INTENTIONAL, not a bug. The function's own doc comment (L526-530) explains: "sufficient for ordering within a process without pulling in the `uuid` crate as a hard dependency here." `katgpt-core` deliberately does NOT depend on the `uuid` crate (it's a leaf-clean public primitive), so swapping to `Uuid::now_v7().to_bytes_le()` would either add a new dep to `katgpt-core` (against the leaf-clean rule) or move this caller out of `katgpt-core`. The current hand-rolled v7 layout is correct and intentional. No action.
 - **L2.** `benches/cgsp_hint_receptivity_bench.rs:150` + `benches/sudoku_speculate_bench.rs:346` — `partial_cmp(...).unwrap()` on `f32`. Silent NaN bug risk (returns `Equal` ordering on NaN). Replace with an explicit NaN-handling comparator or assert `is_finite()` upstream.
   - **Status:** **DONE 2026-07-17** (commit `317534ec`). Replaced with `f32::total_cmp` (Rust 1.62+) which provides a total ordering. NaN now sorts as largest rather than silently comparing equal. No behavior change for the non-NaN inputs the benches actually produce. Validation: `cargo clippy --benches` → 0 warnings.
 - **L3.** Sampling DRY — `softmax_scaled(logits, 1.0/temp); sample_token_into(...)` appears 5+ times across call sites. Extract `sample_next_token(ctx, logits, temp, rng)` helper.
