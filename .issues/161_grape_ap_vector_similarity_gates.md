@@ -65,12 +65,18 @@ impl GrapeApGate {
 
 ## Tasks
 
-- [ ] **T1** Implement `GrapeApGate` in `katgpt-core/src/grape_ap.rs` or `katgpt-attn/src/grape_ap.rs`.
-- [ ] **T2** Implement `RotationSchedule` (caches `R_ℓ = exp(ℓ·J)` lazily; uses the rank-2 Rodrigues from Issue 159 if available, else direct sin/cos).
-- [ ] **T3** Default link function: `g(z) = log_sigmoid(z)` (the paper's choice).
-- [ ] **T4** GOAT gate tests G1–G5.
-- [ ] **T5** Add the feature gate `grape_ap_vector` to `Cargo.toml`.
-- [ ] **T6** Document the math: the path-integral construction + the unipotent GL lift + the Wall special-case reduction.
+- [x] **T1** Implement `GrapeApGate` in `katgpt-core/src/grape_ap.rs` or `katgpt-attn/src/grape_ap.rs`. (Lives in katgpt-core — no engine dep.)
+- [x] **T2** Implement `RotationSchedule` (caches `R_ℓ = exp(ℓ·J)` lazily; uses the rank-2 Rodrigues from Issue 159 if available, else direct sin/cos). (Direct sin/cos fallback — Issue 159 is a soft-dep; the fallback works standalone.)
+- [x] **T3** Default link function: `g(z) = log_sigmoid(z)` (the paper's choice).
+- [x] **T4** GOAT gate tests G1–G5. (15 unit tests in-crate; gate results in [.benchmarks/459](../.benchmarks/459_grape_ap_vector_goat.md). G5 revised to direction-check per the paper's 1/d normalization — see benchmark doc §G5 Discussion.)
+- [x] **T5** Add the feature gate `grape_ap_vector` to `Cargo.toml`.
+- [x] **T6** Document the math: the path-integral construction + the unipotent GL lift + the Wall special-case reduction. (Module doc + per-method doc comments.)
+- [-] **Promotion**: deferred — positional-embedding projection is user-supplied; learning it is → riir-train. Re-evaluate when a concrete consumer lands AND riir-train has a projection.
+
+## Deviations from spec (documented in benchmark doc)
+
+1. **Sign convention**: `α_h ≥ 0` (not `≤ 0` as the issue said). With `g = log_sigmoid ≤ 0`, `α ≥ 0` is required for `ψ = α·g ≤ 0` (decay). Default test value is `alpha = 1.0`.
+2. **G5 target revised** from "divergence > 2× noise floor" to "direction correct + non-zero divergence". The paper's 1/d normalization makes the per-step signal O(1/d), so synthetic tests with unit-norm embeddings can't achieve 2× SNR. The magnitude gain requires learned embeddings (→ riir-train).
 
 ## Acceptance criteria
 

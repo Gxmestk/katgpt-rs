@@ -1090,6 +1090,19 @@ pub use position_group_action::{
     AlibiAction, FoxAction, GrapeMAction, NopeAction, PositionGroupAction, RopeAction, WallAction,
 };
 
+// GRAPE-AP — Vector-Similarity Path-Integral Decay Gates (GRAPE §5).
+// Content-aware extension of Wall Attention: ψ_h(t,ℓ) = α·g(⟨p_t, R_ℓ·p_ℓ⟩/d)
+// with g = log_sigmoid. Tokens whose positional embedding matches the query's
+// decay slower; mismatching tokens decay faster. The headline gain in the
+// GRAPE paper (+1.15 avg on 770M FineWeb-Edu). Wall Attention is the scalar
+// special case (endpoint-independent embeddings). The positional-embedding
+// projection is user-supplied (modelless); learning it is → riir-train.
+// Opt-in until G1–G5 GOAT gate passes (G5 is dilution sanity).
+#[cfg(feature = "grape_ap_vector")]
+pub mod grape_ap;
+#[cfg(feature = "grape_ap_vector")]
+pub use grape_ap::{GrapeApError, GrapeApGate, RotationSchedule, log_sigmoid};
+
 // Spherical Steering — single-target geodesic Slerp rotation
 // `sin((1−t)θ)/sin θ · ĥ + sin(tθ)/sin θ · μ_T` toward a unit-norm target
 // direction on S^{d-1}, with sigmoid-translated vMF confidence gate (Plan 405,
