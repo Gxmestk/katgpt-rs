@@ -23,14 +23,11 @@ Mixes RiM slots, forward passes (7 variants), generators, raven router, depth ro
 
 **Resolved 2026-07-17 (Issue 164):** split into `transformer/` module folder with 8 sub-modules (`mod.rs` + `variants.rs` + `tf_loop.rs` + `prefill.rs` + `generators.rs` + `paged.rs` + `raven.rs` + `quantized.rs` + `tests.rs`). Public API preserved 1:1 via `mod.rs` re-exports. GOAT gate G1 + G3 PASS: 200/200 default tests bit-identical, clippy clean workspace-wide. Module naming differs slightly from the original proposal (batched-forward module is `variants.rs` not `forward.rs` to avoid collision with the re-exported `forward` fn; depth routing lives in `tf_loop.rs` with its sole caller `forward_training_free_loop`).
 
-### C2. `crates/katgpt-speculative/src/dd_tree.rs` — 4207 lines
+### C2. `crates/katgpt-speculative/src/dd_tree.rs` — 4207 lines ✅ DONE (Issue 165)
 
 Mixes dd-tree builders, `TreeBuilder` impl (lines 912→3006 — a **2100-line** impl block), SDE variants, residual/cross-scale trackers.
 
-**Plan needed:**
-- Extract `TreeBuilder` into `tree_builder.rs`.
-- Extract scale configs into `scale_config.rs`.
-- Keep `dd_tree.rs` as the data-type + small-impl home.
+**Resolved 2026-07-17 (Issue 165):** converted to `dd_tree/` module folder with `TreeBuilder` extracted to `tree_builder.rs` (2091 lines). The scale-config structs (`LodestarConfig`, `WidthScaleConfig`, `CrossScaleConfig`, `ResidualTracker`) were NOT split into a separate `scale_config.rs` — they're tightly coupled to their builder functions and small enough to stay in `mod.rs`. Test file `dd_tree_tests.rs` moved into the module folder as `tests.rs`. Both `mod.rs` (2125) and `tree_builder.rs` (2091) are now under the 3200 hard limit (down from Critical); both remain in the 2048–3200 soft-limit band (High). GOAT gate G1 + G3 PASS: 305/305 + 200/200 + 1079/1079 (`--all-features`) tests pass.
 
 ---
 
