@@ -950,6 +950,15 @@ required-features = ["sleep_time_anticipation"]
 name = "sleep_time_02_curiosity_inversion"
 required-features = ["sleep_time_anticipation"]
 
+# Issue 147 diagnostics — require multi_agent_path module (not default-on).
+[[example]]
+name = "ht_chantry_diagnostic"
+required-features = ["multi_agent_path"]
+
+[[example]]
+name = "ht_chantry_config_sweep"
+required-features = ["multi_agent_path"]
+
 # Plan 336 Phase 2 T2.2 — best_belief G2 perf gate. Reports median latency
 # for best_belief_score (target ≤ 100 ns) and select_best_belief on 4 and 8
 # candidates (target ≤ 500 ns).
