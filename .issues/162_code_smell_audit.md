@@ -39,7 +39,7 @@ Mixes dd-tree builders, `TreeBuilder` impl (lines 912→3006 — a **2100-line**
 - `src/pruners/bomber/players.rs` (2828)
 - `crates/katgpt-speculative/src/weaver.rs` (2817)
 - `crates/katgpt-core/src/karc.rs` (2597)
-- `crates/katgpt-forward/src/dd_tree.rs` (2566)
+- `crates/katgpt-forward/src/dd_tree.rs` (2566) ✅ DONE (Issue 168, 2026-07-17): split to `dd_tree/` module folder — `mod.rs` (179, well under 2048 ✓) + `tests.rs` (2387, tests exempt). Single-axis tests extraction (file was 98% tests — only ~175 lines of impl: two feature-gated wrappers + the `pub use katgpt_speculative::dd_tree::*` re-export glob). No `pub(super)` helpers, no path corrections. G1+G3 PASS: 109/109 katgpt-forward default + 112/112 under `thinking_prune,sr2am_configurator,gdsd_distill` (49/49 in `dd_tree::tests::*`) + 200/200 root lib under same features; clippy clean workspace-wide. Pre-existing wiring note: katgpt-forward's `thinking_prune` feature alone does not forward `sr2am_configurator` — same error reproduces against the unsplit original; GOAT gate runs through the root crate (where forwarding is complete).
 - ~~`crates/katgpt-core/src/parallax_attn.rs` (2524)~~ ✅ DONE (Issue 167, 2026-07-17): split to `parallax_attn/` module folder — `mod.rs` (973, well under 2048 ✓) + `tests.rs` (1559, tests exempt). Single-axis tests-extraction split (implementation is cohesive Parallax attention). 4 feature-gated test sections preserved with corrected cfg gates. G1+G3 PASS: 1558/1558 katgpt-core default + 24/24 `parallax_attn,sink_aware_attn,ssmax_temperature` tests pass; clippy clean.
 - `crates/katgpt-core/src/speculative/qmc.rs` (2516)
 - `crates/katgpt-forward/src/d2f.rs` (2268)
