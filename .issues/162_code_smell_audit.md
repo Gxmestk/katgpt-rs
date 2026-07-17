@@ -146,6 +146,38 @@ No conversion to sigmoid needed at any of the 3 sites. The audit's flag was corr
 - **NOT** blanket softmax replacement. See Medium section above.
 - **NOT** touching tests/benches/examples in the soft-limit band unless they block a code change.
 
+---
+
+## Post-audit addendum (2026-07-17) — 8 missed soft-limit files
+
+The original audit's High section stated "~20 files sit in this band" but only
+listed ~11. A direct `find ... | wc -l` sweep for `.rs` ≥ 2048 lines revealed
+**8 additional library files** entirely absent from the audit — the same class
+of miss as Issues 170–175 (prior sessions called files "out of scope" without
+verifying structural seams).
+
+**Mechanical splits (Issue 176, DONE):**
+
+- ~~`crates/katgpt-pruners/src/vocab_channel_pruner.rs` (2053)~~ ✅ DONE (Issue 176 T1): mod.rs lands at 1183, tests.rs at 867 (file was 93% tests). PASS 176/176 under `vocab_channel_pruner`.
+- ~~`crates/katgpt-percepta/src/legacy.rs` (2124)~~ ✅ DONE (Issue 176 T2): mod.rs lands at 910, tests.rs at 1215 (file was 57% tests). PASS 40/40 default + 339/339 under `percepta_compile`.
+- ~~`crates/katgpt-core/src/funcattn.rs` (2086)~~ ✅ DONE (Issue 176 T3): mod.rs lands at 983, tests.rs at 1105 (file was 53% tests). PASS 22/22 `funcattn::tests::*`.
+- ~~`crates/katgpt-dec/src/sheaf_admm.rs` (2109)~~ ✅ DONE (Issue 176 T4): mod.rs lands at 1222, tests.rs at 889 (file was 42% tests). PASS 20/20 `sheaf_admm::tests::*` (DEFAULT-ON).
+- ~~`crates/katgpt-percepta/src/graph/types.rs` (2055)~~ ✅ DONE (Issue 176 T5): mod.rs lands at 1333, tests.rs at 724 (file was 35% tests). PASS 54/54 `graph::types::tests::*` under `percepta_graph`.
+
+**Functional split (Issue 177, PENDING):**
+
+- `crates/katgpt-pruners/src/bandit.rs` (2178) — 14 `// ──` delimiters mark natural seams (Strategy / Stats / Pruner / Beta sampling / Environment / Session / SharedBanditStats / RandOpt). Same functional-split pattern as Issue 175.
+
+**Post-split growth / investigation (Issue 178, PENDING):**
+
+- `crates/katgpt-speculative/src/dd_tree/mod.rs` (2125) + `tree_builder.rs` (2091) — these are post-Issue 165 split results; the mod.rs grew back over the soft limit. Investigate whether a second split is warranted.
+
+**Confirmed skip (unchanged):**
+
+- `crates/katgpt-speculative/src/weaver.rs` (2817) — user-explicit skip.
+
+GOAT G1+G3 for Issue 176: workspace `cargo clippy --lib` clean + 6519 passed / 0 failed under default features.
+
 ## Cross-references
 
 - Global `~/.agents/` rules — file-size limits (`< 3200` hard, `< 2048` soft for `.rs`), sigmoid-not-softmax, `Uuid::now_v7()`, blake3, papaya.
