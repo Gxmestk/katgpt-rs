@@ -92,7 +92,7 @@ fn bench_176_generation_50_tokens_cpu() {
 fn bench_176_backend_selection_overhead() {
     let start = Instant::now();
     for _ in 0..100 {
-        let _backend = auto_backend(BackendKind::Cpu, None);
+        let _backend = auto_backend(BackendKind::Cpu);
     }
     let elapsed = start.elapsed();
     let us_per_selection = elapsed.as_secs_f64() * 1e6 / 100.0;
