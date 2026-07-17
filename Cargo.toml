@@ -392,6 +392,7 @@ orthogonal_procrustes = ["katgpt-spectral/orthogonal_procrustes"]  # Orthogonal 
 spectral_budget = ["katgpt-spectral/spectral_budget"]  # Spectral Budget Router — layer-adaptive NS depth + rank-p truncation (Plan 253, Research 222) — opt-in, GOAT gate. Phase 4: substrate moved to katgpt-spectral (forwards newton_schulz).
 gauge_invariant = ["katgpt-sparse/gauge_invariant", "katgpt-spectral/gauge_invariant"]  # Gauge-invariant adapter composition — LoRA-Muon distillation (Plan 270, Research 238, GOAT 17/17 PASS, default-ON). Phase 4: substrate moved to katgpt-spectral (forwards newton_schulz). Phase 11 (2026-07-04): also forwards to katgpt-sparse so the `compose_gauge_invariant` impl on SparseTaskVector (moved from src/sparse_task_vector.rs) compiles.
 manifold_power_iter_router = ["katgpt-spectral/manifold_power_iter_router"]  # Manifold Power Iteration MoE Router — one-shot router-row conditioning at snapshot swap via shared spectral_retract helper (Plan 279, Research 246, arxiv 2606.12397) — DEFAULT-ON since Plan 279 Phase 4 GOAT 9/9 green. Phase 4: substrate moved to katgpt-spectral (forwards blake3).
+quantile_balance_router = ["katgpt-spectral/quantile_balance_router"]  # Quantile Balancing MoE Router — one-shot per-expert bias β at snapshot swap via alternating-coordinate descent on the balanced-assignment LP (Plan 455, Research 447 §2.4, Su blog Feb 2026 + Marin 32B-A5B validation). Sibling to manifold_power_iter_router (rows vs bias; alignment λ vs balance MaxVio). Opt-in until Plan 455 Phase 2 GOAT G1–G8 + Phase 3 head-to-head land.
 river_valley = ["katgpt-spectral/river_valley"]  # River-valley diagnostic metrics — subspace ratios, effective rank, cosine similarity (Plan 152, Research 114, GOAT 25/25 Bench 050) — default-ON. Phase 4: substrate moved to katgpt-spectral.
 spectral_hierarchy = ["katgpt-core/spectral_hierarchy"]  # Spectral hierarchy diagnostic — eigenspace alignment, Haar wavelets, Cauchy interlacing (Plan 156 GOAT) — default-ON
 sigmoid_margin = ["katgpt-core/sigmoid_margin"]  # Sigmoid margin loss + retrieval margin diagnostic (Research 123, Plan 157)
@@ -1813,6 +1814,10 @@ required-features = ["gauge_invariant"]
 [[example]]
 name = "manifold_power_iter_router_basic"
 required-features = ["manifold_power_iter_router"]
+
+[[example]]
+name = "quantile_balance_router_basic"
+required-features = ["quantile_balance_router"]
 
 [[example]]
 name = "attn_match_basic"

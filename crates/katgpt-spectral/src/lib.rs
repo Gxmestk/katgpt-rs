@@ -51,6 +51,8 @@ pub mod off_principal;
 pub mod peira;
 #[cfg(feature = "orthogonal_procrustes")]
 pub mod procrustes;
+#[cfg(feature = "quantile_balance_router")]
+pub mod quantile_balance_router;
 #[cfg(feature = "spectral_budget")]
 pub mod spectral_budget;
 #[cfg(feature = "stiff_anomaly")]

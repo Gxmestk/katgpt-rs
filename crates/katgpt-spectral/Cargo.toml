@@ -78,6 +78,14 @@ gauge_invariant = ["katgpt-core/newton_schulz"]
 # for snapshot hashing.
 manifold_power_iter_router = ["blake3"]
 
+# Quantile Balancing MoE Router (Plan 455, Research 447 §2.4) — sibling to
+# manifold_power_iter_router. One-shot per-expert bias `β` computation at
+# freeze/thaw snapshot swap via alternating-coordinate descent on the
+# balanced-assignment LP (Su blog Feb 2026 + Marin 32B-A5B validation). No
+# deps — quantile via std::slice::select_nth_unstable. Opt-in until GOAT
+# gate G1–G8 + Phase 3 head-to-head vs Plan 279 MPI land.
+quantile_balance_router = []
+
 # Off-Principal Task Vector Retrieval (Plan 264 Phase 2, Research 231).
 # Needs newton_schulz for the principal-direction recovery and blake3 for the
 # source-weight hash. Also enables the local `newton_schulz` feature so the
