@@ -2,7 +2,7 @@
 
 > **Source:** Yifan Zhang, Zixiang Chen, Yifeng Liu, Zhen Qin, Huizhuo Yuan, Kangping Xu, Yang Yuan, Quanquan Gu, Andrew Chi-Chih Yao — *Group Representational Position Encoding* — [arXiv:2512.07805](https://arxiv.org/abs/2512.07805), ICLR 2026.
 > **Date:** 2026-07-17
-> **Status:** Active — verdict GAIN, no plan opened yet
+> **Status:** Active — verdict GAIN; three issues opened ([159](../.issues/159_grapem_rank2_rodrigues_exponential.md), [160](../.issues/160_position_group_action_trait.md), [161](../.issues/161_grape_ap_vector_similarity_gates.md))
 > **Related Research:** 028 (HLA — higher-order linear attention), 070 (GDN2 — diagonal decay), 086 (RTPurbo — pre-RoPE retrieval projection), 305 (phase rotation — UFO's per-channel 2D rotation), 314 (group invariance + f-divergences), 355 (LieFlow — `GroupAction` trait), 392 (attention dilution SSMax), 431 (Wall Attention — diagonal forget gates as RoPE replacement)
 > **Related Plans:** 173 (Wall Attention — `WallDiagonalGate`), 233 (attention matching / `PositionFreeCompactor`), 322 (phase rotation), 397 (HGA — RoPE-aware summarizer)
 > **Classification:** Public
@@ -166,15 +166,15 @@ Per §1.55 of the research skill — PASS requires "no actionable improvements".
 
 ## 4. Actionable follow-ups (no plan opened — list only)
 
-Per AGENTS.md ("Create issue at .issues for poc, proof, optimization or refactor task, do not create plan"), these become `.issues/` entries when prioritized. Listed here for visibility:
+Three issues opened (per AGENTS.md — "Create issue at .issues for poc, proof, optimization or refactor task, do not create plan"):
 
-1. **Closed-form rank-2 Rodrigues exponential** — new primitive in `katgpt-core`, gated `grapem_rodrigues` (opt-in). `O(d)` per application via 2 inner products. Generalizes `phase_rotation.rs` from scalar broadcast to arbitrary plane. **GOAT gate:** G1 bit-identical to materialized `expm(L)` on random `(a,b,ω)`; G2 latency `< 2× phase_rotation_gate_into`; G4 zero-alloc.
+1. **[Issue 159](../.issues/159_grapem_rank2_rodrigues_exponential.md) — Closed-form rank-2 Rodrigues exponential** — new primitive in `katgpt-core`, gated `grapem_rodrigues` (opt-in). `O(d)` per application via 2 inner products. Generalizes `phase_rotation.rs` from scalar broadcast to arbitrary plane. **GOAT gate:** G1 bit-identical to materialized `expm(L)` on random `(a,b,ω)`; G2 latency `< 2× phase_rotation_gate_into`; G4 zero-alloc.
 
-2. **Unified `PositionGroupAction` trait** — abstract trait in `katgpt-core`, gated `position_group_action` (opt-in). Subsuming `PositionFreeCompactor` (RoPE) + `WallDiagonalGate` (Wall) + future ALiBi/FoX under one `G(n) = exp(n·ω·L)` interface. Enables a unified `apply_phase_shift` / `un_rotate` API. **GOAT gate:** G3 no-regression (existing RoPE/Wall paths unchanged when feature off).
+2. **[Issue 160](../.issues/160_position_group_action_trait.md) — Unified `PositionGroupAction` trait** — abstract trait in `katgpt-core`, gated `position_group_action` (opt-in). Subsuming `PositionFreeCompactor` (RoPE) + `WallDiagonalGate` (Wall) + future ALiBi/FoX under one `G(n) = exp(n·ω·L)` interface. Enables a unified `apply_phase_shift` / `un_rotate` API. **GOAT gate:** G3 no-regression (existing RoPE/Wall paths unchanged when feature off).
 
-3. **GRAPE-AP vector-similarity gates** — extension of `WallDiagonalGate` to vector positional-embedding similarity `ψ_h(t,ℓ) = α·g(⟨p_t, R_ℓ·p_ℓ⟩/d)`, gated `grape_ap_vector` (opt-in). **GOAT gate:** G2 latency overhead `< 1.5×` Wall's scalar path; G4 alloc-free after scratch init.
+3. **[Issue 161](../.issues/161_grape_ap_vector_similarity_gates.md) — GRAPE-AP vector-similarity gates** — extension of `WallDiagonalGate` to vector positional-embedding similarity `ψ_h(t,ℓ) = α·g(⟨p_t, R_ℓ·p_ℓ⟩/d)`, gated `grape_ap_vector` (opt-in). **GOAT gate:** G2 latency overhead `< 1.5×` Wall's scalar path; G4 alloc-free after scratch init.
 
-4. **Composition: `GL(d+2)` block-diagonal joint lift** — combine multiplicative + additive in one transform (Appendix E). Lower priority — only relevant if both 1 and 3 land.
+A fourth item (composition: `GL(d+2)` block-diagonal joint lift — Appendix E) is deferred until Issues 159 + 160 + 161 land; it has no standalone value without them.
 
 ### Cross-repo follow-ups (for downstream guides, not this note)
 
