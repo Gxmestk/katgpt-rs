@@ -91,8 +91,11 @@ fn run_once(
         config,
         residual_gate,
         sdpa_gate,
+        #[cfg(feature = "sleep_consolidation")]
         None,
+        #[cfg(feature = "sleep_consolidation")]
         None,
+        #[cfg(feature = "weight_shared_advantage_gate")]
         None,
         elastic_override,
         #[cfg(feature = "gain_cost_halt")]
