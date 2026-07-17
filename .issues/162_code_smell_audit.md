@@ -35,7 +35,7 @@ Mixes dd-tree builders, `TreeBuilder` impl (lines 912→3006 — a **2100-line**
 
 ~20 files sit in this band. Library-code priorities (in descending impact):
 
-- `src/dllm.rs` (3078)
+- ~~`src/dllm.rs` (3078)~~ ✅ DONE (Issue 166, 2026-07-17): split to `dllm/` module folder — `mod.rs` (1924, under 2048 ✓) + `tests.rs` (1163, tests exempt). Single-axis tests-extraction split (implementation is cohesive dLLM training research code). G1+G3 PASS: 200/200 default + 19/19 `--features dllm` + 24/24 `--features "dllm,replaid_schedules"` tests pass; clippy clean.
 - `src/pruners/bomber/players.rs` (2828)
 - `crates/katgpt-speculative/src/weaver.rs` (2817)
 - `crates/katgpt-core/src/karc.rs` (2597)
