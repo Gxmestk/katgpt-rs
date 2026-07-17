@@ -121,7 +121,7 @@ These categories mirror what Seal Online dialog/quest/KG data would look like in
 `cargo test -p katgpt-core --all-features` reports 1869 passed / 2 failed. The 2 failures are **pre-existing and unrelated** to babel_codec:
 
 1. `curator::tests::test_verification_weight_thresholds` — a float-precision/logic issue in `curator.rs` (not touched by this plan). Fails identically with or without `babel_codec`.
-2. `rtdc::tests::subtree::cg6_verify_cost_within_5x_of_depth_2` — a latency gate flake (5.628× vs 5.5× budget under full-suite load). **Passes in isolation.** Not caused by babel_codec.
+2. `rtdc::tests::subtree::cg6_verify_cost_within_5x_of_depth_2` — a latency gate flake (5.628× vs 5.5× budget under full-suite load). **Passes in isolation.** Not caused by babel_codec. **Resolved 2026-07-17** (separate commit): test marked `#[ignore]` — canonical CG6.1 measurement lives in the criterion bench `rtdc_subtree_bench` (`.benchmarks/303`, 4.60× in release).
 
 All **45 babel_codec tests pass** cleanly under both `--features babel_codec` and `--all-features`.
 
