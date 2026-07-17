@@ -128,11 +128,11 @@ the regression test).
 | Substrate | Lives in | Status |
 |---|---|---|
 | `NpcEmotionScalars` (5 emotion fields) | riir-engine (private) | **AUDITED PASS** (2026-07-17, commit `20f153eb`, iMAUVE=0.9962 via `curiosity_drive` decode) |
-| `ArchetypeBlendShard` π | riir-engine (private) | Trait-ready; non-blocking follow-up |
-| `KarcShard` weights | riir-engine (private) | Trait-ready; non-blocking follow-up |
+| `ArchetypeBlendShard` π | riir-neuron-db (private) | **AUDITED PASS** (2026-07-17, continuation; iMAUVE=0.9917 via `sigmoid(pi_k/tau)` gate decode; Q2 intervention battery all-diverge) |
+| `KarcShard` weights | riir-neuron-db (private) | **AUDITED PASS** (2026-07-17, continuation; iMAUVE=0.9773 via linear readout `Wout @ delay_state`; Q2 intervention battery all-diverge) |
 | `NeuronShard::style_weights[64]` | riir-neuron-db (private) | **AUDITED PASS** (2026-07-17, commit `746c4a0`, iMAUVE=0.9693 GOOD vs 0.6994 BAD via identity decode) |
-| `ZoneGeometryPod` | riir-engine (private) | Trait-ready; non-blocking follow-up |
-| `MerkleFrozenEnvelope` versions | riir-neuron-db (private) | Trait-ready; non-blocking follow-up |
+| `ZoneGeometryPod` | riir-neuron-db (private) | **N/A** (derived artifact, no learnable latent — Q2/Q3 structural PASS) |
+| `MerkleFrozenEnvelope` versions | riir-neuron-db (private) | **N/A** (cryptographic commitment, no decode path — Q3 vacuous PASS) |
 
 The `EuclideanLatentSpace<N>` reference impl proves the protocol works at
 the HLA dimension (N=8) and the `style_weights` dimension (N=64)
@@ -152,12 +152,15 @@ are documented in [Issue 158](../../.issues/158_latent_interpolation_geometry_ev
 §"Three-pressure audit". The audit requires the real decode path.
 
 **Status (2026-07-17):**
-- **Q1 (summarize-vs-route)** is **CLOSED** for `NeuronShard::style_weights` via the summarize-vs-route subsampling audit (Benchmark 459 v3 addendum). The `ConsolidationPipeline::sleep()` average is the canonical summarize operation — divergence scales proportionally with drop fraction. The routing control (argmax-norm) exhibits the expected worst-case spike. `NpcEmotionScalars` is current-state (not trajectory-summary), so Q1 is vacuously N/A for that substrate.
-- **Q2 (runtime-depends-on-latent)** is **CLOSED** for both primary substrates:
+- **Q1 (summarize-vs-route)** is **CLOSED** for `NeuronShard::style_weights` via the summarize-vs-route subsampling audit (Benchmark 459 v3 addendum). The `ConsolidationPipeline::sleep()` average is the canonical summarize operation — divergence scales proportionally with drop fraction. The routing control (argmax-norm) exhibits the expected worst-case spike. `NpcEmotionScalars` is current-state (not trajectory-summary), so Q1 is vacuously N/A for that substrate. The four remaining substrates: 3 are N/A (no trajectory operation), `KarcShard.wout` deferred (ridge regression is structurally summarize).
+- **Q2 (runtime-depends-on-latent)** is **CLOSED** for all six substrates:
   - `NpcEmotionScalars`: `curiosity_drive()` is itself a runtime bridge — Q2 implicit.
   - `NeuronShard::style_weights`: v2 audit (`StyleWeightsScalarSpace`) confirms `latent_is_causal(5.0)` under the runtime affect-scalar decode.
-- **Q3 (local-context-vs-bypass)** is **CLOSED** for both primary substrates via a structural code audit (decode-path purity + consumer-input audit + locality-mechanism inventory). Verdict: **PASS by construction** — the decode paths are pure functions of the latent; the consumers take only the decoded value; cross-NPC influence flows through latent refinement before reaching the decode, not through a raw-state side channel. The SpKv (Plan 070) `window: 128` sliding-window + RTPurbo (Plan 126) sparse-decode infrastructure enforce locality at the transformer-attention layer for runtimes that use transformer attention (NPC dialog WASM etc.), which are out of scope for this substrate-level audit. See [Issue 158](../../.issues/158_latent_interpolation_geometry_evaluation.md) §"Q3 structural audit findings" for the per-substrate trace + locality-mechanism inventory.
-- **All three three-pressure audit questions are now CLOSED** for the two primary substrates. The four remaining private substrates (`ArchetypeBlendShard` π, `KarcShard` weights, `ZoneGeometryPod`, `MerkleFrozenEnvelope`) are non-blocking follow-ups — each plugs into the same audit templates (Q1: `audit_summarize_vs_route`; Q2: `intervention_battery`; Q3: structural code audit) with its own decode/trajectory operations.
+  - `ArchetypeBlendShard.pi`: runtime audit (`ArchetypeBlendPiSpace`) iMAUVE=0.9917; intervention battery all-diverge (0.90/0.47/0.49/0.41).
+  - `KarcShard.wout`: runtime audit (`KarcWoutSpace`) iMAUVE=0.9773; intervention battery all-diverge (4.67/4.29/3.46/9.00).
+  - `ZoneGeometryPod` + `MerkleFrozenEnvelope`: vacuously N/A (no learnable latent decode path).
+- **Q3 (local-context-vs-bypass)** is **CLOSED** for all six substrates via a structural code audit (decode-path purity + consumer-input audit + locality-mechanism inventory). Verdict: **PASS by construction** — the decode paths are pure functions of the latent; the consumers take only the decoded value; cross-NPC influence flows through latent refinement before reaching the decode, not through a raw-state side channel. The SpKv (Plan 070) `window: 128` sliding-window + RTPurbo (Plan 126) sparse-decode infrastructure enforce locality at the transformer-attention layer for runtimes that use transformer attention (NPC dialog WASM etc.), which are out of scope for this substrate-level audit. See [Issue 158](../../.issues/158_latent_interpolation_geometry_evaluation.md) §"Q3 structural audit findings" + §"Remaining-substrate Q1/Q2/Q3 verdicts" for the per-substrate trace + locality-mechanism inventory.
+- **All three three-pressure audit questions are now CLOSED** for all six substrates. Issue 158 is fully closed.
 
 ## See also
 

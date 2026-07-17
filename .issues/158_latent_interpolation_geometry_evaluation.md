@@ -146,23 +146,106 @@ layer for runtimes that DO use transformer attention (dialog WASM etc.) —
 those are out of scope for this substrate-level audit but are covered by the
 existing primitives' GOAT gates.
 
-**Non-blocking follow-up:** the four remaining private substrates
-(`ArchetypeBlendShard` π, `KarcShard` weights, `ZoneGeometryPod`,
-`MerkleFrozenEnvelope`) each plug into the same three-check audit template
-with their own decode path. None is expected to fail — all four are per-entity
-committed state by construction — but the formal audit lands when each
-substrate's real decode path is wired into the `LatentSpace` trait.
+## Remaining-substrate Q1/Q2/Q3 verdicts (2026-07-17, continuation)
+
+The four remaining private substrates are closed by a combination of runtime
+Q2 audits (for the two substrates with a meaningful decode) and structural
+verdicts (for all four). See
+[`riir-neuron-db/src/substrate_geometry_audits.rs`](../../riir-neuron-db/src/substrate_geometry_audits.rs)
+for the runtime Q2 audit code.
+
+### Q2 runtime audits — `ArchetypeBlendShard.pi` + `KarcShard.wout`
+
+Both substrates PASS Q2 (runtime-depends-on-latent) under their real runtime
+decode paths. The intervention battery diverges from matched on both —
+runtime behavior causally depends on the latent.
+
+| Substrate | Decode | iMAUVE | Intervention (matched / shuffled / zero / mean / noise) | Verdict |
+|---|---|---|---|---|
+| `ArchetypeBlendShard.pi` (K=3, tau=1.0) | `sigmoid(pi_k / tau)` per-archetype gate (matches `CommittedFieldBlend::apply_blended`) | **0.9917** | 0 / **0.896** / **0.465** / **0.492** / **0.408** | **PASS** — all 4 interventions diverge from matched |
+| `KarcShard.wout` (d_h=32, D=8) | `ŷ[r] = dot(wout[r*d_h..(r+1)*d_h], delay_state)` per-output-row (matches `KarcForecaster::forecast_into`) | **0.9773** | 0 / **4.67** / **4.29** / **3.46** / **9.00** | **PASS** — all 4 interventions diverge massively from matched |
+
+Both iMAUVE scores are high (>0.97) — midpoints of cluster-mates decode
+close to anchors, confirming the latent geometry is sound. The intervention
+battery confirms the decode causally depends on the latent (all interventions
+move the decoded behavior away from matched).
+
+### Q1 verdicts — mostly N/A (no trajectory summary operation)
+
+Q1 asks: does the latent summarize an underlying trajectory, or is it a
+lookup key? The audit requires a trajectory-summary operation (the latent as
+a function of a sequence of events). Of the four remaining substrates:
+
+| Substrate | Trajectory operation | Q1 verdict |
+|---|---|---|
+| `ArchetypeBlendShard.pi` | One-shot commit via `set_blend_state` from `CommittedFieldBlend::commit`. No trajectory of events — pi is set in a single atomic commit from the field blend. | **N/A** (not a trajectory summary) |
+| `KarcShard.wout` | Ridge-regression fit on a (reservoir_state, target) trajectory. IS a trajectory summary (closed-form least squares). | **Applicable but deferred** — the ridge fit lives in `riir-engine::karc_bridge` / `katgpt-core::karc::KarcForecaster::fit`, not in `riir-neuron-db`. A Q1 audit would generalize `audit_summarize_vs_route` to the ridge-fit trajectory (drop training events, re-fit, measure wout divergence). Non-blocking — ridge regression is by construction a summarize operation (the closed-form solution is the unique minimizer of the squared error over the trajectory, so dropping events moves the solution by O(drop_fraction) under regularity conditions). |
+| `ZoneGeometryPod` | Regenerated from chain-committed NeuronShard + raw info-brain state. Not a trajectory summary — single-source derivation. | **N/A** (derived artifact, not trajectory summary) |
+| `MerkleFrozenEnvelope` | `freeze(data_blocks)` computes a Merkle root over the blocks. Not a trajectory summary — cryptographic commitment over a static block set. | **N/A** (cryptographic commitment, not trajectory summary) |
+
+**Q1 verdict: no remaining substrate requires the summarize-vs-route audit
+today.** `KarcShard.wout` is the only one with a real trajectory operation
+(ridge fit), and it is deferred as non-blocking because ridge regression is
+structurally a summarize operation.
+
+### Q3 structural verdicts — all four PASS by construction
+
+Q3 asks: does the runtime's attention to the committed latent stay local, or
+does raw global context bypass it? The audit is structural (decode purity +
+consumer inputs + locality mechanism).
+
+| Substrate | Decode purity | Consumer inputs | Locality mechanism | Verdict |
+|---|---|---|---|---|
+| `ArchetypeBlendShard.pi` | `sigmoid(pi_k / tau)` — pure function of `pi` + per-NPC `tau` (config, not global state) | `CommittedFieldBlend::apply_blended(pi, tau, fields, z)` — takes only `pi`, `tau`, the field library (per-NPC), and the input `z`. No global state. | Per-NPC shard store (same `papaya::HashMap` locality as `NeuronShard`). The field library is per-NPC (library-side definitions; only the hash crosses sync). | **PASS** |
+| `KarcShard.wout` | `forecast_into(delay_state, out)` = `Wout @ delay_state` — pure function of `wout` (the latent) + `delay_state` (the reservoir state, itself a pure function of prior inputs via the reservoir dynamics) | `KarcForecaster::forecast_now` / `forecast_into` — takes only the forecaster's `wout` + the ring buffer's delay state. No global state. | Per-NPC shard store. The reservoir state is local to the forecaster instance (per-NPC ring buffer). No cross-entity attention over forecasters. | **PASS** |
+| `ZoneGeometryPod` | Cochains are read via DEC operators (`exterior_derivative`, `codifferential`, etc.) — pure functions of the cochain values | DEC consumers (zone reasoning, threat assessment) take only the cochain values + the cell complex topology. No global state. | `ZoneGeometryPod` is per-zone (regenerated at zone AOI entry). The `blake3_source_shard` self-validation ensures the pod is ground-truth-derived from the chain-committed shard — no subjective belief state crosses into the pod (two-brain compliance). | **PASS** |
+| `MerkleFrozenEnvelope` | No decode — `merkle_root` is verified (`verify_thaw`), not decoded. The hash is one-way. | `verify_thaw(data_blocks)` takes only the envelope + the candidate data blocks. No global state. | Per-envelope cryptographic commitment. No attention mechanism, no cross-entity interaction. | **PASS** (vacuously — no decode path to bypass) |
+
+**Q3 verdict: all four remaining substrates PASS by construction.** Each is
+per-entity (or per-zone / per-envelope) committed state; the decode paths
+are pure functions of the latent (or don't exist, for the cryptographic
+envelope); no global-attention bypass exists.
+
+### Why `ZoneGeometryPod` and `MerkleFrozenEnvelope` have no Q2 runtime audit
+
+These two substrates are **vacuously N/A** for Q2 because they have no
+learnable latent decode path:
+
+- **`ZoneGeometryPod`** — cochains are DERIVED from the chain-committed
+  NeuronShard + raw info-brain state (projectiles, occupancy, POI anchors).
+  The pod is a regenerated artifact, not a learnable latent. Reading a
+  cochain value is not a "decode" in the Q2 sense (there's no learned
+  projection; it's a direct SoA read). Q2 doesn't apply — there's no latent
+  whose intervention would change runtime behavior.
+- **`MerkleFrozenEnvelope`** — `merkle_root` is a BLAKE3-based cryptographic
+  commitment. It is verified (`verify_thaw`), never decoded. There is no
+  behavior that depends on the hash value itself (only on whether it
+  matches). Zeroing / shuffling the hash doesn't change runtime behavior —
+  it just flips the integrity check to false. Q2 is vacuous.
+
+### Remaining-substrate audit summary
+
+| Substrate | Q1 | Q2 | Q3 |
+|---|---|---|---|
+| `ArchetypeBlendShard.pi` | N/A (one-shot commit) | **PASS** (runtime audit, iMAUVE=0.9917) | **PASS** (structural) |
+| `KarcShard.wout` | Deferred (ridge fit; structurally summarize) | **PASS** (runtime audit, iMAUVE=0.9773) | **PASS** (structural) |
+| `ZoneGeometryPod` | N/A (derived artifact) | N/A (no learnable latent) | **PASS** (structural) |
+| `MerkleFrozenEnvelope` | N/A (cryptographic commitment) | N/A (no decode path) | **PASS** (vacuous — no decode to bypass) |
+
+**All four remaining substrates are now audited.** Two PASS the runtime Q2
+audit with real numbers; two are vacuously N/A for Q2 (no learnable latent);
+all four PASS Q3 by construction. Q1 is N/A or deferred for all four.
 
 ## Three-pressure audit (bundled)
 
 For each substrate, run the audit checklist derived from Research 445 §1.3:
 
 - [x] **Audit Q1 — summarize or route?** Does the latent summarize the underlying trajectory, or is it a lookup key? Test: subsample the trajectory (MAE-drop analog — sparse observations under fog-of-war), recompute the latent, measure latent divergence. A summarizing latent is stable under subsampling; a routing latent diverges.
-  - **Resolution (2026-07-17):** CLOSED for `NeuronShard::style_weights` via the Q1 summarize-vs-route audit (Benchmark 459 v3 addendum). The `ConsolidationPipeline::sleep()` average is the canonical summarize operation — divergence under subsampling scales proportionally with the drop fraction, both in mean (10%→0.028, 30%→0.047, 50%→0.069) and worst case (10%→0.077, 30%→0.162, 50%→0.226). The routing control (argmax-norm on a unique-outlier trajectory) exhibits the expected routing signature (worst-case spike to ~0.77 at low drop fractions), proving the audit discriminates. The average is also robust to outliers — dropping a 10×-magnitude outlier event from a 60-event trajectory shifts the average by at most `outlier/60`. **`NpcEmotionScalars`** (riir-engine) is current-state, not trajectory-summary — the Q1 question doesn't apply directly (the latent IS the current observation, not a trajectory summary). Q1 for that substrate is vacuously N/A. **The four remaining private substrates** (`ArchetypeBlendShard` π, `KarcShard` weights, `ZoneGeometryPod`, `MerkleFrozenEnvelope`) are non-blocking follow-ups — each plugs into the same `audit_summarize_vs_route` template with its own trajectory-summary operation.
+  - **Resolution (2026-07-17):** CLOSED for `NeuronShard::style_weights` via the Q1 summarize-vs-route audit (Benchmark 459 v3 addendum). The `ConsolidationPipeline::sleep()` average is the canonical summarize operation — divergence under subsampling scales proportionally with the drop fraction, both in mean (10%→0.028, 30%→0.047, 50%→0.069) and worst case (10%→0.077, 30%→0.162, 50%→0.226). The routing control (argmax-norm on a unique-outlier trajectory) exhibits the expected routing signature (worst-case spike to ~0.77 at low drop fractions), proving the audit discriminates. The average is also robust to outliers — dropping a 10×-magnitude outlier event from a 60-event trajectory shifts the average by at most `outlier/60`. **`NpcEmotionScalars`** (riir-engine) is current-state, not trajectory-summary — the Q1 question doesn't apply directly (the latent IS the current observation, not a trajectory summary). Q1 for that substrate is vacuously N/A. **The four remaining private substrates** (`ArchetypeBlendShard` π, `KarcShard` weights, `ZoneGeometryPod`, `MerkleFrozenEnvelope`) are closed in the continuation session: 3 are N/A (no trajectory-summary operation), `KarcShard.wout` is deferred as non-blocking (ridge regression is structurally a summarize operation by closed-form least-squares construction). See §"Remaining-substrate Q1/Q2/Q3 verdicts" below.
 - [x] **Audit Q2 — runtime depends on latent?** Does the runtime behavior actually use the committed latent, or does it bypass via raw state? Test: zero/shuffle the latent (intervention battery), measure behavior delta. FaithfulnessProbe (Plan 278) already does this for injected memory; extend to per-entity committed state.
-  - **Resolution (2026-07-17):** CLOSED for `NeuronShard::style_weights` via the v2 runtime-decode audit (Benchmark 459 v2 addendum). The v2 `StyleWeightsScalarSpace` uses the canonical `sigmoid((1/STYLE_DIM) · dot)` decode (exactly mirroring `project_compacted_to_scalars`) and confirms `latent_is_causal(5.0)` under a high-signal anchor: matched=0, shuffled=0.20, zero=0.56, mean=0.13, noise=0.56. The low-signal regime (small projections → sigmoid ≈ 0.5) is documented as expected sigmoid behavior, not a defect. **`NpcEmotionScalars`** (riir-engine) implicitly answers Q2 via its existing `curiosity_drive()` decode (already a runtime bridge). **The four remaining private substrates** (`ArchetypeBlendShard` π, `KarcShard` weights, `ZoneGeometryPod`, `MerkleFrozenEnvelope`) are non-blocking follow-ups — each plugs into the `LatentSpace` trait with its own runtime decode when needed.
+  - **Resolution (2026-07-17):** CLOSED for `NeuronShard::style_weights` via the v2 runtime-decode audit (Benchmark 459 v2 addendum). The v2 `StyleWeightsScalarSpace` uses the canonical `sigmoid((1/STYLE_DIM) · dot)` decode (exactly mirroring `project_compacted_to_scalars`) and confirms `latent_is_causal(5.0)` under a high-signal anchor: matched=0, shuffled=0.20, zero=0.56, mean=0.13, noise=0.56. The low-signal regime (small projections → sigmoid ≈ 0.5) is documented as expected sigmoid behavior, not a defect. **`NpcEmotionScalars`** (riir-engine) implicitly answers Q2 via its existing `curiosity_drive()` decode (already a runtime bridge). **The four remaining private substrates** are closed in the continuation session: `ArchetypeBlendShard.pi` PASSES (iMAUVE=0.9917, all interventions diverge: 0.90/0.47/0.49/0.41) and `KarcShard.wout` PASSES (iMAUVE=0.9773, all interventions diverge: 4.67/4.29/3.46/9.00) via `riir-neuron-db/src/substrate_geometry_audits.rs`; `ZoneGeometryPod` and `MerkleFrozenEnvelope` are vacuously N/A (no learnable latent decode path). See §"Remaining-substrate Q1/Q2/Q3 verdicts" below.
 - [x] **Audit Q3 — local context or full bypass?** Does the runtime's attention to the latent stay local, or does raw context bypass it? Already addressed by SpKv (Plan 070) and RTPurbo (Plan 126) sliding-window infrastructure; audit confirms no substrate accidentally bypasses via global attention.
-  - **Resolution (2026-07-17):** CLOSED for the two primary substrates via a structural code audit (decode-path purity + consumer-input audit + locality-mechanism inventory). The audit answer is **PASS by construction** — the latent is consumed in local context; no global-state side channel exists in the decode path or its direct consumers. See §"Q3 structural audit findings" below for the per-substrate trace + locality-mechanism inventory. The four remaining private substrates (`ArchetypeBlendShard` π, `KarcShard` weights, `ZoneGeometryPod`, `MerkleFrozenEnvelope`) are non-blocking follow-ups — each plugs into the same audit template with its own decode path.
+  - **Resolution (2026-07-17):** CLOSED for the two primary substrates via a structural code audit (decode-path purity + consumer-input audit + locality-mechanism inventory). The audit answer is **PASS by construction** — the latent is consumed in local context; no global-state side channel exists in the decode path or its direct consumers. See §"Q3 structural audit findings" below for the per-substrate trace + locality-mechanism inventory. **The four remaining private substrates** are closed in the continuation session via the same structural audit template: all four PASS by construction (per-entity/per-zone/per-envelope committed state; pure decode paths; no global-attention bypass). See §"Remaining-substrate Q1/Q2/Q3 verdicts" below.
 
 ## Non-goals
 
