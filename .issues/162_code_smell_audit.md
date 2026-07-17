@@ -168,9 +168,10 @@ verifying structural seams).
 
 - ~~`crates/katgpt-pruners/src/bandit.rs` (2178)~~ ✅ DONE (Issue 177): 14 `// ──` delimiters marked natural seams (Strategy / Stats / Pruner / Beta sampling / Environment / Session / SharedBanditStats / RandOpt). Same functional-split pattern as Issue 175. Split to `bandit/` module folder — mod.rs (1289) + environment.rs (162) + session.rs (499) + shared_stats.rs (172) + randopt.rs (101). All under 2048 ✓. PASS 43/43 `bandit::tests::*` + 197/197 katgpt-pruners under `bandit` + workspace sweep 6519/0.
 
-**Post-split growth / investigation (Issue 178, PENDING):**
+**Post-split growth / investigation (Issue 178, DONE):**
 
-- `crates/katgpt-speculative/src/dd_tree/mod.rs` (2125) + `tree_builder.rs` (2091) — these are post-Issue 165 split results; the mod.rs grew back over the soft limit. Investigate whether a second split is warranted.
+- ~~`crates/katgpt-speculative/src/dd_tree/mod.rs` (2125)~~ ✅ DONE (Issue 178 T1-T3): extracted Lodestar section (L148-421, 274 lines, `lodestar` feature) to `dd_tree/lodestar.rs`. mod.rs lands at 1866 — under 2048 ✓. PASS 305/305 katgpt-speculative under `lodestar` + 1079/1079 under `--all-features` + workspace sweep 6519/0. Other feature-gated sections (Belief-Drafter, RecFM, DendriticGate, AND-OR) kept in mod.rs — already under the limit after Lodestar extraction.
+- `crates/katgpt-speculative/src/dd_tree/tree_builder.rs` (2091) — **VERDICT: KEEP** (Issue 178 T4). Single `TreeBuilder` struct with tightly-coupled private state (`heap`, `chain_nodes`, etc.). Splitting methods across files would require making private fields `pub(super)` (encapsulation hit) — not justified for 43 lines of soft-limit reduction (2% over). File is well under the 3200 hard limit.
 
 **Confirmed skip (unchanged):**
 
