@@ -93,6 +93,7 @@ fn run_once(
         sdpa_gate,
         None,
         None,
+        None,
         elastic_override,
         #[cfg(feature = "gain_cost_halt")]
         None,

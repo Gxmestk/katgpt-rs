@@ -965,6 +965,7 @@ fn null_space(a: &mut [Vec<f32>], n_cols: usize) -> Vec<Vec<f32>> {
 
 #[cfg(test)]
 #[cfg(feature = "group_invariance_probe")]
+#[allow(clippy::needless_range_loop)]
 mod tests {
     use super::*;
 

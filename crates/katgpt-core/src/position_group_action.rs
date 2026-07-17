@@ -545,7 +545,7 @@ impl PositionGroupAction for GrapeMAction {
 // ── Tests ─────────────────────────────────────────────────────────
 
 #[cfg(test)]
-#[allow(clippy::float_cmp, clippy::needless_range_loop, clippy::non_snake_case)]
+#[allow(clippy::float_cmp, clippy::needless_range_loop, non_snake_case)]
 mod tests {
     use super::*;
 
