@@ -15,7 +15,7 @@ Prabhudesai & Geng compress text token sequences (L tokens) into a short sequenc
 
 **Distilled for katgpt-rs (modelless, inference-time):**
 
-The training machinery (text autoencoder Stage 1, MeanFlow generator Stage 2, 4-stage recipe) is **training-only → riir-train**. What survives the modelless filter as actionable is **not a primitive** but a **missing evaluation methodology**: we have no measurement of *interpolation quality* for our committed latent artifacts (HLA states, `ArchetypeBlendShard` π vectors, `KarcShard` style_weights, `NeuronShard` style_weights, `ZoneGeometryPod`, `MerkleFrozenEnvelope`-versioned states). We measure reconstruction (thaw produces bit-identical behavior — the rMAUVE analog). We do NOT measure whether the *midpoint* of two committed latents decodes to a coherent intermediate behavior (the iMAUVE analog). The paper's iMAUVE protocol + 5-way intervention probe battery (matched/shuffled/zero/mean/noise) is the modelless distillation — a generic, deterministic, latent-only evaluation primitive applicable to any of our committed latent substrates. Tracked in [`.issues/158_latent_interpolation_geometry_evaluation.md`](../.issues/158_latent_interpolation_geometry_evaluation.md).
+The training machinery (text autoencoder Stage 1, MeanFlow generator Stage 2, 4-stage recipe) is **training-only → riir-train**. What survives the modelless filter as actionable is **not a primitive** but a **missing evaluation methodology**: we have no measurement of *interpolation quality* for our committed latent artifacts (HLA states, `ArchetypeBlendShard` π vectors, `KarcShard` style_weights, `NeuronShard` style_weights, `ZoneGeometryPod`, `MerkleFrozenEnvelope`-versioned states). We measure reconstruction (thaw produces bit-identical behavior — the rMAUVE analog). We do NOT measure whether the *midpoint* of two committed latents decodes to a coherent intermediate behavior (the iMAUVE analog). The paper's iMAUVE protocol + 5-way intervention probe battery (matched/shuffled/zero/mean/noise) is the modelless distillation — a generic, deterministic, latent-only evaluation primitive applicable to any of our committed latent substrates. **CLOSED 2026-07-17** — primitive landed opt-in (`interpolation_geometry` feature) + three-pressure audit PASS for all six substrates; see [`.benchmarks/456_interpolation_geometry_goat.md`](../.benchmarks/456_interpolation_geometry_goat.md) (originally tracked as Issue 158, removed per noise rule).
 
 ---
 
@@ -223,7 +223,7 @@ Q2/Q3 fail → not Super-GOAT (see §2.6 table). Q1 partial, Q4 yes.
 ### Routing
 
 - **Research note (this file)** → `katgpt-rs/.research/445_*.md` (public).
-- **Issue** → `katgpt-rs/.issues/158_latent_interpolation_geometry_evaluation.md` — tracks the iMAUVE-for-committed-latents PoC: build the protocol as a katgpt-rs primitive, benchmark across the six substrates (or a representative subset), report which substrates have good vs bad interpolation geometry.
+- **Issue (CLOSED)** → originally `katgpt-rs/.issues/158_latent_interpolation_geometry_evaluation.md` — PoC landed opt-in (`interpolation_geometry` feature); three-pressure audit PASS for all six substrates. Issue removed 2026-07-17 per noise rule; verdict preserved in [`.benchmarks/456_interpolation_geometry_goat.md`](../.benchmarks/456_interpolation_geometry_goat.md) + [`.docs/04_calibration/interpolation_geometry.md`](../.docs/04_calibration/interpolation_geometry.md).
 - **No plan yet** — per AGENTS.md "Create issue at .issues for poc, proof, optimization or refactor task, do not create plan". The issue's PoC will decide whether a plan is warranted.
 - **No private guide** — not Super-GOAT.
 - **Training recipe → riir-train** (one-line redirect, no files created this session per skill rules).
@@ -276,7 +276,7 @@ The case for GOAT strengthens only if Issue 158's PoC finds a substrate with poo
 - `katgpt-rs/.research/325_Survey_Latent_Reasoning_Taxonomy_Unifying_Map.md` §7.3 — gist-token training → riir-train routing
 - `riir-ai/.research/158_per_npc_committed_personality_blend_guide.md` — committed personality runtime (entropy-relocation analog)
 - `riir-neuron-db/.research/298_nca_neighborhood_heal_structure_preserving.md` + `riir-neuron-db/.plans/316_*.md` — neighbor_heal (closest shard-interpolation cousin)
-- `katgpt-rs/.issues/158_latent_interpolation_geometry_evaluation.md` — PoC issue tracking this Gain
+- `katgpt-rs/.benchmarks/456_interpolation_geometry_goat.md` — GOAT bench for the closed PoC (originally Issue 158, removed 2026-07-17 per noise rule)
 
 ---
 

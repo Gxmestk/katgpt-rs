@@ -2,7 +2,7 @@
 
 > **Source:** Yifan Zhang, Zixiang Chen, Yifeng Liu, Zhen Qin, Huizhuo Yuan, Kangping Xu, Yang Yuan, Quanquan Gu, Andrew Chi-Chih Yao — *Group Representational Position Encoding* — [arXiv:2512.07805](https://arxiv.org/abs/2512.07805), ICLR 2026.
 > **Date:** 2026-07-17
-> **Status:** Active — verdict GAIN; three issues opened ([159](../.issues/159_grapem_rank2_rodrigues_exponential.md), [160](../.issues/160_position_group_action_trait.md), [161](../.issues/161_grape_ap_vector_similarity_gates.md))
+> **Status:** Done — verdict GAIN; all four actionable items CLOSED. Trilogy landed opt-in on `develop` — GRAPE-M Rodrigues (originally Issue 159, removed 2026-07-17 per noise rule; verdict in [Benchmark 457](../.benchmarks/457_grapem_rodrigues_goat.md)) + unified `PositionGroupAction` trait (Issue 160, [Benchmark 458](../.benchmarks/458_position_group_action_goat.md)) + GRAPE-AP vector gates (Issue 161, [Benchmark 459](../.benchmarks/459_grape_ap_vector_goat.md)) + GL(d+2) joint lift (Issue 163, [Benchmark 460](../.benchmarks/460_grape_joint_lift_goat.md)). All four promoted-deferred (no hot-path consumer today; re-evaluate when a transformer attention path lands).
 > **Related Research:** 028 (HLA — higher-order linear attention), 070 (GDN2 — diagonal decay), 086 (RTPurbo — pre-RoPE retrieval projection), 305 (phase rotation — UFO's per-channel 2D rotation), 314 (group invariance + f-divergences), 355 (LieFlow — `GroupAction` trait), 392 (attention dilution SSMax), 431 (Wall Attention — diagonal forget gates as RoPE replacement)
 > **Related Plans:** 173 (Wall Attention — `WallDiagonalGate`), 233 (attention matching / `PositionFreeCompactor`), 322 (phase rotation), 397 (HGA — RoPE-aware summarizer)
 > **Classification:** Public
@@ -164,19 +164,17 @@ Per §1.55 of the research skill — PASS requires "no actionable improvements".
 
 ---
 
-## 4. Actionable follow-ups (no plan opened — list only)
+## 4. Actionable follow-ups — ALL CLOSED (2026-07-17)
 
-Three issues opened (per AGENTS.md — "Create issue at .issues for poc, proof, optimization or refactor task, do not create plan"):
+Four issues opened (per AGENTS.md — "Create issue at .issues for poc, proof, optimization or refactor task, do not create plan"). All four landed opt-in on `develop`; promotion to default-on deferred pending a hot-path consumer. Issue files removed 2026-07-17 per noise rule; verdicts preserved in their GOAT benchmarks + git history.
 
-1. **[Issue 159](../.issues/159_grapem_rank2_rodrigues_exponential.md) — Closed-form rank-2 Rodrigues exponential** — new primitive in `katgpt-core`, gated `grapem_rodrigues` (opt-in). `O(d)` per application via 2 inner products. Generalizes `phase_rotation.rs` from scalar broadcast to arbitrary plane. **GOAT gate:** G1 bit-identical to materialized `expm(L)` on random `(a,b,ω)`; G2 latency `< 2× phase_rotation_gate_into`; G4 zero-alloc.
+1. **GRAPE-M rank-2 Rodrigues exponential** (originally Issue 159) — new primitive in `katgpt-core`, gated `grapem_rodrigues` (opt-in). `O(d)` per application via 2 inner products. Generalizes `phase_rotation.rs` from scalar broadcast to arbitrary plane. **GOAT gate:** G1 bit-identical to materialized `expm(L)` on random `(a,b,ω)`; G2 latency `< 2× phase_rotation_gate_into`; G4 zero-alloc. **Verdict:** PASS — see [Benchmark 457](../.benchmarks/457_grapem_rodrigues_goat.md).
 
-2. **[Issue 160](../.issues/160_position_group_action_trait.md) — Unified `PositionGroupAction` trait** — abstract trait in `katgpt-core`, gated `position_group_action` (opt-in). Subsuming `PositionFreeCompactor` (RoPE) + `WallDiagonalGate` (Wall) + future ALiBi/FoX under one `G(n) = exp(n·ω·L)` interface. Enables a unified `apply_phase_shift` / `un_rotate` API. **GOAT gate:** G3 no-regression (existing RoPE/Wall paths unchanged when feature off).
+2. **Unified `PositionGroupAction` trait** (originally Issue 160) — abstract trait in `katgpt-core`, gated `position_group_action` (opt-in). Subsuming `PositionFreeCompactor` (RoPE) + `WallDiagonalGate` (Wall) + future ALiBi/FoX under one `G(n) = exp(n·ω·L)` interface. Enables a unified `apply_phase_shift` / `un_rotate` API. **GOAT gate:** G3 no-regression (existing RoPE/Wall paths unchanged when feature off). **Verdict:** PASS — see [Benchmark 458](../.benchmarks/458_position_group_action_goat.md).
 
-3. **[Issue 161](../.issues/161_grape_ap_vector_similarity_gates.md) — GRAPE-AP vector-similarity gates** — extension of `WallDiagonalGate` to vector positional-embedding similarity `ψ_h(t,ℓ) = α·g(⟨p_t, R_ℓ·p_ℓ⟩/d)`, gated `grape_ap_vector` (opt-in). **GOAT gate:** G2 latency overhead `< 1.5×` Wall's scalar path; G4 alloc-free after scratch init.
+3. **GRAPE-AP vector-similarity gates** (originally Issue 161) — extension of `WallDiagonalGate` to vector positional-embedding similarity `ψ_h(t,ℓ) = α·g(⟨p_t, R_ℓ·p_ℓ⟩/d)`, gated `grape_ap_vector` (opt-in). **GOAT gate:** G2 latency overhead `< 1.5×` Wall's scalar path; G4 alloc-free after scratch init. **Verdict:** PASS — see [Benchmark 459](../.benchmarks/459_grape_ap_vector_goat.md).
 
-A fourth item (composition: `GL(d+2)` block-diagonal joint lift — Appendix E) is deferred until Issues 159 + 160 + 161 land; it has no standalone value without them.
-
-**Update 2026-07-17:** Issue 163 landed the joint lift (commit on `develop`). G1–G4 GOAT gate passed; promotion deferred. See [`.benchmarks/460`](../.benchmarks/460_grape_joint_lift_goat.md).
+4. **`GL(d+2)` block-diagonal joint lift** (Appendix E; originally Issue 163, deferred until 159+160+161 landed) — composes GRAPE-M rotary with GRAPE-A additive bias into a single block-diagonal action. Gated `grape_joint_lift` (opt-in, implies `grapem_rodrigues`). **GOAT gate:** G1 bit-identical to manual composition + relativity; G2 latency smoke; G4 alloc-free after `new`. **Verdict:** PASS — see [Benchmark 460](../.benchmarks/460_grape_joint_lift_goat.md).
 
 ### Cross-repo follow-ups (for downstream guides, not this note)
 

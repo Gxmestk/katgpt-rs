@@ -578,3 +578,94 @@ Phase 6 (DDTree argmax-of-marginal tuning) produced a **negative result** — th
 🔧 Feature flag: `gdn_tree_verify` — **opt-in** (complement to Plan 012's attention verify; only relevant for `QwenDeltaNet` / GDN-layer configs).
 
 📖 Plan: [`.plans/424_gdn_tree_verification_primitive.md`](../../.plans/424_gdn_tree_verification_primitive.md), Research: [`.research/407_Trees_from_Marginals_GDN_Tree_Verify.md`](../../.research/407_Trees_from_Marginals_GDN_Tree_Verify.md), Benchmark: [`.benchmarks/424_gdn_tree_verify_goat.md`](../../.benchmarks/424_gdn_tree_verify_goat.md), Paper: [arXiv:2607.06763](https://arxiv.org/abs/2607.06763)
+
+## 19. Interpolation Geometry — iMAUVE + Intervention Battery (Research 445)
+
+Modelless evaluation methodology for committed latent substrates — answers "does the *midpoint* of two committed latents decode to a coherent intermediate behavior?" Distilled from Prabhudesai & Geng, *Latent Thought Flows with Text Compression* (Jun 2026). The paper's headline metric **iMAUVE** (nearest-neighbor midpoint interpolation quality) predicts downstream generation quality with Pearson r=0.99; the **5-way intervention probe** (matched/shuffled/zero/mean/noise) extends Plan 278's binary FaithfulnessProbe to per-entity committed state.
+
+Generic `LatentSpace` trait abstracts over the **six committed-latent substrates** cataloged in Research 445 §2.6: HLA `[f32;8]`, `NeuronShard::style_weights[64]`, `ArchetypeBlendShard.pi`, `KarcShard.wout`, `ZoneGeometryPod`, `MerkleFrozenEnvelope`-versioned states. Pure evaluation methodology — NOT a training primitive.
+
+**Three-pressure audit (all six substrates PASS):**
+- **Q1 (summarize-vs-route)** — does the latent summarize the underlying trajectory, or is it a lookup key? Subsample the trajectory, recompute the latent, measure divergence. A summarizing latent is stable under subsampling.
+- **Q2 (runtime-depends-on-latent)** — does runtime behavior actually use the committed latent, or bypass via raw state? Zero/shuffle the latent (intervention battery), measure behavior delta.
+- **Q3 (local-context-vs-bypass)** — does the runtime's attention to the latent stay local? Structural code audit (decode-path purity + consumer-input audit + locality-mechanism inventory). SpKv (Plan 070) + RTPurbo (Plan 126) enforce locality at the transformer-attention layer.
+
+🔧 Feature flag: `interpolation_geometry` (in `katgpt-core`) — **opt-in**. Pure evaluation methodology, no runtime consumer.
+
+📖 Research: [`.research/445_Latent_Thought_Flows_Text_Compression.md`](../../.research/445_Latent_Thought_Flows_Text_Compression.md), Benchmark: [`.benchmarks/456_interpolation_geometry_goat.md`](../../.benchmarks/456_interpolation_geometry_goat.md), Doc: [`.docs/04_calibration/interpolation_geometry.md`](../04_calibration/interpolation_geometry.md), Source: [latent-thought.vercel.app](https://latent-thought.vercel.app) (Prabhudesai & Geng 2026 blog + MeanFlow arXiv:2601.22158)
+
+## 20. GRAPE-M Rank-2 Rodrigues Exponential (Research 446)
+
+Closed-form application of `exp(n·ω·L)` for an arbitrary rank-2 skew-symmetric generator `L = abᵀ − baᵀ ∈ so(d)` (arXiv:2512.07805 §2.3). Uses the Rodrigues formula `I + (sin s / s)·L + ((1 − cos s) / s²)·L²` with `s = ω·‖a∧b‖`, evaluated as `O(d)` work via two inner products `⟨a,x⟩`, `⟨b,x⟩` (no materialized `L` or `L²`).
+
+Generalizes `phase_rotation`'s scalar-broadcast 2D rotation (canonical basis special case where `a = e_i`, `b = e_{i+D/2}`). Pure modelless float arithmetic on a user-supplied plane `(a, b)`.
+
+| Gate | Target | Result | Verdict |
+|------|--------|--------|---------|
+| **G1** | Bit-identical to materialized `expm(L)` on random `(a,b,ω)` | 0.0 diff | ✅ PASS |
+| **G2** | Latency `< 2× phase_rotation_gate_into` | within bound | ✅ PASS |
+| **G4** | Alloc-free | 0 allocs | ✅ PASS |
+
+🔧 Feature flag: `grapem_rodrigues` (in `katgpt-core`) — **opt-in**. `Rank2Plane` retains `a, b` as `Box<[f32]>` (not just the 4 scalars) — mathematically necessary for the projections.
+
+📖 Research: [`.research/446_GRAPE_Group_Representational_Position_Encoding.md`](../../.research/446_GRAPE_Group_Representational_Position_Encoding.md), Benchmark: [`.benchmarks/457_grapem_rodrigues_goat.md`](../../.benchmarks/457_grapem_rodrigues_goat.md), Paper: [arXiv:2512.07805](https://arxiv.org/abs/2512.07805)
+
+## 21. Unified PositionGroupAction Trait (Research 446)
+
+Abstract trait unifying five position-encoding families under one `G(n) = exp(n·ω·L)` interface (arXiv:2512.07805 §2.2 + §4.1):
+
+- **RoPE** (`SO(d)` multiplicative action) — wraps `PositionFreeCompactor`'s math
+- **ALiBi / FoX / Wall** (`GL(d+2)` unipotent lift — additive bias family)
+- **NoPE** (trivial `L = 0`)
+- **GRAPE-M** (rotary generalization — wraps `Rank2Plane`)
+
+All obey the exact relative law `G(t−s) = G(s)^T·G(t)`, enabling position-encoding-agnostic tooling (KV compaction, attention matching). Hot-path code keeps using `PositionFreeCompactor` / `WallDiagonalGate` directly; the trait is for cold-path interop.
+
+| Gate | Target | Result | Verdict |
+|------|--------|--------|---------|
+| **G3** | No-regression — existing RoPE/Wall paths unchanged when feature off | bit-identical | ✅ PASS |
+
+🔧 Feature flag: `position_group_action` (in `katgpt-core`, implies `grapem_rodrigues`) — **opt-in**. 19 unit tests in-crate.
+
+📖 Research: [`.research/446_GRAPE_Group_Representational_Position_Encoding.md`](../../.research/446_GRAPE_Group_Representational_Position_Encoding.md), Benchmark: [`.benchmarks/458_position_group_action_goat.md`](../../.benchmarks/458_position_group_action_goat.md), Paper: [arXiv:2512.07805](https://arxiv.org/abs/2512.07805)
+
+## 22. GRAPE-AP Vector-Similarity Gates (Research 446)
+
+Content-aware extension of Wall Attention's scalar prefix-sum gates (arXiv:2512.07805 §5). For each head `h` and decoding step `t`, the bias from key position `j` to query `t` is a path integral of edge potentials:
+
+```
+b_h(t, j) = Σ_{ℓ=j+1}^{t} ψ_h(t, ℓ)
+ψ_h(t, ℓ) = α · g(⟨p_t, R_ℓ · p_ℓ⟩ / d)
+```
+
+with `g = log_sigmoid` (the paper's choice) and `R_ℓ = exp(ℓ·J)` a cached rotation schedule. Tokens whose positional embedding matches the query's decay slower. **Wall is the scalar special case** (endpoint-independent embeddings).
+
+| Gate | Target | Result | Verdict |
+|------|--------|--------|---------|
+| **G2** | Latency `< 1.5×` Wall's scalar path | within bound | ✅ PASS |
+| **G4** | Alloc-free after scratch init | 0 steady-state allocs | ✅ PASS |
+| **G5** | Direction-check per paper's 1/d normalization | verified | ✅ PASS |
+
+🔧 Feature flag: `grape_ap_vector` (in `katgpt-core`) — **opt-in**. 15 unit tests in-crate.
+
+📖 Research: [`.research/446_GRAPE_Group_Representational_Position_Encoding.md`](../../.research/446_GRAPE_Group_Representational_Position_Encoding.md), Benchmark: [`.benchmarks/459_grape_ap_vector_goat.md`](../../.benchmarks/459_grape_ap_vector_goat.md), Paper: [arXiv:2512.07805](https://arxiv.org/abs/2512.07805)
+
+## 23. GRAPE Joint Lift — GL(d+2) Block-Diagonal Composition (Research 446)
+
+Composes rotary (GRAPE-M) + additive (GRAPE-A) into a single block-diagonal group action per Appendix E of arXiv:2512.07805. One-pass `score_into`:
+
+```
+score(q, k) = q^T · exp(m · ω_rot · L) · k / √d  +  m · ω_add · (softplus(v · q / √d) + softplus(u · k / √d))
+```
+
+Closes the GRAPE composition story: today Wall *replaces* RoPE in our stack; this primitive proves they *compose* into a single one-parameter subgroup of `GL(d+2)` while preserving the exact relative law. The decoupled `omega_rot` / `omega_add` is a strict generalization of the paper's shared `ω`.
+
+| Gate | Target | Result | Verdict |
+|------|--------|--------|---------|
+| **G1** | Bit-identical to manual composition + relativity law | 0.0 diff | ✅ PASS |
+| **G2** | Latency smoke | within bound | ✅ PASS |
+| **G4** | Alloc-free after `new` | 0 steady-state allocs | ✅ PASS |
+
+🔧 Feature flag: `grape_joint_lift` (in `katgpt-core`, implies `grapem_rodrigues`) — **opt-in**.
+
+📖 Research: [`.research/446_GRAPE_Group_Representational_Position_Encoding.md`](../../.research/446_GRAPE_Group_Representational_Position_Encoding.md), Benchmark: [`.benchmarks/460_grape_joint_lift_goat.md`](../../.benchmarks/460_grape_joint_lift_goat.md), Paper: [arXiv:2512.07805](https://arxiv.org/abs/2512.07805)

@@ -1,6 +1,6 @@
 # Interpolation Geometry — iMAUVE + 5-Way Intervention Probe
 
-> **Source:** [Issue 158](../../.issues/158_latent_interpolation_geometry_evaluation.md),
+> **Source:** [Benchmark 456](../../.benchmarks/456_interpolation_geometry_goat.md),
 > [Research 445](../../.research/445_Latent_Thought_Flows_Text_Compression.md) —
 > Prabhudesai & Geng, *Latent Thought Flows with Text Compression* (Jun 2, 2026).
 > **Module:** `katgpt_core::interpolation_geometry` (feature `interpolation_geometry`, opt-in).
@@ -148,7 +148,7 @@ with their real decode paths — see the cross-references below.
 
 For each substrate, the audit checks whether the latent summarizes-vs-routes,
 whether the runtime depends on it, and whether context stays local. These
-are documented in [Issue 158](../../.issues/158_latent_interpolation_geometry_evaluation.md)
+are documented in [Benchmark 456](../../.benchmarks/456_interpolation_geometry_goat.md) (originally filed as Issue 158, removed 2026-07-17 per noise rule; verdict preserved in git history)
 §"Three-pressure audit". The audit requires the real decode path.
 
 **Status (2026-07-17):**
@@ -159,8 +159,8 @@ are documented in [Issue 158](../../.issues/158_latent_interpolation_geometry_ev
   - `ArchetypeBlendShard.pi`: runtime audit (`ArchetypeBlendPiSpace`) iMAUVE=0.9917; intervention battery all-diverge (0.90/0.47/0.49/0.41).
   - `KarcShard.wout`: runtime audit (`KarcWoutSpace`) iMAUVE=0.9773; intervention battery all-diverge (4.67/4.29/3.46/9.00).
   - `ZoneGeometryPod` + `MerkleFrozenEnvelope`: vacuously N/A (no learnable latent decode path).
-- **Q3 (local-context-vs-bypass)** is **CLOSED** for all six substrates via a structural code audit (decode-path purity + consumer-input audit + locality-mechanism inventory). Verdict: **PASS by construction** — the decode paths are pure functions of the latent; the consumers take only the decoded value; cross-NPC influence flows through latent refinement before reaching the decode, not through a raw-state side channel. The SpKv (Plan 070) `window: 128` sliding-window + RTPurbo (Plan 126) sparse-decode infrastructure enforce locality at the transformer-attention layer for runtimes that use transformer attention (NPC dialog WASM etc.), which are out of scope for this substrate-level audit. See [Issue 158](../../.issues/158_latent_interpolation_geometry_evaluation.md) §"Q3 structural audit findings" + §"Remaining-substrate Q1/Q2/Q3 verdicts" for the per-substrate trace + locality-mechanism inventory.
-- **All three three-pressure audit questions are now CLOSED** for all six substrates. Issue 158 is fully closed.
+- **Q3 (local-context-vs-bypass)** is **CLOSED** for all six substrates via a structural code audit (decode-path purity + consumer-input audit + locality-mechanism inventory). Verdict: **PASS by construction** — the decode paths are pure functions of the latent; the consumers take only the decoded value; cross-NPC influence flows through latent refinement before reaching the decode, not through a raw-state side channel. The SpKv (Plan 070) `window: 128` sliding-window + RTPurbo (Plan 126) sparse-decode infrastructure enforce locality at the transformer-attention layer for runtimes that use transformer attention (NPC dialog WASM etc.), which are out of scope for this substrate-level audit. Per-substrate trace + locality-mechanism inventory preserved in git history (originally Issue 158 §"Q3 structural audit findings" + §"Remaining-substrate Q1/Q2/Q3 verdicts"; issue removed 2026-07-17 per noise rule).
+- **All three three-pressure audit questions are now CLOSED** for all six substrates. Issue 158 is fully closed (removed 2026-07-17 per noise rule; verdict preserved in git history + [Benchmark 456](../../.benchmarks/456_interpolation_geometry_goat.md)).
 
 ## See also
 
