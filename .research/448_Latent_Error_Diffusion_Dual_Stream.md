@@ -236,6 +236,54 @@ If POC refutes the accuracy claim but architectural coverage holds:
 
 ---
 
+## 7. Phase 1 PoC Addendum (recorded honestly per §3.6, 2026-07-17)
+
+Plan 456 Phase 1 (scaffold) landed in `riir-ai/crates/riir-poc/src/latent_ed_poc.rs`.
+The harness works end-to-end — the bench prints the verdict table, computes
+G7–G10, all 10 unit tests pass. **However, the headline finding is a
+mechanism bug, not a paper refutation:**
+
+| Competitor | Accuracy | Seed var | Latency (ns/step) |
+|---|---|---|---|
+| Latent-ED | 0.5322 | 0.00057 | 10038.5 |
+| Frozen baseline | 0.5322 | 0.00057 | 8919.4 |
+| TILR refinement | 0.4730 | 0.00456 | 1221.9 |
+
+- **G7 FAILS decisively:** Latent-ED's accuracy is **bit-identical** to the
+  Frozen baseline. The ED update has zero effect on chosen actions.
+- **G8 "PASS" is vacuous:** TILR is *worse* than Frozen (47.3% vs 53.2%)
+  because its rank-4 invariant-subspace projection is too restrictive for
+  the toy task. Beating TILR by 5.9pp while tied with Frozen is not a gain.
+- **G9 PASSes legitimately:** ED's seed-variance (0.00057) is much lower
+  than TILR's (0.00456) — but this is because ED is effectively frozen.
+- **G10 PASSes legitimately:** no late-phase drift — but again, trivially,
+  because ED is frozen.
+
+**Root cause (preliminary):** The forward pass fully overwrites `(p, n)`
+with sigmoid outputs every tick (`self.p[h] = sigmoid(...)`). The tiny ED
+delta (`dp ≈ η·p·σ'(Z)·R_h ≈ 0.0006` per tick) is below the forward pass's
+noise floor (next tick's `temp_p = p·W_pp ≈ 12`, so sigmoid(2) ≈ 0.88
+regardless of the ED contribution).
+
+**The paper's ED rule modifies weights (which persist); my latent translation
+modifies activations (which get overwritten).** This is a reframing bug,
+not a paper refutation. Three reframing options recorded in Plan 456's
+Phase 1 finding:
+
+- **Option A:** Additive bias — `(p, n)` is a persistent bias added to the
+  forward pass, not overwritten by it.
+- **Option B:** Separate belief state — ED modifies a state that gates action
+  selection directly, bypassing the recurrent dynamics.
+- **Option C:** State-only — drop the recurrent forward entirely; `(p, n)` IS
+  the belief state, evolved only by the ED rule.
+
+**Verdict unchanged:** Gain (pending POC) — but the POC is now pending the
+Phase 2 reframing decision, not just the Phase 3 quality race. If none of
+Options A/B/C produce a working mechanism, the verdict drops to **Pass**
+(the latent reframing doesn't hold up under empirical scrutiny) per T4.5.
+
+---
+
 ## TL;DR
 
 Latent reframing of a biologically plausible *training* rule (Error Diffusion under Dale's principle) into a modelless runtime belief-update primitive. The dual-stream `(p, n)` latent state + four committed non-negative projection matrices + modulo-routed per-action error + local Hebbian-style update is **§3.5 path 3** (latent-space correction), not training. Verdict: **Gain (pending POC)**. Plan 456 ships the defend-wrong PoC in `riir-ai/crates/riir-poc/` per §3.6 — three competitors (Latent-ED vs Frozen vs TILR) on a K-action toy decision task. If POC shows ≥5 pp accuracy gain at ≤2× latency → promote to GOAT + re-open Super-GOAT gate (×TILR fusion is the strongest Super-GOAT angle). If POC refutes → keep open primitive opt-in, record honestly. The user's "gain around accuracy" intuition is the right hypothesis to test; the verdict on whether it holds is the PoC's job, not this note's.

@@ -4,7 +4,7 @@
 **Research:** [katgpt-rs/.research/448_Latent_Error_Diffusion_Dual_Stream.md](../.research/448_Latent_Error_Diffusion_Dual_Stream.md)
 **Source paper:** [arxiv 2606.31700](https://arxiv.org/abs/2606.31700) — Yamada et al., *Diffusing Blame: Task-Dependent Credit Assignment in Biologically Plausible Dual-Stream Networks* (Sakana AI, 30 Jun 2026)
 **Target:** `riir-ai/crates/riir-poc/` (defend-wrong PoC per research skill §3.6)
-**Status:** Active — Phase 1 (POC scaffold)
+**Status:** Active — Phase 1 DONE (scaffold + harness); Phase 2 BLOCKED on reframing decision (see Phase 1 preliminary finding).
 
 ---
 
@@ -27,16 +27,66 @@ The PoC prints a verdict table. If Latent-ED beats TILR by ≥5 pp accuracy at �
 
 ### Tasks
 
-- [ ] **T1.1** Create `riir-ai/crates/riir-poc/src/latent_ed_poc.rs` — three competitors + toy domain + verdict printer
-- [ ] **T1.2** Implement `LatentEdState` — dual-stream `(p, n)` latent state, four non-negative projection matrices `W_pp, W_np, W_nn, W_pn`, modulo routing matrix `M`, layer-specific sigmoid width α
-- [ ] **T1.3** Implement `LatentEdState::step()` — forward pass (dual-stream sigmoid update) + action selection (argmax, never softmax per AGENTS.md) + ED update (local Hebbian-style, no backprop)
-- [ ] **T1.4** Implement `FrozenBaseline` — same dual-stream state, same forward pass, **no ED update** (pure projection). This is the no-adaptation control.
-- [ ] **T1.5** Implement `TilrCompetitor` — wrap Plan 425's `tilr_refine_into` as the runtime belief-update mechanism (the closest shipped cousin)
-- [ ] **T1.6** Implement `toy_decision_task(seed)` — K=10 action decision task with controlled nonlinear reward (matches paper's 10-way MNIST/CIFAR setup). Reward = `sin(action · latent · direction) + noise`. 1000-step horizon.
-- [ ] **T1.7** Implement `verdict_table(seeds)` — runs all 3 competitors × 5 seeds × 1000 steps, prints accuracy / latency / variance table
-- [ ] **T1.8** Add `latent_ed_poc` to `riir-poc/Cargo.toml` `[[bench]]` section + `src/lib.rs` re-export
+- [x] **T1.1** Create `riir-ai/crates/riir-poc/src/latent_ed_poc.rs` — three competitors + toy domain + verdict printer
+- [x] **T1.2** Implement `LatentEdState` — dual-stream `(p, n)` latent state, four non-negative projection matrices `W_pp, W_np, W_nn, W_pn`, modulo routing matrix `M`, layer-specific sigmoid width α
+- [x] **T1.3** Implement `LatentEdState::step()` — forward pass (dual-stream sigmoid update) + action selection (argmax, never softmax per AGENTS.md) + ED update (local Hebbian-style, no backprop)
+- [x] **T1.4** Implement `FrozenBaseline` — same dual-stream state, same forward pass, **no ED update** (pure projection). This is the no-adaptation control.
+- [x] **T1.5** Implement `TilrCompetitor` — wrap Plan 425's `tilr_refine_into` as the runtime belief-update mechanism (the closest shipped cousin)
+- [x] **T1.6** Implement `toy_decision_task(seed)` — K=10 action decision task with controlled nonlinear reward (matches paper's 10-way MNIST/CIFAR setup). Reward = `sin(action · latent · direction) + noise`. 1000-step horizon.
+- [x] **T1.7** Implement `verdict_table(seeds)` — runs all 3 competitors × 5 seeds × 1000 steps, prints accuracy / latency / variance table
+- [x] **T1.8** Add `latent_ed_poc` to `riir-poc/Cargo.toml` `[[bench]]` section + `src/lib.rs` re-export
 
-**Verification:** `cargo bench -p riir-poc --bench latent_ed_poc -- --nocapture` prints the verdict table.
+**Verification:** `cargo bench -p riir-poc --bench latent_ed_poc -- --nocapture` prints the verdict table. ✅ Verified — bench runs, prints the table, computes G7–G10.
+
+### Phase 1 preliminary finding (recorded honestly per §3.6)
+
+The scaffold runs end-to-end on all three competitors. The verdict table
+prints. **However, G7 FAILS decisively in a revealing way**: Latent-ED's
+accuracy is **bit-identical** to the Frozen baseline (0.5322 vs 0.5322,
+same seed variance) across all 5 seeds. The ED update is having **zero
+effect** on chosen actions.
+
+**Root cause analysis (preliminary):** The forward pass fully overwrites
+`(p, n)` with sigmoid outputs every tick:
+```rust
+self.p[h] = sigmoid((p·W_pp − n·W_np + x) / α_p)
+```
+The tiny ED delta (`dp ≈ η·p·σ'(Z)·R_h ≈ 0.0006` per tick) is far below
+the forward pass's noise floor — next tick's `temp_p = p·W_pp` is dominated
+by the W_pp matrix values (`~0.375 per entry × 64 entries ≈ 12`), so
+sigmoid(12/6) ≈ 0.88 regardless of the ED contribution. The ED update is
+washed out by the recurrent dynamics.
+
+**This is a reframing bug, not a paper refutation.** The paper's ED rule
+modifies **weights** (which persist across forward passes). My latent
+translation modifies the **activations** (which get overwritten by the
+next forward pass). The correct latent reframing is one of:
+
+- **Option A (additive bias):** `(p, n)` is a persistent bias added to
+  the forward pass, not overwritten by it. `p_new = sigmoid(...) +
+  accumulated_ed_delta`.
+- **Option B (separate belief state):** ED modifies a separate
+  `belief_state` that gates action selection directly, bypassing the
+  recurrent dynamics.
+- **Option C (state-only):** Drop the recurrent forward entirely. `(p, n)`
+  IS the belief state, evolved only by the ED rule. W_* projections
+  become a one-time input→initial-state transform.
+
+**Phase 2 must pick one option and re-implement before the mechanism gates
+G1–G6 are meaningful.** The current scaffold proves the evaluation harness
+works (the table renders, the gates compute, the smoke test passes); the
+mechanism itself needs the reframing fix.
+
+Notably, TILR (which DOES update a persistent state via `tilr_refine_apply`)
+achieves 47.3% accuracy — worse than Frozen's 53.2%. This is because TILR's
+invariant-subspace projection (rank 4) is too restrictive for this toy
+task's signal structure. The headline gate G8's current PASS (ED beats TILR
+by 5.9pp) is therefore **vacuous** — both ED and TILR are broken in
+*different* ways. After the Phase 2 reframing, G7–G10 must be re-run.
+
+**Verdict: Phase 1 is delivered (scaffold + harness work). Phase 2 (the
+mechanism gates) is BLOCKED on the reframing decision (Option A/B/C).**
+The user should decide which option to pursue before Phase 2 starts.
 
 ---
 
