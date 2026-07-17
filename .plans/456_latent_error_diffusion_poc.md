@@ -4,7 +4,7 @@
 **Research:** [katgpt-rs/.research/448_Latent_Error_Diffusion_Dual_Stream.md](../.research/448_Latent_Error_Diffusion_Dual_Stream.md)
 **Source paper:** [arxiv 2606.31700](https://arxiv.org/abs/2606.31700) — Yamada et al., *Diffusing Blame: Task-Dependent Credit Assignment in Biologically Plausible Dual-Stream Networks* (Sakana AI, 30 Jun 2026)
 **Target:** `riir-ai/crates/riir-poc/` (defend-wrong PoC per research skill §3.6)
-**Status:** Active — Phase 1 DONE (scaffold + harness); Phase 2 BLOCKED on reframing decision (see Phase 1 preliminary finding).
+**Status:** Phase 1 DONE (scaffold + harness); Phase 2 DONE (Option C refactor + G1–G6 mechanism gates all PASS); Phase 3 DONE (G7 FAILS, G8–G10 PASS) → Phase 4 verdict: Research 448 revised to **Pass** (modelless-correct but task-useless; honest negative result).
 
 ---
 
@@ -92,16 +92,48 @@ The user should decide which option to pursue before Phase 2 starts.
 
 ## Phase 2 — Mechanism-Level Gates (modelless correctness)
 
+### Option C Refactor (prerequisite, landed 2026-07-18)
+
+Per user decision (2026-07-18): Option C — make `(p, n)` persist across
+steps instead of being recomputed. The Phase 1 reframing bug was that the
+recurrent forward pass overwrote the ED delta each tick. Option C resolves
+this by construction: drop the recurrent forward entirely; `(p, n)` is
+the persistent belief state, evolved only by the ED rule; `W_*`
+projections become a one-time input→initial-state transform (applied
+lazily on the first `forward()` call after `reset()`).
+
+**Changes landed** (`riir-ai/crates/riir-poc/src/latent_ed_poc.rs`):
+
+- Removed unused state fields `z_p, z_n, sigma_p, sigma_n, temp_p, temp_n`
+  (no recurrent forward → no pre-activation cache needed).
+- Added `bootstrapped: bool` flag controlling the one-time W_* transform.
+- `forward()` is now **read-only** over `(p, n)` post-bootstrap: it only
+  selects actions via argmax against the committed direction vectors.
+- New private `bootstrap()` method runs the W_* projection once using
+  stack-local `[f32; H]` scratch (zero heap allocation).
+- `apply_ed_update()` computes the drive gate as `p * (1 − p)` directly
+  (treating the bounded `p` AS the σ output, which it is by construction).
+- Added two new invariant tests: `latent_ed_forward_is_read_only_post_bootstrap`
+  and `frozen_baseline_matches_latent_ed_pre_update`.
+
 ### Tasks
 
-- [ ] **T2.1** **G1 — Update is local (no backprop)** — assert `LatentEdState::step()` allocates 0 bytes (CountingAllocator) and contains no autograd / reverse-mode AD. The update rule is `Δp += η · p_old · U_p` etc. — pure forward arithmetic.
-- [ ] **T2.2** **G2 — No weight mutation** — assert the four `W_*` projection matrices are bit-identical before and after 1000 `step()` calls. Only `(p, n)` latent state mutates.
-- [ ] **T2.3** **G3 — Sigmoid bounded** — assert all entries of `(p, n)` stay in `[0, 1]` after every step (wide sigmoid + Dale's sign routing bounds the state by construction).
-- [ ] **T2.4** **G4 — Argmax, not softmax** — assert action selection uses `argmax_c (p · d_c − n · d_c)`, never softmax (AGENTS.md mandate).
-- [ ] **T2.5** **G5 — Modulo routing is deterministic** — assert `M[h,c] = (h mod C == c)` and that the routing matrix is fixed across all steps (not learned).
-- [ ] **T2.6** **G6 — E/I balance tracking** — log `||p|| / ||n||` at every 100 steps; assert it stays in `[0.5, 2.0]` (no collapse to all-excitatory or all-inhibitory). If violated → record as honest failure mode per §3.6.
+- [x] **T2.1** **G1 — Update is local (no backprop)** — assert steady-state `forward()` + `apply_ed_update()` allocate 0 bytes (verified via Vec capacity stability across HORIZON=1000 steps; CountingAllocator unavailable because `katgpt-rs` dep claims `#[global_allocator]`, so capacity stability + structural inspection form the proof). **PASS.**
+- [x] **T2.2** **G2 — No weight mutation** — BLAKE3 hash of the four `W_*` matrices is bit-identical before and after 1000 `step()` calls. **PASS.**
+- [x] **T2.3** **G3 — Sigmoid bounded** — all entries of `(p, n)` stay in `[0, 1]` after every step (spot-checked every 100 ticks across HORIZON, including adversarial saturating error magnitudes). **PASS.**
+- [x] **T2.4** **G4 — Argmax, not softmax** — action selection returns binary `a ∈ {0, 1}` across 200 steps × 10 channels; both values appear (no stuck-at degeneracy). **PASS.**
+- [x] **T2.5** **G5 — Modulo routing is deterministic** — routing identity `R_h = error[h % C]` verified for all (h, h') pairs sharing a channel. **PASS** (holds by construction — modulo is a pure function).
+- [x] **T2.6** **G6 — E/I balance tracking** — `‖p‖ / ‖n‖` stays in `[0.5, 2.0]` sampled every 50 ticks across HORIZON; recorded balance history (every 100 steps) all in range. **PASS.**
+- [x] **T2.7** Integration harness: all three competitors complete a full run without panic (`full_run_harness_all_three_competitors_complete`). **PASS.**
 
 **Verification:** `cargo test -p riir-poc --test latent_ed_mechanism_gates`
+→ 7 passed; 0 failed. ✅ Verified.
+
+**Mechanism verdict:** G1–G6 ALL PASS. The latent-ED rule is modelless
+and correct at the mechanism level — zero-alloc hot path, no weight
+mutation, bounded state, binary argmax, deterministic modulo routing,
+E/I balance stable. This says nothing about whether the rule is *useful*
+(Phase 3 settles that).
 
 ---
 
@@ -109,13 +141,38 @@ The user should decide which option to pursue before Phase 2 starts.
 
 ### Tasks
 
-- [ ] **T3.1** **G7 — Accuracy vs Frozen baseline** — Latent-ED accuracy ≥ Frozen baseline accuracy + 10 pp (the no-adaptation control should be easy to beat; if not, the ED rule is broken)
-- [ ] **T3.2** **G8 — Accuracy vs TILR (the headline gate)** — Latent-ED accuracy ≥ TILR accuracy + 5 pp **OR** Latent-ED latency ≤ TILR latency × 0.5 at parity accuracy. Either branch is a GOAT-grade result; both failing is a Gain-only result.
-- [ ] **T3.3** **G9 — Variance check** — Latent-ED seed-variance ≤ 1.5 × TILR seed-variance. Paper reports ED-PPO has higher variance than BP-PPO; the latent analog should NOT inherit this. If it does → mandatory ×TILR fusion (use TILR's invariant-subspace gate as the postsynaptic drive gate) before any promotion.
-- [ ] **T3.4** **G10 — Stability over horizon** — Latent-ED accuracy in ticks [900..1000] ≥ accuracy in ticks [100..200] (no catastrophic forgetting / divergence over the horizon).
-- [ ] **T3.5** Run all gates with `CARGO_TARGET_DIR=/tmp/latent_ed_poc` per AGENTS.md, clean up when done.
+- [x] **T3.1** **G7 — Accuracy vs Frozen baseline** — **FAIL ❌**. Latent-ED 0.5312 vs Frozen 0.5363 (−0.51 pp). The Option C refactor fixed the Phase 1 "ED has zero effect" bug (the two competitors are no longer bit-identical), but the ED rule is actively *hurting* accuracy by a small margin — the Hebbian update accumulates in a direction that does not align with the task's reward structure.
+- [x] **T3.2** **G8 — Accuracy vs TILR (the headline gate)** — **PASS ✅ (vacuous)**. Latent-ED 0.5312 vs TILR 0.4730 (+5.83 pp). **But this is vacuous**: TILR is broken on this toy task (47.30% < Frozen's 53.63% — TILR's rank-4 invariant-subspace projection is too restrictive for the task's signal structure). Beating a broken competitor proves nothing.
+- [x] **T3.3** **G9 — Variance check** — **PASS ✅**. Latent-ED seed-variance 0.00032 vs TILR 0.00456 (ratio 0.07×, well under the 1.5× threshold). The paper reported ED-PPO has higher variance than BP-PPO; the latent analog does NOT inherit this.
+- [x] **T3.4** **G10 — Stability over horizon** — **PASS ✅**. Late accuracy (ticks 900–1000) = 0.5228 ≥ early accuracy (ticks 100–200) = 0.5022. No catastrophic forgetting / divergence over the horizon. The ED-driven state evolution is stable, just not *useful*.
+- [x] **T3.5** Run all gates with `CARGO_TARGET_DIR=/tmp/latent_ed_poc_phase2` per AGENTS.md, clean up when done.
 
-**Verification:** verdict table from T1.7 + G7–G10 assertions. Print honestly — PASS or FAIL with the numbers.
+**Verification:** verdict table from T1.7 + G7–G10 assertions. Printed honestly — G7 FAIL, G8–G10 PASS. ✅ Verified (bench re-run confirms stable numbers).
+
+### Phase 3 honest finding
+
+The Option C refactor **succeeded mechanically** (ED now has measurable
+effect; Phase 1's bit-identical-to-Frozen bug is gone) but **failed
+empirically** (the effect is slightly negative: −0.51 pp vs Frozen). The
+latent-ED rule, even with correct persistence semantics, does not produce
+a useful belief update on this K=10 toy task. The local Hebbian update
+`Δp ∝ p · σ'(Z) · R_h` accumulates, but accumulates in a direction that
+*reduces* accuracy relative to the fixed bootstrap state.
+
+**This is an honest negative result per §3.6.** The mechanism is
+modelless-correct (G1–G6 all PASS) but task-useless (G7 FAILS). The
+defend-wrong PoC has done its job: it defended the hypothesis as hard
+as the modelless reframing allows (Option C is the most faithful
+semantics), and the hypothesis failed the quality bar.
+
+Notably, TILR — the *other* belief-update competitor — also underperforms
+Frozen (47.30% vs 53.63%). This suggests the toy K=10 task may not be a
+favorable domain for *any* runtime belief-update mechanism: the reward
+signal structure rewards the fixed bootstrap projection more than any
+error-driven refinement. This is a property of the task, not the ED rule
+specifically. A follow-up plan could probe whether a different task (e.g.
+K=4 game-action stretch per T5.1) shows a different ranking — but that's
+out of scope for this PoC's verdict.
 
 ---
 
@@ -123,21 +180,41 @@ The user should decide which option to pursue before Phase 2 starts.
 
 ### Tasks
 
-- [ ] **T4.1** Write verdict addendum to `katgpt-rs/.research/448_*.md` §"PoC Addendum" with raw numbers (accuracy / latency / variance for all 3 competitors). Honest per §3.6 — do NOT silently revise the verdict to match a hoped-for outcome.
-- [ ] **T4.2** If G7–G10 all PASS → open follow-up plan in katgpt-rs to ship `latent_error_diffusion` feature in `katgpt-core/src/sense/`. Promote to default-on after that plan's GOAT gate.
-- [ ] **T4.3** If G8 FAILS (no accuracy gain over TILR) but G7 PASSes (mechanism works) → Research 448 stays **Gain**. Keep POC as regression check in riir-poc. Do NOT promote.
-- [ ] **T4.4** If G9 FAILS (variance too high) → test the ×TILR fusion (use TILR's invariant-subspace projection as the postsynaptic drive gate in the ED rule). Re-run G7–G10 with the fused variant.
-- [ ] **T4.5** If the entire mechanism is broken (G1–G6 fail) → honestly revise Research 448 verdict down to **Pass** (mechanism doesn't translate to latent space). Delete the feature flag candidate. Record the negative result.
+- [x] **T4.1** Wrote verdict addendum to `katgpt-rs/.research/448_*.md` §"PoC Addendum" with raw numbers (accuracy / latency / variance for all 3 competitors). Honest per §3.6 — verdict recorded as **modelless-correct but task-useless**.
+- [x] **T4.2** G7–G10 did NOT all PASS (G7 FAILS) → **no follow-up plan opens in katgpt-rs**. The `latent_error_diffusion` feature flag candidate is **dropped**.
+- [x] **T4.3** N/A (G7 FAILS, not just G8).
+- [x] **T4.4** N/A (G9 PASSES — no ×TILR fusion needed).
+- [x] **T4.5** The mechanism is NOT broken at the modelless level (G1–G6 all PASS), but G7 FAILS (the rule is task-useless, not mechanism-broken). Per the honest verdict routing: **Research 448 revised down to Pass** (negative result recorded). The PoC is kept as a regression check in riir-poc — the mechanism gates (G1–G6) remain valuable as a documented modelless-correctness proof even though the rule is not promoted.
+
+### Final Verdict
+
+**Research 448: Pass (negative result).** The latent-ED rule (Yamada et
+al. 2026, arxiv 2606.31700) is **modelless-correct** (G1–G6 all PASS:
+local Hebbian update, no weight mutation, bounded state, argmax action
+selection, deterministic modulo routing, E/I balance stable) but
+**task-useless** (G7 FAILS: −0.51 pp vs the Frozen baseline on the K=10
+toy decision task). The Option C persistent-belief-state reframing — the
+most faithful modelless translation — does not unlock an accuracy gain.
+
+The PoC is retained in `riir-poc` as a regression check. No katgpt-rs
+primitive ships. No feature flag is created.
 
 ---
 
-## Phase 5 — Stretch Goals (only if Phase 3 PASSes)
+## Phase 5 — Stretch Goals (BLOCKED — Phase 3 G7 failure)
 
-### Tasks
+**Status: NOT PURSUED.** Phase 3's G7 failure (Latent-ED −0.51 pp vs Frozen)
+blocks the stretch goals by definition — there's no GOAT-grade result to
+extend. The stretch goals are preserved below for historical reference; a
+future plan could reopen them if a different task domain shows Latent-ED
+beating Frozen (the K=10 toy task is an unfavorable domain for runtime
+belief updates in general — TILR also underperforms Frozen here).
 
-- [ ] **T5.1** **K=4 game-action stretch** — re-run G7–G10 with K=4 actions (fight/flee/forage/talk) on a 100-tick toy NPC sim. Tests the "Craftax shortfall class" — does fine-grained temporal credit assignment work, or does coarse modulo routing fail?
-- [ ] **T5.2** **×TILR fusion PoC** — even if G9 PASSes, test the ×TILR fusion (TILR invariant-subspace gate as ED postsynaptic drive gate). If the fusion strictly dominates vanilla Latent-ED → that's the Super-GOAT re-open trigger per Research 448 §3.
-- [ ] **T5.3** **LatCal commitment stretch** — project `(p, n)` to the 5 synced affect scalars (valence/arousal/desperation/calm/fear) via bridge function. Assert the bridge is zero-allocation, gateable, and the synced raw values are bit-identical across two runs (deterministic replay check).
+### Tasks (NOT PURSUED)
+
+- [-] **T5.1** **K=4 game-action stretch** — would test fine-grained temporal credit assignment. Blocked by G7 failure on K=10. Reopen only if a K=10 follow-up shows a different ranking.
+- [-] **T5.2** **×TILR fusion PoC** — G9 PASSES (variance is fine), so no mandatory fusion trigger. Not pursued.
+- [-] **T5.3** **LatCal commitment stretch** — gated on a working accuracy mechanism; not applicable to a task-useless rule.
 
 ---
 
@@ -185,4 +262,12 @@ rm -rf /tmp/latent_ed_poc
 
 ## TL;DR
 
-Defend-wrong PoC for the latent-ED hypothesis. Three competitors (Latent-ED vs Frozen vs TILR) race on a K=10 multi-action decision task. G1–G6 prove the mechanism is modelless and correct. G7–G10 are the quality race — G8 (vs TILR) is the headline gate. Honest verdict recorded in Research 448 §"PoC Addendum" regardless of outcome. No katgpt-rs primitive ships in this plan; follow-up plan opens only if G7–G10 PASS.
+Defend-wrong PoC for the latent-ED hypothesis, **settled (negative result)**.
+Three competitors (Latent-ED vs Frozen vs TILR) raced on a K=10
+multi-action decision task. G1–G6 PASS (mechanism is modelless-correct).
+G7 FAILS (−0.51 pp vs Frozen — the rule is task-useless). G8 PASSES but
+vacuously (TILR is also broken on this task). G9–G10 PASS. Research 448
+revised to **Pass** (negative result). The Option C persistent-belief-state
+reframing — the most faithful modelless translation per user decision —
+does not unlock an accuracy gain. No katgpt-rs primitive ships. PoC kept
+as a regression check.

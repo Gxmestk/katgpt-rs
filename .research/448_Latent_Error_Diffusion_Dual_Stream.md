@@ -1,11 +1,11 @@
 # Research 448: Latent Error Diffusion — Dual-Stream E/I Belief Updates
 
 > **Source:** *Diffusing Blame: Task-Dependent Credit Assignment in Biologically Plausible Dual-Stream Networks* — Yamada, Grillotti, Charakorn, Risi, Ha, Lange (Sakana AI), [arxiv 2606.31700](https://arxiv.org/abs/2606.31700), 30 Jun 2026
-> **Date:** 2026-07-17
-> **Status:** Active — awaiting POC (Plan 456)
+> **Date:** 2026-07-17 (initial); 2026-07-18 (Phase 2+3 addendum)
+> **Status:** Settled — Pass (negative result). PoC (Plan 456) showed the latent-ED rule is modelless-correct (G1–G6 PASS) but task-useless (G7 FAILS). See §7 for the full addendum.
 > **Related Research:** 408 (TILR — invariant-subspace refinement), 236 (QGF — test-time Q-guided flow), 276 (MicroRecurrentBeliefState), 359 (DEC heat-kernel trajectory), 192 (NextLat belief-state dynamics)
-> **Related Plans:** 456 (POC), 425 (TILR), 268 (QGF), 276 (MicroRecurrentBeliefState), 359 (DEC heat kernel)
-> **Cross-ref (riir-ai):** Plan 456 POC lands at `riir-ai/crates/riir-poc/` (defend-wrong per research skill §3.6)
+> **Related Plans:** 456 (POC — settled), 425 (TILR), 268 (QGF), 276 (MicroRecurrentBeliefState), 359 (DEC heat kernel)
+> **Cross-ref (riir-ai):** Plan 456 POC at `riir-ai/crates/riir-poc/` (defend-wrong per research skill §3.6) — retained as regression check
 > **Classification:** Public (math/distillation), Private (runtime wiring → riir-ai)
 
 ---
@@ -16,7 +16,7 @@ The paper proposes **Error Diffusion (ED)** as a biologically plausible, backpro
 
 **Distilled for katgpt-rs (modelless, inference-time):** A runtime belief-update primitive — `LatentErrorDiffusion` — that (a) maintains a dual-stream `(p, n)` latent state with structural sign routing (excitatory `+pW_pp − nW_np` / inhibitory `+nW_nn − pW_pn`), (b) applies modulo-routed per-output-channel error to drive local latent updates, (c) self-organizes toward emergent E/I balance (depth-dependent inhibitory gradient per paper §"Emergent E/I balance"), and (d) develops implicit sparsity (channels below a non-negative floor → effectively pruned, the latent analog of "forgotten" features). The four weight matrices become four **fixed-sign direction-vector projection matrices** read from the per-NPC committed belief substrate.
 
-**Honest caveat:** The user's claim is "gain around accuracy". §3.6 requires a defend-wrong PoC in `riir-ai/crates/riir-poc/` before any accuracy claim becomes a GOAT gate. Plan 456 ships the PoC. Until the PoC returns, the verdict is **Gain (pending)** — not GOAT.
+**Honest caveat:** The user's claim was "gain around accuracy". §3.6 required a defend-wrong PoC in `riir-ai/crates/riir-poc/` before any accuracy claim became a GOAT gate. Plan 456 shipped the PoC. **The PoC settled negative** (2026-07-18): the latent-ED rule is modelless-correct (G1–G6 all PASS) but task-useless (G7 FAILS: −0.51 pp vs Frozen on the K=10 toy decision task). Verdict: **Pass (negative result)** — no katgpt-rs primitive ships.
 
 ---
 
@@ -150,23 +150,40 @@ This satisfies AGENTS.md: physical domain (position, HP, wallet) stays raw; sema
 
 ## 3. Verdict
 
-**Tier: Gain (pending POC).** Per research skill §3.6, any accuracy-parity claim ("gains on accuracy") requires a defend-wrong PoC in `riir-ai/crates/riir-poc/` before becoming GOAT. Plan 456 ships the PoC. The PoC's job is to defend OR refute — both outcomes are valid.
+**Tier: Pass (negative result, settled 2026-07-18 per §7 PoC Addendum).**
+Originally **Gain (pending POC)**; revised down after Plan 456's defend-wrong
+PoC produced an honest negative result. The latent-ED rule is
+modelless-correct (G1–G6 all PASS) but task-useless (G7 FAILS: −0.51 pp
+vs the Frozen baseline on the K=10 toy decision task). The Option C
+persistent-belief-state reframing — the most faithful modelless
+translation per user decision — does not unlock an accuracy gain.
 
-**One-line reasoning:** The latent-ED rule is a credible modelless runtime belief-update mechanism (path 3 of §3.5), but the accuracy gain over existing belief-update primitives (TILR, QGF, HLA evolution, Committed Personality) is unproven. The paper itself reports ED underperforms DFA backprop by 0.9–7.4 pp on classification and trails BP-PPO on Craftax with higher variance — translating the rule to latent space may or may not recover these gaps.
+**One-line reasoning:** The latent-ED rule is a credible modelless
+runtime belief-update mechanism (path 3 of §3.5) — the mechanism-level
+proofs (G1–G6) confirm it's local, bounded, argmax-based, deterministic,
+and E/I-balanced. But the empirical race (G7–G10) showed it
+underperforms the no-adaptation Frozen control on a toy K=10 task. The
+paper itself reports ED underperforms DFA backprop by 0.9–7.4 pp on
+classification; the latent reframing does not recover this gap — it
+amplifies it on this task domain.
 
 **MOAT gate per domain (§1.6):**
-- **katgpt-rs domain:** The open primitive (dual-stream ED math + modulo routing) is a paper-derived fundamental primitive → in scope. Stays behind feature flag until POC promotes.
-- **riir-ai domain:** The runtime wiring (NPC belief updates, personality substrate) is pillar-adjacent (touches Pillar 1 Egg/Shell + Pillar 8 Reasoning Pack via CLR/Salience gates). Not a new pillar on its own.
+- **katgpt-rs domain:** The open primitive candidate (dual-stream ED math
+  + modulo routing) is **NOT shipped** — the PoC refuted the accuracy
+  claim. No feature flag is created.
+- **riir-ai domain:** The runtime wiring candidate (NPC belief updates,
+  personality substrate) is **NOT shipped** — same reason. The PoC is
+  retained in `riir-poc` as a regression check.
 
-**Promote/demote tracking (per stack):** If POC PASSes → promote to default-on in `katgpt-rs` (latent-belief-update stack slot) + wire into `riir-ai` runtime. If POC refutes the accuracy claim → keep the open primitive (it's still a valid modelless belief-update rule) but don't promote; demote any weaker cousin in the same slot.
-
-**Why NOT Super-GOAT (yet):**
-- Q1 (no prior art): **mostly yes** — dual-stream latent ED with modulo routing has no direct shipped cousin. But the components (dual-stream architectures, latent state updates, sigmoid-gated projections) all ship individually.
-- Q2 (new class of behavior): **uncertain** — "biologically plausible runtime credit assignment" is novel framing, but at the behavior level it's still "NPC updates belief based on action outcome" which we already do via CLR/TILR/QGF.
-- Q3 (product selling point): **TBD by POC** — "our NPCs do biologically plausible credit assignment that no competitor can" only holds if the accuracy gain is real.
-- Q4 (force multiplier, ≥2 pillars): **yes if fusion lands** — the ×TILR and ×Committed-Personality fusions touch multiple pillars.
-
-If the POC shows >5 pp accuracy gain on a controlled toy benchmark AND the ×TILR fusion works, **re-open the Super-GOAT gate** at that point. Until then: Gain.
+**Why NOT promoted (honest negative result):**
+- The mechanism-level proofs (G1–G6) confirm the rule is modelless and
+  correct. That's a valuable negative result: we now know the *math*
+  translates, even though the *utility* doesn't.
+- The K=10 toy task may be an unfavorable domain for runtime belief
+  updates in general — TILR also underperforms Frozen here. A future plan
+  could probe a different task (e.g. K=4 game-action stretch per Plan 456
+  T5.1) before fully closing the line of inquiry.
+- Until such a follow-up shows a different ranking: **Pass**.
 
 ---
 
@@ -236,7 +253,82 @@ If POC refutes the accuracy claim but architectural coverage holds:
 
 ---
 
-## 7. Phase 1 PoC Addendum (recorded honestly per §3.6, 2026-07-17)
+## 7. Phase 2 + 3 PoC Addendum (recorded honestly per §3.6, 2026-07-18)
+
+### Phase 2 — Option C refactor + mechanism gates G1–G6
+
+Per user decision (2026-07-18), pursued **Option C** (state-only): drop the
+recurrent forward entirely; `(p, n)` IS the persistent belief state,
+evolved only by the ED rule; `W_*` projections become a one-time
+input→initial-state transform. This is the most faithful modelless
+reframing — the weights → committed matrices mapping holds, the
+activations → `(p, n)` state mapping holds, the only change is that
+`(p, n)` persists across steps.
+
+**Mechanism gates G1–G6 ALL PASS** (see Plan 456 Phase 2):
+
+- **G1** zero-alloc hot path (Vec capacity stable across HORIZON=1000 steps)
+- **G2** no weight mutation (W_* BLAKE3 hash bit-identical before/after)
+- **G3** sigmoid bounded ((p,n) in [0,1] throughout, including adversarial inputs)
+- **G4** argmax not softmax (actions binary, both values appear)
+- **G5** deterministic modulo routing (routing identity holds by construction)
+- **G6** E/I balance stable (‖p‖/‖n‖ in [0.5, 2.0] throughout)
+
+The latent-ED rule is **modelless-correct**. The Phase 1 reframing bug
+(forward overwriting the ED delta) is resolved by construction — there
+is no recurrent forward to do the overwriting.
+
+### Phase 3 — Quality gates G7–G10
+
+| Competitor | Accuracy | Seed var | Latency (ns/step) | Early | Late |
+|---|---|---|---|---|---|
+| **Latent-ED** | **0.5312** | 0.00032 | 1136.6 | 0.5022 | 0.5228 |
+| **Frozen baseline** | **0.5363** | 0.00016 | 1069.7 | 0.5438 | 0.5126 |
+| **TILR refinement** | **0.4730** | 0.00456 | 964.9 | 0.4518 | 0.4676 |
+
+- **G7 FAILS ❌:** Latent-ED 0.5312 vs Frozen 0.5363 (−0.51 pp). The Option
+  C refactor fixed Phase 1's "ED has zero effect" bug — Latent-ED and
+  Frozen are no longer bit-identical. But the ED rule is actively
+  *hurting* accuracy by a small margin. The local Hebbian update
+  `Δp ∝ p · σ'(Z) · R_h` accumulates, but in a direction that does not
+  align with the task's reward structure.
+- **G8 PASSES (vacuous) ✅:** Latent-ED beats TILR by +5.83 pp. **Vacuous**
+  because TILR itself underperforms Frozen (47.30% vs 53.63%) — TILR's
+  rank-4 invariant-subspace projection is too restrictive for this toy
+  task. Beating a broken competitor proves nothing.
+- **G9 PASSES ✅:** ED seed-variance 0.00032 vs TILR 0.00456 (ratio 0.07×,
+  well under 1.5×). The paper reported ED-PPO has higher variance than
+  BP-PPO; the latent analog does NOT inherit this.
+- **G10 PASSES ✅:** Late (0.5228) ≥ early (0.5022). No catastrophic drift.
+
+### Honest interpretation
+
+The Option C refactor **succeeded mechanically** (ED now has measurable
+effect) but **failed empirically** (the effect is slightly negative).
+The latent-ED rule, even with the most faithful persistence semantics,
+does not produce a useful belief update on this K=10 toy task.
+
+**This is an honest negative result per §3.6.** Notably, TILR — the other
+runtime belief-update competitor — *also* underperforms Frozen on this
+task (47.30% vs 53.63%). This suggests the K=10 toy decision task is an
+unfavorable domain for *any* runtime belief-update mechanism: the
+fixed bootstrap projection captures the task's reward structure better
+than error-driven refinement. This is a property of the task, not the ED
+rule specifically.
+
+### Final verdict
+
+**Research 448 revised: Gain → Pass (negative result).** The latent-ED
+rule is modelless-correct (G1–G6 PASS) but task-useless (G7 FAILS). The
+Option C persistent-belief-state reframing — the most faithful modelless
+translation — does not unlock an accuracy gain. No katgpt-rs primitive
+ships. The PoC is kept in `riir-poc` as a regression check; the mechanism
+gates (G1–G6) remain valuable as a documented modelless-correctness
+proof even though the rule is not promoted.
+
+---
+
+## 8. Historical: Phase 1 PoC Addendum (recorded 2026-07-17, superseded by §7 above)
 
 Plan 456 Phase 1 (scaffold) landed in `riir-ai/crates/riir-poc/src/latent_ed_poc.rs`.
 The harness works end-to-end — the bench prints the verdict table, computes
@@ -286,4 +378,4 @@ Options A/B/C produce a working mechanism, the verdict drops to **Pass**
 
 ## TL;DR
 
-Latent reframing of a biologically plausible *training* rule (Error Diffusion under Dale's principle) into a modelless runtime belief-update primitive. The dual-stream `(p, n)` latent state + four committed non-negative projection matrices + modulo-routed per-action error + local Hebbian-style update is **§3.5 path 3** (latent-space correction), not training. Verdict: **Gain (pending POC)**. Plan 456 ships the defend-wrong PoC in `riir-ai/crates/riir-poc/` per §3.6 — three competitors (Latent-ED vs Frozen vs TILR) on a K-action toy decision task. If POC shows ≥5 pp accuracy gain at ≤2× latency → promote to GOAT + re-open Super-GOAT gate (×TILR fusion is the strongest Super-GOAT angle). If POC refutes → keep open primitive opt-in, record honestly. The user's "gain around accuracy" intuition is the right hypothesis to test; the verdict on whether it holds is the PoC's job, not this note's.
+Latent reframing of a biologically plausible *training* rule (Error Diffusion under Dale's principle) into a modelless runtime belief-update primitive. The dual-stream `(p, n)` latent state + four committed non-negative projection matrices + modulo-routed per-action error + local Hebbian-style update is **§3.5 path 3** (latent-space correction), not training. **Verdict: Pass (negative result, settled 2026-07-18).** Plan 456's defend-wrong PoC in `riir-ai/crates/riir-poc/` showed the mechanism is modelless-correct (G1–G6 all PASS: local, no weight mutation, bounded, argmax, deterministic routing, E/I-balanced) but task-useless (G7 FAILS: −0.51 pp vs Frozen on the K=10 toy decision task). The Option C persistent-belief-state reframing — the most faithful modelless translation per user decision — does not unlock an accuracy gain. No katgpt-rs primitive ships. The user's "gain around accuracy" intuition was the right hypothesis to test; the PoC's job was to settle it, and it settled negative. TILR *also* underperforms Frozen on this task, suggesting the K=10 toy domain is unfavorable for runtime belief updates in general — a future plan could probe a different task before fully closing the line.
