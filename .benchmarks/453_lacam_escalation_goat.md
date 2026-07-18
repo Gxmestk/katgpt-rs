@@ -274,3 +274,91 @@ G6c = 1.000 (PASS), G-col = 0.0% (PASS), G-PI = 0.69 (PASS), G1 = 3/4 maps
 fixes collisions perfectly and improves ht_chantry 28×, but ht_chantry still
 marginally fails G1 (0.28 < 0.30) because one-step LaCAM can't plan multi-step
 maze detours. Stay opt-in; defer to multi-step LaCAM for full G1 parity.
+
+---
+
+## Addendum: Multi-Step LaCAM + Flow-Field Attempts (Issue 546, riir-ai)
+
+**Status: BOTH paths SHIPPED-with-FAIL or REVERTED. ht_chantry G1 gap (0.27-0.28
+vs 0.30 target) is the accepted honest steady-state floor for the current
+architecture.** Recorded here 2026-07-19 from the now-removed
+`riir-ai/.issues/546_lacam_multistep_escalation_ht_chantry.md` per the
+noise-reduction rule.
+
+### Diagnostic (commit `2a8c378d`)
+
+`katgpt-rs/crates/katgpt-core/examples/ht_chantry_deadlock_chain_diagnostic.rs`
+measured the per-tick max-cluster-size distribution on ht_chantry-real (162×141,
+7461 passable, 800 agents, 500 steps, seed=42, `lacam_escalation` ON):
+
+| Metric | Value |
+|---|---|
+| Throughput (this seed) | 5.098 (~0.30 ratio, consistent with bench's 4.80) |
+| Fast-path ticks (zero stuck) | 0/500 (0.0%) — ht_chantry is systemically congested |
+| P95 max-cluster-size | **8** |
+| P99 max-cluster-size | **9** |
+| Max observed | **11** |
+| Depth-2 coverage | 12.8% of stuck ticks |
+| Depth-3 coverage | 36.4% of stuck ticks |
+
+Paper suggests depth 2-3 is "usually sufficient" for multi-step LaCAM. On
+ht_chantry that covers only 36% of stuck ticks. Covering 95% needs depth ≥ 8
+— computationally intractable (combinatorial blow-up) outside the real-time
+MAPF budget.
+
+### Path 1: Multi-step LaCAM (SHIPPED, +0.6% marginal)
+
+Shipped behind `EscalationBudget::multistep_default()` (max_depth = 8) +
+`LifelongLaCam::with_escalation_budget()`. Key innovation vs paper-faithful:
+`target_stuck_agents: bool` — constraint tree iterates over STUCK agents
+(computed by greedy PIBT) instead of all agents in priority order. At depth K,
+constrain stuck agent `stuck_order[K]` to a neighbor cell. T1-T6 of the
+reopened plan all shipped; T7 (this document update) replaces the separate
+benchmark file.
+
+A/B measurement (`ht_chantry_multistep_ab`, ht_chantry-real, 800 agents, 200
+steps, seed=42):
+
+| Metric | Default (Plan 453) | Multistep (Issue 546) | Delta |
+|---|---|---|---|
+| Throughput | **4.49** | **4.51** | +0.025 (+0.6%) |
+| Completions | 898 | 903 | +5 |
+| Median tick | 17.68ms | 18.13ms | +0.45ms (+2.5%) |
+| G1 (≥5.10) | FAIL | FAIL | unchanged |
+
+**Verdict: multistep ships with marginal improvement.** The +0.6% throughput
+is real (5 deadlocks resolved that weren't before), but does not materially
+close the G1 gap. The diagnostic was correct in mechanism but overstated the
+impact — even with stuck-agent targeting and depth-8, the fundamental corridor-
+queue structure on ht_chantry cannot be unwound by constraint-tree search alone.
+No revert — the work is useful for combined-strategy experiments and future
+maze-class maps.
+
+### Path 2: Flow-field hard constraint (REVERTED, Proposal 006 REJECTED)
+
+Attempted via [Proposal 006](../.proposals/006_flow_field_hard_constraint_in_guidance.md)
++ [Issue 182](../.issues/182_flow_field_hard_constraint_in_guidance.md). Phases
+1-3 (bi-directional corridors + A\* hard pruner + cost-tuple demotion) were
+implemented and measured.
+
+Result:
+- ht_chantry throughput: **+0.9% (noise — flat)** — FAIL
+- ht_chantry deadlock-chain P95: **8 → 15 (WORSE)** — FAIL
+- warehouse throughput: +7% (mechanism DID work on warehouse but insufficient)
+
+Per Issue 182 Phase 5 P5.3, code was REVERTED. Proposal 006 marked REJECTED.
+See Proposal 006 §Verdict for the full measurement table and analysis.
+
+### Bottom line
+
+The ht_chantry G1 gap (0.27-0.28 vs 0.30 target) is a **documented steady-state
+fail**. Both attempted closures (multi-step LaCAM, flow-field redesign) have
+been measured and found insufficient. The gap is accepted as the honest floor
+for the current architecture. A fundamentally different approach (e.g. dynamic
+flow reversal, global LP-based direction assignment, or a different planner
+class entirely) would be needed to close it — none are in scope today.
+
+**Feature status:** `lacam_escalation` (one-step, Plan 453) stays opt-in. The
+multi-step extension (`EscalationBudget::multistep_default()`) is available
+for combined-strategy experiments but provides no G1 gain alone. The
+flow-field hard constraint was reverted (Proposal 006 REJECTED).
