@@ -1,0 +1,226 @@
+# Proposal 007 — QGF DualLeoOracle (Test-Time LEO+UVFA Q-Gradient Fusion)
+
+Status: **draft** (no precondition — can move to a plan immediately on approval)
+Branch: `develop`
+Owner: unassigned
+Fusion of: Plan 268 (QGF LeoHeadOracle) × Plan 155 (DualLeoMixer) × Plan 460 (postmax lesson — linear-in-grad mix)
+Related:
+- [Plan 268](../.plans/268_qgf_test_time_q_guided_flow.md) — QGF substrate, ships `LeoHeadOracle` + `FlowFieldOracle`
+- [Plan 460 root-cause](../.benchmarks/460_flow_field_dual_leo_postmax_goat.md) — the pre-vs-post-max nonlinearity lesson this proposal carries forward
+- [Plan 459 pre-max dual fusion](../.benchmarks/459_flow_field_dual_leo_pre_max_goat.md) — the OG attempt; lesson carrier
+- Research 003 §"Cognitive/Reasoning — the New Moat" — basic public / GOAT private
+
+## TL;DR
+
+**Should QGF ship a `DualLeoOracle` — a third `QGradientOracle` impl that fuses a LEO teacher head + a UVFA student head via `DualLeoMixer` at the gradient (not the action-selection) level?** Today QGF ships `LeoHeadOracle` (single LEO head) and `FlowFieldOracle` (FFT flow field). When a UVFA student is available, there is no QGF path that uses both — the dual fusion only exists in the `FlowFieldCache::get_or_compute_dual_postmax` substrate (Plan 460), which is a different pipeline. This proposal closes that gap.
+
+**This is a katgpt-rs primitive** — generic, no game semantics, no chain semantics, lives in `katgpt-core` behind `qgf_oracle + dual_leo` feature gates. The private composition layer (which civ UVFA net, which α per goal category) is a riir-ai concern and explicitly out of scope.
+
+The **Plan 460 lesson** directly informs this proposal: pre-max Q-slice fusion was washed out by `max_a(·)` nonlinearity. QGF gradients are similarly nonlinear in the policy-tilt direction — but the gradient itself is linear in the Q-values (`∇_a Q(s, a)[i] = Q(s, a_i)` per `LeoHeadOracle`'s doc), so a **gradient-level mix avoids the washout** by construction. The proposal carries the Plan 460 root-cause analysis forward as a design constraint.
+
+## The problem this solves
+
+Plan 268's QGF ships two `QGradientOracle` impls in `katgpt-core/src/qgf/oracles.rs`:
+
+| Oracle | Feature | What it wraps |
+|---|---|---|
+| `LeoHeadOracle<H: LeoHead>` | `leo_all_goals` | A single LEO head; emits the per-action Q-slice for the selected goal as the gradient. |
+| `FlowFieldOracle` | `flow_field_nav` | An owned `FlowField`; emits the `(dx, dy)` flow vector at the queried cell. |
+
+The five-tier routing table in `qgf/mod.rs:39-41` shows the gap:
+
+```
+| Plasma/Hot | FlowFieldOracle              | flow_field_nav | 1.0 |
+| Hot        | LeoHeadOracle                | leo_all_goals  | 1.0 |
+| Freeze     | BfnProxyOracle               | (always)       | 0.3 |
+```
+
+When both a LEO teacher AND a UVFA student are available, **there is no QGF oracle that uses both.** The consumer must pick one. The dual-fusion machinery exists (`DualLeoMixer` trait, shipped Plan 155) but only `FlowFieldCache::get_or_compute_dual_postmax` consumes it, and that's a different pipeline (potential-field navigation, not Q-gradient guidance).
+
+For QGF consumers that want test-time teacher-student fusion (the paper's headline use case), the gap is real: the paper's `QGF Alg 1` permits ANY Q-gradient oracle, and the dual-LEO setup (LEO teacher + UVFA student, mixed at α) is a natural Q-gradient source that the current QGF implementation cannot express.
+
+## The proposed design
+
+### The `DualLeoOracle` struct
+
+```rust
+#[cfg(all(feature = "leo_all_goals", feature = "dual_leo"))]
+pub struct DualLeoOracle<H1, H2, M>
+where
+    H1: LeoHead,
+    H2: LeoHead,
+    M: DualLeoMixer,
+{
+    head_leo: H1,
+    head_uvfa: H2,
+    mixer: M,
+    alpha: f32,
+    goal_idx: usize,
+}
+```
+
+### The `QGradientOracle` impl — gradient-level mix (carries Plan 460 lesson)
+
+```rust
+impl<H1, H2, M> QGradientOracle for DualLeoOracle<H1, H2, M>
+where
+    H1: LeoHead,
+    H2: LeoHead,
+    M: DualLeoMixer,
+{
+    type State = Vec<f32>;
+    type Action = ();
+
+    fn q_gradient_at(&self, state: &Self::State, _action: &Self::Action) -> Vec<f32> {
+        // Plan 460 lesson: mix at the gradient level (linear in Q), NOT at the
+        // action-selection level (nonlinear in policy). The gradient IS the
+        // per-action Q-slice, so a DualLeoMixer::combine_into on the two
+        // Q-slices produces a gradient that is a linear combination of the
+        // two heads' Q-values. No max-pool washout — the gradient is never
+        // max-pooled.
+        let q_leo_all = self.head_leo.all_goals_q(state);
+        let q_leo = self.head_leo.q_for_goal(&q_leo_all, self.goal_idx);
+
+        let q_uvfa_all = self.head_uvfa.all_goals_q(state);
+        let q_uvfa = self.head_uvfa.q_for_goal(&q_uvfa_all, self.goal_idx);
+
+        let mut grad = vec![0.0f32; q_leo.len()];
+        self.mixer.combine_into(&mut grad, q_leo, q_uvfa, self.alpha);
+        grad
+    }
+
+    fn confidence(&self, _state: &Self::State) -> f32 {
+        // Both heads are deterministic cached lookups → confidence 1.0.
+        // Matches LeoHeadOracle's contract.
+        1.0
+    }
+}
+```
+
+### Why this avoids the Plan 460 pre-max failure
+
+Plan 459 (pre-max) failed because the FFT pipeline applies `max_a(·)` to the per-cell Q-slice AFTER the α-mix — and `max_a(α·x + (1-α)·y) ≠ α·max_a(x) + (1-α)·max_a(y)`. The α-weighting was washed out by the max-pool.
+
+QGF's `LeoHeadOracle` has no max-pool. The gradient IS the Q-slice (`∇_a Q(s, a)[i] = Q(s, a_i)`, per the existing doc-comment in `LeoHeadOracle`). So the gradient-level mix is a pure linear combination:
+
+```
+grad_mix[i] = α · Q_leo(s, a_i) + (1-α) · Q_uvfa(s, a_i)
+            = α · grad_leo[i] + (1-α) · grad_uvfa[i]
+```
+
+No nonlinearity between the mix and the consumer. **The Plan 460 lesson is encoded as a design invariant: no operator sits between the mix and the consumer.**
+
+### Routing entry
+
+Add a new row to the QGF tier table:
+
+```
+| Hot        | DualLeoOracle                | dual_leo       | 1.0 |
+```
+
+Sits alongside `LeoHeadOracle` (single-head); consumer picks based on whether a UVFA student is available. The adaptive guidance weight saturates to ~1.0 because both heads are deterministic cached lookups (same rationale as `LeoHeadOracle`).
+
+## Domain classification (per global AGENTS.md + Research 003)
+
+| State | Domain | Treatment |
+|---|---|---|
+| `state: Vec<f32>` (input) | **Consumer-supplied** | The oracle does not own it; treats as read-only. Consumer's responsibility to classify (physical / semantic / etc.). |
+| `grad: Vec<f32>` (output) | **Semantic / latent** | The gradient is a Q-value vector, not a committed action. It feeds QGF's marginal tilt; it does NOT cross any sync boundary. |
+| `α` (mixing coefficient) | **Designer scalar** | Authored constant per use case. |
+
+This oracle does NOT cross the sync boundary. It produces a latent gradient that QGF consumes locally. Bridge to raw (committed action) happens downstream in QGF's drafter, not here.
+
+## Honest caveats — READ BEFORE IMPLEMENTING
+
+1. **No measurement yet that dual Q-gradient beats single-head Q-gradient on a downstream task.** Plan 268 itself deferred downstream task-quality gates (Sudoku/DDTree/Bomber) to riir-ai. This proposal adds a new oracle but does not prove the gain — that's the plan's job (G5 below).
+2. **The `combine_into` default uses `mix_into` (Lc mode), which is a linear α-blend.** For Max / Min modes, the mixer applies element-wise max/min — but this may interact badly with QGF's `(1/β)·g` tilt if the resulting gradient has discontinuities. Document the Lc mode as the recommended default; mark Max/Min as experimental.
+3. **`goal_idx` is fixed at construction.** Unlike `LeoHeadOracle::set_goal`, this proposal does NOT ship a `set_goal` method on `DualLeoOracle` initially — the use case is "one goal, dual heads" per construction. Multi-goal switching can be added if a consumer needs it; defer until measured demand.
+4. **The UVFA head must also be `LeoHead`-shaped** (all-goals Q-tensor). Real UVFA nets are single-goal by definition; the consumer must wrap them (e.g. broadcast the single-goal Q across all goal slots, or use a goal-conditioned adapter). This is the same shape mismatch Issue 549 / Proposal 028 face; the consumer-side adapter is out of scope here.
+5. **Confidence always = 1.0 is the same lie `LeoHeadOracle` tells.** A deterministic cached lookup is confidence-1.0 by QGF's contract, but two heads mixed at α=0.5 are not "twice as confident" as one head — the contract conflates determinism with quality. Inherited from Plan 268; not made worse here. Document.
+
+## Fusion lineage
+
+Three existing primitives combine:
+
+1. **Plan 268 `LeoHeadOracle`** (`QGradientOracle` for `LeoHead`) — the substrate. The new oracle mirrors its API and its confidence contract.
+2. **Plan 155 `DualLeoMixer`** (LEO+UVFA α-mix trait) — the fusion mechanism. Already shipped; has 3 consumers (QuestLeoScorer, `get_or_compute_dual`, `get_or_compute_dual_postmax`). This proposal adds a 4th.
+3. **Plan 460 root-cause lesson** (max-pool washout) — the design constraint. Encoded as the "no operator between mix and consumer" invariant in the doc-comment.
+
+The combination produces: **test-time teacher-student Q-gradient fusion** for QGF consumers — something none of the three alone delivers. Plan 268 alone is single-head; Plan 155 alone has no QGF consumer; Plan 460's lesson alone is just a warning.
+
+## GOAT gate
+
+The new oracle ships behind `qgf_oracle + dual_leo` (both already exist; no new feature flag). Promotion to "documented as the recommended dual path" requires:
+
+- **G1** (correctness): with `α=1.0` (LeoOnly mode), `DualLeoOracle` produces bit-identical gradients to `LeoHeadOracle` with the same head + goal. With `α=0.0` (UvfaOnly mode), bit-identical to a `LeoHeadOracle` wrapping the UVFA head.
+- **G2** (perf): one Q-gradient query ≤ 1.5× a single `LeoHeadOracle` query (the cost is 2 forward passes + one `combine_into`, both heads are O(state_dim × hidden × actions)).
+- **G3** (no-regression): all existing katgpt-core tests pass. The Plan 268 QGF bench must still pass.
+- **G4** (alloc-free hot path): `q_gradient_into` variant that takes a pre-allocated `&mut [f32]` scratch buffer. Steady-state zero allocation.
+- **G5** (downstream task gain — **deferred to riir-ai**): ≥3% first-attempt accuracy gain on Sudoku 9×9 OR ≥5% speculative acceptance rate gain on a dual-LEO consumer, vs single-head `LeoHeadOracle`. Mirrors Plan 268's deferred gate. Until this is measured, the oracle ships as opt-in and is documented as "mechanism complete, downstream gain unproven."
+
+## What ships now (katgpt-rs) vs deferred
+
+### Ships now — katgpt-core
+- `DualLeoOracle<H1, H2, M>` struct in `crates/katgpt-core/src/qgf/oracles.rs` (new module `dual_leo_oracle`)
+- `QGradientOracle` impl with `q_gradient_at` + `q_gradient_into` + `confidence`
+- Routing entry in `qgf/mod.rs` tier table
+- Unit tests mirroring `LeoHeadOracle`'s test suite (gradient extraction, confidence=1.0, α=1.0 bit-identity, α=0.0 bit-identity, Max/Min modes documented)
+- Doc-comment encoding the Plan 460 "no operator between mix and consumer" invariant
+
+### Deferred — riir-ai
+- Consumer-side adapter wrapping real UVFA nets as `LeoHead` (caveat 4)
+- Downstream task-quality gate G5 (Sudoku / DDTree / Bomber)
+- Tuning α per consumer
+- Promotion from opt-in to "documented as recommended"
+
+### Explicitly NOT shipped by this proposal
+- **Civ flow-field navigation** — that's Proposal 028 (Option A). This proposal does not touch flow fields or civ.
+- **UVFA network architecture / training** — riir-train + riir-games-civ scope.
+- **Per-goal switching (`set_goal`)** — defer until consumer demand (caveat 3).
+
+## Phased rollout (sketch — a plan would expand this)
+
+### Phase 1 — Primitive (katgpt-core)
+- [ ] T1.1 `DualLeoOracle` struct + `QGradientOracle` impl
+- [ ] T1.2 `q_gradient_into` zero-alloc variant
+- [ ] T1.3 Routing entry in `qgf/mod.rs`
+- [ ] T1.4 Unit tests (G1 bit-identity, G2 perf, G4 alloc-free)
+
+### Phase 2 — GOAT gate
+- [ ] T2.1 G1 bit-identity at α=1.0 and α=0.0
+- [ ] T2.2 G2 perf ≤ 1.5× single-head (median-of-3 per Plan 460 lesson)
+- [ ] T2.3 G3 no-regression (Plan 268 QGF bench still passes)
+- [ ] T2.4 GOAT report `.benchmarks/007_qgf_dual_leo_oracle_goat.md`
+
+### Phase 3 — Deferred to riir-ai
+- [-] T3.1 Consumer adapter (UVFA-as-LeoHead wrapper)
+- [-] T3.2 Downstream task gain G5
+- [-] T3.3 Promotion decision
+
+## Risks
+
+1. **Gain may not materialize** (caveat 1). QGF's `(1/β)·g` tilt is small; the difference between single-head and dual-head gradients may be washed out by the tilt magnitude. Mitigation: G5 is deferred not skipped — if the gain doesn't show, the oracle ships as opt-in and the lesson is documented.
+2. **Shape-mismatch friction** (caveat 4). Real UVFA nets are single-goal; wrapping as `LeoHead` is non-trivial. Mitigation: ship a `UvfaAsLeoHead` adapter helper in katgpt-core if the pattern is generic enough; otherwise leave to riir-ai.
+3. **Max/Min mixer modes may produce discontinuous gradients** (caveat 2). The `combine_into` for Max/Min does element-wise max/min, which has kinks at the swap points. QGF's marginal tilt may not converge cleanly. Mitigation: document Lc as recommended; ship Max/Min behind a `dual_leo_oracle_max_min` sub-feature flag.
+4. **API surface bloat**. QGF now has 3 oracles (Leo, FlowField, Dual). Future oracles (trio, etc.) may proliferate. Mitigation: the `QGradientOracle` trait is the right abstraction; the proliferation is at the impl level, not the API level. Acceptable.
+5. **Confidence-1.0 lie** (caveat 5). Inherited from Plan 268. Not made worse; documented.
+
+## Out of scope
+
+- **Civ flow-field navigation** (Proposal 028).
+- **UVFA network architecture / training** (riir-train / riir-games-civ).
+- **Per-goal switching at runtime** (deferred; no consumer needs it today).
+- **Replacing `LeoHeadOracle`** — it stays as the single-head path. `DualLeoOracle` is a sibling, not a replacement.
+- **Continuous-action QGF** — Plan 268's substrate is discrete-action; this proposal stays discrete.
+
+## References
+
+1. **Q-Guided Flow (QGF)** — Zhou et al., 2026. arXiv:2606.11087. Source paper for Plan 268; the test-time Q-gradient guidance framework this proposal extends.
+2. **Q-VGM: Q-Guided Value-Gradient Matching for Flow-Matching VLA** — arXiv:2606.08015. Sibling prior art: test-time Q-selection/Q-guidance with critic. Relevant to the dual-head confidence contract (caveat 5).
+3. ** Matthews et al. (2026) — "Goal-Conditioned Agents that Learn Everything All at Once"** (LEO paper, arxiv 2605.23551). Source of `DualLeoMixer`.
+4. **Plan 460 root-cause analysis** — the max-pool washout lesson encoded as this proposal's design invariant. `katgpt-rs/.benchmarks/460_flow_field_dual_leo_postmax_goat.md` §"Root cause (confirmed)".
+5. **Plan 268** — the QGF substrate this proposal extends. `katgpt-rs/.plans/268_qgf_test_time_q_guided_flow.md`.
+
+## TL;DR
+
+Ship `DualLeoOracle` as QGF's third oracle — LEO+UVFA Q-gradient fusion at the gradient level, sidestepping the Plan 460 max-pool washout by construction. The primitive is small (~80 LOC + tests), the boundary is clean (katgpt-core, no game semantics), the GOAT gate's G1-G4 are mechanistic and the G5 downstream gain is honestly deferred to riir-ai. **Next action: open Plan NNN on approval.**
