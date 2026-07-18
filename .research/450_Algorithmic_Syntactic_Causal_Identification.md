@@ -117,14 +117,14 @@ Every operation in Theorem 1 is **graph rewriting on a signature**:
 | "monoidal signature" / "string diagram" / "symmetric monoidal category" | (none — no SMC primitive) | **NO** |
 | "marginalization" / `Hide` | (none at signature level; `softmax`-style marginalization in attention is different) | **NO** |
 | "exterior signature" / "maximal model" | (none — closest is `CommittedFieldBlend.pi` aggregation) | **NO** |
-| "topological ordering" / `pre_G` / `succ_G` | Canvas `FlowGraph` CSR (Plan 419 — reachability BFS); Viable Manifold Graph (Plan 312 — transitive closure); `ZonePoset` (cubical_nerve/poset.rs — ancestors/transitive closure) | **YES (graph substrate)** |
+| "topological ordering" / `pre_G` / `succ_G` | Canvas `FlowGraph` CSR (Plan 419 — reachability BFS); Viable Manifold Graph (Plan 312 — transitive closure); `ZonePoset` (crates/katgpt-core/src/cubical_nerve/poset.rs — ancestors/transitive closure) | **YES (graph substrate)** |
 | "back-door adjustment" / "front-door adjustment" | (none — no graph-level adjustment primitive) | **NO** |
 | "Markov category" / "affine SMC" | (none — no category-theory primitive) | **NO** |
 | "min-plus semifield interpretation" | Tropical (max,+) algebra (Plan 337, R321) — **the closest codebase cousin for the semantic interpretation, but it's a different layer** | **Partial — different layer** |
 
 **Grep summary (both vocab sets, all 7 repos, notes + code):**
 - `causal.identif|do.calculus|back.door|front.door|interventional|ADMG|acyclic.directed.mixed|monoidal|fixing.sequence|syntactic.causal|string.diagram` → ZERO codebase hits; the only `.md` hits are Research 043 (Interventional SFT, training-context do-calculus for token masking) and Canvas 398 (which mentions "causal topology" but means *declared* topology, not algorithmic identification).
-- `causal.identif|do.calculus|back.door|front.door|ADMG|monoidal|fixable|district` on `**/*.rs` → ZERO meaningful hits (one stray `back-door` comment in a test about coordinate leakage; one `do-calculus` comment in `riir-gpu/dataloader.rs` referencing Research 043).
+- `causal.identif|do.calculus|back.door|front.door|ADMG|monoidal|fixable|district` on `**/*.rs` → ZERO meaningful hits (one stray `back-door` comment in a test about coordinate leakage; one `do-calculus` comment in `riir-ai/crates/riir-gpu/src/dataloader.rs` referencing Research 043).
 
 **Three-layer check (notes + code + vocab translation) confirms: Q1 NO prior art — the algorithm itself does not ship.** Canvas 398 ships declared topology + reachability; it does NOT ship algorithmic identification via fixing.
 
@@ -138,7 +138,7 @@ Every operation in Theorem 1 is **graph rewriting on a signature**:
 6. **`riir-ai/crates/riir-engine/src/kg_hyperedge/`** — hyperedge extension. Could express multi-entity confounders but doesn't do identification.
 7. **`riir-ai/crates/riir-engine/src/causal_validation/`** — OV-circuit mech-interp harness (Plan 360). **Different "causal"** — head-importance via patched forwards, not graph-rewriting identification.
 8. **`katgpt-rs/crates/katgpt-core/src/causal_head_importance/`** (Plan 358) — attention-mass / OV-norm cheap proxy. **Different layer entirely.**
-9. **`katgpt-rs/.research/043_Interventional_SFT_Causal_Token_Masking.md`** + `riir-gpu/dataloader.rs` — Pearl do-calculus applied to SFT loss masking (`labels[i] = -100` for agent tokens). **Training context** — operates at token level, not graph level. Different layer.
+9. **`katgpt-rs/.research/043_Interventional_SFT_Causal_Token_Masking.md`** + `riir-ai/crates/riir-gpu/src/dataloader.rs` — Pearl do-calculus applied to SFT loss masking (`labels[i] = -100` for agent tokens). **Training context** — operates at token level, not graph level. Different layer.
 10. **Tropical (max,+) algebra** (Plan 337, R321) — closest codebase cousin for the *min-plus semifield interpretation* the paper mentions in §3.1. Different layer (algebra vs causal identification).
 11. **DEC operators** (`katgpt-rs/crates/katgpt-core/src/cubical_nerve/`, Plans 251–252) — `exterior_derivative` (d), `codifferential` (δ), `hodge_laplacian` (Δ). **Graph/topology substrate**; maps the "boundary operator" intuition but for cell complexes, not ADMGs.
 12. **`riir-neuron-db/src/vibe.rs`** — `KgTripleTemplate { subject, predicate, object }` (BLAKE3 hashes). Used for vibe phase cycling, not causal identification.

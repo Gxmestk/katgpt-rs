@@ -32,7 +32,7 @@ The Kronig-Penney delta-lattice model is a 1931 quantum-mechanics toy model: a w
 
 Pure linear algebra. Zero gradient descent, zero Schrödinger equation, zero physics constants. The QM vocabulary ("Bloch factor", "Dirac comb", "Brillouin zone") is just *naming* — the math is a stability/eigenvalue diagnostic over a stack of linear operators.
 
-**Verdict: Gain.** The mechanism is genuinely novel to our stack — verified by grep across all 7 repos in BOTH vocabularies (`kronig|penney|dirac_comb|delta_lattice|bloch_theorem|brillouin|transfer_matrix|band_gap|tunneling|allowed_band|forbidden_band|spectral_gap|wave_function|schrodinger|tight_binding|periodic_barrier|scattering_matrix` → **zero hits**, except the unrelated `spectral_gap` in `katgpt-spectral/spectral.rs` which is a participation-ratio for KV compression, completely different concept). It is **strictly more than `analytic_lattice::compose_chain` ships**: that primitive returns the composite operator only; this primitive analyzes its *spectral band structure* and classifies modes as propagating / decaying / growing. The closest conceptual cousin is `subspace_phase_gate.rs` (`participation_ratio`, `numerical_rank`, `phase_transition_gate`), which gives the discrete `N ≥ d` *sample-sufficiency* threshold — but does not characterize multi-step propagation.
+**Verdict: Gain.** The mechanism is genuinely novel to our stack — verified by grep across all 7 repos in BOTH vocabularies (`kronig|penney|dirac_comb|delta_lattice|bloch_theorem|brillouin|transfer_matrix|band_gap|tunneling|allowed_band|forbidden_band|spectral_gap|wave_function|schrodinger|tight_binding|periodic_barrier|scattering_matrix` → **zero hits**, except the unrelated `spectral_gap` in `crates/katgpt-spectral/src/spectral.rs` which is a participation-ratio for KV compression, completely different concept). It is **strictly more than `analytic_lattice::compose_chain` ships**: that primitive returns the composite operator only; this primitive analyzes its *spectral band structure* and classifies modes as propagating / decaying / growing. The closest conceptual cousin is `subspace_phase_gate.rs` (`participation_ratio`, `numerical_rank`, `phase_transition_gate`), which gives the discrete `N ≥ d` *sample-sufficiency* threshold — but does not characterize multi-step propagation.
 
 But it is **not Super-GOAT** (Q2/Q3 fail):
 - **Q2 (new class of behavior)** — NO. It is a *measurement* (band structure of an existing operator sequence), not a *capability*. HLA's per-tick boundedness is already proven (Plan 353 Lean theorems); this extends the *same idea* to multi-tick propagation. Diagnostics are GOAT/Gain-tier, not Super-GOAT.
@@ -122,7 +122,7 @@ Our primitive extends Bai/Kolter along exactly those three axes: **per-mode** + 
 |---|---|---|
 | "transfer matrix M_n per period" | `TransportOperator { k, data: Vec<f32> }` row-major k×k | YES (`crates/katgpt-core/src/analytic_lattice/mod.rs`) |
 | "compose M = M_N · … · M_1" | `compose_chain(&[TransportOp]) -> TransportOp` / `compose_chain_into` | YES (`analytic_lattice/chain.rs`) |
-| "batch prefix factoring" | `batch_compose_chain` / `batch_compose_chain_into` | YES (`analytic_lattice/batch_chain.rs`) |
+| "batch prefix factoring" | `batch_compose_chain` / `batch_compose_chain_into` | YES (`crates/katgpt-core/src/analytic_lattice/batch_chain.rs`) |
 | "Bloch factor μ = λ^{1/N}" | (NEW — needs eigenvalue + nth-root) | NO — gap |
 | "allowed band / forbidden gap" classification | (NEW — band classifier) | NO — gap |
 | "transmission amplitude t" | (NEW — matrix inverse + entry read) | NO — gap |
@@ -136,9 +136,9 @@ Our primitive extends Bai/Kolter along exactly those three axes: **per-mode** + 
 | "phase transition N ≥ d" | `subspace_phase_gate::phase_transition_gate` | YES (closest cousin for "phase transition") but operates on samples, not on operator eigenvalues |
 
 **Closest shipped spectral concepts** (verified by grep, all different mechanisms):
-- `katgpt-spectral/src/spectral.rs::spectral_gap(eigenvalues, d_eff) -> Option<f32>` — participation-ratio gap `λ_{d_eff}/λ_{d_eff+1}`, used for KV-cache compression bit allocation. **NOT** band-structure spectral gap.
+- `crates/katgpt-spectral/src/spectral.rs::spectral_gap(eigenvalues, d_eff) -> Option<f32>` — participation-ratio gap `λ_{d_eff}/λ_{d_eff+1}`, used for KV-cache compression bit allocation. **NOT** band-structure spectral gap.
 - `subspace_phase_gate.rs::participation_ratio` / `numerical_rank` / `phase_transition_gate` — intrinsic-dimension estimation + the `N ≥ d` sample-sufficiency necessary condition. **NOT** multi-step propagation analysis.
-- `katgpt-dec/src/hodge.rs::betti_numbers` — counts zero eigenvalues of the Hodge Laplacian (topological holes in a cochain). **NOT** eigenvalue magnitude classification.
+- `crates/katgpt-dec/src/hodge.rs::betti_numbers` — counts zero eigenvalues of the Hodge Laplacian (topological holes in a cochain). **NOT** eigenvalue magnitude classification.
 - `katgpt-dec/src/operators.rs::hodge_laplacian` — gives `δd + dδ`, whose spectrum *can* feed band-structure analysis (fusion hook, see §3.6).
 
 ### 2.2 Closest cousins (4 — 3 shipped + 1 cited ML paper)
@@ -189,7 +189,7 @@ For each Super-GOAT factory module, what does the transfer-matrix / band-structu
 
 ### 3.2 `latent_functor/` (`zone_gating`, `reestimation`, `arithmetic`, `cross_game`, `k_selector`, `quality_gate`)
 
-Each functor application `F: latent → latent` is a vector field; its Jacobian `J_F(x_*)` at a fixed point `x_*` is the transfer matrix for infinitesimal perturbations. The eigenvalues of `J_F(x_*)` determine whether `x_*` is attracting (`|λ| < 1`), repelling (`|λ| > 1`), or a center (`|λ| = 1`). This is textbook dynamical-systems stability analysis — it just hasn't been wrapped as a primitive in `latent_functor/quality_gate.rs`. The proposed primitive ships the wrapper.
+Each functor application `F: latent → latent` is a vector field; its Jacobian `J_F(x_*)` at a fixed point `x_*` is the transfer matrix for infinitesimal perturbations. The eigenvalues of `J_F(x_*)` determine whether `x_*` is attracting (`|λ| < 1`), repelling (`|λ| > 1`), or a center (`|λ| = 1`). This is textbook dynamical-systems stability analysis — it just hasn't been wrapped as a primitive in `riir-ai/crates/riir-engine/src/latent_functor/quality_gate.rs`. The proposed primitive ships the wrapper.
 
 ### 3.3 `cgsp_runtime/` (curiosity-guided self-play)
 
@@ -236,7 +236,7 @@ This is the substrate for a **topological band classifier** on belief cochains (
 
 | Q | Answer | Evidence |
 |---|---|---|
-| Q1 — No prior art? | **YES** | Grep across all 7 repos in BOTH vocabularies (`kronig`, `penney`, `dirac_comb`, `delta_lattice`, `bloch`, `brillouin`, `transfer_matrix`, `band_gap`, `tunneling`, `allowed_band`, `forbidden_band`, `wave_function`, `schrodinger`, `tight_binding`, `periodic_barrier`, `scattering_matrix`) → zero hits. The unrelated `spectral_gap` in `katgpt-spectral/spectral.rs` is participation-ratio for KV compression — different mechanism, coincidental name overlap. The closest cousins (`analytic_lattice::compose_chain`, `subspace_phase_gate::phase_transition_gate`, HLA Lean boundedness Plan 353) cover adjacent but distinct territory. |
+| Q1 — No prior art? | **YES** | Grep across all 7 repos in BOTH vocabularies (`kronig`, `penney`, `dirac_comb`, `delta_lattice`, `bloch`, `brillouin`, `transfer_matrix`, `band_gap`, `tunneling`, `allowed_band`, `forbidden_band`, `wave_function`, `schrodinger`, `tight_binding`, `periodic_barrier`, `scattering_matrix`) → zero hits. The unrelated `spectral_gap` in `crates/katgpt-spectral/src/spectral.rs` is participation-ratio for KV compression — different mechanism, coincidental name overlap. The closest cousins (`analytic_lattice::compose_chain`, `subspace_phase_gate::phase_transition_gate`, HLA Lean boundedness Plan 353) cover adjacent but distinct territory. |
 | Q2 — New class of behavior? | **NO** | It is a *measurement* (band structure of an existing operator sequence), not a *capability*. HLA per-tick boundedness is already proven (Lean Plan 353); this is the multi-tick empirical extension — same idea, more general regime. The "band-gap pruner" fusion (§2.3 row 4) is *potentially* a new behavior, but it's TBD — needs a concrete consumer + PoC before claiming behavior-class novelty. |
 | Q3 — Product selling point? | **NO clear sentence** | "Our NPCs have band-gap-aware latent propagation" is engineering quality, not a customer-facing feature. Cannot complete "we do X that no competitor can" in a sentence that means anything to a buyer. |
 | Q4 — Force multiplier? | **YES but thin** | Connects to: `analytic_lattice/compose_chain` (consumes output), `subspace_phase_gate` (extends from sample-sufficiency to mode-propagation), `latent_functor/reestimation` (band-edge as new trigger), HLA Lean boundedness (multi-tick extension), DEC `hodge_laplacian` (topological band structure). But every integration is "use as a diagnostic signal" — none creates a new behavior class on its own. |

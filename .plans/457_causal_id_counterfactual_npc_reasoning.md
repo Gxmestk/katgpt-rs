@@ -73,7 +73,7 @@ The algorithm is already implemented + debugged in the Issue 545 PoC bench (`rii
 
 ### Tasks
 
-- [x] **T2.1** `benches/causal_id_goat.rs` — criterion bench over the 4 scenarios + a synthesized 32-node subgraph. Print verdict table.
+- [x] **T2.1** `crates/katgpt-core/benches/causal_id_goat.rs` — criterion bench over the 4 scenarios + a synthesized 32-node subgraph. Print verdict table.
 - [x] **T2.2** G1 soundness test: 4 scenarios × `assert_eq!` against ground-truth signatures.
   - Asserted inside the bench setup (panic on mismatch). All 4 scenarios reproduce Issue 545 ground truth, including Scenario C's 5-node signature with NPC1 excluded.
 - [x] **T2.3** G2 perf gate: identify on 32 nodes ≤ 100µs release; document if exceeded.
@@ -105,7 +105,7 @@ This is the load-bearing phase. The primitive in Phase 1 is useless without a wa
   - **(a) GM-authored hidden variables** — explicit `HiddenConfounder { a, b, reason }` declarations from the GM tool (Phase 4). Stored in `riir-neuron-db` `vibe.rs` `KgTripleTemplate` extension.
     - **DONE.** `HiddenConfounder` + `inject_confounders()` shipped.
   - **(b) System-detected confounders** — when two visible nodes have a latent common cause inferred from `experience_graph` co-occurrence above a threshold (sigmoid-gated, NOT softmax per global rule). Offline-only, computed in the sleep cycle.
-    - **DONE (2026-07-18).** `detect_confounders(graph, guard, resolver, scoring)` shipped in `causal_id/detected.rs` behind feature `causal_id_experience_graph`. Sigmoid-gated co-occurrence scoring on sibling edges (structural, weight 0.7) + latent-embedding cosine similarity (weight 0.3), default threshold 0.6 with sharpness λ=8.0. Added upstream `ExperienceGraph::iter(guard)` to riir-neuron-db (was missing — only `latent_seed_top_k` exposed node iteration). 9 unit tests + 1 integration test, all PASS.
+    - **DONE (2026-07-18).** `detect_confounders(graph, guard, resolver, scoring)` shipped in `riir-ai/crates/riir-engine/src/causal_id/detected.rs` behind feature `causal_id_experience_graph`. Sigmoid-gated co-occurrence scoring on sibling edges (structural, weight 0.7) + latent-embedding cosine similarity (weight 0.3), default threshold 0.6 with sharpness λ=8.0. Added upstream `ExperienceGraph::iter(guard)` to riir-neuron-db (was missing — only `latent_seed_top_k` exposed node iteration). 9 unit tests + 1 integration test, all PASS.
   - **(c) Designer-authored zone/faction confounders** — static config (e.g., "all NPCs in zone Z share an unobserved mood vector"). Shipped as a config file.
     - **DONE (2026-07-18).** `ConfounderGroup` + `ConfounderConfig` + `config_to_confounders()` shipped in `causal_id/config.rs`. Pure-data schema (no logic), expands each group into the complete pairwise bidirected clique on its members (correct ADMG semantics — star encoding would miss paths). Rides under the existing `causal_id_consumer` feature (no new deps). 10 unit tests including integration with `what_if`, all PASS.
   - The layer composes all three sources into a single `Admg` with the right bidirected edges.
@@ -132,7 +132,7 @@ This is the load-bearing phase. The primitive in Phase 1 is useless without a wa
 
 Both source (b) and source (c) shipped as additive modules on top of source (a):
 
-- **(b) System-detected:** `causal_id/detected.rs` behind feature `causal_id_experience_graph`. Sigmoid-gated co-occurrence scoring on sibling edges (structural proximity) + latent-embedding cosine similarity. Designer-tunable weights + threshold (no learning — modelless mandate). Added upstream `ExperienceGraph::iter(guard)` to expose node iteration (was missing — only `latent_seed_top_k` exposed it, awkwardly sorted by similarity to a query vector).
+- **(b) System-detected:** `riir-ai/crates/riir-engine/src/causal_id/detected.rs` behind feature `causal_id_experience_graph`. Sigmoid-gated co-occurrence scoring on sibling edges (structural proximity) + latent-embedding cosine similarity. Designer-tunable weights + threshold (no learning — modelless mandate). Added upstream `ExperienceGraph::iter(guard)` to expose node iteration (was missing — only `latent_seed_top_k` exposed it, awkwardly sorted by similarity to a query vector).
 - **(c) Designer-authored:** `causal_id/config.rs` riding under `causal_id_consumer` (no new deps). `ConfounderGroup` + `ConfounderConfig` pure-data schema. Each group expands to its complete pairwise bidirected clique (correct ADMG semantics — star encoding would miss paths and let `identify` find spurious derivations).
 
 Both produce `Vec<HiddenConfounder>` and feed into the same `what_if` pipeline — sources compose by concatenating the vecs.

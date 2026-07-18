@@ -454,9 +454,9 @@ them when finalizing their plans:
 
 | File | Broken ref | Actual location |
 |---|---|---|
-| `katgpt-rs/.plans/459_flow_field_dual_leo_mixer_fusion.md:44` | `benches/dual_flow_field_bench.rs` | `crates/katgpt-core/benches/dual_flow_field_bench.rs` (sibling WIP) |
-| `katgpt-rs/.plans/460_flow_field_dual_leo_postmax_fusion.md:136` | `benches/dual_flow_field_bench.rs` | same as above |
-| `katgpt-rs/.proposals/006_flow_field_hard_constraint_in_guidance.md` | `examples/ht_chantry_deadlock_chain_diagnostic.rs` | never shipped (Proposal 006 was REVERTED in commit `9065953e`); ref is now historical noise inside the proposal doc |
+| `katgpt-rs/.plans/459_flow_field_dual_leo_mixer_fusion.md:44` | `crates/katgpt-core/benches/dual_flow_field_bench.rs` | `crates/katgpt-core/benches/dual_flow_field_bench.rs` (sibling WIP) |
+| `katgpt-rs/.plans/460_flow_field_dual_leo_postmax_fusion.md:136` | `crates/katgpt-core/benches/dual_flow_field_bench.rs` | same as above |
+| `katgpt-rs/.proposals/006_flow_field_hard_constraint_in_guidance.md` | `crates/katgpt-core/examples/ht_chantry_deadlock_chain_diagnostic.rs` | never shipped (Proposal 006 was REVERTED in commit `9065953e`); ref is now historical noise inside the proposal doc |
 
 The first two are real path bugs (file exists, wrong prefix). The third is
 moot — Proposal 006 was reverted, so the missing example is expected.
@@ -516,9 +516,9 @@ safety). Re-investigation this session:
 
 | Flag | Verdict | Action |
 |---|---|---|
-| `.plans/459_flow_field_dual_leo_mixer_fusion.md:44` — `benches/dual_flow_field_bench.rs` | **CONFIRMED BUG** (file is at `crates/katgpt-core/benches/dual_flow_field_bench.rs`; bare `benches/` from repo-root `.plans/` resolves to nonexistent `<repo>/benches/`). Owning plan landed (`37623e22`) → parallel-agent safety lifted. | **FIXED** in this session |
-| `.plans/460_flow_field_dual_leo_postmax_fusion.md:136` — `benches/dual_flow_field_bench.rs` | Same as above. Owning plan landed (`dd10aaa9`). | **FIXED** in this session |
-| `.proposals/006_flow_field_hard_constraint_in_guidance.md` — `examples/ht_chantry_deadlock_chain_diagnostic.rs` | **FALSE POSITIVE.** The example file exists at `crates/katgpt-core/examples/ht_chantry_deadlock_chain_diagnostic.rs`, and the proposal already uses the correct `../crates/katgpt-core/examples/...` prefix from `.proposals/`. Proposal header explicitly carries the REJECTED/REVERT verdict (line 3: `Status: **REJECTED**`; line 7 cross-refs Issue 182's CLOSED-with-REVERT). No drift — session 15 mis-flagged it. | **No action needed** |
+| `.plans/459_flow_field_dual_leo_mixer_fusion.md:44` — `crates/katgpt-core/benches/dual_flow_field_bench.rs` | **CONFIRMED BUG** (file is at `crates/katgpt-core/benches/dual_flow_field_bench.rs`; bare `benches/` from repo-root `.plans/` resolves to nonexistent `<repo>/benches/`). Owning plan landed (`37623e22`) → parallel-agent safety lifted. | **FIXED** in this session |
+| `.plans/460_flow_field_dual_leo_postmax_fusion.md:136` — `crates/katgpt-core/benches/dual_flow_field_bench.rs` | Same as above. Owning plan landed (`dd10aaa9`). | **FIXED** in this session |
+| `.proposals/006_flow_field_hard_constraint_in_guidance.md` — `crates/katgpt-core/examples/ht_chantry_deadlock_chain_diagnostic.rs` | **FALSE POSITIVE.** The example file exists at `crates/katgpt-core/examples/ht_chantry_deadlock_chain_diagnostic.rs`, and the proposal already uses the correct `../crates/katgpt-core/examples/...` prefix from `.proposals/`. Proposal header explicitly carries the REJECTED/REVERT verdict (line 3: `Status: **REJECTED**`; line 7 cross-refs Issue 182's CLOSED-with-REVERT). No drift — session 15 mis-flagged it. | **No action needed** |
 
 The two fixes align the `.plans/{459,460}_*.md` references with the path
 already used in the corresponding `.benchmarks/{459,460}_*.md` GOAT reports

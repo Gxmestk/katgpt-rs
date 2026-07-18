@@ -91,7 +91,7 @@ Theorem 7 proves this is geometric: rotational optical flow is depth-independent
 | Multi-axis fixed-strength subspace projection | `subspace_steering` (Plan 412) | ✅ Shipped DEFAULT-ON. Projects a delta onto orthogonal basis axes. Different shape — Poincaré's `W` is **non-orthogonal** (it's a left-inverse of the Jacobian, not an orthonormalization). |
 | Alignment-gated invariant-subspace correction | `tilr_invariant_subspace` (Plan 425) | ✅ Shipped DEFAULT-ON. Step-size `η = η_base · γ` where `γ = ‖Πd‖/‖d‖`. **The TILR `γ` is the modelless analog of Poincaré's "Jacobian rank-6" check** — both gate on "the latent step lives in the decodable subspace". |
 | Rotation-equivariant perception | `se2_equivariant` in `riir-engine/src/equivariant/` (Plan 354, R166, DEFAULT-ON in riir-ai) | ✅ Shipped private. Lift → group-conv → project pipeline for SE(2) equivariance. **Poincaré is the action→latent inverse**; SE(2) is the perception-equivariance forward. They compose: SE(2) gives equivariant features; Poincaré navigates inside them. |
-| Pseudoinverse `W†` as a deterministic navigator | None shipped. `katgpt-core/src/linear.rs` has matmul helpers; `thin_svd_into` (Plan 301) gives the SVD from which `W† = V·Σ⁻¹·Uᵀ` is one line. | ❌ **MISSING.** The closed-form inverse map is the gap. |
+| Pseudoinverse `W†` as a deterministic navigator | None shipped. `crates/katgpt-core/src/occupancy/linear.rs` has matmul helpers; `thin_svd_into` (Plan 301) gives the SVD from which `W† = V·Σ⁻¹·Uᵀ` is one line. | ❌ **MISSING.** The closed-form inverse map is the gap. |
 | Frozen `MerkleFrozenEnvelope` for the fitted adapter | `MerkleFrozenEnvelope` (riir-neuron-db, Plan 007) | ✅ Shipped in neuron-db (not katgpt-rs — chain-bridge concern). The fitted `φ + W + W†` triple is a frozen artifact. **Pattern exists; Poincaré-specific wrapper does not.** |
 
 ### 2.2 What's NOT in katgpt-rs (the gap — three missing primitives)
@@ -152,7 +152,7 @@ Finish the sentence: *"Our NPCs imagine what they would see and feel at unvisite
 ### Q4: Force multiplier? — **PASS** (≥8 systems)
 
 Connects to:
-1. **HLA kernel** (`katgpt-core/src/sense/reconstruction.rs`) — `evolve_hla` becomes *imagined-able*; the NPC can predict its own HLA at unvisited positions.
+1. **HLA kernel** (`crates/katgpt-sense/src/reconstruction.rs`) — `evolve_hla` becomes *imagined-able*; the NPC can predict its own HLA at unvisited positions.
 2. **Two-brain model** (per AGENTS.md) — closes the "imagine" gap.
 3. **Latent Field Steering** (Plan 309) — Poincaré is the inverse direction.
 4. **Viable Manifold Graph** (Plan 312) — complementary (continuous vs discrete navigation).

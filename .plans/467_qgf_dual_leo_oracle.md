@@ -77,7 +77,7 @@ Both `leo_all_goals` and `dual_leo` are already default-on in `katgpt-core`'s `d
 - [x] T1: Add `dual_leo_oracle` module to `crates/katgpt-core/src/qgf/oracles.rs` after `FlowFieldOracle` (struct + `new` + accessors + `QGradientOracle` impl + doc-comment encoding the Plan 460 invariant).
 - [x] T2: Add `pub use dual_leo_oracle::DualLeoOracle;` re-export, gated on `leo_all_goals + dual_leo`.
 - [x] T3: Mirror `LeoHeadOracle`'s test suite + add dual-specific tests (α=1.0 bit-identity with `LeoHeadOracle` on the same LEO head; α=0.0 bit-identity with `LeoHeadOracle` wrapping UVFA head; Lc α=0.5 produces exactly `[α·leo[i] + (1-α)·uvfa[i]]`; out-of-range `goal_idx` → empty gradient + zero-filled buffer; `q_gradient_at`/`q_gradient_into` agree; confidence is 1.0).
-- [x] T4: Update the module-level tier table in `qgf/oracles.rs` (lines 8-16) to add `DualLeoOracle` row.
+- [x] T4: Update the module-level tier table in `crates/katgpt-core/src/qgf/oracles.rs` (lines 8-16) to add `DualLeoOracle` row.
 - [x] T5: Update `qgf/mod.rs` tier table (around lines 38-42) to add `Hot | DualLeoOracle | dual_leo | 1.0` row.
 - [x] T6: Run `cargo test -p katgpt-core --features qgf_oracle,leo_all_goals,dual_leo --lib` — all tests pass.
 - [x] T7: Run `cargo clippy -p katgpt-core --features qgf_oracle,leo_all_goals,dual_leo --all-targets` — no new warnings.
