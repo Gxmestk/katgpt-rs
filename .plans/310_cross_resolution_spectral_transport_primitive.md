@@ -186,7 +186,7 @@ for the integration guide.
 - [-] T5.1 `NeuronShard::transport_to_tier(d_dst, bases) -> NeuronShard` in
       `riir-neuron-db/src/shard.rs`. **DEFERRED to riir-neuron-db Plan 004.**
 - [-] T5.2 `ShardIndex::get_at_tier(zone_hash, d_dst, bases) -> NeuronShard` in
-      `riir-neuron-db/src/index.rs`. **DEFERRED to riir-neuron-db Plan 004.**
+      `seal-online-remaster/crates/seal-asset-explorer/src/index.rs`. **DEFERRED to riir-neuron-db Plan 004.**
 - [-] T5.3 Consolidation integration (`Raven/δ-Mem` low-res → high-res commit). **DEFERRED to riir-neuron-db Plan 004.**
 - [-] T5.4 AnyRAG escalation gateway transport. **DEFERRED to riir-neuron-db Plan 004.**
 

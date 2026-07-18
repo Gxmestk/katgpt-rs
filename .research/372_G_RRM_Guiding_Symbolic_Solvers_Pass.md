@@ -149,7 +149,7 @@ The §3.6 rule warns: *"A PASS verdict backed only by architectural reasoning is
 - `katgpt-rs/.research/182_STV_Self_Trained_Verification.md` — iterative V-R loop.
 
 **Shipped primitives referenced:**
-- `katgpt-rs/crates/katgpt-core/src/traits.rs` — `ConstraintPruner`, `ScreeningPruner`, `SpeculativeGenerator`, `DominoPruner`, `CompletionHorizon`
+- `seal-online-remaster/crates/seal-core/src/packet/traits.rs` — `ConstraintPruner`, `ScreeningPruner`, `SpeculativeGenerator`, `DominoPruner`, `CompletionHorizon`
 - `katgpt-rs/crates/katgpt-core/src/cgsp/traits.rs` — `Solver`, `HintDeltaBandit`, `DifficultyFilter`, `BatchQualityGate`, `CollapseSignal`
 - `katgpt-rs/crates/katgpt-pruners/src/sudoku_pruner.rs` — `SudokuPruner::new_mrv` (Issue 005 Option A, MRV cell ordering), `latent_marginals` (Issue 005 Option B, modelless per-cell prior)
 - `katgpt-rs/benches/sudoku_speculate_bench.rs` — three solver regimes (`backtrack` / `speculate_iterative` / `speculate_oneshot`)

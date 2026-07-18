@@ -99,8 +99,8 @@ Our codebase runs cosine similarity in **five load-bearing latent-space sites**:
 
 | Site | Dim | Path | Cosine function |
 |------|-----|------|-----------------|
-| Shard retrieval (hot) | 8 | `riir-neuron-db/src/index.rs` `ShardIndex::query` | `cosine_sim_ranking_scaled` (squared cosine, no sqrt) |
-| Shard KNN (cold) | 8 | `riir-neuron-db/src/index.rs` `query_k_nearest_cosine` | `cosine_sim` (full cosine) |
+| Shard retrieval (hot) | 8 | `seal-online-remaster/crates/seal-asset-explorer/src/index.rs` `ShardIndex::query` | `cosine_sim_ranking_scaled` (squared cosine, no sqrt) |
+| Shard KNN (cold) | 8 | `seal-online-remaster/crates/seal-asset-explorer/src/index.rs` `query_k_nearest_cosine` | `cosine_sim` (full cosine) |
 | Item retrieval | 8 | `riir-neuron-db/src/item_index.rs` `ItemEmbedIndex::query` | cosine on schema-centroid embeddings |
 | MAG transfer scoring | 64 | `riir-neuron-db/src/consolidation/mod.rs` | `CentroidCosine` / `ClassConditionalCosineMalicious/Benign` |
 | Multi-token rerank | var | `katgpt-rs/crates/katgpt-attn-match/src/rerank.rs` | `cosine_score_into` |

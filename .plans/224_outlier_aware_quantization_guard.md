@@ -200,7 +200,7 @@ graph TD
 | `katgpt-core/src/types.rs` | Add `OutlierGuardConfig`, `OutlierAction` |
 | `katgpt-rs/crates/katgpt-spectral/src/spectral.rs` | Add `ks_d_statistic()` |
 | `katgpt-rs/crates/katgpt-spectral/src/outlier_guard.rs` | New file: `OutlierGuard`, `LayerReport` |
-| `katgpt-rs/src/spectralquant/mod.rs` | Add `outlier_guard` module (behind feature gate) |
+| `riir-ai/crates/riir-gpu/src/spectralquant/mod.rs` | Add `outlier_guard` module (behind feature gate) |
 | Model loading path | Add `OutlierGuard::scan_model()` call |
 | `Cargo.toml` | Add `outlier_guard` feature (default-on) |
 | `tests/` | New test file for GOAT proofs |

@@ -191,7 +191,7 @@ Zero-allocation. O(vocab) per step only for the entropy computation (which `Adap
 ## 5. Cross-References
 
 - `katgpt-rs/src/speculative/verifier.rs` — `LeviathanVerifier` (RS already shipped)
-- `katgpt-rs/src/llmexec_guard.rs` — entropy→tier sigmoid (to be upgraded or demoted)
+- `katgpt-rs/crates/katgpt-core/src/llmexec_guard.rs` — entropy→tier sigmoid (to be upgraded or demoted)
 - `katgpt-rs/src/attn_match/adaptive_cot.rs` — `AdaptiveTraceCompactor::observe_entropy` (EMA entropy helper to reuse)
 - `katgpt-rs/crates/katgpt-pruners/src/freq_bandit.rs` — acceptance_rate bandit reward (forecast becomes prior)
 - `katgpt-rs/crates/katgpt-speculative/src/distill/trd.rs` — `RejectionReason::EntropySpike` (entropy threshold gate)

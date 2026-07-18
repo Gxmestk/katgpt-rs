@@ -20,7 +20,7 @@ Ship the open, generic half of the Cognitive Integrity Layer (private half: `rii
 
 ### Tasks
 
-- [x] **T1.1** Create `katgpt-rs/src/faithfulness/mod.rs` with module doc + feature gate `#![cfg(feature = "faithfulness_probe")]`.
+- [x] **T1.1** Create `katgpt-rs/crates/katgpt-core/src/faithfulness/mod.rs` with module doc + feature gate `#![cfg(feature = "faithfulness_probe")]`.
   **Implementation:** Module doc present; no inner `cfg` (parent module gate in lib.rs handles feature gating).
 - [x] **T1.2** Define `Intervention` enum (`Empty`, `Shuffle`, `Corrupt`, `Irrelevant`, `Filler`) — `#[repr(u8)]`, `#[derive(Clone, Copy, Debug, PartialEq, Eq)]`. Zero-alloc.
 - [x] **T1.3** Define `FaithfulnessProfile<D>` struct (`empty_delta`, `shuffle_or_corrupt_delta`, `irrelevant_delta`, `filler_delta`) — POD, `D: PartialOrd + Copy + Default`. Implement `is_faithfully_used(threshold)` per Research 244 §4.

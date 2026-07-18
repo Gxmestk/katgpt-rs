@@ -236,7 +236,7 @@ The original absolute latency targets (D=8 < 50ns, D=64 < 200ns) were **structur
   - `riir-ai/.research/156_clifford_wedge_npc_emotional_complementarity_guide.md` (HLA fusion selling point — file number corrected 155→156 due to collision)
   - `riir-neuron-db/.research/008_shard_structural_retrieval_guide.md` (shard retrieval selling point — file number corrected 007→008 due to collision)
   - `riir-ai/crates/riir-engine/src/cgsp_runtime/clifford_bridge.rs` (complementarity → Sociability CGSP target, `clifford_complementarity` feature, commit `0bb4b617`)
-  - `riir-neuron-db/src/index.rs::retrieve_diverse` (greedy max-wedge-span ensemble, `diverse_retrieval` feature, commit `33e960e`)
+  - `seal-online-remaster/crates/seal-asset-explorer/src/index.rs::retrieve_diverse` (greedy max-wedge-span ensemble, `diverse_retrieval` feature, commit `33e960e`)
 
 ### What stays public vs private (if elevated to Super-GOAT later)
 

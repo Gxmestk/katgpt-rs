@@ -17,7 +17,7 @@ Implement the modelless Speculative Reconciliation Engine. This is the core infe
 ## Task
 
 - [x] **T1: Core Types** — `TrajectoryPoint` (fixed-layout `[f32; 8]`), `ReconciliationVerdict` enum (Accept/Quarantine/Uncertain), `ReconciliationConfig` (thresholds, K, max_speed, map_bounds). All `#[repr(C)]`, zero heap.
-  - File: `katgpt-rs/src/spec_reconciliation/types.rs`
+  - File: `katgpt-rs/crates/katgpt-speculative/src/spec_reconciliation/types.rs`
   - Test: unit test for TrajectoryPoint construction, Verdict Debug/Clone
 
 - [x] **T2: `ReconciliationPruner`** — Implements `ConstraintPruner`. Hard bounds: velocity (max_speed × dt), position (map_bounds), kill_rate (Chebyshev 5σ). Returns `bool`.
@@ -41,7 +41,7 @@ Implement the modelless Speculative Reconciliation Engine. This is the core infe
   - Test: end-to-end with legitimate trajectory → Accept, hack trajectory → Quarantine
 
 - [x] **T6: `AdaptiveReconciler`** — Wraps `SpecReconciler` with `BanditPruner<ManifoldScorer>` for per-player threshold learning. Uses `ThinkingBandit` freeze/thaw for persistence across sessions.
-  - File: `katgpt-rs/src/spec_reconciliation/adaptive.rs`
+  - File: `katgpt-rs/crates/katgpt-speculative/src/spec_reconciliation/adaptive.rs`
   - Reuses: `BanditPruner` from `katgpt-rs/crates/katgpt-ruliology/src/bandit.rs`, `ThinkingBanditFrozen` from Plan 194
   - Test: simulate 100 reconciliations, verify bandit converges to optimal threshold
 
@@ -57,7 +57,7 @@ Implement the modelless Speculative Reconciliation Engine. This is the core infe
   - G8: matrix soundness (determinant audit on all accepted merges)
 
 - [x] **T8: Feature Gate + Module Wiring** — `spec_reconciliation` feature gate in `katgpt-rs/Cargo.toml`. Module public API. Zero impact when disabled.
-  - File: `katgpt-rs/src/spec_reconciliation/mod.rs`, `katgpt-rs/Cargo.toml`
+  - File: `katgpt-rs/crates/katgpt-speculative/src/spec_reconciliation/mod.rs`, `katgpt-rs/Cargo.toml`
   - Test: `cargo build` without feature → no compilation. `cargo build --features spec_reconciliation` → compiles.
 
 - [x] **T9: Example Demo** — Interactive demo showing reconciliation of 4 scenarios: legitimate play, teleport hack, kill-rate hack, direction mismatch.

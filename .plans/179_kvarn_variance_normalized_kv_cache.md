@@ -56,7 +56,7 @@ Implement the Sinkhorn-style iterative log-domain variance normalization:
 
 ### T2: KVarN KV-Cache Struct
 
-**Where:** `katgpt-rs/src/kvarn/kv_cache.rs` (new module)
+**Where:** `katgpt-rs/crates/katgpt-kv/src/kvarn/kv_cache.rs` (new module)
 
 New `KVarNKVCache` struct:
 
@@ -93,7 +93,7 @@ The key evaluation methodology from the paper:
 
 ### T4: KVarN Module + Feature Gate
 
-**Where:** `katgpt-rs/src/kvarn/mod.rs` + `katgpt-rs/src/lib.rs`
+**Where:** `katgpt-rs/crates/katgpt-kv/src/kvarn/mod.rs` + `katgpt-rs/src/lib.rs`
 
 - [x] New `kvarn` feature flag in `Cargo.toml`
 - [x] `pub mod kvarn;` behind `#[cfg(feature = "kvarn")]`

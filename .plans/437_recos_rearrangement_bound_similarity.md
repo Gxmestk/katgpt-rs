@@ -3,7 +3,7 @@
 **Date:** 2026-07-14
 **Research:** [katgpt-rs/.research/421_Recos_Rearrangement_Bound_Similarity.md](../.research/421_Recos_Rearrangement_Bound_Similarity.md)
 **Source paper:** [arXiv:2602.05266](https://arxiv.org/abs/2602.05266) — "Beyond Cosine Similarity", Xinbo Ai (BUPT), Feb 2026
-**Target:** `katgpt-rs/crates/katgpt-core/src/similarity.rs` (open primitive) + `katgpt-rs/crates/katgpt-core/src/mag/` (cold-path consumer) + `riir-neuron-db/src/index.rs` (conditional hot-path consumer)
+**Target:** `katgpt-rs/crates/katgpt-core/src/similarity.rs` (open primitive) + `katgpt-rs/crates/katgpt-core/src/mag/` (cold-path consumer) + `seal-online-remaster/crates/seal-asset-explorer/src/index.rs` (conditional hot-path consumer)
 **Cargo feature:** `recos` (opt-in until GOAT gate passes)
 **Status:** ✅ COMPLETE, OPT-IN (G1 honest FAIL → no promotion) — Phase 1 ✅ DONE (T1.1–T1.7); Phase 2 ✅ DONE (G1 **FAIL** → do NOT promote); Phase 3 ✅ SHIPPED (opt-in diagnostic); Phase 4 ✅ SHIPPED (opt-in diagnostic, T4.1-T4.5 done, T4.6 stretch deferred).
 
@@ -52,8 +52,8 @@ corrected two details:
 
 | # | Site | Dim | File:line | Current function | Status |
 |---|------|-----|-----------|------------------|--------|
-| 1 | `ShardIndex::query` ±1 rerank (hot) | 8 | `riir-neuron-db/src/index.rs:253,258,265` | `cosine_sim_ranking_scaled(ctx, &emb, norm_a_sq)` | ✅ verified |
-| 2 | `query_k_nearest_cosine` scoring (hot) | 8 | `riir-neuron-db/src/index.rs:1041` | `dot_8(&ctx_norm, &normalized_hla[..])` (unit-norm → cos=dot) | ✅ verified; note didn't emphasize |
+| 1 | `ShardIndex::query` ±1 rerank (hot) | 8 | `seal-online-remaster/crates/seal-asset-explorer/src/index.rs:253,258,265` | `cosine_sim_ranking_scaled(ctx, &emb, norm_a_sq)` | ✅ verified |
+| 2 | `query_k_nearest_cosine` scoring (hot) | 8 | `seal-online-remaster/crates/seal-asset-explorer/src/index.rs:1041` | `dot_8(&ctx_norm, &normalized_hla[..])` (unit-norm → cos=dot) | ✅ verified; note didn't emphasize |
 | 3 | MAG transfer scoring (cold) | 64 | `katgpt-rs/crates/katgpt-core/src/mag/transfer.rs` | `TransferMetric::{CentroidCosine, ClassConditionalCosine*}` via `cosine()` | ✅ verified; **note said "5th metric" — actually the 9th** (enum has 8 variants 0-7) |
 | 4 | Item retrieval | 8 | (riir-neuron-db item_index — deferred, lower priority) | — | not verified this pass |
 
@@ -117,7 +117,7 @@ feature flag. Mirror the `smooth_min_similarity` gating/re-export pattern.
       if bound.abs() < 1e-12 { 0.0 } else { dot / bound }
   }
   ```
-  `dot_8` is private in `riir-neuron-db/src/index.rs`; katgpt-core's `similarity.rs`
+  `dot_8` is private in `seal-online-remaster/crates/seal-asset-explorer/src/index.rs`; katgpt-core's `similarity.rs`
   needs its own local `dot_8` (or reuse an existing helper if one exists in the crate).
   Define a private `fn dot_8` in `similarity.rs` scoped to the `recos` cfg.
 
@@ -373,7 +373,7 @@ warning when the recos branch is active.
   `riir-neuron-db/Cargo.toml`. Documented the Phase 2 G1 FAIL, the lost `norm_a_sq`
   optimization, and the opt-in diagnostic status in the feature comment.
 
-- [x] **T4.2** In `riir-neuron-db/src/index.rs` `ShardIndex::query`, added a
+- [x] **T4.2** In `seal-online-remaster/crates/seal-asset-explorer/src/index.rs` `ShardIndex::query`, added a
   `#[cfg(feature = "recos_rerank")]` alternate rerank path that calls
   `katgpt_core::recos_sim_ranking(context, &hull[...].embedding)` instead of
   `cosine_sim_ranking_scaled`. The lost `norm_a_sq` optimization is documented

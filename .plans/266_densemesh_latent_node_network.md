@@ -40,7 +40,7 @@ katgpt-rs/src/dense_mesh/
 
 ### Phase 1 — Core Traits & Types (unblock) ✅
 
-- [x] Create `katgpt-rs/src/dense_mesh/mod.rs` with module declarations
+- [x] Create `katgpt-rs/crates/katgpt-transformer/src/dense_mesh/mod.rs` with module declarations
 - [x] Define `DenseHidden` type in `types.rs` — fixed-size hidden state buffer (`Box<[f32]>`), zero-alloc scratch reuse
 - [x] Define `Topology` struct in `types.rs` — `Vec<usize>` of layer widths (e.g., `[1,4,4,4,1]`), `LayerRole` enum (Input/Hidden/Output)
 - [x] Define `MeshConfig` in `types.rs` — topology, edge registry, compute thresholds
@@ -123,7 +123,7 @@ katgpt-rs/src/dense_mesh/
 - `katgpt-rs/src/speculative/types.rs` — ForwardContext, scores
 - `katgpt-rs/src/types.rs` — LoRA weights, DomainLatent
 - `katgpt-rs/src/inference_router.rs` — compute target routing
-- `katgpt-rs/src/simd.rs` — SIMD primitives for aggregation
+- `katgpt-rs/crates/katgpt-dec/src/simd.rs` — SIMD primitives for aggregation
 - `katgpt-core/src/traits.rs` — ConstraintPruner pattern (for trait style)
 - `katgpt-rs/crates/katgpt-percepta/src/transformer.rs` — forward pass (DenseNode impl wraps this)
 

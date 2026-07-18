@@ -30,10 +30,10 @@ GOAT gate: G1 (determinism + monotonicity) and G2 (two-sigmoid ablation parity) 
 
 ### Tasks
 
-- [x] **T1.1** Create `katgpt-rs/src/salience/mod.rs` with module-level doc referencing Plan 303 + Research 281.
+- [x] **T1.1** Create `katgpt-rs/crates/katgpt-core/src/salience/mod.rs` with module-level doc referencing Plan 303 + Research 281.
 - [x] **T1.2** Add Cargo feature `salience_tri_gate` to `katgpt-rs/Cargo.toml` (opt-in, default off). Gate the entire module behind it.
 - [x] **T1.3** Wire `pub mod salience;` into `katgpt-rs/src/lib.rs` behind the feature flag.
-- [x] **T1.4** Define the core types in `katgpt-rs/src/salience/types.rs`:
+- [x] **T1.4** Define the core types in `katgpt-rs/crates/katgpt-core/src/salience/types.rs`:
   ```rust
   /// First-class output of the salience gate. Silent is a decision, not a default.
   #[derive(Clone, Copy, Debug, PartialEq)]
@@ -74,7 +74,7 @@ GOAT gate: G1 (determinism + monotonicity) and G2 (two-sigmoid ablation parity) 
       ColdTier         = 3,  // result is a frozen shard (caller's persistence layer)
   }
   ```
-- [x] **T1.5** Define the gate struct in `katgpt-rs/src/salience/gate.rs`:
+- [x] **T1.5** Define the gate struct in `katgpt-rs/crates/katgpt-core/src/salience/gate.rs`:
   ```rust
   /// 3-way salience gate. Maps activation `a` + scalars `z`, `c` to one of
   /// {Speak, Silent, Delegate}. Uses two stacked sigmoids — never softmax.
@@ -132,7 +132,7 @@ GOAT gate: G1 (determinism + monotonicity) and G2 (two-sigmoid ablation parity) 
 
 ### Tasks
 
-- [x] **T2.1** Implement property tests in `katgpt-rs/src/salience/gate.rs::tests`:
+- [x] **T2.1** Implement property tests in `katgpt-rs/crates/katgpt-core/src/salience/gate.rs::tests`:
   - **G1 determinism**: same inputs → same decision (run `decide` twice, assert equal).
   - **G1 monotonicity in salience**: hold `a, z, c` such that `salience < tau_speak`; increase one component of `a` along `d_speak` direction; verify decision transitions Silent→Speak at exactly one threshold crossing.
   - **G1 monotonicity in delegate_dot**: hold others fixed; increase `a` along `d_delegate` direction; verify Speak→Delegate transition is monotone.

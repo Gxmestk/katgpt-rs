@@ -206,8 +206,8 @@ katgpt-rs/src/cce/
 
 ### Phase 1 — Trait + types
 
-- [x] **T1.1** Add `HeterogeneousPayoff<N, A>` trait to `katgpt-rs/src/cce/types.rs` with the five methods above (`n_players`, `deviations_for_player`, `reward_follow`, `reward_deviate`, `gamma0`, `gamma0_coeff`). Default impls for the last three.
-- [x] **T1.2** Re-export from `katgpt-rs/src/cce/mod.rs`: `pub use types::HeterogeneousPayoff;`
+- [x] **T1.1** Add `HeterogeneousPayoff<N, A>` trait to `katgpt-rs/crates/katgpt-core/src/cce/types.rs` with the five methods above (`n_players`, `deviations_for_player`, `reward_follow`, `reward_deviate`, `gamma0`, `gamma0_coeff`). Default impls for the last three.
+- [x] **T1.2** Re-export from `katgpt-rs/crates/katgpt-core/src/cce/mod.rs`: `pub use types::HeterogeneousPayoff;`
 - [x] **T1.3** Add unit test in `types.rs`: a 2-player trivial `HeterogeneousPayoff` impl with `N=2, A=2`, verify `gamma0` on uniform `ρ` matches hand-computed `(1/2)(γ_1 + γ_2)`.
 
 **Phase 1 exit:** `cargo test --features cce_moderator --lib cce::types::` passes. ✅ PASSED 2026-06-21 (9/9).
@@ -256,7 +256,7 @@ katgpt-rs/src/cce/
 
 ### Phase 5 — Documentation + feature promotion
 
-- [x] **T5.1** Add `HeterogeneousPayoff` + `PerPlayerGame` + `solve_heterogeneous` to `katgpt-rs/src/cce/mod.rs` module doc with a 10-line usage example. ✅ Module doc updated with the subjective-CCE LP formulation block.
+- [x] **T5.1** Add `HeterogeneousPayoff` + `PerPlayerGame` + `solve_heterogeneous` to `katgpt-rs/crates/katgpt-core/src/cce/mod.rs` module doc with a 10-line usage example. ✅ Module doc updated with the subjective-CCE LP formulation block.
 - [x] **T5.2** Update `katgpt-rs/.research/274_Optimal_CCE_Moderator_LP_No_Regret.md` with a "Subjective-CCE extension" section linking to this plan and to Issue 327 Path A+. ✅ Added §9.
 - [x] **T5.3** Update `riir-ai/.research/143_Latent_CCE_Moderator_Crowd_Emergent_Coordination.md` with the same pointer. ✅ Added section + cross-link row in the Plan dependency table.
 - [x] **T5.4** Feature promotion: ✅ DONE. T4.3b closed G3, so the "G1+G2+G3+G4 all PASS" condition is met. `cce_moderator` added to `default` features in `katgpt-rs/Cargo.toml` line 45 (2026-06-22). `src/lib.rs` comment updated to reflect DEFAULT-ON status. Zero non-optional deps (feature is `cce_moderator = []`); promotion is zero-cost for non-consumers since the module is `#[cfg(feature = "cce_moderator")]` gated. **Resolves the prior discrepancy** with the Plan 325 note — Plan 325 had not actually promoted the feature (Cargo.toml audit confirmed); Plan 300 T4.3b+T5.4 does the promotion with full GOAT evidence.

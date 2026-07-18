@@ -14,7 +14,7 @@
 - [x] T4: AVX2 Ternary Matvec — `crates/katgpt-dec/src/simd.rs` L1854
 - [x] T5: Dispatch Wrapper — `crates/katgpt-dec/src/simd.rs` L1949
 - [x] T6: Batched Ternary Matmul — `crates/katgpt-dec/src/simd.rs` L1961
-- [x] T7: `.bits` File Loader — `katgpt-rs/src/weights.rs` L224
+- [x] T7: `.bits` File Loader — `riir-ai/crates/riir-engine/src/deltanet/weights.rs` L224
 - [x] T8: Forward Pass Dispatch — `LayerWeights` integration not yet wired
 - [x] T9: Quantization Utility — `katgpt-core/src/types.rs` L2322
 - [x] T10: GOAT Proof Tests — `tests/bench_148_plasma_path_goat.rs`
@@ -172,7 +172,7 @@ pub fn simd_ternary_matmul_batch(w: &TernaryWeights, x: &[f32], batch: usize, y:
 }
 ```
 
-### T7: `.bits` File Loader (`katgpt-rs/src/weights.rs`)
+### T7: `.bits` File Loader (`riir-ai/crates/riir-engine/src/deltanet/weights.rs`)
 
 Load ciot-format `.bits` binary files:
 

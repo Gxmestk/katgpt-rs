@@ -27,7 +27,7 @@ Three distinct things share the name "bridge":
 |---|---|---|---|
 | **LatCal fixed-point bridge** | `riir-chain/src/encoding/latcal_fixed.rs` | f32 ↔ i64×10^6 for cross-node deterministic commitment | **Raw** (synced, quorum-committed) |
 | **ActionBridge** | `katgpt-rs/crates/katgpt-core/src/bridge/mod.rs` | Latent Q-values → raw action index via `sigmoid(dot())` | **Latent→Raw** (one-way projection) |
-| **ShardIndex snapshot** | `riir-neuron-db/src/index.rs` | papaya lock-free HashMap zone→shard lookup | **Latent** (local, but must be atomic) |
+| **ShardIndex snapshot** | `seal-online-remaster/crates/seal-asset-explorer/src/index.rs` | papaya lock-free HashMap zone→shard lookup | **Latent** (local, but must be atomic) |
 
 The "neuro-symbolic" layer is Plan 211 (Three-Mode Router), Plan 210 (INSIGHT), Plan 209 (FOL-LNN) — all empirical GOAT gates, no proofs.
 

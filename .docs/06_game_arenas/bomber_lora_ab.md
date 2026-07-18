@@ -57,7 +57,7 @@ Both files load cleanly via:
 - `LoraAdapter::load_first(path)` → first adapter only.
 
 **Note:** `LoraPlayer::new_with_lora`, `LoraWasmPlayer::new_with_lora`, and
-`HLPlayer::new_with_secrets` (in `katgpt-rs/src/pruners/bomber/players.rs`)
+`HLPlayer::new_with_secrets` (in `seal-online-remaster/crates/seal-gm-tools/src/tabs/players.rs`)
 call `load_first` — only adapter 0 is wired into inference. Layers 1–5 are
 silently dropped on these players. This is the documented single-forward-pass
 heuristic limitation; multi-adapter full wiring requires the L2+ inference

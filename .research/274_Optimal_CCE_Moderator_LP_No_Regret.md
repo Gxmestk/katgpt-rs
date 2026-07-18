@@ -309,7 +309,7 @@ GOAT gate rule: `cce_moderator` feature flag default-off. Promote to considerati
 
 - Paper: [arXiv:2606.20062](https://arxiv.org/pdf/2606.20062) — Campi, Cannerozzi, Tzouanas, 18 Jun 2026
 - Code: https://github.com/JannTzou/Learning-Algorithm-for-Mean-Field-CCE.git (JAX reference, training-flavored)
-- Our payoff: `riir-ai/crates/riir-games/src/payoff.rs`
+- Our payoff: `katgpt-rs/crates/katgpt-ruliology/src/payoff.rs`
 - Our bandit: `katgpt-rs/crates/katgpt-ruliology/src/bandit.rs`, `prudent_banker.rs`
 - Our dual pool: `katgpt-rs/crates/katgpt-core/src/cgsp/dual_pool.rs`
 - Our latent functor: `riir-ai/crates/riir-engine/src/latent_functor/`
@@ -325,7 +325,7 @@ shared across all deviation constraints. The subjective-CCE generalization —
 each NPC `i` evaluates deviations against its own `J_i^{CWM_i}` — requires a
 thin wrapper primitive, shipped in Plan 300:
 
-- **New trait `HeterogeneousPayoff<N,A>`** (`katgpt-rs/src/cce/types.rs`):
+- **New trait `HeterogeneousPayoff<N,A>`** (`katgpt-rs/crates/katgpt-core/src/cce/types.rs`):
   `n_players`, `deviations_for_player`, per-player `reward_follow` /
   `reward_deviate` / `gamma_player` / `gamma_dev_player`, plus moderator
   objective `gamma0 = (1/P) Σ_i γ_i(ρ)` and linear `gamma0_coeff`.

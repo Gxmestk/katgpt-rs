@@ -61,7 +61,7 @@ Implement two open primitives distilled from Dingle–Hutter 2026 (Research 284)
   - Sub-feature `lz4_proxy` adds `lz4` dep (for `Lz4Complexity`) — **stub only in Phase 1; activation deferred to Phase 2+**
   - Sub-feature `blake3_proxy` adds `blake3` dep (for `Blake3CanonicalLengthComplexity`, used by `riir-neuron-db`) — **stub only in Phase 1; activation deferred to Phase 2+**
 
-- [x] **T1.6** Re-export from `katgpt-rs/src/screening/mod.rs` and `katgpt-rs/src/lib.rs`:
+- [x] **T1.6** Re-export from `katgpt-rs/crates/katgpt-pruners/src/screening/mod.rs` and `katgpt-rs/src/lib.rs`:
   - `pub use complexity_prior::{ComplexityProxy, CompressionPriorSampler, LatentCompressionPriorSampler, RleComplexity, EntropyComplexity, L1Complexity};`
   - `pub use coincidence_gate::CoincidenceGate;`
   - Gated by `#[cfg(feature = "complexity_prior_sampler")]`
@@ -120,7 +120,7 @@ Implement two open primitives distilled from Dingle–Hutter 2026 (Research 284)
 
 ### Tasks
 
-- [x] **T3.1** Add adapter trait impl for MCTS — **DEVIATION:** actual path is `katgpt-rs/crates/katgpt-pruners/src/game_state/mcts.rs` (NOT `katgpt-rs/src/mcts.rs` as originally written). MCTS is generic over `S: GameState` with opaque `S::Action`; direct wiring would require threading `CompressionPriorSampler<K>` + an `Action → &[u8]` encoding hook through `mcts_search_impl` / `select_inline` / `expand_and_rollout`. Too invasive for the open-primitive landing. **Adapter-only seam shipped** at `katgpt-rs/crates/katgpt-pruners/src/screening/integration_mcts.rs`: `MctsExpansionPrior` trait with `UniformExpansion` (returns 0.0, byte-identical to pre-Plan-305) and `KPriorExpansion` (delegates to `sampler.log_prob`). Module doc documents the caller-side wiring pattern (encode unexpanded actions as `&[u8]`, call `sampler.sample_ix`). Gated by `mcts_k_prior`. 3/3 tests pass.
+- [x] **T3.1** Add adapter trait impl for MCTS — **DEVIATION:** actual path is `katgpt-rs/crates/katgpt-pruners/src/game_state/mcts.rs` (NOT `katgpt-rs/crates/katgpt-core/src/mcts.rs` as originally written). MCTS is generic over `S: GameState` with opaque `S::Action`; direct wiring would require threading `CompressionPriorSampler<K>` + an `Action → &[u8]` encoding hook through `mcts_search_impl` / `select_inline` / `expand_and_rollout`. Too invasive for the open-primitive landing. **Adapter-only seam shipped** at `katgpt-rs/crates/katgpt-pruners/src/screening/integration_mcts.rs`: `MctsExpansionPrior` trait with `UniformExpansion` (returns 0.0, byte-identical to pre-Plan-305) and `KPriorExpansion` (delegates to `sampler.log_prob`). Module doc documents the caller-side wiring pattern (encode unexpanded actions as `&[u8]`, call `sampler.sample_ix`). Gated by `mcts_k_prior`. 3/3 tests pass.
   - `MctsExpansionPrior` trait with default impl `UniformExpansion`
   - New impl `KPriorExpansion<K: ComplexityProxy>` gated by `mcts_k_prior` sub-feature
   - Zero-cost when feature is off (existing `UniformExpansion` unchanged)

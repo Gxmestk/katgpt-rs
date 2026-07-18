@@ -151,7 +151,7 @@ cd katgpt-rs && cargo bench --quiet 2>&1 | tee .plans/043_baseline.txt
 
 Port `.raw/turboquant/turboquant/codebook.py` to Rust.
 
-**File:** `katgpt-rs/src/turboquant/codebook.rs`
+**File:** `katgpt-rs/crates/katgpt-quant/src/turboquant/codebook.rs`
 
 ```rust
 /// Compute Lloyd-Max optimal codebook for Beta distribution on [-1, 1].
@@ -178,7 +178,7 @@ Test plan:
 
 Port `.raw/turboquant/turboquant/rotation.py` to Rust.
 
-**File:** `katgpt-rs/src/turboquant/rotation.rs`
+**File:** `katgpt-rs/crates/katgpt-quant/src/turboquant/rotation.rs`
 
 ```rust
 /// Generate random orthogonal matrix via QR decomposition.
@@ -203,7 +203,7 @@ Test plan:
 
 ### Task 4: Implement `TurboQuantKVCache`
 
-**File:** `katgpt-rs/src/turboquant/kv_cache.rs`
+**File:** `katgpt-rs/crates/katgpt-quant/src/turboquant/kv_cache.rs`
 
 ```rust
 impl TurboQuantKVCache {
@@ -247,7 +247,7 @@ Test plan:
 
 ### Task 5: Implement `forward_turboquant()` Attention Path
 
-**File:** `katgpt-rs/src/turboquant/forward.rs`
+**File:** `katgpt-rs/crates/katgpt-quant/src/turboquant/forward.rs`
 
 ```rust
 /// Forward pass using TurboQuantKVCache.
@@ -345,12 +345,12 @@ Refs: .research/020_TurboQuant_Online_Vector_Quantization.md"
 
 | File | Lines | Purpose |
 |------|-------|---------|
-| `katgpt-rs/src/turboquant/mod.rs` | ~15 | Module index |
-| `katgpt-rs/src/turboquant/types.rs` | ~60 | Structs: TurboQuantCodebook, TurboQuantLayer, TurboQuantKVCache |
-| `katgpt-rs/src/turboquant/codebook.rs` | ~200 | Lloyd-Max scalar quantizer for Beta distribution |
-| `katgpt-rs/src/turboquant/rotation.rs` | ~80 | Random rotation + QJL matrix generation |
-| `katgpt-rs/src/turboquant/kv_cache.rs` | ~250 | Compressed KV cache: quantize, store, dequantize |
-| `katgpt-rs/src/turboquant/forward.rs` | ~150 | forward_turboquant() attention path |
+| `katgpt-rs/crates/katgpt-quant/src/turboquant/mod.rs` | ~15 | Module index |
+| `katgpt-rs/crates/katgpt-quant/src/turboquant/types.rs` | ~60 | Structs: TurboQuantCodebook, TurboQuantLayer, TurboQuantKVCache |
+| `katgpt-rs/crates/katgpt-quant/src/turboquant/codebook.rs` | ~200 | Lloyd-Max scalar quantizer for Beta distribution |
+| `katgpt-rs/crates/katgpt-quant/src/turboquant/rotation.rs` | ~80 | Random rotation + QJL matrix generation |
+| `katgpt-rs/crates/katgpt-quant/src/turboquant/kv_cache.rs` | ~250 | Compressed KV cache: quantize, store, dequantize |
+| `katgpt-rs/crates/katgpt-quant/src/turboquant/forward.rs` | ~150 | forward_turboquant() attention path |
 | `riir-ai/crates/riir-gpu/src/kernels/attention_score_tq.wgsl` | ~100 | GPU kernel for quantized attention scoring |
 
 ### Modified files

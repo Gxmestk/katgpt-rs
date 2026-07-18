@@ -26,8 +26,8 @@ This is the **public open primitive** for Research 274's Super-GOAT verdict. The
 
 ### Tasks
 
-- [x] **T1.1** Create `katgpt-rs/src/cce/mod.rs` with module declaration. Add `cce_moderator` feature to `Cargo.toml` `[features]` section, default-off. Verify `cargo build --features cce_moderator` succeeds with empty module.
-- [x] **T1.2** Define core types in `katgpt-rs/src/cce/types.rs`:
+- [x] **T1.1** Create `katgpt-rs/crates/katgpt-core/src/cce/mod.rs` with module declaration. Add `cce_moderator` feature to `Cargo.toml` `[features]` section, default-off. Verify `cargo build --features cce_moderator` succeeds with empty module.
+- [x] **T1.2** Define core types in `katgpt-rs/crates/katgpt-core/src/cce/types.rs`:
   - `pub struct StateSpace<const N: usize>` — marker for finite state space of size `N`
   - `pub struct ActionSpace<const A: usize>` — marker for finite action space of size `A`
   - `pub struct OccupationMeasure<const N: usize, const A: usize>` — `Vec<f32>` of size `N·A`, normalized to sum to 1 (invariant checked on construction)

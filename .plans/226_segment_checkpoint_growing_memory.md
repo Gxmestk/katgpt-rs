@@ -42,7 +42,7 @@ Segment boundaries align with KVarN tile_size (128) for zero-copy checkpoints.
 ### Phase 1: Core SegmentCheckpoint (GRM Variant)
 
 #### Task 1: SegmentStore Struct
-- [x] Create `katgpt-rs/src/segment_checkpoint/mod.rs`
+- [x] Create `katgpt-rs/crates/katgpt-kv/src/segment_checkpoint/mod.rs`
 - [x] Define `SegmentCheckpoint` struct:
   ```rust
   pub struct SegmentCheckpoint {
