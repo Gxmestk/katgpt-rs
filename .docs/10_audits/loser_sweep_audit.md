@@ -53,7 +53,7 @@ Key test: **Did the GOAT gate ever run?**
 
 | Feature | Citation | Reason |
 |---|---|---|
-| `embedding_router` | `crates/katgpt-forward/crates/katgpt-forward/src/step.rs` L1665+ | "not yet started" — only commented-out test stubs, zero active `#[cfg]` |
+| `embedding_router` | `crates/katgpt-forward/src/step.rs` L1665+ | "not yet started" — only commented-out test stubs, zero active `#[cfg]` |
 | `language_domain` | Cargo.toml L301 | "future" placeholder — zero `#[cfg(feature = "language_domain")]` hits in src/ |
 | `gpu` | `crates/katgpt-speculative/src/distill/trd.rs` L772 | Gates ONE `#[allow(dead_code)]` TODO stub (`redraft_gpu_batched`); real GPU inference is `gpu_inference` (Metal) |
 | `rest` | `src/speculative/prefill.rs` L850 | Single test stub simulating REST target; client moved to riir-ai/riir-rest (Plan 009) |
@@ -160,7 +160,7 @@ These 4 features have zero active code. Remove the feature line from root
 
 - [x] `embedding_router` — remove from `full` + features section — **DONE 2026-07-06** (empty `[]` placeholder, Plan 024 not started; commented-out `#[cfg]` test stubs in `katgpt-forward/crates/katgpt-forward/src/step.rs` left as TODO markers for Plan 024)
 - [x] `language_domain` — remove from features section — **DONE 2026-07-06** (empty `[]` placeholder, Plan 040 future, zero `.rs` refs)
-- [x] `gpu` — remove from `full` + features section; update `crates/katgpt-speculative/src/distill/trd.rs` dead-code stub — **DONE 2026-07-06** (empty `[]` placeholder + `redraft_gpu_batched` no-op stub removed from `crates/katgpt-speculative/crates/katgpt-speculative/src/distill/trd.rs`; GPU training lives in riir-ai/riir-gpu)
+- [x] `gpu` — remove from `full` + features section; update `crates/katgpt-speculative/src/distill/trd.rs` dead-code stub — **DONE 2026-07-06** (empty `[]` placeholder + `redraft_gpu_batched` no-op stub removed from `crates/katgpt-speculative/src/distill/trd.rs`; GPU training lives in riir-ai/riir-gpu)
 - [-] `rest` — **NOT DEAD, audit was stale.** The 2026-07-01 audit flagged this as dead, but Plan 394 (2026-07-05) revived it: `rest = ["katgpt-forward/rest"]` now forwards to katgpt-forward, and `src/speculative/prefill.rs:127,138` has an active `#[cfg(feature = "rest")]` bridge test (`test_bridge_prefill_to_speculative_decode`). Kept in `full` array.
 
 ---

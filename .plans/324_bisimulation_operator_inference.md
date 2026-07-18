@@ -75,7 +75,7 @@ This is the **PDDL-side counterpart** to the existing CWM primitive (Plan 296): 
 
 ### Tasks
 
-- [x] **T2.1** Implement `partition_refine(graph: &TransitionGraph) -> BisimulationQuotient` in `crates/katgpt-core/crates/katgpt-core/src/bisimulation/refine.rs`. Algorithm: signature-based partition refinement with per-iteration canonicalization (O((|S| + |E|) log²|S| log d) — see module doc for implementation-choice rationale + the oscillation counterexample that motivated canonicalization).
+- [x] **T2.1** Implement `partition_refine(graph: &TransitionGraph) -> BisimulationQuotient` in `crates/katgpt-core/src/bisimulation/refine.rs`. Algorithm: signature-based partition refinement with per-iteration canonicalization (O((|S| + |E|) log²|S| log d) — see module doc for implementation-choice rationale + the oscillation counterexample that motivated canonicalization).
   - Initial partition: one block per distinct `(sorted edge-label multiset)` signature (the "signature" of a state = multiset of its outgoing operator labels).
   - Refine iteratively: split any block whose members have edges going to ≥2 distinct current-block targets under the same operator label. Canonicalize after each iteration. Repeat until stable.
 - [x] **T2.2** Implement `canonicalize_labels(labels: &mut [u32], states: &[StateId])`: renumber classes by the smallest `StateId` in each block (deterministic); called inside the loop + once at the end.
@@ -98,7 +98,7 @@ All G1 tests pass. Latency on N=1024 random-transition graph ≤ 1 ms (G4 — me
 
 ### Tasks
 
-- [x] **T3.1** Define `OperatorSchema` in `crates/katgpt-core/crates/katgpt-core/src/bisimulation/operator.rs`:
+- [x] **T3.1** Define `OperatorSchema` in `crates/katgpt-core/src/bisimulation/operator.rs`:
   ```rust
   pub struct OperatorSchema {
       pub operators: Vec<OperatorDef>,
@@ -132,7 +132,7 @@ G2 passes. Schema covers the source trajectory set with no spurious operators.
 
 ### Tasks
 
-- [x] **T4.1** Implement a minimal classical planner `plan(schema: &OperatorSchema, quotient: &BisimulationQuotient, start: StateClassId, goal: StateClassId) -> Option<Vec<OperatorLabel>>` in `crates/katgpt-core/crates/katgpt-core/src/bisimulation/planner.rs`. Breadth-first search over the quotient graph's operator-labeled edges (sufficient for G3; MetricFF-grade planning is out of scope for the open primitive).
+- [x] **T4.1** Implement a minimal classical planner `plan(schema: &OperatorSchema, quotient: &BisimulationQuotient, start: StateClassId, goal: StateClassId) -> Option<Vec<OperatorLabel>>` in `crates/katgpt-core/src/bisimulation/planner.rs`. Breadth-first search over the quotient graph's operator-labeled edges (sufficient for G3; MetricFF-grade planning is out of scope for the open primitive).
 - [x] **T4.2** G3 validity test:
   - For each `(start, goal)` pair in the source trajectory set where a path exists, `plan()` returns `Some(sequence)`.
   - Replaying the sequence against the original `TransitionGraph` (mapping class IDs back to representative states) never violates operator preconditions and reaches a state in the goal class.

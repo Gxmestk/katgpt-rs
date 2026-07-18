@@ -63,5 +63,5 @@ The trait implies `grapem_rodrigues` (for `GrapeMAction`), which is also opt-in.
 - [Issue 159](../.issues/159_grapem_rank2_rodrigues_exponential.md) — GRAPE-M primitive (soft-dep; `GrapeMAction` wraps `Rank2Plane`).
 - [Issue 161](../.issues/161_grape_ap_vector_similarity_gates.md) — GRAPE-AP vector gates (the strict generalization of `WallAction`).
 - [Research 446](../.research/446_GRAPE_Group_Representational_Position_Encoding.md) — parent distillation.
-- [`crates/katgpt-core/crates/katgpt-core/src/position_group_action.rs`](../crates/katgpt-core/crates/katgpt-core/src/position_group_action.rs) — the trait + 6 impls (795 lines incl. docs + tests).
+- [`crates/katgpt-core/src/position_group_action.rs`](../crates/katgpt-core/src/position_group_action.rs) — the trait + 6 impls (795 lines incl. docs + tests).
 - [Benchmark 457](457_grapem_rodrigues_goat.md) — Issue 159 GOAT gate.

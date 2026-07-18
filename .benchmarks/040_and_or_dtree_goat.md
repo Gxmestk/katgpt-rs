@@ -38,7 +38,7 @@ test result: ok. 5 passed; 0 failed; 0 ignored
 | Component | Tests | File |
 |-----------|-------|------|
 | `AndOrNode<G, S>` (katgpt-core) | 23 | `crates/katgpt-core/src/and_or/types.rs` |
-| `AndOrBuilder` | 14 | `crates/katgpt-speculative/crates/katgpt-speculative/src/and_or_builder.rs` |
+| `AndOrBuilder` | 14 | `crates/katgpt-speculative/src/and_or_builder.rs` |
 | `BlueprintPass` | 7 | `crates/katgpt-speculative/src/blueprint.rs` |
 | `DecompositionReviewer` | 6 | `crates/katgpt-speculative/src/decomp_reviewer.rs` |
 | GOAT proof | 5 | `tests/and_or_goat.rs` |
@@ -75,7 +75,7 @@ graph TD
 |------|-----|---------|
 | `katgpt-core/src/and_or/mod.rs` | 21 | Module declarations |
 | `katgpt-core/src/and_or/types.rs` | 440 | Generic `AndOrNode<G,S>` enum + 23 tests |
-| `katgpt-rs/crates/katgpt-speculative/crates/katgpt-speculative/src/and_or_builder.rs` | ~350 | Decomposition logic + 14 tests |
+| `katgpt-rs/crates/katgpt-speculative/src/and_or_builder.rs` | ~350 | Decomposition logic + 14 tests |
 | `katgpt-rs/crates/katgpt-speculative/src/blueprint.rs` | ~120 | Argmax pre-pass + 7 tests |
 | `katgpt-rs/crates/katgpt-speculative/src/decomp_reviewer.rs` | ~120 | Novelty-based dead-end detection + 6 tests |
 | `katgpt-rs/src/speculative/dd_tree.rs` (+) | ~150 | `build_dd_tree_and_or` + helpers |

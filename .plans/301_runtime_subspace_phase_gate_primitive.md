@@ -4,7 +4,7 @@
 **Research:** [katgpt-rs/.research/279_Diffusion_Curse_Dimensionality_Subspace_Clustering_Fusion.md](../.research/279_Diffusion_Curse_Dimensionality_Subspace_Clustering_Fusion.md)
 **Source paper:** [arXiv:2409.02426](https://arxiv.org/abs/2409.02426) — Wang et al., *Breaking the Curse of Dimensionality*.
 **Private Super-GOAT guide:** `riir-neuron-db/.research/001_Subspace_Consolidation_Quality_Gate_Guide.md`
-**Target:** `katgpt-rs/crates/katgpt-core/crates/katgpt-core/src/subspace_phase_gate.rs` (new module) + Cargo feature `subspace_phase_gate`
+**Target:** `katgpt-rs/crates/katgpt-core/src/subspace_phase_gate.rs` (new module) + Cargo feature `subspace_phase_gate`
 **Status:** ✅ COMPLETE, DEFAULT-ON (2026-07-02) — Phase 1 complete (skeleton shipped), Phase 2 (G1 GOAT proof) complete with [Bench 301](../.benchmarks/301_subspace_phase_gate_g1.md) **G1 PASS** ✅ **re-verified 2026-07-02 after the Issue 008 fix (RESOLVED, commit `4e5750c3`; tracker removed)** (wide-matrix extraction bug: the SOA refactor `a08adc4a` narrowed the column-norm scan from `0..n` to `0..min(m,n)`, missing singular values in columns `k..n`; fixed by restoring the full scan + adding a null-space deflation floor). Phase 3 complete: T3.1–T3.3 PASS (square R^8×8), **T3.4 latency gate now PASSES** (2026-07-02, Plan 301 T4.1 allocation elimination) — the prior 2403 ns/call FAIL figure measured the allocating `jacobian_svd_at` path on a slower bench machine; a breakdown probe showed ~36% of that cost was the 17-`Vec` SOA→owned conversion, NOT the SVD math. T4.1 added the zero-alloc `jacobian_svd_at_into` hot path (~800 ns/call release on R^8→R^8, under the 1µs target), with the SVD math byte-identical (G1 re-verified bit-for-bit). **Phase 5 complete (2026-07-02)**: T5.1 promoted `subspace_phase_gate` to DEFAULT-ON in `katgpt-rs/Cargo.toml`; T5.2 README Feature Showcase entry shipped. SIMD on the Jacobi inner loops is documented as non-blocking future work (the gate passes; the determinism contract discourages SIMD dispatch in the math).
 
 ---
@@ -28,7 +28,7 @@ This is the **open** counterpart of the private Super-GOAT at `riir-neuron-db/.r
 
 ### Tasks
 
-- [x] **T1.1** Create `katgpt-rs/crates/katgpt-core/crates/katgpt-core/src/subspace_phase_gate.rs` with module doc referencing arXiv:2409.02426 and the open research note R279.
+- [x] **T1.1** Create `katgpt-rs/crates/katgpt-core/src/subspace_phase_gate.rs` with module doc referencing arXiv:2409.02426 and the open research note R279.
 - [x] **T1.2** Implement `pub fn participation_ratio(spectrum: &[f32]) -> f32` — `(Σλ)² / Σ(λ²)`. Chunk-4 accumulation for SIMD auto-vectorisation. Zero-allocation. Guard against all-zero input (return 0.0).
 - [x] **T1.3** Implement `pub fn numerical_rank(spectrum: &[f32], eta: f32) -> usize` — smallest `r` such that cumulative energy > η·total. Default η = 0.99 (paper eq. 52). Spectrum assumed sorted descending (caller's responsibility; document this).
 - [x] **T1.4** Implement `pub fn phase_transition_gate(n_samples: usize, intrinsic_dim: usize) -> bool` — `n_samples >= intrinsic_dim`. Trivially simple; the value is the *name* and the *documentation* tying it to Theorem 4.

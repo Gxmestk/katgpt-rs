@@ -129,7 +129,7 @@ Per Plan 432 T3.3 (the G2-fails path): `velocity_field_disagreement` stays **opt
 - **UQ floor benchmark (full detail):** [`.benchmarks/432_vfd_uq_floor.md`](./432_vfd_uq_floor.md)
 - **UQ floor test file:** `crates/katgpt-core/tests/velocity_field_disagreement_uq_floor.rs`
 - **Latency + alloc bench:** `crates/katgpt-core/benches/bench_432_vfd_goat.rs`
-- **Primitive source:** `crates/katgpt-core/crates/katgpt-core/src/velocity_field_disagreement.rs` (918 lines, 20 tests)
+- **Primitive source:** `crates/katgpt-core/src/velocity_field_disagreement.rs` (918 lines, 20 tests)
 - **Plan:** `.plans/432_vfd_velocity_field_disagreement_primitive.md`
 - **Research:** `.research/420_VFD_Velocity_Field_Disagreement_Epistemic_UQ.md`
 - **Ensemble's UQ gate (Plan 376 Phase 6, PASSED):** `.benchmarks/376_uq_floor.md`

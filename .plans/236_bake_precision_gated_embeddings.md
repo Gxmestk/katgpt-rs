@@ -39,18 +39,18 @@ graph TD
 - [x] ~~Extend `KgEmbedding` with optional precision vector~~ (Design decision: precision tracked externally, not in KgEmbedding struct)
   - Precision stored alongside KgEmbedding in container — no struct modification needed
   - `precision_to_confidence()` bridges precision → confidence for backward compat
-  - File: `crates/katgpt-core/crates/katgpt-sense/src/bake.rs`
+  - File: `crates/katgpt-sense/src/bake.rs`
 
 - [x] Implement `bake_update()` function
   - BAKE eq 2: `λ_new = λ_old + λ_obs` (precision grows)
   - BAKE eq 3: `μ_new = (λ_old ⊙ μ_old + λ_obs ⊙ obs) / λ_new` (precision-weighted mean)
   - SIMD-friendly: operates on `[f32; 8]` which auto-vectorizes
-  - File: `crates/katgpt-core/crates/katgpt-sense/src/bake.rs` ✓
+  - File: `crates/katgpt-sense/src/bake.rs` ✓
 
 - [x] Implement `bake_regularize()` function
   - BAKE eq 4: `β · √(λ ⊙ (μ_current - μ_old)²)` (precision-weighted distance)
   - Returns regularization penalty — high when current deviates from high-precision prior
-  - File: `crates/katgpt-core/crates/katgpt-sense/src/bake.rs` ✓
+  - File: `crates/katgpt-sense/src/bake.rs` ✓
 
 - [x] Add feature gate `bake_precision` to `Cargo.toml`
   - Added `bake_precision = []` to katgpt-core Cargo.toml
@@ -68,7 +68,7 @@ graph TD
 - [x] SenseBandit Precision-Weighted Exploration
   - Added `precision_weighted_reward()` behind `#[cfg(feature = "bake_precision")]`
   - Low-precision dimensions get boosted exploration reward
-  - File: `crates/katgpt-core/crates/katgpt-ruliology/crates/katgpt-ruliology/src/bandit.rs` ✓
+  - File: `crates/katgpt-ruliology/crates/katgpt-ruliology/src/bandit.rs` ✓
 
 - [x] ThoughtFold Precision-Gated Fold Confidence
   - Steps where KG embedding has high precision → fold is safe
@@ -83,14 +83,14 @@ graph TD
   - Key: `u64` entity_hash, Value: `PrecisionEntry { mean, precision }`
   - Methods: `new`, `get`, `update`, `snapshot_mean`, `remove`, `len`, `is_empty`
   - All behind `#[cfg(feature = "bake_precision")]`
-  - File: `crates/katgpt-core/crates/katgpt-sense/src/bake.rs` ✓
+  - File: `crates/katgpt-sense/src/bake.rs` ✓
 
 - [x] Session boundary Bayesian update
   - `BakeSession` with `begin`/`observe`/`end`/`is_active` lifecycle
   - Batch Bayesian update at session end: accumulates observations, computes mean, applies single update
   - New entities use uninformative prior `precision = [0.1; 8]`
   - 7 tests: store insert/get, missing, eviction, monotonic, session lifecycle, new entity, empty noop
-  - File: `crates/katgpt-core/crates/katgpt-sense/src/bake.rs` ✓
+  - File: `crates/katgpt-sense/src/bake.rs` ✓
 
 ### Phase 4: GOAT Proof + Benchmarks
 

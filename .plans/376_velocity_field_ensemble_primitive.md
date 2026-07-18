@@ -3,7 +3,7 @@
 **Date:** 2026-07-04
 **Research:** [katgpt-rs/.research/375_Kernelized_Stochastic_Interpolant_Velocity_Field_Ensemble.md](../.research/375_Kernelized_Stochastic_Interpolant_Velocity_Field_Ensemble.md)
 **Source paper:** [arxiv 2602.20070](https://arxiv.org/abs/2602.20070) — Coeurdoux et al., ICML 2026 SPIGM
-**Target:** `katgpt-rs/crates/katgpt-core/crates/katgpt-core/src/velocity_field_ensemble.rs` (new module) + Cargo feature `velocity_field_ensemble`
+**Target:** `katgpt-rs/crates/katgpt-core/src/velocity_field_ensemble.rs` (new module) + Cargo feature `velocity_field_ensemble`
 **Status:** Phase 1+2+3+4+6 COMPLETE. Phase 5 (LatCal) deferred to riir-chain. PROMOTED to default-on (2026-07-04, Phase 3).
 - Phase 4 (heterogeneous-D) → SHIPPED opt-in behind `velocity_field_ensemble_heterogeneous` (2026-07-04).
 - Phase 5 (LatCal commitment) → `riir-chain/.issues/003_velocity_field_ensemble_latcal_commitment.md` (deferred — belongs to riir-chain).
@@ -14,7 +14,7 @@
 
 ## Goal
 
-Ship an open primitive that combines P **frozen pre-trained velocity fields** (any forward model: LLM drafter, HLA forecaster, LinOSS drafter, KARC forecaster, archetype operator field) into a single regression-optimal combined drift `b̂(x) = Σ_i η_i · b_i(x)`, where `η ∈ R^P` is **solved once from N data pairs** via the existing `crates/katgpt-core/crates/katgpt-core/src/linalg/ridge_solve.rs` P×P Cholesky path.
+Ship an open primitive that combines P **frozen pre-trained velocity fields** (any forward model: LLM drafter, HLA forecaster, LinOSS drafter, KARC forecaster, archetype operator field) into a single regression-optimal combined drift `b̂(x) = Σ_i η_i · b_i(x)`, where `η ∈ R^P` is **solved once from N data pairs** via the existing `crates/katgpt-core/src/linalg/ridge_solve.rs` P×P Cholesky path.
 
 Distilled from Coeurdoux et al. 2026 (arxiv 2602.20070) Proposition 2.1: the paper's "feature gradient" basis becomes "frozen model forward outputs"; the paper's `K_t η_t = r_t` system becomes our `ridge_solve_direct_f32`. The combination is regression-optimal for the target distribution (data pairs), valid across heterogeneous architectures (paper §2.5 + Appendix E cross-domain composition).
 
@@ -26,7 +26,7 @@ Distilled from Coeurdoux et al. 2026 (arxiv 2602.20070) Proposition 2.1: the pap
 
 ### Tasks
 
-- [x] **T1.1** Define the `VelocityField` trait in `crates/katgpt-core/crates/katgpt-core/src/velocity_field_ensemble.rs`.
+- [x] **T1.1** Define the `VelocityField` trait in `crates/katgpt-core/src/velocity_field_ensemble.rs`.
   - **Decision (resolved):** const-generic `VelocityField<const D: usize>` trait (follows KARC's `KarcBasis<const M>` pattern). Output is `&mut [f32; D]` (type-level D guarantee). `ClosureField<D, F>` wrapper adapts closures. **No blanket impl on closures** (const-generic D on impl conflicts); users wrap closures in `ClosureField` or use named `fn` items (which coerce to the same `fn(&[f32], &mut [f32; D])` type for `[F; P]` arrays).
 - [x] **T1.2** Define `VelocityFieldEnsemble<F, const P: usize, const D: usize>` + `EnsembleFitScratch<const P: usize, const D: usize>`.
   - **Implementation note:** the `P×P` scratch buffers (`gram`, `gram_reg`, `chol`) are `Vec<f32>` not `[f32; P*P]` — stable Rust does not allow `P * P` in array types when `P` is const-generic (would require `generic_const_exprs` nightly feature). Vec is allocated once in `new()`; the hot path (`fit_into`, `eval_into`) is zero-alloc. The `P`-dim and `D`-dim buffers (`rhs`, `z_solve`, `b_out_i`, `b_out_j`) are fixed-size `[f32; N]` arrays.
@@ -160,7 +160,7 @@ pre-validation: if a future caller adds a UQ claim, this gate is satisfied.
 ## File Layout (target)
 
 ```
-crates/katgpt-core/crates/katgpt-core/src/velocity_field_ensemble.rs   ~600 lines (target < 2048)
+crates/katgpt-core/src/velocity_field_ensemble.rs   ~600 lines (target < 2048)
 ├── trait VelocityField                                  ~50 lines
 ├── struct VelocityFieldEnsemble<P, D>                   ~80 lines
 ├── struct EnsembleFitScratch<P, D>                      ~40 lines

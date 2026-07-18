@@ -115,7 +115,7 @@ Compress game domain knowledge into fixed-type ternary bit-plane sense modules (
 
 ### Phase 3: Self-Learning + Hot-Swap
 
-- [x] **T8: SenseBandit — trial log for sense module quality** (`crates/katgpt-core/crates/katgpt-ruliology/crates/katgpt-ruliology/src/bandit.rs`)
+- [x] **T8: SenseBandit — trial log for sense module quality** (`crates/katgpt-ruliology/crates/katgpt-ruliology/src/bandit.rs`)
   - `SenseTrial` — npc_id: u32, sense_kind: SenseKind, activation: f32, action_taken: u32, reward: f32
   - `SenseTrialLog` — extends existing TrialLog with sense-specific fields
   - `AbsorbCompress` integration — high-reward trials reinforce direction weights
@@ -123,7 +123,7 @@ Compress game domain knowledge into fixed-type ternary bit-plane sense modules (
   - **Never overrides GM-pinned modules** — bandit feedback skips pinned senses
   - Tests: high reward increases confidence, low reward decreases confidence, pinned modules unaffected
 
-- [x] **T9: HotSwapPruner for sense modules** (`crates/katgpt-core/crates/katgpt-core/src/engram/hotswap.rs`)
+- [x] **T9: HotSwapPruner for sense modules** (`crates/katgpt-core/src/engram/hotswap.rs`)
   - `SenseHotSwap` — atomically replace a sense module in NpcBrain at runtime
   - Uses papaya lock-free swap: `AtomicPtr<SenseModule>` with epoch-based reclamation
   - `SenseHotSwap::swap(&self, kind: SenseKind, new_module: SenseModule)` — zero-downtime replacement
@@ -169,7 +169,7 @@ Compress game domain knowledge into fixed-type ternary bit-plane sense modules (
 
 ### Phase 5: KG Confidence Weight Bridge (Plan 221 extension)
 
-- [x] **T13: KG confidence flows from KgEmbedding → SenseModule** (`crates/katgpt-core/crates/katgpt-sense/src/octree.rs`, `types.rs`)
+- [x] **T13: KG confidence flows from KgEmbedding → SenseModule** (`crates/katgpt-sense/src/octree.rs`, `types.rs`)
   - Add `confidence: f32` field to `KgEmbedding` — carries KG triple confidence from extraction pipeline
   - `SenseOctreeBuilder::build()` sets `SenseModule.confidence` = mean of embedding confidences
   - `SenseModule::project()` scales output: `confidence * sigmoid(dot)` — KG weight bridge

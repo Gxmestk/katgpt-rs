@@ -44,7 +44,7 @@
 | `boundary_precision: f32` on `BorelRegion` | `crates/katgpt-pruners/src/bfcf_types.rs` | ✅ Phase 2 complete |
 | `precision_smooth_label()` + `BFCP::precision_smooth()` | `crates/katgpt-pruners/src/bfcf_types.rs` | ✅ Phase 2 complete |
 | `FoldBandit::precision_gated_budget()` | `crates/katgpt-speculative/src/fold/fold_bandit.rs` | ✅ Phase 2 complete |
-| SenseBandit `precision_weighted_reward()` | `crates/katgpt-core/crates/katgpt-ruliology/crates/katgpt-ruliology/src/bandit.rs` | ✅ Phase 1 complete |
+| SenseBandit `precision_weighted_reward()` | `crates/katgpt-ruliology/crates/katgpt-ruliology/src/bandit.rs` | ✅ Phase 1 complete |
 
 ---
 

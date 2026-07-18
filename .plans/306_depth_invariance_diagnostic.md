@@ -5,7 +5,7 @@
 **Private guide (Super-GOAT selling point):** [riir-ai/.research/151_Recursive_Latent_State_Magnitude_Hygiene_Guide.md](../../riir-ai/.research/151_Recursive_Latent_State_Magnitude_Hygiene_Guide.md)
 **Private runtime plan:** [riir-ai/.plans/331_recursive_latent_state_magnitude_hygiene_runtime.md](../../riir-ai/.plans/331_recursive_latent_state_magnitude_hygiene_runtime.md)
 **Source paper:** [arXiv:2605.09992](https://arxiv.org/abs/2605.09992) — Eldenk et al., *Attention Drift: What Autoregressive Speculative Decoding Models Learn*
-**Target:** `katgpt-rs/crates/katgpt-core/crates/katgpt-types/src/depth_invariance.rs` (new) + `crates/katgpt-core/crates/katgpt-types/src/config.rs` (extension) + audit hook in `katgpt-rs/crates/katgpt-speculative/src/belief_drafter.rs`
+**Target:** `katgpt-rs/crates/katgpt-types/src/depth_invariance.rs` (new) + `crates/katgpt-types/src/config.rs` (extension) + audit hook in `katgpt-rs/crates/katgpt-speculative/src/belief_drafter.rs`
 **Status:** ✅ COMPLETE, DEFAULT-ON (T7.4 promoted 2026-06-23) — Phase 1 ✅ complete (12 tests pass), Phase 5 ✅ complete, **Phases 3 / 4 / 6 / 7 / 8.1 / 8.3 ✅ complete** (BeliefDrafter + AttractorKernel + LeakyIntegrator audit hooks, G2 paper-finding reproduced on random-init drafter, G3 negative + positive controls both pass, G4 re-spec'd to absolute-latency + SIMD inner-loop landed, docs cross-linked). Phase 2 G1 tests rolled into Phase 1 per delegation. T8.2 (riir-neuron-db Raven audit issue) is out of scope for this repo. **T7.4 PROMOTED to default-on (parent, 2026-06-23):** G1/G2/G3 PASS, G4 re-spec'd from structurally-impossible relative gates to absolute-latency gates at HLA scale (all PASS with headroom), SIMD inner-loop landed. **HLA `evolve_hla` audit shipped via riir-ai Plan 331 Phase 1** (`katgpt-core/crates/katgpt-sense/src/reconstruction_depth_invariance.rs` — `audit_depth_invariance` + `evolve_hla_regularized`). Key finding from that audit: HLA classifies as `DepthInvariant` by construction (per-element `[-1,1]` clamp bounds magnitude), refuting the drift hypothesis for this kernel; the RmsNorm wrap is retained as a defense-in-depth backstop.
 
 ---
@@ -26,7 +26,7 @@ Minimal, dependency-free classifier. Pure math over `&[f32]` flattened state cha
 
 ### Tasks
 
-- [x] **T1.1** Create `crates/katgpt-core/crates/katgpt-types/src/depth_invariance.rs` with module doc. Re-export from `crates/katgpt-core/src/lib.rs` behind new `depth_invariance` feature (umbrella: just this module for now; may pull in `data_probe` for shared `simd_*` helpers).
+- [x] **T1.1** Create `crates/katgpt-types/src/depth_invariance.rs` with module doc. Re-export from `crates/katgpt-core/src/lib.rs` behind new `depth_invariance` feature (umbrella: just this module for now; may pull in `data_probe` for shared `simd_*` helpers).
 - [x] **T1.2** Define types (all per AGENTS.md; `#[repr(u8)]` on the enum):
   ```rust
   #[derive(Clone, Copy, Debug, PartialEq, Eq)]

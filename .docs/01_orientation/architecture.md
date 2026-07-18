@@ -831,7 +831,7 @@ where
     Qg: BatchQualityGate;      // degenerate-batch gate (Plan 111 data_gate)
 ```
 
-**Per-cycle pipeline** (Plan 274 §2.3, see `crates/katgpt-core/crates/katgpt-core/src/cgsp/loop_.rs::cycle()`):
+**Per-cycle pipeline** (Plan 274 §2.3, see `crates/katgpt-core/src/cgsp/loop_.rs::cycle()`):
 
 1. Conjecturer samples k candidates → `scratch.candidates`.
 2. Guide scores each → `scratch.guide_scores`.
@@ -1018,7 +1018,7 @@ let logits = forward(&mut ctx, &weights, &mut cache, token, pos, &config);
 // which handles the reader→writer swap internally.
 ```
 
-## CODA Fusion Kernels (`crates/katgpt-core/crates/katgpt-core/src/coda.rs`, Plan 103)
+## CODA Fusion Kernels (`crates/katgpt-core/src/coda.rs`, Plan 103)
 
 CODA-inspired fused SIMD kernels that algebraically reparameterize matmul+residual+rmsnorm+activation into single-pass SIMD loops, eliminating intermediate buffer writes.
 
@@ -1084,7 +1084,7 @@ pub struct MoaConfig {
 
 **Feature gate:** `moa_inference` (**default-on**, Plan 158 GOAT 3/3)
 
-## Tiled Attention (`crates/katgpt-core/crates/katgpt-core/src/attention.rs`, Plan 115)
+## Tiled Attention (`crates/katgpt-core/src/attention.rs`, Plan 115)
 
 CPU SIMD tiled flash attention using online-softmax algorithm, adapted from ThunderKittens (Research 077). Processes Q in SIMD-width row tiles, K/V in column tiles — avoids materializing full N×N score matrix.
 
@@ -1261,7 +1261,7 @@ Wake-time (online, per query, zero-alloc hot path):
 
 **Feature gate:** `sleep_time_anticipation` (opt-in — quality gates G2/G3/G4 require a real predictability-labeled corpus, deferred to riir-ai Plan 341). Examples: [`sleep_time_01_basic.rs`](../../crates/katgpt-core/examples/sleep_time_01_basic.rs) + [`sleep_time_02_curiosity_inversion.rs`](../../crates/katgpt-core/examples/sleep_time_02_curiosity_inversion.rs). See `.docs/03_memory/sleep_consolidation.md` for the relationship to Plan 154 (state-internalization vs artifact-emission).
 
-## Spectral Hierarchy (`crates/katgpt-core/crates/katgpt-core/src/spectral_hierarchy.rs`, Plan 156, Research 121)
+## Spectral Hierarchy (`crates/katgpt-core/src/spectral_hierarchy.rs`, Plan 156, Research 121)
 
 Validates that hierarchical splitting geometry in co-occurrence Gram matrices emerges under the decay assumptions (Theorems 1–2 from Research 121). Three diagnostics:
 
@@ -1273,7 +1273,7 @@ Validates that hierarchical splitting geometry in co-occurrence Gram matrices em
 
 **Feature gate:** `spectral_hierarchy` (default-on)
 
-## Roofline Cost (`crates/katgpt-core/crates/katgpt-core/src/roofline.rs`, Research R130, Plan 159)
+## Roofline Cost (`crates/katgpt-core/src/roofline.rs`, Research R130, Plan 159)
 
 GPU operator runtime prediction, ported from FlashLib's `info/roofline.py`. Predicts operator runtime in ~5µs CPU-only estimation, replacing ~100ms GemvAutotune benchmarking.
 
@@ -1613,7 +1613,7 @@ markov → nll → typical_set → claim
 
 **Key types:** `MarkovChain`, `Regime` (Conservative/Typical/Uncertain), `ClaimCard`, `GeometryReport`, `ValidityVerdict`.
 
-## Depth-Invariance Diagnostic (`crates/katgpt-core/crates/katgpt-types/src/depth_invariance.rs`, Plan 306)
+## Depth-Invariance Diagnostic (`crates/katgpt-types/src/depth_invariance.rs`, Plan 306)
 
 Root-cause counterpart to four existing symptom-only detectors
 (`BeliefRankPruner`, `GainCostLoopHalter`, `latent_functor/reestimation.rs`,

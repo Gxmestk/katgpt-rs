@@ -4,7 +4,7 @@
 **Research:** [katgpt-rs/.research/294_Viable_Manifold_Graph_Primitive.md](../.research/294_Viable_Manifold_Graph_Primitive.md)
 **Private Super-GOAT guide:** [riir-ai/.research/154_viable_manifold_graph_game_runtime_guide.md](../../../riir-ai/.research/154_viable_manifold_graph_game_runtime_guide.md)
 **Source paper:** [arxiv 2206.00106](https://arxiv.org/abs/2206.00106) — González-Duque et al., *Mario Plays on a Manifold*, 2022
-**Target:** `katgpt-rs/crates/katgpt-core/crates/katgpt-core/src/viable_manifold_graph.rs` (new module) + Cargo feature `viable_manifold_graph`
+**Target:** `katgpt-rs/crates/katgpt-core/src/viable_manifold_graph.rs` (new module) + Cargo feature `viable_manifold_graph`
 **Status:** ✅ COMPLETE (2026-06-24) — PROMOTED to DEFAULT-ON. All gates (G1–G7 correctness + perf bench) PASS after the CSR adjacency fix closed the perf gate (7.10 ns/step ≤ 100 ns/step). `viable_manifold_graph` in `default = [...]` of both Cargo.toml files.
 
 ---
@@ -66,7 +66,7 @@ This is the "what does it look like?" demo. It validates the mechanism shape end
 ### Tasks
 
 - [x] **T1.1** Add feature gate to `katgpt-rs/crates/katgpt-core/Cargo.toml` (defined as `viable_manifold_graph = ["subspace_phase_gate"]` — auto-pulls the SVD dep) and `viable_manifold_graph = ["katgpt-core/viable_manifold_graph"]` passthrough to root `katgpt-rs/Cargo.toml`.
-- [x] **T1.2** Create `katgpt-rs/crates/katgpt-core/crates/katgpt-core/src/viable_manifold_graph.rs` with module doc referencing R294 + paper arxiv 2206.00106.
+- [x] **T1.2** Create `katgpt-rs/crates/katgpt-core/src/viable_manifold_graph.rs` with module doc referencing R294 + paper arxiv 2206.00106.
 - [x] **T1.3** Define `pub struct VolumeFieldConfig { pub log_eps: f32, pub jacobian_eps: f32 }`. **Deviation:** added `jacobian_eps` because `JacobianSvdScratch` does not store eps (Plan 301's `jacobian_svd_at` takes it as a parameter). Default `jacobian_eps = 1e-4` via `DEFAULT_JACOBIAN_EPS`.
 - [x] **T1.4** Implement `pub fn pullback_volume<F>(f: F, z: &[f32], scratch: &mut JacobianSvdScratch, cfg: &VolumeFieldConfig) -> f32 where F: Fn(&[f32], &mut [f32])`: calls `jacobian_svd_at(f, z, cfg.jacobian_eps, scratch)`, returns `Σ_i log(σᵢ² + cfg.log_eps)`. Zero new allocations beyond SVD.
 - [x] **T1.5** Add `pub use viable_manifold_graph::{...}` to `katgpt-core/src/lib.rs` behind `#[cfg(feature = "viable_manifold_graph")]`, mirroring the `subspace_phase_gate` pattern.

@@ -36,7 +36,7 @@ These gaps mean: training may produce incorrect gradients, distillation quality 
 | 09 | EMO Emergent Modularity | `riir-ai/crates/riir-router/` | ✅ ExpertRegistry + routing |
 | 11 | PPoT | `katgpt-rs/src/speculative/ppot/` | ✅ CPU logit resampling |
 | 12 | TRT (rejection knowledge) | `katgpt-rs/crates/katgpt-speculative/src/ppot/knowledge.rs` | ✅ Adaptive patterns |
-| 14 | Learning Beyond Gradients | `katgpt-rs/crates/katgpt-pruners/crates/katgpt-pruners/src/absorb_compress.rs` | ✅ Absorb+Compress |
+| 14 | Learning Beyond Gradients | `katgpt-rs/crates/katgpt-pruners/src/absorb_compress.rs` | ✅ Absorb+Compress |
 | 15 | Reinforced Agent (reviewer) | `katgpt-rs/crates/katgpt-core/src/pruners/review_metrics.rs` | ✅ Helpfulness/Harmfulness |
 | 16 | AutoTTS (β parameterization) | `riir-gpu/src/training_config.rs` | ✅ BetaConfig |
 | 18 | Free Transformer Latent Injection | `katgpt-rs/src/types.rs` (DomainLatent), `riir-gpu/src/domain_latent.rs` | 🟡 Full VAE ❌, mid-layer K/V domain embedding ✅ (Plan 038) |
@@ -175,7 +175,7 @@ pub struct GpuPipelines {
 
 #### Task 6: Feedback Consumer Service
 
-**File:** `riir-ai/crates/riir-gpu/crates/katgpt-deprecated/src/feedback.rs` (new) or extend `riir-ai/crates/riir-rest/`
+**File:** `riir-ai/crates/katgpt-deprecated/src/feedback.rs` (new) or extend `riir-ai/crates/riir-rest/`
 **Problem:** `katgpt-rs/crates/katgpt-deprecated/src/feedback.rs` POSTs `InferenceResult` to cache endpoint (Plan 042 Task 6 ✅), but nothing reads from that endpoint to trigger retraining. Feedback goes into a void.
 **Context:** Plan 042 implemented the send side. This task implements the receive side.
 
@@ -511,7 +511,7 @@ Cross-reference of all 21 research papers evaluated against the riir-ai / katgpt
 | 5 | **Knowledge Distillation** (Hinton et al.) | 2015 | Per-adapter KL divergence with effective weight distributions | `riir-gpu/distill.rs` | ✅ Full |
 | 6 | **AdamW** (Loshchilov & Hutter) | 2017 | Full AdamW with warmup + cosine decay on GPU | `optimizer.rs`, `optimizer.wgsl` | ✅ Full |
 | 7 | **RMSNorm** (Zhang & Sennrich) | 2019 | GPU RMSNorm kernel (no bias) | `layernorm.wgsl` | ✅ Full |
-| 8 | **Multi-Armed Bandit Routing** | 2023 | EpsilonGreedy + UCB domain routing with episode tracking | `katgpt-rs/crates/katgpt-ruliology/crates/katgpt-ruliology/src/bandit.rs` | ✅ Full |
+| 8 | **Multi-Armed Bandit Routing** | 2023 | EpsilonGreedy + UCB domain routing with episode tracking | `katgpt-rs/crates/katgpt-ruliology/src/bandit.rs` | ✅ Full |
 | 9 | **Early Exit / Dynamic Depth** | 2020 | Domain inference budget with β parameterization, early exit patience | `katgpt-rs/src/speculative/dd_tree.rs` (embedded), Plan 026 | ✅ Full |
 | 10 | **Sparse Attention** (child et al.) | 2019 | Block-sparse attention with heuristic selection (sink + window + α threshold) | `flashprefill_block_select.wgsl`, `flashprefill_sparse_forward.wgsl` | ✅ Full |
 | 11 | **KV Cache Quantization** | 2023 | TurboQuant near-optimal KV cache compression with bit-packed codebooks | `forward_turboquant.rs`, `attention_score_tq.wgsl` | ✅ Full |

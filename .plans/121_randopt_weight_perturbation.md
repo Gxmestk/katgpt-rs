@@ -56,21 +56,21 @@ Additionally, the paper's **solution density** and **spectral discordance** metr
   - High δ (≥ threshold) → exploit (use Q-values directly)
   - Low δ (< threshold) → explore (use UCB1 or Thompson)
   - EMA tracking of density per episode
-  - File: `crates/katgpt-ruliology/crates/katgpt-ruliology/src/bandit.rs`
+  - File: `crates/katgpt-ruliology/src/bandit.rs`
 
 - [x] **T6: `spectral_discordance()` diagnostic** — Specialist detection
   - `fn spectral_discordance(performance_matrix: &[Vec<f32>]) -> f32`
   - Input: N arms × M tasks percentile-rank matrix
   - Output: D ∈ [0, M/(M-1)], D→1 means specialists, D→0 means generalists
   - Exposed via `BanditSession` as `session.spectral_discordance()`
-  - File: `crates/katgpt-ruliology/crates/katgpt-ruliology/src/bandit.rs`
+  - File: `crates/katgpt-ruliology/src/bandit.rs`
 
 - [x] **T7: `solution_density()` diagnostic** — Thicket regime detection
   - `fn solution_density(scores: &[f32], base_score: f32, margin: f32) -> f32`
   - Returns δ(m) = fraction of scores ≥ base_score + margin
   - Useful for both weight-space RandOpt and modelless bandit diagnostics
   - Exposed via `BanditSession` as `session.solution_density(margin)`
-  - File: `crates/katgpt-ruliology/crates/katgpt-ruliology/src/bandit.rs`
+  - File: `crates/katgpt-ruliology/src/bandit.rs`
 
 - [x] **T8: Feature gate + module wiring**
   - Add `randopt_weight = ["bandit"]` to `Cargo.toml`

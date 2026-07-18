@@ -53,7 +53,7 @@ Reads `ScaleBoundary` from `SlodOperator` + NPC distance to player/centroid. Ass
 
 ## Tasks
 
-- [x] Create `SenseLodLevel` enum with `module_mask() -> &[SenseKind]` in `crates/katgpt-core/crates/katgpt-sense/src/lod.rs`
+- [x] Create `SenseLodLevel` enum with `module_mask() -> &[SenseKind]` in `crates/katgpt-sense/src/lod.rs`
 - [x] Add `active_lod: SenseLodLevel` field to `NpcBrain` (default: `Full`)
 - [x] Create `SenseLodRouter` struct — takes `&[ScaleBoundary]` + distance metric, produces `SenseLodLevel`
 - [x] Modify `NpcBrain::project_all_into` to skip modules not in LOD mask, push `0.0` for skipped

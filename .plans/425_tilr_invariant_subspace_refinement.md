@@ -3,7 +3,7 @@
 **Date:** 2026-07-10
 **Research:** [408_Trajectory_Invariant_Latent_Refinement.md](../.research/408_Trajectory_Invariant_Latent_Refinement.md)
 **Source paper:** [arXiv:2606.29164](https://arxiv.org/abs/2606.29164) — Malarkkan et al., *TILR: Trajectory-Invariant Latent Refinement*, ICML 2026 Mech Interp Workshop
-**Target:** `katgpt-rs/crates/katgpt-core/crates/katgpt-core/src/tilr.rs` (new module) + Cargo feature `tilr_invariant_subspace`
+**Target:** `katgpt-rs/crates/katgpt-core/src/tilr.rs` (new module) + Cargo feature `tilr_invariant_subspace`
 **Status:** ✅ COMPLETE — Phase 1 + Phase 2 + Phase 3 + Phase 4 ALL DONE, all GOAT gates PASS (2026-07-10). `tilr_invariant_subspace` promoted to DEFAULT-ON.
 
 **Constraints:**
@@ -97,7 +97,7 @@ the refactor risk.
 
 ### Tasks
 
-- [x] **T1.1** Create `katgpt-rs/crates/katgpt-core/crates/katgpt-core/src/tilr.rs` with module doc
+- [x] **T1.1** Create `katgpt-rs/crates/katgpt-core/src/tilr.rs` with module doc
       explaining: TILR mechanism (5 steps from Research 408 §1.2), the no-harm
       contract, the reuse map (Plan 301 SVD, Plan 152 ratio, Plan 412 steering),
       and the const-generic signature.

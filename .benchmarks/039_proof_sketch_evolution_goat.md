@@ -283,7 +283,7 @@ proof_sketch_evolution = ["bandit"]  # Proof Sketch Evolution (Plan 128, Researc
 | `Cargo.toml` | Added `proof_sketch_evolution = ["bandit"]` feature; added to `full` |
 | `src/pruners/mod.rs` | Added `pub mod proof` + re-exports behind `#[cfg(feature = "proof_sketch_evolution")]` |
 | `crates/katgpt-pruners/src/proof/mod.rs` | **NEW** — Module index with public re-exports |
-| `crates/katgpt-pruners/crates/katgpt-pruners/src/proof/goal_cache.rs` | **NEW** — ProofGoalCache, GoalHash, GoalResult |
+| `crates/katgpt-pruners/src/proof/goal_cache.rs` | **NEW** — ProofGoalCache, GoalHash, GoalResult |
 | `crates/katgpt-pruners/src/proof/sketch_types.rs` | **NEW** — SketchEntry, SketchId, ProofState, Goal, DiversityStrategy |
 | `crates/katgpt-pruners/src/proof/sketch_population.rs` | **NEW** — SketchPopulation, PopulationConfig, EvictionReport |
 | `crates/katgpt-pruners/src/proof/plackett_luce.rs` | **NEW** — PlackettLuceRater, PlackettLuceConfig, Gibbs sampling |

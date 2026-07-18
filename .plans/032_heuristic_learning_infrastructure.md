@@ -46,7 +46,7 @@ Round N+m:   Agent writes new validator.rs → compile .wasm → HotSwapPruner.r
   - Tests: roundtrip write+read, summary aggregation, empty log edge case
   - ~150 lines
 
-- [x] **Task 2: AbsorbCompress** (`crates/katgpt-pruners/crates/katgpt-pruners/src/absorb_compress.rs`)
+- [x] **Task 2: AbsorbCompress** (`crates/katgpt-pruners/src/absorb_compress.rs`)
   - Trait `AbsorbCompress: ScreeningPruner`
   - `fn absorb(&mut self, arm: usize, reward: f32)` — feed new observation
   - `fn compress(&mut self) -> Vec<usize>` — promote stable low-Q arms to hard blocks, returns promoted arm indices
@@ -78,7 +78,7 @@ Round N+m:   Agent writes new validator.rs → compile .wasm → HotSwapPruner.r
   - Tests: all-pass suite, tolerance boundary, empty suite
   - ~150 lines
 
-- [x] **Task 5: Integration — BanditPruner + TrialLog + AbsorbCompress** (`crates/katgpt-ruliology/crates/katgpt-ruliology/src/bandit.rs` extension)
+- [x] **Task 5: Integration — BanditPruner + TrialLog + AbsorbCompress** (`crates/katgpt-ruliology/src/bandit.rs` extension)
   - Add `BanditPruner::run_with_trial_log()` method that wraps `BanditSession::run()` but also appends to `TrialLog`
   - Add `BanditPruner::absorb_compress_cycle()` that checks `should_compress()` and calls `compress()` after each episode batch
   - Wire `AbsorbCompress` as a trait bound option for `BanditPruner<P>` where `P: ScreeningPruner + AbsorbCompress`
@@ -171,10 +171,10 @@ src/pruners/
 | File | Lines | Status |
 |------|-------|--------|
 | `crates/katgpt-pruners/src/trial_log.rs` | ~150 | Pending |
-| `crates/katgpt-pruners/crates/katgpt-pruners/src/absorb_compress.rs` | ~200 | Pending |
+| `crates/katgpt-pruners/src/absorb_compress.rs` | ~200 | Pending |
 | `crates/katgpt-pruners/src/hot_swap.rs` | ~180 | Pending |
 | `crates/katgpt-pruners/src/regression.rs` | ~150 | Pending |
-| `crates/katgpt-ruliology/crates/katgpt-ruliology/src/bandit.rs` (extension) | ~100 added | Pending |
+| `crates/katgpt-ruliology/src/bandit.rs` (extension) | ~100 added | Pending |
 | `src/pruners/mod.rs` (exports) | ~10 added | Pending |
 | `examples/hl_01_trial_log.rs` | ~200 | Pending |
 | `examples/hl_02_hotswap.rs` | ~250 | Pending |

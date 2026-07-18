@@ -47,7 +47,7 @@ The primary integration point is **post-DDTree rescue**: when speculative decodi
   - `PpotConfig` struct: `entropy_threshold: f32`, `num_samples: usize`, `rule: TokenRule`, `different_constraint: bool`
   - Wire into `src/speculative/mod.rs` with `#[cfg(feature = "ppot")]` feature gate
 
-- [x] **Task 5: Post-DDTree rescue integration** (`crates/katgpt-forward/crates/katgpt-forward/src/step.rs`)
+- [x] **Task 5: Post-DDTree rescue integration** (`crates/katgpt-forward/src/step.rs`)
   - Add `ppot_rescue()` function called after DDTree verification fails
   - Pipeline: extract marginals → identify high-entropy positions → resample m paths → screen each through `ScreeningPruner` → return first valid
   - Falls back to greedy only if PPoT rescue also fails
@@ -85,7 +85,7 @@ The primary integration point is **post-DDTree rescue**: when speculative decodi
 | `katgpt-rs/crates/katgpt-speculative/src/ppot/entropy.rs` | New: entropy calculation, position identification |
 | `katgpt-rs/src/speculative/ppot/resample.rs` | New: CPU resampling core |
 | `katgpt-rs/src/speculative/mod.rs` | Add `pub mod ppot` (feature-gated) |
-| `katgpt-rs/crates/katgpt-forward/crates/katgpt-forward/src/step.rs` | Add `ppot_rescue()` integration |
+| `katgpt-rs/crates/katgpt-forward/src/step.rs` | Add `ppot_rescue()` integration |
 | `katgpt-rs/src/types.rs` | Add `PpotConfig` fields to `Config` |
 | `katgpt-rs/src/benchmark.rs` | Add PPoT benchmarks |
 | `katgpt-rs/Cargo.toml` | Add `[features] ppot = []` |

@@ -42,7 +42,7 @@ graph TD
   - `fn compute_and_insert(class_hash: u64, embeddings: &[KgEmbedding]) -> bool`
   - `fn get(&self, class_hash: u64) -> Option<CentroidStats>`
   - Pre-computed once per KG snapshot update, O(d·|E_c|) per class
-  - File: `crates/katgpt-core/crates/katgpt-sense/src/schema_centroid.rs` (new file, 457 lines)
+  - File: `crates/katgpt-sense/src/schema_centroid.rs` (new file, 457 lines)
 
 - [x] Implement `schema_init_entity()` function
   - Signature: `fn schema_init_entity(classes: &[u64], cache: &SchemaCentroidCache, gamma: f32, rng: &mut Rng) -> [f32; 8]`
@@ -50,7 +50,7 @@ graph TD
   - Average centroids: `μ = (1/|C|) Σ_c (v_c + γ·σ_c ⊙ r_c)`
   - Where `r_c` is random noise per class (prevents identical init)
   - Fallback: if class not in cache, use random init (graceful degradation)
-  - File: `crates/katgpt-core/crates/katgpt-sense/src/schema_centroid.rs`
+  - File: `crates/katgpt-sense/src/schema_centroid.rs`
 
 - [x] Add feature gate `schema_centroid` to Cargo.toml
   - `schema_centroid = ["dep:papaya"]` in katgpt-core + `schema_centroid = ["katgpt-core/schema_centroid", "sense_composition"]` in main crate
@@ -67,7 +67,7 @@ graph TD
   - Sparse classes → lower initial precision (centroid is less reliable)
   - `mean = schema_init_entity(...)` instead of random
   - New function: `schema_init_with_precision()` returns `([f32; 8], [f32; 8])`
-  - File: `crates/katgpt-core/crates/katgpt-sense/src/schema_centroid.rs`
+  - File: `crates/katgpt-sense/src/schema_centroid.rs`
 
 - [x] Add `class_membership` field to `KgEmbedding`
   - Design decision: class membership tracked externally via SchemaCentroidCache,
@@ -82,7 +82,7 @@ graph TD
   - Quantize centroid to ternary via existing `embedding_to_ternary()`
   - Fallback to random if class not in cache
   - 2/2 integration tests pass (centroid + fallback)
-  - File: `crates/katgpt-core/crates/katgpt-sense/src/octree.rs`
+  - File: `crates/katgpt-sense/src/octree.rs`
 
 ### Phase 4: GOAT Proof + Benchmarks
 
@@ -134,7 +134,7 @@ graph TD
   - Fallback: unknown class → uninformative prior (0.1) ✅
   - Multi-class: average density → averaged precision ✅
   - GOAT G8 gate passed
-  - File: `crates/katgpt-core/crates/katgpt-sense/src/schema_centroid.rs`, `tests/bench_237_schema_centroid_goat.rs`
+  - File: `crates/katgpt-sense/src/schema_centroid.rs`, `tests/bench_237_schema_centroid_goat.rs`
 
 - [x] GOAT decision: promote to default-ON if all criteria pass
   - ✅ 10.14× cosine improvement (target: ≥1.5×)

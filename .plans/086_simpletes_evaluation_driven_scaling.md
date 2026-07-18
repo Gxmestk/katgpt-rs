@@ -237,12 +237,12 @@ Add `Rpucg` variant to `BanditStrategy` enum. RPUCG (Rooted Propagation UCB on G
 
 ### Where
 
-`crates/katgpt-ruliology/crates/katgpt-ruliology/src/bandit.rs` — add enum variant and selection logic
+`crates/katgpt-ruliology/src/bandit.rs` — add enum variant and selection logic
 
 ### Implementation
 
 ```rust
-// Add to BanditStrategy enum in crates/katgpt-ruliology/crates/katgpt-ruliology/src/bandit.rs
+// Add to BanditStrategy enum in crates/katgpt-ruliology/src/bandit.rs
 
 pub enum BanditStrategy {
     EpsilonGreedy { epsilon: f32 },
@@ -393,7 +393,7 @@ Ensure all TES code is behind `tes_loop` feature gate with zero impact on defaul
 | `src/speculative/types.rs` | `TesConfig`, `TesNode` structs | `tes_loop` |
 | `crates/katgpt-pruners/src/tes_loop.rs` | New file: `TesLoop` trait + default impl | `tes_loop` |
 | `src/pruners/mod.rs` | Conditional `mod tes_loop` | `tes_loop` |
-| `crates/katgpt-ruliology/crates/katgpt-ruliology/src/bandit.rs` | `BanditStrategy::Rpucg` variant + selection | `tes_loop` |
+| `crates/katgpt-ruliology/src/bandit.rs` | `BanditStrategy::Rpucg` variant + selection | `tes_loop` |
 | `src/pruners/arena/` | `TrajectoryPruner` for chain-level pruning | `tes_loop` |
 | `tests/test_simpletes.rs` | New test file: RPUCG selection, propagation proofs | `tes_loop` |
 
@@ -404,4 +404,4 @@ Ensure all TES code is behind `tes_loop` feature gate with zero impact on defaul
 - **Paper**: arXiv:2604.19341 — SimpleTES: Evaluation-Driven Scaling
 - **Research**: `.research/052_SimpleTES_Evaluation_Driven_Scaling.md`
 - **Related**: Plan 030 (BanditPruner), Plan 050 (Feature Gate Audit), Plan 033 (Bomber Arena)
-- **Key files**: `crates/katgpt-ruliology/crates/katgpt-ruliology/src/bandit.rs`, `src/speculative/types.rs`, `src/pruners/arena/`
+- **Key files**: `crates/katgpt-ruliology/src/bandit.rs`, `src/speculative/types.rs`, `src/pruners/arena/`

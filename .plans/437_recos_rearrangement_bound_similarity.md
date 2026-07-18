@@ -3,7 +3,7 @@
 **Date:** 2026-07-14
 **Research:** [katgpt-rs/.research/421_Recos_Rearrangement_Bound_Similarity.md](../.research/421_Recos_Rearrangement_Bound_Similarity.md)
 **Source paper:** [arXiv:2602.05266](https://arxiv.org/abs/2602.05266) — "Beyond Cosine Similarity", Xinbo Ai (BUPT), Feb 2026
-**Target:** `katgpt-rs/crates/katgpt-core/crates/katgpt-core/src/similarity.rs` (open primitive) + `katgpt-rs/crates/katgpt-core/src/mag/` (cold-path consumer) + `riir-neuron-db/src/index.rs` (conditional hot-path consumer)
+**Target:** `katgpt-rs/crates/katgpt-core/src/similarity.rs` (open primitive) + `katgpt-rs/crates/katgpt-core/src/mag/` (cold-path consumer) + `riir-neuron-db/src/index.rs` (conditional hot-path consumer)
 **Cargo feature:** `recos` (opt-in until GOAT gate passes)
 **Status:** ✅ COMPLETE, OPT-IN (G1 honest FAIL → no promotion) — Phase 1 ✅ DONE (T1.1–T1.7); Phase 2 ✅ DONE (G1 **FAIL** → do NOT promote); Phase 3 ✅ SHIPPED (opt-in diagnostic); Phase 4 ✅ SHIPPED (opt-in diagnostic, T4.1-T4.5 done, T4.6 stretch deferred).
 

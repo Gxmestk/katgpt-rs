@@ -89,7 +89,7 @@ Re-evaluate promotion when a concrete consumer lands (riir-ai HLA personality ro
 
 - [Issue 159](../.issues/159_grapem_rank2_rodrigues_exponential.md) — the source issue (T1–T6 all complete).
 - [Research 446](../.research/446_GRAPE_Group_Representational_Position_Encoding.md) — parent distillation.
-- [`crates/katgpt-core/crates/katgpt-core/src/grapem.rs`](../crates/katgpt-core/crates/katgpt-core/src/grapem.rs) — the primitive (744 lines incl. docs + tests).
+- [`crates/katgpt-core/src/grapem.rs`](../crates/katgpt-core/src/grapem.rs) — the primitive (744 lines incl. docs + tests).
 - [`crates/katgpt-core/benches/bench_457_grapem_rodrigues_goat.rs`](../crates/katgpt-core/benches/bench_457_grapem_rodrigues_goat.rs) — this gate.
 - Issue 160 (unified `PositionGroupAction` trait) — soft-depends on this issue for the multiplicative general case (RoPE special case works standalone).
 - Issue 161 (GRAPE-AP vector-similarity gates) — soft-depends on this issue for the `R_ℓ` rotation schedule (sin/cos fallback works).

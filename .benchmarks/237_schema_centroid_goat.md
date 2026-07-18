@@ -54,10 +54,10 @@ running 11 tests — 11 passed; 0 failed
 
 | Component | Tests | File |
 |-----------|-------|------|
-| `CentroidStats`, `compute_centroid` | 3 + 1 GOAT | `crates/katgpt-core/crates/katgpt-sense/src/schema_centroid.rs` |
-| `SchemaCentroidCache` | 2 + 1 GOAT | `crates/katgpt-core/crates/katgpt-sense/src/schema_centroid.rs` |
-| `schema_init_entity` | 5 + 1 GOAT | `crates/katgpt-core/crates/katgpt-sense/src/schema_centroid.rs` |
-| `build_from_centroid` | 2 + 1 GOAT | `crates/katgpt-core/crates/katgpt-sense/src/octree.rs` |
+| `CentroidStats`, `compute_centroid` | 3 + 1 GOAT | `crates/katgpt-sense/src/schema_centroid.rs` |
+| `SchemaCentroidCache` | 2 + 1 GOAT | `crates/katgpt-sense/src/schema_centroid.rs` |
+| `schema_init_entity` | 5 + 1 GOAT | `crates/katgpt-sense/src/schema_centroid.rs` |
+| `build_from_centroid` | 2 + 1 GOAT | `crates/katgpt-sense/src/octree.rs` |
 | GOAT proof + benchmarks | 11 | `tests/bench_237_schema_centroid_goat.rs` |
 | **Total** | **26** | |
 

@@ -422,7 +422,7 @@ DDTree (chain-seed)              316,849 tok/s         3.16           16.00
 | `src/benchmark.rs` | Add `bench_ddtree_chain_seed()`, `bench_ddtree_budget_sweep()` | 2 | — |
 | `src/main.rs` | Add budget sweep output section | 2 | — |
 | `crates/katgpt-percepta/src/transformer.rs` | Add `KVSnapshot`, `KVLayerSnapshot`, `snapshot()`, `restore()` | 3 | 010 ✅, 011 🔧 |
-| `crates/katgpt-forward/crates/katgpt-forward/src/step.rs` | Integrate snapshot/rollback into `speculative_step_verifier()` | 3 | 010 ✅ |
+| `crates/katgpt-forward/src/step.rs` | Integrate snapshot/rollback into `speculative_step_verifier()` | 3 | 010 ✅ |
 | `src/speculative/prefill.rs` | New: `PrefillScorer` trait, `score_token_importance()`, `compress_prompt()`, `speculative_prefill()` | 4 | 009 ✅, 010 ✅ |
 | `src/speculative/mod.rs` | Add `pub mod prefill;` | 4 | — |
 | `crates/katgpt-speculative/src/dflash.rs` | Add `dflash_predict_conditioned()` | 5 | 009 ✅, 010 ✅ |

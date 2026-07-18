@@ -121,7 +121,7 @@ If both prune the same token for different reasons, that's fine. If both claim o
 | File | Change |
 |------|--------|
 | `src/speculative/types.rs` | Add `DraftEvent` enum |
-| `crates/katgpt-forward/crates/katgpt-forward/src/step.rs` | Emit `DraftEvent` during speculative step |
+| `crates/katgpt-forward/src/step.rs` | Emit `DraftEvent` during speculative step |
 | `src/rest/` | Add agent hints parsing, `/v1/tokenize` endpoint |
 | `src/types.rs` | Add `AgentHints` struct, domain truncation config |
 | `src/router/` | Load truncation policy from domain config |

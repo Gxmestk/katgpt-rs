@@ -363,7 +363,7 @@ pub struct CompressedVector {
 }
 ```
 
-### `crates/katgpt-spectral/crates/katgpt-spectral/src/spectral_kv_cache.rs` (~400 lines)
+### `crates/katgpt-spectral/src/spectral_kv_cache.rs` (~400 lines)
 
 SpectralQuant KV cache with per-dim variable-bit packing:
 

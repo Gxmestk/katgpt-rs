@@ -3,7 +3,7 @@
 **Date:** 2026-07-06
 **Research:** [katgpt-rs/.research/382_Spherical_Steering_Geodesic_Slerp.md](../.research/382_Spherical_Steering_Geodesic_Slerp.md)
 **Source paper:** [arXiv:2602.08169](https://arxiv.org/abs/2602.08169) — You, Deng, Chen, ICML 2026
-**Target:** `katgpt-rs/crates/katgpt-core/crates/katgpt-core/src/spherical_steering.rs` (new module) + Cargo feature `spherical_steering`
+**Target:** `katgpt-rs/crates/katgpt-core/src/spherical_steering.rs` (new module) + Cargo feature `spherical_steering`
 **Status:** Phase 1–4 complete — DEFAULT-ON (2026-07-06). Phase 5 (F1 fusion) deferred.
 
 ---
@@ -22,7 +22,7 @@ Sibling to **Plan 322 (`phase_rotation_gate_into`)**, which ships the 2-subspace
 
 ## Architecture
 
-New module: `katgpt-rs/crates/katgpt-core/crates/katgpt-core/src/spherical_steering.rs` (estimated < 500 LOC).
+New module: `katgpt-rs/crates/katgpt-core/src/spherical_steering.rs` (estimated < 500 LOC).
 
 ```rust
 // Signature sketch (full impl in Research 382 §2.1):
@@ -76,7 +76,7 @@ pub fn spherical_steering_into(
 
 - [x] **T1.1** Add `spherical_steering` feature to `katgpt-rs/crates/katgpt-core/Cargo.toml` `[features]`. Default OFF.
 - [x] **T1.2** Add `pub mod spherical_steering;` to `katgpt-rs/crates/katgpt-core/src/lib.rs` under `#[cfg(feature = "spherical_steering")]`. Re-export the three public functions + `SlerpScratch` + `SlerpError`.
-- [x] **T1.3** Create `katgpt-rs/crates/katgpt-core/crates/katgpt-core/src/spherical_steering.rs` with:
+- [x] **T1.3** Create `katgpt-rs/crates/katgpt-core/src/spherical_steering.rs` with:
   - [x] `pub struct SlerpScratch { unit_h: Vec<f32> }` + `new(d: usize)` + `ensure_capacity(d: usize)`
   - [x] `pub enum SlerpError { ShapeMismatch, ZeroNorm, AntipodalDegenerate, InvalidStrength }`
   - [x] `pub fn slerp_steering_into(h, mu_t, t, h_out, scratch) -> Result<(), SlerpError>`

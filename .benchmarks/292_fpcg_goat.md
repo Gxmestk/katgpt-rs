@@ -100,7 +100,7 @@ under a shared-spherical-covariance assumption). It is:
 - **Freeze/thaw compatible** — output is a `FutureBehaviorProbe` artifact with
   an embedded BLAKE3 hash (G7).
 
-Shipped in `crates/katgpt-pruners/crates/katgpt-pruners/src/fpcg_modelless.rs` behind the
+Shipped in `crates/katgpt-pruners/src/fpcg_modelless.rs` behind the
 `future_probe` feature. 8 unit tests verify construction correctness, error
 paths, determinism, and noise robustness.
 

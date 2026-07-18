@@ -3,7 +3,7 @@
 **Date:** 2026-07-09
 **Research:** [katgpt-rs/.research/395_NNs_to_NOs_Function_Space_Operator_Learning_Recipe.md](../.research/395_NNs_to_NOs_Function_Space_Operator_Learning_Recipe.md) (the perf-actual follow-up to the false-DRY Issue 042 verdict)
 **Source:** Issue [042](../.issues/042_function_space_encoder_decoder_trait_re_examination.md) (closed false-DRY) → user-requested perf-actual follow-up
-**Target:** `katgpt-rs/crates/katgpt-core/crates/katgpt-core/src/cross_resolution.rs` (no new module, no new feature flag — pure perf optimization on a DEFAULT-ON primitive)
+**Target:** `katgpt-rs/crates/katgpt-core/src/cross_resolution.rs` (no new module, no new feature flag — pure perf optimization on a DEFAULT-ON primitive)
 **Status:** Done — Phase 3 COMPLETE. All GOAT gates PASS, change promoted (kept).
 
 ---
@@ -86,8 +86,8 @@ Unchanged. The transposed cache is local to the `CrossResolutionBases` struct (p
 - [Issue 042](../.issues/042_function_space_encoder_decoder_trait_re_examination.md) — closed false-DRY; this plan is the perf-actual follow-up.
 - [Research 395](../.research/395_NNs_to_NOs_Function_Space_Operator_Learning_Recipe.md) — progenitor paper; §3 Routing flagged this exact opportunity.
 - [Plan 310](310_cross_resolution_spectral_transport_primitive.md) — the parent plan that shipped `cross_resolution_transport` DEFAULT-ON.
-- `katgpt-rs/crates/katgpt-core/crates/katgpt-core/src/cross_resolution.rs` — the file being optimized.
-- `katgpt-rs/crates/katgpt-types/crates/katgpt-types/src/simd/dot.rs::simd_matmul_rows` — the SIMD primitive being adopted.
+- `katgpt-rs/crates/katgpt-core/src/cross_resolution.rs` — the file being optimized.
+- `katgpt-rs/crates/katgpt-types/src/simd/dot.rs::simd_matmul_rows` — the SIMD primitive being adopted.
 
 ## TL;DR
 

@@ -3,7 +3,7 @@
 **Date:** 2026-07-02
 **Research:** [katgpt-rs/.research/365_PhysiFormer_Single_Shot_Trajectory_Heat_Kernel_DEC.md](../.research/365_PhysiFormer_Single_Shot_Trajectory_Heat_Kernel_DEC.md)
 **Source paper:** [arXiv:2606.27364](https://arxiv.org/abs/2606.27364) — PhysiFormer (Chen/Lan/Vedaldi, VGG Oxford)
-**Target:** `katgpt-rs/crates/katgpt-dec/crates/katgpt-dec/src/heat_kernel.rs` + Cargo feature `heat_kernel_trajectory` (passthrough: katgpt-core → root)
+**Target:** `katgpt-rs/crates/katgpt-dec/src/heat_kernel.rs` + Cargo feature `heat_kernel_trajectory` (passthrough: katgpt-core → root)
 **Status:** ✅ COMPLETE (2026-07-02) — Phase 1–5 ALL DONE. `heat_kernel_trajectory` PROMOTED to DEFAULT-ON in katgpt-dec.
 
 ---
@@ -65,7 +65,7 @@ For large complexes where eigendecomposition is prohibitive (256×256 = 65k vert
 
 ### Tasks
 
-- [x] **T2.1** Implement `krylov_expmv(a_apply: &mut F, h0: &[f32], t: f32, k: usize) -> Vec<f32>` where `a_apply` is a closure computing `v → A·v` (sparse matrix-vector product). Uses Arnoldi iteration (modified Gram-Schmidt) to build the k-dimensional Krylov basis `V_k`, solves the small `exp(t·H_k)` on the projected Hessenberg matrix `H_k` via scaling-squaring + Taylor series, reconstructs `‖b‖ · V_k · exp(t·H_k) · e₁`. Also ships `krylov_expmv_into` (zero-output-alloc variant). Lives in `crates/katgpt-dec/crates/katgpt-dec/src/krylov.rs` (generic linear algebra, no DEC deps).
+- [x] **T2.1** Implement `krylov_expmv(a_apply: &mut F, h0: &[f32], t: f32, k: usize) -> Vec<f32>` where `a_apply` is a closure computing `v → A·v` (sparse matrix-vector product). Uses Arnoldi iteration (modified Gram-Schmidt) to build the k-dimensional Krylov basis `V_k`, solves the small `exp(t·H_k)` on the projected Hessenberg matrix `H_k` via scaling-squaring + Taylor series, reconstructs `‖b‖ · V_k · exp(t·H_k) · e₁`. Also ships `krylov_expmv_into` (zero-output-alloc variant). Lives in `crates/katgpt-dec/src/krylov.rs` (generic linear algebra, no DEC deps).
 
 - [x] **T2.2** Implement `heat_kernel_trajectory_krylov(cx, h0, motor_vec, motor_dim, t, k)` and `heat_kernel_trajectory_krylov_into` — wraps `krylov_expmv` with the DEC `A` operator (built from `graph_laplacian_into` rank-0 fast path / `hodge_laplacian` rank≥1 fallback + motor diagonal). The matvec closure captures pre-allocated scratch CochainFields and reuses them across all k Arnoldi iterations.
 
@@ -98,7 +98,7 @@ Extend to the nonlinear case: `dh/dt = -h + Δ·ReLU(h) + diag(motor)·h`, decom
 
 ### Tasks
 
-- [x] **T3.1** Implemented `expm_source_term_quadrature` in `crates/katgpt-dec/crates/katgpt-dec/src/nonlinear_heat_kernel.rs` — the Duhamel integral `∫₀ᵗ exp((t-s)·L)·N(h(s))ds` approximated by Gauss-Legendre quadrature (n=1..=8 hardcoded tables). Uses the linear heat kernel as the exponential Euler predictor: `h(s) ≈ exp(s·L)·h₀`. **Accumulate** semantics (does NOT zero `out` — caller must zero for standalone use).
+- [x] **T3.1** Implemented `expm_source_term_quadrature` in `crates/katgpt-dec/src/nonlinear_heat_kernel.rs` — the Duhamel integral `∫₀ᵗ exp((t-s)·L)·N(h(s))ds` approximated by Gauss-Legendre quadrature (n=1..=8 hardcoded tables). Uses the linear heat kernel as the exponential Euler predictor: `h(s) ≈ exp(s·L)·h₀`. **Accumulate** semantics (does NOT zero `out` — caller must zero for standalone use).
 
 - [x] **T3.2** Implemented `heat_kernel_trajectory_nonlinear` and `heat_kernel_trajectory_nonlinear_into` — combines linear heat kernel on `L` with quadrature on the ReLU source term. The `_into` variant takes a `NonlinearScratch` struct (4 pre-allocated cochain buffers) for zero-alloc reuse. Supports standard and leaky ReLU via `relu_slope` parameter.
 
@@ -106,7 +106,7 @@ Extend to the nonlinear case: `dh/dt = -h + Δ·ReLU(h) + diag(motor)·h`, decom
 
 - [x] **T3.4** Unit test: `nonlinear_diverges_from_euler_at_long_horizon` — at t=1.0 on 4×4, the nonlinear heat kernel is closer to fine Euler than coarse Euler (dt=0.1). **PASS**. (The “beats Euler at long horizon” property is fundamentally linear — Phase 5 G1 gate. For the ReLU-gated case with stable motors, the field decays to zero at long horizon, making comparisons degenerate. This test uses t=1.0 where the field is alive.)
 
-**Phase 3 exit:** Nonlinear path works. Implemented in `crates/katgpt-dec/crates/katgpt-dec/src/nonlinear_heat_kernel.rs` (separate module for modularity; the existing `heat_kernel.rs` was at 1281 lines). 13 unit tests all pass. The gain over Euler depends on nonlinearity stiffness — for mildly mixed fields, the exponential integrator wins; for strongly mixed fields with stable motors, the field decays and the comparison is degenerate.
+**Phase 3 exit:** Nonlinear path works. Implemented in `crates/katgpt-dec/src/nonlinear_heat_kernel.rs` (separate module for modularity; the existing `heat_kernel.rs` was at 1281 lines). 13 unit tests all pass. The gain over Euler depends on nonlinearity stiffness — for mildly mixed fields, the exponential integrator wins; for strongly mixed fields with stable motors, the field decays and the comparison is degenerate.
 
 ### Phase 3 Implementation Notes (2026-07-02)
 
@@ -132,7 +132,7 @@ The modelless analog of PhysiFormer's generative uncertainty: sample K diverse p
 
 ### Tasks
 
-- [x] **T4.1** Implemented `heat_kernel_trajectory_bom` and `heat_kernel_trajectory_bom_into` in `crates/katgpt-dec/crates/katgpt-dec/src/bom_heat_kernel.rs` — perturbs the initial state `h₀` along the **near-harmonic subspace** (the `n` eigenmodes with smallest `|a_k|` where `a_k = motor_d - 1 + λ_k`), then applies the linear heat kernel to each of K hypotheses. The near-harmonic modes decay slowest under `exp(t·A)`, so perturbations along them PERSIST → producing genuinely different futures. Helper `near_harmonic_indices(eig, motor_d, n)` selects the directions. Noise coefficients are caller-provided (`noise[k·M+m]`), matching the BoMSampler API convention (deterministic RNG at the call site, not inside the primitive).
+- [x] **T4.1** Implemented `heat_kernel_trajectory_bom` and `heat_kernel_trajectory_bom_into` in `crates/katgpt-dec/src/bom_heat_kernel.rs` — perturbs the initial state `h₀` along the **near-harmonic subspace** (the `n` eigenmodes with smallest `|a_k|` where `a_k = motor_d - 1 + λ_k`), then applies the linear heat kernel to each of K hypotheses. The near-harmonic modes decay slowest under `exp(t·A)`, so perturbations along them PERSIST → producing genuinely different futures. Helper `near_harmonic_indices(eig, motor_d, n)` selects the directions. Noise coefficients are caller-provided (`noise[k·M+m]`), matching the BoMSampler API convention (deterministic RNG at the call site, not inside the primitive).
 
 - [x] **T4.2** Unit tests in `bom_heat_kernel.rs` (8 tests, all green): `near_harmonic_indices_returns_smallest_abs_a`, `near_harmonic_indices_caps_at_k`, `bom_returns_k_trajectories`, `bom_into_matches_allocating`, **`bom_produces_diverse_trajectories`** (verifies K trajectories have non-trivial L2 spread), `bom_zero_sigma_returns_baseline` (σ=0 → all trajectories equal the unperturbed linear heat kernel), `bom_trajectories_are_finite_and_bounded` (stability under stable motor), `bom_diversity_grows_with_sigma` (σ-sweep: larger σ → larger spread). The topological-invariant preservation (Hodge decomposition) holds by construction — the heat kernel preserves the DEC structure (verified in Phase 1 T1.6).
 

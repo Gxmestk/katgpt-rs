@@ -47,7 +47,7 @@ downstream cost.
 
 1. **Move `ThinkingMode` and `ComputeTier` to `katgpt-core::traits`.** Currently
    both have a duplicate definition: one in main crate (canonical, in
-   `crates/katgpt-speculative/crates/katgpt-speculative/src/thinking_controller.rs` and `crates/katgpt-core/src/trigger_gate.rs`) and one
+   `crates/katgpt-speculative/src/thinking_controller.rs` and `crates/katgpt-core/src/trigger_gate.rs`) and one
    in katgpt-pruners (`crates/katgpt-pruners/src/{collapse_detector,thicket_variance_probe}.rs`).
    The duplicates are bit-compatible via `#[repr(u8)]` and a `tier_to_kp` bridge,
    but DRY says we should consolidate. Low priority — the bridge is 7 lines.

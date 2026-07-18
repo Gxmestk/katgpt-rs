@@ -10,7 +10,7 @@
 **Date:** 2026-06-16
 **Research:** [katgpt-rs/.research/435_Temporal_Derivative_Kernel_Neocortical_Learning.md](../.research/435_Temporal_Derivative_Kernel_Neocortical_Learning.md)
 **Source paper:** [arXiv:2606.08720](https://arxiv.org/abs/2606.08720) — O'Reilly, "This is how the Neocortex Learns" (Jun 2026)
-**Target:** `crates/katgpt-core/crates/katgpt-core/src/temporal_deriv.rs` (new module) + fusion hooks into `sense/reconstruction.rs` (HLA), `DeltaMemoryState` (Plan 053), `CollapseDetector` (Plan 212), CGSP curiosity (Plan 274)
+**Target:** `crates/katgpt-core/src/temporal_deriv.rs` (new module) + fusion hooks into `sense/reconstruction.rs` (HLA), `DeltaMemoryState` (Plan 053), `CollapseDetector` (Plan 212), CGSP curiosity (Plan 274)
 **Cargo feature:** `temporal_deriv` (opt-in until GOAT gate passes)
 **Status:** ✅ COMPLETE (2026-06-16) — Phase 6 exit MET, GOAT 4/4 PASS (G2 HLA companion, G3 δ-Mem gate, G4 collapse detector, G5 derivative curiosity). `temporal_deriv` promoted to DEFAULT-ON in katgpt-core + root Cargo.toml. No demotions (all fusions additive; CGSP stays for target-seeking).
 
@@ -35,11 +35,11 @@ Ship a generic, zero-allocation, sigmoid-compatible **dual fast/slow temporal-de
 
 ## Phase 1 — Primitive Skeleton (CORE)
 
-Target: `crates/katgpt-core/crates/katgpt-core/src/temporal_deriv.rs`. Generic, no game semantics, no consumer coupling.
+Target: `crates/katgpt-core/src/temporal_deriv.rs`. Generic, no game semantics, no consumer coupling.
 
 ### Tasks
 
-- [x] **T1.1** Create `crates/katgpt-core/crates/katgpt-core/src/temporal_deriv.rs` with `TemporalDerivativeKernel<const N: usize>` struct (fields: `fast: [f32; N]`, `slow: [f32; N]`, `alpha_fast: f32`, `alpha_slow: f32`).
+- [x] **T1.1** Create `crates/katgpt-core/src/temporal_deriv.rs` with `TemporalDerivativeKernel<const N: usize>` struct (fields: `fast: [f32; N]`, `slow: [f32; N]`, `alpha_fast: f32`, `alpha_slow: f32`).
   - `pub fn new(alpha_fast: f32, alpha_slow: f32) -> Self` — zero-init state, validate `0 < alpha_slow < alpha_fast <= 1` (panic in debug, clamp in release).
   - `pub fn with_initial(fast: [f32; N], slow: [f32; N], alpha_fast: f32, alpha_slow: f32) -> Self` — for warm starts / snapshot restore.
 - [x] **T1.2** Implement `pub fn observe(&mut self, signal: &[f32; N]) -> [f32; N]`
@@ -81,7 +81,7 @@ Target: `crates/katgpt-core/crates/katgpt-core/src/temporal_deriv.rs`. Generic, 
 
 ## Phase 2 — Fusion F1: HLA Companion (sense_composition)
 
-Target: extend `crates/katgpt-core/crates/katgpt-sense/crates/katgpt-sense/src/reconstruction.rs`. Adds a per-NPC 8-dim surprise vector as an output channel of the reconstruction cycle.
+Target: extend `crates/katgpt-sense/crates/katgpt-sense/src/reconstruction.rs`. Adds a per-NPC 8-dim surprise vector as an output channel of the reconstruction cycle.
 
 ### Tasks
 

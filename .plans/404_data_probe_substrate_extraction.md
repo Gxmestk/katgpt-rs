@@ -89,7 +89,7 @@ items still require the feature. No existing consumer can break.
 
 ### T1 — Convert katgpt-core `data_probe.rs` → `data_probe/` directory
 
-- `git mv crates/katgpt-core/src/data_probe.rs crates/katgpt-core/crates/katgpt-core/src/data_probe/sink_classify.rs`
+- `git mv crates/katgpt-core/src/data_probe.rs crates/katgpt-core/src/data_probe/sink_classify.rs`
 - Create `crates/katgpt-core/src/data_probe/mod.rs` with:
   - Always-on: `pub mod {markov,nll,typical_set,claim,dirichlet_energy};`
   - Gated: `#[cfg(feature = "sink_aware_attn")] pub mod {sink_classify,geometry};`

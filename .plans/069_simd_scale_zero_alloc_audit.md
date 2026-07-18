@@ -111,14 +111,14 @@ let nb = simd_dot_f32(b, b, b.len()).sqrt();
 
 ## T9: Optimize `extract_ddtree_paths` + `extract_best_path` (D2)
 
-**File**: `crates/katgpt-forward/crates/katgpt-forward/src/step.rs`, `src/speculative/dd_tree.rs`
+**File**: `crates/katgpt-forward/src/step.rs`, `src/speculative/dd_tree.rs`
 
 - Pre-index tree nodes by depth: `[Vec<&TreeNode>; MAX_DEPTH]` built in O(N)
 - Replace O(D × N) `.iter().filter()` scans with O(1) depth lookups
 
 ## T10: Document `speculative_step_rollback` / `_paged` as deprecated (D1)
 
-**File**: `crates/katgpt-forward/crates/katgpt-forward/src/step.rs`
+**File**: `crates/katgpt-forward/src/step.rs`
 
 Add `#[deprecated(note = "Use speculative_step_rollback_with for zero-alloc production path")]` to benchmark-only functions.
 

@@ -3,7 +3,7 @@
 **Date:** 2026-06-16
 **Research:** [katgpt-rs/.research/249_DecentMem_DualPool_Reachable_Router.md](../.research/249_DecentMem_DualPool_Reachable_Router.md)
 **Source paper:** [arXiv:2605.22721](https://arxiv.org/pdf/2605.22721) — Hao, Long, Zhao 2026, "Self-Evolving MAS via Decentralized Memory"
-**Target:** `crates/katgpt-core/crates/katgpt-core/src/cgsp/dual_pool.rs` (new module) + Cargo feature `cgsp_dual_pool`
+**Target:** `crates/katgpt-core/src/cgsp/dual_pool.rs` (new module) + Cargo feature `cgsp_dual_pool`
 **Status:** ✅ COMPLETE, OPT-IN (cgsp_dual_pool) — Phase 4 complete (G3 E-pool growth + G4 faithfulness gate); Phase 5 (G5 CGSP integration) **MIGRATED + COMPLETE in [riir-ai Plan 312](../../riir-ai/.plans/312_dual_pool_cgsp_runtime_integration.md)** — G5.2 FLAT, G5.3 PASS (161 ns overhead), G5.4 PASS; Phase 6 (docs + GOAT decision) complete — feature stays opt-in (G1–G4 + G5.3/G5.4 PASS, G5.2 FLAT — reachability guarantee alone justifies the feature, not personality divergence).
 
 ---
@@ -20,7 +20,7 @@ Ship a generic **dual-pool memory router** that splits a bandit's candidate pool
 
 ### Tasks
 
-- [x] **T1.1** Define `PoolId` enum (`Exploitation = 0`, `Exploration = 1`) with `#[repr(u8)]` in `crates/katgpt-core/crates/katgpt-core/src/cgsp/dual_pool.rs`. Zero-cost tag.
+- [x] **T1.1** Define `PoolId` enum (`Exploitation = 0`, `Exploration = 1`) with `#[repr(u8)]` in `crates/katgpt-core/src/cgsp/dual_pool.rs`. Zero-cost tag.
 - [x] **T1.2** Define `ReachableDualPoolRouter` trait (associated types `Item`, `Reward: Copy`; methods `route_select`, `route_update`, `consolidate`, `exploitation_probability`, `is_reachable`). Doc-comment cites DecentMem Theorems 1 + 2.
 - [x] **T1.3** Implement `DualPoolBandit<B: HintDeltaBandit>` struct:
   - Fields: `e_pool: B` (exploitation — wraps existing HintDeltaBandit), `x_pool: B` (exploration), `w_e: f32` (exploitation weight, init 1.0), `w_x: f32` (exploration weight, fixed 1.0 per paper Eq. 6/7), `alpha_update_gain: f32` (paper's `α = 0.5`), `decay: f32` (paper's `β = 0.5`).

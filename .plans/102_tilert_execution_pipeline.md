@@ -27,7 +27,7 @@
   #[cfg(feature = "stability_metrics")]
   pub stability: StabilitySnapshot,
   ```
-- [x] T3: Instrument `speculative_step_rollback()` in `crates/katgpt-forward/crates/katgpt-forward/src/step.rs` with `std::time::Instant` probes
+- [x] T3: Instrument `speculative_step_rollback()` in `crates/katgpt-forward/src/step.rs` with `std::time::Instant` probes
   - Record wall time for: draft phase, snapshot phase, verify phase, accept/reject phase
   - Zero overhead when feature is disabled (compile-time elimination)
 - [x] T4: Add `stability_metrics` feature to `Cargo.toml` (no default)
@@ -158,7 +158,7 @@ Distill the three highest-value insights from TileRT's execution pipeline into o
 
 | Component | D1 | D2 | D3 |
 |---|---|---|---|
-| `crates/katgpt-forward/crates/katgpt-forward/src/step.rs` | ✅ Instrument timing | — | ✅ Stage dispatch |
+| `crates/katgpt-forward/src/step.rs` | ✅ Instrument timing | — | ✅ Stage dispatch |
 | `src/speculative/types.rs` | ✅ StabilitySnapshot | — | — |
 | `crates/katgpt-percepta/src/transformer.rs` | — | ✅ ContiguousWeights | ✅ DecodeStage |
 | `src/types.rs` | — | — | — |

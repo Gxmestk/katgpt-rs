@@ -3,7 +3,7 @@
 **Date:** 2026-07-01
 **Research:** [katgpt-rs/.research/355_LieFlow_Symmetry_Discovery_Group_Orbit_Support.md](../.research/355_LieFlow_Symmetry_Discovery_Group_Orbit_Support.md)
 **Source paper:** [arXiv:2512.20043](https://arxiv.org/abs/2512.20043) — Chen et al., LieFlow, ICML 2026
-**Target:** `katgpt-rs/crates/katgpt-core/crates/katgpt-core/src/group_invariance_probe.rs` (new module) + Cargo feature `group_invariance_probe`
+**Target:** `katgpt-rs/crates/katgpt-core/src/group_invariance_probe.rs` (new module) + Cargo feature `group_invariance_probe`
 **Status:** ✅ COMPLETE, OPT-IN — Phase 1 (GOAT gate) COMPLETE — 8/8 gates PASS, feature ships OPT-IN
 
 ---
@@ -24,7 +24,7 @@ This is the modelless residue of LieFlow (arXiv:2512.20043) — the trained flow
 
 - [x] **T1.1** Create `katgpt-rs/.plans/356_group_invariance_probe.md` (this plan).
 - [x] **T1.2** Add feature flag `group_invariance_probe = []` to `crates/katgpt-core/Cargo.toml` (opt-in, pure numeric, no deps).
-- [x] **T1.3** Implement `crates/katgpt-core/crates/katgpt-core/src/group_invariance_probe.rs`:
+- [x] **T1.3** Implement `crates/katgpt-core/src/group_invariance_probe.rs`:
   - `GroupAction` trait — `fn act(&self, q: &[f32], out: &mut [f32])` and `fn sample(&mut self, rng: &mut impl Rng) -> Self::Elem`.
   - `invariance_score(distance: f32, beta: f32) -> f32` — shifted sigmoid `σ(β·(1−d))` (hits ≈1.0 at d=0, 0.5 at d=1, ≈0 at d=2; caller normalizes d so indifference point is at d=1).
   - `score_variance(scores: &[f32]) -> f32` — population variance, the PRIMARY discrete-vs-continuous signal for large-fraction subgroups (C₄ ⊂ C₈ → var ≈ 0.25).

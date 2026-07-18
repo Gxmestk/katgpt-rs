@@ -100,13 +100,13 @@ Apply SDAR gate to bandit arm update magnitude.
 
 **Motivation:** SDAR gates distillation loss by teacher-student gap. Analogously, we gate bandit Q-value updates by reward quality gap. When reward signal is noisy (negative gap), attenuate the update. When reward signal is trustworthy (positive gap), pass it through.
 
-- [x] **T3: Add `SdarBanditPruner` wrapper** — `crates/katgpt-ruliology/crates/katgpt-ruliology/src/bandit.rs`
+- [x] **T3: Add `SdarBanditPruner` wrapper** — `crates/katgpt-ruliology/src/bandit.rs`
   - Wraps existing `BanditPruner<P>` with sigmoid-gated reward updates
   - `update(arm, reward)`: compute `gap = reward - q_values[arm]`, gate = `σ(β·gap)`, update with `gated_reward = reward * gate`
   - Property: positive reward surprise → full update, negative reward surprise → attenuated update
   - This is the modelless analog of SDAR's token-level gating
 
-- [x] **T4: Unit tests for `SdarBanditPruner`** — `crates/katgpt-ruliology/crates/katgpt-ruliology/src/bandit.rs` (test module)
+- [x] **T4: Unit tests for `SdarBanditPruner`** — `crates/katgpt-ruliology/src/bandit.rs` (test module)
   - Test: gate opens for positive gap (reward > Q-value)
   - Test: gate closes for negative gap (reward < Q-value)
   - Test: convergence still reaches optimal arm (no regression vs ungated)

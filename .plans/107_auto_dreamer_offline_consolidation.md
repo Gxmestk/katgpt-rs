@@ -323,7 +323,7 @@ Expected:
 ## References
 
 - Auto-Dreamer paper: arXiv:2605.20616
-- Existing `AbsorbCompress`: `crates/katgpt-pruners/crates/katgpt-pruners/src/absorb_compress.rs`
+- Existing `AbsorbCompress`: `crates/katgpt-pruners/src/absorb_compress.rs`
 - Existing `DeltaMemoryState`: `src/pruners/delta_mem/state.rs`
 - Existing Freeze/Thaw: `crates/katgpt-pruners/src/freeze.rs`
 - G-Zero self-play: `src/pruners/g_zero/`

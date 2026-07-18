@@ -4,7 +4,7 @@
 **Research:** [katgpt-rs/.research/305_Phase_Modulated_Cross_Domain_Coupling.md](../.research/305_Phase_Modulated_Cross_Domain_Coupling.md)
 **Private guide:** [riir-ai/.research/159_phase_rotation_subspace_gate_guide.md](../../../riir-ai/.research/159_phase_rotation_subspace_gate_guide.md)
 **Source paper:** [arxiv 2605.12700](https://arxiv.org/abs/2605.12700) — UFO: Domain-Unification-Free Operator Framework (Qiao, Karniadakis, Muniruzzaman, May 2026)
-**Target:** `katgpt-rs/crates/katgpt-core/crates/katgpt-core/src/phase_rotation.rs` (new module) + Cargo feature `phase_rotation_coupling`
+**Target:** `katgpt-rs/crates/katgpt-core/src/phase_rotation.rs` (new module) + Cargo feature `phase_rotation_coupling`
 **Status:** ✅ Phase 1 + Phase 2 COMPLETE (2026-06-25). **PROMOTED to DEFAULT-ON** — all 5 GOAT gates PASS with comfortable headroom (G1 drift 5.96e-8 <1e-4 [1677× headroom], G2 0 reversals/100 steps, G3 D=8 scalar+mix 18.9ns<50ns + D=8 mix-only 5.0ns<20ns + D=64 per-channel+mix 355.7ns<1500ns, G4 0 allocs/100 calls, G6 sigmoid(0)=0.5→cos=sin=1/√2). Pure modelless (closed-form cos/sin/sigmoid/dot, no training). Design pivot: independent-Padé cos/sin was replaced with `phase_safe_cos_sin` (libm sin + Pythagorean sqrt recovery) because independent Padé drifts in cos²+sin²=1 by ~5e-3 (50× G1 budget). Phase 3 SIMD/LUT optimization is unnecessary (355.7ns ≪ 1500ns budget); would only matter if a future hot-path caller needed <600ns. Phase 4 fusion guides remain deferred to riir-ai (HLA runtime) / riir-chain (LatCal committed phase) / katgpt-rs (DEC Hodge mixer) — those repos' responsibility.
 
 ---
@@ -21,7 +21,7 @@ Ship the **phase-modulated coupling primitive** distilled from UFO (arxiv 2605.1
 
 ### Tasks
 
-- [x] **T1.1** Create `katgpt-rs/crates/katgpt-core/crates/katgpt-core/src/phase_rotation.rs`:
+- [x] **T1.1** Create `katgpt-rs/crates/katgpt-core/src/phase_rotation.rs`:
   - `PhaseRotationGate` config struct (sharpness `λ`, broadcast-vs-per-channel flag).
   - `phase_rotation_gate_into(a, b, cos_alpha, sin_alpha, out)` — the core mix. Scalar-broadcast fast path (length-1 cos/sin) + per-channel path (length-D cos/sin). SIMD the inner loop (`simd::simd_mul_add` if available, else chunked 4-wide manual).
   - `compute_phase_from_projection(state, direction, sharpness, &mut cos_alpha, &mut sin_alpha)` — scalar phase: `α = sigmoid(dot · λ) · π/2`; returns (cos α, sin α).
@@ -144,4 +144,4 @@ The primitive is **modelless by construction** — the §3.5 check was performed
 
 ## TL;DR
 
-Ship the phase-modulated coupling primitive (cos α ⊙ a + sin α ⊙ b, α from sigmoid projection) behind feature flag `phase_rotation_coupling` in `katgpt-rs/crates/katgpt-core/crates/katgpt-core/src/phase_rotation.rs`. Phase 1: skeleton + unit tests. Phase 2: GOAT gate (G1 norm preservation <1e-4 is the kill switch; G2 monotone interpolation; G3 latency <50ns D=8 scalar / <600ns D=64 per-channel; G4 zero-alloc). Phase 3: SIMD/LUT if G3 marginally fails. Phase 4: fusion guides in riir-ai (HLA runtime), riir-chain (LatCal committed phase), katgpt-rs (DEC Hodge mixer) — deferred until Phase 2 promotes to default. The primitive is the open math hook for the Super-GOAT in riir-ai/.research/159 (norm-preserving NPC affect rotation, crowd-coherent mode transition, chain-committed phase for deterministic replay).
+Ship the phase-modulated coupling primitive (cos α ⊙ a + sin α ⊙ b, α from sigmoid projection) behind feature flag `phase_rotation_coupling` in `katgpt-rs/crates/katgpt-core/src/phase_rotation.rs`. Phase 1: skeleton + unit tests. Phase 2: GOAT gate (G1 norm preservation <1e-4 is the kill switch; G2 monotone interpolation; G3 latency <50ns D=8 scalar / <600ns D=64 per-channel; G4 zero-alloc). Phase 3: SIMD/LUT if G3 marginally fails. Phase 4: fusion guides in riir-ai (HLA runtime), riir-chain (LatCal committed phase), katgpt-rs (DEC Hodge mixer) — deferred until Phase 2 promotes to default. The primitive is the open math hook for the Super-GOAT in riir-ai/.research/159 (norm-preserving NPC affect rotation, crowd-coherent mode transition, chain-committed phase for deterministic replay).

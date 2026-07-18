@@ -80,7 +80,7 @@ pub enum AndOrNode<G, S> {
 
 ### T2: `AndOrBuilder` — Decomposition logic for DDTree marginals
 
-**Where:** `katgpt-rs/crates/katgpt-speculative/crates/katgpt-speculative/src/and_or_builder.rs` (new)
+**Where:** `katgpt-rs/crates/katgpt-speculative/src/and_or_builder.rs` (new)
 
 Converts flat marginals into AND-OR tree based on `ScreeningPruner::relevance()` signal. Low relevance regions become decomposition points.
 

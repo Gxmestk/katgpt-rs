@@ -767,7 +767,7 @@ or use only for offline analysis rather than per-build correction.
 
 All types are NEW. Integration points (read-only, no changes needed):
 - `src/pruners/mod.rs` — add `delta_mem` module + exports
-- `crates/katgpt-ruliology/crates/katgpt-ruliology/src/bandit.rs` — `BanditPruner` as inner pruner for `MemorySteeredPruner`
+- `crates/katgpt-ruliology/src/bandit.rs` — `BanditPruner` as inner pruner for `MemorySteeredPruner`
 - `crates/katgpt-pruners/src/g_zero/delta_bandit.rs` — `DeltaBanditPruner` δ signal feeds `OutcomeFeatures`
 - `src/speculative/types.rs` — `ScreeningPruner` trait (read-only, no changes)
 - `Cargo.toml` — feature gate

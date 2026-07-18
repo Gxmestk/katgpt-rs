@@ -5,7 +5,7 @@
 **Policy:** `katgpt-rs/AGENTS.md` → Feature Flag Discipline → "UQ-bearing primitive GOAT gate extension".
 **Companion paper:** [arXiv:2606.09473](https://arxiv.org/abs/2606.09473) — *Report the Floor*.
 **Floor:** `ConformalIntervalCalibrator<SeasonalNaiveForecaster>` (Plan 340 Phase 1, `m=1`, plain split conformal).
-**Harness:** `crates/katgpt-core/crates/katgpt-core/src/conformal/floor_harness.rs` (`run_floor_comparison`, Issue 010 T2).
+**Harness:** `crates/katgpt-core/src/conformal/floor_harness.rs` (`run_floor_comparison`, Issue 010 T2).
 
 ---
 

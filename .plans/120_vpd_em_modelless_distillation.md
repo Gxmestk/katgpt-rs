@@ -29,9 +29,9 @@ VPD identifies a critical flaw in existing self-distillation (SDPO): the feedbac
 | `sdar_gate()` / `sdar_modulate()` | `crates/katgpt-pruners/src/sdar_gate.rs` | σ(β·x) gate function — reuse as-is |
 | `BtConfig` / `BtComparison` | `crates/katgpt-pruners/src/bt_rank.rs` | BT pairwise ranking — **extend for BCO unpaired** |
 | `SdarPlayer` | `src/pruners/bomber/sdar_player.rs` | SDAR bomber player — **add E/M cycle** |
-| `BanditPruner<P>` with UCB1 | `crates/katgpt-ruliology/crates/katgpt-ruliology/src/bandit.rs` | Core bandit — reuse Q-value tracking |
+| `BanditPruner<P>` with UCB1 | `crates/katgpt-ruliology/src/bandit.rs` | Core bandit — reuse Q-value tracking |
 | `DataGatePlayer` | `src/pruners/bomber/` | Stability gating — VPD dynamic prior is related |
-| `AbsorbCompressLayer<P>` | `crates/katgpt-pruners/crates/katgpt-pruners/src/absorb_compress.rs` | Compression/distillation — reuse as M-step core |
+| `AbsorbCompressLayer<P>` | `crates/katgpt-pruners/src/absorb_compress.rs` | Compression/distillation — reuse as M-step core |
 
 ### What's New (Implement)
 

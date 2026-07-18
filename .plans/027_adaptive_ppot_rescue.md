@@ -115,7 +115,7 @@ TRT proves three things we can apply at token level:
   - This captures TRT's finding that models switch strategy more after failure (82%) than success (74%)
   - Unit tests: threshold adjusts correctly, bounded by min/max
 
-- [x] **Task 6: Wire adaptive rescue into speculative step** (`crates/katgpt-forward/crates/katgpt-forward/src/step.rs`)
+- [x] **Task 6: Wire adaptive rescue into speculative step** (`crates/katgpt-forward/src/step.rs`)
   - Add `SessionKnowledge` to `SpeculativeContext` (or thread parameter, TBD)
   - Replace `ppot_rescue()` call with `ppot_rescue_adaptive()`
   - After each rescue attempt (success or fail), record insight into knowledge
@@ -150,7 +150,7 @@ TRT proves three things we can apply at token level:
 | `src/speculative/ppot/resample.rs` | ✅ **Extend:** add `ppot_resample_multi_strategy()`, `ppot_rescue_adaptive()` |
 | `crates/katgpt-speculative/src/ppot/types.rs` | ✅ **Extend:** adaptive threshold fields in `PpotConfig` |
 | `src/speculative/ppot/mod.rs` | ✅ **Update:** re-export new types, wire adaptive API |
-| `crates/katgpt-forward/crates/katgpt-forward/src/step.rs` | ✅ API available, integration point wired via `ppot_rescue_adaptive()` |
+| `crates/katgpt-forward/src/step.rs` | ✅ API available, integration point wired via `ppot_rescue_adaptive()` |
 | `src/benchmark.rs` | ✅ **Added:** Plan 027 adaptive rescue benchmark with Plan 026 comparison (Task 7) |
 | `README.md` | ✅ **Update:** add Adaptive PPoT section |
 

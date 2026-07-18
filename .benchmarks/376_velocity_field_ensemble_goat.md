@@ -33,7 +33,7 @@ only (no explicit `--features`).
 
 ## G1 — Mechanics
 
-9 unit tests in `crates/katgpt-core/crates/katgpt-core/src/velocity_field_ensemble.rs::tests`:
+9 unit tests in `crates/katgpt-core/src/velocity_field_ensemble.rs::tests`:
 
 | Test | Purpose |
 |------|---------|

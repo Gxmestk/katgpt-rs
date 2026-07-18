@@ -94,7 +94,7 @@ pub enum BudgetMode {
 
 ## T3: `BanditStrategy::CurvatureInfluence`
 
-**File:** `crates/katgpt-ruliology/crates/katgpt-ruliology/src/bandit.rs` — add to `BanditStrategy` enum
+**File:** `crates/katgpt-ruliology/src/bandit.rs` — add to `BanditStrategy` enum
 
 ```rust
 /// EoS-aware arm selection inspired by arXiv:2606.04212.

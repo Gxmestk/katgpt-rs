@@ -187,5 +187,5 @@ weights), so a PASS gives a clean modelless gain → promote.
 - `katgpt-rs/.research/307_FNO_Practical_Perspective_Spectral_Primitives_Survey.md` — source research note, candidate plan #1.
 - `katgpt-rs/.research/291_cross_resolution_spectral_transport_open_primitive.md` + `.plans/310_*` — the existing FNO headline primitive (already shipped, DEFAULT-ON).
 - `katgpt-rs/.plans/251_dec_operators_cell_complex.md` — DEC `exterior_derivative` (covers spectral differentiation in DEC vocabulary; candidate plan #2 would be a thin wrapper around this for periodic uniform grids).
-- `katgpt-rs/crates/katgpt-core/crates/katgpt-core/src/flow/fft.rs::fft_smooth_into` — existing FFT pattern with pre-allocated scratch (template for `FcScratch`).
-- `katgpt-rs/crates/katgpt-core/crates/katgpt-core/src/cross_resolution.rs` — existing frozen-basis primitive pattern (template for the `*_into` + scratch API).
+- `katgpt-rs/crates/katgpt-core/src/flow/fft.rs::fft_smooth_into` — existing FFT pattern with pre-allocated scratch (template for `FcScratch`).
+- `katgpt-rs/crates/katgpt-core/src/cross_resolution.rs` — existing frozen-basis primitive pattern (template for the `*_into` + scratch API).

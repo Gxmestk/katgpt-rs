@@ -45,7 +45,7 @@ Our system already captures (1) via Raven RSM and (4) via G-Zero phases. The gap
 | Component | Location | Status |
 |-----------|----------|--------|
 | Freeze/Thaw pipeline | `crates/katgpt-pruners/src/freeze.rs` | ✅ Plan 092 complete |
-| Bandit knowledge arrays | `crates/katgpt-ruliology/crates/katgpt-ruliology/src/bandit.rs` | ✅ Working |
+| Bandit knowledge arrays | `crates/katgpt-ruliology/src/bandit.rs` | ✅ Working |
 | Game replay data | `examples/bomber_*.rs`, `examples/go_*.rs` | ✅ Working |
 | LoRA export/load | `riir-ai/crates/riir-gpu` | ✅ Working |
 | GFlowNet distillation | `src/pruners/gflownet.rs` | ✅ Plan 052 |

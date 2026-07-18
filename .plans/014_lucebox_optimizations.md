@@ -106,7 +106,7 @@ dflash_predict_parallel:
 |------|---------|
 | `crates/katgpt-percepta/src/transformer.rs` | Add `forward_paged()` function, `attention_head_paged()` helper |
 | `src/speculative/dd_tree.rs` | No changes — tree builder is cache-agnostic |
-| `crates/katgpt-forward/crates/katgpt-forward/src/step.rs` | Add paged cache branch in `speculative_step*` functions |
+| `crates/katgpt-forward/src/step.rs` | Add paged cache branch in `speculative_step*` functions |
 | `src/speculative/types.rs` | Add `DDTreeBranchCache` struct + impl |
 | `crates/katgpt-speculative/src/dflash.rs` | Add Rayon threshold guard in `dflash_predict_parallel` |
 | `src/types.rs` | Add `parallel_threshold` to `Config`, document f16 path in comments |

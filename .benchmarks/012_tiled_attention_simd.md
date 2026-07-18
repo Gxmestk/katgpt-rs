@@ -120,7 +120,7 @@ cargo test --features tiled_attention --lib -- transformer
 
 | File | Change |
 |------|--------|
-| `crates/katgpt-core/crates/katgpt-core/src/attention.rs` | Tiled attention implementation (T2–T5) |
+| `crates/katgpt-core/src/attention.rs` | Tiled attention implementation (T2–T5) |
 | `crates/katgpt-core/src/lib.rs` | Re-export behind feature gate (T10) |
 | `crates/katgpt-core/Cargo.toml` | `tiled_attention` feature (T1) |
 | `crates/katgpt-percepta/src/transformer.rs` | Wire into `forward_prefill` Phase B (T6) |

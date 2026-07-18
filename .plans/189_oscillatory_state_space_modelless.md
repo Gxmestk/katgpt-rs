@@ -73,7 +73,7 @@ Distill OSSM-PINN's oscillatory state-space principles into katgpt-rs as modelle
 
 ### Phase 3: ModalSpec — Experimental — ✅ Implemented (experimental, NOT default)
 
-- [x] Implement LinOSS cell in `crates/katgpt-core/crates/katgpt-core/src/linoss.rs`
+- [x] Implement LinOSS cell in `crates/katgpt-core/src/linoss.rs`
   - `LinOSSCell { omega_sq: Vec<f32>, beta: Vec<f32> }`
   - `LinOSSState { y: Vec<f32>, z: Vec<f32> }`
   - `imex_step(state, forcing, dt) -> LinOSSState`

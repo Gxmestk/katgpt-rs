@@ -56,7 +56,7 @@ Same cadence as Plans 391→392: substrate first (Plan 393), wrappers next
 - [x] T1.1 Audit `SpeculativeContext` struct + impl for any non-leaf deps
       (expected: none — ForwardContext, MultiLayerKVCache, Config, SdeConfig
       all leaf-resident)
-- [x] T1.2 Create `crates/katgpt-forward/crates/katgpt-forward/src/speculative_context.rs` with the
+- [x] T1.2 Create `crates/katgpt-forward/src/speculative_context.rs` with the
       moved struct + impl.
 - [x] T1.3 Declare `pub mod speculative_context;` +
       `pub use speculative_context::SpeculativeContext;` in katgpt-forward lib.rs
@@ -113,7 +113,7 @@ Same cadence as Plans 391→392: substrate first (Plan 393), wrappers next
 |---|---:|---:|---:|
 | `src/speculative/types.rs` | 609 | 467 | -142 (-23%)
 | `crates/katgpt-percepta/src/transformer.rs` | 5697 | 5615 | -82 (-1.4%)
-| `crates/katgpt-forward/crates/katgpt-forward/src/speculative_context.rs` | 0 | 165 | +165 (new)
+| `crates/katgpt-forward/src/speculative_context.rs` | 0 | 165 | +165 (new)
 | `crates/katgpt-forward/src/forward.rs` | 1097 | 1206 | +109
 | `crates/katgpt-forward/src/lib.rs` | 454 | 464 | +10 |
 
@@ -127,7 +127,7 @@ forward-cycle cluster (~6K LOC) root-bound.
 |---|---:|---:|---:|
 | `src/speculative/types.rs` | 609 | 467 | -142 LOC (-23%). SpeculativeContext struct+impl removed; re-export shim added. |
 | `crates/katgpt-percepta/src/transformer.rs` | 5697 | 5615 | -82 LOC (-1.4%). forward_decode_stage + forward_draft + forward_verify removed; re-export shim added. |
-| `crates/katgpt-forward/crates/katgpt-forward/src/speculative_context.rs` | 0 | 165 | +165 LOC (new file: struct + impl). |
+| `crates/katgpt-forward/src/speculative_context.rs` | 0 | 165 | +165 LOC (new file: struct + impl). |
 | `crates/katgpt-forward/src/forward.rs` | 1097 | 1206 | +109 LOC (3 functions + DecodeStage import). |
 
 ## Import rewrite table

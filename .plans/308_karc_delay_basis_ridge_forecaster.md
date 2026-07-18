@@ -48,7 +48,7 @@ trajectory ─────▶ │ KarcForecaster      │
 ```
 
 **Reuse map (DRY):**
-- Ridge solve `(N + λI)^{-1}` → **`peira::predictor_with_scratch`** math (do not re-implement; extract the Cholesky/inversion kernel into `crates/katgpt-core/crates/katgpt-core/src/linalg/ridge_solve.rs` and have both `peira.rs` and `karc.rs` consume it).
+- Ridge solve `(N + λI)^{-1}` → **`peira::predictor_with_scratch`** math (do not re-implement; extract the Cholesky/inversion kernel into `crates/katgpt-core/src/linalg/ridge_solve.rs` and have both `peira.rs` and `karc.rs` consume it).
 - Basis eval → consume `riir-engine::linoss::basis::SpectralBasis` directly if riir-engine is in the dep tree, otherwise vendor a minimal `KarcBasis` trait with the same shape (the trait surface is ~10 lines).
 - SIMD matvec → reuse `simd::simd_matvec` / `simd::simd_matmul_rows` for the forecast step.
 
@@ -69,7 +69,7 @@ Goal: a compiling, tested, feature-gated module that implements the full KARC pi
 - [x] **T1.3** Implement `DelayRing<D, K>` — fixed-capacity ring buffer of last-K `&[f32; D]` observations. `push(o: &[f32; D])` overwrites oldest. `flatten_into(&mut [f32; K*D])` writes the delay-embedded state `x_i = u_i ⊕ u_{i-1} ⊕ ... ⊕ u_{i-k+1}` in observation order (newest first).
 - [x] **T1.4** Implement `feature_expand<B: KarcBasis>(delay_state: &[f32], basis: &B, out: &mut [f32])` — applies basis to each of the `K·D` delay coordinates, writing `K·D·M` features. Chunk-4 unrolled for SIMD.
 - [x] **T1.5** Implement `KarcForecaster::observe(u: &[f32; D])` — pushes to delay ring; if ring is full and `fit_interval_ticks` has elapsed since last fit, accumulates `(Ψ(x), u_{t+1})` pair into the trajectory buffer.
-- [x] **T1.6** Implement `KarcForecaster::fit_ridge(lambda: f32)` — solves `Wout = YH^T(HH^T + λI)^{-1}` using the Woodbury form `(H^T H + λI)^{-1} H^T Y` when `d_h > N` (the typical per-NPC regime). Extract the inversion kernel from `peira::predictor_with_scratch` into `crates/katgpt-core/crates/katgpt-core/src/linalg/ridge_solve.rs` (new file, no behavior change to PEIRA — pure refactor).
+- [x] **T1.6** Implement `KarcForecaster::fit_ridge(lambda: f32)` — solves `Wout = YH^T(HH^T + λI)^{-1}` using the Woodbury form `(H^T H + λI)^{-1} H^T Y` when `d_h > N` (the typical per-NPC regime). Extract the inversion kernel from `peira::predictor_with_scratch` into `crates/katgpt-core/src/linalg/ridge_solve.rs` (new file, no behavior change to PEIRA — pure refactor).
   - *Deviation:* Shipped a standalone f32+f64 ridge solve rather than extracting from PEIRA (PEIRA's f64 Cholesky is private and tightly coupled to its EMA covariance). KARC accumulates the Gram in f64 for numerical robustness at small λ. See `linalg/mod.rs` module doc for the rationale. `// TODO: unify with peira's f64 path`.
 - [x] **T1.7** Implement `KarcForecaster::forecast_into(delay_state: &[f32], out: &mut [f32; D])` — `feature_expand` into scratch, then `simd_matvec(Wout, features, out)`. Zero allocation.
   - *Note:* `forecast_into(&mut self, ...)` uses a pre-allocated `forecast_psi` buffer (stack arrays of size `K·D·M` are not expressible in stable Rust — `generic_const_exprs` unstable). Zero-alloc verified by G3.

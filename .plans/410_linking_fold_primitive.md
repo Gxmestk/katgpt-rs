@@ -3,7 +3,7 @@
 **Date:** 2026-07-07
 **Research:** [katgpt-rs/.research/391_Low_Dimensional_Topology_Linking_Number.md](../.research/391_Low_Dimensional_Topology_Linking_Number.md)
 **Source paper:** [arXiv:2606.31856](https://arxiv.org/abs/2606.31856) — Ren & Lim, *Low-dimensional topology of deep neural networks*, ICML 2026 (PMLR 306)
-**Target:** `katgpt-rs/crates/katgpt-core/crates/katgpt-core/src/linking_fold.rs` (new module) + Cargo feature `linking_fold`
+**Target:** `katgpt-rs/crates/katgpt-core/src/linking_fold.rs` (new module) + Cargo feature `linking_fold`
 **Status:** ✅ COMPLETE (Phase 1–5 all ✅); Option C feature split — `linking_fold_fold` DEFAULT-ON (2026-07-07), `linking_fold_detector` OPT-IN. G2 detector PASS under audit-cadence budget 500 ms @ n=2×200, Issue 050 Option A resolved 2026-07-07.
 
 **GOAT gate summary (verified 2026-07-07, bench + alloc test run):**
@@ -69,7 +69,7 @@ Goal: a compiling, feature-gated module with the public API surface frozen. No i
 ### Tasks
 
 - [x] **T1.1** Add feature flag `linking_fold = []` to `katgpt-rs/crates/katgpt-core/Cargo.toml` `[features]` section. No new deps (detector is brute-force k-NN; fold is closed-form).
-- [x] **T1.2** Create `katgpt-rs/crates/katgpt-core/crates/katgpt-core/src/linking_fold.rs` with module-level doc referencing Research 391 and arXiv:2606.31856.
+- [x] **T1.2** Create `katgpt-rs/crates/katgpt-core/src/linking_fold.rs` with module-level doc referencing Research 391 and arXiv:2606.31856.
 - [x] **T1.3** Add `#[cfg(feature = "linking_fold")] pub mod linking_fold;` to `katgpt-rs/crates/katgpt-core/src/lib.rs` (alphabetical, after `karc`).
 - [x] **T1.4** Define public types:
   - `LinkingDetectorConfig { k_neighbors, epsilon_quantile, min_cycle_len, n_subdivisions }` with sane defaults (`k=8`, `epsilon_quantile=0.7`, `min_cycle_len=4`, `n_subdivisions=4`).
@@ -139,7 +139,7 @@ All five gates have been measured. **Issue 050 resolved (Option A, 2026-07-07):*
 
 ## TL;DR
 
-Shipped `linking_detector` (Algorithm 1: PCA-3D + ε-kNN + cycle basis + Gauss integral) + `fold_projection_into` / `fold_gelu_into` (coordinate-wise `|x−c|` unlinking correction, paper §5 / Eq. 1) behind feature flag `linking_fold` in `katgpt-rs/crates/katgpt-core/crates/katgpt-core/src/linking_fold.rs`. Pure modelless (closed-form PCA + brute-force k-NN + Gauss quadrature + abs-fold; no training, no GD).
+Shipped `linking_detector` (Algorithm 1: PCA-3D + ε-kNN + cycle basis + Gauss integral) + `fold_projection_into` / `fold_gelu_into` (coordinate-wise `|x−c|` unlinking correction, paper §5 / Eq. 1) behind feature flag `linking_fold` in `katgpt-rs/crates/katgpt-core/src/linking_fold.rs`. Pure modelless (closed-form PCA + brute-force k-NN + Gauss quadrature + abs-fold; no training, no GD).
 
 **GOAT gate status (honest accounting, 2026-07-07, all gates run):**
 - **Fold (hot-path) — all gates PASS:** G1 ✅, G2 ✅ (12–17 ns/call at D=8/D=64), G4 ✅ (0 allocs/1000 calls × 4), G5 ✅ (bit-identical).

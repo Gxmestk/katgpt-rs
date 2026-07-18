@@ -3,7 +3,7 @@
 **Date:** 2026-07-01
 **Task:** Issue 010 T4 — "Report the Floor" comparison for Sleep-Time Query Anticipator (Plan 334/341).
 **Verdict:** **EXCLUDED from the "Report the Floor" policy** (reframing escape hatch — the anticipator's predictability is a gate heuristic, not a calibrated UQ signal).
-**Harness:** `crates/katgpt-core/crates/katgpt-core/src/conformal/floor_harness.rs` (Issue 010 T2).
+**Harness:** `crates/katgpt-core/src/conformal/floor_harness.rs` (Issue 010 T2).
 **Adapter + tests:** `crates/katgpt-core/tests/conformal_floor_sleep_time.rs`.
 
 ---
@@ -191,7 +191,7 @@ switching, 2 blocks).
 
 - Policy: `katgpt-rs/AGENTS.md` Feature Flag Discipline (UQ-bearing primitive
   GOAT gate extension), Issue 010.
-- Harness: `crates/katgpt-core/crates/katgpt-core/src/conformal/floor_harness.rs` (Issue 010 T2).
+- Harness: `crates/katgpt-core/src/conformal/floor_harness.rs` (Issue 010 T2).
 - Adapter + tests: `crates/katgpt-core/tests/conformal_floor_sleep_time.rs`.
 - Sleep-Time Anticipator: `crates/katgpt-sleep/`, Plan 334 (open math);
   riir-ai Plan 341 (private runtime).

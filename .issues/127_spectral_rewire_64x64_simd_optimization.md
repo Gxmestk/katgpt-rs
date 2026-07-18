@@ -9,7 +9,7 @@
 ## Context
 
 The cached-index hot path (`spectral_rewire_with_index_into`) in
-`crates/katgpt-spectral/crates/katgpt-spectral/src/spectral_rewire.rs` does four rank-r matmuls per
+`crates/katgpt-spectral/src/spectral_rewire.rs` does four rank-r matmuls per
 delta after a one-time SVD index build. Benchmark 423 §G5 measured:
 
 | Scale | rank | mean | target | result |

@@ -106,7 +106,7 @@ cargo check -p katgpt-core --all-features --lib           # combo regression che
 ## Cross-references
 
 - **Issue:** `.issues/040_ptg_latent_functor_edge_composition.md`
-- **Implementation:** `crates/katgpt-core/crates/katgpt-core/src/closure/functor_edge.rs` (~520 LOC incl. 17 tests)
+- **Implementation:** `crates/katgpt-core/src/closure/functor_edge.rs` (~520 LOC incl. 17 tests)
 - **Bench:** `crates/katgpt-core/benches/bench_040_ptg_functor_edge.rs`
 - **T1 audit:** `.issues/040_ptg_latent_functor_edge_composition.md` §"T1 Wire-Format Finding"
 - **Sibling primitive:** Issue 039 (whole-architecture commitment) — once this ships,

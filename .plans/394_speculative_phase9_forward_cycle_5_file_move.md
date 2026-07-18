@@ -56,7 +56,7 @@ then `prefill` scorers (only test dep on `verifier`/`step`).
 
 ## Phase 1 — Move `drafter_lora.rs` (1107 LOC, no sibling deps)
 
-- [x] T1.1 Create `crates/katgpt-forward/crates/katgpt-forward/src/drafter_lora.rs` with content
+- [x] T1.1 Create `crates/katgpt-forward/src/drafter_lora.rs` with content
       from root.
 - [x] T1.2 Rewrite imports:
   - `crate::transformer::{ForwardContext, forward}` → `crate::{ForwardContext, forward}`
@@ -66,7 +66,7 @@ then `prefill` scorers (only test dep on `verifier`/`step`).
 - [x] T1.4 Root `src/speculative/mod.rs`: replace `pub mod drafter_lora;` with
       `pub use katgpt_forward::drafter_lora;`. Update `pub use drafter_lora::{...}`
       (lines 176-179) to keep working via the re-export.
-- [x] T1.5 Delete root `crates/katgpt-forward/crates/katgpt-forward/src/drafter_lora.rs`.
+- [x] T1.5 Delete root `crates/katgpt-forward/src/drafter_lora.rs`.
 - [x] T1.6 `cargo check --workspace` clean.
 
 ## Phase 2 — Move `dflash.rs` (1731 LOC, no sibling deps)
@@ -109,7 +109,7 @@ then `prefill` scorers (only test dep on `verifier`/`step`).
 
 ## Phase 4 — Move `step.rs` (1852 LOC, depends on verifier + dflash)
 
-- [x] T4.1 Create `crates/katgpt-forward/crates/katgpt-forward/src/step.rs` with content from root
+- [x] T4.1 Create `crates/katgpt-forward/src/step.rs` with content from root
       EXCEPT `speculative_step_rollback_paged` + its 3 tests (deferred to root).
       Extracted via `sed` to remove lines 577-757 (the deprecated paged fn) and
       1346-1481 (its 3 tests).

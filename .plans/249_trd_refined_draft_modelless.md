@@ -50,7 +50,7 @@ graph TD
 | ConstraintPruner | `src/pruners/constraint.rs` | Modelless teacher: constrain re-draft to valid continuations |
 | ELF SDE | `src/distill/elf.rs` | Controlled noise for re-draft diversity |
 | BT Rank | `src/rank/bt.rs` | Pairwise ranking of raw vs refined branches |
-| BanditPruner | `crates/katgpt-ruliology/crates/katgpt-ruliology/src/bandit.rs` | Adaptive refinement budget (skip/1-step/2-step) |
+| BanditPruner | `crates/katgpt-ruliology/src/bandit.rs` | Adaptive refinement budget (skip/1-step/2-step) |
 | ThoughtFold | `src/distill/thoughtfold.rs` | Pre-fold redundant prefix before re-draft |
 
 ---

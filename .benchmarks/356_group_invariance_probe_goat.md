@@ -62,7 +62,7 @@ The primitive is correct and zero-alloc but has no shipped consumer yet. Promoti
 
 ## Test inventory
 
-- **In-crate** (`crates/katgpt-core/crates/katgpt-core/src/group_invariance_probe.rs::tests`): 13 tests covering `invariance_score`, `score_variance`, `score_concentration`, `classify_subgroup`, `SubgroupClass` round-trip, and the G1 `discover_c8_to_c4` end-to-end.
+- **In-crate** (`crates/katgpt-core/src/group_invariance_probe.rs::tests`): 13 tests covering `invariance_score`, `score_variance`, `score_concentration`, `classify_subgroup`, `SubgroupClass` round-trip, and the G1 `discover_c8_to_c4` end-to-end.
 - **Integration** (`crates/katgpt-core/tests/group_invariance_probe_g4.rs`): 2 CountingAllocator tests for G4.
 
 ## Related

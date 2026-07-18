@@ -150,7 +150,7 @@ Wire the new classifier into the broader `data_probe` family so it composes with
 
 ## Scope reductions (2026-06-17)
 
-1. **Plan target path was wrong.** The plan said `crates/katgpt-core/crates/katgpt-core/src/data_probe/sink_classify.rs`, but the `data_probe` module already exists in the root crate at `src/data_probe/`. Corrected to `crates/katgpt-core/src/data_probe/sink_classify.rs` (root-crate re-export) + `crates/katgpt-core/src/data_probe.rs` (primitive types — needed so katgpt-core can reference them).
+1. **Plan target path was wrong.** The plan said `crates/katgpt-core/src/data_probe/sink_classify.rs`, but the `data_probe` module already exists in the root crate at `src/data_probe/`. Corrected to `crates/katgpt-core/src/data_probe/sink_classify.rs` (root-crate re-export) + `crates/katgpt-core/src/data_probe.rs` (primitive types — needed so katgpt-core can reference them).
 2. **Direct wiring into `parallax_attn.rs` / `funcattn.rs` forward paths — split verdict.** The policy enum + standalone `apply_dual_policy_gate` shipped initially; callers invoke after a forward pass. Keeps `ParallaxConfig` / `FuncAttnConfig` backwards-compatible.
    - **Parallax half: DONE** via [Plan 289](./289_sink_aware_forward_path_wiring.md) (single entry point `tiled_attention_parallax_forward_sink_aware`, separate from `ParallaxConfig`).
    - **FuncAttn half: CLOSED as not-applicable** via [Research 261](../.research/261_FuncAttn_Sink_Semantics_Verdict.md). FuncAttn's `Φ · C · Ṽ` structure has no `n×n` attention matrix for the sink classifier to scan — basis modes are partition-of-unity by design, so the NOP/Broadcast discrimination collapses into a column-norm check.

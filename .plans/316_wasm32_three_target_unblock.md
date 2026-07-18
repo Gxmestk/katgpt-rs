@@ -131,7 +131,7 @@ the Vessel *projection* path (Model B) needed the getrandom + bytemuck fixes.
 
 ## Files Changed
 
-- `crates/katgpt-core/crates/katgpt-types/src/simd/argmax.rs` — +1 line (T1)
+- `crates/katgpt-types/src/simd/argmax.rs` — +1 line (T1)
 - `Cargo.toml` — getrandom wasm32 block (T2) + bytemuck feature (T3)
 
 ## TL;DR

@@ -3,7 +3,7 @@
 **Date:** 2026-07-03
 **Proposal:** [riir-ai/.proposals/003_engram_crud_table_tier_access_matrix.md](../../../riir-ai/.proposals/003_engram_crud_table_tier_access_matrix.md) (P1)
 **Parent plan:** [katgpt-rs/.plans/299_Engram_Hash_Addressed_Pattern_Memory.md](299_Engram_Hash_Addressed_Pattern_Memory.md) (Phase 2 — `InMemoryEngramTable`, `EngramTableBuilder`)
-**Target:** `katgpt-rs/crates/katgpt-core/crates/katgpt-core/src/engram/staging.rs` (new module)
+**Target:** `katgpt-rs/crates/katgpt-core/src/engram/staging.rs` (new module)
 **Cargo feature:** `engram` (existing — no new feature flag; sibling to `table.rs`)
 **Status:** Active — Phase 1 DONE (2026-07-03). 17/17 staging tests pass, 112/112 engram tests pass, 666/666 default-feature tests pass (no regression). Phase 2 (GOAT gate) + Phase 3 (docs wiring) + Phase 4 (promotion decision) pending. Ship behind existing `engram` (still default-off, gated on Plan 299 G6).
 
@@ -68,7 +68,7 @@ Option (b) is cleaner — single chokepoint, future-proof if fields change. This
 - [x] **T1.1** Add `pub(crate) fn from_parts(slots: Box<[f32]>, heads: Box<[HashHead; K_MAX]>, n_slots: usize, d: usize) -> Self` to `InMemoryEngramTable` in `table.rs`. Constructs without re-validating (the staging table has already validated dimensions). Inline. Single-line body — delegates to struct literal.
   - **Done (2026-07-03).** Also added `pub(crate) fn slots(&self) -> &[f32]` for the COW copy. Discovered `num_slots()` and `dim()` are already on the `EngramTable` trait (no new accessors needed for those). Added `#[derive(Debug)]` to `InMemoryEngramTable` (needed by `unwrap_err()` in tests, useful for general debugging).
 
-- [x] **T1.2** Create `crates/katgpt-core/crates/katgpt-core/src/engram/staging.rs` behind `#[cfg(feature = "engram")]`. Define `StagingEngramTable<'a>`:
+- [x] **T1.2** Create `crates/katgpt-core/src/engram/staging.rs` behind `#[cfg(feature = "engram")]`. Define `StagingEngramTable<'a>`:
   ```rust
   pub struct StagingEngramTable<'a> {
       source: &'a InMemoryEngramTable,
@@ -247,7 +247,7 @@ Three deviations from the original plan T1.1–T1.7, all surfaced by the compile
 
 - [x] **T3.2** Add `pub use staging::StagingEngramTable;` to the `engram/mod.rs` re-export block (alongside `pub use table::{EngramTableBuilder, InMemoryEngramTable};`). **Done in Phase 1 (commit 2ea4e669).** Also added `StagingEngramTable, StagingError` to the crate-root `lib.rs` re-export (was missing — completed in Phase 2 session, same commit as the GOAT bench).
 
-- [x] **T3.3** Update `crates/katgpt-core/crates/katgpt-core/src/engram/table.rs` docstring to cross-reference the staging table. **Done in Phase 1 (commit 2ea4e669).**
+- [x] **T3.3** Update `crates/katgpt-core/src/engram/table.rs` docstring to cross-reference the staging table. **Done in Phase 1 (commit 2ea4e669).**
 
 - [x] **T3.4** Run `cargo doc -p katgpt-core --features engram --no-deps`. Verify `StagingEngramTable` appears in the docs with the correct docstring. Fix any broken intra-doc links. **Done in Phase 1 (commit 2ea4e669).**
 
@@ -349,4 +349,4 @@ Single-session achievable.
 
 ## TL;DR
 
-Ship `StagingEngramTable<'a>` in `katgpt-rs/crates/katgpt-core/crates/katgpt-core/src/engram/staging.rs` behind the existing `engram` feature. COW semantics: borrow source immutably, buffer per-slot UPDATE/DELETE mutations, `commit()` produces a new `InMemoryEngramTable` with the source untouched. GOAT gate: G1 mutation isolation, G2 surgical-update ≥10× faster than rebuild, G3 no regression, G4 allocation budget. Promotion HELD — staging ships with `engram` (still opt-in until Plan 299 G6). No consumer wiring in this plan (that's Proposal 003 P2–P4 in other repos).
+Ship `StagingEngramTable<'a>` in `katgpt-rs/crates/katgpt-core/src/engram/staging.rs` behind the existing `engram` feature. COW semantics: borrow source immutably, buffer per-slot UPDATE/DELETE mutations, `commit()` produces a new `InMemoryEngramTable` with the source untouched. GOAT gate: G1 mutation isolation, G2 surgical-update ≥10× faster than rebuild, G3 no regression, G4 allocation budget. Promotion HELD — staging ships with `engram` (still opt-in until Plan 299 G6). No consumer wiring in this plan (that's Proposal 003 P2–P4 in other repos).

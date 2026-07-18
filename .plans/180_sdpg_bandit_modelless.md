@@ -336,5 +336,5 @@ If SDPG Bandit shows no arena improvement over HL baseline:
 - Research doc: `.research/160_SDPG_Self_Distilled_Policy_Gradient.md`
 - SDAR research: `.research/038_SDAR_Self_Distilled_Agentic_RL.md`
 - ROPD research: `.research/036_ROPD_Rubric_OnPolicy_Distillation.md`
-- Bandit infrastructure: `crates/katgpt-ruliology/crates/katgpt-ruliology/src/bandit.rs`
+- Bandit infrastructure: `crates/katgpt-ruliology/src/bandit.rs`
 - Arena replay: `examples/bomber_04_replay_gen.rs`

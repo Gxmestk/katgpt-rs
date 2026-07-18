@@ -92,7 +92,7 @@ else:
 
 ### Part 1: NpcBrainBackend Trait ✅
 
-- [x] Create `crates/katgpt-core/crates/katgpt-dec/src/backend.rs`
+- [x] Create `crates/katgpt-dec/src/backend.rs`
 - [x] Define `NpcBrainBackend` trait: `fn batch_evaluate(&mut self, inputs: &[NpcBrainInput], outputs: &mut [NpcBrainOutput]) -> Result<(), String>`
 - [x] `NpcBrainInput`: hla_state `[f32; 8]`, modules `[ModuleInput; 6]` (ternary directions), overrides, autonomous_disabled
 - [x] `NpcBrainOutput`: projections `[f32; 6]`

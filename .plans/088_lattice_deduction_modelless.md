@@ -100,7 +100,7 @@ When the model has eliminated too many candidates (entropy drops anomalously low
 
 `src/speculative/types.rs` — new trait
 `src/speculative/dd_tree.rs` — wire into expansion loop
-`crates/katgpt-forward/crates/katgpt-forward/src/step.rs` — early termination signal
+`crates/katgpt-forward/src/step.rs` — early termination signal
 
 ### Implementation
 

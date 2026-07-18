@@ -352,7 +352,7 @@ pub fn forward<'a>(
 | `crates/katgpt-percepta/src/transformer.rs` | `LayerWeights`, multi-layer `TransformerWeights`, layer loop | 2-4 |
 | `crates/katgpt-speculative/src/dflash.rs` | Use `MultiLayerKVCache` | 5 |
 | `src/speculative/verifier.rs` | Use `MultiLayerKVCache` | 5 |
-| `crates/katgpt-forward/crates/katgpt-forward/src/step.rs` | Update signatures | 5 |
+| `crates/katgpt-forward/src/step.rs` | Update signatures | 5 |
 | `src/benchmark.rs` | Use `MultiLayerKVCache`, add multi-layer bench | 5-6 |
 | `src/main.rs` | Use `MultiLayerKVCache` | 5 |
 

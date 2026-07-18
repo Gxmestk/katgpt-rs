@@ -3,7 +3,7 @@
 **Date:** 2026-07-13
 **Research:** [katgpt-rs/.research/420_VFD_Velocity_Field_Disagreement_Epistemic_UQ.md](../.research/420_VFD_Velocity_Field_Disagreement_Epistemic_UQ.md)
 **Source paper:** [arxiv 2606.18043](https://arxiv.org/abs/2606.18043) — Römer et al., *Uncertainty Quantification for Flow-Based Vision-Language-Action Models*, §4 (VFD estimator + Theorem 4.1). The SAVE half (§5) is a training method → riir-train, out of scope.
-**Target:** `katgpt-rs/crates/katgpt-core/crates/katgpt-core/src/velocity_field_disagreement.rs` (new module) + Cargo feature `velocity_field_disagreement`
+**Target:** `katgpt-rs/crates/katgpt-core/src/velocity_field_disagreement.rs` (new module) + Cargo feature `velocity_field_disagreement`
 **Status:** COMPLETE — Phase 1 DONE (T1.1–T1.9); Phase 2 DONE (T2.1–T2.5: G1✅ G2❌ G3✅ G4✅ G5✅); Phase 3 DONE (T3.1–T3.5 all closed). **Verdict: VFD does NOT promote to default-on** — ships as opt-in non-UQ disagreement score. See `.benchmarks/432_vfd_goat.md`.
 
 ---
@@ -197,7 +197,7 @@ This is pillar-level work for riir-ai (connects R170 Super-GOAT to P8 Reasoning 
 ## File Layout (target)
 
 ```
-crates/katgpt-core/crates/katgpt-core/src/velocity_field_disagreement.rs   ~600-800 lines (target < 2048)
+crates/katgpt-core/src/velocity_field_disagreement.rs   ~600-800 lines (target < 2048)
 ├── pub struct VfdScore                                  ~10 lines
 ├── pub struct VfdScratch<const M, const D>              ~30 lines
 ├── pub fn vfd_score_into                                ~120 lines (the core algorithm)

@@ -32,7 +32,7 @@ Complete Rust port of Percepta's `transformer-vm` (Apache-2.0 © Percepta). Dist
 | `wasm/reference.py` | 667 | Reference trace generator | `src/percepta/wasm/reference.rs` |
 | `scheduler/milp.py` | 814 | MILP: 4-phase layer assignment, slot reuse, minimize d_model | `crates/katgpt-percepta/src/scheduler.rs` |
 | `model/weights.py` | 776 | Analytical weight construction: graph → weight matrices | `crates/katgpt-percepta/src/weights.rs` |
-| `model/transformer.py` | ~40 | VanillaTransformer with ReGLU FFN | `crates/katgpt-percepta/crates/katgpt-percepta/src/transformer.rs` |
+| `model/transformer.py` | ~40 | VanillaTransformer with ReGLU FFN | `crates/katgpt-percepta/src/transformer.rs` |
 | `model/transformer.cpp` | 473 | Standalone C++ inference engine | (Rust native — no separate engine needed) |
 | `compilation/compile_wasm.py` | 703 | C→WASM compilation pipeline | `crates/katgpt-percepta/src/compile.rs` |
 | `compilation/decoder.py` | 664 | WASM MVP binary decoder | `crates/katgpt-percepta/src/wasm/decoder.rs` |

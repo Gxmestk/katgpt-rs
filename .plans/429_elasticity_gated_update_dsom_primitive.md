@@ -24,7 +24,7 @@ The primary consumer is `riir-neuron-db`'s `neighbor_heal` (error-scaled shard h
 
 ### Tasks
 
-- [x] **T1.1** Create `katgpt-rs/crates/katgpt-core/crates/katgpt-core/src/elasticity_gated_update.rs` — the open primitive module.
+- [x] **T1.1** Create `katgpt-rs/crates/katgpt-core/src/elasticity_gated_update.rs` — the open primitive module.
   - `ElasticityConfig { eta: f32, epsilon: f32, support_diameter: f32 }` — config POD.
   - `elasticity_gated_update_into(state: &[f32], target: &[f32], neighbors: &[(&[f32], f32)], config: &ElasticityConfig, out: &mut [f32])` — the core function.
   - Pure closed-form math: error = normalized L2 distance, step = ε · error, weight = exp(−d²/(η²·error²)), delta = step · Σ(weight · (neighbor − state)) / Σweight.

@@ -186,6 +186,6 @@ The cap only hurt the "one giant batch" framing. The factor-model-anomaly framin
 ## References
 
 - **Primitive:** [Plan 326](326_tucker_hosvd_factorization.md) — `katgpt-core/linalg::tucker` (DEFAULT-ON)
-- **Chain integration point:** `riir-chain/src/consensus/curator_slashing.rs` (`detect_collusion`), `riir-chain/crates/katgpt-core/crates/katgpt-core/src/curator.rs` (`CuratorVote`, `CuratorConsensus`)
+- **Chain integration point:** `riir-chain/src/consensus/curator_slashing.rs` (`detect_collusion`), `riir-chain/crates/katgpt-core/src/curator.rs` (`CuratorVote`, `CuratorConsensus`)
 - **Game integration point:** `seal-online-remaster/crates/seal-gm-tools/src/state.rs` (`EconomyDashboard`, `ShopEntry`), `seal-online-remaster/crates/seal-gm-tools/src/tabs/shops.rs` (`anomaly_section`)
 - **Benchmark record:** `.benchmarks/328_tucker_consumer_applications.md` (created in T3.4)

@@ -3,7 +3,7 @@
 **Date:** 2026-06-23
 **Research:** [katgpt-rs/.research/290_latent_field_steering_open_primitive.md](../.research/290_latent_field_steering_open_primitive.md)
 **Source:** Synthesized from CAA + Anthropic Functional Emotions + Gemini "wave interference" reframing
-**Target:** `katgpt-rs/crates/katgpt-core/crates/katgpt-core/src/latent_steering.rs` (new module) + Cargo feature `latent_field_steering`
+**Target:** `katgpt-rs/crates/katgpt-core/src/latent_steering.rs` (new module) + Cargo feature `latent_field_steering`
 **Status:** Phase 0–2 COMPLETE (2026-06-23). All 5 GOAT gates PASS — primitive proven, ready for Phase 4 promotion decision. Phase 3 T3.1 DONE (AVX2 SAXPY backend landed, bit-identity verified); T3.2 INCONCLUSIVE — dev host is aarch64 so the AVX2 path is compiled out and the speedup gate cannot be measured here (requires x86_64+AVX2 host). G4 carry-over still PASS (7.1µs with dispatcher). Phase 5 (game integration) deferred to riir-ai Plan 330.
 
 ---
@@ -42,7 +42,7 @@ leakage (uncontrolled propagation) **OR** G4 >1ms (too slow for 20Hz tick).
 
 ### Tasks
 
-- [x] T1.1 Created `katgpt-rs/crates/katgpt-core/crates/katgpt-core/src/latent_steering.rs` (437 lines):
+- [x] T1.1 Created `katgpt-rs/crates/katgpt-core/src/latent_steering.rs` (437 lines):
   `LatentSteeringVector` (BLAKE3-committed via per-element LE f32, matches
   `engram/commitment.rs` + `cross_resolution.rs` conventions), `LatentSteeringError::{NotUnitNorm,
   AlphaOutOfRange}`, `FieldSupport::{Global, Radius, Zone}`, `LatentField`,

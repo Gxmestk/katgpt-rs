@@ -31,7 +31,7 @@ mem). Zero pruners-specific knowledge. Single consumer (thinking_controller).
 - [x] Replace `crates/katgpt-pruners/src/freeze.rs` with a re-export shim:
       `pub use katgpt_core::freeze::{load_frozen, save_frozen};`
 - [x] katgpt-pruners `lib.rs` keeps `pub mod freeze;` — re-export transparent
-- [x] Root `crates/katgpt-speculative/crates/katgpt-speculative/src/thinking_controller.rs`: rewrite import to
+- [x] Root `crates/katgpt-speculative/src/thinking_controller.rs`: rewrite import to
       `use katgpt_core::freeze::{load_frozen, save_frozen};`
 - [x] `cargo check --workspace` clean — ✅ 14.47s
 - [x] freeze tests 4/4 pass in katgpt-core
@@ -39,22 +39,22 @@ mem). Zero pruners-specific knowledge. Single consumer (thinking_controller).
 
 ### Phase 2 — Extract `proof` core types to katgpt-core
 
-`crates/katgpt-pruners/crates/katgpt-pruners/src/proof/goal_cache.rs` (799 LOC) defines GoalHash,
+`crates/katgpt-pruners/src/proof/goal_cache.rs` (799 LOC) defines GoalHash,
 GoalResult, GoalVerifier trait, ProofGoalCache, ProofGoalSnapshot. The consumed
 API (by and_or_builder + dd_tree:919) is just `GoalResult` + `ProofGoalCache`.
 
 Plan: extract the **self-contained core** (GoalHash + GoalResult +
-GoalVerifier + ProofGoalCache) to `crates/katgpt-core/crates/katgpt-core/src/proof_cache.rs`.
+GoalVerifier + ProofGoalCache) to `crates/katgpt-core/src/proof_cache.rs`.
 Leave ProofGoalSnapshot + sketch_population + plackett_luce + sketch_sampler
 in katgpt-pruners (they're pruners-specific).
 
-- [x] Create `crates/katgpt-core/crates/katgpt-core/src/proof_cache.rs` with GoalHash, GoalResult,
+- [x] Create `crates/katgpt-core/src/proof_cache.rs` with GoalHash, GoalResult,
       GoalVerifier trait, ProofGoalCache (and their impls)
 - [x] Register `pub mod proof_cache;` in katgpt-core lib.rs
-- [x] `crates/katgpt-pruners/crates/katgpt-pruners/src/proof/goal_cache.rs`: replace extracted code
+- [x] `crates/katgpt-pruners/src/proof/goal_cache.rs`: replace extracted code
       with `pub use katgpt_core::proof_cache::{GoalHash, GoalResult, GoalVerifier, ProofGoalCache};`
       (keep ProofGoalSnapshot + tests in pruners)
-- [x] Root `crates/katgpt-speculative/crates/katgpt-speculative/src/and_or_builder.rs`: rewrite import to
+- [x] Root `crates/katgpt-speculative/src/and_or_builder.rs`: rewrite import to
       `use katgpt_core::proof_cache::{GoalResult, ProofGoalCache};`
 - [x] `cargo check --workspace` clean — ✅ 17.14s
 - [x] proof_cache 22 tests pass in katgpt-core
@@ -79,16 +79,16 @@ had `pub use katgpt_pruners::ThinkingMode;` which would re-introduce the
 cycle. Resolved by extracting ThinkingMode (4-variant `#[repr(u8)]` enum) to
 `katgpt_core::thinking_mode` — same pattern as freeze + proof_cache.
 
-- [x] Extract ThinkingMode to `crates/katgpt-core/crates/katgpt-core/src/thinking_mode.rs`
+- [x] Extract ThinkingMode to `crates/katgpt-core/src/thinking_mode.rs`
 - [x] katgpt-pruners lib.rs: replace enum def with `pub use katgpt_core::thinking_mode::ThinkingMode;`
-- [x] Move `crates/katgpt-speculative/crates/katgpt-speculative/src/and_or_builder.rs` → `crates/katgpt-speculative/crates/katgpt-speculative/src/and_or_builder.rs`
+- [x] Move `crates/katgpt-speculative/src/and_or_builder.rs` → `crates/katgpt-speculative/src/and_or_builder.rs`
       (rewrite `crate::speculative::ScreeningPruner` → `katgpt_core::traits::ScreeningPruner`)
-- [x] Move `crates/katgpt-speculative/crates/katgpt-speculative/src/echo_env.rs` → `crates/katgpt-speculative/crates/katgpt-speculative/src/echo_env.rs`
+- [x] Move `crates/katgpt-speculative/src/echo_env.rs` → `crates/katgpt-speculative/src/echo_env.rs`
       (rewrite test imports: `katgpt_pruners::bandit::*`, `crate::dd_tree::*`,
       `katgpt_types::*`, `katgpt_core::traits::NoScreeningPruner`)
-- [x] Move `crates/katgpt-speculative/crates/katgpt-speculative/src/thinking_controller.rs` → `crates/katgpt-speculative/crates/katgpt-speculative/src/thinking_controller.rs`
+- [x] Move `crates/katgpt-speculative/src/thinking_controller.rs` → `crates/katgpt-speculative/src/thinking_controller.rs`
       (rewrite `crate::cumprodsum::*` → `katgpt_core::cumprodsum::*`)
-- [x] Move `crates/katgpt-pruners/crates/katgpt-pruners/src/echo_env_integration.rs` → `crates/katgpt-pruners/crates/katgpt-pruners/src/echo_env_integration.rs`
+- [x] Move `crates/katgpt-pruners/src/echo_env_integration.rs` → `crates/katgpt-pruners/src/echo_env_integration.rs`
       (rewrite `crate::pruners::bandit::*` → `crate::bandit::*`,
       `crate::speculative::*` → `katgpt_speculative::*` / `katgpt_core::speculative::types::*`)
 - [x] Add katgpt-pruners as **dev-dependency** in katgpt-speculative Cargo.toml

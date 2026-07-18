@@ -3,7 +3,7 @@
 **Date:** 2026-07-10
 **Research:** [406_Spectral_Rewiring_Weight_Delta_Purification.md](../.research/406_Spectral_Rewiring_Weight_Delta_Purification.md)
 **Source paper:** [arXiv:2607.03065](https://arxiv.org/abs/2607.03065) — Zhang et al., *Spectral Rewiring for Exploration, Purification, and Model Merging*, Tsinghua AIR / ByteDance Seed, Jul 2026
-**Target:** `katgpt-rs/crates/katgpt-spectral/crates/katgpt-spectral/src/spectral_rewire.rs` (new module) + Cargo feature `spectral_rewire`
+**Target:** `katgpt-rs/crates/katgpt-spectral/src/spectral_rewire.rs` (new module) + Cargo feature `spectral_rewire`
 **Status:** ✅ COMPLETE (Phases 1–4). All mechanism gates pass; primitive stays opt-in pending Issue 123 (real-delta concentration). Cross-repo fusions routed as notes (Phase 4).
 **Verdict from research:** GOAT (Q1✓ Q2✓ Q3 partial Q4✓) — opt-in until GOAT gate validates spectral concentration at NPC-scale.
 

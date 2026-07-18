@@ -150,7 +150,7 @@
 
 ### Phase 2: Bandit Variance-Minimized Exploration
 
-- [x] **T5: Add `VarianceEpsilon` strategy to `BanditStrategy` enum** — `crates/katgpt-ruliology/crates/katgpt-ruliology/src/bandit.rs`
+- [x] **T5: Add `VarianceEpsilon` strategy to `BanditStrategy` enum** — `crates/katgpt-ruliology/src/bandit.rs`
   - New variant that adapts ε based on per-episode reward variance
   - High variance → increase exploration (haven't converged)
   - Low variance → decrease exploration (exploit learned Q-values)

@@ -142,8 +142,8 @@ graph LR
 
 - Research 167: EoM Hayek Market Coordination
 - EoM paper: [arXiv:2606.02859](https://arxiv.org/abs/2606.02859)
-- BanditPruner: `katgpt-rs/crates/katgpt-ruliology/crates/katgpt-ruliology/src/bandit.rs`
-- AbsorbCompress: `katgpt-rs/crates/katgpt-pruners/crates/katgpt-pruners/src/absorb_compress.rs`
+- BanditPruner: `katgpt-rs/crates/katgpt-ruliology/src/bandit.rs`
+- AbsorbCompress: `katgpt-rs/crates/katgpt-pruners/src/absorb_compress.rs`
 - Bomber arena: `katgpt-rs/.plans/045_bomber_arena.md`
 
 **TL;DR:** WealthPruner replaces UCB1's statistical optimism with economic selection — arms that earn more get more opportunity, bankrupt arms get replaced. Feature-gated under `wealth_pruner`, on by default after GOAT proof.

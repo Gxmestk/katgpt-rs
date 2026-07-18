@@ -283,4 +283,4 @@ cargo test --features "maxsim,turboquant,spectral_quant" --lib --quiet
 - `.raw/maxsim/maxsim_metal/maxsim.mm` — Metal host-side dispatch (reference only)
 - `.research/039_SpectralQuant_Calibrated_Eigenbasis_KV_Compression.md` — primary overlap
 - `riir-ai/crates/riir-gpu/src/kernels/spectralquant_attention.wgsl` — GPU kernel (T11 reference)
-- `riir-ai/crates/riir-gpu/crates/katgpt-core/crates/katgpt-core/src/attention.rs` — GPU host-side dispatch (T11 reference)
+- `riir-ai/crates/katgpt-core/crates/katgpt-core/src/attention.rs` — GPU host-side dispatch (T11 reference)

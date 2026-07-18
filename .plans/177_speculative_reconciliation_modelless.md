@@ -42,7 +42,7 @@ Implement the modelless Speculative Reconciliation Engine. This is the core infe
 
 - [x] **T6: `AdaptiveReconciler`** — Wraps `SpecReconciler` with `BanditPruner<ManifoldScorer>` for per-player threshold learning. Uses `ThinkingBandit` freeze/thaw for persistence across sessions.
   - File: `katgpt-rs/src/spec_reconciliation/adaptive.rs`
-  - Reuses: `BanditPruner` from `katgpt-rs/crates/katgpt-ruliology/crates/katgpt-ruliology/src/bandit.rs`, `ThinkingBanditFrozen` from Plan 194
+  - Reuses: `BanditPruner` from `katgpt-rs/crates/katgpt-ruliology/src/bandit.rs`, `ThinkingBanditFrozen` from Plan 194
   - Test: simulate 100 reconciliations, verify bandit converges to optimal threshold
 
 - [x] **T7: GOAT Proof Suite** — 8 formal verification gates (G1-G8 from Research 156 §5.1).

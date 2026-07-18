@@ -116,7 +116,7 @@ Speculative Decode
 ### Phase 3: RV → ThinkingController Integration
 
 - [x] **T7: Wire RV into `ThinkingController` mode selection**
-  - File: `crates/katgpt-speculative/crates/katgpt-speculative/src/thinking_controller.rs`
+  - File: `crates/katgpt-speculative/src/thinking_controller.rs`
   - Add `rv_signal: f64` parameter to `select_mode()` (or equivalent)
   - High RV → bias bandit toward Latent arm
   - Low RV → bias bandit toward Direct arm
@@ -199,7 +199,7 @@ rv_bandit_pruning = []     # Phase 4: FrequencyBandit top-ρ suppression
 | `src/pruners/mod.rs` | EXTEND (add module export) | 1 |
 | `src/inference_router.rs` | EXTEND (add RV field + routing logic) | 2 |
 | `crates/katgpt-core/src/trigger_gate.rs` | EXTEND (add `rv_tier_boost()`) | 2 |
-| `crates/katgpt-speculative/crates/katgpt-speculative/src/thinking_controller.rs` | EXTEND (add RV bias to mode selection) | 3 |
+| `crates/katgpt-speculative/src/thinking_controller.rs` | EXTEND (add RV bias to mode selection) | 3 |
 | `crates/katgpt-pruners/src/freq_bandit.rs` | EXTEND (add `suppress_low_rv_arms()`) | 4 |
 | `tests/rv_gated_routing.rs` | NEW | 2-5 |
 | `Cargo.toml` | EXTEND (add feature flags) | 1 |

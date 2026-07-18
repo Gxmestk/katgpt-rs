@@ -83,7 +83,7 @@ impl ShardEmbedding {
 
 ## T2: Johnson-Lindenstrauss Projection
 
-**File:** `crates/katgpt-core/crates/katgpt-core/src/shard_embedding.rs` (new)
+**File:** `crates/katgpt-core/src/shard_embedding.rs` (new)
 
 The projection: given style_weights `[f32; 64]` and a pre-generated random orthogonal matrix `W: [[f32; 64]; 8]`, compute `embedding = W × style_weights`.
 

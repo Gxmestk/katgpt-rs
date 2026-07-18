@@ -90,7 +90,7 @@ Without these metrics, you cannot tell if your `BanditPruner` or `ScreeningPrune
   - Tests: default, display format
   - ~40 lines
 
-- [x] **Task 4: BenefitRatioGate for AbsorbCompress** (`crates/katgpt-pruners/crates/katgpt-pruners/src/absorb_compress.rs` extension)
+- [x] **Task 4: BenefitRatioGate for AbsorbCompress** (`crates/katgpt-pruners/src/absorb_compress.rs` extension)
   - Add `min_benefit_ratio: f64` field to `CompressConfig` (default: `2.0` — conservative)
   - Extend `AbsorbCompress::should_compress()` to accept `&ReviewMetrics`:
     - Returns `false` if metrics show `benefit_ratio() < min_benefit_ratio`
@@ -141,7 +141,7 @@ Without these metrics, you cannot tell if your `BanditPruner` or `ScreeningPrune
   - Tests: returns path on first success, loops on failure, breaks when ratio below threshold, disabled when max_loops=0
   - ~80 lines
 
-- [x] **Task 7: Wire ReviewMetrics into BanditSession** (`crates/katgpt-ruliology/crates/katgpt-ruliology/src/bandit.rs` extension)
+- [x] **Task 7: Wire ReviewMetrics into BanditSession** (`crates/katgpt-ruliology/src/bandit.rs` extension)
   - Add `review_metrics: Option<ReviewMetrics>` field to `BanditSession`
   - `BanditSession::with_metrics(self, metrics: ReviewMetrics) -> Self` — builder
   - In `BanditSession::run()`:
@@ -276,8 +276,8 @@ The review loop is a PPoT concern (rescue with structured feedback). Adding it t
 |------|-------|-------------|
 | `crates/katgpt-core/src/pruners/review_metrics.rs` | ~160 | NEW |
 | `crates/katgpt-pruners/src/trial_log.rs` | ~60 | MODIFY |
-| `crates/katgpt-pruners/crates/katgpt-pruners/src/absorb_compress.rs` | ~40 | MODIFY |
-| `crates/katgpt-ruliology/crates/katgpt-ruliology/src/bandit.rs` | ~60 | MODIFY |
+| `crates/katgpt-pruners/src/absorb_compress.rs` | ~40 | MODIFY |
+| `crates/katgpt-ruliology/src/bandit.rs` | ~60 | MODIFY |
 | `src/pruners/mod.rs` | ~2 | MODIFY |
 | `crates/katgpt-speculative/src/ppot/types.rs` | ~30 | MODIFY |
 | `src/speculative/ppot/resample.rs` | ~80 | MODIFY |
@@ -300,7 +300,7 @@ The review loop is a PPoT concern (rescue with structured feedback). Adding it t
 ## References
 
 - arXiv:2604.27233 — "Reinforced Agent: Inference-Time Feedback for Tool-Calling Agents"
-- Plan 030 — Multi-Armed Bandit (`crates/katgpt-ruliology/crates/katgpt-ruliology/src/bandit.rs`)
+- Plan 030 — Multi-Armed Bandit (`crates/katgpt-ruliology/src/bandit.rs`)
 - Plan 032 — Heuristic Learning Infrastructure (`TrialLog`, `AbsorbCompress`, `RegressionSuite`)
 - Plan 021 — ScreeningPruner (`speculative/types.rs`)
 - Plan 026/027 — PPoT rescue (`speculative/ppot/`)

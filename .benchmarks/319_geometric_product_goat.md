@@ -1,7 +1,7 @@
 # Plan 319 — Clifford Geometric Product GOAT Gate Results
 
 **Date:** 2026-06-25 (Phase 1-3 initial), 2026-06-25 (Issue 003 perf unblock + promotion)
-**Primitive:** `katgpt-rs/crates/katgpt-core/crates/katgpt-core/src/linalg/geometric_product.rs`
+**Primitive:** `katgpt-rs/crates/katgpt-core/src/linalg/geometric_product.rs`
 **Bench:** `cargo bench -p katgpt-core --features geometric_product --bench bench_319_geometric_product_goat -- --nocapture`
 **Hardware:** macOS (Apple Silicon, aarch64)
 

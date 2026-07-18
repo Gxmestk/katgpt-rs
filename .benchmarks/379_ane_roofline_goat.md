@@ -4,7 +4,7 @@
 **Plan:** [379](../.plans/379_ane_aware_roofline_cost_model.md) — ANE-Aware Roofline Cost Model
 **Research:** [377](../.research/377_Apple_Neural_Engine_Architecture_Programming_Performance.md)
 **Source paper:** [arXiv:2606.22283](https://arxiv.org/abs/2606.22283) — Bryngelson, *Apple Neural Engine: Architecture, Programming, and Performance* (2026)
-**Primitive:** `crates/katgpt-core/crates/katgpt-core/src/ane_roofline.rs` (feature `ane_roofline`, **promoted to DEFAULT-ON**)
+**Primitive:** `crates/katgpt-core/src/ane_roofline.rs` (feature `ane_roofline`, **promoted to DEFAULT-ON**)
 **Bench:** `crates/katgpt-core/benches/bench_379_ane_roofline_goat.rs`
 **Host:** Apple M3 Max (aarch64, macOS) — `detect()` conservatively returns `AneFamily::M1` per the documented limitation (per-chip discrimination deferred).
 

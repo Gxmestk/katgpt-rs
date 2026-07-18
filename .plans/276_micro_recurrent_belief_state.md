@@ -48,7 +48,7 @@ The GOAT-gate question becomes: **does attractor update (`σ(W_s·s + W_x·x + b
 ### Phase 0 Audit Results (T0.4–T0.6)
 
 **T0.4 — Snapshot infra (katgpt-rs side, not riir-ai):** The plan text mentioned `LoRAWeightVersion`/`LoRAHotSwap`, but those live in **riir-ai** (`riir-ai/crates/riir-engine/src/episode_buffer.rs`), not katgpt-rs. katgpt-rs (public engine) uses a *different* atomic-swap idiom:
-- **`SenseHotSwap`** (`katgpt-rs/crates/katgpt-core/crates/katgpt-core/src/engram/hotswap.rs`): `AtomicPtr<Box<SenseModule>>` + `AtomicBool` lock flag, fixed-size array indexed by `SenseKind`. This is the lock-free hot-swap primitive in the public repo.
+- **`SenseHotSwap`** (`katgpt-rs/crates/katgpt-core/src/engram/hotswap.rs`): `AtomicPtr<Box<SenseModule>>` + `AtomicBool` lock flag, fixed-size array indexed by `SenseKind`. This is the lock-free hot-swap primitive in the public repo.
 - **`SenseModule::commit()` / `verify()`** (`types.rs` L4864–4907): BLAKE3 commitment over struct bytes with `TernaryDir` padding zeroed first for determinism. Same pattern reused by `JlProjectionMatrix::commit()/verify()` (`shard_embedding.rs`) and `GpartAdapter::commitment()/verify()` (`types.rs`).
 - **`MerkleOctree`** (`merkle.rs`): hierarchical BLAKE3 for KG latent octree nodes (Plan 221-M).
 

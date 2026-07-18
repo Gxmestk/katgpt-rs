@@ -239,7 +239,7 @@ Quality gate: max_diff = 0.00e0 ✅
 |---|---|---|
 | `crates/katgpt-percepta/src/transformer.rs` | `raven_readout_into`, `forward_raven` zero-alloc, `ForwardContext.tq_dequant_pos`, `forward_turboquant` incremental dequant, `reset_tq_dequant()`, stack-alloc `r_t` | ✅ Done |
 | `src/types.rs` | `#[repr(u8)]` on `HlaMode` | ✅ Done |
-| `crates/katgpt-forward/crates/katgpt-forward/src/step.rs` | Deprecation notice on non-`_with` rollback | ✅ Done |
+| `crates/katgpt-forward/src/step.rs` | Deprecation notice on non-`_with` rollback | ✅ Done |
 | `crates/katgpt-core/src/speculative/sampling.rs` | No duplicate found — no change needed | ✅ No-op |
 | `tests/bench_068_raven_readout_incremental.rs` | New: 4 benchmark tests (readout, full sequence, steady-state, quality gate) | ✅ Done |
 

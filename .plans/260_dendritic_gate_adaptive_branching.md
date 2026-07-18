@@ -38,7 +38,7 @@ Implement physics-inspired NMDA-gated adaptive tree expansion in DDTree. Uses en
 
 ### Phase 2: ThinkingController Integration
 
-- [x] Add `ThinkingMode::Dendritic` variant to `ThinkingMode` enum in `crates/katgpt-speculative/crates/katgpt-speculative/src/thinking_controller.rs`
+- [x] Add `ThinkingMode::Dendritic` variant to `ThinkingMode` enum in `crates/katgpt-speculative/src/thinking_controller.rs`
   - Uses `DendriticGate` for budget allocation instead of bandit
   - Deterministic: same input always produces same budget
 
@@ -65,7 +65,7 @@ Implement physics-inspired NMDA-gated adaptive tree expansion in DDTree. Uses en
 
 ### Phase 4: MuxBfs Integration
 
-- [x] Add `MuxBfs::step_dendritic()` variant to `crates/katgpt-core/crates/katgpt-core/src/mux/bfs.rs`
+- [x] Add `MuxBfs::step_dendritic()` variant to `crates/katgpt-core/src/mux/bfs.rs`
   - Dynamic width: `comp_width *= nmda_gate` after each BFS layer
   - Minimum width: 1 (always expand at least one candidate)
   - Uses `DendriticGate::compute_gate()` per expansion

@@ -202,6 +202,6 @@ Estimated total LOC: ~1500 (within AGENTS.md 3200-line file budget).
 - Private plan: [`riir-ai/.plans/325_latent_cce_moderator_runtime.md`](../../riir-ai/.plans/325_latent_cce_moderator_runtime.md)
 - Existing Nash solver (deviation class for 1v1 CCE): `riir-games/crates/katgpt-ruliology/src/payoff.rs::PayoffTable<N>`
 - Existing OMD machinery (dual update inspiration): `katgpt-rs/src/pruners/prudent_banker.rs`
-- Existing mean-field α router (primal update inspiration): `katgpt-rs/crates/katgpt-core/crates/katgpt-core/src/cgsp/dual_pool.rs`
+- Existing mean-field α router (primal update inspiration): `katgpt-rs/crates/katgpt-core/src/cgsp/dual_pool.rs`
 
 **TL;DR:** Ship three generic public primitives — `CceLp<N,A>` (active-set LP solver on finite occupation measures), `ExternalRegret<D>` (closed-form external regret + uniqueness check + linear derivative), `CcePrimalDual` (Bregman primal-dual iterator with `O(N⁻¹ᐟ²)` averaged convergence). GOAT gate: G1 (CCE ≥ Nash by ≥ 5% on chicken + BoS), G2 (primal-dual convergence at slope ≈ −0.5), G3 (designer steering demo — same game, two `Γ₀`, two emergent outcomes). All modelless, MIT-licensed, no game semantics. The private selling-point binding (HLA × CGSP × LatCal × `Γ₀`) lands in riir-ai Plan 325.

@@ -26,11 +26,11 @@ Ship a modelless, zero-allocation **AC-GPT-style arbitrary-conditional prefix pr
 
 | AC-GPT feature | Already ships | File |
 |---|---|---|
-| BlockCausal attention (bidirectional within block, causal across) | `AttentionMode::BlockCausal` | `crates/katgpt-core/crates/katgpt-types/crates/katgpt-types/src/enums.rs:74` |
-| Reader/writer LoRA switch (bidirectional prefill vs causal decode) | `LoraPair { reader, writer }` | `crates/katgpt-core/crates/katgpt-types/crates/katgpt-types/src/lora.rs:392` |
+| BlockCausal attention (bidirectional within block, causal across) | `AttentionMode::BlockCausal` | `crates/katgpt-types/crates/katgpt-types/src/enums.rs:74` |
+| Reader/writer LoRA switch (bidirectional prefill vs causal decode) | `LoraPair { reader, writer }` | `crates/katgpt-types/crates/katgpt-types/src/lora.rs:392` |
 | Position-aware prefix entries (`token_id, original_pos`) | `MixedPrefillSequence::Raw` | `crates/katgpt-core/src/mux_latent/inject.rs:34` |
 | Conditional retrieval / fuse into hidden state | Engram `fuse_into_hidden_state` | `crates/katgpt-core/src/engram/` |
-| Top-down direction-vector injection | Latent Field Steering | `crates/katgpt-core/crates/katgpt-core/src/latent_steering.rs` |
+| Top-down direction-vector injection | Latent Field Steering | `crates/katgpt-core/src/latent_steering.rs` |
 | Target-conditioned draft seeding | `speculative_step_conditioned` | `crates/katgpt-speculative/src/dflash.rs:179` |
 
 **The novel composition:** `BlockCausal`-shape attention + original-position-aware copies of conditioning tokens at the front + bidirectional self-attention cluster among the copies that prevents multi-layer leakage. Each piece ships; the composition + leakage-prevention discipline does not.

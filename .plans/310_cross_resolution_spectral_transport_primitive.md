@@ -3,7 +3,7 @@
 **Date:** 2026-06-23
 **Research:** [katgpt-rs/.research/291_cross_resolution_spectral_transport_open_primitive.md](../.research/291_cross_resolution_spectral_transport_open_primitive.md)
 **Source:** Synthesized from FUNCATTN (arxiv 2605.31559, Research 257) + Topological Neural Operators (arxiv 2606.09806, Research 219) + Gemini "continuous field" reframing
-**Target:** `katgpt-rs/crates/katgpt-core/crates/katgpt-core/src/cross_resolution.rs` (new module) + Cargo feature `cross_resolution_transport`
+**Target:** `katgpt-rs/crates/katgpt-core/src/cross_resolution.rs` (new module) + Cargo feature `cross_resolution_transport`
 **Status:** Phase 0–4 COMPLETE (Phase 4 promotion done 2026-06-23: `cross_resolution_transport` now DEFAULT-ON in katgpt-core + root Cargo.toml, README showcase added, per AGENTS.md rule 'GOAT pass → promote to default'). Phase 3 (SIMD) likely a no-op — auto-vec via `simd::simd_dot_f32` is already in place; manual SIMD would be evaluated only if a real deployment shows the hot path is bottlenecked on the contiguous-row dots (unlikely at k ≤ 64, L1-resident). Phase 5 (shard integration) blocked on user decision to proceed with riir-neuron-db Plan 004.
 
 ---
@@ -43,7 +43,7 @@ G2 cos <0.75 (transport destroys personality) — either demotes to Gain.
 
 ### Tasks
 
-- [x] T1.1 Create `katgpt-rs/crates/katgpt-core/crates/katgpt-core/src/cross_resolution.rs`:
+- [x] T1.1 Create `katgpt-rs/crates/katgpt-core/src/cross_resolution.rs`:
   Shipped with `CrossResolutionBases` (BLAKE3-committed via per-element LE f32 →
   matches `engram/commitment.rs::build_merkle_root` convention), `CrossResScratch`,
   `CrossResolutionError::{RankDeficient, ShapeMismatch}` (rank-deficiency guard

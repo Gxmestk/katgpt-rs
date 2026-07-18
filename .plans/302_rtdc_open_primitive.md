@@ -5,7 +5,7 @@
 **Companion guide:** [riir-chain/.research/001_Resolution_Tiered_Deterministic_Commitment_Guide.md](../../../riir-chain/.research/001_Resolution_Tiered_Deterministic_Commitment_Guide.md)
 **Chain-side plan:** [riir-chain/.plans/003_rtdc_quorum_wiring.md](../../../riir-chain/.plans/003_rtdc_quorum_wiring.md)
 **Depends On:** Plan 235 ✅ (SLoD, default-ON), Plan 253 ✅ (Merkle-Octree Curator, opt-in), Plan 258 ✅ (LatCal Fixed, in riir-chain)
-**Target:** `katgpt-rs/crates/katgpt-core/crates/katgpt-core/src/rtdc.rs` (new) + feature gate `rtdc`
+**Target:** `katgpt-rs/crates/katgpt-core/src/rtdc.rs` (new) + feature gate `rtdc`
 **Status:** Phase 1 skeleton shipped (`rtdc.rs`, 1373 LOC, 14 unit tests) + Phase 3 Candidate C (probabilistic `subtree_inclusion`) landed behind `rtdc_subtree_inclusion` — CG6 PASS. Candidate A (Pedersen) research closed dormant; Candidate B (FFT) closed negative. Chain wiring landed in riir-chain (`fac46d5`, `chain_rtdc_subtree` feature). `rtdc` stays opt-in — G1/G2/G4/G6 pending LatCal-backed `DeterministicLeafEncode` impl (riir-chain Plan 003).
 
 ---
@@ -46,7 +46,7 @@ katgpt-rs/crates/katgpt-core/src/
 ### Core types
 
 ```rust
-// katgpt-rs/crates/katgpt-core/crates/katgpt-core/src/rtdc.rs
+// katgpt-rs/crates/katgpt-core/src/rtdc.rs
 
 use crate::merkle::{MerkleNode, MerkleOctree};
 use crate::slod::ScaleBoundary;
@@ -286,12 +286,12 @@ pub enum RtdcError {
 
 ### Tasks
 
-- [x] **T1.1** Create `katgpt-rs/crates/katgpt-core/crates/katgpt-core/src/rtdc.rs` with the types above. Add `#[cfg(feature = "rtdc")] pub mod rtdc;` to `lib.rs`. — `katgpt-rs/crates/katgpt-core/crates/katgpt-core/src/rtdc.rs`, `katgpt-rs/crates/katgpt-core/src/lib.rs`
+- [x] **T1.1** Create `katgpt-rs/crates/katgpt-core/src/rtdc.rs` with the types above. Add `#[cfg(feature = "rtdc")] pub mod rtdc;` to `lib.rs`. — `katgpt-rs/crates/katgpt-core/src/rtdc.rs`, `katgpt-rs/crates/katgpt-core/src/lib.rs`
 - [x] **T1.2** Add `rtdc = ["slod", "merkle_octree", "sense_composition"]` feature gate. Verify `cargo check --features rtdc` compiles. — `katgpt-rs/crates/katgpt-core/Cargo.toml`, `katgpt-rs/Cargo.toml`
-- [x] **T1.3** Implement `DepthTieredMerkleOctree::build` (3 depth-root extraction from existing `MerkleOctree`). — `katgpt-rs/crates/katgpt-core/crates/katgpt-core/src/rtdc.rs`
-- [x] **T1.4** Implement `prove_at_depth` + `verify_at_depth` (Phase 1: truncated path from existing `MerkleOctree::prove_inclusion`). — `katgpt-rs/crates/katgpt-core/crates/katgpt-core/src/rtdc.rs`
-- [x] **T1.5** Implement `DepthSelector::from_boundaries` + `select` (branchless). — `katgpt-rs/crates/katgpt-core/crates/katgpt-core/src/rtdc.rs`
-- [x] **T1.6** Implement `DeterministicLeafEncode` trait + `encode_cbor_canonical` default. — `katgpt-rs/crates/katgpt-core/crates/katgpt-core/src/rtdc.rs`
+- [x] **T1.3** Implement `DepthTieredMerkleOctree::build` (3 depth-root extraction from existing `MerkleOctree`). — `katgpt-rs/crates/katgpt-core/src/rtdc.rs`
+- [x] **T1.4** Implement `prove_at_depth` + `verify_at_depth` (Phase 1: truncated path from existing `MerkleOctree::prove_inclusion`). — `katgpt-rs/crates/katgpt-core/src/rtdc.rs`
+- [x] **T1.5** Implement `DepthSelector::from_boundaries` + `select` (branchless). — `katgpt-rs/crates/katgpt-core/src/rtdc.rs`
+- [x] **T1.6** Implement `DeterministicLeafEncode` trait + `encode_cbor_canonical` default. — `katgpt-rs/crates/katgpt-core/src/rtdc.rs`
 
 ### Notes from implementation
 
@@ -345,7 +345,7 @@ The hard problem: prove that roots[d] is a faithful aggregation of roots[d+1].
 ### Phase 3 status (updated 2026-06-22)
 
 - [x] **Candidate C (probabilistic sampling) — LANDED** in
-      `crates/katgpt-core/crates/katgpt-core/src/rtdc.rs` behind feature `rtdc_subtree_inclusion`.
+      `crates/katgpt-core/src/rtdc.rs` behind feature `rtdc_subtree_inclusion`.
       CG6 PASSES: cost 4.72×≤5.5× (inline test), **4.60×** (formal Criterion
       bench — `.benchmarks/303_rtdc_subtree_inclusion_goat.md`),
       deterministic catch 100%, probabilistic catch at f=1/8 K=8: 66.4%
@@ -426,4 +426,4 @@ The hard problem: prove that roots[d] is a faithful aggregation of roots[d+1].
 
 ## TL;DR
 
-Ship `katgpt-rs/crates/katgpt-core/crates/katgpt-core/src/rtdc.rs` with `DepthTieredMerkleOctree`, `DepthSelector`, `RtdcProof`, and the `DeterministicLeafEncode` trait. The math is generic (public MIT); the LatCal-backed encoding impl lives in `riir-chain`. G1–G6 gates: build ≤ 15µs, verify < 1µs, cross-platform determinism, SLoD boundary wiring. All pass → promote `rtdc` to default-ON. Phase 2 (chain quorum) and Phase 3 (`subtree_inclusion`) live elsewhere.
+Ship `katgpt-rs/crates/katgpt-core/src/rtdc.rs` with `DepthTieredMerkleOctree`, `DepthSelector`, `RtdcProof`, and the `DeterministicLeafEncode` trait. The math is generic (public MIT); the LatCal-backed encoding impl lives in `riir-chain`. G1–G6 gates: build ≤ 15µs, verify < 1µs, cross-platform determinism, SLoD boundary wiring. All pass → promote `rtdc` to default-ON. Phase 2 (chain quorum) and Phase 3 (`subtree_inclusion`) live elsewhere.

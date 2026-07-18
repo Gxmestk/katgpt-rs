@@ -26,7 +26,7 @@ EqR proves that after **landscape shaping** (RI + NI training), the fixed-point 
 |-----------|----------|------|
 | `best_of_k_rollouts()` | `src/speculative/dd_tree.rs` | Width scaling — K parallel trees |
 | `inject_sde_noise()` | `src/speculative/dd_tree.rs` | Noise injection (EqR NI analog) |
-| `BanditPruner<P>` with UCB1 | `crates/katgpt-ruliology/crates/katgpt-ruliology/src/bandit.rs` | Q-value trajectory selection |
+| `BanditPruner<P>` with UCB1 | `crates/katgpt-ruliology/src/bandit.rs` | Q-value trajectory selection |
 | `DDTreeBranchCache` with `max_branches` | `src/speculative/types.rs` | Breadth scaling |
 | `width_rollouts` in Config | `crates/katgpt-core/src/types.rs` | Rollout count configuration |
 | `LoopMode::WeightShared` | `crates/katgpt-core/src/types.rs` | Weight-shared iteration |

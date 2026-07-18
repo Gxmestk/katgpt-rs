@@ -155,7 +155,7 @@ G1–G6 PASS for the katgpt-rs scope, but **Phase 3 PoC is not yet run** (it liv
 | Component | File | Status |
 |-----------|------|--------|
 | Permeation-Map Diagnostic (Phase 1) | `crates/katgpt-core/src/cross_stage_relocation/mod.rs` | **NEW** (~570 lines incl. tests) |
-| Cross-Stage Relocation Operator (Phase 2) | `crates/katgpt-core/crates/katgpt-core/src/cross_stage_relocation/relocate.rs` | **NEW** (~470 lines incl. tests) |
+| Cross-Stage Relocation Operator (Phase 2) | `crates/katgpt-core/src/cross_stage_relocation/relocate.rs` | **NEW** (~470 lines incl. tests) |
 | GOAT gate bench (G2/G3/G4) | `crates/katgpt-core/benches/bench_431_cross_stage_relocation_goat.rs` | **NEW** (~380 lines) |
 | Module registration + re-exports | `crates/katgpt-core/src/lib.rs` | Modified |
 | Feature flag + bench registration | `crates/katgpt-core/Cargo.toml` | Modified |

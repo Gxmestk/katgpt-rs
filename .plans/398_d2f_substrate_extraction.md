@@ -41,7 +41,7 @@ These are training-research concerns that belong in root (or eventually riir-tra
 
 ## (4) Tasks
 
-- [x] **T1**: Create `crates/katgpt-forward/crates/katgpt-forward/src/d2f_context.rs` with the 4 substrate items ported from root `src/dllm.rs`. Imports rewritten to absolute leaf paths (`katgpt_types::Config`, `katgpt_transformer::TransformerWeights`, `katgpt_core::simd`, `katgpt_types::{kv_dim, matmul, matmul_relu, rmsnorm}`). `attention_forward_safe_into` ships as `pub fn` (workspace-internal; katgpt-forward is `publish = false`) — DRY preserved by single source-of-truth in katgpt-forward.
+- [x] **T1**: Create `crates/katgpt-forward/src/d2f_context.rs` with the 4 substrate items ported from root `src/dllm.rs`. Imports rewritten to absolute leaf paths (`katgpt_types::Config`, `katgpt_transformer::TransformerWeights`, `katgpt_core::simd`, `katgpt_types::{kv_dim, matmul, matmul_relu, rmsnorm}`). `attention_forward_safe_into` ships as `pub fn` (workspace-internal; katgpt-forward is `publish = false`) — DRY preserved by single source-of-truth in katgpt-forward.
 - [x] **T2**: Add `pub mod d2f_context;` + re-exports (`D2fContext`, `forward_block_causal_with`, `denoising_accuracy`, `attention_forward_safe_into`) to `crates/katgpt-forward/src/lib.rs`. Feature-gate the module behind `dllm` (mirrors root's gate on the same name).
 - [x] **T3**: Add `dllm = []` tracking feature to `crates/katgpt-forward/Cargo.toml` `[features]` (empty flag — substrate code itself has no `cfg(feature)` branches beyond the optional `rcd_residual` field).
 - [x] **T4**: Add `rcd_residual = ["katgpt-core/rcd_residual"]` tracking feature (gates the 3 RCD fields in `D2fContext`). Mirror root's existing `rcd_residual` forwarding.

@@ -144,8 +144,8 @@ Cost: 2 × kv_dim additions. Zero allocations, zero RNG calls.
   - ~~LoRA training pipeline has matured (riir-burner supports Gemma 2/4 LoRA) — but no domain_latent training path exists yet~~
   - Needs: `DomainLatentAdamWStep` equivalent added to burn pipeline (riir-gpu has it, riir-burner does not)
 
-- [x] **Task 6: Expert Registry integration** (`riir-ai/crates/riir-router/crates/katgpt-core/src/arg/registry.rs`) ✅
-  - ✅ `ExpertRegistry` is fully implemented at `riir-ai/crates/riir-router/crates/katgpt-core/src/arg/registry.rs` (12+ tests)
+- [x] **Task 6: Expert Registry integration** (`riir-ai/crates/katgpt-core/src/arg/registry.rs`) ✅
+  - ✅ `ExpertRegistry` is fully implemented at `riir-ai/crates/katgpt-core/src/arg/registry.rs` (12+ tests)
   - ✅ `ExpertBundle` exists at `riir-ai/crates/riir-router/src/types.rs` (has `lora_path`, `pruner`, `inference_budget`)
   - ✅ Added `domain_latent_path: Option<String>` to `DomainConfig` (feature-gated behind `domain_latent`)
   - ✅ Added `domain_latent: Option<DomainLatent>` to `ExpertBundle` (feature-gated)

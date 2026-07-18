@@ -217,5 +217,5 @@ cargo clippy --features opus_selection --quiet --tests
 - Research 089: `.research/089_OPUS_Optimizer_Induced_Projected_Utility_Selection.md`
 - OPUS paper: arXiv:2602.05400v2
 - CountSketch: Cormode & Muthukrishnan (2005)
-- Existing bandit: `crates/katgpt-ruliology/crates/katgpt-ruliology/src/bandit.rs` (Plan 030)
+- Existing bandit: `crates/katgpt-ruliology/src/bandit.rs` (Plan 030)
 - Boltzmann/softmax: Gibbs distribution, statistical mechanics

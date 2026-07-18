@@ -87,7 +87,7 @@ GATv2 (ICLR 2022) proves that GAT computes **static attention** — the ranking 
 | File | Purpose | ~LOC |
 |------|---------|------|
 | `crates/katgpt-pruners/src/dynamic_rank.rs` | `StaticRankingReport`, `static_ranking_diagnostic()`, `DynamicRankPruner<P>` | ~200 |
-| `crates/katgpt-ruliology/crates/katgpt-ruliology/src/bandit.rs` | `with_dynamic_rank()` builder (feature-gated) | ~10 |
+| `crates/katgpt-ruliology/src/bandit.rs` | `with_dynamic_rank()` builder (feature-gated) | ~10 |
 | `src/pruners/mod.rs` | Module glue | ~2 |
 | `tests/goat_dynamic_rank.rs` | GOAT proof benchmark | ~80 |
 | `Cargo.toml` | Feature gate | ~1 |

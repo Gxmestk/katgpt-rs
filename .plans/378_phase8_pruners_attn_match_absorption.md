@@ -31,9 +31,9 @@ Proposal 003 Phase 8 destination map:
 
 ## Tasks
 
-- [x] T1. Copy `crates/katgpt-pruners/src/closure_wire.rs` → `crates/katgpt-pruners/crates/katgpt-pruners/src/closure_wire.rs`, fix imports
+- [x] T1. Copy `crates/katgpt-pruners/src/closure_wire.rs` → `crates/katgpt-pruners/src/closure_wire.rs`, fix imports
 - [x] T2. Copy `src/screening/*` → `crates/katgpt-pruners/src/screening/`, fix intra-module refs (none needed)
-- [x] T3. Copy `crates/katgpt-attn-match/src/rerank.rs` → `crates/katgpt-attn-match/crates/katgpt-attn-match/src/rerank.rs`, fix imports (none needed)
+- [x] T3. Copy `crates/katgpt-attn-match/src/rerank.rs` → `crates/katgpt-attn-match/src/rerank.rs`, fix imports (none needed)
 - [x] T4. Update `crates/katgpt-pruners/Cargo.toml` (new features) + `src/lib.rs` (new modules)
 - [x] T5. Update `crates/katgpt-attn-match/Cargo.toml` (add katgpt-core dep + new features) + `src/lib.rs`
 - [x] T6. Update root `Cargo.toml` (forward features to crates) + `src/lib.rs` (re-export shims)

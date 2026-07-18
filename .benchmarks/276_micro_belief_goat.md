@@ -189,8 +189,8 @@ cargo test -p katgpt-core --no-default-features \
 - **Research:** [242_Topological_State_Tracking_Recurrent_Belief.md](../.research/242_Topological_State_Tracking_Recurrent_Belief.md)
 - **Source paper:** [arXiv:2604.17121](https://arxiv.org/abs/2604.17121) — Mozer et al., DeepMind, Jun 2026.
 - **Code:**
-  - `katgpt-rs/crates/katgpt-core/crates/katgpt-micro-belief/src/coherence_bench.rs` — G2.1 harness.
-  - `katgpt-rs/crates/katgpt-core/crates/katgpt-micro-belief/src/latent_thought.rs` — Family B + G1.6.
+  - `katgpt-rs/crates/katgpt-micro-belief/src/coherence_bench.rs` — G2.1 harness.
+  - `katgpt-rs/crates/katgpt-micro-belief/src/latent_thought.rs` — Family B + G1.6.
   - `katgpt-rs/crates/katgpt-core/src/micro_belief/tests.rs` — G1.1–G1.5.
 
 ---

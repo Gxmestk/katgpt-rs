@@ -332,7 +332,7 @@ not ban primitives that lose). The primitive ships opt-in behind
 
 | File | Change |
 |------|--------|
-| `crates/katgpt-dec/crates/katgpt-dec/src/bom_heat_kernel.rs` | **New** (Phase 4) — BoM trajectory sampler (`heat_kernel_trajectory_bom`, `heat_kernel_trajectory_bom_into`, `near_harmonic_indices`) + 8 unit tests |
+| `crates/katgpt-dec/src/bom_heat_kernel.rs` | **New** (Phase 4) — BoM trajectory sampler (`heat_kernel_trajectory_bom`, `heat_kernel_trajectory_bom_into`, `near_harmonic_indices`) + 8 unit tests |
 | `crates/katgpt-dec/src/lib.rs` | Registered `bom_heat_kernel` module + re-exports |
 | `crates/katgpt-core/tests/conformal_floor_bom_trajectory.rs` | **New** (Phase 4 T4.3) — "Report the Floor" comparison: `BomTrajectoryAdapter` + 4 evidence tests (seasonal, white noise, width-ratio, σ-sweep) |
 | `crates/katgpt-core/Cargo.toml` | Registered `conformal_floor_bom_trajectory` test behind `conformal_predictive_intervals,heat_kernel_trajectory` |

@@ -615,7 +615,7 @@ Our `WasmPruner` validation is rule-based by construction. We don't need a learn
 
 All types are NEW. Integration points (read-only or additive-only):
 - `src/pruners/mod.rs` — add `stepcode` module + exports
-- `crates/katgpt-ruliology/crates/katgpt-ruliology/src/bandit.rs` — `BanditPruner::update()` (receives shaped rewards, no code change)
+- `crates/katgpt-ruliology/src/bandit.rs` — `BanditPruner::update()` (receives shaped rewards, no code change)
 - `crates/katgpt-pruners/src/trial_log.rs` — `TrialRecord` gets optional `anchors` field
 - `crates/katgpt-core/src/pruners/review_metrics.rs` — adds path consistency classification
 - `Cargo.toml` — feature gate

@@ -376,7 +376,7 @@ The existing `attention_head` already accepts `t_n: usize` (number of KV positio
   - All existing call sites pass `None` (no LoRA) — zero breaking change.
   - New call sites (with LoRA) pass `Some(&writer_lora)`.
 
-- [x] **Task 5: Update call sites for `forward` signature** (`crates/katgpt-percepta/src/transformer.rs`, `crates/katgpt-forward/crates/katgpt-forward/src/step.rs`)
+- [x] **Task 5: Update call sites for `forward` signature** (`crates/katgpt-percepta/src/transformer.rs`, `crates/katgpt-forward/src/step.rs`)
   - `generate_into`, `generate`, `generate_batch`: pass `None`.
   - `forward_paged`: add `lora` param, pass `None` in existing call sites.
   - `forward_raven`: add `lora` param, pass `None`.

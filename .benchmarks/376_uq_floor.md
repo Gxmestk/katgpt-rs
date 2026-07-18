@@ -127,5 +127,5 @@ Adapter: `VfeForecastAdapter` (in the test file)
 - **Issue 038 (the gate, resolved + removed):** `.benchmarks/376_uq_floor.md` (this file) is the canonical record. The original issue tracked the conformal-floor gate per the UQ-bearing primitive GOAT extension (Issue 010); recoverable via `git show fce6e44b^:.issues/038_velocity_field_ensemble_uq_conformal_floor.md`.
 - **Issue 010 (the rule):** `.benchmarks/010_report_the_floor_consolidated.md`
 - **Plan 340 (the floor):** `ConformalIntervalCalibrator<SeasonalNaiveForecaster>` (m=1, default-on)
-- **Floor harness:** `crates/katgpt-core/crates/katgpt-core/src/conformal/floor_harness.rs` — `run_floor_comparison`, `UqPrimitiveUnderTest`, `FloorAdapter`
+- **Floor harness:** `crates/katgpt-core/src/conformal/floor_harness.rs` — `run_floor_comparison`, `UqPrimitiveUnderTest`, `FloorAdapter`
 - **Sibling benchmarks (other primitives' floor comparisons):** `.benchmarks/010_best_belief_floor_comparison.md`, `.benchmarks/010_bom_floor_comparison.md`, `.benchmarks/010_sleep_time_floor_comparison.md`

@@ -16,7 +16,7 @@
   coda_fusion = []
   ```
 
-- [x] **T2**: Create `crates/katgpt-core/crates/katgpt-core/src/coda.rs` — fused SIMD kernel implementations
+- [x] **T2**: Create `crates/katgpt-core/src/coda.rs` — fused SIMD kernel implementations
   ```rust
   //! CODA-inspired fused SIMD kernels (Research 67).
   //!
@@ -201,7 +201,7 @@ forward_coda() per layer:
 | File | Change |
 |------|--------|
 | `katgpt-rs/Cargo.toml` | Add feature gate: `coda_fusion` |
-| `crates/katgpt-core/crates/katgpt-core/src/coda.rs` | New: fused SIMD kernels (T3-T7) |
+| `crates/katgpt-core/src/coda.rs` | New: fused SIMD kernels (T3-T7) |
 | `crates/katgpt-core/src/lib.rs` | Add `pub mod coda;` behind feature gate |
 | `katgpt-rs/crates/katgpt-percepta/src/transformer.rs` | Add `forward_coda()` behind feature gate |
 | `tests/bench_103_coda_fusion_goat.rs` | New: GOAT benchmark |

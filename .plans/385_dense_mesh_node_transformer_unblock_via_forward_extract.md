@@ -57,7 +57,7 @@ next-session candidate for re-audit. The documented blocker was
   forward to `katgpt-forward` (so the cfg-gated code paths in katgpt-forward compile
   when root enables these features).
 - [x] **T6** — Moved `src/dense_mesh/node_transformer.rs` →
-  `crates/katgpt-forward/crates/katgpt-forward/src/dense_mesh_node_transformer.rs`. Update imports:
+  `crates/katgpt-forward/src/dense_mesh_node_transformer.rs`. Update imports:
   `crate::transformer::{forward, ForwardContext, MultiLayerKVCache, TransformerWeights}`
   → `crate::{forward::forward, ForwardContext}` (ForwardContext is already in katgpt-forward)
   + `katgpt_transformer::{MultiLayerKVCache, TransformerWeights}`. Same for `Config`/`Rng`

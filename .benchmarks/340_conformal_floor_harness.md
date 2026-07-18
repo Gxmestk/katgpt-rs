@@ -11,7 +11,7 @@
 ## TL;DR
 
 **Issue 010 T2: ✅ COMPLETE.** The floor-comparison harness ships as
-`crates/katgpt-core/crates/katgpt-core/src/conformal/floor_harness.rs`. It is the enforcement
+`crates/katgpt-core/src/conformal/floor_harness.rs`. It is the enforcement
 substrate for the "Report the Floor" policy: any UQ-bearing primitive can now
 be evaluated against the canonical conformal-naive floor
 (`ConformalIntervalCalibrator<SeasonalNaiveForecaster>` m=1) via a single
