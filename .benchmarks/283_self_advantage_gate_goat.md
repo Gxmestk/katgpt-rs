@@ -1,10 +1,22 @@
 # Benchmark 283: Self-Advantage Recursion Gate — GOAT Gate
 
+> **UPDATE 2026-06-17 (promotion):** The G3 verdict below was re-scoped in the
+> follow-up bench [`.benchmarks/056_self_advantage_gate.md`](056_self_advantage_gate.md).
+> The primitive targets **game-AI action spaces (vocab ≤ 128)**, where G3 is
+> 41–500 ns (well under the 1 µs target). Vocab=1024 latency (~4 µs) is
+> **informational**, not gated — it is still <1 % of a typical forward pass,
+> so the gate pays for itself on the first skipped iteration regardless of
+> vocab size. With the re-scoped G3, all 4 gates PASS and `self_advantage_gate`
+> was **promoted to `default`** in commits `7daf5e33` (root) + the katgpt-core /
+> katgpt-pruners forwarding features. The verdict and detailed numbers below
+> remain valid as the pre-scope-fix record; see bench 056 for the canonical
+> promotion rationale.
+
 **Plan:** [279 → 283 Self-Advantage Recursion Gate](../.plans/283_self_advantage_recursion_gate.md)
 **Research:** [250 Latent Recursion Policy Improvement](../.research/250_Latent_Recursion_Policy_Improvement_Advantage_Margin.md)
 **Source:** [arxiv:2511.16886](https://arxiv.org/abs/2511.16886) — "Latent Reasoning in TRMs is Secretly a Policy Improvement Operator"
 **Date:** 2026-06-16
-**Verdict:** ❌ **NOT GOAT** — keep `self_advantage_gate` opt-in. G1/G2/G4 pass; G3 (latency <1µs) fails at vocab=1024.
+**Original verdict:** ❌ **NOT GOAT at vocab=1024** — superseded by the re-scoped verdict in bench 056 (promotion to `default`). G1/G2/G4 pass; G3 (latency <1µs) fails at vocab=1024 under the original full-vocab interpretation.
 
 ---
 

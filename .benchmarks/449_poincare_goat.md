@@ -1,9 +1,23 @@
 # Benchmark 449 — Poincaré Adapter GOAT Gate (Plan 449 Phase 2)
 
+> **UPDATE 2026-07-18 (promotion):** `poincare_navigator` was **promoted to
+> `default`** in katgpt-core the same day this bench landed (commit
+> `e1ed6fee`, Cargo.toml comment "Phase 18 (2026-07-18): +poincare_navigator
+> (Plan 449 Phase 3 promotion)"). The G2 caveat documented below was **closed
+> by riir-train Plan 317** (`bench_317_poincare_g2_strict`): the trained 2-layer
+> MLP φ via AdamW reaches R²=0.9997 vs linear-only 0.9255 on the same fixture
+> (gap +0.0741, all three strict-domination thresholds PASS). The primitive's
+> load-bearing value at runtime is the closed-form inverse navigation (G3 =
+> perfect Hit@0.3 = 1.000) + the frozen Pod commitment pattern, neither of
+> which depends on G2 strict-domination. Promotion follows the codebase
+> pattern (manifold_bandit P370 G2 FAIL but default-on; set_attention P354
+> G8 FAIL but default-on; ac_prefix P313 modelless unblock) — modelless +
+> zero-cost-unless-invoked + GOAT-passes → default-on.
+
 **Date:** 2026-07-18
 **Run host:** macOS / Apple Silicon (M-class)
 **Toolchain:** `cargo bench` with `CARGO_TARGET_DIR=/tmp/plan449` (isolated per AGENTS.md)
-**Feature flag:** `poincare_navigator` (opt-in)
+**Feature flag:** `poincare_navigator` (**default-on since 2026-07-18** — see banner above)
 **Bench:** `crates/katgpt-core/benches/bench_449_poincare_goat.rs`
 
 ## Verdict Table

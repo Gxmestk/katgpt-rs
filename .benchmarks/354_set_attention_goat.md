@@ -5,7 +5,7 @@
 **Research:** [katgpt-rs/.research/354_Cross_Datapoint_Set_Attention_NPT.md](../.research/354_Cross_Datapoint_Set_Attention_NPT.md)
 **Source paper:** [arXiv:2106.02584](https://arxiv.org/pdf/2106.02584) — Kossen et al., NeurIPS 2021 (NPT)
 **Bench:** [`crates/katgpt-core/benches/set_attention_bench.rs`](../crates/katgpt-core/benches/set_attention_bench.rs)
-**Features:** `set_attention` (opt-in)
+**Features:** `set_attention` (**default-on since 2026-07-01** — see Verdict section)
 
 ## GOAT gate results
 
