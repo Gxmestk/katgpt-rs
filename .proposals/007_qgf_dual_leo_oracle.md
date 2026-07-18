@@ -1,6 +1,6 @@
 # Proposal 007 — QGF DualLeoOracle (Test-Time LEO+UVFA Q-Gradient Fusion)
 
-Status: **shipped Phase 1-2 (Plan 467); G5 measured FAIL on synthetic data (Bench 553 in riir-ai, 2026-07-18); real-network G5 still pending Issue 552 trained weights.**
+Status: **shipped Phase 1-2 (Plan 467); G5 measured FAIL on synthetic data (Bench 553 in riir-ai, 2026-07-18); POST-PLAN-500 re-run (2026-07-18) confirmed the same 0.00%/0.50% numbers are a REAL negative finding (DualLeo α-mix hurts on synthetic), not the vacuous 0/0 implied by the pre-fix frozen-noise LEO behavior. Real-network G5 still pending Issue 552 trained weights.**
 Branch: `develop`
 Owner: unassigned
 Fusion of: Plan 268 (QGF LeoHeadOracle) × Plan 155 (DualLeoMixer) × Plan 460 (postmax lesson — linear-in-grad mix)

@@ -1,12 +1,28 @@
 # Plan 467 — QGF DualLeoOracle GOAT Gate Results
 
-**Date:** 2026-07-18
+**Date:** 2026-07-18 (post-Plan-500 re-run: 2026-07-18)
 **Repo:** `katgpt-rs`
 **Features:** `qgf` + `leo_all_goals` + `dual_leo` (the `dual_leo` feature implies `leo_all_goals`)
 **Plan:** [`.plans/467_qgf_dual_leo_oracle.md`](../.plans/467_qgf_dual_leo_oracle.md)
 **Proposal:** [`.proposals/007_qgf_dual_leo_oracle.md`](../.proposals/007_qgf_dual_leo_oracle.md)
 **Test run:** `CARGO_TARGET_DIR=/tmp/plan467 cargo test -p katgpt-core --features qgf,leo_all_goals,dual_leo --release --lib` (1713 passed, 0 failed, 6 ignored)
 **Perf run:** `cargo test ... --release --lib bench_dual_leo_oracle_g2_perf -- --ignored --nocapture`
+
+## Update (2026-07-18, post-Plan-500)
+
+riir-ai [Plan 500](../riir-ai/.plans/500_dual_leo_trainer_backprop_fix.md) fixed
+[Issue 554](../riir-ai/.issues/554_dual_leo_trainer_backprop_noop.md) — LEO
+last-layer now does real per-sample SGD. The G5 re-run on synthetic data
+(riir-ai Bench 553) reports the SAME 0.00% / 0.50% numbers, but with a
+critical meaning shift: pre-fix the numbers were frozen-noise LEO behavior
+(LEO never updated); post-fix they are a REAL negative finding (LEO DID
+train, T12 proves 32% loss reduction on a learnable task). The synthetic
+task is too weak for LEO's signal to escape α-mixing with UVFA's noise.
+
+Real-network G5 verdict still requires [Issue 552](../riir-ai/.issues/552_civ_dual_leo_training_unblock.md)
+(GPU + civ trajectories). The trainer is now ready for it.
+
+---
 
 ## TL;DR
 
