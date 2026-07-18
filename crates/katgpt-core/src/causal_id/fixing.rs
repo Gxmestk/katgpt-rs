@@ -211,6 +211,34 @@ impl Admg {
             });
         }
     }
+
+    /// Fully alloc-free variant of [`Self::ancestors_into`] — the caller
+    /// supplies both the output buffer AND a frontier (work-queue) buffer.
+    /// Both buffers are `clear`ed + reused. Used by the inner loop of
+    /// `identify_inner` (Issue 183 G4 refactor) to eliminate the frontier
+    /// `Vec::with_capacity` that `ancestors_into` still pays.
+    ///
+    /// Contract: `out` and `frontier` MUST be distinct `Vec`s (aliasing
+    /// them would corrupt the traversal).
+    pub fn ancestors_with_frontier_into(
+        &self,
+        seed: &[NodeId],
+        out: &mut Vec<NodeId>,
+        frontier: &mut Vec<NodeId>,
+    ) {
+        out.clear();
+        out.extend(seed);
+        frontier.clear();
+        frontier.extend(seed);
+        while let Some(v) = frontier.pop() {
+            self.for_each_parent(v, |p| {
+                if !out.contains(&p) {
+                    out.push(p);
+                    frontier.push(p);
+                }
+            });
+        }
+    }
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -233,6 +261,27 @@ impl Admg {
             }
         }
         g
+    }
+
+    /// Alloc-free variant of [`Self::subgraph`] — writes into the
+    /// caller-supplied `out` Admg (all three Vec fields `clear`ed + refilled).
+    /// Used by the inner loop of `identify_inner` (Issue 183 G4 refactor) to
+    /// eliminate the per-call `Admg::new` + grow allocations.
+    pub fn subgraph_into(&self, nodes: &[NodeId], out: &mut Admg) {
+        out.nodes.clear();
+        out.nodes.extend(self.nodes.iter().copied().filter(|n| nodes.contains(n)));
+        out.directed.clear();
+        for &(p, c) in &self.directed {
+            if nodes.contains(&p) && nodes.contains(&c) {
+                out.directed.push((p, c));
+            }
+        }
+        out.bidirected.clear();
+        for &(a, b) in &self.bidirected {
+            if nodes.contains(&a) && nodes.contains(&b) {
+                out.bidirected.push((a, b));
+            }
+        }
     }
 
     /// Apply the `Fix_v` operation: remove `v` and every edge touching `v`
