@@ -1,5 +1,11 @@
 # Research: Raven — Routing Slot Memories for O(1) Perfect Recall
 
+> **Note on file paths (2026-07-18):** Some `*.rs` paths in this document
+> reference modules that were renamed, moved, or never landed under the
+> exact name shown. They are preserved as a **historical record** of the
+> original design intent; consult the current crate layout for the live
+> location.
+
 **Date:** 2025-06
 **Status:** Research → Verdict
 **Context:** katgpt-rs + anyrag neuro-symbolic architecture

@@ -1,5 +1,11 @@
 # Plan 001: 9×9 Sudoku Example with Streaming Thinking
 
+> **Note on file paths (2026-07-18):** Some `*.rs` paths in this document
+> reference modules that were renamed, moved, or never landed under the
+> exact name shown. They are preserved as a **historical record** of the
+> original design intent; consult the current crate layout for the live
+> location.
+
 ## Goal
 Create a runnable `examples/sudoku_01_9x9.rs` that demonstrates the Deterministic Validator concept
 by solving a 9×9 Sudoku puzzle with streaming "thinking" output — matching the web demo

@@ -1,5 +1,11 @@
 # Plan 249: TRDraft — Trajectory-Refined Draft for Modelless Inference
 
+> **Note on file paths (2026-07-18):** Some `*.rs` paths in this document
+> reference modules that were renamed, moved, or never landed under the
+> exact name shown. They are preserved as a **historical record** of the
+> original design intent; consult the current crate layout for the live
+> location.
+
 **Date:** 2026-06-11
 **Status:** All phases complete, GOAT proof passing
 **Feature Gate:** `trd_refined_draft` (default-OFF)

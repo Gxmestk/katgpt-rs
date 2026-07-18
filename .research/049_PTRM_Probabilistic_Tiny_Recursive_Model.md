@@ -1,5 +1,11 @@
 # Research 49: PTRM — Probabilistic Tiny Recursive Model
 
+> **Note on file paths (2026-07-18):** Some `*.rs` paths in this document
+> reference modules that were renamed, moved, or never landed under the
+> exact name shown. They are preserved as a **historical record** of the
+> original design intent; consult the current crate layout for the live
+> location.
+
 **Paper:** PTRM: Probabilistic Tiny Recursive Model (arXiv:2605.19943)
 **Authors:** (see paper)
 **Date:** May 2026

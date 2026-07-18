@@ -1,5 +1,11 @@
 # Plan 122: Event-Sourced Game Traces with Fork-and-Diff
 
+> **Note on file paths (2026-07-18):** Some `*.rs` paths in this document
+> reference modules that were renamed, moved, or never landed under the
+> exact name shown. They are preserved as a **historical record** of the
+> original design intent; consult the current crate layout for the live
+> location.
+
 > **Status:** ✅ Complete (9/9 tasks done)
 > **Priority:** Medium (strengthens GOAT proofs, enables counterfactual strategy exploration)
 > **Feature Gate:** `event_log`

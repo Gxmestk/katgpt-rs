@@ -1,5 +1,11 @@
 # Research: G-Zero — Self-Play for Open-Ended Generation from Zero Data (21)
 
+> **Note on file paths (2026-07-18):** Some `*.rs` paths in this document
+> reference modules that were renamed, moved, or never landed under the
+> exact name shown. They are preserved as a **historical record** of the
+> original design intent; consult the current crate layout for the live
+> location.
+
 > Source: [G-Zero](https://arxiv.org/pdf/2605.09959) by Chengsong Huang, Haolin Liu, Tong Zheng, Runpeng Dai, Langlin Huang, Jinyuan Li, Zongxia Li, Zhepei Wei, Yu Meng, Jiaxin Huang (WashU · UVA · UMD)
 > Date: 2026-05, distilled 2026-05-13
 > Raw code: not yet released
