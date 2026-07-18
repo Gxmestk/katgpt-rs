@@ -418,3 +418,68 @@ After every feature promotion, run BOTH auditors:
 python3 scripts/bench_doc_audit.py /git          # .md docs
 python3 scripts/cargo_comment_audit.py /git      # Cargo.toml inline comments
 ```
+
+---
+
+## Session 15 addendum (2026-07-18) — Post-session-14 verification
+
+Re-verified both auditors after post-session-14 sibling-agent activity.
+
+### Re-verification result
+
+- `python3 scripts/bench_doc_audit.py` across all 8 repos → **0 mismatches**
+  (95 .md labels checked)
+- `python3 scripts/cargo_comment_audit.py` across all 8 repos → **0 mismatches**
+  (360 Cargo.toml inline comments checked)
+- Post-session-14 commits audited for new drift: 6 in katgpt-rs (Plan 459/460
+  FlowField + Proposal 006 REVERT + 2 issue removals), 6 in riir-ai
+  (Plan 498 HLA band-edge Phase 3 + Plan 499 counterfactual claims Phases
+  1–3 + 2 issue removals). Zero new drift introduced on either of the two
+  audited surfaces.
+- New `.benchmarks/549_counterfactual_claims_synthetic.md` (Plan 499 Phase 3,
+  riir-ai) correctly skipped by the label auditor — verdict-only doc with
+  no feature-status claim.
+- No dangling references to recently-removed issues (`.issues/183/184/544/545`
+  removed per noise-reduction rule; grep across `.benchmarks`/`.docs`/`.plans`/
+  `.research`/`.proposals` found zero stale cross-refs — the cleanup commits
+  like `bcca633d` ("redirect 3 file-path refs to Research 450 §8 after
+  riir-ai issue removal") properly handled forward references).
+
+### Sibling-WIP drift flagged (NOT fixed — out of scope)
+
+A separate one-off scan for `.md → nonexistent .rs` path refs found three
+instances of path-bug drift inside sibling-agent active work areas. These
+were left untouched per the sibling-WIP rule; the owning agent should fix
+them when finalizing their plans:
+
+| File | Broken ref | Actual location |
+|---|---|---|
+| `katgpt-rs/.plans/459_flow_field_dual_leo_mixer_fusion.md:44` | `benches/dual_flow_field_bench.rs` | `crates/katgpt-core/benches/dual_flow_field_bench.rs` (sibling WIP) |
+| `katgpt-rs/.plans/460_flow_field_dual_leo_postmax_fusion.md:136` | `benches/dual_flow_field_bench.rs` | same as above |
+| `katgpt-rs/.proposals/006_flow_field_hard_constraint_in_guidance.md` | `examples/ht_chantry_deadlock_chain_diagnostic.rs` | never shipped (Proposal 006 was REVERTED in commit `9065953e`); ref is now historical noise inside the proposal doc |
+
+The first two are real path bugs (file exists, wrong prefix). The third is
+moot — Proposal 006 was reverted, so the missing example is expected.
+
+### Accepted residual (unchanged from session 9–10)
+
+A wider scan for `.md → nonexistent file` path refs across `.benchmarks/`,
+`.docs/`, `.plans/`, `.research/` in all 8 repos finds 525 unique broken
+refs (after dedup). This is the same drift class as the session 9–10
+residual, accepted as design-record noise: many are intentional historical
+references in `.plans/` (forward-looking file paths that describe planned
+but never-shipped layouts), shell-glob brace expansions (`{mod,types,probe}.rs`
+is a valid glob, not a single file), or cross-repo refs whose target was
+renamed during refactors documented elsewhere.
+
+No new auditor for this drift class was added — the signal-to-noise ratio
+is too poor to make a useful gate, and the existing 61 doc-level
+"historical file paths" annotations from sessions 9–10 cover the worst
+offenders. A future plan could sweep this if a concrete cost (broken link
+in published docs, dev confusion) materializes.
+
+### Bottom line
+
+Task remains **independently verified complete** on both audited surfaces.
+The two re-runnable auditors continue to catch their target drift class
+cleanly. No new drift introduced by post-session-14 sibling activity.
