@@ -113,7 +113,7 @@ pub use denoise_loops::denoise_loop_rcd;
 pub use denoise_loops::denoise_loop_rcd_3sr;
 ```
 
-### T4 — Root `src/dllm.rs`
+### T4 — Root `riir-ai/crates/riir-engine/src/transformer/dllm.rs`
 
 Delete moved code (L1801-2486, ~686 LOC). Replace with re-export shims at the
 original locations.
@@ -148,7 +148,7 @@ original locations.
 - [x] T2 Extend katgpt-forward `Cargo.toml` `rcd_residual` feature (forward `katgpt-core/critical_interval_gate`)
 - [x] T2b Extend katgpt-forward `Cargo.toml` `d2f_3sr_warm_start` feature (forward `katgpt-core/d2f_3sr_warm_start` + imply local `rcd_residual`)
 - [x] T3 Register module + re-export in katgpt-forward `lib.rs`
-- [x] T4 Delete moved code from root `src/dllm.rs`, add re-export shims (-651 LOC)
+- [x] T4 Delete moved code from root `riir-ai/crates/riir-engine/src/transformer/dllm.rs`, add re-export shims (-651 LOC)
 - [x] T5 Apply import rewrites in the new file
 - [x] T6 Validate (G3 GOAT gate) — all green
 - [x] T7 Commit on `develop`
@@ -157,7 +157,7 @@ original locations.
 
 | File | Before | After | Delta |
 |---|---:|---:|---:|
-| `src/dllm.rs` | 3659 | 3008 | **-651** |
+| `riir-ai/crates/riir-engine/src/transformer/dllm.rs` | 3659 | 3008 | **-651** |
 | `crates/katgpt-forward/src/denoise_loops.rs` | — | 722 | +722 |
 
 Cumulative root reduction (Plans 399–403): **-2687 LOC**.
@@ -172,7 +172,7 @@ Cumulative root reduction (Plans 399–403): **-2687 LOC**.
 
 ## (7) Next-session candidate
 
-The denoise cluster was the last large pure-inference cluster in `src/dllm.rs`.
+The denoise cluster was the last large pure-inference cluster in `riir-ai/crates/riir-engine/src/transformer/dllm.rs`.
 What remains is predominantly training code (not extractable to katgpt-forward
 without crossing the train/infer boundary) plus the noise/corruption helpers.
 

@@ -85,7 +85,7 @@ This is the most important section. **A naïve direct-map of this paper would cr
 
 | Paper Concept | Shipped Cousin | Location | Status |
 |---------------|----------------|----------|--------|
-| **Algorithmic primitive** `p ∈ P` (minimal reusable unit) | `ConstraintPruner` trait (arm in BanditPruner) + `SkillSpec` (civ) + WASM validator + LoRA adapter | `katgpt-rs/src/pruners/mod.rs`, `riir-games/src/civ/skill.rs`, `riir-engine/src/adapters/` | ✅ Multiple |
+| **Algorithmic primitive** `p ∈ P` (minimal reusable unit) | `ConstraintPruner` trait (arm in BanditPruner) + `SkillSpec` (civ) + WASM validator + LoRA adapter | `katgpt-rs/src/pruners/mod.rs`, `seal-online-remaster/crates/seal-edge-worker/src/persistence/skill.rs`, `riir-engine/src/adapters/` | ✅ Multiple |
 | **Composition operators `C`** (sequence/branch/recurse, type-safe) | `crates/katgpt-pruners/src/lattice_operad/composed_pruner.rs` (operadic AND/OR composition), `TIES merge` (task vector sign election + disjoint merge) | `katgpt-rs/src/lattice_operad/`, `katgpt-rs/.plans/094_*.md` | ✅ Production |
 | **Parsimony / MDL admission gate** | `RegimeTransitionGate::evaluate()` — accept iff `DL_new < DL_old - AdmissionCost` (default 32 bits/pruner) | `katgpt-rs/.plans/215_regime_transition_inference.md` T2 | ✅ **DEFAULT ON**, GOAT 8/8 |
 | **Discovery as vocabulary change** (regime collapse → new primitive admission) | `RegimeCollapseClassifier` → `Discovery` regime in Four-Regime Router | Plan 215 T1 + T5 | ✅ Shipped |

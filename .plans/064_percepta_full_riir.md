@@ -29,7 +29,7 @@ Complete Rust port of Percepta's `transformer-vm` (Apache-2.0 © Percepta). Dist
 | `attention/standard_cache.py` | 32 | O(n) softmax reference | `crates/katgpt-percepta/src/standard_cache.rs` |
 | `graph/core.py` | 449 | Expression/Dimension DSL, fetch, reglu, stepglu, persist | `src/percepta/graph.rs` |
 | `wasm/interpreter.py` | 637 | 35-opcode WASM machine as computation graph | `src/percepta/wasm/interpreter.rs` |
-| `wasm/reference.py` | 667 | Reference trace generator | `src/percepta/wasm/reference.rs` |
+| `wasm/reference.py` | 667 | Reference trace generator | `riir-ai/crates/riir-engine/src/deltanet/reference.rs` |
 | `scheduler/milp.py` | 814 | MILP: 4-phase layer assignment, slot reuse, minimize d_model | `crates/katgpt-percepta/src/scheduler.rs` |
 | `model/weights.py` | 776 | Analytical weight construction: graph → weight matrices | `crates/katgpt-percepta/src/weights.rs` |
 | `model/transformer.py` | ~40 | VanillaTransformer with ReGLU FFN | `crates/katgpt-percepta/src/transformer.rs` |
@@ -276,7 +276,7 @@ We proved transformers can learn to play games.
 
 3. **Granular feature flags** — incremental adoption, each level unlocks the next. See Feature Flags section below. Default off.
 
-4. **File size limit** — `lower.rs` may exceed 2048 lines (source is 1808). Split into `crates/katgpt-percepta/src/wasm/interpreter/arithmetic.rs`, `lower/logic.rs`, `lower/shift.rs` if needed.
+4. **File size limit** — `lower.rs` may exceed 2048 lines (source is 1808). Split into `crates/katgpt-percepta/src/wasm/interpreter/arithmetic.rs`, `riir-game-sdk/crates/riir-viz/src/crowd_demo/logic.rs`, `lower/shift.rs` if needed.
 
 5. **Keep runtime.h as-is** — The C runtime is injected into WASM programs at compile time. It stays as a C header file.
 

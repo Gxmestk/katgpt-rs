@@ -92,8 +92,8 @@ Implemented in `riir-ai/crates/riir-gpu` (Plan 068).
 ### Task 1.3: Noise Schedule Training Kernel ✅
 - [x] `noise_corrupt.wgsl`: PCG32 per-position token masking with prompt protection
 - [x] `loss_masked.wgsl`: importance-weighted CE on masked positions only
-- [x] Feature-gated `GpuNoiseCorrupt` struct in `riir-gpu/src/dllm.rs`
-- [x] Feature-gated `GpuMaskedLoss` struct in `riir-gpu/src/dllm.rs`
+- [x] Feature-gated `GpuNoiseCorrupt` struct in `riir-ai/crates/riir-engine/src/transformer/dllm.rs`
+- [x] Feature-gated `GpuMaskedLoss` struct in `riir-ai/crates/riir-engine/src/transformer/dllm.rs`
 - [x] Test: GPU corruption throughput — `bench_dllm_kernels`
 - [x] Test: GPU masked loss vs CPU — `bench_dllm_kernels`
 

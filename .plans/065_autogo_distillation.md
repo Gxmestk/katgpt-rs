@@ -534,9 +534,9 @@ Using `reqwest::blocking::Client` because:
 | Dataset | `.raw/autogo/src/alpha_go/dataset.py` | Future plan |
 | Game replay → LoRA | `riir-ai/crates/riir-gpu/src/game/trainer.rs` (Bomberman) | Future: Go token adapter (82-token seq) |
 | Game policy config | `riir-ai/crates/riir-gpu/src/game/policy.rs` | Future: Go vocab (82 actions) |
-| GRPO loss | `riir-gpu/src/loss_grpo.rs` | Future: G-Zero Proposer training |
-| DPO loss (GPU) | `riir-gpu/src/loss_dpo.rs` | Future: G-Zero Generator training |
-| GZeroLoop | `riir-gpu/src/gzero_loop.rs` | Future: Model-based Go self-play |
+| GRPO loss | `riir-train/crates/riir-train-gpu/src/loss_grpo.rs` | Future: G-Zero Proposer training |
+| DPO loss (GPU) | `riir-train/crates/riir-train-gpu/src/loss_dpo.rs` | Future: G-Zero Generator training |
+| GZeroLoop | `riir-train/crates/riir-train-gpu/src/gzero_loop.rs` | Future: Model-based Go self-play |
 | Fourier MCTS | `riir-ai/crates/riir-engine/src/fourier/mcts.rs` | Future: Go spatial hash transposition |
 | WASM Validator | `riir-validator-sdk/` + `riir-wasm/` | Future: `go_validator.wasm` |
 
@@ -683,7 +683,7 @@ GoState::play_random_game()           (Plan 065 GoState)
 GZeroLoop activates when Go replays + tokenization exist:
 
 ```text
-GZeroLoop round (riir-gpu/src/gzero_loop.rs):
+GZeroLoop round (riir-train/crates/riir-train-gpu/src/gzero_loop.rs):
   1. GoTemplateProposer → query-hint pairs    (Plan 065 T33)
   2. Go LoRA Generator → move predictions     (adapted riir-ai/crates/riir-gpu/src/game/policy.rs)
   3. HintDelta → intrinsic reward             (log-prob shift)

@@ -98,7 +98,7 @@ Cholinergic modulation suppresses SFA → smaller effective β → wake-like irr
 | **Phase transition** (real eigenvalue crossing — `N ≥ d` input sufficiency) | **`subspace_phase_gate`** (`phase_transition_gate`, `participation_ratio`, `numerical_rank`, `jacobian_svd_at`) | Plan 301, `crates/katgpt-core/src/subspace_phase_gate.rs`; neuron-db consumer `phase_gate.rs` |
 | **Population-mean aggregation** (K trajectories → `P̄_avg`, `beta_per_step`) | **`ict::BranchingDetector`** | Plan 294, `crates/katgpt-core/src/ict/detector.rs` (`last_population_mean`, `ema_beta`) |
 | **Coherence-driven re-estimation** (analog of adaptation feedback closing the loop) | **`ReestimationScheduler`** | Plan 303, `riir-ai/crates/riir-engine/src/latent_functor/reestimation/mod.rs` |
-| **KARC reservoir** (delay-embedding + ridge readout — the *reservoir* formalism the paper's RNN instantiates) | **`KarcForecaster`** | Plan 308, `crates/katgpt-core/src/karc.rs` |
+| **KARC reservoir** (delay-embedding + ridge readout — the *reservoir* formalism the paper's RNN instantiates) | **`KarcForecaster`** | Plan 308, `riir-ai/crates/riir-games-civ/src/civ/map_tick/karc.rs` |
 | **Crowd-scale latent aggregation** (set attention over K NPCs' beliefs) | **`set_sigmoid_attention`** | Plan 354, `crates/katgpt-core/src/set_attention.rs`; riir-ai guide R167 |
 | **Stokes / DEC continuity equation** (Fokker-Planck framing of κ transport) | **DEC operators** (`codifferential` δ, `belief_mass_divergence`) | Plan 251/314, `crates/katgpt-core/src/dec/` |
 | **Frozen per-NPC latent state** (style_weights[64], dendritic branch) | **`NeuronShard`** | `riir-neuron-db/src/shard.rs` |

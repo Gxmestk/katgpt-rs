@@ -94,7 +94,7 @@
 
 ### Phase 1: D2F Variance-Minimized Noise Schedule
 
-- [x] **T2: Add `AdaptiveNoiseSchedule` to `src/dllm.rs`**
+- [x] **T2: Add `AdaptiveNoiseSchedule` to `riir-ai/crates/riir-engine/src/transformer/dllm.rs`**
   - Wraps existing `NoiseSchedule` with per-step loss tracking
   - During training, track reconstruction loss at each denoising step
   - After each training epoch, adapt mask ratios to equalize per-step difficulty
@@ -129,7 +129,7 @@
   - `reset() -> ()` — clear trackers (new training run)
   - Backward-compatible: if `AdaptiveNoiseSchedule` is never `record_step_loss`'d, falls back to `NoiseSchedule::monotonic_ratios()` behavior
 
-- [x] **T3: Integrate into `train_mini_dllm` training loop** — `src/dllm.rs`
+- [x] **T3: Integrate into `train_mini_dllm` training loop** — `riir-ai/crates/riir-engine/src/transformer/dllm.rs`
   - Added `train_mini_dllm_adaptive()` function (feature-gated `replaid_schedules`)
   - Cycles through schedule blocks via modulo counter for per-sample mask ratio
   - Calls `schedule.record_step_loss(block_idx, loss)` after each sample
@@ -139,7 +139,7 @@
   - [x] **T3.1:** Unit test — `test_adaptive_training_reduces_variance` ✅
   - [x] **T3.2:** Unit test — `test_adaptive_schedule_preserves_accuracy` ✅ (both reach 100%)
 
-- [x] **T4: Integrate into GPU D2F training (riir-ai `riir-gpu/src/dllm.rs`)**
+- [x] **T4: Integrate into GPU D2F training (riir-ai `riir-ai/crates/riir-engine/src/transformer/dllm.rs`)**
   - Ported `AdaptiveNoiseSchedule` + `VarianceMinimizer` to `replaid_schedule` module in `dllm.rs`
   - `GpuDllmTrainer::train()` uses `AdaptiveNoiseSchedule` for ratio computation (cfg-gated)
   - Per-block loss recorded via `record_step_loss()` after each training step
@@ -253,7 +253,7 @@
 
 RePlaid Sec 4.2 shows DPM-Solver++(2M) — a second-order multistep solver — beats first-order DDPM at low NFEs (< 64 steps). The solver caches previous predictions and linearly extrapolates (Eq 16-17), reducing steps by ~4×. This is directly transferable to our D2F pipeline.
 
-- [x] **T10.5: Add `prev_logits` cache to `D2fContext`** — `src/dllm.rs`
+- [x] **T10.5: Add `prev_logits` cache to `D2fContext`** — `riir-ai/crates/riir-engine/src/transformer/dllm.rs`
   - Added `prev_logits_flat: Vec<f32>` — `[max_seq * vocab_size]` cached from previous denoising step
   - Added `prev_prev_logits_flat: Vec<f32>` — second cache for multistep extrapolation
   - No FLOPs increase — just memory for 2 extra logit vectors (~400KB at vocab=32K)
@@ -280,7 +280,7 @@ RePlaid Sec 4.2 shows DPM-Solver++(2M) — a second-order multistep solver — b
 
 - [x] **T12: Feature gate `replaid_schedules`** — `Cargo.toml`
   - Default: off (experimental until benchmarks prove value)
-  - Gated in: `crates/katgpt-pruners/src/variance_minimizer.rs`, `AdaptiveNoiseSchedule` in `src/dllm.rs`, `VarianceEpsilon` in `bandit.rs`, `SdarLearnedBeta` in `sdar_gate.rs`
+  - Gated in: `crates/katgpt-pruners/src/variance_minimizer.rs`, `AdaptiveNoiseSchedule` in `riir-ai/crates/riir-engine/src/transformer/dllm.rs`, `VarianceEpsilon` in `bandit.rs`, `SdarLearnedBeta` in `sdar_gate.rs`
   - Add to `full` feature set
 
 - [x] **T13: Update documentation** — partial

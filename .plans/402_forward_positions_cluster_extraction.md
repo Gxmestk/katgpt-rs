@@ -5,7 +5,7 @@
 Handoff from Plan 401 (CLOSED `ed52538a`). Plan 401's stated Plan 402
 candidate was:
 
-> Full `src/dllm.rs` inference extraction — move
+> Full `riir-ai/crates/riir-engine/src/transformer/dllm.rs` inference extraction — move
 > `forward_bidirectional_positions`, `forward_block_causal_positions`,
 > and their shared `BidirectionalContext` type into a cohesive inference
 > module. This would unblock the 2 comparison tests to also move, and
@@ -95,7 +95,7 @@ It will become `pub` so root can re-export it for API compatibility.
       (gated `dllm` to match `d2f_context` gating — the module depends on
       `attention_forward_safe_into` from `d2f_context`).
 
-### T4 — Root `src/dllm.rs`: replace moved code with re-export shims ✅
+### T4 — Root `riir-ai/crates/riir-engine/src/transformer/dllm.rs`: replace moved code with re-export shims ✅
 
 - [x] Delete `BidirectionalContext` struct + impl.
 - [x] Delete `forward_bidirectional_positions`.
@@ -192,7 +192,7 @@ pub use katgpt_forward::forward_positions::{
 
 | File | Before | After | Delta |
 |---|---:|---:|---:|
-| `src/dllm.rs` | 4137 | 3659 | **-478** |
+| `riir-ai/crates/riir-engine/src/transformer/dllm.rs` | 4137 | 3659 | **-478** |
 | `crates/katgpt-forward/src/forward_positions.rs` | — | 567 | +567 |
 
 Root net reduction: **-478 LOC** (Plan 401: -1558 → cumulative -2036 LOC from

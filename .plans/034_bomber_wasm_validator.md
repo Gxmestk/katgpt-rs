@@ -21,5 +21,5 @@
 
 - `riir-ai/crates/riir-validator-sdk/examples/bomber_validator.rs` — safety rules → `bomber_validator.wasm`
 - `crates/riir-gpu/src/game/` — replay parsing + game policy config
-- `crates/riir-gpu/examples/train_bomber.rs` — trains `game_lora.bin`
+- `riir-train/crates/riir-train-gpu/examples/train_bomber.rs` — trains `game_lora.bin`
 - `riir-ai/crates/riir-examples/examples/bomber_demo.rs` — cross-cutting demo

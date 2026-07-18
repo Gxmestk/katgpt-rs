@@ -50,8 +50,8 @@ Combined: loss[t] = sdar_gate(Δt) * is_relevant(t) * reverse_kl[t]
 | Component | Location | Role |
 |-----------|----------|------|
 | `sdar_gate()` / `sdar_modulate()` | `crates/katgpt-pruners/src/sdar_gate.rs` | σ(β·x) sigmoid gate — reuse as modulation layer |
-| `sdar_loss()` | `riir-gpu/src/loss_sdar.rs` | Token-level SDAR loss — **extend with RMSD mask** |
-| `kl_divergence()` | `riir-gpu/src/distill.rs` | Reverse KL — **extend with top-K approximation** |
+| `sdar_loss()` | `riir-train/crates/riir-train-gpu/src/loss_sdar.rs` | Token-level SDAR loss — **extend with RMSD mask** |
+| `kl_divergence()` | `riir-train/crates/riir-train-gpu/src/distill.rs` | Reverse KL — **extend with top-K approximation** |
 | `LossMask` | `riir-train/crates/riir-train-gpu/src/training_loop.rs` | Binary token mask — **extend with relevance scoring** |
 | `SdarBanditPruner<P>` | `crates/katgpt-pruners/src/sdar/mod.rs` | Modelless SDAR bandit — **extend with magnitude pre-filter** |
 | `RubricReward` | `riir-gpu/src/ropd/` | Rubric scoring — reuse judge infrastructure |
@@ -60,7 +60,7 @@ Combined: loss[t] = sdar_gate(Δt) * is_relevant(t) * reverse_kl[t]
 | `ScreeningPruner` trait | `katgpt-rs-core/src/traits.rs` | Relevance scoring — analogue for modelless path |
 | `freeze()`/`thaw()` | `src/pruners/bomber/players.rs` | Bandit knowledge persistence — reuse pattern |
 | `loss_masked.wgsl` | `riir-gpu/src/kernels/` | GPU masked loss kernel — **extend with RMSD positions** |
-| `GZeroLoop` | `riir-gpu/src/gzero_loop.rs` | Self-play loop — integration point |
+| `GZeroLoop` | `riir-train/crates/riir-train-gpu/src/gzero_loop.rs` | Self-play loop — integration point |
 
 ### What's New (Implement)
 

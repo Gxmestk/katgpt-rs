@@ -135,7 +135,7 @@ denoise_loop step k:
 | File | Change | Lines |
 |------|--------|-------|
 | `crates/katgpt-core/src/dllm_solver.rs` | `RcdConfig`, entropy normalization, residual computation, interpolation | ~80 |
-| `src/dllm.rs` | Residual state in `D2fContext`, wire into `denoise_loop` | ~30 |
+| `riir-ai/crates/riir-engine/src/transformer/dllm.rs` | Residual state in `D2fContext`, wire into `denoise_loop` | ~30 |
 | `src/inference_router.rs` | `ResidualMode` enum, tier mapping | ~20 |
 | `src/types.rs` | Residual scratch buffer in relevant types | ~10 |
 | `src/lib.rs` | Feature flag `rcd_residual` | ~5 |

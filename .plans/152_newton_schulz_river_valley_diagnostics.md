@@ -117,7 +117,7 @@ pub fn muon_update(
 
 - [x] ### T4: Wire into D2F Training (feature: `newton_schulz`)
 
-**File:** `src/dllm.rs`
+**File:** `riir-ai/crates/riir-engine/src/transformer/dllm.rs`
 
 Replace the `sgd_update` in D2F mini training with a Muon-style update for matrix parameters, keeping SGD for scalar parameters. This validates that Newton-Schulz works in our training loop.
 

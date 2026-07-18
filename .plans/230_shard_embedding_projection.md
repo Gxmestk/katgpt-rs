@@ -148,7 +148,7 @@ is not a clean modelless gain. Deprecation is the honest resolution.
 - `SenseModule` uses `TernaryDir` direction vectors, NOT `ShardEmbedding`.
 - BFCF region cache (`BfcfQueryBank`, `BfcpLfuShard`) uses region centroids
   (means of token groups), NOT shard embeddings.
-- `riir-poc/jl_backdoor_poc.rs` references Plan 230's `ShardEmbedding` in doc
+- `riir-ai/crates/riir-poc/src/jl_backdoor_poc.rs` references Plan 230's `ShardEmbedding` in doc
   comments only; it defines its own self-contained `Matrix`/`ToyShard` types
   and does not import the katgpt-core primitive.
 - Cross-repo grep (riir-ai, riir-chain, riir-neuron-db) confirms zero code

@@ -170,7 +170,7 @@ Cost: 2 × kv_dim additions. Zero allocations, zero RNG calls.
 | `riir-router/Cargo.toml` | `domain_latent` feature flag | ✅ Done |
 | `riir-ai/crates/riir-gpu/src/domain_latent.rs` | `GpuDomainLatent`, export, CPU AdamW, 4 tests | ✅ Done |
 | `crates/katgpt-core/src/skill_opt/optimizer.rs` | `step_domain_latent()` method | ✅ Done |
-| `riir-gpu/examples/train_bomber.rs` | Train LoRA + domain latent, export both | ✅ Done |
+| `riir-train/crates/riir-train-gpu/examples/train_bomber.rs` | Train LoRA + domain latent, export both | ✅ Done |
 | `riir-burner/train_lora.py` | Language model training (future) | ⏳ Deferred |
 
 **Tests:** 260 pass (katgpt-rs with `domain_latent`), 255 pass (without). 5 domain_latent tests.

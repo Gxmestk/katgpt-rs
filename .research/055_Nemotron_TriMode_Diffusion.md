@@ -102,7 +102,7 @@ Temperature: τ=3.0 for distributions, τ=1.0 for CE
 | MTP drafter | `transformer.rs` mtp_activation_proj | ✅ Plan 055 |
 | LoRA training (wgpu) | `riir-gpu` full stack | ✅ Production |
 | SDAR sigmoid gating | `crates/katgpt-pruners/src/sdar_gate.rs` modelless | ✅ Plan 072 |
-| Gemma 2 model loading | `riir-engine/safetensors_loader.rs` | ✅ Plan 087 |
+| Gemma 2 model loading | `riir-ai/crates/riir-engine/src/safetensors_loader.rs` | ✅ Plan 087 |
 | KV cache | `MultiLayerKVCache`, `PagedKVCache` | ✅ Production |
 | Draft→Verify→Accept pattern | `crates/katgpt-forward/src/step.rs` `speculative_step_rollback()` | ✅ Production |
 | `SpeculativeVerifier` trait | `verifier.rs` with `SimulatedVerifier`, `LeviathanVerifier` | ✅ Production |

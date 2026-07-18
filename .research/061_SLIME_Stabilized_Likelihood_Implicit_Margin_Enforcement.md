@@ -367,7 +367,7 @@ slime_loss = []
 ## Implementation Scope (Plan 098)
 
 ### T1: Core Loss Module
-- `riir-gpu/src/loss_slime.rs` (~250 lines)
+- `riir-train/crates/riir-train-gpu/src/loss_slime.rs` (~250 lines)
 - `SlimeConfig`, `SlimeMetrics`, `slime_loss()` function
 - Unit tests for each component
 

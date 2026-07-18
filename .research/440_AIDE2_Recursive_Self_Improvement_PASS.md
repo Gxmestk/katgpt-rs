@@ -157,7 +157,7 @@ Our quintet **does** ship a form of self-improvement, but it is **latent-state R
 - **Code-level RSI (AIDE²):** the agent rewrites its own harness code (prompts, search policy, context management). Requires an LLM. Outside our mandate.
 - **Latent-state RSI (our quintet):** the runtime updates latent state — HLA direction vectors (`evolve_hla`), consolidation-selected `style_weights` (Raven/δ-Mem), MAPE-K self-healing, curiosity-driven exploration (CGSP), freeze/thaw of emergent personality snapshots (`ArchetypeBlendShard`). No code rewriting, no LLM, no gradient descent. Modelless by mandate.
 
-This distinction is load-bearing: a future agent tempted to "add RSI to our NPCs" must recognize that our mandate forbids code-level RSI and that latent-state RSI already ships across `cgsp_runtime/`, `latent_functor/`, `src/sleep/consolidation.rs`, and `riir-neuron-db/mape_k.rs`. AIDE²'s contribution is to the code-level RSI ladder, which is not our ladder.
+This distinction is load-bearing: a future agent tempted to "add RSI to our NPCs" must recognize that our mandate forbids code-level RSI and that latent-state RSI already ships across `cgsp_runtime/`, `latent_functor/`, `src/sleep/consolidation.rs`, and `riir-neuron-db/src/mape_k.rs`. AIDE²'s contribution is to the code-level RSI ladder, which is not our ladder.
 
 ---
 

@@ -37,7 +37,7 @@ output/replays/bomber_replay_002.jsonl
   │  Filter: only HL (P4) and Validator (P3) players
   │
   ▼
-riir-gpu/examples/train_bomber.rs         (riir-ai repo)
+riir-train/crates/riir-train-gpu/examples/train_bomber.rs         (riir-ai repo)
   │  Loads JSONL → GameSample → wgpu training
   │  3-5 epochs on ~100K samples
   │
@@ -187,7 +187,7 @@ Each line is one `(board_state, action, quality)` sample:
 | File | Action | Description |
 |------|--------|-------------|
 | `riir-ai/crates/riir-gpu/src/game/replay.rs` | Edit | Replace `parse_replay()` stub with real JSONL parser |
-| `crates/riir-gpu/examples/train_bomber.rs` | Edit | Replace stub with actual wgpu training loop |
+| `riir-train/crates/riir-train-gpu/examples/train_bomber.rs` | Edit | Replace stub with actual wgpu training loop |
 
 ---
 

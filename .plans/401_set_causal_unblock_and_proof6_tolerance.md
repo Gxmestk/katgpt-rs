@@ -38,7 +38,7 @@ candidate next steps; this plan executes **two of them**:
 
 ### T2 — Verify `forward_set_causal_positions` is pure inference ✅
 
-- [x] Read the function (lines 2155-2319 of `src/dllm.rs`). Uses only:
+- [x] Read the function (lines 2155-2319 of `riir-ai/crates/riir-engine/src/transformer/dllm.rs`). Uses only:
       - `TransformerWeights`, `Config` (externalizable via `katgpt_transformer`
         / `katgpt_types`)
       - `kv_dim`, `matmul`, `matmul_relu`, `rmsnorm` (all in `katgpt_types::math`
@@ -68,7 +68,7 @@ candidate next steps; this plan executes **two of them**:
       These call the re-exported `forward_set_causal_positions` from
       katgpt-forward via root's `crate::dllm::forward_set_causal_positions`
       shim — public API preserved.
-- [x] Root `src/dllm.rs`: replace function body with
+- [x] Root `riir-ai/crates/riir-engine/src/transformer/dllm.rs`: replace function body with
       `pub use katgpt_forward::forward_set_causal_positions;` re-export.
 - [x] Register module in `crates/katgpt-forward/src/lib.rs` behind
       `set_diffusion` feature gate.
@@ -85,7 +85,7 @@ candidate next steps; this plan executes **two of them**:
 - [x] Root `src/speculative/set_diffusion.rs`: slim to re-export shim (22 LOC)
       + TRAIN-only tests (396 LOC). Final root file: 418 LOC (was 1631).
 - [x] Verify external callers: `src/speculative/mod.rs` re-exports,
-      `src/dllm.rs` lines 1762/1854 (training code, uses
+      `riir-ai/crates/riir-engine/src/transformer/dllm.rs` lines 1762/1854 (training code, uses
       `crate::speculative::set_diffusion::order_to_gen_steps` via shim).
 
 ### T5 — GOAT gate G3 validation ✅
@@ -110,7 +110,7 @@ candidate next steps; this plan executes **two of them**:
 
 ## (2) Scope Discipline
 
-**Plan 402 candidate (deferred)**: Full `src/dllm.rs` inference extraction —
+**Plan 402 candidate (deferred)**: Full `riir-ai/crates/riir-engine/src/transformer/dllm.rs` inference extraction —
 move `forward_bidirectional_positions`, `forward_block_causal_positions`,
 `forward_set_causal_positions` (and their shared `BidirectionalContext` type)
 into a cohesive inference module. This would unblock the 2 comparison tests

@@ -118,7 +118,7 @@ tri_mode = ["dllm"]  # depends on dllm for D2F drafter
 - [x] Test: D2F+AR output matches AR-only ground truth (quality check)
 
 ### T4: Global Loss Averaging (katgpt-rs dllm.rs) ✅
-- [x] Update `masked_loss()` in `src/dllm.rs`:
+- [x] Update `masked_loss()` in `riir-ai/crates/riir-engine/src/transformer/dllm.rs`:
   ```rust
   // BEFORE (per-sequence):
   // L = (1/N) * Σ_n (1/L) * Σ_i ℓ_{n,i}

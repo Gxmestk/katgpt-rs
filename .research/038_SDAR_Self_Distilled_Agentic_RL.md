@@ -134,13 +134,13 @@ Three gating strategies compared (Figure 6):
 
 | SDAR Component | Our Code | Status |
 |---|---|---|
-| GRPO clipped surrogate | `riir-gpu/src/loss_grpo.rs` — `grpo_loss()` | ✅ Production |
-| Group advantage z-score | `riir-gpu/src/loss_grpo.rs` — `group_advantage()` | ✅ Production |
-| KL divergence (reverse direction) | `riir-gpu/src/distill.rs` — `kl_divergence()` | ✅ Production |
+| GRPO clipped surrogate | `riir-train/crates/riir-train-gpu/src/loss_grpo.rs` — `grpo_loss()` | ✅ Production |
+| Group advantage z-score | `riir-train/crates/riir-train-gpu/src/loss_grpo.rs` — `group_advantage()` | ✅ Production |
+| KL divergence (reverse direction) | `riir-train/crates/riir-train-gpu/src/distill.rs` — `kl_divergence()` | ✅ Production |
 | LoRA-only training | `riir-gpu` full stack — wgpu | ✅ Production |
-| DPO loss | `riir-gpu/src/loss_dpo.rs` — `GpuDpoLoss` | ✅ Production |
+| DPO loss | `riir-train/crates/riir-train-gpu/src/loss_dpo.rs` — `GpuDpoLoss` | ✅ Production |
 | Multi-arm bandit (UCB) | `katgpt-rs/crates/katgpt-ruliology/src/bandit.rs` | ✅ Production |
-| Self-play loop | `riir-gpu/src/gzero_loop.rs` | ✅ Production |
+| Self-play loop | `riir-train/crates/riir-train-gpu/src/gzero_loop.rs` | ✅ Production |
 | Sigmoid activation | Various — standard math | ✅ Available |
 | **Token-level gap gating** | **MISSING** | ❌ Gap |
 | **Detached gate + auxiliary loss** | **MISSING** | ❌ Gap |

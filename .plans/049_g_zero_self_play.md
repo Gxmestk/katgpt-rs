@@ -16,10 +16,10 @@
 
 ### Phase 2: Model-Based (δ → DPO/GRPO weight updates) — ✅ Complete (Plan 059)
 
-- [x] T6: Implement `Proposer` trait + `GRPO` optimizer ✅ (`riir-gpu/src/proposer.rs` + `loss_grpo.rs`)
-- [x] T7: Implement `LengthNormalizedDPO` loss for Generator training ✅ (`riir-gpu/src/loss_dpo.rs` + `dpo_log_ratio.wgsl` + `dpo_reduce.wgsl`)
-- [x] T8: Implement `DeltaFilter` + reward hacking defenses ✅ (`riir-gpu/src/delta_filter.rs` — 6-stage filter)
-- [x] T9: Implement model-based `GZeroLoop` + crash recovery ✅ (`riir-gpu/src/gzero_loop.rs`)
+- [x] T6: Implement `Proposer` trait + `GRPO` optimizer ✅ (`riir-train/crates/riir-train-gpu/src/proposer.rs` + `loss_grpo.rs`)
+- [x] T7: Implement `LengthNormalizedDPO` loss for Generator training ✅ (`riir-train/crates/riir-train-gpu/src/loss_dpo.rs` + `dpo_log_ratio.wgsl` + `dpo_reduce.wgsl`)
+- [x] T8: Implement `DeltaFilter` + reward hacking defenses ✅ (`riir-train/crates/riir-train-gpu/src/delta_filter.rs` — 6-stage filter)
+- [x] T9: Implement model-based `GZeroLoop` + crash recovery ✅ (`riir-train/crates/riir-train-gpu/src/gzero_loop.rs`)
 - [x] T10: Update README, .docs, references ✅ (kernel count 21→26, Phase 2 ✅ in README + riir-ai README, feature flag note updated)
 
 ### Feature Gate

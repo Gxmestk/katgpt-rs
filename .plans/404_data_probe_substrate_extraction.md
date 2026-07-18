@@ -11,7 +11,7 @@ Continue the master `src/` consolidation. Plan 403's handoff named the
 **Proposal 003 endgame audit** as the natural next step:
 
 > The denoise cluster was the last large pure-inference cluster in
-> `src/dllm.rs`. What remains (~3008 LOC) is predominantly training code …
+> `riir-ai/crates/riir-engine/src/transformer/dllm.rs`. What remains (~3008 LOC) is predominantly training code …
 > not extractable to katgpt-forward without crossing the train/infer boundary.
 > A Proposal 003 endgame audit would be the natural next step — quantify how
 > much root remains, classify what's extractable vs permanently root-resident,

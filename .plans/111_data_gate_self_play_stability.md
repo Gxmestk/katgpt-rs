@@ -9,8 +9,8 @@
 ## Tasks
 
 - [x] T1: Add `DataGate` trait + `GateDecision` enum to `katgpt-core/src/types.rs` ✅ — Added `TaskType`, `ProposerTask`, `GateDecision`, `DataGate` trait. No feature gate (ungated in core, per plan). Clippy clean.
-- [x] T2: Add `SolverRewardMode` enum to `riir-gpu/src/loss_grpo.rs` ✅ — `Grounded` (default) + `IntrinsicSelfConsistency`. Added to `GrpoConfig` with `Default` impl. Clippy clean.
-- [x] T3: Implement `ExecutionGate` (sandbox exec + determinism check) in `riir-gpu/src/data_gate.rs` ✅ — `TaskExecutor` trait, `NoopExecutor` (games), `ExecutionGate::new/without_determinism/for_games`. Double-run determinism check. 6 unit tests.
+- [x] T2: Add `SolverRewardMode` enum to `riir-train/crates/riir-train-gpu/src/loss_grpo.rs` ✅ — `Grounded` (default) + `IntrinsicSelfConsistency`. Added to `GrpoConfig` with `Default` impl. Clippy clean.
+- [x] T3: Implement `ExecutionGate` (sandbox exec + determinism check) in `riir-train/crates/riir-train-gpu/src/data_gate.rs` ✅ — `TaskExecutor` trait, `NoopExecutor` (games), `ExecutionGate::new/without_determinism/for_games`. Double-run determinism check. 6 unit tests.
 - [x] T4: Implement `LeakyGate<G: DataGate>` (ε-Bernoulli relaxation) for phase diagram experiments ✅ — `LeakyGate<G>` with Bernoulli(ε) relaxation, `AlwaysAdmit` baseline. ε ∈ [0,1] assert. 4 unit tests.
 - [x] T5: Wire `DataGate` into `GZeroLoop` — gate tasks BEFORE solver attempts them ✅ — `data_gate: Option<Box<dyn DataGate>>` field, `with_data_gate()` builder, gate loop in `run_round_mock`. Feature-gated.
 - [x] T6: Add `intrinsic_grounded_gap` metric tracking to `GZeroLoop` round metrics ✅ — `intrinsic_grounded_gap: Option<f32>` + `gate_admission_rate: f32` fields on `RoundMetrics`. Display shows gate % and gap. Feature-gated.
@@ -139,7 +139,7 @@ pub enum GateDecision {
 
 ## T2: `SolverRewardMode` Enum
 
-**File:** `riir-gpu/src/loss_grpo.rs`
+**File:** `riir-train/crates/riir-train-gpu/src/loss_grpo.rs`
 
 ```rust
 /// Solver reward grounding mode.
@@ -176,7 +176,7 @@ pub struct GrpoConfig {
 
 ## T3: `ExecutionGate` Implementation
 
-**File:** `riir-gpu/src/data_gate.rs` (new file)
+**File:** `riir-train/crates/riir-train-gpu/src/data_gate.rs` (new file)
 
 Implements the paper's primary gate: execute the program, check determinism.
 
@@ -235,7 +235,7 @@ Sweep ε ∈ {0.00, 0.05, 0.10, 0.20, 0.40, 0.70, 1.00} to reproduce paper's pha
 
 ## T5: Wire into `GZeroLoop`
 
-**File:** `crates/riir-gpu/src/gzero_loop.rs`
+**File:** `riir-train/crates/riir-train-gpu/src/gzero_loop.rs`
 
 Modify `GZeroLoop` to gate tasks BEFORE solver attempts:
 
@@ -273,7 +273,7 @@ pub struct GZeroLoop {
 
 ## T6: `intrinsic_grounded_gap` Metric
 
-**File:** `riir-gpu/src/gzero_loop.rs` (extend `RoundMetrics`)
+**File:** `riir-train/crates/riir-train-gpu/src/gzero_loop.rs` (extend `RoundMetrics`)
 
 ```rust
 /// Difference between self-consistency reward and grounded accuracy.
@@ -373,9 +373,9 @@ Sweep ε ∈ {0.0, 0.2, 0.5, 1.0} with II config:
 | File | Action | Scope |
 |------|--------|-------|
 | `katgpt-core/src/types.rs` | Add `DataGate`, `GateDecision`, `ProposerTask`, `TaskType` | T1 |
-| `riir-gpu/src/loss_grpo.rs` | Add `SolverRewardMode`, extend `GrpoConfig` | T2 |
-| `riir-gpu/src/data_gate.rs` | New file: `ExecutionGate`, `LeakyGate<G>` | T3-T4 |
-| `riir-gpu/src/gzero_loop.rs` | Wire gate, add gap metric to `RoundMetrics` | T5-T6 |
+| `riir-train/crates/riir-train-gpu/src/loss_grpo.rs` | Add `SolverRewardMode`, extend `GrpoConfig` | T2 |
+| `riir-train/crates/riir-train-gpu/src/data_gate.rs` | New file: `ExecutionGate`, `LeakyGate<G>` | T3-T4 |
+| `riir-train/crates/riir-train-gpu/src/gzero_loop.rs` | Wire gate, add gap metric to `RoundMetrics` | T5-T6 |
 | `riir-ai/crates/riir-gpu/src/lib.rs` | Add `mod data_gate` + re-exports | T7 |
 | `riir-gpu/Cargo.toml` | Add `data_gate` feature | T7 |
 | `katgpt-rs/tests/data_gate_bomber.rs` | GOAT proof test | T8 |

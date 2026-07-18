@@ -150,7 +150,7 @@ Operating on each Super-GOAT factory module:
 
 ## 5. Next steps (see Plan 308)
 
-Phase 1: ship `KarcForecaster<D, M, K>` + `KarcBasis` trait (sealed, three impls) in `crates/katgpt-core/src/karc.rs` behind `karc_forecaster` feature. Reuse `predictor_with_scratch` for the ridge solve; reuse `SpectralBasis::eval` for the basis. Zero game IP. GOAT gate G1–G3 on synthetic chaotic systems (Lorenz-63, double-scroll) reproducing paper Table I within 2×.
+Phase 1: ship `KarcForecaster<D, M, K>` + `KarcBasis` trait (sealed, three impls) in `riir-ai/crates/riir-games-civ/src/civ/map_tick/karc.rs` behind `karc_forecaster` feature. Reuse `predictor_with_scratch` for the ridge solve; reuse `SpectralBasis::eval` for the basis. Zero game IP. GOAT gate G1–G3 on synthetic chaotic systems (Lorenz-63, double-scroll) reproducing paper Table I within 2×.
 
 Phase 2–4: runtime integration in riir-ai (Plan 332), shard subtype in riir-neuron-db (Plan to file separately), LatCal commitment in riir-chain (Plan to file separately).
 

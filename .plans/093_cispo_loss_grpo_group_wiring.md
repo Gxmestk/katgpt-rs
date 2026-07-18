@@ -4,7 +4,7 @@
 >
 > **Parent**: Research 57 (ART Agent Reinforcement Trainer Distillation)
 > **Depends**: Plan 059 (G-Zero DPO/GRPO in `riir-gpu`) ✅
-> **Scope**: Add CISPO loss variant to `riir-gpu/src/loss_grpo.rs`, wire trajectory grouping into `GZeroLoop`
+> **Scope**: Add CISPO loss variant to `riir-train/crates/riir-train-gpu/src/loss_grpo.rs`, wire trajectory grouping into `GZeroLoop`
 > **Default**: CISPO is now the default loss variant (GOAT proved 5/6, Plan 093 T5)
 
 ## Tasks

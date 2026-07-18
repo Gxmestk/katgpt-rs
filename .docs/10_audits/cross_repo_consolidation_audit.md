@@ -32,7 +32,7 @@ However, unlike katgpt-rs pre-Plan-404, the oversized code is **not pure substra
 **File-hygiene debt: MODERATE.** 23 files break the 2048-line rule. Notable offenders:
 - `riir-gpu/src/forward.rs` — **7,894 LOC** (workspace's largest file; 20+ WGSL param structs)
 - `crates/katgpt-percepta/src/wasm/interpreter/arithmetic.rs` — 3,667 LOC (6 functor primitives)
-- `riir-games/src/civ/skill.rs` — 3,556 LOC (skill YAML schema + tiers)
+- `seal-online-remaster/crates/seal-edge-worker/src/persistence/skill.rs` — 3,556 LOC (skill YAML schema + tiers)
 
 Most are mechanical internal-splits (carve WGSL param structs into `forward_params.rs`, split 6 functors into 6 files), not cross-crate extraction.
 

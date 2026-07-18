@@ -67,7 +67,7 @@ Map pretrained MDLM layers 1→pre, 6→FP block, 12→post (motivated by CKA an
 | FP weight-shared iterated block | `LoopMode::WeightShared { loop_count }` — default-on, GOAT 8/8 | Plan 108, `crates/katgpt-core/src/types.rs:314`, `forward_looped` |
 | ODE-motivated iterated block (more general than FP) | `LoopMode::TrainingFree` + `TrainingFreeLoopConfig` (K-stage RK β=0.5, window, cache strategy) — default-on, GOAT 4/4 | Plan 136, `tf_loop` |
 | Adaptive depth (stop when converged) | Hydra cumulative-DE convergence gate; runtime depth-tier cap | Plans 165, 284; `InferenceOverrides.depth_tier` |
-| Masked diffusion denoiser (MDLM-like) | D2F block-parallel denoising, bidirectional positions, mask token | Plan 066 (`dllm` feature), `src/dllm.rs`, `src/speculative/d2f.rs` |
+| Masked diffusion denoiser (MDLM-like) | D2F block-parallel denoising, bidirectional positions, mask token | Plan 066 (`dllm` feature), `riir-ai/crates/riir-engine/src/transformer/dllm.rs`, `src/speculative/d2f.rs` |
 | Masked diffusion (MaskGIT-like) | DMax Soft Parallel Decode — hybrid token/mask embeddings | Plan 109 (`dmax_spd`), default-on |
 | **3SR closest cousin** — token-state-aware carry across D2F steps | **RCD Residual Context Diffusion** — entropy-weighted residual embedding for "still masked" positions | **Plan 258** (`rcd_residual`), `dllm.rs::denoise_loop_rcd:2184` |
 | Cross-step warm-start / carry | HRM-Text learned init for recurrent carry; TF-Loop sub-stepping; LT2 AHLA state carry across calls | Plans 082b, 136, 108 |

@@ -60,7 +60,7 @@ Goal: a compiling, tested, feature-gated module that implements the full KARC pi
 
 ### Tasks
 
-- [x] **T1.1** Create `crates/katgpt-core/src/karc.rs` behind `#[cfg(feature = "karc_forecaster")]`. Empty `KarcForecaster<D, M, K>` struct with const generics, `KarcBasis` sealed trait, `KarcScratch` pre-allocated buffers. Wire `karc_forecaster` into `crates/katgpt-core/Cargo.toml` features list and `lib.rs` mod declaration.
+- [x] **T1.1** Create `riir-ai/crates/riir-games-civ/src/civ/map_tick/karc.rs` behind `#[cfg(feature = "karc_forecaster")]`. Empty `KarcForecaster<D, M, K>` struct with const generics, `KarcBasis` sealed trait, `KarcScratch` pre-allocated buffers. Wire `karc_forecaster` into `crates/katgpt-core/Cargo.toml` features list and `lib.rs` mod declaration.
 - [x] **T1.2** Implement `KarcBasis` trait with three const-generic instances:
   - `FourierBasis<const M: usize>` — `ψ_{2i-1}(x) = cos(2π·i·x/P)`, `ψ_{2i}(x) = sin(...)`, period `P` set at construction.
   - `ChebyshevBasis<const M: usize>` — `T_0..T_{M-1}` via three-term recurrence.

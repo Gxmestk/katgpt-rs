@@ -240,7 +240,7 @@ dmax_spd = ["dllm"]  # Soft Parallel Decoding, depends on D2F infrastructure
 - [x] ~~Design `GpuOputTrainer` — on-policy rollout + L_pred loss~~ — **deferred**
 - [x] ~~Requires: forward pass without grad, sample predictions, second forward with grad~~
 - [x] ~~Depends on riir-gpu D2F training pipeline (already exists from Plan 066)~~
-- [x] ~~~150 lines in `riir-gpu/src/dllm.rs` behind `dmax_oput` feature~~
+- [x] ~~~150 lines in `riir-ai/crates/riir-engine/src/transformer/dllm.rs` behind `dmax_oput` feature~~
 - [x] **Deferred until T1-T7 prove SPD has value at our scale** — GOAT 7/7 passed, but production-scale validation needed before investing in OPUT trainer
 - [x] Key risk from Research 072 Doubt 2: SPD without OPUT may not work well — resurrect if hybrid embeddings show diminishing returns in real training runs
 

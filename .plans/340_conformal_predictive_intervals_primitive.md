@@ -389,7 +389,7 @@ Summary:
 - `conformal_bridge/hla_overlay.rs` — per-channel HLA residual pool.
 - `conformal_bridge/curiosity.rs` — coverage-tested curiosity event.
 - `conformal_bridge/sleep_time.rs` — calibrated predictability scorer.
-- `conformal_bridge/mcts_collapse.rs` — confidence-interval collapse threshold.
+- `riir-ai/crates/riir-engine/src/karc_bridge/mcts_collapse.rs` — confidence-interval collapse threshold.
 - G1–G6 gates per the private guide §5 (the game-corpus gates, not the synthetic gates from Phase 1).
 
 ---

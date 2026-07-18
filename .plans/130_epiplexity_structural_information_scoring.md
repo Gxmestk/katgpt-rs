@@ -58,7 +58,7 @@ From epiplexity paper (arXiv:2601.03220): Structural information extractable by 
 - [x] Implement `PerPositionLossTracker` — for fine-grained scoring
   - Track loss at each token position across training
   - Compute per-position epiplexity contribution
-- [x] Integration point: hook into existing `masked_loss()` in `src/dllm.rs` via LossCurveTracker (loss_history → on_batch_end)
+- [x] Integration point: hook into existing `masked_loss()` in `riir-ai/crates/riir-engine/src/transformer/dllm.rs` via LossCurveTracker (loss_history → on_batch_end)
 - [x] Feature gate: `#[cfg(feature = "epiplexity_scoring")]`
 
 ### T4: SR²AM Context Extension ✅

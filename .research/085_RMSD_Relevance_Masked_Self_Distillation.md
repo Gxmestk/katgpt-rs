@@ -125,8 +125,8 @@ Train: reverse-KL loss on only S positions
 
 | RMSD Component | Our Code | Status | Gap |
 |----------------|----------|--------|-----|
-| Reverse-KL distillation | `riir-gpu/src/distill.rs` — `kl_divergence()` | ✅ Production | Full-vocab only, no top-K |
-| Sigmoid-gated token loss | `riir-gpu/src/loss_sdar.rs` | ✅ Production | Uniform gate, no pre-filter |
+| Reverse-KL distillation | `riir-train/crates/riir-train-gpu/src/distill.rs` — `kl_divergence()` | ✅ Production | Full-vocab only, no top-K |
+| Sigmoid-gated token loss | `riir-train/crates/riir-train-gpu/src/loss_sdar.rs` | ✅ Production | Uniform gate, no pre-filter |
 | Token masking | `riir-train/crates/riir-train-gpu/src/training_loop.rs` — `LossMask` | ✅ Production | Binary mask, no relevance scoring |
 | Entropy-based token weighting | `riir-gpu/src/kernels/loss_masked.wgsl` | ✅ Production | D2F importance, not relevance |
 | On-policy rollout | `GZeroLoop`, `best_of_k_rollouts` | ✅ Production | ✅ Complete |

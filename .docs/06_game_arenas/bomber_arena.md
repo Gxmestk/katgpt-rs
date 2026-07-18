@@ -446,7 +446,7 @@ output/replays/bomber_replay_{timestamp}.jsonl
   │  Filter: quality > 0.5 (survived/won only)
   │
   ▼
-riir-gpu/examples/train_bomber.rs
+riir-train/crates/riir-train-gpu/examples/train_bomber.rs
   │  Loads JSONL → GameSample → wgpu LoRA training
   │
   ▼

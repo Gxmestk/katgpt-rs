@@ -5,7 +5,7 @@
 > **Status:** Done
 > **Related Research:** 133 (FluxMem), 192 (NextLat belief), 196 (KG-Latent-Octree), 216 (MRAgent reconstructive memory), 242 (recurrent belief — HLA prior-art lesson), 060 (MeMo), 024 (δ-Mem)
 > **Classification:** Public
-> **Cross-ref (riir-ai):** `riir-games/src/civ/spatial_cognition.rs::SpatialMemory` (shipped prior art), `riir-ai/crates/riir-games-shared/src/game_traits/spatial.rs::GenericSpatialBelief`, `riir-ai/crates/riir-engine/src/ns_csg.rs::SpatialBelief`
+> **Cross-ref (riir-ai):** `riir-ai/crates/riir-games-civ/src/civ/spatial_cognition.rs::SpatialMemory` (shipped prior art), `riir-ai/crates/riir-games-shared/src/game_traits/spatial.rs::GenericSpatialBelief`, `riir-ai/crates/riir-engine/src/ns_csg.rs::SpatialBelief`
 
 ---
 
@@ -58,7 +58,7 @@ The mandatory two-layer novelty check (notes + shipped code, per the Research 24
 
 | Paper concept | Shipped prior art | Match |
 |---|---|---|
-| Spatial cache of `(location, latent_feature)` | `riir-games/src/civ/spatial_cognition.rs::SpatialMemory` — `ArrayVec<SpatialBelief, MAX_BELIEFS>`, each belief = `(target_id, believed_zone, last_known_pos, last_observed_tick, confidence, is_threat)`; location-keyed, latent-valued | ✅ Cache exists |
+| Spatial cache of `(location, latent_feature)` | `riir-ai/crates/riir-games-civ/src/civ/spatial_cognition.rs::SpatialMemory` — `ArrayVec<SpatialBelief, MAX_BELIEFS>`, each belief = `(target_id, believed_zone, last_known_pos, last_observed_tick, confidence, is_threat)`; location-keyed, latent-valued | ✅ Cache exists |
 | Fog-of-war-gated write (only observe what's visible) | `SpatialMemory::update_from_observation` — AABB early-reject + circular fog-of-war gate | ✅ Identical pattern |
 | Latent readout, no raw bridge in hot path | `SpatialMemory::most_attractive_zone` — `score = sigmoid(dot(preference, zone_embed)) + belief_boost`; `emit_kg_triples` for high-conf beliefs. **No raw decode in the read path.** | ✅ Latent-to-latent readout already enforced |
 | Confidence decay / cache pruning | `SpatialMemory::tick_decay` + `is_expired` swap-remove + LRU eviction when full | ✅ (paper has no decay; we are richer here) |

@@ -163,7 +163,7 @@ If Phase 4 promotes, wire composability. Each opt-in.
 
 ## Open Questions
 
-1. **Cholesky source.** Vendor minimal k×k Cholesky (clean, MIT-compatible) or reuse `riir-gpu/schur.rs` (Apache-2.0, requires attribution header)? Vendor is simpler for the public engine. ~30 lines.
+1. **Cholesky source.** Vendor minimal k×k Cholesky (clean, MIT-compatible) or reuse `riir-train/crates/riir-train-engine/src/schur.rs` (Apache-2.0, requires attribution header)? Vendor is simpler for the public engine. ~30 lines.
 2. **PDE proxy data.** Do we have a Burgers-equation dataset, or do we generate one synthetically? Paper uses Kovachki et al. 2023 benchmark — we'd need to either download or generate. For G2/G3, synthetic sinusoidal regression (paper §5.1) is sufficient and self-contained.
 3. **Training loop for G2/G3.** The basis matrices `W_Φ, W_Ψ` need to be trained. This is technically "training" but it's standard transformer training (AdamW on a small model), not a new training method. Acceptable per skill constraint §1 ("no LLM training" refers to fine-tuning base LLMs, not training small diagnostic models for GOAT gates).
 

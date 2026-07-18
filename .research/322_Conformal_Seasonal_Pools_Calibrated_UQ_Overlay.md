@@ -67,9 +67,9 @@ Argues that a training-free conformal interval (like CSP's) is a **mandatory bas
 
 | Paper mechanism | Shipped cousin | File / Plan |
 |---|---|---|
-| Training-free time-series forecaster | **KARC** — delay-embedding × basis × closed-form ridge | Plan 308, Research 288, `crates/katgpt-core/src/karc.rs` (DEFAULT-ON since 2026-06-25 via riir-ai Plan 332) |
+| Training-free time-series forecaster | **KARC** — delay-embedding × basis × closed-form ridge | Plan 308, Research 288, `riir-ai/crates/riir-games-civ/src/civ/map_tick/karc.rs` (DEFAULT-ON since 2026-06-25 via riir-ai Plan 332) |
 | Delay-basis reservoir (history window) | **KARC delay ring buffer** | `KarcForecaster::observe`, `KarcForecaster::forecast_into` |
-| Seasonal / periodic structure | **FourierBasis** in KARC | `crates/katgpt-core/src/karc.rs:103` — `ψ_{2i-1}(x) = cos(2π·i·x/P)` |
+| Seasonal / periodic structure | **FourierBasis** in KARC | `riir-ai/crates/riir-games-civ/src/civ/map_tick/karc.rs:103` — `ψ_{2i-1}(x) = cos(2π·i·x/P)` |
 | Exponential recency weighting | **HLA leaky integrator** | `evolve_hla` in `crates/katgpt-sense/src/reconstruction.rs` |
 | Per-NPC frozen forecaster | **KarcShard** | `riir-neuron-db/src/karc_shard.rs` (Plan 004) |
 | Offline pre-computation with predictability gating | **Sleep-Time Query Anticipator** | Plan 334, Research 318 — uses KARC residual as curiosity signal |

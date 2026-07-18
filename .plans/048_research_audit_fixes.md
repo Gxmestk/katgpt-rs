@@ -38,7 +38,7 @@ These gaps mean: training may produce incorrect gradients, distillation quality 
 | 12 | TRT (rejection knowledge) | `katgpt-rs/crates/katgpt-speculative/src/ppot/knowledge.rs` | ✅ Adaptive patterns |
 | 14 | Learning Beyond Gradients | `katgpt-rs/crates/katgpt-pruners/src/absorb_compress.rs` | ✅ Absorb+Compress |
 | 15 | Reinforced Agent (reviewer) | `katgpt-rs/crates/katgpt-core/src/pruners/review_metrics.rs` | ✅ Helpfulness/Harmfulness |
-| 16 | AutoTTS (β parameterization) | `riir-gpu/src/training_config.rs` | ✅ BetaConfig |
+| 16 | AutoTTS (β parameterization) | `riir-train/crates/riir-train-gpu/src/training_config.rs` | ✅ BetaConfig |
 | 18 | Free Transformer Latent Injection | `katgpt-rs/src/types.rs` (DomainLatent), `riir-ai/crates/riir-gpu/src/domain_latent.rs` | 🟡 Full VAE ❌, mid-layer K/V domain embedding ✅ (Plan 038) |
 | 19 | TTT Test-Time Training | `katgpt-rs/crates/katgpt-deprecated/src/feedback.rs`, `riir-burner/` | 🟡 Feedback sends, not consumed |
 | 20 | TurboQuant | `katgpt-rs/src/turboquant/` | ✅ CPU path, GPU kernel exists |
@@ -348,7 +348,7 @@ Separate commits per logical unit:
 | File | Change | Lines |
 |------|--------|-------|
 | `riir-ai/crates/riir-engine/src/transformer/gemma2_train/backward.rs` | Fix attention gradient computation, re-enable test | ~110 |
-| `riir-gpu/src/distill.rs` | Replace KL placeholder with real computation | ~60 |
+| `riir-train/crates/riir-train-gpu/src/distill.rs` | Replace KL placeholder with real computation | ~60 |
 | `riir-ai/crates/riir-gpu/src/game/replay.rs` | Implement `parse_replay()` from stub | ~45 |
 | `riir-ai/crates/riir-gpu/src/kernels/mod.rs` | Add 5 new pipelines (4 PFlash + 1 TQ) | ~30 |
 | `riir-gpu/src/forward.rs` | Add PFlash dispatch path, TQ scoring path | ~180 |
@@ -359,8 +359,8 @@ Separate commits per logical unit:
 
 | File | Purpose | Lines |
 |------|---------|-------|
-| `riir-gpu/src/feedback_consumer.rs` | TTT retraining consumer | ~150 |
-| `riir-gpu/examples/feedback_consumer.rs` | CLI for running consumer | ~40 |
+| `riir-train/crates/riir-train-gpu/src/feedback_consumer.rs` | TTT retraining consumer | ~150 |
+| `riir-train/crates/riir-train-gpu/src/feedback_consumer.rs` | CLI for running consumer | ~40 |
 | `riir-ai/.docs/13_research_audit_results.md` | Full audit report | ~120 |
 
 ### Modified files (katgpt-rs)
@@ -508,7 +508,7 @@ Cross-reference of all 21 research papers evaluated against the riir-ai / katgpt
 | 2 | **FlashAttention** (Dao et al.) | 2022 | PFlash block-sparse speculative prefill (4-kernel GPU pipeline) | `forward_flashprefill.rs`, `flashprefill_*.wgsl` | ✅ Full |
 | 3 | **Speculative Decoding** (Leviathan et al.) | 2023 | DDTree speculative verification with budget-aware pruning | `katgpt-rs/src/speculative/dd_tree.rs` | ✅ Full |
 | 4 | **Grouped Query Attention** (Ainslie et al.) | 2023 | GQA kv_group mapping in attention kernels | `attention.wgsl`, `flashprefill_sparse_forward.wgsl` | ✅ Full |
-| 5 | **Knowledge Distillation** (Hinton et al.) | 2015 | Per-adapter KL divergence with effective weight distributions | `riir-gpu/distill.rs` | ✅ Full |
+| 5 | **Knowledge Distillation** (Hinton et al.) | 2015 | Per-adapter KL divergence with effective weight distributions | `riir-train/crates/riir-train-gpu/src/distill.rs` | ✅ Full |
 | 6 | **AdamW** (Loshchilov & Hutter) | 2017 | Full AdamW with warmup + cosine decay on GPU | `optimizer.rs`, `optimizer.wgsl` | ✅ Full |
 | 7 | **RMSNorm** (Zhang & Sennrich) | 2019 | GPU RMSNorm kernel (no bias) | `layernorm.wgsl` | ✅ Full |
 | 8 | **Multi-Armed Bandit Routing** | 2023 | EpsilonGreedy + UCB domain routing with episode tracking | `katgpt-rs/crates/katgpt-ruliology/src/bandit.rs` | ✅ Full |
@@ -520,7 +520,7 @@ Cross-reference of all 21 research papers evaluated against the riir-ai / katgpt
 | 14 | **WASM Sandboxing** | 2019 | WASM validator SDK with streaming events ABI, wasmi 1.0 sandbox (Plan 167 migration from wasmtime; wasmtime kept `[dev-dependency]` for comparison benchmarks) | `riir-validator-sdk/`, `WasmPruner` | ✅ Full |
 | 15 | **Constraint Decoding** | 2022 | DDTree + ConstraintPruner + ScreeningPruner trait system | `katgpt-rs/src/speculative/dd_tree.rs` | ✅ Full |
 | 16 | **Online Softmax** (Milakov & Gimelshein) | 2018 | Stable online softmax in WGSL (max subtraction, 2-pass for sparse) | `softmax.wgsl`, `flashprefill_sparse_forward.wgsl` | ✅ Full |
-| 17 | **Gradient Compression** (Aji & Heafield) | 2017 | Gradient compression for distributed training | `riir-gpu/compress.rs` | ✅ Full |
+| 17 | **Gradient Compression** (Aji & Heafield) | 2017 | Gradient compression for distributed training | `riir-train/crates/riir-train-gpu/src/compress.rs` | ✅ Full |
 | 18 | **NVIDIA Dynamo** (dynamic inference) | 2024 | Early exit + dynamic budget extracted; full framework not applicable at micro-scale | `katgpt-rs/src/speculative/dd_tree.rs` (embedded) | 🔶 Partial |
 | 19 | **BLT: Byte Latent Transformer** (Pagnoni et al.) | 2024 | Byte-level tokenization concepts absorbed into BPE pipeline | `katgpt-rs/crates/katgpt-tokenizer/src/bpe.rs` | 🔶 Distilled |
 | 20 | **Free Transformer** (routing-free inference) | 2024 | Routing-free concepts absorbed into embedding router fallback tier | `riir-ai/crates/riir-router/src/embedding.rs` | 🔶 Distilled |
@@ -542,7 +542,7 @@ Cross-reference of all 21 research papers evaluated against the riir-ai / katgpt
 
 **Resolution:** Replaced with real KL divergence computation using per-adapter effective weight distributions. Computes `KL(teacher ‖ student)` per adapter with proper log-sum-exp stability.
 
-**File:** `riir-gpu/src/distill.rs`
+**File:** `riir-train/crates/riir-train-gpu/src/distill.rs`
 
 ### Task 3: Replay Parser Implementation
 **Finding:** `riir-ai/crates/riir-gpu/src/game/replay.rs` had an unimplemented `parse_replay()` function.
@@ -570,7 +570,7 @@ Cross-reference of all 21 research papers evaluated against the riir-ai / katgpt
 
 **Resolution:** Implemented `FeedbackConsumer` that polls the anyrag episodic cache for new feedback samples, triggers LoRA retraining when sufficient samples accumulate, and signals hot-swap to the inference layer. Feature-gated behind `feedback-consumer`.
 
-**Files:** `riir-gpu/src/feedback_consumer.rs`, `riir-gpu/Cargo.toml`
+**Files:** `riir-train/crates/riir-train-gpu/src/feedback_consumer.rs`, `riir-gpu/Cargo.toml`
 
 ---
 

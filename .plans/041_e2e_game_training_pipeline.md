@@ -182,7 +182,7 @@ Data flow:
 | `katgpt-rs/src/types.rs` | Add `Config::game()` (~20 lines) | katgpt-rs |
 | `riir-ai/crates/riir-gpu/src/game/mod.rs` | Add `pub mod trainer;` | riir-ai |
 | `riir-ai/crates/riir-gpu/src/lib.rs` | Export game trainer types | riir-ai |
-| `riir-gpu/examples/train_bomber.rs` | Rewrite: real Trainer, no dummy grads (~200→150 lines) | riir-ai |
+| `riir-train/crates/riir-train-gpu/examples/train_bomber.rs` | Rewrite: real Trainer, no dummy grads (~200→150 lines) | riir-ai |
 
 ### Removed code
 

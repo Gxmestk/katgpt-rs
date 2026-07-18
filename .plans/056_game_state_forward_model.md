@@ -11,7 +11,7 @@
 
 ### Phase 1: Trait Definition
 
-- [x] T1: Define `GameState` trait in `src/pruners/game_state.rs` with `Action` assoc type, `advance()`, `is_terminal()`, `reward()`, `available_actions()`, `current_player()`, `tick()`
+- [x] T1: Define `GameState` trait in `riir-ai/crates/riir-engine/src/game_state.rs` with `Action` assoc type, `advance()`, `is_terminal()`, `reward()`, `available_actions()`, `current_player()`, `tick()`
 - [x] T2: Define `StateHeuristic<S: GameState>` trait for pluggable evaluation functions
 - [x] T3: Define `ActionSpaceLog` struct for per-tick action space metrics
 - [x] T4: Register `game_state` module in `src/pruners/mod.rs` with feature gate `game_state = ["bomber"]`

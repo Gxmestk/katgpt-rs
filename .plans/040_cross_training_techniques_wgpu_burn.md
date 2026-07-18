@@ -352,7 +352,7 @@ pub struct GameTrainingReport {
   - Benchmark: Training with and without domain latent ✅
   - All benchmarks use `std::time::Instant` like existing benchmarks ✅
   - Output to `bench/056_results.csv` (040–055 already taken) ✅
-  - 5 benchmark tests in `riir-gpu/tests/bench_cross_training.rs` ✅
+  - 5 benchmark tests in `riir-train/crates/riir-train-gpu/tests/bench_cross_training.rs` ✅
 
 ---
 
@@ -362,15 +362,15 @@ pub struct GameTrainingReport {
 
 | File | Change | Target |
 |------|--------|--------|
-| `riir-gpu/src/training_config.rs` | New: `BetaConfig`, `ReviewMetrics`, `GameMetrics`, `CompressReport`, `DistillReport`, `GameTrainingReport` | riir-gpu |
+| `riir-train/crates/riir-train-gpu/src/training_config.rs` | New: `BetaConfig`, `ReviewMetrics`, `GameMetrics`, `CompressReport`, `DistillReport`, `GameTrainingReport` | riir-gpu |
 | `riir-ai/crates/riir-gpu/src/lib.rs` | Export new types + game trainer encoding + compress + screening types | riir-gpu |
 | `riir-train/crates/riir-train-gpu/src/training_loop.rs` | `Serialize`/`Deserialize` on `TrainingReport`, epoch-end grad norm snapshots, `lora_target_filter` | riir-gpu |
-| `riir-gpu/src/compress.rs` | New: `GradNormTracker`, `CompressConfig`, `snapshot_grad_norms()`, `compress_analysis()` (Task 4) | riir-gpu |
+| `riir-train/crates/riir-train-gpu/src/compress.rs` | New: `GradNormTracker`, `CompressConfig`, `snapshot_grad_norms()`, `compress_analysis()` (Task 4) | riir-gpu |
 | `riir-train/crates/riir-train-gpu/src/screening.rs` | New: `ScreeningConfig`, `ScreeningResult`, `TargetGradRank`, gradient ranking (Task 6) | riir-gpu |
-| `riir-gpu/src/distill.rs` | New: `DistillConfig`, `DistillResult`, `init_draft_from_svd()`, CPU LoRA I/O (Task 5) | riir-gpu |
+| `riir-train/crates/riir-train-gpu/src/distill.rs` | New: `DistillConfig`, `DistillResult`, `init_draft_from_svd()`, CPU LoRA I/O (Task 5) | riir-gpu |
 | `riir-ai/crates/riir-gpu/src/game/replay.rs` | `parse_jsonl()`, `parse_jsonl_filtered()`, `parse_jsonl_dir()` | riir-gpu |
 | `riir-ai/crates/riir-gpu/src/game/trainer.rs` | `encode_game_samples()`, `decode_action_token()`, `BOARD_VOCAB`, `ACTION_OFFSET`, `GAME_SEQ_LEN` | riir-gpu |
-| `riir-gpu/examples/train_bomber.rs` | Real pipeline (Plan 041), BetaConfig, ReviewMetrics, compress Phase 6, screening Phase 4a (`--lora-top-k`) | riir-gpu |
+| `riir-train/crates/riir-train-gpu/examples/train_bomber.rs` | Real pipeline (Plan 041), BetaConfig, ReviewMetrics, compress Phase 6, screening Phase 4a (`--lora-top-k`) | riir-gpu |
 | `katgpt-rs/src/types.rs` | `Config::game()` for Bomberman LoRA training (Plan 041) | katgpt-rs |
 | `katgpt-rs/Cargo.toml` | Add `game_domain` and `language_domain` feature flags | katgpt-rs |
 
@@ -378,7 +378,7 @@ pub struct GameTrainingReport {
 
 | File | Change | Target |
 |------|--------|--------|
-| `riir-gpu/tests/bench_cross_training.rs` | New: 5 benchmarks — BetaConfig vs manual, SVD+KL, screening top-K, domain latent, pipeline overhead (Task 9) | riir-gpu |
+| `riir-train/crates/riir-train-gpu/tests/bench_cross_training.rs` | New: 5 benchmarks — BetaConfig vs manual, SVD+KL, screening top-K, domain latent, pipeline overhead (Task 9) | riir-gpu |
 | `katgpt-rs/bench/056_results.csv` | Benchmark results for Plan 040 cross-training techniques | katgpt-rs |
 
 ---

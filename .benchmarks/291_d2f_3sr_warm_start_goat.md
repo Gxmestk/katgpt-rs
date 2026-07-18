@@ -115,7 +115,7 @@ All 11 tests pass. The feature is sound — it just doesn't show measurable gain
 
 ## Files
 
-- Implementation: `crates/katgpt-core/src/dllm_solver.rs` (ThreeStateReuseConfig + 3SR primitives, ~279 lines added); `src/dllm.rs` (BidirectionalContext extension + `denoise_loop_rcd_3sr`, ~462 lines added).
+- Implementation: `crates/katgpt-core/src/dllm_solver.rs` (ThreeStateReuseConfig + 3SR primitives, ~279 lines added); `riir-ai/crates/riir-engine/src/transformer/dllm.rs` (BidirectionalContext extension + `denoise_loop_rcd_3sr`, ~462 lines added).
 - Feature flag: `d2f_3sr_warm_start = ["rcd_residual", "lt2_looped", "dllm"]` in root `Cargo.toml`.
 - GOAT test: `tests/bench_291_d2f_3sr_warm_start_goat.rs` (3 tests, all pass).
 

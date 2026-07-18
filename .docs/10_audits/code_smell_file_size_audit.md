@@ -31,8 +31,8 @@ throughout), zero `Arc<RwLock<HashMap>>`.
 
 | File | Was | Verdict |
 |---|---|---|
-| `src/dllm.rs` | 3078 | ✅ Split (Issue 166) — `src/dllm/mod.rs` 1924 + `tests.rs` 1163 |
-| `crates/katgpt-core/src/karc.rs` | 2597 | ✅ Split (Issue 169) — `crates/katgpt-core/src/karc/mod.rs` 2008 + `tests.rs` 589 |
+| `riir-ai/crates/riir-engine/src/transformer/dllm.rs` | 3078 | ✅ Split (Issue 166) — `src/dllm/mod.rs` 1924 + `tests.rs` 1163 |
+| `riir-ai/crates/riir-games-civ/src/civ/map_tick/karc.rs` | 2597 | ✅ Split (Issue 169) — `crates/katgpt-core/src/karc/mod.rs` 2008 + `tests.rs` 589 |
 | `crates/katgpt-forward/src/dd_tree.rs` | 2566 | ✅ Split (Issue 168) — `dd_tree/mod.rs` 179 + `tests.rs` 2387 (98% tests) |
 | `crates/katgpt-core/src/parallax_attn/mod.rs` | 2524 | ✅ Split (Issue 167) — `crates/katgpt-core/src/parallax_attn/mod.rs` 973 + `tests.rs` 1559 |
 | `crates/katgpt-core/src/speculative/qmc/mod.rs` | 2516 | ✅ Split (Issue 170) — `crates/katgpt-core/src/speculative/qmc/mod.rs` 1085 + `tests.rs` 1430 (57% tests) |

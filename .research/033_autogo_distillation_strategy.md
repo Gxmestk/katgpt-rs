@@ -636,15 +636,15 @@ External reviews correctly identified that `riir-ai` has every component needed 
 |-----------|----------|-------------|---------------|
 | Fourier spatial MCTS | `riir-ai/crates/riir-engine/src/fourier/mcts.rs` | `fourier` | Implement `state_to_entities` for Go tactical shapes |
 | Generic MCTS | `riir-ai/crates/riir-engine/src/mcts.rs` | `game_state` | ✅ Works on any `GameState` — zero adaptation |
-| GRPO loss | `riir-gpu/src/loss_grpo.rs` | `training` | ✅ Game-agnostic — zero adaptation |
-| DPO loss (GPU) | `riir-gpu/src/loss_dpo.rs` | `training` | ✅ Game-agnostic — WGSL kernels work as-is |
-| DeltaFilter | `riir-gpu/src/delta_filter.rs` | `training` | ✅ Game-agnostic — 6-stage pipeline works as-is |
-| GZeroLoop | `riir-gpu/src/gzero_loop.rs` | `training` | ✅ Game-agnostic — activates when Go replays exist |
+| GRPO loss | `riir-train/crates/riir-train-gpu/src/loss_grpo.rs` | `training` | ✅ Game-agnostic — zero adaptation |
+| DPO loss (GPU) | `riir-train/crates/riir-train-gpu/src/loss_dpo.rs` | `training` | ✅ Game-agnostic — WGSL kernels work as-is |
+| DeltaFilter | `riir-train/crates/riir-train-gpu/src/delta_filter.rs` | `training` | ✅ Game-agnostic — 6-stage pipeline works as-is |
+| GZeroLoop | `riir-train/crates/riir-train-gpu/src/gzero_loop.rs` | `training` | ✅ Game-agnostic — activates when Go replays exist |
 | Game replay → LoRA | `riir-ai/crates/riir-gpu/src/game/trainer.rs` | `training` | Adapt `GameAction` enum → 82 Go tokens |
 | Game policy config | `riir-ai/crates/riir-gpu/src/game/policy.rs` | `training` | Adapt `GameConfig` → 3 board + 82 action vocab |
 | WASM Validator SDK | `riir-validator-sdk/` | `go-wasm` | Compile `GoState::is_legal` → `go_validator.wasm` |
 | MTP projection cache | `riir-ai/crates/riir-router/src/mtp_cache.rs` | `percepta` | Document as future: Go tokenizer → MTP projections |
-| Schur complement | `riir-gpu/src/schur.rs` | `training` | ✅ Domain-latent training — 1-shot weight updates |
+| Schur complement | `riir-train/crates/riir-train-engine/src/schur.rs` | `training` | ✅ Domain-latent training — 1-shot weight updates |
 | Bandit + WASM + LoRA | `riir-ai/crates/riir-examples/examples/bandit_with_real_model_demo.rs` | `bandit` | ✅ **Full pipeline proven**: Draft → DDTree → WasmPruner → Leviathan → bandit.update() |
 | Bomber tech A/B | `riir-ai/crates/riir-examples/examples/bomber_tech_ab_demo.rs` | `bomber-wasm` | ✅ **Proven**: LoRA vs WASM vs LoRA+WASM vs Full HL — combined wins |
 | G-Zero arenas | `riir-ai/crates/riir-examples/examples/g_zero_01_arena.rs` | `g_zero` | ✅ **Proven**: GZero beats Greedy/Validator/HL across Bomber + FFT |
@@ -708,7 +708,7 @@ GoState::play_random_game()           (Plan 065 GoState)
 
 **G-Zero model-based activation (gated behind `go-training`):**
 ```text
-GZeroLoop round (riir-gpu/src/gzero_loop.rs):
+GZeroLoop round (riir-train/crates/riir-train-gpu/src/gzero_loop.rs):
   1. GoTemplateProposer → query-hint pairs    (Plan 065 T33)
   2. Go LoRA Generator → move predictions     (adapted riir-ai/crates/riir-gpu/src/game/policy.rs)
   3. HintDelta → intrinsic reward             (log-prob shift)

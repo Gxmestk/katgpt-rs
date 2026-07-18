@@ -3,7 +3,7 @@
 **Date:** 2026-06-28 (revised 2026-06-28 after corpus read — see "Revision history" below)
 **Research:** [katgpt-rs/.research/320_Red_Queen_Godel_Machine_Selective_Erasure_Best_Belief.md](../.research/320_Red_Queen_Godel_Machine_Selective_Erasure_Best_Belief.md)
 **Source paper:** [arXiv:2606.26294](https://arxiv.org/pdf/2606.26294) — Iacob et al., Red Queen Gödel Machine, §3.5 + App. F Prop. 4.
-**Target:** `katgpt-rs/crates/katgpt-core/src/best_belief.rs` (new) + trait extraction over `crates/katgpt-dec/src/cache.rs` + `dec/zone_cache.rs`
+**Target:** `katgpt-rs/crates/katgpt-core/src/best_belief.rs` (new) + trait extraction over `crates/katgpt-dec/src/cache.rs` + `riir-neuron-db/src/zone_cache.rs`
 **Status:** Phase 1+2 SHIPPED — `best_belief` G2-unblocked via 32×32×5 LUT and PROMOTED to default (commits `1da3fb8b`, `bf7f6971`). G1 PASS (3.099e-5 vs statrs), G2 PASS (3.38 ns score, 32.2 ns select-8 — well under targets after LUT), G3 PASS (924/924 tests green), G4 PASS (alloc-free by construction). **Phase 3 (DRY trait) BLOCKED by architectural drift** — see new "Phase 3 — Architectural Blocker" section below; tasks T3.1–T3.5 cannot proceed as written.
 
 ---
@@ -14,7 +14,7 @@
 
 **v2 (2026-06-28 correction, this version):** After reading the riir-ai Super-GOAT corpus (R158 Committed Personality Blend, R161 Cognitive Branch, R155 Sub-Goal Compaction) and grepping the shipped code (`crates/katgpt-dec/src/cache.rs` `DecCache`, Plan 335 `ZoneGeometryCache`):
 
-- **`CriterionVersionedRecords<D>` is NOT a new primitive.** `DecCache` (katgpt-core `crates/katgpt-dec/src/cache.rs`) and `ZoneGeometryCache` (Plan 335 Phase 2, katgpt-core `dec/zone_cache.rs`) already ship the criterion-versioned erasure pattern. `DecCache` even includes derived-stat recomputation (`store_hodge`, `store_betti`). The value is a **DRY trait extraction**, not a new capability → **Gain**, not GOAT.
+- **`CriterionVersionedRecords<D>` is NOT a new primitive.** `DecCache` (katgpt-core `crates/katgpt-dec/src/cache.rs`) and `ZoneGeometryCache` (Plan 335 Phase 2, katgpt-core `riir-neuron-db/src/zone_cache.rs`) already ship the criterion-versioned erasure pattern. `DecCache` even includes derived-stat recomputation (`store_hodge`, `store_betti`). The value is a **DRY trait extraction**, not a new capability → **Gain**, not GOAT.
 - **`best_belief_score()` IS genuinely new.** Grep confirms `sample_beta` exists (Jöhnk's algorithm, Thompson sampling) but no inverse-CDF / Beta quantile function for conservative *selection*. → **GOAT** (standalone).
 - **Super-GOAT fusion (Issue 004) is dead.** The candidate selling point ("per-NPC selective forgetting on personality swap") is a paraphrase of Research 158 §1.3 property #3 (sampling invariance) + §2.4 (sync boundary). Issue 004 closed.
 - **LoRA vocabulary was stale.** The actual modelless erasure substrate is freeze/thaw (`MerkleFrozenEnvelope`) + geometry bins (`ZoneGeometryPod` / `ZoneGeometryCache` with `topology_version` + `SourceShardHashMismatch`). LoRA hot-swap is pre-spinoff framing. Corrected throughout.
@@ -216,7 +216,7 @@ read as **superseded by this section**.
 - RQGM paper §3.5 (Controlled Utility Evolution), App. F Prop. 4 (best-belief lower bound).
 - `crates/katgpt-ruliology/src/bandit.rs` `sample_beta` (Jöhnk's) — the existing Beta *sampler* (exploration) that `best_belief_score` complements as the Beta *quantile* (conservative selection).
 - `crates/katgpt-dec/src/cache.rs` `DecCache` — existing criterion-versioned cache (single-slot, with derived stats). Phase 3 trait extraction target.
-- `katgpt-core/src/dec/zone_cache.rs` `ZoneGeometryCache` (Plan 335) — existing criterion-versioned cache (multi-entry, papaya lock-free, BLAKE3-tagged). Phase 3 trait extraction target.
+- `riir-neuron-db/src/zone_cache.rs` `ZoneGeometryCache` (Plan 335) — existing criterion-versioned cache (multi-entry, papaya lock-free, BLAKE3-tagged). Phase 3 trait extraction target.
 - riir-ai Research 158 (Committed Personality Blend) — the already-committed Super-GOAT that ships the per-NPC committed-personality-with-survives-swap capability.
 
 ---
