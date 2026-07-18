@@ -587,3 +587,104 @@
         }
         assert!(max_abs > 0.0, "all forecasts are zero");
     }
+
+    #[test]
+    fn warm_start_with_game_a_factors_converges_to_valid_solution() {
+        // Smoke test for `low_rank_fit_warm_start`: given Game A's fitted
+        // (A, B) as init, ALS must converge and produce finite factors that
+        // forecast to finite values. Also verifies that warm-start from a
+        // *valid* Game-A solution on the SAME data reproduces the from-scratch
+        // optimum (the ALS fixed point is the same regardless of init).
+        //
+        // This does NOT test cross-game transfer (that's the bench's job) —
+        // it just verifies the API is wired correctly and produces valid math.
+        let d_h = 6usize;
+        let d_out = 2usize;
+        let r = 2usize;
+        let mut gram = vec![0.0f64; d_h * d_h];
+        for i in 0..d_h {
+            for j in 0..d_h {
+                gram[i * d_h + j] = if i == j { 2.0 + (i as f64) * 0.1 } else { 0.3 };
+            }
+        }
+        let mut cov = vec![0.0f64; d_h * d_out];
+        for i in 0..d_h {
+            for d in 0..d_out {
+                cov[i * d_out + d] = (i as f64 + 0.1) * ((d as f64) + 0.5);
+            }
+        }
+        let lambda = 1e-3f64;
+
+        // Step 1: fit from scratch to get a reference (A*, B*).
+        let mut a_ref = vec![0.0f64; d_out * r];
+        let mut b_ref = vec![0.0f64; r * d_h];
+        let mut scr_ref = LowRankFitScratch::with_capacity(d_h, d_out, r);
+        let _n_ref = low_rank_fit(
+            &gram, &cov, d_h, d_out, r, lambda, 50, 1e-12, &mut a_ref, &mut b_ref, &mut scr_ref,
+        );
+
+        // Step 2: warm-start ALS from the reference solution. With max_iters=0,
+        // the factors must be returned UNCHANGED (no ALS steps taken).
+        let mut a_ws = vec![0.0f64; d_out * r];
+        let mut b_ws = vec![0.0f64; r * d_h];
+        let mut scr_ws = LowRankFitScratch::with_capacity(d_h, d_out, r);
+        let n_ws = low_rank_fit_warm_start(
+            &gram, &cov, d_h, d_out, r, lambda, 0, 1e-12,
+            &a_ref, &b_ref, &mut a_ws, &mut b_ws, &mut scr_ws,
+        );
+        assert_eq!(n_ws, 0, "max_iters=0 should run zero ALS iterations");
+        for i in 0..d_out * r {
+            assert_eq!(a_ws[i].to_bits(), a_ref[i].to_bits(),
+                       "max_iters=0 warm-start must copy A unchanged at {}", i);
+        }
+        for i in 0..r * d_h {
+            assert_eq!(b_ws[i].to_bits(), b_ref[i].to_bits(),
+                       "max_iters=0 warm-start must copy B unchanged at {}", i);
+        }
+
+        // Step 3: warm-start from a PERTURBED init (A_ref + noise). After
+        // enough ALS iterations, it must converge back to the same fixed
+        // point (A*, B*) — the ALS objective is convex in each factor
+        // individually, so the fixed point is unique up to scale balancing.
+        let mut a_perturbed = a_ref.clone();
+        for v in a_perturbed.iter_mut() {
+            *v += 0.05; // small perturbation
+        }
+        let mut b_perturbed = b_ref.clone();
+        for v in b_perturbed.iter_mut() {
+            *v += 0.05;
+        }
+        let mut a_ws2 = vec![0.0f64; d_out * r];
+        let mut b_ws2 = vec![0.0f64; r * d_h];
+        let mut scr_ws2 = LowRankFitScratch::with_capacity(d_h, d_out, r);
+        let n_ws2 = low_rank_fit_warm_start(
+            &gram, &cov, d_h, d_out, r, lambda, 100, 1e-12,
+            &a_perturbed, &b_perturbed, &mut a_ws2, &mut b_ws2, &mut scr_ws2,
+        );
+        assert!(n_ws2 > 0, "perturbed warm-start should run ≥1 iteration to converge");
+
+        // The converged Wout = A·B must match the reference Wout = A*·B*
+        // (up to numerical tolerance — scale balancing may differ but the
+        // product is the fixed point).
+        let mut wout_ref = vec![0.0f64; d_out * d_h];
+        let mut wout_ws = vec![0.0f64; d_out * d_h];
+        for d in 0..d_out {
+            for j in 0..d_h {
+                let mut s_ref = 0.0;
+                let mut s_ws = 0.0;
+                for k in 0..r {
+                    s_ref += a_ref[d * r + k] * b_ref[k * d_h + j];
+                    s_ws += a_ws2[d * r + k] * b_ws2[k * d_h + j];
+                }
+                wout_ref[d * d_h + j] = s_ref;
+                wout_ws[d * d_h + j] = s_ws;
+            }
+        }
+        let mut max_diff = 0.0f64;
+        for i in 0..d_out * d_h {
+            max_diff = max_diff.max((wout_ref[i] - wout_ws[i]).abs());
+        }
+        assert!(max_diff < 1e-3,
+                "warm-start from perturbation must converge to same Wout fixed point (max_diff={:e})",
+                max_diff);
+    }

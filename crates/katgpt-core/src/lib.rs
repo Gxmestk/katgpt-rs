@@ -1544,7 +1544,7 @@ pub mod karc;
 pub use karc::{
     BSplineBasis, ChebyshevBasis, DelayRing, FitError, FourierBasis, KarcBasis, KarcForecaster,
     KarcScratch, LowRankFitScratch, chunked_gram_into, feature_expand, feature_expand_higher_order,
-    forecast_low_rank_apply, higher_order_feature_count, low_rank_fit,
+    forecast_low_rank_apply, higher_order_feature_count, low_rank_fit, low_rank_fit_warm_start,
 };
 
 // KarcShard DP Output Perturbation (Issue 370 T4) — post-hoc Gaussian noise

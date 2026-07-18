@@ -67,9 +67,15 @@
 //! of `AᵀA` + r separate d_h×d_h solves (O(r·d_h³) — slow but memory-bounded);
 //! this is tracked as future work and not needed for the Phase 2 GOAT gate.
 
-use crate::linalg::ridge_solve::{
+pub use crate::linalg::ridge_solve::{
     chol_solve_f64, cholesky_f64, ridge_solve_direct_f64, ridge_solve_woodbury_f32,
 };
+
+// NOTE: the `pub use` above serves double duty — it imports the Cholesky
+// primitives for local use in this module AND re-exports them so downstream
+// KARC consumers (e.g. riir-ai's cross_game transfer protocol) can build on
+// the same linear-algebra substrate without reaching into the feature-gated
+// `linalg::ridge_solve` path themselves.
 use crate::simd;
 
 // ── Sealed trait machinery ────────────────────────────────────────────────
@@ -904,15 +910,7 @@ pub fn low_rank_fit(
     assert!(a_out.len() >= d_out * r, "a_out too small");
     assert!(b_out.len() >= r * d_h, "b_out too small");
 
-    // 1. Pre-compute Cholesky of (G + λI) — the B-step system matrix.
-    //    Done ONCE; each B-step is just back-substitution.
-    scratch.gram_reg[..d_h * d_h].copy_from_slice(&gram[..d_h * d_h]);
-    for i in 0..d_h {
-        scratch.gram_reg[i * d_h + i] += lambda;
-    }
-    cholesky_f64(&mut scratch.chol_g, &scratch.gram_reg, d_h);
-
-    // 2. Deterministic init: B = [I_r | 0], A = 0.
+    // Deterministic init: B = [I_r | 0], A = 0.
     for k in 0..r {
         for j in 0..d_h {
             b_out[k * d_h + j] = if j == k { 1.0 } else { 0.0 };
@@ -921,11 +919,49 @@ pub fn low_rank_fit(
     for v in a_out.iter_mut().take(d_out * r) {
         *v = 0.0;
     }
+
+    low_rank_fit_with_init(gram, cov, d_h, d_out, r, lambda, max_iters, tol, a_out, b_out, scratch)
+}
+
+/// ALS loop body shared by [`low_rank_fit`] (deterministic zero/identity init)
+/// and [`low_rank_fit_warm_start`] (caller-supplied init).
+///
+/// Assumes `a_out[..d_out*r]` and `b_out[..r*d_h]` are already initialized by
+/// the caller. Runs the Cholesky pre-computation + ALS iteration loop +
+/// convergence check. Returns the number of iterations performed.
+///
+/// This function is factored out to keep the init strategy DRY: zero-init vs
+/// warm-start-init is the only difference between the two public entry points.
+/// The ALS math itself is identical (and bit-reproducible given the same init).
+#[allow(clippy::too_many_arguments)]
+fn low_rank_fit_with_init(
+    gram: &[f64],
+    cov: &[f64],
+    d_h: usize,
+    d_out: usize,
+    r: usize,
+    lambda: f64,
+    max_iters: usize,
+    tol: f64,
+    a_out: &mut [f64],
+    b_out: &mut [f64],
+    scratch: &mut LowRankFitScratch,
+) -> usize {
+    // 1. Pre-compute Cholesky of (G + λI) — the B-step system matrix.
+    //    Done ONCE; each B-step is just back-substitution.
+    scratch.gram_reg[..d_h * d_h].copy_from_slice(&gram[..d_h * d_h]);
+    for i in 0..d_h {
+        scratch.gram_reg[i * d_h + i] += lambda;
+    }
+    cholesky_f64(&mut scratch.chol_g, &scratch.gram_reg, d_h);
+
+    // wout_old must be zeroed so the first iteration's convergence check
+    // measures against the post-init Wout (not stale memory).
     for v in scratch.wout_old.iter_mut().take(d_out * d_h) {
         *v = 0.0;
     }
 
-    // 3. ALS iterations.
+    // 2. ALS iterations.
     let mut iters_done = max_iters;
     for iter in 0..max_iters {
         // ── A-step: Aᵀ = (B·G·Bᵀ + λI_r)⁻¹ · (B·Cov) ──
@@ -1133,6 +1169,77 @@ pub fn low_rank_fit(
         }
     }
     iters_done
+}
+
+/// ALS fit with caller-supplied initial factors (warm-start).
+///
+/// Same as [`low_rank_fit`] except `a_out` and `b_out` are NOT re-initialized
+/// — the caller must supply valid initial factors (e.g. transferred from a
+/// Game-A fit). This tests the warm-start hypothesis: does starting ALS near
+/// Game A's solution help Game B converge to a better optimum than from-scratch?
+///
+/// The init is copied from `a_init` / `b_init` into `a_out` / `b_out` (so the
+/// caller's source buffers are not mutated), then the ALS loop runs as usual
+/// with the same Cholesky pre-computation, scale balancing, and convergence
+/// check as [`low_rank_fit`].
+///
+/// # Cross-game transfer (Plan 332 Phase 7 follow-up)
+///
+/// The frozen-A variant ([`low_rank_fit_b_with_frozen_a`]) fixes `A` at Game
+/// A's value and only solves `B`. This warm-start variant lets BOTH `A` and
+/// `B` re-optimize from Game A's starting point — a weaker constraint that
+/// may recover signal the frozen-A variant loses. See
+/// `.benchmarks/152_karc_cross_game_transfer.md` for the empirical comparison.
+///
+/// # Panics
+///
+/// Same as [`low_rank_fit`]: `r == 0`, `r > d_h`, `λ ≤ 0`, or undersized
+/// buffers. Additionally panics if `a_init.len() < d_out * r` or
+/// `b_init.len() < r * d_h`.
+#[allow(clippy::too_many_arguments)]
+pub fn low_rank_fit_warm_start(
+    gram: &[f64],
+    cov: &[f64],
+    d_h: usize,
+    d_out: usize,
+    r: usize,
+    lambda: f64,
+    max_iters: usize,
+    tol: f64,
+    a_init: &[f64],
+    b_init: &[f64],
+    a_out: &mut [f64],
+    b_out: &mut [f64],
+    scratch: &mut LowRankFitScratch,
+) -> usize {
+    assert!(r > 0, "low_rank_fit_warm_start: r must be > 0");
+    assert!(
+        r <= d_h,
+        "low_rank_fit_warm_start: r must be <= d_h (got r={}, d_h={})",
+        r,
+        d_h
+    );
+    assert!(lambda > 0.0, "low_rank_fit_warm_start: lambda must be > 0");
+    assert!(a_out.len() >= d_out * r, "a_out too small");
+    assert!(b_out.len() >= r * d_h, "b_out too small");
+    assert!(
+        a_init.len() >= d_out * r,
+        "low_rank_fit_warm_start: a_init.len() = {} but expected d_out*r = {}",
+        a_init.len(),
+        d_out * r
+    );
+    assert!(
+        b_init.len() >= r * d_h,
+        "low_rank_fit_warm_start: b_init.len() = {} but expected r*d_h = {}",
+        b_init.len(),
+        r * d_h
+    );
+
+    // Copy caller-supplied init into the working buffers (do NOT zero them).
+    a_out[..d_out * r].copy_from_slice(&a_init[..d_out * r]);
+    b_out[..r * d_h].copy_from_slice(&b_init[..r * d_h]);
+
+    low_rank_fit_with_init(gram, cov, d_h, d_out, r, lambda, max_iters, tol, a_out, b_out, scratch)
 }
 
 /// Single B-step ridge solve with a **frozen** `A` — solves
@@ -1926,6 +2033,140 @@ impl<B: KarcBasis<M>, const D: usize, const M: usize, const K: usize> KarcForeca
         self.forecast_low_rank_mid.clear();
         self.forecast_low_rank_mid.resize(r, 0.0);
         Ok(())
+    }
+
+    /// Cross-game transfer fit (warm-start variant): re-fit BOTH `A` and `B`
+    /// from the currently-accumulated Game-B trajectory buffer, starting ALS
+    /// from the caller-supplied Game-A factors `(a_init, b_init)`.
+    ///
+    /// This is the warm-start alternative to [`Self::fit_low_rank_with_frozen_a`]:
+    /// instead of holding `A` fixed at Game A's value, both factors are allowed
+    /// to re-optimize. The hypothesis is that starting near Game A's solution
+    /// helps Game B converge faster to a better optimum than from-scratch ALS,
+    /// even when Game A's exact factorization is suboptimal for Game B.
+    ///
+    /// # When to use this vs [`Self::fit_low_rank_with_frozen_a`]
+    ///
+    /// - **Frozen-A** ([`Self::fit_low_rank_with_frozen_a`]): tests "does
+    ///   Game A's personality subspace *as-is* work for Game B?" Strict —
+    ///   documented negative result (0/15 helps, see
+    ///   [`.benchmarks/152_karc_cross_game_transfer.md`](../../../.benchmarks/152_karc_cross_game_transfer.md)).
+    /// - **Warm-start** (this method): tests "does starting near Game A's
+    ///   solution help Game B, allowing both factors to adapt?" Weaker
+    ///   constraint — may recover signal frozen-A loses.
+    ///
+    /// Both fit methods are modelless (closed-form ridge solves in an ALS
+    /// loop; no backprop).
+    ///
+    /// # Arguments
+    ///
+    /// - `a_init` — Game A's fitted `A` factor (`D × r`, row-major). Used as
+    ///   ALS initialization only; both A and B are re-fit.
+    /// - `b_init` — Game A's fitted `B` factor (`r × d_h`, row-major).
+    /// - `r` — rank. Should match the rank used to produce `a_init`/`b_init`.
+    /// - `lambda` — ridge `λ > 0` (typically the same as Game A's).
+    /// - `max_iters` / `tol` — ALS convergence control.
+    ///
+    /// # Returns
+    ///
+    /// Number of ALS iterations performed (capped at `max_iters`). After this
+    /// call, [`Self::is_low_rank_fitted`] is `true`, [`Self::forecast_low_rank_into`]
+    /// works immediately.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `a_init.len() != D * r` or `b_init.len() != r * d_h` (shape
+    /// mismatch). Returns [`FitError::NoSamples`] if the trajectory buffer is
+    /// empty. Returns [`FitError::NonPositiveLambda`] if `lambda <= 0`.
+    pub fn fit_low_rank_warm_start(
+        &mut self,
+        a_init: &[f32],
+        b_init: &[f32],
+        r: usize,
+        lambda: f32,
+        max_iters: usize,
+        tol: f32,
+    ) -> Result<usize, FitError> {
+        if self.n_samples == 0 {
+            return Err(FitError::NoSamples);
+        }
+        if lambda <= 0.0 {
+            return Err(FitError::NonPositiveLambda);
+        }
+        let d_h = Self::D_H;
+        assert_eq!(
+            a_init.len(),
+            D * r,
+            "fit_low_rank_warm_start: a_init.len() = {} but expected D*r = {}*{} = {}",
+            a_init.len(),
+            D,
+            r,
+            D * r,
+        );
+        assert_eq!(
+            b_init.len(),
+            r * d_h,
+            "fit_low_rank_warm_start: b_init.len() = {} but expected r*d_h = {}*{} = {}",
+            b_init.len(),
+            r,
+            d_h,
+            r * d_h,
+        );
+        let n = self.n_samples;
+        let lambda64 = lambda as f64;
+
+        // Build un-regularized Gram (XᵀX) and Cov (XᵀY) in f64 — identical
+        // to the accumulation in fit_low_rank.
+        let s = &mut self.scratch;
+        s.clear();
+        s.gram.clear();
+        s.gram.resize(d_h * d_h, 0.0);
+        accumulate_gram_upper_triangle(&mut s.gram, &self.features_buf, d_h, n);
+        s.cov.clear();
+        s.cov.resize(d_h * D, 0.0);
+        for row_idx in 0..n {
+            let row = &self.features_buf[row_idx * d_h..(row_idx + 1) * d_h];
+            let target = &self.targets_buf[row_idx * D..(row_idx + 1) * D];
+            for (i, &ri) in row.iter().enumerate() {
+                let ri = ri as f64;
+                for (d, &tv) in target.iter().enumerate() {
+                    s.cov[i * D + d] += ri * tv as f64;
+                }
+            }
+        }
+
+        // Cast caller-supplied init to f64.
+        let a64_init: Vec<f64> = a_init.iter().map(|&v| v as f64).collect();
+        let b64_init: Vec<f64> = b_init.iter().map(|&v| v as f64).collect();
+        let mut a64 = a64_init.clone();
+        let mut b64 = b64_init.clone();
+        let mut lr_scratch = LowRankFitScratch::with_capacity(d_h, D, r);
+        let iters = low_rank_fit_warm_start(
+            &s.gram,
+            &s.cov,
+            d_h,
+            D,
+            r,
+            lambda64,
+            max_iters,
+            tol as f64,
+            &a64_init,
+            &b64_init,
+            &mut a64,
+            &mut b64,
+            &mut lr_scratch,
+        );
+
+        // Cast to f32 storage.
+        self.a_low_rank.clear();
+        self.a_low_rank.extend(a64.iter().map(|&v| v as f32));
+        self.b_low_rank.clear();
+        self.b_low_rank.extend(b64.iter().map(|&v| v as f32));
+        self.low_rank_r = r;
+        self.low_rank_fitted = true;
+        self.forecast_low_rank_mid.clear();
+        self.forecast_low_rank_mid.resize(r, 0.0);
+        Ok(iters)
     }
 
     /// Phase 2 (T2.4): forecast `û = A · (B · Ψ(delay_state))` using the
