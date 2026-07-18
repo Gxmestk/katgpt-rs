@@ -92,7 +92,7 @@ else:
 
 ### Part 1: InferenceBackend Trait (Runtime Weight-Based)
 
-- [x] Create `src/inference_backend.rs` with `InferenceBackend` trait
+- [x] Create `riir-ai/crates/riir-engine/src/inference_backend.rs` with `InferenceBackend` trait
 - [x] `CpuBackend` wrapping existing `transformer::forward`
 - [x] `auto_backend()` for CPU/ANE auto-route (legacy — will be replaced by TriggerGate)
 - [x] Unit tests: CpuBackend matches direct forward

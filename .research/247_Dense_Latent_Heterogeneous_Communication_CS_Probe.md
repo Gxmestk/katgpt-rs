@@ -105,7 +105,7 @@ The CS-probe alone is a GOAT diagnostic. The sparse/dense duality alone is a Gai
 |-----------|--------|---------------|
 | CS-KV-Importance Probe | this paper (§3.1) | Ranks which HLA dimensions carry signal per task family |
 | Context-awareness scalar `ca` | this paper (§3.2 duality) | Bandwidth allocation: sparse when receiver has sensors, dense when blind |
-| `HlaCacheProxy` (per-NPC 8-dim belief state) | katgpt-rs sense/reconstruction.rs + riir-games zone/mood.rs | The "cache" being transmitted between NPCs |
+| `HlaCacheProxy` (per-NPC 8-dim belief state) | katgpt-rs sense/reconstruction.rs + riir-games riir-ai/crates/riir-games-shared/src/zone/mood.rs | The "cache" being transmitted between NPCs |
 | Fog-of-war `visible_radius` | riir-armageddon + Plan 118 | Source of `ca`: `ca = sigmoid(coverage_overlap)` between emitter and receiver |
 | `share_trajectory` stub | riir-ai Plan 298 T3.3 (DEFERRED) | The unblocked host system — currently a trait hook with no full impl |
 | Per-KV-group sigmoid gate | katgpt-rs SP-KV (Plan 070) | The gating mechanism that applies the CS-ranked density budget |

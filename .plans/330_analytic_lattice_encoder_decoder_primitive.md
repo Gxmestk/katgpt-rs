@@ -253,7 +253,7 @@ where
 
 - [x] **T1b.4** G1 test (determinism): same `(ctx, plasma, rederive)` inputs →
       byte-identical action when the join is `Ready`. Stale-draft fallback
-      path tested separately (see T1b.5). **DONE 2026-07-02** — `g1_determinism_ready_path` in `tests/analytic_lattice_runtime_goat.rs`.
+      path tested separately (see T1b.5). **DONE 2026-07-02** — `g1_determinism_ready_path` in `riir-ai/crates/riir-engine/tests/analytic_lattice_runtime_goat.rs`.
 
 - [x] **T1b.5** G1b test (non-blocking contract): inject a `MockRederiveOp`
       that returns `Poll::Pending` indefinitely. Assert `ComposerTick::poll`
@@ -302,7 +302,7 @@ where
 
 ### Phase 1b completion notes (2026-07-02)
 
-The orphaned-code problem: `asoc.rs` + `mod.rs` + `tests/analytic_lattice_runtime_goat.rs` were committed by a prior session but **never wired** — no Cargo feature, no `pub mod` in `lib.rs`, no `riir-gpu-async` dep. The module was dead code (unreachable from the crate root). This is the same pattern as Plan 359 (`motor_gated_rehearsal`). The wiring:
+The orphaned-code problem: `asoc.rs` + `mod.rs` + `riir-ai/crates/riir-engine/tests/analytic_lattice_runtime_goat.rs` were committed by a prior session but **never wired** — no Cargo feature, no `pub mod` in `lib.rs`, no `riir-gpu-async` dep. The module was dead code (unreachable from the crate root). This is the same pattern as Plan 359 (`motor_gated_rehearsal`). The wiring:
 
 1. `riir-gpu-async = { path = "../riir-gpu-async", optional = true }` added to `crates/riir-engine/Cargo.toml` deps.
 2. `analytic_lattice_runtime = ["katgpt-core/analytic_lattice", "dep:riir-gpu-async"]` feature added.

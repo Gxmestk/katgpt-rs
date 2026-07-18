@@ -29,7 +29,7 @@ latent space, stronger than NPM's LLM-residual-stream form**:
 | Intra-trajectory (degenerate vs effective step) contrast | **`CognitiveBranch.failures`** (RIZZ Plan 329) + `ProceduralRule` helpful/harmful counters | Persistent per-NPC failure store, orthogonal-subspace isolated, BLAKE3-committable |
 | PCA-based steering extraction | `subspace_phase_gate` (Plan 301, Jacobian SVD) + Dual-Gram PCA (Plan 159) + HLA Windowed Eigenbasis (Issue 001) | Per-NPC eigenbasis recovery, no LAPACK, modelless power iteration |
 | Frozen direction vector, versioned, hot-swap | `MerkleFrozenEnvelope` + `CommittedFieldBlend` (Plan 321) + `KarcShard` / `ArchetypeBlendShard` | Sampling-invariant commitment (FAME Prop. 3), survives snapshot thaw — NPM has no commitment story |
-| Dual-granularity dynamic selection by trajectory length | `latent_functor/reestimation.rs` coherence-gated scheduler + `latent_functor/zone_gating.rs` | Coherence-driven, not heuristic threshold |
+| Dual-granularity dynamic selection by trajectory length | `latent_functor/reestimation.rs` coherence-gated scheduler + `riir-ai/crates/riir-engine/src/latent_functor/zone_gating.rs` | Coherence-driven, not heuristic threshold |
 
 The single genuinely useful **insight** (not mechanism) NPM contributes that the shipped stack
 does not name explicitly: **intra-trajectory contrast from a *single* failed trajectory** —

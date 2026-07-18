@@ -84,7 +84,7 @@ These are the paper's genuine contribution — design rules for the slow-fast co
 
 ### 2.3 The riir-ai gap (not a primitive, a runtime design)
 
-Our codebase has a tier model (plasma/hot/warm/cold) with warm-tier escalation (`SettleDecision::EscalateWarm` in `quest/settle_state.rs`). But the warm→plasma handoff is currently **raw** (path waypoints, settle decisions), not **latent** (residual projections into the plasma tier's input space).
+Our codebase has a tier model (plasma/hot/warm/cold) with warm-tier escalation (`SettleDecision::EscalateWarm` in `riir-ai/crates/riir-games-quest/src/quest/settle_state.rs`). But the warm→plasma handoff is currently **raw** (path waypoints, settle decisions), not **latent** (residual projections into the plasma tier's input space).
 
 The Latent Bridge pattern would be: the warm tier's deliberation produces a **latent state** (HLA-like) that gets projected into the plasma tier's HLA state space, modulating plasma-tier behavior without explicit decision handoff. This is architecturally novel for riir-ai but is an **application of the existing projection primitive** (Plan 311), not a new primitive. It belongs in riir-ai's runtime design docs, not in katgpt-rs.
 

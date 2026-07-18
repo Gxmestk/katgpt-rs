@@ -90,7 +90,7 @@ Target: extend `crates/katgpt-sense/crates/katgpt-sense/src/reconstruction.rs`. 
 - [x] **T2.3** Add accessor `pub fn surprise_vector(&self) -> Option<&[f32; 8]>` — returns `Some(&self.last_surprise)` if feature on, `None` otherwise. Clean downstream API.
 - [x] **T2.4** Add `pub fn surprise_norm(&self) -> f32` — 0.0 when feature off, otherwise delegates to kernel.
 - [x] **T2.5** Wire `ReconstructionConfig` with `temporal_deriv_alpha_fast: f32` (default 0.3) and `temporal_deriv_alpha_slow: f32` (default 0.03). Documented as the paper's ~10× ratio.
-- [x] **T2.6** Synthetic emotional-event trace benchmark (`benches/reconstruction_bench.rs` extension):
+- [x] **T2.6** Synthetic emotional-event trace benchmark (`riir-ai/crates/riir-engine/benches/reconstruction_bench.rs` extension):
   - Generate a 1000-tick trace with embedded events (combat onset at t=200, loot at t=500, encounter at t=800) — HLA gets a step change at those ticks.
   - **G2 gate:** does `surprise_norm()` peak within ±10 ticks of each embedded event? Target: ≥80% recall of events, ≤10% false positives (peaks outside event windows).
   - Compare against baseline: raw `hla.norm()` magnitude does *not* peak at events (it's monotonic). The derivative should.

@@ -11,7 +11,7 @@
 Ship `within_class_effective_rank(states, dim, class_labels) -> f32` — the entropy-based effective rank of the **within-class residual** covariance matrix (paper eq. S.1.2). This is the GOAT-distilled primitive from Research 394: a **fusion of two shipped halves** that have never been combined:
 
 1. `effective_rank` (`data_probe/geometry.rs`, Roy & Vetterli 2007) — entropy-based effective rank, but **class-agnostic** (centers by global mean).
-2. `within_class_adjacency` / `between_class_adjacency` (`riir-engine/src/latent_functor/quality_gate.rs`, Plan 303 T5.1) — the class-conditioning machinery, currently used only for Dirichlet-energy separation scoring.
+2. `within_class_adjacency` / `between_class_adjacency` (`riir-ai/crates/riir-engine/src/latent_functor/quality_gate.rs`, Plan 303 T5.1) — the class-conditioning machinery, currently used only for Dirichlet-energy separation scoring.
 
 The paper (§5.3.1) claims this specific combination — effective rank applied to the within-class residual covariance — is novel. Modelless, ~40 lines, zero new dependencies (reuses the private `jacobi_eigenvalues` eigensolver).
 

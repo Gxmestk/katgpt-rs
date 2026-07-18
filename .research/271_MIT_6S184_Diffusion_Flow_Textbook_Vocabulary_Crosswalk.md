@@ -82,7 +82,7 @@ The **correct** mapping: HLA is closer to a **linear-attention state-space model
 
 ### 3.2 `latent_functor/` (`zone_gating`, `reestimation`, `arithmetic`, `cross_game`, `k_selector`, `quality_gate`)
 
-The textbook's **marginalization trick** (Thm 9: `u(x) = ∫ u(x|z) p_1|t(z|x) dz`) is the formal justification for treating `latent_functor/zone_gating.rs` as a posterior-weighted mixture of zone-specific vector fields. Each zone = a "conditional vector field", the gate = the posterior. This is consistent with 161 dMoE and 246 Manifold Power Iteration MoE Router framings. **Not novel — just clarifying vocabulary.**
+The textbook's **marginalization trick** (Thm 9: `u(x) = ∫ u(x|z) p_1|t(z|x) dz`) is the formal justification for treating `riir-ai/crates/riir-engine/src/latent_functor/zone_gating.rs` as a posterior-weighted mixture of zone-specific vector fields. Each zone = a "conditional vector field", the gate = the posterior. This is consistent with 161 dMoE and 246 Manifold Power Iteration MoE Router framings. **Not novel — just clarifying vocabulary.**
 
 `latent_functor/reestimation.rs`'s "coherence-driven re-estimation when coherence < τ_reest" is the codebase-vocabulary equivalent of DiPOD's "interleave self-distillation when ELBO drifts". Already documented as failure mode #2.
 

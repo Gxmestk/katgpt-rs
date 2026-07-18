@@ -111,7 +111,7 @@ pub struct LatentPatch {
 /// for chain-layer validation instead.
 ///
 /// **Implemented**: `LatentPatchBatch` now implements `GameLayerValidation` in
-/// `riir-games/src/game_sync/adaptive_validation.rs`. Use `validate_adaptive()`
+/// `riir-ai/crates/riir-games/src/game_sync/adaptive_validation.rs`. Use `validate_adaptive()`
 /// to get `FullValidation` or `LightValidation` per tick. The `validation_mod`
 /// field below is set by `AdaptiveModConfig::resolve()` but the actual validation
 /// decision is made by calling `validate_adaptive(&batch, tick, config, zone_players, trust, LatentPatch)`.

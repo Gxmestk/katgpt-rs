@@ -19,7 +19,7 @@ Nunley's *isomorphic world model* is the cleanest published articulation of an i
 **Why this matters here:** the paper's three experiments map to three pillars we already ship *separately* and never composed:
 1. **Physics prediction without teleporting** — DEC `d∘d=0` conservation + locality-by-construction (Plan 251) **is** the no-teleporting guarantee; the paper's "lateral connectivity kernel" is the Hodge-Laplacian's stencil.
 2. **Frozen world model → offline task learning** — `InducedCwmKernel` (Plan 296, frozen + committable + hot-swappable forward model) + `MerkleFrozenEnvelope` (riir-neuron-db) + `sleep_time` consolidation (Plan 341, "pre-think during idle time") **is** the paper's Experiment 2 architecture (Grush emulation theory), with `GameState::advance` as the frozen differentiable roll-forward.
-3. **Body-selective motor channels emerge without body labels** — `latent_functor/zone_gating.rs` (Plan 305) "project city-learned archetypes with a lenient gate" **is** the contingency-detection mechanism the paper discovers as emergent body schema.
+3. **Body-selective motor channels emerge without body labels** — `riir-ai/crates/riir-engine/src/latent_functor/zone_gating.rs` (Plan 305) "project city-learned archetypes with a lenient gate" **is** the contingency-detection mechanism the paper discovers as emergent body schema.
 
 The composition is the Super-GOAT. No single shipped primitive does all three at once; the **motor-gated DEC propagation wrapper** is the missing glue.
 
@@ -49,7 +49,7 @@ The dynamics (Amari 1977): `h_{t+1} = h_t + (dt/τ)·(-h_t + K*ReLU(h_t) + W_in*
 |---|------------|--------|-------------------|
 | 1 | Ballistic prediction (16-channel field, no motor, 32×32) | Neural field median loss 9.33e-4 vs VAE-LSTM 3.94e-3 (p<0.001); **0.0% teleportation** vs 15.4% for VAE-LSTM | DEC `hodge_laplacian` propagation on a 32×32 grid cochain; the "no teleporting" is the `d∘d=0` invariant |
 | 2 | Frozen world model → offline catching policy | Neural-field policy 81.5% real catch rate vs VAE-LSTM 46.0% (p=0.003), approaching 89.0% physics baseline | `InducedCwmKernel::advance` (frozen, committable) + `sleep_time` consolidation (offline "pre-think") + `MerkleFrozenEnvelope` integrity |
-| 3 | Body-selective motor channels (4 motor-gated, no body labels) | Reciprocal (R) channels: shoulder selectivity 2.18 (p=0.002), elbow 1.50 (p=0.002); C channels: n.s. | `latent_functor/zone_gating.rs` projecting city-learned archetypes; the "R channels selective, C not" maps to "channels that move with the action develop contingency" |
+| 3 | Body-selective motor channels (4 motor-gated, no body labels) | Reciprocal (R) channels: shoulder selectivity 2.18 (p=0.002), elbow 1.50 (p=0.002); C channels: n.s. | `riir-ai/crates/riir-engine/src/latent_functor/zone_gating.rs` projecting city-learned archetypes; the "R channels selective, C not" maps to "channels that move with the action develop contingency" |
 
 ### 1.5 Cognitive-science framing
 
@@ -78,8 +78,8 @@ This maps onto the *three-pillar composition* we ship but never unified under on
 | Frozen learned world model | `InducedCwmKernel` (verifiable + committable + hot-swappable forward model) | `katgpt-core/src/induced_cwm/kernel.rs` (Plan 296) |
 | Frozen-simulator policy learning | `sleep_time` consolidation (offline pre-think) + `InducedCwmSlot` atomic swap | `riir-engine/src/sleep_time/` (Plan 341), `katgpt-core/src/induced_cwm/hot_swap.rs` |
 | Frozen envelope integrity | `MerkleFrozenEnvelope` (BLAKE3 + Merkle root) | `riir-neuron-db/src/freeze.rs` |
-| Body-selective motor channels | `latent_functor/zone_gating.rs` (archetype projection with lenient gate) | `riir-engine/src/latent_functor/zone_gating.rs` (Plan 305) |
-| Spatial map / sensory topology | `CellComplex::grid_2d` + `FourierSpatialMap` | `katgpt-dec/src/types.rs`, `riir-engine/src/fourier/physics.rs` |
+| Body-selective motor channels | `riir-ai/crates/riir-engine/src/latent_functor/zone_gating.rs` (archetype projection with lenient gate) | `riir-ai/crates/riir-engine/src/latent_functor/zone_gating.rs` (Plan 305) |
+| Spatial map / sensory topology | `CellComplex::grid_2d` + `FourierSpatialMap` | `katgpt-dec/src/types.rs`, `riir-ai/crates/riir-engine/src/fourier/physics.rs` |
 | Geometric propagation (vs abstract state transition) | DEC `exterior_derivative` + `codifferential` + `hodge_laplacian` | `katgpt-dec/src/operators.rs` |
 
 **Grep verification:** paper-vocabulary grep (`neural field|motor.?gat|isomorphic world|lateral connect|gain modul|Amari|retinotop|sensorimotor contingenc|intuitive physics engine`) returned **zero hits** across all five repos' `.research/` + `.plans/` + `.docs/`. Codebase-vocabulary grep (`Hodge.?Laplacian|apply_latent_steering|InducedCwm|apply_functor`) hits the substrate files listed above. **The composition does not exist; the pieces do.**
@@ -106,7 +106,7 @@ The paper trains the lateral kernel `K` end-to-end via backprop. **We do NOT nee
 | Motor-channel gating weights | `apply_latent_steering_weighted(state, motor_dir, motor_strength)` — direction vector authored or projected from archetype | Path 1 (freeze/thaw): motor directions are frozen `LatentSteeringVector`s, atomic Arc-swap |
 | Reconstruction matrices `W_in`, `W_out` | `latent_functor` rank-k operator `Φ_t_lift · operator · ψ` (Plan 318) — a frozen, BLAKE3-committed operator | Path 1 (freeze/thaw): the operator is a `NeuronShard`-style frozen artifact |
 | Catch predictor (differentiable surrogate) | `InducedCwmKernel` + `sleep_time::consume` blend (gate · precomputed + (1−gate) · fresh) | Path 1 + 3: the gate is `sigmoid(β·(p − τ))`, the precomputed is the frozen sleep-time artifact |
-| Body-selective channel emergence | `latent_functor/zone_gating.rs` archetype projection — "project city-learned functors onto wilderness encounters with a lenient gate" | Path 3: the contingency is captured by zone density `I_d` modulating `(tau, beta)` — no body labels, no training |
+| Body-selective channel emergence | `riir-ai/crates/riir-engine/src/latent_functor/zone_gating.rs` archetype projection — "project city-learned functors onto wilderness encounters with a lenient gate" | Path 3: the contingency is captured by zone density `I_d` modulating `(tau, beta)` — no body labels, no training |
 
 **No §3.5 path fails.** The paper's value is the *architectural insight* (topology + gain + frozen-emulator + offline-consolidation compose into a unified substrate), not the trained weights. The training recipe → riir-train; the distilled runtime composition → here.
 
@@ -126,7 +126,7 @@ HLA's 8-dim per-NPC state (valence/arousal/desperation/calm/fear + 3) is *not* a
 
 ### 3.3 Fourier spatial cell complex (`riir-engine/src/fourier/`)
 
-`FourierSpatialMap` already encodes game entities' positions as Fourier features for spatially-invariant proximity queries. The motor-gated DEC propagation makes this *dynamic*: instead of querying a static map, the field evolves under Δ + motor-gating, predicting where entities will be next tick. `fourier/physics.rs::PeriodicCollisionSystem` becomes the *linear* predictor; the motor-gated field is the *action-conditional* predictor (a ball thrown by NPC X lands at field-state predicted by motor-gated propagation, not just ballistic free-fall).
+`FourierSpatialMap` already encodes game entities' positions as Fourier features for spatially-invariant proximity queries. The motor-gated DEC propagation makes this *dynamic*: instead of querying a static map, the field evolves under Δ + motor-gating, predicting where entities will be next tick. `riir-ai/crates/riir-engine/src/fourier/physics.rs::PeriodicCollisionSystem` becomes the *linear* predictor; the motor-gated field is the *action-conditional* predictor (a ball thrown by NPC X lands at field-state predicted by motor-gated propagation, not just ballistic free-fall).
 
 ### 3.4 Freeze/thaw snapshot (the "frozen learned world model" claim)
 

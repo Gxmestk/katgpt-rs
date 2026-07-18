@@ -111,7 +111,7 @@ For our codebase, the "lattice" is the **latent-space neighborhood graph**:
 
 | Cousin | Where | What it ships | What DSOM adds |
 |--------|-------|---------------|----------------|
-| `ReestimationSteerer` | `riir-engine/src/latent_functor/reestimation_steerer.rs` | Coherence-gated Slerp: `t = sigmoid((c − τ) · λ)` — modulates step size by fit quality | DSOM also modulates the *neighborhood set* (which entities participate), not just the step size. And DSOM's error is `‖x − w_s‖` (distance), not coherence (a correlation metric). |
+| `ReestimationSteerer` | `riir-ai/crates/riir-engine/src/latent_functor/reestimation_steerer.rs` | Coherence-gated Slerp: `t = sigmoid((c − τ) · λ)` — modulates step size by fit quality | DSOM also modulates the *neighborhood set* (which entities participate), not just the step size. And DSOM's error is `‖x − w_s‖` (distance), not coherence (a correlation metric). |
 | `neighbor_heal` (Plan 316, Research 298) | `riir-neuron-db/src/neighbor_heal.rs` | Fixed k=5, fixed alpha=0.1, optional `tau`-gated sigmoid weighting of neighbors | DSOM makes k and alpha error-scaled. Also adds structure-matching (uniform support coverage). |
 | `evolve_hla` | `katgpt-sense/src/reconstruction.rs` | Fixed `hla_learning_rate`, fixed update step | DSOM scales the learning rate by `‖observation − current_belief‖`. |
 | `CommittedFieldBlend` (Plan 321, Research 302) | `katgpt-core/src/committed_field_blend.rs` | Per-entity MoE with committed pi weights, fixed tau | DSOM makes the blend weights error-scaled: when the state is far from any archetype, expand the blend (more archetypes contribute). |

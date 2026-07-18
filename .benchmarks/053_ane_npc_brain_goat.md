@@ -1,7 +1,7 @@
 # Benchmark 053: ANE-Latent NPC Brain Compute — GOAT Proof (Plan 255)
 
 > **📍 Migration note (2026-06-28, Issue 007 Phase C follow-up):** The
-> `ane_npc_*` example files referenced below (`examples/ane_npc_arena.rs`,
+> `ane_npc_*` example files referenced below (`riir-ai/crates/riir-engine/examples/ane_npc_arena.rs`,
 > `ane_npc_goat.rs`, `ane_npc_power.rs`) and the `npc_ane_backend` /
 > `npc_brain_router` modules moved from this repo (katgpt-rs) to
 > `riir-ai/crates/riir-engine/`. The `ane_npc` feature flag now lives in
@@ -112,11 +112,11 @@ cargo test --features sense_composition   # ✅ 6 CPU backend tests pass
 
 | File | Change |
 |------|--------|
-| `src/npc_ane_backend.rs` | Fixed: auto-compile, output discovery, diagonal encoding, residency warmup, batch padding |
+| `riir-ai/crates/riir-engine/src/npc_ane_backend.rs` | Fixed: auto-compile, output discovery, diagonal encoding, residency warmup, batch padding |
 | `scripts/generate_npc_brain_model.py` | Added: dynamic batch via `get_new_symbol`, reshape(-1) for batch dim |
-| `examples/ane_npc_goat.rs` | Added: multi-size sweep [10, 100, 1000] before GOAT verdict |
-| `examples/ane_npc_arena.rs` | NEW — 200-tick arena simulation through NpcBrainRouter |
-| `examples/ane_npc_power.rs` | NEW — CPU utilization via getrusage FFI (zero new deps) |
+| `riir-ai/crates/riir-engine/examples/ane_npc_goat.rs` | Added: multi-size sweep [10, 100, 1000] before GOAT verdict |
+| `riir-ai/crates/riir-engine/examples/ane_npc_arena.rs` | NEW — 200-tick arena simulation through NpcBrainRouter |
+| `riir-ai/crates/riir-engine/examples/ane_npc_power.rs` | NEW — CPU utilization via getrusage FFI (zero new deps) |
 | `Cargo.toml` | Registered `ane_npc_arena` and `ane_npc_power` examples |
 
 ## Verdict

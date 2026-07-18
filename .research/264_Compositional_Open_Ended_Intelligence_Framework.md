@@ -5,7 +5,7 @@
 > **Status:** Active
 > **Related Research:** 172 (MUSE skill lifecycle), 191 (Prism capability substrate), 211 (Bayesian posterior skill evolution), 171 (FrontierCS open-ended arena), 116 (LLM sleep consolidation), 240 (SGS self-play), 194 (CaDDTree)
 > **Related Plans:** 215 (Regime-Transition w/ MDL gate), 274 (CGSP self-play), 282 (Dual-Pool CGSP), 191 (Open-ended arena), 094 (TIES merging)
-> **Cross-ref (riir-ai):** Research 059 (MUSE validators), Plan 299 (NPC curiosity runtime), `cgsp_runtime/cross_game_transfer.rs` (TaR — exact paper primitive already shipped)
+> **Cross-ref (riir-ai):** Research 059 (MUSE validators), Plan 299 (NPC curiosity runtime), `riir-ai/crates/riir-engine/src/cgsp_runtime/cross_game_transfer.rs` (TaR — exact paper primitive already shipped)
 > **Classification:** Public
 
 ---
@@ -138,7 +138,7 @@ This is a **measurement + explainability** layer, not a new capability class. So
 
 **GOAT — Closure-Expansion Instrument (CEI) is a provable-gain measurement + data-structure layer, not a new capability class.**
 
-**One-line reasoning:** The paper's *capability-class* contributions are (a) MDL-gated primitive admission → **already shipped as Plan 215 (DEFAULT ON, GOAT 8/8)**, (b) Transfer-as-Recomposition → **already shipped as private Super-GOAT `AnchorProfile` in `cgsp_runtime/cross_game_transfer.rs`**, (c) Next Primitive Prediction → **training paradigm → riir-train**. What remains genuinely novel — PTG as runtime data structure, motif mining + promotion, closure-expansion metrics (PRI/CDG/TaR) — is *measurement and data-structure* layering over what we already ship. Provably useful for explainability, transfer-quality scoring, and "open-endedness" as a selling-point metric, but does not unlock a new capability the existing stack cannot do.
+**One-line reasoning:** The paper's *capability-class* contributions are (a) MDL-gated primitive admission → **already shipped as Plan 215 (DEFAULT ON, GOAT 8/8)**, (b) Transfer-as-Recomposition → **already shipped as private Super-GOAT `AnchorProfile` in `riir-ai/crates/riir-engine/src/cgsp_runtime/cross_game_transfer.rs`**, (c) Next Primitive Prediction → **training paradigm → riir-train**. What remains genuinely novel — PTG as runtime data structure, motif mining + promotion, closure-expansion metrics (PRI/CDG/TaR) — is *measurement and data-structure* layering over what we already ship. Provably useful for explainability, transfer-quality scoring, and "open-endedness" as a selling-point metric, but does not unlock a new capability the existing stack cannot do.
 
 ### 3.1 Novelty gate (§1.5 of skill protocol)
 
@@ -162,7 +162,7 @@ The paper itself names the missing pieces explicitly (PTG, motif mining, PRI/CDG
 | Research note (this file) | `katgpt-rs/.research/264_*.md` | ✅ Created |
 | Plan: Closure-Expansion Instrument | `katgpt-rs/.plans/` | ✅ Will create as Plan 286 (next free slot) |
 | Open primitive: PTG data structure + motif miner + PRI/CDG/TaR metrics | `katgpt-rs/crates/katgpt-core/src/closure/` | Plan phase 1–4 |
-| riir-ai guide | — | **NOT created** (verdict ≠ Super-GOAT; the private selling-point doc for AnchorProfile already exists in `cgsp_runtime/cross_game_transfer.rs` doc comments) |
+| riir-ai guide | — | **NOT created** (verdict ≠ Super-GOAT; the private selling-point doc for AnchorProfile already exists in `riir-ai/crates/riir-engine/src/cgsp_runtime/cross_game_transfer.rs` doc comments) |
 | riir-train routing | `riir-train/.research/` | NPP training objective → "note redirect to riir-train", do not create in this session |
 
 ---

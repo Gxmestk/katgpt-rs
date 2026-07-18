@@ -48,9 +48,9 @@ CEM + MPC planning in the frozen latent space. On 4 tasks (TwoRoom, Reacher, Pus
 | Paper term | Codebase equivalent | Where it ships |
 |---|---|---|
 | latent state / embedding `z_t` | HLA per-NPC state, belief state, sense projection | `riir-engine/src/hla/`, `katgpt-core` HLA kernels |
-| forward model `g_φ` | `GameState` trait, `InducedCwmKernel` (Plan 296) | `katgpt-core/src/induced_cwm/`, `riir-engine/src/game_state.rs` |
+| forward model `g_φ` | `GameState` trait, `InducedCwmKernel` (Plan 296) | `katgpt-core/src/induced_cwm/`, `riir-ai/crates/riir-engine/src/game_state.rs` |
 | inverse model `h_ψ(z_t, z_{t+1}) → a_t` | `extract_functor` (estimate displacement from pairs) | `riir-engine/src/latent_functor/arithmetic.rs` |
-| `g_a(z) ≈ z + ρ(a)` latent translation | `apply_functor: out = source + f`; `HlaSleepTimeOp: z_i = c + dir_i` | `latent_functor/arithmetic.rs`, `riir-engine/src/sleep_time/hla_op.rs` |
+| `g_a(z) ≈ z + ρ(a)` latent translation | `apply_functor: out = source + f`; `HlaSleepTimeOp: z_i = c + dir_i` | `latent_functor/arithmetic.rs`, `riir-ai/crates/riir-engine/src/sleep_time/hla_op.rs` |
 | Theorem 1 homomorphism `g_{a₂∘a₁} = g_{a₂}∘g_{a₁}` | functor composition, functor table reuse | `latent_functor/`, Research 123 §1.4 |
 | action-aligned representation | committed personality direction vectors, archetype blend | `riir-engine/src/committed_blend/`, `riir-neuron-db/src/archetype_blend_shard.rs` |
 | controllable DoF projection | direction-vector projection (sigmoid, per AGENTS.md constraint #2) | HLA emotion extraction (`civ_emotion` Plan 175), zone attention |

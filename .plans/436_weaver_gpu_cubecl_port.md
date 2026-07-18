@@ -246,7 +246,7 @@ The 40 matmul dispatches dominate Weaver's compute. Porting them to GPU
 
 - [x] T4.1: `GpuWeaverCorrector` struct with `correct_marginals` method
       (matches CPU `WeaverCorrector::correct_marginals_with_scratch` signature).
-      **DONE** — lives in new module `riir-gpu/src/weaver_gpu_corrector.rs`
+      **DONE** — lives in new module `riir-ai/crates/riir-gpu/src/weaver_gpu_corrector.rs`
       (split from `weaver_gpu.rs` to respect the 2048-line guideline).
       `GpuWeaverBatchedScratch` + `GpuWeaverCorrector` with `new`,
       `set_embedding`, `correct_marginals`. API deviation: embedding is
@@ -264,7 +264,7 @@ The 40 matmul dispatches dominate Weaver's compute. Porting them to GPU
       pass is cheaper (seq_len=2 vs seq_len=depth+1).
 - [x] T4.2: Feature-gated call site — `dflash_predict_with_weaver_gpu`
       in riir-gpu (NOT riir-engine, due to cycle constraint).
-      **DONE** — lives in new module `riir-gpu/src/weaver_gpu_dflash.rs`.
+      **DONE** — lives in new module `riir-ai/crates/riir-gpu/src/weaver_gpu_dflash.rs`.
       Calls `riir_engine::dflash::dflash_predict_with_capture` (pub,
       reachable via the path dep) for the draft step, then applies
       `GpuWeaverCorrector::correct_marginals`. Mirrors the CPU
@@ -315,7 +315,7 @@ The 40 matmul dispatches dominate Weaver's compute. Porting them to GPU
 - [x] T4.8: End-to-end acceptance test — `speculative_step_*_with_weaver`
       on GPU corrector, verify ≥1 accepted token. **DONE (2026-07-14).**
       Implemented `speculative_step_gdn_tree_with_weaver_gpu` in
-      `riir-gpu/src/weaver_gpu_dflash.rs` — the GPU sibling of the CPU
+      `riir-ai/crates/riir-gpu/src/weaver_gpu_dflash.rs` — the GPU sibling of the CPU
       `speculative_step_gdn_tree_with_weaver`, using
       `dflash_predict_with_weaver_gpu` (which calls
       `correct_marginals_batched`) for the draft+correction step, then
@@ -418,7 +418,7 @@ feature is a backend choice, not a primitive gate.
 - [Plan 433](433_weaver_dflash_pipeline_wiring.md) — DFlash ↔ Weaver wiring
 - [Plan 434](434_spec_step_weaver_call_site_wiring.md) — QwenDeltaNet wiring
 - [Plan 435](435_gdn_tree_weaver_call_site_wiring.md) — GDN tree wiring
-- `riir-gpu/src/set_diffusion_decoder.rs` — cross-repo pattern blueprint
-- `riir-gpu/src/gemv_cubecl.rs` — existing GEMV kernel for reuse
-- `riir-gpu/src/gemv_f16_cubecl.rs` — existing f16 GEMV (Phase 5+)
+- `riir-ai/crates/riir-gpu/src/set_diffusion_decoder.rs` — cross-repo pattern blueprint
+- `riir-ai/crates/riir-gpu/src/gemv_cubecl.rs` — existing GEMV kernel for reuse
+- `riir-ai/crates/riir-gpu/src/gemv_f16_cubecl.rs` — existing f16 GEMV (Phase 5+)
 - `katgpt-speculative/crates/katgpt-speculative/src/weaver.rs` — CPU reference implementation

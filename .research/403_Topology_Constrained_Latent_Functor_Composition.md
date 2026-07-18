@@ -97,10 +97,10 @@ R398 deferred the behavioral headline to riir-train after exhausting the three p
 ### 2.4 Prior-art surface — what already ships (verified grep + read this session)
 
 1. **`riir-ai/crates/riir-engine/src/latent_functor/mod.rs`** — flat `FunctorTable` (papaya HashMap), coherence-driven re-estimation scheduler, `npc_integration` composes by hardcoded call order. **No declared topology.** (R123/Plan 303)
-2. **`latent_functor/region_subspace_bridge.rs`** (Issue 424) — zone-conditioned two-mode NPC steering. **This is the affect-region producer.**
-3. **`latent_functor/spectral_trajectory_bridge.rs`** — trajectory-region producer.
+2. **`riir-ai/crates/riir-engine/src/latent_functor/region_subspace_bridge.rs`** (Issue 424) — zone-conditioned two-mode NPC steering. **This is the affect-region producer.**
+3. **`riir-ai/crates/riir-engine/src/latent_functor/spectral_trajectory_bridge.rs`** — trajectory-region producer.
 4. **`katgpt-core canvas/`** (Plan 419, opt-in) — `compile_schema`, `can_reach`, `TransitiveClosure`. **The topology/reachability primitive.**
-5. **`katgpt-core faithfulness/probe.rs`** (Plan 278, opt-in, **wired in riir-poc**) — causal-intervention attribution. `DefaultFaithfulnessProbe`, `is_faithfully_used`. **The attribution tool.** Precedent: `riir-poc/benches/jlens_concept_readout_goat.rs`.
+5. **`katgpt-core faithfulness/probe.rs`** (Plan 278, opt-in, **wired in riir-poc**) — causal-intervention attribution. `DefaultFaithfulnessProbe`, `is_faithfully_used`. **The attribution tool.** Precedent: `riir-ai/crates/riir-poc/benches/jlens_concept_readout_goat.rs`.
 6. **`riir-neuron-db/src/freeze.rs`** — `MerkleFrozenEnvelope`. **The region-swap primitive.**
 7. **Percepta** (R031/032, `katgpt-percepta` crate) — analytical weight construction for deterministic regions.
 8. **DEC** (`katgpt-core/src/dec/`, DEFAULT-ON) — geometric region producer (`codifferential`, `heat_kernel_trajectory`).
@@ -213,7 +213,7 @@ is now wired into `cognitive_branch.rs` at the DriftGate call site. The
 `AuditRunner` is stored on `MapInstance` (all 5 construction sites). When empty
 (no probes have run), rate=1.0 → multiplier=1.0 → bit-identical reward.
 **Phase 4 T4.2 (production probe scheduling) shipped 2026-07-10**: new module
-`riir-engine/src/integrity/composition_probe.rs` defines the production
+`riir-ai/crates/riir-engine/src/integrity/composition_probe.rs` defines the production
 consumer (`CompositionActivationConsumer`) — behavior =
 `Σ_i w_i · Σ_j direction_{i,j}` (the NPC's cognitive activation). The probe is
 scheduled at audit cadence (every N=64 ticks) in `cognitive_branch.rs`, ahead
@@ -246,7 +246,7 @@ See: `riir-ai/.benchmarks/430_action_faithfulness_drift.md` (mechanism GOAT) and
 The public primitive is thin (reachability already ships in Plan 419). The novel work is the riir-ai wiring: schema → gated functor graph. Sketch:
 
 ```rust
-// riir-engine/src/latent_functor/canvas_gate.rs (new, gated canvas_functor)
+// riir-ai/crates/riir-engine/src/latent_functor/canvas_gate.rs (new, gated canvas_functor)
 //
 // A gated edge in the functor graph. Absent edge = closed gate = exact
 // marginal independence (the sigmoid gate saturates to 0 contribution).

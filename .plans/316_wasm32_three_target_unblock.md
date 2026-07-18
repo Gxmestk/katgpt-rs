@@ -120,7 +120,7 @@ the Vessel *projection* path (Model B) needed the getrandom + bytemuck fixes.
   `cargo check --target wasm32-unknown-unknown --features chain_node_browser`
   works out of the box. Verified: builds clean (1 pre-existing dead-code warning,
   0 errors). All three targets now compile: native ✅ browser ✅ CF Worker ✅.
-- `seal-edge-worker/src/runtime/wasm_compat.rs:213` has a `0xCA` filler standing
+- `seal-online-remaster/crates/seal-edge-worker/src/runtime/wasm_compat.rs:213` has a `0xCA` filler standing
   in for `web_sys::crypto().getRandomValues()` (`TODO(F-140)`). Any crypto path
   routing through this on CF uses non-random randomness. Audit before production.
 - WASM SIMD128 coverage gap: only `simd_ternary_matvec` has a real wasm32 SIMD128

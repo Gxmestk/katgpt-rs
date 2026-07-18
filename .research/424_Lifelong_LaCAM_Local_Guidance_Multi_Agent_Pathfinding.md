@@ -328,9 +328,9 @@ guidance`, `hindrance`, `multi-agent pathfinding`) AND codebase vocabulary
 `swarm`, `flocking`, `boids`, `crowd density`, `warm start`, `replan`)
 returns:
 - **Single-agent A* pathfinding** (shipped): `riir-engine/src/pathfinder.rs`,
-  `katgpt-pruners/src/pathfinder.rs`, `riir-games-quest/src/quest/path.rs`,
-  `fourier/dungeon.rs`, `fourier/path_periodic.rs`,
-  `dungeon/fourier_pathfind.rs`. All single-agent.
+  `katgpt-pruners/src/pathfinder.rs`, `riir-ai/crates/riir-games-quest/src/quest/path.rs`,
+  `riir-ai/crates/riir-engine/src/fourier/dungeon.rs`, `riir-ai/crates/riir-engine/src/fourier/path_periodic.rs`,
+  `riir-ai/crates/riir-games/src/dungeon/fourier_pathfind.rs`. All single-agent.
 - **Latent-domain crowd coordination** (shipped): `crowd_mcgs/`,
   `crowd_attention_bridge.rs`, `sheaf_coordination_bridge.rs`, Plan 355
   (set attention on HLA belief), Plan 394 (sheaf ADMM on HLA). All operate

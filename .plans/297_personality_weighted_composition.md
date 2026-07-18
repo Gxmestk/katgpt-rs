@@ -101,7 +101,7 @@ Goal: prove G4 (<1µs/entity) and G5 (zero heap allocation).
 - [x] **T4.2** SIMD auto-vectorization:
   - [x] Verify LLVM auto-vectorizes the inner `for j in 0..D { out[j] += weight * d[j] }` loop (check `cargo asm`)
   - [x] If not auto-vectorized, use `katgpt-core::simd::simd_fused_scale_acc` or similar
-- [x] **T4.3** Add `benches/personality_composition_bench.rs` (criterion):
+- [x] **T4.3** Add `riir-ai/crates/riir-engine/benches/personality_composition_bench.rs` (criterion):
   - [x] `compose_n9_d32` — N=9, D=32 (the production case)
   - [x] `compose_n9_d32_batch_10k` — 10K entities per tick (the crowd-scale case)
   - [x] `drift_n9_d32` — drift update cost

@@ -220,7 +220,7 @@ If a future agent re-evaluates this paper, do NOT re-derive a PASS verdict from 
 **Verdict: ❌ REFUTE — quality-parity claim NOT sustained by the consumer PoC.**
 
 The riir-ai Plan 313 Phase 5 PoC
-(`riir-poc/benches/step_attribution_modelless_goat.rs`) refuted the G6 PASS
+(`riir-ai/crates/riir-poc/benches/step_attribution_modelless_goat.rs`) refuted the G6 PASS
 criterion. Raw numbers (deterministic seed `0x1313_1313_1313_1313`, 1000-tick
 scenario, 20% FN/FP noise):
 

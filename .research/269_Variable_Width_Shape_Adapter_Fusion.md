@@ -5,7 +5,7 @@
 > **Status:** **Gain (downgraded 2026-06-20).** Both PRIMARY (stage-gated HLA subspace) and SECONDARY (shape-adaptive adapter routing) fusions have material prior art. Plan-only, feature-flagged, low priority — no primitive opened, no Super-GOAT promotion. See `.issues/034_shape_adapter_novelty_gate.md` (Issue 034 was closed + removed; downgraded to Gain, prior art) and §3 below for the verdict + citation table.
 > **Related Research:** 123 (Latent Functor Runtime Guide — Super-GOAT), 010 (KG × HLA × Role Transport), 148 (Hydra Effect → Hydra Budget), 231 (OPD per-module energy profile), 247 (Dense Latent cross-model adapters, training→riir-train pattern), 258 (Sink-Aware / compression valleys), 266 (DenseMesh adaptive width), 212 (Gemini Fourier × LatCal fusion — the canonical LatCal Super-GOAT precedent).
 > **Related Plans:** 165 (Hydra Budget — layer skip via pre-computed profiles), 258 (LatCal Fixed-Point Shell Bridge), 265 (LatCal Fixed-Point Fourier Coefficients), 276 (MicroRecurrentBeliefState — HLA kernel snapshot).
-> **Cross-ref (riir-ai):** `latent_functor/zone_gating.rs::NpcFunctorRuntime`, `hla/types.rs::MultiLayerHlaCache` (gamma decay = carry-forward), `hla/kernel.rs::evolve_hla`, `riir-chain/src/encoding/latcal*.rs`.
+> **Cross-ref (riir-ai):** `riir-ai/crates/riir-engine/src/latent_functor/zone_gating.rs::NpcFunctorRuntime`, `hla/types.rs::MultiLayerHlaCache` (gamma decay = carry-forward), `hla/kernel.rs::evolve_hla`, `riir-chain/src/encoding/latcal*.rs`.
 > **Classification:** Public (katgpt-rs engine note). The training recipe itself → `riir-train`.
 
 ---
@@ -16,7 +16,7 @@ The paper proposes a `×`-shaped transformer (wide early/late, narrow middle) wi
 
 **Two framings, ranked by tier:**
 
-1. **PRIMARY (Super-GOAT-tier) — Stage-Gated HLA Subspace Activation.** The ×-shape insight reframes as a latent-to-latent operation: at each decision stage (combat / dialog / economic / social), only a *subspace* of the NPC's HLA latent state needs to be active. `latent_functor/zone_gating.rs::NpcFunctorRuntime` already gates by **zone density** (spatial axis). The ×-shape adds a SECOND gating axis: **decision-stage subspace selection within HLA's 8-dim state** (valence/arousal/desperation/calm/fear + 3). Dormant subspaces **carry forward** via HLA's `gamma` decay leaky integrator — exactly the paper's carry-forward mechanism. This is modelless, latent-to-latent, batchable across thousands of NPCs at 20Hz, and the per-stage subspace profile is **LatCal-committable** for deterministic replay/anti-cheat.
+1. **PRIMARY (Super-GOAT-tier) — Stage-Gated HLA Subspace Activation.** The ×-shape insight reframes as a latent-to-latent operation: at each decision stage (combat / dialog / economic / social), only a *subspace* of the NPC's HLA latent state needs to be active. `riir-ai/crates/riir-engine/src/latent_functor/zone_gating.rs::NpcFunctorRuntime` already gates by **zone density** (spatial axis). The ×-shape adds a SECOND gating axis: **decision-stage subspace selection within HLA's 8-dim state** (valence/arousal/desperation/calm/fear + 3). Dormant subspaces **carry forward** via HLA's `gamma` decay leaky integrator — exactly the paper's carry-forward mechanism. This is modelless, latent-to-latent, batchable across thousands of NPCs at 20Hz, and the per-stage subspace profile is **LatCal-committable** for deterministic replay/anti-cheat.
 
 2. **SECONDARY (GOAT-tier fallback) — Shape-Adaptive Adapter Routing.** With on-the-fly LoRA + riir-train, train adapters with per-layer shape objectives and hot-swap by shape. Documented in rev 1 of this note; demoted to fallback after skill refinement mandated the latent reframing first.
 
@@ -61,7 +61,7 @@ The paper proposes a `×`-shaped transformer (wide early/late, narrow middle) wi
 
 The paper's variable-width insight reframes as a **latent-to-latent subspace gating** operation on HLA state. Reading the actual shipped code:
 
-- `NpcFunctorRuntime` (`latent_functor/zone_gating.rs:220`) already has stage-gated activation — but gated by **zone density** (`ZoneGatingTier { min_density, tau, beta, reest_budget }`). `on_zone_transition()` resolves the active tier and pushes to the scheduler. This is the **spatial gating axis**.
+- `NpcFunctorRuntime` (`riir-ai/crates/riir-engine/src/latent_functor/zone_gating.rs:220`) already has stage-gated activation — but gated by **zone density** (`ZoneGatingTier { min_density, tau, beta, reest_budget }`). `on_zone_transition()` resolves the active tier and pushes to the scheduler. This is the **spatial gating axis**.
 - `MultiLayerHlaCache` (`hla/types.rs:136`) carries `gamma: f32` — the **leaky integrator decay**. Dormant HLA subspaces decay via `gamma` but do NOT zero out. This is exactly the paper's **carry-forward** mechanism: inactive dimensions bypass the layer and are restored from their last active value.
 - `ThirdOrderMoment` (`hla/types.rs:211`) captures "relations between relations" in compressed form — this is the **wide early/late, narrow middle** analog: high-order moments are the "wide" subspace where dense relational computation happens; first-order scalars are the "narrow" projection.
 

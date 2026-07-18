@@ -926,7 +926,7 @@ moat (F1 SpecAsPruner + F6 SpecProof, BLAKE3-committed, O(1) bitmap execution)
 continues to dominate the neural-compile path for deterministic, enumerable-output
 specs. For fuzzy/open-ended specs where the neural path is genuinely needed, the
 runtime substrate already ships (`LoRAWeightVersion` ArcSwap-protected atomic
-hot-swap in `riir-engine/src/episode_buffer.rs`, `ShineHypernet` context-to-LoRA
+hot-swap in `riir-ai/crates/riir-engine/src/episode_buffer.rs`, `ShineHypernet` context-to-LoRA
 in `riir-gpu/src/hypernet/`).
 
 ### Routing summary
@@ -945,6 +945,6 @@ in `riir-gpu/src/hypernet/`).
 - R062 (SHINE) — the hypernetwork context-to-LoRA mechanism PAW v2 uses
 - R291 (Cross-Resolution Transport) — train-on-small-deploy-on-large modellessly
 - R074 (Subterranean Agents) — the "compile procedures into weights" pattern; critical finding that LoRA fails for procedural knowledge (PAW v2's neural path inherits this limit)
-- `riir-engine/src/episode_buffer.rs::LoRAWeightVersion` — the runtime half of PAW (atomic A/B hot-swap, ArcSwap-protected, Plan 354 torn-read fix Lean-proven)
+- `riir-ai/crates/riir-engine/src/episode_buffer.rs::LoRAWeightVersion` — the runtime half of PAW (atomic A/B hot-swap, ArcSwap-protected, Plan 354 torn-read fix Lean-proven)
 - `riir-gpu/src/hypernet/` — shipped SHINE runtime (Plan 104b, default-on)
 - `riir-neuron-db/src/freeze.rs::MerkleFrozenEnvelope` — the freeze/thaw envelope for compiled-program artifacts (the PAW "program-as-file" pattern, but BLAKE3-committed)

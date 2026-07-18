@@ -39,7 +39,7 @@ These gaps mean: training may produce incorrect gradients, distillation quality 
 | 14 | Learning Beyond Gradients | `katgpt-rs/crates/katgpt-pruners/src/absorb_compress.rs` | ✅ Absorb+Compress |
 | 15 | Reinforced Agent (reviewer) | `katgpt-rs/crates/katgpt-core/src/pruners/review_metrics.rs` | ✅ Helpfulness/Harmfulness |
 | 16 | AutoTTS (β parameterization) | `riir-gpu/src/training_config.rs` | ✅ BetaConfig |
-| 18 | Free Transformer Latent Injection | `katgpt-rs/src/types.rs` (DomainLatent), `riir-gpu/src/domain_latent.rs` | 🟡 Full VAE ❌, mid-layer K/V domain embedding ✅ (Plan 038) |
+| 18 | Free Transformer Latent Injection | `katgpt-rs/src/types.rs` (DomainLatent), `riir-ai/crates/riir-gpu/src/domain_latent.rs` | 🟡 Full VAE ❌, mid-layer K/V domain embedding ✅ (Plan 038) |
 | 19 | TTT Test-Time Training | `katgpt-rs/crates/katgpt-deprecated/src/feedback.rs`, `riir-burner/` | 🟡 Feedback sends, not consumed |
 | 20 | TurboQuant | `katgpt-rs/src/turboquant/` | ✅ CPU path, GPU kernel exists |
 
@@ -516,14 +516,14 @@ Cross-reference of all 21 research papers evaluated against the riir-ai / katgpt
 | 10 | **Sparse Attention** (child et al.) | 2019 | Block-sparse attention with heuristic selection (sink + window + α threshold) | `flashprefill_block_select.wgsl`, `flashprefill_sparse_forward.wgsl` | ✅ Full |
 | 11 | **KV Cache Quantization** | 2023 | TurboQuant near-optimal KV cache compression with bit-packed codebooks | `forward_turboquant.rs`, `attention_score_tq.wgsl` | ✅ Full |
 | 12 | **Test-Time Training (TTT)** | 2024 | Feedback consumer: polls cache → retrains LoRA → hot-swap signal | `feedback_consumer.rs` (feature-gated) | ✅ Full |
-| 13 | **Embedding-based Retrieval** | 2020 | 3-tier embedding router with RAG fallback for prompt routing | `riir-router/src/embedding.rs`, Plan 024 | ✅ Full |
+| 13 | **Embedding-based Retrieval** | 2020 | 3-tier embedding router with RAG fallback for prompt routing | `riir-ai/crates/riir-router/src/embedding.rs`, Plan 024 | ✅ Full |
 | 14 | **WASM Sandboxing** | 2019 | WASM validator SDK with streaming events ABI, wasmi 1.0 sandbox (Plan 167 migration from wasmtime; wasmtime kept `[dev-dependency]` for comparison benchmarks) | `riir-validator-sdk/`, `WasmPruner` | ✅ Full |
 | 15 | **Constraint Decoding** | 2022 | DDTree + ConstraintPruner + ScreeningPruner trait system | `katgpt-rs/src/speculative/dd_tree.rs` | ✅ Full |
 | 16 | **Online Softmax** (Milakov & Gimelshein) | 2018 | Stable online softmax in WGSL (max subtraction, 2-pass for sparse) | `softmax.wgsl`, `flashprefill_sparse_forward.wgsl` | ✅ Full |
 | 17 | **Gradient Compression** (Aji & Heafield) | 2017 | Gradient compression for distributed training | `riir-gpu/compress.rs` | ✅ Full |
 | 18 | **NVIDIA Dynamo** (dynamic inference) | 2024 | Early exit + dynamic budget extracted; full framework not applicable at micro-scale | `katgpt-rs/src/speculative/dd_tree.rs` (embedded) | 🔶 Partial |
 | 19 | **BLT: Byte Latent Transformer** (Pagnoni et al.) | 2024 | Byte-level tokenization concepts absorbed into BPE pipeline | `katgpt-rs/crates/katgpt-tokenizer/src/bpe.rs` | 🔶 Distilled |
-| 20 | **Free Transformer** (routing-free inference) | 2024 | Routing-free concepts absorbed into embedding router fallback tier | `riir-router/src/embedding.rs` | 🔶 Distilled |
+| 20 | **Free Transformer** (routing-free inference) | 2024 | Routing-free concepts absorbed into embedding router fallback tier | `riir-ai/crates/riir-router/src/embedding.rs` | 🔶 Distilled |
 | 21 | **ColaDLM** (collaborative distillation) | 2024 | Evaluated and rejected — not applicable to micro-scale single-device LoRA training | N/A | ✅ Rejected |
 
 ---
@@ -556,14 +556,14 @@ Cross-reference of all 21 research papers evaluated against the riir-ai / katgpt
 
 **Resolution:** Created `GpuFlashPrefillPass` in `forward_flashprefill.rs` connecting all 4 kernels as a staged pipeline with proper buffer allocation and bind group management.
 
-**Files:** `riir-gpu/src/forward_flashprefill.rs`, `riir-gpu/src/kernels/mod.rs`
+**Files:** `riir-ai/crates/riir-gpu/src/forward_flashprefill.rs`, `riir-gpu/src/kernels/mod.rs`
 
 ### Task 5: TurboQuant GPU Attention Scoring
 **Finding:** `attention_score_tq.wgsl` kernel existed but had no Rust dispatch wrapper.
 
 **Resolution:** Created `GpuTurboQuantScoring` in `forward_turboquant.rs` connecting the bit-packed codebook scoring kernel with orthogonal pre-rotation.
 
-**Files:** `riir-gpu/src/forward_turboquant.rs`, `riir-gpu/src/kernels/mod.rs`
+**Files:** `riir-ai/crates/riir-gpu/src/forward_turboquant.rs`, `riir-gpu/src/kernels/mod.rs`
 
 ### Task 6: TTT Feedback Consumer
 **Finding:** No mechanism to close the TTT retraining loop from inference feedback back to LoRA retraining.

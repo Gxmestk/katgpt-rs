@@ -492,7 +492,7 @@ DRY refactor extracts `apply_blended_with_pi` free function shared by production
 
 ## 15. Within-Class Effective Rank (Plan 415)
 
-Class-conditioned collapse diagnostic: the entropy-based effective rank of the **within-class residual** covariance matrix (arXiv:2412.19419 §5.3.1). Fusion of two shipped halves never combined: `effective_rank` (class-agnostic) + `within_class_adjacency` / `between_class_adjacency` (class-conditioning from `latent_functor/quality_gate.rs`).
+Class-conditioned collapse diagnostic: the entropy-based effective rank of the **within-class residual** covariance matrix (arXiv:2412.19419 §5.3.1). Fusion of two shipped halves never combined: `effective_rank` (class-agnostic) + `within_class_adjacency` / `between_class_adjacency` (class-conditioning from `riir-ai/crates/riir-engine/src/latent_functor/quality_gate.rs`).
 
 Fills the gap where the class-agnostic `effective_rank` cannot distinguish "between-class variance dominates, within-class collapsed" from "all variance is healthy and isotropic". The existing Dirichlet-energy quality gate measures *separation* (between > within) but not *within-class subspace health*.
 

@@ -70,7 +70,7 @@ Under RS + CE: degradation is **almost entirely entropy-driven** (`Δα_mismatch
 
 ### 1.4 The TV loss (training — → riir-train)
 
-The novel training objective `L_TV = 1 − Σ_v min(p_v, q_v)` directly optimizes the rejection-sampling acceptance rate. Gradient is bounded (`|∂L/∂z_j| ≤ 1`), `q_j`-proportional (tail-suppressing), and drives `q_j/p_j → 1`. The e2e multi-step variant `L_e2e = 1 − (1/γ)·Σ_j Π_i α_i` captures the multiplicative structure of multi-step acceptance. This is a **training recipe → riir-train** (where we already have `verify_pinsker_bound` in `riir-train-engine/src/critical_position.rs`).
+The novel training objective `L_TV = 1 − Σ_v min(p_v, q_v)` directly optimizes the rejection-sampling acceptance rate. Gradient is bounded (`|∂L/∂z_j| ≤ 1`), `q_j`-proportional (tail-suppressing), and drives `q_j/p_j → 1`. The e2e multi-step variant `L_e2e = 1 − (1/γ)·Σ_j Π_i α_i` captures the multiplicative structure of multi-step acceptance. This is a **training recipe → riir-train** (where we already have `verify_pinsker_bound` in `riir-train/crates/riir-train-engine/src/critical_position.rs`).
 
 ---
 
@@ -86,7 +86,7 @@ The novel training objective `L_TV = 1 − Σ_v min(p_v, q_v)` directly optimize
 | Entropy-spike detection | `RejectionReason::EntropySpike` in `src/distill/trd.rs:56`, gated by `entropy_threshold` | ✅ shipped |
 | Acceptance-rate bandit reward | `freq_bandit` (`src/freq_bandit.rs:315`, "reward = acceptance_rate × latency_improvement"), `fold_bandit`, `meta_router` (`src/dash_attn/meta_router.rs:206`) | ✅ shipped |
 | EMA entropy tracking | `AdaptiveTraceCompactor::observe_entropy` (`src/attn_match/adaptive_cot.rs:159`), `α=0.1` EMA | ✅ shipped (for KV compaction, not spec-decode γ) |
-| TV distance / Pinsker | `verify_pinsker_bound` in `riir-train-engine/src/critical_position.rs:177` | ✅ shipped in **riir-train** (training-side, correct repo) |
+| TV distance / Pinsker | `verify_pinsker_bound` in `riir-train/crates/riir-train-engine/src/critical_position.rs:177` | ✅ shipped in **riir-train** (training-side, correct repo) |
 
 ### 2.2 What's NOT in katgpt-rs (the gap)
 

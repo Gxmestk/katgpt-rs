@@ -92,7 +92,7 @@ The **architecture** is a refinement of NPT (R354, **already distilled as Super-
 
 #### 2.2.1 ABD (cross-row attention) → `set_sigmoid_attention_into`
 
-TabFM's ABD is NPT's ABD — attention between datapoints (rows). R354 distilled this exact mechanism into the open primitive `set_sigmoid_attention_into(query, key, value, output, scratch)` with sigmoid gate (never softmax, per AGENTS.md §2). The private runtime half is `CrowdAttentionStep::tick_into` in `riir-engine/src/crowd_attention.rs`, where the "rows" are NPC HLA belief states in a zone and the attention is fog-of-war gated.
+TabFM's ABD is NPT's ABD — attention between datapoints (rows). R354 distilled this exact mechanism into the open primitive `set_sigmoid_attention_into(query, key, value, output, scratch)` with sigmoid gate (never softmax, per AGENTS.md §2). The private runtime half is `CrowdAttentionStep::tick_into` in `riir-ai/crates/riir-engine/src/crowd_attention.rs`, where the "rows" are NPC HLA belief states in a zone and the attention is fog-of-war gated.
 
 **Key architectural difference**: TabFM uses standard softmax multi-head attention; the codebase uses sigmoid-gated attention. Per AGENTS.md §2, sigmoid is mandatory (never softmax) for any latent projection — TabFM's softmax is a paper-side choice we deliberately do not adopt.
 

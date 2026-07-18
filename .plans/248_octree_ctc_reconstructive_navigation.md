@@ -1,13 +1,13 @@
 # Plan 248: OctreeCTC — Reconstructive Memory Navigation
 
 > **📍 Migration note (2026-06-28, Issue 007 Phase C follow-up):** The
-> example + test referenced below (`examples/octree_ctc_demo.rs`,
-> `tests/octree_ctc_recall_test.rs`) moved from this repo (katgpt-rs) to
+> example + test referenced below (`riir-ai/crates/riir-engine/examples/octree_ctc_demo.rs`,
+> `riir-ai/crates/riir-engine/tests/octree_ctc_recall_test.rs`) moved from this repo (katgpt-rs) to
 > `riir-ai/crates/riir-engine/`. They construct `NpcBrain` which is now
 > private NPC runtime IP. The reconstruction substrate they consume
 > (`katgpt_core::sense::reconstruction`) stays public. The bench referenced
 > below (`crates/katgpt-core/benches/reconstruction_bench.rs`) ALSO moved to
-> `riir-engine/benches/reconstruction_bench.rs`. Historical task records
+> `riir-ai/crates/riir-engine/benches/reconstruction_bench.rs`. Historical task records
 > below reflect the original locations.
 
 **Date:** 2026-06-11
@@ -82,8 +82,8 @@ Implement multi-step active reconstruction over KG-Latent-Octree, replacing sing
 **GOAT verdict:** Scalar wins full cycle (LLVM tight-loop). Matvec wins expand (3.6×). Production: cache `ProjectionWeights` per brain config.
 
 ### Phase 5: GOAT Proof — DONE
-- [x] `examples/octree_ctc_demo.rs` — before/after demo
-- [x] `tests/octree_ctc_recall_test.rs` — multi-hop recall ≥ 20%
+- [x] `riir-ai/crates/riir-engine/examples/octree_ctc_demo.rs` — before/after demo
+- [x] `riir-ai/crates/riir-engine/tests/octree_ctc_recall_test.rs` — multi-hop recall ≥ 20%
 - [x] Benchmark: 93.2ns < 200ns ✅
 - [x] GOAT PASS → promoted to default feature
 

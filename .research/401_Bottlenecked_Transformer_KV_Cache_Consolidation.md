@@ -268,7 +268,7 @@ Plan 420 Phases 2–4 are permanently shelved. This is NOT a modelless failure o
 
 ### riir-train follow-up — RESOLVED (Plan 313, 2026-07-09)
 
-**The trained-model validation has been completed** in riir-train Plan 313 (`tests/plan_313_kv_consolidation_trained.rs`). A micro-GPT (same architecture as bench_420: d_model=64, 8 heads, single layer) was trained from scratch on few-shot addition using a manually-backpropagated AdamW optimizer (gradient check: 18/18 weights pass, max rel_err 1.53%). The trained model achieves **31.5% train / 31.1% test token accuracy** — well above the ~10% chance floor, confirming the KV cache carries genuine learned structure.
+**The trained-model validation has been completed** in riir-train Plan 313 (`riir-train/crates/riir-train-engine/tests/plan_313_kv_consolidation_trained.rs`). A micro-GPT (same architecture as bench_420: d_model=64, 8 heads, single layer) was trained from scratch on few-shot addition using a manually-backpropagated AdamW optimizer (gradient check: 18/18 weights pass, max rel_err 1.53%). The trained model achieves **31.5% train / 31.1% test token accuracy** — well above the ~10% chance floor, confirming the KV cache carries genuine learned structure.
 
 The 3-competitor PoC was then re-run on the trained model:
 

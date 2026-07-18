@@ -1,7 +1,7 @@
 # Plan 255: ANE-Latent NPC Brain Compute — Batch NPC Ops on Neural Engine
 
 > **📍 Migration note (2026-06-28, Issue 007 Phase C follow-up):** The
-> `ane_npc_*` example files referenced below (`examples/ane_npc_arena.rs`,
+> `ane_npc_*` example files referenced below (`riir-ai/crates/riir-engine/examples/ane_npc_arena.rs`,
 > `ane_npc_goat.rs`, `ane_npc_power.rs`) and the `npc_ane_backend` /
 > `npc_brain_router` modules moved from this repo (katgpt-rs) to
 > `riir-ai/crates/riir-engine/`. The `ane_npc` feature flag now lives in
@@ -154,7 +154,7 @@ else:
   - Fixed: warmup predictions before timing (first run includes ANE pipeline compile)
 - [x] Write test: `AneNpcBrainBackend` matches `SimdNpcBrainBackend` output (cosine ≥ 0.99)
 - [x] Write benchmark: `AneNpcBrainBackend` batch latency vs `SimdNpcBrainBackend` for 10, 100, 1000 NPCs
-  - Implemented as multi-size sweep in `examples/ane_npc_goat.rs`
+  - Implemented as multi-size sweep in `riir-ai/crates/riir-engine/examples/ane_npc_goat.rs`
   - Finding: ANE flat ~280µs (dispatch-bound), CPU linear 0.1→10.6µs (10→1000 NPCs)
 
 ### Part 4: Auto-Route Integration
@@ -180,11 +180,11 @@ TriggerGate routes general inference by QPS; NPC brain routes by NPC count.
   - Measure: total CPU time freed, ANE dispatch overhead, end-to-end latency
 - [x] GOAT arena: bomber/go game with ANE NPC brain vs SIMD NPC brain
   - Verify: same game outcome, different CPU utilization
-  - Implemented as `examples/ane_npc_arena.rs` (200-tick simulation through `NpcBrainRouter`)
+  - Implemented as `riir-ai/crates/riir-engine/examples/ane_npc_arena.rs` (200-tick simulation through `NpcBrainRouter`)
   - Result: PASS — outcome rel diff 0.0047%, cosine 0.999989
 - [x] GOAT power: measure CPU utilization with/without ANE NPC brain
   - Target: CPU utilization reduced by ≥30% at 1000 NPC load
-  - Implemented as `examples/ane_npc_power.rs` (getrusage FFI, zero new deps)
+  - Implemented as `riir-ai/crates/riir-engine/examples/ane_npc_power.rs` (getrusage FFI, zero new deps)
   - Result: PASS on ratio (94.5% → 53.3% = 43.6% reduction), FAIL on absolute CPU time (13.85ms → 584ms)
 - [x] ~~If GOAT passes: promote `ane_npc` to default-on for macOS~~ — **N/A: GOAT FAILED** (see verdict below). Promotion precondition not met. Cannot execute.
 - [x] If GOAT fails: keep as opt-in, document why

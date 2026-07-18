@@ -5,7 +5,7 @@
 > **Status:** Done
 > **Related Research:** 133 (FluxMem), 192 (NextLat belief), 196 (KG-Latent-Octree), 216 (MRAgent reconstructive memory), 242 (recurrent belief — HLA prior-art lesson), 060 (MeMo), 024 (δ-Mem)
 > **Classification:** Public
-> **Cross-ref (riir-ai):** `riir-games/src/civ/spatial_cognition.rs::SpatialMemory` (shipped prior art), `riir-games/src/game_traits/spatial.rs::GenericSpatialBelief`, `riir-engine/src/ns_csg.rs::SpatialBelief`
+> **Cross-ref (riir-ai):** `riir-games/src/civ/spatial_cognition.rs::SpatialMemory` (shipped prior art), `riir-games/src/game_traits/spatial.rs::GenericSpatialBelief`, `riir-ai/crates/riir-engine/src/ns_csg.rs::SpatialBelief`
 
 ---
 

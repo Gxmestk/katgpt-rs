@@ -19,7 +19,7 @@ The original plan had three material defects, all corrected below:
    - `octree.rs` → `crate::merkle::{MerkleOctree, MerkleProof, HASH_SIZE, MERKLE_OCTREE_LEAVES}` (**feature-gated `merkle_octree`**, NEW dep not in original plan — used externally by riir-engine `kg.rs`/`kg_hyperedge.rs`)
    - `spectral_threat.rs` → `crate::linoss` (real, stays in katgpt-core as composition)
    - **False alarms** (already extracted to katgpt-types, no action): `crate::simd`, `crate::leaky_core`, `crate::{DepthInvarianceConfig, classify_chain, apply_magnitude_regularization, Scratch, MagnitudeRegularization, DepthInvarianceKind}` — all resolve to `katgpt_types`.
-3. **File inventory was incomplete.** `sense/mod.rs:7` documents that runtime modules (`brain`, `backend`, `batch`, `gm`, `hotswap`, `bandit`) already moved to `riir-engine::sense::*` in Issue 007 Phase C. A stale `katgpt_core::sense::bandit::{SenseTrial, decay_direction}` import in `riir-engine/tests/bench_221_kg_confidence_weight_goat.rs:406` is pre-existing dead code (no `sense/bandit.rs` exists). Pre-existing bug, not introduced by this refactor.
+3. **File inventory was incomplete.** `sense/mod.rs:7` documents that runtime modules (`brain`, `backend`, `batch`, `gm`, `hotswap`, `bandit`) already moved to `riir-engine::sense::*` in Issue 007 Phase C. A stale `katgpt_core::sense::bandit::{SenseTrial, decay_direction}` import in `riir-ai/crates/riir-engine/tests/bench_221_kg_confidence_weight_goat.rs:406` is pre-existing dead code (no `sense/bandit.rs` exists). Pre-existing bug, not introduced by this refactor.
 
 **Strategy C Revised (adopted):** co-extract `ScaleBoundary` + `TemporalDerivativeKernel<N>` + the octree-merkle primitives (`MerkleOctree`, `MerkleProof`, constants) to katgpt-types; promote `katgpt-sense` with **9 files** (all except `spectral_threat.rs`, which stays in katgpt-core as composition alongside `linoss`); katgpt-sense depends on `katgpt-types` only. Re-export shim in katgpt-core preserves `katgpt_core::sense::{octree,reconstruction,lod,bake,serialize,sector,schema_centroid,reconstruction_depth_invariance,spectral_threat}::*` bit-for-bit.
 
@@ -163,7 +163,7 @@ reconstruction files alone (`octree.rs` + `reconstruction.rs` + `serialize.rs`
   - `cargo test -p katgpt-core --features slod --lib` — test count matches
     pre-extraction baseline (714 → 714).
   - `cargo check -p riir-engine` clean (ScaleBoundary is consumed by
-    `riir-engine/benches/sense_lod.rs`).
+    `riir-ai/crates/riir-engine/benches/sense_lod.rs`).
 
 ### Phase 2 — Co-extract `TemporalDerivativeKernel<N>` to katgpt-types
 

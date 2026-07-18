@@ -121,7 +121,7 @@ The last row is the paper's exact router, minus the trained MLP. The `set_sigmoi
 How LBR looks when operating on the seven Super-GOAT factory modules:
 
 - **(a) HLA per-NPC latent state**: each NPC at a decision point forwards K candidate next-action HLA vectors, a set-attention router compares them, commits one. This is **per-NPC token-level test-time scaling** — the HLA state is the "post-candidate hidden state" the router reads.
-- **(b) `latent_functor/` operations**: a functor application could expand K candidate continuations as parallel functor applications, then route via set-attention on the resulting latent vectors. Maps to `latent_functor/zone_gating.rs` (zone-gated activation) generalized from "gate on/off" to "route among K".
+- **(b) `latent_functor/` operations**: a functor application could expand K candidate continuations as parallel functor applications, then route via set-attention on the resulting latent vectors. Maps to `riir-ai/crates/riir-engine/src/latent_functor/zone_gating.rs` (zone-gated activation) generalized from "gate on/off" to "route among K".
 - **(c) `cgsp_runtime/` curiosity**: curiosity signal drives the width K — more curious = wider exploration. The router's scoring direction could be the curiosity direction vector.
 - **(d) LatCal fixed-point**: not directly relevant — this is a local decode decision, not a sync-boundary commitment.
 - **(e) `NeuronShard` style_weights**: a dendritic branch view could expose K candidate continuations as different branch selections within the shard's `style_weights[64]`.

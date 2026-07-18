@@ -321,7 +321,7 @@ examples/
 
 ```
 crates/riir-gpu/
-  examples/train_bomber.rs    ← T4: updated defaults, --min-quality, --output flags
+  riir-train/crates/riir-train-gpu/examples/train_bomber.rs    ← T4: updated defaults, --min-quality, --output flags
 
 output/
   game_lora_v2.bin            ← T5: new trained LoRA (9.1KB, final_loss=12.67)

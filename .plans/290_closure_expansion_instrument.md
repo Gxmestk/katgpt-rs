@@ -213,7 +213,7 @@ pub struct PrimitiveTransitionGraph {
 
 - **No NPP training objective.** That is riir-train territory. This plan exposes a *runtime data structure* (`PTG`) that a future NPP trainer could consume as training targets, but does not implement the trainer.
 - **No new capability class.** This is a measurement + data-structure layer. The capability-class mechanisms (MDL admission, TaR transfer) already ship; we are making them observable.
-- **No riir-ai guide.** Verdict is GOAT, not Super-GOAT. The private selling-point doc for `AnchorProfile` already exists in `cgsp_runtime/cross_game_transfer.rs` doc comments. This plan does not duplicate or extend that.
+- **No riir-ai guide.** Verdict is GOAT, not Super-GOAT. The private selling-point doc for `AnchorProfile` already exists in `riir-ai/crates/riir-engine/src/cgsp_runtime/cross_game_transfer.rs` doc comments. This plan does not duplicate or extend that.
 - **No changes to existing default-on features.** Everything is behind `closure_instrument` feature flag until G1–G4 pass.
 - **No game semantics in katgpt-rs.** `PrimitiveKind` reserves 0–511 for engine use; game-specific primitive IDs stay in riir-ai and reference back via opaque `u32`.
 

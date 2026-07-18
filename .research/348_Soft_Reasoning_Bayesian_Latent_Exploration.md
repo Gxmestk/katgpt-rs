@@ -106,7 +106,7 @@ Crucial design points (vs the paper):
 
 This reframing gives the **Super-GOAT factory module angle**:
 - **HLA (`sense/`):** explore per-NPC belief-state perturbations. A frightened NPC can Bayesian-explore which latent valence-arousal combination yields the best survival trajectory.
-- **`latent_functor/zone_gating.rs`:** explore which zone-gating direction maximizes a "did I reach the goal zone" verifier reward — runtime zone-attention discovery.
+- **`riir-ai/crates/riir-engine/src/latent_functor/zone_gating.rs`:** explore which zone-gating direction maximizes a "did I reach the goal zone" verifier reward — runtime zone-attention discovery.
 - **DEC (`dec/`):** the `f*_k` incumbent in EI is naturally a Hodge-harmonic scalar (the harmonic component is "what survives perturbation"), so EI explores the exact/coexact channels. **Genuinely novel angle:** EI on the coexact (solenoidal) channel is a modelless analog of "explore circulation patterns".
 - **`cgsp_runtime/`:** curiosity pulse (041) becomes the **exploration term** in EI (the `σ_k(x)·φ(z)` term), regret-bounded — replaces the heuristic curiosity schedule with a principled one.
 

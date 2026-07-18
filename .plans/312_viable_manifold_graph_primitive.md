@@ -144,7 +144,7 @@ This is the "what does it look like?" demo. It validates the mechanism shape end
 This plan ships the open primitive only. The riir-ai-side wiring (G8–G12 from the private guide) is a separate plan in `riir-ai/.plans/` (TBD after Phase 5). It will:
 
 - Use `evolve_hla` as the map `f`.
-- Use `latent_functor/quality_gate.rs` coherence as the predicate `V`.
+- Use `riir-ai/crates/riir-engine/src/latent_functor/quality_gate.rs` coherence as the predicate `V`.
 - Store the per-NPC graph in the Entity Cognition Stack (Plan 327).
 - Wire `manifold_curiosity_walk`'s `weights` closure to `cgsp_runtime::curiosity_step`.
 - Add the designer-facing `schedule_persona_transition` API.

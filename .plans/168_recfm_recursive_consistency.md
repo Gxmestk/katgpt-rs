@@ -93,7 +93,7 @@ Implement recursive cross-scale consistency from RecFM as modelless inference im
 
 - **Recursive D2F**: Secondary denoising trajectory with cross-scale velocity blend. Requires 2× forward passes per step. Benchmark first to validate the cost-benefit tradeoff.
 - **Model-based RecFM**: Training-time velocity consistency for LoRA. Implemented in riir-ai Plan 185.
-- **Cross-Repo Integration**: Validated in `riir-examples/tests/test_recfm_cross_repo.rs` — Plan 168 modelless RecFM + Plan 185 model-based RecFM compose correctly with compound gain (smoother marginals → better velocity profiles → more effective branch pruning).
+- **Cross-Repo Integration**: Validated in `riir-ai/crates/riir-examples/tests/test_recfm_cross_repo.rs` — Plan 168 modelless RecFM + Plan 185 model-based RecFM compose correctly with compound gain (smoother marginals → better velocity profiles → more effective branch pruning).
 
 ---
 

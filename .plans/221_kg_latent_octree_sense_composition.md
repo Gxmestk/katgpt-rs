@@ -1,8 +1,8 @@
 # Plan 221: KG Latent Octree — Modelless Inference-Time Sense Composition
 
 > **📍 Migration note (2026-06-28, Issue 007 Phase C follow-up):** The
-> example files referenced below (`examples/sense_composition.rs`,
-> `examples/sense_bandit_demo.rs`, `tests/bench_221_kg_confidence_weight_goat.rs`)
+> example files referenced below (`riir-ai/crates/riir-engine/examples/sense_composition.rs`,
+> `riir-ai/crates/riir-engine/examples/sense_bandit_demo.rs`, `riir-ai/crates/riir-engine/tests/bench_221_kg_confidence_weight_goat.rs`)
 > moved from this repo (katgpt-rs) to `riir-ai/crates/riir-engine/`. They
 > construct `NpcBrain` (and sense::hotswap, sense::bandit) which are now
 > private NPC runtime IP per `.research/003_Commercial_Open_Source_Strategy`.
@@ -151,9 +151,9 @@ Compress game domain knowledge into fixed-type ternary bit-plane sense modules (
   - **Zero human-in-the-loop by default**: MCP agents (AI) handle routine sense management autonomously
   - **SSH GM tools for narrative events**: human GM via egui dashboard for scripted encounters only
   - Tests: pin overrides autonomous, inject KG triple changes octree, non-admin rejected, MCP action dispatch matches trait call
-  - **Bridge**: `riir-viz/src/gm/vibe_ctrl.rs` calls this API through existing GM Tool SSH channel
+  - **Bridge**: `riir-game-sdk/crates/riir-viz/src/gm/vibe_ctrl.rs` calls this API through existing GM Tool SSH channel
 
-- [x] **T11: Example — sense composition + GM override demo** (`examples/sense_composition.rs`)
+- [x] **T11: Example — sense composition + GM override demo** (`riir-ai/crates/riir-engine/examples/sense_composition.rs`)
   - Demonstrates: load 3 sense modules, create NpcBrain, project HLA state
   - Shows GM override: pin fighter_sense to 0.9 → NPC becomes aggressive
   - Shows scripted mode: disable_autonomous → NPC follows script
@@ -161,7 +161,7 @@ Compress game domain knowledge into fixed-type ternary bit-plane sense modules (
   - Before/after: "without sense modules" vs "with sense modules" vs "GM override"
   - Print: sense activations, decision, confidence, GM override status
 
-- [x] **T12: Example — sense bandit self-learning demo** (`examples/sense_bandit_demo.rs`)
+- [x] **T12: Example — sense bandit self-learning demo** (`riir-ai/crates/riir-engine/examples/sense_bandit_demo.rs`)
   - Demonstrates: self-play loop → sense trials → AbsorbCompress → HotSwap
   - Shows GM lock: lock module → bandit can't swap → stays at GM-chosen version
   - Shows confidence evolution over N episodes

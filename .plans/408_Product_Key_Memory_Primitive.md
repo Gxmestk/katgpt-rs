@@ -134,7 +134,7 @@ These are tracked here for visibility but executed in private repos if the GOAT 
 
 - [-] **T7.1 (riir-neuron-db)** F5 fusion: PKM × Raven consolidation. File `riir-neuron-db/.research/013_*.md` guide + `.plans/` if F5 lands. Gate G6: retention ≥80% after 5 domain shifts vs paper's <30%. **This is the fusion that re-opens the Super-GOAT question** per Research 387 §5.
 - [-] **T7.2 (riir-chain)** F6 fusion: PKM × LatCal commitment. File `riir-chain/.research/010_*.md` guide + `.plans/` if the chain wants quorum-attested PKM snapshots. Gate G8: quorum bit-identity.
-- [-] **T7.3 (riir-ai)** F2 fusion: PKM × CommittedFieldBlend gate. Wire into `riir-engine/src/npc_memory.rs` as the √N-scaled retrieval backend for `NpcMemoryStore`. Private runtime composition.
+- [-] **T7.3 (riir-ai)** F2 fusion: PKM × CommittedFieldBlend gate. Wire into `riir-ai/crates/riir-engine/src/npc_memory.rs` as the √N-scaled retrieval backend for `NpcMemoryStore`. Private runtime composition.
 
 ---
 

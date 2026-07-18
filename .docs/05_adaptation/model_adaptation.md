@@ -406,7 +406,7 @@ Both reader_lora and domain_latent condition the prefill phase. The second half 
 `riir-gpu` provides training infrastructure:
 
 ```rust
-// riir-gpu/src/domain_latent.rs
+// riir-ai/crates/riir-gpu/src/domain_latent.rs
 pub struct GpuDomainLatent {
     // GPU buffers for trainable domain latent (params, grads, m, v)
 }

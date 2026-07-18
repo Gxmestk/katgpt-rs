@@ -94,8 +94,8 @@ V[curator, round, tier] ∈ {0,1}  (or normalized agreement score)
 
 The MMO already has rule-based economy anomaly detection:
 - `seal-gm-tools/src/state.rs` — `EconomyDashboard { rmt_alert_count, recent_flows, ... }`, `ShopEntry { price, volume_24h, flagged }`, `ItemStat { anomaly_flag }`, `Guild { anomaly_flag }`
-- `seal-gm-tools/src/tabs/shops.rs` — `anomaly_section()` UI with suspend/flag/investigate actions on `flagged != 0` shops
-- `seal-gm-tools/src/rerun_stream.rs` — `log_economy_graph(flows)` already visualizes gold flows
+- `seal-online-remaster/crates/seal-gm-tools/src/tabs/shops.rs` — `anomaly_section()` UI with suspend/flag/investigate actions on `flagged != 0` shops
+- `seal-online-remaster/crates/seal-gm-tools/src/rerun_stream.rs` — `log_economy_graph(flows)` already visualizes gold flows
 
 **Current heuristic:** `flagged` is a hand-tuned threshold rule (e.g., price > N× median). Brittle: misses novel RMT patterns, generates false positives on legitimate event-driven price spikes.
 
@@ -134,7 +134,7 @@ The `flagged` field on `ShopEntry`/`ItemStat` gets populated from the Tucker res
 - [x] **T2.3** Wire into `EconomyDashboard` — populate `ShopEntry.flagged` / `ItemStat.anomaly_flag` / `rmt_alert_count` from Tucker residuals instead of (or alongside) the threshold rule.
   *(Shipped as a new `tucker_rmt_anomalies: Vec<RmtAnomaly>` field on `GmAppState` (behind `tucker_rmt` feature). The existing `ShopEntry.flagged` threshold rule is left intact — Tucker runs as a complementary factor-model detector. The dashboard renders both sections side-by-side in the shops tab.)*
 - [x] **T2.4** GM dashboard: add "Market Factor" view (the item-factor loadings as a heatmap) and "Cross-Server Divergence" view (the zone-factor), alongside the existing anomaly section.
-  *(Shipped as `tucker_rmt_section` + `tucker_anomaly_row` in `tabs/shops.rs` (behind `tucker_rmt` feature). Shows flagged (item, zone) pairs with residual and z-score. The full factor-matrix heatmap view is deferred — the current view shows the anomaly LIST, which is the actionable output. A future enhancement could expose the factor matrices for visualization.)*
+  *(Shipped as `tucker_rmt_section` + `tucker_anomaly_row` in `seal-online-remaster/crates/seal-gm-tools/src/tabs/shops.rs` (behind `tucker_rmt` feature). Shows flagged (item, zone) pairs with residual and z-score. The full factor-matrix heatmap view is deferred — the current view shows the anomaly LIST, which is the actionable output. A future enhancement could expose the factor matrices for visualization.)*
 - [x] **T2.5** Tests: synthetic RMT injection (K items with manipulated prices in 1 zone) → Tucker flags them; threshold rule misses them when the manipulation stays under the static threshold.
   *(Shipped: 13 unit tests including G1/G2/G3 gates, G4 perf gate `#[ignore]`, edge cases (empty input, missing cells, shape change, max_anomalies cap, threshold sensitivity). All 13 pass; G4 passes in release mode.)*
 

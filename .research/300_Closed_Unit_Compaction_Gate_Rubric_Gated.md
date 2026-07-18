@@ -201,7 +201,7 @@ The C1/C2/C3/N1 predicates are **scalars derived from latent trajectory features
 
 | Paper predicate | Latent feature (codebase vocabulary) | Sigmoid projection |
 |---|---|---|
-| C1 closed-unit | coherence stability (from `latent_functor/quality_gate.rs`) | `σ(β_c1 · (coherence − τ_c1))` |
+| C1 closed-unit | coherence stability (from `riir-ai/crates/riir-engine/src/latent_functor/quality_gate.rs`) | `σ(β_c1 · (coherence − τ_c1))` |
 | C2 summarizable | negative intrinsic-rank (from `subspace_phase_gate`) | `σ(β_c2 · (d_eff − τ_c2))` inverted |
 | C3 progress | positive divergence since last summary (DEC `codifferential` on belief cochain) | `σ(β_c3 · (div_since_last − τ_c3))` |
 | N1 stuck | negative novelty rate (from `cgsp_runtime` derivative curiosity, or ICT `collision_purity`) | `σ(β_n1 · (novelty − τ_n1))` inverted |

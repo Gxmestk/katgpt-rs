@@ -132,7 +132,7 @@ Combine `MeanFieldOverlap` + `HopfBoundary` + chaos-intensity `g` into the paper
 
 ### Tasks
 
-- [x] **T5.1 (PoC — `riir-ai/crates/riir-poc/`)** Implement `benches/mean_field_regime_poc.rs`:
+- [x] **T5.1 (PoC — `riir-ai/crates/riir-poc/`)** Implement `riir-ai/crates/riir-poc/benches/mean_field_regime_poc.rs`:
   - Implemented the paper's reduced 3D ODE (Eq. 55) as a modelless simulator with `(g, β)` knobs. Uses simplified `χ̄`/`Q_fp`/`G_eff` approximations (NOT the paper's exact DMFT self-consistency — see Issue 034 T1 for the upgrade path).
   - Sweeps a 5×5 `(g, β)` grid (`g ∈ {1.0, 1.2, 1.4, 1.6, 1.8}`, `β ∈ {0.0, 0.35, 0.55, 0.85, 1.4}` — paper Fig. 1 range).
   - Classifies each trajectory's qualitative regime from std-dev, sign-changes, autocorrelation.

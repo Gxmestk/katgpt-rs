@@ -643,11 +643,11 @@ External reviews correctly identified that `riir-ai` has every component needed 
 | Game replay → LoRA | `riir-gpu/src/game/trainer.rs` | `training` | Adapt `GameAction` enum → 82 Go tokens |
 | Game policy config | `riir-gpu/src/game/policy.rs` | `training` | Adapt `GameConfig` → 3 board + 82 action vocab |
 | WASM Validator SDK | `riir-validator-sdk/` | `go-wasm` | Compile `GoState::is_legal` → `go_validator.wasm` |
-| MTP projection cache | `riir-router/src/mtp_cache.rs` | `percepta` | Document as future: Go tokenizer → MTP projections |
+| MTP projection cache | `riir-ai/crates/riir-router/src/mtp_cache.rs` | `percepta` | Document as future: Go tokenizer → MTP projections |
 | Schur complement | `riir-gpu/src/schur.rs` | `training` | ✅ Domain-latent training — 1-shot weight updates |
-| Bandit + WASM + LoRA | `riir-examples/examples/bandit_with_real_model_demo.rs` | `bandit` | ✅ **Full pipeline proven**: Draft → DDTree → WasmPruner → Leviathan → bandit.update() |
-| Bomber tech A/B | `riir-examples/examples/bomber_tech_ab_demo.rs` | `bomber-wasm` | ✅ **Proven**: LoRA vs WASM vs LoRA+WASM vs Full HL — combined wins |
-| G-Zero arenas | `riir-examples/examples/g_zero_01_arena.rs` | `g_zero` | ✅ **Proven**: GZero beats Greedy/Validator/HL across Bomber + FFT |
+| Bandit + WASM + LoRA | `riir-ai/crates/riir-examples/examples/bandit_with_real_model_demo.rs` | `bandit` | ✅ **Full pipeline proven**: Draft → DDTree → WasmPruner → Leviathan → bandit.update() |
+| Bomber tech A/B | `riir-ai/crates/riir-examples/examples/bomber_tech_ab_demo.rs` | `bomber-wasm` | ✅ **Proven**: LoRA vs WASM vs LoRA+WASM vs Full HL — combined wins |
+| G-Zero arenas | `riir-ai/crates/riir-examples/examples/g_zero_01_arena.rs` | `g_zero` | ✅ **Proven**: GZero beats Greedy/Validator/HL across Bomber + FFT |
 
 ### 11.2 Proven Results (Not Theory)
 

@@ -273,7 +273,7 @@ graph TD
 
 ## §PoC Addendum (2026-07-03, Plan 371 Phase 5 T5.1; updated Issue 034 T1–T3 + saddle-magnitude check)
 
-The mandatory defend-wrong PoC ships at `riir-poc/benches/mean_field_regime_poc.rs`.
+The mandatory defend-wrong PoC ships at `riir-ai/crates/riir-poc/benches/mean_field_regime_poc.rs`.
 It implements the paper's reduced 3D ODE (Eq. 55), sweeps a 5×5 `(g, β)` grid,
 and compares the trajectory-classified regime against `RegimeClassifier::classify_with_g`.
 

@@ -89,7 +89,7 @@ Only proceed if Phase 1 T1.8 confirms a modelless quality gain. The primitive la
 
 - [x] **T2.3** Implement `ColliderRouterAdapter<PS: PreservationScorer>` as a generic adapter wrapping any `PreservationScorer` as a `PostCandidateRouter`. `PreservationScorer` is a NEW decoupling trait (lives in katgpt-core) — the canonical implementor is `ColliderConstraint` in katgpt-rs root (which katgpt-core cannot depend on, so the bound is generic). Consumers impl `PreservationScorer` for `ColliderConstraint` to wire it in. Per PoC §8, this pattern is competitive at low noise but degrades at high noise — ship as alternative, not default.
 
-- [x] **T2.4** **DEFERRED** the full prune-shift-grow decode loop — it composes with DDTree infrastructure that lives in katgpt-rs root (NOT katgpt-core). The trait + two router implementations are the right open-primitive scope; the multi-step decode loop is the consumer's composition job. The PoC at `riir-poc/src/lbr_poc.rs` already demonstrates the loop composition; riir-ai Plan 377 Phase 4 will wire it into `entity_cognition/`.
+- [x] **T2.4** **DEFERRED** the full prune-shift-grow decode loop — it composes with DDTree infrastructure that lives in katgpt-rs root (NOT katgpt-core). The trait + two router implementations are the right open-primitive scope; the multi-step decode loop is the consumer's composition job. The PoC at `riir-ai/crates/riir-poc/src/lbr_poc.rs` already demonstrates the loop composition; riir-ai Plan 377 Phase 4 will wire it into `entity_cognition/`.
 
 - [x] **T2.5** Added feature flag `local_branch_routing` to `katgpt-rs/crates/katgpt-core/Cargo.toml` (opt-in until Phase 3 GOAT gate passes — then promoted to `default`).
 
@@ -139,7 +139,7 @@ Only proceed if Phase 1 T1.8 confirms a modelless quality gain. The primitive la
 
 Only if Phase 3 promotes to default. Per-NPC post-action HLA routing.
 
-**Status: COMPLETE (T4.1–T4.4).** Shipped `riir-engine/src/post_action_router.rs` behind opt-in feature `post_action_router` (passthrough `katgpt-core/local_branch_routing`). 21/21 unit tests green. T4.4 latency gate PASS with 3–2500× headroom.
+**Status: COMPLETE (T4.1–T4.4).** Shipped `riir-ai/crates/riir-engine/src/post_action_router.rs` behind opt-in feature `post_action_router` (passthrough `katgpt-core/local_branch_routing`). 21/21 unit tests green. T4.4 latency gate PASS with 3–2500× headroom.
 
 ### Design decision: top-level module, not entity_cognition submodule
 
@@ -147,7 +147,7 @@ The plan said "Wire `PostCandidateRouter` into `entity_cognition/`", but the exi
 
 ### Tasks
 
-- [x] **T4.1** Wired `PostCandidateRouter` into `riir-engine/src/post_action_router.rs` (top-level module, gated by `post_action_router` feature). `NpcPostActionRouter` wraps `DotProductRouter` (the open primitive) with the NPC's committed personality direction as the dot-product target. `route_argmax` / `route_sampled` are pure `#[inline]` forwards — zero wrapper overhead. `refresh_direction` rebuilds the inner router on personality drift (~10% of ticks). 8 unit tests.
+- [x] **T4.1** Wired `PostCandidateRouter` into `riir-ai/crates/riir-engine/src/post_action_router.rs` (top-level module, gated by `post_action_router` feature). `NpcPostActionRouter` wraps `DotProductRouter` (the open primitive) with the NPC's committed personality direction as the dot-product target. `route_argmax` / `route_sampled` are pure `#[inline]` forwards — zero wrapper overhead. `refresh_direction` rebuilds the inner router on personality drift (~10% of ticks). 8 unit tests.
 - [x] **T4.2** `adaptive_width(curiosity, max_k, sharpness)` — maps curiosity drive ∈ [0,1] to K ∈ [1, max_k] via sigmoid projection around the midpoint. Low curiosity → K=1 (greedy, G3 bit-identical); high → K=max_k; NaN → K=1 (safe fallback). 7 unit tests verify monotonicity, clamping, NaN defense.
 - [x] **T4.3** Crowd-scale batch routing via two free functions: `route_crowd_argmax` (shared faction direction) and `route_crowd_argmax_per_npc_direction` (per-NPC directions, the common case). Stack-allocated `ArrayVec<&[f32], 16>` for the candidate slice-of-slices (zero heap alloc when K ≤ 16, which covers all production cases). 5 unit tests cover the layout invariants and the K>16 fallback path.
 - [x] **T4.4** Latency validation via `bench_377_phase4_post_action_router.rs` (criterion). Results:
@@ -197,4 +197,4 @@ Phase 4 (riir-ai per-NPC HLA routing) is optional, post-promotion, and lives in 
 
 **Post-promotion follow-up (2026-07-04):** the consumer-side `impl PreservationScorer for ColliderConstraint` shim was wired in `katgpt-rs/crates/katgpt-band/src/collider_pruner.rs` (pure forward to the existing `collider_preservation_score` inherent method; closes Research 376 §9 deviation #3). The `collider_consistency` feature now forwards `katgpt-core/local_branch_routing`. 2 unit tests guard the wiring (`preservation_scorer_trait_forward_matches_inherent` + `collider_router_adapter_accepts_collider_constraint`).
 
-**Phase 4 COMPLETE (2026-07-04):** shipped `riir-engine/src/post_action_router.rs` behind opt-in feature `post_action_router`. `NpcPostActionRouter` (wraps `DotProductRouter` with the committed personality direction), `adaptive_width` (curiosity → K via sigmoid), `route_crowd_argmax` + `route_crowd_argmax_per_npc_direction` (crowd-scale batch). 21/21 unit tests green. T4.4 latency gate PASS: single-NPC 20–32 ns (50× headroom), 1000-NPC crowd 19–32 µs (3–5× under target, 1500–2500× under 50ms/20Hz budget). The full katgpt-rs → riir-ai distillation chain (PoC → open primitive → consumer shim → riir-ai runtime) is now complete.
+**Phase 4 COMPLETE (2026-07-04):** shipped `riir-ai/crates/riir-engine/src/post_action_router.rs` behind opt-in feature `post_action_router`. `NpcPostActionRouter` (wraps `DotProductRouter` with the committed personality direction), `adaptive_width` (curiosity → K via sigmoid), `route_crowd_argmax` + `route_crowd_argmax_per_npc_direction` (crowd-scale batch). 21/21 unit tests green. T4.4 latency gate PASS: single-NPC 20–32 ns (50× headroom), 1000-NPC crowd 19–32 µs (3–5× under target, 1500–2500× under 50ms/20Hz budget). The full katgpt-rs → riir-ai distillation chain (PoC → open primitive → consumer shim → riir-ai runtime) is now complete.

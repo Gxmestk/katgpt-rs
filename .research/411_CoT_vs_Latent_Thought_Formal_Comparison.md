@@ -112,7 +112,7 @@ Empirical results confirm the theoretical separations: latent wins on paralleliz
 | "stochastic decoding" | sampling, `BoMSampler`, `QuasiMoTTo`, G-Zero self-play | Plans 281, 367; `katgpt-core/src/sampling/` |
 | "DAG evaluation" | DEC cell complex evaluation, cochain propagation | `katgpt-core/src/dec/` (`exterior_derivative`, `codifferential`) |
 | "computation graph" | cell complex, `CellComplex`, cochain field | `katgpt-core/src/dec/` |
-| "polylogarithmic depth" | `log^k n` iterations, rank-k functor | `latent_functor/k_selector.rs` (`K_OPTIONS = [1,2,4,8,16]`) |
+| "polylogarithmic depth" | `log^k n` iterations, rank-k functor | `riir-ai/crates/riir-engine/src/latent_functor/k_selector.rs` (`K_OPTIONS = [1,2,4,8,16]`) |
 
 ### 2.2 Closest prior art (BOTH layers, ALL repos)
 
@@ -138,9 +138,9 @@ Empirical results confirm the theoretical separations: latent wins on paralleliz
 | `katgpt-core/src/thinking_mode.rs` | `ThinkingMode::{Direct, Latent, CpuResample, Dendritic}` | The mode tag SwiR plugs into |
 | `katgpt-core/src/dec/` (operators.rs, hodge.rs, flow.rs) | `exterior_derivative`, `codifferential`, `hodge_decompose`, `CellComplex`, `CochainField` | The DAG substrate — cell complex = layered DAG, d = boundary operator, δ = divergence |
 | `katgpt-types/src/depth_invariance.rs` | `classify_chain`, `DepthInvarianceKind::{DepthInvariant, DepthSpecificRefinement}` | Classifies chains by depth behavior — directly related to depth-vs-size tradeoff |
-| `riir-engine/src/latent_functor/k_selector.rs` | `KSelectionBandit` over `[1,2,4,8,16]` | Per-relation rank-k selection = per-relation complexity class selection |
+| `riir-ai/crates/riir-engine/src/latent_functor/k_selector.rs` | `KSelectionBandit` over `[1,2,4,8,16]` | Per-relation rank-k selection = per-relation complexity class selection |
 | `riir-engine/src/latent_functor/reestimation.rs` | Coherence-driven re-estimation scheduler | The iterative refinement primitive (latent thought loop with halting) |
-| `riir-engine/src/latent_functor/depth_invariance_audit.rs` | Functor chain depth-invariance classification | Audits whether functor iteration is depth-invariant or drifts |
+| `riir-ai/crates/riir-engine/src/latent_functor/depth_invariance_audit.rs` | Functor chain depth-invariance classification | Audits whether functor iteration is depth-invariant or drifts |
 | `katgpt-core/src/breakeven/mod.rs` | `BreakevenTierPair`, cost-amortization routing | Routes by cost, not complexity class |
 | SwiR controller (`src/swir/`) | `SwiRController::step(entropy, ...)` | Mode switch on entropy trend |
 

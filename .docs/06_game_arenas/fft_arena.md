@@ -396,13 +396,13 @@ These utility functions are used by multiple player types:
 
 | File | Purpose |
 |------|----------|
-| `riir-examples/src/fft_arena.rs` | Shared battle runner: `BattleResult`, `BattleStats`, `run_battle`, `run_battle_default`, `extract_kills`, `extract_unit_stats`, `run_tournament` |
-| `riir-examples/examples/g_zero_fft_01_arena.rs` | 100-round ATB tournament: Greedy vs Validator vs HL vs GZero |
-| `riir-examples/examples/g_zero_fft_02_priority_proof.rs` | Priority dilemma regression test (poison/cure, kill/heal, silence/potion) |
-| `riir-examples/examples/g_zero_fft_03_stress_test.rs` | 125 concurrent battles (1000 CCU) with rayon, measures throughput |
-| `riir-examples/examples/g_zero_fft_04_tft_arena.rs` | TFT vs Greedy 100-round arena with mode tracking and provocation stats |
-| `riir-examples/examples/g_zero_fft_05_tft_gvg.rs` | Round-robin GvG: 4 party configs × 6 matchups × 250 rounds |
-| `riir-examples/examples/g_zero_fft_06_tft_benchmark.rs` | A/B benchmark: isolated TFT/HL/GZero/Greedy performance + latency |
+| `riir-ai/crates/riir-examples/src/fft_arena.rs` | Shared battle runner: `BattleResult`, `BattleStats`, `run_battle`, `run_battle_default`, `extract_kills`, `extract_unit_stats`, `run_tournament` |
+| `riir-ai/crates/riir-examples/examples/g_zero_fft_01_arena.rs` | 100-round ATB tournament: Greedy vs Validator vs HL vs GZero |
+| `riir-ai/crates/riir-examples/examples/g_zero_fft_02_priority_proof.rs` | Priority dilemma regression test (poison/cure, kill/heal, silence/potion) |
+| `riir-ai/crates/riir-examples/examples/g_zero_fft_03_stress_test.rs` | 125 concurrent battles (1000 CCU) with rayon, measures throughput |
+| `riir-ai/crates/riir-examples/examples/g_zero_fft_04_tft_arena.rs` | TFT vs Greedy 100-round arena with mode tracking and provocation stats |
+| `riir-ai/crates/riir-examples/examples/g_zero_fft_05_tft_gvg.rs` | Round-robin GvG: 4 party configs × 6 matchups × 250 rounds |
+| `riir-ai/crates/riir-examples/examples/g_zero_fft_06_tft_benchmark.rs` | A/B benchmark: isolated TFT/HL/GZero/Greedy performance + latency |
 
 ## Results
 
@@ -546,4 +546,4 @@ cargo test --features g_zero bench_fft -- --nocapture
 
 7. **ε-greedy decay prevents exploration death** — HL's decaying epsilon starts aggressive (15%) and reduces over rounds, preventing the late-game random actions that lose won battles. The decay rate matters more than the initial value.
 
-8. **Battle runner separation enables cross-project reuse** — extracting `run_battle` and `run_tournament` into `riir-examples/src/fft_arena.rs` decouples the battle loop from player implementations. New player types can be tested by implementing `FftPlayer` without touching the engine.
+8. **Battle runner separation enables cross-project reuse** — extracting `run_battle` and `run_tournament` into `riir-ai/crates/riir-examples/src/fft_arena.rs` decouples the battle loop from player implementations. New player types can be tested by implementing `FftPlayer` without touching the engine.
