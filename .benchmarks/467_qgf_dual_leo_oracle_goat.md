@@ -111,6 +111,24 @@ Verified by inspection — no CountingAllocator harness because the contract is 
 
 ### Root cause
 
+> **Correction (2026-07-18, post-Issue 554 in riir-ai):** the root cause
+> originally reported below as "synthetic data has no signal" was
+> **mis-attributed**. The actual root cause is riir-ai Issue 554:
+> `DualLeoTrainer::apply_leo_last_layer_update` is a `let _ = (grad, lr);`
+> no-op stub — LEO never updates during training. The "near-flat Q-fields"
+> are not because synthetic data is unlearnable but because LEO is
+> structurally frozen at xavier-init forever. The T11 diagnostic test
+> (lands with Issue 554) proves LEO weights are bit-identical before vs
+> after `train_step`. The original root cause analysis is preserved below.
+>
+> **Action:** re-run Bench 553's T9 test after Issue 554 lands (NOT after
+> Issue 552's GPU access). Issue 554 is the actual unblock — Issue 552
+> (GPU + civ trajectories) is necessary but not sufficient until 554 lands.
+> The G5 verdict (dual 0% vs single 0.5%) does NOT change — both numbers
+> are real measurements of frozen-noise-LEO behavior — but the verdict's
+> meaning changes from "quality gate FAILs on synthetic data" to "quality
+> gate FAILs because LEO was never trained at all".
+
 Synthetic training data (300 steps on goal-encoded one-hot state + 5% noise) produces near-flat Q-fields in both LEO and UVFA. LEO @ 0.50% is at chance (uniform-over-82 ≈ 1.22%). UVFA at this training scale is even more degenerate. Argmax over near-flat Q is dominated by initialization noise; the dual mix pulls the argmax toward a DIFFERENT arbitrary action — by chance worse on this eval seed.
 
 This is the **same lesson as Issue 549 / Plan 460 postmax dual-LEO flow-field fusion**: synthetic data on small nets has no real signal to fuse. The bench infrastructure is correct (the correctness invariant (b ≡ a) held bit-identically); the training is insufficient.
