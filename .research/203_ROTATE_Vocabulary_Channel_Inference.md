@@ -41,7 +41,7 @@ ROTATE (Rotation-Optimized Token Alignment in weighT spacE) is a data-free metho
 | Givens rotations | ✅ Shipped | `src/planar_quant/rotation.rs` |
 | `sparse_matmul` | ✅ Shipped | MLP forward with dead ReLU skip |
 | CNA neuron attribution | ✅ Shipped | `src/pruners/cna.rs` |
-| Vocabulary projection (lm_head) | ✅ Exists | `src/transformer.rs` |
+| Vocabulary projection (lm_head) | ✅ Exists | `crates/katgpt-percepta/src/transformer.rs` |
 
 ### What's Missing (the gap)
 

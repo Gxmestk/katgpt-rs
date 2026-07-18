@@ -278,7 +278,7 @@ Reasoning:
 
 ### Code References
 
-- `katgpt-core/src/shard_embedding.rs` — `JlProjectionMatrix` (same math family)
+- `crates/katgpt-core/src/shard_embedding.rs` — `JlProjectionMatrix` (same math family)
 - `katgpt-core/src/types.rs` — `LoraAdapter`, `lora_apply()`, `LoraPair`
 - `katgpt-core/src/simd.rs` — SIMD dispatch tiers (GPart apply uses `simd_dot_f32`)
 - `katgpt-core/tests/bench_230_shard_embedding_goat.rs` — GOAT benchmark template

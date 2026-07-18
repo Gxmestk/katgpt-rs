@@ -220,7 +220,7 @@ The plan task text wrote `(Σσ_k)² / Σσ_k²` (nuclear-to-Frobenius ratio) bu
 We implement the **standard stable rank** because:
 1. It matches the prescribed approximation exactly.
 2. It only needs the top singular value (cheap power iteration).
-3. It is consistent with the Roy-Vetterli definition already shipped in `data_probe/geometry.rs::effective_rank`.
+3. It is consistent with the Roy-Vetterli definition already shipped in `crates/katgpt-core/src/data_probe/geometry.rs::effective_rank`.
 
 Documented in the module-level doc comment of `crates/katgpt-core/src/data_probe.rs`.
 

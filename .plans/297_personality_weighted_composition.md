@@ -123,8 +123,8 @@ Goal: feature flag → default; README updated.
 
 - [x] **T5.1** If G4/G5 pass: add `personality_composition` to default features in `katgpt-rs/Cargo.toml`
 - [x] **T5.2** Add Feature Showcase section to `katgpt-rs/README.md` (1 paragraph + the kernel formula + the trait surface)
-- [x] **T5.3** Add `examples/personality_composition_01_basic.rs` — minimal demo: 3 layers, drift over 100 ticks, show weights converge
-- [x] **T5.4** Add `examples/personality_composition_02_taming.rs` — minimal demo: wildlife entity, food reward, show `w_COMPANIONS(player)` rises above `τ_tame` (the open-primitive half of the taming story; the species-swap happens in the host/riir-ai)
+- [x] **T5.3** Add `crates/katgpt-core/examples/personality_composition_01_basic.rs` — minimal demo: 3 layers, drift over 100 ticks, show weights converge
+- [x] **T5.4** Add `crates/katgpt-core/examples/personality_composition_02_taming.rs` — minimal demo: wildlife entity, food reward, show `w_COMPANIONS(player)` rises above `τ_tame` (the open-primitive half of the taming story; the species-swap happens in the host/riir-ai)
 - [x] **T5.5** Cross-link `katgpt-rs/.research/276_*.md` to this plan in the "Status" line
 
 ---

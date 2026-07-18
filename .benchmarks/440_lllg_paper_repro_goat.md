@@ -280,7 +280,7 @@ ht_chantry has 2.5× more. Both real maps are single connected components
 
 The prior ht_chantry throughput of 0.01 (Issues 140–144) was misdiagnosed as
 severe bottleneck congestion requiring Guided-PIBT. Diagnostic
-(`examples/ht_chantry_diagnostic.rs`) revealed the `ht_chantry_approx` map
+(`crates/katgpt-core/examples/ht_chantry_diagnostic.rs`) revealed the `ht_chantry_approx` map
 generator created **37 disconnected components**:
 
 - Full-width horizontal walls (every 8 rows) with two 2-wide gaps each.
@@ -310,7 +310,7 @@ corridor density).
 
 ### Remaining gap analysis (1.47 vs paper ~17)
 
-A config sweep (`examples/ht_chantry_config_sweep.rs`) tested:
+A config sweep (`crates/katgpt-core/examples/ht_chantry_config_sweep.rs`) tested:
 
 1. **w_Φ sweep** (5, 10, 15, 20): w_Φ=10 gives +16% (1.00→1.16 at 200
    agents). w_Φ=15+ shows diminishing returns (1.06, regresses).

@@ -83,8 +83,8 @@ The novel training objective `L_TV = 1 − Σ_v min(p_v, q_v)` directly optimize
 | RS acceptance = `1 − dTV(p,q)` | `LeviathanVerifier` (`src/speculative/verifier.rs:128`, "Real p/q rejection sampling (Algorithm 1)"); target probs cached in `p_distributions_flat` (`speculative/types.rs:225`) | ✅ shipped |
 | RS preferred over target-only | `LeviathanVerifier` always uses RS; `step.rs:66`, `trust_region.rs:153`, `d2f_verifier.rs:151` all use p/q RS | ✅ shipped (correct default) |
 | Entropy → verification budget | `llmexec_guard` (`src/llmexec_guard.rs`): `sigmoid(-steepness·(entropy−0.5) + depth_bonus)` → `VerifyTier::{Skip, Screening, FullVerify}` | ⚠️ shipped but **ad-hoc sigmoid**, not the paper's **proven linear α forecast** |
-| Entropy-spike detection | `RejectionReason::EntropySpike` in `src/distill/trd.rs:56`, gated by `entropy_threshold` | ✅ shipped |
-| Acceptance-rate bandit reward | `freq_bandit` (`src/freq_bandit.rs:315`, "reward = acceptance_rate × latency_improvement"), `fold_bandit`, `meta_router` (`src/dash_attn/meta_router.rs:206`) | ✅ shipped |
+| Entropy-spike detection | `RejectionReason::EntropySpike` in `crates/katgpt-speculative/src/distill/trd.rs:56`, gated by `entropy_threshold` | ✅ shipped |
+| Acceptance-rate bandit reward | `freq_bandit` (`crates/katgpt-pruners/src/freq_bandit.rs:315`, "reward = acceptance_rate × latency_improvement"), `fold_bandit`, `meta_router` (`crates/katgpt-attn/src/dash_attn/meta_router.rs:206`) | ✅ shipped |
 | EMA entropy tracking | `AdaptiveTraceCompactor::observe_entropy` (`src/attn_match/adaptive_cot.rs:159`), `α=0.1` EMA | ✅ shipped (for KV compaction, not spec-decode γ) |
 | TV distance / Pinsker | `verify_pinsker_bound` in `riir-train/crates/riir-train-engine/src/critical_position.rs:177` | ✅ shipped in **riir-train** (training-side, correct repo) |
 

@@ -152,7 +152,7 @@ Closest cousins across all five repos:
 **One-line reasoning:** Zero prior art for `(max, +)` primitives across all five repos + genuinely new algebraic class + force multiplier across DEC/functor/shard + **G1 non-redundancy gate passed 3/3 substrates** + **G2 perf gate passed after NEON specialization (D=64 0.96×, D=128 1.03× vs simd_matvec)** + product selling point confirmed. See riir-ai/.research/164.
 
 **Super-GOAT criteria (re-checked 2026-06-28 after G1+G2 gates):**
-- Q1 (no prior art?): ✅ Confirmed zero hits on `tropical|max-plus|maxplus|max_plus` outside tokenizers and unrelated `INV_U32_MAX_PLUS_1` constants. The `morphological dilation` in `flow/fft.rs` (Plan 242) is **binary obstacle inflation**, not tropical convolution.
+- Q1 (no prior art?): ✅ Confirmed zero hits on `tropical|max-plus|maxplus|max_plus` outside tokenizers and unrelated `INV_U32_MAX_PLUS_1` constants. The `morphological dilation` in `crates/katgpt-core/src/flow/fft.rs` (Plan 242) is **binary obstacle inflation**, not tropical convolution.
 - Q2 (new class?): ✅ Every shipped latent op is `(ℝ, +, ·)`-linear or sigmoid-gated. `(max, +)` is a different semiring.
 - Q3 (selling point?): ✅ **Confirmed.** G1 gate showed tropical signal non-redundant on 3/3 substrates. Selling point: "NPCs compute worst-case survival paths via tropical line integrals, complementing expected-engagement sum-paths" — see riir-ai/.research/164.
 - Q4 (force multiplier?): ✅ TropicalDEC × TropicalFunctor × shard retrieval × game maps ≥ 3 pillars.

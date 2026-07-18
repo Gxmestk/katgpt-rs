@@ -295,7 +295,7 @@ High-level entry points that compose the full speculative decoding pipeline.
 
 ---
 
-## D2F: Discrete Diffusion Forcing (`speculative/d2f.rs`, behind `"dllm"` feature)
+## D2F: Discrete Diffusion Forcing (`src/speculative/d2f.rs`, behind `"dllm"` feature)
 
 A third decode strategy alongside autoregressive and speculative. D2F decodes entire blocks of tokens in parallel via iterative denoising, using block-causal attention: **bidirectional within each block** (intra-block positions attend to each other), **causal across blocks** (inter-block attention is strictly left-to-right). This preserves standard KV cache semantics — previously decoded blocks accumulate KV entries that subsequent blocks reuse without recomputation.
 

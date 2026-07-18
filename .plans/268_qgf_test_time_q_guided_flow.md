@@ -109,7 +109,7 @@ At generation step t with prefix p_t and drafter velocity v_t:
 - [x] Unit test: known prefix → deterministic projection (mock generator)
 - [x] Unit test: projection cost = 1 generator call (no BPTT)
 - [x] Benchmark: projection overhead < existing drafter call cost + 10%
-  - **Bench:** `katgpt-core/benches/qgf_projector_bench.rs` (criterion).
+  - **Bench:** `crates/katgpt-core/benches/qgf_projector_bench.rs` (criterion).
     Compares `project_one_step` / `project_batch` vs direct `generate()` /
     `generate_batch()` across three generator cost tiers (cheap=4 iters,
     medium=64 iters, expensive=1024 iters).
@@ -273,7 +273,7 @@ At generation step t with prefix p_t and drafter velocity v_t:
      for TvpSignal` — surfaces `reasoning_disagreement` (NOT format or KL:
      format is cosmetic-noise that canonicalization was built to remove; KL
      is unbounded). Defensive clamp guards against fuzzed/deserialized values.
-  3. **`QGuidedDrafter`** (`qgf/drafter.rs`): new `tilt_logits_adaptive_with_signal`
+  3. **`QGuidedDrafter`** (`crates/katgpt-core/src/qgf/drafter.rs`): new `tilt_logits_adaptive_with_signal`
      method — accepts any `&S where S: QgfVarianceSignal` and bridges it to a
      per-query `1/β` via `adaptive_guidance_weight_from_signal`. Kept as a
      separate method from `tilt_logits_adaptive` (which reads
@@ -339,7 +339,7 @@ At generation step t with prefix p_t and drafter velocity v_t:
 - [x] Hot/Plasma impl: `FlowFieldOracle` wrapping `FlowField` (FFT-smoothed)
 - [x] Warm impl: GPU batched critic (training-time / large batch) — deferred to riir-gpu
   ✅ DONE 2026-07-02 (katgpt-core scope). New `WarmTierOracle<S,A,D>` in
-  `qgf/oracles.rs` adapts the `QgfGpuDelegate` trait (T8) into a
+  `crates/katgpt-core/src/qgf/oracles.rs` adapts the `QgfGpuDelegate` trait (T8) into a
   `QGradientOracle` for single-query use. GPU failure → zeroed gradient →
   safe BC fallback (self-degrading). 5 unit tests (gradient write,
   into-matches-at, failure-zeroes-buffer, confidence, accessor). The
@@ -347,7 +347,7 @@ At generation step t with prefix p_t and drafter velocity v_t:
   via `WarmTierOracle::new(my_gpu_delegate, action_space)`.
 - [x] Cold impl: Turso Q-table loader (episode-end consolidation) — deferred (needs turso)
   ✅ DONE 2026-07-02 (katgpt-core scope). New `ColdTierOracle<L>` +
-  `QTableLoader` trait in `qgf/oracles.rs`. katgpt-core ships the oracle
+  `QTableLoader` trait in `crates/katgpt-core/src/qgf/oracles.rs`. katgpt-core ships the oracle
   logic + the trait; the upper layer (`riir-engine` / `riir-chain`)
   implements `QTableLoader` with its encrypted turso/libSQL client. This
   keeps turso OUT of katgpt-core's deps (lowest layer stays dependency-
@@ -359,7 +359,7 @@ At generation step t with prefix p_t and drafter velocity v_t:
 - [x] Test: Freeze tier produces identical output to unguided generator
   (`test_zero_weight_matches_base` + `test_no_guidance_oracle_zero_gradient`)
 - [x] Test: tier promotion/demotion does not corrupt in-flight generation
-  ✅ DONE 2026-07-02. Two tests in `qgf/drafter.rs`:
+  ✅ DONE 2026-07-02. Two tests in `crates/katgpt-core/src/qgf/drafter.rs`:
   `test_tier_promotion_demotion_no_corruption` — runs tilt_logits across a
   Freeze→Plasma→Freeze mid-sequence switch (via a `SwappableOracle` whose
   `plasma_active` flag flips), verifying (a) no panic, (b) pre-swap logits
@@ -459,9 +459,9 @@ At generation step t with prefix p_t and drafter velocity v_t:
 #### T13: Documentation
 - [x] Add QGF section to `katgpt-rs/README.md` Feature Showcase
 - [x] Update `katgpt-rs/.docs/01_overview.md` Feature Flags table
-- [x] Add `examples/qgf_01_guided_drafter.rs` — minimal usage
-- [x] Add `examples/qgf_02_adaptive_weight.rs` — F4 adaptive guidance
-- [x] Add `examples/qgf_03_tier_routing.rs` — plasma/hot/warm/cold/freeze demo
+- [x] Add `crates/katgpt-core/examples/qgf_01_guided_drafter.rs` — minimal usage
+- [x] Add `crates/katgpt-core/examples/qgf_02_adaptive_weight.rs` — F4 adaptive guidance
+- [x] Add `crates/katgpt-core/examples/qgf_03_tier_routing.rs` — plasma/hot/warm/cold/freeze demo
 - [x] Cross-link Research 236 ↔ Plan 268 ↔ Plan 229 (NFCoT)
   ✅ Research 236 ↔ Plan 268 cross-linked in README + .docs + mod.rs rustdoc.
   Plan 229 (NFCoT) cross-linked in Phase 2 T6 below (already marked ✅ COMPLETE).

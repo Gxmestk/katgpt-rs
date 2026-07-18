@@ -21,7 +21,7 @@ Two transferable primitives, one theoretical confirmation, one Pass:
 
 2. **SSMax (multiplicative log-N score rescaling) — NOVEL.** `s̃_L = s_L · log N · s_{L,h,t}` applied to pre-softmax logits, with `s_L` a per-layer learnable scalar. The paper proves the log-N schedule cancels the (N−1) growth in the softmax denominator when `s·Δ > 1` (where Δ = gold–distractor logit gap), so the post-softmax gold weight stays bounded as N grows. We do not ship any length-aware attention temperature. This is the paper's strongest modelless contribution and a clean GOAT candidate for `parallax_attn` / `attention.rs`.
 
-3. **GoldShare diagnostic — clean addition to `data_probe`.** `‖a^G_L‖ / ‖a_L‖` decomposes the layer's attention output into gold-derived and distractor-derived fractions. The paper shows this drops 0.91 → 0.01 across N ∈ {500 → 10k} while `‖a_L‖` shrinks only ~36% — i.e. the layer keeps writing at comparable magnitude but the *content* swaps from gold to aggregate-of-distractors. We ship `effective_rank` and `stable_rank_update` in `data_probe/geometry.rs` and `sink_classify.rs`; the gold-specific output-fraction decomposition is a complementary diagnostic and a clean addition.
+3. **GoldShare diagnostic — clean addition to `data_probe`.** `‖a^G_L‖ / ‖a_L‖` decomposes the layer's attention output into gold-derived and distractor-derived fractions. The paper shows this drops 0.91 → 0.01 across N ∈ {500 → 10k} while `‖a_L‖` shrinks only ~36% — i.e. the layer keeps writing at comparable magnitude but the *content* swaps from gold to aggregate-of-distractors. We ship `effective_rank` and `stable_rank_update` in `crates/katgpt-core/src/data_probe/geometry.rs` and `sink_classify.rs`; the gold-specific output-fraction decomposition is a complementary diagnostic and a clean addition.
 
 4. **Top-B document-level sparse attention — already ships** as MSA / VortexFlow (Research 225, `msa_distill.rs` max-pool + exp-free TopK + per-GQA-group selection). The paper's "doc-level routing at L16 before the retrieval band" maps directly to MSA's indexer branch. No new primitive.
 
@@ -131,8 +131,8 @@ pub fn gold_share(
 This is complementary to our existing `effective_rank` (whole-layer output geometry) and `stable_rank_update` (per-sink degeneracy). `effective_rank` detects *aggregate* collapse; `stable_rank_update` detects per-sink NOP-vs-Broadcast; `gold_share` detects *content-specific* dilution — "is this layer still carrying the signal we care about, or has it been rewritten to carry aggregate noise?"
 
 **Where it composes:**
-- `data_probe/geometry.rs` — extend with a content-aware variant (`gold_share`) alongside the content-agnostic `effective_rank`.
-- `data_probe/sink_classify.rs` — cross-reference: a sink classifier hit on the gold position with low GoldShare is a *broadcast that failed* (signal was in the head but didn't survive normalization).
+- `crates/katgpt-core/src/data_probe/geometry.rs` — extend with a content-aware variant (`gold_share`) alongside the content-agnostic `effective_rank`.
+- `crates/katgpt-core/src/data_probe/sink_classify.rs` — cross-reference: a sink classifier hit on the gold position with low GoldShare is a *broadcast that failed* (signal was in the head but didn't survive normalization).
 - Runtime NPC cognition (riir-ai follow-up, not this note): a "belief-share" analog for HLA — does the NPC's HLA projection still carry its personal signal, or has it been drowned by aggregate crowd projections?
 
 ### 2.3 What does NOT transfer
@@ -203,7 +203,7 @@ If G1 + G2 pass → promote `ssmax_temperature` to default in `parallax_attn` (i
 | Artifact | Repo | Path |
 |---|---|---|
 | SSMax logit rescaling primitive | katgpt-rs (public, MIT) | extend `crates/katgpt-core/src/parallax_attn.rs` and/or `crates/katgpt-core/src/attention.rs` behind `ssmax_temperature` feature |
-| GoldShare diagnostic | katgpt-rs (public) | extend `crates/katgpt-core/src/data_probe/geometry.rs` (or new `data_probe/gold_share.rs`) behind `sink_aware_attn` or a new `gold_share_probe` feature |
+| GoldShare diagnostic | katgpt-rs (public) | extend `crates/katgpt-core/src/data_probe/geometry.rs` (or new `crates/katgpt-core/src/data_probe/gold_share.rs`) behind `sink_aware_attn` or a new `gold_share_probe` feature |
 | Plan | katgpt-rs | `.plans/NNN_ssmax_goldshare.md` |
 | Crowd-scale cognition readout-fidelity probe (fusion follow-up) | riir-ai (private) | file as `.issues/NNN_*` if the fusion idea matures; needs PoC per research skill §3.6 before any quality claim |
 

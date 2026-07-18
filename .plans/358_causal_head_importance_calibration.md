@@ -322,7 +322,7 @@ Ship two modelless, inference-time primitives distilled from HydraHead (arXiv:26
 
 ### Tasks
 
-- [x] **T2.1 (G1 — correctness)** Unit tests in `tests/causal_head_importance_g1.rs`:
+- [x] **T2.1 (G1 — correctness)** Unit tests in `crates/katgpt-core/tests/causal_head_importance_g1.rs`:
   - Synthetic FA head harness: `n_heads` heads, of which a known `k_load_bearing` subset writes the signal into the readout, and `n_heads − k_load_bearing` are *correlated bystanders* (attend to the needle but project to zero in the readout direction).
   - Compute IE scores via the closure-based patched-forward-pass (mock the forward pass as a linear map so `m_patched` is exactly computable).
   - Assert: load-bearing heads all have IE > threshold (0.01); bystanders all have IE < threshold; ranking puts load-bearing above bystanders (Spearman ρ = 1.0 on this clean synthetic).

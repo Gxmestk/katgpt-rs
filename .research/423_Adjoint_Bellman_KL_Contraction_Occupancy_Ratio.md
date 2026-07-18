@@ -159,7 +159,7 @@ A simpler density-ratio regression variant exists (Algorithm 2: regress `ω(X)` 
 | adjoint Bellman operator `B^γ_π` | (none shipped under that name) — structurally isomorphic to **DEC `codifferential`** (adjoint of `exterior_derivative` under L² inner product); also `latent_functor/reestimation.rs::ReestimationScheduler` (the "coherence < tau_reest → re-derive" loop is a fitted iteration on coherence ratios) |
 | Markov kernel pushforward `(ων)P_π` | `forward_kernel` / `pushforward` — **not shipped as a named primitive**; closest is `katgpt_hla::evolve_hla` (per-NPC belief pushforward through sense kernel) and `induced_cwm` (`advance()` on induced `GameState`) |
 | KL projection onto normalized exponential class | `dirichlet.rs` (cousin), `softmax` normalization appears in `product_key_memory.rs` (with explicit "deviation from sigmoid rule" comment) |
-| fitted Q-iteration | `mcts.rs` (tree-based, not fitted), `cgsp/dual_pool.rs` (online routing, not fitted) — **no fitted Bellman regression ships** |
+| fitted Q-iteration | `mcts.rs` (tree-based, not fitted), `crates/katgpt-core/src/cgsp/dual_pool.rs` (online routing, not fitted) — **no fitted Bellman regression ships** |
 | Bellman completeness | not in codebase vocabulary; closest concept is `subspace_phase_gate` (N≥d sufficient condition for freezing, a different sufficiency gate) |
 | doubly robust estimation | not shipped |
 | concentrability / coverage | not shipped as a named condition; closest is `neighbor_heal.rs` (k-HLA-neighbor coverage) and `diverse_retrieval` (wedge coverage) |

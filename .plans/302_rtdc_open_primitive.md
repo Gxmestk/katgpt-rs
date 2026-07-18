@@ -358,7 +358,7 @@ The hard problem: prove that roots[d] is a faithful aggregation of roots[d+1].
       (2026-06-22). After investigating the literature and the RTDC leaf
            data model, Candidate B is a **category error**:
       1. RTDC leaves are 32-byte BLAKE3 hashes, not numerical samples.
-         `fft_smooth_into()` (Plan 242, `flow/fft.rs`) operates on
+         `fft_smooth_into()` (Plan 242, `crates/katgpt-core/src/flow/fft.rs`) operates on
          `Vec<f32>` LEO Q-values — a totally different data type.
       2. FFT batch verification (in the cryptographic sense, e.g.
          arXiv:2405.07941 OR-proofs, or FRI/STARK-based batch Merkle)

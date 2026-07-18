@@ -361,4 +361,4 @@ commit.
 - **Variable n (heteroscedastic — the real-world case): WINS 15–30%.** When candidates have different evidence weights (frozen snapshots with different deployment durations), Beta reduces selection regret by 15–30% across n_mean ∈ [4, 128].
 - **Low-data stress (one candidate n_lo=2): WINS 61–77%.** A 2/2 lucky streak has MLE=1.0 (false positive) but BB_0.05(2,0)≈0.025 (correctly discounted).
 
-`best_belief` stays DEFAULT-ON (Phase 2 promotion confirmed by the floor comparison). See `tests/conformal_floor_best_belief.rs`, `.benchmarks/010_best_belief_floor_comparison.md`.
+`best_belief` stays DEFAULT-ON (Phase 2 promotion confirmed by the floor comparison). See `crates/katgpt-core/tests/conformal_floor_best_belief.rs`, `.benchmarks/010_best_belief_floor_comparison.md`.

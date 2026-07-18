@@ -78,7 +78,7 @@ Goal: prove the theoretical guarantee (Eq. 1: sum-of-mins ≤ min-of-sums) holds
 
 ### Tasks
 
-- [x] **T2.1** Implement `tests/mcts_state_action_cache_eq1.rs` — a property test of the switching-policy dominance inequality:
+- [x] **T2.1** Implement `crates/katgpt-core/tests/mcts_state_action_cache_eq1.rs` — a property test of the switching-policy dominance inequality:
   - [x] Construct a synthetic kernel-error landscape: `ε_a(z) = known_function(a, z)` for `a ∈ {0,1,2}` (three actions) and `z` ranging over a discrete grid of 100 states.
   - [x] Compute LHS: `Σ_z min_a ε_a(z)` (state-dependent switching policy)
   - [x] Compute RHS: `min_a Σ_z ε_a(z)` (best static single action)
@@ -124,7 +124,7 @@ This domain is chosen because:
 
 ### Tasks
 
-- [x] **T3.1** Implement `benches/bench_390_mcts_state_action_cache_goat.rs` (`harness = false`, `required-features = ["mcts_state_action_cache"]`):
+- [x] **T3.1** Implement `crates/katgpt-core/benches/bench_390_mcts_state_action_cache_goat.rs` (`harness = false`, `required-features = ["mcts_state_action_cache"]`):
   - [x] Build the synthetic dLLM-like domain (16-token sequences, 7 depth levels, 3 actions, deterministic transitions, terminal reward)
   - [x] **G1 — cache hit rate vs NFE**: sweep NFE ∈ {256, 512, 1024, 2048, 4096, 8192}, measure cache hit rate. Target: ≥30% hit rate at NFE ≥ 1024. **RESULT: PASS — 42.1% at NFE=1024.**
   - [x] **G2 — effective-budget expansion at matched reward**: at fixed target reward, measure NFE required for cached vs no-cache. Target: ≥1.4×. **RESULT: FAIL — re-gated 2026-07-07 (Issue 044) with three fixes (scaled domain 48/12/5, true no-cache baseline via `StateActionCache::disabled()`, direct NFE-savings metric via `total_rollout_steps`). G2a reward-convergence: 0/6 strict wins (both arms converge to 1.000 at NFE=256). G2b NFE-savings: 1.01–1.03× expansion (avg_rollout_depth=0.6–0.7; rollouts are short because the tree itself reaches terminal depth). The synthetic domain's `apply` is too cheap (4-token array write ~ns) for cache hits to translate to meaningful NFE savings. Only a real dLLM PoC (Plan 5) where each `apply` is a full forward pass can show the budget-expansion benefit.**

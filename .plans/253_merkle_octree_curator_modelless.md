@@ -39,7 +39,7 @@ Add a **modelless verification layer** to the existing KG Latent Octree Sense Co
 ### Phase 4: Tests & Benchmarks
 
 - [x] **T9: Unit tests** — MerkleOctree build (empty, single leaf, full 64 leaves), proof gen + verify (valid proof, tampered leaf, wrong root), curator verifier (consistent KG, inconsistent KG, spectral anomaly), bandit reputation (convergence after N verifications). — `katgpt-core/src/merkle.rs`, `katgpt-core/crates/katgpt-core/src/curator.rs`
-- [x] **T10: Benchmark** — Merkle build from 64 KG embeddings (< 5µs target), proof generation (< 1µs), proof verify (< 1µs), curator verify single module (< 2µs), bandit sample + update (< 100ns). — `katgpt-core/benches/merkle_octree_bench.rs`
+- [x] **T10: Benchmark** — Merkle build from 64 KG embeddings (< 5µs target), proof generation (< 1µs), proof verify (< 1µs), curator verify single module (< 2µs), bandit sample + update (< 100ns). — `crates/katgpt-core/benches/merkle_octree_bench.rs`
 - [x] **T11: GOAT proof** — inclusion proof verifies in < 1µs, full Merkle build from `SenseModule` data < 5µs, curator bandit converges within 100 episodes to > 75% accuracy. Create `.benchmarks/221_merkle_octree_goat.md` with results. — `.benchmarks/221_merkle_octree_goat.md`
 
 ### Phase 5: Feature Gate & Integration

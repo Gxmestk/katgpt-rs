@@ -94,12 +94,12 @@ This is **not** a new primitive — FuncAttn is the primitive. This is the **con
 
 ### Tasks
 
-- [x] **T2.1 (G1 — correctness)** Write unit tests in `tests/functional_substitution_g1.rs`:
+- [x] **T2.1 (G1 — correctness)** Write unit tests in `crates/katgpt-core/tests/functional_substitution_g1.rs`:
   - Identity surrogate (IoU = 1.0, faithfulness delta = 0) → gate accepts.
   - Disjoint surrogate (IoU = 0.0) → gate rejects (regardless of faithfulness).
   - Partial-overlap surrogate at known IoU (e.g., 0.5) → gate accepts iff `tau_iou ≤ 0.5 AND faithfulness ≤ tau_behavior`.
   - High IoU but high behavior delta → gate rejects (faithfulness veto).
-- [x] **T2.2 (G3 — hot-path latency)** Benchmark `HeadSubstitutionGate::should_substitute` against a baseline that always returns `false`. Target: ≤ 5% overhead. Use `criterion` bench at `benches/functional_substitution_g3.rs`. Head counts: 4, 16, 144.
+- [x] **T2.2 (G3 — hot-path latency)** Benchmark `HeadSubstitutionGate::should_substitute` against a baseline that always returns `false`. Target: ≤ 5% overhead. Use `criterion` bench at `crates/katgpt-core/benches/functional_substitution_g3.rs`. Head counts: 4, 16, 144.
 - [x] **T2.3 (G4 — zero-alloc)** Add `#[inline]` to `should_substitute`. Verify the gate itself allocates nothing on the hot path (no `Vec` growth, no `Box`).
 - [x] **T2.4** Run full crate test suite to confirm no regressions: `cargo test -p katgpt-core --features functional_substitution_gate --lib`.
 
@@ -113,7 +113,7 @@ The paper's strongest empirical claim is that IoU is a valid *cheap proxy* for *
 
 ### Tasks
 
-- [x] **T3.1** Build a synthetic harness in `tests/functional_substitution_g2.rs`:
+- [x] **T3.1** Build a synthetic harness in `crates/katgpt-core/tests/functional_substitution_g2.rs`:
   - Generate a synthetic "real" attention matrix with a known structure (e.g., first-token + lower-diagonal per paper Fig 4b GPT-2 categories).
   - Generate a family of surrogates with controlled IoU (0.0, 0.2, 0.4, 0.6, 0.8, 1.0) by blending the real matrix with noise.
   - For each surrogate: measure (a) IoU against real, (b) behavioral delta — KL divergence between softmax(real_tokens) and softmax(surrogate_tokens) on a downstream "task" (a fixed linear projection to a scalar "perplexity proxy").

@@ -70,7 +70,7 @@ Ship the **modelless half** of canvas engineering: a typed `CanvasSchema` compil
 
 ### Tasks
 
-- [x] **T3.1** `canvas/reachability.rs` — information-flow graph `G` as CSR adjacency (`FlowGraph`); arc `dst → src` per connection (info flow). Reuses the CSR pattern from `viable_manifold_graph`.
+- [x] **T3.1** `crates/katgpt-core/src/canvas/reachability.rs` — information-flow graph `G` as CSR adjacency (`FlowGraph`); arc `dst → src` per connection (info flow). Reuses the CSR pattern from `viable_manifold_graph`.
 - [x] **T3.2** `reachability_horizon(n_blocks, n_steps) -> n_blocks·n_steps`.
 - [x] **T3.3** `can_reach(g, from, to, horizon)` — bounded BFS (convenience API; allocates a visited set per call).
 - [x] **T3.4** `TransitiveClosure::build(g, horizon)` + `reaches(from, to)` — precomputed `(n×n)` bitset, **zero-alloc** O(1) hot path.
@@ -97,7 +97,7 @@ Ship the **modelless half** of canvas engineering: a typed `CanvasSchema` compil
 
 ## Phase 5 — GOAT Gate (G1–G6) ✅ DONE — all PASS
 
-Bench: `katgpt-core/benches/bench_419_canvas_schema_goat.rs`. Record: [`.benchmarks/419_canvas_schema_goat.md`](../.benchmarks/419_canvas_schema_goat.md).
+Bench: `crates/katgpt-core/benches/bench_419_canvas_schema_goat.rs`. Record: [`.benchmarks/419_canvas_schema_goat.md`](../.benchmarks/419_canvas_schema_goat.md).
 
 ### Tasks
 

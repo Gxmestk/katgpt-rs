@@ -86,7 +86,7 @@ These categories mirror what Seal Online dialog/quest/KG data would look like in
    - `SigmoidLatentCodec<D, K>` — generic latent projection codec (API-uniformity facade over `DensityBudget`), 11 unit tests (`sigmoid_latent.rs`)
    - `BabelCommitment` — BLAKE3 `[u8; 32]` newtype, 12 unit tests (`commitment.rs`)
    - **45/45 unit tests pass** under both `--features babel_codec` and `--all-features`.
-2. **GOAT bench** (`tests/bench_331_babel_codec_goat.rs`) — G1/G3/G4/G5 pass, G2 fails honestly.
+2. **GOAT bench** (`crates/katgpt-core/tests/bench_331_babel_codec_goat.rs`) — G1/G3/G4/G5 pass, G2 fails honestly.
 3. **Feature stays opt-in** (`babel_codec = []`), NOT in `default`. No promotion.
 
 ---

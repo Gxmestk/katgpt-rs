@@ -19,8 +19,8 @@ Ship the `(max, +)` tropical semiring as a modelless inference primitive: `tropi
 ### Tasks
 
 - [x] **T1.1** Cargo feature `tropical_algebra = []` (opt-in, no default deps) in `katgpt-rs/crates/katgpt-core/Cargo.toml`.
-- [x] **T1.2** New module `katgpt-rs/crates/katgpt-core/src/algebra/mod.rs` + `algebra/tropical.rs`. Module doc explains the (max, +) semiring, references Research 321 §1.2 and Smets Ch. 3 §3.5.
-- [x] **T1.3** Core primitive in `algebra/tropical.rs`:
+- [x] **T1.2** New module `katgpt-rs/crates/katgpt-core/src/algebra/mod.rs` + `crates/katgpt-core/src/algebra/tropical.rs`. Module doc explains the (max, +) semiring, references Research 321 §1.2 and Smets Ch. 3 §3.5.
+- [x] **T1.3** Core primitive in `crates/katgpt-core/src/algebra/tropical.rs`:
   - `pub fn tropical_matvec_into(w_row_major: &[f32], x: &[f32], out: &mut [f32], n_rows: usize, n_cols: usize)` — `(W ⊗ x)_i = max_j (W[i,j] + x[j])`. Initialize `out[i] = f32::NEG_INFINITY`, accumulate via `out[i] = out[i].max(w[i*n_cols+j] + x[j])`. Branch-free inner loop (LLVM auto-vectorizes `f32::max` on NEON/AVX2).
   - `pub fn tropical_dot_into(a: &[f32], b: &[f32], out: &mut f32, n: usize)` — `max_j (a[j] + b[j])`. Convenience scalar variant.
   - `pub fn tropical_matvec(w: &[f32], x: &[f32], n_rows: usize, n_cols: usize) -> Vec<f32>` — allocating wrapper for cold paths / tests.
@@ -36,7 +36,7 @@ Ship the `(max, +)` tropical semiring as a modelless inference primitive: `tropi
 
 ### Tasks
 
-- [x] **T2.1** Three DEC wrappers in `algebra/tropical.rs`, all `#[cfg(feature = "tropical_algebra")]`, all delegating to the shipped `dec/operators.rs` boundary matrices:
+- [x] **T2.1** Three DEC wrappers in `crates/katgpt-core/src/algebra/tropical.rs`, all `#[cfg(feature = "tropical_algebra")]`, all delegating to the shipped `dec/operators.rs` boundary matrices:
   - `tropical_exterior_derivative(cx: &CellComplex, input: &CochainField) -> CochainField` — for each (k+1)-cell, output = `max` over boundary k-cells of `(sign ? 0.0 : f32::NEG_INFINITY) + input[cell]`. Signed `+1` → `+0`, signed `−1` → `−∞` (exclude). Reuses `cx.boundary(k+1)` enumeration from `exterior_derivative_into`.
   - `tropical_codifferential(cx: &CellComplex, input: &CochainField) -> CochainField` — same form, opposite direction (k → k−1).
   - `tropical_line_integral(field: &CochainField, path: &[usize]) -> f32` — `path.iter().map(|&c| field[c]).fold(f32::NEG_INFINITY, f32::max)` — bottleneck-edge cost.

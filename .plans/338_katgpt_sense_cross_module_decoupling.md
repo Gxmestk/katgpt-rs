@@ -88,7 +88,7 @@ as four new public crates.
 | Crate | LOC | External consumers (outside katgpt-core) |
 |---|---|---|
 | katgpt-slod | 1,047 | 0 (only `rtdc.rs` + `sense/lod.rs` use it, both internal) |
-| katgpt-temporal-deriv | 424 | 0 (only `cgsp/derivative_curiosity.rs`, `delta_mem/state.rs`, `sense/reconstruction.rs` — all internal) |
+| katgpt-temporal-deriv | 424 | 0 (only `crates/katgpt-core/src/cgsp/derivative_curiosity.rs`, `delta_mem/state.rs`, `sense/reconstruction.rs` — all internal) |
 | katgpt-linoss | 938 | 0 (only `sense/spectral_threat.rs` — 1 internal consumer) |
 | katgpt-sense | 5,232 | downstream via re-export (TBD) |
 

@@ -87,7 +87,7 @@ At R=2, the "thinking" variant (explicit CoT + latent loop) gains **+26.9 points
 | Per-dispatch elastic loop count | `elastic_loop_override: Option<usize>` on `forward_looped()`, clamped to `[loop_min, 2×loop_max]` | Issue 035, Research 273, `Config::effective_loop_count()` |
 | L_min floor (refuse exit below) | `Config::loop_min` (default 0→1) | Issue 035, `.docs/02_architecture.md` L670-676 |
 | L_max ceiling | `Config::loop_max` (default 0→derive from loop_mode) | Issue 035 |
-| **Effective rank computation** | `data_probe/geometry.rs::effective_rank` — default-on, GOAT 25/25 | Plan 152 (River-Valley Diagnostics) |
+| **Effective rank computation** | `crates/katgpt-core/src/data_probe/geometry.rs::effective_rank` — default-on, GOAT 25/25 | Plan 152 (River-Valley Diagnostics) |
 | Update cosine similarity | River-Valley Diagnostics (subspace ratios, update cos) — default-on | Plan 152 |
 | Fixed-point residual halt (gain-only) | FPRM → `fpopt_halt` (planned, Plan 267); Self-Advantage Gate on HLA (Plan 283) | Research 266, Plan 283 Bench 057 |
 | Stability-based early exit | `PathwayTracker` — default-on, GOAT 7/7 | Plan 231 |

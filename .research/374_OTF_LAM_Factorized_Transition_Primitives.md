@@ -69,9 +69,9 @@ Replace pixel-space prediction with prediction in a **frozen DINOv2 representati
 | Paper term | Codebase equivalent | Where it ships / would land |
 |---|---|---|
 | latent action `z^act_t` | action-direction vector, motor gate latent, policy latent | `latent_functor/` direction vectors; HLA motor channels |
-| observed transition `(x_t, x_{t+1})` | frame delta, TxDelta, temporal derivative, belief-state transition | `katgpt-core/src/temporal_deriv.rs` (DEFAULT-ON Plan 277); `latent_functor/arithmetic.rs` source/target pairs |
+| observed transition `(x_t, x_{t+1})` | frame delta, TxDelta, temporal derivative, belief-state transition | `crates/katgpt-core/src/temporal_deriv.rs` (DEFAULT-ON Plan 277); `latent_functor/arithmetic.rs` source/target pairs |
 | observed-transition primitive `c(k)` | codebook entry, effect atom, shard style dimension | **DOES NOT SHIP for transitions** — codebooks exist only for KV compression (`katgpt-kv`, Lloyd-Max). This primitive would be new. |
-| motion input `o_t` (gradient/Sobel + temporal diff) | temporal derivative signal | `katgpt-core/src/temporal_deriv.rs` (DEFAULT-ON) — ships the dual fast/slow surprise signal |
+| motion input `o_t` (gradient/Sobel + temporal diff) | temporal derivative signal | `crates/katgpt-core/src/temporal_deriv.rs` (DEFAULT-ON) — ships the dual fast/slow surprise signal |
 | patchify + patchwise VQ | block quantization, patch embedding | KV-cache has K-means VQ on groups of 4 channels; no transition-patch equivalent |
 | occupancy map `M(k)_t` | spatial support mask, attention mask | DEC cochains (`terrain_cochains.rs`); zone density maps |
 | activation strength `w(k)_t` | code usage frequency, slot utilization | `ShardIndex` utilization; MoE expert load |
@@ -81,7 +81,7 @@ Replace pixel-space prediction with prediction in a **frozen DINOv2 representati
 | frozen DINO representation space | frozen encoder, fixed embedding target | `InducedCwmKernel` (frozen `g_φ`); `BeliefInferenceFn` (observation→belief); sleep-time frozen rollforward |
 | inverse dynamics (IDM) | `extract_functor` (estimate displacement from pairs) | `latent_functor/arithmetic.rs` — **monolithic** (single mean displacement) |
 | forward dynamics (FDM) | `apply_functor` (predict target from source + functor); `InducedCwmKernel::advance` | `latent_functor/arithmetic.rs`; `katgpt-core/src/induced_cwm/` |
-| agent ambiguity / distractor entanglement | curiosity = prediction-error signal (Pathak-style distractor filter) | `katgpt-core/src/temporal_deriv.rs` (DEFAULT-ON); CGSP (Plan 274) |
+| agent ambiguity / distractor entanglement | curiosity = prediction-error signal (Pathak-style distractor filter) | `crates/katgpt-core/src/temporal_deriv.rs` (DEFAULT-ON); CGSP (Plan 274) |
 | cross-morphology / cross-carrier transfer | cross-game transfer, shard reuse across zones/archetypes | `latent_functor/cross_game.rs`; `NeuronShard` zone transfer; `ArchetypeBlendShard` |
 | behavioral cloning policy | training-only | → riir-train |
 | VQ-VAE codebook learning (k-means init + EMA + commitment loss) | training-only (OR runtime k-means — modelless unblock path) | → riir-train (trained); katgpt-rs (runtime k-means) |

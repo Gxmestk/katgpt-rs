@@ -3,7 +3,7 @@
 **Date:** 2026-07-13
 **Plan:** [katgpt-rs/.plans/430_dual_path_rollback_free_tree_verify_gdn_hola.md](../.plans/430_dual_path_rollback_free_tree_verify_gdn_hola.md)
 **Feature:** `gdn_hola_tree_verify` (opt-in; implies `gdn_tree_verify` + `hippocampal_cache`)
-**Bench:** `benches/bench_430_dual_path_verify.rs`
+**Bench:** `crates/katgpt-core/benches/bench_430_dual_path_verify.rs`
 
 ## Summary
 

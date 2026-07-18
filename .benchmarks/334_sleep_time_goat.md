@@ -66,15 +66,15 @@ When running `cargo check --all-features`, the build failed with `E0252: the nam
 | `anticipator.rs` | 5 (K-slot emission, commitment stability, context-change commitment, predictability range, identity op budget-agnostic) |
 | `consume.rs` | 6 (precomputed-when-predictable, fresh-when-unpredictable, determinism, gate best-match, gate range, smooth blend at gate=0.5) |
 
-### GOAT gate tests (`tests/sleep_time_goat.rs` — 13 total, all PASS)
+### GOAT gate tests (`crates/katgpt-core/tests/sleep_time_goat.rs` — 13 total, all PASS)
 
 G1 × 5, G2 × 4, G7 × 4 — see gate table above.
 
-### Alloc check (`tests/sleep_time_alloc_check.rs` — 1 test, PASS)
+### Alloc check (`crates/katgpt-core/tests/sleep_time_alloc_check.rs` — 1 test, PASS)
 
 `g5_zero_alloc_after_warmup_both_paths` — serial check of both `consume()` and `consume_gate()` against the shared `CountingAllocator`. 200 warmup + 1000 measured calls per path. Result: 0/0 allocs/deallocs on both paths.
 
-### Latency bench (`benches/sleep_time_consume_bench.rs`)
+### Latency bench (`crates/katgpt-core/benches/sleep_time_consume_bench.rs`)
 
 Run: `cargo bench -p katgpt-core --features sleep_time_anticipation --bench sleep_time_consume_bench`
 

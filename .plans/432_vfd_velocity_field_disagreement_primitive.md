@@ -148,7 +148,7 @@ Phase 1 shipped at commit `feat: VFD velocity-field disagreement primitive (Plan
 
 - [x] **T2.3** **G3 (no regression)** — `cargo clippy -p katgpt-core --features velocity_field_disagreement --lib -- -D warnings` clean (single feature); `cargo clippy -p katgpt-core --all-features --lib -- -D warnings` clean (combo check per AGENTS.md). G3 alloc-free re-verified in the bench (`bench_432_vfd_goat` G3 gate: 0 allocs / 0 deallocs on the score path).
 
-- [x] **T2.4** **G4 (latency)** — Microbench M=2, D=8, N_s=10, B=5 → `vfd_score_into` p50 = **10.43 µs** (target ≤ 50 µs; 4.8× margin). G4 PASS. See `benches/bench_432_vfd_goat.rs`.
+- [x] **T2.4** **G4 (latency)** — Microbench M=2, D=8, N_s=10, B=5 → `vfd_score_into` p50 = **10.43 µs** (target ≤ 50 µs; 4.8× margin). G4 PASS. See `crates/katgpt-core/benches/bench_432_vfd_goat.rs`.
 
 - [x] **T2.5** **G5 (QGF integration smoke)** — `VfdVarianceSignal` impl + a smoke test: feed a synthetic VFD score into `adaptive_guidance_weight(signal_confidence)` and verify the weight responds. Already implemented as a Phase 1 unit test (passes when `qgf_adaptive` enabled).
 

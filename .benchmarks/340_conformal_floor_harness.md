@@ -31,7 +31,7 @@ pass; KARC no-regression gate still passes.
 LosesToFloor / Mixed / NotApplicable across 5 canonical scenarios on standard
 corpora.
 
-**Tests:** `tests/conformal_floor_harness.rs` (10 integration tests) +
+**Tests:** `crates/katgpt-core/tests/conformal_floor_harness.rs` (10 integration tests) +
 `crates/katgpt-core/src/conformal/floor_harness.rs::tests` (13 unit tests).
 
 ### Reference results (α=0.05, deterministic seeds)
@@ -105,7 +105,7 @@ single-corpus verdict.
 `corpus_white_noise_is_deterministic`.
 
 The corpus constructors use a deterministic SplitMix64 RNG (same algorithm as
-`examples/conformal_airpassengers.rs`), so corpora are bit-reproducible across
+`crates/katgpt-core/examples/conformal_airpassengers.rs`), so corpora are bit-reproducible across
 runs. Given a fixed primitive, the report is deterministic.
 
 ---
@@ -222,7 +222,7 @@ corpora across runs.
 | File | Role | Lines |
 |---|---|---|
 | `crates/katgpt-core/src/conformal/floor_harness.rs` | Harness module: trait, FloorAdapter, report types, `run_floor_comparison`, corpora, 13 unit tests | ~650 |
-| `tests/conformal_floor_harness.rs` | 10 integration tests + canonical adapter-pattern examples for T3–T7 authors | ~375 |
+| `crates/katgpt-core/tests/conformal_floor_harness.rs` | 10 integration tests + canonical adapter-pattern examples for T3–T7 authors | ~375 |
 | `src/conformal/mod.rs` | Wire `mod floor_harness` + re-export | +9 lines |
 | `src/lib.rs` | Re-export harness types at crate root | +7 lines |
 | `Cargo.toml` | `[[test]] conformal_floor_harness` entry | +8 lines |

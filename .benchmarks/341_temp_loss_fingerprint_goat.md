@@ -27,7 +27,7 @@
 
 ## G1 — Bound Preservation Under Diversity Selection
 
-**Test:** `g1_bound_preservation_under_diversity_selection` in `diversity/temp.rs`
+**Test:** `g1_bound_preservation_under_diversity_selection` in `crates/katgpt-core/src/diversity/temp.rs`
 
 **Fixture:** n=64 candidate loss vectors (8-dim, schedule K=8) drawn from a
 Gaussian mixture: 50 from a tight cluster N(0, 0.5) and 14 from a wide spread
@@ -57,7 +57,7 @@ would induce maximally-different gradients along v (Theorem 3.1).
 
 ## G2 — Prefix-Length Sweep (Kendall Tau)
 
-**Test:** `g2_prefix_length_sweep_kendall_tau` in `diversity/temp.rs`
+**Test:** `g2_prefix_length_sweep_kendall_tau` in `crates/katgpt-core/src/diversity/temp.rs`
 
 **Fixture:** n=32 candidates, each with a 256-token prefix (D=8 per token). Each
 candidate has a well-separated unit direction d_i. Tokens are
@@ -138,7 +138,7 @@ call is the unavoidable `Vec<usize>` return value (the output index set).
 
 ## G4 — Determinism / Quorum-Reproducibility
 
-**Test:** `g4_determinism_bit_identical` in `diversity/temp.rs`
+**Test:** `g4_determinism_bit_identical` in `crates/katgpt-core/src/diversity/temp.rs`
 
 Two independent runs with identical `(s0, s1, lambda_schedule, noise_seeds,
 noise_sigma, candidates)` produce:

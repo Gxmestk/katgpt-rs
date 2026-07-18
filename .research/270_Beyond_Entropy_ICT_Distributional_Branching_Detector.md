@@ -131,7 +131,7 @@ JS selection uses *no* reward information, yet high-JS tokens correlate strongly
 | Paper claim | Our shipped equivalent | Status |
 |---|---|---|
 | H1 entropy → verification tier | `llmexec_guard` `sigmoid(-steepness·(H1−0.5)+depth_bonus)` (Plan 223) | ⚠️ shipped, **wrong entropy** per ICT (H1, not H2/β) |
-| Entropy-spike detection | `RejectionReason::EntropySpike` (`src/distill/trd.rs:56`) | ⚠️ H1 spike, not β-bifurcation |
+| Entropy-spike detection | `RejectionReason::EntropySpike` (`crates/katgpt-speculative/src/distill/trd.rs:56`) | ⚠️ H1 spike, not β-bifurcation |
 | Entropy-linear acceptance forecast | Bebop `α ≈ a − b·H(p)` (R243, Issue 023) | ⚠️ H1 — should be H2/β per §1.5 |
 | Curiosity from underspecification | `CuriosityPulse::uncertainty_ema` from `H1(relevance)` (R041, riir-ai) | ⚠️ H1 — should be β(relevance) per §1.5 |
 | EMA entropy tracking | `AdaptiveTraceCompactor::observe_entropy` (Plan 238 wire-patch) | ⚠️ H1 — should track β |

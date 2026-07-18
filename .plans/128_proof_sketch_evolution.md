@@ -10,12 +10,12 @@
 
 ## Tasks
 
-- [x] T1: `ProofGoalCache` — blake3-keyed global goal deduplication (`proof/goal_cache.rs`)
-- [x] T2: `SketchEntry` + `SketchId` types — proof state + pending goals + lessons (`proof/sketch_types.rs`)
-- [x] T3: `SketchPopulation` — top-64 Elo-rated sketch database (`proof/sketch_population.rs`)
-- [x] T4: Plackett-Luce rating — pairwise comparison → Elo via Gibbs sampling (`proof/plackett_luce.rs`)
-- [x] T5: P-UCB sketch sampling + diversity injection — bridge from `BanditPruner` to sketch selection (`proof/sketch_sampler.rs`)
-- [x] T6: DDTree integration — goal cache shared across draft branches (`proof/dtree_goal_cache.rs`) ✅
+- [x] T1: `ProofGoalCache` — blake3-keyed global goal deduplication (`crates/katgpt-pruners/src/proof/goal_cache.rs`)
+- [x] T2: `SketchEntry` + `SketchId` types — proof state + pending goals + lessons (`crates/katgpt-pruners/src/proof/sketch_types.rs`)
+- [x] T3: `SketchPopulation` — top-64 Elo-rated sketch database (`crates/katgpt-pruners/src/proof/sketch_population.rs`)
+- [x] T4: Plackett-Luce rating — pairwise comparison → Elo via Gibbs sampling (`crates/katgpt-pruners/src/proof/plackett_luce.rs`)
+- [x] T5: P-UCB sketch sampling + diversity injection — bridge from `BanditPruner` to sketch selection (`crates/katgpt-pruners/src/proof/sketch_sampler.rs`)
+- [x] T6: DDTree integration — goal cache shared across draft branches (`crates/katgpt-pruners/src/proof/dtree_goal_cache.rs`) ✅
 - [x] T7: Feature gate `proof_sketch_evolution` + parallelism guard + module glue ✅
 - [x] T8: GOAT proof — 46/46 tests (cache dedup, population CRUD, Plackett-Luce rating, P-UCB sampling, diversity injection, parallelism guard, integration) ✅
 - [x] T9: Benchmark — `.benchmarks/039_proof_sketch_evolution_goat.md` ✅

@@ -132,9 +132,9 @@ Grep across `katgpt-rs/**/*.rs` for `evict|top_w|write_magnitude|β.*∥.*e∥|d
 
 | Match | Location | Is this HOLA's mechanism? |
 |---|---|---|
-| FIFO ring-buffer eviction (motif/conformal) | `katgpt-core/src/closure/motif.rs`, `conformal/ring.rs` | NO — pure recency/FIFO, not surprise. |
-| E-pool priority eviction on consolidation | `katgpt-core/src/cgsp/dual_pool.rs` `consolidate_growing` | PARTIAL — evicts lowest-priority E-pool arm on overflow, but the pool is curiosity *directions*, not KV pairs, and the priority is bandit reward, not β·‖e‖. |
-| Tau-calibrator window eviction | `katgpt-attn/src/chiaroscuro/tau.rs` | NO — entropy threshold window, not delta-rule write magnitude. |
+| FIFO ring-buffer eviction (motif/conformal) | `crates/katgpt-core/src/closure/motif.rs`, `conformal/ring.rs` | NO — pure recency/FIFO, not surprise. |
+| E-pool priority eviction on consolidation | `crates/katgpt-core/src/cgsp/dual_pool.rs` `consolidate_growing` | PARTIAL — evicts lowest-priority E-pool arm on overflow, but the pool is curiosity *directions*, not KV pairs, and the priority is bandit reward, not β·‖e‖. |
+| Tau-calibrator window eviction | `crates/katgpt-attn/src/chiaroscuro/tau.rs` | NO — entropy threshold window, not delta-rule write magnitude. |
 | Zone bank FIFO cap | `benches/alien_sampler_goat.rs` | NO — recency cap, not surprise. |
 | Stale-cache invalidation | `benches/bench_002_density_routing_goat.rs` | NO — regime-transition invalidation, not eviction-by-score. |
 
@@ -144,7 +144,7 @@ Grep across `katgpt-rs/**/*.rs` for `evict|top_w|write_magnitude|β.*∥.*e∥|d
 
 **Conclusion:** The HOLA *mechanism* — surprise-evicted bounded KV cache with decoupled RMSNorm-γ read on the GDN/GDN2 backbone — is **novel as shipped code**. The HOLA *latent-space reframing* — hippocampal complement to a compressive recurrent state — **already ships across three repos**:
 - katgpt-rs: `temporal_deriv` + δ-Mem write gate = surprise-gated parametric memory (Plan 277, default-on).
-- katgpt-rs: `DualPoolBandit` = parametric E-pool + non-parametric X-pool (Research 249, shipped in `cgsp/dual_pool.rs`).
+- katgpt-rs: `DualPoolBandit` = parametric E-pool + non-parametric X-pool (Research 249, shipped in `crates/katgpt-core/src/cgsp/dual_pool.rs`).
 - riir-neuron-db: Raven consolidation (parametric neocortex) + AnyRAG escalation (non-parametric hippocampus); `temp_loss_fingerprint` (Plan 005, default-on) = surprise-diverse wake-event selection before averaging into style_weights.
 
 ### 2.4 Fusion (the GOAT-tier combination)

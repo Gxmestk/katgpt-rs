@@ -164,7 +164,7 @@ All collapse into "band-conditioning CI test against current query."
 - G2: Selection MCC ≥ 0.85 on synthetic SCM test (paper Fig 3 level).
 - G3: KV cache size reduction ≥ 40% with no quality drop on long-context benchmark.
 
-**Integration point:** New file `src/band_conditioner.rs` + trait extension on `ConstraintPruner` (or new `SegmentSelector` trait to keep SRP).
+**Integration point:** New file `crates/katgpt-band/src/band_conditioner.rs` + trait extension on `ConstraintPruner` (or new `SegmentSelector` trait to keep SRP).
 
 #### Fusion B: Specialist Latent Projection (SPLAT)
 
@@ -188,7 +188,7 @@ The mask `M_sparse` is computed once per (query, adapter) pair via:
 - G5: Mask discovery cost ≤ `|I(Ju)|` samples (paper Prop 2's `N_i` cardinality).
 - G6: MSA rescue — SPLAT-masked attention matches dense attention quality at 50% density (where MSA failed).
 
-**Integration point:** New file `src/specialist_projection.rs`. Consumes `SparseTaskVector` from Plan 264. Feature gate `specialist_projection` (depends on `sparse_task_vector`).
+**Integration point:** New file `crates/katgpt-sparse/src/specialist_projection.rs`. Consumes `SparseTaskVector` from Plan 264. Feature gate `specialist_projection` (depends on `sparse_task_vector`).
 
 #### Fusion C: Collider-Consistency ConstraintPruner (CCCP)
 
@@ -211,7 +211,7 @@ If no such `g_i` exists, the branch is dead — it cannot be part of any coheren
 - G8: Combined with bandit, improves DDTree efficiency by ≥ 25% (fewer expansions to find goal).
 - G9: Zero overhead when no tasks are tracked (early return).
 
-**Integration point:** New file `src/collider_pruner.rs`. Implements `ConstraintPruner` trait. Feature gate `collider_consistency`.
+**Integration point:** New file `crates/katgpt-band/src/collider_pruner.rs`. Implements `ConstraintPruner` trait. Feature gate `collider_consistency`.
 
 ---
 

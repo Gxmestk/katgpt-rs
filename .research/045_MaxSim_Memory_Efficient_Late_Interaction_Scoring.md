@@ -215,7 +215,7 @@ This applies MaxSim in its **original design context** (retrieval reranking) wit
 - `maxsim_score()` CPU SIMD — composition of existing tested primitives, provably correct
 - `ScoreReduction::MaxSim` for TurboQuant/SpectralQuant — one-parameter extension of existing kernels
 - PFlash block maxsim scoring — **371% better** needle separation vs mean-K (T7 GOAT passed)
-- REST reranking with MaxSim — `src/rerank.rs` module, `RerankMethod` enum, NDCG@10 proven ≥2% better than cosine (T12 GOAT passed, Benchmark 014)
+- REST reranking with MaxSim — `crates/katgpt-attn-match/src/rerank.rs` module, `RerankMethod` enum, NDCG@10 proven ≥2% better than cosine (T12 GOAT passed, Benchmark 014)
 - GPU MaxSim dispatch — `maxsim_score.wgsl` + `MaxSimScorer` (Plan 085), GPU **41–74× faster** for large batches, threshold=256 (T11 GOAT passed)
 - Fused SQ + MaxSim kernel — `spectralquant_maxsim.wgsl`, dequant + MaxSim in one GPU pass (Plan 085 T5)
 
@@ -255,7 +255,7 @@ This applies MaxSim in its **original design context** (retrieval reranking) wit
 ### Modelless Proposals (tested in katgpt-rs)
 - [x] `maxsim_score()`: matches naive materialized result within 1e-6, **7.46× faster** (48.3µs vs 360.0µs, Lq=32, Ld=256, dim=128, release build) — Plan 080 T2/T4
 - [x] PFlash block maxsim: **371% more** needle blocks selected (4.71× better separation: 20× vs 4.25× for mean-K) — Plan 080 T7
-- [x] REST maxsim reranking: ≥2% better retrieval NDCG vs cosine similarity — `src/rerank.rs` module (`RerankMethod` enum, `ndcg_at`, `rerank`), `bench_maxsim_rerank` test, Benchmark 014 — Plan 080 T12
+- [x] REST maxsim reranking: ≥2% better retrieval NDCG vs cosine similarity — `crates/katgpt-attn-match/src/rerank.rs` module (`RerankMethod` enum, `ndcg_at`, `rerank`), `bench_maxsim_rerank` test, Benchmark 014 — Plan 080 T12
 
 ### Model-Based Proposals (tested in katgpt-rs CPU)
 - [x] TurboQuant `ScoreReduction::MaxSim`: matches uncompressed maxsim within 0.95% at 4-bit; **40.54% error at 3-bit** — Plan 080 T9

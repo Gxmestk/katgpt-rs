@@ -85,11 +85,11 @@ Mamba's multi-input/multi-value (MVA) pattern outperforms others — confirming 
 | Component | Location | SSD Paper Analogue |
 |-----------|----------|-------------------|
 | **GDN2 recurrent attention** | `src/gdn2/` | Diagonal SSM with input-dependent gates (special case of SSD) |
-| **Diagonal decay gate** | `src/diagonal_gate.rs` | A matrix = scalar × identity (exactly SSD's scalar-identity structure!) |
+| **Diagonal decay gate** | `crates/katgpt-attn/src/diagonal_gate.rs` | A matrix = scalar × identity (exactly SSD's scalar-identity structure!) |
 | **LinOSS oscillatory cell** | `crates/katgpt-core/src/linoss.rs` | SSM with imaginary-axis eigenvalues (oscillatory generalization) |
 | **Tiled flash attention** | `crates/katgpt-core/src/attention.rs` | Quadratic mode computation |
 | **ConstraintPruner** | `crates/katgpt-core/src/traits.rs` | Tree pruning — no SSD connection yet |
-| **FreqBandit** | `src/freq_bandit.rs` | Bandit for frequency selection (inference-time routing) |
+| **FreqBandit** | `crates/katgpt-pruners/src/freq_bandit.rs` | Bandit for frequency selection (inference-time routing) |
 
 **Key insight:** Our GDN2 with diagonal decay gate IS the SSD layer. The `diagonal_gate.rs` applies `S *= Diag(α)` which is exactly the scalar-identity A structure the paper describes. We're already running SSD — we just didn't have the theoretical framework to know it.
 

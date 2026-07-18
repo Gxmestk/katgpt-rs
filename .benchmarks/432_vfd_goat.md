@@ -86,7 +86,7 @@ interval = [point ± z(α) · sqrt(variance)]
 
 ### G4 (latency) — ✅ PASS
 
-**Bench:** `benches/bench_432_vfd_goat.rs`
+**Bench:** `crates/katgpt-core/benches/bench_432_vfd_goat.rs`
 
 **Config:** M=2, D=8 (HLA dim), N_s=10, B=5 (paper defaults).
 

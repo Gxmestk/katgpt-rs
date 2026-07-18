@@ -26,7 +26,7 @@ The Nemotron paper calls this "self-speculation" and presents it as a major cont
 | Prefix acceptance | `speculate()` in `LeviathanVerifier` | ✅ Already there |
 | DDTree path extraction | `dd_tree.rs` | ✅ Already there |
 | KV cache snapshot/rollback | `MultiLayerKVCache::snapshot()/restore()` | ✅ Already there |
-| D2F block decode (drafter) | `d2f_decode_block()` in `speculative/d2f.rs` | ✅ Already there |
+| D2F block decode (drafter) | `d2f_decode_block()` in `src/speculative/d2f.rs` | ✅ Already there |
 | D2F context (zero-alloc) | `D2fContext` in `dllm.rs` | ✅ Already there |
 | **D2F drafter verifier** | **MISSING** | ❌ ~100 lines, new `SpeculativeVerifier` impl |
 

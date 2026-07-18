@@ -24,7 +24,7 @@
 
 ## G1 (correctness, ≤1e-6 tolerance)
 
-**Bench**: `benches/bench_417_cross_resolution_simd_encode_goat.rs`
+**Bench**: `crates/katgpt-core/benches/bench_417_cross_resolution_simd_encode_goat.rs`
 **Setup**: same random-orthonormal `phi_src` (seeded) + same `src_state` (seeded) fed to both
 - baseline `project_to_spectral_strided_into` (verbatim pre-417 strided gather-dot)
 - candidate `project_to_spectral_into` (post-417 `simd_matmul_rows` over transposed cache)

@@ -3,7 +3,7 @@
 **Date:** 2026-06-17
 **Research:** [katgpt-rs/.research/258_Attention_Sink_Dual_Mechanism_NOP_Broadcast.md](../.research/258_Attention_Sink_Dual_Mechanism_NOP_Broadcast.md)
 **Source paper:** [arXiv:2606.08105](https://arxiv.org/abs/2606.08105) — Fesser et al., *A Unifying View of Attention Sinks: Two Algorithms, Two Solutions*
-**Target:** `katgpt-rs/crates/katgpt-core/src/data_probe/sink_classify.rs` (new, root crate — path-corrected; primitive types live in `katgpt-rs/crates/katgpt-core/src/data_probe.rs`) + extensions to `data_probe/geometry.rs`
+**Target:** `katgpt-rs/crates/katgpt-core/src/data_probe/sink_classify.rs` (new, root crate — path-corrected; primitive types live in `katgpt-rs/crates/katgpt-core/src/data_probe.rs`) + extensions to `crates/katgpt-core/src/data_probe/geometry.rs`
 **Status:** Complete (Phases 1–5). G1 ✅ PASS, synthetic G2 ✅ PASS, G3 ❌ FAIL (latency). NOT promoted to default — see [`.benchmarks/059_sink_aware_goat.md`](../.benchmarks/059_sink_aware_goat.md).
 
 ---
@@ -120,7 +120,7 @@ Wire the new classifier into the broader `data_probe` family so it composes with
 
 ## Dependencies
 
-- Existing: `simd_dot_f32`, `manifold_power_iter_router` (for power iteration infra), `data_probe/geometry.rs` (Roy-Vetterli effective rank — same family).
+- Existing: `simd_dot_f32`, `manifold_power_iter_router` (for power iteration infra), `crates/katgpt-core/src/data_probe/geometry.rs` (Roy-Vetterli effective rank — same family).
 - New: none. Pure Rust, no new crates.
 
 ---

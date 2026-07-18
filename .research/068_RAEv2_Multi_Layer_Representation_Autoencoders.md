@@ -442,7 +442,7 @@ RAEv2's core ideas transfer to LLM inference at the **mechanism level** (multi-l
 | Item | Effort | Impact | Priority | Target |
 |---|---|---|---|---|
 | 7.3 EP Accuracy@k metric | Trivial | High | HIGH | GOAT benchmark reporting |
-| 7.1 MLS residual aggregation | Medium | Medium | MEDIUM | `src/transformer.rs` + feature gate |
+| 7.1 MLS residual aggregation | Medium | Medium | MEDIUM | `crates/katgpt-percepta/src/transformer.rs` + feature gate |
 | 7.2 Self-guidance pattern | Medium | High (if it works) | LOW | Needs training pipeline first |
 
 ### 12.3 What NOT To Do
@@ -488,7 +488,7 @@ RAEv2's core ideas transfer to LLM inference at the **mechanism level** (multi-l
 
 | File | Role |
 |---|---|
-| `src/transformer.rs` | `forward_base` layer loop, `standard_lm_head`, `TransformerWeights`, `LayerWeights` |
+| `crates/katgpt-percepta/src/transformer.rs` | `forward_base` layer loop, `standard_lm_head`, `TransformerWeights`, `LayerWeights` |
 | `crates/katgpt-core/src/types.rs` | `Config` with `early_exit_*`, `mtp_*` fields, `InferenceOverrides` |
 | `src/speculative/verifier.rs` | `SpeculativeVerifier` trait |
 | `src/speculative/dd_tree.rs` | `inject_sde_noise`, `build_dd_tree_sde`, early exit logic |

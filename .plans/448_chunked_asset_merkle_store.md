@@ -42,7 +42,7 @@ Goal: a compiling, tested, feature-gated module that exposes the public API surf
   - `pub trait ChunkedContentStore` — `put`, `get`, `get_chunk`, `prove_chunk`, `verify_proof` (assoc fn), `stats`. Match Research 262 §2.1 signature.
   - `pub trait ChunkFetcher` — `fn fetch(&self, chunk_hash: &[u8; 32]) -> Option<Vec<u8>>` plus `fn fetch_range(&self, blob_id: &BlobId, range: ChunkRange) -> Option<Vec<u8>>` for partial hydrate (caller may know only the range they need, e.g. LOD-0 only).
   - `pub trait ChunkingStrategy` — `fn chunk<'a>(&self, bytes: &'a [u8]) -> Vec<&'a [u8]>` (borrowed slices; zero-copy on read path).
-- [x] **T1.6** Implement `FixedSizeChunker { chunk_size: usize }` in `content_store/chunker.rs`:
+- [x] **T1.6** Implement `FixedSizeChunker { chunk_size: usize }` in `crates/katgpt-core/src/content_store/chunker.rs`:
   - `chunk_size` defaults to 64 KiB; configurable.
   - `chunk()` returns non-overlapping slices; final slice may be shorter.
   - Unit tests: empty input, exact multiple, partial last chunk, single-byte input.
@@ -90,7 +90,7 @@ Goal: enable cross-blob dedup on similar large blobs. Required for G1 and G2.
 
 ### Tasks
 
-- [x] **T2.1** Implement `FastCdcChunker` in `content_store/chunker.rs`:
+- [x] **T2.1** Implement `FastCdcChunker` in `crates/katgpt-core/src/content_store/chunker.rs`:
   - Algorithm: FastCDC (Xia et al. 2016) — gear-hash-based rolling hash, two-level boundary mask (normal/small/large) for variance.
   - Constants: `MIN_CHUNK_SIZE = 4 KiB`, `MAX_CHUNK_SIZE = 64 KiB`, `NORMAL_LEVEL = 13`, `MIN_LEVEL = 13`, `MAX_LEVEL = 8` (paper defaults for ~8 KiB avg; **deviation from plan's `NORMAL=23, MAX=17` — see module doc for the reasoning: level 23 → expected 8 MiB spacing defeats CDC on ≤1 MiB blobs**). Tune in benchmark.
   - Gear table: `[u64; 256]` compile-time `const` via splitmix64 from fixed seed (deterministic, no RNG).
@@ -117,11 +117,11 @@ Goal: realistic deployment paths for hydration.
 
 ### Tasks
 
-- [x] **T3.1** Implement `InMemoryChunkFetcher` in `content_store/fetcher.rs`:
+- [x] **T3.1** Implement `InMemoryChunkFetcher` in `crates/katgpt-core/src/content_store/fetcher.rs`:
   - Wraps a `papaya::HashMap` (test-only / single-process deploy).
   - **Status (2026-06-25):** DONE. `InMemoryChunkFetcher { chunks: papaya::HashMap<[u8;32], Vec<u8>> }`
     with `put()`, `fetch()`, `len()`, `is_empty()`. 3 tests pass.
-- [x] **T3.2** Implement `FsChunkFetcher` in `content_store/fetcher.rs`:
+- [x] **T3.2** Implement `FsChunkFetcher` in `crates/katgpt-core/src/content_store/fetcher.rs`:
   - Layout: `<root>/<hash[0..2]>/<hash[2..4]>/<hash>.chunk` (sharded to avoid filesystem limits).
   - Reads via `mmap` (per AGENTS.md io_uring/mmap zero-copy preference).
   - `fetch()` returns `Some(Vec<u8>)` or `None` on missing file.
@@ -285,7 +285,7 @@ These are game/chain semantics. They belong in `riir-ai`. See [riir-ai Plan 319]
 | `katgpt-core/src/content_store/in_memory.rs` | ~200 | `InMemoryChunkedStore` + unit tests |
 | `katgpt-core/src/content_store/merkle.rs` | ~150 | Binary Merkle root/proof/verify |
 | `katgpt-core/crates/katgpt-core/src/content_store/fetcher.rs` | ~150 | `InMemoryChunkFetcher`, `FsChunkFetcher`, `NetChunkFetcher` stub, `TieredChunkFetcher` |
-| `katgpt-core/examples/chunked_store_basic.rs` | ~80 | Usage example |
+| `crates/katgpt-core/examples/chunked_store_basic.rs` | ~80 | Usage example |
 | `.benchmarks/262_chunked_content_store_goat.md` | ~150 | G1–G7 results |
 
 **Total: ~1100 lines new code + ~150 lines benchmark docs.** Well under the 2048-line per-file cap. Each file is independent and testable.

@@ -70,31 +70,31 @@ The primitive is generic over the host's readout function, transform, and verdic
 
 ### Tasks
 
-- [x] **T2.1 (G1 — mining correctness)** Unit tests in `tests/mag_g1.rs`:
+- [x] **T2.1 (G1 — mining correctness)** Unit tests in `crates/katgpt-core/tests/mag_g1.rs`:
   - Synthetic: N=100 pairs, known shift `v ∈ ℝ^64`. Assert `mine_direction` recovers `v` to cos ≥ 0.99. **PASS: cos = 1.000000.**
   - Synthetic 2-cluster: 200 samples from N(μ₁, I), 200 from N(μ₂, I) in ℝ^64 (deviation: increased from 50→200 per class to overcome 63-dim noise accumulation at d=64; 50 samples gives cos≈0.93 which is below the 0.95 gate, 200 gives cos=0.985). Assert `mine_contrast_direction` recovers `(μ₁−μ₂)/‖·‖` to cos ≥ 0.95. **PASS: cos = 0.984545.**
   - **PASS required. ✅**
-- [x] **T2.2 (G2 — contrast separability, THE headline gate)** Tests in `tests/mag_g2.rs`:
+- [x] **T2.2 (G2 — contrast separability, THE headline gate)** Tests in `crates/katgpt-core/tests/mag_g2.rs`:
   - Synthetic: 200 samples, 2 overlapping Gaussians (μ₁ = [2,0,...], μ₂ = [−2,0,...], σ=1.5) in ℝ^64. y_M = true Gaussian label (the σ-controlled overlap IS the noise).
   - Mine `u_Q` via `mine_contrast_direction`. LOO nearest-mean classification on `u_Q` projection (sign-invariant — the contrast direction's sign depends on positive/negative assignment; the LINE is what matters).
   - **Gate:** LOO accuracy ≥ 0.75 at σ=1.5. **PASS: 0.9250.** Also σ=3.0: gate ≥ 0.60. **PASS: 0.8100.** The headline kill-it gate holds — contrast directions from self-labeled classes ARE linearly separable.
-- [x] **T2.3 (G3 — reconstruction error sanity)** Tests in `tests/mag_g3.rs`:
+- [x] **T2.3 (G3 — reconstruction error sanity)** Tests in `crates/katgpt-core/tests/mag_g3.rs`:
   - Perfectly linear shift (`m(Q‖p) = m(p) + v`): assert `ϵ_Q = 0.0`. **PASS: ϵ_Q = 0.00000000.**
   - Zero shift (`m(Q‖p) = m(p)`): assert `ϵ_Q = 1.0`. **PASS: ϵ_Q = 1.000000.**
   - Constructed overshoot (`m̂ = m(p) + 3·v` but true shift is `v`): assert `ϵ_Q > 1.0`. **PASS: ϵ_Q = 4.000000.**
   - Bonus: mine→recon roundtrip with calibrated alpha. **PASS: ϵ_Q = 0.00000000.**
   - **PASS required. ✅**
-- [x] **T2.4 (G4 — transfer beats raw cosine)** Tests in `tests/mag_g4.rs`:
+- [x] **T2.4 (G4 — transfer beats raw cosine)** Tests in `crates/katgpt-core/tests/mag_g4.rs`:
   - Synthetic transfer task: 6 candidate sets, 1 target. Candidates have class directions rotated by θ ∈ {0°, 18°, 36°, 54°, 72°, 90°} from target. Balanced classes → raw centroid cosine is near-uninformative (all centroids ≈ noise).
   - Raw centroid cosine Top-1 over 50 trials: **0.220** (random floor = 1/6 ≈ 0.167).
   - MAG class-conditional (cos_ben + cos_mal) Top-1: **0.720** (3.3× random).
   - **Gate:** MAG Top-1 ≥ 0.50. **PASS: 0.720.** Raw cosine < 0.40. **PASS: 0.220.**
   - Unblocks riir-neuron-db Issue 001.
-- [x] **T2.5 (G5 — zero-alloc)** `CountingAllocator` audit in `tests/mag_g5.rs`:
+- [x] **T2.5 (G5 — zero-alloc)** `CountingAllocator` audit in `crates/katgpt-core/tests/mag_g5.rs`:
   - Added zero-alloc `_into` variants: `mine_direction_into` (writes into `&mut [f32]`, no BLAKE3/MagDirection) + `transfer_score_into` (centroid-based metrics use `&mut [f32]` scratch; distribution-based metrics fall back to allocating).
   - Warmup: 10 iterations. Measure: 1000 iterations of mine_direction_into + transfer_score_into(CentroidCosine) + transfer_score_into(ClassConditionalCosineBenign).
   - **Gate:** 0 allocations after warmup. **PASS: 0 allocs, 0 deallocs.**
-- [x] **T2.6 (G6 — latency)** Bench in `benches/mag_g6.rs` (`std::time::Instant + harness = false`):
+- [x] **T2.6 (G6 — latency)** Bench in `crates/katgpt-core/benches/mag_g6.rs` (`std::time::Instant + harness = false`):
   - `mine_direction` on 500×64: **10.13 µs** (target < 100µs). 10× headroom.
   - `mine_contrast_direction` on 250+250×64: **3.31 µs** (target < 100µs). 30× headroom.
   - `transfer_score` (per-score, 6 candidates × 2 metrics): **0.519 µs** (target < 10µs). 19× headroom.

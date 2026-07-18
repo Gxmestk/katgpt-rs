@@ -68,7 +68,7 @@ The paper's hardware framing obscures that **four of the five techniques have di
 | Fused DQ+GEMM kernel | Fused dequantize-matmul (dequant in registers, never spills) | **PARTIAL** — `simd_dot_f16_f32` fuses f16 load + dot; no fused Q4/K dot | Real fusion target |
 | Split DQ+GEMM kernel | Dequant to buffer + separate matmul | **SHIPPED** as the default path in `q4k.rs` + `simd_dot_f32` | Already covered |
 | Kernel-selection heuristic | Breakeven routing (memory-bound vs compute-bound threshold) | **SHIPPED** Plan 218 `breakeven/` | Already covered at the algorithmic level |
-| Async double-buffered DQ | CPU dequant chunk N+1 while GPU computes chunk N | **SHIPPED** `katgpt-kv/src/async_qdq.rs` (Plan 227) | Already covered |
+| Async double-buffered DQ | CPU dequant chunk N+1 while GPU computes chunk N | **SHIPPED** `crates/katgpt-kv/src/async_qdq.rs` (Plan 227) | Already covered |
 
 ### 2.1 The Q4_K hot path — what we do today
 

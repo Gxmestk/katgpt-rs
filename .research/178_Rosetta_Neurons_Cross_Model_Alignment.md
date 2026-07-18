@@ -159,7 +159,7 @@ impl ConstraintPruner for RosettaPruner {
 
 **Idea**: Within a single model's marginals, cluster tokens that have similar activation patterns across contexts. These are "synonym tokens" — the paper's self-clustering applied to LLM output space.
 
-**Already Exists**: `IlcClusterer` + `SynonymMap` in `src/distill/ilc.rs` does exactly this. The Rosetta paper validates the approach.
+**Already Exists**: `IlcClusterer` + `SynonymMap` in `crates/katgpt-speculative/src/distill/ilc.rs` does exactly this. The Rosetta paper validates the approach.
 
 **Verdict**: Already implemented. No action needed. The paper provides theoretical justification for Plan 082b.
 

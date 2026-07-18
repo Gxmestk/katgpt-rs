@@ -760,7 +760,7 @@ No backpropagation. No loss function. The memory learns a linear correction map 
 | `ContextFeatures` | `delta_mem/hash.rs` | Extracts hashable features from DDTree context (depth, parent tokens) |
 | `OutcomeFeatures` | `delta_mem/hash.rs` | Extracts hashable features from outcome (reward, acceptance) |
 | `MemorySteeredPruner<P>` | `delta_mem/pruner.rs` | `ScreeningPruner` with memory-steered corrections |
-| `MultiDomainMemory` | `delta_mem/multi.rs` | Per-domain `DeltaMemoryState` instances |
+| `MultiDomainMemory` | `crates/katgpt-core/src/delta_mem/multi.rs` | Per-domain `DeltaMemoryState` instances |
 | `MultiDomainMemoryPruner<P>` | `delta_mem/multi_pruner.rs` | Per-domain pruner routing |
 
 ### Correction Modes

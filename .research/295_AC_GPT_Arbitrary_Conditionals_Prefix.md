@@ -45,7 +45,7 @@ AC-GPT augments a standard causal Transformer with the ability to evaluate and s
 |---|---|---|---|
 | Bidirectional attention within conditioning set, causal elsewhere | **`AttentionMode::BlockCausal`** | `crates/katgpt-core/src/types/enums.rs:74`, P066 (D2F) | Attention mask |
 | Reader/writer LoRA split (bidirectional prefill vs causal decode) | **`LoraPair { reader, writer }`** | `crates/katgpt-core/src/types/lora.rs:392`, P025 (Bidirectional Prefill + Modality LoRA) | Adapter switch |
-| Position-aware prefix entries (token + original_pos) | **`MixedPrefillSequence::Raw { token_id, original_pos }`** | `src/mux_latent/inject.rs:34`, P238 (MUX-Latent) | Prefix construction |
+| Position-aware prefix entries (token + original_pos) | **`MixedPrefillSequence::Raw { token_id, original_pos }`** | `crates/katgpt-core/src/mux_latent/inject.rs:34`, P238 (MUX-Latent) | Prefix construction |
 | Conditional retrieval / fuse into hidden state | **Engram** `fuse_into_hidden_state`, hash-addressed conditional pattern memory | `crates/katgpt-core/src/engram/`, R278 / P299 | Conditional memory |
 | Top-down direction-vector injection (additive overlay) | **Latent Field Steering** `apply_latent_steering` | `crates/katgpt-core/src/latent_steering.rs`, R290 / P309 / riir-ai R153 | Latent injection |
 | Target-conditioned draft seeding | **`speculative_step_conditioned` / `dflash_predict_conditioned`** | `src/speculative/dflash.rs:179`, P012 Phase 5 | Speculative conditioning |

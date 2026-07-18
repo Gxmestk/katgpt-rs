@@ -134,7 +134,7 @@ Re-cast the recipe against each Super-GOAT factory module:
 - **`latent_functor/`**: the encoder-decoder layer (paper §3.6) is exactly the latent-functor application. `transport_cross_resolution_into` IS the asymmetric-basis functor. **Shipped.**
 - **`cgsp_runtime/`**: spectral-band curiosity (which Fourier band is the NPC exploring?) — niche, not wired.
 - **LatCal fixed-point commitment** (`riir-chain/src/encoding/`): `LatCalSpectralFixed` already commits Fourier `(freq, amp, phase)` as i64 × 10⁶ — FNO coefficients cross the sync boundary as raw fixed-point scalars. **Shipped.**
-- **`NeuronShard` `style_weights[64]`** (`riir-neuron-db/src/shard.rs`): TFNO Tucker factorization of the 8×8 reshaped weight matrix — **shipped as Plan 326** (`linalg/tucker.rs`).
+- **`NeuronShard` `style_weights[64]`** (`riir-neuron-db/src/shard.rs`): TFNO Tucker factorization of the 8×8 reshaped weight matrix — **shipped as Plan 326** (`crates/katgpt-core/src/linalg/tucker.rs`).
 - **DEC Stokes-calculus** (`katgpt-rs/crates/katgpt-dec/src/`): the paper's integral operators are DEC `exterior_derivative`/`codifferential` on a periodic grid; spectral differentiation is `d` in Fourier vocabulary. **Shipped as Plans 251, 325.**
 
 No Super-GOAT reframing emerges — every axis reduces to a shipped primitive.

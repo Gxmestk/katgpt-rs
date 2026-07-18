@@ -132,7 +132,7 @@ See `.benchmarks/440_lllg_paper_repro_goat.md` for full results.
 
 ### Tasks
 
-- [x] **T2.1** Benchmark harness: `benches/bench_440_lllg_paper_repro.rs`.
+- [x] **T2.1** Benchmark harness: `crates/katgpt-core/benches/bench_440_lllg_paper_repro.rs`.
       4 paper maps (synthetic approximations), 800 agents, 300 steps.
 - [x] **T2.2** **G1 — correctness gate.** 2/4 maps PASS (open + moderate
       obstacle). 2/4 FAIL (warehouse + maze) due to greedy PIBT lacking

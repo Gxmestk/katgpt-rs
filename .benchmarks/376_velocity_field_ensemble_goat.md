@@ -102,7 +102,7 @@ test result: ok. 1 passed; 0 failed
 single `#[test]` function (not two) because the `#[global_allocator]` counting
 pattern is fragile under parallel test execution — sibling tests' setup
 allocations get counted by the shared `ALLOC_COUNT`. Single-function is
-inherently serial (matches the `tests/karc_alloc_check.rs` convention).
+inherently serial (matches the `crates/katgpt-core/tests/karc_alloc_check.rs` convention).
 
 ---
 

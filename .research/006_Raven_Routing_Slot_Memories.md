@@ -179,7 +179,7 @@ pub struct RavenKVCache {
 
 | File | What Changes | Why |
 |------|-------------|-----|
-| `src/transformer.rs` | Add `RavenKVCache` alongside existing `KVCache` | Draft model uses Raven, target keeps standard |
+| `crates/katgpt-percepta/src/transformer.rs` | Add `RavenKVCache` alongside existing `KVCache` | Draft model uses Raven, target keeps standard |
 | `src/speculative/step.rs` | Draft step uses `RavenKVCache.readout()` | $O(1)$ per draft token |
 | `src/speculative/prefill.rs` | Prefill populates slots via sparse routing | Initial context → slot memory |
 | `src/percepta.rs` | Raven replaces the 2D hull for adversarial cases | Hull fails on V-shapes; Raven doesn't |
@@ -561,8 +561,8 @@ pub async fn routed_search(
 - [x] Add `RavenKVCache` struct to `transformer.rs` — implemented at L3749 with keys, values, router_scored, router_r_t, readout_scores, readout_output
 - [x] Add `compute_router`, `raven_update`, `raven_readout` functions — all three implemented: `raven_compute_router`, `raven_update`, `raven_readout`, plus `forward_raven`
 - [-] Wire into draft model path in `speculative/step.rs` — **INTENTIONALLY NOT WIRED (Parked, 2026-06).** See §“Verdict: Is Raven the Production GOAT?” above: Raven has no GOAT proof here, the router uses a dummy projection (no trained `W_route`), and the production stack uses lossless speculative decoding instead. Wiring would require a trained router (GPU training, riir-train scope) AND a demonstrated acceptance gain over the DFlash draft path. Neither exists; Raven is held in reserve as an adaptive adversarial fallback, not a default. `DraftResult.routing_overlap` stays `None` in production; `forward_raven` is benchmark-only.
-- [x] Benchmark: draft speed on 5K-token input vs standard KV — `bench_raven_vs_flat_cache` in `benchmark/infrastructure.rs`
-- [x] Test: recall of first 100 tokens after processing 5000 tokens — `bench_raven_recall` in `benchmark/infrastructure.rs`
+- [x] Benchmark: draft speed on 5K-token input vs standard KV — `bench_raven_vs_flat_cache` in `src/benchmark/infrastructure.rs`
+- [x] Test: recall of first 100 tokens after processing 5000 tokens — `bench_raven_recall` in `src/benchmark/infrastructure.rs`
 
 ### Phase 2: Routed Slot Schema in anyrag
 

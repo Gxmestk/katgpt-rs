@@ -113,8 +113,8 @@ For our codebase, the "lattice" is the **latent-space neighborhood graph**:
 |--------|-------|---------------|----------------|
 | `ReestimationSteerer` | `riir-ai/crates/riir-engine/src/latent_functor/reestimation_steerer.rs` | Coherence-gated Slerp: `t = sigmoid((c − τ) · λ)` — modulates step size by fit quality | DSOM also modulates the *neighborhood set* (which entities participate), not just the step size. And DSOM's error is `‖x − w_s‖` (distance), not coherence (a correlation metric). |
 | `neighbor_heal` (Plan 316, Research 298) | `riir-neuron-db/src/neighbor_heal.rs` | Fixed k=5, fixed alpha=0.1, optional `tau`-gated sigmoid weighting of neighbors | DSOM makes k and alpha error-scaled. Also adds structure-matching (uniform support coverage). |
-| `evolve_hla` | `katgpt-sense/src/reconstruction.rs` | Fixed `hla_learning_rate`, fixed update step | DSOM scales the learning rate by `‖observation − current_belief‖`. |
-| `CommittedFieldBlend` (Plan 321, Research 302) | `katgpt-core/src/committed_field_blend.rs` | Per-entity MoE with committed pi weights, fixed tau | DSOM makes the blend weights error-scaled: when the state is far from any archetype, expand the blend (more archetypes contribute). |
+| `evolve_hla` | `crates/katgpt-sense/src/reconstruction.rs` | Fixed `hla_learning_rate`, fixed update step | DSOM scales the learning rate by `‖observation − current_belief‖`. |
+| `CommittedFieldBlend` (Plan 321, Research 302) | `crates/katgpt-core/src/committed_field_blend.rs` | Per-entity MoE with committed pi weights, fixed tau | DSOM makes the blend weights error-scaled: when the state is far from any archetype, expand the blend (more archetypes contribute). |
 | `graph_laplacian` (Plan 251) | `katgpt-core/src/dec/` | Uniform Laplacian smoothing (fixed edge weights) | DSOM makes edge weights error-dependent (non-uniform diffusion). |
 | `BayesianFilterArm` (Plan 370) | `katgpt-core/src/manifold_bandit.rs` | Non-stationary bandit with `filter_drift_rate` | DSOM provides the *update rule* for the filter — how to adapt when drift is detected. Currently the filter detects drift but the update is fixed-step. |
 
@@ -373,9 +373,9 @@ Super-GOAT — structure-matching is confirmed but not a novel capability class)
 
 ## 10. Phase 5 T5.1 Update: Error-Weighted Graph Laplacian (2026-07-12)
 
-**T5.1 COMPLETE.** Added `error_weighted_graph_laplacian_into` + `error_weighted_graph_laplacian` to `katgpt-core/src/elasticity_gated_update.rs`. This is the DSOM × DEC fusion: the standard `graph_laplacian` (uniform ±1 edge weights) gets an error-weighted variant where each edge's contribution is gated by the DSOM neighborhood function `exp(−1/(η²·error²))`.
+**T5.1 COMPLETE.** Added `error_weighted_graph_laplacian_into` + `error_weighted_graph_laplacian` to `crates/katgpt-core/src/elasticity_gated_update.rs`. This is the DSOM × DEC fusion: the standard `graph_laplacian` (uniform ±1 edge weights) gets an error-weighted variant where each edge's contribution is gated by the DSOM neighborhood function `exp(−1/(η²·error²))`.
 
-**Design decision:** the plan originally said "add in `katgpt-core/src/dec/`" but that path is the `katgpt_dec` re-export shim (`pub use katgpt_dec as dec;`). The `katgpt-dec` crate has **zero dependencies by design** (it's a pure-math substrate) and cannot import `neighborhood_weight` from `katgpt-core` (cyclic dependency). The fusion function lives in `katgpt-core/src/elasticity_gated_update.rs` where both `katgpt_dec::{CellComplex, CochainField}` types and the DSOM `neighborhood_weight` function are visible. Feature gate: `#[cfg(all(feature = "dec_operators", feature = "elasticity_gated_update"))]`.
+**Design decision:** the plan originally said "add in `katgpt-core/src/dec/`" but that path is the `katgpt_dec` re-export shim (`pub use katgpt_dec as dec;`). The `katgpt-dec` crate has **zero dependencies by design** (it's a pure-math substrate) and cannot import `neighborhood_weight` from `katgpt-core` (cyclic dependency). The fusion function lives in `crates/katgpt-core/src/elasticity_gated_update.rs` where both `katgpt_dec::{CellComplex, CochainField}` types and the DSOM `neighborhood_weight` function are visible. Feature gate: `#[cfg(all(feature = "dec_operators", feature = "elasticity_gated_update"))]`.
 
 **Math:** `Δ₀^w[v] = Σ_{e incident to v} w_e · (potential[v] − potential[neighbor])`, where `w_e = neighborhood_weight(1.0, edge_errors[e], eta)`. Lattice distance defaults to 1.0 (adjacent vertices on a regular grid).
 

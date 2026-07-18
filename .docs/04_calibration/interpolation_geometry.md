@@ -4,7 +4,7 @@
 > [Research 445](../../.research/445_Latent_Thought_Flows_Text_Compression.md) —
 > Prabhudesai & Geng, *Latent Thought Flows with Text Compression* (Jun 2, 2026).
 > **Module:** `katgpt_core::interpolation_geometry` (feature `interpolation_geometry`, opt-in).
-> **GOAT bench:** `benches/bench_456_interpolation_geometry_goat.rs`.
+> **GOAT bench:** `crates/katgpt-core/benches/bench_456_interpolation_geometry_goat.rs`.
 
 ## What this is
 

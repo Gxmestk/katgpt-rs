@@ -43,7 +43,7 @@ Consolidate three open tasks into a single ordered plan:
 - [x] Fix any failing tests, record count in GOAT table — 20 existing + 2 new T3 integration tests
 
 ### T3: DiffusionSampler integration into D2F denoising loop ✅
-- [x] Add `d2f_decode_block_with_prompt_with_sampler()` in `speculative/d2f.rs` (tri_mode feature-gated)
+- [x] Add `d2f_decode_block_with_prompt_with_sampler()` in `src/speculative/d2f.rs` (tri_mode feature-gated)
 - [x] When sampler present: use `sampler.decide(features)` instead of fixed `chosen_prob >= tau_conf`
 - [x] Add `sampler: Option<DiffusionSampler>` field to `SelfSpecConfig` in `speculative/types.rs`
 - [x] Add re-exports: `d2f_decode_block_with_sampler`, `d2f_decode_block_with_prompt_with_sampler`

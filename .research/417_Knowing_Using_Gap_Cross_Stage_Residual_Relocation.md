@@ -116,7 +116,7 @@ Vocabulary translation table (paper → codebase):
 | Paper vocabulary | Codebase vocabulary | Ships? |
 |---|---|---|
 | "self-patching" (relocate residual state across layers) | "cross-stage residual relocation operator", "deterministic skip-connection", "stage-to-stage reader-writer hot-swap" | ❌ **Not shipped as an applied operator** |
-| "activation patching" (score head importance) | `direct_effect_importance`, `indirect_effect_importance` (`causal_head_importance/patching.rs`, Plan 358) | ✅ Shipped — but as a *scorer*, caller-supplied forward pass. |
+| "activation patching" (score head importance) | `direct_effect_importance`, `indirect_effect_importance` (`crates/katgpt-core/src/causal_head_importance/patching.rs`, Plan 358) | ✅ Shipped — but as a *scorer*, caller-supplied forward pass. |
 | "knowledge-circuit misalignment" (knowledge stored in wrong layer) | "dormant subspace" (R151), "stranded latent state", "coherence < tau_reest" (`latent_functor/reestimation.rs`), "QK drift" (R259) | ⚠️ Partial — shipped for *weights* (R259 per-matrix) and *latent state* (R313 re-estimation); not for *activations across stages*. |
 | "permeation map" (L_src × L_dst scan) | "causal scan", "2D intervention heatmap" | ❌ Not shipped. |
 | "two-cluster pattern" (early→mid, late→mid) | (no shipped analog) | ❌ Not shipped. |

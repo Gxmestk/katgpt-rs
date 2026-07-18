@@ -342,7 +342,7 @@ determinism contract discourages SIMD dispatch in the math. Documented here
 as a measured, non-blocking optimization for a future focused session; the
 allocation-elimination fix is the load-bearing T4.1 win.
 
-**Zero-allocation verification:** `tests/subspace_phase_gate_alloc_check.rs`
+**Zero-allocation verification:** `crates/katgpt-core/tests/subspace_phase_gate_alloc_check.rs`
 (CountingAllocator, 1000 calls after warmup) asserts 0 allocs / 0 deallocs
 on the `jacobian_svd_at_into` hot path.
 
@@ -404,7 +404,7 @@ but should NOT be cited as the primitive's general-case latency.
   (T3.1+T3.2), `jacobian_svd_sigmoid_map_reveals_row_space` (T3.3),
   `jacobian_svd_r8x8_latency_gate` (T3.4, regression guard, both paths),
   `jacobian_svd_at_into_matches_allocating_path` (T4.1 bit-identical SOA vs owned),
-  `tests/subspace_phase_gate_alloc_check.rs::jacobian_svd_at_into_zero_alloc_after_warmup`
+  `crates/katgpt-core/tests/subspace_phase_gate_alloc_check.rs::jacobian_svd_at_into_zero_alloc_after_warmup`
   (T4.1 zero-alloc gate, CountingAllocator).
 - **Run:** `cargo test -p katgpt-core --features subspace_phase_gate --lib subspace_phase_gate::`
   — 19/19 pass (14 pre-existing + 2 Issue-008 + 3 T4.1).

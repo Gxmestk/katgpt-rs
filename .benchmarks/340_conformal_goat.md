@@ -35,7 +35,7 @@ unchanged values" optimization rule applied at the micro-level.
 `ε ~ N(0, σ)`, empirical coverage at α=0.05 over 10,000 ticks ∈ [0.93, 0.97]
 for ALL `m ∈ {12, 24, 48}` AND on `m=1` HStep mode.
 
-**Test:** `tests/conformal_coverage.rs` (3 tests)
+**Test:** `crates/katgpt-core/tests/conformal_coverage.rs` (3 tests)
 
 ### Results (α=0.05, target coverage 0.95)
 
@@ -72,7 +72,7 @@ nominal level across all seasonal periods, noise levels, and alpha values.
 
 **Gate:** `interval_into` ≤ 1µs at H=1, ≤ 100µs at H=8×8 channels.
 
-**Bench:** `benches/conformal_interval_bench.rs` (criterion, 30 samples,
+**Bench:** `crates/katgpt-core/benches/conformal_interval_bench.rs` (criterion, 30 samples,
 0.5s measurement, release build, Apple M-series).
 
 ### Results (median)
@@ -95,7 +95,7 @@ weights-compute-once optimization.
 **Gate:** `update_residual` and `interval_into` perform zero allocations after
 warmup.
 
-**Test:** `tests/conformal_alloc_check.rs` (CountingAllocator pattern, 1000
+**Test:** `crates/katgpt-core/tests/conformal_alloc_check.rs` (CountingAllocator pattern, 1000
 calls × 8 channels after warmup).
 
 | Method | Allocs (1000 × 8 calls) | Verdict |
@@ -119,7 +119,7 @@ and `analytic_lattice_alloc_check` pattern.
 `(residual_pool, m, alpha, h, decay_config, orientation)` produce byte-
 identical `PredictiveInterval` bounds (verified via `f32::to_bits`).
 
-**Test:** `tests/conformal_reproducibility.rs` (3 tests)
+**Test:** `crates/katgpt-core/tests/conformal_reproducibility.rs` (3 tests)
 
 | Check | Variations | Verdict |
 |---|---|---|
@@ -135,7 +135,7 @@ intact.
 
 ## AirPassengers CRPS — "Report the Floor" reference ✅
 
-**Example:** `examples/conformal_airpassengers.rs` (synthetic proxy, 144
+**Example:** `crates/katgpt-core/examples/conformal_airpassengers.rs` (synthetic proxy, 144
 monthly observations, multiplicative seasonality m=12, log-linear trend).
 
 | Metric | Conformal Overlay | Seasonal-Naive ±2σ | Winner |
@@ -165,11 +165,11 @@ with `m=1` on CRPS / coverage / Winkler at their GOAT gate.
 | `crates/katgpt-core/src/conformal/ring.rs` | `SortedRing`, `ResidualRingBuffer`, `RingBuffer`, `RingView` |
 | `crates/katgpt-core/src/conformal/seasonal.rs` | `SeasonalPoolForecaster`, `SeasonalNaiveForecaster` (type alias), `seasonal_naive_floor()` |
 | `src/conformal/metrics.rs` | `crps`, `crps_interval`, `winkler_score`, `empirical_coverage`, `mean_crps_interval`, `mean_winkler` |
-| `tests/conformal_coverage.rs` | G1 gate (3 tests) |
-| `tests/conformal_reproducibility.rs` | G4 gate (3 tests) |
-| `tests/conformal_alloc_check.rs` | G3 gate (2 tests) |
-| `benches/conformal_interval_bench.rs` | G2 gate (5 configs) |
-| `examples/conformal_airpassengers.rs` | CRPS reproduction / "Report the Floor" reference |
+| `crates/katgpt-core/tests/conformal_coverage.rs` | G1 gate (3 tests) |
+| `crates/katgpt-core/tests/conformal_reproducibility.rs` | G4 gate (3 tests) |
+| `crates/katgpt-core/tests/conformal_alloc_check.rs` | G3 gate (2 tests) |
+| `crates/katgpt-core/benches/conformal_interval_bench.rs` | G2 gate (5 configs) |
+| `crates/katgpt-core/examples/conformal_airpassengers.rs` | CRPS reproduction / "Report the Floor" reference |
 
 **Total:** 24 unit tests + 8 integration tests = 32 tests, all passing.
 
@@ -263,9 +263,9 @@ criterion bench, which is unchanged — see G2 table above).
 - **4 adapter unit tests** (`conformal::karc_adapter::tests::*`): channel
   extraction, `observe_and_update` write path, channel-out-of-range panic,
   empty-delay-state panic in debug.
-- **3 no-regression integration tests** (`tests/conformal_karc_no_regression.rs`):
+- **3 no-regression integration tests** (`crates/katgpt-core/tests/conformal_karc_no_regression.rs`):
   bit-identical forecasts, `wout` stability, FourierBasis smoke.
-- **1 example** (`examples/conformal_karc_overlay.rs`): Lorenz-63 coverage.
+- **1 example** (`crates/katgpt-core/examples/conformal_karc_overlay.rs`): Lorenz-63 coverage.
 - **All 24 Phase 1 tests still pass** (G1/G3/G4 gates unchanged).
 
 ### Total test count

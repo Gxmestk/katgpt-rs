@@ -151,7 +151,7 @@ it's approaching CPU-compute territory — but it's still on the ANE (21µs
 
 | File | Change |
 |---|---|
-| `katgpt-backend/examples/bench_439_phase25_ane_fused_validation.rs` | NEW — Phase 2.5 validation binary (pure Rust, no Python) |
+| `crates/katgpt-backend/examples/bench_439_phase25_ane_fused_validation.rs` | NEW — Phase 2.5 validation binary (pure Rust, no Python) |
 | `katgpt-backend/Cargo.toml` | Added `katgpt-core` dev-dependency; registered example with `required-features = ["ane"]` |
 | `.plans/439_ane_fused_chain_cost_model.md` | Phase 2.5 tasks marked `[x]`, status line updated |
 

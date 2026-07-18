@@ -67,7 +67,7 @@ Ship a generic, modelless, inference-time **Product Key Memory** retrieval primi
 
 ### Tasks
 
-- [x] **T3.1** Bench `benches/bench_408_pkm_goat.rs`:
+- [x] **T3.1** Bench `crates/katgpt-core/benches/bench_408_pkm_goat.rs`:
   - **G1 — O(√N) latency:** at `SQRT_N = 1000` (N = 10⁶ slots), `D_K = 64`, `D_V = 128`, `top_k = 8`, measure `query_into` p50 latency. Compare against brute-force O(N) scan over 10⁶ slots. Target: PKM ≥100× faster than brute-force. Report both as criterion benches.
   - **G2 — top-k correctness:** on a fixed random table, for 10⁴ random queries, compute the Jaccard overlap between PKM's top-k and brute-force's top-k. Target: ≥0.95 mean Jaccard (paper's factorization is approximate by construction — the Cartesian product of per-codebook top-k may miss the global top-k if the true top-k spans codebook boundaries; characterize this gap honestly).
   - **G3 — IDW centroid-ness:** on a synthetic k-means task (10 clusters in d_k/2 = 32 dim), initialize keys via k-means centroids, run 1000 queries, measure mean intra-cluster slot access rate. Compare Dot vs IDW. Target: IDW ≥1.2× higher intra-cluster rate.
@@ -103,7 +103,7 @@ Ship a generic, modelless, inference-time **Product Key Memory** retrieval primi
 
 ### Tasks
 
-- [x] **T5.1** In `product_key_memory/episodic.rs` (gated `product_key_memory_episodic`, depends on `product_key_memory` + `katgpt-core/pruners/delta_mem`):
+- [x] **T5.1** In `crates/katgpt-core/src/product_key_memory/episodic.rs` (gated `product_key_memory_episodic`, depends on `product_key_memory` + `katgpt-core/pruners/delta_mem`):
   - `PkmEpisodicStore` — wraps `FrozenProductKeyMemory` + a δ-rule write path.
   - `write(&mut self, q: &[f32; D_K], target: &[f32; D_V], gate: f32)` — δ-rule update on the top-k accessed value rows: `V[idx] += gate * (target - V[idx])` for each `idx` in the current query's top-k. This IS the modelless analog of FwPKM's `L_mem` GD step at η=1 (the gradient of `½‖target − V[idx]‖²` w.r.t. `V[idx]` is `−(target − V[idx])`, so one GD step at η=1 IS `V[idx] += (target − V[idx])`).
   - The `gate` parameter is the curiosity signal (paper's `g_t`) — sourced externally from Temporal Derivative Kernel (Plan 277) or CGSP (Plan 274), NOT computed internally. This keeps the primitive generic (no curiosity-signal dependency).

@@ -110,7 +110,7 @@ For our LoRA ranks (typically r ∈ [4, 64]), the Gram matrices are `r × r` —
 
 ## 2. Distillation for katgpt-rs (Modelless)
 
-### 2.1 Newton-Schulz Inverse Square Root — `src/newton_schulz.rs`
+### 2.1 Newton-Schulz Inverse Square Root — `crates/katgpt-core/src/newton_schulz.rs`
 
 **Status:** MISSING. Currently `newton_schulz.rs` only has `msign` (5-iter NS5) and `muon_update`. The inverse square root for PSD Gram matrices is needed for gauge-invariant updates and gauge rebalancing.
 
@@ -125,7 +125,7 @@ For our LoRA ranks (typically r ∈ [4, 64]), the Gram matrices are `r × r` —
 - `r ≤ 64`: CPU SIMD (current path, ~1KB scratch for r=16).
 - `r > 64`: would route to GPU Muon kernels (`riir-gpu`), but this is out of scope for katgpt-rs — call site should fall back to dense if needed.
 
-### 2.2 Gauge Rebalance — `src/gauge_invariant.rs` (new module)
+### 2.2 Gauge Rebalance — `crates/katgpt-spectral/src/gauge_invariant.rs` (new module)
 
 **Pure inference-time primitive** — no training. Given `(A, B)` factor pair:
 
@@ -150,7 +150,7 @@ pub fn gauge_rebalance(
 - ~O(r · (m+n)) per call — sub-microsecond for typical LoRA sizes (r=16, m=n=256).
 - No allocations: caller-owned scratch buffers.
 
-### 2.3 Gauge-Invariant Compose — `src/gauge_invariant.rs`
+### 2.3 Gauge-Invariant Compose — `crates/katgpt-spectral/src/gauge_invariant.rs`
 
 **Drop-in replacement for naive task-vector arithmetic** when composing trained LoRAs:
 

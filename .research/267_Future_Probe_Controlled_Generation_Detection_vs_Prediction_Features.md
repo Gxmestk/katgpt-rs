@@ -102,7 +102,7 @@ Key metric: **format-filtered rate** (proxy for output degradation). ActSteer wi
 |---|---|---|---|
 | Difference-in-means steering vector | CNA contrastive neuron discovery (`Plan 087`, `crates/katgpt-core/src/...`, `BomberContrastivePairs`, `GoContrastivePairs`) | **Detection** | ✅ shipped, GOAT 4/4 |
 | Linear projection on residual stream for behavior | `EmotionDirections::project` (`Plan 162`, `src/pruners/emotion_vector.rs`), valence/arousal/desperation/calm | **Detection** | ✅ shipped, default-on |
-| Sentence-level CoT as decision unit | `AdaptiveTraceCompactor::observe_entropy` (`src/attn_match/adaptive_cot.rs:159`), `RejectionReason::EntropySpike` (`src/distill/trd.rs:56`) | Both | ✅ shipped (entropy, not behavior) |
+| Sentence-level CoT as decision unit | `AdaptiveTraceCompactor::observe_entropy` (`src/attn_match/adaptive_cot.rs:159`), `RejectionReason::EntropySpike` (`crates/katgpt-speculative/src/distill/trd.rs:56`) | Both | ✅ shipped (entropy, not behavior) |
 | Causal-intervention behavioral delta | `FaithfulnessProbe` (`Plan 278`, `crates/katgpt-core/src/cgsp/dual_pool.rs:1868`), `behavior_delta` trait method | Detection (intervention) | ✅ shipped |
 | Sample-M-candidates → score → argmax-select | CGSP Conjecturer+Guide loop (`crates/katgpt-core/src/cgsp/loop_.rs`); CompressionDrafter beam (`riir-games/src/quest_grammar/compression_draft.rs`) | Mechanism skeleton | ✅ shipped (different domains) |
 | Linear forecast from cheap signal | Issue 023 `AcceptanceForecast { a, b }` (`α ≈ a − b·H(p)`, Research 243 §2.3) | Forecast | 📋 planned, not yet implemented |

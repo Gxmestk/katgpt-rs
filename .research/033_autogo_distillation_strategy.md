@@ -453,7 +453,7 @@ From weakest to strongest:
 | Capture + ko detection | `advance()` + ko tracking | `go.py:play()`, `go_game.h` | `src/pruners/go/state.rs` |
 | Territory scoring | `reward()` via flood fill | `go.py:score()`, `go_game.h` | `src/pruners/go/state.rs` |
 | MCTS PUCT + Dirichlet | Enhance our `mcts_search()` | `mcts.py`, `mcts.h` | `src/pruners/game_state/mcts.rs` |
-| Policy/value dual head | Future: dual-head config | `model.py:GoTransformer` | `src/transformer.rs` |
+| Policy/value dual head | Future: dual-head config | `model.py:GoTransformer` | `crates/katgpt-percepta/src/transformer.rs` |
 | Self-play loop | G-Zero `SelfImprovingCycle` | `self_play.py` | `pruners/g_zero/` |
 | Agent registry pattern | Adapt for Go players | `agents/base.py` | `src/pruners/go/players.rs` |
 | REST API game protocol | Rust HTTP client | `play.py` | `src/pruners/go/autogo_client.rs` |

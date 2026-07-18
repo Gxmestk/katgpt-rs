@@ -32,11 +32,11 @@ Four key findings:
 
 | Component | Status | Location |
 |-----------|--------|----------|
-| Newton-Schulz 5-iteration | ✅ Shipped | `src/newton_schulz.rs`, GOAT 25/25 |
-| Muon momentum buffer | ✅ Shipped | `src/newton_schulz.rs::muon_update()` |
-| River-valley diagnostics | ✅ Shipped | `src/river_valley.rs` (r_dom, r_bulk, effective rank) |
+| Newton-Schulz 5-iteration | ✅ Shipped | `crates/katgpt-core/src/newton_schulz.rs`, GOAT 25/25 |
+| Muon momentum buffer | ✅ Shipped | `crates/katgpt-core/src/newton_schulz.rs::muon_update()` |
+| River-valley diagnostics | ✅ Shipped | `crates/katgpt-spectral/src/river_valley.rs` (r_dom, r_bulk, effective rank) |
 | Curvature-influence scorer | 📋 Planned | Plan 183 (CIAB), trait defined but not implemented |
-| EGA spectral salience | ✅ Shipped | `src/ega_attn.rs` (z-normalized sigmoid gate) |
+| EGA spectral salience | ✅ Shipped | `crates/katgpt-attn/src/ega_attn.rs` (z-normalized sigmoid gate) |
 | Spectral Hierarchy | ✅ Shipped | eigenspace alignment, Haar wavelets, Cauchy interlacing |
 | AMUSE optimizer (riir-ai) | ✅ Shipped | `riir-gpu/src/optimizer_amuse.rs` |
 

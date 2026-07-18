@@ -147,7 +147,7 @@ base weight, only through the class's own θ).
   feature map: the raw state slice IS the feature vector. Plug-in point for
   nonlinear feature maps (Fourier features, Random Kitchen Sinks) — out of
   scope for this plan, but the trait allows it.
-- [x] **T2.2** Self-contained Cholesky helpers in `occupancy/solve.rs`:
+- [x] **T2.2** Self-contained Cholesky helpers in `crates/katgpt-core/src/occupancy/solve.rs`:
   `cholesky_inplace(&mut [f32], dim) -> bool` and
   `cholesky_solve_into(l, b, dim, y_buf, x)`. Mirrors the proven pattern in
   `crate::funcattn` but kept private to this module (no cross-module dep).
@@ -177,7 +177,7 @@ as specified.
 ### Tasks
 
 - [x] **T3.1** Construct the Baird-style MRP state space and transition kernel
-  in `tests/occupancy_baird_mrp.rs`. State space: `X = {u_1,...,u_6, ℓ}` (7
+  in `crates/katgpt-core/tests/occupancy_baird_mrp.rs`. State space: `X = {u_1,...,u_6, ℓ}` (7
   states), encoded as `state_dim = 1` with scalar feature `φ(u_j) = 0.1`,
   `φ(ℓ) = 1.0`. Uses SplitMix64 PRNG (no `rand` dep — matches `conformal_coverage.rs`
   convention) with fixed seed 423.
@@ -215,11 +215,11 @@ See `.benchmarks/438_occupancy_ratio_goat.md` §"Bugs found and fixed" for detai
 
 - [x] **T4.1 (G1)** `cargo test -p katgpt-core --features occupancy_ratio
   --test occupancy_baird_mrp` passes (3/3 tests). Recorded in `.benchmarks/438_occupancy_ratio_goat.md`.
-- [x] **T4.2 (G2)** `benches/bench_438_occupancy_ratio_goat.rs` benchmarking
+- [x] **T4.2 (G2)** `crates/katgpt-core/benches/bench_438_occupancy_ratio_goat.rs` benchmarking
   `OccupancyRatioEstimator::fit` on n=10000, state_dim=8, K=20. Gate: median
   wall-clock < 100 ms on Apple Silicon. Achieved: **48.63 ms** (2× headroom).
 - [x] **T4.3 (G4)** Zero-alloc audit on the inner KL-projection loop using
-  `CountingAllocator` (`tests/occupancy_alloc_check.rs`): after warmup, **0
+  `CountingAllocator` (`crates/katgpt-core/tests/occupancy_alloc_check.rs`): after warmup, **0
   allocations** across 100 `fit_and_evaluate` calls. The outer `fit()` may
   allocate the output `Vec<f32>` and the initial `KlProjectionScratch`.
 - [x] **T4.4 (G5)** Code-review sign-off: no GD through base weights.

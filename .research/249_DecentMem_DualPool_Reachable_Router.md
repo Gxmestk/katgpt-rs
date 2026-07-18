@@ -241,7 +241,7 @@ pub trait ReachableDualPoolRouter {
 pub enum PoolId { Exploitation = 0, Exploration = 1 }
 ```
 
-**Target location:** `katgpt-core/src/cgsp/dual_pool.rs` (extends the existing `cgsp` module). Feature flag: `cgsp_dual_pool` (opt-in until GOAT gate passes).
+**Target location:** `crates/katgpt-core/src/cgsp/dual_pool.rs` (extends the existing `cgsp` module). Feature flag: `cgsp_dual_pool` (opt-in until GOAT gate passes).
 
 ---
 

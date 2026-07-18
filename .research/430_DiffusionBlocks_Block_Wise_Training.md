@@ -61,7 +61,7 @@ The codebase has evolved significantly:
 - **RecFM Sub-Stepping** (`tf_loop.rs`): Acceleration-bounded ODE sub-stepping gated by `recfm` feature
 - **ThoughtFold** (`fold/`): Chain folding with attention-based importance scoring + fold bandit
 - **InferenceRouter** (`inference_router.rs`): TriggerGate-adaptive CPU/GPU/ANE tier routing
-- **D2F Equi-Probability** (`speculative/d2f.rs`): `ScheduleKind::EquiProbability` + `equi_probability_schedule()` with Acklam's Φ⁻¹
+- **D2F Equi-Probability** (`src/speculative/d2f.rs`): `ScheduleKind::EquiProbability` + `equi_probability_schedule()` with Acklam's Φ⁻¹
 - **Discrete Critical Interval Solver** (`dllm_solver.rs`): Entropy-triggered DPM-Solver++↔Q-Sample switching
 - **DEC Infrastructure** (`katgpt-core/src/dec/`): CellComplex, CochainField, exterior_derivative, hodge_decompose, DecFlowField
 - **Sense Octree** (`katgpt-core/src/sense/octree.rs`): KG embeddings → bit-plane octree + BLAKE3 commitment
@@ -84,7 +84,7 @@ The paper's **core contribution** remains a training-time technique (B× memory 
 | Insight | Status |
 |---------|--------|
 | Residual-as-ODE | Captured in LT2/TF-Loop before first visit |
-| Equi-probability partitioning | **NOW IMPLEMENTED** — `ScheduleKind::EquiProbability` in `speculative/d2f.rs` |
+| Equi-probability partitioning | **NOW IMPLEMENTED** — `ScheduleKind::EquiProbability` in `src/speculative/d2f.rs` |
 | One-block-per-step | Already in D2F |
 | Moderate B > E2E | D2F already uses block specialization |
 

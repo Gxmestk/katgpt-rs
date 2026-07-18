@@ -4,8 +4,8 @@
 **Plan:** [453](../.plans/453_bounded_one_step_lacam_escalation.md)
 **Research:** [441](../.research/441_lacam_constraint_tree_distillation.md)
 **Feature:** `lacam_escalation = ["multi_agent_path"]`
-**Bench:** `benches/bench_453_lacam_escalation_goat.rs` (G6c + latency sweep)
-**Bench:** `benches/bench_440_lllg_paper_repro.rs` (G1 throughput, re-run with `--features lacam_escalation`)
+**Bench:** `crates/katgpt-core/benches/bench_453_lacam_escalation_goat.rs` (G6c + latency sweep)
+**Bench:** `crates/katgpt-core/benches/bench_440_lllg_paper_repro.rs` (G1 throughput, re-run with `--features lacam_escalation`)
 
 ## TL;DR
 

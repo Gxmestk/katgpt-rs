@@ -73,7 +73,7 @@ This maps onto the *three-pillar composition* we ship but never unified under on
 | Channel / feature map | `CochainField::dim` (feature dimension per cell) | `katgpt-dec/src/types.rs` |
 | Lateral connectivity kernel K | `hodge_laplacian` (Δ = δd + dδ) — the *linear* stencil analogue; the *non-negative* variant is `relu_gate → Δ` | `katgpt-dec/src/operators.rs`, `hodge.rs` |
 | Local propagation / "no teleporting" | `dₖ₊₁ ∘ dₖ = 0` enforced by construction; tests `curl_of_gradient_is_zero`, `divergence_of_curl_is_zero` | `katgpt-dec/src/operators.rs` |
-| Motor-gated channels | `apply_latent_steering_weighted(state, dir, w)` — elementwise multiplicative gain | `katgpt-core/src/latent_steering.rs` (Plan 309) |
+| Motor-gated channels | `apply_latent_steering_weighted(state, dir, w)` — elementwise multiplicative gain | `crates/katgpt-core/src/latent_steering.rs` (Plan 309) |
 | Action-conditional prediction | `apply_functor` (rank-1 vector addition) + sigmoid trust gate | `riir-engine/src/latent_functor/arithmetic.rs` (Plan 303) |
 | Frozen learned world model | `InducedCwmKernel` (verifiable + committable + hot-swappable forward model) | `katgpt-core/src/induced_cwm/kernel.rs` (Plan 296) |
 | Frozen-simulator policy learning | `sleep_time` consolidation (offline pre-think) + `InducedCwmSlot` atomic swap | `riir-engine/src/sleep_time/` (Plan 341), `katgpt-core/src/induced_cwm/hot_swap.rs` |

@@ -254,7 +254,7 @@ Plus tests in `crates/katgpt-core/src/engram/` (unit) and `tests/bench_299_engra
 | `crates/katgpt-core/src/engram/forward.rs` | fuse_into_hidden_state() end-to-end hook |
 | `tests/bench_299_engram_goat.rs` | G1–G7 GOAT gate tests |
 | `examples/engram_demo.rs` | End-to-end demo |
-| `benches/engram_micro.rs` | Criterion micro-benchmarks (lookup, sigmoid_fuse, hotswap) |
+| `crates/katgpt-core/benches/engram_micro.rs` | Criterion micro-benchmarks (lookup, sigmoid_fuse, hotswap) |
 
 **Estimated total:** ~2500–3000 LOC across engine + tests + benches + example.
 

@@ -75,7 +75,7 @@ under the 500 ns target.
 
 ## G3 — Zero-Allocation Forecast
 
-`tests/karc_alloc_check.rs` — manual `GlobalAlloc` counter wrapping `System`.
+`crates/katgpt-core/tests/karc_alloc_check.rs` — manual `GlobalAlloc` counter wrapping `System`.
 1000 `forecast_into` calls after 10 warmup calls: **0 alloc, 0 dealloc** delta.
 The feature buffer (`forecast_psi`, d_h floats) is pre-allocated at construction
 and reused via indexing (stack arrays of size `K·D·M` are not expressible in
@@ -85,7 +85,7 @@ stable Rust with const-generic arithmetic — `generic_const_exprs` is unstable)
 
 ## G4 — Bit-Reproducibility
 
-`tests/karc_reproducibility.rs` — two forecasters fit on the same deterministic
+`crates/katgpt-core/tests/karc_reproducibility.rs` — two forecasters fit on the same deterministic
 synthetic trajectory produce **byte-identical Wout** (verified via `f32::to_bits`
 comparison, which catches NaN-payload and signed-zero differences). Confirmed at
 λ ∈ {1e-8, 1e-6, 1e-4} for both Fourier and Chebyshev bases.

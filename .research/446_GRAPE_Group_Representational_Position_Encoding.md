@@ -89,7 +89,7 @@ where `p_{·,h}` are positional embeddings (linear projection + RMSNorm of token
 | **Wall per-channel prefix-sum gates** | **`WallDiagonalGate`** (`crates/katgpt-attn/src/diagonal_gate.rs`, Plan 173, Research 431) — exact GRAPE-AP instance |
 | Multiplicative rotation (single plane) | `phase_rotation_gate_into` (`crates/katgpt-core/src/phase_rotation.rs`, Plan 322) — scalar broadcast `cos·a + sin·b`, NOT general rank-2 Rodrigues |
 | `GroupAction` trait (Lie group acts on `ℝᵈ`) | `GroupAction` (`crates/katgpt-core/src/group_invariance_probe.rs`, Research 355) |
-| Skew generator `L = ab^T − ba^T` | (referenced in `linalg/geometric_product.rs` notes re OFT but no impl) |
+| Skew generator `L = ab^T − ba^T` | (referenced in `crates/katgpt-core/src/linalg/geometric_product.rs` notes re OFT but no impl) |
 | Matrix exponential `exp(n·ω·L)` | `katgpt-dec/nonlinear_heat_kernel.rs` uses `exp(t·L)` form for heat equation; no general Lie-group exponential |
 | `exp(−β·‖x‖)` forget decay | `elasticity_gated_update.rs::neighborhood_weight` (different mechanism — RBF, not nilpotent) |
 

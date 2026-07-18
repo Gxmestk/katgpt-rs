@@ -2,7 +2,7 @@
 
 **Date:** 2026-07-07
 **Plan:** [katgpt-rs/.plans/407_sheaf_admm_coordination_primitive.md](../.plans/407_sheaf_admm_coordination_primitive.md)
-**Bench:** `katgpt-dec/benches/bench_407_phase3_sheaf_admm.rs`
+**Bench:** `crates/katgpt-dec/benches/bench_407_phase3_sheaf_admm.rs`
 
 ## Gate summary
 

@@ -75,7 +75,7 @@ The core question from Research 299 §5 Q1: **does the wedge signal carry inform
 
 ### G4 — Performance
 
-- [x] **T2.9** `benches/bench_319_geometric_product_goat.rs` runs G4:
+- [x] **T2.9** `crates/katgpt-core/benches/bench_319_geometric_product_goat.rs` runs G4:
   - `geometric_product_D8_S4` — 152.3 ns/call (target < 50 ns — **target was unrealistic**: 32 `exp()` calls alone exceed 50ns).
   - `geometric_product_D64_S7` — 1071.2 ns/call (target < 200 ns — **target was unrealistic**: 448 `exp()` calls alone exceed 200ns).
   - Speedup vs naive O(D²): **1.89× (D=8, too small for 4×), 9.33× (D=64, PASS ≥ 4×)**.
@@ -129,7 +129,7 @@ G5) required for Super-GOAT elevation.
 
 **Bench:** `cargo bench -p katgpt-core --features geometric_product --bench bench_319_g8e_aoi_latency -- --nocapture`
 
-- [x] **T5.1** `benches/bench_319_g8e_aoi_latency.rs` — simulates 1000 NPCs × 20 AOI partners × D=64 wedge + sigmoid + tau gate per tick (the exact `clifford_bridge::complementarity_target` workload, reproduced inline since katgpt-core can't depend on riir-engine).
+- [x] **T5.1** `crates/katgpt-core/benches/bench_319_g8e_aoi_latency.rs` — simulates 1000 NPCs × 20 AOI partners × D=64 wedge + sigmoid + tau gate per tick (the exact `clifford_bridge::complementarity_target` workload, reproduced inline since katgpt-core can't depend on riir-engine).
 - [x] **T5.2** **G8e result:**
   - **mean tick: 3.340 ms** (target < 5.0 ms) — **✓ PASS** with 1.50× headroom.
   - **p99 tick: 3.571 ms** — excellent tail latency (worst case still <5ms).
@@ -178,7 +178,7 @@ parties survive longer than similarity-weighted parties under varied threats?
 
 **Bench:** `cargo bench -p katgpt-core --features geometric_product --bench bench_319_g8c_formation_robustness -- --nocapture`
 
-- [x] **T5.9** `benches/bench_319_g8c_formation_robustness.rs` — minimal encounter sim: 100-NPC pool (80% specialists + 20% generalists), 4-role model (Tank/Healer/DPS/Support), party formation via max-min wedge (diversity) vs max-min dot (similarity), 200-round combat with random threat types.
+- [x] **T5.9** `crates/katgpt-core/benches/bench_319_g8c_formation_robustness.rs` — minimal encounter sim: 100-NPC pool (80% specialists + 20% generalists), 4-role model (Tank/Healer/DPS/Support), party formation via max-min wedge (diversity) vs max-min dot (similarity), 200-round combat with random threat types.
 - [x] **T5.10** **G8c result:**
   - **Complementarity party: 39.2 rounds mean survival** (covers 3/4 roles).
   - **Similarity party: 13.4 rounds mean survival** (covers 1/4 role — all DPS).
@@ -195,7 +195,7 @@ compositions than similarity-driven factions?
 
 **Bench:** `cargo bench -p katgpt-core --features geometric_product --bench bench_319_g8d_faction_diversity -- --nocapture`
 
-- [x] **T5.12** `benches/bench_319_g8d_faction_diversity.rs` — 100-NPC sandbox, 4 factions, contiguous-block assignment (similar/diverse NPCs cluster together). Two metrics: intra-faction role variance and role coverage.
+- [x] **T5.12** `crates/katgpt-core/benches/bench_319_g8d_faction_diversity.rs` — 100-NPC sandbox, 4 factions, contiguous-block assignment (similar/diverse NPCs cluster together). Two metrics: intra-faction role variance and role coverage.
 - [x] **T5.13** **G8d result:**
   - **Variance ratio: 1.20×** (target ≥ 2×) — **✗ FAIL** (variance is noisy at faction scale; with 25 members per faction, individual NPC noise dominates the assignment-strategy signal).
   - **Coverage: complementarity 4.00/4 vs similarity 3.00/4** — **✓ PASS** (complementarity factions span all roles; similarity factions each miss one role).

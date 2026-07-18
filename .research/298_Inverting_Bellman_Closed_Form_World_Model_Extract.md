@@ -113,7 +113,7 @@ where `P̄^π_l = (P^π_l)ᵀ` is the policy-induced kernel transpose. **This is
 | world model / transition kernel `P` | `GameState::advance`, `InducedCwmKernel`, forward model, deterministic kernel, latent functor application chain |
 | Bellman residual `‖T^π_φ(Q) − Q‖²` | TD error, `delta_signal`, `coherence decay` (latent_functor/reestimation), surprise |
 | Bellman inversion / P-learning | `tabular_p_extract` (closed form), `column_match` (deterministic), re-estimation, re-derive, thawed-snapshot projection |
-| pseudo-inverse `M⁺` | `linalg/ridge_solve.rs` (Plan 308), Schur solver (Plan 318), least-squares lift |
+| pseudo-inverse `M⁺` | `crates/katgpt-core/src/linalg/ridge_solve.rs` (Plan 308), Schur solver (Plan 318), least-squares lift |
 | value equivalence | latent ambiguity, underdetermination, subspace collapse, coherence `< τ` |
 | identifiability / column-injectivity | `subspace_phase_gate` participation ratio, numerical rank, `Dirichlet` separation |
 | resolvent `M = R(I − γP̄)⁻¹` | latent functor arithmetic, LatCal `(I − γP)⁻¹` form, KARC delay-basis |

@@ -21,7 +21,7 @@ validators distilled from the ARG Standard (Iris Technologies, 2026).
 | `PolicyEnvelope` | `arg/policy.rs` | Step 1 (hard gate) | G1, G2a, G4 |
 | `TaxonomyValidator` | `arg/taxonomy.rs` | Step 3 (label-set validation) | G1, G2b, G4 |
 | `LifecycleState` + `RedirectTable` | `arg/lifecycle.rs` | Step E (lifecycle) | G1 |
-| `TypedOfflineCandidate` + `OfflineCandidateScorer` | `arg/candidate.rs`, `arg/scorer.rs` | Step C (offline evolution) | G1, G5 |
+| `TypedOfflineCandidate` + `OfflineCandidateScorer` | `crates/katgpt-core/src/arg/candidate.rs`, `arg/scorer.rs` | Step C (offline evolution) | G1, G5 |
 | `InfoRegistry` | `arg/registry.rs` | Step 9 + Step C (dedup) | G1 |
 
 ---

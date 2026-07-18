@@ -24,7 +24,7 @@ with BoM's actual selling point.
 
 ## Method
 
-The `BoMSamplerAdapter` (`tests/conformal_floor_bom.rs`) wraps
+The `BoMSamplerAdapter` (`crates/katgpt-core/tests/conformal_floor_bom.rs`) wraps
 `AttractorKernel::from_seed` (random init, **unfitted** to the corpus) as a
 `UqPrimitiveUnderTest`:
 

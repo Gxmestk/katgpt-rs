@@ -333,7 +333,7 @@ aggregation protocol in `rank_candidates` already handles metric-disagreement gr
   Also: `transfer_score_into` (zero-alloc) matches `transfer_score` (allocating)
   for the Recos metric. Four tests, all `#[cfg(feature = "recos")]`-gated.
 
-- [-] **T3.5** Bench (`benches/mag_g6.rs` or a new `recos_mag` bench): does adding
+- [-] **T3.5** Bench (`crates/katgpt-core/benches/mag_g6.rs` or a new `recos_mag` bench): does adding
   `Recos` to the metric pool change `rank_candidates` selection on the
   `bench_001_mag_transfer.rs` fixtures? **Deferred** — the Phase 2 G1 FAIL (recos
   is a worse retrieval/ranking metric due to Corollary 2 distractor inflation +

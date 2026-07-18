@@ -141,7 +141,7 @@ pub fn soft_embedding(
 );
 ```
 
-Already have similar infrastructure in `src/sparse_compose.rs` and `src/mux_demux.rs` (Research 158). The soft-embedding op is the same primitive as MUX's `mux(r_i) = Σ_j w_j · onehot(token_j) / Z`, just with `w_j = p_t[v]` (continuous probabilities) instead of geometric decay weights.
+Already have similar infrastructure in `crates/katgpt-sparse/src/sparse_compose.rs` and `crates/katgpt-core/src/mux_demux.rs` (Research 158). The soft-embedding op is the same primitive as MUX's `mux(r_i) = Σ_j w_j · onehot(token_j) / Z`, just with `w_j = p_t[v]` (continuous probabilities) instead of geometric decay weights.
 
 **M3. Signal mixing at switch instants:**
 

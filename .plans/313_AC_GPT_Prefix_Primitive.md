@@ -98,7 +98,7 @@ Ship a modelless, zero-allocation **AC-GPT-style arbitrary-conditional prefix pr
   - Conditioning copies and original conditioning positions stay fixed.
   - Returns just the eval tokens (in original order).
 - [x] **T2.3** Add a `ForwardForAcPrefix` trait in `ac_prefix/forward.rs` so callers can plug in any causal Transformer forward pass without naming concrete weight types. (Mirrors the existing `SpeculativeGenerator` pattern.)
-- [x] **T2.4** Demo in `examples/ac_prefix_demo.rs`: micro-GPT config, 16-token base sequence, 8 conditioning tokens, print conditional logprob and a sampled continuation. Demo the leakage-prevention by also running a "naive" variant (let later tokens attend to in-place conditioning tokens) and showing the conditional logprob differs.
+- [x] **T2.4** Demo in `crates/katgpt-core/examples/ac_prefix_demo.rs`: micro-GPT config, 16-token base sequence, 8 conditioning tokens, print conditional logprob and a sampled continuation. Demo the leakage-prevention by also running a "naive" variant (let later tokens attend to in-place conditioning tokens) and showing the conditional logprob differs.
 
 **Phase 2 exit:** demo runs, conditional logprob is finite, sample is well-formed, naive-vs-AC-GPT logprob differs (proving the leakage-prevention matters).
 

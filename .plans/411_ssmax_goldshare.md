@@ -88,8 +88,8 @@ Goal: prove the gain over the default (sigmoid parallax without SSMax; no GoldSh
 
 ### Bench
 
-- [x] **T4.1** Created `benches/bench_411_ssmax_goat.rs` — synthetic retrieval task with N ∈ {64, 1k, 10k, 100k}, planted gold position (top-1 pre-softmax by Δ=0.5), measures argmax preservation + gold mass recovery with and without SSMax.
-- [x] **T4.2** Created `benches/bench_411_gold_share_goat.rs` — sweep that grows N_kv 8→2048 while shrinking gold attention. Verifies gold_share tracks the swap (range 0.94) while effective_rank stays flat (range 0.00).
+- [x] **T4.1** Created `crates/katgpt-core/benches/bench_411_ssmax_goat.rs` — synthetic retrieval task with N ∈ {64, 1k, 10k, 100k}, planted gold position (top-1 pre-softmax by Δ=0.5), measures argmax preservation + gold mass recovery with and without SSMax.
+- [x] **T4.2** Created `crates/katgpt-core/benches/bench_411_gold_share_goat.rs` — sweep that grows N_kv 8→2048 while shrinking gold attention. Verifies gold_share tracks the swap (range 0.94) while effective_rank stays flat (range 0.00).
 - [x] **T4.3** **G1 (correctness) ✅ PASS** — SSMax preserves argmax at all N ≥ 64 for both Fixed (`s_L=1.0`) and Adaptive (`s_L=1/Δ`). At N=100k: base gold mass 0.00002, SSMax Fixed 0.003 (185× improvement), SSMax Adaptive 0.47 (29,000× improvement).
 - [x] **T4.4** **G2 (quality) ✅ PASS** — SSMax retrieval recall measured via cosine similarity cos(output, v_gold) at N ∈ {1k, 10k}. Base: 0.25, SSMax Adaptive: 0.97 — the output vector points strongly toward the gold value instead of being diluted across distractors. (Initially deferred by a prior session; this session implemented the actual recall test and confirmed PASS.) GoldShare G2 ✅ PASS — differentiating power demonstrated: gold_share collapses 27× while ‖a_L‖ stays constant.
 - [x] **T4.5** **G3 (latency) ✅ PASS** — `apply_ssmax_inplace` @ n_kv=1024: 66.2 ns/call (10k iters). Well under 1% of a typical ~100µs attention forward.

@@ -92,12 +92,12 @@ Goal: prove the QB algorithm's claims on a real calibration-batch shape before a
 
 ### Tasks
 
-- [x] **T2.1** Create `benches/quantile_balance_router_bench.rs` in `katgpt-spectral/benches/` (std::time::Instant, not criterion — matches Plan 279 `manifold_power_iter_router_bench.rs` style):
+- [x] **T2.1** Create `crates/katgpt-spectral/benches/quantile_balance_router_bench.rs` in `katgpt-spectral/benches/` (std::time::Instant, not criterion — matches Plan 279 `manifold_power_iter_router_bench.rs` style):
   - **DONE 2026-07-17** — see `.benchmarks/461_quantile_balance_router_phase2_goat.md` for full sweep numbers.
   - [x] Sweep `N ∈ {8, 32, 64, 256}` experts, `M ∈ {64, 256, 1024}` calibration tokens, `k ∈ {1, 2, 4}`
   - [x] Measure: per-iter cost, total `β` compute time, `route_with_bias` per-token cost
   - [x] Print `MaxVio(s) → MaxVio(s − β)` for each `(N, M, k)`
-- [x] **T2.2** Create `tests/bench_455_quantile_balance_goat.rs` — the GOAT gate test file:
+- [x] **T2.2** Create `crates/katgpt-spectral/tests/bench_455_quantile_balance_goat.rs` — the GOAT gate test file:
   - **DONE 2026-07-17 — 12/12 PASS on release.** Gate revisions from Phase 1 honest findings applied:
     - G2 uses M=64 (large batch) where the 0.1× threshold actually holds; small-M case covered by lib unit test (0.5× threshold).
     - G7 gates MaxVio stability (not β precision) per Phase 1 honest finding #2.

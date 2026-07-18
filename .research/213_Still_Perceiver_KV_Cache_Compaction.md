@@ -420,7 +420,7 @@ for chunk in chunks:
 
 ### What stays (shared infrastructure, NOT demoted)
 
-- `BetaBias` type (`katgpt-kv/src/still_kv/beta_bias.rs`) — **shared** between StillKV and AM. AM uses it with NNLS-optimal values; StillKV uses it with heuristic values. The type itself is infrastructure, not a strategy.
+- `BetaBias` type (`crates/katgpt-kv/src/still_kv/beta_bias.rs`) — **shared** between StillKV and AM. AM uses it with NNLS-optimal values; StillKV uses it with heuristic values. The type itself is infrastructure, not a strategy.
 - `CompactKVCache` type — shared output container.
 - `CompactableKVCache` trait (`src/types.rs`) — shared interface.
 - `PositionFreeCompactor` (RoPE un-rotate/re-rotate) — used by both paths.

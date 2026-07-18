@@ -225,7 +225,7 @@ grepped the codebase for both paper and code vocabulary:
 | `backtrack` | `crates/katgpt-core/src/` | NO |
 | `search_tree` | `crates/katgpt-core/src/` | NO |
 | `constraint_tree` | `crates/katgpt-core/src/` | NO |
-| `priority inheritance` / `funcPIBT` | `multi_agent_path/pibt.rs` | NO (the module docs *discuss* PI but the code uses greedy PIBT, not recursive) |
+| `priority inheritance` / `funcPIBT` | `crates/katgpt-core/src/multi_agent_path/pibt.rs` | NO (the module docs *discuss* PI but the code uses greedy PIBT, not recursive) |
 
 **Conclusion:** the constraint tree is NOT shipped under any name. The
 vocabulary-translation gate passes — Plan 453 is implementing genuinely

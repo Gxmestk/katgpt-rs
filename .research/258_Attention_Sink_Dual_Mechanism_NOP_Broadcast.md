@@ -15,7 +15,7 @@ The same "vertical stripe" attention pattern (a sink) can implement two **distin
 
 **Distilled for katgpt-rs (modelless, inference-time):**
 
-We already ship half of the paper's conclusion by default — sigmoid attention (`parallax_attn.rs`, `funcattn.rs`) eliminates sinks by replacing softmax. But the paper's value is the **discrimination**: some sinks are useful broadcasters doing real computation. A blanket "kill all sinks" policy over-suppresses. The transferable primitive is a **per-head/per-sink classifier** that decides whether a sink should be killed (NOP) or preserved (Broadcast), plus a **dual-policy attention**: sigmoid gate for NOP heads, regular attention for Broadcast heads. This is a clean extension of our `data_probe/geometry.rs` diagnostics from whole-layer to per-sink scope, fused with our existing sigmoid-attention intervention.
+We already ship half of the paper's conclusion by default — sigmoid attention (`parallax_attn.rs`, `funcattn.rs`) eliminates sinks by replacing softmax. But the paper's value is the **discrimination**: some sinks are useful broadcasters doing real computation. A blanket "kill all sinks" policy over-suppresses. The transferable primitive is a **per-head/per-sink classifier** that decides whether a sink should be killed (NOP) or preserved (Broadcast), plus a **dual-policy attention**: sigmoid gate for NOP heads, regular attention for Broadcast heads. This is a clean extension of our `crates/katgpt-core/src/data_probe/geometry.rs` diagnostics from whole-layer to per-sink scope, fused with our existing sigmoid-attention intervention.
 
 ---
 
@@ -91,7 +91,7 @@ pub struct SinkDiagnostic {
 //   otherwise                           → None / ambiguous
 ```
 
-This is a clean extension of our existing `data_probe/geometry.rs` (`effective_rank`, `avg_cosine_similarity`) from whole-layer scope to **per-sink-position scope**. The existing whole-layer metrics are the *aggregate symptom* (broadcast sinks reduce effective rank across all tokens); the per-sink metrics are the *mechanism locator*.
+This is a clean extension of our existing `crates/katgpt-core/src/data_probe/geometry.rs` (`effective_rank`, `avg_cosine_similarity`) from whole-layer scope to **per-sink-position scope**. The existing whole-layer metrics are the *aggregate symptom* (broadcast sinks reduce effective rank across all tokens); the per-sink metrics are the *mechanism locator*.
 
 ### 2.2 Intervention fusion — Dual-Policy Attention
 
@@ -118,13 +118,13 @@ The three closest cousins across both repos, and the novel combination:
 |---|---|---|---|
 | **Research 100 (EGA)** + `ega_attn` feature | katgpt-rs | Spectral salience gate on attention output | Same intervention family (gating), but EGA is uniform — doesn't distinguish NOP from Broadcast. This paper provides the *categorization* EGA lacks. |
 | **Research 070 (GDN2)** + `deltanet_inference` | katgpt-rs | Decoupled **erase** (NOP) and **write** (Broadcast) gates in *linear* attention | Exact dual-mechanism analog, but in linear-attention form. This paper provides the same duality for *softmax* attention with cleaner diagnostics. |
-| **`data_probe/geometry.rs`** | katgpt-rs | Whole-layer `effective_rank` + `avg_cosine_similarity` | Aggregate symptom detector. This paper's per-sink diagnostics are the mechanism locator. |
+| **`crates/katgpt-core/src/data_probe/geometry.rs`** | katgpt-rs | Whole-layer `effective_rank` + `avg_cosine_similarity` | Aggregate symptom detector. This paper's per-sink diagnostics are the mechanism locator. |
 | **Research 018 (Free Transformer)** | katgpt-rs | Mid-layer latent injection | Broadcast-like mechanism. The Free Transformer's Z injection is essentially an explicit broadcast sink — confirming the paper's "broadcast is useful computation" thesis from a different angle. |
 | **riir-ai Guide 134 (SwiR Think/Info Brain)** | riir-ai | Two-brain spatial cognition: info brain (raw, synced) vs think brain (latent belief, fog-of-war) | The Think brain's `SpatialBelief` (zone-level KG triple read by many NPCs) is a *cross-NPC broadcast sink* — many NPC latent states acquire the same zone direction vector → rank-1 update across the crowd. |
 
 **Novel combination (fusion idea — novelty TBD, needs Q1–Q4 check before verdict):**
 
-*Sink-classifier × Two-Brain × HLA latent functor* → **Crowd-scale broadcast detection for MMORPG AI**. At 20Hz with thousands of NPCs, compute per-zone: (a) which zone-attention heads are NOP (NPCs suppressing zone signal — busy with their own LEO goal) vs Broadcast (NPCs aggregating zone signal — e.g., reacting to mayor's tax policy broadcast). The stable-rank-of-update across the crowd's latent states is a real-time *zone-coherence signal*: low rank = crowd is synchronized (broadcasting), high rank = crowd is dispersed (each NPC doing their own thing). This is a **crowd-level curiosity signal** that the existing per-NPC curiosity (`cgsp/derivative_curiosity.rs`) cannot see — it's an emergent property of the crowd, not any single NPC.
+*Sink-classifier × Two-Brain × HLA latent functor* → **Crowd-scale broadcast detection for MMORPG AI**. At 20Hz with thousands of NPCs, compute per-zone: (a) which zone-attention heads are NOP (NPCs suppressing zone signal — busy with their own LEO goal) vs Broadcast (NPCs aggregating zone signal — e.g., reacting to mayor's tax policy broadcast). The stable-rank-of-update across the crowd's latent states is a real-time *zone-coherence signal*: low rank = crowd is synchronized (broadcasting), high rank = crowd is dispersed (each NPC doing their own thing). This is a **crowd-level curiosity signal** that the existing per-NPC curiosity (`crates/katgpt-core/src/cgsp/derivative_curiosity.rs`) cannot see — it's an emergent property of the crowd, not any single NPC.
 
 This fusion is interesting but does not pass the Super-GOAT novelty gate (Q1 fails — too much prior art in our own codebase; Q3 weak — selling point is incremental over existing curiosity signals). It's a **GOAT-tier plan candidate**, not a Super-GOAT.
 
@@ -145,13 +145,13 @@ This fusion is interesting but does not pass the Super-GOAT novelty gate (Q1 fai
 
 ### One-line reasoning
 
-The diagnostics (value-norm ratio + stable-rank-of-update) are a clean, novel-per-scope extension of our existing `data_probe/geometry.rs`, and the dual-policy attention is a categorically-conditioned generalization of our existing `ega_attn` — provable gain over uniform gating, but not a new capability class.
+The diagnostics (value-norm ratio + stable-rank-of-update) are a clean, novel-per-scope extension of our existing `crates/katgpt-core/src/data_probe/geometry.rs`, and the dual-policy attention is a categorically-conditioned generalization of our existing `ega_attn` — provable gain over uniform gating, but not a new capability class.
 
 ### Why NOT Super-GOAT
 
 | Novelty gate question | Answer |
 |---|---|
-| Q1: No prior art? | **NO.** Sigmoid attention (kills sinks), EGA (spectral gate), GDN2 (decoupled erase/write), `data_probe/geometry.rs` (effective rank + cosine sim) all ship in our codebase. The paper's per-sink scope is novel *relative to our diagnostics*, but the mechanism family is well-covered. |
+| Q1: No prior art? | **NO.** Sigmoid attention (kills sinks), EGA (spectral gate), GDN2 (decoupled erase/write), `crates/katgpt-core/src/data_probe/geometry.rs` (effective rank + cosine sim) all ship in our codebase. The paper's per-sink scope is novel *relative to our diagnostics*, but the mechanism family is well-covered. |
 | Q2: New class of behavior? | **NO.** It's a refinement of existing diagnostic + intervention families, not a new capability. |
 | Q3: Product selling point? | **WEAK.** "Our attention distinguishes suppression from broadcast" — true but niche. Doesn't finish the "NPCs do X no competitor can" sentence strongly. |
 | Q4: Force multiplier? | **YES** (connects to Two-Brain, HLA, EGA, GDN2, curiosity signals) — but Q1–Q3 fail, so not enough for Super-GOAT. |
@@ -184,7 +184,7 @@ If G2 passes → promote `sink_aware_attn` to default in `parallax_attn` and `fu
 - Fesser, L. et al. (2026). *A Unifying View of Attention Sinks: Two Algorithms, Two Solutions*. arXiv:2606.08105.
 - Darcet, T. et al. (2023). *Vision Transformers Need Registers*. arXiv:2309.16588. (Broadcast intervention)
 - Qiu, Z. et al. (2025). *Gated Attention for Large Language Models*. (NOP intervention)
-- Roy, V. & Vetterli, M. (2007). *The effective rank: a measure of effective dimensionality*. (Our existing `effective_rank` in `data_probe/geometry.rs`.)
+- Roy, V. & Vetterli, M. (2007). *The effective rank: a measure of effective dimensionality*. (Our existing `effective_rank` in `crates/katgpt-core/src/data_probe/geometry.rs`.)
 - Sandoval-Segura, P. et al. (2025). *Using attention sinks to identify and evaluate dormant heads in pretrained LLMs*. (NOP = "dormant head" — directly maps.)
 
 ---

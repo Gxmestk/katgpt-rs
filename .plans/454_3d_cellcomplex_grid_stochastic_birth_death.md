@@ -146,7 +146,7 @@ pub fn graph_laplacian_into(cx, potential, output) {
 - [x] Do NOT add to `default` — promotion requires the GOAT gate below
 
 ### T7: GOAT gate — replace SA/V with size-normalized roughness ratio
-- [x] New bench `benches/bench_454_3d_nca_goat.rs` behind `required-features = ["grid_3d"]`
+- [x] New bench `crates/katgpt-dec/benches/bench_454_3d_nca_goat.rs` behind `required-features = ["grid_3d"]`
 - [x] **Four competitors** (frozen + det3D + NCA3D for the ablation table; det2D folded into the G4a stencil-ratio comparison):
   1. Frozen baseline (seed only, no evolution — lower bound)
   2. Deterministic 2D diffusion — folded into G4a (2D stencil timing baseline)

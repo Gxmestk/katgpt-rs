@@ -289,7 +289,7 @@ Goal: validate the fused-chain model against real ANE measurements on M1/M2/M3. 
 - [x] **T2.5.1** Compile two CoreML models on the target Mac:
   - **Unfused:** 3 separate CoreML NeuralNetwork models, each with a single InnerProduct [256→256] layer. Between predictions, the output is copied to a host `Vec<f32>` (the DRAM round-trip that fusion eliminates).
   - **Fused:** 1 CoreML NeuralNetwork model with 3 chained InnerProduct layers [256→256→256→256]. Single dispatch, intermediates stay on-chip.
-  - **DONE.** Built using `coreml-proto` spec builders in `katgpt-backend/examples/bench_439_phase25_ane_fused_validation.rs`. Dimension 256 chosen for ANE preference (divisible by 128) and dispatch-bound regime (memory ~28µs < dispatch floor ~230µs on M1).
+  - **DONE.** Built using `coreml-proto` spec builders in `crates/katgpt-backend/examples/bench_439_phase25_ane_fused_validation.rs`. Dimension 256 chosen for ANE preference (divisible by 128) and dispatch-bound regime (memory ~28µs < dispatch floor ~230µs on M1).
 - [x] **T2.5.2** Measure actual latency of both models on the ANE (use `MLComputePlan` to verify ANE placement). Record: unfused_ms, fused_ms.
   - **DONE (MLComputePlan substituted).** The `coreml-native` 0.2 crate does NOT expose `MLComputePlan` (that's a Python coremltools API per Research 224). Substituted: (1) `ComputeUnits::CpuAndNeuralEngine` to force ANE preference (excludes GPU); (2) timing heuristic (dispatch floor ~230µs on M1/A13 → if latency is in that range or above, model is on ANE). Measured on Apple M3 Max: unfused = 452.1 µs/iter, fused = 21.2 µs/iter.
 - [x] **T2.5.3** Compare against model predictions:

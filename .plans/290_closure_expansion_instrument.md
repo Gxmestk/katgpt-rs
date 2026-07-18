@@ -49,7 +49,7 @@ The minimal "every trace becomes a directed graph" primitive. Zero-allocation re
 - [x] **T1.2** `trace.rs`: `PtgRecorder` — wraps any `ConstraintPruner` execution. Methods: `enter(primitive) -> NodeId`, `exit(node_id, op, child_id)`, `finish() -> PrimitiveTransitionGraph`. Use `smallvec::SmallVec<[PtgNode; 16]>` for typical short traces; spill to `Vec` only on overflow. **Zero allocations on the hot path when `closure_instrument` feature is disabled.**
 - [x] **T1.3** `serde` impls for PTG (CBOR or postcard for cold-tier; commitment = `blake3::hash(serialized)`).
 - [x] **T1.4** Property test: `PtgRecorder` output is deterministic given the same call sequence + RNG seed. Property test: serialization round-trip preserves structure.
-- [x] **T1.5** Unit test: PTG of a 4-pruner operadic composition (use `lattice_operad/composed_pruner.rs` fixture) materializes to expected `(nodes, edges)`.
+- [x] **T1.5** Unit test: PTG of a 4-pruner operadic composition (use `crates/katgpt-pruners/src/lattice_operad/composed_pruner.rs` fixture) materializes to expected `(nodes, edges)`.
 
 ### Acceptance
 

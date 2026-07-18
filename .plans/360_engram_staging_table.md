@@ -326,7 +326,7 @@ For a 1M-slot × D=64 table, the copy is 256 MB. This is real. Mitigations if it
 | `pub(crate)` accessors on `InMemoryEngramTable` (`from_parts`, `n_slots`, `dim`, `heads_boxed`) | ~20 | 1 (table.rs) |
 | `StagingEngramTable` impl (struct + constructors + mutations + commit + queries) | ~120 | 1 (staging.rs, NEW) |
 | Unit tests (T1.7, ~10 tests) | ~150 | 1 (staging.rs) |
-| GOAT gate (G1–G4, T2.1–T2.5) | ~200 | 1 (tests/bench_360_engram_staging_goat.rs, NEW) |
+| GOAT gate (G1–G4, T2.1–T2.5) | ~200 | 1 (crates/katgpt-core/tests/bench_360_engram_staging_goat.rs, NEW) |
 | Module wiring + docstring updates (T3.1–T3.4) | ~10 | 2 (mod.rs, table.rs) |
 | Proposal 003 update (T3.5) | ~5 | 1 (riir-ai) |
 | GOAT summary (T4.2) | ~50 | 1 (.benchmarks/360_*.md, NEW) |

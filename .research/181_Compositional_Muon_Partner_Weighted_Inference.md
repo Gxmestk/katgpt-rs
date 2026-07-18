@@ -39,15 +39,15 @@ Compositional Muon (CM) extends Muon's matrix-level steepest descent to **compos
 
 | Component | Status | Location | CM Relevance |
 |-----------|--------|----------|--------------|
-| Newton-Schulz 5-iteration | ✅ Shipped | `src/newton_schulz.rs`, GOAT 25/25 | `msign()` = our `newton_schulz5()` |
-| Muon momentum buffer | ✅ Shipped | `src/newton_schulz.rs::muon_update()` | Partner-whitening wraps this |
-| River-valley diagnostics | ✅ Shipped | `src/river_valley.rs` (r_dom, r_bulk) | Spectral geometry already measured |
+| Newton-Schulz 5-iteration | ✅ Shipped | `crates/katgpt-core/src/newton_schulz.rs`, GOAT 25/25 | `msign()` = our `newton_schulz5()` |
+| Muon momentum buffer | ✅ Shipped | `crates/katgpt-core/src/newton_schulz.rs::muon_update()` | Partner-whitening wraps this |
+| River-valley diagnostics | ✅ Shipped | `crates/katgpt-spectral/src/river_valley.rs` (r_dom, r_bulk) | Spectral geometry already measured |
 | MuxDdTree (DD-tree) | ✅ Shipped | `crates/katgpt-core/src/mux/dd_tree.rs` | Compositional scoring target |
 | MuxBfs (dynamic-width expansion) | ✅ Shipped | `crates/katgpt-core/src/mux/bfs.rs` | Partner-weighted expansion budget |
 | ConstraintPruner trait | ✅ Shipped | `crates/katgpt-core/src/traits.rs` | Hard bounds = one "partner" |
 | ScreeningPruner trait | ✅ Shipped | `crates/katgpt-core/src/traits.rs` | Soft scoring = other "partner" |
 | SpeculativeGenerator trait | ✅ Shipped | `crates/katgpt-core/src/traits.rs` | Draft/verify composition |
-| EGA spectral salience | ✅ Shipped | `src/ega_attn.rs` | z-normalized sigmoid gate |
+| EGA spectral salience | ✅ Shipped | `crates/katgpt-attn/src/ega_attn.rs` | z-normalized sigmoid gate |
 | Parallax local linear attention | ✅ Shipped | `crates/katgpt-core/src/parallax_attn.rs` | Kernel-agnostic covariance correction |
 | Trust-Region Adaptive Speculation | 📋 Research 162 | P_accept = min(πT/πS, 1) | Trust region = compositional budget |
 | NDS curvature proxy | 📋 Research 166 | Spectral entropy → DDTree budget | Partner norm ≈ NDS inverse |

@@ -100,12 +100,12 @@ Empirical results confirm the theoretical separations: latent wins on paralleliz
 
 | Paper term | Codebase equivalents (≥2) | Where it ships |
 |---|---|---|
-| "chain of thought" (CoT) | explicit token generation, `ThinkMode::Direct`, argmax/sample decode | `katgpt-core/src/thinking_mode.rs`, decode path |
-| "latent thought" / "continuous thought" | `ThinkMode::Latent`, RiM buffer slots, soft embedding, `LatentThoughtKernel` | `katgpt-core/src/thinking_mode.rs`, `micro_belief/latent_thought.rs`, SwiR `soft_embedding` |
+| "chain of thought" (CoT) | explicit token generation, `ThinkMode::Direct`, argmax/sample decode | `crates/katgpt-core/src/thinking_mode.rs`, decode path |
+| "latent thought" / "continuous thought" | `ThinkMode::Latent`, RiM buffer slots, soft embedding, `LatentThoughtKernel` | `crates/katgpt-core/src/thinking_mode.rs`, `micro_belief/latent_thought.rs`, SwiR `soft_embedding` |
 | "looped transformer" | `LoopMode::WeightShared`, `LoopMode::TrainingFree`, weight-tied block iteration | Plans 108, 136; `katgpt-rs/src/looped.rs` |
 | "coconut" (hidden state feedback) | `LatentThoughtKernel` Family B, NextLat belief drafter | Research 192, 242; Plan 217, 276 |
 | "TC^k" / "threshold circuit" | (no codebase vocabulary — this is the gap this note fills) | — |
-| "depth of DAG" / "parallelizable" | "depth-invariant", "depth-scaled iteration", `depth(G_n)` | `katgpt-types/src/depth_invariance.rs`, DEC cell complex layers |
+| "depth of DAG" / "parallelizable" | "depth-invariant", "depth-scaled iteration", `depth(G_n)` | `crates/katgpt-types/src/depth_invariance.rs`, DEC cell complex layers |
 | "size of DAG" / "sequential" | "size-scaled steps", "node-by-node", scratchpad tokens | CoT decode path |
 | "FPRAS" / "approximate counting" | (no codebase vocabulary — **genuinely novel**) | — |
 | "self-reducible" | (no codebase vocabulary) | — |
@@ -135,9 +135,9 @@ Empirical results confirm the theoretical separations: latent wins on paralleliz
 
 | File | Mechanism | Match |
 |---|---|---|
-| `katgpt-core/src/thinking_mode.rs` | `ThinkingMode::{Direct, Latent, CpuResample, Dendritic}` | The mode tag SwiR plugs into |
+| `crates/katgpt-core/src/thinking_mode.rs` | `ThinkingMode::{Direct, Latent, CpuResample, Dendritic}` | The mode tag SwiR plugs into |
 | `katgpt-core/src/dec/` (operators.rs, hodge.rs, flow.rs) | `exterior_derivative`, `codifferential`, `hodge_decompose`, `CellComplex`, `CochainField` | The DAG substrate — cell complex = layered DAG, d = boundary operator, δ = divergence |
-| `katgpt-types/src/depth_invariance.rs` | `classify_chain`, `DepthInvarianceKind::{DepthInvariant, DepthSpecificRefinement}` | Classifies chains by depth behavior — directly related to depth-vs-size tradeoff |
+| `crates/katgpt-types/src/depth_invariance.rs` | `classify_chain`, `DepthInvarianceKind::{DepthInvariant, DepthSpecificRefinement}` | Classifies chains by depth behavior — directly related to depth-vs-size tradeoff |
 | `riir-ai/crates/riir-engine/src/latent_functor/k_selector.rs` | `KSelectionBandit` over `[1,2,4,8,16]` | Per-relation rank-k selection = per-relation complexity class selection |
 | `riir-engine/src/latent_functor/reestimation.rs` | Coherence-driven re-estimation scheduler | The iterative refinement primitive (latent thought loop with halting) |
 | `riir-ai/crates/riir-engine/src/latent_functor/depth_invariance_audit.rs` | Functor chain depth-invariance classification | Audits whether functor iteration is depth-invariant or drifts |
@@ -162,13 +162,13 @@ Re-cast the paper's core mechanism as a latent-to-latent operation on the seven 
 
 | Factory module | Reframing | Assessment |
 |---|---|---|
-| **HLA** (`katgpt-sense/src/reconstruction.rs`) | HLA's `evolve_hla` is a per-NPC recurrent belief kernel — a depth-1 latent iteration. The theorem says `log^k n` such iterations capture TC^k. HLA at tick T is one iteration; T ticks = `log^k n` iff T scales as `log^k n` with problem size. | Already shipped; theorem is the proof of what it captures. |
+| **HLA** (`crates/katgpt-sense/src/reconstruction.rs`) | HLA's `evolve_hla` is a per-NPC recurrent belief kernel — a depth-1 latent iteration. The theorem says `log^k n` such iterations capture TC^k. HLA at tick T is one iteration; T ticks = `log^k n` iff T scales as `log^k n` with problem size. | Already shipped; theorem is the proof of what it captures. |
 | **`latent_functor/`** | The functor application cycle IS latent thought iteration. `k_selector` choosing K ∈ `[1,2,4,8,16]` IS choosing the TC^K class. `reestimation.rs` halting IS the convergence criterion. | Already shipped; theorem formalizes the complexity class. |
 | **`cgsp_runtime/`** | Curiosity-driven self-play allocates compute per NPC — the depth budget. The theorem says deeper budgets capture higher TC^K. | Already shipped; theorem justifies the compute allocation. |
 | **LatCal** (`riir-chain/src/encoding/`) | LatCal fixed-point commitment is raw/deterministic — the sync-boundary bridge. The FPRAS separation says stochastic computation (CoT) can do things deterministic latent cannot. LatCal commitment is on the deterministic side. | LatCal stays deterministic (sync requires it); the FPRAS insight applies to the local (pre-commitment) computation, not the committed value. |
 | **`NeuronShard`** (`riir-neuron-db/src/`) | Shard `style_weights[64]` is a frozen latent state. The theorem says iterating on it captures TC^K where K = iteration count. Freeze/thaw snapshots are the committed checkpoints of the latent iteration. | Already shipped; theorem is the complexity-class framing. |
 | **DEC** (`katgpt-core/src/dec/`) | **The strongest reframing.** The cell complex IS a layered DAG. `exterior_derivative` (d) computes the boundary — a depth-1 operation. `hodge_decompose` decomposes a flow into exact (depth-bounded) + coexact (divergence/size-bounded) + harmonic (depth-invariant) components. The paper's DAG depth-vs-size framework maps directly: depth-bounded DEC iteration = TC^depth; size-bounded CoT = sequential node evaluation. Stokes' theorem (`∫_M dω = ∫_∂M ω`) IS the depth-vs-size tradeoff: computing a region's integral from its boundary (depth-bounded, O(n^{(d-1)/d})) vs from its interior (size-bounded, O(n)). | The DEC substrate already embodies the paper's DAG framework. The theorem proves DEC depth-bounded iteration is complexity-class-optimal. |
-| **`classify_chain`** (`katgpt-types/src/depth_invariance.rs`) | `DepthInvariant` = the chain converges (harmonic component, depth-independent). `DepthSpecificRefinement` = the chain is still computing (depth-bounded, not yet at fixed point). | Already shipped; the theorem connects `DepthSpecificRefinement` to TC^K (still computing) and `DepthInvariant` to convergence (fixed point reached). |
+| **`classify_chain`** (`crates/katgpt-types/src/depth_invariance.rs`) | `DepthInvariant` = the chain converges (harmonic component, depth-independent). `DepthSpecificRefinement` = the chain is still computing (depth-bounded, not yet at fixed point). | Already shipped; the theorem connects `DepthSpecificRefinement` to TC^K (still computing) and `DepthInvariant` to convergence (fixed point reached). |
 
 **Assessment:** The latent-space reframing lands cleanly on **existing machinery** — HLA, latent_functor, DEC, classify_chain all embody aspects of the paper's framework. The paper's contribution is the **formal proof** that these mechanisms are complexity-class-optimal, not a new mechanism. The FPRAS separation is the one genuinely novel insight that doesn't map to existing code — it suggests a routing criterion (self-reducible #P → stochastic sampling) that we don't currently implement.
 

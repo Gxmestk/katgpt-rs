@@ -3,7 +3,7 @@
 **Date:** 2026-06-26
 **Plan:** [katgpt-rs/.plans/330_analytic_lattice_encoder_decoder_primitive.md](../.plans/330_analytic_lattice_encoder_decoder_primitive.md)
 **Feature:** `analytic_lattice` (opt-in, NOT promoted to default — pending user review)
-**Test binaries:** `tests/analytic_lattice_goat.rs` (math gates) + `tests/analytic_lattice_alloc_check.rs` (G5)
+**Test binaries:** `crates/katgpt-core/tests/analytic_lattice_goat.rs` (math gates) + `crates/katgpt-core/tests/analytic_lattice_alloc_check.rs` (G5)
 
 ## Scope
 

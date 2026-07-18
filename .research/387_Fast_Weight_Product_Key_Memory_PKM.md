@@ -87,11 +87,11 @@ The paper's continual-learning experiment (Fig 6) shows FwPKM adapts quickly to 
 | top-k sparse retrieval | DDTree top-k, NPC Memory Store heapselect, Raven routing | `katgpt-core/src/mcts.rs`, `riir-ai/crates/riir-engine/src/npc_memory.rs`, `examples/core_02_raven.rs` |
 | TTT-style gradient updates | **FORBIDDEN** → δ-rule update (`DeltaMemoryState::write_segment`) | `delta_mem/state.rs` (Plan 053) |
 | addressing loss (entropy on keys) | **FORBIDDEN (GD)** → TEMP diversity selector (slot spread) | `riir-neuron-db/src/consolidation.rs` (Plan 005) |
-| gated residual `g·v̂ + (1−g)·v` | CommittedFieldBlend, PersonalityWeightedComposition, NPC Memory Store gate | `katgpt-core/src/committed_field_blend.rs`, `katgpt-core/src/sense/`, `riir-ai/crates/riir-engine/src/npc_memory.rs` |
+| gated residual `g·v̂ + (1−g)·v` | CommittedFieldBlend, PersonalityWeightedComposition, NPC Memory Store gate | `crates/katgpt-core/src/committed_field_blend.rs`, `katgpt-core/src/sense/`, `riir-ai/crates/riir-engine/src/npc_memory.rs` |
 | IDW scoring (inverse distance) | **NEW scoring mode** — centroid-finding alternative to dot product | this plan (optional) |
 | episodic memory | HLA session state, δ-Mem, Engram runtime table | HLA, δ-Mem, Engram |
 | semantic memory | frozen NeuronShard `style_weights`, committed personality | `riir-neuron-db/src/shard.rs` |
-| novelty detection via gating `g_t` | Temporal Derivative curiosity, CGSP reward | `katgpt-core/src/temporal_deriv.rs` (Plan 277), `cgsp/` |
+| novelty detection via gating `g_t` | Temporal Derivative curiosity, CGSP reward | `crates/katgpt-core/src/temporal_deriv.rs` (Plan 277), `cgsp/` |
 | iterative reading (n-iter) | Sleep Consolidation N-pass | `katgpt-rs/src/sleep/` (Plan 154) |
 | catastrophic forgetting (future work) | Raven/δ-Mem consolidation (shipped) | `riir-neuron-db/src/consolidation.rs` |
 | slot collapse | TEMP `sleep_diverse` diversity, BranchBank quarantine | `riir-neuron-db`, `katgpt-core/src/branching/` |

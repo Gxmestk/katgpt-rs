@@ -33,7 +33,7 @@ Move 11 `src/` items into the `katgpt-core` workspace crate.
 All module-internal `crate::` imports are **intra-group** (both endpoints move together):
 
 - `cce/{bregman,external_regret,heterogeneous,lp,primal_dual}.rs` → `crate::cce::types::*` and `crate::cce::*` (intra-module)
-- `salience/pending.rs` → `crate::salience::types::DelegateToken` (intra-module)
+- `crates/katgpt-core/src/salience/pending.rs` → `crate::salience::types::DelegateToken` (intra-module)
 - `ssd_block.rs` → `crate::cumprodsum::{cumprodsum_scalar, segsum}` (both move together)
 
 **No root-glue consumers** (no `crate::transformer`, `crate::sleep`, `crate::thinking_cot`, `crate::speculative`, `crate::pruners`, `crate::gdn2`, `crate::hla`, `crate::forward`, etc.) inside any of the 11 modules.
@@ -66,7 +66,7 @@ katgpt-core gains an always-compiled `alloc` module (no feature gate; the `debug
 
 - [x] **T0.** Audit all 11 modules — DONE (see above).
 - [x] **T1.** Add features to `crates/katgpt-core/Cargo.toml` (`cce_moderator`, `llmexec_guard`, `memory_soup_lora`, `mux_demux` already exists, `salience_tri_gate`, `skill_opt`, `ssd_block`, `channel_simd_align`). `cumprodsum`, `trigger_gate`, `alloc` are always-on (no feature gate needed). Update katgpt-core `default` to include the default-ON ones (`cce_moderator`, `llmexec_guard`, `ssd_block`, `salience_tri_gate`).
-- [x] **T2.** Copy 11 modules to `crates/katgpt-core/src/`. Verified byte-identical (8/11) or intentionally rewritten (memory_soup_lora.rs + salience/pending.rs: `katgpt_core::simd::*` → `crate::simd::*`, doc-link `katgpt_rs::` → `katgpt_core::`).
+- [x] **T2.** Copy 11 modules to `crates/katgpt-core/src/`. Verified byte-identical (8/11) or intentionally rewritten (memory_soup_lora.rs + crates/katgpt-core/src/salience/pending.rs: `katgpt_core::simd::*` → `crate::simd::*`, doc-link `katgpt_rs::` → `katgpt_core::`).
 - [x] **T3.** Imports inside moved files verified clean (intra-group `crate::` refs all move together; no cross-crate leakage).
 - [x] **T4.** Wire module declarations in `crates/katgpt-core/src/lib.rs` (L1297-1322: always-on `alloc`/`cumprodsum`/`trigger_gate`; 7 feature-gated modules mirror root feature names; `salience` re-export preserved).
 - [x] **T4b.** Self-reference fix: 3 files had `katgpt_core::simd::*` calls (root-crate vocabulary) — rewritten to `crate::simd::*` post-move. Files: `memory_soup_lora.rs` (3 sites), `ssd_block.rs` (3 sites), `channel_simd.rs` (1 site). No remaining `katgpt_core::` code refs (only doc-link + comments, which are correct as-is).

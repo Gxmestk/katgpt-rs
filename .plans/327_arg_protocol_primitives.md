@@ -71,7 +71,7 @@ The three smallest, most foundational primitives. Ships first so the open adopti
 
 ## Phase 2 — Typed Offline Candidates + Silence-Bias Scorer
 
-- [x] **T2.1** Write `arg/candidate.rs` — `TypedOfflineCandidate`, `CandidateIntent`. ≤150 lines.
+- [x] **T2.1** Write `crates/katgpt-core/src/arg/candidate.rs` — `TypedOfflineCandidate`, `CandidateIntent`. ≤150 lines.
   - `CandidateKind ∈ {Split, Merge, Edge, Taxonomy, NewNode, RegistryDedup}` `#[repr(u8)]` enum
   - `CandidateIntent { kind, target_label: LabelId, before: LabelSet, after: LabelSet, evidence_refs: &[EvidenceId] }`
   - `TypedOfflineCandidate { intent: CandidateIntent, score: Option<f32> }`

@@ -34,7 +34,7 @@ src/chiaroscuro/
 ```
 
 Composed with existing infra (no duplication):
-- Reuses `rustfft` (from `flow/fft.rs`), `simd` helpers, `WelfordVariance` (from reward_calibrator), `SpectralQuant` storage mechanics, `StillKV` f16 storage, `BreakevenBandit` cost matrix.
+- Reuses `rustfft` (from `crates/katgpt-core/src/flow/fft.rs`), `simd` helpers, `WelfordVariance` (from reward_calibrator), `SpectralQuant` storage mechanics, `StillKV` f16 storage, `BreakevenBandit` cost matrix.
 
 ---
 
@@ -44,7 +44,7 @@ Composed with existing infra (no duplication):
 
 - [x] **T1:** Create `src/chiaroscuro/mod.rs` — module root, public API, feature gate
 - [x] **T2:** Create `src/chiaroscuro/entropy.rs` — `spectral_entropy_dct()` and zero-alloc variant
-  - Type-II DCT via `rustfft` (mirroring `flow/fft.rs` pattern)
+  - Type-II DCT via `rustfft` (mirroring `crates/katgpt-core/src/flow/fft.rs` pattern)
   - SIMD-accelerated sum-of-p log p
   - Bounded to [0, 1] via `log d` normalization
 - [x] **T3:** Create `crates/katgpt-attn/src/chiaroscuro/tau.rs` — streaming τ_lo / τ_hi calibration

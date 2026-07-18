@@ -7,7 +7,7 @@
 
 ## Optimization Targets
 
-### 1. flow/fft.rs — `fft_smooth` allocations
+### 1. crates/katgpt-core/src/flow/fft.rs — `fft_smooth` allocations
 - [x] `inflate_obstacles`: Replace `Vec<(usize, usize)>` with double-buffer snapshot pattern — eliminates per-cell pair allocation, uses clamped bounds instead of inner-loop boundary checks
 - [x] Early return for `radius == 0`
 - [x] ~~`fft_smooth` planner caching per grid size~~ (deferred — `rustfft::FftPlanner` already caches internally, no action needed)
@@ -22,7 +22,7 @@
 - [x] Added `collect_leaf_paths_flat()` using index-based DFS — one contiguous Vec instead of one Vec per leaf
 - [x] Kept `collect_leaf_paths()` as backward-compatible wrapper
 
-### 4. mux/demux.rs — `demux` allocation
+### 4. crates/katgpt-core/src/mux/demux.rs — `demux` allocation
 - [x] Kept O(k²) scan (correct for arbitrary u32 token IDs, k ≤ 32)
 - [x] Output `sorted_tokens` unchanged (needs to be Vec since caller owns it)
 

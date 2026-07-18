@@ -304,38 +304,38 @@ Amortization factor across N consumers: `(sum_i budgets[i]) / N`. Break-even: `s
 
 ## Phase 2 — Synthetic Gates (proves the math, not the game)
 
-**Status: ✅ COMPLETE (2026-06-27).** G1×5, G2×4, G7×4 GOAT gate tests pass in `tests/sleep_time_goat.rs`. G5 zero-alloc passes in `tests/sleep_time_alloc_check.rs` (separate binary; both `consume()` and `consume_gate()` at 0 allocs / 1000 calls). G6 latency measured at 9.5ns (D=8,K=8) and 57.6ns (D=64,K=8) — both inside the ≤200ns gate with 3.5–10× margin.
+**Status: ✅ COMPLETE (2026-06-27).** G1×5, G2×4, G7×4 GOAT gate tests pass in `crates/katgpt-core/tests/sleep_time_goat.rs`. G5 zero-alloc passes in `crates/katgpt-core/tests/sleep_time_alloc_check.rs` (separate binary; both `consume()` and `consume_gate()` at 0 allocs / 1000 calls). G6 latency measured at 9.5ns (D=8,K=8) and 57.6ns (D=64,K=8) — both inside the ≤200ns gate with 3.5–10× margin.
 
 These are the **mechanics + zero-alloc + commitment + latency** gates. Quality gates G2/G3/G4 require a real predictability-labeled corpus and live in riir-ai Plan 341.
 
 ### "Report the Floor" UQ comparison (Issue 010 T4)
 
-**G-UQ: N/A — EXCLUDED.** The Sleep-Time Anticipator's predictability score (`DotPredictabilityScorer`, `p = sigmoid(α·dot(c,dir)+β)`) is a **gate heuristic, not a calibrated UQ signal.** Same false-confidence signature as BoM (T3): predictability-derived intervals win CRPS (0.55–0.63 ratio) but lose coverage (37–54% vs nominal 95%) and Winkler (2.5–3.4× the floor). The T4 difficulty-correlation test shows near-zero per-step correlation for BOTH the anticipator and the floor (|r| < 0.08). Excluded via the reframing escape hatch — the anticipator's value is amortized compute gating (Plan 334 G1/G2 mechanics + `AmortizationCostModel`), NOT calibrated UQ. `sleep_time_anticipation` stays OPT-IN (unchanged). See `tests/conformal_floor_sleep_time.rs`, `.benchmarks/010_sleep_time_floor_comparison.md`.
+**G-UQ: N/A — EXCLUDED.** The Sleep-Time Anticipator's predictability score (`DotPredictabilityScorer`, `p = sigmoid(α·dot(c,dir)+β)`) is a **gate heuristic, not a calibrated UQ signal.** Same false-confidence signature as BoM (T3): predictability-derived intervals win CRPS (0.55–0.63 ratio) but lose coverage (37–54% vs nominal 95%) and Winkler (2.5–3.4× the floor). The T4 difficulty-correlation test shows near-zero per-step correlation for BOTH the anticipator and the floor (|r| < 0.08). Excluded via the reframing escape hatch — the anticipator's value is amortized compute gating (Plan 334 G1/G2 mechanics + `AmortizationCostModel`), NOT calibrated UQ. `sleep_time_anticipation` stays OPT-IN (unchanged). See `crates/katgpt-core/tests/conformal_floor_sleep_time.rs`, `.benchmarks/010_sleep_time_floor_comparison.md`.
 
 ### Tasks
 
-- [x] **T2.1** `tests/sleep_time_goat.rs::g1_*` — verify:
+- [x] **T2.1** `crates/katgpt-core/tests/sleep_time_goat.rs::g1_*` — verify:
   - `AnticipatedQuerySet` round-trips (anticipate → serialize → deserialize → bit-identical slots).
   - `consume` returns the precomputed slot when `predictability > tau` and the fresh_think output when `predictability < tau` (smooth blend, not hard switch).
   - `predictability` is in `[0,1]` for all inputs.
   - `consume` is deterministic given (q, c', tau, beta).
 
-- [x] **T2.2** `tests/sleep_time_goat.rs::g2_*` — verify:
+- [x] **T2.2** `crates/katgpt-core/tests/sleep_time_goat.rs::g2_*` — verify:
   - `amortization_factor(sleep=100, N=10, e_gate=0.5, t=10, b_max=100) ≈ 0.55` (matches paper's 2.5× gain inverted: cost ratio = 1/2.5 + offset).
   - `should_pre_compute` returns true iff `sleep_cost < N * t * b_max * e_gate`.
   - `total_cost` is monotonic decreasing in `e_gate` (more predictability → less total cost).
 
-- [x] **T2.3** `tests/sleep_time_alloc_check.rs::g5_zero_alloc_after_warmup_both_paths` — verify via `CountingAllocator`:
+- [x] **T2.3** `crates/katgpt-core/tests/sleep_time_alloc_check.rs::g5_zero_alloc_after_warmup_both_paths` — verify via `CountingAllocator`:
   - After 100 warmup `consume()` calls, **0 allocations / 0 bytes** over 100 measured `consume()` calls.
   - `anticipate()` may allocate (it builds the c' artifact); `consume()` (the wake-time hot path) MUST NOT.
   - This mirrors Plan 308 G5 and Plan 304 G5 — wake-time latency budget is sacred.
 
-- [x] **T2.4** `tests/sleep_time_goat.rs::g7_*` — verify:
+- [x] **T2.4** `crates/katgpt-core/tests/sleep_time_goat.rs::g7_*` — verify:
   - `AnticipatedQuerySet::blake3` is recomputed correctly when any slot's `precomputed` or `predictability` changes.
   - Tampering any byte in a serialized `AnticipatedQuerySet` produces a different `blake3` (catch-in-the-round).
   - Two `anticipate()` calls with identical inputs produce identical `blake3`.
 
-- [x] **T2.5** `benches/sleep_time_consume_bench.rs` — verify `consume()` is < 200ns at D=64. **Measured: 57.6 ns/call at D=64,K=8 (3.5× margin); 9.5 ns/call at D=8,K=8 (10× margin vs the ≤100ns D=8 target).** Both `consume()` and `consume_gate()` measured. Run via `cargo bench -p katgpt-core --features sleep_time_anticipation --bench sleep_time_consume_bench`.
+- [x] **T2.5** `crates/katgpt-core/benches/sleep_time_consume_bench.rs` — verify `consume()` is < 200ns at D=64. **Measured: 57.6 ns/call at D=64,K=8 (3.5× margin); 9.5 ns/call at D=8,K=8 (10× margin vs the ≤100ns D=8 target).** Both `consume()` and `consume_gate()` measured. Run via `cargo bench -p katgpt-core --features sleep_time_anticipation --bench sleep_time_consume_bench`.
 
 ---
 
@@ -345,12 +345,12 @@ These are the **mechanics + zero-alloc + commitment + latency** gates. Quality g
 
 ### Tasks
 
-- [x] **T3.1** `examples/sleep_time_01_basic.rs` — minimal example showing:
+- [x] **T3.1** `crates/katgpt-core/examples/sleep_time_01_basic.rs` — minimal example showing:
   - Construct 4 anticipated-query directions (hardcoded).
   - Run `anticipate()` on a context.
   - Run `consume()` on a query, show the gated blend.
   - Print the cost model: amortization factor at N=1 vs N=10.
-- [x] **T3.2** `examples/sleep_time_02_curiosity_inversion.rs` — show the predictability = 1 − curiosity mapping:
+- [x] **T3.2** `crates/katgpt-core/examples/sleep_time_02_curiosity_inversion.rs` — show the predictability = 1 − curiosity mapping:
   - Use a fake KARC-like forecaster (closed-form ridge over synthetic trajectory).
   - Show that high-curiosity contexts (large forecast residual) get LOW predictability → `should_pre_compute` returns false.
   - Show that low-curiosity contexts get HIGH predictability → `should_pre_compute` returns true.

@@ -185,7 +185,7 @@ The paper uses a fixed newline trigger. §7 explicitly states: "reconsolidation 
 
 | Criterion | Assessment |
 |-----------|------------|
-| Novel mechanism (no prior art in our corpus) | ✅ — confirmed: all existing KV work (213, 233, 109, 101, 083, 063, 042, 039, 165, 159) is compression/selection/quantization. NONE does periodic in-place consolidation for quality. The `cgsp/dual_pool.rs consolidate()` is for the bandit pool, not KV cache. |
+| Novel mechanism (no prior art in our corpus) | ✅ — confirmed: all existing KV work (213, 233, 109, 101, 083, 063, 042, 039, 165, 159) is compression/selection/quantization. NONE does periodic in-place consolidation for quality. The `crates/katgpt-core/src/cgsp/dual_pool.rs consolidate()` is for the bandit pool, not KV cache. |
 | Provable gain | ❌ — quality claim REFUTED on untrained AND trained models (§6 PoC Addendum). The modelless mean-shift has no measurable quality effect even when the KV cache carries learned structure (31% accuracy, Plan 313). The paper's gain comes from a TRAINED Cache Processor, not from mean-shift as an operation. |
 | New class of capability | ✅ — first KV cache operator that improves reasoning quality without reducing footprint (consolidation, not compression) |
 | Modelless | ✅ — selection mechanism transfers directly; trained Processor replaced by deterministic sigmoid-gated value mean-shift (§3.5 path 3: latent-space correction) |

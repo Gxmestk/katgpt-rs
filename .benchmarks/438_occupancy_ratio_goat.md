@@ -25,7 +25,7 @@
 
 ### Analytical anchors (independent f64 solve)
 
-The 7-state Baird-MRP (paper Appendix G.1) was constructed in `tests/occupancy_baird_mrp.rs`. The analytical occupancy ratios were computed independently by solving `(I − γP^T) d^π = (1−γ) d_0` via f64 Gaussian elimination on the full 7×7 system:
+The 7-state Baird-MRP (paper Appendix G.1) was constructed in `crates/katgpt-core/tests/occupancy_baird_mrp.rs`. The analytical occupancy ratios were computed independently by solving `(I − γP^T) d^π = (1−γ) d_0` via f64 Gaussian elimination on the full 7×7 system:
 
 ```
 ω_π,γ(upper) = 0.2211217321  (= 1920/8683)

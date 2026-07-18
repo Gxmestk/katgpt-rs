@@ -31,7 +31,7 @@ At 2-bit, OCTOPUS is the only codec that doesn't collapse on needle-in-a-haystac
 - [x] T2: Add `triplet` module — decomposition of rotated vector into (ρ, n) pairs
 - [x] T3: Add `codebook` module — triplet-norm Beta marginal + oct-coordinate empirical marginal
 - [x] T4: Add `octopus/types.rs` — `OctopusConfig`, `OctopusLayer`, `OctopusCodebook`
-- [x] T5: Add `octopus/encode.rs` — triplet encode with joint 3×3 rounding
+- [x] T5: Add `crates/katgpt-quant/src/octopus/encode.rs` — triplet encode with joint 3×3 rounding
 - [x] T6: Add `octopus/kv_cache.rs` — `OctopusKVCache` implementing `QuantizedKVCache` trait
 - [x] T7: Add `octopus/forward.rs` — score-path decode + attention scoring helpers
 - [x] T8: Add `octopus` feature gate to `Cargo.toml` + conditional module in `src/lib.rs`

@@ -96,7 +96,7 @@ Temperature: τ=3.0 for distributions, τ=1.0 for CE
 | Bidirectional attention | `dllm.rs` `forward_bidirectional_positions()` | ✅ Plan 066 |
 | Block-causal attention | `dllm.rs` `forward_block_causal_positions()` | ✅ Plan 066 |
 | Noise schedule | `dllm.rs` `NoiseSchedule` | ✅ Plan 066 |
-| D2F block decode | `speculative/d2f.rs` `d2f_decode_block()` | ✅ Plan 066 |
+| D2F block decode | `src/speculative/d2f.rs` `d2f_decode_block()` | ✅ Plan 066 |
 | ConstraintPruner | `speculative/types.rs` trait | ✅ Production |
 | Speculative decoding (AR→AR) | `speculative/step.rs` | ✅ Production |
 | MTP drafter | `transformer.rs` mtp_activation_proj | ✅ Plan 055 |
