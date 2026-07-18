@@ -1,6 +1,6 @@
 # Plan 467: QGF DualLeoOracle — Test-Time LEO+UVFA Q-Gradient Fusion
 
-**Status:** DONE — G1–G4 PASS (mechanistic); G5 deferred to riir-ai per Proposal 007. See [`.benchmarks/467_qgf_dual_leo_oracle_goat.md`](../.benchmarks/467_qgf_dual_leo_oracle_goat.md).
+**Status:** DONE — G1–G4 PASS (mechanistic); G5 measured FAIL on synthetic data (Bench 553 in riir-ai, 2026-07-18); real-network G5 still deferred pending trained weights (Issue 552). See [`.benchmarks/467_qgf_dual_leo_oracle_goat.md`](../.benchmarks/467_qgf_dual_leo_oracle_goat.md) + [riir-ai `.benchmarks/553`](../riir-ai/.benchmarks/553_qgf_dual_leo_oracle_g5.md).
 **Branch:** `develop`
 **Repo:** `katgpt-rs`
 **Proposal:** [007 QGF DualLeoOracle](../.proposals/007_qgf_dual_leo_oracle.md)
@@ -92,7 +92,7 @@ Both `leo_all_goals` and `dual_leo` are already default-on in `katgpt-core`'s `d
 - **G2 (perf):** `DualLeoOracle` query ≤ 1.5× `LeoHeadOracle` query (median-of-3 trials of 1000-iteration batches, per Plan 460 perf-honesty lesson).
 - **G3 (no-regression):** `cargo test -p katgpt-core --lib` passes (default features); `cargo test -p katgpt-core --features qgf_oracle,leo_all_goals,dual_leo --lib` passes (+ new tests).
 - **G4 (alloc-free hot path):** `q_gradient_into` writes into the caller's buffer; no `Vec::new` in the into-path (verified by code inspection).
-- **G5 (downstream task gain — DEFERRED to riir-ai):** ≥3% first-attempt accuracy gain on Sudoku 9×9 OR ≥5% speculative acceptance rate gain on a dual-LEO consumer, vs single-head `LeoHeadOracle`. Mirrors Plan 268's deferred G5. Until measured, the oracle ships as opt-in and is documented as "mechanism complete, downstream gain unproven."
+- **G5 (downstream task gain — MEASURED FAIL on synthetic data; real-network measurement pending):** Attempted on riir-ai T7 Go puzzle harness (Bench 553, Issue 553, 2026-07-18): QGF+DualLeoOracle scored **0.00%** vs QGF+LeoHeadOracle **0.50%** — dual is WORSE. The G1 correctness invariant (b ≡ a) held bit-identically, confirming the mechanism is correct; the quality gate FAILs because synthetic data produces near-flat Q-fields with no real signal to fuse. Mirrors the Issue 549 / Plan 460 synthetic-vs-real lesson. Real-network measurement still requires trained CivLeoNet + CivLeoUVFA (Issue 552, GPU-blocked). Until a positive G5 measurement lands on real weights, the oracle ships as opt-in and is documented as "mechanism complete, downstream gain unproven (synthetic measurement negative)."
 
 ## What ships now (katgpt-rs) vs deferred
 
@@ -106,10 +106,10 @@ Both `leo_all_goals` and `dual_leo` are already default-on in `katgpt-core`'s `d
 
 ### Deferred — riir-ai
 
-- Consumer-side adapter wrapping real UVFA nets as `LeoHead` (Proposal 007 caveat 4)
-- Downstream task-quality gate G5 (Sudoku / DDTree / Bomber)
-- Tuning α per consumer
-- Promotion decision from opt-in to "documented as recommended"
+- Consumer-side adapter wrapping real UVFA nets as `LeoHead` (Proposal 007 caveat 4) — **DONE in bench 553** as `UvfaAsLeoHead` (bench-local).
+- Downstream task-quality gate G5 (Sudoku / DDTree / Bomber) — **MEASURED FAIL on synthetic Go puzzles (Bench 553); real-network measurement still pending**.
+- Tuning α per consumer.
+- Promotion decision from opt-in to "documented as recommended" — **BLOCKED on positive G5 measurement** (requires Issue 552 trained weights).
 
 ### Explicitly NOT shipped
 
@@ -128,4 +128,4 @@ Both `leo_all_goals` and `dual_leo` are already default-on in `katgpt-core`'s `d
 
 ## TL;DR
 
-Shipped `DualLeoOracle` as QGF's 3rd oracle — LEO+UVFA Q-gradient fusion at the gradient level. Plan 460's max-pool washout lesson is encoded as a design invariant (no operator between the `DualLeoMixer::combine_into` and the QGF consumer). G1–G4 PASS mechanistically; G5 (downstream task gain) honestly deferred to riir-ai.
+Shipped `DualLeoOracle` as QGF's 3rd oracle — LEO+UVFA Q-gradient fusion at the gradient level. Plan 460's max-pool washout lesson is encoded as a design invariant (no operator between the `DualLeoMixer::combine_into` and the QGF consumer). G1–G4 PASS mechanistically; **G5 measured FAIL on synthetic data (Bench 553)** — dual scored 0.00% vs single 0.50% on T7 Go puzzles; the correctness invariant (b ≡ a) held bit-identically, confirming the mechanism. Real-network G5 measurement still pending Issue 552 trained weights. Primitive stays opt-in with documented unproven G5.

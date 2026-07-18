@@ -1,6 +1,6 @@
 # Proposal 007 — QGF DualLeoOracle (Test-Time LEO+UVFA Q-Gradient Fusion)
 
-Status: **shipped Phase 1-2 (Plan 467); G5 still deferred to riir-ai**
+Status: **shipped Phase 1-2 (Plan 467); G5 measured FAIL on synthetic data (Bench 553 in riir-ai, 2026-07-18); real-network G5 still pending Issue 552 trained weights.**
 Branch: `develop`
 Owner: unassigned
 Fusion of: Plan 268 (QGF LeoHeadOracle) × Plan 155 (DualLeoMixer) × Plan 460 (postmax lesson — linear-in-grad mix)
@@ -132,11 +132,13 @@ This oracle does NOT cross the sync boundary. It produces a latent gradient that
 
 ## Honest caveats — READ BEFORE IMPLEMENTING
 
-1. **No measurement yet that dual Q-gradient beats single-head Q-gradient on a downstream task.** Plan 268 itself deferred downstream task-quality gates (Sudoku/DDTree/Bomber) to riir-ai. This proposal adds a new oracle but does not prove the gain — that's the plan's job (G5 below).
-2. **The `combine_into` default uses `mix_into` (Lc mode), which is a linear α-blend.** For Max / Min modes, the mixer applies element-wise max/min — but this may interact badly with QGF's `(1/β)·g` tilt if the resulting gradient has discontinuities. Document the Lc mode as the recommended default; mark Max/Min as experimental.
-3. **`goal_idx` is fixed at construction.** Unlike `LeoHeadOracle::set_goal`, this proposal does NOT ship a `set_goal` method on `DualLeoOracle` initially — the use case is "one goal, dual heads" per construction. Multi-goal switching can be added if a consumer needs it; defer until measured demand.
-4. **The UVFA head must also be `LeoHead`-shaped** (all-goals Q-tensor). Real UVFA nets are single-goal by definition; the consumer must wrap them (e.g. broadcast the single-goal Q across all goal slots, or use a goal-conditioned adapter). This is the same shape mismatch Issue 549 / Proposal 028 face; the consumer-side adapter is out of scope here.
-5. **Confidence always = 1.0 is the same lie `LeoHeadOracle` tells.** A deterministic cached lookup is confidence-1.0 by QGF's contract, but two heads mixed at α=0.5 are not "twice as confident" as one head — the contract conflates determinism with quality. Inherited from Plan 268; not made worse here. Document.
+1. **G5 MEASURED FAIL on synthetic data (Bench 553, 2026-07-18).** The T7 Go puzzle harness in riir-ai was extended (Issue 553) with a T9 test comparing QGF+DualLeoOracle vs QGF+LeoHeadOracle. Result: dual scored **0.00%** vs single **0.50%** — dual is WORSE. The correctness invariant (QGF+LeoHeadOracle ≡ baseline argmax(Q_LEO)) held bit-identically (diff 0.0000), confirming the mechanism is correct; the quality gate FAILs because synthetic training data produces near-flat Q-fields in both LEO and UVFA with no real signal to fuse. Mirrors the Issue 549 / Plan 460 synthetic-vs-real lesson. Real-network G5 measurement still requires trained CivLeoNet + CivLeoUVFA (Issue 552, GPU-blocked). **Original pre-2026-07-18 caveat preserved below for reference; the empirical evidence supersedes it.**
+
+2. *(Original caveat 1)* **No measurement yet that dual Q-gradient beats single-head Q-gradient on a downstream task.** Plan 268 itself deferred downstream task-quality gates (Sudoku/DDTree/Bomber) to riir-ai. This proposal adds a new oracle but does not prove the gain — that's the plan's job (G5 below). [**Update 2026-07-18**: the measurement is now DONE — see caveat 1 above.]
+3. *(Original caveat 2)* **The `combine_into` default uses `mix_into` (Lc mode), which is a linear α-blend.** For Max / Min modes, the mixer applies element-wise max/min — but this may interact badly with QGF's `(1/β)·g` tilt if the resulting gradient has discontinuities. Document the Lc mode as the recommended default; mark Max/Min as experimental.
+4. *(Original caveat 3)* **`goal_idx` is fixed at construction.** Unlike `LeoHeadOracle::set_goal`, this proposal does NOT ship a `set_goal` method on `DualLeoOracle` initially — the use case is "one goal, dual heads" per construction. Multi-goal switching can be added if a consumer needs it; defer until measured demand.
+5. *(Original caveat 4 — now resolved in bench-local form)* **The UVFA head must also be `LeoHead`-shaped** (all-goals Q-tensor). Real UVFA nets are single-goal by definition; the consumer must wrap them. Bench 553 ships `UvfaAsLeoHead` (bench-local, runs UVFA forward per goal slot) as the consumer-side reference impl. A generic version could move to `katgpt-core` if more consumers need it.
+6. *(Original caveat 5)* **Confidence always = 1.0 is the same lie `LeoHeadOracle` tells.** A deterministic cached lookup is confidence-1.0 by QGF's contract, but two heads mixed at α=0.5 are not "twice as confident" as one head — the contract conflates determinism with quality. Inherited from Plan 268; not made worse here. Document.
 
 ## Fusion lineage
 
@@ -156,7 +158,7 @@ The new oracle ships behind `qgf_oracle + dual_leo` (both already exist; no new 
 - **G2** (perf): one Q-gradient query ≤ 1.5× a single `LeoHeadOracle` query (the cost is 2 forward passes + one `combine_into`, both heads are O(state_dim × hidden × actions)).
 - **G3** (no-regression): all existing katgpt-core tests pass. The Plan 268 QGF bench must still pass.
 - **G4** (alloc-free hot path): `q_gradient_into` variant that takes a pre-allocated `&mut [f32]` scratch buffer. Steady-state zero allocation.
-- **G5** (downstream task gain — **deferred to riir-ai**): ≥3% first-attempt accuracy gain on Sudoku 9×9 OR ≥5% speculative acceptance rate gain on a dual-LEO consumer, vs single-head `LeoHeadOracle`. Mirrors Plan 268's deferred gate. Until this is measured, the oracle ships as opt-in and is documented as "mechanism complete, downstream gain unproven."
+- **G5** (downstream task gain — **MEASURED FAIL on synthetic data; real-network measurement pending**): ≥3% first-attempt accuracy gain on Sudoku 9×9 OR ≥5% speculative acceptance rate gain on a dual-LEO consumer, vs single-head `LeoHeadOracle`. Mirrors Plan 268's deferred gate. **Measurement attempted 2026-07-18 on T7 Go puzzle harness (riir-ai Bench 553): dual 0.00% vs single 0.50%, dual WORSE. The correctness invariant (b ≡ a) held bit-identically — the mechanism is correct; the quality gate FAILs because synthetic data produces near-flat Q-fields with no real signal to fuse.** Until a positive measurement lands on real trained weights (Issue 552), the oracle ships as opt-in and is documented as "mechanism complete, downstream gain unproven (synthetic measurement negative)."
 
 ## What ships now (katgpt-rs) vs deferred
 
@@ -168,10 +170,10 @@ The new oracle ships behind `qgf_oracle + dual_leo` (both already exist; no new 
 - Doc-comment encoding the Plan 460 "no operator between mix and consumer" invariant
 
 ### Deferred — riir-ai
-- Consumer-side adapter wrapping real UVFA nets as `LeoHead` (caveat 4)
-- Downstream task-quality gate G5 (Sudoku / DDTree / Bomber)
-- Tuning α per consumer
-- Promotion from opt-in to "documented as recommended"
+- Consumer-side adapter wrapping real UVFA nets as `LeoHead` (caveat 4) — **DONE bench-local in Bench 553 as `UvfaAsLeoHead`**.
+- Downstream task-quality gate G5 (Sudoku / DDTree / Bomber) — **MEASURED FAIL on synthetic Go puzzles (Bench 553); real-network measurement still pending Issue 552**.
+- Tuning α per consumer.
+- Promotion from opt-in to "documented as recommended" — **BLOCKED on positive G5 measurement**.
 
 ### Explicitly NOT shipped by this proposal
 - **Civ flow-field navigation** — that's Proposal 028 (Option A). This proposal does not touch flow fields or civ.
@@ -223,4 +225,4 @@ The new oracle ships behind `qgf_oracle + dual_leo` (both already exist; no new 
 
 ## TL;DR
 
-Ship `DualLeoOracle` as QGF's third oracle — LEO+UVFA Q-gradient fusion at the gradient level, sidestepping the Plan 460 max-pool washout by construction. The primitive is small (~80 LOC + tests), the boundary is clean (katgpt-core, no game semantics), the GOAT gate's G1-G4 are mechanistic and the G5 downstream gain is honestly deferred to riir-ai. **Next action: open Plan NNN on approval.**
+Ship `DualLeoOracle` as QGF's third oracle — LEO+UVFA Q-gradient fusion at the gradient level, sidestepping the Plan 460 max-pool washout by construction. The primitive is small (~80 LOC + tests), the boundary is clean (katgpt-core, no game semantics), the GOAT gate's G1-G4 are mechanistic and **G5 measured FAIL on synthetic data (Bench 553, 2026-07-18): dual 0.00% vs single 0.50% — mechanism correct (b ≡ a invariant holds bit-identically), quality gate FAILs because synthetic data has no real signal to fuse. Real-network G5 still pending Issue 552 trained weights.** The oracle ships as opt-in with documented unproven G5.

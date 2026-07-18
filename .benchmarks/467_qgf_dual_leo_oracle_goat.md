@@ -14,9 +14,9 @@
 - ✅ **G2 PASS on the zero-alloc hot path** — `q_gradient_into` ratio = **1.126×** (median-of-3, well under the 1.5× gate). The allocating `q_gradient_at` path is **2.101×** (informational only — structurally ≥2× because dual does 2 head lookups by definition; see §G2 analysis).
 - ✅ **G3 PASS** — `cargo test -p katgpt-core --release --lib` passes 1713/1713 (with `qgf,leo_all_goals,dual_leo`); 1676/1676 on default features (no regression). One pre-existing debug-mode timing flake (`subspace_phase_gate::jacobian_svd_r8x8_latency_gate`) is unrelated — passes in release mode and is in a different module.
 - ✅ **G4 PASS** — `q_gradient_into` writes into the caller-provided `&mut [f32]`; the `DualLeoMixer::combine_into` is also in-place. Zero `Vec::new` in the into-path (verified by code inspection). The perf bench confirms zero steady-state allocation (1.126× ratio means no hidden allocator pressure).
-- ❌ **G5 DEFERRED to riir-ai** — downstream task gain (Sudoku / DDTree / Bomber) is out of scope for katgpt-rs. Mirrors Plan 268's deferred G5. The primitive ships as opt-in and is documented as "mechanism complete, downstream gain unproven."
+- ❌ **G5 MEASURED FAIL on synthetic data (Bench 553 in riir-ai, 2026-07-18).** The T7 Go puzzle harness in riir-ai was extended (Issue 553) with a T9 test comparing QGF+DualLeoOracle vs QGF+LeoHeadOracle. Result: dual scored **0.00%** vs single **0.50%** — dual is WORSE. The correctness invariant (QGF+LeoHeadOracle ≡ baseline argmax(Q_LEO)) held bit-identically (diff 0.0000), confirming the mechanism is correct; the quality gate FAILs because synthetic training data produces near-flat Q-fields in both LEO and UVFA with no real signal to fuse. Mirrors the Issue 549 / Plan 460 synthetic-vs-real lesson. **Real-network G5 measurement still requires trained CivLeoNet + CivLeoUVFA (Issue 552, GPU-blocked).** Until a positive G5 measurement lands, the oracle ships as opt-in and is documented as "mechanism complete, downstream gain unproven (synthetic measurement negative)."
 
-**Verdict:** ✅ **DualLeoOracle is the GOAT on the mechanistic gates (G1–G4).** G5 (downstream task gain) is honestly deferred to riir-ai per Proposal 007 — the same stance as Plan 268.
+**Verdict:** ✅ **DualLeoOracle is the GOAT on the mechanistic gates (G1–G4).** G5 attempted on synthetic data (Bench 553) → FAIL; real-network G5 still pending Issue 552 trained weights.
 
 ## G1 — Correctness (bit-identity)
 
@@ -91,15 +91,44 @@ The test's own message says the target is **release** mode. It passes in release
 
 Verified by inspection — no CountingAllocator harness because the contract is clear from the code.
 
-## G5 — Downstream task gain (DEFERRED to riir-ai)
+## G5 — Downstream task gain (MEASURED FAIL on synthetic data; real-network measurement pending)
 
-**DEFERRED per Proposal 007 §"What ships now vs deferred":**
+**Update 2026-07-18:** riir-ai Bench 553 (Issue 553) extended the T7 Go puzzle harness with a T9 test that compares the three configurations:
+
+- **(a) Baseline** (no QGF): `argmax(Q_LEO[goal])`
+- **(b) QGF + LeoHeadOracle**: `argmax(Q_LEO[goal] + w·Q_LEO[goal])` — structurally identical to (a)
+- **(c) QGF + DualLeoOracle**: `argmax(Q_LEO[goal] + w·mix)` where `mix = α·Q_LEO + (1-α)·Q_UVFA`, α=0.3 Lc mode
+
+**Results (release, Apple Silicon, 300 train steps × 200 eval puzzles):**
+
+| Config | Solve rate |
+|---|---|
+| (a) Baseline | 0.50% |
+| (b) QGF + LeoHeadOracle | 0.50% (bit-identical to a — correctness invariant ✅) |
+| (c) QGF + DualLeoOracle | **0.00%** (WORSE) |
+
+**G5 gate (≥ +3% b→c): FAIL.**
+
+### Root cause
+
+Synthetic training data (300 steps on goal-encoded one-hot state + 5% noise) produces near-flat Q-fields in both LEO and UVFA. LEO @ 0.50% is at chance (uniform-over-82 ≈ 1.22%). UVFA at this training scale is even more degenerate. Argmax over near-flat Q is dominated by initialization noise; the dual mix pulls the argmax toward a DIFFERENT arbitrary action — by chance worse on this eval seed.
+
+This is the **same lesson as Issue 549 / Plan 460 postmax dual-LEO flow-field fusion**: synthetic data on small nets has no real signal to fuse. The bench infrastructure is correct (the correctness invariant (b ≡ a) held bit-identically); the training is insufficient.
+
+### What this means
+
+- **Plan 467 G1 mechanism is verified end-to-end on real CivLeoNet** (not just mock LeoHead). The bit-identity invariant holds even when LEO produces near-flat Q-fields.
+- **G5 stays FAIL on synthetic data** — the deferral is no longer "unmeasured". The honest status is now: "mechanism verified correct, synthetic-data quality gate measured-fail, real-network measurement pending Issue 552 trained weights."
+- **Promotion to "documented as recommended" is BLOCKED on positive G5** — requires real trained CivLeoNet + CivLeoUVFA, which is the GPU-blocked Issue 552 path.
+- **The bench harness stays landed** (T9 test in `crates/riir-games/tests/bench_leo_game_training.rs`, gated on `dual_leo + qgf_drafter`). When Issue 552 lands trained weights, re-run T9 with the trained snapshot to measure real-network G5.
+
+### Original pre-2026-07-18 G5 deferral text (for reference)
 
 > Downstream task-quality gate G5 (Sudoku / DDTree / Bomber). Mirrors Plan 268's deferred gate. Until this is measured, the oracle ships as opt-in and is documented as "mechanism complete, downstream gain unproven."
 
-The gate text (for when riir-ai picks it up): ≥3% first-attempt accuracy gain on Sudoku 9×9 OR ≥5% speculative acceptance rate gain on a dual-LEO consumer, vs single-head `LeoHeadOracle`.
+The gate text: ≥3% first-attempt accuracy gain on Sudoku 9×9 OR ≥5% speculative acceptance rate gain on a dual-LEO consumer, vs single-head `LeoHeadOracle`.
 
-Until G5 is measured, the oracle stays opt-in (`qgf` parent feature gate, not in default). Plan 268 itself is opt-in for the same reason — this plan inherits that stance.
+Until G5 is measured (DONE 2026-07-18 — FAIL on synthetic), the oracle stays opt-in (`qgf` parent feature gate, not in default). Plan 268 itself is opt-in for the same reason — this plan inherits that stance.
 
 ## Side-by-side: `DualLeoOracle` vs siblings
 
@@ -157,4 +186,4 @@ The `LeoHeadOracle` stays as the single-head path. `DualLeoOracle` is a sibling,
 
 ## TL;DR
 
-`DualLeoOracle` ships as QGF's 3rd oracle. G1–G4 PASS mechanistically (G2 at 1.126× on the zero-alloc hot path, well under 1.5×). G5 (downstream task gain) is honestly deferred to riir-ai per Proposal 007 — same stance as Plan 268. The Plan 460 max-pool washout lesson is encoded by construction (no operator between the mix and the QGF consumer).
+`DualLeoOracle` ships as QGF's 3rd oracle. G1–G4 PASS mechanistically (G2 at 1.126× on the zero-alloc hot path, well under 1.5×). **G5 measured FAIL on synthetic data (Bench 553, 2026-07-18): dual 0.00% vs single 0.50% — mechanism correct (b ≡ a invariant holds bit-identically), quality gate FAILs because synthetic data has no real signal to fuse. Real-network G5 still pending Issue 552 trained weights.** The Plan 460 max-pool washout lesson is encoded by construction (no operator between the mix and the QGF consumer). Primitive stays opt-in with documented unproven G5.
