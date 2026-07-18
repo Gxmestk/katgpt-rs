@@ -1,5 +1,11 @@
 # Plan 007: Constraint Validator — Full Rust Vocabulary + Validation Pipeline
 
+> **Note on file paths (2026-07-18):** Some `*.rs` paths in this document
+> reference modules that were renamed, moved, or never landed under the
+> exact name shown. They are preserved as a **historical record** of the
+> original design intent; consult the current crate layout for the live
+> location.
+
 > **Rename Note**: The `clora` module was renamed to `validator` because it contains
 > deterministic syntax validation code (SynPruner, PartialParser), not neural LoRA weights.
 > Feature flag: `clora` → `validator` (previously `clora`). Module path: `src/clora/` → `src/validator/`.

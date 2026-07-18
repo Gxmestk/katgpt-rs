@@ -1,5 +1,11 @@
 # Plan 147: Shard-Inspired Asymmetric Codec KV Cache Compression
 
+> **Note on file paths (2026-07-18):** Some `*.rs` paths in this document
+> reference modules that were renamed, moved, or never landed under the
+> exact name shown. They are preserved as a **historical record** of the
+> original design intent; consult the current crate layout for the live
+> location.
+
 > **Origin:** Research 109 (Shard — Drop-In 10× KV Cache)
 **Status:** ✅ COMPLETE — DRAFT (high-value research, pending GOAT proof validation)
 > **GOAT Pillar:** Infrastructure (supports all 4 pillars via memory efficiency)
@@ -8,7 +14,6 @@
 > **Related Research:** 109 (Shard), 81 (Asymmetric K/V), 39 (SpectralQuant), 63 (OCTOPUS), 20 (TurboQuant)
 > **Depends on:** `spectralquant` (eigenbasis), `turboquant` (Lloyd-Max codebook, rotation)
 > **Blocks:** Nothing
-
 ---
 
 ## Task Index

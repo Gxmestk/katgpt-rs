@@ -1,5 +1,11 @@
 # Plan 119: EqR Convergence-Based Selection for Breadth Scaling
 
+> **Note on file paths (2026-07-18):** Some `*.rs` paths in this document
+> reference modules that were renamed, moved, or never landed under the
+> exact name shown. They are preserved as a **historical record** of the
+> original design intent; consult the current crate layout for the live
+> location.
+
 > **Status:** ✅ Complete
 > **Branch:** `develop/feature/119_eqr_convergence_selector`
 > **Depends on:** Plan 079 (ELF SDE ✅), Plan 083 (PTRM width scaling ✅), Plan 030 (BanditPruner ✅)

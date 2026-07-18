@@ -1,5 +1,11 @@
 # Plan 121: RMSD — Relevance-Masked Self-Distillation
 
+> **Note on file paths (2026-07-18):** Some `*.rs` paths in this document
+> reference modules that were renamed, moved, or never landed under the
+> exact name shown. They are preserved as a **historical record** of the
+> original design intent; consult the current crate layout for the live
+> location.
+
 > **Status:** ❌ NO GOAT — Complete (T1–T13 all done, 46 structural proofs pass), but **negative arena result**: RMSD does not improve over SDAR in tournament play. Demoted to 🪦.
 > **Branch:** `develop/feature/121_rmsd_distill`
 > **Depends on:** Plan 072 (SDAR gate ✅), Plan 073 (SDAR loss ✅), Plan 074 (Interventional SFT ✅), Plan 080 (BT rank ✅)
@@ -7,9 +13,7 @@
 > **Source:** [Relevance-Masked Self-Distillation](https://www.appliedcompute.com/research/relevance-masked-self-distillation) — Applied Compute, 2026
 > **Feature gate:** `rmsd_distill` (opt-in, depends on `sdar_gate` + `bandit`)
 > **Goal:** Extend SDAR's uniform token gating with RMSD's two-step relevance mask: pre-filter T positions by logprob magnitude, then select S most relevant positions via judge. This concentrates gradient on the ~5-10 positions that actually carry learning signal, yielding 2× data efficiency and higher performance ceiling.
-
 ## Tasks
-
 - [x] T1: Implement `LogprobMagnitudeFilter` — top-T positions by |Δlogprob| (Step 1 of RMSD)
 - [x] T2: Implement `TopKlApproximator` — top-K=500 vocabulary KL approximation for efficiency
 - [x] T3: Implement `rmsd_loss()` in `rmsd_relevance.rs` — combining SDAR gate + RMSD mask

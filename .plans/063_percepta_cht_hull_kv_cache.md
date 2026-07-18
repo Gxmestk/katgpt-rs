@@ -1,5 +1,10 @@
 # Plan 063: Percepta CHT Hull KV Cache Upgrade (Phase A)
 
+> **Note on file paths (2026-07-18):** Some `*.rs` paths in this document
+> reference modules that were renamed, moved, or never landed under the
+> exact name shown. They are preserved as a **historical record** of the
+> original design intent; consult the current crate layout for the live
+> location.
 Replace Graham Scan + Ternary Search with Dynamic Convex Hull Trick (CHT) / LineContainer, matching the reference implementation at `.raw/transformer-vm/attention/hull2d_cht.h`.
 
 **Distillation strategy:** Percepta's `transformer-vm` is Apache-2.0. We distill to Rust under MIT per `.research/032_percepta_distillation_strategy.md`. This is Phase A (P0–P2: CHT + cumulative sum + parabolic encoding). Phase B (P3: ReGLU/stepglu) follows. Phase C (P4–P6: full compiler) is a pivot decision.

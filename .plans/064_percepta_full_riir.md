@@ -1,5 +1,11 @@
 # Plan 064: Percepta Full RIIR — transformer-vm in Rust
 
+> **Note on file paths (2026-07-18):** Some `*.rs` paths in this document
+> reference modules that were renamed, moved, or never landed under the
+> exact name shown. They are preserved as a **historical record** of the
+> original design intent; consult the current crate layout for the live
+> location.
+
 > **Status**: ✅ Core + Rust→WASM pipeline complete — TG-A through TG-K + TG-L done. K1 deferred (C examples). F6/H5/H6/I4 completed: 18 integration tests. i64→i32 lowering enables Rust WASM backend. Futamura specialization wired up (Runner::specialize). Comparison tasks (G5, J9) deferred to Percepta Docker environment.
 >
 > **MILP Solver Upgrade (Issue 003)**: Swapped `microlp` → **HiGHS** (production-grade, 30s timeout). Full WASM interpreter graph (216 dims, 189 ops, 7 layers) now solves in **1.13s** (was ∞ hang). `percepta_05_pipeline` §2 runs full graph end-to-end: d_model=152, 1.08M params, 2,233 tok/s.
@@ -7,7 +13,6 @@
 > **Final Status**: All tasks addressed. G5, J9 deferred (need Percepta Docker for C-compiled WASM comparison). K1 deferred (C examples are language-agnostic, out of RIIR scope).
 >
 > **WASM Strategy**: Rust-first — write Rust programs → `rustc --target wasm32-unknown-unknown` → feed into percepta pipeline. `compile_rust_to_wasm()` + `rust_template()` + `lower_i64_ops()` handle Rust's WASM backend differences. C→WASM comparison deferred: copy `.wasm` binaries out of Percepta's Docker environment for 1:1 reference matching later.
-
 Complete Rust port of Percepta's `transformer-vm` (Apache-2.0 © Percepta). Distill ~9K lines of Python+C++ into idiomatic Rust under MIT. Prove Rust is better. Show them what's possible.
 
 **Master plan for all Percepta distillation.** Plan 063 (CHT) is Task Group A within this plan.

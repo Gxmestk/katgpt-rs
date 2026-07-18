@@ -1,12 +1,17 @@
 # Research 158: MUX — Multiplexed Latent Reasoning via Vocabulary Superposition
 
+> **Note on file paths (2026-07-18):** Some `*.rs` paths in this document
+> reference modules that were renamed, moved, or never landed under the
+> exact name shown. They are preserved as a **historical record** of the
+> original design intent; consult the current crate layout for the live
+> location.
+
 > **Paper:** [MUX: Continuous Reasoning via Multiplexed Tokens](https://misakitaro0414.github.io/mux/) — Suleymanzade, Gozeten, Bronstein, Ceylan, Kim (AITHYRA, Michigan, Oxford, TU Wien, KAIST), June 2026
 > **Local:** `.raw/mux/` (upstream Python, CODI framework + PCCoT parallel variant)
 > **Date:** 2026-06, distilled 2026-07
 > **Related Research:** 043 (Interventional SFT), 097 (Training-Free Looped Transformers), 151 (GDSD Guided Denoiser), 153 (Thinking Pixel), 156 (Speculative Reconciliation), 037 (REAP Model-Based/Modelless Duality)
 > **Related Plans:** 172 (RiM Reasoning Buffer Slots ✅), 171 (FrozenBaseGuard ✅), 136 (Training-Free Loop Wrapper), 177 (Speculative Reconciliation)
 > **Verdict: HIGH VALUE — Six modelless distillations, three model-based. The superposition-as-search-space idea is a genuine architectural fusion with our DDTree/BanditPruner/ConstraintPruner stack, not a rebranding. The anti-collapse guarantee (Proposition 9) gives us a theoretical foundation for why RiM slots don't degrade.**
-
 ---
 
 ## TL;DR
