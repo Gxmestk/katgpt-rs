@@ -159,7 +159,7 @@ refined strategy doc, stranded in a private fork.
     5. **Track in Phase 2.1** (`riir-engine src/hla/ → consume katgpt_core::hla`). When riir-engine deletes its local `types.rs`/`kernel.rs` and imports from core, the role-aware wrappers will call `katgpt_core::hla::hla_state_update` instead of the local copy. The wrapper code itself can stay in riir-engine indefinitely — it's Category C composition.
 
   **Net result:** the publishable-leaf half of HLA (cache types + streaming kernels, 1625 LoC) now lives in `katgpt-core` and is available to any crate via `cargo add katgpt-core`. The composition half (`forward_hla`/`forward_ahla`, 569 LoC) stays in root because it needs `ForwardContext`. The cognitive half (role-aware + third-order, ~600 LoC) stays in riir-engine because it needs `role_transport`. Three-tier split achieved without breaking any call site.
-- [x] **Step 5 — `dd_tree` + `spec_types` → core.** Traits already in `core/traits.rs`; move dependent types (`TreeNode`, `DDTreeBranchCache`, `SpeculativeContext`, `DraftResult`, `NoPruner`, `ScreeningPruner` dep types) to join them.
+- [x] **Step 5 — `dd_tree` + `spec_types` → core.** Traits already in `crates/katgpt-core/src/cgsp/traits.rs`; move dependent types (`TreeNode`, `DDTreeBranchCache`, `SpeculativeContext`, `DraftResult`, `NoPruner`, `ScreeningPruner` dep types) to join them.
 
   ⚠️ **AUDIT FINDING (2026-06-28, before execution): the original premise needed the same scope correction as Steps 2 and 4.**
   - There is NO `spec_types.rs` in katgpt-rs root. The substrate types live in `src/speculative/types.rs`. (`spec_types.rs` exists only in `riir-engine`, where it's a duplicate copy — Phase 2.5 dedup target.)

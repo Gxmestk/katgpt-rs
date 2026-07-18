@@ -592,7 +592,7 @@ for path in extract_best_path(&tree) {
 ### 2.3 Error Feedback (Self-Correction Loop)
 
 ```rust
-// crates/katgpt-validator/src/types.rs (previously clora/types.rs)
+// crates/katgpt-validator/src/types.rs (previously crates/katgpt-validator/src/types.rs)
 
 /// Compiler error → steering context for next LLM draft.
 pub struct CompilerFeedback {

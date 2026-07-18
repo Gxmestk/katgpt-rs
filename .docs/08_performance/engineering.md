@@ -353,7 +353,7 @@ Feature gate: `spectral_quant` (**on by default** in `Cargo.toml`)
 ### Key Types
 
 ```rust
-// Per-layer calibration state (spectralquant/types.rs)
+// Per-layer calibration state (crates/katgpt-dec/src/types.rs)
 pub struct SpectralQuantLayer {
     calibration: SpectralQuantCalibration,  // eigenvectors, eigenvalues, d_eff
     qjl_signs: Vec<f32>,                    // QJL projection

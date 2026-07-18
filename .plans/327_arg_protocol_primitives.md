@@ -52,7 +52,7 @@ The three smallest, most foundational primitives. Ships first so the open adopti
   - `LifecycleState ∈ {Active, Shadow, Deprecated, Removed}` `#[repr(u8)]` enum
   - `RedirectTable` — papaya lock-free `HashMap<LabelId, LabelId>` (deprecated → replacement); `redirect(&self, id: LabelId) -> LabelId` follows chains; `redirect_chain(&self, id) -> Vec<LabelId>` for audit
   - `RedirectTable::insert_redirect(old, new)` — chain compression on insert (avoid redirect chains longer than 3)
-- [x] **T1.7** Write `arg/lib.rs`-style facade re-exports in `crates/katgpt-core/src/arg/mod.rs`.
+- [x] **T1.7** Write `crates/katgpt-core/src/lib.rs`-style facade re-exports in `crates/katgpt-core/src/arg/mod.rs`.
 
 ### Phase 1 GOAT gate
 

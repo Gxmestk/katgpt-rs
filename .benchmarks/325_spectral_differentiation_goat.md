@@ -92,7 +92,7 @@ We also compare against the centered 2-point finite-difference baseline (O(h²) 
 
 **Verdict: G4 PASS.** Two allocation sources were closed:
 
-1. **rustfft's `Fft::process`** allocates a `Vec<Complex<f32>>` scratch internally on every call (confirmed at `rustfft/src/lib.rs:187-188`). **Fix:** route through `Fft::process_with_scratch` with a pre-allocated `fft_scratch` field sized to `max(fwd.get_inplace_scratch_len(), inv.get_inplace_scratch_len())`.
+1. **rustfft's `Fft::process`** allocates a `Vec<Complex<f32>>` scratch internally on every call (confirmed at `crates/katgpt-dec/src/lib.rs:187-188`). **Fix:** route through `Fft::process_with_scratch` with a pre-allocated `fft_scratch` field sized to `max(fwd.get_inplace_scratch_len(), inv.get_inplace_scratch_len())`.
 2. **`FftPlanner::plan_fft_*`** returns `Arc<dyn Fft<f32>>` from an internal cache (refcount bump — not an allocation), but each call still does a hashmap lookup. **Optimization:** cache the `Arc<Fft>` handles directly in `SpecDiffScratch::{fwd_plan, inv_plan}` keyed by `cached_size`, so steady-state calls skip the lookup entirely.
 
 Without fix #1 the bench measured **200 allocations / 100 calls** (2 per call — forward + inverse FFT). With both fixes: 0.

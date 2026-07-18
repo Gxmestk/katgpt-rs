@@ -32,7 +32,7 @@ examples/gauge_invariant_demo.rs ← before/after demo (naive vs gauge-invariant
 
 Composed with existing infra (no duplication):
 - Reuses `NewtonSchulzScratch`, `simd_dot_f32`, `simd_sum_sq` from Plan 152
-- Reuses power iteration pattern from `distill/peira.rs::PowerIterationScratch`
+- Reuses power iteration pattern from `crates/katgpt-spectral/src/peira.rs::PowerIterationScratch`
 - No GPU/ANE dispatch — pure CPU SIMD (paper's PSD inv-sqrt is r×r for r ≤ 64, ~1-16KB)
 
 ---

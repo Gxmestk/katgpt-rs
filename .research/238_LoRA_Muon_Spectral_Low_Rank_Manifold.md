@@ -146,7 +146,7 @@ pub fn gauge_rebalance(
 )
 ```
 
-- Uses `power_iterate` for `σ_max` estimate (existing pattern from `distill/peira.rs::PowerIterationScratch`).
+- Uses `power_iterate` for `σ_max` estimate (existing pattern from `crates/katgpt-spectral/src/peira.rs::PowerIterationScratch`).
 - ~O(r · (m+n)) per call — sub-microsecond for typical LoRA sizes (r=16, m=n=256).
 - No allocations: caller-owned scratch buffers.
 

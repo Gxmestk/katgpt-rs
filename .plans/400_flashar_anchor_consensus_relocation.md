@@ -90,7 +90,7 @@ path continues to resolve. Verified external callers:
 - [x] 2. Move `flashar_consensus.rs` to katgpt-forward (production + 10 PURE tests)
 - [x] 3. Slim root shims (re-export + 2 TRAIN tests for anchor)
 - [x] 4. Cargo.toml updates (root + katgpt-forward)
-- [x] 5. Module registration in katgpt-forward/lib.rs
+- [x] 5. Module registration in crates/katgpt-forward/src/lib.rs
 - [x] 6. GOAT gate G3 validation
 - [x] 7. Commit on develop
 
