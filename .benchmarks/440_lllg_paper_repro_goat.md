@@ -44,6 +44,18 @@ the selected candidate. The gap is **not corridor detection** — it's the
 | warehouse | 7.34 (0.41) | **7.33 (0.41)** | 0 → 4920 | -0.1% (noise) |
 | ht_chantry | 4.61 (0.27) | **4.66 (0.27)** | 8 → 110 | +1% (noise) |
 
+**Follow-up attempt — Proposal 006 (2026-07-18, REJECTED):** Lifting the flow
+field from a PIBT-level soft cost to a guidance-level hard constraint was
+implemented in three phases (bi-directional corridor pairing + flow-respecting
+A\* + demoted `flow_mismatch` cost position), measured, then **reverted**.
+ht_chantry throughput stayed flat (+0.9%, noise) AND ht_chantry deadlock-chain
+P95 went from 8 → 15 (WORSE); the mechanism DID work on warehouse (+7%) but
+that's not enough to clear either map's gate. Full measurement record + REVERT
+verdict live in [`Proposal 006 §Verdict`](../.proposals/006_flow_field_hard_constraint_in_guidance.md#verdict-2026-07-18-post-implementation);
+the implementation issue (182) was removed per noise-reduction rule. The
+ht_chantry G1 gap (0.27–0.28 vs 0.30 target) remains a documented steady-state
+fail awaiting a different approach.
+
 ---
 
 ## Issue 150 results (2026-07-15) — 2-wide corridor detection
