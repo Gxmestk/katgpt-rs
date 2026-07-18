@@ -133,7 +133,7 @@ must verify bit-identity against the pre-refactor field on the same inputs.
         `get_or_compute` with the same head, same state, same goal.
   - [x] T4.6: `get_or_compute_dual_postmax(UvfaOnly)` matches the UVFA-head-only
         `get_or_compute` field.
-- [x] T5: Extend `benches/dual_flow_field_bench.rs` — reuse the Plan 459
+- [x] T5: Extend `crates/katgpt-core/benches/dual_flow_field_bench.rs` — reuse the Plan 459
       200-NPC gradient-follow simulator + mock heads. Add:
   - [x] T5.1: `dual_postmax_lc_alpha_03` quality + perf measurement (paper default).
   - [x] T5.2: `dual_postmax_alpha_sweep` — α ∈ {0.1, 0.2, 0.3, 0.5, 0.7}, Lc mode.

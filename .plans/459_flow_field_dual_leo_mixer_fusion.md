@@ -41,7 +41,7 @@ On a 2D navigation grid, the LEO teacher produces a *broad* potential field (kno
 - [x] T1: Refactor — extract `compute_from_q_slice` helper from `get_or_compute` (no behavior change).
 - [x] T2: Add `FlowFieldCache::get_or_compute_dual<H1: LeoHead, H2: LeoHead, M: DualLeoMixer>`.
 - [x] T3: Unit test — `get_or_compute_dual` produces a valid `FlowField` and respects `ActingMode::LeoOnly` (α=1.0 ≈ LEO baseline) and `ActingMode::UvfaOnly` (α=0.0 ≈ UVFA baseline).
-- [x] T4: Write `benches/dual_flow_field_bench.rs` — quality metric (avg gradient-path length to goal) + perf metric (cache-miss compute time).
+- [x] T4: Write `crates/katgpt-core/benches/dual_flow_field_bench.rs` — quality metric (avg gradient-path length to goal) + perf metric (cache-miss compute time).
 - [x] T5: Run GOAT gate. Capture results in `.benchmarks/459_flow_field_dual_leo_mixer_goat.md`.
 - [x] T6: Document outcome + promote decision.
 - [x] T7 (added during run): α-sweep {0.1..0.9} to characterize the actual quality curve after the default α=0.3 missed the gate.

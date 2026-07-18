@@ -483,3 +483,62 @@ in published docs, dev confusion) materializes.
 Task remains **independently verified complete** on both audited surfaces.
 The two re-runnable auditors continue to catch their target drift class
 cleanly. No new drift introduced by post-session-14 sibling activity.
+
+## Session 16 addendum (2026-07-18) — Sibling-WIP flags cleared + Proposal 006 false positive
+
+### Re-verification result
+
+Both auditors re-run across all 8 repos with **0 mismatches** again:
+
+| Auditor | Files checked | Mismatches |
+|---|---:|---:|
+| `scripts/bench_doc_audit.py` | 95 `.md` labels | 0 |
+| `scripts/cargo_comment_audit.py` | 360 Cargo.toml inline comments | 0 |
+
+Post-session-15 activity covered:
+- **riir-ai `0b6196d1`** — owning agent manually disambiguated **23 of the
+  AMBIGUOUS `.rs` path refs** flagged in session 9–10 / 15 (17 same-repo +
+  6 cross-repo, across 19 `.md` files). The manual disambig targeted exactly
+  the residual class session 15 declared "signal-to-noise too poor to gate";
+  the owning agent used context-driven resolution (markdown context, crate
+  layout, Issue/Plan history) per `scripts/disambig_protocol.md`. 30 findings
+  were skipped as TRULY_GONE or already-correct. The session 15 residual
+  count drops from 525 → ~502.
+- **riir-ai `80312594` / `e5930071`** — Plan 498 Phase 3 band-edge trigger
+  integration. No new drift on either audited surface.
+- **riir-ai `e93c1a36` / `25047076`** — Plan 499 Phase 3 + Issue 546 G1
+  steady-state-fail verdict. No new drift on either audited surface.
+
+### Session 15 sibling-WIP flags — resolved
+
+Session 15 flagged 3 path bugs as sibling-WIP (deferred per parallel-agent
+safety). Re-investigation this session:
+
+| Flag | Verdict | Action |
+|---|---|---|
+| `.plans/459_flow_field_dual_leo_mixer_fusion.md:44` — `benches/dual_flow_field_bench.rs` | **CONFIRMED BUG** (file is at `crates/katgpt-core/benches/dual_flow_field_bench.rs`; bare `benches/` from repo-root `.plans/` resolves to nonexistent `<repo>/benches/`). Owning plan landed (`37623e22`) → parallel-agent safety lifted. | **FIXED** in this session |
+| `.plans/460_flow_field_dual_leo_postmax_fusion.md:136` — `benches/dual_flow_field_bench.rs` | Same as above. Owning plan landed (`dd10aaa9`). | **FIXED** in this session |
+| `.proposals/006_flow_field_hard_constraint_in_guidance.md` — `examples/ht_chantry_deadlock_chain_diagnostic.rs` | **FALSE POSITIVE.** The example file exists at `crates/katgpt-core/examples/ht_chantry_deadlock_chain_diagnostic.rs`, and the proposal already uses the correct `../crates/katgpt-core/examples/...` prefix from `.proposals/`. Proposal header explicitly carries the REJECTED/REVERT verdict (line 3: `Status: **REJECTED**`; line 7 cross-refs Issue 182's CLOSED-with-REVERT). No drift — session 15 mis-flagged it. | **No action needed** |
+
+The two fixes align the `.plans/{459,460}_*.md` references with the path
+already used in the corresponding `.benchmarks/{459,460}_*.md` GOAT reports
+(which were already correct: `crates/katgpt-core/benches/dual_flow_field_bench.rs`).
+
+### Accepted residual (unchanged from session 9–10, slightly reduced)
+
+- **~502 broken `.md → nonexistent file` path refs** across 8 repos (was 525;
+  riir-ai commit `0b6196d1` resolved 23). Same design-record noise class —
+  shell-glob braces, forward-looking plan paths, refactor-renamed cross-repo
+  refs. Signal-to-noise still too poor to gate.
+- **0 sibling-WIP path bugs outstanding** (the session 15 set is fully cleared).
+
+### Bottom line
+
+Task remains **independently verified complete** on both audited surfaces.
+The two re-runnable auditors continue to pass clean under live sibling-agent
+activity (verified again this session after the Plan 460 GOAT promotion and
+Plan 498 Phase 3 band-edge trigger integration). The session 15 sibling-WIP
+flags are resolved (2 fixed, 1 reclassified as false positive). The wider
+broken-path-ref residual shrank from 525 → ~502 via the owning agent's
+manual disambig (`0b6196d1`); the remainder stays accepted as design-record
+noise (same verdict as sessions 9–10 + 15).
