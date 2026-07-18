@@ -32,7 +32,7 @@
 //! backbone. The interpretation (probabilistic vs deterministic vs
 //! min-plus) is consumer-side and not implemented here.
 //!
-//! ## Allocation budget (G4 — Issue 183)
+//! ## Allocation budget (G4 — Issue 183 + P4 zero-alloc refactor)
 //!
 //! `identify_inner` uses a [`Scratch`] workspace — a struct of reusable
 //! `Vec<NodeId>` slots that are `clear`ed + refilled each frame, instead
@@ -54,20 +54,44 @@
 //! the return path and is NOT counted against G4 (matches the `bench_335`
 //! convention "Construction allocs are informational").
 //!
-//! `Admg::subgraph` and `Admg::fix_node` (used by step 2, step 3, and via
-//! `try_fixseq`) still allocate fresh `Admg` structs — those are
-//! graph-construction allocations, not recursion-scratch, and are out of
-//! the G4 scope of Issue 183. Closing them is a separate (P4) concern
-//! tracked in the Super-GOAT guide.
+//! ## P4 zero-alloc districts + fixseq (Plan 457 Super-GOAT guide)
 //!
-//! A truly zero-alloc recursion would require either `unsafe` (raw-pointer
-//! aliasing around the shared scratch) or a redesigned recursion that does
-//! not pass slice arguments borrowing into the parent's scratch. Both are
-//! out of scope for Issue 183 — the primitive is offline-only (10 µs/query
-//! is well outside the 20 Hz tick), so the remaining ~5 allocs/frame are
-//! not load-bearing.
+//! After Issue 183 closed the recursion-scratch G4 gate, the dominant
+//! remaining allocators were `Admg::districts()` (~30 allocs/frame on the
+//! 32-node scenario via `district_of`'s 3 internal Vecs per district),
+//! `try_fixseq`'s `g.clone()` + `remaining` Vec (~4 allocs/call), and
+//! `d_owned.clone()` in the step-6 multi-district branch (1 alloc/branch).
+//!
+//! P4 closes these via:
+//! - [`Admg::for_each_district_with_buffers`] — callback-based alloc-free
+//!   district enumeration. Step 4 records only `intersecting_count` +
+//!   `first_intersecting` (the first intersecting district's snapshot, only
+//!   materialized if step-5 condition could fire). Step 6 re-iterates and
+//!   recurses inline.
+//! - [`Admg::fix_node_into`] + [`super::fixing::try_fixseq_into`] —
+//!   workspace-based zero-alloc fixseq. Step 5 uses this variant because it
+//!   only needs the feasibility check, not the resulting fixed graph.
+//! - `d_owned.clone()` eliminated — `d: &scratch.an_y_in_gva` survives
+//!   across step-6 iterations because child frames create their own fresh
+//!   Scratch via `identify_inner_owned_slice`, never touching the parent's.
+//!
+//! Allocation measurements (Apple Silicon, release, criterion --quick):
+//!
+//! | Stage | 32-node allocs/call | 32-node latency |
+//! |---|---|---|
+//! | Pre-Issue-183 baseline | 284 | 8.26 µs |
+//! | Issue 183 Scratch refactor | 198 (−30%) | 6.07 µs (−27%) |
+//! | P4 zero-alloc districts + fixseq | **133 (−33% more)** | **5.22 µs (−14% more)** |
+//!
+//! The remaining ~133 allocs/call are the Scratch::new() first-push grow
+//! cost: ~12-15 Vec slots × ~6 recursion frames × first-push grow per slot
+//! per frame. This is the honest floor of the safe-Rust approach without
+//! `unsafe` pointer aliasing or thread-local pooling. A thread-local Scratch
+//! pool could push it to ~0 but would make the primitive context-sensitive
+//! (unsafe through FFI, problematic under async runtimes) — not worth it for
+//! an offline primitive at ~5 µs/query.
 
-use super::fixing::try_fixseq;
+use super::fixing::try_fixseq_into;
 use super::types::{Admg, AdmgSignature, IdentificationError, NodeId};
 
 /// Recursively identify `Σ_{Y|do(A)}` on graph `g`.
@@ -172,6 +196,24 @@ struct Scratch {
     /// Step 3 scratch buffer for the (V\A) subgraph (used to compute
     /// An(Y in G[V\A])). Local to this frame — not passed to recursion.
     sub_va_step3: Admg,
+    // ── P4 zero-alloc additions (districts + fixseq workspaces) ──────
+    /// Step 4 district enumeration — `visited` accumulator (nodes already
+    /// assigned to a district in the current pass).
+    district_visited: Vec<NodeId>,
+    /// Step 4 district enumeration — current district being built.
+    district_buf: Vec<NodeId>,
+    /// Step 4 district enumeration — BFS frontier (work queue).
+    district_frontier: Vec<NodeId>,
+    /// Step 4 district enumeration — per-step next queue.
+    district_next: Vec<NodeId>,
+    /// Step 4 snapshot of the single intersecting district when the step-5
+    /// condition holds (exactly one intersecting district, contains all D).
+    /// Required because step 5 needs the full district `C` to compute
+    /// `V \ C` and `first_two_nodes(C)` for hedge diagnostics.
+    first_intersecting: Vec<NodeId>,
+    /// Step 5 fix-sequence workspace — holds the double-buffered current/next
+    /// Admg + per-iteration district scratch. Reused across step-5 calls.
+    fixseq_ws: super::fixing::FixSeqWorkspace,
 }
 
 impl Scratch {
@@ -278,37 +320,60 @@ fn identify_inner(
     }
 
     // Step 4: D = An(Y in G[V\A]) = an_y_in_gva. Districts of G[V] intersecting D.
-    let d: &Vec<NodeId> = &scratch.an_y_in_gva;
-    let all_districts = g.districts();
-    // Build the intersecting district list as indices into `all_districts`
-    // (stable across step-6 recursion — we only read from `all_districts`,
-    // never modify it).
-    let mut intersecting_idx: arrayvec::ArrayVec<usize, 32> = arrayvec::ArrayVec::new();
-    let mut first_intersecting_idx: Option<usize> = None;
+    //
+    // P4 zero-alloc refactor (Plan 457): instead of `g.districts()` returning
+    // `Vec<Vec<NodeId>>` (~30 allocs on a 32-node graph via `district_of`'s
+    // 3 internal Vecs per district), we enumerate districts via
+    // `for_each_district_with_buffers` (alloc-free — caller supplies 4 scratch
+    // buffers) and record only the information steps 5 and 6 need:
+    //   - intersecting_count: how many districts intersect D
+    //   - first_intersecting: the first such district's full membership (only
+    //     materialized if the step-5 condition could fire — exactly-one +
+    //     contains-all-D)
+    //   - first_district_contains_all: whether that first one contains all D
+    //
+    // Step 6 re-iterates districts via the same callback API, computing
+    // `c ∩ D` inline per intersecting district and recursing. This avoids
+    // storing all intersecting districts as a `Vec<Vec>` snapshot.
+    //
+    // Split-borrow scratch up front so the borrow checker can see that
+    // `an_y_in_gva` (read by `d`) is disjoint from the other fields we
+    // mutably borrow (district_*, first_intersecting, fixseq_ws, etc.).
+    let s = &mut *scratch;
+    let d: &Vec<NodeId> = &s.an_y_in_gva;
+    s.first_intersecting.clear();
+    let mut intersecting_count: u32 = 0;
     let mut first_district_contains_all = false;
-    for (i, dist) in all_districts.iter().enumerate() {
-        if dist.iter().any(|n| d.contains(n)) {
-            if first_intersecting_idx.is_none() {
-                // first intersecting district — capture the step-5 condition.
-                let all = d.iter().all(|n| dist.contains(n));
-                first_intersecting_idx = Some(i);
-                first_district_contains_all = all;
+    g.for_each_district_with_buffers(
+        &mut s.district_visited,
+        &mut s.district_buf,
+        &mut s.district_frontier,
+        &mut s.district_next,
+        |dist: &[NodeId]| {
+            // Check intersection with D.
+            let intersects = dist.iter().any(|n| d.contains(n));
+            if !intersects {
+                return;
             }
-            // ArrayVec::push panics on overflow. Capacity 32 is the
-            // documented upper bound (INLINE_SIGNATURE_CAP). A pathological
-            // graph exceeding it indicates a bug at the call site.
-            intersecting_idx.push(i);
-        }
-    }
+            intersecting_count += 1;
+            if intersecting_count == 1 {
+                // Capture the first intersecting district snapshot + the
+                // step-5 "contains all of D" condition.
+                first_district_contains_all = d.iter().all(|n| dist.contains(n));
+                s.first_intersecting.clear();
+                s.first_intersecting.extend(dist.iter().copied());
+            }
+        },
+    );
 
-    if intersecting_idx.is_empty() {
+    if intersecting_count == 0 {
         // Defensive: should not happen if effect ⊆ v.
         return Ok(AdmgSignature::from_nodes(effect.iter().copied()));
     }
 
     // Step 5: if exactly one district of G[V] contains all of D.
-    if intersecting_idx.len() == 1 && first_district_contains_all {
-        let c = &all_districts[first_intersecting_idx.unwrap()];
+    if intersecting_count == 1 && first_district_contains_all {
+        let c: &Vec<NodeId> = &s.first_intersecting;
         // FAIL condition: the c-component containing D is the entire V.
         // This is the bow-arc / hedge: cannot intervene outside C.
         if c.len() == g.nodes.len() && c.iter().all(|n| g.nodes.contains(n)) {
@@ -318,13 +383,13 @@ fn identify_inner(
                 hedge: first_two_nodes(c),
             });
         }
-        // Fix V \ C in G. This is the "back-door" branch.
-        scratch.fix_set.clear();
-        scratch
-            .fix_set
+        // Fix V \ C in G. This is the "back-door" branch. Zero-alloc via
+        // the fixseq workspace (P4).
+        s.fix_set.clear();
+        s.fix_set
             .extend(g.nodes.iter().copied().filter(|n| !c.contains(n)));
-        match try_fixseq(g, &scratch.fix_set) {
-            Ok(_) => return Ok(AdmgSignature::from_nodes(d.iter().copied())),
+        match try_fixseq_into(g, &s.fix_set, &mut s.fixseq_ws) {
+            Ok(()) => return Ok(AdmgSignature::from_nodes(d.iter().copied())),
             Err(_) => {
                 return Err(IdentificationError::NotIdentifiable {
                     cause: cause_head,
@@ -335,54 +400,71 @@ fn identify_inner(
         }
     }
 
-    // Step 6: multiple districts. Recurse on each to propagate any Err,
-    // then return D as the signature backbone. The union of sub-problem
-    // backbones equals D by the ID algorithm's correctness — we return D
-    // directly to avoid accumulation drift across recursive splits.
+    // Step 6: multiple districts intersect D. Re-iterate districts via the
+    // callback API, compute `c ∩ D` inline, and recurse on each.
     //
     // Scratch contract: each iteration clears + refills `c_in_d` and
-    // `new_cause_step6` BEFORE recursing. The recursion will further
-    // corrupt scratch state, but we re-derive the slots from the stable
-    // `all_districts` + `g.nodes` + `d` references at the top of the next
-    // iteration, so corruption is benign.
+    // `new_cause_step6` BEFORE recursing. The recursion will further clear
+    // scratch fields inside child frames (via `identify_inner_owned_slice`'s
+    // fresh Scratch — but here we reuse OUR scratch across iterations, so
+    // the child returns and we rebuild the slots at the top of the next
+    // callback invocation).
     //
-    // `d` borrows `scratch.an_y_in_gva`, which is also used by child frames.
-    // We need `d` to survive the iteration; the child's `scratch.an_y_in_gva`
-    // re-clear produces a stale `d` slice. To avoid that, we copy `d` once
-    // into a fresh local before the loop — this is ONE allocation per
-    // multi-district branch, not per call frame, and is the documented
-    // "graph-construction" carve-out (the algorithm semantically requires D
-    // to outlive the recursion; without an in-place districts buffer that
-    // is the cheapest sound representation).
-    let d_owned: Vec<NodeId> = d.clone();
-    for &idx in &intersecting_idx {
-        let c = &all_districts[idx];
-        scratch.c_in_d.clear();
-        scratch
-            .c_in_d
-            .extend(c.iter().copied().filter(|n| d_owned.contains(n)));
-        if scratch.c_in_d.is_empty() {
-            continue;
-        }
-        // New intervention set = V \ c_in_d (the original V minus this district).
-        // The filter reads scratch.c_in_d while writing scratch.new_cause_step6;
-        // capture c_in_d into a local binding so the borrow checker can see
-        // the disjointness.
-        scratch.new_cause_step6.clear();
-        let c_in_d = &scratch.c_in_d;
-        scratch
-            .new_cause_step6
-            .extend(g.nodes.iter().copied().filter(|n| !c_in_d.contains(n)));
-        let _ = identify_inner_owned_slice(
-            g,
-            &scratch.new_cause_step6,
-            &scratch.c_in_d,
-            depth + 1,
-            cause_head,
-            effect_head,
-        )?;
+    // `d` borrows `s.an_y_in_gva`. The callback also reads `d`. The
+    // recursion writes into `s.c_in_d` and `s.new_cause_step6`, which are
+    // distinct fields from `s.an_y_in_gva`, so the borrow checker can prove
+    // disjointness through the split-borrow `s`.
+    //
+    // Recursion-error propagation: the callback's return type is `()` (per
+    // `for_each_district_with_buffers`), so we cannot use `?` inside the
+    // closure. Instead, we record the first error into `step6_err` and
+    // short-circuit subsequent iterations via an early-return guard.
+    //
+    // The previous `d_owned.clone()` (1 Vec allocation per multi-district
+    // branch) is gone — `d: &s.an_y_in_gva` survives across iterations
+    // because child frames use their own fresh Scratch (via
+    // `identify_inner_owned_slice`), never touching the parent's scratch.
+    let mut step6_err: Option<IdentificationError> = None;
+    g.for_each_district_with_buffers(
+        &mut s.district_visited,
+        &mut s.district_buf,
+        &mut s.district_frontier,
+        &mut s.district_next,
+        |dist: &[NodeId]| {
+            if step6_err.is_some() {
+                return;
+            }
+            // Compute c ∩ D inline.
+            s.c_in_d.clear();
+            s.c_in_d
+                .extend(dist.iter().copied().filter(|n| d.contains(n)));
+            if s.c_in_d.is_empty() {
+                return; // this district doesn't intersect D
+            }
+            // New intervention set = V \ c_in_d.
+            s.new_cause_step6.clear();
+            let c_in_d = &s.c_in_d;
+            s.new_cause_step6
+                .extend(g.nodes.iter().copied().filter(|n| !c_in_d.contains(n)));
+            // Recurse. `d` (= s.an_y_in_gva) is read-only in the parent
+            // frame and survives the call.
+            let r = identify_inner_owned_slice(
+                g,
+                &s.new_cause_step6,
+                &s.c_in_d,
+                depth + 1,
+                cause_head,
+                effect_head,
+            );
+            if let Err(e) = r {
+                step6_err = Some(e);
+            }
+        },
+    );
+    if let Some(e) = step6_err {
+        return Err(e);
     }
-    Ok(AdmgSignature::from_nodes(d_owned.iter().copied()))
+    Ok(AdmgSignature::from_nodes(d.iter().copied()))
 }
 
 /// Recursive entry point that creates its own fresh Scratch. Used at every

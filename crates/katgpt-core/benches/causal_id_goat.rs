@@ -190,46 +190,39 @@ fn bench_identify(c: &mut Criterion) {
 
     group.finish();
 
-    // ── G4 alloc audit (Issue 183) ──────────────────────────────────────
-    // Measure steady-state allocation delta per `identify` call. The Scratch
-    // refactor (Issue 183) eliminated the redundant `iter.collect()` Vecs in
-    // the recursion (~10/frame) and the `ancestors_into` frontier allocation.
-    // `subgraph_into` (added by Issue 183) eliminates the per-call Admg
-    // allocation in step 2 + step 3.
+    // ── G4 alloc audit (Issue 183 + P4 zero-alloc refactor) ─────────────
+    // Measure steady-state allocation delta per `identify` call.
     //
-    // Remaining allocations per `identify` call:
-    //   - `Admg::districts()` (~30 allocs on 32-node graph: outer Vec +
-    //     N×3 per district via `district_of`'s 3 internal Vecs)
-    //   - `try_fixseq` step-5 graph clone (3 Vec fields) + remaining Vec
-    //   - `d_owned.clone()` in step-6 multi-district branch (1 Vec)
-    //   - Scratch::new() grow on first push per slot (~6 grows/frame)
+    // Allocation history:
+    //   - Pre-Issue-183 baseline: 284 allocs/call (dominated by `iter.collect()` per local)
+    //   - Issue 183 Scratch refactor: 198 allocs/call (−30% — eliminated per-local Vecs)
+    //   - P4 zero-alloc districts + fixseq refactor: 133 allocs/call (−33% more —
+    //     eliminated `districts()` ~30 allocs/frame, `try_fixseq` 4 allocs/call,
+    //     `d_owned.clone()` 1 alloc/multi-district-branch)
     //
-    // The remaining districts/try_fixseq allocations are out of G4 scope
-    // per Issue 183 ("graph-construction allocations, not recursion-scratch").
-    // A truly zero-alloc recursion would require refactoring `districts()`
-    // to a callback-based API + `try_fixseq` to a workspace-based fixer —
-    // P4 work tracked in the Super-GOAT guide.
+    // The remaining ~133 allocs/call are the Scratch::new() first-push grow cost:
+    // ~12-15 Vec slots × ~6 recursion frames × first-push grow per slot per frame.
+    // This is the honest floor of the safe-Rust approach without unsafe
+    // pointer aliasing or thread-local pooling — the alternative (pool Scratch
+    // across calls) would require a thread-local which is undesirable for a
+    // primitive that may be called from any context.
     //
     // The gate is INFORMATIONAL — Issue 183 does NOT require zero allocs
-    // (the primitive is offline-only). The measurement documents the
-    // allocation shape and provides a regression baseline.
-    //
-    // Baseline (pre-refactor, measured): 284 allocs/call.
-    // Post-refactor measurement: ~198 allocs/call (~30% reduction).
-    // The remaining 198 allocs are dominated by districts() (~30/frame × ~6 frames)
-    // + try_fixseq + d_owned.clone() — all out of G4 scope per Issue 183.
+    // (the primitive is offline-only at ~5µs/query, ~100× outside the 500µs
+    // / 20 Hz tick budget). The measurement documents the allocation shape
+    // and provides a regression baseline.
     let (_, alloc_delta_g32) = alloc_delta(|| {
         for _ in 0..100 {
             let _ = identify(black_box(&g_32), black_box(&[cause_32]), black_box(&[eff_32]));
         }
     });
     let per_call_g32 = alloc_delta_g32 / 100;
-    println!("\n── G4: alloc audit (Issue 183, 100-call steady-state, 32-node scenario) ──");
+    println!("\n── G4: alloc audit (Issue 183 + P4, 100-call steady-state, 32-node scenario) ──");
     println!("   total allocs / 100 calls: {alloc_delta_g32}");
     println!("   per-call average:          {per_call_g32}");
     println!("   AdmgSignature variant:     {}", if sig_32.is_inline() { "Inline (zero heap)" } else { "Heap (1 alloc)" });
     println!("   Gate: INFORMATIONAL — Issue 183 does not require zero allocs.");
-    println!("   Remaining: districts() ~30/frame + try_fixseq + d_owned.clone()");
+    println!("   Remaining: Scratch::new() first-push grows (~12 slots × ~6 frames)");
 
     // Also audit the 13-node scenario (smaller recursion, no step-6 branch).
     let (_, alloc_delta_g13) = alloc_delta(|| {
