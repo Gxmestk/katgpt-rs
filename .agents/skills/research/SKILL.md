@@ -33,75 +33,43 @@ Do NOT activate for: pure refactor tasks, bug fixes with no research angle, or o
 
 Always reference files with project-relative paths (e.g. `katgpt-rs/.research/238_*.md`, `riir-ai/.plans/NNN_*.md`, `riir-chain/.plans/NNN_*.md`, `riir-neuron-db/.plans/001_*.md`). The agent can `read_file` these directly.
 
-## Commercial strategy — inline short version (no external ref)
+## Commercial strategy — inline short version
 
-Seven repos. The split is absolute. See §Repos above for the boundary table + per-repo roles. What follows is the decision-routing essence an agent needs at verdict time. (The historical "5-repo quintet" framing referred to the 5 distillation targets before `riir-game-sdk` and `riir-armageddon` joined the stack as consumer-facing + product-domain siblings; research notes still primarily land in those 5 — the SDK and armageddon are downstream consumers, not primary distillation targets.)
+Seven repos (see §Repos). Tier model:
 
-**Tier model (the single most useful structural rule):**
+| Tier | Where | Role |
+|------|-------|------|
+| **0 — Substrate** | `katgpt-core` (leaf, crates.io) | Pure inference mechanics (SIMD, transformer/weights, `hla`, `dd_tree`, `mcts`, `sampling`, `delta_mem`). Leaf-clean deps. |
+| **1 — Engine + cognitive basics** | `katgpt-rs` (root, public) | Adoption funnel — re-exports substrate + BASIC cognitive/reasoning primitives + toy games (each ships WITH its `.md`). |
+| **2 — GOAT + IP** | `riir-ai` / `riir-chain` / `riir-neuron-db` / `riir-train` (private) | GOAT/Super-GOAT tuned versions, `*_runtime` composition layers, game/chain/shard/training IP. |
 
-| Tier | Where | Role | Dep profile |
-|------|-------|------|-------------|
-| **0 — Substrate** | `katgpt-core` (leaf, crates.io) | Pure inference mechanics (SIMD, transformer/weights, `hla`, `dd_tree`, `mcts`, `sampling`, `delta_mem`). The pillars EVERY repo needs for compute. | Minimal, leaf-clean. No `rayon`/`bevy_ecs`/`wasmi`/`plotters`/`metal`. |
-| **1 — Engine + cognitive basics** | `katgpt-rs` (root, public) | Adoption funnel — re-exports substrate + ships the BASIC cognitive/reasoning layer + engine primitives + toy game engines/examples (each ships WITH its `.md`). | Heavier (`rayon`, etc.) but deps kept optional where possible. |
-| **2 — GOAT versions + composition + IP** | `riir-ai` / `riir-chain` / `riir-neuron-db` / `riir-train` (private) | The gas — GOAT/Super-GOAT tuned versions, `*_runtime` composition layers, game/chain/shard/training IP. | Private; whatever each product needs. |
-
-Two rules fall out: (1) a module moves DOWN to core only if it's pure inference substrate (no heavy deps, no cognitive semantics, needed by every compute consumer). `hla` qualifies; `cce`/`cgsp` do not. (2) a module stays in root (tier 1) if it's a cognitive/reasoning primitive — the BASIC public version. Its GOAT-tuned sibling (the `*_runtime` module) lives in `riir-*`.
-
-**The `*_runtime` suffix convention encodes the WHAT/HOW split at module granularity:** `cce` (public primitive) + `cce_runtime` (private GOAT composition); `cgsp` + `cgsp_runtime`; `arg` + `arg_runtime`. Bare-name module = public WHAT; `*_runtime` module = private HOW.
-
-**WHAT vs HOW routing rule:**
+**Routing rules:**
+- Module → core only if pure inference substrate (no heavy deps, no cognitive semantics). `hla` qualifies; `cce`/`cgsp` do not.
+- `*_runtime` suffix = private GOAT composition layer. Bare-name = public primitive.
 - **What = public. How = private.** Training how → `riir-train`. Runtime how → `riir-ai`. Chain how → `riir-chain`. Shard how → `riir-neuron-db`.
-- "NPCs hot-swap personalities at runtime via versioned snapshots" → public (capability).
-- "The snapshot uses [specific concurrency primitive] with [specific memory ordering]" → `riir-ai` private (runtime how).
-- "We train adapters with [specific method] at [specific config]" → `riir-train` private (training how).
-- "Balances are encoded as latent vectors and committed via LatCal fixed-point bridges" → public (concept).
-- "The LatCal projection uses [specific learned values]" → `riir-chain` private (implementation).
-- When unsure → default to the relevant private repo. It is always safe to keep something private; it is never safe to un-leak something public.
-
-**Benchmark domain exception (toy games ≠ product IP):** Toy 2D rule-system games (`bomber`, `monopoly`, `go`, `fft` ATB arena) used as benchmark domains are NOT game IP — they live in `katgpt-rs` (public) and that is correct. The moat is the runtime that runs *on top* of a game (freeze/thaw composition, archetype wiring, HLA tuning, trained weights, design data), not the rule system. Distinguishing test: *"Could a competitor re-implement this from public rules + generic primitives in a weekend?"* → public. *"Does this encode product-specific tuning, weights, wiring, or design?"* → private. **Anti-pattern:** a public benchmark constant whose comment names a private module path (`must match riir_gpu::...`) IS a leak even if the value itself is benign — cross-boundary coupling constants are forbidden; private consumers import from public (one-way), never the reverse.
-
-**Cognitive/reasoning — the asymmetric moat:** Basic cognitive/reasoning primitives (`cce`, `cgsp`, `clr`, trajectory compaction, claim rubrics) stay PUBLIC in tier 1 (good enough to adopt, demonstrates the capability — the adoption hook). GOAT/Super-GOAT tuned versions stay PRIVATE in tier 2 (the version that actually wins — collapse-recovery thresholds, curiosity tuning, personality-blend freeze/thaw integration). "Good enough to adopt, not good enough to win." A competitor forking `katgpt-rs` gets the basic primitives but not the tuning that makes NPCs actually behave well.
-
-**Why katgpt-rs is public (the "Ferrari, no gas" model):** `katgpt-rs` is the open Ferrari. It's the adoption funnel — developers build on the engine, then need the platform. The engine alone produces no useful competitive game AI output (it's a runtime, not the intelligence). MIT attracts contributors + creates dependency without exposing know-how + no legal friction for enterprise. The gas is inside `riir-ai` (gameplay) and `riir-chain` (ledger).
-
-**Why each private repo is hard to replicate (one-liners — context, not routing inputs):**
-- `riir-ai` — freeze/thaw runtime (Lean-proven reader invariant) + latent-to-latent bridge (per-game tuning) + self-learn tuned against real sessions.
-- `riir-chain` — co-located AI+wallet in fixed-size structures + LatCal commitment bridge (Lean-proven round-trip) + network effects (no players = no economy).
-- `riir-neuron-db` — `NeuronShard` fixed-layout Pod (Lean-proven layout + `merkle_root` init) + Raven/δ-Mem consolidation (session-tuned) + AnyRAG escalation policy (the *when* is the IP).
-- `riir-train` — 90+ adapter-training method implementations + honest benchmarking + trained weight assets (GPU-hours).
-
-**Formal verification as a moat (not ceremony):** The stack carries ~79 Lean 4 theorems across four `.proofs/` instances (`KatgptProof` public, `RiirChainProof` / `NeuronDbProof` / `RiirAiProof` private). A Lean theorem is the strongest modelless guarantee: zero runtime cost, forever-verified, refactor-immune. A competitor forking any `riir-*` repo gets the code but not the theorems (private proofs stay private) — the theorems encode the *invariant shape* the runtime depends on, so a re-implementation that satisfies the same empirical tests can still violate invariants in a code path the tests don't cover (the `merkle_root` / `can_freeze` / Issue-354 torn-read pattern repeats this lesson). FV is also a bug-finder: scoping the riir-ai freeze/thaw theorem found a real concurrency bug the existing test couldn't catch.
+- When unsure → default private. Safe to keep private; never safe to un-leak public.
+- **Benchmark exception:** toy 2D games (`bomber`, `monopoly`, `go`, `fft`) are NOT product IP — live in `katgpt-rs`. Test: *"Could a competitor re-implement from public rules in a weekend?"* → public.
+- **Cognitive moat:** basic primitives public ("good enough to adopt"); GOAT-tuned versions private ("the version that actually wins"). `katgpt-rs` is the open Ferrari — the gas is in `riir-ai`/`riir-chain`.
+- **Anti-pattern:** a public benchmark constant naming a private module path (`must match riir_gpu::...`) IS a leak — cross-boundary coupling constants forbidden.
+- **FV moat:** ~79 Lean 4 theorems across 4 `.proofs/` instances. Theorems encode invariant shape; private proofs stay private. FV is bug-finder + refactor-immune guarantee.
 
 ## Read first (grounding) — MANDATORY pre-flight
 
-**Hard rule:** before any distillation, verdict, or file creation, you MUST do **all three** of these in this session:
+**Hard rule:** before any distillation/verdict/file creation, do **all three**:
+1. **`read_file` 4 READMEs + `riir-ai/.docs/README.md`** — defines repo purpose, moat map, raw-vs-latent sync boundary. Skipping = #1 cause of false Super-GOAT claims.
+2. **`list_directory` all 4 `.research/` folders** (create `riir-chain/.research/` + `riir-neuron-db/.research/` on first use).
+3. **`list_directory` 4 runtime/chain/neuron-db src trees** — module names are codebase vocabulary. Skipping = #2 cause of false Super-GOAT claims.
 
-1. **`read_file` the four READMEs + the riir-ai `.docs/` book** — these define repo purpose, the commercial moat map, and the raw-vs-latent sync boundary the research must respect. Skipping this is the #1 cause of research notes that ignore the actual codebase architecture and the #1 cause of false Super-GOAT claims (claiming novelty over a moat that already ships).
-2. **`list_directory` all four `.research/` folders** — these hold the existing distillation corpus you must not duplicate. (Create `riir-chain/.research/` and `riir-neuron-db/.research/` if they do not yet exist and you are about to drop a note there.)
-3. **`list_directory` the four runtime/chain/neuron-db crate src trees** — module names are the codebase's own vocabulary; skipping this is the #2 cause of false Super-GOAT claims (vocabulary mismatch).
+**Reads:** `katgpt-rs/README.md`, `riir-ai/README.md`, `riir-chain/README.md`, `riir-neuron-db/README.md`, `riir-ai/.docs/README.md` (+ `03_pillars/README.md` + `04_supergoat_candidates/README.md` before any Super-GOAT gate — claiming novelty over a moat that ships is the worst false-positive).
 
-**Mandatory reads (before any verdict):**
-- `katgpt-rs/README.md` (`read_file`) — public engine purpose, architecture, current feature set.
-- `riir-ai/README.md` (`read_file`) — private runtime context (freeze/thaw, self-learn, game systems).
-- `riir-chain/README.md` (`read_file`) — chain transport, LatCal, economics, feature-flag umbrellas (`chain`, `chain_economics`, `chain_solana_parity`, `chain_catchup`, `chain_asset_*`, `shard_compactor`, `lora_posterior`). Required reading for any LatCal / commitment / sync-bridge research.
-- `riir-neuron-db/README.md` (`read_file`) — neuron-shard leaf crate. `NeuronShard` Pod layout, BLAKE3/Merkle commitment, feature gates (`spectral_shard`, `shard_compactor`, `merkle_freeze`, `dendritic_lora`, `state_compression`). Required reading for any shard / freeze-envelope / consolidation / AnyRAG / vibe-KG / Merkle-tree research.
-- `riir-ai/.docs/README.md` (`read_file`) — **the consolidated selling-point book.** Organized by capability: `pillars/` (9 proven commercial moats, 4-layer architecture), `04_supergoat_candidates/` (bets that might become pillars), `reasoning/`, `self_learn_npcs/`, `neuro_symbolic_chain/`, `performance/`, `browser/`, `wasm_validators/`, `showcase/`. **`read_file` the `03_pillars/README.md` and `04_supergoat_candidates/README.md` indexes before any novelty gate or Super-GOAT verdict** — claiming novelty over a moat that already ships is the worst false-positive class. When a verdict touches a specific pillar's domain, `read_file` that pillar's doc (e.g. `pillars/reasoning_pack.md`, `pillars/fourier_spatial.md`) before claiming the new primitive multiplies it.
-- `katgpt-rs/.research/` (`list_directory`) — public modelless research corpus (do not duplicate).
-- `riir-ai/.research/` (`list_directory`) — private runtime/game research corpus (do not duplicate).
-- `riir-chain/.research/` (`list_directory` — create the folder on first use) — private chain research corpus.
-- `riir-neuron-db/.research/` (`list_directory` — create the folder on first use) — private neuron-shard research corpus.
-- `riir-ai/crates/riir-engine/src/` (`list_directory`) — **runtime module tree = codebase vocabulary at the highest level.** Module names (`latent_functor/`, `cgsp_runtime/`, `micro_belief/`, `adapters/`, ...) are how the codebase describes its own mechanisms. Skipping this caused the Research DiPOD miss: `latent_functor/reestimation.rs` ships the exact "drift-triggered self-healing swap" pattern under the name "coherence-driven re-estimation scheduler" — invisible to a paper-vocabulary grep.
-- `riir-ai/crates/riir-games/src/` (`list_directory`) — game systems module tree (same rationale).
-- `riir-chain/src/` (`list_directory`) — chain module tree: `encoding/` (LatCal), `consensus/`, `economics/`, `asset_lifecycle/`, `forensic/`, `programs/`, `validator/`, `wallet/`, `batch/`, `catchup/`, `deploy/`, `shell/`. The chain-side `LatCalWalletExt`, `DataTier`, `DATA_TIERS`, `build_tier_root`, `build_block_root` live in `riir-chain/src/catchup/merkle.rs`.
-- `riir-neuron-db/src/` (`list_directory`) — **shard module tree = neuron-db vocabulary.** Files: `shard.rs` (NeuronShard Pod layout, dendritic branch view), `index.rs` (ShardIndex lock-free papaya), `merkle.rs` (generic MerkleTree/Proof), `freeze.rs` (`MerkleFrozenEnvelope`), `mape_k.rs` (self-healing loop), `consolidation.rs` (Raven/δ-Mem), `gateway.rs` (AnyRAG escalation), `vibe.rs` (KG triple templates + arch agent), `spectral_flatness.rs` (lottery-ticket init), `shard_compactor.rs` (cold-tier compaction), `reconstruction_metrics.rs`.
+**`list_directory`:**
+- 4× `.research/` (katgpt-rs, riir-ai, riir-chain, riir-neuron-db)
+- `riir-ai/crates/riir-engine/src/` — runtime vocab (`latent_functor/`, `cgsp_runtime/`, `hla/`, ...). Skipping caused the DiPOD miss: `latent_functor/reestimation.rs` ships "drift-triggered self-healing swap" as "coherence-driven re-estimation scheduler".
+- `riir-ai/crates/riir-games/src/` — game systems
+- `riir-chain/src/` — `encoding/` (LatCal), `consensus/`, `economics/`, `asset_lifecycle/`, `forensic/`, `catchup/`, ...
+- `riir-neuron-db/src/` — `shard.rs`, `index.rs`, `merkle.rs`, `freeze.rs`, `mape_k.rs`, `consolidation.rs`, `gateway.rs`, `vibe.rs`, `spectral_flatness.rs`, `shard_compactor.rs`
 
-If you have NOT done all of: `read_file` the 4 READMEs + `riir-ai/.docs/README.md`, `list_directory` all four `.research/` folders, AND `list_directory` the four runtime/chain/neuron-db crate src trees, STOP and do so now. Do not create any file until all of them are done.
-
-Then read for additional context (as relevant to the topic):
-- `katgpt-rs/src/` + `katgpt-rs/crates/katgpt-core/src/` — existing modelless primitives (ConstraintPruners, bandits, DDTree, speculative decode).
-- `riir-ai/crates/` — runtime IP: `riir-engine`, `riir-games`, `riir-ffi`, `riir-data`, `riir-examples`.
-- `riir-chain/crates/` — chain daemon crate: `riir-chaind`. (LatCal, encoding, etc. live under `riir-chain/src/`; shard types come from `riir-neuron-db`.)
-- `katgpt-rs/.plans/` + `riir-ai/.plans/` + `riir-chain/.plans/` + `riir-neuron-db/.plans/` — existing plans. **Do NOT list these in pre-flight.** Grep them during fusion search (§Workflow step 1), not as grounding — they describe what we *plan to build*, not what the repos *are*.
+Do NOT create any file until all three done. Plans (`.plans/`) are grepped during fusion search (§1), not pre-flight.
 
 ## Primary focus (distill HERE in katgpt-rs / riir-ai)
 
@@ -132,9 +100,9 @@ The highest-value latent-space Super-GOATs cluster in seven module trees. When g
 
 ## Redirect to riir-train (do NOT distill here)
 
-**MANDATORY pre-check:** before redirecting ANY mechanism to riir-train, exhaust the modelless unblock paths in §3.5 below. A mechanism that *looks* training-only may be modelless-validable via freeze/thaw, raw/lora hot-swap, or latent-space correction. Only redirect if §3.5's decision protocol returns "genuine riir-train dependency".
+**MANDATORY pre-check:** before redirecting ANY mechanism to riir-train, exhaust the modelless unblock paths in §3.5 below — **starting with Path 0 (training-target decomposition)**. A mechanism that *looks* training-only may be modelless-validable because its training-target MATH decomposes into already-shipped primitives (dllm interpolant + Latent Field Steering reward-gradient + freeze/thaw replay buffer + induced CWM direction mining). The Flow Sampling lesson (arxiv 2605.03984) is the canonical case: "trains a drift network u_θ via backprop" was initially → riir-train; the conditional drift formula actually decomposes into modelless primitives we already ship. Only redirect if §3.5's decision protocol (Path 0 + Paths 1–3) returns "genuine riir-train dependency".
 
-If a paper is training-only (after §3.5 check) → note "→ riir-train" in one line and stop. Do not create files in this session for it.
+If a paper is genuinely training-only (after §3.5 Path 0 + Paths 1–3 check) → note "→ riir-train" in one line and stop. Do not create files in this session for it.
 
 **By topic:**
 - LoRA / OFT / SPEFT / IA3 / QLoRA / ManifoldE / BAKE / GPart / MSA / Dendritic and all adapter-**training** methods.
@@ -175,7 +143,9 @@ Distill into:
 
 ### 0. Read & classify the paper
 
-Fetch via `https://r.jina.ai/https://arxiv.org/pdf/{ID}` (per AGENTS.md). Ask: *is the value in the training loop, or in a latent-space / inference / routing insight?* If training-only → report "→ riir-train" in conversation and stop. No files.
+Fetch via `https://r.jina.ai/https://arxiv.org/pdf/{ID}` (per AGENTS.md). Ask: *is the value in the training loop itself (optimizer / loss / schedule / RL algorithm), or in the math the training computes (closed-form drift, conditional score, Riemannian correction, steering formula)?* If optimizer/loss/schedule → riir-train. **If the math → run §3.5 Path 0 (training-target decomposition) FIRST**: decompose the math into components and grep for the modelless analog of EACH (see §1 step 2 standing training-math vocabulary) before redirecting. Only if no component has a modelless analog → riir-train.
+
+**Training-math papers are NOT automatically → riir-train (Flow Sampling lesson, arxiv 2605.03984).** A paper framed as "train a drift network u_θ via backprop with replay buffer" was initially → riir-train. Wrong — the value was the **closed-form conditional drift** `u_{t|0} = α̇X_1 + σ̇x_0 + γ∇r(X_1)`, which decomposes into primitives we ALREADY ship: (a) interpolant `α̇X_1 + σ̇x_0` (dllm NoiseSchedule, D2F, ELF), (b) reward-gradient steering `γ∇r` (**Latent Field Steering Plan 309, DEFAULT-ON** — frozen direction vector IS the ∇r analog), (c) replay buffer (freeze/thaw + MAPE-K). The Riemannian parallel transport operator `T_{X1→Xt} = I - 2P_{X1+Xt}` is a curvature-aware refinement of Spherical Geodesic Steering (Plan 405, ships pure Slerp). **PTRM cautionary flag (Research 049):** gradient-guided Langevin gave zero gain in PTRM's use case — cite when the fusion touches gradient-guided sampling; track as PoC in `.issues/`.
 
 **Hardware / accelerator / NMP / ASIC papers are NOT automatically PASS.** This is the R418 lesson (StreamDQ, arxiv 2607.08993): a paper framed in HBM / RTL / 12nm CMOS / NMP / D2D PHY / thermal-sim vocabulary was initially PASS-ed as "hardware-only, not software-distillable" — wrong. The paper's *value* was the **technique** (LUT INT→FP, shared FP32 ALU, sideband-tag dispatch, S/Z co-location), which is substrate-independent. Our codebase explicitly **simulates hardware dequant via software SIMD** (Research 110 Ciot — Plasma tier = ternary SIMD, Cold tier = Q4_K dequant-on-read). The revised verdict was Gain; the implementation shipped 2.3× speedup (vs a pessimistic 1.0-1.5× prediction).
 
@@ -264,15 +234,13 @@ Don't direct-map the paper to our code. Find the transferable primitive: the geo
    - "io_uring" / "DPDK" / "RDMA" / "zero-copy kernel bypass" → "zero-allocation hot path", `_buf` pattern, `pool.rs`
    - "TPU systolic array" / "PE mesh" → "blocked matmul", `simd_matmul_rows`, "tiled GEMM"
 
-   **Decision rule — hardware-as-substrate vs technique-as-mechanism (prevents false-PASS, the R418 root cause):**
-   - If the paper's value is the **technique** (LUT lookup, shared ALU, co-located layout, dispatch tag, batching strategy, zero-copy pattern) → the hardware is one *instantiation* of implementing that technique → translate to our software SIMD substrate → GOAT/Gain candidate. **Canonical: StreamDQ R418** — LUT INT→FP + shared FP32 ALU is the technique; DQB-in-HBM is the paper's instantiation, SIMD dequant function is ours. Shipped 2.3× speedup.
-   - If the paper's value is the **hardware-fabrication advance itself** (new transistor geometry, new die-stacking process, new photolithography, new packaging) → no software analog → PASS.
-   - When you see "hardware paper", the FIRST question is: "what *technique* does the hardware implement?" — not "we don't have hardware, PASS".
-
-   **Decision rule — LLM-as-implementation vs LLM-as-mechanism (prevents false-PASS, the R368 root cause):**
-   - If the paper's value is the **decision structure** (what to decide, when, in what order) → the LLM call is one *instantiation* of computing that decision → translate to our substrate → GOAT candidate. **Canonical: AutoMem R368** — LOG/PLAN is a decision structure; LLM is the paper's instantiation, probe/draft/pruner is ours.
-   - If the paper's value is the **LLM-dependent process** (semantic code generation, natural-language verification, open-ended rewriting) → no modelless substrate computes the same thing → NO-GAIN (R133/R169 class).
-   - The R169 guard ("consult before re-evaluating agent-memory papers at the orchestration layer") applies ONLY to the second case. **Triggering it on the first case (decision structure with LLM as one instantiation) is the false-trigger failure mode that caused the R368 false-PASS.** When you see "N LLM calls/step" in an agent paper, the FIRST question is: "what decision is each LLM call computing?" — not "this violates the 20Hz budget, NO-GAIN."
+   **Unified decision rule — substrate-as-instantiation vs mechanism-as-value (prevents false-PASS/false-redirect — covers R418 hardware + R368 LLM + R300 database + Flow Sampling training-math):**
+   - **Value = technique/access-pattern/decision-structure/math** (not the substrate) → substrate is one *instantiation* → translate to our substrate → GOAT/Gain candidate.
+     - **R418 hardware:** LUT lookup / shared ALU / co-located layout / dispatch tag (StreamDQ — DQB-in-HBM is instantiation, SIMD dequant is ours; shipped 2.3×).
+     - **R368 LLM:** decision structure (AutoMem LOG/PLAN — LLM is instantiation, probe/draft/pruner is ours). **When you see "N LLM calls/step", FIRST ask "what decision is each call computing?" — not "violates 20Hz budget, NO-GAIN".** R169 guard applies ONLY to genuine LLM-dependent process (semantic code generation, NL verification) — NOT to decision structures.
+     - **R300 database:** access pattern (Trellis — Axiom/Velox is instantiation, `riir-neuron-db` Pod + Merkle + vibe KG is ours). `riir-neuron-db` IS a database; prefer latent-first + neuro-symbolic translations over `AnyRAG` external escalation.
+     - **Flow Sampling training-math:** closed-form drift / conditional score / Riemannian correction / regression target (training loop is instantiation, dllm + Latent Field Steering + freeze/thaw is ours).
+   - **Value = substrate-fabrication-advance itself** (new transistor geometry, new query optimizer algorithm, new optimizer like Muon, new loss function, new RL algorithm, semantic code generation) → no modelless analog → PASS or → riir-train.
 
    **Standing database-substrate translation vocabulary (MANDATORY for database / systems / storage / agent-state / query-planner papers — the R300 lesson):** Papers framed in database-engine vocabulary (SQL, Cypher, Axiom, Velox, query planner, materialized view, OLTP/OLAP, vector store, experience graph, bi-temporal) describe **access patterns** whose *implementation substrate* is a database engine, but whose *value* is the access pattern itself. Our codebase ships a **database substrate** (`riir-neuron-db`: Pod storage + lock-free `ShardIndex` + Merkle commitment + compaction + MAPE-K self-healing + Raven/δ-Mem consolidation + `ItemEmbedIndex` + vibe KG triples) WITHOUT a SQL/Cypher engine. **Conflating "we don't have a fused query planner" with "we don't have a database" is the R300 false-PASS root cause.** ALWAYS translate the access pattern to **latent-first + neuro-symbolic** primitives. Before PASS-ing on a database/systems/agent-memory-infrastructure paper, grep BOTH vocabulary sets:
    - "experience graph" / "reward-bearing search tree" / "node with parent + fitness + UCB" → `NeuronShard` + lineage fields, `TrialRecord` (`riir-games/trial_log.rs`), `KarcShard`, `ArchetypeBlendShard`, `EpisodeBuffer`
@@ -286,29 +254,11 @@ Don't direct-map the paper to our code. Find the transferable primitive: the geo
    - "episode buffer" / "experience replay" → `EpisodeBuffer` FIFO (`episode_buffer.rs`), Raven/δ-Mem consolidation input queue
    - "unified query planner" / "SQL/Cypher/Vector fused" → **NO direct analog** (we don't ship a database engine) — BUT individual access patterns map to **latent ops** (cosine, dot-projection) + **neuro-symbolic edges** (KG triples) + **raw commitment** (BLAKE3/Merkle). The planner is the paper's instantiation; the access patterns are ours.
 
-   **Decision rule — database-engine-as-substrate ≠ database-access-pattern-as-mechanism (prevents false-PASS, the R300 root cause):**
-   - If the paper's value is the **access pattern / query structure** (AS-OF temporal reconstruction, vector-seeded graph traversal, materialized view maintenance, governed retraction propagation) → the database engine (SQL/Cypher/Axiom/Velox/Postgres) is one *instantiation* of implementing that pattern → translate to our substrate (`riir-neuron-db` Pod + `MerkleFrozenEnvelope` + `ItemEmbedIndex` + vibe KG + Raven/δ-Mem + MAPE-K) → GOAT/Gain candidate. **Canonical: Trellis R300** — "experience graph as queryable database state" is the access pattern; Axiom/Velox is the paper's instantiation; `riir-neuron-db` Pod + Merkle + vibe KG is ours. Initial false PASS ("we don't have a DB") was corrected to Gain after the user pointed out `riir-neuron-db` IS a database.
-   - If the paper's value is the **database engine fabrication advance itself** (new query optimizer algorithm, new join strategy, new storage format, new B-tree variant) → no application-level analog → PASS unless the engine technique translates to a katgpt-core SIMD/algorithm primitive.
-   - When you see "database paper" / "systems paper" / "agent memory infrastructure paper", the FIRST question is: "what *access pattern* does the database engine serve?" — not "we don't have a database engine, PASS". **`riir-neuron-db` IS a database** (Pod storage + lock-free `ShardIndex` + Merkle commitment + MAPE-K self-healing + Raven/δ-Mem consolidation + compaction + `ItemEmbedIndex` + migration/backup). The gap is individual access patterns (AS-OF, graph traversal, retraction), NOT the database substrate itself. **Prefer latent-first + neuro-symbolic translations** (cosine + KG edges) over external-escalation translations (`AnyRAG` is optional + preprocess-only).
+   **Decision rule — database-engine-as-substrate ≠ database-access-pattern-as-mechanism:** See the **unified decision rule above**. `riir-neuron-db` IS a database; the gap is individual access patterns, NOT the substrate. Prefer latent-first (cosine + dot-projection) + neuro-symbolic (KG triples) translations over `AnyRAG` external escalation (optional + preprocess-only).
 
-   Example (DiPOD paper → riir-ai code):
-   - "double drift" / "ELBO drift" → "coherence decay", "staleness", "divergence"
-   - "self-distillation" → "re-estimation", "re-derive", "recommit"
-   - "tight bound" / "adequate estimator" → "coherence > tau", "parallelism quality", "confidence gate"
-   - "policy-preserving" → "atomic Arc swap", "readers keep old snapshot"
-   - "drop-in regularizer" → "feature flag", "warm-tier scheduler tick"
+   Example (DiPOD paper → riir-ai code): paper-vocabulary grep misses `latent_functor/reestimation.rs` which ships DiPOD's "interleave self-distillation when ELBO drifts" as "coherence-driven re-estimation scheduler when coherence < tau_reest". **Vocabulary translation is the only defense — notes framing can use codebase vocabulary that paper-vocabulary grep misses on BOTH layers.**
 
-   Grep ONLY paper vocabulary → misses `latent_functor/reestimation.rs` (which ships DiPOD's exact pattern under the name "coherence-driven re-estimation scheduler"). Grep BOTH sets → hits it on the first pass. **Notes framing can use codebase vocabulary that a paper-vocabulary grep misses on BOTH layers — translate before grepping.**
-
-   Example (Stokes/divergence-theorem paper → katgpt-rs DEC code):
-   - "divergence" / "flux" / "density tracking" → "codifferential", "δ", "DEC divergence"
-   - "boundary integral" / "CDF via boundary" / "surface flux" → "exterior_derivative", "d", "coboundary", "boundary_flux_mass"
-   - "line integral" / "path energy" → "line_integral", "rank-1 cochain sum"
-   - "Stokes theorem" / "∫_M dω = ∫_∂M ω" → "DEC identity d∘d=0", "curl_of_gradient_is_zero"
-   - "Hodge decomposition" / "exact/coexact/harmonic" → "hodge_decompose", "DecFlowField"
-   - "Fokker-Planck" / "continuity equation" → "belief_mass_divergence", "codifferential"
-
-   Grep ONLY paper vocabulary → ZERO hits across all repos (a corpus grep for `stokes|divergence theorem|boundary integral|fokker-planck` returns nothing). Grep BOTH sets → hits `dec/operators.rs` (`codifferential`, `exterior_derivative`), `dec/hodge.rs` (`hodge_decompose`), `dec/flow.rs` (`DecFlowField`). The Generalized Stokes' theorem machinery ships as DEC operators, but no note framed it in Stokes-theorem vocabulary, so a paper-vocabulary grep missed BOTH notes AND code until the standing DEC vocabulary above was added.
+   Example (Stokes paper → katgpt-rs DEC code): paper-vocabulary grep for `stokes|divergence theorem|fokker-planck` returns ZERO hits. Codebase-vocabulary grep for `codifferential|exterior_derivative|hodge_decompose|DecFlowField` hits `dec/operators.rs`, `dec/hodge.rs`, `dec/flow.rs`. The Generalized Stokes' theorem machinery ships as DEC operators but no note framed it in Stokes vocabulary.
 
 3. **MANDATORY — latent-space reframing before verdict.** Before any verdict, re-cast the paper's core mechanism as a latent-to-latent operation on the codebase's latent-state kernels (the seven Super-GOAT factory modules above). Ask explicitly: "How does this mechanism look when operating on (a) HLA's per-NPC latent state, (b) `latent_functor/` operations, (c) `cgsp_runtime/` curiosity signals, (d) LatCal fixed-point commitment (in `riir-chain/src/encoding/`), (e) `NeuronShard` style_weights / dendritic branch / `MerkleFrozenEnvelope` / Raven consolidation / AnyRAG escalation (in `riir-neuron-db/src/`), (f) DEC Stokes-calculus operators (`katgpt-rs/crates/katgpt-core/src/dec/` — `exterior_derivative` d, `codifferential` δ, `hodge_decompose`, `DecFlowField` exact/coexact/harmonic)?" If your fusion idea only touches adapter routing / KV compression / speculative decode without a latent-state reframing, you are likely in GOAT territory and have probably missed the Super-GOAT angle. If you find yourself reaching for an adapter-routing framing, treat it as a symptom that the stronger latent-functor / HLA / neuron-shard / LatCal reframing is still unfound — adapter routing is the fallback, never the primary Super-GOAT framing. The latent reframing is mandatory even for papers that look pure-training/architecture — most have a latent subspace / stage-gating / persistence / memory-consolidation / manifold-geometry angle that lands in HLA/functor/neuron-shard/DEC.
 
@@ -508,9 +458,11 @@ If a plan is blocked by a missing primitive, implement the minimal version. Afte
 
 ### 3.5. Modelless unblock protocol — MANDATORY before any riir-train deferral
 
-**Hard rule:** before deferring ANY GOAT gate, plan task, or mechanism to riir-train ("this needs training"), you MUST exhaust all modelless correction paths first. A gate that *appears* to need training may be passable modellessly via freeze/thaw, raw/lora hot-swap, or latent-space correction. Deferring to riir-train without checking is the failure mode this protocol prevents.
+**Hard rule:** before deferring ANY GOAT gate, plan task, or mechanism to riir-train ("this needs training"), you MUST exhaust all modelless correction paths first. A gate that *appears* to need training may be passable modellessly via training-target decomposition, freeze/thaw, raw/lora hot-swap, or latent-space correction. Deferring to riir-train without checking is the failure mode this protocol prevents.
 
-**The three modelless unblock paths (check ALL before deferring):**
+**Path 0 — training-target decomposition (the Flow Sampling lesson, arxiv 2605.03984):** Before checking paths 1–3, ask: "is the mechanism's value the **training-loop innovation itself** (new optimizer/loss/curriculum/RL algorithm), or the **math the training computes** (closed-form drift, conditional score, Riemannian correction, steering formula, regression target)?" If the latter, decompose the math into components and grep the codebase for the modelless analog of EACH component (see §1 step 2 standing training-math vocabulary). If ALL components have modelless analogs → the mechanism is MODELLESS-VALIDABLE as a fusion of existing primitives — no riir-train deferral needed. **Canonical: Flow Sampling** — the conditional drift formula decomposes into dllm interpolant + Latent Field Steering (Plan 309) reward-gradient + freeze/thaw replay buffer; the training loop is just one way to compute that math. Only if the math has no modelless decomposition → proceed to paths 1–3 below.
+
+**The three modelless unblock paths (check ALL before deferring, AFTER path 0 decomposition fails):**
 
 1. **Freeze/thaw snapshot correction** (`riir-neuron-db/src/freeze.rs`, `MerkleFrozenEnvelope`) — can a frozen snapshot state, thawed at inference, fix the issue? If the failure is a systematic bias from a runtime construction (e.g., doubled signal, position mismatch, attention pattern asymmetry), a corrected snapshot + thaw may eliminate it without gradient descent.
 2. **Raw/lora reader-writer hot-swap** (`LoraPair { reader, writer }`, Plan 025; `LoRAHotSwap`, `dispatch_lora_merge` in riir-ai) — can a **deterministically constructed** (not trained) reader or writer adapter fix the issue? Applying a pre-constructed LoRA overlay is modelless (weight addition, no backprop). The question is: can the correction be derived in closed form (e.g., scale-by-0.5, zero-out-specific-positions, identity-minus-projection) rather than learned via gradient descent?
@@ -519,7 +471,12 @@ If a plan is blocked by a missing primitive, implement the minimal version. Afte
 **Decision protocol:**
 
 ```
-Gate/mechanism appears to need training
+Gate/mechanism/paper appears to need training
+  → Path 0: Is the value the MATH (closed-form drift, conditional score, Riemannian correction, regression target) rather than the training loop itself?
+    YES → Decompose the math into components; grep for modelless analog of each (§1 step 2 training-math vocabulary).
+      ALL components have modelless analogs → MODELLESS-VALIDABLE as fusion. No riir-train deferral.
+      SOME components have no analog → proceed to paths 1–3 for those components.
+    NO (value is optimizer/loss/curriculum/RL algorithm) → genuine riir-train candidate; still run paths 1–3 below.
   → Does the failure have a SYSTEMATIC, characterizable cause (e.g., "signal doubled", "position offset", "attention asymmetry")?
     NO → genuine riir-train dependency. Note "→ riir-train", stop.
     YES → Can freeze/thaw (path 1) fix it? Check the freeze envelope API.
@@ -531,11 +488,12 @@ Gate/mechanism appears to need training
       YES → freeze the corrected state. Gate is MODELLESS-VALIDABLE.
     
   → MODELLESS-VALIDABLE gates must be implemented and checked BEFORE any riir-train deferral.
-  → If all three paths fail, THEN note "→ riir-train" with explicit documentation of WHY each path failed.
+  → If path 0 + paths 1–3 all fail, THEN note "→ riir-train" with explicit documentation of WHY each path failed.
 ```
 
 **Documentation requirement:** every "→ riir-train" deferral MUST include:
-- Which of the three modelless paths were checked.
+- **Path 0:** what math components were decomposed, which had modelless analogs, which did not.
+- Which of paths 1–3 were checked.
 - Why each failed (concrete reason, not "doesn't apply").
 - What specifically requires gradient descent that no deterministic construction can provide.
 
@@ -632,8 +590,8 @@ Reinforce these when designing game systems or chain state:
 
 **Pre-flight (mandatory, before any verdict):** `read_file` 4 READMEs (`katgpt-rs`, `riir-ai`, `riir-chain`, `riir-neuron-db`) + `riir-ai/.docs/README.md` (read `03_pillars/README.md` + `04_supergoat_candidates/README.md` before any Super-GOAT gate); `list_directory` all 4 `.research/` folders + 4 runtime src trees + 7 Super-GOAT factory modules (§Primary focus).
 
-**Workflow:** read paper → classify (training-only? → riir-train, stop) → distill + fuse (vocabulary-translate BOTH semantic names AND compute units per the standing blocks below, then grep BOTH layers — notes+plans+docs AND src+crates — across all 7 repos, using BOTH paper vocab AND codebase vocab) → **latent-space reframe before verdict** (adapter routing / KV compression / speculative decode are GOAT-tier fallbacks, NOT primary) → **§1.55 value-extraction scan (mandatory even on Pass)** → novelty gate (Q1–Q4, §1.5) → MOAT gate per domain (§1.6) → plan + GOAT gate.
+**Workflow:** read paper → classify (training-only? → run §3.5 path 0 training-target decomposition FIRST — if the math decomposes into modelless primitives, NOT riir-train; only if optimizer/loss/curriculum/RL algorithm itself is the value → riir-train, stop) → distill + fuse (vocabulary-translate BOTH semantic names AND compute units per the standing blocks below, then grep BOTH layers — notes+plans+docs AND src+crates — across all 7 repos, using BOTH paper vocab AND codebase vocab) → **latent-space reframe before verdict** (adapter routing / KV compression / speculative decode are GOAT-tier fallbacks, NOT primary) → **§1.55 value-extraction scan (mandatory even on Pass)** → novelty gate (Q1–Q4, §1.5) → MOAT gate per domain (§1.6) → plan + GOAT gate.
 
 **Hard rules:** modelless-first (translate compute units — LLM-as-implementation ≠ LLM-as-mechanism; when you see "N LLM calls/step", ask "what decision is each call computing?" first, not "violates 20Hz budget, NO-GAIN"); latent-to-latent with sigmoid (never softmax); freeze/thaw over fine-tuning; 7-repo discipline; raw scalars at sync boundary; fusion-first mindset.
 
-**Failure-mode prophylactics:** vocabulary translation blocks below (semantic + compute-unit + DEC/Stokes + per-NPC runtime + **substrate-translation for hardware papers** + **database-substrate translation for database/systems/agent-memory-infrastructure papers**); read-the-hits rule (grep hit touching per-NPC+memory+personality+swap → `read_file` TL;DR before claiming novelty); 7 Super-GOAT factory modules; R169 false-trigger guard (decision-structure ≠ LLM-dependent process); **R418 hardware-paper guard (substrate ≠ value — hardware / NMP / ASIC / PIM papers MUST translate the technique to software SIMD before PASS; grep Research 110 Ciot Plasma/Cold tier explicitly; prediction ≠ ceiling — do not anchor perf ceilings pessimistically, mark them as pending the GOAT gate)**; **R300 database-paper guard (database-engine-as-substrate ≠ access-pattern-as-mechanism — database / systems / agent-memory-infrastructure papers MUST translate the access pattern to `riir-neuron-db`'s substrate [Pod + ShardIndex + MerkleFrozenEnvelope + ItemEmbedIndex + vibe KG + Raven/δ-Mem + MAPE-K] before PASS; "we don't have a SQL planner" ≠ "we don't have a database"; grep `riir-neuron-db/src/` explicitly; prefer latent-first [cosine + dot-projection] + neuro-symbolic [KG triples] over external-escalation [`AnyRAG` is optional + preprocess-only])**. **Parity / "already ships" quality claims need a defend-wrong PoC in `riir-ai/crates/riir-poc/` (§3.6) — architectural coverage ≠ quality parity.** **PASS = no files, Gain = files (§1.55). No middle tier. If the paper has actionable improvements, it's Gain. If it only "validates our design", it's Pass.**
+**Failure-mode prophylactics:** vocabulary translation blocks below (semantic + compute-unit + DEC/Stokes + per-NPC runtime + **substrate-translation for hardware papers** + **database-substrate translation for database/systems/agent-memory-infrastructure papers** + **training-math translation for training/diffusion/flow-matching/sampling papers**); read-the-hits rule (grep hit touching per-NPC+memory+personality+swap → `read_file` TL;DR before claiming novelty); 7 Super-GOAT factory modules; R169 false-trigger guard (decision-structure ≠ LLM-dependent process); **R418 hardware-paper guard (substrate ≠ value — hardware / NMP / ASIC / PIM papers MUST translate the technique to software SIMD before PASS; grep Research 110 Ciot Plasma/Cold tier explicitly; prediction ≠ ceiling — do not anchor perf ceilings pessimistically, mark them as pending the GOAT gate)**; **R300 database-paper guard (database-engine-as-substrate ≠ access-pattern-as-mechanism — database / systems / agent-memory-infrastructure papers MUST translate the access pattern to `riir-neuron-db`'s substrate [Pod + ShardIndex + MerkleFrozenEnvelope + ItemEmbedIndex + vibe KG + Raven/δ-Mem + MAPE-K] before PASS; "we don't have a SQL planner" ≠ "we don't have a database"; grep `riir-neuron-db/src/` explicitly; prefer latent-first [cosine + dot-projection] + neuro-symbolic [KG triples] over external-escalation [`AnyRAG` is optional + preprocess-only])**; **Flow Sampling training-paper guard (training-loop-as-substrate ≠ training-target-math-as-mechanism — training / diffusion / flow-matching / score-matching / sampling papers MUST decompose the training-target math into components and grep for the modelless analog of EACH [dllm interpolant, Latent Field Steering Plan 309 reward-gradient, Spherical Geodesic Steering Plan 405 Riemannian, freeze/thaw replay buffer, induced CWM direction mining] before → riir-train; "this trains a network" ≠ "this is training-only"; PTRM Research 049 cautionary flag on gradient-guided sampling — cite when the fusion touches Langevin)**. **Parity / "already ships" quality claims need a defend-wrong PoC in `riir-ai/crates/riir-poc/` (§3.6) — architectural coverage ≠ quality parity.** **PASS = no files, Gain = files (§1.55). No middle tier. If the paper has actionable improvements, it's Gain. If it only "validates our design", it's Pass.**
