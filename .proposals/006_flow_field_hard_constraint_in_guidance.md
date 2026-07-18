@@ -1,10 +1,10 @@
 # Proposal 006 — Flow Field as Hard Constraint in Guidance (Not Soft Cost in PIBT)
 
-Status: **draft**
+Status: **REJECTED** (2026-07-18, Issue 182 Phase 4 GOAT FAIL — see "Verdict" addendum at bottom)
 Branch: `develop` (per global rule — no feature branches)
 Owner: unassigned
 Fusion of: Plan 440 Issue 149/150 (existing `GridFlowField` soft-cost seam) × Plan 453 (one-step LaCAM escalation) × Issue 546 diagnostic (riir-ai, P95 deadlock-chain = 8)
-Related: [Issue 546 (riir-ai)](../../../riir-ai/.issues/546_lacam_multistep_escalation_ht_chantry.md) (DEFERRED — the diagnostic that motivates this), [Benchmark 440](../.benchmarks/440_lllg_paper_repro_goat.md) (3/4 PASS), [Benchmark 453](../.benchmarks/453_lacam_escalation_goat.md) (one-step shipped)
+Related: [Issue 182](../.issues/182_flow_field_hard_constraint_in_guidance.md) (the implementation plan — CLOSED with REVERT verdict), [Issue 546 (riir-ai)](../../../riir-ai/.issues/546_lacam_multistep_escalation_ht_chantry.md) (DEFERRED — the diagnostic that motivates this), [Benchmark 440](../.benchmarks/440_lllg_paper_repro_goat.md) (3/4 PASS), [Benchmark 453](../.benchmarks/453_lacam_escalation_goat.md) (one-step shipped)
 
 ## TL;DR
 
@@ -315,6 +315,7 @@ wrong and we revert.
 
 ## References
 
+- [Issue 182](../.issues/182_flow_field_hard_constraint_in_guidance.md) — implementation plan (CLOSED with REVERT verdict)
 - [Issue 546 (riir-ai)](../../../riir-ai/.issues/546_lacam_multistep_escalation_ht_chantry.md) — DEFERRED, motivates this proposal
 - [Issue 546 diagnostic](../crates/katgpt-core/examples/ht_chantry_deadlock_chain_diagnostic.rs) (commit `2a8c378d`) — the P95=8 result
 - [Benchmark 440](../.benchmarks/440_lllg_paper_repro_goat.md) — LLLG paper reproduction (3/4 PASS)
@@ -326,3 +327,106 @@ wrong and we revert.
 - `crates/katgpt-core/src/multi_agent_path/flow.rs` — current `GridFlowField` impl
 - `crates/katgpt-core/src/multi_agent_path/local_guidance.rs:459-555` — the A\* search that ignores flow
 - `crates/katgpt-core/src/multi_agent_path/pibt.rs:148-186` — the cost tuple with `flow_mismatch` at position 2
+
+---
+
+## Verdict (2026-07-18, post-implementation)
+
+**Status flipped: draft → REJECTED.** Issue 182 Phases 1-3 were implemented,
+bench_440 re-run, and the deadlock-chain diagnostic re-run. The result is a
+**negative on the target metric** (ht_chantry G1) AND a **negative on the
+mechanism metric** (P95 cluster size). Per the proposal's own P5.3 rule, this
+is the REVERT case.
+
+### What was measured
+
+**bench_440 G1 (800 agents, 300 steps, seed=42):**
+
+| Map | Pre-Proposal | Post-Proposal | Delta | Gate |
+|---|---|---|---|---|
+| empty-48-48 | 18.52 (0.68) | 18.75 (0.69) | +1.2% | PASS (no corridors, no change expected) |
+| random-64-64-10 | 14.56 (0.69) | 13.98 (0.66) | **-4.0%** | PASS but **regression** (needs investigation) |
+| warehouse | 7.33 (0.41) | **7.84 (0.44)** | **+7.0%** | Improved but still FAIL (target 0.5) |
+| ht_chantry | 4.66 (0.27) | 4.70 (0.28) | +0.9% (noise) | **FAIL** (target ≥0.30) |
+
+**ht_chantry deadlock-chain diagnostic (800 agents, 500 steps, seed=42):**
+
+| Metric | Pre-Proposal (commit `2a8c378d`) | Post-Proposal | Delta |
+|---|---|---|---|
+| Throughput | **5.098** | **4.824** | **-5.4% regression** |
+| P95 max-cluster-size | **8** | **15** | **+87.5% (WORSE)** |
+| P99 max-cluster-size | 9 | 18 | +100% (WORSE) |
+| Max observed | 11 | 20 | +82% (WORSE) |
+
+### Why the proposal's hypothesis failed
+
+The proposal predicted that bi-directional corridors + A\* hard pruner would
+close ht_chantry G1 by eliminating corridor deadlocks. The mechanism IS
+working on warehouse (+7% throughput — 4920 2-wide corridor cells, dense
+aisle structure, exactly the proposal's target topology). But ht_chantry's
+corridor topology is **not what the proposal assumed**:
+
+1. **The 8 1-wide corridor cells are all articulation points** (single-passage
+   bottlenecks) — they get the `sign = 0` fallback (P1.4), so the proposal's
+   mechanism doesn't apply to them. No flow enforcement on the maze's narrowest
+   passages.
+2. **The 102 2-wide corridor cells get bi-directional pairing**, but they're
+   short segments between larger open regions. The A\* hard pruner forces
+   agents into the correct lane (+1 lane for +travel, -1 lane for -travel),
+   which **lengthens paths** when an agent must enter a 2-wide corridor in
+   the direction its current lane doesn't serve. The longer paths compound:
+   more steps in transit = more congestion at corridor approaches = larger
+   stuck clusters.
+3. **The deadlock-chain P95 went UP from 8 to 15.** This is the smoking gun:
+   the A\* pruner is causing agents to bunch up at the 2-wide corridor
+   approaches, creating larger deadlock chains than before. The proposal's
+   mechanism is **trading deadlock count for cluster size** — net negative on
+   ht_chantry.
+
+### Where the proposal's mechanism DOES work
+
+The warehouse result (+7% throughput) is real and reproducible. Warehouse has
+4920 2-wide corridor cells (50% of passable cells) forming long, regularly-
+spaced aisles — exactly the topology the proposal targeted. On such maps:
+
+- The bi-directional two-lane highway eliminates head-on deadlocks in aisles.
+- The A\* hard pruner routes agents correctly without significant path
+  lengthening (aisles are long, so the lane constraint adds ≤1 step).
+- Net throughput improves.
+
+But warehouse is still below its G1 target (0.44 vs 0.5), so even the
+positive case doesn't clear the GOAT gate. The mechanism is **architecturally
+sound for dense-aisle maps but insufficient for the gate**.
+
+### Action: REVERT
+
+All Phase 1-3 code changes were reverted (multi_agent_path/{flow.rs,
+local_guidance.rs, mod.rs, pibt.rs, tests.rs}). The proposal and issue files
+remain as a record of the negative result. The ht_chantry G1 gap (0.27-0.28
+vs 0.30 target) **remains open** and is now a documented steady-state fail
+awaiting a different approach.
+
+The warehouse +7% data point is preserved in this verdict for any future
+proposal that targets dense-aisle maps specifically. A future proposal could
+revive the mechanism behind a feature flag (e.g. `flow_bidirectional`) that
+consumers opt into per-map — but that's out of scope here.
+
+### Lessons
+
+1. **Mechanism correctness ≠ target metric improvement.** The proposal's
+   three root causes were all correctly identified, and the three phases each
+closed one. The mechanism IS doing what it was designed to do. But the target
+   map's topology interacted with the mechanism in an unexpected way
+   (path-lengthening compounds into larger clusters), producing a net
+   negative on the target metric.
+2. **Always re-run the mechanism diagnostic, not just the throughput bench.**
+   The bench_440 ht_chantry result (+0.9%) looked like noise-level
+   improvement. The diagnostic revealed the mechanism was actually **causing
+   larger deadlock chains** (P95 8→15) — the opposite of its design goal. The
+   diagnostic is the more sensitive instrument.
+3. **Sparse-corridor maps are not dense-corridor maps.** The proposal's
+   mental model was "corridors cause deadlocks; fix the corridors → fix the
+   deadlocks." That holds when corridors are the dominant topology (warehouse,
+   50% corridor cells). It fails when corridors are a minor feature
+   (ht_chantry, 1.5% corridor cells) and the dominant topology is open regions
+   with sparse bottlenecks. Different topologies need different mechanisms.

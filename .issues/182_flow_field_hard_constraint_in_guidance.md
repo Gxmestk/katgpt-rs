@@ -3,9 +3,15 @@
 > **Type:** optimization / refactor
 > **Priority:** P2
 > **Filed:** 2026-07-18
-> **Status:** OPEN
-> **Proposal:** [006](../.proposals/006_flow_field_hard_constraint_in_guidance.md)
-> **Closes:** [Issue 546 (riir-ai)](../../../riir-ai/.issues/546_lacam_multistep_escalation_ht_chantry.md) — if G1 ht_chantry ≥ 0.30 lands
+> **Status:** **CLOSED (2026-07-18) — REVERT verdict, Proposal 006 REJECTED.** See
+> [Proposal 006 §Verdict](../.proposals/006_flow_field_hard_constraint_in_guidance.md#verdict-2026-07-18-post-implementation)
+> for the full measurement table and lessons. Short version: the three phases
+> were implemented and measured; ht_chantry throughput stayed flat (+0.9%, noise)
+> AND ht_chantry deadlock-chain P95 went from 8 → 15 (WORSE); the mechanism DID
+> work on warehouse (+7%) but that's not enough to clear either map's gate.
+> Code reverted; proposal and issue kept as record of the negative result.
+> **Proposal:** [006](../.proposals/006_flow_field_hard_constraint_in_guidance.md) (status: REJECTED)
+> **Closes:** [Issue 546 (riir-ai)](../../../riir-ai/.issues/546_lacam_multistep_escalation_ht_chantry.md) — NOT CLOSED; G1 ht_chantry remains 0.27-0.28 (steady-state fail)
 > **Repo:** katgpt-rs (substrate is `crates/katgpt-core/src/multi_agent_path/`)
 
 ## Context
@@ -35,78 +41,73 @@ Implement Proposal 006 in three phases. Each phase is independently shippable.
 
 **Files:** `crates/katgpt-core/src/multi_agent_path/flow.rs`
 
-- [ ] **P1.1** Add `sign = 0` (bidirectional / dual) variant. Update `FlowDirection::mismatch`
-  to return `0` for `sign = 0` (any direction allowed).
-- [ ] **P1.2** In `GridFlowField::from_map`, for **2-wide corridors**: assign one cell
-  `sign = +1`, the partner cell `sign = −1`. This creates a two-lane highway.
-- [ ] **P1.3** For **1-wide corridors**: walk each maximal chain between two junctions,
-  number corridors in BFS order from map centroid, alternate `sign = +1 / −1` by parity.
-- [ ] **P1.4** Add articulation-point detection (Tarjan's bridge-finding or a
+- [-] **P1.1** Add `sign = 0` (bidirectional / dual) variant. Update `FlowDirection::mismatch`
+  to return `0` for `sign = 0` (any direction allowed). *(Implemented then reverted.)*
+- [-] **P1.2** In `GridFlowField::from_map`, for **2-wide corridors**: assign one cell
+  `sign = +1`, the partner cell `sign = −1`. This creates a two-lane highway. *(Implemented then reverted.)*
+- [-] **P1.3** For **1-wide corridors**: walk each maximal chain between two junctions,
+  number corridors in BFS order from map centroid, alternate `sign = +1 / −1` by parity. *(Implemented then reverted.)*
+- [-] **P1.4** Add articulation-point detection (Tarjan's bridge-finding or a
   simpler SCC-based check). At 1-wide corridor segments that are the only path between two
-  regions, assign `sign = 0` (accept deadlock risk to preserve reachability).
-- [ ] **P1.5** Tests: bi-directional 2-wide corridor test, 1-wide parity test, articulation-
-  point fallback test. Update existing flow field tests that assumed `sign = +1` everywhere.
+  regions, assign `sign = 0` (accept deadlock risk to preserve reachability). *(Implemented then reverted.)*
+- [-] **P1.5** Tests: bi-directional 2-wide corridor test, 1-wide parity test, articulation-
+  point fallback test. Update existing flow field tests that assumed `sign = +1` everywhere. *(Implemented then reverted.)*
 
 ### Phase 2: Flow-respecting A\* (root cause #1)
 
 **Files:** `crates/katgpt-core/src/multi_agent_path/local_guidance.rs`, `mod.rs`
 
-- [ ] **P2.1** Add `set_flow_field` method to the `LocalGuidanceSource` trait (default no-op).
-- [ ] **P2.2** `SpaceTimeGuidance` stores an optional `Arc<dyn FlowField<P>>` (default
-  `NoFlow`). Add `.with_flow_field(flow)` builder method mirroring `LifelongLaCam::with_flow_field`.
-- [ ] **P2.3** In `astar_for_agent` and `astar_for_agent_flat`, add a hard pruner in the
-  neighbor-expansion loop:
-  ```rust
-  if self.flow_field.mismatch(&pos, &neighbor) == 1 {
-      continue; // Flow-forbidden neighbor — skip.
-  }
-  ```
-- [ ] **P2.4** `LifelongLaCam::tick` passes its flow field to guidance via the new
+- [-] **P2.1** Add `set_flow_field` method to the `LocalGuidanceSource` trait (default no-op). *(Implemented then reverted.)*
+- [-] **P2.2** `SpaceTimeGuidance` stores an optional `Arc<dyn FlowField<P>>` (default
+  `NoFlow`). Add `.with_flow_field(flow)` builder method mirroring `LifelongLaCam::with_flow_field`. *(Implemented then reverted.)*
+- [-] **P2.3** In `astar_for_agent` and `astar_for_agent_flat`, add a hard pruner in the
+  neighbor-expansion loop. *(Implemented then reverted.)*
+- [-] **P2.4** `LifelongLaCam::tick` passes its flow field to guidance via the new
   `set_flow_field` setter before `compute_guidance`. (Both PIBT and guidance now consult the
-  same flow field.)
-- [ ] **P2.5** Tests: a synthetic corridor map where A\* previously routed through the
-  corridor against flow must now route around. Verify path is flow-legal end-to-end.
+  same flow field.) *(Implemented then reverted.)*
+- [-] **P2.5** Tests: a synthetic corridor map where A\* previously routed through the
+  corridor against flow must now route around. Verify path is flow-legal end-to-end. *(Implemented then reverted.)*
 
 ### Phase 3: Demote `flow_mismatch` in PIBT cost tuple (root cause #2)
 
 **Files:** `crates/katgpt-core/src/multi_agent_path/pibt.rs`
 
-- [ ] **P3.1** In `Candidate::lexicographic_cmp`, move `flow_mismatch.cmp(...)` from position 2
-  to position 4 (after `hindrance`).
-- [ ] **P3.2** Update the doc comment on `Candidate` and the module-level comment in
-  `pibt.rs:14-15` to reflect the new ordering.
-- [ ] **P3.3** Re-run all existing PIBT tests. Any test that asserted flow_mismatch dominance
-  over goal_dist needs updating (these tests encoded the bug).
+- [-] **P3.1** In `Candidate::lexicographic_cmp`, move `flow_mismatch.cmp(...)` from position 2
+  to position 4 (after `hindrance`). *(Implemented then reverted.)*
+- [-] **P3.2** Update the doc comment on `Candidate` and the module-level comment in
+  `pibt.rs:14-15` to reflect the new ordering. *(Implemented then reverted.)*
+- [-] **P3.3** Re-run all existing PIBT tests. Any test that asserted flow_mismatch dominance
+  over goal_dist needs updating (these tests encoded the bug). *(Implemented then reverted.)*
 
 ### Phase 4: GOAT gate
 
 **Files:** `crates/katgpt-core/benches/bench_440_lllg_paper_repro.rs`,
 `crates/katgpt-core/examples/ht_chantry_deadlock_chain_diagnostic.rs` (re-run)
 
-- [ ] **P4.1** Run bench_440 with the redesigned flow field on all 4 maps. Targets:
-  - empty-48-48: ≥ 0.68 (no regression — was 0.68)
-  - random-64-64-10: ≥ 0.69 (no regression — was 0.69)
-  - warehouse: ≥ 0.30 (target — was 0.41, should stay or improve)
-  - ht_chantry: **≥ 0.30** (close Issue 546 — was 0.27-0.28)
-- [ ] **P4.2** Re-run the deadlock-chain diagnostic. Target (G-flow): P95 max-cluster-size
-  drops by ≥ 50% (8 → ≤ 4).
-- [ ] **P4.3** Re-run bench_453 (one-step LaCAM GOAT). Verify G6c/G-col collision-freedom
-  stays perfect (1.000 / 0.0%).
-- [ ] **P4.4** Latency: median tick ≤ 100ms at 800 agents on non-maze maps; ht_chantry ≤ 500ms.
+- [x] **P4.1** Run bench_440 with the redesigned flow field on all 4 maps. Targets:
+  - empty-48-48: 0.69 (no regression — was 0.68) ✓
+  - random-64-64-10: 0.66 (**REGRESSION** — was 0.69; -4.0%)
+  - warehouse: **0.44** (improvement from 0.41; still FAIL ≥0.5)
+  - ht_chantry: **0.28** (target was ≥0.30 — FAIL, marginal change from 0.27)
+- [x] **P4.2** Re-run the deadlock-chain diagnostic. Target (G-flow): P95 max-cluster-size
+  drops by ≥ 50% (8 → ≤ 4). **RESULT: P95 WORSENED from 8 to 15** (+87.5%). FAIL.
+- [-] **P4.3** Re-run bench_453 (one-step LaCAM GOAT). Not re-run — P4.1 + P4.2 already
+  triggered the revert gate (P5.3).
+- [-] **P4.4** Latency: not re-run — same reason.
 
 ### Phase 5: Promotion / verdict
 
-- [ ] **P5.1** If P4.1 ht_chantry ≥ 0.30 AND P4.2 cluster-size drops: **close Issue 546** (update
-  `riir-ai/.issues/546_*` to RESOLVED, point to this issue + Proposal 006).
-- [ ] **P5.2** If P4.1 ht_chantry < 0.30 BUT P4.2 cluster-size drops: **mark proposal
-  architecturally correct but insufficient** — accept the marginal G1 fail as steady-state
-  (Issue 546 path 2). Document the verdict in `.benchmarks/440_lllg_paper_repro_goat.md`.
-- [ ] **P5.3** If P4.1 ht_chantry < 0.30 AND P4.2 cluster-size unchanged: **REVERT** — the
-  proposal's mechanism hypothesis is wrong.
-- [ ] **P5.4** Update `.benchmarks/440_lllg_paper_repro_goat.md` with the new G1 results per
-  map. Note whether 4/4 PASS or 3/4 PASS + ht_chantry steady-state.
-- [ ] **P5.5** Update `riir-ai/.issues/546_*` status (RESOLVED if 4/4, or note "flow-field
-  redesign landed but insufficient — accepted marginal fail" if 3/4).
+- [x] **P5.1** If P4.1 ht_chantry ≥ 0.30 AND P4.2 cluster-size drops: close Issue 546. **NOT MET.**
+- [x] **P5.2** If P4.1 ht_chantry < 0.30 BUT P4.2 cluster-size drops: mark architecturally
+  correct but insufficient. **NOT MET** (cluster-size went UP).
+- [x] **P5.3** If P4.1 ht_chantry < 0.30 AND P4.2 cluster-size unchanged: **REVERT** — the
+  proposal's mechanism hypothesis is wrong. **THIS BRANCH TAKEN. Code reverted 2026-07-18.**
+  (Strictly: cluster-size WORSENED, not just unchanged — even stronger grounds for revert.)
+- [x] **P5.4** Update `.benchmarks/440_lllg_paper_repro_goat.md` with the new G1 results.
+  Done in the Proposal 006 §Verdict addendum (the benchmark doc itself stays at the
+  pre-Proposal baseline since the code is reverted).
+- [x] **P5.5** Update `riir-ai/.issues/546_*` status — done in the same commit as this issue's
+  closure.
 
 ## Out of scope
 
