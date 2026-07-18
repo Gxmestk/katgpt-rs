@@ -1157,6 +1157,33 @@ pub use spherical_steering::{
     SlerpError, SlerpScratch, slerp_steering_into, spherical_steering_into, vmf_confidence_gate,
 };
 
+// Sphere Sampling — modelless primitives for sampling from unnormalized
+// densities on the unit hypersphere S^{d-1}. Distilled from Flow Sampling
+// (arxiv 2605.03984 Havens/Karrer/Shaul FAIR+Weizmann May 2026; Issue 544). The
+// paper trains a drift u_θ via backprop; we ship only the modelless core:
+// for vMF-family targets r(x) = κ·μ^T x the score ∇_M r is closed-form, so the
+// entire conditional drift on the sphere integrates via Euler–Maruyama with no
+// learned component. Three primitives: parallel_transport_householder_into
+// (Eq 42 Householder reflection about X_1+X_t midpoint hyperplane),
+// jacobian_logdet_cot_correction (Eq 44 curvature `(d−1)·(t·cot(t·ω_1) − cot(ω_1))·Ẋ_1/ω_1`),
+// sphere_exp_map_into (Riemannian exp, the Euler–Maruyama step from Eq 29).
+// Sibling to Plan 405 above: Plan 405 deterministically pulls a drifted vector
+// toward μ_T via Slerp + Eq-17 gate; this module samples a distribution over
+// directions via Euler–Maruyama on the manifold. The deterministic gate
+// produces one direction; sampling produces a distribution — a capability
+// class the gate cannot serve. Opt-in pending Issue 544 defend-wrong PoC
+// verdict: the most likely failure mode (per Research 049 PTRM cautionary
+// flag) is that the Riemannian sampler produces the same KL as Wood (1994)'s
+// exact vMF sampler at the same N — in which case the complexity is
+// unjustified for the vMF-only case. Promotion requires a non-vMF consumer.
+#[cfg(feature = "sphere_sampling")]
+pub mod sphere_sampling;
+#[cfg(feature = "sphere_sampling")]
+pub use sphere_sampling::{
+    COT_FLOOR, EXP_MAP_FLOOR, SphereError, TRANSPORT_FLOOR, jacobian_logdet_cot_correction,
+    parallel_transport_householder_into, sphere_exp_map_into,
+};
+
 // MAG — Mining via Activation Geometry (Plan 418, Research 397, arXiv:2607.04222
 // LeVi/David/Fomin ICML 2026 FAGEN). Unsupervised direction mining + modelless
 // transfer prediction. The missing acquisition step for the direction-vector
