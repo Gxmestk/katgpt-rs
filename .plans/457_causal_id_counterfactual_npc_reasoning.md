@@ -224,7 +224,7 @@ If Phase 4 T4.7 returns "no consumer pulls its weight": leave as opt-in, do NOT 
 ## Cross-references
 
 - **Research note:** [`katgpt-rs/.research/450_Algorithmic_Syntactic_Causal_Identification.md`](../.research/450_Algorithmic_Syntactic_Causal_Identification.md) (Gain → PoC-confirmed)
-- **Issue (PoC):** [`riir-ai/.issues/545_causal_id_defend_wrong_poc.md`](../../../riir-ai/.issues/545_causal_id_defend_wrong_poc.md) (DONE — GAIN PROVEN)
+- **Issue (PoC):** Issue 545 removed 2026-07-18 per noise-reduction rule — full PoC content preserved in [Research 450 §8 PoC Addendum](../.research/450_Algorithmic_Syntactic_Causal_Identification.md) (DONE — GAIN PROVEN)
 - **PoC bench:** [`riir-ai/crates/riir-poc/benches/causal_id_defend_wrong_poc.rs`](../../../riir-ai/crates/riir-poc/benches/causal_id_defend_wrong_poc.rs) (commit `253406d9`)
 - **Closest cousin:** [Research 398](../.research/398_Canvas_Engineering_Declared_Causal_Topology_Compiler.md) — Canvas schema compiler (the directed-only baseline)
 - **Canvas shipped primitive:** `katgpt-core::canvas` (feature `canvas_schema`, Plan 419) — the S1 baseline

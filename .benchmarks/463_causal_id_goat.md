@@ -3,7 +3,7 @@
 **Date:** 2026-07-18
 **Plan:** [457](../.plans/457_causal_id_counterfactual_npc_reasoning.md) — Phase 2
 **Research:** [450](../.research/450_Algorithmic_Syntactic_Causal_Identification.md) (Gain → PoC-confirmed)
-**PoC:** [Issue 545](../../../riir-ai/.issues/545_causal_id_defend_wrong_poc.md) — DONE, GAIN PROVEN
+**PoC:** Issue 545 (removed 2026-07-18 per noise-reduction rule — full content preserved in [Research 450 §8 PoC Addendum](../.research/450_Algorithmic_Syntactic_Causal_Identification.md)) — DONE, GAIN PROVEN
 **Source paper:** [arXiv:2403.09580](https://arxiv.org/abs/2403.09580) Cakiqi & Little 2024
 **Feature gate:** `causal_identification` (default-on in `katgpt-core` since Plan 457 Phase 5 promotion, 2026-07-18 — see `crates/katgpt-core/Cargo.toml` "Phase 20" comment)
 **Bench:** `crates/katgpt-core/benches/causal_id_goat.rs`

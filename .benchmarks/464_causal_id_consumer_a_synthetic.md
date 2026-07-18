@@ -167,7 +167,7 @@ The KG construction is fully deterministic (no RNG). The query set is hard-coded
 
 - **Plan:** [`katgpt-rs/.plans/457_causal_id_counterfactual_npc_reasoning.md`](../.plans/457_causal_id_counterfactual_npc_reasoning.md)
 - **Research note:** [`katgpt-rs/.research/450_Algorithmic_Syntactic_Causal_Identification.md`](../.research/450_Algorithmic_Syntactic_Causal_Identification.md)
-- **Issue 545 PoC (Gain proven):** [`riir-ai/.issues/545_causal_id_defend_wrong_poc.md`](../../riir-ai/.issues/545_causal_id_defend_wrong_poc.md) (DONE)
+- **Issue 545 PoC (Gain proven):** issue removed 2026-07-18 per noise-reduction rule — full PoC content preserved in [`katgpt-rs/.research/450_Algorithmic_Syntactic_Causal_Identification.md`](../.research/450_Algorithmic_Syntactic_Causal_Identification.md) §8 PoC Addendum
 - **Issue 545 PoC bench:** [`riir-ai/crates/riir-poc/benches/causal_id_defend_wrong_poc.rs`](../../riir-ai/crates/riir-poc/benches/causal_id_defend_wrong_poc.rs) (commit `253406d9`)
 - **This bench:** [`riir-ai/crates/riir-poc/benches/causal_id_synthetic_consumer_a.rs`](../../riir-ai/crates/riir-poc/benches/causal_id_synthetic_consumer_a.rs) (commit `da8a2002`)
 - **Paper:** [arXiv:2403.09580](https://arxiv.org/abs/2403.09580) (Cakiqi & Little 2024)
