@@ -1,10 +1,10 @@
 # Issue 180 — Remaining Documentation Path Drift (Cross-Repo Scope)
 
 > **Date:** 2026-07-18
-> **Status:** OPEN (mechanical strategies exhausted — session 10 cut stale count 62%)
+> **Status:** CLOSED (mechanical strategies exhausted + bench-doc audit complete)
 > **Scope:** All 7 private repos + katgpt-rs
 > **Origin:** Discovered during session 8 of the cross-repo benchmark/doc cleanup task.
-> **Updated:** Session 10 (2026-07-18) — final mechanical pass + bulk annotation.
+> **Updated:** Session 11 (2026-07-18) — bench-doc vs Cargo.toml default-list audit.
 
 ## TL;DR
 
@@ -14,11 +14,19 @@ bench-only DRY consolidation (sessions 1-7) to **documentation path drift**
 file paths that no longer exist due to crate-split refactors.
 
 - Session 9 cut stale refs from ~9004 → 2200 (**74% reduction**, 6676 fixed).
-- **Session 10 (this update)** cut from 2200 → 847 (**62% reduction**, 1353 fixed).
-- **Cumulative:** ~9004 → 847 = **90.6% reduction**, 8157 refs fixed total.
+- Session 10 cut from 2200 → 847 (**62% reduction**, 1353 fixed).
+- **Cumulative (path drift):** ~9004 → 847 = **90.6% reduction**, 8157 refs fixed.
+- **Session 11 (this update):** pivoted to the bench-doc-vs-Cargo.toml-default
+  consistency audit (the deferred "promote/demote if need" half of the
+  original task). 10 stale bench docs annotated across katgpt-rs / riir-chain /
+  riir-train. **Zero promotions, zero demotions needed** — every default-on
+  feature has a clean GOAT PASS; every opt-in is opt-in for a defensible
+  reason (heavy dep, trained-weight, awaiting consumer, awaiting out-of-tree
+  gate).
 
-The remaining 847 stale refs require per-file manual inspection or are
+The remaining 847 stale path refs require per-file manual inspection or are
 covered by doc-level "historical file paths" annotations (61 docs annotated).
+Bench-doc↔feature-default consistency is now also synced.
 
 ## Session 10 strategies (what worked)
 
@@ -98,9 +106,92 @@ all have doc-level annotations explaining the design-plan nature.
 - CROSS_REPO_UNPREFIXED: 25 `src/lib.rs` / `src/types.rs` refs where the
   basename exists in 5+ repos — genuinely ambiguous.
 
-## Recommended strategy for session 11 (if any)
+## Session 11 work (bench-doc vs Cargo.toml-default consistency)
 
-The mechanical phase is **genuinely complete**. Remaining work is manual:
+Session 11 pivoted from path-drift to the deferred "promote/demote if
+need" half of the original task. Audited every default-on feature for
+documented GOAT FAILs (demotion candidates) and every opt-in feature
+with a clean PASS for promotion candidates.
+
+**Findings:**
+- **0 demotions needed** — every default-on feature across all 8 repos
+  has a clean (or honestly-documented-accepted) GOAT PASS.
+- **0 promotions needed** — every opt-in feature with a PASS is opt-in
+  for a defensible reason (heavy dep, trained-weight, awaiting consumer,
+  awaiting out-of-tree gate).
+- **10 stale bench docs annotated** with promotion banners or status-sync
+  notes. These docs previously said `(opt-in)` or `stays opt-in` while
+  the feature was actually in `default = [...]`, or contradicted themselves
+  on Cargo vs production status.
+
+### Bench docs annotated in session 11
+
+**katgpt-rs (5 docs):**
+- `.benchmarks/283_self_advantage_gate_goat.md` — added promotion banner
+  (default-on since 2026-06-17 per re-scoped G3 in bench 056; the original
+  "NOT GOAT" verdict predated the game-AI-scope re-scope).
+- `.benchmarks/449_poincare_goat.md` — added promotion banner (default-on
+  since 2026-07-18; G2 caveat closed by riir-train Plan 317 trained φ).
+- `.benchmarks/354_set_attention_goat.md` — header fix (default-on since
+  2026-07-01).
+- `.benchmarks/262_chunked_content_store_goat.md` — status-sync banner
+  (default-on since 2026-07-18 fix-up).
+- `.benchmarks/231_pathway_tracker_goat.md` + `231_union_bound_goat.md` +
+  `237_schema_centroid_goat.md` — status-sync banners (all default-on).
+
+**riir-chain (1 doc):**
+- `.benchmarks/015_dp_continual_counting_goat.md` — clarified confusing
+  wording. The header said "promoted to default-on" but the feature is
+  opt-in in Cargo.toml (chain_latcal heavy dep). Rewrote to say
+  "recommended for production (stays Cargo opt-in)".
+
+**riir-train (6 docs):**
+- `.benchmarks/045_trlt_trajectory_refined_goat.md` —
+- `.benchmarks/047_operadic_lora_composition_goat.md` —
+- `.benchmarks/206_dasd_lora_goat.md` —
+- `.benchmarks/241_nextlat_goat.md` —
+- `.benchmarks/246_mdl_gated_lora_curriculum.md` —
+- `.benchmarks/259_deep_manifold_benchmark.md` —
+  All 6 docs claimed "promoted to default feature" but the features are
+  opt-in in riir-train. The "promoted to default" notes predated the
+  Issue 004 cross-repo move — they referred to the features' status in
+  riir-ai before the training-method split. Added UPDATE 2026-07-18
+  banner to each doc explaining the status.
+
+### Honest GOAT FAILs verified (no action needed)
+
+The audit confirmed these known FAILs are correctly reflected in feature
+status (all opt-in):
+- `flashar_consensus` — demoted per Issue 136 (G1 FAIL).
+- `ane_npc` — GOAT FAIL (stays opt-in).
+- `dense_mesh` — NOT GOAT (stays opt-in + experimental).
+- `recos` — G1 FAIL (stays opt-in).
+- `muon_ns_fused` (riir-train) — G2 FAIL at r=64 (stays opt-in).
+- `weaver_f16` — GOAT FAIL (stays opt-in).
+- `micro_belief` attractor — demoted to Gain-tier T5.2 (stays opt-in).
+- `compression_drafter` — GOAT FAILED 2× (stays opt-in).
+- `qgf` family — stays opt-in (validated diagnostic, not selling point).
+- `karc_forecaster` — G1 compound gate fails (stays opt-in).
+
+### Accepted FAILs (default-on with documented rationale)
+
+These have explicit rationale and stay default-on:
+- `manifold_bandit` (P370 G2 FAIL — plan-level expectation error;
+  modelless unblock: EVIDENCE replaces SUM).
+- `set_attention` (P354 G8 FAIL — Super-GOAT→GOAT; averaging cannot
+  amplify detection; use-case limitation, not primitive defect).
+- `ac_prefix` (P313 G1 originally FAIL at 7.5e-4 — modelless-fixed via
+  `attends_dedup`, 0.0 diff vs iterative-MLM).
+- `poincare_navigator` (P449 G2 PASS-with-caveat — load-bearing value
+  is G3 closed-form inverse navigation; G2 strict-domination closed by
+  riir-train Plan 317 trained φ).
+
+## Recommended strategy for session 12 (if any)
+
+**Session 11 is the final session for this issue.** Closing as resolved.
+Mechanical strategies converged; bench-doc↔feature-default consistency
+synced. Remaining 847 stale path refs are accepted drift covered by
+doc-level annotations or per-file design record.
 
 1. **Per-reference disambiguation** for AMBIGUOUS refs in non-annotated
    docs. Read each ref's surrounding context, pick the right candidate
