@@ -155,10 +155,7 @@ rare; the prior cause is usually vocabulary mismatch, not novelty.
 The user's explicit second ask: "also find paper online for it too."
 
 1. **arxiv keyword search** using the standing URL from global AGENTS.md:
-   ```
-   https://r.jina.ai/https://arxiv.org/search/advanced?advanced=&terms-0-operator=AND&terms-0-term={KEYWORD}&terms-0-field=abstract&classification-computer_science=y&classification-mathematics=y&classification-physics_archives=all&classification-statistics=y&classification-include_cross_list=include&date-filter_by=all_dates&date-year=&date-from_date=&date-to_date=&date-date_type=submitted_date&abstracts=show&size=50&order=-announced_date_first
-   ```
-   Run **2–3 keyword variants** (paper vocabulary AND codebase vocabulary
+   Use web search mcp to run **2–3 keyword variants** (paper vocabulary AND codebase vocabulary
    from Step 1). One search is rarely enough — the right keyword often lives
    in the codebase-equivalent term set, not the user's phrasing.
 
