@@ -82,7 +82,7 @@ The substrate is **byte-for-byte structural move** with `crate::*` → `katgpt_*
 ## (7) Handoff to Plan 399
 
 Once this plan lands, the wrapper files can move:
-- `src/speculative/d2f.rs` → `crates/katgpt-forward/src/speculative/d2f.rs` — depends on `crate::dllm::{D2fContext, denoising_accuracy, forward_block_causal_with}` which will become `crate::d2f_context::*`. The training-dependent tests (`train_mini_dllm`, `generate_pattern_dataset`) either stay in root or move to riir-train.
+- `src/speculative/d2f.rs` → `src/speculative/d2f.rs` — depends on `crate::dllm::{D2fContext, denoising_accuracy, forward_block_causal_with}` which will become `crate::d2f_context::*`. The training-dependent tests (`train_mini_dllm`, `generate_pattern_dataset`) either stay in root or move to riir-train.
 - `src/speculative/d2f_verifier.rs` → `crates/katgpt-forward/src/d2f_verifier.rs` — straightforward after `d2f.rs` moves.
 - `src/speculative/diffusion_sampler.rs` → `crates/katgpt-forward/src/diffusion_sampler.rs` — same.
 

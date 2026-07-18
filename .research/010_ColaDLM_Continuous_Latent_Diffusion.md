@@ -162,7 +162,7 @@ Replacing katgpt-rs with a DiT + VAE architecture would destroy our current perf
 - Send images to LM Studio vision API (local, already supported by anyrag providers)
 - Store descriptions as text alongside code examples in turso
 - No changes to katgpt-rs inference path
-- Scope: extension to `anyrag/crates/github/src/ingest/extractor.rs`
+- Scope: extension to `crates/katgpt-claim/src/clr/extractor.rs`
 
 *Layer 2 — Inference-time (katgpt-rs, Cola DLM-style MMDiT):*
 - Vision encoder running alongside draft model

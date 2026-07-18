@@ -67,7 +67,7 @@ Win/loss records, matchup history, and streak detection are countable from tourn
 **All PGD in-game features are computable without a neural model.** This is the highest-value, lowest-risk distillation:
 
 ```
-GoGameAnalytics (new module: src/pruners/go/analytics.rs)
+GoGameAnalytics (new module: crates/katgpt-pruners/src/go/analytics.rs)
 ├─ WinRateTrace: Vec<f32>            // GoHeuristic at each move
 ├─ ScoreTrace: Vec<f32>              // territory scoring at each move
 ├─ GarbageMoveRatio: f32             // % moves after game decided
@@ -161,7 +161,7 @@ fn coincidence_rate(replay: &GoReplay, state_seq: &[GoState]) -> f32 {
 
 ### Phase 1: Modelless Analytics (katgpt-rs, High Value, Low Risk)
 
-**File:** `src/pruners/go/analytics.rs` (new, ~300 lines)
+**File:** `crates/katgpt-pruners/src/go/analytics.rs` (new, ~300 lines)
 
 | Task | Description | Dependencies |
 |---|---|---|

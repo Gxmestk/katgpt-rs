@@ -303,7 +303,7 @@ katgpt-rs/src/cce/
 - [x] G3 PASS (convergence rate log-log slope = -1.0; ≤ -0.5 paper bound).
 - [x] G4 PASS (<50ms on ALL scales post-T4.3b: 32-player crowd-scale = 8.9ms via primal-dual).
 - [x] All unit tests in `heterogeneous.rs` pass (5/5).
-- [~] `cargo check --all-features` clean (CI feature guard catches combo regressions per the `merkle_root` lesson). **PRE-EXISTING FAILURE** in `katgpt-core/crates/katgpt-dec/src/hodge.rs:222` (borrow-checker error in unrelated `LoraAdapter` combo) — not introduced by Plan 300. `cargo check --features cce_moderator` passes clean; `cargo check` (default features, post-T5.4 promotion) passes clean. The `--all-features` failure is in a different crate and was present before this plan. Left for the owner of the hodge/LoraAdapter work to fix.
+- [~] `cargo check --all-features` clean (CI feature guard catches combo regressions per the `merkle_root` lesson). **PRE-EXISTING FAILURE** in `crates/katgpt-dec/src/hodge.rs:222` (borrow-checker error in unrelated `LoraAdapter` combo) — not introduced by Plan 300. `cargo check --features cce_moderator` passes clean; `cargo check` (default features, post-T5.4 promotion) passes clean. The `--all-features` failure is in a different crate and was present before this plan. Left for the owner of the hodge/LoraAdapter work to fix.
 - [x] Plan 300 status → ✅ COMPLETE. Issue 327 T-A+.1 through T-A+.4 marked done.
 
 ---

@@ -11,7 +11,7 @@
 
 ## TL;DR
 
-GRAPE unifies **all** mainstream transformer positional encodings (RoPE, ALiBi, FoX, LieRE, Wall, NoPE) under a single group-action view `G(n) = exp(n·ω·L)`. The multiplicative family (RoPE, LieRE) lives in `SO(d)` with rank-2 skew generators `L = ab^T - ba^T`; the additive family (ALiBi, FoX, Wall) lives in a homogeneous lift of `GL(d+2)` with rank-1 nilpotent generators `A² = 0`. Both reduce to **closed-form `O(d)` kernels** (Rodrigues formula for multiplicative, `I + n·ω·A` for additive), enabling **learned rotation planes** without the `O(d³)` matrix exponential LieRE needs. Position encoding becomes a **group-action trait** — the same abstraction our `katgpt-core/group_invariance_probe.rs::GroupAction` already ships for symmetry discovery.
+GRAPE unifies **all** mainstream transformer positional encodings (RoPE, ALiBi, FoX, LieRE, Wall, NoPE) under a single group-action view `G(n) = exp(n·ω·L)`. The multiplicative family (RoPE, LieRE) lives in `SO(d)` with rank-2 skew generators `L = ab^T - ba^T`; the additive family (ALiBi, FoX, Wall) lives in a homogeneous lift of `GL(d+2)` with rank-1 nilpotent generators `A² = 0`. Both reduce to **closed-form `O(d)` kernels** (Rodrigues formula for multiplicative, `I + n·ω·A` for additive), enabling **learned rotation planes** without the `O(d³)` matrix exponential LieRE needs. Position encoding becomes a **group-action trait** — the same abstraction our `crates/katgpt-core/src/group_invariance_probe.rs::GroupAction` already ships for symmetry discovery.
 
 **Distilled for katgpt-rs (modelless, inference-time):**
 
@@ -90,7 +90,7 @@ where `p_{·,h}` are positional embeddings (linear projection + RMSNorm of token
 | Multiplicative rotation (single plane) | `phase_rotation_gate_into` (`crates/katgpt-core/src/phase_rotation.rs`, Plan 322) — scalar broadcast `cos·a + sin·b`, NOT general rank-2 Rodrigues |
 | `GroupAction` trait (Lie group acts on `ℝᵈ`) | `GroupAction` (`crates/katgpt-core/src/group_invariance_probe.rs`, Research 355) |
 | Skew generator `L = ab^T − ba^T` | (referenced in `crates/katgpt-core/src/linalg/geometric_product.rs` notes re OFT but no impl) |
-| Matrix exponential `exp(n·ω·L)` | `katgpt-dec/nonlinear_heat_kernel.rs` uses `exp(t·L)` form for heat equation; no general Lie-group exponential |
+| Matrix exponential `exp(n·ω·L)` | `crates/katgpt-dec/src/nonlinear_heat_kernel.rs` uses `exp(t·L)` form for heat equation; no general Lie-group exponential |
 | `exp(−β·‖x‖)` forget decay | `elasticity_gated_update.rs::neighborhood_weight` (different mechanism — RBF, not nilpotent) |
 
 ### 2.2 What ships vs what GRAPE adds

@@ -29,7 +29,7 @@ Goal: a compiling, feature-gated module with the type surface frozen. No drift y
   - [x] `PersonalityConfig` struct (tau, alpha, w_max, ema_decay)
   - [x] `ArchetypeLabel` newtype (opaque label that seeds initial `w`; not interpreted by the kernel)
   - [x] Default impl: `tau = 1.0`, `alpha = 0.01`, `w_max = 5.0`, `ema_decay = 0.95`
-- [x] **T1.5** Implement `personality_composition/sigmoid.rs` — numerically stable sigmoid helper:
+- [x] **T1.5** Implement `crates/katgpt-personality/src/sigmoid.rs` — numerically stable sigmoid helper:
   - [x] `pub fn sigmoid(x: f32) -> f32` — branching impl per AGENTS.md (positive vs negative branch, no overflow)
   - [x] Vectorized variant `sigmoid_into(x: &[f32], out: &mut [f32])` for batch
 - [x] **T1.6** Implement `personality_composition/trait.rs`:

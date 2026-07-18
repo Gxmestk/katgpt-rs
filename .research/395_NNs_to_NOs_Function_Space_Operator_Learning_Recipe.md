@@ -110,7 +110,7 @@ This is **exactly** the FUNCATTN mechanism (Research 257, Plan 286): `Φ^T Q` (e
 | Paper concept | Shipped primitive | Match |
 |---|---|---|
 | Cross-resolution spectral transport (the headline FNO capability) | `katgpt-rs/crates/katgpt-core/src/cross_resolution.rs::transport_cross_resolution_into` (Plan 310, **DEFAULT-ON**) | **Strictly stronger** — composes cross-resolution × cross-domain transport in one 4-matrix product |
-| SpectralConv (FNO §3.3) | `katgpt-rs/crates/katgpt-core/src/funcattn.rs` (Plan 286) + `spectralquant/spectral_kv_cache.rs` (Plan 039) | FUNCATTN = SpectralConv with frozen bases |
+| SpectralConv (FNO §3.3) | `katgpt-rs/crates/katgpt-core/src/funcattn.rs` (Plan 286) + `crates/katgpt-spectral/src/spectral_kv_cache.rs` (Plan 039) | FUNCATTN = SpectralConv with frozen bases |
 | Encoder-decoder inner-product operator (paper §3.6, App A.8) | `funcattn` + `cross_resolution_transport` (same machinery, different vocabulary) | **Exact** — see Research 257 §1.1, 307 §2.2 |
 | Integral operator / GNO (§3.1, §3.4) | `katgpt-rs/crates/katgpt-dec/src/operators.rs::exterior_derivative` (Plan 251) | **DEC formulation** — `d` on a cell complex IS a GNO with kernel = incidence matrix |
 | Spectral differentiation `F{∂^m f} = (ik)^m f̂` (App A.6) | `katgpt-rs/crates/katgpt-core/src/spectral/differentiation.rs` (Plan 325, **DEFAULT-ON**) + DEC `exterior_derivative` | **Shipped** as the specialized periodic-1D case where DEC is overkill |

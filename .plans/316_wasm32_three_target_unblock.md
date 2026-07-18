@@ -29,7 +29,7 @@ targets. Root causes were NOT architectural — three missing cfg/feature declar
 
 ## Tasks
 
-- [x] **T1: Fix `argmax.rs` missing import** (`katgpt-core/crates/katgpt-types/src/simd/argmax.rs`)
+- [x] **T1: Fix `argmax.rs` missing import** (`crates/katgpt-types/src/simd/argmax.rs`)
   - Added `use crate::simd::simd_max_f32;`
   - Regression from the `simd.rs` → `simd/` folder refactor (`9d0ba6ee`). Native CI
     was green because the `aarch64`/`x86_64` branches early-return before reaching

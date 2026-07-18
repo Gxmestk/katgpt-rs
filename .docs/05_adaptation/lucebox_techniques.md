@@ -354,7 +354,7 @@ Data-driven eigenbasis quantization:
 5. **QJL projection**: Subspace residual estimation for quantization error bounds
 
 ```rust
-// spectralquant/spectral_kv_cache.rs
+// crates/katgpt-spectral/src/spectral_kv_cache.rs
 pub struct SpectralQuantKVCache {
     pub layers: Vec<SpectralQuantLayer>,
     // variable-bit packed key/val indices, norms, scratch buffers
@@ -381,10 +381,10 @@ pub fn generate_selective_qjl_signs(d_eff, qjl_dim, seed) -> Vec<f32>;
 ```
 
 ### Modules
-- `spectralquant/spectral.rs` — Eigenbasis calibration, water-fill, bit allocation
-- `spectralquant/nonuniform_quant.rs` — Non-uniform scalar quantizer (`NonUniformQuantizer`, `CompressedVector`)
-- `spectralquant/spectral_rotation.rs` — Eigenbasis rotation (`SpectralRotation`), random rotation (`RandomRotation`, gated by `turboquant` feature)
-- `spectralquant/spectral_kv_cache.rs` — SpectralQuant KV cache (implements `QuantizedKVCache`)
+- `crates/katgpt-spectral/src/spectral.rs` — Eigenbasis calibration, water-fill, bit allocation
+- `crates/katgpt-spectral/src/nonuniform_quant.rs` — Non-uniform scalar quantizer (`NonUniformQuantizer`, `CompressedVector`)
+- `crates/katgpt-spectral/src/spectral_rotation.rs` — Eigenbasis rotation (`SpectralRotation`), random rotation (`RandomRotation`, gated by `turboquant` feature)
+- `crates/katgpt-spectral/src/spectral_kv_cache.rs` — SpectralQuant KV cache (implements `QuantizedKVCache`)
 - `spectralquant/forward.rs` — Dequantization + attention, parallel dequantize, MaxSim scoring (gated by `maxsim` feature)
 - `spectralquant/types.rs` — `LloydMaxCodebook`, `SpectralQuantCalibration`, `WaterfillAllocation`, `SpectralQuantKVCacheConfig`
 

@@ -108,7 +108,7 @@ Ship a modelless, zero-allocation **AC-GPT-style arbitrary-conditional prefix pr
 
 ### Tasks
 
-- [x] **T3.1 (G1 — correctness)** Write `tests/bench_313_ac_prefix_goat.rs::test_g1_correctness`:
+- [x] **T3.1 (G1 — correctness)** Write `crates/katgpt-core/benches/bench_313_ac_prefix_goat.rs::test_g1_correctness`:
   - Build a micro-GPT config (`Config::micro()`).
   - Take a 32-token base sequence, mark 16 as conditioning.
   - Compute AC-GPT conditional logprob via T2.1.

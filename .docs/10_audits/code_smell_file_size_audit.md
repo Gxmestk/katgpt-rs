@@ -37,7 +37,7 @@ throughout), zero `Arc<RwLock<HashMap>>`.
 | `crates/katgpt-core/src/parallax_attn/mod.rs` | 2524 | ✅ Split (Issue 167) — `crates/katgpt-core/src/parallax_attn/mod.rs` 973 + `tests.rs` 1559 |
 | `crates/katgpt-core/src/speculative/qmc/mod.rs` | 2516 | ✅ Split (Issue 170) — `crates/katgpt-core/src/speculative/qmc/mod.rs` 1085 + `tests.rs` 1430 (57% tests) |
 | `crates/katgpt-core/src/manifold_bandit/mod.rs` | 2196 | ✅ Split (Issue 171) — `crates/katgpt-core/src/manifold_bandit/mod.rs` 1290 + `tests.rs` 906 (41% tests) |
-| `crates/katgpt-forward/src/speculative/d2f.rs` | 2268 | ✅ Split (Issue 172) — `crates/katgpt-forward/src/d2f/mod.rs` 1783 + `tests.rs` 485 (21% tests) |
+| `src/speculative/d2f.rs` | 2268 | ✅ Split (Issue 172) — `crates/katgpt-forward/src/d2f/mod.rs` 1783 + `tests.rs` 485 (21% tests) |
 | `crates/katgpt-percepta/src/wasm/lower/mod.rs` | 2248 | ✅ Split (Issue 173) — `crates/katgpt-percepta/src/wasm/lower/mod.rs` 1873 + `tests.rs` 375 (17% tests) |
 | `crates/katgpt-core/src/traits.rs` | 2203 | ✅ Split (Issue 174) — `crates/katgpt-core/src/traits/mod.rs` 1495 + 5 sibling test files (692 total) |
 | `src/pruners/bomber/players.rs` | 2828 | ✅ Functional split (Issue 175) — `players/` folder: mod.rs 155 + helpers.rs 783 + 7 player-type files + tests.rs 102 |

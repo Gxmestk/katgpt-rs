@@ -276,7 +276,7 @@ We proved transformers can learn to play games.
 
 3. **Granular feature flags** — incremental adoption, each level unlocks the next. See Feature Flags section below. Default off.
 
-4. **File size limit** — `lower.rs` may exceed 2048 lines (source is 1808). Split into `lower/arithmetic.rs`, `lower/logic.rs`, `lower/shift.rs` if needed.
+4. **File size limit** — `lower.rs` may exceed 2048 lines (source is 1808). Split into `crates/katgpt-percepta/src/wasm/interpreter/arithmetic.rs`, `lower/logic.rs`, `lower/shift.rs` if needed.
 
 5. **Keep runtime.h as-is** — The C runtime is injected into WASM programs at compile time. It stays as a C header file.
 

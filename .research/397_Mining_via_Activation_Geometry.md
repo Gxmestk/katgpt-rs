@@ -110,7 +110,7 @@ The paper operates on 4096-dim LLM residual streams with natural-language prefix
 | BLAKE3 commitment | `MerkleFrozenEnvelope` (riir-neuron-db/freeze.rs) | **MAG directions are frozen artifacts** — same envelope |
 | Curiosity / exploration | CGSP (R126/P299), Curiosity Pulse (R041) | **MAG transfer prediction = modelless curiosity signal** — predicts which experiences teach the most |
 | External escalation | AnyRAG gateway (riir-neuron-db/gateway.rs) | **MAG transfer ranking = which source to escalate to** |
-| Consolidation | Raven/δ-Mem (riir-neuron-db/consolidation.rs) | **MAG transfer prediction ranks which shards/experiences to consolidate** |
+| Consolidation | Raven/δ-Mem (src/sleep/consolidation.rs) | **MAG transfer prediction ranks which shards/experiences to consolidate** |
 
 **Nothing here is new math.** The mean-difference is identical to EmotionDirections. What is new: (a) the **unsupervised label source** (`y_M` — the model/runtime's own verdict), (b) the **operator family** that isolates different parts of the shift, (c) the **linearity diagnostic** `ϵ_Q` that predicts steerability, and (d) the **transfer-prediction** application.
 

@@ -185,7 +185,7 @@ The Super-GOAT novelty for our codebase is **not** "we invented algorithmic-prob
 Two new modules in `katgpt-rs/src/screening/`:
 
 ```rust
-//katgpt-rs/src/screening/complexity_prior.rs
+crates/katgpt-pruners/src/screening/complexity_prior.rs
 pub trait ComplexityProxy {
     /// O(1) or O(n) computable K̃(x). Lower = simpler.
     fn k_tilde<T: AsRef<[u8]>>(&self, candidate: T) -> f32;
@@ -217,7 +217,7 @@ impl<K: ComplexityProxy> CompressionPriorSampler<K> {
     pub fn top_k(&self, candidates: &[&[u8]], k: usize, out: &mut [usize]);
 }
 
-//katgpt-rs/src/screening/coincidence_gate.rs
+crates/katgpt-pruners/src/screening/coincidence_gate.rs
 pub struct CoincidenceGate {
     /// Threshold τ on |X_O(1)| estimate. Above τ → optimistic transfer probe.
     /// Below τ → skip (treat as random).

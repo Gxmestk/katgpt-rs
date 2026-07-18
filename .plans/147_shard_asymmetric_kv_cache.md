@@ -134,7 +134,7 @@ This phase stays in riir-ai because:
 
 | Task | Description | Est. | Depends |
 |------|-------------|------|---------|
-| T1 | Add `undo_rope()` to `spectralquant/spectral.rs` | 2h | — |
+| T1 | Add `undo_rope()` to `crates/katgpt-spectral/src/spectral.rs` | 2h | — |
 | T2 | Extend `SpectralQuantCalibration` to store RoPE parameters | 1h | — |
 | T3 | Modify `spectral_rotation.rs` to operate on no-RoPE basis | 2h | T1, T2 |
 | T4 | Update `forward.rs` to reapply RoPE after dequant (or use Δ-identity) | 3h | T3 |

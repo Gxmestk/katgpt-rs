@@ -121,7 +121,7 @@ L_URKL = E[β * 0.5 * (log(πθ(a)/πref(a)))²]
 | SDPG Component | Our Code | Status |
 |---|---|---|
 | Bandit Q-values (analog of π logits) | `BanditPruner` — `src/pruners/bandit.rs` | ✅ Production |
-| δ-reward signal (analog of A_out) | `DeltaBanditPruner` — `src/pruners/g_zero/delta_bandit.rs` | ✅ Production |
+| δ-reward signal (analog of A_out) | `DeltaBanditPruner` — `crates/katgpt-pruners/src/g_zero/delta_bandit.rs` | ✅ Production |
 | Sigmoid gating (SDAR) | `SdarGate` — `crates/katgpt-pruners/src/sdar_gate.rs` | ✅ Production |
 | Rubric scoring (ROPD) | `RubricBanditPruner` — `src/pruners/ropd/` | ✅ Production |
 | DDTree relevance scores | `ScreeningPruner` — `src/speculative/screening.rs` | ✅ Production |

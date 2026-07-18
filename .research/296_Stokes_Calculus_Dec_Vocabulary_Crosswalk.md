@@ -100,7 +100,7 @@ HLA is a second-order linear-attention streaming recurrence (verified in Researc
 
 ### 3.2 `latent_functor/` (`zone_gating`, `reestimation`, `arithmetic`, `cross_game`, `k_selector`, `quality_gate`)
 
-`latent_functor/arithmetic.rs` already treats functor application as a vector op. The Stokes lens says: a functor `F: latent → latent` is a vector field. Its **divergence** (via `codifferential` after discretization) tells you whether the functor is contractive (converging to a fixed point = attractor) or expansive (diverging = unstable). This is a modelless **stability diagnostic** that could feed `quality_gate.rs` and `reestimation.rs`. Not new machinery — a new *signal* derived from shipped operators.
+`crates/katgpt-percepta/src/wasm/interpreter/arithmetic.rs` already treats functor application as a vector op. The Stokes lens says: a functor `F: latent → latent` is a vector field. Its **divergence** (via `codifferential` after discretization) tells you whether the functor is contractive (converging to a fixed point = attractor) or expansive (diverging = unstable). This is a modelless **stability diagnostic** that could feed `quality_gate.rs` and `reestimation.rs`. Not new machinery — a new *signal* derived from shipped operators.
 
 ### 3.3 `cgsp_runtime/` (curiosity-guided self-play)
 
@@ -171,7 +171,7 @@ pub fn line_integral(
 ) -> f32;
 ```
 
-**Fuses:** DEC `CochainField` (shipped) + Plan 312 `manifold_geodesic` (the path) + `latent_functor/arithmetic.rs` (functor as vector field).
+**Fuses:** DEC `CochainField` (shipped) + Plan 312 `manifold_geodesic` (the path) + `crates/katgpt-percepta/src/wasm/interpreter/arithmetic.rs` (functor as vector field).
 
 **GOAT gate:** A/B — does `line_integral`-weighted geodesic beat unweighted `manifold_geodesic` on NPC navigation smoothness (fewer direction reversals)? Target: ≥20% fewer reversals at equal path length.
 

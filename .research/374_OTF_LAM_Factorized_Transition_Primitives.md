@@ -69,18 +69,18 @@ Replace pixel-space prediction with prediction in a **frozen DINOv2 representati
 | Paper term | Codebase equivalent | Where it ships / would land |
 |---|---|---|
 | latent action `z^act_t` | action-direction vector, motor gate latent, policy latent | `latent_functor/` direction vectors; HLA motor channels |
-| observed transition `(x_t, x_{t+1})` | frame delta, TxDelta, temporal derivative, belief-state transition | `crates/katgpt-core/src/temporal_deriv.rs` (DEFAULT-ON Plan 277); `latent_functor/arithmetic.rs` source/target pairs |
+| observed transition `(x_t, x_{t+1})` | frame delta, TxDelta, temporal derivative, belief-state transition | `crates/katgpt-core/src/temporal_deriv.rs` (DEFAULT-ON Plan 277); `crates/katgpt-percepta/src/wasm/interpreter/arithmetic.rs` source/target pairs |
 | observed-transition primitive `c(k)` | codebook entry, effect atom, shard style dimension | **DOES NOT SHIP for transitions** — codebooks exist only for KV compression (`katgpt-kv`, Lloyd-Max). This primitive would be new. |
 | motion input `o_t` (gradient/Sobel + temporal diff) | temporal derivative signal | `crates/katgpt-core/src/temporal_deriv.rs` (DEFAULT-ON) — ships the dual fast/slow surprise signal |
 | patchify + patchwise VQ | block quantization, patch embedding | KV-cache has K-means VQ on groups of 4 channels; no transition-patch equivalent |
 | occupancy map `M(k)_t` | spatial support mask, attention mask | DEC cochains (`terrain_cochains.rs`); zone density maps |
 | activation strength `w(k)_t` | code usage frequency, slot utilization | `ShardIndex` utilization; MoE expert load |
 | state-aware factor token `r_{t,k} = Γ(c(k), M, w, x_t)` | state-conditioned embedding, FiLM-modulated token | `ega_attn.rs` FiLM-style gating; `funcattn` cross-feature interaction |
-| sigmoid relevance gate `α_k = σ(G_θ(r))` | sigmoid gate (hard rule, never softmax) | Pervasive: `ega_attn`, `gdn2/kernel`, `rat_bridge/fuse`, `manifold_power_iter_router`, `latent_functor/arithmetic.rs::functor_gate` |
+| sigmoid relevance gate `α_k = σ(G_θ(r))` | sigmoid gate (hard rule, never softmax) | Pervasive: `ega_attn`, `gdn2/kernel`, `rat_bridge/fuse`, `manifold_power_iter_router`, `crates/katgpt-percepta/src/wasm/interpreter/arithmetic.rs::functor_gate` |
 | normalized gated average `Σ α_k r_k / (Σ α_k + ε)` | soft attention, mean-field aggregation | `mean_field/` module; `set_attention.rs`; `PersonalityWeightedComposition::compose_into` (Plan 297) |
 | frozen DINO representation space | frozen encoder, fixed embedding target | `InducedCwmKernel` (frozen `g_φ`); `BeliefInferenceFn` (observation→belief); sleep-time frozen rollforward |
-| inverse dynamics (IDM) | `extract_functor` (estimate displacement from pairs) | `latent_functor/arithmetic.rs` — **monolithic** (single mean displacement) |
-| forward dynamics (FDM) | `apply_functor` (predict target from source + functor); `InducedCwmKernel::advance` | `latent_functor/arithmetic.rs`; `katgpt-core/src/induced_cwm/` |
+| inverse dynamics (IDM) | `extract_functor` (estimate displacement from pairs) | `crates/katgpt-percepta/src/wasm/interpreter/arithmetic.rs` — **monolithic** (single mean displacement) |
+| forward dynamics (FDM) | `apply_functor` (predict target from source + functor); `InducedCwmKernel::advance` | `crates/katgpt-percepta/src/wasm/interpreter/arithmetic.rs`; `katgpt-core/src/induced_cwm/` |
 | agent ambiguity / distractor entanglement | curiosity = prediction-error signal (Pathak-style distractor filter) | `crates/katgpt-core/src/temporal_deriv.rs` (DEFAULT-ON); CGSP (Plan 274) |
 | cross-morphology / cross-carrier transfer | cross-game transfer, shard reuse across zones/archetypes | `riir-ai/crates/riir-engine/src/latent_functor/cross_game.rs`; `NeuronShard` zone transfer; `ArchetypeBlendShard` |
 | behavioral cloning policy | training-only | → riir-train |
@@ -98,7 +98,7 @@ The mandatory two-layer novelty check (notes + shipped code, per the Research 24
 | Paper mechanism | Shipped prior art | Match |
 |---|---|---|
 | Monolithic latent action (`z^act` = single vector) | `extract_functor`/`apply_functor` (Research 123, Plan 273) — Super-GOAT | ✅ Monolithic version ships |
-| Inverse dynamics (`z_{t+1} ≈ z_t + ρ(a)`) | `latent_functor/arithmetic.rs` + `sleep_time::HlaSleepTimeOp` (DEFAULT-ON) | ✅ Ships (Research 358/360 PASS precedent) |
+| Inverse dynamics (`z_{t+1} ≈ z_t + ρ(a)`) | `crates/katgpt-percepta/src/wasm/interpreter/arithmetic.rs` + `sleep_time::HlaSleepTimeOp` (DEFAULT-ON) | ✅ Ships (Research 358/360 PASS precedent) |
 | Plan-execute-adapt-replan loop | `ReestimationScheduler` (Research 123, Plans 303/317) | ✅ Ships (Research 360 PASS precedent) |
 | Frozen forward model (`g_φ`) | `InducedCwmKernel: GameState` (Plan 296) | ✅ Ships |
 | Curiosity / distractor filter | Temporal Deriv Kernel (Plan 277, DEFAULT-ON) | ✅ Ships |

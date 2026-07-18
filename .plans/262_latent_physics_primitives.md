@@ -21,7 +21,7 @@ These are NOT game-specific. Any game with NPC AI that thinks in latent space ne
 ## Tasks
 
 ### Phase 0: SectorProjection
-- [x] Create `katgpt-rs-core/crates/katgpt-sense/src/sector.rs`
+- [x] Create `crates/katgpt-sense/src/sector.rs`
 - [x] Define `SectorProjection` struct:
   ```rust
   /// Multi-sector spatial projection for NPC perception.

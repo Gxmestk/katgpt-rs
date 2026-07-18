@@ -35,7 +35,7 @@ In this neuro-symbolic architecture (katgpt-rs + anyrag), there are exactly **tw
 |---------------|----------|-------------------|
 | `ConstraintPruner` trait | `src/speculative/types.rs` | The trait interface — pluggable into DDTree hot path |
 | `NoPruner` | `src/speculative/types.rs` | Passthrough (no validation) |
-| `SudokuPruner` | `src/speculative/sudoku_pruner.rs` | Path-aware row/col/box constraint checking |
+| `SudokuPruner` | `crates/katgpt-pruners/src/sudoku_pruner.rs` | Path-aware row/col/box constraint checking |
 | `SynPruner` | `crates/katgpt-validator/src/syn_pruner.rs` | Two-tier Rust syntax validation (bracket DFA + `syn` parse) |
 | `PartialParser` | `crates/katgpt-validator/src/partial_parser.rs` | Tier 0: O(n) bracket balancing DFA |
 

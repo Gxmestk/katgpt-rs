@@ -52,7 +52,7 @@ Lift the paper's residual-stream analogy mechanism (`e_target ≈ e_source + f`)
 | Self-learn welcome | Re-estimation from fresh latent observations is runtime self-improvement of a routing/direction table, not of base weights. |
 | Plasma/Hot tiering | Extraction is O(N·dim) adds; apply is one vector add; parallelism is two dots — all SIMD, L1-resident, batchable across thousands of NPCs. |
 
-## API (corrected — target: `riir-engine/crates/katgpt-percepta/src/wasm/interpreter/arithmetic.rs`, feature `latent_functor`)
+## API (corrected — target: `crates/katgpt-percepta/src/wasm/interpreter/arithmetic.rs`, feature `latent_functor`)
 
 ```rust
 /// Estimate functor direction + coherence from N position-aligned analog pairs.

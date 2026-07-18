@@ -363,7 +363,7 @@ pub struct SpectralQuantLayer {
     d_eff: usize, b_high: u8, b_low: u8,
 }
 
-// Zero-alloc compressed KV cache (spectralquant/spectral_kv_cache.rs)
+// Zero-alloc compressed KV cache (crates/katgpt-spectral/src/spectral_kv_cache.rs)
 pub struct SpectralQuantKVCache {
     layers: Vec<SpectralQuantLayer>,
     key_indices: Vec<Vec<Vec<u8>>>,  // variable-bit packed

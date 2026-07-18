@@ -167,7 +167,7 @@ pub trait StepLocalizer<Dir, W> {
 
 ### Tasks
 
-- [x] **T3.1** Add a criterion bench `crates/katgpt-pruners/benches/step_attribution_qualifier.rs` measuring `qualify()` latency for W=16/32/64/128 replay windows with a no-op `ReplayExecutor` (isolates gate overhead from executor overhead).
+- [x] **T3.1** Add a criterion bench `crates/katgpt-pruners/src/step_attribution_qualifier.rs` measuring `qualify()` latency for W=16/32/64/128 replay windows with a no-op `ReplayExecutor` (isolates gate overhead from executor overhead).
   - **DEV NOTE:** bench lives at `benches/step_attribution_qualifier_bench.rs` (root benches/, not crate-local) to match the existing convention (`salience_tri_gate_bench.rs`, `cucg_bench.rs`). Uses `std::time::Instant` + `harness = false`, not Criterion — DRY with the existing crate convention.
 - [x] **T3.2** Document the sub-ms gate-overhead target (excluding executor). Gate overhead = aggregate + compare + branch; should be < 1µs for W=64.
   - **RESULT:** 13 ns aggregate-only at W=64 (76.9× margin under 1 µs target). End-to-end `qualify()` 119 ns at W=64.

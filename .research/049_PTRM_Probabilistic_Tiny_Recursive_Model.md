@@ -494,7 +494,7 @@ PTRM independently validates our existing design:
 | `crates/katgpt-pruners/src/bt_rank.rs` | `BtRank` Bradley-Terry pairwise ranking |
 | `crates/katgpt-speculative/src/flow_pruner.rs` | `FlowPruner<P>` GFlowNet flow bonus |
 | `crates/katgpt-pruners/src/sdar/sdar_bandit.rs` | `SdarBanditPruner<P>` sigmoid-gated bandit |
-| `src/pruners/sdar/sdar_absorb.rs` | `SdarGatedAbsorbCompress<P>` sigmoid-gated absorb-compress |
+| `crates/katgpt-pruners/src/sdar/sdar_absorb.rs` | `SdarGatedAbsorbCompress<P>` sigmoid-gated absorb-compress |
 | `tests/bench_elf_modelless.rs` | SDE noise benchmarks (diversity + overhead) |
 | `examples/bandit_02_ddtree.rs` | BanditPruner + DDTree integration example |
 | `examples/bandit_03_slot.rs` | BanditPruner proof-of-value example |

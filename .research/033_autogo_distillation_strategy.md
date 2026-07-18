@@ -456,7 +456,7 @@ From weakest to strongest:
 | Policy/value dual head | Future: dual-head config | `model.py:GoTransformer` | `crates/katgpt-percepta/src/transformer.rs` |
 | Self-play loop | G-Zero `SelfImprovingCycle` | `self_play.py` | `pruners/g_zero/` |
 | Agent registry pattern | Adapt for Go players | `agents/base.py` | `crates/katgpt-pruners/src/go/players.rs` |
-| REST API game protocol | Rust HTTP client | `play.py` | `src/pruners/go/autogo_client.rs` |
+| REST API game protocol | Rust HTTP client | `play.py` | `crates/katgpt-pruners/src/go/autogo_client.rs` |
 | Replay data (NPZ → JSONL) | Our ReplayWriter format | `dataset.py`, `gameplay.py` | `crates/katgpt-pruners/src/go/replay.rs` |
 
 ### 6.2 Skip (Not Applicable / Already Better)

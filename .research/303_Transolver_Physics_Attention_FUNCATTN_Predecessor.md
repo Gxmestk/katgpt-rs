@@ -18,7 +18,7 @@ Transolver's **Physics-Attention** reduces quadratic attention over N mesh point
 **Distilled for katgpt-rs (modelless, inference-time):** the slice/deslice primitive is **already conceptually covered** by three stronger cousins:
 - **Research 257 (FUNCATTN)** — strictly stronger successor. Plan 286 ships the open primitive; Plan 318 ships the riir-ai rank-k functor upgrade. Transolver is a strict subset.
 - **Research 302 (FAME)** — per-entity fixed MoE blend, verdict'd Super-GOAT today. Covers the "M slices = K archetype fields, weights computed once and frozen" angle as a stronger commitment-tier primitive.
-- **latent_functor rank-1 (Research 123 / Plan 303)** — the rank-1, basis-free special case already shipped in `riir-engine/src/latent_functor/arithmetic.rs`.
+- **latent_functor rank-1 (Research 123 / Plan 303)** — the rank-1, basis-free special case already shipped in `crates/katgpt-percepta/src/wasm/interpreter/arithmetic.rs`.
 
 **The only genuinely novel angle Transolver adds to the corpus** (not in Research 257/302/123) is a small reframing: **slice = DEC codifferential δ (rank-1 → rank-0 aggregation), deslice = DEC exterior_derivative d (rank-0 → rank-1 coboundary broadcast)**. The DEC operators (`codifferential`, `exterior_derivative`, `hodge_decompose`) already ship in `crates/katgpt-dec/src/operators.rs` (Plan 251). This is a vocabulary bridge, not a new primitive.
 
@@ -65,7 +65,7 @@ The transferable primitive is **soft-cluster reduce-scatter attention**: project
 |---|---|---|
 | **FUNCATTN (R257)** | `crates/katgpt-core/src/funcattn/mod.rs` (Plan 286, Gain-tier pending) | Closed-form Tikhonov k×k ridge solve `(1-α)·K̃ᵀK̃ + α·I` replacing softmax M-attention. Beats Transolver 6–26% on the same benchmarks. Lipschitz-bounded by α. Resolution-invariant. |
 | **FAME CommittedFieldBlend (R302)** | `crates/katgpt-core/src/committed_field_blend.rs` (Plan 321, Super-GOAT, today) | Per-ENTITY FIXED MoE blend computed ONCE from trajectory summary then frozen. M slices = K archetype operator fields, weights π committed via BLAKE3, sampling-invariant. |
-| **latent_functor rank-1 (R123)** | `riir-engine/src/latent_functor/arithmetic.rs` (Plan 303, shipped) | The k=1, λ=0, basis-free special case. `extract_functor: f = mean_k(target_k - source_k)`, apply via `out = source + f`. Rank-1 operator between two latent spaces. |
+| **latent_functor rank-1 (R123)** | `crates/katgpt-percepta/src/wasm/interpreter/arithmetic.rs` (Plan 303, shipped) | The k=1, λ=0, basis-free special case. `extract_functor: f = mean_k(target_k - source_k)`, apply via `out = source + f`. Rank-1 operator between two latent spaces. |
 
 Research 257 §2.2 explicitly notes: *"Math pieces all shipped (Schur ridge solve, SpectralQuant eigenbasis, Parallax sigmoid partition-of-unity, latent_functor rank-1 operator). The combination as an attention operator + as a rank-k functor upgrade is novel."* The same is true for Transolver — except Transolver is **strictly weaker** than FUNCATTN (softmax M-attention vs closed-form ridge solve), so there is no combination Transolver enables that FUNCATTN doesn't already enable better.
 
@@ -162,7 +162,7 @@ Add to the standing DEC vocabulary table in the research skill and in Research 2
 | **Research 257 / Plan 286** (FUNCATTN) | notes + planned (`funcattn.rs`) | **Canonical stronger successor.** Same slice/deslice primitive, closed-form ridge solve replaces softmax M-attention, beats Transolver 6–26% on same benchmarks. | This note defers to 257 for all implementation and fusion. |
 | **Research 302 / Plan 321** (FAME CommittedFieldBlend) | notes + planned (`committed_field_blend.rs`, today) | **Per-entity commitment-tier cousin.** Per-entity FIXED MoE blend computed once then frozen — the commitment-tier version of Transolver's per-forward-pass slice blend. | Crowd-scale Transolver reframing subsumed by FAME. |
 | **Research 246 / Plan 279** (Manifold Power Iteration MoE Router) | notes + shipped (`manifold_power_iter_router.rs`) | Sibling GOAT. Power iteration on router rows; same "shipped math, novel application" pattern. | Confirms the pattern: Transolver is the third paper in this family verdict'd below Super-GOAT. |
-| **Research 123 / Plan 303** (latent_functor) | notes + shipped (`latent_functor/arithmetic.rs`) | Rank-1, λ=0, basis-free special case of FUNCATTN (and therefore of Transolver). | The rank-k upgrade (Plan 318) is the path forward, not Transolver. |
+| **Research 123 / Plan 303** (latent_functor) | notes + shipped (`crates/katgpt-percepta/src/wasm/interpreter/arithmetic.rs`) | Rank-1, λ=0, basis-free special case of FUNCATTN (and therefore of Transolver). | The rank-k upgrade (Plan 318) is the path forward, not Transolver. |
 | **Research 219 / Plan 251** (DEC operators) | notes + shipped (`crates/katgpt-dec/src/operators.rs`) | The DEC substrate. Slice/deslice = codifferential/exterior_derivative. | Vocabulary bridge (§5 above). |
 | **Research 296 / Plan 314** (Stokes calculus wrappers) | notes + planned | The Stokes-theorem vocabulary crosswalk. | §5 adds Transolver to the crosswalk. |
 | **Plan 290** (Latent Field Steering, `apply_field_to_crowd`) | shipped (`latent_steering.rs`) | Crowd-scale field application primitive. | The crowd-scale Transolver reframing would compose with this, not replace it. |

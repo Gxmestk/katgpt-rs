@@ -111,7 +111,7 @@ cargo check -p katgpt-core --all-features --lib           # combo regression che
 - **T1 audit:** `.issues/040_ptg_latent_functor_edge_composition.md` §"T1 Wire-Format Finding"
 - **Sibling primitive:** Issue 039 (whole-architecture commitment) — once this ships,
   a `FunctorEdgeParams.direction_set` reference can be included in the architecture root.
-- **riir-ai counterpart:** `riir-engine/crates/katgpt-percepta/src/wasm/interpreter/arithmetic.rs` (Plan 273) —
+- **riir-ai counterpart:** `crates/katgpt-percepta/src/wasm/interpreter/arithmetic.rs` (Plan 273) —
   the full HLA-aware functor (rank-k, tropical, KARC consumers). katgpt-rs ships only
   the edge-apply numerics (cosine + sigmoid + SAXPY); the caller pre-resolves the
   direction vector from the `direction_set` BLAKE3 ref + `direction_index`.

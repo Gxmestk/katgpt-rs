@@ -187,7 +187,7 @@ The codebook is constructed modellessly via **k-means clustering** on observed t
 
 - **Paper:** Nam et al., *Latent Actions from Factorized Transition Effects under Agent Ambiguity*, arXiv:2606.30544, 2026-06-30.
 - **Research note:** [katgpt-rs/.research/374_OTF_LAM_Factorized_Transition_Primitives.md](../.research/374_OTF_LAM_Factorized_Transition_Primitives.md)
-- **Monolithic baseline:** Plan 273 (`latent_functor/arithmetic.rs`), Research 123 (Latent Functor Runtime — Super-GOAT).
+- **Monolithic baseline:** Plan 273 (`crates/katgpt-percepta/src/wasm/interpreter/arithmetic.rs`), Research 123 (Latent Functor Runtime — Super-GOAT).
 - **Codebook mechanism cousin:** `katgpt-kv` Lloyd-Max VQ (KV compression, not transition factorization).
 - **Aggregation pattern cousin:** Plan 297 (`PersonalityWeightedComposition` — weighted layer composition).
 - **Motion input cousin:** Plan 277 (Temporal Deriv Kernel — DEFAULT-ON, the `o_t` analog).

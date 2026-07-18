@@ -313,7 +313,7 @@ The feature flag `plasma_path` is mildly misleading post-reclassification —
 it gates the Hot-tier ternary CPU path, not the Plasma-tier binary. Renaming
 `plasma_path` → `ternary_hot` was considered and rejected: it would touch 7+
 Cargo.toml files, ~15 `#[cfg(feature = "plasma_path")]` sites in
-`katgpt-speculative/trd.rs`, the `riir-core-wasm` re-export, and
+`crates/katgpt-speculative/src/distill/trd.rs`, the `riir-core-wasm` re-export, and
 `riir-examples`'s `plasma` feature. Per Gate B ("Prefer minimal churn unless
 rename clarifies the architecture for downstream consumers"), the Cargo.toml
 comments now carry the tier semantics and the rename is deferred.

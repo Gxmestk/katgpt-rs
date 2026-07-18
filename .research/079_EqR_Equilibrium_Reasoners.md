@@ -406,5 +406,5 @@ EqR independently validates our existing design from the attractor dynamics pers
 | `src/speculative/types.rs` | `EarlyStopGate`, `SdeConfig`, `ScreeningPruner` |
 | `src/pruners/bandit.rs` | `BanditPruner<P>` with UCB1 and selection strategies |
 | `crates/katgpt-pruners/src/g_zero/types.rs` | `HintDelta` — intrinsic reward signal (analogous to EqR residual) |
-| `src/pruners/g_zero/delta_absorb.rs` | `DeltaGatedAbsorbCompress` — δ-gated state updates |
-| `src/pruners/g_zero/delta_bandit.rs` | `DeltaBanditPruner` — δ-based arm selection |
+| `crates/katgpt-pruners/src/g_zero/delta_absorb.rs` | `DeltaGatedAbsorbCompress` — δ-gated state updates |
+| `crates/katgpt-pruners/src/g_zero/delta_bandit.rs` | `DeltaBanditPruner` — δ-based arm selection |

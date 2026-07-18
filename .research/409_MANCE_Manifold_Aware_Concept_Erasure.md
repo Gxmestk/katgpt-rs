@@ -73,7 +73,7 @@ MANCE takes ~8 min/panel (NVIDIA B200, 458–475s across variants). ~50% runtime
 | probe / classifier (finds the concept direction) | **direction vector** (HLA `EmotionDirections`), **MAG** `mine_contrast_direction` (Plan 418), **CNA** contrastive pair (Plan 087), **ConstraintPruner** |
 | surgicality / preserve other concepts | **non-interference** (Plan 329 — orthogonal branch allocation), **no-harm guarantee** (TILR Plan 425 — γ→0 bit-recovers input), **branch-local** |
 | natural representations X⁽⁰⁾ | **natural manifold**, **reference representations**, **baseline state** (freeze/thaw pre-edit snapshot, shard pre-consolidation state) |
-| iterative probe refit | **re-estimation** (`riir-ai/crates/riir-engine/src/latent_functor/reestimation/mod.rs` — coherence-driven re-estimation), **consolidation cycle** (`riir-neuron-db/consolidation.rs`) |
+| iterative probe refit | **re-estimation** (`riir-ai/crates/riir-engine/src/latent_functor/reestimation/mod.rs` — coherence-driven re-estimation), **consolidation cycle** (`src/sleep/consolidation.rs`) |
 | LEACE (1st-moment erasure) | **mean removal**, **centering** (shipped as a preprocessing step in many primitives), **orthogonal projection** onto mean direction |
 | CovMatch (2nd-moment, rank-2) | **covariance asymmetry projection** (NOT shipped; `dual_gram_pca` ships PCA but not class-conditional ΔΣ eigenvector projection) |
 

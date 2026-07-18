@@ -20,7 +20,7 @@ The Nemotron paper calls this "self-speculation" and presents it as a major cont
 
 | Component | What We Already Have | Delta |
 |---|---|---|
-| Draft→Verify→Accept pattern | `speculative/step.rs` `speculative_step_rollback()` | ✅ Same pattern |
+| Draft→Verify→Accept pattern | `crates/katgpt-forward/src/step.rs` `speculative_step_rollback()` | ✅ Same pattern |
 | `SpeculativeVerifier` trait | `verifier.rs` with `SimulatedVerifier`, `LeviathanVerifier` | ✅ Abstraction ready |
 | AR verification | `forward()` with causal attention | ✅ Already there |
 | Prefix acceptance | `speculate()` in `LeviathanVerifier` | ✅ Already there |

@@ -142,7 +142,7 @@ Since Hadamard is linear: `Σ w_t · H(V_rot_t) = H(Σ w_t · V_rot_t)`. Apply o
 | Random rotation | `crates/katgpt-quant/src/turboquant/rotation.rs` | ✅ Direct reuse |
 | KV cache trait | `QuantizedKVCache` trait | ✅ Extend for asymmetric codec |
 | Bit packing | `crates/katgpt-quant/src/turboquant/kv_cache.rs` | ✅ Reuse for int4 coefficients |
-| SVD/eigenbasis | `spectralquant/spectral.rs` | ✅ Adapt for no-RoPE input |
+| SVD/eigenbasis | `crates/katgpt-spectral/src/spectral.rs` | ✅ Adapt for no-RoPE input |
 
 ### What Does NOT Map
 

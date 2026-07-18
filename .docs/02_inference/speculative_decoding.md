@@ -276,7 +276,7 @@ Low-level sampling primitives used by verifiers and tree builders.
 
 ---
 
-## Step Functions (`speculative/step.rs`)
+## Step Functions (`crates/katgpt-forward/src/step.rs`)
 
 High-level entry points that compose the full speculative decoding pipeline.
 
@@ -755,7 +755,7 @@ Pipeline steps:
 
 ---
 
-## Drafter LoRA (`speculative/drafter_lora.rs`)
+## Drafter LoRA (`crates/katgpt-forward/src/drafter_lora.rs`)
 
 LoRA-trained drafter weights for improved speculative decoding quality (Plan 117: MTP LoRA Drafter).
 

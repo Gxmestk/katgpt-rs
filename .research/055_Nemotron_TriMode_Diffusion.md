@@ -98,13 +98,13 @@ Temperature: τ=3.0 for distributions, τ=1.0 for CE
 | Noise schedule | `dllm.rs` `NoiseSchedule` | ✅ Plan 066 |
 | D2F block decode | `src/speculative/d2f.rs` `d2f_decode_block()` | ✅ Plan 066 |
 | ConstraintPruner | `speculative/types.rs` trait | ✅ Production |
-| Speculative decoding (AR→AR) | `speculative/step.rs` | ✅ Production |
+| Speculative decoding (AR→AR) | `crates/katgpt-forward/src/step.rs` | ✅ Production |
 | MTP drafter | `transformer.rs` mtp_activation_proj | ✅ Plan 055 |
 | LoRA training (wgpu) | `riir-gpu` full stack | ✅ Production |
 | SDAR sigmoid gating | `crates/katgpt-pruners/src/sdar_gate.rs` modelless | ✅ Plan 072 |
 | Gemma 2 model loading | `riir-engine/safetensors_loader.rs` | ✅ Plan 087 |
 | KV cache | `MultiLayerKVCache`, `PagedKVCache` | ✅ Production |
-| Draft→Verify→Accept pattern | `speculative/step.rs` `speculative_step_rollback()` | ✅ Production |
+| Draft→Verify→Accept pattern | `crates/katgpt-forward/src/step.rs` `speculative_step_rollback()` | ✅ Production |
 | `SpeculativeVerifier` trait | `verifier.rs` with `SimulatedVerifier`, `LeviathanVerifier` | ✅ Production |
 | DDTree path extraction | `src/speculative/dd_tree.rs` | ✅ Production |
 | KV cache snapshot/rollback | `MultiLayerKVCache::snapshot()/restore()` | ✅ Production |

@@ -279,7 +279,7 @@ pub fn forward<'a>(
 - `transformer.rs` — weights struct, cache struct, forward(), generate()
 - `crates/katgpt-speculative/src/spechop/verifier.rs` — `LeviathanVerifier` creates `KVCache`
 - `crates/katgpt-speculative/src/dflash.rs` — `dflash_predict*` creates `KVCache`
-- `speculative/step.rs` — `speculative_step*` creates `KVCache`
+- `crates/katgpt-forward/src/step.rs` — `speculative_step*` creates `KVCache`
 - `benchmark.rs` — creates `KVCache`
 - `main.rs` — creates `KVCache`
 

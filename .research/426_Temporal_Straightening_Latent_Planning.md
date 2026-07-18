@@ -215,7 +215,7 @@ The only genuinely transferable *runtime* observation — the paper's note that 
 
 1. **The curvature metric** → `LatentTrajectoryGeometry::mean_curvature` (Plan 342, Research 324) — exact formula, opt-in, 3.04 µs at HLA scale.
 2. **The ε-straight linearized dynamics** (`A ≈ I` regime) → `latent_functor/arithmetic/::extract_functor` (Plan 303/317, Research 123 Super-GOAT) — constructs `A = I` *closed-form from a transition buffer*, no gradient. The runtime doesn't regularize toward straightness; it constructs straightness.
-3. **The harmonic-projection "straightening" correction** → `katgpt-dec/hodge.rs::hodge_decompose` + `harmonic_flow` (Plan 251) — extracts the harmonic (zero-Laplacian = flat) component of any latent trajectory cochain. The modelless analog of training an encoder to produce straight trajectories.
+3. **The harmonic-projection "straightening" correction** → `crates/katgpt-dec/src/hodge.rs::hodge_decompose` + `harmonic_flow` (Plan 251) — extracts the harmonic (zero-Laplacian = flat) component of any latent trajectory cochain. The modelless analog of training an encoder to produce straight trajectories.
 
 The paper's primary value proposition — ε-straight latents → well-conditioned planning Hessian → faster **gradient-based** action optimization — does not transfer to our substrate: NPC planning uses MCTS / CGSP / closed-form functor application, not GD through a differentiable rollout. There is no Hessian to condition. The training recipe (joint encoder + predictor optimization with `L_curv` as auxiliary loss) belongs in riir-train as a one-line refinement — and the curvature-reward analog already ships there as `riir-train/crates/riir-train-engine/src/dec_training/hodge_reward.rs`.
 

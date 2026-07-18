@@ -106,7 +106,7 @@ Key metric: **format-filtered rate** (proxy for output degradation). ActSteer wi
 | Causal-intervention behavioral delta | `FaithfulnessProbe` (`Plan 278`, `crates/katgpt-core/src/cgsp/dual_pool.rs:1868`), `behavior_delta` trait method | Detection (intervention) | ✅ shipped |
 | Sample-M-candidates → score → argmax-select | CGSP Conjecturer+Guide loop (`crates/katgpt-core/src/cgsp/loop_.rs`); CompressionDrafter beam (`riir-games/src/quest_grammar/compression_draft.rs`) | Mechanism skeleton | ✅ shipped (different domains) |
 | Linear forecast from cheap signal | Issue 023 `AcceptanceForecast { a, b }` (`α ≈ a − b·H(p)`, Research 243 §2.3) | Forecast | 📋 planned, not yet implemented |
-| Bayesian precision vector for arm lifecycle | `PosteriorGuidedPruner` (`Plan 239`, `src/pruners/posterior/wrapper.rs`) | Posterior (not future) | ✅ shipped, default-on |
+| Bayesian precision vector for arm lifecycle | `PosteriorGuidedPruner` (`Plan 239`, `crates/katgpt-pruners/src/posterior/wrapper.rs`) | Posterior (not future) | ✅ shipped, default-on |
 | Self-revising discovery on regime shift | Regime-Transition Inference (`Plan 215`, `crates/katgpt-pruners/src/regime_transition.rs`) | Regime detection | ✅ shipped, default-on |
 | Per-NPC recurrent belief kernel | `evolve_hla` (`crates/katgpt-sense/src/reconstruction.rs`, Research 242); `LeakyIntegrator` in micro_belief (Plan 276) | Belief state | ✅ shipped (no behavior-forecast framing) |
 

@@ -150,7 +150,7 @@ pub fn merge_retrieved_branches(
 ### Integration Point
 
 ```rust
-// speculative/step.rs — extended speculative step with REST
+// crates/katgpt-forward/src/step.rs — extended speculative step with REST
 
 #[cfg(feature = "rest")]
 pub async fn speculative_step_rest(
@@ -227,7 +227,7 @@ rest = ["reqwest", "tokio"]   # Retrieval-based speculative decoding
 - [x] 3.6 Add test: merge with empty retrieval is no-op
 
 ### Phase 4: Integration
-- [x] 4.1 Create `speculative_step_rest()` in `speculative/step.rs`
+- [x] 4.1 Create `speculative_step_rest()` in `crates/katgpt-forward/src/step.rs`
 - [x] 4.2 Wire: DFlash → DDTree → target forward → REST query → merge → verify
 - [x] 4.3 Add benchmark: `Speculative (REST)` vs `Speculative (Simulated)` acceptance rate
 - [x] 4.4 Add example: `examples/rest_demo.rs` (behind `rest` feature)

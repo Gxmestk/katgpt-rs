@@ -88,7 +88,7 @@ This is the bridge to our latent-space substrate: `c'` *is* a learned representa
 | Modelless `S(c)` (no BPTT) | **AutoDreamer** — offline consolidation tick | Plan 107, Research 069 (which **already cites this paper** as "Sleep-time Compute: Lin et al. 2025 (offline pre-computation)") |
 | `S(c)` that produces *reusable artifacts* (motifs, not weights) | **Closure-Expansion Instrument** — mines motifs at every sleep-cycle boundary | Plan 290, `crates/katgpt-core/src/closure/mining.rs`, `crates/katgpt-core/src/closure/motif.rs` |
 | Per-NPC trajectory forecaster (the "predict what comes next" primitive) | **KARC** — closed-form delay-basis ridge readout, fits in `KarcShard` (NeuronShard subtype) | Plan 308, Research 288, `crates/katgpt-core/src/karc/` |
-| Per-NPC per-relation learned direction vector + coherence-gated apply | **latent_functor** — `extract_functor_into`, `apply_functor`, `functor_gate(coherence)` (sigmoid) | Plan 303, `riir-engine/src/latent_functor/arithmetic.rs` |
+| Per-NPC per-relation learned direction vector + coherence-gated apply | **latent_functor** — `extract_functor_into`, `apply_functor`, `functor_gate(coherence)` (sigmoid) | Plan 303, `crates/katgpt-percepta/src/wasm/interpreter/arithmetic.rs` |
 | Test-time budget `b` per-NPC adaptive halting | **Gain/Cost Loop Halting** — `halt_decision(gain, cost, tau)` | Plan 304, Research 282 |
 | Per-tick "should I think more or answer now" decision | **Salience Tri-Gate** — `Speak / Silent / Delegate` | Plan 303 (katgpt-rs), Research 281 |
 | Per-NPC hash-addressed conditional pattern memory | **Engram** — hash-keyed conditional lookup | Plan 299, Research 278 |

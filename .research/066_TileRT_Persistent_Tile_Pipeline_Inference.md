@@ -196,7 +196,7 @@ Allocation + deallocation:                   ~10%  (DDTree, scratch buffers)
 
 Currently:
 ```rust
-// speculative/step.rs — serial pipeline
+// crates/katgpt-forward/src/step.rs — serial pipeline
 let draft = dflash_predict(&mut draft_cache, ...);     // ~12μs
 let snapshot = kv_cache.snapshot();                     // ~2μs (allocation!)
 let verified = forward(&mut main_cache, ...);           // ~12μs

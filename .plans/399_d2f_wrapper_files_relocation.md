@@ -19,7 +19,7 @@ external crates too — `katgpt_forward`, `katgpt_transformer`, and
 
 | File | LOC | Target |
 |---|---:|---|
-| `src/speculative/d2f.rs` | 2301 | `crates/katgpt-forward/src/speculative/d2f.rs` |
+| `src/speculative/d2f.rs` | 2301 | `src/speculative/d2f.rs` |
 | `src/speculative/d2f_verifier.rs` | 311 | `crates/katgpt-forward/src/d2f_verifier.rs` |
 | `src/speculative/diffusion_sampler.rs` | 1463 | `crates/katgpt-forward/src/diffusion_sampler.rs` |
 | **Total** | **4075** | |
@@ -135,7 +135,7 @@ continue to resolve through the shim.
 | `src/speculative/d2f_verifier.rs` | 311 | 12 | **-299** |
 | `src/speculative/diffusion_sampler.rs` | 1463 | 329 | **-1134** |
 | **Root net** | 4075 | 445 | **-3630** |
-| `crates/katgpt-forward/src/speculative/d2f.rs` | 0 | 2224 | +2224 |
+| `src/speculative/d2f.rs` | 0 | 2224 | +2224 |
 | `crates/katgpt-forward/src/d2f_verifier.rs` | 0 | 318 | +318 |
 | `crates/katgpt-forward/src/diffusion_sampler.rs` | 0 | 1191 | +1191 |
 | **katgpt-forward net** | 0 | 3733 | **+3733** |

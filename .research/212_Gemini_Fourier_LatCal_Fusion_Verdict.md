@@ -62,7 +62,7 @@ The Gemini output proposes 7 pillars fusing Fourier Spatial AI, LatCal, and neur
 **Gemini Claim:** Convert player input timestamps into frequency signatures via 1D Fourier Transform. Boss AI queries combat rhythm to anticipate combo peaks.
 
 **What We Already Have:**
-- `LinOSSCell` (katgpt-core/linoss.rs) — angular frequency ω², damping β, state-space oscillation
+- `LinOSSCell` (crates/katgpt-core/src/linoss.rs) — angular frequency ω², damping β, state-space oscillation
 - `VocabFourierBasis` — DFT top-K mode extraction from embeddings
 - `ModalSpecDrafter` — LinOSS state → modal coefficients → Fourier reconstruct → nearest token
 - LinOSS combat rhythm research (riir-ai R060) — combat actions decomposed into natural frequencies

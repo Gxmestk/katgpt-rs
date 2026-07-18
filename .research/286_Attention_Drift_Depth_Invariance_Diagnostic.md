@@ -252,7 +252,7 @@ The paper names a failure mode we **already ship in production** (BeliefDrafter'
 
 | Artifact | Repo | Path | Status |
 |---|---|---|---|
-| Open primitive (math, no game semantics) | katgpt-rs | `crates/katgpt-core/src/depth_invariance.rs` (new, behind `depth_invariance` feature) | **Plan 306 — to ship** |
+| Open primitive (math, no game semantics) | katgpt-rs | `crates/katgpt-types/src/depth_invariance.rs` (new, behind `depth_invariance` feature) | **Plan 306 — to ship** |
 | Open plan | katgpt-rs | `.plans/306_depth_invariance_diagnostic.md` | **Created this session** |
 | Private selling-point guide | riir-ai | `.research/151_Recursive_Latent_State_Magnitude_Hygiene_Guide.md` | **Created this session** |
 | Private runtime audit + fix plan | riir-ai | `.plans/331_recursive_latent_state_magnitude_hygiene_runtime.md` | **Created this session** |
@@ -271,7 +271,7 @@ If G2 reproduces (our BeliefDrafter has the bug) AND G3 confirms (micro_belief i
 
 | Artifact | Repo | Path |
 |---|---|---|
-| `DepthInvarianceDiagnostic` + `MagnitudeRegularizedResidual` primitives | katgpt-rs (public, MIT) | `crates/katgpt-core/src/depth_invariance.rs` (new) |
+| `DepthInvarianceDiagnostic` + `MagnitudeRegularizedResidual` primitives | katgpt-rs (public, MIT) | `crates/katgpt-types/src/depth_invariance.rs` (new) |
 | `DepthInvarianceConfig` extension to existing Config | katgpt-rs | `crates/katgpt-types/src/config.rs` |
 | Plan | katgpt-rs | `.plans/306_depth_invariance_diagnostic.md` |
 | BeliefDrafter audit (diagnostic-only, no fix without retrain) | katgpt-rs | `.plans/306_*.md` Phase 3 |

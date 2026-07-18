@@ -61,18 +61,18 @@ The paper frames the result as: *"latent world models should continue to be trai
 |---|---|---|
 | latent state `z_t` | HLA per-NPC 8-dim state, belief state, sense projection | `riir-engine/src/hla/`, `katgpt-core` HLA kernels |
 | JEPA encoder `ℰ_s` + predictor `f_θ` | `InducedCwmKernel: GameState` (frozen forward model) + `BeliefInferenceFn` (observation→belief sampler) | `katgpt-core/src/induced_cwm/`, Research 275 / Plan 296 |
-| action encoder `ℰ_a` | `extract_functor` (estimate displacement from (source, target) pairs) | `riir-engine/src/latent_functor/arithmetic.rs` |
+| action encoder `ℰ_a` | `extract_functor` (estimate displacement from (source, target) pairs) | `crates/katgpt-percepta/src/wasm/interpreter/arithmetic.rs` |
 | plan-execute-adapt-replan (Algorithm 1) | CGSP/MCTS plan → NPC acts → `ReestimationScheduler::observe()` → `tick()` re-estimates functors → next planning cycle reuses | `riir-ai/crates/riir-engine/src/latent_functor/reestimation/mod.rs`, `cgsp_runtime/` |
 | online buffer ℬ (capacity N) | `ObservationBuffer` (capacity-capped ring buffer) | `reestimation.rs::ObservationBuffer` |
 | `recent-N` vs `hard-N` strategy | FIFO ring buffer (`head`/`len` wraps oldest) — the `recent-N` default; `JsUniquenessTrigger` + TEMP `sleep_diverse` cover the `hard-N` spirit (rare/diverse preservation) | `reestimation.rs`, `riir-neuron-db/.plans/005` |
-| adaptation loss `L_ada` | `extract_functor` MSE over `(source, target)` pairs = `(1/N) Σ_k (target_k − source_k)` mean displacement | `latent_functor/arithmetic.rs` |
-| stop-gradient anti-collapse | freeze/thaw atomicity (readers keep old snapshot; writers commit new); coherence gate `functor_gate(coherence, β, τ) = sigmoid(β·(c−τ))` | `MerkleFrozenEnvelope`, `latent_functor/arithmetic.rs` |
+| adaptation loss `L_ada` | `extract_functor` MSE over `(source, target)` pairs = `(1/N) Σ_k (target_k − source_k)` mean displacement | `crates/katgpt-percepta/src/wasm/interpreter/arithmetic.rs` |
+| stop-gradient anti-collapse | freeze/thaw atomicity (readers keep old snapshot; writers commit new); coherence gate `functor_gate(coherence, β, τ) = sigmoid(β·(c−τ))` | `MerkleFrozenEnvelope`, `crates/katgpt-percepta/src/wasm/interpreter/arithmetic.rs` |
 | adapted parameters Ω (last layer) | functor direction vectors (the only mutable state); base operator frozen | `LatentSteeringVector`, `apply_functor` |
 | `coherence < threshold` trigger (implicit: prediction error grows → adapt) | `coherence < tau_reest` re-estimation trigger | `reestimation.rs::ReestimationScheduler::tick` |
 | MPC replan | MCTS rollout / CGSP cycle / decision stage | `cgsp_runtime/`, `mcts_collapse_bridge.rs` |
 | distribution shift → frozen model fails | coherence decay → staleness → re-estimation trigger | `reestimation.rs`, DiPOD-class pattern |
 | one gradient step per replan | one `tick()` per decision stage (modelless, no gradient) | `reestimation.rs::tick` |
-| single GD step on last layers | `extract_functor` re-derives the displacement from the buffer (closed-form, no gradient) | `latent_functor/arithmetic.rs` |
+| single GD step on last layers | `extract_functor` re-derives the displacement from the buffer (closed-form, no gradient) | `crates/katgpt-percepta/src/wasm/interpreter/arithmetic.rs` |
 
 ---
 

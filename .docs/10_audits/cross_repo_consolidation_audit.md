@@ -27,11 +27,11 @@ However, unlike katgpt-rs pre-Plan-404, the oversized code is **not pure substra
 ### Findings
 
 **Cross-crate extraction debt: LOW.** Only ONE genuine extraction candidate exists:
-- `riir-games/crates/katgpt-attn/src/dash_attn/meta_router.rs` (2,449 LOC) — Vortex meta-routing bandit, depends only on `fastrand`. Pristine deps. Could move to `riir-router` (fits its "inference routing" mandate) or its own `riir-meta-router` crate.
+- `crates/katgpt-attn/src/dash_attn/meta_router.rs` (2,449 LOC) — Vortex meta-routing bandit, depends only on `fastrand`. Pristine deps. Could move to `riir-router` (fits its "inference routing" mandate) or its own `riir-meta-router` crate.
 
 **File-hygiene debt: MODERATE.** 23 files break the 2048-line rule. Notable offenders:
 - `riir-gpu/src/forward.rs` — **7,894 LOC** (workspace's largest file; 20+ WGSL param structs)
-- `riir-engine/crates/katgpt-percepta/src/wasm/interpreter/arithmetic.rs` — 3,667 LOC (6 functor primitives)
+- `crates/katgpt-percepta/src/wasm/interpreter/arithmetic.rs` — 3,667 LOC (6 functor primitives)
 - `riir-games/src/civ/skill.rs` — 3,556 LOC (skill YAML schema + tiers)
 
 Most are mechanical internal-splits (carve WGSL param structs into `forward_params.rs`, split 6 functors into 6 files), not cross-crate extraction.
@@ -44,7 +44,7 @@ Most are mechanical internal-splits (carve WGSL param structs into `forward_para
 
 1. **GPU substrate coupling.** Every oversized `riir-gpu` file depends on `crate::buffer` + `crate::kernels` + `crate::lora` + `crate::speft`. Four intertwined substrates — the riir-ai equivalent of katgpt-rs's `ForwardContext` linchpin.
 2. **`riir-engine` is already the root leaf.** Zero outbound riir deps. Its 65 top-level modules are each cohesive subsystems. No "trapped substrate at root" — the substrate IS the root.
-3. **Mod-cohesion, not file-bloat.** `latent_functor/arithmetic.rs` (3,667 LOC) isn't one god-file — it's six functor primitives alongside 11 siblings in a 12K-LOC cohesive module. The fix is per-primitive file-splitting, not crate extraction.
+3. **Mod-cohesion, not file-bloat.** `crates/katgpt-percepta/src/wasm/interpreter/arithmetic.rs` (3,667 LOC) isn't one god-file — it's six functor primitives alongside 11 siblings in a 12K-LOC cohesive module. The fix is per-primitive file-splitting, not crate extraction.
 
 ### Recommended next steps (deferred)
 

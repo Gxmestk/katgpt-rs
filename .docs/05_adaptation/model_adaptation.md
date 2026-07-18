@@ -494,11 +494,11 @@ TurboQuant uses random rotation + uniform codebook — 5.3× compression but cos
 SpectralQuant (Plan 077) replaces random rotation with eigenbasis rotation calibrated from activation statistics, then allocates bits per dimension via water-fill optimization.
 
 ```rust
-// spectralquant/spectral.rs — eigenbasis calibration
+// crates/katgpt-spectral/src/spectral.rs — eigenbasis calibration
 pub fn calibrate_eigenbasis(samples: &[Vec<f32>], head_dim: usize) -> CalibrationResult
 pub fn waterfill_bits(eigenvalues: &[f64], total_bits: usize, min_bits: u8, max_bits: Option<u8>) -> Vec<u8>
 
-// spectralquant/nonuniform_quant.rs — Lloyd-Max scalar quantizer
+// crates/katgpt-spectral/src/nonuniform_quant.rs — Lloyd-Max scalar quantizer
 pub struct NonUniformQuantizer { /* eigenvalues, avg_bits, head_dim, per-dim codebooks */ }
 pub struct CompressedVector { /* semantic_indices, tail_indices, d_eff, bits metadata */ }
 ```

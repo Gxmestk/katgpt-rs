@@ -51,7 +51,7 @@ Operator utilization entropy `U = -Σ q_o log q_o` — U→0 indicates collapse.
 | Component | Status | Location | CHIAR Relevance |
 |-----------|--------|----------|-----------------|
 | FreqBandit (token-stream DFT) | ✅ Default-on, GOAT | `crates/katgpt-pruners/src/freq_bandit.rs` | Spectral entropy of **token stream** (temporal). Different signal from CHIAR's per-embedding DCT. |
-| SpectralQuant KV cache | ✅ GOAT | `src/spectralquant/spectral_kv_cache.rs` | Per-**dimension** rotation+variable-bit quantization. Does NOT use per-token complexity. |
+| SpectralQuant KV cache | ✅ GOAT | `crates/katgpt-spectral/src/spectral_kv_cache.rs` | Per-**dimension** rotation+variable-bit quantization. Does NOT use per-token complexity. |
 | Spectral Budget Router (Plan 254) | ✅ GOAT | `crates/katgpt-spectral/src/spectral_budget.rs` | Power laws → NS iteration depth. Different application (Newton-Schulz). |
 | Breakeven Complexity Router (Plan 250) | ✅ GOAT | `src/breakeven/` | Cost-aware tier promotion. Natural host for "operator cost vs accuracy" routing. |
 | DiagonalGate trait (GDN2 + Wall) | ✅ Shipped | `crates/katgpt-attn/src/diagonal_gate.rs` | Per-dim gate abstraction — same shape as per-token operator gate. |
