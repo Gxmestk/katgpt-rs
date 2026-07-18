@@ -20,8 +20,8 @@ All three are gated by `Config` thresholds. Small models skip them with a single
 
 | Existing | Relationship |
 |----------|-------------|
-| DFlash (`speculative/dflash.rs`) | **Orthogonal** — MTP feeds richer context INTO the drafter. DFlash's tree verification still runs on the output. They compose. |
-| LeviathanVerifier (`speculative/verifier.rs`) | **Modified** — this is where target→draft activation transfer happens (target already exposes `hidden_state`) |
+| DFlash (`crates/katgpt-speculative/src/dflash.rs`) | **Orthogonal** — MTP feeds richer context INTO the drafter. DFlash's tree verification still runs on the output. They compose. |
+| LeviathanVerifier (`crates/katgpt-speculative/src/spechop/verifier.rs`) | **Modified** — this is where target→draft activation transfer happens (target already exposes `hidden_state`) |
 | TruncatePadProjector (`riir-router/projector.rs`) | **Shared pattern** — same truncate/pad strategy for dim mismatch, but MTP needs the target's hidden state not an embedding |
 | PagedKVCache (`transformer.rs`) | **Extended** — add read-only cross-attention view for drafter |
 | Sparse MLP threshold (`Config.sparse_threshold`) | **Same pattern** — threshold-gated feature activation |

@@ -144,7 +144,7 @@ RePlaid beats MDLM when trained past compute-optimal (Fig 1c):
 **Adaptation:**
 - **D2F noise schedule** (`src/dllm.rs` `NoiseSchedule`): Replace fixed monotonic ratios with variance-minimized ratios that equalize per-step reconstruction difficulty.
 - **Bandit exploration schedule** (`src/pruners/bandit.rs`): Make exploration rate adaptive based on per-episode reward variance tracking.
-- **SDAR β learning** (`src/pruners/sdar_gate.rs`): Replace fixed β=5.0 with variance-minimized β that equalizes gated signal intensity across episodes.
+- **SDAR β learning** (`crates/katgpt-pruners/src/sdar_gate.rs`): Replace fixed β=5.0 with variance-minimized β that equalizes gated signal intensity across episodes.
 
 **Priority:** High. Self-contained, no model needed, directly improves existing infrastructure.
 
@@ -258,8 +258,8 @@ Prop 2 (near-linear CE) assumes a Bayes-optimal denoiser (Def 1). Our D2F models
 |---|---|---|---|
 | `src/dllm.rs` `NoiseSchedule` | Fixed monotonic min→max | Variance-minimized ratios (track per-step loss, equalize difficulty) | Prop 1 |
 | `src/pruners/bandit.rs` `BanditStrategy` | Fixed ε, UCB1 | Add `VarianceEpsilon` that adapts ε to equalize per-episode reward variance | Prop 1 analog |
-| `src/pruners/sdar_gate.rs` `SDAR_BETA` | Fixed 5.0 | Add `learned_beta()` that minimizes gated-signal variance across episodes | Sec 5.2 |
-| `src/pruners/sdar_gate.rs` + `ropd.rs` | Independent losses | Gate ROPD through SDAR (never add independently) | Sec 2.6, Fig 5c |
+| `crates/katgpt-pruners/src/sdar_gate.rs` `SDAR_BETA` | Fixed 5.0 | Add `learned_beta()` that minimizes gated-signal variance across episodes | Sec 5.2 |
+| `crates/katgpt-pruners/src/sdar_gate.rs` + `ropd.rs` | Independent losses | Gate ROPD through SDAR (never add independently) | Sec 2.6, Fig 5c |
 
 ### 7.2 Medium-term (Model — riir-ai)
 

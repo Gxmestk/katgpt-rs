@@ -62,21 +62,21 @@ Unifies all three. The DEC module ships `d` (exterior derivative) and `δ` (codi
 
 | Stokes-theorem term | DEC / codebase equivalent | Where it ships |
 |---|---|---|
-| Exterior derivative `d` (coboundary operator) | `exterior_derivative(cx, field)` | `dec/operators.rs` |
-| Codifferential `δ` (adjoint of `d`, discrete divergence on rank-1) | `codifferential(cx, field)` | `dec/operators.rs` |
-| Hodge Laplacian `Δ = δd + dδ` | `hodge_laplacian(cx, field)` | `dec/operators.rs` |
-| Graph Laplacian (rank-0 special case) | `graph_laplacian`, `graph_laplacian_into` | `dec/operators.rs` |
-| Hodge star `*` (metric mass matrix) | `hodge_star(rank)` (identity for uniform grids) | `dec/operators.rs` |
+| Exterior derivative `d` (coboundary operator) | `exterior_derivative(cx, field)` | `crates/katgpt-dec/src/operators.rs` |
+| Codifferential `δ` (adjoint of `d`, discrete divergence on rank-1) | `codifferential(cx, field)` | `crates/katgpt-dec/src/operators.rs` |
+| Hodge Laplacian `Δ = δd + dδ` | `hodge_laplacian(cx, field)` | `crates/katgpt-dec/src/operators.rs` |
+| Graph Laplacian (rank-0 special case) | `graph_laplacian`, `graph_laplacian_into` | `crates/katgpt-dec/src/operators.rs` |
+| Hodge star `*` (metric mass matrix) | `hodge_star(rank)` (identity for uniform grids) | `crates/katgpt-dec/src/operators.rs` |
 | Hodge decomposition (exact ⊕ harmonic ⊕ coexact) | `hodge_decompose(cx, field)` | `crates/katgpt-dec/src/hodge.rs` |
 | Betti numbers `βₖ` (topological holes) | `betti_numbers(cx)` (count zero eigenvalues of Δₖ) | `crates/katgpt-dec/src/hodge.rs` |
 | Harmonic projector `P_harm` | `harmonic_projector(cx)` | `crates/katgpt-dec/src/hodge.rs` |
-| Gradient `∇φ` (rank-0 → rank-1, exact) | `exact_flow(cx, potential)` / `d₀` | `dec/flow.rs` |
-| Curl `∇×F` (rank-1 → rank-2) | `d₁` | `dec/operators.rs` |
-| Divergence `∇·F` (rank-2 → rank-3, or rank-1 → rank-0 via δ) | `codifferential` / `δ₁` | `dec/operators.rs` |
-| Conservative / exact field (curl-free) | `DecFlowField::exact` | `dec/flow.rs` |
-| Solenoidal / coexact field (divergence-free) | `DecFlowField::coexact` | `dec/flow.rs` |
-| Topological / harmonic field (both-free) | `DecFlowField::harmonic` | `dec/flow.rs` |
-| `∫_M dω = ∫_∂M ω` (Generalized Stokes) | identity `d∘d=0` enforced by construction; tests `curl_of_gradient_is_zero`, `divergence_of_curl_is_zero` | `dec/operators.rs` tests |
+| Gradient `∇φ` (rank-0 → rank-1, exact) | `exact_flow(cx, potential)` / `d₀` | `crates/katgpt-dec/src/flow.rs` |
+| Curl `∇×F` (rank-1 → rank-2) | `d₁` | `crates/katgpt-dec/src/operators.rs` |
+| Divergence `∇·F` (rank-2 → rank-3, or rank-1 → rank-0 via δ) | `codifferential` / `δ₁` | `crates/katgpt-dec/src/operators.rs` |
+| Conservative / exact field (curl-free) | `DecFlowField::exact` | `crates/katgpt-dec/src/flow.rs` |
+| Solenoidal / coexact field (divergence-free) | `DecFlowField::coexact` | `crates/katgpt-dec/src/flow.rs` |
+| Topological / harmonic field (both-free) | `DecFlowField::harmonic` | `crates/katgpt-dec/src/flow.rs` |
+| `∫_M dω = ∫_∂M ω` (Generalized Stokes) | identity `d∘d=0` enforced by construction; tests `curl_of_gradient_is_zero`, `divergence_of_curl_is_zero` | `crates/katgpt-dec/src/operators.rs` tests |
 | Divergence theorem `∫_V ∇·F dV = ∮_∂V F·n dS` | `codifferential` gives `∇·F`; **no `boundary_flux_mass()` wrapper yet** | **gap → Plan 314** |
 | Continuity equation / Fokker-Planck `∂_t p = -div(pu)` | `codifferential` gives the divergence; **no `fokker_planck_validator()` wrapper yet** | **gap → Plan 314** (also flagged by Research 271 §2) |
 | Line integral `∫_C F·dr` | rank-1 `CochainField` supports edge fields; **no `line_integral()` wrapper yet** | **gap → Plan 314** |

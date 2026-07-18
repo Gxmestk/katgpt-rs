@@ -272,7 +272,7 @@ If G2 reproduces (our BeliefDrafter has the bug) AND G3 confirms (micro_belief i
 | Artifact | Repo | Path |
 |---|---|---|
 | `DepthInvarianceDiagnostic` + `MagnitudeRegularizedResidual` primitives | katgpt-rs (public, MIT) | `crates/katgpt-core/src/depth_invariance.rs` (new) |
-| `DepthInvarianceConfig` extension to existing Config | katgpt-rs | `crates/katgpt-core/src/types/config.rs` |
+| `DepthInvarianceConfig` extension to existing Config | katgpt-rs | `crates/katgpt-types/src/config.rs` |
 | Plan | katgpt-rs | `.plans/306_depth_invariance_diagnostic.md` |
 | BeliefDrafter audit (diagnostic-only, no fix without retrain) | katgpt-rs | `.plans/306_*.md` Phase 3 |
 | Private guide | riir-ai | `.research/151_Recursive_Latent_State_Magnitude_Hygiene_Guide.md` |

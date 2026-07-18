@@ -74,7 +74,7 @@ The primitive does not claim a UQ distribution, so the **"Report the Floor" rule
 - [-] **T3.1** Compose with `ac_prefix::ConditionalLogprob` (Plan 313) — token-level NLL kernel for text traces. **Deferred:** requires a text-trace dataset; deferred until riir-neuron-db Plan 005 G2' demonstrates the gain on shard consolidation (the primary substrate).
 - [-] **T3.2** Compose with HLA surprise kernel (`crates/katgpt-sense/src/reconstruction.rs`) — per-tick HLA surprise as the loss. **Deferred:** requires riir-ai runtime integration; tracked as cross-ref from riir-neuron-db Plan 005 Phase 3.
 - [-] **T3.3** Compose with KARC residual (`Plan 308`) — KARC forecast residual as the loss. **Deferred** to post-GOAT.
-- [-] **T3.4** DEC cross-reference (`dec/operators.rs`): document the Stokes-theoretic reframing (`|<d(loss_cochain), v>|` is the directional exterior derivative of loss along `v`). **Documentation only, no code change** — the DEC operators already ship; this is the conceptual bridge. Curse-of-dim caveat noted.
+- [-] **T3.4** DEC cross-reference (`crates/katgpt-dec/src/operators.rs`): document the Stokes-theoretic reframing (`|<d(loss_cochain), v>|` is the directional exterior derivative of loss along `v`). **Documentation only, no code change** — the DEC operators already ship; this is the conceptual bridge. Curse-of-dim caveat noted.
 
 ---
 

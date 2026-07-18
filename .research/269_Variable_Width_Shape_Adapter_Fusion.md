@@ -43,7 +43,7 @@ The paper proposes a `×`-shaped transformer (wide early/late, narrow middle) wi
 
 | `> <former` insight | Shipped cousin | File / Plan | Granularity |
 |---|---|---|---|
-| Middle layers collapse → skip them | **Hydra Budget** `HydraSkipPlan { skip_layers: Vec<bool> }`, `HydraBudgetConfig { modelless: bool }` | `src/pruners/hydra_budget.rs`, P165, R148, default-on, GOAT 4/4 | **Layer** |
+| Middle layers collapse → skip them | **Hydra Budget** `HydraSkipPlan { skip_layers: Vec<bool> }`, `HydraBudgetConfig { modelless: bool }` | `crates/katgpt-pruners/src/hydra_budget.rs`, P165, R148, default-on, GOAT 4/4 | **Layer** |
 | MLP dead dimensions → skip them | **Sparse MLP** + **Prism** per-capability masks + **CNA** neuron discovery | P022, R191, R053 | **Dimension (within-layer)** |
 | Per-layer capacity varies → adapt compute | **DenseMesh adaptive_width** `WidthDecision::{Contract,Neutral,Expand}` driven by Collapse-Aware + BreakevenRouter | `crates/katgpt-transformer/src/dense_mesh/adaptive_width.rs`, P266, R234 | **Topology (across-nodes)** |
 | Normalized matrix entropy per layer | **`effective_rank`** (Roy-Vetterli) — `normalized_matrix_entropy = log(effective_rank)/log(r)` | `crates/katgpt-core/src/data_probe/geometry.rs` | Metric |
@@ -137,7 +137,7 @@ Closest prior art:
 Grep of `HydraBudgetConfig` call sites in `katgpt-rs/src/` and `katgpt-rs/crates/katgpt-core/src/` (2026-06-20):
 - `crates/katgpt-core/src/types.rs:4203` — struct definition `{ skip_threshold, cumulative_threshold, modelless: bool, skip_erasure_draft: bool }`. **No adapter-aware field.** `modelless` means "lookup vs logit-lens," not "base vs adapter."
 - `crates/katgpt-core/src/lib.rs:184` — re-export.
-- `src/pruners/hydra_budget.rs:11,95` — `hydra_layer_skip(profiles: &[HydraLayerProfile], config: &HydraBudgetConfig)`. Profile source is the caller's responsibility; nothing prevents passing an adapter-derived profile.
+- `crates/katgpt-pruners/src/hydra_budget.rs:11,95` — `hydra_layer_skip(profiles: &[HydraLayerProfile], config: &HydraBudgetConfig)`. Profile source is the caller's responsibility; nothing prevents passing an adapter-derived profile.
 - `tests/bench_165_hydra_budget_goat.rs` — benchmarks pass synthetic profiles.
 
 **Verdict:** no adapter-aware variant exists in katgpt-rs today. The mechanism is feasible — extend `HydraBudgetConfig` with `adapter_profile: Option<HydraLayerProfile>` (or pass adapter-derived profiles into `hydra_layer_skip`). But LayerRoute already demonstrates LoRA-driven layer skip in the literature, so this is novel-as-shipped-code, not novel-as-concept.

@@ -277,8 +277,8 @@ pub fn forward<'a>(
 
 **Affected files**:
 - `transformer.rs` — weights struct, cache struct, forward(), generate()
-- `speculative/verifier.rs` — `LeviathanVerifier` creates `KVCache`
-- `speculative/dflash.rs` — `dflash_predict*` creates `KVCache`
+- `crates/katgpt-speculative/src/spechop/verifier.rs` — `LeviathanVerifier` creates `KVCache`
+- `crates/katgpt-speculative/src/dflash.rs` — `dflash_predict*` creates `KVCache`
 - `speculative/step.rs` — `speculative_step*` creates `KVCache`
 - `benchmark.rs` — creates `KVCache`
 - `main.rs` — creates `KVCache`
@@ -351,7 +351,7 @@ pub fn forward<'a>(
 | `src/types.rs` | Add `n_layer` to Config, add `small_target()` | 1 |
 | `crates/katgpt-percepta/src/transformer.rs` | `LayerWeights`, multi-layer `TransformerWeights`, layer loop | 2-4 |
 | `crates/katgpt-speculative/src/dflash.rs` | Use `MultiLayerKVCache` | 5 |
-| `src/speculative/verifier.rs` | Use `MultiLayerKVCache` | 5 |
+| `crates/katgpt-speculative/src/spechop/verifier.rs` | Use `MultiLayerKVCache` | 5 |
 | `crates/katgpt-forward/src/step.rs` | Update signatures | 5 |
 | `src/benchmark/mod.rs` | Use `MultiLayerKVCache`, add multi-layer bench | 5-6 |
 | `src/main.rs` | Use `MultiLayerKVCache` | 5 |

@@ -97,7 +97,7 @@ Top-K ensemble → single model SFT on hard examples:
 | Majority vote ensemble | `best_of_k_rollouts()` width scaling | `src/speculative/dd_tree.rs` |
 | Seed-based perturbation | `Rng` seed control for reproducibility | `src/types.rs` |
 | Parallel evaluation | `BanditPruner::prepare_episode()` batch | `src/pruners/bandit.rs` |
-| Hard example distillation | `bt_rank` Bradley-Terry selection | `src/pruners/bt_rank.rs` |
+| Hard example distillation | `bt_rank` Bradley-Terry selection | `crates/katgpt-pruners/src/bt_rank.rs` |
 
 ### The Gap: Weight-Space Perturbation
 

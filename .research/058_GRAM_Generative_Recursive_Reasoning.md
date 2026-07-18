@@ -140,8 +140,8 @@ This directly validates PTRM's finding (Research 49): width >> depth. 20 paralle
 | Width scaling (N samples) | `max_branches` field | `src/speculative/types.rs:370` | ✅ Configurable |
 | Trajectory selection (LPRM) | `BanditPruner<P>` Q-values | `src/pruners/bandit.rs:297+` | ✅ Online Q-learning |
 | Majority voting | `extract_best_path()` | `src/speculative/dd_tree.rs` | ✅ Best path extraction |
-| Richer pairwise selection | `BtScores`/`bt_fit()` (Bradley-Terry) | `src/pruners/bt_rank.rs` | ✅ Feature `bt_rank` |
-| Flow-based exploration | `FlowPruner<P>` (GFlowNet) | `src/speculative/flow_pruner.rs:43-55` | ✅ GRAM doesn't have this |
+| Richer pairwise selection | `BtScores`/`bt_fit()` (Bradley-Terry) | `crates/katgpt-pruners/src/bt_rank.rs` | ✅ Feature `bt_rank` |
+| Flow-based exploration | `FlowPruner<P>` (GFlowNet) | `crates/katgpt-speculative/src/flow_pruner.rs:43-55` | ✅ GRAM doesn't have this |
 | Sigmoid-gated selection | `SdarBanditPruner<P>` | `crates/katgpt-pruners/src/sdar/sdar_bandit.rs:187-197` | ✅ SDAR gate |
 | ACT early exit | `domain_latent` feature | Feature flag | ✅ Implemented |
 | Deep supervision (N_sup steps) | DPO/GRPO intermediate state training | `riir-ai/.plans/059_gzero_dpo_grpo.md` (Plan 059 ✅) | ✅ Model-based path |
@@ -244,7 +244,7 @@ Key advantage: BanditPruner learns online (no separate training phase), adapts t
 
 GRAM selects trajectories via LPRM scoring or majority vote — both pointwise methods. Our `BtScores`/`bt_fit()` (Bradley-Terry) uses pairwise comparisons that internalize relative strength:
 
-```src/pruners/bt_rank.rs
+```crates/katgpt-pruners/src/bt_rank.rs
 // bt_fit(): pairwise ranking with Bradley-Terry model
 // Each comparison updates both candidates' ratings via BtScores
 // More robust than pointwise scoring
@@ -256,7 +256,7 @@ Where GRAM says "pick the highest LPRM score," we say "compare all pairs, rank b
 
 GRAM explores via parallel noisy trajectories. Our `FlowPruner<P>` adds GFlowNet flow-based exploration:
 
-```src/speculative/flow_pruner.rs#L43-55
+```crates/katgpt-speculative/src/flow_pruner.rs#L43-55
 pub struct FlowPruner<P: ScreeningPruner> {
     inner: P,
     lambda: f32,  // Flow regularization
@@ -499,10 +499,10 @@ GRAM independently validates our existing design from a completely different ang
 |---|---|
 | `src/speculative/dd_tree.rs` | `inject_sde_noise`, `build_dd_tree_sde`, `extract_best_path` |
 | `src/speculative/types.rs` | `SdeConfig`, `DDTreeBranchCache` (re-exports `ScreeningPruner`, `ConstraintPruner` from `katgpt_core::traits`) |
-| `src/speculative/verifier.rs` | `SpeculativeVerifier` trait |
+| `crates/katgpt-speculative/src/spechop/verifier.rs` | `SpeculativeVerifier` trait |
 | `src/pruners/bandit.rs` | `BanditPruner<P>` with Q-values and strategies |
-| `src/pruners/bt_rank.rs` | `BtScores`, `BtConfig`, `bt_fit()` — Bradley-Terry pairwise ranking |
-| `src/speculative/flow_pruner.rs` | `FlowPruner<P>` GFlowNet flow bonus |
+| `crates/katgpt-pruners/src/bt_rank.rs` | `BtScores`, `BtConfig`, `bt_fit()` — Bradley-Terry pairwise ranking |
+| `crates/katgpt-speculative/src/flow_pruner.rs` | `FlowPruner<P>` GFlowNet flow bonus |
 | `crates/katgpt-pruners/src/sdar/sdar_bandit.rs` | `SdarBanditPruner<P>` sigmoid-gated bandit |
 | `src/pruners/sdar/sdar_absorb.rs` | `SdarGatedAbsorbCompress<P>` sigmoid-gated absorb-compress |
 | `tests/bench_elf_modelless.rs` | SDE noise benchmarks (diversity + overhead) |

@@ -22,7 +22,7 @@ The textbook's distillation-worthy content is Chapter 3, and within it two disti
 
 **Distilled for katgpt-rs (modelless, inference-time):**
 - Open primitive: `tropical_matvec_into(w: &[f32], x: &[f32], out: &mut [f32])` = `(W ⊗ x)_i = max_j (W[i,j] + x[j])` — the (max, +) analog of `simd_matvec`. Zero-allocation, SIMD-vectorizable via `max` reduction. Behind `tropical_algebra` feature flag.
-- Plus three wrappers over the shipped DEC substrate: `tropical_exterior_derivative` (boundary operator in max-plus → max of boundary contributions instead of signed sum), `tropical_codifferential` (max-plus divergence → "worst-case flux" instead of net flux), `tropical_line_integral` (max-plus path cost → "bottleneck edge" geodesic instead of total work). All thin wrappers over `dec/operators.rs`, gated by `tropical_algebra`.
+- Plus three wrappers over the shipped DEC substrate: `tropical_exterior_derivative` (boundary operator in max-plus → max of boundary contributions instead of signed sum), `tropical_codifferential` (max-plus divergence → "worst-case flux" instead of net flux), `tropical_line_integral` (max-plus path cost → "bottleneck edge" geodesic instead of total work). All thin wrappers over `crates/katgpt-dec/src/operators.rs`, gated by `tropical_algebra`.
 - The fusion case (TropicalDEC producing "max-threat path" orthogonal to "sum-threat path") is the headline. Plan 337 implements the primitive + the G1 non-redundancy gate.
 
 ---
@@ -103,7 +103,7 @@ pub fn tropical_codifferential(cx: &CellComplex, input: &CochainField) -> Cochai
 pub fn tropical_line_integral(field: &CochainField, path: &[usize]) -> f32;
 ```
 
-The DEC wrappers reuse the **boundary matrices** already shipped in `dec/operators.rs::exterior_derivative_into` — they swap the inner reduction from `Σ ±ω[cell]` to `max(±∞, ω[cell])` (signed coefficients become "include / exclude" via `+0` vs `−∞`). ~30 LOC each.
+The DEC wrappers reuse the **boundary matrices** already shipped in `crates/katgpt-dec/src/operators.rs::exterior_derivative_into` — they swap the inner reduction from `Σ ±ω[cell]` to `max(±∞, ω[cell])` (signed coefficients become "include / exclude" via `+0` vs `−∞`). ~30 LOC each.
 
 ### 2.3 Latent-space reframing (mandatory)
 

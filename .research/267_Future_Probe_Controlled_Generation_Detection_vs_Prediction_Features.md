@@ -101,14 +101,14 @@ Key metric: **format-filtered rate** (proxy for output degradation). ActSteer wi
 | Paper mechanism | Our shipped equivalent | Class | Status |
 |---|---|---|---|
 | Difference-in-means steering vector | CNA contrastive neuron discovery (`Plan 087`, `crates/katgpt-core/src/...`, `BomberContrastivePairs`, `GoContrastivePairs`) | **Detection** | ✅ shipped, GOAT 4/4 |
-| Linear projection on residual stream for behavior | `EmotionDirections::project` (`Plan 162`, `src/pruners/emotion_vector.rs`), valence/arousal/desperation/calm | **Detection** | ✅ shipped, default-on |
+| Linear projection on residual stream for behavior | `EmotionDirections::project` (`Plan 162`, `crates/katgpt-pruners/src/emotion_vector.rs`), valence/arousal/desperation/calm | **Detection** | ✅ shipped, default-on |
 | Sentence-level CoT as decision unit | `AdaptiveTraceCompactor::observe_entropy` (`src/attn_match_adaptive_cot.rs:159`), `RejectionReason::EntropySpike` (`crates/katgpt-speculative/src/distill/trd.rs:56`) | Both | ✅ shipped (entropy, not behavior) |
 | Causal-intervention behavioral delta | `FaithfulnessProbe` (`Plan 278`, `crates/katgpt-core/src/cgsp/dual_pool.rs:1868`), `behavior_delta` trait method | Detection (intervention) | ✅ shipped |
 | Sample-M-candidates → score → argmax-select | CGSP Conjecturer+Guide loop (`crates/katgpt-core/src/cgsp/loop_.rs`); CompressionDrafter beam (`riir-games/src/quest_grammar/compression_draft.rs`) | Mechanism skeleton | ✅ shipped (different domains) |
 | Linear forecast from cheap signal | Issue 023 `AcceptanceForecast { a, b }` (`α ≈ a − b·H(p)`, Research 243 §2.3) | Forecast | 📋 planned, not yet implemented |
 | Bayesian precision vector for arm lifecycle | `PosteriorGuidedPruner` (`Plan 239`, `src/pruners/posterior/wrapper.rs`) | Posterior (not future) | ✅ shipped, default-on |
-| Self-revising discovery on regime shift | Regime-Transition Inference (`Plan 215`, `src/pruners/regime_transition.rs`) | Regime detection | ✅ shipped, default-on |
-| Per-NPC recurrent belief kernel | `evolve_hla` (`crates/katgpt-core/src/sense/reconstruction.rs`, Research 242); `LeakyIntegrator` in micro_belief (Plan 276) | Belief state | ✅ shipped (no behavior-forecast framing) |
+| Self-revising discovery on regime shift | Regime-Transition Inference (`Plan 215`, `crates/katgpt-pruners/src/regime_transition.rs`) | Regime detection | ✅ shipped, default-on |
+| Per-NPC recurrent belief kernel | `evolve_hla` (`crates/katgpt-sense/src/reconstruction.rs`, Research 242); `LeakyIntegrator` in micro_belief (Plan 276) | Belief state | ✅ shipped (no behavior-forecast framing) |
 
 ### 2.2 What's NOT in katgpt-rs (the gap)
 
@@ -207,7 +207,7 @@ This is a future `riir-ai/.research/` guide **only if** the katgpt-rs plan ships
 ## 5. Plan sketch (to be elaborated in `.plans/267_*.md`)
 
 - **Phase 1 — Vocabulary in the trait stack.** Add `FeatureClass::{Detection, Prediction}` tag to `ScreeningPruner`. Mark `EmotionDirections`, CNA, FaithfulnessProbe as `Detection`. Reserve `Prediction` slot. Zero-cost enum tag.
-- **Phase 2 — FutureBehaviorProbe primitive.** New struct in `src/pruners/future_probe.rs`: holds `w_B: Vec<f32>` direction + bias. Method `forecast(&[f32]) -> f32` returning sigmoid probability. Trained offline (Python script following Kortukov's resampling recipe) → loaded at init. **No online training.** Direction vector is a frozen artifact (freeze/thaw-compatible).
+- **Phase 2 — FutureBehaviorProbe primitive.** New struct in `crates/katgpt-pruners/src/future_probe.rs`: holds `w_B: Vec<f32>` direction + bias. Method `forecast(&[f32]) -> f32` returning sigmoid probability. Trained offline (Python script following Kortukov's resampling recipe) → loaded at init. **No online training.** Direction vector is a frozen artifact (freeze/thaw-compatible).
 - **Phase 3 — SentenceCandidateSelector.** Sampler that produces M candidate next-utterance-spans (sentence-terminated) and selects argmax/min by probe score. Reuses CGSP's Conjecturer trait shape.
 - **Phase 4 — GOAT gate.** Benchmark vs (a) unsteered baseline (perplexity parity, <5% behavior shift), (b) Emotion Vector desperation monitor (behavior shift ≥ 30pp at <5% perplexity increase), (c) CNA modulation (format-filter rate ≤ 10% where CNA filters >30%). Synthetic test on a small model.
 - **Phase 5 — Promotion / demotion.** If GOAT passes: promote to default-on for the probe primitive (opt-in for the selector loop, since it costs M forward passes). If GOAT fails on quality: demote to opt-in, keep only the vocabulary tag (Phase 1) as the shippable output.

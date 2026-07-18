@@ -64,7 +64,7 @@ The codebase has evolved significantly:
 - **D2F Equi-Probability** (`src/speculative/d2f.rs`): `ScheduleKind::EquiProbability` + `equi_probability_schedule()` with Acklam's Φ⁻¹
 - **Discrete Critical Interval Solver** (`dllm_solver.rs`): Entropy-triggered DPM-Solver++↔Q-Sample switching
 - **DEC Infrastructure** (`katgpt-core/src/dec/`): CellComplex, CochainField, exterior_derivative, hodge_decompose, DecFlowField
-- **Sense Octree** (`katgpt-core/src/sense/octree.rs`): KG embeddings → bit-plane octree + BLAKE3 commitment
+- **Sense Octree** (`crates/katgpt-sense/src/octree.rs`): KG embeddings → bit-plane octree + BLAKE3 commitment
 
 ### Evaluated Novel Fusions (All Rejected)
 

@@ -299,7 +299,7 @@ Top co-occurring pairs:
 
 | Paper | What We Adopted | Where |
 |-------|----------------|-------|
-| 02 Leviathan | Speculative decoding with rejection sampling | `speculative/verifier.rs` |
+| 02 Leviathan | Speculative decoding with rejection sampling | `crates/katgpt-speculative/src/spechop/verifier.rs` |
 | 06 Raven | O(1) slot memory routing | `forward_raven()` |
 | 08 TwELL | Sparse MLP matmul for ReLU activations | `types.rs sparse_matmul` |
 | 20 TurboQuant | 3-bit KV cache quantization (legacy baseline) | `turboquant` module |

@@ -178,7 +178,7 @@ Two distinct claims:
 | Kimi K3 primitive | Shipped cousin | File / Plan |
 |---|---|---|
 | KDA (gated linear attention, DeltaNet-family) | **GDN2** — `Gdn2GateConfig::Kda` variant ships | Plan 105, `crates/katgpt-core/src/gdn2.rs`, Research 070 |
-| AttnRes (skip layers via cumulative DE) | **Hydra Budget** | Plan 165, `src/pruners/hydra_budget.rs`, `HydraSkipPlan { skip_layers, cumulative_de }` |
+| AttnRes (skip layers via cumulative DE) | **Hydra Budget** | Plan 165, `crates/katgpt-pruners/src/hydra_budget.rs`, `HydraSkipPlan { skip_layers, cumulative_de }` |
 | AttnRes (relocate activations across stages) | **Cross-Stage Residual Relocation** | Plan 431, Research 417, opt-in behind `cross_stage_relocation` |
 | AttnRes (compose direction vectors with sigmoid) | **PersonalityWeightedComposition** | Plan 297, Research 276, default-on |
 | Stable LatentMoE (per-entity committed blend over K archetypes) | **CommittedFieldBlend** | Plan 321, Research 302, default-on GOAT 5/5, `crates/katgpt-core/src/committed_field_blend.rs` |

@@ -25,7 +25,7 @@ Goal: a compiling, tested, feature-gated module that implements the core AM algo
 - [x] **T1.1** Create `src/attn_match/` directory with empty `mod.rs`
 - [x] **T1.2** Add feature flag `attention_matching = []` to `katgpt-rs/Cargo.toml` features section (after `still_kv`)
 - [x] **T1.3** Add `#[cfg(feature = "attention_matching")] pub mod attn_match;` to `src/lib.rs` (alphabetical, after `alloc` or similar)
-- [x] **T1.4** Implement `src/attn_match/types.rs`:
+- [x] **T1.4** Implement `crates/katgpt-attn-match/src/types.rs`:
   - [x] `AmConfig` struct (compaction ratio, NNLS iters, OMP k/τ, solver choice, ridge λ, stability bounds)
   - [x] `AmResult` struct (Ck indices, β vec, Cv flat buffer, reconstruction error)
   - [x] `ScoreMethod` enum (Mean, Rms, Max)
@@ -57,7 +57,7 @@ Goal: a compiling, tested, feature-gated module that implements the core AM algo
   - [x] `compact(K, V, queries, config) -> CompactKVCache`
   - [x] Pipeline: select Ck → fit β → fit Cv → wrap in AmResult
   - [x] Reconstruction error reporting (relative Frobenius)
-- [x] **T1.11** Write unit tests in `src/attn_match/tests.rs`:
+- [x] **T1.11** Write unit tests in `crates/katgpt-attn-match/src/tests.rs`:
   - [x] Synthetic test: known β recovery (||β − β_ref||_∞ < 0.1) → GOAT G1 ✅
   - [x] Synthetic test: Cv reconstruction (< 5% relative error) → GOAT G2 ✅
   - [x] OMP mass coverage test (residual < 5% of initial after t iters) → GOAT G3 ✅
@@ -88,7 +88,7 @@ Goal: size-aware and load-aware routing across CPU/SIMD/Rayon/GPU/ANE backends.
 
 ### Tasks
 
-- [x] **T2.1** Implement `src/attn_match/router.rs`:
+- [x] **T2.1** Implement `crates/katgpt-attn-match/src/router.rs`:
   - [x] `SolverRouterConfig` struct (cpu_max_t, simd_max_t, gpu_min_t, ane_max_t, hysteresis_pct)
   - [x] `SolverBackend` enum (CpuScalar, CpuSimd, CpuRayon, Gpu, Ane)
   - [x] `pick_backend(t: usize, T: usize, gpu_available: bool, config) -> SolverBackend`

@@ -87,7 +87,7 @@ parent_path: u128  // 16 bits per depth → max token 65535, max depth 8
 
 ### Core Types
 ```rust
-// tokenizer/types.rs
+// crates/katgpt-tokenizer/src/types.rs
 #[derive(Clone, Serialize, Deserialize)]
 pub struct BpeTokenizer {
     #[serde(with = "map_serde")]
@@ -225,7 +225,7 @@ pub fn validate(&mut self, code: &str) -> PruneResult {
 }
 ```
 
-## PruneResult & ErrorKind (`validator/types.rs`)
+## PruneResult & ErrorKind (`crates/katgpt-validator/src/types.rs`)
 
 ```rust
 #[derive(Debug, Clone)]
@@ -242,7 +242,7 @@ pub enum ErrorKind {
 }
 ```
 
-## CompilerFeedback (`validator/types.rs`)
+## CompilerFeedback (`crates/katgpt-validator/src/types.rs`)
 
 ```rust
 #[derive(Debug, Clone)]

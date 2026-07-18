@@ -356,8 +356,8 @@ The conceptual alignment is near-perfect:
   - `040_OpenDeepThink_Bradley_Terry_Pairwise_Ranking.md` (BtRank design)
   - `076_SR2AM_Self_Regulated_Simulative_Reasoning.md` (budget configurator)
 - Key code:
-  - `src/pruners/bt_rank.rs` — BtRank pairwise tournament (comparator)
+  - `crates/katgpt-pruners/src/bt_rank.rs` — BtRank pairwise tournament (comparator)
   - `src/speculative/dd_tree.rs` — DDTree branch expansion (proposer)
   - `src/speculative/types.rs` — ScreeningPruner, ConstraintPruner (critic/verifier)
   - `src/pruners/bandit.rs` — BanditPruner (diversity)
-  - `src/pruners/configurator_bandit.rs` — SR²AM (budget allocator)
+  - `crates/katgpt-pruners/src/configurator_bandit.rs` — SR²AM (budget allocator)

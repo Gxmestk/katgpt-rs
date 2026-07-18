@@ -55,7 +55,7 @@ Add a **modelless verification layer** to the existing KG Latent Octree Sense Co
 katgpt-core/src/
 ├── merkle.rs          # T1, T3 — MerkleOctree + MerkleProof
 ├── curator.rs         # T4-T8 — CuratorVerifier + MerkleFrozenEnvelope + CuratorBandit
-├── sense/octree.rs    # T2, T13 — build_with_merkle() + merkle_root field
+├── crates/katgpt-sense/src/octree.rs    # T2, T13 — build_with_merkle() + merkle_root field
 ├── types.rs           # T13 — SenseModule optional merkle_root
 └── lib.rs             # T12 — module declarations behind feature gate
 

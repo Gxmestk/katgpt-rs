@@ -39,7 +39,7 @@ katgpt-rs/crates/katgpt-core/src/
 ├── slod.rs          # existing — ScaleBoundary (reuse)
 ├── merkle.rs        # existing — MerkleOctree, MerkleNode, MerkleProof (reuse)
 ├── curator.rs       # existing — CuratorVerifier (extend with verify_at_depth)
-├── sense/octree.rs  # existing — KgEmbedding, SenseOctreeBuilder (reuse)
+├── crates/katgpt-sense/src/octree.rs  # existing — KgEmbedding, SenseOctreeBuilder (reuse)
 └── lib.rs           # add `#[cfg(feature = "rtdc")] pub mod rtdc;`
 ```
 

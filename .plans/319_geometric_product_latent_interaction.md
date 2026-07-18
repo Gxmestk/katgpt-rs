@@ -26,7 +26,7 @@ Ship the **channel-wise geometric product** `uv = u·v + u∧v` as a modelless, 
 - [x] **T1.2** Create `katgpt-rs/crates/katgpt-core/src/linalg/geometric_product.rs` with:
   - `pub fn cyclic_shift_into(src: &[f32], dim: usize, shift: usize, out: &mut [f32])` — zero-alloc cyclic channel shift `T_s`. Handles wrap-around. Documented with the anti-symmetric sign caveat (Research 299 §5 Q4).
   - `pub fn geometric_product_into(u, v, dim, shifts, dot_out, wedge_out, scratch_u, scratch_v)` — accumulates `Σ_s SiLU(u ⊙ T_s(v))` into `dot_out` and `Σ_s (u ⊙ T_s(v) − T_s(u) ⊙ v)` into `wedge_out`. Zero alloc after scratch init.
-  - SIMD chunking hint (4-wide) on inner channel loop, mirroring `dec/operators.rs::exterior_derivative_into` pattern.
+  - SIMD chunking hint (4-wide) on inner channel loop, mirroring `crates/katgpt-dec/src/operators.rs::exterior_derivative_into` pattern.
 - [x] **T1.3** Gate the module behind `#[cfg(feature = "geometric_product")]` and re-export from `crates/katgpt-core/src/linalg/mod.rs`. Also broadened the top-level `pub mod linalg` gate in `lib.rs` from `#[cfg(feature = "karc_forecaster")]` to `#[cfg(any(feature = "karc_forecaster", feature = "geometric_product"))]` so the linalg module compiles when only `geometric_product` is on.
 - [x] **T1.4** Unit tests (same file, `#[cfg(test)]`) — **15 tests, all pass**:
   - `wedge_is_antisymmetric`: `geometric_product_into(u, v, ...) == -geometric_product_into(v, u, ...)` on the wedge output. ✅
@@ -212,7 +212,7 @@ compositions than similarity-driven factions?
 | Anti-symmetric wrap-around sign corrupts wedge at low D | Medium | T1.4 `shift_s_extracts_diagonal` test catches this. If sign corruption is systematic, use zero-padded (non-wrapping) shifts instead of cyclic. Document the choice. |
 | Shift set S not expressive enough at D=8 (HLA) | Low | G1 uses `&[1,2,4]` which covers all 7 non-trivial shifts mod 8. If G1 fails, try exhaustive `&[1,2,3,4,5,6,7]`. |
 | Wedge magnitude scale mismatch with dot in the GGR gate | Low | Sigmoid gate absorbs scale. G1 uses raw `Σ` scores; if scale is an issue, normalize wedge by `1/|S|` before comparison. |
-| SIMD auto-vectorization doesn't trigger on the inner loop | Low | Mirror the explicit 4-wide chunking in `dec/operators.rs::exterior_derivative_into` (T1.2). G4 bench will reveal if vectorization landed. |
+| SIMD auto-vectorization doesn't trigger on the inner loop | Low | Mirror the explicit 4-wide chunking in `crates/katgpt-dec/src/operators.rs::exterior_derivative_into` (T1.2). G4 bench will reveal if vectorization landed. |
 | Fusion guides (T4.1/T4.2) created before G1 passes | High | **Hard block**: T4.x tasks are gated on T3.1 promotion. Do NOT create riir-ai/riir-neuron-db guides until the GOAT gate passes — per skill rule, no "Super-GOAT candidate" escape hatch. |
 
 ---

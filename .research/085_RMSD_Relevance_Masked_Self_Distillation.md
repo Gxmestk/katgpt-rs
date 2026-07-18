@@ -352,7 +352,7 @@ rmsd_distill = ["sdar_gate", "bandit"]
 
 | File | Lines | Role |
 |------|-------|------|
-| `src/pruners/rmsd_relevance.rs` | ~330 | Core types, filter, loss, continuation |
+| `crates/katgpt-pruners/src/rmsd_relevance.rs` | ~330 | Core types, filter, loss, continuation |
 | `src/pruners/bomber/rmsd_player.rs` | ~800 | Bomber arena player |
 | `tests/test_125_rmsd_goat.rs` | ~620 | 44 GOAT proofs |
 | `examples/bomber_16_rmsd_tournament.rs` | ~394 | Tournament example |

@@ -88,9 +88,9 @@ Results: +51–52% aggregate throughput at moderate SLA, +60–85% (Flash) / +57
 
 | DSpark mechanism | Our shipped equivalent | Status |
 |---|---|---|
-| RS acceptance = `1 − dTV(p,q)` (Eq. 8) | `LeviathanVerifier` (`src/speculative/verifier.rs`) — real p/q rejection sampling; target probs in `p_distributions_flat` (`speculative/types.rs`) | ✅ shipped |
-| Per-step acceptance forecast `α ≈ a − b·H(p)` | `AcceptanceForecast` (`src/speculative/acceptance_forecast.rs`, Bebop Plan 243); H_2 upgrade in `crates/katgpt-core/src/ict/bebop_upgrade.rs` (Plan 294 G10) | ✅ shipped |
-| Expected accepted length `τ = Σ sigmoid(k·(Π top1 − t))` | `AcceptanceSurrogate::expected_accepted_length[_at_budget[_top1]]` (`src/speculative/caddtree_budget.rs`) | ✅ shipped (sigmoid-gated variant) |
+| RS acceptance = `1 − dTV(p,q)` (Eq. 8) | `LeviathanVerifier` (`crates/katgpt-speculative/src/spechop/verifier.rs`) — real p/q rejection sampling; target probs in `p_distributions_flat` (`speculative/types.rs`) | ✅ shipped |
+| Per-step acceptance forecast `α ≈ a − b·H(p)` | `AcceptanceForecast` (`crates/katgpt-speculative/src/acceptance_forecast.rs`, Bebop Plan 243); H_2 upgrade in `crates/katgpt-core/src/ict/bebop_upgrade.rs` (Plan 294 G10) | ✅ shipped |
+| Expected accepted length `τ = Σ sigmoid(k·(Π top1 − t))` | `AcceptanceSurrogate::expected_accepted_length[_at_budget[_top1]]` (`crates/katgpt-speculative/src/caddtree_budget.rs`) | ✅ shipped (sigmoid-gated variant) |
 | `cumprod(a_i)` atomic primitive | `cumprodsum_scalar/batched[_simd]` (`crates/katgpt-core/src/cumprodsum.rs`) — SIMD-accelerated | ✅ shipped |
 | Anchor-block drafting pattern | `flashar_anchor.rs` (Plan 166 — AR anchor + D2F fill), `d2f.rs` (block-parallel D2F with mask tokens) | ✅ shipped (different pattern: FlashAR is AR-stride + D2F-fill; DSpark is anchor-emit + mask-block + sequential head) |
 | Confidence head = Linear(d,1)+sigmoid | Architecturally identical to our dot-product + sigmoid direction-vector projection (constraint #2) | ✅ shipped as *shape* (Bebop `AcceptanceForecast`); the *trained weights* are training-only |

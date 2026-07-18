@@ -305,7 +305,7 @@ PPoT's core insight — **reusing discarded next-token distributions for cheap C
 
 - "Probabilistic Programs of Thought" (arXiv:2604.17290) — Garg, Geh, Israel, Millstein, Richardson, Van den Broeck
 - PPoT Reference Implementation: `raw/PPoT/ppot/` in this repo
-- katgpt-rs DFlash: `src/speculative/dflash.rs`
+- katgpt-rs DFlash: `crates/katgpt-speculative/src/dflash.rs`
 - katgpt-rs DDTree: `src/speculative/dd_tree.rs`
 - katgpt-rs Sampling: `crates/katgpt-core/src/speculative/sampling.rs`
 - Screening Pruner Research: `.research/007_Screening_Absolute_Relevance.md`

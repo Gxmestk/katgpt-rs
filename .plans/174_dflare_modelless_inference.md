@@ -130,8 +130,8 @@ graph TD
 | File | Change | Feature Gate |
 |------|--------|-------------|
 | `speculative/types.rs` | `MarginalFusionConfig`, `KvRoutingConfig`, `PositionWeightedBudget` structs | `dflare_fusion`, `dflare_kv_routing`, `dflare_progressive_budget` |
-| `speculative/dflash.rs` | `dflash_predict_ar_with_fusion` — multi-pass conditioning + blend | `dflare_fusion` |
-| `speculative/dflash.rs` | `dflash_predict_conditioned_with_routing` — pruner-confidence KV routing | `dflare_kv_routing` |
+| `crates/katgpt-speculative/src/dflash.rs` | `dflash_predict_ar_with_fusion` — multi-pass conditioning + blend | `dflare_fusion` |
+| `crates/katgpt-speculative/src/dflash.rs` | `dflash_predict_conditioned_with_routing` — pruner-confidence KV routing | `dflare_kv_routing` |
 | `src/speculative/dd_tree.rs` | `build_dd_tree_screened_progressive` — per-depth position-weighted budget | `dflare_progressive_budget` |
 | `speculative/mod.rs` | Re-exports for all three features | All three |
 | `Cargo.toml` | Three feature flags (already existed) | — |

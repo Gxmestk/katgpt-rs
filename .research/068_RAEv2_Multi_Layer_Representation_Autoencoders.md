@@ -490,7 +490,7 @@ RAEv2's core ideas transfer to LLM inference at the **mechanism level** (multi-l
 |---|---|
 | `crates/katgpt-percepta/src/transformer.rs` | `forward_base` layer loop, `standard_lm_head`, `TransformerWeights`, `LayerWeights` |
 | `crates/katgpt-core/src/types.rs` | `Config` with `early_exit_*`, `mtp_*` fields, `InferenceOverrides` |
-| `src/speculative/verifier.rs` | `SpeculativeVerifier` trait |
+| `crates/katgpt-speculative/src/spechop/verifier.rs` | `SpeculativeVerifier` trait |
 | `src/speculative/dd_tree.rs` | `inject_sde_noise`, `build_dd_tree_sde`, early exit logic |
 | `src/speculative/types.rs` | `SdeConfig`, `DDTreeBranchCache`, screening types |
 | `crates/katgpt-pruners/src/sdar/sdar_bandit.rs` | `SdarBanditPruner<P>` sigmoid-gated bandit |

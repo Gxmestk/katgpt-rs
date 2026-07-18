@@ -123,7 +123,7 @@ This is the load-bearing section. **Every survey family is already represented.*
 - **HLA / AHLA (Research 028)** — higher-order linear attention, second-order SK accumulator, O(d·dv) state. This IS the survey's "linear-state recurrence" family, shipped before the survey.
 - **Raven RSM (Research 006)** — O(1) routing slot memory.
 - **δ-Mem / Dual-Pool Reachable Router (Research 024, 249; Plan 282)** — online associative memory, non-trapping router.
-- **MicroBelief / LeakyIntegrator (Plan 276)** — Family C, byte-identical to `evolve_hla` (`katgpt-core/src/sense/reconstruction.rs`).
+- **MicroBelief / LeakyIntegrator (Plan 276)** — Family C, byte-identical to `evolve_hla` (`crates/katgpt-sense/src/reconstruction.rs`).
 - **Topological Recurrent Belief (Research 242, Plan 276)** — Mozer et al. taxonomy (recurrence axis × tokens-per-step). This is the closest cousin to the new survey's recurrent-belief subset; verdict was revised Super-GOAT → GOAT after the HLA prior-art check (the canonical "grep shipped code, not just notes" lesson).
 - **SSD Duality (Research 230)** — semiseparable state-space duality, Mamba-2 algebra.
 

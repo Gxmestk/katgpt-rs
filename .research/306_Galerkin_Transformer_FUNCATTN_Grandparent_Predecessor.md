@@ -177,14 +177,14 @@ Add to the standing DEC vocabulary table in the research skill and in Research 2
 | "Céa's lemma" / "quasi-optimality" | Tikhonov-regularized least-squares approximation bound | `schur.rs::solve_unconstrained` (Plan 067) |
 | "LBB inf-sup condition" / "Banach-Nečas-Babuška" | Lipschitz continuity bound controlled by λ (R257 Prop 4.5) | Documented in R257 §1.3 |
 | "Ladyzhenskaya-Babuška-Brezzi" | (same as LBB) | — |
-| "discrete Ladyzhenskaya-Babuška-Brezzi" | `d∘d=0` discrete identity (curl(grad)=0, div(curl)=0) | `dec/operators.rs` (tests verify by construction) |
+| "discrete Ladyzhenskaya-Babuška-Brezzi" | `d∘d=0` discrete identity (curl(grad)=0, div(curl)=0) | `crates/katgpt-dec/src/operators.rs` (tests verify by construction) |
 | "Fourier-type attention" `(Q̃K̃ᵀ)V/n` | Linear attention with no regularization; predecessor to Parallax sigmoid attention | `parallax_attn.rs` (Plan 135) |
 | "Galerkin-type attention" `Q(K̃ᵀṼ)/n` | Linear-in-n attention via KᵀV-first matmul reorder; predecessor to FUNCATTN `Φ·C·Ψᵀ` | `funcattn.rs` (Plan 286) |
 | "dynamic basis update" / "layer-wise change of basis" | Freeze/thaw snapshot cycle for projection matrices; latent_functor re-estimation | `riir-ai/crates/riir-engine/src/latent_functor/reestimation/mod.rs` (Plan 303) |
 | "Galerkin projection-type layer norm" (pre-dot-product, scale-preserving) | Pre-LN attention block (alternative to post-attention sigmoid normalization) | Not in corpus — small architectural alternative worth benchmarking against post-LN in Plan 286 G3 |
 | "diagonal-dominant rescaled init" `W ← ηU + δI` | Tikhonov regularization `+λI` in the ridge solve (equivalent numerical effect) | `schur.rs` (Plan 067) — `δ` ≈ `λ` |
 | "energy decay" / "scale-preserving" | Norm preservation under attention (R305 phase-modulated coupling is the strict L2-norm-preserving cousin) | `phase_rotation_subspace_gate.rs` (Plan 322) |
-| "Assumption 4.2: columns of Q/K/V as basis DoFs" | HLA `style_weights[64]` columns as basis functions; sense projection channels as orthogonal bases | `katgpt-core/src/sense/reconstruction.rs`, `riir-neuron-db/src/shard.rs` |
+| "Assumption 4.2: columns of Q/K/V as basis DoFs" | HLA `style_weights[64]` columns as basis functions; sense projection channels as orthogonal bases | `crates/katgpt-sense/src/reconstruction.rs`, `riir-neuron-db/src/shard.rs` |
 | "Fredholm equation of the second kind" | Fixed-point iteration / attractor model | `katgpt-rs/.research/035_Attractor_Models_Fixed_Point_Refinement.md` |
 
 **Caveat (per R296):** the boundary-vs-volume perf win from Stokes holds only for d ≤ 3. Galerkin's Hilbert-space theory is dimension-agnostic; the LBB condition is what guarantees n-independence, not a Stokes-type boundary trick. The DEC framing is for the *vocabulary bridge*, not for a perf claim.
@@ -200,7 +200,7 @@ Add to the standing DEC vocabulary table in the research skill and in Research 2
 | **Research 303** (Transolver) | notes only | **Intermediate predecessor.** Softmax M-slice attention (KL=1.8 vs Galerkin's 0.3). Verdict'd Gain for the same *a fortiori* reasoning this note applies to Galerkin. | Confirms the pattern: Galerkin is the third paper in this family verdict'd below Super-GOAT. |
 | **Research 123 / Plan 303** (latent_functor) | notes + shipped (`latent_functor/arithmetic.rs`) | Rank-1, λ=0, basis-free special case of FUNCATTN (and therefore of Galerkin's λ=0 variant). | The rank-k upgrade (Plan 318) is the path forward, not Galerkin. |
 | **Research 051 / Plan 085** (Deep Manifold) | notes | Previously dismissed "Galerkin method implementation" as "Our 'learned basis' is already the Transformer". | Confirms the corpus already considered and dismissed Galerkin-as-implementation. |
-| **Research 219 / Plan 251** (DEC operators) | notes + shipped (`dec/operators.rs`) | The DEC substrate. Galerkin's Petrov-Galerkin projection is a weighted instance of DEC's Hodge-Laplacian action. | Vocabulary bridge (§5 above). |
+| **Research 219 / Plan 251** (DEC operators) | notes + shipped (`crates/katgpt-dec/src/operators.rs`) | The DEC substrate. Galerkin's Petrov-Galerkin projection is a weighted instance of DEC's Hodge-Laplacian action. | Vocabulary bridge (§5 above). |
 | **Research 296 / Plan 314** (Stokes calculus wrappers) | notes + planned | The Stokes-theorem vocabulary crosswalk. | §5 adds Galerkin to the crosswalk. |
 | **Research 305 / Plan 322** (Phase-Modulated Coupling) | notes + planned (`phase_rotation_subspace_gate.rs`) | Strictly L2-norm-preserving rotation cousin. Galerkin's "scale-preserving Galerkin LN" is the looser, attention-block-local version. | Confirms the codebase already pursues norm-preservation more strictly than Galerkin. |
 | **Plan 135 / Research 140** (Parallax Sigmoid Attention) | shipped + GOAT-failed (`parallax_attn.rs`) | Sigmoid partition-of-unity linear attention; GOAT-failed but shipped. The closest shipped *attention* cousin to Galerkin's Fourier-type attention. | Confirms softmax-free linear attention is already in the stack. |

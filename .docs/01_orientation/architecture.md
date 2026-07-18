@@ -2029,8 +2029,8 @@ pub trait MicroRecurrentBeliefState: Send + Sync {
 | `crates/katgpt-micro-belief/src/attractor.rs` | A — `s_t = 2·σ(W_s·s + W_x·x + b) − 1` | Opt-in experiment (G1.4 + G2.1 FAIL) |
 | `crates/katgpt-micro-belief/src/latent_thought.rs` | B — K iters of Family A per tick | Opt-in experiment (G1.6: K=1 bit-identical to A) |
 | `crates/katgpt-micro-belief/src/leaky.rs` | C — monotone additive, `±max_delta` clamp | **Promotable** — byte-identical to `evolve_hla` |
-| `micro_belief/snapshot.rs` | freeze/thaw — BLAKE3-committed weights | Opt-in (per-NPC personality divergence) |
-| `micro_belief/bridge.rs` | `project_to_scalars` — sigmoid(dot) | Shared bridge (all families delegate) |
+| `crates/katgpt-micro-belief/src/snapshot.rs` | freeze/thaw — BLAKE3-committed weights | Opt-in (per-NPC personality divergence) |
+| `crates/katgpt-micro-belief/src/bridge.rs` | `project_to_scalars` — sigmoid(dot) | Shared bridge (all families delegate) |
 | `leaky_core.rs` (ungated) | shared `leaky_step` primitive | Single source of truth for Family C math |
 
 **GOAT verdict:** trait unification + `LeakyIntegrator` are the promotable outputs.

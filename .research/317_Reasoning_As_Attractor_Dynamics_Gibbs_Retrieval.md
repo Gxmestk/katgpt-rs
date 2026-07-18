@@ -94,8 +94,8 @@ Phase transition: as K grows, probability mass of "sharp minima" (hallucinations
 | K-trajectory particle cloud | `BoMSampler::sample_k_states` (K Gaussian noise queries, single batched matvec) | `katgpt-rs/crates/katgpt-micro-belief/src/bom.rs` (Plan 281) |
 | Gibbs weight `exp(-β·H)` | `boltzmann_probabilities`, `boltzmann_sample_batch` (τ-controlled softmax); PlackettLuce Gibbs sampling (I=1000, B=200) | `src/pruners/opus/boltzmann.rs` (Plan 129, B039) |
 | Inverse-energy trajectory scorer | `exp(-λ_c · T)` cost-penalty scorer | `benches/latent_thought_flow_scorer_bench.rs` (R263) |
-| Per-answer basin aggregation | `majority_vote`, `rank_by_consistency`, `select_best_variant`, `ConvergenceSelector::MajorityVote` | `src/speculative/parallel_probe.rs`, `src/speculative/ppot/rank.rs`, `types.rs` |
-| Flat vs sharp minima | `spectral_flatness` (used by CUCG `can_freeze` gate: `< 0.3` ⇒ freeze); `nds_proxy = 1 - flatness`; `classify_chain` flatness pass | `riir-neuron-db/src/spectral_flatness.rs`, `riir-neuron-db/src/phase_gate.rs` (Plan 333 CUCG), `src/pruners/nds_proxy.rs` (Plan 186), Plan 306 |
+| Per-answer basin aggregation | `majority_vote`, `rank_by_consistency`, `select_best_variant`, `ConvergenceSelector::MajorityVote` | `crates/katgpt-speculative/src/parallel_probe.rs`, `src/speculative/ppot/rank.rs`, `types.rs` |
+| Flat vs sharp minima | `spectral_flatness` (used by CUCG `can_freeze` gate: `< 0.3` ⇒ freeze); `nds_proxy = 1 - flatness`; `classify_chain` flatness pass | `riir-neuron-db/src/spectral_flatness.rs`, `riir-neuron-db/src/phase_gate.rs` (Plan 333 CUCG), `crates/katgpt-pruners/src/nds_proxy.rs` (Plan 186), Plan 306 |
 | Phase transition (mass evaporates at critical β) | `phase_transition_gate(N, d)`, participation_ratio, numerical_rank, Jacobian SVD | `crates/katgpt-core/src/subspace_phase_gate/` (Plan 301) |
 | Hopfield MHN update / attractor | `AttractorKernel` (Hopfield-style recurrent sigmoid update) + **honest G2.1 null result** | `crates/katgpt-core/src/micro_belief/` (Plan 276, B276) |
 | Relaxation to equilibrium | `MicroRecurrentBeliefState::step` iterated to fixed point | same |

@@ -153,7 +153,7 @@ Step 5: Cross-game synthesis ("In both Bomber and Go, corner strategies vs cente
 
 **Why modelless:** QA pairs become heuristic knowledge for `BanditPruner` + `AbsorbCompress`. No gradient update needed. The QA format is directly consumable by our `ScreeningPruner::relevance()`.
 
-**Implementation:** `src/pruners/reflection.rs` with `fn synthesize_reflections(game_replay: &[GameState]) -> Vec<ReflectionQA>` behind feature gate `memo_reflections`.
+**Implementation:** `crates/katgpt-pruners/src/reflection.rs` with `fn synthesize_reflections(game_replay: &[GameState]) -> Vec<ReflectionQA>` behind feature gate `memo_reflections`.
 
 ### D2: TIES Model Merging (Model-Based)
 

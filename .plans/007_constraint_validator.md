@@ -475,7 +475,7 @@ DDTree only uses Tier 0. Tier 1 runs on the top-K paths. Tiers 2-3 run offline o
 ### 1.1 Core Types
 
 ```rust
-// tokenizer/types.rs
+// crates/katgpt-tokenizer/src/types.rs
 
 /// BPE tokenizer for Rust source code.
 pub struct BpeTokenizer {
@@ -586,7 +586,7 @@ for path in extract_best_path(&tree) {
 ### 2.3 Error Feedback (Self-Correction Loop)
 
 ```rust
-// validator/types.rs (previously clora/types.rs)
+// crates/katgpt-validator/src/types.rs (previously clora/types.rs)
 
 /// Compiler error → steering context for next LLM draft.
 pub struct CompilerFeedback {
@@ -630,9 +630,9 @@ The training data pipeline (`src/data/`) is deferred to plan 009 because:
 
 Plan 008 (wgpu LoRA Training) covers GPU-accelerated forward + backward pass for `lora.bin` fine-tuning.
 
-**Module ownership**: `src/data/` is owned by Plan 009. Plan 008 places its `DataLoader` in `src/gpu/dataloader.rs` (inside the `gpu/` module) to avoid ownership conflict. The split is:
+**Module ownership**: `src/data/` is owned by Plan 009. Plan 008 places its `DataLoader` in `riir-ai/crates/riir-gpu/src/dataloader.rs` (inside the `gpu/` module) to avoid ownership conflict. The split is:
 - `src/data/ingester.rs`, `src/data/filter.rs`, `src/data/exporter.rs` → Plan 009 (corpus processing)
-- `src/gpu/dataloader.rs` → Plan 008 (batch iteration for GPU training)
+- `riir-ai/crates/riir-gpu/src/dataloader.rs` → Plan 008 (batch iteration for GPU training)
 
 Plan 009 will cover:
 - `data/ingester.rs` — walk dirs, read .rs, blake3 dedup

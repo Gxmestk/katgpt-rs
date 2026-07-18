@@ -1,7 +1,7 @@
 # Plan 197: Domino Causal Correction — Modelless Decoupled Pattern
 
 > **Source:** Research 177 — Domino Decoupled Causal Speculative Decoding (Modelless Distillation)
-> **Depends On:** DDTree (`src/speculative/dd_tree.rs`), DFlash (`speculative/dflash.rs`), ConstraintPruner trait
+> **Depends On:** DDTree (`src/speculative/dd_tree.rs`), DFlash (`crates/katgpt-speculative/src/dflash.rs`), ConstraintPruner trait
 **Feature Gate:** `domino_correction` (default ON, GOAT proof passed)
 > **Status:** ✅ Complete — GOAT PASSED (25/25 tests, -22.8% build time), promoted to default-ON
 
@@ -55,7 +55,7 @@ No model training. No LoRA. Pure inference-time pattern extraction.
   - Zero-alloc lookup: `fn lookup(&self, prefix_hash: u64) -> &[f32]`
   - Builder pattern for construction from constraint rules
 
-- [x] **T2: Add `domino_correct_marginals` function in `speculative/dflash.rs`**
+- [x] **T2: Add `domino_correct_marginals` function in `crates/katgpt-speculative/src/dflash.rs`**
   - Signature: `fn domino_correct_marginals(marginals: &mut [Vec<f32>], sampled_tokens: &[usize], table: &PrefixCorrectionTable)`
   - For depth i > 0: compute prefix hash from `sampled_tokens[0..i]`, lookup correction, apply as logit residual
   - Re-normalize each marginal after correction
@@ -130,7 +130,7 @@ No model training. No LoRA. Pure inference-time pattern extraction.
 |------|--------|
 | `katgpt-core/src/traits.rs` | Add `DominoPruner` trait |
 | `speculative/types.rs` | Add `PrefixCorrectionTable` |
-| `speculative/dflash.rs` | Add `domino_correct_marginals` |
+| `crates/katgpt-speculative/src/dflash.rs` | Add `domino_correct_marginals` |
 | `src/speculative/dd_tree.rs` | Add `domino_score` + wire into `build_dd_tree_pruned` |
 | `Cargo.toml` | Add `domino_correction` feature |
 | `examples/domino_sudoku.rs` | New example |

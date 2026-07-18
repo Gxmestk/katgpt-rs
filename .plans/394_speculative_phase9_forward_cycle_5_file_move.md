@@ -104,7 +104,7 @@ then `prefill` scorers (only test dep on `verifier`/`step`).
       `pub use katgpt_forward::verifier;`.
 - [x] T3.5 `d2f_verifier.rs` + `flashar_consensus.rs` continue to resolve
       `crate::speculative::verifier::SpeculativeVerifier` via the re-export.
-- [x] T3.6 Delete root `src/speculative/verifier.rs`.
+- [x] T3.6 Delete root `crates/katgpt-speculative/src/spechop/verifier.rs`.
 - [x] T3.7 `cargo check --workspace` clean (default / all-features / no-default).
 
 ## Phase 4 — Move `step.rs` (1852 LOC, depends on verifier + dflash)

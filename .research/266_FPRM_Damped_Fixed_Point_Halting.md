@@ -111,7 +111,7 @@ All of this is training-side and out of scope for the modelless workflow.
 | Weight-tied looped block (Eq. 1) | `LoopMode::WeightShared { loop_count }` — default-on, GOAT 8/8 | Plan 108, `crates/katgpt-core/src/types.rs:314`, `forward_looped` |
 | ODE-motivated damped iterated block (more general than Eq. 1) | `LoopMode::TrainingFree` + `TrainingFreeLoopConfig` (K-stage RK β=0.5, window, cache strategy) — default-on, GOAT 4/4 | Plan 136, `tf_loop` |
 | Adaptive depth (halt when converged) | Hydra cumulative-DE convergence gate; runtime depth-tier cap | Plans 165, 284; `InferenceOverrides.depth_tier` |
-| Fixed-point residual scoring | `ManifoldResidual` trait + `L2ResidualScorer` / `KlResidualScorer` + `ResidualRelevanceScorer`, GOAT 6/6 | Plan 085, `src/pruners/manifold_residual.rs` |
+| Fixed-point residual scoring | `ManifoldResidual` trait + `L2ResidualScorer` / `KlResidualScorer` + `ResidualRelevanceScorer`, GOAT 6/6 | Plan 085, `crates/katgpt-pruners/src/manifold_residual.rs` |
 | Cubic fixed-point iteration (different sense — orthogonalisation) | Newton-Schulz 5-iteration cubic fixed-point, GOAT 25/25 | Plan 152, `crates/katgpt-core/src/newton_schulz.rs` |
 | Residual-based early-halt | Self-Advantage Gate on HLA reconstruction — halts HLA iterative refinement when residual collapses, GOAT 2/3 + 0ns overhead | Plan 283, Bench 057 |
 | Patience-based early halt (different substrate — tree search) | `early_exit_patience` in `dd_tree.rs::TreeBuilder::build` and `build_screened`, and in `crates/katgpt-speculative/src/distill/ilc.rs` — patience on consecutive-dominant with gap threshold | `src/speculative/dd_tree.rs:2234`, `crates/katgpt-speculative/src/distill/ilc.rs:635` |

@@ -20,7 +20,7 @@ Transolver's **Physics-Attention** reduces quadratic attention over N mesh point
 - **Research 302 (FAME)** — per-entity fixed MoE blend, verdict'd Super-GOAT today. Covers the "M slices = K archetype fields, weights computed once and frozen" angle as a stronger commitment-tier primitive.
 - **latent_functor rank-1 (Research 123 / Plan 303)** — the rank-1, basis-free special case already shipped in `riir-engine/src/latent_functor/arithmetic.rs`.
 
-**The only genuinely novel angle Transolver adds to the corpus** (not in Research 257/302/123) is a small reframing: **slice = DEC codifferential δ (rank-1 → rank-0 aggregation), deslice = DEC exterior_derivative d (rank-0 → rank-1 coboundary broadcast)**. The DEC operators (`codifferential`, `exterior_derivative`, `hodge_decompose`) already ship in `crates/katgpt-core/src/dec/operators.rs` (Plan 251). This is a vocabulary bridge, not a new primitive.
+**The only genuinely novel angle Transolver adds to the corpus** (not in Research 257/302/123) is a small reframing: **slice = DEC codifferential δ (rank-1 → rank-0 aggregation), deslice = DEC exterior_derivative d (rank-0 → rank-1 coboundary broadcast)**. The DEC operators (`codifferential`, `exterior_derivative`, `hodge_decompose`) already ship in `crates/katgpt-dec/src/operators.rs` (Plan 251). This is a vocabulary bridge, not a new primitive.
 
 **Verdict: Gain.** No plan, no Super-GOAT guide, no open primitive. Document the predecessor relationship + the DEC reframing so future readers don't accidentally re-distill Transolver when FUNCATTN (257) already covers it strictly better.
 
@@ -73,8 +73,8 @@ Research 257 §2.2 explicitly notes: *"Math pieces all shipped (Schur ridge solv
 
 Research 257 frames the slice/deslice as functional-map basis projection (ΦᵀQ, Φ·C·Ṽ). Research 302 frames it as archetype blend (Σ_k π_k · f_k). **Neither frames it as a DEC operator pair.** Transolver's mechanism admits a clean DEC interpretation that is worth recording:
 
-- **Slice** (Eq. 2: `z_j = Σ_i w_{i,j} x_i / Σ_i w_{i,j}`) is a **codifferential-style aggregation** — it takes a 0-cochain (per-mesh-point field, rank 0) and produces M scalar values per channel (a rank-(-1)-like "super-cell" cochain). In DEC terms, `codifferential` (`dec/operators.rs:126`) maps rank k → rank k−1 by summing boundary contributions with signs. Transolver's slice is the same shape: rank 0 (points) → aggregate to M meta-cells, weighted by `w_{i,j}` instead of ±1 boundary signs.
-- **Deslice** (Eq. 4: `x'_i = Σ_j w_{i,j} z'_j`) is an **exterior-derivative-style coboundary broadcast** — rank 0 meta-cells → rank 0 points, broadcasting each meta-cell's value to its member points. `exterior_derivative` (`dec/operators.rs:48`) maps rank k → rank k+1 by accumulating coboundary entries.
+- **Slice** (Eq. 2: `z_j = Σ_i w_{i,j} x_i / Σ_i w_{i,j}`) is a **codifferential-style aggregation** — it takes a 0-cochain (per-mesh-point field, rank 0) and produces M scalar values per channel (a rank-(-1)-like "super-cell" cochain). In DEC terms, `codifferential` (`crates/katgpt-dec/src/operators.rs:126`) maps rank k → rank k−1 by summing boundary contributions with signs. Transolver's slice is the same shape: rank 0 (points) → aggregate to M meta-cells, weighted by `w_{i,j}` instead of ±1 boundary signs.
+- **Deslice** (Eq. 4: `x'_i = Σ_j w_{i,j} z'_j`) is an **exterior-derivative-style coboundary broadcast** — rank 0 meta-cells → rank 0 points, broadcasting each meta-cell's value to its member points. `exterior_derivative` (`crates/katgpt-dec/src/operators.rs:48`) maps rank k → rank k+1 by accumulating coboundary entries.
 - **Slice + deslice round-trip with M-attention in between** is structurally a **δ-then-d composition with an M-dim inner operator** — i.e., a low-rank approximation of the Hodge-Laplacian's action, where the M-attention plays the role of the harmonic projector on the slice domain.
 
 **Why this matters (small but real):** it gives a vocabulary bridge from Transolver/FUNCATTN to the DEC substrate (Plan 251, Research 219/296). A future Stokes-calculus paper that says "discretization-invariant integral operator via boundary flux" can be recognized as the same family as Transolver's Theorem 3.4, via the DEC identity `d∘d=0`. This is the same vocabulary-translation lesson as Research 296 (Stokes): paper vocabulary ("slice", "physics-aware token") ↔ codebase vocabulary ("codifferential aggregation", "coboundary broadcast"). Adding Transolver to the standing vocabulary crosswalk closes one more gap.
@@ -146,10 +146,10 @@ Add to the standing DEC vocabulary table in the research skill and in Research 2
 
 | Paper term (Transolver / FUNCATTN family) | DEC equivalent | Codebase location |
 |---|---|---|
-| "slice" / "aggregate to M tokens" / "physics-aware token" | `codifferential` (δ, rank k → k−1 aggregation) | `dec/operators.rs:126` |
-| "deslice" / "broadcast back to N points" | `exterior_derivative` (d, rank k → k+1 coboundary) | `dec/operators.rs:48` |
+| "slice" / "aggregate to M tokens" / "physics-aware token" | `codifferential` (δ, rank k → k−1 aggregation) | `crates/katgpt-dec/src/operators.rs:126` |
+| "deslice" / "broadcast back to N points" | `exterior_derivative` (d, rank k → k+1 coboundary) | `crates/katgpt-dec/src/operators.rs:48` |
 | "slice + deslice round-trip with M-attention" | low-rank δ-then-d with M-dim inner operator (harmonic-projector-shaped) | `crates/katgpt-dec/src/hodge.rs:302 hodge_decompose` |
-| "Physics-Attention = learnable integral on Ω_s" (Thm 3.4) | DEC identity `d∘d=0` on the slice complex (discretization-invariant operator) | `dec/operators.rs` (tests verify `curl(grad)=0`, `div(curl)=0`) |
+| "Physics-Attention = learnable integral on Ω_s" (Thm 3.4) | DEC identity `d∘d=0` on the slice complex (discretization-invariant operator) | `crates/katgpt-dec/src/operators.rs` (tests verify `curl(grad)=0`, `div(curl)=0`) |
 
 **Caveat (per R296):** the boundary-vs-volume perf win from Stokes holds only for d ≤ 3. Transolver's M-slice domain is small (M=32–256) but the underlying mesh can be high-dim (3D Shape-Net Car, 32,186 points). The DEC framing is for the *vocabulary bridge*, not for a perf claim.
 
@@ -163,7 +163,7 @@ Add to the standing DEC vocabulary table in the research skill and in Research 2
 | **Research 302 / Plan 321** (FAME CommittedFieldBlend) | notes + planned (`committed_field_blend.rs`, today) | **Per-entity commitment-tier cousin.** Per-entity FIXED MoE blend computed once then frozen — the commitment-tier version of Transolver's per-forward-pass slice blend. | Crowd-scale Transolver reframing subsumed by FAME. |
 | **Research 246 / Plan 279** (Manifold Power Iteration MoE Router) | notes + shipped (`manifold_power_iter_router.rs`) | Sibling GOAT. Power iteration on router rows; same "shipped math, novel application" pattern. | Confirms the pattern: Transolver is the third paper in this family verdict'd below Super-GOAT. |
 | **Research 123 / Plan 303** (latent_functor) | notes + shipped (`latent_functor/arithmetic.rs`) | Rank-1, λ=0, basis-free special case of FUNCATTN (and therefore of Transolver). | The rank-k upgrade (Plan 318) is the path forward, not Transolver. |
-| **Research 219 / Plan 251** (DEC operators) | notes + shipped (`dec/operators.rs`) | The DEC substrate. Slice/deslice = codifferential/exterior_derivative. | Vocabulary bridge (§5 above). |
+| **Research 219 / Plan 251** (DEC operators) | notes + shipped (`crates/katgpt-dec/src/operators.rs`) | The DEC substrate. Slice/deslice = codifferential/exterior_derivative. | Vocabulary bridge (§5 above). |
 | **Research 296 / Plan 314** (Stokes calculus wrappers) | notes + planned | The Stokes-theorem vocabulary crosswalk. | §5 adds Transolver to the crosswalk. |
 | **Plan 290** (Latent Field Steering, `apply_field_to_crowd`) | shipped (`latent_steering.rs`) | Crowd-scale field application primitive. | The crowd-scale Transolver reframing would compose with this, not replace it. |
 | **Plan 298** (Crowd MCGS) | shipped + promoted default (`crowd_mcgs/`) | Crowd-scale retrieval infrastructure. | Crowd-scale game AI stack already exists; Transolver is not unblocking. |

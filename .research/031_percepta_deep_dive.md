@@ -428,7 +428,7 @@ def _cursor_lookup(values, name=None):
 
 **Why**: Foundation for any gate-graph work. Required for conditional logic and multiplication in attention-FFN systems.
 
-**Scope**: ~100 lines new module `src/percepta/gates.rs`.
+**Scope**: ~100 lines new module `crates/katgpt-percepta/src/gates.rs`.
 - `reglu(a, b) -> f64` — `relu(b) * a`
 - `stepglu(a, b) -> f64` — `a * step(b >= 0)`
 - `multiply(a, b) -> f64` — via `reglu(a,b) - reglu(a,-b)`

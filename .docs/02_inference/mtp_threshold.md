@@ -169,8 +169,8 @@ MTP-Enhanced DFlash (this plan):
 
 | Feature | Relationship |
 |---------|-------------|
-| DFlash (`speculative/dflash.rs`) | **Orthogonal** — MTP feeds richer context INTO the drafter. DFlash's tree verification still runs on the output. |
-| LeviathanVerifier (`speculative/verifier.rs`) | **Modified** — target→draft activation transfer happens here (target already exposes `hidden_state`) |
+| DFlash (`crates/katgpt-speculative/src/dflash.rs`) | **Orthogonal** — MTP feeds richer context INTO the drafter. DFlash's tree verification still runs on the output. |
+| LeviathanVerifier (`crates/katgpt-speculative/src/spechop/verifier.rs`) | **Modified** — target→draft activation transfer happens here (target already exposes `hidden_state`) |
 | PagedKVCache (`transformer.rs`) | **Extended** — read-only cross-attention view for drafter |
 | Sparse MLP threshold (`Config.sparse_threshold`) | **Same pattern** — threshold-gated feature activation |
 | TurboQuant | **Independent** — compresses precision, MTP improves draft quality |

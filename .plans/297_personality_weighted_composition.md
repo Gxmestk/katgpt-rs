@@ -144,5 +144,5 @@ Goal: feature flag → default; README updated.
 
 - **Research:** [276 (this plan's parent)](../.research/276_Personality_Weighted_Latent_Layer_Composition.md)
 - **Companion (riir-ai):** [Research 146](../../../riir-ai/.research/146_Entity_Cognition_Stack_Guide.md), [Plan 327](../../../riir-ai/.plans/327_entity_cognition_stack_runtime.md) (runtime wiring)
-- **Depends on:** R242 (`MicroRecurrentKernelSnapshot` in `micro_belief/snapshot.rs`) — Phase 3 extends this
+- **Depends on:** R242 (`MicroRecurrentKernelSnapshot` in `crates/katgpt-micro-belief/src/snapshot.rs`) — Phase 3 extends this
 - **Does NOT depend on:** game systems (entity-agnostic), chain (host responsibility), LatCal (host responsibility)

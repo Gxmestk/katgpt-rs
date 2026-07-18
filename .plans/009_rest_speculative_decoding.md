@@ -213,8 +213,8 @@ rest = ["reqwest", "tokio"]   # Retrieval-based speculative decoding
 ### Phase 2: REST Client Module
 - [x] 2.1 Add `reqwest` and `tokio` to `Cargo.toml` behind `rest` feature
 - [x] 2.2 Create `src/rest/mod.rs` with feature gate
-- [x] 2.3 Create `src/rest/client.rs` — `RestClient`, `RetrievalResult`
-- [x] 2.4 Create `src/rest/types.rs` — request/response types matching anyrag API
+- [x] 2.3 Create `riir-ai/crates/riir-rest/src/client.rs` — `RestClient`, `RetrievalResult`
+- [x] 2.4 Create `riir-ai/crates/riir-rest/src/types.rs` — request/response types matching anyrag API
 - [x] 2.5 Add `pub mod rest;` to `src/lib.rs` behind `#[cfg(feature = "rest")]`
 - [x] 2.6 Add tests: mock REST response parsing
 
@@ -269,8 +269,8 @@ full = ["leviathan", "sudoku", "validator", "rest", "training", "gpu"]  # previo
 | `crates/katgpt-percepta/src/transformer.rs` | Add `hidden_state` field + copy | 1 |
 | `Cargo.toml` | Add `reqwest`, `tokio`, `rest` feature | 2 |
 | `src/rest/mod.rs` | New | 2 |
-| `src/rest/client.rs` | New | 2 |
-| `src/rest/types.rs` | New | 2 |
+| `riir-ai/crates/riir-rest/src/client.rs` | New | 2 |
+| `riir-ai/crates/riir-rest/src/types.rs` | New | 2 |
 | `src/lib.rs` | Add `mod rest` behind feature gate | 2 |
 | `src/speculative/dd_tree.rs` | Add `merge_retrieved_branches` | 3 |
 | `crates/katgpt-forward/src/step.rs` | Add `speculative_step_rest` | 4 |

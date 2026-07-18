@@ -95,7 +95,7 @@ This is the bridge to our latent-space substrate: `c'` *is* a learned representa
 | Cross-node curiosity snapshot commitment (sync-boundary bridge) | **cgsp_runtime/chain_bridge.rs** — `commit_snapshot_via_quorum`, `reload_snapshot_from_chain` | `riir-ai/crates/riir-engine/src/cgsp_runtime/chain_bridge.rs` |
 | Per-NPC frozen latent state, replicable | **NeuronShard / MerkleFrozenEnvelope** | `riir-neuron-db/src/shard.rs`, `freeze.rs` |
 | Warm-tier offline generation positioning (the existing "NPC sleep cycle" framing) | **CompressionDrafter** — explicit verdict: "Warm-tier offline generation — quest packs generated during NPC sleep cycles, where ms latency is fine" (Bench 285, GOAT FAILED for Hot-tier) | Plan 285, Research 137 (riir-ai) |
-| Predictability score via dot-product | **EmotionDirections / FutureBehaviorProbe::forecast** | `src/pruners/emotion_vector.rs`, `future_probe.rs` |
+| Predictability score via dot-product | **EmotionDirections / FutureBehaviorProbe::forecast** | `crates/katgpt-pruners/src/emotion_vector.rs`, `future_probe.rs` |
 | Multi-query cost amortization via warm-tier cache hit | **BFCF × LFU × Sharding** — region-keyed amortized retrieval | Plan 218, Research 193 |
 
 ### 2.2 What the paper adds that NONE of the above does alone

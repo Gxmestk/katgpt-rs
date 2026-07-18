@@ -71,7 +71,7 @@ All well under the 1ms audit-cadence target (this is NOT hot-path — runs every
 | **G1b** unfaithful detection | ≥99% | **100.0%** (200/200) | ✅ PASS |
 | Combined overall | ≥99% | **100.0%** (400/400) | ✅ PASS |
 
-Property test (hand-rolled with `fastrand` — `proptest`/`quickcheck` are not katgpt-rs dev-deps per repo convention; see `crates/katgpt-core/src/micro_belief/tests.rs:137`). 400 randomized trials: 200 faithful consumers (positive weights in [0.3, 2.0], distinct memory values) + 200 unfaithful consumers (constant output, ignores memory). All correctly classified.
+Property test (hand-rolled with `fastrand` — `proptest`/`quickcheck` are not katgpt-rs dev-deps per repo convention; see `crates/katgpt-micro-belief/src/tests.rs:137`). 400 randomized trials: 200 faithful consumers (positive weights in [0.3, 2.0], distinct memory values) + 200 unfaithful consumers (constant output, ignores memory). All correctly classified.
 
 ### G2 — IG surrogate Spearman ρ ✅ PASS
 

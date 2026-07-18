@@ -36,7 +36,7 @@ Ship the `(max, +)` tropical semiring as a modelless inference primitive: `tropi
 
 ### Tasks
 
-- [x] **T2.1** Three DEC wrappers in `crates/katgpt-core/src/algebra/tropical.rs`, all `#[cfg(feature = "tropical_algebra")]`, all delegating to the shipped `dec/operators.rs` boundary matrices:
+- [x] **T2.1** Three DEC wrappers in `crates/katgpt-core/src/algebra/tropical.rs`, all `#[cfg(feature = "tropical_algebra")]`, all delegating to the shipped `crates/katgpt-dec/src/operators.rs` boundary matrices:
   - `tropical_exterior_derivative(cx: &CellComplex, input: &CochainField) -> CochainField` — for each (k+1)-cell, output = `max` over boundary k-cells of `(sign ? 0.0 : f32::NEG_INFINITY) + input[cell]`. Signed `+1` → `+0`, signed `−1` → `−∞` (exclude). Reuses `cx.boundary(k+1)` enumeration from `exterior_derivative_into`.
   - `tropical_codifferential(cx: &CellComplex, input: &CochainField) -> CochainField` — same form, opposite direction (k → k−1).
   - `tropical_line_integral(field: &CochainField, path: &[usize]) -> f32` — `path.iter().map(|&c| field[c]).fold(f32::NEG_INFINITY, f32::max)` — bottleneck-edge cost.

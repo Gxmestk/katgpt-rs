@@ -59,11 +59,11 @@ This allows long inference chains to fit in context without losing critical info
 |----------------|----------------|----------|--------|
 | Skill interface (behavioral contract) | `ConstraintPruner` trait (`is_valid`, `relevance`) | `src/pruners/mod.rs` | ✅ Production |
 | Skill retrieval (which skill to use) | `BanditPruner<P>` with `BanditStrategy` | `src/pruners/bandit.rs` | ✅ Production |
-| Skill refinement (improve over time) | `AbsorbCompress` — promote winning patterns | `src/pruners/absorb_compress.rs` | ✅ Production |
-| Skill update (hot-swap at runtime) | `HotSwapPruner` — atomic pruner replacement | `src/pruners/hot_swap.rs` | ✅ Production |
-| Cross-session persistence | Freeze/thaw — `repr(C)` disk I/O | `src/pruners/freeze.rs` | ✅ Production |
+| Skill refinement (improve over time) | `AbsorbCompress` — promote winning patterns | `crates/katgpt-pruners/src/absorb_compress.rs` | ✅ Production |
+| Skill update (hot-swap at runtime) | `HotSwapPruner` — atomic pruner replacement | `crates/katgpt-pruners/src/hot_swap.rs` | ✅ Production |
+| Cross-session persistence | Freeze/thaw — `repr(C)` disk I/O | `crates/katgpt-pruners/src/freeze.rs` | ✅ Production |
 | Multi-level memory | Five-tier memory system | `src/memory/` | ✅ Production (MORE granular than MUSE's 3-tier) |
-| Context compression | `AbsorbCompress` delta-gated merging | `src/pruners/absorb_compress.rs` | ✅ Production |
+| Context compression | `AbsorbCompress` delta-gated merging | `crates/katgpt-pruners/src/absorb_compress.rs` | ✅ Production |
 | Bandit feedback as skill selection | UCB1/Thompson/ε-greedy over pruner arms | `src/pruners/bandit.rs` | ✅ Production |
 | Safe baseline (fallback) | `NoScreeningPruner` as conservative default | `src/pruners/mod.rs` | ✅ Production |
 | Validation/proof | GOAT benchmark proof system | `katgpt-rs/.benchmarks/` | ✅ Production |

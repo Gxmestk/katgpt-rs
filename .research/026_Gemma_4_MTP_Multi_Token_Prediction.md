@@ -255,8 +255,8 @@ if config.vocab_size > config.mtp_cluster_vocab_threshold {
 
 | Component | Relationship |
 |-----------|-------------|
-| **DFlash** (`speculative/dflash.rs`) | **Complementary** — DFlash does token-level conditioning (drafter sees accepted tokens). MTP does activation-level conditioning (drafter sees target's hidden state). They compose: MTP feeds richer context INTO the drafter, DFlash's tree verification still runs on the output. Not conflicting — both improve acceptance rate via different signals. |
-| **LeviathanVerifier** (`speculative/verifier.rs`) | **Modified** — This is where target→draft activation transfer happens. Already has `target_ctx: ForwardContext` with `hidden_state` populated. MTP adds one `matmul` (or truncate) before the drafter AR loop. |
+| **DFlash** (`crates/katgpt-speculative/src/dflash.rs`) | **Complementary** — DFlash does token-level conditioning (drafter sees accepted tokens). MTP does activation-level conditioning (drafter sees target's hidden state). They compose: MTP feeds richer context INTO the drafter, DFlash's tree verification still runs on the output. Not conflicting — both improve acceptance rate via different signals. |
+| **LeviathanVerifier** (`crates/katgpt-speculative/src/spechop/verifier.rs`) | **Modified** — This is where target→draft activation transfer happens. Already has `target_ctx: ForwardContext` with `hidden_state` populated. MTP adds one `matmul` (or truncate) before the drafter AR loop. |
 | **DDTree** (`src/speculative/dd_tree.rs`) | **Unchanged** — Tree verification doesn't change. MTP just makes the drafter produce better candidates for the tree. |
 | **TruncatePadProjector** (`riir-router/projector.rs`) | **Shared pattern** — Same truncate/pad strategy for dimension mismatch. MTP applies it to target hidden state instead of embeddings. Could share a utility function. |
 | **PagedKVCache** (`transformer.rs`) | **Extended** — Cross-attention to target KV needs a read-only view. PagedKVCache already has `read_kv()` — add a variant that returns `&[f32]` slices without copying. |

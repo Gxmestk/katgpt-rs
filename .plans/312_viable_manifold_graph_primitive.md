@@ -31,7 +31,7 @@ Ship the generic, modelless, MIT-licensed open half of the Viable Manifold Graph
 - **Sigmoid not softmax** — any blending uses sigmoid (e.g., the calibrated-decoder α(z) semaphore if we expose it). Per AGENTS.md.
 - **Latent-vs-raw boundary respected** — operates only on `&[f32]` + closures. Never touches sync. No boundary crossing by construction (G7).
 - **Reuse existing infra** — `jacobian_svd_at` (Plan 301) for the SVD; we add only the `det(J^T J)` reduction + graph + navigation.
-- **DRY** — graph storage reuses the pattern from `dense_mesh` (Vec-based, no graph crate dependency); A* reuses the pattern from `pruners/pathfinder.rs`.
+- **DRY** — graph storage reuses the pattern from `dense_mesh` (Vec-based, no graph crate dependency); A* reuses the pattern from `crates/katgpt-pruners/src/pathfinder.rs`.
 
 ---
 

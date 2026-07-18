@@ -84,7 +84,7 @@ The Super-GOAT is the fusion: **per-NPC committed archetype blend × KARC trajec
 | Per-token MoE expert routing (block-level coreset) | **dMoE** | Research 161, Plan 181 — `top_p_coreset`, `select_arms_top_p` |
 | Per-NPC trajectory forecaster (delay-basis ridge, fits in a shard) | **KARC** | Research 288, Plan 308, `crates/katgpt-core/src/karc.rs` — `KarcForecaster<D,M,K>` |
 | Per-NPC recurrent belief state (leaky integrator, byte-identical to `evolve_hla`) | **MicroRecurrentBeliefState / LeakyIntegrator** | Plan 276, Research 242, `crates/katgpt-core/src/micro_belief/` |
-| HLA forward state evolution | **`evolve_hla`** | `crates/katgpt-core/src/sense/reconstruction.rs` |
+| HLA forward state evolution | **`evolve_hla`** | `crates/katgpt-sense/src/reconstruction.rs` |
 | Forward + backward latent passes (bidirectional prefill) | **Plan 025 bidirectional prefill** | reader LoRA (prefill) + writer LoRA (decode) — the Bi-NCDE's fwd/bwd split, modellessly |
 | Two-brain model (info brain = ground truth, think brain = belief) | **AGENTS.md §Spatial Cognition** | one-way bridge, fog-of-war gated |
 | Discretization-invariant path sum / line integral | **DEC `line_integral`** | Plan 314, Research 296, `crates/katgpt-core/src/dec/` |

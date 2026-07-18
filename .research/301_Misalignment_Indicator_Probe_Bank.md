@@ -116,14 +116,14 @@ At matched per-turn FPR ~15%: 18-probe transcript-TPR = 90.8%, 5-behavior-probe 
 
 | Paper mechanism | Our shipped equivalent | Class | Status |
 |---|---|---|---|
-| Linear probe (single direction) on residual stream | `FutureBehaviorProbe` (Plan 292, `src/pruners/future_probe.rs`); `EmotionDirections::project` (Plan 162, `src/pruners/emotion_vector.rs`); CNA contrastive (Plan 087) | Detection (R267 vocabulary) / Prediction (R267 vocabulary) | ✅ shipped |
+| Linear probe (single direction) on residual stream | `FutureBehaviorProbe` (Plan 292, `crates/katgpt-pruners/src/future_probe.rs`); `EmotionDirections::project` (Plan 162, `crates/katgpt-pruners/src/emotion_vector.rs`); CNA contrastive (Plan 087) | Detection (R267 vocabulary) / Prediction (R267 vocabulary) | ✅ shipped |
 | Direction-vector pool with sigmoid verifier | `ClaimVerifier::verify` returning `sigmoid(dot(claim.embedding, direction_vec[idx]))` (Plan 284 / Research 255, `src/clr/`) | Detection | ✅ shipped |
 | Freeze/thaw-versioned direction vectors | `DirectionVectorSource { direction(), blake3(), version() }` (Plan 284) | Artifact discipline | ✅ shipped |
 | Two-stage cascade (cheap online filter + heavy offline verifier) | `TriggeredInjectionGate` (plasma-tier hot path) + `AuditRunner` (periodic) + `AntiCheatChecker` (event emission) in `riir-engine/src/integrity/` (Plan 308, Research 129) | Cascade | ✅ shipped (game-runtime side) |
 | Raw scalar at sync boundary (5 emotion scalars, not the full embedding) | `RawInjectionSignature { valence, arousal, desperation, calm, fear }` in `riir-ai/crates/riir-engine/src/integrity/types.rs` | Raw/latent bridge | ✅ shipped |
 | KG triple emission from latent similarity | `KgTripleTemplate { subject, predicate, object }` in `riir-neuron-db/src/vibe.rs`; `kg_probe` in integrity/ | KG triple | ✅ shipped |
 | Pre-NPC 8-dim latent state (the probe substrate) | `NpcBrain::hla_state: [f32; 8]` in `katgpt-core/src/sense/brain.rs`; `evolve_hla` belief kernel (Research 242) | Belief state | ✅ shipped |
-| Per-NPC recurrent belief-state kernel | `evolve_hla` (`katgpt-core/src/sense/reconstruction.rs`, R242) | Belief state | ✅ shipped |
+| Per-NPC recurrent belief-state kernel | `evolve_hla` (`crates/katgpt-sense/src/reconstruction.rs`, R242) | Belief state | ✅ shipped |
 | Betrayal / friendship / trade as displacement in latent space | `latent_functor` (Plan 303, Research 123, `riir-engine/src/latent_functor/`) — already models "betrayal" as relational displacement | Relational direction | ✅ shipped |
 | Causal intervention probe (input-side) | `FaithfulnessProbe` (Plan 278, `behavior_delta` trait method) | Input-side faithfulness | ✅ shipped |
 | Functional emotions as linear representations | Research 144 (Sofroniew et al., cited by source paper); Plan 162 | Linear repr | ✅ shipped |

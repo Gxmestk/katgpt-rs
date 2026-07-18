@@ -43,12 +43,12 @@ AC-GPT augments a standard causal Transformer with the ability to evaluate and s
 
 | AC-GPT feature | Shipped cousin | File / Plan | Granularity |
 |---|---|---|---|
-| Bidirectional attention within conditioning set, causal elsewhere | **`AttentionMode::BlockCausal`** | `crates/katgpt-core/src/types/enums.rs:74`, P066 (D2F) | Attention mask |
-| Reader/writer LoRA split (bidirectional prefill vs causal decode) | **`LoraPair { reader, writer }`** | `crates/katgpt-core/src/types/lora.rs:392`, P025 (Bidirectional Prefill + Modality LoRA) | Adapter switch |
+| Bidirectional attention within conditioning set, causal elsewhere | **`AttentionMode::BlockCausal`** | `crates/katgpt-types/src/enums.rs:74`, P066 (D2F) | Attention mask |
+| Reader/writer LoRA split (bidirectional prefill vs causal decode) | **`LoraPair { reader, writer }`** | `crates/katgpt-types/src/lora.rs:392`, P025 (Bidirectional Prefill + Modality LoRA) | Adapter switch |
 | Position-aware prefix entries (token + original_pos) | **`MixedPrefillSequence::Raw { token_id, original_pos }`** | `crates/katgpt-core/src/mux_latent/inject.rs:34`, P238 (MUX-Latent) | Prefix construction |
 | Conditional retrieval / fuse into hidden state | **Engram** `fuse_into_hidden_state`, hash-addressed conditional pattern memory | `crates/katgpt-core/src/engram/`, R278 / P299 | Conditional memory |
 | Top-down direction-vector injection (additive overlay) | **Latent Field Steering** `apply_latent_steering` | `crates/katgpt-core/src/latent_steering.rs`, R290 / P309 / riir-ai R153 | Latent injection |
-| Target-conditioned draft seeding | **`speculative_step_conditioned` / `dflash_predict_conditioned`** | `src/speculative/dflash.rs:179`, P012 Phase 5 | Speculative conditioning |
+| Target-conditioned draft seeding | **`speculative_step_conditioned` / `dflash_predict_conditioned`** | `crates/katgpt-speculative/src/dflash.rs:179`, P012 Phase 5 | Speculative conditioning |
 | Conditional q(x|x_{<i}) drafting | **`dflash_predict_ar`** — "Produces conditional q(x|x_{<i}) distributions" | `riir-ai/crates/riir-engine/src/dflash.rs:248` | Conditional drafting |
 
 **The gap:** no shipped primitive composes (a) `BlockCausal`-shape attention with (b) original-position-aware copies of conditioning tokens placed at the front of an augmented sequence, where (c) the conditioning tokens form a *bidirectional self-attention cluster* that prevents multi-layer information leakage from later evaluation tokens to earlier ones. Each piece ships; the **composition** with the explicit leakage-prevention discipline does not.

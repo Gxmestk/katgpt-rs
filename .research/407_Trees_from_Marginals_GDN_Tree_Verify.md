@@ -154,7 +154,7 @@ The latent reframing confirms: the factorized→coupled insight is well-represen
 
 | Paper term | Codebase equivalent | Ships? |
 |---|---|---|
-| "factorized drafter" / "marginal drafter" | DFlash (`speculative/dflash.rs`), DDTree marginals | ✅ Plan 012 |
+| "factorized drafter" / "marginal drafter" | DFlash (`crates/katgpt-speculative/src/dflash.rs`), DDTree marginals | ✅ Plan 012 |
 | "tree verification" / "tree attention" | KV-cache snapshot/rollback (`speculative_step_rollback_paged`) | ✅ Plan 012 (attention only) |
 | "Gated Delta Net" / "GDN" / "delta rule" | GDN2 (`gdn2/` module, `Gdn2State`, `Gdn2Gate`) | ✅ Plan 105 (forward only) |
 | "rollback-free tree verification for GDN" | — | ❌ **GAP (this note's plan)** |

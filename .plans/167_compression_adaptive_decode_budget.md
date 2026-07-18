@@ -32,7 +32,7 @@ Per `.contexts/optimization.md`:
 - [x] Default: `Off` (current behavior preserved)
 
 ### Task 2 — Implement `adaptive_tree_budget()` function
-- [x] T2: New module `speculative/budget.rs` with `adaptive_tree_budget()` + `compression_ratio()`
+- [x] T2: New module `crates/katgpt-speculative/src/budget.rs` with `adaptive_tree_budget()` + `compression_ratio()`
   - Linear scale: f(0)=0.5, f(0.5)=1.25, f(1)=2.0, clamped [base/2, base*2]
 - [x] Unit tests: 11 tests covering all modes, clamping, edge cases, monotonicity
 

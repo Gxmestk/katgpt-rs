@@ -132,7 +132,7 @@ pub struct TreeBuilder {
 
 ---
 
-## DFlash (`speculative/dflash.rs`)
+## DFlash (`crates/katgpt-speculative/src/dflash.rs`)
 
 Draft-Flash produces marginal distributions over future tokens. It runs the draft model in a single forward pass per depth level, avoiding autoregressive serialization.
 
@@ -157,7 +157,7 @@ All `_with` variants accept a `&mut SpeculativeContext` and write results into p
 
 ---
 
-## SpeculativeVerifier (`speculative/verifier.rs`)
+## SpeculativeVerifier (`crates/katgpt-speculative/src/spechop/verifier.rs`)
 
 ### Trait
 
@@ -993,7 +993,7 @@ Based on the ternary verdict and confidence levels, each position is routed to o
 
 ---
 
-## Budget Adaptation (`speculative/budget.rs`, behind `"budget_adaptation"` feature)
+## Budget Adaptation (`crates/katgpt-speculative/src/budget.rs`, behind `"budget_adaptation"` feature)
 
 Adaptive tree budget scaling based on compression ratio. The tree budget is dynamically adjusted within `[base/2, base*2]` to match the current workload characteristics.
 

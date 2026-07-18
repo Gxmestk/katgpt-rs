@@ -152,7 +152,7 @@ mod.rs           ← re-exports everything
 | `crates/katgpt-core/src/speculative/sampling.rs` | New — sampling functions |
 | `src/speculative/dd_tree.rs` | New — DDTree build + path extraction |
 | `crates/katgpt-speculative/src/dflash.rs` | New — DFlash predict functions |
-| `src/speculative/verifier.rs` | New — SpeculativeVerifier trait + impls |
+| `crates/katgpt-speculative/src/spechop/verifier.rs` | New — SpeculativeVerifier trait + impls |
 | `crates/katgpt-forward/src/step.rs` | New — speculative_step wrappers |
 | `crates/katgpt-pruners/src/sudoku_pruner.rs` | New — SudokuPruner (sudoku feature) |
 | `Cargo.toml` | Add `sudoku = []` feature |

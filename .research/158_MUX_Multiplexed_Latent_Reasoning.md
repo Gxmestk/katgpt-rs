@@ -274,7 +274,7 @@ MUX is the theoretical foundation we didn't know we needed. RiM slots worked emp
 
 ### D1: MuxSpanPruner (ConstraintPruner in Vocabulary Simplex)
 - **What:** Prune branches whose logit distribution doesn't form a valid superposition
-- **Where:** `src/pruners/mux_span.rs` (new file)
+- **Where:** `crates/katgpt-pruners/src/mux_span.rs` (new file)
 - **Depends on:** `ConstraintPruner` trait
 - **Cost:** O(V · log K) per branch — negligible (K ≤ 8)
 - **Feature gate:** `mux_pruner`
@@ -388,7 +388,7 @@ MUX is the theoretical foundation we didn't know we needed. RiM slots worked emp
 
 | Gate | Depends On | Default | File |
 |------|-----------|---------|------|
-| `mux_pruner` | — | off | `src/pruners/mux_span.rs` |
+| `mux_pruner` | — | off | `crates/katgpt-pruners/src/mux_span.rs` |
 | `mux_ddtree` | `mux_pruner` | off | `src/tree/mux_dd_tree.rs` |
 | `mux_bandit_width` | `bandit`, `rim_slots` | off | `src/pruners/bandit.rs` (extend) |
 | `mux_demux` | — | off | `src/validator/mux_demux.rs` |

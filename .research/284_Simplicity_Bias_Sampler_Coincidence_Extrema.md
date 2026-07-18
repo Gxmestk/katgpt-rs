@@ -150,7 +150,7 @@ The latent-to-latent operation is the primary Super-GOAT framing. Adapter routin
 **Adapter routing / MCTS / speculative decode applications** (secondary framings):
 - `polytope_router.rs`: select adapter by K-prior over the polytope vertex weights.
 - `mcts.rs`: replace uniform child expansion with K-prior-weighted expansion.
-- `speculative/dendritic_gate.rs`: K-prior on candidate tokens (entropy already shipped as `entropy_f32` — K-prior is the deterministic companion).
+- `crates/katgpt-speculative/src/dendritic_gate.rs`: K-prior on candidate tokens (entropy already shipped as `entropy_f32` — K-prior is the deterministic companion).
 
 ### 2.4 What is genuinely new vs. the underlying Levin Search
 

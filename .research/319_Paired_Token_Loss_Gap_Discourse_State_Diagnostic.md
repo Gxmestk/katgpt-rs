@@ -147,7 +147,7 @@ The paper provides *empirical evidence* that the two-brain split is the right sp
 | **`evolve_hla`** (`katgpt-rs/crates/katgpt-sense/src/reconstruction.rs`) | IS the discourse-state `Update(δ_{j-1}, sent_j)` operator. This paper validates it is the right operator for state-conditioned readout. No change needed — the validation is theoretical. |
 | **`riir-ai/crates/riir-engine/src/latent_functor/reestimation/mod.rs`** (riir-engine) | Coherence-driven re-estimation IS the "state-conditioned readout triggers re-derivation" pattern. The paper's finding (state-conditioned tokens are hybrid-favored) validates this is where runtime self-learn effort should concentrate. |
 | **SalienceTriGate** (Plan 303) | Three-way per-tick emit gate (Speak/Silent/Delegate). Fusion candidate: route curiosity budget by token class — high on open-class state-conditioned tokens, low on copy/closure tokens (see §4 Fusion). |
-| **DEC Stokes operators** (`dec/operators.rs`) | Proposition 1 is a volume-of-support bound. For a cochain on a cell complex, `V_τ` = the set of values the cochain can take on a cell. Connects to boundary-vs-volume perf (Plan 314): boundary-only mass computation wins when the boundary is smaller than the interior — the *same* curse-of-dimensionality intuition as `log|V_τ|` bound. |
+| **DEC Stokes operators** (`crates/katgpt-dec/src/operators.rs`) | Proposition 1 is a volume-of-support bound. For a cochain on a cell complex, `V_τ` = the set of values the cochain can take on a cell. Connects to boundary-vs-volume perf (Plan 314): boundary-only mass computation wins when the boundary is smaller than the interior — the *same* curse-of-dimensionality intuition as `log|V_τ|` bound. |
 
 ---
 

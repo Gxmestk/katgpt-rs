@@ -644,7 +644,7 @@ pub enum BudgetAdaptation {
 **Key property:** Zero additional cost — reuses a value already computed during
 PFlash block selection. Feature-gated behind `budget_adaptation`.
 
-**Source:** `speculative/budget.rs`, `crates/katgpt-speculative/src/budget_compat.rs`
+**Source:** `crates/katgpt-speculative/src/budget.rs`, `crates/katgpt-speculative/src/budget_compat.rs`
 
 ---
 

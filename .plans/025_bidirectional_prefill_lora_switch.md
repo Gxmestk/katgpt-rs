@@ -384,7 +384,7 @@ The existing `attention_head` already accepts `t_n: usize` (number of KV positio
   - All existing callers are non-breaking (new param has default `None` via wrapper).
   - Strategy: create `forward_base` with lora param, `forward` wrapper defaults to `None`.
 
-- [x] **Task 6: Add dual LoRA to `DomainConfig` and `ExpertBundle`** (`src/router/types.rs`)
+- [x] **Task 6: Add dual LoRA to `DomainConfig` and `ExpertBundle`** (`riir-ai/crates/riir-router/src/types.rs`)
   ```toml
   # domains.toml — add reader_lora / writer_lora to any domain
   ```
@@ -537,7 +537,7 @@ The existing `attention_head` already accepts `t_n: usize` (number of KV positio
 |------|--------|
 | `src/types.rs` | Add `LoraAdapter` struct, `lora_apply` function, `LoraAdapter::load` |
 | `crates/katgpt-percepta/src/transformer.rs` | Add `PrefillContext`, `forward_prefill`, `forward_base`, update `forward` signature, add `generate_with_prefill`, update `ForwardContext` with `lora_buf` |
-| `src/router/types.rs` | Add `reader_lora`/`writer_lora` to `DomainConfig`, add `LoraPair`, update `ExpertBundle` |
+| `riir-ai/crates/riir-router/src/types.rs` | Add `reader_lora`/`writer_lora` to `DomainConfig`, add `LoraPair`, update `ExpertBundle` |
 | `crates/katgpt-core/src/arg/registry.rs` | Add `resolve_lora_pair`, load dual LoRAs |
 | `domains.toml` | Add `reader_lora`/`writer_lora` fields |
 | `README.md` | Add Plan 025 architecture section |

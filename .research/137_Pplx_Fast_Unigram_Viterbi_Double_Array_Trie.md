@@ -125,7 +125,7 @@ datrie_vocab = []  # Double-array trie vocab lookup for ToaST tokenizer (Researc
   - Runtime: byte-by-byte walk, return token_id or None
   - Single `base: Vec<i32>` + `check: Vec<u32>` + `value: Vec<Option<u32>>` (token_id)
   - Zero allocations on lookup
-  - Target: `src/tokenizer/datrie.rs` behind `#[cfg(feature = "datrie_vocab")]`
+  - Target: `crates/katgpt-tokenizer/src/datrie.rs` behind `#[cfg(feature = "datrie_vocab")]`
 
 - [x] T2: Implement `DatrieTreeIndex` — double-array trie for pretoken→tree-index lookup
   - Same structure, value = index into `trees` Vec
