@@ -45,7 +45,7 @@ throughout), zero `Arc<RwLock<HashMap>>`.
 | `crates/katgpt-percepta/src/legacy/mod.rs` | 2124 | ✅ Split (Issue 176 T2) — mod.rs 910 (57% tests) |
 | `crates/katgpt-core/src/funcattn/mod.rs` | 2086 | ✅ Split (Issue 176 T3) — mod.rs 983 (53% tests) |
 | `crates/katgpt-dec/src/sheaf_admm/mod.rs` | 2109 | ✅ Split (Issue 176 T4) — mod.rs 1222 (42% tests) |
-| `crates/katgpt-percepta/src/graph/types.rs` | 2055 | ✅ Split (Issue 176 T5) — `crates/katgpt-percepta/src/graph/types/mod.rs` 1333 (35% tests) |
+| `crates/katgpt-ruliology/src/types.rs` | 2055 | ✅ Split (Issue 176 T5) — `crates/katgpt-percepta/src/graph/types/mod.rs` 1333 (35% tests) |
 | `crates/katgpt-ruliology/src/bandit.rs` | 2178 | ✅ Functional split (Issue 177) — `bandit/` folder: mod.rs 1289 + environment.rs + session.rs + shared_stats.rs + randopt.rs |
 | `crates/katgpt-speculative/src/dd_tree/mod.rs` | 2125 | ✅ Extracted Lodestar (Issue 178) — mod.rs 1866 + `lodestar.rs` 770 |
 | `crates/katgpt-speculative/src/weaver.rs` | 2817 | **CONFIRMED KEEP** — user-explicit skip (759 test lines; extraction leaves impl at 2058, 10 over soft limit) |

@@ -25,7 +25,7 @@ Goal: a compiling, feature-gated module with the type surface frozen. No drift y
 - [x] **T1.1** Create `katgpt-rs/crates/katgpt-core/src/personality_composition/` directory with empty `mod.rs`
 - [x] **T1.2** Add feature flag `personality_composition = []` to `katgpt-rs/crates/katgpt-core/Cargo.toml` features section (alphabetical)
 - [x] **T1.3** Add `#[cfg(feature = "personality_composition")] pub mod personality_composition;` to `katgpt-rs/crates/katgpt-core/src/lib.rs` (alphabetical, after `peira` or similar)
-- [x] **T1.4** Implement `personality_composition/types.rs`:
+- [x] **T1.4** Implement `crates/katgpt-personality/src/types.rs`:
   - [x] `PersonalityConfig` struct (tau, alpha, w_max, ema_decay)
   - [x] `ArchetypeLabel` newtype (opaque label that seeds initial `w`; not interpreted by the kernel)
   - [x] Default impl: `tau = 1.0`, `alpha = 0.01`, `w_max = 5.0`, `ema_decay = 0.95`
@@ -45,7 +45,7 @@ Goal: a compiling, feature-gated module with the type surface frozen. No drift y
 ### Validation
 
 - [x] **T1.V1** `cargo build --features personality_composition` compiles cleanly
-- [x] **T1.V2** `cargo test --features personality_composition` — write `personality_composition/tests.rs` with: `compose_zero_weights_uniform`, `compose_extreme_positive_weight_selects_layer`, `compose_extreme_negative_weight_zeros_layer`, `compose_belief_confidence_decay_shrinks_contribution`
+- [x] **T1.V2** `cargo test --features personality_composition` — write `crates/katgpt-personality/src/tests.rs` with: `compose_zero_weights_uniform`, `compose_extreme_positive_weight_selects_layer`, `compose_extreme_negative_weight_zeros_layer`, `compose_belief_confidence_decay_shrinks_contribution`
 
 ---
 
@@ -75,7 +75,7 @@ Goal: extend `MicroRecurrentKernelSnapshot` (R242) to carry the `w` vector + arc
 
 ### Tasks
 
-- [x] **T3.1** Add `personality_composition/snapshot.rs`:
+- [x] **T3.1** Add `crates/katgpt-personality/src/snapshot.rs`:
   - [x] `pub struct PersonalitySnapshot<const N: usize>` with `w: [f32; N]`, `archetype: ArchetypeLabel`, `version: u64`, `blake3: [u8; 32]`
   - [x] `pub fn from_composition(composition: &PersonalityWeightedComposition<N, D>, archetype: ArchetypeLabel, version: u64) -> Self` — hashes `w` + archetype into BLAKE3
   - [x] `pub fn verify_blake3(&self) -> bool`

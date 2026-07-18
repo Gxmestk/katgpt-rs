@@ -57,7 +57,7 @@ After:  raw K → undo RoPE → eigenbasis → water-fill → quantize
 **Files to modify:**
 - `crates/katgpt-spectral/src/spectral.rs` — add `undo_rope()` before eigendecomposition
 - `crates/katgpt-spectral/src/spectral_rotation.rs` — store RoPE angles in calibration struct
-- `src/spectralquant/forward.rs` — reapply RoPE after dequant (or use Shard's Δ-identity)
+- `crates/katgpt-spectral/src/forward.rs` — reapply RoPE after dequant (or use Shard's Δ-identity)
 
 **GOAT proof targets:**
 1. Eigenvalue concentration improves: d_eff drops (more variance in fewer components)

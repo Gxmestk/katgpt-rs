@@ -665,7 +665,7 @@ Plan 009 will cover:
 ### Phase 1: BPE Tokenizer
 
 - [x] 1.1 Add `blake3`, `serde`, `serde_json` to `Cargo.toml` dependencies
-- [x] 1.2 Create `src/tokenizer/mod.rs` with re-exports
+- [x] 1.2 Create `crates/katgpt-types/src/simd/mod.rs` with re-exports
 - [x] 1.3 Create `crates/katgpt-tokenizer/src/types.rs` with `BpeTokenizer`, `MergeRule`
 - [x] 1.4 Create `crates/katgpt-tokenizer/src/bpe.rs` with `encode()`, `decode()`, `decode_single()`, `train()`
 - [x] 1.5 Add `Config::bpe()` and `Config::bpe_draft()` to `src/types.rs`
@@ -734,7 +734,7 @@ validator = ["syn", "proc-macro2"]  # previously clora
 | `src/speculative/types.rs` | `u64` → `u128` in TreeNode; add `parent_tokens_buf` to `SpeculativeContext` | 0 | **Yes** — all tests update |
 | `src/speculative/dd_tree.rs` | shift/mask update | 0 | No (internal) |
 | `Cargo.toml` | Add deps + features | 1-2 | No |
-| `src/tokenizer/mod.rs` | New | 1 | No |
+| `crates/katgpt-types/src/simd/mod.rs` | New | 1 | No |
 | `crates/katgpt-tokenizer/src/types.rs` | New | 1 | No |
 | `crates/katgpt-tokenizer/src/bpe.rs` | New | 1 | No |
 | `src/types.rs` | Add Config::bpe() (`n_layer` already exists from Plan 010) | 1 | No |

@@ -241,7 +241,7 @@ No claim that "our HGA implementation matches the paper's Qwen3-30B 64K NIAH 100
    ```
    - `InMemoryTieredKvStore` — hot (always-resident summaries + sink + local), warm (LRU shard cache), cold (host-RAM-backed full token K/V). The reference implementation; production mmap-backed variant is a riir-ai/riir-neuron-db follow-up (mirrors `ZoneGeometryCache`).
 
-4. **HGA forward path** in `crates/katgpt-core/src/hga/forward.rs`:
+4. **HGA forward path** in `crates/katgpt-forward/src/forward.rs`:
    - Compose `GroupSummaryCache` + `MixedRopeSummarizer` + `TieredKvStore` + DashAttention's α-entmax routing (reuse Plan 106's `entmax_1p5` + `entmax_gqa_aggregate`).
    - Stage 1: chunk-level entmax routing (reuses DashAttention).
    - Stage 2: group-level top-K routing within selected chunks (new).

@@ -164,7 +164,7 @@ riir-burner already reads JSONL. The only addition: optional `reward` field for 
   - ~20 lines in `riir-ai/crates/riir-games/src/plasma/ddtree.rs`
 
 - [x] **Task 3: Solution cache in anyrag**
-  - New module: `crates/lib/src/cache/mod.rs` + `crates/lib/src/cache/solution_cache.rs`
+  - New module: `crates/katgpt-types/src/simd/mod.rs` + `crates/lib/src/cache/solution_cache.rs`
   - `SolutionCache` struct with:
     - `entries: papaya::HashMap<u64, CachedSolution>` (lock-free, per user's lib preference)
     - `max_entries: usize` (configurable, default 1000)
@@ -234,7 +234,7 @@ riir-burner already reads JSONL. The only addition: optional `reward` field for 
 | `katgpt-rs/src/types.rs` | Add `InferenceResult` struct (~30 lines) | katgpt-rs |
 | `riir-ai/crates/riir-games/src/plasma/ddtree.rs` | Return `InferenceResult` alongside output (~20 lines) | katgpt-rs |
 | `katgpt-rs/src/lib.rs` | `pub mod feedback;` | katgpt-rs |
-| `anyrag/crates/lib/src/lib.rs` | `pub mod cache;` + feature gate | anyrag |
+| `crates/katgpt-types/src/lib.rs` | `pub mod cache;` + feature gate | anyrag |
 | `anyrag/crates/lib/Cargo.toml` | Add `solution-cache` feature | anyrag |
 | `anyrag/crates/server/Cargo.toml` | Add `solution-cache` feature | anyrag |
 | `anyrag/crates/server/src/handlers/mod.rs` | Add cache module | anyrag |

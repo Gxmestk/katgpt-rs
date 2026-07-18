@@ -112,7 +112,7 @@ All gates validated via `core_05_maxsim` example and `bench_maxsim_score` / `ben
   - `#[allow(dead_code)]` removed — no longer a stub
   - **GOAT gate: ✅** Matches uncompressed within 0.95% (18.9444 vs 19.1255, kv_dim=16, 4-bit). At 3-bit: TQ error 27.15% vs SQ 3.88% — SQ wins 7× at same budget. Proven in `core_05_maxsim` Section 7 with `--features "maxsim,turboquant,spectral_quant"`
 
-- [x] **T10: Add `maxsim_score_spectralquant` to `src/spectralquant/forward.rs`**
+- [x] **T10: Add `maxsim_score_spectralquant` to `crates/katgpt-spectral/src/forward.rs`**
   - Reusable `key_buf` for dequantize-into — avoids per-position allocation
   - `cache.dequantize_key_into(layer, t, &mut key_buf)` → `simd_dot_f32` → running max
   - Comments document SpectralQuant's d_eff truncation implications
@@ -239,7 +239,7 @@ If PFlash block maxsim (T7-T8) shows no improvement over mean-K, that applicatio
 | `src/speculative/prefill.rs` | `block_score_maxsim` function |
 | `src/speculative/mod.rs` | Re-export `block_score_maxsim` (feature-gated) |
 | `crates/katgpt-quant/src/turboquant/forward.rs` | `maxsim_score_turboquant` — lazy dequantize + running max |
-| `src/spectralquant/forward.rs` | `maxsim_score_spectralquant` — reusable `key_buf` + dequantize-into |
+| `crates/katgpt-spectral/src/forward.rs` | `maxsim_score_spectralquant` — reusable `key_buf` + dequantize-into |
 | `src/benchmark/mod.rs` | `bench_maxsim_score` (6 configs), `bench_pflash_maxsim_block_scoring`, wired into `run_all`/`run_all_parallel` |
 | `examples/core_05_maxsim.rs` | Demo: core scoring, packed batch, block vs mean-K, scale timing |
 | `crates/katgpt-attn-match/src/rerank.rs` | `RerankMethod` enum, `RerankedDoc` struct, `rerank()`, `ndcg_at()`, `cosine_score()` — feature-gated behind `maxsim` |

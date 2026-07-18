@@ -50,7 +50,7 @@ The PoC lives in `katgpt-rs/crates/katgpt-core/benches/bench_420_kv_consolidatio
 
 ### Tasks
 
-- [-] **T2.1** Create `crates/katgpt-core/src/kv_consolidation/mod.rs` with:
+- [-] **T2.1** Create `crates/katgpt-types/src/simd/mod.rs` with:
   - `KvConsolidationConfig` struct: `g_max`, `lambda`, `k`, `rsw_len`, `trigger: ConsolidationTrigger` enum (`NewlineToken | SurpriseGate { threshold }`)
   - `KvConsolidator` struct: holds config + scratch buffers (pre-allocated, zero-alloc hot path per AGENTS.md)
   - `consolidate(&mut self, kv_cache: &mut KvCache, attention_weights: &[f32], layer: usize) -> ConsolidationReport`

@@ -360,7 +360,7 @@ pub struct SpectralQuantKVCache {
     // variable-bit packed key/val indices, norms, scratch buffers
 }
 
-// spectralquant/types.rs
+// crates/katgpt-spectral/src/types.rs
 pub struct SpectralQuantLayer {
     pub calibration: SpectralQuantCalibration,
     pub qjl_signs: Vec<f32>,
@@ -385,8 +385,8 @@ pub fn generate_selective_qjl_signs(d_eff, qjl_dim, seed) -> Vec<f32>;
 - `crates/katgpt-spectral/src/nonuniform_quant.rs` — Non-uniform scalar quantizer (`NonUniformQuantizer`, `CompressedVector`)
 - `crates/katgpt-spectral/src/spectral_rotation.rs` — Eigenbasis rotation (`SpectralRotation`), random rotation (`RandomRotation`, gated by `turboquant` feature)
 - `crates/katgpt-spectral/src/spectral_kv_cache.rs` — SpectralQuant KV cache (implements `QuantizedKVCache`)
-- `spectralquant/forward.rs` — Dequantization + attention, parallel dequantize, MaxSim scoring (gated by `maxsim` feature)
-- `spectralquant/types.rs` — `LloydMaxCodebook`, `SpectralQuantCalibration`, `WaterfillAllocation`, `SpectralQuantKVCacheConfig`
+- `crates/katgpt-spectral/src/forward.rs` — Dequantization + attention, parallel dequantize, MaxSim scoring (gated by `maxsim` feature)
+- `crates/katgpt-spectral/src/types.rs` — `LloydMaxCodebook`, `SpectralQuantCalibration`, `WaterfillAllocation`, `SpectralQuantKVCacheConfig`
 
 ## Technique 8: PFlash Block-Sparse Speculative Prefill (Plan 044)
 

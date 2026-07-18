@@ -567,7 +567,7 @@ pub async fn routed_search(
 ### Phase 2: Routed Slot Schema in anyrag
 
 - [x] Add `rag_slots` and `slot_documents` tables to migration — SQL constants in `anyrag/lib/providers/db/sqlite/sql.rs`
-- [x] Implement keyword-based `route_document()` function — `KeywordRouter::route()` in `anyrag/lib/slots/router.rs`
+- [x] Implement keyword-based `route_document()` function — `KeywordRouter::route()` in `crates/katgpt-pruners/src/spec_compile/router.rs`
 - [x] Implement `decay_slot()` selective decay — `decayed_score()` in `crates/katgpt-pruners/src/dreamer/decay.rs`
 - [x] Define default slots: architecture, types, apis, dependencies, tests, chatter — `seed_default_slots()` in `anyrag/lib/slots/seeder.rs`
 - [-] Benchmark: retrieval accuracy at 100K docs vs monolithic — DEFERRED

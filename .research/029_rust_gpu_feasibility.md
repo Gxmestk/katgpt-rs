@@ -544,7 +544,7 @@ When GPU batching becomes necessary:
 
 ## Appendix A: rust-gpu Compute Example (Reference)
 
-The canonical compute shader from `examples/shaders/compute-shader/src/lib.rs`:
+The canonical compute shader from `crates/katgpt-hla/src/lib.rs`:
 
 ```rust
 #![cfg_attr(target_arch = "spirv", no_std)]

@@ -421,7 +421,7 @@ CuratorVerdict (pass/fail)
 - [x] Add `SenseOctreeBuilder::build_with_merkle()` — bottom-up hash computation from KgEmbeddings
 - [x] Implement `MerkleProof` generation (`prove_inclusion`) and verification (`verify_proof`)
 - [x] Implement sparse Merkle representation for memory efficiency
-- [x] Add `CuratorVerifier` in `katgpt-core/src/curator/mod.rs` (feature: `curator`)
+- [x] Add `CuratorVerifier` in `crates/katgpt-spectral/src/stiff_anomaly/mod.rs` (feature: `curator`)
 - [x] Implement KG triple consistency check (contradictory embedding detection)
 - [x] Implement spectral flatness verification over `[TernaryDir]` matrix
 - [x] Implement latent conditioning check for `ShardEmbedding` projections
