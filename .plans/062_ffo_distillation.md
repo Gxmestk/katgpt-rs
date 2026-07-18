@@ -105,7 +105,7 @@ fn test_baseline_bandit_q_distribution() {
 Instead of a separate wrapper (which can't access Q-values), add a cutoff field directly:
 
 ```rust
-// src/pruners/bandit.rs — modification to existing BanditPruner
+// crates/katgpt-ruliology/crates/katgpt-ruliology/src/bandit.rs — modification to existing BanditPruner
 
 pub struct BanditPruner<P: ScreeningPruner> {
     inner: P,
@@ -270,7 +270,7 @@ Schur:    Cholesky + Schur complement KKT solve (O(d² + m²) where m = constrai
 |------|--------|
 | `tests/ffo_gradient_correctness.rs` | New — FD hypergradient + Schur complement correctness tests |
 | `tests/bench_ffo_distillation.rs` | New — Q-value distribution analysis + A/B benchmark |
-| `src/pruners/bandit.rs` | Add `dual_cutoff` field + masking logic (4 lines in `relevance()`) |
+| `crates/katgpt-ruliology/crates/katgpt-ruliology/src/bandit.rs` | Add `dual_cutoff` field + masking logic (4 lines in `relevance()`) |
 
 ## References
 

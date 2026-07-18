@@ -421,4 +421,4 @@ feature is a backend choice, not a primitive gate.
 - `riir-gpu/src/set_diffusion_decoder.rs` — cross-repo pattern blueprint
 - `riir-gpu/src/gemv_cubecl.rs` — existing GEMV kernel for reuse
 - `riir-gpu/src/gemv_f16_cubecl.rs` — existing f16 GEMV (Phase 5+)
-- `katgpt-speculative/src/weaver.rs` — CPU reference implementation
+- `katgpt-speculative/crates/katgpt-speculative/src/weaver.rs` — CPU reference implementation

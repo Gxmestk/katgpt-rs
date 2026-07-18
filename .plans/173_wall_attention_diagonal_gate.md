@@ -129,7 +129,7 @@ The factorized form `q̃_i = exp(P_i) ⊙ q_i`, `k̃_j = exp(-P_j) ⊙ k_j` mean
 
 - `crates/katgpt-core/src/types.rs`: `WallConfig`, `Config.wall_config`, `Config::wall_enabled()`
 - `crates/katgpt-core/Cargo.toml`: `wall_attention` feature flag
-- `src/transformer.rs`: `WallPrefixState`, `LayerWeights.attn_wg`, forward path integration
+- `crates/katgpt-percepta/src/transformer.rs`: `WallPrefixState`, `LayerWeights.attn_wg`, forward path integration
 - `Cargo.toml`: `wall_attention` feature flag, `full` feature
 - `tests/goat_172_173_rim_wall.rs`: 12 GOAT proof tests
 

@@ -50,7 +50,7 @@ Speculative Decode
 
 ### Phase 1: AcceptanceVarianceTracker
 
-- [x] **T1: Create `src/pruners/acceptance_variance.rs`**
+- [x] **T1: Create `crates/katgpt-pruners/src/acceptance_variance.rs`**
   - `AcceptanceVarianceTracker` struct with Welford online variance + EMA smoothing
   - `observe(&mut self, accepted: bool)` — O(1), 3 flops per update
   - `rv(&self) -> f64` — returns current EMA-smoothed variance
@@ -68,7 +68,7 @@ Speculative Decode
   ```
 
 - [x] **T2: Unit tests for AcceptanceVarianceTracker**
-  - File: `src/pruners/acceptance_variance.rs` (inline `#[cfg(test)]`)
+  - File: `crates/katgpt-pruners/src/acceptance_variance.rs` (inline `#[cfg(test)]`)
   - Test: all-accept → RV ≈ 0
   - Test: all-reject → RV ≈ 0 (variance of constant)
   - Test: 50/50 accept/reject → RV > 0
@@ -94,7 +94,7 @@ Speculative Decode
   ```
 
 - [x] **T5: RV-gated tier promotion in `TriggerGate`**
-  - File: `src/trigger_gate.rs`
+  - File: `crates/katgpt-core/src/trigger_gate.rs`
   - Add `rv_tier_boost(&self, rv: f64) -> Option<ComputeTier>` method
   - High RV → promote tier regardless of QPS (override)
   - Low RV → allow demotion even under moderate load
@@ -116,7 +116,7 @@ Speculative Decode
 ### Phase 3: RV → ThinkingController Integration
 
 - [x] **T7: Wire RV into `ThinkingController` mode selection**
-  - File: `src/speculative/thinking_controller.rs`
+  - File: `crates/katgpt-speculative/crates/katgpt-speculative/src/thinking_controller.rs`
   - Add `rv_signal: f64` parameter to `select_mode()` (or equivalent)
   - High RV → bias bandit toward Latent arm
   - Low RV → bias bandit toward Direct arm
@@ -137,7 +137,7 @@ Speculative Decode
 ### Phase 4: Top-ρ Bandit Arm Suppression
 
 - [x] **T9: Add top-ρ suppression to `FrequencyBandit`**
-  - File: `src/freq_bandit.rs`
+  - File: `crates/katgpt-pruners/src/freq_bandit.rs`
   - Add `suppress_low_rv_arms(rho: f32)` method
   - Uses `BanditStats::reward_variance()` (already exists) per arm
   - Suppress arms below `(1 - ρ)` quantile of variance
@@ -195,12 +195,12 @@ rv_bandit_pruning = []     # Phase 4: FrequencyBandit top-ρ suppression
 
 | File | Action | Phase |
 |------|--------|-------|
-| `src/pruners/acceptance_variance.rs` | NEW | 1 |
+| `crates/katgpt-pruners/src/acceptance_variance.rs` | NEW | 1 |
 | `src/pruners/mod.rs` | EXTEND (add module export) | 1 |
 | `src/inference_router.rs` | EXTEND (add RV field + routing logic) | 2 |
-| `src/trigger_gate.rs` | EXTEND (add `rv_tier_boost()`) | 2 |
-| `src/speculative/thinking_controller.rs` | EXTEND (add RV bias to mode selection) | 3 |
-| `src/freq_bandit.rs` | EXTEND (add `suppress_low_rv_arms()`) | 4 |
+| `crates/katgpt-core/src/trigger_gate.rs` | EXTEND (add `rv_tier_boost()`) | 2 |
+| `crates/katgpt-speculative/crates/katgpt-speculative/src/thinking_controller.rs` | EXTEND (add RV bias to mode selection) | 3 |
+| `crates/katgpt-pruners/src/freq_bandit.rs` | EXTEND (add `suppress_low_rv_arms()`) | 4 |
 | `tests/rv_gated_routing.rs` | NEW | 2-5 |
 | `Cargo.toml` | EXTEND (add feature flags) | 1 |
 

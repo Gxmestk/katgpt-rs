@@ -377,17 +377,17 @@ These utility functions are used by multiple player types:
 
 | File | Purpose |
 |------|----------|
-| `src/pruners/fft/types.rs` | Core types: Class (6), ActionType (9), Stats, Unit, Pos, Action, GameEvent, TftMode, ProvokeLevel, PartyTftState, UnitTftState |
-| `src/pruners/fft/battle.rs` | BattleState with ATB: `new`, `new_with_config`, `new_random_8`, `new_random_n`, `advance_ct`, `ready_units`, `reset_ct`, `tick_effects`, `resolve_action`, `should_forgive` |
-| `src/pruners/fft/status.rs` | StatusEffect enum (9), ActiveEffect, `apply_tick_effects`, `can_cast`, `can_act`, `ct_fill_rate`, `effective_phys_def`, `effective_mag_def`, `effective_hit_rate` |
-| `src/pruners/fft/players.rs` | `FftPlayer` trait + 3 implementations (Greedy, Validator, HL) + shared AI helpers |
-| `src/pruners/fft/g_zero_player.rs` | `GZeroFFTPlayer` — G-Zero self-play with template hints + Hint-δ (feature: `g_zero`) |
-| `src/pruners/fft/tft_player.rs` | `TftFFTPlayer` — game theory Tit-for-Tat with ProvokeLevel escalation (feature: `g_zero`) |
-| `src/pruners/fft/rubric_player.rs` | `RubricFFTPlayer` — ROPD rubric-vector-aware player (feature: `ropd_rubric`) |
-| `src/pruners/fft/sdar_player.rs` | `SdarFFTPlayer` — SDAR sigmoid-gated reward player (feature: `sdar_gate`) |
-| `src/pruners/fft/arena_runner.rs` | `FftArenaConfig`, `FftBattleResult`, `run_fft_battle`, `run_fft_matchup` — N-battle match runner |
-| `src/pruners/fft/mod.rs` | Module exports, feature-gated: `g_zero` enables GZeroFFTPlayer + TftFFTPlayer, `ropd_rubric` enables RubricFFTPlayer, `sdar_gate` enables SdarFFTPlayer |
-| `src/pruners/g_zero/fft_templates.rs` | `FFTTemplate` + `FFTTemplateProposer` — 10 strategy archetypes |
+| `crates/katgpt-pruners/src/fft/types.rs` | Core types: Class (6), ActionType (9), Stats, Unit, Pos, Action, GameEvent, TftMode, ProvokeLevel, PartyTftState, UnitTftState |
+| `crates/katgpt-pruners/src/fft/battle.rs` | BattleState with ATB: `new`, `new_with_config`, `new_random_8`, `new_random_n`, `advance_ct`, `ready_units`, `reset_ct`, `tick_effects`, `resolve_action`, `should_forgive` |
+| `crates/katgpt-pruners/src/fft/status.rs` | StatusEffect enum (9), ActiveEffect, `apply_tick_effects`, `can_cast`, `can_act`, `ct_fill_rate`, `effective_phys_def`, `effective_mag_def`, `effective_hit_rate` |
+| `crates/katgpt-pruners/src/fft/players.rs` | `FftPlayer` trait + 3 implementations (Greedy, Validator, HL) + shared AI helpers |
+| `crates/katgpt-pruners/src/fft/g_zero_player.rs` | `GZeroFFTPlayer` — G-Zero self-play with template hints + Hint-δ (feature: `g_zero`) |
+| `crates/katgpt-pruners/src/fft/tft_player.rs` | `TftFFTPlayer` — game theory Tit-for-Tat with ProvokeLevel escalation (feature: `g_zero`) |
+| `crates/katgpt-pruners/src/fft/rubric_player.rs` | `RubricFFTPlayer` — ROPD rubric-vector-aware player (feature: `ropd_rubric`) |
+| `crates/katgpt-pruners/src/fft/sdar_player.rs` | `SdarFFTPlayer` — SDAR sigmoid-gated reward player (feature: `sdar_gate`) |
+| `crates/katgpt-pruners/src/fft/arena_runner.rs` | `FftArenaConfig`, `FftBattleResult`, `run_fft_battle`, `run_fft_matchup` — N-battle match runner |
+| `crates/katgpt-pruners/src/fft/mod.rs` | Module exports, feature-gated: `g_zero` enables GZeroFFTPlayer + TftFFTPlayer, `ropd_rubric` enables RubricFFTPlayer, `sdar_gate` enables SdarFFTPlayer |
+| `crates/katgpt-pruners/src/g_zero/fft_templates.rs` | `FFTTemplate` + `FFTTemplateProposer` — 10 strategy archetypes |
 | `examples/fft_01_arena.rs` | Standalone FFT arena (Plan 047, original 4-class version) |
 | `examples/fft_02_rubric_tournament.rs` | Rubric vs GZero tournament (features: `ropd_rubric`, `g_zero`, `fft`) |
 | `examples/fft_03_sdar_tournament.rs` | SDAR vs Rubric vs GZero tournament (features: `sdar_gate`, `ropd_rubric`, `g_zero`, `fft`) |

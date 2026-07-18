@@ -64,7 +64,7 @@ katgpt-rs/examples/
 
 ## T1: `arena/types.rs` — Shared Tournament Types
 
-### File: `katgpt-rs/src/pruners/arena/types.rs`
+### File: `katgpt-rs/crates/katgpt-pruners/src/arena/types.rs`
 
 ```rust
 use std::fmt;
@@ -229,7 +229,7 @@ impl EloCalculator {
 
 ## T2: `arena/scheduler.rs` — Round-Robin Matchup Generator
 
-### File: `katgpt-rs/src/pruners/arena/scheduler.rs`
+### File: `katgpt-rs/crates/katgpt-pruners/src/arena/scheduler.rs`
 
 Generates all pairwise (or group) matchups for a tournament.
 
@@ -293,7 +293,7 @@ pub fn full_field_matchups(n: usize, field_size: usize) -> Vec<Matchup> {
 
 ## T3: `arena/mod.rs` — Module Index
 
-### File: `katgpt-rs/src/pruners/arena/mod.rs`
+### File: `katgpt-rs/crates/katgpt-pruners/src/arena/mod.rs`
 
 ```rust
 //! Cross-arena tournament infrastructure — scheduling, scoring, leaderboards.
@@ -415,7 +415,7 @@ pub fn run_bomber_matchup(
 
 ## T5: `fft/arena_runner.rs` — FFTArenaRunner
 
-### File: `katgpt-rs/src/pruners/fft/arena_runner.rs`
+### File: `katgpt-rs/crates/katgpt-pruners/src/fft/arena_runner.rs`
 
 Runs a tournament between FftPlayer implementations in 4v4 battles.
 

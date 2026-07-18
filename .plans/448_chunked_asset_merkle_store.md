@@ -280,11 +280,11 @@ These are game/chain semantics. They belong in `riir-ai`. See [riir-ai Plan 319]
 |---|---|---|
 | `katgpt-core/src/content_store/mod.rs` | ~30 | Module wiring, feature gate |
 | `katgpt-core/src/content_store/types.rs` | ~80 | `BlobId`, `StoreStats`, `ChunkRange`, `MerkleProof` |
-| `katgpt-core/src/content_store/trait.rs` | ~80 | `ChunkedContentStore`, `ChunkFetcher`, `ChunkingStrategy` traits |
-| `katgpt-core/src/content_store/chunker.rs` | ~200 | `FixedSizeChunker`, `FastCdcChunker`, gear table |
+| `katgpt-core/crates/katgpt-core/src/content_store/trait.rs` | ~80 | `ChunkedContentStore`, `ChunkFetcher`, `ChunkingStrategy` traits |
+| `katgpt-core/crates/katgpt-core/src/content_store/chunker.rs` | ~200 | `FixedSizeChunker`, `FastCdcChunker`, gear table |
 | `katgpt-core/src/content_store/in_memory.rs` | ~200 | `InMemoryChunkedStore` + unit tests |
 | `katgpt-core/src/content_store/merkle.rs` | ~150 | Binary Merkle root/proof/verify |
-| `katgpt-core/src/content_store/fetcher.rs` | ~150 | `InMemoryChunkFetcher`, `FsChunkFetcher`, `NetChunkFetcher` stub, `TieredChunkFetcher` |
+| `katgpt-core/crates/katgpt-core/src/content_store/fetcher.rs` | ~150 | `InMemoryChunkFetcher`, `FsChunkFetcher`, `NetChunkFetcher` stub, `TieredChunkFetcher` |
 | `katgpt-core/examples/chunked_store_basic.rs` | ~80 | Usage example |
 | `.benchmarks/262_chunked_content_store_goat.md` | ~150 | G1–G7 results |
 

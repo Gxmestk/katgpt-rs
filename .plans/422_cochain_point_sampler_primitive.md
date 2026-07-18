@@ -3,7 +3,7 @@
 **Date:** 2026-07-10
 **Research:** [katgpt-rs/.research/404_Cells2Pixels_Resolution_Decoupled_NCA.md](../.research/404_Cells2Pixels_Resolution_Decoupled_NCA.md)
 **Source paper:** [arxiv:2506.22899](https://arxiv.org/abs/2506.22899) — Pajouheshgar et al., *Neural Cellular Automata: From Cells to Pixels*, SIGGRAPH 2026
-**Target:** `katgpt-rs/crates/katgpt-dec/src/point_sampler.rs` (new module) + Cargo feature `cochain_point_sampler`
+**Target:** `katgpt-rs/crates/katgpt-dec/crates/katgpt-dec/src/point_sampler.rs` (new module) + Cargo feature `cochain_point_sampler`
 **Status:** ✅ COMPLETE — Phase 1 ✅ + Phase 2 ✅ + Phase 3 ✅ + Phase 4 ✅ (G1–G5 ALL PASS, opt-in per Gain verdict). Commits `d38dc011` (impl), `64bd308e` (GOAT bench), `80810434` (docs).
 
 ---
@@ -35,7 +35,7 @@ on candidate).
 
 ### Tasks
 
-- [x] **T1.1** Create `katgpt-dec/src/point_sampler.rs`. Gate behind
+- [x] **T1.1** Create `katgpt-dec/crates/katgpt-dec/src/point_sampler.rs`. Gate behind
   `cochain_point_sampler` feature in `katgpt-dec/Cargo.toml`.
 - [x] **T1.2** Define `LocalCoordEncode` enum: `CartesianSincos { n_harmonics }`
   (for quad/cube), `BarycentricSortCdf` (for tri/tet), `Raw` (no aug, just `u`).

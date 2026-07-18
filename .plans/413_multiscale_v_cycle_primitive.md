@@ -9,7 +9,7 @@ multi-scale composition gap the shipped single-complex DEC operators
 `hodge_decompose`) always had: those handle one resolution level; this
 composes two (fine → coarse → fine).
 
-- [x] A1. Create `katgpt-dec/src/htno.rs` with `htno_v_cycle` skeleton. Gate
+- [x] A1. Create `katgpt-dec/crates/katgpt-dec/src/htno.rs` with `htno_v_cycle` skeleton. Gate
       behind `htno_v_cycle` feature in `katgpt-dec/Cargo.toml`.
 - [x] A2. Implement restrict step: fine vertex cochain → coarse via selector
       gather (O(1) per coarse vertex, no dense matvec — same gather-scatter
@@ -42,7 +42,7 @@ composes two (fine → coarse → fine).
 
 | Item | Where |
 |---|---|
-| `htno_v_cycle`, `htno_v_cycle_into` | `katgpt-dec/src/htno.rs` |
+| `htno_v_cycle`, `htno_v_cycle_into` | `katgpt-dec/crates/katgpt-dec/src/htno.rs` |
 | `VCycleRestriction` (selector restriction map) | same |
 | `VCycleScratch` (reusable scratch buffers) | same |
 | `grid_coarsen_2x2` (2×2-block grid coarsening helper) | same |

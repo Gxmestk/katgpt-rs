@@ -295,7 +295,7 @@ Issue 010 T2 required a reusable benchmark fixture that wraps any UQ-bearing pri
 
 | File | Role |
 |---|---|
-| `src/conformal/floor_harness.rs` | The harness module. `UqPrimitiveUnderTest` trait, `FloorAdapter`, `PredictiveOutput`, `run_floor_comparison`, `TrajectoryCorpus`, `FloorComparisonReport`, `OverallVerdict`. Gated on `conformal_predictive_intervals`. |
+| `crates/katgpt-core/src/conformal/floor_harness.rs` | The harness module. `UqPrimitiveUnderTest` trait, `FloorAdapter`, `PredictiveOutput`, `run_floor_comparison`, `TrajectoryCorpus`, `FloorComparisonReport`, `OverallVerdict`. Gated on `conformal_predictive_intervals`. |
 | `tests/conformal_floor_harness.rs` | 10 integration tests covering: floor-vs-floor tie, true-oracle win, over-wide loss, samples-only path, empty/NotApplicable path, mean-tracker beats-floor-on-white-noise, mean-tracker loses-on-seasonal, multi-corpus sweep, pretty-print smoke, alpha propagation. |
 
 ### The harness API

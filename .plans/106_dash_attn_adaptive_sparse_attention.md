@@ -12,14 +12,14 @@
 
 ### Phase 1: α-entmax Kernel (CPU)
 - [x] **T1**: Create `src/dash_attn/mod.rs` — module index, re-exports, feature gate `#[cfg(feature = "dash_attn")]`
-- [x] **T2**: Implement `entmax_1p5()` in `src/dash_attn/entmax.rs` — α=1.5 special case: `p_i = max(0, 0.5*s_i - τ)²`. Two-pass threshold finding (sort + cumulative sum). Returns sparse weights and threshold τ. Unit tests: known inputs → exact zeros, sum=1.0, non-negative
+- [x] **T2**: Implement `entmax_1p5()` in `crates/katgpt-attn/src/dash_attn/entmax.rs` — α=1.5 special case: `p_i = max(0, 0.5*s_i - τ)²`. Two-pass threshold finding (sort + cumulative sum). Returns sparse weights and threshold τ. Unit tests: known inputs → exact zeros, sum=1.0, non-negative
 - [x] **T3**: Implement `entmax_support()` — extract active indices from entmax weights. Returns `Vec<usize>` of positions where weight > 0
 - [x] **T4**: Implement `entmax_gqa_aggregate()` — average entmax probabilities across query heads in same GQA group. Input: `[n_query_heads][n_chunks]`, output: `[n_kv_heads][n_chunks]`. Zeros propagate (non-dispersive)
 - [x] **T5**: Add `DashAttnConfig` to `katgpt-core/src/types.rs` — `chunk_size: usize` (64), `alpha: f32` (1.5), `scaling_factor: f32` (1.0), `sigma: f32` (1e6), `estimate_diagonal: bool` (true)
 - [x] **T6**: Register `#[cfg(feature = "dash_attn")]` gate in `Cargo.toml` features + `pub mod dash_attn` in `lib.rs`
 
 ### Phase 2: Learned Chunk Summaries
-- [x] **T7**: Create `src/dash_attn/chunk_summary.rs` — `ChunkSummaryQuery` struct with `head_cls: Vec<f32>` (shape `[n_kv_head, head_dim]`)
+- [x] **T7**: Create `crates/katgpt-attn/src/dash_attn/chunk_summary.rs` — `ChunkSummaryQuery` struct with `head_cls: Vec<f32>` (shape `[n_kv_head, head_dim]`)
 - [x] **T8**: Implement `summarize_chunk()` — local SDPA: `k̄_c = softmax(q̄ · K_chunk / √d) · K_chunk`. At zero-init: returns mean pooling. After training: weighted attention
 - [x] **T9**: Implement `ChunkSummaryCache` — stores completed chunk summaries `[n_chunks, n_kv_head, head_dim]`. Append-only during decode. `allocate()`, `append()`, `view()` methods
 - [x] **T10**: Unit tests: verify zero-init → mean pooling equivalence, trained → non-uniform weighting
@@ -73,7 +73,7 @@ katgpt-core/src/types.rs
 ├── DashAttnConfig struct         — chunk_size, alpha, scaling_factor, sigma, estimate_diagonal
 └── AttentionMode::DashAttn       — new variant
 
-src/transformer.rs
+crates/katgpt-percepta/src/transformer.rs
 └── ForwardContext                 — dispatch DashAttn variant
 
 src/benchmark.rs                  — Phase 6 benchmarks

@@ -42,7 +42,7 @@ Key findings per crate:
 - **Feature name mismatches**: `collider_pruner` is gated by feature
   `collider_consistency`; `adaptive_cot_stopper` by `adaptive_cot_identifiability`.
   Preserve these names in the new crate.
-- **External inbound edge**: `src/specialist_projection.rs:44` imports
+- **External inbound edge**: `crates/katgpt-sparse/src/specialist_projection.rs:44` imports
   `crate::band_conditioner::ComputeTarget` — will become
   `crate::katgpt_band::ComputeTarget` via root shim (back-compat preserved).
 - **External crate deps**: `katgpt_core::sigmoid` (all 4);

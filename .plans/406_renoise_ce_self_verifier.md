@@ -3,7 +3,7 @@
 **Date:** 2026-07-06
 **Research:** [`.research/369_Flow_Reasoning_Models_Renoise_CE_Self_Verifier.md`](../.research/369_Flow_Reasoning_Models_Renoise_CE_Self_Verifier.md)
 **Source paper:** [arXiv:2606.29150](https://arxiv.org/abs/2606.29150) — Helbling, Bryutkin, Martino, Dehmamy, Strobelt (Georgia Tech / MIT / MIT-IBM), 28 Jun 2026
-**Target:** `crates/katgpt-core/src/renoise_ce.rs` (new module) + Cargo feature `renoise_ce`
+**Target:** `crates/katgpt-core/crates/katgpt-core/src/renoise_ce.rs` (new module) + Cargo feature `renoise_ce`
 **Status:** CLOSED — G1+G2 PASS, `renoise_ce` promoted to DEFAULT-ON (2026-07-06).
 
 ---
@@ -37,7 +37,7 @@ The primitive ships behind an opt-in `renoise_ce` feature flag, runs the GOAT ga
 
 ### Tasks
 
-- [x] **T1.1** Create `crates/katgpt-core/src/renoise_ce.rs` with module docstring (cite Research 369, paper, modelless mandate, UQ-floor caveat).
+- [x] **T1.1** Create `crates/katgpt-core/crates/katgpt-core/src/renoise_ce.rs` with module docstring (cite Research 369, paper, modelless mandate, UQ-floor caveat).
 - [x] **T1.2** Implement `RenoiseCeConfig` (perturbation_level, k_draws, tau) — `#[derive(Clone, Debug)]`.
 - [x] **T1.3** Implement `RenoiseCeScore` (drift, per_draw `[f32; 8]`, accepted) — fixed-size, zero-alloc.
 - [x] **T1.4** Implement `RenoiseCeProbe` trait (associated `State`, `re_resolve`, `perturb`, `drift_ce`). Use `fastrand::Rng` (codebase convention — NOT the full `rand` crate).

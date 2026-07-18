@@ -45,7 +45,7 @@ The GEA pitch — "group experience sharing consolidates diversity into a shared
 re-usable pool that seeds the next generation" — reframed into our substrate is already
 covered by the consolidation + coordination substrate:
 
-- **Raven / δ-Mem consolidation** (`riir-neuron-db/src/consolidation.rs`) — the
+- **Raven / δ-Mem consolidation** (`riir-neuron-db/src/sleep/consolidation.rs`) — the
   sleep-cycle that consolidates wake-events into a frozen `NeuronShard`, gated by
   `FreezeGateReport`. This IS "experience → shared archive entry", just over latent
   wake-events rather than LLM text.
@@ -109,7 +109,7 @@ the verdict is **PASS**; do not re-distill unless **ALL** of the following hold:
    Today we produce no "agent harness" artifact, so MAP-Elites-over-harnesses has no
    archive to populate.
 3. **A sub-mechanism is identified that is NOT already covered** by Raven/δ-Mem
-   consolidation (`riir-neuron-db/src/consolidation.rs`), neighborhood heal, or sheaf
+   consolidation (`riir-neuron-db/src/sleep/consolidation.rs`), neighborhood heal, or sheaf
    coordination — the existing latent-state analogs of "group experience sharing".
 
 A weaker re-evaluation signal (does NOT alone justify re-distillation, but worth a grep):

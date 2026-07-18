@@ -210,13 +210,13 @@ pattern: diagnostics ship opt-in, inference primitives ship default-on.
 
 - `crates/katgpt-core/src/paired_loss/types.rs` — `TokenClass` → `#[repr(u8)]`
   + `CopyN(u8)`; new `FilterScratch` type; `TokenClass::is_open_class()` helper.
-- `crates/katgpt-core/src/paired_loss/gap.rs` — `from_log_probs` SIMD-friendly
+- `crates/katgpt-core/crates/katgpt-core/src/paired_loss/gap.rs` — `from_log_probs` SIMD-friendly
   write; `filtered_mean_with_scratch` + `masked_mean_simd`; single-pass
   `filtered_mean_topk_nocopy_scratch`; branchless `mean_gap_for_class` /
   `class_sum_count`.
 - `crates/katgpt-core/src/paired_loss/mod.rs` — export `FilterScratch`.
-- `crates/katgpt-core/src/paired_loss/tagger.rs` — `CopyN(n.min(255) as u8)`.
-- `crates/katgpt-core/src/simd/elementwise.rs` — new
+- `crates/katgpt-core/crates/katgpt-core/src/paired_loss/tagger.rs` — `CopyN(n.min(255) as u8)`.
+- `crates/katgpt-core/crates/katgpt-types/src/simd/elementwise.rs` — new
   `simd_masked_sum_count_f32` dispatcher + NEON/AVX2/wasm32/scalar backends.
 - `crates/katgpt-core/src/simd/mod.rs` — export `simd_masked_sum_count_f32`.
 - `crates/katgpt-core/benches/bench_335_paired_loss_goat.rs` — new GOAT gate

@@ -244,11 +244,11 @@ Plus tests in `crates/katgpt-core/src/engram/` (unit) and `tests/bench_299_engra
 | `crates/katgpt-core/src/lib.rs` | Export `engram` module behind feature gate |
 | `crates/katgpt-core/src/engram/mod.rs` | Public API: EngramTable trait, EngramHash, K_MAX, EngramConfig |
 | `crates/katgpt-core/src/engram/hash.rs` | MultiHeadHash, HashHead, multi_head_hash() |
-| `crates/katgpt-core/src/engram/table.rs` | InMemoryEngramTable, EngramTableBuilder |
-| `crates/katgpt-core/src/engram/tokenizer.rs` | SurjectiveMap, compress_token(), build_surjective_map() |
+| `crates/katgpt-core/crates/katgpt-core/src/engram/table.rs` | InMemoryEngramTable, EngramTableBuilder |
+| `crates/katgpt-core/crates/katgpt-core/src/engram/tokenizer.rs` | SurjectiveMap, compress_token(), build_surjective_map() |
 | `crates/katgpt-core/src/engram/kernel.rs` | sigmoid_fuse_into(), rmsnorm_into(), SigmoidFusionConfig |
-| `crates/katgpt-core/src/engram/conv.rs` | Depthwise causal conv (paper §2.3) |
-| `crates/katgpt-core/src/engram/hotswap.rs` | EngramHotSwap — AtomicPtr<Box<EngramTable>> |
+| `crates/katgpt-core/crates/katgpt-core/src/engram/conv.rs` | Depthwise causal conv (paper §2.3) |
+| `crates/katgpt-core/crates/katgpt-core/src/engram/hotswap.rs` | EngramHotSwap — AtomicPtr<Box<EngramTable>> |
 | `crates/katgpt-core/src/engram/cache.rs` | ZipfianCacheHierarchy — tiered cache |
 | `crates/katgpt-core/src/engram/commitment.rs` | EngramTableId, build_merkle_root() |
 | `crates/katgpt-core/src/engram/forward.rs` | fuse_into_hidden_state() end-to-end hook |
@@ -266,7 +266,7 @@ Plus tests in `crates/katgpt-core/src/engram/` (unit) and `tests/bench_299_engra
 - **Private selling-point guide:** `riir-ai/.research/147_Engram_Conditional_Memory_NPC_Guide.md`
 - **Chain commitment half:** `riir-chain/.research/007_Engram_LatCal_Commitment_Bridge.md` (filed 2026-07-04; the chain commitment half — specifies EngramTableId commitment, 3-way integrity check extension, and slashing protocol)
 - **Existing primitives reused:**
-  - `SenseHotSwap` (`katgpt-rs/crates/katgpt-core/src/sense/hotswap.rs`) — AtomicPtr pattern
+  - `SenseHotSwap` (`katgpt-rs/crates/katgpt-core/crates/katgpt-core/src/engram/hotswap.rs`) — AtomicPtr pattern
   - `MerkleOctree` / `MerkleProof` (R221, P253) — binary Merkle root
   - `simd::simd_dot_f32`, `simd::simd_outer_product_acc` — SIMD kernels
   - `types::rmsnorm` — RMSNorm helper (if signature fits)

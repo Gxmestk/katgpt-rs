@@ -28,9 +28,9 @@ The reference uses a **Dynamic Convex Hull Trick** (CHT) via `std::multiset<Line
 
 - [x] **T1: Create `src/percepta/` module directory**
   - Move `src/percepta.rs` → `src/percepta/mod.rs` (re-export everything) ✅
-  - Create `src/percepta/cht.rs` for the new CHT implementation ✅
-  - Create `src/percepta/hull.rs` for the `HardAttentionHead` wrapper ✅
-  - Create `src/percepta/gates.rs` for ReGLU/stepglu primitives (deferred to TG-B)
+  - Create `crates/katgpt-percepta/src/cht.rs` for the new CHT implementation ✅
+  - Create `crates/katgpt-percepta/src/hull.rs` for the `HardAttentionHead` wrapper ✅
+  - Create `crates/katgpt-percepta/src/gates.rs` for ReGLU/stepglu primitives (deferred to TG-B)
   - Update `src/lib.rs` and any imports ✅
 
 - [x] **T2: Implement `HullMeta` value aggregation** ✅ `types.rs`

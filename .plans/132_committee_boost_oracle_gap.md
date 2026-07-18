@@ -24,22 +24,22 @@ The paper proves our DDTree + BtRank + ScreeningPruner stack IS the committee pr
 ## Tasks
 
 ### Phase 1: Oracle-Gap Recovery Metric
-- [x] **T1**: Create `src/pruners/committee_boost/mod.rs` — module index, re-exports, `#[cfg(feature = "committee_boost")]` gate
-- [x] **T2**: Create `src/pruners/committee_boost/types.rs` — `OracleGapRecovery` struct with `p1`, `p_oracle`, `p_system` fields
+- [x] **T1**: Create `crates/katgpt-pruners/src/committee_boost/mod.rs` — module index, re-exports, `#[cfg(feature = "committee_boost")]` gate
+- [x] **T2**: Create `crates/katgpt-pruners/src/committee_boost/types.rs` — `OracleGapRecovery` struct with `p1`, `p_oracle`, `p_system` fields
 - [x] **T3**: Implement `OracleGapRecovery::recovery()` — returns `(p_system - p1) / (p_oracle - p1)`, handles NaN/zero-gap
 - [x] **T4**: Implement `OracleGapRecovery::failure_mode()` — returns enum `SelectionFailure | CoverageFailure | Mixed` based on recovery value
 - [x] **T5**: Implement `OracleGapRecovery::diagnostic()` — human-readable breakdown: "Recovery=78.3%: selection recovers most latent capability; focus on proposer diversity for further gains"
 - [x] **T6**: Unit tests: recovery() with known values (p1=0.5, p_oracle=0.8, p_system=0.74 → Rec=0.8), edge cases (p_oracle=p1 → NaN, p_system=p_oracle → 1.0)
 
 ### Phase 2: Position-Swap Debiasing
-- [x] **T7**: Create `src/pruners/committee_boost/debiased_compare.rs` — `debiased_compare<F>(i, j, compare: &F) -> BtOutcome`
+- [x] **T7**: Create `crates/katgpt-pruners/src/committee_boost/debiased_compare.rs` — `debiased_compare<F>(i, j, compare: &F) -> BtOutcome`
 - [x] **T8**: Implement A/B swap logic: compare(i,j) and compare(j,i), map reversed result back, require agreement for win/loss, disagreement → Tie
 - [x] **T9**: Implement `DebiasedComparator` struct wrapping comparison function with swap-debiasing
 - [x] **T10**: Implement `DebiasedComparator::tournament()` — run debiased pairwise comparisons over all pairs, collect `Vec<BtComparison>` for `bt_fit()`
 - [x] **T11**: Unit tests: symmetric comparison (same input → Tie), asymmetric with agreement → correct winner, asymmetric with disagreement → Tie
 
 ### Phase 3: Budget Sizing from Theory
-- [x] **T12**: Create `src/pruners/committee_boost/budget.rs` — `CommitteeBudget` struct with `k`, `m`, `r` fields
+- [x] **T12**: Create `crates/katgpt-pruners/src/committee_boost/budget.rs` — `CommitteeBudget` struct with `k`, `m`, `r` fields
 - [x] **T13**: Implement `committee_budget(depth, delta, alpha, beta, sigma, portfolio_size) -> CommitteeBudget` per paper Theorem 3:
   - `k ≥ |P_N| × ⌈ln(2L/δ) / α₀⌉`
   - `m ≥ ⌈(1/2β₀) × ln(2k²L/δ)⌉`
@@ -49,7 +49,7 @@ The paper proves our DDTree + BtRank + ScreeningPruner stack IS the committee pr
 - [x] **T16**: Unit tests: sizing matches paper examples, total_role_calls formula, edge cases (very small/large parameters)
 
 ### Phase 4: Blind-Spot Floor Estimation
-- [x] **T17**: Create `src/pruners/committee_boost/blind_spot.rs` — `BlindSpotEstimate` struct
+- [x] **T17**: Create `crates/katgpt-pruners/src/committee_boost/blind_spot.rs` — `BlindSpotEstimate` struct
 - [x] **T18**: Implement `estimate_blind_spot_floor(oracle_rates: &[(usize, f64)]) -> f64` — B ≈ 1 - max(oracle_rates)
 - [x] **T19**: Implement `fit_convergence(oracle_rates: &[(usize, f64)]) -> ConvergenceFit` — exponential fit to estimate saturation point
 - [x] **T20**: Implement `coverage_diagnostic(oracle_rates: &[(usize, f64)]) -> CoverageDiagnostic` — report B, R_k residual, recommended action (diversify proposers vs increase k)
@@ -169,6 +169,6 @@ CommitteeBoost::diagnostic() ─────── reports Rec, failure mode, bl
 - Research: `.research/093_Boosting_Weak_Reasoning_Committee_Search.md`
 - Related plans: Plan 030 (Bandit), Plan 040 (BtRank), Plan 112 (SR²AM)
 - Key code:
-  - `src/pruners/bt_rank.rs` — BtRank (comparator)
+  - `crates/katgpt-pruners/src/bt_rank.rs` — BtRank (comparator)
   - `src/speculative/dd_tree.rs` — DDTree (proposer)
   - `src/speculative/types.rs` — ScreeningPruner (critic)

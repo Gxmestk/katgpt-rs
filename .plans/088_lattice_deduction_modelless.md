@@ -100,7 +100,7 @@ When the model has eliminated too many candidates (entropy drops anomalously low
 
 `src/speculative/types.rs` — new trait
 `src/speculative/dd_tree.rs` — wire into expansion loop
-`src/speculative/step.rs` — early termination signal
+`crates/katgpt-forward/crates/katgpt-forward/src/step.rs` — early termination signal
 
 ### Implementation
 
@@ -186,7 +186,7 @@ This intersects the current state with the union of all valid solutions still co
 ### Implementation
 
 ```rust
-// src/speculative/alpha.rs
+// crates/katgpt-speculative/src/alpha.rs
 
 //! LDT α-operator: progressive multi-solution supervision target.
 //!
@@ -389,7 +389,7 @@ Run tournament: MCTS + conflict cutoff vs MCTS baseline, 20 games, 9×9.
 |------|--------|-------------|
 | `Cargo.toml` | Add `lattice_deduction` feature + add to `full` | — |
 | `src/speculative/types.rs` | `LdtPruneConfig`, `ConflictDetector`, `EntropyConflictDetector`, `LDT_THETA_ELIM` | `lattice_deduction` |
-| `src/speculative/alpha.rs` | New file: `alpha_intersect`, `is_consistent`, `AlphaTarget` | `lattice_deduction` |
+| `crates/katgpt-speculative/src/alpha.rs` | New file: `alpha_intersect`, `is_consistent`, `AlphaTarget` | `lattice_deduction` |
 | `src/speculative/mod.rs` | Conditional `mod alpha` + re-exports | `lattice_deduction` |
 | `tests/bench_ldt_lattice_deduction.rs` | New test file: T1-T7 GOAT proofs | `lattice_deduction` |
 

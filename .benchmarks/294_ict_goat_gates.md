@@ -48,7 +48,7 @@ G5 PASS: 0.000 allocs/call (mean), 0 total across 1000 calls.
 ```
 
 Verified via `katgpt_rs::alloc::TrackingAllocator` (debug-only, per-thread
-counters — see `src/alloc.rs`). All scratch buffers are pre-allocated in
+counters — see `crates/katgpt-core/src/alloc.rs`). All scratch buffers are pre-allocated in
 `BranchingDetector::new`:
 
 - `scratch_p_avg: Vec<f32>` — length `action_dim`
@@ -104,5 +104,5 @@ cargo test --features ict_branching --test bench_294_ict_g6 -- --nocapture
 
 - Plan 294 §Phase 5 T5.1–T5.4
 - Research 270 §1.4 (plasma budget rationale)
-- `crates/katgpt-core/src/ict/detector.rs` (the hot path)
+- `crates/katgpt-core/crates/katgpt-core/src/ict/detector.rs` (the hot path)
 - `benches/fpcg_probe_forecast_bench.rs` (the bench convention this follows)

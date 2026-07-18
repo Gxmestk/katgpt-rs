@@ -241,7 +241,7 @@ Spectral LOD (Plan 238 Phase 4) already controls this — high-energy windows ge
 ## Task
 
 ### Phase 1: Core Wire Types ✅ DONE
-- [x] Create `src/mux_latent/wire.rs` module
+- [x] Create `crates/katgpt-core/src/mux_latent/wire.rs` module
 - [x] Implement `LatentPatch` (fixed-size 68 bytes, `#[repr(C)]`)
 - [x] Implement `LatentPatchBatch` with SIMD 4-wide chunked BLAKE3 verify
 - [x] Implement `PatchReceipt` + `PatchRejection` enums

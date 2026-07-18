@@ -84,7 +84,7 @@ load-bearing IDW test is the Phase 2 unit test `t27_idw_attracts_to_closer_centr
 | `crates/katgpt-core/src/product_key_memory/types.rs` | `ProductKeyMemory`, `ScoreFn`, `PkQuery`, `PkEntry`, constructors |
 | `crates/katgpt-core/src/product_key_memory/kernel.rs` | `query_into`, `score_dot`, `score_idw`, `PkmScratch`, heapselect + Cartesian top-k |
 | `crates/katgpt-core/src/product_key_memory/freeze.rs` | `FrozenProductKeyMemory` (Phase 4, gated `product_key_memory_freeze`) — `Arc<RwLock<Arc<...>>>` + BLAKE3 commitment + atomic swap |
-| `crates/katgpt-core/src/product_key_memory/episodic.rs` | `PkmEpisodicStore` (Phase 5, gated `product_key_memory_episodic`) — δ-rule write gate (F1 fusion: PKM × δ-Mem) |
+| `crates/katgpt-core/crates/katgpt-core/src/product_key_memory/episodic.rs` | `PkmEpisodicStore` (Phase 5, gated `product_key_memory_episodic`) — δ-rule write gate (F1 fusion: PKM × δ-Mem) |
 | `examples/product_key_memory_demo.rs` | Three-part demo: basic retrieval, latency cliff, IDW vs Dot |
 | `.benchmarks/408_pkm_goat.md` | Full GOAT gate results |
 

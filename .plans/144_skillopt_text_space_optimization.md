@@ -47,7 +47,7 @@ fn edit_budget_at_step()                Game-specific prompt templates
 **Types to define:**
 
 ```rust
-// src/skill_opt/edit.rs
+// crates/katgpt-core/src/skill_opt/edit.rs
 pub enum EditOp {
     Append,
     InsertAfter,
@@ -93,14 +93,14 @@ impl EditBudgetSchedule {
     pub fn budget_at_step(&self, step: usize) -> usize { ... }
 }
 
-// src/skill_opt/apply.rs
+// crates/katgpt-core/src/skill_opt/apply.rs
 pub fn apply_edits(skill: &str, edits: &[SkillEdit], budget: usize) -> String { ... }
 ```
 
 **Trait:**
 
 ```rust
-// src/skill_opt/optimizer.rs
+// crates/katgpt-core/src/skill_opt/optimizer.rs
 pub trait SkillOptimizer {
     /// Propose edits given scored trajectories and current skill
     fn propose_edits(
@@ -166,7 +166,7 @@ skill_opt = []
 
 - [x] **T2: Edit Application Engine (katgpt-rs, `skill_opt` feature)**
 
-**Location:** `src/skill_opt/apply.rs`
+**Location:** `crates/katgpt-core/src/skill_opt/apply.rs`
 
 The `apply_edits()` function applies bounded edits to a text skill document:
 

@@ -43,13 +43,13 @@ graph LR
 ### Part 1: WealthBanditPruner Core
 
 - [x] **T1: `WealthArm` struct** — Per-arm state: `wealth: f64`, `total_reward: f64`, `pulls: u32`, `q_value: f64`
-  - File: `katgpt-rs/src/pruners/wealth_bandit.rs`
+  - File: `katgpt-rs/crates/katgpt-pruners/src/wealth_bandit.rs`
   - `WealthArm::new(initial_wealth: f64) -> Self`
   - `WealthArm::is_bankrupt(&self) -> bool` — wealth < 0.0
   - `WealthArm::rebirth_from(parent: &Self, sigma: f64) -> Self` — parent.q ± N(0,σ), reset wealth
 
 - [x] **T2: `WealthBanditPruner<P>` struct** — Generic wrapper like `BanditPruner<P>`
-  - File: `katgpt-rs/src/pruners/wealth_bandit.rs`
+  - File: `katgpt-rs/crates/katgpt-pruners/src/wealth_bandit.rs`
   - Fields: `arms: Vec<WealthArm>`, `inner: P` (ScreeningPruner), `bid_alpha: f64` (default 0.1), `rent: f64` (default 0.0), `rent_interval: u32` (default 0), `episode_count: u32`
   - Implements `ScreeningPruner` trait: `relevance(&self, arm, context) -> f64` returns `q_value + wealth * bid_alpha`
   - `update(&mut self, arm, reward)` — arm.wealth += reward, arm.q_value update
@@ -61,7 +61,7 @@ graph LR
   - `rebirth_count(&self) -> u32` — statistics
 
 - [x] **T4: `WealthPrunerConfig`** — Configuration struct
-  - File: `katgpt-rs/src/pruners/wealth_bandit.rs`
+  - File: `katgpt-rs/crates/katgpt-pruners/src/wealth_bandit.rs`
   - `initial_wealth: f64` (default 0.5)
   - `bid_alpha: f64` (default 0.1)
   - `rent: f64` (default 0.0)
@@ -142,8 +142,8 @@ graph LR
 
 - Research 167: EoM Hayek Market Coordination
 - EoM paper: [arXiv:2606.02859](https://arxiv.org/abs/2606.02859)
-- BanditPruner: `katgpt-rs/src/pruners/bandit.rs`
-- AbsorbCompress: `katgpt-rs/src/pruners/absorb_compress.rs`
+- BanditPruner: `katgpt-rs/crates/katgpt-ruliology/crates/katgpt-ruliology/src/bandit.rs`
+- AbsorbCompress: `katgpt-rs/crates/katgpt-pruners/crates/katgpt-pruners/src/absorb_compress.rs`
 - Bomber arena: `katgpt-rs/.plans/045_bomber_arena.md`
 
 **TL;DR:** WealthPruner replaces UCB1's statistical optimism with economic selection — arms that earn more get more opportunity, bankrupt arms get replaced. Feature-gated under `wealth_pruner`, on by default after GOAT proof.

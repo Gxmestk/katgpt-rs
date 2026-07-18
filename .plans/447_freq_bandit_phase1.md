@@ -8,7 +8,7 @@ FreqBandit uses spectral analysis of recent token streams to adaptively select s
 
 ## Implementation
 
-- **File**: `src/freq_bandit.rs` (402 lines, under 500-line limit)
+- **File**: `crates/katgpt-pruners/src/freq_bandit.rs` (402 lines, under 500-line limit)
 - **Feature gate**: `freq_bandit = ["bandit"]` in `Cargo.toml`
 - **Default on**: Added to `default` and `full` feature sets
 - **Module**: `#[cfg(feature = "freq_bandit")] pub mod freq_bandit;` in `src/lib.rs`

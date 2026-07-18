@@ -2,7 +2,7 @@
 
 **Date:** 2026-07-04
 **Primitive:** `CognitiveArchitectureRoot([u8; 32])` — whole-architecture BLAKE3 commitment.
-**Location:** `crates/katgpt-core/src/engram/architecture_root.rs`
+**Location:** `crates/katgpt-core/crates/katgpt-core/src/engram/architecture_root.rs`
 **Bench:** `crates/katgpt-core/benches/bench_039_architecture_root_goat.rs`
 **Feature:** `cognitive_architecture_root = ["engram"]` → **promoted to DEFAULT-ON**.
 
@@ -108,7 +108,7 @@ pub fn verify_parts(
 
 ## Files
 
-- `crates/katgpt-core/src/engram/architecture_root.rs` (431 LOC) — primitive + 13 unit tests.
+- `crates/katgpt-core/crates/katgpt-core/src/engram/architecture_root.rs` (431 LOC) — primitive + 13 unit tests.
 - `crates/katgpt-core/src/engram/mod.rs` — module registration + layering doc.
 - `crates/katgpt-core/benches/bench_039_architecture_root_goat.rs` (306 LOC) — GOAT gate.
 - `crates/katgpt-core/Cargo.toml` — feature flag + default-on promotion + bench registration.

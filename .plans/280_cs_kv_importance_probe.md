@@ -22,7 +22,7 @@ Ship the two modelless primitives distilled from Research 247 as a generic, MIT-
 **Non-goals (explicitly out of scope here):**
 - NPC comms wiring, fog-of-war `ca` computation, zone broadcast → riir-ai Plan 311.
 - Cross-shape projection training → riir-train.
-- Position-disentanglement (RoPE strip/restore) → already shipped in `src/shard_kv/rope.rs` (`undo_rope`/`reapply_rope`); this plan re-exports it, does not reinvent it.
+- Position-disentanglement (RoPE strip/restore) → already shipped in `crates/katgpt-kv/src/shard_kv/rope.rs` (`undo_rope`/`reapply_rope`); this plan re-exports it, does not reinvent it.
 
 ---
 
@@ -38,7 +38,7 @@ Ship the two modelless primitives distilled from Research 247 as a generic, MIT-
   - `pub struct DensityBudget { pub k_sparse: usize, pub k_dense: usize, pub d_total: usize }` — the interpolator config. Defaults: `k_sparse = round(0.035 * d_total)`, `k_dense = round(0.87 * d_total)` (paper's floors/ceilings).
 - [x] **T1.3** Implement `sample_masks` in `src/cs_kv_probe/probe.rs`:
   - `pub fn sample_masks(n_heads: usize, m: usize, ablation_fraction: f32, rng: &mut fastrand::Rng) -> Vec<AblationMask>` — stratified random masks, each zeroing exactly `ablation_fraction` (default 0.05) of heads. Returns `Vec::with_capacity(m)`. Paper uses `M=200`, `fraction=0.05`.
-- [x] **T1.4** Implement Lasso solver in `src/cs_kv_probe/lasso.rs`:
+- [x] **T1.4** Implement Lasso solver in `crates/katgpt-kv/src/cs_kv_probe/lasso.rs`:
   - `pub fn lasso(Phi: &[[bool; HishouldBeDynamicUseVec]], y: &[f32], alpha: f32, n_iter: usize) -> Vec<f32>` — coordinate descent L1-regularized regression. Inputs: measurement matrix `Phi` (M×N bool → cast to f32), centered observations `y` (M,), regularization `alpha` (default 1e-4), iteration count (default 1000). Output: coefficient vector `x` (N,). 
   - **No external dep** — implement coordinate descent in-place with pre-allocated scratch. ~80 lines. Avoid pulling in a linear-algebra crate for a single solver.
   - Test: known-sparse ground truth (e.g. only heads 3, 17, 42 matter) → Lasso recovers them within rank tolerance.

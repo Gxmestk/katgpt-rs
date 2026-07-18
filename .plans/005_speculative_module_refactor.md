@@ -1,7 +1,7 @@
 # Plan 005: Speculative Module Refactor — SOLID Decomposition
 
 ## Objective
-Decompose the monolithic `src/speculative.rs` (1591 lines) into a `src/speculative/` module directory following Single Responsibility Principle. Extract Sudoku-specific code behind a `sudoku` feature flag so the core speculative decoding framework is reusable without domain coupling.
+Decompose the monolithic `src/benchmark/speculative.rs` (1591 lines) into a `src/speculative/` module directory following Single Responsibility Principle. Extract Sudoku-specific code behind a `sudoku` feature flag so the core speculative decoding framework is reusable without domain coupling.
 
 ## Current Problem
 - `speculative.rs` imports `percepta::Sudoku9x9` → any consumer pulls in Sudoku domain
@@ -146,15 +146,15 @@ mod.rs           ← re-exports everything
 
 | File | Action |
 |------|--------|
-| `src/speculative.rs` | Delete (replaced by directory) |
+| `src/benchmark/speculative.rs` | Delete (replaced by directory) |
 | `src/speculative/mod.rs` | New — re-exports |
 | `src/speculative/types.rs` | New — TreeNode, DraftResult, ConstraintPruner, NoPruner |
-| `src/speculative/sampling.rs` | New — sampling functions |
+| `crates/katgpt-core/src/speculative/sampling.rs` | New — sampling functions |
 | `src/speculative/dd_tree.rs` | New — DDTree build + path extraction |
-| `src/speculative/dflash.rs` | New — DFlash predict functions |
+| `crates/katgpt-speculative/src/dflash.rs` | New — DFlash predict functions |
 | `src/speculative/verifier.rs` | New — SpeculativeVerifier trait + impls |
-| `src/speculative/step.rs` | New — speculative_step wrappers |
-| `src/speculative/sudoku_pruner.rs` | New — SudokuPruner (sudoku feature) |
+| `crates/katgpt-forward/crates/katgpt-forward/src/step.rs` | New — speculative_step wrappers |
+| `crates/katgpt-pruners/src/sudoku_pruner.rs` | New — SudokuPruner (sudoku feature) |
 | `Cargo.toml` | Add `sudoku = []` feature |
 | `src/benchmark.rs` | Possibly update imports |
 | `examples/sudoku_speculative.rs` | Possibly add feature gate |

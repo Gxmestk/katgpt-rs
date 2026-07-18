@@ -17,7 +17,7 @@ Implement curvature-influence allocation inspired by the EoS selective learning 
 
 ## Tasks
 
-- [x] T1: Implement `CurvatureInfluenceScorer` trait + `EosProxyScorer` in `src/pruners/curvature_alloc.rs`
+- [x] T1: Implement `CurvatureInfluenceScorer` trait + `EosProxyScorer` in `crates/katgpt-pruners/src/curvature_alloc.rs`
 - [x] T2: Implement `CurvatureWeightedBudget` variant for DDTree node allocation
 - [x] T3: Implement `BanditStrategy::CurvatureInfluence` — EoS-aware arm selection
 - [x] T4: Wire curvature scoring into speculative decode verification depth
@@ -94,7 +94,7 @@ pub enum BudgetMode {
 
 ## T3: `BanditStrategy::CurvatureInfluence`
 
-**File:** `src/pruners/bandit.rs` — add to `BanditStrategy` enum
+**File:** `crates/katgpt-ruliology/crates/katgpt-ruliology/src/bandit.rs` — add to `BanditStrategy` enum
 
 ```rust
 /// EoS-aware arm selection inspired by arXiv:2606.04212.

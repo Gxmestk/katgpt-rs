@@ -21,7 +21,7 @@ training example.
 | `output/lora_ab/game_lora_action_only.bin`   | 9316 B | `LORA` | 6 | 4 | 8.0 | 32 | 32 | `ActionOnly` |
 
 Binary structure (verified 2026-07-04 via `xxd`, offsets from
-`katgpt-types/src/lora.rs`):
+`katgpt-types/crates/katgpt-types/src/lora.rs`):
 
 ```
 offset 0..4    magic           = b"LORA"

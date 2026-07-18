@@ -191,7 +191,7 @@ Load ciot-format `.bits` binary files:
 pub fn load_ternary_bits(path: &std::path::Path) -> std::io::Result<TernaryWeights> { ... }
 ```
 
-### T8: Forward Pass Dispatch (`katgpt-rs/src/transformer.rs`) — ⏳ Not Yet Wired
+### T8: Forward Pass Dispatch (`katgpt-rs/crates/katgpt-percepta/src/transformer.rs`) — ⏳ Not Yet Wired
 
 Add ternary weight dispatch to `forward_base()`:
 

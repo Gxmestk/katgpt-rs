@@ -40,7 +40,7 @@ Add a CPU sparse matmul path for the MLP's second weight matrix (`w2 @ hidden`),
   - `1.0` = never use sparse (always dense)
   - When sparsity < threshold, fall back to dense `matmul`
 
-- [x] **Task 5: Implement sparse MLP in `forward()`** (`src/transformer.rs`)
+- [x] **Task 5: Implement sparse MLP in `forward()`** (`crates/katgpt-percepta/src/transformer.rs`)
   - After `matmul_relu(hidden, w1, x)`:
     - If `sparse_mlp` feature enabled: call `sparse_matmul(x, w2, hidden, n, mlp_hidden, active_indices, active_values)`
     - Check alive_ratio = alive_count / mlp_hidden; if > (1 - sparse_threshold), fall back to dense
@@ -79,7 +79,7 @@ Add a CPU sparse matmul path for the MLP's second weight matrix (`w2 @ hidden`),
 |------|--------|
 | `katgpt-rs/src/types.rs` | Add `sparse_matmul()` function |
 | `katgpt-rs/Cargo.toml` | Add `sparse_mlp` feature |
-| `katgpt-rs/src/transformer.rs` | Add buffers to `ForwardContext`, sparse path in forward functions |
+| `katgpt-rs/crates/katgpt-percepta/src/transformer.rs` | Add buffers to `ForwardContext`, sparse path in forward functions |
 | `katgpt-rs/src/benchmark.rs` | Add sparse vs dense benchmark |
 | `katgpt-rs/src/gpu/forward.rs` | Add docs comment for GPU sparse rationale |
 | `katgpt-rs/README.md` | Add TwELL Sparse MLP section |

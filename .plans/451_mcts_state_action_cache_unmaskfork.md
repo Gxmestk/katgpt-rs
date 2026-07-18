@@ -3,7 +3,7 @@
 **Date:** 2026-07-07
 **Research:** [katgpt-rs/.research/386_UnMaskFork_Deterministic_Action_Branching_MCTS.md](../.research/386_UnMaskFork_Deterministic_Action_Branching_MCTS.md)
 **Source paper:** [arxiv 2602.04344](https://arxiv.org/abs/2602.04344) — UnMaskFork: Test-Time Scaling for Masked Diffusion via Deterministic Action Branching (Misaki & Akiba, Sakana AI, Feb 2026)
-**Target:** `katgpt-rs/crates/katgpt-core/src/mcts_state_action_cache.rs` (new module) + Cargo feature `mcts_state_action_cache`
+**Target:** `katgpt-rs/crates/katgpt-core/crates/katgpt-core/src/mcts_state_action_cache.rs` (new module) + Cargo feature `mcts_state_action_cache`
 **Status:** Closed — opt-in-forever (Phase 3 G2 FAILED, Phase 4 T4.3 executed). See `.issues/044_*`.
 
 ---
@@ -32,7 +32,7 @@ Goal: a compiling, tested, feature-gated module that implements the state-action
 - [x] **T1.1** Add feature flag `mcts_state_action_cache = ["dep:papaya", "dep:blake3"]` to `katgpt-rs/crates/katgpt-core/Cargo.toml` features section (after the existing `mcts`-adjacent entries; both deps already optional in this crate). Verify `papaya` and `blake3` are still listed as `optional = true` in `[dependencies]`.
   - **Deviation:** `blake3` is non-optional in this crate (line 16), so `dep:blake3` is invalid. Used `mcts_state_action_cache = ["dep:papaya"]` instead. Documented inline in Cargo.toml.
 - [x] **T1.2** Add `#[cfg(feature = "mcts_state_action_cache")] pub mod mcts_state_action_cache;` to `katgpt-rs/crates/katgpt-core/src/lib.rs` (alphabetical, near `mcts`).
-- [x] **T1.3** Implement `katgpt-rs/crates/katgpt-core/src/mcts_state_action_cache.rs`:
+- [x] **T1.3** Implement `katgpt-rs/crates/katgpt-core/crates/katgpt-core/src/mcts_state_action_cache.rs`:
   - [x] `InferenceAction { config_id: u16, strategy_id: u8 }` — `#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]`, `#[repr(C)]` (3 bytes + 1 pad). Opaque action handle; caller-defined semantics (which solver kind / temperature / shard id / remasking strategy).
   - [x] `StateActionKey { state: blake3::Hash, action: InferenceAction }` — `#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]`. The cache key.
   - [x] `StateActionCache<R: Copy>` — wraps `papaya::HashMap<StateActionKey, (blake3::Hash, R)>` (papaya default `RandomState`; no custom hasher to keep it simple).

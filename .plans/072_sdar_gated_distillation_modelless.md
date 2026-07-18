@@ -40,7 +40,7 @@ The core building block — a reusable sigmoid gate function.
 - Properties: smooth, differentiable, bounded ∈ (0,1), monotonic
 - β=5.0 is empirically optimal (β=0 = no gate, β→∞ = binary gate)
 
-- [x] **T2: Implement `sdar_gate` function** — `src/pruners/sdar_gate.rs`
+- [x] **T2: Implement `sdar_gate` function** — `crates/katgpt-pruners/src/sdar_gate.rs`
   ```rust
   //! SDAR-inspired sigmoid gating for modelless distillation signals.
   //!
@@ -100,13 +100,13 @@ Apply SDAR gate to bandit arm update magnitude.
 
 **Motivation:** SDAR gates distillation loss by teacher-student gap. Analogously, we gate bandit Q-value updates by reward quality gap. When reward signal is noisy (negative gap), attenuate the update. When reward signal is trustworthy (positive gap), pass it through.
 
-- [x] **T3: Add `SdarBanditPruner` wrapper** — `src/pruners/bandit.rs`
+- [x] **T3: Add `SdarBanditPruner` wrapper** — `crates/katgpt-ruliology/crates/katgpt-ruliology/src/bandit.rs`
   - Wraps existing `BanditPruner<P>` with sigmoid-gated reward updates
   - `update(arm, reward)`: compute `gap = reward - q_values[arm]`, gate = `σ(β·gap)`, update with `gated_reward = reward * gate`
   - Property: positive reward surprise → full update, negative reward surprise → attenuated update
   - This is the modelless analog of SDAR's token-level gating
 
-- [x] **T4: Unit tests for `SdarBanditPruner`** — `src/pruners/bandit.rs` (test module)
+- [x] **T4: Unit tests for `SdarBanditPruner`** — `crates/katgpt-ruliology/crates/katgpt-ruliology/src/bandit.rs` (test module)
   - Test: gate opens for positive gap (reward > Q-value)
   - Test: gate closes for negative gap (reward < Q-value)
   - Test: convergence still reaches optimal arm (no regression vs ungated)

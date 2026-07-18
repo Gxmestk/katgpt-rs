@@ -50,7 +50,7 @@ All module-internal `crate::` imports are **intra-group** (both endpoints move t
 
 ### `mux_demux` feature chain discovery
 
-Root `Cargo.toml` line 395: `mux_demux = ["katgpt-pruners/mux_demux"]`. Verified: `crates/katgpt-pruners/src/` has **NO** `mux_demux.rs` file — the forward is a tracking alias only (katgpt-pruners has the feature declared but no module behind it). Moving `src/mux_demux.rs` to katgpt-core is correct; root feature becomes `mux_demux = ["katgpt-core/mux_demux", "katgpt-pruners/mux_demux"]` (preserves tracking chain, adds the actual module gate).
+Root `Cargo.toml` line 395: `mux_demux = ["katgpt-pruners/mux_demux"]`. Verified: `crates/katgpt-pruners/src/` has **NO** `mux_demux.rs` file — the forward is a tracking alias only (katgpt-pruners has the feature declared but no module behind it). Moving `crates/katgpt-core/src/mux_demux.rs` to katgpt-core is correct; root feature becomes `mux_demux = ["katgpt-core/mux_demux", "katgpt-pruners/mux_demux"]` (preserves tracking chain, adds the actual module gate).
 
 ### `alloc.rs` special case
 

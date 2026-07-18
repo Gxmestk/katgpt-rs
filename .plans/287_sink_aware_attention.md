@@ -3,7 +3,7 @@
 **Date:** 2026-06-17
 **Research:** [katgpt-rs/.research/258_Attention_Sink_Dual_Mechanism_NOP_Broadcast.md](../.research/258_Attention_Sink_Dual_Mechanism_NOP_Broadcast.md)
 **Source paper:** [arXiv:2606.08105](https://arxiv.org/abs/2606.08105) — Fesser et al., *A Unifying View of Attention Sinks: Two Algorithms, Two Solutions*
-**Target:** `katgpt-rs/src/data_probe/sink_classify.rs` (new, root crate — path-corrected; primitive types live in `katgpt-rs/crates/katgpt-core/src/data_probe.rs`) + extensions to `data_probe/geometry.rs`
+**Target:** `katgpt-rs/crates/katgpt-core/src/data_probe/sink_classify.rs` (new, root crate — path-corrected; primitive types live in `katgpt-rs/crates/katgpt-core/src/data_probe.rs`) + extensions to `data_probe/geometry.rs`
 **Status:** Complete (Phases 1–5). G1 ✅ PASS, synthetic G2 ✅ PASS, G3 ❌ FAIL (latency). NOT promoted to default — see [`.benchmarks/059_sink_aware_goat.md`](../.benchmarks/059_sink_aware_goat.md).
 
 ---
@@ -26,7 +26,7 @@ The minimal, dependency-free classifier. Pure math over `&[f32]` attention maps 
 
 ### Tasks
 
-- [x] **T1.1** Create `crates/katgpt-core/src/data_probe.rs` with module doc. Re-export from `src/data_probe/sink_classify.rs` behind existing `data_probe` feature. *(2026-06-17)*
+- [x] **T1.1** Create `crates/katgpt-core/src/data_probe.rs` with module doc. Re-export from `crates/katgpt-core/src/data_probe/sink_classify.rs` behind existing `data_probe` feature. *(2026-06-17)*
 - [x] **T1.2** Define types:
   ```rust
   pub enum SinkKind { None, Nop, Broadcast }
@@ -52,7 +52,7 @@ The minimal, dependency-free classifier. Pure math over `&[f32]` attention maps 
   - `update_stable_rank`: if `update_O` provided, vendored ~30-line power iteration (5 iters, no `manifold_power_iter_router` dependency). If `None`, set to `f32::NAN`.
   - Decision rule per research note §2.1.
 - [x] **T1.4** `classify_all_sinks(attn, values, cfg, scratch, out: &mut Vec<SinkDiagnostic>)`. Caller-owned `out`; single n-length allocation per call.
-- [x] **T1.5** Unit tests (G1): 8 tests in `src/data_probe/sink_classify.rs`:
+- [x] **T1.5** Unit tests (G1): 8 tests in `crates/katgpt-core/src/data_probe/sink_classify.rs`:
   - `g1_nop_only_head`, `g1_broadcast_only_head`, `g1_mixed_head`, `g1_mixed_head_both_above_threshold`, `g1_no_sink_head`, `g1_zero_attn_column_edge`, `g1_degenerate_values_edge`, `g1_stable_rank_zero_matrix`. All pass.
 
 ---
@@ -92,7 +92,7 @@ Wire the new classifier into the broader `data_probe` family so it composes with
 
 ### Tasks
 
-- [x] **T4.1** `LayerSinkSummary` added to `src/data_probe/geometry.rs`: `layer_index`, `n_nop_sinks`, `n_broadcast_sinks`, `dominant_kind`, `mean_broadcast_value_norm`. *(2026-06-17)*
+- [x] **T4.1** `LayerSinkSummary` added to `crates/katgpt-core/src/data_probe/geometry.rs`: `layer_index`, `n_nop_sinks`, `n_broadcast_sinks`, `dominant_kind`, `mean_broadcast_value_norm`. *(2026-06-17)*
 - [x] **T4.2** `summarize_layer_sinks(attn_per_head, values_per_head, cfg, scratch, layer_index) -> LayerSinkSummary`. Runs classifier across all heads; aggregates via plurality vote.
 - [x] **T4.3** Example `examples/sink_phase_plot.rs`. Synthetic ViT-like activations; layers 0-3 NOP-dominant (zero CLS value), layers 4-7 would-be Broadcast (showing as None since `classify_all_sinks` doesn't pass `update_O` — documented in example output).
 - [x] **T4.4** Cross-reference in `src/data_probe/mod.rs` doc: classifier is mechanism locator, `effective_rank` is aggregate symptom.
@@ -140,7 +140,7 @@ Wire the new classifier into the broader `data_probe` family so it composes with
 
 | Gate | Status | Result |
 |---|---|---|
-| G1 (classifier correctness) | ✅ PASS (2026-06-17) | 8/8 unit tests in `src/data_probe/sink_classify.rs`. NOP, Broadcast, mixed, edge cases all handled. |
+| G1 (classifier correctness) | ✅ PASS (2026-06-17) | 8/8 unit tests in `crates/katgpt-core/src/data_probe/sink_classify.rs`. NOP, Broadcast, mixed, edge cases all handled. |
 | G2 (effective_rank preserved/improved — synthetic) | ✅ PASS (2026-06-17) | 2/2 tests in `tests/sink_aware_g2_synthetic.rs`. DualPolicy preserves Broadcast output, gates NOP output. |
 | G2 (effective_rank preserved/improved — real ViT) | ⏳ DEFERRED | Requires frozen ViT model + per-layer hook. Out of scope for this task. |
 | G3 (latency overhead ≤5%) | ❌ FAIL (2026-06-17) | 1671% overhead at n=128, d_h=64 (target was ≤5%). Root cause: stable-rank computation cost + n² col-sum scan. See `.benchmarks/059_sink_aware_goat.md` for analysis. |
@@ -150,7 +150,7 @@ Wire the new classifier into the broader `data_probe` family so it composes with
 
 ## Scope reductions (2026-06-17)
 
-1. **Plan target path was wrong.** The plan said `crates/katgpt-core/src/data_probe/sink_classify.rs`, but the `data_probe` module already exists in the root crate at `src/data_probe/`. Corrected to `src/data_probe/sink_classify.rs` (root-crate re-export) + `crates/katgpt-core/src/data_probe.rs` (primitive types — needed so katgpt-core can reference them).
+1. **Plan target path was wrong.** The plan said `crates/katgpt-core/crates/katgpt-core/src/data_probe/sink_classify.rs`, but the `data_probe` module already exists in the root crate at `src/data_probe/`. Corrected to `crates/katgpt-core/src/data_probe/sink_classify.rs` (root-crate re-export) + `crates/katgpt-core/src/data_probe.rs` (primitive types — needed so katgpt-core can reference them).
 2. **Direct wiring into `parallax_attn.rs` / `funcattn.rs` forward paths — split verdict.** The policy enum + standalone `apply_dual_policy_gate` shipped initially; callers invoke after a forward pass. Keeps `ParallaxConfig` / `FuncAttnConfig` backwards-compatible.
    - **Parallax half: DONE** via [Plan 289](./289_sink_aware_forward_path_wiring.md) (single entry point `tiled_attention_parallax_forward_sink_aware`, separate from `ParallaxConfig`).
    - **FuncAttn half: CLOSED as not-applicable** via [Research 261](../.research/261_FuncAttn_Sink_Semantics_Verdict.md). FuncAttn's `Φ · C · Ṽ` structure has no `n×n` attention matrix for the sink classifier to scan — basis modes are partition-of-unity by design, so the NOP/Broadcast discrimination collapses into a column-norm check.

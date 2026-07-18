@@ -224,7 +224,7 @@ examples/
 
 ### Phase 1: Core Infrastructure ✅
 - [x] Add `Hash` derive to `GameState` (needed for A* visited set)
-- [x] Create `src/pruners/pathfinder.rs` with A* implementation
+- [x] Create `crates/katgpt-pruners/src/pathfinder.rs` with A* implementation
 - [x] Add `find_path` function: grid A* considering walls and blocked tiles
 - [x] Add `find_distance` function: A* distance only (faster, no path reconstruction)
 - [x] Add `reachable_positions` function: BFS flood fill for cost evaluation

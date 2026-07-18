@@ -25,22 +25,22 @@ These gaps mean: training may produce incorrect gradients, distillation quality 
 | # | Paper | Where | Status |
 |---|-------|-------|--------|
 | 00 | Neuro-Symbolic Architecture | `katgpt-rs/src/speculative/` | ✅ DFlash, DDTree, Percepta |
-| 01 | Advanced Neuro-Symbolic | `katgpt-rs/src/transformer.rs` | ✅ PagedKV, GQA, SIMD hints |
+| 01 | Advanced Neuro-Symbolic | `katgpt-rs/crates/katgpt-percepta/src/transformer.rs` | ✅ PagedKV, GQA, SIMD hints |
 | 02 | Speculative Decoding (Leviathan) | `katgpt-rs/src/speculative/verifier.rs` | ✅ Full rejection sampling |
 | 03 | Commercial Strategy | 4-repo architecture split | ✅ Engine/Fuel separation |
-| 04 | LoRA Architecture | `riir-gpu/src/lora.rs` | ✅ 6 targets/layer, BLAKE3 |
+| 04 | LoRA Architecture | `riir-gpu/crates/katgpt-types/src/lora.rs` | ✅ 6 targets/layer, BLAKE3 |
 | 05 | Artifact Definition | `riir-validator-sdk/` | ✅ 10 WASM validators |
-| 06 | Raven RSM | `katgpt-rs/src/transformer.rs` | ✅ O(1) KV cache |
+| 06 | Raven RSM | `katgpt-rs/crates/katgpt-percepta/src/transformer.rs` | ✅ O(1) KV cache |
 | 07 | Screening Absolute Relevance | `katgpt-rs/src/speculative/types.rs` | ✅ Continuous [0,1] |
 | 08 | TwELL Sparse MLP | `katgpt-rs/src/types.rs` | ✅ Feature-gated sparse GEMV |
 | 09 | EMO Emergent Modularity | `riir-ai/crates/riir-router/` | ✅ ExpertRegistry + routing |
 | 11 | PPoT | `katgpt-rs/src/speculative/ppot/` | ✅ CPU logit resampling |
-| 12 | TRT (rejection knowledge) | `katgpt-rs/src/speculative/ppot/knowledge.rs` | ✅ Adaptive patterns |
-| 14 | Learning Beyond Gradients | `katgpt-rs/src/pruners/absorb_compress.rs` | ✅ Absorb+Compress |
-| 15 | Reinforced Agent (reviewer) | `katgpt-rs/src/pruners/review_metrics.rs` | ✅ Helpfulness/Harmfulness |
+| 12 | TRT (rejection knowledge) | `katgpt-rs/crates/katgpt-speculative/src/ppot/knowledge.rs` | ✅ Adaptive patterns |
+| 14 | Learning Beyond Gradients | `katgpt-rs/crates/katgpt-pruners/crates/katgpt-pruners/src/absorb_compress.rs` | ✅ Absorb+Compress |
+| 15 | Reinforced Agent (reviewer) | `katgpt-rs/crates/katgpt-core/src/pruners/review_metrics.rs` | ✅ Helpfulness/Harmfulness |
 | 16 | AutoTTS (β parameterization) | `riir-gpu/src/training_config.rs` | ✅ BetaConfig |
 | 18 | Free Transformer Latent Injection | `katgpt-rs/src/types.rs` (DomainLatent), `riir-gpu/src/domain_latent.rs` | 🟡 Full VAE ❌, mid-layer K/V domain embedding ✅ (Plan 038) |
-| 19 | TTT Test-Time Training | `katgpt-rs/src/feedback.rs`, `riir-burner/` | 🟡 Feedback sends, not consumed |
+| 19 | TTT Test-Time Training | `katgpt-rs/crates/katgpt-deprecated/src/feedback.rs`, `riir-burner/` | 🟡 Feedback sends, not consumed |
 | 20 | TurboQuant | `katgpt-rs/src/turboquant/` | ✅ CPU path, GPU kernel exists |
 
 ### Correctly Rejected (1/21 papers)
@@ -175,8 +175,8 @@ pub struct GpuPipelines {
 
 #### Task 6: Feedback Consumer Service
 
-**File:** `riir-ai/crates/riir-gpu/src/feedback.rs` (new) or extend `riir-ai/crates/riir-rest/`
-**Problem:** `katgpt-rs/src/feedback.rs` POSTs `InferenceResult` to cache endpoint (Plan 042 Task 6 ✅), but nothing reads from that endpoint to trigger retraining. Feedback goes into a void.
+**File:** `riir-ai/crates/riir-gpu/crates/katgpt-deprecated/src/feedback.rs` (new) or extend `riir-ai/crates/riir-rest/`
+**Problem:** `katgpt-rs/crates/katgpt-deprecated/src/feedback.rs` POSTs `InferenceResult` to cache endpoint (Plan 042 Task 6 ✅), but nothing reads from that endpoint to trigger retraining. Feedback goes into a void.
 **Context:** Plan 042 implemented the send side. This task implements the receive side.
 
 **Architecture:**
@@ -511,7 +511,7 @@ Cross-reference of all 21 research papers evaluated against the riir-ai / katgpt
 | 5 | **Knowledge Distillation** (Hinton et al.) | 2015 | Per-adapter KL divergence with effective weight distributions | `riir-gpu/distill.rs` | ✅ Full |
 | 6 | **AdamW** (Loshchilov & Hutter) | 2017 | Full AdamW with warmup + cosine decay on GPU | `optimizer.rs`, `optimizer.wgsl` | ✅ Full |
 | 7 | **RMSNorm** (Zhang & Sennrich) | 2019 | GPU RMSNorm kernel (no bias) | `layernorm.wgsl` | ✅ Full |
-| 8 | **Multi-Armed Bandit Routing** | 2023 | EpsilonGreedy + UCB domain routing with episode tracking | `katgpt-rs/src/pruners/bandit.rs` | ✅ Full |
+| 8 | **Multi-Armed Bandit Routing** | 2023 | EpsilonGreedy + UCB domain routing with episode tracking | `katgpt-rs/crates/katgpt-ruliology/crates/katgpt-ruliology/src/bandit.rs` | ✅ Full |
 | 9 | **Early Exit / Dynamic Depth** | 2020 | Domain inference budget with β parameterization, early exit patience | `katgpt-rs/src/speculative/dd_tree.rs` (embedded), Plan 026 | ✅ Full |
 | 10 | **Sparse Attention** (child et al.) | 2019 | Block-sparse attention with heuristic selection (sink + window + α threshold) | `flashprefill_block_select.wgsl`, `flashprefill_sparse_forward.wgsl` | ✅ Full |
 | 11 | **KV Cache Quantization** | 2023 | TurboQuant near-optimal KV cache compression with bit-packed codebooks | `forward_turboquant.rs`, `attention_score_tq.wgsl` | ✅ Full |
@@ -522,7 +522,7 @@ Cross-reference of all 21 research papers evaluated against the riir-ai / katgpt
 | 16 | **Online Softmax** (Milakov & Gimelshein) | 2018 | Stable online softmax in WGSL (max subtraction, 2-pass for sparse) | `softmax.wgsl`, `flashprefill_sparse_forward.wgsl` | ✅ Full |
 | 17 | **Gradient Compression** (Aji & Heafield) | 2017 | Gradient compression for distributed training | `riir-gpu/compress.rs` | ✅ Full |
 | 18 | **NVIDIA Dynamo** (dynamic inference) | 2024 | Early exit + dynamic budget extracted; full framework not applicable at micro-scale | `katgpt-rs/src/speculative/dd_tree.rs` (embedded) | 🔶 Partial |
-| 19 | **BLT: Byte Latent Transformer** (Pagnoni et al.) | 2024 | Byte-level tokenization concepts absorbed into BPE pipeline | `katgpt-rs/src/tokenizer/bpe.rs` | 🔶 Distilled |
+| 19 | **BLT: Byte Latent Transformer** (Pagnoni et al.) | 2024 | Byte-level tokenization concepts absorbed into BPE pipeline | `katgpt-rs/crates/katgpt-tokenizer/src/bpe.rs` | 🔶 Distilled |
 | 20 | **Free Transformer** (routing-free inference) | 2024 | Routing-free concepts absorbed into embedding router fallback tier | `riir-router/src/embedding.rs` | 🔶 Distilled |
 | 21 | **ColaDLM** (collaborative distillation) | 2024 | Evaluated and rejected — not applicable to micro-scale single-device LoRA training | N/A | ✅ Rejected |
 

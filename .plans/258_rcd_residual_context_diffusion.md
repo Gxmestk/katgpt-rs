@@ -72,7 +72,7 @@ denoise_loop step k:
 ### Phase 3: ResidPruner — Constraint-Filtered Residuals (~50 lines)
 
 - [x] **Task 3.1**: Implement `ResidPruner` struct
-  - `src/pruners/resid_pruner.rs` — wraps `ConstraintPruner`
+  - `crates/katgpt-pruners/src/resid_pruner.rs` — wraps `ConstraintPruner`
   - `should_inject()` extracts top-K from marginals, checks pruner validity
   - Zero-alloc: caller-provided scratch buffer
 
@@ -83,12 +83,12 @@ denoise_loop step k:
 ### Phase 4: MUX-RCD Fusion (~60 lines)
 
 - [x] **Task 4.1**: Implement `compute_mux_residual()` for DDTree paths
-  - In `src/mux_demux.rs`, gated by `#[cfg(all(feature = "mux_demux", feature = "rcd_residual"))]`
+  - In `crates/katgpt-core/src/mux_demux.rs`, gated by `#[cfg(all(feature = "mux_demux", feature = "rcd_residual"))]`
   - Weighted sum across paths: Δ = Σ weight * p * E
   - Normalizes path scores to probabilities
 
 - [x] **Task 4.2**: Wire MUX-RCD into `build_dd_tree_adaptive()`
-  - Implemented as `build_dd_tree_adaptive_mux_residual()` in `src/speculative/caddtree_budget.rs`
+  - Implemented as `build_dd_tree_adaptive_mux_residual()` in `crates/katgpt-speculative/src/caddtree_budget.rs`
   - Composes `build_dd_tree_adaptive` + `compute_mux_residual`; extracts path scores from `TreeNode.score`
   - **Feature gate correction:** plan referenced non-existent `mux_latent`; actual gate is `#[cfg(all(feature = "mux_demux", feature = "rcd_residual"))]` (matches `compute_mux_residual`'s gate)
   - **Score semantics:** DDTree scores are cumulative log-probs (≤ 0); wiring applies log-sum-exp shift `(s - max).exp()` before normalization so `compute_mux_residual` receives positive weights
@@ -134,13 +134,13 @@ denoise_loop step k:
 
 | File | Change | Lines |
 |------|--------|-------|
-| `src/dllm_solver.rs` | `RcdConfig`, entropy normalization, residual computation, interpolation | ~80 |
+| `crates/katgpt-core/src/dllm_solver.rs` | `RcdConfig`, entropy normalization, residual computation, interpolation | ~80 |
 | `src/dllm.rs` | Residual state in `D2fContext`, wire into `denoise_loop` | ~30 |
 | `src/inference_router.rs` | `ResidualMode` enum, tier mapping | ~20 |
 | `src/types.rs` | Residual scratch buffer in relevant types | ~10 |
 | `src/lib.rs` | Feature flag `rcd_residual` | ~5 |
 | `src/pruners/` | New `resid_pruner.rs` | ~50 |
-| `src/mux_demux.rs` | MUX-RCD fusion function | ~40 |
+| `crates/katgpt-core/src/mux_demux.rs` | MUX-RCD fusion function | ~40 |
 | `Cargo.toml` | Feature flag | ~2 |
 | Tests | Unit + integration + benchmark | ~100 |
 

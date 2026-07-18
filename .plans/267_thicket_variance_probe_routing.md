@@ -12,7 +12,7 @@
 
 ## Summary
 
-Plan 121 already implemented weight-space RandOpt (`src/pruners/randopt.rs`, synthetic). This plan implements the **creative fusion**: sample K cheap decoding-config-perturbed probes per query, measure their disagreement (decomposed into format vs reasoning), and emit a `TvpSignal` that the existing `InferenceRouter` consumes as a new tier-promotion/demotion input — distinct from trust, RV, critical_entropy, lodestar, breakeven, modality, QPS.
+Plan 121 already implemented weight-space RandOpt (`crates/katgpt-pruners/src/randopt.rs`, synthetic). This plan implements the **creative fusion**: sample K cheap decoding-config-perturbed probes per query, measure their disagreement (decomposed into format vs reasoning), and emit a `TvpSignal` that the existing `InferenceRouter` consumes as a new tier-promotion/demotion input — distinct from trust, RV, critical_entropy, lodestar, breakeven, modality, QPS.
 
 **Why modelless first:** Probes perturb inference-time knobs (temperature, top-p, drafter seed, KV noise, mask bits). No weights change, no training, no LoRA. Direct constraint 1, 4, 7, 9 satisfaction.
 
@@ -56,7 +56,7 @@ TVP runs after critical-entropy gate, before breakeven amortization. Order ensur
 ### Phase 1: Core Types & Signal Extraction
 
 - [x] **T1: `TvpConfig` + `TvpSignal` types**
-  - File: `src/pruners/thicket_variance_probe.rs`
+  - File: `crates/katgpt-pruners/src/thicket_variance_probe.rs`
   - `TvpConfig { probe_count: u8, temperature_delta: f32, top_p_delta: f32, kv_noise_sigma: f32, mask_flip_count: u8, promote_at: f32, demote_at: f32, ema_alpha: f32 }`
   - `TvpSignal { reasoning_disagreement: f32, format_disagreement: f32, logit_kl: f32, probe_count_used: u8 }`
   - Defaults: K=4, ΔT=0.1, Δp=0.05, σ_kv=0.0, mask_flip=0, promote_at=0.6, demote_at=0.2, α=0.05
@@ -69,7 +69,7 @@ TVP runs after critical-entropy gate, before breakeven amortization. Order ensur
   - `format_hash` = BLAKE3-hash of canonicalized form (lowercased, alphanumeric-only) — for format-vs-reasoning decomposition
 
 - [x] **T3: `TvpAggregator` — variance computation**
-  - File: `src/pruners/thicket_variance_probe.rs`
+  - File: `crates/katgpt-pruners/src/thicket_variance_probe.rs`
   - `fn aggregate(&self, probes: &[ProbeOutput]) -> TvpSignal`
   - `answer_disagreement = 1.0 - max_class_share(token_ids)` — paper's δ(m) analog in decoding space
   - `format_disagreement = 1.0 - max_format_hash_share(format_hashes)` — Section 8 decomposition
@@ -137,7 +137,7 @@ TVP runs after critical-entropy gate, before breakeven amortization. Order ensur
 ### Phase 5: CollapseDetector Composition
 
 - [x] **T12: Add `observe_tvp_disagreement()` to `S2FCollapseDetector`** ✅ (Plan 267 T12 — landed 2026-06-14)
-  - File: `src/pruners/collapse_detector.rs`
+  - File: `crates/katgpt-pruners/src/collapse_detector.rs`
   - Inverse signal of hesitation: high disagreement → expand budget; high hesitation → contract
   - Optional field `tvp_expand_budget_delta: u32` added to `S2FCollapseDetector` when feature on
   - Composes with existing EMA self-learning
@@ -151,14 +151,14 @@ TVP runs after critical-entropy gate, before breakeven amortization. Order ensur
 ### Phase 6: Freeze/Thaw Persistence
 
 - [x] **T13: `TvpSignalFrozen` struct (16 bytes, repr(C))**
-  - File: `src/pruners/thicket_variance_probe.rs`
+  - File: `crates/katgpt-pruners/src/thicket_variance_probe.rs`
   - `magic: [u8; 4] = *b"TVP1"`, `version: u32 = 1`
   - `promote_at_ema: f32`, `demote_at_ema: f32`, `ema_alpha: f32`, `probe_count_bandit_state: u32`
   - BLAKE3 hash for provenance
   - `validate()` checks magic + version
 
 - [x] **T14: Wire into existing freeze/thaw infrastructure** _(roundtrip test passes; direct field override via public setters; full save_frozen/load_frozen plumbing deferred until T9 lands)_
-  - Reuse `src/pruners/freeze.rs` (`save_frozen`, `load_frozen`)
+  - Reuse `crates/katgpt-pruners/src/freeze.rs` (`save_frozen`, `load_frozen`)
   - Test: roundtrip preserves thresholds, EMA state, bandit arm
 
 ### Phase 7: Feature Gate & Wiring
@@ -180,7 +180,7 @@ TVP runs after critical-entropy gate, before breakeven amortization. Order ensur
   - `test_reasoning_disagreement_subtracts_format` — net substantive disagreement
   - `test_logit_kl_zero_for_identical` — identical logits → KL = 0
   - `test_logit_kl_positive_for_divergent` — divergent logits → KL > 0
-  - File: `src/pruners/thicket_variance_probe.rs` (inline `mod tests`)
+  - File: `crates/katgpt-pruners/src/thicket_variance_probe.rs` (inline `mod tests`)
 
 - [x] **T18: Unit tests — threshold adaptation** _(covered in T17)_
   - `test_promote_threshold_raises_on_wrong_high_disagreement`

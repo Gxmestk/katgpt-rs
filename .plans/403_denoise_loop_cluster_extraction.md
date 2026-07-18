@@ -22,8 +22,8 @@ next candidate:
 ### Investigation that refined the scope (the "verify the blocker" lesson)
 
 The inherited "BLOCKED on `crate::dllm_solver::*`" claim was **stale**. The
-helpers are NOT in root `src/dllm_solver.rs` (no such file). They live in
-**katgpt-core** at `crates/katgpt-core/src/dllm_solver.rs`, gated
+helpers are NOT in root `crates/katgpt-core/src/dllm_solver.rs` (no such file). They live in
+**katgpt-core** at `crates/katgpt-core/crates/katgpt-core/src/dllm_solver.rs`, gated
 `#[cfg(feature = "critical_interval_gate")]` (see katgpt-core's
 `src/lib.rs:1320-1321`). Root re-exports them:
 
@@ -66,7 +66,7 @@ leave consumers in root).
 
 ## (2) Plan
 
-### T1 — New file `crates/katgpt-forward/src/denoise_loops.rs`
+### T1 — New file `crates/katgpt-forward/crates/katgpt-forward/src/denoise_loops.rs`
 
 Module gated `dllm` (mirrors `forward_positions` from Plan 402 — the loops
 depend on `BidirectionalContext` + `forward_bidirectional_positions_into`
@@ -144,7 +144,7 @@ original locations.
 
 ## (4) Tasks
 
-- [x] T1 Create `crates/katgpt-forward/src/denoise_loops.rs` (722 LOC)
+- [x] T1 Create `crates/katgpt-forward/crates/katgpt-forward/src/denoise_loops.rs` (722 LOC)
 - [x] T2 Extend katgpt-forward `Cargo.toml` `rcd_residual` feature (forward `katgpt-core/critical_interval_gate`)
 - [x] T2b Extend katgpt-forward `Cargo.toml` `d2f_3sr_warm_start` feature (forward `katgpt-core/d2f_3sr_warm_start` + imply local `rcd_residual`)
 - [x] T3 Register module + re-export in katgpt-forward `lib.rs`
@@ -158,7 +158,7 @@ original locations.
 | File | Before | After | Delta |
 |---|---:|---:|---:|
 | `src/dllm.rs` | 3659 | 3008 | **-651** |
-| `crates/katgpt-forward/src/denoise_loops.rs` | — | 722 | +722 |
+| `crates/katgpt-forward/crates/katgpt-forward/src/denoise_loops.rs` | — | 722 | +722 |
 
 Cumulative root reduction (Plans 399–403): **-2687 LOC**.
 

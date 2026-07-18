@@ -32,7 +32,7 @@ Session-level Out-Of-Distribution (OOD) detection using signals that already exi
 | File | Change |
 |------|--------|
 | `src/pruners/delta_mem/state.rs` | Add `mean_prediction_error()` method |
-| `src/pruners/review_metrics.rs` | Add entropy anomaly fields + methods + Display |
+| `crates/katgpt-core/src/pruners/review_metrics.rs` | Add entropy anomaly fields + methods + Display |
 | `tests/` | New test for entropy anomaly tracking |
 
 ### Signal Design

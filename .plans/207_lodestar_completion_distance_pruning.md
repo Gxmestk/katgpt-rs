@@ -48,7 +48,7 @@ adaptive-CoT budget  ∝ d(root)   +   CPU/GPU route on (d, budget, bw-pressure)
 - [x] T2. `CompletionHorizon: ConstraintPruner` in `katgpt-core/src/traits.rs` —
   `min_completion_distance()`/`singular_span_len()`, both default-0; admissibility contract
   documented; `impl … for NoPruner`. Re-exported via `speculative::types`. Zero-overhead opt-in. ✅
-- [x] T3. `src/pruners/lodestar.rs`: `LodestarAutomaton` + builder; reverse-relaxation distance
+- [x] T3. `crates/katgpt-pruners/src/lodestar.rs`: `LodestarAutomaton` + builder; reverse-relaxation distance
   precompute; **also** precomputes singular-span lengths. Branch-free O(1) lookups. ✅
 - [x] T4. `LodestarPruner` implements `ConstraintPruner` (+ `batch_is_valid` amortized) and
   `CompletionHorizon`. Optional `with_budget` constructor. ✅
@@ -69,7 +69,7 @@ adaptive-CoT budget  ∝ d(root)   +   CPU/GPU route on (d, budget, bw-pressure)
 ### Phase 3 — Adaptive CoT + routing (constraints #4, #7)
 - [x] T9. Adaptive-CoT: scale `tree_budget` by `f(d(root))`; learn the multiplier with an EMA
   bandit (reuse `pruners::bandit`). Self-learning, inference-only — no LLM training. ✅
-  `AdaptiveCoTBudget` in `src/pruners/lodestar_cot.rs` — 4 distance bins × 6 arms, EMA update,
+  `AdaptiveCoTBudget` in `crates/katgpt-pruners/src/lodestar_cot.rs` — 4 distance bins × 6 arms, EMA update,
   8/8 tests PASS.
 - [x] T10. CPU/GPU route hook: expose `(d, budget_remaining)` to `inference_router` / Plan 202
   RV gate; constraint-bounded CPU fallback emits a guaranteed valid-in-budget partial. ✅

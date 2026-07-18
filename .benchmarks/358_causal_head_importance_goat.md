@@ -113,12 +113,12 @@ passthrough. `CalibrationMode::AttentionMass` is the `#[default]` variant.
 | `crates/katgpt-core/src/causal_head_importance/{mod,readout,patching,scorer,fusion}.rs` | New module — 5 files, 27 unit tests |
 | `crates/katgpt-core/Cargo.toml` | `causal_head_importance = []` feature + `causal_head_importance_g1` test registration |
 | `crates/katgpt-core/src/lib.rs` | Module registration + re-exports (incl. `CalibrationMode`) |
-| `crates/katgpt-types/src/enums.rs` | `CalibrationMode` enum + `RtTurboConfig.calibration_mode` field |
+| `crates/katgpt-types/crates/katgpt-types/src/enums.rs` | `CalibrationMode` enum + `RtTurboConfig.calibration_mode` field |
 | `crates/katgpt-types/src/lib.rs` | `CalibrationMode` re-export |
 | `crates/katgpt-core/tests/causal_head_importance_g1.rs` | G1 correctness gate (5 tests) |
 | `tests/causal_head_importance_g2.rs` | G2 bystander discrimination gate (3 tests, root tests/) |
 | `benches/causal_head_importance_g3.rs` | G3 latency bench (root benches/) |
-| `src/rt_turbo/calibration.rs` | `calibrate_from_causal_scores` sibling fn |
+| `crates/katgpt-speculative/src/rt_turbo/calibration.rs` | `calibrate_from_causal_scores` sibling fn |
 | `src/rt_turbo/mod.rs` | Re-export `calibrate_from_causal_scores` |
 | `src/rt_turbo/forward.rs` | Fix struct literal (add `..Default::default()`) |
 | `tests/test_126_rt_turbo_goat.rs` | Fix struct literal |

@@ -100,7 +100,7 @@ under a shared-spherical-covariance assumption). It is:
 - **Freeze/thaw compatible** — output is a `FutureBehaviorProbe` artifact with
   an embedded BLAKE3 hash (G7).
 
-Shipped in `crates/katgpt-pruners/src/fpcg_modelless.rs` behind the
+Shipped in `crates/katgpt-pruners/crates/katgpt-pruners/src/fpcg_modelless.rs` behind the
 `future_probe` feature. 8 unit tests verify construction correctness, error
 paths, determinism, and noise robustness.
 
@@ -161,7 +161,7 @@ issue 032. The methodology for that run is documented below unchanged.
 
 - **T4.1-real — Test corpus.** A prompt set with binary-behavior ground-truth labels. Simplest per Plan 292 Risk #1: **refusal** (binary, large effect size). Generate labels via the paper's resampling recipe: **S=10 base responses per prompt**, each split into sentences, then **M=10 completions re-sampled per sentence prefix** to measure the empirical future-behavior probability `B̄(p_{i←r_{j:k}})`. Reference pipeline: <https://github.com/kortukov/future_probes> (`behavior_distribution_analysis.py`). Open behaviors to consider: refusal, prompt-injection, sycophancy (free-form) and myopia/wealth/survival (MCQ).
 - **T4.2-real — Trained probe.** Logistic regression on `(mid-layer residual-stream activation at sentence-end position, future-behavior-probability label)` pairs. Single layer (the paper shows linear probes capture most of the signal; MLP adds little). Save as the `FPPB` binary format via `FutureBehaviorProbe::save_to_bytes()` with the BLAKE3 manifest hash embedded (G7 already enforces this on load). **Lives in `riir-train`** or a one-off `scripts/train_future_probe.py` — never in `katgpt-rs` (modelless constraint).
-- **Engine wiring.** `ActivationExtractor` impl backed by a real model forward pass (likely `src/transformer.rs` / `inference_backend.rs`), exposing the residual stream at `probe.layer()` at the sentence-end token. Not currently wired (Phase 3 ships the trait + a stub).
+- **Engine wiring.** `ActivationExtractor` impl backed by a real model forward pass (likely `crates/katgpt-percepta/src/transformer.rs` / `inference_backend.rs`), exposing the residual stream at `probe.layer()` at the sentence-end token. Not currently wired (Phase 3 ships the trait + a stub).
 
 #### G1-real — Steering strength (≥ 30pp behavior shift)
 
@@ -256,10 +256,10 @@ Plus the Pareto comparison: FPCG is Pareto-optimal with a unique zero-PPL-cost a
 | Component | Path | Tests |
 |-----------|------|-------|
 | `FeatureClass` enum + `ScreeningPruner::feature_class()` default | `crates/katgpt-core/src/traits.rs` | 4 |
-| `feature_class.rs` re-export shim | `src/pruners/feature_class.rs` | (same 4) |
-| `EmotionDirections::feature_class()` explicit override | `src/pruners/emotion_vector.rs` | inherited |
-| `FutureBehaviorProbe` primitive (Phase 2) | `src/pruners/future_probe.rs` | 13 |
-| `FpcgSelector` + traits + default generator (Phase 3) | `src/pruners/fpcg_selector.rs` | 12 |
+| `feature_class.rs` re-export shim | `crates/katgpt-pruners/src/feature_class.rs` | (same 4) |
+| `EmotionDirections::feature_class()` explicit override | `crates/katgpt-pruners/src/emotion_vector.rs` | inherited |
+| `FutureBehaviorProbe` primitive (Phase 2) | `crates/katgpt-pruners/src/future_probe.rs` | 13 |
+| `FpcgSelector` + traits + default generator (Phase 3) | `crates/katgpt-pruners/src/fpcg_selector.rs` | 12 |
 | **Phase 4 G5+G7 integration gate (new)** | `tests/fpcg_goat_gate.rs` | 3 (G5, G7, feature-class sanity) |
 | **Phase 4 G6 latency bench (new)** | `benches/fpcg_probe_forecast_bench.rs` | — (bench, not test) |
 | Examples | `examples/future_probe_01_basic.rs`, `examples/fpcg_01_basic.rs` | — |

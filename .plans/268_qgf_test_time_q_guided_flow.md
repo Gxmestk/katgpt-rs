@@ -103,7 +103,7 @@ At generation step t with prefix p_t and drafter velocity v_t:
 - [x] Doc cross-ref to `.research/236_QGF_Test_Time_Q_Guided_Flow.md` §F3
 
 #### T2: FirstOrderProjector (F2)
-- [x] Create `katgpt-core/src/qgf/projector.rs`
+- [x] Create `katgpt-core/crates/katgpt-core/src/qgf/projector.rs`
 - [x] Implement `project_one_step` for discrete chains
 - [x] Implement batch variant `project_batch` using `generate_batch`
 - [x] Unit test: known prefix → deterministic projection (mock generator)
@@ -145,7 +145,7 @@ At generation step t with prefix p_t and drafter velocity v_t:
 ### Phase 2: QGuidedDrafter (F1) — the core fusion
 
 #### T4: QGuidedDrafter struct
-- [x] Create `katgpt-core/src/qgf/drafter.rs`
+- [x] Create `katgpt-core/crates/katgpt-core/src/qgf/drafter.rs`
 - [x] Implement `QGuidedDrafter<G, O>` wrapping any `SpeculativeGenerator` + `QGradientOracle`
   ```rust
   pub struct QGuidedDrafter<G, O> {
@@ -187,7 +187,7 @@ At generation step t with prefix p_t and drafter velocity v_t:
 
 #### T6: NFCoT FlowScore fusion (unblock Plan 229) — ✅ COMPLETE
 - [x] Extend `NfFlowScore` (Plan 229) to optionally consume Q-gradient guidance
-  - **New API (in `src/speculative/nf_flow.rs`):**
+  - **New API (in `crates/katgpt-speculative/src/nf_flow.rs`):**
     - `score_with_qgf(marginals, selected, gradient, guidance_weight) -> f32`
       — applies the QGF bonus at the *last* position (the projection point).
     - `score_with_qgf_at(marginals, selected, gradient, projection_pos, weight) -> f32`
@@ -202,7 +202,7 @@ At generation step t with prefix p_t and drafter velocity v_t:
   - **Optional by construction:** when `guidance_weight == 0.0` or `gradient`
     is empty, the QGF-aware score is byte-identical to `flow_score`.
 - [x] When `qgf_drafter` + `nf_flow_score` both enabled: QGF steers generation, NFCoT scores the result
-  - **New module `src/speculative/nf_flow_qgf.rs`** (Plan 268 T6).
+  - **New module `crates/katgpt-speculative/src/nf_flow_qgf.rs`** (Plan 268 T6).
   - **`NfQgfDrafter<G, O>`** composes `QGuidedDrafter<G, O>` (Plan 268 F1)
     with `NfFlowScore` (Plan 229). Pipeline:
     1. `drafter.generate_guided(condition, rng, step)` → candidates.
@@ -240,7 +240,7 @@ At generation step t with prefix p_t and drafter velocity v_t:
   - `cargo test --features nf_flow_score --test nf_flow_goat` → 7 pass, 0 fail
   - `cargo test -p katgpt-core --features "qgf,qgf_drafter,qgf_adaptive" --lib` → 310 pass, 0 fail
   - Clippy clean on all new/modified files (pre-existing `set_len` error in
-    `src/cumprodsum.rs:167` is unrelated)
+    `crates/katgpt-core/src/cumprodsum.rs:167` is unrelated)
 
 ---
 
@@ -430,7 +430,7 @@ At generation step t with prefix p_t and drafter velocity v_t:
 
 #### T12: Cross-feature integration tests
 - [x] QGF + NFCoT FlowScore (Plan 229) on Sudoku
-  ✅ Already DONE (Phase 2 T6, in root `src/speculative/nf_flow_qgf.rs`). The
+  ✅ Already DONE (Phase 2 T6, in root `crates/katgpt-speculative/src/nf_flow_qgf.rs`). The
   QGF+NFCoT synergy is tested via `test_sudoku_like_qgf_nfcoot_synergy` etc.
 - [-] QGF + ThoughtFold (Plan 195) — guide, then fold, then re-guide
   DEFERRED — ThoughtFold (Plan 195) is not implemented in katgpt-core (it's a

@@ -43,7 +43,7 @@ graph TD
 
 ### Phase 1: Acceptance Surrogate
 
-- [x] T1: Define `AcceptanceSurrogate` struct in `src/speculative/caddtree_budget.rs`
+- [x] T1: Define `AcceptanceSurrogate` struct in `crates/katgpt-speculative/src/caddtree_budget.rs`
   - Input: per-depth marginal distributions `Vec<&[f32]>`
   - Compute: geometric acceptance estimate `Π(1 - top_k_prob_i)` for each depth
   - Output: expected accepted length `E[accept_len]` as f32
@@ -67,7 +67,7 @@ graph TD
 
 ### Phase 2: Online Latency Estimator
 
-- [x] T5: Define `LatencyEstimator` struct in `src/speculative/caddtree_budget.rs`
+- [x] T5: Define `LatencyEstimator` struct in `crates/katgpt-speculative/src/caddtree_budget.rs`
   - EMA of draft time and verify time per round
   - Alpha parameter for EMA smoothing (default 0.1)
   - papaya lock-free concurrent updates (for multi-thread verify)
@@ -92,7 +92,7 @@ graph TD
 
 ### Phase 3: Unimodal Budget Search
 
-- [x] T9: Define `BudgetSelector` struct in `src/speculative/caddtree_budget.rs`
+- [x] T9: Define `BudgetSelector` struct in `crates/katgpt-speculative/src/caddtree_budget.rs`
   - Combines `AcceptanceSurrogate` + `LatencyEstimator`
   - `select_budget()` → optimal B* for current round
 

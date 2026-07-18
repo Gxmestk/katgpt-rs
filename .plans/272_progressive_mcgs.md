@@ -48,7 +48,7 @@ Goal: compiling, tested, feature-gated module exposing the public API surface (g
   - [x] `fn branch_selection_entropy(selection_counts) -> f32` — Shannon entropy, diagnostic only
   - [x] `fn effective_branch_count(selection_counts) -> f32` — `exp(H)` per paper Figure 3
   - [x] `RngLite` trait + `fastrand::Rng` adapter (decouples from specific RNG crate)
-- [x] **T1.7** Implement `src/progressive_mcgs/stagnation.rs`:
+- [x] **T1.7** Implement `crates/katgpt-speculative/src/progressive_mcgs/stagnation.rs`:
   - [x] `StagnationGate { branch_threshold, global_threshold, ... }` (defaults: 3, 6)
   - [x] `BranchStagnationState { since_last_improve }` + `GlobalStagnationState { since_last_best }`
   - [x] `observe_expansion(branch, reward)` — snapshots BEFORE update (Plan 272 §4 risk)
@@ -59,7 +59,7 @@ Goal: compiling, tested, feature-gated module exposing the public API surface (g
   - [x] `intra_branch_history(graph, node, k)` — walks `primary_parent` within same branch
   - [x] `cross_branch_top_n(graph, current_branch, n)` — top-N foreign nodes by Q-value
   - [x] `multi_branch_aggregate(graph, per_branch)` — union of top trajectories per branch
-- [x] **T1.9** Implement `src/progressive_mcgs/uct.rs`:
+- [x] **T1.9** Implement `crates/katgpt-speculative/src/progressive_mcgs/uct.rs`:
   - [x] `exploration_constant(t_norm, c_0, c_min, switch_start, switch_end)` — piecewise decay `√2 → 0.5`
   - [x] `uct_select_child(graph, parent, c)` — paper Eq. 3 with `ε` smoothing, zero-alloc
   - [x] `uct_descend_to_leaf(graph, root, c)` — iterative descent
@@ -98,7 +98,7 @@ Goal: audit the existing `BanditPruner` / `ConstraintPruner` / `EpisodePruner` s
 
 - [x] **T2.1** ~~Extract shared UCT math into `src/bandit/uct_math.rs`.~~ **REJECTED.** Audit shows the two formulas are different UCB1 variants: `BanditPruner` uses classic per-arm UCB1 `Q(a) + √(2·ln(N)/n(a))` with **fixed √2** coefficient (see `bandit.rs:257-271`), while `progressive_mcgs::uct` uses MCTS UCT `Q + c(t)·√(ln(N_v+1)/(N_i+ε))` with **time-decayed c(t)**, parent visits, and ε smoothing (see `progressive_mcgs/uct.rs:91-94`). The shared math is a single `(x.ln()/y).sqrt()` line — extracting adds indirection for zero DRY benefit. Document the divergence instead.
 - [x] **T2.2** ~~Expose operators as `ConstraintPruner` impls.~~ **REJECTED.** `ConstraintPruner::is_valid(depth, token_idx, parent_tokens) -> bool` (see `crates/katgpt-core/src/traits.rs:37-45`) is a **token-stream validator** — it gates drafted tokens at token positions. `progressive_mcgs` operators (`intra_branch_history`, `cross_branch_top_n`, `multi_branch_aggregate`) are **graph-walkers that produce reference sets** over search nodes with arbitrary payload. Forcing them through `ConstraintPruner` would be type-system violence — different domain, different lifetime, different identity. A `ReferenceAwarePruner` sub-trait would be over-engineering for a single consumer. Document the layering boundary in `mod.rs` instead.
-- [x] **T2.3** ~~Reuse `EpisodePruner` reward-history API for `branch_best`.~~ **REJECTED.** `EpisodePruner` exists at `src/pruners/episode_pruner.rs` (Plan 206, EGCS) but it does **prompt-pattern → constraint synthesis** — it looks up similar prompts in an episode DB and injects structural-diff constraints. The stagnation gate's `branch_best: Option<Reward>` snapshot is **Q-value tracking** (per-branch best reward classification for stagnation counter reset). Different domain — `EpisodePruner` doesn't expose a `branch_best(branch) -> Option<Reward>` API because that's not what it tracks. No reuse possible.
+- [x] **T2.3** ~~Reuse `EpisodePruner` reward-history API for `branch_best`.~~ **REJECTED.** `EpisodePruner` exists at `crates/katgpt-pruners/src/episode_pruner.rs` (Plan 206, EGCS) but it does **prompt-pattern → constraint synthesis** — it looks up similar prompts in an episode DB and injects structural-diff constraints. The stagnation gate's `branch_best: Option<Reward>` snapshot is **Q-value tracking** (per-branch best reward classification for stagnation counter reset). Different domain — `EpisodePruner` doesn't expose a `branch_best(branch) -> Option<Reward>` API because that's not what it tracks. No reuse possible.
 - [x] **T2.4** Verify `EntropyGatedScheduler` doesn't duplicate `BreakevenComplexityRouter` (R218). **CONFIRMED DOC-ONLY.** `BreakevenComplexityRouter` is **not yet implemented** in code — only Research 218 exists at `.research/218_Breakeven_Complexity_Inference_Router.md`, with Plan 250 (`.plans/250_breakeven_inference_routing.md`) marked "Active". The existing layering note in `mod.rs:43-45` is accurate: `EntropyGatedScheduler` picks UCT/Elite within a search; `BreakevenComplexityRouter` will route across plasma/hot/warm tiers. They compose, don't conflict. No code change needed.
 - [x] **T2.5** Add `#[doc(alias = "mcts")]`, `#[doc(alias = "graph_search")]`, `#[doc(alias = "mcgs")]` to module for discoverability.
 - [x] **T2.6** Clippy clean on `progressive_mcgs` module.

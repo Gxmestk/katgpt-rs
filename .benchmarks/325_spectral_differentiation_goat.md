@@ -141,5 +141,5 @@ Environment: macOS arm64 (Apple Silicon), release profile (`cargo bench` default
 - **Plan:** [325_spectral_differentiation_primitive.md](../.plans/325_spectral_differentiation_primitive.md)
 - **Research:** [307_FNO_Practical_Perspective_Spectral_Primitives_Survey.md](../.research/307_FNO_Practical_Perspective_Spectral_Primitives_Survey.md) (§3 candidate plan #2)
 - **Sibling (Plan 323):** [323_fourier_continuation_primitive.md](../.plans/323_fourier_continuation_primitive.md) — chain FC → diff for non-periodic inputs
-- **General case (DEC):** `crates/katgpt-core/src/dec/operators.rs::exterior_derivative` — cell-complex derivative operator
+- **General case (DEC):** `crates/katgpt-core/crates/katgpt-dec/src/operators.rs::exterior_derivative` — cell-complex derivative operator
 - **Source paper:** [arXiv:2511.05963](https://arxiv.org/abs/2511.05963) — Duruisseaux/Kossaffi/Anandkumar, *FNO Explained: A Practical Perspective*

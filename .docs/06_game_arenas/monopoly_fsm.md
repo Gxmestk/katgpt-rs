@@ -388,10 +388,10 @@ Key methods: `owns_complete_set()`, `count_in_group()`, `owned_in_group()`, `net
 
 | File | Lines | Purpose |
 |------|-------|--------|
-| `src/pruners/monopoly/mod.rs` | 1052 | Module index: enums, components, resources, events, constants, board data, 26 tests |
-| `src/pruners/monopoly/board.rs` | 738 | Board initialization, 40-square `street_data()`, card decks, group helpers, 13 tests |
-| `src/pruners/monopoly/systems.rs` | 1494 | Game systems: `init_world`, `execute_turn`, `run_game`, rent/build/liquidation, 13 tests |
-| `src/pruners/monopoly/players.rs` | 1977 | `MonopolyPlayer` trait + 4 implementations + shared AI functions, 38 tests |
+| `crates/katgpt-pruners/src/monopoly/mod.rs` | 1052 | Module index: enums, components, resources, events, constants, board data, 26 tests |
+| `crates/katgpt-pruners/src/monopoly/board.rs` | 738 | Board initialization, 40-square `street_data()`, card decks, group helpers, 13 tests |
+| `crates/katgpt-pruners/src/monopoly/systems.rs` | 1494 | Game systems: `init_world`, `execute_turn`, `run_game`, rent/build/liquidation, 13 tests |
+| `crates/katgpt-pruners/src/monopoly/players.rs` | 1977 | `MonopolyPlayer` trait + 4 implementations + shared AI functions, 38 tests |
 | `examples/monopoly_01_arena.rs` | 161 | Headless 100-game tournament runner |
 | `examples/monopoly_02_tui.rs` | 1125 | Animated ratatui TUI replay with three-panel layout |
 | `examples/monopoly_03_hl_proof.rs` | 243 | 1000-game HL proof experiment with stats |

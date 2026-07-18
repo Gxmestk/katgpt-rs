@@ -17,7 +17,7 @@ Distill OSSM-PINN's oscillatory state-space principles into katgpt-rs as modelle
 
 ### Phase 1: FreqBandit — GOAT, Default On
 
-- [x] Implement `FrequencyBandit` in `src/freq_bandit.rs`
+- [x] Implement `FrequencyBandit` in `crates/katgpt-pruners/src/freq_bandit.rs`
   - Arms: {low_freq, mid_freq, high_freq} — pre-defined temporal frequency bands
   - Reward: acceptance_rate × latency_improvement from speculative decode
   - Uses existing `BanditPruner` infrastructure
@@ -51,7 +51,7 @@ Distill OSSM-PINN's oscillatory state-space principles into katgpt-rs as modelle
 
 ### Phase 2: OscKV — Conditional, Opt-In ✅
 
-- [x] Implement `OscKVCache` struct in `src/osc_kv.rs`
+- [x] Implement `OscKVCache` struct in `crates/katgpt-kv/src/osc_kv.rs`
   - `OscKVLayer { y: Vec<f32>, z: Vec<f32>, omega_sq: Vec<f32>, beta: Vec<f32> }`
   - IMEX discretization (symplectic, energy-preserving)
   - Bandit-learned ω from inference-time feedback
@@ -73,7 +73,7 @@ Distill OSSM-PINN's oscillatory state-space principles into katgpt-rs as modelle
 
 ### Phase 3: ModalSpec — Experimental — ✅ Implemented (experimental, NOT default)
 
-- [x] Implement LinOSS cell in `crates/katgpt-core/src/linoss.rs`
+- [x] Implement LinOSS cell in `crates/katgpt-core/crates/katgpt-core/src/linoss.rs`
   - `LinOSSCell { omega_sq: Vec<f32>, beta: Vec<f32> }`
   - `LinOSSState { y: Vec<f32>, z: Vec<f32> }`
   - `imex_step(state, forcing, dt) -> LinOSSState`

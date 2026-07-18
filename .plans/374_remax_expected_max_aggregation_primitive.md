@@ -3,7 +3,7 @@
 **Date:** 2026-07-03
 **Research:** [katgpt-rs/.research/373_ReMax_Expected_Max_Retry_Aggregation.md](../.research/373_ReMax_Expected_Max_Retry_Aggregation.md)
 **Source paper:** [arxiv:2606.00151](https://arxiv.org/pdf/2606.00151) — Nishimori et al. ICML 2026, "Emergence of Exploration in Policy Gradient RL via Retrying"
-**Target:** `katgpt-rs/src/pruners/remax.rs` (new module) + Cargo feature `remax_aggregation`
+**Target:** `katgpt-rs/crates/katgpt-core/src/pruners/remax.rs` (new module) + Cargo feature `remax_aggregation`
 **Status:** Phase 5 COMPLETE (2026-07-03). All gates PASS. **NO modelless GOAT** — keep opt-in. G2 finding: ReMax EI selection = Greedy (by monotonicity theorem). Exploration is training-time (RePPO) → riir-train. See `.benchmarks/374_remax_goat.md`.
 
 ---
@@ -26,12 +26,12 @@ Ship the closed-form ReMax aggregation operator (`expected_max_over_m`) and Expe
   - Added `remax_aggregation = []` to `katgpt-core/Cargo.toml` (opt-in, NOT in `default`)
   - Added `remax_aggregation = ["katgpt-core/remax_aggregation"]` forwarding to root `Cargo.toml`
   - Added entry to README.md "Opt-In & Gated Features" table
-  - **Location note:** placed in `katgpt-core/src/pruners/remax.rs` (not root `src/pruners/`),
+  - **Location note:** placed in `katgpt-core/crates/katgpt-core/src/pruners/remax.rs` (not root `src/pruners/`),
     because katgpt-core is the only crate that ships to crates.io and riir-ai depends on
     it non-optionally. Matches `active_state.rs` pattern (zero-dep pruner in katgpt-core
     for downstream consumption).
 
-- [x] **T1.2** Create `katgpt-core/src/pruners/remax.rs` with the core functions
+- [x] **T1.2** Create `katgpt-core/crates/katgpt-core/src/pruners/remax.rs` with the core functions
   - `pub fn expected_max_over_m(pi: &[f32], q: &[f32], m: f32) -> f32` — Eq 4, scalar
   - `pub fn expected_improvement(r: f32, pi: &[f32], q: &[f32], m: f32) -> f32` — Eq 10, scalar
   - `pub fn expected_improvement_per_action(pi: &[f32], q: &[f32], m: f32) -> Vec<f32>` — Q_plus for RePPO baseline

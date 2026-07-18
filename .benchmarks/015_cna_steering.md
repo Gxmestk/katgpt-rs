@@ -104,8 +104,8 @@ Layer distribution when signal injected only in layers 4-5:
 
 ### Implementation
 
-- Discovery: `cna_discover()` in `src/pruners/cna.rs`
-- Modulation: `cna_modulate()` forward hook in `src/transformer.rs`
+- Discovery: `cna_discover()` in `crates/katgpt-pruners/src/cna.rs`
+- Modulation: `cna_modulate()` forward hook in `crates/katgpt-percepta/src/transformer.rs`
 - Feature gate: `cna_steering = ["bandit"]`
 - Game pairs: `GoContrastivePairs`, `BomberContrastivePairs`, `FftContrastivePairs`
 - GOAT proof: `tests/bench_cna_steering_goat.rs`

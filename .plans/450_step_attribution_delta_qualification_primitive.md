@@ -5,7 +5,7 @@
 **Private guide:** [riir-ai/.research/313_Step_Level_Fault_Attribution_Commit_Gate_Guide.md](../../riir-ai/.research/313_Step_Level_Fault_Attribution_Commit_Gate_Guide.md)
 **Runtime wiring:** [riir-ai/.plans/313_step_attribution_branch_wiring.md](../../riir-ai/.plans/313_step_attribution_branch_wiring.md)
 **Source paper:** [arXiv:2606.01311](https://arxiv.org/abs/2606.01311) — SkillAdaptor, Yu et al. 2026
-**Target:** `crates/katgpt-pruners/src/step_attribution_qualifier.rs` (new module) + Cargo feature `step_attribution_qualifier`
+**Target:** `crates/katgpt-pruners/crates/katgpt-pruners/src/step_attribution_qualifier.rs` (new module) + Cargo feature `step_attribution_qualifier`
 **Status:** ✅ COMPLETE (Phases 1-5 done; Phase 4 T4.1 done 2026-07-06; T4.2 deferred per plan)
 
 ---
@@ -24,7 +24,7 @@ This primitive does NOT fit a transformer stack slot (attention/KV/sampling/spec
 
 ### Tasks
 
-- [x] **T1.1** Create `crates/katgpt-pruners/src/step_attribution_qualifier.rs` behind feature `step_attribution_qualifier`. Module doc references Plan 381 + Research 381 + SkillAdaptor arXiv:2606.01311 eq. 8.
+- [x] **T1.1** Create `crates/katgpt-pruners/crates/katgpt-pruners/src/step_attribution_qualifier.rs` behind feature `step_attribution_qualifier`. Module doc references Plan 381 + Research 381 + SkillAdaptor arXiv:2606.01311 eq. 8.
 - [x] **T1.2** Define the core trait + types (generic over state `K`, replay input `I`, score `S`):
 
 ```rust

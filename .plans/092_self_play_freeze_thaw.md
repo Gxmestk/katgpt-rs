@@ -83,7 +83,7 @@ The `thaw()` creates a **fresh** player (no transient state) with pre-loaded ban
 
 ### Phase 3: Disk I/O Helpers
 
-A shared module `src/pruners/freeze.rs` with:
+A shared module `crates/katgpt-pruners/src/freeze.rs` with:
 - `fn save_frozen<T>(path: &Path, data: &T) -> Result<(), String>` — raw bytes write
 - `fn load_frozen<T>(path: &Path) -> Result<T, String>` — raw bytes read + magic/version check
 - Uses `std::fs::write` / `std::fs::read` — zero dependencies, pure `repr(C)` binary.
@@ -140,7 +140,7 @@ Expected improvement with 100 rounds:
 
 | File | Purpose |
 |------|---------|
-| `src/pruners/freeze.rs` | Shared `repr(C)` disk I/O helpers |
+| `crates/katgpt-pruners/src/freeze.rs` | Shared `repr(C)` disk I/O helpers |
 | `examples/bomber_12_self_play_freeze.rs` | Bomber freeze/thaw demo |
 | `examples/go_07_self_play_freeze.rs` | Go freeze/thaw demo |
 
@@ -152,9 +152,9 @@ Expected improvement with 100 rounds:
 | `src/pruners/bomber/mod.rs` | Re-export freeze module |
 | `src/pruners/bomber/players.rs` | Add `freeze()`/`thaw()` to `HLPlayer` |
 | `src/pruners/bomber/g_zero_player.rs` | Add `freeze()`/`thaw()` to `GZeroPlayer` |
-| `src/pruners/go/types.rs` | Add `GoFrozenBandit` + `GoFrozenTemplates` |
-| `src/pruners/go/mod.rs` | Re-export freeze module |
-| `src/pruners/go/players.rs` | Add `freeze()`/`thaw()` to `GoHLPlayer`, `GoGZeroPlayer` |
+| `crates/katgpt-pruners/src/go/types.rs` | Add `GoFrozenBandit` + `GoFrozenTemplates` |
+| `crates/katgpt-pruners/src/go/mod.rs` | Re-export freeze module |
+| `crates/katgpt-pruners/src/go/players.rs` | Add `freeze()`/`thaw()` to `GoHLPlayer`, `GoGZeroPlayer` |
 | `src/pruners/mod.rs` | Add `freeze` module |
 | `tests/test_freeze_thaw.rs` | Round-trip tests |
 | `README.md` | Add freeze/thaw section |

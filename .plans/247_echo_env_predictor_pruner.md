@@ -36,7 +36,7 @@ graph LR
 
 ## Tasks
 
-### T1: Types — `src/speculative/echo_env.rs`
+### T1: Types — `crates/katgpt-speculative/crates/katgpt-speculative/src/echo_env.rs`
 - [x] Define `PredictedOutcome` struct: `{ state_features: Vec<f32>, confidence: f32, entropy: f32 }`
 - [x] Define `EnvPredictorConfig` with λ thresholds, bandit arms, consistency gate params
 - [x] Define `PredictionRecord` for prediction-vs-reality tracking across branches

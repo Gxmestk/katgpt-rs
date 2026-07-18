@@ -41,10 +41,10 @@
 
 | Integration | File | Status |
 |-------------|------|--------|
-| `boundary_precision: f32` on `BorelRegion` | `src/pruners/bfcf_types.rs` | ✅ Phase 2 complete |
-| `precision_smooth_label()` + `BFCP::precision_smooth()` | `src/pruners/bfcf_types.rs` | ✅ Phase 2 complete |
-| `FoldBandit::precision_gated_budget()` | `src/fold/fold_bandit.rs` | ✅ Phase 2 complete |
-| SenseBandit `precision_weighted_reward()` | `crates/katgpt-core/src/sense/bandit.rs` | ✅ Phase 1 complete |
+| `boundary_precision: f32` on `BorelRegion` | `crates/katgpt-pruners/src/bfcf_types.rs` | ✅ Phase 2 complete |
+| `precision_smooth_label()` + `BFCP::precision_smooth()` | `crates/katgpt-pruners/src/bfcf_types.rs` | ✅ Phase 2 complete |
+| `FoldBandit::precision_gated_budget()` | `crates/katgpt-speculative/src/fold/fold_bandit.rs` | ✅ Phase 2 complete |
+| SenseBandit `precision_weighted_reward()` | `crates/katgpt-core/crates/katgpt-ruliology/crates/katgpt-ruliology/src/bandit.rs` | ✅ Phase 1 complete |
 
 ---
 

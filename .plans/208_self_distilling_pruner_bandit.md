@@ -57,7 +57,7 @@ combined_reward = (1 - alpha) * episode_reward + alpha * acceptance_reward
 
 ### Phase 1: Core Implementation
 
-- [x] **T1: Create `src/pruners/self_distilling_bandit.rs`**
+- [x] **T1: Create `crates/katgpt-pruners/src/self_distilling_bandit.rs`**
   - `SelfDistillingConfig` struct with configurable alpha, k, match_threshold
   - `EpisodeRewardComputer` struct with `compute_reward(generated, reference, acceptance) -> f32`
   - `SelfDistillingBandit<P, L>` generic over inner `ScreeningPruner` P and `EpisodeLookup` L
@@ -132,7 +132,7 @@ self_distilling_bandit = ["egcs"]  # Depends on EpisodeLookup + EpisodePruner in
 
 | File | Action | Phase |
 |------|--------|-------|
-| `src/pruners/self_distilling_bandit.rs` | NEW | 1-3 |
+| `crates/katgpt-pruners/src/self_distilling_bandit.rs` | NEW | 1-3 |
 | `src/pruners/mod.rs` | EXTEND | 4 |
 | `Cargo.toml` | EXTEND | 4 |
 | `examples/self_distilling_demo.rs` | NEW | 5 |

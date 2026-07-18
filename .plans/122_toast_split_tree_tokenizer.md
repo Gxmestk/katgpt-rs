@@ -33,7 +33,7 @@ Training/LP optimization deferred to riir-ai plan (model-based, requires corpus 
 
 ## T1: Split Tree Types
 
-File: `katgpt-rs/src/tokenizer/toast_types.rs`
+File: `katgpt-rs/crates/katgpt-tokenizer/src/toast_types.rs`
 
 ```rust
 /// A node in a split tree.
@@ -87,7 +87,7 @@ Key decisions:
 
 ## T2: Split Tree Construction
 
-File: `katgpt-rs/src/tokenizer/toast_builder.rs`
+File: `katgpt-rs/crates/katgpt-tokenizer/src/toast_builder.rs`
 
 Algorithm (from paper Section 2):
 ```
@@ -136,7 +136,7 @@ impl<'a> SplitTreeBuilder<'a> {
 
 ## T3: Recursive Descent Inference
 
-File: `katgpt-rs/src/tokenizer/toast_inference.rs`
+File: `katgpt-rs/crates/katgpt-tokenizer/src/toast_inference.rs`
 
 ```rust
 pub struct ToastTokenizerImpl;

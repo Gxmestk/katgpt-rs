@@ -174,10 +174,10 @@ cargo run --features spechop --example spechop_02_cost_model
 | `src/spechop/types.rs` | SpecHopConfig, HopObservation, SpecOutcome, HopState | 19 |
 | `src/spechop/cost_model.rs` | α/β/p → k\*, RelLat, starvation | 30 |
 | `src/spechop/verifier.rs` | RuleBasedVerifier, token_set_jaccard | 22 |
-| `src/spechop/speculator.rs` | CacheSpeculator, BanditSpeculator | 13 |
-| `src/spechop/window.rs` | SpecWindow thread pool (commit/rollback) | 19 |
+| `crates/katgpt-speculative/src/spechop/speculator.rs` | CacheSpeculator, BanditSpeculator | 13 |
+| `crates/katgpt-speculative/src/spechop/window.rs` | SpecWindow thread pool (commit/rollback) | 19 |
 | `src/spechop/pipeline.rs` | SpecHopPipeline continuous loop | 19 |
-| `src/spechop/hop_tree.rs` | Hop-level DDTree integration | 28 |
+| `crates/katgpt-speculative/src/spechop/hop_tree.rs` | Hop-level DDTree integration | 28 |
 | `tests/test_131_spechop_goat.rs` | 6 GOAT proofs | 6 |
 
 ### Test Statistics
@@ -222,10 +222,10 @@ pub mod spechop;
 | `src/spechop/types.rs` | SpecHopConfig, HopObservation, SpecOutcome, HopState |
 | `src/spechop/cost_model.rs` | α/β/p → k\*, RelLat, starvation, InferenceStats |
 | `src/spechop/verifier.rs` | ObservationVerifier trait + RuleBasedVerifier |
-| `src/spechop/speculator.rs` | HopSpeculator trait + CacheSpeculator + BanditSpeculator |
-| `src/spechop/window.rs` | SpecWindow thread pool manager |
+| `crates/katgpt-speculative/src/spechop/speculator.rs` | HopSpeculator trait + CacheSpeculator + BanditSpeculator |
+| `crates/katgpt-speculative/src/spechop/window.rs` | SpecWindow thread pool manager |
 | `src/spechop/pipeline.rs` | SpecHopPipeline continuous loop (Algorithm 1) |
-| `src/spechop/hop_tree.rs` | Hop-level DDTree integration |
+| `crates/katgpt-speculative/src/spechop/hop_tree.rs` | Hop-level DDTree integration |
 | `tests/test_131_spechop_goat.rs` | NEW: 6 GOAT proof tests |
 | `.benchmarks/042_spechop_goat.md` | NEW: This file |
 | `examples/spechop_01_pipeline.rs` | 4-hop continuous speculation example |

@@ -180,10 +180,10 @@ cargo test --features opus_selection --test test_129_opus_boltzmann_goat
 
 | File | Lines | Purpose |
 |------|-------|---------|
-| `src/pruners/opus/mod.rs` | 29 | Module index (re-exports) |
-| `src/pruners/opus/types.rs` | ~875 | OpusConfig, OpusBanditPruner<P>, OpusRedundantEnv |
-| `src/pruners/opus/count_sketch.rs` | ~264 | CountSketch projection primitive |
-| `src/pruners/opus/boltzmann.rs` | ~490 | Boltzmann temperature sampling |
+| `crates/katgpt-pruners/src/opus/mod.rs` | 29 | Module index (re-exports) |
+| `crates/katgpt-pruners/src/opus/types.rs` | ~875 | OpusConfig, OpusBanditPruner<P>, OpusRedundantEnv |
+| `crates/katgpt-pruners/src/opus/count_sketch.rs` | ~264 | CountSketch projection primitive |
+| `crates/katgpt-pruners/src/opus/boltzmann.rs` | ~490 | Boltzmann temperature sampling |
 | `tests/test_129_opus_boltzmann_goat.rs` | ~623 | GOAT proofs (20 tests) |
 
 ### Modified Files
@@ -217,5 +217,5 @@ cargo clippy --features opus_selection --quiet --tests
 - Research 089: `.research/089_OPUS_Optimizer_Induced_Projected_Utility_Selection.md`
 - OPUS paper: arXiv:2602.05400v2
 - CountSketch: Cormode & Muthukrishnan (2005)
-- Existing bandit: `src/pruners/bandit.rs` (Plan 030)
+- Existing bandit: `crates/katgpt-ruliology/crates/katgpt-ruliology/src/bandit.rs` (Plan 030)
 - Boltzmann/softmax: Gibbs distribution, statistical mechanics

@@ -3,7 +3,7 @@
 ## Tasks
 
 - [x] T1: Add `tiled_attention` feature gate to `katgpt-core/Cargo.toml`
-- [x] T2: Create `katgpt-core/src/attention.rs` with tiled flash attention skeleton
+- [x] T2: Create `katgpt-core/crates/katgpt-core/src/attention.rs` with tiled flash attention skeleton
 - [x] T3: Implement `tiled_attention_forward()` — online softmax with SIMD tile iteration
 - [x] T4: Implement `exp2` temperature scaling trick (avoid `exp()`, use `exp2()`)
 - [x] T5: Add threshold heuristic — fall back to full materialization for small N
@@ -111,7 +111,7 @@ katgpt-core/src/
 ### API
 
 ```rust
-// katgpt-core/src/attention.rs
+// katgpt-core/crates/katgpt-core/src/attention.rs
 
 /// Tiled online-softmax flash attention for CPU SIMD.
 ///
@@ -148,7 +148,7 @@ pub fn tiled_attention_batched(
 ### Integration Point
 
 ```rust
-// katgpt-rs/src/transformer.rs — in the attention forward section
+// katgpt-rs/crates/katgpt-percepta/src/transformer.rs — in the attention forward section
 
 #[cfg(feature = "tiled_attention")]
 {

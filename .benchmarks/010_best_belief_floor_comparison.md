@@ -208,7 +208,7 @@ OneLowData (see test source for per-mode parameters).
 - Policy: `katgpt-rs/AGENTS.md` Feature Flag Discipline (UQ-bearing primitive
   GOAT gate extension), Issue 010.
 - Adapter + tests: `crates/katgpt-core/tests/conformal_floor_best_belief.rs`.
-- Best-Belief primitive: `crates/katgpt-core/src/best_belief.rs`, Plan 336.
+- Best-Belief primitive: `crates/katgpt-core/crates/katgpt-core/src/best_belief.rs`, Plan 336.
 - Best-Belief GOAT gate (G1–G4): `.benchmarks/` Plan 336 (3.099e-5 vs statrs,
   3.38ns score via LUT, 924/924 tests, alloc-free).
 - Companion paper: [arXiv:2606.09473](https://arxiv.org/abs/2606.09473) —

@@ -28,7 +28,7 @@
 >
 > **Status (ILC Distillation):** Iterative Latent Clustering — synonym-aware DDTree pruning. Offline clustering + online inference path. `IlcClusterer`, `SynonymMap`, `SynonymAwarePruner`. Behind `--features ilc_distill`.
 >
-> **Status (Plan 060):** MeMo Reflection QA Pipeline — 5-step compositional data synthesis from game replays. `ReflectionStep` (DirectExtraction, IndirectExtraction, Consolidation, Verification, EntitySurfacing, CrossGameSynthesis), `ReflectionQA`, `ReflectionDomain` behind `--features memo_reflections`. Consumed by BanditPruner for training signal enrichment. See `src/pruners/reflection.rs`.
+> **Status (Plan 060):** MeMo Reflection QA Pipeline — 5-step compositional data synthesis from game replays. `ReflectionStep` (DirectExtraction, IndirectExtraction, Consolidation, Verification, EntitySurfacing, CrossGameSynthesis), `ReflectionQA`, `ReflectionDomain` behind `--features memo_reflections`. Consumed by BanditPruner for training signal enrichment. See `crates/katgpt-pruners/src/reflection.rs`.
 
 ## What is Heuristic Learning?
 
@@ -69,7 +69,7 @@ katgpt-rs is uniquely positioned for HL because of its **trait-based pruner arch
 | SDAR Sigmoid Gate | `sdar_gate()` — asymmetric trust σ(β·x), β=5.0 optimum (Plan 072) |
 | SDAR-Gated Bandit | `SdarBanditPruner` — sigmoid-gated reward updates (Plan 072) |
 | SDAR-Gated Absorb | `SdarGatedAbsorbCompress` — soft sigmoid promotion gate (Plan 072) |
-| Knowledge Persistence | `BanditPruner` → `src/pruners/freeze.rs` — `repr(C)` bandit knowledge save/load (Plan 092) |
+| Knowledge Persistence | `BanditPruner` → `crates/katgpt-pruners/src/freeze.rs` — `repr(C)` bandit knowledge save/load (Plan 092) |
 | Width Scaling | `best_of_k_rollouts()` — K parallel SDE rollouts, select best (PTRM Plan 083) |
 | Early Stop Gate | `EarlyStopGate<P>` — depth-aware pruning when relevance < threshold (PTRM Plan 083) |
 | Width Selection | `WidthSelectionMode::{BestQ, MostFrequent, Top1Converged}` — rollout selection strategy (PTRM Plan 083, EqR Plan 119) |
@@ -166,7 +166,7 @@ After N episodes:
 
 ### Freeze/Thaw Persistence (Plan 092)
 
-`BanditPruner` uses `src/pruners/freeze.rs` for `repr(C)` bandit knowledge persistence across sessions. Arena players (Bomber, FFT, Go) call `.freeze()` → `save_frozen()` to write raw bytes, and `load_frozen()` on startup to restore Q-values and visit counts. Zero-dependency binary I/O — no serde/bincode needed.
+`BanditPruner` uses `crates/katgpt-pruners/src/freeze.rs` for `repr(C)` bandit knowledge persistence across sessions. Arena players (Bomber, FFT, Go) call `.freeze()` → `save_frozen()` to write raw bytes, and `load_frozen()` on startup to restore Q-values and visit counts. Zero-dependency binary I/O — no serde/bincode needed.
 
 **Per-Move Reward Fix (Issue 065):** Initial implementation used blended reward (`α=0.3 * per_move + 0.7 * game_end`), which caused all Q-values to collapse to ~0.25 when losing 86% of games (binary game-end reward = 0 for losses). Fix: `α=1.0` (pure per-move heuristic delta) + 10× amplification. Result: **+11pp win rate** for frozen GoHL vs Validator over naive baseline. Q-values now differentiate meaningfully (Corner: 0.80 vs Defense: 0.40).
 
@@ -700,7 +700,7 @@ Multi-criteria rubric reward replaces scalar δ for Bomber arena. Uses `BomberTe
 
 ### RubricFFTPlayer (FFT Tactics Arena)
 
-`src/pruners/fft/rubric_player.rs` — behind `ropd_rubric` + `g_zero` + `fft`
+`crates/katgpt-pruners/src/fft/rubric_player.rs` — behind `ropd_rubric` + `g_zero` + `fft`
 
 Same architecture as RubricPlayer but for multi-axis FFT domain. Uses `FFTTemplateProposer` (10 strategies, UCB1) + `RubricBanditPruner` + `RubricGatedAbsorbCompress` + Q-learning over 9 action types. Class-dependent rubric scoring — each of the 6 classes weights criteria differently.
 
@@ -997,7 +997,7 @@ Based on Anthropic Transformer Circuits research (Research 144), emotion concept
 Emotion reading is a **zero-cost extension to ReviewMetrics**: one O(d) dot product per decode step, no extra forward passes, no feature gate (passes T7 overhead proof).
 
 ```rust
-// src/pruners/emotion_vector.rs
+// crates/katgpt-pruners/src/emotion_vector.rs
 pub struct EmotionDirections {
     valence: Vec<f32>,     // positive/negative sentiment [d_model]
     arousal: Vec<f32>,     // high/low activation [d_model]

@@ -67,7 +67,7 @@ It will become `pub` so root can re-export it for API compatibility.
 
 ## (2) Tasks
 
-### T1 — Create `crates/katgpt-forward/src/forward_positions.rs` ✅
+### T1 — Create `crates/katgpt-forward/crates/katgpt-forward/src/forward_positions.rs` ✅
 
 - [x] Move `BidirectionalContext` struct + impl (fields → `pub`,
       `new` → `pub fn`). Final: 567 LOC.
@@ -193,7 +193,7 @@ pub use katgpt_forward::forward_positions::{
 | File | Before | After | Delta |
 |---|---:|---:|---:|
 | `src/dllm.rs` | 4137 | 3659 | **-478** |
-| `crates/katgpt-forward/src/forward_positions.rs` | — | 567 | +567 |
+| `crates/katgpt-forward/crates/katgpt-forward/src/forward_positions.rs` | — | 567 | +567 |
 
 Root net reduction: **-478 LOC** (Plan 401: -1558 → cumulative -2036 LOC from
 the Plan 399-402 extraction series). katgpt-forward continues to grow as the

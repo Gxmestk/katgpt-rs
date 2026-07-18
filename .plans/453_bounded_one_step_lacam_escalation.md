@@ -290,7 +290,7 @@ search doesn't improve collision-freedom but starts hurting latency.
 
 ### Phase 2 — Implement bounded one-step LaCAM ✅ DONE
 
-- [x] **T2.1** Created `crates/katgpt-core/src/multi_agent_path/lacam.rs` behind
+- [x] **T2.1** Created `crates/katgpt-core/crates/katgpt-core/src/multi_agent_path/lacam.rs` behind
       `feature = ["lacam_escalation"]`. Module structure:
       - `Constraint { who: Vec<usize>, where_cells: Vec<P> }` (depth = `who.len()`)
       - `ConstraintQueue` (FIFO `VecDeque<Constraint<P>>` — LaCAM BFS-style)
@@ -472,8 +472,8 @@ stuck agents exist, which is the congested minority of ticks).
 
 | File | Change |
 |---|---|
-| `crates/katgpt-core/src/multi_agent_path/lacam.rs` | **NEW** — constraint tree, recursive PIBT, escalation step (behind `lacam_escalation` feature) |
-| `crates/katgpt-core/src/multi_agent_path/pibt.rs` | Wire `lacam_escalation_step` into `pibt_step` behind the feature flag; keep shuffled-retry as the OFF-path fallback |
+| `crates/katgpt-core/crates/katgpt-core/src/multi_agent_path/lacam.rs` | **NEW** — constraint tree, recursive PIBT, escalation step (behind `lacam_escalation` feature) |
+| `crates/katgpt-core/crates/katgpt-core/src/multi_agent_path/pibt.rs` | Wire `lacam_escalation_step` into `pibt_step` behind the feature flag; keep shuffled-retry as the OFF-path fallback |
 | `crates/katgpt-core/src/multi_agent_path/mod.rs` | Export `lacam_escalation_step` + `EscalationBudget`; update module docs |
 | `crates/katgpt-core/src/multi_agent_path/tests.rs` | Add LaCAM-specific tests (T2.6) |
 | `crates/katgpt-core/Cargo.toml` | Add `lacam_escalation` feature (opt-in); add to `multi_agent_path` feature deps |

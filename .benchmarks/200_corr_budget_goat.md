@@ -28,7 +28,7 @@ cargo run --features corr_budget --example corr_budget_01_bench
 
 ## Files
 
-- Implementation: `src/speculative/correlation_budget.rs`
+- Implementation: `crates/katgpt-speculative/src/correlation_budget.rs`
 - Integration: `src/speculative/dd_tree.rs` (`build_dd_tree_screened_corr`)
 - Benchmark: `examples/corr_budget_01_bench.rs`
 - Tests: 10 tests in `correlation_budget::tests` — ALL PASS ✅

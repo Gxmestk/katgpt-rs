@@ -157,7 +157,7 @@ pub trait RegionBatching: Send + Sync {
 ## Tasks
 
 ### Phase 1: LFU Region Cache
-- [x] Add `FreqTier`, `CachedRegion`, `BfcpRegionCache` types to `src/pruners/bfcp_region_cache.rs`
+- [x] Add `FreqTier`, `CachedRegion`, `BfcpRegionCache` types to `crates/katgpt-pruners/src/bfcp_region_cache.rs`
 - [x] Implement `BfcpRegionCache::lookup()` — BLAKE3 hash lookup via papaya lock-free HashMap
 - [x] Implement `BfcpRegionCache::insert()` — insert with LFU eviction when full
 - [x] Implement `BfcpRegionCache::decay()` — multiply all freq counters by λ = 0.99
@@ -171,7 +171,7 @@ pub trait RegionBatching: Send + Sync {
 - [x] Benchmark: cache hit rate on synthetic workload (target: ≥ 60% across 100 steps) — achieved 95%
 
 ### Phase 2: Frequency-Aware Region Sharding
-- [x] Add `RegionShardMap`, `RegionSharding` trait to `src/pruners/region_shard_map.rs`
+- [x] Add `RegionShardMap`, `RegionSharding` trait to `crates/katgpt-pruners/src/region_shard_map.rs`
 - [x] Implement shard assignment: Hot → dedicated shard, Warm → round-robin, Cold → lazy
 - [x] Implement `rebalance()` — promote/demote shards when FreqTier transitions
 - [x] Implement `min_regions_for_shard()` — only shard when regions > 30 (below: sequential)
@@ -181,7 +181,7 @@ pub trait RegionBatching: Send + Sync {
 - [x] Test: sequential fallback when region count < threshold
 
 ### Phase 3: Region-Level Batching
-- [x] Add `RegionBatching` trait and impl to `src/pruners/region_batch.rs`
+- [x] Add `RegionBatching` trait and impl to `crates/katgpt-pruners/src/region_batch.rs`
 - [x] Implement `batch_accept()` — SIMD batch sampling from accept regions
 - [x] Implement `batch_reject_count()` — O(1) sum of token_counts
 - [x] Implement `batch_refine()` — batch preimage lookahead on maybe regions

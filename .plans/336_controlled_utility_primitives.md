@@ -3,7 +3,7 @@
 **Date:** 2026-06-28 (revised 2026-06-28 after corpus read — see "Revision history" below)
 **Research:** [katgpt-rs/.research/320_Red_Queen_Godel_Machine_Selective_Erasure_Best_Belief.md](../.research/320_Red_Queen_Godel_Machine_Selective_Erasure_Best_Belief.md)
 **Source paper:** [arXiv:2606.26294](https://arxiv.org/pdf/2606.26294) — Iacob et al., Red Queen Gödel Machine, §3.5 + App. F Prop. 4.
-**Target:** `katgpt-rs/crates/katgpt-core/src/best_belief.rs` (new) + trait extraction over `dec/cache.rs` + `dec/zone_cache.rs`
+**Target:** `katgpt-rs/crates/katgpt-core/crates/katgpt-core/src/best_belief.rs` (new) + trait extraction over `dec/cache.rs` + `dec/zone_cache.rs`
 **Status:** Phase 1+2 SHIPPED — `best_belief` G2-unblocked via 32×32×5 LUT and PROMOTED to default (commits `1da3fb8b`, `bf7f6971`). G1 PASS (3.099e-5 vs statrs), G2 PASS (3.38 ns score, 32.2 ns select-8 — well under targets after LUT), G3 PASS (924/924 tests green), G4 PASS (alloc-free by construction). **Phase 3 (DRY trait) BLOCKED by architectural drift** — see new "Phase 3 — Architectural Blocker" section below; tasks T3.1–T3.5 cannot proceed as written.
 
 ---
@@ -33,7 +33,7 @@ Ship one genuinely-new GOAT primitive + one Gain-tier DRY extraction:
 
 ### Tasks
 
-- [x] **T1.1** Create `katgpt-rs/crates/katgpt-core/src/best_belief.rs`. Define:
+- [x] **T1.1** Create `katgpt-rs/crates/katgpt-core/crates/katgpt-core/src/best_belief.rs`. Define:
   ```rust
   /// ε-quantile of Beta(1 + successes, 1 + failures) — the conservative lower bound
   /// the candidate's true utility exceeds with probability 1 − ε (RQGM Prop. 4).
@@ -122,7 +122,7 @@ This is pure DRY — no new behavior, no new capability. Existing impls get blan
 - [-] **T3.1** Define `CriterionVersionedCache` trait in `katgpt-core/src/cache_version.rs`.
 - [-] **T3.2** `impl CriterionVersionedCache for DecCache` (single-slot — Key = ()).
 - [-] **T3.3** `impl CriterionVersionedCache for ZoneGeometryCache` (multi-entry — Key = ZoneHash).
-- [-] **T3.4** Document the pattern in `katgpt-core/src/dec/cache.rs` doc-comment, pointing to the trait.
+- [-] **T3.4** Document the pattern in `katgpt-core/crates/katgpt-dec/src/cache.rs` doc-comment, pointing to the trait.
 - [-] **T3.5** No GOAT gate (Gain-tier DRY refactor). Just `cargo check --all-features` + existing tests pass bit-identically.
 
 ## Phase 3 — Architectural Blocker (2026-06-28)
@@ -214,8 +214,8 @@ read as **superseded by this section**.
 - [Research 320](../.research/320_Red_Queen_Godel_Machine_Selective_Erasure_Best_Belief.md) (corrected).
 - Issue 004 (closed + removed, not novel — covered by R158/R161/R155).
 - RQGM paper §3.5 (Controlled Utility Evolution), App. F Prop. 4 (best-belief lower bound).
-- `katgpt-core/src/pruners/bandit.rs` `sample_beta` (Jöhnk's) — the existing Beta *sampler* (exploration) that `best_belief_score` complements as the Beta *quantile* (conservative selection).
-- `katgpt-core/src/dec/cache.rs` `DecCache` — existing criterion-versioned cache (single-slot, with derived stats). Phase 3 trait extraction target.
+- `katgpt-core/crates/katgpt-ruliology/crates/katgpt-ruliology/src/bandit.rs` `sample_beta` (Jöhnk's) — the existing Beta *sampler* (exploration) that `best_belief_score` complements as the Beta *quantile* (conservative selection).
+- `katgpt-core/crates/katgpt-dec/src/cache.rs` `DecCache` — existing criterion-versioned cache (single-slot, with derived stats). Phase 3 trait extraction target.
 - `katgpt-core/src/dec/zone_cache.rs` `ZoneGeometryCache` (Plan 335) — existing criterion-versioned cache (multi-entry, papaya lock-free, BLAKE3-tagged). Phase 3 trait extraction target.
 - riir-ai Research 158 (Committed Personality Blend) — the already-committed Super-GOAT that ships the per-NPC committed-personality-with-survives-swap capability.
 
@@ -223,7 +223,7 @@ read as **superseded by this section**.
 
 ## Phase 1+2 Results (implemented 2026-06-28)
 
-**Implementation.** `katgpt-rs/crates/katgpt-core/src/best_belief.rs` ships the three
+**Implementation.** `katgpt-rs/crates/katgpt-core/crates/katgpt-core/src/best_belief.rs` ships the three
 public fns from the spec: `best_belief_score(S, F, ε)`,
 `select_best_belief(candidates, ε, incumbent_idx)`, and the diagnostic
 `best_belief_scores(candidates, ε)`. The inverse regularized incomplete Beta

@@ -349,7 +349,7 @@ Production Stack (after GOAT 024):
 ## References
 
 - Plan 100 results: `.benchmarks/023_block_diagonal_goat.md`
-- OCTOPUS encoding: `src/octopus/encode.rs`
+- OCTOPUS encoding: `crates/katgpt-quant/src/octopus/encode.rs`
 - OCTOPUS KV cache: `src/octopus/kv_cache.rs`
 - PlanarQuant rotation: `src/planar_quant/rotation.rs`
 - PlanarQuant KV cache: `src/planar_quant/kv_cache.rs`

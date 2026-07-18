@@ -66,7 +66,7 @@ graph TD
 - [x] `#[serde(default)]` for TOML config support
 
 ### T2: KS D-Statistic Computation — Zero-Allocation
-- [x] Add `ks_d_statistic` to `katgpt-rs/src/spectralquant/spectral.rs` (shared math infra)
+- [x] Add `ks_d_statistic` to `katgpt-rs/crates/katgpt-spectral/src/spectral.rs` (shared math infra)
   ```rust
   /// Compute Kolmogorov-Smirnov D-statistic between a weight distribution
   /// and a Gaussian reference N(μ, σ). O(n) single pass, zero allocation.
@@ -198,8 +198,8 @@ graph TD
 | File | Change |
 |------|--------|
 | `katgpt-core/src/types.rs` | Add `OutlierGuardConfig`, `OutlierAction` |
-| `katgpt-rs/src/spectralquant/spectral.rs` | Add `ks_d_statistic()` |
-| `katgpt-rs/src/spectralquant/outlier_guard.rs` | New file: `OutlierGuard`, `LayerReport` |
+| `katgpt-rs/crates/katgpt-spectral/src/spectral.rs` | Add `ks_d_statistic()` |
+| `katgpt-rs/crates/katgpt-spectral/src/outlier_guard.rs` | New file: `OutlierGuard`, `LayerReport` |
 | `katgpt-rs/src/spectralquant/mod.rs` | Add `outlier_guard` module (behind feature gate) |
 | Model loading path | Add `OutlierGuard::scan_model()` call |
 | `Cargo.toml` | Add `outlier_guard` feature (default-on) |

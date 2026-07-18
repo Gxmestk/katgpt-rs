@@ -14,7 +14,7 @@ Implement CoExplain's Read/Write/Enhance cycle for the modelless inference pipel
 ## Tasks
 
 ### Phase 1: TED-Lite Divergence Metric (Enabling Infrastructure)
-- [x] Add `PrunerDivergence` struct to `katgpt-rs/src/pruners/ted_lite.rs`
+- [x] Add `PrunerDivergence` struct to `katgpt-rs/crates/katgpt-pruners/src/ted_lite.rs`
   - `threshold_divergence: f32` — Σ |τ_current - τ_original| / N
   - `topology_divergence: f32` — Hamming distance on branch existence vectors
   - `lambda_t: f32` — developer-configurable divergence clamp (default: 0.1)
@@ -23,7 +23,7 @@ Implement CoExplain's Read/Write/Enhance cycle for the modelless inference pipel
 - [x] Add diagnostic log: emit divergence metrics per N tokens (behind `log`)
 
 ### Phase 2: Self-Refining Pruner (Extends BanditPruner)
-- [x] Add `PrunerAccuracy` tracker to `katgpt-rs/src/pruners/self_refining.rs`
+- [x] Add `PrunerAccuracy` tracker to `katgpt-rs/crates/katgpt-pruners/src/self_refining.rs`
   - Track TP, TN, FP, FN per pruner slot
   - Compute precision, recall, F1 per slot
 - [x] Implement threshold mode: adjust SynPruner rejection threshold based on FP/FN ratio
@@ -35,7 +35,7 @@ Implement CoExplain's Read/Write/Enhance cycle for the modelless inference pipel
 - [x] Feature gate: `coexplain_pruner`
 
 ### Phase 3: CoEditable ConstraintPruner (Bidirectional)
-- [x] Add `EditableConstraintPruner` trait extending `ConstraintPruner` in `katgpt-rs/src/pruners/editable_constraint.rs`
+- [x] Add `EditableConstraintPruner` trait extending `ConstraintPruner` in `katgpt-rs/crates/katgpt-pruners/src/editable_constraint.rs`
   - `fn edit_threshold(&mut self, slot: usize, new_threshold: f32) -> Result<(), DivergenceError>`
   - `fn edit_topology(&mut self, branch: &[usize], action: TopologyAction) -> Result<(), DivergenceError>`
   - `fn snapshot(&self) -> PrunerSnapshot` — captures golden reference for TED-Lite

@@ -13,7 +13,7 @@ MeMo validates our existing Raven RSM (O(1) retrieval) and G-Zero (multi-phase p
 ## Tasks
 
 - [x] T1: Add `memo_reflections` feature gate to `katgpt-rs/Cargo.toml`
-- [x] T2: Create `src/pruners/reflection.rs` with `ReflectionQA` struct and `synthesize_reflections()` skeleton
+- [x] T2: Create `crates/katgpt-pruners/src/reflection.rs` with `ReflectionQA` struct and `synthesize_reflections()` skeleton
 - [x] T3: Implement Step 1 (Fact Extraction) — direct + indirect extraction from game state sequences
 - [x] T4: Implement Step 2 (Consolidation) — merge related facts into multi-fact questions
 - [x] T5: Implement Step 3 (Verification) — self-containment check + rewrite
@@ -44,8 +44,8 @@ Our system already captures (1) via Raven RSM and (4) via G-Zero phases. The gap
 
 | Component | Location | Status |
 |-----------|----------|--------|
-| Freeze/Thaw pipeline | `src/pruners/freeze.rs` | ✅ Plan 092 complete |
-| Bandit knowledge arrays | `src/pruners/bandit.rs` | ✅ Working |
+| Freeze/Thaw pipeline | `crates/katgpt-pruners/src/freeze.rs` | ✅ Plan 092 complete |
+| Bandit knowledge arrays | `crates/katgpt-ruliology/crates/katgpt-ruliology/src/bandit.rs` | ✅ Working |
 | Game replay data | `examples/bomber_*.rs`, `examples/go_*.rs` | ✅ Working |
 | LoRA export/load | `riir-ai/crates/riir-gpu` | ✅ Working |
 | GFlowNet distillation | `src/pruners/gflownet.rs` | ✅ Plan 052 |
@@ -245,7 +245,7 @@ Prove that TIES merging at ρ=0.3 produces usable merged adapter:
 
 | File | Purpose |
 |------|---------|
-| `katgpt-rs/src/pruners/reflection.rs` | Reflection QA pipeline + types |
+| `katgpt-rs/crates/katgpt-pruners/src/reflection.rs` | Reflection QA pipeline + types |
 | `katgpt-rs/examples/bomber_13_reflection_qa.rs` | Bomber reflection QA demo |
 | `katgpt-rs/examples/go_09_reflection_qa.rs` | Go reflection QA demo |
 | `katgpt-rs/tests/test_memo_reflections.rs` | GOAT proof tests |

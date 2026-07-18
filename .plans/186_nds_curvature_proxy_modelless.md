@@ -23,8 +23,8 @@ All modelless — no Hessian, no training, no new allocations.
 
 ## Tasks
 
-- [x] T1: Implement `nds_proxy()` function in `src/pruners/nds_proxy.rs`
-- [x] T2: Implement `NdsBudgetModifier` trait + `SpectralFlatnessBudget` in `src/pruners/nds_proxy.rs`
+- [x] T1: Implement `nds_proxy()` function in `crates/katgpt-pruners/src/nds_proxy.rs`
+- [x] T2: Implement `NdsBudgetModifier` trait + `SpectralFlatnessBudget` in `crates/katgpt-pruners/src/nds_proxy.rs`
 - [x] T3: Implement `spectral_balance_score()` for DDTree branch visit counts
 - [x] T4: Implement `layer_weighted_verification_depth()` from 70/28/2 heuristic
 - [x] T5: Wire NDS proxy into DDTree budget allocation (compose with `budget_adaptation`)

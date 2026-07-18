@@ -193,12 +193,12 @@ Included in `full` feature.
 | `Cargo.toml` | Added `convex_tok` feature; fixed `percepta_compile` to use `dep:good_lp` |
 | `src/tokenizer/mod.rs` | Added 6 convex modules + re-exports behind `#[cfg(feature = "convex_tok")]` |
 | `src/percepta/mod.rs` | Fixed `good_lp` cfg to `percepta_compile` (pre-existing bug) |
-| `src/tokenizer/convex_types.rs` | **NEW** — Core types |
-| `src/tokenizer/convex_graph.rs` | **NEW** — Graph builder |
-| `src/tokenizer/convex_solver.rs` | **NEW** — LP solver |
-| `src/tokenizer/convex_rounding.rs` | **NEW** — Rounding schemes |
-| `src/tokenizer/convex_certify.rs` | **NEW** — Optimality certification |
-| `src/tokenizer/convex_toast_bridge.rs` | **NEW** — ToaST bridge |
+| `crates/katgpt-tokenizer/src/convex_types.rs` | **NEW** — Core types |
+| `crates/katgpt-tokenizer/src/convex_graph.rs` | **NEW** — Graph builder |
+| `crates/katgpt-tokenizer/src/convex_solver.rs` | **NEW** — LP solver |
+| `crates/katgpt-tokenizer/src/convex_rounding.rs` | **NEW** — Rounding schemes |
+| `crates/katgpt-tokenizer/src/convex_certify.rs` | **NEW** — Optimality certification |
+| `crates/katgpt-tokenizer/src/convex_toast_bridge.rs` | **NEW** — ToaST bridge |
 | `tests/test_127_convex_tok_goat.rs` | **NEW** — 12 GOAT proofs |
 
 ---

@@ -49,11 +49,11 @@ Combined: loss[t] = sdar_gate(Δt) * is_relevant(t) * reverse_kl[t]
 
 | Component | Location | Role |
 |-----------|----------|------|
-| `sdar_gate()` / `sdar_modulate()` | `src/pruners/sdar_gate.rs` | σ(β·x) sigmoid gate — reuse as modulation layer |
+| `sdar_gate()` / `sdar_modulate()` | `crates/katgpt-pruners/src/sdar_gate.rs` | σ(β·x) sigmoid gate — reuse as modulation layer |
 | `sdar_loss()` | `riir-gpu/src/loss_sdar.rs` | Token-level SDAR loss — **extend with RMSD mask** |
 | `kl_divergence()` | `riir-gpu/src/distill.rs` | Reverse KL — **extend with top-K approximation** |
 | `LossMask` | `riir-gpu/src/training_loop.rs` | Binary token mask — **extend with relevance scoring** |
-| `SdarBanditPruner<P>` | `src/pruners/sdar/mod.rs` | Modelless SDAR bandit — **extend with magnitude pre-filter** |
+| `SdarBanditPruner<P>` | `crates/katgpt-pruners/src/sdar/mod.rs` | Modelless SDAR bandit — **extend with magnitude pre-filter** |
 | `RubricReward` | `riir-gpu/src/ropd/` | Rubric scoring — reuse judge infrastructure |
 | `VerifierClient` | `riir-gpu/src/ropd/client.rs` | Judge client — **repurpose for token selection** |
 | `LeviathanVerifier` | Referenced in research 040 | LoRA-as-Judge — use as token relevance judge |
@@ -73,7 +73,7 @@ Combined: loss[t] = sdar_gate(Δt) * is_relevant(t) * reverse_kl[t]
 | `RmsdConfig` | T, S, K, continuation trigger config | `riir-gpu/src/loss_rmsd.rs` |
 | `RmsdMetrics` | Logprob magnitudes, mask density, judge selections | `riir-gpu/src/loss_rmsd.rs` |
 | `TeacherContinuation` | Snapshot student → teacher on plateau | `riir-gpu/src/loss_rmsd.rs` |
-| `RmsdRelevanceFilter` | Modelless action-level magnitude pre-filter | `src/pruners/rmsd_relevance.rs` |
+| `RmsdRelevanceFilter` | Modelless action-level magnitude pre-filter | `crates/katgpt-pruners/src/rmsd_relevance.rs` |
 | `RmsdPlayer` | Bomber arena player with RMSD filtering | `src/pruners/bomber/rmsd_player.rs` |
 
 ## Architecture
@@ -421,7 +421,7 @@ fn mean(values: &[f32]) -> f32 {
 ### Modelless Architecture (katgpt-rs)
 
 ```rust
-// src/pruners/rmsd_relevance.rs
+// crates/katgpt-pruners/src/rmsd_relevance.rs
 
 /// Modelless relevance filter: action-level analogue of RMSD.
 /// Pre-filters actions by |Q_teacher(a) - Q_student(a)| magnitude

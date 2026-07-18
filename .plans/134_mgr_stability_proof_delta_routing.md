@@ -23,20 +23,20 @@ Answer: **Yes, partially.** Our routing is additive (`residual += weighted_sum`)
 - [x] Add doc comment to `depth_route()` referencing MGR §3.2
 - [x] Note: our additive routing is **not** a convex combination (it's residual + weighted_sum), so the per-layer norm ceiling does NOT formally apply
 - [x] Note: practical stability comes from RMSNorm + softmax normalization, not from convex-combination guarantee
-- **Files:** `src/transformer.rs` (doc comments on `depth_route` at ~L964)
+- **Files:** `crates/katgpt-percepta/src/transformer.rs` (doc comments on `depth_route` at ~L964)
 - **No new code** — documentation only
 
 ### T2: GOAT Proof — Verify `depth_route` Norm Stability 🐐
 - [x] Add a GOAT test that verifies activation norm doesn't grow unboundedly over 36+ layers with `depth_route` enabled
 - [x] Test: forward pass through all layers, check `‖x_L‖ ≤ C × ‖x_0‖` for some reasonable constant C (e.g., C < 10)
 - [x] This is an **empirical** stability check, not a formal proof (unlike MGR's theoretical guarantee)
-- **Files:** New test in `src/transformer.rs`
+- **Files:** New test in `crates/katgpt-percepta/src/transformer.rs`
 - **Feature gate:** Uses existing `delta_routing` — no new gate needed
 
 ### T3: Record Bias Initialization Formula (Eq. 14) 📐
 - [x] Add Eq. 14 as a comment in `depth_route` or `TransformerWeights::new`
 - [x] Useful if/when we add training infrastructure
-- **Files:** `src/transformer.rs` — comment only
+- **Files:** `crates/katgpt-percepta/src/transformer.rs` — comment only
 
 ## What We're NOT Doing
 

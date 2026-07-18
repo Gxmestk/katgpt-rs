@@ -34,8 +34,8 @@ dependencies** that no prior plan anticipated:
 | Sense File | External katgpt-core dep | Source |
 |---|---|---|
 | `sense/lod.rs` | `crate::slod::ScaleBoundary` | `katgpt-core/src/slod.rs` (1,047 LOC) |
-| `sense/reconstruction.rs` | `crate::temporal_deriv::TemporalDerivativeKernel` (gated `temporal_deriv`) | `katgpt-core/src/temporal_deriv.rs` (424 LOC) |
-| `sense/spectral_threat.rs` | `crate::linoss::{LinOSSCell, LinOSSState}` | `katgpt-core/src/linoss.rs` (938 LOC) |
+| `sense/reconstruction.rs` | `crate::temporal_deriv::TemporalDerivativeKernel` (gated `temporal_deriv`) | `katgpt-core/crates/katgpt-core/src/temporal_deriv.rs` (424 LOC) |
+| `sense/spectral_threat.rs` | `crate::linoss::{LinOSSCell, LinOSSState}` | `katgpt-core/crates/katgpt-core/src/linoss.rs` (938 LOC) |
 | All sense files | `crate::types::{SenseKind, SenseModule, TernaryDir}` | `katgpt-types` ✅ already extracted |
 
 **Recommended strategy: C — Hybrid co-extraction.**
@@ -66,7 +66,7 @@ where they belong as composition-layer code.
 ### Option A — Co-extract `ScaleBoundary` to katgpt-types only
 
 Move just the `ScaleBoundary` struct (small POD: `sigma`, `lambda`, etc.) to
-`katgpt-types/src/enums.rs` or a new `spectral.rs` submodule.
+`katgpt-types/crates/katgpt-types/src/enums.rs` or a new `spectral.rs` submodule.
 
 - `sense/lod.rs` then depends only on `katgpt-types` — promoted cleanly.
 - `sense/reconstruction.rs` still depends on `temporal_deriv` — **stays blocked**.
@@ -167,13 +167,13 @@ reconstruction files alone (`octree.rs` + `reconstruction.rs` + `serialize.rs`
 
 ### Phase 2 — Co-extract `TemporalDerivativeKernel<N>` to katgpt-types
 
-- [x] **T2.1** Audit `katgpt-core/src/temporal_deriv.rs` (424 LOC) — extract
+- [x] **T2.1** Audit `katgpt-core/crates/katgpt-core/src/temporal_deriv.rs` (424 LOC) — extract
   the public API surface (`TemporalDerivativeKernel<const N: usize>` struct,
   constructor, `process`/`step` methods, `sigmoid_surprise_gate` free fn) into
-  `katgpt-types/src/temporal.rs`. **Note the const generic `<N>`.**
+  `katgpt-types/crates/katgpt-types/src/temporal.rs`. **Note the const generic `<N>`.**
 - [x] **T2.2** Tests stay in katgpt-core (they exercise the kernel through
   the re-export).
-- [x] **T2.3** Update `katgpt-core/src/temporal_deriv.rs` to be a re-export
+- [x] **T2.3** Update `katgpt-core/crates/katgpt-core/src/temporal_deriv.rs` to be a re-export
   shim: `pub use katgpt_types::temporal::*;`. Preserve the
   `#[cfg(feature = "temporal_deriv")]` gate.
 - [x] **T2.4** Run GOAT gate:
@@ -217,7 +217,7 @@ reconstruction files alone (`octree.rs` + `reconstruction.rs` + `serialize.rs`
   - `bake.rs`, `lod.rs`, `mod.rs` (→ `lib.rs`), `octree.rs`,
     `reconstruction.rs`, `reconstruction_depth_invariance.rs`,
     `schema_centroid.rs`, `sector.rs`, `serialize.rs`.
-- [x] **T3.3** KEEP `spectral_threat.rs` in `katgpt-core/src/sense_threat.rs`
+- [x] **T3.3** KEEP `spectral_threat.rs` in `katgpt-core/crates/katgpt-core/src/sense_threat.rs`
   (rename to avoid clash). It needs `crate::linoss` which stays in
   katgpt-core.
 - [x] **T3.4** Rename `mod.rs` → `lib.rs`, update internal paths:

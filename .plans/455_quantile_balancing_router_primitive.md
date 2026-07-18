@@ -3,7 +3,7 @@
 **Date:** 2026-07-17
 **Research:** [katgpt-rs/.research/447_Kimi_K3_KDA_AttnRes_LatentMoE.md](../.research/447_Kimi_K3_KDA_AttnRes_LatentMoE.md) §2.4
 **Source algorithm:** [Jianlin Su, Feb 2026 blog](https://spaces.ac.cn/archives/11619) + [Marin team JAX validation at 32B-A5B / 1e22 FLOPs](https://openathena.ai/blog/quantile-balancing/)
-**Target:** `katgpt-rs/crates/katgpt-spectral/src/quantile_balance_router.rs` (new module, sibling to `manifold_power_iter_router.rs`) + Cargo feature `quantile_balance_router` (re-exported from root `katgpt-rs/Cargo.toml` as `quantile_balance_router = ["katgpt-spectral/quantile_balance_router"]`).
+**Target:** `katgpt-rs/crates/katgpt-spectral/crates/katgpt-spectral/src/quantile_balance_router.rs` (new module, sibling to `manifold_power_iter_router.rs`) + Cargo feature `quantile_balance_router` (re-exported from root `katgpt-rs/Cargo.toml` as `quantile_balance_router = ["katgpt-spectral/quantile_balance_router"]`).
 **Status:** Phase 1 DONE (2026-07-17) — 11/11 unit tests pass, clippy clean, example runs (MaxVio 1.875→0.0625 = 30× reduction at 54µs). Phase 2 (GOAT gate G1–G8) + Phase 3 (head-to-head vs Plan 279 MPI) pending.
 
 > **Numbering note.** The research note (447 §6) proposed this as `Plan 447`. That number is already in use (`.plans/447_freq_bandit_phase1.md`), and the katgpt-rs AGENTS.md rule — *"monotonic and never reused — even after a file is removed per the noise-reduction rule"* — forbids recycling it. Re-issued as **Plan 455** = `.plans/.highwater` (454) + 1. The matching KDA binding issue was re-issued as **Issue 179** (not 165 — `.issues/165_dd_tree_file_split_c2.md` exists).
@@ -241,7 +241,7 @@ katgpt-rs/
         └── bench_455_quantile_balance_goat.rs            # NEW — GOAT gate G1–G8
 ```
 
-Sibling to (NOT inside) `crates/katgpt-spectral/src/manifold_power_iter_router.rs`. The two files live side-by-side; Phase 3 composes them via the caller (or a `RouterReconditioner` trait if Case C lands — TBD).
+Sibling to (NOT inside) `crates/katgpt-spectral/crates/katgpt-spectral/src/manifold_power_iter_router.rs`. The two files live side-by-side; Phase 3 composes them via the caller (or a `RouterReconditioner` trait if Case C lands — TBD).
 
 ---
 

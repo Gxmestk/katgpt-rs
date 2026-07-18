@@ -33,13 +33,13 @@ Our existing DDTree operates at **token granularity**. This plan extends specula
 - [x] **T10**: Unit tests: identical observations → true, different numbers → false, paraphrased → true (Jaccard ≥ 0.55), short answer mismatch → false, refusal pattern → false
 
 ### Phase 3: Hop Speculator Trait & Implementations
-- [x] **T11**: Create `src/spechop/speculator.rs` — `HopSpeculator` trait with `speculate(action: &str) -> Result<String, SpecError>`
+- [x] **T11**: Create `crates/katgpt-speculative/src/spechop/speculator.rs` — `HopSpeculator` trait with `speculate(action: &str) -> Result<String, SpecError>`
 - [x] **T12**: Implement `CacheSpeculator` — HashMap-based cache lookup, returns cached observation or error (modelless path)
 - [x] **T13**: Implement `BanditSpeculator<P: ScreeningPruner>` — uses bandit Q-values to predict high-relevance observations (modelless-model-based bridge)
 - [x] **T14**: Unit tests: CacheSpeculator hit/miss, BanditSpeculator delegates to ScreeningPruner relevance
 
 ### Phase 4: Spec Window Manager
-- [x] **T15**: Create `src/spechop/window.rs` — `SpecWindow` struct managing up to k speculative threads
+- [x] **T15**: Create `crates/katgpt-speculative/src/spechop/window.rs` — `SpecWindow` struct managing up to k speculative threads
 - [x] **T16**: Implement `SpecWindow::push_thread()` — add new speculative thread, panic if > k
 - [x] **T17**: Implement `SpecWindow::verify_earliest()` — verify oldest pending thread, return `SpecOutcome::Commit` or `SpecOutcome::Rollback`
 - [x] **T18**: Implement `SpecWindow::rollback_all()` — discard all speculative work, reset to last verified state

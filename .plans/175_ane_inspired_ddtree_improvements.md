@@ -21,7 +21,7 @@ All three are inference-time only, no LLM training, zero perf hurt, on by defaul
 
 ### Part 1: Residency Audit (Fusion 1) ✅
 
-- [x] Create `src/speculative/residency_audit.rs` with `ResidencyReport` struct and audit functions
+- [x] Create `crates/katgpt-speculative/src/residency_audit.rs` with `ResidencyReport` struct and audit functions
 - [x] Implement `ResidencyReport` with fields: `fast_path_ratio`, `avg_branch_cost_ns`, `silent_degradation`
 - [x] Implement `audit_constraint_pruner()`, `audit_screening_pruner()`, `audit_baseline()`, `is_degrading()`
 - [x] Write test: baseline (NoPruner) passes audit, no silent degradation

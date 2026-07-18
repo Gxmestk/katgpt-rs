@@ -3,7 +3,7 @@
 **Date:** 2026-06-30
 **Task:** Issue 010 T3 — "Report the Floor" comparison for BoMSampler (Plan 281).
 **Verdict:** **EXCLUDED from the "Report the Floor" policy** (T3 escape hatch, exercised with evidence).
-**Harness:** `crates/katgpt-core/src/conformal/floor_harness.rs` (Issue 010 T2).
+**Harness:** `crates/katgpt-core/crates/katgpt-core/src/conformal/floor_harness.rs` (Issue 010 T2).
 **Adapter + tests:** `crates/katgpt-core/tests/conformal_floor_bom.rs`.
 
 ---
@@ -207,9 +207,9 @@ Config pinned: `kernel_seed=42`, `noise_seed` per-corpus (see test source),
 
 - Policy: `katgpt-rs/AGENTS.md` Feature Flag Discipline (UQ-bearing primitive
   GOAT gate extension), Issue 010.
-- Harness: `crates/katgpt-core/src/conformal/floor_harness.rs` (Issue 010 T2).
+- Harness: `crates/katgpt-core/crates/katgpt-core/src/conformal/floor_harness.rs` (Issue 010 T2).
 - Adapter + tests: `crates/katgpt-core/tests/conformal_floor_bom.rs`.
-- BoMSampler: `crates/katgpt-micro-belief/src/bom.rs`, Plan 281.
+- BoMSampler: `crates/katgpt-micro-belief/crates/katgpt-micro-belief/src/bom.rs`, Plan 281.
 - BoM GOAT gate (G2 arena): riir-ai Plan 314 (+31.49pp).
 - Companion paper: [arXiv:2606.09473](https://arxiv.org/abs/2606.09473) —
   *Report the Floor*.

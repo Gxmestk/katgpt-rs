@@ -3,7 +3,7 @@
 **Issue:** [163](../.issues/163_grape_joint_lift_gl_d_plus_2.md)
 **Feature:** `grape_joint_lift` (opt-in, implies `grapem_rodrigues`)
 **Source:** Zhang et al., *GRAPE* (arXiv:2512.07805, ICLR 2026, **Appendix E**)
-**Module:** [`crates/katgpt-core/src/grape_joint_lift.rs`](../crates/katgpt-core/src/grape_joint_lift.rs)
+**Module:** [`crates/katgpt-core/crates/katgpt-core/src/grape_joint_lift.rs`](../crates/katgpt-core/crates/katgpt-core/src/grape_joint_lift.rs)
 **Date:** 2026-07-17
 **Hardware:** Apple M3 Max (aarch64, NEON)
 

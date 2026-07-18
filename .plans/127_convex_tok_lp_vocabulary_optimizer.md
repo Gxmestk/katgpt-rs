@@ -44,7 +44,7 @@ The **model-based training path** (full corpus pipeline, n-gram counting, LM tra
 
 ## T1: Tokenisation Graph Types
 
-File: `katgpt-rs/src/tokenizer/convex_types.rs`
+File: `katgpt-rs/crates/katgpt-tokenizer/src/convex_types.rs`
 
 ### Core Types
 
@@ -160,7 +160,7 @@ pub struct OptimalityCert {
 
 ## T2: Tokenisation Graph Construction
 
-File: `katgpt-rs/src/tokenizer/convex_graph.rs`
+File: `katgpt-rs/crates/katgpt-tokenizer/src/convex_graph.rs`
 
 ### Algorithm
 
@@ -205,7 +205,7 @@ For production scale (N=600K, L=100): ~60M vertices, ~6B edges — need chunked 
 
 ## T3: LP Formulation via good_lp/HiGHS
 
-File: `katgpt-rs/src/tokenizer/convex_solver.rs`
+File: `katgpt-rs/crates/katgpt-tokenizer/src/convex_solver.rs`
 
 ### LP Formulation
 
@@ -275,7 +275,7 @@ Paper reports 4hr on GH200 for their full-scale experiment. Our micro/small benc
 
 ## T4: Rounding Schemes
 
-File: `katgpt-rs/src/tokenizer/convex_rounding.rs`
+File: `katgpt-rs/crates/katgpt-tokenizer/src/convex_rounding.rs`
 
 ### Three Schemes from Paper
 
@@ -346,7 +346,7 @@ This is O(V + E) — linear in graph size, negligible compared to LP solve time.
 
 ## T5: Optimality Certification
 
-File: `katgpt-rs/src/tokenizer/convex_certify.rs`
+File: `katgpt-rs/crates/katgpt-tokenizer/src/convex_certify.rs`
 
 ```rust
 pub struct Certifier;
@@ -406,7 +406,7 @@ impl Certifier {
 
 ## T6: ConvexTok → ToaST Bridge
 
-File: `katgpt-rs/src/tokenizer/convex_toast_bridge.rs`
+File: `katgpt-rs/crates/katgpt-tokenizer/src/convex_toast_bridge.rs`
 
 Converts a `RoundedVocabulary` into a `ToastTokenizer` for inference.
 

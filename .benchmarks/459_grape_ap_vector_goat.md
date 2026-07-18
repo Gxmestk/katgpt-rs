@@ -76,6 +76,6 @@ The positional-embedding projection is **user-supplied** (modelless). Learning t
 - [Issue 159](../.issues/159_grapem_rank2_rodrigues_exponential.md) — GRAPE-M primitive (soft-dep for `R_ℓ`; the sin/cos fallback in `RotationSchedule` works standalone).
 - [Issue 160](../.issues/160_position_group_action_trait.md) — unified trait (independent; `WallAction` is the scalar special case).
 - [Research 446](../.research/446_GRAPE_Group_Representational_Position_Encoding.md) — parent distillation.
-- [`crates/katgpt-core/src/grape_ap.rs`](../crates/katgpt-core/src/grape_ap.rs) — the primitive (~810 lines incl. docs + tests).
+- [`crates/katgpt-core/crates/katgpt-core/src/grape_ap.rs`](../crates/katgpt-core/crates/katgpt-core/src/grape_ap.rs) — the primitive (~810 lines incl. docs + tests).
 - [Benchmark 457](457_grapem_rodrigues_goat.md) — Issue 159 GOAT gate.
 - [Benchmark 458](458_position_group_action_goat.md) — Issue 160 GOAT gate.

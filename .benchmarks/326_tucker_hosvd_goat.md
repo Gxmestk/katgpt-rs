@@ -5,7 +5,7 @@
 ## Primitive
 
 `tucker_decompose_into` + `tucker_reconstruct_into` — N-mode (N ≤ 4) Higher-Order
-SVD in `crates/katgpt-core/src/linalg/tucker.rs`. Decomposes a tensor
+SVD in `crates/katgpt-core/crates/katgpt-core/src/linalg/tucker.rs`. Decomposes a tensor
 `X ∈ R^(I₀×…×I_{N-1})` into `S ×₀ A^(0) ×₁ A^(1) × … ×_{N-1} A^(N-1)` via N
 one-sided-Jacobi SVDs of the mode-n unfoldings + tensor-times-matrix contractions.
 The N-mode generalization of `thin_svd_into` from `subspace_phase_gate`.

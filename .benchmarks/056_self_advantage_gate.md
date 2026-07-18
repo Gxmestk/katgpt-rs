@@ -181,7 +181,7 @@ cargo bench --bench self_advantage_gate_bench
 | File | Role |
 |------|------|
 | `benches/self_advantage_gate_bench.rs` | GOAT gate benchmark (G1–G4) |
-| `src/pruners/self_advantage.rs` | Primitive implementation (Phases 1–3) |
+| `crates/katgpt-pruners/crates/katgpt-pruners/src/self_advantage.rs` | Primitive implementation (Phases 1–3) |
 | `.benchmarks/056_self_advantage_gate.md` | This file |
 
 ## Related

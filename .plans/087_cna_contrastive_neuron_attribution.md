@@ -18,7 +18,7 @@ Implement Contrastive Neuron Attribution (CNA) for sparse MLP circuit discovery 
 ## Tasks
 
 ### T1: Types — CNA Circuit & Modulator
-- [x] Create `src/pruners/cna.rs` with core types
+- [x] Create `crates/katgpt-pruners/src/cna.rs` with core types
 - [x] `CnaNeuron { layer, index, delta }` — single discovered neuron
 - [x] `CnaCircuit { neurons, universal_excluded, metadata }` — discovered circuit
 - [x] `CnaModulator { circuit, multiplier }` — runtime steering state
@@ -35,11 +35,11 @@ Implement Contrastive Neuron Attribution (CNA) for sparse MLP circuit discovery 
 - [x] Unit tests with synthetic activation data
 
 ### T3: Forward Hook — cna_modulate()
-- [x] Add `cna_modulate(hidden, layer_idx, modulator)` function in `src/pruners/cna.rs`
+- [x] Add `cna_modulate(hidden, layer_idx, modulator)` function in `crates/katgpt-pruners/src/cna.rs`
 - [x] Returns immediately if `multiplier == 1.0` (baseline, no-op)
 - [x] Iterates sparse circuit neurons for current layer, multiplies activation
 - [x] O(k) where k ≈ 0.1% of mlp_hidden per layer — negligible cost
-- [x] Integrate into `forward_base()` at `src/transformer.rs` after `matmul_relu`, before `matmul(w2)`
+- [x] Integrate into `forward_base()` at `crates/katgpt-percepta/src/transformer.rs` after `matmul_relu`, before `matmul(w2)`
 - [x] Behind `#[cfg(feature = "cna_steering")]` — zero cost when disabled
 - [x] Store `Option<CnaModulator>` in `ForwardContext` field — no parameter signature change
 
@@ -139,7 +139,7 @@ Implement Contrastive Neuron Attribution (CNA) for sparse MLP circuit discovery 
    │ Pruner         │  │              │  │                │
    └────────────────┘  └──────────────┘  └────────────────┘
 
-Forward pass integration (src/transformer.rs):
+Forward pass integration (crates/katgpt-percepta/src/transformer.rs):
 
   matmul_relu(ctx.hidden, w1, x)   // post-ReLU MLP activations
   #[cfg(feature = "cna_steering")]                        // Plan 087
@@ -171,7 +171,7 @@ Forward pass integration (src/transformer.rs):
 ## File Structure
 
 ```text
-src/pruners/cna.rs          # Core types + discovery + modulation ✅ (T1-T4, 13 tests)
+crates/katgpt-pruners/src/cna.rs          # Core types + discovery + modulation ✅ (T1-T4, 13 tests)
 examples/cna_01_discovery.rs # Discovery demo ✅ (T6)
 examples/cna_02_steering.rs  # Steering demo ✅ (T7)
 examples/cna_03_go_circuit.rs # Go end-to-end — STUB, pending (T8)
@@ -187,7 +187,7 @@ examples/cna_03_go_circuit.rs # Go end-to-end — STUB, pending (T8)
 | Forward hook adds latency | O(k) where k ≈ 0.1% of mlp_hidden. cna_02_steering confirms zero non-circuit RMSE. T9 GOAT benchmark pending. |
 | Discovery requires many forward passes | Late-layer optimization skips 85% of layers. Configurable pair count. |
 | Circuit doesn't transfer across models | Paper shows cross-architecture replication (Llama+Qwen). Our game domains use same MLP structure. |
-| Feature gate complexity | Single gate `cna_steering`. No sub-features. All new code in `src/pruners/cna.rs`. |
+| Feature gate complexity | Single gate `cna_steering`. No sub-features. All new code in `crates/katgpt-pruners/src/cna.rs`. |
 
 ---
 

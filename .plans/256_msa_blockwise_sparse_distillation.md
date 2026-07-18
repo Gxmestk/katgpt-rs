@@ -99,7 +99,7 @@ Distill MSA's key inference-time mechanisms into katgpt-rs's existing VortexFlow
 - [x] Update README.md feature showcase with MSA results
   - Added "MSA Sparse Attention Family" subsection under VortexFlow showcase with GOAT results table
 - [x] Update VortexFlow documentation to include MSA scoring variants
-  - Updated `src/dash_attn/vortex_flow.rs` module doc + `VortexFlowConfig` variant docs
+  - Updated `crates/katgpt-attn/src/dash_attn/vortex_flow.rs` module doc + `VortexFlowConfig` variant docs
 
 ### GOAT Verdict: ❌ FAIL — `msa_sparse` stays opt-in
 

@@ -4,7 +4,7 @@
 **Research:** [`.research/267_Future_Probe_Controlled_Generation_Detection_vs_Prediction_Features.md`](../.research/267_Future_Probe_Controlled_Generation_Detection_vs_Prediction_Features.md)
 **Source paper:** [openreview 48NnVTsirb](https://openreview.net/forum?id=48NnVTsirb) — Kortukov et al., NeurIPS 2026 / Mech Interp Workshop at ICML 2026
 **Reference impl:** <https://github.com/kortukov/future_probes>
-**Target:** `katgpt-rs/src/pruners/future_probe.rs` (new module) + `katgpt-rs/src/pruners/feature_class.rs` (vocabulary tag) + Cargo features `future_probe`, `fpcg_selector`
+**Target:** `katgpt-rs/crates/katgpt-pruners/src/future_probe.rs` (new module) + `katgpt-rs/crates/katgpt-pruners/src/feature_class.rs` (vocabulary tag) + Cargo features `future_probe`, `fpcg_selector`
 **Status:** ✅ COMPLETE — Phase 1 ✓ / Phase 2 ✓ / Phase 3 ✓ / Phase 4 ✓ (G1–G7 all PASS at the mechanism level via the modelless mean-difference probe path + synthetic corpus; G1–G4 real-model run remains a riir-train/riir-ai follow-up per issue 032) / Phase 5 ✓ DECIDED (features stay opt-in pending real-model evidence; Phase 1 vocabulary tag always-on)
 
 ---
@@ -36,7 +36,7 @@ The smallest, highest-value output of this plan. The detection-vs-prediction dis
 
 ### Tasks
 
-- [x] **T1.1** Create `src/pruners/feature_class.rs` with `FeatureClass` enum:
+- [x] **T1.1** Create `crates/katgpt-pruners/src/feature_class.rs` with `FeatureClass` enum:
 
   ```rust
   /// Tags how a primitive reads model activations.
@@ -73,11 +73,11 @@ The smallest, highest-value output of this plan. The detection-vs-prediction dis
 
 ## Phase 2 — FutureBehaviorProbe Primitive
 
-The forecast-side primitive. Single new file: `src/pruners/future_probe.rs`. Mirror `src/pruners/emotion_vector.rs` for the projection pattern.
+The forecast-side primitive. Single new file: `crates/katgpt-pruners/src/future_probe.rs`. Mirror `crates/katgpt-pruners/src/emotion_vector.rs` for the projection pattern.
 
 ### Tasks
 
-- [x] **T2.1** Define types in `src/pruners/future_probe.rs`:
+- [x] **T2.1** Define types in `crates/katgpt-pruners/src/future_probe.rs`:
 
   ```rust
   /// Frozen direction vector for forecasting future behavior probability.
@@ -149,7 +149,7 @@ The candidate-sampler + score + select loop. Mirrors the CGSP Conjecturer→Guid
 
 ### Tasks
 
-- [x] **T3.1** Define `SentenceCandidateSelector` trait (in `src/pruners/future_probe.rs` or a new `src/pruners/fpcg_selector.rs`):
+- [x] **T3.1** Define `SentenceCandidateSelector` trait (in `crates/katgpt-pruners/src/future_probe.rs` or a new `crates/katgpt-pruners/src/fpcg_selector.rs`):
 
   ```rust
   /// Generates M candidate next-utterance-spans for FPCG.
@@ -209,7 +209,7 @@ Benchmark vs the existing detection-side primitives. The headline is the **perpl
 - [x] **T4.1** Set up a small test corpus (synthetic behaviors + resampling labels, or reuse a small open-source prompt set — Refusal-style binary behaviors are simplest). Generate ground-truth behavior labels via the paper's resampling recipe (S=10 base × M=10 completion per sentence).
   - **DONE (mechanism-level, modelless path):** synthetic refusal corpus in `tests/fpcg_goat_gate.rs`. Binary behavior: candidate strings start with `REFUSE:` (label=true) or `COMPLY:` (label=false). d_model=8, refusal signal in dim 0, deterministic hash-derived noise in dims 1–7. 20 prompts × 10 candidates (5 refuse + 5 comply). Activation is a deterministic function of the candidate string (models a real residual-stream snapshot). The paper's resampling recipe (S=10 × M=10) is replaced by a deterministic synthetic generator for the mechanism-level gate — the real-model resampling remains a riir-train follow-up (T4.1-real in `.benchmarks/292_fpcg_goat.md`).
 - [x] **T4.2** Train a `FutureBehaviorProbe` direction vector offline (Python script in `scripts/train_future_probe.py` or `riir-train/`). Logistic regression on (mid-layer activation, behavior-probability label). Save as safetensors with BLAKE3 manifest.
-  - **DONE (modelless path — mean-difference, NOT logistic regression):** `construct_probe_via_mean_difference()` in `crates/katgpt-pruners/src/fpcg_modelless.rs`. Closed-form: `w = mean(act|label=true) − mean(act|label=false)`, `bias = −w·centroid`. No gradient descent (AGENTS.md modelless mandate). This is the standard mech-interp baseline probe (LDA / Fisher discriminant direction). The logistic-regression upgrade (tighter calibration) remains a riir-train follow-up (T4.2-real). 8 unit tests in `fpcg_modelless::tests`.
+  - **DONE (modelless path — mean-difference, NOT logistic regression):** `construct_probe_via_mean_difference()` in `crates/katgpt-pruners/crates/katgpt-pruners/src/fpcg_modelless.rs`. Closed-form: `w = mean(act|label=true) − mean(act|label=false)`, `bias = −w·centroid`. No gradient descent (AGENTS.md modelless mandate). This is the standard mech-interp baseline probe (LDA / Fisher discriminant direction). The logistic-regression upgrade (tighter calibration) remains a riir-train follow-up (T4.2-real). 8 unit tests in `fpcg_modelless::tests`.
 - [x] **T4.3** Run FPCG selector on test corpus. Record: behavior-fraction shift (pp), perplexity delta, format-filter rate, mean tokens generated.
   - **DONE (mechanism-level):** `g1_steering_strength_at_least_30pp` (Δpp=100.0), `g2_ppl_delta_is_zero_by_construction` (PPL=0 by construction), `g3_format_filter_rate_below_10pct` (0.0%) in `tests/fpcg_goat_gate.rs`. Real-model perplexity measurement requires a real model forward pass (riir-ai); the mechanism-level result verifies the algorithm is correct.
 - [x] **T4.4** Run baselines on same corpus:

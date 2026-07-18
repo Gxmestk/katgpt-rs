@@ -3,7 +3,7 @@
 **Date:** 2026-06-21
 **Research:** [katgpt-rs/.research/277_DiffusionGemma_Transparency_Smearing_Faithfulness.md](../.research/277_DiffusionGemma_Transparency_Smearing_Faithfulness.md)
 **Source paper:** [arXiv:2606.20560](https://arxiv.org/abs/2606.20560) — Engels et al., "How Transparent is DiffusionGemma?", DeepMind, Jun 2026
-**Target:** `katgpt-rs/crates/katgpt-core/src/faithfulness/smear.rs` (new module) + Cargo feature `smear_classifier` (depends on `faithfulness_probe`)
+**Target:** `katgpt-rs/crates/katgpt-core/crates/katgpt-core/src/faithfulness/smear.rs` (new module) + Cargo feature `smear_classifier` (depends on `faithfulness_probe`)
 **Status:** Active — Phase 1 complete, Phases 2-4 pending
 
 ---
@@ -113,7 +113,7 @@ impl Default for CosineSmearClassifier {
 
 ### Tasks
 
-- [x] **T1.1** Create `crates/katgpt-core/src/faithfulness/smear.rs` with `SmearClass`, `SmearReport`, `SmearClassifier` trait, `CosineSmearClassifier` impl. Behind `smear_classifier` feature (depends on `faithfulness_probe`).
+- [x] **T1.1** Create `crates/katgpt-core/crates/katgpt-core/src/faithfulness/smear.rs` with `SmearClass`, `SmearReport`, `SmearClassifier` trait, `CosineSmearClassifier` impl. Behind `smear_classifier` feature (depends on `faithfulness_probe`).
 - [x] **T1.2** Implement zero-alloc `classify`: caller passes `&mut [f32]` scratch of length `k + k*(k-1)/2`. Use `simd_dot_f32` for the inner products. No allocations in the hot path.
 - [x] **T1.3** Use `#[repr(u8)]` on `SmearClass` per AGENTS.md rule (1-byte enum).
 - [x] **T1.4** Unit tests:

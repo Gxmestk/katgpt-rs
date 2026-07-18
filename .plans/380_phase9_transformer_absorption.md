@@ -15,7 +15,7 @@ Move four `src/` items into the `katgpt-transformer` workspace crate:
 
 ## Why this unblocks Phase 7 deferred work
 
-Phase 7 deferred `sleep/` because `forward_looped` in `src/transformer.rs`
+Phase 7 deferred `sleep/` because `forward_looped` in `crates/katgpt-percepta/src/transformer.rs`
 directly consumes `crate::sleep::SleepConfig`. Once `mbu`/`dense_mesh`/`swir`/
 `tf_loop` are out of root, the residual `crate::transformer` surface shrinks,
 which is the prerequisite for either (a) Phase 12 final sweep or (b) a future

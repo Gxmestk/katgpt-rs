@@ -793,7 +793,7 @@ fn monopoly_app(seed: u64) -> World {
 
 ## Tasks
 
-- [x] **Task 1: Core Types & Board Data** (`src/pruners/monopoly/mod.rs`)
+- [x] **Task 1: Core Types & Board Data** (`crates/katgpt-pruners/src/monopoly/mod.rs`)
   - Define `PropertyGroup`, `SquareKind`, `TaxKind`, `TurnPhase` enums
   - Define `CardEffect` enum with all classic card types
   - Define `GameEvent` enum with all game events
@@ -802,7 +802,7 @@ fn monopoly_app(seed: u64) -> World {
   - Define Chance and Community Chest card decks (classic 16 each)
   - Unit tests for enum conversions and board data integrity
 
-- [x] **Task 2: ECS Components & Resources** (`src/pruners/monopoly/mod.rs`)
+- [x] **Task 2: ECS Components & Resources** (`crates/katgpt-pruners/src/monopoly/mod.rs`)
   - `Player` component with cash, position, jail state, GOOJF cards
   - `Property` component with square data (name, price, rent table, house cost)
   - `Owned` component (owner, mortgage, house count)
@@ -811,14 +811,14 @@ fn monopoly_app(seed: u64) -> World {
   - `Board`, `TurnState`, `GameConfig`, `PlayerEntities`, `Statistics` resources
   - Unit tests for component defaults
 
-- [x] **Task 3: Board Initialization** (`src/pruners/monopoly/board.rs`)
+- [x] **Task 3: Board Initialization** (`crates/katgpt-pruners/src/monopoly/board.rs`)
   - `build_board(world)` — create 40 square entities with correct Property data
   - `shuffle_decks(world, seed)` — shuffle Chance and Community Chest
   - Property data: all 22 streets, 4 railroads, 2 utilities, 6 special squares
   - Rent tables: base rent, monopoly rent (double), 1–4 houses, hotel
   - Verify all 40 squares have correct indices, prices, and group assignments
 
-- [x] **Task 4: Game Systems** (`src/pruners/monopoly/systems.rs`)
+- [x] **Task 4: Game Systems** (`crates/katgpt-pruners/src/monopoly/systems.rs`)
   - `init_world(seed)` — create world with all resources and board
   - `spawn_players(world)` — 4 players with $1500 starting cash
   - PreTurn phase — jail management, pre-roll decisions
@@ -833,7 +833,7 @@ fn monopoly_app(seed: u64) -> World {
   - Full game runner `run_game()` with `GameResult` return
   - Unit tests for rent, monopolies, building rules, liquidation, full game
 
-- [x] **Task 5: MonopolyPlayer Trait** (`src/pruners/monopoly/players.rs`)
+- [x] **Task 5: MonopolyPlayer Trait** (`crates/katgpt-pruners/src/monopoly/players.rs`)
   - `trait MonopolyPlayer` with decision methods:
     - `should_buy_property(&mut self, ctx: &DecisionContext, square: u8, price: u32) -> bool`
     - `auction_bid(&mut self, ctx: &DecisionContext, square: u8, current_bid: u32) -> u32`
@@ -847,7 +847,7 @@ fn monopoly_app(seed: u64) -> World {
   - `JailDecision` enum: `PayFine`, `UseCard`, `RollForDoubles`
   - `TradeResponse` enum: `Accept`, `Decline`, `CounterOffer(TradeOffer)`
 
-- [x] **Task 6: RandomPlayer (P1)** (`src/pruners/monopoly/players.rs`)
+- [x] **Task 6: RandomPlayer (P1)** (`crates/katgpt-pruners/src/monopoly/players.rs`)
   - Buy: square parity pseudo-random, 50% if affordable
   - Auction: AUCTION_MIN_BID or pass
   - Jail: PayFine if affordable, else RollForDoubles
@@ -856,7 +856,7 @@ fn monopoly_app(seed: u64) -> World {
   - Mortgage: no ordering (empty vec)
   - Unit tests verifying random decisions stay within legal bounds
 
-- [x] **Task 7: GreedyPlayer (P2)** (`src/pruners/monopoly/players.rs`)
+- [x] **Task 7: GreedyPlayer (P2)** (`crates/katgpt-pruners/src/monopoly/players.rs`)
   - Buy: everything affordable (cash - price ≥ $100)
   - Auction: bid up to 80% of strategic value
   - Jail: pay early (turns 1–15), roll late
@@ -866,7 +866,7 @@ fn monopoly_app(seed: u64) -> World {
   - Heuristic scoring function `property_strategic_value()`
   - Unit tests for buying/building priorities
 
-- [x] **Task 8: ValidatorPlayer (P3)** (`src/pruners/monopoly/players.rs`)
+- [x] **Task 8: ValidatorPlayer (P3)** (`crates/katgpt-pruners/src/monopoly/players.rs`)
   - Buy: cash_buffer ≥ $200 after purchase
   - Auction: bid up to strategic value minus safety margin
   - Jail: stay late game (board dangerous), pay early
@@ -876,7 +876,7 @@ fn monopoly_app(seed: u64) -> World {
   - Financial risk assessment function
   - Unit tests for safety constraints (never drops below reserve)
 
-- [x] **Task 9: HLPlayer (P4)** (`src/pruners/monopoly/players.rs`)
+- [x] **Task 9: HLPlayer (P4)** (`crates/katgpt-pruners/src/monopoly/players.rs`)
   - All P3 safety rules + opponent portfolio tracking
   - Game phase detection (`GamePhase::Early/Mid/Late`) with strategy adaptation
   - 5 `Strategy` arms: Expansion, Development, Survival, Aggressive, Conservative
@@ -969,10 +969,10 @@ tests/
 
 | File | Est. Lines | Purpose |
 |------|-----------|---------|
-| `src/pruners/monopoly/mod.rs` | ~400 | Enums, components, resources, events, board data constants |
-| `src/pruners/monopoly/board.rs` | ~250 | Board init, deck shuffle, property definitions |
-| `src/pruners/monopoly/systems.rs` | ~700 | Turn execution, phase systems, utility functions |
-| `src/pruners/monopoly/players.rs` | ~1200 | Trait + 4 AI implementations |
+| `crates/katgpt-pruners/src/monopoly/mod.rs` | ~400 | Enums, components, resources, events, board data constants |
+| `crates/katgpt-pruners/src/monopoly/board.rs` | ~250 | Board init, deck shuffle, property definitions |
+| `crates/katgpt-pruners/src/monopoly/systems.rs` | ~700 | Turn execution, phase systems, utility functions |
+| `crates/katgpt-pruners/src/monopoly/players.rs` | ~1200 | Trait + 4 AI implementations |
 | `examples/monopoly_01_arena.rs` | ~250 | Headless tournament runner |
 | `examples/monopoly_02_tui.rs` | ~550 | TUI with board rendering |
 | `examples/monopoly_03_hl_proof.rs` | ~450 | 1000-game proof experiment |

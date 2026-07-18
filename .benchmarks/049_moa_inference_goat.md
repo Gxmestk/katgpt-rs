@@ -120,7 +120,7 @@ moa_inference = ["coda_fusion", "katgpt-core/moa_inference"]
 
 | File | Role |
 |------|------|
-| `crates/katgpt-core/src/coda.rs` | `MoaActivation`, `MoaConfig`, `compute_moa_gates`, `moa_swiglu`, `simd_matmul_rmsnorm_moa_swiglu` + tests (incl. elementwise sign-error fix) |
+| `crates/katgpt-core/crates/katgpt-core/src/coda.rs` | `MoaActivation`, `MoaConfig`, `compute_moa_gates`, `moa_swiglu`, `simd_matmul_rmsnorm_moa_swiglu` + tests (incl. elementwise sign-error fix) |
 | `crates/katgpt-core/src/lib.rs` | Re-exports under the `moa_inference` gate |
 | `.benchmarks/049_moa_inference_goat.md` | NEW: this file |
 

@@ -156,7 +156,7 @@ crates/katgpt-core/src/
 
 ### Implementation
 
-- [x] Create `src/speculative/selectivity_router.rs`
+- [x] Create `crates/katgpt-speculative/src/selectivity_router.rs`
   - [x] Implement `SelectivityRouter` struct with `position_kurtosis: Vec<f32>`, `kurtosis_threshold: f32`, `alpha: f32`
   - [x] Implement `new()` with defaults (threshold=1.0, alpha=0.1)
   - [x] Implement `with_capacity(max_positions: usize)` for pre-allocation

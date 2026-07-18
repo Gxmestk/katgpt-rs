@@ -76,7 +76,7 @@ graph TD
 
 ### Phase 3: `IdeaDivergence` Metric + Collapse Prevention
 
-- [x] **T3.1** Create `IdeaDivergence` struct in `src/pruners/idea_divergence.rs`
+- [x] **T3.1** Create `IdeaDivergence` struct in `crates/katgpt-pruners/src/idea_divergence.rs`
   - Score vector storage: `arm_scores: Vec<Vec<f32>>`
   - `fn divergence(arm_a, arm_b) -> f32` — normalized L2 distance (FrontierSmith eq. 3)
   - `fn is_novel(new_arm_scores) -> bool` — min divergence > threshold

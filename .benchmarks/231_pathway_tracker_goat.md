@@ -53,11 +53,11 @@ running 7 tests — 7 passed; 0 failed
 
 | Component | Tests | File |
 |-----------|-------|------|
-| `PathwayTracker::new` | 1 unit + 7 GOAT | `src/speculative/pathway_tracker.rs` |
-| `PathwayTracker::update` | 2 unit + 7 GOAT | `src/speculative/pathway_tracker.rs` |
-| `PathwayTracker::stability` | 2 unit + 7 GOAT | `src/speculative/pathway_tracker.rs` |
-| `PathwayTracker::is_converged` | 3 unit + 7 GOAT | `src/speculative/pathway_tracker.rs` |
-| `PathwayTracker::reset` | 1 unit + 7 GOAT | `src/speculative/pathway_tracker.rs` |
+| `PathwayTracker::new` | 1 unit + 7 GOAT | `crates/katgpt-speculative/src/pathway_tracker.rs` |
+| `PathwayTracker::update` | 2 unit + 7 GOAT | `crates/katgpt-speculative/src/pathway_tracker.rs` |
+| `PathwayTracker::stability` | 2 unit + 7 GOAT | `crates/katgpt-speculative/src/pathway_tracker.rs` |
+| `PathwayTracker::is_converged` | 3 unit + 7 GOAT | `crates/katgpt-speculative/src/pathway_tracker.rs` |
+| `PathwayTracker::reset` | 1 unit + 7 GOAT | `crates/katgpt-speculative/src/pathway_tracker.rs` |
 | GOAT proof | 7 | `tests/bench_231_pathway_tracker_goat.rs` |
 | **Total** | **22** | |
 

@@ -563,7 +563,7 @@ SelfImprovingCycle {
     └── Path C (Phase 2):   Proposer↔Generator self-play → DPO LoRA  (model-based G-Zero)
                               ├─ SFT + DPO loss: riir-gpu/src/loss.rs (GpuLoss CE + DPO extension)
                               ├─ Backward pass:  riir-gpu/src/backward.rs (LoRA grads)
-                              ├─ Optimizer:      riir-gpu/src/optimizer.rs (AdamW)
+                              ├─ Optimizer:      riir-gpu/crates/katgpt-core/src/skill_opt/optimizer.rs (AdamW)
                               └─ Alt SFT path:   riir-burner --backend rust (burn/Metal subprocess, SFT only)
 }
 ```
@@ -659,7 +659,7 @@ Key architectural difference: The source runs on **Tinker** (cloud API with `Sam
 - `SamplingClient.sample()` → `katgpt-rs` transformer forward + generate
 - `SamplingClient.compute_logprobs()` → teacher-forced forward with log-prob extraction
 - `TrainingClient.forward_backward_custom()` → `riir-gpu` custom loss pipeline
-- `TrainingClient.optim_step()` → `riir-gpu/src/optimizer.rs` AdamW
+- `TrainingClient.optim_step()` → `riir-gpu/crates/katgpt-core/src/skill_opt/optimizer.rs` AdamW
 
 ---
 

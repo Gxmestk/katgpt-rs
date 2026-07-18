@@ -4,7 +4,7 @@
 **Research:** [katgpt-rs/.research/256_GzipLM_Compression_Drafter.md](../.research/256_GzipLM_Compression_Drafter.md) (revised to GOAT)
 **Private companion:** `riir-ai/.research/137_Compression_Drafter_Plasma_Personality_Guide.md` (exploration, not committed)
 **Source paper:** [nathan.rs/gzip-lm](https://nathan.rs/posts/gzip-lm/) — beam-search text generation by compression
-**Target:** `katgpt-rs/crates/katgpt-core/src/compression_drafter.rs` (new module, open) + `riir-ai/crates/riir-games/src/quest_grammar/compression_draft.rs` (game wiring, private)
+**Target:** `katgpt-rs/crates/katgpt-core/crates/katgpt-core/src/compression_drafter.rs` (new module, open) + `riir-ai/crates/riir-games/src/quest_grammar/compression_draft.rs` (game wiring, private)
 **Cargo features:** `compression_drafter` (katgpt-core, opt-in), `quest_compression_draft` (riir-games, opt-in, depends on `quest_grammar` + `compression_drafter`)
 **Status:** COMPLETE — GOAT FAILED (2 runs). Demoted. `TernaryDraftModel` remains default-on for Hot-tier quest grammar. `compression_drafter` open primitive + `quest_compression_draft` private wiring stay opt-in, unused, ready for any future Warm-tier consumer.
 
@@ -36,7 +36,7 @@ Ship a **Hot-tier modelless CompressionDrafter** that scores quest-continuation 
 ### Tasks
 
 - [x] **T1.1** Add `lz4_flex = "3"` to `katgpt-rs/crates/katgpt-core/Cargo.toml` under optional dep `lz4_flex` (feature-gated by `compression_drafter`). Pure Rust, no unsafe, BSD-2 license — compatible with MIT.
-- [x] **T1.2** Create `katgpt-rs/crates/katgpt-core/src/compression_drafter.rs` with:
+- [x] **T1.2** Create `katgpt-rs/crates/katgpt-core/crates/katgpt-core/src/compression_drafter.rs` with:
   - `pub trait CompressionDrafter { fn score(&mut self, ctx: &[u8], candidate: &[u8]) -> i32; fn score_batch(&mut self, ctx: &[u8], candidates: &[&[u8]]) -> Vec<i32>; fn corpus(&self) -> &[u8]; }`
   - `pub struct Lz4FlexDrafter { corpus: Vec<u8>, scratch: Vec<u8> }` — wraps `lz4_flex::compress_prepend_size` for batched scoring.
   - `score(ctx, candidate)` returns `compressed_len(ctx) - compressed_len(ctx + candidate)` (higher = more compressible = more likely). Negative values mean candidate added entropy.
@@ -101,7 +101,7 @@ Root cause analysis:
 
 ### Tasks
 
-- [x] **T5.1** Add `beam_search()` function to `katgpt-rs/crates/katgpt-core/src/compression_drafter.rs`:
+- [x] **T5.1** Add `beam_search()` function to `katgpt-rs/crates/katgpt-core/crates/katgpt-core/src/compression_drafter.rs`:
   - Signature: `pub fn beam_search<S: MatchScorer>(scorer: &S, seed_ctx: &[u8], alphabet: &[u8], horizon: usize, beam_width: usize, tail_len: usize) -> Vec<u8>`
   - Algorithm: nathan.rs/gzip-lm's actual beam search (see research §1.1). At each of `horizon` steps:
     1. For each beam × each alphabet byte, score `tail(seed_ctx + beam) + [byte]`.

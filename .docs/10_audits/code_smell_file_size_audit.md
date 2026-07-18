@@ -24,7 +24,7 @@ throughout), zero `Arc<RwLock<HashMap>>`.
 
 | File | Was | Now | Sub-issue |
 |---|---|---|---|
-| `src/transformer.rs` | 5672 | `transformer/` module folder (8 sub-modules, public API preserved 1:1 via `mod.rs` re-exports) | Issue 164 |
+| `crates/katgpt-percepta/src/transformer.rs` | 5672 | `transformer/` module folder (8 sub-modules, public API preserved 1:1 via `mod.rs` re-exports) | Issue 164 |
 | `crates/katgpt-speculative/src/dd_tree.rs` | 4207 | `dd_tree/` module folder — `mod.rs` + `tree_builder.rs` + `lodestar.rs` + `tests.rs` | Issues 165 + 178 |
 
 ## High (2048–3200 lines — soft limit) — split outcomes
@@ -37,7 +37,7 @@ throughout), zero `Arc<RwLock<HashMap>>`.
 | `crates/katgpt-core/src/parallax_attn.rs` | 2524 | ✅ Split (Issue 167) — `parallax_attn/mod.rs` 973 + `tests.rs` 1559 |
 | `crates/katgpt-core/src/speculative/qmc.rs` | 2516 | ✅ Split (Issue 170) — `qmc/mod.rs` 1085 + `tests.rs` 1430 (57% tests) |
 | `crates/katgpt-core/src/manifold_bandit.rs` | 2196 | ✅ Split (Issue 171) — `manifold_bandit/mod.rs` 1290 + `tests.rs` 906 (41% tests) |
-| `crates/katgpt-forward/src/d2f.rs` | 2268 | ✅ Split (Issue 172) — `d2f/mod.rs` 1783 + `tests.rs` 485 (21% tests) |
+| `crates/katgpt-forward/src/speculative/d2f.rs` | 2268 | ✅ Split (Issue 172) — `d2f/mod.rs` 1783 + `tests.rs` 485 (21% tests) |
 | `crates/katgpt-percepta/src/wasm/lower.rs` | 2248 | ✅ Split (Issue 173) — `wasm/lower/mod.rs` 1873 + `tests.rs` 375 (17% tests) |
 | `crates/katgpt-core/src/traits.rs` | 2203 | ✅ Split (Issue 174) — `traits/mod.rs` 1495 + 5 sibling test files (692 total) |
 | `src/pruners/bomber/players.rs` | 2828 | ✅ Functional split (Issue 175) — `players/` folder: mod.rs 155 + helpers.rs 783 + 7 player-type files + tests.rs 102 |
@@ -46,10 +46,10 @@ throughout), zero `Arc<RwLock<HashMap>>`.
 | `crates/katgpt-core/src/funcattn.rs` | 2086 | ✅ Split (Issue 176 T3) — mod.rs 983 (53% tests) |
 | `crates/katgpt-dec/src/sheaf_admm.rs` | 2109 | ✅ Split (Issue 176 T4) — mod.rs 1222 (42% tests) |
 | `crates/katgpt-percepta/src/graph/types.rs` | 2055 | ✅ Split (Issue 176 T5) — `types/mod.rs` 1333 (35% tests) |
-| `crates/katgpt-pruners/src/bandit.rs` | 2178 | ✅ Functional split (Issue 177) — `bandit/` folder: mod.rs 1289 + environment.rs + session.rs + shared_stats.rs + randopt.rs |
+| `crates/katgpt-pruners/crates/katgpt-ruliology/src/bandit.rs` | 2178 | ✅ Functional split (Issue 177) — `bandit/` folder: mod.rs 1289 + environment.rs + session.rs + shared_stats.rs + randopt.rs |
 | `crates/katgpt-speculative/src/dd_tree/mod.rs` | 2125 | ✅ Extracted Lodestar (Issue 178) — mod.rs 1866 + `lodestar.rs` 770 |
-| `crates/katgpt-speculative/src/weaver.rs` | 2817 | **CONFIRMED KEEP** — user-explicit skip (759 test lines; extraction leaves impl at 2058, 10 over soft limit) |
-| `crates/katgpt-speculative/src/dd_tree/tree_builder.rs` | 2091 | **CONFIRMED KEEP** (Issue 178 T4) — single `TreeBuilder` struct with tightly-coupled private state; splitting would require `pub(super)` fields or accessor boilerplate. 2% over soft limit, well under hard limit. Cohesion > marginal split benefit. |
+| `crates/katgpt-speculative/crates/katgpt-speculative/src/weaver.rs` | 2817 | **CONFIRMED KEEP** — user-explicit skip (759 test lines; extraction leaves impl at 2058, 10 over soft limit) |
+| `crates/katgpt-speculative/crates/katgpt-speculative/src/dd_tree/tree_builder.rs` | 2091 | **CONFIRMED KEEP** (Issue 178 T4) — single `TreeBuilder` struct with tightly-coupled private state; splitting would require `pub(super)` fields or accessor boilerplate. 2% over soft limit, well under hard limit. Cohesion > marginal split benefit. |
 
 **Lesson (Issue 170–174):** prior sessions mis-called several files as
 "functional-split-required" when they were actually mechanical
@@ -75,8 +75,8 @@ Three sites flagged for latent-domain misuse — all audited, all KEEP:
 
 | Site | Verdict |
 |---|---|
-| `crates/katgpt-transformer/src/swir/strategy_adapter.rs:106, 192` | **KEEP** — `softmax_into_scratch` converts token logits → probability distribution for soft-embedding accumulation. Canonical logit-domain. |
-| `crates/katgpt-sense/src/reconstruction.rs:1236, 1237, 1264` | **KEEP** — `advantage_margin_hla` (Eq. 18, arxiv:2511.16886) computes `KL(π+ ‖ π̂)` via `log_softmax`. KL divergence between action distributions mathematically requires log-softmax. Feature-gated `self_advantage_gate`. |
+| `crates/katgpt-transformer/crates/katgpt-transformer/src/swir/strategy_adapter.rs:106, 192` | **KEEP** — `softmax_into_scratch` converts token logits → probability distribution for soft-embedding accumulation. Canonical logit-domain. |
+| `crates/katgpt-sense/crates/katgpt-sense/src/reconstruction.rs:1236, 1237, 1264` | **KEEP** — `advantage_margin_hla` (Eq. 18, arxiv:2511.16886) computes `KL(π+ ‖ π̂)` via `log_softmax`. KL divergence between action distributions mathematically requires log-softmax. Feature-gated `self_advantage_gate`. |
 | `crates/katgpt-quant/src/octopus/forward.rs:438` | **KEEP** — cited line is a test-assertion message string, not production softmax. Production softmax (`attention_octopus` L88) is canonical softmax-over-keys for attention weights. |
 
 ## Low

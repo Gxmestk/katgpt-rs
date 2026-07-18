@@ -31,8 +31,8 @@ This catches a failure mode discrete pruners miss: a branch generating syntactic
 ### Files to Create/Modify
 
 - [x] `crates/katgpt-core/src/mux/mod.rs` — new `mux` module root, conditionally compiled under `mux_pruner`
-- [x] `crates/katgpt-core/src/mux/span_pruner.rs` — `MuxSpanPruner` struct + `ConstraintPruner` impl
-- [x] `crates/katgpt-core/src/mux/top_k.rs` — `extract_top_k_peaks()` helper (sort logits, return (index, value) pairs)
+- [x] `crates/katgpt-core/crates/katgpt-core/src/mux/span_pruner.rs` — `MuxSpanPruner` struct + `ConstraintPruner` impl
+- [x] `crates/katgpt-core/crates/katgpt-core/src/mux/top_k.rs` — `extract_top_k_peaks()` helper (sort logits, return (index, value) pairs)
 - [x] `crates/katgpt-core/src/lib.rs` — add `#[cfg(feature = "mux_pruner")] pub mod mux;`
 - [x] `crates/katgpt-core/Cargo.toml` — add `mux_pruner = []` feature
 - [x] `Cargo.toml` — add `mux_pruner = []` feature gate
@@ -154,7 +154,7 @@ This connects to existing HL infrastructure:
 
 ### Files to Create/Modify
 
-- [x] `crates/katgpt-core/src/mux/bandit_width.rs` — `MuxBanditWidth` arm selector, K ∈ {1, 2, 3, 5, 8}
+- [x] `crates/katgpt-core/crates/katgpt-core/src/mux/bandit_width.rs` — `MuxBanditWidth` arm selector, K ∈ {1, 2, 3, 5, 8}
 - [x] `crates/katgpt-core/src/mux/mod.rs` — add `bandit_width` submodule under `mux_bandit` gate
 - [x] `crates/katgpt-core/Cargo.toml` — add `mux_bandit = ["mux_pruner"]` feature (note: `bandit` + `rim_slots` are workspace-level deps)
 - [x] `Cargo.toml` — add `mux_bandit = ["mux_pruner", "bandit", "rim_slots"]` feature gate
@@ -210,7 +210,7 @@ At each DDTree depth, read the model's logit distribution at the current positio
 
 ### Files to Create/Modify
 
-- [x] `crates/katgpt-core/src/mux/bfs.rs` — `MuxBfs` dynamic-width expansion strategy
+- [x] `crates/katgpt-core/crates/katgpt-core/src/mux/bfs.rs` — `MuxBfs` dynamic-width expansion strategy
 - [x] `crates/katgpt-core/src/mux/dd_tree.rs` — extend `MuxDdTree` with BFS frontier mode
 - [x] `crates/katgpt-core/src/mux/mod.rs` — add `bfs` submodule under `mux_bfs` gate
 - [x] `crates/katgpt-core/Cargo.toml` — add `mux_bfs = ["mux_ddtree"]` feature
@@ -271,7 +271,7 @@ Implement the deterministic demultiplexer: given a logit vector, extract top-K p
 
 ### Files to Create/Modify
 
-- [x] `crates/katgpt-core/src/mux/demux.rs` — `mux_demux()` function + `MuxDemuxVerifier` struct
+- [x] `crates/katgpt-core/crates/katgpt-core/src/mux/demux.rs` — `mux_demux()` function + `MuxDemuxVerifier` struct
 - [x] `crates/katgpt-core/src/mux/mod.rs` — add `demux` submodule under `mux_demux` gate
 - [x] `crates/katgpt-core/Cargo.toml` — add `mux_demux = []` feature
 - [x] `Cargo.toml` — add `mux_demux = []` feature gate
@@ -406,11 +406,11 @@ graph TD
 
 | Gate | Depends On | Default | File | Phase |
 |------|-----------|---------|------|-------|
-| `mux_pruner` | — | off | `crates/katgpt-core/src/mux/span_pruner.rs` | 1 |
-| `mux_demux` | — | off | `crates/katgpt-core/src/mux/demux.rs` | 1 |
+| `mux_pruner` | — | off | `crates/katgpt-core/crates/katgpt-core/src/mux/span_pruner.rs` | 1 |
+| `mux_demux` | — | off | `crates/katgpt-core/crates/katgpt-core/src/mux/demux.rs` | 1 |
 | `mux_ddtree` | `mux_pruner` | off | `crates/katgpt-core/src/mux/dd_tree.rs` | 2 |
-| `mux_bfs` | `mux_ddtree` | off | `crates/katgpt-core/src/mux/bfs.rs` | 2 |
-| `mux_bandit` | `mux_pruner`, `bandit`, `rim_slots` | off | `crates/katgpt-core/src/mux/bandit_width.rs` | 3 |
+| `mux_bfs` | `mux_ddtree` | off | `crates/katgpt-core/crates/katgpt-core/src/mux/bfs.rs` | 2 |
+| `mux_bandit` | `mux_pruner`, `bandit`, `rim_slots` | off | `crates/katgpt-core/crates/katgpt-core/src/mux/bandit_width.rs` | 3 |
 | `mux_freeze_thaw` | `mux_pruner`, `rim_slots` | off | `crates/katgpt-core/src/mux/freeze_thaw.rs` | 3 |
 
 ## CPU/GPU Auto-Route

@@ -214,7 +214,7 @@ katgpt-rs/src/cce/
 
 ### Phase 2 — LP solver extension
 
-- [x] **T2.1** Implement `CceLp::solve_heterogeneous::<N, A, H>(game: &H)` in `katgpt-rs/src/cce/lp.rs`. Refactor the existing `solve` to share BFS-enumeration infrastructure with the new method (extract `enumerate_bfs(mat, rhs, n_vars, na)` helper — DRY, keeps both paths consistent).
+- [x] **T2.1** Implement `CceLp::solve_heterogeneous::<N, A, H>(game: &H)` in `katgpt-rs/crates/katgpt-core/src/cce/lp.rs`. Refactor the existing `solve` to share BFS-enumeration infrastructure with the new method (extract `enumerate_bfs(mat, rhs, n_vars, na)` helper — DRY, keeps both paths consistent).
 - [x] **T2.2** Implement `CceLp::is_heterogeneous_cce(rho, game, epsilon)` — per-player, per-deviation regret check. Early-exit on first violation.
 - [x] **T2.3** Implement `ExternalRegret::er_heterogeneous(rho, game)` — average per-player external regret.
 
@@ -222,7 +222,7 @@ katgpt-rs/src/cce/
 
 ### Phase 3 — `PerPlayerGame` default impl + tests
 
-- [x] **T3.1** Implement `PerPlayerGame<N, A, P, D>` in `katgpt-rs/src/cce/heterogeneous.rs`.
+- [x] **T3.1** Implement `PerPlayerGame<N, A, P, D>` in `katgpt-rs/crates/katgpt-core/src/cce/heterogeneous.rs`.
 - [x] **T3.2** Unit tests in `heterogeneous.rs`:
   - `homogeneous_equivalence` — `PerPlayerGame` with all players sharing the same `(P, D)` gives the same `ρ⋆` as `CceLp::solve(d, p)` on that single `(P, D)`. **Closes the "wrapper is a strict generalization" check.**
   - `two_player_prisoners_dilemma` — classic 2-player PD where each player has its own payoff tensor. **Wording corrected:** single-shot PD with constant-deviation class has a larger CCE feasible set than `{δ_(D,D)}`; the test verifies feasibility + CCE validity + per-player regret ≤ ε + γ₀ range, not cooperation (which is not incentive-compatible).
@@ -303,7 +303,7 @@ katgpt-rs/src/cce/
 - [x] G3 PASS (convergence rate log-log slope = -1.0; ≤ -0.5 paper bound).
 - [x] G4 PASS (<50ms on ALL scales post-T4.3b: 32-player crowd-scale = 8.9ms via primal-dual).
 - [x] All unit tests in `heterogeneous.rs` pass (5/5).
-- [~] `cargo check --all-features` clean (CI feature guard catches combo regressions per the `merkle_root` lesson). **PRE-EXISTING FAILURE** in `katgpt-core/src/dec/hodge.rs:222` (borrow-checker error in unrelated `LoraAdapter` combo) — not introduced by Plan 300. `cargo check --features cce_moderator` passes clean; `cargo check` (default features, post-T5.4 promotion) passes clean. The `--all-features` failure is in a different crate and was present before this plan. Left for the owner of the hodge/LoraAdapter work to fix.
+- [~] `cargo check --all-features` clean (CI feature guard catches combo regressions per the `merkle_root` lesson). **PRE-EXISTING FAILURE** in `katgpt-core/crates/katgpt-dec/src/hodge.rs:222` (borrow-checker error in unrelated `LoraAdapter` combo) — not introduced by Plan 300. `cargo check --features cce_moderator` passes clean; `cargo check` (default features, post-T5.4 promotion) passes clean. The `--all-features` failure is in a different crate and was present before this plan. Left for the owner of the hodge/LoraAdapter work to fix.
 - [x] Plan 300 status → ✅ COMPLETE. Issue 327 T-A+.1 through T-A+.4 marked done.
 
 ---

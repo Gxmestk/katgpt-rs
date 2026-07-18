@@ -18,7 +18,7 @@ Apply Gemma 4 QAT's fundamental insight (*optimize for the precision you'll depl
 
 ### Phase 1: Static Calibration Tables (SCT) — Highest confidence, pure modelless
 
-- [x] Create `src/static_cal.rs` with `StaticCalTable` struct
+- [x] Create `crates/katgpt-attn/src/static_cal.rs` with `StaticCalTable` struct
   - `scales: Vec<f32>` indexed by `(layer * num_heads + head)`
   - `calibrate_from_stats(stats: &[HeadStats])` — sigmoid + EMA calibration
   - `get_scale(layer: usize, head: usize) -> f32` — O(1) unsafe lookup in release
@@ -37,7 +37,7 @@ Apply Gemma 4 QAT's fundamental insight (*optimize for the precision you'll depl
 
 ### Phase 2: Targeted Precision Budget (TPB) — Per-head bit allocation
 
-- [x] Create `src/targeted_precision.rs` with `PrecisionBudget` struct
+- [x] Create `crates/katgpt-kv/src/targeted_precision.rs` with `PrecisionBudget` struct
   - `head_bits: Vec<u8>` — bits per attention head
   - `budget: f32` — total bits budget (average)
   - `compute_budget(model: &Model, calibration_data: &[Tensor]) -> PrecisionBudget`
@@ -54,7 +54,7 @@ Apply Gemma 4 QAT's fundamental insight (*optimize for the precision you'll depl
 
 ### Phase 3: Modality-Pruned Context Loading — Pipeline pruning
 
-- [x] Create `src/pipeline_pruner.rs` with `PipelineConfig` enum
+- [x] Create `crates/katgpt-core/src/pipeline_pruner.rs` with `PipelineConfig` enum
   - `Simple` — direct decode only
   - `Code` — DDTree + SynPruner, no KV compression
   - `LongContext` — VortexFlow + KV compression, no speculative
@@ -73,7 +73,7 @@ Apply Gemma 4 QAT's fundamental insight (*optimize for the precision you'll depl
 
 ### Phase 4: Precision-Aware Speculative Drafting (PASD)
 
-- [x] Create `src/precision_aware_draft.rs` with `BoundaryPenalty` struct
+- [x] Create `crates/katgpt-speculative/src/precision_aware_draft.rs` with `BoundaryPenalty` struct
   - `compute_boundary_score(token_logits: &[f32], quant_scale: f32) -> f32`
   - Scores how close logits are to quantization boundaries
 - [x] Add `precision_aware_draft` feature flag
@@ -102,7 +102,7 @@ Apply Gemma 4 QAT's fundamental insight (*optimize for the precision you'll depl
 
 - [x] Add `async_qdq_overlap` feature flag (requires `inference_router`)
 - [x] Implement double-buffered KV dequantize: CPU dequantizes chunk N+1 while GPU processes chunk N
-- [x] Implement in `src/async_qdq.rs` (generic, ready for GPU integration)
+- [x] Implement in `crates/katgpt-kv/src/async_qdq.rs` (generic, ready for GPU integration)
 - [x] Write `tests/async_qdq_goat.rs` benchmark:
   - Before: sequential dequantize → attention
   - After: overlapped dequantize + attention

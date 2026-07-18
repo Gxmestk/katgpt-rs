@@ -46,7 +46,7 @@ pub trait BestBuddyAligner: Send + Sync {
 - [x] Implement `pearson_correlation(a: &[f32], b: &[f32]) -> f32` in `katgpt-core/src/traits.rs` (SIMD-friendly, single-pass, no allocation)
 - [x] Implement `best_buddies(corr_rows: &[&[f32]], k: usize) -> Vec<(usize, usize)>` in `katgpt-core/src/traits.rs`
 - [x] Add `BestBuddyAligner` trait to `katgpt-core/src/traits.rs`
-- [x] Implement `MarginalBestBuddyAligner` in `katgpt-rs/src/speculative/best_buddies.rs`
+- [x] Implement `MarginalBestBuddyAligner` in `katgpt-rs/crates/katgpt-speculative/src/best_buddies.rs`
 - [x] Integrate into `build_dd_tree_speculative`: filter marginals by mutual agreement before tree construction
 - [x] Add feature flag `best_buddies` (opt-in initially, default-on after GOAT proof)
 - [x] Write tests: pearson_correlation, best_buddies, MarginalBestBuddyAligner, integration (19 tests passing)

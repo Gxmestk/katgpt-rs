@@ -80,7 +80,7 @@ pub enum AndOrNode<G, S> {
 
 ### T2: `AndOrBuilder` — Decomposition logic for DDTree marginals
 
-**Where:** `katgpt-rs/src/speculative/and_or_builder.rs` (new)
+**Where:** `katgpt-rs/crates/katgpt-speculative/crates/katgpt-speculative/src/and_or_builder.rs` (new)
 
 Converts flat marginals into AND-OR tree based on `ScreeningPruner::relevance()` signal. Low relevance regions become decomposition points.
 
@@ -107,7 +107,7 @@ Key methods:
 
 ### T3: Blueprint Pre-Pass — Cheap argmax plan generation
 
-**Where:** `katgpt-rs/src/speculative/blueprint.rs` (new)
+**Where:** `katgpt-rs/crates/katgpt-speculative/src/blueprint.rs` (new)
 
 Generate a cheap "blueprint" (argmax path without tree search) that guides the expensive DDTree search. Tokens compatible with the blueprint get priority in the heap.
 
@@ -134,7 +134,7 @@ impl BlueprintPass {
 
 ### T4: Decomposition Reviewer — Progress signal for dead-end detection
 
-**Where:** `katgpt-rs/src/speculative/decomp_reviewer.rs` (new)
+**Where:** `katgpt-rs/crates/katgpt-speculative/src/decomp_reviewer.rs` (new)
 
 Lightweight entropy-based check that detects unproductive DDTree branches. Uses `ProofGoalCache` hit rate as progress signal.
 

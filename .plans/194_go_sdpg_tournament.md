@@ -36,7 +36,7 @@ Key difference from Bomber: No template proposer layer. Go's categories ARE the 
 
 ### Phase 1: GoSdpgPlayer Implementation
 
-- [x] **T1: Create `src/pruners/go/sdpg_player.rs`** — `GoSdpgPlayer` struct
+- [x] **T1: Create `crates/katgpt-pruners/src/go/sdpg_player.rs`** — `GoSdpgPlayer` struct
   - Wraps `GoHLPlayer` for move categorization and heuristic scoring
   - Own `SdpgBanditPruner<NoScreeningPruner>` with 8 arms (one per `GoMoveCategory`)
   - `with_teacher_q(teacher_q: Vec<f32>)` constructor for oracle injection
@@ -80,8 +80,8 @@ Key difference from Bomber: No template proposer layer. Go's categories ARE the 
 
 | File | Changes |
 |------|---------|
-| `src/pruners/go/sdpg_player.rs` | **New:** `GoSdpgPlayer` struct + `GoPlayer` impl |
-| `src/pruners/go/mod.rs` | Add `sdpg_player` module + re-export |
-| `src/pruners/go/tournament.rs` | Add `GoPlayerType::Sdpg` variant |
+| `crates/katgpt-pruners/src/go/sdpg_player.rs` | **New:** `GoSdpgPlayer` struct + `GoPlayer` impl |
+| `crates/katgpt-pruners/src/go/mod.rs` | Add `sdpg_player` module + re-export |
+| `crates/katgpt-pruners/src/go/tournament.rs` | Add `GoPlayerType::Sdpg` variant |
 | `examples/go_10_sdpg_tournament.rs` | **New:** Burn-in + SDPG tournament + GOAT gate |
 | `Cargo.toml` | Register example |

@@ -148,7 +148,7 @@ pub trait RoaringBatching: Send + Sync {
 ## Tasks
 
 ### Phase 1: LSH SimHash Approximate Cache
-- [x] Add `SimHashFingerprint`, `LshBucket`, `LshApproximateCache` types to `src/pruners/lsh_cache.rs`
+- [x] Add `SimHashFingerprint`, `LshBucket`, `LshApproximateCache` types to `crates/katgpt-pruners/src/lsh_cache.rs`
 - [x] Implement `SimHashFingerprint::from_logits()` — random projection R ∈ {-1,+1}^(d×64) → sign(R^T·x) → u64
 - [x] Implement `LshApproximateCache::new()` — 4096 buckets, configurable capacity per bucket
 - [x] Implement `LshApproximateCache::lookup()` — compute SimHash, find bucket, check Hamming distance ≤ radius
@@ -164,7 +164,7 @@ pub trait RoaringBatching: Send + Sync {
 - [x] Benchmark: LSH warm-start vs full compute on realistic decode sequence
 
 ### Phase 2: Count-Min Sketch Frequency
-- [x] Add `CountMinSketch` type to `src/pruners/count_min_sketch.rs`
+- [x] Add `CountMinSketch` type to `crates/katgpt-pruners/src/count_min_sketch.rs`
 - [x] Implement `CountMinSketch::new()` — 4 rows × 256 cols, BLAKE3-derived seeds
 - [x] Implement `CountMinSketch::update()` — increment counters for each row
 - [x] Implement `CountMinSketch::estimate()` — min across rows (one-sided overestimate)
@@ -180,7 +180,7 @@ pub trait RoaringBatching: Send + Sync {
 
 ### Phase 3: Roaring Bitmap Membership
 - [x] ~~Add `roaring` dependency to `Cargo.toml`~~ — SKIPPED: custom `CompactBitmap` with no external dep (prove concept first)
-- [x] Add `RoaringMembership` type to `src/pruners/roaring_membership.rs`
+- [x] Add `RoaringMembership` type to `crates/katgpt-pruners/src/roaring_membership.rs`
 - [x] Implement `CompactBitmap::from_bool_vec()` — convert Vec<bool> to CompactBitmap
 - [x] Implement `RoaringBatching` trait methods
 - [x] Implement `roaring_reject_count()` — CompactBitmap::len() (O(containers))
@@ -194,7 +194,7 @@ pub trait RoaringBatching: Send + Sync {
 - [x] Benchmark: memory usage CompactBitmap vs Vec<bool> at 128K vocab (≥3× reduction verified)
 
 ### Phase 4: Integration & Pipeline Wiring
-- [x] Create `BfcpLshCms` top-level fusion struct in `src/pruners/bfcp_lsh_cms.rs`
+- [x] Create `BfcpLshCms` top-level fusion struct in `crates/katgpt-pruners/src/bfcp_lsh_cms.rs`
 - [x] Wire: process() → L0 exact lookup → L1 LSH lookup → full compute → insert both → CMS update
 - [x] Wire: eviction uses CMS estimate, not per-entry freq
 - [x] Wire: decay uses CMS O(1) decay, not per-entry scan

@@ -200,7 +200,7 @@ pub struct KVCache {
 }
 ```
 
-- [x] **3.1** Add `Snapshot` struct to `src/transformer.rs`:
+- [x] **3.1** Add `Snapshot` struct to `crates/katgpt-percepta/src/transformer.rs`:
   ```rust
   /// Cheap snapshot of KV cache state up to position `pos`.
   /// Only copies filled slots [0..pos) per layer, not the entire block_size buffer.
@@ -297,7 +297,7 @@ Our version uses the existing draft model's attention scores (already computed d
 
 DFlash's draft model sees `[last_target_token, MASK×15]` + last 5 target hidden states. Every position conditions on real target features, not its own noisy predictions. Structurally stronger than independent marginals.
 
-- [x] **5.1** Add `dflash_predict_conditioned()` to `src/speculative/dflash.rs`
+- [x] **5.1** Add `dflash_predict_conditioned()` to `crates/katgpt-speculative/src/dflash.rs`
 - [x] **5.2** Capture target hidden state at current position via `ForwardContext.hidden_state` (plan 009)
 - [x] **5.3** Implement conditioning:
   - Option A: Concatenate `hidden_state` to draft input embedding (requires larger wte or projection)
@@ -421,9 +421,9 @@ DDTree (chain-seed)              316,849 tok/s         3.16           16.00
 | `src/speculative/dd_tree.rs` | Add `chain_seed` param to `build_dd_tree_pruned()` | 1 | — |
 | `src/benchmark.rs` | Add `bench_ddtree_chain_seed()`, `bench_ddtree_budget_sweep()` | 2 | — |
 | `src/main.rs` | Add budget sweep output section | 2 | — |
-| `src/transformer.rs` | Add `KVSnapshot`, `KVLayerSnapshot`, `snapshot()`, `restore()` | 3 | 010 ✅, 011 🔧 |
-| `src/speculative/step.rs` | Integrate snapshot/rollback into `speculative_step_verifier()` | 3 | 010 ✅ |
+| `crates/katgpt-percepta/src/transformer.rs` | Add `KVSnapshot`, `KVLayerSnapshot`, `snapshot()`, `restore()` | 3 | 010 ✅, 011 🔧 |
+| `crates/katgpt-forward/crates/katgpt-forward/src/step.rs` | Integrate snapshot/rollback into `speculative_step_verifier()` | 3 | 010 ✅ |
 | `src/speculative/prefill.rs` | New: `PrefillScorer` trait, `score_token_importance()`, `compress_prompt()`, `speculative_prefill()` | 4 | 009 ✅, 010 ✅ |
 | `src/speculative/mod.rs` | Add `pub mod prefill;` | 4 | — |
-| `src/speculative/dflash.rs` | Add `dflash_predict_conditioned()` | 5 | 009 ✅, 010 ✅ |
+| `crates/katgpt-speculative/src/dflash.rs` | Add `dflash_predict_conditioned()` | 5 | 009 ✅, 010 ✅ |
 | `README.md` | Add Lucebox-Hub references, update features/benchmarks | 6 | — |

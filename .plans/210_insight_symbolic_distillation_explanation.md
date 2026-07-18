@@ -51,7 +51,7 @@ DDTree Exploration (existing)
 
 ### Phase 1: F4 — Reward-Gated Pruner Calibration (P0)
 
-- [x] **F4.1:** Create `src/pruners/reward_calibrator.rs` with `ParameterKey` and `ParameterStats` structs
+- [x] **F4.1:** Create `crates/katgpt-pruners/src/reward_calibrator.rs` with `ParameterKey` and `ParameterStats` structs
   - `ParameterKey { pruner_id: u32, parameter_idx: u16, depth: u16 }` — 8 bytes, cache-line friendly
   - `ParameterStats { reward_sum: f32, visits: u32, variance: f32 }` — 12 bytes
   - `#[repr(u8)]` on any field-less enums
@@ -98,7 +98,7 @@ DDTree Exploration (existing)
 
 ### Phase 2: F1 — Symbolic Expression Distillation (P1)
 
-- [x] **F1.1:** Create `src/pruners/symbolic_expression.rs` with core types
+- [x] **F1.1:** Create `crates/katgpt-pruners/src/symbolic_expression.rs` with core types
   - `BasisFn` enum: `Identity`, `Square`, `Cube`, `Sigmoid` — `#[repr(u8)]`
   - `Term { basis: BasisFn, coefficient: f32, feature_idx: usize }` — single basis × coefficient
   - `SymbolicExpression { terms: Vec<Term>, bias: f32 }` — compact polynomial expression
@@ -126,7 +126,7 @@ DDTree Exploration (existing)
   - `TraceRecorder::record(depth, token, features, scores, accepted)` — called during DDTree exploration
   - Pre-allocate with `Vec::with_capacity(1024)`, `clear()` + reuse across episodes
 
-- [x] **F1.5:** Create `src/pruners/expression_pruner.rs` with `ExpressionPruner<P>`
+- [x] **F1.5:** Create `crates/katgpt-pruners/src/expression_pruner.rs` with `ExpressionPruner<P>`
   - `ExpressionPruner<P: ScreeningPruner> { inner: P, expression: SymbolicExpression, feature_extractor: Box<dyn FeatureExtractor> }`
   - `FeatureExtractor` trait: `fn extract(depth: usize, token: usize, parents: &[usize], inner_scores: &[f32]) -> Vec<f32>`
   - `ScreeningPruner` impl: extract features → evaluate expression → return relevance
@@ -170,7 +170,7 @@ DDTree Exploration (existing)
 
 ### Phase 3: F2 — Concept Grounding for Pruner Rules (P2)
 
-- [x] **F2.1:** Create `src/pruners/concept_grounding.rs` with core types
+- [x] **F2.1:** Create `crates/katgpt-pruners/src/concept_grounding.rs` with core types
   - `GroundingSource` enum: `Template`, `Learned` — `#[repr(u8)]`
   - `ConceptMapping { variable: String, semantic: String, confidence: f32, source: GroundingSource }`
   - `PolicyExplanation { mappings: Vec<ConceptMapping>, chain_of_thought: Vec<String>, summary: String }`
@@ -233,7 +233,7 @@ DDTree Exploration (existing)
 
 ### Phase 4: F3 — Decision Explanation via Sensitivity Analysis (P3)
 
-- [x] **F3.1:** Create `src/pruners/decision_explainer.rs` with core types
+- [x] **F3.1:** Create `crates/katgpt-pruners/src/decision_explainer.rs` with core types
   - `TokenChoice { depth: usize, token_idx: usize, score: f32, pruner_attributions: Vec<PrunerAttribution> }`
   - `PrunerAttribution { pruner_name: String, score: f32, sensitivity: f32 }` — how much this pruner influenced the choice
   - `RejectedAlternative { token_idx: usize, score: f32, why_rejected: String }`
@@ -424,7 +424,7 @@ F1 (SymbolicExpressionFitter) ────┤
 
 ### Type Sharing Strategy
 
-- `SymbolicExpression` in katgpt-rs `src/pruners/symbolic_expression.rs` is the canonical engine type
+- `SymbolicExpression` in katgpt-rs `crates/katgpt-pruners/src/symbolic_expression.rs` is the canonical engine type
 - riir-ai 240's `EqlExpression` serializes to `SymbolicExpression` binary format via shared serde
 - Activation mapping: `EqlActivation::Constant → BasisFn::Identity(coeff=1.0)`, `EqlActivation::Product/Sum → expand as multi-term`
 - Feature gate: `eql_eval` in riir-engine depends on `katgpt-core` types behind `eql_eval` feature

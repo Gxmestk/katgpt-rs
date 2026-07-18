@@ -103,7 +103,7 @@ that the other three miss — e.g., argmax-drift-with-sharp-entropy where the ac
 distribution stays sharp but the top module changes between steps.
 
 The math is an inline minimal of the canonical `AdvantageMarginGate` (root crate,
-`src/pruners/self_advantage.rs`, Plan 283). Kept inline because katgpt-core cannot depend on
+`crates/katgpt-pruners/crates/katgpt-pruners/src/self_advantage.rs`, Plan 283). Kept inline because katgpt-core cannot depend on
 the root crate. Module activations are sigmoid-bounded `[0, 1]` (treated as logits over 6
 module candidates); the advantage math is scale-invariant but the threshold needs separate
 tuning from the LLM-logit benchmark.

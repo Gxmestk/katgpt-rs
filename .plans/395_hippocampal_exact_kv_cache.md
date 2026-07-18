@@ -3,7 +3,7 @@
 **Date:** 2026-07-05
 **Research:** [katgpt-rs/.research/378_HOLA_Hippocampal_Exact_KV_for_Linear_Attention.md](../.research/378_HOLA_Hippocampal_Exact_KV_for_Linear_Attention.md)
 **Source paper:** [arxiv 2607.02303](https://arxiv.org/abs/2607.02303) — Cui 2026, HOLA
-**Target:** `crates/katgpt-core/src/hippocampal_cache.rs` (new module) + Cargo feature `hippocampal_cache` + `gdn2` integration point
+**Target:** `crates/katgpt-core/crates/katgpt-core/src/hippocampal_cache.rs` (new module) + Cargo feature `hippocampal_cache` + `gdn2` integration point
 **Status:** Complete — G1–G4 PASS, opt-in shipped. G5 deferred to riir-train (Issue 038).
 
 ---
@@ -27,7 +27,7 @@ Lands in the **KV-compression slot** alongside AM (Plan 271, opt-in), Sink-Aware
 
 ### Tasks
 
-- [x] **T1.1** Create `crates/katgpt-core/src/hippocampal_cache.rs` skeleton behind `#[cfg(feature = "hippocampal_cache")]`. Add feature `hippocampal_cache = []` to `crates/katgpt-core/Cargo.toml`. Keep it OFF by default.
+- [x] **T1.1** Create `crates/katgpt-core/crates/katgpt-core/src/hippocampal_cache.rs` skeleton behind `#[cfg(feature = "hippocampal_cache")]`. Add feature `hippocampal_cache = []` to `crates/katgpt-core/Cargo.toml`. Keep it OFF by default.
 - [x] **T1.2** Define `HippocampalCache<D, W>` generic struct (no model semantics):
   ```rust
   pub struct HippocampalCache<const D: usize, const W: usize> {
@@ -72,7 +72,7 @@ Lands in the **KV-compression slot** alongside AM (Plan 271, opt-in), Sink-Aware
 
 ### Tasks
 
-- [x] **T2.1** **G1 — eviction correctness.** Test suite in `crates/katgpt-core/src/hippocampal_cache.rs` `#[cfg(test)]`:
+- [x] **T2.1** **G1 — eviction correctness.** Test suite in `crates/katgpt-core/crates/katgpt-core/src/hippocampal_cache.rs` `#[cfg(test)]`:
   - Synthetic 8-key multi-needle stream (4k tokens, 8 keys placed at controlled depths).
   - Each token has `(beta, residual_norm)` assigned; the 8 needles get the top-8 scores.
   - After feeding the full stream into `HippocampalCache<64, 8>`, assert all 8 needles are in the cache. **PASS bar: 8/8.**
@@ -199,11 +199,11 @@ The read target miss at D=256 is an honest finding: the read is compute-bound by
 - **F2 fusion (HOLA × temporal_deriv)** — two-signal cache eviction. Validate after Plan 395 ships; track in a follow-up plan if F2 gate passes.
 - **F3 fusion (HOLA × DualPoolBandit)** — consolidation rule for cache → state absorption. Research 249 territory; follow-up plan.
 - **F4 fusion (HOLA × AM)** — online + offline compaction composition. Plan 271 territory; follow-up plan.
-- **Per-NPC HLA cache variant** — using HLA `evolve_hla` (in `katgpt-sense/src/reconstruction.rs`) as the "compressive recurrent state" and a per-NPC episodic KV cache as the hippocampus. This is a riir-ai follow-up; the katgpt-rs primitive is substrate-agnostic and the riir-ai guide is not triggered (verdict is GOAT not Super-GOAT).
+- **Per-NPC HLA cache variant** — using HLA `evolve_hla` (in `katgpt-sense/crates/katgpt-sense/src/reconstruction.rs`) as the "compressive recurrent state" and a per-NPC episodic KV cache as the hippocampus. This is a riir-ai follow-up; the katgpt-rs primitive is substrate-agnostic and the riir-ai guide is not triggered (verdict is GOAT not Super-GOAT).
 - **riir-neuron-db fusion** — persisting HOLA cache contents across sessions via `MerkleFrozenEnvelope`. Out of scope; the cache is inference-local state.
 
 ---
 
 ## TL;DR
 
-Plan 395 ships the HOLA hippocampal exact KV cache as a `katgpt-rs` open primitive (`crates/katgpt-core/src/hippocampal_cache.rs`, feature `hippocampal_cache`, opt-in). The cache stores the top-w tokens by intrinsic delta-rule write magnitude `β·‖e‖` (free from the shipped GDN2 backbone, Plan 105) and reads them via a decoupled RMSNorm-γ sharpened softmax. GOAT gate G1–G4 is modelless (eviction correctness, latency, no-regression, synthetic retrieval); G5 (perplexity + RULER) is deferred to riir-train (tracked issue). Modelless unblock for the γ parameter (§3.5): ship `gamma=ones` as default + `gamma=per_key_norm_rescale` as the deterministic-correction variant; only defer γ-tuning to riir-train if both fail G4 with documented reason. The primitive competes for the KV-compression slot alongside AM (Plan 271) and Sink-Aware (Plan 287); demote the loser at G5 time.
+Plan 395 ships the HOLA hippocampal exact KV cache as a `katgpt-rs` open primitive (`crates/katgpt-core/crates/katgpt-core/src/hippocampal_cache.rs`, feature `hippocampal_cache`, opt-in). The cache stores the top-w tokens by intrinsic delta-rule write magnitude `β·‖e‖` (free from the shipped GDN2 backbone, Plan 105) and reads them via a decoupled RMSNorm-γ sharpened softmax. GOAT gate G1–G4 is modelless (eviction correctness, latency, no-regression, synthetic retrieval); G5 (perplexity + RULER) is deferred to riir-train (tracked issue). Modelless unblock for the γ parameter (§3.5): ship `gamma=ones` as default + `gamma=per_key_norm_rescale` as the deterministic-correction variant; only defer γ-tuning to riir-train if both fail G4 with documented reason. The primitive competes for the KV-compression slot alongside AM (Plan 271) and Sink-Aware (Plan 287); demote the loser at G5 time.

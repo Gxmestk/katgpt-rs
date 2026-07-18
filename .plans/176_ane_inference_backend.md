@@ -136,7 +136,7 @@ else:
 
 ### Part 4: Trigger Gate
 
-- [x] Create `src/trigger_gate.rs`
+- [x] Create `crates/katgpt-core/src/trigger_gate.rs`
 - [x] `TriggerGateConfig` with thresholds:
   ```rust
   pub struct TriggerGateConfig {

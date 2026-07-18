@@ -29,26 +29,26 @@ Additionally, the paper's **solution density** and **spectral discordance** metr
   - `RandOptWeightSampler` generates θ' = θ + σ·ε(seed) for given base weights
   - Seed-based reproducibility (deterministic from `base_seed + arm_index`)
   - Multiple σ support: assign σ from `sigma_set` round-robin or random
-  - File: `src/pruners/randopt.rs`
+  - File: `crates/katgpt-pruners/src/randopt.rs`
 
 - [x] **T2: `RandOptScorer` trait** — Validation scoring interface
   - `pub trait RandOptScorer: Send + Sync { fn score(&self, weights: &[f32]) -> f32; }`
   - Implement `AccuracyScorer` for discrete-answer tasks (majority vote match)
   - Implement `WinRateScorer` for game arenas (win rate over N rounds)
-  - File: `src/pruners/randopt.rs`
+  - File: `crates/katgpt-pruners/src/randopt.rs`
 
 - [x] **T3: `RandOptEnsemble`** — Majority-vote + mean aggregation
   - `RandOptEnsemble::new(ensemble_size)`
   - `fn aggregate(&self, predictions: &[DiscreteAnswer]) -> DiscreteAnswer` (majority vote)
   - `fn aggregate_continuous(&self, predictions: &[f32]) -> f32` (mean)
-  - File: `src/pruners/randopt.rs`
+  - File: `crates/katgpt-pruners/src/randopt.rs`
 
 - [x] **T4: `RandOptSession`** — Orchestrate full RandOpt pipeline
   - Wraps `BanditSession` protocol: N perturbations → score → top-K → ensemble
   - `fn run(&mut self, base_weights: &[f32], scorer: &dyn RandOptScorer) -> RandOptResult`
   - `RandOptResult { best_seeds, best_sigmas, scores, top_k_indices }`
   - Reuses `BanditStrategy` for selection (UCB1 default)
-  - File: `src/pruners/randopt.rs`
+  - File: `crates/katgpt-pruners/src/randopt.rs`
 
 - [x] **T5: `BanditStrategy::RandOptAdaptive`** — Density-aware exploration
   - New enum variant: `RandOptAdaptive { density_threshold, decay }`
@@ -56,21 +56,21 @@ Additionally, the paper's **solution density** and **spectral discordance** metr
   - High δ (≥ threshold) → exploit (use Q-values directly)
   - Low δ (< threshold) → explore (use UCB1 or Thompson)
   - EMA tracking of density per episode
-  - File: `src/pruners/bandit.rs`
+  - File: `crates/katgpt-ruliology/crates/katgpt-ruliology/src/bandit.rs`
 
 - [x] **T6: `spectral_discordance()` diagnostic** — Specialist detection
   - `fn spectral_discordance(performance_matrix: &[Vec<f32>]) -> f32`
   - Input: N arms × M tasks percentile-rank matrix
   - Output: D ∈ [0, M/(M-1)], D→1 means specialists, D→0 means generalists
   - Exposed via `BanditSession` as `session.spectral_discordance()`
-  - File: `src/pruners/bandit.rs`
+  - File: `crates/katgpt-ruliology/crates/katgpt-ruliology/src/bandit.rs`
 
 - [x] **T7: `solution_density()` diagnostic** — Thicket regime detection
   - `fn solution_density(scores: &[f32], base_score: f32, margin: f32) -> f32`
   - Returns δ(m) = fraction of scores ≥ base_score + margin
   - Useful for both weight-space RandOpt and modelless bandit diagnostics
   - Exposed via `BanditSession` as `session.solution_density(margin)`
-  - File: `src/pruners/bandit.rs`
+  - File: `crates/katgpt-ruliology/crates/katgpt-ruliology/src/bandit.rs`
 
 - [x] **T8: Feature gate + module wiring**
   - Add `randopt_weight = ["bandit"]` to `Cargo.toml`

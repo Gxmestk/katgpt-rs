@@ -50,8 +50,8 @@ After:  raw K → undo RoPE → eigenbasis → water-fill → quantize
 ```
 
 **Files to modify:**
-- `src/spectralquant/spectral.rs` — add `undo_rope()` before eigendecomposition
-- `src/spectralquant/spectral_rotation.rs` — store RoPE angles in calibration struct
+- `crates/katgpt-spectral/src/spectral.rs` — add `undo_rope()` before eigendecomposition
+- `crates/katgpt-spectral/src/spectral_rotation.rs` — store RoPE angles in calibration struct
 - `src/spectralquant/forward.rs` — reapply RoPE after dequant (or use Shard's Δ-identity)
 
 **GOAT proof targets:**
@@ -89,7 +89,7 @@ Sink + window:
 **New files:**
 - `src/shard_kv/mod.rs` — module index
 - `src/shard_kv/types.rs` — `ShardConfig`, `ShardLayer`, `ShardCalibration`
-- `src/shard_kv/rope.rs` — RoPE undo/reapply utilities
+- `crates/katgpt-kv/src/shard_kv/rope.rs` — RoPE undo/reapply utilities
 - `src/shard_kv/k_pca.rs` — PCA compression path for K
 - `src/shard_kv/v_vq.rs` — Hadamard + k-means VQ for V
 - `src/shard_kv/dp_bits.rs` — DP bit allocation with drop penalty

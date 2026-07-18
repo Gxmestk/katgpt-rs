@@ -29,13 +29,13 @@
 
 | Test | File |
 |------|------|
-| `test_complexity_low_for_simple_partition` | `src/pruners/percept_router.rs` |
-| `test_complexity_high_for_complex_partition` | `src/pruners/percept_router.rs` |
-| `test_route_fast_for_simple` | `src/pruners/percept_router.rs` |
-| `test_route_deep_for_complex` | `src/pruners/percept_router.rs` |
-| `test_route_standard_for_medium` | `src/pruners/percept_router.rs` |
-| `test_complexity_bounded_unit_interval` | `src/pruners/percept_router.rs` |
-| `test_entropy_of_uniform_labels` | `src/pruners/percept_router.rs` |
+| `test_complexity_low_for_simple_partition` | `crates/katgpt-pruners/src/percept_router.rs` |
+| `test_complexity_high_for_complex_partition` | `crates/katgpt-pruners/src/percept_router.rs` |
+| `test_route_fast_for_simple` | `crates/katgpt-pruners/src/percept_router.rs` |
+| `test_route_deep_for_complex` | `crates/katgpt-pruners/src/percept_router.rs` |
+| `test_route_standard_for_medium` | `crates/katgpt-pruners/src/percept_router.rs` |
+| `test_complexity_bounded_unit_interval` | `crates/katgpt-pruners/src/percept_router.rs` |
+| `test_entropy_of_uniform_labels` | `crates/katgpt-pruners/src/percept_router.rs` |
 
 ## Expected Gains
 

@@ -135,4 +135,4 @@ No new feature flags. All additions are gated under existing `elf_sde`.
 - **Research 35**: `.research/035_Attractor_Models_Fixed_Point_Refinement.md` (attractor = recursive refinement)
 - **Plan 079**: `.plans/079_elf_embedded_language_flows_modelless.md` (SDE GOAT proof)
 - **Plan 030**: `.plans/030_multi_armed_bandit.md` (BanditPruner)
-- **Key files**: `src/speculative/dd_tree.rs`, `src/speculative/types.rs`, `src/pruners/bandit.rs`
+- **Key files**: `src/speculative/dd_tree.rs`, `src/speculative/types.rs`, `crates/katgpt-ruliology/crates/katgpt-ruliology/src/bandit.rs`

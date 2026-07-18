@@ -3,7 +3,7 @@
 **Date:** 2026-06-25
 **Research:** [katgpt-rs/.research/307_FNO_Practical_Perspective_Spectral_Primitives_Survey.md](../.research/307_FNO_Practical_Perspective_Spectral_Primitives_Survey.md) (§3 candidate plan #2)
 **Source paper:** [arXiv:2511.05963](https://arxiv.org/abs/2511.05963) — *Fourier Neural Operators Explained: A Practical Perspective* (Duruisseaux/Kossaffi/Anandkumar, Caltech+NVIDIA) §2.1 spectral differentiation.
-**Target:** `katgpt-rs/crates/katgpt-core/src/spectral/differentiation.rs` (new module) + Cargo feature `spectral_differentiation`.
+**Target:** `katgpt-rs/crates/katgpt-core/crates/katgpt-core/src/spectral/differentiation.rs` (new module) + Cargo feature `spectral_differentiation`.
 **Status:** Done — all 4 GOAT gates PASS, promoted to DEFAULT-ON (Phase 3, 2026-06-25).
 
 ---
@@ -56,7 +56,7 @@ X = FFT(x)                                // N complex coefficients
 ### Tasks
 
 - [x] **T1.1** Create `.plans/325_spectral_differentiation_primitive.md` (this file).
-- [x] **T1.2** Implement `crates/katgpt-core/src/spectral/differentiation.rs`:
+- [x] **T1.2** Implement `crates/katgpt-core/crates/katgpt-core/src/spectral/differentiation.rs`:
   - `SpecDiffError` (TooFewSamples, OutputSizeMismatch, InvalidOrder).
   - `SpecDiffConfig { order: u32, spacing: f32 }` with `DEFAULT { order: 1, spacing: 1.0 }`.
   - `SpecDiffScratch { planner: FftPlanner<f32>, freq_buf: Vec<Complex<f32>> }` with `ensure_capacity`.

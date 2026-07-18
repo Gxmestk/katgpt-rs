@@ -3,7 +3,7 @@
 **Date:** 2026-06-25
 **Research:** [302_FAME_Sampling_Invariant_Per_Entity_MoE](../.research/302_FAME_Sampling_Invariant_Per_Entity_MoE.md)
 **Source paper:** [arxiv 2510.00621](https://arxiv.org/abs/2510.00621) — FAME: Adaptive Functional Attention with Expert Routing for Function-on-Function Regression (Gao/Chen/Zhang, NeurIPS 2025)
-**Target:** `crates/katgpt-core/src/committed_field_blend.rs` (new module) + Cargo feature `committed_field_blend`
+**Target:** `crates/katgpt-core/crates/katgpt-core/src/committed_field_blend.rs` (new module) + Cargo feature `committed_field_blend`
 **Status:** ✅ COMPLETE, DEFAULT-ON (committed_field_blend in katgpt-core default) — Phase 1 ✅ + Phase 2 GOAT G1–G5 ✅ PASSED (2026-06-25)
 **Tier:** Super-GOAT (open primitive half; private guide at `riir-ai/.research/158_*.md`)
 
@@ -134,7 +134,7 @@ G2 gate tests this directly: simulate an entity with dense observations vs spars
 
 ### Tasks
 
-- [x] **T1.1** Create `crates/katgpt-core/src/committed_field_blend.rs` with `ArchetypeFieldSource<D>` trait + `CommittedFieldBlend<N, D>` struct.
+- [x] **T1.1** Create `crates/katgpt-core/crates/katgpt-core/src/committed_field_blend.rs` with `ArchetypeFieldSource<D>` trait + `CommittedFieldBlend<N, D>` struct.
 - [x] **T1.2** Implement `commit()` — sigmoid projection of summary onto K direction vectors, clamp to `pi_max`, BLAKE3 hash of `(pi, field_commitments, version)`.
 - [x] **T1.3** Implement `apply_blended()` — reuse `simd_fused_scale_acc` inner loop (same primitive as `PersonalityWeightedComposition::compose_into`); outer loop over N fields calling `ArchetypeFieldSource::evolve`.
 - [x] **T1.4** Implement `verify_commitment()` + `recompute_blake3()` for thaw-time anti-tamper.
@@ -143,7 +143,7 @@ G2 gate tests this directly: simulate an entity with dense observations vs spars
 
 ### Location
 
-`crates/katgpt-core/src/committed_field_blend.rs`
+`crates/katgpt-core/crates/katgpt-core/src/committed_field_blend.rs`
 
 ---
 
@@ -164,7 +164,7 @@ G2 gate tests this directly: simulate an entity with dense observations vs spars
 
 ### Location
 
-`crates/katgpt-core/src/committed_field_blend.rs` (inline test module)
+`crates/katgpt-core/crates/katgpt-core/src/committed_field_blend.rs` (inline test module)
 `crates/katgpt-core/benches/committed_field_blend_bench.rs` (G4 alloc audit)
 
 ---

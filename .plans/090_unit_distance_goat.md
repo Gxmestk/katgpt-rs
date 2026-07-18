@@ -62,7 +62,7 @@ pub struct MinkowskiLattice {
 
 ### Where
 
-`src/unit_distance/minkowski.rs` behind `unit_distance` feature gate.
+`crates/katgpt-deprecated/src/unit_distance/minkowski.rs` behind `unit_distance` feature gate.
 
 ---
 
@@ -102,7 +102,7 @@ Output: Lower bound on |{u ∈ Q^(-2) : |u| = 1}|
 
 ### Where
 
-`src/unit_distance/pigeonhole.rs` behind `unit_distance` feature gate.
+`crates/katgpt-deprecated/src/unit_distance/pigeonhole.rs` behind `unit_distance` feature gate.
 
 ---
 
@@ -188,7 +188,7 @@ This is **light model-based** because:
 
 ### Where
 
-`src/unit_distance/cm_field.rs` behind `unit_distance` feature gate.
+`crates/katgpt-deprecated/src/unit_distance/cm_field.rs` behind `unit_distance` feature gate.
 
 ---
 

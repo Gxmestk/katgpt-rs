@@ -203,7 +203,7 @@ than `simd_matvec`:
 
 **Root cause:** a single `acc = acc.max(s0); acc = acc.max(s1); ...` chain is
 **latency-bound** on `f32::max` (~2–4 cycles/op, serialised across the chain).
-The comparable `simd_dot_f32` (in `katgpt-types/src/simd/dot.rs`) uses **four
+The comparable `simd_dot_f32` (in `katgpt-types/crates/katgpt-types/src/simd/dot.rs`) uses **four
 independent accumulators** precisely to hide FMA latency — its scalar fallback
 comment explicitly warns about this anti-pattern.
 

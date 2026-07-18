@@ -83,7 +83,7 @@ impl ShardEmbedding {
 
 ## T2: Johnson-Lindenstrauss Projection
 
-**File:** `crates/katgpt-core/src/shard_embedding.rs` (new)
+**File:** `crates/katgpt-core/crates/katgpt-core/src/shard_embedding.rs` (new)
 
 The projection: given style_weights `[f32; 64]` and a pre-generated random orthogonal matrix `W: [[f32; 64]; 8]`, compute `embedding = W × style_weights`.
 
@@ -155,8 +155,8 @@ is not a clean modelless gain. Deprecation is the honest resolution.
   consumers.
 
 **Actions taken:**
-- `ShardEmbedding` (katgpt-types/src/sense.rs) + `JlProjectionMatrix`
-  (katgpt-core/src/shard_embedding.rs) marked `#[deprecated]`.
+- `ShardEmbedding` (katgpt-types/crates/katgpt-types/src/sense.rs) + `JlProjectionMatrix`
+  (katgpt-core/crates/katgpt-core/src/shard_embedding.rs) marked `#[deprecated]`.
 - Feature gate prose updated: `shard_embedding = []  # DEPRECATED ...`
 - `tests/bench_230_shard_embedding_goat.rs` + `tests/diag_230_embed_dim_sweep.rs`
   removed (testing deprecated code with no consumers).

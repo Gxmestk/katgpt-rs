@@ -52,8 +52,8 @@ running 10 tests — 10 passed; 0 failed
 
 | Component | Tests | File |
 |-----------|-------|------|
-| `ResidualCheck` | 2 unit + 10 GOAT | `src/pruners/federation_composer.rs` |
-| `FederationComposer` | 3 unit + 10 GOAT | `src/pruners/federation_composer.rs` |
+| `ResidualCheck` | 2 unit + 10 GOAT | `crates/katgpt-pruners/src/federation_composer.rs` |
+| `FederationComposer` | 3 unit + 10 GOAT | `crates/katgpt-pruners/src/federation_composer.rs` |
 | GOAT proof | 10 | `tests/bench_231_federation_composer_goat.rs` |
 | **Total** | **25** | |
 

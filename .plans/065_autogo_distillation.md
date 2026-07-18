@@ -12,7 +12,7 @@
 
 ### G1: Feature Gate Chain Fix
 **Problem:** Plan v1 said `go = ["game_state", ...]` but `game_state = ["bomber"]` pulls in `bevy_ecs` + entire bomber arena.
-**Fix:** `go` depends on `["bandit"]` only. The `GameState` trait in `src/pruners/game_state/mod.rs` is **always compiled** (no `#[cfg]` on the trait itself). Only the `BomberState` impl is gated behind `game_state = ["bomber"]`. Go provides its own impl.
+**Fix:** `go` depends on `["bandit"]` only. The `GameState` trait in `crates/katgpt-pruners/src/game_state/mod.rs` is **always compiled** (no `#[cfg]` on the trait itself). Only the `BomberState` impl is gated behind `game_state = ["bomber"]`. Go provides its own impl.
 
 ### G2: API Dual-Move Semantics
 **Problem:** AutoGo's `POST /api/game/{id}/move` plays human move AND immediately triggers `_ai_make_move()`. Response contains BOTH moves applied.
@@ -56,7 +56,7 @@ Before writing any Go rules, validate the head-to-head benchmarking path by spin
   - **NOT** `game_state` (which pulls in `bevy_ecs` via bomber). The `GameState` trait is always compiled.
   - `bandit` is needed for HL player and G-Zero.
   - Note: `serde`/`serde_json` are already non-optional deps, only `reqwest` needed as optional.
-- [x] T3: Create `src/pruners/go/autogo_client.rs` — REST API client for AutoGo's `play.py` server:
+- [x] T3: Create `crates/katgpt-pruners/src/go/autogo_client.rs` — REST API client for AutoGo's `play.py` server:
   ```rust
   /// AutoGo REST API client (calls play.py FastAPI server).
   ///
@@ -129,7 +129,7 @@ Before writing any Go rules, validate the head-to-head benchmarking path by spin
 
 Port `FastGoBoard` (`go.py`) + `GoBoard` (`go_game.h`) to Rust, implementing our `GameState` trait. Reference both Python and C++ implementations.
 
-- [x] T9: Define `GoAction` enum and `GoCell` enum in `src/pruners/go/types.rs`:
+- [x] T9: Define `GoAction` enum and `GoCell` enum in `crates/katgpt-pruners/src/go/types.rs`:
   ```rust
   #[derive(Clone, Debug, PartialEq)]
   pub enum GoAction {
@@ -156,7 +156,7 @@ Port `FastGoBoard` (`go.py`) + `GoBoard` (`go_game.h`) to Rust, implementing our
       }
   }
   ```
-- [x] T10: Define `GoState` snapshot in `src/pruners/go/state.rs` — port from `FastGoBoard` (Python) with C++ optimizations:
+- [x] T10: Define `GoState` snapshot in `crates/katgpt-pruners/src/go/state.rs` — port from `FastGoBoard` (Python) with C++ optimizations:
   ```rust
   /// Lightweight Go state snapshot. Port from go.py:FastGoBoard + go_game.h:GoBoard.
   ///
@@ -235,7 +235,7 @@ Port `FastGoBoard` (`go.py`) + `GoBoard` (`go_game.h`) to Rust, implementing our
   - Run 200 random games, 0 panics = pass
   - **API cross-validation**: If AutoGo Docker is running, play same random game via API, compare `legal_moves` at each step. Skip silently if Docker unavailable.
 - [x] T16: Create `examples/go_01_mcts.rs` — MCTS player vs Random on 9×9, configurable games/budget via env vars, print win rates
-- [x] T16a: Create `src/pruners/go/replay.rs` — game recording and playback (G6):
+- [x] T16a: Create `crates/katgpt-pruners/src/go/replay.rs` — game recording and playback (G6):
   ```rust
   /// Single move record for replay.
   #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -267,7 +267,7 @@ Port `FastGoBoard` (`go.py`) + `GoBoard` (`go_game.h`) to Rust, implementing our
 
 ### Phase 2: Go Player Strategies (Prove HL Thesis on Go)
 
-- [x] T17: Define `GoPlayer` trait in `src/pruners/go/players.rs` (adapted from `agents/base.py:Agent`):
+- [x] T17: Define `GoPlayer` trait in `crates/katgpt-pruners/src/go/players.rs` (adapted from `agents/base.py:Agent`):
   ```rust
   /// Go player strategy trait. Matches AutoGo's `agents/base.py:Agent` pattern.
   pub trait GoPlayer {
@@ -289,7 +289,7 @@ Port `FastGoBoard` (`go.py`) + `GoBoard` (`go_game.h`) to Rust, implementing our
 
 ### Phase 3: Head-to-Head Tournament via API (Prove Against AutoGo)
 
-- [x] T25: Create `src/pruners/go/tournament.rs` — tournament runner using `AutoGoClient`:
+- [x] T25: Create `crates/katgpt-pruners/src/go/tournament.rs` — tournament runner using `AutoGoClient`:
   ```rust
   pub struct GoTournamentConfig {
       pub board_size: usize,           // 9
@@ -335,7 +335,7 @@ Port `FastGoBoard` (`go.py`) + `GoBoard` (`go_game.h`) to Rust, implementing our
 
 ### Phase 4: Go G-Zero Self-Play (Prove Transfer)
 
-- [x] T32: Create `src/pruners/go/g_zero_player.rs` — full G-Zero self-play for Go
+- [x] T32: Create `crates/katgpt-pruners/src/go/g_zero_player.rs` — full G-Zero self-play for Go
 - [x] T33: Implement `GoTemplateProposer` with **4 initial templates** (G7 — reduced from 9):
   ```rust
   /// Go strategy templates for G-Zero self-play.
@@ -358,7 +358,7 @@ Port `FastGoBoard` (`go.py`) + `GoBoard` (`go_game.h`) to Rust, implementing our
 
 ### Phase 5: AutoResearch Loop (Prove Velocity)
 
-- [x] T38: Create `src/pruners/go/autoresearch.rs` — automated hyperparameter search over Go
+- [x] T38: Create `crates/katgpt-pruners/src/go/autoresearch.rs` — automated hyperparameter search over Go
 - [x] T39: Define `GoResearchConfig`:
   ```rust
   pub struct GoResearchConfig {
@@ -458,7 +458,7 @@ The C++ `GoBoard::KOMI = 7.5f` (comment: "7.5 is recommended for high level / AI
 go = ["bandit", "dep:reqwest", "dep:serde", "dep:serde_json"]
 ```
 
-The `GameState` trait in `src/pruners/game_state/mod.rs` is **always compiled** — it's not behind `#[cfg(feature = "game_state")]`. Only the `BomberState` impl is gated. Go provides its own `GoState` impl behind `#[cfg(feature = "go")]`. Zero impact on existing features. Does NOT pull in `bevy_ecs`.
+The `GameState` trait in `crates/katgpt-pruners/src/game_state/mod.rs` is **always compiled** — it's not behind `#[cfg(feature = "game_state")]`. Only the `BomberState` impl is gated. Go provides its own `GoState` impl behind `#[cfg(feature = "go")]`. Zero impact on existing features. Does NOT pull in `bevy_ecs`.
 
 ### 6. 9×9 First, 19×19 Stretch
 

@@ -11,7 +11,7 @@
 ## TL;DR
 
 **Issue 010 T2: ✅ COMPLETE.** The floor-comparison harness ships as
-`crates/katgpt-core/src/conformal/floor_harness.rs`. It is the enforcement
+`crates/katgpt-core/crates/katgpt-core/src/conformal/floor_harness.rs`. It is the enforcement
 substrate for the "Report the Floor" policy: any UQ-bearing primitive can now
 be evaluated against the canonical conformal-naive floor
 (`ConformalIntervalCalibrator<SeasonalNaiveForecaster>` m=1) via a single
@@ -32,7 +32,7 @@ LosesToFloor / Mixed / NotApplicable across 5 canonical scenarios on standard
 corpora.
 
 **Tests:** `tests/conformal_floor_harness.rs` (10 integration tests) +
-`src/conformal/floor_harness.rs::tests` (13 unit tests).
+`crates/katgpt-core/src/conformal/floor_harness.rs::tests` (13 unit tests).
 
 ### Reference results (α=0.05, deterministic seeds)
 
@@ -221,7 +221,7 @@ corpora across runs.
 
 | File | Role | Lines |
 |---|---|---|
-| `src/conformal/floor_harness.rs` | Harness module: trait, FloorAdapter, report types, `run_floor_comparison`, corpora, 13 unit tests | ~650 |
+| `crates/katgpt-core/src/conformal/floor_harness.rs` | Harness module: trait, FloorAdapter, report types, `run_floor_comparison`, corpora, 13 unit tests | ~650 |
 | `tests/conformal_floor_harness.rs` | 10 integration tests + canonical adapter-pattern examples for T3–T7 authors | ~375 |
 | `src/conformal/mod.rs` | Wire `mod floor_harness` + re-export | +9 lines |
 | `src/lib.rs` | Re-export harness types at crate root | +7 lines |

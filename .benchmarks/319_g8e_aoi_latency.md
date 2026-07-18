@@ -1,7 +1,7 @@
 # Plan 319 — G8e: AOI Pairwise Complementarity Latency Gate
 
 **Date:** 2026-06-25
-**Primitive:** `katgpt-rs/crates/katgpt-core/src/linalg/geometric_product.rs`
+**Primitive:** `katgpt-rs/crates/katgpt-core/crates/katgpt-core/src/linalg/geometric_product.rs`
 **Bench:** `cargo bench -p katgpt-core --features geometric_product --bench bench_319_g8e_aoi_latency -- --nocapture`
 **Hardware:** macOS (Apple Silicon, aarch64), macOS 26.5.1
 

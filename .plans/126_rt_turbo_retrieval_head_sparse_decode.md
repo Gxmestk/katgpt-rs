@@ -13,7 +13,7 @@
 ## Tasks
 
 ### Phase 1: Offline Head Calibration
-- [x] **T1**: Create `src/rt_turbo/calibration.rs` — `HeadCalibration` struct with `retrieval_scores: Vec<f32>` (one per query head), `retrieval_set: Vec<usize>`, `threshold: f32`
+- [x] **T1**: Create `crates/katgpt-speculative/src/rt_turbo/calibration.rs` — `HeadCalibration` struct with `retrieval_scores: Vec<f32>` (one per query head), `retrieval_set: Vec<usize>`, `threshold: f32`
 - [x] **T2**: Implement `calibrate_heads()` — takes model weights + calibration sequence (needle at beginning and end), computes per-head retrieval score `R_h = mean(attn from post-needle to pre-needle)`, partitions into H_ret (top 15%) and H_loc
 - [x] **T3**: Implement `HeadCalibration::save()` / `HeadCalibration::load()` — serialize to JSON/TOML for offline reuse
 - [x] **T4**: Unit tests: synthetic attention patterns → correct head classification, single-head edge case, all-retrieval / all-local edge cases
@@ -27,7 +27,7 @@
 - [x] **T10**: Unit tests: zero-initialized projection → uniform scores, identity projection → matches full-dim dot product on first 16 dims, dimensionality check — 31 projection tests passing
 
 ### Phase 3: Dynamic Top-P Token Selection
-- [x] **T11**: Create `src/rt_turbo/top_p.rs` — sort-free top-p selector for CPU
+- [x] **T11**: Create `crates/katgpt-speculative/src/rt_turbo/top_p.rs` — sort-free top-p selector for CPU
 - [x] **T12**: Implement `select_top_p()` — given scores `[seq_len]` and threshold p (0.9): sort descending, compute cumulative softmax mass, return indices where cumsum < p + last index that pushes over threshold
 - [x] **T13**: Implement `select_top_p_blockwise()` — block-level variant that scores blocks via low-dim projection, selects blocks where cumulative block mass ≥ p, then fine-grained within selected blocks
 - [x] **T14**: Unit tests: concentrated scores (single peak) → 1-2 tokens selected, uniform scores → many tokens selected, edge case p=1.0 → all tokens, edge case p=0.0 → top-1 only, exact mass preservation check — 11 tests passing

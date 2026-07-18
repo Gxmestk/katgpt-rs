@@ -11,8 +11,8 @@
 
 ### Phase 1: Types & State
 
-- [x] T1: Define `HlaQHeadState` struct in `src/hla/types.rs` — CQV `[hd×hd]`, mQ `[hd]`, G `[hd×hd]`, h `[hd]` + `new(hd)` + `reset()`
-- [x] T2: Define `AhlaQHeadState` struct in `src/hla/types.rs` — e `[hd×hd]`, n `[hd]` + `new(hd)` + `reset()`
+- [x] T1: Define `HlaQHeadState` struct in `crates/katgpt-hla/src/types.rs` — CQV `[hd×hd]`, mQ `[hd]`, G `[hd×hd]`, h `[hd]` + `new(hd)` + `reset()`
+- [x] T2: Define `AhlaQHeadState` struct in `crates/katgpt-hla/src/types.rs` — e `[hd×hd]`, n `[hd]` + `new(hd)` + `reset()`
 - [x] T3: Define `MultiLayerHlaCache` — `layers: Vec<HlaLayerState>` with SK per KV group, per-Q-head state (GQA-aware)
 - [x] T4: Define `MultiLayerAhlaCache` — same layer structure with PKV/mK per KV group, E/n per Q head
 - [x] T5: Add `new()` / `reset()` / `with_gamma()` / `memory_bytes()` for both caches
@@ -20,7 +20,7 @@
 
 ### Phase 2: Attention Kernels
 
-- [x] T7: Implement `hla_state_update()` in `src/hla/kernel.rs` — streaming recurrence with correct update ordering (cross-terms before main accumulators). Zero-alloc via pre-allocated temp buffers
+- [x] T7: Implement `hla_state_update()` in `crates/katgpt-hla/src/kernel.rs` — streaming recurrence with correct update ordering (cross-terms before main accumulators). Zero-alloc via pre-allocated temp buffers
 - [x] T8: Implement `hla_readout()` — readout `o_t = q_tᵀ(SK·CQV − G)`. Two-stage matvec, zero-alloc
 - [x] T9: Implement `ahla_step()` — combined update+readout for AHLA. Zero-alloc
 - [x] T10: Add normalization: `hla_denom()` / `ahla_denom()` + optional divide-by-denom in layer helpers
@@ -63,7 +63,7 @@ src/hla/                         — Feature-gated module: #[cfg(feature = "hla_
 └── forward.rs                   — forward_hla(), forward_ahla(),
                                    generate_hla_into(), generate_ahla_into()
 
-src/transformer.rs
+crates/katgpt-percepta/src/transformer.rs
 └── ForwardContext               — fields made pub(crate) for HLA module access
 
 src/types.rs

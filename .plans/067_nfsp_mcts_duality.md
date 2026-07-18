@@ -229,8 +229,8 @@ effective than plain MCTS in the 4-player arena.
 
 | File | Changes |
 |------|---------|
-| `src/pruners/game_state/mod.rs` | Added `RolloutPolicy<S>` trait, `RandomRolloutPolicy` struct, exports |
-| `src/pruners/game_state/mcts.rs` | Refactored to `mcts_search_impl` + policy, added `BanditRolloutPolicy`, `mcts_search_informed`, 19 tests |
-| `src/pruners/game_state/bomber_state.rs` | Added `BanditBomberHeuristic` (domain + bandit fusion) |
+| `crates/katgpt-pruners/src/game_state/mod.rs` | Added `RolloutPolicy<S>` trait, `RandomRolloutPolicy` struct, exports |
+| `crates/katgpt-pruners/src/game_state/mcts.rs` | Refactored to `mcts_search_impl` + policy, added `BanditRolloutPolicy`, `mcts_search_informed`, 19 tests |
+| `src/pruners/bomber/bomber_state.rs` | Added `BanditBomberHeuristic` (domain + bandit fusion) |
 | `Cargo.toml` | Added `bandit_mcts` feature flag, included in `full` |
 | `tests/bench_067_bandit_mcts.rs` | New: 3 benchmark tests (tournament, baseline, micro) |

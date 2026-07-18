@@ -35,7 +35,7 @@ Key test: **Did the GOAT gate ever run?**
 
 | Feature | Code lives in | Citation | Reason |
 |---|---|---|---|
-| `feedback` | `src/feedback.rs` | `src/feedback.rs` L19,48 | Dead stub — `log::debug!` only, `let Some(_url)` ignores URL, never HTTP POSTs |
+| `feedback` | `crates/katgpt-deprecated/src/feedback.rs` | `crates/katgpt-deprecated/src/feedback.rs` L19,48 | Dead stub — `log::debug!` only, `let Some(_url)` ignores URL, never HTTP POSTs |
 | `unit_distance` | `src/unit_distance/` | Cargo.toml L159; Proposal 003 L130 | Number-theory Erdős research toy (Plan 090); no inference role |
 | `alien_sampler` | `src/alien_sampler/` | `.benchmarks/311_alien_sampler_goat.md` L10,19; Proposal 003 L111 | 1/4 PASS (then 2/4), explicitly DEMOTED; cited in Proposal 003 §3 as category-3 exemplar |
 | `dense_mesh` | `src/dense_mesh/` | `.benchmarks/266_densemesh_goat.md` L7,21 | Gate 2 FAILED empirically; "modelless hypothesis was empirically falsified"; demoted to experimental |
@@ -53,9 +53,9 @@ Key test: **Did the GOAT gate ever run?**
 
 | Feature | Citation | Reason |
 |---|---|---|
-| `embedding_router` | `src/speculative/step.rs` L1665+ | "not yet started" — only commented-out test stubs, zero active `#[cfg]` |
+| `embedding_router` | `crates/katgpt-forward/crates/katgpt-forward/src/step.rs` L1665+ | "not yet started" — only commented-out test stubs, zero active `#[cfg]` |
 | `language_domain` | Cargo.toml L301 | "future" placeholder — zero `#[cfg(feature = "language_domain")]` hits in src/ |
-| `gpu` | `src/distill/trd.rs` L772 | Gates ONE `#[allow(dead_code)]` TODO stub (`redraft_gpu_batched`); real GPU inference is `gpu_inference` (Metal) |
+| `gpu` | `crates/katgpt-speculative/src/distill/trd.rs` L772 | Gates ONE `#[allow(dead_code)]` TODO stub (`redraft_gpu_batched`); real GPU inference is `gpu_inference` (Metal) |
 | `rest` | `src/speculative/prefill.rs` L850 | Single test stub simulating REST target; client moved to riir-ai/riir-rest (Plan 009) |
 
 **Exile count: 13 features with code + 4 dead feature entries = 17 total.**
@@ -111,7 +111,7 @@ The vast majority of opt-in features (~80) are category 1 — opt-in because the
 These 4 src/ items have no consumers outside their own module and can be exiled
 immediately to `crates/katgpt-deprecated/`:
 
-- [x] `feedback` — `src/feedback.rs` → `katgpt-deprecated` (zero consumers) — **DONE 2026-07-01**
+- [x] `feedback` — `crates/katgpt-deprecated/src/feedback.rs` → `katgpt-deprecated` (zero consumers) — **DONE 2026-07-01**
 - [x] `unit_distance` — `src/unit_distance/` + `tests/bench_unit_distance_goat.rs` + `tests/goat_090_tower_search.rs` → `katgpt-deprecated` (tests stay in root, resolve via re-export) — **DONE 2026-07-01**
 - [x] `alien_sampler` — `src/alien_sampler/` + `benches/alien_sampler_bench.rs` + `benches/alien_sampler_goat.rs` → `katgpt-deprecated` (benches stay in root, resolve via re-export) — **DONE 2026-07-01**
 - [-] `dense_mesh` — `src/dense_mesh/` + `tests/dense_mesh_goat_gates.rs` + `tests/prof_dense_mesh.rs` → **DEFERRED**. `node_transformer.rs` imports `crate::transformer::{forward, ForwardContext, ...}` — transformer-bound glue that can't leave root (same as `gdn2/forward.rs`, `hla/forward.rs` per Proposal 003 §"Stays in src/"). Stays in root as retained glue; exile blocked by the forward-vs-primitive seam.
@@ -158,9 +158,9 @@ code-organization cleanup; batch with Phase 3b in a future consolidation pass.
 These 4 features have zero active code. Remove the feature line from root
 `Cargo.toml` and clean up any commented-out `#[cfg]` stubs:
 
-- [x] `embedding_router` — remove from `full` + features section — **DONE 2026-07-06** (empty `[]` placeholder, Plan 024 not started; commented-out `#[cfg]` test stubs in `katgpt-forward/src/step.rs` left as TODO markers for Plan 024)
+- [x] `embedding_router` — remove from `full` + features section — **DONE 2026-07-06** (empty `[]` placeholder, Plan 024 not started; commented-out `#[cfg]` test stubs in `katgpt-forward/crates/katgpt-forward/src/step.rs` left as TODO markers for Plan 024)
 - [x] `language_domain` — remove from features section — **DONE 2026-07-06** (empty `[]` placeholder, Plan 040 future, zero `.rs` refs)
-- [x] `gpu` — remove from `full` + features section; update `src/distill/trd.rs` dead-code stub — **DONE 2026-07-06** (empty `[]` placeholder + `redraft_gpu_batched` no-op stub removed from `crates/katgpt-speculative/src/distill/trd.rs`; GPU training lives in riir-ai/riir-gpu)
+- [x] `gpu` — remove from `full` + features section; update `crates/katgpt-speculative/src/distill/trd.rs` dead-code stub — **DONE 2026-07-06** (empty `[]` placeholder + `redraft_gpu_batched` no-op stub removed from `crates/katgpt-speculative/crates/katgpt-speculative/src/distill/trd.rs`; GPU training lives in riir-ai/riir-gpu)
 - [-] `rest` — **NOT DEAD, audit was stale.** The 2026-07-01 audit flagged this as dead, but Plan 394 (2026-07-05) revived it: `rest = ["katgpt-forward/rest"]` now forwards to katgpt-forward, and `src/speculative/prefill.rs:127,138` has an active `#[cfg(feature = "rest")]` bridge test (`test_bridge_prefill_to_speculative_decode`). Kept in `full` array.
 
 ---
@@ -190,7 +190,7 @@ The 4 audit agents disagreed on 5 features. Coordinator decisions:
 | `stokes_calculus` | — | AMBIGUOUS | — | BENCH-LOSER | **BENCH-LOSER** | G-B genuinely won (5.36×), primitives correct (15 tests, Stokes identities hold), not "demoted"/"research-only". Lost head-to-head on G-A but kept for the G-B win = classic A/B loser. |
 | `opus_selection` | AMBIGUOUS | — | — | — | **BENCH-LOSER** | GOAT passed; softmax violation is a code-style flag, not a gate failure. |
 | `cs_kv_probe` | AMBIGUOUS | — | — | — | **PENDING** | Stale Cargo.toml comment; Plan 280 says gates green. No actual failure. |
-| `product_policy_sharpen` | — | DEAD-FAILED (dead stub) | — | — | **PENDING** | Agent B was wrong — `#[cfg(feature = "product_policy_sharpen")]` DOES have real code in `katgpt-pruners/src/self_advantage.rs` (struct + impl + 3 tests). Not a dead stub; part of Plan 283 self_advantage family. |
+| `product_policy_sharpen` | — | DEAD-FAILED (dead stub) | — | — | **PENDING** | Agent B was wrong — `#[cfg(feature = "product_policy_sharpen")]` DOES have real code in `katgpt-pruners/crates/katgpt-pruners/src/self_advantage.rs` (struct + impl + 3 tests). Not a dead stub; part of Plan 283 self_advantage family. |
 | `proof_cert` | — | — | — | DEAD-FAILED (off-topic) | **PENDING** | Agent D was wrong — `src/proof_cert/` has 7 real files (certificate, chain, macros, serde, wasm). It's GOAT-gate verification infrastructure, not a failed/demoted primitive. Destination crate ambiguous (katgpt-validator or katgpt-bench). |
 
 ---

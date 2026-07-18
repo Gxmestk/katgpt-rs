@@ -26,7 +26,7 @@
 
 ### Phase 3: Generic MCTS
 
-- [x] T10: Implement `mcts_search<S: GameState>()` in `src/pruners/game_state/mcts.rs` — UCB1 selection, random rollout, configurable budget (FM calls), configurable rollout depth
+- [x] T10: Implement `mcts_search<S: GameState>()` in `crates/katgpt-pruners/src/game_state/mcts.rs` — UCB1 selection, random rollout, configurable budget (FM calls), configurable rollout depth
 - [x] T11: MCTS skips opponent turns (same simplification as STRATEGA paper — only optimize current player's action sequence)
 - [x] T12: Write unit tests: MCTS returns a valid action, respects budget, prefers winning moves in trivial states
 

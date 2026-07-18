@@ -27,7 +27,7 @@ Ship a generic, modelless, **rubric-gated trajectory compaction** primitive (`Cl
 ### Tasks
 
 - [x] **T1.1** Create module `src/compaction/mod.rs` with feature gate `#[cfg(feature = "closed_unit_compaction")]`. Re-export public API.
-- [x] **T1.2** Define `Rubric` trait in `src/compaction/rubric.rs`:
+- [x] **T1.2** Define `Rubric` trait in `crates/katgpt-core/src/compaction/rubric.rs`:
   ```rust
   pub trait Rubric {
       const ARITY: usize;
@@ -39,8 +39,8 @@ Ship a generic, modelless, **rubric-gated trajectory compaction** primitive (`Cl
   }
   ```
   With `RubricVerdict { predicates: [PredicateResult; ARITY] }` and `PredicateResult::{Yes { quote_start, quote_len }, No { reason }}`. Fixed-size arrays; no heap alloc in the verdict.
-- [x] **T1.3** Define `FireRule` enum in `src/compaction/fire_rule.rs`: `And(u8)`, `Or(u8)`, `Not(u8)`, `Box(Box, Box)`. Implement `fn evaluate(&self, verdict: &RubricVerdict) -> bool` (recursive, no alloc).
-- [x] **T1.4** Define `Backstop` enum in `src/compaction/backstop.rs`: `None`, `TokenPct(f32)`, `Never`. Implement `fn should_force(&self, prompt_len: usize, ctx_window: usize) -> bool`.
+- [x] **T1.3** Define `FireRule` enum in `crates/katgpt-core/src/compaction/fire_rule.rs`: `And(u8)`, `Or(u8)`, `Not(u8)`, `Box(Box, Box)`. Implement `fn evaluate(&self, verdict: &RubricVerdict) -> bool` (recursive, no alloc).
+- [x] **T1.4** Define `Backstop` enum in `crates/katgpt-core/src/compaction/backstop.rs`: `None`, `TokenPct(f32)`, `Never`. Implement `fn should_force(&self, prompt_len: usize, ctx_window: usize) -> bool`.
 - [x] **T1.5** Define `CompactionAuditRecord` in `src/compaction/audit.rs`: `#[derive(Clone, Copy, Debug, PartialEq)]`, fixed-size, `#[repr(C)]` for sync-boundary crossing. Fields per research note §2.3.
 - [x] **T1.6** Define `CompactionDecision` enum: `Compress { audit }`, `Continue { audit }`, `Forced { audit }`.
 - [x] **T1.7** Unit tests: `FireRule::And(0b1111)` returns true iff all 4 predicates Yes; `Or(0b0001)` returns true iff predicate 0 Yes; `Not(0)` returns true iff predicate 0 No; `Box(Or, And)` composes.
@@ -127,7 +127,7 @@ G3 PASSES (release-mode probe latency ratio=1.00 across L=1k/10k/100k). Math rub
 
 ### Tasks
 
-- [x] **T5.1** Implement `ShardFreezeRubric` in `src/compaction/rubrics/shard_freeze.rs` with `ARITY = 2` mirroring `riir-neuron-db/src/phase_gate.rs`:
+- [x] **T5.1** Implement `ShardFreezeRubric` in `crates/katgpt-core/src/compaction/rubrics/shard_freeze.rs` with `ARITY = 2` mirroring `riir-neuron-db/src/phase_gate.rs`:
   - P0 (input_sufficient): `n_wake_events >= intrinsic_dim` (Wang et al. Thm 4).
   - P1 (output_converged): `spectral_flatness < 0.3`.
   - `fire_rule = And(0b0011)` → `can_freeze = input_sufficient && output_converged`.

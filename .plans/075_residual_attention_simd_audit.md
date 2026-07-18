@@ -4,7 +4,7 @@
 
 ## Summary
 
-Wire SIMD primitives into all remaining scalar loops in `src/transformer.rs`, `src/types.rs`, and `src/speculative/sampling.rs`. Issue 057/058 already added `simd_dot_f32`, `simd_scale_inplace`, and related kernels — this plan closes the gap on residual adds, embedding adds, raven attention, and softmax max-finding.
+Wire SIMD primitives into all remaining scalar loops in `crates/katgpt-percepta/src/transformer.rs`, `src/types.rs`, and `crates/katgpt-core/src/speculative/sampling.rs`. Issue 057/058 already added `simd_dot_f32`, `simd_scale_inplace`, and related kernels — this plan closes the gap on residual adds, embedding adds, raven attention, and softmax max-finding.
 
 ## Tasks
 
@@ -71,9 +71,9 @@ Wire SIMD primitives into all remaining scalar loops in `src/transformer.rs`, `s
 | File | Changes |
 |------|---------|
 | `src/simd.rs` | Add `simd_add_inplace`, `simd_add_into`, `simd_max_f32`, `simd_fused_decay_write` + tests |
-| `src/transformer.rs` | Wire SIMD into embedding/residual/raven loops |
+| `crates/katgpt-percepta/src/transformer.rs` | Wire SIMD into embedding/residual/raven loops |
 | `src/types.rs` | Wire `simd_max_f32` into `softmax` / `softmax_scaled` |
-| `src/speculative/sampling.rs` | Wire `simd_scale_inplace` into normalize |
+| `crates/katgpt-core/src/speculative/sampling.rs` | Wire `simd_scale_inplace` into normalize |
 | `tests/bench_residual_simd_062.rs` | Component benchmark (new) |
 
 ## Expected Improvement

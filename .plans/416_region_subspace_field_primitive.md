@@ -3,7 +3,7 @@
 **Date:** 2026-07-09
 **Research:** [katgpt-rs/.research/396_MFA_Region_Conditioned_Factor_Analyzer.md](../.research/396_MFA_Region_Conditioned_Factor_Analyzer.md)
 **Source paper:** [arXiv:2602.02464](https://arxiv.org/abs/2602.02464) — Shafran et al., "From Directions to Regions: Decomposing Activations in Language Models via Local Geometry"
-**Target:** `katgpt-rs/crates/katgpt-core/src/region_subspace.rs` (new module) + Cargo feature `region_subspace_steering`
+**Target:** `katgpt-rs/crates/katgpt-core/crates/katgpt-core/src/region_subspace.rs` (new module) + Cargo feature `region_subspace_steering`
 **Status:** ✅ COMPLETE (2026-07-09) — Phase 5 COMPLETE. `region_subspace_steering` PROMOTED to DEFAULT-ON.
 
 ---
@@ -115,7 +115,7 @@ pub struct RegionSubspaceField<const D: usize, const K: usize, const R: usize> {
 
 ### Tasks
 
-- [x] **T1.1** Create `katgpt-rs/crates/katgpt-core/src/region_subspace.rs` with module docstring (cite Research 396 + Plan 416 + arXiv:2602.02464 + the `K=1` parity contract with Plan 412). **DONE**
+- [x] **T1.1** Create `katgpt-rs/crates/katgpt-core/crates/katgpt-core/src/region_subspace.rs` with module docstring (cite Research 396 + Plan 416 + arXiv:2602.02464 + the `K=1` parity contract with Plan 412). **DONE**
 - [x] **T1.2** Define `RegionSubspaceField<const D: usize, const K: usize, const R: usize>` struct (centroids, loadings, log_pi, psi_inv, projectors, commitment) + `RegionSubspaceError` enum (`NotOrthonormal`, `InvalidPrecision`). **DONE** — dropped `DimensionMismatch` (const generics enforce it) and `InvalidProbability` (log_pi is a raw log-weight, not a probability).
 - [x] **T1.3** Implement `RegionSubspaceField::new(centroids, loadings, log_pi, psi_inv, tol)` — validates loadings orthonormality (per region), computes projectors `Z_k` via eq. 10 (closed-form `(I + W^T Ψ^{-1} W)^{-1} W^T Ψ^{-1}` via Gauss-Jordan), computes BLAKE3 commitment. **DONE**
 - [x] **T1.4** Implement `membership_gates(state: &[f32; D], field: &Self, tau: f32) -> [f32; K]` — per-region sigmoid gates. Zero-alloc. **DONE**
@@ -195,7 +195,7 @@ All five coexist — each occupies a distinct steering niche. Plan 416 does NOT 
 
 - **Research:** [katgpt-rs/.research/396_MFA_Region_Conditioned_Factor_Analyzer.md](../.research/396_MFA_Region_Conditioned_Factor_Analyzer.md)
 - **Source paper:** [arXiv:2602.02464](https://arxiv.org/abs/2602.02464) — Shafran et al., "From Directions to Regions"
-- **Within-region sibling:** `katgpt-rs/.plans/412_subspace_steering_field_primitive.md` + `katgpt-rs/crates/katgpt-core/src/subspace_steering.rs`
+- **Within-region sibling:** `katgpt-rs/.plans/412_subspace_steering_field_primitive.md` + `katgpt-rs/crates/katgpt-core/crates/katgpt-core/src/subspace_steering.rs`
 - **Cluster-aware steering cousin:** `katgpt-rs/.plans/409_jlens_concept_readout_prefilter_poc.md` (CHaRS routing) + Research 389
 - **Per-entity MoE cousin:** `katgpt-rs/.plans/321_sampling_invariant_per_entity_moe_primitive.md` + Research 302
 - **1D steering baseline:** `katgpt-rs/.plans/309_latent_field_steering_primitive.md`

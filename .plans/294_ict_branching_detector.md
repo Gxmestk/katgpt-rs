@@ -46,11 +46,11 @@ No game IP. No chain IP. Pure information-theoretic math + selector + EMA tracke
   - `shannon_h1(probs: &[f32]) -> f32` — for G3 baseline comparison
   - `js_divergence(p: &[f32], q: &[f32], scratch_m: &mut [f32]) -> f32` — symmetric JS using `m = (p+q)/2` scratch
   - `js_divergence_batch<'a>(dists: &[&[f32]], scratch_m: &mut [f32]) -> Vec<f32>` — pairwise to mean
-- [x] **T1.5** Create `katgpt-rs/crates/katgpt-core/src/ict/branching.rs`:
+- [x] **T1.5** Create `katgpt-rs/crates/katgpt-core/crates/katgpt-core/src/ict/branching.rs`:
   - `is_critical_branching(prob_of_action: f32, beta: f32, eta: f32) -> bool` — `|π(a*) − β| < η`
   - `branching_point_mask(uniqueness_scores: &[f32], k_percent: f32, mask: &mut [bool])` — top-k% selector writing into pre-allocated mask
   - `branching_point_mask_into(uniqueness_scores: &[f32], threshold: f32, mask: &mut [bool])` — threshold-based variant
-- [x] **T1.6** Create `katgpt-rs/crates/katgpt-core/src/ict/detector.rs`:
+- [x] **T1.6** Create `katgpt-rs/crates/katgpt-core/crates/katgpt-core/src/ict/detector.rs`:
   - `pub struct BranchingDetector { k_trajectories, action_dim, k_percent, eta, scratch_p_avg, scratch_m, scratch_u, scratch_mask, ema_beta, ema_alpha }`
   - `fn new(k_trajectories, action_dim, k_percent, eta) -> Self` — pre-allocates all scratch
   - `fn observe_and_detect(&mut self, trajectories: &[&[f32]]) -> BranchingReport` — main entry; returns per-step mask + per-step β
@@ -159,7 +159,7 @@ No game IP. No chain IP. Pure information-theoretic math + selector + EMA tracke
 
 ### Tasks
 
-- [x] **T6.1** Create `katgpt-rs/src/ict/bebop_upgrade.rs` (behind `ict_branching`):
+- [x] **T6.1** Create `katgpt-rs/crates/katgpt-core/src/ict/bebop_upgrade.rs` (behind `ict_branching`):
   - `AcceptanceForecastH2 { a: f32, b: f32, ema_beta: f32, ema_alpha: f32 }`
   - `fn observe_and_forecast(&mut self, next_token_logits: &[f32]) -> f32` — uses `β = collision_purity(softmax(logits))` instead of Bebop's H1
   - `fn adaptive_gamma(&self, target_accept_length, gamma_min, gamma_max) -> usize` — same as Bebop R243 §4 sketch
@@ -213,10 +213,10 @@ No game IP. No chain IP. Pure information-theoretic math + selector + EMA tracke
 |------|-----|---------|
 | `katgpt-rs/crates/katgpt-core/src/ict/mod.rs` | ~25 | Module declarations + feature-gated re-exports |
 | `katgpt-rs/crates/katgpt-core/src/ict/math.rs` | ~180 | `collision_purity`, `renyi_h2`, `shannon_h1`, `js_divergence` + 8 unit tests |
-| `katgpt-rs/crates/katgpt-core/src/ict/branching.rs` | ~120 | `is_critical_branching`, `branching_point_mask` + 6 unit tests |
-| `katgpt-rs/crates/katgpt-core/src/ict/detector.rs` | ~250 | `BranchingDetector` struct + `observe_and_detect` + 10 unit tests |
+| `katgpt-rs/crates/katgpt-core/crates/katgpt-core/src/ict/branching.rs` | ~120 | `is_critical_branching`, `branching_point_mask` + 6 unit tests |
+| `katgpt-rs/crates/katgpt-core/crates/katgpt-core/src/ict/detector.rs` | ~250 | `BranchingDetector` struct + `observe_and_detect` + 10 unit tests |
 | `katgpt-rs/crates/katgpt-core/src/ict/types.rs` | ~60 | `BranchingReport` + doc-comments |
-| `katgpt-rs/src/ict/bebop_upgrade.rs` | ~120 | `AcceptanceForecastH2` (Bebop H1→H2 drop-in) |
+| `katgpt-rs/crates/katgpt-core/src/ict/bebop_upgrade.rs` | ~120 | `AcceptanceForecastH2` (Bebop H1→H2 drop-in) |
 | `katgpt-rs/tests/bench_294_ict_g1.rs` | ~120 | G1 paper-proof test |
 | `katgpt-rs/tests/bench_294_ict_g2.rs` | ~180 | G2 inflection test |
 | `katgpt-rs/tests/bench_294_ict_g3.rs` | ~180 | G3 orthogonality test (MAKE-OR-BREAK) |

@@ -91,7 +91,7 @@ Amortization factor across N consumers: `(sum_i budgets[i]) / N`. Break-even: `s
   }
   ```
 
-- [x] **T1.3** Define `PredictabilityScorer` trait in `katgpt-rs/src/sleep_time/predictability.rs`:
+- [x] **T1.3** Define `PredictabilityScorer` trait in `katgpt-rs/crates/katgpt-sleep/src/predictability.rs`:
   ```rust
   /// Scores how predictable a query of class `dir` is from context `c`.
   /// Returns p in [0,1]. Higher = more predictable = more sleep-time compute warranted.
@@ -121,7 +121,7 @@ Amortization factor across N consumers: `(sum_i budgets[i]) / N`. Break-even: `s
   }
   ```
 
-- [x] **T1.4** Define `SleepTimeAnticipator` trait in `katgpt-rs/src/sleep_time/anticipator.rs`:
+- [x] **T1.4** Define `SleepTimeAnticipator` trait in `katgpt-rs/crates/katgpt-sleep/src/anticipator.rs`:
   ```rust
   /// The sleep-time operator S(c) → c'. Trait-bound, not concrete — the concrete
   /// per-domain op (latent_functor extraction, KARC ridge fit, Engram hash lookup,
@@ -240,7 +240,7 @@ Amortization factor across N consumers: `(sum_i budgets[i]) / N`. Break-even: `s
   }
   ```
 
-- [x] **T1.6** Define wake-time `consume` helper in `katgpt-rs/src/sleep_time/consume.rs`:
+- [x] **T1.6** Define wake-time `consume` helper in `katgpt-rs/crates/katgpt-sleep/src/consume.rs`:
   ```rust
   /// Wake-time consumer: given query q and pre-computed c', produce an answer
   /// via cheap lookup + sigmoid gate. Falls through to caller-provided fresh_think

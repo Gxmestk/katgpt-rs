@@ -155,7 +155,7 @@ pub struct LloydMaxCodebook {
 
 ## New Files
 
-### `src/turboquant/spectral.rs` (~450 lines)
+### `crates/katgpt-spectral/src/spectral.rs` (~450 lines)
 
 Core SpectralQuant algorithms:
 
@@ -284,7 +284,7 @@ pub fn spectral_gap(eigenvalues: &[f32], d_eff: f32) -> Option<f32> { ... }
 pub fn cumulative_variance_thresholds(eigenvalues: &[f32]) -> (usize, usize) { ... }
 ```
 
-### `src/turboquant/nonuniform_quant.rs` (~350 lines)
+### `crates/katgpt-spectral/src/nonuniform_quant.rs` (~350 lines)
 
 Non-uniform quantizer combining two-regime allocation + per-dim water-fill:
 
@@ -363,7 +363,7 @@ pub struct CompressedVector {
 }
 ```
 
-### `src/turboquant/spectral_kv_cache.rs` (~400 lines)
+### `crates/katgpt-spectral/crates/katgpt-spectral/src/spectral_kv_cache.rs` (~400 lines)
 
 SpectralQuant KV cache with per-dim variable-bit packing:
 
@@ -414,7 +414,7 @@ fn pack_variable_bits(indices: &[u8], bits_per_dim: &[u8], out: &mut Vec<u8>) { 
 fn unpack_variable_bits(packed: &[u8], bits_per_dim: &[u8], n_dims: usize, out: &mut [u8]) { ... }
 ```
 
-### `src/turboquant/spectral_rotation.rs` (~200 lines)
+### `crates/katgpt-spectral/src/spectral_rotation.rs` (~200 lines)
 
 Rotation transforms (spectral + random baseline):
 

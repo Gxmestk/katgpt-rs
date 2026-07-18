@@ -266,14 +266,14 @@ full = ["leviathan", "sudoku", "validator", "rest", "training", "gpu"]  # previo
 
 | File | Action | Phase |
 |------|--------|-------|
-| `src/transformer.rs` | Add `hidden_state` field + copy | 1 |
+| `crates/katgpt-percepta/src/transformer.rs` | Add `hidden_state` field + copy | 1 |
 | `Cargo.toml` | Add `reqwest`, `tokio`, `rest` feature | 2 |
 | `src/rest/mod.rs` | New | 2 |
 | `src/rest/client.rs` | New | 2 |
 | `src/rest/types.rs` | New | 2 |
 | `src/lib.rs` | Add `mod rest` behind feature gate | 2 |
 | `src/speculative/dd_tree.rs` | Add `merge_retrieved_branches` | 3 |
-| `src/speculative/step.rs` | Add `speculative_step_rest` | 4 |
+| `crates/katgpt-forward/crates/katgpt-forward/src/step.rs` | Add `speculative_step_rest` | 4 |
 | `src/benchmark.rs` | Add REST benchmark | 4 |
 | `examples/rest_demo.rs` | New | 4 |
 

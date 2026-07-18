@@ -93,7 +93,7 @@ target and the diagnostic clears it at the HLA operating point.
 The deferred Phase-1 TODO landed in commit `fb2c7c4f`: the per-timestep
 magnitude + participation-ratio pass is now a single fused
 `simd::simd_sum_sq_quartic` sweep (NEON/AVX2/scalar dispatch in
-`crates/katgpt-core/src/simd/research.rs`). The cosine step still uses
+`crates/katgpt-core/crates/katgpt-types/src/simd/research.rs`). The cosine step still uses
 `simd::simd_dot_f32`. Math, decision rule, and zero-alloc invariant are
 unchanged — pure perf.
 

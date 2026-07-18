@@ -88,7 +88,7 @@ Per AGENTS.md feature-flag discipline: **the GOAT gate (G1–G5) passes with mod
 
 ## Files
 
-- `crates/katgpt-core/src/committed_field_blend.rs` — primitive + 13 inline tests
+- `crates/katgpt-core/crates/katgpt-core/src/committed_field_blend.rs` — primitive + 13 inline tests
 - `crates/katgpt-core/benches/committed_field_blend_bench.rs` — G4 alloc audit
 - `crates/katgpt-core/Cargo.toml` — feature + bench registration
 - `crates/katgpt-core/src/lib.rs` — re-export

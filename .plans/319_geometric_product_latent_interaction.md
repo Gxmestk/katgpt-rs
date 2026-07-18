@@ -3,7 +3,7 @@
 **Date:** 2026-06-25
 **Research:** [katgpt-rs/.research/299_Clifford_Geometric_Product_Latent_Interaction.md](../.research/299_Clifford_Geometric_Product_Latent_Interaction.md)
 **Source paper:** [arXiv:2601.06793](https://arxiv.org/abs/2601.06793) — CliffordNet: All You Need is Geometric Algebra (Ji, Feb 2026)
-**Target:** `katgpt-rs/crates/katgpt-core/src/linalg/geometric_product.rs` (new module) + Cargo feature `geometric_product`
+**Target:** `katgpt-rs/crates/katgpt-core/crates/katgpt-core/src/linalg/geometric_product.rs` (new module) + Cargo feature `geometric_product`
 **Status:** ✅ COMPLETE, DEFAULT-ON (Phase 3 promoted, Issue 003 RESOLVED) — Phase 1 ✅, Phase 2 ✅ (quality GOAT), Phase 3 ✅ PROMOTED to default-on (Issue 003 RESOLVED), Phase 4 ✅ COMPLETE (fusion guides + wiring shipped), Phase 5 ✅ ALL GATES RUN: G8e latency PASS (3.34ms), G8c formation PASS (2.93× survival), G8d coverage PASS (4/4 vs 3/4), G5 retrieval PASS (3.31× diversity, post-compaction FAIL on AM rank-1 collapse). Super-GOAT elevation: all runtime gates evaluated.
 
 ---
@@ -23,7 +23,7 @@ Ship the **channel-wise geometric product** `uv = u·v + u∧v` as a modelless, 
 ### Tasks
 
 - [x] **T1.1** Add `geometric_product` feature to `katgpt-rs/crates/katgpt-core/Cargo.toml` (empty deps, opt-in).
-- [x] **T1.2** Create `katgpt-rs/crates/katgpt-core/src/linalg/geometric_product.rs` with:
+- [x] **T1.2** Create `katgpt-rs/crates/katgpt-core/crates/katgpt-core/src/linalg/geometric_product.rs` with:
   - `pub fn cyclic_shift_into(src: &[f32], dim: usize, shift: usize, out: &mut [f32])` — zero-alloc cyclic channel shift `T_s`. Handles wrap-around. Documented with the anti-symmetric sign caveat (Research 299 §5 Q4).
   - `pub fn geometric_product_into(u, v, dim, shifts, dot_out, wedge_out, scratch_u, scratch_v)` — accumulates `Σ_s SiLU(u ⊙ T_s(v))` into `dot_out` and `Σ_s (u ⊙ T_s(v) − T_s(u) ⊙ v)` into `wedge_out`. Zero alloc after scratch init.
   - SIMD chunking hint (4-wide) on inner channel loop, mirroring `dec/operators.rs::exterior_derivative_into` pattern.
@@ -251,7 +251,7 @@ compositions than similarity-driven factions?
 
 - Source paper: https://arxiv.org/abs/2601.06793 (CliffordNet, Ji 2026)
 - Research note: `katgpt-rs/.research/299_Clifford_Geometric_Product_Latent_Interaction.md`
-- Closest shipped cousin (spatial, NOT channel): `katgpt-rs/crates/katgpt-core/src/dec/operators.rs::exterior_derivative` (Plan 251)
+- Closest shipped cousin (spatial, NOT channel): `katgpt-rs/crates/katgpt-core/crates/katgpt-dec/src/operators.rs::exterior_derivative` (Plan 251)
 - Closest shipped cousin (orthogonal construction, NOT interaction): RotorQuant (Research 65, Plan 100)
 - Closest shipped cousin (batch cross-product, NOT per-point): Latent Functor rank-k (Plan 318)
 - Canonical plan example: `katgpt-rs/.plans/271_attention_matching_compaction.md`

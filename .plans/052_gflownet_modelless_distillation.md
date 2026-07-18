@@ -49,7 +49,7 @@ Measured via existing benchmarks. To be filled during Task 1:
 
 The GFlowNet flow regularization is `λ * exp(logsumexp(-log_pf_stop))` (verified: `train.py` L215, L243). In our model, `P_F(s_f | s)` is the LoRA model's probability of the EOS token at depth d. The flow `F(s) = 1/P_stop(s)` — high when the model thinks the solution continues. Low P_stop = high flow = model expects more tokens = boost exploration there.
 
-- [x] **T2: Implement `FlowPruner<P: ScreeningPruner>`** — `src/speculative/flow_pruner.rs`
+- [x] **T2: Implement `FlowPruner<P: ScreeningPruner>`** — `crates/katgpt-speculative/src/flow_pruner.rs`
   ```rust
   pub struct FlowPruner<P: ScreeningPruner> {
       inner: P,
@@ -111,7 +111,7 @@ Currently DDTree `build_screened` blends `ln(P_llm) + ln(R)` where R from Screen
 
 The paper minimizes trajectory length via flow regularization. We add a trajectory length bonus to the existing `DeltaBanditPruner` reward.
 
-- [x] **T6: Add `observe_delta_with_flow` to `DeltaBanditPruner`** — `src/pruners/g_zero/delta_bandit.rs`
+- [x] **T6: Add `observe_delta_with_flow` to `DeltaBanditPruner`** — `crates/katgpt-pruners/src/g_zero/delta_bandit.rs`
   ```rust
   pub fn observe_delta_with_flow(&mut self, arm: usize, delta: f32, prefix_len: usize) {
       let flow_bonus = self.lambda_length / prefix_len.max(1) as f32;
@@ -184,9 +184,9 @@ Fractional relevance (R ∈ (0,1)) provides priority signal that binary relevanc
 
 | File | Changes |
 |------|---------|
-| `src/speculative/flow_pruner.rs` | **New:** FlowPruner<P> wrapper |
+| `crates/katgpt-speculative/src/flow_pruner.rs` | **New:** FlowPruner<P> wrapper |
 | `src/speculative/dd_tree.rs` | **New:** `build_balanced` method on TreeBuilder |
-| `src/pruners/g_zero/delta_bandit.rs` | **New:** `observe_delta_with_flow` method + `lambda_length` field |
+| `crates/katgpt-pruners/src/g_zero/delta_bandit.rs` | **New:** `observe_delta_with_flow` method + `lambda_length` field |
 | `src/pruners/bomber/replay_backward.rs` | **New:** ReplayBackwardWalker |
 | `src/speculative/mod.rs` | Export FlowPruner, build_dd_tree_balanced |
 | `tests/bench_gflownet_modelless.rs` | **New:** Full benchmark suite |

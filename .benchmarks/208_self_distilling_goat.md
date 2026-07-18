@@ -73,7 +73,7 @@ Episode lookup only happens in `episode_update()`, which is called *after* gener
 
 | File | LOC | Content |
 |------|-----|---------|
-| `src/pruners/self_distilling_bandit.rs` | ~710 | Core implementation + 15 tests |
+| `crates/katgpt-pruners/src/self_distilling_bandit.rs` | ~710 | Core implementation + 15 tests |
 | `examples/self_distilling_demo.rs` | ~247 | 3-section demo |
 | `src/pruners/mod.rs` | +11 | Module + re-exports |
 | `Cargo.toml` | +5 | Feature + example entry |

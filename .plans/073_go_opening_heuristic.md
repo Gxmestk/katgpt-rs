@@ -56,8 +56,8 @@ Expected impact: MCTS at budget=200 should improve from ~60% to >80% vs Random o
 
 | File | Change |
 |------|--------|
-| `src/pruners/go/state.rs` | `GoHeuristic` — add phase-aware territorial preference, replace center_preference |
-| `src/pruners/go/players.rs` | `greedy_score()` — flip center→corner bonus, add connect bonus |
+| `crates/katgpt-pruners/src/go/state.rs` | `GoHeuristic` — add phase-aware territorial preference, replace center_preference |
+| `crates/katgpt-pruners/src/go/players.rs` | `greedy_score()` — flip center→corner bonus, add connect bonus |
 
 ## Tasks
 

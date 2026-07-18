@@ -36,7 +36,7 @@ Synthetic REST retrieval simulation measuring retrieval quality (NDCG@10) for Ma
 
 ## New Module
 
-### `src/rerank.rs` (feature-gated behind `maxsim`)
+### `crates/katgpt-attn-match/src/rerank.rs` (feature-gated behind `maxsim`)
 
 | Component | Description |
 |-----------|-------------|

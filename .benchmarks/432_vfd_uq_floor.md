@@ -197,6 +197,6 @@ cargo test -p katgpt-core \
 - **Plan 376 Phase 6 (the ensemble's UQ gate, which PASSED):** `.benchmarks/376_uq_floor.md`
 - **Issue 010 (the "Report the Floor" rule):** `.benchmarks/010_report_the_floor_consolidated.md`
 - **Plan 340 (the floor):** `ConformalIntervalCalibrator<SeasonalNaiveForecaster>` (m=1, default-on)
-- **Floor harness:** `crates/katgpt-core/src/conformal/floor_harness.rs`
+- **Floor harness:** `crates/katgpt-core/crates/katgpt-core/src/conformal/floor_harness.rs`
 - **Research 420 (the VFD research note):** `.research/420_VFD_Velocity_Field_Disagreement_Epistemic_UQ.md`
 - **Source paper:** arXiv:2606.18043 — Römer et al., §4 (VFD estimator + Theorem 4.1)

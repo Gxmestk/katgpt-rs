@@ -213,15 +213,15 @@ Speedup: Speculative vs AR went from **0.72x** → **1.48x**
 
 ## File Changes Summary
 - `src/speculative/types.rs` — ✅ `SpeculativeContext` struct + `new`/`reset`/accessor methods
-- `src/speculative/dflash.rs` — ✅ `_with` variants (`dflash_predict_with`, `_ar_with`, `_conditioned_with`), parallel uses per-worker `probs_buf`, backward-compat wrappers
+- `crates/katgpt-speculative/src/dflash.rs` — ✅ `_with` variants (`dflash_predict_with`, `_ar_with`, `_conditioned_with`), parallel uses per-worker `probs_buf`, backward-compat wrappers
 - `src/speculative/dd_tree.rs` — ✅ `TreeBuilder` struct + `build`/`build_and_merge` with `&[&[f32]]` sig, `extract_best_path_into`
-- `src/speculative/sampling.rs` — ✅ `sample_residual_distribution_into` (zero-alloc), `sample_residual_distribution` now wrapper
+- `crates/katgpt-core/src/speculative/sampling.rs` — ✅ `sample_residual_distribution_into` (zero-alloc), `sample_residual_distribution` now wrapper
 - `src/speculative/verifier.rs` — ✅ `SimulatedVerifier` holds `SpeculativeContext` + `TreeBuilder`; `LeviathanVerifier` holds `draft_sctx` + `tree_builder`
-- `src/speculative/step.rs` — ✅ `_with` variants for rollback/conditioned, `speculative_step` uses zero-alloc verifier
+- `crates/katgpt-forward/crates/katgpt-forward/src/step.rs` — ✅ `_with` variants for rollback/conditioned, `speculative_step` uses zero-alloc verifier
 - `src/speculative/prefill.rs` — ✅ `score_into` on `PrefillScorer` trait, `AttentionScorer` reuses pre-allocated context
 - `src/speculative/mod.rs` — ✅ re-exports `SpeculativeContext`, `TreeBuilder`, `extract_best_path_into`, `sample_residual_distribution_into`, `_with` fns
 - `src/benchmark.rs` — ✅ all bench functions use `SpeculativeContext`/`TreeBuilder` outside loops; `bench_prefill_compression` uses `score_into`
-- `src/transformer.rs` — ✅ `generate_into` added, `generate` is thin wrapper
+- `crates/katgpt-percepta/src/transformer.rs` — ✅ `generate_into` added, `generate` is thin wrapper
 
 ## Dependency Order
 1. `SpeculativeContext` (Task 1) — foundation for everything else

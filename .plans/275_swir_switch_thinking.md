@@ -44,7 +44,7 @@ Goal: compiling, tested, feature-gated module implementing the core SwiR state m
   - [x] `StepAction` enum: `EmitToken(u32)`, `EmitSoftEmbedding`, `InjectControlToken(ControlToken)`, `Terminate`
   - [x] `ControlToken` enum: `CloseThink` (`</think>`), `ForceAnswerPrefix` (`</think>\n\nThe final answer is`)
   - [x] `SwiRStats` struct (switches_total, latent_steps, explicit_steps, mode_at_termination) for debugging/benchmarks
-- [x] **T1.5** Implement `src/swir/controller.rs` — `SwiRController` state machine:
+- [x] **T1.5** Implement `crates/katgpt-transformer/src/swir/controller.rs` — `SwiRController` state machine:
   - [x] Struct fields: mode, reference_entropy, dwell_steps, switch_count, injection_queue (small VecDeque or fixed `[u32; 8]` ring), answer_budget_remaining, config, stats
   - [x] `SwiRController::new(config)` initializes mode=Latent, reference_entropy=NaN (set on first step), switch_count=0, queue empty
   - [x] `fn step(&mut self, entropy: f32, step_index: u32) -> StepAction` — Algorithm 1 of the paper:
@@ -60,18 +60,18 @@ Goal: compiling, tested, feature-gated module implementing the core SwiR state m
     5. Return `EmitToken(0)` (caller fills token id) if mode==Explicit, `EmitSoftEmbedding` if mode==Latent
   - [x] `fn should_mix_signal(&self) -> Option<(SignalMixKind, f32)>` — returns `Some((LatentEntry, α_t))` or `Some((ExplicitExit, β_t))` only on the first step after a switch, None otherwise. Schedule: `α_t = α_0 + (1 - α_0) * step_index / max_steps`, same for β.
   - [x] `fn stats(&self) -> SwiRStats`
-- [x] **T1.6** Implement `src/swir/soft_embedding.rs` — latent-mode soft embedding:
+- [x] **T1.6** Implement `crates/katgpt-transformer/src/swir/soft_embedding.rs` — latent-mode soft embedding:
   - [x] `fn soft_embedding(probs: &[f32], embedding_matrix: &[f32], embedding_dim: usize, out: &mut [f32])` — `ẽ_t = Σ_v p_t[v] * e(v)`, writes to `out` (length=embedding_dim, caller-allocated)
   - [x] Zero-overhead: no allocation. Caller responsible for `out.zero_fill()` before call (or document that this is "accumulate" semantics — TBD which is cleaner; lean toward zero-internal-alloc by requiring caller to pre-zero).
   - [x] SIMD chunked loop (8-wide) over `embedding_dim` for the inner reduction.
   - [x] Numerical guard: if `probs` does not sum to ≈1, normalize on the fly with a single pre-pass (documented cost).
-- [x] **T1.7** Implement `src/swir/signal_mix.rs`:
+- [x] **T1.7** Implement `crates/katgpt-transformer/src/swir/signal_mix.rs`:
   - [x] `fn mix_thinking_signal(soft_embed: &mut [f32], control_token_embed: &[f32], ratio: f32)` — `out ← ratio * out + (1 - ratio) * control_token_embed`. In-place, no alloc.
   - [x] Assert `ratio ∈ [0, 1]` in debug builds.
-- [x] **T1.8** Implement `src/swir/convex_hull_check.rs` (G4 invariant):
+- [x] **T1.8** Implement `crates/katgpt-transformer/src/swir/convex_hull_check.rs` (G4 invariant):
   - [x] `fn in_vocab_convex_hull(soft_embed: &[f32], embedding_matrix: &[f32], embedding_dim: usize) -> bool` — for each dim d, check `min_v e(v)[d] ≤ soft_embed[d] ≤ max_v e(v)[d]`. O(vocab * embedding_dim) but only runs in test/debug, not hot path.
   - [x] Used in unit tests to verify Lyapunov-style invariant.
-- [x] **T1.9** Unit tests in `src/swir/controller.rs` (#[cfg(test)]):
+- [x] **T1.9** Unit tests in `crates/katgpt-transformer/src/swir/controller.rs` (#[cfg(test)]):
   - [x] `test_first_step_initializes_reference_entropy` — NaN → real value
   - [x] `test_latent_to_explicit_on_confidence_rise` — H_t < H̄ triggers switch
   - [x] `test_explicit_to_latent_requires_dwell_window` — H_t > H̄ but dwell < W_E→L stays explicit
@@ -82,7 +82,7 @@ Goal: compiling, tested, feature-gated module implementing the core SwiR state m
   - [x] `test_terminate_after_answer_budget_exhausted`
   - [x] `test_signal_mix_schedule_at_switch_instants` — ratio increases with step_index per α_t/β_t schedule
   - [x] `test_no_signal_mix_on_non_switch_steps`
-- [x] **T1.10** Unit tests in `src/swir/soft_embedding.rs`:
+- [x] **T1.10** Unit tests in `crates/katgpt-transformer/src/swir/soft_embedding.rs`:
   - [x] `test_uniform_probs_returns_centroid` — uniform p over k one-hot vectors returns mean embedding
   - [x] `test_one_hot_prob_returns_token_embedding` — p concentrated on token v returns e(v)
   - [x] `test_result_lies_in_vocab_convex_hull` — random probs, G4 invariant holds (covered by convex_hull_check::tests::random_soft_embeddings_all_in_hull)
@@ -100,7 +100,7 @@ Goal: wire SwiR into the existing `thinking_cot` framework so it can actually dr
 
 ### Tasks
 
-- [x] **T2.1** Audit `src/lib.rs` exports and `thinking_cot` module (Plan 194) for the existing `ThinkingStrategy` trait (or equivalent trait/type that switches between direct/CoT/early-exit modes). If no such trait exists yet, define a minimal one in `src/thinking_cot/strategy.rs`:
+- [x] **T2.1** Audit `src/lib.rs` exports and `thinking_cot` module (Plan 194) for the existing `ThinkingStrategy` trait (or equivalent trait/type that switches between direct/CoT/early-exit modes). If no such trait exists yet, define a minimal one in `crates/katgpt-transformer/src/thinking_cot/strategy.rs`:
   ```rust
   pub trait ThinkingStrategy {
       fn on_step(&mut self, ctx: &mut StepContext) -> StepDirective;
@@ -121,7 +121,7 @@ Goal: wire SwiR into the existing `thinking_cot` framework so it can actually dr
   }
   ```
   **Finding:** `thinking_cot` was a meta-feature with no `pub mod thinking_cot;` in lib.rs and no trait. T2.1 introduces both: `src/thinking_cot/{mod,strategy}.rs` defining `ThinkingStrategy`, `StepContext`, `StepDirective`, and `ControlTokenIds` (the wiring struct lives here, not under swir, because the dependency arrow is swir → thinking_cot — swir depends on thinking_cot, not the reverse).
-- [x] **T2.2** Implement `src/swir/strategy_adapter.rs` — `impl ThinkingStrategy for SwiRController`:
+- [x] **T2.2** Implement `crates/katgpt-transformer/src/swir/strategy_adapter.rs` — `impl ThinkingStrategy for SwiRController`:
   - [x] Compute entropy from `ctx.logits` ( Shannon: `H = -Σ p log p`, with a SIMD-friendly chunked loop; clamp `log(0)` to 0 via masked select).
   - [x] Call `self.step(entropy, ctx.step_index)`.
   - [x] Translate `StepAction` to `StepDirective`. For `EmitSoftEmbedding`, call `soft_embedding()` writing into the strategy's pre-allocated scratch buffer, then apply signal mixing if `should_mix_signal()` returns Some.
@@ -136,7 +136,7 @@ Goal: wire SwiR into the existing `thinking_cot` framework so it can actually dr
   - [x] Switch count matches expected schedule from the synthetic entropy.
   - [x] Convergence trigger fires when switch_count = ½c_max.
   - [x] Termination trigger fires when switch_count > c_max.
-  **Implementation:** `tests/swir_strategy_integration.rs` (6 tests). `latent_explicit_latent_explicit_schedule_drives_switches` verifies the schedule. `convergence_fires_close_think_at_half_cmax` verifies the convergence guard. `termination_fires_force_answer_then_terminate` verifies the overthinking guard + budget countdown. `soft_embedding_satisfies_g4_throughout_long_run` runs 64 random distributions through the loop and asserts G4 on every soft step. Unit tests in `src/swir/strategy_adapter.rs` (7 tests) cover the same paths at module level.
+  **Implementation:** `tests/swir_strategy_integration.rs` (6 tests). `latent_explicit_latent_explicit_schedule_drives_switches` verifies the schedule. `convergence_fires_close_think_at_half_cmax` verifies the convergence guard. `termination_fires_force_answer_then_terminate` verifies the overthinking guard + budget countdown. `soft_embedding_satisfies_g4_throughout_long_run` runs 64 random distributions through the loop and asserts G4 on every soft step. Unit tests in `crates/katgpt-transformer/src/swir/strategy_adapter.rs` (7 tests) cover the same paths at module level.
 - [x] **T2.6** Feature gate composition: add `swir_switch_thinking = ["thinking_cot"]` dependency in Cargo.toml. Document that this enables latent mode via soft embedding (requires embedding matrix access on every decode step — verify `thinking_cot` exposes this).
   **Implementation:** `swir_switch_thinking = ["thinking_cot"]` in Cargo.toml. `StepContext.embedding_matrix` is the host-side contract — the host is responsible for making the LM-head embedding matrix available. (The existing `thinking_cot` host code is not modified; only the trait is added. Future Phase 3 wiring into a real model will surface any missing access.)
 
@@ -144,7 +144,7 @@ Goal: wire SwiR into the existing `thinking_cot` framework so it can actually dr
 
 **VERIFICATION NOTE (2026-06-16):** the `bench_275_swir_goat` integration suite passes **10/10 serially** (`-- --test-threads=1`) but **9/10 under default parallel execution** — `g7_step_zero_allocation_debug` flakes because the global `katgpt_rs::alloc` tracking allocator is process-global, so allocations from concurrently-running tests bleed into the `count <= 0` assertion. The controller itself is zero-allocation (proven by the serial run and by `g7_adapter_on_step_allocations_debug`). This is a **test-harness isolation gap, not a production-code bug**. The reproduce command in `src/swir/BENCHMARKS.md` already pins `--test-threads=1`; a future cleanup could thread a per-test allocator counter. Documented honestly here rather than claiming a clean parallel pass.
 
-**RESOLVED (2026-06-16):** `src/alloc.rs` switched from process-global `AtomicUsize` counters to thread-local `Cell<AllocStats>` counters. This fixes the root cause — each test thread's allocation measurements are now isolated from sibling tests. `g7_step_zero_allocation_debug` now passes **10/10 under default parallel execution** (verified with 5 consecutive runs). The `--test-threads=1` pin is removed from the test doc and `src/swir/BENCHMARKS.md`. Stale comments in `src/attn_match/router.rs` and `tests/bench_271_attn_match_goat.rs` (both referenced the now-inaccurate "global counter" model) updated. All 6 alloc-audit call sites (`alloc.rs` internal, `attn_match/router.rs`, `bench_271/272/274/275`) benefit from the isolation fix.
+**RESOLVED (2026-06-16):** `crates/katgpt-core/src/alloc.rs` switched from process-global `AtomicUsize` counters to thread-local `Cell<AllocStats>` counters. This fixes the root cause — each test thread's allocation measurements are now isolated from sibling tests. `g7_step_zero_allocation_debug` now passes **10/10 under default parallel execution** (verified with 5 consecutive runs). The `--test-threads=1` pin is removed from the test doc and `src/swir/BENCHMARKS.md`. Stale comments in `src/attn_match/router.rs` and `tests/bench_271_attn_match_goat.rs` (both referenced the now-inaccurate "global counter" model) updated. All 6 alloc-audit call sites (`alloc.rs` internal, `attn_match/router.rs`, `bench_271/272/274/275`) benefit from the isolation fix.
 
 ---
 
@@ -175,7 +175,7 @@ Goal: prove the GOAT gate on a real model (Gemma 2 or Qwen3 family already suppo
 - [x] **T3.7** GOAT gate G5 (no regression): run the existing `thinking_cot` and `collapse_aware_thinking` test suites with `swir_switch_thinking` disabled — 100% pass.
   **PASS:** `cargo check` (default, no swir) clean; `cargo check --features swir_switch_thinking` clean. The swir module is fully feature-gated.
 - [x] **T3.8** GOAT gate G6 (auto-fallback): construct a synthetic "rigid-constraint" task (paper's 3D-surface-shortest-path style) and verify that `selectivity_router`'s kurtosis signal forces explicit-only mode, bypassing SwiR's latent mode. If selectivity_router doesn't fire, add a manual escape hatch: `SwiRConfig::disable_latent_mode_on_high_kurtosis: bool` (default true) that consults an externally-supplied kurtosis scalar each step.
-  **PASS.** `selectivity_router` is an empty Cargo feature (no module), so per the plan's fallback clause we added `SwiRConfig::kurtosis_escape_threshold: f32` (default `f32::INFINITY` = disabled) + `SwiRController::observe_kurtosis(&mut self, k: f32)`. 5 unit tests in `src/swir/controller.rs` + 1 end-to-end GOAT test (`g6_kurtosis_escape_hatch_end_to_end`) verify the escape forces Explicit and blocks Latent re-entry while kurtosis stays high.
+  **PASS.** `selectivity_router` is an empty Cargo feature (no module), so per the plan's fallback clause we added `SwiRConfig::kurtosis_escape_threshold: f32` (default `f32::INFINITY` = disabled) + `SwiRController::observe_kurtosis(&mut self, k: f32)`. 5 unit tests in `crates/katgpt-transformer/src/swir/controller.rs` + 1 end-to-end GOAT test (`g6_kurtosis_escape_hatch_end_to_end`) verify the escape forces Explicit and blocks Latent re-entry while kurtosis stays high.
 - [x] **T3.9** Ablation studies on the internal benchmark:
   - [x] W_E→L ∈ {64, 128, 256, 512, 1024} — expect 512 to win (paper Tab. 3).
   - [x] α_0 ∈ {0.3, 0.6, 0.9, 1.0} — expect broad plateau (paper Tab. 2).

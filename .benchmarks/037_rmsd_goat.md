@@ -97,7 +97,7 @@ rmsd_distill = ["sdar_gate", "bandit"]
 
 | File | Role |
 |------|------|
-| `src/pruners/rmsd_relevance.rs` | Core types: RmsdConfig, LogprobMagnitudeFilter, TopKlApproximator, MagnitudeJudge, RmsdRelevanceFilter, TeacherContinuation, rmsd_loss |
+| `crates/katgpt-pruners/src/rmsd_relevance.rs` | Core types: RmsdConfig, LogprobMagnitudeFilter, TopKlApproximator, MagnitudeJudge, RmsdRelevanceFilter, TeacherContinuation, rmsd_loss |
 | `src/pruners/bomber/rmsd_player.rs` | Bomber arena player using RMSD-filtered SDAR |
 | `tests/test_125_rmsd_goat.rs` | 44 GOAT proofs (34 unit + 2 arena) |
 | `examples/bomber_16_rmsd_tournament.rs` | Tournament example: RMSD vs SDAR vs VPD vs GZero vs Random |

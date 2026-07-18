@@ -63,7 +63,7 @@ rule extraction are production-ready.
 
 ## Files Changed
 
-- `src/pruners/riir_feedback.rs` — P4+P5 implementation (8 unit tests)
+- `crates/katgpt-pruners/src/riir_feedback.rs` — P4+P5 implementation (8 unit tests)
 - `tests/coexplain_goat.rs` — 6 GOAT integration tests
 - `examples/coexplain_demo.rs` — Full pipeline demo
 - `src/pruners/mod.rs` — Module registration + re-exports

@@ -26,7 +26,7 @@ The `parent_path` packs **5 bits per depth** (`<< 5`, `& 0x1F`). This means **ma
 
 ### Blocker 2: `TransformerWeights` scales linearly with `vocab_size`
 
-```/src/transformer.rs#L25-35
+```/crates/katgpt-percepta/src/transformer.rs#L25-35
         Self {
             wte: init(config.vocab_size * n),      // [vocab_size * n_embd]
             lm_head: init(config.vocab_size * n),  // [vocab_size * n_embd]
@@ -660,8 +660,8 @@ Plan 009 will cover:
 
 - [x] 1.1 Add `blake3`, `serde`, `serde_json` to `Cargo.toml` dependencies
 - [x] 1.2 Create `src/tokenizer/mod.rs` with re-exports
-- [x] 1.3 Create `src/tokenizer/types.rs` with `BpeTokenizer`, `MergeRule`
-- [x] 1.4 Create `src/tokenizer/bpe.rs` with `encode()`, `decode()`, `decode_single()`, `train()`
+- [x] 1.3 Create `crates/katgpt-tokenizer/src/types.rs` with `BpeTokenizer`, `MergeRule`
+- [x] 1.4 Create `crates/katgpt-tokenizer/src/bpe.rs` with `encode()`, `decode()`, `decode_single()`, `train()`
 - [x] 1.5 Add `Config::bpe()` and `Config::bpe_draft()` to `src/types.rs`
 - [x] 1.6 Add `pub mod tokenizer;` to `src/lib.rs`
 - [x] 1.7 Add tests: encode/decode roundtrip, special tokens, vocab coverage
@@ -674,9 +674,9 @@ Plan 009 will cover:
 - [x] 2.1 Add `syn` and `proc-macro2` to `Cargo.toml` under `[dependencies]` with `optional = true`
 - [x] 2.2 Add `validator = ["syn", "proc-macro2"]` to `[features]` (previously `clora`)
 - [x] 2.3 Create `src/validator/mod.rs` with re-exports (behind `#[cfg(feature = "validator")]`)
-- [x] 2.4 Create `src/validator/types.rs` with `PruneResult`, `ErrorKind`, `CompilerFeedback`
-- [x] 2.5 Create `src/validator/partial_parser.rs` with bracket balancer DFA
-- [x] 2.6 Create `src/validator/syn_pruner.rs` with `SynPruner` implementing `ConstraintPruner`
+- [x] 2.4 Create `crates/katgpt-validator/src/types.rs` with `PruneResult`, `ErrorKind`, `CompilerFeedback`
+- [x] 2.5 Create `crates/katgpt-validator/src/partial_parser.rs` with bracket balancer DFA
+- [x] 2.6 Create `crates/katgpt-validator/src/syn_pruner.rs` with `SynPruner` implementing `ConstraintPruner`
 - [x] 2.7 Add `pub mod validator;` to `src/lib.rs` (behind `#[cfg(feature = "validator")]`)
 - [x] 2.8 Add tests: partial parser accepts valid fragments, rejects unbalanced
 - [x] 2.9 Add tests: SynPruner prunes invalid Rust, accepts valid Rust
@@ -729,14 +729,14 @@ validator = ["syn", "proc-macro2"]  # previously clora
 | `src/speculative/dd_tree.rs` | shift/mask update | 0 | No (internal) |
 | `Cargo.toml` | Add deps + features | 1-2 | No |
 | `src/tokenizer/mod.rs` | New | 1 | No |
-| `src/tokenizer/types.rs` | New | 1 | No |
-| `src/tokenizer/bpe.rs` | New | 1 | No |
+| `crates/katgpt-tokenizer/src/types.rs` | New | 1 | No |
+| `crates/katgpt-tokenizer/src/bpe.rs` | New | 1 | No |
 | `src/types.rs` | Add Config::bpe() (`n_layer` already exists from Plan 010) | 1 | No |
 | `src/lib.rs` | Add mod tokenizer | 1 | No |
 | `src/validator/mod.rs` | New | 2 | No |
-| `src/validator/types.rs` | New | 2 | No |
-| `src/validator/partial_parser.rs` | New | 2 | No |
-| `src/validator/syn_pruner.rs` | New | 2 | No |
+| `crates/katgpt-validator/src/types.rs` | New | 2 | No |
+| `crates/katgpt-validator/src/partial_parser.rs` | New | 2 | No |
+| `crates/katgpt-validator/src/syn_pruner.rs` | New | 2 | No |
 | `examples/validator_demo.rs` | New | 3 | No |
 | `src/benchmark.rs` | Add BPE + validator benches | 1-3 | No |
 

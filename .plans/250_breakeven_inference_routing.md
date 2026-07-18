@@ -115,7 +115,7 @@ Integration
 | File | Action |
 |------|--------|
 | `src/breakeven/mod.rs` | NEW — BreakevenTracker, BreakevenBandit |
-| `src/breakeven/fidelity.rs` | NEW — FidelityMatcher |
+| `crates/katgpt-core/src/breakeven/fidelity.rs` | NEW — FidelityMatcher |
 | `src/inference_router.rs` | MODIFY — add breakeven signal integration |
 | `src/lib.rs` | MODIFY — add conditional module |
 | `Cargo.toml` | MODIFY — add feature flag |

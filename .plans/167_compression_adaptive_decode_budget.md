@@ -120,8 +120,8 @@ Per `.contexts/optimization.md`:
 
 | File | Action | Description |
 |------|--------|-------------|
-| `src/speculative/budget.rs` | NEW | Core `adaptive_tree_budget()` + `compression_ratio()` + 11 unit tests |
-| `src/speculative/budget_compat.rs` | NEW | Integration layer: `effective_tree_budget()` + `scaled_draft_lookahead()` + 9 tests |
+| `crates/katgpt-speculative/src/budget.rs` | NEW | Core `adaptive_tree_budget()` + `compression_ratio()` + 11 unit tests |
+| `crates/katgpt-speculative/src/budget_compat.rs` | NEW | Integration layer: `effective_tree_budget()` + `scaled_draft_lookahead()` + 9 tests |
 | `src/speculative/types.rs` | MODIFIED | Added `BudgetAdaptation` enum + field on `FlashPrefillConfig` |
 | `src/speculative/prefill.rs` | MODIFIED | Added `block_compression_ratio()` |
 | `src/speculative/mod.rs` | MODIFIED | Module + re-exports |

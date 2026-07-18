@@ -84,7 +84,7 @@ Test file: `tests/test_139_ega_attn.rs`
 ## Module Structure
 
 ```
-src/ega_attn.rs              # ~220 lines — EgaGate + helpers + unit tests
+crates/katgpt-attn/src/ega_attn.rs              # ~220 lines — EgaGate + helpers + unit tests
 tests/test_139_ega_attn.rs   # ~200 lines — 6 GOAT proofs
 ```
 
@@ -107,5 +107,5 @@ No dependencies. Pure Rust.
 |------|--------|
 | `Cargo.toml` | Added `ega_attn = []` feature |
 | `src/lib.rs` | Added `#[cfg(feature = "ega_attn")] pub mod ega_attn;` |
-| `src/ega_attn.rs` | **NEW** — Core EGA types and helpers |
+| `crates/katgpt-attn/src/ega_attn.rs` | **NEW** — Core EGA types and helpers |
 | `tests/test_139_ega_attn.rs` | **NEW** — 6 GOAT proofs |

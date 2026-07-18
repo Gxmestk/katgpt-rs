@@ -27,18 +27,18 @@ However, unlike katgpt-rs pre-Plan-404, the oversized code is **not pure substra
 ### Findings
 
 **Cross-crate extraction debt: LOW.** Only ONE genuine extraction candidate exists:
-- `riir-games/src/meta_router.rs` (2,449 LOC) — Vortex meta-routing bandit, depends only on `fastrand`. Pristine deps. Could move to `riir-router` (fits its "inference routing" mandate) or its own `riir-meta-router` crate.
+- `riir-games/crates/katgpt-attn/src/dash_attn/meta_router.rs` (2,449 LOC) — Vortex meta-routing bandit, depends only on `fastrand`. Pristine deps. Could move to `riir-router` (fits its "inference routing" mandate) or its own `riir-meta-router` crate.
 
 **File-hygiene debt: MODERATE.** 23 files break the 2048-line rule. Notable offenders:
 - `riir-gpu/src/forward.rs` — **7,894 LOC** (workspace's largest file; 20+ WGSL param structs)
-- `riir-engine/src/latent_functor/arithmetic.rs` — 3,667 LOC (6 functor primitives)
+- `riir-engine/crates/katgpt-percepta/src/wasm/interpreter/arithmetic.rs` — 3,667 LOC (6 functor primitives)
 - `riir-games/src/civ/skill.rs` — 3,556 LOC (skill YAML schema + tiers)
 
 Most are mechanical internal-splits (carve WGSL param structs into `forward_params.rs`, split 6 functors into 6 files), not cross-crate extraction.
 
 **Cohesion debt: MODERATE, concentrated in `riir-games`.** The `civ/` submodule alone is 83 files / 43K LOC — bigger than 16 of the 18 crates. 27 top-level modules span civ, quest, plasma, worms, ruliology, etc. The real opportunity is **splitting `riir-games` along domain lines** (e.g. `riir-games-civ`, `riir-games-quest`).
 
-**DRY debt: LOW.** One proven intentional fork: `FrameSampler` duplicated between `riir-engine/src/frame/sampler.rs` and `riir-games/src/combat/sampler.rs` (games version is a perf-improved fork with `sim_tick_into` buffer reuse). Other apparent duplicates (`SpatialBelief`, `KgTriple`) are coincidental name collisions with different fields/semantics — NOT true duplication.
+**DRY debt: LOW.** One proven intentional fork: `FrameSampler` duplicated between `riir-engine/crates/katgpt-deprecated/src/alien_sampler/sampler.rs` and `riir-games/crates/katgpt-deprecated/src/alien_sampler/sampler.rs` (games version is a perf-improved fork with `sim_tick_into` buffer reuse). Other apparent duplicates (`SpatialBelief`, `KgTriple`) are coincidental name collisions with different fields/semantics — NOT true duplication.
 
 ### Blockers
 

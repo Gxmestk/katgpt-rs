@@ -96,7 +96,7 @@ per worker), so eliminating it captures most of the gain.
 
 | File | Change |
 |------|--------|
-| `crates/katgpt-spectral/src/spectral_kv_cache.rs` | Added `_into` variants for keys + values; refactored alloc variants to delegate (DRY); 2 new unit tests |
+| `crates/katgpt-spectral/crates/katgpt-spectral/src/spectral_kv_cache.rs` | Added `_into` variants for keys + values; refactored alloc variants to delegate (DRY); 2 new unit tests |
 | `crates/katgpt-spectral/src/forward.rs` | Added `_into` wrapper functions; fixed `DequantizeScratch` import (was over-gated on `maxsim`) |
 | `crates/katgpt-spectral/src/lib.rs` | Export `_into` functions |
 | `src/benchmark/infrastructure.rs` | Added `_into` vs alloc comparison in par dequant benchmark |

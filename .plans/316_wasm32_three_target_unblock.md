@@ -29,7 +29,7 @@ targets. Root causes were NOT architectural — three missing cfg/feature declar
 
 ## Tasks
 
-- [x] **T1: Fix `argmax.rs` missing import** (`katgpt-core/src/simd/argmax.rs`)
+- [x] **T1: Fix `argmax.rs` missing import** (`katgpt-core/crates/katgpt-types/src/simd/argmax.rs`)
   - Added `use crate::simd::simd_max_f32;`
   - Regression from the `simd.rs` → `simd/` folder refactor (`9d0ba6ee`). Native CI
     was green because the `aarch64`/`x86_64` branches early-return before reaching
@@ -131,7 +131,7 @@ the Vessel *projection* path (Model B) needed the getrandom + bytemuck fixes.
 
 ## Files Changed
 
-- `crates/katgpt-core/src/simd/argmax.rs` — +1 line (T1)
+- `crates/katgpt-core/crates/katgpt-types/src/simd/argmax.rs` — +1 line (T1)
 - `Cargo.toml` — getrandom wasm32 block (T2) + bytemuck feature (T3)
 
 ## TL;DR

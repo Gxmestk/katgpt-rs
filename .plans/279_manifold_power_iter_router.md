@@ -3,7 +3,7 @@
 **Date:** 2026-06-16
 **Research:** [katgpt-rs/.research/246_Manifold_Power_Iteration_MoE_Router.md](../.research/246_Manifold_Power_Iteration_MoE_Router.md)
 **Source paper:** [arxiv 2606.12397](https://arxiv.org/abs/2606.12397) — Redesign MoE Routers with Manifold Power Iteration (RUC / Tencent, 10 Jun 2026)
-**Target:** `katgpt-rs/src/manifold_power_iter_router.rs` (new module) + Cargo feature `manifold_power_iter_router` + shared `power_iter_retract` helper in `katgpt-rs/src/spectral_retract.rs`
+**Target:** `katgpt-rs/crates/katgpt-spectral/src/manifold_power_iter_router.rs` (new module) + Cargo feature `manifold_power_iter_router` + shared `power_iter_retract` helper in `katgpt-rs/crates/katgpt-spectral/src/spectral_retract.rs`
 **Status:** Done — Phase 4 GOAT gate 9/9 green, promoted to DEFAULT-ON 2026-06-16 (verified 2026-06-17: 27/27 tests still green across 4 test files).
 
 ---
@@ -20,16 +20,16 @@ Goal: a compiling, tested, feature-gated module that implements `manifold_power_
 
 ### Tasks
 
-- [x] **T1.1** Create `src/spectral_retract.rs` (new shared helper module) with empty `mod.rs`-style doc header
+- [x] **T1.1** Create `crates/katgpt-spectral/src/spectral_retract.rs` (new shared helper module) with empty `mod.rs`-style doc header
 - [x] **T1.2** Add feature flag `manifold_power_iter_router = ["dep:spectral_retract"]` to `katgpt-rs/Cargo.toml` features section (after `gauge_invariant`)
 - [x] **T1.3** Add `#[cfg(feature = "manifold_power_iter_router")] pub mod manifold_power_iter_router;` and `pub mod spectral_retract;` (always-on — helper is shared) to `src/lib.rs` (alphabetical, after `sparse_task_vector`)
-- [x] **T1.4** Implement shared `power_iter_retract` helper in `src/spectral_retract.rs`:
+- [x] **T1.4** Implement shared `power_iter_retract` helper in `crates/katgpt-spectral/src/spectral_retract.rs`:
   - [x] `PowerRetractScratch` struct (reuses `PowerIterationScratch` pattern from `src/distill/peira.rs`): `mv_out: Vec<f32>` (D), `norm: f32`
   - [x] `pub fn power_iter_retract(v: &mut [f32], psd_op: &[f32], dim: usize, target_norm: f32, iters: u8, scratch: &mut PowerRetractScratch)` — one or more steps of `v ← v·M` then `v ← target_norm · v / ‖v‖₂`. Zero-alloc, caller-owned scratch. Works on any PSD operator (Gram for MoE, `AᵀA`/`BᵀB` for LoRA gauge).
   - [x] Deterministic given `(v, M, target_norm, iters)` — safe for sync/quorum
   - [x] Sub-μs per call for D ≤ 1024 (plasma tier)
-- [x] **T1.5** DRY refactor: migrate `gauge_rebalance` (Plan 270) in `src/gauge_invariant.rs` to call `power_iter_retract` for its `σ_max` estimation step (the power iteration in `power_iterate_sigma_max`). Verify `gauge_rebalance`'s invariants still hold: `‖A·Bᵀ‖_F` unchanged, existing tests (`t01_gauge_rebalance_preserves_abt_exactly`, `test_gauge_rebalance_balances_sigmas`, `test_gauge_rebalance_zero_matrix_safe`) pass unchanged
-- [x] **T1.6** Implement `src/manifold_power_iter_router.rs` types:
+- [x] **T1.5** DRY refactor: migrate `gauge_rebalance` (Plan 270) in `crates/katgpt-spectral/src/gauge_invariant.rs` to call `power_iter_retract` for its `σ_max` estimation step (the power iteration in `power_iterate_sigma_max`). Verify `gauge_rebalance`'s invariants still hold: `‖A·Bᵀ‖_F` unchanged, existing tests (`t01_gauge_rebalance_preserves_abt_exactly`, `test_gauge_rebalance_balances_sigmas`, `test_gauge_rebalance_zero_matrix_safe`) pass unchanged
+- [x] **T1.6** Implement `crates/katgpt-spectral/src/manifold_power_iter_router.rs` types:
   - [x] `MpiRouterConfig` struct (`c_prime: f32`, `iters: u8` (=1 per paper §1.4), `beta_sigmoid: f32` temperature)
   - [x] `MpiRouterResult` struct (`r_prime: Vec<f32>` N×D, `lambda_alignment: f32` diagnostic, `maxvio: f32` diagnostic)
   - [x] `ExpertGramView` enum/borrow type: `Owned(Vec<f32>)` vs `Borrowed(&[f32])` for the per-expert Gram slices
@@ -50,7 +50,7 @@ Goal: a compiling, tested, feature-gated module that implements `manifold_power_
   - [x] Compute diagnostic `lambda_alignment` (paper Eq. 11): mean over rows of `(R'[i]·M[i]·R'[i]ᵀ) / (‖R'[i]·M[i]‖₂ · ‖R'[i]‖₂)`
   - [x] Compute diagnostic `maxvio`: max row-norm deviation from `C` (should be ≈0 after retraction)
 - [x] **T1.9** Implement `gate_sigmoid_topk(x: &[f32], r_prime: &[f32], n_experts: usize, d_model: usize, beta: f32, k: usize, out_scores: &mut [f32]) -> Vec<usize>` — research note §2.3 distillation. **Independent per-expert sigmoid** `σ(β · x · R'[i]ᵀ)`, then TopK_k by sigmoid score. Never softmax.
-- [x] **T1.10** Write unit tests in `src/manifold_power_iter_router.rs` `mod tests`:
+- [x] **T1.10** Write unit tests in `crates/katgpt-spectral/src/manifold_power_iter_router.rs` `mod tests`:
   - [x] Synthetic: known principal-direction recovery — construct `W_g` with a known dominant right-singular vector `u`, random `R[0]`, verify after MPI `R'[0]·u ≈ C` (cosine > 0.95 for `iters=1`, > 0.99 for `iters=5`) → GOAT G1
   - [x] Determinism: same `(R, M, c_prime, iters)` → byte-identical `R'` → sync-safe → GOAT G2
   - [x] Norm invariant: `‖R'[i]‖₂ ≈ C' / √N` for all `i` after retraction → GOAT G3
@@ -63,7 +63,7 @@ Goal: a compiling, tested, feature-gated module that implements `manifold_power_
   - [x] Print `maxvio` before/after (target: 1.13 → 0.96 shape)
   - [x] Print timing (target: sub-ms for N=8, D=256)
   - [x] Show sigmoid top-k gating on a sample token `x`
-- [x] **T1.12** Document module in `src/manifold_power_iter_router.rs` header with paper reference (arxiv 2606.12397), equations (Eq. 4–5), and the §2.3 sigmoid-distillation note
+- [x] **T1.12** Document module in `crates/katgpt-spectral/src/manifold_power_iter_router.rs` header with paper reference (arxiv 2606.12397), equations (Eq. 4–5), and the §2.3 sigmoid-distillation note
 
 ### Phase 1 Exit Criteria
 - [x] `cargo build --features manifold_power_iter_router` compiles clean
@@ -81,7 +81,7 @@ Goal: the MPI conditioning fires **once per snapshot swap** (research note §2.2
 
 ### Tasks
 
-- [x] **T2.1** Implement `MpiRouterSnapshotHook` trait in `src/manifold_power_iter_router.rs`:
+- [x] **T2.1** Implement `MpiRouterSnapshotHook` trait in `crates/katgpt-spectral/src/manifold_power_iter_router.rs`:
   ```
   pub trait MpiRouterSnapshotHook {
       /// Called once when a frozen expert pool is hot-swapped.
@@ -155,7 +155,7 @@ Goal: per AGENTS.md GOAT gate rule — if the new technique wins, promote to def
 
 - [x] **T4.1** Run full GOAT gate (`bench_279_manifold_power_iter_goat.rs`) on default features. Confirm 8/8 green. — **DONE: 9/9 tests pass (G1–G8 + summary). All gates green on release build.**
 - [x] **T4.2** If 8/8 green: promote `manifold_power_iter_router` to default features in `katgpt-rs/Cargo.toml`. Update `src/lib.rs` to remove the `#[cfg(feature = ...)]` gate (or keep the gate but add to default feature set). Update `README.md` Feature Showcase + GOAT Proofs section with the λ/MaxVio/zero-overhead numbers. — **DONE (verified 2026-06-17): `Cargo.toml` `default` array contains `"manifold_power_iter_router"` (line 45) with comment `DEFAULT-ON since Plan 279 Phase 4 GOAT 9/9 green`. `src/lib.rs` keeps the `#[cfg(feature = ...)]` gate (line 84) but the feature is now in the default set. `README.md` has the full Feature Showcase entry at L796-807 with the GOAT 9/9 green decision documented.**
-- [x] **T4.3** If 8/8 green: demote the loser (vanilla unconditioned router) — any internal caller that currently uses raw `R` for MoE gating should switch to `R'` via the snapshot hook. Document the migration in `src/manifold_power_iter_router.rs` module docs. — **N/A: no internal caller currently uses raw `R` for MoE gating (MPI router is a new module, no incumbent to demote).**
+- [x] **T4.3** If 8/8 green: demote the loser (vanilla unconditioned router) — any internal caller that currently uses raw `R` for MoE gating should switch to `R'` via the snapshot hook. Document the migration in `crates/katgpt-spectral/src/manifold_power_iter_router.rs` module docs. — **N/A: no internal caller currently uses raw `R` for MoE gating (MPI router is a new module, no incumbent to demote).**
 - [x] **T4.4** If ANY gate fails: keep `manifold_power_iter_router` behind its feature flag (opt-in). Document which gate(s) failed and why in this plan's Phase 4 section. Do NOT promote. The shared `power_iter_retract` helper (Phase 1 T1.4/T1.5) still ships — it's a DRY win independent of the MPI verdict. — **N/A: all gates passed.**
 - [x] **T4.5** Update research note `katgpt-rs/.research/246_*.md` Status field: `Active → Done` (if promoted) or `Active → Shelved` (if demoted). Add a one-line postscript: "Plan 279 GOAT gate: N/8 green, promoted|shelved on YYYY-MM-DD."
 
@@ -187,12 +187,12 @@ Goal: per AGENTS.md GOAT gate rule — if the new technique wins, promote to def
 
 ## DRY Note (Research 246 §2.4 / §6 Fusion Idea F)
 
-`gauge_rebalance` (Plan 270, `src/gauge_invariant.rs`) and `manifold_power_iter_router` (this plan) are both instances of **"power-iteration step + norm retraction on a vector against a PSD operator"**:
+`gauge_rebalance` (Plan 270, `crates/katgpt-spectral/src/gauge_invariant.rs`) and `manifold_power_iter_router` (this plan) are both instances of **"power-iteration step + norm retraction on a vector against a PSD operator"**:
 
 - `gauge_rebalance`: `v ← v · (AᵀA)` for `σ_max(A)` estimation, then implicit retraction via `c = (σ_max(B)/σ_max(A))^{α/2}`.
 - `manifold_power_iter_router`: `R[i] ← R[i] · (W_g W_gᵀ)`, then explicit `R'[i] ← C · R̂[i]/‖R̂[i]‖₂`.
 
-Extracting a shared `power_iter_retract(v, psd_op, dim, target_norm, iters, scratch)` helper in `src/spectral_retract.rs` (Phase 1 T1.4–T1.5) eliminates duplication and makes future spectral-conditioning ops one-liners (e.g., HLA shard direction conditioning — Research 246 §6 Fusion Idea E). The helper is always-on (not feature-gated to `manifold_power_iter_router`) because `gauge_rebalance` is already default-on.
+Extracting a shared `power_iter_retract(v, psd_op, dim, target_norm, iters, scratch)` helper in `crates/katgpt-spectral/src/spectral_retract.rs` (Phase 1 T1.4–T1.5) eliminates duplication and makes future spectral-conditioning ops one-liners (e.g., HLA shard direction conditioning — Research 246 §6 Fusion Idea E). The helper is always-on (not feature-gated to `manifold_power_iter_router`) because `gauge_rebalance` is already default-on.
 
 ---
 

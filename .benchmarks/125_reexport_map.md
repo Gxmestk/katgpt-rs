@@ -182,7 +182,7 @@ own internal re-exports, but the module ITSELF is root):
 - `katgpt_rs::pruners` (mod → `src/pruners/mod.rs`)
 - `katgpt_rs::speculative` (mod → `src/speculative/mod.rs`)
 - `katgpt_rs::types` (mod → `src/types.rs`)
-- `katgpt_rs::transformer` (mod → `src/transformer.rs`)
+- `katgpt_rs::transformer` (mod → `crates/katgpt-percepta/src/transformer.rs`)
 - `katgpt_rs::inference_router` (mod → `src/inference_router.rs`)
 - `katgpt_rs::dllm` (mod → `src/dllm.rs`)
 - `katgpt_rs::benchmark`, `katgpt_rs::plot`, `katgpt_rs::sleep`, `katgpt_rs::tf_loop`

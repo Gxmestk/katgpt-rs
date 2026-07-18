@@ -168,4 +168,4 @@ One line change. Gate bias is precomputed before attention loop:
 - Baseline comparisons: StreamingLLM, H2O, KVZap, ExpectedAttention
 - Our TurboQuant: arXiv:2504.19874
 - Our PFlash: `src/speculative/prefill.rs`
-- Our Raven: `src/transformer.rs:RavenKVCache`
+- Our Raven: `crates/katgpt-percepta/src/transformer.rs:RavenKVCache`

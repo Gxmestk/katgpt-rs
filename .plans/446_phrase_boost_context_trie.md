@@ -17,7 +17,7 @@ Implement a `PhraseBoostPruner` that wraps any `ScreeningPruner` and adds domain
 ## Tasks
 
 ### T1: PhraseTrie — Compact Token-Level Trie
-- [x] Create `src/pruners/phrase_trie.rs` behind `#[cfg(feature = "phrase_boost")]`
+- [x] Create `crates/katgpt-pruners/src/phrase_trie.rs` behind `#[cfg(feature = "phrase_boost")]`
 - [x] `PhraseTrieNode` with `children: Vec<Option<usize>>` (vocab-indexed, O(1) child lookup)
 - [x] `PhraseTrie::insert(token_ids: &[usize])` — insert single phrase
 - [x] `PhraseTrie::build(phrases: &[&str], encode_fn)` — bulk build from strings
@@ -26,7 +26,7 @@ Implement a `PhraseBoostPruner` that wraps any `ScreeningPruner` and adds domain
 - [x] Unit tests: insert + lookup + advance roundtrip
 
 ### T2: PhraseBoostPruner — ScreeningPruner Wrapper
-- [x] Create `src/pruners/phrase_boost.rs` behind `#[cfg(feature = "phrase_boost")]`
+- [x] Create `crates/katgpt-pruners/src/phrase_boost.rs` behind `#[cfg(feature = "phrase_boost")]`
 - [x] `PhraseBoostPruner<P: ScreeningPruner>` wrapping any inner pruner
 - [x] `relevance()` delegates to inner, adds normalized boost for boosted tokens
 - [x] Boost normalization: `boost_score / (1.0 + boost_score)` to stay in [0, 1+]

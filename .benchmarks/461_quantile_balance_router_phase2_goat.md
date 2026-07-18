@@ -3,7 +3,7 @@
 **Plan:** [`katgpt-rs/.plans/455_quantile_balancing_router_primitive.md`](../.plans/455_quantile_balancing_router_primitive.md)
 **Date:** 2026-07-17
 **Status:** ✅ **PASS — 12/12 GOAT gates green on release build**
-**Substrate:** `crates/katgpt-spectral/src/quantile_balance_router.rs` (sibling to Plan 279 Manifold Power Iteration Router)
+**Substrate:** `crates/katgpt-spectral/crates/katgpt-spectral/src/quantile_balance_router.rs` (sibling to Plan 279 Manifold Power Iteration Router)
 **Test artifact:** `crates/katgpt-spectral/tests/bench_455_quantile_balance_goat.rs`
 **Bench artifact:** `crates/katgpt-spectral/benches/quantile_balance_router_bench.rs`
 

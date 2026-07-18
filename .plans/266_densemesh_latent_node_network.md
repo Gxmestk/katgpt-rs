@@ -119,13 +119,13 @@ katgpt-rs/src/dense_mesh/
 
 ## Dependencies (existing modules reused — DRY)
 
-- `katgpt-rs/src/speculative/thinking_controller.rs` — ThinkingBandit (for EdgeBandit)
+- `katgpt-rs/crates/katgpt-speculative/crates/katgpt-speculative/src/thinking_controller.rs` — ThinkingBandit (for EdgeBandit)
 - `katgpt-rs/src/speculative/types.rs` — ForwardContext, scores
 - `katgpt-rs/src/types.rs` — LoRA weights, DomainLatent
 - `katgpt-rs/src/inference_router.rs` — compute target routing
 - `katgpt-rs/src/simd.rs` — SIMD primitives for aggregation
 - `katgpt-core/src/traits.rs` — ConstraintPruner pattern (for trait style)
-- `katgpt-rs/src/transformer.rs` — forward pass (DenseNode impl wraps this)
+- `katgpt-rs/crates/katgpt-percepta/src/transformer.rs` — forward pass (DenseNode impl wraps this)
 
 ---
 

@@ -25,7 +25,7 @@
 
 ### Phase 0: Core Primitive — VarianceMinimizer
 
-- [x] **T1: Implement `VarianceMinimizer` struct** — `src/pruners/variance_minimizer.rs`
+- [x] **T1: Implement `VarianceMinimizer` struct** — `crates/katgpt-pruners/src/variance_minimizer.rs`
   - Tracks running mean and variance of a signal across steps/episodes
   - Adapts a scalar schedule parameter to minimize variance (RePlaid Fig 8 simplified)
   - Exponential moving average (EMA) for online updates — no history storage
@@ -150,7 +150,7 @@
 
 ### Phase 2: Bandit Variance-Minimized Exploration
 
-- [x] **T5: Add `VarianceEpsilon` strategy to `BanditStrategy` enum** — `src/pruners/bandit.rs`
+- [x] **T5: Add `VarianceEpsilon` strategy to `BanditStrategy` enum** — `crates/katgpt-ruliology/crates/katgpt-ruliology/src/bandit.rs`
   - New variant that adapts ε based on per-episode reward variance
   - High variance → increase exploration (haven't converged)
   - Low variance → decrease exploration (exploit learned Q-values)
@@ -204,7 +204,7 @@
 
 ### Phase 3: SDAR Learned β
 
-- [x] **T8: Add `SdarLearnedBeta` to `src/pruners/sdar_gate.rs`**
+- [x] **T8: Add `SdarLearnedBeta` to `crates/katgpt-pruners/src/sdar_gate.rs`**
   - Replace fixed `SDAR_BETA = 5.0` with learned β that minimizes gated-signal variance
   - Track variance of `sdar_gate(gap, beta) * signal` across episodes
   - Adapt β to flatten this variance (same principle as Prop 1)
@@ -234,7 +234,7 @@
   }
   ```
 
-- [x] **T9: Integrate `SdarLearnedBeta` into `SdarBanditPruner`** — `src/pruners/sdar/sdar_bandit.rs`
+- [x] **T9: Integrate `SdarLearnedBeta` into `SdarBanditPruner`** — `crates/katgpt-pruners/src/sdar/sdar_bandit.rs`
   - Added `learned_beta: Option<SdarLearnedBeta>` field behind `#[cfg(feature = "replaid_schedules")]`
   - `update()` uses `learned_beta.beta()` when present, falls back to static `self.beta`
   - Added `with_learned_beta(initial_beta)` builder method
@@ -280,7 +280,7 @@ RePlaid Sec 4.2 shows DPM-Solver++(2M) — a second-order multistep solver — b
 
 - [x] **T12: Feature gate `replaid_schedules`** — `Cargo.toml`
   - Default: off (experimental until benchmarks prove value)
-  - Gated in: `src/pruners/variance_minimizer.rs`, `AdaptiveNoiseSchedule` in `src/dllm.rs`, `VarianceEpsilon` in `bandit.rs`, `SdarLearnedBeta` in `sdar_gate.rs`
+  - Gated in: `crates/katgpt-pruners/src/variance_minimizer.rs`, `AdaptiveNoiseSchedule` in `src/dllm.rs`, `VarianceEpsilon` in `bandit.rs`, `SdarLearnedBeta` in `sdar_gate.rs`
   - Add to `full` feature set
 
 - [x] **T13: Update documentation** — partial

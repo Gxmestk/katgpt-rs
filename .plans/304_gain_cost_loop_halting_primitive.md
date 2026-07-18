@@ -4,7 +4,7 @@
 **Research:** [katgpt-rs/.research/282_LoopCoder_V2_Gain_Cost_Loop_Halting.md](../.research/282_LoopCoder_V2_Gain_Cost_Loop_Halting.md)
 **Private guide:** [riir-ai/.research/149_Per_NPC_Gain_Cost_Reasoning_Depth_Guide.md](../../../riir-ai/.research/149_Per_NPC_Gain_Cost_Reasoning_Depth_Guide.md)
 **Source paper:** [arxiv 2606.18023](https://arxiv.org/abs/2606.18023) — LoopCoder-v2 (Yang et al., 2026)
-**Target:** `crates/katgpt-core/src/gain_cost_halt.rs` (new module) + Cargo feature `gain_cost_halt`
+**Target:** `crates/katgpt-core/crates/katgpt-core/src/gain_cost_halt.rs` (new module) + Cargo feature `gain_cost_halt`
 **Status:** Active — Phase 1 complete (kernel + 24/24 G1 mechanics tests shipped). Phase 2 complete (forward_looped wiring: T2.1–T2.3 done; T2.4 + T2.5 done — synthetic G2/G3 bench harness shipped at `benches/gain_cost_halt_bench.rs`, both gates PASS: G2 76.7% crowd-NPC savings, G3 0-loop important-NPC waste; see `.benchmarks/304_gain_cost_halt_goat.md`). **G4 done (2026-06-23): oscillation-vs-stability bench added to the same harness — G4 PASS, halter catches cos θ=−1.0 at L=2 while PathwayTracker (stability-only) reports stability 0.881 after 10 oscillatory loops (structurally blind to activation reversal).** Phase 3 done (T3.1 architecture doc, T3.3 README entry, T3.4 demo example, T3.5 feature isolation PASS; T3.2 skipped — comparison doc out of scope for Research 282). 27/27 kernel tests + 28/28 forward_looped integration tests PASS. GOAT gate matrix now complete: G1 (mechanics) + G2 (crowd savings) + G3 (no-regression) + G4 (oscillation detection) + G5 (feature isolation) all PASS. Real-world validation deferred to riir-ai Plan 330. Phase 2.5 (TF-Loop wiring into `forward_training_free_loop`) remains deferred — different semantics (ODE sub-step endpoint refinement vs weight-shared loop).
 
 ---
@@ -23,7 +23,7 @@ The primitive composes with the shipped elastic loop override (`Config::effectiv
 
 ### Tasks
 
-- [x] **T1.1** Create `crates/katgpt-core/src/gain_cost_halt.rs` behind `gain_cost_halt` feature. Re-export from `crates/katgpt-core/src/lib.rs`.
+- [x] **T1.1** Create `crates/katgpt-core/crates/katgpt-core/src/gain_cost_halt.rs` behind `gain_cost_halt` feature. Re-export from `crates/katgpt-core/src/lib.rs`.
 
 - [x] **T1.2** Define the halter state struct (zero-alloc, hot-path-safe):
 

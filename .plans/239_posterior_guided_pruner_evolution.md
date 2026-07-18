@@ -15,14 +15,14 @@ Fuse BAKE precision vectors with MUSE skill lifecycle to create posterior-guided
 ## Tasks
 
 ### Phase 1: Core Types & Precision Primitive ✅ COMPLETE (29 tests pass)
-- [x] Create `src/pruners/posterior/types.rs` — `PosteriorEvidence` struct (task_id, outcome, context, failure_mode, token_bucket, latency_bucket)
-- [x] Create `src/pruners/posterior/precision.rs` — `PrecisionVector<[f32; 8]>` with BAKE-style sequential update (precision += obs, posterior = μ × precision/total)
-- [x] Create `src/pruners/posterior/surprise.rs` — `SurpriseComputer` with KL(posterior||prior) per dimension, sigmoid-gated trigger
+- [x] Create `crates/katgpt-pruners/src/posterior/types.rs` — `PosteriorEvidence` struct (task_id, outcome, context, failure_mode, token_bucket, latency_bucket)
+- [x] Create `crates/katgpt-pruners/src/posterior/precision.rs` — `PrecisionVector<[f32; 8]>` with BAKE-style sequential update (precision += obs, posterior = μ × precision/total)
+- [x] Create `crates/katgpt-pruners/src/posterior/surprise.rs` — `SurpriseComputer` with KL(posterior||prior) per dimension, sigmoid-gated trigger
 - [x] Unit tests for precision update correctness (before/after precision values match hand-computed)
 - [x] Unit tests for surprise computation (known posterior/prior → known KL divergence)
 
 ### Phase 2: Precision Policy (The Five Actions) ✅ COMPLETE (8 tests pass)
-- [x] Create `src/pruners/posterior/policy.rs` — `LifecycleAction` enum with 5 actions: Explore, Patch, Split, Compress, Retire
+- [x] Create `crates/katgpt-pruners/src/posterior/policy.rs` — `LifecycleAction` enum with 5 actions: Explore, Patch, Split, Compress, Retire
 - [x] Implement `PrecisionPolicy::decide(posterior, surprise, observations, failure_modes)` — ordered priority rules with precision thresholds
 - [x] Implement `PrecisionPolicy::patch_trigger(surprise, β)` — sigmoid(β × surprise) > 0.7
 - [x] Implement `PrecisionPolicy::split_trigger(precision_divergence)` — detect when two arms' precision vectors diverge beyond threshold
@@ -31,7 +31,7 @@ Fuse BAKE precision vectors with MUSE skill lifecycle to create posterior-guided
 - [x] Unit tests for each action trigger with known inputs/expected outputs
 
 ### Phase 3: PosteriorGuidedPruner Integration ✅ COMPLETE (15 tests pass)
-- [x] Create `src/pruners/posterior/wrapper.rs` — `PosteriorGuidedPruner<P: ScreeningPruner>` decorator that adds precision tracking to any existing pruner
+- [x] Create `crates/katgpt-pruners/src/posterior/wrapper.rs` — `PosteriorGuidedPruner<P: ScreeningPruner>` decorator that adds precision tracking to any existing pruner
 - [x] Implement `ScreeningPruner` for `PosteriorGuidedPruner` — delegates to inner pruner with precision-gated modulation
 - [x] Implement `PosteriorGuidedPruner::record_evidence(outcome, context, failure_mode)` — updates precision vector, returns KL surprise
 - [x] Implement `PosteriorGuidedPruner::lifecycle_action()` — returns current `PrecisionPolicy` decision

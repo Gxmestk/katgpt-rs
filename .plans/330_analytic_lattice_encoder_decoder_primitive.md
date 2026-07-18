@@ -8,7 +8,7 @@
 
 > **Revision note (2026-06-26):** Original Phase 1 (`AnalyticLatticeEncoder`
 > trait + 3 reference impls) is **DROPPED** — it is redundant with
-> `riir-ai/crates/riir-engine/src/fourier/encoder.rs`, which already ships
+> `riir-ai/crates/riir-engine/crates/katgpt-core/src/mux_latent/encoder.rs`, which already ships
 > `FourierEncoder::encode_position_into` / `encode_offset_into` (closed-form
 > analytic encoder). Phase 1 is replaced by **ASOC cascade**
 > (`ComposerTick: GpuFuture`) as the new headline primitive, built on the
@@ -30,7 +30,7 @@
 > the math primitives (`compose_chain`, `batch_compose_chain`,
 > `direction_vector_decode`, spectral audit) stay in `katgpt-core`. The
 > **`GpuFuture` impl** (`ComposerTick` + `Join3`) moves to
-> `riir-ai/crates/riir-engine/src/analytic_lattice/asoc.rs`. Feature flags
+> `riir-ai/crates/riir-engine/crates/katgpt-core/src/analytic_lattice/asoc.rs`. Feature flags
 > split: `analytic_lattice` (katgpt-core, traits + math) and
 > `analytic_lattice_runtime` (riir-engine, the `GpuFuture` wiring).
 
@@ -48,7 +48,7 @@ Ship the primitives identified as genuinely novel in R311 (revised):
    - **Layer split:** the generic **trait shapes** (`PlasmaDraft`, `RederiveOp`)
      ship in `katgpt-core` (no `GpuFuture` import — they use an associated
      `type Fut`). The `GpuFuture` **impl** (`ComposerTick` + `Join3`) ships in
-     `riir-engine/src/analytic_lattice/asoc.rs` (the only place with both
+     `riir-engine/crates/katgpt-core/src/analytic_lattice/asoc.rs` (the only place with both
      `katgpt-core` + `riir-gpu-async` in scope). See revision note above.
 2. **`compose_chain`** — cross-entity operator product
    `C[n-1] × ... × C[1] × C[0]` for an arbitrary-length chain of `f32`
@@ -65,7 +65,7 @@ Ship the primitives identified as genuinely novel in R311 (revised):
 
 **Redundant (NOT shipped here):** `AnalyticLatticeEncoder` trait. The
 encoder half is already shipped as `FourierEncoder::encode_*_into` in
-`riir-engine/src/fourier/encoder.rs` — we reuse it instead of re-shipping.
+`riir-engine/crates/katgpt-core/src/mux_latent/encoder.rs` — we reuse it instead of re-shipping.
 
 All four primitives: zero-alloc, SIMD-first, ARM64/x86_64/wasm32-portable,
 behind ONE feature flag. GOAT gate G1–G6 (per R311 §5) must pass before
@@ -120,7 +120,7 @@ pub struct TransportOperator {
 
 ### Phase 1a — Trait shapes (katgpt-core)
 
-**Target:** `katgpt-rs/crates/katgpt-core/src/analytic_lattice/asoc.rs` (new)
+**Target:** `katgpt-rs/crates/katgpt-core/crates/katgpt-core/src/analytic_lattice/asoc.rs` (new)
 
 ### Tasks
 
@@ -190,7 +190,7 @@ pub struct ComposerCtx {
 
 ### Phase 1b — `ComposerTick: GpuFuture` impl + `Join3` (riir-engine)
 
-**Target:** `riir-ai/crates/riir-engine/src/analytic_lattice/asoc.rs` (new)
+**Target:** `riir-ai/crates/riir-engine/crates/katgpt-core/src/analytic_lattice/asoc.rs` (new)
 
 ### Tasks
 
@@ -474,7 +474,7 @@ pub fn compose_chain_into(
 
 ## Phase 2.5 — `batch_compose_chain` zone-batched prefix factoring
 
-**Target:** `katgpt-rs/crates/katgpt-core/src/analytic_lattice/batch_chain.rs`
+**Target:** `katgpt-rs/crates/katgpt-core/crates/katgpt-core/src/analytic_lattice/batch_chain.rs`
 
 > **Why this Phase exists (perf).** In a zone with N players, all N players
 > share the same `C_boss × C_quest` prefix (the boss and quest are zone-level
@@ -637,7 +637,7 @@ pub fn direction_vector_decode<const N: usize>(
 - Chain length > 16 — defer until G3 holds at length 16.
 - Cross-resolution transport (Plan 310) composition — separate primitive, may fuse later.
 - Refactoring `riir-games::scalar_projection.rs` to call `direction_vector_decode` — noted as cleanup follow-up, not in this plan.
-- ~~`AnalyticLatticeEncoder` trait~~ — DROPPED, redundant with `riir-engine/src/fourier/encoder.rs`.
+- ~~`AnalyticLatticeEncoder` trait~~ — DROPPED, redundant with `riir-engine/crates/katgpt-core/src/mux_latent/encoder.rs`.
 
 ## TL;DR
 

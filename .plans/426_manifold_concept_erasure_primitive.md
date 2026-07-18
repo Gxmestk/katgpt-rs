@@ -4,7 +4,7 @@
 **Research:** [409_MANCE_Manifold_Aware_Concept_Erasure.md](../.research/409_MANCE_Manifold_Aware_Concept_Erasure.md)
 **Source paper:** [arXiv:2607.03973](https://arxiv.org/abs/2607.03973) — Avitan, Goldberg, Elazar, *MANCE: Manifold Aware Concept Erasure*, Jul 2026
 **Code:** [github.com/MatanAvitan/mance](https://github.com/MatanAvitan/mance)
-**Target:** `katgpt-rs/crates/katgpt-core/src/manifold_erasure.rs` (new module) + Cargo feature `manifold_erasure`
+**Target:** `katgpt-rs/crates/katgpt-core/crates/katgpt-core/src/manifold_erasure.rs` (new module) + Cargo feature `manifold_erasure`
 **Status:** ✅ COMPLETE — Phases 1–4 all done, GOAT gate G1–G6 ALL PASS, `manifold_erasure` promoted to default-on. SVD caching optimization in Plan 427 (Issue 132, CLOSED).
 
 ---
@@ -32,7 +32,7 @@ This is the **local, spectrally-weighted, trust-bounded erasure** member of the 
 
 ### Tasks
 
-- [x] **T1.1** Create `crates/katgpt-core/src/manifold_erasure.rs` module (feature-gated under `manifold_erasure` in `katgpt-core/Cargo.toml`).
+- [x] **T1.1** Create `crates/katgpt-core/crates/katgpt-core/src/manifold_erasure.rs` module (feature-gated under `manifold_erasure` in `katgpt-core/Cargo.toml`).
 - [x] **T1.2** Define types:
   - `ManceConfig { epsilon: f32, lambda_max: f32, alpha: f32, k: usize, r: usize }` — all dimensionless, defaults `epsilon=0.1, lambda_max=64.0, alpha=1.0, k=8, r=8`.
   - `ManceScratch` — pre-allocated scratch buffers: `neighbor_distances: Vec<f32>`, `centered_neighbors: Vec<f32>` (k×d), `tangent_basis: Vec<f32>` (d×r), `singular_values: Vec<f32>` (r), `projection_coords: Vec<f32>` (r), `tangent_direction: Vec<f32>` (d), `mean_neighbor: Vec<f32>` (d). `with_capacity(d, k, r)` constructor.

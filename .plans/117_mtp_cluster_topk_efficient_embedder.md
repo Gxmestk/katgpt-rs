@@ -189,7 +189,7 @@ MTP = "predict ahead with a small model, verify with the big model." This maps t
 
 ### Phase 1: LoRA-Trained Drafter (Highest Priority)
 
-- [x] **T1**: Create `src/speculative/drafter_lora.rs` — LoRA adapter struct for drafter weights
+- [x] **T1**: Create `crates/katgpt-forward/crates/katgpt-forward/src/drafter_lora.rs` — LoRA adapter struct for drafter weights
 - [x] **T2**: Implement `train_drafter_lora()` — training loop: forward target → collect pairs → train LoRA on drafter via cross-entropy (finite-difference gradients for ~288 params)
 - [x] **T3**: Implement `generate_training_pairs_from_replays()` / `generate_synthetic_pairs()` — run target on game replays / text corpus → produce (input, target_token) pairs
 - [x] **T4**: Add `drafter_lora: Option<DrafterLoraWeights>` field to `LeviathanVerifier` + `with_drafter_lora()` / `set_drafter_lora()` / `has_drafter_lora()` methods
@@ -249,7 +249,7 @@ MTP = "predict ahead with a small model, verify with the big model." This maps t
 
 ### Phase 5: Sync + Benchmark
 
-- [x] **T36**: Sync `clustered_lm_head` changes to `riir-ai/crates/riir-engine/src/transformer.rs` — added `select_topk_indices`, updated to Top-K selection, 627 riir-engine tests pass
+- [x] **T36**: Sync `clustered_lm_head` changes to `riir-ai/crates/riir-engine/crates/katgpt-percepta/src/transformer.rs` — added `select_topk_indices`, updated to Top-K selection, 627 riir-engine tests pass
 - [x] **T37**: Sync `Config` changes to `riir-ai/crates/riir-engine/src/types.rs` — already synced via `pub use katgpt_core::types::*` re-export
 - [x] **T38**: Benchmark: `game()` + LoRA drafter — measure acceptance rate improvement over random baseline (4/4 tests pass)
 - [x] **T39**: Benchmark: `bpe()` + LoRA drafter — measure acceptance rate and throughput

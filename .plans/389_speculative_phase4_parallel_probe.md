@@ -6,8 +6,8 @@
 
 ## Goal
 
-Move `src/speculative/parallel_probe.rs` (1187 LOC, Plan 133 Parallel-Probe 2D
-controller) to `katgpt-speculative/src/parallel_probe.rs`.
+Move `crates/katgpt-speculative/crates/katgpt-speculative/src/parallel_probe.rs` (1187 LOC, Plan 133 Parallel-Probe 2D
+controller) to `katgpt-speculative/crates/katgpt-speculative/src/parallel_probe.rs`.
 
 Root-only speculative count drops from 14 → 13 files.
 
@@ -44,12 +44,12 @@ back-compat shim.
 ## Tasks
 
 - [x] **Phase 4.1 — Host `SpeculativeVerifier` trait in katgpt-speculative**
-  - [x] Create `crates/katgpt-speculative/src/verifier_trait.rs` with the trait def.
+  - [x] Create `crates/katgpt-speculative/crates/katgpt-speculative/src/verifier_trait.rs` with the trait def.
   - [x] Wire `katgpt-transformer` as optional dep gated by `parallel_probe` feature.
   - [x] Add `pub mod verifier_trait;` + re-export in katgpt-speculative lib.rs.
   - [x] `cargo check -p katgpt-speculative --features parallel_probe` clean (no warnings).
 - [x] **Phase 4.2 — Move `parallel_probe.rs` to katgpt-speculative**
-  - [x] `git mv src/speculative/parallel_probe.rs crates/katgpt-speculative/src/`
+  - [x] `git mv crates/katgpt-speculative/crates/katgpt-speculative/src/parallel_probe.rs crates/katgpt-speculative/src/`
   - [x] Rewrite imports per Plan 388 table (extends).
   - [x] Add `pub mod parallel_probe;` to katgpt-speculative lib.rs (gated).
   - [x] `cargo check -p katgpt-speculative --features parallel_probe` clean.

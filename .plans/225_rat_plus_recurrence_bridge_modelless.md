@@ -120,7 +120,7 @@ Wire existing GDN2 recurrent state as a "bridge" for dilated sparse attention du
   - `compute_centroids`: store dilated KV centroids from D-strided keys
   - `score_blocks`: GDN2 bridge + dilated centroids for block scoring (sigmoid gate)
   - Demonstrates RAT+ insight: recurrence improves block scoring
-  - File: `src/rat_bridge/vortex.rs` (4 tests)
+  - File: `crates/katgpt-attn/src/rat_bridge/vortex.rs` (4 tests)
 
 - [x] **T5.2** Register `vortex` module in `rat_bridge/mod.rs`
   - Feature-gated behind `rat_plus_bridge`

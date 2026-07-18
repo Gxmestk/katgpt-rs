@@ -103,7 +103,7 @@ refined strategy doc, stranded in a private fork.
       from root `src/weights.rs`)
   - [x] 2c. Deleted root `src/weights.rs`; replaced `pub mod weights;` in
     root `src/lib.rs` with `pub use katgpt_transformer::{ContiguousWeights, load_ternary_bits};`
-  - [x] 2d. Root `src/transformer.rs` keeps: `ForwardContext`, all forward
+  - [x] 2d. Root `crates/katgpt-percepta/src/transformer.rs` keeps: `ForwardContext`, all forward
     functions, all tests. Imports types via `pub use katgpt_transformer::{...}`.
     Stays a single 7055-line file for this commit; splitting forward funcs into
     `src/transformer/{forward,prefill,raven,paged,generate,...}.rs` is a
@@ -121,7 +121,7 @@ refined strategy doc, stranded in a private fork.
     in isolation).
   - [x] 2h. Commit: `feat: Plan 008 step 2 — extract katgpt-transformer substrate crate` (1debf905 on develop, 2026-06-27)
 
-  **FOLLOW-UP (separate commit, not step 2):** split root `src/transformer.rs`
+  **FOLLOW-UP (separate commit, not step 2):** split root `crates/katgpt-percepta/src/transformer.rs`
   forward functions into per-family submodules mirroring riir-engine's
   `transformer/{gemma2,llama,prefill,raven,mtp,attention}.rs` layout. Root
   file is ~6300 lines after step 2 (forward funcs + ForwardContext + tests),
@@ -208,11 +208,11 @@ refined strategy doc, stranded in a private fork.
 - [x] **Step 6 — `mcts`, `sampling`, `delta_mem` → core.** Leaf inference mechanics. `mcts` parameterize over a core `Game` trait (Q3 verdict); leave game-specific impls in riir-engine.
 
   ⚠️ **AUDIT FINDING (2026-06-28, before execution): the original premise needed the same scope correction as Steps 2, 4, and 5.**
-  - There is NO `src/mcts.rs`, NO `src/sampling.rs`, NO `src/delta_mem/` at root. The actual locations are:
-    - `src/pruners/game_state/mcts.rs` (1044 LoC) — MCTS algorithm (substrate) + `BanditRolloutPolicy` (composition, gated by `bandit`).
-    - `src/speculative/sampling.rs` (131 LoC) — CDF + residual samplers (substrate).
+  - There is NO `src/mcts.rs`, NO `crates/katgpt-core/src/speculative/sampling.rs`, NO `src/delta_mem/` at root. The actual locations are:
+    - `crates/katgpt-pruners/src/game_state/mcts.rs` (1044 LoC) — MCTS algorithm (substrate) + `BanditRolloutPolicy` (composition, gated by `bandit`).
+    - `crates/katgpt-core/src/speculative/sampling.rs` (131 LoC) — CDF + residual samplers (substrate).
     - `src/pruners/delta_mem/{state,hash,multi,pruner,multi_pruner}.rs` (1992 LoC) — split: 3 substrate files + 2 composition files.
-  - The `GameState` / `StateHeuristic` / `RolloutPolicy` / `RandomRolloutPolicy` / `ActionSpaceLog` **traits already live in `katgpt-core/src/traits.rs`** (Plan 107 Phase 0). `src/pruners/game_state/mod.rs` is already a re-export shim. So Step 6 is really about extracting the **algorithms + types that sit on top of those traits**, not the traits themselves.
+  - The `GameState` / `StateHeuristic` / `RolloutPolicy` / `RandomRolloutPolicy` / `ActionSpaceLog` **traits already live in `katgpt-core/src/traits.rs`** (Plan 107 Phase 0). `crates/katgpt-pruners/src/game_state/mod.rs` is already a re-export shim. So Step 6 is really about extracting the **algorithms + types that sit on top of those traits**, not the traits themselves.
   - `BanditRolloutPolicy` CANNOT move cleanly: it depends on `BanditStats` from `crate::pruners::bandit` (root-only). Same split pattern as Step 4's `forward.rs` and Step 5's `SpeculativeContext`.
   - `MemorySteeredPruner<P>` / `MultiDomainMemoryPruner<P>` CANNOT move cleanly: they wrap `ScreeningPruner` (now in `katgpt_core::traits`) with root-side composition — they're consumers of the substrate trait, not substrate themselves.
 
@@ -220,7 +220,7 @@ refined strategy doc, stranded in a private fork.
 
   ### Done subtasks (2026-06-28)
   - [x] 6a. Created `katgpt-core/src/mcts.rs` (806 LoC) — `MCTSNode`, `mcts_search`, `mcts_search_informed`, `mcts_search_impl`, `select_inline`, `expand_and_rollout`, `rollout`, `backpropagate`, `ucb1_score`, `UCB1_C`, `MAX_TREE_SIZE` + 14 substrate tests. Moved verbatim from root `pruners/game_state/mcts.rs`; imports changed from `super::{GameState, ...}` to `crate::traits::{GameState, ...}`. Pure substrate: depends only on `katgpt_core::traits` + `fastrand::Rng` (already in core).
-  - [x] 6b. Created `katgpt-core/src/speculative/sampling.rs` (145 LoC) — `sample_from_distribution`, `sample_residual_distribution_into`, `sample_residual_distribution` + 5 tests. Moved verbatim from root `speculative/sampling.rs`; imports changed to `crate::simd::simd_scale_inplace` + `crate::types::Rng` (both always-on in core).
+  - [x] 6b. Created `katgpt-core/crates/katgpt-core/src/speculative/sampling.rs` (145 LoC) — `sample_from_distribution`, `sample_residual_distribution_into`, `sample_residual_distribution` + 5 tests. Moved verbatim from root `speculative/sampling.rs`; imports changed to `crate::simd::simd_scale_inplace` + `crate::types::Rng` (both always-on in core).
   - [x] 6c. Created `katgpt-core/src/delta_mem/` (new always-on module like `mcts`/`hla`/`speculative`):
     - `mod.rs` (37 LoC) — module doc + `pub mod {hash, multi, state};` + re-exports.
     - `state.rs` (910 LoC) — `DeltaMemoryConfig`, `DeltaMemoryState`, `DeltaMemorySnapshot` + 17 default tests + 8 `temporal_deriv`-gated tests. Moved verbatim; only path change: `use katgpt_core::temporal_deriv::TemporalDerivativeKernel` (was already `katgpt_core::` in root — no change).
@@ -228,9 +228,9 @@ refined strategy doc, stranded in a private fork.
     - `multi.rs` (242 LoC) — `MultiDomainMemory`, `AggregationStrategy` + 6 tests. Verbatim copy (depends on `super::state::*` which resolves in core).
   - [x] 6d. Updated `katgpt-core/src/lib.rs` — added `pub mod delta_mem;` + `pub mod mcts;` (both always-on) + updated crate doc to list the new modules and document the substrate/composition split.
   - [x] 6e. Updated `katgpt-core/src/speculative/mod.rs` — added `pub mod sampling;` + re-exports of the 3 sampling functions.
-  - [x] 6f. Rewrote root `src/pruners/game_state/mcts.rs` (was 1044 LoC, now 314 LoC) as composition-only: re-exports `mcts_search` / `mcts_search_informed` from `katgpt_core::mcts`, keeps `BanditRolloutPolicy` (gated by `bandit`) + 5 composition tests. All 14 substrate tests moved to core.
-  - [x] 6g. Rewrote root `src/speculative/sampling.rs` (was 131 LoC, now 16 LoC) as re-export shim from `katgpt_core::speculative::sampling::{...}`. All 5 tests moved to core.
-  - [x] 6h. Rewrote root `src/pruners/delta_mem/mod.rs` (was 35 LoC, now 64 LoC) as re-export shim: re-exports substrate types from `katgpt_core::delta_mem::{...}`, re-exposes the substrate module layout via inline `pub mod hash/state/multi { pub use katgpt_core::delta_mem::...; }` so absolute paths (`crate::pruners::delta_mem::state::DEFAULT_THETA_SURPRISE`) resolve unchanged, declares local `mod pruner; mod multi_pruner;` (composition). Deleted the 3 substrate files (state/hash/multi.rs); kept pruner.rs + multi_pruner.rs unchanged (they import from `super::{state,hash}` which still resolves via the re-export shim).
+  - [x] 6f. Rewrote root `crates/katgpt-pruners/src/game_state/mcts.rs` (was 1044 LoC, now 314 LoC) as composition-only: re-exports `mcts_search` / `mcts_search_informed` from `katgpt_core::mcts`, keeps `BanditRolloutPolicy` (gated by `bandit`) + 5 composition tests. All 14 substrate tests moved to core.
+  - [x] 6g. Rewrote root `crates/katgpt-core/src/speculative/sampling.rs` (was 131 LoC, now 16 LoC) as re-export shim from `katgpt_core::speculative::sampling::{...}`. All 5 tests moved to core.
+  - [x] 6h. Rewrote root `crates/katgpt-pruners/src/delta_mem/mod.rs` (was 35 LoC, now 64 LoC) as re-export shim: re-exports substrate types from `katgpt_core::delta_mem::{...}`, re-exposes the substrate module layout via inline `pub mod hash/state/multi { pub use katgpt_core::delta_mem::...; }` so absolute paths (`crate::pruners::delta_mem::state::DEFAULT_THETA_SURPRISE`) resolve unchanged, declares local `mod pruner; mod multi_pruner;` (composition). Deleted the 3 substrate files (state/hash/multi.rs); kept pruner.rs + multi_pruner.rs unchanged (they import from `super::{state,hash}` which still resolves via the re-export shim).
   - [x] 6i. **GOAT gate PASSED** — bit-identical, no call-site changes:
     - `cargo check -p katgpt-core` clean (substrate always-on, like simd/types/hla/speculative).
     - `cargo check -p katgpt-core --no-default-features` clean.
@@ -256,10 +256,10 @@ refined strategy doc, stranded in a private fork.
   | Tier | Location | Content | LoC | Rationale |
   |---|---|---|---|---|
   | **Substrate** | `katgpt-core/src/mcts.rs` | `mcts_search`, `mcts_search_informed`, `MCTSNode`, UCB1/backprop/rollout helpers | 806 | Pure algorithm over `GameState` trait |
-  | **Substrate** | `katgpt-core/src/speculative/sampling.rs` | `sample_from_distribution`, `sample_residual_distribution_into`, `sample_residual_distribution` | 145 | Pure CDF math over `Rng` + `simd` |
+  | **Substrate** | `katgpt-core/crates/katgpt-core/src/speculative/sampling.rs` | `sample_from_distribution`, `sample_residual_distribution_into`, `sample_residual_distribution` | 145 | Pure CDF math over `Rng` + `simd` |
   | **Substrate** | `katgpt-core/src/delta_mem/{state,hash,multi}.rs` | `DeltaMemoryState`, `FeatureHasher`, `MultiDomainMemory` + configs + snapshots | 1427 | Pure data + algorithm over `serde` + `fastrand` + `temporal_deriv` |
-  | **Composition** | `katgpt-rs/src/pruners/game_state/mcts.rs` | `BanditRolloutPolicy` + 5 tests | 314 | Needs `BanditStats` from root-only `crate::pruners::bandit` |
-  | **Composition** | `katgpt-rs/src/speculative/sampling.rs` | re-export shim | 16 | N/A |
+  | **Composition** | `katgpt-rs/crates/katgpt-pruners/src/game_state/mcts.rs` | `BanditRolloutPolicy` + 5 tests | 314 | Needs `BanditStats` from root-only `crate::pruners::bandit` |
+  | **Composition** | `katgpt-rs/crates/katgpt-core/src/speculative/sampling.rs` | re-export shim | 16 | N/A |
   | **Composition** | `katgpt-rs/src/pruners/delta_mem/{mod,pruner,multi_pruner}.rs` | `MemorySteeredPruner<P>`, `MultiDomainMemoryPruner<P>` + re-export shim | ~600 | Wrap root-only `ScreeningPruner` instances |
 
   **Net result:** 2378 LoC of substrate (mcts algorithm + sampling primitives + delta_mem state machine) now lives in `katgpt-core` and is available to any crate via `cargo add katgpt-core`. The composition half (`BanditRolloutPolicy`, `MemorySteeredPruner<P>`, `MultiDomainMemoryPruner<P>`, ~930 LoC) stays in root because it needs root-only types. Three-tier split achieved without breaking any call site — all existing import paths (`crate::pruners::game_state::mcts_search`, `crate::speculative::sampling::sample_from_distribution`, `crate::pruners::delta_mem::DeltaMemoryConfig`, `crate::pruners::delta_mem::state::DEFAULT_THETA_SURPRISE`, etc.) resolve unchanged via the re-export shims.
@@ -292,7 +292,7 @@ refined strategy doc, stranded in a private fork.
     - `cargo build -p riir-engine --example wasm_simd_bench --no-default-features --features hla` (native) clean — example updated to use `simd_matvec` instead of dropped `matmul_f32_simd` wrapper.
     - WASM example build blocked by pre-existing `freetype-sys` C++ cross-compile failure (missing `string.h` for wasip2 sysroot) — unrelated to this change; the example's Rust code compiles clean (validated via lib check).
 
-  **Bonus fix (pre-existing bug unblocked by Step 7):** `katgpt-core/src/simd/elementwise.rs:1493` `mask_f32x4_wasm` used `f32x4(...)` without importing it (relied on a function-scoped `use` in a sibling function). Latent bug — only surfaces when building for `wasm32 +simd128`, which riir-ai's `.cargo/config.toml` enables unconditionally (`rustflags = ["-C", "target-feature=+simd128"]`). Fixed by adding `use core::arch::wasm32::f32x4;` inside `mask_f32x4_wasm`. This unblocks the entire WASM SIMD128 build path for riir-engine.
+  **Bonus fix (pre-existing bug unblocked by Step 7):** `katgpt-core/crates/katgpt-types/src/simd/elementwise.rs:1493` `mask_f32x4_wasm` used `f32x4(...)` without importing it (relied on a function-scoped `use` in a sibling function). Latent bug — only surfaces when building for `wasm32 +simd128`, which riir-ai's `.cargo/config.toml` enables unconditionally (`rustflags = ["-C", "target-feature=+simd128"]`). Fixed by adding `use core::arch::wasm32::f32x4;` inside `mask_f32x4_wasm`. This unblocks the entire WASM SIMD128 build path for riir-engine.
 
 ### Phase 2 — riir-engine dedup (the DRY payoff)
 
@@ -375,7 +375,7 @@ After each Phase 1 step lands, riir-engine deletes its copy and imports from
 - [x] **2.3 riir-engine `src/types.rs` → `use katgpt_core::types::{...}`** (2026-06-28)
 
   **Scope:** riir-engine's `types.rs` already does `pub use katgpt_core::types::*;` at line 10. Only local addition is `NoiseSchedule` (feature-gated `dllm`, engine-specific D2F noise schedule). No further dedup possible — the substrate (Config, Rng, math utils, LoRA, DomainLatent, AttentionMode) is fully re-exported.
-- [~] 2.4 riir-engine `src/tokenizer.rs` → consume `katgpt-tokenizer` (or `katgpt_core`). UNBLOCKED as of Step 3 re-audit (2026-07-01): the `katgpt-tokenizer` crate now exists and is publishable. The riir-engine `src/tokenizer.rs` dedup pass itself was NOT separately re-run in this re-audit — it's a non-blocking follow-up (riir-engine's local tokenizer.rs continues to work; the substrate is now available for it to consume whenever a refactor pass is scheduled).
+- [~] 2.4 riir-engine `crates/katgpt-core/src/engram/tokenizer.rs` → consume `katgpt-tokenizer` (or `katgpt_core`). UNBLOCKED as of Step 3 re-audit (2026-07-01): the `katgpt-tokenizer` crate now exists and is publishable. The riir-engine `crates/katgpt-core/src/engram/tokenizer.rs` dedup pass itself was NOT separately re-run in this re-audit — it's a non-blocking follow-up (riir-engine's local tokenizer.rs continues to work; the substrate is now available for it to consume whenever a refactor pass is scheduled).
 - [x] **2.5 riir-engine `src/dd_tree.rs` + `spec_types.rs` → consume core** (2026-06-28)
 
   **Scope:** riir-engine's `spec_types.rs` local definitions of `TreeNode`, `DraftResult`, `RejectionReason`, `DraftEvent`, `PrefillMode`, `FlashPrefillConfig`, `BlockScores` replaced with `pub use katgpt_core::speculative::types::{...}` re-export. katgpt-core's versions are supersets (additive feature-gated fields/variants like `RejectionReason::KurtosisRejection`, `DraftResult.cost_snapshot`/`stability`/`routing_overlap`, `FlashPrefillConfig.score_reduction`/`budget_adaptation`).
@@ -393,7 +393,7 @@ After each Phase 1 step lands, riir-engine deletes its copy and imports from
 
   **2.6a mcts + sampling:**
   - Ported riir-engine's perf optimizations to core: (1) `sample_residual_distribution_into` 4-wide chunked residual + fused write+sum + chunked normalize (replaces scalar + `simd_scale_inplace`); (2) `MCTSNode.children`/`unexpanded` changed from `Vec<usize>` to `ArrayVec<usize, 16>` (zero heap alloc per node, `MAX_UNEXPANDED=16` covers Bomber=6/Grid=5/Raid=~9); (3) `ucb1_score_cached` (hoist `ln(parent_visits)` out of inner loop, `total_cmp` over `partial_cmp`). Added `arrayvec` dep to katgpt-core.
-  - riir-engine `src/sampling.rs` (164→16 LoC) and `src/mcts.rs` (697→19 LoC) rewritten as re-export shims. Note: `src/mcts.rs` was only used by its own tests (production uses `fourier/mcts.rs`'s `mcts_search_fourier`).
+  - riir-engine `crates/katgpt-core/src/speculative/sampling.rs` (164→16 LoC) and `src/mcts.rs` (697→19 LoC) rewritten as re-export shims. Note: `src/mcts.rs` was only used by its own tests (production uses `fourier/mcts.rs`'s `mcts_search_fourier`).
 
   **2.6b delta_mem:**
   - Ported riir-engine's hot-path APIs to core: `FeatureHasher::{hash_key_into, hash_value_into, feature_dim, to_vec_into, to_array}` (zero-alloc); `DeltaMemoryState::read_into` + inline-SIMD `write` + pre-allocated `segment_*_buf`; `MultiDomainMemory::{read_domain_into, read_aggregated(&mut self)}` + pre-allocated buffers + `#[repr(u8)]` on `AggregationStrategy`. Used the FourierFeatureHasher transpose trick (column-major generation → row-major storage) to preserve katgpt-core's bit-pattern AND get SIMD performance. Core's `temporal_deriv` surprise gate preserved.
@@ -405,7 +405,7 @@ After each Phase 1 step lands, riir-engine deletes its copy and imports from
   **Net LoC: −1808 in riir-engine** (substrate deleted), **+445 in katgpt-core** (improvements ported with tests).
 - [x] **2.7 riir-engine `src/simd/` → consume core** (2026-06-28, Step 7)
 
-  **Scope:** riir-engine `simd/mod.rs` now does `pub use katgpt_core::simd::*;` for all targets (was target-gated). Deleted `src/simd/wasm32.rs` (630 LoC). Of its 11 functions: 8 had bit-identical core equivalents; 2 (`simd_sum_sq`, `simd_outer_product_acc`) had missing WASM SIMD128 paths in core — ported; 2 thin ergonomic wrappers (`dot_f32_simd`, `matmul_f32_simd`) dropped; 1 unique substrate (`project_ternary_simd`) ported to core under `plasma_path`. Bonus: fixed latent `mask_f32x4_wasm` missing-import bug in `katgpt-core/src/simd/elementwise.rs:1493`.
+  **Scope:** riir-engine `simd/mod.rs` now does `pub use katgpt_core::simd::*;` for all targets (was target-gated). Deleted `src/simd/wasm32.rs` (630 LoC). Of its 11 functions: 8 had bit-identical core equivalents; 2 (`simd_sum_sq`, `simd_outer_product_acc`) had missing WASM SIMD128 paths in core — ported; 2 thin ergonomic wrappers (`dot_f32_simd`, `matmul_f32_simd`) dropped; 1 unique substrate (`project_ternary_simd`) ported to core under `plasma_path`. Bonus: fixed latent `mask_f32x4_wasm` missing-import bug in `katgpt-core/crates/katgpt-types/src/simd/elementwise.rs:1493`.
 
   **GOAT gate:** bit-identical, 124/124 core simd tests green (+7 new), 2428/2429 riir-engine lib tests green (1 pre-existing `cgsp_runtime::dual_pool_bridge::g5_epool_persistence`).
 

@@ -81,7 +81,7 @@ where continuous mixtures would hallucinate. NaN-safe: an un-observed kurtosis
 (NaN) never fires the escape (NaN > threshold is false), preserving backward
 compatibility for hosts that don't wire a kurtosis signal.
 
-**5 unit tests** in `src/swir/controller.rs` cover: forces-Explicit-from-Latent,
+**5 unit tests** in `crates/katgpt-transformer/src/swir/controller.rs` cover: forces-Explicit-from-Latent,
 blocks-Explicit-to-Latent-reentry, below-threshold-is-inert, NaN-is-inert,
 releases-when-kurtosis-drops. The GOAT gate `g6_kurtosis_escape_hatch_end_to_end`
 re-runs the path through the full adapter (StepContext → on_step → StepDirective).
@@ -94,10 +94,10 @@ re-runs the path through the full adapter (StepContext → on_step → StepDirec
 | `SwiRStrategyAdapter::on_step()` (soft path) | **2** | `soft_scratch.clone()` (embedding_dim × 4 bytes) + amortised softmax scratch resize. Unavoidable: the `EmitSoftEmbedding` directive owns its payload because the borrow checker can't tie the strategy's scratch lifetime to the call. |
 | `SwiRStrategyAdapter::on_step()` (inject path) | **1** | `vec![id]` for `InjectTokens`. Fires only on convergence/termination steps. |
 
-The adapter allocations are documented in `src/swir/strategy_adapter.rs` and
+The adapter allocations are documented in `crates/katgpt-transformer/src/swir/strategy_adapter.rs` and
 measured in `g7_adapter_on_step_allocations_debug`. They are **by design** —
 the `ThinkingStrategy` trait contract acknowledges this (see
-`src/thinking_cot/strategy.rs` lines 125-132).
+`crates/katgpt-transformer/src/thinking_cot/strategy.rs` lines 125-132).
 
 ## Key Honest Finding: Convergence Guard Livelock — FIXED
 
@@ -109,7 +109,7 @@ inject-queue drain (step 1 of `step()`) preempted the mode-switch logic
 another Latent→Explicit switch → `switch_count` froze → termination (`> c_max`)
 never fired.
 
-**Fix applied** (`src/swir/controller.rs`): the switch-count guards now fire
+**Fix applied** (`crates/katgpt-transformer/src/swir/controller.rs`): the switch-count guards now fire
 only when `switched_to == Some(ThinkMode::Explicit)` — i.e., on the step where
 the Latent→Explicit switch *just happened*. This is a one-shot trigger per
 switch event, matching the paper's intent (§3.4 describes switch-count

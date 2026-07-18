@@ -34,7 +34,7 @@ Three key properties (preserved from paper):
 
 **Why this matters for bandit:** Currently `BanditPruner::update(arm, 1.0)` treats every correct arm identically. But an arm accepted at depth 0 that leads to 5 more accepted tokens is MORE valuable than an arm accepted at depth 0 that leads to immediate rejection at depth 1. Shaped reward captures this "enabling" signal.
 
-- [x] **T2: Implement `ShapedPath` struct** — `src/pruners/stepcode.rs`
+- [x] **T2: Implement `ShapedPath` struct** — `crates/katgpt-pruners/src/stepcode.rs`
 
   ```rust
   //! Intra-trajectory reward shaping distilled from StepCodeReasoner (arXiv 2605.11922).
@@ -179,7 +179,7 @@ Three key properties (preserved from paper):
   }
   ```
 
-- [x] **T3: Implement `shape_path` helper function** — `src/pruners/stepcode.rs`
+- [x] **T3: Implement `shape_path` helper function** — `crates/katgpt-pruners/src/stepcode.rs`
 
   ```rust
   /// Convenience: shape a flat `(arm, reward)` path with default λ = 0.3.
@@ -219,7 +219,7 @@ Three key properties (preserved from paper):
   }
   ```
 
-- [x] **T4: Unit tests for ShapedPath** — `src/pruners/stepcode.rs`
+- [x] **T4: Unit tests for ShapedPath** — `crates/katgpt-pruners/src/stepcode.rs`
   - `test_shape_all_correct` — all rewards = 1.0, verify boosting cascade
   - `test_shape_all_wrong` — all rewards = 0.0, verify all shaped = 0.0
   - `test_shape_terminal_flat` — last step gets no future shaping
@@ -232,7 +232,7 @@ Three key properties (preserved from paper):
 
 ### Phase 2: AnchorTrace — Enriched TrialLog (D2)
 
-- [x] **T5: Add `AnchorTrace` to TrialRecord** — `src/pruners/trial_log.rs`
+- [x] **T5: Add `AnchorTrace` to TrialRecord** — `crates/katgpt-pruners/src/trial_log.rs`
 
   ```rust
   /// Per-anchor verification trace for stepwise reward analysis.
@@ -266,7 +266,7 @@ Three key properties (preserved from paper):
 
   Default impl: `anchors: None` — backward-compatible.
 
-- [x] **T6: Implement `TrialRecord::from_shaped_path`** — `src/pruners/trial_log.rs`
+- [x] **T6: Implement `TrialRecord::from_shaped_path`** — `crates/katgpt-pruners/src/trial_log.rs`
 
   ```rust
   impl TrialRecord {
@@ -326,7 +326,7 @@ Three key properties (preserved from paper):
   }
   ```
 
-- [x] **T7: Unit tests for AnchorTrace** — `src/pruners/trial_log.rs`
+- [x] **T7: Unit tests for AnchorTrace** — `crates/katgpt-pruners/src/trial_log.rs`
   - `test_anchor_trace_serialization` — roundtrip through JSONL
   - `test_trial_record_from_shaped_path` — verify fields populated correctly
   - `test_backward_compat_none_anchors` — existing logs without anchors load fine
@@ -334,7 +334,7 @@ Three key properties (preserved from paper):
 
 ### Phase 3: PathConsistency — Reward Hacking Detection (D3)
 
-- [x] **T8: Add `path_consistency` to ReviewMetrics classification** — `src/pruners/review_metrics.rs`
+- [x] **T8: Add `path_consistency` to ReviewMetrics classification** — `crates/katgpt-core/src/pruners/review_metrics.rs`
 
   Add a new classification category:
 
@@ -373,7 +373,7 @@ Three key properties (preserved from paper):
 
   **Minimal implementation:** Add `path_hacking_count: AtomicU64` and `path_faithful_count: AtomicU64` to `ReviewMetrics`. Gate `AbsorbCompress` when reward hacking ratio exceeds threshold.
 
-- [x] **T9: Unit tests for path consistency** — `src/pruners/review_metrics.rs`
+- [x] **T9: Unit tests for path consistency** — `crates/katgpt-core/src/pruners/review_metrics.rs`
   - `test_path_consistency_faithful` — high consistency → faithful
   - `test_path_consistency_hacking` — low consistency + correct final → hacking
   - `test_path_consistency_wrong_final` — wrong final → not counted
@@ -458,7 +458,7 @@ Three key properties (preserved from paper):
 
 | File | Lines | Purpose |
 |------|-------|---------|
-| `src/pruners/stepcode.rs` | ~200 | ShapedPath, PathStep, shape_path, path_consistency |
+| `crates/katgpt-pruners/src/stepcode.rs` | ~200 | ShapedPath, PathStep, shape_path, path_consistency |
 | `tests/bench_stepcode_modelless.rs` | ~150 | Full benchmark suite |
 | `examples/stepcode_01_shaped_bandit.rs` | ~80 | Integration example |
 
@@ -468,8 +468,8 @@ Three key properties (preserved from paper):
 |------|--------|
 | `Cargo.toml` | Add `stepcode = ["bandit"]` feature, update `full` |
 | `src/pruners/mod.rs` | Add feature-gated `stepcode` module + re-exports |
-| `src/pruners/trial_log.rs` | Add `AnchorTrace` struct + `anchors` field to `TrialRecord` |
-| `src/pruners/review_metrics.rs` | Add path consistency classification |
+| `crates/katgpt-pruners/src/trial_log.rs` | Add `AnchorTrace` struct + `anchors` field to `TrialRecord` |
+| `crates/katgpt-core/src/pruners/review_metrics.rs` | Add path consistency classification |
 
 ### Expected Test Results
 
@@ -615,9 +615,9 @@ Our `WasmPruner` validation is rule-based by construction. We don't need a learn
 
 All types are NEW. Integration points (read-only or additive-only):
 - `src/pruners/mod.rs` — add `stepcode` module + exports
-- `src/pruners/bandit.rs` — `BanditPruner::update()` (receives shaped rewards, no code change)
-- `src/pruners/trial_log.rs` — `TrialRecord` gets optional `anchors` field
-- `src/pruners/review_metrics.rs` — adds path consistency classification
+- `crates/katgpt-ruliology/crates/katgpt-ruliology/src/bandit.rs` — `BanditPruner::update()` (receives shaped rewards, no code change)
+- `crates/katgpt-pruners/src/trial_log.rs` — `TrialRecord` gets optional `anchors` field
+- `crates/katgpt-core/src/pruners/review_metrics.rs` — adds path consistency classification
 - `Cargo.toml` — feature gate
 
 ## Relationship to Existing Work

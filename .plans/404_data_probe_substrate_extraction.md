@@ -89,7 +89,7 @@ items still require the feature. No existing consumer can break.
 
 ### T1 — Convert katgpt-core `data_probe.rs` → `data_probe/` directory
 
-- `git mv crates/katgpt-core/src/data_probe.rs crates/katgpt-core/src/data_probe/sink_classify.rs`
+- `git mv crates/katgpt-core/src/data_probe.rs crates/katgpt-core/crates/katgpt-core/src/data_probe/sink_classify.rs`
 - Create `crates/katgpt-core/src/data_probe/mod.rs` with:
   - Always-on: `pub mod {markov,nll,typical_set,claim,dirichlet_energy};`
   - Gated: `#[cfg(feature = "sink_aware_attn")] pub mod {sink_classify,geometry};`
@@ -123,7 +123,7 @@ items still require the feature. No existing consumer can break.
 Replace `pub mod X;` declarations with `pub use katgpt_core::data_probe::X;`
 for all 7 submodules. Preserve the existing re-export block at the bottom.
 
-### T5 — Root `src/data_probe/sink_classify.rs`
+### T5 — Root `crates/katgpt-core/src/data_probe/sink_classify.rs`
 
 Update the re-export path from `katgpt_core::data_probe::{...}` to
 `katgpt_core::data_probe::sink_classify::{...}` (the items moved one level

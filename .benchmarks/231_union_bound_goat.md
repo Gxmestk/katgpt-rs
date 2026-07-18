@@ -52,10 +52,10 @@ running 7 tests — 7 passed; 0 failed
 
 | Component | Tests | File |
 |-----------|-------|------|
-| `BranchConfidence` trait | 3 unit + 6 GOAT | `src/speculative/branch_confidence.rs` |
-| `MultiplicativeScorer` | 3 unit + 6 GOAT | `src/speculative/branch_confidence.rs` |
-| `UnionBoundScorer` | 4 unit + 6 GOAT | `src/speculative/branch_confidence.rs` |
-| `HybridScorer` | 3 unit + 6 GOAT | `src/speculative/branch_confidence.rs` |
+| `BranchConfidence` trait | 3 unit + 6 GOAT | `crates/katgpt-speculative/src/branch_confidence.rs` |
+| `MultiplicativeScorer` | 3 unit + 6 GOAT | `crates/katgpt-speculative/src/branch_confidence.rs` |
+| `UnionBoundScorer` | 4 unit + 6 GOAT | `crates/katgpt-speculative/src/branch_confidence.rs` |
+| `HybridScorer` | 3 unit + 6 GOAT | `crates/katgpt-speculative/src/branch_confidence.rs` |
 | GOAT proof | 7 | `tests/bench_231_union_bound_goat.rs` |
 | **Total** | **33** | |
 

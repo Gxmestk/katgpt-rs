@@ -166,13 +166,13 @@ Each floor row shows:
 
 ### Tasks
 
-- [x] Create `src/pruners/dungeon_pruner.rs`:
+- [x] Create `crates/katgpt-pruners/src/dungeon_pruner.rs`:
   - [x] `DungeonMap` struct (floors, stairs, targets)
   - [x] `DungeonState` struct (adds `floor` field)
   - [x] `DungeonPruner` (multi-floor movement, combat, stairs)
   - [x] `DungeonPruner::apply_action` (actions 0-5)
   - [x] `DungeonPruner::terrain_cost` (per-floor terrain)
-- [x] Create `src/pruners/dungeon_pathfinder.rs`:
+- [x] Create `crates/katgpt-pruners/src/dungeon_pathfinder.rs`:
   - [x] `find_path_multifloor` (cross-floor A*)
   - [x] `find_path_on_floor` (delegates to existing `find_path`)
   - [x] `StairConnection` struct
@@ -240,7 +240,7 @@ impl MapGenerator {
 ### Tasks
 
 - [x] Add `fastrand` dependency to Cargo.toml (lightweight RNG)
-- [x] Create `src/pruners/map_generator.rs`:
+- [x] Create `crates/katgpt-pruners/src/map_generator.rs`:
   - [x] `MapGenerator` struct with configuration
   - [x] `generate_single_floor` (random solvable map)
   - [x] `generate_multi_floor` (random multi-layer dungeon)

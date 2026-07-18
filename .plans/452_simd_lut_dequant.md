@@ -3,7 +3,7 @@
 **Date:** 2026-07-13
 **Research:** [katgpt-rs/.research/418_StreamDQ_SIMD_LUT_DeQuant.md](../.research/418_StreamDQ_SIMD_LUT_DeQuant.md)
 **Source paper:** [arxiv 2607.08993](https://arxiv.org/abs/2607.08993) — StreamDQ (Jeong et al., SK Hynix, 2026-07-09)
-**Target:** `katgpt-rs/crates/katgpt-core/src/simd_lut_dequant.rs` (new module) + Cargo feature `simd_lut_dequant`
+**Target:** `katgpt-rs/crates/katgpt-core/crates/katgpt-core/src/simd_lut_dequant.rs` (new module) + Cargo feature `simd_lut_dequant`
 **Status:** COMPLETE — Phases 1+2+3+4+5 all done. ALL GOAT GATES PASS. `simd_lut_dequant` PROMOTED to default-on in katgpt-core (Phase 4); `simd_lut_q4k` PROMOTED to default-on in riir-engine (Phase 5 / Plan 486).
 
 ---
@@ -26,7 +26,7 @@ Distill StreamDQ's "shared FP32 ALU + format-specific type-cast" pattern (paper 
 
 ### Tasks
 
-- [x] **T1.1** Create `katgpt-rs/crates/katgpt-core/src/simd_lut_dequant.rs` (feature-gated on `simd_lut_dequant`)
+- [x] **T1.1** Create `katgpt-rs/crates/katgpt-core/crates/katgpt-core/src/simd_lut_dequant.rs` (feature-gated on `simd_lut_dequant`)
 - [x] **T1.2** Define the format-tag enum + LUT trait:
   ```rust
   pub trait QuantLut {

@@ -3,7 +3,7 @@
 **Date:** 2026-07-12
 **Research:** [katgpt-rs/.research/414_Fully_Looped_Transformer_Readout_Blind_Spot.md](../.research/414_Fully_Looped_Transformer_Readout_Blind_Spot.md)
 **Source papers:** [arXiv:2605.18797](https://arxiv.org/abs/2605.18797) (Fully Looped Transformer) + [arXiv:2606.24898](https://arxiv.org/abs/2606.24898) (Readout Blind Spot)
-**Target:** `katgpt-rs/benches/loop_stability_poc.rs` (PoC benchmark) + `katgpt-rs/src/transformer.rs` (implementation behind feature flag)
+**Target:** `katgpt-rs/benches/loop_stability_poc.rs` (PoC benchmark) + `katgpt-rs/crates/katgpt-percepta/src/transformer.rs` (implementation behind feature flag)
 **Status:** Active — Phase 1 (PoC)
 
 ---
@@ -108,7 +108,7 @@ Empirically validate whether three parameter-free architectural fixes improve T-
 ### Phase 2 Results (2026-07-13)
 
 **Implementation:**
-- `LoopStabilityMode` enum added to `katgpt-types/src/enums.rs` with `None` (default) and `InterLoopNorm` variants
+- `LoopStabilityMode` enum added to `katgpt-types/crates/katgpt-types/src/enums.rs` with `None` (default) and `InterLoopNorm` variants
 - `Config.loop_stability_mode` field added behind `#[cfg(feature = "loop_stability_fix")]`, initialized to `None` in all 11 constructors
 - **Issue 140 fix (2026-07-15):** Two test files (`bench_ldt_lattice_deduction.rs`, `bench_217_belief_drafter_goat.rs`) used raw `Config { ... }` struct literals that were missed when the field was added — only manifested under `--all-features` (the `merkle_root`-class bug). Both files now include the cfg-gated field. `cargo clippy --workspace --all-features --all-targets` is clean.
 - Inter-loop RMSNorm wired into `forward_looped` at the top of the outer loop (tau > 0), before `prev_h` save and inner layer pass

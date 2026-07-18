@@ -54,13 +54,13 @@ lto = "fat"
 codegen-units = 1
 ```
 
-### Fix 2: Lazy Mutex allocation (`crates/katgpt-pruners/src/bandit.rs`)
+### Fix 2: Lazy Mutex allocation (`crates/katgpt-pruners/crates/katgpt-ruliology/src/bandit.rs`)
 
 Changed `soft_route_scores`/`soft_route_weights` from `Mutex<Vec<f32>>` to
 `Option<Mutex<Vec<f32>>>`, defaulting to `None`. Allocated on first
 `set_soft_route(true, …)`.
 
-### Fix 3: Revert compress() to Vec lookup (`crates/katgpt-pruners/src/absorb_compress.rs`)
+### Fix 3: Revert compress() to Vec lookup (`crates/katgpt-pruners/crates/katgpt-pruners/src/absorb_compress.rs`)
 
 `compress()` candidate filter uses `self.compressed.contains(&arm)` (Vec) instead
 of `self.compressed_set.contains(&arm)` (HashSet). The HashSet is retained for

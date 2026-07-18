@@ -11,13 +11,13 @@
 
 ## Tasks
 
-- [x] T1: Define `EventLog<A>` types in `src/pruners/event_log.rs` — `EventId`, `EventType`, `Actor`, `GameOutcome`, `Event<A>`, `EventLog<A>` with push/get/iter/len/last_id
+- [x] T1: Define `EventLog<A>` types in `crates/katgpt-pruners/src/event_log.rs` — `EventId`, `EventType`, `Actor`, `GameOutcome`, `Event<A>`, `EventLog<A>` with push/get/iter/len/last_id
 - [x] T2: Implement `EvalCache` with content-addressed hashing — `EvalCache` with `HashMap<[u8; 32], CachedEval>`, `get`/`insert`/`hit_rate`/`Default` (note: consumer provides hash; no blake3 crate dependency)
 - [x] T3: Implement `fork()` and `structural_diff()` for `EventLog<A>` — `fork(at)` clones prefix, `diff()` returns `ForkDiff<A>` with `DiffEvent` enum, `replay()` for state reconstruction
 - [x] T4: Wire `EventLog` into Bomber HL arena — `BomberEventLog` wrapper in `src/pruners/bomber/event_log_player.rs`
 - [x] T5: Add GOAT proof for deterministic replay from event log — `test_deterministic_replay`, `test_multiple_games_replay` (100 games) in `tests/test_124_event_log_goat.rs`
 - [x] T6: Add GOAT proof for fork-and-diff counterfactual outcome — `test_fork_shares_prefix`, `test_structural_diff`, `test_identical_logs_diff`, `test_diff_different_lengths` (22 GOAT proofs total)
-- [x] T7: Wire `EventLog` into Go arena — `GoEventLog` wrapper in `src/pruners/go/event_log_player.rs`
+- [x] T7: Wire `EventLog` into Go arena — `GoEventLog` wrapper in `crates/katgpt-pruners/src/go/event_log_player.rs`
 - [x] T8: Benchmark: event_log overhead vs raw game trace — `tests/bench_124_event_log_overhead.rs`
 - [x] T9: Update README.md and feature flags documentation — Event Log section + feature flag table entry
 
@@ -40,7 +40,7 @@ Our model-based/modelless spectrum in event-sourced form:
 
 ## Architecture
 
-### Module: `src/pruners/event_log.rs`
+### Module: `crates/katgpt-pruners/src/event_log.rs`
 
 ```
 src/pruners/
@@ -143,7 +143,7 @@ pub enum GameOutcome {
 
 ### T1: Define `EventLog<A>` types
 
-File: `src/pruners/event_log.rs`
+File: `crates/katgpt-pruners/src/event_log.rs`
 
 - `EventLog<A>` — append-only, no mutation of existing events
 - `Event<A>` — causal chain via `caused_by` field
@@ -154,7 +154,7 @@ File: `src/pruners/event_log.rs`
 
 ### T2: Implement `EvalCache`
 
-File: `src/pruners/event_log.rs`
+File: `crates/katgpt-pruners/src/event_log.rs`
 
 - `EvalCache` using `papaya::HashMap` (lock-free, per project rules)
 - Key: `blake3::Hash` of game state serialization
@@ -165,7 +165,7 @@ File: `src/pruners/event_log.rs`
 
 ### T3: Implement fork and structural diff
 
-File: `src/pruners/event_log.rs`
+File: `crates/katgpt-pruners/src/event_log.rs`
 
 - `EventLog::fork(&self, at: EventId) -> EventLog<A>` — clone prefix, new empty log after
 - `EventLog::diff(&self, other: &EventLog<A>) -> ForkDiff<A>` — compare event-by-event from fork point

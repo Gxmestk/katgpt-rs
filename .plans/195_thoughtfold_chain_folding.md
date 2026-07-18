@@ -42,20 +42,20 @@ ThinkingController (Plan 194)
 
 ### T1: Core Types
 - [x] Create `src/fold/mod.rs` — module root
-- [x] Create `src/fold/step_boundary.rs` — `StepBoundary` struct, `StepBoundaryTracker`
+- [x] Create `crates/katgpt-speculative/src/fold/step_boundary.rs` — `StepBoundary` struct, `StepBoundaryTracker`
   - Detects `\n\n`, `</think_* >` tag transitions as step boundaries
   - Maintains `Vec<(token_pos, step_index)>` mapping
 - [x] Create `src/fold/types.rs` — `FoldDecision` enum (`Keep`, `Fold`, `Anchor`), `FoldResult` struct
 
 ### T2: Attention Importance Scorer
-- [x] Create `src/fold/attention_importance.rs`
+- [x] Create `crates/katgpt-speculative/src/fold/attention_importance.rs`
   - `AttentionImportance` struct
   - `fn score_steps(scores: &[f32], boundaries: &[StepBoundary]) -> Vec<f32>` — average attention per step
   - Uses `ForwardContext.scores` from middle transformer layer
   - O(n) scan over attention scores, grouped by step boundaries
 
 ### T3: ChainFolder (ScreeningPruner)
-- [x] Create `src/fold/chain_folder.rs`
+- [x] Create `crates/katgpt-speculative/src/fold/chain_folder.rs`
   - `ChainFolder` implements `ScreeningPruner` trait
   - `fn relevance(&self, token_pos: usize, context: &FoldContext) -> f32`
     - Returns `1.0` for essential steps, `0.0` for foldable steps, `0.5` for anchor steps
@@ -67,7 +67,7 @@ ThinkingController (Plan 194)
   - If verification fails → reject, increase k
 
 ### T4: FoldCache (KV Rollback)
-- [x] Create `src/fold/fold_cache.rs`
+- [x] Create `crates/katgpt-speculative/src/fold/fold_cache.rs`
   - `FoldCache` wraps `MultiLayerKVCache`
   - `fn truncate_to_step(step: usize)` — rollback KV cache to step boundary
   - `fn replay_essential(steps: &[usize], model: &mut dyn InferenceBackend)` — replay essential tokens

@@ -122,8 +122,8 @@ Ship a generic `BabelCodec` trait + two deterministic implementations:
 | File | Change |
 |------|--------|
 | `crates/katgpt-core/src/babel_codec/mod.rs` | New: trait + module docs |
-| `crates/katgpt-core/src/babel_codec/fixed_rule.rs` | New: BT-P8 schema codec |
-| `crates/katgpt-core/src/babel_codec/sigmoid_latent.rs` | New: latent projection codec |
+| `crates/katgpt-core/crates/katgpt-core/src/babel_codec/fixed_rule.rs` | New: BT-P8 schema codec |
+| `crates/katgpt-core/crates/katgpt-core/src/babel_codec/sigmoid_latent.rs` | New: latent projection codec |
 | `crates/katgpt-core/src/babel_codec/commitment.rs` | New: BLAKE3 commitment |
 | `crates/katgpt-core/Cargo.toml` | Add `babel_codec` feature (opt-in) |
 | `crates/katgpt-core/src/lib.rs` | Add `#[cfg(feature = "babel_codec")] pub mod babel_codec;` |

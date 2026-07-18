@@ -3,7 +3,7 @@
 **Date:** 2026-06-25
 **Research:** [katgpt-rs/.research/307_FNO_Practical_Perspective_Spectral_Primitives_Survey.md](../.research/307_FNO_Practical_Perspective_Spectral_Primitives_Survey.md) (§3 candidate plan #3)
 **Source paper:** [arXiv:2511.05963](https://arxiv.org/abs/2511.05963) — Duruisseaux, Kossaffi, Anandkumar, *Fourier Neural Operators: A Practical Perspective* (Caltech + NVIDIA, Nov 2025)
-**Target:** `katgpt-rs/crates/katgpt-core/src/linalg/tucker.rs` (open primitive) + `riir-neuron-db/src/shard_compactor.rs` (integration), Cargo feature `tucker_factorization`
+**Target:** `katgpt-rs/crates/katgpt-core/crates/katgpt-core/src/linalg/tucker.rs` (open primitive) + `riir-neuron-db/src/shard_compactor.rs` (integration), Cargo feature `tucker_factorization`
 **Status:** ✅ COMPLETE (Phase 3 done) — `tucker_factorization` DEFAULT-ON in katgpt-core (G1–G4 PASS: rel-Frob ~1e-6, 71 µs, 0 allocs). Opt-in in riir-neuron-db per T2.P: AM-deep beats Tucker on raw floats at every N ≤ 16 and is ~10× faster on compaction; Tucker's value is near-lossless full-batch factorization for Cold-tier archival, not a compression win. Zero production consumers as of 2026-06-25.
 
 ---
@@ -76,7 +76,7 @@ Generic HOSVD on flat `&[f32]` + shape descriptor. Pure numeric, no shard/chain/
 
 ### Tasks
 
-- [x] **T1.1** Create `crates/katgpt-core/src/linalg/tucker.rs` with module doc + feature gating
+- [x] **T1.1** Create `crates/katgpt-core/crates/katgpt-core/src/linalg/tucker.rs` with module doc + feature gating
 - [x] **T1.2** Implement `TuckerConfig` — inline-array shape/ranks (`[usize; MAX_MODES]` + len, no `smallvec` dep) + validation (ranks ≤ shape per mode, ≥1 mode, ≤4 modes)
 - [x] **T1.3** Implement `TuckerScratch` — pre-allocated buffers for: per-mode unfolding matrix (sized for max `(I_n, prod(I_others))`), `SvdScratch` + `SvdResultScratch` (reuse from subspace_phase_gate), core assembly workspace
 - [x] **T1.4** Implement mode-n unfolding: `unfold_into(tensor, shape, mode, out: &mut [f32])` — row-major `I_n × prod(other)` matrix

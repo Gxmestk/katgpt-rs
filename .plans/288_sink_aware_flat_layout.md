@@ -2,7 +2,7 @@
 
 **Date:** 2026-06-18
 **Prior work:** [Plan 287](./287_sink_aware_attention.md) (mechanics DONE), [Issue 001](../issues/001_sink_aware_g3_latency.md) (RESOLVED via cached variant)
-**Target:** `crates/katgpt-core/src/data_probe.rs` (extend) + `src/data_probe/sink_classify.rs` (re-export + tests)
+**Target:** `crates/katgpt-core/src/data_probe.rs` (extend) + `crates/katgpt-core/src/data_probe/sink_classify.rs` (re-export + tests)
 **Status:** Complete. All GOAT gates PASS.
 
 ---
@@ -29,9 +29,9 @@ This is explicitly listed as "(Optional) deferred" in Plan 287's closing notes a
 - [x] **T4** Private helpers `copy_rows_flat(src, dst, total_len)` and `scale_rows_flat(src, scale, dst, total_len)`. Use `simd::simd_fused_decay_write` for scale (single SIMD pass: `dst = 0·dst + scale·src`).
 - [x] **T5** `apply_dual_policy_gate_flat(attn: &[f32], values: &[f32], o: &[f32], n: usize, d: usize, policy, gate_scale, scratch, out: &mut [f32]) -> SinkKind`.
 - [x] **T6** `apply_dual_policy_gate_cached_flat(...)` — cached audit-cadence variant, same shape as T5 plus `cached: &mut CachedSinkClassification`.
-- [x] **T7** Unit tests in `src/data_probe/sink_classify.rs` — parity with `Vec<Vec<f32>>` variants on identical inputs. 8 tests covering: rank-1 stable-rank parity, zero-matrix stable-rank, NOP classify parity, Broadcast classify parity, classify_all_sinks parity, gate parity (Broadcast), gate NOP gating, cached-flat audit+reuse.
+- [x] **T7** Unit tests in `crates/katgpt-core/src/data_probe/sink_classify.rs` — parity with `Vec<Vec<f32>>` variants on identical inputs. 8 tests covering: rank-1 stable-rank parity, zero-matrix stable-rank, NOP classify parity, Broadcast classify parity, classify_all_sinks parity, gate parity (Broadcast), gate NOP gating, cached-flat audit+reuse.
 - [x] **T8** Bench: `benches/sink_aware_latency_bench.rs` extended with `dual_flat` + `cached_flat` columns and two regimes (`rank1`, `random`). Result: flat variants are **1.8×–5.1× faster** than Vec<Vec<f32>> (hypothesis was ≥5%; delivered 80%–410%).
-- [x] **T9** Re-exported all 5 new flat symbols from both `src/data_probe/sink_classify.rs` and `crates/katgpt-core/src/lib.rs`. Also fixed pre-existing gap: `CachedSinkClassification` and `apply_dual_policy_gate_cached` were missing from the katgpt-core lib re-export — now present.
+- [x] **T9** Re-exported all 5 new flat symbols from both `crates/katgpt-core/src/data_probe/sink_classify.rs` and `crates/katgpt-core/src/lib.rs`. Also fixed pre-existing gap: `CachedSinkClassification` and `apply_dual_policy_gate_cached` were missing from the katgpt-core lib re-export — now present.
 - [x] **T10** Updated `.benchmarks/059_sink_aware_goat.md` with G3-flat row, full numbers, and "why flat is faster" analysis. Cross-referenced Plan 288 as the unblock for Plan 289.
 
 ---

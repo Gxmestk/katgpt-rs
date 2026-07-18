@@ -27,7 +27,7 @@
   #[cfg(feature = "stability_metrics")]
   pub stability: StabilitySnapshot,
   ```
-- [x] T3: Instrument `speculative_step_rollback()` in `src/speculative/step.rs` with `std::time::Instant` probes
+- [x] T3: Instrument `speculative_step_rollback()` in `crates/katgpt-forward/crates/katgpt-forward/src/step.rs` with `std::time::Instant` probes
   - Record wall time for: draft phase, snapshot phase, verify phase, accept/reject phase
   - Zero overhead when feature is disabled (compile-time elimination)
 - [x] T4: Add `stability_metrics` feature to `Cargo.toml` (no default)
@@ -74,7 +74,7 @@
 
 ### D3: Stage-Specialized Decode Path — Feature Gate `decode_specialize`
 
-- [x] T13: Define `DecodeStage` enum in `src/transformer.rs`
+- [x] T13: Define `DecodeStage` enum in `crates/katgpt-percepta/src/transformer.rs`
   ```rust
   #[derive(Clone, Copy, PartialEq, Eq)]
   pub enum DecodeStage {
@@ -158,9 +158,9 @@ Distill the three highest-value insights from TileRT's execution pipeline into o
 
 | Component | D1 | D2 | D3 |
 |---|---|---|---|
-| `src/speculative/step.rs` | ✅ Instrument timing | — | ✅ Stage dispatch |
+| `crates/katgpt-forward/crates/katgpt-forward/src/step.rs` | ✅ Instrument timing | — | ✅ Stage dispatch |
 | `src/speculative/types.rs` | ✅ StabilitySnapshot | — | — |
-| `src/transformer.rs` | — | ✅ ContiguousWeights | ✅ DecodeStage |
+| `crates/katgpt-percepta/src/transformer.rs` | — | ✅ ContiguousWeights | ✅ DecodeStage |
 | `src/types.rs` | — | — | — |
 | `src/lib.rs` | — | — | ✅ Feature gate export |
 | `Cargo.toml` | ✅ Feature gate | — | ✅ Feature gate |

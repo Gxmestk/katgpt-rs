@@ -3,7 +3,7 @@
 **Date:** 2025-06
 **Status:** ✅ Complete
 **Depends on:** `.research/006_Raven_Routing_Slot_Memories.md`
-**Target:** `katgpt-rs/src/transformer.rs` (draft model path)
+**Target:** `katgpt-rs/crates/katgpt-percepta/src/transformer.rs` (draft model path)
 
 ---
 
@@ -64,7 +64,7 @@ Record these specific metrics for regression comparison:
 
 ## Task 2: Add `RavenKVCache` Struct and Core Math
 
-**File:** `src/transformer.rs` (add after `PagedKVCache` impl block)
+**File:** `crates/katgpt-percepta/src/transformer.rs` (add after `PagedKVCache` impl block)
 
 ### Struct Definition
 
@@ -120,7 +120,7 @@ Three pure functions (no trait needed yet — keep it simple):
 
 ## Task 3: Add `forward_raven()` Forward Pass Variant
 
-**File:** `src/transformer.rs`
+**File:** `crates/katgpt-percepta/src/transformer.rs`
 
 Same structure as `forward()` but:
 - Takes `RavenKVCache` instead of `MultiLayerKVCache`
@@ -376,7 +376,7 @@ git commit -m "feat: add Raven RSM (Routing Slot Memory) KV cache for draft mode
 
 | File | Action | Lines Changed |
 |------|--------|--------------|
-| `src/transformer.rs` | Add `RavenKVCache`, `forward_raven`, `raven_compute_router`, `raven_update`, `raven_readout` | +297 |
+| `crates/katgpt-percepta/src/transformer.rs` | Add `RavenKVCache`, `forward_raven`, `raven_compute_router`, `raven_update`, `raven_readout` | +297 |
 | `src/benchmark.rs` | Add `bench_raven_vs_flat_cache`, `bench_raven_recall`, wire into `run_all`, imports | +182 |
 | `tests/integration.rs` | Add 8 Raven test cases (router, update, decay, readout, recall, forward) | +303 |
 | `.plans/020_baseline.txt` | Baseline benchmark output | auto |

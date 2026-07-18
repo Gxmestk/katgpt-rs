@@ -100,7 +100,7 @@ Gate: warm p99 ≤ 1ms (Warm-tier budget, Plan 221 LoRA target)
 **The 500× latency regression from synthetic (313µs) to real (153ms) is algorithmic, not implementational.** The `MatchLengthScorer::suffix_match_len` algorithm iterates ALL corpus positions matching the candidate's last byte:
 
 ```rust
-// katgpt-rs/crates/katgpt-core/src/compression_drafter.rs L261
+// katgpt-rs/crates/katgpt-core/crates/katgpt-core/src/compression_drafter.rs L261
 for &pos in positions {  // positions.len() = count of last_byte in corpus
     // extend backwards...
 }

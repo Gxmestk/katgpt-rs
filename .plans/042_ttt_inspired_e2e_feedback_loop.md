@@ -201,7 +201,7 @@ riir-burner already reads JSONL. The only addition: optional `reward` field for 
   - Make this opt-in via config: `feedback_url: Option<String>` in `Config`
   - If `feedback_url` is None, skip (no behavior change)
   - If set, fire-and-forget POST (don't block inference on cache write)
-  - ~30 lines in `katgpt-rs/src/feedback.rs` (new file)
+  - ~30 lines in `katgpt-rs/crates/katgpt-deprecated/src/feedback.rs` (new file)
 
 - [x] **Task 7: E2E validation** *(manual — requires running servers end-to-end)*
   - Run anyrag with `solution-cache` feature
@@ -224,7 +224,7 @@ riir-burner already reads JSONL. The only addition: optional `reward` field for 
 | `anyrag/crates/lib/src/cache/mod.rs` | ~5 | Module index | anyrag |
 | `anyrag/crates/lib/src/cache/solution_cache.rs` | ~120 | Cache with PUCT scoring | anyrag |
 | `anyrag/crates/server/src/handlers/cache.rs` | ~60 | Cache API endpoints | anyrag |
-| `katgpt-rs/src/feedback.rs` | ~30 | Fire-and-forget cache write | katgpt-rs |
+| `katgpt-rs/crates/katgpt-deprecated/src/feedback.rs` | ~30 | Fire-and-forget cache write | katgpt-rs |
 | `katgpt-rs/.docs/12_ttt_feedback_loop_results.md` | ~50 | E2E validation results | katgpt-rs |
 
 ### Modified files

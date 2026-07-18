@@ -14,7 +14,7 @@ This plan came from the pre-SKILL-bug-fix research era. Critical audit found:
 
 | Issue | Verdict |
 |-------|---------|
-| Target repo `katgpt-core/src/dirichlet.rs` (public MIT) | ❌ **Wrong per `003`.** Functor arithmetic is a latent operation (projection direction + sigmoid gate). `003` explicitly: "Latent-operation internals → riir-ai internal." Must ship to riir-ai. |
+| Target repo `katgpt-core/crates/katgpt-core/src/dirichlet.rs` (public MIT) | ❌ **Wrong per `003`.** Functor arithmetic is a latent operation (projection direction + sigmoid gate). `003` explicitly: "Latent-operation internals → riir-ai internal." Must ship to riir-ai. |
 | Tasks marked `[x]` COMPLETE | ❌ **Dishonest.** Code does not exist in katgpt-rs (verified: `dirichlet.rs` is 104 lines, only Plan 149 diagnostics). Reverted to `[ ]`. |
 | API: `extract_functor(sources, targets, dim)` — pair alignment ambiguous | ❌ **Bug.** How are source/target paired? Position-aligned? The riir-train version uses explicit `pairs: &[(usize,usize)]`. Fixed below. |
 | No zero-alloc `extract_functor_into` | ❌ **Gap.** `functor_parallelism` has `_into` but `extract_functor` doesn't. Inconsistent. Added. |
@@ -38,7 +38,7 @@ Lift the paper's residual-stream analogy mechanism (`e_target ≈ e_source + f`)
 - **Verify** a candidate pair with parallelism `cos(target − source, f)` (paper §4.2 eq. 3).
 - **Gate** application by a sigmoid of the functor's coherence (dot + sigmoid, never softmax).
 
-**Target repo (corrected):** `riir-ai/crates/riir-engine/src/latent_functor/` (private, per `003`). NOT `katgpt-core/src/dirichlet.rs` (public) — the original target was wrong.
+**Target repo (corrected):** `riir-ai/crates/riir-engine/src/latent_functor/` (private, per `003`). NOT `katgpt-core/crates/katgpt-core/src/dirichlet.rs` (public) — the original target was wrong.
 
 **What stays in katgpt-rs (public, unchanged):** The Dirichlet Energy diagnostic from Plan 149 — `dirichlet_energy`, `functor_adjacency`, `consecutive_adjacency`, `kv_cache_dirichlet_energy`. This is a pure measurement (graph signal smoothness), not a latent operation. Already shipped.
 
@@ -52,7 +52,7 @@ Lift the paper's residual-stream analogy mechanism (`e_target ≈ e_source + f`)
 | Self-learn welcome | Re-estimation from fresh latent observations is runtime self-improvement of a routing/direction table, not of base weights. |
 | Plasma/Hot tiering | Extraction is O(N·dim) adds; apply is one vector add; parallelism is two dots — all SIMD, L1-resident, batchable across thousands of NPCs. |
 
-## API (corrected — target: `riir-engine/src/latent_functor/arithmetic.rs`, feature `latent_functor`)
+## API (corrected — target: `riir-engine/crates/katgpt-percepta/src/wasm/interpreter/arithmetic.rs`, feature `latent_functor`)
 
 ```rust
 /// Estimate functor direction + coherence from N position-aligned analog pairs.

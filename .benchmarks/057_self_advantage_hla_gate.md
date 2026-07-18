@@ -121,7 +121,7 @@ cargo bench -p katgpt-core --bench self_advantage_hla_bench \
 ## Notes
 
 - **Inline vs canonical:** the gate math here is an inline minimal (~50 LOC) of
-  the canonical `AdvantageMarginGate` (root crate, `src/pruners/self_advantage.rs`).
+  the canonical `AdvantageMarginGate` (root crate, `crates/katgpt-pruners/crates/katgpt-pruners/src/self_advantage.rs`).
   Kept inline because katgpt-core cannot depend on the root crate. The two are
   mathematically equivalent; the canonical version has its own GOAT gate (Bench 056,
   4/4 PASS at vocab ≤ 128).

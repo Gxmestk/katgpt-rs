@@ -24,23 +24,23 @@ Complete Rust port of Percepta's `transformer-vm` (Apache-2.0 © Percepta). Dist
 
 | Source File | Lines | What | Target Rust File |
 |-------------|-------|------|-----------------|
-| `attention/hull2d_cht.h` | 419 | CHT data structure (upper+lower hull, HullMeta) | `src/percepta/cht.rs` |
+| `attention/hull2d_cht.h` | 419 | CHT data structure (upper+lower hull, HullMeta) | `crates/katgpt-percepta/src/cht.rs` |
 | `attention/hull_cache.py` | 44 | Python wrapper for CHT | (merged into cht.rs) |
-| `attention/standard_cache.py` | 32 | O(n) softmax reference | `src/percepta/standard_cache.rs` |
+| `attention/standard_cache.py` | 32 | O(n) softmax reference | `crates/katgpt-percepta/src/standard_cache.rs` |
 | `graph/core.py` | 449 | Expression/Dimension DSL, fetch, reglu, stepglu, persist | `src/percepta/graph.rs` |
 | `wasm/interpreter.py` | 637 | 35-opcode WASM machine as computation graph | `src/percepta/wasm/interpreter.rs` |
 | `wasm/reference.py` | 667 | Reference trace generator | `src/percepta/wasm/reference.rs` |
-| `scheduler/milp.py` | 814 | MILP: 4-phase layer assignment, slot reuse, minimize d_model | `src/percepta/scheduler.rs` |
-| `model/weights.py` | 776 | Analytical weight construction: graph → weight matrices | `src/percepta/weights.rs` |
-| `model/transformer.py` | ~40 | VanillaTransformer with ReGLU FFN | `src/percepta/transformer.rs` |
+| `scheduler/milp.py` | 814 | MILP: 4-phase layer assignment, slot reuse, minimize d_model | `crates/katgpt-percepta/src/scheduler.rs` |
+| `model/weights.py` | 776 | Analytical weight construction: graph → weight matrices | `crates/katgpt-percepta/src/weights.rs` |
+| `model/transformer.py` | ~40 | VanillaTransformer with ReGLU FFN | `crates/katgpt-percepta/crates/katgpt-percepta/src/transformer.rs` |
 | `model/transformer.cpp` | 473 | Standalone C++ inference engine | (Rust native — no separate engine needed) |
-| `compilation/compile_wasm.py` | 703 | C→WASM compilation pipeline | `src/percepta/compile.rs` |
-| `compilation/decoder.py` | 664 | WASM MVP binary decoder | `src/percepta/wasm/decoder.rs` |
+| `compilation/compile_wasm.py` | 703 | C→WASM compilation pipeline | `crates/katgpt-percepta/src/compile.rs` |
+| `compilation/decoder.py` | 664 | WASM MVP binary decoder | `crates/katgpt-percepta/src/wasm/decoder.rs` |
 | `compilation/lower.py` | 1808 | Lower unsupported ops (MUL, DIV, AND, etc.) | `src/percepta/wasm/lower.rs` |
 | `compilation/runtime.h` | 155 | C runtime for WASM programs | `src/percepta/runtime.h` (keep as-is) |
-| `specialize.py` | 148 | First Futamura projection | `src/percepta/specialize.rs` |
-| `evaluator.py` | 404 | Graph evaluator (exact arithmetic) | `src/percepta/evaluator.rs` |
-| `runner.py` | 301 | CLI runner (C++ or Python inference) | `src/percepta/runner.rs` |
+| `specialize.py` | 148 | First Futamura projection | `crates/katgpt-percepta/src/specialize.rs` |
+| `evaluator.py` | 404 | Graph evaluator (exact arithmetic) | `crates/katgpt-percepta/src/evaluator.rs` |
+| `runner.py` | 301 | CLI runner (C++ or Python inference) | `crates/katgpt-percepta/src/runner.rs` |
 | `build.py` | ~50 | Build universal transformer weights | (merged into weights.rs) |
 | **Total** | **~9096** | | |
 

@@ -298,7 +298,7 @@ SpecHop SKIPS when α ≥ 0.3 (speculator too slow relative to target tool)
 │ Parent tracking │ parent_path: u128       │ parent_idx: Option<usize>    │
 │ Verification    │ Exact logit match       │ ObservationVerifier (fuzzy)  │
 │ Granularity     │ Single token            │ Entire tool-call hop         │
-│ Module          │ src/speculative/        │ src/spechop/hop_tree.rs      │
+│ Module          │ src/speculative/        │ crates/katgpt-speculative/src/spechop/hop_tree.rs      │
 └─────────────────┴─────────────────────────┴──────────────────────────────┘
 ```
 

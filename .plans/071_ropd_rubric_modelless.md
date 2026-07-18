@@ -41,7 +41,7 @@ The foundation: structured rubric representation that replaces scalar δ.
 
 **Our adaptation:** Template-based criteria (no LLM), WASM-verifiable (no judge API).
 
-- [x] **T2: Implement `RubricTemplate` enum** — `src/pruners/ropd_rubric/template.rs`
+- [x] **T2: Implement `RubricTemplate` enum** — `crates/katgpt-pruners/src/ropd_rubric/template.rs`
   ```rust
   /// Fixed rubric criteria per domain — no LLM generation needed.
   /// Each variant maps to a deterministic WASM-checkable criterion.
@@ -72,7 +72,7 @@ The foundation: structured rubric representation that replaces scalar δ.
   - `RubricTemplate::fft_tactics()` — role_fulfillment + team_coordination + survival (3 criteria, multi-axis)
   - `RubricTemplate::generic()` — task + structure + constraints (3 criteria, baseline)
 
-- [x] **T3: Implement `RubricVector`** — `src/pruners/ropd_rubric/types.rs`
+- [x] **T3: Implement `RubricVector`** — `crates/katgpt-pruners/src/ropd_rubric/types.rs`
   ```rust
   /// Structured multi-criteria score — ROPD's reward without LLM.
   /// Replaces scalar HintDelta with per-criterion pass/fail vector.
@@ -107,7 +107,7 @@ The foundation: structured rubric representation that replaces scalar δ.
 
   **Design principle (SRP):** `RubricVector` is pure data — no domain logic. Domain-specific scoring stays in the template/validator.
 
-- [x] **T4: Implement `RubricScorer` trait** — `src/pruners/ropd_rubric/scorer.rs`
+- [x] **T4: Implement `RubricScorer` trait** — `crates/katgpt-pruners/src/ropd_rubric/scorer.rs`
   ```rust
   /// Scores a response against a rubric template — no LLM.
   /// Implementations use WASM validators, pattern matching, or game-state queries.
@@ -154,7 +154,7 @@ Replace `DeltaGatedAbsorbCompress`'s scalar δ gate with rubric vector gate.
 **From our HL:** Absorb-compress promotes observed patterns to hard constraints.
 **Synthesis:** Only absorb when rubric reveals a gap in a high-weight criterion.
 
-- [x] **T5: Implement `RubricGatedAbsorbCompress<P>`** — `src/pruners/ropd_rubric/rubric_absorb.rs`
+- [x] **T5: Implement `RubricGatedAbsorbCompress<P>`** — `crates/katgpt-pruners/src/ropd_rubric/rubric_absorb.rs`
   ```rust
   /// Absorb-compress gated by rubric vector instead of scalar δ.
   ///
@@ -203,7 +203,7 @@ Replace `DeltaBanditPruner`'s scalar δ reward with rubric-weighted score.
 **From ROPD:** reward = `(student_score - teacher_score) / reward_scale`
 **Our adaptation:** reward = `(student.weighted_score() - reference.weighted_score()) / max_score`
 
-- [x] **T7: Implement `RubricBanditPruner<P>`** — `src/pruners/ropd_rubric/rubric_bandit.rs`
+- [x] **T7: Implement `RubricBanditPruner<P>`** — `crates/katgpt-pruners/src/ropd_rubric/rubric_bandit.rs`
   ```rust
   /// Bandit pruner using rubric-weighted scores as reward.
   ///
@@ -245,7 +245,7 @@ Wire rubric components into existing game arenas for real-world validation.
   - Scorer: game-state-based (alive? in blast zone? used bombs efficiently?)
   - Compare: `GZeroPlayer` (δ) vs `RubricPlayer` (rubric) vs `GreedyPlayer`
 
-- [x] **T10: Implement `RubricFFTPlayer` for FFT arena** — `src/pruners/fft/rubric_player.rs`
+- [x] **T10: Implement `RubricFFTPlayer` for FFT arena** — `crates/katgpt-pruners/src/fft/rubric_player.rs`
   - Template: `RubricTemplate::fft_tactics()` (role_fulfillment + team_coordination + survival)
   - Multi-axis domain where rubrics should help most
   - Compare: `GZeroFFTPlayer` (δ) vs `RubricFFTPlayer` (rubric) vs `TFTPlayer`
@@ -265,7 +265,7 @@ Wire rubric components into existing game arenas for real-world validation.
   - Off by default (same as `delta_mem`)
   - Feature implies `bandit` (reuses `AbsorbCompressLayer`, `BanditPruner`)
 
-- [x] **T13: Update module structure** — `src/pruners/ropd_rubric/mod.rs`
+- [x] **T13: Update module structure** — `crates/katgpt-pruners/src/ropd_rubric/mod.rs`
   ```
   src/pruners/ropd_rubric/
       mod.rs              — re-exports

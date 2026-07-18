@@ -13,8 +13,8 @@
 - [x] T6: Verify all tests pass (80 passed, 1 pre-existing GOAT failure)
 
 ## Changes
-- `src/still_kv/beta_bias.rs`: Added `AttentionDistribution` struct with `from_cross_attn`, `is_non_degenerate`, `is_not_collapsed`
-- `src/still_kv/iterative.rs`: Added `with_beta_strategy()` builder
+- `crates/katgpt-kv/src/still_kv/beta_bias.rs`: Added `AttentionDistribution` struct with `from_cross_attn`, `is_non_degenerate`, `is_not_collapsed`
+- `crates/katgpt-kv/src/still_kv/iterative.rs`: Added `with_beta_strategy()` builder
 - `src/still_kv/mod.rs`: Added `run_compaction_with_beta`, T25 benchmark, T26/T27 verification tests
 - `src/speculative/dd_tree.rs`: Fixed `u8` vs `usize` comparison
 - `crates/katgpt-core/src/slod.rs`: Fixed extra `}` and `usize` vs `f32` type mismatch

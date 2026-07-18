@@ -308,7 +308,7 @@ katgpt-rs/crates/katgpt-core/src/forensic/
 | `crates/katgpt-core/src/forensic/tardos.rs` | Anti-collusion codebook (Tardos 2008) |
 | `crates/katgpt-core/src/forensic/vertex.rs` | Vertex perturbation (LoopWM spectral stability) |
 | `crates/katgpt-core/src/forensic/texture.rs` | DCT mid-frequency embedding + recovery |
-| `crates/katgpt-core/src/forensic/topology.rs` | Degenerate-triangle topology mark + recovery |
+| `crates/katgpt-core/crates/katgpt-transformer/src/dense_mesh/topology.rs` | Degenerate-triangle topology mark + recovery |
 | `crates/katgpt-core/src/forensic/recover.rs` | End-to-end forensic recovery + attribution |
 | `benches/forensic_watermark.rs` | Criterion benchmarks for derive/apply/recover |
 | `examples/forensic_watermark_demo.rs` | End-to-end demo |

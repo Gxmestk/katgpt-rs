@@ -3,7 +3,7 @@
 **Date:** 2026-07-08
 **Research:** [katgpt-rs/.research/393_Block_Sparse_Featurizer_Subspace_Concept_Primitive.md](../.research/393_Block_Sparse_Featurizer_Subspace_Concept_Primitive.md)
 **Source paper:** [arXiv:2606.25234](https://arxiv.org/abs/2606.25234) — Goodfire, Block-Sparse Featurizers
-**Target:** `katgpt-rs/crates/katgpt-core/src/subspace_steering.rs` (new module) + Cargo feature `subspace_steering`
+**Target:** `katgpt-rs/crates/katgpt-core/crates/katgpt-core/src/subspace_steering.rs` (new module) + Cargo feature `subspace_steering`
 **Status:** Active — Phase 1 (unblocking skeleton)
 
 ---
@@ -59,7 +59,7 @@ pub struct SubspaceSteeringField<const D: usize, const K: usize> {
 
 ### Tasks
 
-- [x] **T1.1** Create `katgpt-rs/crates/katgpt-core/src/subspace_steering.rs` with module docstring (mirror `latent_steering.rs` doc style; cite Research 393 + Plan 412 + the `K=1` parity contract). **DONE**
+- [x] **T1.1** Create `katgpt-rs/crates/katgpt-core/crates/katgpt-core/src/subspace_steering.rs` with module docstring (mirror `latent_steering.rs` doc style; cite Research 393 + Plan 412 + the `K=1` parity contract). **DONE**
 - [x] **T1.2** Define `SubspaceSteeringField<const D: usize, const K: usize>` struct (block, alphas, commitment) + `SubspaceSteeringError` enum (`NotOrthonormal`, `AlphaOutOfRange`, `DimensionMismatch`). **DONE** — `DimensionMismatch` dropped: with const generics `D` and `K` are compile-time fixed, so dimension mismatch is impossible by construction (the array types enforce it). `NotOrthonormal` covers both non-unit-norm AND non-orthogonal-pair cases.
 - [x] **T1.3** Implement `SubspaceSteeringField::new(block, alphas, orthonormal_tol)` — validates orthonormality (each `basis[j]` unit-norm within tol, pairwise dot < tol) and `alpha ∈ [0,1]`, computes BLAKE3 commitment. **DONE**
 - [x] **T1.4** Implement `apply_subspace_steering(state: &mut [f32], field: &SubspaceSteeringField)` — chunked SIMD SAXPY over `K·D`. Zero-alloc. Document the `K=1` → Plan 309 reduction. **DONE** — signature adapted to const generics: `state: &mut [f32; D]` (fixed array, zero-alloc by construction). Method form `field.apply(&mut state)` + free-function `apply_subspace_steering` wrapper. Inner loop over D is the SAXPY; outer loop over K accumulates. No cross-lane reduction → bit-identical to scalar regardless of vectorization.
@@ -136,8 +136,8 @@ All four coexist — each occupies a distinct steering niche. Plan 412 does NOT 
 ## References
 
 - **Research**: [katgpt-rs/.research/393_Block_Sparse_Featurizer_Subspace_Concept_Primitive.md](../.research/393_Block_Sparse_Featurizer_Subspace_Concept_Primitive.md)
-- **1D sibling**: `katgpt-rs/.plans/309_latent_field_steering_primitive.md` + `katgpt-rs/crates/katgpt-core/src/latent_steering.rs`
-- **Basis discovery**: `katgpt-rs/.plans/301_runtime_subspace_phase_gate_primitive.md` + `katgpt-rs/crates/katgpt-core/src/subspace_phase_gate.rs`
+- **1D sibling**: `katgpt-rs/.plans/309_latent_field_steering_primitive.md` + `katgpt-rs/crates/katgpt-core/crates/katgpt-core/src/latent_steering.rs`
+- **Basis discovery**: `katgpt-rs/.plans/301_runtime_subspace_phase_gate_primitive.md` + `katgpt-rs/crates/katgpt-core/crates/katgpt-core/src/subspace_phase_gate.rs`
 - **Orthogonalization**: `katgpt-rs/.plans/152_newton_schulz_river_valley_diagnostics.md` (Newton-Schulz, shipped)
 - **Norm-preservation analysis**: `katgpt-rs/.benchmarks/322_phase_rotation_goat.md`
 - **Super-GOAT fusion tracker**: `katgpt-rs/.issues/049_block_sparse_hla_supergoat_validation.md`

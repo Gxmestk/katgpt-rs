@@ -3,14 +3,14 @@
 **Date:** 2026-07-04
 **Research:** [katgpt-rs/.research/377_Apple_Neural_Engine_Architecture_Programming_Performance.md](../.research/377_Apple_Neural_Engine_Architecture_Programming_Performance.md)
 **Source paper:** [arXiv:2606.22283](https://arxiv.org/abs/2606.22283) — Bryngelson, *Apple Neural Engine: Architecture, Programming, and Performance* (2026)
-**Target:** `katgpt-rs/crates/katgpt-core/src/ane_roofline.rs` (new module) + Cargo feature `ane_roofline`. **Refines** (does NOT replace) `riir-ai/crates/riir-engine/src/npc_brain_router.rs` (Plan 255 Part 4, shipped).
+**Target:** `katgpt-rs/crates/katgpt-core/crates/katgpt-core/src/ane_roofline.rs` (new module) + Cargo feature `ane_roofline`. **Refines** (does NOT replace) `riir-ai/crates/riir-engine/src/npc_brain_router.rs` (Plan 255 Part 4, shipped).
 **Status:** ✅ COMPLETE, DEFAULT-ON (2026-07-04) — Phase 1 ✅, Phase 2 ✅, Phase 3 ✅ (all COMPLETE 2026-07-04)
 
 ---
 
 ## Goal
 
-Distill Bryngelson's reverse-engineered ANE measurements (ch. 9, 12, 25, 35) into a generic, modelless, MIT-licensed Rust module under `katgpt-rs/crates/katgpt-core/src/ane_roofline.rs`. The module extends the existing GPU-only `roofline.rs` primitive with the ANE's distinct cost shape:
+Distill Bryngelson's reverse-engineered ANE measurements (ch. 9, 12, 25, 35) into a generic, modelless, MIT-licensed Rust module under `katgpt-rs/crates/katgpt-core/crates/katgpt-core/src/ane_roofline.rs`. The module extends the existing GPU-only `roofline.rs` primitive with the ANE's distinct cost shape:
 
 1. **A third routing axis** — on-chip working-set size — on top of `roofline.rs`'s compute/memory/launch.
 2. **ANE-specific peaks** for the M1–M5 family (compute, bandwidth, dispatch floor, working-set cap).
@@ -61,7 +61,7 @@ Goal: a compiling, tested, feature-gated module that implements the ANE cost mod
 ### Tasks
 
 - [x] **T1.1** Add feature flag `ane_roofline = []` to `katgpt-rs/crates/katgpt-core/Cargo.toml` `[features]` section. No new deps.
-- [x] **T1.2** Create `katgpt-rs/crates/katgpt-core/src/ane_roofline.rs` with module-level doc referencing Research 377 and arXiv:2606.22283.
+- [x] **T1.2** Create `katgpt-rs/crates/katgpt-core/crates/katgpt-core/src/ane_roofline.rs` with module-level doc referencing Research 377 and arXiv:2606.22283.
 - [x] **T1.3** Add `#[cfg(feature = "ane_roofline")] pub mod ane_roofline;` to `katgpt-rs/crates/katgpt-core/src/lib.rs` (alphabetical, after `alloc`).
 - [x] **T1.4** Implement `AneFamily` enum (`#[repr(u8)]`):
   - `A11Legacy = 0, A12 = 1, A13 = 2, A14 = 3, A15 = 4, A16 = 5, A17 = 6, A18 = 7`
@@ -139,7 +139,7 @@ Goal: a compiling, tested, feature-gated module that implements the ANE cost mod
   - `FamilyGated` → CPU (op won't lower on this chip)
   - `Compute` → ANE
   - `Memory` → GPU (ANE standalone stream is 24 GB/s vs GPU's 230 GB/s per Bryngelson ch. 9.5)
-- [x] **T1.12** Write unit tests in `katgpt-rs/crates/katgpt-core/src/ane_roofline.rs` `#[cfg(test)] mod tests`:
+- [x] **T1.12** Write unit tests in `katgpt-rs/crates/katgpt-core/crates/katgpt-core/src/ane_roofline.rs` `#[cfg(test)] mod tests`:
   - **T1.12a** Family-floor gate: op with `min_family = F3` (crop-resize) on M1 (A13) returns `AneBound::FamilyGated`. ✅ G3 hook.
   - **T1.12b** Working-set cliff: GEMM with operand > 2 MB on M1 returns `AneBound::WorkingSet`. ✅ G1 hook.
   - **T1.12c** Dispatch floor: 64×64 GEMM on M1 returns `AneBound::Dispatch` (work < 0.23 ms floor). ✅ G1 hook.
@@ -287,7 +287,7 @@ Goal: replace the hardcoded `ANE_BATCH_THRESHOLD = 100` in `riir-ai/crates/riir-
 
 - [arXiv:2606.22283](https://arxiv.org/abs/2606.22283) — Bryngelson, *Apple Neural Engine: Architecture, Programming, and Performance* (2026)
 - `katgpt-rs/.research/377_Apple_Neural_Engine_Architecture_Programming_Performance.md` — distillation + GOAT verdict
-- `katgpt-rs/crates/katgpt-core/src/roofline.rs` — existing GPU-only roofline (the extension target)
+- `katgpt-rs/crates/katgpt-core/crates/katgpt-core/src/roofline.rs` — existing GPU-only roofline (the extension target)
 - `riir-ai/crates/riir-engine/src/npc_brain_router.rs` — shipped router with hardcoded threshold (Phase 3 refinement target)
 - `riir-ai/crates/riir-engine/src/npc_ane_backend.rs` — shipped ANE backend (untouched)
 - `riir-ai/assets/npc_brain.mlpackage` — shipped CoreML model (untouched)
@@ -300,7 +300,7 @@ Goal: replace the hardcoded `ANE_BATCH_THRESHOLD = 100` in `riir-ai/crates/riir-
 
 ## TL;DR
 
-Extend `katgpt-rs/crates/katgpt-core/src/roofline.rs` with an ANE-aware cost model (new module
+Extend `katgpt-rs/crates/katgpt-core/crates/katgpt-core/src/roofline.rs` with an ANE-aware cost model (new module
 `ane_roofline.rs`, opt-in `ane_roofline` feature). Three ANE-specific axes: 2 MB working-set
 cliff, 0.23 ms dispatch floor (M1), family-floor capability gate. Per-chip peaks for M1–M5.
 Phase 1 ships the primitive + unit tests; Phase 2 runs the GOAT gate (bench binary

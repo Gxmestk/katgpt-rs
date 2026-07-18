@@ -11,7 +11,7 @@
 
 Wire `dflash_predict_with_weaver` (the Plan 433 building block) into the
 actual production spec decode hot path (`speculative_step_qwen_deltanet_tree`
-in `riir-ai/crates/riir-engine/src/deltanet/tree_forward.rs`). After this
+in `riir-ai/crates/riir-engine/crates/katgpt-attn/crates/katgpt-attn/src/gdn2/tree_forward.rs`). After this
 plan, callers can opt into Weaver marginal correction for the DeltaNet
 spec tree by calling the new sibling variant instead of the base function.
 
@@ -35,7 +35,7 @@ commit). Extract lines 824-989 into a private helper
 and have both the base and weaver variants delegate to it.
 
 This mirrors the established sibling-variant pattern from
-`katgpt-forward/src/step.rs` (`speculative_step` / `_rollback` /
+`katgpt-forward/crates/katgpt-forward/src/step.rs` (`speculative_step` / `_rollback` /
 `_rollback_with` / `_conditioned_with` / `_with_configurator`) and Plan 433
 (`dflash_predict_with` / `_with_capture` / `_with_weaver`).
 

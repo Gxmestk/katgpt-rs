@@ -349,10 +349,10 @@ pub fn forward<'a>(
 | File | Action | Phase |
 |------|--------|-------|
 | `src/types.rs` | Add `n_layer` to Config, add `small_target()` | 1 |
-| `src/transformer.rs` | `LayerWeights`, multi-layer `TransformerWeights`, layer loop | 2-4 |
-| `src/speculative/dflash.rs` | Use `MultiLayerKVCache` | 5 |
+| `crates/katgpt-percepta/src/transformer.rs` | `LayerWeights`, multi-layer `TransformerWeights`, layer loop | 2-4 |
+| `crates/katgpt-speculative/src/dflash.rs` | Use `MultiLayerKVCache` | 5 |
 | `src/speculative/verifier.rs` | Use `MultiLayerKVCache` | 5 |
-| `src/speculative/step.rs` | Update signatures | 5 |
+| `crates/katgpt-forward/crates/katgpt-forward/src/step.rs` | Update signatures | 5 |
 | `src/benchmark.rs` | Use `MultiLayerKVCache`, add multi-layer bench | 5-6 |
 | `src/main.rs` | Use `MultiLayerKVCache` | 5 |
 

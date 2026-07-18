@@ -53,7 +53,7 @@ Implement recursive cross-scale consistency from RecFM as modelless inference im
 
 ### Task 3: Recursive SpecHop Cross-Hop Consistency
 
-- [x] T3.1: Add `CrossHopConfig` to `src/spechop/speculator.rs`
+- [x] T3.1: Add `CrossHopConfig` to `crates/katgpt-speculative/src/spechop/speculator.rs`
   - Fields: `enable: bool`, `velocity_threshold: f32`, `min_hops_for_consistency: usize` (default 2)
 - [x] T3.2: Implement `observation_velocity(obs_k: &str, obs_k1: &str) -> f32`
   - Returns normalized Levenshtein distance between consecutive observations

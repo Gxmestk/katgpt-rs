@@ -4,7 +4,7 @@
 **Research:** [katgpt-rs/.research/301_Misalignment_Indicator_Probe_Bank.md](../.research/301_Misalignment_Indicator_Probe_Bank.md)
 **Private selling-point guide:** [riir-ai/.research/157_bidirectional_cognitive_monitoring_guide.md](../../riir-ai/.research/157_bidirectional_cognitive_monitoring_guide.md)
 **Source paper:** [Zhou et al. 2026 — Probing the Misaligned Thinking Process of Language Models](https://arxiv.org/pdf/2606.24251) — ICML 2026 Mech Interp Workshop
-**Target:** `katgpt-rs/crates/katgpt-core/src/pruners/indicator_probe_bank.rs` (new module) + Cargo feature `indicator_probe_bank`, `indicator_similarity`, `indicator_cascade`
+**Target:** `katgpt-rs/crates/katgpt-core/crates/katgpt-core/src/pruners/indicator_probe_bank.rs` (new module) + Cargo feature `indicator_probe_bank`, `indicator_similarity`, `indicator_cascade`
 **Status:** Done — all phases shipped; `indicator_probe_bank` + `indicator_similarity` promoted to DEFAULT-ON, `indicator_cascade` stays opt-in.
 
 ---
@@ -25,7 +25,7 @@ The bank operates on any `[f32; D]` state — it carries zero game semantics. Th
 
 ### Tasks
 
-- [x] **T1.1** Create module `katgpt-rs/crates/katgpt-core/src/pruners/indicator_probe_bank.rs`. Add to `pruners/mod.rs` behind `#[cfg(feature = "indicator_probe_bank")]`.
+- [x] **T1.1** Create module `katgpt-rs/crates/katgpt-core/crates/katgpt-core/src/pruners/indicator_probe_bank.rs`. Add to `pruners/mod.rs` behind `#[cfg(feature = "indicator_probe_bank")]`.
 
 - [x] **T1.2** Define the indicator label enum (generic — no game semantics). Numeric discriminant, `#[repr(u8)]`, stable for sync:
 
@@ -185,7 +185,7 @@ The paper's Fig. 6 finding (block-structured cosine similarity) as a first-class
 
 ### Tasks
 
-- [x] **T2.1** Create module `katgpt-rs/crates/katgpt-core/src/pruners/indicator_similarity.rs` behind `#[cfg(feature = "indicator_similarity")]` (pulls in `indicator_probe_bank`).
+- [x] **T2.1** Create module `katgpt-rs/crates/katgpt-core/crates/katgpt-core/src/pruners/indicator_similarity.rs` behind `#[cfg(feature = "indicator_similarity")]` (pulls in `indicator_probe_bank`).
 
 - [x] **T2.2** Define `IndicatorSimilarityMatrix<L: IndicatorLabel>`:
 
@@ -233,7 +233,7 @@ The two-stage cascade from the paper (probes online → verifier offline). The v
 
 ### Tasks
 
-- [x] **T3.1** Create module `katgpt-rs/crates/katgpt-core/src/pruners/indicator_cascade.rs` behind `#[cfg(feature = "indicator_cascade")]` (pulls in `indicator_probe_bank`).
+- [x] **T3.1** Create module `katgpt-rs/crates/katgpt-core/crates/katgpt-core/src/pruners/indicator_cascade.rs` behind `#[cfg(feature = "indicator_cascade")]` (pulls in `indicator_probe_bank`).
 
 - [x] **T3.2** Define the verifier trait:
 
@@ -406,4 +406,4 @@ These are tracked in `riir-ai/.research/157_bidirectional_cognitive_monitoring_g
 
 ## TL;DR
 
-Ship a generic `IndicatorProbeBank<L, D>` primitive in `katgpt-rs/crates/katgpt-core/src/pruners/indicator_probe_bank.rs` (Phase 1, always ships), an `IndicatorSimilarityMatrix<L>` artifact (Phase 2), and an `IndicatorCascade<L, D>` trait + driver (Phase 3, opt-in). The bank holds N pre-computed, BLAKE3-committed, freeze/thaw-versioned direction vectors, projects them via dot-product + sigmoid, OR-fuses into a single firing label. The cascade escalates flagged candidates to an opaque verifier (stage-2). All three modules are generic over `L: IndicatorLabel` and `const D: usize` — zero game semantics. Phase 4 ships the synthetic GOAT gate (G1 indicator AU-ROC, G2 OR-fusion TPR/FPR, G3 cascade FPR reduction, G4 zero-alloc hot path, G5 similarity block recovery, G6 feature-off regression, G7 wire-format integrity). Phase 5 promotes `indicator_probe_bank` + `indicator_similarity` to default-on (pure read-side, zero overhead when no bank loaded); keeps `indicator_cascade` opt-in. **The private selling-point moat** (bidirectional cognitive monitoring for emergent NPC alignment, 18-indicator NPC taxonomy, KG-triple audit trail) **lives in `riir-ai/.research/157_*.md` and downstream riir-ai plans** — out of scope for this open plan.
+Ship a generic `IndicatorProbeBank<L, D>` primitive in `katgpt-rs/crates/katgpt-core/crates/katgpt-core/src/pruners/indicator_probe_bank.rs` (Phase 1, always ships), an `IndicatorSimilarityMatrix<L>` artifact (Phase 2), and an `IndicatorCascade<L, D>` trait + driver (Phase 3, opt-in). The bank holds N pre-computed, BLAKE3-committed, freeze/thaw-versioned direction vectors, projects them via dot-product + sigmoid, OR-fuses into a single firing label. The cascade escalates flagged candidates to an opaque verifier (stage-2). All three modules are generic over `L: IndicatorLabel` and `const D: usize` — zero game semantics. Phase 4 ships the synthetic GOAT gate (G1 indicator AU-ROC, G2 OR-fusion TPR/FPR, G3 cascade FPR reduction, G4 zero-alloc hot path, G5 similarity block recovery, G6 feature-off regression, G7 wire-format integrity). Phase 5 promotes `indicator_probe_bank` + `indicator_similarity` to default-on (pure read-side, zero overhead when no bank loaded); keeps `indicator_cascade` opt-in. **The private selling-point moat** (bidirectional cognitive monitoring for emergent NPC alignment, 18-indicator NPC taxonomy, KG-triple audit trail) **lives in `riir-ai/.research/157_*.md` and downstream riir-ai plans** — out of scope for this open plan.

@@ -4,7 +4,7 @@
 **Research:** [katgpt-rs/.research/359_Isomorphic_Neural_Field_World_Model_Motor_Gated_DEC_Propagation.md](../.research/359_Isomorphic_Neural_Field_World_Model_Motor_Gated_DEC_Propagation.md)
 **Source paper:** [arXiv:2602.18690](https://arxiv.org/abs/2602.18690) — Nunley, *Neural Fields as World Models* (CogSci 2026)
 **Private guide:** [riir-ai/.research/168_Motor_Gated_Isomorphic_World_Model_Game_Runtime_Guide.md](../../riir-ai/.research/168_Motor_Gated_Isomorphic_World_Model_Game_Runtime_Guide.md)
-**Target:** `katgpt-rs/crates/katgpt-dec/src/motor_gated.rs` (new module) + Cargo feature `motor_gated_field` (opt-in)
+**Target:** `katgpt-rs/crates/katgpt-dec/crates/katgpt-dec/src/motor_gated.rs` (new module) + Cargo feature `motor_gated_field` (opt-in)
 **Status:** Phase 1–4 COMPLETE. G1–G5 ALL PASS (G5 closed by grid-stencil fast path: 120 µs → 29 µs, 4.1× speedup). `motor_gated_field` is **ready for downstream consumption** (riir-ai Research 168 Phase 2), stays opt-in by design.
 
 ---
@@ -23,7 +23,7 @@ Ship the **missing glue primitive** that unifies the DEC substrate (Plan 251 `ho
 
 ### Tasks
 
-- [x] **T1.1** Create `katgpt-rs/crates/katgpt-dec/src/motor_gated.rs` with module doc referencing Research 359 + Plan 357 + the paper.
+- [x] **T1.1** Create `katgpt-rs/crates/katgpt-dec/crates/katgpt-dec/src/motor_gated.rs` with module doc referencing Research 359 + Plan 357 + the paper.
 - [x] **T1.2** Add Cargo feature `motor_gated_field = []` to `katgpt-dec/Cargo.toml` (opt-in, no extra deps — composes existing `dec_operators` surface).
 - [x] **T1.3** Implement `evolve_motor_gated_field(cx, h, motor_vec, motor_dim, dt, relu_slope, scratch_lap, scratch_relu)`:
   - Step 1: `relu_gate_into(h, relu_slope, scratch_relu)` — per-element `max(0, x)` (or leaky `relu_slope·x` for negative) into scratch.

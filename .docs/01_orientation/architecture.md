@@ -786,7 +786,7 @@ Score formula: `blended = parent_score + ln(P_llm) + ln(R)`
 
 `config.screening_threshold` (default `0.0`) controls hard-trim cutoff. Set `> 0.0` to aggressively trim low-relevance branches.
 
-## Freeze/Thaw (`src/pruners/freeze.rs`, Plan 092)
+## Freeze/Thaw (`crates/katgpt-pruners/src/freeze.rs`, Plan 092)
 
 Shared freeze/thaw disk I/O for `repr(C)` bandit knowledge structs. Zero-dependency binary persistence — raw `std::fs::write`/`read` on `repr(C)` data with magic bytes + version validation on load. No serde/bincode needed.
 
@@ -831,7 +831,7 @@ where
     Qg: BatchQualityGate;      // degenerate-batch gate (Plan 111 data_gate)
 ```
 
-**Per-cycle pipeline** (Plan 274 §2.3, see `crates/katgpt-core/src/cgsp/loop_.rs::cycle()`):
+**Per-cycle pipeline** (Plan 274 §2.3, see `crates/katgpt-core/crates/katgpt-core/src/cgsp/loop_.rs::cycle()`):
 
 1. Conjecturer samples k candidates → `scratch.candidates`.
 2. Guide scores each → `scratch.guide_scores`.
@@ -1018,7 +1018,7 @@ let logits = forward(&mut ctx, &weights, &mut cache, token, pos, &config);
 // which handles the reader→writer swap internally.
 ```
 
-## CODA Fusion Kernels (`crates/katgpt-core/src/coda.rs`, Plan 103)
+## CODA Fusion Kernels (`crates/katgpt-core/crates/katgpt-core/src/coda.rs`, Plan 103)
 
 CODA-inspired fused SIMD kernels that algebraically reparameterize matmul+residual+rmsnorm+activation into single-pass SIMD loops, eliminating intermediate buffer writes.
 
@@ -1084,7 +1084,7 @@ pub struct MoaConfig {
 
 **Feature gate:** `moa_inference` (**default-on**, Plan 158 GOAT 3/3)
 
-## Tiled Attention (`crates/katgpt-core/src/attention.rs`, Plan 115)
+## Tiled Attention (`crates/katgpt-core/crates/katgpt-core/src/attention.rs`, Plan 115)
 
 CPU SIMD tiled flash attention using online-softmax algorithm, adapted from ThunderKittens (Research 077). Processes Q in SIMD-width row tiles, K/V in column tiles — avoids materializing full N×N score matrix.
 
@@ -1105,7 +1105,7 @@ Threshold: tiled path activates when N > 128 (score matrix > L1 cache)
 
 **Feature gate:** `tiled_attention`
 
-## Newton-Schulz Orthogonalization (`src/newton_schulz.rs`, Plan 152, Research 114)
+## Newton-Schulz Orthogonalization (`crates/katgpt-core/src/newton_schulz.rs`, Plan 152, Research 114)
 
 5-iteration cubic fixed-point iteration that projects any matrix to its nearest orthogonal factor. Generic building block for Muon-family optimizers.
 
@@ -1129,7 +1129,7 @@ Constants from the AMUSE paper (converges for σ ∈ [0, 1]):
 
 **GOAT:** 25/25 (Bench 050)
 
-## River-Valley Diagnostics (`src/river_valley.rs`, Plan 152, Research 114)
+## River-Valley Diagnostics (`crates/katgpt-spectral/src/river_valley.rs`, Plan 152, Research 114)
 
 Modelless training diagnostics that reveal why optimization is (or isn't) converging. Pure scalar arithmetic, no external dependencies.
 
@@ -1143,7 +1143,7 @@ Modelless training diagnostics that reveal why optimization is (or isn't) conver
 
 **GOAT:** 25/25 (Bench 050)
 
-## Energy-Gated Attention (`src/ega_attn.rs`, Plan 139)
+## Energy-Gated Attention (`crates/katgpt-attn/src/ega_attn.rs`, Plan 139)
 
 Spectral salience gating for attention. Gates value aggregation by the spectral energy of key token embeddings — each key position's attention weight is scaled by a learned sigmoid gate derived from dot-product energy of the input embedding with a learned projection vector.
 
@@ -1261,7 +1261,7 @@ Wake-time (online, per query, zero-alloc hot path):
 
 **Feature gate:** `sleep_time_anticipation` (opt-in — quality gates G2/G3/G4 require a real predictability-labeled corpus, deferred to riir-ai Plan 341). Examples: [`sleep_time_01_basic.rs`](../../crates/katgpt-core/examples/sleep_time_01_basic.rs) + [`sleep_time_02_curiosity_inversion.rs`](../../crates/katgpt-core/examples/sleep_time_02_curiosity_inversion.rs). See `.docs/03_memory/sleep_consolidation.md` for the relationship to Plan 154 (state-internalization vs artifact-emission).
 
-## Spectral Hierarchy (`crates/katgpt-core/src/spectral_hierarchy.rs`, Plan 156, Research 121)
+## Spectral Hierarchy (`crates/katgpt-core/crates/katgpt-core/src/spectral_hierarchy.rs`, Plan 156, Research 121)
 
 Validates that hierarchical splitting geometry in co-occurrence Gram matrices emerges under the decay assumptions (Theorems 1–2 from Research 121). Three diagnostics:
 
@@ -1273,7 +1273,7 @@ Validates that hierarchical splitting geometry in co-occurrence Gram matrices em
 
 **Feature gate:** `spectral_hierarchy` (default-on)
 
-## Roofline Cost (`crates/katgpt-core/src/roofline.rs`, Research R130, Plan 159)
+## Roofline Cost (`crates/katgpt-core/crates/katgpt-core/src/roofline.rs`, Research R130, Plan 159)
 
 GPU operator runtime prediction, ported from FlashLib's `info/roofline.py`. Predicts operator runtime in ~5µs CPU-only estimation, replacing ~100ms GemvAutotune benchmarking.
 
@@ -1438,7 +1438,7 @@ pub struct ParallaxScratch {
 
 **Feature gate:** `parallax_attn` (requires `tiled_attention`, `newton_schulz`). **opt-in** — requires Muon-trained W_R weights.
 
-## Emotion Vector Inference (`src/pruners/emotion_vector.rs`, Plan 162, Research 144)
+## Emotion Vector Inference (`crates/katgpt-pruners/src/emotion_vector.rs`, Plan 162, Research 144)
 
 Zero-cost read of emotion directions from mid-layer residual-stream activations during speculative decoding. Based on Anthropic Transformer Circuits research showing linear emotion representations causally drive behavior (desperation steering → 14× reward-hacking increase at +0.1 offset).
 
@@ -1537,7 +1537,7 @@ pub struct ConsensusConfig {
 | `route_thermal_path(ternary, conf_h, conf_v, config)` → `ThermalPath` | Classify each position into thermal path |
 | `ternary_consensus(token_h, conf_h, token_v, conf_v)` → (i8, token) | Compute ternary signal + winner |
 
-## Budget Adaptation (`src/speculative/budget.rs`, Plan 167)
+## Budget Adaptation (`crates/katgpt-speculative/src/budget.rs`, Plan 167)
 
 Compression-adaptive decode budget — uses PFlash scoring ratio (a free byproduct of prefill) to dynamically scale DDTree budget per-prompt. Feature-gated behind `budget_adaptation`.
 
@@ -1562,7 +1562,7 @@ r=0.5 → scale=1.25 (budget slightly above base)
 r=1.0 → scale=2.0  (budget doubled, complex prompt)
 ```
 
-## ILC Distillation (`src/distill/ilc.rs`, Plan 164)
+## ILC Distillation (`crates/katgpt-speculative/src/distill/ilc.rs`, Plan 164)
 
 Iterative Latent Clustering — synonym-aware DDTree pruning. Distilled from arXiv:2605.27734 (Korchinski, Favero, Wyart). Feature-gated behind `ilc_distill`.
 
@@ -1613,7 +1613,7 @@ markov → nll → typical_set → claim
 
 **Key types:** `MarkovChain`, `Regime` (Conservative/Typical/Uncertain), `ClaimCard`, `GeometryReport`, `ValidityVerdict`.
 
-## Depth-Invariance Diagnostic (`crates/katgpt-core/src/depth_invariance.rs`, Plan 306)
+## Depth-Invariance Diagnostic (`crates/katgpt-core/crates/katgpt-types/src/depth_invariance.rs`, Plan 306)
 
 Root-cause counterpart to four existing symptom-only detectors
 (`BeliefRankPruner`, `GainCostLoopHalter`, `latent_functor/reestimation.rs`,
@@ -1710,7 +1710,7 @@ SAT + rolling hash + sensitivity masking for KV cache analysis. All modelless �
 | `rolling_hash` | `RollingHash`, `CachedSegment`, `KvSegmentPool` — O(n) variable-length segment matching |
 | `sensitivity` | `SensitivityDetector` trait, `StrictDetector`, `OpenDetector` — selective KV sharing |
 
-## Hydra Budget (`src/pruners/hydra_budget.rs`, Research 148, Plan 165)
+## Hydra Budget (`crates/katgpt-pruners/src/hydra_budget.rs`, Research 148, Plan 165)
 
 Hydra-Aware Adaptive Layer Budget — emergent self-repair layer skipping. Distills the Hydra Effect (arXiv:2307.15771, McGrath et al.) into adaptive layer skipping. Feature-gated behind `hydra_budget`.
 
@@ -1739,7 +1739,7 @@ pub struct HydraBudgetResult {
 
 **Skip Rules:** Never skips layers with `backup_frequency > 0.1` (Hydra backups) or non-erasure layers with significant `mean_de`. Erasure MLPs skipped during draft if `skip_erasure_draft` is set.
 
-## GEPA-D Reflective (`src/pruners/gepa_reflective.rs`)
+## GEPA-D Reflective (`crates/katgpt-pruners/src/gepa_reflective.rs`)
 
 Pareto bandit config evolution via reflective distillation. Evolves system-level config (rubric weights, template hints, bandit params) from MeMo trajectory reflection using Pareto-frontier bandit selection. Feature-gated behind `gepa_reflective` (requires `bandit`, `memo_reflections`).
 
@@ -1757,7 +1757,7 @@ pub struct ConfigVariant {
 
 Total arms = 4 × 4 × 4 × 4 = 256. Uses UCB1 selection. Rubric presets: balanced, relevance-heavy, novelty-heavy, uniform.
 
-## PhraseBoost (`src/pruners/phrase_boost.rs` + `phrase_trie.rs`, Plan 164)
+## PhraseBoost (`crates/katgpt-pruners/src/phrase_boost.rs` + `phrase_trie.rs`, Plan 164)
 
 Context trie phrase boosting for DDTree. Zero training cost — phrases provided at call site. Feature-gated behind `phrase_boost`.
 

@@ -51,7 +51,7 @@ candidate next steps; this plan executes **two of them**:
 
 ### T3 — Move `forward_set_causal_positions` to katgpt-forward ✅
 
-- [x] Create `crates/katgpt-forward/src/forward_set_causal.rs` with the
+- [x] Create `crates/katgpt-forward/crates/katgpt-forward/src/forward_set_causal.rs` with the
       function body, imports rewritten to `katgpt_types::*` and
       `katgpt_transformer::*`.
 - [x] Move 5 PURE tests that only need `forward_set_causal_positions`:

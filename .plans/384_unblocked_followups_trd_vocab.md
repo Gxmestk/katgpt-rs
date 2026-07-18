@@ -4,9 +4,9 @@
 
 Two Phase 12 DEFER items whose blockers dissolved during Phase 12 itself:
 
-1. **`src/distill/trd.rs`** (1107 LOC) — blocker was `crate::fold` dep.
+1. **`crates/katgpt-speculative/src/distill/trd.rs`** (1107 LOC) — blocker was `crate::fold` dep.
    Phase 12 T4.5 moved `fold/` to `katgpt-speculative`. **NOW MOVABLE**
-   to `katgpt-speculative/src/distill/trd.rs`.
+   to `katgpt-speculative/crates/katgpt-speculative/src/distill/trd.rs`.
 
 2. **`src/speculative/vocab_channel_pruner.rs`** (2048 LOC) — blocker was
    `crate::lattice_operad` dep.
@@ -46,7 +46,7 @@ compiled in `cargo check` but produced zero test symbols. Fixed to
 
 ## Tasks
 
-- [x] **T1.** Move `src/distill/trd.rs` → `katgpt-speculative/src/distill/trd.rs`
+- [x] **T1.** Move `crates/katgpt-speculative/src/distill/trd.rs` → `katgpt-speculative/crates/katgpt-speculative/src/distill/trd.rs`
       - T1.1 `git mv` file ✅
       - T1.2 Imports unchanged — `crate::fold` is now native to katgpt-speculative ✅
       - T1.3 Added `pub mod trd;` to `katgpt-speculative/src/distill/mod.rs`

@@ -219,7 +219,7 @@ fn main() {
 
 ### 5.2 Composed with `BanditPruner` — domain gates proposals
 
-`BanditPruner` is a UCB1-based per-arm screener (see `src/pruners/bandit.rs`).
+`BanditPruner` is a UCB1-based per-arm screener (see `crates/katgpt-ruliology/crates/katgpt-ruliology/src/bandit.rs`).
 It operates in a different bandit domain than `progressive_mcgs::uct` —
 fixed `√2` exploration, no parent-visits term, no time-decay. **The two
 don't share code** (Phase 2 DRY audit found they operate in different

@@ -2,7 +2,7 @@
 
 **Date:** 2026-07-06
 **Primitive:** `StepAttributionQualifier` + `StepLocalizer` + `DotProductLocalizer` + `SumAggregator` / `MeanAggregator`
-**Module:** `crates/katgpt-pruners/src/step_attribution_qualifier.rs`
+**Module:** `crates/katgpt-pruners/crates/katgpt-pruners/src/step_attribution_qualifier.rs`
 **Feature:** `step_attribution_qualifier` (opt-in)
 **Source paper:** [arXiv:2606.01311](https://arxiv.org/abs/2606.01311) — SkillAdaptor, Yu et al. 2026
 **Bench:** `benches/step_attribution_qualifier_bench.rs` (`cargo run --release --bench step_attribution_qualifier_bench --features step_attribution_qualifier`)
@@ -64,5 +64,5 @@ No new dependencies were added to `crates/katgpt-pruners/Cargo.toml`. The module
 - **Research:** `.research/381_SkillAdaptor_Step_Level_Fault_Attribution_Delta_Qualification.md`
 - **Private guide (riir-ai):** `riir-ai/.research/313_Step_Level_Fault_Attribution_Commit_Gate_Guide.md`
 - **Runtime wiring (riir-ai):** `riir-ai/.plans/313_step_attribution_branch_wiring.md`
-- **Sibling primitive:** `TrajectoryDoctor` (Plan 223) — `crates/katgpt-pruners/src/trajectory_doctor.rs`
+- **Sibling primitive:** `TrajectoryDoctor` (Plan 223) — `crates/katgpt-pruners/crates/katgpt-pruners/src/trajectory_doctor.rs`
 - **Source paper:** [arXiv:2606.01311](https://arxiv.org/abs/2606.01311) — SkillAdaptor, Yu et al. 2026

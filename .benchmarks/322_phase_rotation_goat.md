@@ -2,7 +2,7 @@
 
 **Date:** 2026-06-25
 **Bench:** `katgpt-rs/crates/katgpt-core/benches/bench_322_phase_rotation_goat.rs` (`harness = false`, `std::time::Instant`, direct binary launch bypassing the dyld/trustd stall)
-**Primitive:** `katgpt-rs/crates/katgpt-core/src/phase_rotation.rs` (feature `phase_rotation_coupling`)
+**Primitive:** `katgpt-rs/crates/katgpt-core/crates/katgpt-core/src/phase_rotation.rs` (feature `phase_rotation_coupling`)
 **Research:** [`katgpt-rs/.research/305_Phase_Modulated_Cross_Domain_Coupling.md`](../.research/305_Phase_Modulated_Cross_Domain_Coupling.md)
 **Source paper:** [arXiv:2605.12700](https://arxiv.org/abs/2605.12700) — UFO: Domain-Unification-Free Operator Framework (Qiao, Karniadakis, Muniruzzaman, May 2026)
 **Status:** ✅ **ALL GATES PASS — PROMOTED to DEFAULT-ON** (Plan 322 Phase 2, 2026-06-25)

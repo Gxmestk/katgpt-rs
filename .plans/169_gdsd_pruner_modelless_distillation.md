@@ -48,7 +48,7 @@ fn relevance(&self, depth: usize, token_idx: usize, parent_tokens: &[usize]) -> 
 ## Tasks
 
 ### Phase 1: Core Pruner ✅
-- [x] Create `katgpt-rs/src/pruners/gdsd.rs` with `GdsdPruner<P: ScreeningPruner>` struct
+- [x] Create `katgpt-rs/crates/katgpt-pruners/src/gdsd.rs` with `GdsdPruner<P: ScreeningPruner>` struct
 - [x] Implement `ScreeningPruner` trait for `GdsdPruner`
 - [x] Add `GdsdConfig` with defaults (ψ=10.0, β=0.001, tlc=true)
   - Also `.no_tlc()`, `.strong()` (ψ=20, β=0.01), `.mild()` (ψ=1, β=0.0001) presets
@@ -133,7 +133,7 @@ G3: Overhead ≤ 20% ......................... ❌ FAIL (+181.5%, nearly 3× cos
 ## Implementation Summary
 
 ### Files
-- `katgpt-rs/src/pruners/gdsd.rs` — 518 lines, 20 unit tests
+- `katgpt-rs/crates/katgpt-pruners/src/gdsd.rs` — 518 lines, 20 unit tests
 - `katgpt-rs/tests/bench_gdsd_modelless.rs` — 474 lines, 8 GOAT tests
 - `katgpt-rs/src/speculative/dd_tree.rs` — `build_dd_tree_gdsd()` convenience builder
 - `katgpt-rs/Cargo.toml` — `gdsd_distill = ["bandit"]` feature gate
@@ -148,7 +148,7 @@ G3: Overhead ≤ 20% ......................... ❌ FAIL (+181.5%, nearly 3× cos
 ## Module Structure
 
 ```
-katgpt-rs/src/pruners/gdsd.rs          # GdsdPruner<P> + GdsdConfig + advantage functions + TLC
+katgpt-rs/crates/katgpt-pruners/src/gdsd.rs          # GdsdPruner<P> + GdsdConfig + advantage functions + TLC
 katgpt-rs/src/speculative/dd_tree.rs   # build_dd_tree_gdsd() convenience builder
 katgpt-rs/tests/bench_gdsd_modelless.rs # GOAT proof (T1-T7 + summary)
 ```

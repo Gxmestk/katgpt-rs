@@ -70,7 +70,7 @@ of Q-value. This bridges RL with the existing constraint pruning architecture.
 
 ## Tasks
 
-- [x] 1. Create `src/pruners/bandit.rs` with `BanditStrategy` enum
+- [x] 1. Create `crates/katgpt-ruliology/crates/katgpt-ruliology/src/bandit.rs` with `BanditStrategy` enum
 - [x] 2. Add `BanditPruner<P: ScreeningPruner>` implementing `ScreeningPruner`
 - [x] 3. Add `BanditEnv` trait + `BernoulliEnv` + `GaussianEnv`
 - [x] 4. Add `BanditSession` with episode loop, reward/regret tracking, `BanditEvent` stream
@@ -86,7 +86,7 @@ of Q-value. This bridges RL with the existing constraint pruning architecture.
 
 | File | Action | Description |
 |------|--------|-------------|
-| `src/pruners/bandit.rs` | Create | Core module: strategy, pruner, env, session |
+| `crates/katgpt-ruliology/crates/katgpt-ruliology/src/bandit.rs` | Create | Core module: strategy, pruner, env, session |
 | `src/pruners/mod.rs` | Edit | Add `bandit` module + re-exports |
 | `src/lib.rs` | Edit | No changes needed (re-exported via pruners) |
 | `Cargo.toml` | Edit | Add `bandit = []` feature, example entry |
