@@ -144,7 +144,7 @@ Prompt tokens [0..S)
 ### New Types
 
 ```rust
-// speculative/types.rs
+// crates/katgpt-core/src/speculative/types.rs
 
 /// Algorithmic parameters for block-sparse FlashPrefill scoring.
 /// Ported from dflash/src/flashprefill.h FlashPrefillConfig.
@@ -294,10 +294,10 @@ fn bench_niah_retrieval_rate() {
 
 ### Task 2: Add `FlashPrefillConfig` Struct
 
-Add `FlashPrefillConfig`, `PrefillMode`, and `BlockScores` to `speculative/types.rs`.
+Add `FlashPrefillConfig`, `PrefillMode`, and `BlockScores` to `crates/katgpt-core/src/speculative/types.rs`.
 
 ```rust
-// speculative/types.rs
+// crates/katgpt-core/src/speculative/types.rs
 
 impl Default for FlashPrefillConfig {
     fn default() -> Self {
@@ -1240,7 +1240,7 @@ fn bench_block_selection_guarantees() {
 
 1. Update `.docs/08_lucebox_techniques.md` — add Technique 4a: Metal-Accelerated Block-Sparse PFlash
 2. Update `.docs/01_overview.md` — module structure with new types and GPU kernels
-3. Update `speculative/mod.rs` — re-export `FlashPrefillConfig`, `PrefillMode`, `BlockScores`, `BlockAttentionScorer`, `block_select`, `block_select_grid`, `compress_prompt_blocks`, `speculative_prefill_block`, `speculative_prefill_adaptive`, `should_compress`
+3. Update `crates/katgpt-core/src/speculative/mod.rs` — re-export `FlashPrefillConfig`, `PrefillMode`, `BlockScores`, `BlockAttentionScorer`, `block_select`, `block_select_grid`, `compress_prompt_blocks`, `speculative_prefill_block`, `speculative_prefill_adaptive`, `should_compress`
 4. Update `riir-ai/crates/riir-gpu/src/kernels/mod.rs` — register 4 new WGSL kernels
 5. Update `riir-ai/crates/riir-gpu/src/lib.rs` — export `GpuFlashPrefillPass`, `GpuFlashPrefillBuffers`
 6. Run `cargo clippy --fix --allow-dirty` on both `katgpt-rs` and `riir-gpu`

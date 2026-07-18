@@ -27,7 +27,7 @@ Per `.contexts/optimization.md`:
 ## Phase 1: Budget Derivation Function
 
 ### Task 1 — Add `BudgetAdaptation` enum
-- [x] T1: Add `BudgetAdaptation` enum to `speculative/types.rs` — Off/Compression/Entropy with Default=Off
+- [x] T1: Add `BudgetAdaptation` enum to `crates/katgpt-core/src/speculative/types.rs` — Off/Compression/Entropy with Default=Off
 - [x] Add to `FlashPrefillConfig.budget_adaptation` field
 - [x] Default: `Off` (current behavior preserved)
 
@@ -39,7 +39,7 @@ Per `.contexts/optimization.md`:
 ### Task 3 — Extract compression ratio from existing scoring
 - [x] T3: `compression_ratio()` free function in `budget.rs` — zero-alloc division
 - [x] `block_compression_ratio()` in `prefill.rs` — computes ratio from block scores + alpha threshold
-- [x] Re-exported from `speculative/mod.rs` under `budget_adaptation` feature gate
+- [x] Re-exported from `crates/katgpt-core/src/speculative/mod.rs` under `budget_adaptation` feature gate
 
 ---
 

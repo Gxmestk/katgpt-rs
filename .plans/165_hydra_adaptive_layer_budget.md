@@ -72,7 +72,7 @@ pub struct HydraBudgetConfig {
 
 ### Phase 1: Infrastructure
 
-- [x] T1: Add `HydraLayerProfile` and `HydraBudgetConfig` to `katgpt-core/src/types.rs`
+- [x] T1: Add `HydraLayerProfile` and `HydraBudgetConfig` to `crates/katgpt-types/src/lib.rs`
 - [x] T2: Add `hydra_budget` feature gate to `Cargo.toml`
 - [x] T3: Add `HydraBudgetConfig` fields to `Config` and `InferenceOverrides`
 - [x] T4: Add `Vec<HydraLayerProfile>` to `Config` (populated from calibration data or defaults)

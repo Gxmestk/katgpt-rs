@@ -45,7 +45,7 @@ adaptive-CoT budget  ∝ d(root)   +   CPU/GPU route on (d, budget, bw-pressure)
 
 ### Phase 1 — Core (engine, MIT)
 - [x] T1. Add `lodestar` feature to `Cargo.toml` (off by default until full GOAT proof). ✅
-- [x] T2. `CompletionHorizon: ConstraintPruner` in `katgpt-core/src/traits.rs` —
+- [x] T2. `CompletionHorizon: ConstraintPruner` in `crates/katgpt-core/src/traits/mod.rs` —
   `min_completion_distance()`/`singular_span_len()`, both default-0; admissibility contract
   documented; `impl … for NoPruner`. Re-exported via `speculative::types`. Zero-overhead opt-in. ✅
 - [x] T3. `crates/katgpt-pruners/src/lodestar.rs`: `LodestarAutomaton` + builder; reverse-relaxation distance

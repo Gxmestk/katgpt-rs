@@ -87,7 +87,7 @@ pub struct CombatRhythmTracker {
 |-----------|------|--------|
 | `SpectralThreatFeatures` | `crates/katgpt-core/src/sense_threat.rs` | New file |
 | `CombatRhythmTracker` | `crates/katgpt-core/src/sense_threat.rs` | New file |
-| `SenseKind` | `katgpt-core/src/types.rs` | Add `SpectralThreat` variant (discriminant 6) |
+| `SenseKind` | `crates/katgpt-types/src/lib.rs` | Add `SpectralThreat` variant (discriminant 6) |
 | `NpcBrain` | `riir-ai/crates/riir-engine/src/sense/brain.rs` | No change — tracker is a sense module |
 | `ThreatHeuristic` | `src/benchmark/heuristic.rs` | Optional `spectral: Option<SpectralThreatFeatures>` field |
 | `FrameSnapshot` | `riir-ai/crates/riir-engine/src/frame/types.rs` | No change — spectral features are computed, not stored |

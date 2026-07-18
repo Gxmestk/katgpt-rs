@@ -401,7 +401,7 @@ EqR independently validates our existing design from the attractor dynamics pers
 
 | File | Role |
 |---|---|
-| `crates/katgpt-core/src/types.rs` | `LoopMode`, `ResidualGate`, `SdpaOutputGate`, `Config.width_rollouts`, `DomainLatent` |
+| `crates/katgpt-types/src/lib.rs` | `LoopMode`, `ResidualGate`, `SdpaOutputGate`, `Config.width_rollouts`, `DomainLatent` |
 | `src/speculative/dd_tree.rs` | `inject_sde_noise`, `best_of_k_rollouts` |
 | `src/speculative/types.rs` | `EarlyStopGate`, `SdeConfig`, `ScreeningPruner` |
 | `crates/katgpt-ruliology/src/bandit.rs` | `BanditPruner<P>` with UCB1 and selection strategies |

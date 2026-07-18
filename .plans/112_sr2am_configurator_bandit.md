@@ -10,7 +10,7 @@
 
 ### Phase 1: Configurator Types & Bandit Arm (Modelless)
 
-- [x] T1: Define `PlanningDecision` enum in `katgpt-core/src/types.rs`
+- [x] T1: Define `PlanningDecision` enum in `crates/katgpt-types/src/lib.rs`
   - `PlanNew` — reset tree, full budget allocation
   - `PlanExtend` — keep tree, add one depth level
   - `PlanSkip` — early exit, direct token sampling
@@ -244,12 +244,12 @@ Run GZeroLoop 100 rounds with/without reward shaping:
 
 | File | Change | Lines (est.) |
 |------|--------|-------------|
-| `crates/katgpt-core/src/types.rs` | `PlanningDecision`, `ConfiguratorContext` | +36 |
+| `crates/katgpt-types/src/lib.rs` | `PlanningDecision`, `ConfiguratorContext` | +36 |
 | `crates/katgpt-core/src/lib.rs` | Feature-gated re-exports | +3 |
 | `crates/katgpt-core/Cargo.toml` | Feature gate | +1 |
 | `src/pruners/mod.rs` | Add `configurator_bandit` module + re-exports | +6 |
 | `crates/katgpt-pruners/src/configurator_bandit.rs` | `ConfiguratorBandit` struct + impl + tests | +570 |
-| `crates/katgpt-core/src/types.rs` | `InferenceResult` addition | +3 |
+| `crates/katgpt-types/src/lib.rs` | `InferenceResult` addition | +3 |
 | `crates/katgpt-deprecated/src/feedback.rs` | `planning_decision: None` in test structs | +6 |
 | `src/speculative/dd_tree.rs` | `entropy_truncate_horizon` + `build_inference_result` update | +29 |
 | `src/speculative/mod.rs` | Re-export `entropy_truncate_horizon` | +2 |

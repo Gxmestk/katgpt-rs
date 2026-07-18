@@ -86,7 +86,7 @@ The key insight: **answer-level consensus across parallel branches is a uniquely
 - [x] Integration with `DDTreeBranchCache` — call `discard_branch()` on pruned branches
 - [x] Hook into `speculative_step` — periodic probe at probe_interval tokens
 - [x] Wire `ProbeDecision` responses: stop → return consensus answer, prune → discard branches
-- [x] Feature gate `parallel_probe` in `Cargo.toml` + `speculative/mod.rs`
+- [x] Feature gate `parallel_probe` in `Cargo.toml` + `crates/katgpt-core/src/speculative/mod.rs`
 
 ### T4: GOAT Proof + Benchmark
 - [x] Benchmark: SCOUT-style offline simulation (pre-sample N=64 trajectories, simulate probe control)

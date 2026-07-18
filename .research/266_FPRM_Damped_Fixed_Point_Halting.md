@@ -108,7 +108,7 @@ All of this is training-side and out of scope for the modelless workflow.
 
 | Paper mechanism | Shipped cousin | File / Plan |
 |---|---|---|
-| Weight-tied looped block (Eq. 1) | `LoopMode::WeightShared { loop_count }` — default-on, GOAT 8/8 | Plan 108, `crates/katgpt-core/src/types.rs:314`, `forward_looped` |
+| Weight-tied looped block (Eq. 1) | `LoopMode::WeightShared { loop_count }` — default-on, GOAT 8/8 | Plan 108, `crates/katgpt-types/src/lib.rs:314`, `forward_looped` |
 | ODE-motivated damped iterated block (more general than Eq. 1) | `LoopMode::TrainingFree` + `TrainingFreeLoopConfig` (K-stage RK β=0.5, window, cache strategy) — default-on, GOAT 4/4 | Plan 136, `tf_loop` |
 | Adaptive depth (halt when converged) | Hydra cumulative-DE convergence gate; runtime depth-tier cap | Plans 165, 284; `InferenceOverrides.depth_tier` |
 | Fixed-point residual scoring | `ManifoldResidual` trait + `L2ResidualScorer` / `KlResidualScorer` + `ResidualRelevanceScorer`, GOAT 6/6 | Plan 085, `crates/katgpt-pruners/src/manifold_residual.rs` |

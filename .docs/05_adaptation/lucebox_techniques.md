@@ -435,7 +435,7 @@ target model prefill on compressed tokens
 
 ### Config
 ```rust
-// speculative/types.rs
+// crates/katgpt-core/src/speculative/types.rs
 pub struct FlashPrefillConfig {
     pub block_size: usize,          // tokens per block (default: 32)
     pub attention_sink: usize,      // initial blocks to keep (default: 1)
@@ -493,7 +493,7 @@ Both reductions multiply: PFlash reduces tokens, TurboQuant reduces bits per tok
 
 ### DraftResult
 ```rust
-// speculative/types.rs
+// crates/katgpt-core/src/speculative/types.rs
 pub struct DraftResult {
     pub marginals: Vec<Vec<f32>>,
     pub sampled_tokens: Vec<usize>,

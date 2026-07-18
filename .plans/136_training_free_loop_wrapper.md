@@ -18,7 +18,7 @@ The key insight from the paper: each pre-norm transformer layer is a forward Eul
 ## Tasks
 
 ### Phase 0: Core Types (katgpt-core)
-- [x] T0: Add `SubStepStrategy` enum to `katgpt-core/src/types.rs`
+- [x] T0: Add `SubStepStrategy` enum to `crates/katgpt-types/src/lib.rs`
   ```rust
   /// Sub-stepping strategy for training-free loop refinement.
   #[derive(Clone, Copy, Debug, Default, PartialEq)]

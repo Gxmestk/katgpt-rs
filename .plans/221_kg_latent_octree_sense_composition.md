@@ -48,7 +48,7 @@ Compress game domain knowledge into fixed-type ternary bit-plane sense modules (
 
 ### Phase 1: Core Types
 
-- [x] **T1: SenseKind enum + SenseModule Pod** (`crates/katgpt-core/src/types.rs`)
+- [x] **T1: SenseKind enum + SenseModule Pod** (`crates/katgpt-types/src/lib.rs`)
   - `#[repr(u8)] pub enum SenseKind` — CommonSense(0), FighterSense(1), GameTheorySense(2), SpatialSense(3), SocialSense(4), SkillSense(5), Reserved(7)
   - `#[repr(C)] pub struct SenseModule` — kind, version, octree_depth, n_directions, octree_bits: [u64; 4], directions: [TernaryDir; 8], confidence: f32, commitment: [u8; 32]
   - `TernaryDir` — pos_bits: u64, neg_bits: u64, row_scale: f32 (20B each)

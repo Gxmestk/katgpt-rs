@@ -95,7 +95,7 @@ Root retains:
 | File | Plan 391 end | Plan 392 end | Delta |
 |---|---:|---:|---:|
 | `src/speculative/dd_tree.rs` | 5149 | 2556 | -2593 (-50%)
-| `crates/katgpt-speculative/src/dd_tree.rs` | 3254 | 4789 | +1535 (+47%)
+| `crates/katgpt-core/src/mux/dd_tree.rs` | 3254 | 4789 | +1535 (+47%)
 
 Root file is larger than the original ~1500 estimate because the test module
 (~2380 LOC) was untouched per plan rules — it remains root-bound due to
@@ -125,7 +125,7 @@ perf-flaky under parallel test execution load. Unrelated to Plan 392 changes
 | File | Before | After Phase 3 (actual) | Notes |
 |---|---:|---:|---|
 | `src/speculative/dd_tree.rs` | 5149 | 2556 | -2593 LOC (-50%). Root retains 2 root-bound wrappers + 2380-line test module (untouched per plan rules). Bonus: deleted dead-duplicate TreeBuilder struct+impl (~998 LOC) after verifying zero non-test `TreeBuilder::new` call sites. |
-| `crates/katgpt-speculative/src/dd_tree.rs` | 3254 | 4789 | +1535 LOC: 3 TreeBuilder methods (~980 LOC) + 13 wrapper functions (~555 LOC). |
+| `crates/katgpt-core/src/mux/dd_tree.rs` | 3254 | 4789 | +1535 LOC: 3 TreeBuilder methods (~980 LOC) + 13 wrapper functions (~555 LOC). |
 
 ## Import rewrite table (extends Plan 391)
 

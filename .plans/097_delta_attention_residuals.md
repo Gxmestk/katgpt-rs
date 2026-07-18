@@ -18,7 +18,7 @@ For our stack:
 ## Tasks
 
 - [x] T1: Add `delta_routing` feature flag to `Cargo.toml` (katgpt-rs) and `katgpt-core` types
-- [x] T2: Add `DeltaRoutingConfig` to `katgpt-core/src/types.rs` — block_size, mode enum (Off/DeltaBlock/DeltaAttnRes)
+- [x] T2: Add `DeltaRoutingConfig` to `crates/katgpt-types/src/lib.rs` — block_size, mode enum (Off/DeltaBlock/DeltaAttnRes)
 - [x] T3: Add delta routing buffers to `ForwardContext` in `transformer.rs` — block_deltas Vec, delta_query weights, delta_rmsnorm weights
 - [x] T4: Implement `depth_route()` function in `transformer.rs` — softmax over delta sources, additive to residual
 - [x] T5: Integrate `depth_route()` into `forward_base()` layer loop — compute per-sublayer deltas, store block deltas, call routing at block boundaries
@@ -58,7 +58,7 @@ In our forward_base():
 ### Files Modified
 
 1. `Cargo.toml` — added `delta_routing = []` feature, added to `full` feature list
-2. `crates/katgpt-core/src/types.rs` — added `DeltaRoutingMode` enum and `DeltaRoutingConfig` struct
+2. `crates/katgpt-types/src/lib.rs` — added `DeltaRoutingMode` enum and `DeltaRoutingConfig` struct
 4. `crates/katgpt-percepta/src/transformer.rs` — added:
    - `delta_routing_query` and `delta_routing_norm` fields to `TransformerWeights`
    - `block_deltas` and `delta_routing_logits` buffers to `ForwardContext`

@@ -243,7 +243,7 @@ Reasoning:
 
 > **Implementation Status (2026-07-11):** All tasks below implemented via [Plan 257](../.plans/257_gpart_adapter_inference.md) — ✅ Complete (14/14 tasks done). Feature gate: `gpart_adapter` (opt-in). The unchecked `- [ ]` markers below are stale; see Plan 257 for completion records.
 
-- [x] `GpartAdapter` struct in `katgpt-core/src/types.rs` (seed, theta, d)
+- [x] `GpartAdapter` struct in `crates/katgpt-types/src/lib.rs` (seed, theta, d)
 - [x] `GpartAdapter::generate_partition()` — seed-based pseudorandom group assignment
 - [x] `GpartAdapter::apply()` — single-pass O(N) weight delta application
 - [x] `GpartAdapter::commitment()` — BLAKE3(seed || theta)
@@ -279,7 +279,7 @@ Reasoning:
 ### Code References
 
 - `crates/katgpt-core/src/shard_embedding.rs` — `JlProjectionMatrix` (same math family)
-- `katgpt-core/src/types.rs` — `LoraAdapter`, `lora_apply()`, `LoraPair`
+- `crates/katgpt-types/src/lib.rs` — `LoraAdapter`, `lora_apply()`, `LoraPair`
 - `crates/katgpt-dec/src/simd.rs` — SIMD dispatch tiers (GPart apply uses `simd_dot_f32`)
 - `katgpt-core/tests/bench_230_shard_embedding_goat.rs` — GOAT benchmark template
 

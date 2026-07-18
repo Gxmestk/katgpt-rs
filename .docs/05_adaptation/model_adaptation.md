@@ -147,7 +147,7 @@ Different phases of a task need different behavior. During prefill, the model re
 Load two LoRA adapters per domain — `reader_lora` (active during prefill) and `writer_lora` (active during decode). The switch is a reference swap at the prefill→decode boundary.
 
 ```rust
-// crates/katgpt-core/src/types.rs — LoRA pair (Plan 025)
+// crates/katgpt-types/src/lib.rs — LoRA pair (Plan 025)
 pub struct LoraPair {
     /// Active during bidirectional prefill (e.g., Python Reader).
     pub reader: Option<LoraAdapter>,
@@ -159,7 +159,7 @@ pub struct LoraPair {
 ### LoRA Application — In-Place Delta
 
 ```rust
-// crates/katgpt-core/src/types.rs
+// crates/katgpt-types/src/lib.rs
 pub struct LoraAdapter {
     pub rank: usize,
     pub in_dim: usize,
@@ -216,7 +216,7 @@ ReLU zeros out ~50% of MLP neurons by definition. With L1 regularization during 
 CPU index-packing sparse matmul for the MLP's second weight matrix (`w2 @ hidden`). Skip dead neurons to reduce FLOPs.
 
 ```rust
-// crates/katgpt-core/src/types.rs — sparse_matmul (Plan 022)
+// crates/katgpt-types/src/lib.rs — sparse_matmul (Plan 022)
 /// Pack alive neurons (input[c] > 0.0) and multiply only those.
 /// Returns alive count for diagnostics.
 pub fn sparse_matmul(
@@ -257,7 +257,7 @@ Even with `sparse_mlp` feature enabled, the actual sparsity is checked at runtim
 ### Config
 
 ```rust
-// crates/katgpt-core/src/types.rs
+// crates/katgpt-types/src/lib.rs
 pub struct Config {
     pub sparse_threshold: f32,  // default: 0.8
     // ...
@@ -308,7 +308,7 @@ LoRA adapts weights per domain, but has no mechanism for injecting an explicit d
 Distill the Free Transformer's mid-layer latent injection into a LoRA-compatible mechanism. Inject a learned domain embedding at layer `L/2` via K/V modulation.
 
 ```rust
-// crates/katgpt-core/src/types.rs — DomainLatent (Plan 038)
+// crates/katgpt-types/src/lib.rs — DomainLatent (Plan 038)
 pub struct DomainLatent {
     pub embedding: Vec<f32>,  // [kv_dim]
 }
@@ -509,7 +509,7 @@ Each dimension gets bits proportional to its variance share. High-variance dimen
 ### Forward Integration
 
 ```rust
-// transformer.rs — quantized KV forward, generic over QuantizedKVCache trait (crates/katgpt-core/src/traits.rs)
+// transformer.rs — quantized KV forward, generic over QuantizedKVCache trait (crates/katgpt-core/src/traits/mod.rs)
 pub fn forward_quantized<C: types::QuantizedKVCache>(ctx, weights, cache: &mut C, ...)
 // AttentionMode::SpectralQuant dispatches to spectralquant::forward
 ```
@@ -534,7 +534,7 @@ DDTree builds homogeneous candidate trees — similar prefixes explored, wasting
 ELF SDE (Plan 079) injects logit-normal noise during tree expansion, biasing exploration toward t=0 (early tokens) where diversity matters most.
 
 ```rust
-// speculative/types.rs — SDE configuration (default-on)
+// crates/katgpt-core/src/speculative/types.rs — SDE configuration (default-on)
 pub struct SdeConfig {
     pub gamma: f32,           // noise re-injection scale
     pub confidence_floor: f32, // minimum logit magnitude for noise application
@@ -560,7 +560,7 @@ pub struct WidthScaleConfig {
 pub enum WidthSelectionMode { BestQ, MostFrequent, Top1Converged }
 pub fn best_of_k_rollouts(marginals, config, screener, sde_config, width_config, base_seed) -> Vec<usize>
 
-// crates/katgpt-core/src/types.rs — Config convenience fields
+// crates/katgpt-types/src/lib.rs — Config convenience fields
 pub struct Config {
     pub width_rollouts: usize,            // default: 1 (disabled)
     pub early_stop_threshold: f32,        // default: 0.0 (disabled)
@@ -690,7 +690,7 @@ pub struct SimpleTesLoop<E: BanditEnv> {
     best_idx: usize,
 }
 
-// speculative/types.rs — trajectory credit
+// crates/katgpt-core/src/speculative/types.rs — trajectory credit
 pub struct TrajectoryCredit {
     pub num_trajectories: usize,
     pub best_score: f32,

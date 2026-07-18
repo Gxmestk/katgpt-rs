@@ -76,7 +76,7 @@ Deterministic validation — a neuro-symbolic inference system where `rustc`/`sy
 ## Path Encoding
 
 ```rust
-// crates/katgpt-core/src/traits.rs (re-exported via speculative/types.rs)
+// crates/katgpt-core/src/traits/mod.rs (re-exported via crates/katgpt-core/src/speculative/types.rs)
 parent_path: u128  // 16 bits per depth → max token 65535, max depth 8
 ```
 - Extract: `(path >> (depth * 16)) & 0xFFFF`
@@ -126,7 +126,7 @@ pub struct MergeRule {
 
 ### Config
 ```rust
-// crates/katgpt-core/src/types.rs
+// crates/katgpt-types/src/lib.rs
 impl Config {
     pub fn bpe() -> Self {
         Self { vocab_size: 4096, block_size: 256, n_embd: 32, n_head: 4,
@@ -268,7 +268,7 @@ validator = ["syn", "proc-macro2"]
 
 ## ConstraintPruner Trait
 
-Defined in `crates/katgpt-core/src/traits.rs`, re-exported via `speculative/types.rs`:
+Defined in `crates/katgpt-core/src/traits/mod.rs`, re-exported via `crates/katgpt-core/src/speculative/types.rs`:
 
 ```rust
 pub trait ConstraintPruner: Send + Sync {

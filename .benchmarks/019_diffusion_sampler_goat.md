@@ -12,7 +12,7 @@ Implemented `DiffusionSampler` — a per-position correctness predictor that rep
 |--------|--------|
 | Feature gate | `tri_mode` (depends on `dllm`) |
 | New files | `src/speculative/diffusion_sampler.rs`, `tests/test_diffusion_sampler_goat.rs` |
-| Modified files | `src/speculative/d2f.rs`, `speculative/mod.rs`, `speculative/types.rs` |
+| Modified files | `src/speculative/d2f.rs`, `crates/katgpt-core/src/speculative/mod.rs`, `crates/katgpt-core/src/speculative/types.rs` |
 | Lines added | ~450 (sampler impl + D2F integration + GOAT tests) |
 | Unit tests | 22/22 pass |
 | GOAT tests | 5/5 pass |

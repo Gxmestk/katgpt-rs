@@ -59,7 +59,7 @@ Implement physics-inspired NMDA-gated adaptive tree expansion in DDTree. Uses en
   - Early exit when `nmda_gate < 0.1` (proximal dendrite sufficient)
   - Chain-seed support for greedy backbone
 
-- [x] Wire into `speculative/mod.rs` re-exports via feature gate
+- [x] Wire into `crates/katgpt-core/src/speculative/mod.rs` re-exports via feature gate
   - `#[cfg(feature = "dendritic_gate")]` conditional
   - `dendritic_gate` feature enables `katgpt-core/dendritic_gate`
 

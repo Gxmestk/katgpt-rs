@@ -119,8 +119,8 @@ Paper's Algorithm 1 + Theorem 1 give a *theory-backed* stopping criterion for ad
 ### Phase 6 — Documentation
 
 - [x] T6.1 Add module-level docs explaining the three theorems (Thm 1, Prop 2, Thm 2) with one-paragraph summaries. (Added to all 4 new `.rs` files.)
-- [-] T6.2 Add cross-references from `ConstraintPruner` trait doc to CCCP impl. **OUT OF SCOPE** — `katgpt-core/src/traits.rs` not in write scope.
-  *(Deferred: `katgpt-core/src/traits.rs` is owned by the substrate crate; cross-ref would be a separate small docs PR.)*
+- [-] T6.2 Add cross-references from `ConstraintPruner` trait doc to CCCP impl. **OUT OF SCOPE** — `crates/katgpt-core/src/traits/mod.rs` not in write scope.
+  *(Deferred: `crates/katgpt-core/src/traits/mod.rs` is owned by the substrate crate; cross-ref would be a separate small docs PR.)*
 - [-] T6.3 Add cross-references from `SparseTaskVector` (Plan 264) doc to SPLAT consumer. **OUT OF SCOPE** — `crates/katgpt-sparse/src/sparse_task_vector.rs` not in write scope (owned by Plan 264).
   *(Deferred: owned by Plan 264; cross-ref would be a separate small docs PR.)*
 - [-] T6.4 Note in README that this research rescues MSA (Plan 256 GOAT-FAILED). **OUT OF SCOPE** — README not in write scope.

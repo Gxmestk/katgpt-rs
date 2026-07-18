@@ -80,7 +80,7 @@ The novel training objective `L_TV = 1 − Σ_v min(p_v, q_v)` directly optimize
 
 | Paper claim | Our shipped equivalent | Status |
 |---|---|---|
-| RS acceptance = `1 − dTV(p,q)` | `LeviathanVerifier` (`crates/katgpt-speculative/src/spechop/verifier.rs:128`, "Real p/q rejection sampling (Algorithm 1)"); target probs cached in `p_distributions_flat` (`speculative/types.rs:225`) | ✅ shipped |
+| RS acceptance = `1 − dTV(p,q)` | `LeviathanVerifier` (`crates/katgpt-speculative/src/spechop/verifier.rs:128`, "Real p/q rejection sampling (Algorithm 1)"); target probs cached in `p_distributions_flat` (`crates/katgpt-core/src/speculative/types.rs:225`) | ✅ shipped |
 | RS preferred over target-only | `LeviathanVerifier` always uses RS; `step.rs:66`, `trust_region.rs:153`, `d2f_verifier.rs:151` all use p/q RS | ✅ shipped (correct default) |
 | Entropy → verification budget | `llmexec_guard` (`crates/katgpt-core/src/llmexec_guard.rs`): `sigmoid(-steepness·(entropy−0.5) + depth_bonus)` → `VerifyTier::{Skip, Screening, FullVerify}` | ⚠️ shipped but **ad-hoc sigmoid**, not the paper's **proven linear α forecast** |
 | Entropy-spike detection | `RejectionReason::EntropySpike` in `crates/katgpt-speculative/src/distill/trd.rs:56`, gated by `entropy_threshold` | ✅ shipped |

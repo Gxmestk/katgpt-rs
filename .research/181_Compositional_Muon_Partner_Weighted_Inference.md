@@ -44,9 +44,9 @@ Compositional Muon (CM) extends Muon's matrix-level steepest descent to **compos
 | River-valley diagnostics | ✅ Shipped | `crates/katgpt-spectral/src/river_valley.rs` (r_dom, r_bulk) | Spectral geometry already measured |
 | MuxDdTree (DD-tree) | ✅ Shipped | `crates/katgpt-core/src/mux/dd_tree.rs` | Compositional scoring target |
 | MuxBfs (dynamic-width expansion) | ✅ Shipped | `crates/katgpt-core/src/mux/bfs.rs` | Partner-weighted expansion budget |
-| ConstraintPruner trait | ✅ Shipped | `crates/katgpt-core/src/traits.rs` | Hard bounds = one "partner" |
-| ScreeningPruner trait | ✅ Shipped | `crates/katgpt-core/src/traits.rs` | Soft scoring = other "partner" |
-| SpeculativeGenerator trait | ✅ Shipped | `crates/katgpt-core/src/traits.rs` | Draft/verify composition |
+| ConstraintPruner trait | ✅ Shipped | `crates/katgpt-core/src/traits/mod.rs` | Hard bounds = one "partner" |
+| ScreeningPruner trait | ✅ Shipped | `crates/katgpt-core/src/traits/mod.rs` | Soft scoring = other "partner" |
+| SpeculativeGenerator trait | ✅ Shipped | `crates/katgpt-core/src/traits/mod.rs` | Draft/verify composition |
 | EGA spectral salience | ✅ Shipped | `crates/katgpt-attn/src/ega_attn.rs` | z-normalized sigmoid gate |
 | Parallax local linear attention | ✅ Shipped | `crates/katgpt-core/src/parallax_attn/mod.rs` | Kernel-agnostic covariance correction |
 | Trust-Region Adaptive Speculation | 📋 Research 162 | P_accept = min(πT/πS, 1) | Trust region = compositional budget |

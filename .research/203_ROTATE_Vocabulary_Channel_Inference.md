@@ -35,8 +35,8 @@ ROTATE (Rotation-Optimized Token Alignment in weighT spacE) is a data-free metho
 | `excess_kurtosis()` | ✅ Shipped | `crates/katgpt-speculative/src/kurtosis_gate.rs` |
 | `KurtosisGate` | ✅ Shipped | `crates/katgpt-speculative/src/kurtosis_gate.rs` |
 | `SelectivityRouter` | ✅ Shipped | `crates/katgpt-speculative/src/selectivity_router.rs` |
-| `ConstraintPruner` trait | ✅ Shipped | `crates/katgpt-core/src/traits.rs` |
-| `ScreeningPruner` trait | ✅ Shipped | `crates/katgpt-core/src/traits.rs` |
+| `ConstraintPruner` trait | ✅ Shipped | `crates/katgpt-core/src/traits/mod.rs` |
+| `ScreeningPruner` trait | ✅ Shipped | `crates/katgpt-core/src/traits/mod.rs` |
 | DDTree + kurtosis integration | ✅ Shipped | `src/speculative/dd_tree.rs` |
 | Givens rotations | ✅ Shipped | `crates/katgpt-quant/src/planar_quant/rotation.rs` |
 | `sparse_matmul` | ✅ Shipped | MLP forward with dead ReLU skip |

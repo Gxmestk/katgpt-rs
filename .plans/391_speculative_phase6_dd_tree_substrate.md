@@ -98,21 +98,21 @@ lines 3607-4027). The root is now a 23--LOC re-export shim.
 The tasks below are marked complete to reflect the supersession; no new
 work was done under Plan 391 for these items.
 
-- [x] T3.1 Move `build_dd_tree_domino` — DONE (in `katgpt-speculative/src/dd_tree.rs:3607`)
-- [x] T3.2 Move `build_dd_tree_speculative` — DONE (`katgpt-speculative/src/dd_tree.rs:3645`)
-- [x] T3.3 Move `build_dd_tree_speculative_kurtosis` — DONE (`katgpt-speculative/src/dd_tree.rs:3798`)
-- [x] T3.4 Move `build_dd_tree_speculative_best_buddies` — DONE (`katgpt-speculative/src/dd_tree.rs:3876`)
-- [x] T3.5 Move `build_dd_tree_belief`, `_belief_collapse_aware` — DONE (`katgpt-speculative/src/dd_tree.rs:3720`, `:3762`)
-- [x] T3.6 Move `build_dd_tree_screened_progressive` — DONE (`katgpt-speculative/src/dd_tree.rs:3903`)
-- [x] T3.7 Move `build_dd_tree_screened_corr` — DONE (`katgpt-speculative/src/dd_tree.rs:3920`)
-- [x] T3.8 Move `build_dd_tree_screened_flow_budget` — DONE (`katgpt-speculative/src/dd_tree.rs:3945`)
-- [x] T3.9 Move `build_dd_tree_screened_recfm` — DONE (`katgpt-speculative/src/dd_tree.rs:3989`)
-- [x] T3.10 Move `build_dd_tree_and_or` + helpers — DONE (`katgpt-speculative/src/dd_tree.rs:4017`)
+- [x] T3.1 Move `build_dd_tree_domino` — DONE (in `crates/katgpt-core/src/mux/dd_tree.rs:3607`)
+- [x] T3.2 Move `build_dd_tree_speculative` — DONE (`crates/katgpt-core/src/mux/dd_tree.rs:3645`)
+- [x] T3.3 Move `build_dd_tree_speculative_kurtosis` — DONE (`crates/katgpt-core/src/mux/dd_tree.rs:3798`)
+- [x] T3.4 Move `build_dd_tree_speculative_best_buddies` — DONE (`crates/katgpt-core/src/mux/dd_tree.rs:3876`)
+- [x] T3.5 Move `build_dd_tree_belief`, `_belief_collapse_aware` — DONE (`crates/katgpt-core/src/mux/dd_tree.rs:3720`, `:3762`)
+- [x] T3.6 Move `build_dd_tree_screened_progressive` — DONE (`crates/katgpt-core/src/mux/dd_tree.rs:3903`)
+- [x] T3.7 Move `build_dd_tree_screened_corr` — DONE (`crates/katgpt-core/src/mux/dd_tree.rs:3920`)
+- [x] T3.8 Move `build_dd_tree_screened_flow_budget` — DONE (`crates/katgpt-core/src/mux/dd_tree.rs:3945`)
+- [x] T3.9 Move `build_dd_tree_screened_recfm` — DONE (`crates/katgpt-core/src/mux/dd_tree.rs:3989`)
+- [x] T3.10 Move `build_dd_tree_and_or` + helpers — DONE (`crates/katgpt-core/src/mux/dd_tree.rs:4017`)
 - [x] T3.11 Move `TreeBuilder::build_screened_progressive/_with_depth_budgets/_recfm`
-      — DONE (`katgpt-speculative/src/dd_tree.rs:1970`, `:2311`, `:2584`)
+      — DONE (`crates/katgpt-core/src/mux/dd_tree.rs:1970`, `:2311`, `:2584`)
 - [x] T3.12 Root keeps `build_dd_tree_screened_with_schedule`, `build_dd_tree_gdsd`,
       and the test module — **OVERTAKEN by Plan 396**: all three moved to
-      `katgpt-forward/src/dd_tree.rs`. Root is now a 23-LOC re-export shim
+      `crates/katgpt-core/src/mux/dd_tree.rs`. Root is now a 23-LOC re-export shim
       (`pub use katgpt_forward::dd_tree::*` + feature-gated re-exports).
       This is *more* than Phase 3 planned — Plan 396's strategy was cleaner
       because katgpt-forward already depends on every sibling leaf the
@@ -129,9 +129,9 @@ work was done under Plan 391 for these items.
 residue; Plan 396 moved every one of them to `katgpt-forward`, leaving the
 root file as a 23-LOC pure re-export shim.
 
-- ~~`build_dd_tree_screened_with_schedule`~~ — moved to `katgpt-forward/src/dd_tree.rs` (Plan 396)
-- ~~`build_dd_tree_gdsd`~~ — moved to `katgpt-forward/src/dd_tree.rs` (Plan 396)
-- ~~`mod tests`~~ — moved to `katgpt-forward/src/dd_tree.rs` (Plan 396)
+- ~~`build_dd_tree_screened_with_schedule`~~ — moved to `crates/katgpt-core/src/mux/dd_tree.rs` (Plan 396)
+- ~~`build_dd_tree_gdsd`~~ — moved to `crates/katgpt-core/src/mux/dd_tree.rs` (Plan 396)
+- ~~`mod tests`~~ — moved to `crates/katgpt-core/src/mux/dd_tree.rs` (Plan 396)
 - Module shim + re-export — root is now `pub use katgpt_forward::dd_tree::*`
   (changed from `katgpt_speculative` because Plan 396 hosts the test module
   + root-only production fns in katgpt-forward, which already depends on

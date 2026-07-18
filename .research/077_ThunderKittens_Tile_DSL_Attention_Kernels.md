@@ -16,7 +16,7 @@ ThunderKittens (TK) is a CUDA-embedded DSL from Stanford's Hazy Research that ab
 
 **The punchline for our stack:** We do NOT have NVIDIA Tensor Cores, TMA, or TMEM. Our GPU path is wgpu → Metal/Vulkan via CubeCL. Our CPU path is NEON/AVX2 SIMD. But TK's *architectural patterns* — not its hardware-specific instructions — are what we should distill:
 
-1. **CPU (katgpt-core):** TK's online-softmax flash attention algorithm maps directly to our SIMD matmul pipeline. We already have `softmax_scaled()` and `matmul()` in `katgpt-core/src/types.rs`. What we lack is the *tiled iteration* pattern that avoids materializing the full `N×N` attention score matrix. This is a pure algorithmic improvement, independent of GPU hardware.
+1. **CPU (katgpt-core):** TK's online-softmax flash attention algorithm maps directly to our SIMD matmul pipeline. We already have `softmax_scaled()` and `matmul()` in `crates/katgpt-types/src/lib.rs`. What we lack is the *tiled iteration* pattern that avoids materializing the full `N×N` attention score matrix. This is a pure algorithmic improvement, independent of GPU hardware.
 
 2. **GPU (riir-ai):** CubeCL already provides a tiled matmul pipeline (Plan 106 T2.4 complete). TK's LCF (load-compute-finish) template shows how to structure a *kernel template* with producer/consumer roles, pipelined SMEM staging, and persistent task scheduling. This guides our CubeCL kernel architecture.
 

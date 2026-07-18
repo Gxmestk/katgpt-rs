@@ -15,7 +15,7 @@
 - [x] **T2**: Implement `entmax_1p5()` in `crates/katgpt-attn/src/dash_attn/entmax.rs` — α=1.5 special case: `p_i = max(0, 0.5*s_i - τ)²`. Two-pass threshold finding (sort + cumulative sum). Returns sparse weights and threshold τ. Unit tests: known inputs → exact zeros, sum=1.0, non-negative
 - [x] **T3**: Implement `entmax_support()` — extract active indices from entmax weights. Returns `Vec<usize>` of positions where weight > 0
 - [x] **T4**: Implement `entmax_gqa_aggregate()` — average entmax probabilities across query heads in same GQA group. Input: `[n_query_heads][n_chunks]`, output: `[n_kv_heads][n_chunks]`. Zeros propagate (non-dispersive)
-- [x] **T5**: Add `DashAttnConfig` to `katgpt-core/src/types.rs` — `chunk_size: usize` (64), `alpha: f32` (1.5), `scaling_factor: f32` (1.0), `sigma: f32` (1e6), `estimate_diagonal: bool` (true)
+- [x] **T5**: Add `DashAttnConfig` to `crates/katgpt-types/src/lib.rs` — `chunk_size: usize` (64), `alpha: f32` (1.5), `scaling_factor: f32` (1.0), `sigma: f32` (1e6), `estimate_diagonal: bool` (true)
 - [x] **T6**: Register `#[cfg(feature = "dash_attn")]` gate in `Cargo.toml` features + `pub mod dash_attn` in `lib.rs`
 
 ### Phase 2: Learned Chunk Summaries
@@ -34,7 +34,7 @@
 - [x] **T15**: Create `crates/katgpt-attn/src/dash_attn/forward.rs` — `forward_dash_attn_prefill()` for prefill mode
 - [x] **T16**: Implement prefill flow: (1) chunk summarization over K, (2) entmax routing, (3) sparse attention on active chunks with routing bias, (4) store chunk summaries to cache
 - [x] **T17**: Implement `forward_dash_attn_decode()` — reuse cached chunk summaries, only score against cached summaries + current diagonal chunk
-- [x] **T18**: Add `AttentionMode::DashAttn` variant to `katgpt-core/src/types.rs` — dispatches to `forward_dash_attn_prefill` / `forward_dash_attn_decode`
+- [x] **T18**: Add `AttentionMode::DashAttn` variant to `crates/katgpt-types/src/lib.rs` — dispatches to `forward_dash_attn_prefill` / `forward_dash_attn_decode`
 - [x] **T19**: Wire into `transformer.rs` forward dispatch — `match config.attention_mode { DashAttn => ... }`
 
 ### Phase 5: PFlash Integration (Drop-in Replacement)
@@ -69,7 +69,7 @@ src/dash_attn/                    — Feature-gated module: #[cfg(feature = "das
 src/speculative/
 └── prefill.rs                    — block_select_entmax() alternative (T20)
 
-katgpt-core/src/types.rs
+crates/katgpt-types/src/lib.rs
 ├── DashAttnConfig struct         — chunk_size, alpha, scaling_factor, sigma, estimate_diagonal
 └── AttentionMode::DashAttn       — new variant
 

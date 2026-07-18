@@ -60,7 +60,7 @@ All gates validated via `core_06_peira` example.
   - Wraps PeiraCovariance + PeiraConfig
   - Implements the SC-PEIRA Algorithm 1 training loop
   - Returns loss + gradient signal for integration with BanditPruner
-  - Location: `src/distill/peira.rs` (new file)
+  - Location: `crates/katgpt-spectral/src/peira.rs` (new file)
 
 ### Phase 2: Integration
 
@@ -72,7 +72,7 @@ All gates validated via `core_06_peira` example.
   - Computes alignment α = (eᵀN e) / (||e|| ||Ne||) between signal and noise eigenvectors
   - Returns f64 in [0, 1], where 1.0 = perfect alignment = canonical structure found
   - Useful as GOAT proof criterion
-  - Location: `src/distill/peira.rs`
+  - Location: `crates/katgpt-spectral/src/peira.rs`
 
 - [x] **T7: Integration example — `core_06_peira` example binary**
   - Demonstrates: init PeiraDistiller → feed student/teacher pairs → compute loss → check alignment score
@@ -146,7 +146,7 @@ If PEIRA's auxiliary loss shows no improvement over existing distillation losses
 | `crates/katgpt-core/src/peira.rs` | New: `PeiraConfig`, `PeiraCovariance`, `peira_aux_loss` |
 | `crates/katgpt-core/src/lib.rs` | `#[cfg(feature = "peira_distill")] pub mod peira;` |
 | `crates/katgpt-core/Cargo.toml` | `peira_distill` feature gate |
-| `src/distill/peira.rs` | New: `PeiraDistiller`, `peira_alignment_score` |
+| `crates/katgpt-spectral/src/peira.rs` | New: `PeiraDistiller`, `peira_alignment_score` |
 | `crates/katgpt-speculative/src/peira_pruner.rs` | New: `PeiraPruner<P>` — PEIRA alignment-modulated ScreeningPruner |
 | `src/speculative/mod.rs` | `#[cfg(feature = "peira_distill")] pub mod peira_pruner;` |
 | `examples/core_06_peira.rs` | Demo: init → train → alignment → GOAT gates |

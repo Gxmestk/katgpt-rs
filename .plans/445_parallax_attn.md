@@ -27,7 +27,7 @@
 
 ### T2: Config Types
 
-**Files:** `crates/katgpt-core/src/types.rs`
+**Files:** `crates/katgpt-types/src/lib.rs`
 
 - Added `parallax_gate_scale: f32` (default 0.0 = disabled) and `parallax_zero_init: bool` (default true) to `Config`
 - All 9 Config constructors updated with default values

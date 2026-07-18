@@ -3,7 +3,7 @@
 ## Overview
 The transformer is a from-scratch GPT-2 style implementation. No frameworks — weights are `Vec<f32>`, ops are hand-written matmul/softmax/rmsnorm. Supports multi-layer, grouped-query attention (GQA), and zero-allocation inference.
 
-## Config (`crates/katgpt-core/src/types.rs`, re-exported via `src/types.rs`)
+## Config (`crates/katgpt-types/src/lib.rs`, re-exported via `src/types.rs`)
 ```rust
 pub struct Config {
     pub vocab_size: usize,
@@ -109,7 +109,7 @@ pub struct Config {
 - Validation: `n_head % n_kv_head == 0`, `n_embd == n_head * head_dim`
 - `kv_dim()` helper returns `n_kv_head * head_dim`
 
-### Key Enums (`crates/katgpt-core/src/types.rs`)
+### Key Enums (`crates/katgpt-types/src/lib.rs`)
 
 ```rust
 #[repr(u8)]
@@ -271,7 +271,7 @@ pub enum GateDecision {
 }
 ```
 
-### Wall Attention (`crates/katgpt-core/src/types.rs`, Plan 173)
+### Wall Attention (`crates/katgpt-types/src/lib.rs`, Plan 173)
 
 Feature-gated behind `wall_attention`.
 
@@ -283,14 +283,14 @@ pub struct WallConfig {
 }
 ```
 
-### RiM Reasoning Buffer Slots (`crates/katgpt-core/src/types.rs`, Plan 172, Research 192)
+### RiM Reasoning Buffer Slots (`crates/katgpt-types/src/lib.rs`, Plan 172, Research 192)
 
 Feature-gated behind `rim_slots`. Fields on `Config`:
 - `rim_block_count: usize` — number of reasoning buffer blocks (K in RiM paper), 0 = disabled
 - `rim_tokens_per_block: usize` — tokens per buffer block (M), default 2
 - `rim_buffer_token: usize` — token ID used for buffer positions (default: bos_token)
 
-### Hydra Types (`crates/katgpt-core/src/types.rs`, Research 148, Plan 165)
+### Hydra Types (`crates/katgpt-types/src/lib.rs`, Research 148, Plan 165)
 
 Feature-gated behind `hydra_budget`.
 
@@ -311,7 +311,7 @@ pub struct HydraBudgetConfig {
 }
 ```
 
-### Training-Free Loop (`crates/katgpt-core/src/types.rs`, Plan 136)
+### Training-Free Loop (`crates/katgpt-types/src/lib.rs`, Plan 136)
 
 Used when `Config.loop_mode = TrainingFree`.
 
@@ -326,7 +326,7 @@ pub struct TrainingFreeLoopConfig {
 }
 ```
 
-### Problem Mutator (`crates/katgpt-core/src/traits.rs`, feature `problem_mutator`)
+### Problem Mutator (`crates/katgpt-core/src/traits/mod.rs`, feature `problem_mutator`)
 
 FrontierSmith closed→open problem synthesis: mutate game configs into harder variants.
 
@@ -352,7 +352,7 @@ pub struct MutantConfig {
 }
 ```
 
-### Data Gate (`crates/katgpt-core/src/types.rs`, feature `data_gate`)
+### Data Gate (`crates/katgpt-types/src/lib.rs`, feature `data_gate`)
 
 Task-level admission gate for self-play training pool.
 
@@ -366,7 +366,7 @@ pub struct ProposerTask {
 }
 ```
 
-### InferenceOverrides (`crates/katgpt-core/src/types.rs`)
+### InferenceOverrides (`crates/katgpt-types/src/lib.rs`)
 
 Runtime override fields that can be applied per-inference call without modifying the base `Config`:
 
@@ -410,7 +410,7 @@ pub struct InferenceOverrides {
 
 Overrides are merged onto a base `Config` at inference time, allowing per-request parameter tuning without cloning or mutating the shared config.
 
-### InferenceResult (`crates/katgpt-core/src/types.rs`)
+### InferenceResult (`crates/katgpt-types/src/lib.rs`)
 
 Output of a single inference pass with reward signal for feedback loop:
 
@@ -583,7 +583,7 @@ When `n_kv_head < n_head`, K/V heads are shared:
 - K/V projection outputs `kv_dim` instead of `n_embd`
 - 4× KV cache reduction for `n_head=8, n_kv_head=2`
 
-## Math Kernels (`crates/katgpt-core/src/types.rs`)
+## Math Kernels (`crates/katgpt-types/src/lib.rs`)
 All hot-path kernels are `#[inline(always)]` with `unsafe get_unchecked`:
 - `matmul(out, w, x, rows, cols)` — out = W @ x — SIMD-accelerated via `simd_dot_f32` (Plan 060)
 - `matmul_relu(out, w, x, rows, cols)` — fused matmul + ReLU — SIMD-accelerated with fused ReLU zero-clamp (Plan 060)
@@ -656,7 +656,7 @@ For τ = 1..T:
 Output: lm_head(h)
 ```
 
-**Key types** (`crates/katgpt-core/src/types.rs`):
+**Key types** (`crates/katgpt-types/src/lib.rs`):
 
 | Type | Description |
 |------|-------------|
@@ -1309,7 +1309,7 @@ Reference: FlashLib `primitives/pca/triton/pca.py` L73–116 (Research R130).
 
 **Feature gate:** `dual_gram_pca` (default-on)
 
-## Consolidated Traits (`crates/katgpt-core/src/traits.rs`, Plan 107 Phase 0)
+## Consolidated Traits (`crates/katgpt-core/src/traits/mod.rs`, Plan 107 Phase 0)
 
 Shared traits for game AI and speculative decoding, consolidated from katgpt-rs and riir-engine to eliminate duplication. Both crates depend on `katgpt-core`, so moving traits here requires zero new dependency edges.
 

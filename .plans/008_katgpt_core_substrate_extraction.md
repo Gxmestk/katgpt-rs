@@ -159,7 +159,7 @@ refined strategy doc, stranded in a private fork.
   ⚠️ **AUDIT FINDING (2026-06-28, before execution): the original premise needed the same scope correction as Steps 2 and 4.**
   - There is NO `spec_types.rs` in katgpt-rs root. The substrate types live in `src/speculative/types.rs`. (`spec_types.rs` exists only in `riir-engine`, where it's a duplicate copy — Phase 2.5 dedup target.)
   - `src/speculative/dd_tree.rs` (6575 lines) is the BUILDER file (composition: `build_dd_tree_*`, `TreeBuilder` impl, tests). It stays in root exactly like `riir-ai/crates/riir-engine/src/hla/forward.rs` stayed in root in Step 4.
-  - Some types in `speculative/types.rs` are PURE substrate (depend only on `Config` + core traits + std) — these move.
+  - Some types in `crates/katgpt-core/src/speculative/types.rs` are PURE substrate (depend only on `Config` + core traits + std) — these move.
   - Some types are COMPOSITION (need `katgpt-transformer` or root-only types) — these stay.
 
   **Corrected scope:** move the pure-substrate types to `crates/katgpt-core/src/speculative/types.rs`; keep the composition types in root as a re-export shim.
@@ -169,7 +169,7 @@ refined strategy doc, stranded in a private fork.
   - [x] 5b. Forwarded those 12 features from root `Cargo.toml` (e.g. `elf_sde = ["katgpt-core/elf_sde"]`). Root's feature still owns the root-specific modules (e.g. root's `elf_sde` still gates Plan 079 ELF SDE noise injection); the forward just enables the substrate gate in core.
   - [x] 5c. Created `katgpt-core/src/speculative/` (new module, always-on like `simd`/`types`/`traits`/`hla`) with:
     - `mod.rs` (42 LoC) — module doc + `pub mod types;` + `pub use types::*;`
-    - `types.rs` (1394 LoC) — pure substrate types moved verbatim from root `speculative/types.rs`. Imports: `use crate::traits::ScreeningPruner; use crate::types::Config; use std::cmp::Ordering;` (all already in core). Includes all substrate tests (32 tests, all green).
+    - `types.rs` (1394 LoC) — pure substrate types moved verbatim from root `crates/katgpt-core/src/speculative/types.rs`. Imports: `use crate::traits::ScreeningPruner; use crate::types::Config; use std::cmp::Ordering;` (all already in core). Includes all substrate tests (32 tests, all green).
   - [x] 5d. Updated `crates/katgpt-core/src/lib.rs` — added `pub mod speculative;` (always-on) + updated crate doc to list the new module.
   - [x] 5e. Rewrote root `src/speculative/types.rs` as a thin re-export shim (was 2190 LoC, now 596 LoC):
     - Re-exports the substrate API from `katgpt_core::speculative::types::{...}` (always-on types) + feature-gated re-exports for `MarginalFusionConfig` / `KvRoutingConfig` / `PositionWeightedBudget` / `LdtPruneConfig` / `ConflictDetector` / `EntropyConflictDetector` / `LDT_THETA_ELIM` / `TesNode` / `TrajectoryCredit`.
@@ -212,7 +212,7 @@ refined strategy doc, stranded in a private fork.
     - `crates/katgpt-pruners/src/game_state/mcts.rs` (1044 LoC) — MCTS algorithm (substrate) + `BanditRolloutPolicy` (composition, gated by `bandit`).
     - `crates/katgpt-core/src/speculative/sampling.rs` (131 LoC) — CDF + residual samplers (substrate).
     - `src/pruners/delta_mem/{state,hash,multi,pruner,multi_pruner}.rs` (1992 LoC) — split: 3 substrate files + 2 composition files.
-  - The `GameState` / `StateHeuristic` / `RolloutPolicy` / `RandomRolloutPolicy` / `ActionSpaceLog` **traits already live in `katgpt-core/src/traits.rs`** (Plan 107 Phase 0). `crates/katgpt-pruners/src/game_state/mod.rs` is already a re-export shim. So Step 6 is really about extracting the **algorithms + types that sit on top of those traits**, not the traits themselves.
+  - The `GameState` / `StateHeuristic` / `RolloutPolicy` / `RandomRolloutPolicy` / `ActionSpaceLog` **traits already live in `crates/katgpt-core/src/traits/mod.rs`** (Plan 107 Phase 0). `crates/katgpt-pruners/src/game_state/mod.rs` is already a re-export shim. So Step 6 is really about extracting the **algorithms + types that sit on top of those traits**, not the traits themselves.
   - `BanditRolloutPolicy` CANNOT move cleanly: it depends on `BanditStats` from `crate::pruners::bandit` (root-only). Same split pattern as Step 4's `forward.rs` and Step 5's `SpeculativeContext`.
   - `MemorySteeredPruner<P>` / `MultiDomainMemoryPruner<P>` CANNOT move cleanly: they wrap `ScreeningPruner` (now in `katgpt_core::traits`) with root-side composition — they're consumers of the substrate trait, not substrate themselves.
 
@@ -376,7 +376,7 @@ After each Phase 1 step lands, riir-engine deletes its copy and imports from
 
   **Scope:** riir-engine's `types.rs` already does `pub use katgpt_core::types::*;` at line 10. Only local addition is `NoiseSchedule` (feature-gated `dllm`, engine-specific D2F noise schedule). No further dedup possible — the substrate (Config, Rng, math utils, LoRA, DomainLatent, AttentionMode) is fully re-exported.
 - [~] 2.4 riir-engine `crates/katgpt-core/src/engram/tokenizer.rs` → consume `katgpt-tokenizer` (or `katgpt_core`). UNBLOCKED as of Step 3 re-audit (2026-07-01): the `katgpt-tokenizer` crate now exists and is publishable. The riir-engine `crates/katgpt-core/src/engram/tokenizer.rs` dedup pass itself was NOT separately re-run in this re-audit — it's a non-blocking follow-up (riir-engine's local tokenizer.rs continues to work; the substrate is now available for it to consume whenever a refactor pass is scheduled).
-- [x] **2.5 riir-engine `src/dd_tree.rs` + `spec_types.rs` → consume core** (2026-06-28)
+- [x] **2.5 riir-engine `crates/katgpt-core/src/mux/dd_tree.rs` + `spec_types.rs` → consume core** (2026-06-28)
 
   **Scope:** riir-engine's `spec_types.rs` local definitions of `TreeNode`, `DraftResult`, `RejectionReason`, `DraftEvent`, `PrefillMode`, `FlashPrefillConfig`, `BlockScores` replaced with `pub use katgpt_core::speculative::types::{...}` re-export. katgpt-core's versions are supersets (additive feature-gated fields/variants like `RejectionReason::KurtosisRejection`, `DraftResult.cost_snapshot`/`stability`/`routing_overlap`, `FlashPrefillConfig.score_reduction`/`budget_adaptation`).
 

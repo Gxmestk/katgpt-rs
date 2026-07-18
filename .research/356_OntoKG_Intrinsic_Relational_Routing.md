@@ -62,7 +62,7 @@ Research 141 (`riir-ai/.research/141_KG_Triple_Typology_Reference_and_Structural
 
 | OntoKG concept | Our shipped equivalent | Status |
 |---|---|---|
-| **Category** `C_i` (people/places/orgs) | **`SenseKind`** (`katgpt-core/src/types.rs`) — 6 always-on semantic domains (Common/Fighter/GameTheory/Spatial/Social/Skill) + feature-gated SpectralThreat | ✅ shipped — but oriented to NPC cognitive domains, not encyclopedic entity types |
+| **Category** `C_i` (people/places/orgs) | **`SenseKind`** (`crates/katgpt-types/src/lib.rs`) — 6 always-on semantic domains (Common/Fighter/GameTheory/Spatial/Social/Skill) + feature-gated SpectralThreat | ✅ shipped — but oriented to NPC cognitive domains, not encyclopedic entity types |
 | **Module** `m` (grouping of related properties) | **`ACTION_*` namespace** (`kg.rs`) — 1000s=physical, 2000s=combat, 3000s=economic, 4000s=spatial, 5000s=social, 6000s=skill, 7000s=reputation | ✅ shipped — but confined to ONE SenseKind each (no cross-cutting) |
 | **Gate matching** (type-assertion → category) | **`classify_sense(transition) → SenseKind`** (`kg.rs`) — `match` on `transition.action` | ✅ shipped |
 | **Module indicators** `I(m)` | The `match` arms in `classify_sense` (value-based routing by action ID) | ✅ shipped |

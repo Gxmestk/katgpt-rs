@@ -17,7 +17,7 @@
 - [x] **T2**: Implement `calibrate_heads()` — takes model weights + calibration sequence (needle at beginning and end), computes per-head retrieval score `R_h = mean(attn from post-needle to pre-needle)`, partitions into H_ret (top 15%) and H_loc
 - [x] **T3**: Implement `HeadCalibration::save()` / `HeadCalibration::load()` — serialize to JSON/TOML for offline reuse
 - [x] **T4**: Unit tests: synthetic attention patterns → correct head classification, single-head edge case, all-retrieval / all-local edge cases
-- [x] **T5**: Add `RtTurboConfig` to `katgpt-core/src/types.rs` — `retrieval_head_ratio: f32` (0.15), `low_dim: usize` (16), `top_p: f32` (0.9), `sliding_window: usize` (8192), `sink_tokens: usize` (4), `block_size: usize` (64)
+- [x] **T5**: Add `RtTurboConfig` to `crates/katgpt-types/src/lib.rs` — `retrieval_head_ratio: f32` (0.15), `low_dim: usize` (16), `top_p: f32` (0.9), `sliding_window: usize` (8192), `sink_tokens: usize` (4), `block_size: usize` (64)
 - [x] **T6**: Register `#[cfg(feature = "rt_turbo")]` gate in `Cargo.toml` features, add `pub mod rt_turbo` in `lib.rs`, require `dash_attn` feature
 
 ### Phase 2: Low-Dimensional Pre-RoPE Projection

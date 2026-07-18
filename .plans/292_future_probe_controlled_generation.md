@@ -63,7 +63,7 @@ The smallest, highest-value output of this plan. The detection-vs-prediction dis
 
 - [x] **T1.2** Add `fn feature_class(&self) -> FeatureClass` to `ScreeningPruner` trait with default `FeatureClass::Detection` (non-breaking). All existing pruners inherit Detection by default — no migration.
 - [x] **T1.3** Add `FeatureClass::Detection` annotation to `EmotionDirections`, CNA's pruner, `FaithfulnessProbe`, `RegimeTransition`. (Document-only — they already default to Detection; this makes it explicit.)
-- [x] **T1.4** Add a doc cross-reference in `crates/katgpt-core/src/traits.rs` pointing to Research 267 for the rationale.
+- [x] **T1.4** Add a doc cross-reference in `crates/katgpt-core/src/traits/mod.rs` pointing to Research 267 for the rationale.
 - [x] **T1.5** Unit test: assert `EmotionDirections::feature_class() == Detection`. Assert that a new `FutureBehaviorProbe` (Phase 2) returns `Prediction`. Assert the default impl returns `Detection`.
 - [x] **T1.6** Add `feature_class` field to `ReviewMetrics` for telemetry (count of detection-side vs prediction-side reads per session).
 

@@ -156,7 +156,7 @@ All three are independent but composable. `idea_divergence` works best with `par
 
 | File | Role |
 |------|------|
-| `katgpt-core/src/traits.rs` | `PartialScorer` trait, `ProblemMutator` trait |
+| `crates/katgpt-core/src/traits/mod.rs` | `PartialScorer` trait, `ProblemMutator` trait |
 | `crates/katgpt-pruners/src/partial_scorer.rs` | `WinLossScorer`, `BomberPartialScorer` |
 | `crates/katgpt-pruners/src/problem_mutator.rs` | `BomberConfigMutator`, `GoConfigMutator`, `EvolutionArena` |
 | `crates/katgpt-pruners/src/idea_divergence.rs` | `IdeaDivergence` struct, `is_scorer_novel()` |

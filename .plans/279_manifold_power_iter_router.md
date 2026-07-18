@@ -24,7 +24,7 @@ Goal: a compiling, tested, feature-gated module that implements `manifold_power_
 - [x] **T1.2** Add feature flag `manifold_power_iter_router = ["dep:spectral_retract"]` to `katgpt-rs/Cargo.toml` features section (after `gauge_invariant`)
 - [x] **T1.3** Add `#[cfg(feature = "manifold_power_iter_router")] pub mod manifold_power_iter_router;` and `pub mod spectral_retract;` (always-on — helper is shared) to `src/lib.rs` (alphabetical, after `sparse_task_vector`)
 - [x] **T1.4** Implement shared `power_iter_retract` helper in `crates/katgpt-spectral/src/spectral_retract.rs`:
-  - [x] `PowerRetractScratch` struct (reuses `PowerIterationScratch` pattern from `src/distill/peira.rs`): `mv_out: Vec<f32>` (D), `norm: f32`
+  - [x] `PowerRetractScratch` struct (reuses `PowerIterationScratch` pattern from `crates/katgpt-spectral/src/peira.rs`): `mv_out: Vec<f32>` (D), `norm: f32`
   - [x] `pub fn power_iter_retract(v: &mut [f32], psd_op: &[f32], dim: usize, target_norm: f32, iters: u8, scratch: &mut PowerRetractScratch)` — one or more steps of `v ← v·M` then `v ← target_norm · v / ‖v‖₂`. Zero-alloc, caller-owned scratch. Works on any PSD operator (Gram for MoE, `AᵀA`/`BᵀB` for LoRA gauge).
   - [x] Deterministic given `(v, M, target_norm, iters)` — safe for sync/quorum
   - [x] Sub-μs per call for D ≤ 1024 (plasma tier)

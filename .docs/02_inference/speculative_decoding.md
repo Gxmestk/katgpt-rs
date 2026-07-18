@@ -490,7 +490,7 @@ pub struct RetrievalResult {
 
 ---
 
-## SpeculativeContext (`speculative/types.rs`)
+## SpeculativeContext (`crates/katgpt-core/src/speculative/types.rs`)
 
 Pre-allocated buffer struct for zero-alloc speculative decoding across all pipeline stages.
 
@@ -533,7 +533,7 @@ pub struct DDTreeBranchCache {
 
 Methods: `new(config, max_branches)`, `fork_branch(...)`, `forward_branch(...)`, `rollback_branch(...)`, `discard_branch(...)`, `reset()`.
 
-### SelfSpecConfig (`speculative/types.rs`, behind `"tri_mode"` feature)
+### SelfSpecConfig (`crates/katgpt-core/src/speculative/types.rs`, behind `"tri_mode"` feature)
 
 Configuration for D2F self-speculation mode (used by `D2fDrafterVerifier`).
 
@@ -559,7 +559,7 @@ pub struct SdeConfig {
 
 ---
 
-## ConstraintPruner (`speculative/types.rs`)
+## ConstraintPruner (`crates/katgpt-core/src/speculative/types.rs`)
 
 Trait for filtering invalid token branches during tree construction.
 
@@ -637,7 +637,7 @@ Key methods:
 
 ---
 
-## Event & Diagnostic Types (`speculative/types.rs`)
+## Event & Diagnostic Types (`crates/katgpt-core/src/speculative/types.rs`)
 
 ```rust
 pub enum RejectionReason {

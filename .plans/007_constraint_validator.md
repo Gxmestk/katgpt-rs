@@ -163,7 +163,7 @@ Current: `u64` bitfield, 5 bits per depth → max token 31, max depth 12.
 New: `u128` bitfield, 16 bits per depth → max token 65535, max depth 8.
 
 ```rust
-// speculative/types.rs — updated TreeNode
+// crates/katgpt-core/src/speculative/types.rs — updated TreeNode
 
 /// DDTree node for Best-First Search.
 ///
@@ -644,11 +644,11 @@ Plan 009 will cover:
 
 ### Phase 0: Path Encoding Fix (Prerequisite)
 
-- [x] 0.1 Change `TreeNode.parent_path` from `u64` to `u128` in `speculative/types.rs`
+- [x] 0.1 Change `TreeNode.parent_path` from `u64` to `u128` in `crates/katgpt-core/src/speculative/types.rs`
 - [x] 0.2 Update `extract_parent_tokens` to use 16-bit shifts (`<< 16`, `& 0xFFFF`)
 - [x] 0.3 Update `build_dd_tree_pruned` shift from `<< 5` to `<< 16`
 - [x] 0.4 Add `extract_parent_tokens_into(parent_path: u128, num_tokens: usize, buf: &mut [usize])` to `dd_tree.rs` — zero-alloc version that writes into pre-allocated buffer
-- [x] 0.5 Update `SpeculativeContext` in `speculative/types.rs` to include `parent_tokens_buf: Vec<usize>` (size = `draft_lookahead + 1`)
+- [x] 0.5 Update `SpeculativeContext` in `crates/katgpt-core/src/speculative/types.rs` to include `parent_tokens_buf: Vec<usize>` (size = `draft_lookahead + 1`)
 - [x] 0.6 Migrate all internal `extract_parent_tokens()` callers to `extract_parent_tokens_into()` with `SpeculativeContext::parent_tokens_buf`
 - [x] 0.7 Update all tests in `dd_tree.rs` for new encoding
 - [x] 0.8 Run `cargo test --all-features` — all 176 tests pass

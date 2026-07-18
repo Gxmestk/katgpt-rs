@@ -88,7 +88,7 @@ Results: +51–52% aggregate throughput at moderate SLA, +60–85% (Flash) / +57
 
 | DSpark mechanism | Our shipped equivalent | Status |
 |---|---|---|
-| RS acceptance = `1 − dTV(p,q)` (Eq. 8) | `LeviathanVerifier` (`crates/katgpt-speculative/src/spechop/verifier.rs`) — real p/q rejection sampling; target probs in `p_distributions_flat` (`speculative/types.rs`) | ✅ shipped |
+| RS acceptance = `1 − dTV(p,q)` (Eq. 8) | `LeviathanVerifier` (`crates/katgpt-speculative/src/spechop/verifier.rs`) — real p/q rejection sampling; target probs in `p_distributions_flat` (`crates/katgpt-core/src/speculative/types.rs`) | ✅ shipped |
 | Per-step acceptance forecast `α ≈ a − b·H(p)` | `AcceptanceForecast` (`crates/katgpt-speculative/src/acceptance_forecast.rs`, Bebop Plan 243); H_2 upgrade in `crates/katgpt-core/src/ict/bebop_upgrade.rs` (Plan 294 G10) | ✅ shipped |
 | Expected accepted length `τ = Σ sigmoid(k·(Π top1 − t))` | `AcceptanceSurrogate::expected_accepted_length[_at_budget[_top1]]` (`crates/katgpt-speculative/src/caddtree_budget.rs`) | ✅ shipped (sigmoid-gated variant) |
 | `cumprod(a_i)` atomic primitive | `cumprodsum_scalar/batched[_simd]` (`crates/katgpt-core/src/cumprodsum.rs`) — SIMD-accelerated | ✅ shipped |

@@ -124,7 +124,7 @@ katgpt-rs/src/dense_mesh/
 - `katgpt-rs/src/types.rs` — LoRA weights, DomainLatent
 - `katgpt-rs/src/inference_router.rs` — compute target routing
 - `katgpt-rs/crates/katgpt-dec/src/simd.rs` — SIMD primitives for aggregation
-- `katgpt-core/src/traits.rs` — ConstraintPruner pattern (for trait style)
+- `crates/katgpt-core/src/traits/mod.rs` — ConstraintPruner pattern (for trait style)
 - `katgpt-rs/crates/katgpt-percepta/src/transformer.rs` — forward pass (DenseNode impl wraps this)
 
 ---

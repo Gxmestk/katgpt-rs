@@ -30,7 +30,7 @@ Implement curvature-influence allocation inspired by the EoS selective learning 
 
 ## T1: `CurvatureInfluenceScorer` Trait
 
-**File:** `crates/katgpt-core/src/types.rs`
+**File:** `crates/katgpt-types/src/lib.rs`
 
 ```rust
 /// Curvature influence scorer — modelless proxy for (∇ℓₖ · v₁)².

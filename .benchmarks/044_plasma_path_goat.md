@@ -190,7 +190,7 @@ plasma_path = ["katgpt-core/plasma_path"]
 | File | Change |
 |------|--------|
 | `crates/katgpt-core/Cargo.toml` | Added `plasma_path` feature gate |
-| `crates/katgpt-core/src/types.rs` | Added `TernaryWeights` struct + `new/set/get/quantize_from_f32/checksum` |
+| `crates/katgpt-types/src/lib.rs` | Added `TernaryWeights` struct + `new/set/get/quantize_from_f32/checksum` |
 | `crates/katgpt-dec/src/simd.rs` | Added `ternary_matvec_scalar`, `neon_ternary_matvec`, `avx2_ternary_matvec`, `simd_ternary_matvec`, `simd_ternary_matmul_batch`. **Issue 298 (2026-06-14):** rewrote all 3 SIMD backends with SWAR + sign-FMLA + 4 accumulators (2.1× speedup on NEON). |
 | `crates/katgpt-core/src/lib.rs` | Re-exports for `TernaryWeights`, ternary matvec functions |
 | `Cargo.toml` | Added `plasma_path` feature gate |

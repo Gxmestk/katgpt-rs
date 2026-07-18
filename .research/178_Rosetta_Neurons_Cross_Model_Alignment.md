@@ -64,7 +64,7 @@ The Rosetta insight is: **you don't need to train alignment. You can mine it fro
 **Implementation Path**:
 
 ```rust
-// katgpt-core/src/traits.rs — new trait
+// crates/katgpt-core/src/traits/mod.rs — new trait
 
 /// Cross-model activation alignment via mutual nearest neighbors.
 ///

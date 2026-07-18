@@ -141,7 +141,7 @@ Dynamo extracted standalone crates: `dynamo-protocols`, `dynamo-parsers`, `dynam
 
 ### High Priority
 - [x] Benchmark: measure TTFT with stable vs unstable prefix on speculative pipeline — `tests/prefix_stability_bench.rs`
-- [x] Generalize `SolveEvent` → `DraftEvent` for streaming speculative decoding steps — `DraftEvent` enum in `speculative/types.rs` L465
+- [x] Generalize `SolveEvent` → `DraftEvent` for streaming speculative decoding steps — `DraftEvent` enum in `crates/katgpt-core/src/speculative/types.rs` L465
 - [x] Add domain-level truncation policy to `domains.toml` (tokens vs bytes, limit) — `truncation = { mode = "tokens", limit = 10000 }` in `domains.toml`
 
 ### Medium Priority

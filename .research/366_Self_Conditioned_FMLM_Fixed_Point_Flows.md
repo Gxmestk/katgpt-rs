@@ -71,7 +71,7 @@ FMLM★ achieves SOTA among entropy-preserving (≈5.44 nats) few-step baselines
 
 | FMLM mechanism | Shipped cousin | File / Plan |
 |---|---|---|
-| **Iterated fixed-point block** (the entire §3.2 mechanism — `z_{j+1} = D̂(x, z_j)`) | `LoopMode::WeightShared { loop_count }` — default-on, GOAT 8/8 | Plan 108, `crates/katgpt-core/src/types.rs`, `forward_looped` |
+| **Iterated fixed-point block** (the entire §3.2 mechanism — `z_{j+1} = D̂(x, z_j)`) | `LoopMode::WeightShared { loop_count }` — default-on, GOAT 8/8 | Plan 108, `crates/katgpt-types/src/lib.rs`, `forward_looped` |
 | ODE-motivated iterated block (strictly more general than Picard FP) | `LoopMode::TrainingFree` + `TrainingFreeLoopConfig` (K-stage RK β=0.5) — default-on, GOAT 4/4 | Plan 136, `tf_loop` |
 | **FP convergence halt** (Prop 3.5 iteration count) | `ResidualRelevanceScorer.is_converged` — default-on, GOAT 6/6 | Plan 085, `manifold_residual.rs` |
 | **Self-conditioning** (the z = sg(D(x,0)) trick) | `self_cond_draft` — 2-pass self-conditioned speculative draft (pass 1 → estimate → pass 2 with SC) | Plan 222, `critical_interval_gate` + `self_cond_draft` feature |

@@ -137,7 +137,7 @@ forward-cycle cluster (~6K LOC) root-bound.
 | `crate::transformer::{ForwardContext, ...}` | `crate::{ForwardContext, ...}` (ForwardContext already in katgpt-forward) |
 | `crate::transformer::{MultiLayerKVCache, TransformerWeights}` | `katgpt_transformer::{MultiLayerKVCache, TransformerWeights}` |
 | `crate::types::Config` | `katgpt_types::Config` |
-| `super::types::SdeConfig` (from speculative/types.rs) | `katgpt_core::speculative::types::SdeConfig` |
+| `super::types::SdeConfig` (from crates/katgpt-core/src/speculative/types.rs) | `katgpt_core::speculative::types::SdeConfig` |
 | `crate::transformer::forward_base` (in forward_decode_stage) | `crate::forward::forward_base` (same crate, forward submodule) |
 
 ## GOAT Gate

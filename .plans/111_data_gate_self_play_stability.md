@@ -8,7 +8,7 @@
 
 ## Tasks
 
-- [x] T1: Add `DataGate` trait + `GateDecision` enum to `katgpt-core/src/types.rs` ✅ — Added `TaskType`, `ProposerTask`, `GateDecision`, `DataGate` trait. No feature gate (ungated in core, per plan). Clippy clean.
+- [x] T1: Add `DataGate` trait + `GateDecision` enum to `crates/katgpt-types/src/lib.rs` ✅ — Added `TaskType`, `ProposerTask`, `GateDecision`, `DataGate` trait. No feature gate (ungated in core, per plan). Clippy clean.
 - [x] T2: Add `SolverRewardMode` enum to `riir-train/crates/riir-train-gpu/src/loss_grpo.rs` ✅ — `Grounded` (default) + `IntrinsicSelfConsistency`. Added to `GrpoConfig` with `Default` impl. Clippy clean.
 - [x] T3: Implement `ExecutionGate` (sandbox exec + determinism check) in `riir-train/crates/riir-train-gpu/src/data_gate.rs` ✅ — `TaskExecutor` trait, `NoopExecutor` (games), `ExecutionGate::new/without_determinism/for_games`. Double-run determinism check. 6 unit tests.
 - [x] T4: Implement `LeakyGate<G: DataGate>` (ε-Bernoulli relaxation) for phase diagram experiments ✅ — `LeakyGate<G>` with Bernoulli(ε) relaxation, `AlwaysAdmit` baseline. ε ∈ [0,1] assert. 4 unit tests.
@@ -75,7 +75,7 @@ Both filters are needed. But the paper proves the **upstream gate** is the bindi
 
 ## T1: `DataGate` Trait
 
-**File:** `katgpt-core/src/types.rs` (shared between both crates)
+**File:** `crates/katgpt-types/src/lib.rs` (shared between both crates)
 
 ```rust
 /// Task-level admission gate for self-play training pool.
@@ -311,7 +311,7 @@ pub mod data_gate;
 pub use data_gate::{ExecutionGate, LeakyGate};
 ```
 
-The `DataGate` trait itself goes in `katgpt-core/src/types.rs` (ungated — both projects need it, like `ScreeningPruner`).
+The `DataGate` trait itself goes in `crates/katgpt-types/src/lib.rs` (ungated — both projects need it, like `ScreeningPruner`).
 
 ---
 
@@ -372,7 +372,7 @@ Sweep ε ∈ {0.0, 0.2, 0.5, 1.0} with II config:
 
 | File | Action | Scope |
 |------|--------|-------|
-| `katgpt-core/src/types.rs` | Add `DataGate`, `GateDecision`, `ProposerTask`, `TaskType` | T1 |
+| `crates/katgpt-types/src/lib.rs` | Add `DataGate`, `GateDecision`, `ProposerTask`, `TaskType` | T1 |
 | `riir-train/crates/riir-train-gpu/src/loss_grpo.rs` | Add `SolverRewardMode`, extend `GrpoConfig` | T2 |
 | `riir-train/crates/riir-train-gpu/src/data_gate.rs` | New file: `ExecutionGate`, `LeakyGate<G>` | T3-T4 |
 | `riir-train/crates/riir-train-gpu/src/gzero_loop.rs` | Wire gate, add gap metric to `RoundMetrics` | T5-T6 |

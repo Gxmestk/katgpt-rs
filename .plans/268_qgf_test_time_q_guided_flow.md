@@ -72,7 +72,7 @@ At generation step t with prefix p_t and drafter velocity v_t:
 ### Phase 1: Core Primitives (unblock — no integration risk)
 
 #### T1: QGradientOracle trait (F3)
-- [x] Add `QGradientOracle` trait to `katgpt-core/src/traits.rs`
+- [x] Add `QGradientOracle` trait to `crates/katgpt-core/src/traits/mod.rs`
   ```rust
   pub trait QGradientOracle {
       type State;
@@ -492,8 +492,8 @@ At generation step t with prefix p_t and drafter velocity v_t:
 ## Dependencies
 
 ### Existing (no new deps)
-- `SpeculativeGenerator` trait (`katgpt-core/src/traits.rs`)
-- `LeoHead` trait (`katgpt-core/src/traits.rs`, feature `leo_all_goals`)
+- `SpeculativeGenerator` trait (`crates/katgpt-core/src/traits/mod.rs`)
+- `LeoHead` trait (`crates/katgpt-core/src/traits/mod.rs`, feature `leo_all_goals`)
 - `FlowFieldCache` + `FlowField::gradient()` (`katgpt-core/src/flow/`)
 - `ActionBridge` (`katgpt-core/src/bridge/`, feature `action_bridge`)
 - NFCoT FlowScore (Plan 229, feature `nf_flow_score`)

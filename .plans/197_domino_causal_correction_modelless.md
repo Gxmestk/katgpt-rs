@@ -48,7 +48,7 @@ No model training. No LoRA. Pure inference-time pattern extraction.
 
 ### Phase 1: DominoCorrector Core
 
-- [x] **T1: Add `PrefixCorrectionTable` struct in `speculative/types.rs`**
+- [x] **T1: Add `PrefixCorrectionTable` struct in `crates/katgpt-core/src/speculative/types.rs`**
   - Pre-computed table of prefix-token → correction vectors
   - Hash-based: `HashMap<u64, Vec<f32>>` where key = blake3(prefix_tokens) truncated to u64
   - Correction vectors are small: only top-K token adjustments (sparse, not full vocab)
@@ -70,7 +70,7 @@ No model training. No LoRA. Pure inference-time pattern extraction.
 
 ### Phase 2: DominoPruner Trait Extension
 
-- [x] **T4: Add `DominoPruner` trait extending `ConstraintPruner` in `katgpt-core/src/traits.rs`**
+- [x] **T4: Add `DominoPruner` trait extending `ConstraintPruner` in `crates/katgpt-core/src/traits/mod.rs`**
   - `fn causal_correction(&self, depth: usize, token: usize, prefix: &[usize], base_valid: bool) -> bool`
   - Default impl: returns `base_valid` (no-op)
   - SudokuPruner impl: checks row/col/box constraints given the *specific prefix path*
@@ -128,8 +128,8 @@ No model training. No LoRA. Pure inference-time pattern extraction.
 
 | File | Change |
 |------|--------|
-| `katgpt-core/src/traits.rs` | Add `DominoPruner` trait |
-| `speculative/types.rs` | Add `PrefixCorrectionTable` |
+| `crates/katgpt-core/src/traits/mod.rs` | Add `DominoPruner` trait |
+| `crates/katgpt-core/src/speculative/types.rs` | Add `PrefixCorrectionTable` |
 | `crates/katgpt-speculative/src/dflash.rs` | Add `domino_correct_marginals` |
 | `src/speculative/dd_tree.rs` | Add `domino_score` + wire into `build_dd_tree_pruned` |
 | `Cargo.toml` | Add `domino_correction` feature |

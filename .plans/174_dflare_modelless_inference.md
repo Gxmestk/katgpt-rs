@@ -26,7 +26,7 @@
 
 Add `MarginalFusionConfig` and blending logic to `SpeculativeContext`.
 
-- [x] **T1a:** Add `MarginalFusionConfig` struct to `speculative/types.rs` with:
+- [x] **T1a:** Add `MarginalFusionConfig` struct to `crates/katgpt-core/src/speculative/types.rs` with:
   - `alpha_weights: Vec<f32>` — per-conditioning-source blend weights
   - `condition_layer_ids: Vec<Vec<usize>>` — which target layers to extract per source
   - `enabled: bool`
@@ -39,7 +39,7 @@ Add `MarginalFusionConfig` and blending logic to `SpeculativeContext`.
 
 Route between target-conditioned and unconditioned KV based on pruner confidence.
 
-- [x] **T2a:** Add `KvRoutingConfig` to `speculative/types.rs` with:
+- [x] **T2a:** Add `KvRoutingConfig` to `crates/katgpt-core/src/speculative/types.rs` with:
   - `high_confidence_threshold: f32`
   - `low_confidence_threshold: f32`
   - `enabled: bool`
@@ -129,11 +129,11 @@ graph TD
 
 | File | Change | Feature Gate |
 |------|--------|-------------|
-| `speculative/types.rs` | `MarginalFusionConfig`, `KvRoutingConfig`, `PositionWeightedBudget` structs | `dflare_fusion`, `dflare_kv_routing`, `dflare_progressive_budget` |
+| `crates/katgpt-core/src/speculative/types.rs` | `MarginalFusionConfig`, `KvRoutingConfig`, `PositionWeightedBudget` structs | `dflare_fusion`, `dflare_kv_routing`, `dflare_progressive_budget` |
 | `crates/katgpt-speculative/src/dflash.rs` | `dflash_predict_ar_with_fusion` — multi-pass conditioning + blend | `dflare_fusion` |
 | `crates/katgpt-speculative/src/dflash.rs` | `dflash_predict_conditioned_with_routing` — pruner-confidence KV routing | `dflare_kv_routing` |
 | `src/speculative/dd_tree.rs` | `build_dd_tree_screened_progressive` — per-depth position-weighted budget | `dflare_progressive_budget` |
-| `speculative/mod.rs` | Re-exports for all three features | All three |
+| `crates/katgpt-core/src/speculative/mod.rs` | Re-exports for all three features | All three |
 | `Cargo.toml` | Three feature flags (already existed) | — |
 | `tests/bench_dflare_modelless.rs` | GOAT proofs T4–T7 | All three |
 

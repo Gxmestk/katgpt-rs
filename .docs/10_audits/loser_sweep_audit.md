@@ -126,7 +126,7 @@ absorption runs (Phase 10). Move the code from `crates/katgpt-core/src/` to
 All 4 losers are already opt-in (verified: 0 occurrences in any `default` feature
 list). The functional demotion goal is achieved. The exile (moving code to
 katgpt-deprecated) is pure code-organization cleanup with marginal value:
-- `dflare_*` types are inline in `speculative/types.rs` behind `#[cfg]` — extracting
+- `dflare_*` types are inline in `crates/katgpt-core/src/speculative/types.rs` behind `#[cfg]` — extracting
   them to a movable file is invasive and risky for no functional gain.
 - `compression_drafter` is a separate file but low-traffic.
 Exile can be batched with a future katgpt-deprecated consolidation pass.
@@ -209,7 +209,7 @@ Of the 13 with code: 4 live in `src/` (Phase 3a), 4 live in `katgpt-core` (Phase
 
 - **Phase 0.5 (audit): DONE.** This document.
 - **Phase 3a (src/ exile): 3 of 4 done.** `feedback`, `unit_distance`, `alien_sampler` exiled to `katgpt-deprecated` with back-compat re-exports. `dense_mesh` deferred (transformer-bound glue). All workspace tests pass (122 in deprecated crate, 5266+ in workspace).
-- **Phase 3b/3c (cross-crate exile): DEFERRED 2026-07-06.** Phase 8 (Plan 378) and Phase 10 (Plan 381) absorptions are both DONE, but exile is deferred: all 9 losers are already opt-in (0 in any `default` list). Exile is pure code-organization cleanup (moving dead code to katgpt-deprecated) with marginal value; `dflare_*` types are inline in `speculative/types.rs` making extraction invasive. Batch with a future consolidation pass.
+- **Phase 3b/3c (cross-crate exile): DEFERRED 2026-07-06.** Phase 8 (Plan 378) and Phase 10 (Plan 381) absorptions are both DONE, but exile is deferred: all 9 losers are already opt-in (0 in any `default` list). Exile is pure code-organization cleanup (moving dead code to katgpt-deprecated) with marginal value; `dflare_*` types are inline in `crates/katgpt-core/src/speculative/types.rs` making extraction invasive. Batch with a future consolidation pass.
 - **Phase 3d (dead Cargo.toml entries): DONE 2026-07-06.** 3 of 4 removed (`embedding_router`, `language_domain`, `gpu`). The 4th (`rest`) was a false positive — revived by Plan 394 (forwards to `katgpt-forward/rest`, active bridge test). No regression: `default`, `--features full`, `--all-features` all compile clean.
 
 The remaining ~80 opt-in features are either PENDING (GOAT not yet run) or BENCH-LOSER (passed but kept opt-in for A/B). Exiling them would destroy active WIP.

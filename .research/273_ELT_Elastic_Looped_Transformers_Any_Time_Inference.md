@@ -29,7 +29,7 @@ A composite block `g_Θ` of N unique transformer layers is applied L times:
 F_(N,L)(x) = g_Θ^L(x)   // L loops, N unique layers, effective depth N×L
 ```
 
-Parameter count is bounded by N; depth D = N×L scales with L. This is **exactly `LoopMode::WeightShared { loop_count }`** in katgpt-rs (`crates/katgpt-core/src/types.rs`), shipped in Plan 108, default-on, GOAT 8/8. ELT adds nothing new architecturally over our LT2.
+Parameter count is bounded by N; depth D = N×L scales with L. This is **exactly `LoopMode::WeightShared { loop_count }`** in katgpt-rs (`crates/katgpt-types/src/lib.rs`), shipped in Plan 108, default-on, GOAT 8/8. ELT adds nothing new architecturally over our LT2.
 
 ### 1.2 Intra-Loop Self Distillation (ILSD) — the training contribution → riir-train
 

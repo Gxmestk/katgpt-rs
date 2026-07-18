@@ -310,7 +310,7 @@ Parameter Calibration         →   RewardGatedCalibrator (formalized)
 | `crates/katgpt-pruners/src/trial_log.rs` | `TrialLog` — F2/F3 explanations logged to JSONL |
 | `crates/katgpt-pruners/src/regression.rs` | `RegressionSuite` — F4 verification |
 | `src/pruners/mod.rs` | Module registration |
-| `crates/katgpt-core/src/traits.rs` | `ScreeningPruner`, `ConstraintPruner`, `SpeculativeGenerator`, `GameState`, `StateHeuristic` |
+| `crates/katgpt-core/src/traits/mod.rs` | `ScreeningPruner`, `ConstraintPruner`, `SpeculativeGenerator`, `GameState`, `StateHeuristic` |
 | `src/speculative/types.rs` | `DDTreeBranchCache` — F1/F3 trace source |
 
 ---

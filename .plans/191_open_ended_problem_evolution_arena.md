@@ -38,7 +38,7 @@ graph TD
 
 ### Phase 1: `PartialScorer` Trait + Bandit Integration
 
-- [x] **T1.1** Create `PartialScorer` trait in `katgpt-core/src/traits.rs`
+- [x] **T1.1** Create `PartialScorer` trait in `crates/katgpt-core/src/traits/mod.rs`
   - `fn partial_score(&self, trace: &GameTrace) -> f32` — graduated [0.0, 1.0]
   - `fn score_breakdown(&self, trace: &GameTrace) -> Vec<(&str, f32)>` — per-criteria
   - Feature gate: `partial_scoring`
@@ -55,7 +55,7 @@ graph TD
 
 ### Phase 2: `ProblemMutator` Trait + Config Mutation
 
-- [x] **T2.1** Create `ProblemMutator` trait in `katgpt-core/src/traits.rs`
+- [x] **T2.1** Create `ProblemMutator` trait in `crates/katgpt-core/src/traits/mod.rs`
   - `fn mutate(&self, seed: &GameConfig) -> Vec<MutantConfig>`
   - `MutationKind` enum: `GoalReweight`, `ConstrainOutputs`, `GeneralizeInputs`
 - [x] **T2.2** Create `MutantConfig` struct with `difficulty_delta` estimate

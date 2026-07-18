@@ -39,7 +39,7 @@ All modelless — no Hessian, no training, no new allocations.
 
 ## T1: `nds_proxy()` Function
 
-**File:** `crates/katgpt-core/src/types.rs`
+**File:** `crates/katgpt-types/src/lib.rs`
 
 ```rust
 /// Inference-time NDS (Normalized Directional Sharpness) proxy.

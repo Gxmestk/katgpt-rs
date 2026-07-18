@@ -184,7 +184,7 @@ Two distinct claims:
 | Stable LatentMoE (per-entity committed blend over K archetypes) | **CommittedFieldBlend** | Plan 321, Research 302, default-on GOAT 5/5, `crates/katgpt-core/src/committed_field_blend.rs` |
 | Stable LatentMoE (block-level expert coreset, adaptive top-p) | **dMoE** | Research 161, `top_p_coreset` |
 | Router conditioning without aux loss (one-shot, deterministic) | **Manifold Power Iteration MoE Router** | Plan 279, Research 246, default-on GOAT 8/8 |
-| Sparse expert activation (sparse_mlp with index packing) | **Sparse MLP** | Plan 022, `katgpt-core/src/types.rs::sparse_matmul` |
+| Sparse expert activation (sparse_mlp with index packing) | **Sparse MLP** | Plan 022, `crates/katgpt-types/src/lib.rs::sparse_matmul` |
 | Raven slot routing (top-k via linear projection + sigmoid, no aux loss) | **Raven RSM** | Plan 020, Research 006 — explicitly **no load balancing loss** |
 | Top-p coreset aggregation | **DDTree Vocab Coreset (D1 from R161)** | dMoE distillation |
 | Imbalanced routing is correct behavior | **Raven (R006)** "Don't implement load balancing on slots" | Research 006 §"What NOT To Do" item 3 |

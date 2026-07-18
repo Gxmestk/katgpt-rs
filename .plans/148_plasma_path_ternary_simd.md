@@ -8,7 +8,7 @@
 
 ## Task Index
 
-- [x] T1: TernaryWeights Type — `katgpt-core/src/types.rs` L2248–2379
+- [x] T1: TernaryWeights Type — `crates/katgpt-types/src/lib.rs` L2248–2379
 - [x] T2: Scalar Ternary Matvec — `crates/katgpt-dec/src/simd.rs` L1734
 - [x] T3: NEON Ternary Matvec — `crates/katgpt-dec/src/simd.rs` L1756
 - [x] T4: AVX2 Ternary Matvec — `crates/katgpt-dec/src/simd.rs` L1854
@@ -16,7 +16,7 @@
 - [x] T6: Batched Ternary Matmul — `crates/katgpt-dec/src/simd.rs` L1961
 - [x] T7: `.bits` File Loader — `riir-ai/crates/riir-engine/src/deltanet/weights.rs` L224
 - [x] T8: Forward Pass Dispatch — `LayerWeights` integration not yet wired
-- [x] T9: Quantization Utility — `katgpt-core/src/types.rs` L2322
+- [x] T9: Quantization Utility — `crates/katgpt-types/src/lib.rs` L2322
 - [x] T10: GOAT Proof Tests — `tests/bench_148_plasma_path_goat.rs`
 - [x] T11: Benchmark Harness — In GOAT test file
 
@@ -49,7 +49,7 @@ Freeze     Disk-backed (Turso/libSQL)       Variable          ~10ms+
 
 ## Tasks
 
-### T1: TernaryWeights Type (`katgpt-core/src/types.rs`)
+### T1: TernaryWeights Type (`crates/katgpt-types/src/lib.rs`)
 
 Add bit-plane ternary weight storage:
 
@@ -216,7 +216,7 @@ pub struct LayerWeights {
 
 **Status:** The `.bits` loader and SIMD kernels are complete. The `LayerWeights` struct does not yet have `Option<TernaryWeights>` fields and forward pass dispatch is not wired. This is the plug point for private `riir-ai` game integration (Plan 145).
 
-### T9: Quantization Utility (`katgpt-core/src/types.rs`)
+### T9: Quantization Utility (`crates/katgpt-types/src/lib.rs`)
 
 Row-wise error-compensated ternary quantization (from ciot's `pack_ternary.py`):
 
@@ -303,7 +303,7 @@ T1 (TernaryWeights type)
 | File | Change |
 |------|--------|
 | `crates/katgpt-core/Cargo.toml` | Added `plasma_path` feature gate |
-| `crates/katgpt-core/src/types.rs` | Added `TernaryWeights` struct + `new/set/get/quantize_from_f32/checksum` |
+| `crates/katgpt-types/src/lib.rs` | Added `TernaryWeights` struct + `new/set/get/quantize_from_f32/checksum` |
 | `crates/katgpt-dec/src/simd.rs` | Added `ternary_matvec_scalar`, `neon_ternary_matvec`, `avx2_ternary_matvec`, `simd_ternary_matvec`, `simd_ternary_matmul_batch` |
 | `crates/katgpt-core/src/lib.rs` | Re-exports for `TernaryWeights`, ternary matvec functions |
 | `Cargo.toml` | Added `plasma_path` feature gate (default-on) |

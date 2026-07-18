@@ -64,7 +64,7 @@ on construction for zero-alloc hot paths.
 - `sigma()`, `n_matrix()` — read current covariance estimates as `&[f64]`
 - `reset()` — clear all buffers and reset step_count to 0
 
-### `PeiraDistiller` — `src/distill/peira.rs`
+### `PeiraDistiller` — `crates/katgpt-spectral/src/peira.rs`
 
 Wraps the full SC-PEIRA Algorithm 1 loop:
 
@@ -86,7 +86,7 @@ for (student, teacher) in pairs {
 - `predictor() -> (Vec<f64>, Vec<f64>)` — current (P\*, Q\*)
 - `reset()` — clear covariance + histories for a new episode
 
-### `peira_alignment_score` — `src/distill/peira.rs`
+### `peira_alignment_score` — `crates/katgpt-spectral/src/peira.rs`
 
 ```rust
 pub fn peira_alignment_score(sigma: &[f64], n_matrix: &[f64], k: usize) -> f64
@@ -99,7 +99,7 @@ Spectral alignment metric α ∈ [0, 1]:
 
 Uses 20-iteration power method to find top eigenvectors of Σ and N, then computes `|cos(θ)|`.
 
-### `peira_planning_quality` — `src/distill/peira.rs`
+### `peira_planning_quality` — `crates/katgpt-spectral/src/peira.rs`
 
 ```rust
 pub fn peira_planning_quality(student_scores: &[f32], teacher_scores: &[f32]) -> f32
@@ -167,6 +167,6 @@ cargo clippy --features peira_distill --examples --quiet
 | `crates/katgpt-core/src/peira.rs` | `PeiraConfig`, `PeiraCovariance`, `peira_aux_loss`, SIMD outer product / dot kernels |
 | `crates/katgpt-core/src/lib.rs` | Feature-gated re-exports (`PeiraConfig`, `PeiraCovariance`, `peira_aux_loss`) |
 | `crates/katgpt-core/Cargo.toml` | `peira_distill` feature gate |
-| `src/distill/peira.rs` | `PeiraDistiller`, `peira_alignment_score`, `peira_planning_quality`, `synthetic_cca_sample` |
+| `crates/katgpt-spectral/src/peira.rs` | `PeiraDistiller`, `peira_alignment_score`, `peira_planning_quality`, `synthetic_cca_sample` |
 | `crates/katgpt-speculative/src/distill/mod.rs` | `#[cfg(feature = "peira_distill")]` module |
 | `examples/core_06_peira.rs` | GOAT proof demo |

@@ -166,14 +166,14 @@ crates/katgpt-core/src/
   - [x] Implement `reset()` — clear all tracking
   - [x] Implement `ComputeRoute` enum (`CpuSpeculative`, `GpuAutoregressive`)
   - [x] Implement `recommend_route(position) -> ComputeRoute`
-- [x] Wire `selectivity_router` module into `speculative/mod.rs` behind `#[cfg(feature = "selectivity_router")]`
+- [x] Wire `selectivity_router` module into `crates/katgpt-core/src/speculative/mod.rs` behind `#[cfg(feature = "selectivity_router")]`
 
 ### Integration
 
 - [x] Add integration point: after each speculative decode, call `router.observe(position, excess_kurtosis(logits))` with computed kurtosis
   - `speculative_step_rollback_with_router()` in `step.rs` — observes kurtosis from draft marginals, then routes
   - `speculative_step_conditioned_with_router()` in `step.rs` — same for conditioned draft path
-  - Both re-exported from `speculative/mod.rs` behind `selectivity_router` feature
+  - Both re-exported from `crates/katgpt-core/src/speculative/mod.rs` behind `selectivity_router` feature
 - [x] Add integration point: before generation, check `router.should_think(position)` → route direct vs CoT
   - Router guard in both `_with_router` functions: high kurtosis → skip tree, sample direct from first marginal
   - Low kurtosis → build DDTree (needs exploration/CoT)

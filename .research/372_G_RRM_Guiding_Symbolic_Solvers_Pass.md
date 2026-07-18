@@ -66,15 +66,15 @@ The table below maps every G-RRM architectural element to a shipped katgpt-rs / 
 
 | G-RRM element (paper §) | Shipped analog | File / trait | Coverage |
 |---|---|---|---|
-| SE-RRM forward pass → `Ŷ ∈ ℝ^{I×K}` per-cell scores | `SpeculativeGenerator::generate` + `ScreeningPruner::relevance` | `katgpt-core/src/traits.rs` | ✅ Architectural |
+| SE-RRM forward pass → `Ŷ ∈ ℝ^{I×K}` per-cell scores | `SpeculativeGenerator::generate` + `ScreeningPruner::relevance` | `crates/katgpt-core/src/traits/mod.rs` | ✅ Architectural |
 | `argsort(Ŷ_{i,:})` → value ordering `π_i` | DDTree decode over `marginals: Vec<Vec<f32>>` | `tactical_06_tui.rs`, `tactical_07_strategic.rs` | ✅ Architectural |
 | Backtracking cell selection = **MRV** (§2.3.2) | `SudokuPruner::new_mrv` (Issue 005 Option A) — "ascending candidate count, row-major tiebreak" | `crates/katgpt-pruners/src/sudoku_pruner.rs:87` | ✅ **Word-for-word match** — the paper's exact MRV heuristic, on the paper's exact domain (Sudoku) |
 | Backtracking digit selection = SE-RRM-guided ordering | `SudokuPruner::latent_marginals` (Issue 005 Option B) — naked single → `p=1.0`; N candidates → uniform `1/N`; 0 → all-zero | `crates/katgpt-pruners/src/sudoku_pruner.rs:141` | ✅ Modelless prior derived from constraint set (paper's analog is trained) |
 | CDCL phase initialization from `d*_i` | DDTree path-commit / speculation accept — drafter proposes, verifier accepts/rejects | `katgpt-rs` speculative decode | ✅ Architectural |
-| Symbolic solver (completeness guarantee) | `ConstraintPruner::is_valid` ("Returns `false` to prune") + `batch_is_valid` + `propagate` + `DominoPruner::causal_correction` | `katgpt-core/src/traits.rs:36` | ✅ Hard contract — the "order ≠ correctness" safety invariant |
+| Symbolic solver (completeness guarantee) | `ConstraintPruner::is_valid` ("Returns `false` to prune") + `batch_is_valid` + `propagate` + `DominoPruner::causal_correction` | `crates/katgpt-core/src/traits/mod.rs:36` | ✅ Hard contract — the "order ≠ correctness" safety invariant |
 | Solver-architecture-aware regime (cadical3 vs glucose4) | `DifficultyFilter::admit(guide_score, estimated_solve_rate)` — drops trivially-solved (1.0) and impossible (0.0) | `crates/katgpt-core/src/cgsp/traits.rs:229` | ⚠️ Partial — drops the 0/1 extremes but doesn't model "overhead-dominated solver that shouldn't receive hints at all" (see §2.3) |
 | Empirical solve-rate → priority update (SLE loop) | `Solver::attempt` returns `f32 ∈ [0,1]` solve-rate; `HintDeltaBandit::absorb(arm, reward = (1-solve_rate)·guide_score)` | `crates/katgpt-core/src/cgsp/traits.rs:92, 127` | ✅ Architectural — the runtime half of SLE |
-| `min_completion_distance` / "no valid completion reachable" | `CompletionHorizon::min_completion_distance` (Research 183) — admissible lower bound on tokens to reach a complete valid output | `katgpt-core/src/traits.rs:232` | ✅ Direct analog of "MRV exposes contradictions early" |
+| `min_completion_distance` / "no valid completion reachable" | `CompletionHorizon::min_completion_distance` (Research 183) — admissible lower bound on tokens to reach a complete valid output | `crates/katgpt-core/src/traits/mod.rs:232` | ✅ Direct analog of "MRV exposes contradictions early" |
 | Three solver regimes benchmarked (§3) | `sudoku_speculate_bench.rs` Modes 1/2/3: `backtrack` / `speculate_iterative` (draft→prune→commit→verify with backtrack fallback) / `speculate_oneshot` (single full-depth lookahead) | `katgpt-rs/benches/sudoku_speculate_bench.rs` | ✅ **The paper's exact three regimes, on the paper's exact domain** |
 
 ### 2.2 Why this is a stronger validation than PTRM (Research 049)

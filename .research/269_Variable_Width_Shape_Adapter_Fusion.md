@@ -135,7 +135,7 @@ Closest prior art:
 ### Q1.c — adapter-driven Hydra skip plan: **feasible, novel as code, not as concept**
 
 Grep of `HydraBudgetConfig` call sites in `katgpt-rs/src/` and `katgpt-rs/crates/katgpt-core/src/` (2026-06-20):
-- `crates/katgpt-core/src/types.rs:4203` — struct definition `{ skip_threshold, cumulative_threshold, modelless: bool, skip_erasure_draft: bool }`. **No adapter-aware field.** `modelless` means "lookup vs logit-lens," not "base vs adapter."
+- `crates/katgpt-types/src/lib.rs:4203` — struct definition `{ skip_threshold, cumulative_threshold, modelless: bool, skip_erasure_draft: bool }`. **No adapter-aware field.** `modelless` means "lookup vs logit-lens," not "base vs adapter."
 - `crates/katgpt-core/src/lib.rs:184` — re-export.
 - `crates/katgpt-pruners/src/hydra_budget.rs:11,95` — `hydra_layer_skip(profiles: &[HydraLayerProfile], config: &HydraBudgetConfig)`. Profile source is the caller's responsibility; nothing prevents passing an adapter-derived profile.
 - `tests/bench_165_hydra_budget_goat.rs` — benchmarks pass synthetic profiles.

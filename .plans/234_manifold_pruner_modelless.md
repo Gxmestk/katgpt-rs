@@ -68,7 +68,7 @@ ManifoldE embeds knowledge graph triples as points near a manifold (sphere/hyper
 
 | File | Purpose | ~LOC |
 |------|---------|------|
-| `crates/katgpt-core/src/traits.rs` | Trait extensions (`manifold_score`, `constraint_vector`) | ~30 |
+| `crates/katgpt-core/src/traits/mod.rs` | Trait extensions (`manifold_score`, `constraint_vector`) | ~30 |
 | `crates/katgpt-pruners/src/hyperplane_pruner.rs` | `HyperplanePruner` half-space intersection | ~200 |
 | `crates/katgpt-pruners/src/manifold_pruner.rs` | `ManifoldPruner` soft sigmoid wrapper | ~150 |
 | `crates/katgpt-pruners/src/kernel_scoring.rs` | `KernelKind` enum + SIMD kernel functions | ~200 |
@@ -82,7 +82,7 @@ ManifoldE embeds knowledge graph triples as points near a manifold (sphere/hyper
 
 ### Phase 1: Trait Extensions (Backward Compatible)
 
-- [x] Add `manifold_score(&self, depth: usize, token_idx: usize, prefix: &[usize]) -> f32` default method to `ConstraintPruner` trait in `crates/katgpt-core/src/traits.rs`. Default: `if self.is_valid(depth, token_idx, prefix) { 1.0 } else { 0.0 }`. Zero cost if not overridden.
+- [x] Add `manifold_score(&self, depth: usize, token_idx: usize, prefix: &[usize]) -> f32` default method to `ConstraintPruner` trait in `crates/katgpt-core/src/traits/mod.rs`. Default: `if self.is_valid(depth, token_idx, prefix) { 1.0 } else { 0.0 }`. Zero cost if not overridden.
 - [x] Add `constraint_vector(&self, depth: usize, prefix: &[usize]) -> Option<(&[f32], f32)>` optional method to `ConstraintPruner` trait. Returns `(normal_vector, threshold)` for half-space constraint. Default: `None` (fall back to `is_valid()`).
 - [x] Add `KernelKind` enum: `Linear`, `Gaussian { sigma: f32 }`, `Polynomial { degree: f32, c: f32 }`.
 - [x] Test: default `manifold_score()` returns 1.0 for valid, 0.0 for invalid tokens (backward compat)

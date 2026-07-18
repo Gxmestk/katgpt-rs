@@ -47,13 +47,13 @@ Zero extra forward pass. O(d) dot product per decode step. Already computed by m
   - `pub mod emotion_vector;` in `mod.rs` — not behind any feature gate
   - Already default-on since Phase 1
 - [x] T11: If T8 passes (information gain), integrate desperation_score into `SR2AMConfig` context features ✅
-  - Added `desperation_bin: usize` to `ConfiguratorContext` in `katgpt-core/src/types.rs`
+  - Added `desperation_bin: usize` to `ConfiguratorContext` in `crates/katgpt-types/src/lib.rs`
   - Added `ConfiguratorContext::new()` and `with_desperation()` constructors
   - Updated `ConfiguratorBandit` HashMap key from `(domain, entropy_bin)` to `(domain, entropy_bin, desperation_bin)`
   - Updated all 28 construction sites across 5 files
   - SR²AM GOAT 6/6 still passes
 - [x] T12: Add `emotion_desperation_threshold` to domain config (with sensible default) ✅
-  - Added `emotion_desperation_threshold: f32` to `Config` in `katgpt-core/src/types.rs`
+  - Added `emotion_desperation_threshold: f32` to `Config` in `crates/katgpt-types/src/lib.rs`
   - Default: 0.5 (moderate desperation)
   - Initialized in all 9 Config constructors (micro, game, game_go, draft, small_target, gqa_draft, bpe, bpe_draft, gemma2_2b)
 - [x] T13: Update README with emotion vector monitoring section ✅

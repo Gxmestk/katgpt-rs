@@ -41,7 +41,7 @@ graph TD
 ## Tasks
 
 ### T1: CollapseDetector Trait + Struct
-- [x] Define `CollapseDetector` trait in `katgpt-core/src/traits.rs`
+- [x] Define `CollapseDetector` trait in `crates/katgpt-core/src/traits/mod.rs`
   ```rust
   pub trait CollapseDetector: Send + Sync {
       /// Called per token during reasoning. Returns true if collapse detected.
@@ -62,7 +62,7 @@ graph TD
 - [x] Zero-allocation: pre-allocated `[u32; 64]` ring buffer for token window
 
 ### T2: ThinkingBudget Per-Instance Adaptive Budget
-- [x] Add `ThinkingBudget` struct to `katgpt-core/src/types.rs`
+- [x] Add `ThinkingBudget` struct to `crates/katgpt-types/src/lib.rs`
   ```rust
   #[derive(Clone, Debug)]
   #[repr(C)]

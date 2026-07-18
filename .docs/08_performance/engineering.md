@@ -158,7 +158,7 @@ Every `dflash_predict`, `build_dd_tree`, and speculative step was allocating `Ve
 
 ### Solution: Pre-allocated Contexts
 
-**SpeculativeContext** (`speculative/types.rs`):
+**SpeculativeContext** (`crates/katgpt-core/src/speculative/types.rs`):
 - Holds `ForwardContext`, `MultiLayerKVCache`, flat marginals buffer, probs buffer, sampled tokens, accepted tokens, path buffer, residual buffer, p_distributions buffer
 - `new(config)` allocates once, `reset()` clears for reuse
 - All `_with()` function variants accept `&mut SpeculativeContext`

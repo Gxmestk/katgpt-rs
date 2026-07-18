@@ -52,7 +52,7 @@ Per `.contexts/optimization.md`:
   - New signature: `fn rmsnorm_with_gamma(x: &mut [f32], gamma: &[f32])`
   - Implementation: `x[i] *= inv_rms * gamma[i]` (fused multiply, no separate pass)
   - Keep existing `rmsnorm()` as `rmsnorm_with_gamma(x, &[1.0; 0])` or just unchanged for backward compat
-  - **Scope:** `crates/katgpt-core/src/types.rs`
+  - **Scope:** `crates/katgpt-types/src/lib.rs`
 
 - [x] T3: Wire gamma into `forward_base()` and `forward_coda()`
   - Replace `rmsnorm(&mut ctx.x)` with `rmsnorm_with_gamma(&mut ctx.x, &layer_weights.attn_norm_gamma)`

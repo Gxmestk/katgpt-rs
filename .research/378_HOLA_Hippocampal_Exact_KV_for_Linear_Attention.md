@@ -114,7 +114,7 @@ Per the skill's mandatory two-layer check (notes + shipped code, with vocabulary
 - "delta rule" / "linear attention" → GDN2 (Plan 105), delta_mem (Plan 053)
 - "surprise" / "write magnitude β·‖e‖" / "innovation residual" → `temporal_deriv` surprise signal (Plan 277), `surprise_norm()`, δ-Mem write gate, `temp_loss_fingerprint` (Plan 005)
 - "semiparametric" / "parametric state + non-parametric KV" → `DualPoolBandit` E/X pools (Research 249), Raven consolidation (parametric) + AnyRAG (non-parametric)
-- "sharpened read" / "decoupled RMSNorm-γ" → `rmsnorm_with_gamma` (in `katgpt-core/src/types.rs` / `crates/katgpt-types/src/math.rs`)
+- "sharpened read" / "decoupled RMSNorm-γ" → `rmsnorm_with_gamma` (in `crates/katgpt-types/src/lib.rs` / `crates/katgpt-types/src/math.rs`)
 
 **Notes layer (grep results — both vocabularies):**
 

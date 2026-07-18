@@ -55,7 +55,7 @@ Wire existing GDN2 recurrent state as a "bridge" for dilated sparse attention du
 
 ### Phase 1: Core Infrastructure
 
-- [x] **T1.1** Add `DilationConfig` enum to `katgpt-core/src/types.rs`
+- [x] **T1.1** Add `DilationConfig` enum to `crates/katgpt-types/src/lib.rs`
   ```rust
   #[repr(u8)]
   #[derive(Clone, Copy, Debug, PartialEq)]

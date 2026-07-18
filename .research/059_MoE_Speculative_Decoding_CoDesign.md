@@ -102,10 +102,10 @@ Shared experts reduce verification cost at low BS but raise effective k/N, pushi
 | Cohere Concept | Our Equivalent | Location | Match |
 |----------------|---------------|----------|-------|
 | MoE top-k expert routing | Raven RSM: top-k slot routing | `transformer.rs` `raven_update` | ✅ Structural analog |
-| Sparse expert activation | Sparse MLP: index packing for alive neurons | `katgpt-core/types.rs` `sparse_matmul` | ✅ Unstructured analog |
+| Sparse expert activation | Sparse MLP: index packing for alive neurons | `crates/katgpt-types/src/lib.rs` `sparse_matmul` | ✅ Unstructured analog |
 | Speculative decoding verification | `LeviathanVerifier` | `crates/katgpt-speculative/src/spechop/verifier.rs` | ✅ Direct match |
 | Draft model (small, fast) | `Config::draft()` / `Config::bpe_draft()` | `types.rs` | ✅ Direct match |
-| Arithmetic intensity (k/N) | Sparsity ratio in `sparse_matmul` alive count | `katgpt-core/types.rs` | 🟡 Analogous concept |
+| Arithmetic intensity (k/N) | Sparsity ratio in `sparse_matmul` alive count | `crates/katgpt-types/src/lib.rs` | 🟡 Analogous concept |
 | Batch-size regimes | Domain inference budget (`tree_budget`, `beta`) | riir-ai Plan 026 | 🟡 Config-level only |
 | Temporal correlation | Raven slot reuse across positions | Not measured | ❌ Gap (T1 below) |
 | Amdahl decomposition | Not modeled for LeviathanVerifier | Not implemented | ❌ Gap (T2 below) |

@@ -37,7 +37,7 @@ Ship the **generic, IP-free half** of the CWM Super-GOAT (Research 275):
 ### Tasks
 
 - [x] **T1.1** Create `katgpt-rs/crates/katgpt-core/src/induced_cwm/mod.rs` with module-level docs that mirror Research 275 §2.1: this is the open half of the CWM primitive; the LLM-induction pipeline lives in riir-ai. Re-export from `crates/katgpt-core/src/lib.rs` gated by `induced_cwm` feature.
-- [x] **T1.2** Add `induced_cwm = []` and `induced_cwm_ismcts = ["induced_cwm"]` to `katgpt-core/Cargo.toml` `[features]`. (`induced_cwm_ismcts` dropped the `game_state` dep — that feature lives in the ROOT crate, not katgpt-core; the only thing Phase 2 needs is `induced_cwm` itself, since `GameState` is already in `katgpt-core/src/traits.rs`.) Also added forwarding features to root `katgpt-rs/Cargo.toml`.
+- [x] **T1.2** Add `induced_cwm = []` and `induced_cwm_ismcts = ["induced_cwm"]` to `katgpt-core/Cargo.toml` `[features]`. (`induced_cwm_ismcts` dropped the `game_state` dep — that feature lives in the ROOT crate, not katgpt-core; the only thing Phase 2 needs is `induced_cwm` itself, since `GameState` is already in `crates/katgpt-core/src/traits/mod.rs`.) Also added forwarding features to root `katgpt-rs/Cargo.toml`.
 - [x] **T1.3** Define `pub trait InducedCwmKernel: GameState` in `crates/katgpt-core/src/induced_cwm/kernel.rs` — exact design as planned (marker trait + `canonical_bytes` + default `commitment`).
 - [x] **T1.4** Define `CwmCommitment` in `crates/katgpt-core/src/induced_cwm/commitment.rs`. **DEViates from plan**: dropped `snapshot_id: Uuid` in favour of `version: u64`, following the established `micro_belief::MicroRecurrentKernelSnapshot` precedent (UUID is deferred to the swap-event layer in riir-ai Plan 326). The `uuid` crate is not currently a katgpt-core/katgpt-rs dependency; adding it for one unread field is scope-creep. Documented in the file-level rustdoc with the AGENTS.md rule citation. Kept `blake3` + `created_at_tick` as planned.
 - [x] **T1.5** Define `pub trait BeliefInferenceFn<S: GameState>` in `crates/katgpt-core/src/induced_cwm/belief.rs` — exact design as planned, with `type Sample` associated type and the posterior-support contract documented.
@@ -48,7 +48,7 @@ Ship the **generic, IP-free half** of the CWM Super-GOAT (Research 275):
 
 ### Phase 1 deviations summary
 
-1. **T1.2**: `induced_cwm_ismcts` no longer depends on `game_state` — that feature is in the ROOT crate, not katgpt-core. The `GameState` trait lives in `katgpt-core/src/traits.rs` already (unconditional), so no extra feature dep is needed.
+1. **T1.2**: `induced_cwm_ismcts` no longer depends on `game_state` — that feature is in the ROOT crate, not katgpt-core. The `GameState` trait lives in `crates/katgpt-core/src/traits/mod.rs` already (unconditional), so no extra feature dep is needed.
 2. **T1.4**: `CwmCommitment` uses `u64 version` instead of `Uuid snapshot_id` (micro_belief precedent; UUID deferred to swap-event layer in riir-ai Plan 326).
 3. **T1.6**: `verify_transition` takes `&TransitionUnitTest<S>` only, no `kernel: &K` (the state IS the kernel under the codebase's `GameState` convention).
 

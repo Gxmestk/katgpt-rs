@@ -255,7 +255,7 @@ Plus the Pareto comparison: FPCG is Pareto-optimal with a unique zero-PPL-cost a
 
 | Component | Path | Tests |
 |-----------|------|-------|
-| `FeatureClass` enum + `ScreeningPruner::feature_class()` default | `crates/katgpt-core/src/traits.rs` | 4 |
+| `FeatureClass` enum + `ScreeningPruner::feature_class()` default | `crates/katgpt-core/src/traits/mod.rs` | 4 |
 | `feature_class.rs` re-export shim | `crates/katgpt-pruners/src/feature_class.rs` | (same 4) |
 | `EmotionDirections::feature_class()` explicit override | `crates/katgpt-pruners/src/emotion_vector.rs` | inherited |
 | `FutureBehaviorProbe` primitive (Phase 2) | `crates/katgpt-pruners/src/future_probe.rs` | 13 |

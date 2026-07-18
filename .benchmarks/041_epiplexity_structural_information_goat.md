@@ -263,6 +263,6 @@ cargo clippy --features epiplexity_scoring --quiet --tests
 
 - Research 090: `.research/090_Epiplexity_Structural_Information_Computationally_Bounded_Observers.md`
 - Epiplexity paper: arXiv:2601.03220
-- Existing ScreeningPruner trait: `crates/katgpt-core/src/traits.rs`
+- Existing ScreeningPruner trait: `crates/katgpt-core/src/traits/mod.rs`
 - Existing bandit: `crates/katgpt-ruliology/src/bandit.rs` (Plan 030)
 - Benchmark 040: `.benchmarks/040_opus_boltzmann_bandit.md`

@@ -154,7 +154,7 @@ plasma_path = ["katgpt-core/plasma_path"]
 ### Integration Points
 
 1. **`crates/katgpt-dec/src/simd.rs`**: Add `simd_ternary_matvec()` alongside existing `simd_matvec()`
-2. **`katgpt-core/src/types.rs`**: Add `TernaryWeights` struct (pos_bits, neg_bits, row_scale, blocks64)
+2. **`crates/katgpt-types/src/lib.rs`**: Add `TernaryWeights` struct (pos_bits, neg_bits, row_scale, blocks64)
 3. **`katgpt-rs/crates/katgpt-percepta/src/transformer.rs`**: Add ternary weight dispatch in `forward_base()`
 4. **`riir-ai/crates/riir-engine/src/deltanet/weights.rs`**: Add `.bits` file loader for TernaryMatrix
 5. **`riir-ai/crates/riir-games/`**: Game-specific ternary quantization and threshold tuning

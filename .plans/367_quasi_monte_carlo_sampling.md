@@ -26,7 +26,7 @@ Verdict: **GOAT** (not Super-GOAT). Sample-efficiency gain, not a new capability
 
 ## Phase 1 — Core `QmcSource` trait + three methods
 
-**Target:** `katgpt-rs/crates/katgpt-core/src/speculative/qmc/mod.rs` (new file), `pub mod qmc;` wired into `speculative/mod.rs`, feature `qmc_sampling = []` added to `katgpt-core/Cargo.toml`.
+**Target:** `katgpt-rs/crates/katgpt-core/src/speculative/qmc/mod.rs` (new file), `pub mod qmc;` wired into `crates/katgpt-core/src/speculative/mod.rs`, feature `qmc_sampling = []` added to `katgpt-core/Cargo.toml`.
 
 ### Tasks
 

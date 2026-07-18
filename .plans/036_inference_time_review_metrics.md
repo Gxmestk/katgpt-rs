@@ -302,5 +302,5 @@ The review loop is a PPoT concern (rescue with structured feedback). Adding it t
 - arXiv:2604.27233 — "Reinforced Agent: Inference-Time Feedback for Tool-Calling Agents"
 - Plan 030 — Multi-Armed Bandit (`crates/katgpt-ruliology/src/bandit.rs`)
 - Plan 032 — Heuristic Learning Infrastructure (`TrialLog`, `AbsorbCompress`, `RegressionSuite`)
-- Plan 021 — ScreeningPruner (`speculative/types.rs`)
+- Plan 021 — ScreeningPruner (`crates/katgpt-core/src/speculative/types.rs`)
 - Plan 026/027 — PPoT rescue (`speculative/ppot/`)

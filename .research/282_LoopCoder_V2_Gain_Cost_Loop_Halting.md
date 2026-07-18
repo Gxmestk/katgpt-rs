@@ -82,7 +82,7 @@ At R=2, the "thinking" variant (explicit CoT + latent loop) gains **+26.9 points
 
 | LoopCoder-v2 component | Shipped cousin | Evidence |
 |---|---|---|
-| Weight-shared looped block | `LoopMode::WeightShared { loop_count }` — default-on, GOAT 8/8 | Plan 108, `crates/katgpt-core/src/types.rs`, `forward_looped` |
+| Weight-shared looped block | `LoopMode::WeightShared { loop_count }` — default-on, GOAT 8/8 | Plan 108, `crates/katgpt-types/src/lib.rs`, `forward_looped` |
 | ODE-motivated damped sub-stepping | `LoopMode::TrainingFree` + K-stage RK β=0.5 — default-on | Plan 136, `tf_loop` feature |
 | Per-dispatch elastic loop count | `elastic_loop_override: Option<usize>` on `forward_looped()`, clamped to `[loop_min, 2×loop_max]` | Issue 035, Research 273, `Config::effective_loop_count()` |
 | L_min floor (refuse exit below) | `Config::loop_min` (default 0→1) | Issue 035, `.docs/02_architecture.md` L670-676 |

@@ -113,12 +113,12 @@ A pairwise win is counted ONLY if both orders agree. Disagreements → treated a
 | Paper Concept | Our Component | Location | Type |
 |---------------|---------------|----------|------|
 | Proposer (k samples) | DDTree branch expansion | `src/speculative/dd_tree.rs` | Model-based |
-| Critic (m votes) | ScreeningPruner + ConstraintPruner | `speculative/types.rs` | Modelless→model-based |
+| Critic (m votes) | ScreeningPruner + ConstraintPruner | `crates/katgpt-core/src/speculative/types.rs` | Modelless→model-based |
 | Comparator (r votes) | BtRank pairwise tournament | `crates/katgpt-pruners/src/bt_rank.rs` | Model-based |
 | Copeland tournament | `BtScores::rank()` | `crates/katgpt-pruners/src/bt_rank.rs` | Modelless |
-| Verifier R_x | `ConstraintPruner::is_valid()` | `speculative/types.rs` | Modelless |
-| Valid state system | TreeNode state space | `speculative/types.rs` | Structural |
-| Progress rank d_x | TreeNode depth / rollout position | `speculative/types.rs` | Structural |
+| Verifier R_x | `ConstraintPruner::is_valid()` | `crates/katgpt-core/src/speculative/types.rs` | Modelless |
+| Valid state system | TreeNode state space | `crates/katgpt-core/src/speculative/types.rs` | Structural |
+| Progress rank d_x | TreeNode depth / rollout position | `crates/katgpt-core/src/speculative/types.rs` | Structural |
 | Portfolio P_N | BanditPruner strategies | `crates/katgpt-ruliology/src/bandit.rs` | Modelless |
 | Blind-spot floor B | Unseen states / unsolvable positions | (diagnostic) | Measurement |
 | SR²AM configurator | Budget allocator (k,m,r sizing) | `crates/katgpt-pruners/src/configurator_bandit.rs` | Modelless |

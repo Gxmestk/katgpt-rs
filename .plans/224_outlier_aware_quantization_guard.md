@@ -32,7 +32,7 @@ graph TD
 ## Tasks
 
 ### T1: OutlierGuardConfig — Modelless Config
-- [x] Add `OutlierGuardConfig` to `katgpt-core/src/types.rs`
+- [x] Add `OutlierGuardConfig` to `crates/katgpt-types/src/lib.rs`
   ```rust
   /// Configuration for the outlier-aware quantization guard.
   /// Runs once at model load time to detect outlier injection attacks.
@@ -197,7 +197,7 @@ graph TD
 
 | File | Change |
 |------|--------|
-| `katgpt-core/src/types.rs` | Add `OutlierGuardConfig`, `OutlierAction` |
+| `crates/katgpt-types/src/lib.rs` | Add `OutlierGuardConfig`, `OutlierAction` |
 | `katgpt-rs/crates/katgpt-spectral/src/spectral.rs` | Add `ks_d_statistic()` |
 | `katgpt-rs/crates/katgpt-spectral/src/outlier_guard.rs` | New file: `OutlierGuard`, `LayerReport` |
 | `riir-ai/crates/riir-gpu/src/spectralquant/mod.rs` | Add `outlier_guard` module (behind feature gate) |

@@ -79,7 +79,7 @@ Concretely: if you give `HardwareAwarePrefixScheduler` a step-function `SpsCurve
 ### 2.3 Additional shipped adaptive-budget primitives (also superior to a static table)
 
 - **`AcceptanceSurrogate::expected_accepted_length_at_budget`** (`caddtree_budget.rs`, Plan 219 / Research 194) — per-request budget-vs-acceptance tradeoff via `τ = Σ sigmoid(k·(Π top1 − t))`. CaDDTree proves throughput is **unimodal in budget** under convex verification cost → greedy stopping is provably optimal.
-- **`PositionWeightedBudget`** (`speculative/types.rs`) — position-weighted budget allocation with `gamma` decay and `min_budget_per_depth`.
+- **`PositionWeightedBudget`** (`crates/katgpt-core/src/speculative/types.rs`) — position-weighted budget allocation with `gamma` decay and `min_budget_per_depth`.
 - **`BudgetAdaption` enum** (`Off | Compression | Entropy | EchoConsistency`) — adaptive budget by entropy or compression signal.
 - **TRAS** (`trust_region.rs`, Plan 182 / Research 162) — trust-region adaptive speculation window: high acceptance → expand window, low → window=1.
 - **Breakeven Complexity Router** (Plan 250 / Research 218) — cost-amortization-aware tier routing.

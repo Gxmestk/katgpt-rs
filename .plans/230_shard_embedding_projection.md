@@ -54,7 +54,7 @@ Option 2 (random orthogonal) is the GOAT for modelless: zero training, zero data
 
 ## T1: ShardEmbedding Type
 
-**File:** `crates/katgpt-core/src/types.rs` (extends)
+**File:** `crates/katgpt-types/src/lib.rs` (extends)
 
 ```rust
 /// Low-dimensional projection of NeuronShard style_weights for fast similarity search.
