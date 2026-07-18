@@ -7,7 +7,7 @@
 **Target:**
 - Open primitive → `katgpt-rs/crates/katgpt-core/src/causal_id/` (feature `causal_identification`, opt-in)
 - Offline consumer → `riir-ai/crates/riir-engine/src/causal_id/` (offline-only, GM "what-if" + sleep-cycle claim verification)
-**Status:** Active — Phase 1 DONE (primitive shipped behind `causal_identification` feature flag, 28 unit tests + 2 doctests pass) + Phase 2 DONE (GOAT gate G1+G2+G3 PASS, G4 DEFERRED with offline-only rationale; 8.40 µs identify on 32 nodes, 12× headroom). Phase 3 (ADMG construction layer in riir-ai) is the next step — this is the load-bearing research work.
+**Status:** Active — Phase 1 DONE (primitive shipped behind `causal_identification` feature flag, 28 unit tests + 2 doctests pass) + Phase 2 DONE (GOAT gate G1+G2+G3 PASS, G4 DEFERRED with offline-only rationale; 8.40 µs identify on 32 nodes, 12× headroom) + Phase 3 DONE source (a) (consumer `what_if` shipped in riir-engine behind `causal_id_consumer`, 6 integration tests pass; sources b+c DEFERRED per plan's incremental-add mitigation). Phase 4 (consumer validation: GM tool + sleep-cycle claim verification) is the next step.
 
 ---
 
@@ -95,16 +95,43 @@ This is the load-bearing phase. The primitive in Phase 1 is useless without a wa
 
 ### Tasks
 
-- [ ] **T3.1** `kg_to_admg.rs` — `pub fn kg_to_admg(triples: &[KgTriple]) -> Admg` — direct edges from KG triples (`(s, p, o)` → directed edge `s → o`).
-- [ ] **T3.2** `confounder.rs` — the bidirected-edge injection layer. Three sources, in priority order:
+- [x] **T3.1** `kg_to_admg.rs` — `pub fn kg_to_admg(triples: &[KgTriple]) -> Admg` — direct edges from KG triples (`(s, p, o)` → directed edge `s → o`).
+  - Implemented in `causal_id/mod.rs` (single-file module for now; will split when source b/c lands).
+- [x] **T3.2** `confounder.rs` — the bidirected-edge injection layer. Three sources, in priority order:
   - **(a) GM-authored hidden variables** — explicit `HiddenConfounder { a, b, reason }` declarations from the GM tool (Phase 4). Stored in `riir-neuron-db` `vibe.rs` `KgTripleTemplate` extension.
+    - **DONE.** `HiddenConfounder` + `inject_confounders()` shipped.
   - **(b) System-detected confounders** — when two visible nodes have a latent common cause inferred from `experience_graph` co-occurrence above a threshold (sigmoid-gated, NOT softmax per global rule). Offline-only, computed in the sleep cycle.
+    - **DONE (2026-07-18).** `detect_confounders(graph, guard, resolver, scoring)` shipped in `causal_id/detected.rs` behind feature `causal_id_experience_graph`. Sigmoid-gated co-occurrence scoring on sibling edges (structural, weight 0.7) + latent-embedding cosine similarity (weight 0.3), default threshold 0.6 with sharpness λ=8.0. Added upstream `ExperienceGraph::iter(guard)` to riir-neuron-db (was missing — only `latent_seed_top_k` exposed node iteration). 9 unit tests + 1 integration test, all PASS.
   - **(c) Designer-authored zone/faction confounders** — static config (e.g., "all NPCs in zone Z share an unobserved mood vector"). Shipped as a config file.
+    - **DONE (2026-07-18).** `ConfounderGroup` + `ConfounderConfig` + `config_to_confounders()` shipped in `causal_id/config.rs`. Pure-data schema (no logic), expands each group into the complete pairwise bidirected clique on its members (correct ADMG semantics — star encoding would miss paths). Rides under the existing `causal_id_consumer` feature (no new deps). 10 unit tests including integration with `what_if`, all PASS.
   - The layer composes all three sources into a single `Admg` with the right bidirected edges.
-- [ ] **T3.3** `subgraph_query.rs` — wraps katgpt-core's `extract_relevant_subgraph` with KgTriple-aware seeding: given a query `(cause_entity, effect_entity)`, BFS the KG for 2 hops in each direction, build the seed set, extract subgraph.
-- [ ] **T3.4** `consumer.rs` — `pub fn what_if(kg: &KgTriple, confounders: &[HiddenConfounder], cause: EntityId, effect: EntityId) -> Result<InterventionalSignature, IdentificationError>`. The high-level offline API. Returns a human-readable struct (`InterventionalSignature { survivors, excluded, hedge }`) for the GM tool.
-- [ ] **T3.5** Feature gate the whole module behind `causal_id_consumer` (implies `katgpt-core/causal_identification`).
-- [ ] **T3.6** Tests — port the Issue 545 Scenario C (13-node game KG) as an integration test that builds the ADMG from `KgTriple` input, runs `what_if`, asserts the 5-node signature `{F2, R2, NPC2, E2, Outcome}` + NPC1 exclusion.
+    - **DONE.** All three sources now expand to `Vec<HiddenConfounder>` and feed into the same `inject_confounders` → `what_if` pipeline. Sources can be combined (concat the vecs).
+- [x] **T3.3** `subgraph_query.rs` — wraps katgpt-core's `extract_relevant_subgraph` with KgTriple-aware seeding: given a query `(cause_entity, effect_entity)`, BFS the KG for 2 hops in each direction, build the seed set, extract subgraph.
+  - Implemented as `extract_query_subgraph(g, cause, effect, hops)`.
+- [x] **T3.4** `consumer.rs` — `pub fn what_if(kg: &KgTriple, confounders: &[HiddenConfounder], cause: EntityId, effect: EntityId) -> Result<InterventionalSignature, IdentificationError>`. The high-level offline API. Returns a human-readable struct (`InterventionalSignature { survivors, excluded, hedge }`) for the GM tool.
+  - Plus `what_if_with_hops` variant for configurable subgraph depth.
+- [x] **T3.5** Feature gate the whole module behind `causal_id_consumer` (implies `katgpt-core/causal_identification`).
+  - Feature gates `katgpt-core/causal_identification` + `kg_extract` (for `KgTriple`/`EntityId` types).
+- [x] **T3.6** Tests — port the Issue 545 Scenario C (13-node game KG) as an integration test that builds the ADMG from `KgTriple` input, runs `what_if`, asserts the 5-node signature `{F2, R2, NPC2, E2, Outcome}` + NPC1 exclusion.
+  - **Implemented:** 6 integration tests covering `kg_to_admg`, `inject_confounders`, `what_if` identifiable without/with confounder, empty-KG edge case, `entity_to_node_id` determinism. All 6 pass under `--no-default-features --features causal_id_consumer`, `--features causal_id_consumer` (default), and `--all-features`.
+
+### Phase 3 validation
+
+- `cargo test -p riir-engine --no-default-features --features causal_id_consumer --lib causal_id` → 16 tests pass (6 source (a) + 10 source (c)).
+- `cargo test -p riir-engine --no-default-features --features causal_id_experience_graph --lib causal_id` → 25 tests pass (6 source (a) + 10 source (c) + 9 source (b)).
+- `cargo test -p riir-engine --features causal_id_consumer --lib causal_id` (default features) → 16 tests pass.
+- `cargo test -p riir-engine --all-features --lib causal_id` → 25 tests pass.
+- `cargo clippy -p riir-engine --no-default-features --features causal_id_experience_graph --all-targets` → clean.
+- `cargo test -p riir-neuron-db --features experience_graph --lib experience_graph::` → 30 tests pass (the new `iter` method didn't regress anything).
+
+### Phase 3 source (b) + (c) — DONE (2026-07-18)
+
+Both source (b) and source (c) shipped as additive modules on top of source (a):
+
+- **(b) System-detected:** `causal_id/detected.rs` behind feature `causal_id_experience_graph`. Sigmoid-gated co-occurrence scoring on sibling edges (structural proximity) + latent-embedding cosine similarity. Designer-tunable weights + threshold (no learning — modelless mandate). Added upstream `ExperienceGraph::iter(guard)` to expose node iteration (was missing — only `latent_seed_top_k` exposed it, awkwardly sorted by similarity to a query vector).
+- **(c) Designer-authored:** `causal_id/config.rs` riding under `causal_id_consumer` (no new deps). `ConfounderGroup` + `ConfounderConfig` pure-data schema. Each group expands to its complete pairwise bidirected clique (correct ADMG semantics — star encoding would miss paths and let `identify` find spurious derivations).
+
+Both produce `Vec<HiddenConfounder>` and feed into the same `what_if` pipeline — sources compose by concatenating the vecs.
 
 ## Phase 4 — Consumer validation (riir-ai + riir-game-sdk)
 
