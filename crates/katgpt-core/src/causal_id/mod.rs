@@ -45,12 +45,24 @@
 //!
 //! ## Status
 //!
-//! Opt-in via `causal_identification`. Plan 457 Phase 1 — implementation
-//! complete, GOAT gate (Phase 2) pending. The Issue 545 PoC proved the
-//! algorithm strictly dominates Canvas FlowGraph reachability on a
-//! 13-node game KG with a `NPC1 ↔ NPC2` confounder (S2 produces a
-//! 5-node interventional signature that correctly excludes NPC1; S1
-//! yields only a boolean `reaches=true` and cannot see the confounder).
+//! DEFAULT-ON (Plan 457 Phase 5 promotion, 2026-07-18). Plan 457 Phase 1 —
+//! implementation complete. Phase 2 GOAT gate G1+G2+G3 PASS, G4 DEFERRED
+//! with offline-only rationale (8.40µs/32-node identify is well outside
+//! the 20Hz tick). Phase 4 T4.5 synthetic Consumer A bench
+//! (`.benchmarks/464_causal_id_consumer_a_synthetic.md`) cleared the T4.7
+//! promotion gate: 71.7% non-trivial Ok rate (43/60 queries) on a 100-node
+//! game-world KG with 3 faction confounder cliques, 43 actionable
+//! interventional signatures S1 (Canvas FlowGraph reachability) cannot
+//! derive. Consumer B T4.6 (sleep-cycle trace) remains BLOCKED on real-trace
+//! capture + new counterfactual-claim infrastructure (T4.3); per Plan 457
+//! §T4.7 the promotion criterion is Consumer A OR Consumer B, so Consumer A
+//! passing alone is sufficient.
+//!
+//! The Issue 545 PoC proved the algorithm strictly dominates Canvas
+//! FlowGraph reachability on a 13-node game KG with a `NPC1 ↔ NPC2`
+//! confounder (S2 produces a 5-node interventional signature that correctly
+//! excludes NPC1; S1 yields only a boolean `reaches=true` and cannot see
+//! the confounder).
 
 pub mod fixing;
 pub mod identify;
