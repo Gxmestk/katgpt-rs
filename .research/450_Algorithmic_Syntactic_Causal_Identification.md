@@ -70,17 +70,19 @@ For an ADMG `G = (V_G, E_G)`, the generated signature is:
 
 ### 1.5 Theorem 1 — Syntactic ID algorithm
 
-For ADMG `G`, cause `A ⊂ V_G`, effect `Y ⊂ V_G`, with `A ∩ Y = ∅`:
-1. `Y⋆ = an_{G_{V_G\A}}(Y)` — ancestors of Y in the sub-ADMG after removing A.
-2. `D⋆` = districts of subgraph `G_{Y⋆}` (connected components via bidirected edges).
-3. **Identifiability condition**: for every district `D' ∈ D⋆`, the set `V_G \ D'` must be a valid fixing sequence.
-4. **If identifiable**, the interventional signature is:
+> **Correction (2026-07-18, Issue 545 PoC):** The original summary here was a simplified one-pass formulation that is **incorrect** for the classic front-door case. The Cakiqi-Little theorem distills the **recursive Shpitser-Pearl ID algorithm** (Shpitser & Pearl 2006; Richardson et al. 2012); the recursive structure is load-bearing. See §8 PoC Addendum for the bug discovery.
 
-   ```
-   Σ_{Y|do(A)} = Hide_{Y⋆\Y} ( ⋃_{D' ∈ D⋆} Simple(Fixseq_{V_G\D'}(Σ_F)) )
-   ```
+For ADMG `G` with node set `V`, cause `A ⊂ V`, effect `Y ⊂ V`, with `A ∩ Y = ∅`, the algorithm is recursive on c-components (districts):
 
-That's the entire algorithm. It produces a signature where the causal modules are explicitly typed — interpretable as probability distributions, deterministic functions, min-plus biases, or anything else.
+1. **Ancestor restriction.** `W = An(Y)_{G[V\A]}` — ancestors of Y in the sub-ADMG after removing A. If `W ≠ V \ A`, recurse on the smaller graph: `ID(Y, A ∩ W, G[W])`.
+2. **District decomposition.** Let `C(G)` = c-components (districts via bidirected edges) of the **original** `G` (NOT of `G[Y⋆]` — this was the simplification bug). For each district `D'` that intersects `Y⋆`:
+   - If `D' = V` itself (the entire graph is one c-component containing `Y⋆`) → **FAIL: hedge / NotIdentifiable**.
+   - Else **recurse**: `ID(D' ∩ Y⋆, V \ D', G[D'])` — fixing the rest of the graph first, then identifying within the district.
+3. **Combine.** Multiply / combine the per-district signatures; hide `Y⋆ \ Y`.
+
+The FAIL condition (step 2) is the **hedge criterion**: a hedge exists iff some c-component `F` of `G` is contained in another c-component `F'` where `F ⊆ Y⋆` and `F' ⊈ Y⋆`. The canonical hedge is the **bow-arc** (`A → Y`, `A ↔ Y`) — verified as Scenario D in the Issue 545 PoC.
+
+**Front-door worked example** (the case the original summary got wrong): ADMG `A → M → Y`, `A ↔ Y`. Query `Σ_{Y|do(A)}`. `Y⋆ = An(Y)_{G[V\A]} = {M, Y}`. Districts of original `G`: `{A, Y}` (via A↔Y) and `{M}`. `{A, Y} ∩ Y⋆ = {Y}` ≠ `V`, so recurse into district `{A, Y}` with new intervention set `V \ {A, Y} = {M}` — i.e. fix M first. After fixing M, identify `Y` within the reduced graph. **Result: identifiable via the front-door formula.** The one-pass summary failed here because it computed districts of `G[Y⋆]` (which drops A, hiding the A↔Y confounder) instead of districts of the original `G`.
 
 ### 1.6 Applications in the paper
 
@@ -218,9 +220,13 @@ The latent reframing confirms: the algorithm is genuinely orthogonal to our late
 - **riir-neuron-db (private shards):** the `vibe.rs` KgTripleTemplate + `MerkleFrozenEnvelope` would be the natural input/output layers. Today no consumer.
 - **riir-train:** N/A — no training component.
 
-### 3.3 §3.6 defend-wrong PoC — NOT triggered now
+### 3.3 §3.6 defend-wrong PoC — DONE 2026-07-18 (Issue 545)
 
-The §3.6 PoC rule triggers for PASS verdicts that downgrade on "runtime analog already ships" OR for quality-parity claims. This verdict is **Gain** (not PASS) and makes **no quality-parity claim** — it explicitly states the gain is unmeasured (no empirical validation in the paper) and the consumer is unspecified. A PoC is the right *follow-up* for the fusion's potential Super-GOAT re-evaluation (concrete consumer + head-to-head against a simpler graph-reachability baseline), not a blocker for the Gain.
+**PoC landed:** [`riir-ai/crates/riir-poc/benches/causal_id_defend_wrong_poc.rs`](../../../riir-ai/crates/riir-poc/benches/causal_id_defend_wrong_poc.rs) (commit `253406d9`, riir-ai). Three competitors (S0 no-intervention, S1 Canvas FlowGraph reachability, S2 Cakiqi-Little) on four scenarios (A front-door, B back-door, C realistic 13-node game KG with `NPC1 ↔ NPC2` bidirected confounder, D bow-arc negative control).
+
+**Verdict: GAIN PROVEN.** See §8 PoC Addendum for the full numbers + honest caveats. The Gain verdict is **upheld and strengthened** — S2 produces a 5-node interventional signature on Scenario C that excludes the confounder path Canvas would mis-attribute, and correctly returns `Err(NotIdentifiable)` on Scenario D. The PoC's positive findings unblock the consumer plan (`katgpt-rs/.plans/457_*`); its three honest caveats become design constraints in that plan.
+
+(Original 2026-07-18 pre-PoC note, preserved for context: the §3.6 PoC rule triggers for PASS verdicts that downgrade on "runtime analog already ships" OR for quality-parity claims. This verdict was **Gain** and made no quality-parity claim — but the PoC was run anyway as the T0 pre-flight gate for Super-GOAT re-evaluation, per the issue opener's request.)
 
 ### 3.4 §1.55 PASS-vs-Gain check — Gain, not Pass
 
@@ -350,15 +356,18 @@ This is where the fusion with Tropical (Plan 337, R321) would land — the min-p
 
 ---
 
-## 6. Plan — NOT scheduled
+## 6. Plan — OPENED 2026-07-18 (Plan 457)
 
-No plan created. The fusion follow-up (§2.5) is tracked here, not in `.plans/`. Re-open a Super-GOAT gate IF:
+**Consumer plan created:** [`katgpt-rs/.plans/457_causal_id_counterfactual_npc_reasoning.md`](../.plans/457_causal_id_counterfactual_npc_reasoning.md) — offline counterfactual NPC reasoning consumer.
 
-- A concrete consumer materializes (e.g., a future "counterfactual NPC reasoning" plan, or a GM "what-if" tool that needs to answer counterfactual questions over the game-world KG).
-- A PoC in `riir-ai/crates/riir-poc/` shows the algorithm produces non-trivial interventional signatures on a realistic game-world KG (≥10 nodes, ≥1 bidirected confounder).
-- The PoC beats a simpler baseline (graph reachability via Canvas `FlowGraph`, or plain Bayesian-network inference if we ever ship one).
+The Issue 545 PoC (§8) proved the gain on Scenario C (realistic 13-node game KG with bidirected confounder): S2 produces a 5-node interventional signature that excludes the confounder path; Canvas reachability cannot. The consumer plan turns this proof into a shipped primitive behind feature flag `causal_identification` in `katgpt-rs/crates/katgpt-core/src/causal_id/` + an offline consumer in riir-ai.
 
-If all three pass, the Super-GOAT gate (Q1–Q4 + MOAT per domain) should be re-run before creating the private guide.
+**The three honest caveats from the PoC (§8) become explicit design constraints in Plan 457:**
+1. ADMG construction from `KgTriple` (directed-only) is itself a modeling research question — the plan must specify how confounders get added (unobserved faction tensions, latent resource shortages).
+2. `O(k²)` to `O(k³)` latency scaling — the consumer must specify a subgraph-extraction strategy (identify over a 20-node relevant subgraph, not the whole 1000-node KG).
+3. **Offline-only** — not the 20Hz tick. Consumer is offline counterfactual reasoning, GM "what-if" tooling, or quest authoring.
+
+**Super-GOAT re-evaluation:** the PoC proves Q2 (new class of behavior — algorithmic counterfactual query planning) and Q3 (product selling point — "NPCs that reason counterfactually about the game-world KG, syntactically, even under unobserved confounders"). Combined with the original Q1 (no prior art) and Q4 (≥7 pillar connections), the Super-GOAT gate (Q1–Q4 + MOAT) is **re-opened**. If Plan 457 lands a concrete consumer + the GOAT gate passes, the private guide is created (per research skill §1.5 mandatory outputs) and the verdict is upgraded Gain → Super-GOAT.
 
 ---
 
@@ -373,9 +382,67 @@ If all three pass, the Super-GOAT gate (Q1–Q4 + MOAT per domain) should be re-
 - **Tropical (max,+):** Plan 337, Research 321 — the min-plus interpretation the paper mentions in §3.1.
 - **Claim Rubric:** Plan 307 — L1/L2/L3 evidence ladder, potential consumer for interventional signatures.
 - **LatCal commitment:** `riir-chain/src/encoding/latcal*.rs` — sync-boundary bridge angle for committed causal claims.
+- **PoC:** [`riir-ai/crates/riir-poc/benches/causal_id_defend_wrong_poc.rs`](../../../riir-ai/crates/riir-poc/benches/causal_id_defend_wrong_poc.rs) (Issue 545, commit `253406d9`)
+- **Consumer plan:** [Plan 457](../.plans/457_causal_id_counterfactual_npc_reasoning.md) (opened 2026-07-18)
+
+---
+
+## 8. PoC Addendum (Issue 545, 2026-07-18)
+
+**PoC file:** [`riir-ai/crates/riir-poc/benches/causal_id_defend_wrong_poc.rs`](../../../riir-ai/crates/riir-poc/benches/causal_id_defend_wrong_poc.rs) (909 lines, commit `253406d9`).
+
+**Setup:** Three competitors — S0 no-intervention (collapses to S1 — Canvas can't distinguish observe from intervene, documented honestly as a PoC finding), S1 Canvas FlowGraph reachability (Plan 419, feature `canvas_schema`), S2 Cakiqi-Little Theorem 1 syntactic ID (modelless, implemented in the bench). Four scenarios: A classic front-door (3 nodes), B classic back-door (3 nodes), C realistic game-world KG (13 nodes, `NPC1 ↔ NPC2` bidirected confounder), D bow-arc negative control (2 nodes).
+
+### 8.1 Verdict table
+
+| Scenario | n | dir | bi | S0 (ns) | S1 (ns) | S2 (ns) | S2 result | Ground truth |
+|---|---|---|---|---|---|---|---|---|
+| A front-door | 3 | 2 | 1 | 1375 | 459 | 10375 | `Ok({M, Y})` | IDENTIFIABLE ✓ |
+| B back-door | 3 | 3 | 0 | 750 | 375 | 7750 | `Ok({Z, Y})` | IDENTIFIABLE ✓ |
+| C game KG | 13 | 11 | 1 | 1333 | 833 | 23959 | `Ok({F2, R2, NPC2, E2, Outcome})` | IDENTIFIABLE ✓ |
+| D bow-arc | 2 | 1 | 1 | 667 | 375 | 1458 | `Err(NotIdentifiable)` | NOT IDENTIFIABLE ✓ |
+
+**All four scenarios match analytical ground truth.** Scenario D negative control PASSES (algorithm honestly fails on the bow-arc hedge).
+
+### 8.2 The load-bearing finding (Scenario C)
+
+On the realistic 13-node game KG with `NPC1 ↔ NPC2` bidirected confounder (unobserved faction tension), querying `identify(Outcome, do(E1))`:
+
+- **S1 (Canvas reachability):** `reaches(E1, Outcome) = true`. Boolean only. Canvas would ALSO flag `NPC1 → E1 → Outcome` as a cause path. Canvas cannot see the confounder.
+- **S2 (Cakiqi-Little):** Produces a 5-node interventional signature `{F2, R2, NPC2, E2, Outcome}`. **EXCLUDES NPC1** — the confounder path is correctly cut by `do(E1)`. Canvas would mis-attribute NPC1 as a cause; S2 correctly excludes it.
+
+This is the non-trivial interventional signature Canvas reachability cannot derive. **S2 strictly dominates S1 on Scenario C.**
+
+### 8.3 Latency characterization
+
+S2 is 4–29× slower than S1 (graph rewriting vs. alloc-free bitset lookup). Scenario C (13 nodes) runs in **~24µs** — ~400× under the research note's "offline 5–10ms+" budget ceiling. Confirms the offline-only caveat (risk #3). Consistent with `O(k²)` to `O(k³)` scaling for `k`-node ADMGs; a 1000-node KG would be 100ms–10s, so subgraph extraction is required for any realistic consumer.
+
+### 8.4 Algorithm bug caught by the PoC (§1.5 correction)
+
+The original §1.5 algorithm summary was a simplified one-pass formulation that computed districts of `G[Y⋆]` instead of districts of the original `G`. **This is wrong for the classic front-door case** (`A → M → Y`, `A ↔ Y`): computing districts of `G[Y⋆] = G[{M,Y}]` drops A from the subgraph, hiding the `A ↔ Y` confounder, so district decomposition yields `{M}, {Y}` instead of the correct `{A, Y}, {M}`. The one-pass identifiability check then fails on district `{Y}` (because `V \ {Y} = {A, M}` is not a valid fixing sequence — `A`'s bidirected district `{A, Y}` requires `Y` to also be in the fixing set). The buggy formulation would return `NotIdentifiable` for the classic front-door — a soundness failure.
+
+**Fix (landed in the PoC, propagated to §1.5):** implement the recursive Shpitser-Pearl ID algorithm — districts of the **original** `G` (not `G[Y⋆]`), with recursion on each district. The FAIL condition is the hedge criterion: the entire `V` is a single c-component containing `Y⋆`. The bow-arc (`A → Y`, `A ↔ Y`) is the canonical hedge — verified as Scenario D.
+
+**Lesson:** research-note algorithm summaries should be validated by a PoC before being trusted as ground truth. The PoC's job is to defend OR refute; here it caught a soundness bug in the note's own algorithm description.
+
+### 8.5 Three honest caveats (carried forward to Plan 457 as design constraints)
+
+1. **ADMG construction from `KgTriple` is itself a modeling research question.** Our `KgTriple` is directed-only. The plan must specify *how* confounders get added (unobserved faction tensions, latent resource shortages, GM-authored hidden variables). This is not just an implementation task — it is a research question that Plan 457 must address.
+2. **Latency scaling.** Scenario C (13 nodes) ran in 24µs; a 1000-node KG would be 100ms–10s. The consumer must specify a **subgraph extraction** strategy — identify over a 20-node relevant subgraph (e.g., 2-hop neighborhood of the query nodes), not the whole KG.
+3. **Offline-only.** S2 cannot run in the 20Hz tick. The consumer must be **offline** counterfactual reasoning, GM "what-if" tooling, quest authoring, or sleep-cycle claim verification — NOT hot-loop NPC decisions.
+
+### 8.6 Overall verdict
+
+**GAIN PROVEN.** The PoC defends the original Gain verdict with empirical evidence. S2 produces information S1 cannot derive on the realistic Scenario C, and correctly fails on the negative control. The Gain verdict is **upheld and strengthened** — Q2 (new class) and Q3 (selling point) now have empirical support, reopening the Super-GOAT gate contingent on Plan 457 landing a concrete consumer.
 
 ---
 
 ## TL;DR
 
-**Verdict: Gain.** Algorithmic syntactic causal identification (arXiv:2403.09580) is a **purely modelless, graph-rewriting algorithm** for deriving interventional signatures `Σ_{Y|do(A)}` from ADMGs with latent confounders, using symmetric monoidal categories instead of probability theory. It is **genuinely novel** to our stack (zero prior-art hits across all 7 repos, both paper and codebase vocabulary, three-layer check). It is **strictly more than Canvas Engineering 398 ships** (Canvas *declares* topology + reads off reachability; this paper *algorithmically derives* interventional signatures from arbitrary confounded ADMGs). But: (a) the paper is purely theoretical with no empirical validation, (b) **no concrete consumer needs it today** — NPCs decide via forward-pass + sigmoid gate, validators check commitment consistency, the KG is used for retrieval not counterfactual reasoning, (c) the algorithm is offline-only (5–10ms+, not 20Hz-tick-compatible), (d) ADMGs with bidirected confounder edges don't naturally arise in our directed `KgTriple` substrate. The fusion opportunity (Canvas × this × KG triples × experience_graph × Claim Rubric → offline counterfactual NPC reasoning + GM "what-if" tooling) is tracked as TBD — re-open the Super-GOAT gate IF a concrete consumer materializes and a PoC beats a simpler reachability baseline. **No plan, no guide, no implementation scheduled.** Research note only.
+**Verdict: Gain → PoC-confirmed 2026-07-18 (Issue 545), Super-GOAT re-opened contingent on Plan 457.** Algorithmic syntactic causal identification (arXiv:2403.09580) is a **purely modelless, graph-rewriting algorithm** for deriving interventional signatures `Σ_{Y|do(A)}` from ADMGs with latent confounders, using symmetric monoidal categories instead of probability theory. It is **genuinely novel** to our stack (zero prior-art hits across all 7 repos). It is **strictly more than Canvas Engineering 398 ships** (Canvas *declares* topology + reads off reachability; this paper *algorithmically derives* interventional signatures from arbitrary confounded ADMGs).
+
+**PoC (Issue 545, §8):** Three competitors × four scenarios. S2 strictly dominates S1 on the realistic Scenario C (13-node game KG with `NPC1 ↔ NPC2` bidirected confounder): S2 produces a 5-node interventional signature `{F2, R2, NPC2, E2, Outcome}` that **excludes NPC1** (the confounder path Canvas would mis-attribute). S2 correctly returns `Err(NotIdentifiable)` on the bow-arc negative control (Scenario D). Latency: ~24µs on 13 nodes — well within the offline budget, ~400× under ceiling. **GAIN PROVEN empirically.**
+
+**Algorithm correction (§1.5):** the PoC caught a soundness bug in the original one-pass algorithm summary (districts of `G[Y⋆]` instead of original `G`); fixed to the recursive Shpitser-Pearl ID formulation. Research-note algorithm summaries should be PoC-validated before being trusted.
+
+**Plan 457 opened** to ship the primitive behind feature flag `causal_identification` in `katgpt-rs/crates/katgpt-core/src/causal_id/` + an offline consumer in riir-ai. Three honest caveats (ADMG construction from directed `KgTriple`, `O(k²)`-`O(k³)` subgraph extraction, offline-only) become explicit design constraints in the plan. **Super-GOAT gate re-opened** — if Plan 457 lands a concrete consumer + the GOAT gate passes, the private guide is created and the verdict is upgraded Gain → Super-GOAT.
