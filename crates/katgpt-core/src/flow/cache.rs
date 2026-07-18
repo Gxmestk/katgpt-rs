@@ -10,6 +10,8 @@ use rustfft::{FftPlanner, num_complex::Complex};
 use super::{
     FlowField, FlowFieldConfig, LeoPotentialGrid, fft_smooth_into, inflate_obstacles_with_snapshot,
 };
+#[cfg(feature = "dual_leo")]
+use crate::traits::DualLeoMixer;
 use crate::traits::LeoHead;
 
 /// Per-goal cached flow field with dirty-tracking metadata.
@@ -133,6 +135,11 @@ impl FlowFieldCache {
     /// Returns `None` if:
     /// - `npc_count < min_npcs` (individual LEO should be used instead).
     /// - The goal index is out of range for the head.
+    ///
+    /// This is the **LEO-only** path (`ActingMode::LeoOnly` in Plan 155's vocabulary).
+    /// For the dual teacher-student mix, see [`get_or_compute_dual`](Self::get_or_compute_dual)
+    /// (Plan 459), which mixes LEO + UVFA Q-slices via `DualLeoMixer::combine_into`
+    /// before building the same `LeoPotentialGrid`.
     #[allow(clippy::too_many_arguments)]
     pub fn get_or_compute<H: LeoHead>(
         &mut self,
@@ -145,18 +152,107 @@ impl FlowFieldCache {
         tick: u64,
         npc_count: u16,
     ) -> Option<&FlowField> {
-        // Skip if too few NPCs share this goal.
-        if npc_count < self.min_npcs {
+        let (cached_valid, goal_q) = self.validate_and_extract_single(
+            goal_id, head, state, goal_idx, grid_w, grid_h, tick, npc_count,
+        )?;
+        if cached_valid {
+            return self.fields.get(&goal_id).map(|c| &c.field);
+        }
+        // `validate_and_extract_single` returned the goal_q slice as `&[f32]` borrow
+        // from `head.all_goals_q` (a fresh Vec owned locally inside the helper). To
+        // make the borrow checker happy across the helper boundary, the helper
+        // returns an owned `Vec<f32>` for the goal slice — see its doc-comment.
+        // For the single-head path we can pass it directly to `compute_from_q_slice`.
+        self.compute_from_q_slice(goal_id, &goal_q, grid_w, grid_h, tick)
+    }
+
+    /// Get or compute a flow field for a goal, mixing LEO teacher + UVFA student
+    /// Q-slices via a [`DualLeoMixer`] (Plan 459).
+    ///
+    /// `head_leo` is the all-goals Q-teacher (broad, modelless). `head_uvfa` is
+    /// the goal-conditioned student (sharp, may be model-based). The mixer's
+    /// [`DualLeoMixer::combine_into`] applies the configured `ActingMode`
+    /// (Lc / LeoOnly / UvfaOnly / Max / Min) at `alpha` to produce the mixed
+    /// Q-slice, which is then fed through the same FFT-smoothed gradient pipeline
+    /// as [`get_or_compute`](Self::get_or_compute).
+    ///
+    /// **Cache key caveat:** `goal_id` is the cache key. Callers that vary `alpha`
+    /// for the same goal MUST encode `alpha` into `goal_id` (e.g. hash goal + α),
+    /// otherwise the cache will return the field computed at the first α seen.
+    ///
+    /// **Quality caveat (Plan 459 GOAT — honest demotion):** On a synthetic
+    /// 64×64 landscape with a broad-LEO + sharp-UVFA mock pair, the paper's
+    /// default α=0.3 did NOT beat the LEO-only baseline by the 30%
+    /// stuck-reduction gate (achieved only 3.7%). An α-sweep {0.1..0.9} found
+    /// 25.9% at α=0.1 (best) but no α reached the gate. Root cause: the
+    /// downstream pipeline applies `max-over-actions` + FFT smoothing, both
+    /// nonlinear, which washes out the α-weighting done on raw Q-slices.
+    /// Callers should NOT assume the paper's α=0.3 default transfers to flow
+    /// fields — sweep α for your specific heads, or consider mixing post-max
+    /// potentials (out of scope for Plan 459). See
+    /// [`.benchmarks/459_flow_field_dual_leo_mixer_goat.md`](../../../../.benchmarks/459_flow_field_dual_leo_mixer_goat.md)
+    /// for the full report.
+    ///
+    /// Returns `None` under the same conditions as `get_or_compute`, plus if the
+    /// two heads return incompatible goal/action counts.
+    #[cfg(feature = "dual_leo")]
+    #[allow(clippy::too_many_arguments)]
+    pub fn get_or_compute_dual<H1, H2, M>(
+        &mut self,
+        goal_id: u64,
+        head_leo: &H1,
+        head_uvfa: &H2,
+        mixer: &M,
+        alpha: f32,
+        state: &[f32],
+        goal_idx: usize,
+        grid_w: u16,
+        grid_h: u16,
+        tick: u64,
+        npc_count: u16,
+    ) -> Option<&FlowField>
+    where
+        H1: LeoHead,
+        H2: LeoHead,
+        M: DualLeoMixer,
+    {
+        let cached_valid = self.check_cache(goal_id, tick, npc_count)?;
+        if cached_valid {
+            return self.fields.get(&goal_id).map(|c| &c.field);
+        }
+
+        // Validate goal index against both heads.
+        if goal_idx >= head_leo.goal_count() || goal_idx >= head_uvfa.goal_count() {
             return None;
         }
 
-        // Check for a valid cached entry via single lookup. `entry()` would resolve
-        // the bucket and let us return `&e.get().field` directly, but the borrow
-        // checker forbids returning the entry handle from this scope, so we'd pay
-        // a second `[&goal_id]` hash on the cache-hit fast path. Instead, use `get`
-        // for the validation pass and a second `get` only on the cache-hit return —
-        // both probes are cheap (same hash, hot bucket), and this avoids `entry()`'s
-        // bookkeeping for the common case.
+        // Extract Q-slices from both heads for this goal.
+        let q_leo_all = head_leo.all_goals_q(state);
+        let q_leo = head_leo.q_for_goal(&q_leo_all, goal_idx);
+        let q_uvfa_all = head_uvfa.all_goals_q(state);
+        let q_uvfa = head_uvfa.q_for_goal(&q_uvfa_all, goal_idx);
+
+        // Mix via DualLeoMixer (allocates the combined slice — single per cache-miss).
+        let mut q_mixed = vec![0.0f32; q_leo.len()];
+        mixer.combine_into(&mut q_mixed, q_leo, q_uvfa, alpha);
+
+        self.compute_from_q_slice(goal_id, &q_mixed, grid_w, grid_h, tick)
+    }
+
+    /// Cache validation + npc_count gate (shared by both entry points).
+    ///
+    /// Returns `Some(cached_valid)` if the call should proceed (with `cached_valid=true`
+    /// meaning "hot cache hit, skip compute"), or `None` if the call should early-return `None`.
+    #[inline]
+    fn check_cache(
+        &self,
+        goal_id: u64,
+        tick: u64,
+        npc_count: u16,
+    ) -> Option<bool> {
+        if npc_count < self.min_npcs {
+            return None;
+        }
         let cached_valid = match self.fields.get(&goal_id) {
             Some(cached) => {
                 cached.dirty_count == 0
@@ -165,31 +261,74 @@ impl FlowFieldCache {
             }
             None => false,
         };
-        if cached_valid {
-            return self.fields.get(&goal_id).map(|c| &c.field);
-        }
+        Some(cached_valid)
+    }
 
-        // Validate goal index.
+    /// Validate goal index + extract the goal-Q slice from a single head.
+    ///
+    /// Returns `Some((cached_valid, goal_q_owned))` or `None` on early-exit.
+    /// The goal-Q slice is returned as an **owned** `Vec<f32>` because the
+    /// upstream `head.all_goals_q(state)` returns an owned `Vec<f32>` that
+    /// would otherwise drop at helper return.
+    #[allow(clippy::too_many_arguments)]
+    fn validate_and_extract_single<H: LeoHead>(
+        &self,
+        goal_id: u64,
+        head: &H,
+        state: &[f32],
+        goal_idx: usize,
+        grid_w: u16,
+        grid_h: u16,
+        tick: u64,
+        npc_count: u16,
+    ) -> Option<(bool, Vec<f32>)> {
+        let cached_valid = self.check_cache(goal_id, tick, npc_count)?;
+        if cached_valid {
+            // Hot cache hit — no need to extract Q at all.
+            return Some((true, Vec::new()));
+        }
         if goal_idx >= head.goal_count() {
             return None;
         }
-
-        // Extract Q-values for this goal.
         let all_q = head.all_goals_q(state);
-        let goal_q = head.q_for_goal(&all_q, goal_idx);
-
-        // Derive actions_per_cell from total action count and grid dimensions.
+        let goal_q = head.q_for_goal(&all_q, goal_idx).to_vec();
+        // Pre-validate actions_per_cell here so compute_from_q_slice can be pure.
         let total_cells = (grid_w as usize) * (grid_h as usize);
-        let actions_per_cell = match total_cells {
-            0 => return None,
-            cells => head.action_count() / cells,
-        };
+        if total_cells == 0 {
+            return None;
+        }
+        if head.action_count() / total_cells == 0 {
+            return None;
+        }
+        Some((false, goal_q))
+    }
+
+    /// Pure helper: take a goal-Q slice and produce (or fetch from cache) a `FlowField`.
+    ///
+    /// The caller is responsible for cache validation + npc_count gate before this.
+    /// This function always stores the freshly-computed field under `goal_id`.
+    fn compute_from_q_slice(
+        &mut self,
+        goal_id: u64,
+        goal_q: &[f32],
+        grid_w: u16,
+        grid_h: u16,
+        tick: u64,
+    ) -> Option<&FlowField> {
+        // Derive actions_per_cell from goal_q length and grid dimensions.
+        // (Validated upstream: goal_q.len() == actions_per_cell * total_cells.)
+        let total_cells = (grid_w as usize) * (grid_h as usize);
+        if total_cells == 0 {
+            return None;
+        }
+        let actions_per_cell = goal_q.len() / total_cells;
         if actions_per_cell == 0 {
             return None;
         }
 
-        // Build potential grid from Q-values.
-        let mut grid = LeoPotentialGrid::from_q_values(grid_w, grid_h, goal_q, actions_per_cell);
+        // Build potential grid from the (possibly mixed) Q-slice.
+        let mut grid =
+            LeoPotentialGrid::from_q_values(grid_w, grid_h, goal_q, actions_per_cell);
 
         // Inflate obstacles before FFT to prevent flow into walls.
         let words_per_row = (grid_w as usize).div_ceil(64);
@@ -591,5 +730,192 @@ mod tests {
             f2.is_some(),
             "should return a field even after topology change"
         );
+    }
+
+    // ──── Plan 459: DualLeoMixer fusion tests ────────────────────────────
+
+    /// A trivial mixer that uses the default `combine_into` (Lc / LeoOnly / UvfaOnly / Max / Min).
+    #[cfg(feature = "dual_leo")]
+    struct TestMixer(crate::traits::ActingMode);
+
+    #[cfg(feature = "dual_leo")]
+    impl crate::traits::DualLeoMixer for TestMixer {
+        fn acting_mode(&self) -> crate::traits::ActingMode {
+            self.0
+        }
+    }
+
+    /// Second head with a *different* Q-shape so the dual mix is observable.
+    /// Constant 0.5 everywhere → under Lc at α=0.3 the mixed Q is
+    /// `0.3·q_leo + 0.7·0.5`, which is a uniform shift that should not change
+    /// the gradient direction (only its magnitude, which the FlowField normalises
+    /// away). This makes the G1 baseline sanity check clean.
+    #[cfg(feature = "dual_leo")]
+    struct ConstantHead {
+        goals: usize,
+        actions: usize,
+        grid_w: u16,
+        grid_h: u16,
+        value: f32,
+    }
+
+    #[cfg(feature = "dual_leo")]
+    impl LeoHead for ConstantHead {
+        fn all_goals_q(&self, _state: &[f32]) -> Vec<f32> {
+            vec![self.value; self.goals * (self.grid_w as usize) * (self.grid_h as usize) * self.actions]
+        }
+        #[inline]
+        fn goal_count(&self) -> usize {
+            self.goals
+        }
+        fn action_count(&self) -> usize {
+            (self.grid_w as usize) * (self.grid_h as usize) * self.actions
+        }
+        fn q_for_goal<'a>(&self, all_q: &'a [f32], goal: usize) -> &'a [f32] {
+            let per_goal = (self.grid_w as usize) * (self.grid_h as usize) * self.actions;
+            let start = goal * per_goal;
+            &all_q[start..start + per_goal]
+        }
+    }
+
+    /// G1 (correctness): `get_or_compute_dual` with `ActingMode::LeoOnly`
+    /// produces bit-identical `FlowField` to `get_or_compute` with the same
+    /// LEO head, same state, same goal.
+    #[cfg(feature = "dual_leo")]
+    #[test]
+    fn test_dual_leo_only_matches_single_head_bit_identical() {
+        let mut cache_a = FlowFieldCache::new(test_config()).with_min_npcs(1);
+        let mut cache_b = FlowFieldCache::new(test_config()).with_min_npcs(1);
+        let head_leo = make_head();
+        let head_uvfa = ConstantHead {
+            goals: 1,
+            actions: 4,
+            grid_w: 4,
+            grid_h: 4,
+            value: 0.5,
+        };
+        let mixer = TestMixer(crate::traits::ActingMode::LeoOnly);
+
+        let single = cache_a.get_or_compute(7, &head_leo, &[0.0], 0, 4, 4, 0, 5).unwrap();
+        let dual = cache_b
+            .get_or_compute_dual(7, &head_leo, &head_uvfa, &mixer, 0.3, &[0.0], 0, 4, 4, 0, 5)
+            .unwrap();
+
+        // Bit-identical: LeoOnly mode copies q_leo unchanged into the pipeline.
+        assert_eq!(single.width(), dual.width());
+        assert_eq!(single.height(), dual.height());
+        for y in 0..single.height() {
+            for x in 0..single.width() {
+                let a = single.lookup(x, y);
+                let b = dual.lookup(x, y);
+                assert_eq!(a, b, "mismatch at ({x},{y}): single={a:?} dual={b:?}");
+            }
+        }
+    }
+
+    /// Sanity: `ActingMode::UvfaOnly` should produce the same field as calling
+    /// `get_or_compute` directly with the UVFA head.
+    #[cfg(feature = "dual_leo")]
+    #[test]
+    fn test_dual_uvfa_only_matches_uvfa_head() {
+        let mut cache_a = FlowFieldCache::new(test_config()).with_min_npcs(1);
+        let mut cache_b = FlowFieldCache::new(test_config()).with_min_npcs(1);
+        let head_leo = make_head();
+        let head_uvfa = ConstantHead {
+            goals: 1,
+            actions: 4,
+            grid_w: 4,
+            grid_h: 4,
+            value: 0.9,
+        };
+        let mixer = TestMixer(crate::traits::ActingMode::UvfaOnly);
+
+        let direct = cache_a.get_or_compute(7, &head_uvfa, &[0.0], 0, 4, 4, 0, 5).unwrap();
+        let dual = cache_b
+            .get_or_compute_dual(7, &head_leo, &head_uvfa, &mixer, 0.0, &[0.0], 0, 4, 4, 0, 5)
+            .unwrap();
+
+        for y in 0..direct.height() {
+            for x in 0..direct.width() {
+                assert_eq!(direct.lookup(x, y), dual.lookup(x, y), "at ({x},{y})");
+            }
+        }
+    }
+
+    /// Sanity: `get_or_compute_dual` with the default Lc mode and α=0.3 produces
+    /// a valid (non-empty) FlowField. The constant-0.5 UVFA should shift the
+    /// potential but the gradient direction (after FFT smoothing) should remain
+    /// oriented the same way.
+    #[cfg(feature = "dual_leo")]
+    #[test]
+    fn test_dual_lc_mode_produces_valid_field() {
+        let mut cache = FlowFieldCache::new(test_config()).with_min_npcs(1);
+        let head_leo = make_head();
+        let head_uvfa = ConstantHead {
+            goals: 1,
+            actions: 4,
+            grid_w: 4,
+            grid_h: 4,
+            value: 0.5,
+        };
+        let mixer = TestMixer(crate::traits::ActingMode::Lc);
+
+        let dual = cache
+            .get_or_compute_dual(11, &head_leo, &head_uvfa, &mixer, 0.3, &[0.0], 0, 4, 4, 0, 5);
+        assert!(dual.is_some(), "dual Lc path should produce a field");
+        let dual = dual.unwrap();
+        assert_eq!(dual.width(), 4);
+        assert_eq!(dual.height(), 4);
+    }
+
+    /// Cache key caveat: same `goal_id` with different α should still return the
+    /// **first** cached field. Callers must encode α into the goal_id. Documented
+    /// behavior — we test it to make sure the contract holds.
+    #[cfg(feature = "dual_leo")]
+    #[test]
+    fn test_dual_cache_key_is_goal_id_only() {
+        let mut cache = FlowFieldCache::new(test_config()).with_min_npcs(1);
+        let head_leo = make_head();
+        let head_uvfa = ConstantHead {
+            goals: 1,
+            actions: 4,
+            grid_w: 4,
+            grid_h: 4,
+            value: 0.5,
+        };
+        let mixer = TestMixer(crate::traits::ActingMode::Lc);
+
+        // First call at α=0.3 — populates cache under goal_id=42.
+        let f_first = cache
+            .get_or_compute_dual(42, &head_leo, &head_uvfa, &mixer, 0.3, &[0.0], 0, 4, 4, 0, 5)
+            .unwrap();
+        let first_lookup = f_first.lookup(0, 0);
+
+        // Second call at α=0.9, same goal_id=42, same tick → cache hit, returns the α=0.3 field.
+        let f_cached = cache
+            .get_or_compute_dual(42, &head_leo, &head_uvfa, &mixer, 0.9, &[0.0], 0, 4, 4, 0, 5)
+            .unwrap();
+        assert_eq!(f_cached.lookup(0, 0), first_lookup, "cache key is goal_id only; α is not part of the key");
+    }
+
+    /// Dual path respects npc_count gate (same as single path).
+    #[cfg(feature = "dual_leo")]
+    #[test]
+    fn test_dual_returns_none_below_min_npcs() {
+        let mut cache = FlowFieldCache::new(test_config()).with_min_npcs(3);
+        let head_leo = make_head();
+        let head_uvfa = ConstantHead {
+            goals: 1,
+            actions: 4,
+            grid_w: 4,
+            grid_h: 4,
+            value: 0.5,
+        };
+        let mixer = TestMixer(crate::traits::ActingMode::Lc);
+
+        let result = cache.get_or_compute_dual(
+            42, &head_leo, &head_uvfa, &mixer, 0.3, &[0.0], 0, 4, 4, 0, 2,
+        );
+        assert!(result.is_none(), "dual path should respect npc_count gate");
     }
 }

@@ -386,6 +386,15 @@ name = "flow_field_bench"
 harness = false
 required-features = ["flow_field_nav"]
 
+# Plan 459 — FlowField × DualLeoMixer fusion GOAT gate.
+# Proves the modelless fusion (LEO teacher + UVFA student mixed via DualLeoMixer
+# at α=0.3 Lc) produces a measurably better navigation field than the LEO-only
+# baseline. G1 bit-identity, G2 ≤1.5× perf overhead, G5 ≥30% stuck-NPC reduction.
+[[bench]]
+name = "dual_flow_field_bench"
+harness = false
+required-features = ["flow_field_nav", "dual_leo"]
+
 [[bench]]
 name = "merkle_octree_bench"
 harness = false

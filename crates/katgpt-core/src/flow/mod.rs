@@ -20,6 +20,7 @@ pub use steering::{blend_steering, flow_steering, should_use_flow_field};
 ///
 /// One per goal (or per goal-group for shared goals).
 /// Vectors are stored row-major as `[w * h * 2]` with `(dx, dy)` pairs.
+#[derive(Clone)]
 pub struct FlowField {
     /// Flow vectors: `[w * h * 2]` — `(dx, dy)` per cell, row-major.
     /// Normalised to unit length or zero for blocked cells.
