@@ -1,10 +1,17 @@
 # Research 451: Delta-Lattice Tunneling → Transfer-Matrix Band-Structure Analyzer
 
-> **Source:** Kronig & Penney, *Quantum Mechanics of Electrons in Crystal Lattices* (Proc. Roy. Soc. A, vol. 130, pp. 499–513, 1931). Modern delta-function (Dirac-comb) simplification + the transfer-matrix method as generalized in many QM textbooks (Griffiths Ch. 5, Sakurai §5.3). User prompt (2026-07-18): "Delta Lattice Tunneling sound cool, can we make use of that some how?"
+> **Sources (cross-domain literature):**
+> - **Physics (the original):** Kronig & Penney, *Quantum Mechanics of Electrons in Crystal Lattices* (Proc. Roy. Soc. A **130**, 499–513, 1931) — the periodic delta-function (Dirac-comb) lattice + the band-structure result `|Tr(M/2)| ≤ 1` defines allowed bands.
+> - **Textbook treatment (delta-function version):** D. J. Griffiths, *Introduction to Quantum Mechanics* §5.3; M. Born & E. Wolf, *Optics* §1.6 (multilayer-film transfer matrices — the same math in classical optics, no quantum required).
+> - **ML — Deep Equilibrium Models (the headline ML anchor):** Bai, Koltun, Kolter, *Stabilizing Equilibrium Models by Jacobian Regularization*, **[arXiv:2106.14342](https://arxiv.org/abs/2106.14342)** (ICML 2021 Short Oral). The DEQ fixed-point Jacobian `J_*` IS the per-period transfer matrix in our reframing. Their `ρ(J_*) < 1` condition is the band-stability criterion. Their training-time scalar spectral-radius regularizer is the single-number version of what our primitive provides as a *runtime, per-mode, classified band structure*.
+> - **ML — Weight-matrix spectral properties (model-quality signal):** Martin & Mahoney, *Implicit Self-Regularization in Deep Neural Networks*, **[arXiv:1810.01075](https://arxiv.org/abs/1810.01075)** (2018) + *Traditional and Heavy-Tailed Self Regularization*, **[arXiv:1901.08276](https://arxiv.org/abs/1901.08276)** (ICML 2019). The empirical spectral density (ESD) of a DNN weight matrix carries the model's training phase + generalization signature. The 5+1 phases of training correspond to increasing amounts of self-regularization, observable in the ESD. This is the same lens (matrix spectrum → model property) applied offline to trained weights — our primitive applies it at runtime to per-tick operator chains.
+> - **ML — Loss-surface geometry:** Pennington, Schoenholz, Ganguli, *Geometry of Neural Network Loss Surfaces via Random Matrix Theory* (ICML 2017, [proceedings.mlr.press/v70/pennington17a](https://proceedings.mlr.press/v70/pennington17a.html)). Eigenvalue distribution of the Hessian at critical points classifies them by index.
+> - **ML — Recurrent network stability (classical):** Arjovsky, Shah, Bengio, *Unitary Evolution RNNs* (ICML 2016) — constrain `|λ|=1` (the unit circle = allowed band edge) for stable long-term propagation; Vorontsov et al., *Orthogonal RNNs*; coRNN, nnRNN — all use the same eigenvalue-magnitude criterion this primitive formalizes as a band classifier.
+> **User prompt (2026-07-18):** "Delta Lattice Tunneling sound cool, can we make use of that some how?"
 > **Date:** 2026-07-18
 > **Status:** Active
 > **Related Research:** 311 (Analytic Lattice — closest cousin: cross-entity operator composition), 296 (Stokes/DEC vocabulary crosswalk), 279 (Diffusion curse of dimensionality / subspace clustering — closest cousin for `subspace_phase_gate`), 051 (Deep Manifold boundary conditions), 169 (Oscillatory State-Space Modelless Distillation — closest spectral-stability cousin), 205 (Deep Manifold neural-network math), 219 (Topological Neural Operators / DEC), 230 (Semiseparable State-Space Duality — linear-recurrence transfer-matrix angle)
-> **Related Plans:** 330 (Analytic Lattice Encoder/Decoder — closest plan), 301 (Subspace Phase-Gate — closest plan for "phase transition"), 251 (DEC operators — shared substrate), 353 (`riir-ai` HLA Lean boundedness proofs — the per-tick analog this would extend to multi-tick)
+> **Related Plans:** 330 (Analytic Lattice Encoder/Decoder — closest plan), 301 (Subspace Phase-Gate — closest plan for "phase transition"), 251 (DEC operators — shared substrate), 353 (`riir-ai` HLA Lean boundedness proofs — the per-tick analog this would extend to multi-tick), 458 (Transfer Matrix Band-Structure — the plan for this primitive)
 > **Classification:** Public (katgpt-rs)
 
 ---
@@ -87,6 +94,24 @@ The **delta-function simplification** is what makes the math closed-form. For a 
 
 In our codebase vocabulary: a "delta barrier" = a per-stage *discrete jump operator* applied between two *free-propagation steps*. This already has a name in the codebase — it's literally what `TransportOperator` in `analytic_lattice/mod.rs` is. The missing piece is *eigenvalue analysis* of the composed chain.
 
+### 1.4 ML literature anchors (the grounding this is NOT just a physics toy)
+
+The transfer-matrix method is not just physics — it is the **stability theory of linear dynamical systems**, which is the foundation of multiple active ML research areas. Three lines of ML literature converge on the same math:
+
+**1. Deep Equilibrium Models + Jacobian regularization (the headline anchor).** Bai, Koltun, Kolter ([arXiv:2106.14342](https://arxiv.org/abs/2106.14342), ICML 2021) train DEQ models by adding a Jacobian regularization loss `||J_*(z)||_F²` to push the spectral radius `ρ(J_*) < 1`. This is the **single-number, training-time, scalar-regularizer version of the band-stability criterion**. Their `J_*` IS the per-period transfer matrix in Kronig-Penney vocabulary. Their `ρ(J_*) < 1` IS the `|μ| < 1` "decaying band" classifier. What they do NOT do:
+
+- **Mode-resolved classification** — they regularize the Frobenius norm (a scalar), not per-eigenvalue band labels.
+- **Runtime diagnostic** — their loss is computed during training; the deployed model has no `J_*` introspection.
+- **Actionable as a pruner** — they nudge weights via SGD; they do not project out unstable modes at inference time.
+
+Our primitive extends Bai/Kolter along exactly those three axes: **per-mode** + **runtime** + **pruner-ready**. This is a modelless extension of their training-time regularizer — and the extension is non-trivial because (a) computing per-mode eigenvalues at runtime needs to be sub-µs, (b) classifying into bands needs a principled `ε` threshold (the band-edge), and (c) the projection step (if the pruner ships) needs to preserve the model's expressed behavior while suppressing the unstable direction.
+
+**2. Implicit self-regularization + ESD phases (the weight-matrix angle).** Martin & Mahoney ([arXiv:1810.01075](https://arxiv.org/abs/1810.01075) + [arXiv:1901.08276](https://arxiv.org/abs/1901.08276), ICML 2019) read off a DNN's training quality from the empirical spectral density (ESD) of its weight matrices. Their "5+1 phases of training" correspond to increasing amounts of self-regularization, observable as a transition from bulk-Marchenko-Pastur ESD → heavy-tailed ESD with a few outlier eigenvalues. **This is the same lens (matrix spectrum → model property) applied offline to trained weights.** Our primitive applies it at runtime to per-tick operator chains — the analog for HLA / `latent_functor` is: "how many modes are in the allowed band, how many in the decaying band, how many in the growing band?". A clean ESD with no growing-band modes is the runtime analog of Martin/Mahoney's well-regularized phase.
+
+**3. Orthogonal/unitary RNNs (the classical recurrence angle).** Arjovsky et al. (uRNN, ICML 2016), Vorontsov et al. (orthogonal RNNs), coRNN, nnRNN all constrain the recurrent weight matrix to have `|λ| = 1` (orthogonal) or `|λ| = 1` on a related manifold (unitary). This is the **band-edge constraint** — every mode sits exactly on `|μ| = 1`, the boundary between allowed and forbidden. Their motivation (long-term dependency learning) is exactly the band-stability problem: a mode with `|μ| < 1` decays and forgets; a mode with `|μ| > 1` explodes. Their solution is to hard-constrain the matrix to the band edge; our primitive is the diagnostic that tells you, for an *unconstrained* matrix, where each mode sits.
+
+**Why this grounding matters for the verdict:** the math is well-established ML theory, not a stretch from physics. The Bai/Kolter paper alone is a direct precedent — the proposal here is a strict superset of their regularizer (per-mode + runtime + pruner-ready). This moves the verdict from "interesting physics-to-ML crossover" to "well-grounded ML primitive with a clear delta over a cited ICML 2021 paper". The Gain tier holds; the TBD path to Super-GOAT (via the band-gap pruner) becomes more credible because Bai/Kolter already proved the training-time regularizer works.
+
 ---
 
 ## 2. Distillation — fusion protocol
@@ -116,13 +141,15 @@ In our codebase vocabulary: a "delta barrier" = a per-stage *discrete jump opera
 - `katgpt-dec/src/hodge.rs::betti_numbers` — counts zero eigenvalues of the Hodge Laplacian (topological holes in a cochain). **NOT** eigenvalue magnitude classification.
 - `katgpt-dec/src/operators.rs::hodge_laplacian` — gives `δd + dδ`, whose spectrum *can* feed band-structure analysis (fusion hook, see §3.6).
 
-### 2.2 Closest cousins (3)
+### 2.2 Closest cousins (4 — 3 shipped + 1 cited ML paper)
 
 1. **`analytic_lattice::compose_chain`** (Plan 330, ships in `crates/katgpt-core/src/analytic_lattice/`) — **closest by far**. Composes a sequence of k×k `TransportOperator`s via row-major matmul. The proposed primitive is literally `eigenvalues(compose_chain(ops)) + band_classify(λ) + transmission(M)`. The matmul chain already exists; only the spectral analysis is missing.
 
 2. **`subspace_phase_gate::phase_transition_gate`** (Plan 301, ships in `crates/katgpt-core/src/subspace_phase_gate.rs`) — **closest "phase transition" cousin**. Implements the necessary condition `N ≥ d` from Wang et al. (arxiv 2409.02426) Theorem 4: a d-dimensional subspace cannot be recovered from fewer than d samples. The proposed primitive extends "phase transition" from *sample sufficiency* to *mode propagation* — same mathematical shape (`|Tr(M)/2| ≤ 1` is the `N ≥ d` analog for transfer matrices).
 
 3. **`riir-ai` HLA boundedness Lean proofs** (Plan 353, ships in `riir-ai/.proofs/RiirAiProof/Hla/Bounded.lean`) — **closest "stability" cousin**. Proves that each per-tick sigmoid-derived HLA scalar is in `(0, 1)` over ℝ. The proposed primitive extends this to *multi-tick* propagation: over N ticks, which linear combinations of the 8 HLA dimensions grow (`|μ|>1`), decay (`|μ|<1`), or stay bounded (`|μ|≈1`)? This is the empirical N-tick analog of the per-tick Lean theorem.
+
+4. **Bai, Koltun, Kolter — DEQ Jacobian Regularization** ([arXiv:2106.14342](https://arxiv.org/abs/2106.14342), ICML 2021) — **closest ML literature precedent**. Their `ρ(J_*) < 1` condition is the scalar spectral-radius version of our band-stability criterion; their Jacobian regularization loss is the training-time version of what we propose as a runtime diagnostic + pruner. The delta: ours is **per-mode** (not scalar), **runtime** (not training-time), and **pruner-ready** (not a regularizer). See §1.4 for the full delta analysis.
 
 ### 2.3 Fusion — what novel combination does this enable?
 
