@@ -1,10 +1,15 @@
 # GOAT Proof 237: Schema-Centroid Informed KG Embedding Initialization
 
+> **UPDATE 2026-07-18 (status sync):** `schema_centroid` is **default-on** in
+> the root `Cargo.toml` (`default = [...]`). The `(opt-in)` label below was
+> stale relative to the Cargo.toml default list. The "promote to default-ON
+> candidate" note in the Status line is now resolved — promotion landed.
+
 **Date:** 2026-06-09
 **Plan:** 237
 **Research:** 210 (Schema Centroid Informed Init)
-**Feature gate:** `schema_centroid` (opt-in)
-**Status:** ✅ GOAT 7/7 PASS — **promote to default-ON candidate**
+**Feature gate:** `schema_centroid` (**default-on in root Cargo.toml**)
+**Status:** ✅ GOAT 7/7 PASS — promoted to default-on (see banner above)
 
 ---
 

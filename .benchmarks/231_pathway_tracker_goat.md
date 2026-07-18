@@ -1,9 +1,14 @@
 # GOAT Proof 231: Pathway Tracker
 
+> **UPDATE 2026-07-18 (status sync):** `pathway_tracker` is **default-on** in
+> the root `Cargo.toml` (`default = [...]`, comment: "GOAT 7/7, default-ON").
+> The `(opt-in)` label below was stale relative to the Cargo.toml default
+> list.
+
 **Date:** 2026-06-09
 **Plan:** 231
 **Research:** 205 (Deep Manifold §4.2-4.3)
-**Feature gate:** `pathway_tracker` (opt-in)
+**Feature gate:** `pathway_tracker` (**default-on in root Cargo.toml**)
 **Status:** ✅ GOAT 7/7 PASS
 
 ---

@@ -734,6 +734,26 @@ pub mod ac_prefix;
 // G1–G4 GOAT gate passes; competes for the RTPurbo calibration slot.
 #[cfg(feature = "causal_head_importance")]
 pub mod causal_head_importance;
+
+// Causal-ID — Algorithmic Syntactic Causal Identification (Plan 457,
+// Research 450, arXiv:2403.09580 Cakiqi & Little 2024). Pure modelless
+// graph rewriting on Acyclic Directed Mixed Graphs (ADMGs) with bidirected
+// confounders: `identify(Y, do(A))` returns the interventional signature
+// backbone `Y⋆ = An(Y in G[V\A])` via the recursive Shpitser-Pearl ID
+// algorithm (Cakiqi-Little Theorem 1 distillation). The Issue 545
+// defend-wrong PoC proved S2 strictly dominates Canvas FlowGraph
+// reachability on a 13-node game KG with a `NPC1 ↔ NPC2` confounder: S2
+// produces a 5-node interventional signature that correctly excludes NPC1
+// (the confounder neighbor); S1 yields only a boolean reaches=true and
+// cannot see the confounder. Sibling of `causal_head_importance` (activation
+// patching) + `canvas` (declared directed-only topology) — causal_id adds
+// the bidirected-confounder dimension they cannot see. Pure modelless
+// (graph rewriting on BLAKE3-committed NodeId set). Offline-only (24µs on
+// 13 nodes is well outside the 20Hz tick; subgraph extraction mandatory to
+// stay ≤32 nodes per query). Opt-in until Plan 457 Phase 2 GOAT gate passes;
+// promotion to default REQUIRES Phase 4 consumer validation.
+#[cfg(feature = "causal_identification")]
+pub mod causal_id;
 #[cfg(feature = "spectral_pruner")]
 pub use irrep_pruner::{
     IrrepPruner, IrrepPrunerConfig, irrep_pruner_from_config, spectral_flatness,

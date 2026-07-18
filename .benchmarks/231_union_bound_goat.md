@@ -1,9 +1,14 @@
 # GOAT Proof 231: Union Bound Branch Confidence
 
+> **UPDATE 2026-07-18 (status sync):** `union_bound_confidence` is
+> **default-on** in the root `Cargo.toml` (`default = [...]`, comment: "GOAT
+> 6/6, default-ON"). The `(opt-in)` label below was stale relative to the
+> Cargo.toml default list.
+
 **Date:** 2026-06-09
 **Plan:** 231
 **Research:** 205 (Deep Manifold §2.4.2)
-**Feature gate:** `union_bound_confidence` (opt-in)
+**Feature gate:** `union_bound_confidence` (**default-on in root Cargo.toml**)
 **Status:** ✅ GOAT 6/6 PASS
 
 ---

@@ -7,7 +7,7 @@
 **Target:**
 - Open primitive → `katgpt-rs/crates/katgpt-core/src/causal_id/` (feature `causal_identification`, opt-in)
 - Offline consumer → `riir-ai/crates/riir-engine/src/causal_id/` (offline-only, GM "what-if" + sleep-cycle claim verification)
-**Status:** Active — Phase 0 (planning complete, implementation not started)
+**Status:** Active — Phase 1 DONE (primitive shipped behind `causal_identification` feature flag, 28 unit tests + 2 doctests pass). Phase 2 (GOAT gate) is the next step.
 
 ---
 
@@ -44,14 +44,26 @@ The algorithm is already implemented + debugged in the Issue 545 PoC bench (`rii
 
 ### Tasks
 
-- [ ] **T1.1** Add feature `causal_identification = []` to `katgpt-rs/crates/katgpt-core/Cargo.toml` (opt-in, NOT default). Gated module gated behind `#[cfg(feature = "causal_identification")]` in `lib.rs`.
-- [ ] **T1.2** `types.rs` — `NodeId` (`[u8; 32]` BLAKE3 hash, `#[repr(transparent)]`, `Copy`), `Admg` (`{ nodes, directed, bidirected }`, `SmallVec<[NodeId; 32]>` for bounded-domain case), `AdmgSignature`, `IdentificationError` enum (`NotIdentifiable { hedge: (NodeId, NodeId) }`, `SubgraphTooLarge`, `EmptyQuery`).
-- [ ] **T1.3** `fixing.rs` — the core recursive ID algorithm per research note §1.5 (corrected recursive formulation): `fix`, `fixable`, `fixseq`, `districts` (c-components via bidirected edges), `ancestors_in_subgraph`.
-- [ ] **T1.4** `identify.rs` — top-level driver `pub fn identify(sig: &Admg, cause: &[NodeId], effect: &[NodeId]) -> Result<AdmgSignature, IdentificationError>` implementing the recursive ID algorithm with the hedge FAIL condition.
-- [ ] **T1.5** `subgraph.rs` — `pub fn extract_relevant_subgraph(graph: &Admg, seeds: &[NodeId], hops: usize) -> Admg` — bounded BFS subgraph extractor (default 2 hops, configurable). Returns a smaller `Admg` containing only nodes within `hops` of any seed node. **Caveat #2 mitigation.**
-- [ ] **T1.6** `lib.rs` re-exports: `pub use types::*; pub use fixing::*; pub use identify::*; pub use subgraph::*;`
-- [ ] **T1.7** Tests — port the 4 PoC scenarios (front-door, back-door, game KG, bow-arc) as unit tests. **All must match analytical ground truth.**
-- [ ] **T1.8** `cargo clippy -p katgpt-core --features causal_identification` clean.
+- [x] **T1.1** Add feature `causal_identification = []` to `katgpt-rs/crates/katgpt-core/Cargo.toml` (opt-in, NOT default). Gated module gated behind `#[cfg(feature = "causal_identification")]` in `lib.rs`.
+- [x] **T1.2** `types.rs` — `NodeId` (`[u8; 32]` BLAKE3 hash, `#[repr(transparent)]`, `Copy`), `Admg` (`{ nodes, directed, bidirected }`, `SmallVec<[NodeId; 32]>` for bounded-domain case), `AdmgSignature`, `IdentificationError` enum (`NotIdentifiable { hedge: (NodeId, NodeId) }`, `SubgraphTooLarge`, `EmptyQuery`).
+  - **Deviation:** used `arrayvec::ArrayVec<NodeId, 32>` instead of `SmallVec` (arrayvec already non-optional in Cargo.toml; SmallVec would be a new dep). `AdmgSignature` is an enum `Inline(ArrayVec<32>) | Heap(Vec)` — spills to heap above 32 nodes (inline variant has `#[allow(clippy::large_enum_variant)]` with a doc'd rationale: boxing defeats the alloc-free read path).
+- [x] **T1.3** `fixing.rs` — the core recursive ID algorithm per research note §1.5 (corrected recursive formulation): `fix`, `fixable`, `fixseq`, `districts` (c-components via bidirected edges), `ancestors_in_subgraph`.
+  - **Note:** shipped as `try_fixseq` (the greedy fix-sequence search) + `Admg::fix_node`, `Admg::districts`, `Admg::district_of`, `Admg::ancestors`, `Admg::ancestors_into`, `Admg::subgraph`. Plus the alloc-free `for_each_*` variants (`for_each_parent`, `for_each_bidir_neighbor`, `for_each_in_district_with_visited`) the Phase 2 G4 audit will use.
+- [x] **T1.4** `identify.rs` — top-level driver `pub fn identify(sig: &Admg, cause: &[NodeId], effect: &[NodeId]) -> Result<AdmgSignature, IdentificationError>` implementing the recursive ID algorithm with the hedge FAIL condition.
+- [x] **T1.5** `subgraph.rs` — `pub fn extract_relevant_subgraph(graph: &Admg, seeds: &[NodeId], hops: usize) -> Admg` — bounded BFS subgraph extractor (default 2 hops, configurable). Returns a smaller `Admg` containing only nodes within `hops` of any seed node. **Caveat #2 mitigation.**
+- [x] **T1.6** `lib.rs` re-exports: `pub use types::*; pub use fixing::*; pub use identify::*; pub use subgraph::*;`
+  - **Deviation:** used `pub use fixing::try_fixseq; pub use identify::identify; pub use subgraph::extract_relevant_subgraph; pub use types::{Admg, AdmgSignature, IdentificationError, NodeId, INLINE_SIGNATURE_CAP};` — explicit list (cleaner + avoids star-import warnings).
+- [x] **T1.7** Tests — port the 4 PoC scenarios (front-door, back-door, game KG, bow-arc) as unit tests. **All must match analytical ground truth.**
+  - **Result:** 28 unit tests total, all pass under both `--features causal_identification` and `--all-features`. The 4 PoC scenarios (scenario_a/b/c/d) reproduce the Issue 545 verdict: A/B/C identifiable, D bow-arc correctly `NotIdentifiable`, scenario C correctly excludes the NPC1 confounder neighbor from the signature.
+- [x] **T1.8** `cargo clippy -p katgpt-core --features causal_identification` clean.
+  - **Result:** clippy clean on lib + tests + benches (one pre-existing warning in `bench_449_poincare_goat.rs` is not mine). `#[allow(clippy::large_enum_variant)]` + `#[allow(clippy::result_large_err)]` applied at the 4 sites where the design justifies the size (inline ArrayVec signature + hedge-pair error).
+
+### Phase 1 validation
+
+- `cargo test -p katgpt-core --features causal_identification --lib causal_id` → 28 tests pass.
+- `cargo test -p katgpt-core --features causal_identification --doc causal_id` → 2 doctests pass.
+- `cargo test -p katgpt-core --lib` (default features) → 1647 tests pass, no regression.
+- `cargo test -p katgpt-core --all-features --lib causal_id` → 28 tests pass.
 
 ## Phase 2 — GOAT gate (katgpt-rs)
 

@@ -1,6 +1,14 @@
 # GOAT Gate Benchmarks — Plan 272 Chunked Content-Addressed Merkle Store
 
-**Feature:** `chunked_content_store` (opt-in)
+> **UPDATE 2026-07-18 (promotion fix-up):** `chunked_content_store` was
+> **promoted to `default`** in katgpt-core the same day this doc was originally
+> written (commit referenced in Cargo.toml as "Phase 19b (2026-07-18):
+> +chunked_content_store promotion fix-up. The bench file claimed promotion
+> was done but Cargo.toml was never updated — this lands it."). The `(opt-in)`
+> label below was stale relative to the Cargo.toml default list at the time of
+> this audit; the feature is now correctly default-on.
+
+**Feature:** `chunked_content_store` (**default-on since 2026-07-18** — see banner above)
 **Research:** [262 — Lore Chunked Asset Merkle Store Modelless](../.research/262_Lore_Chunked_Asset_Merkle_Store_Modelless.md)
 **Plan:** [448](../.plans/448_chunked_asset_merkle_store.md)
 **Date:** 2026-06-25

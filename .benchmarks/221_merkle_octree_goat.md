@@ -1,5 +1,9 @@
 # GOAT Proof 221: Merkle Octree Integrity
 
+> **Note:** `merkle_octree` status not audited in this pass — bench refers to a
+> pre-default-on state and the feature may or may not be in Cargo.toml
+> `default`. Verify before relying on the `(opt-in)` label below.
+
 **Date:** 2026-06-12
 **Plan:** 253
 **Research:** 221 (Merkle Octree)
