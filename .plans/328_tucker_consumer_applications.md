@@ -124,7 +124,7 @@ The `flagged` field on `ShopEntry`/`ItemStat` gets populated from the Tucker res
 ### Tasks
 
 - [x] **T2.1** `EconomyTensor` builder in `seal-gm-tools/src/analytics/` (or `seal-container-service`) — rolls up `ShopEntry`/`GoldFlow`/`ItemStat` history into `P[item, window, zone]`. **T0 prerequisite:** confirm the persistence layer retains enough per-item-per-zone-per-window history (if not, T0 adds a retention table).
-  *(Shipped as `build_tensor_into` in `rmt_tucker.rs` + `shops_to_price_points` adapter in `analytics/mod.rs`. T0 finding: the MMO has NO per-item-per-zone-per-window price history table today — `ShopEntry` only stores current price/volume_24h. The detector takes pre-windowed `PricePoint` inputs; a future server-side collector would feed multi-window data. The `shops_to_price_points` adapter converts a single shop snapshot into 1-window `PricePoint`s as a thin shim for the current data model.)*
+  *(Shipped as `build_tensor_into` in `rmt_tucker.rs` + `shops_to_price_points` adapter in `seal-online-remaster/crates/seal-gm-tools/src/analytics/mod.rs`. T0 finding: the MMO has NO per-item-per-zone-per-window price history table today — `ShopEntry` only stores current price/volume_24h. The detector takes pre-windowed `PricePoint` inputs; a future server-side collector would feed multi-window data. The `shops_to_price_points` adapter converts a single shop snapshot into 1-window `PricePoint`s as a thin shim for the current data model.)*
 - [x] **T2.2** `detect_rmt_tucker(tensor, ranks) -> Vec<RmtAnomaly>` that:
   - Calls `katgpt_core::linalg::tucker_decompose_into` with ranks `(r_i, r_w, r_z)` (low-rank — the normal market is low-dimensional)
   - Reconstructs via `tucker_reconstruct_into`

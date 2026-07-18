@@ -78,7 +78,7 @@ matmul(&mut ctx.logits, &weights.lm_head, &ctx.x, config.vocab_size, n);
 ### REST Client
 
 ```rust
-// src/rest/mod.rs (new module, feature-gated behind "rest" feature)
+// RuVector/examples/vibecast-7sense/crates/sevensense-api/src/rest/mod.rs (new module, feature-gated behind "rest" feature)
 
 pub struct RestClient {
     base_url: String,     // e.g., "http://localhost:9090"
@@ -212,7 +212,7 @@ rest = ["reqwest", "tokio"]   # Retrieval-based speculative decoding
 
 ### Phase 2: REST Client Module
 - [x] 2.1 Add `reqwest` and `tokio` to `Cargo.toml` behind `rest` feature
-- [x] 2.2 Create `src/rest/mod.rs` with feature gate
+- [x] 2.2 Create `RuVector/examples/vibecast-7sense/crates/sevensense-api/src/rest/mod.rs` with feature gate
 - [x] 2.3 Create `riir-ai/crates/riir-rest/src/client.rs` — `RestClient`, `RetrievalResult`
 - [x] 2.4 Create `riir-ai/crates/riir-rest/src/types.rs` — request/response types matching anyrag API
 - [x] 2.5 Add `pub mod rest;` to `src/lib.rs` behind `#[cfg(feature = "rest")]`
@@ -268,7 +268,7 @@ full = ["leviathan", "sudoku", "validator", "rest", "training", "gpu"]  # previo
 |------|--------|-------|
 | `crates/katgpt-percepta/src/transformer.rs` | Add `hidden_state` field + copy | 1 |
 | `Cargo.toml` | Add `reqwest`, `tokio`, `rest` feature | 2 |
-| `src/rest/mod.rs` | New | 2 |
+| `RuVector/examples/vibecast-7sense/crates/sevensense-api/src/rest/mod.rs` | New | 2 |
 | `riir-ai/crates/riir-rest/src/client.rs` | New | 2 |
 | `riir-ai/crates/riir-rest/src/types.rs` | New | 2 |
 | `src/lib.rs` | Add `mod rest` behind feature gate | 2 |
