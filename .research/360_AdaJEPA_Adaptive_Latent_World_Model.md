@@ -62,7 +62,7 @@ The paper frames the result as: *"latent world models should continue to be trai
 | latent state `z_t` | HLA per-NPC 8-dim state, belief state, sense projection | `riir-engine/src/hla/`, `katgpt-core` HLA kernels |
 | JEPA encoder `ℰ_s` + predictor `f_θ` | `InducedCwmKernel: GameState` (frozen forward model) + `BeliefInferenceFn` (observation→belief sampler) | `katgpt-core/src/induced_cwm/`, Research 275 / Plan 296 |
 | action encoder `ℰ_a` | `extract_functor` (estimate displacement from (source, target) pairs) | `riir-engine/src/latent_functor/arithmetic.rs` |
-| plan-execute-adapt-replan (Algorithm 1) | CGSP/MCTS plan → NPC acts → `ReestimationScheduler::observe()` → `tick()` re-estimates functors → next planning cycle reuses | `riir-engine/src/latent_functor/reestimation.rs`, `cgsp_runtime/` |
+| plan-execute-adapt-replan (Algorithm 1) | CGSP/MCTS plan → NPC acts → `ReestimationScheduler::observe()` → `tick()` re-estimates functors → next planning cycle reuses | `riir-ai/crates/riir-engine/src/latent_functor/reestimation/mod.rs`, `cgsp_runtime/` |
 | online buffer ℬ (capacity N) | `ObservationBuffer` (capacity-capped ring buffer) | `reestimation.rs::ObservationBuffer` |
 | `recent-N` vs `hard-N` strategy | FIFO ring buffer (`head`/`len` wraps oldest) — the `recent-N` default; `JsUniquenessTrigger` + TEMP `sleep_diverse` cover the `hard-N` spirit (rare/diverse preservation) | `reestimation.rs`, `riir-neuron-db/.plans/005` |
 | adaptation loss `L_ada` | `extract_functor` MSE over `(source, target)` pairs = `(1/N) Σ_k (target_k − source_k)` mean displacement | `latent_functor/arithmetic.rs` |
@@ -110,7 +110,7 @@ AdaJEPA's per-episode adaptation (each episode starts from the pretrained model,
 
 ### 3.4 Prediction-error-driven recalibration — **already DEFAULT-ON**
 
-AdaJEPA's signal is the latent prediction error `ℓ(ẑ_{t+1}, z_{t+1})`. The Temporal Derivative Kernel (Research 243, Plan 277, **DEFAULT-ON**) ships curiosity = prediction-error signal. `latent_functor/reestimation.rs::tick` triggers re-estimation on coherence decay, which is the same signal under a different name (coherence is `1 − normalized prediction error`).
+AdaJEPA's signal is the latent prediction error `ℓ(ẑ_{t+1}, z_{t+1})`. The Temporal Derivative Kernel (Research 243, Plan 277, **DEFAULT-ON**) ships curiosity = prediction-error signal. `riir-ai/crates/riir-engine/src/latent_functor/reestimation/mod.rs::tick` triggers re-estimation on coherence decay, which is the same signal under a different name (coherence is `1 − normalized prediction error`).
 
 ### 3.5 Closest cousins across all 5 repos
 

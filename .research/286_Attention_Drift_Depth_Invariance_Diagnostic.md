@@ -173,7 +173,7 @@ pub struct DepthInvarianceConfig {
 |---|---|---|---|
 | **`BeliefDrafter::LatentDynamicsMLP`** (Plan 217) | katgpt-rs | Recursive `h_{t+1} = h_t + FC3(...)` with LayerNorm on input only | **HAS THE BUG** — unnormalized residual. This paper's diagnosis applies verbatim. Diagnostic-only fix (frozen MLP); retrain for post-norm. |
 | **`crates/katgpt-micro-belief/src/attractor.rs`** (Plan 276) | katgpt-rs | Attractor + leaky belief kernels with `clamp(-1, 1)` | **Already ships the fix pattern.** This is the bounded-magnitude recursive latent state the paper prescribes. |
-| **`latent_functor/reestimation.rs`** (riir-ai, Plan 303/317) | riir-ai | Coherence-driven re-estimation scheduler (re-derive functor when coherence < τ_reest) | **Downstream fix** (re-derive on drift). This paper provides the *upstream* fix (prevent drift at source via magnitude regularization). The two compose as defense-in-depth. |
+| **`riir-ai/crates/riir-engine/src/latent_functor/reestimation/mod.rs`** (riir-ai, Plan 303/317) | riir-ai | Coherence-driven re-estimation scheduler (re-derive functor when coherence < τ_reest) | **Downstream fix** (re-derive on drift). This paper provides the *upstream* fix (prevent drift at source via magnitude regularization). The two compose as defense-in-depth. |
 | **`BeliefRankPruner`** (katgpt-rs/src/pruners/) | katgpt-rs | `effective_rank` / `flatness` of hidden states as a quality signal | **Symptom detector.** This paper's magnitude-growth-rate is the *root-cause* counterpart. |
 | **`gain_cost_halt.rs::GainCostLoopHalter`** (Plan 304) | katgpt-rs | Halts loops based on gain/cost/cos_theta; "cost = coherence decay or staleness" | **Symptom-based halter.** This paper adds *root-cause* signal (magnitude slope > τ → halt, we're in depth-specific refinement). |
 | **Sink-Aware Attention** (R258, Plan 287) | katgpt-rs | NOP/Broadcast sink classifier + dual-policy attention | **DIFFERENT mechanism.** That paper (2606.08105) is about *target-side* sink mechanisms. This paper (2605.09992) is about *drafter-side* magnitude accumulation. The two papers are frequently confused but address different layers of the stack. |
@@ -185,7 +185,7 @@ pub struct DepthInvarianceConfig {
 
 The single strongest fusion (this paper × existing shipped primitives × latent-functor reframing):
 
-**Attention-Drift × latent_functor/reestimation.rs × GainCostLoopHalter × MicroBelief attractor** → **Defense-in-Depth Recursive Latent State Hygiene**
+**Attention-Drift × riir-ai/crates/riir-engine/src/latent_functor/reestimation/mod.rs × GainCostLoopHalter × MicroBelief attractor** → **Defense-in-Depth Recursive Latent State Hygiene**
 
 Three layers, each modelless:
 
@@ -201,7 +201,7 @@ Layer 2 (detect): DepthInvarianceDiagnostic
    - Distinguishes {DepthInvariant, DepthSpecificRefinement, Collapsed}
    - Bridges to BeliefRankPruner (effective_rank) and GainCostLoopHalter (cos_theta oscillation)
 
-Layer 3 (recover): latent_functor/reestimation.rs coherence-driven re-derivation
+Layer 3 (recover): riir-ai/crates/riir-engine/src/latent_functor/reestimation/mod.rs coherence-driven re-derivation
    - When diagnostic says DepthSpecificRefinement or Collapsed AND magnitude regularization
      is unavailable (frozen kernel) OR insufficient (distribution shift pushed us out of training support)
    - Re-derive the latent state from upstream signal (the existing reestimation.rs pattern)
@@ -231,7 +231,7 @@ Layer 3 (recover): latent_functor/reestimation.rs coherence-driven re-derivation
 
 ### One-line reasoning
 
-The paper names a failure mode we **already ship in production** (BeliefDrafter's unnormalized residual), generalizes it to a universal property of recursive latent-state kernels (depth-specific refinement vs depth-invariant autoregression), and provides a clean three-signal diagnostic primitive that is the *root-cause* counterpart to four of our existing *symptom*-only detectors. Fusion with our existing `latent_functor/reestimation.rs` (downstream recovery) and `crates/katgpt-micro-belief/src/attractor.rs` (already-shipped prevention pattern) produces a defense-in-depth latent-state hygiene system that no competitor offers — a new capability class with a concrete MMORPG-scale selling point.
+The paper names a failure mode we **already ship in production** (BeliefDrafter's unnormalized residual), generalizes it to a universal property of recursive latent-state kernels (depth-specific refinement vs depth-invariant autoregression), and provides a clean three-signal diagnostic primitive that is the *root-cause* counterpart to four of our existing *symptom*-only detectors. Fusion with our existing `riir-ai/crates/riir-engine/src/latent_functor/reestimation/mod.rs` (downstream recovery) and `crates/katgpt-micro-belief/src/attractor.rs` (already-shipped prevention pattern) produces a defense-in-depth latent-state hygiene system that no competitor offers — a new capability class with a concrete MMORPG-scale selling point.
 
 ### Why Super-GOAT (novelty gate Q1–Q4)
 
@@ -246,7 +246,7 @@ The paper names a failure mode we **already ship in production** (BeliefDrafter'
 
 - **R269 failure mode (defaulting to adapter routing when latent-space reframing is stronger):** AVOIDED. The primary framing is recursive latent-state hygiene across the six Super-GOAT factory modules (HLA / latent_functor / cgsp_runtime / sense / neuron-shard / LatCal). Adapter routing is not even a secondary framing here — the paper isn't about adapter composition.
 - **`evolve_hla` failure mode (no notes framing at all → false Super-GOAT claim):** ADDRESSED. The private guide (riir-ai/.research/151) explicitly audits `evolve_hla` and the other recursive kernels for the bug before claiming the selling point.
-- **DiPOD / `latent_functor/reestimation.rs` failure mode (notes framing under different vocabulary → missed by paper-vocabulary grep):** ADDRESSED. The vocabulary crosswalk (§2.2) explicitly maps the paper's "depth-specific refinement / pre-norm magnitude growth" to the codebase's "depth-conditioned functor composition / leaky integrator without output bound", and the grep hit `reestimation.rs` on the first pass via this translation.
+- **DiPOD / `riir-ai/crates/riir-engine/src/latent_functor/reestimation/mod.rs` failure mode (notes framing under different vocabulary → missed by paper-vocabulary grep):** ADDRESSED. The vocabulary crosswalk (§2.2) explicitly maps the paper's "depth-specific refinement / pre-norm magnitude growth" to the codebase's "depth-conditioned functor composition / leaky integrator without output bound", and the grep hit `reestimation.rs` on the first pass via this translation.
 
 ### Mandatory outputs (created this session)
 

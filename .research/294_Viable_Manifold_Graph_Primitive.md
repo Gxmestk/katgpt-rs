@@ -81,7 +81,7 @@ Tradeoff: gain in reliability comes at a small cost in diversity of decoded samp
 | Sigmoid semaphore `α(z)` blend | `PersonalityWeightedComposition::compose_into` (Plan 297) kernel: `Σ sigmoid(wᵢ/τ) · belief_confidence_i · dᵢ` | ✅ Shipped, **default-on**. Same mathematical shape as the calibrated-decoder blend. |
 | Top-down direction-vector injection (the "steer toward" half) | `apply_latent_steering(state, field)` (Plan 309, R290) | ✅ Shipped, **default-on**, Super-GOAT. VMG is the "stay within" complement. |
 | Quality gate on direction vectors (Dirichlet separation ratio) | `riir-ai/crates/riir-engine/src/latent_functor/quality_gate.rs::DirectionQuality` | ✅ Shipped in riir-ai. Predicate-shape analogue for *directions*, not *states*. |
-| Coherence-decay → re-estimation trigger | `latent_functor/reestimation.rs::tick` (Plan 303) | ✅ Shipped in riir-ai. The "low coherence = drift off safe manifold" signal exists; VMG adds the *graph* substrate to make drift recoverable by navigation, not just by re-estimation. |
+| Coherence-decay → re-estimation trigger | `riir-ai/crates/riir-engine/src/latent_functor/reestimation/mod.rs::tick` (Plan 303) | ✅ Shipped in riir-ai. The "low coherence = drift off safe manifold" signal exists; VMG adds the *graph* substrate to make drift recoverable by navigation, not just by re-estimation. |
 | Generic A* on graphs | `pruners/pathfinder.rs::find_path` (Plans 017/018, raw grid A*) | ✅ Shipped. Raw-grid, not graph-of-latent-nodes. Different substrate. |
 | CAT(0) geodesic on safe nodes (raw space) | `CubicalNerve::cat0_geodesic()` (Plan 252) | ✅ Shipped. **Raw navigation space, not latent.** Direct structural cousin — same shape (shortest path on a subgraph of "safe" nodes), different domain. VMG is the latent-space upgrade. |
 | Latent node network substrate | `DenseMesh` (Plan 266) | ⚠️ Shipped but **Gate 2 FAILED** empirically (composition of untrained LoRA edges = no-op). Substrate exists; the *composition* use case failed. VMG uses a latent node graph for *navigation*, not composition — different use case, not blocked by DenseMesh's failure. |
@@ -111,7 +111,7 @@ Without VMG: crowd-scale curiosity-driven exploration of HLA affect space produc
 
 **Fusion B (open, secondary): VMG × jacobian_svd_at × reestimation → drift-recovery by navigation, not by re-estimation**
 
-Today, `latent_functor/reestimation.rs` triggers when coherence decays — it re-derives the direction vector from scratch. VMG offers an alternative recovery: instead of re-estimating, *navigate back* along the safe-manifold graph to the nearest coherent node. This is cheaper (graph lookup vs SVD) and preserves the learned direction (no re-derivation).
+Today, `riir-ai/crates/riir-engine/src/latent_functor/reestimation/mod.rs` triggers when coherence decays — it re-derives the direction vector from scratch. VMG offers an alternative recovery: instead of re-estimating, *navigate back* along the safe-manifold graph to the nearest coherent node. This is cheaper (graph lookup vs SVD) and preserves the learned direction (no re-derivation).
 
 **Fusion C (latent-space reframing of an existing raw-space primitive): VMG × Cubical CAT(0) → unified safe-graph navigation across raw and latent space**
 

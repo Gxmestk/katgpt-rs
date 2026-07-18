@@ -206,7 +206,7 @@ The smear classifier respects the sync boundary by construction:
 2. **`katgpt-rs/.research/158_MUX_Multiplexed_Latent_Reasoning.md` + `.plans/178_mux_multiplexed_latent_reasoning.md`** — MUX *is* deterministic sequence smearing. The paper is external evidence that the phenomenon is real and load-bearing in production latent reasoners.
 3. **`katgpt-rs/.research/248_DeltaTok_DeltaWorld_BoM_Single_Pass_Diverse_Sampling.md` + `.plans/281_bom_single_pass_diverse_sampling.md`** — BoM *is* stochastic token smearing (K noise queries → K diverse hypotheses at adjacent positions).
 4. **`riir-ai/.research/129_Cognitive_Integrity_Layer_Guide.md`** — the private selling-point doc this paper validates. **Should be updated to cite arXiv:2606.20560** as external validation.
-5. **`riir-ai/.research/123_Latent_Functor_Runtime_Guide.md` + `latent_functor/reestimation.rs`** — the DiPOD-canonical "coherence < tau_reest → re-estimate" pattern. Maps to the paper's "retroactive self-correction" (§5.1.2).
+5. **`riir-ai/.research/123_Latent_Functor_Runtime_Guide.md` + `riir-ai/crates/riir-engine/src/latent_functor/reestimation/mod.rs`** — the DiPOD-canonical "coherence < tau_reest → re-estimate" pattern. Maps to the paper's "retroactive self-correction" (§5.1.2).
 6. **`katgpt-rs/.research/228_RCD_Residual_Context_Diffusion.md` + `.plans/258_rcd_residual_context_diffusion.md`** — RCD's entropy-weighted residual carry between D2F denoising steps is the closest cousin of DiffusionGemma's self-conditioning matrix `S_t` (Eq. 1).
 
 ---

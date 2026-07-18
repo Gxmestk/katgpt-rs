@@ -67,7 +67,7 @@ Four terms: time-delay truncation `L_F√d·w^k` (geometric in delay length `k`)
 | Per-NPC learned direction vector from observation pairs, with coherence gate + re-estimation | **latent_functor** — `extract_functor`, `predict_stance`, `ReestimationScheduler` | Plan 303, `riir-engine/src/latent_functor/` (especially `arithmetic.rs`, `reestimation.rs`) |
 | Per-NPC recurrent belief kernel (attractor + leaky families) | **MicroRecurrentBeliefState** | Plan 276, Research 242, `crates/katgpt-core/src/micro_belief/` |
 | HLA recurrent update (leaky integrator step) | **`evolve_hla`** | `crates/katgpt-core/src/sense/reconstruction.rs`, `leaky_core.rs` |
-| Crowdscale curiosity signal from coherence decay + JS-uniqueness | **cgsp_runtime** curiosity boosts | `riir-engine/src/cgsp_runtime/`, `latent_functor/reestimation.rs` |
+| Crowdscale curiosity signal from coherence decay + JS-uniqueness | **cgsp_runtime** curiosity boosts | `riir-engine/src/cgsp_runtime/`, `riir-ai/crates/riir-engine/src/latent_functor/reestimation/mod.rs` |
 | MCTS collapse detection baseline (cheap predictor) | **mcts_collapse_bridge** | `riir-ai/crates/riir-engine/src/cgsp_runtime/mcts_collapse_bridge.rs` |
 | Per-shard frozen latent state (Pod, BLAKE3, dendritic branch) | **NeuronShard** | `riir-neuron-db/src/shard.rs` (`style_weights[64]`, `hla_moments[8]`) |
 | Deterministic linear-op commitment + 2×2 matrix arithmetic | **LatCal** | `riir-chain/src/encoding/latcal.rs` (`LatCalMatrix`, `multiply`, `to_fixed`) |

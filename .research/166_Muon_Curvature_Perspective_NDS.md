@@ -38,7 +38,7 @@ Four key findings:
 | Curvature-influence scorer | 📋 Planned | Plan 183 (CIAB), trait defined but not implemented |
 | EGA spectral salience | ✅ Shipped | `crates/katgpt-attn/src/ega_attn.rs` (z-normalized sigmoid gate) |
 | Spectral Hierarchy | ✅ Shipped | eigenspace alignment, Haar wavelets, Cauchy interlacing |
-| AMUSE optimizer (riir-ai) | ✅ Shipped | `riir-gpu/src/optimizer_amuse.rs` |
+| AMUSE optimizer (riir-ai) | ✅ Shipped | `riir-ai/crates/riir-gpu/src/optimizer_amuse/mod.rs` |
 
 **What's NEW from this paper:** The NDS decomposition formula, the data imbalance amplification result, the within-layer concentration finding, and the theoretical proof connecting spectral balance to loss decrease.
 

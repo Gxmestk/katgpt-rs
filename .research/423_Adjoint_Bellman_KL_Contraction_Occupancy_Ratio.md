@@ -156,7 +156,7 @@ A simpler density-ratio regression variant exists (Algorithm 2: regress `ω(X)` 
 | Paper term | Codebase equivalents (grep-verified) |
 |---|---|
 | discounted occupancy ratio `ω_π,γ` | (none shipped) — closest cousin is `dirichlet.rs` (Dirichlet weights), `committed_field_blend.rs::CommittedFieldBlend::pi` (per-archetype weight vector), `manifold_bandit.rs` (Thompson sampling weights). **No density-ratio-over-distributions primitive ships.** |
-| adjoint Bellman operator `B^γ_π` | (none shipped under that name) — structurally isomorphic to **DEC `codifferential`** (adjoint of `exterior_derivative` under L² inner product); also `latent_functor/reestimation.rs::ReestimationScheduler` (the "coherence < tau_reest → re-derive" loop is a fitted iteration on coherence ratios) |
+| adjoint Bellman operator `B^γ_π` | (none shipped under that name) — structurally isomorphic to **DEC `codifferential`** (adjoint of `exterior_derivative` under L² inner product); also `riir-ai/crates/riir-engine/src/latent_functor/reestimation/mod.rs::ReestimationScheduler` (the "coherence < tau_reest → re-derive" loop is a fitted iteration on coherence ratios) |
 | Markov kernel pushforward `(ων)P_π` | `forward_kernel` / `pushforward` — **not shipped as a named primitive**; closest is `katgpt_hla::evolve_hla` (per-NPC belief pushforward through sense kernel) and `induced_cwm` (`advance()` on induced `GameState`) |
 | KL projection onto normalized exponential class | `dirichlet.rs` (cousin), `softmax` normalization appears in `product_key_memory.rs` (with explicit "deviation from sigmoid rule" comment) |
 | fitted Q-iteration | `mcts.rs` (tree-based, not fitted), `crates/katgpt-core/src/cgsp/dual_pool.rs` (online routing, not fitted) — **no fitted Bellman regression ships** |
@@ -195,7 +195,7 @@ The three strongest fusion products, in priority order:
 
 #### Fusion A — FORE × CLR re-estimation scheduler (riir-ai primary target)
 
-**Inputs**: this paper (Section 5.2 occupancy-weighted FQE) × Research 123 (`latent_functor/reestimation.rs`) × Plan 317 (feeling-brain mux scatter consolidation).
+**Inputs**: this paper (Section 5.2 occupancy-weighted FQE) × Research 123 (`riir-ai/crates/riir-engine/src/latent_functor/reestimation/mod.rs`) × Plan 317 (feeling-brain mux scatter consolidation).
 
 **Product**: Replace the CLR re-estimation scheduler's `coherence > tau_reest` trigger with a fitted FORE ratio over the NPC's engram table. The resulting CLR cycle contracts in KL by factor γ per re-estimation round **without requiring the latent-functor K-basis to be closed under the re-estimation operator**. Concretely: at each re-estimation tick, fit `ω_fit^(k)` to the engram's wake-event distribution vs. the target personality's occupancy; use `ω_fit` as the projection weight in the K-basis re-derivation.
 

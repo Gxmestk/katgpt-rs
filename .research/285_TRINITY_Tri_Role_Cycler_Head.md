@@ -180,7 +180,7 @@ The tri-role per-query T→W→V cycler is a **provable-gain composition** of (r
 
 Per the skill's three documented failure modes:
 1. **`evolve_hla` failure (no notes framing at all)**: N/A — we DID find `SenseModule::project` framing in docs 02 and 24, and it IS the right cousin.
-2. **`latent_functor/reestimation.rs` failure (notes under different vocabulary)**: actively avoided — vocabulary-translated grep ("penultimate hidden state" → "HLA state / belief state / sense projection"; "tri-role T/W/V" → "Solver/Conjecturer/Guide / one-binary-three-roles / role_transport") hit Research 126 + Research 136 immediately.
+2. **`riir-ai/crates/riir-engine/src/latent_functor/reestimation/mod.rs` failure (notes under different vocabulary)**: actively avoided — vocabulary-translated grep ("penultimate hidden state" → "HLA state / belief state / sense projection"; "tri-role T/W/V" → "Solver/Conjecturer/Guide / one-binary-three-roles / role_transport") hit Research 126 + Research 136 immediately.
 3. **R269 / `> <former` failure (defaulted to adapter routing)**: actively avoided — the latent reframing (§2.2 fusion recipe) is the primary framing; adapter routing is mentioned only as one of several pool sources (ZoneExpertBundle, Dynamic-Pair LoRA, dMoE).
 
 ---

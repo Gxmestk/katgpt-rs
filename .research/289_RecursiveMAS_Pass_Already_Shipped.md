@@ -62,7 +62,7 @@ Sequential / Mixture / Distillation / Deliberation — all are **MAS topology te
 | Recursion depth halting | Self-Advantage Gate, Gain/Cost Halter, Depth-Invariance | P283, P304, R286 |
 | Residual MLP projection form | latent_functor rank-1 (f), FuncAttn rank-k (C operator) | P273/P303, P286/P318 |
 | Freeze/thaw of projection weights | `riir-ai/crates/riir-engine/src/latent_functor/table.rs::FunctorEntry` (atomic Arc-swap, BLAKE3-committed, Uuid::now_v7 versioned) | P303 |
-| Coherence-driven re-estimation on drift | `latent_functor/reestimation.rs::ReestimationScheduler` (DiPOD equivalent) | P303 |
+| Coherence-driven re-estimation on drift | `riir-ai/crates/riir-engine/src/latent_functor/reestimation/mod.rs::ReestimationScheduler` (DiPOD equivalent) | P303 |
 | Latent-to-text decode only at final round | Standard inference path (decode is already only-at-output by design) | existing |
 | Sequential/Mixture/Distillation/Deliberation topologies | Polytope, Dynamic Pair, dMoE, Crowd MCGS, federation | R091/P260/R161/P298/P231 |
 

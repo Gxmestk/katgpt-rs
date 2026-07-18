@@ -130,7 +130,7 @@ All steps are matmuls or a single k×k Cholesky/Schur solve (k=64 typically). No
 
 #### Fusion F1 (PRIMARY — riir-ai): Latent Functor rank-1 → rank-k
 
-**The combination:** `latent_functor/arithmetic.rs` × FUNCATTN × SchurSolver × `latent_functor/reestimation.rs` (Plan 303's coherence-driven scheduler).
+**The combination:** `latent_functor/arithmetic.rs` × FUNCATTN × SchurSolver × `riir-ai/crates/riir-engine/src/latent_functor/reestimation/mod.rs` (Plan 303's coherence-driven scheduler).
 
 Today `extract_functor` learns `f = mean_k(target_k - source_k)` — a single displacement vector per (NPC, relation). This captures only **monotonic translational** relations: "if A fears B, A's embedding shifts by f". It cannot represent **rotational / multi-axis** relations like "A's fear of B is high-arousal-low-valence but A's admiration of C is low-arousal-high-valence" — those bend multiple semantic axes simultaneously and need a k×k operator, not a single direction.
 

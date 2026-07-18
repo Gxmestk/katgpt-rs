@@ -29,7 +29,7 @@ latent space, stronger than NPM's LLM-residual-stream form**:
 | Intra-trajectory (degenerate vs effective step) contrast | **`CognitiveBranch.failures`** (RIZZ Plan 329) + `ProceduralRule` helpful/harmful counters | Persistent per-NPC failure store, orthogonal-subspace isolated, BLAKE3-committable |
 | PCA-based steering extraction | `subspace_phase_gate` (Plan 301, Jacobian SVD) + Dual-Gram PCA (Plan 159) + HLA Windowed Eigenbasis (Issue 001) | Per-NPC eigenbasis recovery, no LAPACK, modelless power iteration |
 | Frozen direction vector, versioned, hot-swap | `MerkleFrozenEnvelope` + `CommittedFieldBlend` (Plan 321) + `KarcShard` / `ArchetypeBlendShard` | Sampling-invariant commitment (FAME Prop. 3), survives snapshot thaw — NPM has no commitment story |
-| Dual-granularity dynamic selection by trajectory length | `latent_functor/reestimation.rs` coherence-gated scheduler + `riir-ai/crates/riir-engine/src/latent_functor/zone_gating.rs` | Coherence-driven, not heuristic threshold |
+| Dual-granularity dynamic selection by trajectory length | `riir-ai/crates/riir-engine/src/latent_functor/reestimation/mod.rs` coherence-gated scheduler + `riir-ai/crates/riir-engine/src/latent_functor/zone_gating.rs` | Coherence-driven, not heuristic threshold |
 
 The single genuinely useful **insight** (not mechanism) NPM contributes that the shipped stack
 does not name explicitly: **intra-trajectory contrast from a *single* failed trajectory** —
@@ -138,7 +138,7 @@ to NPM's task-specific dynamic synthesis.
 | Retrieval + dynamic synthesis | `BranchRouter::route` (cosine snap + Jaccard fallback) + `Engram::lookup_into` | Plan 329, Plan 299 | Dot-product snap on pre-normalized embeddings, 301 ns on 64-branch bank, zero-alloc. NPM uses dense retriever + PCA composition — heavier. |
 | Frozen direction vector, versioned, atomic swap | `MerkleFrozenEnvelope` + `CommittedFieldBlend` + `KarcShard` + `ArchetypeBlendShard` | Plan 321, riir-neuron-db Plan 004/336 | **NPM has no commitment story.** Our direction vectors are BLAKE3-committed, sampling-invariant (FAME Prop. 3), survive snapshot thaw, cross LatCal sync boundary as K raw floats. Strictly stronger. |
 | Hybrid (implicit + explicit) | `MUX-Latent` (Plan 238) latent+explicit mode + `SwiR` switch-thinking (Plan 275) | Plans 238, 275 | Same hybrid pattern (textual plan + latent enforcement) — already shipped. |
-| Dual-granularity dynamic selection | `latent_functor/reestimation.rs` coherence-gated scheduler + `zone_gating.rs` | riir-engine | Coherence-driven re-estimation trigger; not NPM's heuristic length-threshold `L_q > γ·L̄`. |
+| Dual-granularity dynamic selection | `riir-ai/crates/riir-engine/src/latent_functor/reestimation/mod.rs` coherence-gated scheduler + `zone_gating.rs` | riir-engine | Coherence-driven re-estimation trigger; not NPM's heuristic length-threshold `L_q > γ·L̄`. |
 
 **No mechanism in NPM is unshipped.** Every load-bearing primitive has a shipped cousin that
 is either (a) identical-math but in a stronger target space (HLA 8-D vs LLM residual 4096-D),

@@ -12,7 +12,7 @@
 
 ## Goal
 
-Ship the open `DepthInvarianceDiagnostic` + `MagnitudeRegularizedResidual` primitives (modelless math, no game semantics) behind a `depth_invariance` feature flag, and audit our existing `BeliefDrafter` to confirm whether it exhibits the attention-drift failure mode the paper diagnoses. The diagnostic is the *root-cause* counterpart to four existing *symptom*-only detectors (`BeliefRankPruner`, `GainCostLoopHalter`, `latent_functor/reestimation.rs`, `crates/katgpt-micro-belief/src/coherence_bench.rs`).
+Ship the open `DepthInvarianceDiagnostic` + `MagnitudeRegularizedResidual` primitives (modelless math, no game semantics) behind a `depth_invariance` feature flag, and audit our existing `BeliefDrafter` to confirm whether it exhibits the attention-drift failure mode the paper diagnoses. The diagnostic is the *root-cause* counterpart to four existing *symptom*-only detectors (`BeliefRankPruner`, `GainCostLoopHalter`, `riir-ai/crates/riir-engine/src/latent_functor/reestimation/mod.rs`, `crates/katgpt-micro-belief/src/coherence_bench.rs`).
 
 **GOAT gate (open primitive):** G1 (8 correctness tests) + G2 (reproduce paper Figure 10 on BeliefDrafter — should classify as `DepthSpecificRefinement` beyond TTT) + G3 (negative control on `crates/katgpt-micro-belief/src/attractor.rs` — should classify as `DepthInvariant`) + G4 (≤5% latency overhead). If all four pass → promote `depth_invariance` to default-on diagnostic. The Super-GOAT gate (private side, riir-ai/.research/151 G5) is separate.
 

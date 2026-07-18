@@ -180,7 +180,7 @@ Add to the standing DEC vocabulary table in the research skill and in Research 2
 | "discrete Ladyzhenskaya-Babuška-Brezzi" | `d∘d=0` discrete identity (curl(grad)=0, div(curl)=0) | `dec/operators.rs` (tests verify by construction) |
 | "Fourier-type attention" `(Q̃K̃ᵀ)V/n` | Linear attention with no regularization; predecessor to Parallax sigmoid attention | `parallax_attn.rs` (Plan 135) |
 | "Galerkin-type attention" `Q(K̃ᵀṼ)/n` | Linear-in-n attention via KᵀV-first matmul reorder; predecessor to FUNCATTN `Φ·C·Ψᵀ` | `funcattn.rs` (Plan 286) |
-| "dynamic basis update" / "layer-wise change of basis" | Freeze/thaw snapshot cycle for projection matrices; latent_functor re-estimation | `latent_functor/reestimation.rs` (Plan 303) |
+| "dynamic basis update" / "layer-wise change of basis" | Freeze/thaw snapshot cycle for projection matrices; latent_functor re-estimation | `riir-ai/crates/riir-engine/src/latent_functor/reestimation/mod.rs` (Plan 303) |
 | "Galerkin projection-type layer norm" (pre-dot-product, scale-preserving) | Pre-LN attention block (alternative to post-attention sigmoid normalization) | Not in corpus — small architectural alternative worth benchmarking against post-LN in Plan 286 G3 |
 | "diagonal-dominant rescaled init" `W ← ηU + δI` | Tikhonov regularization `+λI` in the ridge solve (equivalent numerical effect) | `schur.rs` (Plan 067) — `δ` ≈ `λ` |
 | "energy decay" / "scale-preserving" | Norm preservation under attention (R305 phase-modulated coupling is the strict L2-norm-preserving cousin) | `phase_rotation_subspace_gate.rs` (Plan 322) |

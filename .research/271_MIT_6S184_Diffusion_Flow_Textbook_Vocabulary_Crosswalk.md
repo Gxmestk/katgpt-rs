@@ -15,7 +15,7 @@ This is a **textbook**, not a single-mechanism paper. **Verdict: Pass on novelty
 The artifact value here is **not a new plan**. It is a **vocabulary crosswalk** between MIT 6.S184's mathematical notation and our codebase's mechanism names. This crosswalk exists to prevent the three documented false-Super-GOAT failure modes:
 
 - **#1 `evolve_hla` (no notes framing):** a per-NPC recurrent belief-state kernel ships in `katgpt-rs/crates/katgpt-sense/src/reconstruction.rs` with no `.research/` note framing it as a denoising/belief kernel. Notes-only grep misses it.
-- **#2 `latent_functor/reestimation.rs` (different vocabulary):** DiPOD's "interleave self-distillation when ELBO drifts" ships as "coherence-driven re-estimation when coherence < τ_reest". Paper-vocabulary grep misses BOTH notes AND code.
+- **#2 `riir-ai/crates/riir-engine/src/latent_functor/reestimation/mod.rs` (different vocabulary):** DiPOD's "interleave self-distillation when ELBO drifts" ships as "coherence-driven re-estimation when coherence < τ_reest". Paper-vocabulary grep misses BOTH notes AND code.
 - **#3 R269 (adapter-routing default):** defaulting to adapter routing when a latent-functor/HLA/LatCal reframing is available.
 
 Future diffusion/score/flow-matching research notes should grep this crosswalk first.
@@ -84,7 +84,7 @@ The **correct** mapping: HLA is closer to a **linear-attention state-space model
 
 The textbook's **marginalization trick** (Thm 9: `u(x) = ∫ u(x|z) p_1|t(z|x) dz`) is the formal justification for treating `riir-ai/crates/riir-engine/src/latent_functor/zone_gating.rs` as a posterior-weighted mixture of zone-specific vector fields. Each zone = a "conditional vector field", the gate = the posterior. This is consistent with 161 dMoE and 246 Manifold Power Iteration MoE Router framings. **Not novel — just clarifying vocabulary.**
 
-`latent_functor/reestimation.rs`'s "coherence-driven re-estimation when coherence < τ_reest" is the codebase-vocabulary equivalent of DiPOD's "interleave self-distillation when ELBO drifts". Already documented as failure mode #2.
+`riir-ai/crates/riir-engine/src/latent_functor/reestimation/mod.rs`'s "coherence-driven re-estimation when coherence < τ_reest" is the codebase-vocabulary equivalent of DiPOD's "interleave self-distillation when ELBO drifts". Already documented as failure mode #2.
 
 ### 3.3 `cgsp_runtime/` (curiosity-guided self-play)
 

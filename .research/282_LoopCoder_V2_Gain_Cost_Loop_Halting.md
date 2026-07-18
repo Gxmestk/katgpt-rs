@@ -5,7 +5,7 @@
 > **Status:** Done
 > **Related Research:** 073 (LT2 — architecture we ship), 097 (Training-Free Loop), 266 (FPRM damped fixed-point halting), 273 (ELT elastic any-time)
 > **Related Plans:** 108 (LT2 — shipped, GOAT 8/8), 136 (TF-Loop — shipped), 152 (River-Valley Diagnostics — effective rank, shipped), 231 (PathwayTracker stability exit), 283 (Self-Advantage Gate residual halt), 304 (Gain/Cost Loop Halting primitive — this note)
-> **Cross-ref (riir-ai):** Research 149 (Per-NPC Gain/Cost Reasoning Depth Guide — the private selling-point doc), latent_functor/reestimation.rs (coherence-decay signals = cost curve), riir-ai/crates/riir-engine/src/latent_functor/k_selector.rs (KSelectionBandit — functor-rank selector, complementary granularity)
+> **Cross-ref (riir-ai):** Research 149 (Per-NPC Gain/Cost Reasoning Depth Guide — the private selling-point doc), riir-ai/crates/riir-engine/src/latent_functor/reestimation/mod.rs (coherence-decay signals = cost curve), riir-ai/crates/riir-engine/src/latent_functor/k_selector.rs (KSelectionBandit — functor-rank selector, complementary granularity)
 > **Classification:** Public
 
 ---
@@ -92,7 +92,7 @@ At R=2, the "thinking" variant (explicit CoT + latent loop) gains **+26.9 points
 | Fixed-point residual halt (gain-only) | FPRM → `fpopt_halt` (planned, Plan 267); Self-Advantage Gate on HLA (Plan 283) | Research 266, Plan 283 Bench 057 |
 | Stability-based early exit | `PathwayTracker` — default-on, GOAT 7/7 | Plan 231 |
 | Collapse-driven early exit | Collapse-Aware Adaptive Thinking — GOAT 6/6 | Plan 212 |
-| Coherence-decay re-estimation trigger | `ReestimationScheduler::tick` — coherence < tau_reest triggers re-derivation | riir-ai latent_functor/reestimation.rs, Plan 303 |
+| Coherence-decay re-estimation trigger | `ReestimationScheduler::tick` — coherence < tau_reest triggers re-derivation | riir-ai riir-ai/crates/riir-engine/src/latent_functor/reestimation/mod.rs, Plan 303 |
 | Gain/cost bandit (functor-rank level) | `KSelectionBandit` — UCB1 over K_OPTIONS=[1,2,4,8,16], reward = coherence − α·latency | riir-ai riir-ai/crates/riir-engine/src/latent_functor/k_selector.rs, Plan 318 |
 | Per-zone elastic budget | `ReestimationScheduler::set_active_budget`, `set_zone_gating` | riir-ai Research 128, Plan 305 |
 

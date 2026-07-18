@@ -207,7 +207,7 @@ read as **superseded by this section**.
 
 - Super-GOAT fusion / per-NPC selective forgetting (Issue 004 — CLOSED, covered by R158/R161/R155).
 - Co-evolution training loop (LLM evaluator improvement) → riir-train.
-- Controlled-utility-evolution runtime (epoch freeze + boundary replacement + selective erasure as a unified runtime abstraction) — architectural observation only, no plan. Research 320 §2.2.3 documents the mapping to existing modules (`MerkleFrozenEnvelope`, `mape_k.rs`, `consolidation.rs`, `latent_functor/reestimation.rs`, `committed_blend/`).
+- Controlled-utility-evolution runtime (epoch freeze + boundary replacement + selective erasure as a unified runtime abstraction) — architectural observation only, no plan. Research 320 §2.2.3 documents the mapping to existing modules (`MerkleFrozenEnvelope`, `mape_k.rs`, `consolidation.rs`, `riir-ai/crates/riir-engine/src/latent_functor/reestimation/mod.rs`, `committed_blend/`).
 
 ## References
 

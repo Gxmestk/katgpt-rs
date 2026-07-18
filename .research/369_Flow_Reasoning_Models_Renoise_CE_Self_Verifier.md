@@ -98,7 +98,7 @@ Renoise-CE selection: top-1 accuracy 1.00 (Shah) / 0.99–1.00 (Extreme) vs plur
 | **Verifier-free self-verification** (no external label) | CLR `(mean_m v_k,m)^M` claim-level reliability vote; CoE trajectory geometry | Plan 284 (DEFAULT-ON, ECE 0.0087), Plan 342/R345 | ✅ Different signal — CLR=claim-vote, CoE=trajectory-shape, **renoise-CE=perturbation-stability (MISSING)** |
 | **Population test-time scaling** (N candidates, refine, tournament) | MaxProof PATCH/REWRITE + BtRank + redundancy early-stop | R260 (GOAT, plan TBD) | ✅ By external verifier |
 | **Pre/post recursion log-ratio** (compare two passes through model) | Self-Advantage Gate `AdvantageMarginGate` | Plan 283 (default-on), `.benchmarks/056` | ⚠️ On SAME input (dead-compute detector), NOT on PERTURBED input |
-| **Coherence-driven re-derivation when coherence < tau** (triggered re-estimation) | `ReestimationScheduler` | `latent_functor/reestimation.rs`, Plan 303 | ⚠️ REACTIVE coherence gate, NOT PROACTIVE perturbation-and-re-resolve |
+| **Coherence-driven re-derivation when coherence < tau** (triggered re-estimation) | `ReestimationScheduler` | `riir-ai/crates/riir-engine/src/latent_functor/reestimation/mod.rs`, Plan 303 | ⚠️ REACTIVE coherence gate, NOT PROACTIVE perturbation-and-re-resolve |
 | **Plurality vote / self-consistency** | `MajorityVote` scorer, `tally[voted_action]` | `latent_thought_flow_scorer_bench.rs` | ✅ The BASELINE renoise-CE beats (paper Table 4) |
 | **k-invariance / Jaccard stability / Monte Carlo null test** (perturbation-based stability) | Stiff/Soft Subspace Anomaly Gate | Plan 138 | ⚠️ For ANOMALY DETECTION on input, not self-verification of output |
 | **DPO on self-mined negatives, wrong-cell localized** | — | — | ⛔ Training → riir-train |
@@ -176,7 +176,7 @@ CLR (Plan 284, DEFAULT-ON, ECE 0.0087) currently ranks trajectories by `(mean_m 
 **F2 (strong, GOAT-tier): Renoise-CE as PROACTIVE stability probe on latent_functor directions.**
 Current `ReestimationScheduler` (Plan 303) REACTIVELY re-estimates when coherence < tau. Add a PROACTIVE renoise-CE tick: perturb the observation buffer, re-estimate the direction into a scratch vector, measure cosine drift from the committed direction. If drift > threshold → flag as brittle (even if coherence is still high) → boost curiosity (drive exploration before the direction fails).
 - **Gain:** catches brittle directions before they manifest as coherence decay. The reactive gate is always one step behind; the proactive probe is ahead.
-- **Routing:** riir-ai runtime (latent_functor/reestimation.rs extension). Open primitive in katgpt-rs (generic perturb-and-re-resolve scorer).
+- **Routing:** riir-ai runtime (riir-ai/crates/riir-engine/src/latent_functor/reestimation/mod.rs extension). Open primitive in katgpt-rs (generic perturb-and-re-resolve scorer).
 
 **F3 (GOAT-tier): Renoise-CE × MaxProof — verifier-free population test-time scaling.**
 MaxProof (R260) uses an EXTERNAL verifier (ConstraintPruner/ScreeningPruner) for best-of-N selection. Replace with renoise-CE self-verifier for **verifier-free** population search: propose N candidates, score each by renoise-CE (no external verifier), tournament-select.
@@ -439,7 +439,7 @@ where
 | `renoise_ce_score` open primitive (generic perturb + re-resolve + drift) | `katgpt-rs` (MIT) | Generic modelless inference primitive, no game/chain/shard IP |
 | `verify_and_restart` / `best_of_n_stability` open loop framework | `katgpt-rs` (MIT) | Generic test-time scaling, composes with DDTree/CLR/MaxProof |
 | CLR + renoise-CE fusion arm (F1) | `riir-ai` (private) | Game-runtime IP: per-NPC test-time scaling integration |
-| Proactive functor stability probe (F2) | `riir-ai` (private) | latent_functor/reestimation.rs extension — runtime IP |
+| Proactive functor stability probe (F2) | `riir-ai` (private) | riir-ai/crates/riir-engine/src/latent_functor/reestimation/mod.rs extension — runtime IP |
 | Proactive shard freeze-gate probe (F5) | `riir-neuron-db` (private) | consolidation.rs `can_freeze` extension — shard IP |
 | HLA renoise-CE probe (F4) | `riir-ai` (private, speculative) | Per-NPC self-eval — needs R344 null-result re-validation |
 | Flow DPO / self-conditioning channel training | `riir-train` (private) | Training — preference optimization on self-mined negatives |

@@ -135,7 +135,7 @@ Two examples — simple flocking (linear-quadratic, explicit Nash) and emission 
 | Equilibrium reasoners | EqR residual-based convergence (R079) | — |
 | Cross-paradigm arena with Nash meta-game | Ruliology (R168, Plan 213) | `katgpt-rs/src/ruliology/`, `katgpt-rs/examples/ruliology_demo.rs` |
 | Population welfare via economic selection | WealthPruner (R167) — coordinator with own objective per-arm wealth | (R167 §Fusion 1) |
-| Coherence-driven re-estimation scheduler | `latent_functor/reestimation.rs` (self-healing on coherence < τ_reest) | `riir-ai/crates/riir-engine/src/latent_functor/reestimation.rs` |
+| Coherence-driven re-estimation scheduler | `riir-ai/crates/riir-engine/src/latent_functor/reestimation/mod.rs` (self-healing on coherence < τ_reest) | `riir-ai/crates/riir-engine/src/latent_functor/reestimation.rs` |
 
 ### 2.3 What's missing (the Super-GOAT novelty)
 
@@ -182,7 +182,7 @@ The dual update `λⁿ⁺¹ = λⁿ + (1/√N)·ER(ρⁿ⁺¹)` is a PrudentBank
 The moderator's `Γ₀` is WealthPruner's wealth-flows-promote-success applied at the *population* level. Each NPC's CGSP conjecturer pool is the deviation class; the moderator's recommendation policy is the wealth-promoted conjecturer. **Bankruptcy (WealthPruner) ↔ deviation-profitability (CCE)** — both remove underperformers, but CCE removes them *correlatedly* across the population via the shared signal, while WealthPruner removes them independently per arm.
 
 **Fusion D — CCE × Latent Functor re-estimation (coherence-decay triggers re-moderation):**
-`latent_functor/reestimation.rs` triggers re-estimation when `coherence < τ_reest`. The CCE primal-dual iterator should *also* trigger re-moderation when `coherence < τ_reest` — the moderator's `ρ` becomes stale as the population drifts. This fuses DiPOD's "self-distillation when ELBO drifts" pattern with CCE's "re-moderation when regret drifts". **The two schedulers are the same scheduler** under different vocabulary.
+`riir-ai/crates/riir-engine/src/latent_functor/reestimation/mod.rs` triggers re-estimation when `coherence < τ_reest`. The CCE primal-dual iterator should *also* trigger re-moderation when `coherence < τ_reest` — the moderator's `ρ` becomes stale as the population drifts. This fuses DiPOD's "self-distillation when ELBO drifts" pattern with CCE's "re-moderation when regret drifts". **The two schedulers are the same scheduler** under different vocabulary.
 
 **Fusion E — CCE × ICT Distributional Branching (gate expensive moderator updates):**
 Per-NPC cognitive economics (R270, R143) says only ~10% of moments are real decisions. The moderator doesn't need to update `ρ` every tick — only at branching points. **The ICT BranchingMask gates the primal-dual update itself.** This gives crowd-scale CCE updates at ~10× lower cost without losing decision quality.
@@ -224,7 +224,7 @@ Per-NPC cognitive economics (R270, R143) says only ~10% of moments are real deci
 | CGSP conjecturer pool as deviation class | — | ✅ game-specific (CGSP runtime) |
 | LatCal commitment of correlation signal | — | ✅ chain-specific (LatCal fixed-point bridge) |
 | Moderator objective `Γ₀` per game mode | — | ✅ game-specific (economy/faction/narrative) |
-| Latent Functor re-estimation trigger fusion | — | ✅ game-specific (latent_functor/reestimation.rs) |
+| Latent Functor re-estimation trigger fusion | — | ✅ game-specific (riir-ai/crates/riir-engine/src/latent_functor/reestimation/mod.rs) |
 | ICT BranchingMask gating of moderator updates | — | ✅ game-specific (per-NPC cognitive economics) |
 
 **Commercial principle (R003):** the public primitive is the adoption hook (generic LP-CCE math, no game semantics). The private guide is the moat (HLA + zone mood + CGSP pool + LatCal + game-specific `Γ₀`). Training know-how (neural-network parametrization, Adam optimizer on policy parameters) → riir-train, never leaks.

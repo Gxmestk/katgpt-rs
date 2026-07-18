@@ -1616,7 +1616,7 @@ markov → nll → typical_set → claim
 ## Depth-Invariance Diagnostic (`crates/katgpt-types/src/depth_invariance.rs`, Plan 306)
 
 Root-cause counterpart to four existing symptom-only detectors
-(`BeliefRankPruner`, `GainCostLoopHalter`, `latent_functor/reestimation.rs`,
+(`BeliefRankPruner`, `GainCostLoopHalter`, `riir-ai/crates/riir-engine/src/latent_functor/reestimation/mod.rs`,
 `crates/katgpt-micro-belief/src/coherence_bench.rs`). Modelless math over flattened `&[f32]`
 state chains from any recursive latent-state kernel. Detects
 `DepthSpecificRefinement` (monotonically growing magnitude — the paper's

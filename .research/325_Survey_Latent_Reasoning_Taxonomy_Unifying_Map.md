@@ -6,7 +6,7 @@
 > **Related Research:** 028 (HLA), 034 (D2F), 035 (Attractor), 048 (HRM), 073 (LT2), 097 (Training-Free Looped), 158 (MUX), 175 (ThoughtFold), 192 (NextLat), 230 (SSD duality), 241 (SwiR switch), 242 (Topological recurrent belief), 263 (Latent Thought Flow), 265 (CoFRe FP-MGM), 266 (FPRM damped halting), 273 (ELT), 282 (LoopCoder-V2), 317 (Reasoning as attractor)
 > **Related Plans:** 025 (bidirectional prefill), 066 (D2F), 108 (LT2 looped), 136 (TF Loop), 217 (NextLat drafter), 276 (MicroRecurrentBeliefState), 291 (D2F 3SR warm-start)
 > **Classification:** Public
-> **Verdict: Gain** — survey, not a new mechanism. Value is a unifying taxonomy that maps the codebase's scattered latent-reasoning corpus to a single frame, prevents future false-Super-GOAT claims in this saturated corner, and surfaces two narrow fusion gaps (bidirectional dKV-Cache for diffusion; explicit "depth-from-optimization-over-time" bridge framing for `latent_functor/reestimation.rs`).
+> **Verdict: Gain** — survey, not a new mechanism. Value is a unifying taxonomy that maps the codebase's scattered latent-reasoning corpus to a single frame, prevents future false-Super-GOAT claims in this saturated corner, and surfaces two narrow fusion gaps (bidirectional dKV-Cache for diffusion; explicit "depth-from-optimization-over-time" bridge framing for `riir-ai/crates/riir-engine/src/latent_functor/reestimation/mod.rs`).
 
 ---
 
@@ -94,7 +94,7 @@ This is the load-bearing section. **Every survey family is already represented.*
 | horizontal recurrence / hidden state | HLA, AHLA, Raven RSM, δ-Mem, MicroBelief | `katgpt-core/src/sense/`, Raven RSM slot memory |
 | linear-state recurrence | HLA / AHLA second-order SK accumulator | Research 028; `AHLAState` |
 | gradient-state recurrence / fast weights | LoRA reader-writer hot-swap, raw/lora (deterministic) | `LoraPair`, `dispatch_lora_merge` (riir-ai) |
-| hidden state as fast weights / TTT | `latent_functor/reestimation.rs` coherence-driven re-estimation | riir-ai (the canonical vocabulary-mismatch example) |
+| hidden state as fast weights / TTT | `riir-ai/crates/riir-engine/src/latent_functor/reestimation/mod.rs` coherence-driven re-estimation | riir-ai (the canonical vocabulary-mismatch example) |
 | Pre/Loop/Coda | `LoopMode::{None, Count}`, hybrid SDPA+AHLA 1:4 | Plan 108, `.benchmarks/033_lt2_looped_goat.md` |
 | early-exit / `max_t Δh < ε` | FPRM damped halting, LoopCoder-V2 gain-cost halting | Research 266, 282; `GainCostLoopHalter` |
 | attractor / fixed-point | Attractor kernel (Family A), FPRM | Research 035, 266, 317 |
@@ -171,7 +171,7 @@ The survey's §5.2 unification — "depth emerges from optimization over time, h
 
 ### 3.3 Fusion idea (novelty TBD — NOT a Super-GOAT claim)
 
-Survey's "gradient-state recurrence = optimization over time" × our `latent_functor/reestimation.rs` × our KARC reservoir (Plan 308/332, `KarcShard`) → a per-NPC primitive where the KARC reservoir's delay-basis ridge update is **driven by the functor's coherence signal** as the online "loss", unifying horizontal recurrence (reservoir state) with vertical (functor re-estimation trigger) under one optimization-over-time frame.
+Survey's "gradient-state recurrence = optimization over time" × our `riir-ai/crates/riir-engine/src/latent_functor/reestimation/mod.rs` × our KARC reservoir (Plan 308/332, `KarcShard`) → a per-NPC primitive where the KARC reservoir's delay-basis ridge update is **driven by the functor's coherence signal** as the online "loss", unifying horizontal recurrence (reservoir state) with vertical (functor re-estimation trigger) under one optimization-over-time frame.
 
 **Novelty TBD.** This crosses the §3.5 modelless-unblock boundary cautiously: the reservoir update is deterministic ridge regression (modelless), the functor coherence signal is latent (modelless), but the *coupling* (coherence as loss) needs a closed-form construction before it qualifies. Do NOT promote to Super-GOAT without running Q1–Q4 of the novelty gate. Track in `.issues/` if pursued.
 

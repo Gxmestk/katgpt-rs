@@ -139,7 +139,7 @@ Empirical results confirm the theoretical separations: latent wins on paralleliz
 | `katgpt-core/src/dec/` (operators.rs, hodge.rs, flow.rs) | `exterior_derivative`, `codifferential`, `hodge_decompose`, `CellComplex`, `CochainField` | The DAG substrate — cell complex = layered DAG, d = boundary operator, δ = divergence |
 | `crates/katgpt-types/src/depth_invariance.rs` | `classify_chain`, `DepthInvarianceKind::{DepthInvariant, DepthSpecificRefinement}` | Classifies chains by depth behavior — directly related to depth-vs-size tradeoff |
 | `riir-ai/crates/riir-engine/src/latent_functor/k_selector.rs` | `KSelectionBandit` over `[1,2,4,8,16]` | Per-relation rank-k selection = per-relation complexity class selection |
-| `riir-engine/src/latent_functor/reestimation.rs` | Coherence-driven re-estimation scheduler | The iterative refinement primitive (latent thought loop with halting) |
+| `riir-ai/crates/riir-engine/src/latent_functor/reestimation/mod.rs` | Coherence-driven re-estimation scheduler | The iterative refinement primitive (latent thought loop with halting) |
 | `riir-ai/crates/riir-engine/src/latent_functor/depth_invariance_audit.rs` | Functor chain depth-invariance classification | Audits whether functor iteration is depth-invariant or drifts |
 | `crates/katgpt-core/src/breakeven/mod.rs` | `BreakevenTierPair`, cost-amortization routing | Routes by cost, not complexity class |
 | SwiR controller (`src/swir/`) | `SwiRController::step(entropy, ...)` | Mode switch on entropy trend |
