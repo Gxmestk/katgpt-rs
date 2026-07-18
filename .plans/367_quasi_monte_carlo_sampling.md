@@ -145,7 +145,7 @@ The pre-existing `inverse_normal_cdf` implementation used Acklam's algorithm but
 These are consumers of the open primitive, each gets its own plan:
 
 - [x] **riir-ai CLR × QuasiMoTTo** (R136 / Plan 316 consumer) — replace `sample_multinomial` (`riir-ai/crates/riir-engine/src/swir_validation/gemma2_backend.rs:81`) with a QMC sampler when K>1. Crowd-scale CLR cost drops ~25–47%. **Fusion B per R367 §2.3.** Separate plan in `riir-ai/.plans/`.
-      **✅ DONE (2026-07-04)** — shipped directly under Plan 367 (per user instruction "Do NOT start a new plan"). `Gemma2DecodeBackend` gained three additions in `crates/riir-engine/src/swir_validation/gemma2_backend.rs`:
+      **✅ DONE (2026-07-04)** — shipped directly under Plan 367 (per user instruction "Do NOT start a new plan"). `Gemma2DecodeBackend` gained three additions in `riir-ai/crates/riir-engine/src/swir_validation/gemma2_backend.rs`:
       - `QmcMethod` enum (`Lattice`/`Stratified`/`Sobol`, default `Lattice` — the pass@k champion per R367 §1.1).
       - `with_qmc_sampling(temperature, seed, method)` builder — replaces `with_temperature_sampling` for the K>1 path. Sets `qmc_source: Option<Box<dyn QmcSource>>` + carried `qmc_u: f32`; clears `rng` (last-builder-wins semantics).
       - `prepare_qmc_rollouts(k)` — pre-draws K low-discrepancy initial coordinates in a single `source.draw(k, ...)` batch. **Critical:** Lattice/Stratified sources produce their low-discrepancy structure *within* a batch; calling `draw(1, ...)` K times yields K i.i.d. points (defeating the purpose). `reset()` consumes one pre-drawn coordinate per call; falls back to `draw(1, ...)` if no batch prepared (Sobol-correct, Lattice/Stratified degraded to i.i.d. — harmless for single-rollout Pass@1).

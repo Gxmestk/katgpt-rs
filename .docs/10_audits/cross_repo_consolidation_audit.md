@@ -60,23 +60,23 @@ Tracked in riir-ai issues (to be created):
 
 ### Executive summary
 
-**At natural endgame for crate-level consolidation.** The neuron-db spin-off (Plan 001) is exemplary: `src/neuron_db/mod.rs` is an 85-LOC shim, `catchup/merkle.rs` correctly delegates generics to the leaf crate and retains chain-specifics. Zero files over the 2048-LOC limit.
+**At natural endgame for crate-level consolidation.** The neuron-db spin-off (Plan 001) is exemplary: `riir-chain/src/neuron_db/mod.rs` is an 85-LOC shim, `catchup/merkle.rs` correctly delegates generics to the leaf crate and retains chain-specifics. Zero files over the 2048-LOC limit.
 
 **One clear DRY violation found and FIXED:** ~895 LOC of acknowledged `cold_store` boilerplate duplicated across 4 `*_commit.rs` files.
 
 ### Findings
 
 **Spin-off cleanliness: EXEMPLARY.** Verified:
-- `src/neuron_db/mod.rs` — 85-LOC shim, single `pub use riir_neuron_db::*;` + the `LatCalWalletExt` trait (legitimately stays — references chain-side `LatCalMatrix`)
-- `src/catchup/merkle.rs` — re-exports generic `MerkleTree`/`MerkleProof` from leaf, retains `DataTier`/`build_*_root` (chain block-commitment concepts)
+- `riir-chain/src/neuron_db/mod.rs` — 85-LOC shim, single `pub use riir_neuron_db::*;` + the `LatCalWalletExt` trait (legitimately stays — references chain-side `LatCalMatrix`)
+- `riir-chain/src/catchup/merkle.rs` — re-exports generic `MerkleTree`/`MerkleProof` from leaf, retains `DataTier`/`build_*_root` (chain block-commitment concepts)
 - Zero duplication between riir-chain and riir-neuron-db
 
 **DRY violation (FIXED):** Four `*_commit.rs` files each carried ~210-230 LOC of near-identical `mod cold_store` boilerplate. Code comments said: *"Verbatim from ShardStore/KarcBatchStore/... — kept local rather than shared"*. Extracted into generic `ColdBatchStore<B: ColdBatch>` (see `issues/001_cold_batch_store_dry.md`).
 
 **Largest files (all under 2048 limit):**
-- `src/consensus/guard_pruner.rs` — 1,837 LOC (watch — approaching limit)
+- `riir-chain/src/consensus/guard_pruner.rs` — 1,837 LOC (watch — approaching limit)
 - `crates/riir-chaind/src/mcp.rs` — 1,633 LOC (daemon, correctly placed)
-- `src/karc_commit.rs` — 1,463 LOC (was larger pre-extraction)
+- `riir-chain/src/karc_commit.rs` — 1,463 LOC (was larger pre-extraction)
 
 ### Action taken
 

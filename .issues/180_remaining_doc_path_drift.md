@@ -41,7 +41,7 @@ Three classes of drift remain **open** in this issue:
 | Repo | Remaining stale refs | Notes |
 |---|---:|---|
 | katgpt-rs | 338 | Mix of cross-repo (crates/katgpt-core/src/... from sibling docs), ambiguous (mod.rs/types.rs), and truly-gone (e.g. `src/pruners/bomber.rs`, `src/blue_bear_pruner.rs`). |
-| riir-ai | 883* | Mostly cross-repo (`crates/katgpt-core/src/...`, `crates/riir-chain/src/...`) + 371 truly-gone (e.g. `src/catchup/*` moved to riir-chain, `src/encoding/latcal.rs` likely moved). *The 883 count is inflated by cross-repo refs that DO exist, just not in riir-ai. |
+| riir-ai | 883* | Mostly cross-repo (`crates/katgpt-core/src/...`, `crates/riir-chain/src/...`) + 371 truly-gone (e.g. `src/catchup/*` moved to riir-chain, `riir-chain/src/encoding/latcal.rs` likely moved). *The 883 count is inflated by cross-repo refs that DO exist, just not in riir-ai. |
 | riir-chain | 5 | Truly-gone (e.g. `src/ring.rs`, `src/harness.rs`). |
 | riir-neuron-db | 15 | Mix; most look like `src/catchup/*` which moved to riir-chain. |
 | riir-game-sdk | 4 | Small residue. |

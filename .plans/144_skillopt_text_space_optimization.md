@@ -344,7 +344,7 @@ fn compute_epoch_comparison(
 
 - [x] **T6: Skill Optimization Binary (riir-ai, private) 🔒**
 
-**Location:** `crates/riir-games/examples/bomber_skill_opt.rs`
+**Location:** `riir-ai/crates/riir-games/examples/bomber_skill_opt.rs`
 
 CLI tool to run skill optimization:
 

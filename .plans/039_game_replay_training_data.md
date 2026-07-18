@@ -186,7 +186,7 @@ Each line is one `(board_state, action, quality)` sample:
 
 | File | Action | Description |
 |------|--------|-------------|
-| `crates/riir-gpu/src/game/replay.rs` | Edit | Replace `parse_replay()` stub with real JSONL parser |
+| `riir-ai/crates/riir-gpu/src/game/replay.rs` | Edit | Replace `parse_replay()` stub with real JSONL parser |
 | `crates/riir-gpu/examples/train_bomber.rs` | Edit | Replace stub with actual wgpu training loop |
 
 ---

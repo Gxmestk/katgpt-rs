@@ -178,7 +178,7 @@ crates/riir-examples/examples/
 - `src/speculative/d2f_verifier.rs` — D2fDrafterVerifier (Plan 089 T1)
 - `src/speculative/mod.rs` — Module index (needs `pub mod diffusion_sampler`)
 - `src/speculative/types.rs` — SelfSpecConfig (needs `sampler` field)
-- `crates/riir-examples/examples/go_12_analytics_validate.rs` — Natsukaze validation (exists)
+- `riir-ai/crates/riir-examples/examples/go_12_analytics_validate.rs` — Natsukaze validation (exists)
 
 ### Benchmarks
 - `.benchmarks/018_d2f_verifier_goat.md` — Plan 089 GOAT (T1-T5 baseline)

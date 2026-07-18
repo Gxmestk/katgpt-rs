@@ -673,7 +673,7 @@ Plan 009 will cover:
 
 - [x] 2.1 Add `syn` and `proc-macro2` to `Cargo.toml` under `[dependencies]` with `optional = true`
 - [x] 2.2 Add `validator = ["syn", "proc-macro2"]` to `[features]` (previously `clora`)
-- [x] 2.3 Create `src/validator/mod.rs` with re-exports (behind `#[cfg(feature = "validator")]`)
+- [x] 2.3 Create `riir-chain/src/validator/mod.rs` with re-exports (behind `#[cfg(feature = "validator")]`)
 - [x] 2.4 Create `crates/katgpt-validator/src/types.rs` with `PruneResult`, `ErrorKind`, `CompilerFeedback`
 - [x] 2.5 Create `crates/katgpt-validator/src/partial_parser.rs` with bracket balancer DFA
 - [x] 2.6 Create `crates/katgpt-validator/src/syn_pruner.rs` with `SynPruner` implementing `ConstraintPruner`
@@ -733,7 +733,7 @@ validator = ["syn", "proc-macro2"]  # previously clora
 | `crates/katgpt-tokenizer/src/bpe.rs` | New | 1 | No |
 | `src/types.rs` | Add Config::bpe() (`n_layer` already exists from Plan 010) | 1 | No |
 | `src/lib.rs` | Add mod tokenizer | 1 | No |
-| `src/validator/mod.rs` | New | 2 | No |
+| `riir-chain/src/validator/mod.rs` | New | 2 | No |
 | `crates/katgpt-validator/src/types.rs` | New | 2 | No |
 | `crates/katgpt-validator/src/partial_parser.rs` | New | 2 | No |
 | `crates/katgpt-validator/src/syn_pruner.rs` | New | 2 | No |

@@ -216,4 +216,4 @@ Phase 2 (T10-T12) are integration tasks that use analytics features. The model-b
 - Our Go engine: `.docs/14_go_arena.md`, Plan 065
 - Our G-Zero self-play: Plan 049
 - Our heuristic: `crates/katgpt-pruners/src/go/state.rs:GoHeuristic`
-- riir-ai data loading: `crates/riir-gpu/src/game/go.rs:load_flat_zip()`
+- riir-ai data loading: `riir-ai/crates/riir-gpu/src/game/go.rs:load_flat_zip()`
