@@ -141,8 +141,10 @@ Two consumers wired in this phase:
 
 ### Consumer A — GM "what-if" panel (riir-game-sdk)
 
-- [ ] **T4.1** `crates/riir-gm-tool` (in riir-game-sdk workspace) — add a "What-If" tab behind the `gm` feature that exposes `consumer::what_if`. Designer selects a cause entity + effect entity from the world; the panel calls the offline API and renders the interventional signature as a node-graph diff (survivors green, excluded red, hedge error if not identifiable).
-- [ ] **T4.2** Cache layer — `what_if` results are deterministic given the same KG state; cache by `(kg_merkle_root, cause, effect)` BLAKE3 hash. The cache lives in the GM tool process, NOT in chain state (offline-only).
+- [x] **T4.1** `crates/riir-gm-tool` (in riir-game-sdk workspace) — add a "What-If" tab behind the `gm` feature that exposes `consumer::what_if`. Designer selects a cause entity + effect entity from the world; the panel calls the offline API and renders the interventional signature as a node-graph diff (survivors green, excluded red, hedge error if not identifiable).
+  - **DONE (2026-07-18).** `WhatIfTab<Q>` shipped in `riir-game-sdk/src/gm/what_if_tab.rs`. SDK owns the form + rendering + cache; consumer owns the query via the `WhatIfQuery` trait (same dependency-inversion pattern as T3.3-T3.5). SDK-owned `WhatIfResult` parallel type preserves the facade constraint (no engine deps). 13 unit tests cover all display states.
+- [x] **T4.2** Cache layer — `what_if` results are deterministic given the same KG state; cache by `(kg_merkle_root, cause, effect)` BLAKE3 hash. The cache lives in the GM tool process, NOT in chain state (offline-only).
+  - **DONE (2026-07-18).** Cache ships as part of `WhatIfTab` (keyed by `(cause, effect)`). Per-process only — never crosses sync. "Clear cache" button forces a re-query after KG state changes.
 
 ### Consumer B — Sleep-cycle claim verification (riir-ai)
 
