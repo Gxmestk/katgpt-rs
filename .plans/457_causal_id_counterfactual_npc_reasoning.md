@@ -152,8 +152,10 @@ Two consumers wired in this phase:
 
 ### Consumer B — Sleep-cycle claim verification (riir-ai)
 
-- [ ] **T4.3** Hook into `riir-engine` sleep cycle (Plan 334 Sleep-Time Anticipator) — when the system generates a counterfactual claim during consolidation ("would NPC X have won if they took path Y?"), optionally run `what_if(cause=action, effect=outcome)` to verify the claim is identifiable. If `Err(NotIdentifiable)` → mark the claim L0 (unverifiable) in the Claim Rubric (Plan 307) instead of L1/L2/L3. Honest downgrade — the system admits it cannot verify this claim.
-- [ ] **T4.4** Metric — count how often `what_if` returns `Ok` vs `Err` on real game traces. Target: ≥30% `Ok` on a realistic game trace to justify the integration. If `Ok` rate is too low, the primitive isn't pulling its weight — demote.
+- [-] **T4.3** Hook into `riir-engine` sleep cycle (Plan 334 Sleep-Time Anticipator) — when the system generates a counterfactual claim during consolidation ("would NPC X have won if they took path Y?"), optionally run `what_if(cause=action, effect=outcome)` to verify the claim is identifiable. If `Err(NotIdentifiable)` → mark the claim L0 (unverifiable) in the Claim Rubric (Plan 307) instead of L1/L2/L3. Honest downgrade — the system admits it cannot verify this claim.
+  - **DEFERRED.** Needs counterfactual claim generation infrastructure (riir-ai sibling Plan 499) + real sleep-cycle traces. Per Plan 457 §T4.7 the promotion criterion is Consumer A OR Consumer B, so this deferral does NOT block promotion (Consumer A cleared the gate).
+- [-] **T4.4** Metric — count how often `what_if` returns `Ok` vs `Err` on real game traces. Target: ≥30% `Ok` on a realistic game trace to justify the integration. If `Ok` rate is too low, the primitive isn't pulling its weight — demote.
+  - **DEFERRED.** Blocked on T4.3.
 
 ### Consumer validation gate
 

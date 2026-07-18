@@ -113,19 +113,19 @@ Bench: `crates/katgpt-core/benches/bench_449_poincare_goat.rs`. Run with `cargo 
 
 > Not in this plan's scope. Filed as the riir-ai implementation of `riir-ai/.research/319` Integration 1. This plan only ships the open primitive; the consumer wiring is a separate riir-ai plan.
 
-- [ ] **T4.1** (DEFERRED to riir-ai plan) HLA ↔ MapPos adapter fit per `riir-ai/.research/319` Integration 1.
-- [ ] **T4.2** (DEFERRED to riir-ai plan) Two-brain imagination loop per Integration 1.
-- [ ] **T4.3** (DEFERRED to riir-ai plan) MCTS over imagined HLA per Integration 2.
-- [ ] **T4.4** (DEFERRED to riir-ai plan) sleep_time → SpatialAnticipatedHla per Integration 3.
+- [-] **T4.1** (DEFERRED to riir-ai plan) HLA ↔ MapPos adapter fit per `riir-ai/.research/319` Integration 1.
+- [-] **T4.2** (DEFERRED to riir-ai plan) Two-brain imagination loop per Integration 1.
+- [-] **T4.3** (DEFERRED to riir-ai plan) MCTS over imagined HLA per Integration 2.
+- [-] **T4.4** (DEFERRED to riir-ai plan) sleep_time → SpatialAnticipatedHla per Integration 3.
 
 ---
 
 ## Phase 5 — Fusion (speculative, post Phase 3)
 
-- [ ] **T5.1** Fusion with SE(2) equivariant features (R166/Plan 354): adapter fits tighter on SE(2) features than raw features. Verify with a head-to-head G2 gate.
-- [ ] **T5.2** Fusion with Motor-Gated DEC (R168/Plan 357): compose imagined HLA (this primitive) with imagined spatial field (Motor-Gated DEC) for full sensorimotor imagination.
-- [ ] **T5.3** Fusion with InducedCwmKernel (Plan 296): the adapter triple as a frozen Cwm parameter set.
-- [ ] **T5.4** Fusion with Spherical Geodesic Steering (Plan 405): Poincaré for linear-chart segments; Slerp for geodesic corrections. Hybrid navigator.
+- [-] **T5.1** (SPECULATIVE) Fusion with SE(2) equivariant features (R166/Plan 354): adapter fits tighter on SE(2) features than raw features. Verify with a head-to-head G2 gate.
+- [-] **T5.2** (SPECULATIVE) Fusion with Motor-Gated DEC (R168/Plan 357): compose imagined HLA (this primitive) with imagined spatial field (Motor-Gated DEC) for full sensorimotor imagination.
+- [-] **T5.3** (SPECULATIVE) Fusion with InducedCwmKernel (Plan 296): the adapter triple as a frozen Cwm parameter set.
+- [-] **T5.4** (SPECULATIVE) Fusion with Spherical Geodesic Steering (Plan 405): Poincaré for linear-chart segments; Slerp for geodesic corrections. Hybrid navigator.
 
 ---
 
