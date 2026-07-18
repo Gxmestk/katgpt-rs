@@ -318,7 +318,14 @@ The benchmarks progress from individual components to full pipelines. Benchmark 
 
 Files: `src/turboquant/{mod,codebook,forward,kv_cache,rotation,types}.rs`
 
-Feature gate: `turboquant` (opt-in, NOT in default features)
+Feature gate: `turboquant` (transitively default-on: `hybrid_oct_pq` [in `default`] enables `planar_quant` which enables `turboquant`. Originally opt-in per Plan 063; promoted transitively when `hybrid_oct_pq` [Plan 101] landed default-on.)
+
+> **UPDATE 2026-07-18 (status sync):** the previous label said
+> `turboquant` (opt-in, NOT in default features). The "NOT in default"
+> claim went stale once `hybrid_oct_pq` was promoted to default-on —
+> `hybrid_oct_pq = ["planar_quant", ...]` and `planar_quant = ["turboquant", ...]`,
+> so `turboquant` is now compiled in by default. The standalone feature is
+> still exposed for `--no-default-features` consumers.
 
 ### Memory Compression
 | Bits | Bytes/token | Compression | Key cos_sim | Attention corr |

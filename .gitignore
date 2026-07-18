@@ -12,3 +12,7 @@ output/
 # Trained weights belong in riir-train (source) / riir-ai/assets (runtime).
 *.mlpackage/
 *.mlmodel
+
+# Python — scripts/ ships re-runnable auditors/builders; bytecode cache should not ship.
+__pycache__/
+*.pyc

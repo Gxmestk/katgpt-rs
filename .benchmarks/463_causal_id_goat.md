@@ -5,8 +5,19 @@
 **Research:** [450](../.research/450_Algorithmic_Syntactic_Causal_Identification.md) (Gain → PoC-confirmed)
 **PoC:** [Issue 545](../../../riir-ai/.issues/545_causal_id_defend_wrong_poc.md) — DONE, GAIN PROVEN
 **Source paper:** [arXiv:2403.09580](https://arxiv.org/abs/2403.09580) Cakiqi & Little 2024
-**Feature gate:** `causal_identification` (opt-in)
+**Feature gate:** `causal_identification` (default-on in `katgpt-core` since Plan 457 Phase 5 promotion, 2026-07-18 — see `crates/katgpt-core/Cargo.toml` "Phase 20" comment)
 **Bench:** `crates/katgpt-core/benches/causal_id_goat.rs`
+
+> **UPDATE 2026-07-18 (status sync):** the previous label said
+> `causal_identification` (opt-in). That was accurate when this bench was
+> written (Plan 457 Phase 2) but went stale the same day when Phase 5
+> promotion landed in `crates/katgpt-core/Cargo.toml` (Phase 20 entry,
+> +causal_identification appended to `default = [...]`). The Phase 5
+> promotion was justified by the T4.5 synthetic Consumer A bench
+> (`.benchmarks/464_causal_id_consumer_a_synthetic.md`): 71.7% non-trivial
+> Ok rate (43/60), 43 actionable interventional signatures. Offline-only
+> (8.40µs/32-node identify) — well outside 20Hz tick budget but valid for
+> offline reasoning.
 
 ## TL;DR
 
