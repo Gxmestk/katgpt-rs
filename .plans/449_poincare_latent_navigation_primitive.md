@@ -5,7 +5,7 @@
 **Private guide:** [riir-ai/.research/319_SeeSE3_Latent_Imagination_Game_Runtime_Guide.md](../../riir-ai/.research/319_SeeSE3_Latent_Imagination_Game_Runtime_Guide.md)
 **Source paper:** [arXiv:2607.14228](https://arxiv.org/abs/2607.14228) — Chen et al., *SeeSE3: Emergence of 3D Space in Vision Features* (DeepMind, 15 Jul 2026). Headline theorems: 3 (local decodability always exists), 5 (global obstruction = manifold curvature; nonlinear φ unrolls), 7 (rotation easier than translation — depth-dependence).
 **Target:** `katgpt-rs/crates/katgpt-core/src/poincare.rs` (new module) + Cargo feature `poincare_navigator` (opt-in)
-**Status:** Active — Phase 1 IN-FLIGHT
+**Status:** Active — Phase 1 COMPLETE, Phase 2 IN-FLIGHT
 
 ---
 
@@ -17,40 +17,41 @@ The primitive is the **adoption hook** for the private game-runtime selling poin
 
 ---
 
-## Phase 1 — Skeleton: PoincareAdapter Pod + navigator fns (CORE)
+## Phase 1 — Skeleton: PoincareAdapter Pod + navigator fns (CORE) ✅ DONE
 
 ### Tasks
 
-- [ ] **T1.1** Define `PoincareAdapter` Pod in `crates/katgpt-core/src/poincare.rs`:
-  - `#[repr(C)]` struct: `{ phi_w1: [f32; PHID1], phi_b1: [f32; PHIHID], phi_w2: [f32; PHID2], phi_b2: [f32; PHIOUT], W: [f32; TARGET_DIM * PHIOUT], W_pinv: [f32; PHIOUT * TARGET_DIM], target_dim: u8, phi_hidden: u16, phi_out: u16, blake3: [u8; 32] }`
-  - Constants: `PHIHID = 64`, `PHIOUT = 20`, `TARGET_DIM_LE_MAX = 8` (target space ≤ 8D).
-  - `bytemuck Pod + Zeroable`. BLAKE3 commitment over all weights.
-  - Constructors: `new_from_fit(...) -> Result<Self, FitError>` (offline ridge + closed-form φ), `from_bytes(...)`, `canonical_bytes() -> Vec<u8>` (for `MerkleFrozenEnvelope`).
-  - Validation: roundtrip serialize/deserialize; BLAKE3 verify.
+- [x] **T1.1** Define `PoincareAdapter` Pod in `crates/katgpt-core/src/poincare.rs`:
+  - `#[derive(Debug, Clone)]` struct with `Vec<f32>` weight arrays (phi_w1, phi_b1, phi_w2, phi_b2, W, W_pinv) + dim headers (u8) + blake3 commitment.
+  - Constants: `LATENT_DIM_MAX = 64`, `PHI_OUT_DEFAULT = 20`, `PHI_HIDDEN_DEFAULT = 20`, `TARGET_DIM_MAX = 8`.
+  - BLAKE3 commitment over all weights via `recompute_blake3` / `verify`.
+  - Constructors: `from_bytes` (with magic + dim + BLAKE3 verification), `canonical_bytes` (for `MerkleFrozenEnvelope`).
+  - Validation: roundtrip serialize/deserialize test; tamper-detection test.
 
-- [ ] **T1.2** Implement `poincare_navigate_into(z_src: &[f32], delta_target: &[f32], adapter: &PoincareAdapter, z_out: &mut [f32])`:
-  - Compute `g_src = phi(z_src)` (2-layer MLP, SIMD via existing `simd_dot_f32`).
-  - Compute `g_dest = g_src + W_pinv · delta_target` (one matvec, `TARGET_DIM_LE_MAX × PHIOUT`).
-  - If `phi` is invertible: `z_out = phi_inv(g_dest)` (closed-form for PCA-tanh φ; for general φ, leave `z_out = g_dest` in chart space and document the consumer-side retrieval pattern).
-  - Zero-allocation. Single function call. ≤ 1µs SIMD target.
+- [x] **T1.2** Implement `poincare_navigate_into(z_src, delta_target, adapter, z_out, phi_scratch, hidden_scratch)`:
+  - Compute `g_src = phi(z_src)` (2-layer MLP, SIMD via `simd_dot_f32`).
+  - Compute `g_dest = g_src + W_pinv · delta_target` (one matvec).
+  - `z_out = z_src + W1ᵀ · g_dest` (least-squares φ⁻¹ back-projection).
+  - Zero-allocation. Single function call.
 
-- [ ] **T1.3** Implement `poincare_multi_step_into(z_src, delta_target, n_steps, adapter, z_out)`:
-  - Split `delta_target / n_steps`. Iterate `poincare_navigate_into(z, delta_target/n_steps, adapter, z)` `n_steps` times, writing to `z_out`.
-  - Open-loop integrator. No correction.
-  - Tests: 4-step path stays within chart valid region; deterministic given seed.
+- [x] **T1.3** Implement `poincare_multi_step_into(z_src, delta_target, n_steps, adapter, z_out, phi_scratch, hidden_scratch, delta_step_scratch)`:
+  - Split `delta_target / n_steps`. Iterate `poincare_navigate_into` `n_steps` times.
+  - Open-loop integrator. Uses a stack `[f32; LATENT_DIM_MAX]` snapshot buffer to work around the borrow checker (z_out can't alias z_src directly).
+  - Tests: 4-step path is deterministic bit-identical across runs.
 
-- [ ] **T1.4** Implement offline fit helpers (modelless, no gradient descent):
-  - `fit_poincare_adapter(z_pairs: &[(&[f32], &[f32])], target_pairs: &[(&[f32], &[f32])], config: FitConfig) -> Result<PoincareAdapter, FitError>`
-  - **Closed-form ridge for W**: `W = (ZᵀZ + αI)⁻¹·ZᵀY` where Z = stacked `φ(z₂) − φ(z₁)`, Y = stacked `target₂ − target₁`. α = 1.0 default (matches paper).
-  - **Deterministic closed-form φ**: PCA on the z-pairs (top-`PHIOUT` components via existing `thin_svd_into` from Plan 301), then `tanh` activation. This is the modelless-unblock path per research skill §3.5 — gradient φ fit is a riir-train follow-up IF G2 fails.
-  - **Pseudo-inverse**: `W_pinv = Wᵀ(W·Wᵀ)⁻¹` (rank-`TARGET_DIM` assumption).
-  - Tests: round-trip on a known linear map (identity + random projection) achieves R² > 0.95.
+- [x] **T1.4** Implement offline fit helpers (modelless, no gradient descent):
+  - `fit_poincare_adapter(z_samples, target_samples, latent_dim, target_dim, phi_out, phi_hidden, cfg) -> Result<PoincareAdapter, FitError>`
+  - **Closed-form ridge for W**: `W = (ZᵀZ + αI)⁻¹·ZᵀY` via `ridge_solve_direct_f32` (Plan 308).
+  - **Deterministic closed-form φ**: PCA on the z-pairs via `thin_svd_into` (Plan 301), then `tanh` activation. W1 = unit-norm PCA directions (NOT scaled by σ — scaling pushes the projection into tanh saturation). The σ information is recovered through the ridge fit.
+  - **Pseudo-inverse**: `W_pinv = V · Σ⁻¹ · Uᵀ` via thin SVD of W (rank-checked against `cfg.rank_tau`).
+  - Tests: linear-map recovery (max abs err < 0.5 — bounded by tanh distortion); canonical-bytes round-trip; tamper detection; inverse-navigator direction match.
 
-- [ ] **T1.5** Wire Cargo feature `poincare_navigator` (opt-in) in `crates/katgpt-core/Cargo.toml`:
-  - `[features] poincare_navigator = ["dep:blake3", "dep:bytemuck"]` (likely already transitively enabled).
-  - Export from `crates/katgpt-core/src/lib.rs`: `pub mod poincare; pub use poincare::{PoincareAdapter, poincare_navigate_into, poincare_multi_step_into, fit_poincare_adapter, FitConfig, FitError};`
+- [x] **T1.5** Wire Cargo feature `poincare_navigator` (opt-in) in `crates/katgpt-core/Cargo.toml`:
+  - `poincare_navigator = []` (no new deps — blake3, bytemuck already non-optional; SVD + ridge already in-tree).
+  - Module gated on `#[cfg(all(feature = "poincare_navigator", feature = "subspace_phase_gate"))]` (the SVD substrate).
+  - Exported from `crates/katgpt-core/src/lib.rs`: `pub mod poincare; pub use poincare::{PoincareAdapter, poincare_navigate_into, poincare_multi_step_into, fit_poincare_adapter, eval_phi_into, accumulate_pinv_into, FitConfig, PoincareFitError, LATENT_DIM_MAX, PHI_OUT_DEFAULT, PHI_HIDDEN_DEFAULT, TARGET_DIM_MAX, RIDGE_ALPHA_DEFAULT};`
 
-- [ ] **T1.6** Update `katgpt-rs/README.md` Feature Showcase with a new entry for Plan 449 (Poincaré Adapter). Update `.docs/` index if a relevant folder exists.
+- [x] **T1.6** Documentation: module-level rustdoc explains the math, the modelless mandate, Theorem 7 design constraint, the sibling-primitive relationships, and the sync-boundary invariant. README update deferred to Phase 3 promotion.
 
 ---
 

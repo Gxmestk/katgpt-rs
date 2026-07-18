@@ -1885,6 +1885,28 @@ pub use manifold_erasure::{
 #[cfg(feature = "multi_agent_path")]
 pub mod multi_agent_path;
 
+// Plan 449: Poincaré Adapter — closed-form latent navigation primitive.
+// Distillation of arXiv:2607.14228 (Chen et al., *SeeSE3: Emergence of 3D
+// Space in Vision Features*, DeepMind, 15 Jul 2026). Research 449 ran the
+// novelty gate (4/4 Super-GOAT). The open primitive ships a frozen
+// `PoincareAdapter` Pod + the closed-form navigator `poincare_navigate_into`
+// + the multi-step variant + an offline closed-form ridge fit. Private game-
+// runtime selling point (NPC imagination) lives in riir-ai/.research/319.
+//
+// Pure modelless (closed-form PCA + ridge + SVD pseudoinverse; no gradient
+// descent). Reuses Plan 301's `thin_svd_into` + Plan 308's
+// `ridge_solve_direct_f32`. Gated on `subspace_phase_gate` for the SVD. Opt-in
+// until the G1–G7 GOAT gate passes (Plan 449 Phase 2).
+#[cfg(all(feature = "poincare_navigator", feature = "subspace_phase_gate"))]
+pub mod poincare;
+#[cfg(all(feature = "poincare_navigator", feature = "subspace_phase_gate"))]
+pub use poincare::{
+    LATENT_DIM_MAX, PHI_HIDDEN_DEFAULT, PHI_OUT_DEFAULT, RIDGE_ALPHA_DEFAULT, TARGET_DIM_MAX,
+    FitConfig, PoincareAdapter, PoincareFitError,
+    accumulate_pinv_into, eval_phi_into, fit_poincare_adapter,
+    poincare_multi_step_into, poincare_navigate_into,
+};
+
 // Test-only `#[global_allocator]` so `alloc::tests::*` pass when running
 // `cargo test -p katgpt-core --lib`. Downstream consumers (katgpt-rs root,
 // riir-engine, etc.) install their OWN `#[global_allocator]`; this static is
