@@ -196,7 +196,7 @@ GOAT proof benchmark file at `.benchmarks/274_cgsp_goat.md`. Decision recorded.
 
 ### Phase 4 notes
 
-- **Bug found and fixed while writing examples:** `src/cgsp.rs` (the re-export
+- **Bug found and fixed while writing examples:** `crates/katgpt-core/src/cgsp/mod.rs` (the re-export
   shim that bridges `katgpt_rs::cgsp::*` to `katgpt_core::cgsp::*`) was missing
   the submodule re-exports (`traits`, `conjecturer`, `filters`, `guide`,
   `loop_`, `types`). Both the GOAT benchmark (`tests/bench_274_cgsp_goat.rs`)
@@ -261,7 +261,7 @@ These are all game IP and belong in `riir-ai`.
 - Phase 2: 3/3 tasks complete ✅
 - Phase 3: 8/8 tasks complete ✅ (GOAT gate run — keep opt-in)
 - Phase 4: 6/6 tasks complete ✅ (docs + examples shipped; pre-existing shim
-  bug in `src/cgsp.rs` found and fixed during example compilation)
+  bug in `crates/katgpt-core/src/cgsp/mod.rs` found and fixed during example compilation)
 
 **Next action:** None — Plan 274 is fully shipped. CGSP remains opt-in until
 riir-ai Plan 299 validates on real game domains. The remaining optimisation

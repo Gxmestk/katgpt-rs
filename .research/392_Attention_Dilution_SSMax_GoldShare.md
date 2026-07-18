@@ -202,7 +202,7 @@ If G1 + G2 pass → promote `ssmax_temperature` to default in `parallax_attn` (i
 
 | Artifact | Repo | Path |
 |---|---|---|
-| SSMax logit rescaling primitive | katgpt-rs (public, MIT) | extend `crates/katgpt-core/src/parallax_attn.rs` and/or `crates/katgpt-core/src/attention.rs` behind `ssmax_temperature` feature |
+| SSMax logit rescaling primitive | katgpt-rs (public, MIT) | extend `crates/katgpt-core/src/parallax_attn/mod.rs` and/or `crates/katgpt-core/src/attention.rs` behind `ssmax_temperature` feature |
 | GoldShare diagnostic | katgpt-rs (public) | extend `crates/katgpt-core/src/data_probe/geometry.rs` (or new `crates/katgpt-core/src/data_probe/gold_share.rs`) behind `sink_aware_attn` or a new `gold_share_probe` feature |
 | Plan | katgpt-rs | `.plans/NNN_ssmax_goldshare.md` |
 | Crowd-scale cognition readout-fidelity probe (fusion follow-up) | riir-ai (private) | file as `.issues/NNN_*` if the fusion idea matures; needs PoC per research skill §3.6 before any quality claim |

@@ -234,7 +234,7 @@ For a 4-layer model with `block_size=256`:
 | `src/types.rs` | Add `n_kv_head` to Config | 1 |
 | `crates/katgpt-percepta/src/transformer.rs` | GQA forward, PagedKVCache | 2-3 |
 | `src/speculative/dd_tree.rs` | Paged cache integration | 4 |
-| `src/benchmark.rs` | GQA + paged cache benchmarks | 5 |
+| `src/benchmark/mod.rs` | GQA + paged cache benchmarks | 5 |
 
 ## References
 

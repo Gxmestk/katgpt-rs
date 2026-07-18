@@ -65,7 +65,7 @@ in softmax/attention. Measure before/after with release benchmarks.
 | `crates/katgpt-speculative/src/dflash.rs` | Replaced 4× temp-div+softmax with `softmax_scaled` |
 | `crates/katgpt-speculative/src/ppot/entropy.rs` | Added `_with_entropy_into` variants for zero-double-compute entropy+positions |
 | `src/speculative/ppot/resample.rs` | Updated `ppot_rescue_adaptive` to use new entropy functions |
-| `src/benchmark.rs` | Replaced 2× temp-div+softmax with `softmax_scaled` |
+| `src/benchmark/mod.rs` | Replaced 2× temp-div+softmax with `softmax_scaled` |
 
 ## Key Design Decisions
 1. **`softmax_scaled(x, inv_temp)`** as a new function rather than modifying `softmax` signature — backward compatible, callers opt-in

@@ -17,7 +17,7 @@ Hayes et al. distill attention heads in pretrained transformers (BERT-base, GPT-
 
 The paper is **fully modelless**: no gradient descent, no weight mutation, no fine-tuning. The pipeline is (1) extract attention maps → (2) prompt an external LM to synthesize Python programs → (3) score by JSD/IoU → (4) causally validate by substitution.
 
-**After corpus review (see §3.3 revision log):** the distilled primitive is NOT a new `ProgramSynthesizedHead` struct. The "tokens → attention via an externally-supplied operator" shape is exactly what **`FuncAttn`** (R257, `katgpt-core/src/funcattn.rs`) already ships — `FuncAttn` solves for the operator C via closed-form Tikhonov; the paper's Python program is a strictly more general operator representation (Turing-complete callable vs closed-form matrix). The "programs become the attention mechanism" paradigm is exactly what **Percepta** (R031/032, the `katgpt-percepta` crate) ships — Percepta compiles C → WASM → lowered bytecode → transformer weights at compile time; the paper does the same via runtime callable substitution. Same paradigm, different point on the compile-vs-runtime spectrum.
+**After corpus review (see §3.3 revision log):** the distilled primitive is NOT a new `ProgramSynthesizedHead` struct. The "tokens → attention via an externally-supplied operator" shape is exactly what **`FuncAttn`** (R257, `crates/katgpt-core/src/funcattn/mod.rs`) already ships — `FuncAttn` solves for the operator C via closed-form Tikhonov; the paper's Python program is a strictly more general operator representation (Turing-complete callable vs closed-form matrix). The "programs become the attention mechanism" paradigm is exactly what **Percepta** (R031/032, the `katgpt-percepta` crate) ships — Percepta compiles C → WASM → lowered bytecode → transformer weights at compile time; the paper does the same via runtime callable substitution. Same paradigm, different point on the compile-vs-runtime spectrum.
 
 **What's actually novel in this paper for us** is not the primitive — it's three empirical findings + one gate:
 
@@ -259,7 +259,7 @@ With these two layers included, the only novel piece remaining is the **gate** (
 ### 3.3 Revision log
 
 **2026-06-30 (same day, post-commit):** User prompted "sound like percepta? and a bit of funtional attention?" — corpus re-review confirmed both:
-- FuncAttn (`katgpt-core/src/funcattn.rs`, R257 / Plan 286) ships the exact `tokens → attention via external operator` primitive shape.
+- FuncAttn (`crates/katgpt-core/src/funcattn/mod.rs`, R257 / Plan 286) ships the exact `tokens → attention via external operator` primitive shape.
 - Percepta (`katgpt-percepta` crate, R031 / R032 / Plan 064) ships the programs-as-attention paradigm.
 
 Verdict revised GOAT → Gain. The proposed `ProgramSynthesizedHead` primitive is structurally redundant with FuncAttn; Plan 353 is revised to ship only `HeadSubstitutionGate` as a wrapper around FuncAttn's existing trait. This is a **vocabulary-translation failure** in the initial pass: the paper uses "arbitrary Python program" which reads as novel, but the underlying primitive shape (external operator producing attention) is FuncAttn's existing surface. The skill's standing vocabulary block does not include "external operator → attention map" as an explicit translation entry; this case suggests it should ("functional attention", "operator-valued attention", "programmatic attention" → `FuncAttn`, `dyn FuncAttnKernel`).

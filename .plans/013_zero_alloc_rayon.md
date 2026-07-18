@@ -220,7 +220,7 @@ Speedup: Speculative vs AR went from **0.72x** → **1.48x**
 - `crates/katgpt-forward/src/step.rs` — ✅ `_with` variants for rollback/conditioned, `speculative_step` uses zero-alloc verifier
 - `src/speculative/prefill.rs` — ✅ `score_into` on `PrefillScorer` trait, `AttentionScorer` reuses pre-allocated context
 - `src/speculative/mod.rs` — ✅ re-exports `SpeculativeContext`, `TreeBuilder`, `extract_best_path_into`, `sample_residual_distribution_into`, `_with` fns
-- `src/benchmark.rs` — ✅ all bench functions use `SpeculativeContext`/`TreeBuilder` outside loops; `bench_prefill_compression` uses `score_into`
+- `src/benchmark/mod.rs` — ✅ all bench functions use `SpeculativeContext`/`TreeBuilder` outside loops; `bench_prefill_compression` uses `score_into`
 - `crates/katgpt-percepta/src/transformer.rs` — ✅ `generate_into` added, `generate` is thin wrapper
 
 ## Dependency Order

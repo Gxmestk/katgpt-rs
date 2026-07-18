@@ -100,7 +100,7 @@ All gates validated via `core_05_maxsim` example and `bench_maxsim_score` / `ben
   - **GOAT gate: ✅ 4.71× better needle separation** (demonstrated in `core_05_maxsim` example: MaxSim 20× vs mean-K 4.25×)
 
 - [x] **T8: Benchmark PFlash maxsim block scoring**
-  - `bench_pflash_maxsim_block_scoring` in `src/benchmark.rs` — synthetic 1024 tokens, spike attention
+  - `bench_pflash_maxsim_block_scoring` in `src/benchmark/mod.rs` — synthetic 1024 tokens, spike attention
   - Wired into `run_all()` and `run_all_parallel()`
 
 ### Phase 3: TurboQuant/SpectralQuant `ScoreReduction::MaxSim`
@@ -240,7 +240,7 @@ If PFlash block maxsim (T7-T8) shows no improvement over mean-K, that applicatio
 | `src/speculative/mod.rs` | Re-export `block_score_maxsim` (feature-gated) |
 | `crates/katgpt-quant/src/turboquant/forward.rs` | `maxsim_score_turboquant` — lazy dequantize + running max |
 | `src/spectralquant/forward.rs` | `maxsim_score_spectralquant` — reusable `key_buf` + dequantize-into |
-| `src/benchmark.rs` | `bench_maxsim_score` (6 configs), `bench_pflash_maxsim_block_scoring`, wired into `run_all`/`run_all_parallel` |
+| `src/benchmark/mod.rs` | `bench_maxsim_score` (6 configs), `bench_pflash_maxsim_block_scoring`, wired into `run_all`/`run_all_parallel` |
 | `examples/core_05_maxsim.rs` | Demo: core scoring, packed batch, block vs mean-K, scale timing |
 | `crates/katgpt-attn-match/src/rerank.rs` | `RerankMethod` enum, `RerankedDoc` struct, `rerank()`, `ndcg_at()`, `cosine_score()` — feature-gated behind `maxsim` |
 | `src/lib.rs` | `#[cfg(feature = "maxsim")] pub mod rerank;` after `pub mod simd;` |

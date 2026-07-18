@@ -36,9 +36,9 @@
 
 ### Phase 4: Benchmarks (Before/After)
 
-- [x] T17: `bench_hla_vs_flat_cache()` in `src/benchmark.rs` — compares flat KV vs symmetric HLA vs asymmetric AHLA at positions 1, 16, 64, 128, 256 across micro/game/bpe configs. Measures tok/s and µs/step
-- [x] T18: `bench_hla_memory()` in `src/benchmark.rs` — measures bytes/layer for flat KV (O(N)), symmetric HLA (O(d²)), asymmetric AHLA (O(d·dv)) across all 5 configs. Cross-checked with `HlaVariant::layer_bytes()`
-- [x] T19: `bench_hla_quality()` in `src/benchmark.rs` — logit divergence sanity check: asserts finite/non-NaN outputs, reports max/mean absolute divergence between SDPA and HLA/AHLA on random weights. Not a quality claim (models must be trained with HLA)
+- [x] T17: `bench_hla_vs_flat_cache()` in `src/benchmark/mod.rs` — compares flat KV vs symmetric HLA vs asymmetric AHLA at positions 1, 16, 64, 128, 256 across micro/game/bpe configs. Measures tok/s and µs/step
+- [x] T18: `bench_hla_memory()` in `src/benchmark/mod.rs` — measures bytes/layer for flat KV (O(N)), symmetric HLA (O(d²)), asymmetric AHLA (O(d·dv)) across all 5 configs. Cross-checked with `HlaVariant::layer_bytes()`
+- [x] T19: `bench_hla_quality()` in `src/benchmark/mod.rs` — logit divergence sanity check: asserts finite/non-NaN outputs, reports max/mean absolute divergence between SDPA and HLA/AHLA on random weights. Not a quality claim (models must be trained with HLA)
 - [x] T20: Add HLA/AHLA rows to existing benchmark CSV output and timeseries — bench functions return `Vec<BenchResult>` compatible with `save_results_csv()` + `save_timeseries_csv()`
 
 ### Phase 5: Documentation & Polish
@@ -70,7 +70,7 @@ src/types.rs
 ├── HlaMode enum                 — Standard, Hla, Ahla (added in Plan 058 commit)
 └── Config.hla_mode/normalize/decay — HLA config fields (added in Plan 058 commit)
 
-src/benchmark.rs                 — Phase 4 (TODO)
+src/benchmark/mod.rs                 — Phase 4 (TODO)
 ├── bench_hla_vs_flat_cache()   — throughput comparison
 ├── bench_hla_memory()          — memory comparison
 └── bench_hla_quality()         — logit divergence sanity check

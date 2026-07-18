@@ -75,7 +75,7 @@ Tracked in riir-ai issues (to be created):
 
 **Largest files (all under 2048 limit):**
 - `riir-chain/src/consensus/guard_pruner.rs` — 1,837 LOC (watch — approaching limit)
-- `crates/riir-chaind/src/mcp.rs` — 1,633 LOC (daemon, correctly placed)
+- `riir-chain/crates/riir-chaind/src/mcp/mod.rs` — 1,633 LOC (daemon, correctly placed)
 - `riir-chain/src/karc_commit.rs` — 1,463 LOC (was larger pre-extraction)
 
 ### Action taken

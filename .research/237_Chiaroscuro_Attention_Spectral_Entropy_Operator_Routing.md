@@ -57,7 +57,7 @@ Operator utilization entropy `U = -Σ q_o log q_o` — U→0 indicates collapse.
 | DiagonalGate trait (GDN2 + Wall) | ✅ Shipped | `crates/katgpt-attn/src/diagonal_gate.rs` | Per-dim gate abstraction — same shape as per-token operator gate. |
 | VortexFlow trait (Plan 196) | ✅ GOAT 72/72 | `crates/katgpt-core/src/mux/` | Sparse attention router. Operates at KV-block level. CHIAR operates at operator level. |
 | EGA spectral salience | ✅ Plan 139 | `crates/katgpt-attn/src/ega_attn.rs` | Per-key sigmoid gate from energy. Adjacent to CHIAR but does not switch operators. |
-| Parallax local linear attn | ✅ Shipped | `crates/katgpt-core/src/parallax_attn.rs` | Alternative operator (linear-time) — candidate "low-entropy" operator. |
+| Parallax local linear attn | ✅ Shipped | `crates/katgpt-core/src/parallax_attn/mod.rs` | Alternative operator (linear-time) — candidate "low-entropy" operator. |
 | DashAttention α-entmax | ✅ Plan 106 | `src/dash_attn/` | Adaptive sparse — complementary, not operator-switching. |
 | InferenceRouter | ✅ Shipped | `src/inference_router.rs` | CPU/GPU/ANE tier router. Already integrates TriggerGate, trust, RV, breakeven. |
 | FFT primitives | ✅ Shipped | `crates/katgpt-core/src/flow/fft.rs` | rustfft-based. Easily extended to DCT. |

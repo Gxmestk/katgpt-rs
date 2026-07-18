@@ -35,7 +35,7 @@
 
 ### T3: Streaming Covariance Branch
 
-**Files:** `crates/katgpt-core/src/parallax_attn.rs` (new, 471 lines)
+**Files:** `crates/katgpt-core/src/parallax_attn/mod.rs` (new, 471 lines)
 
 - `ParallaxConfig`: gate_scale + zero_init
 - `compute_rho(r_proj, x, out)`: ρ = W_R · x via `simd::simd_matmul_rows`

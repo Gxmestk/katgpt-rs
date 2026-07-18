@@ -26,8 +26,8 @@ The Phase 0 probe (Issue 001) showed a HAND-CRAFTED signal-aligned basis beats r
 
 | File | Purpose |
 |------|---------|
-| `crates/katgpt-core/src/funcattn.rs` | `make_dct_log_basis`, `make_haar_packet_basis`, `gram_schmidt_rows` (private helper) — all gated by `#[cfg(feature = "funcattn_structured_basis")]` |
-| `crates/katgpt-core/src/funcattn.rs` (tests module) | 5 unit tests: orthonormality, frequency coverage, forward-pass sanity |
+| `crates/katgpt-core/src/funcattn/mod.rs` | `make_dct_log_basis`, `make_haar_packet_basis`, `gram_schmidt_rows` (private helper) — all gated by `#[cfg(feature = "funcattn_structured_basis")]` |
+| `crates/katgpt-core/src/funcattn/mod.rs` (tests module) | 5 unit tests: orthonormality, frequency coverage, forward-pass sanity |
 | `crates/katgpt-core/tests/funcattn_structured_basis_g1.rs` | Phase 2 GOAT gate (G1 + G2 verdict) |
 | `crates/katgpt-core/tests/funcattn_structured_basis_k_sweep.rs` | Phase 3 k-sweep (k ∈ {4,8,16,32}) |
 

@@ -60,7 +60,7 @@ Four terms: time-delay truncation `L_F√d·w^k` (geometric in delay length `k`)
 | Paper mechanism | Shipped cousin | File / Plan |
 |---|---|---|
 | Closed-form ridge readout `Wout = YH^T(HH^T+λI)^{-1}` | **PEIRA** — `P* = Σ(N + λI)^{-1}` zero-alloc | Plan 153, `crates/katgpt-core/src/peira.rs` (lines 875–917 — `predictor_with_scratch`, `predict_and_loss`) |
-| Closed-form Tikhonov solve `(1-α)·K̃ᵀK̃ + α·I_d` | **FuncAttn** regression operator | Plan 286, Research 257, `crates/katgpt-core/src/funcattn.rs` |
+| Closed-form Tikhonov solve `(1-α)·K̃ᵀK̃ + α·I_d` | **FuncAttn** regression operator | Plan 286, Research 257, `crates/katgpt-core/src/funcattn/mod.rs` |
 | Fourier / Walsh / Haar basis dictionary with `SpectralBasis` trait | **riir-ai/crates/riir-engine/src/linoss/basis.rs** — exact same family | `riir-ai/crates/riir-engine/src/linoss/basis.rs` — `FourierBasis`, `WalshBasis`, `HaarBasis` |
 | Spectral eigenbasis projection (`V^T @ x`) | **TurboQuant SpectralRotation** | Plan 077, `src/spectralquant/spectral_rotation.rs` |
 | Oscillatory SSM forecaster + Fourier-mode drafter | **LinOSS / ModalSpec** — drafter reconstructs via Fourier coeffs | Plan 189, `crates/katgpt-core/src/linoss.rs:561` (`ModalSpecDrafter`) |

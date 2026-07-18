@@ -61,7 +61,7 @@ mod.rs           ← re-exports everything
 - [x] 9. **Write `mod.rs`** — Re-exports all public items from submodules. Gates `sudoku_pruner` behind `#[cfg(feature = "sudoku")]`.
 - [x] 10. **Update `Cargo.toml`** — Added `sudoku = []` feature + `[[example]]` required-features for sudoku examples.
 - [x] 11. **Update `src/lib.rs`** — No change needed (already `pub mod speculative;`).
-- [x] 12. **Update `src/benchmark.rs`** — No change needed (works via `speculative::*` re-exports).
+- [x] 12. **Update `src/benchmark/mod.rs`** — No change needed (works via `speculative::*` re-exports).
 - [x] 13. **Update examples** — Added `required-features = ["sudoku"]` in Cargo.toml for both sudoku examples.
 - [x] 14. **Move tests to each submodule** — Split 47 unit tests to matching files. 16 sudoku tests behind `#[cfg(feature = "sudoku")]`.
 - [x] 15. **Update `tests/integration.rs`** — No change needed (all `speculative::` imports resolve via re-exports).
@@ -156,5 +156,5 @@ mod.rs           ← re-exports everything
 | `crates/katgpt-forward/src/step.rs` | New — speculative_step wrappers |
 | `crates/katgpt-pruners/src/sudoku_pruner.rs` | New — SudokuPruner (sudoku feature) |
 | `Cargo.toml` | Add `sudoku = []` feature |
-| `src/benchmark.rs` | Possibly update imports |
+| `src/benchmark/mod.rs` | Possibly update imports |
 | `examples/sudoku_speculative.rs` | Possibly add feature gate |

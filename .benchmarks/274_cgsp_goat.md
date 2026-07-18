@@ -335,7 +335,7 @@ default-on for all NPCs.
 - Research notes: `.research/240_SGS_Curiosity_Guided_Self_Play.md`
 - Plan: `.plans/274_curiosity_guided_self_play.md`
 - Implementation: `crates/katgpt-core/src/cgsp/` (7 modules, 29 unit tests)
-- Re-export shim: `src/cgsp.rs` (preserves `katgpt_rs::cgsp::*` import path)
+- Re-export shim: `crates/katgpt-core/src/cgsp/mod.rs` (preserves `katgpt_rs::cgsp::*` import path)
 - Benchmark: `tests/bench_274_cgsp_goat.rs` (9 GOAT tests)
 
 ---

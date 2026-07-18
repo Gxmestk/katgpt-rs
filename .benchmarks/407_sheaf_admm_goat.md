@@ -173,7 +173,7 @@ cargo test -p katgpt-dec --features sheaf_admm --no-default-features \
 
 | File | Change |
 |------|--------|
-| `crates/katgpt-dec/src/sheaf_admm.rs` | Added identity fast path: `sheaf_laplacian_identity_grid_into` + grid-stencil dispatch in `sheaf_laplacian_via_maps` |
+| `crates/katgpt-dec/src/sheaf_admm/mod.rs` | Added identity fast path: `sheaf_laplacian_identity_grid_into` + grid-stencil dispatch in `sheaf_laplacian_via_maps` |
 | `crates/katgpt-dec/Cargo.toml` | Added `[[bench]]` entry; promoted `sheaf_admm` to `default` |
 | `crates/katgpt-dec/tests/sheaf_admm_goat.rs` | NEW: G1, G2, G3, G6 correctness gates |
 | `crates/katgpt-dec/benches/bench_407_sheaf_admm_goat.rs` | NEW: G4, G5 perf gates |

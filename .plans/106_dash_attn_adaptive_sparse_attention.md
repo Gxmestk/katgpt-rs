@@ -76,7 +76,7 @@ katgpt-core/src/types.rs
 crates/katgpt-percepta/src/transformer.rs
 └── ForwardContext                 — dispatch DashAttn variant
 
-src/benchmark.rs                  — Phase 6 benchmarks
+src/benchmark/mod.rs                  — Phase 6 benchmarks
 ```
 
 ---

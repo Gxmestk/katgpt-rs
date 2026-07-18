@@ -148,7 +148,7 @@ cargo test -p riir-gpu --features cubecl_runtime test_cubecl_vs_cpu -- --nocaptu
 |------|--------|
 | `riir-ai/crates/riir-gpu/src/gemv_autotune.rs` | **New**: GEMV autotune — benchmarks plane vs tiled per (m, n), caches result |
 | `riir-ai/crates/riir-gpu/src/gemv_cubecl.rs` | Made `launch_plane` and `launch_tiled` `pub` for autotune access |
-| `crates/riir-gpu/src/gemma2_cubecl.rs` | GeGLU fix, KV cache fix, RoPE on K, `gemv_autotune` field, replaced all `GemvCubeCL::launch` with autotuned version |
+| `riir-ai/crates/riir-gpu/src/gemma2_cubecl/mod.rs` | GeGLU fix, KV cache fix, RoPE on K, `gemv_autotune` field, replaced all `GemvCubeCL::launch` with autotuned version |
 | `riir-ai/crates/riir-gpu/src/rope_geglu_cubecl.rs` | GeGLU GPU kernel fix: removed extra `g *` factor |
 | `riir-ai/crates/riir-gpu/src/lib.rs` | Added `gemv_autotune` module + `GemvAutotune` export |
 | `riir-ai/crates/riir-examples/examples/gemma2_gpu_inference.rs` | Added `--debug` flag for diagnostic output |

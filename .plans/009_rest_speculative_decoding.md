@@ -274,7 +274,7 @@ full = ["leviathan", "sudoku", "validator", "rest", "training", "gpu"]  # previo
 | `src/lib.rs` | Add `mod rest` behind feature gate | 2 |
 | `src/speculative/dd_tree.rs` | Add `merge_retrieved_branches` | 3 |
 | `crates/katgpt-forward/src/step.rs` | Add `speculative_step_rest` | 4 |
-| `src/benchmark.rs` | Add REST benchmark | 4 |
+| `src/benchmark/mod.rs` | Add REST benchmark | 4 |
 | `examples/rest_demo.rs` | New | 4 |
 
 ## References

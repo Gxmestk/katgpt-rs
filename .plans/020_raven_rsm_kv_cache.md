@@ -163,7 +163,7 @@ each KV head effectively owns all 16 slots.
 
 ## Task 4: Add `bench_raven_vs_flat_cache` Benchmark
 
-**File:** `src/benchmark.rs`
+**File:** `src/benchmark/mod.rs`
 
 Mirror the existing `bench_paged_vs_flat_cache` pattern:
 
@@ -338,7 +338,7 @@ The win comes at scale: for `small_target` config (block=256, kv_dim=64):
 
 ## Task 7: Wire into Benchmark Suite
 
-**File:** `src/benchmark.rs`
+**File:** `src/benchmark/mod.rs`
 
 Add to `run_all()` after the paged vs flat comparison:
 
@@ -377,7 +377,7 @@ git commit -m "feat: add Raven RSM (Routing Slot Memory) KV cache for draft mode
 | File | Action | Lines Changed |
 |------|--------|--------------|
 | `crates/katgpt-percepta/src/transformer.rs` | Add `RavenKVCache`, `forward_raven`, `raven_compute_router`, `raven_update`, `raven_readout` | +297 |
-| `src/benchmark.rs` | Add `bench_raven_vs_flat_cache`, `bench_raven_recall`, wire into `run_all`, imports | +182 |
+| `src/benchmark/mod.rs` | Add `bench_raven_vs_flat_cache`, `bench_raven_recall`, wire into `run_all`, imports | +182 |
 | `tests/integration.rs` | Add 8 Raven test cases (router, update, decay, readout, recall, forward) | +303 |
 | `.plans/020_baseline.txt` | Baseline benchmark output | auto |
 | `.plans/020_after.txt` | Post-impl benchmark output | auto |

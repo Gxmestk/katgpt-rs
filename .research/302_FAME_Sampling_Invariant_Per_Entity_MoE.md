@@ -88,7 +88,7 @@ The Super-GOAT is the fusion: **per-NPC committed archetype blend × KARC trajec
 | Forward + backward latent passes (bidirectional prefill) | **Plan 025 bidirectional prefill** | reader LoRA (prefill) + writer LoRA (decode) — the Bi-NCDE's fwd/bwd split, modellessly |
 | Two-brain model (info brain = ground truth, think brain = belief) | **AGENTS.md §Spatial Cognition** | one-way bridge, fog-of-war gated |
 | Discretization-invariant path sum / line integral | **DEC `line_integral`** | Plan 314, Research 296, `crates/katgpt-core/src/dec/` |
-| Lipschitz-stable closed-form regression operator | **FuncAttn** (different mechanism — see vocabulary alert) | Plan 286, Research 257, `crates/katgpt-core/src/funcattn.rs` |
+| Lipschitz-stable closed-form regression operator | **FuncAttn** (different mechanism — see vocabulary alert) | Plan 286, Research 257, `crates/katgpt-core/src/funcattn/mod.rs` |
 | Frozen operator-field snapshots (Pod, BLAKE3, dendritic branch) | **NeuronShard** | `riir-neuron-db/src/shard.rs` — `style_weights[64]`, `hla_moments[8]` |
 | Deterministic linear-op commitment (2×2 fixed-point blocks) | **LatCal** | `riir-chain/src/encoding/latcal.rs` — `LatCalMatrix`, `to_fixed` |
 | Per-NPC learned dynamics from trajectory (delay-embedded basis ridge) | **KARC** (again) | Plan 308 — the "backward" pass of FAME's Bi-NCDE |

@@ -17,7 +17,7 @@ Shipped the per-head sink classifier (`SinkKind`, `SinkDiagnostic`,
 (`SinkAwarePolicy`, `apply_dual_policy_gate`, `CachedSinkClassification`,
 `apply_dual_policy_gate_cached`) as an opt-in diagnostic primitive under
 the `sink_aware_attn` feature. The classifier lives in
-`crates/katgpt-core/src/data_probe.rs`; the root crate re-exports at
+`crates/katgpt-core/src/data_probe/mod.rs`; the root crate re-exports at
 `katgpt_rs::data_probe::sink_classify`.
 
 **NOT promoted to default features.** G1 (correctness) and the synthetic G2
@@ -62,7 +62,7 @@ G2 still DEFERRED.
 
 ## Phase 3 deliverables (DONE — scope-reduced per validation fallback)
 
-- ✅ T3.1 — `SinkAwarePolicy` enum shipped in `crates/katgpt-core/src/data_probe.rs`. **Scope reduction:** NOT wired into `ParallaxConfig` / `FuncAttnConfig` (would break backwards-compat for `Default` impls and add feature-gate complexity to the forward paths). Standalone path only.
+- ✅ T3.1 — `SinkAwarePolicy` enum shipped in `crates/katgpt-core/src/data_probe/mod.rs`. **Scope reduction:** NOT wired into `ParallaxConfig` / `FuncAttnConfig` (would break backwards-compat for `Default` impls and add feature-gate complexity to the forward paths). Standalone path only.
 - ✅ T3.2 — `apply_dual_policy_gate(attn, values, O, policy, gate_scale, scratch, out) -> SinkKind`. Standalone post-forward intervention. Classifies dominant sink; gates if NOP, copies if Broadcast/None.
 - ✅ T3.3 — Same `SinkAwarePolicy` enum + gate covers both parallax and funcattn paths (it's policy-agnostic). The funcattn-specific "scale Φ residual contribution" variant is not implemented — `apply_dual_policy_gate` operates on the post-`AV` output `O`, which is the same for both parallax and funcattn.
 - ✅ T3.4 — Synthetic G2 test `tests/sink_aware_g2_synthetic.rs` — 2/2 PASS. Real-ViT G2 DEFERRED.
@@ -222,7 +222,7 @@ We implement the **standard stable rank** because:
 2. It only needs the top singular value (cheap power iteration).
 3. It is consistent with the Roy-Vetterli definition already shipped in `crates/katgpt-core/src/data_probe/geometry.rs::effective_rank`.
 
-Documented in the module-level doc comment of `crates/katgpt-core/src/data_probe.rs`.
+Documented in the module-level doc comment of `crates/katgpt-core/src/data_probe/mod.rs`.
 
 ---
 
@@ -230,7 +230,7 @@ Documented in the module-level doc comment of `crates/katgpt-core/src/data_probe
 
 | File | Role | Lines |
 |------|------|-------|
-| `crates/katgpt-core/src/data_probe.rs` | Primitive: types, classifier, stable-rank, dual-policy gate. Gated `#[cfg(feature = "sink_aware_attn")]`. | ~620 |
+| `crates/katgpt-core/src/data_probe/mod.rs` | Primitive: types, classifier, stable-rank, dual-policy gate. Gated `#[cfg(feature = "sink_aware_attn")]`. | ~620 |
 | `crates/katgpt-core/src/lib.rs` | `pub mod data_probe;` + re-exports. | +16 |
 | `crates/katgpt-core/Cargo.toml` | `sink_aware_attn = []` feature. | +1 |
 | `crates/katgpt-core/src/data_probe/sink_classify.rs` | Root-crate re-export + 8 G1 unit tests. | ~265 |

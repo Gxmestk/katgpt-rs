@@ -353,7 +353,7 @@ pub fn forward<'a>(
 | `crates/katgpt-speculative/src/dflash.rs` | Use `MultiLayerKVCache` | 5 |
 | `src/speculative/verifier.rs` | Use `MultiLayerKVCache` | 5 |
 | `crates/katgpt-forward/src/step.rs` | Update signatures | 5 |
-| `src/benchmark.rs` | Use `MultiLayerKVCache`, add multi-layer bench | 5-6 |
+| `src/benchmark/mod.rs` | Use `MultiLayerKVCache`, add multi-layer bench | 5-6 |
 | `src/main.rs` | Use `MultiLayerKVCache` | 5 |
 
 ## References

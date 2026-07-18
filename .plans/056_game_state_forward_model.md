@@ -33,7 +33,7 @@
 ### Phase 4: Example + Benchmark
 
 - [x] T13: Create `examples/game_state_01_bomber_mcts.rs` — MCTS player vs Random/Greedy players, 100 rounds, print win rates
-- [x] T14: Add `bench_game_state()` to `src/benchmark.rs` — measure `BomberState::advance()` ops/sec and `mcts_search()` actions/sec
+- [x] T14: Add `bench_game_state()` to `src/benchmark/mod.rs` — measure `BomberState::advance()` ops/sec and `mcts_search()` actions/sec
 - [x] T15: Print `ActionSpaceLog` per tick to validate branching factor tracking
 
 ### Phase 5: Documentation

@@ -874,7 +874,7 @@ let mut scratch = ScratchBuffers::new(k, pool_size);
 let result = lp.cycle(&target, &mut scratch);
 ```
 
-See `examples/cgsp_minimal.rs` and `examples/cgsp_collapse_recovery.rs` for full runnable demos. Implementation lives in `crates/katgpt-core/src/cgsp/` so `riir-engine` (Plan 299) can consume it without depending on the root application crate; `src/cgsp.rs` is a thin re-export shim preserving the `katgpt_rs::cgsp::*` import path.
+See `examples/cgsp_minimal.rs` and `examples/cgsp_collapse_recovery.rs` for full runnable demos. Implementation lives in `crates/katgpt-core/src/cgsp/` so `riir-engine` (Plan 299) can consume it without depending on the root application crate; `crates/katgpt-core/src/cgsp/mod.rs` is a thin re-export shim preserving the `katgpt_rs::cgsp::*` import path.
 
 ## SpeculativeVerifier (Strategy Pattern)
 
@@ -1392,7 +1392,7 @@ Re-exported from both `katgpt-core` and `katgpt-rs`.
 
 LoRA application is fused in-place after each projection: `output += (α/r) × B @ (A @ input)`. Zero intermediate buffers — the delta accumulates directly into the output.
 
-## Parallax Attention (`crates/katgpt-core/src/parallax_attn.rs`, Plan 135)
+## Parallax Attention (`crates/katgpt-core/src/parallax_attn/mod.rs`, Plan 135)
 
 Streaming covariance-correction layer on top of tiled online-softmax flash attention. Reduces the regression gap between local-linear kernel attention and full SDPA from O(N²) computation to O(N) outer products via column-sum factorization.
 

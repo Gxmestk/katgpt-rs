@@ -123,7 +123,7 @@ TRT proves three things we can apply at token level:
   - Add `adaptive_ppot: bool` config flag (default: true when ppot enabled)
   - Integration test: full speculative step with adaptive rescue
 
-- [x] **Task 7: Benchmarks — before/after comparison** (`src/benchmark.rs`)
+- [x] **Task 7: Benchmarks — before/after comparison** (`src/benchmark/mod.rs`)
   - **Must run AFTER Plan 026 benchmarks are recorded**
   - Benchmark: adaptive rescue vs random rescue acceptance rate
   - Benchmark: adaptive rescue overhead (should match PPoT baseline ±2%)
@@ -151,7 +151,7 @@ TRT proves three things we can apply at token level:
 | `crates/katgpt-speculative/src/ppot/types.rs` | ✅ **Extend:** adaptive threshold fields in `PpotConfig` |
 | `src/speculative/ppot/mod.rs` | ✅ **Update:** re-export new types, wire adaptive API |
 | `crates/katgpt-forward/src/step.rs` | ✅ API available, integration point wired via `ppot_rescue_adaptive()` |
-| `src/benchmark.rs` | ✅ **Added:** Plan 027 adaptive rescue benchmark with Plan 026 comparison (Task 7) |
+| `src/benchmark/mod.rs` | ✅ **Added:** Plan 027 adaptive rescue benchmark with Plan 026 comparison (Task 7) |
 | `README.md` | ✅ **Update:** add Adaptive PPoT section |
 
 ---

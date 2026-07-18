@@ -665,7 +665,7 @@ Plan 009 will cover:
 - [x] 1.5 Add `Config::bpe()` and `Config::bpe_draft()` to `src/types.rs`
 - [x] 1.6 Add `pub mod tokenizer;` to `src/lib.rs`
 - [x] 1.7 Add tests: encode/decode roundtrip, special tokens, vocab coverage
-- [x] 1.8 Add benchmark: BPE encode/decode throughput (in `src/benchmark.rs`)
+- [x] 1.8 Add benchmark: BPE encode/decode throughput (in `src/benchmark/mod.rs`)
 - [x] 1.9 Run `cargo clippy --all-features`, `cargo test --all-features`
 - [x] 1.10 Commit with message `feat: BPE tokenizer for Rust source code`
 
@@ -738,7 +738,7 @@ validator = ["syn", "proc-macro2"]  # previously clora
 | `crates/katgpt-validator/src/partial_parser.rs` | New | 2 | No |
 | `crates/katgpt-validator/src/syn_pruner.rs` | New | 2 | No |
 | `examples/validator_demo.rs` | New | 3 | No |
-| `src/benchmark.rs` | Add BPE + validator benches | 1-3 | No |
+| `src/benchmark/mod.rs` | Add BPE + validator benches | 1-3 | No |
 
 ## References
 

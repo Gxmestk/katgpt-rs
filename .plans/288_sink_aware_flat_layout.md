@@ -2,7 +2,7 @@
 
 **Date:** 2026-06-18
 **Prior work:** [Plan 287](./287_sink_aware_attention.md) (mechanics DONE), [Issue 001](../issues/001_sink_aware_g3_latency.md) (RESOLVED via cached variant)
-**Target:** `crates/katgpt-core/src/data_probe.rs` (extend) + `crates/katgpt-core/src/data_probe/sink_classify.rs` (re-export + tests)
+**Target:** `crates/katgpt-core/src/data_probe/mod.rs` (extend) + `crates/katgpt-core/src/data_probe/sink_classify.rs` (re-export + tests)
 **Status:** Complete. All GOAT gates PASS.
 
 ---

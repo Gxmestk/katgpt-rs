@@ -12,7 +12,7 @@
 
 **Initial plan** proposed shipping a new `ProgramSynthesizedHead` primitive + `Box<dyn SynthesizedAttentionFn>` trait. **User-prompted re-review** ("sound like percepta? and a bit of functional attention?") identified that:
 
-1. **FuncAttn** (`katgpt-core/src/funcattn.rs`, R257 / Plan 286) already ships the `tokens → attention via external operator` primitive shape. The proposed `SynthesizedAttentionFn` trait is structurally `dyn FuncAttnKernel` — redundant.
+1. **FuncAttn** (`crates/katgpt-core/src/funcattn/mod.rs`, R257 / Plan 286) already ships the `tokens → attention via external operator` primitive shape. The proposed `SynthesizedAttentionFn` trait is structurally `dyn FuncAttnKernel` — redundant.
 2. **Percepta** (`katgpt-percepta` crate, R031 / R032 / Plan 064) already ships the programs-as-attention paradigm.
 
 The initial plan was revised: **drop `ProgramSynthesizedHead`**, ship only `HeadSubstitutionGate` as a small wrapper around FuncAttn's existing trait surface. Verdict dropped GOAT → Gain. See Research 353 §3.3 for the full revision log.
@@ -35,7 +35,7 @@ This is **not** a new primitive — FuncAttn is the primitive. This is the **con
 
 | Mechanism | Where | What's missing |
 |---|---|---|
-| **FuncAttn** (R257, Plan 286) — surrogate representation | `katgpt-core/src/funcattn.rs` | No substitution gate — FuncAttn computes attention, doesn't decide when to use itself vs a real head |
+| **FuncAttn** (R257, Plan 286) — surrogate representation | `crates/katgpt-core/src/funcattn/mod.rs` | No substitution gate — FuncAttn computes attention, doesn't decide when to use itself vs a real head |
 | **Percepta** (R031/032, Plan 064) — programs-as-attention | `katgpt-percepta` crate | Compile-time only; no runtime substitution decision |
 | `FaithfulnessProbe` causal intervention (R244, Plan 278) | `crates/katgpt-core/src/faithfulness/probe.rs` | Detects unfaithfulness; doesn't prescribe a surrogate or gate substitution |
 | `SmearClassifier` hallucinated-feature detector (R277, Plan 298) | `katgpt-core/crates/katgpt-core/src/faithfulness/smear.rs` | Detects smear; doesn't gate substitution |
@@ -156,7 +156,7 @@ The paper's strongest empirical claim is that IoU is a valid *cheap proxy* for *
 ## Cross-references
 
 - **Research note:** `katgpt-rs/.research/353_Program_Synthesized_Attention_Head_Surrogates.md` (esp. §3.3 revision log)
-- **Primitive being gated:** `katgpt-core/src/funcattn.rs` (R257, Plan 286)
+- **Primitive being gated:** `crates/katgpt-core/src/funcattn/mod.rs` (R257, Plan 286)
 - **Validation primitive:** `crates/katgpt-core/src/faithfulness/probe.rs` (R244, Plan 278)
 - **Cadence pattern source:** Plan 287 (SinkAware cached-cadence)
 - **Cousin research:** 257 (FuncAttn), 031/032 (Percepta), 244 (FaithfulnessProbe), 229 (ProgramAsWeights), 277 (SmearClassifier), 178 (Rosetta Neurons), 302 (FAME — latent reframing target)

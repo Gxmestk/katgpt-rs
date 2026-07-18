@@ -116,7 +116,7 @@ For our codebase, the "lattice" is the **latent-space neighborhood graph**:
 | `evolve_hla` | `crates/katgpt-sense/src/reconstruction.rs` | Fixed `hla_learning_rate`, fixed update step | DSOM scales the learning rate by `‖observation − current_belief‖`. |
 | `CommittedFieldBlend` (Plan 321, Research 302) | `crates/katgpt-core/src/committed_field_blend.rs` | Per-entity MoE with committed pi weights, fixed tau | DSOM makes the blend weights error-scaled: when the state is far from any archetype, expand the blend (more archetypes contribute). |
 | `graph_laplacian` (Plan 251) | `katgpt-core/src/dec/` | Uniform Laplacian smoothing (fixed edge weights) | DSOM makes edge weights error-dependent (non-uniform diffusion). |
-| `BayesianFilterArm` (Plan 370) | `katgpt-core/src/manifold_bandit.rs` | Non-stationary bandit with `filter_drift_rate` | DSOM provides the *update rule* for the filter — how to adapt when drift is detected. Currently the filter detects drift but the update is fixed-step. |
+| `BayesianFilterArm` (Plan 370) | `crates/katgpt-core/src/manifold_bandit/mod.rs` | Non-stationary bandit with `filter_drift_rate` | DSOM provides the *update rule* for the filter — how to adapt when drift is detected. Currently the filter detects drift but the update is fixed-step. |
 
 ### 2.4 Fusion
 

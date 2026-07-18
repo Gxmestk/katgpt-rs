@@ -162,7 +162,7 @@ fn build_dd_tree_pruned(marginals, config, pruner, chain_seed: bool):
 
 Lucebox swept DDTree budget empirically — budget=22 was the sweet spot for RTX 3090 + Q4_K_M 27B. Our scale is different (micro/draft/small_target), so we need our own sweep.
 
-- [x] **2.1** Add `bench_ddtree_budget_sweep()` to `src/benchmark.rs`
+- [x] **2.1** Add `bench_ddtree_budget_sweep()` to `src/benchmark/mod.rs`
 - [x] **2.2** Sweep budgets: `[4, 8, 12, 16, 20, 22, 24, 32, 48, 64]`
 - [x] **2.3** Run sweep for each config:
   - `Config::draft()` ✅ — sweep in main.rs output (budgets 4–64)
@@ -419,7 +419,7 @@ DDTree (chain-seed)              316,849 tok/s         3.16           16.00
 | File | Action | Phase | Depends On |
 |------|--------|-------|------------|
 | `src/speculative/dd_tree.rs` | Add `chain_seed` param to `build_dd_tree_pruned()` | 1 | — |
-| `src/benchmark.rs` | Add `bench_ddtree_chain_seed()`, `bench_ddtree_budget_sweep()` | 2 | — |
+| `src/benchmark/mod.rs` | Add `bench_ddtree_chain_seed()`, `bench_ddtree_budget_sweep()` | 2 | — |
 | `src/main.rs` | Add budget sweep output section | 2 | — |
 | `crates/katgpt-percepta/src/transformer.rs` | Add `KVSnapshot`, `KVLayerSnapshot`, `snapshot()`, `restore()` | 3 | 010 ✅, 011 🔧 |
 | `crates/katgpt-forward/src/step.rs` | Integrate snapshot/rollback into `speculative_step_verifier()` | 3 | 010 ✅ |

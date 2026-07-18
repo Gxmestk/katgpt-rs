@@ -11,7 +11,7 @@ Two Phase 12 DEFER items whose blockers dissolved during Phase 12 itself:
 2. **`src/speculative/vocab_channel_pruner.rs`** (2048 LOC) — blocker was
    `crate::lattice_operad` dep.
    Phase 12 T4.4 moved `lattice_operad/` to `katgpt-pruners`. **NOW MOVABLE**
-   to `katgpt-pruners/src/vocab_channel_pruner.rs`.
+   to `crates/katgpt-pruners/src/vocab_channel_pruner/mod.rs`.
 
 **Bonus discovery:** vocab_channel_pruner's other "blocker"
 (`crate::transformer::TransformerWeights`, `crate::types::Config`) is also
@@ -60,7 +60,7 @@ compiled in `cargo check` but produced zero test symbols. Fixed to
             `katgpt-speculative/trd_refined_draft` ✅
 
 - [x] **T2.** Move `src/speculative/vocab_channel_pruner.rs` →
-            `katgpt-pruners/src/vocab_channel_pruner.rs`
+            `crates/katgpt-pruners/src/vocab_channel_pruner/mod.rs`
       - T2.1 `git mv` file ✅
       - T2.2 Rewrote imports:
             - `crate::lattice_operad::*` stays (native to katgpt-pruners)

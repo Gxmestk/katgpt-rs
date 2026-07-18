@@ -47,7 +47,7 @@ Add a CPU sparse matmul path for the MLP's second weight matrix (`w2 @ hidden`),
     - If feature disabled: existing `matmul(x, w2, hidden, n, mlp_hidden)` unchanged
   - Same pattern for `forward_paged()` and `forward_raven()`
 
-- [x] **Task 6: Add benchmark** (`src/benchmark.rs`)
+- [x] **Task 6: Add benchmark** (`src/benchmark/mod.rs`)
   - Benchmark: `matmul` vs `sparse_matmul` at 0%, 50%, 90%, 95%, 99% sparsity
   - Config sizes: micro (mlp_hidden=64), bpe (128), small_target (256), large (16384)
   - Include break-even analysis: at what sparsity does sparse win?

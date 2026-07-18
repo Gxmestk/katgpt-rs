@@ -110,7 +110,7 @@ dflash_predict_parallel:
 | `src/speculative/types.rs` | Add `DDTreeBranchCache` struct + impl |
 | `crates/katgpt-speculative/src/dflash.rs` | Add Rayon threshold guard in `dflash_predict_parallel` |
 | `src/types.rs` | Add `parallel_threshold` to `Config`, document f16 path in comments |
-| `src/benchmark.rs` | Add `bench_paged_speculative` benchmark variant |
+| `src/benchmark/mod.rs` | Add `bench_paged_speculative` benchmark variant |
 
 ## What We Will NOT Do
 

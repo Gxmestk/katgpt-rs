@@ -30,7 +30,7 @@ captures the **corrected** scope after a full audit of the current tree.
 
 3. **Phase 2B's premise is inverted.** Issue 007 says "cgsp in core, cce in
    root — move cgsp UP". Reality: `cgsp` is already in `katgpt-core/src/cgsp/`
-   AND re-exported from root `src/cgsp.rs` (verbatim `pub use katgpt_core::cgsp`).
+   AND re-exported from root `crates/katgpt-core/src/cgsp/mod.rs` (verbatim `pub use katgpt_core::cgsp`).
    `cce` is in root `src/cce/`. The issue's "tier inconsistency" is real but
    the proposed direction ("move cgsp up") contradicts the cargo-publish
    decision in finding #1 — the only publishable crate is core, so substrate

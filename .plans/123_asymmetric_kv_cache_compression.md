@@ -36,7 +36,7 @@ This plan:
   - `AsymmetricBenchResult` struct with cosine_sim_key/value, compression_ratio, label
   - `cosine_similarity()` utility function
   - `combined_fidelity()` method for harmonic mean metric
-  - File: `src/benchmark.rs`
+  - File: `src/benchmark/mod.rs`
 
 - [x] **T3: GOAT proof — V compression is free** — 24 GOAT proofs in test file
   - `test_v_free_at_2bit`, `test_v_free_at_3bit`, `test_v_free_at_4bit`
@@ -58,7 +58,7 @@ This plan:
   - Tests configs: (3,3) symmetric, (4,2) aggressive, (8,2) aggressive asymmetric, (8,3) recommended, (2,8) inverted
   - Uses simple uniform quantization (method-agnostic, softmax amplification is fundamental)
   - Returns one `AsymmetricBenchResult` per config with cos_k, cos_v, combined fidelity, compression
-  - File: `src/benchmark.rs`
+  - File: `src/benchmark/mod.rs`
 
 - [x] **T7: `AsymmetricKVConfig` type** — `types.rs`
   - `AsymmetricKVConfig { key_bits: u8, val_bits: u8 }` with Default (8, 3)

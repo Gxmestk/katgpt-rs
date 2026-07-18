@@ -12,7 +12,7 @@
 ## Summary
 
 Shipped the FUNCATTN primal operator as a Gain-tier open primitive in
-`crates/katgpt-core/src/funcattn.rs`, matching the reference implementation's
+`crates/katgpt-core/src/funcattn/mod.rs`, matching the reference implementation's
 **dual form** (d×d convex-combo regularization `(1-α)·K̃ᵀK̃ + α·I_d`, column-
 normalized slice tokens, per-slice-token to_q/to_k/to_v linear projections).
 All 13 unit tests pass against a scalar reference. **Promoted to DEFAULT-ON**
@@ -363,7 +363,7 @@ primary value path and will share the basis infrastructure shipped here.
 
 | File | Role |
 |------|------|
-| `crates/katgpt-core/src/funcattn.rs` | Module (1344 lines including tests) |
+| `crates/katgpt-core/src/funcattn/mod.rs` | Module (1344 lines including tests) |
 | `crates/katgpt-core/src/lib.rs` | `pub mod funcattn;` + re-exports |
 | `crates/katgpt-core/Cargo.toml` | `funcattn = []` feature |
 | `Cargo.toml` | `funcattn = ["tiled_attention", "katgpt-core/funcattn"]`, added to `full` |

@@ -89,7 +89,7 @@ items still require the feature. No existing consumer can break.
 
 ### T1 — Convert katgpt-core `data_probe.rs` → `data_probe/` directory
 
-- `git mv crates/katgpt-core/src/data_probe.rs crates/katgpt-core/src/data_probe/sink_classify.rs`
+- `git mv crates/katgpt-core/src/data_probe/mod.rs crates/katgpt-core/src/data_probe/sink_classify.rs`
 - Create `crates/katgpt-core/src/data_probe/mod.rs` with:
   - Always-on: `pub mod {markov,nll,typical_set,claim,dirichlet_energy};`
   - Gated: `#[cfg(feature = "sink_aware_attn")] pub mod {sink_classify,geometry};`
@@ -174,7 +174,7 @@ level.
 |---|---:|---:|---:|
 | `src/data_probe/{markov,nll,typical_set,claim,dirichlet_energy,geometry}.rs` | 1638 | 0 | **-1638** |
 | `crates/katgpt-core/src/data_probe/mod.rs` | 69 | 72 | +3 (re-export shim) |
-| `crates/katgpt-core/src/data_probe.rs` → `data_probe/{mod,sink_classify}.rs` | 1337 | 1440 | +103 (mod.rs + edits) |
+| `crates/katgpt-core/src/data_probe/mod.rs` → `data_probe/{mod,sink_classify}.rs` | 1337 | 1440 | +103 (mod.rs + edits) |
 | `crates/katgpt-core/src/data_probe/{markov,nll,...}.rs` | 0 | 1644 | +1644 (moved) |
 
 **Net root reduction: -1635 LOC.**
