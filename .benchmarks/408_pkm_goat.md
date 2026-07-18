@@ -74,7 +74,7 @@ This gate is **advisory** because the load-bearing IDW test is the Phase 2 unit 
 
 ## G4 — Zero-alloc steady state
 
-**Setup:** `CountingAllocator` (the shared `tests/common/mod.rs` macro). 10 warmup calls, then 1000 steady-state `query_into` calls.
+**Setup:** `CountingAllocator` (the shared `crates/katgpt-core/tests/common/mod.rs` macro). 10 warmup calls, then 1000 steady-state `query_into` calls.
 
 **Result:** **0 allocations** over 1000 calls.
 

@@ -85,7 +85,7 @@ Theorem 7 proves this is geometric: rotational optical flow is depth-independent
 
 | Paper concept | Existing codebase analogue | Status |
 |---|---|---|
-| Poincaré ball geometry (distance, log/exp map, Fréchet mean) | `poincare_distance`, `log_map_into`, `exp_map`, `frechet_mean` in `katgpt-core/src/slod.rs` (Plan 235) | ✅ Shipped DEFAULT-ON — used for KG abstraction-level selection. **Different use case** (KG LOD, not latent navigation). |
+| Poincaré ball geometry (distance, log/exp map, Fréchet mean) | `poincare_distance`, `log_map_into`, `exp_map`, `frechet_mean` in `crates/katgpt-core/src/slod.rs` (Plan 235) | ✅ Shipped DEFAULT-ON — used for KG abstraction-level selection. **Different use case** (KG LOD, not latent navigation). |
 | Top-down additive direction injection | `apply_latent_steering(state, field)` (Plan 309, R290) | ✅ Shipped DEFAULT-ON, Super-GOAT. **The forward direction**: given a direction vector `v`, push state by `s + α·v`. Poincaré is the **inverse**: given a desired target movement `ΔP`, find the latent step `Δz` that achieves it. |
 | Linear-algebra navigation on a graph | `manifold_geodesic`, `manifold_random_walk` in `viable_manifold_graph.rs` (Plan 312, R294) | ✅ Shipped (DEFAULT-ON as part of latent_functor). **Graph-based A* on discrete viable nodes**. Poincaré is **continuous closed-form** — one matvec vs path search. Complementary, not duplicate. |
 | Multi-axis fixed-strength subspace projection | `subspace_steering` (Plan 412) | ✅ Shipped DEFAULT-ON. Projects a delta onto orthogonal basis axes. Different shape — Poincaré's `W` is **non-orthogonal** (it's a left-inverse of the Jacobian, not an orthonormalization). |
@@ -133,7 +133,7 @@ InducedCwmKernel (Plan 296) is a frozen world model with `advance(state, action)
 **Paper-vocabulary grep** (`poincare.adapter|latent.navigation|visual.odometry|imagine.observation|inverse.poincare|W†·ΔP|closed-form.navigator`): zero hits across all 7 repos, both layers (notes + code).
 
 **Codebase-vocabulary grep** (`pseudoinverse|pinv|W†|left.inverse|jacobian.inverse|manifold.unroll|homogeneous.coordinate|linear.chart`): zero hits in latent-navigation context. Closest matches are unrelated:
-- `katgpt-core/src/slod.rs` — Poincaré ball distance/log/exp (KG abstraction LOD, **not** latent navigation).
+- `crates/katgpt-core/src/slod.rs` — Poincaré ball distance/log/exp (KG abstraction LOD, **not** latent navigation).
 - `thin_svd_into` (Plan 301) — gives the SVD; `W† = V·Σ⁻¹·Uᵀ` is one line of post-processing that's **not exposed** as a navigator.
 - `pathfinder.rs` (Plan 017/018) — raw-grid A* (graph search, not closed-form).
 - `manifold_geodesic` (Plan 312) — graph A* on viable latent nodes (graph search, not closed-form).

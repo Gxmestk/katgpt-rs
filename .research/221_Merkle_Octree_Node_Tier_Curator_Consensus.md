@@ -256,8 +256,8 @@ The bandit learns which curators to trust, which to audit, and which to reject �
 |-----------|-------------|--------------|
 | `SenseOctreeBuilder` | Add `build_with_merkle()` | `merkle_octree` |
 | `SenseModule` | Add optional `merkle_root: [u8; 32]` alongside `commitment` | `merkle_octree` |
-| `MerkleOctree` | New struct in `sense/merkle.rs` | `merkle_octree` |
-| `MerkleProof` | New struct in `sense/merkle.rs` | `merkle_octree` |
+| `MerkleOctree` | New struct in `crates/katgpt-types/src/merkle.rs` | `merkle_octree` |
+| `MerkleProof` | New struct in `crates/katgpt-types/src/merkle.rs` | `merkle_octree` |
 | `CuratorVerifier` | New module `curator/` | `curator` |
 | `MerkleFrozenEnvelope` | Extend `freeze.rs` | `merkle_freeze` |
 | `CuratorBandit` | New in `pruners/curator_bandit.rs` | `curator` |
@@ -417,7 +417,7 @@ CuratorVerdict (pass/fail)
 
 > **Implementation Status (2026-07-11):** All tasks below implemented via [Plan 253](../.plans/253_merkle_octree_curator_modelless.md) — ✅ Complete (13/13 tasks done). Feature gate: `merkle_octree` (opt-in). The unchecked `- [ ]` markers below are stale; see Plan 253 for completion records.
 
-- [x] Implement `MerkleNode` and `MerkleOctree` structs in `katgpt-core/src/sense/merkle.rs` (feature: `merkle_octree`)
+- [x] Implement `MerkleNode` and `MerkleOctree` structs in `crates/katgpt-types/src/merkle.rs` (feature: `merkle_octree`)
 - [x] Add `SenseOctreeBuilder::build_with_merkle()` — bottom-up hash computation from KgEmbeddings
 - [x] Implement `MerkleProof` generation (`prove_inclusion`) and verification (`verify_proof`)
 - [x] Implement sparse Merkle representation for memory efficiency

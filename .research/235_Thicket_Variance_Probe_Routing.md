@@ -10,7 +10,7 @@
 
 ## TL;DR
 
-RandOpt (Neural Thickets) shows that after sufficient pretraining, the **weight neighborhood** of a model is dense with task-specialists — random Gaussian perturbations land on good solutions with measurable probability δ(m), and the set of specialists is diverse (spectral discordance D). Plan 121 already mapped this **directly** into a weight-space bandit (`src/pruners/randopt.rs`, synthetic-only).
+RandOpt (Neural Thickets) shows that after sufficient pretraining, the **weight neighborhood** of a model is dense with task-specialists — random Gaussian perturbations land on good solutions with measurable probability δ(m), and the set of specialists is diverse (spectral discordance D). Plan 121 already mapped this **directly** into a weight-space bandit (`crates/katgpt-pruners/src/randopt.rs`, synthetic-only).
 
 This research proposes the **creative fusion** the user asked for: instead of re-implementing weight-space RandOpt, we lift the paper's *fundamental insight* — **variance structure of perturbation probes reveals loss-landscape geometry** — out of weight-space and into **decoding-config-space**. We sample K cheap probes that perturb decoding knobs (temperature, top-p, drafter seed, KV quantization noise, substrate mask bit-flips), measure the disagreement of their outputs, and feed that disagreement as a *new routing signal* into the existing `InferenceRouter` (CPU↔GPU↔ANE) and `S2FCollapseDetector` (CoT budget expand/contract).
 

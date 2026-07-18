@@ -186,7 +186,7 @@ is bit-identical.
 ### G4 — Zero-allocation hot path ✅ PASS
 
 **Result: 0 allocs / 1000 calls.** Fixed `[f32; N]`, `[f32; D]`, `[f32; 8]`
-arrays — no heap. Verified via `tests/common/mod.rs` CountingAllocator.
+arrays — no heap. Verified via `crates/katgpt-core/tests/common/mod.rs` CountingAllocator.
 
 ### G5 — Latency ✅ PASS
 
