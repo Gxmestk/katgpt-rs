@@ -58,7 +58,7 @@ Compress game domain knowledge into fixed-type ternary bit-plane sense modules (
   - `SenseModule::query_octree(&self, level: u8, index: u8) -> Option<bool>` — 2-bit occupancy query
   - Tests: roundtrip serialize/deserialize, project nonzero changes output, octree query valid indices, BLAKE3 commitment verify
 
-- [x] **T2: Ternary dot-product kernel** (`crates/katgpt-core/src/simd.rs`)
+- [x] **T2: Ternary dot-product kernel** (`crates/katgpt-dec/src/simd.rs`)
   - `simd_ternary_dot_f32(state: &[f32], dir: &TernaryDir) -> f32` — branchless SIMD conditional add/subtract
   - Reuse existing `simd_ternary_matvec` pattern from plasma_path
   - Scalar fallback for non-SIMD platforms
@@ -105,7 +105,7 @@ Compress game domain knowledge into fixed-type ternary bit-plane sense modules (
   - Tests: single module project, multiple modules compose, fuel exhaustion returns default (fail-safe)
   - Note: WASM is for community/untrusted sense modules only. Core senses use native Rust (T5).
 
-- [x] **T7: Batch sense projection** (`crates/katgpt-core/src/benchmark/batch.rs`)
+- [x] **T7: Batch sense projection** (`src/benchmark/batch.rs`)
   - `batch_project_all(brains: &[NpcBrain], results: &mut [Vec<f32>])` — process N NPCs
   - For WASM path: serialize all HLA states, call batch_project once, deserialize results
   - For native path: parallel via rayon if N > 64 (per optimization.md guidelines)
@@ -133,7 +133,7 @@ Compress game domain knowledge into fixed-type ternary bit-plane sense modules (
 
 ### Phase 4: Internal Sense API + Examples
 
-- [x] **T10: Internal Sense API — engine-level dispatch target** (`crates/katgpt-core/src/sense/gm.rs`)
+- [x] **T10: Internal Sense API — engine-level dispatch target** (`riir-ai/crates/riir-engine/src/sense/gm.rs`)
   - `pub(crate) trait GmSenseApi` — **internal-only** trait, NOT exposed as public API
   - Callers: MCP binary protocol (AI agents via `McpSupervisor`), SSH GM tools (egui dashboard)
   - No new auth layer — reuse existing `GmKeyStore` (papaya) + `EntityControlEnvelope` (Ed25519)

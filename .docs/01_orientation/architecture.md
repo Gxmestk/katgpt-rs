@@ -599,7 +599,7 @@ All hot-path kernels are `#[inline(always)]` with `unsafe get_unchecked`:
 - `rmsnorm_with_gamma(x, gamma)` — RMSNorm with learnable gain parameter
 - `rmsnorm_with_gamma_eps(x, gamma, eps)` — RMSNorm with gain and custom epsilon
 
-## SIMD Kernels (`crates/katgpt-core/src/simd.rs`, Plan 060)
+## SIMD Kernels (`crates/katgpt-dec/src/simd.rs`, Plan 060)
 
 Runtime SIMD detection and dispatch for hot-path operations:
 - `SimdLevel` enum: `Scalar`, `Neon` (ARM), `Avx2` (x86_64)
@@ -1296,7 +1296,7 @@ Operator types: `Gemv`, `Gemm`, `Elementwise`, `Reduction`. Calibrated via `Hard
 
 **Feature gate:** `roofline_cost` (default-on)
 
-## Dual-Gram PCA (`crates/katgpt-core/src/simd.rs`, Research R130, Plan 159)
+## Dual-Gram PCA (`crates/katgpt-dec/src/simd.rs`, Research R130, Plan 159)
 
 Dual-Gram PCA routing for short-sequence calibration. When `seq_len < 4 * head_dim`, computes the Gram matrix G = X·Xᵀ (seq_len × seq_len) instead of the covariance C = Xᵀ·X (d_h × d_h), yielding correct eigenvectors without O(d²) work.
 

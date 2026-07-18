@@ -45,7 +45,7 @@ key   = L2_norm(tanh(W_mk · x))   # unit sphere projection
 query = L2_norm(tanh(W_mq · x))   # prevents state explosion
 ```
 
-- [x] **T2: Implement `DeltaMemoryState`** — `src/pruners/delta_mem/state.rs`
+- [x] **T2: Implement `DeltaMemoryState`** — `crates/katgpt-core/src/delta_mem/state.rs`
   ```rust
   //! Compact associative memory updated by delta-rule learning.
   //!
@@ -152,7 +152,7 @@ query = L2_norm(tanh(W_mq · x))   # prevents state explosion
   }
   ```
 
-- [x] **T3: Implement `FeatureHasher`** — `src/pruners/delta_mem/hash.rs`
+- [x] **T3: Implement `FeatureHasher`** — `crates/katgpt-core/src/delta_mem/hash.rs`
   ```rust
   //! Hashes context features into a compact r-dimensional vector.
   //!
@@ -551,8 +551,8 @@ The paper's Multi-State Write (MSW). Verified from `delta_impl.py`:
 | File | Lines | Purpose |
 |------|-------|---------|
 | `crates/katgpt-pruners/src/delta_mem/mod.rs` | 35 | Module index + re-exports |
-| `src/pruners/delta_mem/state.rs` | ~300 | DeltaMemoryState (r×r associative matrix) |
-| `src/pruners/delta_mem/hash.rs` | ~180 | FeatureHasher + ContextFeatures + OutcomeFeatures |
+| `crates/katgpt-core/src/delta_mem/state.rs` | ~300 | DeltaMemoryState (r×r associative matrix) |
+| `crates/katgpt-core/src/delta_mem/hash.rs` | ~180 | FeatureHasher + ContextFeatures + OutcomeFeatures |
 | `crates/katgpt-pruners/src/delta_mem/pruner.rs` | ~310 | MemorySteeredPruner (low-rank correction wrapper) |
 | `crates/katgpt-core/src/delta_mem/multi.rs` | ~160 | MultiDomainMemory (MSW adaptation) |
 | `crates/katgpt-pruners/src/delta_mem/multi_pruner.rs` | ~240 | MultiDomainMemoryPruner |
@@ -608,8 +608,8 @@ The real gain would come if we had a Transformer to correct (not just a tree sco
 | File | Changes |
 |------|---------|
 | `crates/katgpt-pruners/src/delta_mem/mod.rs` | **New:** Module index |
-| `src/pruners/delta_mem/state.rs` | **New:** DeltaMemoryState (r×r associative matrix) |
-| `src/pruners/delta_mem/hash.rs` | **New:** FeatureHasher + ContextFeatures + OutcomeFeatures |
+| `crates/katgpt-core/src/delta_mem/state.rs` | **New:** DeltaMemoryState (r×r associative matrix) |
+| `crates/katgpt-core/src/delta_mem/hash.rs` | **New:** FeatureHasher + ContextFeatures + OutcomeFeatures |
 | `crates/katgpt-pruners/src/delta_mem/pruner.rs` | **New:** MemorySteeredPruner (low-rank correction wrapper) |
 | `crates/katgpt-core/src/delta_mem/multi.rs` | **New:** MultiDomainMemory (MSW adaptation) |
 | `crates/katgpt-pruners/src/delta_mem/multi_pruner.rs` | **New:** MultiDomainMemoryPruner |

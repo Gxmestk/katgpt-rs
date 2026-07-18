@@ -280,7 +280,7 @@ These are game/chain semantics. They belong in `riir-ai`. See [riir-ai Plan 319]
 |---|---|---|
 | `crates/katgpt-core/src/content_store/mod.rs` | ~30 | Module wiring, feature gate |
 | `crates/katgpt-core/src/content_store/types.rs` | ~80 | `BlobId`, `StoreStats`, `ChunkRange`, `MerkleProof` |
-| `katgpt-core/crates/katgpt-core/src/content_store/trait.rs` | ~80 | `ChunkedContentStore`, `ChunkFetcher`, `ChunkingStrategy` traits |
+| `crates/katgpt-core/src/content_store/trait.rs` | ~80 | `ChunkedContentStore`, `ChunkFetcher`, `ChunkingStrategy` traits |
 | `katgpt-core/crates/katgpt-core/src/content_store/chunker.rs` | ~200 | `FixedSizeChunker`, `FastCdcChunker`, gear table |
 | `crates/katgpt-core/src/content_store/in_memory.rs` | ~200 | `InMemoryChunkedStore` + unit tests |
 | `crates/katgpt-core/src/content_store/merkle.rs` | ~150 | Binary Merkle root/proof/verify |

@@ -141,7 +141,7 @@ Goal: per-head sensitivity curves + greedy swap solver, producing a model-specif
   - [x] `solve(target_ratio) -> Vec<f32>` (per-head shares, sum=1)
   - [x] Greedy swap algorithm (Algorithm 4)
   - [x] Step size η configurable
-- [x] **T3.3** Implement `src/attn_match/head_budget/schedule.rs`:
+- [x] **T3.3** Implement `crates/katgpt-attn-match/src/head_budget/schedule.rs`:
   - [x] `HeadBudgetSchedule` struct (model_id, shares, version, blake3_hash)
   - [x] Serialize/deserialize via postcard (existing dep)
   - [x] BLAKE3 hash for tamper detection

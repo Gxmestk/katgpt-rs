@@ -25,12 +25,12 @@ Implement physics-inspired NMDA-gated adaptive tree expansion in DDTree. Uses en
   - `fn compute_gate(&self, entropy: f32, coincidence: f32) -> f32` — returns `sigmoid(sensitivity * (entropy - threshold)) * coincidence`
   - All methods must be `#[inline]`, zero-allocation, stack-only
 
-- [x] Add SIMD-accelerated `entropy_f32(logprobs: &[f32]) -> f32` to `crates/katgpt-core/src/simd.rs`
+- [x] Add SIMD-accelerated `entropy_f32(logprobs: &[f32]) -> f32` to `crates/katgpt-dec/src/simd.rs`
   - Use existing `simd_dot_f32` pattern
   - Chunk-4 unrolled for auto-vectorization
   - Handle log-space: `entropy = -Σ p·log(p)` where `p = exp(logprobs[i])` normalized
 
-- [x] Add `coincidence_score(top_k: &[usize], parent_path: &[usize]) -> f32` to `crates/katgpt-core/src/simd.rs`
+- [x] Add `coincidence_score(top_k: &[usize], parent_path: &[usize]) -> f32` to `crates/katgpt-dec/src/simd.rs`
   - Count agreement between top-K candidates and parent path within window
   - Returns `agreement_count / window_size` ∈ [0, 1]
 

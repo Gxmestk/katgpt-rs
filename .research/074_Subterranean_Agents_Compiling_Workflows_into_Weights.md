@@ -131,7 +131,7 @@ Flowchart as directed graph: `F = (N, E, n₀, T)`
 | Runtime without orchestrator | WASM Validator + BanditPruner | `src/pruners/bandit.rs` |
 | Recompile cycle | Freeze/Thaw pipeline | `src/pruners/freeze.rs` |
 | Quality scoring (LLM-as-judge) | Bradley-Terry pairwise ranking | `src/pruners/bt_rank.rs` |
-| Multi-criteria rubric | ROPD RubricVector | `src/pruners/ropd_rubric/types.rs` |
+| Multi-criteria rubric | ROPD RubricVector | `crates/katgpt-pruners/src/ropd_rubric/types.rs` |
 
 ### What We Already Have
 

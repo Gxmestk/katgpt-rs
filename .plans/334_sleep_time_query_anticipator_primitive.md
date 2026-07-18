@@ -61,7 +61,7 @@ Amortization factor across N consumers: `(sum_i budgets[i]) / N`. Break-even: `s
 ### Tasks
 
 
-- [x] **T1.1** Create `katgpt-rs/src/sleep_time/mod.rs` with module root + re-exports. (Landed at `crates/katgpt-core/src/sleep_time/mod.rs` — the path in the task was the pre-workspace layout; current canonical path is under `crates/katgpt-core/`.)
+- [x] **T1.1** Create `katgpt-rs/src/sleep_time/mod.rs` with module root + re-exports. (Landed at `riir-ai/crates/riir-engine/src/sleep_time/mod.rs` — the path in the task was the pre-workspace layout; current canonical path is under `crates/katgpt-core/`.)
 - [x] **T1.2** Define core types in `katgpt-rs/src/sleep_time/types.rs`:
   ```rust
   /// A frozen anticipated-query direction vector. The "slot" in c'.

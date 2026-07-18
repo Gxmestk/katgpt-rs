@@ -22,7 +22,7 @@ Key finding: post-AlphaGo (2016+), professional Coincidence Rate (agreement with
 
 ### 1. We Already Have a "KataGo Lite" — `GoHeuristic`
 
-Our `GoHeuristic` (in `src/pruners/go/state.rs`) evaluates Go states using a weighted combination:
+Our `GoHeuristic` (in `crates/katgpt-pruners/src/go/state.rs`) evaluates Go states using a weighted combination:
 
 | Component | Weight | PGD Equivalent |
 |---|---|---|
@@ -290,4 +290,4 @@ Plan 081 implemented modelless PGD analytics features and validated them with GO
 - Dataset: https://github.com/Gifanan/Professional-Go-Dataset
 - Our Go engine: `.docs/14_go_arena.md`, Plan 065
 - Our G-Zero self-play: Plan 049, `.plans/065_autogo_distillation.md`
-- Our heuristic: `src/pruners/go/state.rs:GoHeuristic` (L560–790)
+- Our heuristic: `crates/katgpt-pruners/src/go/state.rs:GoHeuristic` (L560–790)

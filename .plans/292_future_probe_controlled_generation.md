@@ -277,7 +277,7 @@ Deferred. Only kicks in if Phase 5 promotes. Sketch:
 ## Dependencies
 
 - Phase 1: none (pure trait change).
-- Phase 2: `simd` primitives from `crates/katgpt-core/src/simd.rs` (simd_dot_f32), `blake3` crate (already in workspace), `papaya` or `arc-swap` for atomic direction swap (already in workspace).
+- Phase 2: `simd` primitives from `crates/katgpt-dec/src/simd.rs` (simd_dot_f32), `blake3` crate (already in workspace), `papaya` or `arc-swap` for atomic direction swap (already in workspace).
 - Phase 3: Phase 2 + a forward-pass interface (already exists in `inference_backend.rs` / `transformer_still.rs`).
 - Phase 4: a small test model + corpus. Reuse the smallest config in `katgpt-rs/Cargo.toml` presets (`micro`).
 

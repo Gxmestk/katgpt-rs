@@ -210,7 +210,7 @@ The actionable KDA distillation is the **DPLR `a=b=k` binding** (§1.5), which d
 2. **Binds `a = b = k`** in the chunkwise kernel (the unique KDA trick)
 3. Skips the 2 secondary-chunking steps + 3 matmuls that the general DPLR form requires
 
-**GOAT gate (the open question):** paper Figure 2 shows ~2× speedup on GPU (batch=1, 16 heads, seq 2k–64k). Does this transfer to **CPU SIMD** (our `simd_*` kernels in `katgpt-core/src/simd.rs`)? Three possible outcomes:
+**GOAT gate (the open question):** paper Figure 2 shows ~2× speedup on GPU (batch=1, 16 heads, seq 2k–64k). Does this transfer to **CPU SIMD** (our `simd_*` kernels in `crates/katgpt-dec/src/simd.rs`)? Three possible outcomes:
 - **GOAT PASS (promote):** CPU SIMD also gets ≥1.5× speedup → promote `KdaBound` to default-on for the GDN2 family.
 - **GOAT PARTIAL (keep opt-in):** speedup only on large seq lengths (≥4k), regress on short → keep opt-in, document the threshold.
 - **GOAT FAIL (demote / Pass):** the binding doesn't help on CPU SIMD (matmul cost structure differs from tensor cores) → close as PASS, ship the channel-wise variant as `EraseOnly` extension only.
@@ -369,7 +369,7 @@ Not required — no parity claim is made. The verdict is "architectural coverage
 
 4. **AttnRes remains blog-only.** Neither the K3 blog nor the KDA paper (which predates K3) provides AttnRes equations or architecture. Distillation is speculative until the K3 tech report or weights-drop reverse-engineering.
 
-5. **KDA's 2× GPU speedup may not transfer to CPU SIMD.** The `a=b=k` binding removes tensor-core matmuls. Our substrate is `katgpt-core/src/simd.rs` (NEON/AVX2). The matmul cost structure differs — the GOAT gate is the only honest way to verify transfer.
+5. **KDA's 2× GPU speedup may not transfer to CPU SIMD.** The `a=b=k` binding removes tensor-core matmuls. Our substrate is `crates/katgpt-dec/src/simd.rs` (NEON/AVX2). The matmul cost structure differs — the GOAT gate is the only honest way to verify transfer.
 
 6. **QB's "per-step training" application doesn't directly apply to katgpt-rs.** We don't train. The distillation reframes QB as a **snapshot-swap one-shot bias computation** (same application point as Plan 279 MPI Router). This is a faithful reinterpretation — the LP formulation is application-agnostic — but the empirical validation (Marin 32B-A5B) is for the per-step training variant, not the snapshot-swap variant. The GOAT gate must revalidate at the snapshot-swap application point.
 

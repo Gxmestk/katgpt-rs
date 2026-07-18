@@ -122,7 +122,7 @@ This is pure DRY — no new behavior, no new capability. Existing impls get blan
 - [-] **T3.1** Define `CriterionVersionedCache` trait in `katgpt-core/src/cache_version.rs`.
 - [-] **T3.2** `impl CriterionVersionedCache for DecCache` (single-slot — Key = ()).
 - [-] **T3.3** `impl CriterionVersionedCache for ZoneGeometryCache` (multi-entry — Key = ZoneHash).
-- [-] **T3.4** Document the pattern in `katgpt-core/crates/katgpt-dec/src/cache.rs` doc-comment, pointing to the trait.
+- [-] **T3.4** Document the pattern in `crates/katgpt-dec/src/cache.rs` doc-comment, pointing to the trait.
 - [-] **T3.5** No GOAT gate (Gain-tier DRY refactor). Just `cargo check --all-features` + existing tests pass bit-identically.
 
 ## Phase 3 — Architectural Blocker (2026-06-28)
@@ -214,8 +214,8 @@ read as **superseded by this section**.
 - [Research 320](../.research/320_Red_Queen_Godel_Machine_Selective_Erasure_Best_Belief.md) (corrected).
 - Issue 004 (closed + removed, not novel — covered by R158/R161/R155).
 - RQGM paper §3.5 (Controlled Utility Evolution), App. F Prop. 4 (best-belief lower bound).
-- `katgpt-core/crates/katgpt-ruliology/src/bandit.rs` `sample_beta` (Jöhnk's) — the existing Beta *sampler* (exploration) that `best_belief_score` complements as the Beta *quantile* (conservative selection).
-- `katgpt-core/crates/katgpt-dec/src/cache.rs` `DecCache` — existing criterion-versioned cache (single-slot, with derived stats). Phase 3 trait extraction target.
+- `crates/katgpt-ruliology/src/bandit.rs` `sample_beta` (Jöhnk's) — the existing Beta *sampler* (exploration) that `best_belief_score` complements as the Beta *quantile* (conservative selection).
+- `crates/katgpt-dec/src/cache.rs` `DecCache` — existing criterion-versioned cache (single-slot, with derived stats). Phase 3 trait extraction target.
 - `katgpt-core/src/dec/zone_cache.rs` `ZoneGeometryCache` (Plan 335) — existing criterion-versioned cache (multi-entry, papaya lock-free, BLAKE3-tagged). Phase 3 trait extraction target.
 - riir-ai Research 158 (Committed Personality Blend) — the already-committed Super-GOAT that ships the per-NPC committed-personality-with-survives-swap capability.
 

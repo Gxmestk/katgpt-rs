@@ -38,7 +38,7 @@ Most are mechanical internal-splits (carve WGSL param structs into `forward_para
 
 **Cohesion debt: MODERATE, concentrated in `riir-games`.** The `civ/` submodule alone is 83 files / 43K LOC — bigger than 16 of the 18 crates. 27 top-level modules span civ, quest, plasma, worms, ruliology, etc. The real opportunity is **splitting `riir-games` along domain lines** (e.g. `riir-games-civ`, `riir-games-quest`).
 
-**DRY debt: LOW.** One proven intentional fork: `FrameSampler` duplicated between `riir-engine/crates/katgpt-deprecated/src/alien_sampler/sampler.rs` and `riir-games/crates/katgpt-deprecated/src/alien_sampler/sampler.rs` (games version is a perf-improved fork with `sim_tick_into` buffer reuse). Other apparent duplicates (`SpatialBelief`, `KgTriple`) are coincidental name collisions with different fields/semantics — NOT true duplication.
+**DRY debt: LOW.** One proven intentional fork: `FrameSampler` duplicated between `crates/katgpt-deprecated/src/alien_sampler/sampler.rs` and `crates/katgpt-deprecated/src/alien_sampler/sampler.rs` (games version is a perf-improved fork with `sim_tick_into` buffer reuse). Other apparent duplicates (`SpatialBelief`, `KgTriple`) are coincidental name collisions with different fields/semantics — NOT true duplication.
 
 ### Blockers
 

@@ -192,7 +192,7 @@ riir-burner already reads JSONL. The only addition: optional `reward` field for 
   - riir-burner: add optional `--reward-weight` flag to sample proportionally to reward
   - If `--reward-weight` is set, sample training examples weighted by `reward` field
   - Without flag, uniform sampling (backward compatible)
-  - ~40 lines in `riir-burner/src/pipeline.rs`
+  - ~40 lines in `riir-train/crates/riir-train-gpu/src/pipeline.rs`
 
 - [x] **Task 6: Wire feedback in katgpt-rs**
   - After inference, if `solution-cache` feature is enabled:
@@ -238,7 +238,7 @@ riir-burner already reads JSONL. The only addition: optional `reward` field for 
 | `anyrag/crates/lib/Cargo.toml` | Add `solution-cache` feature | anyrag |
 | `anyrag/crates/server/Cargo.toml` | Add `solution-cache` feature | anyrag |
 | `anyrag/crates/server/src/handlers/mod.rs` | Add cache module | anyrag |
-| `riir-burner/src/pipeline.rs` | Add `--reward-weight` sampling (~40 lines) | riir-burner |
+| `riir-train/crates/riir-train-gpu/src/pipeline.rs` | Add `--reward-weight` sampling (~40 lines) | riir-burner |
 
 ---
 

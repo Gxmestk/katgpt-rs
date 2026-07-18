@@ -22,7 +22,7 @@
 - `v128_bitmask`, `v128_and`, `v128_or`, `v128_xor` for bit manipulation
 - Maps perfectly to our ternary representation
 
-This is a **new SIMD dispatch tier** in `katgpt-core/src/simd.rs`:
+This is a **new SIMD dispatch tier** in `crates/katgpt-dec/src/simd.rs`:
 
 ```
 Current:  AVX2 → NEON → scalar
@@ -56,7 +56,7 @@ katgpt-rs remains pure CPU. The WebGPU path lives in riir-ai/riir-gpu. The share
 - riir-ai Research 113 — full browser inference verdict
 - riir-ai Plan 286 — implementation plan
 - Research 110 (CiOT) — ternary inference CPU distillation
-- `katgpt-core/src/simd.rs` — existing SIMD dispatch
+- `crates/katgpt-dec/src/simd.rs` — existing SIMD dispatch
 
 ---
 

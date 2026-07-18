@@ -103,7 +103,7 @@ At generation step t with prefix p_t and drafter velocity v_t:
 - [x] Doc cross-ref to `.research/236_QGF_Test_Time_Q_Guided_Flow.md` §F3
 
 #### T2: FirstOrderProjector (F2)
-- [x] Create `katgpt-core/crates/katgpt-core/src/qgf/projector.rs`
+- [x] Create `crates/katgpt-core/src/qgf/projector.rs`
 - [x] Implement `project_one_step` for discrete chains
 - [x] Implement batch variant `project_batch` using `generate_batch`
 - [x] Unit test: known prefix → deterministic projection (mock generator)
@@ -497,7 +497,7 @@ At generation step t with prefix p_t and drafter velocity v_t:
 - `FlowFieldCache` + `FlowField::gradient()` (`katgpt-core/src/flow/`)
 - `ActionBridge` (`katgpt-core/src/bridge/`, feature `action_bridge`)
 - NFCoT FlowScore (Plan 229, feature `nf_flow_score`)
-- `simd::dot_f32_i8`, `simd::fast_sigmoid` (`katgpt-core/src/simd.rs`)
+- `simd::dot_f32_i8`, `simd::fast_sigmoid` (`crates/katgpt-dec/src/simd.rs`)
 - `AutocurriculumSampler` (for BFN-proxy oracle, feature `dual_leo`)
 
 ### Optional (feature-gated)

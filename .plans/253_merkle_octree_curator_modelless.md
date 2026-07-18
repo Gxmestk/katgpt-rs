@@ -22,30 +22,30 @@ Add a **modelless verification layer** to the existing KG Latent Octree Sense Co
 ### Phase 1: Merkle Data Structure
 
 - [x] **T1: Implement `MerkleOctree`** — 73-node fixed array (depth-3: 1 root + 8 internal + 64 leaves), per-node `[u8; 32]` BLAKE3 hashes, zero-alloc build. Feature-gated behind `merkle_octree`. — `crates/katgpt-core/src/merkle.rs` — GOAT: build < 5µs
-- [x] **T2: Add `build_with_merkle()` to `SenseOctreeBuilder`** — bottom-up hash computation: leaves = `BLAKE3(kg_triple_data || embedding_bytes)`, internal = `BLAKE3(child_0_hash || ... || child_7_hash)`, root hash stored in `SenseModule`. — `katgpt-core/crates/katgpt-sense/src/octree.rs` — GOAT: overhead < 2µs on top of existing `build()`
+- [x] **T2: Add `build_with_merkle()` to `SenseOctreeBuilder`** — bottom-up hash computation: leaves = `BLAKE3(kg_triple_data || embedding_bytes)`, internal = `BLAKE3(child_0_hash || ... || child_7_hash)`, root hash stored in `SenseModule`. — `crates/katgpt-sense/src/octree.rs` — GOAT: overhead < 2µs on top of existing `build()`
 - [x] **T3: Implement `MerkleProof`** — generate/verify O(log n) inclusion proofs for depth-3 (2 sibling levels × 7 siblings). `generate(leaf_index) → MerkleProof`, `verify(proof, root_hash) → bool`. — `crates/katgpt-core/src/merkle.rs` — GOAT: proof gen < 1µs, verify < 1µs
 
 ### Phase 2: Curator Verification
 
-- [x] **T4: Implement `CuratorVerifier`** — modelless checks: (1) KG consistency = dot-product similarity between KG embedding and claimed octree direction, (2) spectral flatness = variance of leaf hashes must exceed entropy floor, (3) latent conditioning = sigmoid(dot(query_vector, direction)) within [0,1]. No model weights. — `katgpt-core/crates/katgpt-core/src/curator.rs` — GOAT: verify single module < 2µs
-- [x] **T5: Implement `MerkleFrozenEnvelope`** — extends `MuxPatternStore` freeze pattern with BLAKE3 Merkle root for self-play data. `freeze_with_root(key, target, merkle_root)`, `thaw_and_verify(key) → Option<(&MuxTarget, bool)>`. — `katgpt-core/crates/katgpt-core/src/curator.rs` — GOAT: freeze/thaw overhead < 1µs
-- [x] **T6: Freeze/thaw Merkle integration** — G-Zero `GoSelfPlayResult[]` → extract KG triples → freeze with Merkle root → thaw verifies against root. Wire into existing `run_gzero_selfplay` flow. — `katgpt-core/crates/katgpt-core/src/curator.rs`, `katgpt-core/examples/` — GOAT: full pipeline overhead < 3% of self-play loop
+- [x] **T4: Implement `CuratorVerifier`** — modelless checks: (1) KG consistency = dot-product similarity between KG embedding and claimed octree direction, (2) spectral flatness = variance of leaf hashes must exceed entropy floor, (3) latent conditioning = sigmoid(dot(query_vector, direction)) within [0,1]. No model weights. — `crates/katgpt-core/src/curator.rs` — GOAT: verify single module < 2µs
+- [x] **T5: Implement `MerkleFrozenEnvelope`** — extends `MuxPatternStore` freeze pattern with BLAKE3 Merkle root for self-play data. `freeze_with_root(key, target, merkle_root)`, `thaw_and_verify(key) → Option<(&MuxTarget, bool)>`. — `crates/katgpt-core/src/curator.rs` — GOAT: freeze/thaw overhead < 1µs
+- [x] **T6: Freeze/thaw Merkle integration** — G-Zero `GoSelfPlayResult[]` → extract KG triples → freeze with Merkle root → thaw verifies against root. Wire into existing `run_gzero_selfplay` flow. — `crates/katgpt-core/src/curator.rs`, `katgpt-core/examples/` — GOAT: full pipeline overhead < 3% of self-play loop
 
 ### Phase 3: Curator Bandit
 
-- [x] **T7: Implement `CuratorBandit`** — reuses `BanditPruner` infrastructure pattern. Tracks curator accuracy (correct verifications vs false positives/negatives). Thompson sampling (Beta distribution) for reputation scoring. Per-curator `alpha`/`beta` counts, `sample() → f32` for verification weight. — `katgpt-core/crates/katgpt-core/src/curator.rs` — GOAT: sample + update < 100ns
-- [x] **T8: AbsorbCompress integration** — high-accuracy curators (>80% correct) get amplified verification weight. Low-accuracy curators (<50%) get probation (weight → 0). EMA decay on alpha/beta to handle concept drift. Reuses existing `AbsorbCompress` promotion/demotion pattern from Go self-play. — `katgpt-core/crates/katgpt-core/src/curator.rs` — GOAT: reputation update < 200ns
+- [x] **T7: Implement `CuratorBandit`** — reuses `BanditPruner` infrastructure pattern. Tracks curator accuracy (correct verifications vs false positives/negatives). Thompson sampling (Beta distribution) for reputation scoring. Per-curator `alpha`/`beta` counts, `sample() → f32` for verification weight. — `crates/katgpt-core/src/curator.rs` — GOAT: sample + update < 100ns
+- [x] **T8: AbsorbCompress integration** — high-accuracy curators (>80% correct) get amplified verification weight. Low-accuracy curators (<50%) get probation (weight → 0). EMA decay on alpha/beta to handle concept drift. Reuses existing `AbsorbCompress` promotion/demotion pattern from Go self-play. — `crates/katgpt-core/src/curator.rs` — GOAT: reputation update < 200ns
 
 ### Phase 4: Tests & Benchmarks
 
-- [x] **T9: Unit tests** — MerkleOctree build (empty, single leaf, full 64 leaves), proof gen + verify (valid proof, tampered leaf, wrong root), curator verifier (consistent KG, inconsistent KG, spectral anomaly), bandit reputation (convergence after N verifications). — `crates/katgpt-core/src/merkle.rs`, `katgpt-core/crates/katgpt-core/src/curator.rs`
+- [x] **T9: Unit tests** — MerkleOctree build (empty, single leaf, full 64 leaves), proof gen + verify (valid proof, tampered leaf, wrong root), curator verifier (consistent KG, inconsistent KG, spectral anomaly), bandit reputation (convergence after N verifications). — `crates/katgpt-core/src/merkle.rs`, `crates/katgpt-core/src/curator.rs`
 - [x] **T10: Benchmark** — Merkle build from 64 KG embeddings (< 5µs target), proof generation (< 1µs), proof verify (< 1µs), curator verify single module (< 2µs), bandit sample + update (< 100ns). — `crates/katgpt-core/benches/merkle_octree_bench.rs`
 - [x] **T11: GOAT proof** — inclusion proof verifies in < 1µs, full Merkle build from `SenseModule` data < 5µs, curator bandit converges within 100 episodes to > 75% accuracy. Create `.benchmarks/221_merkle_octree_goat.md` with results. — `.benchmarks/221_merkle_octree_goat.md`
 
 ### Phase 5: Feature Gate & Integration
 
 - [x] **T12: Add `merkle_octree` feature flag** — add to `katgpt-core/Cargo.toml` as `merkle_octree = ["sense_composition"]`. Guard `merkle.rs` and `curator.rs` modules. — `katgpt-core/Cargo.toml`, `crates/katgpt-core/src/lib.rs`
-- [x] **T13: Wire `MerkleOctree` into `SenseModule`** — `build_with_merkle()` replaces `commitment` with Merkle root hash. No additional `merkle_root` field needed — `commitment` IS the Merkle root when built via Merkle path. `build()` (non-Merkle) uses flat BLAKE3 as before. — `katgpt-core/crates/katgpt-sense/src/octree.rs`
+- [x] **T13: Wire `MerkleOctree` into `SenseModule`** — `build_with_merkle()` replaces `commitment` with Merkle root hash. No additional `merkle_root` field needed — `commitment` IS the Merkle root when built via Merkle path. `build()` (non-Merkle) uses flat BLAKE3 as before. — `crates/katgpt-sense/src/octree.rs`
 
 ---
 

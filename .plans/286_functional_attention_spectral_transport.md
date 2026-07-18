@@ -88,7 +88,7 @@ Minimal module, behind feature flag, not in default features.
   - **Apply**: `out_slice = C · Ṽ` (k×d), then `out = Φ · out_slice` (n×d) — inverse projection via the SAME basis weights Φ used in forward slice.
   - All in `scratch`, output to caller-owned `out: &mut [f32]`
   - **Orthogonal init** for `w_basis` (code L20-21: `torch.nn.init.orthogonal_`) — document in module doc, applied by caller (we don't init weights in inference paths).
-- [x] **T1.5** Reuse `crates/katgpt-core/src/simd.rs` for matmuls. Added `pub fn solve_convex_combo_dual(...)` helper to `funcattn.rs` — forms `(1-α)·K̃ᵀK̃ + α·I_d` and solves via in-place Cholesky (vendored, MIT).
+- [x] **T1.5** Reuse `crates/katgpt-dec/src/simd.rs` for matmuls. Added `pub fn solve_convex_combo_dual(...)` helper to `funcattn.rs` — forms `(1-α)·K̃ᵀK̃ + α·I_d` and solves via in-place Cholesky (vendored, MIT).
 
 ---
 

@@ -493,7 +493,7 @@ RAEv2's core ideas transfer to LLM inference at the **mechanism level** (multi-l
 | `src/speculative/verifier.rs` | `SpeculativeVerifier` trait |
 | `src/speculative/dd_tree.rs` | `inject_sde_noise`, `build_dd_tree_sde`, early exit logic |
 | `src/speculative/types.rs` | `SdeConfig`, `DDTreeBranchCache`, screening types |
-| `src/pruners/sdar/sdar_bandit.rs` | `SdarBanditPruner<P>` sigmoid-gated bandit |
+| `crates/katgpt-pruners/src/sdar/sdar_bandit.rs` | `SdarBanditPruner<P>` sigmoid-gated bandit |
 | `src/benchmark.rs` | GOAT benchmark infrastructure, MTP benchmarks |
 | `Cargo.toml` | Feature gates (`sdar_gate`, `elf_sde`, `delta_routing`, etc.) |
 ```

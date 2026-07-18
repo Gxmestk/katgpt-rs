@@ -96,7 +96,7 @@ The paper's §6 evaluation metrics as runtime functions. PRI/CDG are pure-PTG-ag
 
 - PRI computation on 1K-trace corpus < 100µs (G1).
 - TaR computation on 2×100-PTG corpus < 1ms.
-- All bridge functions are `#[inline]`, zero-alloc, and SIMD-friendly (use `simd_dot_f32` from `katgpt-core/src/simd.rs`).
+- All bridge functions are `#[inline]`, zero-alloc, and SIMD-friendly (use `simd_dot_f32` from `crates/katgpt-dec/src/simd.rs`).
 
 ---
 

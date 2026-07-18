@@ -51,7 +51,7 @@ Infrastructure benchmark validating width >> depth on DDTree with SDE noise. GOA
 - `get_unchecked` / `get_unchecked_mut` in inner matmul loops — eliminates bounds checks
 - `copy_nonoverlapping` for KV cache store — faster than `copy_from_slice` for known sizes
 - Edition 2024: explicit `unsafe {}` blocks inside `unsafe fn`
-- SIMD intrinsics (NEON/AVX2) in `crates/katgpt-core/src/simd.rs` (re-exported via `crates/katgpt-dec/src/simd.rs`) — runtime detection, safe API wrapping `core::arch::{aarch64, x86_64}` (Plan 060)
+- SIMD intrinsics (NEON/AVX2) in `crates/katgpt-dec/src/simd.rs` (re-exported via `crates/katgpt-dec/src/simd.rs`) — runtime detection, safe API wrapping `core::arch::{aarch64, x86_64}` (Plan 060)
 
 ### Fused Kernels
 - **`matmul_relu`**: single-pass MLP hidden layer (avoids extra scan of hidden buffer) — SIMD-accelerated dot product + fused ReLU zero-clamp
@@ -67,7 +67,7 @@ Infrastructure benchmark validating width >> depth on DDTree with SDE noise. GOA
 
 ## SIMD Acceleration (Plan 060)
 
-NEON (ARM) / AVX2 (x86_64) SIMD dispatch via `katgpt-core/src/simd.rs` (re-exported through `crates/katgpt-dec/src/simd.rs`). All kernels use runtime `SimdLevel` detection and provide scalar fallbacks. Public API:
+NEON (ARM) / AVX2 (x86_64) SIMD dispatch via `crates/katgpt-dec/src/simd.rs` (re-exported through `crates/katgpt-dec/src/simd.rs`). All kernels use runtime `SimdLevel` detection and provide scalar fallbacks. Public API:
 
 ### Kernel-Level Throughput (NEON, Apple Silicon, release)
 

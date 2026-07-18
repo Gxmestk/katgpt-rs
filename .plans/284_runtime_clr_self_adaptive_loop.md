@@ -6,7 +6,7 @@
 **Source paper:** [arxiv 2606.16140](https://arxiv.org/pdf/2606.16140) — Xu et al., "VibeThinker-3B" (Sina Weibo Inc.), 15 Jun 2026
 **Target:** `katgpt-rs/src/clr/` (new module) + Cargo feature `clr` (opt-in until GOAT G1–G5 pass)
 **Status:** ✅ COMPLETE, DEFAULT-ON (root, Phase 5 T5.6) — Phase 1-5 complete. All GOAT gates G1–G5 pass; `clr` promoted to default-on in katgpt-rs/Cargo.toml.
-**Depends On:** existing SIMD helpers (`simd_dot_f32`, `simd_sum_f32`, `simd_exp_inplace` from `crates/katgpt-core/src/simd.rs`), `ConstraintPruner` trait (existing, for the fallback binary verifier path)
+**Depends On:** existing SIMD helpers (`simd_dot_f32`, `simd_sum_f32`, `simd_exp_inplace` from `crates/katgpt-dec/src/simd.rs`), `ConstraintPruner` trait (existing, for the fallback binary verifier path)
 **GOAT Criteria:** G1 (CLR-vote ≥ +3pp over best-of-N majority on synthetic suite), G2 (verifier sigmoid ECE ≤ 0.10), G3 (≤200µs/call at K=32, M=5, 8-dim direction vectors — target ≤50µs), G4 (zero heap allocation on the vote path), G5 (feature isolation — compiles with/without `clr`, zero overhead when disabled)
 
 ---
@@ -51,7 +51,7 @@ Ship the four modelless primitives distilled from Research 255 as a generic, MIT
   - Implements `ClaimExtractor<T>` by delegating to `f`. Asserts `result.len() == m`. Used in tests + as a quick adapter for callers that don't want to define a full struct.
 - [x] **T1.5** Implement `SigmoidProjectionVerifier` reference impl in `crates/katgpt-claim/src/clr/verifier.rs`:
   - `pub struct SigmoidProjectionVerifier<'a> { pub directions: &'a DirectionVectorSource, pub direction_dim: usize }`
-  - `verify(claim, direction_idx)`: `let d = directions.direction(direction_idx); let dot = simd_dot_f32(&claim.embedding, d, direction_dim); sigmoid(dot)` where `sigmoid(x) = 1.0 / (1.0 + simd_exp_inplace_one(-x))`. Reuse `simd_dot_f32` from `crates/katgpt-core/src/simd.rs`. **No softmax anywhere.**
+  - `verify(claim, direction_idx)`: `let d = directions.direction(direction_idx); let dot = simd_dot_f32(&claim.embedding, d, direction_dim); sigmoid(dot)` where `sigmoid(x) = 1.0 / (1.0 + simd_exp_inplace_one(-x))`. Reuse `simd_dot_f32` from `crates/katgpt-dec/src/simd.rs`. **No softmax anywhere.**
 - [x] **T1.6** Implement `brevity_tiebreak()` in `crates/katgpt-claim/src/clr/brevity.rs`:
   - `pub fn brevity_tiebreak<T>(candidates: &[&Cluster<T>], trajectories: &[Trajectory<T>], eps: f32) -> usize` — among candidates whose `total_reliability` is within `eps` of the max, return the index of the one whose representative trajectory has the smallest `tokens_or_steps`. Pure algorithm, zero allocation beyond the input scan.
 
@@ -148,7 +148,7 @@ Ship the four modelless primitives distilled from Research 255 as a generic, MIT
 
 | Dependency | Source | Status |
 |-----------|--------|--------|
-| `simd_dot_f32`, `simd_sum_f32`, `simd_exp_inplace` | `crates/katgpt-core/src/simd.rs` | ✅ Shipped |
+| `simd_dot_f32`, `simd_sum_f32`, `simd_exp_inplace` | `crates/katgpt-dec/src/simd.rs` | ✅ Shipped |
 | `ConstraintPruner` trait | existing | ✅ Shipped (for fallback binary verifier path, not used by default) |
 | `fastrand` | existing dep | ✅ Available (for synthetic tests) |
 | `criterion` | dev-dep | ✅ Available (for `cargo bench`) |

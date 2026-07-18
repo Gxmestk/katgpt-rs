@@ -135,7 +135,7 @@ sigmoid_margin = ["katgpt-core/sigmoid_margin"]
 
 | File | Role |
 |------|------|
-| `crates/katgpt-core/src/simd.rs` | `sigmoid_margin_loss`, `compute_retrieval_margin`, `dim_sufficiency_bound` + `sigmoid_margin_tests` |
+| `crates/katgpt-dec/src/simd.rs` | `sigmoid_margin_loss`, `compute_retrieval_margin`, `dim_sufficiency_bound` + `sigmoid_margin_tests` |
 | `crates/katgpt-core/src/lib.rs` | Re-exports under the `sigmoid_margin` gate |
 | `.benchmarks/048_sigmoid_margin_goat.md` | NEW: this file |
 

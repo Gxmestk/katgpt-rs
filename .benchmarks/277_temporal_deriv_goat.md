@@ -75,7 +75,7 @@ Argmax gap: 792 ticks (target > 10 for orthogonality)
 ## G3 — δ-Mem Temporal Write Gate (Fusion F2)
 
 **Commit:** `c07866e4`
-**Target:** `src/pruners/delta_mem/state.rs`
+**Target:** `crates/katgpt-core/src/delta_mem/state.rs`
 **Bench:** `benches/delta_mem_surprise_gate_bench.rs`
 **In-crate test:** `test_g3_gate_surprise_vs_baseline`
 

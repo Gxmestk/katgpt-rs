@@ -89,7 +89,7 @@ This is the **public open primitive** for Research 274's Super-GOAT verdict. The
 
 - [x] **T3.1** **G1 — CCE ≥ Nash benchmark** in `katgpt-rs/tests/cce_vs_nash.rs`:
   - Three canonical games: RPS (no Pareto gain, CCE = Nash), chicken (Pareto-dominant CCE exists), battle-of-sexes (Pareto-dominant CCE exists).
-  - For each: solve via `CceLp::solve` (with `Γ₀ = sum of player payoffs`); solve via `PayoffTable<N>::nash_equilibrium` (already shipped in `riir-games/crates/katgpt-ruliology/src/payoff.rs`).
+  - For each: solve via `CceLp::solve` (with `Γ₀ = sum of player payoffs`); solve via `PayoffTable<N>::nash_equilibrium` (already shipped in `crates/katgpt-ruliology/src/payoff.rs`).
   - Assert: `Γ₀(ρ_CCE) ≥ Γ₀(ρ_Nash)` (with `≥` because we maximize welfare, not minimize cost); for chicken and BoS, strict `>` by ≥ 5%.
   - **Implementation note**: `PayoffTable<N>::nash_equilibrium` lives in `riir-games` (separate crate), so Nash welfare is computed analytically (chicken mixed Nash = 4.0, BoS mixed Nash = 2.4). Player-1-only CCE model used (deviation class contains only player 1's deviations); welfare numbers are an upper bound on full-game CCE welfare. Multi-player extension deferred to riir-ai Plan 325.
   - G1 PASS: chicken +37.5% (5.5 vs 4.0), BoS +108% (5.0 vs 2.4). RPS: softer sanity check (LP exploits free state distribution without dynamics constraint — documented limitation).
@@ -200,7 +200,7 @@ Estimated total LOC: ~1500 (within AGENTS.md 3200-line file budget).
 - Research: [`katgpt-rs/.research/274_Optimal_CCE_Moderator_LP_No_Regret.md`](../.research/274_Optimal_CCE_Moderator_LP_No_Regret.md)
 - Private guide: [`riir-ai/.research/143_Latent_CCE_Moderator_Crowd_Emergent_Coordination.md`](../../riir-ai/.research/143_Latent_CCE_Moderator_Crowd_Emergent_Coordination.md)
 - Private plan: [`riir-ai/.plans/325_latent_cce_moderator_runtime.md`](../../riir-ai/.plans/325_latent_cce_moderator_runtime.md)
-- Existing Nash solver (deviation class for 1v1 CCE): `riir-games/crates/katgpt-ruliology/src/payoff.rs::PayoffTable<N>`
+- Existing Nash solver (deviation class for 1v1 CCE): `crates/katgpt-ruliology/src/payoff.rs::PayoffTable<N>`
 - Existing OMD machinery (dual update inspiration): `katgpt-rs/src/pruners/prudent_banker.rs`
 - Existing mean-field α router (primal update inspiration): `katgpt-rs/crates/katgpt-core/src/cgsp/dual_pool.rs`
 

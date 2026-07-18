@@ -267,7 +267,7 @@ Prop 2 (near-linear CE) assumes a Bayes-optimal denoiser (Def 1). Our D2F models
 |---|---|---|---|
 | `riir-gpu/src/backward.rs` | Pure CE loss | Add ELBO auxiliary loss (reconstruction + diffusion terms) | Sec 2, Eq 4 |
 | `riir-gpu/src/forward.rs` `GpuForwardPass::forward()` | Single forward pass | Add self-conditioning path (forward → estimate → forward with conditioning) | Sec 2 |
-| `riir-gpu/src/training_loop.rs` `TrainingConfig` | Fixed LR schedule | Add per-component LR (embeddings: 1e-2, backbone: 2e-4) from Tab 7 | Tab 7, 9 |
+| `riir-train/crates/riir-train-gpu/src/training_loop.rs` `TrainingConfig` | Fixed LR schedule | Add per-component LR (embeddings: 1e-2, backbone: 2e-4) from Tab 7 | Tab 7, 9 |
 
 ### 7.3 Medium-term (D2F Acceleration)
 

@@ -128,7 +128,7 @@ Two examples — simple flocking (linear-quadratic, explicit Nash) and emission 
 
 | Paper component | Our shipped equivalent | Evidence |
 |---|---|---|
-| Nash equilibrium solver | `PayoffTable<N>::nash_equilibrium` (Cramer + support enumeration) | `riir-games/src/payoff.rs` |
+| Nash equilibrium solver | `PayoffTable<N>::nash_equilibrium` (Cramer + support enumeration) | `crates/katgpt-ruliology/src/payoff.rs` |
 | No-regret bandit convergence to Nash | `bandit_05_rps.rs` example (UCB1 vs ε-greedy → 33/33/33) | `katgpt-rs/examples/bandit_05_rps.rs` |
 | Mean-field α router with O(log T) regret | `DualPoolBandit` (Plan 282, G2 PASS: regret 24.6 ≤ 5·log(10k)) | `katgpt-rs/crates/katgpt-core/src/cgsp/dual_pool.rs`, `katgpt-rs/.benchmarks/028_dualpool_g2_log_regret.md` |
 | Mirror descent / OMD with delay | PrudentBanker (R098, Plan 137) — Banker-OMD, O(log T + √D) regret | `katgpt-rs/src/pruners/prudent_banker.rs` |
@@ -295,7 +295,7 @@ GOAT gate rule: `cce_moderator` feature flag default-off. Promote to considerati
 
 | Code | Connection |
 |---|---|
-| `riir-games/src/payoff.rs` (`PayoffTable<N>`) | Nash solver; deviation class for 1v1 CCE |
+| `crates/katgpt-ruliology/src/payoff.rs` (`PayoffTable<N>`) | Nash solver; deviation class for 1v1 CCE |
 | `katgpt-rs/src/pruners/prudent_banker.rs` | OMD primal-dual machinery |
 | `katgpt-rs/crates/katgpt-core/src/cgsp/dual_pool.rs` | Mean-field α router + O(log T) regret bound |
 | `riir-ai/crates/riir-engine/src/latent_functor/reestimation.rs` | Coherence-driven re-estimation scheduler (Fusion D) |

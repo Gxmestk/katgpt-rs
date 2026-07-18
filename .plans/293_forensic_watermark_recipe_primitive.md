@@ -60,7 +60,7 @@ katgpt-rs/crates/katgpt-core/src/forensic/
 
 ### Tasks
 
-- [x] **T1.1** Create module skeleton `crates/katgpt-core/src/forensic/mod.rs` with feature gate `#[cfg(feature = "forensic_watermark")]`. Add feature to `crates/katgpt-core/Cargo.toml`. Export from `crates/katgpt-core/src/lib.rs` behind feature gate.
+- [x] **T1.1** Create module skeleton `riir-chain/src/forensic/mod.rs` with feature gate `#[cfg(feature = "forensic_watermark")]`. Add feature to `crates/katgpt-core/Cargo.toml`. Export from `crates/katgpt-core/src/lib.rs` behind feature gate.
 - [x] **T1.2** Define `RecipeConfig` struct in `recipe.rs`:
   ```rust
   pub struct RecipeConfig {
@@ -303,11 +303,11 @@ katgpt-rs/crates/katgpt-core/src/forensic/
 |------|--------|
 | `crates/katgpt-core/Cargo.toml` | Add `forensic_watermark` feature (no new deps — uses blake3, bytemuck, optional chacha20) |
 | `crates/katgpt-core/src/lib.rs` | Export `forensic` module behind feature gate |
-| `crates/katgpt-core/src/forensic/mod.rs` | Public API: Recipe, RecipeConfig, apply_*, recover_*, attribute |
-| `crates/katgpt-core/src/forensic/recipe.rs` | BLAKE3-seeded recipe derivation, P_vertex constructor |
+| `riir-chain/src/forensic/mod.rs` | Public API: Recipe, RecipeConfig, apply_*, recover_*, attribute |
+| `riir-chain/src/forensic/recipe.rs` | BLAKE3-seeded recipe derivation, P_vertex constructor |
 | `crates/katgpt-core/src/forensic/tardos.rs` | Anti-collusion codebook (Tardos 2008) |
 | `crates/katgpt-core/src/forensic/vertex.rs` | Vertex perturbation (LoopWM spectral stability) |
-| `crates/katgpt-core/src/forensic/texture.rs` | DCT mid-frequency embedding + recovery |
+| `riir-chain/src/forensic/texture.rs` | DCT mid-frequency embedding + recovery |
 | `crates/katgpt-transformer/src/dense_mesh/topology.rs` | Degenerate-triangle topology mark + recovery |
 | `crates/katgpt-core/src/forensic/recover.rs` | End-to-end forensic recovery + attribution |
 | `riir-chain/benches/forensic_watermark.rs` | Criterion benchmarks for derive/apply/recover |

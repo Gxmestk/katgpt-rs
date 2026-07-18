@@ -446,7 +446,7 @@ pub fn ahla_step(pkv: &mut [f32], mk: &mut [f32], q_head: &mut AhlaQHeadState, q
 
 ### SIMD Acceleration (Plan 060)
 
-All HLA kernels dispatch through `crates/katgpt-core/src/simd.rs` (re-exported via `crates/katgpt-dec/src/simd.rs`) — runtime NEON/AVX2 detection:
+All HLA kernels dispatch through `crates/katgpt-dec/src/simd.rs` (re-exported via `crates/katgpt-dec/src/simd.rs`) — runtime NEON/AVX2 detection:
 
 | Operation | NEON Throughput (hd=4) |
 |-----------|----------------------|

@@ -138,7 +138,7 @@ where `g_max` is the max consolidation strength and λ controls the decay rate. 
 The paper uses a fixed newline trigger. §7 explicitly states: "reconsolidation appears to depend on prediction error at retrieval... surprise/PE gating (rather than a fixed newline trigger) would be more suitable."
 
 **Our codebase already ships this:**
-- δ-Mem surprise gate (`pruners/delta_mem/state.rs`) — triggers on prediction error
+- δ-Mem surprise gate (`crates/katgpt-core/src/delta_mem/state.rs`) — triggers on prediction error
 - SwiR block-relative entropy switch (Plan 275) — triggers on entropy spike
 - Temporal derivative kernel (Plan 277) — temporal surprise signal
 

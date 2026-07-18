@@ -142,7 +142,7 @@ This directly validates PTRM's finding (Research 49): width >> depth. 20 paralle
 | Majority voting | `extract_best_path()` | `src/speculative/dd_tree.rs` | ✅ Best path extraction |
 | Richer pairwise selection | `BtScores`/`bt_fit()` (Bradley-Terry) | `src/pruners/bt_rank.rs` | ✅ Feature `bt_rank` |
 | Flow-based exploration | `FlowPruner<P>` (GFlowNet) | `src/speculative/flow_pruner.rs:43-55` | ✅ GRAM doesn't have this |
-| Sigmoid-gated selection | `SdarBanditPruner<P>` | `src/pruners/sdar/sdar_bandit.rs:187-197` | ✅ SDAR gate |
+| Sigmoid-gated selection | `SdarBanditPruner<P>` | `crates/katgpt-pruners/src/sdar/sdar_bandit.rs:187-197` | ✅ SDAR gate |
 | ACT early exit | `domain_latent` feature | Feature flag | ✅ Implemented |
 | Deep supervision (N_sup steps) | DPO/GRPO intermediate state training | `riir-ai/.plans/059_gzero_dpo_grpo.md` (Plan 059 ✅) | ✅ Model-based path |
 | Feature flag | `elf_sde`, `bandit`, `bt_rank` | `Cargo.toml` features | ✅ All default-on |
@@ -503,7 +503,7 @@ GRAM independently validates our existing design from a completely different ang
 | `src/pruners/bandit.rs` | `BanditPruner<P>` with Q-values and strategies |
 | `src/pruners/bt_rank.rs` | `BtScores`, `BtConfig`, `bt_fit()` — Bradley-Terry pairwise ranking |
 | `src/speculative/flow_pruner.rs` | `FlowPruner<P>` GFlowNet flow bonus |
-| `src/pruners/sdar/sdar_bandit.rs` | `SdarBanditPruner<P>` sigmoid-gated bandit |
+| `crates/katgpt-pruners/src/sdar/sdar_bandit.rs` | `SdarBanditPruner<P>` sigmoid-gated bandit |
 | `src/pruners/sdar/sdar_absorb.rs` | `SdarGatedAbsorbCompress<P>` sigmoid-gated absorb-compress |
 | `tests/bench_elf_modelless.rs` | SDE noise benchmarks (diversity + overhead) |
 | `examples/bandit_02_ddtree.rs` | BanditPruner + DDTree integration example |

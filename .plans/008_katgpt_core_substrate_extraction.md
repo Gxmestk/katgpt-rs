@@ -133,7 +133,7 @@ refined strategy doc, stranded in a private fork.
   `forward.rs` CANNOT move cleanly to core — it imports `crate::transformer::{ForwardContext, TransformerWeights}` and `ForwardContext` has root-only pruner fields (`CnaModulator`, `SubstrateMask`, `HydraSkipPlan`). This is the **same split pattern as Step 2** (`katgpt-transformer` got the substrate types; root kept the forward composition). Corrected scope: move the **pure substrate half** (`types.rs` + `kernel.rs`) to core; keep the **composition half** (`forward.rs`) in root.
 
   ### Done subtasks (2026-06-28)
-  - [x] 4a. Move `types.rs` (606 LoC) + `kernel.rs` (1019 LoC) → `katgpt-core/src/hla/` (verbatim; both files depend only on `crate::simd` + `crate::types::Config`, both already in core — zero import changes needed). New `katgpt-core/src/hla/mod.rs` declares `pub mod kernel; pub mod types;` + re-exports the substrate API. `forward.rs` stays in root.
+  - [x] 4a. Move `types.rs` (606 LoC) + `kernel.rs` (1019 LoC) → `katgpt-core/src/hla/` (verbatim; both files depend only on `crate::simd` + `crate::types::Config`, both already in core — zero import changes needed). New `riir-ai/crates/riir-engine/src/hla/mod.rs` declares `pub mod kernel; pub mod types;` + re-exports the substrate API. `forward.rs` stays in root.
   - [x] 4c. Root `riir-ai/crates/riir-engine/src/hla/mod.rs` → thin re-export of `katgpt_core::hla::{kernel, types}` + substrate API + local `pub mod forward;` (the composition layer). All existing call sites (`crate::hla::MultiLayerHlaCache`, `crate::hla::hla_state_update`, etc.) resolve unchanged via the re-exports.
   - [x] 4d. **GOAT gate PASSED** — bit-identical forward output:
     - `cargo test -p katgpt-core --lib hla::` → **16/16 green** (9 types + 7 kernel substrate tests, moved verbatim).
@@ -219,8 +219,8 @@ refined strategy doc, stranded in a private fork.
   **Corrected scope:** move the pure-substrate algorithms + types to `katgpt-core`; keep the composition that needs root-only types in root as re-export shims.
 
   ### Done subtasks (2026-06-28)
-  - [x] 6a. Created `crates/katgpt-core/src/mcts.rs` (806 LoC) — `MCTSNode`, `mcts_search`, `mcts_search_informed`, `mcts_search_impl`, `select_inline`, `expand_and_rollout`, `rollout`, `backpropagate`, `ucb1_score`, `UCB1_C`, `MAX_TREE_SIZE` + 14 substrate tests. Moved verbatim from root `pruners/game_state/mcts.rs`; imports changed from `super::{GameState, ...}` to `crate::traits::{GameState, ...}`. Pure substrate: depends only on `katgpt_core::traits` + `fastrand::Rng` (already in core).
-  - [x] 6b. Created `katgpt-core/crates/katgpt-core/src/speculative/sampling.rs` (145 LoC) — `sample_from_distribution`, `sample_residual_distribution_into`, `sample_residual_distribution` + 5 tests. Moved verbatim from root `crates/katgpt-core/src/speculative/sampling.rs`; imports changed to `crate::simd::simd_scale_inplace` + `crate::types::Rng` (both always-on in core).
+  - [x] 6a. Created `crates/katgpt-core/src/mcts.rs` (806 LoC) — `MCTSNode`, `mcts_search`, `mcts_search_informed`, `mcts_search_impl`, `select_inline`, `expand_and_rollout`, `rollout`, `backpropagate`, `ucb1_score`, `UCB1_C`, `MAX_TREE_SIZE` + 14 substrate tests. Moved verbatim from root `crates/katgpt-pruners/src/game_state/mcts.rs`; imports changed from `super::{GameState, ...}` to `crate::traits::{GameState, ...}`. Pure substrate: depends only on `katgpt_core::traits` + `fastrand::Rng` (already in core).
+  - [x] 6b. Created `crates/katgpt-core/src/speculative/sampling.rs` (145 LoC) — `sample_from_distribution`, `sample_residual_distribution_into`, `sample_residual_distribution` + 5 tests. Moved verbatim from root `crates/katgpt-core/src/speculative/sampling.rs`; imports changed to `crate::simd::simd_scale_inplace` + `crate::types::Rng` (both always-on in core).
   - [x] 6c. Created `katgpt-core/src/delta_mem/` (new always-on module like `mcts`/`hla`/`speculative`):
     - `mod.rs` (37 LoC) — module doc + `pub mod {hash, multi, state};` + re-exports.
     - `state.rs` (910 LoC) — `DeltaMemoryConfig`, `DeltaMemoryState`, `DeltaMemorySnapshot` + 17 default tests + 8 `temporal_deriv`-gated tests. Moved verbatim; only path change: `use katgpt_core::temporal_deriv::TemporalDerivativeKernel` (was already `katgpt_core::` in root — no change).
@@ -248,15 +248,15 @@ refined strategy doc, stranded in a private fork.
   - [x] 6j. Commit: `feat(core): Plan 008 step 6 — move mcts/sampling/delta_mem substrate to katgpt-core` (see commit log).
 
   ### Composition types that stayed in root (with rationale)
-  - `BanditRolloutPolicy` (root `pruners/game_state/mcts.rs`) — depends on `BanditStats` from `crate::pruners::bandit` (root-only). Stays behind `bandit` feature; 5 bandit tests stayed with it.
-  - `MemorySteeredPruner<P>` (root `pruners/delta_mem/pruner.rs`) — wraps an inner `P: ScreeningPruner`. Generic is instantiated at root call sites that compose spec-decoding context. The trait `ScreeningPruner` itself moved to `katgpt_core::traits` in Step 5 — but the *composition* (a pruner that holds a `DeltaMemoryState` + `FeatureHasher` and adds memory-steered corrections) is consumer-specific.
-  - `MultiDomainMemoryPruner<P>` (root `pruners/delta_mem/multi_pruner.rs`) — same pattern, multi-domain variant.
+  - `BanditRolloutPolicy` (root `crates/katgpt-pruners/src/game_state/mcts.rs`) — depends on `BanditStats` from `crate::pruners::bandit` (root-only). Stays behind `bandit` feature; 5 bandit tests stayed with it.
+  - `MemorySteeredPruner<P>` (root `crates/katgpt-pruners/src/delta_mem/pruner.rs`) — wraps an inner `P: ScreeningPruner`. Generic is instantiated at root call sites that compose spec-decoding context. The trait `ScreeningPruner` itself moved to `katgpt_core::traits` in Step 5 — but the *composition* (a pruner that holds a `DeltaMemoryState` + `FeatureHasher` and adds memory-steered corrections) is consumer-specific.
+  - `MultiDomainMemoryPruner<P>` (root `crates/katgpt-pruners/src/delta_mem/multi_pruner.rs`) — same pattern, multi-domain variant.
 
   ### Layering achieved
   | Tier | Location | Content | LoC | Rationale |
   |---|---|---|---|---|
   | **Substrate** | `crates/katgpt-core/src/mcts.rs` | `mcts_search`, `mcts_search_informed`, `MCTSNode`, UCB1/backprop/rollout helpers | 806 | Pure algorithm over `GameState` trait |
-  | **Substrate** | `katgpt-core/crates/katgpt-core/src/speculative/sampling.rs` | `sample_from_distribution`, `sample_residual_distribution_into`, `sample_residual_distribution` | 145 | Pure CDF math over `Rng` + `simd` |
+  | **Substrate** | `crates/katgpt-core/src/speculative/sampling.rs` | `sample_from_distribution`, `sample_residual_distribution_into`, `sample_residual_distribution` | 145 | Pure CDF math over `Rng` + `simd` |
   | **Substrate** | `katgpt-core/src/delta_mem/{state,hash,multi}.rs` | `DeltaMemoryState`, `FeatureHasher`, `MultiDomainMemory` + configs + snapshots | 1427 | Pure data + algorithm over `serde` + `fastrand` + `temporal_deriv` |
   | **Composition** | `katgpt-rs/crates/katgpt-pruners/src/game_state/mcts.rs` | `BanditRolloutPolicy` + 5 tests | 314 | Needs `BanditStats` from root-only `crate::pruners::bandit` |
   | **Composition** | `katgpt-rs/crates/katgpt-core/src/speculative/sampling.rs` | re-export shim | 16 | N/A |

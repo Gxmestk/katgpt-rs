@@ -716,7 +716,7 @@ pub enum ThermalPath {
 both paths converge. This uses Plasma Path ternary weights (Plan 148, `TernaryWeights`)
 for the underlying SIMD matvec. Feature-gated behind `plasma_path`.
 
-**Source:** `src/speculative/flashar_consensus.rs`, `crates/katgpt-core/src/simd.rs`
+**Source:** `src/speculative/flashar_consensus.rs`, `crates/katgpt-dec/src/simd.rs`
 
 ---
 

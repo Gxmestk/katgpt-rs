@@ -153,7 +153,7 @@ Goal: implement paper Methods §A (higher-order outer products) and §C (Woodbur
 ## Dependencies
 
 No new external dependencies. All math is closed-form (matvec, Cholesky/Vandermonde inversion, Cox-de Boor recursion). Reuse:
-- `crates/katgpt-core/src/simd.rs` — `simd_matvec`, `simd_outer_product_acc`
+- `crates/katgpt-dec/src/simd.rs` — `simd_matvec`, `simd_outer_product_acc`
 - `crates/katgpt-core/src/peira.rs` — extract `(N + λI)^{-1}` kernel into `crates/katgpt-core/src/linalg/ridge_solve.rs`
 - Optionally `riir-ai/crates/riir-engine/src/linoss/basis.rs` — `FourierBasis` if dep tree allows (otherwise vendor)
 

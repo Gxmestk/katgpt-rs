@@ -9,11 +9,11 @@
 ## Task Index
 
 - [x] T1: TernaryWeights Type — `katgpt-core/src/types.rs` L2248–2379
-- [x] T2: Scalar Ternary Matvec — `katgpt-core/src/simd.rs` L1734
-- [x] T3: NEON Ternary Matvec — `katgpt-core/src/simd.rs` L1756
-- [x] T4: AVX2 Ternary Matvec — `katgpt-core/src/simd.rs` L1854
-- [x] T5: Dispatch Wrapper — `katgpt-core/src/simd.rs` L1949
-- [x] T6: Batched Ternary Matmul — `katgpt-core/src/simd.rs` L1961
+- [x] T2: Scalar Ternary Matvec — `crates/katgpt-dec/src/simd.rs` L1734
+- [x] T3: NEON Ternary Matvec — `crates/katgpt-dec/src/simd.rs` L1756
+- [x] T4: AVX2 Ternary Matvec — `crates/katgpt-dec/src/simd.rs` L1854
+- [x] T5: Dispatch Wrapper — `crates/katgpt-dec/src/simd.rs` L1949
+- [x] T6: Batched Ternary Matmul — `crates/katgpt-dec/src/simd.rs` L1961
 - [x] T7: `.bits` File Loader — `katgpt-rs/src/weights.rs` L224
 - [x] T8: Forward Pass Dispatch — `LayerWeights` integration not yet wired
 - [x] T9: Quantization Utility — `katgpt-core/src/types.rs` L2322
@@ -80,7 +80,7 @@ Methods:
 - `TernaryWeights::get(row, col) -> i8` — get ternary value
 - `TernaryWeights::quantize_from_f32(weights: &[f32], rows: usize, cols: usize) -> Self` — row-wise error-compensated quantization (from ciot's `pack_ternary.py`)
 
-### T2: Scalar Ternary Matvec (`katgpt-core/src/simd.rs`)
+### T2: Scalar Ternary Matvec (`crates/katgpt-dec/src/simd.rs`)
 
 Reference implementation for correctness testing:
 
@@ -105,7 +105,7 @@ pub fn ternary_matvec_scalar(w: &TernaryWeights, x: &[f32], y: &mut [f32]) {
 }
 ```
 
-### T3: NEON Ternary Matvec (`katgpt-core/src/simd.rs`)
+### T3: NEON Ternary Matvec (`crates/katgpt-dec/src/simd.rs`)
 
 RIIR of ciot's `matvec_ternary_native` for `target_arch = "aarch64"`:
 
@@ -123,7 +123,7 @@ unsafe fn neon_ternary_matvec(w: &TernaryWeights, x: &[f32], y: &mut [f32]) {
 }
 ```
 
-### T4: AVX2 Ternary Matvec (`katgpt-core/src/simd.rs`)
+### T4: AVX2 Ternary Matvec (`crates/katgpt-dec/src/simd.rs`)
 
 RIIR of ciot's AVX2 path for `target_arch = "x86_64"`:
 
@@ -138,7 +138,7 @@ unsafe fn avx2_ternary_matvec(w: &TernaryWeights, x: &[f32], y: &mut [f32]) {
 }
 ```
 
-### T5: Dispatch Wrapper (`katgpt-core/src/simd.rs`)
+### T5: Dispatch Wrapper (`crates/katgpt-dec/src/simd.rs`)
 
 ```rust
 /// SIMD-accelerated ternary matvec: y = W_ternary × x
@@ -157,7 +157,7 @@ pub fn simd_ternary_matvec(w: &TernaryWeights, x: &[f32], y: &mut [f32]) {
 }
 ```
 
-### T6: Batched Ternary Matmul (`katgpt-core/src/simd.rs`)
+### T6: Batched Ternary Matmul (`crates/katgpt-dec/src/simd.rs`)
 
 ```rust
 /// Batched ternary matmul: for each row batch[i], compute y[i] = W × batch[i].
@@ -304,7 +304,7 @@ T1 (TernaryWeights type)
 |------|--------|
 | `crates/katgpt-core/Cargo.toml` | Added `plasma_path` feature gate |
 | `crates/katgpt-core/src/types.rs` | Added `TernaryWeights` struct + `new/set/get/quantize_from_f32/checksum` |
-| `crates/katgpt-core/src/simd.rs` | Added `ternary_matvec_scalar`, `neon_ternary_matvec`, `avx2_ternary_matvec`, `simd_ternary_matvec`, `simd_ternary_matmul_batch` |
+| `crates/katgpt-dec/src/simd.rs` | Added `ternary_matvec_scalar`, `neon_ternary_matvec`, `avx2_ternary_matvec`, `simd_ternary_matvec`, `simd_ternary_matmul_batch` |
 | `crates/katgpt-core/src/lib.rs` | Re-exports for `TernaryWeights`, ternary matvec functions |
 | `Cargo.toml` | Added `plasma_path` feature gate (default-on) |
 | `src/weights.rs` | Added `load_ternary_bits()` `.bits` file loader |

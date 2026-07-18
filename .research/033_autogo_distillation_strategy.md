@@ -448,16 +448,16 @@ From weakest to strongest:
 
 | AutoGo Concept | Our Implementation | Source File | Module |
 |----------------|-------------------|-------------|--------|
-| Go board rules (Tromp-Taylor) | `GoState` GameState impl | `go.py`, `go_game.h` | `src/pruners/go/state.rs` |
-| Legal move generation | `available_actions()` | `go.py:is_legal()`, `go_game.h` | `src/pruners/go/state.rs` |
-| Capture + ko detection | `advance()` + ko tracking | `go.py:play()`, `go_game.h` | `src/pruners/go/state.rs` |
-| Territory scoring | `reward()` via flood fill | `go.py:score()`, `go_game.h` | `src/pruners/go/state.rs` |
-| MCTS PUCT + Dirichlet | Enhance our `mcts_search()` | `mcts.py`, `mcts.h` | `src/pruners/game_state/mcts.rs` |
+| Go board rules (Tromp-Taylor) | `GoState` GameState impl | `go.py`, `go_game.h` | `crates/katgpt-pruners/src/go/state.rs` |
+| Legal move generation | `available_actions()` | `go.py:is_legal()`, `go_game.h` | `crates/katgpt-pruners/src/go/state.rs` |
+| Capture + ko detection | `advance()` + ko tracking | `go.py:play()`, `go_game.h` | `crates/katgpt-pruners/src/go/state.rs` |
+| Territory scoring | `reward()` via flood fill | `go.py:score()`, `go_game.h` | `crates/katgpt-pruners/src/go/state.rs` |
+| MCTS PUCT + Dirichlet | Enhance our `mcts_search()` | `mcts.py`, `mcts.h` | `crates/katgpt-pruners/src/game_state/mcts.rs` |
 | Policy/value dual head | Future: dual-head config | `model.py:GoTransformer` | `crates/katgpt-percepta/src/transformer.rs` |
 | Self-play loop | G-Zero `SelfImprovingCycle` | `self_play.py` | `pruners/g_zero/` |
-| Agent registry pattern | Adapt for Go players | `agents/base.py` | `src/pruners/go/players.rs` |
+| Agent registry pattern | Adapt for Go players | `agents/base.py` | `crates/katgpt-pruners/src/go/players.rs` |
 | REST API game protocol | Rust HTTP client | `play.py` | `src/pruners/go/autogo_client.rs` |
-| Replay data (NPZ → JSONL) | Our ReplayWriter format | `dataset.py`, `gameplay.py` | `src/pruners/go/replay.rs` |
+| Replay data (NPZ → JSONL) | Our ReplayWriter format | `dataset.py`, `gameplay.py` | `crates/katgpt-pruners/src/go/replay.rs` |
 
 ### 6.2 Skip (Not Applicable / Already Better)
 

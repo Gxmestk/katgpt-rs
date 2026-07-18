@@ -155,7 +155,7 @@ is not a clean modelless gain. Deprecation is the honest resolution.
   consumers.
 
 **Actions taken:**
-- `ShardEmbedding` (katgpt-types/crates/katgpt-types/src/sense.rs) + `JlProjectionMatrix`
+- `ShardEmbedding` (crates/katgpt-types/src/sense.rs) + `JlProjectionMatrix`
   (katgpt-core/crates/katgpt-core/src/shard_embedding.rs) marked `#[deprecated]`.
 - Feature gate prose updated: `shard_embedding = []  # DEPRECATED ...`
 - `tests/bench_230_shard_embedding_goat.rs` + `tests/diag_230_embed_dim_sweep.rs`

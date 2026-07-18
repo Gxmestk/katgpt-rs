@@ -24,8 +24,8 @@ We already use sigmoid extensively (SDAR, EGA, SdpaOutputGate, GeGELU) but NOT f
 
 ## Task
 
-- [x] T1: `sigmoid_margin_loss` function in `katgpt-core/src/simd.rs`
-- [x] T2: `compute_retrieval_margin` diagnostic in `katgpt-core/src/simd.rs`
+- [x] T1: `sigmoid_margin_loss` function in `crates/katgpt-dec/src/simd.rs`
+- [x] T2: `compute_retrieval_margin` diagnostic in `crates/katgpt-dec/src/simd.rs`
 - [x] T3: `dim_sufficiency_bound` theoretical bound check
 - [x] T4: GOAT proof (7/7)
 - [x] T5: Feature gate `sigmoid_margin` in Cargo.toml
@@ -157,7 +157,7 @@ After GOAT 7/7 passes:
 ## Module Structure
 
 ```
-katgpt-core/src/simd.rs
+crates/katgpt-dec/src/simd.rs
   ├── sigmoid_margin_loss()     # T1
   ├── compute_retrieval_margin() # T2
   └── dim_sufficiency_bound()   # T3

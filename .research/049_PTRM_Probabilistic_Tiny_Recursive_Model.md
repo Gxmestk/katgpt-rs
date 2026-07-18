@@ -104,7 +104,7 @@ Translation to our system: `DDTreeBranchCache` with more branches (K) >> deeper 
 | Depth scaling (T steps) | `Config.draft_lookahead` | `src/types.rs` | ✅ Configurable T |
 | Rollout selection (best of K) | `extract_best_path()` / `extract_best_path_into()` | `src/speculative/dd_tree.rs` | ✅ Best path extraction |
 | Bandit arm selection | `BanditStrategy::Ucb1 / EpsilonGreedy` | `src/pruners/bandit.rs` | ✅ Multiple strategies |
-| Sigmoid gating | `SdarBanditPruner<P>` with β parameter | `src/pruners/sdar/sdar_bandit.rs:187-196` | ✅ SDAR gate |
+| Sigmoid gating | `SdarBanditPruner<P>` with β parameter | `crates/katgpt-pruners/src/sdar/sdar_bandit.rs:187-196` | ✅ SDAR gate |
 | Pairwise ranking | `BtRank` (Bradley-Terry) | `src/pruners/bt_rank.rs` | ✅ Feature `bt_rank` |
 | Flow-based exploration | `FlowPruner<P>` (GFlowNet) | `src/speculative/flow_pruner.rs:43-52` | ✅ λ-regularized |
 | Feature flag | `elf_sde`, `bandit`, `bt_rank`, `sdar_gate` | `Cargo.toml` features | ✅ All gated |
@@ -493,7 +493,7 @@ PTRM independently validates our existing design:
 | `src/pruners/bandit.rs` | `BanditPruner<P>` with Q-values and strategies |
 | `src/pruners/bt_rank.rs` | `BtRank` Bradley-Terry pairwise ranking |
 | `src/speculative/flow_pruner.rs` | `FlowPruner<P>` GFlowNet flow bonus |
-| `src/pruners/sdar/sdar_bandit.rs` | `SdarBanditPruner<P>` sigmoid-gated bandit |
+| `crates/katgpt-pruners/src/sdar/sdar_bandit.rs` | `SdarBanditPruner<P>` sigmoid-gated bandit |
 | `src/pruners/sdar/sdar_absorb.rs` | `SdarGatedAbsorbCompress<P>` sigmoid-gated absorb-compress |
 | `tests/bench_elf_modelless.rs` | SDE noise benchmarks (diversity + overhead) |
 | `examples/bandit_02_ddtree.rs` | BanditPruner + DDTree integration example |
