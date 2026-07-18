@@ -38,6 +38,7 @@
 //! | Plasma | [`ActionBridgeOracle`](oracles::ActionBridgeOracle) | `action_bridge` | 1.0 |
 //! | Plasma/Hot | [`FlowFieldOracle`](oracles::FlowFieldOracle) | `flow_field_nav` | 1.0 |
 //! | Hot | [`LeoHeadOracle`](oracles::LeoHeadOracle) | `leo_all_goals` | 1.0 |
+//! | Hot | [`DualLeoOracle`](oracles::DualLeoOracle) | `dual_leo` | 1.0 |
 //! | Freeze | [`BfnProxyOracle`](oracles::BfnProxyOracle) | (always) | 0.3 |
 //! | Freeze | [`NoGuidanceOracle`] | `qgf_oracle` | 0.0 |
 //!

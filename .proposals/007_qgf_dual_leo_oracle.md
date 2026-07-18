@@ -1,6 +1,6 @@
 # Proposal 007 — QGF DualLeoOracle (Test-Time LEO+UVFA Q-Gradient Fusion)
 
-Status: **draft** (no precondition — can move to a plan immediately on approval)
+Status: **shipped Phase 1-2 (Plan 467); G5 still deferred to riir-ai**
 Branch: `develop`
 Owner: unassigned
 Fusion of: Plan 268 (QGF LeoHeadOracle) × Plan 155 (DualLeoMixer) × Plan 460 (postmax lesson — linear-in-grad mix)

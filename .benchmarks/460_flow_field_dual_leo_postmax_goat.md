@@ -141,7 +141,7 @@ The variance in `t_leo` itself (1.91ms to 5.47ms — a 2.9× spread on the *base
 
 | Plan / Issue | Status | Connection |
 |---|---|---|
-| Plan 155 (LEO All-Goals) | ✅ DEFAULT-ON SUPER GOAT | Source of `LeoHead` + `DualLeoMixer` traits. Plan 460 adds a 3rd consumer of `DualLeoMixer` (was 2: QuestLeoScorer + Plan 459; now 3) and a new primitive `LeoPotentialGrid::blend_into`. |
+| Plan 155 (LEO All-Goals) | ✅ DEFAULT-ON SUPER GOAT | Source of `LeoHead` + `DualLeoMixer` traits. Plan 460 adds a 3rd consumer of `DualLeoMixer` (was 2: QuestLeoScorer + Plan 459; now 3) and a new primitive `LeoPotentialGrid::blend_into`. **As of Plan 467 (2026-07-18) the consumer count is 4** — `DualLeoOracle` (QGF's 3rd oracle) consumes `DualLeoMixer` at the gradient level, encoding Plan 460's "no operator between mix and consumer" invariant as a doc-comment. |
 | Plan 242 (Fourier Flow Fields) | ✅ DEFAULT-ON | Source of `FlowFieldCache::get_or_compute`. Plan 460 adds `compute_from_grid` (refactored tail), `get_or_compute_dual_postmax` (recommended dual path), and `LeoPotentialGrid::blend_into`. |
 | Plan 268 (QGF) | ✅ (opt-in) | `LeoHeadOracle` consumes `LeoHead`. A future `DualLeoOracle` would be a sibling — out of scope here (see Follow-up). |
 | Plan 459 (pre-max dual fusion) | ✅ DONE — honest demotion, now DEMOTED to compatibility | Plan 459's pre-max `get_or_compute_dual` stays landed but is no longer the recommended dual path. Plan 460 is the recommended path. The two-failed-gates stop rule did NOT trigger — Plan 460 crossed G5' where Plan 459 could not. |

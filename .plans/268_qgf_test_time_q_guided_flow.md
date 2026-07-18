@@ -4,6 +4,8 @@
 **Paper:** [arXiv:2606.11087](https://arxiv.org/pdf/2606.11087) — Q-Guided Flow (Zhou et al., 2026)
 **Status:** 🚧 Phase 1–4 implemented, Phase 5 katgpt-core mechanism gate DONE (2026-07-01), Phase 6 docs DONE (2026-07-01). Tests green. **Phase 5 katgpt-core mechanism gate DONE 2026-07-01** (G1 correctness + G2 regression-safety + G3 no-regression + G4 overhead/alloc + G5 stability all PASS, see `.benchmarks/268_qgf_goat.md`); downstream task-quality gates (Sudoku/DDTree/Bomber) **deferred to riir-ai** as the selling-point layer. Phase 6 T13 docs shipped (README + `.docs/01_overview.md` + 3 runnable examples). Stays opt-in until a riir-ai plan proves the downstream gain.
 **Branch:** `develop` (no new feature branch per project rules)
+
+> **Sibling: Plan 467 `DualLeoOracle`** (2026-07-18) — QGF's 3rd `QGradientOracle` impl, fusing LEO teacher + UVFA student via `DualLeoMixer::combine_into` at the gradient level. Encodes Plan 460's "no operator between mix and consumer" invariant as a doc-comment. Plan 268 stays opt-in; Plan 467 inherits that stance. See `.plans/467_qgf_dual_leo_oracle.md` + `.benchmarks/467_qgf_dual_leo_oracle_goat.md` (G1–G4 PASS mechanistic; G5 deferred to riir-ai).
 **Feature Gates:** `qgf` (parent, default OFF until GOAT proof)
   - `qgf_projector` (F2 — FirstOrderProjector)
   - `qgf_oracle` (F3 — QGradientOracle trait)
