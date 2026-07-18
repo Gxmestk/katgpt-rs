@@ -1,4 +1,4 @@
-# Plan 385 — Unblock `dense_mesh/node_transformer.rs` by extracting `forward` to `katgpt-forward`
+# Plan 385 — Unblock `crates/katgpt-forward/src/dense_mesh_node_transformer.rs` by extracting `forward` to `katgpt-forward`
 
 **Started:** 2026-07-05
 **Status:** CLOSED
@@ -7,7 +7,7 @@
 
 ## Motivation
 
-Plan 384 (Phase 14) closed with `dense_mesh/node_transformer.rs` (334 LOC) flagged as the
+Plan 384 (Phase 14) closed with `crates/katgpt-forward/src/dense_mesh_node_transformer.rs` (334 LOC) flagged as the
 next-session candidate for re-audit. The documented blocker was
 `crate::transformer::forward` (the cognitive-primitive composer). Re-audit confirms:
 
@@ -56,7 +56,7 @@ next-session candidate for re-audit. The documented blocker was
 - [x] **T5** — Update root `Cargo.toml` features: `domain_latent` and `kog_cpu_fusion`
   forward to `katgpt-forward` (so the cfg-gated code paths in katgpt-forward compile
   when root enables these features).
-- [x] **T6** — Moved `src/dense_mesh/node_transformer.rs` →
+- [x] **T6** — Moved `crates/katgpt-forward/src/dense_mesh_node_transformer.rs` →
   `crates/katgpt-forward/src/dense_mesh_node_transformer.rs`. Update imports:
   `crate::transformer::{forward, ForwardContext, MultiLayerKVCache, TransformerWeights}`
   → `crate::{forward::forward, ForwardContext}` (ForwardContext is already in katgpt-forward)

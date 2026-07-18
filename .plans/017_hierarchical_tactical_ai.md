@@ -242,7 +242,7 @@ examples/
   - [x] Check reachability via A*
 
 ### Phase 3: Hierarchical Solver ✅
-- [x] Create `examples/tactical_ai.rs`
+- [x] Create `examples/tactical_01_ai.rs`
 - [x] Design 17×16 dungeon map with 3 monsters, 3 treasures, walls, corridors
 - [x] Implement target enumeration from map
 - [x] Build marginals (uniform BFS — pruner does all the work)
@@ -252,7 +252,7 @@ examples/
 - [x] Assert solution correctness
 
 ### Phase 4: TUI Visualization ✅
-- [x] Create `examples/tactical_ai_tui.rs`
+- [x] Create `examples/tactical_06_tui.rs`
 - [x] Solve with segment tracking (target sequence + per-segment A* paths)
 - [x] Show strategic plan (target order with ✓/▶/· status) in sidebar
 - [x] Highlight current target on map
@@ -265,7 +265,7 @@ examples/
 
 ### Phase 5: Polish ✅
 - [x] ~~Add cost/stamina model~~ → Done in plan 018 (terrain costs, total_cost, weighted A*)
-- [x] Benchmark: strategic solve vs brute-force DDTree → `examples/tactical_bench.rs`
+- [x] Benchmark: strategic solve vs brute-force DDTree → `examples/tactical_05_bench.rs`
 - [x] Verify 16×16 map solvability with different layouts → Arena + Corridor maps verified
 - [x] Update `.handovers` → `.handovers/013_tactical_ai_tui.md`
 - [x] Commit and clean up

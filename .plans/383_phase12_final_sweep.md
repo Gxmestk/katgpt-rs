@@ -191,7 +191,7 @@ Ordered by (a) clean dep surface, (b) per-cluster LOC, (c) blast radius.
 |---|---:|---|---|
 | `benchmark/` + `plot.rs` | ~6.9K | 33 `forward*` calls across 6 files + 5 root modules (speculative/, hla/, pruners/, dllm*, breakeven/, inference_backend) | Move the root modules first, then either move transformer.rs forward family (out of scope) or rewrite benchmark to call leaf-resident forward variants |
 | `sleep/` | 707 | Phase 7 blocker: ForwardContext + crate::gdn2 root deps | forward family + gdn2 relocate first |
-| `dense_mesh/node_transformer.rs` | 334 | Calls root `crate::transformer::forward` composer | transformer.rs linchpin move (out of scope) |
+| `crates/katgpt-forward/src/dense_mesh_node_transformer.rs` | 334 | Calls root `crate::transformer::forward` composer | transformer.rs linchpin move (out of scope) |
 | `crates/katgpt-speculative/src/distill/trd.rs` + `crates/katgpt-speculative/src/distill/mod.rs` | 1142 | chain_fold-gated prefold_prefix depends on `crate::fold` | fold moves first (this plan T4.5 — TRD unblocks after) |
 | `sparse_compose.rs` (revisit) | — | was DEFER; now MOVE-eligible (sparse_task_vector in katgpt-sparse since Phase 11) | unblocked |
 | `vocab_channel_pruner.rs` | 2048 | Gated `lattice_operad` feature path needs `crate::lattice_operad` | lattice_operad moves first (this plan T4.4 — unblocks after) |

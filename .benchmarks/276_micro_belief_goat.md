@@ -191,7 +191,7 @@ cargo test -p katgpt-core --no-default-features \
 - **Code:**
   - `katgpt-rs/crates/katgpt-micro-belief/src/coherence_bench.rs` — G2.1 harness.
   - `katgpt-rs/crates/katgpt-micro-belief/src/latent_thought.rs` — Family B + G1.6.
-  - `katgpt-rs/crates/katgpt-core/src/micro_belief/tests.rs` — G1.1–G1.5.
+  - `crates/katgpt-micro-belief/src/tests.rs` — G1.1–G1.5.
 
 ---
 

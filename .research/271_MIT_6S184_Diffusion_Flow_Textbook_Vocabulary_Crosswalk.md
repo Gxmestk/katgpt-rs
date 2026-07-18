@@ -44,7 +44,7 @@ Future diffusion/score/flow-matching research notes should grep this crosswalk f
 | MIT 6.S184 term | Codebase equivalent | Where it ships / is framed |
 |---|---|---|
 | Vector field `u_θ_t(x)` | `SpeculativeGenerator::generate()` velocity | `katgpt-rs/src/speculative/` |
-| Flow / ODE simulation (Euler) | Drafter step / dflash predict | `katgpt-rs/src/speculative/dflash.rs` |
+| Flow / ODE simulation (Euler) | Drafter step / dflash predict | `crates/katgpt-forward/src/dflash.rs` |
 | SDE / Euler-Maruyama (`+ σ_t √h ε`) | SDE noise injection (overhead benchmarked, NOT a runtime knob) | `katgpt-rs/tests/bench_elf_modelless.rs::bench_sde_noise_injection_overhead` |
 | Score function `∇ log p_t(x)` | Latent direction vector (HLA projection / functor) | `katgpt-rs/crates/katgpt-core/src/sense/`, `riir-ai/.../latent_functor/` |
 | Score matching (denoising) | `NoiseSchedule` mask ratios, `denoise_loop` | `riir-ai/crates/riir-engine/src/transformer/dllm.rs` |

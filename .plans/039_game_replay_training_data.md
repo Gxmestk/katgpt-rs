@@ -132,7 +132,7 @@ Each line is one `(board_state, action, quality)` sample:
   - Only dump winning episodes (score > threshold) or top-N by score
   - This is the primary data source for training — 1000 rounds, filtered quality
 
-- [x] **Task 6: Standalone replay generator** (`examples/bomber_04_replay_gen.rs` — NEW)
+- [x] **Task 6: Standalone replay generator** (`examples/bomber_05_replay_gen.rs` — NEW)
   - Dedicated example for generating training data
   - Runs 1000 rounds with default 4 players
   - Filters: only dump P3/P4 winning episodes
@@ -180,7 +180,7 @@ Each line is one `(board_state, action, quality)` sample:
 | `src/pruners/bomber/mod.rs` | Edit | Add `pub mod replay;` |
 | `examples/bomber_01_arena.rs` | Edit | Add `--replay-dir` flag, optional replay dump |
 | `examples/bomber_03_hl_proof.rs` | Edit | Add `--replay-dir`, filtered P3/P4 winning episodes |
-| `examples/bomber_04_replay_gen.rs` | NEW | Dedicated replay generator, 1000 rounds, quality-filtered |
+| `examples/bomber_05_replay_gen.rs` | NEW | Dedicated replay generator, 1000 rounds, quality-filtered |
 
 ### riir-ai (secrets — training)
 

@@ -241,7 +241,7 @@ Goal: entropy-thresholded, bandit-tuned online compaction for thinking traces.
 
 ### Tasks
 
-- [x] **T6.1** Implement `src/attn_match/adaptive_cot.rs` (802 lines):
+- [x] **T6.1** Implement `src/attn_match_adaptive_cot.rs` (802 lines):
   - [x] `AdaptiveTraceCompactor` (composes `OnlineCompactor` + `FrequencyBandit`; ChainFolder has no trait so composition used instead of inheritance)
   - [x] Entropy monitoring via `observe_entropy(&[f32]) -> f32` — computes `H = -Σ p_i ln p_i` from logits, EMA-smoothed
   - [x] Thresholds: `theta_low` (compact when EMA entropy < low), `theta_high` (preserve when > high), `max_compacts` cap

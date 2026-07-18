@@ -513,7 +513,7 @@ The existing `attention_head` already accepts `t_n: usize` (number of KV positio
   - `test_no_lora_matches_existing_forward`: forward with `None` matches old behavior
   - `test_generate_with_prefill_produces_tokens`: end-to-end generates valid tokens
 
-- [x] **Task 10: Benchmark** (`examples/bidirectional_prefill_demo.rs`)
+- [x] **Task 10: Benchmark** (`examples/core_04_prefill.rs`)
   - Benchmark `forward_prefill` vs sequential `forward` for same prompt length
   - Measure: time per prefill, cache population correctness
   - Compare: causal prefill (N calls to `forward`) vs bidirectional prefill (one `forward_prefill`)

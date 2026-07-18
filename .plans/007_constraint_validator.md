@@ -686,7 +686,7 @@ Plan 009 will cover:
 
 ### Phase 3: Integration & Validation
 
-- [x] 3.1 Create example: `examples/validator_demo.rs` (behind `validator` feature, previously `clora`)
+- [x] 3.1 Create example: `examples/core_01_validator.rs` (behind `validator` feature, previously `clora`)
 - [x] 3.2 Demo shows: BPE encode → draft → SynPruner → syn validate → output
 - [x] 3.3 Run baseline benchmark (no Deterministic Validator) → `bench/027_bench_result.png`
 - [x] 3.4 Run Deterministic Validator benchmark (with SynPruner) → `bench/030_bench_result.png`
@@ -737,7 +737,7 @@ validator = ["syn", "proc-macro2"]  # previously clora
 | `crates/katgpt-validator/src/types.rs` | New | 2 | No |
 | `crates/katgpt-validator/src/partial_parser.rs` | New | 2 | No |
 | `crates/katgpt-validator/src/syn_pruner.rs` | New | 2 | No |
-| `examples/validator_demo.rs` | New | 3 | No |
+| `examples/core_01_validator.rs` | New | 3 | No |
 | `src/benchmark/mod.rs` | Add BPE + validator benches | 1-3 | No |
 
 ## References

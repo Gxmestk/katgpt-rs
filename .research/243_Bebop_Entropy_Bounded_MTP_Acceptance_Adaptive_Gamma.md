@@ -85,7 +85,7 @@ The novel training objective `L_TV = 1 − Σ_v min(p_v, q_v)` directly optimize
 | Entropy → verification budget | `llmexec_guard` (`crates/katgpt-core/src/llmexec_guard.rs`): `sigmoid(-steepness·(entropy−0.5) + depth_bonus)` → `VerifyTier::{Skip, Screening, FullVerify}` | ⚠️ shipped but **ad-hoc sigmoid**, not the paper's **proven linear α forecast** |
 | Entropy-spike detection | `RejectionReason::EntropySpike` in `crates/katgpt-speculative/src/distill/trd.rs:56`, gated by `entropy_threshold` | ✅ shipped |
 | Acceptance-rate bandit reward | `freq_bandit` (`crates/katgpt-pruners/src/freq_bandit.rs:315`, "reward = acceptance_rate × latency_improvement"), `fold_bandit`, `meta_router` (`crates/katgpt-attn/src/dash_attn/meta_router.rs:206`) | ✅ shipped |
-| EMA entropy tracking | `AdaptiveTraceCompactor::observe_entropy` (`src/attn_match/adaptive_cot.rs:159`), `α=0.1` EMA | ✅ shipped (for KV compaction, not spec-decode γ) |
+| EMA entropy tracking | `AdaptiveTraceCompactor::observe_entropy` (`src/attn_match_adaptive_cot.rs:159`), `α=0.1` EMA | ✅ shipped (for KV compaction, not spec-decode γ) |
 | TV distance / Pinsker | `verify_pinsker_bound` in `riir-train/crates/riir-train-engine/src/critical_position.rs:177` | ✅ shipped in **riir-train** (training-side, correct repo) |
 
 ### 2.2 What's NOT in katgpt-rs (the gap)
@@ -190,9 +190,9 @@ Zero-allocation. O(vocab) per step only for the entropy computation (which `Adap
 
 ## 5. Cross-References
 
-- `katgpt-rs/src/speculative/verifier.rs` — `LeviathanVerifier` (RS already shipped)
+- `crates/katgpt-forward/src/verifier.rs` — `LeviathanVerifier` (RS already shipped)
 - `katgpt-rs/crates/katgpt-core/src/llmexec_guard.rs` — entropy→tier sigmoid (to be upgraded or demoted)
-- `katgpt-rs/src/attn_match/adaptive_cot.rs` — `AdaptiveTraceCompactor::observe_entropy` (EMA entropy helper to reuse)
+- `src/attn_match_adaptive_cot.rs` — `AdaptiveTraceCompactor::observe_entropy` (EMA entropy helper to reuse)
 - `katgpt-rs/crates/katgpt-pruners/src/freq_bandit.rs` — acceptance_rate bandit reward (forecast becomes prior)
 - `katgpt-rs/crates/katgpt-speculative/src/distill/trd.rs` — `RejectionReason::EntropySpike` (entropy threshold gate)
 - `riir-train/crates/riir-train-engine/src/critical_position.rs` — `verify_pinsker_bound` (TV-distance training infra)

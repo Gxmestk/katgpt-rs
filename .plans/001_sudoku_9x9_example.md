@@ -1,7 +1,7 @@
 # Plan 001: 9×9 Sudoku Example with Streaming Thinking
 
 ## Goal
-Create a runnable `examples/sudoku_9x9.rs` that demonstrates the Deterministic Validator concept
+Create a runnable `examples/sudoku_01_9x9.rs` that demonstrates the Deterministic Validator concept
 by solving a 9×9 Sudoku puzzle with streaming "thinking" output — matching the web demo
 experience shown in the Percepta blog.
 
@@ -28,7 +28,7 @@ experience shown in the Percepta blog.
   - Returns only valid (digit, prob) pairs — invalid ones removed
   - This is the bridge between LLM drafting and deterministic rules
 
-- [x] **T3: Create `examples/sudoku_9x9.rs`**
+- [x] **T3: Create `examples/sudoku_01_9x9.rs`**
   - Load the Arto Inkala puzzle (21 clues)
   - Show initial board with clue count
   - Stream "thinking" output during solve (concise ~25 lines)
@@ -63,7 +63,7 @@ experience shown in the Percepta blog.
   - 10 new tests: NoPruner, SudokuPruner, pruned tree size, valid-only guarantee
 
 - [x] **T7: End-to-end Sudoku speculative decoding example**
-  - Create `examples/sudoku_speculative.rs`
+  - Create `examples/sudoku_02_speculative.rs`
   - Simulated draft model marginals (uniform over valid digits)
   - DDTree comparison: without vs with Deterministic Validator pruning
   - Results: **52% valid unpruned → 100% valid pruned** (48 invalid branches eliminated)

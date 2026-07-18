@@ -90,7 +90,7 @@ of Q-value. This bridges RL with the existing constraint pruning architecture.
 | `src/pruners/mod.rs` | Edit | Add `bandit` module + re-exports |
 | `src/lib.rs` | Edit | No changes needed (re-exported via pruners) |
 | `Cargo.toml` | Edit | Add `bandit = []` feature, example entry |
-| `examples/bandit_demo.rs` | Create | 5-armed Bernoulli demo with regret plot |
+| `examples/bandit_01_basic.rs` | Create | 5-armed Bernoulli demo with regret plot |
 | `README.md` | Edit | Add Bandit section |
 
 ## Design Decisions

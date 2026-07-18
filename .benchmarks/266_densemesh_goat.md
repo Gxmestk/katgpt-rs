@@ -159,7 +159,7 @@ T4: compute_router::pick_compute() dispatch latency: 0.00 ns/call (inlined) ✅
 
 | File | Tests | Status |
 |---|---|---|
-| `src/dense_mesh/node_transformer.rs` | `test_transformer_node_basic_forward`, `test_transformer_node_repeated_forward_safe`, `test_transformer_node_hidden_dim_is_vocab_size` | 3/3 ✅ |
+| `crates/katgpt-forward/src/dense_mesh_node_transformer.rs` | `test_transformer_node_basic_forward`, `test_transformer_node_repeated_forward_safe`, `test_transformer_node_hidden_dim_is_vocab_size` | 3/3 ✅ |
 | `tests/dense_mesh_goat_gates.rs` | `test_dense_mesh_gate2_composition_differs_from_single_lora`, `test_dense_mesh_gate3_easy_overhead_vs_vanilla`, `test_dense_mesh_gate4_hard_bound_width4_measured` (ignored), `test_dense_mesh_gate5_bandit_convergence` | 3/3 + 1 measured ✅ |
 
 **Pre-existing tests still pass:** 48 lib tests in `dense_mesh::*`, 5 prof tests.

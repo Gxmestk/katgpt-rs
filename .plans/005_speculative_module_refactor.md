@@ -157,4 +157,4 @@ mod.rs           ← re-exports everything
 | `crates/katgpt-pruners/src/sudoku_pruner.rs` | New — SudokuPruner (sudoku feature) |
 | `Cargo.toml` | Add `sudoku = []` feature |
 | `src/benchmark/mod.rs` | Possibly update imports |
-| `examples/sudoku_speculative.rs` | Possibly add feature gate |
+| `examples/sudoku_02_speculative.rs` | Possibly add feature gate |

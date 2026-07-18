@@ -41,11 +41,11 @@ showing the grid filling step-by-step as the solver explores and backtracks.
 - `crossterm` — terminal backend (ratatui dependency)
 
 ## Files to Create
-- `examples/sudoku_tui.rs` — single-file TUI example (~500 lines)
+- `examples/sudoku_03_tui.rs` — single-file TUI example (~500 lines)
 
 ## Tasks
 - [x] T1: Add `ratatui` + `crossterm` to `[dev-dependencies]` in Cargo.toml
-- [x] T2: Create `examples/sudoku_tui.rs` with TUI scaffold
+- [x] T2: Create `examples/sudoku_03_tui.rs` with TUI scaffold
 - [x] T3: Implement channel-based solver thread for 9x9 mode
 - [x] T4: Implement Sudoku grid widget with color-coded cells
   - Green: clue (given)

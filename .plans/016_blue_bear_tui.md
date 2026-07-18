@@ -12,8 +12,8 @@ Additionally, refactor `sudoku_pruner` from `speculative/` into the new `pruners
 - [x] Update `src/speculative/mod.rs` — remove module, keep backward-compatible re-export via `crate::pruners`
 - [x] Update example imports (`sudoku_speculative.rs`, `sudoku_tui.rs`) to use `katgpt_rs::pruners::SudokuPruner`
 - [x] Update `src/lib.rs` to include `pub mod pruners;`
-- [x] Create `examples/blue_bear.rs` — non-TUI solver/benchmark with emoji output
-- [x] Create `examples/blue_bear_tui.rs` with:
+- [x] Create `examples/bear_01_demo.rs` — non-TUI solver/benchmark with emoji output
+- [x] Create `examples/bear_02_tui.rs` with:
   - [x] Emoji map rendering (🐻=Bear, 👹=Monster, 💎=Treasure, 🚪=Goal, 🧱=Wall, ◼️=Floor, 🔑=Item)
   - [x] TUI with ratatui + crossterm
   - [x] Step-by-step solution navigation with Next/Back buttons

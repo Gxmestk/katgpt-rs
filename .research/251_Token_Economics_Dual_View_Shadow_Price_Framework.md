@@ -110,7 +110,7 @@ The two-layer grep (notes + code) confirms the following paper mechanisms are al
 | **Cross-context KV cache reuse** (KVComm [112], TokenDance [4]) | ShardKV RoPE-strip + Still Perceiver un-rotate | `katgpt-rs/crates/katgpt-kv/src/shard_kv/rope.rs` + `riir-ai` Plan 213 | Shipped (GOAT) |
 | **Per-KV-group sigmoid gating** (Q-KVComm adaptive layer-wise quant) | SP-KV `soft_gate_bias` + EGA spectral salience | `katgpt-rs/crates/katgpt-kv/src/sp_kv/utility_predictor.rs` + `ega_attn.rs` | Shipped |
 | **Token density / latent reasoning** (Coconut [47], Compressed CoT [43]) | MUX multiplexed latent reasoning + NITP next implicit token + SwiReasoning switch | `.research/158, 113, 241` | Shipped |
-| **Procedure cost model** (Subterranean-style compile-vs-in-context tradeoff) | `ProcedureCostModel` with `break_even_inferences()` and `cost_ratio_vs_in_context()` | `katgpt-rs/src/pruners/subterranean/cost_model.rs` | Shipped |
+| **Procedure cost model** (Subterranean-style compile-vs-in-context tradeoff) | `ProcedureCostModel` with `break_even_inferences()` and `cost_ratio_vs_in_context()` | `crates/katgpt-pruners/src/subterranean/cost_model.rs` | Shipped |
 
 ### 2.3 What's genuinely MISSING (the novel gap)
 

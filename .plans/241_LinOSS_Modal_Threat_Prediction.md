@@ -85,8 +85,8 @@ pub struct CombatRhythmTracker {
 
 | Component | File | Change |
 |-----------|------|--------|
-| `SpectralThreatFeatures` | `katgpt-core/src/sense/spectral_threat.rs` | New file |
-| `CombatRhythmTracker` | `katgpt-core/src/sense/spectral_threat.rs` | New file |
+| `SpectralThreatFeatures` | `crates/katgpt-core/src/sense_threat.rs` | New file |
+| `CombatRhythmTracker` | `crates/katgpt-core/src/sense_threat.rs` | New file |
 | `SenseKind` | `katgpt-core/src/types.rs` | Add `SpectralThreat` variant (discriminant 6) |
 | `NpcBrain` | `katgpt-core/src/sense/brain.rs` | No change — tracker is a sense module |
 | `ThreatHeuristic` | `src/benchmark/heuristic.rs` | Optional `spectral: Option<SpectralThreatFeatures>` field |
@@ -98,7 +98,7 @@ pub struct CombatRhythmTracker {
 ## Tasks
 
 ### T1: Core Types — `SpectralThreatFeatures`
-- [x] Create `crates/katgpt-core/src/sense/spectral_threat.rs` behind `#[cfg(feature = "spectral_threat")]`
+- [x] Create `crates/katgpt-core/src/sense_threat.rs` behind `#[cfg(feature = "spectral_threat")]`
 - [x] Define `SpectralThreatFeatures` struct (4 × f32, `repr(C)`, 16 bytes)
 - [x] Implement `SpectralThreatFeatures::dodge_urgency(&self) -> f32` — sigmoid composite of frequency × phase
   - High frequency + phase near 0.0 → urgency near 1.0 (dodge NOW)

@@ -26,7 +26,7 @@ These gaps mean: training may produce incorrect gradients, distillation quality 
 |---|-------|-------|--------|
 | 00 | Neuro-Symbolic Architecture | `katgpt-rs/src/speculative/` | ✅ DFlash, DDTree, Percepta |
 | 01 | Advanced Neuro-Symbolic | `katgpt-rs/crates/katgpt-percepta/src/transformer.rs` | ✅ PagedKV, GQA, SIMD hints |
-| 02 | Speculative Decoding (Leviathan) | `katgpt-rs/src/speculative/verifier.rs` | ✅ Full rejection sampling |
+| 02 | Speculative Decoding (Leviathan) | `crates/katgpt-forward/src/verifier.rs` | ✅ Full rejection sampling |
 | 03 | Commercial Strategy | 4-repo architecture split | ✅ Engine/Fuel separation |
 | 04 | LoRA Architecture | `crates/katgpt-types/src/lora.rs` | ✅ 6 targets/layer, BLAKE3 |
 | 05 | Artifact Definition | `riir-validator-sdk/` | ✅ 10 WASM validators |

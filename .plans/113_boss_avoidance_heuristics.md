@@ -128,7 +128,7 @@ counterproductive because your avoidance patterns become predictable too.
 | File | Changes |
 |------|---------|
 | `examples/tactical_10_fog_bench.rs` | FogState boss tracking, dodge_boss_if_adjacent |
-| `examples/tactical_09_fog.rs` | Same changes for TUI version |
+| `examples/tactical_09_fog_tui.rs` | Same changes for TUI version |
 | `.plans/104_fog_of_war_exploration.md` | Mark boss avoidance task complete |
 
 ## Future Work

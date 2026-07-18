@@ -105,7 +105,7 @@ else:
 
 - [x] Add `metal = { version = "0.33", optional = true }` to macOS dependencies
 - [x] Add `gpu_inference = ["dep:metal"]` feature flag
-- [x] Create `src/gpu_backend.rs` behind `#[cfg(all(target_os = "macos", feature = "gpu_inference"))]`
+- [x] Create `crates/katgpt-backend/src/gpu.rs` behind `#[cfg(all(target_os = "macos", feature = "gpu_inference"))]`
 - [x] Implement `GpuBackend`:
   - [x] `compile()`: take `TransformerWeights`, build Metal compute pipeline for matmul + attention + FFN
   - [x] `forward()`: dispatch to GPU, wait for completion, return logits

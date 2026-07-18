@@ -89,7 +89,7 @@ Solution: 8 steps, total cost = 8 (varies by terrain path chosen)
 ## Files Modified
 - `crates/katgpt-pruners/src/tactical_pruner.rs` — `total_cost` in GameState, `terrain_cost()`, cost accumulation in `apply_action`
 - `crates/katgpt-pruners/src/pathfinder.rs` — `terrain_cost()`, weighted A* g-score, new test
-- `examples/blue_bear_tui.rs` — animated rendering, cost display, new map, auto-play, gap-based animation
+- `examples/bear_02_tui.rs` — animated rendering, cost display, new map, auto-play, gap-based animation
 
 ## Verification
 - ✅ `cargo clippy --examples` — zero warnings

@@ -182,7 +182,7 @@ T4.2 (`closure_wire.rs`) and T4.3 (`closure_mining.rs`) are already shipped.
 - GOAT test: `tests/bench_290_closure_instrument_goat.rs` (10 tests, all pass)
 - Feature flag: now in `default` of root `Cargo.toml` and `crates/katgpt-core/Cargo.toml`
 - Re-exports: `crates/katgpt-core/src/lib.rs`
-- Runtime wiring: `crates/katgpt-pruners/src/closure_wire.rs` (`PtgTracedPruner`) + `src/closure_mining.rs` (sleep-cycle hook)
+- Runtime wiring: `crates/katgpt-pruners/src/closure_wire.rs` (`PtgTracedPruner`) + `crates/katgpt-core/src/closure/mining.rs` (sleep-cycle hook)
 
 ## TL;DR
 
