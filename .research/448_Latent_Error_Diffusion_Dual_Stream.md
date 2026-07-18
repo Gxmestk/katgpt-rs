@@ -116,7 +116,7 @@ n_new += η · n_old · (−U_p)                        # sign-symmetric inhibit
 | Paper concept | Codebase analog | Source |
 |---|---|---|
 | Dual-stream `(p, n)` latent state | AHLA recurrent state, HLA per-NPC belief state | `katgpt-core/src/sense/`, Plan 276 MicroRecurrentBeliefState |
-| Four non-negative projection matrices | Committed direction vectors (BLAKE3-hashed) | `riir-neuron-db/src/shard.rs`, Plan 297 PersonalityWeightedComposition |
+| Four non-negative projection matrices | Committed direction vectors (BLAKE3-hashed) | `riir-neuron-db/src/shard/mod.rs`, Plan 297 PersonalityWeightedComposition |
 | Modulo routing `M[h,c]` | Per-action latent channel assignment | (novel — closest cousin is plan 303 SalienceTriGate's per-action delegation) |
 | Layer-specific sigmoid width α | Sigmoid saturation parameter | AGENTS.md mandates sigmoid (never softmax); α is the inverse-temperature |
 | Batch-centered class error | Centered reward prediction error | CLR vote (Plan 284), Salience Tri-Gate (Plan 303) |

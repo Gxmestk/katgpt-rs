@@ -94,7 +94,7 @@ This is the substrate. Everything else in the paper layers trained weights on to
 | Layer | Artifact | Match to FNO primitive |
 |---|---|---|
 | Code | `katgpt-rs/crates/katgpt-core/src/cross_resolution.rs` | **`transport_cross_resolution_into` = FNO super-resolution / cross-resolution spectral transport.** Frozen BLAKE3-committed basis pair `(Φ_src, Ψ_dst)`, k-dim spectral projection, reconstruct at any dim. DEFAULT-ON. **The headline FNO inference primitive.** |
-| Code | `katgpt-rs/crates/katgpt-core/src/funcattn.rs` | FUNCATTN = spectral attention with frozen bases (Research 257/290). SpectralConv-equivalent. |
+| Code | `katgpt-rs/crates/katgpt-core/src/funcattn/mod.rs` | FUNCATTN = spectral attention with frozen bases (Research 257/290). SpectralConv-equivalent. |
 | Code | `katgpt-rs/crates/katgpt-core/src/flow/fft.rs` | `fft_smooth` with Nyquist-cutoff low-pass on potential fields. FNO spectral downsampling for periodic grids. |
 | Code | `katgpt-rs/crates/katgpt-pruners/src/freq_bandit.rs::token_stream_spectrum` | DFT up to Nyquist. FNO power-spectrum diagnostic. |
 | Code | `katgpt-rs/crates/katgpt-spectral/src/spectral_kv_cache.rs` | Eigenbasis KV compression (Research 039). SpectralConv applied to KV cache. |

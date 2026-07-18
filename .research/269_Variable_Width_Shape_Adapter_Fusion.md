@@ -50,7 +50,7 @@ The paper proposes a `×`-shaped transformer (wide early/late, narrow middle) wi
 | MLP participation ratio per layer | **`participation_ratio`** `d_eff = (Σλ)²/Σ(λ²)` | SpectralQuant, P078, default-on, GOAT-proven | Metric |
 | Attention sinks / compression valleys | **Sink-Aware Attention** (targets the de Llano 2026 finding the paper cites) | P287, R258 (deferred for latency; diagnostic ships) | Head |
 | Per-module energy profile of adapter | **`ModuleEnergyProfile::PAPER_AVERAGE { ffn, attn, embed, other }`** | `src/inference_router/router_compute_target.rs`, R231 (OPD) | Module-type |
-| Per-adapter shape descriptor | **`AdapterShape { rank, in_dim, out_dim }`** | `riir-ai/crates/riir-gpu/src/optimizer_amuse.rs` | Static per-adapter |
+| Per-adapter shape descriptor | **`AdapterShape { rank, in_dim, out_dim }`** | `riir-ai/crates/riir-gpu/src/optimizer_amuse/mod.rs` | Static per-adapter |
 | Per-snapshot metadata + atomic swap | **`SnapshotMeta { blake3_hash, n_layers, ... }`**, `LoRAHotSwap`, `SenseHotSwap`, `KernelHotSwap` | `riir-ai/crates/riir-engine/src/snapshot.rs`, P276, P279 | Snapshot |
 
 **The gap:** every shipped cousin is either (a) per-module-type (OPD: FFN vs Attn), (b) per-adapter-static (`AdapterShape`: fixed rank per adapter), or (c) per-layer-intrinsic (Hydra: skip based on the *base model's* profile). **Nothing characterizes an adapter by its per-LAYER shape profile** — which layers it concentrates capacity in vs suppresses. That is the dimension `> <former` operates on, and it's orthogonal to all three shipped axes.
@@ -200,7 +200,7 @@ Issue 034 closed (2026-06-20) with **both Q1.a (PRIMARY) and Q1.a' (SECONDARY) s
   - `katgpt-rs/.research/266_DenseMesh_Latent_Node_Network.md` — topology-level width adaptation; the layer-level version is the gap
   - `katgpt-rs/.research/258_Attention_Sink_Dual_Mechanism_NOP_Broadcast.md` — same compression-valley phenomenon
 - **Runtime plumbing:** `riir-ai/crates/riir-engine/src/snapshot.rs::SnapshotMeta` (extend with per-layer profile), `riir-ai/crates/riir-engine/src/episode_buffer.rs::LoRAHotSwap` (atomic swap by shape profile).
-- **Training side:** `riir-ai/crates/riir-gpu/src/optimizer_amuse.rs::AdapterShape` (currently static per-adapter; would need a per-layer variant).
+- **Training side:** `riir-ai/crates/riir-gpu/src/optimizer_amuse/mod.rs::AdapterShape` (currently static per-adapter; would need a per-layer variant).
 
 ## TL;DR
 

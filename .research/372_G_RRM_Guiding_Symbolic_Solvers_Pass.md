@@ -153,7 +153,7 @@ The §3.6 rule warns: *"A PASS verdict backed only by architectural reasoning is
 - `katgpt-rs/crates/katgpt-core/src/cgsp/traits.rs` — `Solver`, `HintDeltaBandit`, `DifficultyFilter`, `BatchQualityGate`, `CollapseSignal`
 - `katgpt-rs/crates/katgpt-pruners/src/sudoku_pruner.rs` — `SudokuPruner::new_mrv` (Issue 005 Option A, MRV cell ordering), `latent_marginals` (Issue 005 Option B, modelless per-cell prior)
 - `katgpt-rs/benches/sudoku_speculate_bench.rs` — three solver regimes (`backtrack` / `speculate_iterative` / `speculate_oneshot`)
-- `katgpt-rs/crates/katgpt-percepta/src/legacy.rs` — `Sudoku9x9::solve` (the ground-truth complete solver)
+- `katgpt-rs/crates/katgpt-percepta/src/legacy/mod.rs` — `Sudoku9x9::solve` (the ground-truth complete solver)
 
 **Routed elsewhere:**
 - SE-RRM training → riir-train (out of scope for this workflow)

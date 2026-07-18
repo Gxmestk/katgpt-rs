@@ -287,7 +287,7 @@ New compute shader implementing Algorithm 2's inner product estimator:
 // 6. score = mse + qjl (unbiased)
 ```
 
-Plus Rust bindings in `riir-ai/crates/riir-gpu/src/forward.rs`:
+Plus Rust bindings in `riir-ai/crates/riir-gpu/src/forward/mod.rs`:
 - New `dispatch_attention_tq()` method
 - Upload codebook, rotation, QJL as storage buffers
 - Upload bit-packed indices + norms as storage buffers
@@ -358,11 +358,11 @@ Refs: .research/020_TurboQuant_Online_Vector_Quantization.md"
 | File | Change |
 |------|--------|
 | `katgpt-rs/src/lib.rs` | Add `pub mod turboquant;` |
-| `katgpt-rs/src/benchmark.rs` | Add `bench_turboquant_vs_flat_cache`, `bench_turboquant_quality` |
+| `katgpt-rs/src/benchmark/mod.rs` | Add `bench_turboquant_vs_flat_cache`, `bench_turboquant_quality` |
 | `katgpt-rs/Cargo.toml` | Add `statrs`, `nalgebra` dependencies |
 | `riir-ai/crates/riir-gpu/src/lib.rs` | Export TQ attention |
 | `riir-ai/crates/riir-gpu/src/kernels/mod.rs` | Register `attention_score_tq` pipeline |
-| `riir-ai/crates/riir-gpu/src/forward.rs` | Add `dispatch_attention_tq()` |
+| `riir-ai/crates/riir-gpu/src/forward/mod.rs` | Add `dispatch_attention_tq()` |
 | `riir-ai/crates/riir-gpu/Cargo.toml` | Add `statrs` dependency |
 
 ---

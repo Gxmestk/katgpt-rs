@@ -69,7 +69,7 @@ On UCF-101 (N=6, L_max=4), peak FVD 69.20 occurs at L=6 (not L_max=4). ILSD regu
 | Hybrid dispatch (full + linear interleave) | `HybridPattern::Interleave { full_ratio }` + AHLA | Plan 108, `forward_looped()` in transformer.rs |
 | Per-loop residual gate ρ_τ | `ResidualGate` (zero-init) | Plan 108 |
 | SDPA output gate | `SdpaOutputGate` (zero-init sigmoid) | Plan 108 |
-| Elastic budget per zone | `ReestimationScheduler::set_active_budget`, `set_zone_gating` | riir-ai/crates/riir-engine/src/latent_functor/reestimation.rs (lines 567–594) |
+| Elastic budget per zone | `ReestimationScheduler::set_active_budget`, `set_zone_gating` | riir-ai/crates/riir-engine/src/latent_functor/reestimation/mod.rs (lines 567–594) |
 | Zone-density → budget mapping | `ZoneGatingProfile { tiers }` — `I_d → (τ, β, reest_budget)` | riir-ai/.research/128 (default-on for `latent_functor`) |
 | Per-NPC compute dispatch | Per-NPC saCLR cycle, freeze/thaw per NPC | riir-ai/.research/136 |
 | Stability-based early exit | `PathwayTracker` (Plan 231, GOAT 7/7, default-on) | katgpt-rs/.benchmarks/231_pathway_tracker_goat.md |

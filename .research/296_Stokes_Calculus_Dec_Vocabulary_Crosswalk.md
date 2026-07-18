@@ -110,7 +110,7 @@ Curiosity = "where is the belief field expanding?" = **positive divergence** of 
 
 LatCal is the deterministic raw↔latent bridge. The Stokes lens says: the 5 committed scalars (valence/arousal/desperation/calm/fear) are the **boundary flux** of the latent belief region across the sync boundary. Research 271 §3.4 already frames the "5 scalars across sync boundary" heuristic as a rate-distortion point; the Stokes lens adds that those 5 scalars are precisely the surface integral that (by the divergence theorem) determines the interior belief mass if the field is mostly exact. **Boundary-only commitment is the Super-GOAT-shaped idea** — commit the boundary, derive the interior — but it requires the field to be curl-free (verifiable via `hodge_decompose`), and the curse of dimensionality caps the win at d ≤ 3. For 8-dim HLA and 64-dim shards, the boundary is larger than the interior, so this is NOT a storage win there. It IS a win for 2D game maps and KG triple embeddings. → GOAT, scoped to low-dim.
 
-### 3.5 `NeuronShard` (`riir-neuron-db/src/shard.rs`)
+### 3.5 `NeuronShard` (`riir-neuron-db/src/shard/mod.rs`)
 
 `style_weights[64]` is a 64-dim vector — too high-dim for boundary-only commitment (curse of dimensionality). The Stokes lens does **not** give a storage win here. It DOES give a **validation** primitive: a frozen shard's `style_weights` should define a (mostly) harmonic field (it is a learned direction vector); `hodge_decompose` on a shard-derived cochain can flag shards whose field has unexpectedly large exact or coexact components (= drifted / corrupted shard). This is a `mape_k.rs` self-healing signal, modelless. → Gain-tier for riir-neuron-db.
 

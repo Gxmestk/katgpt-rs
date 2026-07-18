@@ -106,7 +106,7 @@ This is **not in the codebase.** The probe/draft/pruner substrate exists (`katgp
 
 | AutoMem concept | Status | Shipped equivalent |
 |-----------------|--------|--------------------|
-| File-system memory substrate | ✅ Ships | `NeuronShard` Pod + `ShardIndex` lock-free papaya (`riir-neuron-db/src/shard.rs`, `index.rs`) |
+| File-system memory substrate | ✅ Ships | `NeuronShard` Pod + `ShardIndex` lock-free papaya (`riir-neuron-db/src/shard/mod.rs`, `index.rs`) |
 | `<|UPSERT_MAP|>` coordinate-keyed dedup | ✅ Ships | `ShardIndex` papaya upsert (key → shard overwrite) |
 | Auto-synced inventory/status files | ✅ Ships | HLA raw→latent scalar bridge (5 synced affect scalars auto-derived from observation) |
 | Pre-populated strategy reference | ✅ Ships | `ZoneGeometryPod` + `LatCalEggshell` + frozen direction vectors |

@@ -230,7 +230,7 @@ Promote `committed_field_blend` to default-on ONLY if:
 - **Closest shipped cousin (per-layer, drifting):** Plan 297 (`PersonalityWeightedComposition`)
 - **Forecast partner (Bi-NCDE backward pass):** Plan 308 (`KarcForecaster`)
 - **DEC sampling-invariance substrate:** Plan 314 (`line_integral`), Research 296
-- **Freeze substrate:** `riir-neuron-db/src/shard.rs` (NeuronShard + future ArchetypeBlendShard subtype)
+- **Freeze substrate:** `riir-neuron-db/src/shard/mod.rs` (NeuronShard + future ArchetypeBlendShard subtype)
 - **Commitment bridge:** `riir-chain/src/encoding/latcal.rs` (LatCal fixed-point commitment of K-weight vector)
 - **Private Super-GOAT guide:** `riir-ai/.research/158_per_npc_committed_personality_blend_guide.md`
 - **Runtime integration plan (filed 2026-06-25, unblocked by Phase 4):** [riir-ai/.plans/336_committed_personality_runtime_integration.md](../../riir-ai/.plans/336_committed_personality_runtime_integration.md)

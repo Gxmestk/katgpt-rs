@@ -37,7 +37,7 @@ over identity) lives in the riir-ai runtime plan (P355).**
 
 ### Tasks
 
-- [x] **T1.1** Create `katgpt-rs/crates/katgpt-core/src/set_attention/mod.rs` with module doc referencing Research 354 §2. *(Implemented as single file `set_attention.rs` per codebase convention — matches `latent_steering.rs`, `gain_cost_halt.rs`, `best_belief.rs`.)*
+- [x] **T1.1** Create `katgpt-rs/crates/katgpt-core/src/set_attention.rs` with module doc referencing Research 354 §2. *(Implemented as single file `set_attention.rs` per codebase convention — matches `latent_steering.rs`, `gain_cost_halt.rs`, `best_belief.rs`.)*
 - [x] **T1.2** Define `SetAttentionConfig` struct in `set_attention/types.rs`: *(Inlined into `set_attention.rs` — `beta`, `gamma`, `top_k` fields with `Copy` + builder.)*
   ```rust
   pub struct SetAttentionConfig {

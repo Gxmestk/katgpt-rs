@@ -128,7 +128,7 @@ But the current code doesn't properly accumulate gradients through the multi-hea
 
 #### Task 4: Wire PFlash GPU Dispatch
 
-**Files:** `riir-ai/crates/riir-gpu/src/kernels/mod.rs`, `riir-ai/crates/riir-gpu/src/forward.rs`
+**Files:** `riir-ai/crates/riir-gpu/src/kernels/mod.rs`, `riir-ai/crates/riir-gpu/src/forward/mod.rs`
 **Problem:** 4 WGSL shaders exist (`flashprefill_mean_k.wgsl`, `flashprefill_block_score.wgsl`, `flashprefill_block_select.wgsl`, `flashprefill_sparse_forward.wgsl`) but are never compiled into `GpuPipelines` or dispatched.
 
 **Current state (riir-ai/crates/riir-gpu/src/kernels/mod.rs GpuPipelines):**
@@ -159,7 +159,7 @@ pub struct GpuPipelines {
 
 #### Task 5: Wire TurboQuant GPU Attention Scoring
 
-**Files:** `riir-ai/crates/riir-gpu/src/kernels/mod.rs`, `riir-ai/crates/riir-gpu/src/forward.rs`
+**Files:** `riir-ai/crates/riir-gpu/src/kernels/mod.rs`, `riir-ai/crates/riir-gpu/src/forward/mod.rs`
 **Problem:** `attention_score_tq.wgsl` exists but is not in `GpuPipelines` or dispatched.
 **Context:** CPU `forward_turboquant()` in `katgpt-rs` works. GPU path would accelerate the dequantize→score→attention step.
 **Fix:**

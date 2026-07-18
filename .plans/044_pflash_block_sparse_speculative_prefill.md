@@ -198,7 +198,7 @@ pub struct BlockScores {
 ```
 
 ```rust
-// riir-ai/crates/riir-gpu/src/forward.rs (additions)
+// riir-ai/crates/riir-gpu/src/forward/mod.rs (additions)
 
 /// GPU-side FlashPrefill buffers.
 /// Allocated once, reused across scoring calls.
@@ -986,7 +986,7 @@ fn flashprefill_sparse_forward(@builtin(global_invocation_id) gid: vec3<u32>) {
 Connect the 4 GPU kernels into a pipeline in `riir-gpu`, and add the CPU fallback in `prefill.rs`.
 
 ```rust
-// riir-ai/crates/riir-gpu/src/forward.rs (additions)
+// riir-ai/crates/riir-gpu/src/forward/mod.rs (additions)
 
 impl GpuFlashPrefillPass {
     pub fn new(ctx: GpuContext, config: &Config, fp_config: &FlashPrefillConfig) -> Self {
@@ -1264,7 +1264,7 @@ fn bench_block_selection_guarantees() {
 - `katgpt-rs/src/speculative/types.rs` — add `FlashPrefillConfig`, `PrefillMode`, `BlockScores`
 - `katgpt-rs/src/speculative/prefill.rs` — add `BlockAttentionScorer`, `block_select`, `block_select_grid`, `compress_prompt_blocks`, `speculative_prefill_block`, `speculative_prefill_adaptive`, `should_compress`
 - `katgpt-rs/src/speculative/mod.rs` — re-export new types and functions
-- `riir-ai/crates/riir-gpu/src/forward.rs` — add `GpuFlashPrefillPass`, `GpuFlashPrefillBuffers`, GPU pipeline
+- `riir-ai/crates/riir-gpu/src/forward/mod.rs` — add `GpuFlashPrefillPass`, `GpuFlashPrefillBuffers`, GPU pipeline
 - `riir-ai/crates/riir-gpu/src/kernels/mod.rs` — register 4 new WGSL shaders
 - `riir-ai/crates/riir-gpu/src/lib.rs` — export GPU PFlash types
 - `katgpt-rs/.docs/08_lucebox_techniques.md` — document Metal PFlash

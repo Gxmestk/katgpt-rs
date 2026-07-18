@@ -3,7 +3,7 @@
 **Date:** 2026-07-03
 **Research:** [katgpt-rs/.research/367_QuasiMoTTo_QMC_Test_Time_Scaling.md](../.research/367_QuasiMoTTo_QMC_Test_Time_Scaling.md)
 **Source paper:** [arXiv:2607.01179](https://arxiv.org/abs/2607.01179) — Li, Zhan, Gandhi, Goodman, Fox (Stanford), 2026-07-01
-**Target:** `katgpt-rs/crates/katgpt-core/src/speculative/qmc.rs` (new module) + Cargo feature `qmc_sampling` (opt-in until GOAT gate)
+**Target:** `katgpt-rs/crates/katgpt-core/src/speculative/qmc/mod.rs` (new module) + Cargo feature `qmc_sampling` (opt-in until GOAT gate)
 **Status:** ✅ COMPLETE — Phase 1 + 2 + 3 + 4 + 5 + 6 ALL COMPLETE (850/850 lib tests pass with qmc_sampling, 26 new bootstrap tests, G5 latency bench PASS, GOAT gate PASS). `qmc_sampling` PROMOTED to DEFAULT-ON. Plan fully shipped; remaining work is in separate downstream-fusion plans.
 
 ---
@@ -26,12 +26,12 @@ Verdict: **GOAT** (not Super-GOAT). Sample-efficiency gain, not a new capability
 
 ## Phase 1 — Core `QmcSource` trait + three methods
 
-**Target:** `katgpt-rs/crates/katgpt-core/src/speculative/qmc.rs` (new file), `pub mod qmc;` wired into `speculative/mod.rs`, feature `qmc_sampling = []` added to `katgpt-core/Cargo.toml`.
+**Target:** `katgpt-rs/crates/katgpt-core/src/speculative/qmc/mod.rs` (new file), `pub mod qmc;` wired into `speculative/mod.rs`, feature `qmc_sampling = []` added to `katgpt-core/Cargo.toml`.
 
 ### Tasks
 
 - [x] **T1.1** Add `qmc_sampling = []` opt-in feature to `katgpt-rs/crates/katgpt-core/Cargo.toml` (empty dep list — zero-dep for lattice/stratified; Sobol direction numbers vendored as a `const` table to avoid a new dep).
-- [x] **T1.2** Create `katgpt-rs/crates/katgpt-core/src/speculative/qmc.rs` gated by `#[cfg(feature = "qmc_sampling")]`.
+- [x] **T1.2** Create `katgpt-rs/crates/katgpt-core/src/speculative/qmc/mod.rs` gated by `#[cfg(feature = "qmc_sampling")]`.
 - [x] **T1.3** Define the trait per R367 §2.1:
   ```rust
   /// K marginally-Unif[0,1) points with controlled joint structure.

@@ -135,7 +135,7 @@ Two examples — simple flocking (linear-quadratic, explicit Nash) and emission 
 | Equilibrium reasoners | EqR residual-based convergence (R079) | — |
 | Cross-paradigm arena with Nash meta-game | Ruliology (R168, Plan 213) | `katgpt-rs/src/ruliology/`, `katgpt-rs/examples/ruliology_demo.rs` |
 | Population welfare via economic selection | WealthPruner (R167) — coordinator with own objective per-arm wealth | (R167 §Fusion 1) |
-| Coherence-driven re-estimation scheduler | `riir-ai/crates/riir-engine/src/latent_functor/reestimation/mod.rs` (self-healing on coherence < τ_reest) | `riir-ai/crates/riir-engine/src/latent_functor/reestimation.rs` |
+| Coherence-driven re-estimation scheduler | `riir-ai/crates/riir-engine/src/latent_functor/reestimation/mod.rs` (self-healing on coherence < τ_reest) | `riir-ai/crates/riir-engine/src/latent_functor/reestimation/mod.rs` |
 
 ### 2.3 What's missing (the Super-GOAT novelty)
 
@@ -298,7 +298,7 @@ GOAT gate rule: `cce_moderator` feature flag default-off. Promote to considerati
 | `crates/katgpt-ruliology/src/payoff.rs` (`PayoffTable<N>`) | Nash solver; deviation class for 1v1 CCE |
 | `katgpt-rs/src/pruners/prudent_banker.rs` | OMD primal-dual machinery |
 | `katgpt-rs/crates/katgpt-core/src/cgsp/dual_pool.rs` | Mean-field α router + O(log T) regret bound |
-| `riir-ai/crates/riir-engine/src/latent_functor/reestimation.rs` | Coherence-driven re-estimation scheduler (Fusion D) |
+| `riir-ai/crates/riir-engine/src/latent_functor/reestimation/mod.rs` | Coherence-driven re-estimation scheduler (Fusion D) |
 | `riir-ai/crates/riir-engine/src/hla/` | HLA channel — signal `ζ` broadcast medium |
 | `riir-ai/crates/riir-chain/src/encoding/latcal*.rs` | LatCal fixed-point bridge — sync commitment of `ζ` |
 | `riir-ai/crates/riir-engine/src/cgsp_runtime/` | CGSP conjecturer pool = deviation class `D` |

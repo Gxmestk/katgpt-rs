@@ -141,7 +141,7 @@ The latent-to-latent operation is the primary Super-GOAT framing. Adapter routin
 
 **On `cgsp_runtime/` curiosity** (`riir-ai/crates/riir-engine/src/cgsp_runtime/`): curiosity signal = `KL(p_sampled || p_K_prior)`. When the runtime samples a high-K candidate (deviating from the algorithmic-probability baseline), curiosity spikes. This unifies curiosity-driven exploration (R240 SGS) with algorithmic-probability sampling under one signal.
 
-**On `NeuronShard::style_weights[64]`** (`riir-neuron-db/src/shard.rs`): the per-zone K-prior is committed as part of the shard — BLAKE3-hashed, Merkle-tree-leaf, freeze/thaw-enveloped. The `(α, β)` scalars are stored alongside `style_weights` as part of the shard's "algorithmic-probability signature". Cold-tier retrieval uses K-prior to bias shard selection (`ShardCompactor` already operates on compressibility).
+**On `NeuronShard::style_weights[64]`** (`riir-neuron-db/src/shard/mod.rs`): the per-zone K-prior is committed as part of the shard — BLAKE3-hashed, Merkle-tree-leaf, freeze/thaw-enveloped. The `(α, β)` scalars are stored alongside `style_weights` as part of the shard's "algorithmic-probability signature". Cold-tier retrieval uses K-prior to bias shard selection (`ShardCompactor` already operates on compressibility).
 
 **On LatCal** (`riir-chain/src/encoding/latcal_fixed.rs`): the bridge from latent `(α, β)` to chain-committed raw scalars. `α_latcal = latcal_fixed::to_fixed(α)`, ditto `β`. These become part of the `MerkleFrozenEnvelope` and are quorum-committed. **Raw at sync, latent at runtime** — exactly the AGENTS.md sync-boundary rule.
 

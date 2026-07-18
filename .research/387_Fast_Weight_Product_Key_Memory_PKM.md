@@ -83,14 +83,14 @@ The paper's continual-learning experiment (Fig 6) shows FwPKM adapts quickly to 
 |---|---|---|
 | fast weights / fast-weight memory | runtime latent state, δ-Mem associative matrix, HLA per-NPC state | `katgpt-core/src/pruners/delta_mem/`, `riir-engine/src/hla/` |
 | product key / PKM | **NEW** — `ProductKeyMemory` primitive | `katgpt-core/src/product_key_memory/` (this plan) |
-| memory slot / value row | δ-Mem rank-r slot, Engram table entry, NeuronShard slot | `crates/katgpt-core/src/delta_mem/state.rs`, `engram/`, `riir-neuron-db/src/shard.rs` |
+| memory slot / value row | δ-Mem rank-r slot, Engram table entry, NeuronShard slot | `crates/katgpt-core/src/delta_mem/state.rs`, `engram/`, `riir-neuron-db/src/shard/mod.rs` |
 | top-k sparse retrieval | DDTree top-k, NPC Memory Store heapselect, Raven routing | `crates/katgpt-core/src/mcts.rs`, `riir-ai/crates/riir-engine/src/npc_memory.rs`, `examples/core_02_raven.rs` |
 | TTT-style gradient updates | **FORBIDDEN** → δ-rule update (`DeltaMemoryState::write_segment`) | `crates/katgpt-core/src/delta_mem/state.rs` (Plan 053) |
 | addressing loss (entropy on keys) | **FORBIDDEN (GD)** → TEMP diversity selector (slot spread) | `katgpt-rs/src/sleep/consolidation.rs` (Plan 005) |
 | gated residual `g·v̂ + (1−g)·v` | CommittedFieldBlend, PersonalityWeightedComposition, NPC Memory Store gate | `crates/katgpt-core/src/committed_field_blend.rs`, `katgpt-core/src/sense/`, `riir-ai/crates/riir-engine/src/npc_memory.rs` |
 | IDW scoring (inverse distance) | **NEW scoring mode** — centroid-finding alternative to dot product | this plan (optional) |
 | episodic memory | HLA session state, δ-Mem, Engram runtime table | HLA, δ-Mem, Engram |
-| semantic memory | frozen NeuronShard `style_weights`, committed personality | `riir-neuron-db/src/shard.rs` |
+| semantic memory | frozen NeuronShard `style_weights`, committed personality | `riir-neuron-db/src/shard/mod.rs` |
 | novelty detection via gating `g_t` | Temporal Derivative curiosity, CGSP reward | `crates/katgpt-core/src/temporal_deriv.rs` (Plan 277), `cgsp/` |
 | iterative reading (n-iter) | Sleep Consolidation N-pass | `katgpt-rs/src/sleep/` (Plan 154) |
 | catastrophic forgetting (future work) | Raven/δ-Mem consolidation (shipped) | `katgpt-rs/src/sleep/consolidation.rs` |

@@ -163,7 +163,7 @@ x_{l+1}^t   = f_τ(x_l^t, S_l^t)          (bidirectional block using cache)
 
 ### 3.2 "Depth from optimization over time" explicit framing for `reestimation.rs` (framing gap)
 
-The survey's §5.2 unification — "depth emerges from optimization over time, hidden state = fast-weight layer refined per token" — is the **conceptual bridge** between vertical and horizontal recurrence. Our `riir-ai/crates/riir-engine/src/latent_functor/reestimation.rs` ships exactly this pattern under the name "coherence-driven re-estimation scheduler when coherence < tau_reest" — DiPOD's "self-distillation when ELBO drifts" in codebase vocabulary.
+The survey's §5.2 unification — "depth emerges from optimization over time, hidden state = fast-weight layer refined per token" — is the **conceptual bridge** between vertical and horizontal recurrence. Our `riir-ai/crates/riir-engine/src/latent_functor/reestimation/mod.rs` ships exactly this pattern under the name "coherence-driven re-estimation scheduler when coherence < tau_reest" — DiPOD's "self-distillation when ELBO drifts" in codebase vocabulary.
 
 **Gap:** no `.research/` note frames `reestimation.rs` in the survey's "fast-weight optimization over time" vocabulary. This is the canonical vocabulary-mismatch failure the skill warns about. A future note (or a one-paragraph addendum to an existing riir-ai functor note) closing this vocabulary gap would prevent the next paper-vocabulary-only grep from missing it.
 

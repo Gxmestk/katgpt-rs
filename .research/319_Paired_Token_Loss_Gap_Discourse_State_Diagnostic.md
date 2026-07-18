@@ -200,7 +200,7 @@ All three are GOAT-tier (provable gain), not Super-GOAT-tier (new capability cla
 - `katgpt-rs/.research/036_Luce_Megakernel_Hybrid_DeltaNet_Attention.md` — hybrid DeltaNet/attention GPU kernel (the architecture this paper analyzes).
 - `katgpt-rs/.research/070_Gated_DeltaNet_2_Decoupled_Erase_Write_Linear_Attention.md` — GDN (the recurrent layer in Olmo Hybrid).
 - `riir-ai/.research/127_Implicit_Microcognition_Crowd_NPC_Guide.md` — design context for HLA-as-discourse-state (private).
-- `riir-ai/crates/riir-engine/src/latent_functor/reestimation.rs` — coherence-driven re-estimation = state-conditioned readout triggers re-derivation.
+- `riir-ai/crates/riir-engine/src/latent_functor/reestimation/mod.rs` — coherence-driven re-estimation = state-conditioned readout triggers re-derivation.
 
 ---
 

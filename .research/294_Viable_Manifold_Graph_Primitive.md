@@ -139,7 +139,7 @@ Curiosity drives exploration. Today, exploration is a free Gaussian step in late
 
 If the safe-manifold graph itself is a chain artifact (e.g., a "faction persona manifold" committed by the faction's founding snapshot), the graph's BLAKE3-committed structure is the IP. LatCal bridges: the *graph adjacency* is committed raw; the *latent positions* of nodes stay latent. The bridge function is `manifold_graph_commitment_hash(g) → [u8; 32]` — a deterministic BLAKE3 over the sorted edge list, not over the latent coordinates.
 
-### 3.5 `NeuronShard` (`riir-neuron-db/src/shard.rs`)
+### 3.5 `NeuronShard` (`riir-neuron-db/src/shard/mod.rs`)
 
 A shard's `style_weights[64]` is a frozen latent direction. The "playable manifold around this shard" = the set of latent states reachable from the shard's projection that remain coherent. Freeze/thaw versions the manifold: each snapshot defines its own safe subgraph, and persona divergence between NPCs is measurable as graph-distance between their current node in their respective manifolds. **Cross-ref for `riir-neuron-db` follow-up**: a `shard_manifold_graph` view (gated behind a new feature) would be the shard-side analogue of Plan 301's `subspace_phase_gate` wrapper.
 

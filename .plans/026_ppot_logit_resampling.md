@@ -87,7 +87,7 @@ The primary integration point is **post-DDTree rescue**: when speculative decodi
 | `katgpt-rs/src/speculative/mod.rs` | Add `pub mod ppot` (feature-gated) |
 | `katgpt-rs/crates/katgpt-forward/src/step.rs` | Add `ppot_rescue()` integration |
 | `katgpt-rs/src/types.rs` | Add `PpotConfig` fields to `Config` |
-| `katgpt-rs/src/benchmark.rs` | Add PPoT benchmarks |
+| `katgpt-rs/src/benchmark/mod.rs` | Add PPoT benchmarks |
 | `katgpt-rs/Cargo.toml` | Add `[features] ppot = []` |
 | `katgpt-rs/README.md` | Add PPoT architecture section |
 

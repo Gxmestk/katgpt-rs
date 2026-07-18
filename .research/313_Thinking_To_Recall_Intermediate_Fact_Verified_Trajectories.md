@@ -139,7 +139,7 @@ Despite the PASS verdict, the paper has genuine value to the project:
 - **Recursive latent reasoning substrate (the "we don't do CoT" grounding):** `katgpt-rs/.research/289_RecursiveMAS_Pass_Already_Shipped.md`
 - **M1 analog (recursion depth):** `katgpt-rs/.plans/108_lt2_looped_inference_pipeline.md`, `katgpt-rs/.plans/276_micro_recurrent_belief_state.md`, `katgpt-rs/.plans/283_self_advantage_recursion_gate.md`, `katgpt-rs/.plans/304_gain_cost_loop_halting_primitive.md`, `katgpt-rs/.research/286_Attention_Drift_Depth_Invariance_Diagnostic.md`
 - **M2 analog (direction-vector priming):** `katgpt-rs/.research/290_latent_field_steering_open_primitive.md`, `katgpt-rs/.research/278_Engram_Conditional_Memory_Latent_Lookup_Fusion.md`, `katgpt-rs/.research/276_Personality_Weighted_Latent_Layer_Composition.md`
-- **M3 analog (coherence-driven re-estimation):** `riir-ai/crates/riir-engine/src/latent_functor/reestimation.rs` (`ReestimationScheduler`, `tau_reest`, `TickReport`), `riir-ai/crates/riir-engine/src/latent_functor/quality_gate.rs` (`SwapAlignment`, `alignment_gate`), `katgpt-rs/.research/244_Self_Evolver_Faithfulness_Cognitive_Integrity.md`
+- **M3 analog (coherence-driven re-estimation):** `riir-ai/crates/riir-engine/src/latent_functor/reestimation/mod.rs` (`ReestimationScheduler`, `tau_reest`, `TickReport`), `riir-ai/crates/riir-engine/src/latent_functor/quality_gate.rs` (`SwapAlignment`, `alignment_gate`), `katgpt-rs/.research/244_Self_Evolver_Faithfulness_Cognitive_Integrity.md`
 - **pass@k framing cousin:** `katgpt-rs/.plans/281_bom_single_pass_diverse_sampling.md`, `katgpt-rs/.research/255_VibeThinker_CLR_Test_Time_Reliability.md`
 
 ---

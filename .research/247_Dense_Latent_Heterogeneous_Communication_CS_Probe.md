@@ -22,7 +22,7 @@ The paper's headline mechanism (cross-model KV-cache adapter, trained via Phase-
 The CS-Lasso probe is pure inference: sample `M≈200` random binary ablation masks over `H` heads, measure task accuracy under each mask, solve a Lasso, aggregate per-KV-group. The output is a **fixed-size ranking vector** — a `ConstraintPruner`-style artifact that gates which KV groups transmit, with **sigmoid**-gated density (never softmax, per AGENTS.md). The sparse/dense duality becomes a single scalar `context_awareness ∈ [0,1]` that interpolates the K-budget between the sparse floor (~3.5%) and the dense ceiling (~87%).
 
 **Already shipped (NOT reinvented — do not overclaim novelty on these):**
-- Position-disentanglement (RoPE strip → transform → restore): `katgpt-rs/crates/katgpt-kv/src/shard_kv/rope.rs` (`undo_rope`/`reapply_rope`, Plan 147, GOAT-proved) AND `riir-ai/crates/riir-engine/src/lora_still.rs` (Still Perceiver, Plan 213).
+- Position-disentanglement (RoPE strip → transform → restore): `katgpt-rs/crates/katgpt-kv/src/shard_kv/rope.rs` (`undo_rope`/`reapply_rope`, Plan 147, GOAT-proved) AND `riir-ai/crates/riir-engine/src/lora_still/mod.rs` (Still Perceiver, Plan 213).
 - Per-KV-group sigmoid gating: `katgpt-rs/crates/katgpt-kv/src/sp_kv/utility_predictor.rs` (`soft_gate_bias`, Plan 070) and `ega_attn.rs` (Plan 139).
 - Layer-monotonic alignment: trivial; our GQA already maps Q-head → KV-group via `kv_group = q_head * n_kv_head / n_head`.
 
@@ -112,7 +112,7 @@ The CS-probe alone is a GOAT diagnostic. The sparse/dense duality alone is a Gai
 
 **Closest cousins across both repos (notes + code, mandatory two-layer check):**
 - `katgpt-rs/.research/109_Shard_Drop_In_10x_KV_Cache_Compression.md` + `crates/katgpt-kv/src/shard_kv/rope.rs` — RoPE-strip primitive, single-model compression. **Same RoPE mechanism, no CS-probe, no sparse/dense routing, no cross-agent.**
-- `katgpt-rs/.research/213_Still_Perceiver_KV_Cache_Compaction.md` + `riir-ai/crates/riir-engine/src/lora_still.rs` — 3-step un-rotate/compress/re-rotate. **Same position-disentanglement, single-model, trained Perceiver (riir-train material).**
+- `katgpt-rs/.research/213_Still_Perceiver_KV_Cache_Compaction.md` + `riir-ai/crates/riir-engine/src/lora_still/mod.rs` — 3-step un-rotate/compress/re-rotate. **Same position-disentanglement, single-model, trained Perceiver (riir-train material).**
 - `katgpt-rs/.research/238_*` MUX-Latent + `.plans/238_mux_latent_context_compression.md` — superposition fusion for context compression. **Single-model, no receiver-context-awareness axis.**
 - `katgpt-rs/.research/086_RTPurbo` + `.plans/126_rt_turbo_retrieval_head_sparse_decode.md` — retrieval head identification. **Training-time head identification, NOT post-hoc per-task CS probe.**
 - `riir-ai/.plans/298_crowd_scale_progressive_mcgs_npc_emergent_behavior.md` T3.3 — `HlaCacheProxy::share_trajectory` **stub, deferred, no bandwidth allocation.**

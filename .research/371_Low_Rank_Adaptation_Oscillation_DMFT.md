@@ -101,7 +101,7 @@ Cholinergic modulation suppresses SFA → smaller effective β → wake-like irr
 | **KARC reservoir** (delay-embedding + ridge readout — the *reservoir* formalism the paper's RNN instantiates) | **`KarcForecaster`** | Plan 308, `riir-ai/crates/riir-games-civ/src/civ/map_tick/karc.rs` |
 | **Crowd-scale latent aggregation** (set attention over K NPCs' beliefs) | **`set_sigmoid_attention`** | Plan 354, `crates/katgpt-core/src/set_attention.rs`; riir-ai guide R167 |
 | **Stokes / DEC continuity equation** (Fokker-Planck framing of κ transport) | **DEC operators** (`codifferential` δ, `belief_mass_divergence`) | Plan 251/314, `crates/katgpt-core/src/dec/` |
-| **Frozen per-NPC latent state** (style_weights[64], dendritic branch) | **`NeuronShard`** | `riir-neuron-db/src/shard.rs` |
+| **Frozen per-NPC latent state** (style_weights[64], dendritic branch) | **`NeuronShard`** | `riir-neuron-db/src/shard/mod.rs` |
 
 ### 2.2 What the paper adds that none of the above does alone
 

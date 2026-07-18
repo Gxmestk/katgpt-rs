@@ -189,7 +189,7 @@ If a future implementer is tempted to (a) add a sophisticated MCTS/island-GA sea
 - **The R368 lesson (decision-structure vs LLM-dependent-process split):** `katgpt-rs/.research/368_AutoMem_Metamemory_LLM_Orchestration_PASS.md` — AutoMem is the canonical example of an agent paper whose decision structure WAS modellessly instantiable (GOAT). AIDE² fails the AutoMem test: its decision is code generation, which is not.
 - **Bi-level-loop-already-shipped precedent:** `katgpt-rs/.research/289_RecursiveMAS_Pass_Already_Shipped.md` — RecursiveMAS also framed itself as bi-level (inner-outer loop); every primitive shipped, training recipe → riir-train. AIDE²'s bi-level structure is at a different layer (code, not latent comms) but the verdict logic is the same.
 - **Benchmark/validation PASS precedent:** `riir-ai/.research/169_Agent_Native_Memory_Benchmark_PASS.md` — same confirmatory-only value pattern.
-- **Latent-state RSI (our self-improvement, by mandate):** `riir-ai/crates/riir-engine/src/cgsp_runtime/` (curiosity/exploration), `riir-ai/crates/riir-engine/src/latent_functor/reestimation.rs` (coherence-driven re-estimation), `katgpt-rs/src/sleep/consolidation.rs` (Raven/δ-Mem), `riir-neuron-db/src/mape_k.rs` (MAPE-K self-healing).
+- **Latent-state RSI (our self-improvement, by mandate):** `riir-ai/crates/riir-engine/src/cgsp_runtime/` (curiosity/exploration), `riir-ai/crates/riir-engine/src/latent_functor/reestimation/mod.rs` (coherence-driven re-estimation), `katgpt-rs/src/sleep/consolidation.rs` (Raven/δ-Mem), `riir-neuron-db/src/mape_k.rs` (MAPE-K self-healing).
 
 ## Re-evaluation guard
 

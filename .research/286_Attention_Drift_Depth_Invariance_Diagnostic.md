@@ -30,7 +30,7 @@ Two transferable primitives, both inference-time, both modelless:
    h_raw  = h_t + Δ(h_t)
    h_{t+1} = post_norm ? rmsnorm(h_raw) : h_raw * pinch(h_raw)
    ```
-   This is the *upstream* fix. The *downstream* fix (re-derive when drift exceeds τ) is `riir-ai/crates/riir-engine/src/latent_functor/reestimation.rs` ("coherence-driven re-estimation scheduler") — the two compose as defense-in-depth.
+   This is the *upstream* fix. The *downstream* fix (re-derive when drift exceeds τ) is `riir-ai/crates/riir-engine/src/latent_functor/reestimation/mod.rs` ("coherence-driven re-estimation scheduler") — the two compose as defense-in-depth.
 
 **Critical finding from codebase audit:** our existing `BeliefDrafter` (Plan 217) at `katgpt-rs/crates/katgpt-speculative/src/belief_drafter.rs:80-81, 193-197` implements exactly the paper's failure mode: `h_{t+1} = h_t + FC3(...)` with the residual path **unnormalized** (LayerNorm is on the *input* only, line 35-50). This drafter IS subject to attention/magnitude drift and the paper's diagnosis applies verbatim. For BeliefDrafter specifically, only the **diagnostic** is modelless — the post-norm *fix* requires MLP retraining (paper §4.4 Table 4: inference-time magnitude pin drops acceptance 56% on pre-norm models). For our *own* kernels (HLA, latent_functor, micro_belief, engram retrieval chains, Raven consolidation) the fix is modelless because we own the kernel — we can post-norm at runtime without retraining anything.
 

@@ -2,7 +2,7 @@
 
 **Date:** 2026-07-03
 **Bench:** `katgpt-rs/crates/katgpt-core/benches/bench_367_qmc_goat.rs` (`harness = false`, `std::time::Instant`, direct binary launch)
-**Primitive:** `katgpt-rs/crates/katgpt-core/src/speculative/qmc.rs` + `sampling.rs` (feature `qmc_sampling`)
+**Primitive:** `katgpt-rs/crates/katgpt-core/src/speculative/qmc/mod.rs` + `sampling.rs` (feature `qmc_sampling`)
 **Research:** `katgpt-rs/.research/367_QuasiMoTTo.md`
 **Source paper:** [arXiv:2607.01179](https://arxiv.org/abs/2607.01179) — QuasiMoTTo: Quasi-Monte Carlo Test-Time Scaling Sampler
 **Status:** ✅ **ALL GATES PASS — PROMOTED to DEFAULT-ON** (Plan 367 Phase 5, 2026-07-03)

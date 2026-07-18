@@ -175,7 +175,7 @@ Plan 276 benchmarked `AttractorKernel::from_seed` (random Xavier W_s) and got th
 - **Can freeze/thaw (path 1) fix it?** YES — load a committed, trained `style_weights` as `W_s`.
 - **Does it require gradient descent?** NO — the gradient descent happened offline when the shard was consolidated (Raven/δ-Mem); at runtime we just swap the frozen matrix in.
 
-This converts Plan 276 from "opt-in experiment, G2.1 FAIL" → "candidate for re-benchmarking under shard-loaded W_s." That is a **riir-neuron-db × katgpt-rs** fusion — the shard source lives in `riir-neuron-db/src/shard.rs`, the attractor lives in `katgpt-rs/crates/katgpt-core/src/micro_belief/`. Private IP is the "shard-trained NPC personality attractor" selling point; open primitive is the `W_s` loading trait.
+This converts Plan 276 from "opt-in experiment, G2.1 FAIL" → "candidate for re-benchmarking under shard-loaded W_s." That is a **riir-neuron-db × katgpt-rs** fusion — the shard source lives in `riir-neuron-db/src/shard/mod.rs`, the attractor lives in `katgpt-rs/crates/katgpt-core/src/micro_belief/`. Private IP is the "shard-trained NPC personality attractor" selling point; open primitive is the `W_s` loading trait.
 
 **Fusion C — DEC `harmonic_projector` as deterministic basin-volume estimator (Super-GOAT-tier cross-reference, not this paper's contribution).**
 

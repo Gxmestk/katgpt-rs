@@ -3,7 +3,7 @@
 **Date:** 2026-07-07
 **Research:** [katgpt-rs/.research/392_Attention_Dilution_SSMax_GoldShare.md](../.research/392_Attention_Dilution_SSMax_GoldShare.md)
 **Source paper:** [arxiv 2607.01538](https://arxiv.org/abs/2607.01538) — *Can Language Models Actually Retrieve In-Context?* (Gollapudi et al., UC Berkeley / UT Austin, 2026)
-**Target:** `katgpt-rs/crates/katgpt-core/src/parallax_attn.rs` (SSMax extension) + `katgpt-rs/crates/katgpt-core/src/data_probe/gold_share.rs` (new diagnostic) + Cargo features `ssmax_temperature`, `gold_share_probe`
+**Target:** `katgpt-rs/crates/katgpt-core/src/parallax_attn/mod.rs` (SSMax extension) + `katgpt-rs/crates/katgpt-core/src/data_probe/gold_share.rs` (new diagnostic) + Cargo features `ssmax_temperature`, `gold_share_probe`
 **Status:** ✅ COMPLETE — ssmax_temperature DEFAULT-ON (Phase 5, 2026-07-07, G1+G2+G3+G4+G5 ALL PASS); gold_share_probe OPT-IN diagnostic. Phase 1 COMPLETE (2026-07-07). Both feature-gated modules compile clean: `ssmax_temperature` (13 unit tests) + `gold_share_probe` (8 unit tests). 1347 total lib tests pass, 0 warnings. Default + all-features both clean (no combo regression). Phases 2–5 pending (GOAT gate G1–G5).
 
 ---

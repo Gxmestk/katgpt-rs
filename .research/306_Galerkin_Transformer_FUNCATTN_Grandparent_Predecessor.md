@@ -106,8 +106,8 @@ The transferable primitive is **softmax-free linear attention with Hilbert-space
 | Galerkin piece | Already shipped? | Where | Notes |
 |---|---|---|---|
 | Closed-form ridge solve `M(MᵀM+λI)⁻¹` | ✅ | `riir-train/crates/riir-train-engine/src/schur.rs` (Plan 067, riir-train) | Same math, framed as training primitive. FUNCATTN uses this directly. |
-| Softmax-free attention operator | ✅ | `katgpt-rs/crates/katgpt-core/src/funcattn.rs` (Plan 286) | FUNCATTN open primitive. Galerkin is the λ=0 special case. |
-| Linear-in-n attention | ✅ | `katgpt-rs/crates/katgpt-core/src/parallax_attn.rs` (Plan 135) | Parallax sigmoid partition-of-unity attention. GOAT-failed but shipped. |
+| Softmax-free attention operator | ✅ | `katgpt-rs/crates/katgpt-core/src/funcattn/mod.rs` (Plan 286) | FUNCATTN open primitive. Galerkin is the λ=0 special case. |
+| Linear-in-n attention | ✅ | `katgpt-rs/crates/katgpt-core/src/parallax_attn/mod.rs` (Plan 135) | Parallax sigmoid partition-of-unity attention. GOAT-failed but shipped. |
 | Recurrent basis (per-NPC latent state) | ✅ | `katgpt-rs/crates/katgpt-sense/src/reconstruction.rs` (`evolve_hla`) | HLA belief kernel = per-position recurrent latent, the "Assumption 4.2 columns-as-basis-DoFs" pattern. |
 | Diagonal-dominant init `W ← ηU + δI` | ❌ not in corpus | — | **Small numerical-stability trick worth recording.** Approximated by `λ > 0` in FUNCATTN's ridge solve; not separately needed. |
 | Galerkin projection-type LN (pre-dot-product, scale-preserving) | ❌ not in corpus | — | **Small architectural detail worth recording.** Parallax and FUNCATTN both use post-attention sigmoid normalization; pre-LN is an alternative to benchmark. |
@@ -184,7 +184,7 @@ Add to the standing DEC vocabulary table in the research skill and in Research 2
 | "Galerkin projection-type layer norm" (pre-dot-product, scale-preserving) | Pre-LN attention block (alternative to post-attention sigmoid normalization) | Not in corpus — small architectural alternative worth benchmarking against post-LN in Plan 286 G3 |
 | "diagonal-dominant rescaled init" `W ← ηU + δI` | Tikhonov regularization `+λI` in the ridge solve (equivalent numerical effect) | `schur.rs` (Plan 067) — `δ` ≈ `λ` |
 | "energy decay" / "scale-preserving" | Norm preservation under attention (R305 phase-modulated coupling is the strict L2-norm-preserving cousin) | `phase_rotation_subspace_gate.rs` (Plan 322) |
-| "Assumption 4.2: columns of Q/K/V as basis DoFs" | HLA `style_weights[64]` columns as basis functions; sense projection channels as orthogonal bases | `crates/katgpt-sense/src/reconstruction.rs`, `riir-neuron-db/src/shard.rs` |
+| "Assumption 4.2: columns of Q/K/V as basis DoFs" | HLA `style_weights[64]` columns as basis functions; sense projection channels as orthogonal bases | `crates/katgpt-sense/src/reconstruction.rs`, `riir-neuron-db/src/shard/mod.rs` |
 | "Fredholm equation of the second kind" | Fixed-point iteration / attractor model | `katgpt-rs/.research/035_Attractor_Models_Fixed_Point_Refinement.md` |
 
 **Caveat (per R296):** the boundary-vs-volume perf win from Stokes holds only for d ≤ 3. Galerkin's Hilbert-space theory is dimension-agnostic; the LBB condition is what guarantees n-independence, not a Stokes-type boundary trick. The DEC framing is for the *vocabulary bridge*, not for a perf claim.

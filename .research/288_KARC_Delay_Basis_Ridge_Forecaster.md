@@ -69,7 +69,7 @@ Four terms: time-delay truncation `L_F√d·w^k` (geometric in delay length `k`)
 | HLA recurrent update (leaky integrator step) | **`evolve_hla`** | `crates/katgpt-sense/src/reconstruction.rs`, `leaky_core.rs` |
 | Crowdscale curiosity signal from coherence decay + JS-uniqueness | **cgsp_runtime** curiosity boosts | `riir-engine/src/cgsp_runtime/`, `riir-ai/crates/riir-engine/src/latent_functor/reestimation/mod.rs` |
 | MCTS collapse detection baseline (cheap predictor) | **mcts_collapse_bridge** | `riir-ai/crates/riir-engine/src/cgsp_runtime/mcts_collapse_bridge.rs` |
-| Per-shard frozen latent state (Pod, BLAKE3, dendritic branch) | **NeuronShard** | `riir-neuron-db/src/shard.rs` (`style_weights[64]`, `hla_moments[8]`) |
+| Per-shard frozen latent state (Pod, BLAKE3, dendritic branch) | **NeuronShard** | `riir-neuron-db/src/shard/mod.rs` (`style_weights[64]`, `hla_moments[8]`) |
 | Deterministic linear-op commitment + 2×2 matrix arithmetic | **LatCal** | `riir-chain/src/encoding/latcal.rs` (`LatCalMatrix`, `multiply`, `to_fixed`) |
 | Spectral commitment of Fourier coefficients | **LatCal Fixed-Point Fourier Coefficients** | Plan 265 (riir-ai) |
 | Forensic fingerprint of a fixed-point committed blob | **Forensic Watermark** | Plan 322 (riir-ai), `riir-chain/src/forensic/` |

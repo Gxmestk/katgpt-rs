@@ -26,7 +26,7 @@ The **transferable primitive** is not the LLM-orchestration demo (that's RL-on-t
 | Tri-role protocol (T/W/V) | CGSP runtime triad (Solver / Conjecturer / Guide) + CLR (claim extractor / verifier / voter) + `game_sync` "one binary, three roles" | `riir-ai/crates/riir-engine/src/cgsp_runtime/runtime.rs`, `riir-ai/.research/126_NPC_Curiosity_Guided_Self_Play_Guide.md`, `riir-ai/.research/136_Per_NPC_Runtime_Test_Time_Scaling_Guide.md` |
 | Multi-turn until verifier accepts | CLR cluster voting + Breakeven Complexity Router + MCTS Collapse Discriminator | Research 136, Plan 250, Research 125 |
 | Block-ε separability ⇒ diagonal methods | `RoleTransport::Diagonal` (element-wise) vs `Orthogonal` (full linear) — Plan 100 benchmarked this exact tradeoff empirically | `riir-ai/crates/riir-engine/src/role_transport.rs`, `.benchmarks/023_block_diagonal_goat.md` |
-| Agent pool of frozen LLMs | Frozen LoRA shards (riir-neuron-db) + ZoneExpertBundle + Dynamic-Pair LoRA (Plan 260) + dMoE expert routing (Research 161) | `riir-neuron-db/src/shard.rs`, Plan 260, Research 161 |
+| Agent pool of frozen LLMs | Frozen LoRA shards (riir-neuron-db) + ZoneExpertBundle + Dynamic-Pair LoRA (Plan 260) + dMoE expert routing (Research 161) | `riir-neuron-db/src/shard/mod.rs`, Plan 260, Research 161 |
 
 The **one missing piece** in our stack is the *unified per-query T→W→V cycler* — a single primitive that rotates the role projection per turn on a single problem, with verifier-accept early-exit. CGSP has persistent roles per NPC; CLR has cluster voting on K candidates; neither has the "cycle T→W→V on one problem until V says ACCEPT" protocol. **That primitive is the GOAT gain**, behind a feature flag.
 
@@ -220,7 +220,7 @@ Per the skill's three documented failure modes:
   - `riir-ai/crates/riir-engine/src/cgsp_runtime/runtime.rs` — `NpcCgspRuntime`, `PriorityTableBandit`, `TickReport`
   - `riir-ai/crates/riir-engine/src/sense/brain.rs` — `NpcBrain` + HLA projection
   - `katgpt-rs/crates/katgpt-attn/src/dash_attn/meta_router.rs` — `MetaRouter` bandit policy head
-  - `riir-neuron-db/src/shard.rs` — frozen LoRA shard pool
+  - `riir-neuron-db/src/shard/mod.rs` — frozen LoRA shard pool
 - **Training-side redirect:** sep-CMA-ES + SVF → `riir-train/.research/` (separate note, out of scope for this session)
 
 ---

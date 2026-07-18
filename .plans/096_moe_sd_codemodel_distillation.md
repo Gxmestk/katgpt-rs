@@ -218,7 +218,7 @@ Only implement if T3 shows Raven slot overlap > 30% at step 1.
 
 ### Location
 
-`katgpt-rs/crates/katgpt-core/src/types.rs` — new function `sparse_matmul_delta()`
+`katgpt-rs/src/types.rs` — new function `sparse_matmul_delta()`
 
 ### Implementation Sketch
 

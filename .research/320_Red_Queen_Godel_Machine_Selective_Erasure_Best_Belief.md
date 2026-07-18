@@ -151,7 +151,7 @@ This is the modelless analog of RQGM Algorithm 1 lines 22–31. The "anchor" in 
 - `riir-neuron-db/src/freeze.rs` `MerkleFrozenEnvelope` = the epoch freeze (BLAKE3-tagged criterion).
 - `riir-neuron-db/src/mape_k.rs` MAPE-K loop = the checkpoint schedule + replan.
 - `katgpt-rs/src/sleep/consolidation.rs` Raven/δ-Mem = selective erasure on consolidation.
-- `riir-ai/crates/riir-engine/src/latent_functor/reestimation.rs` = the drift-triggered re-estimation scheduler (analog of "evaluator replacement triggered by drift").
+- `riir-ai/crates/riir-engine/src/latent_functor/reestimation/mod.rs` = the drift-triggered re-estimation scheduler (analog of "evaluator replacement triggered by drift").
 - `riir-ai/crates/riir-engine/src/committed_blend/` `CommittedFieldBlend` = the BLAKE3-committed archetype field (analog of "frozen evaluator with anchor lower bound").
 
 None of these today implement the full 4-part contract (epoch freeze + boundary replacement + anchor validation + selective erasure) as a unified abstraction. They each implement a slice.

@@ -147,13 +147,13 @@ Two bandwidth axes: K (latent token count) and d (per-token channel). Compressio
 | `katgpt-rs/crates/katgpt-core/src/mux_demux.rs` | MUX superposition + lossless recovery via `mux_demux`. | The "lossless encoder" analog. |
 | `katgpt-rs/crates/katgpt-sense/src/reconstruction.rs::evolve_hla` | Per-NPC 8-dim HLA belief state, dot-product + sigmoid, feeds reconstruction. | The HLA "latent state" — IS it an interpolation-coherent summary, or a routing/copy mechanism? **UNTESTED.** |
 | `riir-ai/crates/riir-engine/src/hla/{kernel,forward,types}.rs` | 8-dim HLA runtime; 5 scalars cross sync boundary. | The per-NPC latent plan analog. |
-| `riir-neuron-db/src/shard.rs::NeuronShard::style_weights[64]` | Fixed-layout Pod weight blob; `#[repr(C)]`. | Compressed latent representation of a weight manifold. Midpoint interpolation untested. |
+| `riir-neuron-db/src/shard/mod.rs::NeuronShard::style_weights[64]` | Fixed-layout Pod weight blob; `#[repr(C)]`. | Compressed latent representation of a weight manifold. Midpoint interpolation untested. |
 | `riir-neuron-db/src/archetype_blend_shard.rs` | 224-byte Pod; π vector + lipschitz bound; BLAKE3-committed. | The committed per-entity latent. Midpoint of two NPCs' π — does it produce a coherent third NPC? **UNTESTED.** |
 | `riir-neuron-db/src/karc_shard.rs` | KARC delay-basis weights Pod. | Same — midpoint untested. |
 | `riir-neuron-db/src/neighbor_heal.rs` (Plan 316) | `neighbor_heal_delta` — weighted style_weights blend toward k-NN. | Applies interpolation; does NOT evaluate whether the result is on-manifold. |
 | `katgpt-rs/crates/katgpt-core/src/faithfulness_probe/` (Plan 278) | `FaithfulnessProbe`, `AttributionProbe`, `TriggeredInjectionGate`. | Binary intervention on injected segments — does NOT cover intervention on per-entity committed state. |
 | `katgpt-rs/src/sp_kv.rs` (Plan 070, window=128), `rt_turbo.rs` (Plan 126, sliding_window=8192) | Sliding-window attention — local head + sink tokens only. | Pressure (iii) — already shipped. |
-| `riir-ai/crates/riir-engine/src/latent_functor/reestimation.rs` | Coherence-driven re-estimation scheduler — "when coherence < tau_reest, re-estimate". | Re-estimation is a form of "is this latent still on-manifold" detection, but on a *single* latent, not on interpolation. |
+| `riir-ai/crates/riir-engine/src/latent_functor/reestimation/mod.rs` | Coherence-driven re-estimation scheduler — "when coherence < tau_reest, re-estimate". | Re-estimation is a form of "is this latent still on-manifold" detection, but on a *single* latent, not on interpolation. |
 
 ### 2.4 Latent-space reframing (mandatory per skill §1.4)
 

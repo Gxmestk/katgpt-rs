@@ -344,7 +344,7 @@ Bebop's `α ≈ a − b·H(p)` is a per-step *scalar acceptance forecast*. ICT's
   - `riir-ai/.research/041_Curiosity_Pulse_Entropy_Driven_Information_Gathering.md` — H1 underspecification curiosity. This is the H1 baseline the β upgrade targets.
   - `katgpt-rs/.research/182_STV_Self_Trained_Verification.md` — uses JS divergence (α=0.5) for OPD. Closest shipped use of JS.
   - `katgpt-rs/.plans/085_deep_manifold_boundary_conditions.md` — `kl_divergence` with JS-proxy. Different use (boundary alignment).
-  - `riir-ai/crates/riir-engine/src/latent_functor/reestimation.rs` — coherence-decay trigger (orthogonal signal — fit quality, not distributional novelty).
+  - `riir-ai/crates/riir-engine/src/latent_functor/reestimation/mod.rs` — coherence-decay trigger (orthogonal signal — fit quality, not distributional novelty).
   - `riir-ai/crates/riir-engine/src/hla/types.rs` — `mq` (second moment), `third_order` (third moment) — moment hierarchy already in HLA.
 - **→ riir-train redirect:** the GRPO modification (sparse gradient mask on top-10% unique tokens during RLVR training) is **training-only**. One-line note, no files created in this session for it. The training pipeline + Algorithm 1 + Algorithm 2 → `riir-train`.
 

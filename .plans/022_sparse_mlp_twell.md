@@ -80,7 +80,7 @@ Add a CPU sparse matmul path for the MLP's second weight matrix (`w2 @ hidden`),
 | `katgpt-rs/src/types.rs` | Add `sparse_matmul()` function |
 | `katgpt-rs/Cargo.toml` | Add `sparse_mlp` feature |
 | `katgpt-rs/crates/katgpt-percepta/src/transformer.rs` | Add buffers to `ForwardContext`, sparse path in forward functions |
-| `katgpt-rs/src/benchmark.rs` | Add sparse vs dense benchmark |
+| `katgpt-rs/src/benchmark/mod.rs` | Add sparse vs dense benchmark |
 | `katgpt-rs/src/gpu/forward.rs` | Add docs comment for GPU sparse rationale |
 | `katgpt-rs/README.md` | Add TwELL Sparse MLP section |
 
