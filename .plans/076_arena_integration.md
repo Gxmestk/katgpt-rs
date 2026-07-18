@@ -631,7 +631,7 @@ cargo test --features ropd_rubric,g_zero,bomber,fft --quiet
 
 1. **T1** → types.rs (no deps)
 2. **T2** → scheduler.rs (depends on T1 types)
-3. **T3** → crates/katgpt-pruners/src/arena/mod.rs + register in pruners/mod.rs (depends on T1, T2)
+3. **T3** → crates/katgpt-pruners/src/arena/mod.rs + register in crates/katgpt-pruners/src/lib.rs (depends on T1, T2)
 4. **T4** → src/pruners/bomber/arena_runner.rs (depends on T1, T3)
 5. **T5** → crates/katgpt-pruners/src/fft/arena_runner.rs (depends on T1, T3)
 6. **T6** → bomber_09_rubric_tournament.rs (depends on T4)

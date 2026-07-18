@@ -25,7 +25,7 @@ The bank operates on any `[f32; D]` state — it carries zero game semantics. Th
 
 ### Tasks
 
-- [x] **T1.1** Create module `katgpt-rs/crates/katgpt-core/src/pruners/indicator_probe_bank.rs`. Add to `pruners/mod.rs` behind `#[cfg(feature = "indicator_probe_bank")]`.
+- [x] **T1.1** Create module `katgpt-rs/crates/katgpt-core/src/pruners/indicator_probe_bank.rs`. Add to `crates/katgpt-pruners/src/lib.rs` behind `#[cfg(feature = "indicator_probe_bank")]`.
 
 - [x] **T1.2** Define the indicator label enum (generic — no game semantics). Numeric discriminant, `#[repr(u8)]`, stable for sync:
 

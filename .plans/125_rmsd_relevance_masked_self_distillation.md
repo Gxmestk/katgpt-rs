@@ -61,7 +61,7 @@ Combined: loss[t] = sdar_gate(Δt) * is_relevant(t) * reverse_kl[t]
 | `RubricReward` | `riir-gpu/src/ropd/` | Rubric scoring — reuse judge infrastructure |
 | `VerifierClient` | `riir-ai/crates/riir-gpu/src/ropd/client.rs` | Judge client — **repurpose for token selection** |
 | `LeviathanVerifier` | Referenced in research 040 | LoRA-as-Judge — use as token relevance judge |
-| `ScreeningPruner` trait | `katgpt-rs-core/src/traits.rs` | Relevance scoring — analogue for modelless path |
+| `ScreeningPruner` trait | `crates/katgpt-core/src/traits/mod.rs` | Relevance scoring — analogue for modelless path |
 | `freeze()`/`thaw()` | `src/pruners/bomber/players.rs` | Bandit knowledge persistence — reuse pattern |
 | `loss_masked.wgsl` | `riir-gpu/src/kernels/` | GPU masked loss kernel — **extend with RMSD positions** |
 | `GZeroLoop` | `riir-train/crates/riir-train-gpu/src/gzero_loop.rs` | Self-play loop — integration point |

@@ -37,7 +37,7 @@ Fuse BAKE precision vectors with MUSE skill lifecycle to create posterior-guided
 - [x] Implement `PosteriorGuidedPruner::lifecycle_action()` — returns current `PrecisionPolicy` decision
 - [x] Implement `PosteriorGuidedPruner::record_structured_evidence()` — accepts full `PosteriorEvidence`
 - [x] Implement `PosteriorGuidedPruner::best_arm()` — posterior-guided best arm selection
-- [x] Re-export `PosteriorGuidedPruner` and `PrecisionPolicyConfig` from mod.rs and pruners/mod.rs
+- [x] Re-export `PosteriorGuidedPruner` and `PrecisionPolicyConfig` from mod.rs and crates/katgpt-pruners/src/lib.rs
 - [x] Unit tests: cold start, retired arm, evidence recording, best arm convergence, all 5 lifecycle actions, custom config
 
 ### Phase 4: Precision-Gated AbsorbCompress ✅ COMPLETE (7 tests pass)

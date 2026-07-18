@@ -10,7 +10,7 @@
 
 # Task
 
-- [x] T1: Add `LeoHead` trait to `katgpt-rs-core/src/traits.rs`
+- [x] T1: Add `LeoHead` trait to `crates/katgpt-core/src/traits/mod.rs`
 - [x] T2: Add `DualLeoMixer` trait + default impl
 - [x] T3: Add `AllGoalsUpdate` trait + vectorized Bellman
 - [x] T4: Add `AutocurriculumSampler` trait + default impl

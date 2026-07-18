@@ -68,7 +68,7 @@ fn relevance(&self, depth: usize, token_idx: usize, parent_tokens: &[usize]) -> 
 - [x] Bandit integration verified: `GdsdPruner<BanditPruner<P>>` works (T5 test)
 - [x] Add `build_dd_tree_gdsd()` variant to `dd_tree.rs` that uses `GdsdPruner`
 - [x] Re-export from `crates/katgpt-core/src/speculative/mod.rs`
-- [x] Module registration in `pruners/mod.rs` with full public exports
+- [x] Module registration in `crates/katgpt-pruners/src/lib.rs` with full public exports
 
 ### Phase 4: GOAT Proof ✅ (8/8)
 - [x] T1: Relevance overhead — 118-141% (3 relevance calls + GDSD blend, acceptable)
