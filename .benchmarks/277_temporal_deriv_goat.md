@@ -1,7 +1,7 @@
 # Plan 277 GOAT Scorecard — Temporal Derivative Kernel
 
 > **📍 Migration note (2026-06-28, Issue 007 Phase C follow-up):** The
-> `crates/katgpt-core/benches/reconstruction_bench.rs` references below moved
+> `riir-ai/crates/riir-engine/benches/reconstruction_bench.rs` references below moved
 > to `riir-ai/crates/riir-engine/benches/reconstruction_bench.rs` (NPC runtime
 > IP — the bench constructs `NpcBrain` which is private runtime code). The
 > reproduction commands should now use `-p riir-engine` with
@@ -34,7 +34,7 @@ The dual fast/slow temporal-derivative kernel (O'Reilly 2026) was distilled into
 
 **Commit:** `9f729711` (wiring) + `4689ef89` (G2 bench gate)
 **Target:** `crates/katgpt-sense/src/reconstruction.rs`
-**Bench:** `crates/katgpt-core/benches/reconstruction_bench.rs` (G2 section)
+**Bench:** `riir-ai/crates/riir-engine/benches/reconstruction_bench.rs` (G2 section)
 **In-crate test:** `surprise_detects_emotional_events_g2_gate`
 
 ### Setup

@@ -305,11 +305,11 @@ katgpt-rs/crates/katgpt-core/src/forensic/
 | `crates/katgpt-core/src/lib.rs` | Export `forensic` module behind feature gate |
 | `riir-chain/src/forensic/mod.rs` | Public API: Recipe, RecipeConfig, apply_*, recover_*, attribute |
 | `riir-chain/src/forensic/recipe.rs` | BLAKE3-seeded recipe derivation, P_vertex constructor |
-| `crates/katgpt-core/src/forensic/tardos.rs` | Anti-collusion codebook (Tardos 2008) |
-| `crates/katgpt-core/src/forensic/vertex.rs` | Vertex perturbation (LoopWM spectral stability) |
+| `riir-chain/src/forensic/tardos.rs` | Anti-collusion codebook (Tardos 2008) |
+| `riir-chain/src/forensic/vertex.rs` | Vertex perturbation (LoopWM spectral stability) |
 | `riir-chain/src/forensic/texture.rs` | DCT mid-frequency embedding + recovery |
 | `crates/katgpt-transformer/src/dense_mesh/topology.rs` | Degenerate-triangle topology mark + recovery |
-| `crates/katgpt-core/src/forensic/recover.rs` | End-to-end forensic recovery + attribution |
+| `riir-chain/src/forensic/recover.rs` | End-to-end forensic recovery + attribution |
 | `riir-chain/benches/forensic_watermark.rs` | Criterion benchmarks for derive/apply/recover |
 | `riir-chain/examples/forensic_watermark_demo.rs` | End-to-end demo |
 | `README.md` | Feature Showcase entry (after G1–G4 pass) |

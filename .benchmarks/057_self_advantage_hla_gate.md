@@ -1,7 +1,7 @@
 # Bench 057: Self-Advantage Gate on HLA Reconstruction (Plan 283 T5.1.3/T5.1.4)
 
 > **📍 Migration note (2026-06-28, Issue 007 Phase C follow-up):** The bench
-> `crates/katgpt-core/benches/self_advantage_hla_bench.rs` moved to
+> `riir-ai/crates/riir-engine/benches/self_advantage_hla_bench.rs` moved to
 > `riir-ai/crates/riir-engine/benches/self_advantage_hla_bench.rs` (NPC
 > runtime IP — the bench constructs `NpcBrain` which is private runtime code).
 > The reproduction command below should now be:
@@ -13,7 +13,7 @@
 **Plan:** [283_self_advantage_recursion_gate.md](../.plans/283_self_advantage_recursion_gate.md) — Phase 5, T5.1
 **Issue:** originally tracked in `028_self_advantage_gate_integration_followups.md` (closed + removed; integrations deferred per Plan 283; this benchmark is the canonical record).
 **Feature:** `self_advantage_gate` (root) → `katgpt-core/self_advantage_gate` (forwarded)
-**Bench:** `crates/katgpt-core/benches/self_advantage_hla_bench.rs`
+**Bench:** `riir-ai/crates/riir-engine/benches/self_advantage_hla_bench.rs`
 **Paper:** [arxiv:2511.16886](https://arxiv.org/abs/2511.16886) — Eq. 18 advantage-margin gate
 
 ---

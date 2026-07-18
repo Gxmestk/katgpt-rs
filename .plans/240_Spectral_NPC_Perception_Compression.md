@@ -1,7 +1,7 @@
 # Plan 240: Spectral NPC Perception Compression
 
 > **📍 Migration note (2026-06-28, Issue 007 Phase C follow-up):** The bench
-> referenced below (`crates/katgpt-core/benches/sense_lod.rs`) moved to
+> referenced below (`riir-ai/crates/riir-engine/benches/sense_lod.rs`) moved to
 > `riir-ai/crates/riir-engine/benches/sense_lod.rs` (NPC runtime IP — the
 > bench constructs `NpcBrain` which is private runtime code). The `sense_lod`
 > feature still exists in `katgpt-core/Cargo.toml` (gates the generic LOD
@@ -60,7 +60,7 @@ Reads `ScaleBoundary` from `SlodOperator` + NPC distance to player/centroid. Ass
 - [x] Modify `batch_project_all` / `batch_project_all_par` to accept `SenseLodRouter` and assign LODs pre-batch
 - [x] Add `#[cfg(feature = "sense_lod")]` gate on all new code; feature requires `sense_composition` + `slod` in `Cargo.toml`
 - [x] Add unit tests: mask correctness, skip behavior, fallback when no boundaries
-- [x] Create benchmark `crates/katgpt-core/benches/sense_lod.rs`: 200 NPCs, measure CPU reduction vs behavioral delta
+- [x] Create benchmark `riir-ai/crates/riir-engine/benches/sense_lod.rs`: 200 NPCs, measure CPU reduction vs behavioral delta
 
 ## GOAT Gate
 

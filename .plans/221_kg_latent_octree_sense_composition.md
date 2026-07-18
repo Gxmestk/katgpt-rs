@@ -81,7 +81,7 @@ Compress game domain knowledge into fixed-type ternary bit-plane sense modules (
 
 ### Phase 2: NpcBrain + GM Override
 
-- [x] **T5: NpcBrain with GM override mask** (`crates/katgpt-core/src/sense/brain.rs`)
+- [x] **T5: NpcBrain with GM override mask** (`riir-ai/crates/riir-engine/src/sense/brain.rs`)
   - `pub struct NpcBrain` — modules: Vec<SenseModule>, hla_state: [f32; 8], overrides: SenseOverride
   - `pub struct SenseOverride` — pinned: [(SenseKind, f32); MAX_OVERRIDES], autonomous_disabled: bool, script_id: Option<u64>
   - `NpcBrain::compose(modules: Vec<SenseModule>)` — load at NPC spawn time

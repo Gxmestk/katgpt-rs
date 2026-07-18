@@ -122,7 +122,7 @@ At matched per-turn FPR ~15%: 18-probe transcript-TPR = 90.8%, 5-behavior-probe 
 | Two-stage cascade (cheap online filter + heavy offline verifier) | `TriggeredInjectionGate` (plasma-tier hot path) + `AuditRunner` (periodic) + `AntiCheatChecker` (event emission) in `riir-engine/src/integrity/` (Plan 308, Research 129) | Cascade | ✅ shipped (game-runtime side) |
 | Raw scalar at sync boundary (5 emotion scalars, not the full embedding) | `RawInjectionSignature { valence, arousal, desperation, calm, fear }` in `riir-ai/crates/riir-engine/src/integrity/types.rs` | Raw/latent bridge | ✅ shipped |
 | KG triple emission from latent similarity | `KgTripleTemplate { subject, predicate, object }` in `riir-neuron-db/src/vibe.rs`; `kg_probe` in integrity/ | KG triple | ✅ shipped |
-| Pre-NPC 8-dim latent state (the probe substrate) | `NpcBrain::hla_state: [f32; 8]` in `katgpt-core/src/sense/brain.rs`; `evolve_hla` belief kernel (Research 242) | Belief state | ✅ shipped |
+| Pre-NPC 8-dim latent state (the probe substrate) | `NpcBrain::hla_state: [f32; 8]` in `riir-ai/crates/riir-engine/src/sense/brain.rs`; `evolve_hla` belief kernel (Research 242) | Belief state | ✅ shipped |
 | Per-NPC recurrent belief-state kernel | `evolve_hla` (`crates/katgpt-sense/src/reconstruction.rs`, R242) | Belief state | ✅ shipped |
 | Betrayal / friendship / trade as displacement in latent space | `latent_functor` (Plan 303, Research 123, `riir-engine/src/latent_functor/`) — already models "betrayal" as relational displacement | Relational direction | ✅ shipped |
 | Causal intervention probe (input-side) | `FaithfulnessProbe` (Plan 278, `behavior_delta` trait method) | Input-side faithfulness | ✅ shipped |

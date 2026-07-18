@@ -6,7 +6,7 @@
 > `riir-ai/crates/riir-engine/`. They construct `NpcBrain` which is now
 > private NPC runtime IP. The reconstruction substrate they consume
 > (`katgpt_core::sense::reconstruction`) stays public. The bench referenced
-> below (`crates/katgpt-core/benches/reconstruction_bench.rs`) ALSO moved to
+> below (`riir-ai/crates/riir-engine/benches/reconstruction_bench.rs`) ALSO moved to
 > `riir-ai/crates/riir-engine/benches/reconstruction_bench.rs`. Historical task records
 > below reflect the original locations.
 

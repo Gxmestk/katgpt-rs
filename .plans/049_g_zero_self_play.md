@@ -562,7 +562,7 @@ SelfImprovingCycle {
     ├── Path B (Phase 1):   DeltaGatedAbsorbCompress + DeltaBanditPruner (smarter modelless)
     └── Path C (Phase 2):   Proposer↔Generator self-play → DPO LoRA  (model-based G-Zero)
                               ├─ SFT + DPO loss: riir-ai/crates/riir-gpu/src/loss.rs (GpuLoss CE + DPO extension)
-                              ├─ Backward pass:  riir-gpu/src/backward.rs (LoRA grads)
+                              ├─ Backward pass:  riir-ai/crates/riir-engine/src/transformer/gemma2_train/backward.rs (LoRA grads)
                               ├─ Optimizer:      crates/katgpt-core/src/skill_opt/optimizer.rs (AdamW)
                               └─ Alt SFT path:   riir-burner --backend rust (burn/Metal subprocess, SFT only)
 }

@@ -347,7 +347,7 @@ Separate commits per logical unit:
 
 | File | Change | Lines |
 |------|--------|-------|
-| `riir-gpu/src/backward.rs` | Fix attention gradient computation, re-enable test | ~110 |
+| `riir-ai/crates/riir-engine/src/transformer/gemma2_train/backward.rs` | Fix attention gradient computation, re-enable test | ~110 |
 | `riir-gpu/src/distill.rs` | Replace KL placeholder with real computation | ~60 |
 | `riir-ai/crates/riir-gpu/src/game/replay.rs` | Implement `parse_replay()` from stub | ~45 |
 | `riir-ai/crates/riir-gpu/src/kernels/mod.rs` | Add 5 new pipelines (4 PFlash + 1 TQ) | ~30 |
@@ -535,7 +535,7 @@ Cross-reference of all 21 research papers evaluated against the riir-ai / katgpt
 
 **Resolution:** Implemented proper per-head softmax Jacobian gradient computation. Each attention head now independently computes `dL/d_scores` from `dL/d_attn_output` before propagating through the output projection.
 
-**File:** `riir-gpu/src/backward.rs`
+**File:** `riir-ai/crates/riir-engine/src/transformer/gemma2_train/backward.rs`
 
 ### Task 2: KL Divergence Fix
 **Finding:** `distill.rs` had a `0.0` placeholder for KL divergence loss, making knowledge distillation a no-op.

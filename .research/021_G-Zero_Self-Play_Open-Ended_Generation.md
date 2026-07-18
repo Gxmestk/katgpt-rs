@@ -184,7 +184,7 @@ None of these work for **open-ended generation** (write a doc, explain a concept
 Hint-δ needs two log-prob evaluations per token: `log π_G(a_t | q, a_<t)` and `log π_G(a_t | q, h, a_<t)`. Both are already computed during normal decoding:
 
 - `riir-ai/crates/riir-gpu/src/loss.rs` already emits a `log_probs_buf` for cross-entropy. That's the unconditioned term.
-- The hint-conditioned term is a second forward pass with `h` prepended — *or*, if we're already running with the **EmbeddingRouter + KV cache priming** (`riir-router/embedding.rs`, Plan 024), the hint is *already* in the KV prefix. We just need to also run an unconditioned pass at training data collection time.
+- The hint-conditioned term is a second forward pass with `h` prepended — *or*, if we're already running with the **EmbeddingRouter + KV cache priming** (`riir-ai/crates/riir-router/src/embedding.rs`, Plan 024), the hint is *already* in the KV prefix. We just need to also run an unconditioned pass at training data collection time.
 
 Implementation surface:
 - New helper `compute_hint_delta(q, h, a) -> f32` in `riir-gpu` using two passes through `loss.rs::log_probs_buf`.
@@ -224,7 +224,7 @@ Rule-based query-hint generator replacing the neural Proposer for Phase 1:
 ##### 2a. Prompt Router as Proposer (High Value, Architectural Fit)
 
 The **Proposer** in G-Zero generates `(query, hint)` pairs. Our `riir-router` is *almost* this object today:
-- `riir-router/keyword.rs` and `embedding.rs` already map `query → (domain, hint-via-KV-prime)`.
+- `riir-ai/crates/riir-router/src/keyword.rs` and `embedding.rs` already map `query → (domain, hint-via-KV-prime)`.
 - `riir-router/registry.rs` maps domain → expert pruner + LoRA path.
 
 The router emits hints as KV-cache primes; G-Zero wants explicit hint *text* fed into the Generator. The gap is small: have the router additionally emit a textual hint (a routed example, a doc snippet, a domain prompt-prefix) into the Generator's context — which is what RAG already does. **Plan 023 (Prompt Router) + Plan 024 (Embedding Router KV Prime) together = a Proposer prototype.** What's missing is the **training** of the Proposer to *maximize* Hint-δ, rather than just retrieve nearest neighbors.
