@@ -1,7 +1,7 @@
 # Benchmark 466 — Causal-ID P4 zero-alloc districts + fixseq
 
 > **Primitive:** `causal_id::identify` (Plan 457, Super-GOAT)
-> **Issue:** [184](../.issues/184_causal_id_p4_zero_alloc.md)
+> **Issue:** 184 (removed per noise-reduction rule; canonical content lives here + [Plan 457](../.plans/457_causal_id_counterfactual_npc_reasoning.md) Super-GOAT guide P4)
 > **Predecessor:** [465](./465_causal_id_alloc_free_scratch.md) — Issue 183 Scratch refactor
 > **Date:** 2026-07-18
 > **Machine:** Apple Silicon (M-series), release build, `criterion --quick`

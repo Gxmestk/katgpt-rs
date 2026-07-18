@@ -1,7 +1,7 @@
 # Benchmark 465 — Causal-ID `identify_inner` G4 alloc-free scratch refactor
 
 > **Date:** 2026-07-18
-> **Issue:** [183](../.issues/183_causal_id_alloc_free_scratch.md)
+> **Issue:** 183 (removed per noise-reduction rule; canonical content lives here + [Plan 457](../.plans/457_causal_id_counterfactual_npc_reasoning.md) Phase 2)
 > **Plan:** [457](../.plans/457_causal_id_counterfactual_npc_reasoning.md) Phase 2 G4 (closed by this benchmark)
 > **Research:** [450](../.research/450_Algorithmic_Syntactic_Causal_Identification.md) — Super-GOAT verdict
 > **Feature:** `causal_identification` (DEFAULT-ON)
