@@ -1424,3 +1424,14 @@ required-features = ["lacam_escalation"]
 name = "bench_457_grapem_rodrigues_goat"
 harness = false
 required-features = ["grapem_rodrigues"]
+
+# Plan 449 — Poincaré Adapter GOAT gate (Phase 2).
+# G1 local decodability + G2 global unrolling + G3 inverse round-trip + G4
+# zero-alloc + G5 latency < 1µs + G6 multi-step coherence + G7 latent-vs-raw
+# boundary. Run with:
+#   CARGO_TARGET_DIR=/tmp/plan449 cargo bench -p katgpt-core \
+#       --features poincare_navigator --bench bench_449_poincare_goat -- --nocapture
+[[bench]]
+name = "bench_449_poincare_goat"
+harness = false
+required-features = ["poincare_navigator"]
