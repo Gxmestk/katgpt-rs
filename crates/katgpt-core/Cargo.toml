@@ -1437,3 +1437,14 @@ required-features = ["grapem_rodrigues"]
 name = "bench_449_poincare_goat"
 harness = false
 required-features = ["poincare_navigator"]
+
+# Plan 457 Phase 2 — Causal-ID GOAT gate.
+# G1 soundness on 4 PoC scenarios (Issue 545 reproduction) + G2 ≤ 100µs
+# identify on 32-node subgraph + G3 no-regression (covered by lib tests) +
+# G4 alloc-free steady state (separate audit). Run with:
+#   CARGO_TARGET_DIR=/tmp/causal_id_goat cargo bench -p katgpt-core \
+#       --features causal_identification --bench causal_id_goat -- --nocapture
+[[bench]]
+name = "causal_id_goat"
+harness = false
+required-features = ["causal_identification"]

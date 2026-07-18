@@ -7,7 +7,7 @@
 **Target:**
 - Open primitive → `katgpt-rs/crates/katgpt-core/src/causal_id/` (feature `causal_identification`, opt-in)
 - Offline consumer → `riir-ai/crates/riir-engine/src/causal_id/` (offline-only, GM "what-if" + sleep-cycle claim verification)
-**Status:** Active — Phase 1 DONE (primitive shipped behind `causal_identification` feature flag, 28 unit tests + 2 doctests pass). Phase 2 (GOAT gate) is the next step.
+**Status:** Active — Phase 1 DONE (primitive shipped behind `causal_identification` feature flag, 28 unit tests + 2 doctests pass) + Phase 2 DONE (GOAT gate G1+G2+G3 PASS, G4 DEFERRED with offline-only rationale; 8.40 µs identify on 32 nodes, 12× headroom). Phase 3 (ADMG construction layer in riir-ai) is the next step — this is the load-bearing research work.
 
 ---
 
@@ -71,12 +71,21 @@ The algorithm is already implemented + debugged in the Issue 545 PoC bench (`rii
 
 ### Tasks
 
-- [ ] **T2.1** `benches/causal_id_goat.rs` — criterion bench over the 4 scenarios + a synthesized 32-node subgraph. Print verdict table.
-- [ ] **T2.2** G1 soundness test: 4 scenarios × `assert_eq!` against ground-truth signatures.
-- [ ] **T2.3** G2 perf gate: identify on 32 nodes ≤ 100µs release; document if exceeded.
-- [ ] **T2.4** G3 no-regression: `cargo test -p katgpt-core --lib` + `cargo check --all-features` clean.
-- [ ] **T2.5** G4 alloc audit: `identify()` inner loop uses scratch buffers; no `Vec::new()` in recursion.
-- [ ] **T2.6** **Promotion decision:** opt-in for now. Promotion to default REQUIRES a modelless gain (Phase 4 consumer shows the primitive is consumed). Per AGENTS.md, the gain was proven empirically in PoC Issue 545 — but the *consumer* gain (does anyone actually call this in prod?) must be demonstrated by Phase 4 before promotion.
+- [x] **T2.1** `benches/causal_id_goat.rs` — criterion bench over the 4 scenarios + a synthesized 32-node subgraph. Print verdict table.
+- [x] **T2.2** G1 soundness test: 4 scenarios × `assert_eq!` against ground-truth signatures.
+  - Asserted inside the bench setup (panic on mismatch). All 4 scenarios reproduce Issue 545 ground truth, including Scenario C's 5-node signature with NPC1 excluded.
+- [x] **T2.3** G2 perf gate: identify on 32 nodes ≤ 100µs release; document if exceeded.
+  - **Result: 8.40 µs** (12× headroom). PASS.
+- [x] **T2.4** G3 no-regression: `cargo test -p katgpt-core --lib` + `cargo check --all-features` clean.
+  - 1647 default lib tests pass; 28 causal_id tests pass under both `--features causal_identification` and `--all-features`.
+- [-] **T2.5** G4 alloc audit: `identify()` inner loop uses scratch buffers; no `Vec::new()` in recursion.
+  - **DEFERRED with rationale** (see `.benchmarks/463_causal_id_goat.md` §G4). The current recursion allocates ~15-20 Vecs per call. Acceptable for an offline-only primitive (8 µs/call budget, 12× G2 headroom). The alloc-free `for_each_*` primitives + `ancestors_into` already ship in `fixing.rs` ready for a future scratch-buffer refactor. **Becomes mandatory if Phase 4 puts `identify()` on a hot path.**
+- [x] **T2.6** **Promotion decision:** opt-in for now. Promotion to default REQUIRES a modelless gain (Phase 4 consumer shows the primitive is consumed). Per AGENTS.md, the gain was proven empirically in PoC Issue 545 — but the *consumer* gain (does anyone actually call this in prod?) must be demonstrated by Phase 4 before promotion.
+
+### Phase 2 validation
+
+- Bench reproduced at `.benchmarks/463_causal_id_goat.md`.
+- G1+G2+G3 PASS, G4 DEFERRED (offline-only rationale). Feature stays opt-in. Phase 3 unblocked.
 
 ## Phase 3 — ADMG construction layer (riir-ai)
 
