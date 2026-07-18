@@ -67,9 +67,12 @@ This prevents `src/foo.rs` from matching inside `crates/X/src/foo.rs`
 | riir-train | 336 | 36+449 | 38+137+55+50+9 | Sibling-repo refs dominate |
 | seal-online-remaster | 1050 | 0+3 | 117+41+16+188+0 | Big consumer; 188 TRULY_GONE |
 | poc-maxman | 9 | 2+7 | 3+0+0+1+1 | Tiny |
-| **TOTAL** | **8359** | **1070+2436** | **716+417+360+575+235 = 2328** | |
+| **TOTAL** | **8359** | **1070+2562** | **713+417+233+579+233 = 2200** | |
 
-Total stale dropped from ~9004 (session-8 end) → 2328 (session-9 end).
+(Updated after final cross-repo-migrations pass: AMBIGUOUS_RESOLVED_CROSS
+233 (down from 360), CROSS_REPO_PREFIXED_VALID 2562 (up from 2436).)
+
+Total stale dropped from ~9004 (session-8 end) → 2200 (session-9 end).
 
 ## What remains (3 classes)
 
@@ -127,7 +130,7 @@ Session 9 includes:
 
 ## Commits landed in session 9
 
-32 commits across 8 repos. Highlights:
+33+ commits across 8 repos. Highlights:
 
 | Repo | Strategy | Replacements | Commit(s) |
 |---|---|---:|---|
@@ -146,6 +149,8 @@ Session 9 includes:
 | All 7 | Module→crate name match | ~385 | 8a148554, ced344f4, ... |
 | All 7 | Parent-dir→crate-suffix match | ~260 | 2107af8f, 6c80b9b1, ... |
 | All 7 | Git rename history | ~100 | d186e211, 41ae7a81, ... |
+
+| All 7 | Cross-repo migrations via git history | ~130 | 195a2040, 3c123685, ... |
 
 (Full per-commit list available via `git log --oneline --since="1 day ago"`
 in each repo.)
