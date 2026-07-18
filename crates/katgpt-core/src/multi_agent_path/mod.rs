@@ -86,6 +86,7 @@ pub use local_guidance::{
     Guidance, GuidanceConfig, LocalGuidanceSource, SpaceTimeGuidance,
 };
 pub use pibt::{pibt_step, Deadlock, NeighborFn};
+use pibt::pibt_step_with_budget;
 pub use position::{soft_cost, GridMap, GridPos, Position};
 pub use warm_start::{WarmStartCache, WarmStartScheme};
 
@@ -247,6 +248,15 @@ pub struct LifelongLaCam<P: Position> {
     /// When `None`, uses [`NoFlow`] (paper-faithful — no corridor enforcement).
     /// Set via [`with_flow_field`](Self::with_flow_field) for maze maps.
     flow_field: Option<FlowFieldBox<P>>,
+    /// LaCAM escalation budget (Issue 546 multi-step extension).
+    ///
+    /// Only consulted when the `lacam_escalation` feature is ON. Defaults to
+    /// [`EscalationBudget::default`] (Plan 453 one-step behavior). Set to
+    /// [`EscalationBudget::multistep_default`] via
+    /// [`with_escalation_budget`](Self::with_escalation_budget) for maze maps
+    /// where stuck-agent targeting + higher depth is needed.
+    #[cfg(feature = "lacam_escalation")]
+    escalation_budget: EscalationBudget,
 }
 
 impl<P: Position> LifelongLaCam<P> {
@@ -263,6 +273,8 @@ impl<P: Position> LifelongLaCam<P> {
             priorities: Vec::new(),
             neighbors_fn: None,
             flow_field: None,
+            #[cfg(feature = "lacam_escalation")]
+            escalation_budget: EscalationBudget::default(),
         }
     }
 
@@ -302,6 +314,27 @@ impl<P: Position> LifelongLaCam<P> {
         F: FlowField<P> + Send + Sync + 'static,
     {
         self.flow_field = Some(Box::new(flow_field));
+        self
+    }
+
+    /// Set the LaCAM escalation budget (Issue 546 multi-step extension).
+    ///
+    /// Only consulted when the `lacam_escalation` feature is ON. The default
+    /// budget ([`EscalationBudget::default`]) reproduces Plan 453 one-step
+    /// behavior. Pass [`EscalationBudget::multistep_default`] to enable
+    /// stuck-agent targeting + depth-8 search for maze-class maps.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use katgpt_core::multi_agent_path::*;
+    /// # let warm = WarmStartCache::new(WarmStartScheme::default(), 0.0);
+    /// let lacam = LifelongLaCam::new(warm)
+    ///     .with_escalation_budget(EscalationBudget::multistep_default());
+    /// ```
+    #[cfg(feature = "lacam_escalation")]
+    pub fn with_escalation_budget(mut self, budget: EscalationBudget) -> Self {
+        self.escalation_budget = budget;
         self
     }
 
@@ -365,7 +398,7 @@ impl<P: Position> LifelongLaCam<P> {
             }
         };
 
-        let action = pibt_step(
+        let action = pibt_step_with_budget(
             config,
             &self.guidance_scratch,
             goals,
@@ -374,6 +407,8 @@ impl<P: Position> LifelongLaCam<P> {
             flow,
             self.neighbors_fn.as_deref(),
             rng,
+            #[cfg(feature = "lacam_escalation")]
+            self.escalation_budget,
         )
         .unwrap_or_else(|deadlock| {
             log::debug!(

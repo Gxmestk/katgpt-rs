@@ -974,6 +974,13 @@ required-features = ["multi_agent_path"]
 name = "ht_chantry_deadlock_chain_diagnostic"
 required-features = ["lacam_escalation"]
 
+# Issue 546 (riir-ai) multi-step A/B — throughput delta between default
+# (Plan 453 one-step) and multistep (stuck-agent targeting + depth 8) budgets
+# on ht_chantry-real. Reports whether multi-step closes the G1 gap (≥0.30).
+[[example]]
+name = "ht_chantry_multistep_ab"
+required-features = ["lacam_escalation"]
+
 # Plan 336 Phase 2 T2.2 — best_belief G2 perf gate. Reports median latency
 # for best_belief_score (target ≤ 100 ns) and select_best_belief on 4 and 8
 # candidates (target ≤ 500 ns).

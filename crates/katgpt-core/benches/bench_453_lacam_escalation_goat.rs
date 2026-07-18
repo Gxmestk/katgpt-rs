@@ -376,6 +376,8 @@ fn main() {
         let budget = EscalationBudget {
             max_nodes,
             time_budget_us: 5_000_000, // 5s — generous, let max_nodes be the binding constraint
+            max_depth: 8,               // Issue 546 multi-step: same default as EscalationBudget::default
+            target_stuck_agents: false,  // Legacy Plan 453 behavior for this bench
         };
         let (median_us, max_us, rate) = run_latency_sweep(&map, &starts, &goals, 200, 42, budget);
         println!("  {:>10}  {:>14.1}  {:>14.1}  {:>17.1}%", max_nodes, median_us, max_us, rate * 100.0);

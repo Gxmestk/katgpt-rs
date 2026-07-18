@@ -449,9 +449,27 @@ fn run_simulation(
     let warm = WarmStartCache::new(WarmStartScheme::default(), cfg.w_phi);
     let flow = GridFlowField::from_map(map);
     let map_clone2 = map.clone();
-    let mut lacam = LifelongLaCam::new(warm)
+    let lacam = LifelongLaCam::new(warm)
         .with_neighbors(move |p| map_clone2.passable_neighbors(p))
         .with_flow_field(flow);
+
+    // Issue 546 multi-step extension: opt in via LLLG_MULTISTEP=1 env var.
+    // When set, uses EscalationBudget::multistep_default() (stuck-agent
+    // targeting + depth-8 + larger node/time budget) for maze-class maps.
+    // Default: not set → Plan 453 one-step behavior (paper-faithful).
+    let multistep = std::env::var("LLLG_MULTISTEP")
+        .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
+        .unwrap_or(false);
+    #[cfg(feature = "lacam_escalation")]
+    let mut lacam = if multistep {
+        lacam.with_escalation_budget(EscalationBudget::multistep_default())
+    } else {
+        lacam
+    };
+    #[cfg(not(feature = "lacam_escalation"))]
+    let _ = multistep;
+    #[cfg(not(feature = "lacam_escalation"))]
+    let mut lacam = lacam;
 
     // Run simulation.
     let mut current = config;

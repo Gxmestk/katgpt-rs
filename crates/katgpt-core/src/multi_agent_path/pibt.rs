@@ -228,30 +228,68 @@ where
     P: Position,
     H: HindranceEstimator<P>,
 {
+    // Delegate to pibt_step_with_budget with the default budget. When the
+    // lacam_escalation feature is ON, the default budget reproduces Plan 453
+    // one-step behavior; callers who want multi-step (Issue 546) call
+    // pibt_step_with_budget directly with EscalationBudget::multistep_default().
+    #[cfg(feature = "lacam_escalation")]
+    {
+        pibt_step_with_budget(
+            config,
+            guidance,
+            goals,
+            priorities,
+            hindrance,
+            flow_field,
+            neighbors_fn,
+            rng,
+            super::lacam::EscalationBudget::default(),
+        )
+    }
+    #[cfg(not(feature = "lacam_escalation"))]
+    {
+        pibt_step_with_budget(
+            config,
+            guidance,
+            goals,
+            priorities,
+            hindrance,
+            flow_field,
+            neighbors_fn,
+            rng,
+        )
+    }
+}
+
+/// PIBT step with an explicit LaCAM escalation budget (Issue 546 multi-step).
+///
+/// Same as [`pibt_step`] but accepts an [`EscalationBudget`] argument, allowing
+/// callers to opt into stuck-agent targeting + deeper constraint-tree search.
+/// Only available when the `lacam_escalation` feature is ON.
+///
+/// [`EscalationBudget`]: super::lacam::EscalationBudget
+#[allow(clippy::too_many_arguments)]
+#[cfg(feature = "lacam_escalation")]
+pub(in crate::multi_agent_path) fn pibt_step_with_budget<P, H>(
+    config: &JointConfig<P>,
+    guidance: &Guidance<P>,
+    goals: &[P],
+    priorities: &[f32],
+    hindrance: &mut H,
+    flow_field: &dyn FlowField<P>,
+    neighbors_fn: Option<&NeighborFn<P>>,
+    rng: &mut fastrand::Rng,
+    budget: super::lacam::EscalationBudget,
+) -> Result<JointAction<P>, Deadlock>
+where
+    P: Position,
+    H: HindranceEstimator<P>,
+{
     let n = config.n_agents();
     let order = compute_priority_order(n, priorities);
 
-    // Empty backer set — the swap technique (Issue 144) is infrastructure-only.
-    //
-    // Issue 144 benchmarked the swap technique (Okumura 2023a) and found it
-    // does NOT improve any GOAT-gate map:
-    //   - ht_chantry (target): 0.01 → 0.01 (unchanged — the synthetic maze
-    //     uses 2-wide corridors, not 1-wide; agents sidestep naturally and
-    //     the swap pattern rarely fires)
-    //   - warehouse: 0.42 → 0.24 (REGRESSED — forced back-ups in aisles reduce
-    //     sustained throughput; fewer stuck agents ≠ higher throughput)
-    //   - empty/random: unchanged (swap gated behind congestion threshold)
-    //
-    // The swap technique is the right algorithm for 1-wide corridor maps
-    // (Okumura's warehouse-20-40-10-2-1), but our benchmark maps don't have
-    // that topology. The infrastructure (detect_swap_backers + the
-    // greedy_pibt_pass swap_backers parameter) is kept for consumers with
-    // 1-wide-corridor maps who can opt in via a custom escalation path.
-    // This mirrors the recursive-PIBT finding (Issue 143): forcing agents to
-    // move away from their goals hurts lifelong MAPF throughput.
     let no_backers = vec![false; n];
 
-    // First pass: greedy PIBT with the given priority order.
     let (moves, stuck) = greedy_pibt_pass(
         config,
         guidance,
@@ -264,56 +302,61 @@ where
         &no_backers,
     );
 
-    // Fast path: no stuck agents (or too few to justify retry overhead).
-    // On open maps this is the overwhelmingly common case.
-    //
-    // NOTE (Proposal 023 / Issue 516 G6c measurement, 2026-07-15): when stuck
-    // agents exist, the forced-wait in `greedy_pibt_pass` creates vertex
-    // collisions (the stuck agent's current position is committed by another
-    // agent). The all-wait fallback (return `config.positions.clone()` when
-    // stuck is non-empty) fixes collisions but kills throughput on congested
-    // maps (G6a: 26.7% → 0.0%, G7a: 12 ticks → 200 ticks). The proper fix is
-    // PIBT priority inheritance (Okumura 2019), tracked as a separate issue.
-    // The current behavior (collisions on congested ticks) is the lesser evil
-    // vs zero throughput — consumers that need guaranteed collision-freedom
-    // should use the occupied-set baseline.
-    //
-    // Plan 453 (lacam_escalation): the threshold is lowered to 1 when the
-    // feature is ON. The constraint tree resolves even a single stuck agent
-    // collision-free via recursive PIBT — unlike the shuffled retry which
-    // needed 20+ stuck agents to justify its overhead. The greedy fast path
-    // (zero stuck agents) is unaffected, so open-map throughput is preserved.
-    #[cfg(feature = "lacam_escalation")]
-    const MIN_STUCK_FOR_LACAM_GATE: usize = 1;
-    #[cfg(not(feature = "lacam_escalation"))]
-    const MIN_STUCK_FOR_LACAM_GATE: usize = MIN_STUCK_FOR_RETRY;
-
-    if stuck.len() < MIN_STUCK_FOR_LACAM_GATE {
+    if stuck.len() < super::lacam::MIN_STUCK_FOR_LACAM {
         return Ok(JointAction::new(moves));
     }
 
-    // LaCAM escalation. When the `lacam_escalation` feature is ON (Plan 453),
-    // delegate to the real LaCAM constraint-tree search + recursive PIBT.
-    // When OFF, use the legacy shuffled-priority retry (Issue 143 — NOT real
-    // LaCAM, kept as the GOAT-gate baseline).
-    #[cfg(feature = "lacam_escalation")]
-    {
-        Ok(super::lacam::lacam_escalation_step(
-            config,
-            guidance,
-            goals,
-            priorities,
-            hindrance,
-            flow_field,
-            neighbors_fn,
-            rng,
-            super::lacam::EscalationBudget::default(),
-        ))
+    Ok(super::lacam::lacam_escalation_step(
+        config,
+        guidance,
+        goals,
+        priorities,
+        hindrance,
+        flow_field,
+        neighbors_fn,
+        rng,
+        budget,
+    ))
+}
+
+/// PIBT step without lacam_escalation feature (legacy shuffled retry path).
+#[allow(clippy::too_many_arguments)]
+#[cfg(not(feature = "lacam_escalation"))]
+pub(in crate::multi_agent_path) fn pibt_step_with_budget<P, H>(
+    config: &JointConfig<P>,
+    guidance: &Guidance<P>,
+    goals: &[P],
+    priorities: &[f32],
+    hindrance: &mut H,
+    flow_field: &dyn FlowField<P>,
+    neighbors_fn: Option<&NeighborFn<P>>,
+    rng: &mut fastrand::Rng,
+) -> Result<JointAction<P>, Deadlock>
+where
+    P: Position,
+    H: HindranceEstimator<P>,
+{
+    let n = config.n_agents();
+    let order = compute_priority_order(n, priorities);
+
+    let no_backers = vec![false; n];
+
+    let (moves, stuck) = greedy_pibt_pass(
+        config,
+        guidance,
+        goals,
+        hindrance,
+        flow_field,
+        neighbors_fn,
+        rng,
+        &order,
+        &no_backers,
+    );
+
+    if stuck.len() < MIN_STUCK_FOR_RETRY {
+        return Ok(JointAction::new(moves));
     }
 
-    // Legacy path: shuffled-priority retry (Issue 143). Used when
-    // `lacam_escalation` is OFF.
-    #[cfg(not(feature = "lacam_escalation"))]
     legacy_shuffled_retry(
         config, guidance, goals, hindrance, flow_field, neighbors_fn, rng, &order, &no_backers,
         moves, stuck,

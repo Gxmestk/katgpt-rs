@@ -1507,5 +1507,100 @@ mod lacam_escalation_tests {
         let b = EscalationBudget::default();
         assert!(b.max_nodes > 0, "default max_nodes should be positive");
         assert!(b.time_budget_us > 0, "default time_budget_us should be positive");
+        // Issue 546 multi-step extension: default budget should NOT target
+        // stuck agents (preserves Plan 453 paper-faithful behavior).
+        assert!(!b.target_stuck_agents, "default should not target stuck agents");
+        assert!(b.max_depth > 0, "default max_depth should be positive");
+    }
+
+    /// T2.6f (Issue 546): multistep_default budget is sensible and opts in
+    /// to stuck-agent targeting + depth-8 search.
+    #[test]
+    fn test_escalation_budget_multistep_default() {
+        let b = EscalationBudget::multistep_default();
+        assert!(b.target_stuck_agents, "multistep should target stuck agents");
+        assert_eq!(b.max_depth, 8, "multistep max_depth should be 8 (P95 ht_chantry)");
+        assert!(b.max_nodes >= 10_000, "multistep max_nodes should allow deep search");
+        assert!(b.time_budget_us >= 10_000, "multistep time budget should allow deep search");
+    }
+
+    /// T2.6g (Issue 546): with_escalation_budget wires the budget through tick.
+    ///
+    /// This is a smoke test: just verify the budget field is set and tick runs
+    /// without panic. The actual throughput improvement is measured by
+    /// bench_440_lllg_paper_repro, not here.
+    #[test]
+    fn test_with_escalation_budget_wires_through_tick() {
+        let map = GridMap::empty(5, 5);
+        let starts = vec![
+            GridPos::new(0, 0),
+            GridPos::new(4, 0),
+            GridPos::new(0, 4),
+            GridPos::new(4, 4),
+        ];
+        let config = JointConfig::new(starts);
+        let goals = vec![GridPos::new(2, 2); 4];
+        let cfg = GuidanceConfig::default();
+        let mut guidance = make_guidance(&map, cfg);
+        let mut hindrance = BlockingCount::new();
+        let mut rng = Rng::with_seed(2026);
+        let map_clone = map.clone();
+        let mut lacam =
+            LifelongLaCam::new(WarmStartCache::new(WarmStartScheme::default(), cfg.w_phi))
+                .with_neighbors(move |p| map_clone.passable_neighbors(p))
+                .with_escalation_budget(EscalationBudget::multistep_default());
+
+        let mut current = config;
+        for _ in 0..10 {
+            let action = lacam.tick(&current, &goals, &mut guidance, &mut hindrance, &mut rng);
+            assert_eq!(action.moves.len(), 4, "JointAction has one move per agent");
+            current = JointConfig::new(action.moves);
+        }
+    }
+
+    /// T2.6h (Issue 546): multistep_default does NOT regress an open map.
+    ///
+    /// Open maps have no corridors and well-separated agents → no stuck agents
+    /// → the multistep budget is never consulted. Throughput should match the
+    /// default budget (both hit the greedy fast path).
+    #[test]
+    fn test_multistep_no_regression_on_open_map() {
+        let map = GridMap::empty(10, 10);
+        let starts = vec![
+            GridPos::new(0, 0),
+            GridPos::new(9, 0),
+            GridPos::new(0, 9),
+            GridPos::new(9, 9),
+        ];
+        let goals = vec![
+            GridPos::new(9, 9),
+            GridPos::new(0, 0),
+            GridPos::new(9, 0),
+            GridPos::new(0, 9),
+        ];
+        let config = JointConfig::new(starts);
+        let cfg = GuidanceConfig::default();
+        let mut guidance = make_guidance(&map, cfg);
+        let mut hindrance = BlockingCount::new();
+        let mut rng = Rng::with_seed(7);
+        let map_clone = map.clone();
+        let mut lacam =
+            LifelongLaCam::new(WarmStartCache::new(WarmStartScheme::default(), cfg.w_phi))
+                .with_neighbors(move |p| map_clone.passable_neighbors(p))
+                .with_escalation_budget(EscalationBudget::multistep_default());
+
+        let mut current = config;
+        let mut collisions = 0;
+        for _ in 0..100 {
+            let action = lacam.tick(&current, &goals, &mut guidance, &mut hindrance, &mut rng);
+            let mut seen = std::collections::HashSet::new();
+            for p in &action.moves {
+                if !seen.insert(*p) {
+                    collisions += 1;
+                }
+            }
+            current = JointConfig::new(action.moves);
+        }
+        assert_eq!(collisions, 0, "open map + multistep budget should have 0 collisions");
     }
 }

@@ -61,13 +61,27 @@ pub const DEFAULT_MAX_NODES: usize = 1000;
 /// falls back to greedy PIBT.
 pub const DEFAULT_TIME_BUDGET_US: u64 = 5000;
 
+/// Default maximum constraint-tree depth (Issue 546 multi-step extension).
+///
+/// Caps how many agents the constraint tree can force-assign. With
+/// `target_stuck_agents = true`, this is the maximum number of stuck agents
+/// the tree will try to break free. The ht_chantry diagnostic (commit
+/// `2a8c378d`) measured P95 max-cluster-size = 8, so depth 8 is the minimum
+/// useful bound on the hardest map. Higher values cover more of the tail but
+/// cost latency (combinatorial expansion).
+pub const DEFAULT_MAX_DEPTH: usize = 8;
+
 /// Minimum number of stuck agents before LaCAM escalation triggers.
 ///
 /// Re-exports the `pibt.rs` constant semantics: on open maps, a few agents
 /// may get stuck each tick due to random collisions — they resolve naturally
 /// next tick. The escalation is only worth its overhead on genuinely congested
 /// maps (systemic stuck agents).
-const MIN_STUCK_FOR_LACAM: usize = 1;
+///
+/// Exposed as `pub(super)` so the `pibt_step_with_budget` wrapper in
+/// `pibt.rs` can use the same threshold when deciding whether to enter the
+/// LaCAM constraint-tree search.
+pub(super) const MIN_STUCK_FOR_LACAM: usize = 1;
 
 /// Budget for the constraint-tree search.
 ///
@@ -79,6 +93,24 @@ pub struct EscalationBudget {
     pub max_nodes: usize,
     /// Wall-clock budget in microseconds. Checked every 64 nodes.
     pub time_budget_us: u64,
+    /// Maximum constraint-tree depth (Issue 546 multi-step extension).
+    ///
+    /// Caps how many agents the tree can force-assign. Default 8 covers the
+    /// P95 cluster size on ht_chantry. Ignored when `target_stuck_agents`
+    /// is false (legacy behavior expands to depth `n`).
+    pub max_depth: usize,
+    /// Target stuck agents in the constraint tree (Issue 546 multi-step).
+    ///
+    /// When `true`, the constraint tree iterates over stuck agents (computed
+    /// by the initial greedy PIBT pass) instead of all agents in priority
+    /// order. This makes depth-K constraints target the K stuck agents
+    /// directly, dramatically reducing the search space on maps where stuck
+    /// agents are deep in the priority order (ht_chantry-style maze maps).
+    ///
+    /// Default `false` preserves Plan 453 behavior (paper-faithful BFS over
+    /// priority order). Default-on for the multi-step extension via
+    /// [`EscalationBudget::multistep_default`].
+    pub target_stuck_agents: bool,
 }
 
 impl Default for EscalationBudget {
@@ -86,6 +118,29 @@ impl Default for EscalationBudget {
         Self {
             max_nodes: DEFAULT_MAX_NODES,
             time_budget_us: DEFAULT_TIME_BUDGET_US,
+            max_depth: DEFAULT_MAX_DEPTH,
+            target_stuck_agents: false,
+        }
+    }
+}
+
+impl EscalationBudget {
+    /// Multi-step LaCAM defaults (Issue 546 reopened plan).
+    ///
+    /// Stuck-agent targeting + depth 8 + larger node/time budget for
+    /// maze-class maps. Use this on ht_chantry-class maps where the
+    /// paper-faithful BFS-over-priority-order cannot reach stuck agents
+    /// within the default budget.
+    ///
+    /// Latency budget: 100ms (vs 5ms default). At ~1µs/node that's 100K
+    /// nodes — well within the Issue 546 acceptance criteria (≤ 500ms on
+    /// the hard map).
+    pub fn multistep_default() -> Self {
+        Self {
+            max_nodes: 100_000,
+            time_budget_us: 100_000,
+            max_depth: DEFAULT_MAX_DEPTH,
+            target_stuck_agents: true,
         }
     }
 }
@@ -212,6 +267,33 @@ where
     }
 
     // Phase B: constraint-tree search.
+    //
+    // Issue 546 multi-step extension: when `target_stuck_agents` is set, the
+    // constraint tree iterates over stuck agents (computed above by greedy
+    // PIBT) instead of all agents in priority order. This dramatically
+    // reduces the search space on maze maps where stuck agents are deep in
+    // the priority order.
+    //
+    // Build the expansion order: either the full priority order (legacy,
+    // paper-faithful) or just the stuck agents (Issue 546 multi-step).
+    let stuck_indices: Vec<usize> = if budget.target_stuck_agents {
+        stuck.iter().map(|a| a.0 as usize).collect()
+    } else {
+        Vec::new()
+    };
+    let expansion_order: Vec<usize> = if budget.target_stuck_agents {
+        stuck_indices.clone()
+    } else {
+        order.clone()
+    };
+    let expansion_depth_cap: usize = if budget.target_stuck_agents {
+        // Cap at min(max_depth, stuck.len()) — can't constrain more agents
+        // than are stuck, and don't exceed the configured depth bound.
+        budget.max_depth.min(expansion_order.len())
+    } else {
+        n
+    };
+
     let mut queue = ConstraintQueue::<P>::with_capacity(budget.max_nodes);
     queue.push(Constraint::empty());
 
@@ -237,10 +319,15 @@ where
             break;
         }
 
-        // Expand: push children for the next agent in priority order.
+        // Expand: push children for the next agent in the expansion order.
+        //
+        // Legacy (Plan 453): expansion_order = priority order, depth cap = n.
+        // Issue 546 multi-step: expansion_order = stuck agents, depth cap =
+        // min(max_depth, stuck.len()). The constraint at depth K forces the
+        // K-th agent in `expansion_order` to one of its neighbor cells.
         let depth = constraint.depth();
-        if depth < n {
-            let i = order[depth];
+        if depth < expansion_depth_cap {
+            let i = expansion_order[depth];
             let current = config.pos(AgentId(i as u32));
             let neighbors: Vec<P> = if let Some(f) = neighbors_fn {
                 f(current)
@@ -283,6 +370,7 @@ where
     }
 
     // Phase C: budget exhausted — fall back to greedy PIBT result.
+    let _ = stuck_indices; // suppress unused warning when not targeting
     JointAction::new(greedy_moves)
 }
 
