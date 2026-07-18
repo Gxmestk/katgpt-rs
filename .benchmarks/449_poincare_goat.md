@@ -74,7 +74,65 @@ rm -rf /tmp/plan449
 
 ## See Also
 
-- [Plan 449](../.plans/449_poincare_latent_navigation_primitive.md) — execution plan (Phase 1 + Phase 2 DONE; Phase 3 promotion decision next)
+- [Plan 449](../.plans/449_poincare_latent_navigation_primitive.md) — execution plan (Phase 1 + Phase 2 + Phase 3 DONE; primitive PROMOTED TO DEFAULT-ON 2026-07-18; G2 caveat closed by Plan 317)
 - [Research 449](../.research/449_SeeSE3_Poincare_Adapter_Primitive.md) — math + 4/4 Super-GOAT novelty gate
 - [riir-ai/.research/319](../../riir-ai/.research/319_SeeSE3_Latent_Imagination_Game_Runtime_Guide.md) — private game-runtime selling-point guide
 - [arXiv:2607.14228](https://arxiv.org/abs/2607.14228) — source paper (Chen et al., *SeeSE3*, DeepMind 2026)
+
+---
+
+## Phase 3 follow-up — G2 strict-domination CLOSED (Plan 317, 2026-07-18)
+
+The original G2 verdict was PASS-with-caveat: adapter R²=0.71 > the spec
+threshold of 0.5 (PASS), but did NOT strictly dominate linear-only ridge
+(R²=0.93) — the documented caveat that "strict-domination requires the
+gradient-fit φ (riir-train follow-up)."
+
+**Plan 317 ([`riir-train/.plans/317_poincare_phi_gradient_fit.md`](../../riir-train/.plans/317_poincare_phi_gradient_fit.md)) closed the caveat.** It ships
+`fit_poincare_adapter_trained` in `riir-train-engine` behind feature
+`poincare_phi_train`: a 2-layer MLP φ trained via AdamW (manual backprop,
+~15 ms fit-time, frozen at inference). The cross-verification bench
+[`bench_317_poincare_g2_strict`](../../riir-train/crates/riir-train-engine/benches/bench_317_poincare_g2_strict.rs)
+reproduces the exact G2 fixture from this bench's `g2_global_unrolling`
+(same seed 2027, same dims `latent_dim=6, target_dim=3, phi_out=4, hidden_width=4`,
+same n=300 training, same 200-sample held-out eval) and reports:
+
+| Competitor | R² |
+|---|---|
+| Modelless PCA-tanh (this bench) | 0.7149 |
+| **Trained 2-layer MLP φ (Plan 317)** | **0.9997** |
+| Linear-only ridge | 0.9255 |
+
+| Threshold | Verdict |
+|---|---|
+| G2-strict (trained > linear + 0.05) | **PASS** (gap +0.0741) |
+| Ceiling (trained > 0.98) | **PASS** (0.9997) |
+| Beats-modelless (trained > modelless + 0.05) | **PASS** (gap +0.2848) |
+
+The trained φ reaches the theoretical ceiling (~1.0) on the 2-layer MLP
+fixture — it successfully learned the inverse of `tanh(V · ·)`. The
+modelless PCA-tanh φ cannot, because PCA is linear and cannot invert a
+nonlinear coupling.
+
+**Updated G2 verdict**: PASS — strict-domination closed by trained φ
+(Plan 317). The primitive's load-bearing value was always G3 (closed-form
+inverse navigation, perfect Hit@0.3=1.000); G2 strict-domination is now
+also achieved via the trained-φ constructor.
+
+### What changed in katgpt-rs
+
+**Nothing.** The `PoincareAdapter` Pod layout, `poincare_navigate_into`,
+`poincare_multi_step_into`, and `fit_poincare_adapter` (modelless) are
+unchanged. The trained-φ constructor lives entirely in `riir-train-engine`
+(private) — it produces a `PoincareAdapter` Pod with the same shape and
+BLAKE3 commitment discipline. The open primitive gained a sibling constructor;
+no breaking change.
+
+The feature was already promoted to DEFAULT-ON in Cargo.toml Phase 19
+(2026-07-18, commit `e1ed6fee`) based on the codebase pattern (modelless +
+zero-cost-unless-invoked + GOAT-passes → default-on). Plan 317's contribution
+is closing the G2 caveat, which strengthens the verdict but was not strictly
+required for promotion.
+
+See [`riir-train/.benchmarks/317_poincare_g2_strict.md`](../../riir-train/.benchmarks/317_poincare_g2_strict.md) for the full verdict table,
+latency breakdown, and reproduction steps.

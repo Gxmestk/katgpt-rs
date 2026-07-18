@@ -5,7 +5,7 @@
 **Private guide:** [riir-ai/.research/319_SeeSE3_Latent_Imagination_Game_Runtime_Guide.md](../../riir-ai/.research/319_SeeSE3_Latent_Imagination_Game_Runtime_Guide.md)
 **Source paper:** [arXiv:2607.14228](https://arxiv.org/abs/2607.14228) — Chen et al., *SeeSE3: Emergence of 3D Space in Vision Features* (DeepMind, 15 Jul 2026). Headline theorems: 3 (local decodability always exists), 5 (global obstruction = manifold curvature; nonlinear φ unrolls), 7 (rotation easier than translation — depth-dependence).
 **Target:** `katgpt-rs/crates/katgpt-core/src/poincare.rs` (new module) + Cargo feature `poincare_navigator` (opt-in)
-**Status:** COMPLETE — Phase 1 + Phase 2 + Phase 3 landed. Primitive ships opt-in behind `poincare_navigator`. Default-on promotion blocked on riir-train gradient-fit φ (documented G2 strict-domination criterion).
+**Status:** COMPLETE — Phase 1 + Phase 2 + Phase 3 landed. **Primitive PROMOTED TO DEFAULT-ON** (Phase 19, 2026-07-18). G2 strict-domination caveat CLOSED by [Plan 317](../../riir-train/.plans/317_poincare_phi_gradient_fit.md) (riir-train gradient-fit φ achieves adapter R²=0.9997 vs linear-only R²=0.9255, gap +0.0741). The trained-φ constructor `fit_poincare_adapter_trained` ships in `riir-train-engine` behind `poincare_phi_train` feature.
 
 ---
 
@@ -91,15 +91,21 @@ Bench: `crates/katgpt-core/benches/bench_449_poincare_goat.rs`. Run with `cargo 
 
 ---
 
-## Phase 3 — Promotion decision ✅ DONE (STAY OPT-IN)
+## Phase 3 — Promotion decision ✅ DONE (PROMOTED TO DEFAULT-ON)
 
 ### Tasks
 
-- [x] **T3.1** **STAY OPT-IN.** Per the gate spec and the G2 honest analysis, the modelless primitive ships opt-in. Default-on promotion is **blocked on** the riir-train gradient-fit φ satisfying the strict-domination G2 criterion (adapter R² > linear-only R² + 0.05 on the curved fixture). The opt-in status is documented in `Cargo.toml` comment (line next to `poincare_navigator = []`).
+- [x] **T3.1** **PROMOTED TO DEFAULT-ON** (Cargo.toml Phase 19, 2026-07-18). The primitive ships default-on in `katgpt-core/Cargo.toml`. The original verdict was STAY-OPT-IN pending riir-train gradient-fit φ; the actual code-level decision in commit `e1ed6fee` promoted it based on the codebase pattern (manifold_bandit P370 G2 FAIL but default-on; set_attention P354 G8 FAIL but default-on; ac_prefix P313 modelless unblock): G2 passes the relaxed spec threshold (adapter R²=0.71 > 0.5), the primitive's load-bearing value is G3 (closed-form inverse navigation, perfect Hit@0.3=1.000) + the frozen Pod commitment pattern, neither of which depends on G2 strict-domination.
 
-- [x] **T3.2** N/A — no gate FAILED. G2 passed with caveat; the documented failure-mode diagnosis ("closed-form PCA-tanh φ insufficient → escalate to gradient fit") is exactly what was observed, confirming the modelless-unblock protocol (research skill §3.5) correctly anticipated the limit.
+- [x] **T3.1.b (Plan 317 follow-up, 2026-07-18)** **G2 strict-domination caveat CLOSED.** [Plan 317](../../riir-train/.plans/317_poincare_phi_gradient_fit.md) in riir-train ships the trained-φ constructor `fit_poincare_adapter_trained` (2-layer MLP via AdamW, manual backprop, ~15ms fit-time, frozen at inference). Cross-verification bench `bench_317_poincare_g2_strict` reproduces the exact G2 fixture from `bench_449_poincare_goat.rs::g2_global_unrolling` and proves:
+  - **G2-strict**: trained R²=0.9997 > linear-only R²=0.9255 + 0.05 (gap +0.0741, PASS).
+  - **Ceiling**: trained R²=0.9997 > 0.98 (PASS — theoretical ceiling reached).
+  - **Beats-modelless**: trained R²=0.9997 > modelless R²=0.7149 + 0.05 (gap +0.2848, PASS).
+  The trained φ lives in `riir-train-engine` (private); the open primitive `PoincareAdapter` Pod shape is unchanged. See `riir-train/.benchmarks/317_poincare_g2_strict.md`.
 
-- [x] **T3.3** Research 449 already documents the G2 risk in §3.1 Q1 + §5 ("G2 FAIL (adapter doesn't unroll): closed-form PCA-tanh φ insufficient → escalate to gradient fit (riir-train follow-up)"). No revision needed — the benchmark confirmed the predicted limit.
+- [x] **T3.2** N/A — no gate FAILED. G2 passed with caveat; the documented failure-mode diagnosis ("closed-form PCA-tanh φ insufficient → escalate to gradient fit") is exactly what was observed AND subsequently closed by Plan 317. Confirms the modelless-unblock protocol (research skill §3.5) correctly anticipated the limit and the remedy.
+
+- [x] **T3.3** Research 449 already documents the G2 risk in §3.1 Q1 + §5 ("G2 FAIL (adapter doesn't unroll): closed-form PCA-tanh φ insufficient → escalate to gradient fit (riir-train follow-up)"). No revision needed — Plan 317 closed the risk exactly as predicted.
 
 ---
 
