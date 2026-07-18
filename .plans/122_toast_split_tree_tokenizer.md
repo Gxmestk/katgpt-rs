@@ -8,9 +8,9 @@
 
 ## Tasks
 
-- [x] T1: Split tree types (`tokenizer/toast_types.rs`)
-- [x] T2: Split tree construction from byte n-gram counts (`tokenizer/toast_builder.rs`)
-- [x] T3: Recursive descent inference (`tokenizer/toast_inference.rs`)
+- [x] T1: Split tree types (`crates/katgpt-tokenizer/src/toast_types.rs`)
+- [x] T2: Split tree construction from byte n-gram counts (`crates/katgpt-tokenizer/src/toast_builder.rs`)
+- [x] T3: Recursive descent inference (`crates/katgpt-tokenizer/src/toast_inference.rs`)
 - [x] T4: Feature gate `toast_tokenizer` + module glue
 - [x] T5: GOAT proof — 17/17 tests pass (encode/decode roundtrip, serde, compression, no UNK)
 - [x] T6: Rényi efficiency metric + benchmark (`tests/bench_120_renyi_efficiency.rs`) — Rényi H_α at α=2.5, efficiency comparison vs BPE, min token count ≥ 100 verified

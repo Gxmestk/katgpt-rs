@@ -128,6 +128,6 @@ When `SinkAwarePolicy::Uniform`, the wrapper **must not** pay for the temporary 
 | G2 (synthetic Broadcast preserved) | ✅ PASS (2026-06-18) | `plan289_synthetic_broadcast_head_preserved` — classifier returns Broadcast, output bit-identical to Uniform. |
 | G2 (real ViT) | ⏳ DEFERRED | Same blocker as Plan 287 — needs frozen model, riir-ai scope. |
 | G3 (Uniform overhead ≤5%) | ✅ PASS (2026-06-18) | `benches/sink_aware_forward_bench.rs`: -0.3% / 0.0% / +0.6% at n ∈ {64, 128, 256}. Zero-cost abstraction confirmed. |
-| cargo check (all features) | ✅ PASS (2026-06-18) | Clean (1 pre-existing unrelated warning in `micro_belief/bom_arena.rs`). |
+| cargo check (all features) | ✅ PASS (2026-06-18) | Clean (1 pre-existing unrelated warning in `crates/katgpt-micro-belief/src/bom_arena.rs`). |
 | parallax_attn test suite | ✅ PASS (2026-06-18) | 17/17 tests pass (10 pre-existing + 7 new Plan 289). |
 | cached path semantics | ✅ PASS (2026-06-18) | `plan289_cached_path_audit_and_reuse` — cadence counter + steady-state output verified. |

@@ -33,8 +33,8 @@ dependencies** that no prior plan anticipated:
 
 | Sense File | External katgpt-core dep | Source |
 |---|---|---|
-| `sense/lod.rs` | `crate::slod::ScaleBoundary` | `crates/katgpt-core/src/slod.rs` (1,047 LOC) |
-| `sense/reconstruction.rs` | `crate::temporal_deriv::TemporalDerivativeKernel` (gated `temporal_deriv`) | `crates/katgpt-core/src/temporal_deriv.rs` (424 LOC) |
+| `crates/katgpt-sense/src/lod.rs` | `crate::slod::ScaleBoundary` | `crates/katgpt-core/src/slod.rs` (1,047 LOC) |
+| `crates/katgpt-sense/src/reconstruction.rs` | `crate::temporal_deriv::TemporalDerivativeKernel` (gated `temporal_deriv`) | `crates/katgpt-core/src/temporal_deriv.rs` (424 LOC) |
 | `sense/spectral_threat.rs` | `crate::linoss::{LinOSSCell, LinOSSState}` | `crates/katgpt-core/src/linoss.rs` (938 LOC) |
 | All sense files | `crate::types::{SenseKind, SenseModule, TernaryDir}` | `katgpt-types` ✅ already extracted |
 
@@ -68,8 +68,8 @@ where they belong as composition-layer code.
 Move just the `ScaleBoundary` struct (small POD: `sigma`, `lambda`, etc.) to
 `crates/katgpt-types/src/enums.rs` or a new `spectral.rs` submodule.
 
-- `sense/lod.rs` then depends only on `katgpt-types` — promoted cleanly.
-- `sense/reconstruction.rs` still depends on `temporal_deriv` — **stays blocked**.
+- `crates/katgpt-sense/src/lod.rs` then depends only on `katgpt-types` — promoted cleanly.
+- `crates/katgpt-sense/src/reconstruction.rs` still depends on `temporal_deriv` — **stays blocked**.
 - `sense/spectral_threat.rs` still depends on `linoss` — **stays blocked**.
 
 **Verdict:** Unblocks 1 of 3 problem files. The remaining 2 keep `katgpt-sense`
@@ -87,8 +87,8 @@ as four new public crates.
 
 | Crate | LOC | External consumers (outside katgpt-core) |
 |---|---|---|
-| katgpt-slod | 1,047 | 0 (only `rtdc.rs` + `sense/lod.rs` use it, both internal) |
-| katgpt-temporal-deriv | 424 | 0 (only `crates/katgpt-core/src/cgsp/derivative_curiosity.rs`, `crates/katgpt-core/src/delta_mem/state.rs`, `sense/reconstruction.rs` — all internal) |
+| katgpt-slod | 1,047 | 0 (only `rtdc.rs` + `crates/katgpt-sense/src/lod.rs` use it, both internal) |
+| katgpt-temporal-deriv | 424 | 0 (only `crates/katgpt-core/src/cgsp/derivative_curiosity.rs`, `crates/katgpt-core/src/delta_mem/state.rs`, `crates/katgpt-sense/src/reconstruction.rs` — all internal) |
 | katgpt-linoss | 938 | 0 (only `sense/spectral_threat.rs` — 1 internal consumer) |
 | katgpt-sense | 5,232 | downstream via re-export (TBD) |
 

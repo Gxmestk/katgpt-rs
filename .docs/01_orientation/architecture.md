@@ -1617,7 +1617,7 @@ markov → nll → typical_set → claim
 
 Root-cause counterpart to four existing symptom-only detectors
 (`BeliefRankPruner`, `GainCostLoopHalter`, `latent_functor/reestimation.rs`,
-`micro_belief/coherence_bench.rs`). Modelless math over flattened `&[f32]`
+`crates/katgpt-micro-belief/src/coherence_bench.rs`). Modelless math over flattened `&[f32]`
 state chains from any recursive latent-state kernel. Detects
 `DepthSpecificRefinement` (monotonically growing magnitude — the paper's
 primary signal), `Collapsed` (effective rank trending to 1), `DepthInvariant`
@@ -1632,9 +1632,9 @@ recursive kernel: h_{t+1} = f(h_t, x_t)
 | Module | Description |
 |--------|-------------|
 | `depth_invariance.rs` | The primitive: `classify_chain`, `classify_chain_batched`, `Scratch`, `DepthInvarianceConfig`, `DepthInvarianceKind` (`#[repr(u8)]`), `MagnitudeRegularization` enum, `apply_magnitude_regularization`. Zero-alloc hot path (caller-owned `Scratch`). |
-| `speculative/belief_drafter.rs::BeliefDrafter::audit_depth_invariance` | Plan 306 Phase 3 G2 audit hook (behind `depth_invariance` × `belief_drafter`). Also `capture_chain` for the G2c inference-time RmsNorm demonstration. |
-| `micro_belief/attractor.rs::AttractorKernel::audit_depth_invariance` | Plan 306 Phase 4 G3a negative control (behind `depth_invariance` × `micro_belief`). Attractor clamps to `(-1,1)` → classifies `DepthInvariant`. |
-| `micro_belief/leaky.rs::LeakyIntegrator::audit_depth_invariance` | Plan 306 Phase 4 audit hook. The shipped `LeakyIntegrator` also clamps to `[-1,1]`, so it too classifies `DepthInvariant`; the G3b positive control strips the clamp inline in the test (no kernel-level support needed). |
+| `crates/katgpt-speculative/src/belief_drafter.rs::BeliefDrafter::audit_depth_invariance` | Plan 306 Phase 3 G2 audit hook (behind `depth_invariance` × `belief_drafter`). Also `capture_chain` for the G2c inference-time RmsNorm demonstration. |
+| `crates/katgpt-micro-belief/src/attractor.rs::AttractorKernel::audit_depth_invariance` | Plan 306 Phase 4 G3a negative control (behind `depth_invariance` × `micro_belief`). Attractor clamps to `(-1,1)` → classifies `DepthInvariant`. |
+| `crates/katgpt-micro-belief/src/leaky.rs::LeakyIntegrator::audit_depth_invariance` | Plan 306 Phase 4 audit hook. The shipped `LeakyIntegrator` also clamps to `[-1,1]`, so it too classifies `DepthInvariant`; the G3b positive control strips the clamp inline in the test (no kernel-level support needed). |
 
 **GOAT verdict (Plan 306):** G1 (8 correctness tests) + G2 (paper finding
 reproduced on random-init `BeliefDrafter`: `DepthSpecificRefinement`,
@@ -2026,9 +2026,9 @@ pub trait MicroRecurrentBeliefState: Send + Sync {
 
 | Module | Family | Status |
 |---|---|---|
-| `micro_belief/attractor.rs` | A — `s_t = 2·σ(W_s·s + W_x·x + b) − 1` | Opt-in experiment (G1.4 + G2.1 FAIL) |
-| `micro_belief/latent_thought.rs` | B — K iters of Family A per tick | Opt-in experiment (G1.6: K=1 bit-identical to A) |
-| `micro_belief/leaky.rs` | C — monotone additive, `±max_delta` clamp | **Promotable** — byte-identical to `evolve_hla` |
+| `crates/katgpt-micro-belief/src/attractor.rs` | A — `s_t = 2·σ(W_s·s + W_x·x + b) − 1` | Opt-in experiment (G1.4 + G2.1 FAIL) |
+| `crates/katgpt-micro-belief/src/latent_thought.rs` | B — K iters of Family A per tick | Opt-in experiment (G1.6: K=1 bit-identical to A) |
+| `crates/katgpt-micro-belief/src/leaky.rs` | C — monotone additive, `±max_delta` clamp | **Promotable** — byte-identical to `evolve_hla` |
 | `micro_belief/snapshot.rs` | freeze/thaw — BLAKE3-committed weights | Opt-in (per-NPC personality divergence) |
 | `micro_belief/bridge.rs` | `project_to_scalars` — sigmoid(dot) | Shared bridge (all families delegate) |
 | `leaky_core.rs` (ungated) | shared `leaky_step` primitive | Single source of truth for Family C math |

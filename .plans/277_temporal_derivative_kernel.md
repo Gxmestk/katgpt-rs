@@ -10,7 +10,7 @@
 **Date:** 2026-06-16
 **Research:** [katgpt-rs/.research/435_Temporal_Derivative_Kernel_Neocortical_Learning.md](../.research/435_Temporal_Derivative_Kernel_Neocortical_Learning.md)
 **Source paper:** [arXiv:2606.08720](https://arxiv.org/abs/2606.08720) — O'Reilly, "This is how the Neocortex Learns" (Jun 2026)
-**Target:** `crates/katgpt-core/src/temporal_deriv.rs` (new module) + fusion hooks into `sense/reconstruction.rs` (HLA), `DeltaMemoryState` (Plan 053), `CollapseDetector` (Plan 212), CGSP curiosity (Plan 274)
+**Target:** `crates/katgpt-core/src/temporal_deriv.rs` (new module) + fusion hooks into `crates/katgpt-sense/src/reconstruction.rs` (HLA), `DeltaMemoryState` (Plan 053), `CollapseDetector` (Plan 212), CGSP curiosity (Plan 274)
 **Cargo feature:** `temporal_deriv` (opt-in until GOAT gate passes)
 **Status:** ✅ COMPLETE (2026-06-16) — Phase 6 exit MET, GOAT 4/4 PASS (G2 HLA companion, G3 δ-Mem gate, G4 collapse detector, G5 derivative curiosity). `temporal_deriv` promoted to DEFAULT-ON in katgpt-core + root Cargo.toml. No demotions (all fusions additive; CGSP stays for target-seeking).
 

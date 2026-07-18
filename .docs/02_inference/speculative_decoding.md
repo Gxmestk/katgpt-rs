@@ -246,7 +246,7 @@ Self-speculation mode — uses the same model for both drafting and verification
 | `d2f_config` | `D2fDecodeConfig::default()` | D2F decode parameters |
 | `sampler` | `None` | Optional `DiffusionSampler` for adaptive confidence (Plan 116) |
 
-### ParallelProbeVerifier (`speculative/parallel_probe.rs`, behind `"parallel_probe"` feature)
+### ParallelProbeVerifier (`crates/katgpt-speculative/src/parallel_probe.rs`, behind `"parallel_probe"` feature)
 
 Multi-branch speculative decoding with answer extraction and consensus-based early stopping. Runs multiple branches in parallel, extracts answers, and stops when branches agree.
 
@@ -606,7 +606,7 @@ pub struct EarlyStopGate<P: ScreeningPruner> {
 
 Depth-aware early stopping gate (PTRM Plan 083). Wraps any `ScreeningPruner` and prunes branches where relevance falls below `confidence_threshold` at depth > 0. At depth 0, always passthrough. Behind `"elf_sde"` feature.
 
-### FlowPruner (`speculative/flow_pruner.rs`, behind `"bandit"` feature)
+### FlowPruner (`crates/katgpt-speculative/src/flow_pruner.rs`, behind `"bandit"` feature)
 
 GFlowNet-inspired stop-probability regularization. Wraps any `ScreeningPruner` and adds a multiplicative flow bonus:
 
@@ -621,7 +621,7 @@ Key methods:
 - `set_stop_probs_from_entropy(marginals)` — use entropy as proxy.
 - `flow_bonus(depth) -> f32` — get the flow bonus at a given depth.
 
-### PeiraPruner (`speculative/peira_pruner.rs`, behind `"peira_distill"` feature)
+### PeiraPruner (`crates/katgpt-speculative/src/peira_pruner.rs`, behind `"peira_distill"` feature)
 
 PEIRA alignment-modulated ScreeningPruner. Wraps any `ScreeningPruner` and modulates its relevance signal using PEIRA's spectral alignment score:
 
@@ -791,7 +791,7 @@ pub struct DrafterForwardContext { /* internal buffers */ }
 
 ---
 
-## Alpha: Lattice Deduction (`speculative/alpha.rs`, behind `"lattice_deduction"` feature)
+## Alpha: Lattice Deduction (`crates/katgpt-speculative/src/alpha.rs`, behind `"lattice_deduction"` feature)
 
 LDT α-operator for progressive multi-solution supervision (Plan 088).
 
@@ -824,7 +824,7 @@ Methods: `new(len, solutions)`, `commit(pos, val)`, `uncommit(pos)`, `reset()`, 
 
 ---
 
-## Answer Extraction (`speculative/answer_extract.rs`, behind `"parallel_probe"` feature)
+## Answer Extraction (`crates/katgpt-speculative/src/answer_extract.rs`, behind `"parallel_probe"` feature)
 
 Extracts answers from token streams for parallel probe consensus.
 

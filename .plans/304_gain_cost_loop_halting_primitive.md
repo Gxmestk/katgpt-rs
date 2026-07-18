@@ -213,7 +213,7 @@ pub fn angular_change(curr_step: &[f32], prev_step: &[f32]) -> f32 {
 - [x] **T3.5** G5 feature isolation:
   - `cargo check --no-default-features` — PASS (only pre-existing warnings).
   - `cargo check --features gain_cost_halt` — PASS.
-  - `cargo check --all-features` — 10 pre-existing errors in unrelated modules (`percepta/evaluator.rs`, `proof_cert/wasm_proof_witness.rs`, `feedback_bandit.rs`, `linoss.rs`, etc. — other agents' in-progress work); NONE in gain_cost_halt or forward_looped files.
+  - `cargo check --all-features` — 10 pre-existing errors in unrelated modules (`crates/katgpt-percepta/src/evaluator.rs`, `proof_cert/wasm_proof_witness.rs`, `feedback_bandit.rs`, `linoss.rs`, etc. — other agents' in-progress work); NONE in gain_cost_halt or forward_looped files.
   - `cargo check --features "gain_cost_halt,lt2_looped,sleep_consolidation,weight_shared_advantage_gate"` — PASS (full composition).
   - `cargo-hack` installed (v0.6.45); `--each-feature` not run to completion because it triggers `--all-features` combos that hit the same pre-existing unrelated failures. Scoped powerset on the 4 relevant features PASS.
   - The `Option<&mut GainCostLoopHalter>` param is zero-cost when feature is off (cfg-stripped from signature) and predicted-not-taken when feature is on but halter is `None`.

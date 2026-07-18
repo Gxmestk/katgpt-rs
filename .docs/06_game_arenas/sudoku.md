@@ -69,7 +69,7 @@ pub struct StreamingSolver {
 - Shows first 4 placements, evenly spaced middle, last 5
 - `cht_head` mirrors the `(step, filled)` trace for O(log N) hard attention queries (gated behind `"percepta"` feature)
 
-## SudokuPruner (`pruners/sudoku_pruner.rs`, behind `"sudoku"` feature)
+## SudokuPruner (`crates/katgpt-pruners/src/sudoku_pruner.rs`, behind `"sudoku"` feature)
 
 Implements `ConstraintPruner` (from `katgpt-core::traits`) for DDTree branch validation:
 

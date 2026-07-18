@@ -66,7 +66,7 @@ The key insight: **answer-level consensus across parallel branches is a uniquely
 
 ## Tasks
 
-### T1: Core Types (`speculative/parallel_probe.rs`)
+### T1: Core Types (`crates/katgpt-speculative/src/parallel_probe.rs`)
 - [x] `ParallelProbeConfig` — config struct with probe_interval, stability_patience (u), prune_patience (k), warmup_steps (W), min_active_branches, prune_vote_ratio
 - [x] `BranchProbeState` — per-branch tracking: last_answer, disagree_streak, is_pruned, is_finished
 - [x] `ProbeDecision` enum — Continue / Stop / Prune / StopAndPrune with answer + branch_ids

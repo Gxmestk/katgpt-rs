@@ -28,10 +28,10 @@ Implement two open primitives distilled from Dingle–Hutter 2026 (Research 284)
 
 ### Tasks
 
-- [x] **T1.1** Create `katgpt-rs/crates/katgpt-pruners/src/screening/complexity_prior.rs` with: — **DEVIATION:** `ruliology/irreducibility.rs`'s `rle_compress` is private (`fn`, not `pub fn`) and operates on `WinMatrix`, not raw bytes. Implemented self-contained `rle_compressed_len` (zero-alloc, counts runs) and `shannon_entropy_bits` inline.
+- [x] **T1.1** Create `katgpt-rs/crates/katgpt-pruners/src/screening/complexity_prior.rs` with: — **DEVIATION:** `crates/katgpt-ruliology/src/irreducibility.rs`'s `rle_compress` is private (`fn`, not `pub fn`) and operates on `WinMatrix`, not raw bytes. Implemented self-contained `rle_compressed_len` (zero-alloc, counts runs) and `shannon_entropy_bits` inline.
   - `pub trait ComplexityProxy { fn k_tilde<T: AsRef<[u8]>>(&self, candidate: T) -> f32; }`
-  - `pub struct RleComplexity;` — re-export `rle_compress` from `ruliology/irreducibility.rs`, compute `compressed_len / raw_len`
-  - `pub struct EntropyComplexity;` — re-export Shannon entropy kernel from `ruliology/irreducibility.rs` (already SIMD-friendly)
+  - `pub struct RleComplexity;` — re-export `rle_compress` from `crates/katgpt-ruliology/src/irreducibility.rs`, compute `compressed_len / raw_len`
+  - `pub struct EntropyComplexity;` — re-export Shannon entropy kernel from `crates/katgpt-ruliology/src/irreducibility.rs` (already SIMD-friendly)
   - `pub struct L1Complexity;` — sum of `|x|` over the byte slice (R125 sandwich bound proxy for fixed-precision latents)
   - `pub struct Lz4Complexity;` — lazily-initialized lz4 encoder (Warm tier; behind sub-feature `lz4_proxy` to keep the default zero-dep)
   - All proxies `#[inline]`, zero-allocation, `const fn new()` where possible

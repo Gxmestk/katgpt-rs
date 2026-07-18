@@ -586,7 +586,7 @@ Residual-stream steering (CAA) uses linear probes that ignore layer structure, a
 CNA Steering (Plan 087) discovers sparse MLP circuits via contrastive attribution, then modulates only the discovered neurons at runtime.
 
 ```rust
-// pruners/cna.rs — circuit discovery + modulation
+// crates/katgpt-pruners/src/cna.rs — circuit discovery + modulation
 pub struct CnaNeuron { pub layer: usize, pub index: usize, pub delta: f32 }
 pub struct CnaCircuit {
     pub neurons: Vec<CnaNeuron>,
@@ -630,7 +630,7 @@ BanditPruner Q-values implicitly encode residual distance, but without explicit 
 Deep Manifold (Plan 085) makes residual distance explicit via L2/KL scoring. Federation adds symmetric KL boundary alignment between experts — no data exchange needed.
 
 ```rust
-// pruners/manifold_residual.rs — fixed-point residual scoring
+// crates/katgpt-pruners/src/manifold_residual.rs — fixed-point residual scoring
 pub trait ManifoldResidual: Send + Sync {
     fn residual(&self, candidate: &[f32], base: &[f32]) -> f32;
     fn is_converged(&self, residual: f32, tolerance: f32) -> bool;
@@ -640,7 +640,7 @@ pub struct L2ResidualScorer { pub tolerance: f32 }
 pub struct KlResidualScorer { pub tolerance: f32 }
 pub struct ResidualRelevanceScorer<R: ManifoldResidual> { pub residual_scorer: R, pub residual_weight: f32 }
 
-// pruners/boundary_alignment.rs — federated KL coupling
+// crates/katgpt-pruners/src/boundary_alignment.rs — federated KL coupling
 pub trait BoundaryAlignment: Send + Sync {
     fn kl_divergence(&self, local: &[f32], ensemble: &[f32]) -> f32;
     fn coupling_weight(&self, domain: &str, neighbors: &[&str]) -> f32;
@@ -673,7 +673,7 @@ Greedy DDTree expansion wastes budget on low-value branches. No trajectory-level
 SimpleTES (Plan 086) implements RPUCG (Rollout Policy Using Credit-Guided search): full C×L×K budget loop with trajectory credit assignment bridging to G-Zero Phase 2.
 
 ```rust
-// pruners/tes_loop.rs — SimpleTES loop
+// crates/katgpt-pruners/src/tes_loop.rs — SimpleTES loop
 pub trait TesLoop: Send + Sync {
     fn config(&self) -> &TesConfig;
     fn budget(&self) -> usize;
@@ -759,7 +759,7 @@ DDTree screening prunes candidates without domain-specific phrase awareness. Imp
 PhraseBoost (Plan 164, Research 147) adds a context trie phrase boosting layer for DDTree. Zero training cost — phrases are provided at call site. `PhraseBoostPruner` wraps any `ScreeningPruner` and adds normalized boost for phrase matches.
 
 ```rust
-// pruners/phrase_boost.rs
+// crates/katgpt-pruners/src/phrase_boost.rs
 pub struct PhraseBoostPruner<P: ScreeningPruner> {
     inner: P,
     phrase_trie: ContextTrie,

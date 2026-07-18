@@ -101,7 +101,7 @@ Temperature: τ=3.0 for distributions, τ=1.0 for CE
 | Speculative decoding (AR→AR) | `speculative/step.rs` | ✅ Production |
 | MTP drafter | `transformer.rs` mtp_activation_proj | ✅ Plan 055 |
 | LoRA training (wgpu) | `riir-gpu` full stack | ✅ Production |
-| SDAR sigmoid gating | `pruners/sdar_gate.rs` modelless | ✅ Plan 072 |
+| SDAR sigmoid gating | `crates/katgpt-pruners/src/sdar_gate.rs` modelless | ✅ Plan 072 |
 | Gemma 2 model loading | `riir-engine/safetensors_loader.rs` | ✅ Plan 087 |
 | KV cache | `MultiLayerKVCache`, `PagedKVCache` | ✅ Production |
 | Draft→Verify→Accept pattern | `speculative/step.rs` `speculative_step_rollback()` | ✅ Production |

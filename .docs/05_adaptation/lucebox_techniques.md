@@ -644,7 +644,7 @@ pub enum BudgetAdaptation {
 **Key property:** Zero additional cost — reuses a value already computed during
 PFlash block selection. Feature-gated behind `budget_adaptation`.
 
-**Source:** `speculative/budget.rs`, `speculative/budget_compat.rs`
+**Source:** `speculative/budget.rs`, `crates/katgpt-speculative/src/budget_compat.rs`
 
 ---
 
@@ -749,4 +749,4 @@ phrases are provided at call site.
 DDTree pipeline. Feature-gated behind `phrase_boost` (default-on, Plan 164
 GOAT 7/7).
 
-**Source:** `pruners/phrase_boost.rs`, `pruners/phrase_trie.rs`
+**Source:** `crates/katgpt-pruners/src/phrase_boost.rs`, `crates/katgpt-pruners/src/phrase_trie.rs`

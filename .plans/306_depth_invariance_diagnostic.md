@@ -12,9 +12,9 @@
 
 ## Goal
 
-Ship the open `DepthInvarianceDiagnostic` + `MagnitudeRegularizedResidual` primitives (modelless math, no game semantics) behind a `depth_invariance` feature flag, and audit our existing `BeliefDrafter` to confirm whether it exhibits the attention-drift failure mode the paper diagnoses. The diagnostic is the *root-cause* counterpart to four existing *symptom*-only detectors (`BeliefRankPruner`, `GainCostLoopHalter`, `latent_functor/reestimation.rs`, `micro_belief/coherence_bench.rs`).
+Ship the open `DepthInvarianceDiagnostic` + `MagnitudeRegularizedResidual` primitives (modelless math, no game semantics) behind a `depth_invariance` feature flag, and audit our existing `BeliefDrafter` to confirm whether it exhibits the attention-drift failure mode the paper diagnoses. The diagnostic is the *root-cause* counterpart to four existing *symptom*-only detectors (`BeliefRankPruner`, `GainCostLoopHalter`, `latent_functor/reestimation.rs`, `crates/katgpt-micro-belief/src/coherence_bench.rs`).
 
-**GOAT gate (open primitive):** G1 (8 correctness tests) + G2 (reproduce paper Figure 10 on BeliefDrafter — should classify as `DepthSpecificRefinement` beyond TTT) + G3 (negative control on `micro_belief/attractor.rs` — should classify as `DepthInvariant`) + G4 (≤5% latency overhead). If all four pass → promote `depth_invariance` to default-on diagnostic. The Super-GOAT gate (private side, riir-ai/.research/151 G5) is separate.
+**GOAT gate (open primitive):** G1 (8 correctness tests) + G2 (reproduce paper Figure 10 on BeliefDrafter — should classify as `DepthSpecificRefinement` beyond TTT) + G3 (negative control on `crates/katgpt-micro-belief/src/attractor.rs` — should classify as `DepthInvariant`) + G4 (≤5% latency overhead). If all four pass → promote `depth_invariance` to default-on diagnostic. The Super-GOAT gate (private side, riir-ai/.research/151 G5) is separate.
 
 **Constraint:** the *fix* (post-norm on the recursive residual) is modelless only for kernels we own (HLA, latent_functor, micro_belief, engram, Raven). For BeliefDrafter (frozen MLP), only the *diagnostic* applies — the fix requires MLP retraining and lives in riir-train. This plan ships the open diagnostic; the private MagnitudeRegularizedResidual wiring lands in riir-ai Plan 331.
 
@@ -97,7 +97,7 @@ The paper's central empirical finding: pre-norm EAGLE-3 drafters classify as `De
 
 ---
 
-## Phase 4 — G3 negative control on `micro_belief/attractor.rs`
+## Phase 4 — G3 negative control on `crates/katgpt-micro-belief/src/attractor.rs`
 
 - [x] **T4.1** Add `audit_depth_invariance` method to `AttractorBeliefKernel` (or whichever kernel in `micro_belief/` exposes the recursive update), behind `depth_invariance` feature.
 - [x] **T4.2** G3a test: `attractor_kernel_classifies_depth_invariant`. Run the attractor for k=64 ticks under random input. Expect `DepthInvariant` (clamp bounds magnitude).

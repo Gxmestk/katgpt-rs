@@ -37,7 +37,7 @@ The GOAT-gate question (G2): **does planning against K diverse belief hypotheses
 ### Architecture
 
 ```rust
-// micro_belief/bom.rs (new, behind `bom_sampling` feature)
+// crates/katgpt-micro-belief/src/bom.rs (new, behind `bom_sampling` feature)
 
 /// K-hypothesis belief sampling (Research 248, Plan 281).
 ///
@@ -85,7 +85,7 @@ pub struct NoiseQueryConfig {
 
 ### Tasks
 
-- [x] **T1.1** Create `micro_belief/bom.rs` with `BoMSampler` trait + `NoiseQueryConfig` + `SeedStrategy` (behind `bom_sampling` feature).
+- [x] **T1.1** Create `crates/katgpt-micro-belief/src/bom.rs` with `BoMSampler` trait + `NoiseQueryConfig` + `SeedStrategy` (behind `bom_sampling` feature).
 - [x] **T1.2** Implement `BoMSampler` for `AttractorKernel`. Zero-alloc: base activation computed once (chunked-4 loop mirroring `step()` for bit-identical σ=0 degeneracy), K elementwise perturbations write directly into `out`.
 - [x] **T1.3** Implement `BoMSampler` for `LeakyIntegrator` (the `evolve_hla` family). Shared normalization computed once, K elementwise delta perturbations; zero-total guard copies `s_prev` into every row.
 - [x] **T1.4** `select_best()` with a generic scorer closure, factored through `select_best_generic` helper (DRY). Default scorer factory `dot_product_scorer` reuses `simd_dot_f32`.

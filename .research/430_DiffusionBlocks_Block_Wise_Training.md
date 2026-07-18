@@ -56,7 +56,7 @@ This allocates more blocks to intermediate noise levels where denoising is harde
 ### What Changed Since First Visit
 
 The codebase has evolved significantly:
-- **Hydra Skip Plans** (`pruners/hydra_budget.rs`): Bitmask-based layer skipping with `SkipBitmask`, `HydraSkipPlan`, cumulative DE thresholds
+- **Hydra Skip Plans** (`crates/katgpt-pruners/src/hydra_budget.rs`): Bitmask-based layer skipping with `SkipBitmask`, `HydraSkipPlan`, cumulative DE thresholds
 - **Sleep Consolidation** (`sleep/`): Offline N-pass GDN2 state consolidation at eviction time
 - **RecFM Sub-Stepping** (`tf_loop.rs`): Acceleration-bounded ODE sub-stepping gated by `recfm` feature
 - **ThoughtFold** (`fold/`): Chain folding with attention-based importance scoring + fold bandit

@@ -10,12 +10,12 @@
 
 ## Tasks
 
-- [x] T1: Tokenisation graph types (`tokenizer/convex_types.rs`) ✅
-- [x] T2: Tokenisation graph construction from pretokenized corpus (`tokenizer/convex_graph.rs`) ✅
-- [x] T3: LP formulation via `good_lp`/HiGHS (`tokenizer/convex_solver.rs`) ✅
-- [x] T4: Rounding schemes — Det / Bias / Int (`tokenizer/convex_rounding.rs`) ✅
-- [x] T5: Optimality certification — LP bound + gap computation (`tokenizer/convex_certify.rs`) ✅
-- [x] T6: ConvexTok → ToaST vocabulary import (`tokenizer/convex_toast_bridge.rs`) ✅
+- [x] T1: Tokenisation graph types (`crates/katgpt-tokenizer/src/convex_types.rs`) ✅
+- [x] T2: Tokenisation graph construction from pretokenized corpus (`crates/katgpt-tokenizer/src/convex_graph.rs`) ✅
+- [x] T3: LP formulation via `good_lp`/HiGHS (`crates/katgpt-tokenizer/src/convex_solver.rs`) ✅
+- [x] T4: Rounding schemes — Det / Bias / Int (`crates/katgpt-tokenizer/src/convex_rounding.rs`) ✅
+- [x] T5: Optimality certification — LP bound + gap computation (`crates/katgpt-tokenizer/src/convex_certify.rs`) ✅
+- [x] T6: ConvexTok → ToaST vocabulary import (`crates/katgpt-tokenizer/src/convex_toast_bridge.rs`) ✅
 - [x] T7: Feature gate `convex_tok` + module glue ✅
 - [x] T8: GOAT proof — 12/12 tests (types, construction, LP solve, rounding, certification, ToaST interop) ✅
 - [x] T9: Benchmark — compression vs BPE vs manual ToaST on synthetic corpus ✅

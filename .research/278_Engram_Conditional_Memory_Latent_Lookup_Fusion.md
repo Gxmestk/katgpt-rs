@@ -169,7 +169,7 @@ Paper vocabulary → codebase vocabulary, with the **shipping cousin** (or none)
 
 | Paper term | Codebase equivalent | Shipped? |
 |---|---|---|
-| N-gram embedding / hash embedding | `SequenceConstraint { first, second, third: Option }` (`pruners/constraint_miner.rs`, P196) | ✅ Shipped — but as a **ConstraintPruner guardrail**, not as memory embeddings. Different substrate. |
+| N-gram embedding / hash embedding | `SequenceConstraint { first, second, third: Option }` (`crates/katgpt-pruners/src/constraint_miner.rs`, P196) | ✅ Shipped — but as a **ConstraintPruner guardrail**, not as memory embeddings. Different substrate. |
 | Conditional memory | `KgEmbedding` octree (P221, P253) | ✅ Shipped — but spatial traversal, not N-gram-suffix-keyed. Different addressing. |
 | O(1) routing slot memory | `RavenKVCache` (R006, P020) | ✅ Shipped but parked — dynamic routing slots, not deterministic hash lookup. Same "O(1) memory" axis but **opposite addressing mechanism**. |
 | Context-aware sigmoid gating | `PersonalityWeightedComposition` (R276), `SenseModule::project()`, `evolve_hla` | ✅ Shipped — same sigmoid×direction kernel, different vector source (recurrent state vs static table). |

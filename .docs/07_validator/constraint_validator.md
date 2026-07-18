@@ -144,7 +144,7 @@ impl Config {
 ```
 - Total weights: ~1.1 MB (target), ~130 KB (draft)
 
-## PartialParser (`validator/partial_parser.rs`)
+## PartialParser (`crates/katgpt-validator/src/partial_parser.rs`)
 
 NOT a full Rust parser. A pragmatic DFA:
 
@@ -174,7 +174,7 @@ This is "Phase 0 Validator":
 - Near-zero false negatives (rarely prunes valid code)
 - The remaining ~80-90% pass to Tier 1 (syn) and Tier 2 (cargo check)
 
-## SynPruner (`validator/syn_pruner.rs`)
+## SynPruner (`crates/katgpt-validator/src/syn_pruner.rs`)
 
 ### Two-Tier Validation
 

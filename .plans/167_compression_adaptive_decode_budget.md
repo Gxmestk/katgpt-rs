@@ -46,7 +46,7 @@ Per `.contexts/optimization.md`:
 ## Phase 2: Wiring into DDTree Dispatch
 
 ### Task 4 — Pass adaptive budget to `speculative_step`
-- [x] T4: `effective_tree_budget()` in `speculative/budget_compat.rs` — bridges to dispatch layer
+- [x] T4: `effective_tree_budget()` in `crates/katgpt-speculative/src/budget_compat.rs` — bridges to dispatch layer
   - Feature-gated: delegates to `adaptive_tree_budget()` when enabled, returns base otherwise
   - Backward compatible: same signature in both modes
 
@@ -56,7 +56,7 @@ Per `.contexts/optimization.md`:
   - Field parsed via serde, defaults to Off
 
 ### Task 6 — Wire into DFlash marginals
-- [x] T6: `scaled_draft_lookahead()` in `speculative/budget_compat.rs`
+- [x] T6: `scaled_draft_lookahead()` in `crates/katgpt-speculative/src/budget_compat.rs`
   - sqrt scaling: 2× budget → ~1.4× lookahead, 0.5× budget → ~0.7× lookahead
   - Clamped: lookahead ∈ [1, base*2]
   - 8 unit tests covering all cases

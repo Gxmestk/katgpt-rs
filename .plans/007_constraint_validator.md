@@ -320,7 +320,7 @@ validator = ["syn", "proc-macro2"] # gates validator/ module (previously clora) 
 NOT a full Rust parser. A **bracket balancer + keyword acceptor**:
 
 ```rust
-// validator/partial_parser.rs (previously clora/)
+// crates/katgpt-validator/src/partial_parser.rs (previously clora/)
 
 /// Incremental bracket balancer for Rust syntax.
 /// Fast enough for per-token DDTree validation (~50ns per call).
@@ -413,7 +413,7 @@ impl PartialParser {
 ### SynPruner Implementation
 
 ```rust
-// validator/syn_pruner.rs (previously clora/)
+// crates/katgpt-validator/src/syn_pruner.rs (previously clora/)
 
 /// Compiler-in-the-Loop pruner — two-tier validation.
 ///
@@ -502,7 +502,7 @@ pub struct MergeRule {
 ### 1.2 BPE Algorithm
 
 ```rust
-// tokenizer/bpe.rs
+// crates/katgpt-tokenizer/src/bpe.rs
 impl BpeTokenizer {
     /// Encode a string into BPE token IDs.
     /// 1. Convert string to byte-level tokens
@@ -522,7 +522,7 @@ impl BpeTokenizer {
 ### 1.3 BPE Training
 
 ```rust
-// tokenizer/bpe.rs
+// crates/katgpt-tokenizer/src/bpe.rs
 impl BpeTokenizer {
     /// Train BPE from a directory of .rs files.
     ///

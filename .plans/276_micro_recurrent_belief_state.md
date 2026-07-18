@@ -215,7 +215,7 @@ katgpt-rs/crates/katgpt-core/src/
 
 - [x] **T3.1** `latent_thought.rs`: `LatentThoughtKernel { inner: AttractorKernel, k_iters: u8 }`.
   - `step()`: apply `inner.step()` K times with the same input `x_t`. K=1 reduces to Family A.
-  **DONE (2026-06-16):** `micro_belief/latent_thought.rs` (250 lines). `from_seed(seed, dim, k_iters)`, `with_k_iters` builder, `impl MicroRecurrentBeliefState` (delegates `dim`/`project_to_scalars` to inner + bridge; `step` applies inner.step K times; `family()` → `LatentThought`). Registered in `mod.rs`.
+  **DONE (2026-06-16):** `crates/katgpt-micro-belief/src/latent_thought.rs` (250 lines). `from_seed(seed, dim, k_iters)`, `with_k_iters` builder, `impl MicroRecurrentBeliefState` (delegates `dim`/`project_to_scalars` to inner + bridge; `step` applies inner.step K times; `family()` → `LatentThought`). Registered in `mod.rs`.
 - [x] **T3.2** Tests: same G1 suite. Add G1.6: K=1 case bit-identical to Family A with same weights.
   **DONE (2026-06-16):** G1.6 (`k_equals_one_is_bit_identical_to_attractor`) passes — `LatentThoughtKernel(seed=42,dim=16,k=1)` produces byte-identical state to `AttractorKernel(seed=42,dim=16)` over 100 steps. Also added `determinism`, `family_is_latent_thought`, `k_equals_zero_is_noop`, `k_iters_increases_settling_speed`.
 - [x] **T3.3** Composability test: a `TrainingFreeLoop` (Plan 136) wrapping a model that contains a `MicroRecurrentBeliefState` stage works end-to-end. (Validates the "composable, not redundant" claim in Research 242 §2.3.)
@@ -243,7 +243,7 @@ katgpt-rs/crates/katgpt-core/src/
 ### Tasks
 
 - [x] **T5.0** **NEW (the actual GOAT gate for this plan):** Build the G2.1 coherence benchmark — a synthetic long-horizon (1000-step) input sequence with injected ambiguity/flip-flop triggers (analog of the paper's "bank" polysemy). Run LeakyIntegrator (HLA default) vs AttractorKernel (Family A). Measure flip-flop rate + belief stability.
-  **DONE (2026-06-16):** `micro_belief/coherence_bench.rs` (393 lines). 1000-step synthetic sequence: strong dim-0 signal (steps 0–399), ambiguous near-uniform noise (400–599), strong dim-1 signal (600–999). Identity direction matrix for projection. Results (release, bit-identical in debug):
+  **DONE (2026-06-16):** `crates/katgpt-micro-belief/src/coherence_bench.rs` (393 lines). 1000-step synthetic sequence: strong dim-0 signal (steps 0–399), ambiguous near-uniform noise (400–599), strong dim-1 signal (600–999). Identity direction matrix for projection. Results (release, bit-identical in debug):
   | Kernel | Flip-flops | Ambig-window argmax var |
   |---|---|---|
   | **LeakyIntegrator (Family C)** | **1** | 0.0000 |

@@ -101,7 +101,7 @@ Empirical results confirm the theoretical separations: latent wins on paralleliz
 | Paper term | Codebase equivalents (≥2) | Where it ships |
 |---|---|---|
 | "chain of thought" (CoT) | explicit token generation, `ThinkMode::Direct`, argmax/sample decode | `crates/katgpt-core/src/thinking_mode.rs`, decode path |
-| "latent thought" / "continuous thought" | `ThinkMode::Latent`, RiM buffer slots, soft embedding, `LatentThoughtKernel` | `crates/katgpt-core/src/thinking_mode.rs`, `micro_belief/latent_thought.rs`, SwiR `soft_embedding` |
+| "latent thought" / "continuous thought" | `ThinkMode::Latent`, RiM buffer slots, soft embedding, `LatentThoughtKernel` | `crates/katgpt-core/src/thinking_mode.rs`, `crates/katgpt-micro-belief/src/latent_thought.rs`, SwiR `soft_embedding` |
 | "looped transformer" | `LoopMode::WeightShared`, `LoopMode::TrainingFree`, weight-tied block iteration | Plans 108, 136; `katgpt-rs/src/looped.rs` |
 | "coconut" (hidden state feedback) | `LatentThoughtKernel` Family B, NextLat belief drafter | Research 192, 242; Plan 217, 276 |
 | "TC^k" / "threshold circuit" | (no codebase vocabulary — this is the gap this note fills) | — |

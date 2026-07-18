@@ -97,8 +97,8 @@ Replaces uniform candidate generation in any inference-time search with `sigmoid
 
 | `K̃` proxy | Source | Cost | When to use |
 |-----------|--------|------|-------------|
-| RLE compression ratio | `ruliology/irreducibility.rs` (R188) | sub-µs, SIMD-able | Discrete candidate sets (bandit arms, MCTS branches) |
-| Shannon entropy of byte-quantized latent | `ruliology/irreducibility.rs` (R188) | sub-µs | Latent vectors quantized to u8 |
+| RLE compression ratio | `crates/katgpt-ruliology/src/irreducibility.rs` (R188) | sub-µs, SIMD-able | Discrete candidate sets (bandit arms, MCTS branches) |
+| Shannon entropy of byte-quantized latent | `crates/katgpt-ruliology/src/irreducibility.rs` (R188) | sub-µs | Latent vectors quantized to u8 |
 | `‖θ‖_1` (weight norm) | R125 sandwich bound | already computed by AdamW | Adapter / LoRA selection |
 | lz4/gzip compression length | `compression_drafter` (R256) | µs-scale (Warm tier) | Long byte corpuses (quest grammars, NPC dialog) |
 | BLAKE3-canonical-encoding length | chain layer | ns-scale after hash | Cold-tier shard selection |

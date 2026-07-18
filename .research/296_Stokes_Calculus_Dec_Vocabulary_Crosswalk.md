@@ -67,9 +67,9 @@ Unifies all three. The DEC module ships `d` (exterior derivative) and `δ` (codi
 | Hodge Laplacian `Δ = δd + dδ` | `hodge_laplacian(cx, field)` | `dec/operators.rs` |
 | Graph Laplacian (rank-0 special case) | `graph_laplacian`, `graph_laplacian_into` | `dec/operators.rs` |
 | Hodge star `*` (metric mass matrix) | `hodge_star(rank)` (identity for uniform grids) | `dec/operators.rs` |
-| Hodge decomposition (exact ⊕ harmonic ⊕ coexact) | `hodge_decompose(cx, field)` | `dec/hodge.rs` |
-| Betti numbers `βₖ` (topological holes) | `betti_numbers(cx)` (count zero eigenvalues of Δₖ) | `dec/hodge.rs` |
-| Harmonic projector `P_harm` | `harmonic_projector(cx)` | `dec/hodge.rs` |
+| Hodge decomposition (exact ⊕ harmonic ⊕ coexact) | `hodge_decompose(cx, field)` | `crates/katgpt-dec/src/hodge.rs` |
+| Betti numbers `βₖ` (topological holes) | `betti_numbers(cx)` (count zero eigenvalues of Δₖ) | `crates/katgpt-dec/src/hodge.rs` |
+| Harmonic projector `P_harm` | `harmonic_projector(cx)` | `crates/katgpt-dec/src/hodge.rs` |
 | Gradient `∇φ` (rank-0 → rank-1, exact) | `exact_flow(cx, potential)` / `d₀` | `dec/flow.rs` |
 | Curl `∇×F` (rank-1 → rank-2) | `d₁` | `dec/operators.rs` |
 | Divergence `∇·F` (rank-2 → rank-3, or rank-1 → rank-0 via δ) | `codifferential` / `δ₁` | `dec/operators.rs` |

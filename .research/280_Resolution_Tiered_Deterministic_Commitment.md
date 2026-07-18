@@ -23,7 +23,7 @@ The open primitive is the **depth-tiered Merkle octree with deterministic leaf e
 
 ### 1.1 SLoD — Plan 235 / R208 (shipped, default-ON)
 
-- File: `katgpt-rs/crates/katgpt-core/src/slod.rs` + `sense/lod.rs`
+- File: `katgpt-rs/crates/katgpt-core/src/slod.rs` + `crates/katgpt-sense/src/lod.rs`
 - `SlodOperator::boundary_scan()` detects σ values where the KG representation undergoes qualitative transitions (three-signal composite: Fréchet velocity V(σ), weight divergence D_w(σ), neighbourhood churn C_k(σ), MAD peak picker).
 - `SenseLodRouter` already maps distance → 3-tier enum (`Full` / `Compressed` / `Minimal`) using σ1, σ2 boundaries.
 - `SenseLodMask` pre-computes the active sense-module set per tier.
@@ -191,7 +191,7 @@ Reuses spectral hierarchy via `slod` (transitive), reuses `MerkleOctree` via `me
 
 | Existing pillar | Connection from RTDC |
 |-----------------|----------------------|
-| **Plan 235 SLoD** (`slod.rs`, `sense/lod.rs`) | Boundary set becomes the depth assignment for the octree — boundaries are now committed, not advisory |
+| **Plan 235 SLoD** (`slod.rs`, `crates/katgpt-sense/src/lod.rs`) | Boundary set becomes the depth assignment for the octree — boundaries are now committed, not advisory |
 | **Plan 253 Merkle-Octree** (`merkle.rs`, `curator.rs`) | Single root → 3 roots. `CuratorVerifier::verify_module` gains a `verify_at_depth` variant. `CuratorBandit` reputation gets a per-depth dimension (a curator might be accurate at depth 0 but wrong at depth 2) |
 | **Plan 258 LatCal Fixed** (`latcal_fixed.rs`) | `LatCalSpectralFixed` becomes the deterministic leaf encoder for KG spectral coefficients |
 | **Plan 265 LatCal Spectral Fixed** (same file) | Already ships `freq/amp/phase` — exactly what RTDC leaves encode |
@@ -202,7 +202,7 @@ Reuses spectral hierarchy via `slod` (transitive), reuses `MerkleOctree` via `me
 | **riir-armageddon two-brain model** | Think brain verifies only the depth it can see (fog-of-war); info brain holds all 3 roots |
 | **`cgsp_runtime` curiosity** (riir-ai) | Curiosity signal at coarse depth commits to a different root than at fine depth — emergent "what does this NPC know at this distance" verifiable |
 | **`latent_functor/reestimation`** (riir-ai) | Re-estimation trigger can compare curator verdicts *across depths* — drift between depth-0 and depth-2 verdicts is a coherence signal |
-| **HLA per-NPC belief state** (`sense/reconstruction.rs`) | The 5 scalars that cross sync (valence/arousal/desperation/calm/fear) are already raw — RTDC adds the *commitment* layer so they're tamper-evident at every zoom level |
+| **HLA per-NPC belief state** (`crates/katgpt-sense/src/reconstruction.rs`) | The 5 scalars that cross sync (valence/arousal/desperation/calm/fear) are already raw — RTDC adds the *commitment* layer so they're tamper-evident at every zoom level |
 
 That's 12 pillars touched — comfortably force-multiplier ≥ 2.
 
@@ -236,7 +236,7 @@ This fusion lives *on* the sync boundary, so the boundary discipline matters:
 - Vocabulary-translated grep across both layers (`.research/` + `.plans/` + `src/`/`crates/`) of all five repos for: `slod.*merkle`, `merkle.*slod`, `spectral.*merkle`, `fixed_point.*slod`, `deterministic.*boundary`, `resolution_tier`, `zoom.*merkle`, `tier.*commit`, `commit.*tier`, `abstraction.*commit`, `scale-aware`, `sigma_tier`. **Zero matches** for any 2-of-3 fusion. Closest hits:
   - Plan 290 notes "Cold-tier commitment via Plan 280 Merkle-octree deferred" — single-resolution BLAKE3, not multi-resolution
   - Plan 243 mentions "SpectralLOD already handles adaptive depth" for the octree — *uses* SLoD's tier selection, but the tier itself is not committed
-  - `sense/lod.rs` ships the `SenseLodRouter` but routes to a module *mask*, not to a Merkle root
+  - `crates/katgpt-sense/src/lod.rs` ships the `SenseLodRouter` but routes to a module *mask*, not to a Merkle root
 - Codebase-vocabulary grep also clean. **Q1 = YES.**
 
 **Q2: New class of behavior?**

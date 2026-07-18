@@ -18,7 +18,7 @@ A theoretical framework paper, not a primitive. Ruffini et al. unify **Algorithm
 | Paper concept | Codebase instance (shipped) |
 |---|---|
 | Comparator detects model drift → re-estimate | `latent_functor/reestimation.rs` — coherence-driven re-estimation scheduler when `coherence < tau_reest` |
-| Agent dynamics track world via recurrent latent state | `evolve_hla` (`sense/reconstruction.rs`), `MicroRecurrentBeliefState` (Plan 276), NextLat belief-state drafter (Research 192) |
+| Agent dynamics track world via recurrent latent state | `evolve_hla` (`crates/katgpt-sense/src/reconstruction.rs`), `MicroRecurrentBeliefState` (Plan 276), NextLat belief-state drafter (Research 192) |
 | Lie-group equivariant operators | Smets textbook Ch 3 → Research 321 (katgpt-rs) + Research 166 (riir-ai SE(2) game maps Super-GOAT) |
 | Conserved quantity / maximal invariant for symmetry | Plan 270 (LoRA `(A,B)` R+-gauge invariance — the one practical case) |
 | Reduced / hierarchical nested manifolds | HLA 8-dim affect projection (high-dim cochain → 8 scalars), `schema_centroid`, sense `lod`, zone-attention |

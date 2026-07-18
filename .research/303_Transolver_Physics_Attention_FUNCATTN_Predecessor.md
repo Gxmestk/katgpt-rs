@@ -148,7 +148,7 @@ Add to the standing DEC vocabulary table in the research skill and in Research 2
 |---|---|---|
 | "slice" / "aggregate to M tokens" / "physics-aware token" | `codifferential` (δ, rank k → k−1 aggregation) | `dec/operators.rs:126` |
 | "deslice" / "broadcast back to N points" | `exterior_derivative` (d, rank k → k+1 coboundary) | `dec/operators.rs:48` |
-| "slice + deslice round-trip with M-attention" | low-rank δ-then-d with M-dim inner operator (harmonic-projector-shaped) | `dec/hodge.rs:302 hodge_decompose` |
+| "slice + deslice round-trip with M-attention" | low-rank δ-then-d with M-dim inner operator (harmonic-projector-shaped) | `crates/katgpt-dec/src/hodge.rs:302 hodge_decompose` |
 | "Physics-Attention = learnable integral on Ω_s" (Thm 3.4) | DEC identity `d∘d=0` on the slice complex (discretization-invariant operator) | `dec/operators.rs` (tests verify `curl(grad)=0`, `div(curl)=0`) |
 
 **Caveat (per R296):** the boundary-vs-volume perf win from Stokes holds only for d ≤ 3. Transolver's M-slice domain is small (M=32–256) but the underlying mesh can be high-dim (3D Shape-Net Car, 32,186 points). The DEC framing is for the *vocabulary bridge*, not for a perf claim.

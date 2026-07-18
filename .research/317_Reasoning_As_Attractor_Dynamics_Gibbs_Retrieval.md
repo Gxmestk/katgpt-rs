@@ -163,7 +163,7 @@ pub fn gibbs_basin_aggregator(
 }
 ```
 
-This is a 30-line extension to `micro_belief/bom.rs` behind a `gibbs_basin_aggregator` feature, NOT a new module. Goes in **katgpt-rs** (public, generic).
+This is a 30-line extension to `crates/katgpt-micro-belief/src/bom.rs` behind a `gibbs_basin_aggregator` feature, NOT a new module. Goes in **katgpt-rs** (public, generic).
 
 **Fusion B — `NeuronShard::style_weights → AttractorKernel::W_s` (modelless §3.5 unblock of Plan 276).**
 

@@ -57,7 +57,7 @@ cargo build -p katgpt-core --no-default-features --features sparse_mlp,temporal_
 
 ## G2.1 Coherence Benchmark — The Actual GOAT Gate (T5.0)
 
-**Setup** (see `micro_belief/coherence_bench.rs`):
+**Setup** (see `crates/katgpt-micro-belief/src/coherence_bench.rs`):
 - `dim = 16` (smaller than the G1.* tests' `dim = 32` to keep the 1000-step × 3-kernel run fast; documented in the module).
 - Synthetic 1000-step input sequence, three phases:
   1. **Steps 0..400** — strong signal on dimension 0 (`input[0] = 0.8`, others `±0.05` noise). A good kernel settles into "dim 0 is dominant".
