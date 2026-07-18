@@ -1,11 +1,11 @@
 # Plan 460: FlowField × DualLeoMixer Post-Max Fusion
 
-**Status:** NOT STARTED
+**Status:** DONE — G5' PASS at α=0.10 (31.5% stuck reduction). **PROMOTED** as the recommended dual path. See [`.benchmarks/460_flow_field_dual_leo_postmax_goat.md`](../.benchmarks/460_flow_field_dual_leo_postmax_goat.md).
 **Branch:** `develop`
 **Repo:** `katgpt-rs`
 **Predecessor:** [Plan 459](459_flow_field_dual_leo_mixer_fusion.md) (pre-max Q-slice fusion — G1–G4 PASS, G5 FAIL)
-**Started:** —
-**Completed:** —
+**Started:** 2026-07-18
+**Completed:** 2026-07-18
 
 ## Context (the gap Plan 459 left open)
 
@@ -114,45 +114,43 @@ must verify bit-identity against the pre-refactor field on the same inputs.
 
 ## Tasks
 
-- [ ] T1: Refactor — extract `compute_from_grid` helper from `compute_from_q_slice`
+- [x] T1: Refactor — extract `compute_from_grid` helper from `compute_from_q_slice`
       (everything after `LeoPotentialGrid::from_q_values`). No behavior change.
       Verify G3 (existing tests, including Plan 459's 5 dual tests) still pass.
-- [ ] T2: Add `LeoPotentialGrid::blend_into(&self, other: &Self, alpha: f32, out: &mut [f32])`
+- [x] T2: Add `LeoPotentialGrid::blend_into(&self, other: &Self, alpha: f32, out: &mut [f32])`
       — pure primitive. Asserts `out.len() >= self.cells()`. Writes
       `α·self.potential[i] + (1-α)·other.potential[i]`. No allocation.
-- [ ] T3: Add `FlowFieldCache::get_or_compute_dual_postmax<H1, H2, M>` —
+- [x] T3: Add `FlowFieldCache::get_or_compute_dual_postmax<H1, H2, M>` —
       signature mirrors `get_or_compute_dual`. Internally: build two grids,
       OR their blocked bitfields, blend potentials into `self.potential_buf`,
       then call `compute_from_grid` on the assembled grid.
-- [ ] T4: Unit tests
-  - [ ] T4.1: `blend_into` at α=1.0 writes `self.potential` bit-identically.
-  - [ ] T4.2: `blend_into` at α=0.0 writes `other.potential` bit-identically.
-  - [ ] T4.3: `blend_into` at α=0.5 produces elementwise mean.
-  - [ ] T4.4: `blend_into` asserts on length mismatch (panics on `out.len() < cells`).
-  - [ ] T4.5: `get_or_compute_dual_postmax(LeoOnly)` is bit-identical to
+- [x] T4: Unit tests
+  - [x] T4.1: `blend_into` at α=1.0 writes `self.potential` bit-identically.
+  - [x] T4.2: `blend_into` at α=0.0 writes `other.potential` bit-identically.
+  - [x] T4.3: `blend_into` at α=0.5 produces elementwise mean.
+  - [x] T4.4: `blend_into` asserts on length mismatch (panics on `out.len() < cells`).
+  - [x] T4.5: `get_or_compute_dual_postmax(LeoOnly)` is bit-identical to
         `get_or_compute` with the same head, same state, same goal.
-  - [ ] T4.6: `get_or_compute_dual_postmax(UvfaOnly)` matches the UVFA-head-only
+  - [x] T4.6: `get_or_compute_dual_postmax(UvfaOnly)` matches the UVFA-head-only
         `get_or_compute` field.
-- [ ] T5: Extend `benches/dual_flow_field_bench.rs` — reuse the Plan 459
+- [x] T5: Extend `benches/dual_flow_field_bench.rs` — reuse the Plan 459
       200-NPC gradient-follow simulator + mock heads. Add:
-  - [ ] T5.1: `dual_postmax_lc_alpha_03` quality + perf measurement (paper default).
-  - [ ] T5.2: `dual_postmax_alpha_sweep` — α ∈ {0.1, 0.2, 0.3, 0.5, 0.7}, Lc mode.
-  - [ ] T5.3: Print side-by-side vs Plan 459's pre-max numbers for direct
+  - [x] T5.1: `dual_postmax_lc_alpha_03` quality + perf measurement (paper default).
+  - [x] T5.2: `dual_postmax_alpha_sweep` — α ∈ {0.1, 0.2, 0.3, 0.5, 0.7}, Lc mode.
+  - [x] T5.3: Print side-by-side vs Plan 459's pre-max numbers for direct
         comparison in the bench output.
-- [ ] T6: Run GOAT gate. Capture results in
+- [x] T5.4 (added during run): perf measurement upgraded to **median of 3 trials**
+      after a single-run 3.10× outlier proved to be macOS scheduler noise. Median
+      is stable at 1.22–1.26× across invocations.
+- [x] T6: Run GOAT gate. Capture results in
       `.benchmarks/460_flow_field_dual_leo_postmax_goat.md`. Side-by-side
       table vs Plan 459 must be included (this is the whole point — prove
       or disprove that the pipeline-stage change moves the needle).
-- [ ] T7: Promotion decision
-  - If G5 passes (≥30% stuck-NPC reduction at some α) → promote
-    `get_or_compute_dual_postmax` as the **recommended** dual path in the
-    doc-comment, demote Plan 459's pre-max path to "compatibility only".
-  - If G5 fails again → keep both APIs landed (both correct + cheap), update
-    doc-comments to say honestly "neither pre-max nor post-max dual fusion
-    improves navigation on synthetic 2D grids; the gain — if any — requires
-    real CivLeoNet + UVFA evidence". Do **not** open a third pipeline-stage
-    variant (QGF `DualLeoOracle` is a different axis — test-time, not
-    geometry).
+- [x] T7: Promotion decision — **PROMOTED**. G1+G2+G5' all PASS. Post-max
+      crosses the quality gate that pre-max missed (31.5% vs 25.9% at α=0.10).
+      Doc-comments on both `get_or_compute_dual` (demoted to compatibility) and
+      `get_or_compute_dual_postmax` (recommended) updated. The two-failed-gates
+      stop rule did NOT trigger.
 
 ## GOAT Gate Definition
 

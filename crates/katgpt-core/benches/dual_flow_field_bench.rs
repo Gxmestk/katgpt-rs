@@ -338,6 +338,49 @@ fn gate_g1_bit_identity(grid_w: u16, grid_h: u16) -> bool {
     }
 }
 
+/// Plan 460 G1: post-max path with `LeoOnly` (effective α=1.0) must produce a
+/// bit-identical field to the single-head `get_or_compute` baseline. Mirrors
+/// `gate_g1_bit_identity` but calls `get_or_compute_dual_postmax`.
+fn gate_g1_bit_identity_postmax(grid_w: u16, grid_h: u16) -> bool {
+    let teacher = BenchLeoTeacher {
+        grid_w: grid_w as usize,
+        grid_h: grid_h as usize,
+        goal_x: grid_w as usize / 2,
+        goal_y: grid_h as usize / 2,
+        decoy_x: grid_w as usize / 4,
+        decoy_y: grid_h as usize / 4,
+        sharpness: 8.0,
+    };
+    let student = BenchUvfaStudent {
+        grid_w: grid_w as usize,
+        grid_h: grid_h as usize,
+        goal_x: grid_w as usize / 2,
+        goal_y: grid_h as usize / 2,
+        sharpness: 0.5,
+    };
+    let mut cache_single = FlowFieldCache::new(FlowFieldConfig::default());
+    let mut cache_postmax = FlowFieldCache::new(FlowFieldConfig::default());
+    let state = vec![0.0f32; grid_w as usize * grid_h as usize];
+
+    let single = cache_single.get_or_compute(1, &teacher, &state, 0, grid_w, grid_h, 0, 5);
+    let postmax = cache_postmax.get_or_compute_dual_postmax(
+        1, &teacher, &student, &LeoOnlyMixer, 1.0, &state, 0, grid_w, grid_h, 0, 5,
+    );
+    match (single, postmax) {
+        (Some(s), Some(d)) => {
+            for y in 0..s.height() {
+                for x in 0..s.width() {
+                    if s.lookup(x, y) != d.lookup(x, y) {
+                        return false;
+                    }
+                }
+            }
+            true
+        }
+        _ => false,
+    }
+}
+
 // ── G2: perf overhead ────────────────────────────────────────────────────
 
 fn time_cache_miss_single(
@@ -372,6 +415,28 @@ fn time_cache_miss_dual(
     let start = Instant::now();
     for i in 0..iterations {
         let _ = cache.get_or_compute_dual(
+            i as u64, teacher, student, mixer, alpha, &state, 0, grid_w, grid_h, i as u64, 5,
+        );
+    }
+    start.elapsed()
+}
+
+/// Plan 460: post-max dual fusion timing harness. Identical structure to
+/// `time_cache_miss_dual` but calls `get_or_compute_dual_postmax`.
+fn time_cache_miss_dual_postmax(
+    teacher: &BenchLeoTeacher,
+    student: &BenchUvfaStudent,
+    mixer: &impl DualLeoMixer,
+    alpha: f32,
+    grid_w: u16,
+    grid_h: u16,
+    iterations: usize,
+) -> std::time::Duration {
+    let state = vec![0.0f32; grid_w as usize * grid_h as usize];
+    let mut cache = FlowFieldCache::new(FlowFieldConfig::default());
+    let start = Instant::now();
+    for i in 0..iterations {
+        let _ = cache.get_or_compute_dual_postmax(
             i as u64, teacher, student, mixer, alpha, &state, 0, grid_w, grid_h, i as u64, 5,
         );
     }
@@ -509,14 +574,36 @@ fn main() {
     }
 
     // ── G2: Perf overhead ───────────────────────────────────────────────
+    // Run 3 trials and report median — single-run timings on macOS are noisy
+    // (CPU freq scaling, background tasks). The median is the honest signal.
     println!();
     let iters = 30;
-    let t_leo = time_cache_miss_single(&teacher, grid_w, grid_h, iters);
-    let t_lc = time_cache_miss_dual(&teacher, &student, &LcMixer, 0.3, grid_w, grid_h, iters);
-    let t_max = time_cache_miss_dual(&teacher, &student, &MaxMixer, 0.3, grid_w, grid_h, iters);
-    let t_uvfa = time_cache_miss_dual(&teacher, &student, &UvfaOnlyMixer, 0.0, grid_w, grid_h, iters);
+    let trials = 3;
+    let mut t_leo_runs = Vec::with_capacity(trials);
+    let mut t_lc_runs = Vec::with_capacity(trials);
+    let mut t_max_runs = Vec::with_capacity(trials);
+    let mut t_uvfa_runs = Vec::with_capacity(trials);
+    let mut t_postmax_runs = Vec::with_capacity(trials);
+    for _ in 0..trials {
+        t_leo_runs.push(time_cache_miss_single(&teacher, grid_w, grid_h, iters));
+        t_lc_runs.push(time_cache_miss_dual(&teacher, &student, &LcMixer, 0.3, grid_w, grid_h, iters));
+        t_max_runs.push(time_cache_miss_dual(&teacher, &student, &MaxMixer, 0.3, grid_w, grid_h, iters));
+        t_uvfa_runs.push(time_cache_miss_dual(&teacher, &student, &UvfaOnlyMixer, 0.0, grid_w, grid_h, iters));
+        t_postmax_runs.push(time_cache_miss_dual_postmax(&teacher, &student, &LcMixer, 0.3, grid_w, grid_h, iters));
+    }
+    // Median is more robust than mean for skewed distributions.
+    t_leo_runs.sort();
+    t_lc_runs.sort();
+    t_max_runs.sort();
+    t_uvfa_runs.sort();
+    t_postmax_runs.sort();
+    let t_leo = t_leo_runs[t_leo_runs.len() / 2];
+    let t_lc = t_lc_runs[t_lc_runs.len() / 2];
+    let t_max = t_max_runs[t_max_runs.len() / 2];
+    let t_uvfa = t_uvfa_runs[t_uvfa_runs.len() / 2];
+    let t_postmax_lc = t_postmax_runs[t_postmax_runs.len() / 2];
 
-    println!("G2 (Cache-miss perf overhead, {iters} cold-cache computes, {grid_w}×{grid_h}):");
+    println!("G2 (Cache-miss perf overhead, median of {trials} trials × {iters} cold-cache computes, {grid_w}×{grid_h}):");
     println!("  LeoOnly (single):       {:?}", t_leo);
     println!("  LeoOnly (dual UvfaOnly):{:?}", t_uvfa);
     println!("  Lc α=0.3:               {:?}  (ratio {:.2}×)", t_lc, t_lc.as_nanos() as f64 / t_leo.as_nanos() as f64);
@@ -525,36 +612,179 @@ fn main() {
     let g2_pass = (t_lc.as_nanos() as f64 / t_leo.as_nanos() as f64) <= 1.5;
     println!("G2 (≤1.5× overhead):  {}", if g2_pass { "PASS ✅" } else { "FAIL ❌" });
 
-    // ── Summary ─────────────────────────────────────────────────────────
+    // ═══ Plan 460: post-max dual fusion ═══════════════════════════════════
+    //
+    // Same landscape + mock heads + simulator as Plan 459 above, but the fusion
+    // point moves from pre-max raw-Q mixing to **post-max potential blending**.
+    // The expected mechanism: linear blend of two post-max potentials → FFT
+    // (linear) preserves the α-ratio → gradient pipeline sees a cleaner mix.
     println!();
-    println!("═══ Summary ═══");
+    println!("═══ Plan 460 — Post-Max DualLeoMixer Fusion GOAT Gate ═══");
+    println!("(same {grid_w}×{grid_h} grid, same mock LEO+UVFA, same simulator as Plan 459)");
+    println!();
+
+    // ── G1 postmax: Bit-identity ─────────────────────────────────────────
+    let g1_pass_postmax = gate_g1_bit_identity_postmax(grid_w, grid_h);
+    println!(
+        "G1 (LeoOnly postmax ≡ single-head, bit-identical):  {}",
+        if g1_pass_postmax { "PASS ✅" } else { "FAIL ❌" }
+    );
+
+    // ── G5 postmax: Quality @ α=0.3 ────────────────────────────────────
+    let mut cache_postmax_lc = FlowFieldCache::new(FlowFieldConfig::default());
+    let field_postmax_lc = cache_postmax_lc
+        .get_or_compute_dual_postmax(5, &teacher, &student, &LcMixer, 0.3, &state, 0, grid_w, grid_h, 0, 5)
+        .unwrap();
+    let field_postmax_lc_owned: FlowField = field_postmax_lc.clone();
+    drop(cache_postmax_lc);
+
+    let q_postmax_lc = evaluate_quality(&field_postmax_lc_owned, n_npcs, 42, goal_x, goal_y);
+    let stuck_reduction_postmax_lc =
+        (q_leo.stuck as f32 - q_postmax_lc.stuck as f32).max(0.0) / (q_leo.stuck as f32 + 1.0);
+
+    println!();
+    println!("G5 postmax (Quality @ α=0.3, Lc mode):");
+    println!("  {:<28} {:>10} {:>10} {:>10} {:>10}", "Config", "reached", "stuck", "oob", "avg_steps");
+    println!(
+        "  {:<28} {:>9.1}% {:>9.1}% {:>9.1}% {:>10.1}",
+        "LeoOnly (LEO base)",
+        q_leo.reached_pct(),
+        q_leo.stuck_pct(),
+        100.0 * q_leo.out_of_bounds as f32 / q_leo.total as f32,
+        q_leo.avg_reached_steps
+    );
+    println!(
+        "  {:<28} {:>9.1}% {:>9.1}% {:>9.1}% {:>10.1}",
+        "Postmax Lc α=0.3",
+        q_postmax_lc.reached_pct(),
+        q_postmax_lc.stuck_pct(),
+        100.0 * q_postmax_lc.out_of_bounds as f32 / q_postmax_lc.total as f32,
+        q_postmax_lc.avg_reached_steps
+    );
+    println!();
+    println!(
+        "  Stuck-NPC reduction (postmax Lc vs LeoOnly):  {:.1}%",
+        100.0 * stuck_reduction_postmax_lc
+    );
+    let g5_pass_postmax = stuck_reduction_postmax_lc >= 0.30;
+    println!(
+        "G5 postmax (≥30% stuck reduction @ α=0.3):  {}",
+        if g5_pass_postmax { "PASS ✅" } else { "FAIL ❌ (see sweep below)" }
+    );
+
+    // ── G5' postmax: α-sweep ──────────────────────────────────────────────
+    println!();
+    println!("α-sweep (postmax Lc mode):");
+    println!("  {:<8} {:>10} {:>10} {:>10} {:>10} {:>18}", "α", "reached", "stuck", "oob", "avg_steps", "stuck-red-vs-LEO");
+    let mut best_alpha_postmax = 0.3_f32;
+    let mut best_stuck_reduction_postmax = 0.0_f32;
+    for &alpha in &[0.1_f32, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9] {
+        let goal_id = 200 + (alpha * 10.0) as u64;
+        let mut cache = FlowFieldCache::new(FlowFieldConfig::default());
+        let f = cache
+            .get_or_compute_dual_postmax(goal_id, &teacher, &student, &LcMixer, alpha, &state, 0, grid_w, grid_h, 0, 5)
+            .unwrap();
+        let f_owned: FlowField = f.clone();
+        drop(cache);
+        let q = evaluate_quality(&f_owned, n_npcs, 42, goal_x, goal_y);
+        let reduction = (q_leo.stuck as f32 - q.stuck as f32).max(0.0) / (q_leo.stuck as f32 + 1.0);
+        if reduction > best_stuck_reduction_postmax {
+            best_stuck_reduction_postmax = reduction;
+            best_alpha_postmax = alpha;
+        }
+        println!(
+            "  α={:<6.2} {:>9.1}% {:>9.1}% {:>9.1}% {:>10.1}  {:>17.1}%",
+            alpha,
+            q.reached_pct(),
+            q.stuck_pct(),
+            100.0 * q.out_of_bounds as f32 / q.total as f32,
+            q.avg_reached_steps,
+            100.0 * reduction
+        );
+    }
+    println!();
+    println!(
+        "  Best α postmax (most stuck reduction): {:.2} → {:.1}% reduction",
+        best_alpha_postmax,
+        100.0 * best_stuck_reduction_postmax
+    );
+    let g5_pass_sweep_postmax = best_stuck_reduction_postmax >= 0.30;
+    println!(
+        "G5' postmax (≥30% stuck reduction at SOME α):  {}",
+        if g5_pass_sweep_postmax { "PASS ✅" } else { "FAIL ❌" }
+    );
+
+    // ── G2 postmax: Perf overhead ────────────────────────────────────────
+    // (t_postmax_lc was measured alongside the pre-max timings above and is
+    // already the median of `trials` runs.)
+    println!();
+    println!("G2 postmax (Cache-miss perf overhead, median of {trials} trials × {iters} cold-cache computes, {grid_w}×{grid_h}):");
+    println!("  LeoOnly (single):       {:?}", t_leo);
+    println!(
+        "  Postmax Lc α=0.3:       {:?}  (ratio {:.2}×)",
+        t_postmax_lc,
+        t_postmax_lc.as_nanos() as f64 / t_leo.as_nanos() as f64
+    );
+    let g2_pass_postmax = (t_postmax_lc.as_nanos() as f64 / t_leo.as_nanos() as f64) <= 1.5;
+    println!(
+        "G2 postmax (≤1.5× overhead):  {}",
+        if g2_pass_postmax { "PASS ✅" } else { "FAIL ❌" }
+    );
+
+    // ═══ Plan 459 Summary (pre-max) ═══
+    println!();
+    println!("═══ Plan 459 Summary (pre-max) ═══");
     println!("  G1 bit-identity:           {}", if g1_pass { "PASS ✅" } else { "FAIL ❌" });
     println!("  G2 perf ≤1.5×:             {}", if g2_pass { "PASS ✅" } else { "FAIL ❌" });
     println!("  G5 quality @α=0.3:         {}", if g5_pass { "PASS ✅" } else { "FAIL ❌" });
     println!("  G5' best-α quality sweep:  {}", if g5_pass_sweep { "PASS ✅" } else { "FAIL ❌" });
+
+    // ═══ Plan 460 Summary (post-max) ═══
     println!();
-    if g1_pass && g2_pass {
-        if g5_pass || g5_pass_sweep {
-            println!("VERDICT: ✅ Fusion PROVES a modelless navigation quality gain");
-            if !g5_pass {
-                println!("         (at α={best_alpha:.2}, not the paper's default 0.3).");
-            }
-            println!("         Promote get_or_compute_dual as a recommended path (opt-in, doc'd).");
+    println!("═══ Plan 460 Summary (post-max) ═══");
+    println!("  G1 bit-identity:           {}", if g1_pass_postmax { "PASS ✅" } else { "FAIL ❌" });
+    println!("  G2 perf ≤1.5×:             {}", if g2_pass_postmax { "PASS ✅" } else { "FAIL ❌" });
+    println!("  G5 quality @α=0.3:         {}", if g5_pass_postmax { "PASS ✅" } else { "FAIL ❌" });
+    println!("  G5' best-α quality sweep:  {}", if g5_pass_sweep_postmax { "PASS ✅" } else { "FAIL ❌" });
+
+    // ═══ Side-by-side: pre-max vs post-max (the whole point of Plan 460) ═══
+    println!();
+    println!("═══ Side-by-side: pre-max (Plan 459) vs post-max (Plan 460) ═══");
+    println!("  {:<32} {:>12} {:>12}", "Metric", "pre-max", "post-max");
+    println!("  {:<32} {:>11.1}% {:>11.1}%", "Stuck reduction @ α=0.3", 100.0 * stuck_reduction_lc, 100.0 * stuck_reduction_postmax_lc);
+    println!("  {:<32} {:>11.1}% {:>11.1}%", "Best-α stuck reduction", 100.0 * best_stuck_reduction, 100.0 * best_stuck_reduction_postmax);
+    println!("  {:<32} {:>12.2} {:>12.2}", "Best α", best_alpha, best_alpha_postmax);
+    println!(
+        "  {:<32} {:>11.2}× {:>11.2}×",
+        "Cache-miss perf overhead (Lc α=0.3)",
+        t_lc.as_nanos() as f64 / t_leo.as_nanos() as f64,
+        t_postmax_lc.as_nanos() as f64 / t_leo.as_nanos() as f64
+    );
+
+    // ═══ Final verdict ═══
+    println!();
+    println!("═══ Plan 460 Verdict ═══");
+    if g1_pass_postmax && g2_pass_postmax {
+        if g5_pass_postmax || g5_pass_sweep_postmax {
+            let alpha_used = if g5_pass_postmax { 0.3 } else { best_alpha_postmax };
+            println!("VERDICT: ✅ Post-max fusion PROVES a modelless navigation quality gain");
+            println!("         at α={alpha_used:.2}. The pipeline-stage change matters:");
+            println!("         blending post-max potentials is linear in the FFT's input,");
+            println!("         which is where Plan 459's pre-max mix was washed out.");
+            println!("         PROMOTE get_or_compute_dual_postmax as the recommended dual path.");
+            println!("         Demote Plan 459's pre-max get_or_compute_dual to 'compatibility'.");
         } else {
-            println!("VERDICT: ⚠ Fusion is correct + cheap, but no α in {{0.1..0.9}} reaches");
-            println!("         the 30% stuck-reduction gate on this synthetic landscape.");
-            println!("         Honest demotion: keep the API, document that the gain");
-            println!("         requires a real CivLeoNet + UVFA pair with genuinely");
-            println!("         different fields. See Plan 459 §Honest caveats.");
-            println!();
-            println!("         Likely root cause: the downstream pipeline applies");
-            println!("         max-over-actions + FFT smoothing, both nonlinear. The");
-            println!("         α=0.3 arithmetic on raw Q-values gets washed out by the");
-            println!("         max-pool. A future revision could mix the *post-max*");
-            println!("         potentials, not the raw Q-slices.");
+            println!("VERDICT: ⚠ Post-max fusion is correct + cheap (G1+G2 PASS), but NO α");
+            println!("         in {{0.1..0.9}} reaches the 30% stuck-reduction gate.");
+            println!("         Pre-max AND post-max both failed G5 on this synthetic landscape.");
+            println!("         This is the TWO-FAILED-GATES STOP RULE from Plan 460 §'Honest");
+            println!("         caveats' — flow-field navigation is NOT a LEO-fusion quality");
+            println!("         target on synthetic data. The next attack is test-time fusion");
+            println!("         (QGF DualLeoOracle, sibling plan) OR real-network evidence");
+            println!("         (riir-games-civ wiring). Do NOT open a third pipeline-stage variant.");
         }
     } else {
-        println!("VERDICT: ❌ Fusion fails a hard gate (G1/G2). Do NOT promote.");
+        println!("VERDICT: ❌ Post-max fusion fails a hard gate (G1/G2). Do NOT promote.");
     }
 
     black_box(());

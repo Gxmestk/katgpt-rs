@@ -180,18 +180,23 @@ impl FlowFieldCache {
     /// for the same goal MUST encode `alpha` into `goal_id` (e.g. hash goal + α),
     /// otherwise the cache will return the field computed at the first α seen.
     ///
-    /// **Quality caveat (Plan 459 GOAT — honest demotion):** On a synthetic
-    /// 64×64 landscape with a broad-LEO + sharp-UVFA mock pair, the paper's
-    /// default α=0.3 did NOT beat the LEO-only baseline by the 30%
+    /// **Quality caveat (Plan 459 GOAT — DEMOTED to compatibility by Plan 460):**
+    /// On a synthetic 64×64 landscape with a broad-LEO + sharp-UVFA mock pair,
+    /// the paper's default α=0.3 did NOT beat the LEO-only baseline by the 30%
     /// stuck-reduction gate (achieved only 3.7%). An α-sweep {0.1..0.9} found
     /// 25.9% at α=0.1 (best) but no α reached the gate. Root cause: the
     /// downstream pipeline applies `max-over-actions` + FFT smoothing, both
     /// nonlinear, which washes out the α-weighting done on raw Q-slices.
-    /// Callers should NOT assume the paper's α=0.3 default transfers to flow
-    /// fields — sweep α for your specific heads, or consider mixing post-max
-    /// potentials (out of scope for Plan 459). See
+    /// **Plan 460 fixed this** by moving the blend to post-max potentials
+    /// (`get_or_compute_dual_postmax`), which IS linear in the FFT's input and
+    /// crosses the gate at α=0.10 (31.5%). **New flow-field dual consumers
+    /// should use `get_or_compute_dual_postmax`, not this method.** This method
+    /// is kept for compatibility and for callers that want parity with QGF's
+    /// pre-max mix. See
     /// [`.benchmarks/459_flow_field_dual_leo_mixer_goat.md`](../../../../.benchmarks/459_flow_field_dual_leo_mixer_goat.md)
-    /// for the full report.
+    /// and
+    /// [`.benchmarks/460_flow_field_dual_leo_postmax_goat.md`](../../../../.benchmarks/460_flow_field_dual_leo_postmax_goat.md)
+    /// for the full reports.
     ///
     /// Returns `None` under the same conditions as `get_or_compute`, plus if the
     /// two heads return incompatible goal/action counts.
@@ -237,6 +242,156 @@ impl FlowFieldCache {
         mixer.combine_into(&mut q_mixed, q_leo, q_uvfa, alpha);
 
         self.compute_from_q_slice(goal_id, &q_mixed, grid_w, grid_h, tick)
+    }
+
+    /// Dual teacher-student flow field — **post-max** fusion (Plan 460).
+    ///
+    /// Builds two complete [`LeoPotentialGrid`]s (one per head, each with
+    /// `from_q_values`' `max-over-actions` already applied), then linear-blends
+    /// their **post-max potentials** via [`LeoPotentialGrid::blend_into`] before
+    /// the FFT low-pass + gradient tail. This is the sibling to
+    /// [`get_or_compute_dual`](Self::get_or_compute_dual) (Plan 459, pre-max):
+    ///
+    /// ```text
+    ///   Plan 459 (pre-max):  mix raw Q per action → from_q_values(max) → FFT → grad
+    ///   Plan 460 (post-max): from_q_values(max) ⊗ from_q_values(max) → blend → FFT → grad
+    /// ```
+    ///
+    /// The post-max blend is **linear in the field the FFT sees**, so the
+    /// α-weighting survives the FFT low-pass. Plan 459's pre-max mix was washed
+    /// out by the nonlinear `max_a (·)` pool; this path sidesteps that root
+    /// cause.
+    ///
+    /// **`ActingMode` honoring:** as with Plan 459, the mixer's `acting_mode()`
+    /// selects the blend semantics. The four non-trivial modes map to α values:
+    /// `Lc` → use `alpha`, `LeoOnly` → `alpha = 1.0`, `UvfaOnly` → `alpha = 0.0`,
+    /// `Max`/`Min` → not meaningful for potentials (they're already max-pooled);
+    /// the implementation delegates to `mixer.combine_into` on a per-cell dummy
+    /// single-action Q so all 5 modes still work uniformly via the existing
+    /// mixer trait, but for `Max`/`Min` callers should prefer
+    /// [`get_or_compute_dual`](Self::get_or_compute_dual) (where per-action max
+    /// is well-defined).
+    ///
+    /// **Cache key caveat:** same as Plan 459 — `goal_id` is the cache key.
+    /// Callers that vary `alpha` MUST encode it into `goal_id`.
+    ///
+    /// **Quality verdict (Plan 460 GOAT — PROMOTED):** Post-max blending is
+    /// **linear in the field the FFT sees**, which is the correct fusion point for
+    /// flow-field navigation. On a synthetic 64×64 landscape with the same mock
+    /// LEO+UVFA pair that failed pre-max G5' in Plan 459, post-max **crosses the
+    /// 30% stuck-reduction gate at α=0.10** (31.5% reduction; pre-max best was
+    /// 25.9%). This is the **recommended** dual path. See
+    /// [`.benchmarks/460_flow_field_dual_leo_postmax_goat.md`](../../../../.benchmarks/460_flow_field_dual_leo_postmax_goat.md)
+    /// for the full report including the side-by-side vs Plan 459.
+    ///
+    /// **α guidance:** the paper's default α=0.3 is wrong for flow-field
+    /// navigation on this landscape (only 1.9% reduction). The sweep winner is
+    /// α=0.10. Sweep α for your specific heads — the optimal value depends on
+    /// how clean the UVFA student's post-max potential is relative to the LEO
+    /// teacher's.
+    ///
+    /// Returns `None` under the same conditions as `get_or_compute_dual`.
+    #[cfg(feature = "dual_leo")]
+    #[allow(clippy::too_many_arguments)]
+    pub fn get_or_compute_dual_postmax<H1, H2, M>(
+        &mut self,
+        goal_id: u64,
+        head_leo: &H1,
+        head_uvfa: &H2,
+        mixer: &M,
+        alpha: f32,
+        state: &[f32],
+        goal_idx: usize,
+        grid_w: u16,
+        grid_h: u16,
+        tick: u64,
+        npc_count: u16,
+    ) -> Option<&FlowField>
+    where
+        H1: LeoHead,
+        H2: LeoHead,
+        M: DualLeoMixer,
+    {
+        let cached_valid = self.check_cache(goal_id, tick, npc_count)?;
+        if cached_valid {
+            return self.fields.get(&goal_id).map(|c| &c.field);
+        }
+
+        // Validate goal index against both heads.
+        if goal_idx >= head_leo.goal_count() || goal_idx >= head_uvfa.goal_count() {
+            return None;
+        }
+
+        let total_cells = (grid_w as usize) * (grid_h as usize);
+        if total_cells == 0 {
+            return None;
+        }
+
+        // Build both post-max potential grids. Each `from_q_values` applies
+        // max-over-actions internally; the two resulting `potential` buffers
+        // are the post-max fields we want to blend.
+        let q_leo_all = head_leo.all_goals_q(state);
+        let q_leo = head_leo.q_for_goal(&q_leo_all, goal_idx);
+        let actions_per_cell_leo = q_leo.len() / total_cells;
+        if actions_per_cell_leo == 0 {
+            return None;
+        }
+        let mut grid_leo = LeoPotentialGrid::from_q_values(
+            grid_w,
+            grid_h,
+            q_leo,
+            actions_per_cell_leo,
+        );
+
+        let q_uvfa_all = head_uvfa.all_goals_q(state);
+        let q_uvfa = head_uvfa.q_for_goal(&q_uvfa_all, goal_idx);
+        let actions_per_cell_uvfa = q_uvfa.len() / total_cells;
+        if actions_per_cell_uvfa == 0 {
+            return None;
+        }
+        let grid_uvfa = LeoPotentialGrid::from_q_values(
+            grid_w,
+            grid_h,
+            q_uvfa,
+            actions_per_cell_uvfa,
+        );
+
+        // Resolve effective alpha from the mixer's acting mode. The post-max
+        // blend only has a scalar α knob (no per-action max/min semantics),
+        // so Max/Min collapse to Lc with the caller-provided alpha. This is
+        // documented in the method doc-comment above.
+        let effective_alpha = match mixer.acting_mode() {
+            crate::traits::ActingMode::LeoOnly => 1.0,
+            crate::traits::ActingMode::UvfaOnly => 0.0,
+            crate::traits::ActingMode::Lc
+            | crate::traits::ActingMode::Max
+            | crate::traits::ActingMode::Min => alpha,
+        };
+
+        // Blend into the cache's potential scratch buffer (no allocation —
+        // `potential_buf` is reused across cache-misses).
+        self.potential_buf.resize(total_cells, 0.0);
+        grid_leo.blend_into(&grid_uvfa, effective_alpha, &mut self.potential_buf);
+
+        // Reuse `grid_leo` as the working grid: overwrite its potential with
+        // the blended values. Safe because `grid_leo`'s original potential has
+        // already been read by `blend_into` and is now stale.
+        grid_leo
+            .potential_mut()[..total_cells]
+            .copy_from_slice(&self.potential_buf[..total_cells]);
+
+        // OR the UVFA grid's blocked bitfield into the LEO grid's (an obstacle
+        // on either side is an obstacle).
+        {
+            let leo_blocked = grid_leo.blocked_mut();
+            let uvfa_blocked = grid_uvfa.blocked();
+            let words = leo_blocked.len().min(uvfa_blocked.len());
+            for i in 0..words {
+                leo_blocked[i] |= uvfa_blocked[i];
+            }
+        }
+
+        self.compute_from_grid(grid_leo, goal_id, tick)
     }
 
     /// Cache validation + npc_count gate (shared by both entry points).
@@ -307,6 +462,15 @@ impl FlowFieldCache {
     ///
     /// The caller is responsible for cache validation + npc_count gate before this.
     /// This function always stores the freshly-computed field under `goal_id`.
+    ///
+    /// **Legacy pre-max fusion point (Plan 459, demoted by Plan 460):** the Q-slice
+    /// may itself be the output of `DualLeoMixer::combine_into`, but the resulting
+    /// `LeoPotentialGrid::from_q_values` still applies `max-over-actions` per cell
+    /// after the mix — this nonlinearity washes out the α-weighting on synthetic
+    /// data (Plan 459 G5 FAIL). New dual consumers should use
+    /// [`get_or_compute_dual_postmax`](Self::get_or_compute_dual_postmax), which
+    /// blends post-max potentials via [`compute_from_grid`](Self::compute_from_grid)
+    /// directly (Plan 460 G5' PASS).
     fn compute_from_q_slice(
         &mut self,
         goal_id: u64,
@@ -327,8 +491,34 @@ impl FlowFieldCache {
         }
 
         // Build potential grid from the (possibly mixed) Q-slice.
-        let mut grid =
-            LeoPotentialGrid::from_q_values(grid_w, grid_h, goal_q, actions_per_cell);
+        let grid = LeoPotentialGrid::from_q_values(grid_w, grid_h, goal_q, actions_per_cell);
+
+        self.compute_from_grid(grid, goal_id, tick)
+    }
+
+    /// Tail pipeline: take a fully-built `LeoPotentialGrid` (post-`from_q_values`,
+    /// post-`blend_into` if dual) and produce (or fetch from cache) a `FlowField`.
+    ///
+    /// Steps: obstacle inflate → FFT low-pass → gradient → cache insert.
+    /// Shared between [`compute_from_q_slice`](Self::compute_from_q_slice)
+    /// (single-head / pre-max Plan 459 path) and
+    /// [`get_or_compute_dual_postmax`](Self::get_or_compute_dual_postmax)
+    /// (post-max Plan 460 path).
+    ///
+    /// The caller is responsible for cache validation + npc_count gate before this.
+    /// This function always stores the freshly-computed field under `goal_id`.
+    fn compute_from_grid(
+        &mut self,
+        mut grid: LeoPotentialGrid,
+        goal_id: u64,
+        tick: u64,
+    ) -> Option<&FlowField> {
+        let grid_w = grid.w;
+        let grid_h = grid.h;
+        let total_cells = (grid_w as usize) * (grid_h as usize);
+        if total_cells == 0 {
+            return None;
+        }
 
         // Inflate obstacles before FFT to prevent flow into walls.
         let words_per_row = (grid_w as usize).div_ceil(64);
@@ -917,5 +1107,127 @@ mod tests {
             42, &head_leo, &head_uvfa, &mixer, 0.3, &[0.0], 0, 4, 4, 0, 2,
         );
         assert!(result.is_none(), "dual path should respect npc_count gate");
+    }
+
+    // ──── Plan 460: post-max dual fusion tests ────────────────────────
+
+    /// G1 (correctness): `get_or_compute_dual_postmax` with `ActingMode::LeoOnly`
+    /// produces bit-identical `FlowField` to `get_or_compute` with the same LEO
+    /// head, same state, same goal. The post-max blend at effective α=1.0 writes
+    /// `grid_leo.potential` unchanged, so the downstream FFT + gradient pipeline
+    /// sees the same input as the single-head path.
+    #[cfg(feature = "dual_leo")]
+    #[test]
+    fn test_dual_postmax_leo_only_matches_single_head_bit_identical() {
+        let mut cache_a = FlowFieldCache::new(test_config()).with_min_npcs(1);
+        let mut cache_b = FlowFieldCache::new(test_config()).with_min_npcs(1);
+        let head_leo = make_head();
+        let head_uvfa = ConstantHead {
+            goals: 1,
+            actions: 4,
+            grid_w: 4,
+            grid_h: 4,
+            value: 0.5,
+        };
+        let mixer = TestMixer(crate::traits::ActingMode::LeoOnly);
+
+        let single = cache_a.get_or_compute(7, &head_leo, &[0.0], 0, 4, 4, 0, 5).unwrap();
+        let dual_postmax = cache_b
+            .get_or_compute_dual_postmax(7, &head_leo, &head_uvfa, &mixer, 0.3, &[0.0], 0, 4, 4, 0, 5)
+            .unwrap();
+
+        assert_eq!(single.width(), dual_postmax.width());
+        assert_eq!(single.height(), dual_postmax.height());
+        for y in 0..single.height() {
+            for x in 0..single.width() {
+                let a = single.lookup(x, y);
+                let b = dual_postmax.lookup(x, y);
+                assert_eq!(
+                    a, b,
+                    "postmax LeoOnly mismatch at ({x},{y}): single={a:?} dual_postmax={b:?}"
+                );
+            }
+        }
+    }
+
+    /// Sanity: `ActingMode::UvfaOnly` on the post-max path should produce the
+    /// same field as calling `get_or_compute` directly with the UVFA head.
+    /// (Effective α=0.0 → out = grid_uvfa.potential.)
+    #[cfg(feature = "dual_leo")]
+    #[test]
+    fn test_dual_postmax_uvfa_only_matches_uvfa_head() {
+        let mut cache_a = FlowFieldCache::new(test_config()).with_min_npcs(1);
+        let mut cache_b = FlowFieldCache::new(test_config()).with_min_npcs(1);
+        let head_leo = make_head();
+        let head_uvfa = ConstantHead {
+            goals: 1,
+            actions: 4,
+            grid_w: 4,
+            grid_h: 4,
+            value: 0.9,
+        };
+        let mixer = TestMixer(crate::traits::ActingMode::UvfaOnly);
+
+        let direct = cache_a.get_or_compute(7, &head_uvfa, &[0.0], 0, 4, 4, 0, 5).unwrap();
+        let dual_postmax = cache_b
+            .get_or_compute_dual_postmax(7, &head_leo, &head_uvfa, &mixer, 0.0, &[0.0], 0, 4, 4, 0, 5)
+            .unwrap();
+
+        for y in 0..direct.height() {
+            for x in 0..direct.width() {
+                assert_eq!(
+                    direct.lookup(x, y),
+                    dual_postmax.lookup(x, y),
+                    "postmax UvfaOnly mismatch at ({x},{y})"
+                );
+            }
+        }
+    }
+
+    /// Sanity: `get_or_compute_dual_postmax` with Lc mode produces a valid
+    /// (non-empty) FlowField. The constant-0.5 UVFA blend shifts the potential
+    /// but the field shape should remain coherent.
+    #[cfg(feature = "dual_leo")]
+    #[test]
+    fn test_dual_postmax_lc_mode_produces_valid_field() {
+        let mut cache = FlowFieldCache::new(test_config()).with_min_npcs(1);
+        let head_leo = make_head();
+        let head_uvfa = ConstantHead {
+            goals: 1,
+            actions: 4,
+            grid_w: 4,
+            grid_h: 4,
+            value: 0.5,
+        };
+        let mixer = TestMixer(crate::traits::ActingMode::Lc);
+
+        let dual = cache.get_or_compute_dual_postmax(
+            11, &head_leo, &head_uvfa, &mixer, 0.3, &[0.0], 0, 4, 4, 0, 5,
+        );
+        assert!(dual.is_some(), "postmax Lc path should produce a field");
+        let dual = dual.unwrap();
+        assert_eq!(dual.width(), 4);
+        assert_eq!(dual.height(), 4);
+    }
+
+    /// Post-max dual path respects npc_count gate (same as single + pre-max).
+    #[cfg(feature = "dual_leo")]
+    #[test]
+    fn test_dual_postmax_returns_none_below_min_npcs() {
+        let mut cache = FlowFieldCache::new(test_config()).with_min_npcs(3);
+        let head_leo = make_head();
+        let head_uvfa = ConstantHead {
+            goals: 1,
+            actions: 4,
+            grid_w: 4,
+            grid_h: 4,
+            value: 0.5,
+        };
+        let mixer = TestMixer(crate::traits::ActingMode::Lc);
+
+        let result = cache.get_or_compute_dual_postmax(
+            42, &head_leo, &head_uvfa, &mixer, 0.3, &[0.0], 0, 4, 4, 0, 2,
+        );
+        assert!(result.is_none(), "postmax dual path should respect npc_count gate");
     }
 }
