@@ -22,8 +22,8 @@ The paper's headline mechanism (cross-model KV-cache adapter, trained via Phase-
 The CS-Lasso probe is pure inference: sample `M≈200` random binary ablation masks over `H` heads, measure task accuracy under each mask, solve a Lasso, aggregate per-KV-group. The output is a **fixed-size ranking vector** — a `ConstraintPruner`-style artifact that gates which KV groups transmit, with **sigmoid**-gated density (never softmax, per AGENTS.md). The sparse/dense duality becomes a single scalar `context_awareness ∈ [0,1]` that interpolates the K-budget between the sparse floor (~3.5%) and the dense ceiling (~87%).
 
 **Already shipped (NOT reinvented — do not overclaim novelty on these):**
-- Position-disentanglement (RoPE strip → transform → restore): `katgpt-rs/src/shard_kv/rope.rs` (`undo_rope`/`reapply_rope`, Plan 147, GOAT-proved) AND `riir-ai/crates/riir-engine/src/lora_still.rs` (Still Perceiver, Plan 213).
-- Per-KV-group sigmoid gating: `katgpt-rs/src/sp_kv/utility_predictor.rs` (`soft_gate_bias`, Plan 070) and `ega_attn.rs` (Plan 139).
+- Position-disentanglement (RoPE strip → transform → restore): `katgpt-rs/crates/katgpt-kv/src/shard_kv/rope.rs` (`undo_rope`/`reapply_rope`, Plan 147, GOAT-proved) AND `riir-ai/crates/riir-engine/src/lora_still.rs` (Still Perceiver, Plan 213).
+- Per-KV-group sigmoid gating: `katgpt-rs/crates/katgpt-kv/src/sp_kv/utility_predictor.rs` (`soft_gate_bias`, Plan 070) and `ega_attn.rs` (Plan 139).
 - Layer-monotonic alignment: trivial; our GQA already maps Q-head → KV-group via `kv_group = q_head * n_kv_head / n_head`.
 
 **What's genuinely new (and drives the Super-GOAT verdict):** the fusion of {CS-probe} × {sparse/dense duality as a routing axis} × {existing HLA per-NPC belief state} × {fog-of-war context-availability signal} → **adaptive-bandwidth NPC mind-reading**. See §2.Fusion and riir-ai/.research/133 for the selling point.

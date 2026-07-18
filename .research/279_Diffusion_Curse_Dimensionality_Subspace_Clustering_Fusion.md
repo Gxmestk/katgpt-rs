@@ -16,7 +16,7 @@ Wang et al. prove that training a diffusion model on a **mixture of low-rank Gau
 
 **Distilled for katgpt-rs (modelless, inference-time):**
 
-1. **Phase-transition gate primitive**: `N ≥ d` is a *sample-sufficiency* check, complementary to our existing `spectral_flatness()` *output-convergence* check in `riir-neuron-db/src/consolidation.rs`. Together they form a two-sided quality gate: "do we have enough inputs?" (N ≥ d) AND "is the output converged?" (flatness < τ). Ships as a generic numeric primitive — no game/shard semantics.
+1. **Phase-transition gate primitive**: `N ≥ d` is a *sample-sufficiency* check, complementary to our existing `spectral_flatness()` *output-convergence* check in `katgpt-rs/src/sleep/consolidation.rs`. Together they form a two-sided quality gate: "do we have enough inputs?" (N ≥ d) AND "is the output converged?" (flatness < τ). Ships as a generic numeric primitive — no game/shard semantics.
 2. **Runtime Jacobian SVD primitive**: given any differentiable map `f: R^n → R^n` (HLA evolution kernel, latent functor, projection head), estimate its Jacobian at a point via forward differences, SVD it, and expose the leading singular vectors as candidate "task directions". This is the modelless, inference-time analog of the paper's Section 5.2 procedure — no training, no diffusion model required.
 3. **Theoretical justification for SpectralQuant (R039)**: the paper proves that for MoLRG-structured data, eigenbasis rotation + truncation to the top-d eigenvectors is *optimal* — exactly what SpectralQuant's `calibrate_eigenbasis()` does offline. This elevates SpectralQuant from "empirically works" to "provably optimal under MoLRG".
 
@@ -215,8 +215,8 @@ Per workflow §1.5, all three are produced in this session:
 ## 6. References
 
 - **Source paper**: [arXiv:2409.02426](https://arxiv.org/abs/2409.02426) — Wang et al., v5 Jun 2026.
-- **Closest internal cousin (shipped)**: `katgpt-rs/.research/039_SpectralQuant_Calibrated_Eigenbasis_KV_Compression.md` + `katgpt-rs/src/spectralquant/spectral.rs` (`participation_ratio`, `calibrate_eigenbasis`).
-- **Closest internal cousin (consolidation)**: `riir-neuron-db/src/consolidation.rs::spectral_convergence_check` + `riir-neuron-db/src/spectral_flatness.rs`.
+- **Closest internal cousin (shipped)**: `katgpt-rs/.research/039_SpectralQuant_Calibrated_Eigenbasis_KV_Compression.md` + `katgpt-rs/crates/katgpt-spectral/src/spectral.rs` (`participation_ratio`, `calibrate_eigenbasis`).
+- **Closest internal cousin (consolidation)**: `katgpt-rs/src/sleep/consolidation.rs::spectral_convergence_check` + `riir-neuron-db/src/spectral_flatness.rs`.
 - **Latent functor rank-k**: `riir-ai/.plans/318_latent_functor_rank_k_upgrade.md`.
 - **Stage-gated HLA**: `katgpt-rs/.research/269_Variable_Width_Shape_Adapter_Fusion.md`.
 - **Canonical LatCal Super-GOAT precedent**: `katgpt-rs/.research/212_Gemini_Fourier_LatCal_Fusion_Verdict.md`.

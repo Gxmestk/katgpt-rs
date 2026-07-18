@@ -10,11 +10,11 @@
 
 ## TL;DR
 
-This is a **textbook**, not a single-mechanism paper. **Verdict: Pass on novelty** — every chapter (flow matching, score matching, classifier-free guidance, VAEs, discrete diffusion/CTMCs, generator matching) is already covered by 12+ research notes in the corpus and is shipping in `katgpt-rs/src/dllm.rs`, ELF (Plan 079), D2F (Plan 066), DiffusionSampler (Plan 116), RecFM (150), QGF (236), and GDSD (151/186).
+This is a **textbook**, not a single-mechanism paper. **Verdict: Pass on novelty** — every chapter (flow matching, score matching, classifier-free guidance, VAEs, discrete diffusion/CTMCs, generator matching) is already covered by 12+ research notes in the corpus and is shipping in `riir-ai/crates/riir-engine/src/transformer/dllm.rs`, ELF (Plan 079), D2F (Plan 066), DiffusionSampler (Plan 116), RecFM (150), QGF (236), and GDSD (151/186).
 
 The artifact value here is **not a new plan**. It is a **vocabulary crosswalk** between MIT 6.S184's mathematical notation and our codebase's mechanism names. This crosswalk exists to prevent the three documented false-Super-GOAT failure modes:
 
-- **#1 `evolve_hla` (no notes framing):** a per-NPC recurrent belief-state kernel ships in `katgpt-rs/crates/katgpt-core/src/sense/reconstruction.rs` with no `.research/` note framing it as a denoising/belief kernel. Notes-only grep misses it.
+- **#1 `evolve_hla` (no notes framing):** a per-NPC recurrent belief-state kernel ships in `katgpt-rs/crates/katgpt-sense/src/reconstruction.rs` with no `.research/` note framing it as a denoising/belief kernel. Notes-only grep misses it.
 - **#2 `latent_functor/reestimation.rs` (different vocabulary):** DiPOD's "interleave self-distillation when ELBO drifts" ships as "coherence-driven re-estimation when coherence < τ_reest". Paper-vocabulary grep misses BOTH notes AND code.
 - **#3 R269 (adapter-routing default):** defaulting to adapter routing when a latent-functor/HLA/LatCal reframing is available.
 
@@ -47,14 +47,14 @@ Future diffusion/score/flow-matching research notes should grep this crosswalk f
 | Flow / ODE simulation (Euler) | Drafter step / dflash predict | `katgpt-rs/src/speculative/dflash.rs` |
 | SDE / Euler-Maruyama (`+ σ_t √h ε`) | SDE noise injection (overhead benchmarked, NOT a runtime knob) | `katgpt-rs/tests/bench_elf_modelless.rs::bench_sde_noise_injection_overhead` |
 | Score function `∇ log p_t(x)` | Latent direction vector (HLA projection / functor) | `katgpt-rs/crates/katgpt-core/src/sense/`, `riir-ai/.../latent_functor/` |
-| Score matching (denoising) | `NoiseSchedule` mask ratios, `denoise_loop` | `katgpt-rs/src/dllm.rs` |
-| Conditional flow matching loss `L_CFM` | D2F training loss (`L = ‖ε_θ(α_t z + β_t ε) − ε‖²`) | `katgpt-rs/src/dllm.rs::denoise_loop` |
+| Score matching (denoising) | `NoiseSchedule` mask ratios, `denoise_loop` | `riir-ai/crates/riir-engine/src/transformer/dllm.rs` |
+| Conditional flow matching loss `L_CFM` | D2F training loss (`L = ‖ε_θ(α_t z + β_t ε) − ε‖²`) | `riir-ai/crates/riir-engine/src/transformer/dllm.rs::denoise_loop` |
 | Classifier-free guidance `(1-w)u(∅) + w·u(y)` | QGF reference + scaled critic gradient; LoRA hot-swap linear interp | QGF (236), `riir-ai/.../adapters/`, `polytope_router.rs` |
 | Denoiser `D_t(x) = E[z\|x]` (Remark 16) | `BakeStillState::from_posterior` | `riir-ai/.../lora_still_continual.rs` |
 | Noise schedulers `α_t, β_t` | `ScheduleKind::{Uniform, LogitNormal{mean,std}}` | `katgpt-rs/src/speculative/d2f.rs::D2fDecodeConfig` |
-| Gaussian CondOT path `p_t(x\|z) = N(tz, (1-t)²)` | `NoiseSchedule::monotonic_ratios` (discrete analog κ_t) | `katgpt-rs/src/dllm.rs` |
+| Gaussian CondOT path `p_t(x\|z) = N(tz, (1-t)²)` | `NoiseSchedule::monotonic_ratios` (discrete analog κ_t) | `riir-ai/crates/riir-engine/src/transformer/dllm.rs` |
 | Marginalization trick `u(x) = ∫ u(x\|z) p_1\|t(z\|x) dz` | MoE/dMoE router (router = Bayesian posterior over expert identity) | 161 dMoE, 246 Manifold Power Iteration MoE Router |
-| CTMC rate matrix `Q_t(y\|x)` | Token re-mask rate per position | `katgpt-rs/src/dllm.rs::corrupt_block` |
+| CTMC rate matrix `Q_t(y\|x)` | Token re-mask rate per position | `riir-ai/crates/riir-engine/src/transformer/dllm.rs::corrupt_block` |
 | Factorized mixture path (Bernoulli mask) | Block-causal mask + remask | D2F (034) |
 | MDLM `[MASK]^d → data` | D2F masked diffusion decode | `katgpt-rs/src/speculative/d2f.rs` |
 | VAE encoder `q_φ(z\|x)` / decoder `p_θ(x\|z)` | LatCal raw↔latent bridge (deterministic) + HLA projection (latent) | `riir-ai/.../encoding/latcal*.rs`, `katgpt-rs/.../sense/` |

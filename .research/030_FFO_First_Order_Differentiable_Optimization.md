@@ -341,7 +341,7 @@ Current ScreeningPruner uses bandit Q-values for pruning decisions. FFO's dual c
 
 ### P0: KKT Schur Complement — ✅ CLEAR WIN (Plan 067)
 
-**Implemented in** `riir-ai/crates/riir-gpu/src/schur.rs` (feature-gated `schur_exact`)
+**Implemented in** `riir-train/crates/riir-train-engine/src/schur.rs` (feature-gated `schur_exact`)
 
 | Metric | AdamW 100 steps | Schur 1-shot |
 |--------|-----------------|--------------|
@@ -355,7 +355,7 @@ Pure-Rust Cholesky decomposition (no LAPACK dependency) for small matrices (d �
 
 ### P1: Dual-Cutoff Active Masking — ❌ NO GAIN (Plan 062)
 
-**Implemented in** `katgpt-rs/src/pruners/bandit.rs` (`dual_cutoff` field, default 0.0 = disabled)
+**Implemented in** `katgpt-rs/crates/katgpt-ruliology/src/bandit.rs` (`dual_cutoff` field, default 0.0 = disabled)
 
 The plan hypothesized that ≥80% of bandit arms would already have near-zero relevance via soft `domain × bandit_q` blending, making hard cutoff redundant. **This was wrong** — with UCB1, 0% of arms had near-zero relevance because the exploration bonus inflates low-Q arm scores.
 

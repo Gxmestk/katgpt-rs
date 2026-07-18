@@ -91,7 +91,7 @@ Phase transition: as K grows, probability mass of "sharp minima" (hallucinations
 | Paper term | Codebase equivalent (shipped) | Location |
 |---|---|---|
 | Trajectory energy / spectral entropy | `spectral_entropy_dct`, `spectral_entropy_dct_into` (Type-II DCT, per-token, [0,1], zero-alloc) | `katgpt-rs/src/chiaroscuro/entropy.rs` (Plan 269) |
-| K-trajectory particle cloud | `BoMSampler::sample_k_states` (K Gaussian noise queries, single batched matvec) | `katgpt-rs/crates/katgpt-core/src/micro_belief/bom.rs` (Plan 281) |
+| K-trajectory particle cloud | `BoMSampler::sample_k_states` (K Gaussian noise queries, single batched matvec) | `katgpt-rs/crates/katgpt-micro-belief/src/bom.rs` (Plan 281) |
 | Gibbs weight `exp(-β·H)` | `boltzmann_probabilities`, `boltzmann_sample_batch` (τ-controlled softmax); PlackettLuce Gibbs sampling (I=1000, B=200) | `src/pruners/opus/boltzmann.rs` (Plan 129, B039) |
 | Inverse-energy trajectory scorer | `exp(-λ_c · T)` cost-penalty scorer | `benches/latent_thought_flow_scorer_bench.rs` (R263) |
 | Per-answer basin aggregation | `majority_vote`, `rank_by_consistency`, `select_best_variant`, `ConvergenceSelector::MajorityVote` | `src/speculative/parallel_probe.rs`, `src/speculative/ppot/rank.rs`, `types.rs` |

@@ -3,7 +3,7 @@
 **Date:** 2026-06-22
 **Research:** [katgpt-rs/.research/288_KARC_Delay_Basis_Ridge_Forecaster.md](../.research/288_KARC_Delay_Basis_Ridge_Forecaster.md)
 **Source paper:** [arxiv 2606.19984](https://arxiv.org/abs/2606.19984) — Huang, Kurths, Tang, *Kolmogorov-Arnold Reservoir Computing*, 2026-06-18
-**Target:** `katgpt-rs/crates/katgpt-core/src/karc.rs` (new module) + Cargo feature `karc_forecaster`
+**Target:** `riir-ai/crates/riir-games-civ/src/civ/map_tick/karc.rs` (new module) + Cargo feature `karc_forecaster`
 **Status:** Phase 1 ✅ COMPLETE (G2/G3/G4 PASS, G1 threshold 8.16 LT PASS, G1 NRMSE 5× miss documented). **Phase 2 ✅ COMPLETE** (higher-order R=2 features Eq. 32, chunked Gram Eq. 44, ALS low-rank fit Eq. 47 — NRMSE 1.67e-4 on small config, 6× better than target; low-rank within 1.105× of full-rank). **Phase 3 [-] DEFERRED** (optional — paper §III spline-knot adaptivity; defer unless riir-ai integration surfaces a real NPC trajectory with non-smooth structure). **Phase 4 G1–G4 bench runs [x] DONE** (results in `.benchmarks/308_karc_goat.md`): G1 NRMSE 1.67e-4 PASS, G1 threshold 2.85 LT ❌ FAIL on K=4 config, G2 381ns PASS, G3 PASS, G4 PASS. **Promotion T4.5–T4.7 [-] DEFERRED** — blocked on either (a) large-d_h ALS B-step (Jacobi eigendecomposition of AᵀA) to make K=8/M=24/R=2 feasible without the 220 GB Cholesky, OR (b) gate re-spec accepting small-config NRMSE + relaxed threshold (similar to Plan 306 G4 re-spec). Algorithm itself proven — NRMSE 6× better than paper target; only the compound gate's threshold leg fails due to short K=4 delay window.
 
 ---

@@ -127,7 +127,7 @@ If a future agent wants the *richer* think-brain spatial representation the user
 - `katgpt-rs/.research/216_MRAgent_Reconstructive_Memory_Graph.md` — reconstructive memory over octree (GOAT).
 - `katgpt-rs/.research/242_Topological_State_Tracking_Recurrent_Belief.md` — the prior-art-check cautionary tale (Super-GOAT→GOAT after `evolve_hla` check); same lesson applied here.
 - `riir-ai/.research/007_Four_Tier_Memory_Architecture.md` — four-tier memory.
-- **Shipped code (the decisive prior art):** `riir-ai/crates/riir-games/src/civ/spatial_cognition.rs::SpatialMemory`, `katgpt-rs/crates/katgpt-core/src/sense/octree.rs::SenseOctreeBuilder`.
+- **Shipped code (the decisive prior art):** `riir-ai/crates/riir-games-civ/src/civ/spatial_cognition.rs::SpatialMemory`, `katgpt-rs/crates/katgpt-sense/src/octree.rs::SenseOctreeBuilder`.
 
 ---
 

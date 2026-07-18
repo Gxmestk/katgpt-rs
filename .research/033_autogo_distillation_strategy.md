@@ -755,14 +755,14 @@ Plan 065 implements `go` feature gate (GoState + MCTS + HL + API bridge). Each s
 - Fourier spatial MCTS: `riir-ai/crates/riir-engine/src/fourier/mcts.rs`
 - Fourier encoder: `riir-ai/crates/riir-engine/src/fourier/encoder.rs`
 - Generic MCTS: `riir-ai/crates/riir-engine/src/mcts.rs`
-- GRPO loss: `riir-ai/crates/riir-gpu/src/loss_grpo.rs`
-- DPO loss (GPU): `riir-ai/crates/riir-gpu/src/loss_dpo.rs`
-- DeltaFilter: `riir-ai/crates/riir-gpu/src/delta_filter.rs`
-- GZeroLoop: `riir-ai/crates/riir-gpu/src/gzero_loop.rs`
+- GRPO loss: `riir-train/crates/riir-train-gpu/src/loss_grpo.rs`
+- DPO loss (GPU): `riir-train/crates/riir-train-gpu/src/loss_dpo.rs`
+- DeltaFilter: `riir-train/crates/riir-train-gpu/src/delta_filter.rs`
+- GZeroLoop: `riir-train/crates/riir-train-gpu/src/gzero_loop.rs`
 - Game replay → LoRA: `riir-ai/crates/riir-gpu/src/game/trainer.rs`
 - Game policy config: `riir-ai/crates/riir-gpu/src/game/policy.rs`
 - Game replay parser: `riir-ai/crates/riir-gpu/src/game/replay.rs`
-- Schur complement: `riir-ai/crates/riir-gpu/src/schur.rs` (Plan 067 ✅ — CLEAR WIN)
+- Schur complement: `riir-train/crates/riir-train-engine/src/schur.rs` (Plan 067 ✅ — CLEAR WIN)
 - WASM Validator SDK: `riir-ai/crates/riir-validator-sdk/`
 - WASM Pruner: `riir-ai/crates/riir-wasm/src/wasm_pruner.rs`
 - MTP projection cache: `riir-ai/crates/riir-router/src/mtp_cache.rs`

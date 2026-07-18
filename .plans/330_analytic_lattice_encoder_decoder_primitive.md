@@ -8,7 +8,7 @@
 
 > **Revision note (2026-06-26):** Original Phase 1 (`AnalyticLatticeEncoder`
 > trait + 3 reference impls) is **DROPPED** — it is redundant with
-> `riir-ai/crates/katgpt-core/src/mux_latent/encoder.rs`, which already ships
+> `riir-ai/crates/riir-engine/src/fourier/encoder.rs`, which already ships
 > `FourierEncoder::encode_position_into` / `encode_offset_into` (closed-form
 > analytic encoder). Phase 1 is replaced by **ASOC cascade**
 > (`ComposerTick: GpuFuture`) as the new headline primitive, built on the
@@ -30,7 +30,7 @@
 > the math primitives (`compose_chain`, `batch_compose_chain`,
 > `direction_vector_decode`, spectral audit) stay in `katgpt-core`. The
 > **`GpuFuture` impl** (`ComposerTick` + `Join3`) moves to
-> `riir-ai/crates/katgpt-core/src/analytic_lattice/asoc.rs`. Feature flags
+> `riir-ai/crates/riir-engine/src/analytic_lattice/asoc.rs`. Feature flags
 > split: `analytic_lattice` (katgpt-core, traits + math) and
 > `analytic_lattice_runtime` (riir-engine, the `GpuFuture` wiring).
 
@@ -190,7 +190,7 @@ pub struct ComposerCtx {
 
 ### Phase 1b — `ComposerTick: GpuFuture` impl + `Join3` (riir-engine)
 
-**Target:** `riir-ai/crates/katgpt-core/src/analytic_lattice/asoc.rs` (new)
+**Target:** `riir-ai/crates/riir-engine/src/analytic_lattice/asoc.rs` (new)
 
 ### Tasks
 

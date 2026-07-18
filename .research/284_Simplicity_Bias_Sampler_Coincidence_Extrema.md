@@ -145,7 +145,7 @@ The latent-to-latent operation is the primary Super-GOAT framing. Adapter routin
 
 **On LatCal** (`riir-chain/src/encoding/latcal_fixed.rs`): the bridge from latent `(α, β)` to chain-committed raw scalars. `α_latcal = latcal_fixed::to_fixed(α)`, ditto `β`. These become part of the `MerkleFrozenEnvelope` and are quorum-committed. **Raw at sync, latent at runtime** — exactly the AGENTS.md sync-boundary rule.
 
-**On `sense/` HLA reconstruction** (`katgpt-rs/crates/katgpt-core/src/sense/reconstruction.rs`, `evolve_hla`): the existing per-NPC recurrent belief-state kernel becomes a *sampling* kernel — at each tick, candidate next-beliefs are sampled by `sigmoid(-α·K̃(v_candidate) - β)`, not by Gaussian noise. The same kernel that *evolves* belief also *biases* it toward low-K trajectories.
+**On `sense/` HLA reconstruction** (`katgpt-rs/crates/katgpt-sense/src/reconstruction.rs`, `evolve_hla`): the existing per-NPC recurrent belief-state kernel becomes a *sampling* kernel — at each tick, candidate next-beliefs are sampled by `sigmoid(-α·K̃(v_candidate) - β)`, not by Gaussian noise. The same kernel that *evolves* belief also *biases* it toward low-K trajectories.
 
 **Adapter routing / MCTS / speculative decode applications** (secondary framings):
 - `polytope_router.rs`: select adapter by K-prior over the polytope vertex weights.

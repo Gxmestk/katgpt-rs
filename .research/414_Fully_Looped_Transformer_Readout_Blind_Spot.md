@@ -111,7 +111,7 @@ CART uses a "learned Linear Time-Invariant (LTI) gate" for loop stability, with 
 
 ### 2.1 What ships in our T-pass (forward_looped)
 
-Current `forward_looped` (katgpt-rs/src/transformer.rs:268):
+Current `forward_looped` (katgpt-rs/crates/katgpt-percepta/src/transformer.rs:268):
 - Outer loop: `for tau in 0..loop_count`
 - Saves `ctx.prev_h` at start of each loop (line 379)
 - Per-layer: RMSNorm → QKV → attention → output proj + residual → MLP + residual

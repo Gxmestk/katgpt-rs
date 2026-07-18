@@ -144,8 +144,8 @@ Two bandwidth axes: K (latent token count) and d (per-token channel). Compressio
 | Code | Mechanism | Match |
 |---|---|---|
 | `katgpt-rs/src/mux_latent/` (Plan 238) | `MuxLatentEncoder`, `LatentContextBuffer`, `compress_context`, `decompress_segment` (EXPAND analog), `forward_prefill_with_compression`. DEFAULT-ON. | Ships the LCLM compression idea modellessly. No Stage-2 generator. |
-| `katgpt-rs/src/mux_demux.rs` | MUX superposition + lossless recovery via `mux_demux`. | The "lossless encoder" analog. |
-| `katgpt-rs/crates/katgpt-core/src/sense/reconstruction.rs::evolve_hla` | Per-NPC 8-dim HLA belief state, dot-product + sigmoid, feeds reconstruction. | The HLA "latent state" — IS it an interpolation-coherent summary, or a routing/copy mechanism? **UNTESTED.** |
+| `katgpt-rs/crates/katgpt-core/src/mux_demux.rs` | MUX superposition + lossless recovery via `mux_demux`. | The "lossless encoder" analog. |
+| `katgpt-rs/crates/katgpt-sense/src/reconstruction.rs::evolve_hla` | Per-NPC 8-dim HLA belief state, dot-product + sigmoid, feeds reconstruction. | The HLA "latent state" — IS it an interpolation-coherent summary, or a routing/copy mechanism? **UNTESTED.** |
 | `riir-ai/crates/riir-engine/src/hla/{kernel,forward,types}.rs` | 8-dim HLA runtime; 5 scalars cross sync boundary. | The per-NPC latent plan analog. |
 | `riir-neuron-db/src/shard.rs::NeuronShard::style_weights[64]` | Fixed-layout Pod weight blob; `#[repr(C)]`. | Compressed latent representation of a weight manifold. Midpoint interpolation untested. |
 | `riir-neuron-db/src/archetype_blend_shard.rs` | 224-byte Pod; π vector + lipschitz bound; BLAKE3-committed. | The committed per-entity latent. Midpoint of two NPCs' π — does it produce a coherent third NPC? **UNTESTED.** |

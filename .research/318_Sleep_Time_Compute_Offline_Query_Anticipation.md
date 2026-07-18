@@ -278,7 +278,7 @@ fn sleep_time_to_synced_scalars(hla_prime: &[f32; 8]) -> [f32; 5] {
 - **Closest shipped cousin (consolidation side):** `katgpt-rs/.research/116_LLM_Sleep_Offline_Recursive_Memory_Consolidation.md`, `katgpt-rs/.plans/154_sleep_consolidation_offline_memory.md`, `src/sleep/`
 - **Closest shipped cousin (forecast side):** `katgpt-rs/.research/288_KARC_Delay_Basis_Ridge_Forecaster.md`, `katgpt-rs/.plans/308_karc_delay_basis_ridge_forecaster.md`
 - **Closest shipped cousin (warm-tier positioning, GOAT FAILED):** `katgpt-rs/.benchmarks/285_compression_drafter_goat.md` (the explicit "NPC sleep cycle warm-tier" framing thatCompressionDrafter failed to make work at Hot-tier)
-- **Closest shipped cousin (latent-to-latent):** `riir-ai/.research/123_Latent_Functor_Runtime_Guide.md`, `riir-ai/crates/riir-engine/src/latent_functor/arithmetic.rs` (`extract_functor_into`, `functor_gate`)
+- **Closest shipped cousin (latent-to-latent):** `riir-ai/.research/123_Latent_Functor_Runtime_Guide.md`, `katgpt-rs/crates/katgpt-percepta/src/wasm/interpreter/arithmetic.rs` (`extract_functor_into`, `functor_gate`)
 - **Closest shipped cousin (cross-consumer commitment):** `riir-ai/crates/riir-engine/src/cgsp_runtime/chain_bridge.rs` (`commit_snapshot_via_quorum`, `reload_snapshot_from_chain`)
 - **Predictability↔curiosity inversion:** `katgpt-rs/.research/126` (CGSP), `katgpt-rs/.research/288` (KARC curiosity as forecast residual)
 

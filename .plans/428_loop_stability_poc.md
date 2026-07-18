@@ -3,7 +3,7 @@
 **Date:** 2026-07-12
 **Research:** [katgpt-rs/.research/414_Fully_Looped_Transformer_Readout_Blind_Spot.md](../.research/414_Fully_Looped_Transformer_Readout_Blind_Spot.md)
 **Source papers:** [arXiv:2605.18797](https://arxiv.org/abs/2605.18797) (Fully Looped Transformer) + [arXiv:2606.24898](https://arxiv.org/abs/2606.24898) (Readout Blind Spot)
-**Target:** `katgpt-rs/benches/loop_stability_poc.rs` (PoC benchmark) + `katgpt-rs/crates/katgpt-percepta/src/transformer.rs` (implementation behind feature flag)
+**Target:** `katgpt-rs/examples/loop_stability_poc.rs` (PoC benchmark) + `katgpt-rs/crates/katgpt-percepta/src/transformer.rs` (implementation behind feature flag)
 **Status:** Active — Phase 1 (PoC)
 
 ---

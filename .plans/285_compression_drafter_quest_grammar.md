@@ -4,7 +4,7 @@
 **Research:** [katgpt-rs/.research/256_GzipLM_Compression_Drafter.md](../.research/256_GzipLM_Compression_Drafter.md) (revised to GOAT)
 **Private companion:** `riir-ai/.research/137_Compression_Drafter_Plasma_Personality_Guide.md` (exploration, not committed)
 **Source paper:** [nathan.rs/gzip-lm](https://nathan.rs/posts/gzip-lm/) — beam-search text generation by compression
-**Target:** `katgpt-rs/crates/katgpt-core/src/compression_drafter.rs` (new module, open) + `riir-ai/crates/riir-games/src/quest_grammar/compression_draft.rs` (game wiring, private)
+**Target:** `katgpt-rs/crates/katgpt-core/src/compression_drafter.rs` (new module, open) + `riir-ai/crates/riir-games-quest/src/quest_grammar/compression_draft.rs` (game wiring, private)
 **Cargo features:** `compression_drafter` (katgpt-core, opt-in), `quest_compression_draft` (riir-games, opt-in, depends on `quest_grammar` + `compression_drafter`)
 **Status:** COMPLETE — GOAT FAILED (2 runs). Demoted. `TernaryDraftModel` remains default-on for Hot-tier quest grammar. `compression_drafter` open primitive + `quest_compression_draft` private wiring stay opt-in, unused, ready for any future Warm-tier consumer.
 
@@ -56,7 +56,7 @@ Ship a **Hot-tier modelless CompressionDrafter** that scores quest-continuation 
 ### Tasks
 
 - [x] **T2.1** Add `compression_drafter` to `katgpt-rs` re-export from `katgpt-rs/src/lib.rs` (passthrough, like `micro_belief`). Add `quest_compression_draft = ["quest_grammar", "katgpt-rs/compression_drafter"]` to `riir-ai/crates/riir-games/Cargo.toml`.
-- [x] **T2.2** Create `riir-ai/crates/riir-games/src/quest_grammar/compression_draft.rs` with:
+- [x] **T2.2** Create `riir-ai/crates/riir-games-quest/src/quest_grammar/compression_draft.rs` with:
   - `pub struct CompressionQuestDrafter { inner: katgpt_core::compression_drafter::Lz4FlexDrafter, }`
   - `pub fn from_registered_quests(quests: &[String]) -> Self` — join with `\n`, feed as initial corpus.
   - `pub fn generate(&self, ctx: &str, candidates: &[&str]) -> Option<&str>` — score each candidate as `ctx + cand`, return argmax. Returns `None` if `candidates` empty.
@@ -138,7 +138,7 @@ Root cause analysis:
 
 ### Tasks
 
-- [x] **T7.1** Update `riir-ai/crates/riir-games/src/quest_grammar/compression_draft.rs`:
+- [x] **T7.1** Update `riir-ai/crates/riir-games-quest/src/quest_grammar/compression_draft.rs`:
   - Add `pub fn generate_beam(&mut self, seed_ctx: &str, alphabet: &[u8], horizon: usize, beam_width: usize, tail_len: usize) -> String` — uses `beam_search` with `MatchLengthScorer`.
   - Keep existing `generate()` (candidate-set) for backward compat.
   - The alphabet for quest grammar: the ASCII bytes appearing in the registered corpus (use `corpus_alphabet()` helper).

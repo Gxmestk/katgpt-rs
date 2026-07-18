@@ -310,7 +310,7 @@ GOAT gate rule: `cce_moderator` feature flag default-off. Promote to considerati
 - Paper: [arXiv:2606.20062](https://arxiv.org/pdf/2606.20062) — Campi, Cannerozzi, Tzouanas, 18 Jun 2026
 - Code: https://github.com/JannTzou/Learning-Algorithm-for-Mean-Field-CCE.git (JAX reference, training-flavored)
 - Our payoff: `riir-ai/crates/riir-games/src/payoff.rs`
-- Our bandit: `katgpt-rs/src/pruners/bandit.rs`, `prudent_banker.rs`
+- Our bandit: `katgpt-rs/crates/katgpt-ruliology/src/bandit.rs`, `prudent_banker.rs`
 - Our dual pool: `katgpt-rs/crates/katgpt-core/src/cgsp/dual_pool.rs`
 - Our latent functor: `riir-ai/crates/riir-engine/src/latent_functor/`
 - Our HLA: `riir-ai/crates/riir-engine/src/hla/`
@@ -329,19 +329,19 @@ thin wrapper primitive, shipped in Plan 300:
   `n_players`, `deviations_for_player`, per-player `reward_follow` /
   `reward_deviate` / `gamma_player` / `gamma_dev_player`, plus moderator
   objective `gamma0 = (1/P) Σ_i γ_i(ρ)` and linear `gamma0_coeff`.
-- **New method `CceLp::solve_heterogeneous`** (`katgpt-rs/src/cce/lp.rs`):
+- **New method `CceLp::solve_heterogeneous`** (`katgpt-rs/crates/katgpt-core/src/cce/lp.rs`):
   builds `Σ_i |D_i|` constraint rows, each using player `i`'s cost tensor.
   Shares BFS-enumeration infrastructure with `solve` (DRY refactor —
   `enumerate_bfs` helper).
-- **New struct `PerPlayerGame<N,A,P,D>`** (`katgpt-rs/src/cce/heterogeneous.rs`):
+- **New struct `PerPlayerGame<N,A,P,D>`** (`katgpt-rs/crates/katgpt-core/src/cce/heterogeneous.rs`):
   default concrete impl backed by per-player `(PayoffTensor, DeviationClass)`
   slices.
 - **New methods `CcePrimalDual::step_heterogeneous` + `run_heterogeneous`**
-  (`katgpt-rs/src/cce/primal_dual.rs`, Plan 300 T4.3b): per-player subgradient
+  (`katgpt-rs/crates/katgpt-core/src/cce/primal_dual.rs`, Plan 300 T4.3b): per-player subgradient
   oracle caches best deviation `κ_i*(ρ)` once per step, then aggregates
   `grad[m] = gamma0_coeff(m) + λ · (1/P) Σ_i [cost_i(s,a) − reward_deviate(i, s, κ_i*)]`.
 - **New method `ExternalRegret::linear_derivative_heterogeneous`**
-  (`katgpt-rs/src/cce/external_regret.rs`, Plan 300 T4.3b): public per-(s,a)
+  (`katgpt-rs/crates/katgpt-core/src/cce/external_regret.rs`, Plan 300 T4.3b): public per-(s,a)
   subgradient for testing / single-index callers.
 
 **Regret bound transfer (doc 62 §2):** `ER(ρ̄_T) ≤ O(T⁻¹ᐟ²)` holds as-is — each

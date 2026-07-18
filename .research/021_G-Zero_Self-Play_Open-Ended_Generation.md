@@ -166,7 +166,7 @@ In plain English: as long as the Proposer explores enough (`α_S`) and the δ-fi
 
 ### Where Plan 042 (TTT Feedback Loop) and Plan 048 (Self-Improving Loop) currently stop
 
-Plan 042 wires `katgpt-rs/src/feedback.rs` → anyrag `/cache/export` → `riir-gpu/feedback_consumer.rs` → retraining. The **shape** of the loop is in place. The **reward signal**, however, is currently:
+Plan 042 wires `katgpt-rs/crates/katgpt-deprecated/src/feedback.rs` → anyrag `/cache/export` → `riir-gpu/feedback_consumer.rs` → retraining. The **shape** of the loop is in place. The **reward signal**, however, is currently:
 - Game-domain: win/loss (Bomberman, Monopoly).
 - Code-domain: compile success, validator pass.
 - Generic: `InferenceResult.reward` = max relevance from the screening pruner.
@@ -202,7 +202,7 @@ Current `AbsorbCompress` promotes heuristics based on raw environment reward (di
 
 ##### 1c. DeltaBanditPruner (High Value, Dense Reward)
 
-`katgpt-rs/src/pruners/bandit.rs` (UCB1 / Thompson / ε-greedy) already does exploration. G-Zero's δ gives it a **denser, more informative reward**:
+`katgpt-rs/crates/katgpt-ruliology/src/bandit.rs` (UCB1 / Thompson / ε-greedy) already does exploration. G-Zero's δ gives it a **denser, more informative reward**:
 
 - Arm = (domain, hint-template).
 - Reward = Hint-δ (immediate, per-token, no episode completion needed).
@@ -331,7 +331,7 @@ Our existing arenas have explicit verifiers (game outcome). But G-Zero's premise
 
 ##### Priority 3: DeltaBanditPruner (~100 LOC)
 
-`katgpt-rs/src/pruners/delta_bandit.rs`:
+`katgpt-rs/crates/katgpt-pruners/src/g_zero/delta_bandit.rs`:
 - Wraps existing `BanditPruner<P>`.
 - `observe_delta(arm, δ)` — feed δ as dense reward.
 - `blind_spot_arms(top_k)` — arms with highest accumulated δ.
@@ -339,7 +339,7 @@ Our existing arenas have explicit verifiers (game outcome). But G-Zero's premise
 
 ##### Priority 4: TemplateProposer (~150 LOC)
 
-`katgpt-rs/src/pruners/template_proposer.rs`:
+`katgpt-rs/crates/katgpt-pruners/src/g_zero/template_proposer.rs`:
 - 6 categories from G-Zero Appendix A (Writing, Explanation, Advice, Analysis, Coding, Reasoning ≤1/6).
 - UCB1-weighted template selection biased toward `blind_spot_arms()`.
 - Emits `(query, hint)` pairs — no neural model needed.

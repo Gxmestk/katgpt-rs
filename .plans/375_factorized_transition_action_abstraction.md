@@ -112,7 +112,7 @@ The codebook is constructed modellessly via **k-means clustering** on observed t
 
 ### Tasks
 
-- [x] **T3.1** Create benchmark `katgpt-rs/benches/bench_375_factorized_action_goat.rs` with the **four** competitors (per Research 374 §9 + §10 code verification):
+- [x] **T3.1** Create benchmark `katgpt-rs/crates/katgpt-core/benches/bench_375_factorized_action_goat.rs` with the **four** competitors (per Research 374 §9 + §10 code verification):
   1. **Monolithic baseline** — `extract_functor` + `apply_functor` (single mean displacement).
   2. **Factorized OTF (modelless, Gate mode)** — k-means codebook (**K=128, D=32** — paper defaults) + sigmoid gate + normalized weighted average.
   3. **Factorized OTF (modelless, Mean mode)** — same codebook, `α_k = 1` uniform (the ablation from `aggregator_type: "mean"`).

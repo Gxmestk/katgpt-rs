@@ -184,11 +184,11 @@ impl HardwareAwarePrefixScheduler {
 ## 5. Cross-References
 
 - **`katgpt-rs/.plans/339_hardware_aware_prefix_scheduler.md`** — SHIPPED: `HardwareAwarePrefixScheduler` + `SpsCurve` + non-anticipating early-stop (GOAT G1-G5 PASS, opt-in)
-- `katgpt-rs/src/speculative/prefix_scheduler.rs` — the shipped scheduler implementation
-- `katgpt-rs/src/speculative/acceptance_forecast.rs` — `AcceptanceForecast` (Bebop, produces `c_k`; scheduler consumes `Π c_i`)
-- `katgpt-rs/src/speculative/caddtree_budget.rs` — `AcceptanceSurrogate::expected_accepted_length_at_budget` (per-request analog of the scheduler's multi-request objective)
+- `katgpt-rs/crates/katgpt-speculative/src/prefix_scheduler.rs` — the shipped scheduler implementation
+- `katgpt-rs/crates/katgpt-speculative/src/acceptance_forecast.rs` — `AcceptanceForecast` (Bebop, produces `c_k`; scheduler consumes `Π c_i`)
+- `katgpt-rs/crates/katgpt-speculative/src/caddtree_budget.rs` — `AcceptanceSurrogate::expected_accepted_length_at_budget` (per-request analog of the scheduler's multi-request objective)
 - `katgpt-rs/src/speculative/verifier.rs` — `LeviathanVerifier` (RS = 1−dTV, already shipped)
-- `katgpt-rs/src/cumprodsum.rs` — `cumprodsum_*` (SIMD atomic for `Π c_i`)
+- `katgpt-rs/crates/katgpt-core/src/cumprodsum.rs` — `cumprodsum_*` (SIMD atomic for `Π c_i`)
 - `katgpt-rs/src/speculative/budget.rs` — per-request adaptive budget (generalized by the scheduler)
 - `katgpt-rs/.research/243_Bebop_Entropy_Bounded_MTP_Acceptance_Adaptive_Gamma.md` — Bebop `α ≈ a−b·H(p)` (scheduler's per-position input source; modelless confidence proxy for DSpark's trained confidence head)
 - `katgpt-rs/.research/177_Domino_Decoupled_Causal_Speculative_Decoding.md` — Domino (concurrent work, CausalEncoder ≈ DSpark RNN head → riir-train)

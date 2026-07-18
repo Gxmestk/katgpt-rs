@@ -147,7 +147,7 @@ Each line is one `(board_state, action, quality)` sample:
   - Filter by `player_type` and `quality` threshold
   - Unit tests: parse a small JSONL file, verify sample count and content
 
-- [x] **Task 8: Wire `train_bomber.rs`** (`riir-ai/crates/riir-gpu/examples/train_bomber.rs`)
+- [x] **Task 8: Wire `train_bomber.rs`** (`riir-train/crates/riir-train-gpu/examples/train_bomber.rs`)
   - Replace stub with actual training loop
   - Load JSONL from `output/replays/` via `parse_replay()`
   - Convert `GameSample` → training batches for wgpu

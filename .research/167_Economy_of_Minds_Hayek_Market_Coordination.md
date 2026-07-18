@@ -198,9 +198,9 @@ EoM's approach is O(W) per reward, SimpleTES is O(C×L×K). EoM is cheaper and s
 
 - EoM paper: [arXiv:2606.02859](https://arxiv.org/abs/2606.02859)
 - EoM code: `.raw/EoM/` (HayekMAS reference implementation)
-- Our bandit: `katgpt-rs/src/pruners/bandit.rs`
-- Our absorb-compress: `katgpt-rs/src/pruners/absorb_compress.rs`
-- Our DDTree: `katgpt-rs/src/ddtree.rs`
+- Our bandit: `katgpt-rs/crates/katgpt-ruliology/src/bandit.rs`
+- Our absorb-compress: `katgpt-rs/crates/katgpt-pruners/src/absorb_compress.rs`
+- Our DDTree: `riir-ai/crates/riir-games/src/plasma/ddtree.rs`
 - Monopoly arena: `katgpt-rs/.plans/035_monopoly_fsm.md`
 - RandOpt population: `katgpt-rs/.research/080_RandOpt_Neural_Thickets.md`
 - SimpleTES credit: `katgpt-rs/.research/052_SimpleTES_Evaluation_Driven_Scaling.md`

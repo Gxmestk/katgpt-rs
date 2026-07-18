@@ -253,7 +253,7 @@ Any **parity claim** ("renoise-CE matches/beats CLR or plurality vote at self-ev
 
 ---
 
-## 4. Open primitive (target: `katgpt-rs/src/pruners/renoise_ce.rs` or `katgpt-rs/crates/katgpt-core/src/renoise_ce.rs`)
+## 4. Open primitive (target: `katgpt-rs/crates/katgpt-core/src/renoise_ce.rs` or `katgpt-rs/crates/katgpt-core/src/renoise_ce.rs`)
 
 ```rust
 //! Renoise-CE self-verifier — perturb a completed state, re-resolve through

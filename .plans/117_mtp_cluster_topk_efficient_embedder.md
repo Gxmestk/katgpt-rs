@@ -249,7 +249,7 @@ MTP = "predict ahead with a small model, verify with the big model." This maps t
 
 ### Phase 5: Sync + Benchmark
 
-- [x] **T36**: Sync `clustered_lm_head` changes to `riir-ai/crates/katgpt-percepta/src/transformer.rs` — added `select_topk_indices`, updated to Top-K selection, 627 riir-engine tests pass
+- [x] **T36**: Sync `clustered_lm_head` changes to `katgpt-rs/crates/katgpt-percepta/src/transformer.rs` — added `select_topk_indices`, updated to Top-K selection, 627 riir-engine tests pass
 - [x] **T37**: Sync `Config` changes to `riir-ai/crates/riir-engine/src/types.rs` — already synced via `pub use katgpt_core::types::*` re-export
 - [x] **T38**: Benchmark: `game()` + LoRA drafter — measure acceptance rate improvement over random baseline (4/4 tests pass)
 - [x] **T39**: Benchmark: `bpe()` + LoRA drafter — measure acceptance rate and throughput

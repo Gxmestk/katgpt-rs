@@ -139,7 +139,7 @@ Three gating strategies compared (Figure 6):
 | KL divergence (reverse direction) | `riir-gpu/src/distill.rs` — `kl_divergence()` | ✅ Production |
 | LoRA-only training | `riir-gpu` full stack — wgpu | ✅ Production |
 | DPO loss | `riir-gpu/src/loss_dpo.rs` — `GpuDpoLoss` | ✅ Production |
-| Multi-arm bandit (UCB) | `katgpt-rs/src/pruners/bandit.rs` | ✅ Production |
+| Multi-arm bandit (UCB) | `katgpt-rs/crates/katgpt-ruliology/src/bandit.rs` | ✅ Production |
 | Self-play loop | `riir-gpu/src/gzero_loop.rs` | ✅ Production |
 | Sigmoid activation | Various — standard math | ✅ Available |
 | **Token-level gap gating** | **MISSING** | ❌ Gap |

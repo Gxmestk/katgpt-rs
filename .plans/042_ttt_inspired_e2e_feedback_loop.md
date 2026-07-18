@@ -161,7 +161,7 @@ riir-burner already reads JSONL. The only addition: optional `reward` field for 
     - `screened`: reward < screening_threshold
   - Return `InferenceResult` alongside the generated text
   - Minimal change to DDTree API: wrap return in `(String, InferenceResult)`
-  - ~20 lines in `katgpt-rs/src/ddtree.rs`
+  - ~20 lines in `riir-ai/crates/riir-games/src/plasma/ddtree.rs`
 
 - [x] **Task 3: Solution cache in anyrag**
   - New module: `crates/lib/src/cache/mod.rs` + `crates/lib/src/cache/solution_cache.rs`
@@ -232,7 +232,7 @@ riir-burner already reads JSONL. The only addition: optional `reward` field for 
 | File | Change | Repo |
 |------|--------|------|
 | `katgpt-rs/src/types.rs` | Add `InferenceResult` struct (~30 lines) | katgpt-rs |
-| `katgpt-rs/src/ddtree.rs` | Return `InferenceResult` alongside output (~20 lines) | katgpt-rs |
+| `riir-ai/crates/riir-games/src/plasma/ddtree.rs` | Return `InferenceResult` alongside output (~20 lines) | katgpt-rs |
 | `katgpt-rs/src/lib.rs` | `pub mod feedback;` | katgpt-rs |
 | `anyrag/crates/lib/src/lib.rs` | `pub mod cache;` + feature gate | anyrag |
 | `anyrag/crates/lib/Cargo.toml` | Add `solution-cache` feature | anyrag |

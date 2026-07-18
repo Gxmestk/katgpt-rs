@@ -67,7 +67,7 @@ The math substrate ships (Plan 335 `lattice_edge_utility_into`, Plan 286
 | `lattice_edge_utility_into` | `katgpt-rs/crates/katgpt-core/src/...` (Plan 335 P5) | SIMD FMA `utility = sigmoid(x·w_x + y·w_y + z·w_z + f·w_f + ...)` over the LatCal eggshell lanes |
 | `ZoneGeometryPod` w/ `[x,y,z,safety\|interest,occupancy,threat,destruction]` lanes | `riir-neuron-db/src/zone_geometry.rs` (Plan 335 P0) | The 8-lane SIMD register target — already typed per-slot |
 | `LatCalEggshell::project_from`, `validate` | `riir-neuron-db/src/zone_geometry.rs` | Bridge between latent ops and raw committed lanes |
-| `extract_functor`, `apply_functor`, `functor_gate` (rank-1 + rank-k + affine) | `riir-ai/crates/riir-engine/src/latent_functor/arithmetic.rs` | Displacement-based functor between (src,tgt) pairs — the "bending" primitive |
+| `extract_functor`, `apply_functor`, `functor_gate` (rank-1 + rank-k + affine) | `katgpt-rs/crates/katgpt-percepta/src/wasm/interpreter/arithmetic.rs` | Displacement-based functor between (src,tgt) pairs — the "bending" primitive |
 | `funcattn_forward`, `solve_convex_combo_dual`, `compute_basis_into`, `pre_rotate_basis_weights_into` | `katgpt-rs/crates/katgpt-core/src/funcattn.rs` | k×k spectral transport operator C (Tikhonov dual solver) |
 | `funcattn_compose` (spectral_pre_rotate, chiar_blend, freeze_thaw) | `katgpt-rs/src/funcattn_compose/` | Token/weight-level composition (NOT cross-entity) |
 | `FieldRegistry`, `FactionStanceRegistry`, `apply_all` | `riir-ai/crates/riir-engine/src/latent_field_wiring.rs` | Zone/faction latent field injection (Plan 309) |

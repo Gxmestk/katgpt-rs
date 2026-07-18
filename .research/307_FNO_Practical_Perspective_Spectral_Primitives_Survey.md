@@ -96,11 +96,11 @@ This is the substrate. Everything else in the paper layers trained weights on to
 | Code | `katgpt-rs/crates/katgpt-core/src/cross_resolution.rs` | **`transport_cross_resolution_into` = FNO super-resolution / cross-resolution spectral transport.** Frozen BLAKE3-committed basis pair `(Φ_src, Ψ_dst)`, k-dim spectral projection, reconstruct at any dim. DEFAULT-ON. **The headline FNO inference primitive.** |
 | Code | `katgpt-rs/crates/katgpt-core/src/funcattn.rs` | FUNCATTN = spectral attention with frozen bases (Research 257/290). SpectralConv-equivalent. |
 | Code | `katgpt-rs/crates/katgpt-core/src/flow/fft.rs` | `fft_smooth` with Nyquist-cutoff low-pass on potential fields. FNO spectral downsampling for periodic grids. |
-| Code | `katgpt-rs/src/freq_bandit.rs::token_stream_spectrum` | DFT up to Nyquist. FNO power-spectrum diagnostic. |
-| Code | `katgpt-rs/src/spectralquant/spectral_kv_cache.rs` | Eigenbasis KV compression (Research 039). SpectralConv applied to KV cache. |
+| Code | `katgpt-rs/crates/katgpt-pruners/src/freq_bandit.rs::token_stream_spectrum` | DFT up to Nyquist. FNO power-spectrum diagnostic. |
+| Code | `katgpt-rs/crates/katgpt-spectral/src/spectral_kv_cache.rs` | Eigenbasis KV compression (Research 039). SpectralConv applied to KV cache. |
 | Code | `katgpt-rs/crates/katgpt-core/src/dec/operators.rs` | `exterior_derivative` (d), `codifferential` (δ), `hodge_laplacian` (Δ). FNO spectral differentiation **in DEC vocabulary** — d on a periodic cell complex IS spectral differentiation. |
 | Code | `katgpt-rs/crates/katgpt-core/src/subspace_phase_gate.rs::thin_svd_into` | 2D SVD (one-sided Jacobi). TFNO's Tucker is the N-mode generalization — partial coverage. |
-| Code | `katgpt-rs/src/karc.rs` (Plan 308) | `KarcForecaster<FourierBasis>` — Fourier delay-basis ridge regression. Fourier-basis forecasting already shipped. |
+| Code | `riir-ai/crates/riir-games-civ/src/civ/map_tick/karc.rs` (Plan 308) | `KarcForecaster<FourierBasis>` — Fourier delay-basis ridge regression. Fourier-basis forecasting already shipped. |
 | Code | `riir-chain/src/encoding/latcal_fixed.rs::LatCalSpectralFixed` | Fixed-point Fourier coefficients `(freq × 10^6, amp × 10^6, phase × 10^6)` for chain commitment. FNO coefficients crossing the sync boundary. |
 | Code | `riir-chain/src/catchup/shard_quorum.rs::spectral_diversification` | Cosine-based shard ensemble diversity. FNO spectral mode coverage analog. |
 | Code | `riir-chain/src/consensus/curator_bridge.rs::verify_spectral_shard` | Spectral shard condition-number bound (BLAKE3-committed integrity). |

@@ -177,7 +177,7 @@ Two empirical findings from AIDE² validate design decisions our quintet has alr
 | AIDE² finding | Validates | Where to look |
 |---|---|---|
 | **Simple composable mechanisms beat sophisticated literature mechanisms under fixed budget** (§2.5 — 95 rejected proposals covering island GA, tournament selection, MCTS backup, restart policies, bagging) | The quintet's entire design philosophy: simple composable primitives behind feature flags, GOAT gate picks winners, demote losers | global AGENTS.md; every Plan's GOAT gate section |
-| **Held-out private score selection pressure causes emergent reward-hacking prevention** (§2.3 — 63%→34% without instruction) | `can_freeze` two-sided contract (selects on held-out flatness/convergence, not training events); `desperation` emotion early-warning (P162); GOAT gate held-out-eval discipline | `riir-neuron-db/src/consolidation.rs` (`can_freeze`), P162/R144 |
+| **Held-out private score selection pressure causes emergent reward-hacking prevention** (§2.3 — 63%→34% without instruction) | `can_freeze` two-sided contract (selects on held-out flatness/convergence, not training events); `desperation` emotion early-warning (P162); GOAT gate held-out-eval discipline | `katgpt-rs/src/sleep/consolidation.rs` (`can_freeze`), P162/R144 |
 
 If a future implementer is tempted to (a) add a sophisticated MCTS/island-GA search where a simple bandit suffices, or (b) select consolidation candidates on the training criterion rather than a held-out one — AIDE²'s evidence says each loses under a fixed budget. That is the entirety of this note's actionable value.
 
@@ -189,7 +189,7 @@ If a future implementer is tempted to (a) add a sophisticated MCTS/island-GA sea
 - **The R368 lesson (decision-structure vs LLM-dependent-process split):** `katgpt-rs/.research/368_AutoMem_Metamemory_LLM_Orchestration_PASS.md` — AutoMem is the canonical example of an agent paper whose decision structure WAS modellessly instantiable (GOAT). AIDE² fails the AutoMem test: its decision is code generation, which is not.
 - **Bi-level-loop-already-shipped precedent:** `katgpt-rs/.research/289_RecursiveMAS_Pass_Already_Shipped.md` — RecursiveMAS also framed itself as bi-level (inner-outer loop); every primitive shipped, training recipe → riir-train. AIDE²'s bi-level structure is at a different layer (code, not latent comms) but the verdict logic is the same.
 - **Benchmark/validation PASS precedent:** `riir-ai/.research/169_Agent_Native_Memory_Benchmark_PASS.md` — same confirmatory-only value pattern.
-- **Latent-state RSI (our self-improvement, by mandate):** `riir-ai/crates/riir-engine/src/cgsp_runtime/` (curiosity/exploration), `riir-ai/crates/riir-engine/src/latent_functor/reestimation.rs` (coherence-driven re-estimation), `riir-neuron-db/src/consolidation.rs` (Raven/δ-Mem), `riir-neuron-db/src/mape_k.rs` (MAPE-K self-healing).
+- **Latent-state RSI (our self-improvement, by mandate):** `riir-ai/crates/riir-engine/src/cgsp_runtime/` (curiosity/exploration), `riir-ai/crates/riir-engine/src/latent_functor/reestimation.rs` (coherence-driven re-estimation), `katgpt-rs/src/sleep/consolidation.rs` (Raven/δ-Mem), `riir-neuron-db/src/mape_k.rs` (MAPE-K self-healing).
 
 ## Re-evaluation guard
 

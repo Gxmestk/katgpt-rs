@@ -105,10 +105,10 @@ The transferable primitive is **softmax-free linear attention with Hilbert-space
 
 | Galerkin piece | Already shipped? | Where | Notes |
 |---|---|---|---|
-| Closed-form ridge solve `M(MᵀM+λI)⁻¹` | ✅ | `riir-ai/crates/riir-gpu/src/schur.rs` (Plan 067, riir-train) | Same math, framed as training primitive. FUNCATTN uses this directly. |
+| Closed-form ridge solve `M(MᵀM+λI)⁻¹` | ✅ | `riir-train/crates/riir-train-engine/src/schur.rs` (Plan 067, riir-train) | Same math, framed as training primitive. FUNCATTN uses this directly. |
 | Softmax-free attention operator | ✅ | `katgpt-rs/crates/katgpt-core/src/funcattn.rs` (Plan 286) | FUNCATTN open primitive. Galerkin is the λ=0 special case. |
 | Linear-in-n attention | ✅ | `katgpt-rs/crates/katgpt-core/src/parallax_attn.rs` (Plan 135) | Parallax sigmoid partition-of-unity attention. GOAT-failed but shipped. |
-| Recurrent basis (per-NPC latent state) | ✅ | `katgpt-rs/crates/katgpt-core/src/sense/reconstruction.rs` (`evolve_hla`) | HLA belief kernel = per-position recurrent latent, the "Assumption 4.2 columns-as-basis-DoFs" pattern. |
+| Recurrent basis (per-NPC latent state) | ✅ | `katgpt-rs/crates/katgpt-sense/src/reconstruction.rs` (`evolve_hla`) | HLA belief kernel = per-position recurrent latent, the "Assumption 4.2 columns-as-basis-DoFs" pattern. |
 | Diagonal-dominant init `W ← ηU + δI` | ❌ not in corpus | — | **Small numerical-stability trick worth recording.** Approximated by `λ > 0` in FUNCATTN's ridge solve; not separately needed. |
 | Galerkin projection-type LN (pre-dot-product, scale-preserving) | ❌ not in corpus | — | **Small architectural detail worth recording.** Parallax and FUNCATTN both use post-attention sigmoid normalization; pre-LN is an alternative to benchmark. |
 | Petrov-Galerkin / Céa theory | Partial (R257 §1.3) | — | R257 cites "regularized integral operator" + "Intention as special case" but not the Céa/LBB theory. This note adds the vocabulary. |

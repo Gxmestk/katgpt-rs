@@ -107,8 +107,8 @@ The two-layer grep (notes + code) confirms the following paper mechanisms are al
 | **Memory as durable capital** (T3, Generative Agents reflection, Mem0, MemoryBank forgetting curve) | NeuronShard `{style_weights, hla_moments}` Cold-tier commitment + HLA cache + CuriosityPrioritySnapshot chain quorum | `riir-ai/.plans/299` (BLAKE3 commitment + Cold tier body) | Shipped |
 | **Security as endogenous constraint** (§6, prompt injection tax, verification overhead) | Cognitive Integrity Layer + FaithfulnessProbe + chain BLAKE3 anti-cheat | `riir-ai/.plans/308` + `katgpt-rs/.plans/278` | Shipped |
 | **Congestion pricing / QoS tiers** (§5.2) | Chain quorum `confirmations > 0 → Committed` semantics, capacity-gated commit | `riir-ai/.plans/299` (SnapshotCommit POD 72 bytes) | Shipped |
-| **Cross-context KV cache reuse** (KVComm [112], TokenDance [4]) | ShardKV RoPE-strip + Still Perceiver un-rotate | `katgpt-rs/src/shard_kv/rope.rs` + `riir-ai` Plan 213 | Shipped (GOAT) |
-| **Per-KV-group sigmoid gating** (Q-KVComm adaptive layer-wise quant) | SP-KV `soft_gate_bias` + EGA spectral salience | `katgpt-rs/src/sp_kv/utility_predictor.rs` + `ega_attn.rs` | Shipped |
+| **Cross-context KV cache reuse** (KVComm [112], TokenDance [4]) | ShardKV RoPE-strip + Still Perceiver un-rotate | `katgpt-rs/crates/katgpt-kv/src/shard_kv/rope.rs` + `riir-ai` Plan 213 | Shipped (GOAT) |
+| **Per-KV-group sigmoid gating** (Q-KVComm adaptive layer-wise quant) | SP-KV `soft_gate_bias` + EGA spectral salience | `katgpt-rs/crates/katgpt-kv/src/sp_kv/utility_predictor.rs` + `ega_attn.rs` | Shipped |
 | **Token density / latent reasoning** (Coconut [47], Compressed CoT [43]) | MUX multiplexed latent reasoning + NITP next implicit token + SwiReasoning switch | `.research/158, 113, 241` | Shipped |
 | **Procedure cost model** (Subterranean-style compile-vs-in-context tradeoff) | `ProcedureCostModel` with `break_even_inferences()` and `cost_ratio_vs_in_context()` | `katgpt-rs/src/pruners/subterranean/cost_model.rs` | Shipped |
 

@@ -145,7 +145,7 @@ Raven is the only architecture that maintains >99% recall from 1K through 16K to
 
 The draft model in `transformer.rs` uses standard MHA with growing KV cache:
 
-```katgpt-rs/src/transformer.rs#L88-94
+```katgpt-rs/crates/katgpt-percepta/src/transformer.rs#L88-94
 pub struct KVCache {
     pub key: Vec<f32>,   // [block_size, kv_dim]
     pub value: Vec<f32>, // [block_size, kv_dim]
@@ -202,7 +202,7 @@ This mirrors the Hybrid-Raven approach from Table 4 — use the fast path when p
 ### PoC: RavenKVCache Implementation
 
 ```rust
-// katgpt-rs/src/transformer.rs (addition, not replacement)
+// katgpt-rs/crates/katgpt-percepta/src/transformer.rs (addition, not replacement)
 
 /// Sparse router: computes Top-K routing vector from raw logits.
 ///

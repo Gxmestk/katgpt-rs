@@ -72,7 +72,7 @@ These gaps mean: training may produce incorrect gradients, distillation quality 
 
 #### Task 1: Fix Attention Backward Propagation
 
-**File:** `riir-ai/crates/riir-gpu/src/backward.rs`
+**File:** `riir-ai/crates/riir-engine/src/transformer/gemma2_train/backward.rs`
 **Problem:** Q perturbations don't propagate through attention to logits (L690-694, test disabled).
 **Root Cause:** The backward pass through attention assumes a simplified gradient path. The softmax attention gradient requires computing:
 ```
@@ -95,7 +95,7 @@ But the current code doesn't properly accumulate gradients through the multi-hea
 
 #### Task 2: Implement Real KL Divergence in Distillation
 
-**File:** `riir-ai/crates/riir-gpu/src/distill.rs`
+**File:** `riir-train/crates/riir-train-gpu/src/distill.rs`
 **Problem:** `kl_divergence: 0.0` placeholder at L531 — can't measure distillation quality.
 **Fix:**
 1. After SVD truncation, compute actual KL divergence:
@@ -175,7 +175,7 @@ pub struct GpuPipelines {
 
 #### Task 6: Feedback Consumer Service
 
-**File:** `riir-ai/crates/katgpt-deprecated/src/feedback.rs` (new) or extend `riir-ai/crates/riir-rest/`
+**File:** `katgpt-rs/crates/katgpt-deprecated/src/feedback.rs` (new) or extend `riir-ai/crates/riir-rest/`
 **Problem:** `katgpt-rs/crates/katgpt-deprecated/src/feedback.rs` POSTs `InferenceResult` to cache endpoint (Plan 042 Task 6 ✅), but nothing reads from that endpoint to trigger retraining. Feedback goes into a void.
 **Context:** Plan 042 implemented the send side. This task implements the receive side.
 

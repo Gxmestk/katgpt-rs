@@ -3,7 +3,7 @@
 **Date:** 2026-06-18
 **Research:** [katgpt-rs/.research/437_CoFRe_FP_MGM_Three_State_Reuse.md](../.research/437_CoFRe_FP_MGM_Three_State_Reuse.md)
 **Source paper:** [arXiv:2605.31215](https://arxiv.org/abs/2605.31215) — Miele et al., "Fixed-Point Masked Generative Modeling" (CoFRe)
-**Target:** `katgpt-rs/src/dllm.rs` (extend `denoise_loop_rcd` family) + Cargo feature `d2f_3sr_warm_start` (depends on `rcd_residual` + `lt2_looped` + `dllm`)
+**Target:** `riir-ai/crates/riir-engine/src/transformer/dllm.rs` (extend `denoise_loop_rcd` family) + Cargo feature `d2f_3sr_warm_start` (depends on `rcd_residual` + `lt2_looped` + `dllm`)
 **Status:** Phase 1 COMPLETE — G1 FAILED honest null (micro_dllm scale: all configs converge in 2 steps, 0% reduction). Stays opt-in Gain, NOT default-on. Phases 2-3 deferred until G1 can be re-attempted at realistic scale (see `.benchmarks/291_d2f_3sr_warm_start_goat.md` root-cause).
 
 ---

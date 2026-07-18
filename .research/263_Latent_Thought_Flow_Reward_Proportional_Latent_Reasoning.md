@@ -136,11 +136,11 @@ Per `AGENTS.md` rule "Freeze/thaw over fine-tuning" and the SKILL's "No LLM trai
 | File | Mechanism | Match |
 |---|---|---|
 | `katgpt-rs/src/speculative/dd_tree.rs:3591-3648` | `TreeBuilder::build_balanced` — `balanced_score = ln(P_llm) + backward_weight × ln(R) + lambda_flow × (1 - stop_prob[depth])` | **LTF's flow bonus `exp(-λ_c·C(τ)) × V(τ)` is structurally identical** |
-| `katgpt-rs/src/pruners/g_zero/delta_bandit.rs:64-129` | `DeltaBanditPruner::lambda_length` — "GFlowNet flow regularization: shorter solutions get higher bonus" | Trajectory-length regularization (LTF's C(τ)=T) |
+| `katgpt-rs/crates/katgpt-pruners/src/g_zero/delta_bandit.rs:64-129` | `DeltaBanditPruner::lambda_length` — "GFlowNet flow regularization: shorter solutions get higher bonus" | Trajectory-length regularization (LTF's C(τ)=T) |
 | `katgpt-rs/src/pruners/bomber/replay_backward.rs` | `ReplayBackwardWalker` — GFlowNet-inspired backward policy extraction | GFlowNet backward transition |
-| `katgpt-rs/crates/katgpt-core/src/micro_belief/latent_thought.rs` | `LatentThoughtKernel` (Family B, K-iter latent-thought loop) — the **shipped** per-NPC latent-thought trajectory primitive | Replaces the trained latent head `q_φ` |
-| `katgpt-rs/crates/katgpt-core/src/sense/reconstruction.rs` | `ReconstructionConfig::entropy_threshold = 0.05` — entropy-band early stopping | "Effective entropy threshold" already in code |
-| `katgpt-rs/src/distill/trd.rs:105` | `TrdConfig::entropy_threshold = 0.5` — entropy-gated refinement | Same shape |
+| `katgpt-rs/crates/katgpt-micro-belief/src/latent_thought.rs` | `LatentThoughtKernel` (Family B, K-iter latent-thought loop) — the **shipped** per-NPC latent-thought trajectory primitive | Replaces the trained latent head `q_φ` |
+| `katgpt-rs/crates/katgpt-sense/src/reconstruction.rs` | `ReconstructionConfig::entropy_threshold = 0.05` — entropy-band early stopping | "Effective entropy threshold" already in code |
+| `katgpt-rs/crates/katgpt-speculative/src/distill/trd.rs:105` | `TrdConfig::entropy_threshold = 0.5` — entropy-gated refinement | Same shape |
 | `katgpt-rs/src/types.rs:784` | `Config::belief_drafter_entropy_threshold = 2.0` | Same shape, drafter level |
 
 ### 2.4 What's NOT here (stays in riir-train / not needed modellessly)
@@ -236,8 +236,8 @@ If a future benchmark on bomber arena or HLA-driven NPC thought cycles shows the
 - `katgpt-rs/.plans/219_caddtree_adaptive_budget.md` — cost-aware adaptive budget
 - `katgpt-rs/.plans/276_micro_recurrent_belief_state.md` — ships `LatentThoughtKernel`
 - `katgpt-rs/src/speculative/dd_tree.rs` — `build_dd_tree_balanced` flow bonus implementation
-- `katgpt-rs/src/pruners/g_zero/delta_bandit.rs` — `DeltaBanditPruner::lambda_length` trajectory length regularizer
-- `katgpt-rs/crates/katgpt-core/src/micro_belief/latent_thought.rs` — `LatentThoughtKernel` shipped primitive
+- `katgpt-rs/crates/katgpt-pruners/src/g_zero/delta_bandit.rs` — `DeltaBanditPruner::lambda_length` trajectory length regularizer
+- `katgpt-rs/crates/katgpt-micro-belief/src/latent_thought.rs` — `LatentThoughtKernel` shipped primitive
 
 ## 6. References
 

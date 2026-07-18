@@ -125,7 +125,7 @@ Grep across `katgpt-rs/**/*.rs` for `group_summary|two_level_route|chunk_group_r
 
 | Match | Location | Is this HGA's mechanism? |
 |---|---|---|
-| `chunk_summary.rs` learned summary query | `katgpt-rs/src/dash_attn/chunk_summary.rs` (Plan 106) | NO — single-level (chunk), learned via local SDPA, used as routing key AND feeds output softmax via prior-induced bias. HGA's group level + mixed-RoPE + route-only rule are absent. |
+| `chunk_summary.rs` learned summary query | `katgpt-rs/crates/katgpt-attn/src/dash_attn/chunk_summary.rs` (Plan 106) | NO — single-level (chunk), learned via local SDPA, used as routing key AND feeds output softmax via prior-induced bias. HGA's group level + mixed-RoPE + route-only rule are absent. |
 | PFlash `block_select` sink+window+last_n_full+alpha | `katgpt-rs/src/speculative/prefill.rs` (Plan 044) | NO — block-level only, no sub-block group tier, mean-K scoring not RoPE-aware mixed. |
 | RTPurbo pre-RoPE projection | `katgpt-rs/src/rt_turbo/` (Plan 126) | NO — projects to 16-dim pre-RoPE subspace; HGA keeps full-dim keys with per-frequency-pair mixed rule. |
 | BFCF LFU Sharding Hot/Warm/Cold | `katgpt-rs/src/bfcf/` (Plan 218) | NO — region-level cache (≈50 regions), not K/V tiered store. |

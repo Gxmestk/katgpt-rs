@@ -129,7 +129,7 @@ Both achieve the same effect. Ours doesn't require a hierarchical model.
 
 The claim that validators struggle with token IDs is addressed by our `SynPruner`:
 
-```katgpt-rs/src/validator/syn_pruner.rs#L63-74
+```katgpt-rs/crates/katgpt-validator/src/syn_pruner.rs#L63-74
 impl ConstraintPruner for SynPruner {
     fn is_valid(&self, _depth: usize, token_idx: usize, parent_tokens: &[usize]) -> bool {
         let mut all_tokens = parent_tokens.to_vec();

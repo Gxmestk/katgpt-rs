@@ -341,7 +341,7 @@ Single-session achievable.
 - **Proposal 003** (the spawning proposal): `riir-ai/.proposals/003_engram_crud_table_tier_access_matrix.md` §3.1 (P1 — this plan), §6 (sizing), §7 (phasing).
 - **Plan 299** (the parent — `InMemoryEngramTable`, `EngramTableBuilder`, `EngramHotSwap`): `katgpt-rs/.plans/299_Engram_Hash_Addressed_Pattern_Memory.md`. Phases 1–8 COMPLETE; G6 deferred; `engram` feature stays opt-in.
 - **Research 147** (the Super-GOAT guide — names `engram_runtime/` TODO in §5): `riir-ai/.research/147_Engram_Conditional_Memory_NPC_Guide.md`.
-- **Existing GOAT bench pattern**: `katgpt-rs/crates/katgpt-core/tests/bench_299_engram_goat.rs` (Instant-based, `harness=false`).
+- **Existing GOAT bench pattern**: `katgpt-rs/tests/bench_299_engram_goat.rs` (Instant-based, `harness=false`).
 - **Existing micro-bench**: `katgpt-rs/crates/katgpt-core/benches/engram_micro.rs` (criterion; extend for staging).
 - **AGENTS.md GOAT gate rule**: `katgpt-rs/AGENTS.md` §"Feature Flag Discipline" — implement behind feature, write benchmark, run GOAT gate (G1 correctness, G2 perf, G3 no-regression, G4 alloc-free or equivalent), promote only if modelless gain.
 

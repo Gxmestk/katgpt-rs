@@ -173,7 +173,7 @@ The 4-question novelty gate was originally scored all-YES, but on reflection Q3 
 | **Q4: Force multiplier?** | **YES** | Plasma Path (sub-µs SIMD LZ for tiny alphabet), Freeze/Thaw (`Vec<u8>` snapshot via BLAKE3 — exactly the existing snapshot protocol), HLA (compress HLA moments as per-NPC corpus), PhraseBoost (composable trie + compressor), R188 IrreducibilityGate (reuse same compressor for diagnostic + generation — see Fusion C). |
 
 **Mandatory Super-GOAT outputs (this session):**
-1. **Open primitive** → `katgpt-rs/src/drafters/compression_drafter.rs` (generic math, no game semantics). Future plan: `katgpt-rs/.plans/281_*`.
+1. **Open primitive** → `katgpt-rs/crates/katgpt-core/src/compression_drafter.rs` (generic math, no game semantics). Future plan: `katgpt-rs/.plans/281_*`.
 2. **Architectural GUIDE** → `riir-ai/.research/137_Compression_Drafter_Plasma_Personality_Guide.md` (created in this session).
 3. **Plans** → `katgpt-rs/.plans/281_*` (open primitive) + `riir-ai/.plans/` (game integration), to be created AFTER guide validation per skill rule ("Super-GOAT plans should be created AFTER the riir-ai guide").
 

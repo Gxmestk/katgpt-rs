@@ -110,12 +110,12 @@ All steps are matmuls or a single k×k Cholesky/Schur solve (k=64 typically). No
 
 | Paper piece | Already shipped? | Where | Notes |
 |---|---|---|---|
-| Closed-form ridge solve `M(M^TM+λI)^{-1}` | ✅ | `riir-ai/crates/riir-gpu/src/schur.rs` (Plan 067, riir-train) | SchurSolver::solve_unconstrained solves `Qz*=-p` with `Q=X^TX+λI` via Cholesky. Same math, framed as training primitive. |
-| Eigenbasis / spectral basis | ✅ | `katgpt-rs/src/spectralquant/spectral.rs` (Plan 077) | `calibrate_eigenbasis` from sample covariance. SpectralQuant's per-dim eigenbasis rotation IS the "fixed basis" ablation row in Tab 7. |
+| Closed-form ridge solve `M(M^TM+λI)^{-1}` | ✅ | `riir-train/crates/riir-train-engine/src/schur.rs` (Plan 067, riir-train) | SchurSolver::solve_unconstrained solves `Qz*=-p` with `Q=X^TX+λI` via Cholesky. Same math, framed as training primitive. |
+| Eigenbasis / spectral basis | ✅ | `katgpt-rs/crates/katgpt-spectral/src/spectral.rs` (Plan 077) | `calibrate_eigenbasis` from sample covariance. SpectralQuant's per-dim eigenbasis rotation IS the "fixed basis" ablation row in Tab 7. |
 | Linear attention + sigmoid basis | ✅ | `katgpt-rs/crates/katgpt-core/src/parallax_attn.rs` (Plan 135) | `ParallaxActivation::Sigmoid` is the default — partition-of-unity kernel `K(x,y)=σ(x·y·s)`. Different operator (NW correction), same sigmoid-partition-of-unity idea. |
 | Streaming second-order state | ✅ | `katgpt-rs/src/hla/` (Plan 057) | O(1) outer-product accumulator. Different math (no closed-form solve) but solves the same problem (linear attention with bounded state). |
-| Latent operator between spaces | ✅ (rank-1) | `riir-ai/crates/riir-engine/src/latent_functor/arithmetic.rs` (Plan 303) | `extract_functor`: `f = mean_k(target_k - source_k)`, coherence `mean_k cos(...)`. **This is the rank-1 special case of FUNCATTN's k×k operator C.** Apply via `out = source + f` (additive). |
-| Per-NPC recurrent belief kernel | ✅ | `katgpt-rs/crates/katgpt-core/src/sense/reconstruction.rs` (`evolve_hla`) | No research note framing it as such — per the workflow's canonical failure mode. |
+| Latent operator between spaces | ✅ (rank-1) | `katgpt-rs/crates/katgpt-percepta/src/wasm/interpreter/arithmetic.rs` (Plan 303) | `extract_functor`: `f = mean_k(target_k - source_k)`, coherence `mean_k cos(...)`. **This is the rank-1 special case of FUNCATTN's k×k operator C.** Apply via `out = source + f` (additive). |
+| Per-NPC recurrent belief kernel | ✅ | `katgpt-rs/crates/katgpt-sense/src/reconstruction.rs` (`evolve_hla`) | No research note framing it as such — per the workflow's canonical failure mode. |
 | Freeze/thaw snapshot of direction vectors | ✅ | `riir-ai/crates/riir-engine/src/latent_functor/table.rs` | `FunctorEntry { direction, coherence, version: Uuid::now_v7(), commitment: [u8;32] }`. Atomic Arc-swap. Versioned. BLAKE3-committed. |
 
 ### 2.3 Closest cousins (3)

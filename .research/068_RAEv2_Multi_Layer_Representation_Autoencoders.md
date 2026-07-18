@@ -113,7 +113,7 @@ The pattern is: strong prediction + (strong - weak) contrast = guided output. Th
 
 Our `forward_base` currently runs all layers and uses only the **final** `ctx.x` for the LM head:
 
-```katgpt-rs/src/transformer.rs#L823-1040
+```katgpt-rs/crates/katgpt-percepta/src/transformer.rs#L823-1040
 fn forward_base<'a>(
     ctx: &'a mut ForwardContext,
     weights: &TransformerWeights,

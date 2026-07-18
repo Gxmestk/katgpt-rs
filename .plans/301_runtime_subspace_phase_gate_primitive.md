@@ -119,7 +119,7 @@ This is the **open** counterpart of the private Super-GOAT at `riir-neuron-db/.r
 - **Private Super-GOAT guide:** `riir-neuron-db/.research/001_*.md`.
 - **Private execution plan:** `riir-neuron-db/.plans/002_phase_transition_consolidation_gate.md`.
 - **Closest shipped cousin:** `katgpt-rs/crates/katgpt-spectral/src/spectral.rs` (`participation_ratio`, `calibrate_eigenbasis`).
-- **Consolidation cousin:** `riir-neuron-db/src/sleep/consolidation.rs::spectral_convergence_check`.
+- **Consolidation cousin:** `katgpt-rs/src/sleep/consolidation.rs::spectral_convergence_check`.
 
 ---
 

@@ -170,7 +170,7 @@ fn ties_merge(base: &LoRAWeights, task_vectors: &[TaskVector], density: f32) -> 
 
 **Why model-based:** Requires trained LoRA adapters (from `riir-gpu`). This is the Phase 2 path — when modelless plateaus, merge multiple domain adapters.
 
-**Implementation:** In `riir-ai/crates/riir-gpu/src/merging.rs` behind feature gate `ties_merge`. Uses existing `export_lora` / `load_lora` infrastructure.
+**Implementation:** In `riir-train/crates/riir-train-engine/src/merging.rs` behind feature gate `ties_merge`. Uses existing `export_lora` / `load_lora` infrastructure.
 
 ### D3: Entity Surfacing for Reversal Curse (Modelless)
 

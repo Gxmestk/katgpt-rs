@@ -270,7 +270,7 @@ G7 (latent/raw boundary), G8 (ICT × CLR fusion), G9 (ICT × HLA fusion) → **r
 |------|-----------|
 | G3 fails (ρ ≥ 0.9) | Downgrade R270 to Gain. Keep T1-T6 (primitives + H1→H2 upgrade). Cancel Plan 324. File issue. |
 | G2 fails (no 10% inflection) | The 10% is LLM-token-specific. Sweep k% to find our inflection. May be 20-30% for NPCs. Document in T3.3. |
-| `js_divergence` SIMD autovectorization fails | Manual 4-way chunk unroll on the inner `Σ p·log(p/m)` loop. If still slow, GPU route via existing `katgpt-rs/src/device_selector.rs`. |
+| `js_divergence` SIMD autovectorization fails | Manual 4-way chunk unroll on the inner `Σ p·log(p/m)` loop. If still slow, GPU route via existing `riir-ai/crates/riir-engine/src/device_selector.rs`. |
 | Bebop H1→H2 upgrade (G10) shows no improvement | H2 unconditionally valid (proven), but practical magnitude may be small if LLM top-tokens are mostly > 0.37. Document either way in T6.3. |
 | Scope creep into riir-ai runtime | HARD LINE: nothing in this plan touches riir-ai. Plan 324 owns the runtime fusion. |
 

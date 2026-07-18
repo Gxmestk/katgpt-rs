@@ -214,7 +214,7 @@ Reasons:
 ## 7. Implementation Sketch
 
 ```rust
-// katgpt-rs/src/pruners/entropy_bifurcated.rs
+// katgpt-rs/crates/katgpt-pruners/src/entropy_bifurcated.rs
 
 /// Entropy-bifurcated screening — DASD's directional insight applied to pruning.
 /// Low-entropy scaffolding: full screening (stabilize execution)

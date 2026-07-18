@@ -22,7 +22,7 @@ The **transferable primitive** is not the LLM-orchestration demo (that's RL-on-t
 
 | TRINITY mechanism | Already-shipped cousin | Where |
 |---|---|---|
-| Penultimate-hidden-state → linear head → (agent, role) logits | `SenseModule::project` (8-dim HLA projection at ~45ns) + `MetaRouter` (bandit policy head) + `role_transport.rs` (Diagonal/Orthogonal role-conditioned projection) | `katgpt-core/src/sense/`, `katgpt-rs/src/dash_attn/meta_router.rs`, `riir-ai/crates/riir-engine/src/role_transport.rs` |
+| Penultimate-hidden-state → linear head → (agent, role) logits | `SenseModule::project` (8-dim HLA projection at ~45ns) + `MetaRouter` (bandit policy head) + `role_transport.rs` (Diagonal/Orthogonal role-conditioned projection) | `katgpt-core/src/sense/`, `katgpt-rs/crates/katgpt-attn/src/dash_attn/meta_router.rs`, `riir-ai/crates/riir-engine/src/role_transport.rs` |
 | Tri-role protocol (T/W/V) | CGSP runtime triad (Solver / Conjecturer / Guide) + CLR (claim extractor / verifier / voter) + `game_sync` "one binary, three roles" | `riir-engine/src/cgsp_runtime/runtime.rs`, `riir-ai/.research/126_NPC_Curiosity_Guided_Self_Play_Guide.md`, `riir-ai/.research/136_Per_NPC_Runtime_Test_Time_Scaling_Guide.md` |
 | Multi-turn until verifier accepts | CLR cluster voting + Breakeven Complexity Router + MCTS Collapse Discriminator | Research 136, Plan 250, Research 125 |
 | Block-ε separability ⇒ diagonal methods | `RoleTransport::Diagonal` (element-wise) vs `Orthogonal` (full linear) — Plan 100 benchmarked this exact tradeoff empirically | `riir-ai/crates/riir-engine/src/role_transport.rs`, `.benchmarks/023_block_diagonal_goat.md` |
@@ -218,8 +218,8 @@ Per the skill's three documented failure modes:
 - **Shipped code (the prior art):**
   - `riir-ai/crates/riir-engine/src/role_transport.rs` — `RoleTransport::Diagonal` / `Orthogonal`, `RoleEmbeddingTable`, `apply_transport`
   - `riir-ai/crates/riir-engine/src/cgsp_runtime/runtime.rs` — `NpcCgspRuntime`, `PriorityTableBandit`, `TickReport`
-  - `katgpt-rs/crates/katgpt-core/src/sense/brain.rs` — `NpcBrain` + HLA projection
-  - `katgpt-rs/src/dash_attn/meta_router.rs` — `MetaRouter` bandit policy head
+  - `riir-ai/crates/riir-engine/src/sense/brain.rs` — `NpcBrain` + HLA projection
+  - `katgpt-rs/crates/katgpt-attn/src/dash_attn/meta_router.rs` — `MetaRouter` bandit policy head
   - `riir-neuron-db/src/shard.rs` — frozen LoRA shard pool
 - **Training-side redirect:** sep-CMA-ES + SVF → `riir-train/.research/` (separate note, out of scope for this session)
 

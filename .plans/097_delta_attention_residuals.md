@@ -75,7 +75,7 @@ In our forward_base():
 9. `riir-ai/crates/riir-engine/Cargo.toml` — Added `delta_routing` feature gate
 10. `riir-ai/crates/riir-engine/src/gemma_layer.rs` — Added `delta_routing_query`/`delta_routing_norm` to both f32 and f16 weight structs
 11. `riir-ai/crates/riir-engine/src/safetensors_loader.rs` — Zero/one-init delta routing weights on model load
-12. `riir-ai/crates/katgpt-percepta/src/transformer.rs` — Integrated delta routing into `forward_gemma2()`, `forward_gemma2_trace()`, `forward_gemma2_f16()`
+12. `katgpt-rs/crates/katgpt-percepta/src/transformer.rs` — Integrated delta routing into `forward_gemma2()`, `forward_gemma2_trace()`, `forward_gemma2_f16()`
 13. `riir-ai/crates/riir-engine/tests/bench_097_gemma2_delta_routing_ppl.rs` — 2B-scale PPL benchmark (4 tests, all passing)
 14. `riir-ai/.benchmarks/021_gemma2_delta_routing_ppl.md` — Gemma 2 2B results
 

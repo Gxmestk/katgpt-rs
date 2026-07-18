@@ -250,7 +250,7 @@ The novelty is *not* any single primitive. It is **the fusion into a single hot-
 
 | Term | Hits | Notes |
 |------|------|-------|
-| `claim\|reliability\|self_verif\|falsif` | `katgpt-rs/src/data_probe/claim.rs::ClaimCard` | **Research-validation card**, not runtime inference-time reliability — different concept |
+| `claim\|reliability\|self_verif\|falsif` | `katgpt-rs/crates/katgpt-core/src/data_probe/claim.rs::ClaimCard` | **Research-validation card**, not runtime inference-time reliability — different concept |
 | `brevity\|long2short\|claim_extract\|reliability_score\|cluster_vote\|self_verifier` | **Zero** | No code in any repo |
 | `length_penalty` | `katgpt-rs/.plans/049_g_zero_self_play.md::length_penalty` | Training-time *negative* verbosity penalty (GRPO/DPO), not zero-sum inference tiebreak |
 

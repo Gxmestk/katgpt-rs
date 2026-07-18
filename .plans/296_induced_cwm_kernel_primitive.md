@@ -216,6 +216,6 @@ Promotion rule: all 4 PASS → keep `induced_cwm` opt-in but mark ready for down
 - Source paper: [arxiv 2510.04542](https://arxiv.org/pdf/2510.04542)
 - Direct ancestor: Plan 056 (GameState forward model + generic MCTS) — `.plans/056_game_state_forward_model.md`
 - Forward-model distillation: Research 027 (STRATEGA)
-- Belief-inference cousin (latent side): `katgpt-rs/crates/katgpt-sense/crates/katgpt-sense/src/reconstruction.rs` (`evolve_hla`)
+- Belief-inference cousin (latent side): `katgpt-rs/crates/katgpt-sense/src/reconstruction.rs` (`evolve_hla`)
 - riir-ai Super-GOAT guide: `riir-ai/.research/145_CWM_Runtime_Induced_Game_Rules_Guide.md`
 - riir-ai runtime plan: `riir-ai/.plans/326_cwm_npc_runtime_integration.md`

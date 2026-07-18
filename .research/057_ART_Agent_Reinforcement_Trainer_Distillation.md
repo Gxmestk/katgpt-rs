@@ -260,7 +260,7 @@ Tasks:
 - ART loss.py: `.raw/ART/src/art/loss.py` (CISPO implementation)
 - ART trajectories.py: `.raw/ART/src/art/trajectories.py` (TrajectoryGroup)
 - ART ruler.py: `.raw/ART/src/art/rewards/ruler.py` (LLM-as-judge)
-- Our GRPO: `riir-ai/crates/riir-gpu/src/loss_grpo.rs`
-- Our DPO: `riir-ai/crates/riir-gpu/src/loss_dpo.rs`
+- Our GRPO: `riir-train/crates/riir-train-gpu/src/loss_grpo.rs`
+- Our DPO: `riir-train/crates/riir-train-gpu/src/loss_dpo.rs`
 - Our GZero: `katgpt-rs/src/pruners/g_zero/`
 - Related research: `21_G-Zero_Self-Play_Open-Ended_Generation.md` (Hint-δ), `25_StepCodeReasoner_BiLevel_GRPO.md` (GRPO), `40_OpenDeepThink_Bradley_Terry_Pairwise_Ranking.md` (BT ranking)

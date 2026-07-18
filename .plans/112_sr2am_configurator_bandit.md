@@ -73,12 +73,12 @@
 
 ### Phase 5: Horizon-Deepening Reward for GZeroLoop (Model-Based Bridge) ✅
 
-- [x] T19: Add `plan_depth_reward` to `GZeroLoop` reward shaping ✅ `riir-ai/crates/riir-gpu/src/loss_grpo.rs`
+- [x] T19: Add `plan_depth_reward` to `GZeroLoop` reward shaping ✅ `riir-train/crates/riir-train-gpu/src/loss_grpo.rs`
   - `plan_depth_reward(planned, actual_depth, max_depth, alpha)` — returns 0.0 when not planned
   - `grpo_reward_with_planning()` — extends `grpo_reward` with horizon bonus
   - `GrpoConfig::horizon_reward_alpha` field (default: 0.0 = disabled)
   - 10 unit tests: full/half depth, not planned, alpha=0, max_depth=0, exceeds max, integration tests
-- [x] T20: Add `ConfiguratorDecisionStats` tracking in `GZeroLoop` round metrics ✅ `riir-ai/crates/riir-gpu/src/gzero_loop.rs`
+- [x] T20: Add `ConfiguratorDecisionStats` tracking in `GZeroLoop` round metrics ✅ `riir-train/crates/riir-train-gpu/src/gzero_loop.rs`
   - `ConfiguratorDecisionStats` struct: plan_new_count, plan_extend_count, plan_skip_count, avg_plan_depth, max_plan_depth
   - `planned_count()`, `total()`, `skip_rate()` helper methods
   - `RoundMetrics::configurator_stats` field behind `#[cfg(feature = "sr2am_configurator")]`

@@ -84,7 +84,7 @@ The ELT architecture is **subsumed by LT2**. The Any-Time inference property is 
 
 ELT's strongest transferable claim is conceptual: **"intermediate loop states are themselves valid belief states, not just intermediate computations to be discarded on early exit."** In our stack, this reframes two existing kernels:
 
-- **HLA evolution** (`katgpt-rs/crates/katgpt-core/src/sense/reconstruction.rs` — `evolve_hla`): the recurrent belief-state kernel. ELT framing: any prefix of `evolve_hla` applications is a valid belief state, not just a step toward one. This justifies **elastic HLA depth** — exit early when belief stabilizes (which PathwayTracker already detects, but the framing as "belief-valid prefix" is new vocabulary).
+- **HLA evolution** (`katgpt-rs/crates/katgpt-sense/src/reconstruction.rs` — `evolve_hla`): the recurrent belief-state kernel. ELT framing: any prefix of `evolve_hla` applications is a valid belief state, not just a step toward one. This justifies **elastic HLA depth** — exit early when belief stabilizes (which PathwayTracker already detects, but the framing as "belief-valid prefix" is new vocabulary).
 - **latent_functor applications** (`riir-ai/crates/riir-engine/src/latent_functor/`): functor application is by definition weight-shared block reuse. ELT framing: any prefix of functor applications is a valid operator-valued latent state. This aligns with the `set_active_budget` mechanism but adds the claim that **the prefix-state itself is a valid functor**, not just a budget-truncated approximation.
 
 This is a **reframing**, not a new mechanism — the kernels already produce intermediate states; we just don't currently market them as "valid belief states in their own right."

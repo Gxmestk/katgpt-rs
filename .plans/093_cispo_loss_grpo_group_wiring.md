@@ -82,7 +82,7 @@ Key differences:
 
 ## T1: `GrpoLossVariant` Enum
 
-**File**: `riir-ai/crates/riir-gpu/src/loss_grpo.rs`
+**File**: `riir-train/crates/riir-train-gpu/src/loss_grpo.rs`
 
 ```rust
 /// GRPO loss variant selection.
@@ -122,7 +122,7 @@ pub struct GrpoConfig {
 
 ## T2: CISPO Loss Function (CPU)
 
-**File**: `riir-ai/crates/riir-gpu/src/loss_grpo.rs`
+**File**: `riir-train/crates/riir-train-gpu/src/loss_grpo.rs`
 
 ```rust
 /// CISPO loss computation (CPU version for testing parity).
@@ -303,7 +303,7 @@ Wire into `GpuPipelines` with `cispo_loss` and `cispo_reduce` pipeline registrat
 
 ## T4: Trajectory Grouping in GZeroLoop
 
-**File**: `riir-ai/crates/riir-gpu/src/gzero_loop.rs`
+**File**: `riir-train/crates/riir-train-gpu/src/gzero_loop.rs`
 
 The existing `GrpoConfig::group_size` (default: 16) exists but isn't used in the self-play loop. Wire it:
 

@@ -74,7 +74,7 @@ Key findings per crate:
 
 ### `katgpt-claim`
 - **Two siblings, no internal coupling** (claim_rubric ↔ clr do NOT reference
-  each other). The bridge lives in `riir-ai/npc_clr/claim_rubric_bridge.rs`
+  each other). The bridge lives in `riir-ai/crates/riir-games-civ/src/npc_clr/claim_rubric_bridge.rs`
   (consumer-side).
 - **External crate deps**: `katgpt_core::traits::FeatureClass` (claim_rubric);
   `katgpt_core::simd` + `blake3` test-only (clr).
