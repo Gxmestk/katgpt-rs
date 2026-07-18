@@ -370,3 +370,51 @@ All four directives of the cross-repo benchmark/doc cleanup task are now
 | Update related md if need | ✅ Sessions 8–10 (path drift, 90.6% reduction); sessions 11–13 (status-label drift, 35 docs annotated total) |
 | Rm orphan benchmark if need | ✅ Audited sessions 11–13 — zero orphans |
 | Fix if failed and promote/demote if need | ✅ Audited sessions 11–13 — zero promotions, zero demotions, zero GOAT fixes needed |
+
+---
+
+## Session 14 addendum (2026-07-18) — Cargo.toml inline-comment audit
+
+The session 13 residual item ("Cargo.toml comments themselves are stale for
+`micro_belief` etc.") is now closed. Built the parallel auditor and swept all
+8 repos.
+
+### New artifact
+
+- **`scripts/cargo_comment_audit.py`** — Cargo.toml inline-comment auditor.
+  Same drift class as `bench_doc_audit.py` but for `# ...` comments on
+  feature-definition lines instead of `.md` doc labels. Hybrid closure
+  strategy: union for default-on claims (cross-crate "via X" / "in root"
+  counts), per-manifest for opt-in claims (root-level opt-in is precise
+  about root). Local-scope overrides for "stays opt-in", "Opt-in in <crate>",
+  "NOT in <crate> default" patterns.
+
+### 12 stale Cargo.toml comments fixed (all in katgpt-rs)
+
+Group A — opt-in claim but IS in default closure (7):
+- `Cargo.toml`: funcattn (direct), temporal_deriv (direct), selectivity_router (via collapse_aware_thinking), decision_trace (via regime_transition)
+- `crates/katgpt-core/Cargo.toml`: micro_belief (via bom_sampling — the original session-13 flagged case), engram (via cognitive_architecture_root), simd_lut_dequant (direct)
+
+Group B — default-on claim but NOT in any closure (5):
+- `Cargo.toml`: rv_gated_thinking, rv_bandit_pruning (both direction-confused: feature depends on rv_gated_routing, not the reverse)
+- `crates/katgpt-core/Cargo.toml`: cubical_nerve ("DEFAULT-ON in root" was stale)
+- `crates/katgpt-pruners/Cargo.toml`: rv_bandit_pruning (same direction issue), interval_pruner ("DEFAULT-ON in root" was stale)
+
+Other 7 repos clean (0 mismatches).
+
+### Verification
+
+- `python3 scripts/cargo_comment_audit.py /git/{all 8 repos}` → 0 mismatches
+  (360 inline comments checked across all repos)
+- `python3 scripts/bench_doc_audit.py /git/{all 8 repos}` → 0 mismatches
+  (still passes, unaffected by the new auditor)
+- `cargo check -p katgpt-core --lib` → clean (comment-only changes)
+
+### Run-after-promotion discipline (updated)
+
+After every feature promotion, run BOTH auditors:
+
+```bash
+python3 scripts/bench_doc_audit.py /git          # .md docs
+python3 scripts/cargo_comment_audit.py /git      # Cargo.toml inline comments
+```
