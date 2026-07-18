@@ -1,8 +1,12 @@
 # GOAT Proof 221: Merkle Octree Integrity
 
-> **Note:** `merkle_octree` status not audited in this pass — bench refers to a
-> pre-default-on state and the feature may or may not be in Cargo.toml
-> `default`. Verify before relying on the `(opt-in)` label below.
+> **UPDATE 2026-07-18 (status sync):** `merkle_octree` is **opt-in** in
+> `crates/katgpt-core/Cargo.toml` (NOT in the `default` list — pulled in
+> transitively only via `rtdc`). GOAT verdict is 5/6 PASS + 1 ⚠️ (G6 warning:
+> full `merkle_build_from_64_embeddings` pipeline at 11.80 µs exceeds the
+> 5 µs target, but Merkle overhead alone is 3.47 µs which passes). Stays
+> opt-in pending either (a) G6 strict pass or (b) explicit acceptance of
+> the partial-pipeline target. The `(opt-in)` label below is correct.
 
 **Date:** 2026-06-12
 **Plan:** 253

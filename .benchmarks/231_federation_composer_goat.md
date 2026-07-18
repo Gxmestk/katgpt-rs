@@ -1,9 +1,14 @@
 # GOAT Proof 231: Federation Composer
 
+> **UPDATE 2026-07-18 (status sync):** `federation_composer` is **default-on**
+> in the root `Cargo.toml` (`default = [...]`). The `(opt-in, depends on bandit)`
+> label below was stale relative to the Cargo.toml default list (bandit is also
+> default-on, so the dep is satisfied without extra flags).
+
 **Date:** 2026-06-09
 **Plan:** 231
 **Research:** 205 (Deep Manifold §7.5)
-**Feature gate:** `federation_composer` (opt-in, depends on `bandit`)
+**Feature gate:** `federation_composer` (**default-on in root Cargo.toml**)
 **Status:** ✅ GOAT 7/7 PASS
 
 ---

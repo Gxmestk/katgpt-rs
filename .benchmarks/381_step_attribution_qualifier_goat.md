@@ -3,7 +3,7 @@
 **Date:** 2026-07-06
 **Primitive:** `StepAttributionQualifier` + `StepLocalizer` + `DotProductLocalizer` + `SumAggregator` / `MeanAggregator`
 **Module:** `crates/katgpt-pruners/src/step_attribution_qualifier.rs`
-**Feature:** `step_attribution_qualifier` (opt-in)
+**Feature:** `step_attribution_qualifier` (**default-on since 2026-07-06** — see TL;DR below; root Cargo.toml comment: "Plan 381 Phase 5, 2026-07-06")
 **Source paper:** [arXiv:2606.01311](https://arxiv.org/abs/2606.01311) — SkillAdaptor, Yu et al. 2026
 **Bench:** `benches/step_attribution_qualifier_bench.rs` (`cargo run --release --bench step_attribution_qualifier_bench --features step_attribution_qualifier`)
 
