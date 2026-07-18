@@ -1,7 +1,7 @@
 # Plan 359 — DEC Heat Kernel Trajectory GOAT Results
 
 **Date:** 2026-07-02 (G1-nl T5.2 added 2026-07-02)
-**Primitive:** `heat_kernel_trajectory_linear` + `heat_kernel_trajectory_krylov` + `heat_kernel_trajectory_nonlinear` (`katgpt-dec/crates/katgpt-dec/src/heat_kernel.rs`, `katgpt-dec/crates/katgpt-dec/src/krylov.rs`, `katgpt-dec/crates/katgpt-dec/src/nonlinear_heat_kernel.rs`)
+**Primitive:** `heat_kernel_trajectory_linear` + `heat_kernel_trajectory_krylov` + `heat_kernel_trajectory_nonlinear` (`crates/katgpt-dec/src/heat_kernel.rs`, `crates/katgpt-dec/src/krylov.rs`, `crates/katgpt-dec/src/nonlinear_heat_kernel.rs`)
 **Feature:** `heat_kernel_trajectory` — **promoted to DEFAULT-ON in katgpt-dec** (2026-07-02); nonlinear path stays opt-in under the same feature flag
 **Bench:** `cargo bench -p katgpt-core --features heat_kernel_trajectory --bench bench_359_dec_heat_kernel_trajectory_goat -- --nocapture`
 **Hardware:** macOS (Apple Silicon)

@@ -38,7 +38,7 @@ This is **not** a new primitive — FuncAttn is the primitive. This is the **con
 | **FuncAttn** (R257, Plan 286) — surrogate representation | `crates/katgpt-core/src/funcattn/mod.rs` | No substitution gate — FuncAttn computes attention, doesn't decide when to use itself vs a real head |
 | **Percepta** (R031/032, Plan 064) — programs-as-attention | `katgpt-percepta` crate | Compile-time only; no runtime substitution decision |
 | `FaithfulnessProbe` causal intervention (R244, Plan 278) | `crates/katgpt-core/src/faithfulness/probe.rs` | Detects unfaithfulness; doesn't prescribe a surrogate or gate substitution |
-| `SmearClassifier` hallucinated-feature detector (R277, Plan 298) | `katgpt-core/crates/katgpt-core/src/faithfulness/smear.rs` | Detects smear; doesn't gate substitution |
+| `SmearClassifier` hallucinated-feature detector (R277, Plan 298) | `crates/katgpt-core/src/faithfulness/smear.rs` | Detects smear; doesn't gate substitution |
 
 **The novel piece this plan ships:** `HeadSubstitutionGate` — a small wrapper that decides when FuncAttn should fire as a substitute for a real head, using the paper's IoU `r > 0.9` finding as the cheap-proxy gate and FaithfulnessProbe as the expensive-validation cadence.
 

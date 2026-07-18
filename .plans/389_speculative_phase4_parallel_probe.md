@@ -7,7 +7,7 @@
 ## Goal
 
 Move `crates/katgpt-speculative/src/parallel_probe.rs` (1187 LOC, Plan 133 Parallel-Probe 2D
-controller) to `katgpt-speculative/crates/katgpt-speculative/src/parallel_probe.rs`.
+controller) to `crates/katgpt-speculative/src/parallel_probe.rs`.
 
 Root-only speculative count drops from 14 → 13 files.
 

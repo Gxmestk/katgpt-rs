@@ -35,7 +35,7 @@ commit). Extract lines 824-989 into a private helper
 and have both the base and weaver variants delegate to it.
 
 This mirrors the established sibling-variant pattern from
-`katgpt-forward/crates/katgpt-forward/src/step.rs` (`speculative_step` / `_rollback` /
+`crates/katgpt-forward/src/step.rs` (`speculative_step` / `_rollback` /
 `_rollback_with` / `_conditioned_with` / `_with_configurator`) and Plan 433
 (`dflash_predict_with` / `_with_capture` / `_with_weaver`).
 

@@ -199,7 +199,7 @@ The read target miss at D=256 is an honest finding: the read is compute-bound by
 - **F2 fusion (HOLA × temporal_deriv)** — two-signal cache eviction. Validate after Plan 395 ships; track in a follow-up plan if F2 gate passes.
 - **F3 fusion (HOLA × DualPoolBandit)** — consolidation rule for cache → state absorption. Research 249 territory; follow-up plan.
 - **F4 fusion (HOLA × AM)** — online + offline compaction composition. Plan 271 territory; follow-up plan.
-- **Per-NPC HLA cache variant** — using HLA `evolve_hla` (in `katgpt-sense/crates/katgpt-sense/src/reconstruction.rs`) as the "compressive recurrent state" and a per-NPC episodic KV cache as the hippocampus. This is a riir-ai follow-up; the katgpt-rs primitive is substrate-agnostic and the riir-ai guide is not triggered (verdict is GOAT not Super-GOAT).
+- **Per-NPC HLA cache variant** — using HLA `evolve_hla` (in `crates/katgpt-sense/src/reconstruction.rs`) as the "compressive recurrent state" and a per-NPC episodic KV cache as the hippocampus. This is a riir-ai follow-up; the katgpt-rs primitive is substrate-agnostic and the riir-ai guide is not triggered (verdict is GOAT not Super-GOAT).
 - **riir-neuron-db fusion** — persisting HOLA cache contents across sessions via `MerkleFrozenEnvelope`. Out of scope; the cache is inference-local state.
 
 ---

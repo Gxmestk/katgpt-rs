@@ -235,7 +235,7 @@ Sweep ε ∈ {0.00, 0.05, 0.10, 0.20, 0.40, 0.70, 1.00} to reproduce paper's pha
 
 ## T5: Wire into `GZeroLoop`
 
-**File:** `riir-gpu/crates/riir-gpu/src/gzero_loop.rs`
+**File:** `crates/riir-gpu/src/gzero_loop.rs`
 
 Modify `GZeroLoop` to gate tasks BEFORE solver attempts:
 

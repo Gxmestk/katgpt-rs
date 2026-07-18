@@ -7,9 +7,9 @@ Proposal 003 Phase 8 destination map:
 
 | Item | LOC | Destination | Feature gate |
 |---|---|---|---|
-| `crates/katgpt-pruners/src/closure_wire.rs` | 451 | `katgpt-pruners/crates/katgpt-pruners/src/closure_wire.rs` | `closure_instrument` (new in katgpt-pruners) |
+| `crates/katgpt-pruners/src/closure_wire.rs` | 451 | `crates/katgpt-pruners/src/closure_wire.rs` | `closure_instrument` (new in katgpt-pruners) |
 | `src/screening/` (6 files) | 1756 | `katgpt-pruners/src/screening/` | `complexity_prior_sampler` + `mcts_k_prior`/`bandit_k_prior`/`spec_k_prior` (new in katgpt-pruners) |
-| `crates/katgpt-attn-match/src/rerank.rs` | 526 | `katgpt-attn-match/crates/katgpt-attn-match/src/rerank.rs` | `maxsim` + `bt_rank` (new in katgpt-attn-match) |
+| `crates/katgpt-attn-match/src/rerank.rs` | 526 | `crates/katgpt-attn-match/src/rerank.rs` | `maxsim` + `bt_rank` (new in katgpt-attn-match) |
 
 ## Pre-move audit findings
 

@@ -141,7 +141,7 @@ Each gate is a standalone file. All must pass to promote from opt-in.
       (8× f32 for d=8 HLA via `std::arch::x86_64::_mm256_add_ps` and
       `_mm256_mul_ps`, with fallback scalar path for non-AVX2 targets).
       **DONE (2026-06-23).** Extracted a shared `saxpy_inplace` dispatcher in
-      `katgpt-core/crates/katgpt-core/src/latent_steering.rs` (3 call sites now share it:
+      `crates/katgpt-core/src/latent_steering.rs` (3 call sites now share it:
       `apply_latent_steering`, `apply_latent_steering_weighted`, the
       `apply_field_to_crowd` inner loop). AVX2 backend uses `_mm256_mul_ps` +
       `_mm256_add_ps` (NOT FMA — bit-identical to scalar mul-then-add rounding).

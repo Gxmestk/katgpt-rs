@@ -145,7 +145,7 @@ At generation step t with prefix p_t and drafter velocity v_t:
 ### Phase 2: QGuidedDrafter (F1) — the core fusion
 
 #### T4: QGuidedDrafter struct
-- [x] Create `katgpt-core/crates/katgpt-core/src/qgf/drafter.rs`
+- [x] Create `crates/katgpt-core/src/qgf/drafter.rs`
 - [x] Implement `QGuidedDrafter<G, O>` wrapping any `SpeculativeGenerator` + `QGradientOracle`
   ```rust
   pub struct QGuidedDrafter<G, O> {

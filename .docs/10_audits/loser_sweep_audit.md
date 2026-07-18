@@ -158,7 +158,7 @@ code-organization cleanup; batch with Phase 3b in a future consolidation pass.
 These 4 features have zero active code. Remove the feature line from root
 `Cargo.toml` and clean up any commented-out `#[cfg]` stubs:
 
-- [x] `embedding_router` — remove from `full` + features section — **DONE 2026-07-06** (empty `[]` placeholder, Plan 024 not started; commented-out `#[cfg]` test stubs in `katgpt-forward/crates/katgpt-forward/src/step.rs` left as TODO markers for Plan 024)
+- [x] `embedding_router` — remove from `full` + features section — **DONE 2026-07-06** (empty `[]` placeholder, Plan 024 not started; commented-out `#[cfg]` test stubs in `crates/katgpt-forward/src/step.rs` left as TODO markers for Plan 024)
 - [x] `language_domain` — remove from features section — **DONE 2026-07-06** (empty `[]` placeholder, Plan 040 future, zero `.rs` refs)
 - [x] `gpu` — remove from `full` + features section; update `crates/katgpt-speculative/src/distill/trd.rs` dead-code stub — **DONE 2026-07-06** (empty `[]` placeholder + `redraft_gpu_batched` no-op stub removed from `crates/katgpt-speculative/src/distill/trd.rs`; GPU training lives in riir-ai/riir-gpu)
 - [-] `rest` — **NOT DEAD, audit was stale.** The 2026-07-01 audit flagged this as dead, but Plan 394 (2026-07-05) revived it: `rest = ["katgpt-forward/rest"]` now forwards to katgpt-forward, and `src/speculative/prefill.rs:127,138` has an active `#[cfg(feature = "rest")]` bridge test (`test_bridge_prefill_to_speculative_decode`). Kept in `full` array.
@@ -190,7 +190,7 @@ The 4 audit agents disagreed on 5 features. Coordinator decisions:
 | `stokes_calculus` | — | AMBIGUOUS | — | BENCH-LOSER | **BENCH-LOSER** | G-B genuinely won (5.36×), primitives correct (15 tests, Stokes identities hold), not "demoted"/"research-only". Lost head-to-head on G-A but kept for the G-B win = classic A/B loser. |
 | `opus_selection` | AMBIGUOUS | — | — | — | **BENCH-LOSER** | GOAT passed; softmax violation is a code-style flag, not a gate failure. |
 | `cs_kv_probe` | AMBIGUOUS | — | — | — | **PENDING** | Stale Cargo.toml comment; Plan 280 says gates green. No actual failure. |
-| `product_policy_sharpen` | — | DEAD-FAILED (dead stub) | — | — | **PENDING** | Agent B was wrong — `#[cfg(feature = "product_policy_sharpen")]` DOES have real code in `katgpt-pruners/crates/katgpt-pruners/src/self_advantage.rs` (struct + impl + 3 tests). Not a dead stub; part of Plan 283 self_advantage family. |
+| `product_policy_sharpen` | — | DEAD-FAILED (dead stub) | — | — | **PENDING** | Agent B was wrong — `#[cfg(feature = "product_policy_sharpen")]` DOES have real code in `crates/katgpt-pruners/src/self_advantage.rs` (struct + impl + 3 tests). Not a dead stub; part of Plan 283 self_advantage family. |
 | `proof_cert` | — | — | — | DEAD-FAILED (off-topic) | **PENDING** | Agent D was wrong — `src/proof_cert/` has 7 real files (certificate, chain, macros, serde, wasm). It's GOAT-gate verification infrastructure, not a failed/demoted primitive. Destination crate ambiguous (katgpt-validator or katgpt-bench). |
 
 ---

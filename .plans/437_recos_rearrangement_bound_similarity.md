@@ -70,7 +70,7 @@ cost (3 candidates × recos), not just single-pair recos-vs-cosine.
 
 ## Phase 1 — Open primitive (CORE)
 
-Add the three `recos` functions to `katgpt-core/crates/katgpt-core/src/similarity.rs` behind the `recos`
+Add the three `recos` functions to `crates/katgpt-core/src/similarity.rs` behind the `recos`
 feature flag. Mirror the `smooth_min_similarity` gating/re-export pattern.
 
 ### Tasks
@@ -490,7 +490,7 @@ warning when the recos branch is active.
 ## TL;DR
 
 Ship `recos` (Rearrangement-Inequality Cosine Similarity) behind a `recos` feature in
-`katgpt-core/crates/katgpt-core/src/similarity.rs` alongside `smooth_min_similarity`. Four phases: (1) open
+`crates/katgpt-core/src/similarity.rs` alongside `smooth_min_similarity`. Four phases: (1) open
 primitive + unit tests, (2) synthetic GOAT gate proving/disproving the gain on our
 embedding regime, (3) cold-path MAG `TransferMetric::Recos` (9th variant), (4) hot-path
 `ShardIndex::query` rerank. **Critical subtlety:** recos cannot reuse cosine's

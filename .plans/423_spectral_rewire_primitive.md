@@ -76,7 +76,7 @@ access pattern in this crate.
 
 ### Tasks
 
-- [x] **T1.1** Create `katgpt-spectral/crates/katgpt-spectral/src/spectral_rewire.rs` module skeleton.
+- [x] **T1.1** Create `crates/katgpt-spectral/src/spectral_rewire.rs` module skeleton.
   Gate behind `spectral_rewire` feature in `katgpt-spectral/Cargo.toml`.
   Add `pub mod spectral_rewire;` in `crates/katgpt-spectral/src/lib.rs` under the
   feature gate. Enable `katgpt-core/subspace_phase_gate` as a feature dep

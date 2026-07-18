@@ -108,7 +108,7 @@ Empirically validate whether three parameter-free architectural fixes improve T-
 ### Phase 2 Results (2026-07-13)
 
 **Implementation:**
-- `LoopStabilityMode` enum added to `katgpt-types/crates/katgpt-types/src/enums.rs` with `None` (default) and `InterLoopNorm` variants
+- `LoopStabilityMode` enum added to `crates/katgpt-types/src/enums.rs` with `None` (default) and `InterLoopNorm` variants
 - `Config.loop_stability_mode` field added behind `#[cfg(feature = "loop_stability_fix")]`, initialized to `None` in all 11 constructors
 - **Issue 140 fix (2026-07-15):** Two test files (`bench_ldt_lattice_deduction.rs`, `bench_217_belief_drafter_goat.rs`) used raw `Config { ... }` struct literals that were missed when the field was added — only manifested under `--all-features` (the `merkle_root`-class bug). Both files now include the cfg-gated field. `cargo clippy --workspace --all-features --all-targets` is clean.
 - Inter-loop RMSNorm wired into `forward_looped` at the top of the outer loop (tau > 0), before `prev_h` save and inner layer pass
