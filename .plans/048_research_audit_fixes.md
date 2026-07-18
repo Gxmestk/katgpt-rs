@@ -351,7 +351,7 @@ Separate commits per logical unit:
 | `riir-train/crates/riir-train-gpu/src/distill.rs` | Replace KL placeholder with real computation | ~60 |
 | `riir-ai/crates/riir-gpu/src/game/replay.rs` | Implement `parse_replay()` from stub | ~45 |
 | `riir-ai/crates/riir-gpu/src/kernels/mod.rs` | Add 5 new pipelines (4 PFlash + 1 TQ) | ~30 |
-| `riir-gpu/src/forward.rs` | Add PFlash dispatch path, TQ scoring path | ~180 |
+| `riir-ai/crates/riir-gpu/src/forward/mod.rs` | Add PFlash dispatch path, TQ scoring path | ~180 |
 | `riir-gpu/Cargo.toml` | Add `feedback-consumer` feature | ~5 |
 | `riir-ai/README.md` | Update training status, add new sections | ~30 |
 

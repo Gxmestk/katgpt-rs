@@ -62,7 +62,7 @@ Add a CPU sparse matmul path for the MLP's second weight matrix (`w2 @ hidden`),
   - Test: `ForwardContext` buffers are correct size
   - Test: fallback to dense when sparsity below threshold
 
-- [x] **Task 8: Update GPU path docs** (`src/gpu/forward.rs`)
+- [x] **Task 8: Update GPU path docs** (`riir-ai/crates/riir-gpu/src/forward/mod.rs`)
   - Add comment in `dispatch_layer()` MLP section explaining why GPU stays dense
   - Reference this plan and research doc
 
@@ -81,7 +81,7 @@ Add a CPU sparse matmul path for the MLP's second weight matrix (`w2 @ hidden`),
 | `katgpt-rs/Cargo.toml` | Add `sparse_mlp` feature |
 | `katgpt-rs/crates/katgpt-percepta/src/transformer.rs` | Add buffers to `ForwardContext`, sparse path in forward functions |
 | `katgpt-rs/src/benchmark/mod.rs` | Add sparse vs dense benchmark |
-| `katgpt-rs/src/gpu/forward.rs` | Add docs comment for GPU sparse rationale |
+| `riir-ai/crates/riir-gpu/src/forward/mod.rs` | Add docs comment for GPU sparse rationale |
 | `katgpt-rs/README.md` | Add TwELL Sparse MLP section |
 
 ---

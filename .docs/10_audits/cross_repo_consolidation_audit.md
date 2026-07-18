@@ -30,7 +30,7 @@ However, unlike katgpt-rs pre-Plan-404, the oversized code is **not pure substra
 - `crates/katgpt-attn/src/dash_attn/meta_router.rs` (2,449 LOC) — Vortex meta-routing bandit, depends only on `fastrand`. Pristine deps. Could move to `riir-router` (fits its "inference routing" mandate) or its own `riir-meta-router` crate.
 
 **File-hygiene debt: MODERATE.** 23 files break the 2048-line rule. Notable offenders:
-- `riir-gpu/src/forward.rs` — **7,894 LOC** (workspace's largest file; 20+ WGSL param structs)
+- `riir-ai/crates/riir-gpu/src/forward/mod.rs` — **7,894 LOC** (workspace's largest file; 20+ WGSL param structs)
 - `crates/katgpt-percepta/src/wasm/interpreter/arithmetic.rs` — 3,667 LOC (6 functor primitives)
 - `seal-online-remaster/crates/seal-edge-worker/src/persistence/skill.rs` — 3,556 LOC (skill YAML schema + tiers)
 

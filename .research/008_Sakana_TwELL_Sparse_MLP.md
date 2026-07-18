@@ -264,6 +264,6 @@ Implementation status (all complete):
 - "Sparser, Faster, Lighter Transformer Language Models" (arXiv:2603.23198) — Sakana AI & NVIDIA
 - katgpt-rs MLP: `crates/katgpt-percepta/src/transformer.rs` lines 362-377 (forward), 487-506 (forward_paged), 1070-1089 (forward_raven)
 - katgpt-rs matmul: `src/types.rs` — `matmul()`, `matmul_relu()`
-- katgpt-rs GPU MLP: `src/gpu/forward.rs` — `dispatch_layer()` lines 555-585
+- katgpt-rs GPU MLP: `riir-ai/crates/riir-gpu/src/forward/mod.rs` — `dispatch_layer()` lines 555-585
 - Raven RSM: `.research/006_Raven_Routing_Slot_Memories.md`
 - Screening Pruner: `.research/007_Screening_Absolute_Relevance.md`
