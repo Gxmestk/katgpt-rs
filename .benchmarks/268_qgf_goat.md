@@ -38,7 +38,7 @@ The original plan's G1–G3 framed the gate as **downstream task quality** (Sudo
 
 ## G1 — Correctness (guidance shifts distribution toward higher Q)
 
-**File:** `tests/qgf_goat.rs` (4 tests)
+**File:** `crates/katgpt-core/tests/qgf_goat.rs` (4 tests)
 
 The load-bearing proof: tilting reference logits by `+w·∇Q` increases the expected Q of the induced categorical `E[Q] = Σ softmax(logits)_i · Q_i`.
 
@@ -55,7 +55,7 @@ The load-bearing proof: tilting reference logits by `+w·∇Q` increases the exp
 
 ## G2 — Regression safety (freeze-tier equivalence)
 
-**File:** `tests/qgf_goat.rs` (3 tests)
+**File:** `crates/katgpt-core/tests/qgf_goat.rs` (3 tests)
 
 1. `goat_g2_zero_weight_bit_identical` — `guidance_weight = 0.0` → `tilt_logits` reports `applied = false` and leaves the logits buffer **byte-identical**. The freeze tier (no critic) is the pure BC reference policy.
 2. `goat_g2_period_mismatch_skips_tilt` — steps outside the `guidance_period` skip the tilt and leave logits untouched.
@@ -79,7 +79,7 @@ The load-bearing proof: tilting reference logits by `+w·∇Q` increases the exp
 
 ## G4a — Tilt overhead vs action-space size
 
-**File:** `benches/qgf_goat.rs` (`bench_tilt_overhead_vs_size`)
+**File:** `crates/katgpt-core/benches/qgf_goat.rs` (`bench_tilt_overhead_vs_size`)
 
 | n (action space) | time | throughput |
 |------------------|------|------------|
@@ -94,7 +94,7 @@ Linear scaling with a small constant (one SIMD FMA per 4–8 lanes). **Target: s
 
 ## G4b — End-to-end pipeline overhead vs base generate
 
-**File:** `benches/qgf_goat.rs` (`bench_pipeline_overhead_vs_base`)
+**File:** `crates/katgpt-core/benches/qgf_goat.rs` (`bench_pipeline_overhead_vs_base`)
 
 | generator tier | base generate | guided pipeline | overhead | overhead % |
 |----------------|---------------|-----------------|----------|------------|
@@ -112,7 +112,7 @@ Linear scaling with a small constant (one SIMD FMA per 4–8 lanes). **Target: s
 
 ## G4c — Adaptive vs fixed-weight tilt
 
-**File:** `benches/qgf_goat.rs` (`bench_adaptive_vs_fixed_tilt`)
+**File:** `crates/katgpt-core/benches/qgf_goat.rs` (`bench_adaptive_vs_fixed_tilt`)
 
 | path | time (n=64) |
 |------|-------------|
@@ -127,7 +127,7 @@ Adaptive (F4) adds **0.3 ns (3%)** — the per-call `confidence()` query + sigmo
 
 ## G4 alloc-free (tilt hot path = 0 allocations)
 
-**File:** `tests/qgf_goat.rs` (2 tests, thread-local CountingAllocator)
+**File:** `crates/katgpt-core/tests/qgf_goat.rs` (2 tests, thread-local CountingAllocator)
 
 `tilt_logits` and `tilt_logits_adaptive` operate entirely on caller-owned buffers. Verified **0 allocations across 2000 hot-path calls** for both paths (after warmup), using a **thread-local** `CountingAllocator` to avoid the false-positive race that a global counter would suffer under `cargo test`'s parallel runner (the G1/G5 tests allocate `Vec`s concurrently).
 
@@ -139,7 +139,7 @@ The one-shot convenience methods (`generate_guided`, `generate_project_tilt_samp
 
 ## G5 — Stability (bounded, finite, non-degenerate)
 
-**File:** `tests/qgf_goat.rs` (4 tests)
+**File:** `crates/katgpt-core/tests/qgf_goat.rs` (4 tests)
 
 1. `goat_g5_adaptive_weight_bounded_and_finite` — `adaptive_guidance_weight` is finite and in `[0,1]` for confidence ∈ {−100, 0, 0.5, 1, 100, ±∞} and extreme steepness. The numerically-stable sigmoid branch produces no NaN/Inf. PASS.
 2. `goat_g5_extreme_tilt_no_nan_no_inf` — extreme tilt (weight 1e4 × gradient 1e4) produces no NaN or Inf in the logits buffer (additive shift of finite values stays finite well within f32 range). PASS.

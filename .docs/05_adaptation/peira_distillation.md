@@ -168,5 +168,5 @@ cargo clippy --features peira_distill --examples --quiet
 | `crates/katgpt-core/src/lib.rs` | Feature-gated re-exports (`PeiraConfig`, `PeiraCovariance`, `peira_aux_loss`) |
 | `crates/katgpt-core/Cargo.toml` | `peira_distill` feature gate |
 | `src/distill/peira.rs` | `PeiraDistiller`, `peira_alignment_score`, `peira_planning_quality`, `synthetic_cca_sample` |
-| `src/distill/mod.rs` | `#[cfg(feature = "peira_distill")]` module |
+| `crates/katgpt-speculative/src/distill/mod.rs` | `#[cfg(feature = "peira_distill")]` module |
 | `examples/core_06_peira.rs` | GOAT proof demo |

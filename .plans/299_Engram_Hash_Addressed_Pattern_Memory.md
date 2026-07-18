@@ -137,7 +137,7 @@ Plus tests in `crates/katgpt-core/src/engram/` (unit) and `tests/bench_299_engra
 
 ### Tasks
 
-- [x] **T5.1** Define `EngramHotSwap` in `hotswap.rs` — mirror `SenseHotSwap` pattern (`sense/hotswap.rs`):
+- [x] **T5.1** Define `EngramHotSwap` in `hotswap.rs` — mirror `SenseHotSwap` pattern (`riir-ai/crates/riir-engine/src/sense/hotswap.rs`):
   - `table: AtomicPtr<Box<dyn EngramTable>>` (double-boxed so the AtomicPtr's T is Sized)
   - `lock: AtomicBool` — set during swap, cleared after
   - `current_commitment: AtomicU64` — low 8 bytes of BLAKE3, for fast identity check
@@ -229,7 +229,7 @@ Plus tests in `crates/katgpt-core/src/engram/` (unit) and `tests/bench_299_engra
 
 ### Tasks
 
-- [x] **T8.1** Module-level rustdoc in `engram/mod.rs`: what it does, when to use, the sparsity-axis framing (conditional memory vs conditional computation), reference to Research 278. Phase-status section updated; deferred TODOs removed.
+- [x] **T8.1** Module-level rustdoc in `crates/katgpt-core/src/engram/mod.rs`: what it does, when to use, the sparsity-axis framing (conditional memory vs conditional computation), reference to Research 278. Phase-status section updated; deferred TODOs removed.
 - [x] **T8.2** Added `katgpt-rs/.docs/27_engram_conditional_memory.md` covering: trait surface, when to enable, performance characteristics, comparison vs Raven (the other axis). (`26_micro_belief.md` already existed; bumped to 27.)
 - [x] **T8.3** Added `katgpt-rs/.benchmarks/299_engram_goat.md` with G1–G7 results table + promotion decision.
 - [x] **T8.4** Updated `katgpt-rs/README.md` Feature Showcase (Engram section added) + GOAT-Proved Additions table row. **Did NOT update `.docs/15_paper_feature_comparison.md`** — out of scope for this task (would require reviewing the entire matrix); documented here for orchestrator follow-up.

@@ -108,7 +108,7 @@ impl RestClient {
 ### DDTree Merge
 
 ```rust
-// speculative/dd_tree.rs — add retrieved branches to tree
+// src/speculative/dd_tree.rs — add retrieved branches to tree
 
 /// Inject retrieved token sequences into the DDTree as candidate branches.
 /// Each retrieved sequence becomes a path in the tree with score = similarity * weight.
@@ -219,7 +219,7 @@ rest = ["reqwest", "tokio"]   # Retrieval-based speculative decoding
 - [x] 2.6 Add tests: mock REST response parsing
 
 ### Phase 3: DDTree Merge
-- [x] 3.1 Add `merge_retrieved_branches()` to `speculative/dd_tree.rs`
+- [x] 3.1 Add `merge_retrieved_branches()` to `src/speculative/dd_tree.rs`
 - [x] 3.2 Implement score blending: `(1-w) * log(draft_prob) + w * log(retrieval_score)`
 - [x] 3.3 Implement path reconstruction from retrieved sequences
 - [x] 3.4 Add test: merge preserves tree_budget

@@ -33,7 +33,7 @@ The dual fast/slow temporal-derivative kernel (O'Reilly 2026) was distilled into
 ## G2 — HLA Surprise Companion (Fusion F1)
 
 **Commit:** `9f729711` (wiring) + `4689ef89` (G2 bench gate)
-**Target:** `crates/katgpt-sense/crates/katgpt-sense/src/reconstruction.rs`
+**Target:** `crates/katgpt-sense/src/reconstruction.rs`
 **Bench:** `crates/katgpt-core/benches/reconstruction_bench.rs` (G2 section)
 **In-crate test:** `surprise_detects_emotional_events_g2_gate`
 

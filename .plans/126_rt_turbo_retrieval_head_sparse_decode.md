@@ -21,7 +21,7 @@
 - [x] **T6**: Register `#[cfg(feature = "rt_turbo")]` gate in `Cargo.toml` features, add `pub mod rt_turbo` in `lib.rs`, require `dash_attn` feature
 
 ### Phase 2: Low-Dimensional Pre-RoPE Projection
-- [x] **T7**: Create `src/rt_turbo/projection.rs` — `RetrievalProjection` struct with `w_q: Vec<f32>` and `w_k: Vec<f32>` per retrieval head (shape `[head_dim, low_dim]`)
+- [x] **T7**: Create `crates/katgpt-speculative/src/rt_turbo/projection.rs` — `RetrievalProjection` struct with `w_q: Vec<f32>` and `w_k: Vec<f32>` per retrieval head (shape `[head_dim, low_dim]`)
 - [x] **T8**: Implement `project_score()` — compute low-dim relevance: `s(m,n) = (W_Q · q_pre)ᵀ · (W_K · k_pre)` for pre-RoPE query/key vectors
 - [x] **T9**: Implement `batch_project_scores()` — vectorized scoring over full KV cache for a single retrieval head using SIMD. Returns `Vec<f32>` of scores `[seq_len]`
 - [x] **T10**: Unit tests: zero-initialized projection → uniform scores, identity projection → matches full-dim dot product on first 16 dims, dimensionality check — 31 projection tests passing
@@ -33,7 +33,7 @@
 - [x] **T14**: Unit tests: concentrated scores (single peak) → 1-2 tokens selected, uniform scores → many tokens selected, edge case p=1.0 → all tokens, edge case p=0.0 → top-1 only, exact mass preservation check — 11 tests passing
 
 ### Phase 4: Head-Wise Sparse Decode Integration
-- [x] **T15**: Create `src/rt_turbo/forward.rs` — `forward_rt_turbo_decode()` integrating head-wise routing
+- [x] **T15**: Create `crates/katgpt-speculative/src/rt_turbo/forward.rs` — `forward_rt_turbo_decode()` integrating head-wise routing
 - [x] **T16**: Implement local-head path — sliding window (8192) + sink tokens (4) only, skip full KV scan, use existing `forward_sdpa` on window slice
 - [x] **T17**: Implement retrieval-head path — low-dim projection → top-p token selection → full-dim SDPA on selected token indices only
 - [x] **T18**: Implement `forward_rt_turbo_prefill()` — local heads: window + sinks; retrieval heads: dense (delegate to standard prefill). This matches RTPurbo design

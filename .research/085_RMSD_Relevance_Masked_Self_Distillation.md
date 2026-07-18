@@ -131,7 +131,7 @@ Train: reverse-KL loss on only S positions
 | Entropy-based token weighting | `riir-gpu/src/kernels/loss_masked.wgsl` | ✅ Production | D2F importance, not relevance |
 | On-policy rollout | `GZeroLoop`, `best_of_k_rollouts` | ✅ Production | ✅ Complete |
 | Teacher forward pass (hint-conditioned) | `loss_sdar.rs` teacher branch | ✅ Production | ✅ Complete |
-| LoRA-as-Judge | `ropd/client.rs`, `LeviathanVerifier` | ✅ Production | Not used for token selection |
+| LoRA-as-Judge | `riir-ai/crates/riir-gpu/src/ropd/client.rs`, `LeviathanVerifier` | ✅ Production | Not used for token selection |
 | ScreeningPruner relevance | `katgpt-rs-core/traits.rs` | ✅ Production | Action-level, not token-level |
 | Freeze/thaw teacher update | Game bandit `freeze()`/`thaw()` | ✅ Production | Bandit Q-values, not LoRA weights |
 | SDAR asymmetric trust | `sdar_gate.rs` — σ(β·Δt) | ✅ Production | All tokens, no pre-filter |

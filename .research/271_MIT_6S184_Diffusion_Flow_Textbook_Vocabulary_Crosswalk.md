@@ -76,7 +76,7 @@ For each of the five Super-GOAT factory modules, what does this textbook's machi
 
 ### 3.1 HLA (`katgpt-rs/crates/katgpt-core/src/sense/` + `riir-ai/.../hla/`)
 
-**HLA is NOT a diffusion denoiser.** Verified by reading `hla/kernel.rs`: HLA is a **second-order linear-attention streaming recurrence** with leaky decay γ (`SK += kkᵀ`, `CQV += qvᵀ`, `mQ += q`, exponential decay). It tracks second-order moments, not Bayesian posteriors. Treating HLA as `D_t(x) = E[z|x]` would be the R269 failure mode (defaulting to a plausible-sounding but wrong reframe).
+**HLA is NOT a diffusion denoiser.** Verified by reading `riir-ai/crates/riir-engine/src/hla/kernel.rs`: HLA is a **second-order linear-attention streaming recurrence** with leaky decay γ (`SK += kkᵀ`, `CQV += qvᵀ`, `mQ += q`, exponential decay). It tracks second-order moments, not Bayesian posteriors. Treating HLA as `D_t(x) = E[z|x]` would be the R269 failure mode (defaulting to a plausible-sounding but wrong reframe).
 
 The **correct** mapping: HLA is closer to a **linear-attention state-space model** (cf. 070 Gated DeltaNet, 230 Semiseparable SSD), where the recurrence plays the role of an ODE integrator. The denoiser analogy applies only to `BakeStillState::from_posterior` in LoRA continual training, not to runtime HLA.
 
@@ -88,7 +88,7 @@ The textbook's **marginalization trick** (Thm 9: `u(x) = ∫ u(x|z) p_1|t(z|x) d
 
 ### 3.3 `cgsp_runtime/` (curiosity-guided self-play)
 
-Verified by reading `cgsp_runtime/runtime.rs`: curiosity is modeled as a **decayed-absorb priority bandit** (`p ← p·decay + reward`, decay=0.7, capped at 1.0). This is **NOT** Langevin dynamics or SDE-driven exploration. The textbook's `σ_t` as a noise-injection knob for exploration is a genuinely different mechanism — see Issue 037.
+Verified by reading `riir-ai/crates/riir-engine/src/cgsp_runtime/runtime.rs`: curiosity is modeled as a **decayed-absorb priority bandit** (`p ← p·decay + reward`, decay=0.7, capped at 1.0). This is **NOT** Langevin dynamics or SDE-driven exploration. The textbook's `σ_t` as a noise-injection knob for exploration is a genuinely different mechanism — see Issue 037.
 
 ### 3.4 LatCal (`riir-ai/.../encoding/latcal*.rs`)
 

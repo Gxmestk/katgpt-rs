@@ -109,9 +109,9 @@ struct RoutingDecision {
 | DoubleSparse | `Gather(c["k"])` channels | `GeMM(channels, q_gathered)` → `topK` |
 
 **Why GOAT:**
-- **Unification**: DashAttention (`dash_attn/routing.rs`), ShardKV, and future sparse attention all plug into one trait. Adding a new algorithm is just a new `impl VortexFlow`.
+- **Unification**: DashAttention (`crates/katgpt-attn/src/dash_attn/routing.rs`), ShardKV, and future sparse attention all plug into one trait. Adding a new algorithm is just a new `impl VortexFlow`.
 - **Zero-cost abstraction**: Rust monomorphization = no vtable overhead. Generic over `VortexFlow` in the hot path compiles to direct calls.
-- **Composability**: `RoutingScratch` pattern already exists in `dash_attn/routing.rs` (lines 38-65). The trait formalizes it.
+- **Composability**: `RoutingScratch` pattern already exists in `crates/katgpt-attn/src/dash_attn/routing.rs` (lines 38-65). The trait formalizes it.
 - **Enables meta-routing** (Idea E): With all algorithms behind one trait, bandit selection becomes trivially composable.
 - **Enables channel pruning** (Idea B): `forward_cache` is the natural place to extract routing channels.
 
@@ -268,7 +268,7 @@ Each decode step:
 
 ### DashAttention (Plan 106, Research 071)
 
-`score_blocks_entmax` in `dash_attn/routing.rs` currently does: chunk logits → `entmax_1p5` → support extraction. This is `forward_indexer` only, with `ChunkSummaryCache` handling cache-level work. VortexFlow formalizes the separation. `EntmaxRouter` becomes `impl VortexFlow for EntmaxRouter` wrapping existing code — zero behavioral change.
+`score_blocks_entmax` in `crates/katgpt-attn/src/dash_attn/routing.rs` currently does: chunk logits → `entmax_1p5` → support extraction. This is `forward_indexer` only, with `ChunkSummaryCache` handling cache-level work. VortexFlow formalizes the separation. `EntmaxRouter` becomes `impl VortexFlow for EntmaxRouter` wrapping existing code — zero behavioral change.
 
 ### Wall Attention (Plan 173, Research 145)
 

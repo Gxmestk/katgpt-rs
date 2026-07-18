@@ -31,16 +31,16 @@ Core innovations vs. our existing stack:
 
 ## Tasks
 
-- [x] T1: Add `planar_quant/types.rs` — `PlanarQuantConfig`, `PlanarQuantLayer`, rotation params
-- [x] T2: Add `planar_quant/rotation.rs` — Givens 2D rotation (generate, apply, inverse) with unit tests
-- [x] T3: Add `planar_quant/kv_cache.rs` — `PlanarQuantKVCache` implementing `QuantizedKVCache` trait
+- [x] T1: Add `crates/katgpt-quant/src/planar_quant/types.rs` — `PlanarQuantConfig`, `PlanarQuantLayer`, rotation params
+- [x] T2: Add `crates/katgpt-quant/src/planar_quant/rotation.rs` — Givens 2D rotation (generate, apply, inverse) with unit tests
+- [x] T3: Add `crates/katgpt-quant/src/planar_quant/kv_cache.rs` — `PlanarQuantKVCache` implementing `QuantizedKVCache` trait
 - [x] T4: Add `planar_quant/forward.rs` — score-path decode + attention scoring helpers
-- [x] T5: Add `planar_quant/mod.rs` — module index + re-exports
-- [x] T6: Add `iso_quant/types.rs` — `IsoQuantConfig`, `IsoQuantLayer`, quaternion params
-- [x] T7: Add `iso_quant/rotation.rs` — quaternion 4D rotation (generate, multiply, conjugate, sandwich, inverse)
-- [x] T8: Add `iso_quant/kv_cache.rs` — `IsoQuantKVCache` implementing `QuantizedKVCache` trait
+- [x] T5: Add `crates/katgpt-quant/src/planar_quant/mod.rs` — module index + re-exports
+- [x] T6: Add `crates/katgpt-quant/src/iso_quant/types.rs` — `IsoQuantConfig`, `IsoQuantLayer`, quaternion params
+- [x] T7: Add `crates/katgpt-quant/src/iso_quant/rotation.rs` — quaternion 4D rotation (generate, multiply, conjugate, sandwich, inverse)
+- [x] T8: Add `crates/katgpt-quant/src/iso_quant/kv_cache.rs` — `IsoQuantKVCache` implementing `QuantizedKVCache` trait
 - [x] T9: Add `iso_quant/forward.rs` — score-path decode + attention scoring helpers
-- [x] T10: Add `iso_quant/mod.rs` — module index + re-exports
+- [x] T10: Add `crates/katgpt-quant/src/iso_quant/mod.rs` — module index + re-exports
 - [x] T11: Add `planar_quant` + `iso_quant` feature gates to `Cargo.toml` + conditional modules in `src/lib.rs`
 - [x] T12: Add GOAT benchmark — PlanarQuant vs IsoQuant vs OCTOPUS vs TurboQuant: MSE, cosine, IP error (d=64/128/256, bits=2/3/4)
 - [x] T13: Add GOAT benchmark — MaxSim late-interaction scoring comparison
@@ -77,7 +77,7 @@ katgpt-rs/src/
 ### Key Types
 
 ```rust
-// planar_quant/types.rs
+// crates/katgpt-quant/src/planar_quant/types.rs
 
 /// Configuration for PlanarQuant KV cache
 pub struct PlanarQuantConfig {
@@ -101,7 +101,7 @@ pub struct PlanarQuantLayer {
 ```
 
 ```rust
-// iso_quant/types.rs
+// crates/katgpt-quant/src/iso_quant/types.rs
 
 /// Configuration for IsoQuant KV cache
 pub struct IsoQuantConfig {
@@ -138,7 +138,7 @@ pub struct IsoQuantLayer {
 ### Rotation Kernels
 
 ```rust
-// planar_quant/rotation.rs — Givens 2D rotation
+// crates/katgpt-quant/src/planar_quant/rotation.rs — Givens 2D rotation
 
 /// Apply 2D rotation: (cos·v0 - sin·v1, sin·v0 + cos·v1)
 #[inline]
@@ -169,7 +169,7 @@ pub fn generate_givens_rotations(n_groups: usize, seed: u64) -> Vec<[f32; 2]> {
 ```
 
 ```rust
-// iso_quant/rotation.rs — Quaternion 4D rotation
+// crates/katgpt-quant/src/iso_quant/rotation.rs — Quaternion 4D rotation
 
 /// Quaternion multiply (Hamilton product): 16 FMAs
 #[inline]
@@ -347,17 +347,17 @@ File: `.benchmarks/023_block_diagonal_goat.md`
 ## Implementation Order
 
 ```
-T1  planar_quant/types.rs      — config + layer structs
-T2  planar_quant/rotation.rs   — Givens 2D, test immediately
-T3  planar_quant/kv_cache.rs   — QuantizedKVCache impl
+T1  crates/katgpt-quant/src/planar_quant/types.rs      — config + layer structs
+T2  crates/katgpt-quant/src/planar_quant/rotation.rs   — Givens 2D, test immediately
+T3  crates/katgpt-quant/src/planar_quant/kv_cache.rs   — QuantizedKVCache impl
 T4  planar_quant/forward.rs    — score-path decode
-T5  planar_quant/mod.rs        — wire up module
+T5  crates/katgpt-quant/src/planar_quant/mod.rs        — wire up module
 
-T6  iso_quant/types.rs         — config + layer structs
-T7  iso_quant/rotation.rs      — quaternion 4D, test immediately
-T8  iso_quant/kv_cache.rs      — QuantizedKVCache impl
+T6  crates/katgpt-quant/src/iso_quant/types.rs         — config + layer structs
+T7  crates/katgpt-quant/src/iso_quant/rotation.rs      — quaternion 4D, test immediately
+T8  crates/katgpt-quant/src/iso_quant/kv_cache.rs      — QuantizedKVCache impl
 T9  iso_quant/forward.rs       — score-path decode
-T10 iso_quant/mod.rs           — wire up module
+T10 crates/katgpt-quant/src/iso_quant/mod.rs           — wire up module
 
 T11 feature gates              — Cargo.toml + src/lib.rs
 T12 GOAT synthetic             — MSE, cosine, IP error sweep

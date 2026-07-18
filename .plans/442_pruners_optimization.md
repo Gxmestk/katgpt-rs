@@ -70,7 +70,7 @@ Implementation of issue 001 (pruners optimization) findings — issue closed + r
 ### LOW
 - [x] `bandit.rs` BanditStats field reordering (checked: already well-packed after prior changes)
 - [x] `cna.rs` CnaNeuron already well-packed (issue confirms no change needed)
-- [x] `monopoly/players.rs` const arrays for railroad/utility squares → done (hoisted to module-level consts)
+- [x] `crates/katgpt-pruners/src/monopoly/players.rs` const arrays for railroad/utility squares → done (hoisted to module-level consts)
 - [x] `regime_transition` two-pass std → Welford's one-pass
 - [x] `lodestar` Vec<bool> → BitVec
 - [x] `sketch_types` Debug/Display hex formatting optimization (write! directly, no String intermediate)

@@ -168,7 +168,7 @@ crates/riir-gpu/src/
   dataloader.rs              ← RoleGate enum, TrainingSample.role_gates, batches_with_roles()
   training_loop.rs           ← LossMask enum, Trainer branching on loss_mask
   backward.rs                ← backward_pass_interventional() (GradMode::Interventional)
-  game/trainer.rs            ← role gates for game trace format
+  riir-ai/crates/riir-gpu/src/game/trainer.rs            ← role gates for game trace format
   gzero_loop.rs              ← LossMask config for self-play
 
 tests/

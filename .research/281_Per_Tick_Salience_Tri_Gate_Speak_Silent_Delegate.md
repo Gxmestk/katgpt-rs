@@ -13,7 +13,7 @@
 
 ## TL;DR
 
-JoyAI-VL-Interaction's headline contribution is deceptively simple: **make "when to act" a learned per-second decision of the model itself, with `silence` treated as a first-class output token alongside `speak` and `delegate`**. We strip the training recipe (GRPO + role-weighted SFT → riir-train) and keep the runtime pattern: a **3-way sigmoid salience gate** that decides every tick whether to emit, stay silent, or hand off to a background reasoner. This is the missing primitive our NPC stack needs — every existing emit path (`npc/dialog.rs`, `npc_comms/`, combat shouts) is **user-prompted or event-triggered**, never autonomously decided by the NPC's own latent state.
+JoyAI-VL-Interaction's headline contribution is deceptively simple: **make "when to act" a learned per-second decision of the model itself, with `silence` treated as a first-class output token alongside `speak` and `delegate`**. We strip the training recipe (GRPO + role-weighted SFT → riir-train) and keep the runtime pattern: a **3-way sigmoid salience gate** that decides every tick whether to emit, stay silent, or hand off to a background reasoner. This is the missing primitive our NPC stack needs — every existing emit path (`riir-ai/crates/riir-games/src/npc/dialog.rs`, `npc_comms/`, combat shouts) is **user-prompted or event-triggered**, never autonomously decided by the NPC's own latent state.
 
 **Distilled for katgpt-rs (modelless, inference-time):**
 A fixed-size `SalienceTriGate<A, D>` struct that maps an activation vector `a ∈ R^D` + two scalar context signals (zone-attention `z`, curiosity `c`) to one of three decisions `{Speak, Silent, Delegate}`. Decisions are produced by **two stacked sigmoids** (never softmax — per AGENTS.md), with `Silent` as a **first-class variant**, not "below threshold = skip". The delegate variant returns a `DelegateToken` (a typed handoff) rather than emitting immediately; the caller wires the token to any async backend (AnyRAG gateway, cold-tier lookup, external model).
@@ -229,7 +229,7 @@ Vocabulary translation (paper terms → codebase terms) and grep results from th
 | Paper term | Codebase candidates grepped | Hits |
 |---|---|---|
 | `silence` / `stay_silent` / `silent_token` | `nop_emit`, `speak_gate`, `emission_gate`, `silence` | Only FFT `Silence` combat debuff + Parakeet `prime_with_silence` (warm-up). **Zero emit-gate hits.** |
-| `speak` / `response` / `delegate` | `npc_comms`, `dialogue_trigger`, `utterance`, `delegate`, `background_brain` | `npc/dialog.rs` exists but is user-prompted (turn-based). `npc_comms/` exists but is bandwidth allocation (R133). `AnyRagGateway` is a delegate *target*, not a *decision*. |
+| `speak` / `response` / `delegate` | `npc_comms`, `dialogue_trigger`, `utterance`, `delegate`, `background_brain` | `riir-ai/crates/riir-games/src/npc/dialog.rs` exists but is user-prompted (turn-based). `npc_comms/` exists but is bandwidth allocation (R133). `AnyRagGateway` is a delegate *target*, not a *decision*. |
 | `interaction_model` / `per_second_decision` | `tick_gate`, `salience_router`, `proactive_response`, `unsolicited` | **Zero hits.** |
 | `salience` | `ega`, `spectral_salience`, `attention_sink`, `spectral_threat` | EGA (Plan 139) is closest — spectral salience for *attention*, not for *emit decisions*. Different output modality. |
 | `delegate` / `background_loop` / `async_dispatch` | `async_dispatch`, `two_loop`, `background_bridge` | Existing delegate uses (`DualPool`, `DerivativeCuriosity`, `AnyRagGateway`) are all *internal* delegation (delegate-to-inner-sampler, delegate-to-external-judge). None of them is a *per-tick decision to delegate vs speak vs silent*. |
@@ -238,7 +238,7 @@ Vocabulary translation (paper terms → codebase terms) and grep results from th
 
 ### Q2: New class of behavior? — **YES**
 
-Current NPC emit paths (`npc/dialog.rs:DialogEngine::respond`, `npc_comms::bus::publish`, combat shouts via `ActionBridge`) all require an external trigger: a player input, a sensor event, a combat tick. **None of them autonomously decides "this tick, I will speak; that tick, I will stay silent".** The tri-gate produces a new behavior class: *proactive unsolicited emit decisions from latent state*. Incumbent systems cannot do this without an external polling clock — which is exactly the paradigm gap JoyAI-VL exploits to beat Doubao/Gemini.
+Current NPC emit paths (`riir-ai/crates/riir-games/src/npc/dialog.rs:DialogEngine::respond`, `npc_comms::bus::publish`, combat shouts via `ActionBridge`) all require an external trigger: a player input, a sensor event, a combat tick. **None of them autonomously decides "this tick, I will speak; that tick, I will stay silent".** The tri-gate produces a new behavior class: *proactive unsolicited emit decisions from latent state*. Incumbent systems cannot do this without an external polling clock — which is exactly the paradigm gap JoyAI-VL exploits to beat Doubao/Gemini.
 
 ### Q3: Product selling point? — **YES**
 

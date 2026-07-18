@@ -29,7 +29,7 @@ where `H(p) = −Σ p_v ln p_v` is the target model's next-token entropy, comput
 Three things, in decreasing order of "already have it":
 
 1. **Rejection sampling > target-only** for MTP acceptance — **already shipped** in `LeviathanVerifier` (`src/speculative/verifier.rs:128`). The paper confirms this is the right default for virtually all native MTP deployments (§7.5: 23/24 model–task pairs fall in the RS-better region). No action.
-2. **Entropy → verification tier gating** — **already shipped** in `llmexec_guard` (`src/llmexec_guard.rs`) via `sigmoid(-steepness * (entropy - 0.5) + depth_bonus)`. But ours is an **ad-hoc sigmoid confidence gate**; the paper gives a **proven linear acceptance-rate forecast** `α ≈ a − b·H(p)`. Replacing the ad-hoc sigmoid with the calibrated linear forecast is the Gain.
+2. **Entropy → verification tier gating** — **already shipped** in `llmexec_guard` (`crates/katgpt-core/src/llmexec_guard.rs`) via `sigmoid(-steepness * (entropy - 0.5) + depth_bonus)`. But ours is an **ad-hoc sigmoid confidence gate**; the paper gives a **proven linear acceptance-rate forecast** `α ≈ a − b·H(p)`. Replacing the ad-hoc sigmoid with the calibrated linear forecast is the Gain.
 3. **Per-step adaptive γ from acceptance forecast** — **NOT shipped.** `draft_lookahead` is a static `Config` field. The paper explicitly flags adaptive-γ as future work (§7.6: "suggests that adaptive MTP strategies — adjusting the draft length γ based on the estimated local entropy—could further improve throughput") **without proof**. This is the genuinely open fusion opportunity, and it is unproven.
 
 **Why Gain, not higher:** The linear bound is a proven insight, but the adaptive application (γ-shrinking, skip-when-low-α, bandit-prior) is speculative — even the paper doesn't benchmark it. No new capability class. No product selling point. The mechanism is a two-parameter linear model, not a novel primitive.
@@ -82,7 +82,7 @@ The novel training objective `L_TV = 1 − Σ_v min(p_v, q_v)` directly optimize
 |---|---|---|
 | RS acceptance = `1 − dTV(p,q)` | `LeviathanVerifier` (`src/speculative/verifier.rs:128`, "Real p/q rejection sampling (Algorithm 1)"); target probs cached in `p_distributions_flat` (`speculative/types.rs:225`) | ✅ shipped |
 | RS preferred over target-only | `LeviathanVerifier` always uses RS; `step.rs:66`, `trust_region.rs:153`, `d2f_verifier.rs:151` all use p/q RS | ✅ shipped (correct default) |
-| Entropy → verification budget | `llmexec_guard` (`src/llmexec_guard.rs`): `sigmoid(-steepness·(entropy−0.5) + depth_bonus)` → `VerifyTier::{Skip, Screening, FullVerify}` | ⚠️ shipped but **ad-hoc sigmoid**, not the paper's **proven linear α forecast** |
+| Entropy → verification budget | `llmexec_guard` (`crates/katgpt-core/src/llmexec_guard.rs`): `sigmoid(-steepness·(entropy−0.5) + depth_bonus)` → `VerifyTier::{Skip, Screening, FullVerify}` | ⚠️ shipped but **ad-hoc sigmoid**, not the paper's **proven linear α forecast** |
 | Entropy-spike detection | `RejectionReason::EntropySpike` in `crates/katgpt-speculative/src/distill/trd.rs:56`, gated by `entropy_threshold` | ✅ shipped |
 | Acceptance-rate bandit reward | `freq_bandit` (`crates/katgpt-pruners/src/freq_bandit.rs:315`, "reward = acceptance_rate × latency_improvement"), `fold_bandit`, `meta_router` (`crates/katgpt-attn/src/dash_attn/meta_router.rs:206`) | ✅ shipped |
 | EMA entropy tracking | `AdaptiveTraceCompactor::observe_entropy` (`src/attn_match/adaptive_cot.rs:159`), `α=0.1` EMA | ✅ shipped (for KV compaction, not spec-decode γ) |

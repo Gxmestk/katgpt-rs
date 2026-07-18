@@ -31,8 +31,8 @@ forward_base()                    forward_sp_kv() dispatch variant
 ## Tasks
 
 ### Phase 1: Core Mechanism
-- [x] **T1**: Create `src/sp_kv/mod.rs` — module index, re-exports ✅
-- [x] **T2**: Create `src/sp_kv/types.rs` — `SpKvConfig`, `SpKvGateMode`, `SpKvCache`, `SpKvLayerCache`, `UtilityPredictorWeights`, `SpKvPredictors`, `GateBiasBuffer` ✅
+- [x] **T1**: Create `crates/katgpt-kv/src/sp_kv/mod.rs` — module index, re-exports ✅
+- [x] **T2**: Create `crates/katgpt-kv/src/sp_kv/types.rs` — `SpKvConfig`, `SpKvGateMode`, `SpKvCache`, `SpKvLayerCache`, `UtilityPredictorWeights`, `SpKvPredictors`, `GateBiasBuffer` ✅
 - [x] **T3**: Implement `UtilityPredictor` — 2-layer MLP: `d_model → hidden → n_kv_heads`, sigmoid output, `predict()` and `predict_single_head()`, soft/hard/tahg gate bias helpers, `UtilityAggregation` enum ✅
 - [x] **T4**: Implement `attention_head_gated()` — copy `attention_head()`, add `gate_bias: Option<&[f32]>` param, add `gate_bias[t]` to score before softmax ✅
 - [x] **T5**: Implement `SpKvCache` — sparse-write KV cache: `SpKvLayerCache` with `write_gated()` / `write_unconditional()`, per-position `retained` bitfield + `retained_count`, density tracking ✅

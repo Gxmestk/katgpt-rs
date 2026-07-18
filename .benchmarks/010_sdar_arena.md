@@ -10,8 +10,8 @@
 
 | Player | File | Bandit | Absorb | Feature |
 |--------|------|--------|--------|---------|
-| `SdarPlayer` | `bomber/sdar_player.rs` | `SdarBanditPruner` | `SdarGatedAbsorbCompress` | `sdar_gate` |
-| `SdarFFTPlayer` | `fft/sdar_player.rs` | `SdarBanditPruner` | `SdarGatedAbsorbCompress` | `sdar_gate` |
+| `SdarPlayer` | `src/pruners/bomber/sdar_player.rs` | `SdarBanditPruner` | `SdarGatedAbsorbCompress` | `sdar_gate` |
+| `SdarFFTPlayer` | `crates/katgpt-pruners/src/fft/sdar_player.rs` | `SdarBanditPruner` | `SdarGatedAbsorbCompress` | `sdar_gate` |
 
 ## Technology Stack Comparison
 

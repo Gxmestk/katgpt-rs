@@ -245,7 +245,7 @@ Three deviations from the original plan T1.1–T1.7, all surfaced by the compile
 
 - [x] **T3.1** Add `mod staging;` to `crates/katgpt-core/src/engram/mod.rs` (between `mod table;` and `mod tokenizer;` — alphabetical). Behind `#[cfg(feature="engram")]` (the whole `engram` module already is, but be explicit for clarity). **Done in Phase 1 (commit 2ea4e669).**
 
-- [x] **T3.2** Add `pub use staging::StagingEngramTable;` to the `engram/mod.rs` re-export block (alongside `pub use table::{EngramTableBuilder, InMemoryEngramTable};`). **Done in Phase 1 (commit 2ea4e669).** Also added `StagingEngramTable, StagingError` to the crate-root `lib.rs` re-export (was missing — completed in Phase 2 session, same commit as the GOAT bench).
+- [x] **T3.2** Add `pub use staging::StagingEngramTable;` to the `crates/katgpt-core/src/engram/mod.rs` re-export block (alongside `pub use table::{EngramTableBuilder, InMemoryEngramTable};`). **Done in Phase 1 (commit 2ea4e669).** Also added `StagingEngramTable, StagingError` to the crate-root `lib.rs` re-export (was missing — completed in Phase 2 session, same commit as the GOAT bench).
 
 - [x] **T3.3** Update `crates/katgpt-core/src/engram/table.rs` docstring to cross-reference the staging table. **Done in Phase 1 (commit 2ea4e669).**
 

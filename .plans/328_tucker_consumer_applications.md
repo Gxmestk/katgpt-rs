@@ -71,7 +71,7 @@ V[curator, round, tier] ∈ {0,1}  (or normalized agreement score)
   - Returns `CollusionBloc { members: Vec<u64>, cohesion: f32, rounds_active: Vec<u64> }`
   *(Shipped. Design finding: `curator_rank=1` is optimal — a bloc IS a rank-1 phenomenon. Higher ranks introduce SVD null-space noise that breaks single-linkage cosine clustering. The bloc is the principal mode-0 singular direction; bloc members project strongly, honest voters ≈0.)*
 - [x] **T1.3** Wire `detect_collusion_tucker` alongside `detect_collusion` — exact-match stays the fast path; Tucker runs on the analytics cadence (e.g., every `R` rounds) and feeds `curator_slashing`.
-  *(Shipped as both a free function `detect_collusion_tucker` (one-shot) and a stateful `TuckerCollusionDetector` (reuses scratch buffers for the analytics loop). Wired into `consensus/mod.rs` behind `chain_curator` feature. No new Cargo feature needed — `tucker_factorization` is DEFAULT-ON in katgpt-core, and `katgpt-core` is an always-on dep of riir-chain.)*
+  *(Shipped as both a free function `detect_collusion_tucker` (one-shot) and a stateful `TuckerCollusionDetector` (reuses scratch buffers for the analytics loop). Wired into `riir-chain/src/consensus/mod.rs` behind `chain_curator` feature. No new Cargo feature needed — `tucker_factorization` is DEFAULT-ON in katgpt-core, and `katgpt-core` is an always-on dep of riir-chain.)*
 - [x] **T1.4** Tests: synthetic bloc injection (K curators vote together with ε noise across R rounds) → Tucker detects the bloc; exact-match misses it when ε > 0.
   *(Shipped: 8 unit tests including `t1_4_synthetic_bloc_injection`, `g1`–`g3` gates, `g4` perf gate `#[ignore]`, and edge cases.)*
 
@@ -93,7 +93,7 @@ V[curator, round, tier] ∈ {0,1}  (or normalized agreement score)
 ### Current state (the upgrade target)
 
 The MMO already has rule-based economy anomaly detection:
-- `seal-gm-tools/src/state.rs` — `EconomyDashboard { rmt_alert_count, recent_flows, ... }`, `ShopEntry { price, volume_24h, flagged }`, `ItemStat { anomaly_flag }`, `Guild { anomaly_flag }`
+- `seal-online-remaster/crates/seal-gm-tools/src/state.rs` — `EconomyDashboard { rmt_alert_count, recent_flows, ... }`, `ShopEntry { price, volume_24h, flagged }`, `ItemStat { anomaly_flag }`, `Guild { anomaly_flag }`
 - `seal-online-remaster/crates/seal-gm-tools/src/tabs/shops.rs` — `anomaly_section()` UI with suspend/flag/investigate actions on `flagged != 0` shops
 - `seal-online-remaster/crates/seal-gm-tools/src/rerun_stream.rs` — `log_economy_graph(flows)` already visualizes gold flows
 

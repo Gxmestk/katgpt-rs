@@ -213,7 +213,7 @@ Key findings per crate:
   - Commit `f18b128b` on `develop`. 52 files changed: 5 new crate Cargo.toml +
     5 new crate lib.rs + 38 renames (src/* → crates/*/src/*) + root Cargo.toml
     feature forwards + root src/lib.rs shims + Cargo.lock + Plan 382 +
-    Proposal 003 Phase 11 entry + 1 delete (validator/mod.rs superseded by
+    Proposal 003 Phase 11 entry + 1 delete (riir-chain/src/validator/mod.rs superseded by
     lib.rs).
 
 ## GOAT gate G3 (per crate)

@@ -119,7 +119,7 @@ The classifier is ready for integration. Downstream consumers (riir-ai Cognitive
 - **Private guide (riir-ai):** [129_Cognitive_Integrity_Layer_Guide.md](../../riir-ai/.research/129_Cognitive_Integrity_Layer_Guide.md) — T4.3 cross-repo vocabulary update still TODO
 - **Superposition sources this classifier consumes:**
   - Plan 178 (MUX — `crates/katgpt-core/src/mux/`)
-  - Plan 281 (BoMSampler — `crates/katgpt-micro-belief/crates/katgpt-micro-belief/src/bom.rs`)
+  - Plan 281 (BoMSampler — `crates/katgpt-micro-belief/src/bom.rs`)
 - **Source paper:** [arXiv:2606.20560](https://arxiv.org/abs/2606.20560)
 - **Implementation:**
   - `crates/katgpt-core/src/faithfulness/smear.rs` (Phase 1 — standalone classifier)

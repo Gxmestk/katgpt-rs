@@ -21,9 +21,9 @@ Add a **modelless verification layer** to the existing KG Latent Octree Sense Co
 
 ### Phase 1: Merkle Data Structure
 
-- [x] **T1: Implement `MerkleOctree`** — 73-node fixed array (depth-3: 1 root + 8 internal + 64 leaves), per-node `[u8; 32]` BLAKE3 hashes, zero-alloc build. Feature-gated behind `merkle_octree`. — `katgpt-core/src/merkle.rs` — GOAT: build < 5µs
+- [x] **T1: Implement `MerkleOctree`** — 73-node fixed array (depth-3: 1 root + 8 internal + 64 leaves), per-node `[u8; 32]` BLAKE3 hashes, zero-alloc build. Feature-gated behind `merkle_octree`. — `crates/katgpt-core/src/merkle.rs` — GOAT: build < 5µs
 - [x] **T2: Add `build_with_merkle()` to `SenseOctreeBuilder`** — bottom-up hash computation: leaves = `BLAKE3(kg_triple_data || embedding_bytes)`, internal = `BLAKE3(child_0_hash || ... || child_7_hash)`, root hash stored in `SenseModule`. — `katgpt-core/crates/katgpt-sense/src/octree.rs` — GOAT: overhead < 2µs on top of existing `build()`
-- [x] **T3: Implement `MerkleProof`** — generate/verify O(log n) inclusion proofs for depth-3 (2 sibling levels × 7 siblings). `generate(leaf_index) → MerkleProof`, `verify(proof, root_hash) → bool`. — `katgpt-core/src/merkle.rs` — GOAT: proof gen < 1µs, verify < 1µs
+- [x] **T3: Implement `MerkleProof`** — generate/verify O(log n) inclusion proofs for depth-3 (2 sibling levels × 7 siblings). `generate(leaf_index) → MerkleProof`, `verify(proof, root_hash) → bool`. — `crates/katgpt-core/src/merkle.rs` — GOAT: proof gen < 1µs, verify < 1µs
 
 ### Phase 2: Curator Verification
 
@@ -38,13 +38,13 @@ Add a **modelless verification layer** to the existing KG Latent Octree Sense Co
 
 ### Phase 4: Tests & Benchmarks
 
-- [x] **T9: Unit tests** — MerkleOctree build (empty, single leaf, full 64 leaves), proof gen + verify (valid proof, tampered leaf, wrong root), curator verifier (consistent KG, inconsistent KG, spectral anomaly), bandit reputation (convergence after N verifications). — `katgpt-core/src/merkle.rs`, `katgpt-core/crates/katgpt-core/src/curator.rs`
+- [x] **T9: Unit tests** — MerkleOctree build (empty, single leaf, full 64 leaves), proof gen + verify (valid proof, tampered leaf, wrong root), curator verifier (consistent KG, inconsistent KG, spectral anomaly), bandit reputation (convergence after N verifications). — `crates/katgpt-core/src/merkle.rs`, `katgpt-core/crates/katgpt-core/src/curator.rs`
 - [x] **T10: Benchmark** — Merkle build from 64 KG embeddings (< 5µs target), proof generation (< 1µs), proof verify (< 1µs), curator verify single module (< 2µs), bandit sample + update (< 100ns). — `crates/katgpt-core/benches/merkle_octree_bench.rs`
 - [x] **T11: GOAT proof** — inclusion proof verifies in < 1µs, full Merkle build from `SenseModule` data < 5µs, curator bandit converges within 100 episodes to > 75% accuracy. Create `.benchmarks/221_merkle_octree_goat.md` with results. — `.benchmarks/221_merkle_octree_goat.md`
 
 ### Phase 5: Feature Gate & Integration
 
-- [x] **T12: Add `merkle_octree` feature flag** — add to `katgpt-core/Cargo.toml` as `merkle_octree = ["sense_composition"]`. Guard `merkle.rs` and `curator.rs` modules. — `katgpt-core/Cargo.toml`, `katgpt-core/src/lib.rs`
+- [x] **T12: Add `merkle_octree` feature flag** — add to `katgpt-core/Cargo.toml` as `merkle_octree = ["sense_composition"]`. Guard `merkle.rs` and `curator.rs` modules. — `katgpt-core/Cargo.toml`, `crates/katgpt-core/src/lib.rs`
 - [x] **T13: Wire `MerkleOctree` into `SenseModule`** — `build_with_merkle()` replaces `commitment` with Merkle root hash. No additional `merkle_root` field needed — `commitment` IS the Merkle root when built via Merkle path. `build()` (non-Merkle) uses flat BLAKE3 as before. — `katgpt-core/crates/katgpt-sense/src/octree.rs`
 
 ---

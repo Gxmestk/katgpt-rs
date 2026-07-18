@@ -19,7 +19,7 @@
     feedback-consumer = ["reqwest"]
     hla_attention = ["katgpt-rs/hla_attention"]
     ```
-  - Add `mod distill_attention;` to `riir-gpu/src/lib.rs` behind `#[cfg(feature = "hla_attention")]`
+  - Add `mod distill_attention;` to `riir-ai/crates/riir-gpu/src/lib.rs` behind `#[cfg(feature = "hla_attention")]`
   - Verify: `cargo build -p riir-gpu --features hla_attention` compiles (no new code yet)
 
 - [x] T1: Expose `distill.rs` helpers as `pub(crate)`

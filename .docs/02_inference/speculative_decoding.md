@@ -56,7 +56,7 @@ Token + Position
 
 ---
 
-## DDTree (`speculative/dd_tree.rs`)
+## DDTree (`src/speculative/dd_tree.rs`)
 
 ### TreeNode
 
@@ -217,7 +217,7 @@ Implements the full Algorithm 1 from Leviathan et al. 2022 ("Fast Inference from
 - `set_drafter_lora(&mut self, lora, draft_config)` — set LoRA on existing verifier.
 - `has_drafter_lora(&self) → bool` — check if LoRA is attached.
 
-### D2fDrafterVerifier (`speculative/d2f_verifier.rs`, behind `"tri_mode"` feature)
+### D2fDrafterVerifier (`src/speculative/d2f_verifier.rs`, behind `"tri_mode"` feature)
 
 Self-speculation mode — uses the same model for both drafting and verification (Plan 089: Tri-Mode Inference). D2F block decode acts as the drafter (parallel, bidirectional within block), standard AR forward pass acts as the verifier.
 
@@ -264,7 +264,7 @@ Multi-branch speculative decoding with answer extraction and consensus-based ear
 
 ---
 
-## Sampling (`speculative/sampling.rs`)
+## Sampling (`crates/katgpt-core/src/speculative/sampling.rs`)
 
 Low-level sampling primitives used by verifiers and tree builders.
 
@@ -707,7 +707,7 @@ Presets for `FlashPrefillConfig`: `metal()`, `long_context()`, `short_context()`
 
 ---
 
-## Speculative Prefill (`speculative/prefill.rs`)
+## Speculative Prefill (`src/speculative/prefill.rs`)
 
 PFlash-inspired prompt compression for reducing Time-To-First-Token (TTFT) on long prompts.
 
@@ -837,7 +837,7 @@ Extracts answers from token streams for parallel probe consensus.
 
 ---
 
-## DiffusionSampler (`speculative/diffusion_sampler.rs`, behind `"tri_mode"` feature)
+## DiffusionSampler (`src/speculative/diffusion_sampler.rs`, behind `"tri_mode"` feature)
 
 Learned accept/reject decisions for D2F denoising steps (Plan 116).
 
@@ -941,7 +941,7 @@ DFlash → DDTree → Verify
 
 ---
 
-## FlashAR Anchor-Then-Fill (`speculative/flashar_anchor.rs`, behind `"flashar_anchor"` feature)
+## FlashAR Anchor-Then-Fill (`src/speculative/flashar_anchor.rs`, behind `"flashar_anchor"` feature)
 
 Requires `"dllm"` feature. Two-round decoding strategy that reduces the D2F denoising search space.
 
@@ -959,7 +959,7 @@ By constraining the D2F block with high-confidence anchor tokens at regular inte
 
 ---
 
-## FlashAR Consensus Tri-Mode (`speculative/flashar_consensus.rs`, behind `"flashar_consensus"` feature)
+## FlashAR Consensus Tri-Mode (`src/speculative/flashar_consensus.rs`, behind `"flashar_consensus"` feature)
 
 Requires `"tri_mode"` and `"plasma_path"` features. Replaces tri_mode's prefix-match acceptance with a dual-path consensus mechanism and ternary thermal routing.
 

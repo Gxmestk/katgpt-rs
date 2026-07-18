@@ -65,11 +65,11 @@ This plan:
   - `new()`, `symmetric()`, `is_asymmetric()`, `compression_ratio()`, `total_bits()`
   - File: `src/types.rs`
 
-- [x] **T8: Update `TurboQuantKVCache` recommended constructor** — `turboquant/kv_cache.rs`
+- [x] **T8: Update `TurboQuantKVCache` recommended constructor** — `crates/katgpt-quant/src/turboquant/kv_cache.rs`
   - Added `pub fn new_asymmetric(config: &Config) -> Self` → `key_bits=8, val_bits=3`
   - Doc: "Recommended asymmetric config from Research 081. V compression is quality-free."
   - Feature-gated behind `#[cfg(feature = "asymmetric_kv")]`
-  - File: `src/turboquant/kv_cache.rs`
+  - File: `crates/katgpt-quant/src/turboquant/kv_cache.rs`
 
 - [x] **T9: Benchmark result file** — `.benchmarks/036_asymmetric_kv_goat.md`
   - GOAT 25/25 proof summary (24 proofs + 1 cross-method benchmark)
@@ -91,7 +91,7 @@ This plan:
 src/
   types.rs                    # T7: AsymmetricKVConfig
   benchmark.rs                # T2-T6: asymmetric benchmarks + GOAT proofs
-  turboquant/kv_cache.rs      # T8: new_asymmetric() constructor
+  crates/katgpt-quant/src/turboquant/kv_cache.rs      # T8: new_asymmetric() constructor
 
 .benchmarks/
   036_asymmetric_kv_goat.md   # T9: GOAT 25/25 results

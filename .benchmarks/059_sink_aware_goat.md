@@ -74,7 +74,7 @@ G2 still DEFERRED.
 - ✅ T4.1 — `LayerSinkSummary` added to `crates/katgpt-core/src/data_probe/geometry.rs`. Fields: `layer_index`, `n_nop_sinks`, `n_broadcast_sinks`, `dominant_kind`, `mean_broadcast_value_norm`.
 - ✅ T4.2 — `summarize_layer_sinks(attn_per_head, values_per_head, cfg, scratch, layer_index) -> LayerSinkSummary`. Runs classifier across all heads, aggregates.
 - ✅ T4.3 — Example `examples/sink_phase_plot.rs`. Synthetic ViT-like activations; layers 0-3 NOP-dominant (zero CLS value), layers 4-7 would-be Broadcast (but `classify_all_sinks` doesn't pass `update_O`, so they show as None — documented in example output).
-- ✅ T4.4 — `src/data_probe/mod.rs` docstring updated with "mechanism locator vs aggregate symptom" framing.
+- ✅ T4.4 — `crates/katgpt-core/src/data_probe/mod.rs` docstring updated with "mechanism locator vs aggregate symptom" framing.
 
 ## Phase 5 deliverables (DONE)
 
@@ -234,7 +234,7 @@ Documented in the module-level doc comment of `crates/katgpt-core/src/data_probe
 | `crates/katgpt-core/src/lib.rs` | `pub mod data_probe;` + re-exports. | +16 |
 | `crates/katgpt-core/Cargo.toml` | `sink_aware_attn = []` feature. | +1 |
 | `crates/katgpt-core/src/data_probe/sink_classify.rs` | Root-crate re-export + 8 G1 unit tests. | ~265 |
-| `src/data_probe/mod.rs` | `pub mod sink_classify;` + re-exports + docstring. | +15 |
+| `crates/katgpt-core/src/data_probe/mod.rs` | `pub mod sink_classify;` + re-exports + docstring. | +15 |
 | `crates/katgpt-core/src/data_probe/geometry.rs` | `LayerSinkSummary` + `summarize_layer_sinks`. | +108 |
 | `Cargo.toml` | `data_probe` extended; `sink_aware_attn` added; 4 [[bench]]/[[test]]/[[example]] entries. | +6 +30 |
 | `benches/sink_classify_bench.rs` | Phase 2 T2.4 bench. | ~200 |

@@ -82,7 +82,7 @@ already has `domino_correction`. Missing 7:
     `katgpt_core::traits::*` (traits) + `katgpt_core::speculative::types::TreeNode`
 - [x] T1.3 Add 7 tracking features to katgpt-forward/Cargo.toml + `fastrand` dev-dep.
 - [x] T1.4 Forward the 7 new features from root Cargo.toml.
-- [x] T1.5 Register module in katgpt-forward/src/lib.rs: `pub mod dd_tree;` +
+- [x] T1.5 Register module in crates/katgpt-forward/src/lib.rs: `pub mod dd_tree;` +
       feature-gated re-exports of the 2 production fns.
 - [x] T1.6 Slim root `src/speculative/dd_tree.rs` to a 23-LOC re-export shim:
       `pub use katgpt_forward::dd_tree::*;` + feature-gated re-exports of

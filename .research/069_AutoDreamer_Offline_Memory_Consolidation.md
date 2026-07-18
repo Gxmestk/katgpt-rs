@@ -44,7 +44,7 @@ Key equation: `B* = (B \ R) ∪ Cθ(R, T_R)` — region replacement, not per-ent
 | Auto-Dreamer Concept | Our Equivalent | Location |
 |---------------------|----------------|----------|
 | Fast Writer (per-session) | `TrialLog` + JSONL replays + `ReflectionQA` | `trial_log.rs`, `reflection.rs` |
-| Typed Memory Bank | `DeltaMemoryState` (rank×rank matrix) + `BanditPruner` (q_values) | `delta_mem/state.rs`, `bandit.rs` |
+| Typed Memory Bank | `DeltaMemoryState` (rank×rank matrix) + `BanditPruner` (q_values) | `crates/katgpt-core/src/delta_mem/state.rs`, `bandit.rs` |
 | Region Selection | `DeltaGatedAbsorbCompress` (gated absorb by hint-δ quality) | `absorb_compress.rs` |
 | Provenance Links | `AnchorTrace` (depth/reward/future_accuracy per trial) | `trial_log.rs` |
 | Consolidation | `AbsorbCompress::compress()` (merge similar arms) | `absorb_compress.rs` |

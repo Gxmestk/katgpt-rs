@@ -11,7 +11,7 @@ Apply the **trait-impl split** technique (refined in Plan 389) to `prefill.rs`.
 The file has a clean bimodal split:
 
 - **Pure substrate** (trait + helpers, ~580 LOC): no `forward`, no `SpeculativeContext`.
-  Moves to `katgpt-speculative/src/prefill.rs`.
+  Moves to `crates/katgpt-speculative/src/prefill.rs`.
 - **Forward-coupled impls** (~520 LOC): `AttentionScorer` / `BlockAttentionScorer` call
   `crate::transformer::forward` and need `SpeculativeContext`. Stay in root, implement
   the trait from katgpt-speculative (Plan 389 pattern).
@@ -38,9 +38,9 @@ katgpt-kv, katgpt-transformer, serde). Pulling that for one function is overkill
 
 ## Tasks
 
-- [x] Create `katgpt-speculative/src/prefill.rs` with substrate code.
+- [x] Create `crates/katgpt-speculative/src/prefill.rs` with substrate code.
 - [x] Add `prefill = []` (not needed — always-on) and `maxsim = ["katgpt-core/maxsim"]` tracking flags to `katgpt-speculative/Cargo.toml`.
-- [x] Add `pub mod prefill;` to `katgpt-speculative/src/lib.rs` (no `pub use prefill::*;` — root re-exports the symbols it needs).
+- [x] Add `pub mod prefill;` to `crates/katgpt-speculative/src/lib.rs` (no `pub use prefill::*;` — root re-exports the symbols it needs).
 - [x] Rewrite root `src/speculative/prefill.rs` to keep only forward-coupled impls + `block_select_entmax`, re-export substrate from katgpt-speculative.
 - [x] Update root `Cargo.toml` feature: `maxsim` forwards to `katgpt-speculative/maxsim`.
 - [x] GOAT G3: `cargo check` (default / all-features / no-default) + tests.

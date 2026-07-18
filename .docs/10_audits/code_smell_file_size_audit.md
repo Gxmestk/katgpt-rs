@@ -31,21 +31,21 @@ throughout), zero `Arc<RwLock<HashMap>>`.
 
 | File | Was | Verdict |
 |---|---|---|
-| `src/dllm.rs` | 3078 | ✅ Split (Issue 166) — `dllm/mod.rs` 1924 + `tests.rs` 1163 |
-| `crates/katgpt-core/src/karc.rs` | 2597 | ✅ Split (Issue 169) — `karc/mod.rs` 2008 + `tests.rs` 589 |
+| `src/dllm.rs` | 3078 | ✅ Split (Issue 166) — `src/dllm/mod.rs` 1924 + `tests.rs` 1163 |
+| `crates/katgpt-core/src/karc.rs` | 2597 | ✅ Split (Issue 169) — `crates/katgpt-core/src/karc/mod.rs` 2008 + `tests.rs` 589 |
 | `crates/katgpt-forward/src/dd_tree.rs` | 2566 | ✅ Split (Issue 168) — `dd_tree/mod.rs` 179 + `tests.rs` 2387 (98% tests) |
-| `crates/katgpt-core/src/parallax_attn.rs` | 2524 | ✅ Split (Issue 167) — `parallax_attn/mod.rs` 973 + `tests.rs` 1559 |
-| `crates/katgpt-core/src/speculative/qmc.rs` | 2516 | ✅ Split (Issue 170) — `qmc/mod.rs` 1085 + `tests.rs` 1430 (57% tests) |
-| `crates/katgpt-core/src/manifold_bandit.rs` | 2196 | ✅ Split (Issue 171) — `manifold_bandit/mod.rs` 1290 + `tests.rs` 906 (41% tests) |
-| `crates/katgpt-forward/src/speculative/d2f.rs` | 2268 | ✅ Split (Issue 172) — `d2f/mod.rs` 1783 + `tests.rs` 485 (21% tests) |
-| `crates/katgpt-percepta/src/wasm/lower.rs` | 2248 | ✅ Split (Issue 173) — `wasm/lower/mod.rs` 1873 + `tests.rs` 375 (17% tests) |
-| `crates/katgpt-core/src/traits.rs` | 2203 | ✅ Split (Issue 174) — `traits/mod.rs` 1495 + 5 sibling test files (692 total) |
+| `crates/katgpt-core/src/parallax_attn.rs` | 2524 | ✅ Split (Issue 167) — `crates/katgpt-core/src/parallax_attn/mod.rs` 973 + `tests.rs` 1559 |
+| `crates/katgpt-core/src/speculative/qmc.rs` | 2516 | ✅ Split (Issue 170) — `crates/katgpt-core/src/speculative/qmc/mod.rs` 1085 + `tests.rs` 1430 (57% tests) |
+| `crates/katgpt-core/src/manifold_bandit.rs` | 2196 | ✅ Split (Issue 171) — `crates/katgpt-core/src/manifold_bandit/mod.rs` 1290 + `tests.rs` 906 (41% tests) |
+| `crates/katgpt-forward/src/speculative/d2f.rs` | 2268 | ✅ Split (Issue 172) — `crates/katgpt-forward/src/d2f/mod.rs` 1783 + `tests.rs` 485 (21% tests) |
+| `crates/katgpt-percepta/src/wasm/lower.rs` | 2248 | ✅ Split (Issue 173) — `crates/katgpt-percepta/src/wasm/lower/mod.rs` 1873 + `tests.rs` 375 (17% tests) |
+| `crates/katgpt-core/src/traits.rs` | 2203 | ✅ Split (Issue 174) — `crates/katgpt-core/src/traits/mod.rs` 1495 + 5 sibling test files (692 total) |
 | `src/pruners/bomber/players.rs` | 2828 | ✅ Functional split (Issue 175) — `players/` folder: mod.rs 155 + helpers.rs 783 + 7 player-type files + tests.rs 102 |
 | `crates/katgpt-pruners/src/vocab_channel_pruner.rs` | 2053 | ✅ Split (Issue 176 T1) — mod.rs 1183 (93% tests) |
 | `crates/katgpt-percepta/src/legacy.rs` | 2124 | ✅ Split (Issue 176 T2) — mod.rs 910 (57% tests) |
 | `crates/katgpt-core/src/funcattn.rs` | 2086 | ✅ Split (Issue 176 T3) — mod.rs 983 (53% tests) |
 | `crates/katgpt-dec/src/sheaf_admm.rs` | 2109 | ✅ Split (Issue 176 T4) — mod.rs 1222 (42% tests) |
-| `crates/katgpt-percepta/src/graph/types.rs` | 2055 | ✅ Split (Issue 176 T5) — `types/mod.rs` 1333 (35% tests) |
+| `crates/katgpt-percepta/src/graph/types.rs` | 2055 | ✅ Split (Issue 176 T5) — `crates/katgpt-percepta/src/graph/types/mod.rs` 1333 (35% tests) |
 | `crates/katgpt-ruliology/src/bandit.rs` | 2178 | ✅ Functional split (Issue 177) — `bandit/` folder: mod.rs 1289 + environment.rs + session.rs + shared_stats.rs + randopt.rs |
 | `crates/katgpt-speculative/src/dd_tree/mod.rs` | 2125 | ✅ Extracted Lodestar (Issue 178) — mod.rs 1866 + `lodestar.rs` 770 |
 | `crates/katgpt-speculative/src/weaver.rs` | 2817 | **CONFIRMED KEEP** — user-explicit skip (759 test lines; extraction leaves impl at 2058, 10 over soft limit) |

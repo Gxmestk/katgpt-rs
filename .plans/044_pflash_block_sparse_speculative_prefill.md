@@ -358,7 +358,7 @@ impl FlashPrefillConfig {
 Port `block_select` from `dflash/src/flashprefill_select.cpp`. This runs on CPU even in the GPU path (selection output is small — ~1100×16 entries at 128K context).
 
 ```rust
-// speculative/prefill.rs
+// src/speculative/prefill.rs
 
 /// Block selection: turns per-(q_block, k_block, head) scores into
 /// selected block indices per (q_block, head).
@@ -505,7 +505,7 @@ pub fn block_select_grid(
 Also add CPU fallback scorer:
 
 ```rust
-// speculative/prefill.rs
+// src/speculative/prefill.rs
 
 /// Block-sparse attention scorer (CPU fallback).
 ///
@@ -1030,7 +1030,7 @@ impl GpuFlashPrefillPass {
 ```
 
 ```rust
-// speculative/prefill.rs — compress_prompt_blocks and top-level API
+// src/speculative/prefill.rs — compress_prompt_blocks and top-level API
 
 /// Compress prompt using block-sparse selection (PFlash algorithm).
 ///

@@ -34,11 +34,11 @@ Goal: a compiling, tested, feature-gated module that exposes the public API surf
 - [x] **T1.1** Add Cargo feature `chunked_content_store = ["dep:papaya", "dep:blake3"]` to `katgpt-rs/crates/katgpt-core/Cargo.toml`. Ensure `papaya` and `blake3` are already present (they should be — verify via `cargo tree -p katgpt-core`).
 - [x] **T1.2** Create module `katgpt-rs/crates/katgpt-core/src/content_store/mod.rs` with module doc referencing Research 262 + this plan + the "no game IP / no chain IP" boundary.
 - [x] **T1.3** Add `#[cfg(feature = "chunked_content_store")] pub mod content_store;` to `katgpt-rs/crates/katgpt-core/src/lib.rs` (alphabetical).
-- [x] **T1.4** Define types in `content_store/types.rs`:
+- [x] **T1.4** Define types in `crates/katgpt-core/src/content_store/types.rs`:
   - `BlobId(pub [u8; 32])` — `#[repr(transparent)]`, `#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, bytemuck::Pod, bytemuck::Zeroable)]`.
   - `StoreStats { n_chunks_stored: u64, n_blobs_indexed: u64, total_bytes_stored: u64, total_bytes_logical: u64, dedup_ratio: f32 }` — `#[repr(C)]`.
   - `ChunkRange { offset: u64, length: u32 }` — for partial reads.
-- [x] **T1.5** Define traits in `content_store/trait.rs`:
+- [x] **T1.5** Define traits in `crates/katgpt-core/src/content_store/trait.rs`:
   - `pub trait ChunkedContentStore` — `put`, `get`, `get_chunk`, `prove_chunk`, `verify_proof` (assoc fn), `stats`. Match Research 262 §2.1 signature.
   - `pub trait ChunkFetcher` — `fn fetch(&self, chunk_hash: &[u8; 32]) -> Option<Vec<u8>>` plus `fn fetch_range(&self, blob_id: &BlobId, range: ChunkRange) -> Option<Vec<u8>>` for partial hydrate (caller may know only the range they need, e.g. LOD-0 only).
   - `pub trait ChunkingStrategy` — `fn chunk<'a>(&self, bytes: &'a [u8]) -> Vec<&'a [u8]>` (borrowed slices; zero-copy on read path).
@@ -46,20 +46,20 @@ Goal: a compiling, tested, feature-gated module that exposes the public API surf
   - `chunk_size` defaults to 64 KiB; configurable.
   - `chunk()` returns non-overlapping slices; final slice may be shorter.
   - Unit tests: empty input, exact multiple, partial last chunk, single-byte input.
-- [x] **T1.7** Implement `InMemoryChunkedStore` in `content_store/in_memory.rs`:
+- [x] **T1.7** Implement `InMemoryChunkedStore` in `crates/katgpt-core/src/content_store/in_memory.rs`:
   - Backed by `papaya::HashMap<[u8; 32], Vec<u8>>` for chunks (per AGENTS.md lock-free rule).
   - Backed by `papaya::HashMap<[u8; 32], BlobMetadata>` for blob index.
   - `BlobMetadata { n_chunks: u32, chunk_hashes: Box<[[u8; 32]]>, total_bytes: u64 }` — fixed-size fields where possible.
   - Implement all five `ChunkedContentStore` methods + `stats()`.
   - `get_chunk` returns `&[u8]` borrowed from the hashmap value (zero-copy).
-- [x] **T1.8** Add a binary Merkle root helper in `content_store/merkle.rs`:
+- [x] **T1.8** Add a binary Merkle root helper in `crates/katgpt-core/src/content_store/merkle.rs`:
   - `pub fn build_binary_merkle_root(hashes: &[[u8; 32]]) -> [u8; 32]` — pads to next power of 2 with zero hashes, builds bottom-up via `blake3::hash(left ‖ right)`.
   - `pub fn build_binary_merkle_proof(hashes: &[[u8; 32]], leaf_index: usize) -> Vec<[u8; 32]>` — O(log n) siblings.
   - `pub fn verify_binary_merkle_proof(leaf_hash: &[u8; 32], leaf_index: usize, siblings: &[[u8; 32]], root: &[u8; 32]) -> bool` — pure BLAKE3, no store access.
   - If Plan 253 `MerkleOctree`/`MerkleProof` already supports binary mode (depth = ⌈log₂ n⌉), reuse it; otherwise this module is the reference impl.
-- [x] **T1.9** Add a `MerkleProof` wrapper struct in `content_store/types.rs`:
+- [x] **T1.9** Add a `MerkleProof` wrapper struct in `crates/katgpt-core/src/content_store/types.rs`:
   - `pub struct MerkleProof { pub leaf_index: usize, pub siblings: Vec<[u8; 32]>, pub expected_root: [u8; 32] }` — matches the binary-tree shape.
-- [x] **T1.10** Write unit tests in `content_store/in_memory.rs` (`#[cfg(test)] mod tests`):
+- [x] **T1.10** Write unit tests in `crates/katgpt-core/src/content_store/in_memory.rs` (`#[cfg(test)] mod tests`):
   - `test_put_get_roundtrip` — put bytes, get them back, byte-identical.
   - `test_idempotent_put` — same bytes → same `BlobId`.
   - `test_dedup_chunks_shared` — two blobs with 50% shared chunks → chunk store has only 1.5× unique chunks (not 2×).
@@ -174,7 +174,7 @@ Goal: prove the gain. Required before promoting `chunked_content_store` to defau
   - Put all 100 into `InMemoryChunkedStore`.
   - Compute `StoreStats.dedup_ratio` = `total_bytes_logical / total_bytes_stored`.
   - Pass: ratio ≥ 5.0. Document actual value.
-  - **Status (2026-06-25):** DONE as inline `#[test]` (`content_store/goat.rs::g1_dedup_ratio_meets_target`)
+  - **Status (2026-06-25):** DONE as inline `#[test]` (`crates/katgpt-core/src/content_store/goat.rs::g1_dedup_ratio_meets_target`)
     instead of `benches/chunked_dedup.rs` — follows codebase convention and avoids `criterion` bench
     target in `Cargo.toml` (concurrent-edit collision). Scaled to 50 blobs × 10 chunks (640 KiB each)
     rather than 100 × 1 MiB to keep test memory <32 MiB. Uses `FixedSizeChunker` for deterministic
@@ -200,7 +200,7 @@ Goal: prove the gain. Required before promoting `chunked_content_store` to defau
     sibling lookups (zero BLAKE3 calls). **2088× improvement** (1.2ms → 588ns). Debug mode: 12.45µs
     (BLAKE3 debug overhead); perf gates run in release via `cargo test --release -- --ignored`.
 - [x] **T4.5** Implement G4 (light-client verify) check:
-  - Grep `content_store/merkle.rs` and `content_store/trait.rs`: assert no `chunks.get()`, no `blobs.get()`, no `self.chunks` access in `verify_proof` or `verify_binary_merkle_proof`.
+  - Grep `crates/katgpt-core/src/content_store/merkle.rs` and `crates/katgpt-core/src/content_store/trait.rs`: assert no `chunks.get()`, no `blobs.get()`, no `self.chunks` access in `verify_proof` or `verify_binary_merkle_proof`.
   - Pass: zero grep hits.
   - **Status (2026-06-25):** DONE. Verified at the TYPE SYSTEM level — `ChunkedContentStore::verify_proof`
     is an associated fn (no `&self`), and `verify_binary_merkle_proof` takes only `(leaf_hash, leaf_index,
@@ -278,12 +278,12 @@ These are game/chain semantics. They belong in `riir-ai`. See [riir-ai Plan 319]
 
 | File | Lines | Purpose |
 |---|---|---|
-| `katgpt-core/src/content_store/mod.rs` | ~30 | Module wiring, feature gate |
-| `katgpt-core/src/content_store/types.rs` | ~80 | `BlobId`, `StoreStats`, `ChunkRange`, `MerkleProof` |
+| `crates/katgpt-core/src/content_store/mod.rs` | ~30 | Module wiring, feature gate |
+| `crates/katgpt-core/src/content_store/types.rs` | ~80 | `BlobId`, `StoreStats`, `ChunkRange`, `MerkleProof` |
 | `katgpt-core/crates/katgpt-core/src/content_store/trait.rs` | ~80 | `ChunkedContentStore`, `ChunkFetcher`, `ChunkingStrategy` traits |
 | `katgpt-core/crates/katgpt-core/src/content_store/chunker.rs` | ~200 | `FixedSizeChunker`, `FastCdcChunker`, gear table |
-| `katgpt-core/src/content_store/in_memory.rs` | ~200 | `InMemoryChunkedStore` + unit tests |
-| `katgpt-core/src/content_store/merkle.rs` | ~150 | Binary Merkle root/proof/verify |
+| `crates/katgpt-core/src/content_store/in_memory.rs` | ~200 | `InMemoryChunkedStore` + unit tests |
+| `crates/katgpt-core/src/content_store/merkle.rs` | ~150 | Binary Merkle root/proof/verify |
 | `katgpt-core/crates/katgpt-core/src/content_store/fetcher.rs` | ~150 | `InMemoryChunkFetcher`, `FsChunkFetcher`, `NetChunkFetcher` stub, `TieredChunkFetcher` |
 | `crates/katgpt-core/examples/chunked_store_basic.rs` | ~80 | Usage example |
 | `.benchmarks/262_chunked_content_store_goat.md` | ~150 | G1–G7 results |

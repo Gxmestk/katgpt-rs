@@ -305,7 +305,7 @@ aggregation protocol in `rank_candidates` already handles metric-disagreement gr
   `katgpt-rs/crates/katgpt-core/src/mag/types.rs` (keeps `#[repr(u8)]`; update the
   enum doc comment count).
 
-- [x] **T3.2** Add match arm in `transfer_score` (`mag/transfer.rs`):
+- [x] **T3.2** Add match arm in `transfer_score` (`crates/katgpt-core/src/mag/transfer.rs`):
   ```rust
   TransferMetric::Recos => {
       let c = centroid(candidate.activations, d);

@@ -63,7 +63,7 @@ graph TD
 - [x] Implement `detect_prefix_failure()` — combine LeviathanVerifier rejection signal + CollapseDetector entropy spike + BanditPruner Q-value drop
 - [x] Implement `TrajectoryRefinedDraft` struct with configurable `max_refinement_steps: usize` (default: 2)
 - [x] Add feature gate `trd_refined_draft` in `Cargo.toml` with dependencies `["elf_sde", "bandit", "bt_rank"]`
-- [x] Add `#[cfg(feature = "trd_refined_draft")]` module declaration in `src/distill/mod.rs`
+- [x] Add `#[cfg(feature = "trd_refined_draft")]` module declaration in `crates/katgpt-speculative/src/distill/mod.rs`
 
 ### Phase 2: Branch Refinement
 

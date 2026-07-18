@@ -118,9 +118,9 @@ Episode 1..N:
 
 ## Tasks
 
-- [x] T1: Add `RolloutPolicy<S>` trait to `game_state/mod.rs`
+- [x] T1: Add `RolloutPolicy<S>` trait to `crates/katgpt-pruners/src/game_state/mod.rs`
 - [x] T2: Implement `RandomRolloutPolicy` (wraps existing random logic, for parity testing)
-- [x] T3: Implement `BanditRolloutPolicy<S>` in `game_state/mcts.rs`
+- [x] T3: Implement `BanditRolloutPolicy<S>` in `crates/katgpt-pruners/src/game_state/mcts.rs`
 - [x] T4: Add `action_index()` to `BomberAction` (stable arm mapping) — already existed as `as_usize()`
 - [x] T5: Refactor `mcts_search` to accept `&mut dyn RolloutPolicy<S>` (backward-compatible)
 - [x] T6: Implement `BanditBomberHeuristic` combining domain + bandit signals

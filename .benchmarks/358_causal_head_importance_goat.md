@@ -119,8 +119,8 @@ passthrough. `CalibrationMode::AttentionMass` is the `#[default]` variant.
 | `tests/causal_head_importance_g2.rs` | G2 bystander discrimination gate (3 tests, root tests/) |
 | `benches/causal_head_importance_g3.rs` | G3 latency bench (root benches/) |
 | `crates/katgpt-speculative/src/rt_turbo/calibration.rs` | `calibrate_from_causal_scores` sibling fn |
-| `src/rt_turbo/mod.rs` | Re-export `calibrate_from_causal_scores` |
-| `src/rt_turbo/forward.rs` | Fix struct literal (add `..Default::default()`) |
+| `crates/katgpt-speculative/src/rt_turbo/mod.rs` | Re-export `calibrate_from_causal_scores` |
+| `crates/katgpt-speculative/src/rt_turbo/forward.rs` | Fix struct literal (add `..Default::default()`) |
 | `tests/test_126_rt_turbo_goat.rs` | Fix struct literal |
 | `examples/rt_turbo_01_calibration.rs` | Step 6 causal-mode demo |
 | `examples/rt_turbo_02_decode_bench.rs` | Fix struct literal |

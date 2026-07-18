@@ -81,7 +81,7 @@ Causal models are far more amenable to symbolic approximation than bidirectional
 
 | Paper term | Codebase equivalent | Where it ships |
 |---|---|---|
-| "causal head replacement" / "interchange intervention" | causal intervention, `FaithfulnessProbe`, `Intervention::Empty/Shuffle/Corrupt/Irrelevant/Filler` | R244, Plan 278, `katgpt-core/src/faithfulness/probe.rs` |
+| "causal head replacement" / "interchange intervention" | causal intervention, `FaithfulnessProbe`, `Intervention::Empty/Shuffle/Corrupt/Irrelevant/Filler` | R244, Plan 278, `crates/katgpt-core/src/faithfulness/probe.rs` |
 | "program synthesis" / "executable program approximation" | spec → compiled rule, `SpecPruner`, `SpecChain`, `SpecProof` | R229, Plan 259, `katgpt-core/src/spec_compile` |
 | "best program per head" / "library re-ranking" | "best buddies" cross-system alignment, MAP-Elites library | R178, Plan 199/201 |
 | "hallucinated structural features" | `SmearClass::TokenSmear / SequenceSmear`, `SmearClassifier` | R277, Plan 298, `crates/katgpt-core/src/faithfulness/smear.rs` |

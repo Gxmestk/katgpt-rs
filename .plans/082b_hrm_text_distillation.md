@@ -21,7 +21,7 @@ HRM-Text achieves 1B-scale pretraining with ~$1000. While the hierarchical recur
 - [x] **T1: Adam-atan2 WGSL kernel** — Replace Adam update in training shaders
   - Created `crates/riir-gpu/src/kernels/adam_atan2.wgsl` with `atan2(m_hat, v_sqrt)` update
   - Struct layout matches `AdamWParams` (32 bytes with `_eps_reserved` and `_pad`)
-  - Registered in `kernels/mod.rs`: source constant, entry point, pipeline field, pipeline creation
+  - Registered in `riir-ai/crates/riir-gpu/src/kernels/mod.rs`: source constant, entry point, pipeline field, pipeline creation
   - CPU reference: `adam_atan2_step_cpu()` + `CpuAdamAtan2Step` in `optimizer.rs`
   - Bounded: |atan2(m, sqrt(v))| ≤ π/2 when v > 0, prevents LoRA weight explosion
   - No epsilon needed (atan2 handles near-zero naturally)

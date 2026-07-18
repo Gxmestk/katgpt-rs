@@ -179,7 +179,7 @@ fn coincidence_rate(replay: &GoReplay, state_seq: &[GoState]) -> f32 {
 
 ### Phase 2: Model-Based Prediction (riir-ai, Speculative)
 
-**Files:** `riir-engine/src/go_analytics.rs` or `riir-gpu/src/game/go.rs` extension
+**Files:** `riir-engine/src/go_analytics.rs` or `riir-ai/crates/riir-gpu/src/game/go.rs` extension
 
 | Task | Description | Dependencies |
 |---|---|---|

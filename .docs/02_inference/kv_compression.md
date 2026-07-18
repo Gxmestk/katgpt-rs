@@ -175,5 +175,5 @@ let config = AsymmetricKVConfig::default(); // key_bits=8, val_bits=3
 let cache = TurboQuantKVCache::new_asymmetric(&config);
 ```
 
-📁 `src/types.rs` — `AsymmetricKVConfig` · `src/benchmark.rs` — `bench_asymmetric_cross_method()` · `src/turboquant/kv_cache.rs` — `new_asymmetric()`
+📁 `src/types.rs` — `AsymmetricKVConfig` · `src/benchmark.rs` — `bench_asymmetric_cross_method()` · `crates/katgpt-quant/src/turboquant/kv_cache.rs` — `new_asymmetric()`
 🔧 Feature flag: `asymmetric_kv` (opt-in, depends on `turboquant`)

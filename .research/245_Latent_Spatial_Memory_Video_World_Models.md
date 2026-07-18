@@ -65,7 +65,7 @@ The mandatory two-layer novelty check (notes + shipped code, per the Research 24
 | Dynamic-object exclusion on write | `SpatialMemory` handles transience differently: confidence decay + prune (effect achieves the same goal — stale/transient content doesn't persist) | ✅ Equivalent goal, different mechanism |
 | Spatially-indexed latent content (generic) | `katgpt-core/src/sense/octree.rs::SenseOctreeBuilder` — KG embeddings → octree bit-planes + `TernaryDir` directions, Merkle-committed, MUX-latent bridge in `crates/katgpt-core/src/mux_latent/octree_bridge.rs` | ✅ Spatially-indexed latent store shipped |
 
-Plus **four** `SpatialBelief`/`GenericSpatialBelief<T>` structs shipped (`ns_csg.rs:238`, `spatial_cognition.rs:87`, `crowd_mcgs/types.rs:333`, `game_traits/spatial.rs:68`), all implementing the AGENTS.md two-brain model (info brain raw/synced, think brain latent/local, one-way bridge, `sigmoid(-λΔt)` confidence decay).
+Plus **four** `SpatialBelief`/`GenericSpatialBelief<T>` structs shipped (`ns_csg.rs:238`, `spatial_cognition.rs:87`, `riir-ai/crates/riir-games/src/crowd_mcgs/types.rs:333`, `riir-ai/crates/riir-games-shared/src/game_traits/spatial.rs:68`), all implementing the AGENTS.md two-brain model (info brain raw/synced, think brain latent/local, one-way bridge, `sigmoid(-λΔt)` confidence decay).
 
 ### 2.3 Why the paper's signature mechanism doesn't transfer to us
 

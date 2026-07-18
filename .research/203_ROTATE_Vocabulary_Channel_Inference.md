@@ -38,7 +38,7 @@ ROTATE (Rotation-Optimized Token Alignment in weighT spacE) is a data-free metho
 | `ConstraintPruner` trait | ✅ Shipped | `crates/katgpt-core/src/traits.rs` |
 | `ScreeningPruner` trait | ✅ Shipped | `crates/katgpt-core/src/traits.rs` |
 | DDTree + kurtosis integration | ✅ Shipped | `src/speculative/dd_tree.rs` |
-| Givens rotations | ✅ Shipped | `src/planar_quant/rotation.rs` |
+| Givens rotations | ✅ Shipped | `crates/katgpt-quant/src/planar_quant/rotation.rs` |
 | `sparse_matmul` | ✅ Shipped | MLP forward with dead ReLU skip |
 | CNA neuron attribution | ✅ Shipped | `src/pruners/cna.rs` |
 | Vocabulary projection (lm_head) | ✅ Exists | `crates/katgpt-percepta/src/transformer.rs` |

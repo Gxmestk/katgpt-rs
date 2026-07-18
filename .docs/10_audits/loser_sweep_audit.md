@@ -114,7 +114,7 @@ immediately to `crates/katgpt-deprecated/`:
 - [x] `feedback` — `crates/katgpt-deprecated/src/feedback.rs` → `katgpt-deprecated` (zero consumers) — **DONE 2026-07-01**
 - [x] `unit_distance` — `src/unit_distance/` + `tests/bench_unit_distance_goat.rs` + `tests/goat_090_tower_search.rs` → `katgpt-deprecated` (tests stay in root, resolve via re-export) — **DONE 2026-07-01**
 - [x] `alien_sampler` — `src/alien_sampler/` + `benches/alien_sampler_bench.rs` + `benches/alien_sampler_goat.rs` → `katgpt-deprecated` (benches stay in root, resolve via re-export) — **DONE 2026-07-01**
-- [-] `dense_mesh` — `src/dense_mesh/` + `tests/dense_mesh_goat_gates.rs` + `tests/prof_dense_mesh.rs` → **DEFERRED**. `node_transformer.rs` imports `crate::transformer::{forward, ForwardContext, ...}` — transformer-bound glue that can't leave root (same as `gdn2/forward.rs`, `hla/forward.rs` per Proposal 003 §"Stays in src/"). Stays in root as retained glue; exile blocked by the forward-vs-primitive seam.
+- [-] `dense_mesh` — `src/dense_mesh/` + `tests/dense_mesh_goat_gates.rs` + `tests/prof_dense_mesh.rs` → **DEFERRED**. `node_transformer.rs` imports `crate::transformer::{forward, ForwardContext, ...}` — transformer-bound glue that can't leave root (same as `crates/katgpt-attn/src/gdn2/forward.rs`, `riir-ai/crates/riir-engine/src/hla/forward.rs` per Proposal 003 §"Stays in src/"). Stays in root as retained glue; exile blocked by the forward-vs-primitive seam.
 
 ### Phase 3b — exile katgpt-core items (cross-crate, during Phase 10 absorption)
 

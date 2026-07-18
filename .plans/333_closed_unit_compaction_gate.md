@@ -26,7 +26,7 @@ Ship a generic, modelless, **rubric-gated trajectory compaction** primitive (`Cl
 
 ### Tasks
 
-- [x] **T1.1** Create module `src/compaction/mod.rs` with feature gate `#[cfg(feature = "closed_unit_compaction")]`. Re-export public API.
+- [x] **T1.1** Create module `crates/katgpt-core/src/compaction/mod.rs` with feature gate `#[cfg(feature = "closed_unit_compaction")]`. Re-export public API.
 - [x] **T1.2** Define `Rubric` trait in `crates/katgpt-core/src/compaction/rubric.rs`:
   ```rust
   pub trait Rubric {
@@ -41,7 +41,7 @@ Ship a generic, modelless, **rubric-gated trajectory compaction** primitive (`Cl
   With `RubricVerdict { predicates: [PredicateResult; ARITY] }` and `PredicateResult::{Yes { quote_start, quote_len }, No { reason }}`. Fixed-size arrays; no heap alloc in the verdict.
 - [x] **T1.3** Define `FireRule` enum in `crates/katgpt-core/src/compaction/fire_rule.rs`: `And(u8)`, `Or(u8)`, `Not(u8)`, `Box(Box, Box)`. Implement `fn evaluate(&self, verdict: &RubricVerdict) -> bool` (recursive, no alloc).
 - [x] **T1.4** Define `Backstop` enum in `crates/katgpt-core/src/compaction/backstop.rs`: `None`, `TokenPct(f32)`, `Never`. Implement `fn should_force(&self, prompt_len: usize, ctx_window: usize) -> bool`.
-- [x] **T1.5** Define `CompactionAuditRecord` in `src/compaction/audit.rs`: `#[derive(Clone, Copy, Debug, PartialEq)]`, fixed-size, `#[repr(C)]` for sync-boundary crossing. Fields per research note §2.3.
+- [x] **T1.5** Define `CompactionAuditRecord` in `crates/katgpt-core/src/compaction/audit.rs`: `#[derive(Clone, Copy, Debug, PartialEq)]`, fixed-size, `#[repr(C)]` for sync-boundary crossing. Fields per research note §2.3.
 - [x] **T1.6** Define `CompactionDecision` enum: `Compress { audit }`, `Continue { audit }`, `Forced { audit }`.
 - [x] **T1.7** Unit tests: `FireRule::And(0b1111)` returns true iff all 4 predicates Yes; `Or(0b0001)` returns true iff predicate 0 Yes; `Not(0)` returns true iff predicate 0 No; `Box(Or, And)` composes.
 - [x] **T1.8** Unit tests: `Backstop::TokenPct(0.30)` forces at 30% of ctx_window, doesn't force below.
@@ -56,7 +56,7 @@ Compiles with `cargo check --features closed_unit_compaction`. Unit tests pass. 
 
 ### Tasks
 
-- [x] **T2.1** Define `ClosedUnitCompactionGate<R: Rubric>` in `src/compaction/gate.rs`:
+- [x] **T2.1** Define `ClosedUnitCompactionGate<R: Rubric>` in `crates/katgpt-core/src/compaction/gate.rs`:
   ```rust
   pub struct ClosedUnitCompactionGate<R: Rubric> {
       rubric: R,
@@ -88,7 +88,7 @@ Compiles with `cargo check --features closed_unit_compaction`. Unit tests pass. 
 
 ### Tasks
 
-- [x] **T3.1** Implement `SearchRubric` in `src/compaction/rubrics/search.rs` with `ARITY = 4` (C1, C2, C3, N1). Predicates computed from a `TrajectoryFeatures` struct the caller supplies (coherence stability, intrinsic rank, divergence-since-last-summary, novelty rate) — **latent reframing per research note §2.4**, not LLM-judged.
+- [x] **T3.1** Implement `SearchRubric` in `crates/katgpt-core/src/compaction/rubrics/search.rs` with `ARITY = 4` (C1, C2, C3, N1). Predicates computed from a `TrajectoryFeatures` struct the caller supplies (coherence stability, intrinsic rank, divergence-since-last-summary, novelty rate) — **latent reframing per research note §2.4**, not LLM-judged.
 - [x] **T3.2** Define `TrajectoryFeatures { coherence: f32, intrinsic_rank: f32, divergence_since_last: f32, novelty_rate: f32 }`. Each feature is a scalar from existing primitives (latent_functor quality_gate, subspace_phase_gate, DEC codifferential, cgsp curiosity).
 - [x] **T3.3** Implement predicate sigmoids:
   - C1: `σ(β_c1 · (coherence − τ_c1))` → Yes iff > 0.5.
@@ -109,8 +109,8 @@ G1 PASSES (recall=1.000, FDR=0.000 on synthetic Figure-1 reproduction). `cargo t
 
 ### Tasks
 
-- [x] **T4.1** Implement `MathRubric` in `src/compaction/rubrics/math.rs` with `ARITY = 3` (Q1, Q2, Q3). Configure `fire_rule = Or(Q1_mask, And(Q2_mask | Q3_mask))` — paper's math rule.
-- [x] **T4.2** Implement `CacheReuseProbe` in `src/compaction/probe.rs`:
+- [x] **T4.1** Implement `MathRubric` in `crates/katgpt-core/src/compaction/rubrics/math.rs` with `ARITY = 3` (Q1, Q2, Q3). Configure `fire_rule = Or(Q1_mask, And(Q2_mask | Q3_mask))` — paper's math rule.
+- [x] **T4.2** Implement `CacheReuseProbe` in `crates/katgpt-core/src/compaction/probe.rs`:
   - `pub fn probe_append(&self, trajectory: &mut Vec<u8>, rubric_prompt: &[u8]) -> ProbeToken` — appends rubric prompt to trajectory (preserving KV cache), returns token for revert.
   - `pub fn revert(&self, trajectory: &mut Vec<u8>, token: ProbeToken)` — removes the appended prompt on CONTINUE (no cache pollution).
   - `pub fn summarize(&self, trajectory: &[u8], summarizer_prompt: &[u8]) -> Summary` — caller-supplied summarizer (LLM or chain_fold); CUCG itself does not summarize.

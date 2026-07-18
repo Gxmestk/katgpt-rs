@@ -84,7 +84,7 @@ Generic HOSVD on flat `&[f32]` + shape descriptor. Pure numeric, no shard/chain/
 - [x] **T1.6** Implement `tucker_reconstruct_into(core, factors, shape, out: &mut [f32])` — inverse `X̃ = S ×_1 U^(1) ×_2 U^(2) × … ×_N U^(N)`
 - [x] **T1.7** Implement `TuckerResultScratch` (SOA, hot-path) + `TuckerResult::from_scratch` convenience (owned)
 - [x] **T1.8** Add `tucker_factorization = ["subspace_phase_gate"]` to `Cargo.toml` features (initially OFF)
-- [x] **T1.9** Register `pub mod tucker;` in `linalg/mod.rs` + re-exports in `lib.rs`
+- [x] **T1.9** Register `pub mod tucker;` in `crates/katgpt-core/src/linalg/mod.rs` + re-exports in `lib.rs`
 - [x] **T1.10** Unit tests: known-rank tensor recovery, orthogonality of factors, core energy bound, reconstruction error monotonic in ranks (25 tests, all PASS)
 
 ### Phase 1 GOAT gate

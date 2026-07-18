@@ -44,7 +44,7 @@ next-session candidate for re-audit. The documented blocker was
 - [x] **T2** — Update `katgpt-forward/Cargo.toml`: added `domain_latent`, `kog_cpu_fusion`,
   `kog_cpu_fusion = ["katgpt-transformer/kog_cpu_fusion"]` features (forward trio reads
   these via `#[cfg(feature = ...)]`).
-- [x] **T3** — Update `katgpt-forward/src/lib.rs`: declared `pub mod forward;` +
+- [x] **T3** — Update `crates/katgpt-forward/src/lib.rs`: declared `pub mod forward;` +
   `pub use forward::*;` so root can `use katgpt_forward::forward_base;` etc.
 - [x] **T4** — In `crates/katgpt-percepta/src/transformer.rs`: deleted moved code (1057 LOC), replaced with
   `pub use katgpt_forward::forward;` (for callers) and
@@ -63,7 +63,7 @@ next-session candidate for re-audit. The documented blocker was
   + `katgpt_transformer::{MultiLayerKVCache, TransformerWeights}`. Same for `Config`/`Rng`
   via `katgpt_core::types::`. The `super::traits::DenseNode` / `super::types::*`
   references become `katgpt_transformer::dense_mesh::{traits::DenseNode, types::*}`.
-- [x] **T7** — Updated `src/dense_mesh/mod.rs` shim: re-export from katgpt-forward.
+- [x] **T7** — Updated `crates/katgpt-transformer/src/dense_mesh/mod.rs` shim: re-export from katgpt-forward.
 - [x] **T8** — GOAT gate G3 PASS. `cargo check --workspace` clean on default /
   all-features / no-default-features. katgpt-forward lib tests: 12/12 (8 hla_forward
   + 4 dense_mesh_node_transformer) with --all-features. Root lib tests: 769/769

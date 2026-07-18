@@ -138,7 +138,7 @@ JS selection uses *no* reward information, yet high-JS tokens correlate strongly
 | Rényi entropy metric | `bench_120_renyi_efficiency.rs` (Plan 122 T6, α=2.5) | ✅ tokenizer metric, different domain |
 | JS divergence proxy | `kl_divergence` with "Symmetric KL (Jensen-Shannon proxy)" (Plan 085 Deep Manifold) | ✅ exists, used for boundary alignment, not selector |
 | Novelty filter (L2) | `IdeaDivergence::is_novel` (Plan 191, L2 norm) | ⚠️ L2, not JS — paper proves JS is the right metric (A.5) |
-| Second/third moments | `HlaQHeadState::mq`, `HlaQHeadState::third_order` (riir-engine `hla/types.rs`) | ✅ for residual stream, not policy distribution |
+| Second/third moments | `HlaQHeadState::mq`, `HlaQHeadState::third_order` (riir-engine `riir-ai/crates/riir-engine/src/hla/types.rs`) | ✅ for residual stream, not policy distribution |
 | `advantage_margin` gate | `ReconstructionConfig::advantage_margin_threshold` (Plan 242) | ✅ related concept, different math |
 | Reliability gate (CLR) | `(mean_m v_k,m)^M` (Plan 284, default-on) | ✅ closest cousin — **different math** (mean^M not Σ π²; per-completion not per-step) |
 | Coherence-decay re-estimation | `latent_functor/reestimation.rs::tick` (Plan 303/305) | ✅ orthogonal signal — coherence decay ≠ JS-uniqueness |

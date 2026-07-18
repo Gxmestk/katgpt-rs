@@ -78,7 +78,7 @@ The distillation principle (per global AGENTS.md and the research skill): extrac
 
 ### 2.2 The modelless LOG/PLAN instantiation (the GOAT)
 
-The per-NPC tick currently runs as a **single-pass** 9-layer personality-weighted composition (`entity_cognition/mod.rs`): layers produce direction vectors → `PersonalityWeightedComposition` blends them → `DriftGate` fires on coherence change → `FreezeTrigger` snapshots when `‖Δw‖ > δ_drift`. Memory operations (shard reads/writes, KG triple emission, Engram admission, AnyRAG escalation) happen **implicitly** as side effects of layer updates and the freeze trigger. There is no explicit "what should I write to memory?" or "what should I retrieve before acting?" decision gate.
+The per-NPC tick currently runs as a **single-pass** 9-layer personality-weighted composition (`riir-ai/crates/riir-engine/src/entity_cognition/mod.rs`): layers produce direction vectors → `PersonalityWeightedComposition` blends them → `DriftGate` fires on coherence change → `FreezeTrigger` snapshots when `‖Δw‖ > δ_drift`. Memory operations (shard reads/writes, KG triple emission, Engram admission, AnyRAG escalation) happen **implicitly** as side effects of layer updates and the freeze trigger. There is no explicit "what should I write to memory?" or "what should I retrieve before acting?" decision gate.
 
 AutoMem's LOG/PLAN pattern, applied via probe/draft/pruner, makes these decisions explicit:
 

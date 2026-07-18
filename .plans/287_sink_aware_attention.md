@@ -95,7 +95,7 @@ Wire the new classifier into the broader `data_probe` family so it composes with
 - [x] **T4.1** `LayerSinkSummary` added to `crates/katgpt-core/src/data_probe/geometry.rs`: `layer_index`, `n_nop_sinks`, `n_broadcast_sinks`, `dominant_kind`, `mean_broadcast_value_norm`. *(2026-06-17)*
 - [x] **T4.2** `summarize_layer_sinks(attn_per_head, values_per_head, cfg, scratch, layer_index) -> LayerSinkSummary`. Runs classifier across all heads; aggregates via plurality vote.
 - [x] **T4.3** Example `examples/sink_phase_plot.rs`. Synthetic ViT-like activations; layers 0-3 NOP-dominant (zero CLS value), layers 4-7 would-be Broadcast (showing as None since `classify_all_sinks` doesn't pass `update_O` — documented in example output).
-- [x] **T4.4** Cross-reference in `src/data_probe/mod.rs` doc: classifier is mechanism locator, `effective_rank` is aggregate symptom.
+- [x] **T4.4** Cross-reference in `crates/katgpt-core/src/data_probe/mod.rs` doc: classifier is mechanism locator, `effective_rank` is aggregate symptom.
 
 ---
 

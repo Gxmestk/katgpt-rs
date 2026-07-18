@@ -27,7 +27,7 @@ Ship the **channel-wise geometric product** `uv = u·v + u∧v` as a modelless, 
   - `pub fn cyclic_shift_into(src: &[f32], dim: usize, shift: usize, out: &mut [f32])` — zero-alloc cyclic channel shift `T_s`. Handles wrap-around. Documented with the anti-symmetric sign caveat (Research 299 §5 Q4).
   - `pub fn geometric_product_into(u, v, dim, shifts, dot_out, wedge_out, scratch_u, scratch_v)` — accumulates `Σ_s SiLU(u ⊙ T_s(v))` into `dot_out` and `Σ_s (u ⊙ T_s(v) − T_s(u) ⊙ v)` into `wedge_out`. Zero alloc after scratch init.
   - SIMD chunking hint (4-wide) on inner channel loop, mirroring `dec/operators.rs::exterior_derivative_into` pattern.
-- [x] **T1.3** Gate the module behind `#[cfg(feature = "geometric_product")]` and re-export from `linalg/mod.rs`. Also broadened the top-level `pub mod linalg` gate in `lib.rs` from `#[cfg(feature = "karc_forecaster")]` to `#[cfg(any(feature = "karc_forecaster", feature = "geometric_product"))]` so the linalg module compiles when only `geometric_product` is on.
+- [x] **T1.3** Gate the module behind `#[cfg(feature = "geometric_product")]` and re-export from `crates/katgpt-core/src/linalg/mod.rs`. Also broadened the top-level `pub mod linalg` gate in `lib.rs` from `#[cfg(feature = "karc_forecaster")]` to `#[cfg(any(feature = "karc_forecaster", feature = "geometric_product"))]` so the linalg module compiles when only `geometric_product` is on.
 - [x] **T1.4** Unit tests (same file, `#[cfg(test)]`) — **15 tests, all pass**:
   - `wedge_is_antisymmetric`: `geometric_product_into(u, v, ...) == -geometric_product_into(v, u, ...)` on the wedge output. ✅
   - `wedge_self_is_zero`: `u ∧ u = 0` (anti-symmetry implies `x∧x=0`). ✅

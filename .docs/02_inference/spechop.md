@@ -25,7 +25,7 @@ SpecHop extends speculative execution from **token-level** to **hop-level** (too
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
 │                        SpecHopPipeline                              │
-│                     (src/spechop/pipeline.rs)                       │
+│                     (crates/katgpt-speculative/src/spechop/pipeline.rs)                       │
 │                                                                     │
 │  ┌─────────────┐    ┌─────────────┐    ┌──────────────────────┐    │
 │  │   Config     │    │  Speculator │    │      Verifier        │    │
@@ -383,7 +383,7 @@ spechop = ["bandit"]  # Continuous multi-hop speculation pipeline (Plan 131)
 #[cfg(feature = "spechop")]
 pub mod spechop;
 
-// spechop/mod.rs — segment_match is gated on both features
+// crates/katgpt-speculative/src/spechop/mod.rs — segment_match is gated on both features
 #[cfg(all(feature = "spechop", feature = "cache_prune"))]
 pub mod segment_match;
 ```

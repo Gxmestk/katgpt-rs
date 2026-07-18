@@ -51,7 +51,7 @@ Compositional Muon (CM) extends Muon's matrix-level steepest descent to **compos
 | Parallax local linear attention | ✅ Shipped | `crates/katgpt-core/src/parallax_attn.rs` | Kernel-agnostic covariance correction |
 | Trust-Region Adaptive Speculation | 📋 Research 162 | P_accept = min(πT/πS, 1) | Trust region = compositional budget |
 | NDS curvature proxy | 📋 Research 166 | Spectral entropy → DDTree budget | Partner norm ≈ NDS inverse |
-| SIMD matmul + transpose | ✅ Shipped | `src/simd.rs` | Needed for Gram computation |
+| SIMD matmul + transpose | ✅ Shipped | `crates/katgpt-dec/src/simd.rs` | Needed for Gram computation |
 
 ---
 

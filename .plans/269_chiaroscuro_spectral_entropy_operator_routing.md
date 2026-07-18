@@ -42,8 +42,8 @@ Composed with existing infra (no duplication):
 
 ### Phase 1: Foundation — Per-Token Spectral Entropy + Streaming τ
 
-- [x] **T1:** Create `src/chiaroscuro/mod.rs` — module root, public API, feature gate
-- [x] **T2:** Create `src/chiaroscuro/entropy.rs` — `spectral_entropy_dct()` and zero-alloc variant
+- [x] **T1:** Create `crates/katgpt-attn/src/chiaroscuro/mod.rs` — module root, public API, feature gate
+- [x] **T2:** Create `crates/katgpt-attn/src/chiaroscuro/entropy.rs` — `spectral_entropy_dct()` and zero-alloc variant
   - Type-II DCT via `rustfft` (mirroring `crates/katgpt-core/src/flow/fft.rs` pattern)
   - SIMD-accelerated sum-of-p log p
   - Bounded to [0, 1] via `log d` normalization
@@ -92,7 +92,7 @@ Composed with existing infra (no duplication):
 
 - [x] **T13:** Feature flag `chiaroscuro` in `Cargo.toml` (opt-in, GOAT-proven)
 - [x] **T14:** Module declaration in `src/lib.rs`
-- [x] **T15:** Integration hook into `InferenceRouter` — `ChiarRouterHook` added to `src/chiaroscuro/mod.rs`, wired into `InferenceRouter` behind `#[cfg(feature = "chiaroscuro")]`. Exposes `observe_chiar_key()`, `observe_chiar_prompt_token()`, `chiar_stats()` methods + `RouterStats.chiar_stats` field. Observation-only (does NOT influence tier routing). 3 integration tests pass.
+- [x] **T15:** Integration hook into `InferenceRouter` — `ChiarRouterHook` added to `crates/katgpt-attn/src/chiaroscuro/mod.rs`, wired into `InferenceRouter` behind `#[cfg(feature = "chiaroscuro")]`. Exposes `observe_chiar_key()`, `observe_chiar_prompt_token()`, `chiar_stats()` methods + `RouterStats.chiar_stats` field. Observation-only (does NOT influence tier routing). 3 integration tests pass.
 - [x] **T16:** Cross-feature composition documented (orthogonal to kvarn, spectral_quant, still_kv, vortex_flow)
 
 ### Phase 7: Tests, Examples, GOAT Proof

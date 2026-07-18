@@ -36,15 +36,15 @@ Ship the **generic, IP-free half** of the CWM Super-GOAT (Research 275):
 
 ### Tasks
 
-- [x] **T1.1** Create `katgpt-rs/crates/katgpt-core/src/induced_cwm/mod.rs` with module-level docs that mirror Research 275 §2.1: this is the open half of the CWM primitive; the LLM-induction pipeline lives in riir-ai. Re-export from `katgpt-core/src/lib.rs` gated by `induced_cwm` feature.
+- [x] **T1.1** Create `katgpt-rs/crates/katgpt-core/src/induced_cwm/mod.rs` with module-level docs that mirror Research 275 §2.1: this is the open half of the CWM primitive; the LLM-induction pipeline lives in riir-ai. Re-export from `crates/katgpt-core/src/lib.rs` gated by `induced_cwm` feature.
 - [x] **T1.2** Add `induced_cwm = []` and `induced_cwm_ismcts = ["induced_cwm"]` to `katgpt-core/Cargo.toml` `[features]`. (`induced_cwm_ismcts` dropped the `game_state` dep — that feature lives in the ROOT crate, not katgpt-core; the only thing Phase 2 needs is `induced_cwm` itself, since `GameState` is already in `katgpt-core/src/traits.rs`.) Also added forwarding features to root `katgpt-rs/Cargo.toml`.
-- [x] **T1.3** Define `pub trait InducedCwmKernel: GameState` in `induced_cwm/kernel.rs` — exact design as planned (marker trait + `canonical_bytes` + default `commitment`).
-- [x] **T1.4** Define `CwmCommitment` in `induced_cwm/commitment.rs`. **DEViates from plan**: dropped `snapshot_id: Uuid` in favour of `version: u64`, following the established `micro_belief::MicroRecurrentKernelSnapshot` precedent (UUID is deferred to the swap-event layer in riir-ai Plan 326). The `uuid` crate is not currently a katgpt-core/katgpt-rs dependency; adding it for one unread field is scope-creep. Documented in the file-level rustdoc with the AGENTS.md rule citation. Kept `blake3` + `created_at_tick` as planned.
-- [x] **T1.5** Define `pub trait BeliefInferenceFn<S: GameState>` in `induced_cwm/belief.rs` — exact design as planned, with `type Sample` associated type and the posterior-support contract documented.
+- [x] **T1.3** Define `pub trait InducedCwmKernel: GameState` in `crates/katgpt-core/src/induced_cwm/kernel.rs` — exact design as planned (marker trait + `canonical_bytes` + default `commitment`).
+- [x] **T1.4** Define `CwmCommitment` in `crates/katgpt-core/src/induced_cwm/commitment.rs`. **DEViates from plan**: dropped `snapshot_id: Uuid` in favour of `version: u64`, following the established `micro_belief::MicroRecurrentKernelSnapshot` precedent (UUID is deferred to the swap-event layer in riir-ai Plan 326). The `uuid` crate is not currently a katgpt-core/katgpt-rs dependency; adding it for one unread field is scope-creep. Documented in the file-level rustdoc with the AGENTS.md rule citation. Kept `blake3` + `created_at_tick` as planned.
+- [x] **T1.5** Define `pub trait BeliefInferenceFn<S: GameState>` in `crates/katgpt-core/src/induced_cwm/belief.rs` — exact design as planned, with `type Sample` associated type and the posterior-support contract documented.
 - [x] **T1.6** Define `TransitionUnitTest<S>` + `verify_transition` in `crates/katgpt-core/src/induced_cwm/unit_test.rs`. **DEViates from plan**: dropped the `kernel: &K` parameter — it's redundant with `test.pre: S` since `GameState::advance(&self, action, pid)` is called on the state itself, not via a separate kernel object. The `InducedCwmKernel` bound on `S` enforces kernel-ness. Matches how existing `mcts_search(state: &S, ...)` works. Documented in `verify_transition` rustdoc.
 - [x] **T1.7** Add `pub fn make_transition_tests_from_trajectory<S, I>` helper in `unit_test.rs`.
-- [x] **T1.8** Added `#[cfg(test)] mod tests` in `induced_cwm/tests.rs` covering all 4 planned categories (canonical_bytes determinism, transition test pass/fail, belief sampler count, serde roundtrip, plus commitment hash/eq and version-doesn't-affect-blake3). 17 tests, all pass.
-- [x] **T1.9** Re-exported everything from `induced_cwm/mod.rs` and from `katgpt-core/src/lib.rs` under `#[cfg(feature = "induced_cwm")]`.
+- [x] **T1.8** Added `#[cfg(test)] mod tests` in `crates/katgpt-core/src/induced_cwm/tests.rs` covering all 4 planned categories (canonical_bytes determinism, transition test pass/fail, belief sampler count, serde roundtrip, plus commitment hash/eq and version-doesn't-affect-blake3). 17 tests, all pass.
+- [x] **T1.9** Re-exported everything from `crates/katgpt-core/src/induced_cwm/mod.rs` and from `crates/katgpt-core/src/lib.rs` under `#[cfg(feature = "induced_cwm")]`.
 
 ### Phase 1 deviations summary
 
@@ -105,7 +105,7 @@ katgpt-rs/examples/
 
 ### Tasks
 
-- [x] **T3.1** `pub struct ValueFnTournament<S, V>` defined in `induced_cwm/tournament.rs` with `candidates: Vec<V>`, `games_per_match: usize`, `rng_seed: u64`, plus `ply_cap: u32` and `mcts_budget: usize`. `run(&self, initial_state: &S, baseline: &dyn Fn(&S, u8) -> S::Action) -> TournamentWinner<S, V>`. **DEViates from plan**: dropped `kernel: &K` parameter — redundant with `initial_state: &S` under the codebase's `GameState` convention (state IS the kernel — see Phase 1 T1.6 deviation). Matches Phase 2's `ismcts_search_with_inference<S, B>(...)` shape. Also added `mcts_budget` parameter so the search depth is configurable per tournament (held constant across candidates).
+- [x] **T3.1** `pub struct ValueFnTournament<S, V>` defined in `crates/katgpt-core/src/induced_cwm/tournament.rs` with `candidates: Vec<V>`, `games_per_match: usize`, `rng_seed: u64`, plus `ply_cap: u32` and `mcts_budget: usize`. `run(&self, initial_state: &S, baseline: &dyn Fn(&S, u8) -> S::Action) -> TournamentWinner<S, V>`. **DEViates from plan**: dropped `kernel: &K` parameter — redundant with `initial_state: &S` under the codebase's `GameState` convention (state IS the kernel — see Phase 1 T1.6 deviation). Matches Phase 2's `ismcts_search_with_inference<S, B>(...)` shape. Also added `mcts_budget` parameter so the search depth is configurable per tournament (held constant across candidates).
 - [x] **T3.2** `PlayerStats { wins, losses, draws, score }` with `Display` impl, plus `win_rate()`, `avg_reward()`, `games()` accessors. Chess-style scoring (win=1, draw=0.5, loss=0). Added `score: f32` instead of plan's `avg_reward: f32` because `avg_reward` is derived from `score / games()` — keeping the raw sum lets callers compute different aggregations later.
 - [x] **T3.3** Self-contained flat-UCB1 MCTS in `tournament.rs`. **DEViates from plan**: cannot reuse `mcts_search` because it lives in the ROOT crate (`katgpt-rs/crates/katgpt-pruners/src/game_state/mcts.rs`), and `katgpt-core` cannot depend on the root crate (circular dep — same constraint Phase 2 hit). The tournament measures *relative* heuristic strength, so absolute search quality is irrelevant as long as it's held constant across candidates — the mirrored MCTS satisfies this. Documented in `tournament.rs` module-level rustdoc.
 - [x] **T3.4** 10 unit tests in `tournament.rs` `#[cfg(test)] mod tests` (all pass): `PlayerStats` default/record/display, tournament picks Advance over Constant/Stall, head-to-head matrix consistency, tournament determinism given seed, empty-candidates panic, `seed_for_match` distinctness, `pick_ucb1` unvisited-first + max-UCB1. Mock is `RaceState` (race-to-N, GOAL=25) — GOAL > 2*MCTS_ROLLOUT_DEPTH_CAP forces the heuristic to be the only signal in MCTS leaf eval.
@@ -133,7 +133,7 @@ katgpt-rs/examples/
 
 ### Tasks
 
-- [x] **T4.1** In `induced_cwm/hot_swap.rs`, added:
+- [x] **T4.1** In `crates/katgpt-core/src/induced_cwm/hot_swap.rs`, added:
   ```rust
   /// Hot-swap slot for an induced CWM kernel, using the same atomic Arc
   /// pattern as LoRAWeightVersion. Readers never see a torn snapshot.

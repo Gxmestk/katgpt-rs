@@ -80,7 +80,7 @@ promotion to `default`.
 ### Tasks
 
 - [x] **T0.1** Add Cargo feature `analytic_lattice = []` to `katgpt-rs/crates/katgpt-core/Cargo.toml`. NOT default-on. (Name changed from `analytic_lattice_encoder` — the encoder is dropped per revision note; this flag now covers only the math primitives + traits that stay in katgpt-core.)
-- [x] **T0.2** Create `analytic_lattice/mod.rs` with module doc + sub-module declarations. **Note:** the originally-planned `encoder.rs` submodule is DROPPED (redundant with `fourier/encoder.rs`). New submodule set: `asoc.rs`, `chain.rs`, `batch_chain.rs`, `decoder.rs`, `audit.rs`.
+- [x] **T0.2** Create `crates/katgpt-core/src/analytic_lattice/mod.rs` with module doc + sub-module declarations. **Note:** the originally-planned `encoder.rs` submodule is DROPPED (redundant with `riir-ai/crates/riir-engine/src/fourier/encoder.rs`). New submodule set: `asoc.rs`, `chain.rs`, `batch_chain.rs`, `decoder.rs`, `audit.rs`.
 - [x] **T0.3** Define the typed-slot lattice vector and transport operator:
 
 ```rust
@@ -98,7 +98,7 @@ pub struct TransportOperator {
 }
 ```
 
-- [x] **T0.4** Wire into `katgpt-core/src/lib.rs` behind the feature flag.
+- [x] **T0.4** Wire into `crates/katgpt-core/src/lib.rs` behind the feature flag.
 
 ---
 
@@ -647,6 +647,6 @@ verifier (spectral audit) behind `analytic_lattice_encoder` feature flag.
 7-gate GOAT (G1 determinism, G1b non-blocking contract, G2 ranking, G3
 associativity, G4 latency + batch speedup, G5 zero-alloc, G6 spectral audit).
 Promotes to default if all pass. The originally-planned `AnalyticLatticeEncoder`
-trait is DROPPED — redundant with the already-shipped `fourier/encoder.rs`.
+trait is DROPPED — redundant with the already-shipped `riir-ai/crates/riir-engine/src/fourier/encoder.rs`.
 Game-side schemas live in riir-ai (Plan 339 demo, R162 guide). Math is generic —
 no game IP leaks to katgpt-rs.

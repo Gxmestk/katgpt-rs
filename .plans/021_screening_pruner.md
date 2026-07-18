@@ -92,7 +92,7 @@ Upgrade the binary `ConstraintPruner` (`is_valid -> bool`) to a continuous `Scre
 | `katgpt-rs/src/speculative/mod.rs` | Export new types |
 | `katgpt-rs/src/wasm/` | Update `WasmPruner` to support `ScreeningPruner` |
 | `riir-validator-sdk/crates/katgpt-claim/src/claim_rubric/validator.rs` | Add `relevance()` to `Validator` trait with default |
-| `riir-validator-sdk/src/exports.rs` | Add `relevance` WASM export with Q16.16 |
+| `riir-ai/crates/riir-validator-sdk/src/exports.rs` | Add `relevance` WASM export with Q16.16 |
 | `katgpt-rs/README.md` | Add ScreeningPruner architecture section |
 
 ---

@@ -4,8 +4,8 @@
 
 ## Tasks
 
-- [x] T1: Define `BomberFrozenBandit` `repr(C)` struct in `bomber/mod.rs`
-- [x] T2: Define `GoFrozenBandit` + `GoFrozenTemplates` `repr(C)` structs in `go/types.rs`
+- [x] T1: Define `BomberFrozenBandit` `repr(C)` struct in `src/pruners/bomber/mod.rs`
+- [x] T2: Define `GoFrozenBandit` + `GoFrozenTemplates` `repr(C)` structs in `crates/katgpt-pruners/src/go/types.rs`
 - [x] T3: Add `freeze()` / `thaw()` methods to `HLPlayer` (bomber)
 - [x] T4: Add `freeze()` / `thaw()` methods to `GZeroPlayer` (bomber)
 - [x] T5: Add `freeze()` / `thaw()` methods to `GoHLPlayer`
@@ -49,7 +49,7 @@ pub struct BomberFrozenBandit {
 }
 // Total: 4 + 4 + 28 + 28 + 4 + 7 + 16 = 91 bytes, padded to 92
 
-// go/types.rs
+// crates/katgpt-pruners/src/go/types.rs
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
 pub struct GoFrozenBandit {

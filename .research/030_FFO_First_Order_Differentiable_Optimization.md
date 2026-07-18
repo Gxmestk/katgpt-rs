@@ -117,7 +117,7 @@ The layer replaces f(x, y*) with cᵀy*(x) where c = detach(∂F/∂y*). This me
 |----------|-----------|-----------------|------|--------|
 | P0 | KKT Schur complement exact solver | riir-gpu LoRA/domain-latent training | Replace AdamW iterations with 1-shot exact solve for QP subproblems | Medium |
 | P1 | Dual-cutoff active constraint masking | ScreeningPruner variant | Better constraint activation via bandit Q-values (analogous to duals) | Small |
-| P2 | Cholesky-accelerated HLA kernel | `src/hla/kernel.rs` | Marginal throughput on AHLA update — Cholesky vs iterative solve | Medium |
+| P2 | Cholesky-accelerated HLA kernel | `riir-ai/crates/riir-engine/src/hla/kernel.rs` | Marginal throughput on AHLA update — Cholesky vs iterative solve | Medium |
 | P3 | Finite-difference hypergradient | Already covered by DDTree + BanditPruner | None — already captured by modelless distillation | N/A |
 
 ### P0: KKT Schur Complement for riir-gpu

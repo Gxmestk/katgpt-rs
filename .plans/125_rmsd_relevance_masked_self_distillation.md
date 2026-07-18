@@ -55,7 +55,7 @@ Combined: loss[t] = sdar_gate(Δt) * is_relevant(t) * reverse_kl[t]
 | `LossMask` | `riir-gpu/src/training_loop.rs` | Binary token mask — **extend with relevance scoring** |
 | `SdarBanditPruner<P>` | `crates/katgpt-pruners/src/sdar/mod.rs` | Modelless SDAR bandit — **extend with magnitude pre-filter** |
 | `RubricReward` | `riir-gpu/src/ropd/` | Rubric scoring — reuse judge infrastructure |
-| `VerifierClient` | `riir-gpu/src/ropd/client.rs` | Judge client — **repurpose for token selection** |
+| `VerifierClient` | `riir-ai/crates/riir-gpu/src/ropd/client.rs` | Judge client — **repurpose for token selection** |
 | `LeviathanVerifier` | Referenced in research 040 | LoRA-as-Judge — use as token relevance judge |
 | `ScreeningPruner` trait | `katgpt-rs-core/src/traits.rs` | Relevance scoring — analogue for modelless path |
 | `freeze()`/`thaw()` | `src/pruners/bomber/players.rs` | Bandit knowledge persistence — reuse pattern |
@@ -622,7 +622,7 @@ src/pruners/
 ├── mod.rs                    # MOD: Add rmsd_relevance module behind feature gate
 ├── bomber/
 │   └── rmsd_player.rs        # NEW: RmsdPlayer for bomber arena
-├── bomber/mod.rs             # MOD: Add rmsd_player module behind feature gate
+├── src/pruners/bomber/mod.rs             # MOD: Add rmsd_player module behind feature gate
 └── Cargo.toml                # MOD: Add rmsd_distill feature
 
 tests/

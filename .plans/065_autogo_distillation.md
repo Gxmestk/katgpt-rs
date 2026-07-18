@@ -529,15 +529,15 @@ Using `reqwest::blocking::Client` because:
 | GameState model | `.raw/autogo/src/alpha_go/play.py:GameState` | `autogo_client.rs` (note: `human_color` field) |
 | MoveRequest model | `.raw/autogo/src/alpha_go/play.py:MoveRequest` | `autogo_client.rs` (note: `pass_move: bool` field) |
 | Self-play | `.raw/autogo/src/alpha_go/self_play.py` | `g_zero_player.rs` |
-| MCTS | `.raw/autogo/src/alpha_go/mcts.py` + `.raw/autogo/src/alpha_go/cpp/mcts/mcts.h` | `game_state/mcts.rs` (existing) |
+| MCTS | `.raw/autogo/src/alpha_go/mcts.py` + `.raw/autogo/src/alpha_go/cpp/mcts/mcts.h` | `crates/katgpt-pruners/src/game_state/mcts.rs` (existing) |
 | Model | `.raw/autogo/src/alpha_go/model.py` | Future plan (not this one) |
 | Dataset | `.raw/autogo/src/alpha_go/dataset.py` | Future plan |
-| Game replay → LoRA | `riir-gpu/src/game/trainer.rs` (Bomberman) | Future: Go token adapter (82-token seq) |
-| Game policy config | `riir-gpu/src/game/policy.rs` | Future: Go vocab (82 actions) |
+| Game replay → LoRA | `riir-ai/crates/riir-gpu/src/game/trainer.rs` (Bomberman) | Future: Go token adapter (82-token seq) |
+| Game policy config | `riir-ai/crates/riir-gpu/src/game/policy.rs` | Future: Go vocab (82 actions) |
 | GRPO loss | `riir-gpu/src/loss_grpo.rs` | Future: G-Zero Proposer training |
 | DPO loss (GPU) | `riir-gpu/src/loss_dpo.rs` | Future: G-Zero Generator training |
 | GZeroLoop | `riir-gpu/src/gzero_loop.rs` | Future: Model-based Go self-play |
-| Fourier MCTS | `riir-engine/src/fourier/mcts.rs` | Future: Go spatial hash transposition |
+| Fourier MCTS | `riir-ai/crates/riir-engine/src/fourier/mcts.rs` | Future: Go spatial hash transposition |
 | WASM Validator | `riir-validator-sdk/` + `riir-wasm/` | Future: `go_validator.wasm` |
 
 ---
@@ -657,7 +657,7 @@ These demos are running code with measured results — the pipeline works:
 
 ### 3. Board State → Token Encoding
 
-`game/trainer.rs` encodes Bomberman into 170-token sequences. Same pipeline for Go:
+`riir-ai/crates/riir-gpu/src/game/trainer.rs` encodes Bomberman into 170-token sequences. Same pipeline for Go:
 
 | Component | Bomber (existing) | Go (adapt) |
 |-----------|-------------------|------------|
@@ -671,8 +671,8 @@ These demos are running code with measured results — the pipeline works:
 ```text
 GoState::play_random_game()           (Plan 065 GoState)
   → GoReplay                          (Plan 065 T16a)
-  → game/replay.rs → samples          (adapt GameAction enum)
-  → game/trainer.rs → 82-token seq    (adapt encode_game_sample)
+  → riir-ai/crates/riir-gpu/src/game/replay.rs → samples          (adapt GameAction enum)
+  → riir-ai/crates/riir-gpu/src/game/trainer.rs → 82-token seq    (adapt encode_game_sample)
   → riir-gpu LoRA fine-tuning         (existing wgpu kernels)
   → Go LoRA adapter (.bin)            (tiny: ~4K params)
   → GoLoRAPlayer                      (new player type)
@@ -685,7 +685,7 @@ GZeroLoop activates when Go replays + tokenization exist:
 ```text
 GZeroLoop round (riir-gpu/src/gzero_loop.rs):
   1. GoTemplateProposer → query-hint pairs    (Plan 065 T33)
-  2. Go LoRA Generator → move predictions     (adapted game/policy.rs)
+  2. Go LoRA Generator → move predictions     (adapted riir-ai/crates/riir-gpu/src/game/policy.rs)
   3. HintDelta → intrinsic reward             (log-prob shift)
   4. DeltaFilter → preference pairs           (6-stage, game-agnostic)
   5. GRPO → train Proposer                    (loss_grpo.rs)
@@ -694,7 +694,7 @@ GZeroLoop round (riir-gpu/src/gzero_loop.rs):
 
 ### 6. Fourier Spatial MCTS (`go-fourier` gate)
 
-`riir-engine/src/fourier/mcts.rs` — position-invariant transposition table. For Go, implement `state_to_entities` callback:
+`riir-ai/crates/riir-engine/src/fourier/mcts.rs` — position-invariant transposition table. For Go, implement `state_to_entities` callback:
 - Stone positions relative to groups
 - Liberty counts as spatial features
 - Ko point as special entity

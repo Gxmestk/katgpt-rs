@@ -20,10 +20,10 @@ data structures + dot-product projections + budget arithmetic.
 | Primitive | Module | Role | Gate coverage |
 |-----------|--------|------|---------------|
 | `BranchBank<E>` | `crates/katgpt-core/src/branching/bank.rs` | Bounded persistent CognitiveBranch bank (spawn/merge/prune) | G1 |
-| `BranchRouter<E>` | `branching/router.rs` | Dot-product snap + Jaccard fallback routing | G1, G2, G4 |
-| `VerifierGate` | `branching/verifier.rs` | Reward + curiosity + centroid-quarantine write gate | G1, G4 |
-| `NonInterferenceProjection<D>` | `branching/projection.rs` | Orthogonal latent subspace per branch | G1 |
-| `BudgetCompiler` | `branching/compiler.rs` | Priority-cascade context compiler under byte budget | G1 |
+| `BranchRouter<E>` | `crates/katgpt-core/src/branching/router.rs` | Dot-product snap + Jaccard fallback routing | G1, G2, G4 |
+| `VerifierGate` | `crates/katgpt-core/src/branching/verifier.rs` | Reward + curiosity + centroid-quarantine write gate | G1, G4 |
+| `NonInterferenceProjection<D>` | `crates/katgpt-core/src/branching/projection.rs` | Orthogonal latent subspace per branch | G1 |
+| `BudgetCompiler` | `crates/katgpt-core/src/branching/compiler.rs` | Priority-cascade context compiler under byte budget | G1 |
 
 ---
 

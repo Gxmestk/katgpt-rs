@@ -47,7 +47,7 @@ Layer 3: SLoDPruner (online, inference-time)
 slod = ["spectral_hierarchy"]  # Reuses eigen decomposition
 ```
 
-### New Types (in katgpt-core/src/slod.rs)
+### New Types (in crates/katgpt-core/src/slod.rs)
 
 ```rust
 /// SLoD operator — continuous zoom on hyperbolic KG.

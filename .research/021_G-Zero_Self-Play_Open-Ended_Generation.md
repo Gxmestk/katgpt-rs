@@ -183,7 +183,7 @@ None of these work for **open-ended generation** (write a doc, explain a concept
 
 Hint-δ needs two log-prob evaluations per token: `log π_G(a_t | q, a_<t)` and `log π_G(a_t | q, h, a_<t)`. Both are already computed during normal decoding:
 
-- `riir-gpu/src/loss.rs` already emits a `log_probs_buf` for cross-entropy. That's the unconditioned term.
+- `riir-ai/crates/riir-gpu/src/loss.rs` already emits a `log_probs_buf` for cross-entropy. That's the unconditioned term.
 - The hint-conditioned term is a second forward pass with `h` prepended — *or*, if we're already running with the **EmbeddingRouter + KV cache priming** (`riir-router/embedding.rs`, Plan 024), the hint is *already* in the KV prefix. We just need to also run an unconditioned pass at training data collection time.
 
 Implementation surface:

@@ -327,8 +327,8 @@ guidance`, `hindrance`, `multi-agent pathfinding`) AND codebase vocabulary
 (`pathfind`, `find_path`, `navigation`, `collision`, `crowd coordination`,
 `swarm`, `flocking`, `boids`, `crowd density`, `warm start`, `replan`)
 returns:
-- **Single-agent A* pathfinding** (shipped): `riir-engine/src/pathfinder.rs`,
-  `katgpt-pruners/src/pathfinder.rs`, `riir-ai/crates/riir-games-quest/src/quest/path.rs`,
+- **Single-agent A* pathfinding** (shipped): `riir-ai/crates/riir-engine/src/pathfinder.rs`,
+  `crates/katgpt-pruners/src/pathfinder.rs`, `riir-ai/crates/riir-games-quest/src/quest/path.rs`,
   `riir-ai/crates/riir-engine/src/fourier/dungeon.rs`, `riir-ai/crates/riir-engine/src/fourier/path_periodic.rs`,
   `riir-ai/crates/riir-games/src/dungeon/fourier_pathfind.rs`. All single-agent.
 - **Latent-domain crowd coordination** (shipped): `crowd_mcgs/`,

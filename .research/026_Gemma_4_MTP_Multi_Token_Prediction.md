@@ -177,7 +177,7 @@ For our purposes, **round-robin is the zero-cost default** (no training, no look
 
 - **Threshold gating** — `Config` already has `sparse_threshold`, `screening_threshold`, `early_exit_patience`. MTP thresholds follow the exact same pattern: `if config.n_embd < config.mtp_threshold { skip } else { activate }`.
 
-- **Truncate/pad fallback** — When no trained projection weights exist, truncate or zero-pad the target hidden state to draft dimension. This is the same strategy as `TruncatePadProjector` in `riir-router/src/projector.rs`. Zero cost, no training needed, works as a baseline.
+- **Truncate/pad fallback** — When no trained projection weights exist, truncate or zero-pad the target hidden state to draft dimension. This is the same strategy as `TruncatePadProjector` in `riir-ai/crates/riir-router/src/projector.rs`. Zero cost, no training needed, works as a baseline.
 
 ### What Doesn't Map
 
@@ -257,13 +257,13 @@ if config.vocab_size > config.mtp_cluster_vocab_threshold {
 |-----------|-------------|
 | **DFlash** (`speculative/dflash.rs`) | **Complementary** — DFlash does token-level conditioning (drafter sees accepted tokens). MTP does activation-level conditioning (drafter sees target's hidden state). They compose: MTP feeds richer context INTO the drafter, DFlash's tree verification still runs on the output. Not conflicting — both improve acceptance rate via different signals. |
 | **LeviathanVerifier** (`speculative/verifier.rs`) | **Modified** — This is where target→draft activation transfer happens. Already has `target_ctx: ForwardContext` with `hidden_state` populated. MTP adds one `matmul` (or truncate) before the drafter AR loop. |
-| **DDTree** (`speculative/dd_tree.rs`) | **Unchanged** — Tree verification doesn't change. MTP just makes the drafter produce better candidates for the tree. |
+| **DDTree** (`src/speculative/dd_tree.rs`) | **Unchanged** — Tree verification doesn't change. MTP just makes the drafter produce better candidates for the tree. |
 | **TruncatePadProjector** (`riir-router/projector.rs`) | **Shared pattern** — Same truncate/pad strategy for dimension mismatch. MTP applies it to target hidden state instead of embeddings. Could share a utility function. |
 | **PagedKVCache** (`transformer.rs`) | **Extended** — Cross-attention to target KV needs a read-only view. PagedKVCache already has `read_kv()` — add a variant that returns `&[f32]` slices without copying. |
 | **Sparse MLP threshold** (`Config.sparse_threshold`) | **Same pattern** — Runtime threshold gating with zero cost when inactive. MTP thresholds follow identical convention. |
 | **InferenceBudget** (`riir-router/types.rs`) | **Extended** — MTP thresholds are per-domain inference knobs. Game domains get `None` (disabled), code domains get explicit thresholds. Same propagation path as existing budget fields. |
-| **TurboQuant** (`turboquant/kv_cache.rs`) | **Orthogonal** — Compresses KV cache storage. Shared KV still works with TurboQuant — the drafter reads dequantized keys/values. |
-| **PFlash** (`speculative/prefill.rs`) | **Synergistic** — PFlash compresses the prompt before prefill. Shared KV means the drafter benefits from PFlash's compression too (smaller KV to cross-attend to). |
+| **TurboQuant** (`crates/katgpt-quant/src/turboquant/kv_cache.rs`) | **Orthogonal** — Compresses KV cache storage. Shared KV still works with TurboQuant — the drafter reads dequantized keys/values. |
+| **PFlash** (`src/speculative/prefill.rs`) | **Synergistic** — PFlash compresses the prompt before prefill. Shared KV means the drafter benefits from PFlash's compression too (smaller KV to cross-attend to). |
 
 ---
 

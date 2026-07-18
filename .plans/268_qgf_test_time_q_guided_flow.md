@@ -137,7 +137,7 @@ At generation step t with prefix p_t and drafter velocity v_t:
 - [x] Add `qgf` parent feature to `katgpt-core/Cargo.toml`
 - [x] Add `qgf_projector`, `qgf_oracle`, `qgf_drafter`, `qgf_adaptive` sub-features
 - [x] All OFF by default until GOAT proof
-- [x] Wire `pub mod qgf;` in `katgpt-core/src/lib.rs` under `#[cfg(feature = "qgf")]`
+- [x] Wire `pub mod qgf;` in `crates/katgpt-core/src/lib.rs` under `#[cfg(feature = "qgf")]`
 - [x] Forward features from top-level `katgpt-rs/Cargo.toml`
 
 ---
@@ -247,7 +247,7 @@ At generation step t with prefix p_t and drafter velocity v_t:
 ### Phase 3: VarianceAdaptiveGuidance (F4)
 
 #### T7: Adaptive guidance weight
-- [x] Create `katgpt-core/src/qgf/adaptive.rs`
+- [x] Create `crates/katgpt-core/src/qgf/adaptive.rs`
 - [x] Implement sigmoid-gated per-query guidance weight:
   ```rust
   /// guidance_weight = sigmoid(k · (confidence − threshold))
@@ -264,7 +264,7 @@ At generation step t with prefix p_t and drafter velocity v_t:
   computes `1/β` per call from `oracle.confidence(state)` (needs T4 — done).
 - [x] Reuse Thicket (Plan 267) variance probe as the confidence signal
   ✅ DONE 2026-07-02 (Plan 268 T7). The bridge is a three-layer wiring:
-  1. **katgpt-core** (`qgf/adaptive.rs`): new `QgfVarianceSignal` trait +
+  1. **katgpt-core** (`crates/katgpt-core/src/qgf/adaptive.rs`): new `QgfVarianceSignal` trait +
      `confidence_from_disagreement(d) = 1 − clamp(d, 0, 1)` bridge function +
      `adaptive_guidance_weight_from_signal(signal, τ, k)` helper. Substrate-
      agnostic: knows about "a normalized disagreement in [0,1]", not about
@@ -300,7 +300,7 @@ At generation step t with prefix p_t and drafter velocity v_t:
   else { CpuSimd }
   ```
 - [x] Dispatch `q_gradient_at` to appropriate backend based on route
-  ✅ DONE 2026-07-02 (Plan 268 T8). New module `qgf/dispatch.rs` ships
+  ✅ DONE 2026-07-02 (Plan 268 T8). New module `crates/katgpt-core/src/qgf/dispatch.rs` ships
   `QgfBackendDispatch<'a, O, Gpu, Ane>` — routes batched Q-gradient queries
   via `route_for(action_space, batch)` and falls back to CPU on delegate
   failure. `dispatch_single` (batch=1) ALWAYS routes to CPU per `route_for`'s
@@ -333,7 +333,7 @@ At generation step t with prefix p_t and drafter velocity v_t:
   (`test_route_o1` verifies < 100ns/call over 100k iterations).
 
 #### T9: Plasma / Hot / Warm / Cold / Freeze tier wiring
-- [x] Document tier mapping in `qgf/mod.rs` (table from research doc §6)
+- [x] Document tier mapping in `crates/katgpt-core/src/qgf/mod.rs` (table from research doc §6)
 - [x] Plasma impl: `ActionBridgeOracle` wrapping `ActionBridge` (default for game NPCs)
 - [x] Hot impl: `LeoHeadOracle` wrapping `LeoHead` (default for active inference)
 - [x] Hot/Plasma impl: `FlowFieldOracle` wrapping `FlowField` (FFT-smoothed)
@@ -374,12 +374,12 @@ At generation step t with prefix p_t and drafter velocity v_t:
 ### Phase 5: GOAT Proof — Before vs After
 
 #### T10: GOAT benchmarks (the gate)
-- [x] Create `katgpt-core/benches/qgf_goat.rs` with feature-gated benchmarks
-  ✅ DONE 2026-07-01. Two bench files now: `benches/qgf_goat.rs` (G4a/b/c overhead) + `tests/qgf_goat.rs` (G1/G2/G4-alloc/G5 mechanism gates, 13 tests). See `.benchmarks/268_qgf_goat.md`.
+- [x] Create `crates/katgpt-core/benches/qgf_goat.rs` with feature-gated benchmarks
+  ✅ DONE 2026-07-01. Two bench files now: `crates/katgpt-core/benches/qgf_goat.rs` (G4a/b/c overhead) + `crates/katgpt-core/tests/qgf_goat.rs` (G1/G2/G4-alloc/G5 mechanism gates, 13 tests). See `.benchmarks/268_qgf_goat.md`.
 - [-] **G1: First-attempt accuracy** — Sudoku 9×9 with vs without QGF
   - Baseline: DDTree + NFCoT FlowScore (Plan 229)
   - Target: +3-8% first-attempt solve rate
-  **DEFERRED to riir-ai** (selling-point layer — needs a real Sudoku generator + DDTree harness, both outside katgpt-core). The katgpt-core mechanism-G1 (tilt shifts distribution toward higher Q, with anti-gradient + random-gradient negative controls) is done in `tests/qgf_goat.rs`.
+  **DEFERRED to riir-ai** (selling-point layer — needs a real Sudoku generator + DDTree harness, both outside katgpt-core). The katgpt-core mechanism-G1 (tilt shifts distribution toward higher Q, with anti-gradient + random-gradient negative controls) is done in `crates/katgpt-core/tests/qgf_goat.rs`.
 - [-] **G2: Speculative acceptance rate** — DDTree spec bench
   - Baseline: DDTree greedy
   - Target: +5-12% acceptance
@@ -400,7 +400,7 @@ At generation step t with prefix p_t and drafter velocity v_t:
   - Compute `cos(G(s, a_t), G(s, a_t + ε))` for QGF, OOD, BPTT estimators
   - QGF should have highest cosine similarity (lowest variance)
   ✅ DONE 2026-07-02 (katgpt-core mechanism scope). Three tests in
-  `tests/qgf_goat.rs`:
+  `crates/katgpt-core/tests/qgf_goat.rs`:
   `t11_qgf_has_highest_cosine_similarity_under_perturbation` — constructs
   QGF / BPTT-like / OOD-like estimator models and proves QGF has the highest
   mean cosine similarity under action perturbation (QGF cos ≈ 1.0 because
@@ -422,7 +422,7 @@ At generation step t with prefix p_t and drafter velocity v_t:
   implemented (the trait structurally prevents it — see
   `t11_qgf_drop_jacobian_documented_in_trait`). This matches the plan's note.
 - [x] Document result — validates the "drop Jacobian" decision
-  ✅ DONE 2026-07-02. The three T11 tests in `tests/qgf_goat.rs` document and
+  ✅ DONE 2026-07-02. The three T11 tests in `crates/katgpt-core/tests/qgf_goat.rs` document and
   prove the variance property. The trait doc in `traits.rs` already carries
   the design-decision note (Research 236 §F3): "Jacobian is intentionally
   dropped (J ≈ I). Do NOT add chain-rule backprop — it increases variance

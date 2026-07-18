@@ -73,8 +73,8 @@ graph TD
 
 | File | LOC | Purpose |
 |------|-----|---------|
-| `katgpt-core/src/and_or/mod.rs` | 21 | Module declarations |
-| `katgpt-core/src/and_or/types.rs` | 440 | Generic `AndOrNode<G,S>` enum + 23 tests |
+| `crates/katgpt-core/src/and_or/mod.rs` | 21 | Module declarations |
+| `crates/katgpt-core/src/and_or/types.rs` | 440 | Generic `AndOrNode<G,S>` enum + 23 tests |
 | `katgpt-rs/crates/katgpt-speculative/src/and_or_builder.rs` | ~350 | Decomposition logic + 14 tests |
 | `katgpt-rs/crates/katgpt-speculative/src/blueprint.rs` | ~120 | Argmax pre-pass + 7 tests |
 | `katgpt-rs/crates/katgpt-speculative/src/decomp_reviewer.rs` | ~120 | Novelty-based dead-end detection + 6 tests |

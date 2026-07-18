@@ -93,7 +93,7 @@ continue to resolve through the shim.
 - [x] T2: Move `d2f.rs` (production + 20 PURE tests)
 - [x] T3: Move `d2f_verifier.rs` (production + 3 PURE tests)
 - [x] T4: Move `diffusion_sampler.rs` (production + 16 PURE tests)
-- [x] T5: Register modules in `katgpt-forward/src/lib.rs`
+- [x] T5: Register modules in `crates/katgpt-forward/src/lib.rs`
 - [x] T6: Slim root files to re-export shims + TRAIN test modules
 - [x] T7: Validate — `cargo check --workspace --all-features` (clean)
 - [x] T8: Validate — `cargo test -p katgpt-forward --lib --all-features` — 201/201 PASS

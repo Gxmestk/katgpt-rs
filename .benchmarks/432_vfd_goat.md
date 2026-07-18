@@ -106,7 +106,7 @@ interval = [point ± z(α) · sqrt(variance)]
 
 **Test:** `test_qgf_bridge_smoke` (Phase 1 unit test, gated on `qgf_adaptive`).
 
-**What it checks:** `VfdVarianceSignal` implements `QgfVarianceSignal`, and feeding a VFD score into the QGF adaptive guidance weight pipeline produces the expected response (higher VFD → lower confidence → lower guidance weight). Closes the "ensemble KL" open item in `qgf/adaptive.rs`.
+**What it checks:** `VfdVarianceSignal` implements `QgfVarianceSignal`, and feeding a VFD score into the QGF adaptive guidance weight pipeline produces the expected response (higher VFD → lower confidence → lower guidance weight). Closes the "ensemble KL" open item in `crates/katgpt-core/src/qgf/adaptive.rs`.
 
 ---
 

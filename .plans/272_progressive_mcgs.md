@@ -27,20 +27,20 @@ Goal: compiling, tested, feature-gated module exposing the public API surface (g
 - [x] **T1.1** Create `src/progressive_mcgs/` directory with `mod.rs`. Paper reference + equations in module doc.
 - [x] **T1.2** Add feature flag `progressive_mcgs = []` to `katgpt-rs/Cargo.toml` features section (no new deps — `fastrand` already present).
 - [x] **T1.3** Add `#[cfg(feature = "progressive_mcgs")] pub mod progressive_mcgs;` to `src/lib.rs` (alphabetical, between `precision_aware_draft` and `proof_cert`).
-- [x] **T1.4** Implement `src/progressive_mcgs/types.rs`:
+- [x] **T1.4** Implement `crates/katgpt-speculative/src/progressive_mcgs/types.rs`:
   - [x] `NodeId` newtype (u32 — dense indexing, not Uuid; nodes are local to a graph instance)
   - [x] `BranchId` newtype (u32) — distinct type from `NodeId` to prevent accidental cross-use
   - [x] `EdgeKind` enum (`Primary`, `Reference`) — `#[repr(u8)]`
   - [x] `Reward` enum (`Failure`/`Neutral`/`Progress`/`Breakthrough`) with `as_f32()` mapping to `{-1, +1, +1, +2}`
   - [x] `SelectMode` enum (`Uct`, `Elite`) — moved to `scheduler.rs`
   - [x] `ProgressiveMcgsConfig` struct with all paper Table 4 defaults + `validate()` method
-- [x] **T1.5** Implement `src/progressive_mcgs/graph.rs`:
+- [x] **T1.5** Implement `crates/katgpt-speculative/src/progressive_mcgs/graph.rs`:
   - [x] `ProgressiveMcgs<N: Clone>` generic over node payload
   - [x] Dense SoA storage: `payloads`, `primary_parent`, `primary_children`, `reference_edges`, `visits`, `cumulative_reward`, `branch_id`, `branch_best`, `global_best`
   - [x] `reference_edges` capped at `max_refs_per_node` (default 3) with LRU eviction
   - [x] Methods: `add_root`, `expand_primary`, `add_reference`, `backprop`, `q_value`, `branch_best`, `global_best`, `node_ids`, etc.
   - [x] **Critical**: `backprop` walks only `primary_parent` chain — doc comment + assert + test verify it NEVER touches `reference_edges`.
-- [x] **T1.6** Implement `src/progressive_mcgs/scheduler.rs`:
+- [x] **T1.6** Implement `crates/katgpt-speculative/src/progressive_mcgs/scheduler.rs`:
   - [x] `EntropyGatedScheduler { w_min, switch_start, switch_end, elite_topk }` (defaults: `0.2, 0.5, 0.7, 3`)
   - [x] `fn w(&self, t_norm: f32) -> f32` — piecewise-linear decay 1.0 → w_min
   - [x] `fn pick_mode(&self, t_norm, rng) -> SelectMode`
@@ -55,7 +55,7 @@ Goal: compiling, tested, feature-gated module exposing the public API surface (g
   - [x] `check(branch) -> StagnationTriggers` — fixed-capacity (3) stack-allocated queue, zero-alloc
   - [x] `StagnationTrigger` enum: `IntraBranchEvolve`, `CrossBranchReference`, `MultiBranchAggregation`
   - [x] CrossBranchReference suppressed during global stagnation (no point referencing other branches if all are stuck)
-- [x] **T1.8** Implement `src/progressive_mcgs/operators.rs` — pure functions:
+- [x] **T1.8** Implement `crates/katgpt-speculative/src/progressive_mcgs/operators.rs` — pure functions:
   - [x] `intra_branch_history(graph, node, k)` — walks `primary_parent` within same branch
   - [x] `cross_branch_top_n(graph, current_branch, n)` — top-N foreign nodes by Q-value
   - [x] `multi_branch_aggregate(graph, per_branch)` — union of top trajectories per branch
@@ -78,7 +78,7 @@ Goal: compiling, tested, feature-gated module exposing the public API surface (g
   - [x] Synthetic 4-branch search, 500 expansions
   - [x] Prints: final Q-values per branch, reference-edge count, entropy curve (50 samples)
   - [x] Stagnation operators fire (2385 ref edges added, 634 events)
-- [x] **T1.13** Document module in `src/progressive_mcgs/mod.rs` with paper citation, three primitives summary, critical-invariant warning, layering note.
+- [x] **T1.13** Document module in `crates/katgpt-speculative/src/progressive_mcgs/mod.rs` with paper citation, three primitives summary, critical-invariant warning, layering note.
 
 ### Phase 1 Exit Criteria — ✅ ALL MET
 - ✅ `cargo build --features progressive_mcgs --lib` compiles clean (release + debug)
@@ -102,7 +102,7 @@ Goal: audit the existing `BanditPruner` / `ConstraintPruner` / `EpisodePruner` s
 - [x] **T2.4** Verify `EntropyGatedScheduler` doesn't duplicate `BreakevenComplexityRouter` (R218). **CONFIRMED DOC-ONLY.** `BreakevenComplexityRouter` is **not yet implemented** in code — only Research 218 exists at `.research/218_Breakeven_Complexity_Inference_Router.md`, with Plan 250 (`.plans/250_breakeven_inference_routing.md`) marked "Active". The existing layering note in `mod.rs:43-45` is accurate: `EntropyGatedScheduler` picks UCT/Elite within a search; `BreakevenComplexityRouter` will route across plasma/hot/warm tiers. They compose, don't conflict. No code change needed.
 - [x] **T2.5** Add `#[doc(alias = "mcts")]`, `#[doc(alias = "graph_search")]`, `#[doc(alias = "mcgs")]` to module for discoverability.
 - [x] **T2.6** Clippy clean on `progressive_mcgs` module.
-- [x] **T2.7** **(was T1.10 — DEFERRED)** Implement top-level `ProgressiveMcgsSearch` orchestrator in `src/progressive_mcgs/search.rs`:
+- [x] **T2.7** **(was T1.10 — DEFERRED)** Implement top-level `ProgressiveMcgsSearch` orchestrator in `crates/katgpt-speculative/src/progressive_mcgs/search.rs`:
   - Owns `ProgressiveMcgs<N>` + `EntropyGatedScheduler` + `StagnationGate` + `ProgressiveMcgsConfig`
   - Exposes `SearchDomain` trait (consumer provides `propose(graph, parent, branch, refs) -> N` and `evaluate(graph, node) -> Reward`)
   - `step(rng) -> StepResult` runs one full expansion: select mode → pick branch → descend to leaf → propose → expand → classify reward → backprop → update bests → observe stagnation → fire triggers → build reference sets
@@ -152,7 +152,7 @@ Goal: prove the three GOAT criteria. Hard pass/fail, no tuning excuses.
 ### Tasks
 
 - [x] **T4.1** Write `katgpt-rs/.docs/progressive_mcgs.md` with: API reference, config knob table, 3 usage examples (pure search, integrated with `BanditPruner`, integrated with `ConstraintPruner`).
-- [x] **T4.2** Add module-level example to `src/progressive_mcgs/mod.rs` doc comment.
+- [x] **T4.2** Add module-level example to `crates/katgpt-speculative/src/progressive_mcgs/mod.rs` doc comment.
 - [x] **T4.3** Update `katgpt-rs/.research/239_*.md` "Related Plans" from "TBD" to "272 (this plan)".
 - [x] **T4.4** Update `riir-ai/.plans/298_*.md` Phase 0 status: dependency on Plan 272 → resolved. Mark Plan 298 ready to proceed to Phase 1.
 - [x] **T4.5** Tag release (per AGENTS.md commit convention — `feat:` prefix): `feat(progressive_mcgs): graph search with reference edges + entropy-gated schedule`.

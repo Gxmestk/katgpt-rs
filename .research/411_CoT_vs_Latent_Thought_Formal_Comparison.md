@@ -141,7 +141,7 @@ Empirical results confirm the theoretical separations: latent wins on paralleliz
 | `riir-ai/crates/riir-engine/src/latent_functor/k_selector.rs` | `KSelectionBandit` over `[1,2,4,8,16]` | Per-relation rank-k selection = per-relation complexity class selection |
 | `riir-engine/src/latent_functor/reestimation.rs` | Coherence-driven re-estimation scheduler | The iterative refinement primitive (latent thought loop with halting) |
 | `riir-ai/crates/riir-engine/src/latent_functor/depth_invariance_audit.rs` | Functor chain depth-invariance classification | Audits whether functor iteration is depth-invariant or drifts |
-| `katgpt-core/src/breakeven/mod.rs` | `BreakevenTierPair`, cost-amortization routing | Routes by cost, not complexity class |
+| `crates/katgpt-core/src/breakeven/mod.rs` | `BreakevenTierPair`, cost-amortization routing | Routes by cost, not complexity class |
 | SwiR controller (`src/swir/`) | `SwiRController::step(entropy, ...)` | Mode switch on entropy trend |
 
 ### 2.3 What's genuinely novel (not in our corpus)

@@ -54,7 +54,7 @@ The paper's "sheaf diffusion" z-update is gradient descent on the sheaf energy:
 ```
 z^{(t+1)} = z^{(t)} − η L_F z^{(t)} = z^{(t)} − η F^T F z^{(t)}
 ```
-In our shipped vocabulary (`katgpt-dec/src/operators.rs`):
+In our shipped vocabulary (`crates/katgpt-dec/src/operators.rs`):
 - The coboundary operator `F` is `exterior_derivative` (d)
 - The adjoint `F^T` is `codifferential` (δ)
 - The sheaf Laplacian `L_F = F^T F` is `hodge_laplacian` (Δ = δd + dδ)

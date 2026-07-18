@@ -16,13 +16,13 @@ Two Phase 12 DEFER items whose blockers dissolved during Phase 12 itself:
 **Bonus discovery:** vocab_channel_pruner's other "blocker"
 (`crate::transformer::TransformerWeights`, `crate::types::Config`) is also
 already leaf-resident:
-- `TransformerWeights` is in `katgpt-transformer/src/weights.rs`
-- `Config` is in `katgpt-types/src/config.rs`
+- `TransformerWeights` is in `crates/katgpt-transformer/src/weights.rs`
+- `Config` is in `crates/katgpt-types/src/config.rs`
 
 So vocab_channel_pruner is FULLY decoupled, not partially. The original
 "transformer-bound" classification was stale.
 
-**Latent bug uncovered:** `katgpt-speculative/src/lib.rs` had
+**Latent bug uncovered:** `crates/katgpt-speculative/src/lib.rs` had
 `pub mod distill` gated on `ilc_distill` ALONE. Enabling `trd_refined_draft`
 without `ilc_distill` silently cfg'd out the entire distill umbrella — trd
 compiled in `cargo check` but produced zero test symbols. Fixed to
@@ -49,12 +49,12 @@ compiled in `cargo check` but produced zero test symbols. Fixed to
 - [x] **T1.** Move `crates/katgpt-speculative/src/distill/trd.rs` → `katgpt-speculative/crates/katgpt-speculative/src/distill/trd.rs`
       - T1.1 `git mv` file ✅
       - T1.2 Imports unchanged — `crate::fold` is now native to katgpt-speculative ✅
-      - T1.3 Added `pub mod trd;` to `katgpt-speculative/src/distill/mod.rs`
+      - T1.3 Added `pub mod trd;` to `crates/katgpt-speculative/src/distill/mod.rs`
             under `#[cfg(feature = "trd_refined_draft")]` ✅
       - T1.4 Added `trd_refined_draft = []` + `plasma_path = []` + `gpu = []`
             tracking flags to katgpt-speculative Cargo.toml (the latter two
             silence `unexpected_cfgs` lints on dead-code stubs inside trd.rs) ✅
-      - T1.5 Root `src/distill/mod.rs`: replaced `pub mod trd;` with
+      - T1.5 Root `crates/katgpt-speculative/src/distill/mod.rs`: replaced `pub mod trd;` with
             `pub use katgpt_speculative::distill::trd;` re-export ✅
       - T1.6 Root Cargo.toml: extended `trd_refined_draft` with
             `katgpt-speculative/trd_refined_draft` ✅
@@ -66,7 +66,7 @@ compiled in `cargo check` but produced zero test symbols. Fixed to
             - `crate::lattice_operad::*` stays (native to katgpt-pruners)
             - `crate::transformer::TransformerWeights` → `katgpt_transformer::TransformerWeights`
             - `crate::types::Config` → `katgpt_types::Config` ✅
-      - T2.3 Added `pub mod vocab_channel_pruner;` to `katgpt-pruners/src/lib.rs`
+      - T2.3 Added `pub mod vocab_channel_pruner;` to `crates/katgpt-pruners/src/lib.rs`
             under `#[cfg(feature = "vocab_channel_pruner")]` ✅
       - T2.4 Added `vocab_channel_pruner = []` feature to katgpt-pruners Cargo.toml ✅
       - T2.5 Root `src/speculative/mod.rs`: replaced `pub mod vocab_channel_pruner;`
@@ -75,7 +75,7 @@ compiled in `cargo check` but produced zero test symbols. Fixed to
             `katgpt-pruners/vocab_channel_pruner` ✅
 
 - [x] **T2.5b (bonus).** Fixed latent `pub mod distill` umbrella gate in
-      `katgpt-speculative/src/lib.rs`:
+      `crates/katgpt-speculative/src/lib.rs`:
       `#[cfg(feature = "ilc_distill")]` →
       `#[cfg(any(feature = "ilc_distill", feature = "trd_refined_draft"))]`.
       Without this, trd compiled but produced zero test symbols.

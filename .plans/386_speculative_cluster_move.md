@@ -70,7 +70,7 @@ All files have zero `crate::` refs OR only leaf-reexport refs. Grouped by gate:
 - [x] Physical `git mv` for each file
 - [x] Fix import paths: `super::nf_flow` → `crate::nf_flow`, `super::spec_generator` → `crate::spec_generator`, `super::nf_flow_generator` → `crate::nf_flow_generator` (in nf_flow_qgf)
 
-### T3: katgpt-speculative/src/lib.rs — declare modules
+### T3: crates/katgpt-speculative/src/lib.rs — declare modules
 - [x] Add `pub mod` declarations with matching feature gates
 
 ### T4: Root src/speculative/mod.rs — convert to re-exports

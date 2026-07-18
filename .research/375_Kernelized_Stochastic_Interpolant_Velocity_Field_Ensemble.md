@@ -73,7 +73,7 @@ Under a *characteristic* kernel (Gaussian RBF, Laplacian, inverse-multiquadric â
 | Per-layer sigmoid composition with per-tick DRIFT | **PersonalityWeightedComposition** | Plan 297, Research 276 |
 | Asymmetric basis projection (cross-resolution transport) | **CrossResolutionTransport** | Plan 310, Research 291, `crates/katgpt-core/src/cross_resolution.rs` |
 | Pre-trained velocity-field drafter (Fourier-mode token drafting) | **LinOSS ModalSpecDrafter** | Plan 189, `crates/katgpt-core/src/linoss.rs:561` |
-| BLAKE3-committed frozen artifact pool + atomic Arc-swap | **LoRAHotSwap**, **EmotionDirections loader**, **MerkleFrozenEnvelope** | riir-neuron-db/src/freeze.rs, riir-engine/src/snapshot.rs |
+| BLAKE3-committed frozen artifact pool + atomic Arc-swap | **LoRAHotSwap**, **EmotionDirections loader**, **MerkleFrozenEnvelope** | riir-neuron-db/src/freeze.rs, riir-ai/crates/riir-engine/src/snapshot.rs |
 | Raw scalar list crossing sync boundary via fixed-point | **LatCal** 2Ã—2-block commitment | riir-chain/src/encoding/latcal.rs |
 
 ### 2.2 What the paper adds that none of the above does alone

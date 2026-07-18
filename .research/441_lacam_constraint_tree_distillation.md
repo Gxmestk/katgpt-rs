@@ -221,7 +221,7 @@ grepped the codebase for both paper and code vocabulary:
 
 | Paper term | Codebase grep | Found? |
 |---|---|---|
-| `constraint` | `crates/katgpt-core/src/` | YES — but only in `arg/policy.rs` (`PolicyConstraints` — governance, unrelated to MAPF) |
+| `constraint` | `crates/katgpt-core/src/` | YES — but only in `crates/katgpt-core/src/arg/policy.rs` (`PolicyConstraints` — governance, unrelated to MAPF) |
 | `backtrack` | `crates/katgpt-core/src/` | NO |
 | `search_tree` | `crates/katgpt-core/src/` | NO |
 | `constraint_tree` | `crates/katgpt-core/src/` | NO |

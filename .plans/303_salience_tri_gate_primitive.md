@@ -141,7 +141,7 @@ GOAT gate: G1 (determinism + monotonicity) and G2 (two-sigmoid ablation parity) 
   - Single `decide()` call latency: **D=8: 9.11 ns**, D=16: 14.81 ns, D=32: 30.27 ns. Target: < 50ns (cf. `evolve_hla` ~14ns for D=8). **PASS** — D=8 latency is ~5 ns over `evolve_hla`'s 14 ns reference (the gap is the second dot-product).
   - Batched `decide_batch()` throughput: D=8 N=1000: **120.6 M/s**, D=8 N=10000: 92.8 M/s. Target ≥ 50M decisions/sec. **PASS**. (D=32 drops to 33-36 M/s — informational only, not a gate target.)
   - Full results in `.benchmarks/303_salience_tri_gate_goat.md`.
-- [x] **T2.3** Document the G1/G2 gate criteria in the module doc with the actual numbers when the bench runs. — Updated `src/salience/gate.rs` struct doc with the 9.11 ns / 120.6 M/s numbers and the `evolve_hla` comparison.
+- [x] **T2.3** Document the G1/G2 gate criteria in the module doc with the actual numbers when the bench runs. — Updated `crates/katgpt-core/src/salience/gate.rs` struct doc with the 9.11 ns / 120.6 M/s numbers and the `evolve_hla` comparison.
 
 ### Phase 2 acceptance
 
@@ -198,7 +198,7 @@ GOAT gate: G1 (determinism + monotonicity) and G2 (two-sigmoid ablation parity) 
 
 - [x] **T5.1** Run `cargo test --features salience_tri_gate` — all G1/G2 property tests pass. (Re-confirmed at bench time: G1 determinism 1000-call re-confirm PASS, G2 ablation parity 10k-input re-confirm PASS.)
 - [x] **T5.2** Run `cargo bench --features salience_tri_gate salience_tri_gate_bench` — capture latency + throughput numbers. (9.11 ns / 120.6 M/s for D=8; see `.benchmarks/303_salience_tri_gate_goat.md`.)
-- [x] **T5.3** Fill in actual numbers in the module doc. (Done in `src/salience/gate.rs`.)
+- [x] **T5.3** Fill in actual numbers in the module doc. (Done in `crates/katgpt-core/src/salience/gate.rs`.)
 - [x] **T5.4** **GOAT promotion decision (2026-06-23):**
   - G1+G2 PASS, latency 9.11 ns < 50 ns, throughput 120.6 M/s ≥ 50 M → **PROMOTE `salience_tri_gate` to default feature** in `katgpt-rs/Cargo.toml`. ✅ DONE.
 

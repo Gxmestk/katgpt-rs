@@ -76,7 +76,7 @@ The next step up: a genuine multi-resolution basis (Haar wavelet packet at log-s
 - [x] Add `funcattn_structured_basis = ["funcattn"]` to `katgpt-rs/crates/katgpt-core/Cargo.toml`
 - [x] Add `funcattn_structured_basis = ["katgpt-core/funcattn_structured_basis"]` to `katgpt-rs/Cargo.toml`
 - [x] Gate the two constructors behind `#[cfg(feature = "funcattn_structured_basis")]`
-- [x] Add gated `pub use` re-export in `katgpt-core/src/lib.rs`
+- [x] Add gated `pub use` re-export in `crates/katgpt-core/src/lib.rs`
 
 ---
 

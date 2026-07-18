@@ -82,7 +82,7 @@ The Gemini output proposes 7 pillars fusing Fourier Spatial AI, LatCal, and neur
 - BFCP region extraction, polytope LoRA routing
 - `ConPwlValueFunction`, `ConPwcStrategy`, `minimax_pi_step()` — alternating best-response policy iteration
 - MatrixAccount (14 LatCalMatrix cells) with CPI chain (riir-chain riir-chain/src/programs/cpi.rs)
-- Combat heuristics (riir-engine frame/heuristic.rs) — ThreatHeuristic, CombatHeuristic
+- Combat heuristics (riir-engine riir-ai/crates/riir-engine/src/frame/heuristic.rs) — ThreatHeuristic, CombatHeuristic
 
 **Verdict: ALREADY GOAT. The Gemini `BossMatrixState` is literally our MatrixAccount + NS-CSG pipeline.**
 

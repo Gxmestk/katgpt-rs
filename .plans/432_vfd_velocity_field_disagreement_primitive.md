@@ -10,7 +10,7 @@
 
 ## Goal
 
-Ship a modelless epistemic-UQ estimator (`VfdScore`) that consumes M frozen velocity fields and produces a scalar uncertainty score per conditioning input, by computing pairwise velocity-field disagreement along an ODE integration weighted by `κ_s = s/(1−s)`. The primitive extends the existing `VelocityFieldEnsemble<P, D>` (Plan 376, default-on) — it activates that primitive's deferred G7 UQ gate (Plan 376 Phase 6, "primitive still ships as non-UQ") and closes the open `QgfVarianceSignal` "ensemble KL" item in `qgf/adaptive.rs`.
+Ship a modelless epistemic-UQ estimator (`VfdScore`) that consumes M frozen velocity fields and produces a scalar uncertainty score per conditioning input, by computing pairwise velocity-field disagreement along an ODE integration weighted by `κ_s = s/(1−s)`. The primitive extends the existing `VelocityFieldEnsemble<P, D>` (Plan 376, default-on) — it activates that primitive's deferred G7 UQ gate (Plan 376 Phase 6, "primitive still ships as non-UQ") and closes the open `QgfVarianceSignal` "ensemble KL" item in `crates/katgpt-core/src/qgf/adaptive.rs`.
 
 **Two-use substrate:** the same M frozen velocity fields are (a) ridge-combined into a super-forecaster via `VelocityFieldEnsemble::fit_into` (existing), AND (b) measured for pairwise disagreement via `vfd_score_into` (this plan). Two uses, one frozen library, no extra training.
 
@@ -79,7 +79,7 @@ Ship a modelless epistemic-UQ estimator (`VfdScore`) that consumes M frozen velo
       }
   }
   ```
-  This closes the `qgf/adaptive.rs:131-133` docstring's "ensemble KL" open item.
+  This closes the `crates/katgpt-core/src/qgf/adaptive.rs:131-133` docstring's "ensemble KL" open item.
 
 - [x] **T1.5** Write the G1 mechanics test:
   ```rust

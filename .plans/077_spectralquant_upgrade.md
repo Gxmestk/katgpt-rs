@@ -459,12 +459,12 @@ Benchmark: cosine similarity, compression ratio, latency before/after.
 
 ## Modifications to Existing Files
 
-### `src/turboquant/types.rs`
+### `crates/katgpt-quant/src/turboquant/types.rs`
 
 - Add `SpectralQuantCalibration`, `SpectralQuantLayer`, `SpectralQuantKVCacheConfig`, `WaterfillAllocation`, `LloydMaxCodebook`, `CompressedVector` structs behind `#[cfg(feature = "spectral_quant")]`
 - No changes to existing types — backward compatible
 
-### `src/turboquant/mod.rs`
+### `crates/katgpt-quant/src/turboquant/mod.rs`
 
 ```rust
 // Add behind cfg gate:
@@ -496,7 +496,7 @@ pub use types::{
 };
 ```
 
-### `src/turboquant/forward.rs`
+### `crates/katgpt-quant/src/turboquant/forward.rs`
 
 - Add `attention_spectralquant()` function — same signature as `attention_turboquant` but uses `SpectralQuantKVCache`
 - Add `dequantize_spectral_keys_flat()` / `dequantize_spectral_values_flat()` helpers

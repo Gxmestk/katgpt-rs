@@ -45,7 +45,7 @@ G2 cos <0.75 (transport destroys personality) — either demotes to Gain.
 
 - [x] T1.1 Create `katgpt-rs/crates/katgpt-core/src/cross_resolution.rs`:
   Shipped with `CrossResolutionBases` (BLAKE3-committed via per-element LE f32 →
-  matches `engram/commitment.rs::build_merkle_root` convention), `CrossResScratch`,
+  matches `crates/katgpt-core/src/engram/commitment.rs::build_merkle_root` convention), `CrossResScratch`,
   `CrossResolutionError::{RankDeficient, ShapeMismatch}` (rank-deficiency guard
   from Research 291 §5.4), `project_to_spectral_into`, `reconstruct_from_spectral_into`
   (uses `simd::simd_dot_f32` for contiguous dst-row dots), `transport_cross_resolution_into`,
@@ -63,7 +63,7 @@ G2 cos <0.75 (transport destroys personality) — either demotes to Gain.
   cross_resolution_transport = ["katgpt-core/cross_resolution_transport"]  # ...
   ```
 
-- [x] T1.3 Wire module into `katgpt-core/src/lib.rs`:
+- [x] T1.3 Wire module into `crates/katgpt-core/src/lib.rs`:
   ```rust
   #[cfg(feature = "cross_resolution_transport")]
   pub mod cross_resolution;

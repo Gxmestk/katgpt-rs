@@ -73,9 +73,9 @@ pub enum AndOrNode<G, S> {
 }
 ```
 
-- [x] Create `katgpt-core/src/and_or/mod.rs` with module declarations
-- [x] Create `katgpt-core/src/and_or/types.rs` with `AndOrNode<G, S>` enum
-- [x] Add `#[cfg(feature = "and_or_dtree")]` module gate in `katgpt-core/src/lib.rs`
+- [x] Create `crates/katgpt-core/src/and_or/mod.rs` with module declarations
+- [x] Create `crates/katgpt-core/src/and_or/types.rs` with `AndOrNode<G, S>` enum
+- [x] Add `#[cfg(feature = "and_or_dtree")]` module gate in `crates/katgpt-core/src/lib.rs`
 - [x] Unit tests: tree construction, child access, solved status propagation
 
 ### T2: `AndOrBuilder` — Decomposition logic for DDTree marginals

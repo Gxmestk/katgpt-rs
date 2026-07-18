@@ -69,7 +69,7 @@ The codebook is constructed modellessly via **k-means clustering** on observed t
   factorized_action = []
   ```
 
-- [x] **T1.7** Wire module into `katgpt-core/src/lib.rs`:
+- [x] **T1.7** Wire module into `crates/katgpt-core/src/lib.rs`:
   ```rust
   #[cfg(feature = "factorized_action")]
   pub mod factorized_action;

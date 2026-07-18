@@ -72,7 +72,7 @@ Goal: GoldShare is callable as a diagnostic from any layer that already exposes 
 
 ### Tasks
 
-- [x] **T3.1** `data_probe/mod.rs` re-export block already includes `GoldShareReport`, `GoldShareScratch`, `gold_share`, `gold_share_flat` (done in Phase 1 T1.7).
+- [x] **T3.1** `crates/katgpt-core/src/data_probe/mod.rs` re-export block already includes `GoldShareReport`, `GoldShareScratch`, `gold_share`, `gold_share_flat` (done in Phase 1 T1.7).
 - [x] **T3.2** Added cross-reference doc to `sink_classify.rs` module-level docs: documents the "broadcast that failed" signature (classifier says Broadcast + low gold_share = signal in head, lost in residual) and the "healthy broadcast" contrast.
 - [x] **T3.3** Added `#[cfg(feature = "gold_share_probe")] pub gold_share: Option<crate::data_probe::GoldShareReport>` field to `SinkDiagnostic`. Updated both construction sites (`classify_sink_at`, `classify_sink_at_flat`) to initialize the field as `None`.
 - [x] **T3.4** Wrote `crates/katgpt-core/tests/plan411_joint_classifier_gold_share.rs` integration test (2 tests, both PASS): `joint_classifier_gold_share_broadcast_that_failed_signature` (paper's Table 1 toy: 4-head 8-key half-gold, verifies gold_pre_softmax_max = 0.05, noise_gap = -0.15, gold_share < 0.5, SinkDiagnostic.gold_share field is accessible and None) + `joint_signature_healthy_broadcast_when_gold_share_high` (contrast case: all-attention-on-gold → gold_share = 1.0, noise_gap = 0.5).

@@ -29,7 +29,7 @@
 
 ### Phase 3: Forward Integration
 
-- [x] T13: Add `forward_hla()` in `src/hla/forward.rs` — same structure as `forward_base()` with HLA cache
+- [x] T13: Add `forward_hla()` in `riir-ai/crates/riir-engine/src/hla/forward.rs` — same structure as `forward_base()` with HLA cache
 - [x] T14: Add `forward_ahla()` — same with AHLA cache
 - [x] T15: Pre-allocated temp buffers in forward functions (stack-allocated, reused across layers)
 - [x] T16: Add `generate_hla_into()` / `generate_ahla_into()` — convenience wrappers matching `generate_into()` API

@@ -428,7 +428,7 @@ head-to-head), `jlens_concept_readout_goat.rs` (`DefaultFaithfulnessProbe` prece
 
 ### The right tool for canvas's behavioral question (don't grep for this)
 
-`FaithfulnessProbe` (Plan 278, `katgpt-core/src/faithfulness/probe.rs`) is the causal-intervention probe
+`FaithfulnessProbe` (Plan 278, `crates/katgpt-core/src/faithfulness/probe.rs`) is the causal-intervention probe
 that should settle the §7 question. **It is already wired into riir-poc** (`Cargo.toml` line 23 feature
 dep) with a precedent bench (`jlens_concept_readout_goat.rs` imports `DefaultFaithfulnessProbe` +
 `faithfulness_profile`, verdict at 0.5 threshold). The canvas PoC lives in the same crate and could have

@@ -42,7 +42,7 @@ Ship the **modelless half** of canvas engineering: a typed `CanvasSchema` compil
 ### Tasks
 
 - [x] **T1.1** Create `crates/katgpt-core/src/canvas/` module behind `canvas_schema` feature gate. Wired into `lib.rs`; feature registered in `Cargo.toml` (opt-in, NOT in `default`).
-- [x] **T1.2** Core types in `canvas/types.rs` (AGENTS.md `types.rs` convention): `CanvasBounds`, `RegionId`, `SemanticType`, `AttentionFnFamily` (15 families), `RegionSpec`, `Connection`, `CanvasLayout`, `CanvasTopology`, `CanvasSchema`, `CompiledCanvas`, `AttentionMaskSpec`, `LossWeightMask`.
+- [x] **T1.2** Core types in `crates/katgpt-core/src/canvas/types.rs` (AGENTS.md `types.rs` convention): `CanvasBounds`, `RegionId`, `SemanticType`, `AttentionFnFamily` (15 families), `RegionSpec`, `Connection`, `CanvasLayout`, `CanvasTopology`, `CanvasSchema`, `CompiledCanvas`, `AttentionMaskSpec`, `LossWeightMask`.
 - [x] **T1.3** `region_indices(spec, layout) -> Range<usize>` (struct-offset arithmetic, contiguous-slab convention).
 - [x] **T1.4** Topology constructors: `dense`, `isolated`, `hub_spoke`, `causal_chain`, `causal_temporal`.
 - [x] **T1.5** Unit tests: region_indices, constructors, `CanvasSchema` structure.
@@ -119,7 +119,7 @@ Bench: `crates/katgpt-core/benches/bench_419_canvas_schema_goat.rs`. Record: [`.
 ### Tasks
 
 - [x] **T6.1** Added `canvas_schema` to the feature-flag catalog: [`.docs/09_feature_catalog/opt_in_features.md`](../.docs/09_feature_catalog/opt_in_features.md) §12 (one-line summary + GOAT table + honesty note). (The plan referenced `01_overview.md`; that file does not exist — the opt-in catalog is the canonical home for opt-in features.)
-- [x] **T6.2** Doc example: the `canvas/mod.rs` module doc carries a compile-tested quick-start (`compile_schema` end-to-end on a 2-region canvas) + a reachability-guarantee quick-start (doctested). See also the G5 199-region ICU fixture in the bench.
+- [x] **T6.2** Doc example: the `crates/katgpt-core/src/canvas/mod.rs` module doc carries a compile-tested quick-start (`compile_schema` end-to-end on a 2-region canvas) + a reachability-guarantee quick-start (doctested). See also the G5 199-region ICU fixture in the bench.
 - [x] **T6.3** Consumer contract documented in `mask.rs` (`build_attention_mask` doc: the `AttentionMaskSpec` is a sparse `(query, key, weight)` list that consumers lower to whatever dense/blocked form their kernel needs — generic `add log M to logits`, AC-Prefix, or VortexFlow). Actual wiring into AC-Prefix/VortexFlow is a separate follow-up, not this plan.
 - [x] **T6.4** `.issues/043` cross-referenced as the tracked follow-up for the game-runtime Super-GOAT re-evaluation (linked from the benchmark record, the catalog entry, and the promotion-decision note above).
 

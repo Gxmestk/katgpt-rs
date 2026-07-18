@@ -49,11 +49,11 @@ katgpt-rs/examples/
 
 ## Tasks
 
-- [x] **T1**: `arena/types.rs` — shared tournament types
-- [x] **T2**: `arena/scheduler.rs` — round-robin matchup generator
-- [x] **T3**: `arena/mod.rs` — module index + re-exports
-- [x] **T4**: `bomber/arena_runner.rs` — BomberArenaRunner
-- [x] **T5**: `fft/arena_runner.rs` — FFTArenaRunner
+- [x] **T1**: `crates/katgpt-pruners/src/arena/types.rs` — shared tournament types
+- [x] **T2**: `crates/katgpt-pruners/src/arena/scheduler.rs` — round-robin matchup generator
+- [x] **T3**: `crates/katgpt-pruners/src/arena/mod.rs` — module index + re-exports
+- [x] **T4**: `src/pruners/bomber/arena_runner.rs` — BomberArenaRunner
+- [x] **T5**: `crates/katgpt-pruners/src/fft/arena_runner.rs` — FFTArenaRunner
 - [x] **T6**: `bomber_09_rubric_tournament.rs` — Bomber rubric tournament example
 - [x] **T7**: `fft_02_rubric_tournament.rs` — FFT rubric tournament example
 - [x] **T8**: Run tournaments + record results to `.benchmarks/009_arena_integration.md`
@@ -62,7 +62,7 @@ katgpt-rs/examples/
 
 ---
 
-## T1: `arena/types.rs` — Shared Tournament Types
+## T1: `crates/katgpt-pruners/src/arena/types.rs` — Shared Tournament Types
 
 ### File: `katgpt-rs/crates/katgpt-pruners/src/arena/types.rs`
 
@@ -227,7 +227,7 @@ impl EloCalculator {
 
 ---
 
-## T2: `arena/scheduler.rs` — Round-Robin Matchup Generator
+## T2: `crates/katgpt-pruners/src/arena/scheduler.rs` — Round-Robin Matchup Generator
 
 ### File: `katgpt-rs/crates/katgpt-pruners/src/arena/scheduler.rs`
 
@@ -291,7 +291,7 @@ pub fn full_field_matchups(n: usize, field_size: usize) -> Vec<Matchup> {
 
 ---
 
-## T3: `arena/mod.rs` — Module Index
+## T3: `crates/katgpt-pruners/src/arena/mod.rs` — Module Index
 
 ### File: `katgpt-rs/crates/katgpt-pruners/src/arena/mod.rs`
 
@@ -317,7 +317,7 @@ pub mod arena;
 
 ---
 
-## T4: `bomber/arena_runner.rs` — BomberArenaRunner
+## T4: `src/pruners/bomber/arena_runner.rs` — BomberArenaRunner
 
 ### File: `katgpt-rs/src/pruners/bomber/arena_runner.rs`
 
@@ -413,7 +413,7 @@ pub fn run_bomber_matchup(
 
 ---
 
-## T5: `fft/arena_runner.rs` — FFTArenaRunner
+## T5: `crates/katgpt-pruners/src/fft/arena_runner.rs` — FFTArenaRunner
 
 ### File: `katgpt-rs/crates/katgpt-pruners/src/fft/arena_runner.rs`
 
@@ -631,9 +631,9 @@ cargo test --features ropd_rubric,g_zero,bomber,fft --quiet
 
 1. **T1** → types.rs (no deps)
 2. **T2** → scheduler.rs (depends on T1 types)
-3. **T3** → arena/mod.rs + register in pruners/mod.rs (depends on T1, T2)
-4. **T4** → bomber/arena_runner.rs (depends on T1, T3)
-5. **T5** → fft/arena_runner.rs (depends on T1, T3)
+3. **T3** → crates/katgpt-pruners/src/arena/mod.rs + register in pruners/mod.rs (depends on T1, T2)
+4. **T4** → src/pruners/bomber/arena_runner.rs (depends on T1, T3)
+5. **T5** → crates/katgpt-pruners/src/fft/arena_runner.rs (depends on T1, T3)
 6. **T6** → bomber_09_rubric_tournament.rs (depends on T4)
 7. **T7** → fft_02_rubric_tournament.rs (depends on T5)
 8. **T8** → run tournaments, record results (depends on T6, T7)

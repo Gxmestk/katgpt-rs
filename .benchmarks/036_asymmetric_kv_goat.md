@@ -142,5 +142,5 @@ let symmetric = AsymmetricKVConfig::symmetric(4);
 
 - `src/types.rs` — `AsymmetricKVConfig` type (Plan 123 T7)
 - `src/benchmark/asymmetric.rs` — `AsymmetricBenchResult`, `cosine_similarity()`, `bench_asymmetric_cross_method()` (Plan 123 T2/T6) — file was `src/benchmark.rs` at the time this doc was written and later refactored into the `src/benchmark/` directory module.
-- `src/turboquant/kv_cache.rs` — `TurboQuantKVCache::new_asymmetric()` (Plan 123 T8)
+- `crates/katgpt-quant/src/turboquant/kv_cache.rs` — `TurboQuantKVCache::new_asymmetric()` (Plan 123 T8)
 - `tests/test_123_asymmetric_kv_goat.rs` — 25 GOAT proofs

@@ -38,15 +38,15 @@ All gates validated via `core_05_maxsim` example and `bench_maxsim_score` / `ben
 
 ### Phase 1: Core Primitive — `maxsim_score`
 
-- [x] **T1: Add `maxsim_score` to `src/simd.rs`**
+- [x] **T1: Add `maxsim_score` to `crates/katgpt-dec/src/simd.rs`**
   - Signature: `pub fn maxsim_score(queries: &[f32], documents: &[f32], lq: usize, ld: usize, dim: usize) -> f32`
   - Computes `Σ_i max_j dot(q_i, d_j)` without allocating `[Lq × Ld]`
   - Uses running max per query token, calls `simd_dot_f32` for inner loop
   - FP32 accumulation regardless of input (matches Metal kernel design)
   - Feature-gated behind `maxsim`
-  - Location: `src/simd.rs` ~L788-822
+  - Location: `crates/katgpt-dec/src/simd.rs` ~L788-822
 
-- [x] **T2: Add `maxsim_score` tests to `src/simd.rs` mod tests**
+- [x] **T2: Add `maxsim_score` tests to `crates/katgpt-dec/src/simd.rs` mod tests**
   - 7 tests in `mod maxsim_tests` behind `#[cfg(feature = "maxsim")]`:
     - `maxsim_matches_naive` — random matrices, fused vs materialized naive
     - `maxsim_single_query_token` — Lq=1 edge case
@@ -57,7 +57,7 @@ All gates validated via `core_05_maxsim` example and `bench_maxsim_score` / `ben
     - `maxsim_packed_matches_sequential` — packed vs individual calls
   - **GOAT gate: ✅** All 7 pass, matches naive within 1e-6
 
-- [x] **T3: Add `maxsim_score_packed` to `src/simd.rs`**
+- [x] **T3: Add `maxsim_score_packed` to `crates/katgpt-dec/src/simd.rs`**
   - Packed/ragged form: score N (query, doc) pairs with offset arrays
   - Signature:
     ```rust
@@ -105,7 +105,7 @@ All gates validated via `core_05_maxsim` example and `bench_maxsim_score` / `ben
 
 ### Phase 3: TurboQuant/SpectralQuant `ScoreReduction::MaxSim`
 
-- [x] **T9: Add `maxsim_score_turboquant` to `src/turboquant/forward.rs`**
+- [x] **T9: Add `maxsim_score_turboquant` to `crates/katgpt-quant/src/turboquant/forward.rs`**
   - Lazy dequantize: one key vector in memory at a time, O(dim) peak
   - Streaming pattern: `cache.dequantize_key(layer, t)` → `simd_dot_f32` → running max
   - Feature-gated behind `turboquant` + `maxsim`
@@ -234,11 +234,11 @@ If PFlash block maxsim (T7-T8) shows no improvement over mean-K, that applicatio
 | File | Changes |
 |------|---------|
 | `Cargo.toml` | `maxsim` feature flag + `core_05_maxsim` example + added to `full` |
-| `src/simd.rs` | `maxsim_score`, `maxsim_score_packed`, `maxsim_tests` module (7 tests) |
+| `crates/katgpt-dec/src/simd.rs` | `maxsim_score`, `maxsim_score_packed`, `maxsim_tests` module (7 tests) |
 | `src/speculative/types.rs` | `ScoreReduction` enum (always compiles, `MaxSim` variant feature-gated), `FlashPrefillConfig.score_reduction` field |
 | `src/speculative/prefill.rs` | `block_score_maxsim` function |
 | `src/speculative/mod.rs` | Re-export `block_score_maxsim` (feature-gated) |
-| `src/turboquant/forward.rs` | `maxsim_score_turboquant` — lazy dequantize + running max |
+| `crates/katgpt-quant/src/turboquant/forward.rs` | `maxsim_score_turboquant` — lazy dequantize + running max |
 | `src/spectralquant/forward.rs` | `maxsim_score_spectralquant` — reusable `key_buf` + dequantize-into |
 | `src/benchmark.rs` | `bench_maxsim_score` (6 configs), `bench_pflash_maxsim_block_scoring`, wired into `run_all`/`run_all_parallel` |
 | `examples/core_05_maxsim.rs` | Demo: core scoring, packed batch, block vs mean-K, scale timing |
@@ -283,4 +283,4 @@ cargo test --features "maxsim,turboquant,spectral_quant" --lib --quiet
 - `.raw/maxsim/maxsim_metal/maxsim.mm` — Metal host-side dispatch (reference only)
 - `.research/039_SpectralQuant_Calibrated_Eigenbasis_KV_Compression.md` — primary overlap
 - `riir-ai/crates/riir-gpu/src/kernels/spectralquant_attention.wgsl` — GPU kernel (T11 reference)
-- `riir-ai/crates/katgpt-core/crates/katgpt-core/src/attention.rs` — GPU host-side dispatch (T11 reference)
+- `riir-ai/crates/katgpt-core/src/attention.rs` — GPU host-side dispatch (T11 reference)

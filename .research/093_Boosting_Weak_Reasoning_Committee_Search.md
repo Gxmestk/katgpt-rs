@@ -112,7 +112,7 @@ A pairwise win is counted ONLY if both orders agree. Disagreements → treated a
 
 | Paper Concept | Our Component | Location | Type |
 |---------------|---------------|----------|------|
-| Proposer (k samples) | DDTree branch expansion | `speculative/dd_tree.rs` | Model-based |
+| Proposer (k samples) | DDTree branch expansion | `src/speculative/dd_tree.rs` | Model-based |
 | Critic (m votes) | ScreeningPruner + ConstraintPruner | `speculative/types.rs` | Modelless→model-based |
 | Comparator (r votes) | BtRank pairwise tournament | `pruners/bt_rank.rs` | Model-based |
 | Copeland tournament | `BtScores::rank()` | `pruners/bt_rank.rs` | Modelless |

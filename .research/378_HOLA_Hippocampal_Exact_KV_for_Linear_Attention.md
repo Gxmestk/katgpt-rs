@@ -114,7 +114,7 @@ Per the skill's mandatory two-layer check (notes + shipped code, with vocabulary
 - "delta rule" / "linear attention" → GDN2 (Plan 105), delta_mem (Plan 053)
 - "surprise" / "write magnitude β·‖e‖" / "innovation residual" → `temporal_deriv` surprise signal (Plan 277), `surprise_norm()`, δ-Mem write gate, `temp_loss_fingerprint` (Plan 005)
 - "semiparametric" / "parametric state + non-parametric KV" → `DualPoolBandit` E/X pools (Research 249), Raven consolidation (parametric) + AnyRAG (non-parametric)
-- "sharpened read" / "decoupled RMSNorm-γ" → `rmsnorm_with_gamma` (in `katgpt-core/src/types.rs` / `katgpt-types/src/math.rs`)
+- "sharpened read" / "decoupled RMSNorm-γ" → `rmsnorm_with_gamma` (in `katgpt-core/src/types.rs` / `crates/katgpt-types/src/math.rs`)
 
 **Notes layer (grep results — both vocabularies):**
 
@@ -132,7 +132,7 @@ Grep across `katgpt-rs/**/*.rs` for `evict|top_w|write_magnitude|β.*∥.*e∥|d
 
 | Match | Location | Is this HOLA's mechanism? |
 |---|---|---|
-| FIFO ring-buffer eviction (motif/conformal) | `crates/katgpt-core/src/closure/motif.rs`, `conformal/ring.rs` | NO — pure recency/FIFO, not surprise. |
+| FIFO ring-buffer eviction (motif/conformal) | `crates/katgpt-core/src/closure/motif.rs`, `crates/katgpt-core/src/conformal/ring.rs` | NO — pure recency/FIFO, not surprise. |
 | E-pool priority eviction on consolidation | `crates/katgpt-core/src/cgsp/dual_pool.rs` `consolidate_growing` | PARTIAL — evicts lowest-priority E-pool arm on overflow, but the pool is curiosity *directions*, not KV pairs, and the priority is bandit reward, not β·‖e‖. |
 | Tau-calibrator window eviction | `crates/katgpt-attn/src/chiaroscuro/tau.rs` | NO — entropy threshold window, not delta-rule write magnitude. |
 | Zone bank FIFO cap | `benches/alien_sampler_goat.rs` | NO — recency cap, not surprise. |
@@ -140,7 +140,7 @@ Grep across `katgpt-rs/**/*.rs` for `evict|top_w|write_magnitude|β.*∥.*e∥|d
 
 **Grep for `top_w|write_magnitude|delta_rule_write|β.*e_norm|frobenius.*residual` → NO MATCHES in any `.rs`.** No shipped KV-cache eviction policy uses the delta-rule write Frobenius norm as its score.
 
-**Grep for `rmsnorm_with_gamma` → SHIPS** in `katgpt-types/src/math.rs` (and re-exported via `katgpt-core`). Not currently wired to a decoupled cache-read path.
+**Grep for `rmsnorm_with_gamma` → SHIPS** in `crates/katgpt-types/src/math.rs` (and re-exported via `katgpt-core`). Not currently wired to a decoupled cache-read path.
 
 **Conclusion:** The HOLA *mechanism* — surprise-evicted bounded KV cache with decoupled RMSNorm-γ read on the GDN/GDN2 backbone — is **novel as shipped code**. The HOLA *latent-space reframing* — hippocampal complement to a compressive recurrent state — **already ships across three repos**:
 - katgpt-rs: `temporal_deriv` + δ-Mem write gate = surprise-gated parametric memory (Plan 277, default-on).

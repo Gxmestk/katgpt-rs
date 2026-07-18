@@ -37,7 +37,7 @@ This is **not** a new primitive — FuncAttn is the primitive. This is the **con
 |---|---|---|
 | **FuncAttn** (R257, Plan 286) — surrogate representation | `katgpt-core/src/funcattn.rs` | No substitution gate — FuncAttn computes attention, doesn't decide when to use itself vs a real head |
 | **Percepta** (R031/032, Plan 064) — programs-as-attention | `katgpt-percepta` crate | Compile-time only; no runtime substitution decision |
-| `FaithfulnessProbe` causal intervention (R244, Plan 278) | `katgpt-core/src/faithfulness/probe.rs` | Detects unfaithfulness; doesn't prescribe a surrogate or gate substitution |
+| `FaithfulnessProbe` causal intervention (R244, Plan 278) | `crates/katgpt-core/src/faithfulness/probe.rs` | Detects unfaithfulness; doesn't prescribe a surrogate or gate substitution |
 | `SmearClassifier` hallucinated-feature detector (R277, Plan 298) | `katgpt-core/crates/katgpt-core/src/faithfulness/smear.rs` | Detects smear; doesn't gate substitution |
 
 **The novel piece this plan ships:** `HeadSubstitutionGate` — a small wrapper that decides when FuncAttn should fire as a substitute for a real head, using the paper's IoU `r > 0.9` finding as the cheap-proxy gate and FaithfulnessProbe as the expensive-validation cadence.
@@ -49,7 +49,7 @@ This is **not** a new primitive — FuncAttn is the primitive. This is the **con
 ### Tasks
 
 - [x] **T1.1** Create module directory `katgpt-rs/crates/katgpt-core/src/functional_substitution/` with `mod.rs`, `gate.rs`, `iou.rs`.
-- [x] **T1.2** Add feature flag `functional_substitution_gate` to `katgpt-rs/crates/katgpt-core/Cargo.toml` (default-off). The feature depends on `funcattn` (for the surrogate trait) and `faithfulness_probe` (for the validation primitive). Wire into `katgpt-core/src/lib.rs` behind `#[cfg(feature = "functional_substitution_gate")]`.
+- [x] **T1.2** Add feature flag `functional_substitution_gate` to `katgpt-rs/crates/katgpt-core/Cargo.toml` (default-off). The feature depends on `funcattn` (for the surrogate trait) and `faithfulness_probe` (for the validation primitive). Wire into `crates/katgpt-core/src/lib.rs` behind `#[cfg(feature = "functional_substitution_gate")]`.
 - [x] **T1.3** Define `iou` function in `iou.rs`: `iou(a: &[f32], b: &[f32]) -> f32`. Formula per paper eq. 3: `Σ min(a,b) / Σ max(a,b)`. SIMD-friendly chunked loop, no allocations. Unit-tested against hand-computed cases (identity → 1.0, disjoint → 0.0, half-overlap → 0.5).
 - [x] **T1.4** Define `HeadSubstitutionGate` struct in `gate.rs`:
   ```rust
@@ -157,7 +157,7 @@ The paper's strongest empirical claim is that IoU is a valid *cheap proxy* for *
 
 - **Research note:** `katgpt-rs/.research/353_Program_Synthesized_Attention_Head_Surrogates.md` (esp. §3.3 revision log)
 - **Primitive being gated:** `katgpt-core/src/funcattn.rs` (R257, Plan 286)
-- **Validation primitive:** `katgpt-core/src/faithfulness/probe.rs` (R244, Plan 278)
+- **Validation primitive:** `crates/katgpt-core/src/faithfulness/probe.rs` (R244, Plan 278)
 - **Cadence pattern source:** Plan 287 (SinkAware cached-cadence)
 - **Cousin research:** 257 (FuncAttn), 031/032 (Percepta), 244 (FaithfulnessProbe), 229 (ProgramAsWeights), 277 (SmearClassifier), 178 (Rosetta Neurons), 302 (FAME — latent reframing target)
 

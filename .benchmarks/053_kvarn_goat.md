@@ -120,9 +120,9 @@ cargo run --example kvarn_thinking_demo --features "kvarn,thinking_cot" --releas
 ## Files
 
 - `src/kvarn/variance_norm.rs` — Sinkhorn iterative variance normalization (SIMD)
-- `src/kvarn/kv_cache.rs` — `KVarNKVCache` struct (store/dequant pipeline)
+- `crates/katgpt-kv/src/kvarn/kv_cache.rs` — `KVarNKVCache` struct (store/dequant pipeline)
 - `src/kvarn/pseudo_decode.rs` — Error accumulation evaluation harness
-- `src/kvarn/mod.rs` — Module root + feature gate
+- `crates/katgpt-kv/src/kvarn/mod.rs` — Module root + feature gate
 - `examples/kvarn_goat_proof.rs` — GOAT proof + benchmarks
 - `examples/kvarn_thinking_demo.rs` — Reasoning/CoT quality demo
 - `examples/octpq_kvarn_fusion.rs` — Hybrid OCT+PQ + KVarN VarN fusion

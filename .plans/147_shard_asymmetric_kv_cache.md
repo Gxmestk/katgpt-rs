@@ -78,7 +78,7 @@ V path (prefill):
   3. pack indices
 
 Decode streaming:
-  1. Lloyd-Max 8-bit (reuse turboquant/codebook.rs)
+  1. Lloyd-Max 8-bit (reuse crates/katgpt-quant/src/turboquant/codebook.rs)
   2. Bit-exact lossless path
 
 Sink + window:
@@ -87,13 +87,13 @@ Sink + window:
 ```
 
 **New files:**
-- `src/shard_kv/mod.rs` — module index
-- `src/shard_kv/types.rs` — `ShardConfig`, `ShardLayer`, `ShardCalibration`
+- `crates/katgpt-kv/src/shard_kv/mod.rs` — module index
+- `crates/katgpt-kv/src/shard_kv/types.rs` — `ShardConfig`, `ShardLayer`, `ShardCalibration`
 - `crates/katgpt-kv/src/shard_kv/rope.rs` — RoPE undo/reapply utilities
 - `src/shard_kv/k_pca.rs` — PCA compression path for K
 - `src/shard_kv/v_vq.rs` — Hadamard + k-means VQ for V
 - `src/shard_kv/dp_bits.rs` — DP bit allocation with drop penalty
-- `src/shard_kv/kv_cache.rs` — `ShardKVCache` struct
+- `crates/katgpt-kv/src/shard_kv/kv_cache.rs` — `ShardKVCache` struct
 - `src/shard_kv/forward.rs` — dequant + attention paths
 - `src/shard_kv/sink_window.rs` — attention sink + recency window management
 
@@ -259,8 +259,8 @@ Phase 1:
 
 Phase 2:
   + spectralquant/ (from Phase 1)
-  + turboquant/codebook.rs (Lloyd-Max reuse)
-  + turboquant/rotation.rs (Hadamard reuse)
+  + crates/katgpt-quant/src/turboquant/codebook.rs (Lloyd-Max reuse)
+  + crates/katgpt-quant/src/turboquant/rotation.rs (Hadamard reuse)
   + NEW: shard_kv/ module
 
 Phase 3 (riir-ai):

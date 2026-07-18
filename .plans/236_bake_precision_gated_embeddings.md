@@ -68,7 +68,7 @@ graph TD
 - [x] SenseBandit Precision-Weighted Exploration
   - Added `precision_weighted_reward()` behind `#[cfg(feature = "bake_precision")]`
   - Low-precision dimensions get boosted exploration reward
-  - File: `crates/katgpt-ruliology/crates/katgpt-ruliology/src/bandit.rs` ✓
+  - File: `crates/katgpt-ruliology/src/bandit.rs` ✓
 
 - [x] ThoughtFold Precision-Gated Fold Confidence
   - Steps where KG embedding has high precision → fold is safe

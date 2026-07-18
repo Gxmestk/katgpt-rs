@@ -217,7 +217,7 @@ tiled_attention = []  # Tiled online-softmax flash attention for CPU SIMD
 ```
 
 **Scope:**
-- Tiled attention function in `katgpt-core/src/attention.rs` (new file)
+- Tiled attention function in `crates/katgpt-core/src/attention.rs` (new file)
 - Processes Q in SIMD-width row tiles, K/V in column tiles
 - Online softmax with exp2 trick
 - Falls back to current `softmax_scaled()` for small N where tiling overhead dominates
@@ -260,7 +260,7 @@ Being honest about the limitations:
 
 ### For katgpt-rs (CPU SIMD):
 1. Add `tiled_attention` feature gate to `katgpt-core/Cargo.toml`
-2. Implement tiled online-softmax attention in `katgpt-core/src/attention.rs`
+2. Implement tiled online-softmax attention in `crates/katgpt-core/src/attention.rs`
 3. Benchmark: compare throughput and memory usage vs current full-materialization path
 4. GOAT proof: cosine similarity > 0.999 vs reference SDPA
 

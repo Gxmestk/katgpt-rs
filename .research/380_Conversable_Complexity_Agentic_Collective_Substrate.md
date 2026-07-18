@@ -100,7 +100,7 @@ The paper is unusual: it does not have a per-NPC-state substrate to reframe. The
 | **Mechanistic channel** (causal pathway) | Bidirectional Cognitive Monitoring (Research 157) + Indicator Probe Bank (Plan 320) |
 | **Individuation** conjecture | Entity Cognition Stack committed-personality via quorum (`riir-ai/crates/riir-engine/src/entity_cognition/commit.rs`) + `species_transition` (feral/tame/criminal/pack) |
 | **Inheritance** conjecture | `KarcShard` / `ArchetypeBlendShard` / `MerkleFrozenEnvelope` — descendants inherit committed artifacts |
-| **Externalised cognition** conjecture | `engram_runtime` + `cognitive_branches_runtime/scratch.rs` + `NeuronShard` consolidation (offload to fixed-size Pod artifacts) |
+| **Externalised cognition** conjecture | `engram_runtime` + `riir-ai/crates/riir-engine/src/cognitive_branches_runtime/scratch.rs` + `NeuronShard` consolidation (offload to fixed-size Pod artifacts) |
 | **Role differentiation** conjecture | `role_transport.rs` + `species::SpeciesArchetype` + faction culture vectors (Community layer) |
 | **Multi-scale** conjecture | crowd MCGS (`crowd_mcgs/`) + faction hierarchy + chain consensus |
 | **Open-endedness** conjecture | `cgsp_runtime` curiosity-driven self-play + `skill_opt` (MUSE → ITSE) |

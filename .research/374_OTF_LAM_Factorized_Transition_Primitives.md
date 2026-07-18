@@ -82,7 +82,7 @@ Replace pixel-space prediction with prediction in a **frozen DINOv2 representati
 | inverse dynamics (IDM) | `extract_functor` (estimate displacement from pairs) | `latent_functor/arithmetic.rs` — **monolithic** (single mean displacement) |
 | forward dynamics (FDM) | `apply_functor` (predict target from source + functor); `InducedCwmKernel::advance` | `latent_functor/arithmetic.rs`; `katgpt-core/src/induced_cwm/` |
 | agent ambiguity / distractor entanglement | curiosity = prediction-error signal (Pathak-style distractor filter) | `crates/katgpt-core/src/temporal_deriv.rs` (DEFAULT-ON); CGSP (Plan 274) |
-| cross-morphology / cross-carrier transfer | cross-game transfer, shard reuse across zones/archetypes | `latent_functor/cross_game.rs`; `NeuronShard` zone transfer; `ArchetypeBlendShard` |
+| cross-morphology / cross-carrier transfer | cross-game transfer, shard reuse across zones/archetypes | `riir-ai/crates/riir-engine/src/latent_functor/cross_game.rs`; `NeuronShard` zone transfer; `ArchetypeBlendShard` |
 | behavioral cloning policy | training-only | → riir-train |
 | VQ-VAE codebook learning (k-means init + EMA + commitment loss) | training-only (OR runtime k-means — modelless unblock path) | → riir-train (trained); katgpt-rs (runtime k-means) |
 | action decoder (latent → true action) | training-only | → riir-train |
@@ -105,7 +105,7 @@ The mandatory two-layer novelty check (notes + shipped code, per the Research 24
 | **Factorized codebook of K transition primitives** | **NOT FOUND** — codebooks exist only for KV compression (`katgpt-kv` Lloyd-Max), never for transition/observation factorization | ❌ **Novel** |
 | **Per-primitive sigmoid relevance gate over a codebook** | Sigmoid gates are pervasive, but NOT applied over a factorized transition codebook | ❌ **Novel as a combination** |
 | **Normalized gated average of codebook primitives → action latent** | `PersonalityWeightedComposition` does weighted composition over LAYERS, not over a transition codebook | ❌ **Novel as a combination** |
-| Cross-morphology codebook transfer | `latent_functor/cross_game.rs` transfers functors (monolithic); no codebook-transfer mechanism | ❌ **Novel** |
+| Cross-morphology codebook transfer | `riir-ai/crates/riir-engine/src/latent_functor/cross_game.rs` transfers functors (monolithic); no codebook-transfer mechanism | ❌ **Novel** |
 
 **The factorization is the novel angle.** The monolithic latent-action primitive already ships as Super-GOAT (Research 123). OTF-LAM is the **factorized/compositional refinement**: instead of one displacement vector, K discrete primitives combined via state-aware sigmoid gating.
 

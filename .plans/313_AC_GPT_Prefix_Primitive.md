@@ -26,8 +26,8 @@ Ship a modelless, zero-allocation **AC-GPT-style arbitrary-conditional prefix pr
 
 | AC-GPT feature | Already ships | File |
 |---|---|---|
-| BlockCausal attention (bidirectional within block, causal across) | `AttentionMode::BlockCausal` | `crates/katgpt-types/crates/katgpt-types/src/enums.rs:74` |
-| Reader/writer LoRA switch (bidirectional prefill vs causal decode) | `LoraPair { reader, writer }` | `crates/katgpt-types/crates/katgpt-types/src/lora.rs:392` |
+| BlockCausal attention (bidirectional within block, causal across) | `AttentionMode::BlockCausal` | `crates/katgpt-types/src/enums.rs:74` |
+| Reader/writer LoRA switch (bidirectional prefill vs causal decode) | `LoraPair { reader, writer }` | `crates/katgpt-types/src/lora.rs:392` |
 | Position-aware prefix entries (`token_id, original_pos`) | `MixedPrefillSequence::Raw` | `crates/katgpt-core/src/mux_latent/inject.rs:34` |
 | Conditional retrieval / fuse into hidden state | Engram `fuse_into_hidden_state` | `crates/katgpt-core/src/engram/` |
 | Top-down direction-vector injection | Latent Field Steering | `crates/katgpt-core/src/latent_steering.rs` |
@@ -97,7 +97,7 @@ Ship a modelless, zero-allocation **AC-GPT-style arbitrary-conditional prefix pr
     - Write the sampled token into the augmented sequence at the eval position.
   - Conditioning copies and original conditioning positions stay fixed.
   - Returns just the eval tokens (in original order).
-- [x] **T2.3** Add a `ForwardForAcPrefix` trait in `ac_prefix/forward.rs` so callers can plug in any causal Transformer forward pass without naming concrete weight types. (Mirrors the existing `SpeculativeGenerator` pattern.)
+- [x] **T2.3** Add a `ForwardForAcPrefix` trait in `crates/katgpt-core/src/ac_prefix/forward.rs` so callers can plug in any causal Transformer forward pass without naming concrete weight types. (Mirrors the existing `SpeculativeGenerator` pattern.)
 - [x] **T2.4** Demo in `crates/katgpt-core/examples/ac_prefix_demo.rs`: micro-GPT config, 16-token base sequence, 8 conditioning tokens, print conditional logprob and a sampled continuation. Demo the leakage-prevention by also running a "naive" variant (let later tokens attend to in-place conditioning tokens) and showing the conditional logprob differs.
 
 **Phase 2 exit:** demo runs, conditional logprob is finite, sample is well-formed, naive-vs-AC-GPT logprob differs (proving the leakage-prevention matters).

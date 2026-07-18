@@ -35,7 +35,7 @@ Ship two modelless, inference-time primitives distilled from HydraHead (arXiv:26
 ### Tasks
 
 - [x] **T1.1** Create module directory `katgpt-rs/crates/katgpt-core/src/causal_head_importance/` with `mod.rs`, `readout.rs`, `patching.rs`, `scorer.rs`, `fusion.rs`.
-- [x] **T1.2** Add feature flag `causal_head_importance` to `katgpt-rs/crates/katgpt-core/Cargo.toml` (default-off). No new heavy deps — the primitive operates on `&[f32]` slices and callbacks. Wire into `katgpt-core/src/lib.rs` behind `#[cfg(feature = "causal_head_importance")]`.
+- [x] **T1.2** Add feature flag `causal_head_importance` to `katgpt-rs/crates/katgpt-core/Cargo.toml` (default-off). No new heavy deps — the primitive operates on `&[f32]` slices and callbacks. Wire into `crates/katgpt-core/src/lib.rs` behind `#[cfg(feature = "causal_head_importance")]`.
 - [x] **T1.3** Define `SpanLogitDiffReadout` in `readout.rs` (paper Eq 9):
   ```rust
   /// Span-level logit-difference readout with exponential decay (paper Eq 9).

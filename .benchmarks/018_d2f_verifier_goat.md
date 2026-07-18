@@ -11,7 +11,7 @@ Implemented `D2fDrafterVerifier` — a speculative verifier that uses D2F diffus
 | Aspect | Result |
 |--------|--------|
 | Feature gate | `tri_mode` (depends on `dllm`) |
-| New files | `speculative/d2f_verifier.rs`, `tests/test_d2f_verifier.rs` |
+| New files | `src/speculative/d2f_verifier.rs`, `tests/test_d2f_verifier.rs` |
 | Modified files | `speculative/types.rs`, `speculative/mod.rs`, `dllm.rs` |
 | Lines added | ~250 (impl + tests) |
 | Zero regressions | ✅ All 668 existing tests pass |

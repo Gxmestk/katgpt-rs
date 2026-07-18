@@ -122,7 +122,7 @@ pub struct RegionSubspaceField<const D: usize, const K: usize, const R: usize> {
 - [x] **T1.5** Implement `local_coordinates(state: &[f32; D], field: &Self, k: usize) -> [f32; R]` — `Z_k · (x − μ_k)`. Zero-alloc. **DONE**
 - [x] **T1.6** Implement `steer_centroid(state: &mut [f32; D], field: &Self, k: usize, alpha: f32)` — in-place SAXPY `(1−α)x + αμ_k`. Zero-alloc. **DONE**
 - [x] **T1.7** Implement `steer_local(state: &mut [f32; D], field: &Self, k: usize, offset: &[f32; R])` — in-place `x += W_k · offset`. Zero-alloc. Documented the `K=1, μ=0, W=I` → Plan 412 reduction. **DONE**
-- [x] **T1.8** Add `pub mod region_subspace;` + re-exports to `katgpt-core/src/lib.rs`, gated `#[cfg(feature = "region_subspace_steering")]`. **DONE**
+- [x] **T1.8** Add `pub mod region_subspace;` + re-exports to `crates/katgpt-core/src/lib.rs`, gated `#[cfg(feature = "region_subspace_steering")]`. **DONE**
 - [x] **T1.9** Add `region_subspace_steering = ["subspace_steering"]` feature to `katgpt-core/Cargo.toml`. **DONE**
 - [x] **T1.10** G1 unit test: `k1_degenerate_parity_with_plan_412` — construct a `RegionSubspaceField<D, 1, D>` with `μ_1=0, W_1=I_D`, apply `steer_local`, assert bit-identical to Plan 412. **DONE** — bit-identical via `f32::to_bits()` equality on all D=8 elements.
 

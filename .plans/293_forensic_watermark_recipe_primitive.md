@@ -266,7 +266,7 @@ katgpt-rs/crates/katgpt-core/src/forensic/
 
 ### Tasks
 
-- [x] **T8.1** Add module-level rustdoc to `forensic/mod.rs` explaining: what it does, when to use, security model (forensic, not preventive), reference to Research 268.
+- [x] **T8.1** Add module-level rustdoc to `riir-chain/src/forensic/mod.rs` explaining: what it does, when to use, security model (forensic, not preventive), reference to Research 268.
 - [-] **T8.2** Add `katgpt-rs/README.md` Feature Showcase entry for Forensic Watermark (after G1–G4 pass). Cross-link to Research 268 + Plan 322.  
   **NOT EXECUTED** — the code moved to riir-chain (OPSEC). The katgpt-rs README has a tombstone pointing at riir-ai Plan 322 (added in commit `f4ca6ea7`). A Showcase entry would advertise the primitive publicly, which contradicts the OPSEC rationale for the move. The README entry belongs in riir-chain (if any), gated by the Plan 322 integration-level GOAT gate.
 - [x] **T8.3** Add example `riir-chain/examples/forensic_watermark_demo.rs` showing: derive recipe → apply to synthetic mesh → recover → attribute. ~100 lines, runs without GPU.

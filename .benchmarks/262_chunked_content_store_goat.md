@@ -38,10 +38,10 @@ consumed by riir-ai Plan 319 (Executable Asset Vessel + Quorum Gitflow).
 
 | Test | Gate | File |
 |------|------|------|
-| `g1_dedup_ratio_meets_target` | G1 | `content_store/goat.rs` |
+| `g1_dedup_ratio_meets_target` | G1 | `crates/katgpt-core/src/content_store/goat.rs` |
 | `test_cdc_dedup_with_variant` | G2 | `crates/katgpt-core/src/content_store/chunker.rs` (Phase 2) |
-| `g3_inclusion_proof_cost_under_10us` | G3 | `content_store/goat.rs` (`#[ignore]` — release-only; PASS after O(log n) fix) |
-| `g4_light_client_verify_no_self` | G4 | `content_store/goat.rs` |
+| `g3_inclusion_proof_cost_under_10us` | G3 | `crates/katgpt-core/src/content_store/goat.rs` (`#[ignore]` — release-only; PASS after O(log n) fix) |
+| `g4_light_client_verify_no_self` | G4 | `crates/katgpt-core/src/content_store/goat.rs` |
 | (type-system check) | G6 | `cargo check --no-default-features` |
-| `g5_hot_path_read_p99_under_200ns` | G5 | `content_store/goat.rs` (`#[ignore]` — release-only) |
-| `g7_tamper_detection` | G7 | `content_store/goat.rs` |
+| `g5_hot_path_read_p99_under_200ns` | G5 | `crates/katgpt-core/src/content_store/goat.rs` (`#[ignore]` — release-only) |
+| `g7_tamper_detection` | G7 | `crates/katgpt-core/src/content_store/goat.rs` |

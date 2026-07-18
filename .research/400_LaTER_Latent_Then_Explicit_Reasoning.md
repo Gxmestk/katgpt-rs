@@ -82,10 +82,10 @@ SwiR additionally reports real-model GOAT: G2 token-efficiency 1.32×/1.37×/1.4
 
 | LaTER term | Shipped equivalent | Where |
 |---|---|---|
-| latent-then-explicit | `ThinkMode::{Latent, Explicit}` alternating | `src/swir/controller.rs` (Plan 275) |
+| latent-then-explicit | `ThinkMode::{Latent, Explicit}` alternating | `crates/katgpt-transformer/src/swir/controller.rs` (Plan 275) |
 | project hidden state → embedding space | `soft_embedding(probs, embedding_matrix, ...)` | `crates/katgpt-transformer/src/swir/soft_embedding.rs` |
-| entropy switch | `SwiRController::step(entropy, ...)` block-relative H̄ | `src/swir/controller.rs` |
-| stop-token probe | Switch Count Controller convergence/termination triggers | `src/swir/controller.rs` |
+| entropy switch | `SwiRController::step(entropy, ...)` block-relative H̄ | `crates/katgpt-transformer/src/swir/controller.rs` |
+| stop-token probe | Switch Count Controller convergence/termination triggers | `crates/katgpt-transformer/src/swir/controller.rs` |
 | preserve latent KV cache | soft embedding preserves first-order distribution (G4 hull invariant) | `crates/katgpt-transformer/src/swir/soft_embedding.rs` + `convex_hull_check.rs` |
 | training-free | SwiR is training-free; promoted to default-on | Plan 275, Plan 313 T6.2 |
 

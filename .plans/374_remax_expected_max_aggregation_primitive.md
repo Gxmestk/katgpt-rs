@@ -41,7 +41,7 @@ Ship the closed-form ReMax aggregation operator (`expected_max_over_m`) and Expe
     `Q_plus` is a separate computation. Implemented as scalar `expected_improvement` +
     separate `expected_improvement_per_action`. See module docs §"Plan deviation note".
 
-- [x] **T1.3** Re-export from `katgpt-core/src/pruners/mod.rs` (feature-gated)
+- [x] **T1.3** Re-export from `crates/katgpt-core/src/pruners/mod.rs` (feature-gated)
   - `#[cfg(feature = "remax_aggregation")] pub mod remax;`
 
 - [x] **T1.4** Unit tests (14 tests, all passing)

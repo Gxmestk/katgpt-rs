@@ -68,19 +68,19 @@ This maps onto the *three-pillar composition* we ship but never unified under on
 
 | Paper term | DEC / codebase equivalent | Where it ships |
 |---|---|---|
-| Neural field / activity map | `CochainField` (multi-channel cochain on `CellComplex`) | `katgpt-dec/src/types.rs` |
-| Cell / pixel / location | Vertex (rank-0 cell) of `CellComplex::grid_2d(W, H)` | `katgpt-dec/src/types.rs` |
-| Channel / feature map | `CochainField::dim` (feature dimension per cell) | `katgpt-dec/src/types.rs` |
-| Lateral connectivity kernel K | `hodge_laplacian` (Δ = δd + dδ) — the *linear* stencil analogue; the *non-negative* variant is `relu_gate → Δ` | `katgpt-dec/src/operators.rs`, `hodge.rs` |
-| Local propagation / "no teleporting" | `dₖ₊₁ ∘ dₖ = 0` enforced by construction; tests `curl_of_gradient_is_zero`, `divergence_of_curl_is_zero` | `katgpt-dec/src/operators.rs` |
+| Neural field / activity map | `CochainField` (multi-channel cochain on `CellComplex`) | `crates/katgpt-dec/src/types.rs` |
+| Cell / pixel / location | Vertex (rank-0 cell) of `CellComplex::grid_2d(W, H)` | `crates/katgpt-dec/src/types.rs` |
+| Channel / feature map | `CochainField::dim` (feature dimension per cell) | `crates/katgpt-dec/src/types.rs` |
+| Lateral connectivity kernel K | `hodge_laplacian` (Δ = δd + dδ) — the *linear* stencil analogue; the *non-negative* variant is `relu_gate → Δ` | `crates/katgpt-dec/src/operators.rs`, `hodge.rs` |
+| Local propagation / "no teleporting" | `dₖ₊₁ ∘ dₖ = 0` enforced by construction; tests `curl_of_gradient_is_zero`, `divergence_of_curl_is_zero` | `crates/katgpt-dec/src/operators.rs` |
 | Motor-gated channels | `apply_latent_steering_weighted(state, dir, w)` — elementwise multiplicative gain | `crates/katgpt-core/src/latent_steering.rs` (Plan 309) |
 | Action-conditional prediction | `apply_functor` (rank-1 vector addition) + sigmoid trust gate | `riir-engine/src/latent_functor/arithmetic.rs` (Plan 303) |
-| Frozen learned world model | `InducedCwmKernel` (verifiable + committable + hot-swappable forward model) | `katgpt-core/src/induced_cwm/kernel.rs` (Plan 296) |
-| Frozen-simulator policy learning | `sleep_time` consolidation (offline pre-think) + `InducedCwmSlot` atomic swap | `riir-engine/src/sleep_time/` (Plan 341), `katgpt-core/src/induced_cwm/hot_swap.rs` |
+| Frozen learned world model | `InducedCwmKernel` (verifiable + committable + hot-swappable forward model) | `crates/katgpt-core/src/induced_cwm/kernel.rs` (Plan 296) |
+| Frozen-simulator policy learning | `sleep_time` consolidation (offline pre-think) + `InducedCwmSlot` atomic swap | `riir-engine/src/sleep_time/` (Plan 341), `crates/katgpt-core/src/induced_cwm/hot_swap.rs` |
 | Frozen envelope integrity | `MerkleFrozenEnvelope` (BLAKE3 + Merkle root) | `riir-neuron-db/src/freeze.rs` |
 | Body-selective motor channels | `riir-ai/crates/riir-engine/src/latent_functor/zone_gating.rs` (archetype projection with lenient gate) | `riir-ai/crates/riir-engine/src/latent_functor/zone_gating.rs` (Plan 305) |
-| Spatial map / sensory topology | `CellComplex::grid_2d` + `FourierSpatialMap` | `katgpt-dec/src/types.rs`, `riir-ai/crates/riir-engine/src/fourier/physics.rs` |
-| Geometric propagation (vs abstract state transition) | DEC `exterior_derivative` + `codifferential` + `hodge_laplacian` | `katgpt-dec/src/operators.rs` |
+| Spatial map / sensory topology | `CellComplex::grid_2d` + `FourierSpatialMap` | `crates/katgpt-dec/src/types.rs`, `riir-ai/crates/riir-engine/src/fourier/physics.rs` |
+| Geometric propagation (vs abstract state transition) | DEC `exterior_derivative` + `codifferential` + `hodge_laplacian` | `crates/katgpt-dec/src/operators.rs` |
 
 **Grep verification:** paper-vocabulary grep (`neural field|motor.?gat|isomorphic world|lateral connect|gain modul|Amari|retinotop|sensorimotor contingenc|intuitive physics engine`) returned **zero hits** across all five repos' `.research/` + `.plans/` + `.docs/`. Codebase-vocabulary grep (`Hodge.?Laplacian|apply_latent_steering|InducedCwm|apply_functor`) hits the substrate files listed above. **The composition does not exist; the pieces do.**
 

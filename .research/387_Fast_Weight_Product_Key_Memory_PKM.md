@@ -83,9 +83,9 @@ The paper's continual-learning experiment (Fig 6) shows FwPKM adapts quickly to 
 |---|---|---|
 | fast weights / fast-weight memory | runtime latent state, δ-Mem associative matrix, HLA per-NPC state | `katgpt-core/src/pruners/delta_mem/`, `riir-engine/src/hla/` |
 | product key / PKM | **NEW** — `ProductKeyMemory` primitive | `katgpt-core/src/product_key_memory/` (this plan) |
-| memory slot / value row | δ-Mem rank-r slot, Engram table entry, NeuronShard slot | `delta_mem/state.rs`, `engram/`, `riir-neuron-db/src/shard.rs` |
-| top-k sparse retrieval | DDTree top-k, NPC Memory Store heapselect, Raven routing | `katgpt-core/src/mcts.rs`, `riir-ai/crates/riir-engine/src/npc_memory.rs`, `examples/core_02_raven.rs` |
-| TTT-style gradient updates | **FORBIDDEN** → δ-rule update (`DeltaMemoryState::write_segment`) | `delta_mem/state.rs` (Plan 053) |
+| memory slot / value row | δ-Mem rank-r slot, Engram table entry, NeuronShard slot | `crates/katgpt-core/src/delta_mem/state.rs`, `engram/`, `riir-neuron-db/src/shard.rs` |
+| top-k sparse retrieval | DDTree top-k, NPC Memory Store heapselect, Raven routing | `crates/katgpt-core/src/mcts.rs`, `riir-ai/crates/riir-engine/src/npc_memory.rs`, `examples/core_02_raven.rs` |
+| TTT-style gradient updates | **FORBIDDEN** → δ-rule update (`DeltaMemoryState::write_segment`) | `crates/katgpt-core/src/delta_mem/state.rs` (Plan 053) |
 | addressing loss (entropy on keys) | **FORBIDDEN (GD)** → TEMP diversity selector (slot spread) | `katgpt-rs/src/sleep/consolidation.rs` (Plan 005) |
 | gated residual `g·v̂ + (1−g)·v` | CommittedFieldBlend, PersonalityWeightedComposition, NPC Memory Store gate | `crates/katgpt-core/src/committed_field_blend.rs`, `katgpt-core/src/sense/`, `riir-ai/crates/riir-engine/src/npc_memory.rs` |
 | IDW scoring (inverse distance) | **NEW scoring mode** — centroid-finding alternative to dot product | this plan (optional) |

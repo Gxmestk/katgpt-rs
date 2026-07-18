@@ -175,11 +175,11 @@ The rubric approach needs:
 
 | Component | File | Lines | Status |
 |-----------|------|-------|--------|
-| `arena/types.rs` | Shared tournament types | 369 | ✅ 14 tests |
-| `arena/scheduler.rs` | Round-robin scheduling | 126 | ✅ 10 tests |
-| `arena/mod.rs` | Module index | 9 | ✅ |
-| `bomber/arena_runner.rs` | Bomber match runner | ~320 | ✅ 8 tests |
-| `fft/arena_runner.rs` | FFT battle runner | ~200 | ✅ 6 tests |
+| `crates/katgpt-pruners/src/arena/types.rs` | Shared tournament types | 369 | ✅ 14 tests |
+| `crates/katgpt-pruners/src/arena/scheduler.rs` | Round-robin scheduling | 126 | ✅ 10 tests |
+| `crates/katgpt-pruners/src/arena/mod.rs` | Module index | 9 | ✅ |
+| `src/pruners/bomber/arena_runner.rs` | Bomber match runner | ~320 | ✅ 8 tests |
+| `crates/katgpt-pruners/src/fft/arena_runner.rs` | FFT battle runner | ~200 | ✅ 6 tests |
 | `bomber_09_rubric_tournament.rs` | Bomber tournament example | 353 | ✅ Runs clean |
 | `fft_02_rubric_tournament.rs` | FFT tournament example | 463 | ✅ Runs clean |
 

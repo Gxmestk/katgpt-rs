@@ -100,7 +100,7 @@ the encoder (which ships in `fourier/`).
 
 | Paper term | Codebase-equivalent | Verified shipped? |
 |---|---|---|
-| "analytic encoder" / "closed-form embedding" | `FourierEncoder::encode_position_into` / `encode_offset_into` (`riir-engine/src/fourier/encoder.rs`) | **YES — ships** (NOT novel; original R311 draft was wrong here) |
+| "analytic encoder" / "closed-form embedding" | `FourierEncoder::encode_position_into` / `encode_offset_into` (`riir-ai/crates/riir-engine/src/fourier/encoder.rs`) | **YES — ships** (NOT novel; original R311 draft was wrong here) |
 | "operator composition" / "functional correspondence" | `compose_chain` (NEW); `funcattn_compose` (token-level only) | Partial — `compose_chain` is the novel cross-entity gap |
 | "zone-batched prefix factoring" | `batch_compose_chain` (NEW) | No — gap (amortizes N players in one zone) |
 | "adaptive speculative cascade" / "stale-draft fallback" | ASOC `ComposerTick: GpuFuture` (NEW) | No — gap (uses shipped `GpuFuture`/`Join`/`block_on` as substrate) |
@@ -132,7 +132,7 @@ amortizes across N players in one zone via prefix factoring."
 | **Zone-batched prefix factoring** | `compose_chain` (above) | `papaya` lock-free `ShardIndex` (zone→shard) | **NEW** — `batch_compose_chain`: factor `C_qb` once, apply N× `C_player_i × C_qb` |
 | **Decoder × direction vectors** | scalar_projection.rs (decoder-only, HLA-only) | gyrocalculus per-axis distance | **NEW (generalization)** — `direction_vector_decode(state, direction) -> action_score` for non-HLA directions |
 | **Spectral audit verifier** | arxiv 2606.02427 tangent-Fourier | GOAT-gate discipline | **NEW** — Fourier-mode tangent operator check, the G6 verifier |
-| ~~Analytic encoder × eggshell lanes~~ | ~~PJ-RoPE~~ | ~~Plan 335 SIMD lanes~~ | **NOT novel** — `fourier/encoder.rs` already ships closed-form encoding. Dropped. |
+| ~~Analytic encoder × eggshell lanes~~ | ~~PJ-RoPE~~ | ~~Plan 335 SIMD lanes~~ | **NOT novel** — `riir-ai/crates/riir-engine/src/fourier/encoder.rs` already ships closed-form encoding. Dropped. |
 
 ---
 
@@ -140,10 +140,10 @@ amortizes across N players in one zone via prefix factoring."
 
 | Q | Answer | Evidence |
 |---|---|---|
-| Q1 — No prior art? | **YES** | grep across all 5 repos, both layers (notes + code), both vocabularies (paper + codebase). Five primitives genuinely missing: `compose_chain`, `batch_compose_chain`, ASOC `ComposerTick`, generic `direction_vector_decode`, spectral audit. The original encoder-trait gap was a false positive (already ships in `fourier/encoder.rs`). |
+| Q1 — No prior art? | **YES** | grep across all 5 repos, both layers (notes + code), both vocabularies (paper + codebase). Five primitives genuinely missing: `compose_chain`, `batch_compose_chain`, ASOC `ComposerTick`, generic `direction_vector_decode`, spectral audit. The original encoder-trait gap was a false positive (already ships in `riir-ai/crates/riir-engine/src/fourier/encoder.rs`). |
 | Q2 — New class of behavior? | **YES** | "Speculative GPU-cascade action selection with stale-draft fallback" — no incumbent ships non-blocking GPU-joined operator composition for autoplay bots. The closest shipped analog (`funcattn_compose`) is token-level, not cross-entity, and never returns a stale draft. |
 | Q3 — Product selling point? | **YES** | "Our autoplay bot never blocks on GPU — every tick emits a plasma-tier action in nanoseconds, and speculatively joins three transport-operator rederive futures, falling back to the stale plasma draft on congestion." |
-| Q4 — Force multiplier? | **YES** | Multiplies ≥8 shipped pillars: `riir-gpu-async` `GpuFuture` (the new substrate), `fourier/encoder.rs`, Plan 335 eggshell, latent_functor arithmetic, funcattn, latent_field_steering, viable_manifold_graph, riir-games plasma `QuestDraftModel`, riir-viz. |
+| Q4 — Force multiplier? | **YES** | Multiplies ≥8 shipped pillars: `riir-gpu-async` `GpuFuture` (the new substrate), `riir-ai/crates/riir-engine/src/fourier/encoder.rs`, Plan 335 eggshell, latent_functor arithmetic, funcattn, latent_field_steering, viable_manifold_graph, riir-games plasma `QuestDraftModel`, riir-viz. |
 
 **Selling point (one sentence, revised):** *The bot's action loop never blocks — every tick emits a plasma-tier draft in nanoseconds, then speculatively composes `C_boss × C_quest × C_player` cross-entity via `GpuFuture::Join`, falling back to the stale draft on GPU congestion.*
 
@@ -194,7 +194,7 @@ amortizes across N players in one zone via prefix factoring."
 | `direction_vector_decode` SIMD (generic) | katgpt-rs (open) | Generic dot-product + sigmoid |
 | Spectral audit verifier | katgpt-rs (open) | Generic Fourier-mode tangent check |
 | ASOC `ComposerTick<P,Rb,Rq,Rp,D>: GpuFuture` impl + `Join3` | **riir-ai** (private) | Needs `GpuFuture` + `Join` imports from `riir-gpu-async`, which is private to riir-ai. Same layering rule as Plan 335's `ZoneGeometryCache`. |
-| ~~`AnalyticLatticeEncoder` trait~~ | ~~katgpt-rs~~ | **DROPPED — redundant with `fourier/encoder.rs`.** Reuse, do not re-ship. |
+| ~~`AnalyticLatticeEncoder` trait~~ | ~~katgpt-rs~~ | **DROPPED — redundant with `riir-ai/crates/riir-engine/src/fourier/encoder.rs`.** Reuse, do not re-ship. |
 | Plasma-tier draft model (concrete game) | riir-ai (private) | Game design IP — ships as `riir-games::quest_draft::QuestDraftModel` |
 | Quest/Zone/Boss/Player encoding schemas | riir-ai (private) | Game design IP |
 | Game-specific direction vectors (per archetype) | riir-ai (private) | Game balance |
@@ -215,7 +215,7 @@ amortizes across N players in one zone via prefix factoring."
 ## TL;DR
 
 Super-GOAT verdict: 4/4 novelty gate passes **(revised)**. The encoder half of
-the original draft was a false-positive gap (already ships in `fourier/encoder.rs`);
+the original draft was a false-positive gap (already ships in `riir-ai/crates/riir-engine/src/fourier/encoder.rs`);
 the genuinely-novel contribution is the **ASOC cascade** (headline) plus
 `compose_chain`, `batch_compose_chain`, generic `direction_vector_decode`, and
 the spectral audit G6 verifier — all built on the already-shipped `GpuFuture` /

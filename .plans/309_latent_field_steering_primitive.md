@@ -44,7 +44,7 @@ leakage (uncontrolled propagation) **OR** G4 >1ms (too slow for 20Hz tick).
 
 - [x] T1.1 Created `katgpt-rs/crates/katgpt-core/src/latent_steering.rs` (437 lines):
   `LatentSteeringVector` (BLAKE3-committed via per-element LE f32, matches
-  `engram/commitment.rs` + `cross_resolution.rs` conventions), `LatentSteeringError::{NotUnitNorm,
+  `crates/katgpt-core/src/engram/commitment.rs` + `cross_resolution.rs` conventions), `LatentSteeringError::{NotUnitNorm,
   AlphaOutOfRange}`, `FieldSupport::{Global, Radius, Zone}`, `LatentField`,
   `apply_latent_steering`, `apply_latent_steering_weighted`, `kernel_weight`,
   `apply_field_to_crowd`, HLA axis index constants (`HLA_VALENCE`..`HLA_FEAR`,
@@ -55,7 +55,7 @@ leakage (uncontrolled propagation) **OR** G4 >1ms (too slow for 20Hz tick).
 - [x] T1.3 Feature gates added. In `katgpt-core/Cargo.toml`:
   `latent_field_steering = []`. In root `Cargo.toml`:
   `latent_field_steering = ["katgpt-core/latent_field_steering"]`.
-- [x] T1.4 Wired module into `katgpt-core/src/lib.rs` with `pub mod` + `pub use`.
+- [x] T1.4 Wired module into `crates/katgpt-core/src/lib.rs` with `pub mod` + `pub use`.
 - [x] T1.5 Smoke tests (6 in-module tests, all PASS):
   - `smoke_global_field_shifts_state` — verifies `state[i] += alpha * dir[i]` exactly.
   - `smoke_radius_field_localizes` — inside shifted, outside skipped.

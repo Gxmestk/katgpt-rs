@@ -438,7 +438,7 @@ Two variants implemented:
 - **AHLA** (asymmetric): maintains PKV, E matrices — O(d·dv) state per head
 
 ```rust
-// hla/kernel.rs — O(1) state update (Plan 057, SIMD-accelerated Plan 060)
+// riir-ai/crates/riir-engine/src/hla/kernel.rs — O(1) state update (Plan 057, SIMD-accelerated Plan 060)
 pub fn hla_state_update(sk: &mut [f32], q_head: &mut HlaQHeadState, q: &[f32], k: &[f32], v: &[f32], hd: usize, gamma: f32, tmp_k_cqv: &mut [f32], tmp_q_g: &mut [f32])
 pub fn hla_readout(q: &[f32], sk: &[f32], q_head: &HlaQHeadState, hd: usize, out: &mut [f32], tmp_u: &mut [f32])
 pub fn ahla_step(pkv: &mut [f32], mk: &mut [f32], q_head: &mut AhlaQHeadState, q: &[f32], k: &[f32], v: &[f32], hd: usize, gamma: f32, out: &mut [f32], tmp_r: &mut [f32])
@@ -446,7 +446,7 @@ pub fn ahla_step(pkv: &mut [f32], mk: &mut [f32], q_head: &mut AhlaQHeadState, q
 
 ### SIMD Acceleration (Plan 060)
 
-All HLA kernels dispatch through `crates/katgpt-core/src/simd.rs` (re-exported via `src/simd.rs`) — runtime NEON/AVX2 detection:
+All HLA kernels dispatch through `crates/katgpt-core/src/simd.rs` (re-exported via `crates/katgpt-dec/src/simd.rs`) — runtime NEON/AVX2 detection:
 
 | Operation | NEON Throughput (hd=4) |
 |-----------|----------------------|
@@ -460,7 +460,7 @@ Single ARM core handles 30K CCU @ 20Hz with 9.8× headroom.
 ### Forward Variants
 
 ```rust
-// hla/forward.rs — drop-in replacements for forward()
+// riir-ai/crates/riir-engine/src/hla/forward.rs — drop-in replacements for forward()
 pub fn forward_hla(ctx: &mut ForwardContext, weights: &TransformerWeights, cache: &mut MultiLayerHlaCache, token: usize, pos: usize, config: &Config) -> &mut [f32]
 pub fn forward_ahla(ctx: &mut ForwardContext, weights: &TransformerWeights, cache: &mut MultiLayerAhlaCache, token: usize, pos: usize, config: &Config) -> &mut [f32]
 ```
@@ -541,7 +541,7 @@ pub struct SdeConfig {
     pub preserve_top1: bool,  // keep highest-prob token clean
 }
 
-// speculative/dd_tree.rs — noise-augmented tree building
+// src/speculative/dd_tree.rs — noise-augmented tree building
 pub fn build_dd_tree_sde(...)    // SDE-augmented expansion
 pub fn build_dd_tree_balanced_sde(...) // balanced + SDE
 ```
@@ -552,7 +552,7 @@ Noise concentrates near t=0 via logit-normal distribution: 2.2× concentration a
 ### Width Scaling (PTRM, Plan 083)
 
 ```rust
-// speculative/dd_tree.rs — width scaling via best-of-K
+// src/speculative/dd_tree.rs — width scaling via best-of-K
 pub struct WidthScaleConfig {
     pub k_rollouts: usize,                // K parallel rollouts
     pub selection: WidthSelectionMode,     // how to pick winner

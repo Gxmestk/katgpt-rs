@@ -69,7 +69,7 @@ This is the "what does it look like?" demo. It validates the mechanism shape end
 - [x] **T1.2** Create `katgpt-rs/crates/katgpt-core/src/viable_manifold_graph.rs` with module doc referencing R294 + paper arxiv 2206.00106.
 - [x] **T1.3** Define `pub struct VolumeFieldConfig { pub log_eps: f32, pub jacobian_eps: f32 }`. **Deviation:** added `jacobian_eps` because `JacobianSvdScratch` does not store eps (Plan 301's `jacobian_svd_at` takes it as a parameter). Default `jacobian_eps = 1e-4` via `DEFAULT_JACOBIAN_EPS`.
 - [x] **T1.4** Implement `pub fn pullback_volume<F>(f: F, z: &[f32], scratch: &mut JacobianSvdScratch, cfg: &VolumeFieldConfig) -> f32 where F: Fn(&[f32], &mut [f32])`: calls `jacobian_svd_at(f, z, cfg.jacobian_eps, scratch)`, returns `Σ_i log(σᵢ² + cfg.log_eps)`. Zero new allocations beyond SVD.
-- [x] **T1.5** Add `pub use viable_manifold_graph::{...}` to `katgpt-core/src/lib.rs` behind `#[cfg(feature = "viable_manifold_graph")]`, mirroring the `subspace_phase_gate` pattern.
+- [x] **T1.5** Add `pub use viable_manifold_graph::{...}` to `crates/katgpt-core/src/lib.rs` behind `#[cfg(feature = "viable_manifold_graph")]`, mirroring the `subspace_phase_gate` pattern.
 
 **Exit:** `cargo check -p katgpt-core --features viable_manifold_graph` clean.
 

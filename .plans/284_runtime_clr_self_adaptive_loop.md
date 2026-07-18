@@ -33,8 +33,8 @@ Ship the four modelless primitives distilled from Research 255 as a generic, MIT
 
 ### Tasks
 
-- [x] **T1.1** Create `src/clr/mod.rs` with module root + re-exports. Add `clr` feature to root `Cargo.toml` (opt-in, NOT in `default` or `full` until G1–G5 pass). Gate all module code behind `#[cfg(feature = "clr")]`. Update `src/lib.rs` to declare `pub mod clr;` behind the feature.
-- [x] **T1.2** Define types in `src/clr/types.rs`:
+- [x] **T1.1** Create `crates/katgpt-claim/src/clr/mod.rs` with module root + re-exports. Add `clr` feature to root `Cargo.toml` (opt-in, NOT in `default` or `full` until G1–G5 pass). Gate all module code behind `#[cfg(feature = "clr")]`. Update `src/lib.rs` to declare `pub mod clr;` behind the feature.
+- [x] **T1.2** Define types in `crates/katgpt-claim/src/clr/types.rs`:
   - `pub struct ClrConfig { pub k: usize, pub m: usize, pub tau_v: f32, pub tau_reliable: f32, pub tau_curiosity: f32, pub alpha_freeze_thaw: f32, pub gamma_mgpo: f32, pub lambda_long2short: f32, pub tiebreak_eps: f32 }` — the full saCLR config. Defaults (paper): `k=32, m=5, tau_v=0.5, tau_reliable=0.5, tau_curiosity=0.7, alpha_freeze_thaw=0.01, gamma_mgpo=2.0, lambda_long2short=0.2, tiebreak_eps=1e-3`.
   - `pub struct Trajectory<T> { pub outcome: T, pub tokens_or_steps: usize, pub claims: Vec<T>, pub log_probs: Option<Vec<f32>> }` — generic over the outcome/claim type. `tokens_or_steps` is the length used by Long2Short. `claims` is filled by `ClaimExtractor::extract()`. `log_probs` is optional — present only when `learning_potential` is being computed (cheap path: don't compute if no consumer).
   - `pub struct Claim<T> { pub embedding: Vec<f32>, pub payload: T }` — `embedding` is the latent vector for dot-product + sigmoid projection onto a direction vector; `payload` is the opaque claim data for downstream consumers.
@@ -42,14 +42,14 @@ Ship the four modelless primitives distilled from Research 255 as a generic, MIT
   - `pub type ReliabilityScore = f32;` — the `(mean)^M` score.
   - `pub struct Cluster<T> { pub outcome: T, pub total_reliability: ReliabilityScore, pub representative_idx: usize, pub member_indices: Vec<usize> }` — output of the vote. `representative_idx` is the trajectory chosen to represent the cluster (by Long2Short after tiebreak).
   - `pub struct VoteResult<T> { pub winner: Cluster<T>, pub all_clusters: Vec<Cluster<T>>, pub per_trajectory_reliability: Vec<ReliabilityScore>, pub per_trajectory_verdicts: Vec<[Verdict; M_DYNAMIC]> }` — caller gets the winner + full audit trail for visualization/debugging. Use `Vec<Verdict>` rather than `[Verdict; M]` to keep M dynamic at runtime (avoids const-generics complexity in v1).
-- [x] **T1.3** Define traits in `src/clr/traits.rs`:
+- [x] **T1.3** Define traits in `crates/katgpt-claim/src/clr/traits.rs`:
   - `pub trait ClaimExtractor<T> { fn extract(&self, trajectory: &Trajectory<T>) -> Vec<Claim<T>>; }` — returns exactly `M` claims (caller asserts length). Domain-specific.
   - `pub trait ClaimVerifier<T> { fn verify(&self, claim: &Claim<T>, direction_idx: usize) -> Verdict; }` — returns sigmoid(dot(claim.embedding, direction_vec[direction_idx])). `direction_idx ∈ [0, M)` indexes into a direction-vector pool that the verifier owns.
   - `pub trait DirectionVectorSource { fn direction(&self, idx: usize) -> &[f32]; fn blake3(&self) -> [u8; 32]; fn version(&self) -> u64; }` — for freeze/thaw versioning. Concrete impls in consumer crates.
 - [x] **T1.4** Implement `FnClaimExtractor` reference adapter in `crates/katgpt-claim/src/clr/extractor.rs`:
   - `pub struct FnClaimExtractor<F, T> { pub m: usize, pub f: F, _phantom: PhantomData<T> } where F: Fn(&Trajectory<T>) -> Vec<Claim<T>>`
   - Implements `ClaimExtractor<T>` by delegating to `f`. Asserts `result.len() == m`. Used in tests + as a quick adapter for callers that don't want to define a full struct.
-- [x] **T1.5** Implement `SigmoidProjectionVerifier` reference impl in `src/clr/verifier.rs`:
+- [x] **T1.5** Implement `SigmoidProjectionVerifier` reference impl in `crates/katgpt-claim/src/clr/verifier.rs`:
   - `pub struct SigmoidProjectionVerifier<'a> { pub directions: &'a DirectionVectorSource, pub direction_dim: usize }`
   - `verify(claim, direction_idx)`: `let d = directions.direction(direction_idx); let dot = simd_dot_f32(&claim.embedding, d, direction_dim); sigmoid(dot)` where `sigmoid(x) = 1.0 / (1.0 + simd_exp_inplace_one(-x))`. Reuse `simd_dot_f32` from `crates/katgpt-core/src/simd.rs`. **No softmax anywhere.**
 - [x] **T1.6** Implement `brevity_tiebreak()` in `crates/katgpt-claim/src/clr/brevity.rs`:
@@ -160,11 +160,11 @@ Ship the four modelless primitives distilled from Research 255 as a generic, MIT
 
 | File | Action | Phase |
 |------|--------|-------|
-| `src/clr/mod.rs` | NEW | 1 |
-| `src/clr/types.rs` | NEW | 1 |
-| `src/clr/traits.rs` | NEW | 1 |
+| `crates/katgpt-claim/src/clr/mod.rs` | NEW | 1 |
+| `crates/katgpt-claim/src/clr/types.rs` | NEW | 1 |
+| `crates/katgpt-claim/src/clr/traits.rs` | NEW | 1 |
 | `crates/katgpt-claim/src/clr/extractor.rs` | NEW | 1 |
-| `src/clr/verifier.rs` | NEW | 1 |
+| `crates/katgpt-claim/src/clr/verifier.rs` | NEW | 1 |
 | `crates/katgpt-claim/src/clr/brevity.rs` | NEW | 1 |
 | `crates/katgpt-claim/src/clr/vote.rs` | NEW | 2 |
 | `crates/katgpt-claim/src/clr/scratch.rs` | NEW | 2 |

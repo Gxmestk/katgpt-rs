@@ -40,8 +40,8 @@ For each module, identify:
 - [x] **T5.** Decide per-module: clean move vs. partial move vs. defer — DONE: 3 partial moves (dense_mesh, swir, tf_loop) + 1 clean (mbu).
 - [x] **T6.** Add features to `katgpt-transformer/Cargo.toml` for any feature-gated modules — DONE: 6 new features (`tf_loop`, `recfm`, `thinking_prune`, `dense_mesh`, `swir_switch_thinking`, `collapse_aware_thinking`, `breakeven_routing`) + `fastrand` dep.
 - [x] **T7.** Copy modules to `crates/katgpt-transformer/src/` — DONE.
-- [x] **T8.** Rewrite imports inside moved files — DONE: `mbu.rs` (1), `tf_loop.rs` (1 + strip pruner fn), `swir/types.rs` (strip resolve_via), `swir/mod.rs` (strip strategy_adapter), `dense_mesh/mod.rs` (strip node_transformer).
-- [x] **T9.** Wire re-exports in root `src/lib.rs` + `src/dense_mesh/mod.rs` + `src/swir/mod.rs` + `src/tf_loop.rs` shims — DONE.
+- [x] **T8.** Rewrite imports inside moved files — DONE: `mbu.rs` (1), `tf_loop.rs` (1 + strip pruner fn), `crates/katgpt-transformer/src/swir/types.rs` (strip resolve_via), `crates/katgpt-transformer/src/swir/mod.rs` (strip strategy_adapter), `crates/katgpt-transformer/src/dense_mesh/mod.rs` (strip node_transformer).
+- [x] **T9.** Wire re-exports in root `src/lib.rs` + `crates/katgpt-transformer/src/dense_mesh/mod.rs` + `crates/katgpt-transformer/src/swir/mod.rs` + `src/tf_loop.rs` shims — DONE.
 - [x] **T10.** Delete original files from `src/` — DONE (kept only shims + deferred files).
 - [x] **T11.** Update root `Cargo.toml` features to forward to crate — DONE.
 - [x] **T12.** GOAT gate G3 — DONE: workspace check (3 configs) + katgpt-transformer lib tests (122 PASS) + root lib tests (1397 PASS) + external consumer tests (mbu/tf_loop/dense_mesh/swir) + clippy.

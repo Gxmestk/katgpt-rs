@@ -373,7 +373,7 @@ These are the **mechanics + zero-alloc + commitment + latency** gates. Quality g
 
 - Per-NPC HLA wiring (the concrete `SleepTimeComputeOp` impl that uses `extract_functor` / `karc_forecast`).
 - Per-zone direction vector catalog (game-specific: shopkeeper zone, quest-giver zone, lore NPC zone).
-- Chain quorum commitment of `c'` (uses `cgsp_runtime/chain_bridge.rs`'s `commit_snapshot_via_quorum`).
+- Chain quorum commitment of `c'` (uses `riir-ai/crates/riir-engine/src/cgsp_runtime/chain_bridge.rs`'s `commit_snapshot_via_quorum`).
 - SleepAnticipationShard subtype (riir-neuron-db territory, deferred to P2).
 - Real game corpus G2/G3/G4 quality gates.
 - NPC tiering (important NPC gets full K directions; crowd NPC gets K=1 or K=0).

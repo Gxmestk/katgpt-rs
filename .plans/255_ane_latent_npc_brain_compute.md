@@ -104,7 +104,7 @@ else:
 - [x] Write test: GM override takes precedence
 - [x] Write test: autonomous_disabled zeros unpinned projections
 - [x] Write test: length mismatch returns error
-- [x] Register module in `sense/mod.rs` with re-exports
+- [x] Register module in `riir-ai/crates/riir-engine/src/sense/mod.rs` with re-exports
 
 **Key finding**: SenseModule uses ternary bit-plane projection (not float matmul). ANE path will need ternary-to-float conversion or custom MIL kernel. CPU baseline preserves exact ternary semantics.
 

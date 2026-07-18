@@ -1,7 +1,7 @@
 # Plan 197: Domino Causal Correction — Modelless Decoupled Pattern
 
 > **Source:** Research 177 — Domino Decoupled Causal Speculative Decoding (Modelless Distillation)
-> **Depends On:** DDTree (`speculative/dd_tree.rs`), DFlash (`speculative/dflash.rs`), ConstraintPruner trait
+> **Depends On:** DDTree (`src/speculative/dd_tree.rs`), DFlash (`speculative/dflash.rs`), ConstraintPruner trait
 **Feature Gate:** `domino_correction` (default ON, GOAT proof passed)
 > **Status:** ✅ Complete — GOAT PASSED (25/25 tests, -22.8% build time), promoted to default-ON
 
@@ -62,7 +62,7 @@ No model training. No LoRA. Pure inference-time pattern extraction.
   - Zero allocation: correction is applied in-place on marginals
   - Guard: if table is empty, no-op (zero cost)
 
-- [x] **T3: Add `domino_score` tree expansion priority in `speculative/dd_tree.rs`**
+- [x] **T3: Add `domino_score` tree expansion priority in `src/speculative/dd_tree.rs`**
   - New scoring function alongside existing `score` in TreeNode
   - `domino_score = base_score * prefix_strength^depth` where prefix_strength = product of parent marginal probs
   - Integrate into `build_dd_tree_pruned` as an option
@@ -131,7 +131,7 @@ No model training. No LoRA. Pure inference-time pattern extraction.
 | `katgpt-core/src/traits.rs` | Add `DominoPruner` trait |
 | `speculative/types.rs` | Add `PrefixCorrectionTable` |
 | `speculative/dflash.rs` | Add `domino_correct_marginals` |
-| `speculative/dd_tree.rs` | Add `domino_score` + wire into `build_dd_tree_pruned` |
+| `src/speculative/dd_tree.rs` | Add `domino_score` + wire into `build_dd_tree_pruned` |
 | `Cargo.toml` | Add `domino_correction` feature |
 | `examples/domino_sudoku.rs` | New example |
 | `examples/domino_code.rs` | New example (feature: validator) |

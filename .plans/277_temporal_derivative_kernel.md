@@ -81,7 +81,7 @@ Target: `crates/katgpt-core/src/temporal_deriv.rs`. Generic, no game semantics, 
 
 ## Phase 2 — Fusion F1: HLA Companion (sense_composition)
 
-Target: extend `crates/katgpt-sense/crates/katgpt-sense/src/reconstruction.rs`. Adds a per-NPC 8-dim surprise vector as an output channel of the reconstruction cycle.
+Target: extend `crates/katgpt-sense/src/reconstruction.rs`. Adds a per-NPC 8-dim surprise vector as an output channel of the reconstruction cycle.
 
 ### Tasks
 

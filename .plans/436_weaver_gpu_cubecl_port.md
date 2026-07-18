@@ -285,7 +285,7 @@ The 40 matmul dispatches dominate Weaver's compute. Porting them to GPU
       "weaver_gpu")]` gate on `pub mod weaver_gpu_dflash` (and
       `weaver_gpu_corrector`, `weaver_gpu`) compiles the entire GPU
       module out when the feature is off. The CPU `dflash_predict_with_weaver`
-      in `riir-engine/src/dflash.rs` is gated on `weaver_runtime`
+      in `riir-ai/crates/riir-engine/src/dflash.rs` is gated on `weaver_runtime`
       (not `weaver_gpu`), so the two are independently switchable. No
       shared mutable state, no feature interaction. The 19 Phase 1-4
       tests all live under `#[cfg(all(test, feature = "cubecl_runtime"))]`

@@ -48,7 +48,7 @@ X = FFT(x)                                // N complex coefficients
 
 **Relationship to existing primitives:**
 - **Complementary to DEC `exterior_derivative`** (`dec/operators.rs`): DEC handles arbitrary cell complexes (irregular meshes, 2D/3D grids, manifolds with boundary). This primitive handles only the 1D periodic uniform case, but does so in O(N log N) with zero topological setup — useful when the input is a flat array of equally-spaced periodic samples (e.g. time-series windows, cyclic HLA channels, ring buffers).
-- **Complementary to Plan 323 `fourier_continue`** (`spectral/continuation.rs`): FC makes a non-periodic signal approximately periodic so the FFT does not ring; this primitive then differentiates the periodic (or FC-extended) signal. They chain naturally: `spectral_differentiate(&fourier_continue(x, ...), ...)` for non-periodic inputs.
+- **Complementary to Plan 323 `fourier_continue`** (`crates/katgpt-core/src/spectral/continuation.rs`): FC makes a non-periodic signal approximately periodic so the FFT does not ring; this primitive then differentiates the periodic (or FC-extended) signal. They chain naturally: `spectral_differentiate(&fourier_continue(x, ...), ...)` for non-periodic inputs.
 - **Complementary to `flow::fft_smooth`** (`crates/katgpt-core/src/flow/fft.rs`): FFT smoothing is low-pass filtering (multiply by a real mask in frequency domain); this is differentiation (multiply by `(iω)^m`).
 
 ## Phase 1 — Unblocking Skeleton (CORE)

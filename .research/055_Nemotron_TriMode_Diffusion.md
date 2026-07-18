@@ -106,7 +106,7 @@ Temperature: τ=3.0 for distributions, τ=1.0 for CE
 | KV cache | `MultiLayerKVCache`, `PagedKVCache` | ✅ Production |
 | Draft→Verify→Accept pattern | `speculative/step.rs` `speculative_step_rollback()` | ✅ Production |
 | `SpeculativeVerifier` trait | `verifier.rs` with `SimulatedVerifier`, `LeviathanVerifier` | ✅ Production |
-| DDTree path extraction | `speculative/dd_tree.rs` | ✅ Production |
+| DDTree path extraction | `src/speculative/dd_tree.rs` | ✅ Production |
 | KV cache snapshot/rollback | `MultiLayerKVCache::snapshot()/restore()` | ✅ Production |
 | Prefix acceptance logic | `LeviathanVerifier::speculate()` | ✅ Production |
 | **D2F Drafter Verifier** | **MISSING — new `SpeculativeVerifier` impl** | ❌ ~100 lines |

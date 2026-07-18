@@ -175,8 +175,8 @@ Paper vocabulary → codebase vocabulary, with the **shipping cousin** (or none)
 | Context-aware sigmoid gating | `PersonalityWeightedComposition` (R276), `SenseModule::project()`, `evolve_hla` | ✅ Shipped — same sigmoid×direction kernel, different vector source (recurrent state vs static table). |
 | Tokenizer compression (surjective V→V') | `ConvexTok` LP optimizer (R087, P127) | ✅ Shipped but for vocab optimization, not for embedding-table dedup. Adjacent. |
 | Multi-level cache hierarchy (Zipfian) | Four-Tier Memory (R007), Lore ContentStore (R262), FlashMemory (R258) | ✅ Shipped but for assets / KV cache, not for pattern embeddings. |
-| Deterministic addressing (hash → committed value) | `forensic/recipe.rs` BLAKE3→codeword→indices (R268, P293) | ✅ Shipped but for asset watermarking, not embedding retrieval. Same primitive, different domain. |
-| Frozen snapshot + atomic Arc swap | `SenseHotSwap` (`sense/hotswap.rs`, AtomicPtr<Box<SenseModule>>) | ✅ Shipped — same primitive, will be reused for `EngramHotSwap`. |
+| Deterministic addressing (hash → committed value) | `riir-chain/src/forensic/recipe.rs` BLAKE3→codeword→indices (R268, P293) | ✅ Shipped but for asset watermarking, not embedding retrieval. Same primitive, different domain. |
+| Frozen snapshot + atomic Arc swap | `SenseHotSwap` (`riir-ai/crates/riir-engine/src/sense/hotswap.rs`, AtomicPtr<Box<SenseModule>>) | ✅ Shipped — same primitive, will be reused for `EngramHotSwap`. |
 | BLAKE3 commitment of table identity | `MerkleOctree`, `BlobId`, `EngramTableId` (this plan) | ✅ Infrastructure exists (R221, R253, R262). |
 
 **The gap**: no single primitive ships the *combination* — N-gram-suffix hash → embedding table → sigmoid fusion → residual-fuse into hidden state. Each component has a cousin; the composition is novel. This is the Super-GOAT claim: **the first conditional-memory axis** in our stack, distinct from Raven's conditional-computation axis.

@@ -161,10 +161,10 @@ with `m=1` on CRPS / coverage / Winkler at their GOAT gate.
 
 | File | Role |
 |---|---|
-| `src/conformal/mod.rs` | `ConformalIntervalCalibrator<F>`, `PointForecaster` trait, `PredictiveInterval`, `ResidualMode`, `DecayUnit` |
+| `crates/katgpt-core/src/conformal/mod.rs` | `ConformalIntervalCalibrator<F>`, `PointForecaster` trait, `PredictiveInterval`, `ResidualMode`, `DecayUnit` |
 | `crates/katgpt-core/src/conformal/ring.rs` | `SortedRing`, `ResidualRingBuffer`, `RingBuffer`, `RingView` |
 | `crates/katgpt-core/src/conformal/seasonal.rs` | `SeasonalPoolForecaster`, `SeasonalNaiveForecaster` (type alias), `seasonal_naive_floor()` |
-| `src/conformal/metrics.rs` | `crps`, `crps_interval`, `winkler_score`, `empirical_coverage`, `mean_crps_interval`, `mean_winkler` |
+| `crates/katgpt-core/src/conformal/metrics.rs` | `crps`, `crps_interval`, `winkler_score`, `empirical_coverage`, `mean_crps_interval`, `mean_winkler` |
 | `crates/katgpt-core/tests/conformal_coverage.rs` | G1 gate (3 tests) |
 | `crates/katgpt-core/tests/conformal_reproducibility.rs` | G4 gate (3 tests) |
 | `crates/katgpt-core/tests/conformal_alloc_check.rs` | G3 gate (2 tests) |

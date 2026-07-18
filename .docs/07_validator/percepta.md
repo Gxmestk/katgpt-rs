@@ -31,9 +31,9 @@ The geometric trick that enables exact discrete retrieval in 2D attention heads:
 |----|------|--------|--------|:------:|
 | **A** | CHT Hull KV Cache | `hull2d_cht.h` (419 lines) | `cht.rs` + `hull.rs` + `encoding.rs` + `cumsum.rs` + `standard_cache.rs` | ✅ |
 | **B** | ReGLU/stepglu gates | `core.py` (gates portion) | `gates.rs` | ✅ |
-| **C** | Expression/Dimension DSL | `core.py` (449 lines) | `graph/types.rs` + `graph/mod.rs` | ✅ |
+| **C** | Expression/Dimension DSL | `core.py` (449 lines) | `graph/types.rs` + `crates/katgpt-percepta/src/graph/mod.rs` | ✅ |
 | **D** | MILP scheduling | `milp.py` (814 lines) | `scheduler.rs` | ✅ |
-| **E** | WASM decoder + lowering | `decoder.py` + `lower.py` (2472 lines) | `wasm/decoder.rs` + `wasm/lower.rs` | ✅ |
+| **E** | WASM decoder + lowering | `decoder.py` + `lower.py` (2472 lines) | `crates/katgpt-percepta/src/wasm/decoder.rs` + `wasm/lower.rs` | ✅ |
 | **F** | WASM interpreter | `interpreter.py` (637 lines) | `wasm/interpreter/` (dispatch, arithmetic, tokens) | ✅ |
 | **G** | Weight construction | `weights.py` (776 lines) | `weights.rs` | ✅ |
 | **H** | Transformer execution | `transformer.py` + `.cpp` (513 lines) | `transformer.rs` (Rust native, no C++ needed) | ✅ |

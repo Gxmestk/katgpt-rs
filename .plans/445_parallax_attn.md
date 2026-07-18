@@ -47,7 +47,7 @@
 
 ### T4: AHLA Covariance Experiment
 
-**Files:** `crates/katgpt-hla/src/types.rs`, `src/hla/mod.rs`
+**Files:** `crates/katgpt-hla/src/types.rs`, `riir-ai/crates/riir-engine/src/hla/mod.rs`
 
 - `ParallaxAhlaQHeadState`: sigma_kv (hd²) + weighted_k_mean (hd) + weighted_v_mean (hd) + weight_sum
 - `ParallaxAhlaLayerState`: per-Q-head covariance (GQA-aware)

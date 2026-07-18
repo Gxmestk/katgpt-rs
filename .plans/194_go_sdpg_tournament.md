@@ -45,7 +45,7 @@ Key difference from Bomber: No template proposer layer. Go's categories ARE the 
   - `as_any_mut()` for downcast in tournament
 
 - [x] **T2: Wire `GoSdpgPlayer` into Go module exports**
-  - Add `pub mod sdpg_player;` behind `#[cfg(feature = "sdpg_bandit")]` in `go/mod.rs`
+  - Add `pub mod sdpg_player;` behind `#[cfg(feature = "sdpg_bandit")]` in `crates/katgpt-pruners/src/go/mod.rs`
   - Re-export `GoSdpgPlayer`
 
 - [x] **T3: Add `GoPlayerType::Sdpg` variant** (optional, for tournament config)

@@ -60,7 +60,7 @@ Tracked in riir-ai issues (to be created):
 
 ### Executive summary
 
-**At natural endgame for crate-level consolidation.** The neuron-db spin-off (Plan 001) is exemplary: `riir-chain/src/neuron_db/mod.rs` is an 85-LOC shim, `catchup/merkle.rs` correctly delegates generics to the leaf crate and retains chain-specifics. Zero files over the 2048-LOC limit.
+**At natural endgame for crate-level consolidation.** The neuron-db spin-off (Plan 001) is exemplary: `riir-chain/src/neuron_db/mod.rs` is an 85-LOC shim, `riir-chain/src/catchup/merkle.rs` correctly delegates generics to the leaf crate and retains chain-specifics. Zero files over the 2048-LOC limit.
 
 **One clear DRY violation found and FIXED:** ~895 LOC of acknowledged `cold_store` boilerplate duplicated across 4 `*_commit.rs` files.
 
@@ -100,7 +100,7 @@ Tracked in riir-ai issues (to be created):
 - `.proofs/NeuronDbProof/Merkle/Soundness.lean` — 4 theorems (axiom-free under injectivity hypothesis)
 - Paired Rust spec-match tests: 17 tests across 3 files
 
-**One file over 2048 limit (FIXED):** `consolidation.rs` was 2,666 LOC but ~72% was inline test blocks (~1,911 LOC tests, ~755 LOC library code). Split into `consolidation/mod.rs` (786 LOC) + 6 test files. Commit `4bea4f0`. Test parity: 233/233 (default), 478/478 (all-features).
+**One file over 2048 limit (FIXED):** `consolidation.rs` was 2,666 LOC but ~72% was inline test blocks (~1,911 LOC tests, ~755 LOC library code). Split into `riir-neuron-db/src/consolidation/mod.rs` (786 LOC) + 6 test files. Commit `4bea4f0`. Test parity: 233/233 (default), 478/478 (all-features).
 
 **Minor doc drift:** `.proofs/README.md` says "15 Lean theorems" but `Layout.lean` alone has 16; actual total is ~28. Cosmetic, doesn't affect correctness.
 

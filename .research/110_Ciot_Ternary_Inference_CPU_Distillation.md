@@ -300,7 +300,7 @@ sub-threshold latency win.
 
 ### Sense octree exception (NOT touched by Issue 145)
 
-`katgpt-sense/src/octree.rs` uses `TernaryDir` for KG embeddings where the
+`crates/katgpt-sense/src/octree.rs` uses `TernaryDir` for KG embeddings where the
 zero state means "this dimension doesn't matter for this concept." That is a
 **different domain** — KG embedding sparsity, not weight quantization. Ternary
 stays there regardless of the weight-tier reclassification. This is the same

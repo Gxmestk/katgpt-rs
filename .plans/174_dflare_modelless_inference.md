@@ -132,7 +132,7 @@ graph TD
 | `speculative/types.rs` | `MarginalFusionConfig`, `KvRoutingConfig`, `PositionWeightedBudget` structs | `dflare_fusion`, `dflare_kv_routing`, `dflare_progressive_budget` |
 | `speculative/dflash.rs` | `dflash_predict_ar_with_fusion` — multi-pass conditioning + blend | `dflare_fusion` |
 | `speculative/dflash.rs` | `dflash_predict_conditioned_with_routing` — pruner-confidence KV routing | `dflare_kv_routing` |
-| `speculative/dd_tree.rs` | `build_dd_tree_screened_progressive` — per-depth position-weighted budget | `dflare_progressive_budget` |
+| `src/speculative/dd_tree.rs` | `build_dd_tree_screened_progressive` — per-depth position-weighted budget | `dflare_progressive_budget` |
 | `speculative/mod.rs` | Re-exports for all three features | All three |
 | `Cargo.toml` | Three feature flags (already existed) | — |
 | `tests/bench_dflare_modelless.rs` | GOAT proofs T4–T7 | All three |

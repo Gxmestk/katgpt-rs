@@ -49,7 +49,7 @@ Goal: a compiling, tested, feature-gated module that implements the state-action
   - [x] `pub fn mcts_search_with_state_action_cache<S, A>(space: &A, root: &S, budget: usize, cache: &StateActionCache<f32>, scratch: &mut SearchScratch) -> SearchResult` where `A: InferenceActionSpace<S>, S: Clone` — uses UCB1 selection (constant `UCB1_C = 1.414` from existing `mcts.rs`), consults the cache at Expand time, inserts after rollout. Falls back to standard rollout on cache miss.
   - [x] Note: this is a *standalone* search — it does NOT reuse the existing `mcts_search` from `mcts.rs` (which is parameterized over `GameState` game actions, not opaque inference actions). Keep the algorithm body small and self-contained; the existing `MCTSNode` struct design (index-based parent/child links, `ArrayVec` for children/unexpanded) is the template.
   - **Deviation:** (1) Added `S: Clone` bound (the search re-walks the selection path each iteration, re-applying actions inline, which needs one `root.clone()` per iteration — cheap for fixed-size/refcounted states). (2) Added a `scratch: &mut SearchScratch` parameter for the Phase 3 G4 zero-alloc hot-path gate (pre-allocated tree node vec + path stack). (3) Returns `SearchResult { best_action, cache_hits, cache_misses, tree_size }` instead of bare `S::Action` — richer return for gate reporting.
-- [x] **T1.5** Write unit tests in `tests/mcts_state_action_cache_basic.rs`:
+- [x] **T1.5** Write unit tests in `crates/katgpt-core/tests/mcts_state_action_cache_basic.rs`:
   - [x] Cache insert/get round-trip (deterministic — same key returns same value)
   - [x] Same state + different action → different cache entries (the key novelty vs state-only)
   - [x] Different state + same action → different cache entries
@@ -57,7 +57,7 @@ Goal: a compiling, tested, feature-gated module that implements the state-action
   - [x] `InferenceAction` is 4 bytes (`size_of::<InferenceAction>() == 4`) — verify with `assert_eq!`
   - [x] Determinism contract documented in the module doc-comments (determinism-across-runs test in the test binary)
   - **Additional tests beyond the plan:** search-finds-action-on-fresh-cache, second-search-hits-cache, search-is-deterministic-across-runs, search-returns-none-for-terminal-root (4 search-integration tests). Pure-cache tests also duplicated inline in the module under `#[cfg(test)]`.
-- [x] **T1.6** Write a small example `examples/mcts_state_action_cache_basic.rs`:
+- [x] **T1.6** Write a small example `crates/katgpt-core/examples/mcts_state_action_cache_basic.rs`:
   - [x] Synthetic 3-action space (3 "inference configurations") over a 4-step deterministic transition graph
   - [x] Run search with cache, print: total rollouts, cache hits, cache misses, best reward
   - [x] Re-run search with the SAME cache populated — show 100% cache hit rate on the second run (zero rollouts). **Verified:** Run 1 = 53.3% hit rate (intra-search reuse), Run 2 = 100% hit rate (graph fully cached).

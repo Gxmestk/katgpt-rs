@@ -138,7 +138,7 @@ pub fn prisoners_dilemma(a: u8, b: u8) -> (f64, f64) {
 
 ### Phase 1: Core Types & FSM Enumerator (modelless) ✅
 
-- [x] Create `src/ruliology/mod.rs` with `SimpleProgram` trait, `FsmStrategy`, `WinMatrix`, `RuliologyPruner`
+- [x] Create `riir-ai/crates/riir-games/src/ruliology/mod.rs` with `SimpleProgram` trait, `FsmStrategy`, `WinMatrix`, `RuliologyPruner`
 - [x] Implement `FsmEnumerator::enumerate(2)` — 22 distinct 2-state FSMs
 - [x] Implement `FsmEnumerator::enumerate(3)` — ~1054 distinct 3-state FSMs (behavioral dedup with blake3, Wolfram reports 956 with stricter equivalence)
 - [x] Implement `matching_pennies` and `prisoners_dilemma` payoff functions

@@ -41,11 +41,11 @@ ThinkingController (Plan 194)
 ## Tasks
 
 ### T1: Core Types
-- [x] Create `src/fold/mod.rs` — module root
+- [x] Create `crates/katgpt-speculative/src/fold/mod.rs` — module root
 - [x] Create `crates/katgpt-speculative/src/fold/step_boundary.rs` — `StepBoundary` struct, `StepBoundaryTracker`
   - Detects `\n\n`, `</think_* >` tag transitions as step boundaries
   - Maintains `Vec<(token_pos, step_index)>` mapping
-- [x] Create `src/fold/types.rs` — `FoldDecision` enum (`Keep`, `Fold`, `Anchor`), `FoldResult` struct
+- [x] Create `crates/katgpt-speculative/src/fold/types.rs` — `FoldDecision` enum (`Keep`, `Fold`, `Anchor`), `FoldResult` struct
 
 ### T2: Attention Importance Scorer
 - [x] Create `crates/katgpt-speculative/src/fold/attention_importance.rs`

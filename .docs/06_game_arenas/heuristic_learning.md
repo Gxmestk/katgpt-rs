@@ -8,7 +8,7 @@
 >
 > **Status (Plan 071):** ROPD Rubric modelless distillation — `RubricVector`, `RubricTemplate`, `RubricGatedAbsorbCompress`, `RubricBanditPruner` behind `--features ropd_rubric` (implies `bandit`). Per-criterion gap targeting replaces scalar δ with structured multi-criteria reward. `RubricPlayer` (bomber, `g_zero`+`bomber`) and `RubricFFTPlayer` (FFT, `g_zero`+`fft`) integrate rubric reward into arena players (Plan 071 T9/T10). Benchmark: 5.3M observe_rubric/sec, 20/20 targeting accuracy, zero regression. See `.benchmarks/007_ropd_rubric_modelless.md`.
 >
-> **Status (Plan 076):** Arena Integration — cross-arena tournament infrastructure (`arena/types.rs`, `arena/scheduler.rs`, `bomber/arena_runner.rs`, `fft/arena_runner.rs`). Round-robin tournaments with ELO ratings confirm **Rubric ≈ GZero** in both Bomber (8W vs 8W) and FFT (60% vs 60%, 100% draws head-to-head). The 3-criterion rubric vector collapses to the same effective signal as scalar Hint-δ. See `.benchmarks/009_arena_integration.md`.
+> **Status (Plan 076):** Arena Integration — cross-arena tournament infrastructure (`crates/katgpt-pruners/src/arena/types.rs`, `crates/katgpt-pruners/src/arena/scheduler.rs`, `src/pruners/bomber/arena_runner.rs`, `crates/katgpt-pruners/src/fft/arena_runner.rs`). Round-robin tournaments with ELO ratings confirm **Rubric ≈ GZero** in both Bomber (8W vs 8W) and FFT (60% vs 60%, 100% draws head-to-head). The 3-criterion rubric vector collapses to the same effective signal as scalar Hint-δ. See `.benchmarks/009_arena_integration.md`.
 >
 > **Status (Plan 072):** SDAR Gated distillation modelless — `sdar_gate()`, `SdarBanditPruner`, `SdarGatedAbsorbCompress` behind `--features sdar_gate`. Asymmetric trust: sigmoid gate σ(β·x) endorses positive gaps, attenuates negative. β=5.0 paper-validated. Benchmark: 118M updates/sec, zero hot-path overhead, 97.5% targeting accuracy. See `.benchmarks/008_sdar_gated_modelless.md`.
 >
@@ -753,15 +753,15 @@ No backpropagation. No loss function. The memory learns a linear correction map 
 
 | Component | File | Purpose |
 |-----------|------|---------|
-| `DeltaMemoryState` | `delta_mem/state.rs` | Compact r×r associative memory with `read()`, `write()`, `adapt_gates()`, `mean_prediction_error()` |
-| `DeltaMemoryConfig` | `delta_mem/state.rs` | `rank`, `beta_init`, `couple_gates` configuration |
-| `DeltaMemorySnapshot` | `delta_mem/state.rs` | Serializable snapshot of memory state for persistence |
-| `FeatureHasher` | `delta_mem/hash.rs` | Random projection: L2-normalized keys, raw values |
-| `ContextFeatures` | `delta_mem/hash.rs` | Extracts hashable features from DDTree context (depth, parent tokens) |
-| `OutcomeFeatures` | `delta_mem/hash.rs` | Extracts hashable features from outcome (reward, acceptance) |
-| `MemorySteeredPruner<P>` | `delta_mem/pruner.rs` | `ScreeningPruner` with memory-steered corrections |
+| `DeltaMemoryState` | `crates/katgpt-core/src/delta_mem/state.rs` | Compact r×r associative memory with `read()`, `write()`, `adapt_gates()`, `mean_prediction_error()` |
+| `DeltaMemoryConfig` | `crates/katgpt-core/src/delta_mem/state.rs` | `rank`, `beta_init`, `couple_gates` configuration |
+| `DeltaMemorySnapshot` | `crates/katgpt-core/src/delta_mem/state.rs` | Serializable snapshot of memory state for persistence |
+| `FeatureHasher` | `crates/katgpt-core/src/delta_mem/hash.rs` | Random projection: L2-normalized keys, raw values |
+| `ContextFeatures` | `crates/katgpt-core/src/delta_mem/hash.rs` | Extracts hashable features from DDTree context (depth, parent tokens) |
+| `OutcomeFeatures` | `crates/katgpt-core/src/delta_mem/hash.rs` | Extracts hashable features from outcome (reward, acceptance) |
+| `MemorySteeredPruner<P>` | `crates/katgpt-pruners/src/delta_mem/pruner.rs` | `ScreeningPruner` with memory-steered corrections |
 | `MultiDomainMemory` | `crates/katgpt-core/src/delta_mem/multi.rs` | Per-domain `DeltaMemoryState` instances |
-| `MultiDomainMemoryPruner<P>` | `delta_mem/multi_pruner.rs` | Per-domain pruner routing |
+| `MultiDomainMemoryPruner<P>` | `crates/katgpt-pruners/src/delta_mem/multi_pruner.rs` | Per-domain pruner routing |
 
 ### Correction Modes
 

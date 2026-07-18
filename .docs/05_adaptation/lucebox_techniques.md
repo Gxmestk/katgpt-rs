@@ -198,7 +198,7 @@ Long prompts require expensive target model prefill over every token. 128K token
 Use draft model's attention scores to identify important tokens, compress prompt before target prefill.
 
 ```rust
-// speculative/prefill.rs
+// src/speculative/prefill.rs
 pub trait PrefillScorer: Send + Sync {
     fn score(&self, draft_weights, draft_config, prompt_tokens) -> Vec<f32>;
     fn score_into(&self, draft_weights, draft_config, prompt_tokens, scores: &mut [f32]);
@@ -283,7 +283,7 @@ Compress each KV coordinate from 32-bit f32 to 2-4 bits using TurboQuant (Zandie
 4. **Bit-pack** → 2/3/4 bits per coordinate stored as u8 array
 
 ```rust
-// turboquant/kv_cache.rs
+// crates/katgpt-quant/src/turboquant/kv_cache.rs
 pub struct TurboQuantKVCache { /* bit-packed indices + norms + rotation matrices */ }
 
 impl TurboQuantKVCache {
@@ -307,7 +307,7 @@ impl TurboQuantKVCache {
 
 ### Configuration
 ```rust
-// turboquant/types.rs
+// crates/katgpt-quant/src/turboquant/types.rs
 pub struct TurboQuantKVCacheConfig {
     pub n_layers: usize,
     pub kv_dim: usize,
@@ -334,11 +334,11 @@ pub struct TurboQuantKVCacheConfig {
 At 32K context (hypothetical hd=128): **1073.7 MB → 151.0 MB (7.1× compression)**.
 
 ### Modules
-- `turboquant/codebook.rs` — Lloyd-Max codebook computation
-- `turboquant/rotation.rs` — QR-based orthogonal rotation + QJL projection
-- `turboquant/kv_cache.rs` — Bit-packed compressed KV cache (implements `QuantizedKVCache` trait from `src/types.rs`)
-- `turboquant/forward.rs` — Dequantization + attention forward path
-- `turboquant/types.rs` — `TurboQuantCodebook`, `TurboQuantLayer`, `TurboQuantKVCacheConfig`
+- `crates/katgpt-quant/src/turboquant/codebook.rs` — Lloyd-Max codebook computation
+- `crates/katgpt-quant/src/turboquant/rotation.rs` — QR-based orthogonal rotation + QJL projection
+- `crates/katgpt-quant/src/turboquant/kv_cache.rs` — Bit-packed compressed KV cache (implements `QuantizedKVCache` trait from `src/types.rs`)
+- `crates/katgpt-quant/src/turboquant/forward.rs` — Dequantization + attention forward path
+- `crates/katgpt-quant/src/turboquant/types.rs` — `TurboQuantCodebook`, `TurboQuantLayer`, `TurboQuantKVCacheConfig`
 
 ## Technique 7: SpectralQuant KV Cache Compression (Plan 078)
 
@@ -397,7 +397,7 @@ Long-context prefill is O(S²). Vanilla llama.cpp on RTX 3090 takes ~257s to pre
 Score per-block importance using draft model's tail attention, then select important blocks with structured rules:
 
 ```rust
-// speculative/prefill.rs
+// src/speculative/prefill.rs
 pub fn block_select(block_scores: &[f32], cfg: &FlashPrefillConfig) -> Vec<usize>;
 pub fn block_select_grid(score: &[f32], num_q_blocks, num_k_blocks, num_heads, cfg: &FlashPrefillConfig) -> (Vec<i32>, Vec<i32>);
 pub fn block_select_entmax(block_scores: &[f32], cfg: &FlashPrefillConfig) -> Vec<usize>;  // gated by dash_attn
@@ -576,7 +576,7 @@ pub struct TesNode { pub solution, score, metadata, parent_idx, visit_count, pro
 ## Architecture Decisions
 
 1. **Chain-seed is additive** — `build_dd_tree()` works as before (chain_seed=false)
-2. **Prefill is a new module** — `speculative/prefill.rs`, no feature flag needed
+2. **Prefill is a new module** — `src/speculative/prefill.rs`, no feature flag needed
 3. **KV snapshot copies only filled slots** — cheap at our scale, uses `kv_dim()` for GQA
 4. **Target conditioning via KV seed** — simplest option, no weight changes
 5. **Flat cache + PagedKVCache** — `PagedKVCache` with fork/rollback now implemented (Plan 014+)
@@ -679,7 +679,7 @@ pub struct AnchorFillResult {
 the denoising search space. The `step_reduction` field quantifies the gain over
 baseline D2F. Feature-gated behind `flashar_anchor` (requires `dllm`).
 
-**Source:** `speculative/flashar_anchor.rs`
+**Source:** `src/speculative/flashar_anchor.rs`
 
 ---
 
@@ -716,7 +716,7 @@ pub enum ThermalPath {
 both paths converge. This uses Plasma Path ternary weights (Plan 148, `TernaryWeights`)
 for the underlying SIMD matvec. Feature-gated behind `plasma_path`.
 
-**Source:** `speculative/flashar_consensus.rs`, `crates/katgpt-core/src/simd.rs`
+**Source:** `src/speculative/flashar_consensus.rs`, `crates/katgpt-core/src/simd.rs`
 
 ---
 

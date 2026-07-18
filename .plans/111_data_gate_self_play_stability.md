@@ -376,7 +376,7 @@ Sweep ε ∈ {0.0, 0.2, 0.5, 1.0} with II config:
 | `riir-gpu/src/loss_grpo.rs` | Add `SolverRewardMode`, extend `GrpoConfig` | T2 |
 | `riir-gpu/src/data_gate.rs` | New file: `ExecutionGate`, `LeakyGate<G>` | T3-T4 |
 | `riir-gpu/src/gzero_loop.rs` | Wire gate, add gap metric to `RoundMetrics` | T5-T6 |
-| `riir-gpu/src/lib.rs` | Add `mod data_gate` + re-exports | T7 |
+| `riir-ai/crates/riir-gpu/src/lib.rs` | Add `mod data_gate` + re-exports | T7 |
 | `riir-gpu/Cargo.toml` | Add `data_gate` feature | T7 |
 | `katgpt-rs/tests/data_gate_bomber.rs` | GOAT proof test | T8 |
 | `katgpt-rs/README.md` | Update with DataGate section | T9 |

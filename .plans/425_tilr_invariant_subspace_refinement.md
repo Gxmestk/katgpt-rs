@@ -186,7 +186,7 @@ the refactor risk.
 - [x] **T1.5** Add feature gate `tilr_invariant_subspace` to
       `katgpt-core/Cargo.toml`. Gate the module behind
       `#[cfg(feature = "tilr_invariant_subspace")]`.
-- [x] **T1.6** Register the module in `katgpt-core/src/lib.rs`:
+- [x] **T1.6** Register the module in `crates/katgpt-core/src/lib.rs`:
       `#[cfg(feature = "tilr_invariant_subspace")] pub mod tilr;`
 - [x] **T1.7** Forward the feature in root `katgpt-rs/Cargo.toml`:
       `tilr_invariant_subspace = ["katgpt-core/tilr_invariant_subspace"]` (opt-in,

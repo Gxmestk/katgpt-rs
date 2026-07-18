@@ -23,7 +23,7 @@ Super-GOAT potential: If calibration is fast enough for per-game-session KV comp
 ## Tasks
 
 - [x] T1: Add `gram.wgsl` — compute X·Xᵀ (seq_len × seq_len Gram matrix) in WGSL
-- [x] T2: Add dual-Gram routing to `spectralquant/calibration.rs` — dispatch based on `seq_len < 4 * d_h`
+- [x] T2: Add dual-Gram routing to `riir-ai/crates/riir-gpu/src/spectralquant/calibration.rs` — dispatch based on `seq_len < 4 * d_h`
 - [x] T3: GOAT proof — calibration accuracy with dual-Gram must match standard cov path
 - [x] T4: Port `roofline.py` → `roofline.rs` in katgpt-core (~200 lines, pure Rust)
 - [x] T5: GOAT proof — roofline predicted vs actual within ±20%
@@ -72,7 +72,7 @@ FlashLib reference: `primitives/pca/triton/pca.py` L73-116
 
 ## T2: Dual-Gram Routing in Calibration
 
-Current code (`spectralquant/calibration.rs` L289) always computes d_h × d_h covariance.
+Current code (`riir-ai/crates/riir-gpu/src/spectralquant/calibration.rs` L289) always computes d_h × d_h covariance.
 
 Add routing:
 ```rust

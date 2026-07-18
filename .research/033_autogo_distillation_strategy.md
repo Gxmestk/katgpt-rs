@@ -634,14 +634,14 @@ External reviews correctly identified that `riir-ai` has every component needed 
 
 | Component | Location | Feature Gate | Go Adaptation |
 |-----------|----------|-------------|---------------|
-| Fourier spatial MCTS | `riir-engine/src/fourier/mcts.rs` | `fourier` | Implement `state_to_entities` for Go tactical shapes |
-| Generic MCTS | `riir-engine/src/mcts.rs` | `game_state` | ✅ Works on any `GameState` — zero adaptation |
+| Fourier spatial MCTS | `riir-ai/crates/riir-engine/src/fourier/mcts.rs` | `fourier` | Implement `state_to_entities` for Go tactical shapes |
+| Generic MCTS | `riir-ai/crates/riir-engine/src/mcts.rs` | `game_state` | ✅ Works on any `GameState` — zero adaptation |
 | GRPO loss | `riir-gpu/src/loss_grpo.rs` | `training` | ✅ Game-agnostic — zero adaptation |
 | DPO loss (GPU) | `riir-gpu/src/loss_dpo.rs` | `training` | ✅ Game-agnostic — WGSL kernels work as-is |
 | DeltaFilter | `riir-gpu/src/delta_filter.rs` | `training` | ✅ Game-agnostic — 6-stage pipeline works as-is |
 | GZeroLoop | `riir-gpu/src/gzero_loop.rs` | `training` | ✅ Game-agnostic — activates when Go replays exist |
-| Game replay → LoRA | `riir-gpu/src/game/trainer.rs` | `training` | Adapt `GameAction` enum → 82 Go tokens |
-| Game policy config | `riir-gpu/src/game/policy.rs` | `training` | Adapt `GameConfig` → 3 board + 82 action vocab |
+| Game replay → LoRA | `riir-ai/crates/riir-gpu/src/game/trainer.rs` | `training` | Adapt `GameAction` enum → 82 Go tokens |
+| Game policy config | `riir-ai/crates/riir-gpu/src/game/policy.rs` | `training` | Adapt `GameConfig` → 3 board + 82 action vocab |
 | WASM Validator SDK | `riir-validator-sdk/` | `go-wasm` | Compile `GoState::is_legal` → `go_validator.wasm` |
 | MTP projection cache | `riir-ai/crates/riir-router/src/mtp_cache.rs` | `percepta` | Document as future: Go tokenizer → MTP projections |
 | Schur complement | `riir-gpu/src/schur.rs` | `training` | ✅ Domain-latent training — 1-shot weight updates |
@@ -677,7 +677,7 @@ go-full = ["go-training", "go-wasm", "go-fourier", "go-mtp"]  # Everything
 
 This is how bomber does it (`bomber`, `bomber-agent`, `bomber-wasm`). Same pattern, new domain.
 
-### 11.4 Adaptation Path: `game/trainer.rs` → Go
+### 11.4 Adaptation Path: `riir-ai/crates/riir-gpu/src/game/trainer.rs` → Go
 
 **Bomberman (existing, proven):**
 ```text
@@ -699,8 +699,8 @@ Model:        ~4K params, LoRA rank 4
 ```text
 GoState::play_random_game()           (Plan 065 GoState)
   → GoReplay                          (Plan 065 T16a)
-  → game/replay.rs → samples          (adapt GameAction enum)
-  → game/trainer.rs → 82-token seq    (adapt encode_game_sample)
+  → riir-ai/crates/riir-gpu/src/game/replay.rs → samples          (adapt GameAction enum)
+  → riir-ai/crates/riir-gpu/src/game/trainer.rs → 82-token seq    (adapt encode_game_sample)
   → riir-gpu LoRA fine-tuning         (existing wgpu kernels)
   → Go LoRA adapter (.bin)            (tiny model, fast train)
   → GoLoRAPlayer                      (new player type)
@@ -710,7 +710,7 @@ GoState::play_random_game()           (Plan 065 GoState)
 ```text
 GZeroLoop round (riir-gpu/src/gzero_loop.rs):
   1. GoTemplateProposer → query-hint pairs    (Plan 065 T33)
-  2. Go LoRA Generator → move predictions     (adapted game/policy.rs)
+  2. Go LoRA Generator → move predictions     (adapted riir-ai/crates/riir-gpu/src/game/policy.rs)
   3. HintDelta → intrinsic reward             (log-prob shift)
   4. DeltaFilter → preference pairs           (6-stage, game-agnostic)
   5. GRPO → train Proposer                    (loss_grpo.rs)
@@ -733,7 +733,7 @@ GZeroLoop round (riir-gpu/src/gzero_loop.rs):
 
 ### 11.6 Decision
 
-Plan 065 implements `go` feature gate (GoState + MCTS + HL + API bridge). Each subsequent feature gate (`go-training`, `go-wasm`, `go-fourier`, `go-mtp`) is unlocked by proving the previous one works via benchmarks. The `game/trainer.rs` → Go adaptation is the first unlock after Plan 065 completes.
+Plan 065 implements `go` feature gate (GoState + MCTS + HL + API bridge). Each subsequent feature gate (`go-training`, `go-wasm`, `go-fourier`, `go-mtp`) is unlocked by proving the previous one works via benchmarks. The `riir-ai/crates/riir-gpu/src/game/trainer.rs` → Go adaptation is the first unlock after Plan 065 completes.
 
 ---
 

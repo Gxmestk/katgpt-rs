@@ -24,7 +24,7 @@ Move 11 `src/` items into the `katgpt-core` workspace crate.
 
 - `alien_sampler/` — already exiled to `katgpt-deprecated` (Phase 3a). The Phase 10 line in the proposal still lists it but that's a stale reference.
 - `sigmoid` hoist — Phase 0 DONE.
-- `closure_mining.rs` — Phase 7 DONE (now in `katgpt-core/src/closure/mining.rs`).
+- `closure_mining.rs` — Phase 7 DONE (now in `crates/katgpt-core/src/closure/mining.rs`).
 
 ## Pre-move audit (DONE via grep)
 
@@ -42,7 +42,7 @@ All module-internal `crate::` imports are **intra-group** (both endpoints move t
 
 - `cce` — 5+ files: `tests/cce_convergence.rs`, `tests/cce_vs_nash.rs`, `benches/heterogeneous_cce.rs`, `examples/cce_demo.rs`
 - `salience` — 3 files: `examples/salience_tri_gate_basic.rs`, `examples/salience_tri_gate_batch.rs`, `benches/salience_tri_gate_bench.rs`
-- `trigger_gate` — `tests/bench_176_trigger_gate.rs`, `tests/bench_250_breakeven_goat.rs`, `src/breakeven/mod.rs` (intra-root, resolves via shim)
+- `trigger_gate` — `tests/bench_176_trigger_gate.rs`, `tests/bench_250_breakeven_goat.rs`, `crates/katgpt-core/src/breakeven/mod.rs` (intra-root, resolves via shim)
 - `alloc` — 4 test files: `tests/bench_271_attn_match_goat.rs`, `tests/bench_280_cs_kv_probe_goat.rs`, `tests/bench_284_clr_goat_g4.rs`, `tests/bench_294_ict_g5.rs`
 - `llmexec_guard` — `examples/llmexec_guard_demo.rs`, `src/benchmark/llmexec_guard.rs` (intra-root)
 - `cumprodsum`, `ssd_block` — `examples/ssd_demo.rs`
@@ -71,7 +71,7 @@ katgpt-core gains an always-compiled `alloc` module (no feature gate; the `debug
 - [x] **T4.** Wire module declarations in `crates/katgpt-core/src/lib.rs` (L1297-1322: always-on `alloc`/`cumprodsum`/`trigger_gate`; 7 feature-gated modules mirror root feature names; `salience` re-export preserved).
 - [x] **T4b.** Self-reference fix: 3 files had `katgpt_core::simd::*` calls (root-crate vocabulary) — rewritten to `crate::simd::*` post-move. Files: `memory_soup_lora.rs` (3 sites), `ssd_block.rs` (3 sites), `channel_simd.rs` (1 site). No remaining `katgpt_core::` code refs (only doc-link + comments, which are correct as-is).
 - [x] **T4c.** `trigger_gate.rs` toml dep: `from_toml`/`to_toml` were test-only API (no external caller — verified via grep across `src/`). Gated behind `#[cfg(test)]`; added `toml = "0.8"` to katgpt-core `[dev-dependencies]` so katgpt-core stays leaf-clean for downstream consumers (no `toml` in the non-test dep set).
-- [x] **T4d.** `alloc::tests::*` was failing because the test binary had no `#[global_allocator]` installed (counters stayed 0). Added a test-only `#[cfg(all(test, debug_assertions))] #[global_allocator] static TEST_GLOBAL_ALLOC: alloc::TrackingAllocator` at the end of katgpt-core/src/lib.rs. `cfg(test)` means it does not exist when katgpt-core is consumed as a library dep — no double-declare conflict with the root crate's own `#[global_allocator]`. All 1221 katgpt-core lib tests now pass (was 1216 pass + 5 fail).
+- [x] **T4d.** `alloc::tests::*` was failing because the test binary had no `#[global_allocator]` installed (counters stayed 0). Added a test-only `#[cfg(all(test, debug_assertions))] #[global_allocator] static TEST_GLOBAL_ALLOC: alloc::TrackingAllocator` at the end of crates/katgpt-core/src/lib.rs. `cfg(test)` means it does not exist when katgpt-core is consumed as a library dep — no double-declare conflict with the root crate's own `#[global_allocator]`. All 1221 katgpt-core lib tests now pass (was 1216 pass + 5 fail).
 - [x] **T5.** Rewrite root shims: `src/lib.rs` `pub mod X` → `pub use katgpt_core::X` for the 11 modules. Handle `alloc` special case (keep `#[global_allocator]` static). — DONE (previous agent)
 - [x] **T6.** Update root `Cargo.toml` features to forward to katgpt-core (8 features; `cumprodsum`/`trigger_gate`/`alloc` need no forward — always-on). — DONE (previous agent). Verified: `cce_moderator`, `llmexec_guard`, `memory_soup_lora`, `salience_tri_gate`, `skill_opt`, `ssd_block`, `channel_simd_align`, `mux_demux` all forward to `katgpt-core/<feature>`.
 - [x] **T7.** Delete original files from `src/` (the 8 single files + 3 directory trees). — DONE: all 11 items removed from `src/` (8 single `.rs` files + `src/skill_opt/` (7 files) + `src/cce/` (8 files) + `src/salience/` (4 files)). Verified via `find_path` glob — zero matches for any of the 11 item names.

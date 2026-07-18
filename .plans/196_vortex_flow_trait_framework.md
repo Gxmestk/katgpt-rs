@@ -97,7 +97,7 @@ Data flow:
 - [x] **T3: Define `RoutingScratch` reusable buffer**
   - `scores: Vec<f32>` — block scores (capacity = max_blocks)
   - `indices: Vec<usize>` — top-k index buffer
-  - Already partially exists in `dash_attn/routing.rs` — extract and formalize
+  - Already partially exists in `crates/katgpt-attn/src/dash_attn/routing.rs` — extract and formalize
 
 - [x] **T4: Implement `BlockTopKRouter`**
   - `forward_cache`: compute `Mean(keys[block_size])` → centroid per block. Store in `BlockTopKCache { centroids: Vec<f32> }` shape `[n_blocks, head_dim]`

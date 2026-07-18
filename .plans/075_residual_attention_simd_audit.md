@@ -8,10 +8,10 @@ Wire SIMD primitives into all remaining scalar loops in `crates/katgpt-percepta/
 
 ## Tasks
 
-- [x] T1: Add `simd_add_inplace(dst: &mut [f32], src: &[f32])` to `src/simd.rs` — NEON `vaddq_f32`, AVX2 `_mm256_add_ps`
-- [x] T2: Add `simd_add_into(dst: &mut [f32], a: &[f32], b: &[f32])` to `src/simd.rs` — zip add a+b into dst
-- [x] T3: Add `simd_max_f32(x: &[f32]) -> f32` to `src/simd.rs` — NEON `vmaxq_f32`, AVX2 `_mm256_max_ps` + horizontal reduction
-- [x] T4: Add `simd_fused_decay_write(dst: &mut [f32], decay: f32, src: &[f32], write: f32)` to `src/simd.rs` — dst = decay*dst + write*src
+- [x] T1: Add `simd_add_inplace(dst: &mut [f32], src: &[f32])` to `crates/katgpt-dec/src/simd.rs` — NEON `vaddq_f32`, AVX2 `_mm256_add_ps`
+- [x] T2: Add `simd_add_into(dst: &mut [f32], a: &[f32], b: &[f32])` to `crates/katgpt-dec/src/simd.rs` — zip add a+b into dst
+- [x] T3: Add `simd_max_f32(x: &[f32]) -> f32` to `crates/katgpt-dec/src/simd.rs` — NEON `vmaxq_f32`, AVX2 `_mm256_max_ps` + horizontal reduction
+- [x] T4: Add `simd_fused_decay_write(dst: &mut [f32], decay: f32, src: &[f32], write: f32)` to `crates/katgpt-dec/src/simd.rs` — dst = decay*dst + write*src
 - [x] T5: Wire `simd_add_into` into embedding add loops (5 forward variants + prefill multi-layer init)
 - [x] T6: Wire `simd_add_inplace` into all residual add loops (attn + MLP × 5 forward variants + domain_latent injection)
 - [x] T7: Wire `simd_dot_f32` into `raven_readout_into` Q·K dot product
@@ -24,7 +24,7 @@ Wire SIMD primitives into all remaining scalar loops in `crates/katgpt-percepta/
 
 ## Architecture
 
-### New SIMD Primitives (src/simd.rs)
+### New SIMD Primitives (crates/katgpt-dec/src/simd.rs)
 
 | Function | NEON | AVX2 | Scalar Fallback |
 |----------|------|------|-----------------|
@@ -70,7 +70,7 @@ Wire SIMD primitives into all remaining scalar loops in `crates/katgpt-percepta/
 
 | File | Changes |
 |------|---------|
-| `src/simd.rs` | Add `simd_add_inplace`, `simd_add_into`, `simd_max_f32`, `simd_fused_decay_write` + tests |
+| `crates/katgpt-dec/src/simd.rs` | Add `simd_add_inplace`, `simd_add_into`, `simd_max_f32`, `simd_fused_decay_write` + tests |
 | `crates/katgpt-percepta/src/transformer.rs` | Wire SIMD into embedding/residual/raven loops |
 | `src/types.rs` | Wire `simd_max_f32` into `softmax` / `softmax_scaled` |
 | `crates/katgpt-core/src/speculative/sampling.rs` | Wire `simd_scale_inplace` into normalize |

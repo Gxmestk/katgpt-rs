@@ -214,7 +214,7 @@ PPoT:  data1 = np.random.randn(6, 50)     # resampled 5→6, renders correctly
 | PPoT Component | katgpt-rs Equivalent | Status |
 |---|---|---|
 | Next-token logit capture | `DFlash` marginals in `SpeculativeContext::marginals_flat` | ✅ Done |
-| Categorical sampling | `sample_from_distribution()` in `src/speculative/sampling.rs` | ✅ Done |
+| Categorical sampling | `sample_from_distribution()` in `crates/katgpt-core/src/speculative/sampling.rs` | ✅ Done |
 | Residual distribution | `sample_residual_distribution()` | ✅ Done |
 | Constraint verification | `ConstraintPruner` / `ScreeningPruner` / `WasmPruner` | ✅ Done |
 | Tree-based path exploration | `DDTree` with best-first search | ✅ Done |
@@ -307,6 +307,6 @@ PPoT's core insight — **reusing discarded next-token distributions for cheap C
 - PPoT Reference Implementation: `raw/PPoT/ppot/` in this repo
 - katgpt-rs DFlash: `src/speculative/dflash.rs`
 - katgpt-rs DDTree: `src/speculative/dd_tree.rs`
-- katgpt-rs Sampling: `src/speculative/sampling.rs`
+- katgpt-rs Sampling: `crates/katgpt-core/src/speculative/sampling.rs`
 - Screening Pruner Research: `.research/007_Screening_Absolute_Relevance.md`
 - Leviathan Speculative Decoding: `.research/002_Fast_Inference_from_Transformers_via_Speculative_Decoding.md`

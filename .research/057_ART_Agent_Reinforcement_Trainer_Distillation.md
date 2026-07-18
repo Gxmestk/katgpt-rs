@@ -247,7 +247,7 @@ Tasks:
 ### Plan 091 (riir-ai): SFT→RL Pipeline Config
 
 Tasks:
-- [x] T1: Add `SftWarmupConfig` to `riir-gpu` (SFT epochs → GRPO rounds) — `SftWarmupConfig` in `riir-gpu/src/config.rs` L14-24
+- [x] T1: Add `SftWarmupConfig` to `riir-gpu` (SFT epochs → GRPO rounds) — `SftWarmupConfig` in `riir-ai/crates/riir-gpu/src/config.rs` L14-24
 - [x] T2: Wire sequential SFT→GRPO in example script — `SftRlPipeline` in `riir-gpu/src/pipeline.rs`
 - [x] T3: Document in `.docs/` — `riir-ai/.docs/23_sft_rl_pipeline.md`
 

@@ -50,7 +50,7 @@ otherwise stays opt-in as an engine primitive consumers can opt into.
 
 ### Tasks
 
-- [x] **T1.1** Create `katgpt-core/src/occupancy/mod.rs`. Gate behind
+- [x] **T1.1** Create `crates/katgpt-core/src/occupancy/mod.rs`. Gate behind
   `occupancy_ratio = []` feature in `katgpt-core/Cargo.toml`. Add to
   `[features]` block alongside other opt-in primitives (e.g.
   `cochain_point_sampler`).
@@ -163,7 +163,7 @@ base weight, only through the class's own θ).
 - [x] **T2.5** Implement `value_estimate(ratio, rewards) -> f32` as a free
   function (no class state needed). Two unit tests shipped.
 - [x] **T2.6** Smoke test `smoke_fit_produces_finite_nonneg_ratios` in
-  `occupancy/mod.rs`: 2-state MRP, K=20, asserts all outputs finite,
+  `crates/katgpt-core/src/occupancy/mod.rs`: 2-state MRP, K=20, asserts all outputs finite,
   non-negative, normalized (mean ≈ 1.0), non-degenerate (states get
   different ratios). G5 modelless-ness verified by inspection — the only
   mutable state in the module is `θ: Vec<f32>`.
@@ -246,7 +246,7 @@ See `.benchmarks/438_occupancy_ratio_goat.md` §"Bugs found and fixed" for detai
 - [x] **T5.3** `cargo test -p katgpt-core --lib` passes unchanged — verified
   in Phase 4 (1555 pass, 1 pre-existing debug-mode latency fail in
   `subspace_phase_gate` unrelated to occupancy).
-- [x] **T5.4** Module doc-comment shipped in Phase 1 (`occupancy/mod.rs`) —
+- [x] **T5.4** Module doc-comment shipped in Phase 1 (`crates/katgpt-core/src/occupancy/mod.rs`) —
   describes the primitive as generic off-policy evaluation math with no
   game/chain/shard/NPC semantics; cross-references Research 423.
 - [x] **T5.5** Softmax-vs-sigmoid carve-out shipped in Phase 1 (`mod.rs`) —
@@ -256,7 +256,7 @@ See `.benchmarks/438_occupancy_ratio_goat.md` §"Bugs found and fixed" for detai
 - [x] **T5.6** "Honest limitations" section shipped in Phase 1 (`mod.rs`) —
   covers Research 423 §5 caveats #3 (offline transition data instrumentation)
   and #5 (continuous high-dim state space feasibility bound).
-- [x] **T5.7** Re-export shipped in Phase 1 (`katgpt-core/src/lib.rs`) under
+- [x] **T5.7** Re-export shipped in Phase 1 (`crates/katgpt-core/src/lib.rs`) under
   `#[cfg(feature = "occupancy_ratio")] pub mod occupancy;`.
 
 ---

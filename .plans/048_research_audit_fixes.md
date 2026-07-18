@@ -131,7 +131,7 @@ But the current code doesn't properly accumulate gradients through the multi-hea
 **Files:** `riir-ai/crates/riir-gpu/src/kernels/mod.rs`, `riir-ai/crates/riir-gpu/src/forward.rs`
 **Problem:** 4 WGSL shaders exist (`flashprefill_mean_k.wgsl`, `flashprefill_block_score.wgsl`, `flashprefill_block_select.wgsl`, `flashprefill_sparse_forward.wgsl`) but are never compiled into `GpuPipelines` or dispatched.
 
-**Current state (kernels/mod.rs GpuPipelines):**
+**Current state (riir-ai/crates/riir-gpu/src/kernels/mod.rs GpuPipelines):**
 ```rust
 pub struct GpuPipelines {
     pub matmul: PipelineBundle,
@@ -294,9 +294,9 @@ Separate commits per logical unit:
 
 - [x] **Task 1:** Fix attention backward propagation in `backward.rs` (~110 lines)
 - [x] **Task 2:** Implement real KL divergence in `distill.rs` (~60 lines)
-- [x] **Task 3:** Implement game replay parser in `game/replay.rs` (~45 lines)
-- [x] **Task 4:** Wire PFlash GPU dispatch in `kernels/mod.rs` + `forward.rs` (~230 lines)
-- [x] **Task 5:** Wire TurboQuant GPU attention scoring in `kernels/mod.rs` + `forward.rs` (~90 lines)
+- [x] **Task 3:** Implement game replay parser in `riir-ai/crates/riir-gpu/src/game/replay.rs` (~45 lines)
+- [x] **Task 4:** Wire PFlash GPU dispatch in `riir-ai/crates/riir-gpu/src/kernels/mod.rs` + `forward.rs` (~230 lines)
+- [x] **Task 5:** Wire TurboQuant GPU attention scoring in `riir-ai/crates/riir-gpu/src/kernels/mod.rs` + `forward.rs` (~90 lines)
 - [x] **Task 6:** Add feedback consumer for TTT retraining loop (~210 lines)
 - [x] **Task 7:** E2E validation suite — all 6 fixes proven working
 - [x] **Task 8:** Update README, docs, create research audit doc
@@ -336,7 +336,7 @@ Separate commits per logical unit:
   │  forward.rs ──▶ [PFlash GPU] ──▶ attention ──▶ [TQ GPU]     │
   │  backward.rs ──▶ [FIXED attn grad] ──▶ LoRA grads           │
   │  distill.rs ──▶ [REAL KL divergence] ──▶ quality metric     │
-  │  game/replay.rs ──▶ [REAL parse_replay] ──▶ training data   │
+  │  riir-ai/crates/riir-gpu/src/game/replay.rs ──▶ [REAL parse_replay] ──▶ training data   │
   │  feedback_consumer.rs ──▶ poll → retrain → hot-swap signal   │
   └───────────────────────────────────────────────────────────────┘
 ```
@@ -349,8 +349,8 @@ Separate commits per logical unit:
 |------|--------|-------|
 | `riir-gpu/src/backward.rs` | Fix attention gradient computation, re-enable test | ~110 |
 | `riir-gpu/src/distill.rs` | Replace KL placeholder with real computation | ~60 |
-| `riir-gpu/src/game/replay.rs` | Implement `parse_replay()` from stub | ~45 |
-| `riir-gpu/src/kernels/mod.rs` | Add 5 new pipelines (4 PFlash + 1 TQ) | ~30 |
+| `riir-ai/crates/riir-gpu/src/game/replay.rs` | Implement `parse_replay()` from stub | ~45 |
+| `riir-ai/crates/riir-gpu/src/kernels/mod.rs` | Add 5 new pipelines (4 PFlash + 1 TQ) | ~30 |
 | `riir-gpu/src/forward.rs` | Add PFlash dispatch path, TQ scoring path | ~180 |
 | `riir-gpu/Cargo.toml` | Add `feedback-consumer` feature | ~5 |
 | `riir-ai/README.md` | Update training status, add new sections | ~30 |
@@ -391,7 +391,7 @@ The backward pass architecture is sound. Only the attention gradient path needs 
 
 ### 5. Replay parser uses existing JSONL infrastructure
 
-`parse_jsonl()` and `parse_jsonl_filtered()` already exist in `game/replay.rs`. `parse_replay()` just needs to call them and map to `GameSample`. No new parsing code.
+`parse_jsonl()` and `parse_jsonl_filtered()` already exist in `riir-ai/crates/riir-gpu/src/game/replay.rs`. `parse_replay()` just needs to call them and map to `GameSample`. No new parsing code.
 
 ---
 
@@ -545,25 +545,25 @@ Cross-reference of all 21 research papers evaluated against the riir-ai / katgpt
 **File:** `riir-gpu/src/distill.rs`
 
 ### Task 3: Replay Parser Implementation
-**Finding:** `game/replay.rs` had an unimplemented `parse_replay()` function.
+**Finding:** `riir-ai/crates/riir-gpu/src/game/replay.rs` had an unimplemented `parse_replay()` function.
 
 **Resolution:** Implemented full `parse_replay()` that converts `ReplayEvent` stream into `GameSamples` with quality assignment based on outcome and action coherence.
 
-**File:** `riir-gpu/src/game/replay.rs`
+**File:** `riir-ai/crates/riir-gpu/src/game/replay.rs`
 
 ### Task 4: PFlash GPU Dispatch
 **Finding:** 4 WGSL kernels existed (`flashprefill_mean_k`, `block_score`, `block_select`, `sparse_forward`) but were not wired into the Rust dispatch layer.
 
 **Resolution:** Created `GpuFlashPrefillPass` in `forward_flashprefill.rs` connecting all 4 kernels as a staged pipeline with proper buffer allocation and bind group management.
 
-**Files:** `riir-ai/crates/riir-gpu/src/forward_flashprefill.rs`, `riir-gpu/src/kernels/mod.rs`
+**Files:** `riir-ai/crates/riir-gpu/src/forward_flashprefill.rs`, `riir-ai/crates/riir-gpu/src/kernels/mod.rs`
 
 ### Task 5: TurboQuant GPU Attention Scoring
 **Finding:** `attention_score_tq.wgsl` kernel existed but had no Rust dispatch wrapper.
 
 **Resolution:** Created `GpuTurboQuantScoring` in `forward_turboquant.rs` connecting the bit-packed codebook scoring kernel with orthogonal pre-rotation.
 
-**Files:** `riir-ai/crates/riir-gpu/src/forward_turboquant.rs`, `riir-gpu/src/kernels/mod.rs`
+**Files:** `riir-ai/crates/riir-gpu/src/forward_turboquant.rs`, `riir-ai/crates/riir-gpu/src/kernels/mod.rs`
 
 ### Task 6: TTT Feedback Consumer
 **Finding:** No mechanism to close the TTT retraining loop from inference feedback back to LoRA retraining.

@@ -279,7 +279,7 @@ search doesn't improve collision-freedom but starts hurting latency.
 - [x] **T1.2** Vocabulary-translate the paper against the codebase. Grep
       `crates/katgpt-core/src/` for: `constraint`, `backtrack`, `recursive`,
       `priority inheritance`, `search_tree`, `constraint_tree`. Result:
-      `constraint` appears only in `arg/policy.rs` (`PolicyConstraints` —
+      `constraint` appears only in `crates/katgpt-core/src/arg/policy.rs` (`PolicyConstraints` —
       governance, unrelated to MAPF). The constraint tree is NOT shipped
       under any name (Research 441 §3 documents the full vocabulary table).
 - [x] **T1.3** Document the prior-art distinction: PI alone (Issues 140/143,

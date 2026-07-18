@@ -159,7 +159,7 @@ orthonormal-basis stabilization if a benchmark shows it's needed.
 
 ## Tasks
 
-- [x] T1 — Create `src/spectral/mod.rs` + `src/spectral/continuation.rs` skeleton with the API above.
+- [x] T1 — Create `crates/katgpt-core/src/spectral/mod.rs` + `crates/katgpt-core/src/spectral/continuation.rs` skeleton with the API above.
 - [x] T2 — Implement `fourier_continue_into`: **final algorithm is C¹-matched linear extrapolation + x[0] wrap target** (NOT the polynomial-blend originally proposed — see G1 GOAT iteration history in `.benchmarks/322_*`).
 - [x] T3 — Add the `fourier_continuation` feature flag in both `Cargo.toml` files.
 - [x] T4 — Register `pub mod spectral;` in `lib.rs` under `#[cfg(feature = "fourier_continuation")]`.

@@ -76,9 +76,9 @@ katgpt-rs/src/dense_mesh/
 ### Phase 5 — Adaptive Width & Compute Routing ✅
 
 - [x] Integrate with `CollapseAwareThinking` (P212) — entropy spike triggers width expansion
-  - **DONE 2026-06-14.** `dense_mesh/adaptive_width.rs::collapse_signal()` reads `CollapseDetector::hesitation_count()` / `threshold()` and returns `WidthDecision::{Contract,Neutral,Expand}` based on a configurable hysteresis band (default `[0.25, 0.75]`). Mirrors the `TvpExpansion` pattern in `S2FCollapseDetector`. Feature-gated on `collapse_aware_thinking`.
+  - **DONE 2026-06-14.** `crates/katgpt-transformer/src/dense_mesh/adaptive_width.rs::collapse_signal()` reads `CollapseDetector::hesitation_count()` / `threshold()` and returns `WidthDecision::{Contract,Neutral,Expand}` based on a configurable hysteresis band (default `[0.25, 0.75]`). Mirrors the `TvpExpansion` pattern in `S2FCollapseDetector`. Feature-gated on `collapse_aware_thinking`.
 - [x] Integrate with `BreakevenRouter` (P250) — breakeven analysis picks optimal width
-  - **DONE 2026-06-14.** `dense_mesh/adaptive_width.rs::breakeven_signal()` reads a `BreakevenSnapshot { cpu_to_gpu_amortized }` (constructed from `BreakevenBandit::stats()`) and returns `Expand` when the CPU→GPU upgrade has amortised, else `Contract`. Feature-gated on `breakeven_routing`.
+  - **DONE 2026-06-14.** `crates/katgpt-transformer/src/dense_mesh/adaptive_width.rs::breakeven_signal()` reads a `BreakevenSnapshot { cpu_to_gpu_amortized }` (constructed from `BreakevenBandit::stats()`) and returns `Expand` when the CPU→GPU upgrade has amortised, else `Contract`. Feature-gated on `breakeven_routing`.
   - **Decision rule:** collapse is the primary (quality) signal — non-`Neutral` collapse always wins. When collapse has no opinion, breakeven (cost signal) decides. Both `Neutral` → falls back to `Contract` (cheapest baseline, matches gate 1).
 - [x] Implement `pick_compute(width, layer_role)` in `compute_router.rs`:
   - `width == 1` → Cpu (no GPU launch overhead)

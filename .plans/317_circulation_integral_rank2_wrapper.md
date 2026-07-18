@@ -68,7 +68,7 @@ the natural rank-2 Stokes companion**. The right outcome is:
   - [x] **T3.2** Constant-curl (rigid rotation) field → circulation = curl × area.
         Cross-checked against `exterior_derivative` (Stokes identity). PASS.
   - [x] **T3.3** Reversal antisymmetry: clockwise == −counterclockwise. PASS.
-- [x] **T4** Add `circulation_integral` to `dec/mod.rs` re-exports.
+- [x] **T4** Add `circulation_integral` to `crates/katgpt-core/src/babel_codec/mod.rs` re-exports.
 - [x] **T5** Run unit tests: 15/15 pass (12 existing + 3 new).
 - [x] **T6** Add G-C benchmark variant using `circulation_integral` on closed loops.
 - [x] **T7** Run the benchmark; results in `.benchmarks/317_circulation_integral_goat.md`.

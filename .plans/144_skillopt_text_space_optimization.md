@@ -65,7 +65,7 @@ pub struct SkillEdit {
 
 pub enum EditSource { Failure, Success, SlowUpdate, MetaSkill }
 
-// src/skill_opt/gate.rs
+// crates/katgpt-core/src/skill_opt/gate.rs
 pub struct ValidationGate {
     pub accepted: bool,
     pub candidate_score: f64,
@@ -81,7 +81,7 @@ pub struct RejectedEdit {
     pub step: usize,
 }
 
-// src/skill_opt/schedule.rs
+// crates/katgpt-core/src/skill_opt/schedule.rs
 pub enum EditBudgetSchedule {
     Constant { budget: usize },
     Linear { start: usize, end: usize, total_steps: usize },
@@ -202,7 +202,7 @@ pub fn apply_edits(skill: &str, edits: &[SkillEdit], budget: usize) -> ApplyResu
 
 - [x] **T3: Rejected-Edit Buffer (katgpt-rs, `skill_opt` feature)**
 
-**Location:** `src/skill_opt/buffer.rs`
+**Location:** `crates/katgpt-core/src/skill_opt/buffer.rs`
 
 ```rust
 pub struct RejectedEditBuffer {

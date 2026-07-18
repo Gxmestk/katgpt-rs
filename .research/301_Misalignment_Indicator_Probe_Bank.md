@@ -120,7 +120,7 @@ At matched per-turn FPR ~15%: 18-probe transcript-TPR = 90.8%, 5-behavior-probe 
 | Direction-vector pool with sigmoid verifier | `ClaimVerifier::verify` returning `sigmoid(dot(claim.embedding, direction_vec[idx]))` (Plan 284 / Research 255, `src/clr/`) | Detection | ✅ shipped |
 | Freeze/thaw-versioned direction vectors | `DirectionVectorSource { direction(), blake3(), version() }` (Plan 284) | Artifact discipline | ✅ shipped |
 | Two-stage cascade (cheap online filter + heavy offline verifier) | `TriggeredInjectionGate` (plasma-tier hot path) + `AuditRunner` (periodic) + `AntiCheatChecker` (event emission) in `riir-engine/src/integrity/` (Plan 308, Research 129) | Cascade | ✅ shipped (game-runtime side) |
-| Raw scalar at sync boundary (5 emotion scalars, not the full embedding) | `RawInjectionSignature { valence, arousal, desperation, calm, fear }` in `riir-engine/src/integrity/types.rs` | Raw/latent bridge | ✅ shipped |
+| Raw scalar at sync boundary (5 emotion scalars, not the full embedding) | `RawInjectionSignature { valence, arousal, desperation, calm, fear }` in `riir-ai/crates/riir-engine/src/integrity/types.rs` | Raw/latent bridge | ✅ shipped |
 | KG triple emission from latent similarity | `KgTripleTemplate { subject, predicate, object }` in `riir-neuron-db/src/vibe.rs`; `kg_probe` in integrity/ | KG triple | ✅ shipped |
 | Pre-NPC 8-dim latent state (the probe substrate) | `NpcBrain::hla_state: [f32; 8]` in `katgpt-core/src/sense/brain.rs`; `evolve_hla` belief kernel (Research 242) | Belief state | ✅ shipped |
 | Per-NPC recurrent belief-state kernel | `evolve_hla` (`katgpt-core/src/sense/reconstruction.rs`, R242) | Belief state | ✅ shipped |

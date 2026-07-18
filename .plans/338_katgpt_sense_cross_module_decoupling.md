@@ -19,7 +19,7 @@ The original plan had three material defects, all corrected below:
    - `octree.rs` → `crate::merkle::{MerkleOctree, MerkleProof, HASH_SIZE, MERKLE_OCTREE_LEAVES}` (**feature-gated `merkle_octree`**, NEW dep not in original plan — used externally by riir-engine `kg.rs`/`kg_hyperedge.rs`)
    - `spectral_threat.rs` → `crate::linoss` (real, stays in katgpt-core as composition)
    - **False alarms** (already extracted to katgpt-types, no action): `crate::simd`, `crate::leaky_core`, `crate::{DepthInvarianceConfig, classify_chain, apply_magnitude_regularization, Scratch, MagnitudeRegularization, DepthInvarianceKind}` — all resolve to `katgpt_types`.
-3. **File inventory was incomplete.** `sense/mod.rs:7` documents that runtime modules (`brain`, `backend`, `batch`, `gm`, `hotswap`, `bandit`) already moved to `riir-engine::sense::*` in Issue 007 Phase C. A stale `katgpt_core::sense::bandit::{SenseTrial, decay_direction}` import in `riir-ai/crates/riir-engine/tests/bench_221_kg_confidence_weight_goat.rs:406` is pre-existing dead code (no `sense/bandit.rs` exists). Pre-existing bug, not introduced by this refactor.
+3. **File inventory was incomplete.** `riir-ai/crates/riir-engine/src/sense/mod.rs:7` documents that runtime modules (`brain`, `backend`, `batch`, `gm`, `hotswap`, `bandit`) already moved to `riir-engine::sense::*` in Issue 007 Phase C. A stale `katgpt_core::sense::bandit::{SenseTrial, decay_direction}` import in `riir-ai/crates/riir-engine/tests/bench_221_kg_confidence_weight_goat.rs:406` is pre-existing dead code (no `riir-ai/crates/riir-engine/src/sense/bandit.rs` exists). Pre-existing bug, not introduced by this refactor.
 
 **Strategy C Revised (adopted):** co-extract `ScaleBoundary` + `TemporalDerivativeKernel<N>` + the octree-merkle primitives (`MerkleOctree`, `MerkleProof`, constants) to katgpt-types; promote `katgpt-sense` with **9 files** (all except `spectral_threat.rs`, which stays in katgpt-core as composition alongside `linoss`); katgpt-sense depends on `katgpt-types` only. Re-export shim in katgpt-core preserves `katgpt_core::sense::{octree,reconstruction,lod,bake,serialize,sector,schema_centroid,reconstruction_depth_invariance,spectral_threat}::*` bit-for-bit.
 
@@ -33,7 +33,7 @@ dependencies** that no prior plan anticipated:
 
 | Sense File | External katgpt-core dep | Source |
 |---|---|---|
-| `sense/lod.rs` | `crate::slod::ScaleBoundary` | `katgpt-core/src/slod.rs` (1,047 LOC) |
+| `sense/lod.rs` | `crate::slod::ScaleBoundary` | `crates/katgpt-core/src/slod.rs` (1,047 LOC) |
 | `sense/reconstruction.rs` | `crate::temporal_deriv::TemporalDerivativeKernel` (gated `temporal_deriv`) | `katgpt-core/crates/katgpt-core/src/temporal_deriv.rs` (424 LOC) |
 | `sense/spectral_threat.rs` | `crate::linoss::{LinOSSCell, LinOSSState}` | `katgpt-core/crates/katgpt-core/src/linoss.rs` (938 LOC) |
 | All sense files | `crate::types::{SenseKind, SenseModule, TernaryDir}` | `katgpt-types` ✅ already extracted |
@@ -88,7 +88,7 @@ as four new public crates.
 | Crate | LOC | External consumers (outside katgpt-core) |
 |---|---|---|
 | katgpt-slod | 1,047 | 0 (only `rtdc.rs` + `sense/lod.rs` use it, both internal) |
-| katgpt-temporal-deriv | 424 | 0 (only `crates/katgpt-core/src/cgsp/derivative_curiosity.rs`, `delta_mem/state.rs`, `sense/reconstruction.rs` — all internal) |
+| katgpt-temporal-deriv | 424 | 0 (only `crates/katgpt-core/src/cgsp/derivative_curiosity.rs`, `crates/katgpt-core/src/delta_mem/state.rs`, `sense/reconstruction.rs` — all internal) |
 | katgpt-linoss | 938 | 0 (only `sense/spectral_threat.rs` — 1 internal consumer) |
 | katgpt-sense | 5,232 | downstream via re-export (TBD) |
 
@@ -123,7 +123,7 @@ internals. **Reject** — over-engineered, leaks internal layering decisions.
 - katgpt-core keeps `linoss.rs` (938 LOC) + `sense/spectral_threat.rs` (623
   LOC) = 1,561 LOC of composition code.
 - Re-export shim: `#[cfg(feature = "sense_composition")] pub use katgpt_sense as sense;`
-  in `katgpt-core/src/lib.rs`.
+  in `crates/katgpt-core/src/lib.rs`.
 - `sense/spectral_threat.rs` becomes `katgpt_core::sense_threat` (or similar)
   and is re-exported alongside the substrate via a second shim.
 
@@ -151,10 +151,10 @@ reconstruction files alone (`octree.rs` + `reconstruction.rs` + `serialize.rs`
 
 ### Phase 1 — Co-extract `ScaleBoundary` to katgpt-types
 
-- [x] **T1.1** Audit `katgpt-core/src/slod.rs` — extract the `ScaleBoundary`
+- [x] **T1.1** Audit `crates/katgpt-core/src/slod.rs` — extract the `ScaleBoundary`
   struct definition + its derives/impls into a new katgpt-types module
-  (`katgpt-types/src/slod.rs` or extend `enums.rs`).
-- [x] **T1.2** Update `katgpt-core/src/slod.rs` to re-export
+  (`crates/katgpt-types/src/slod.rs` or extend `enums.rs`).
+- [x] **T1.2** Update `crates/katgpt-core/src/slod.rs` to re-export
   `katgpt_types::ScaleBoundary` (mirror the leaky_core / depth_invariance
   pattern from Tier 1 #3).
 - [x] **T1.3** Run GOAT gate:
@@ -182,7 +182,7 @@ reconstruction files alone (`octree.rs` + `reconstruction.rs` + `serialize.rs`
   - `cargo check -p katgpt-core --features temporal_deriv` clean.
   - `cargo test -p katgpt-core --features temporal_deriv --lib` — test count
     matches (701 → 701).
-  - `cargo check -p katgpt-core --features delta_mem` clean (delta_mem/state.rs
+  - `cargo check -p katgpt-core --features delta_mem` clean (crates/katgpt-core/src/delta_mem/state.rs
     consumes the kernel) — verified via `cargo check --features delta_mem` on
     katgpt-rs workspace (feature lives on root, not katgpt-core).
   - `cargo check -p riir-engine` clean (TemporalDerivativeKernel consumed by
@@ -191,7 +191,7 @@ reconstruction files alone (`octree.rs` + `reconstruction.rs` + `serialize.rs`
 ### Phase 2.5 — Co-extract octree-merkle primitives to katgpt-types (NEW)
 
 - [x] **T2.5.1** Move the octree-merkle public surface from
-  `katgpt-core/src/merkle.rs` to `katgpt-types/src/merkle.rs`:
+  `crates/katgpt-core/src/merkle.rs` to `crates/katgpt-types/src/merkle.rs`:
   constants (`MERKLE_OCTREE_NODES`, `MERKLE_OCTREE_LEAVES`,
   `MERKLE_OCTREE_BRANCHING`, `HASH_SIZE`, `MERKLE_OCTREE_INTERNAL`,
   `MERKLE_OCTREE_DEPTH`), `MerkleOctree` struct + `build_from_leaves`,
@@ -230,7 +230,7 @@ reconstruction files alone (`octree.rs` + `reconstruction.rs` + `serialize.rs`
   - `crate::leaky_core::` → `katgpt_types::leaky_core::`.
   - `crate::{classify_chain, apply_magnitude_regularization, Scratch, DepthInvarianceConfig, ...}` → `katgpt_types::`.
   - `super::` refs stay valid (same crate, modules flatten).
-- [x] **T3.5** Add re-export shim in `katgpt-core/src/lib.rs` that preserves
+- [x] **T3.5** Add re-export shim in `crates/katgpt-core/src/lib.rs` that preserves
   `katgpt_core::sense::*` **bit-for-bit**. Because `spectral_threat` stays
   local but the 9 substrate files move out, the shim is a `pub mod sense`
   that re-exports katgpt-sense AND adds the local `spectral_threat`:
@@ -252,7 +252,7 @@ reconstruction files alone (`octree.rs` + `reconstruction.rs` + `serialize.rs`
   `schema_centroid`, `bake_precision`, `sense_lod`, `merkle_octree`,
   `sector_projection`, `depth_invariance`, `self_advantage_gate` to
   katgpt-sense.
-- [x] **T3.7** Remove katgpt-core's `sense/mod.rs` (substrate moved out);
+- [x] **T3.7** Remove katgpt-core's `riir-ai/crates/riir-engine/src/sense/mod.rs` (substrate moved out);
   the shim in T3.5 replaces it.
 
 ### Phase 4 — Verification (cross-cutting, riir-engine REQUIRED)

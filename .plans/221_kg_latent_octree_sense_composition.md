@@ -115,7 +115,7 @@ Compress game domain knowledge into fixed-type ternary bit-plane sense modules (
 
 ### Phase 3: Self-Learning + Hot-Swap
 
-- [x] **T8: SenseBandit — trial log for sense module quality** (`crates/katgpt-ruliology/crates/katgpt-ruliology/src/bandit.rs`)
+- [x] **T8: SenseBandit — trial log for sense module quality** (`crates/katgpt-ruliology/src/bandit.rs`)
   - `SenseTrial` — npc_id: u32, sense_kind: SenseKind, activation: f32, action_taken: u32, reward: f32
   - `SenseTrialLog` — extends existing TrialLog with sense-specific fields
   - `AbsorbCompress` integration — high-reward trials reinforce direction weights

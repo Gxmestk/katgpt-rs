@@ -17,7 +17,7 @@ TNOs model physical quantities as cochains on cell complexes (vertices→scalars
 
 ### 1.1 Cochain Fields (Not Just Point Fields)
 
-Current state: `FlowField` in `flow/mod.rs` stores 2D flow vectors on a grid — all rank-0 (vertex) data. TNOs show this is lossy: physical quantities have geometric type. Pressures live on vertices, circulations on edges, fluxes on faces.
+Current state: `FlowField` in `crates/katgpt-core/src/flow/mod.rs` stores 2D flow vectors on a grid — all rank-0 (vertex) data. TNOs show this is lossy: physical quantities have geometric type. Pressures live on vertices, circulations on edges, fluxes on faces.
 
 **Key equation:** A k-cochain `uₖ: Kₖ → ℝ^{dₖ}` assigns features to k-cells. Rank matters:
 - Rank 0 (vertices): scalars — potential, pressure, HP, value
@@ -142,7 +142,7 @@ These become new `is_valid()` and `relevance()` signals for the pruner.
 | Dirichlet Energy | `dirichlet.rs` | Already exists — extend to Hodge energy |
 | Spectral hierarchy | `spectral_hierarchy.rs` | Extend to Hodge spectrum |
 | Betti numbers | NEW | Compute from Hodge Laplacian zero eigenvalues |
-| Flow field | `flow/mod.rs` | Extend to multi-rank cochain fields |
+| Flow field | `crates/katgpt-core/src/flow/mod.rs` | Extend to multi-rank cochain fields |
 
 ### 3.2 What's New (Novel Fusion)
 

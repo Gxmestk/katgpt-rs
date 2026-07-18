@@ -134,7 +134,7 @@ coboundary index widens G-B but doesn't change the feature's promotion status.
       - T8.3: empty region → 0.0.
       - T8.4: exact/gradient field → zero flux (FTC).
       - T8.5: rebuild after mutation matches full-scan reference.
-- [x] T9: Re-export `boundary_flux_mass_indexed` and `CoboundaryIndex` from `dec/mod.rs`.
+- [x] T9: Re-export `boundary_flux_mass_indexed` and `CoboundaryIndex` from `crates/katgpt-core/src/babel_codec/mod.rs`.
 - [x] T10: Add benchmark variants to `stokes_calculus_bench.rs`:
       - `G-B_256x256_full_scan_baseline` (re-baseline in same group)
       - `G-B_256x256_indexed_cold` (clone + build + 1 query per iter)
