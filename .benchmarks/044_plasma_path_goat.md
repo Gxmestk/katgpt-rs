@@ -194,7 +194,7 @@ plasma_path = ["katgpt-core/plasma_path"]
 | `crates/katgpt-dec/src/simd.rs` | Added `ternary_matvec_scalar`, `neon_ternary_matvec`, `avx2_ternary_matvec`, `simd_ternary_matvec`, `simd_ternary_matmul_batch`. **Issue 298 (2026-06-14):** rewrote all 3 SIMD backends with SWAR + sign-FMLA + 4 accumulators (2.1× speedup on NEON). |
 | `crates/katgpt-core/src/lib.rs` | Re-exports for `TernaryWeights`, ternary matvec functions |
 | `Cargo.toml` | Added `plasma_path` feature gate |
-| `src/weights.rs` | Added `load_ternary_bits()` `.bits` file loader |
+| `riir-ai/crates/riir-engine/src/deltanet/weights.rs` | Added `load_ternary_bits()` `.bits` file loader |
 | `tests/bench_148_plasma_path_goat.rs` | 11 GOAT proof tests + **Issue 298 G3b SWAR speedup gate** (≥ 5.0× scalar) |
 | `.benchmarks/044_plasma_path_goat.md` | This file (refreshed post-Issue 298) |
 

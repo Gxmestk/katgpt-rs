@@ -98,12 +98,12 @@ Translation to our system: `DDTreeBranchCache` with more branches (K) >> deeper 
 | Branch rollback | `DDTreeBranchCache::rollback_branch()` | `src/speculative/types.rs:330+` | ✅ Shared prefix preserved |
 | Small model proposes | Draft model in `SpeculativeVerifier` | `crates/katgpt-speculative/src/spechop/verifier.rs:22-32` | ✅ Core speculative decoding |
 | Recursive refinement | `build_dd_tree_sde()` + marginals | `src/speculative/dd_tree.rs:256-263` | ✅ SDE + screened tree |
-| Q-head (trajectory scoring) | `BanditPruner<P>.q_values()` | `src/pruners/bandit.rs:289+` | ✅ Q-values per arm |
+| Q-head (trajectory scoring) | `BanditPruner<P>.q_values()` | `crates/katgpt-ruliology/src/bandit.rs:289+` | ✅ Q-values per arm |
 | Q-head early stopping | Not yet (selection only) | — | 🟡 See Section 7.1 |
 | Width scaling (K rollouts) | `max_branches` in `DDTreeBranchCache::new()` | `src/speculative/types.rs:307-317` | ✅ Configurable K |
 | Depth scaling (T steps) | `Config.draft_lookahead` | `src/types.rs` | ✅ Configurable T |
 | Rollout selection (best of K) | `extract_best_path()` / `extract_best_path_into()` | `src/speculative/dd_tree.rs` | ✅ Best path extraction |
-| Bandit arm selection | `BanditStrategy::Ucb1 / EpsilonGreedy` | `src/pruners/bandit.rs` | ✅ Multiple strategies |
+| Bandit arm selection | `BanditStrategy::Ucb1 / EpsilonGreedy` | `crates/katgpt-ruliology/src/bandit.rs` | ✅ Multiple strategies |
 | Sigmoid gating | `SdarBanditPruner<P>` with β parameter | `crates/katgpt-pruners/src/sdar/sdar_bandit.rs:187-196` | ✅ SDAR gate |
 | Pairwise ranking | `BtRank` (Bradley-Terry) | `crates/katgpt-pruners/src/bt_rank.rs` | ✅ Feature `bt_rank` |
 | Flow-based exploration | `FlowPruner<P>` (GFlowNet) | `crates/katgpt-speculative/src/flow_pruner.rs:43-52` | ✅ λ-regularized |
@@ -184,7 +184,7 @@ impl Default for SdeConfig {
 
 PTRM's Q-head scores trajectories for selection. Our `BanditPruner<P>` does the same via Q-values:
 
-```src/pruners/bandit.rs#L289-293
+```crates/katgpt-ruliology/src/bandit.rs#L289-293
 pub struct BanditPruner<P: ScreeningPruner> {
     inner: P,
     strategy: BanditStrategy,
@@ -490,7 +490,7 @@ PTRM independently validates our existing design:
 | `src/speculative/dd_tree.rs` | `inject_sde_noise`, `build_dd_tree_sde`, `extract_best_path` |
 | `src/speculative/types.rs` | `SdeConfig`, `DDTreeBranchCache`, `ScreeningPruner`, `ConstraintPruner` |
 | `crates/katgpt-speculative/src/spechop/verifier.rs` | `SpeculativeVerifier` trait |
-| `src/pruners/bandit.rs` | `BanditPruner<P>` with Q-values and strategies |
+| `crates/katgpt-ruliology/src/bandit.rs` | `BanditPruner<P>` with Q-values and strategies |
 | `crates/katgpt-pruners/src/bt_rank.rs` | `BtRank` Bradley-Terry pairwise ranking |
 | `crates/katgpt-speculative/src/flow_pruner.rs` | `FlowPruner<P>` GFlowNet flow bonus |
 | `crates/katgpt-pruners/src/sdar/sdar_bandit.rs` | `SdarBanditPruner<P>` sigmoid-gated bandit |

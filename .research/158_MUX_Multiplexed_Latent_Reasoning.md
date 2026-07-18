@@ -390,7 +390,7 @@ MUX is the theoretical foundation we didn't know we needed. RiM slots worked emp
 |------|-----------|---------|------|
 | `mux_pruner` | — | off | `crates/katgpt-pruners/src/mux_span.rs` |
 | `mux_ddtree` | `mux_pruner` | off | `src/tree/mux_dd_tree.rs` |
-| `mux_bandit_width` | `bandit`, `rim_slots` | off | `src/pruners/bandit.rs` (extend) |
+| `mux_bandit_width` | `bandit`, `rim_slots` | off | `crates/katgpt-ruliology/src/bandit.rs` (extend) |
 | `mux_demux` | — | off | `crates/katgpt-core/src/mux_demux.rs` |
 | `mux_bfs` | `mux_ddtree` | off | `src/tree/mux_dd_tree.rs` (extend) |
 | `mux_freeze_thaw` | `rim_slots` | off | `src/memory/neuron_shard.rs` (extend) |

@@ -67,7 +67,7 @@ Y ← Â · V                         // value aggregation
 | `crates/katgpt-core/src/types.rs` | Add `EgaGate` struct + `ega_gates` field to Config | Low |
 | `crates/katgpt-core/src/attention.rs` | Add `ega_attention_forward()` with energy gate | Medium |
 | `crates/katgpt-percepta/src/transformer.rs` | Wire EGA gate into attention layers | Medium |
-| `src/weights.rs` | Serialize/deserialize EGA gate params | Low |
+| `riir-ai/crates/riir-engine/src/deltanet/weights.rs` | Serialize/deserialize EGA gate params | Low |
 
 ---
 

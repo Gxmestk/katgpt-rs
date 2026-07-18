@@ -100,8 +100,8 @@ refined strategy doc, stranded in a private fork.
     - [x] `mtp.rs` — `MtpProjection`, `load_mtp_projection`, `project_target_activation`,
       magic constants + tests
     - [x] `contiguous.rs` — `ContiguousWeights` + `load_ternary_bits` (moved verbatim
-      from root `src/weights.rs`)
-  - [x] 2c. Deleted root `src/weights.rs`; replaced `pub mod weights;` in
+      from root `riir-ai/crates/riir-engine/src/deltanet/weights.rs`)
+  - [x] 2c. Deleted root `riir-ai/crates/riir-engine/src/deltanet/weights.rs`; replaced `pub mod weights;` in
     root `src/lib.rs` with `pub use katgpt_transformer::{ContiguousWeights, load_ternary_bits};`
   - [x] 2d. Root `crates/katgpt-percepta/src/transformer.rs` keeps: `ForwardContext`, all forward
     functions, all tests. Imports types via `pub use katgpt_transformer::{...}`.

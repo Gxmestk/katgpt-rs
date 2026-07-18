@@ -153,7 +153,7 @@ Research 238 / Plan 270 shipped `gauge_rebalance` (power iteration for `σ_max` 
 
 ### 2.5 Fusion B — Fuse with Plan 181 (dMoE Adaptive Top-p Bandit)
 
-Plan 181 shipped dMoE's "aggregate scores → top-p coreset" as adaptive bandit arm selection (`src/pruners/bandit.rs:1999`, `crates/katgpt-speculative/src/vocab_coreset.rs`). That operates on *scores*; this paper conditions the *router weights that produce the scores*.
+Plan 181 shipped dMoE's "aggregate scores → top-p coreset" as adaptive bandit arm selection (`crates/katgpt-ruliology/src/bandit.rs:1999`, `crates/katgpt-speculative/src/vocab_coreset.rs`). That operates on *scores*; this paper conditions the *router weights that produce the scores*.
 
 **Composition (modelless):**
 ```

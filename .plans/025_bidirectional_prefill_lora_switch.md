@@ -90,7 +90,7 @@ The existing `attention_head` already accepts `t_n: usize` (number of KV positio
 - [x] **Task 1: Add `LoraAdapter` CPU struct** (`src/types.rs`)
   - Production-grade CPU-side LoRA adapter for CPU inference path.
   - Mirrors `GpuLoraAdapter` fields but uses `Vec<f32>` instead of GPU buffers.
-  - Loads from the same `.bin` format as `gpu/lora.rs::export_lora` (blake3 checksum, LORA magic).
+  - Loads from the same `.bin` format as `crates/katgpt-types/src/lora.rs::export_lora` (blake3 checksum, LORA magic).
   ```rust
   /// CPU-side LoRA adapter for CPU inference path.
   /// Loads from the same binary format as GpuLoraAdapter (Plan 008).
@@ -105,7 +105,7 @@ The existing `attention_head` already accepts `t_n: usize` (number of KV positio
   }
 
   impl LoraAdapter {
-      /// Load from binary file (same format as gpu/lora.rs::export_lora).
+      /// Load from binary file (same format as crates/katgpt-types/src/lora.rs::export_lora).
       /// Format: [LORA(4) | version(4) | blake3(32) | payload...]
       pub fn load(path: &Path) -> Result<Self, String> { ... }
   }

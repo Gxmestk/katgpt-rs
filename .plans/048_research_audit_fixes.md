@@ -504,7 +504,7 @@ Cross-reference of all 21 research papers evaluated against the riir-ai / katgpt
 
 | # | Paper | Year | Implementation | Module(s) | Status |
 |---|-------|------|----------------|-----------|--------|
-| 1 | **LoRA: Low-Rank Adaptation** (Hu et al.) | 2021 | Full LoRA A/B training pipeline | `riir-gpu/lora.rs`, `lora_a.wgsl`, `lora_b.wgsl` | ✅ Full |
+| 1 | **LoRA: Low-Rank Adaptation** (Hu et al.) | 2021 | Full LoRA A/B training pipeline | `crates/katgpt-types/src/lora.rs`, `lora_a.wgsl`, `lora_b.wgsl` | ✅ Full |
 | 2 | **FlashAttention** (Dao et al.) | 2022 | PFlash block-sparse speculative prefill (4-kernel GPU pipeline) | `forward_flashprefill.rs`, `flashprefill_*.wgsl` | ✅ Full |
 | 3 | **Speculative Decoding** (Leviathan et al.) | 2023 | DDTree speculative verification with budget-aware pruning | `katgpt-rs/src/speculative/dd_tree.rs` | ✅ Full |
 | 4 | **Grouped Query Attention** (Ainslie et al.) | 2023 | GQA kv_group mapping in attention kernels | `attention.wgsl`, `flashprefill_sparse_forward.wgsl` | ✅ Full |

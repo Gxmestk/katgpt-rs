@@ -119,7 +119,7 @@ A pairwise win is counted ONLY if both orders agree. Disagreements → treated a
 | Verifier R_x | `ConstraintPruner::is_valid()` | `speculative/types.rs` | Modelless |
 | Valid state system | TreeNode state space | `speculative/types.rs` | Structural |
 | Progress rank d_x | TreeNode depth / rollout position | `speculative/types.rs` | Structural |
-| Portfolio P_N | BanditPruner strategies | `pruners/bandit.rs` | Modelless |
+| Portfolio P_N | BanditPruner strategies | `crates/katgpt-ruliology/src/bandit.rs` | Modelless |
 | Blind-spot floor B | Unseen states / unsolvable positions | (diagnostic) | Measurement |
 | SR²AM configurator | Budget allocator (k,m,r sizing) | `crates/katgpt-pruners/src/configurator_bandit.rs` | Modelless |
 
@@ -359,5 +359,5 @@ The conceptual alignment is near-perfect:
   - `crates/katgpt-pruners/src/bt_rank.rs` — BtRank pairwise tournament (comparator)
   - `src/speculative/dd_tree.rs` — DDTree branch expansion (proposer)
   - `src/speculative/types.rs` — ScreeningPruner, ConstraintPruner (critic/verifier)
-  - `src/pruners/bandit.rs` — BanditPruner (diversity)
+  - `crates/katgpt-ruliology/src/bandit.rs` — BanditPruner (diversity)
   - `crates/katgpt-pruners/src/configurator_bandit.rs` — SR²AM (budget allocator)

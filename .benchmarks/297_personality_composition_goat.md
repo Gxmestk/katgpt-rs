@@ -140,5 +140,5 @@ features in `katgpt-rs/Cargo.toml` (Plan 297 T5.1).
 - Plan: `.plans/297_personality_weighted_composition.md`
 - Research: `.research/276_Personality_Weighted_Latent_Layer_Composition.md`
 - Bench source: `riir-ai/crates/riir-engine/benches/personality_composition_bench.rs`
-- Kernel source: `crates/katgpt-core/src/personality_composition/kernel.rs`
+- Kernel source: `riir-ai/crates/riir-engine/src/hla/kernel.rs`
 - SIMD helper used: `simd::simd_fused_scale_acc` (NEON/AVX2 FMA)

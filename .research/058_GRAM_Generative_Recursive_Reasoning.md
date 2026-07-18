@@ -138,7 +138,7 @@ This directly validates PTRM's finding (Research 49): width >> depth. 20 paralle
 | N parallel trajectories | `DDTreeBranchCache` with K branches | `src/speculative/types.rs:367-371` | ✅ Implemented |
 | Branch forking | `DDTreeBranchCache::fork_branch()` | `src/speculative/types.rs:387-394` | ✅ Copy-on-write KV |
 | Width scaling (N samples) | `max_branches` field | `src/speculative/types.rs:370` | ✅ Configurable |
-| Trajectory selection (LPRM) | `BanditPruner<P>` Q-values | `src/pruners/bandit.rs:297+` | ✅ Online Q-learning |
+| Trajectory selection (LPRM) | `BanditPruner<P>` Q-values | `crates/katgpt-ruliology/src/bandit.rs:297+` | ✅ Online Q-learning |
 | Majority voting | `extract_best_path()` | `src/speculative/dd_tree.rs` | ✅ Best path extraction |
 | Richer pairwise selection | `BtScores`/`bt_fit()` (Bradley-Terry) | `crates/katgpt-pruners/src/bt_rank.rs` | ✅ Feature `bt_rank` |
 | Flow-based exploration | `FlowPruner<P>` (GFlowNet) | `crates/katgpt-speculative/src/flow_pruner.rs:43-55` | ✅ GRAM doesn't have this |
@@ -229,7 +229,7 @@ More branches >> deeper lookahead. Research 49 (PTRM) showed +28.6pp from K=64 v
 
 GRAM uses LPRM (Latent Process Reward Model) to score trajectories. Our `BanditPruner<P>` does the same with online Q-learning:
 
-```src/pruners/bandit.rs#L297-307
+```crates/katgpt-ruliology/src/bandit.rs#L297-307
 pub struct BanditPruner<P: ScreeningPruner> {
     inner: P,
     strategy: BanditStrategy,
@@ -500,7 +500,7 @@ GRAM independently validates our existing design from a completely different ang
 | `src/speculative/dd_tree.rs` | `inject_sde_noise`, `build_dd_tree_sde`, `extract_best_path` |
 | `src/speculative/types.rs` | `SdeConfig`, `DDTreeBranchCache` (re-exports `ScreeningPruner`, `ConstraintPruner` from `katgpt_core::traits`) |
 | `crates/katgpt-speculative/src/spechop/verifier.rs` | `SpeculativeVerifier` trait |
-| `src/pruners/bandit.rs` | `BanditPruner<P>` with Q-values and strategies |
+| `crates/katgpt-ruliology/src/bandit.rs` | `BanditPruner<P>` with Q-values and strategies |
 | `crates/katgpt-pruners/src/bt_rank.rs` | `BtScores`, `BtConfig`, `bt_fit()` — Bradley-Terry pairwise ranking |
 | `crates/katgpt-speculative/src/flow_pruner.rs` | `FlowPruner<P>` GFlowNet flow bonus |
 | `crates/katgpt-pruners/src/sdar/sdar_bandit.rs` | `SdarBanditPruner<P>` sigmoid-gated bandit |

@@ -32,11 +32,11 @@ Goal: a compiling, feature-gated module with the type surface frozen. No drift y
 - [x] **T1.5** Implement `crates/katgpt-personality/src/sigmoid.rs` — numerically stable sigmoid helper:
   - [x] `pub fn sigmoid(x: f32) -> f32` — branching impl per AGENTS.md (positive vs negative branch, no overflow)
   - [x] Vectorized variant `sigmoid_into(x: &[f32], out: &mut [f32])` for batch
-- [x] **T1.6** Implement `personality_composition/trait.rs`:
+- [x] **T1.6** Implement `crates/katgpt-core/src/content_store/trait.rs`:
   - [x] `pub trait LayerDirectionSource` with `direction(&self, scratch: &mut [f32]) -> &[f32]`
   - [x] `fn recent_direction(&self) -> &[f32]` (default: returns current direction)
   - [x] `fn belief_confidence(&self) -> f32 { 1.0 }` (default: plasma-tier layers)
-- [x] **T1.7** Implement `personality_composition/kernel.rs` — the composition struct:
+- [x] **T1.7** Implement `riir-ai/crates/riir-engine/src/hla/kernel.rs` — the composition struct:
   - [x] `pub struct PersonalityWeightedComposition<const N: usize, const D: usize>` with `w: [f32; N]`, config, `r_expected: [f32; N]`
   - [x] `pub fn new(config: PersonalityConfig, initial_w: [f32; N]) -> Self`
   - [x] `pub fn compose_into(&self, layers: &[&dyn LayerDirectionSource; N], scratch: &mut [f32], out: &mut [f32]) -> &mut [f32]` — the kernel: `out[j] += sigmoid(w[i]/tau) * belief_confidence[i] * d[i][j]`

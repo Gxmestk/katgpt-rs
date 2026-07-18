@@ -55,7 +55,7 @@ over identity) lives in the riir-ai runtime plan (P355).**
       pub top_k: Option<usize>,
   }
   ```
-- [x] **T1.3** Implement the core kernel `set_sigmoid_attention_into` in `set_attention/kernel.rs`: *(Inlined into `set_attention.rs`. Design pivot during implementation: the residual update is normalised by N (peer count) so γ is invariant to crowd size — without this, a guard in a 100-NPC zone would move 100× further than one in a 1-NPC zone. See the dense_accumulate doc comment.)*
+- [x] **T1.3** Implement the core kernel `set_sigmoid_attention_into` in `riir-ai/crates/riir-engine/src/hla/kernel.rs`: *(Inlined into `set_attention.rs`. Design pivot during implementation: the residual update is normalised by N (peer count) so γ is invariant to crowd size — without this, a guard in a 100-NPC zone would move 100× further than one in a 1-NPC zone. See the dense_accumulate doc comment.)*
   ```rust
   /// Permutation-equivariant, sigmoid-gated cross-entity set attention.
   ///

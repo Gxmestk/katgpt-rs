@@ -128,7 +128,7 @@ Flowchart as directed graph: `F = (N, E, n₀, T)`
 | Flowchart `F = (N, E, n₀, T)` | GameState FSM + ActionSpaceLog | `src/pruners/game_state/` |
 | Synthetic conversation generation | Self-play arena + replay backward | `src/pruners/arena/`, `src/pruners/bomber/replay_backward.rs` |
 | Full fine-tuning | LoRA training (riir-burner) — **GAP**: no full FT path | `riir-ai/crates/riir-gpu/` |
-| Runtime without orchestrator | WASM Validator + BanditPruner | `src/pruners/bandit.rs` |
+| Runtime without orchestrator | WASM Validator + BanditPruner | `crates/katgpt-ruliology/src/bandit.rs` |
 | Recompile cycle | Freeze/Thaw pipeline | `crates/katgpt-pruners/src/freeze.rs` |
 | Quality scoring (LLM-as-judge) | Bradley-Terry pairwise ranking | `crates/katgpt-pruners/src/bt_rank.rs` |
 | Multi-criteria rubric | ROPD RubricVector | `crates/katgpt-pruners/src/ropd_rubric/types.rs` |

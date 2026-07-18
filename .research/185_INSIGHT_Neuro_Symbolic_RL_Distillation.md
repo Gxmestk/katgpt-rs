@@ -304,7 +304,7 @@ Parameter Calibration         →   RewardGatedCalibrator (formalized)
 
 | File | Relevance |
 |------|-----------|
-| `src/pruners/bandit.rs` | `BanditPruner<P>` — F1 fitting uses bandit traces |
+| `crates/katgpt-ruliology/src/bandit.rs` | `BanditPruner<P>` — F1 fitting uses bandit traces |
 | `crates/katgpt-pruners/src/absorb_compress.rs` | `AbsorbCompressLayer<P>` — F4 extends to continuous params |
 | `crates/katgpt-pruners/src/hot_swap.rs` | `HotSwapPruner<P>` — F4 hot-swaps calibrated parameters |
 | `crates/katgpt-pruners/src/trial_log.rs` | `TrialLog` — F2/F3 explanations logged to JSONL |

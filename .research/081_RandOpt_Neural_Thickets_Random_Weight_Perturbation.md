@@ -91,12 +91,12 @@ Top-K ensemble → single model SFT on hard examples:
 
 | RandOpt Concept | Our Existing System | Location |
 |----------------|---------------------|----------|
-| N random perturbations | `BanditPruner` population of arms | `src/pruners/bandit.rs` |
+| N random perturbations | `BanditPruner` population of arms | `crates/katgpt-ruliology/src/bandit.rs` |
 | Score evaluation | `ScreeningPruner::relevance()` | `src/speculative/types.rs` |
-| Top-K selection | `BanditStrategy::Ucb1` arm selection | `src/pruners/bandit.rs` |
+| Top-K selection | `BanditStrategy::Ucb1` arm selection | `crates/katgpt-ruliology/src/bandit.rs` |
 | Majority vote ensemble | `best_of_k_rollouts()` width scaling | `src/speculative/dd_tree.rs` |
 | Seed-based perturbation | `Rng` seed control for reproducibility | `src/types.rs` |
-| Parallel evaluation | `BanditPruner::prepare_episode()` batch | `src/pruners/bandit.rs` |
+| Parallel evaluation | `BanditPruner::prepare_episode()` batch | `crates/katgpt-ruliology/src/bandit.rs` |
 | Hard example distillation | `bt_rank` Bradley-Terry selection | `crates/katgpt-pruners/src/bt_rank.rs` |
 
 ### The Gap: Weight-Space Perturbation

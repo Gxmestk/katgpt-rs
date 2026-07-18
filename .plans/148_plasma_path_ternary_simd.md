@@ -307,6 +307,6 @@ T1 (TernaryWeights type)
 | `crates/katgpt-dec/src/simd.rs` | Added `ternary_matvec_scalar`, `neon_ternary_matvec`, `avx2_ternary_matvec`, `simd_ternary_matvec`, `simd_ternary_matmul_batch` |
 | `crates/katgpt-core/src/lib.rs` | Re-exports for `TernaryWeights`, ternary matvec functions |
 | `Cargo.toml` | Added `plasma_path` feature gate (default-on) |
-| `src/weights.rs` | Added `load_ternary_bits()` `.bits` file loader |
+| `riir-ai/crates/riir-engine/src/deltanet/weights.rs` | Added `load_ternary_bits()` `.bits` file loader |
 | `tests/bench_148_plasma_path_goat.rs` | NEW: GOAT proof tests |
 | `.benchmarks/044_plasma_path_goat.md` | NEW: GOAT proof results |

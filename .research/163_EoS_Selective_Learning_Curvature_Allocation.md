@@ -84,7 +84,7 @@ Where:
 
 **Why**: The paper proves this selective allocation improves adversarial robustness AND OOD generalization simultaneously when the right group dominates. Our bandit can achieve the same by steering exploration toward structurally important arms.
 
-**Where**: `BanditStrategy` enum in `pruners/bandit.rs`.
+**Where**: `BanditStrategy` enum in `crates/katgpt-ruliology/src/bandit.rs`.
 
 ---
 

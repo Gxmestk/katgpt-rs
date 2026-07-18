@@ -117,7 +117,7 @@ GOAT gate: G1 (determinism + monotonicity) and G2 (two-sigmoid ablation parity) 
     ```
   - All branches return a `SalienceDecision<A>` — Silent is first-class.
 - [x] **T1.8** Reuse `crate::simd::fast_sigmoid` for the sigmoid (already shipped, libm-exp-bounded). Add a doc note that we never use softmax. — **DEVIATION:** `crate::simd::fast_sigmoid` does not exist in the root crate's simd module; implemented a private libm-bounded inline `sigmoid` in `gate.rs` with a TODO to hoist to `crate::simd::fast_sigmoid` when a SIMD dispatcher lands.
-- [x] **T1.9** Use `mul_add` for the dot-product accumulation (matches the `ActionBridge` pattern in `bridge/mod.rs`). Add an inline SIMD note.
+- [x] **T1.9** Use `mul_add` for the dot-product accumulation (matches the `ActionBridge` pattern in `crates/katgpt-core/src/bridge/mod.rs`). Add an inline SIMD note.
 - [x] **T1.10** Implement `SalienceTriGate::decide_batch(&self, activations: &[[f32; D]], z: &[f32], c: &[f32], payloads: &[A], tick: u64, out: &mut [SalienceDecision<A>])` — same logic, batched. Caller provides output buffer; no internal allocation.
 
 ### Phase 1 acceptance

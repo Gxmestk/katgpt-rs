@@ -203,7 +203,7 @@ Per the skill's fusion protocol, we cross-checked the four fusion cousins in thi
 ### 3.4 HLA per-NPC belief state (`riir-ai/crates/riir-engine/src/hla/`)
 - **HLA axis:** per-NPC 8-dim latent state (valence/arousal/desperation/calm/fear + 3).
 - **JoyAI-VL axis:** the substrate `a` for the salience projection.
-- **Fusion gain:** HLA finally has a *runtime decision consumer*. Currently HLA feeds the action bridge (`bridge/mod.rs`) for combat/movement actions; the tri-gate adds the **emit/silent/delegate** output channel. This means HLA's emotional state directly drives *whether the NPC speaks*, not just *what action it takes*. A fearful NPC (high `fear`) with low salience stays silent; a calm NPC (high `calm`) with high salience speaks. This is the **emergent social behavior** the selling point promises.
+- **Fusion gain:** HLA finally has a *runtime decision consumer*. Currently HLA feeds the action bridge (`crates/katgpt-core/src/bridge/mod.rs`) for combat/movement actions; the tri-gate adds the **emit/silent/delegate** output channel. This means HLA's emotional state directly drives *whether the NPC speaks*, not just *what action it takes*. A fearful NPC (high `fear`) with low salience stays silent; a calm NPC (high `calm`) with high salience speaks. This is the **emergent social behavior** the selling point promises.
 
 ### 3.5 The novel combination
 

@@ -78,7 +78,7 @@ This is `O(d·r)` not `O(d²)` — the paper's headline cost claim.
 |---|---|---|
 | `thin_svd_into` + `SvdScratch` + `SvdResultScratch` | `crates/katgpt-core/src/subspace_phase_gate.rs` (Plan 301) | The SVD used to discover `U_r` offline. TILR consumes the output `right_singular_vectors`. |
 | `subspace_ratios` (the γ math) | `crates/katgpt-spectral/src/river_valley.rs` (Plan 152) | Computes `r_dom = ‖U_k^T g‖ / ‖g‖` — **the identical metric**. Extract or re-expose the core ratio computation; do not duplicate. |
-| `simd_dot_f32`, `simd_*` | `katgpt-core/simd.rs` | SIMD-accelerated dot products for the projection + norm computations. |
+| `simd_dot_f32`, `simd_*` | `maxion-protector/crates/maxion-core/src/simd.rs` | SIMD-accelerated dot products for the projection + norm computations. |
 
 **DRY decision:** the γ ratio lives in `katgpt-spectral`, but TILR lives in
 `katgpt-core` (leaf). Two options:

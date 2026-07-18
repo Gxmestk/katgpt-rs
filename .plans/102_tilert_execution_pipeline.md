@@ -40,7 +40,7 @@
 
 ### D2: Contiguous Weight Allocation (Internal Refactor, No Feature Gate) — **In Progress**
 
-- [x] T7: Create `ContiguousWeights` struct in `src/weights.rs` ✅
+- [x] T7: Create `ContiguousWeights` struct in `riir-ai/crates/riir-engine/src/deltanet/weights.rs` ✅
   ```rust
   pub struct ContiguousWeights {
       buffer: Vec<f32>,                              // single allocation

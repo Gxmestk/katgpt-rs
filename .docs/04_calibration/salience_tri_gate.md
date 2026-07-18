@@ -142,7 +142,7 @@ can distinguish "nothing to say" from "explicitly chose silence".
 `decide` and `decide_batch` perform no heap allocation. All temporaries are
 stack scalars. `decide_batch` takes a caller-owned output buffer. The dot
 products use `f32::mul_add` for single-rounding FMA contraction (matches the
-`bridge/mod.rs` / `cumprodsum.rs` convention).
+`crates/katgpt-core/src/bridge/mod.rs` / `cumprodsum.rs` convention).
 
 ### `PendingDelegateQueue` is a fixed-size ring
 

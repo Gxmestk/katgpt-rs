@@ -22,7 +22,7 @@ All three are gated by `Config` thresholds. Small models skip them with a single
 |----------|-------------|
 | DFlash (`crates/katgpt-speculative/src/dflash.rs`) | **Orthogonal** — MTP feeds richer context INTO the drafter. DFlash's tree verification still runs on the output. They compose. |
 | LeviathanVerifier (`crates/katgpt-speculative/src/spechop/verifier.rs`) | **Modified** — this is where target→draft activation transfer happens (target already exposes `hidden_state`) |
-| TruncatePadProjector (`riir-router/projector.rs`) | **Shared pattern** — same truncate/pad strategy for dim mismatch, but MTP needs the target's hidden state not an embedding |
+| TruncatePadProjector (`crates/katgpt-core/src/qgf/projector.rs`) | **Shared pattern** — same truncate/pad strategy for dim mismatch, but MTP needs the target's hidden state not an embedding |
 | PagedKVCache (`transformer.rs`) | **Extended** — add read-only cross-attention view for drafter |
 | Sparse MLP threshold (`Config.sparse_threshold`) | **Same pattern** — threshold-gated feature activation |
 
@@ -178,7 +178,7 @@ Phase 1 (T1–T5) → Phase 2 (T6–T10) → Phase 5 (T21–T23 smoke tests) →
 
 | Risk | Mitigation |
 |------|-----------|
-| Untrained projection weights are noise | Fallback to truncate/pad (zero-cost, no training) — already proven in `riir-router/projector.rs` |
+| Untrained projection weights are noise | Fallback to truncate/pad (zero-cost, no training) — already proven in `crates/katgpt-core/src/qgf/projector.rs` |
 | Clustered LM head adds branching overhead | Threshold ensures it only fires for large vocabs where win outweighs branch cost |
 | Cross-attention to target KV requires dimension alignment | Drafter's `kv_dim` may differ from target — add optional `kv_proj` or require matching dims |
 | Feature flag explosion | All MTP features compile unconditionally; thresholds gate at runtime (single branch in hot path) |

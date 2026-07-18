@@ -225,13 +225,13 @@ Rule-based query-hint generator replacing the neural Proposer for Phase 1:
 
 The **Proposer** in G-Zero generates `(query, hint)` pairs. Our `riir-router` is *almost* this object today:
 - `riir-ai/crates/riir-router/src/keyword.rs` and `embedding.rs` already map `query → (domain, hint-via-KV-prime)`.
-- `riir-router/registry.rs` maps domain → expert pruner + LoRA path.
+- `crates/katgpt-core/src/arg/registry.rs` maps domain → expert pruner + LoRA path.
 
 The router emits hints as KV-cache primes; G-Zero wants explicit hint *text* fed into the Generator. The gap is small: have the router additionally emit a textual hint (a routed example, a doc snippet, a domain prompt-prefix) into the Generator's context — which is what RAG already does. **Plan 023 (Prompt Router) + Plan 024 (Embedding Router KV Prime) together = a Proposer prototype.** What's missing is the **training** of the Proposer to *maximize* Hint-δ, rather than just retrieve nearest neighbors.
 
 ##### 2b. DPO Training in riir-gpu (High Value, New)
 
-`riir-gpu/training_loop.rs` currently has cross-entropy via `loss.rs`. DPO requires:
+`RuVector/crates/ruvllm/src/qat/training_loop.rs` currently has cross-entropy via `loss.rs`. DPO requires:
 - A *pairwise* loss: `−log σ(β · (log π_G(chosen|q) − log π_G(rejected|q) − log π_ref(chosen|q) + log π_ref(rejected|q)))`.
 - A frozen reference policy `π_ref` (= the Generator at the start of the round; can be the LoRA base before the round's delta).
 - Length normalization (divide log-probs by token count).
@@ -293,7 +293,7 @@ Our existing arenas have explicit verifiers (game outcome). But G-Zero's premise
 | **δ as bandit reward** | `DeltaBanditPruner` wrapping existing `BanditPruner` | 1 | ❌ Need to build |
 | **Template-based Proposer** | `TemplateProposer` (rule-based, bandit-weighted) | 1 | ❌ Need to build |
 | **Generator model** | Main inference model in `katgpt-rs` (draft + target) | Both | ✅ Exists |
-| **Bandit as Proposer** | `pruners/bandit.rs` UCB1/Thompson (80% of GRPO at our scale) | 1 | ✅ Exists |
+| **Bandit as Proposer** | `crates/katgpt-ruliology/src/bandit.rs` UCB1/Thompson (80% of GRPO at our scale) | 1 | ✅ Exists |
 | **Episode history** | `TrialLog` (JSONL) | Both | ✅ Direct reuse |
 | **Reward hacking defense** | `ReviewMetrics` benefit-ratio gate | Both | ✅ Similar philosophy |
 | **Hot-swap updated model** | `HotSwapPruner` | Both | ✅ Direct reuse |
