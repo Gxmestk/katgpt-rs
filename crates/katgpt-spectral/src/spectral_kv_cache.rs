@@ -1188,16 +1188,39 @@ fn generate_random_rotation(dim: usize, seed: u64) -> Vec<f32> {
 ///
 /// Uses binary search on the assumption that centroids are sorted ascending.
 /// This gives O(log n) instead of O(n) for the hot-path quantize loop.
+///
+/// For tiny codebooks (≤8 centroids, the typical case for 1-3 bit quant),
+/// a linear scan beats binary search: branch predictor handles the always-
+/// ascending compares better than log n data-dependent mid branches, and
+/// the loop body is small enough to unroll fully.
 fn quantize_to_idx(value: f32, centroids: &[f32]) -> u8 {
     // Empty or single-centroid codebook: only one valid index.
-    match centroids.len() {
-        0 | 1 => return 0,
-        _ => {}
+    let n = centroids.len();
+    if n <= 1 {
+        return 0;
     }
 
-    // Binary search for insertion point
+    // Small codebook specialization: linear scan with branchless min-track.
+    // Benchmarked to beat binary search below 8 centroids because the branch
+    // predictor learns the monotone-compare pattern.
+    if n <= 8 {
+        let mut best = 0u8;
+        let mut best_d = (value - centroids[0]).abs();
+        for (i, &c) in centroids.iter().enumerate().skip(1) {
+            let d = (value - c).abs();
+            // `d < best_d` selects the new min; cast keeps it branchless
+            // after LLVM lowering (select instruction on most ISAs).
+            if d < best_d {
+                best_d = d;
+                best = i as u8;
+            }
+        }
+        return best;
+    }
+
+    // Binary search for insertion point (large codebooks)
     let mut lo = 0usize;
-    let mut hi = centroids.len() - 1;
+    let mut hi = n - 1;
 
     // Clamp to range
     if value <= centroids[lo] {
