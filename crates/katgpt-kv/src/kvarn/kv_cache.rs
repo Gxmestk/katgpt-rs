@@ -125,14 +125,17 @@ pub struct KVarNKVCache {
     /// Layer-tile-major layout: element `(layer, tile)` is at
     /// `(layer * n_tiles + tile) * key_tile_packed_len`.
     key_quantized: Vec<u8>,
-    /// Key tile metadata: [layer][tile].
-    key_tiles: Vec<Vec<TileMeta>>,
+    /// Key tile metadata, flat `[n_layers * n_tiles]` indexed by
+    /// `layer * n_tiles + tile_idx` (see `key_tile_meta`). Flattened from
+    /// the previous Vec<Vec<TileMeta>> to collapse two pointer chases + two
+    /// bounds checks on every per-token/per-dequant access into one of each.
+    key_tiles: Vec<TileMeta>,
     /// Key tile buffer: [kv_dim * tile_size] — accumulates raw data for current tile.
     key_buffer: Vec<f32>,
     /// Quantized value data: flat `[n_layers * n_tiles * val_tile_packed_len]`.
     val_quantized: Vec<u8>,
-    /// Value tile metadata: [layer][tile].
-    val_tiles: Vec<Vec<TileMeta>>,
+    /// Value tile metadata, flat `[n_layers * n_tiles]` (see `key_tiles`).
+    val_tiles: Vec<TileMeta>,
     /// Value tile buffer: [tile_size * kv_dim].
     val_buffer: Vec<f32>,
     // ── Scratch buffers for zero-alloc hot path ──
@@ -217,6 +220,15 @@ impl KVarNKVCache {
         (layer * self.n_tiles + tile_idx) * self.val_tile_packed_len
     }
 
+    /// Flat index of tile `(layer, tile_idx)` in either `key_tiles` or `val_tiles`.
+    /// Free function to avoid borrow-checker conflicts when callers need
+    /// `&mut self.{key,val}_tiles[idx]` (calling a `&self` method in the same
+    /// expression would conflict with the `&mut self` borrow).
+    #[inline]
+    fn tile_meta_idx(n_tiles: usize, layer: usize, tile_idx: usize) -> usize {
+        layer * n_tiles + tile_idx
+    }
+
     /// Create a new KVarN KV cache from config.
     pub fn with_config(cfg: &KVarNConfig) -> Self {
         let n_tiles = cfg.max_seq_len.div_ceil(cfg.tile_size);
@@ -235,20 +247,22 @@ impl KVarNKVCache {
 
         // Initialize per-layer, per-tile storage (flat: one contiguous allocation)
         let key_quantized = vec![0u8; cfg.n_layers * n_tiles * key_tile_packed_len];
-        let key_tiles: Vec<Vec<TileMeta>> = (0..cfg.n_layers)
-            .map(|_| {
+        // Flat tile metadata: one contiguous Vec<TileMeta> indexed by
+        // `layer * n_tiles + tile_idx`. Replaces Vec<Vec<TileMeta>> to collapse
+        // (n_layers + 1) heap allocations and per-access pointer chases into
+        // a single allocation + single bounds-checked index.
+        let key_tiles: Vec<TileMeta> = (0..cfg.n_layers)
+            .flat_map(|_| {
                 (0..n_tiles)
                     .map(|_| TileMeta::empty(tile_size, key_tile_rows, key_tile_cols))
-                    .collect()
             })
             .collect();
 
         let val_quantized = vec![0u8; cfg.n_layers * n_tiles * val_tile_packed_len];
-        let val_tiles: Vec<Vec<TileMeta>> = (0..cfg.n_layers)
-            .map(|_| {
+        let val_tiles: Vec<TileMeta> = (0..cfg.n_layers)
+            .flat_map(|_| {
                 (0..n_tiles)
                     .map(|_| TileMeta::empty(tile_size, val_tile_rows, val_tile_cols))
-                    .collect()
             })
             .collect();
 
@@ -333,7 +347,7 @@ impl KVarNKVCache {
             self.key_buffer[ch * self.tile_size + pos_in_tile] = k;
         }
 
-        let tile = &mut self.key_tiles[layer][tile_idx];
+        let tile = &mut self.key_tiles[Self::tile_meta_idx(self.n_tiles, layer, tile_idx)];
         tile.count += 1;
 
         // If tile is complete, quantize it
@@ -359,7 +373,7 @@ impl KVarNKVCache {
         let off = pos_in_tile * self.kv_dim;
         self.val_buffer[off..off + self.kv_dim].copy_from_slice(value);
 
-        let tile = &mut self.val_tiles[layer][tile_idx];
+        let tile = &mut self.val_tiles[Self::tile_meta_idx(self.n_tiles, layer, tile_idx)];
         tile.count += 1;
 
         if tile.count == self.tile_size || pos == self.max_seq_len - 1 {
@@ -374,7 +388,7 @@ impl KVarNKVCache {
         let tile_idx = pos / self.tile_size;
         let pos_in_tile = pos % self.tile_size;
 
-        let tile = &self.key_tiles[layer][tile_idx];
+        let tile = &self.key_tiles[Self::tile_meta_idx(self.n_tiles, layer, tile_idx)];
         if tile.count == 0 {
             out.fill(0.0);
             return;
@@ -473,7 +487,7 @@ impl KVarNKVCache {
         let tile_idx = pos / self.tile_size;
         let pos_in_tile = pos % self.tile_size;
 
-        let tile = &self.val_tiles[layer][tile_idx];
+        let tile = &self.val_tiles[Self::tile_meta_idx(self.n_tiles, layer, tile_idx)];
         if tile.count == 0 {
             out.fill(0.0);
             return;
@@ -666,9 +680,10 @@ impl KVarNKVCache {
         self.key_quantized.fill(0);
         self.val_quantized.fill(0);
         for layer in 0..self.n_layers {
+            let base = layer * self.n_tiles;
             for t in 0..self.n_tiles {
-                self.key_tiles[layer][t].count = 0;
-                self.val_tiles[layer][t].count = 0;
+                self.key_tiles[base + t].count = 0;
+                self.val_tiles[base + t].count = 0;
             }
         }
     }
@@ -811,7 +826,7 @@ impl KVarNKVCache {
 
         // Store
         let bpr = packed_bytes_per_row(cols, bits);
-        let meta = &mut self.key_tiles[layer][tile_idx];
+        let meta = &mut self.key_tiles[Self::tile_meta_idx(self.n_tiles, layer, tile_idx)];
         meta.count = count;
         meta.var_scales = var_scales;
         meta.rtn_scales = rtn_scales;
@@ -943,7 +958,7 @@ impl KVarNKVCache {
         };
 
         let bpr = packed_bytes_per_row(cols, bits);
-        let meta = &mut self.val_tiles[layer][tile_idx];
+        let meta = &mut self.val_tiles[Self::tile_meta_idx(self.n_tiles, layer, tile_idx)];
         meta.count = count;
         meta.var_scales = var_scales;
         meta.rtn_scales = rtn_scales;
@@ -1450,7 +1465,7 @@ mod tests {
         assert_eq!(cache.pos(), 0);
 
         // After reset, tiles should be empty
-        assert_eq!(cache.key_tiles[0][0].count, 0);
+        assert_eq!(cache.key_tiles[0].count, 0);
     }
 
     #[test]
