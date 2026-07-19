@@ -51,6 +51,8 @@
 #![allow(clippy::too_many_arguments)] // perf kernel — explicit args beat struct builders
 #![allow(clippy::needless_range_loop)] // explicit indexing aids SIMD auto-vectorization
 
+use std::cell::UnsafeCell;
+
 // ─────────────────────────────────────────────────────────────────────
 // Config (T1.2)
 // ─────────────────────────────────────────────────────────────────────
@@ -427,20 +429,36 @@ fn dense_accumulate(
     // Precompute v_proj[j] = W_V · state_j for all j, once.
     // Without this, v_j would be recomputed n times (once per query i),
     // turning an O(n·d²) matvec into O(n²·d²).
-    let v_proj: Option<Vec<f32>> = w_v.map(|wv| {
-        let mut vp = vec![0.0f32; n * d];
-        for j in 0..n {
-            let state_j = &states[j * d..(j + 1) * d];
-            let vp_row = &mut vp[j * d..(j + 1) * d];
-            for m in 0..d {
-                let mut v_j_m = 0.0f32;
-                for a in 0..d {
-                    v_j_m += wv[a + m * d] * state_j[a];
-                }
-                vp_row[m] = v_j_m;
-            }
+    //
+    // Reuse a per-thread grow-only buffer (matching the pattern in
+    // `attention::tiled_attention_batched`). The first call with (n, d)
+    // allocates; subsequent calls with the same or smaller workload reuse
+    // the existing capacity (zero alloc in steady state — required by the
+    // G4 zero-alloc gate and by the module-level doc claim).
+    let v_proj: Option<&mut [f32]> = w_v.map(|wv| {
+        thread_local! {
+            static V_PROJ_BUF: UnsafeCell<Vec<f32>> = const { UnsafeCell::new(Vec::new()) };
         }
-        vp
+        V_PROJ_BUF.with(|cell| {
+            // Safety: thread_local guarantees exclusive per-thread access.
+            let vp = unsafe { &mut *cell.get() };
+            if vp.len() < n * d {
+                vp.resize(n * d, 0.0);
+            }
+            let vp = &mut vp[..n * d];
+            for j in 0..n {
+                let state_j = &states[j * d..(j + 1) * d];
+                let vp_row = &mut vp[j * d..(j + 1) * d];
+                for m in 0..d {
+                    let mut v_j_m = 0.0f32;
+                    for a in 0..d {
+                        v_j_m += wv[a + m * d] * state_j[a];
+                    }
+                    vp_row[m] = v_j_m;
+                }
+            }
+            vp
+        })
     });
     for i in 0..n {
         let q_row = &scratch_q[i * k..(i + 1) * k];
@@ -519,28 +537,60 @@ fn topk_accumulate(
 ) -> Result<(), SetAttentionError> {
     let gamma = cfg.gamma;
     let effective_k = k_max.min(n);
-    // Selection buffer — reused across queries. We use a Vec for the indexed
-    // sort; this is a small allocation but kept inside the function (not steady
-    // state per-tick for the same caller). For true zero-alloc top-k, the
-    // caller can pass an explicit indexed scratch in a future API extension.
-    let mut idx: Vec<usize> = (0..n).collect();
+    // Selection buffer — reused across queries via a per-thread grow-only
+    // Vec<usize>. Each call resets the [0..n) range in place (one linear pass)
+    // rather than reallocating. The downstream `select_nth_unstable_by` +
+    // `sort_unstable_by` scramble the contents but leave the same multiset,
+    // so this in-place reset is sufficient.
+    //
+    // Same thread_local pattern as `attention::tiled_attention_batched` and
+    // the v_proj scratch in `dense_accumulate` — zero alloc in steady state.
+    thread_local! {
+        static IDX_BUF: UnsafeCell<Vec<usize>> = const { UnsafeCell::new(Vec::new()) };
+    }
+    let idx: &mut [usize] = IDX_BUF.with(|cell| {
+        // Safety: thread_local guarantees exclusive per-thread access.
+        let buf = unsafe { &mut *cell.get() };
+        if buf.len() < n {
+            buf.resize(n, 0);
+        }
+        let buf = &mut buf[..n];
+        for (i, slot) in buf.iter_mut().enumerate() {
+            *slot = i;
+        }
+        buf
+    });
     // Precompute v_proj[j] = W_V · state_j for all j, once.
     // Without this, v_j would be recomputed per query i (up to n times),
     // turning an O(n·d²) matvec into O(n²·d²).
-    let v_proj: Option<Vec<f32>> = w_v.map(|wv| {
-        let mut vp = vec![0.0f32; n * d];
-        for j in 0..n {
-            let state_j = &states[j * d..(j + 1) * d];
-            let vp_row = &mut vp[j * d..(j + 1) * d];
-            for m in 0..d {
-                let mut v_j_m = 0.0f32;
-                for a in 0..d {
-                    v_j_m += wv[a + m * d] * state_j[a];
-                }
-                vp_row[m] = v_j_m;
-            }
+    //
+    // Reuse the same per-thread V_PROJ_BUF as `dense_accumulate` — the two
+    // paths never run concurrently within a single call, and even across
+    // threads each thread has its own thread_local slot.
+    let v_proj: Option<&mut [f32]> = w_v.map(|wv| {
+        thread_local! {
+            static V_PROJ_BUF: UnsafeCell<Vec<f32>> = const { UnsafeCell::new(Vec::new()) };
         }
-        vp
+        V_PROJ_BUF.with(|cell| {
+            // Safety: thread_local guarantees exclusive per-thread access.
+            let vp = unsafe { &mut *cell.get() };
+            if vp.len() < n * d {
+                vp.resize(n * d, 0.0);
+            }
+            let vp = &mut vp[..n * d];
+            for j in 0..n {
+                let state_j = &states[j * d..(j + 1) * d];
+                let vp_row = &mut vp[j * d..(j + 1) * d];
+                for m in 0..d {
+                    let mut v_j_m = 0.0f32;
+                    for a in 0..d {
+                        v_j_m += wv[a + m * d] * state_j[a];
+                    }
+                    vp_row[m] = v_j_m;
+                }
+            }
+            vp
+        })
     });
     for i in 0..n {
         let q_row = &scratch_q[i * k..(i + 1) * k];

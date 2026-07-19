@@ -87,8 +87,9 @@ impl SparseTaskVector {
                 deltas.push(v);
             }
         }
-        mask.shrink_to_fit();
-        deltas.shrink_to_fit();
+        // No shrink_to_fit: the dense.len()/4 heuristic is already tuned to
+        // paper-reported densities (10.5%–33.3%), so capacity ≈ length on
+        // average. shrink_to_fit would force a realloc + copy with no win.
         Self {
             shape,
             mask,
@@ -379,8 +380,10 @@ impl SparseTaskVector {
         }
         merged_mask.truncate(write);
         merged_deltas.truncate(write);
-        merged_mask.shrink_to_fit();
-        merged_deltas.shrink_to_fit();
+        // No shrink_to_fit: `cap` is already a tight upper bound and the
+        // CANCEL_THRESHOLD (1e-7) is much tighter than `from_dense`'s 1e-5,
+        // so the prune step rarely removes more than a handful of entries.
+        // The realloc-on-shrink costs more than the memory saved.
 
         SparseTaskVector {
             shape: self.shape,

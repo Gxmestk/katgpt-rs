@@ -42,8 +42,11 @@ pub struct SpectralQuantKVCache {
     scratch_normalized: Vec<f32>,
     scratch_rotated: Vec<f32>,
     scratch_unrotated: Vec<f32>,
-    scratch_semantic_indices: Vec<u8>,
-    scratch_tail_indices: Vec<u8>,
+    /// Combined index scratch used by both store (semantic + tail written
+    /// directly here) and dequant (`unpack_variable_bits` output). Replaces
+    /// the previous three-buffer split (`scratch_semantic_indices`,
+    /// `scratch_tail_indices`, `scratch_all_indices`) which forced two extra
+    /// `copy_from_slice` calls per store_vector.
     scratch_all_indices: Vec<u8>,
     // ── usize fields (8-byte aligned, no padding between them) ──
     /// Current write position.
@@ -368,8 +371,6 @@ impl SpectralQuantKVCache {
             scratch_normalized: vec![0.0f32; kv_dim],
             scratch_rotated: vec![0.0f32; kv_dim],
             scratch_unrotated: vec![0.0f32; kv_dim],
-            scratch_semantic_indices: vec![0u8; kv_dim],
-            scratch_tail_indices: vec![0u8; kv_dim],
             scratch_all_indices: vec![0u8; kv_dim],
         }
     }
@@ -484,33 +485,28 @@ impl SpectralQuantKVCache {
             &mut self.scratch_rotated,
         );
 
-        // Quantize semantic dims
+        // Quantize semantic dims directly into the combined scratch buffer
+        // (`scratch_all_indices[..d_eff]`), avoiding an intermediate buffer + copy.
+        let all_indices = &mut self.scratch_all_indices;
         if let Some(cb) = &layer_state.semantic_codebook {
             // v1: shared semantic codebook
-            for i in 0..d_eff {
-                self.scratch_semantic_indices[i] =
-                    quantize_to_idx(self.scratch_rotated[i], &cb.centroids);
+            for (i, slot) in all_indices.iter_mut().enumerate().take(d_eff) {
+                *slot = quantize_to_idx(self.scratch_rotated[i], &cb.centroids);
             }
         } else if let Some(per_dim) = &layer_state.per_dim_semantic_codebooks {
             // v2: per-dim codebooks
             for (i, cb) in per_dim.iter().enumerate().take(d_eff) {
-                self.scratch_semantic_indices[i] =
-                    quantize_to_idx(self.scratch_rotated[i], &cb.centroids);
+                all_indices[i] = quantize_to_idx(self.scratch_rotated[i], &cb.centroids);
             }
         }
 
-        // Quantize tail dims
+        // Quantize tail dims directly into the combined scratch buffer tail.
         let tail_cb = &layer_state.tail_codebook;
         let tail_len = self.kv_dim - d_eff;
         for i in 0..tail_len {
-            self.scratch_tail_indices[i] =
+            all_indices[i + d_eff] =
                 quantize_to_idx(self.scratch_rotated[i + d_eff], &tail_cb.centroids);
         }
-
-        // Build combined indices array
-        let all_indices = &mut self.scratch_all_indices;
-        all_indices[..d_eff].copy_from_slice(&self.scratch_semantic_indices[..d_eff]);
-        all_indices[d_eff..self.kv_dim].copy_from_slice(&self.scratch_tail_indices[..tail_len]);
 
         // Pack variable bits into flat storage using precomputed packed_bits.
         // The slot is pre-zeroed so trailing bytes beyond the actual packed
