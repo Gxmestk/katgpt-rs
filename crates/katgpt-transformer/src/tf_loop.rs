@@ -21,6 +21,8 @@
 
 use crate::MultiLayerKVCache;
 use katgpt_core::simd::simd_fused_decay_write;
+#[cfg(feature = "recfm")]
+use katgpt_core::simd::simd_dist_sq;
 use katgpt_core::types::Config;
 use katgpt_core::types::kv_dim;
 
@@ -63,7 +65,9 @@ impl Default for AccelBoundConfig {
 /// Returns `||v_curr - v_prev||₂ / dim` — the average per-dimension acceleration.
 /// This is the discrete analog of RecFM's continuous acceleration field.
 ///
-/// Uses the same SIMD infrastructure as `simd_fused_decay_write` for zero-overhead.
+/// Uses `simd_dist_sq` (NEON/AVX2-accelerated `||a-b||²`) instead of a
+/// scalar iterator chain that LLVM struggles to auto-vectorize across
+/// the strict-FP `zip + map + sum` reduction.
 #[cfg(feature = "recfm")]
 #[inline]
 pub fn accel_norm(v_curr: &[f32], v_prev: &[f32]) -> f32 {
@@ -72,14 +76,7 @@ pub fn accel_norm(v_curr: &[f32], v_prev: &[f32]) -> f32 {
     if dim == 0 {
         return 0.0;
     }
-    let sum_sq: f32 = v_curr
-        .iter()
-        .zip(v_prev.iter())
-        .map(|(c, p)| {
-            let d = c - p;
-            d * d
-        })
-        .sum();
+    let sum_sq = simd_dist_sq(v_curr, v_prev, dim);
     (sum_sq / dim as f32).sqrt()
 }
 

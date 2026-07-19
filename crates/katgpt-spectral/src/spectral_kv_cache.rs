@@ -353,8 +353,23 @@ impl SpectralQuantKVCache {
             }
         }
 
-        // Conservative packed size: 1 byte per dim covers all variable-bit layouts
-        let max_packed = kv_dim;
+        // Packed size per position = ceil(sum(packed_bits) / 8).
+        // Compute the per-layer max once and use it for both key and value
+        // storage. The previous conservative bound (kv_dim bytes/pos) was
+        // ~2-4x the actual packed length for typical (b_high=4, b_low=2, d_eff=kv_dim/2)
+        // layouts, wasting multiple MB on long-context workloads.
+        let max_packed = layers
+            .iter()
+            .map(|l| {
+                l.packed_bits
+                    .iter()
+                    .map(|&b| b as usize)
+                    .sum::<usize>()
+                    .div_ceil(8)
+            })
+            .max()
+            .unwrap_or(kv_dim)
+            .max(1);
 
         Self {
             layers,
