@@ -750,8 +750,11 @@ pub mod causal_head_importance;
 // the bidirected-confounder dimension they cannot see. Pure modelless
 // (graph rewriting on BLAKE3-committed NodeId set). Offline-only (24µs on
 // 13 nodes is well outside the 20Hz tick; subgraph extraction mandatory to
-// stay ≤32 nodes per query). Opt-in until Plan 457 Phase 2 GOAT gate passes;
-// promotion to default REQUIRES Phase 4 consumer validation.
+// stay ≤32 nodes per query). DEFAULT-ON since 2026-07-18 (Plan 457 Phase 5
+// promotion): Plan 457 Phase 2 GOAT G1+G2+G3+G4 ALL PASS; §T4.7 promotion
+// gate PASS on Consumer A (synthetic 100-node game-world KG, OR criterion —
+// Consumer B T4.6 sleep-cycle remains BLOCKED on real-trace capture but does
+// not block promotion).
 #[cfg(feature = "causal_identification")]
 pub mod causal_id;
 #[cfg(feature = "spectral_pruner")]
@@ -1406,8 +1409,10 @@ pub use personality_composition::{
 // trajectory is sampling-invariant (FAME Proposition 3 / Young-integral).
 // Zero-alloc apply + BLAKE3-committed. Reuses personality_composition's
 // sigmoid + simd::simd_fused_scale_acc (DRY).
-// Opt-in until G1–G5 GOAT gate passes; G2 (sampling invariance) is the
-// make-or-break gate. Private selling-point guide at riir-ai/.research/158.
+// DEFAULT-ON since 2026-06-28 (Issue 005 executed): Plan 321 G1–G5 + riir-ai
+// Plan 336 G6a–G6e + G7a ALL PASS. G2 (sampling invariance, the make-or-break
+// gate) worst-case Δpi=1.19e-6/100 entities. Private selling-point guide at
+// riir-ai/.research/158.
 #[cfg(feature = "committed_field_blend")]
 pub mod committed_field_blend;
 #[cfg(feature = "committed_field_blend")]
@@ -1456,7 +1461,9 @@ pub use engram::{
 // Phase 1 (this commit): types only — const-generic
 // `ProductKeyMemory<SQRT_N, D_K, D_V>`, `ScoreFn` (Dot/Idw), fixed-size
 // `PkQuery<K>`. Leaf-clean (zero deps). Phase 2 ships the kernel + GOAT gate.
-// Opt-in until G1+G2+G4 GOAT gate passes.
+// DEFAULT-ON since 2026-07-07 (Plan 408 Phase 3 GOAT): G1 latency 1670×
+// speedup, G2 top-k Jaccard 1.0000 vs brute-force, G3 IDW centroid-ness PASS,
+// G4 0 allocs/1000 steady-state query_into calls. See `.benchmarks/408_pkm_goat.md`.
 #[cfg(feature = "product_key_memory")]
 pub mod product_key_memory;
 #[cfg(feature = "product_key_memory")]
@@ -1517,8 +1524,14 @@ pub use gain_cost_halt::{
 // the caller's responsibility (see the riir-ai runtime plan 355 for the
 // HLA-specific wiring + the unchanged 5-scalar bridge).
 //
-// Opt-in until G1–G5 GOAT gate (Research 354 §5) passes; Super-GOAT promotion
-// also requires riir-ai Plan 355 G6 (CS-ranking fusion adds value).
+// DEFAULT-ON since 2026-07-01 (Plan 354 Phase 2 + Plan 355 G6/G7/G9):
+// G1 permutation equivariance bit-exact, G2 identity-floor meaningfulness,
+// G3 latency 21.96µs at N=64, G4 0 allocs/100 calls, G5 sigmoid-not-softmax
+// lonely-query correctness. riir-ai runtime G6 fusion cosine sim <0.95 (fusion
+// adds value over identity), G7 crowd stability <5% drift over 100×2000 ticks,
+// G9 production latency 75.7µs mean/tick at 100 NPCs. G8 collective inference
+// FAILED (Super-GOAT→GOAT) — averaging cannot amplify detection; use-case
+// limitation, NOT a primitive defect. Validated selling point: crowd coherence.
 #[cfg(feature = "set_attention")]
 pub mod set_attention;
 #[cfg(feature = "set_attention")]

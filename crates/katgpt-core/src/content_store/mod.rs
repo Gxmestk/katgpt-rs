@@ -31,9 +31,14 @@
 //!
 //! ## GOAT gate
 //!
-//! Default-off until G1–G7 pass (Plan 448 §Phase 4). G4 (light-client verify)
-//! is enforced structurally: [`ChunkedContentStore::verify_proof`] is an
-//! associated fn that takes only the proof + leaf hash — no `&self`.
+//! DEFAULT-ON since 2026-07-18 (Phase 19b promotion fix-up — the bench file
+//! `.benchmarks/262_chunked_content_store_goat.md` had recorded promotion but
+//! `Cargo.toml` was never updated; this comment + the Cargo.toml `default`
+//! entry are the fix-up). G1–G7 ALL PASS (dedup 8.47×, CDC 1.35%, inclusion
+//! proof <2µs, tamper 10000/10000). G4 (light-client verify) is enforced
+//! structurally: [`ChunkedContentStore::verify_proof`] is an associated fn
+//! that takes only the proof + leaf hash — no `&self`. Pure modelless +
+//! zero-cost-unless-invoked.
 
 // `trait` is a reserved keyword; the source file is `trait.rs` but the module
 // is referenced via the raw identifier `r#trait`. Re-exports below hide this.

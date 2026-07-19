@@ -4,7 +4,10 @@
 //! Context Trie. Zero training cost — phrases are provided at call site.
 //! Modeled after parakeet.cpp's phrase boosting, adapted to our DDTree pipeline.
 //!
-//! Feature-gated behind `phrase_boost` (default-OFF until GOAT proves gain).
+//! Feature-gated behind `phrase_boost`. DEFAULT-ON at the katgpt-rs root crate
+//! (the user-facing consumer surface); katgpt-pruners's own `[features] default`
+//! is empty because the root forwards the feature here via
+//! `katgpt-pruners/phrase_boost`. GOAT-promoted at the root level.
 
 use katgpt_speculative::ScreeningPruner;
 

@@ -8,7 +8,10 @@
 //! - Model-based: Per-layer logit lens scoring during forward pass (one matmul per layer)
 //!
 //! Reference: arXiv:2307.15771 — McGrath et al. (DeepMind)
-//! Feature-gated behind `hydra_budget` (default-OFF until GOAT proves gain).
+//! Feature-gated behind `hydra_budget`. DEFAULT-ON at the katgpt-rs root crate
+//! (the user-facing consumer surface); katgpt-pruners's own `[features] default`
+//! is empty because the root forwards the feature here via
+//! `katgpt-pruners/hydra_budget`. GOAT-promoted at the root level.
 
 use katgpt_core::{HydraBudgetConfig, HydraLayerProfile};
 
