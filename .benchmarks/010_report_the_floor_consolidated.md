@@ -11,14 +11,14 @@
 
 ## TL;DR
 
-Four UQ-bearing primitives were grandfathered when the "Report the Floor" rule was adopted (2026-06-28). This doc consolidates their retroactive floor comparisons. **One genuinely beats the floor; three are EXCLUDED via the reframing escape hatch; one (KARC) is the floor's own overlay example — measured 2026-07-20 as scope-limited (BEATS on chaotic, LOSES on stationary seasonal).**
+Four UQ-bearing primitives were grandfathered when the "Report the Floor" rule was adopted (2026-06-28). This doc consolidates their retroactive floor comparisons. **One genuinely beats the floor; three are EXCLUDED via the reframing escape hatch; one (KARC) is the floor's own overlay example — measured 2026-07-20 as SCOPE-LIMITED to chaotic regimes (K-sweep refuted the prior "K=4 too shallow" hypothesis: scope-limit is structural — KARC's Chebyshev basis + ridge-fit doesn't fit periodic data regardless of K).**
 
 | # | Primitive | T# | Verdict | Why |
 |---|---|---|---|---|
 | 1 | BoMSampler (Plan 281) | T3 | 🟠 **EXCLUDED** | Belief-space exploration, not calibrated UQ. False-confidence signature (5–15% coverage). |
 | 2 | Sleep-Time Anticipator (Plan 334) | T4 | 🟠 **EXCLUDED** | Compute-gating heuristic, not calibrated UQ. Same false-confidence signature (37–54% coverage). |
 | 3 | Best-Belief Beta Selector (Plan 336) | T5 | 🟢 **BEATS FLOOR** | 15–30% selection-regret reduction in the heteroscedastic regime (the real-world case). Genuine UQ gain. |
-| 4 | KARC + conformal overlay (Plan 308 + 340 Ph.2) | T7 (2026-07-20) | 🟡 **SCOPE-LIMITED** | IS the overlay composed with KARC's point forecast. BEATS on Lorenz-x (crps_ratio 0.0047); LOSES on stationary seasonal (crps_ratio 5.74). Coverage stays calibrated on both — no false-confidence signature. |
+| 4 | KARC + conformal overlay (Plan 308 + 340 Ph.2) | T7 (2026-07-20) | 🟡 **SCOPE-LIMITED (chaotic-only)** | Composed with KARC's point forecast. BEATS on Lorenz-x chaotic (crps_ratio 0.0047 K=4 → 0.0018 K=12); LOSES on stationary seasonal (crps_ratio 5.74 K=4 → 20.26 K=12 — loses *worse* with more context, not better). K-sweep REFUTES the "K=4 too shallow" hypothesis: scope-limit is structural (Chebyshev basis + ridge-fit doesn't fit periodic data regardless of K). Coverage stays calibrated on both — no false-confidence signature. |
 | 5 | Alien Sampler (Plan 311) | T6 | 🟠 **EXCLUDED** | Relative ranking signal (which candidate is most alien), not calibrated UQ. No distribution to feed the harness. Additionally exiled to `katgpt-deprecated` (GOAT 2/4 PASS — initially 1/4, G3 closed via Rayon). |
 
 **Net outcome:** the policy is enforceable and exercised. Of the four grandfathered primitives that actually make a UQ-adjacent claim, **only Best-Belief (T5) genuinely beats the floor on its native metric** — and it does so decisively in the regime that matters (heteroscedastic evidence). The other three are correctly excluded: their value propositions (planning diversity, compute gating, population diversity) are orthogonal to calibrated predictive intervals, and the floor comparison exposes any attempt to reframe them as UQ.
@@ -71,20 +71,28 @@ This is a genuine UQ gain, not a reframing. The Beta prior earns its keep exactl
 - **Full benchmark:** [`010_best_belief_floor_comparison.md`](010_best_belief_floor_comparison.md)
 - **Adapter + tests:** `crates/katgpt-core/tests/conformal_floor_best_belief.rs` (6 tests)
 
-### KARC + conformal overlay: IS THE OVERLAY (composed with a regime-specific point forecaster)
+### KARC + conformal overlay: SCOPE-LIMITED (composed with a regime-specific point forecaster; structurally chaotic-only)
 
 KARC (Plan 308) is a delay-basis ridge forecaster — a **point forecast** primitive. The conformal overlay (Plan 340 Phase 2) *is* the floor applied to KARC's point forecast: `ConformalIntervalCalibrator<KarcForecaster>`. There is no separate "KARC vs floor" comparison because KARC + overlay **is** the floor pattern composed with a point forecaster.
 
 **2026-07-20 update (Plan 468 follow-on — Issue 010 T7):** the question "does KARC produce a *better* point forecast than seasonal-naive?" is empirical, not structural, and was not previously measured. A dedicated floor comparison test ([`conformal_floor_karc_overlay.rs`](../crates/katgpt-core/tests/conformal_floor_karc_overlay.rs)) now closes this gap with honest results:
 
-| Corpus | CRPS ratio (prim/floor) | Coverage (prim vs floor) | Verdict |
-|---|---|---|---|
-| `stationary_seasonal m=12, σ=0.5` | 5.74 | 0.916 vs 0.939 | **LosesToFloor** |
-| Lorenz-x `dt=0.02` (chaotic) | 0.0047 | 0.932 vs 0.943 | **BeatsFloor** |
+| Corpus | K | CRPS ratio (prim/floor) | Coverage (prim vs floor) | Verdict |
+|---|---|---|---|---|
+| `stationary_seasonal m=12, σ=0.5` | 4 | 5.74 | 0.916 vs 0.939 | **LosesToFloor** |
+| Lorenz-x `dt=0.02` (chaotic) | 4 | 0.0047 | 0.932 vs 0.943 | **BeatsFloor** |
+| `stationary_seasonal m=12, σ=0.5` | 12 | **20.26** | 0.911 vs 0.939 | **LosesToFloor (worse)** |
+| Lorenz-x `dt=0.02` (chaotic) | 12 | **0.0018** | 0.933 vs 0.943 | **BeatsFloor (better)** |
 
-The composite's coverage stays calibrated on both corpora (within 0.10 of the floor — no false-confidence signature). The CRPS/Winkler delta reflects the **point-forecast quality** delta, exactly as the overlay math predicts. KARC's K=4 delay embedding is too shallow to capture a period-12 seasonal cycle (→ worse point forecast → wider conformal intervals) but captures Lorenz-63's chaotic structure (→ much better point forecast → ~210× tighter intervals). The Plan 308 GOAT gate (Lorenz double-scroll) remains the right canonical validation target; stationary-seasonal is explicitly out-of-scope. The composite is IN-SCOPE as a UQ primitive (calibrated intervals, no coverage break) but **SCOPE-LIMITED** to regimes where KARC's delay embedding captures the signal's structure.
+The composite's coverage stays calibrated on both corpora (within 0.10 of the floor — no false-confidence signature). The CRPS/Winkler delta reflects the **point-forecast quality** delta, exactly as the overlay math predicts.
 
-- **Adapter + tests:** `crates/katgpt-core/tests/conformal_floor_karc_overlay.rs` (4 tests)
+**2026-07-20 K-sweep (same session):** the original T7 verdict stated "K=4 too shallow for period-12" as a hypothesis. The K-sweep tests (`floor_comparison_stationary_seasonal_k12` + `floor_comparison_lorenz_x_k12`) **REFUTE** that hypothesis: K=12 (matching the period) LOSES WORSE on seasonal (CRPS ratio 5.74 → 20.26, ~3.5× worse) and WINS HARDER on Lorenz (CRPS ratio 0.0047 → 0.0018, ~2.6× better). The scope-limit is **structural** (KARC's Chebyshev basis + ridge-fit architecture doesn't fit periodic data regardless of K), not parametric. More delay context helps on chaotic signals (longer trajectory memory) and actively hurts on periodic ones (more overfitting capacity).
+
+**Production guidance:** KARC+overlay is a chaotic-regime specialist. Pick K by how much trajectory memory the chaotic signal benefits from. For periodic/seasonal data, use the floor (`SeasonalNaiveForecaster`) directly — KARC cannot match it regardless of K.
+
+The Plan 308 GOAT gate (Lorenz double-scroll) remains the right canonical validation target; stationary-seasonal is out-of-scope regardless of K. The composite is IN-SCOPE as a UQ primitive (calibrated intervals, no coverage break) but **SCOPE-LIMITED to chaotic regimes**.
+
+- **Adapter + tests:** `crates/katgpt-core/tests/conformal_floor_karc_overlay.rs` (6 tests: 4 K=4 + 2 K=12 K-sweep)
 
 ### T6 — Alien Sampler: EXCLUDED
 
@@ -106,7 +114,7 @@ Structurally the same exclusion class as T3/T4: a primitive whose value proposit
 | T3 | BoMSampler | `bom_sampling` (DEFAULT-ON) | No (planning) | EXCLUDED | CRPS/coverage/Winkler | 5–15% coverage | None — stays DEFAULT-ON |
 | T4 | Sleep-Time | `sleep_time_anticipation` (OPT-IN) | No (gating) | EXCLUDED | CRPS/coverage/Winkler + difficulty r | 37–54% coverage | None — stays OPT-IN |
 | T5 | Best-Belief | `best_belief` (DEFAULT-ON) | Yes (conservative selection) | **BEATS FLOOR** | Selection regret | 15–30% regret ↓ (variable n) | Confirms DEFAULT-ON |
-| — | KARC + overlay | `karc_forecaster` + `conformal_predictive_intervals` | Yes (calibrated intervals via overlay) | **IS THE OVERLAY** (scope-limited: BEATS on Lorenz-x, LOSES on stationary seasonal) | CRPS/coverage/Winkler | crps_ratio 0.0047 (Lorenz) / 5.74 (seasonal) | None — both stay as-is |
+| — | KARC + overlay | `karc_forecaster` + `conformal_predictive_intervals` | Yes (calibrated intervals via overlay) | **SCOPE-LIMITED (chaotic-only)** — BEATS Lorenz-x (crps 0.0047 K=4 → 0.0018 K=12); LOSES seasonal (crps 5.74 K=4 → 20.26 K=12). Structural scope-limit — KARC's basis doesn't fit periodic data regardless of K. | CRPS/coverage/Winkler | crps_ratio 0.0047–0.0018 (Lorenz) / 5.74–20.26 (seasonal) | None — both stay as-is |
 | T6 | Alien Sampler | `alien_sampler` (exiled → `katgpt-deprecated`) | No (ranking) | EXCLUDED | n/a (structural) | n/a | Already demoted on GOAT |
 
 ---
@@ -149,4 +157,4 @@ cargo test -p katgpt-core --test conformal_floor_best_belief \
 
 ## TL;DR
 
-The "Report the Floor" policy is enforceable and exercised. Of the five grandfathered UQ-adjacent primitives, **only Best-Belief (T5) genuinely beats the floor** — and it does so in the heteroscedastic regime that characterizes its actual use case (15–30% selection-regret reduction, up to 77% on low-data false positives). The other four are correctly excluded: BoM and Sleep-Time produce the textbook false-confidence signature (narrow intervals, collapsed coverage) and are reframed as planning/gating primitives; KARC + overlay *is* the floor composed with a better point forecast; Alien Sampler has no UQ-shaped output to evaluate. The policy's coverage + Winkler requirements are load-bearing — they catch false confidence that CRPS alone hides.
+The "Report the Floor" policy is enforceable and exercised. Of the five grandfathered UQ-adjacent primitives, **only Best-Belief (T5) genuinely beats the floor** — and it does so in the heteroscedastic regime that characterizes its actual use case (15–30% selection-regret reduction, up to 77% on low-data false positives). The other four are correctly excluded: BoM and Sleep-Time produce the textbook false-confidence signature (narrow intervals, collapsed coverage) and are reframed as planning/gating primitives; KARC + overlay *is* the floor composed with a chaotic-regime point forecaster (SCOPE-LIMITED — the 2026-07-20 K-sweep refuted the "K=4 too shallow" hypothesis: K=12 LOSES WORSE on seasonal, WINS HARDER on Lorenz; the scope-limit is structural in KARC's basis choice); Alien Sampler has no UQ-shaped output to evaluate. The policy's coverage + Winkler requirements are load-bearing — they catch false confidence that CRPS alone hides.

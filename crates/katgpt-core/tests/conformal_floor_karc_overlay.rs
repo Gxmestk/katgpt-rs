@@ -30,27 +30,49 @@
 //!
 //! ## Honest verdict (recorded from the canonical run)
 //!
-//! | Corpus | CRPS ratio | Winkler ratio | Coverage (nom 0.95) | Verdict |
-//! |---|---|---|---|---|
-//! | stationary_seasonal m=12, σ=0.5 | 5.74 | 21.73 | 0.916 vs 0.939 | **LosesToFloor** |
-//! | Lorenz-x dt=0.02 (chaotic) | 0.0047 | 0.0059 | 0.932 vs 0.943 | **BeatsFloor** |
+//! | Corpus | K | CRPS ratio | Winkler ratio | Coverage (nom 0.95) | Verdict |
+//! |---|---|---|---|---|---|
+//! | stationary_seasonal m=12, σ=0.5 | 4 | 5.74 | 21.73 | 0.916 vs 0.939 | **LosesToFloor** |
+//! | Lorenz-x dt=0.02 (chaotic) | 4 | 0.0047 | 0.0059 | 0.932 vs 0.943 | **BeatsFloor** |
+//! | stationary_seasonal m=12, σ=0.5 | 12 | 20.26 | 36.97 | 0.911 vs 0.939 | **LosesToFloor (worse)** |
+//! | Lorenz-x dt=0.02 (chaotic) | 12 | 0.0018 | 0.0023 | 0.933 vs 0.943 | **BeatsFloor (better)** |
 //!
 //! **KARC+overlay is a chaotic-regime specialist, not a universal UQ
-//! improvement.** On stationary seasonal data (period 12) with K=4 delay
-//! embedding, KARC's reservoir cannot capture the period-12 cycle and
-//! produces WORSE point forecasts than the trivial last-value anchor.
-//! The conformal overlay faithfully calibrates around the worse point →
-//! ~5.7× wider intervals at slightly lower coverage. On Lorenz-63
-//! (KARC's design target), KARC's delay embedding captures the chaos and
-//! produces ~210× tighter intervals than the floor at near-identical
-//! coverage.
+//! improvement.** On stationary seasonal data (period 12) KARC LOSES
+//! regardless of K — the prior session's hypothesis that "K=4 is too
+//! shallow for period-12" was **refuted by the K=12 measurement**: K=12
+//! loses WORSE (CRPS ratio 5.74 → 20.26), not better. The scope-limit is
+//! **structural** (KARC's Chebyshev basis + ridge-fit architecture doesn't
+//! fit periodic data), not parametric in K. Meanwhile K=12 IMPROVES KARC's
+//! chaotic performance (CRPS ratio 0.0047 → 0.0018, ~2.6× tighter) — more
+//! delay context helps on chaotic signals and hurts on periodic ones.
+//!
+//! ### K-sweep follow-up (this file's `*_k12` tests, measured 2026-07-20)
+//!
+//! The original T7 verdict stated "K=4 too shallow for period-12" as a
+//! hypothesis. The K-sweep tests verify that claim empirically by re-running
+//! the seasonal comparison with K=12 (matching the period). The measurement
+//! REFUTES the hypothesis:
+//!   - **K=12 on seasonal: LosesToFloor WORSE (CRPS 5.74 → 20.26)** → the
+//!     scope-limit is structural. KARC's basis/reservoir architecture doesn't
+//!     fit periodic data regardless of delay depth. More context makes the
+//!     over-fit worse, not better.
+//!   - **K=12 on Lorenz: BeatsFloor HARDER (CRPS 0.0047 → 0.0018)** → more
+//!     delay context genuinely helps on chaotic signals. KARC benefits from
+//!     longer memory of recent trajectory curvature.
+//!
+//! Production guidance: KARC+overlay is a chaotic-regime specialist. Pick K
+//! based on how much trajectory memory the chaotic signal benefits from
+//! (larger K = tighter intervals on chaotic, but no help on periodic). For
+//! periodic/seasonal data, use the floor (`SeasonalNaiveForecaster`)
+//! directly — KARC cannot match it regardless of K.
 //!
 //! The take-away for the "Report the Floor" policy: KARC+overlay is
 //! **IN-SCOPE** as a UQ primitive (it produces calibrated intervals, the
-//! coverage doesn't break) but **SCOPE-LIMITED** to regimes where KARC's
-//! delay embedding can capture the signal's structure. The Plan 308 GOAT
-//! gate (chaotic Lorenz double-scroll) remains the right canonical
-//! validation target; stationary-seasonal is explicitly out-of-scope.
+//! coverage doesn't break) but **SCOPE-LIMITED** to chaotic regimes where
+//! KARC's delay embedding captures the signal's structure. The Plan 308 GOAT
+//! gate (chaotic Lorenz double-scroll) remains the right canonical validation
+//! target; stationary-seasonal is out-of-scope regardless of K.
 //!
 //! ## Method
 //!
@@ -87,12 +109,18 @@ use katgpt_core::{
 // ── KARC shape ────────────────────────────────────────────────────────────
 // D=1 (scalar trajectory — matches the floor's 1-channel layout exactly),
 // M=8 (Chebyshev features per coordinate — enough expressivity to capture
-// Lorenz-x's smooth-but-chaotic dynamics), K=4 (delay-embedding depth).
-// d_h = K·D·M = 32 features. Small enough to fit fast in-test; deep enough
-// to expose KARC's reservoir advantage over the last-value anchor.
+// Lorenz-x's smooth-but-chaotic dynamics). K (delay-embedding depth) is
+// generic per-adapter — the original T7 tests use K=4 (d_h=32 features);
+// the K-sweep follow-up tests use K=12 to match period-12 seasonal cycles.
 const D: usize = 1;
 const M: usize = 8;
-const K: usize = 4;
+
+/// The canonical K=4 (original T7 measurement). Used by the original tests.
+pub const K4: usize = 4;
+
+/// K=12 (K-sweep follow-up). Matches the period-12 seasonal cycle, letting
+/// KARC's delay embedding see a full period of context.
+pub const K12: usize = 12;
 
 /// Capacity of the conformal residual ring buffer. Matches the canonical
 /// floor config (FLOOR_CAPACITY = 256).
@@ -163,10 +191,11 @@ fn generate_lorenz_x(n_transient: usize, n: usize, dt: f64) -> Vec<f32> {
 // ===== KarcOverlayAdapter ==================================================
 
 /// Adapter wrapping a pre-fitted KARC + conformal overlay as a
-/// `UqPrimitiveUnderTest`. Mirrors the production integration pattern
-/// documented in `conformal::karc_adapter`: `interval_from_point_into`
-/// (point-supplied read path), `update_residual` + `step` (write path).
-pub struct KarcOverlayAdapter {
+/// `UqPrimitiveUnderTest`. Generic over K (the delay-embedding depth) so
+/// the same adapter logic supports both the canonical K=4 measurement and
+/// the K-sweep follow-up (K=12, etc.). D and M are file-level consts
+/// (D=1, M=8) — only K varies in this test suite.
+pub struct KarcOverlayAdapter<const K: usize> {
     /// KARC wrapped in the conformal calibrator. The calibrator's wrapped
     /// forecaster is `KarcChannelForecaster<..>` (channel 0 of D=1).
     calibrator: ConformalIntervalCalibrator<KarcChannelForecaster<ChebyshevBasis<M>, D, M, K>>,
@@ -188,7 +217,7 @@ pub struct KarcOverlayAdapter {
     n_seen: usize,
 }
 
-impl KarcOverlayAdapter {
+impl<const K: usize> KarcOverlayAdapter<K> {
     /// Construct an adapter with a PRE-FITTED KARC forecaster.
     ///
     /// The KARC is fit on the `warmup_corpus` slice (the same observations
@@ -204,9 +233,15 @@ impl KarcOverlayAdapter {
         // Build training pairs: for each t ∈ [K-1, n-1], delay_state =
         // [y_t, y_{t-1}, ..., y_{t-K+1}] flattened (K·D values, here D=1 so
         // just K values), target = y_{t+1}.
+        //
+        // (We use a `Vec` for `ds` rather than a stack array because K is a
+        // const generic — stable Rust doesn't allow `K * D` in array lengths.
+        // This is test-only warmup-fit code; the production hot path stays
+        // zero-alloc — see `KarcForecaster::with_capacity`'s pre-allocated
+        // buffers.)
         if warmup_corpus.len() > K {
+            let mut ds = vec![0.0_f32; K * D];
             for t in (K - 1)..(warmup_corpus.len() - 1) {
-                let mut ds = [0.0_f32; K * D];
                 for k in 0..K {
                     ds[k * D..(k + 1) * D].copy_from_slice(&warmup_corpus[t - k..t - k + 1]);
                 }
@@ -267,9 +302,23 @@ impl KarcOverlayAdapter {
     }
 }
 
-impl UqPrimitiveUnderTest for KarcOverlayAdapter {
+impl<const K: usize> UqPrimitiveUnderTest for KarcOverlayAdapter<K> {
     fn name(&self) -> &str {
-        "KARC+overlay (Chebyshev M=8, K=4, D=1; pre-fitted on warmup)"
+        // Allocate a per-call String. This is a cold API call (once per test run,
+        // for logging) — the hot `predict_next` / `observe` paths stay zero-alloc.
+        // We leak the String to get a `&'static str` so the trait signature stays
+        // simple; tests don't churn this enough to matter.
+        //
+        // (Alternative: use a `&'static str` via `concat!`, but `K` is generic —
+        // can't `concat!` a const generic. `format!` + `Box::leak` is the
+        // cleanest escape hatch for one-off cold-path formatting.)
+        let s: String = format!(
+            "KARC+overlay (Chebyshev M={M}, K={K}, D={D}; pre-fitted on warmup)",
+            M = M,
+            K = K,
+            D = D
+        );
+        Box::leak(s.into_boxed_str())
     }
 
     fn predict_next(&mut self) -> PredictiveOutput {
@@ -325,7 +374,7 @@ impl UqPrimitiveUnderTest for KarcOverlayAdapter {
 fn adapter_predicts_after_warmup() {
     let corpus = TrajectoryCorpus::stationary_seasonal(12, 0.1, 200, 0x1234);
     let warmup = corpus.recommended_warmup;
-    let mut adapter = KarcOverlayAdapter::new_fitted(&corpus.values[..warmup], ALPHA);
+    let mut adapter = KarcOverlayAdapter::<K4>::new_fitted(&corpus.values[..warmup], ALPHA);
 
     // Feed the warmup observations through observe() so the window fills.
     for &y in &corpus.values[..warmup] {
@@ -349,7 +398,7 @@ fn adapter_is_deterministic() {
     let warmup = corpus.recommended_warmup;
 
     let run_once = || -> Vec<PredictiveInterval> {
-        let mut adapter = KarcOverlayAdapter::new_fitted(&corpus.values[..warmup], ALPHA);
+        let mut adapter = KarcOverlayAdapter::<K4>::new_fitted(&corpus.values[..warmup], ALPHA);
         for &y in &corpus.values[..warmup] {
             let _ = adapter.predict_next();
             adapter.observe(y);
@@ -398,7 +447,7 @@ fn floor_comparison_stationary_seasonal() {
     let corpus = TrajectoryCorpus::stationary_seasonal(12, 0.5, 800, 0xCAFE_BABE);
     let warmup = corpus.recommended_warmup;
 
-    let mut adapter = KarcOverlayAdapter::new_fitted(&corpus.values[..warmup], ALPHA);
+    let mut adapter = KarcOverlayAdapter::<K4>::new_fitted(&corpus.values[..warmup], ALPHA);
     let report: FloorComparisonReport = run_floor_comparison(
         &mut adapter,
         &corpus.values,
@@ -466,7 +515,7 @@ fn floor_comparison_lorenz_x() {
     let warmup = 600;
     let corpus = TrajectoryCorpus::from_slice("lorenz_x_dt0.02", &traj, warmup);
 
-    let mut adapter = KarcOverlayAdapter::new_fitted(&corpus.values[..warmup], ALPHA);
+    let mut adapter = KarcOverlayAdapter::<K4>::new_fitted(&corpus.values[..warmup], ALPHA);
     let report: FloorComparisonReport = run_floor_comparison(
         &mut adapter,
         &corpus.values,
@@ -511,5 +560,159 @@ fn floor_comparison_lorenz_x() {
     assert!(
         prim_crps <= floor_crps * 1.10,
         "KARC CRPS {prim_crps:.6} > floor CRPS {floor_crps:.6} × 1.10 — significant regression on Lorenz"
+    );
+}
+
+// ===== K-sweep follow-up: K=12 tests ======================================
+//
+// The original T7 measurement found KARC+overlay with K=4 LOSES on
+// stationary_seasonal (period 12). The post-hoc explanation was "K=4 is
+// too shallow to capture a period-12 cycle". These tests verify that
+// explanation empirically: if K=12 (matching the period) also loses, the
+// scope-limit is structural; if K=12 wins, the scope-limit was a parameter
+// choice and the prior session's conclusion needs refinement.
+//
+// We also re-run Lorenz-x with K=12 as a sanity check — increasing K should
+// not catastrophically regress KARC's chaotic-regime performance (more
+// context is at worst redundant on a chaotic signal).
+
+/// K=12 on stationary_seasonal (period 12): the headline K-sweep question.
+///
+/// **Possible verdicts:**
+///   - **BeatsFloor / TiesFloor** → scope-limit was a parameter issue.
+///     KARC CAN handle seasonal when K ≥ period. Production guidance becomes
+///     "pick K ≥ dominant period". Refines the prior session's conclusion.
+///   - **LosesToFloor** → scope-limit is structural (KARC's Chebyshev basis /
+///     reservoir architecture doesn't fit periodic data regardless of delay
+///     depth). Prior session's conclusion stands, now measured.
+///   - **Mixed** → ambiguous: CRPS may improve while Winkler doesn't, or vice
+///     versa. Record and move on; this is a measurement, not a gate.
+///
+/// Gate: we ACCEPT any verdict here. The hard gates are the same as the K=4
+/// tests — coverage stays within 0.10 of floor (no calibration break), the
+/// verdict is one of the scored outcomes (not NotApplicable). The test is a
+/// *measurement*, not a pass/fail gate.
+#[test]
+fn floor_comparison_stationary_seasonal_k12() {
+    let corpus = TrajectoryCorpus::stationary_seasonal(12, 0.5, 800, 0xCAFE_BABE);
+    let warmup = corpus.recommended_warmup;
+
+    let mut adapter = KarcOverlayAdapter::<K12>::new_fitted(&corpus.values[..warmup], ALPHA);
+    let report: FloorComparisonReport = run_floor_comparison(
+        &mut adapter,
+        &corpus.values,
+        ALPHA,
+        warmup,
+        &corpus.name,
+    );
+
+    println!("── KARC+overlay (K=12) vs floor on {} ──", corpus.name);
+    println!("{:.?}", report);
+
+    // Sanity: at least 100 scored steps.
+    assert!(report.n_scored > 100, "n_scored = {}", report.n_scored);
+
+    // Hard gate: coverage must stay calibrated (same invariant as K=4 tests).
+    let floor_cov = report.floor.coverage;
+    let prim_cov = report.primitive.coverage;
+    let cov_delta = (prim_cov - floor_cov).abs();
+    assert!(
+        cov_delta < 0.10,
+        "coverage delta too large: floor={floor_cov:.4}, prim={prim_cov:.4}, |Δ|={cov_delta:.4}"
+    );
+
+    // Accept any scored verdict — this is a measurement, not a gate.
+    assert!(
+        matches!(
+            report.overall,
+            OverallVerdict::BeatsFloor
+                | OverallVerdict::TiesFloor
+                | OverallVerdict::Mixed
+                | OverallVerdict::LosesToFloor
+        ),
+        "KARC+overlay (K=12) verdict on seasonal: {:?} — expected one of the scored outcomes",
+        report.overall
+    );
+
+    // Log the CRPS ratio so the test output records the measurement. This is
+    // the load-bearing number for the scope-limit question.
+    let prim_crps = report.primitive.mean_crps_interval;
+    let floor_crps = report.floor.mean_crps_interval;
+    let crps_ratio = if floor_crps > 1e-12 {
+        prim_crps / floor_crps
+    } else {
+        f32::NAN
+    };
+    println!(
+        "K=12 stationary_seasonal CRPS ratio (prim/floor): {:.4} (K=4 baseline was 5.74)",
+        crps_ratio
+    );
+}
+
+/// K=12 on Lorenz-x (chaotic): sanity check that deeper delay doesn't
+/// catastrophically regress KARC's chaotic-regime performance.
+///
+/// The prior session measured K=4 → BeatsFloor (CRPS ratio 0.0047, 210×
+/// tighter intervals). Increasing K to 12 gives KARC three times as much
+/// context — for a chaotic signal this should be at worst redundant (extra
+/// features that the ridge fit zeroes out) and at best slightly helpful
+/// (longer memory of recent trajectory curvature).
+///
+/// Gate: K=12 should still Beat or Tie the floor on Lorenz. A LOSES verdict
+/// would indicate that K=12 over-fits the warmup slice and fails to
+/// generalize — a real finding worth recording.
+#[test]
+fn floor_comparison_lorenz_x_k12() {
+    let n_total = 2_000;
+    let n_transient = 1_000;
+    let traj = generate_lorenz_x(n_transient, n_total, 0.02);
+    let warmup = 600;
+    let corpus = TrajectoryCorpus::from_slice("lorenz_x_dt0.02", &traj, warmup);
+
+    let mut adapter = KarcOverlayAdapter::<K12>::new_fitted(&corpus.values[..warmup], ALPHA);
+    let report: FloorComparisonReport = run_floor_comparison(
+        &mut adapter,
+        &corpus.values,
+        ALPHA,
+        warmup,
+        &corpus.name,
+    );
+
+    println!("── KARC+overlay (K=12) vs floor on {} ──", corpus.name);
+    println!("{:.?}", report);
+
+    assert!(report.n_scored > 500, "n_scored = {}", report.n_scored);
+
+    // Same coverage invariant.
+    let floor_cov = report.floor.coverage;
+    let prim_cov = report.primitive.coverage;
+    let cov_delta = (prim_cov - floor_cov).abs();
+    assert!(
+        cov_delta < 0.10,
+        "coverage delta too large: floor={floor_cov:.4}, prim={prim_cov:.4}, |Δ|={cov_delta:.4}"
+    );
+
+    // Verdict: still expect Beats/Ties/Mixed on Lorenz with K=12. A LOSES
+    // would be a significant negative finding.
+    assert!(
+        matches!(
+            report.overall,
+            OverallVerdict::BeatsFloor | OverallVerdict::TiesFloor | OverallVerdict::Mixed
+        ),
+        "KARC+overlay (K=12) verdict on Lorenz-x: {:?} — expected Beats/Ties/Mixed",
+        report.overall
+    );
+
+    // Log the CRPS ratio.
+    let prim_crps = report.primitive.mean_crps_interval;
+    let floor_crps = report.floor.mean_crps_interval;
+    let crps_ratio = if floor_crps > 1e-12 {
+        prim_crps / floor_crps
+    } else {
+        f32::NAN
+    };
+    println!(
+        "K=12 Lorenz-x CRPS ratio (prim/floor): {:.4} (K=4 baseline was 0.0047)",
+        crps_ratio
     );
 }
