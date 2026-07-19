@@ -21,7 +21,7 @@
 /// # Examples
 ///
 /// ```
-/// # use katgpt_core::personality_composition::sigmoid;
+/// # use katgpt_personality::sigmoid;
 /// assert!((sigmoid(0.0) - 0.5).abs() < 1e-6);
 /// assert!(sigmoid(100.0) > 0.999999);
 /// assert!(sigmoid(-100.0) < 1e-6);
