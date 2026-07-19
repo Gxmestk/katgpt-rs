@@ -1025,12 +1025,15 @@ where
     out.copy_from_slice(x);
 
     let mut grad_buf = vec![0.0f32; d];
+    // Hoisted outside the loop: avoid per-round allocation. `current` must be a
+    // distinct buffer from `out` because `manifold_erasure_step_into` reads
+    // `&current` and writes `&mut out` simultaneously.
+    let mut current = vec![0.0f32; d];
     let mut infos = Vec::with_capacity(n_rounds);
 
     for _ in 0..n_rounds {
         gradient_fn(out, &mut grad_buf);
-        // Copy out to a temp to avoid aliasing &out and &mut out.
-        let current = out.to_vec();
+        current.copy_from_slice(out);
         let info = manifold_erasure_step_into(
             &current,
             &grad_buf,
@@ -1068,8 +1071,9 @@ where
 ///
 /// # Allocation
 ///
-/// The per-round `grad_buf` and `current` allocations match the uncached
-/// loop's pattern. The SVD-skip (the optimization) adds zero allocations.
+/// The per-call `grad_buf` and `current` buffers are hoisted outside the
+/// round loop (one alloc each, not `n_rounds` allocs each). The SVD-skip
+/// (the optimization) adds zero allocations.
 #[cfg(feature = "subspace_phase_gate")]
 #[allow(clippy::too_many_arguments)] // buffer-passing API: x, gradient_fn, pool, n, config, n_rounds, scratch, cache, out
 pub fn manifold_erasure_loop_cached_into<F>(
@@ -1093,12 +1097,14 @@ where
     out.copy_from_slice(x);
 
     let mut grad_buf = vec![0.0f32; d];
+    // Hoisted outside the loop: avoid per-round allocation. See
+    // `manifold_erasure_loop_into` for the aliasing rationale.
+    let mut current = vec![0.0f32; d];
     let mut infos = Vec::with_capacity(n_rounds);
 
     for _ in 0..n_rounds {
         gradient_fn(out, &mut grad_buf);
-        // Copy out to a temp to avoid aliasing &out and &mut out.
-        let current = out.to_vec();
+        current.copy_from_slice(out);
         let info = manifold_erasure_step_cached_into(
             &current,
             &grad_buf,
@@ -1263,7 +1269,10 @@ where
     )?;
 
     // MANCE loop on preprocessed state.
-    // Copy out to avoid aliasing &out and &mut out in the loop.
+    // `manifold_erasure_loop_into` overwrites `out` from `x` on entry, so
+    // the clone is semantically dead — but the borrow checker can't prove
+    // `out` isn't aliased by the `&mut out` write inside the loop, so we
+    // keep a one-time snapshot. (Single allocation per call, not per round.)
     let preprocessed = out.to_vec();
     manifold_erasure_loop_into(
         &preprocessed,
@@ -1325,7 +1334,10 @@ where
     )?;
 
     // MANCE loop on preprocessed state.
-    // Copy out to avoid aliasing &out and &mut out in the loop.
+    // `manifold_erasure_loop_into` overwrites `out` from `x` on entry, so
+    // the clone is semantically dead — but the borrow checker can't prove
+    // `out` isn't aliased by the `&mut out` write inside the loop, so we
+    // keep a one-time snapshot. (Single allocation per call, not per round.)
     let preprocessed = out.to_vec();
     manifold_erasure_loop_into(
         &preprocessed,
