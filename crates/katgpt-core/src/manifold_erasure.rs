@@ -55,7 +55,7 @@
 //! | Plan 425 `tilr` | Global U_r | γ-alignment | INJECTION |
 //! | **MANCE (this)** | **Local k-NN tangent** | **σ^α + ε·r_i** | **ERASURE** |
 
-use crate::simd::simd_dot_f32;
+use crate::simd::{simd_dot_f32, simd_fused_scale_acc};
 
 // The local tangent SVD needs Plan 301's thin_svd. Gated on both features.
 // In the default build, `subspace_phase_gate` is transitively enabled via
@@ -579,7 +579,7 @@ pub fn tangent_erasure_direction_into(
         coords[j] = dot;
     }
 
-    let coord_sq_sum: f32 = coords.iter().map(|c| c * c).sum();
+    let coord_sq_sum = simd_dot_f32(coords, coords, r);
     let alignment = coord_sq_sum.sqrt();
 
     // Step 2: d_vec = B · diag(σ^α) · c = Σ_j (σ_j^α · c_j · basis_col_j)
@@ -593,9 +593,8 @@ pub fn tangent_erasure_direction_into(
             continue;
         }
         let col = &basis[j * d..(j + 1) * d];
-        for i in 0..d {
-            direction[i] += coeff * col[i];
-        }
+        // AXPBY: direction += coeff * col. SIMD via fused multiply-add.
+        simd_fused_scale_acc(direction, col, coeff, d);
     }
 
     // Step 3: normalize û = d / ‖d‖.
