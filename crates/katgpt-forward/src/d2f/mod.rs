@@ -1255,6 +1255,12 @@ impl<'a> D2fPipeline<'a> {
         // Reused across blocks: rebuilt in place each iteration instead of
         // re-cloning the (growing) prefix per block.
         let mut seq_tokens = Vec::with_capacity(self.config.block_size);
+        // Hoisted outside the block loop: both buffers are reused across blocks
+        // (vocab and max_steps are loop-invariant). sample_exp_buf is purely
+        // internal scratch; confidence_history is moved into each block's result
+        // via mem::take, leaving an empty Vec for the next iteration.
+        let mut sample_exp_buf: Vec<f32> = Vec::with_capacity(vocab);
+        let mut confidence_history: Vec<f32> = Vec::with_capacity(max_steps);
 
         for block_idx in 0..n_blocks {
             let remaining = self.total_len.saturating_sub(block_idx * block_size);
@@ -1303,11 +1309,7 @@ impl<'a> D2fPipeline<'a> {
             let seq_len = seq_tokens.len().min(self.config.block_size);
             let block_start = seq_len.saturating_sub(current_block_size);
 
-            let mut confidence_history = Vec::with_capacity(max_steps);
             let mut converged_step = max_steps;
-            // Reusable exp scratch buffer for sample_temperatured (avoids
-            // per-position allocation in the denoising loop).
-            let mut sample_exp_buf: Vec<f32> = Vec::with_capacity(vocab);
 
             for step in 0..max_steps {
                 let _seq_len_actual = forward_block_causal_with(
@@ -1419,7 +1421,7 @@ impl<'a> D2fPipeline<'a> {
             block_results.push(D2fBlockResult {
                 tokens: block_tokens.clone(),
                 steps_used,
-                confidence_history,
+                confidence_history: std::mem::take(&mut confidence_history),
                 accuracy: None,
                 state,
             });
