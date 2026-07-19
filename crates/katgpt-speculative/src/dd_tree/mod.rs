@@ -1412,8 +1412,10 @@ where
                 *v /= sum;
             }
         } else {
-            // All filtered out — use original marginals as fallback
-            filtered = marginal.to_vec();
+            // All filtered out — use original marginals as fallback. Same length
+            // as `filtered` (both sized to marginal.len()), so copy in place
+            // instead of allocating a fresh Vec and dropping the existing one.
+            filtered.copy_from_slice(marginal);
         }
 
         filtered_marginals.push(filtered);
@@ -1580,7 +1582,8 @@ where
                 *v /= sum;
             }
         } else {
-            filtered = marginal.to_vec();
+            // All filtered out — copy original marginals in place (same length).
+            filtered.copy_from_slice(marginal);
         }
 
         filtered_marginals.push(filtered);

@@ -15,6 +15,15 @@ pub struct TreeBuilder {
     parent_tokens_buf: Vec<usize>,
     candidates_buf: Vec<usize>,
     valid_buf: Vec<bool>,
+    /// Reusable per-depth budget counter for the progressive / depth-budgeted
+    /// build variants. Hoisted out of the per-build scope to avoid one Vec
+    /// allocation per build call.
+    #[cfg(any(
+        feature = "dflare_progressive_budget",
+        feature = "corr_budget",
+        feature = "nf_flow_budget"
+    ))]
+    depth_used_buf: Vec<usize>,
     /// Cached `ln(marginals[d][i])` — computed once per build to avoid redundant
     /// `f32::ln()` calls in the Phase C expansion inner loop (called per token
     /// per heap-pop). Entries for `prob <= 0.0` are `0.0` (unused since those
@@ -41,6 +50,12 @@ impl TreeBuilder {
             parent_tokens_buf: vec![0usize; config.draft_lookahead + 1],
             candidates_buf: Vec::with_capacity(config.vocab_size),
             valid_buf: Vec::with_capacity(config.vocab_size),
+            #[cfg(any(
+                feature = "dflare_progressive_budget",
+                feature = "corr_budget",
+                feature = "nf_flow_budget"
+            ))]
+            depth_used_buf: Vec::new(),
             log_marginals: Vec::new(),
             deep_argmax_threshold: None,
         }
@@ -129,7 +144,7 @@ impl TreeBuilder {
                     break;
                 }
 
-                cumulative_score += prob.ln();
+                cumulative_score += self.log_marginals[depth][token_idx];
                 let node_path = if depth == 0 {
                     token_idx as u128
                 } else {
@@ -512,8 +527,9 @@ impl TreeBuilder {
                     break;
                 }
 
-                // Blended score: ln(P_llm) + ln(R)
-                cumulative_score += prob.ln() + relevance.ln();
+                // Blended score: ln(P_llm) + ln(R). Use the cached ln(prob).
+                cumulative_score +=
+                    self.log_marginals[depth][token_idx] + relevance.ln();
                 let node_path = if depth == 0 {
                     token_idx as u128
                 } else {
@@ -1147,8 +1163,13 @@ impl TreeBuilder {
 
         // Compute per-depth budget allocation
         let depth_budgets = bcfg.allocate(config.tree_budget, marginals.len());
-        // Track how many nodes have been added at each depth
-        let mut depth_used: Vec<usize> = vec![0; depth_budgets.len()];
+        // Reuse the per-build depth_used buffer (clear + resize preserves the
+        // inner allocation across builds). Accessed as `self.depth_used_buf`
+        // throughout because the build loop interleaves `depth_used[d] += 1`
+        // with `self.tree.push(...)` — a separate `let` binding would conflict
+        // with the other self borrows.
+        self.depth_used_buf.clear();
+        self.depth_used_buf.resize(depth_budgets.len(), 0);
 
         let threshold = config.screening_threshold;
         self.heap.clear();
@@ -1172,7 +1193,7 @@ impl TreeBuilder {
                     break;
                 }
                 // Per-depth budget check for chain backbone
-                if depth_used[depth] >= depth_budgets[depth] {
+                if self.depth_used_buf[depth] >= depth_budgets[depth] {
                     break;
                 }
 
@@ -1196,8 +1217,10 @@ impl TreeBuilder {
                     break;
                 }
 
-                // Blended score: ln(P_llm) + ln(R)
-                cumulative_score += prob.ln() + relevance.ln();
+                // Blended score: ln(P_llm) + ln(R). Use the cached ln(prob) from
+                // cache_log_marginals (computed once per build).
+                cumulative_score +=
+                    self.log_marginals[depth][token_idx] + relevance.ln();
                 let node_path = if depth == 0 {
                     token_idx as u128
                 } else {
@@ -1212,7 +1235,7 @@ impl TreeBuilder {
                 };
 
                 self.tree.push(node);
-                depth_used[depth] += 1;
+                self.depth_used_buf[depth] += 1;
                 self.chain_nodes.push(node);
                 parent_path = node_path;
                 self.chain_parent_tokens.push(token_idx);
@@ -1246,7 +1269,7 @@ impl TreeBuilder {
                     self.heap.extend(nodes);
                 } else {
                     for (i, &prob) in marginals[0].iter().enumerate() {
-                        if depth_used[0] >= budget_d0 {
+                        if self.depth_used_buf[0] >= budget_d0 {
                             break;
                         }
                         if prob <= 0.0 {
@@ -1358,7 +1381,7 @@ impl TreeBuilder {
                 self.heap.extend(nodes);
             } else {
                 for (i, &prob) in marginals[0].iter().enumerate() {
-                    if depth_used[0] >= budget_d0 {
+                    if self.depth_used_buf[0] >= budget_d0 {
                         break;
                     }
                     if prob <= 0.0 {
@@ -1389,13 +1412,13 @@ impl TreeBuilder {
 
             // Per-depth budget check: skip nodes whose depth is exhausted
             if best.depth < depth_budgets.len()
-                && depth_used[best.depth] >= depth_budgets[best.depth]
+                && self.depth_used_buf[best.depth] >= depth_budgets[best.depth]
             {
                 continue;
             }
 
             self.tree.push(best);
-            depth_used[best.depth] += 1;
+            self.depth_used_buf[best.depth] += 1;
 
             // Confidence-gap early exit (Plan 026: AutoTTS)
             let score = best.score;
@@ -1430,7 +1453,7 @@ impl TreeBuilder {
                 let next_depth = best.depth + 1;
                 // Skip expanding children into a depth that has exhausted its budget
                 if next_depth < depth_budgets.len()
-                    && depth_used[next_depth] >= depth_budgets[next_depth]
+                    && self.depth_used_buf[next_depth] >= depth_budgets[next_depth]
                 {
                     continue;
                 }
@@ -1482,7 +1505,9 @@ impl TreeBuilder {
             return self.build_screened(marginals, config, screener, chain_seed);
         }
 
-        let mut depth_used: Vec<usize> = vec![0; depth_budgets.len()];
+        // Reuse the per-build depth_used buffer (see build_screened_progressive).
+        self.depth_used_buf.clear();
+        self.depth_used_buf.resize(depth_budgets.len(), 0);
         let threshold = config.screening_threshold;
         self.heap.clear();
         self.tree.clear();
@@ -1503,7 +1528,7 @@ impl TreeBuilder {
                 if self.tree.len() >= config.tree_budget {
                     break;
                 }
-                if depth >= depth_budgets.len() || depth_used[depth] >= depth_budgets[depth] {
+                if depth >= depth_budgets.len() || self.depth_used_buf[depth] >= depth_budgets[depth] {
                     break;
                 }
 
@@ -1527,7 +1552,8 @@ impl TreeBuilder {
                     break;
                 }
 
-                cumulative_score += prob.ln() + relevance.ln();
+                cumulative_score +=
+                    self.log_marginals[depth][token_idx] + relevance.ln();
                 let node_path = if depth == 0 {
                     token_idx as u128
                 } else {
@@ -1542,7 +1568,7 @@ impl TreeBuilder {
                 };
 
                 self.tree.push(node);
-                depth_used[depth] += 1;
+                self.depth_used_buf[depth] += 1;
                 self.chain_nodes.push(node);
                 parent_path = node_path;
                 self.chain_parent_tokens.push(token_idx);
@@ -1552,7 +1578,7 @@ impl TreeBuilder {
             if self.chain_nodes.is_empty() {
                 let budget_d0 = depth_budgets.first().copied().unwrap_or(config.tree_budget);
                 for (i, &prob) in marginals[0].iter().enumerate() {
-                    if depth_used[0] >= budget_d0 {
+                    if self.depth_used_buf[0] >= budget_d0 {
                         break;
                     }
                     if prob <= 0.0 {
@@ -1639,7 +1665,7 @@ impl TreeBuilder {
         } else {
             let budget_d0 = depth_budgets.first().copied().unwrap_or(config.tree_budget);
             for (i, &prob) in marginals[0].iter().enumerate() {
-                if depth_used[0] >= budget_d0 {
+                if self.depth_used_buf[0] >= budget_d0 {
                     break;
                 }
                 if prob <= 0.0 {
@@ -1668,13 +1694,13 @@ impl TreeBuilder {
             };
 
             if best.depth < depth_budgets.len()
-                && depth_used[best.depth] >= depth_budgets[best.depth]
+                && self.depth_used_buf[best.depth] >= depth_budgets[best.depth]
             {
                 continue;
             }
 
             self.tree.push(best);
-            depth_used[best.depth] += 1;
+            self.depth_used_buf[best.depth] += 1;
 
             let score = best.score;
             match best_score {
@@ -1816,8 +1842,9 @@ impl TreeBuilder {
                 }
                 prev_velocity = velocity;
 
-                // Blended score: ln(P_llm) + ln(R)
-                cumulative_score += prob.ln() + relevance.ln();
+                // Blended score: ln(P_llm) + ln(R). Use the cached ln(prob).
+                cumulative_score +=
+                    self.log_marginals[depth][token_idx] + relevance.ln();
                 let node_path = if depth == 0 {
                     token_idx as u128
                 } else {
