@@ -3,7 +3,7 @@
 **Date:** 2026-06-30
 **Plan:** [`.plans/340_conformal_predictive_intervals_primitive.md`](../.plans/340_conformal_predictive_intervals_primitive.md) Phase 2.5
 **Issue:** 010 (T2 — RESOLVED; tracker removed; this benchmark + `.benchmarks/010_report_the_floor_consolidated.md` are the lasting record)
-**Feature flag:** `conformal_predictive_intervals` (opt-in, same as Phase 1+2)
+**Feature flag:** `conformal_predictive_intervals` (opt-in at time of writing, 2026-06-30; **promoted to DEFAULT-ON 2026-07-20 by Plan 468** — see `.benchmarks/340_conformal_goat.md` §"Promotion decision")
 **Modelless:** ✅ Yes — the harness only orchestrates and scores. No training, no learned params.
 
 ---

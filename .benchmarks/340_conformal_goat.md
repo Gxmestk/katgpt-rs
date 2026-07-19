@@ -3,7 +3,7 @@
 **Date:** 2026-06-30
 **Plan:** [`.plans/340_conformal_predictive_intervals_primitive.md`](../.plans/340_conformal_predictive_intervals_primitive.md) Phase 1
 **Issue:** 010 (T1 — RESOLVED; tracker removed; floor shipped here)
-**Feature flag:** `conformal_predictive_intervals` (opt-in)
+**Feature flag:** `conformal_predictive_intervals` (**DEFAULT-ON since 2026-07-20 per Plan 468** — was opt-in at time of writing)
 **Modelless:** ✅ Yes — no training, no learned parameters, no gradient descent. Pure empirical-quantile calibration over a residual reservoir.
 
 ---
@@ -11,9 +11,13 @@
 ## TL;DR
 
 **GOAT gate: ✅ PASS (G1, G2, G3, G4 all clear).** The conformal predictive
-intervals primitive ships behind `conformal_predictive_intervals` (opt-in).
-Promotion to default-on is **deferred** per Plan 340 T1.14: the open primitive's
-gates prove the math; the runtime gates (Plan 342 riir-ai) prove the utility.
+intervals primitive was opt-in at the time of this bench (2026-06-30); the
+primitive-level gate proves the math. **Promotion to DEFAULT-ON landed
+2026-07-20 (Plan 468)** after two runtime consumers demonstrated gains over
+their simpler heuristic counterparts — Bench 564 (MCTS collapse G3 PASS) +
+Bench 565 (Salience Tri-Gate G3 PASS, ΔF1 = +0.3145 at 6.3× gate margin).
+Two additional consumers FAILED their G3 (Bench 562 curiosity + Bench 563
+sleep-time) — the Cargo.toml language required only one PASS, two landed.
 The primitive IS the canonical conformal-naive floor instance — Issue 010's
 retroactive UQ-floor comparison harness is now unblocked.
 
@@ -227,7 +231,12 @@ decision).
 - **Plan 340 Phase 2** — KARC adapter can now be built on the validated
   `PointForecaster` trait + `ConformalIntervalCalibrator` substrate.
 - **Plan 342 (riir-ai)** — runtime integration (HLA overlay, curiosity,
-  sleep-time, MCTS collapse) can consume the open primitive.
+  sleep-time, MCTS collapse) can consume the open primitive. *(Historical
+  note: there is no riir-ai Plan 342 — this was the original-ship-time
+  placeholder for the future runtime integration plans. The actual runtime
+  integration work landed in July 2026 via Plans 508/509/510/511 + Benches
+  562-565 — four consumer probes, two PASSed. The primitive was promoted
+  to DEFAULT-ON by Plan 468 on 2026-07-20.)*
 
 ---
 
