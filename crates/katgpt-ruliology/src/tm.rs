@@ -102,16 +102,43 @@ impl TmStrategy {
     /// Each transition has (write, direction, next_state). We count distinct
     /// triplets across all symbol entries, normalized by total entries.
     fn compute_complexity(transitions: &[(u8, u8, u8); 2], n_states: u8) -> f32 {
-        let mut vals = Vec::with_capacity(6);
+        // Fixed-size stack buffer (6 bytes — exactly 2 transitions × 3 fields).
+        // Avoids a heap allocation on every TmStrategy::new; the 1-state
+        // enumerator builds 36 machines, but this same complexity calc runs
+        // for every additional enumeration pass.
+        //
+        // Bit-identical to Vec::sort + Vec::dedup on the same byte sequence
+        // (total order on u8; stable insertion sort preserves equal-run
+        // ordering; dedup collapses runs to the first occurrence).
+        let mut vals = [0u8; 6];
+        let mut idx = 0usize;
         for &(w, d, ns) in transitions {
-            vals.push(w);
-            vals.push(d);
-            vals.push(ns);
+            vals[idx] = w;
+            vals[idx + 1] = d;
+            vals[idx + 2] = ns;
+            idx += 3;
         }
-        vals.sort();
-        vals.dedup();
 
-        let distinct = vals.len() as f32;
+        // Stable insertion-sort on the full 6-byte buffer.
+        for i in 1..vals.len() {
+            let key = vals[i];
+            let mut j = i;
+            while j > 0 && vals[j - 1] > key {
+                vals[j] = vals[j - 1];
+                j -= 1;
+            }
+            vals[j] = key;
+        }
+
+        // Dedup in-place (matches slice::dedup).
+        let mut write = 1usize;
+        for read in 1..vals.len() {
+            if vals[read] != vals[write - 1] {
+                vals[write] = vals[read];
+                write += 1;
+            }
+        }
+        let distinct = write as f32;
         // Max distinct: write has 2 values, direction has 3, next_state has n_states.
         let max_distinct = (2 + 3 + n_states as usize) as f32;
         if max_distinct == 0.0 {
