@@ -175,11 +175,10 @@ impl FuncAttnWeightsSnapshot {
     /// Compute (or recompute) the BLAKE3 commitment. Idempotent.
     pub fn commit(&mut self) -> [u8; 32] {
         let mut hasher = blake3::Hasher::new();
-        // Hash the logical fields with blake3 zeroed (so it doesn't feed back).
-        let saved = self.blake3;
-        self.blake3 = [0u8; 32];
+        // hash_into excludes `blake3` and `version` from the hashed payload
+        // (see its doc comment), so no save/zero/restore dance is needed —
+        // the hash is independent of `self.blake3` by construction.
         self.hash_into(&mut hasher);
-        self.blake3 = saved;
         let hash = *hasher.finalize().as_bytes();
         self.blake3 = hash;
         hash
@@ -191,10 +190,9 @@ impl FuncAttnWeightsSnapshot {
     /// indicates tampering or corruption.
     pub fn verify(&self) -> bool {
         let mut hasher = blake3::Hasher::new();
-        // verify must ignore self.blake3 (treat as zero) regardless of stored value.
-        let mut probe = self.clone();
-        probe.blake3 = [0u8; 32];
-        probe.hash_into(&mut hasher);
+        // hash_into excludes `blake3` from the hashed payload, so we don't need
+        // to clone-and-zero self — just hash the weight fields directly.
+        self.hash_into(&mut hasher);
         let recomputed = *hasher.finalize().as_bytes();
         recomputed == self.blake3
     }
