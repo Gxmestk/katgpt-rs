@@ -295,10 +295,15 @@ workflow_lattice = ["hoare_pruner"]
 # Step-Attribution Δ-Qualification (Plan 381, Research 381).
 # Generic modelless instantiation of SkillAdaptor's eq. 8 commit gate.
 # Sibling to `trajectory_doctor` in the cognitive-branch / skill-lifecycle
-# stack. Opt-in until the riir-ai Plan 313 G6 quality-parity PoC passes
-# (per §3.6 defend-wrong rule). Empty tracking flag — gates
-# `src/step_attribution_qualifier.rs` (traits + types + canonical
-# `DotProductLocalizer` impl). Root forwards as `step_attribution_qualifier`.
+# stack. Gate PASS — riir-ai Plan 313 Phase 5 G6 quality-parity PoC landed
+# (81.6% drift reduction vs no-attribution baseline, 63.1% vs
+# TrajectoryDoctor-only, per root Cargo.toml comment). The feature is
+# DEFAULT-ON at root (root Cargo.toml default array); this leaf flag stays
+# opt-in because katgpt-pruners ships `default = []` (all features leaf-level
+# opt-in; root activates as needed — the layer-split convention). Empty
+# tracking flag — gates `src/step_attribution_qualifier.rs` (traits + types
+# + canonical `DotProductLocalizer` impl). Root forwards as
+# `step_attribution_qualifier`.
 step_attribution_qualifier = []
 
 # Manifold / dynamic rank
