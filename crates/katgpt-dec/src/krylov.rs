@@ -211,13 +211,26 @@ pub fn krylov_expmv_into<F>(
     // ── Small-matrix exponential: exp(t · H_m) ──────────────────────────
     // Extract the m×m leading principal submatrix of H (which is k×k) and
     // scale by t.
+    //
+    // Buffer plan (4 length-(m·m) buffers, allocated once, reused across all
+    // Taylor iterations and squaring steps inside `expm_small_into`):
+    //   h_sub   — input (scaled t·H_m), then dead
+    //   exp_h   — output exp(t·H_m)
+    //   expm_sa — scratch_a inside expm_small_into (holds scaled M)
+    //   expm_sb — scratch_b inside expm_small_into (holds current Taylor term)
+    // Previously `expm_small` allocated `result` + 2 scratch + ~EXPM_MAX_TERMS+s
+    // per-iteration matmul outputs — the refactor cuts that to 4 allocs total.
     let mut h_sub = vec![0.0f32; m * m];
     for i in 0..m {
         for jj in 0..m {
             h_sub[i * m + jj] = h[i * k + jj] * t;
         }
     }
-    let exp_h = expm_small(m, &h_sub);
+    let mut exp_h = vec![0.0f32; m * m];
+    let mut expm_sa = vec![0.0f32; m * m];
+    let mut expm_sb = vec![0.0f32; m * m];
+    expm_small_into(m, &h_sub, &mut exp_h, &mut expm_sa, &mut expm_sb);
+    // h_sub / expm_sa / expm_sb are dead past this point — dropped at end of scope.
 
     // ── Reconstruct: result = β · V_m · exp(t·H_m) · e₁ ────────────────
     // y = exp(t·H_m) · e₁ = first column of exp_h: y[j] = exp_h[j·m].
@@ -253,6 +266,12 @@ pub fn krylov_expmv_into<F>(
 /// epsilon in ≤ 15 terms. The squaring step compounds rounding at `s`
 /// doublings, but for `s ≤ 15` (covers `‖M‖ ≤ 16K`) the error stays well
 /// within f32 precision for the DEC use case.
+// Test-only convenience wrapper around [`expm_small_into`]. The production
+// path (`krylov_expmv_into`) calls [`expm_small_into`] directly so it can reuse
+// scratch buffers across the small-matrix exponential and the outer Krylov
+// reconstruction loop. This allocating wrapper exists solely so the unit
+// tests below can construct an `exp(M)` with a one-line call.
+#[cfg(test)]
 fn expm_small(m: usize, mat: &[f32]) -> Vec<f32> {
     if m == 0 {
         return Vec::new();
