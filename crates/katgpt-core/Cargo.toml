@@ -1153,7 +1153,7 @@ required-features = ["qmc_sampling", "bom_sampling"]
 
 # Plan 367 Phase 5 — QuasiMoTTo GOAT gate (G1–G6). Chi-square marginal
 # exactness, pass@k sample efficiency, K=1 bit-identical regression, zero-alloc,
-# sub-µs overhead. If all gates PASS, promote `qmc_sampling` to `default`.
+# sub-µs overhead. All gates PASS — `qmc_sampling` promoted to `default` 2026-07-03.
 [[bench]]
 name = "bench_367_qmc_goat"
 harness = false
@@ -1161,8 +1161,8 @@ required-features = ["qmc_sampling"]
 
 # Issue 039 — Cognitive Architecture Root GOAT gate (G1 correctness + G1
 # avalanche + G2 perf < 500 ns + G2-alloc zero hot-path allocs + G4 size_of
-# == 32). Pure modelless (BLAKE3 composition). If all gates PASS, promote
-# `cognitive_architecture_root` to `default`.
+# == 32). Pure modelless (BLAKE3 composition). All gates PASS —
+# `cognitive_architecture_root` promoted to `default` 2026-07-04.
 [[bench]]
 name = "bench_039_architecture_root_goat"
 harness = false
@@ -1170,8 +1170,8 @@ required-features = ["cognitive_architecture_root"]
 
 # Issue 040 — PTG × latent_functor edge GOAT gate (G1 correctness + G2 perf
 # < 200 ns + G2-alloc zero hot-path allocs + G4 struct size). Pure modelless
-# (closed-form cosine + sigmoid + SAXPY). If all gates PASS, promote
-# `ptg_functor_edges` to `default`.
+# (closed-form cosine + sigmoid + SAXPY). All gates PASS — `ptg_functor_edges`
+# promoted to `default` 2026-07-04.
 [[bench]]
 name = "bench_040_ptg_functor_edge"
 harness = false
@@ -1179,7 +1179,7 @@ required-features = ["ptg_functor_edges"]
 
 # Plan 379 — ANE-aware roofline GOAT gate (G1 routing verdicts match Bryngelson
 # ch. 11 + G2 ane_estimate < 1µs + G2-alloc 0 + G4 struct sizes). Pure
-# modelless arithmetic. If all gates PASS, promote `ane_roofline` to `default`.
+# modelless arithmetic. All gates PASS — `ane_roofline` promoted to `default` 2026-07-04.
 [[bench]]
 name = "bench_379_ane_roofline_goat"
 harness = false
