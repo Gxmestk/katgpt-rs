@@ -30,8 +30,9 @@ categories = ["mathematics", "science"]
 # (`evolve_motor_gated_field`). It composes the existing DEC surface
 # (`hodge_laplacian` / `graph_laplacian_into`) + a ReLU gate + a per-channel
 # motor gain — no new deps. Stays opt-in by design (it's a primitive, not a
-# default-on capability); promotion to downstream consumption (riir-ai
-# Research 168) is gated on the Plan 357 Phase 2 GOAT (G1–G5).
+# default-on capability). Plan 357 Phase 2 GOAT (G1–G5) ALL PASS (Bench 357,
+# 2026-07-01; G5 closed by grid-stencil fast path 120µs→29µs, 3.4× margin
+# under 100µs target). READY FOR DOWNSTREAM CONSUMPTION (riir-ai Research 168).
 #
 # `heat_kernel_trajectory` (Plan 359, Research 365) — DEFAULT-ON (2026-07-02,
 # Plan 359 Phase 5 GOAT): the single-shot DEC heat-kernel trajectory predictor

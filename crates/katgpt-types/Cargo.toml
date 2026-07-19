@@ -61,7 +61,11 @@ plasma_path = []
 
 # Binary {−1,+1} plasma tier — single bit-plane, group-wise FP16 scale (Issue 145).
 # Strict subset of ternary encoding (pos_bits = sign_bits, neg_bits = !sign_bits).
-# The new Plasma tier; ternary moves to Hot. Opt-in until GOAT gate passes.
+# The new Plasma tier; ternary (plasma_path) moved to Hot. STAYS OPT-IN by design
+# (Issue 145 Phase 2 T2.4, 2026-07-15): GOAT gate PASSED, but promotion to default
+# requires BOTH ≥1.5× latency AND ≥1.5× storage. Measured 1.22× latency (FAILS)
+# + 1.82× storage (PASSES). Conjunction fails → binary remains opt-in for
+# memory-constrained edge deployments.
 binary_plasma = []
 
 # MaxSim late-interaction scoring (Plan 080, Research 073).
