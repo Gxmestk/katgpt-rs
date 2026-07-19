@@ -80,23 +80,54 @@ impl FsmStrategy {
         outputs: &[u8; MAX_STATES],
     ) -> f32 {
         let n = n_states as usize;
-        let mut vals = Vec::with_capacity(3 * n);
-
-        for s in 0..n {
-            vals.push(transitions[s][0]);
-            vals.push(transitions[s][1]);
-            vals.push(outputs[s]);
-        }
-
-        vals.sort();
-        vals.dedup();
-
-        let distinct = vals.len() as f32;
-        let max_distinct = (3 * n) as f32;
-
-        if max_distinct == 0.0 {
+        // Fixed-size stack buffer (3 * MAX_STATES = 12 bytes). Avoids a heap
+        // allocation on every FsmStrategy::new — the enumerator builds up to
+        // (n*n*2)^n strategies (e.g. ~1M for n=4), so this is on a hot path.
+        // The manual stable sort + dedup below is bit-identical to Vec::sort +
+        // Vec::dedup on the same byte sequence (total order on u8, equal runs
+        // collapsed to the first occurrence).
+        //
+        // n=0 early return matches the original's `max_distinct == 0.0` branch
+        // (kept here so the dedup logic below can assume len >= 1).
+        if n == 0 {
             return 0.0;
         }
+        let mut vals = [0u8; 3 * MAX_STATES];
+        let mut len = 0usize;
+
+        for s in 0..n {
+            vals[len] = transitions[s][0];
+            vals[len + 1] = transitions[s][1];
+            vals[len + 2] = outputs[s];
+            len += 3;
+        }
+
+        // Stable insertion-sort on the active prefix. Byte domain is tiny, so
+        // the quadratic constant is negligible; the win is avoiding the heap
+        // trip. Equality semantics match slice::sort (total order on u8).
+        let active = &mut vals[..len];
+        for i in 1..active.len() {
+            let key = active[i];
+            let mut j = i;
+            while j > 0 && active[j - 1] > key {
+                active[j] = active[j - 1];
+                j -= 1;
+            }
+            active[j] = key;
+        }
+
+        // Dedup in-place (matches slice::dedup: collapse runs of equal
+        // elements to a single occurrence).
+        let mut write = 1usize;
+        for read in 1..active.len() {
+            if active[read] != active[write - 1] {
+                active[write] = active[read];
+                write += 1;
+            }
+        }
+        let distinct = write as f32;
+        let max_distinct = (3 * n) as f32;
+
         distinct / max_distinct
     }
 
