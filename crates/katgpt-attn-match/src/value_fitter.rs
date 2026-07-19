@@ -305,9 +305,10 @@ fn cholesky_decompose_unblocked(a: &[f32], t: usize) -> Option<Vec<f32>> {
 /// amenable to SIMD auto-vectorization because it operates on contiguous
 /// rectangular blocks rather than triangular strided access.
 ///
-/// Per AGENTS.md: the only allocation is the output buffer `l` plus a single
-/// `a_red` scratch the size of `a`. Per-block sub-buffers are reused across
-/// iterations by clearing in place.
+/// Per AGENTS.md: the only allocations are the output buffer `l`, a single
+/// `a_red` scratch the size of `a`, and one `diag_block` scratch reused
+/// across all block iterations (allocated once at max block size, cleared in
+/// place per iteration — `bk * bk` is `bs * bs` at most).
 #[inline]
 fn cholesky_decompose_blocked(a: &[f32], t: usize) -> Option<Vec<f32>> {
     debug_assert!(t >= CHOLESKY_BLOCK_SIZE, "use unblocked for small t");
@@ -315,17 +316,21 @@ fn cholesky_decompose_blocked(a: &[f32], t: usize) -> Option<Vec<f32>> {
     let mut a_red = a.to_vec();
     let mut l = vec![0.0f32; t * t];
     let bs = CHOLESKY_BLOCK_SIZE;
+    // Hoist the diagonal-block scratch outside the block loop: it's sized for
+    // the largest possible block (`bs * bs`) once and reused each iteration
+    // by writing only the live `bk * bk` sub-range. Saves a heap allocation
+    // per block iteration (the block count is `ceil(t / bs)`).
+    let mut diag_block = vec![0.0f32; bs * bs];
     let mut k = 0usize;
     while k < t {
         let bk = bs.min(t - k);
         // 1. Extract and factorize the diagonal block A[k:k+bk, k:k+bk].
-        let mut diag_block = vec![0.0f32; bk * bk];
         for i in 0..bk {
             for j in 0..bk {
                 diag_block[i * bk + j] = a_red[(k + i) * t + (k + j)];
             }
         }
-        let diag_l = cholesky_decompose_unblocked(&diag_block, bk)?;
+        let diag_l = cholesky_decompose_unblocked(&diag_block[..bk * bk], bk)?;
         // Write lower-triangular result into L.
         for i in 0..bk {
             for j in 0..=i {
