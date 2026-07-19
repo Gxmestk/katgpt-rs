@@ -424,19 +424,26 @@ fn adapter_is_deterministic() {
     }
 }
 
-/// Comparison 1: stationary seasonal corpus.
+/// Comparison 1: stationary seasonal corpus (K=4 baseline).
 ///
 /// The floor's seasonal-naive anchor (forecast = last value) is near-optimal
-/// for a stationary seasonal signal with period m=12. KARC's delay embedding
-/// (K=4) is too shallow to capture a period-12 cycle, so KARC's point
-/// forecast can systematically overshoot/undershoot at curvature changes.
+/// for a stationary seasonal signal with period m=12. KARC's Chebyshev basis
+/// with ridge-fit doesn't fit periodic data — the point forecast
+/// systematically overshoots/undershoots at curvature changes, so the
+/// conformal overlay's intervals are wider than the floor's.
 ///
-/// **Honest verdict: KARC+overlay LOSES on this corpus.** This is a real
-/// finding, not a bug — KARC+overlay is a chaotic-regime specialist, not a
-/// universal UQ improvement. The conformal overlay faithfully calibrates
-/// around whatever point forecast KARC produces; when the point forecast is
-/// worse than the floor's anchor, the overlay's intervals are wider (the
-/// overlay doesn't lie about uncertainty).
+/// **Measured verdict (K=4): KARC+overlay LOSES on this corpus**
+/// (CRPS ratio 5.74, coverage 0.916 vs floor 0.939). This is a real finding,
+/// not a bug — KARC+overlay is a chaotic-regime specialist, not a universal
+/// UQ improvement. The conformal overlay faithfully calibrates around
+/// whatever point forecast KARC produces; when the point forecast is worse
+/// than the floor's anchor, the overlay's intervals are wider (the overlay
+/// doesn't lie about uncertainty).
+///
+/// **K-sweep follow-up** (see `floor_comparison_stationary_seasonal_k12`
+/// below): the prior "K=4 too shallow for period-12" hypothesis was REFUTED —
+/// K=12 (matching the period) loses WORSE (CRPS ratio 20.26), not better.
+/// The scope-limit is structural, not parametric in K.
 ///
 /// Gate: we ACCEPT LosesToFloor here as a documented scope limitation.
 /// The test asserts the weaker but still load-bearing properties:
@@ -477,10 +484,11 @@ fn floor_comparison_stationary_seasonal() {
     );
 
     // Verdict: any of these is acceptable on seasonal. LosesToFloor is the
-    // expected honest verdict (KARC's K=4 delay embedding can't capture
-    // period-12). BeatsFloor would mean KARC found structure we didn't
-    // expect; that's also fine. NotApplicable shouldn't happen (adapter
-    // always emits intervals post-warmup).
+    // expected honest verdict (KARC's Chebyshev basis doesn't fit periodic
+    // data — see the K=12 K-sweep test below for the structural confirmation).
+    // BeatsFloor would mean KARC found structure we didn't expect; that's
+    // also fine. NotApplicable shouldn't happen (adapter always emits
+    // intervals post-warmup).
     assert!(
         matches!(
             report.overall,
@@ -563,35 +571,44 @@ fn floor_comparison_lorenz_x() {
     );
 }
 
-// ===== K-sweep follow-up: K=12 tests ======================================
+// ===== K-sweep follow-up: K=12 tests (RUN 2026-07-20) ====================
 //
 // The original T7 measurement found KARC+overlay with K=4 LOSES on
 // stationary_seasonal (period 12). The post-hoc explanation was "K=4 is
-// too shallow to capture a period-12 cycle". These tests verify that
-// explanation empirically: if K=12 (matching the period) also loses, the
-// scope-limit is structural; if K=12 wins, the scope-limit was a parameter
-// choice and the prior session's conclusion needs refinement.
+// too shallow to capture a period-12 cycle". The K=12 tests below verify
+// that explanation empirically by re-running with K matching the period.
 //
-// We also re-run Lorenz-x with K=12 as a sanity check — increasing K should
-// not catastrophically regress KARC's chaotic-regime performance (more
-// context is at worst redundant on a chaotic signal).
+// MEASURED RESULT (recorded in the file header verdict table):
+//   - K=12 on seasonal: LosesToFloor WORSE (CRPS ratio 5.74 → 20.26)
+//     → REFUTES the "K=4 too shallow" hypothesis. The scope-limit is
+//       structural: KARC's Chebyshev basis + ridge-fit doesn't fit periodic
+//       data regardless of delay depth. More context → more overfitting
+//       capacity → worse point forecast at curvature changes.
+//   - K=12 on Lorenz: BeatsFloor HARDER (CRPS ratio 0.0047 → 0.0018)
+//     → more delay context genuinely helps on chaotic signals (longer
+//       trajectory memory captures more of the attractor dynamics).
+//
+// Production guidance: KARC+overlay is a chaotic-regime specialist. Pick K
+// by how much trajectory memory the chaotic signal benefits from. For
+// periodic/seasonal data, use the floor (`SeasonalNaiveForecaster`)
+// directly — KARC cannot match it regardless of K.
 
-/// K=12 on stationary_seasonal (period 12): the headline K-sweep question.
+/// K=12 on stationary_seasonal (period 12): the headline K-sweep measurement.
 ///
-/// **Possible verdicts:**
-///   - **BeatsFloor / TiesFloor** → scope-limit was a parameter issue.
-///     KARC CAN handle seasonal when K ≥ period. Production guidance becomes
-///     "pick K ≥ dominant period". Refines the prior session's conclusion.
-///   - **LosesToFloor** → scope-limit is structural (KARC's Chebyshev basis /
-///     reservoir architecture doesn't fit periodic data regardless of delay
-///     depth). Prior session's conclusion stands, now measured.
-///   - **Mixed** → ambiguous: CRPS may improve while Winkler doesn't, or vice
-///     versa. Record and move on; this is a measurement, not a gate.
+/// **Measured verdict: LosesToFloor WORSE than K=4** (CRPS ratio 20.26 vs
+/// K=4's 5.74; Winkler ratio 36.97 vs K=4's 21.73; coverage 0.911 vs floor
+/// 0.939 — still calibrated, no false-confidence signature). This REFUTES
+/// the prior session's "K=4 too shallow for period-12" hypothesis: matching
+/// K to the period makes KARC LOSE WORSE on seasonal, not better. The
+/// scope-limit is **structural** — KARC's Chebyshev basis + ridge-fit
+/// architecture doesn't fit periodic data regardless of delay depth. More
+/// delay context gives the ridge fit more overfitting capacity, amplifying
+/// the systematic point-forecast errors at curvature changes.
 ///
-/// Gate: we ACCEPT any verdict here. The hard gates are the same as the K=4
-/// tests — coverage stays within 0.10 of floor (no calibration break), the
-/// verdict is one of the scored outcomes (not NotApplicable). The test is a
-/// *measurement*, not a pass/fail gate.
+/// Gate: we ACCEPT LosesToFloor here (measurement, not a pass/fail gate).
+/// The hard gates are the same as the K=4 tests — coverage stays within
+/// 0.10 of floor (no calibration break), the verdict is one of the scored
+/// outcomes (not NotApplicable).
 #[test]
 fn floor_comparison_stationary_seasonal_k12() {
     let corpus = TrajectoryCorpus::stationary_seasonal(12, 0.5, 800, 0xCAFE_BABE);
@@ -649,18 +666,20 @@ fn floor_comparison_stationary_seasonal_k12() {
     );
 }
 
-/// K=12 on Lorenz-x (chaotic): sanity check that deeper delay doesn't
-/// catastrophically regress KARC's chaotic-regime performance.
+/// K=12 on Lorenz-x (chaotic): sanity check that deeper delay IMPROVES
+/// KARC's chaotic-regime performance (the inverse of the seasonal case).
 ///
-/// The prior session measured K=4 → BeatsFloor (CRPS ratio 0.0047, 210×
-/// tighter intervals). Increasing K to 12 gives KARC three times as much
-/// context — for a chaotic signal this should be at worst redundant (extra
-/// features that the ridge fit zeroes out) and at best slightly helpful
-/// (longer memory of recent trajectory curvature).
+/// **Measured verdict: BeatsFloor HARDER than K=4** (CRPS ratio 0.0018 vs
+/// K=4's 0.0047, ~2.6× tighter; coverage 0.933 vs floor 0.943 — calibrated).
+/// More delay context genuinely helps on chaotic signals: longer trajectory
+/// memory captures more of the Lorenz attractor's structure. This is the
+/// mirror image of the seasonal result — same architecture, same K change,
+/// opposite effect because the signal class is different.
 ///
-/// Gate: K=12 should still Beat or Tie the floor on Lorenz. A LOSES verdict
-/// would indicate that K=12 over-fits the warmup slice and fails to
-/// generalize — a real finding worth recording.
+/// Gate: K=12 BEATS the floor on Lorenz (as expected). The test would only
+/// FAIL if K=12 catastrophically regressed — e.g. over-fitting the warmup
+/// slice and failing to generalize. The measured result confirms the
+/// chaotic-regime specialist role documented in the file header.
 #[test]
 fn floor_comparison_lorenz_x_k12() {
     let n_total = 2_000;
