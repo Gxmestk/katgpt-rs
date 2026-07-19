@@ -301,9 +301,7 @@ pub struct WeaverScratch {
     // ── Attention scratch ──
     scores: Vec<f32>, // [seq_len]
 
-    // ── Top-K gather + output (flat, not Vec<Vec<f32>>) ──
-    /// Gathered embedding rows `[max_depth * K * h]`.
-    gathered: Vec<f32>,
+    // ── Top-K output (flat, not Vec<Vec<f32>>) ──
     /// Weaver residual logits `[max_depth * K]`.
     residual_flat: Vec<f32>,
     /// Corrected logits `[max_depth * K]`.
@@ -339,7 +337,6 @@ impl WeaverScratch {
             up: vec![0.0; max_seq * ff],
             down: vec![0.0; h],
             scores: vec![0.0; max_seq],
-            gathered: vec![0.0; config.max_depth * k * h],
             residual_flat: vec![0.0; max_dk],
             corrected_logits_flat: vec![0.0; max_dk],
             corrected_probs_flat: vec![0.0; max_dk],
@@ -1000,11 +997,15 @@ pub fn weaver_forward(weights: &WeaverWeights, input: &WeaverInput) -> WeaverOut
         );
     }
 
-    // ── Steps 6 + 7: Top-K gather + residual add + softmax over K ──
+    // ── Steps 6 + 7: Top-K residual add + softmax over K ──
+    // The gather+dot is fused: each top-K embedding row is read directly from
+    // `input.embedding` and dotted with `h_weaver` once. No scratch buffer is
+    // needed — `h_weaver` is `h` floats (~9 KB at h=2304) and stays hot in L1
+    // across the K reads, while each embedding row is touched exactly once
+    // (versus gather-then-dot which would touch each row twice).
     let mut weaver_residual = vec![vec![0.0f32; k]; d_depth];
     let mut corrected_logits = vec![vec![0.0f32; k]; d_depth];
     let mut corrected_probs = vec![vec![0.0f32; k]; d_depth];
-    let mut gathered = vec![0.0f32; k * h]; // scratch for gathered embedding rows
 
     for di in 0..d_depth {
         let pos = di + 1; // skip verifier position 0
@@ -1012,7 +1013,7 @@ pub fn weaver_forward(weights: &WeaverWeights, input: &WeaverInput) -> WeaverOut
         let ids = input.topk_ids[di];
         let dfl = input.dflash_logits[di];
 
-        // Gather K embedding rows.
+        // Compute residual logits directly from the vocab embedding.
         for (ki, &tid) in ids.iter().enumerate() {
             let tid = tid as usize;
             debug_assert!(
@@ -1022,13 +1023,7 @@ pub fn weaver_forward(weights: &WeaverWeights, input: &WeaverInput) -> WeaverOut
                 input.vocab_size
             );
             let row = &input.embedding[tid * h..(tid + 1) * h];
-            gathered[ki * h..(ki + 1) * h].copy_from_slice(row);
-        }
-
-        // Compute residual logits.
-        for ki in 0..k {
-            let grow = &gathered[ki * h..(ki + 1) * h];
-            weaver_residual[di][ki] = dot(h_weaver, grow);
+            weaver_residual[di][ki] = dot(h_weaver, row);
         }
 
         // Corrected = dflash + weaver_residual.
@@ -1129,7 +1124,6 @@ pub fn weaver_forward_into(
         up,
         down,
         scores,
-        gathered,
         residual_flat,
         corrected_logits_flat,
         corrected_probs_flat,
@@ -1233,15 +1227,19 @@ pub fn weaver_forward_into(
         rmsnorm_into(post_buf, &weights.norm_mlp, eps, uf);
     }
 
-    // ── Steps 6 + 7: Top-K gather + residual add + softmax over K ──
+    // ── Steps 6 + 7: Top-K residual add + softmax over K ──
+    // Gather+dot is fused: each top-K embedding row is read directly from
+    // `input.embedding` and dotted with `h_weaver` once. This drops the
+    // `gathered` scratch buffer entirely (was `[max_depth * K * h]` f32,
+    // ~37 MB at production config) and halves embedding memory traffic.
     for di in 0..d_depth {
         let pos = di + 1; // skip verifier position 0
         let h_weaver = &u_final[pos * h..(pos + 1) * h];
         let ids = input.topk_ids[di];
         let dfl = input.dflash_logits[di];
 
-        // Gather K embedding rows into `gathered[di*K*h..]`.
-        let g_off = di * k * h;
+        // Compute residual logits directly from the vocab embedding.
+        let r_off = di * k;
         for (ki, &tid) in ids.iter().enumerate() {
             let tid = tid as usize;
             debug_assert!(
@@ -1251,14 +1249,7 @@ pub fn weaver_forward_into(
                 input.vocab_size
             );
             let row = &input.embedding[tid * h..(tid + 1) * h];
-            gathered[g_off + ki * h..g_off + (ki + 1) * h].copy_from_slice(row);
-        }
-
-        // Compute residual logits.
-        let r_off = di * k;
-        for ki in 0..k {
-            let grow = &gathered[g_off + ki * h..g_off + (ki + 1) * h];
-            residual_flat[r_off + ki] = dot(h_weaver, grow);
+            residual_flat[r_off + ki] = dot(h_weaver, row);
         }
 
         // Corrected = dflash + weaver_residual; softmax over K.
@@ -1349,7 +1340,6 @@ pub fn weaver_forward_parallel(
         up,
         down: _,
         scores,
-        gathered,
         residual_flat,
         corrected_logits_flat,
         corrected_probs_flat,
@@ -1493,12 +1483,12 @@ pub fn weaver_forward_parallel(
             });
         });
 
-    // ── Steps 6+7 (PARALLEL): Top-K gather + residual + softmax per depth ──
-    // Each depth is independent. Per-thread `grow` buffer avoids a heap
-    // allocation per rayon iteration.
-    thread_local! {
-        static GROW_BUF: std::cell::UnsafeCell<Vec<f32>> = const { std::cell::UnsafeCell::new(Vec::new()) };
-    }
+    // ── Steps 6+7 (PARALLEL): Top-K residual + softmax per depth ──
+    // Each depth is independent. The gather+dot is fused: each top-K
+    // embedding row is read directly from `input.embedding` and dotted with
+    // `h_weaver` once — no scratch buffer needed (h_weaver stays in L1 across
+    // the K reads). This also drops the per-thread `GROW_BUF` thread_local
+    // entirely.
     residual_flat
         .par_chunks_mut(k)
         .zip(corrected_logits_flat.par_chunks_mut(k))
@@ -1510,20 +1500,13 @@ pub fn weaver_forward_parallel(
             let ids = input.topk_ids[di];
             let dfl = input.dflash_logits[di];
 
-            // Gather K embedding rows + compute residual logits.
-            GROW_BUF.with(|grow_cell| {
-                let grow = unsafe { &mut *grow_cell.get() };
-                if grow.len() < h {
-                    grow.resize(h, 0.0);
-                }
-                let grow = &mut grow[..h];
-                for ki in 0..k {
-                    let tid = ids[ki] as usize;
-                    debug_assert!(tid < input.vocab_size);
-                    grow.copy_from_slice(&input.embedding[tid * h..(tid + 1) * h]);
-                    resid_row[ki] = dot(h_weaver, grow);
-                }
-            });
+            // Compute residual logits directly from the vocab embedding.
+            for (ki, &tid) in ids.iter().enumerate() {
+                let tid = tid as usize;
+                debug_assert!(tid < input.vocab_size);
+                let row = &input.embedding[tid * h..(tid + 1) * h];
+                resid_row[ki] = dot(h_weaver, row);
+            }
 
             // Corrected = dflash + residual; softmax over K.
             let mut max_c = f32::NEG_INFINITY;
@@ -1545,10 +1528,6 @@ pub fn weaver_forward_parallel(
                 *cp *= inv_sum;
             }
         });
-
-    // Suppress unused warning for `gathered` — the parallel path uses
-    // per-position local `grow` instead of the shared gathered buffer.
-    let _ = gathered;
 
     (d_depth, k)
 }
@@ -1600,7 +1579,6 @@ pub fn weaver_forward_parallel_f16(
         up,
         down: _,
         scores,
-        gathered,
         residual_flat,
         corrected_logits_flat,
         corrected_probs_flat,
@@ -1730,10 +1708,8 @@ pub fn weaver_forward_parallel_f16(
             });
         });
 
-    // ── Steps 6+7 (PARALLEL): Top-K gather + residual + softmax (f32, unchanged) ──
-    thread_local! {
-        static F16_GROW_BUF: std::cell::UnsafeCell<Vec<f32>> = const { std::cell::UnsafeCell::new(Vec::new()) };
-    }
+    // ── Steps 6+7 (PARALLEL): Top-K residual + softmax (f32, unchanged) ──
+    // Gather+dot fused — see `weaver_forward_parallel` for rationale.
     residual_flat
         .par_chunks_mut(k)
         .zip(corrected_logits_flat.par_chunks_mut(k))
@@ -1745,19 +1721,12 @@ pub fn weaver_forward_parallel_f16(
             let ids = input.topk_ids[di];
             let dfl = input.dflash_logits[di];
 
-            F16_GROW_BUF.with(|grow_cell| {
-                let grow = unsafe { &mut *grow_cell.get() };
-                if grow.len() < h {
-                    grow.resize(h, 0.0);
-                }
-                let grow = &mut grow[..h];
-                for ki in 0..k {
-                    let tid = ids[ki] as usize;
-                    debug_assert!(tid < input.vocab_size);
-                    grow.copy_from_slice(&input.embedding[tid * h..(tid + 1) * h]);
-                    resid_row[ki] = dot(h_weaver, grow);
-                }
-            });
+            for (ki, &tid) in ids.iter().enumerate() {
+                let tid = tid as usize;
+                debug_assert!(tid < input.vocab_size);
+                let row = &input.embedding[tid * h..(tid + 1) * h];
+                resid_row[ki] = dot(h_weaver, row);
+            }
 
             let mut max_c = f32::NEG_INFINITY;
             for ki in 0..k {
@@ -1778,8 +1747,6 @@ pub fn weaver_forward_parallel_f16(
                 *cp *= inv_sum;
             }
         });
-
-    let _ = gathered;
 
     (d_depth, k)
 }
