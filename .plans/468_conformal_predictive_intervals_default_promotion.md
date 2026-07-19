@@ -4,6 +4,7 @@
 **Repo:** katgpt-rs (primary) + riir-ai (doc updates)
 **Parent:** [Plan 340](340_conformal_predictive_intervals_primitive.md) — T1.14 deferral lift
 **Status:** COMPLETE — T1-T7 all done (2026-07-20)
+**Committed:** 2026-07-20 — katgpt-rs `562b9a79`, riir-ai `7f2d8a80b` + `d6448c870` + `9d0716e22` + `a12f23a44`
 **Branch:** `develop` (per AGENTS.md)
 
 ## TL;DR
@@ -75,8 +76,13 @@ The Cargo.toml language specified "a runtime consumer that demonstrably beats"
       with a "Promotion landed" note pointing to Plan 468.
 - [x] **T6** — Update Plan 340 promotion-decision section + Bench 340 promotion
       section with "Promotion landed 2026-07-20 per Plan 468" pointer.
-- [ ] **T7** — Commit katgpt-rs changes (`feat:` prefix), then riir-ai doc
+- [x] **T7** — Commit katgpt-rs changes (`feat:` prefix), then riir-ai doc
       changes (`docs:` prefix). Per AGENTS.md commit rule.
+      **DONE 2026-07-20:** katgpt-rs landed as `562b9a79`
+      (`feat(conformal): promote conformal_predictive_intervals to DEFAULT-ON
+      (Plan 468)`); riir-ai doc syncs landed as `7f2d8a80b` (Bench 565),
+      `d6448c870` (super-goat status), `9d0716e22` + `a12f23a44`
+      (feature-gate-audit stale-surface cleanup).
 
 ## Non-Goals
 
