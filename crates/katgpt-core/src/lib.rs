@@ -1246,7 +1246,7 @@ pub use mag::{
 // `analytic_lattice::apply_operator_into` when both features are on. Access it
 // via `katgpt_core::mag::apply_operator_into`.
 
-// ChunkedContentStore — Lore-distilled chunked content-addressed Merkle store (Plan 272, Research 262).
+// ChunkedContentStore — Lore-distilled chunked content-addressed Merkle store (Plan 448, Research 262).
 // Open primitive: chunks → BLAKE3 → dedup via papaya → binary Merkle root. No game/chain IP.
 // Consumed by riir-ai Plan 319 (Executable Asset Vessel + Quorum Gitflow).
 //

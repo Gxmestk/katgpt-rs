@@ -1,4 +1,4 @@
-# GOAT Gate Benchmarks — Plan 272 Chunked Content-Addressed Merkle Store
+# GOAT Gate Benchmarks — Plan 448 Chunked Content-Addressed Merkle Store
 
 > **UPDATE 2026-07-18 (promotion fix-up):** `chunked_content_store` was
 > **promoted to `default`** in katgpt-core the same day this doc was originally
