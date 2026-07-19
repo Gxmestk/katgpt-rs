@@ -218,15 +218,18 @@ impl SimpleProgram for TmStrategy {
     /// 3. Apply transition: write symbol, move head, change state.
     /// 4. Return the symbol written.
     fn next_action(&mut self, opponent_history: &[u8]) -> u8 {
+        // Ensure tape covers `head` before any indexed access below. Previously
+        // this was called twice (once inside the `if let`, once unconditionally);
+        // a single call upfront is sufficient — `head` does not change between
+        // this point and the indexed reads/writes that follow.
+        self.ensure_tape_size();
+
         // If there's opponent history, write the last move to the tape at head.
         // This initializes the tape from the game context.
         if let Some(&last) = opponent_history.last() {
             let val = if last > 0 { 1 } else { 0 };
-            self.ensure_tape_size();
             self.tape[self.head] = val;
         }
-
-        self.ensure_tape_size();
 
         // Read current symbol.
         let symbol = self.tape[self.head];
