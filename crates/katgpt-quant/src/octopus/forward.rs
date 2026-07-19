@@ -207,13 +207,18 @@ pub fn maxsim_score_octopus(
 
     let mut key_buf = vec![0.0f32; dim];
     let mut score = 0.0f32;
+    // Hoist the range endpoints out of the outer loop — `Range<usize>` is not
+    // `Copy`, so the previous form cloned it `lq` times. Iterating
+    // `pos_start..pos_end` creates a fresh `Range` (16-byte struct) per outer
+    // iteration without any heap traffic, and produces the identical iteration
+    // sequence.
+    let pos_start = pos_range.start;
+    let pos_end = pos_range.end;
     for i in 0..lq {
         let q_row = &queries[i * dim..(i + 1) * dim];
         let mut my_max = f32::NEG_INFINITY;
-        for t in pos_range.clone() {
+        for t in pos_start..pos_end {
             // Zero-alloc lazy dequantize into reusable buffer.
-            // (.clone() is required: Range<usize> is not Copy and the inner
-            // `for` consumes it via into_iter() on each outer iteration.)
             cache.dequantize_key_into(layer, t, &mut key_buf);
             let dot = katgpt_core::simd::simd_dot_f32(q_row, &key_buf, dim);
             my_max = my_max.max(dot);
