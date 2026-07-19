@@ -65,8 +65,10 @@
 //!
 //! # Feature gate
 //!
-//! Gated behind the `velocity_field_ensemble` Cargo feature. Opt-in until
-//! the GOAT gate (G1–G4, Plan 376 Phase 3) passes. See
+//! Gated behind the `velocity_field_ensemble` Cargo feature. **DEFAULT-ON**
+//! since Plan 376 Phase 3 (2026-07-04) — G1 (9/9 unit tests, η recovery <1e-4),
+//! G2 (3/3 cross-domain metrics, 3.5× MSE reduction), G3 (0 allocs + clean),
+//! G4 (fit_into 6.27µs<50µs + eval_into 21ns<200ns) ALL PASS. See
 //! `katgpt-rs/.plans/376_velocity_field_ensemble_primitive.md`.
 //!
 //! # References

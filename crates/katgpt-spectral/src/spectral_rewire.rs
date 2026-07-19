@@ -36,9 +36,13 @@
 //!
 //! # Feature gate
 //!
-//! Opt-in until the Plan 423 GOAT gate passes. The make-or-break gate is G1:
-//! spectral concentration at NPC scale (the paper proves it for 1.5B–32B LLM
-//! weights; our 64×64 / 128×128 matrices are unvalidated).
+//! STAYS OPT-IN — Plan 423 Phase 3 GOAT (Bench 423, 2026-07-10): all mechanism
+//! gates PASS (G1a/G2/G3/G4/G5/G6), but the spectral concentration assumption
+//! (G1b) does NOT hold at NPC scale (≤64×64), verified via riir-train Issue 374
+//! (trained LoRA deltas produce on_manifold_fraction in [0.27, 0.58], far
+//! below the SAR threshold > 0.8). The paper proves spectral concentration for
+//! 1.5B–32B LLM weights; our 64×64 / 128×128 matrices are unvalidated at that
+//! scale. See `.benchmarks/423_*`.
 
 use katgpt_core::simd::simd_dot_f32;
 use katgpt_core::{SvdResultScratch, SvdScratch, thin_svd_into};

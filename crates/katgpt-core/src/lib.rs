@@ -75,7 +75,12 @@ pub use best_belief::{best_belief_score, best_belief_scores, select_best_belief}
 // coverage-guaranteed predictive intervals. The
 // ConformalIntervalCalibrator<SeasonalNaiveForecaster> with m=1 is the
 // canonical conformal-naive floor per the "Report the Floor" rule (Issue 010,
-// AGENTS.md Feature Flag Discipline). Opt-in until G1–G4 GOAT gate passes.
+// AGENTS.md Feature Flag Discipline). STAYS OPT-IN — primitive-level G1–G4 GOAT
+// PASS (Bench 340, 2026-06-30); promotion to default-on deferred pending a
+// runtime consumer that demonstrably beats its simpler heuristic counterpart.
+// The Plan 508 curiosity-detector consumer (riir-ai Bench 562, 2026-07-19)
+// FAILED G3 — conformal intervals wider than 5×EMA on the L2 surprise signal.
+// Other consumers (Sleep-Time, MCTS, Salience) remain open.
 #[cfg(feature = "conformal_predictive_intervals")]
 pub mod conformal;
 #[cfg(feature = "conformal_predictive_intervals")]
@@ -206,8 +211,10 @@ pub use similarity::{recos_sim, recos_sim_ranking, recos_sim_slice, recos_sim_sl
 // Time-invariant, error-scaled latent update: step scales with error,
 // neighborhood weights are error-gated Gaussian. Pure modelless (exp +
 // weighted average). Zero-alloc (stack [f32;32] weights, &mut [f32] output).
-// Opt-in until GOAT gate G1–G6 pass. Primary consumer: riir-neuron-db
-// neighbor_heal (error-scaled shard heal).
+// STAYS OPT-IN in katgpt-core (consumer enables transitively) — Consumer
+// GOAT PASS (riir-neuron-db, 2026-07-12, Bench 429): G1–G6 ALL PASS; consumer
+// feature `elasticity_gated_heal` PROMOTED to default-on in riir-neuron-db
+// (behavior opt-in via `.with_neighbor_eta(1.0)`). Primary consumer: neighbor_heal.
 #[cfg(feature = "elasticity_gated_update")]
 pub mod elasticity_gated_update;
 #[cfg(feature = "elasticity_gated_update")]
@@ -388,7 +395,10 @@ pub use temporal_deriv::{TemporalDerivativeKernel, sigmoid_surprise_gate};
 // HOLA Hippocampal Exact KV Cache — surprise-evicted (β·‖e‖) bounded KV cache with
 // decoupled RMSNorm-γ read (Plan 395, Research 378, arxiv 2607.02303). Complements
 // the GDN2 fixed-size recurrent state with a top-w exact KV set for long-range
-// retrieval. Opt-in until G1–G4 GOAT gate passes. Pure stdlib + katgpt-types.
+// retrieval. STAYS OPT-IN — G1–G4 GOAT PASS + consumer wiring PASS (modelless
+// gain, Issue 038 production wiring in forward_gdn2 via HippocampalCacheDyn);
+// promotion deferred to G5 riir-train gate (perplexity on real text). Pure
+// stdlib + katgpt-types.
 #[cfg(feature = "hippocampal_cache")]
 pub mod hippocampal_cache;
 #[cfg(feature = "hippocampal_cache")]
@@ -636,7 +646,9 @@ pub mod subspace_phase_gate;
 // then classify the discovered H as Discrete / Continuous / Partial / None via
 // a participation-ratio-style concentration measure on the score histogram.
 // Pure numeric, no game/shard/chain semantics, zero deps. Sibling of
-// `subspace_phase_gate`. Opt-in until G1 GOAT gate passes (Plan 356 Phase 1).
+// `subspace_phase_gate`. STAYS OPT-IN — 8/8 GOAT gates PASS (Bench 356,
+// 2026-07-01); not promoted to default because no shipped consumer exists yet
+// (Issue 011 Q2+Q3 verdict + riir-ai fusion plan still pending).
 #[cfg(feature = "group_invariance_probe")]
 pub mod group_invariance_probe;
 
@@ -685,7 +697,10 @@ pub mod viable_manifold_graph;
 // primitive proving exact marginal independence for binary masks (absent
 // edge ⟹ no influence, by construction). Plus a transfer_distance semantic-
 // type compatibility scalar. Pure structure compilation, zero gradient
-// descent. Opt-in until G1–G6 GOAT gates pass.
+// descent. STAYS OPT-IN — G1–G6 GOAT gates ALL PASS (Bench 419, 2026-07-09);
+// not promoted to default because the fusion PoC resolved inconclusively
+// (Issue 043, removed) and the primitive's constituents are already default-on
+// with runtime consumers.
 #[cfg(feature = "canvas_schema")]
 pub mod canvas;
 
@@ -1090,7 +1105,11 @@ pub use phase_rotation::{
 // the new capability is rotation in a *learned* plane (per-NPC HLA personality
 // rotation, per-shard rotation in MerkleFrozenEnvelope — see Issue 159).
 // Pure modelless float arithmetic; learning the plane is → riir-train.
-// Opt-in until the G1–G4 GOAT gate passes (Issue 159 T6).
+// STAYS OPT-IN — G1–G4 GOAT gate ALL PASS (Bench 457, 2026-07-17); promotion
+// deferred per Issue 159 T6: gain is modelless but perf-only on a NEW capability
+// (arbitrary-plane rotation), not a faster way to do something the crate already
+// does. Re-evaluate when a concrete consumer lands (riir-ai HLA personality
+// rotation, riir-neuron-db per-shard rotation).
 #[cfg(feature = "grapem_rodrigues")]
 pub mod grapem;
 #[cfg(feature = "grapem_rodrigues")]
@@ -1104,7 +1123,10 @@ pub use grapem::{GrapemError, Rank2Plane, grapem_apply_into};
 // homogeneous lift). Hot-path code keeps using PositionFreeCompactor /
 // WallDiagonalGate directly; the trait is for cold-path interop.
 // Implies grapem_rodrigues (GrapeMAction wraps Rank2Plane).
-// Opt-in until G1–G4 GOAT gate passes (Issue 160 T4).
+// STAYS OPT-IN — G1–G4 GOAT gate ALL PASS (Bench 458, 2026-07-17); promotion
+// deferred per Issue 160 T4: vocabulary bridge — no hot-path consumer today.
+// Re-evaluate when a position-encoding-agnostic tool (KV compactor, attention
+// matcher) lands. Should be promoted together with grapem_rodrigues.
 #[cfg(feature = "position_group_action")]
 pub mod position_group_action;
 #[cfg(feature = "position_group_action")]
@@ -1119,7 +1141,11 @@ pub use position_group_action::{
 // GRAPE paper (+1.15 avg on 770M FineWeb-Edu). Wall Attention is the scalar
 // special case (endpoint-independent embeddings). The positional-embedding
 // projection is user-supplied (modelless); learning it is → riir-train.
-// Opt-in until G1–G5 GOAT gate passes (G5 is dilution sanity).
+// STAYS OPT-IN — G1–G5 GOAT gate ALL PASS (Bench 459, 2026-07-17); promotion
+// deferred: positional-embedding projection is user-supplied; no hot-path
+// consumer yet. The G5 magnitude gate was revised from "divergence > 2× noise
+// floor" (infeasible on unit-norm synthetic) to a direction check; the
+// magnitude gate is deferred to riir-train integration.
 #[cfg(feature = "grape_ap_vector")]
 pub mod grape_ap;
 #[cfg(feature = "grape_ap_vector")]
@@ -1135,7 +1161,10 @@ pub use grape_ap::{GrapeApError, GrapeApGate, RotationSchedule, log_sigmoid};
 // vectors (u, v) are user-supplied (modelless); learning is → riir-train.
 // Implies grapem_rodrigues (wraps Rank2Plane). Decoupled omega_rot/omega_add
 // is a strict generalization of the paper's shared ω.
-// Opt-in until G1–G4 GOAT gate passes (Issue 163 T6).
+// STAYS OPT-IN — G1–G4 GOAT gate ALL PASS (Bench 460, 2026-07-17); promotion
+// deferred per Issue 163 T6: thin composition layer — value is unified API +
+// correctness guarantee (Appendix E's block-diagonal GL(d+2) proof), not a
+// perf gain over calling the parts separately. No hot-path consumer today.
 #[cfg(feature = "grape_joint_lift")]
 pub mod grape_joint_lift;
 #[cfg(feature = "grape_joint_lift")]
@@ -1301,8 +1330,10 @@ pub use data_probe::{
 // (top-k% selector over K candidate trajectories + per-step β EMA), and the
 // Bebop H₁→H₂ acceptance-forecast upgrade. No game semantics, no chain;
 // runtime fusion (CLR gating, HLA updates, KG emission) is riir-ai Plan 324.
-// Opt-in until G3 (Spearman ρ(H₁, JS-uniqueness) < 0.5) AND G8 (riir-ai
-// Plan 324 runtime validation) pass.
+// STAYS OPT-IN — G3 (Spearman ρ < 0.5) PASS (Bench 294/3) AND G10
+// (Bebop H₁→H₂ upgrade) PASS (Bench 294/10). Default-on promotion requires
+// G8 (riir-ai Plan 324 runtime validation) per Plan 294 §Phase 8 T8.4 — G3
+// alone is necessary but not sufficient. See .benchmarks/294_ict_promotion.md.
 #[cfg(feature = "ict_branching")]
 pub mod ict;
 #[cfg(feature = "ict_branching")]
@@ -1495,7 +1526,11 @@ pub use product_key_memory::PkmEpisodicStore;
 // Latent vs Raw: gain/cost signals are local latent (per-loop hidden-state
 // deltas); the halt count L is a deterministic raw scalar safe to sync/replay.
 //
-// Opt-in until G1–G5 GOAT gate (Research 149 §5) passes.
+// STAYS OPT-IN — G2/G3/G4 GOAT gate ALL PASS (Bench 304, 2026-06-23); synthetic
+// kernel-only bench confirms the contract on three reference regimes (crowd-NPC
+// savings, important-NPC no-regression, oscillation detection). Real-world
+// validation requires actual game loops → riir-ai Plan 330 is the gating
+// dependency. The cost_floor is the load-bearing knob for G2.
 #[cfg(feature = "gain_cost_halt")]
 pub mod gain_cost_halt;
 #[cfg(feature = "gain_cost_halt")]
@@ -1718,7 +1753,9 @@ pub use sleep_time::{
 // (DKL ≤ log|V_τ|) — the volume-of-support bound justifying raw-vs-latent
 // sync. Generic math, no game/chain/shard semantics — legitimately public.
 // NOT an inference mechanism (measurement tool only) → not Super-GOAT.
-// Opt-in until G1–G4 GOAT gate passes.
+// STAYS OPT-IN — G1 + G2 + G2-alloc + G3 + G4 GOAT gate ALL PASS (Bench 335,
+// 2026-06-27); not promoted to default because it's a measurement tool by
+// nature — opt-in is the right shape (consumers opt in when running A/B).
 #[cfg(feature = "paired_loss_diagnostic")]
 pub mod paired_loss;
 #[cfg(feature = "paired_loss_diagnostic")]
@@ -1899,7 +1936,10 @@ pub mod ssd_block;
 // speculative trees (Plan 424, Research 407, arXiv:2607.06763 §3.4). Reduces
 // tree verification for GDN recurrent layers to (I+X)U=βV, eliminating state
 // rollback entirely. Pure-math substrate: flat &[f32] slices, no Gdn2State/Config
-// dep. Opt-in until G1–G4 GOAT gate passes.
+// dep. STAYS OPT-IN — G1–G4 GOAT gate PASS (Bench 424, 2026-07-10; G2 wins on
+// deep draft trees); not promoted to default because it only activates on
+// opt-in GDN/QwenDeltaNet configs and provides significant speedup only on
+// deep trees.
 #[cfg(feature = "gdn_tree_verify")]
 pub mod gdn_tree_verify;
 

@@ -135,8 +135,8 @@ pub use bom_heat_kernel::{
     heat_kernel_trajectory_bom, heat_kernel_trajectory_bom_into, near_harmonic_indices,
 };
 
-// Plan 407 — Sheaf-ADMM coordination primitive (modelless, opt-in until
-// the Phase 2 GOAT gate G1–G6 passes).
+// Plan 407 — Sheaf-ADMM coordination primitive (modelless, DEFAULT-ON since
+// Phase 2 GOAT gate G1–G6 ALL PASS, 2026-07-07, Bench 407).
 #[cfg(feature = "sheaf_admm")]
 pub use sheaf_admm::{
     AdmmScratch, LocalObjective, SheafMaps, sheaf_admm_step, sheaf_admm_step_cg_into,

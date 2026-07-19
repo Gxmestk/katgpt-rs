@@ -70,7 +70,11 @@ pub mod hla_eigenbasis;
 
 // Spectral Rewiring — weight delta purification via base SVD projection
 // (Plan 423, Research 406). The on-principal complement of `off_principal`
-// (Plan 264). Opt-in until GOAT gate passes.
+// (Plan 264). STAYS OPT-IN — Plan 423 Phase 3 GOAT (Bench 423, 2026-07-10):
+// all mechanism gates PASS (G1a/G2/G3/G4/G5/G6), but the spectral concentration
+// assumption (G1b) does NOT hold at NPC scale (≤64×64), verified via
+// riir-train Issue 374 (trained LoRA deltas produce on_manifold_fraction in
+// [0.27, 0.58], far below the SAR threshold > 0.8). Stays cold-tier only.
 #[cfg(feature = "spectral_rewire")]
 pub mod spectral_rewire;
 

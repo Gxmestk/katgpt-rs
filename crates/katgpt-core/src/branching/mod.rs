@@ -36,8 +36,11 @@
 //! # Feature gate
 //!
 //! Entire module is `#[cfg(feature = "non_interference_branches")]`. Zero cost
-//! when disabled — every public API vanishes from the build. Opt-in until the
-//! G1–G5 GOAT gate passes (Phase 3).
+//! when disabled — every public API vanishes from the build. **DEFAULT-ON**
+//! since Plan 329 Phase 3 (2026-06-26) — G1–G5 GOAT gate ALL PASS (8 orthogonal
+//! directions in D=8, route 301.5ns<1µs, 0 allocs/100 calls, [] deps, 101/101
+//! tests). The feature is in `default = [...]` of both katgpt-core and katgpt-rs
+//! root. See `.benchmarks/329_*` for the GOAT gate evidence.
 //!
 //! # Composition
 //!
