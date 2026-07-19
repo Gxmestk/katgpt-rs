@@ -787,6 +787,17 @@ required-features = ["conformal_predictive_intervals", "best_belief"]
 name = "conformal_floor_bom_trajectory"
 required-features = ["conformal_predictive_intervals", "heat_kernel_trajectory"]
 
+# Issue 010 T7 — KARC + conformal overlay floor comparison. Wraps
+# KarcChannelForecaster (Plan 308 + Plan 340 Phase 2) as a
+# `UqPrimitiveUnderTest` and runs it against the conformal-naive floor on
+# stationary seasonal + Lorenz-63 chaotic corpora. Closes the gap left by
+# T3 (BoM) / T4 (Sleep-Time) / T5 (Best-Belief) — KARC+overlay was the last
+# grandfathered UQ primitive without a floor test. Needs BOTH the floor
+# harness and the KARC forecaster.
+[[test]]
+name = "conformal_floor_karc_overlay"
+required-features = ["conformal_predictive_intervals", "karc_forecaster"]
+
 # Plan 321 Phase 2 — CommittedFieldBlend G4 zero-alloc GOAT gate. CountingAllocator
 # audit of apply_blended (1000 iters) + commit (100 re-commits). Gated on
 # committed_field_blend so default features compile cleanly.
