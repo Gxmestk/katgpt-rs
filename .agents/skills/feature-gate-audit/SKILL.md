@@ -123,6 +123,20 @@ comments to explain the split; do NOT propagate the promotion.
 | `committed_personality_runtime` | DEFAULT-ON (plasma-tier core) | OPT-IN `committed_blend_freeze` (ArchetypeBlendShard persistence layer) | Engine ships the core; persistence layer stays opt-in |
 | `arg_runtime` | DEFAULT-ON (plasma-tier core) | OPT-IN `_manifold`, `_action`, `_offline`, `_replay` | Engine ships the core; heterogeneous Steps 4/5/7/8 stay opt-in |
 | `cwm_runtime` | DEFAULT-ON (IP-free core with mock LLM) | OPT-IN `cwm_gemini` / `cwm_local_llm` / `cwm_wasm_loader` | Engine ships the modelless core; concrete LLM backends stay opt-in |
+| `conformal_predictive_intervals` | DEFAULT-ON (Plan 468, 2026-07-20): generic `ConformalIntervalCalibrator` substrate — pure empirical-quantile math, zero-cost-when-uninvoked | OPT-IN — **7 consumer surfaces** across 2 crates: `karc_conformal_width` (riir-engine, per-NPC state field on `NpcKarcState`), `salience_conformal_width` (riir-games-civ, Delegate-nudge routing — IP-bearing), 5 probe features (`conformal_{curiosity,sleep_time,mcts_collapse,salience_tri_gate,per_channel}_probe`, riir-engine, standalone measurement) | Engine ships the math; consumers gate **three distinct concerns**: (a) per-NPC residual-pool overhead (Bench 567 measured +113.9% G2 — sidecar attachment is consumer choice); (b) IP-bearing nudge policy (Delegate vs Speak — `DelegateNudgeSource::ConformalWidth`); (c) standalone measurement corpora (`#[ignore]`-d probes sweep 11×100×100+ configurations). **The most granular layer split in the codebase** — three opt-in concerns at two consumer crates. |
+
+**Three-layer split pattern (the `conformal_predictive_intervals` extension):**
+The existing rows above are all two-layer splits (engine + game). The conformal
+primitive introduced a three-layer split — engine substrate (katgpt-rs) →
+engine consumer state (riir-engine `karc_conformal_width`) → civ routing
+(riir-games-civ `salience_conformal_width`). The middle layer exists because
+the per-NPC `Option<KarcConformalSidecar>` field has measurable overhead
+(Bench 567) that the consumer should opt into explicitly, distinct from the
+IP-bearing routing policy at the civ layer. When auditing a UQ primitive
+with a similar shape, look for this three-layer pattern: the engine ships
+the math, the engine consumer gates the per-NPC state cost, the game layer
+gates the IP-bearing policy. Each layer's opt-in is a separate concern and
+should NOT be propagated.
 
 **Established propagate-the-promotion patterns (NOT splits):**
 
@@ -160,6 +174,7 @@ After running an audit, produce a per-feature verdict table:
 |---|---|---|---|---|---|---|
 | `npc_sleep_time` | ✅ L44-66 | ✅ L629-642 | ✅ engine default-on | ✅ civ opt-in by design | ✅ bench 341 | deliberate-split |
 | `<feature>` | ✅/❌ + line | ✅/❌ + line | ✅/❌ + line | ✅/❌ + line | ✅/❌ + file | see verdicts |
+| `conformal_predictive_intervals` (post-Plan-468 audit, 2026-07-20) | ✅ no stale `//!` claims in `crates/katgpt-core/src/conformal/` | ✅ `crates/katgpt-core/src/lib.rs` L75-97 — promotion comment accurate (DEFAULT-ON since Plan 468, consumer gates STAY opt-in) | ✅ in `default = [...]` with Phase 21 comment | ✅ 7 consumer gates stay opt-in (deliberate three-layer split — see Defense 3 table) | ✅ Bench 340 + 560/562/563/564/565/567/568 all accurate | deliberate-split (clean) |
 
 **Verdicts:**
 
@@ -212,12 +227,38 @@ concludes "the comment is just stale" — eroding trust in the whole
 documentation surface. **Always** do the 5-surface grep; fix all stale
 surfaces in one commit.
 
+### "Append-only anti-pattern"
+
+Touching the right surface but in the WRONG WAY: appending a footnote /
+"Post-X update" section at the bottom of a doc while leaving the original
+in-text claim untouched. A future reader who hits the in-text claim (which
+appears first, in the TL;DR or body) trusts it without scrolling 100+
+lines down to find the contradicting footnote. This is more subtle than
+the single-surface fix because the surface IS touched — a naive `git
+diff` audit concludes "Bench NNN was updated" — but the claim a reader
+actually sees is still stale.
+
+**Canonical failure (conformal primitive, 2026-07-20):** Plan 468's
+promotion commit appended a "Plan 468 update" section to Bench 565 but
+left the in-text "stays opt-in" claim at line 196 untouched. A follow-up
+feature-gate-audit cycle (commits `97f32789` + `9d0716e22`) had to fix
+the in-text claims across 7 surfaces — exactly because the append-only
+approach had left the doc surface internally inconsistent.
+
+**Fix discipline:** when correcting a stale claim, EDIT the original
+sentence in place — convert present-tense "stays opt-in" to past-tense
+"was opt-in at the time of this probe/bench" with an inline
+`(Post-X update, YYYY-MM-DD, Plan NNN): ...` annotation. Footnotes are
+acceptable ONLY for additional context that didn't exist in the original
+claim's scope — never as a substitute for correcting the original claim.
+
 ### "Reflexive discrepancy framing"
 
 Seeing asymmetric gate status and assuming it's a bug. This is the
 single most common framing error in this codebase because the layer
-split is the **dominant** pattern (5 of the 9 major runtimes ship as
-engine-core-default-on + sub-features-opt-in). **Always** check whether
+split is the **dominant** pattern (6 of the 10 major runtime/primitive
+rows in the Defense 3 table ship as engine-default-on +
+consumer-opt-in). **Always** check whether
 each layer gates the same concern before claiming a discrepancy.
 
 ### "Authoritative-sounding stale comment"
