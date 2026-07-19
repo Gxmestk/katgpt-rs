@@ -77,12 +77,15 @@ pub fn forward_dash_attn_prefill(
     let mut summarize_scores_buf = vec![0.0f32; chunk_size];
     let mut summarize_entropy = 0.0f32;
 
-    // Per-head chunk key buffer: `chunk_keys_buf[h]` holds the last layer's K
-    // for head `h` across all tokens in the current chunk, laid out as
-    // `[chunk_size * head_dim]` (token-major within each head). Populated
-    // incrementally as each token's K is computed; summarized when the chunk
-    // completes (every `chunk_size` tokens, or at sequence end for a partial
-    // tail chunk).
+    // Per-head chunk key buffer (flat): `[n_kv_head * chunk_size * hd]`, laid
+    // out head-major — head `h`'s chunk slot `(chunk_local, d)` lives at
+    // `h * chunk_size * hd + chunk_local * hd + d`. Populated incrementally as
+    // each token's K is computed; summarized when the chunk completes (every
+    // `chunk_size` tokens, or at sequence end for a partial tail chunk).
+    //
+    // Flattened from `Vec<Vec<f32>>` to a single `Vec<f32>` so the whole
+    // buffer is one allocation (vs `n_kv_head + 1` allocations) and one
+    // contiguous memory block (friendlier to memcpy prefetch).
     //
     // This upgrades the prefill from single-token summaries (degenerate MVP)
     // to full-chunk summaries, which (a) fixes a pre-existing mean-pool bug
@@ -90,9 +93,8 @@ pub fn forward_dash_attn_prefill(
     // chunk_size, producing k/hd instead of the correct mean), and (b)
     // activates the HiLS Prop 3.1 entropy bias (Issue 044) — at zero-init,
     // b'_c = ln(chunk_size) instead of ln(1) = 0.
-    let mut chunk_keys_buf: Vec<Vec<f32>> = (0..config.n_kv_head)
-        .map(|_| vec![0.0f32; chunk_size * hd])
-        .collect();
+    let chunk_stride = chunk_size * hd;
+    let mut chunk_keys_buf: Vec<f32> = vec![0.0f32; config.n_kv_head * chunk_stride];
 
     for (pos, &token) in tokens.iter().enumerate() {
         let tok_off = token * n;
@@ -156,10 +158,12 @@ pub fn forward_dash_attn_prefill(
         // After the layer loop, ctx.k holds the last layer's K for this token.
         // Buffer head h's key into the current chunk slot.
         let chunk_local = pos % chunk_size;
-        for (h, buf) in chunk_keys_buf.iter_mut().enumerate() {
+        let dst_start = chunk_local * hd;
+        for h in 0..config.n_kv_head {
             let src_start = h * hd;
-            let dst_start = chunk_local * hd;
-            buf[dst_start..dst_start + hd].copy_from_slice(&ctx.k[src_start..src_start + hd]);
+            let head_off = h * chunk_stride;
+            chunk_keys_buf[head_off + dst_start..head_off + dst_start + hd]
+                .copy_from_slice(&ctx.k[src_start..src_start + hd]);
         }
 
         // Summarize at chunk completion (full chunk or partial tail).
@@ -172,13 +176,15 @@ pub fn forward_dash_attn_prefill(
             } else {
                 chunk_local + 1
             };
+            let actual_bytes = actual_size * hd;
             if chunk_idx < summary_cache.n_chunks() {
-                for (h, buf) in chunk_keys_buf.iter().enumerate() {
+                for h in 0..config.n_kv_head {
+                    let head_off = h * chunk_stride;
                     let slot = &mut summary_cache.summaries[chunk_idx][h];
                     let entropy_slot = &mut summary_cache.entropy_biases[chunk_idx][h];
                     summarize_chunk_into_with_entropy(
                         summary_query,
-                        &buf[..actual_size * hd],
+                        &chunk_keys_buf[head_off..head_off + actual_bytes],
                         actual_size,
                         h,
                         hd,
