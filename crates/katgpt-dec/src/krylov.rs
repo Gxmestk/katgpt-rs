@@ -261,6 +261,44 @@ fn expm_small(m: usize, mat: &[f32]) -> Vec<f32> {
         return vec![mat[0].exp()];
     }
 
+    let mut result = vec![0.0f32; m * m];
+    let mut scratch_a = vec![0.0f32; m * m];
+    let mut scratch_b = vec![0.0f32; m * m];
+    expm_small_into(m, mat, &mut result, &mut scratch_a, &mut scratch_b);
+    result
+}
+
+/// Zero-alloc variant of [`expm_small`] — writes into pre-allocated buffers.
+///
+/// - `result`: length `m * m`, holds the final `exp(M)`.
+/// - `scratch_a` / `scratch_b`: length `m * m` each, reused as the scaled
+///   matrix / Taylor-term scratch (left in an unspecified state on return).
+///
+/// Bit-identical to [`expm_small`] — same loop nests, same accumulation order.
+/// The two scratch buffers replace the per-call `m_scaled`, `term`, and
+/// `new_term` allocations plus the per-iteration `matmul` allocation in the
+/// original (which allocated up to `EXPM_MAX_TERMS + s` fresh `Vec<f32>`s of
+/// length `m*m` per call).
+fn expm_small_into(
+    m: usize,
+    mat: &[f32],
+    result: &mut [f32],
+    scratch_a: &mut [f32],
+    scratch_b: &mut [f32],
+) {
+    if m == 0 {
+        return;
+    }
+    if m == 1 {
+        result[0] = mat[0].exp();
+        return;
+    }
+
+    let mm = m * m;
+    debug_assert!(result.len() >= mm);
+    debug_assert!(scratch_a.len() >= mm);
+    debug_assert!(scratch_b.len() >= mm);
+
     // 1. ‖M‖_∞
     let norm = inf_norm(m, mat);
 
@@ -274,52 +312,61 @@ fn expm_small(m: usize, mat: &[f32]) -> Vec<f32> {
     let s = s.max(0);
     let scale = 1.0f32 / 2.0f32.powi(s);
 
-    // 3. Scaled matrix M_scaled = scale · M
-    let mut m_scaled = vec![0.0f32; m * m];
-    for i in 0..m * m {
+    // 3. Scaled matrix M_scaled = scale · M (lives in scratch_a for the
+    //    entire Taylor loop).
+    let m_scaled = &mut scratch_a[..mm];
+    for i in 0..mm {
         m_scaled[i] = mat[i] * scale;
     }
 
     // 4. Taylor series: result = I + M + M²/2 + M³/6 + ...
     //    term_j = M^j / j!; term_{j+1} = term_j · M / (j+1)
-    let mut result = vec![0.0f32; m * m];
-    let mut term = vec![0.0f32; m * m];
+    //
+    //    `term` lives in scratch_b and is preserved across iterations. The
+    //    matmul output (`new_term`) cannot alias `term` or `m_scaled`, so it
+    //    gets its own buffer — allocated once here, reused across all Taylor
+    //    iterations and the squaring loop below.
+    let term = &mut scratch_b[..mm];
     for i in 0..m {
         result[i * m + i] = 1.0; // term_0 = I
         term[i * m + i] = 1.0;
     }
+    let mut new_term: Vec<f32> = vec![0.0f32; mm];
 
     for j in 1..=EXPM_MAX_TERMS {
         // term = term · m_scaled / j
-        let new_term = matmul(m, &term, &m_scaled);
+        matmul_into(m, term, m_scaled, &mut new_term);
         let inv_j = 1.0 / j as f32;
-        for i in 0..m * m {
+        for i in 0..mm {
             term[i] = new_term[i] * inv_j;
         }
 
         // result += term
-        for i in 0..m * m {
+        for i in 0..mm {
             result[i] += term[i];
         }
 
         // Convergence check
-        if inf_norm(m, &term) < EXPM_TOL {
+        if inf_norm(m, term) < EXPM_TOL {
             break;
         }
     }
 
-    // 5. Squaring: result = result^(2^s)
+    // 5. Squaring: result = result^(2^s). Reuse `new_term` as the squaring
+    //    output buffer (the Taylor loop is done).
     for _ in 0..s {
-        let squared = matmul(m, &result, &result);
-        result.copy_from_slice(&squared);
+        matmul_into(m, result, result, &mut new_term);
+        result.copy_from_slice(&new_term[..mm]);
     }
-
-    result
 }
 
-/// `m×m` matrix multiply: `out = a · b` (row-major throughout).
-fn matmul(m: usize, a: &[f32], b: &[f32]) -> Vec<f32> {
-    let mut out = vec![0.0f32; m * m];
+/// `m×m` matrix multiply writing into a caller-supplied buffer.
+///
+/// Bit-identical to the previous allocating `matmul` — same loop nest, same
+/// accumulation order; only the storage differs.
+#[inline]
+fn matmul_into(m: usize, a: &[f32], b: &[f32], out: &mut [f32]) {
+    debug_assert!(out.len() >= m * m);
     for i in 0..m {
         for j in 0..m {
             let mut sum = 0.0f32;
@@ -329,7 +376,6 @@ fn matmul(m: usize, a: &[f32], b: &[f32]) -> Vec<f32> {
             out[i * m + j] = sum;
         }
     }
-    out
 }
 
 /// Infinity norm: max absolute row sum of an `m×m` row-major matrix.
