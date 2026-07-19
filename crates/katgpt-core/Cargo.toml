@@ -300,7 +300,7 @@ factorized_action = []  # Factorized Transition Action Abstraction — modelless
 # ── Phase 10 absorption (Proposal 003, 2026-07-04): modules moved from katgpt-rs/src/.
 # Always-on modules (`alloc`, `cumprodsum`, `trigger_gate`) need no feature gate — they declare `pub mod X;` unconditionally in lib.rs. The seven gated modules below mirror their root feature names.
 # ── Phase 12 absorption (Proposal 003, 2026-07-04): more modules moved from katgpt-rs/src/.
-critical_interval_gate = []  # Discrete Critical Interval Solver Switching (Plan 222). DEFAULT-ON in root.
+critical_interval_gate = []  # Discrete Critical Interval Solver Switching (Plan 222). Transitively DEFAULT-ON via root's `rcd_residual`/`closure_instrument` (Issue 181 demoted 23 transitively-redundant features from `default` — root comment updated, this one was missed). Not in `default` directly.
 modality_pruned_load = []  # Modality-Pruned Context Loading — query classifier + pipeline selection (Plan 227 Phase 3). DEFAULT-ON in root.
 # Sub-features consumed by dllm_solver.rs's internal #[cfg(feature = ...)] gates.
 # All are tracking flags — root forwards them so the gated items resolve.
