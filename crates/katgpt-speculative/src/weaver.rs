@@ -310,7 +310,9 @@ pub struct WeaverScratch {
     corrected_probs_flat: Vec<f32>,
 
     // ── correct_marginals_with_scratch scratch ──
-    top_pairs: Vec<(usize, f32)>, // [vocab] (reused across depths)
+    // Bounded at k+1 entries via partial insertion sort (never grows to
+    // vocab_size — see correct_marginals_with_scratch).
+    top_pairs: Vec<(usize, f32)>, // [≤ k+1]
 }
 
 impl WeaverScratch {
@@ -556,13 +558,16 @@ impl WeaverCorrector {
         // fresh single-depth WeaverInput per iteration.
         let mut topk_ids: Vec<u32> = vec![0; k];
         let mut topk_logits: Vec<f32> = vec![0.0; k];
+        // Hoisted out of the depth loop — reused via clear() to avoid one
+        // Vec allocation per depth.
+        let mut top: Vec<(usize, f32)> = Vec::with_capacity(k + 1);
 
         for di in 0..depth {
             let marg_row = &marginals[di * vocab_size..(di + 1) * vocab_size];
 
             // Select top-K token ids by probability mass.
             // Use partial selection sort (same as precompute_weaver_real_data).
-            let mut top: Vec<(usize, f32)> = Vec::with_capacity(k + 1);
+            top.clear();
             for (vid, &p) in marg_row.iter().enumerate() {
                 if !p.is_finite() {
                     continue;
@@ -705,25 +710,30 @@ impl WeaverCorrector {
         for di in 0..depth {
             let marg_row = &marginals[di * vocab_size..(di + 1) * vocab_size];
 
-            // Collect (vid, prob) for finite probs into scratch.top_pairs.
-            // Reused across depths — clear() + reuse avoids reallocation.
+            // Select top-K token ids by probability mass using partial
+            // insertion sort — O(vocab · log k) expected (most entries skip
+            // the insert because partition_point returns k). Matches the
+            // allocating sibling's algorithm; bit-identical output.
+            // scratch.top_pairs stays bounded at k+1 entries (no vocab-sized
+            // allocation, no full sort).
             scratch.top_pairs.clear();
-            scratch.top_pairs.reserve(vocab_size);
             for (vid, &p) in marg_row.iter().enumerate() {
-                if p.is_finite() {
-                    scratch.top_pairs.push((vid, p));
+                if !p.is_finite() {
+                    continue;
+                }
+                let pos = scratch
+                    .top_pairs
+                    .partition_point(|&(_, v)| v > p);
+                if pos < k {
+                    scratch.top_pairs.insert(pos, (vid, p));
+                    if scratch.top_pairs.len() > k {
+                        scratch.top_pairs.pop();
+                    }
                 }
             }
-            // Sort descending by probability. O(vocab · log vocab) per depth.
-            // total_cmp: NaN-deterministic, branch-free. Non-finite probs were
-            // already filtered at L716, so total_cmp is strictly equivalent here.
-            scratch
-                .top_pairs
-                .sort_unstable_by(|a, b| b.1.total_cmp(&a.1));
 
             // Fill topk_ids + topk_logits.
-            let n_valid = scratch.top_pairs.len();
-            let n_take = n_valid.min(k);
+            let n_take = scratch.top_pairs.len().min(k);
             for ki in 0..n_take {
                 let (vid, p) = scratch.top_pairs[ki];
                 topk_ids[ki] = vid as u32;
