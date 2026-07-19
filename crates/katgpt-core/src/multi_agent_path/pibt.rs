@@ -358,8 +358,17 @@ where
     }
 
     legacy_shuffled_retry(
-        config, guidance, goals, hindrance, flow_field, neighbors_fn, rng, &order, &no_backers,
-        moves, stuck,
+        config,
+        guidance,
+        goals,
+        hindrance,
+        flow_field,
+        neighbors_fn,
+        rng,
+        &order,
+        &no_backers,
+        moves,
+        stuck,
     )
 }
 
@@ -569,10 +578,11 @@ where
             // is committed to moving to my current position.
             if let Some(&j) = current_to_agent.get(next)
                 && j != i
-                    && let Some(their_next) = &moves[j]
-                        && their_next == current {
-                            continue; // swap collision
-                        }
+                && let Some(their_next) = &moves[j]
+                && their_next == current
+            {
+                continue; // swap collision
+            }
             committed_dests.insert(next.clone());
             moves[i] = Some(next.clone());
             placed = true;

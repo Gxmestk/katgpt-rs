@@ -41,15 +41,15 @@ use katgpt_transformer::WallPrefixState;
 pub struct ForwardContext {
     // ── u64-aligned fields first (Vec, usize, arrays) ──────────────
     // Grouped by alignment to eliminate inter-field padding.
-    pub x: Vec<f32>,            // [n_embd] main activation
-    pub xr: Vec<f32>,           // [n_embd] residual
-    pub xr2: Vec<f32>,          // [n_embd] residual 2
-    pub q: Vec<f32>,            // [n_embd] query
-    pub k: Vec<f32>,            // [kv_dim] key (kv_dim = n_kv_head * head_dim)
-    pub v: Vec<f32>,            // [kv_dim] value
-    pub attn_out: Vec<f32>,     // [n_embd] attention output
-    pub scores: Vec<f32>,       // [block_size] attention scores (max possible)
-    pub hidden: Vec<f32>,       // [mlp_hidden] MLP hidden
+    pub x: Vec<f32>,        // [n_embd] main activation
+    pub xr: Vec<f32>,       // [n_embd] residual
+    pub xr2: Vec<f32>,      // [n_embd] residual 2
+    pub q: Vec<f32>,        // [n_embd] query
+    pub k: Vec<f32>,        // [kv_dim] key (kv_dim = n_kv_head * head_dim)
+    pub v: Vec<f32>,        // [kv_dim] value
+    pub attn_out: Vec<f32>, // [n_embd] attention output
+    pub scores: Vec<f32>,   // [block_size] attention scores (max possible)
+    pub hidden: Vec<f32>,   // [mlp_hidden] MLP hidden
     // Gated MLP (Issue 377): second hidden buffer for the "up" projection.
     // When `gated_mlp` is enabled, the forward path computes
     // gate = W_gate·h into `hidden`, up = W_up·h into `hidden2`,

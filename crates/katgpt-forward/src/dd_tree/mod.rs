@@ -174,6 +174,5 @@ pub fn build_dd_tree_gdsd(
 // TreeBuilder directly. Verified: zero `TreeBuilder::new` call sites in
 // non-test root code.
 
-
 #[cfg(test)]
 mod tests;

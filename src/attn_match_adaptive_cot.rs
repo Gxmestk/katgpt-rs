@@ -48,11 +48,11 @@
 //! token, `maybe_compact_adaptive` when you'd normally consider compaction,
 //! and `update_reward` after each trace.
 
+use crate::types::Rng;
 use katgpt_attn_match::compact::CompactError;
 use katgpt_attn_match::online::{OnlineCompactResult, OnlineCompactor};
 use katgpt_attn_match::types::AmConfig;
 use katgpt_pruners::freq_bandit::{FrequencyBand, FrequencyBandit};
-use crate::types::Rng;
 
 /// Per-trace cap on compactions. Prevents a long trace from compacting
 /// itself into oblivion — even if entropy stays low, we want a floor on

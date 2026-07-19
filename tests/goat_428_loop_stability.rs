@@ -14,11 +14,13 @@
 
 #![cfg(feature = "loop_stability_fix")]
 
-use katgpt_rs::transformer::{ForwardContext, MultiLayerKVCache, TransformerWeights, forward_looped};
+use katgpt_rs::hla::MultiLayerAhlaCache;
+use katgpt_rs::transformer::{
+    ForwardContext, MultiLayerKVCache, TransformerWeights, forward_looped,
+};
 use katgpt_rs::types::{
     Config, HybridPattern, LoopMode, LoopStabilityMode, ResidualGate, Rng, SdpaOutputGate,
 };
-use katgpt_rs::hla::MultiLayerAhlaCache;
 
 /// Root-mean-square norm of a slice.
 fn rms_norm(x: &[f32]) -> f32 {
@@ -90,8 +92,10 @@ fn g1_byte_identical_when_none() {
     let sdpa_gate = SdpaOutputGate::new(config.n_head, config.head_dim, config.n_embd);
 
     // Run twice — results must be identical (deterministic).
-    let (norm1, logits1, _) = run_forward_looped(&config, &weights, &residual_gate, &sdpa_gate, 0, 0);
-    let (norm2, logits2, _) = run_forward_looped(&config, &weights, &residual_gate, &sdpa_gate, 0, 0);
+    let (norm1, logits1, _) =
+        run_forward_looped(&config, &weights, &residual_gate, &sdpa_gate, 0, 0);
+    let (norm2, logits2, _) =
+        run_forward_looped(&config, &weights, &residual_gate, &sdpa_gate, 0, 0);
 
     assert!(
         logits1 == logits2,
@@ -119,7 +123,8 @@ fn g2_logits_finite_with_inter_loop_norm() {
 
     // Run across multiple positions to verify robustness.
     for pos in 0..8 {
-        let (norm, logits, _) = run_forward_looped(&config, &weights, &residual_gate, &sdpa_gate, 0, pos);
+        let (norm, logits, _) =
+            run_forward_looped(&config, &weights, &residual_gate, &sdpa_gate, 0, pos);
 
         assert!(
             norm.is_finite(),
@@ -166,7 +171,8 @@ fn g3_latency_overhead() {
     let mut baseline_us = 0u64;
     const RUNS: usize = 20;
     for _ in 0..RUNS {
-        let (_, _, us) = run_forward_looped(&config_baseline, &weights, &residual_gate, &sdpa_gate, 0, 0);
+        let (_, _, us) =
+            run_forward_looped(&config_baseline, &weights, &residual_gate, &sdpa_gate, 0, 0);
         baseline_us += us;
     }
     let baseline_avg = baseline_us / RUNS as u64;
@@ -174,7 +180,8 @@ fn g3_latency_overhead() {
     // Measure with fix.
     let mut fix_us = 0u64;
     for _ in 0..RUNS {
-        let (_, _, us) = run_forward_looped(&config_fix, &weights, &residual_gate, &sdpa_gate, 0, 0);
+        let (_, _, us) =
+            run_forward_looped(&config_fix, &weights, &residual_gate, &sdpa_gate, 0, 0);
         fix_us += us;
     }
     let fix_avg = fix_us / RUNS as u64;
@@ -270,7 +277,9 @@ fn g4_norm_control() {
         "[G4] InterLoopNorm produced degenerate logits (max == min)"
     );
 
-    println!("[G4] ✅ InterLoopNorm controls norm (ratio {fix_ratio:.2}× vs baseline {baseline_ratio:.2}×)");
+    println!(
+        "[G4] ✅ InterLoopNorm controls norm (ratio {fix_ratio:.2}× vs baseline {baseline_ratio:.2}×)"
+    );
 }
 
 /// Summary — print the GOAT verdict table.

@@ -197,7 +197,10 @@ impl LatentSteeringEnvelope {
         }
         payload.extend_from_slice(&v.alpha.to_le_bytes());
         let commitment = *blake3::hash(&payload).as_bytes();
-        Self { commitment, payload }
+        Self {
+            commitment,
+            payload,
+        }
     }
 
     /// Verify that the envelope's commitment matches its payload.
@@ -256,9 +259,7 @@ impl LatentSteeringEnvelope {
             }
             direction.push(f);
         }
-        let alpha = f32::from_le_bytes(
-            payload[4 + dim * 4..4 + dim * 4 + 4].try_into().ok()?,
-        );
+        let alpha = f32::from_le_bytes(payload[4 + dim * 4..4 + dim * 4 + 4].try_into().ok()?);
         if alpha.is_nan() {
             return None;
         }
@@ -595,8 +596,7 @@ mod tests {
                     let dir = make_unit_direction(d, seed);
                     let base: Vec<f32> = (0..d)
                         .map(|i| {
-                            ((seed.wrapping_mul((i as u64) + 1)) >> 33) as f32
-                                / (1u64 << 31) as f32
+                            ((seed.wrapping_mul((i as u64) + 1)) >> 33) as f32 / (1u64 << 31) as f32
                                 - 1.0
                         })
                         .collect();
@@ -633,7 +633,9 @@ mod tests {
     fn envelope_round_trip_bit_identical() {
         let v = make_steering_vector(8, 0.25, 42);
         let envelope = LatentSteeringEnvelope::freeze(&v);
-        let thawed = envelope.thaw().expect("thaw should succeed on valid envelope");
+        let thawed = envelope
+            .thaw()
+            .expect("thaw should succeed on valid envelope");
         // Bit-identical: direction, alpha, and reconstructed commitment must match.
         assert_eq!(thawed.as_slice(), v.as_slice());
         assert!(thawed.alpha.to_bits() == v.alpha.to_bits());

@@ -351,7 +351,12 @@ mod tests {
         let q_safe = est.predict_all(&phi_safe());
         let q_danger = est.predict_all(&phi_danger());
         // Same arm (0) should have different Q in safe vs danger bins.
-        assert!(q_safe[0] > q_danger[0], "safe Q {} should > danger Q {}", q_safe[0], q_danger[0]);
+        assert!(
+            q_safe[0] > q_danger[0],
+            "safe Q {} should > danger Q {}",
+            q_safe[0],
+            q_danger[0]
+        );
     }
 
     // ── Kernel estimator tests ──
@@ -425,7 +430,10 @@ mod tests {
 
         // Predictions must be identical.
         for i in 0..ACTION_COUNT {
-            assert_eq!(q_before[i], q_after[i], "arm {i}: prediction changed after round-trip");
+            assert_eq!(
+                q_before[i], q_after[i],
+                "arm {i}: prediction changed after round-trip"
+            );
         }
     }
 

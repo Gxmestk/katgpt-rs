@@ -156,8 +156,8 @@ pub mod types;
 // Re-export the public API at the module root for ergonomic access
 // (`katgpt_core::mag::mine_direction` instead of `...::mag::mining::mine_direction`).
 pub use mining::{
-    apply_operator, apply_operator_into, calibrate_alpha, mine_contrast_direction,
-    mine_direction, mine_direction_into, reconstruction_error,
+    apply_operator, apply_operator_into, calibrate_alpha, mine_contrast_direction, mine_direction,
+    mine_direction_into, reconstruction_error,
 };
-pub use transfer::{rank_candidates, transfer_score, transfer_score_into, DataSet, RankEntry};
+pub use transfer::{DataSet, RankEntry, rank_candidates, transfer_score, transfer_score_into};
 pub use types::{MagDirection, MagError, MagOperator, TransferMetric};

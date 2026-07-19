@@ -22,19 +22,23 @@ use crate::pruners::bomber::{
 #[cfg(feature = "bomber-wasm")]
 use crate::types::LoraAdapter;
 
-use super::{
-    ACTION_COUNT, BOMB_FUSE_TICKS, DEFAULT_BLAST_RANGE, ALL_ACTIONS, KnownBomb, KnownOpponent,
-    BomberPlayer,
-};
-use super::helpers::{
-    action_index, count_escape_routes, has_escape_route, in_blast_zone, intercept_score,
-    index_to_action, is_safe_action, move_target, predict_direction, score_action, trap_score,
-    update_bombs, update_opponents, update_powerups,
-};
 #[cfg(feature = "bomber-wasm")]
 use super::helpers::lora_score_actions;
+use super::helpers::{
+    action_index, count_escape_routes, has_escape_route, in_blast_zone, index_to_action,
+    intercept_score, is_safe_action, move_target, predict_direction, score_action, trap_score,
+    update_bombs, update_opponents, update_powerups,
+};
+use super::{
+    ACTION_COUNT, ALL_ACTIONS, BOMB_FUSE_TICKS, BomberPlayer, DEFAULT_BLAST_RANGE, KnownBomb,
+    KnownOpponent,
+};
 
-#[cfg(any(feature = "contextual_bandit", feature = "binned_blend", feature = "kernel_blend"))]
+#[cfg(any(
+    feature = "contextual_bandit",
+    feature = "binned_blend",
+    feature = "kernel_blend"
+))]
 use crate::pruners::bomber::blend_context;
 
 #[cfg(feature = "contextual_bandit")]
@@ -85,7 +89,11 @@ pub struct HLPlayer {
     /// T3 evidence #3 (the n-armed bandit cannot learn context-dependent
     /// safety because the same action gets the same Q regardless of board
     /// state).
-    #[cfg(any(feature = "contextual_bandit", feature = "binned_blend", feature = "kernel_blend"))]
+    #[cfg(any(
+        feature = "contextual_bandit",
+        feature = "binned_blend",
+        feature = "kernel_blend"
+    ))]
     pub(crate) round_contexts: Vec<[f32; blend_context::CONTEXT_DIM]>,
     /// Linear contextual bandit (Issue 371 Option 1 — T6). When present,
     /// replaces the n-armed `arm_q` lookup in `select_action`'s centered blend
@@ -141,7 +149,11 @@ impl HLPlayer {
             compressed: [false; ACTION_COUNT],
             round_actions: Vec::new(),
             round_rewards: Vec::new(),
-            #[cfg(any(feature = "contextual_bandit", feature = "binned_blend", feature = "kernel_blend"))]
+            #[cfg(any(
+                feature = "contextual_bandit",
+                feature = "binned_blend",
+                feature = "kernel_blend"
+            ))]
             round_contexts: Vec::new(),
             #[cfg(feature = "contextual_bandit")]
             contextual_bandit: ContextualBandit::default(),
@@ -188,7 +200,11 @@ impl HLPlayer {
             compressed: [false; ACTION_COUNT],
             round_actions: Vec::new(),
             round_rewards: Vec::new(),
-            #[cfg(any(feature = "contextual_bandit", feature = "binned_blend", feature = "kernel_blend"))]
+            #[cfg(any(
+                feature = "contextual_bandit",
+                feature = "binned_blend",
+                feature = "kernel_blend"
+            ))]
             round_contexts: Vec::new(),
             #[cfg(feature = "contextual_bandit")]
             contextual_bandit: ContextualBandit::default(),
@@ -232,7 +248,11 @@ impl HLPlayer {
             compressed: [false; ACTION_COUNT],
             round_actions: Vec::new(),
             round_rewards: Vec::new(),
-            #[cfg(any(feature = "contextual_bandit", feature = "binned_blend", feature = "kernel_blend"))]
+            #[cfg(any(
+                feature = "contextual_bandit",
+                feature = "binned_blend",
+                feature = "kernel_blend"
+            ))]
             round_contexts: Vec::new(),
             #[cfg(feature = "contextual_bandit")]
             contextual_bandit: ContextualBandit::default(),
@@ -586,7 +606,11 @@ impl HLPlayer {
             compressed: frozen.compressed.map(|c| c != 0),
             round_actions: Vec::new(),
             round_rewards: Vec::new(),
-            #[cfg(any(feature = "contextual_bandit", feature = "binned_blend", feature = "kernel_blend"))]
+            #[cfg(any(
+                feature = "contextual_bandit",
+                feature = "binned_blend",
+                feature = "kernel_blend"
+            ))]
             round_contexts: Vec::new(),
             #[cfg(feature = "contextual_bandit")]
             contextual_bandit: ContextualBandit::default(),
@@ -710,7 +734,11 @@ impl BomberPlayer for HLPlayer {
         // blend estimators (contextual_bandit, binned_blend, kernel_blend) so
         // the same action gets different Q-values in safe vs dangerous board
         // states — the principled fix for T3 evidence #3.
-        #[cfg(any(feature = "contextual_bandit", feature = "binned_blend", feature = "kernel_blend"))]
+        #[cfg(any(
+            feature = "contextual_bandit",
+            feature = "binned_blend",
+            feature = "kernel_blend"
+        ))]
         let phi = blend_context::compute_phi(
             pos,
             grid,
@@ -856,14 +884,22 @@ impl BomberPlayer for HLPlayer {
             } else {
                 0.0
             };
-            #[cfg(all(feature = "contextual_bandit", not(feature = "binned_blend"), not(feature = "kernel_blend")))]
+            #[cfg(all(
+                feature = "contextual_bandit",
+                not(feature = "binned_blend"),
+                not(feature = "kernel_blend")
+            ))]
             let bandit_term = if !self.contextual_bandit.is_cold(i) {
                 let q = self.contextual_bandit.predict(i, &phi);
                 (q - 0.5) * 2.0
             } else {
                 0.0
             };
-            #[cfg(not(any(feature = "contextual_bandit", feature = "binned_blend", feature = "kernel_blend")))]
+            #[cfg(not(any(
+                feature = "contextual_bandit",
+                feature = "binned_blend",
+                feature = "kernel_blend"
+            )))]
             let bandit_term = if self.arm_visits(i) > 0 {
                 (self.arm_q(i) - 0.5) * 2.0
             } else {
@@ -953,7 +989,11 @@ impl BomberPlayer for HLPlayer {
                 self.round_actions.push(action);
                 self.round_rewards
                     .push(shape_tick(action, &self.known_bombs));
-                #[cfg(any(feature = "contextual_bandit", feature = "binned_blend", feature = "kernel_blend"))]
+                #[cfg(any(
+                    feature = "contextual_bandit",
+                    feature = "binned_blend",
+                    feature = "kernel_blend"
+                ))]
                 self.round_contexts.push(phi);
                 self.last_dir = Some(action);
                 return action;
@@ -975,7 +1015,11 @@ impl BomberPlayer for HLPlayer {
 
         self.round_actions.push(best);
         self.round_rewards.push(shape_tick(best, &self.known_bombs));
-        #[cfg(any(feature = "contextual_bandit", feature = "binned_blend", feature = "kernel_blend"))]
+        #[cfg(any(
+            feature = "contextual_bandit",
+            feature = "binned_blend",
+            feature = "kernel_blend"
+        ))]
         self.round_contexts.push(phi);
         if matches!(
             best,
@@ -1000,7 +1044,11 @@ impl BomberPlayer for HLPlayer {
         self.known_opponents.clear();
         self.round_actions.clear();
         self.round_rewards.clear();
-        #[cfg(any(feature = "contextual_bandit", feature = "binned_blend", feature = "kernel_blend"))]
+        #[cfg(any(
+            feature = "contextual_bandit",
+            feature = "binned_blend",
+            feature = "kernel_blend"
+        ))]
         self.round_contexts.clear();
         self.last_dir = None;
         // NOTE: Q-values, visits, compressed persist across rounds (bandit memory)

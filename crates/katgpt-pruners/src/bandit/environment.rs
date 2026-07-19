@@ -159,4 +159,3 @@ impl BanditEnv for GaussianEnv {
         self.optimal_arm
     }
 }
-

@@ -125,10 +125,14 @@ fn rand_matrix(rng: &mut impl FnMut() -> f32, rows: usize, cols: usize) -> Vec<f
 }
 
 fn rel_fro_err(a: &[f32], b: &[f32]) -> f32 {
-    let diff: f64 = a.iter().zip(b).map(|(&x, &y)| {
-        let d = (x - y) as f64;
-        d * d
-    }).sum();
+    let diff: f64 = a
+        .iter()
+        .zip(b)
+        .map(|(&x, &y)| {
+            let d = (x - y) as f64;
+            d * d
+        })
+        .sum();
     let base: f64 = b.iter().map(|&v| (v as f64) * (v as f64)).sum();
     if base < 1e-30 {
         0.0
@@ -166,9 +170,21 @@ fn build_on_manifold_delta(
 
 /// Cosine similarity of two equal-length vectors.
 fn cosine(a: &[f32], b: &[f32]) -> f32 {
-    let dot: f64 = a.iter().zip(b).map(|(&x, &y)| (x as f64) * (y as f64)).sum();
-    let na: f64 = a.iter().map(|&v| (v as f64) * (v as f64)).sum::<f64>().sqrt();
-    let nb: f64 = b.iter().map(|&v| (v as f64) * (v as f64)).sum::<f64>().sqrt();
+    let dot: f64 = a
+        .iter()
+        .zip(b)
+        .map(|(&x, &y)| (x as f64) * (y as f64))
+        .sum();
+    let na: f64 = a
+        .iter()
+        .map(|&v| (v as f64) * (v as f64))
+        .sum::<f64>()
+        .sqrt();
+    let nb: f64 = b
+        .iter()
+        .map(|&v| (v as f64) * (v as f64))
+        .sum::<f64>()
+        .sqrt();
     if na < 1e-30 || nb < 1e-30 {
         0.0
     } else {
@@ -187,7 +203,15 @@ fn g1a_numerical_stability(d_out: usize, d_in: usize, rank: usize) -> bool {
 
     let mut svd_result = SvdResultScratch::with_capacity(d_out, d_in);
     let mut svd_work = SvdScratch::with_capacity(d_in, d_out);
-    let delta = build_on_manifold_delta(&w0, d_out, d_in, rank, &m_diag, &mut svd_result, &mut svd_work);
+    let delta = build_on_manifold_delta(
+        &w0,
+        d_out,
+        d_in,
+        rank,
+        &m_diag,
+        &mut svd_result,
+        &mut svd_work,
+    );
 
     let mut scratch = SpectralRewireScratch::with_capacity(d_out, d_in, rank);
     let out = spectral_rewire_into(&w0, &delta, d_out, d_in, rank, &mut scratch);
@@ -418,21 +442,30 @@ fn g5_latency() -> bool {
     let pass_mid = idx_mid <= target_mid;
     println!(
         "  G5 index path (8×8 r=4):     mean = {:.3}µs (target ≤ {:.0}µs, NPC style_weights) → {}",
-        idx_npc * 1e6, target_npc * 1e6, if pass_npc { "PASS" } else { "FAIL" }
+        idx_npc * 1e6,
+        target_npc * 1e6,
+        if pass_npc { "PASS" } else { "FAIL" }
     );
     println!(
         "  G5 index path (512×64 r=32): mean = {:.2}µs (target ≤ {:.0}µs, LoRA-scale rows) → {}",
-        idx_big * 1e6, target_big * 1e6, if pass_big { "PASS" } else { "FAIL" }
+        idx_big * 1e6,
+        target_big * 1e6,
+        if pass_big { "PASS" } else { "FAIL" }
     );
     println!(
         "  G5 index path (64×64 r=8):   mean = {:.2}µs (target ≤ {:.0}µs, recalibrated) → {}",
-        idx_mid * 1e6, target_mid * 1e6, if pass_mid { "PASS" } else { "FAIL" }
+        idx_mid * 1e6,
+        target_mid * 1e6,
+        if pass_mid { "PASS" } else { "FAIL" }
     );
     println!("    note: 64×64 target recalibrated 10µs→50µs (plan’s 10µs predated the");
     println!("          flop count; ~75K flops of memory-bound rank-1 axpy ≈ 29µs measured).");
     println!("          SVD cap (Issue 124) RESOLVED — arbitrary d_in now supported.");
-    println!("          SVD path is {:.1}× / {:.0}× slower (512×64 / 64×64) — cold-tier only.",
-        svd_big / idx_big.max(1e-12), svd_small / idx_mid.max(1e-12));
+    println!(
+        "          SVD path is {:.1}× / {:.0}× slower (512×64 / 64×64) — cold-tier only.",
+        svd_big / idx_big.max(1e-12),
+        svd_small / idx_mid.max(1e-12)
+    );
 
     pass_npc && pass_big && pass_mid
 }

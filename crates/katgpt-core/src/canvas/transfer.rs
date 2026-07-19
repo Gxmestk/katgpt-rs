@@ -77,10 +77,7 @@ pub(crate) fn cosine_distance(a: &[f32], b: &[f32]) -> f32 {
 ///
 /// Allocates the result `Vec`. The scan itself is O(n_regions²) with no
 /// per-pair allocation.
-pub fn compatible_regions(
-    schema: &CanvasSchema,
-    max_distance: f32,
-) -> Vec<(RegionId, RegionId)> {
+pub fn compatible_regions(schema: &CanvasSchema, max_distance: f32) -> Vec<(RegionId, RegionId)> {
     compatible_regions_in_layout(&schema.layout, max_distance)
 }
 
@@ -187,7 +184,10 @@ mod tests {
         let a = SemanticType::new("a", e);
         let b = SemanticType::new("b", e);
         let d = transfer_distance(&a, &b);
-        assert!(d.abs() < 1e-3, "parallel large-magnitude vectors should be distance ~0, got {d}");
+        assert!(
+            d.abs() < 1e-3,
+            "parallel large-magnitude vectors should be distance ~0, got {d}"
+        );
         assert!(!d.is_nan(), "distance must never be NaN");
     }
 }

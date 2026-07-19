@@ -14,8 +14,8 @@ use fastrand::Rng;
 
 use crate::inference_router::InferenceRouter;
 use crate::transformer::{ForwardContext, MultiLayerKVCache, TransformerWeights};
-use katgpt_core::trigger_gate::TriggerGateConfig;
 use crate::types::{Config, Rng as KatRng};
+use katgpt_core::trigger_gate::TriggerGateConfig;
 
 use super::arena::ArenaGrid;
 use super::players::{

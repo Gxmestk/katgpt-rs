@@ -580,8 +580,20 @@ pub fn forward_base<'a>(
         #[cfg(feature = "gated_mlp")]
         {
             // SwiGLU: SiLU(W_gate·h) ⊙ W_up·h → W_down·hidden
-            matmul(&mut ctx.hidden, &layer_weights.mlp_w1, &ctx.x, config.mlp_hidden, n);
-            matmul(&mut ctx.hidden2, &layer_weights.mlp_w_up, &ctx.x, config.mlp_hidden, n);
+            matmul(
+                &mut ctx.hidden,
+                &layer_weights.mlp_w1,
+                &ctx.x,
+                config.mlp_hidden,
+                n,
+            );
+            matmul(
+                &mut ctx.hidden2,
+                &layer_weights.mlp_w_up,
+                &ctx.x,
+                config.mlp_hidden,
+                n,
+            );
             types::swiglu_inplace(&mut ctx.hidden, &ctx.hidden2);
         }
         #[cfg(not(feature = "gated_mlp"))]
@@ -998,14 +1010,14 @@ pub fn forward_coda<'a>(
         // in a single kernel, no intermediate hidden2 buffer needed.
         #[cfg(feature = "gated_mlp")]
         katgpt_core::coda::simd_matmul_rmsnorm_swiglu_split(
-            &mut ctx.hidden,                             // output
-            &layer_weights.mlp_w1,                        // gate weight
-            &layer_weights.mlp_w_up,                      // up weight
-            &ctx.x[..n],                                 // input (O from kernel 1)
-            rstd,                                        // delayed RMS scale
-            katgpt_core::coda::GateActivation::Silu,      // SwiGLU = SiLU gate
-            config.mlp_hidden,                           // output_dim
-            n,                                           // input_dim
+            &mut ctx.hidden,                         // output
+            &layer_weights.mlp_w1,                   // gate weight
+            &layer_weights.mlp_w_up,                 // up weight
+            &ctx.x[..n],                             // input (O from kernel 1)
+            rstd,                                    // delayed RMS scale
+            katgpt_core::coda::GateActivation::Silu, // SwiGLU = SiLU gate
+            config.mlp_hidden,                       // output_dim
+            n,                                       // input_dim
         );
 
         // LoRA perturbation for MLP up projection: add to hidden

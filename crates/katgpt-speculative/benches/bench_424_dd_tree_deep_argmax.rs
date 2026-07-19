@@ -25,8 +25,8 @@
 //!   cargo run -p katgpt-speculative --bench bench_424_dd_tree_deep_argmax --release -- --nocapture
 //! ```
 
-use katgpt_speculative::dd_tree::{build_dd_tree_deep_argmax, extract_parent_tokens};
 use katgpt_speculative::TreeNode;
+use katgpt_speculative::dd_tree::{build_dd_tree_deep_argmax, extract_parent_tokens};
 use katgpt_types::Config;
 
 /// xorshift32 PRNG for reproducible synthetic marginals.
@@ -94,10 +94,9 @@ fn accepted_prefix_len(tree: &[TreeNode], gt: &[usize]) -> usize {
             continue;
         }
         let path = extract_parent_tokens(node.parent_path, node.depth + 1);
-        if path.len() == node.depth + 1 && path == gt[..node.depth + 1]
-            && node.depth + 1 > best {
-                best = node.depth + 1;
-            }
+        if path.len() == node.depth + 1 && path == gt[..node.depth + 1] && node.depth + 1 > best {
+            best = node.depth + 1;
+        }
     }
     best
 }
@@ -144,21 +143,13 @@ fn main() {
     let thresholds: &[Option<usize>] = &[None, Some(2), Some(4)];
 
     for &(name, base, slope, floor) in regimes {
-        println!(
-            "║                                                                  ║"
-        );
+        println!("║                                                                  ║");
         println!(
             "║  regime={name:12}  base={base:.2}  slope={slope:.2}  floor={floor:.2}  ({n_seeds} seeds)",
         );
-        println!(
-            "║  ┌──────────────┬──────────────────┬──────────────────┬───────────┐"
-        );
-        println!(
-            "║  │ threshold    │ mean accept len  │ mean tree depth  │ tree size │"
-        );
-        println!(
-            "║  ├──────────────┼──────────────────┼──────────────────┼───────────┤"
-        );
+        println!("║  ┌──────────────┬──────────────────┬──────────────────┬───────────┐");
+        println!("║  │ threshold    │ mean accept len  │ mean tree depth  │ tree size │");
+        println!("║  ├──────────────┼──────────────────┼──────────────────┼───────────┤");
 
         let mut best_accept = 0.0f64;
         let mut best_label = String::new();
@@ -180,8 +171,15 @@ fn main() {
                     .map(|_| (xorshift32(&mut rs) as usize) % config.vocab_size)
                     .collect();
 
-                let marginals =
-                    make_draft_marginals(&gt, config.vocab_size, base, slope, floor, n_decoys, seed);
+                let marginals = make_draft_marginals(
+                    &gt,
+                    config.vocab_size,
+                    base,
+                    slope,
+                    floor,
+                    n_decoys,
+                    seed,
+                );
                 let mv: Vec<&[f32]> = marginals.iter().map(|s| s.as_slice()).collect();
 
                 let tree = build_dd_tree_deep_argmax(&mv, &config, thresh);
@@ -203,17 +201,11 @@ fn main() {
                 "║  │ {label:10}   │ {mean_accept:14.3}   │ {mean_d:14.3}   │ {mean_sz:7.1}   │"
             );
         }
-        println!(
-            "║  └──────────────┴──────────────────┴──────────────────┴───────────┘"
-        );
-        println!(
-            "║  → best: {best_label:10}  (mean accept len = {best_accept:.3})",
-        );
+        println!("║  └──────────────┴──────────────────┴──────────────────┴───────────┘");
+        println!("║  → best: {best_label:10}  (mean accept len = {best_accept:.3})",);
     }
 
-    println!(
-        "║                                                                  ║"
-    );
+    println!("║                                                                  ║");
     println!("╚══════════════════════════════════════════════════════════════════╝");
     println!();
     println!("VERDICT: No acceptance-length gain from deep_argmax_threshold on the");

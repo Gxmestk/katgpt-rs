@@ -409,11 +409,7 @@ fn project_onto_simplex(v: &[f32]) -> Vec<f32> {
 /// Sorts `sorted_scratch` in place (caller fills it with a copy of `v` first),
 /// computes θ, then writes the projection into `out` (cleared + extended).
 /// Both scratch buffers are reused across calls by `CcePrimalDual::step`.
-fn project_onto_simplex_into(
-    sorted_scratch: &mut Vec<f32>,
-    out: &mut Vec<f32>,
-    v: &[f32],
-) {
+fn project_onto_simplex_into(sorted_scratch: &mut Vec<f32>, out: &mut Vec<f32>, v: &[f32]) {
     let d = v.len();
     if d == 0 {
         out.clear();

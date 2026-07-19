@@ -10,9 +10,9 @@
 
 use std::time::Instant;
 
-use katgpt_transformer::mbu;
 use katgpt_rs::transformer::{ForwardContext, MultiLayerKVCache, TransformerWeights, forward};
 use katgpt_rs::types::{Config, Rng};
+use katgpt_transformer::mbu;
 
 #[test]
 fn bench_kog_cpu_fusion() {

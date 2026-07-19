@@ -87,11 +87,11 @@ fn random_unit_vector(rng: &mut fastrand::Rng, dim: usize) -> Vec<f32> {
 fn r_squared(truth_pred: &[(f32, f32)]) -> f32 {
     let n = truth_pred.len() as f32;
     let mean_truth: f32 = truth_pred.iter().map(|(t, _)| *t).sum::<f32>() / n;
-    let ss_tot: f32 = truth_pred.iter().map(|(t, _)| (t - mean_truth).powi(2)).sum();
-    let ss_res: f32 = truth_pred
+    let ss_tot: f32 = truth_pred
         .iter()
-        .map(|(t, p)| (t - p).powi(2))
+        .map(|(t, _)| (t - mean_truth).powi(2))
         .sum();
+    let ss_res: f32 = truth_pred.iter().map(|(t, p)| (t - p).powi(2)).sum();
     if ss_tot < 1e-12 {
         return 0.0;
     }
@@ -170,8 +170,7 @@ fn g1_local_decodability() -> bool {
     let phi_out = latent_dim; // no reduction → linear decoder regime
 
     // Fit on small-magnitude z so tanh ≈ identity.
-    let (adapter, _) =
-        fit_linear_map(&mut rng, latent_dim, target_dim, phi_out, 100, 0.05);
+    let (adapter, _) = fit_linear_map(&mut rng, latent_dim, target_dim, phi_out, 100, 0.05);
 
     // Sample small-displacement pairs (z_src, z_dst) and verify that
     // W · (φ(z_dst) - φ(z_src)) ≈ A · (z_dst - z_src) within 1e-3.
@@ -379,31 +378,23 @@ fn g2_global_unrolling() -> bool {
         "G2 global unrolling: adapter R² = {:.4}, linear-only R² = {:.4}  → {}",
         adapter_r2,
         linear_only_r2,
-        if pass { "PASS (adapter R² > 0.5)" } else { "FAIL" }
+        if pass {
+            "PASS (adapter R² > 0.5)"
+        } else {
+            "FAIL"
+        }
     );
     println!(
         "    (strict spec: adapter > 0.5 AND beats linear-only by 0.05; beats_linear = {})",
         beats_linear
     );
     if !beats_linear {
-        println!(
-            "    NOTE: modelless PCA-tanh does NOT beat linear-only on this fixture."
-        );
-        println!(
-            "          This is the documented G2 risk (Plan 449 Phase 3 T3.2): the"
-        );
-        println!(
-            "          gradient-fit path (riir-train follow-up per research skill"
-        );
-        println!(
-            "          §3.5) is required for the adapter to strictly dominate."
-        );
-        println!(
-            "          The modelless adapter still ships as a useful chart for"
-        );
-        println!(
-            "          closed-form inverse navigation (G3 PASSES on the same fixture)."
-        );
+        println!("    NOTE: modelless PCA-tanh does NOT beat linear-only on this fixture.");
+        println!("          This is the documented G2 risk (Plan 449 Phase 3 T3.2): the");
+        println!("          gradient-fit path (riir-train follow-up per research skill");
+        println!("          §3.5) is required for the adapter to strictly dominate.");
+        println!("          The modelless adapter still ships as a useful chart for");
+        println!("          closed-form inverse navigation (G3 PASSES on the same fixture).");
     }
     pass
 }
@@ -429,8 +420,9 @@ fn g3_inverse_navigation_round_trip() -> bool {
         let delta_target: Vec<f32> = (0..target_dim).map(|_| rng.f32() * 0.4 - 0.2).collect();
         // W·φ(z_src) + Δtarget = truth for the destination.
         let truth_at_src = forward_decode(&z_src, &adapter);
-        let truth_at_dest: Vec<f32> =
-            (0..target_dim).map(|j| truth_at_src[j] + delta_target[j]).collect();
+        let truth_at_dest: Vec<f32> = (0..target_dim)
+            .map(|j| truth_at_src[j] + delta_target[j])
+            .collect();
 
         let mut z_dest = vec![0.0f32; latent_dim];
         poincare_navigate_into(
@@ -576,11 +568,25 @@ fn g6_multi_step_coherence() -> bool {
     let mut delta_step = vec![0.0f32; target_dim];
 
     poincare_multi_step_into(
-        &z_src, &delta, 4, &adapter, &mut z_out_a, &mut phi, &mut hidden, &mut delta_step,
+        &z_src,
+        &delta,
+        4,
+        &adapter,
+        &mut z_out_a,
+        &mut phi,
+        &mut hidden,
+        &mut delta_step,
     );
     // Determinism: rerun and check bit-identical.
     poincare_multi_step_into(
-        &z_src, &delta, 4, &adapter, &mut z_out_b, &mut phi, &mut hidden, &mut delta_step,
+        &z_src,
+        &delta,
+        4,
+        &adapter,
+        &mut z_out_b,
+        &mut phi,
+        &mut hidden,
+        &mut delta_step,
     );
     let mut bit_identical = true;
     for j in 0..latent_dim {
@@ -632,13 +638,34 @@ fn main() {
     let g7 = g7_latent_vs_raw_boundary();
 
     println!("\n──────────── Summary ────────────");
-    println!("G1 local decodability       : {}", if g1 { "PASS" } else { "FAIL" });
-    println!("G2 global unrolling         : {}", if g2 { "PASS" } else { "FAIL" });
-    println!("G3 inverse round-trip       : {}", if g3 { "PASS" } else { "FAIL" });
-    println!("G4 zero-alloc               : {}", if g4 { "PASS" } else { "FAIL" });
-    println!("G5 latency                  : {}", if g5 { "PASS" } else { "FAIL" });
-    println!("G6 multi-step coherence     : {}", if g6 { "PASS" } else { "FAIL" });
-    println!("G7 latent-vs-raw boundary   : {}", if g7 { "PASS" } else { "FAIL" });
+    println!(
+        "G1 local decodability       : {}",
+        if g1 { "PASS" } else { "FAIL" }
+    );
+    println!(
+        "G2 global unrolling         : {}",
+        if g2 { "PASS" } else { "FAIL" }
+    );
+    println!(
+        "G3 inverse round-trip       : {}",
+        if g3 { "PASS" } else { "FAIL" }
+    );
+    println!(
+        "G4 zero-alloc               : {}",
+        if g4 { "PASS" } else { "FAIL" }
+    );
+    println!(
+        "G5 latency                  : {}",
+        if g5 { "PASS" } else { "FAIL" }
+    );
+    println!(
+        "G6 multi-step coherence     : {}",
+        if g6 { "PASS" } else { "FAIL" }
+    );
+    println!(
+        "G7 latent-vs-raw boundary   : {}",
+        if g7 { "PASS" } else { "FAIL" }
+    );
 
     let all_pass = g1 && g2 && g3 && g4 && g5 && g6 && g7;
     println!(

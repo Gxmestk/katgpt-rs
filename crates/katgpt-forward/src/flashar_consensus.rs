@@ -28,8 +28,8 @@
 use crate::d2f::{D2fDecodeConfig, d2f_decode_block_with_prompt_with};
 use crate::d2f_context::D2fContext;
 use crate::{ForwardContext, forward};
-use katgpt_core::speculative::sampling::sample_from_distribution;
 use katgpt_core::simd::simd_max_f32;
+use katgpt_core::speculative::sampling::sample_from_distribution;
 use katgpt_core::traits::{NoPruner, NoScreeningPruner};
 use katgpt_speculative::SpeculativeVerifier;
 use katgpt_transformer::{MultiLayerKVCache, TransformerWeights};

@@ -72,4 +72,4 @@ pub mod types;
 pub use fixing::try_fixseq;
 pub use identify::identify;
 pub use subgraph::extract_relevant_subgraph;
-pub use types::{Admg, AdmgSignature, IdentificationError, NodeId, INLINE_SIGNATURE_CAP};
+pub use types::{Admg, AdmgSignature, INLINE_SIGNATURE_CAP, IdentificationError, NodeId};

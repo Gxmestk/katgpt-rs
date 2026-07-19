@@ -7,12 +7,12 @@ use std::sync::Arc;
 
 use katgpt_types::Rng;
 
+use super::environment::BanditEnv;
+use super::{BanditStats, BanditStrategy, make_stats};
+use crate::review_metrics::ReviewMetrics;
 #[cfg(feature = "safe_bandit")]
 use crate::safe_phased::SafePhasedState;
-use crate::review_metrics::ReviewMetrics;
 use crate::trial_log::{TrialLog, TrialRecord};
-use super::{make_stats, BanditStats, BanditStrategy};
-use super::environment::BanditEnv;
 
 // ── Bandit Event ────────────────────────────────────────────────
 

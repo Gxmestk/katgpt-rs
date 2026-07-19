@@ -13,14 +13,14 @@
 
 #![cfg(feature = "shard_kv")]
 
+use katgpt_kv::shard_kv::{ShardCalibration, ShardConfig, ShardKVCache};
 #[cfg(all(feature = "planar_quant", feature = "octopus"))]
 use katgpt_quant::hybrid_oct_pq::{HybridOctPqConfig, HybridOctPqKVCache};
-use katgpt_kv::shard_kv::{ShardCalibration, ShardConfig, ShardKVCache};
+use katgpt_quant::turboquant::{TurboQuantKVCache, TurboQuantKVCacheConfig};
 use katgpt_rs::spectralquant::participation_ratio;
 use katgpt_rs::spectralquant::{
     SpectralQuantCalibration, SpectralQuantKVCache, SpectralQuantKVCacheConfig,
 };
-use katgpt_quant::turboquant::{TurboQuantKVCache, TurboQuantKVCacheConfig};
 
 // ── Helpers ───────────────────────────────────────────────────
 

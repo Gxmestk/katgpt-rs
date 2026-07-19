@@ -124,11 +124,7 @@ impl Admg {
     /// True iff `set` is a subset of the bidirected district of `v` in this
     /// graph. Used by [`try_fixseq`] to check fixability: a node is fixable
     /// iff its district is contained in the to-be-fixed set.
-    pub fn district_of_contains_superset(
-        &self,
-        v: NodeId,
-        superset: &[NodeId],
-    ) -> bool {
+    pub fn district_of_contains_superset(&self, v: NodeId, superset: &[NodeId]) -> bool {
         let mut all_in = true;
         self.for_each_in_district(v, |w| {
             if !superset.contains(&w) {
@@ -297,7 +293,13 @@ impl Admg {
     /// Subgraph induced by `nodes` — keeps only nodes in the set and edges
     /// whose both endpoints are in the set.
     pub fn subgraph(&self, nodes: &[NodeId]) -> Admg {
-        let mut g = Admg::new(self.nodes.iter().copied().filter(|n| nodes.contains(n)).collect());
+        let mut g = Admg::new(
+            self.nodes
+                .iter()
+                .copied()
+                .filter(|n| nodes.contains(n))
+                .collect(),
+        );
         for &(p, c) in &self.directed {
             if nodes.contains(&p) && nodes.contains(&c) {
                 g.directed.push((p, c));
@@ -317,7 +319,8 @@ impl Admg {
     /// eliminate the per-call `Admg::new` + grow allocations.
     pub fn subgraph_into(&self, nodes: &[NodeId], out: &mut Admg) {
         out.nodes.clear();
-        out.nodes.extend(self.nodes.iter().copied().filter(|n| nodes.contains(n)));
+        out.nodes
+            .extend(self.nodes.iter().copied().filter(|n| nodes.contains(n)));
         out.directed.clear();
         for &(p, c) in &self.directed {
             if nodes.contains(&p) && nodes.contains(&c) {
@@ -355,7 +358,8 @@ impl Admg {
     /// Used by `try_fixseq_into` (P4 zero-alloc refactor).
     pub fn fix_node_into(&self, v: NodeId, out: &mut Admg) {
         out.nodes.clear();
-        out.nodes.extend(self.nodes.iter().copied().filter(|n| *n != v));
+        out.nodes
+            .extend(self.nodes.iter().copied().filter(|n| *n != v));
         out.directed.clear();
         for &(p, c) in &self.directed {
             if p != v && c != v {
@@ -738,9 +742,24 @@ mod tests {
             let reference = g.fix_node(v);
             let mut got = Admg::default();
             g.fix_node_into(v, &mut got);
-            assert_eq!(reference.nodes, got.nodes, "nodes mismatch for v={:?}", v.as_u32());
-            assert_eq!(reference.directed, got.directed, "directed mismatch for v={:?}", v.as_u32());
-            assert_eq!(reference.bidirected, got.bidirected, "bidirected mismatch for v={:?}", v.as_u32());
+            assert_eq!(
+                reference.nodes,
+                got.nodes,
+                "nodes mismatch for v={:?}",
+                v.as_u32()
+            );
+            assert_eq!(
+                reference.directed,
+                got.directed,
+                "directed mismatch for v={:?}",
+                v.as_u32()
+            );
+            assert_eq!(
+                reference.bidirected,
+                got.bidirected,
+                "bidirected mismatch for v={:?}",
+                v.as_u32()
+            );
         }
     }
 
@@ -752,13 +771,13 @@ mod tests {
         let n = |i: u32| NodeId::from_u32(i);
 
         let subsets_to_try: &[&[NodeId]] = &[
-            &[n(0)],               // not fixable (district {0,2} ⊄ {0})
-            &[n(1)],               // fixable (district {1})
-            &[n(2)],               // not fixable (district {0,2} ⊄ {2})
-            &[n(0), n(2)],         // fixable (district {0,2} ⊆ {0,2})
-            &[n(1), n(2)],         // not fixable: 2's district {0,2} ⊄ {1,2}
-            &[n(0), n(1), n(2)],   // fixable (everything)
-            &[],                   // trivially Ok (nothing to fix)
+            &[n(0)],             // not fixable (district {0,2} ⊄ {0})
+            &[n(1)],             // fixable (district {1})
+            &[n(2)],             // not fixable (district {0,2} ⊄ {2})
+            &[n(0), n(2)],       // fixable (district {0,2} ⊆ {0,2})
+            &[n(1), n(2)],       // not fixable: 2's district {0,2} ⊄ {1,2}
+            &[n(0), n(1), n(2)], // fixable (everything)
+            &[],                 // trivially Ok (nothing to fix)
         ];
 
         let mut ws = FixSeqWorkspace::new();
@@ -777,7 +796,10 @@ mod tests {
 
         // Re-run after the workspace has been used — buffers must still work.
         let got_again = try_fixseq_into(&g, &[n(1)], &mut ws);
-        assert!(got_again.is_ok(), "workspace reuse must preserve correctness");
+        assert!(
+            got_again.is_ok(),
+            "workspace reuse must preserve correctness"
+        );
     }
 
     #[test]

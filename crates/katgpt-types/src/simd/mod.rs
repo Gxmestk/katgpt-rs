@@ -41,6 +41,9 @@
 // only `is_avx2_fma_available` (below) and `horizontal::*` are shared.
 mod activations;
 mod argmax;
+/// Binary matvec kernels (`binary_plasma` feature, Issue 145).
+#[cfg(feature = "binary_plasma")]
+pub mod binary;
 mod dot;
 mod elementwise;
 mod horizontal;
@@ -48,9 +51,6 @@ mod maxsim;
 mod research;
 mod sparse;
 mod ternary;
-/// Binary matvec kernels (`binary_plasma` feature, Issue 145).
-#[cfg(feature = "binary_plasma")]
-pub mod binary;
 
 #[cfg(test)]
 mod tests;
@@ -101,19 +101,19 @@ pub use elementwise::{
 };
 // Feature-gated re-exports — mirror the `#[cfg(feature = "...")]` gates on
 // the underlying items so `cargo check --no-default-features` stays green.
+#[cfg(feature = "binary_plasma")]
+pub use binary::{binary_matvec_scalar, simd_binary_matmul_batch, simd_binary_matvec};
 #[cfg(feature = "maxsim")]
 pub use maxsim::{maxsim_score, maxsim_score_packed};
 pub use research::{
-    coincidence_score, entropy_f32, simd_dist_sq, simd_fused_scale_acc,
-    simd_fused_scale_acc_f16, simd_fused_sub_acc, simd_gram_f32, simd_l_inf_distance_f32,
-    simd_sum_abs_f32, simd_sum_sq, simd_sum_sq_quartic,
+    coincidence_score, entropy_f32, simd_dist_sq, simd_fused_scale_acc, simd_fused_scale_acc_f16,
+    simd_fused_sub_acc, simd_gram_f32, simd_l_inf_distance_f32, simd_sum_abs_f32, simd_sum_sq,
+    simd_sum_sq_quartic,
 };
 #[cfg(feature = "sigmoid_margin")]
 pub use research::{compute_retrieval_margin, dim_sufficiency_bound, sigmoid_margin_loss};
 pub use sparse::{simd_sparse_dot_f32, simd_sparse_matmul_rows};
 pub use ternary::simd_ternary_dot_f32;
-#[cfg(feature = "binary_plasma")]
-pub use binary::{binary_matvec_scalar, simd_binary_matmul_batch, simd_binary_matvec};
 #[cfg(feature = "plasma_path")]
 pub use ternary::{
     project_ternary_simd, project_ternary_simd_scalar, simd_ternary_matmul_batch,

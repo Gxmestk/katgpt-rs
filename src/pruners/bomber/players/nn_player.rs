@@ -6,14 +6,14 @@ use std::any::Any;
 
 use fastrand::Rng;
 
-use crate::pruners::bomber::{ArenaGrid, BomberAction, GameEvent, GridPos};
 use crate::pruners::bomber::wasm_pruner::BomberWasmPruner;
+use crate::pruners::bomber::{ArenaGrid, BomberAction, GameEvent, GridPos};
 
-use super::{ALL_ACTIONS, BOMB_FUSE_TICKS, DEFAULT_BLAST_RANGE, BomberPlayer, KnownBomb};
 use super::helpers::{
     action_index, escape_distance, in_blast_zone, is_safe_action, move_target, score_action,
     update_bombs, update_powerups,
 };
+use super::{ALL_ACTIONS, BOMB_FUSE_TICKS, BomberPlayer, DEFAULT_BLAST_RANGE, KnownBomb};
 
 /// P2.5: Neural Network + WASM Validator — heuristic scoring + WASM safety.
 ///

@@ -84,11 +84,7 @@ struct Rng {
 impl Rng {
     fn new(seed: u64) -> Self {
         Self {
-            state: if seed == 0 {
-                0x9E3779B97F4A7C15
-            } else {
-                seed
-            },
+            state: if seed == 0 { 0x9E3779B97F4A7C15 } else { seed },
         }
     }
     /// Uniform (0, 1) via xorshift64.
@@ -132,7 +128,12 @@ fn build_grams(n: usize, d: usize) -> Vec<Vec<f32>> {
 /// Gram principal direction `e_i` by angle θ. Vanilla λ ≈ cos(θ)-ish metric.
 fn build_router(n: usize, d: usize, theta: f32) -> Vec<f32> {
     // Need d >= 2*n so that e_{i+N} indices are valid (positions N..2N).
-    assert!(d >= 2 * n, "D must be >= 2*N for the fixture, got D={}, N={}", d, n);
+    assert!(
+        d >= 2 * n,
+        "D must be >= 2*N for the fixture, got D={}, N={}",
+        d,
+        n
+    );
     let mut r = vec![0.0f32; n * d];
     let ct = theta.cos();
     let st = theta.sin();
@@ -233,15 +234,8 @@ fn head_to_head_decision_matrix() {
     // ── Variant 4: Composed (MPI → recompute scores → QB on new scores) ─
     let mut r_comp = r_original.clone();
     let mut mpi_scratch2 = PowerRetractScratch::new(D);
-    let _ = manifold_power_iter_router(
-        &mut r_comp,
-        &gram_refs,
-        N,
-        D,
-        c_prime,
-        1,
-        &mut mpi_scratch2,
-    );
+    let _ =
+        manifold_power_iter_router(&mut r_comp, &gram_refs, N, D, c_prime, 1, &mut mpi_scratch2);
     let s_comp = compute_scores(&x, &r_comp, M, N, D);
     let mut qb_scratch2 = QbScratch::new(M, N);
     let qb_comp_res = quantile_balance_router(&s_comp, M, N, K, &cfg, &mut qb_scratch2);
@@ -272,7 +266,10 @@ fn head_to_head_decision_matrix() {
     );
     eprintln!(
         "  {:<22} {:>10.4}  {:>12.4}  {:>10.4}",
-        "QB only", lambda_qb, maxvio_qb, qb_res.beta.iter().cloned().fold(0.0f32, f32::max).abs()
+        "QB only",
+        lambda_qb,
+        maxvio_qb,
+        qb_res.beta.iter().cloned().fold(0.0f32, f32::max).abs()
     );
     eprintln!(
         "  {:<22} {:>10.4}  {:>12.4}  {:>10.4}",
@@ -344,9 +341,7 @@ fn head_to_head_decision_matrix() {
     );
     eprintln!(
         "    G-P3-4  Comp reduces MaxVio:   {}  (MaxVio_comp {:.4} vs MaxVio_mpi {:.4})",
-        comp_reduces_maxvio_vs_mpi,
-        maxvio_comp,
-        maxvio_mpi
+        comp_reduces_maxvio_vs_mpi, maxvio_comp, maxvio_mpi
     );
     eprintln!(
         "    G-P3-5  Comp > QB on λ:        {}  (λ_comp {:.4} vs λ_qb {:.4}, Δ=+{:.4})",
@@ -365,13 +360,13 @@ fn head_to_head_decision_matrix() {
 
     if is_case_c {
         eprintln!("  ✓ CASE C CONFIRMED: composition strictly beats either alone.");
-        eprintln!(
-            "    → Promote BOTH quantile_balance_router and manifold_power_iter_router"
-        );
+        eprintln!("    → Promote BOTH quantile_balance_router and manifold_power_iter_router");
         eprintln!(
             "      to DEFAULT-ON. They solve orthogonal problems on the (λ, MaxVio) Pareto frontier:"
         );
-        eprintln!("        MPI  fixes alignment λ  (router rows → expert Gram principal direction).");
+        eprintln!(
+            "        MPI  fixes alignment λ  (router rows → expert Gram principal direction)."
+        );
         eprintln!("        QB   fixes balance MaxVio (per-expert bias β → balanced top-k).");
         eprintln!();
     } else {
@@ -409,33 +404,39 @@ fn head_to_head_decision_matrix() {
     assert!(
         comp_reduces_maxvio_vs_mpi,
         "G-P3-4 FAIL: QB on MPI-conditioned scores did not halve MaxVio (got {:.4} → {:.4}).",
-        maxvio_mpi,
-        maxvio_comp
+        maxvio_mpi, maxvio_comp
     );
     assert!(
         comp_beats_qb_on_lambda,
         "G-P3-5 FAIL: Composition doesn't beat QB-only on λ by ≥ 0.1 \
          (λ_comp {:.4} vs λ_qb {:.4}).",
-        lambda_comp,
-        lambda_qb
+        lambda_comp, lambda_qb
     );
 
     // ── Strict Pareto dominance (composed > either alone) ──────────────
     // Composed must be no-worse on both axes and strictly better on at least
     // one, compared to EACH alternative.
-    let comp_dominates_mpi =
-        lambda_comp >= lambda_mpi - 1e-6 && maxvio_comp < maxvio_mpi - 1e-6;
-    let comp_dominates_qb =
-        maxvio_comp <= maxvio_qb + 0.1 && lambda_comp > lambda_qb + 0.1;
+    let comp_dominates_mpi = lambda_comp >= lambda_mpi - 1e-6 && maxvio_comp < maxvio_mpi - 1e-6;
+    let comp_dominates_qb = maxvio_comp <= maxvio_qb + 0.1 && lambda_comp > lambda_qb + 0.1;
     assert!(
         comp_dominates_mpi && comp_dominates_qb,
         "G-P3-6 FAIL: Composition is not strictly Pareto-better than both alternatives.\n\
          dominates MPI-only: {} (λ_comp {:.4} ≥ λ_mpi {:.4}={}, MaxVio_comp {:.4} < MaxVio_mpi {:.4}={})\n\
          dominates QB-only:  {} (MaxVio_comp {:.4} ≤ MaxVio_qb {:.4}+0.1={}, λ_comp {:.4} > λ_qb {:.4}={})",
-        comp_dominates_mpi, lambda_comp, lambda_mpi, lambda_comp >= lambda_mpi - 1e-6,
-        maxvio_comp, maxvio_mpi, maxvio_comp < maxvio_mpi - 1e-6,
-        comp_dominates_qb, maxvio_comp, maxvio_qb, maxvio_comp <= maxvio_qb + 0.1,
-        lambda_comp, lambda_qb, lambda_comp > lambda_qb + 0.1,
+        comp_dominates_mpi,
+        lambda_comp,
+        lambda_mpi,
+        lambda_comp >= lambda_mpi - 1e-6,
+        maxvio_comp,
+        maxvio_mpi,
+        maxvio_comp < maxvio_mpi - 1e-6,
+        comp_dominates_qb,
+        maxvio_comp,
+        maxvio_qb,
+        maxvio_comp <= maxvio_qb + 0.1,
+        lambda_comp,
+        lambda_qb,
+        lambda_comp > lambda_qb + 0.1,
     );
 
     eprintln!("  G-P3-6 PASS: Composition strictly Pareto-dominates both alternatives.\n");

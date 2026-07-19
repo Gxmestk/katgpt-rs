@@ -164,13 +164,11 @@ impl BpeTrainer {
 
             // Add merged token to vocabulary via entry API (single hash lookup
             // instead of contains_key + insert).
-            let id = *vocab_to_id
-                .entry(merged.clone())
-                .or_insert_with(|| {
-                    let id = id_to_vocab.len();
-                    id_to_vocab.push(merged.clone());
-                    id
-                });
+            let id = *vocab_to_id.entry(merged.clone()).or_insert_with(|| {
+                let id = id_to_vocab.len();
+                id_to_vocab.push(merged.clone());
+                id
+            });
             let _ = id; // id is already tracked via the merges table below
 
             merges.push(MergeRule {

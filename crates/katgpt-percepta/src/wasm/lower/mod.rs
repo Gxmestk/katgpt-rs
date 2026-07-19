@@ -1868,6 +1868,5 @@ pub fn check_basic_only(func: &FuncBody) -> HashMap<&'static str, usize> {
 //  Tests                                                                 //
 // ===================================================================== //
 
-
 #[cfg(test)]
 mod tests;

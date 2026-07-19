@@ -79,11 +79,11 @@ pub trait BomberPlayer {
 
 // ── Submodules ─────────────────────────────────────────────────
 
-mod helpers;
-mod random_player;
 mod greedy_player;
-mod validator_player;
+mod helpers;
 mod hl_player;
+mod random_player;
+mod validator_player;
 
 #[cfg(feature = "bomber-wasm")]
 mod lora_player;
@@ -120,8 +120,7 @@ pub use helpers::is_safe_action;
 // `blend_estimators.rs`, `contextual_bandit.rs`).
 pub(crate) use helpers::{
     count_escape_routes, in_blast_zone, intercept_score, is_in_single_blast, move_target,
-    predict_direction, score_action, should_place_bomb, trap_score, update_bombs,
-    update_powerups,
+    predict_direction, score_action, should_place_bomb, trap_score, update_bombs, update_powerups,
 };
 
 // ── Factory ────────────────────────────────────────────────────

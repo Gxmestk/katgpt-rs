@@ -72,7 +72,9 @@ use katgpt_transformer::swir::{
     StepAction, SwiRConfig, SwiRController, SwiRStrategyAdapter, ThinkMode, entropy_from_logits,
     in_vocab_convex_hull, mix_thinking_signal, shannon_entropy, soft_embedding,
 };
-use katgpt_transformer::thinking_cot::{ControlTokenIds, StepContext, StepDirective, ThinkingStrategy};
+use katgpt_transformer::thinking_cot::{
+    ControlTokenIds, StepContext, StepDirective, ThinkingStrategy,
+};
 use std::time::Instant;
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -588,7 +590,9 @@ fn g1c_controller_correctness_on_converging_schedule() {
             StepAction::InjectControlToken(katgpt_transformer::swir::ControlToken::CloseThink) => {
                 close_think_injections += 1;
             }
-            StepAction::InjectControlToken(katgpt_transformer::swir::ControlToken::ForceAnswerPrefix) => {
+            StepAction::InjectControlToken(
+                katgpt_transformer::swir::ControlToken::ForceAnswerPrefix,
+            ) => {
                 force_answer_injections += 1;
             }
             StepAction::Terminate => {

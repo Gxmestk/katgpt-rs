@@ -128,11 +128,15 @@ struct GateConfig {
 
 #[test]
 fn bench_483_lt2_loop_stable_goat() {
-    println!("\n\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}");
+    println!(
+        "\n\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}"
+    );
     println!("  Plan 483 T2.1+T2.2 — LT2 Loop-Stable Gate GOAT Benchmark");
     println!("  §3.5 Path 2 (T2.1): deterministic loop-stable residual gate");
     println!("  §3.5 Path 3 (T2.2): spectral-aware gate (power iteration)");
-    println!("\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}");
+    println!(
+        "\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}"
+    );
     println!();
 
     let mut config = Config::micro();
@@ -149,9 +153,15 @@ fn bench_483_lt2_loop_stable_goat() {
     // Uses layer 0's Wq as a representative spectral sample.
     let wq = &weights.layers[0].attn_wq;
     let lambda_max = dominant_eigenvalue(wq, config.n_embd, config.n_embd, 50);
-    println!("  T2.2 spectral analysis: λ_max(Wq layer 0) = {:.4}", lambda_max);
+    println!(
+        "  T2.2 spectral analysis: λ_max(Wq layer 0) = {:.4}",
+        lambda_max
+    );
     let spectral_gate_val = (1.0 / lambda_max).clamp(0.01, 0.9);
-    println!("  T2.2 spectral gate value: 1/λ_max = {:.4} (clamped to [0.01, 0.9])", spectral_gate_val);
+    println!(
+        "  T2.2 spectral gate value: 1/λ_max = {:.4} (clamped to [0.01, 0.9])",
+        spectral_gate_val
+    );
     println!();
 
     // Gate configurations to benchmark
@@ -201,10 +211,18 @@ fn bench_483_lt2_loop_stable_goat() {
     ];
 
     // Results table
-    println!("┌──────────────────────────────┬──────────┬──────────────┬──────────────┬──────────────┐");
-    println!("│ Gate                         │ G1 stab. │ G2 KL(1→4)   │ G3 KL(3→4)   │ G4 regress.  │");
-    println!("│                              │ (finite) │ (carry-fwd)  │ (converge)   │ (vs zero)    │");
-    println!("├──────────────────────────────┼──────────┼──────────────┼──────────────┼──────────────┤");
+    println!(
+        "┌──────────────────────────────┬──────────┬──────────────┬──────────────┬──────────────┐"
+    );
+    println!(
+        "│ Gate                         │ G1 stab. │ G2 KL(1→4)   │ G3 KL(3→4)   │ G4 regress.  │"
+    );
+    println!(
+        "│                              │ (finite) │ (carry-fwd)  │ (converge)   │ (vs zero)    │"
+    );
+    println!(
+        "├──────────────────────────────┼──────────┼──────────────┼──────────────┼──────────────┤"
+    );
 
     let mut all_pass = true;
     let mut zero_init_kl_1_4 = 0.0f32;
@@ -259,7 +277,11 @@ fn bench_483_lt2_loop_stable_goat() {
         let g4_pass = all_finite_t4;
 
         // G1: stability
-        let g1_str = if all_finite_t4 { "✅ PASS" } else { "❌ FAIL" };
+        let g1_str = if all_finite_t4 {
+            "✅ PASS"
+        } else {
+            "❌ FAIL"
+        };
 
         // G2: carry-forward — any non-zero KL means the gate is doing something
         let g2_str = format!("{:.6}", avg_kl_1_4);
@@ -280,23 +302,34 @@ fn bench_483_lt2_loop_stable_goat() {
         );
     }
 
-    println!("└──────────────────────────────┴──────────┴──────────────┴──────────────┴──────────────┘");
+    println!(
+        "└──────────────────────────────┴──────────┴──────────────┴──────────────┴──────────────┘"
+    );
     println!();
 
     // Analysis
     println!("── Analysis ──────────────────────────────────────────────────");
-    println!("  Zero-init baseline: KL(1→4) = {:.6}, KL(3→4) = {:.6}", zero_init_kl_1_4, zero_init_kl_3_4);
+    println!(
+        "  Zero-init baseline: KL(1→4) = {:.6}, KL(3→4) = {:.6}",
+        zero_init_kl_1_4, zero_init_kl_3_4
+    );
     println!();
 
     // GOAT gate verdict
     println!("── GOAT Gate ─────────────────────────────────────────────────");
     println!("  G1 (stability): all logits finite at T=4 for all gate types");
     println!("  G2 (carry-forward): KL(1→4) measures how much T=4 differs from T=1");
-    println!("    - Zero-init: KL = {:.6} (carry-forward from AHLA state only)", zero_init_kl_1_4);
+    println!(
+        "    - Zero-init: KL = {:.6} (carry-forward from AHLA state only)",
+        zero_init_kl_1_4
+    );
     println!("    - Loop-stable gates should show DIFFERENT KL values");
     println!("  G3 (convergence): KL(3→4) measures output stabilization");
     println!("    - Lower KL(3→4) = output is converging");
-    println!("    - Zero-init baseline: KL(3→4) = {:.6}", zero_init_kl_3_4);
+    println!(
+        "    - Zero-init baseline: KL(3→4) = {:.6}",
+        zero_init_kl_3_4
+    );
     println!("  G4 (no-regression): all logits finite (no divergence)");
     println!();
 
@@ -311,13 +344,15 @@ fn bench_483_lt2_loop_stable_goat() {
     println!("── Carry-Forward Analysis ────────────────────────────────────");
     println!("  If loop-stable gates show different KL(1→4) from zero-init,");
     println!("  the residual gate is contributing to information carry-forward.");
-    println!("  This is the modelless correction (§3.5 path 2).", );
+    println!("  This is the modelless correction (§3.5 path 2).",);
     println!();
     println!("── T2.2 vs T2.1 Comparison ───────────────────────────────────");
     println!("  T2.2 (spectral-aware) uses λ_max from power iteration on Wq.");
     println!("  If spectral gate ≠ best T2.1 gate (α=0.9), the spectral info");
     println!("  does NOT improve over the simple constant decay. T2.1 alone");
-    println!("  is sufficient (modelless win).", );
-    println!("\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}");
+    println!("  is sufficient (modelless win).",);
+    println!(
+        "\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}"
+    );
     println!("═══════════════════════════════════════════════════════════════");
 }

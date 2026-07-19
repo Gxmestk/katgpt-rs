@@ -9,8 +9,8 @@
 //! from experience.
 
 use super::types::{
-    check_dim, compute_direction_commitment, normalize_in_place, MagDirection, MagError,
-    MagOperator,
+    MagDirection, MagError, MagOperator, check_dim, compute_direction_commitment,
+    normalize_in_place,
 };
 
 // ── Mean-shift direction ───────────────────────────────────────────
@@ -308,7 +308,10 @@ pub fn calibrate_alpha<S: AsRef<[f32]>>(
 /// at least `d` elements. Returns `Err(MagError::DimMismatch)` on inconsistency
 /// or `Err(MagError::Empty)` if a required readout for the chosen operator is
 /// missing.
-#[allow(clippy::too_many_arguments, reason = "each arg is a distinct activation readout the operator selects between; see doc comment")]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "each arg is a distinct activation readout the operator selects between; see doc comment"
+)]
 pub fn apply_operator_into(
     op: MagOperator,
     a_p: &[f32],
@@ -404,7 +407,10 @@ pub fn apply_operator_into(
 
 /// Allocating convenience wrapper for [`apply_operator_into`]. Returns a fresh
 /// `Vec<f32>` of length `d`. Prefer [`apply_operator_into`] on hot paths.
-#[allow(clippy::too_many_arguments, reason = "each arg is a distinct activation readout the operator selects between; see doc comment")]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "each arg is a distinct activation readout the operator selects between; see doc comment"
+)]
 pub fn apply_operator(
     op: MagOperator,
     a_p: &[f32],
@@ -462,14 +468,20 @@ mod tests {
     fn mine_direction_zero_shift_errors() {
         let with: Vec<[f32; 2]> = vec![[1.0, 2.0], [3.0, 4.0]];
         let without: Vec<[f32; 2]> = vec![[1.0, 2.0], [3.0, 4.0]];
-        assert_eq!(mine_direction(&with, &without).unwrap_err(), MagError::ZeroNorm);
+        assert_eq!(
+            mine_direction(&with, &without).unwrap_err(),
+            MagError::ZeroNorm
+        );
     }
 
     #[test]
     fn mine_direction_dim_mismatch_errors() {
         let with: Vec<Vec<f32>> = vec![vec![1.0, 2.0], vec![3.0, 4.0]];
         let without: Vec<Vec<f32>> = vec![vec![1.0, 2.0, 3.0]];
-        assert_eq!(mine_direction(&with, &without).unwrap_err(), MagError::DimMismatch);
+        assert_eq!(
+            mine_direction(&with, &without).unwrap_err(),
+            MagError::DimMismatch
+        );
     }
 
     #[test]
@@ -522,7 +534,10 @@ mod tests {
         let with: Vec<[f32; 2]> = vec![[3.0, 4.0]]; // mean = [3,4], norm = 5
         let direction = [1.0, 0.0]; // unit norm
         let alpha = calibrate_alpha(0.1, &with, &direction).unwrap();
-        assert!(approx_eq(alpha, 0.5, 1e-4), "alpha = 0.1 * 5 / 1 = 0.5, got {alpha}");
+        assert!(
+            approx_eq(alpha, 0.5, 1e-4),
+            "alpha = 0.1 * 5 / 1 = 0.5, got {alpha}"
+        );
     }
 
     #[test]
@@ -610,17 +625,8 @@ mod tests {
     fn apply_operator_allocating_wrapper() {
         let a_p = [1.0, 2.0];
         let a_eqp = [4.0, 6.0];
-        let out = apply_operator(
-            MagOperator::FewShot,
-            &a_p,
-            &[],
-            &[],
-            &[],
-            &[],
-            &[],
-            &a_eqp,
-        )
-        .unwrap();
+        let out =
+            apply_operator(MagOperator::FewShot, &a_p, &[], &[], &[], &[], &[], &a_eqp).unwrap();
         assert_eq!(out, vec![3.0, 4.0]);
     }
 
@@ -630,8 +636,7 @@ mod tests {
         let without: Vec<[f32; 2]> = vec![[1.0, 0.0], [2.0, 1.0]];
         let dir = mine_direction(&with, &without).unwrap();
         assert!(dir.recon_error.is_nan());
-        let (eps, cos) =
-            reconstruction_error(&with, &without, dir.as_slice(), 1.0).unwrap();
+        let (eps, cos) = reconstruction_error(&with, &without, dir.as_slice(), 1.0).unwrap();
         let dir = dir.with_diagnostics(eps, cos);
         assert!(!dir.recon_error.is_nan());
         assert!(!dir.cosine.is_nan());

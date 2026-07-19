@@ -12,9 +12,9 @@
 //! loss is convex (log-sum-exp minus linear); we solve it via Newton's method
 //! with the PSD Hessian `Cov̂_{ω_θ}(φ(X))` and Cholesky back-solve.
 
+use super::LogRatioClass;
 use super::solve::{cholesky_inplace, cholesky_solve_into};
 use super::types::{InitialMoments, KlProjectionScratch, TransitionBatch};
-use super::LogRatioClass;
 
 /// 3-iterator zip helper (avoids pulling the `itertools` crate for one fn).
 /// Takes slices by reference; returns an iterator of `(&mut A, &B, &C)`.
@@ -24,7 +24,10 @@ fn izip3_mut<'a, A, B, C>(
     b: &'a [B],
     c: &'a [C],
 ) -> impl Iterator<Item = (&'a mut A, &'a B, &'a C)> {
-    a.iter_mut().zip(b.iter()).zip(c.iter()).map(|((a, b), c)| (a, b, c))
+    a.iter_mut()
+        .zip(b.iter())
+        .zip(c.iter())
+        .map(|((a, b), c)| (a, b, c))
 }
 
 /// Evaluate the KL-projection loss `L(θ) = log((1/n)Σ e^{θ·φ_i}) − θ^T m` at the
@@ -174,7 +177,10 @@ impl LogRatioClass for LinearLogRatioClass {
     ) {
         let n = transitions.n;
         let d = self.feature_dim;
-        debug_assert_eq!(transitions.state_dim, d, "identity feature map: state_dim == feature_dim");
+        debug_assert_eq!(
+            transitions.state_dim, d,
+            "identity feature map: state_dim == feature_dim"
+        );
         debug_assert_eq!(initial.state_dim, d);
         debug_assert_eq!(current_ratio.len(), n);
         debug_assert_eq!(next_ratio.len(), n);
@@ -205,11 +211,7 @@ impl LogRatioClass for LinearLogRatioClass {
             for (i, &omega) in current_ratio.iter().enumerate() {
                 let w = omega * inv_omega_sum;
                 let succ = &transitions.successors[i * d..(i + 1) * d];
-                for (slot, &s) in scratch
-                    .successor_weighted_sum
-                    .iter_mut()
-                    .zip(succ.iter())
-                {
+                for (slot, &s) in scratch.successor_weighted_sum.iter_mut().zip(succ.iter()) {
                     *slot += w * s;
                 }
             }
@@ -337,9 +339,7 @@ impl LogRatioClass for LinearLogRatioClass {
             let mut step_accepted = false;
             for _retry in 0..MAX_LM_RETRIES {
                 // Copy H → H_damped, add λ·I, Cholesky, solve.
-                scratch
-                    .hessian_damped
-                    .copy_from_slice(&scratch.hessian);
+                scratch.hessian_damped.copy_from_slice(&scratch.hessian);
                 for a in 0..d {
                     scratch.hessian_damped[a * d + a] += lambda;
                 }
@@ -358,11 +358,9 @@ impl LogRatioClass for LinearLogRatioClass {
                 );
 
                 // Trial: θ_trial = θ − Δθ.
-                for (trial, &th, &delta) in izip3_mut(
-                    &mut scratch.params_trial,
-                    &params[..],
-                    &scratch.newton_step,
-                ) {
+                for (trial, &th, &delta) in
+                    izip3_mut(&mut scratch.params_trial, &params[..], &scratch.newton_step)
+                {
                     *trial = th - delta;
                 }
 

@@ -19,11 +19,11 @@
 
 #![cfg(feature = "gauge_invariant")]
 
+use katgpt_core::newton_schulz::{InvSqrtScratch, ns_inv_sqrt_psd, ns_inv_sqrt_psd_into};
 use katgpt_spectral::gauge_invariant::{
     GaugePair, GaugeRebalanceScratch, gauge_invariant_compose, gauge_invariant_lerp,
     gauge_rebalance,
 };
-use katgpt_core::newton_schulz::{InvSqrtScratch, ns_inv_sqrt_psd, ns_inv_sqrt_psd_into};
 use std::time::{Duration, Instant};
 
 // ── Helpers ──────────────────────────────────────────────────────────────

@@ -110,11 +110,7 @@ impl FsmStrategy {
     ) -> u64 {
         let mut hasher = blake3::Hasher::new();
         for s in 0..n_states as usize {
-            hasher.update(&[
-                transitions[s][0],
-                transitions[s][1],
-                outputs[s],
-            ]);
+            hasher.update(&[transitions[s][0], transitions[s][1], outputs[s]]);
         }
         hasher.update(&[n_states]);
         let hash = hasher.finalize();

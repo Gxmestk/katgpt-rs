@@ -169,4 +169,3 @@ pub struct BanditSnapshot {
     pub total_pulls: u32,
     pub compressed: Vec<bool>,
 }
-

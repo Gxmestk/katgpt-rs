@@ -18,7 +18,9 @@ use katgpt_core::newton_schulz::{InvSqrtScratch, ns_inv_sqrt_psd_into};
 
 /// Simple LCG for deterministic random data (no external dep).
 fn lcg_next(state: &mut u64) -> f32 {
-    *state = state.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+    *state = state
+        .wrapping_mul(6364136223846793005)
+        .wrapping_add(1442695040888963407);
     let bits = (*state >> 33) as u32;
     // Map to [-1, 1]
     (bits as f32) / (u32::MAX as f32) * 2.0 - 1.0
@@ -30,7 +32,9 @@ fn rank_deficient_psd(seed: u64, r: usize, actual_rank: usize) -> Vec<f32> {
     assert!(actual_rank <= r);
     let mut state = seed;
     // M is actual_rank × r (row-major)
-    let m = (0..actual_rank * r).map(|_| lcg_next(&mut state)).collect::<Vec<f32>>();
+    let m = (0..actual_rank * r)
+        .map(|_| lcg_next(&mut state))
+        .collect::<Vec<f32>>();
     // P = Mᵀ·M (r × r)
     let mut p = vec![0.0f32; r * r];
     for i in 0..r {
@@ -155,9 +159,15 @@ fn issue043_rank_deficient_r16_rank2_no_nan() {
         let mut out = vec![0.0f32; r * r];
         let mut scratch = InvSqrtScratch::new(r);
         ns_inv_sqrt_psd_into(&p, r, &mut out, &mut scratch, 7);
-        assert!(all_finite(&out), "r={r} rank={actual_rank} seed={seed}: NaN/Inf in output");
+        assert!(
+            all_finite(&out),
+            "r={r} rank={actual_rank} seed={seed}: NaN/Inf in output"
+        );
         let sym = max_symmetry_error(&out, r);
-        assert!(sym < 1e-3, "r={r} rank={actual_rank} seed={seed}: symmetry err {sym:.4e} >= 1e-3");
+        assert!(
+            sym < 1e-3,
+            "r={r} rank={actual_rank} seed={seed}: symmetry err {sym:.4e} >= 1e-3"
+        );
     }
 }
 
@@ -172,9 +182,15 @@ fn issue043_rank_deficient_r32_rank2_no_nan() {
         let mut out = vec![0.0f32; r * r];
         let mut scratch = InvSqrtScratch::new(r);
         ns_inv_sqrt_psd_into(&p, r, &mut out, &mut scratch, 7);
-        assert!(all_finite(&out), "r={r} rank={actual_rank} seed={seed}: NaN/Inf in output");
+        assert!(
+            all_finite(&out),
+            "r={r} rank={actual_rank} seed={seed}: NaN/Inf in output"
+        );
         let sym = max_symmetry_error(&out, r);
-        assert!(sym < 1e-3, "r={r} rank={actual_rank} seed={seed}: symmetry err {sym:.4e} >= 1e-3");
+        assert!(
+            sym < 1e-3,
+            "r={r} rank={actual_rank} seed={seed}: symmetry err {sym:.4e} >= 1e-3"
+        );
     }
 }
 
@@ -187,9 +203,15 @@ fn issue043_rank_deficient_r32_rank8_no_nan() {
         let mut out = vec![0.0f32; r * r];
         let mut scratch = InvSqrtScratch::new(r);
         ns_inv_sqrt_psd_into(&p, r, &mut out, &mut scratch, 7);
-        assert!(all_finite(&out), "r={r} rank={actual_rank} seed={seed}: NaN/Inf in output");
+        assert!(
+            all_finite(&out),
+            "r={r} rank={actual_rank} seed={seed}: NaN/Inf in output"
+        );
         let sym = max_symmetry_error(&out, r);
-        assert!(sym < 1e-3, "r={r} rank={actual_rank} seed={seed}: symmetry err {sym:.4e} >= 1e-3");
+        assert!(
+            sym < 1e-3,
+            "r={r} rank={actual_rank} seed={seed}: symmetry err {sym:.4e} >= 1e-3"
+        );
     }
 }
 
@@ -204,9 +226,15 @@ fn issue043_rank_deficient_r64_rank8_no_nan() {
         let mut out = vec![0.0f32; r * r];
         let mut scratch = InvSqrtScratch::new(r);
         ns_inv_sqrt_psd_into(&p, r, &mut out, &mut scratch, 7);
-        assert!(all_finite(&out), "r={r} rank={actual_rank} seed={seed}: NaN/Inf in output");
+        assert!(
+            all_finite(&out),
+            "r={r} rank={actual_rank} seed={seed}: NaN/Inf in output"
+        );
         let sym = max_symmetry_error(&out, r);
-        assert!(sym < 1e-3, "r={r} rank={actual_rank} seed={seed}: symmetry err {sym:.4e} >= 1e-3");
+        assert!(
+            sym < 1e-3,
+            "r={r} rank={actual_rank} seed={seed}: symmetry err {sym:.4e} >= 1e-3"
+        );
     }
 }
 
@@ -219,9 +247,15 @@ fn issue043_rank_deficient_r64_rank16_no_nan() {
         let mut out = vec![0.0f32; r * r];
         let mut scratch = InvSqrtScratch::new(r);
         ns_inv_sqrt_psd_into(&p, r, &mut out, &mut scratch, 7);
-        assert!(all_finite(&out), "r={r} rank={actual_rank} seed={seed}: NaN/Inf in output");
+        assert!(
+            all_finite(&out),
+            "r={r} rank={actual_rank} seed={seed}: NaN/Inf in output"
+        );
         let sym = max_symmetry_error(&out, r);
-        assert!(sym < 1e-3, "r={r} rank={actual_rank} seed={seed}: symmetry err {sym:.4e} >= 1e-3");
+        assert!(
+            sym < 1e-3,
+            "r={r} rank={actual_rank} seed={seed}: symmetry err {sym:.4e} >= 1e-3"
+        );
     }
 }
 

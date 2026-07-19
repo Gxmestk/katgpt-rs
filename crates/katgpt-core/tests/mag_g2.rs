@@ -35,10 +35,7 @@ fn gaussian(rng: &mut fastrand::Rng) -> f32 {
 
 /// Generate samples from 2 Gaussians. Returns (samples, labels) where
 /// labels[i] = true for class 1 (μ₁), false for class 2 (μ₂).
-fn generate_two_class(
-    rng: &mut fastrand::Rng,
-    sigma: f32,
-) -> (Vec<[f32; D]>, Vec<bool>) {
+fn generate_two_class(rng: &mut fastrand::Rng, sigma: f32) -> (Vec<[f32; D]>, Vec<bool>) {
     let mut mu1 = [0.0_f32; D];
     let mut mu2 = [0.0_f32; D];
     mu1[0] = 2.0;

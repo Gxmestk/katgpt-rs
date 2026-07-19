@@ -274,11 +274,7 @@ pub fn recos_sim_slice_into(a: &mut [f32], b: &mut [f32]) -> f32 {
     } else {
         b.sort_unstable_by(|x, y| y.partial_cmp(x).unwrap());
     }
-    let bound: f32 = a
-        .iter()
-        .zip(b.iter())
-        .map(|(&x, &y)| x * y)
-        .sum();
+    let bound: f32 = a.iter().zip(b.iter()).map(|(&x, &y)| x * y).sum();
     if bound.abs() < 1e-12 {
         0.0
     } else {
@@ -298,14 +294,20 @@ mod tests {
     fn all_ones_gives_one() {
         // All cosines = 1.0 → perfect match → similarity = 1.0
         let sim = smooth_min_similarity(&[1.0, 1.0, 1.0, 1.0], 1e4);
-        assert!((sim - 1.0).abs() < TOL, "all-ones should give 1.0, got {sim}");
+        assert!(
+            (sim - 1.0).abs() < TOL,
+            "all-ones should give 1.0, got {sim}"
+        );
     }
 
     #[test]
     fn single_element_returns_it() {
         // m=1: smooth_min([c]) = 1 - log_β(β^(1-c) - 1 + 1) = 1 - (1-c) = c
         let sim = smooth_min_similarity(&[0.7], 1e4);
-        assert!((sim - 0.7).abs() < TOL, "single element should return c, got {sim}");
+        assert!(
+            (sim - 0.7).abs() < TOL,
+            "single element should return c, got {sim}"
+        );
     }
 
     #[test]
@@ -317,7 +319,10 @@ mod tests {
         let sim_m1 = smooth_min_similarity(&[0.5], 1e4);
         let sim_m2 = smooth_min_similarity(&[0.5, 0.5], 1e4);
         let sim_m4 = smooth_min_similarity(&[0.5, 0.5, 0.5, 0.5], 1e4);
-        assert!((sim_m1 - 0.5).abs() < TOL, "m=1 should return c, got {sim_m1}");
+        assert!(
+            (sim_m1 - 0.5).abs() < TOL,
+            "m=1 should return c, got {sim_m1}"
+        );
         assert!(sim_m2 < sim_m1, "m=2 should be < m=1: {sim_m2} < {sim_m1}");
         assert!(sim_m4 < sim_m2, "m=4 should be < m=2: {sim_m4} < {sim_m2}");
     }
@@ -349,7 +354,10 @@ mod tests {
         let sim_high = smooth_min_similarity(&cosines, 1e6);
         // Just verify they're all different and finite
         assert!(sim_low.is_finite() && sim_mid.is_finite() && sim_high.is_finite());
-        assert!(sim_low != sim_mid || sim_mid != sim_high, "β should affect the score");
+        assert!(
+            sim_low != sim_mid || sim_mid != sim_high,
+            "β should affect the score"
+        );
     }
 
     #[test]
@@ -370,7 +378,10 @@ mod tests {
     fn handles_negative_cosines() {
         // Anti-correlated tokens should give low (possibly negative) scores
         let sim = smooth_min_similarity(&[0.5, -0.5, 0.5, -0.5], 1e4);
-        assert!(sim < 0.0, "anti-correlated should give negative score, got {sim}");
+        assert!(
+            sim < 0.0,
+            "anti-correlated should give negative score, got {sim}"
+        );
     }
 
     #[test]
@@ -417,7 +428,10 @@ mod tests {
         let p1 = edit_penalty(0.5, 1.0);
         let p2 = edit_penalty(1.0, 1.0);
         let p3 = edit_penalty(2.0, 1.0);
-        assert!(p1 > p2 && p2 > p3, "should be decreasing: {p1} > {p2} > {p3}");
+        assert!(
+            p1 > p2 && p2 > p3,
+            "should be decreasing: {p1} > {p2} > {p3}"
+        );
     }
 
     #[test]
@@ -426,7 +440,10 @@ mod tests {
         let p1 = edit_penalty(1.0, 0.5);
         let p2 = edit_penalty(1.0, 1.0);
         let p3 = edit_penalty(1.0, 2.0);
-        assert!(p1 < p2 && p2 < p3, "should be increasing: {p1} < {p2} < {p3}");
+        assert!(
+            p1 < p2 && p2 < p3,
+            "should be increasing: {p1} < {p2} < {p3}"
+        );
     }
 
     #[test]
@@ -434,7 +451,10 @@ mod tests {
         // For non-negative norm_sq, penalty is in (0, 1]
         for &norm_sq in &[0.0, 0.1, 0.5, 1.0, 2.0, 10.0, 100.0] {
             let p = edit_penalty(norm_sq, 1.0);
-            assert!(p > 0.0 && p <= 1.0, "penalty {p} not in (0,1] for norm_sq={norm_sq}");
+            assert!(
+                p > 0.0 && p <= 1.0,
+                "penalty {p} not in (0,1] for norm_sq={norm_sq}"
+            );
         }
     }
 
@@ -473,7 +493,10 @@ mod tests {
         // log_β(m) offset, but above the distractor scenario.
         let sim = smooth_min_similarity(&[0.8, 0.6], 1e4);
         // For m=2, β=10⁴: sim ≈ 0.586 (below min 0.6, above 0)
-        assert!(sim > 0.0 && sim < 0.6, "two-token case: {sim} should be in (0, 0.6)");
+        assert!(
+            sim > 0.0 && sim < 0.6,
+            "two-token case: {sim} should be in (0, 0.6)"
+        );
     }
 
     #[test]
@@ -482,7 +505,10 @@ mod tests {
         // log_β(m) offset is larger, so the score can be lower.
         let cosines: Vec<f32> = (0..64).map(|i| 0.3 + 0.01 * i as f32).collect();
         let sim = smooth_min_similarity(&cosines, 1e4);
-        assert!(sim.is_finite(), "large token count should give finite result");
+        assert!(
+            sim.is_finite(),
+            "large token count should give finite result"
+        );
         // With 64 tokens at cosine 0.3-0.93, sim is dominated by the low end
         // and the large m offset. Just check it's finite and ordered correctly.
     }
@@ -528,10 +554,16 @@ mod tests {
         let a = [1.0f32, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0];
         let b = [1.0f32, 4.0, 9.0, 16.0, 25.0, 36.0, 49.0, 64.0]; // b = a²
         let r = recos_sim(&a, &b);
-        assert!((r - 1.0).abs() < 1e-5, "ordinal concordant should be 1.0, got {r}");
+        assert!(
+            (r - 1.0).abs() < 1e-5,
+            "ordinal concordant should be 1.0, got {r}"
+        );
         let c = cosine_sim(&a, &b);
         // recos == 1.0, cosine < 1.0 — demonstrates the wider capture range.
-        assert!(c < 1.0 - 1e-4, "cosine {c} should be < 1.0 here (nonlinear pair)");
+        assert!(
+            c < 1.0 - 1e-4,
+            "cosine {c} should be < 1.0 here (nonlinear pair)"
+        );
     }
 
     #[cfg(feature = "recos")]
@@ -590,9 +622,18 @@ mod tests {
         let b = normalize(b_raw);
         let r = recos_sim(&a, &b);
         let c = cosine_sim(&a, &b);
-        assert!((r - 1.0).abs() < 1e-4, "unit-norm recos should saturate at 1.0, got {r}");
-        assert!(c < 1.0 - 1e-3, "unit-norm cosine should stay < 1.0 (nonlinear), got {c}");
-        assert!(r > c, "recos {r} should beat cosine {c} on monotonic-nonlinear");
+        assert!(
+            (r - 1.0).abs() < 1e-4,
+            "unit-norm recos should saturate at 1.0, got {r}"
+        );
+        assert!(
+            c < 1.0 - 1e-3,
+            "unit-norm cosine should stay < 1.0 (nonlinear), got {c}"
+        );
+        assert!(
+            r > c,
+            "recos {r} should beat cosine {c} on monotonic-nonlinear"
+        );
     }
 
     #[cfg(feature = "recos")]
@@ -602,12 +643,21 @@ mod tests {
         let zero = [0.0f32; 8];
         let b = [1.0f32, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0];
         let r = recos_sim(&zero, &b);
-        assert!(r == 0.0 && r.is_finite(), "zero-vector recos should be 0.0, got {r}");
+        assert!(
+            r == 0.0 && r.is_finite(),
+            "zero-vector recos should be 0.0, got {r}"
+        );
         let r2 = recos_sim(&b, &zero);
-        assert!(r2 == 0.0 && r2.is_finite(), "zero-vector recos (b,zero) should be 0.0, got {r2}");
+        assert!(
+            r2 == 0.0 && r2.is_finite(),
+            "zero-vector recos (b,zero) should be 0.0, got {r2}"
+        );
         // Ranking variant too.
         let r3 = recos_sim_ranking(&zero, &b);
-        assert!(r3 == 0.0 && r3.is_finite(), "zero-vector ranking should be 0.0, got {r3}");
+        assert!(
+            r3 == 0.0 && r3.is_finite(),
+            "zero-vector ranking should be 0.0, got {r3}"
+        );
     }
 
     #[cfg(feature = "recos")]
@@ -622,7 +672,10 @@ mod tests {
         let dot = dot_8(&a, &b);
         assert!(dot < 0.0, "precondition: dot should be negative, got {dot}");
         let r = recos_sim(&a, &b);
-        assert!((r - 1.0).abs() < 1e-4, "sign-flipped concordant recos should be +1.0, got {r}");
+        assert!(
+            (r - 1.0).abs() < 1e-4,
+            "sign-flipped concordant recos should be +1.0, got {r}"
+        );
     }
 
     #[cfg(feature = "recos")]
@@ -633,7 +686,10 @@ mod tests {
         let b: [f32; 8] = [1.1, 0.4, -2.8, 3.3, 1.7, -0.9, 2.5, 0.6];
         let fixed = recos_sim(&a, &b);
         let slice = recos_sim_slice(&a, &b);
-        assert!((fixed - slice).abs() < 1e-5, "slice {slice} should match d8 {fixed}");
+        assert!(
+            (fixed - slice).abs() < 1e-5,
+            "slice {slice} should match d8 {fixed}"
+        );
     }
 
     #[cfg(feature = "recos")]
@@ -655,8 +711,14 @@ mod tests {
         let k_low = recos_sim_ranking(&a, &b_low);
 
         // Same ordering under both scorers.
-        assert!(r_perf >= r_mid && r_mid >= r_low, "recos order: {r_perf} >= {r_mid} >= {r_low}");
-        assert!(k_perf >= k_mid && k_mid >= k_low, "ranking order: {k_perf} >= {k_mid} >= {k_low}");
+        assert!(
+            r_perf >= r_mid && r_mid >= r_low,
+            "recos order: {r_perf} >= {r_mid} >= {r_low}"
+        );
+        assert!(
+            k_perf >= k_mid && k_mid >= k_low,
+            "ranking order: {k_perf} >= {k_mid} >= {k_low}"
+        );
     }
 
     #[cfg(feature = "recos")]
@@ -666,6 +728,9 @@ mod tests {
         let b = [1.1f32, 0.4, -2.8, 3.3, 1.7, -0.9, 2.5, 0.6];
         let x = recos_sim(&a, &b);
         let y = recos_sim(&a, &b);
-        assert!((x - y).abs() < f32::EPSILON, "recos should be deterministic");
+        assert!(
+            (x - y).abs() < f32::EPSILON,
+            "recos should be deterministic"
+        );
     }
 }

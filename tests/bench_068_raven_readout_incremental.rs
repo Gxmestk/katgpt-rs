@@ -13,11 +13,11 @@
 use std::hint::black_box;
 use std::time::Instant;
 
+use katgpt_quant::turboquant::TurboQuantKVCache;
 use katgpt_rs::transformer::{
     ForwardContext, RavenKVCache, TransformerWeights, forward_turboquant, raven_readout,
     raven_readout_into, raven_update,
 };
-use katgpt_quant::turboquant::TurboQuantKVCache;
 use katgpt_rs::types::{Config, Rng, kv_dim};
 
 // ─── Raven Readout Benchmark ─────────────────────────────────────

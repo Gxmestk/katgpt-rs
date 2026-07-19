@@ -15,20 +15,22 @@
 
 #![allow(clippy::needless_range_loop)]
 
+use crate::types::{Config, Rng, softmax_scaled};
+use katgpt_attn::gdn2::MultiLayerGdn2Cache;
 use katgpt_attn::gdn2::forward::forward_gdn2;
 use katgpt_attn::gdn2::tree_forward::forward_tree_gdn2;
-use katgpt_attn::gdn2::MultiLayerGdn2Cache;
 use katgpt_core::gdn_tree_verify::{GdnTreeVerifier, TreeTopology, build_topology_from_tree_nodes};
-use katgpt_core::speculative::sampling::{sample_from_distribution, sample_residual_distribution_into};
+use katgpt_core::speculative::sampling::{
+    sample_from_distribution, sample_residual_distribution_into,
+};
 use katgpt_core::speculative::types::TreeNode;
 use katgpt_core::traits::NoPruner;
-use katgpt_forward::{ForwardContext, SpeculativeContext};
 use katgpt_forward::dflash::dflash_predict_with;
 #[cfg(feature = "weaver_runtime")]
 use katgpt_forward::dflash::dflash_predict_with_weaver;
+use katgpt_forward::{ForwardContext, SpeculativeContext};
 use katgpt_speculative::dd_tree::TreeBuilder;
 use katgpt_transformer::TransformerWeights;
-use crate::types::{Config, Rng, softmax_scaled};
 
 /// Build a `&[&[f32]]` view over `marginals_flat` using a stack array (max 64 steps).
 ///
@@ -166,9 +168,17 @@ pub fn gdn_tree_post_verify(
         // Bonus token if all accepted.
         if all_accepted && !accepted.is_empty() {
             let last_depth = path.len() - 1;
-            let last_prefix = path.iter().take(last_depth + 1).enumerate().fold(0u128, |acc, (d, &tok)| {
-                if d == 0 { tok as u128 } else { (acc << 16) | (tok as u128) }
-            });
+            let last_prefix =
+                path.iter()
+                    .take(last_depth + 1)
+                    .enumerate()
+                    .fold(0u128, |acc, (d, &tok)| {
+                        if d == 0 {
+                            tok as u128
+                        } else {
+                            (acc << 16) | (tok as u128)
+                        }
+                    });
             let bonus_logits: Option<Vec<f32>> = (0..t).find_map(|k| {
                 let orig = topo.topo_order[k];
                 let node = &tree[orig];
@@ -256,17 +266,17 @@ pub fn speculative_step_gdn_tree(
 ) -> (Vec<usize>, usize) {
     // 1. Draft marginals via DFlash.
     let _ = dflash_predict_with(draft_sctx, draft_weights, draft_config, token, pos);
-    let (count, marginals_buf) =
-        build_marginals_view(&draft_sctx.marginals_flat, draft_sctx.steps_populated, draft_config.vocab_size);
+    let (count, marginals_buf) = build_marginals_view(
+        &draft_sctx.marginals_flat,
+        draft_sctx.steps_populated,
+        draft_config.vocab_size,
+    );
     let marginals = &marginals_buf[..count];
 
     // 2. Build DDTree + topology.
     let tree = tree_builder.build(marginals, draft_config, &NoPruner, false);
     if tree.is_empty() {
-        let fallback = sample_from_distribution(
-            marginals.first().copied().unwrap_or(&[1.0]),
-            rng,
-        );
+        let fallback = sample_from_distribution(marginals.first().copied().unwrap_or(&[1.0]), rng);
         return (vec![fallback], 1);
     }
     let alpha = target_cache
@@ -355,17 +365,17 @@ pub fn speculative_step_gdn_tree_with_weaver(
         embedding,
         weaver_scratch,
     );
-    let (count, marginals_buf) =
-        build_marginals_view(&draft_sctx.marginals_flat, draft_sctx.steps_populated, draft_config.vocab_size);
+    let (count, marginals_buf) = build_marginals_view(
+        &draft_sctx.marginals_flat,
+        draft_sctx.steps_populated,
+        draft_config.vocab_size,
+    );
     let marginals = &marginals_buf[..count];
 
     // 2. Build DDTree + topology.
     let tree = tree_builder.build(marginals, draft_config, &NoPruner, false);
     if tree.is_empty() {
-        let fallback = sample_from_distribution(
-            marginals.first().copied().unwrap_or(&[1.0]),
-            rng,
-        );
+        let fallback = sample_from_distribution(marginals.first().copied().unwrap_or(&[1.0]), rng);
         return (vec![fallback], 1);
     }
     let alpha = target_cache
@@ -467,17 +477,17 @@ pub fn speculative_step_gdn_hola_tree(
 
     // 1. Draft marginals via DFlash.
     let _ = dflash_predict_with(draft_sctx, draft_weights, draft_config, token, pos);
-    let (count, marginals_buf) =
-        build_marginals_view(&draft_sctx.marginals_flat, draft_sctx.steps_populated, draft_config.vocab_size);
+    let (count, marginals_buf) = build_marginals_view(
+        &draft_sctx.marginals_flat,
+        draft_sctx.steps_populated,
+        draft_config.vocab_size,
+    );
     let marginals = &marginals_buf[..count];
 
     // 2. Build DDTree + topology.
     let tree = tree_builder.build(marginals, draft_config, &NoPruner, false);
     if tree.is_empty() {
-        let fallback = sample_from_distribution(
-            marginals.first().copied().unwrap_or(&[1.0]),
-            rng,
-        );
+        let fallback = sample_from_distribution(marginals.first().copied().unwrap_or(&[1.0]), rng);
         return (vec![fallback], 1);
     }
     let alpha = target_cache
@@ -560,17 +570,17 @@ pub fn speculative_step_gdn_hola_tree_with_weaver(
         embedding,
         weaver_scratch,
     );
-    let (count, marginals_buf) =
-        build_marginals_view(&draft_sctx.marginals_flat, draft_sctx.steps_populated, draft_config.vocab_size);
+    let (count, marginals_buf) = build_marginals_view(
+        &draft_sctx.marginals_flat,
+        draft_sctx.steps_populated,
+        draft_config.vocab_size,
+    );
     let marginals = &marginals_buf[..count];
 
     // 2. Build DDTree + topology.
     let tree = tree_builder.build(marginals, draft_config, &NoPruner, false);
     if tree.is_empty() {
-        let fallback = sample_from_distribution(
-            marginals.first().copied().unwrap_or(&[1.0]),
-            rng,
-        );
+        let fallback = sample_from_distribution(marginals.first().copied().unwrap_or(&[1.0]), rng);
         return (vec![fallback], 1);
     }
     let alpha = target_cache
@@ -681,10 +691,18 @@ mod tests {
             let mut rng = Rng::new(42);
 
             speculative_step_gdn_tree(
-                &mut draft_sctx, &mut tree_builder,
-                &weights, &config, &weights, &config,
-                &mut ctx, &mut cache, &mut verifier,
-                config.bos_token, 0, &mut rng,
+                &mut draft_sctx,
+                &mut tree_builder,
+                &weights,
+                &config,
+                &weights,
+                &config,
+                &mut ctx,
+                &mut cache,
+                &mut verifier,
+                config.bos_token,
+                0,
+                &mut rng,
             )
         };
 
@@ -707,7 +725,9 @@ mod tests {
         katgpt_speculative::weaver::WeaverCorrector,
         katgpt_speculative::weaver::WeaverScratch,
     ) {
-        use katgpt_speculative::weaver::{WeaverConfig, WeaverCorrector, WeaverScratch, WeaverWeights};
+        use katgpt_speculative::weaver::{
+            WeaverConfig, WeaverCorrector, WeaverScratch, WeaverWeights,
+        };
         let weaver_cfg = WeaverConfig {
             hidden_dim: n_embd,
             n_heads: 4,
@@ -747,21 +767,38 @@ mod tests {
             if use_weaver {
                 let (weaver, mut wscratch) =
                     make_zero_weaver(config.n_embd, config.vocab_size, config.draft_lookahead);
-                let mut h_dflash_captured =
-                    vec![0.0f32; config.draft_lookahead * config.n_embd];
+                let mut h_dflash_captured = vec![0.0f32; config.draft_lookahead * config.n_embd];
                 speculative_step_gdn_tree_with_weaver(
-                    &mut draft_sctx, &mut tree_builder,
-                    &weights, &config, &weights, &config,
-                    &mut ctx, &mut cache, &mut verifier,
-                    config.bos_token, 0, &mut rng,
-                    &mut h_dflash_captured, &weaver, &mut wscratch,
+                    &mut draft_sctx,
+                    &mut tree_builder,
+                    &weights,
+                    &config,
+                    &weights,
+                    &config,
+                    &mut ctx,
+                    &mut cache,
+                    &mut verifier,
+                    config.bos_token,
+                    0,
+                    &mut rng,
+                    &mut h_dflash_captured,
+                    &weaver,
+                    &mut wscratch,
                 )
             } else {
                 speculative_step_gdn_tree(
-                    &mut draft_sctx, &mut tree_builder,
-                    &weights, &config, &weights, &config,
-                    &mut ctx, &mut cache, &mut verifier,
-                    config.bos_token, 0, &mut rng,
+                    &mut draft_sctx,
+                    &mut tree_builder,
+                    &weights,
+                    &config,
+                    &weights,
+                    &config,
+                    &mut ctx,
+                    &mut cache,
+                    &mut verifier,
+                    config.bos_token,
+                    0,
+                    &mut rng,
                 )
             }
         };
@@ -784,7 +821,9 @@ mod tests {
     #[cfg(feature = "weaver_runtime")]
     #[test]
     fn test_speculative_step_gdn_tree_with_weaver_returns_tokens() {
-        use katgpt_speculative::weaver::{WeaverConfig, WeaverCorrector, WeaverScratch, WeaverWeights};
+        use katgpt_speculative::weaver::{
+            WeaverConfig, WeaverCorrector, WeaverScratch, WeaverWeights,
+        };
         let config = Config::micro();
         let weights = random_weights(&config);
 
@@ -816,11 +855,21 @@ mod tests {
         let mut h_dflash_captured = vec![0.0f32; config.draft_lookahead * config.n_embd];
 
         let (accepted, len) = speculative_step_gdn_tree_with_weaver(
-            &mut draft_sctx, &mut tree_builder,
-            &weights, &config, &weights, &config,
-            &mut ctx, &mut cache, &mut verifier,
-            config.bos_token, 0, &mut rng,
-            &mut h_dflash_captured, &corrector, &mut wscratch,
+            &mut draft_sctx,
+            &mut tree_builder,
+            &weights,
+            &config,
+            &weights,
+            &config,
+            &mut ctx,
+            &mut cache,
+            &mut verifier,
+            config.bos_token,
+            0,
+            &mut rng,
+            &mut h_dflash_captured,
+            &corrector,
+            &mut wscratch,
         );
 
         assert!(!accepted.is_empty(), "must accept at least one token");
@@ -853,14 +902,27 @@ mod tests {
         let mut h_dflash_captured = vec![0.0f32; config.draft_lookahead * config.n_embd];
 
         let (accepted, len) = speculative_step_gdn_tree_with_weaver(
-            &mut draft_sctx, &mut tree_builder,
-            &weights, &config, &weights, &config,
-            &mut ctx, &mut cache, &mut verifier,
-            config.bos_token, 0, &mut rng,
-            &mut h_dflash_captured, &weaver, &mut wscratch,
+            &mut draft_sctx,
+            &mut tree_builder,
+            &weights,
+            &config,
+            &weights,
+            &config,
+            &mut ctx,
+            &mut cache,
+            &mut verifier,
+            config.bos_token,
+            0,
+            &mut rng,
+            &mut h_dflash_captured,
+            &weaver,
+            &mut wscratch,
         );
 
-        assert!(!accepted.is_empty(), "cold-start must accept at least one token");
+        assert!(
+            !accepted.is_empty(),
+            "cold-start must accept at least one token"
+        );
         assert_eq!(len, accepted.len());
     }
 }

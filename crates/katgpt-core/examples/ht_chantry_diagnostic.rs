@@ -218,7 +218,11 @@ fn degree_histogram(map: &GridMap) -> [usize; 6] {
                 continue;
             }
             let p = GridPos::new(x, y);
-            let deg = map.passable_neighbors(&p).iter().filter(|n| **n != p).count();
+            let deg = map
+                .passable_neighbors(&p)
+                .iter()
+                .filter(|n| **n != p)
+                .count();
             let idx = deg.min(5);
             hist[idx] += 1;
         }

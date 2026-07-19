@@ -374,9 +374,7 @@ pub fn load_binary_bits(path: &std::path::Path) -> std::io::Result<katgpt_core::
     if groups_per_row != expected_groups {
         return Err(std::io::Error::new(
             std::io::ErrorKind::InvalidData,
-            format!(
-                "groups_per_row mismatch: header={groups_per_row}, expected={expected_groups}"
-            ),
+            format!("groups_per_row mismatch: header={groups_per_row}, expected={expected_groups}"),
         ));
     }
 

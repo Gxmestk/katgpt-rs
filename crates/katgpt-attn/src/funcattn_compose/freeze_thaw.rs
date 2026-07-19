@@ -211,9 +211,8 @@ impl FuncAttnWeightsSnapshot {
 #[inline]
 fn hash_f32_slice(hasher: &mut blake3::Hasher, xs: &[f32]) {
     hasher.update(&(xs.len() as u64).to_le_bytes());
-    let bytes: &[u8] = unsafe {
-        std::slice::from_raw_parts(xs.as_ptr() as *const u8, std::mem::size_of_val(xs))
-    };
+    let bytes: &[u8] =
+        unsafe { std::slice::from_raw_parts(xs.as_ptr() as *const u8, std::mem::size_of_val(xs)) };
     hasher.update(bytes);
 }
 

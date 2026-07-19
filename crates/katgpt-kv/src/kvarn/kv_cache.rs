@@ -234,8 +234,7 @@ impl KVarNKVCache {
         let val_tile_packed_len = packed_bytes_per_row(cfg.kv_dim, cfg.bits) * tile_size;
 
         // Initialize per-layer, per-tile storage (flat: one contiguous allocation)
-        let key_quantized =
-            vec![0u8; cfg.n_layers * n_tiles * key_tile_packed_len];
+        let key_quantized = vec![0u8; cfg.n_layers * n_tiles * key_tile_packed_len];
         let key_tiles: Vec<Vec<TileMeta>> = (0..cfg.n_layers)
             .map(|_| {
                 (0..n_tiles)
@@ -244,8 +243,7 @@ impl KVarNKVCache {
             })
             .collect();
 
-        let val_quantized =
-            vec![0u8; cfg.n_layers * n_tiles * val_tile_packed_len];
+        let val_quantized = vec![0u8; cfg.n_layers * n_tiles * val_tile_packed_len];
         let val_tiles: Vec<Vec<TileMeta>> = (0..cfg.n_layers)
             .map(|_| {
                 (0..n_tiles)
@@ -389,7 +387,8 @@ impl KVarNKVCache {
         let kv_dim = self.kv_dim;
 
         let quantized_off = self.key_tile_off(layer, tile_idx);
-        let quantized = &self.key_quantized[quantized_off..quantized_off + self.key_tile_packed_len];
+        let quantized =
+            &self.key_quantized[quantized_off..quantized_off + self.key_tile_packed_len];
 
         // Precompute column-scale constant (same for all channels)
         let var_col = tile.var_scales.s_col[pos_in_tile];

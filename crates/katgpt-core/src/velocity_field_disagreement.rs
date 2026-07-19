@@ -92,9 +92,7 @@
 //!   — provides [`VelocityField`], [`Schedule`], [`stochastic_interpolant_step_into`].
 
 use crate::simd::{fast_sigmoid, simd_dot_f32};
-use crate::velocity_field_ensemble::{
-    Schedule, VelocityField, stochastic_interpolant_step_into,
-};
+use crate::velocity_field_ensemble::{Schedule, VelocityField, stochastic_interpolant_step_into};
 
 // ── Public types ───────────────────────────────────────────────────────────
 
@@ -486,13 +484,25 @@ mod tests {
         // Linear schedule: kappa_s = s/(1-s). Verify at several points.
         let sched = Schedule::Linear;
         // kappa_s(0.0) = 0/1 = 0
-        assert!((kappa_s(sched, 0.0) - 0.0).abs() < 1e-6, "kappa_0 should be 0");
+        assert!(
+            (kappa_s(sched, 0.0) - 0.0).abs() < 1e-6,
+            "kappa_0 should be 0"
+        );
         // kappa_s(0.5) = 0.5/0.5 = 1.0
-        assert!((kappa_s(sched, 0.5) - 1.0).abs() < 1e-6, "kappa_0.5 should be 1");
+        assert!(
+            (kappa_s(sched, 0.5) - 1.0).abs() < 1e-6,
+            "kappa_0.5 should be 1"
+        );
         // kappa_s(0.9) = 0.9/0.1 = 9.0
-        assert!((kappa_s(sched, 0.9) - 9.0).abs() < 1e-5, "kappa_0.9 should be 9");
+        assert!(
+            (kappa_s(sched, 0.9) - 9.0).abs() < 1e-5,
+            "kappa_0.9 should be 9"
+        );
         // kappa_s(0.75) = 0.75/0.25 = 3.0
-        assert!((kappa_s(sched, 0.75) - 3.0).abs() < 1e-6, "kappa_0.75 should be 3");
+        assert!(
+            (kappa_s(sched, 0.75) - 3.0).abs() < 1e-6,
+            "kappa_0.75 should be 3"
+        );
     }
 
     #[test]
@@ -641,7 +651,9 @@ mod tests {
         let mut scratch: VfdScratch<2, D> = VfdScratch::new();
         let mut rng = TestRng::new(42);
 
-        let score = vfd_score_into(&fields, schedule, n_steps, batch, &mut scratch, &mut || rng.next_normal());
+        let score = vfd_score_into(&fields, schedule, n_steps, batch, &mut scratch, &mut || {
+            rng.next_normal()
+        });
 
         assert!(
             (score - expected).abs() < 1e-3,
@@ -665,7 +677,10 @@ mod tests {
                     analytic_vfd_constant_disagreement(disagreement_sq, n_steps, schedule);
                 let mut scratch: VfdScratch<2, D> = VfdScratch::new();
                 let mut rng = TestRng::new(7);
-                let score = vfd_score_into(&fields, schedule, n_steps, batch, &mut scratch, &mut || rng.next_normal());
+                let score =
+                    vfd_score_into(&fields, schedule, n_steps, batch, &mut scratch, &mut || {
+                        rng.next_normal()
+                    });
                 assert!(
                     (score - expected).abs() < 1e-2,
                     "n_steps={n_steps} batch={batch}: score {score} vs analytic {expected}"
@@ -690,7 +705,9 @@ mod tests {
 
         let mut scratch: VfdScratch<2, D> = VfdScratch::new();
         let mut rng = TestRng::new(99);
-        let score = vfd_score_into(&fields, schedule, n_steps, batch, &mut scratch, &mut || rng.next_normal());
+        let score = vfd_score_into(&fields, schedule, n_steps, batch, &mut scratch, &mut || {
+            rng.next_normal()
+        });
 
         assert!(
             (score - expected).abs() < 1e-2,
@@ -709,7 +726,9 @@ mod tests {
 
         let mut scratch: VfdScratch<2, D> = VfdScratch::new();
         let mut rng = TestRng::new(1);
-        let score = vfd_score_into(&fields, Schedule::Linear, 10, 5, &mut scratch, &mut || rng.next_normal());
+        let score = vfd_score_into(&fields, Schedule::Linear, 10, 5, &mut scratch, &mut || {
+            rng.next_normal()
+        });
 
         assert!(
             score.abs() < 1e-6,
@@ -730,7 +749,9 @@ mod tests {
 
             let mut scratch: VfdScratch<2, D> = VfdScratch::new();
             let mut rng = TestRng::new(123);
-            let score = vfd_score_into(&fields, Schedule::Linear, 15, 5, &mut scratch, &mut || rng.next_normal());
+            let score = vfd_score_into(&fields, Schedule::Linear, 15, 5, &mut scratch, &mut || {
+                rng.next_normal()
+            });
 
             assert!(
                 score >= prev_score - 1e-6,
@@ -751,9 +772,14 @@ mod tests {
 
             let mut scratch: VfdScratch<2, D> = VfdScratch::new();
             let mut rng = TestRng::new(seed);
-            let score = vfd_score_into(&fields, Schedule::Linear, 10, 3, &mut scratch, &mut || rng.next_normal());
+            let score = vfd_score_into(&fields, Schedule::Linear, 10, 3, &mut scratch, &mut || {
+                rng.next_normal()
+            });
 
-            assert!(score >= 0.0, "VFD should be >= 0, got {score} (seed {seed})");
+            assert!(
+                score >= 0.0,
+                "VFD should be >= 0, got {score} (seed {seed})"
+            );
         }
     }
 
@@ -767,11 +793,15 @@ mod tests {
 
         let mut s1: VfdScratch<2, D> = VfdScratch::new();
         let mut rng1 = TestRng::new(77);
-        let score1 = vfd_score_into(&fields, Schedule::Linear, 10, 5, &mut s1, &mut || rng1.next_normal());
+        let score1 = vfd_score_into(&fields, Schedule::Linear, 10, 5, &mut s1, &mut || {
+            rng1.next_normal()
+        });
 
         let mut s2: VfdScratch<2, D> = VfdScratch::new();
         let mut rng2 = TestRng::new(77);
-        let score2 = vfd_score_into(&fields, Schedule::Linear, 10, 5, &mut s2, &mut || rng2.next_normal());
+        let score2 = vfd_score_into(&fields, Schedule::Linear, 10, 5, &mut s2, &mut || {
+            rng2.next_normal()
+        });
 
         assert_eq!(
             score1.to_bits(),
@@ -791,7 +821,9 @@ mod tests {
 
         let mut scratch: VfdScratch<3, D> = VfdScratch::new();
         let mut rng = TestRng::new(55);
-        let score = vfd_score_into(&fields, Schedule::Linear, 10, 5, &mut scratch, &mut || rng.next_normal());
+        let score = vfd_score_into(&fields, Schedule::Linear, 10, 5, &mut scratch, &mut || {
+            rng.next_normal()
+        });
 
         // For constant fields, disagreement is constant = ||c_i - c_j||^2.
         // Average pairwise KL = (1/6) * sum_{i!=j} (1/N_s) sum_l kappa_{s_l} * ||c_i - c_j||^2
@@ -815,7 +847,8 @@ mod tests {
         let avg_disagreement = sum_disagreement / 6.0; // M(M-1) = 3*2 = 6
 
         let n_steps = 10;
-        let expected = analytic_vfd_constant_disagreement(avg_disagreement, n_steps, Schedule::Linear);
+        let expected =
+            analytic_vfd_constant_disagreement(avg_disagreement, n_steps, Schedule::Linear);
 
         assert!(
             (score - expected).abs() < 1e-2,
@@ -832,7 +865,9 @@ mod tests {
         let fields: [&dyn VelocityField<D>; 2] = [&f0, &f1];
         let mut scratch: VfdScratch<2, D> = VfdScratch::new();
         let mut rng = TestRng::new(1);
-        let _ = vfd_score_into(&fields, Schedule::Linear, 0, 5, &mut scratch, &mut || rng.next_normal());
+        let _ = vfd_score_into(&fields, Schedule::Linear, 0, 5, &mut scratch, &mut || {
+            rng.next_normal()
+        });
     }
 
     #[test]
@@ -844,7 +879,9 @@ mod tests {
         let fields: [&dyn VelocityField<D>; 2] = [&f0, &f1];
         let mut scratch: VfdScratch<2, D> = VfdScratch::new();
         let mut rng = TestRng::new(1);
-        let _ = vfd_score_into(&fields, Schedule::Linear, 10, 0, &mut scratch, &mut || rng.next_normal());
+        let _ = vfd_score_into(&fields, Schedule::Linear, 10, 0, &mut scratch, &mut || {
+            rng.next_normal()
+        });
     }
 
     #[test]
@@ -874,10 +911,15 @@ mod tests {
 
         let mut scratch: VfdScratch<2, D> = VfdScratch::new();
         let mut rng = TestRng::new(88);
-        let score = vfd_score_into(&fields, Schedule::Linear, 10, 5, &mut scratch, &mut || rng.next_normal());
+        let score = vfd_score_into(&fields, Schedule::Linear, 10, 5, &mut scratch, &mut || {
+            rng.next_normal()
+        });
 
         assert!(score.is_finite(), "VFD should be finite");
-        assert!(score > 0.0, "VFD should be > 0 for x-dependent fields with disagreement");
+        assert!(
+            score > 0.0,
+            "VFD should be > 0 for x-dependent fields with disagreement"
+        );
     }
 
     // ── QGF integration smoke test (G5 analog) ──────────────────────────────
@@ -886,9 +928,7 @@ mod tests {
     #[cfg(feature = "qgf_adaptive")]
     #[test]
     fn test_vfd_qgf_integration_smoke() {
-        use crate::qgf::adaptive::{
-            adaptive_guidance_weight, confidence_from_disagreement,
-        };
+        use crate::qgf::adaptive::{adaptive_guidance_weight, confidence_from_disagreement};
 
         // A VfdVarianceSignal with moderate disagreement.
         let sig = VfdVarianceSignal::new(1.0, 1.0);
@@ -902,12 +942,11 @@ mod tests {
 
         // Higher VFD score → more disagreement → less confidence → lower weight.
         let sig_high = VfdVarianceSignal::new(100.0, 1.0);
-        let weight_high =
-            adaptive_guidance_weight(
-                confidence_from_disagreement(sig_high.normalized_disagreement()),
-                0.5,
-                6.0,
-            );
+        let weight_high = adaptive_guidance_weight(
+            confidence_from_disagreement(sig_high.normalized_disagreement()),
+            0.5,
+            6.0,
+        );
         assert!(
             weight_high < weight,
             "higher VFD → lower guidance weight: {weight_high} should be < {weight}"

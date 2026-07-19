@@ -50,8 +50,8 @@ use katgpt_forward::ForwardContext;
 use katgpt_transformer::TransformerWeights;
 
 use super::kernel::l2_normalize;
-use super::types::MultiLayerGdn2Cache;
 use super::tree_verify_bridge::verify_gdn2_tree_layer;
+use super::types::MultiLayerGdn2Cache;
 
 /// Tree-structured forward pass through a pure-GDN2 model.
 ///
@@ -112,7 +112,8 @@ pub fn forward_tree_gdn2(
     let mut x = vec![0.0f32; t * n];
 
     // ── 1. Embed all tree nodes ──
-    #[allow(clippy::needless_range_loop)] // k indexes depths, topo_order, and x (unsafe get_unchecked_mut)
+    #[allow(clippy::needless_range_loop)]
+    // k indexes depths, topo_order, and x (unsafe get_unchecked_mut)
     for k in 0..t {
         let orig = topo.topo_order[k];
         let token = token_ids[orig];
@@ -121,8 +122,8 @@ pub fn forward_tree_gdn2(
         let pos_off = node_pos * n;
         for i in 0..n {
             unsafe {
-                *x.get_unchecked_mut(k * n + i) =
-                    *weights.wte.get_unchecked(tok_off + i) + *weights.wpe.get_unchecked(pos_off + i);
+                *x.get_unchecked_mut(k * n + i) = *weights.wte.get_unchecked(tok_off + i)
+                    + *weights.wpe.get_unchecked(pos_off + i);
             }
         }
     }
@@ -191,14 +192,7 @@ pub fn forward_tree_gdn2(
         // and branching trees, see T4.3b tests).
         let scale_correction = (hd as f32).sqrt();
         let mut attn_out_all = verify_gdn2_tree_layer(
-            verifier,
-            topo,
-            cache,
-            layer_idx,
-            &keys,
-            &values,
-            &queries,
-            config,
+            verifier, topo, cache, layer_idx, &keys, &values, &queries, config,
         );
         // Apply scale correction in-place.
         for v in &mut attn_out_all {
@@ -234,8 +228,20 @@ pub fn forward_tree_gdn2(
             #[cfg(feature = "gated_mlp")]
             {
                 // SwiGLU: SiLU(W_gate·h) ⊙ W_up·h → W_down·hidden
-                types::matmul(&mut ctx.hidden, &layer_weights.mlp_w1, &ctx.x, config.mlp_hidden, n);
-                types::matmul(&mut ctx.hidden2, &layer_weights.mlp_w_up, &ctx.x, config.mlp_hidden, n);
+                types::matmul(
+                    &mut ctx.hidden,
+                    &layer_weights.mlp_w1,
+                    &ctx.x,
+                    config.mlp_hidden,
+                    n,
+                );
+                types::matmul(
+                    &mut ctx.hidden2,
+                    &layer_weights.mlp_w_up,
+                    &ctx.x,
+                    config.mlp_hidden,
+                    n,
+                );
                 types::swiglu_inplace(&mut ctx.hidden, &ctx.hidden2);
             }
             #[cfg(not(feature = "gated_mlp"))]
@@ -314,9 +320,7 @@ impl TreeLayerVerifier for GdnTreeVerifier {
 
 /// Dual-path GDN × HOLA verify strategy (Plan 430).
 #[cfg(feature = "hippocampal_cache")]
-impl TreeLayerVerifier
-    for katgpt_core::gdn_tree_verify::hola_fusion::GdnHolaTreeVerifier
-{
+impl TreeLayerVerifier for katgpt_core::gdn_tree_verify::hola_fusion::GdnHolaTreeVerifier {
     #[inline]
     fn verify_layer(
         &mut self,
@@ -430,8 +434,20 @@ pub fn forward_tree_gdn2_impl<V: TreeLayerVerifier>(
             types::rmsnorm(&mut ctx.x);
             #[cfg(feature = "gated_mlp")]
             {
-                types::matmul(&mut ctx.hidden, &layer_weights.mlp_w1, &ctx.x, config.mlp_hidden, n);
-                types::matmul(&mut ctx.hidden2, &layer_weights.mlp_w_up, &ctx.x, config.mlp_hidden, n);
+                types::matmul(
+                    &mut ctx.hidden,
+                    &layer_weights.mlp_w1,
+                    &ctx.x,
+                    config.mlp_hidden,
+                    n,
+                );
+                types::matmul(
+                    &mut ctx.hidden2,
+                    &layer_weights.mlp_w_up,
+                    &ctx.x,
+                    config.mlp_hidden,
+                    n,
+                );
                 types::swiglu_inplace(&mut ctx.hidden, &ctx.hidden2);
             }
             #[cfg(not(feature = "gated_mlp"))]
@@ -442,7 +458,13 @@ pub fn forward_tree_gdn2_impl<V: TreeLayerVerifier>(
                 config.mlp_hidden,
                 n,
             );
-            types::matmul(&mut ctx.x, &layer_weights.mlp_w2, &ctx.hidden, n, config.mlp_hidden);
+            types::matmul(
+                &mut ctx.x,
+                &layer_weights.mlp_w2,
+                &ctx.hidden,
+                n,
+                config.mlp_hidden,
+            );
             for i in 0..n {
                 ctx.x[i] += ctx.xr2[i];
             }
@@ -510,13 +532,22 @@ mod tests {
         // Build a chain tree: 3 nodes.
         let nodes = vec![
             katgpt_core::speculative::types::TreeNode {
-                depth: 0, token_idx: 1, parent_path: 0x0001, score: -1.0,
+                depth: 0,
+                token_idx: 1,
+                parent_path: 0x0001,
+                score: -1.0,
             },
             katgpt_core::speculative::types::TreeNode {
-                depth: 1, token_idx: 2, parent_path: 0x0001_0002, score: -2.0,
+                depth: 1,
+                token_idx: 2,
+                parent_path: 0x0001_0002,
+                score: -2.0,
             },
             katgpt_core::speculative::types::TreeNode {
-                depth: 2, token_idx: 3, parent_path: 0x0001_0002_0003, score: -3.0,
+                depth: 2,
+                token_idx: 3,
+                parent_path: 0x0001_0002_0003,
+                score: -3.0,
             },
         ];
 
@@ -535,7 +566,14 @@ mod tests {
         let mut verifier = GdnTreeVerifier::new(t, hd, hd);
 
         let logits = forward_tree_gdn2(
-            &mut ctx, &weights, &cache, &topo, &token_ids, 0, &config, &mut verifier,
+            &mut ctx,
+            &weights,
+            &cache,
+            &topo,
+            &token_ids,
+            0,
+            &config,
+            &mut verifier,
         );
 
         // All logits must be finite
@@ -578,7 +616,14 @@ mod tests {
         let mut verifier = GdnTreeVerifier::new(t, hd, hd);
 
         let logits = forward_tree_gdn2(
-            &mut ctx, &weights, &cache, &topo, &token_ids, 0, &config, &mut verifier,
+            &mut ctx,
+            &weights,
+            &cache,
+            &topo,
+            &token_ids,
+            0,
+            &config,
+            &mut verifier,
         );
 
         assert_eq!(logits.len(), vocab);
@@ -639,7 +684,7 @@ mod tests {
         }
     }
 
-       // ── T4.3b: Convention alignment tests ─────────────────────────
+    // ── T4.3b: Convention alignment tests ─────────────────────────
     //
     // These tests prove that `forward_tree_gdn2` produces numerically
     // equivalent results to sequential `forward_gdn2` when the GDN2 layer
@@ -759,7 +804,11 @@ mod tests {
             max_diff < 1e-3,
             "T4.3b chain mismatch: max_diff = {max_diff:.6} at node {} vocab {max_diff_at:?}\n\
              tree[{}][{}] vs ref[{}][{}]",
-            max_diff_at.0, max_diff_at.0, max_diff_at.1, max_diff_at.0, max_diff_at.1
+            max_diff_at.0,
+            max_diff_at.0,
+            max_diff_at.1,
+            max_diff_at.0,
+            max_diff_at.1
         );
         eprintln!("T4.3b chain match: max_diff = {max_diff:.6} (tol 1e-3)");
     }
@@ -834,8 +883,7 @@ mod tests {
         let mut max_diff = 0.0f32;
         for k in 0..t {
             for v in 0..vocab {
-                let diff =
-                    (tree_logits[k * vocab + v] - ref_logits[k][v]).abs();
+                let diff = (tree_logits[k * vocab + v] - ref_logits[k][v]).abs();
                 if diff > max_diff {
                     max_diff = diff;
                 }
@@ -905,16 +953,28 @@ mod tests {
         //   D: depth 2, token 3, path 0x0001_0002_0003
         let nodes = vec![
             katgpt_core::speculative::types::TreeNode {
-                depth: 0, token_idx: 1, parent_path: 0x0001, score: -1.0,
+                depth: 0,
+                token_idx: 1,
+                parent_path: 0x0001,
+                score: -1.0,
             },
             katgpt_core::speculative::types::TreeNode {
-                depth: 1, token_idx: 2, parent_path: 0x0001_0002, score: -2.0,
+                depth: 1,
+                token_idx: 2,
+                parent_path: 0x0001_0002,
+                score: -2.0,
             },
             katgpt_core::speculative::types::TreeNode {
-                depth: 1, token_idx: 4, parent_path: 0x0001_0004, score: -2.0,
+                depth: 1,
+                token_idx: 4,
+                parent_path: 0x0001_0004,
+                score: -2.0,
             },
             katgpt_core::speculative::types::TreeNode {
-                depth: 2, token_idx: 3, parent_path: 0x0001_0002_0003, score: -3.0,
+                depth: 2,
+                token_idx: 3,
+                parent_path: 0x0001_0002_0003,
+                score: -3.0,
             },
         ];
 
@@ -931,7 +991,14 @@ mod tests {
         let mut ctx = ForwardContext::new(&config);
         let mut verifier = GdnTreeVerifier::new(t, hd, hd);
         let tree_logits = forward_tree_gdn2(
-            &mut ctx, &weights, &tree_cache, &topo, &topo_token_ids, 0, &config, &mut verifier,
+            &mut ctx,
+            &weights,
+            &tree_cache,
+            &topo,
+            &topo_token_ids,
+            0,
+            &config,
+            &mut verifier,
         );
 
         // Map DDTree nodes to topology indices. The topology sorts by (depth, parent_path):

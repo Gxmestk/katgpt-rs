@@ -26,13 +26,13 @@ use katgpt_types::{InferenceResult, Rng};
 use rayon::prelude::*;
 
 // Sub-modules (Issue 162 C2 split, 2026-07-17; Issue 178 Lodestar extraction 2026-07-17)
-mod tree_builder;
 #[cfg(feature = "lodestar")]
 mod lodestar;
+mod tree_builder;
 
-pub use tree_builder::TreeBuilder;
 #[cfg(feature = "lodestar")]
 pub use lodestar::*;
+pub use tree_builder::TreeBuilder;
 
 /// Minimum candidate count to justify rayon overhead for trivial per-element work.
 /// Below this, serial iteration is faster (~5μs rayon overhead vs ~0.1μs per element).
@@ -651,7 +651,6 @@ where
         .min_by_key(|(_, result)| cost_fn(result))
 }
 
-
 // ── SDE-Aware DDTree Builders (ELF Plan 079) ────────────────────
 //
 // Plan 391 (2026-07-05): moved from `katgpt-rs/src/speculative/dd_tree.rs`
@@ -1028,23 +1027,22 @@ pub fn best_of_k_rollouts(
         WidthSelectionMode::Top1Converged => {
             // Select rollout with smallest final residual (EqR convergence proxy).
             // Fallback to BestQ if no residual data (e.g., single depth).
-            let best_idx = if final_residuals.is_empty()
-                || final_residuals.iter().all(|&r| r == 0.0)
-            {
-                scores
-                    .iter()
-                    .enumerate()
-                    .max_by(|(_, a), (_, b)| a.total_cmp(b))
-                    .map(|(i, _)| i)
-                    .unwrap_or(0)
-            } else {
-                final_residuals
-                    .iter()
-                    .enumerate()
-                    .min_by(|(_, a), (_, b)| a.total_cmp(b))
-                    .map(|(i, _)| i)
-                    .unwrap_or(0)
-            };
+            let best_idx =
+                if final_residuals.is_empty() || final_residuals.iter().all(|&r| r == 0.0) {
+                    scores
+                        .iter()
+                        .enumerate()
+                        .max_by(|(_, a), (_, b)| a.total_cmp(b))
+                        .map(|(i, _)| i)
+                        .unwrap_or(0)
+                } else {
+                    final_residuals
+                        .iter()
+                        .enumerate()
+                        .min_by(|(_, a), (_, b)| a.total_cmp(b))
+                        .map(|(i, _)| i)
+                        .unwrap_or(0)
+                };
             paths.into_iter().nth(best_idx).unwrap_or_default()
         }
     }

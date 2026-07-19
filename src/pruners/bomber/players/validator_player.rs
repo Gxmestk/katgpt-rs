@@ -6,13 +6,13 @@ use std::any::Any;
 
 use fastrand::Rng;
 
-use super::{
-    ALL_ACTIONS, BOMB_FUSE_TICKS, DEFAULT_BLAST_RANGE, ArenaGrid, BomberAction, BomberPlayer,
-    GameEvent, GridPos, KnownBomb,
-};
 use super::helpers::{
     escape_distance, in_blast_zone, is_safe_action, move_target, score_action, update_bombs,
     update_powerups,
+};
+use super::{
+    ALL_ACTIONS, ArenaGrid, BOMB_FUSE_TICKS, BomberAction, BomberPlayer, DEFAULT_BLAST_RANGE,
+    GameEvent, GridPos, KnownBomb,
 };
 
 /// P3: Model + Validator — policy scoring with safety validation.

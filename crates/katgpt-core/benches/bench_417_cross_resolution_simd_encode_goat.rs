@@ -51,14 +51,7 @@ counting_allocator!();
 
 /// `(d_src, k)` sweep covering plasma-tier shards (16), warm-tier HLA (64),
 /// cold-tier shards (256), and rank from tight (8) to wide (64).
-const SWEEP: &[(usize, usize)] = &[
-    (16, 8),
-    (64, 8),
-    (64, 16),
-    (256, 8),
-    (256, 16),
-    (256, 64),
-];
+const SWEEP: &[(usize, usize)] = &[(16, 8), (64, 8), (64, 16), (256, 8), (256, 16), (256, 64)];
 
 const ITERS: usize = 100_000;
 const ALLOC_ITERS: usize = 100;
@@ -153,14 +146,20 @@ fn main() {
 
     let mut all_g1_pass = true;
     let mut any_prod_g2_pass = false; // PASS if ANY production point clears 1.5×
-                                      // (we accept partial wins — the small-d_src
-                                      // point may wash; we care about d_src ≥ 64).
+    // (we accept partial wins — the small-d_src
+    // point may wash; we care about d_src ≥ 64).
     let mut production_results: Vec<SweepResult> = Vec::new();
     let mut all_results: Vec<SweepResult> = Vec::new();
 
     for &(d_src, k) in SWEEP {
         // Build bases + a random src_state.
-        let phi_src = random_orthonormal(d_src, k, 0xA1B2_C3D4u64.wrapping_add((d_src as u64) << 8).wrapping_add(k as u64));
+        let phi_src = random_orthonormal(
+            d_src,
+            k,
+            0xA1B2_C3D4u64
+                .wrapping_add((d_src as u64) << 8)
+                .wrapping_add(k as u64),
+        );
         let psi_dst = random_orthonormal(k.max(8), k, 0xB2C3_D4E5u64); // d_dst ≥ k, irrelevant for encode
         let d_dst = k.max(8);
         let bases: Result<CrossResolutionBases, CrossResolutionError> =
@@ -174,7 +173,11 @@ fn main() {
             }
         };
 
-        let mut rng = make_rng(0xCAFE_BABEu64.wrapping_add((d_src as u64) << 16).wrapping_add(k as u64));
+        let mut rng = make_rng(
+            0xCAFE_BABEu64
+                .wrapping_add((d_src as u64) << 16)
+                .wrapping_add(k as u64),
+        );
         let src_state: Vec<f32> = (0..d_src).map(|_| rng()).collect();
 
         // project_to_spectral_into signature is (src_state, bases, spectral: &mut [f32]).
@@ -206,7 +209,11 @@ fn main() {
         }
         println!(
             "── (d_src={}, k={}) G1 correctness ──   max|Δ| = {:.3e}   (tol ≤ {:.0e})   {}",
-            d_src, k, max_abs_diff, G1_TOL, pass_fail(g1_pass)
+            d_src,
+            k,
+            max_abs_diff,
+            G1_TOL,
+            pass_fail(g1_pass)
         );
 
         // ── G2: perf — baseline ──────────────────────────────────────────
@@ -269,7 +276,11 @@ fn main() {
             candidate_ns,
             speedup,
             pass_fail(g2_pass),
-            if is_production { "" } else { "   (non-production, not gated)" }
+            if is_production {
+                ""
+            } else {
+                "   (non-production, not gated)"
+            }
         );
 
         // ── G4: zero-alloc hot path ──────────────────────────────────────
@@ -285,14 +296,21 @@ fn main() {
         let g4_pass = candidate_allocs == 0;
         println!(
             "── (d_src={}, k={}) G4 alloc-free ──   candidate × {} = {} allocs   (target 0)   {}",
-            d_src, k, ALLOC_ITERS, candidate_allocs, pass_fail(g4_pass)
+            d_src,
+            k,
+            ALLOC_ITERS,
+            candidate_allocs,
+            pass_fail(g4_pass)
         );
         println!();
     }
 
     // ── Verdict ──────────────────────────────────────────────────────────
     println!("══════════════════════════════════════════════════════════════════");
-    println!("── G1 (correctness, all sweep points ≤ 1e-6 tol) ──   {}", pass_fail(all_g1_pass));
+    println!(
+        "── G1 (correctness, all sweep points ≤ 1e-6 tol) ──   {}",
+        pass_fail(all_g1_pass)
+    );
     println!(
         "── G2 (perf, ANY production point ≥ {:.1}×) ──   {}",
         G2_SPEEDUP_TARGET,
@@ -304,7 +322,12 @@ fn main() {
     for &((d_src, k), baseline_ns, candidate_ns, speedup, passed) in &production_results {
         println!(
             "  d_src={:>3} k={:>2}   baseline {:>7.1} ns → candidate {:>7.1} ns   {:>5.2}×   {}",
-            d_src, k, baseline_ns, candidate_ns, speedup, pass_fail(passed)
+            d_src,
+            k,
+            baseline_ns,
+            candidate_ns,
+            speedup,
+            pass_fail(passed)
         );
     }
 
@@ -321,7 +344,11 @@ fn main() {
     println!("\n══════════════════════════════════════════════════════════════════");
     println!(
         "  OVERALL: {}",
-        if overall_pass { "✓ ALL GATES PASS — promote (keep change)" } else { "✗ SOME GATES FAILED — verdict below" }
+        if overall_pass {
+            "✓ ALL GATES PASS — promote (keep change)"
+        } else {
+            "✗ SOME GATES FAILED — verdict below"
+        }
     );
     println!("══════════════════════════════════════════════════════════════════");
 
@@ -330,11 +357,20 @@ fn main() {
         // the change should be reverted (gather-dot auto-unroll was already
         // optimal). If G1 fails, that's a bug in the transpose — block.
         if !all_g1_pass {
-            eprintln!("\nFAIL reason: G1 correctness failed — transpose is exact; any diff > tol is a bug.");
+            eprintln!(
+                "\nFAIL reason: G1 correctness failed — transpose is exact; any diff > tol is a bug."
+            );
         } else if !any_prod_g2_pass {
-            eprintln!("\nFAIL reason: G2 perf did not clear {:.1}× at ANY production point.", G2_SPEEDUP_TARGET);
-            eprintln!("Honest verdict: the pre-417 strided gather-dot was already optimal at these scales.");
-            eprintln!("Per Plan 417 T3.2: revert the change, document the finding, close the plan.");
+            eprintln!(
+                "\nFAIL reason: G2 perf did not clear {:.1}× at ANY production point.",
+                G2_SPEEDUP_TARGET
+            );
+            eprintln!(
+                "Honest verdict: the pre-417 strided gather-dot was already optimal at these scales."
+            );
+            eprintln!(
+                "Per Plan 417 T3.2: revert the change, document the finding, close the plan."
+            );
         }
         std::process::exit(1);
     }

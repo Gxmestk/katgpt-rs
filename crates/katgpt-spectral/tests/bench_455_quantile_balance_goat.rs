@@ -434,11 +434,7 @@ fn g07_iters5_sufficiency_maxvio_stability() {
             .map(|(a, b)| (a - b) * (a - b))
             .sum();
         let den: f32 = res10.beta.iter().map(|v| v * v).sum();
-        if den < 1e-20 {
-            0.0
-        } else {
-            (num / den).sqrt()
-        }
+        if den < 1e-20 { 0.0 } else { (num / den).sqrt() }
     };
 
     eprintln!(
@@ -588,7 +584,12 @@ fn zzz_goat_gate_summary() {
     let f = FAIL.load(Ordering::SeqCst);
     eprintln!();
     eprintln!("══════════════════════════════════════════════════");
-    eprintln!("  GOAT GATE (Plan 455 QB): {}/{}  (failures: {})", p, p + f, f);
+    eprintln!(
+        "  GOAT GATE (Plan 455 QB): {}/{}  (failures: {})",
+        p,
+        p + f,
+        f
+    );
     eprintln!("══════════════════════════════════════════════════");
     if f > 0 {
         panic!(

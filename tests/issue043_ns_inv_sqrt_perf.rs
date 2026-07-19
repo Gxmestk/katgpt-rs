@@ -9,14 +9,18 @@ use std::hint::black_box;
 use std::time::Instant;
 
 fn lcg_next(state: &mut u64) -> f32 {
-    *state = state.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+    *state = state
+        .wrapping_mul(6364136223846793005)
+        .wrapping_add(1442695040888963407);
     let bits = (*state >> 33) as u32;
     (bits as f32) / (u32::MAX as f32) * 2.0 - 1.0
 }
 
 fn make_psd(seed: u64, r: usize) -> Vec<f32> {
     let mut state = seed;
-    let m = (0..r * r).map(|_| lcg_next(&mut state)).collect::<Vec<f32>>();
+    let m = (0..r * r)
+        .map(|_| lcg_next(&mut state))
+        .collect::<Vec<f32>>();
     let mut p = vec![0.0f32; r * r];
     for i in 0..r {
         for j in 0..r {

@@ -44,7 +44,11 @@ pub fn compute_phi(
     nearest_opponent: Option<(i32, i32)>,
 ) -> [f32; CONTEXT_DIM] {
     // 1. in_blast_zone (0.0 or 1.0)
-    let in_blast = if in_blast_zone(pos, grid, bombs) { 1.0 } else { 0.0 };
+    let in_blast = if in_blast_zone(pos, grid, bombs) {
+        1.0
+    } else {
+        0.0
+    };
 
     // 2. blast_proximity — sigmoid of -(Manhattan dist to nearest bomb - 3).
     let min_bomb_dist = bombs

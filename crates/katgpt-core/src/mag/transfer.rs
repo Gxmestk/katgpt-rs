@@ -12,7 +12,7 @@
 //! "what transfers to my goal?" (MAG geometry). Consumed by CGSP curiosity
 //! routing and the AnyRAG escalation gateway in riir-ai / riir-neuron-db.
 
-use super::types::{check_dim, cosine, MagError, TransferMetric};
+use super::types::{MagError, TransferMetric, check_dim, cosine};
 
 // recos_sim_slice(_into) live in the `similarity` module (gated on `recos`).
 // When the feature is off, `TransferMetric::Recos` falls back to centroid
@@ -47,7 +47,10 @@ impl<'a, S: AsRef<[f32]>> DataSet<'a, S> {
     /// Construct a dataset view from activations + labels.
     #[inline]
     pub fn new(activations: &'a [S], labels: &'a [bool]) -> Self {
-        Self { activations, labels }
+        Self {
+            activations,
+            labels,
+        }
     }
 
     /// Number of samples.
@@ -125,7 +128,11 @@ pub fn transfer_score<S: AsRef<[f32]>>(
         }
         TransferMetric::RbfMmd => {
             let gamma = 1.0 / d as f32;
-            Ok(-rbf_mmd_sq(candidate.activations, target.activations, gamma))
+            Ok(-rbf_mmd_sq(
+                candidate.activations,
+                target.activations,
+                gamma,
+            ))
         }
         TransferMetric::Wasserstein1d => {
             Ok(-wasserstein1d(candidate.activations, target.activations, d))
@@ -444,11 +451,7 @@ fn pearson(a: &[f32], b: &[f32]) -> f32 {
         var_b += db * db;
     }
     let denom = (var_a * var_b).sqrt();
-    if denom == 0.0 {
-        0.0
-    } else {
-        cov / denom
-    }
+    if denom == 0.0 { 0.0 } else { cov / denom }
 }
 
 /// RBF-kernel MMD² between two sample sets (biased estimator).
@@ -480,9 +483,7 @@ fn rbf_mmd_sq<S: AsRef<[f32]>>(x: &[S], y: &[S], gamma: f32) -> f32 {
         }
     }
 
-    let mmd = sum_xx / (m * m) as f32
-        + sum_yy / (n * n) as f32
-        - 2.0 * sum_xy / (m * n) as f32;
+    let mmd = sum_xx / (m * m) as f32 + sum_yy / (n * n) as f32 - 2.0 * sum_xy / (m * n) as f32;
     mmd.max(0.0) // MMD² is non-negative by construction (guard against f32 drift)
 }
 
@@ -554,11 +555,7 @@ fn cka_linear<S: AsRef<[f32]>>(x: &[S], y: &[S], d: usize) -> f32 {
         }
     }
     let denom = (norm_cx * norm_cy).sqrt();
-    if denom == 0.0 {
-        0.0
-    } else {
-        trace_val / denom
-    }
+    if denom == 0.0 { 0.0 } else { trace_val / denom }
 }
 
 /// Compute the d×d feature Gram matrix `XᵀX/n` (flattened row-major).
@@ -615,10 +612,22 @@ mod tests {
 
         // target: same structure → class-conditional cosine should be ~1.0
         let target = DataSet::new(&cand_acts, &cand_labels);
-        let score_mal = transfer_score(&cand, &target, TransferMetric::ClassConditionalCosineMalicious).unwrap();
-        let score_ben = transfer_score(&cand, &target, TransferMetric::ClassConditionalCosineBenign).unwrap();
-        assert!(approx_eq(score_mal, 1.0, 1e-5), "malicious cos got {score_mal}");
-        assert!(approx_eq(score_ben, 1.0, 1e-5), "benign cos got {score_ben}");
+        let score_mal = transfer_score(
+            &cand,
+            &target,
+            TransferMetric::ClassConditionalCosineMalicious,
+        )
+        .unwrap();
+        let score_ben =
+            transfer_score(&cand, &target, TransferMetric::ClassConditionalCosineBenign).unwrap();
+        assert!(
+            approx_eq(score_mal, 1.0, 1e-5),
+            "malicious cos got {score_mal}"
+        );
+        assert!(
+            approx_eq(score_ben, 1.0, 1e-5),
+            "benign cos got {score_ben}"
+        );
     }
 
     #[test]
@@ -678,12 +687,8 @@ mod tests {
             DataSet::new(&c2_acts, &labels),
         ];
 
-        let ranked = rank_candidates(
-            &candidates,
-            &target,
-            &[TransferMetric::CentroidCosine],
-        )
-        .unwrap();
+        let ranked =
+            rank_candidates(&candidates, &target, &[TransferMetric::CentroidCosine]).unwrap();
 
         assert_eq!(ranked.len(), 3);
         // Best (identical) should be first.
@@ -749,7 +754,10 @@ mod tests {
         let labels = [true, false];
         let ds = DataSet::new(&acts, &labels);
         let score = transfer_score(&ds, &ds, TransferMetric::Recos).unwrap();
-        assert!((score - 1.0).abs() < 1e-5, "identical centroids: recos={score}");
+        assert!(
+            (score - 1.0).abs() < 1e-5,
+            "identical centroids: recos={score}"
+        );
     }
 
     #[cfg(feature = "recos")]
@@ -784,8 +792,14 @@ mod tests {
         let recos = transfer_score(&cand, &target, TransferMetric::Recos).unwrap();
 
         assert!(cos < 1.0, "cosine of nonlinear pair: cos={cos} < 1.0");
-        assert!((recos - 1.0).abs() < 1e-5, "recos of monotonic pair: recos={recos} = 1.0");
-        assert!(recos > cos, "recos ({recos}) > cosine ({cos}) on monotonic-nonlinear pair");
+        assert!(
+            (recos - 1.0).abs() < 1e-5,
+            "recos of monotonic pair: recos={recos} = 1.0"
+        );
+        assert!(
+            recos > cos,
+            "recos ({recos}) > cosine ({cos}) on monotonic-nonlinear pair"
+        );
     }
 
     #[cfg(feature = "recos")]
@@ -804,6 +818,9 @@ mod tests {
         let mut scratch = [0.0_f32; 8]; // 2 * d = 2 * 4
         let score_into =
             transfer_score_into(&cand, &target, TransferMetric::Recos, &mut scratch).unwrap();
-        assert!((score_alloc - score_into).abs() < 1e-5, "alloc={score_alloc} into={score_into}");
+        assert!(
+            (score_alloc - score_into).abs() < 1e-5,
+            "alloc={score_alloc} into={score_into}"
+        );
     }
 }

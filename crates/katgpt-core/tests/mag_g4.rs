@@ -22,7 +22,7 @@
 
 #![cfg(feature = "mag_mining")]
 
-use katgpt_core::mag::{rank_candidates, DataSet, TransferMetric};
+use katgpt_core::mag::{DataSet, TransferMetric, rank_candidates};
 
 const D: usize = 64;
 const N_CANDIDATES: usize = 6;
@@ -98,9 +98,12 @@ fn run_trial(seed: u64) -> (bool, bool) {
         .collect();
 
     // Raw cosine ranking.
-    let raw_entries =
-        rank_candidates(&candidate_dss, &target_ds, &[TransferMetric::CentroidCosine])
-            .expect("rank_candidates raw");
+    let raw_entries = rank_candidates(
+        &candidate_dss,
+        &target_ds,
+        &[TransferMetric::CentroidCosine],
+    )
+    .expect("rank_candidates raw");
     let raw_top1 = raw_entries[0].candidate_idx == 0;
 
     // MAG class-conditional ranking (the paper's informative metrics).

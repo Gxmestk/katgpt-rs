@@ -183,7 +183,15 @@ pub fn htno_v_cycle(
     );
     let mut output = CochainField::zeros(0, fine.n_vertices(), field.dim);
     let mut scratch = VCycleScratch::new(coarse, 0, field.dim);
-    htno_v_cycle_into(fine, coarse, restriction, field, coarse_op, &mut output, &mut scratch);
+    htno_v_cycle_into(
+        fine,
+        coarse,
+        restriction,
+        field,
+        coarse_op,
+        &mut output,
+        &mut scratch,
+    );
     output
 }
 
@@ -209,11 +217,9 @@ pub fn htno_v_cycle_into(
     assert_eq!(field.rank, 0, "htno_v_cycle_into: field must be rank-0");
     assert_eq!(output.rank, 0, "htno_v_cycle_into: output must be rank-0");
     assert_eq!(
-        output.dim,
-        field.dim,
+        output.dim, field.dim,
         "htno_v_cycle_into: output.dim {} != field.dim {}",
-        output.dim,
-        field.dim
+        output.dim, field.dim
     );
     assert_eq!(
         output.n_cells(),
@@ -318,7 +324,11 @@ mod tests {
 
     /// Elementwise max-abs difference between two cochains' data slices.
     fn max_abs_diff(a: &CochainField, b: &CochainField) -> f32 {
-        assert_eq!(a.data.len(), b.data.len(), "length mismatch in max_abs_diff");
+        assert_eq!(
+            a.data.len(),
+            b.data.len(),
+            "length mismatch in max_abs_diff"
+        );
         a.data
             .iter()
             .zip(b.data.iter())
@@ -405,7 +415,8 @@ mod tests {
         // (between the representative fine vertices) and gather its d₀ value.
         let fine_b1 = fine.boundary_entries(0);
         // Build fine edge → d₀ value lookup. d₀ on edge e = Σ sign·input.
-        let mut fine_edge_d0: std::collections::HashMap<usize, f32> = std::collections::HashMap::new();
+        let mut fine_edge_d0: std::collections::HashMap<usize, f32> =
+            std::collections::HashMap::new();
         for &(v, e, sign) in fine_b1 {
             *fine_edge_d0.entry(e).or_insert(0.0) += sign as f32 * fine_field.scalar(v);
         }
@@ -445,7 +456,10 @@ mod tests {
                     }
                 }
             }
-            assert!(found, "no fine edge for coarse edge {ce} (ft={ft}, fh={fh})");
+            assert!(
+                found,
+                "no fine edge for coarse edge {ce} (ft={ft}, fh={fh})"
+            );
             rhs.set_scalar(ce, val);
         }
 
@@ -485,7 +499,8 @@ mod tests {
         // fine_field[i+1] - fine_field[i]. The coarse edges are the fine edges
         // between consecutive representatives {1,2,3,4}: edges (1,2),(2,3),(3,4).
         let fine_b1 = fine.boundary_entries(0);
-        let mut fine_edge_d0: std::collections::HashMap<usize, f32> = std::collections::HashMap::new();
+        let mut fine_edge_d0: std::collections::HashMap<usize, f32> =
+            std::collections::HashMap::new();
         for &(v, e, sign) in fine_b1 {
             *fine_edge_d0.entry(e).or_insert(0.0) += sign as f32 * fine_field.scalar(v);
         }
@@ -496,7 +511,11 @@ mod tests {
             let mut ch = usize::MAX;
             for &(v, e, _sign) in coarse_b1 {
                 if e == ce {
-                    if ct == usize::MAX { ct = v; } else { ch = v; }
+                    if ct == usize::MAX {
+                        ct = v;
+                    } else {
+                        ch = v;
+                    }
                 }
             }
             let ft = restriction.fine_vertex_of(ct) as usize;
@@ -507,7 +526,10 @@ mod tests {
                 if v == ft || v == fh {
                     let mut other = usize::MAX;
                     for &(v2, e2, _s2) in fine_b1 {
-                        if e2 == e && v2 != v { other = v2; break; }
+                        if e2 == e && v2 != v {
+                            other = v2;
+                            break;
+                        }
                     }
                     if (v == ft && other == fh) || (v == fh && other == ft) {
                         val = *fine_edge_d0.get(&e).unwrap_or(&0.0);
@@ -524,7 +546,10 @@ mod tests {
             "irregular commutativity failed: max abs diff = {diff:.3e} (tol {TOL:.0e})"
         );
         // Sanity: the coarse complex is non-trivial (has edges).
-        assert!(coarse.n_edges() > 0, "induced sub-complex should have edges");
+        assert!(
+            coarse.n_edges() > 0,
+            "induced sub-complex should have edges"
+        );
     }
 
     #[test]

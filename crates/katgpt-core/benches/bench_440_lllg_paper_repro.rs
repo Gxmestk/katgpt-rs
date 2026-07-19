@@ -60,10 +60,18 @@ struct GateResult {
 
 impl GateResult {
     fn pass(name: &'static str, detail: impl Into<String>) -> Self {
-        Self { name, passed: true, detail: detail.into() }
+        Self {
+            name,
+            passed: true,
+            detail: detail.into(),
+        }
     }
     fn fail(name: &'static str, detail: impl Into<String>) -> Self {
-        Self { name, passed: false, detail: detail.into() }
+        Self {
+            name,
+            passed: false,
+            detail: detail.into(),
+        }
     }
 }
 
@@ -94,13 +102,11 @@ fn generate_maps() -> Vec<(&'static str, GridMap)> {
         ),
         (
             "random-64-64-10-real",
-            load_real("data/random-64-64-10.map")
-                .unwrap_or_else(|| random_map(64, 64, 0.10, 42)),
+            load_real("data/random-64-64-10.map").unwrap_or_else(|| random_map(64, 64, 0.10, 42)),
         ),
         (
             "warehouse-10-20-10-2-2-real",
-            load_real("data/warehouse-10-20-10-2-2.map")
-                .unwrap_or_else(|| warehouse_map(63, 45)),
+            load_real("data/warehouse-10-20-10-2-2.map").unwrap_or_else(|| warehouse_map(63, 45)),
         ),
         (
             "ht_chantry-real",
@@ -393,12 +399,7 @@ struct SimMetrics {
 
 /// Run one simulation: N agents on `map` for `steps` ticks, reassigning goals
 /// on reach (lifelong MAPF).
-fn run_simulation(
-    map: &GridMap,
-    n_agents: usize,
-    steps: usize,
-    seed: u64,
-) -> SimMetrics {
+fn run_simulation(map: &GridMap, n_agents: usize, steps: usize, seed: u64) -> SimMetrics {
     let n_passable = count_passable(map);
     assert!(
         n_agents < n_passable,
@@ -415,10 +416,7 @@ fn run_simulation(
     // Random distinct starts.
     let mut indices: Vec<usize> = (0..passable.len()).collect();
     shuffle(&mut indices, &mut rng);
-    let starts: Vec<GridPos> = indices[..n_agents]
-        .iter()
-        .map(|&i| passable[i])
-        .collect();
+    let starts: Vec<GridPos> = indices[..n_agents].iter().map(|&i| passable[i]).collect();
     let config = JointConfig::new(starts.clone());
 
     // Goals: random distinct positions (can overlap with starts of other agents).
@@ -443,8 +441,8 @@ fn run_simulation(
         max_expansions: 0,
     };
     let map_clone = map.clone();
-    let mut guidance = SpaceTimeGuidance::new(cfg)
-        .with_neighbors(move |p| map_clone.passable_neighbors(p));
+    let mut guidance =
+        SpaceTimeGuidance::new(cfg).with_neighbors(move |p| map_clone.passable_neighbors(p));
     let mut hindrance = BlockingCount::new();
     let warm = WarmStartCache::new(WarmStartScheme::default(), cfg.w_phi);
     let flow = GridFlowField::from_map(map);
@@ -551,12 +549,7 @@ fn run_simulation(
 
 /// Run a "no-guidance" baseline: PIBT with empty guidance (LllgEmpty scheme)
 /// to measure the congestion mitigation benefit of the local guidance.
-fn run_no_guidance_baseline(
-    map: &GridMap,
-    n_agents: usize,
-    steps: usize,
-    seed: u64,
-) -> SimMetrics {
+fn run_no_guidance_baseline(map: &GridMap, n_agents: usize, steps: usize, seed: u64) -> SimMetrics {
     let n_passable = count_passable(map);
     assert!(n_agents < n_passable);
 
@@ -589,13 +582,13 @@ fn run_no_guidance_baseline(
         max_expansions: 0,
     };
     let map_clone = map.clone();
-    let mut guidance = SpaceTimeGuidance::new(cfg)
-        .with_neighbors(move |p| map_clone.passable_neighbors(p));
+    let mut guidance =
+        SpaceTimeGuidance::new(cfg).with_neighbors(move |p| map_clone.passable_neighbors(p));
     let mut hindrance = BlockingCount::new();
     let warm = WarmStartCache::new(WarmStartScheme::LllgEmpty, cfg.w_phi);
     let map_clone2 = map.clone();
-    let mut lacam = LifelongLaCam::new(warm)
-        .with_neighbors(move |p| map_clone2.passable_neighbors(p));
+    let mut lacam =
+        LifelongLaCam::new(warm).with_neighbors(move |p| map_clone2.passable_neighbors(p));
 
     let mut current = config;
     let mut goals = goals;
@@ -747,19 +740,13 @@ fn main() {
         let n_passable = count_passable(map);
         let n = n_agents_g1.min(n_passable / 2);
         if n < 100 {
-            println!(
-                    "  {map_name:<30}: too few passable cells ({n_passable}), skipping"
-                );
+            println!("  {map_name:<30}: too few passable cells ({n_passable}), skipping");
             continue;
         }
 
         // Maps not in paper_targets are diagnostic-only (e.g. ht_chantry-approx).
         // Run them and print for contrast, but don't count toward the gate.
-        let Some((_, target)) = paper_targets
-            .iter()
-            .find(|(n, _)| *n == *map_name)
-            .copied()
-        else {
+        let Some((_, target)) = paper_targets.iter().find(|(n, _)| *n == *map_name).copied() else {
             let metrics = run_simulation(map, n, steps_g1, 42);
             println!(
                 "  {map_name:<30}: throughput={:>7.2} (DIAGNOSTIC, no paper target, n={}, completions={})",
@@ -783,7 +770,7 @@ fn main() {
         }
 
         println!(
-                "  {map_name:<30}: throughput={:>7.2} (paper≈{:.1}, ratio={:.2}, n={}, completions={})  {}",
+            "  {map_name:<30}: throughput={:>7.2} (paper≈{:.1}, ratio={:.2}, n={}, completions={})  {}",
             metrics.throughput,
             target,
             ratio,
@@ -868,7 +855,9 @@ fn main() {
     );
     println!(
         "  LllgEmpty: max_stops/cell={}, mean_stops={:.1}, throughput={:.2}",
-        baseline_metrics.max_stops_per_cell, baseline_metrics.mean_stops_per_cell, baseline_metrics.throughput
+        baseline_metrics.max_stops_per_cell,
+        baseline_metrics.mean_stops_per_cell,
+        baseline_metrics.throughput
     );
 
     // G2 gate: LLLG max-stops should be < 0.5 × baseline max-stops.
@@ -893,9 +882,7 @@ fn main() {
         passed: g2_pass,
         detail: format!(
             "LLLG max_stops={} vs baseline={}, ratio={:.2}. Pass if ratio<0.5 or max<10",
-            lllg_metrics.max_stops_per_cell,
-            baseline_metrics.max_stops_per_cell,
-            g2_ratio
+            lllg_metrics.max_stops_per_cell, baseline_metrics.max_stops_per_cell, g2_ratio
         ),
     });
 
@@ -910,9 +897,7 @@ fn main() {
         "  {} agents, {} steps: median={:.2}ms, max={:.2}ms",
         n_agents_g4, steps_g4, latency_metrics.median_tick_ms, latency_metrics.max_tick_ms
     );
-    println!(
-        "  Target: < 500ms (generous). Paper reports 210-260ms on M1 Ultra at 1000 agents."
-    );
+    println!("  Target: < 500ms (generous). Paper reports 210-260ms on M1 Ultra at 1000 agents.");
 
     let g4_pass = latency_metrics.median_tick_ms < 500.0;
     let g4_stretch = latency_metrics.median_tick_ms < 100.0;

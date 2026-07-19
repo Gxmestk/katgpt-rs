@@ -22,8 +22,8 @@
 #![cfg(feature = "occupancy_ratio")]
 
 use katgpt_core::occupancy::{
-    InitialMoments, KlProjectionScratch, LinearLogRatioClass, LogRatioClass, OccupancyRatioEstimator,
-    TransitionBatch,
+    InitialMoments, KlProjectionScratch, LinearLogRatioClass, LogRatioClass,
+    OccupancyRatioEstimator, TransitionBatch,
 };
 use std::hint::black_box;
 use std::sync::atomic::Ordering;
@@ -128,7 +128,13 @@ fn g4_alloc_free() -> (bool, usize) {
     // Warmup.
     for _ in 0..5 {
         class.fit_and_evaluate(
-            &transitions, &initial, &ratio, 0.95, &mut params, &mut next_ratio, &mut scratch,
+            &transitions,
+            &initial,
+            &ratio,
+            0.95,
+            &mut params,
+            &mut next_ratio,
+            &mut scratch,
         );
         std::mem::swap(&mut ratio, &mut next_ratio);
     }
@@ -140,7 +146,13 @@ fn g4_alloc_free() -> (bool, usize) {
     let mut sink = 0.0_f32;
     for _ in 0..100 {
         class.fit_and_evaluate(
-            &transitions, &initial, &ratio, 0.95, &mut params, &mut next_ratio, &mut scratch,
+            &transitions,
+            &initial,
+            &ratio,
+            0.95,
+            &mut params,
+            &mut next_ratio,
+            &mut scratch,
         );
         sink += next_ratio[0];
         std::mem::swap(&mut ratio, &mut next_ratio);
@@ -167,7 +179,10 @@ fn main() {
     let (g2_pass, median_ms) = g2_perf();
     println!("── G2 (perf): FORE fit n=10000, d=8, K=20 ──");
     println!("   median latency:       {median_ms:.2} ms  (target < 100 ms)");
-    println!("   Result:               {}", if g2_pass { "PASS ✓" } else { "FAIL ✗" });
+    println!(
+        "   Result:               {}",
+        if g2_pass { "PASS ✓" } else { "FAIL ✗" }
+    );
     println!();
 
     // G4: alloc-free
@@ -175,7 +190,10 @@ fn main() {
     println!("── G4 (alloc-free): fit_and_evaluate inner loop ──");
     println!("   100 calls:            {allocs} alloc+dealloc");
     println!("   Threshold:            0");
-    println!("   Result:               {}", if g4_pass { "PASS ✓" } else { "FAIL ✗" });
+    println!(
+        "   Result:               {}",
+        if g4_pass { "PASS ✓" } else { "FAIL ✗" }
+    );
     println!();
 
     // G1: correctness (informational — verified in tests/occupancy_baird_mrp.rs)

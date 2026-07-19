@@ -20,8 +20,8 @@
 //! The hot read-path (`active_branches`) allocates nothing.
 
 use crate::branching::types::{
-    decode_lifecycle, encode_lifecycle, BranchId, BranchLifecycle, CognitiveBranch, EpisodicCodec,
-    BRANCH_TYPES_WIRE_VERSION,
+    BRANCH_TYPES_WIRE_VERSION, BranchId, BranchLifecycle, CognitiveBranch, EpisodicCodec,
+    decode_lifecycle, encode_lifecycle,
 };
 use std::collections::HashSet;
 
@@ -967,7 +967,10 @@ mod tests {
             assert_eq!(decoded_slot.token_signature, original.token_signature);
             assert_eq!(decoded_slot.episodic.len(), original.episodic.len());
             for (i, e) in original.episodic.iter().enumerate() {
-                assert_eq!(decoded_slot.episodic[i].payload, e.payload, "slot {slot} ep {i}");
+                assert_eq!(
+                    decoded_slot.episodic[i].payload, e.payload,
+                    "slot {slot} ep {i}"
+                );
                 assert_eq!(decoded_slot.episodic[i].tick, e.tick);
             }
             assert_eq!(decoded_slot.stats, original.stats);
@@ -997,7 +1000,11 @@ mod tests {
 
         // Spawning on the decoded bank should reuse slot 1 (the pruned one).
         let reused = decoded.spawn(vec![0.5]).unwrap();
-        assert_eq!(reused, BranchId(1), "decoded bank must reuse the pruned slot");
+        assert_eq!(
+            reused,
+            BranchId(1),
+            "decoded bank must reuse the pruned slot"
+        );
     }
 
     #[test]
@@ -1051,7 +1058,9 @@ mod tests {
         let mut bytes = bank.to_bytes();
         let last = bytes.len() - 1;
         bytes[last] ^= 0x01; // toggle low bit of the high byte of n_active
-        assert!(BranchBank::<()>::from_bytes(&bytes).is_none(),
-            "n_active checksum mismatch must be rejected");
+        assert!(
+            BranchBank::<()>::from_bytes(&bytes).is_none(),
+            "n_active checksum mismatch must be rejected"
+        );
     }
 }

@@ -26,11 +26,9 @@
 
 #![cfg(feature = "gdn_hola_tree_verify")]
 
+use katgpt_core::gdn_tree_verify::hola_fusion::{GdnHolaTreeVerifier, verify_gdn_hola_tree_into};
 use katgpt_core::gdn_tree_verify::{
-    build_topology, verify_gdn_tree_into, GdnLayerParams, GdnTreeVerifier,
-};
-use katgpt_core::gdn_tree_verify::hola_fusion::{
-    verify_gdn_hola_tree_into, GdnHolaTreeVerifier,
+    GdnLayerParams, GdnTreeVerifier, build_topology, verify_gdn_tree_into,
 };
 use katgpt_core::hippocampal_cache_dyn::HippocampalCacheDyn;
 
@@ -71,7 +69,13 @@ fn gen_random_tree(t: usize, d: usize, seed: u32) -> TreeData {
     // Random parent: each node's parent is a uniformly-random earlier node
     // (shallow tree, depth ~log T — typical speculative decode shape).
     let parents: Vec<usize> = (0..t)
-        .map(|i| if i == 0 { usize::MAX } else { (next() as usize) % i })
+        .map(|i| {
+            if i == 0 {
+                usize::MAX
+            } else {
+                (next() as usize) % i
+            }
+        })
         .collect();
     fill_tree_data(parents, t, d, seed.wrapping_mul(7))
 }
@@ -79,8 +83,9 @@ fn gen_random_tree(t: usize, d: usize, seed: u32) -> TreeData {
 fn gen_chain_tree(t: usize, d: usize, seed: u32) -> TreeData {
     // Chain: each node's parent is the previous node (depth = T — worst case
     // for sequential, deepest ancestor paths for HOLA block_kv).
-    let parents: Vec<usize> =
-        (0..t).map(|i| if i == 0 { usize::MAX } else { i - 1 }).collect();
+    let parents: Vec<usize> = (0..t)
+        .map(|i| if i == 0 { usize::MAX } else { i - 1 })
+        .collect();
     fill_tree_data(parents, t, d, seed.wrapping_mul(7))
 }
 
@@ -94,7 +99,15 @@ fn fill_tree_data(parents: Vec<usize>, t: usize, d: usize, seed: u32) -> TreeDat
     let alphas: Vec<f32> = (0..t).map(|_| 0.85 + 0.1 * frng()).collect();
     let betas: Vec<f32> = (0..t).map(|_| 0.4 + 0.4 * frng()).collect();
     let s0: Vec<f32> = (0..d * d).map(|_| 0.05 * frng()).collect();
-    TreeData { parents, keys, values, queries, alphas, betas, s0 }
+    TreeData {
+        parents,
+        keys,
+        values,
+        queries,
+        alphas,
+        betas,
+        s0,
+    }
 }
 
 /// Build a populated HOLA cache (D=d, W=64 — paper-scale width). The cache is
@@ -172,7 +185,8 @@ fn g4_alloc_free() {
 
     // Now measure the hot path — should be 0 allocs.
     let (_, delta) = alloc_delta(|| {
-        let _ = verify_gdn_hola_tree_into(&mut verifier, &topo, &params, &mut cache, &data.s0, d, d);
+        let _ =
+            verify_gdn_hola_tree_into(&mut verifier, &topo, &params, &mut cache, &data.s0, d, d);
     });
 
     if delta == 0 {
@@ -185,17 +199,8 @@ fn g4_alloc_free() {
 
 // ─── G2: perf overhead ────────────────────────────────────────────────────
 
-fn g2_perf_one_shape<F: Fn(usize, usize, u32) -> TreeData>(
-    label: &str,
-    tree_fn: F,
-    d: usize,
-) {
-    let sizes: &[(usize, &str)] = &[
-        (16, "T=16"),
-        (32, "T=32"),
-        (64, "T=64"),
-        (128, "T=128"),
-    ];
+fn g2_perf_one_shape<F: Fn(usize, usize, u32) -> TreeData>(label: &str, tree_fn: F, d: usize) {
+    let sizes: &[(usize, &str)] = &[(16, "T=16"), (32, "T=32"), (64, "T=64"), (128, "T=128")];
 
     println!("║ ── {label} ──");
 
@@ -219,18 +224,42 @@ fn g2_perf_one_shape<F: Fn(usize, usize, u32) -> TreeData>(
 
         // Warmup (3 iters each).
         for _ in 0..3 {
-            let _ = verify_gdn_hola_tree_into(&mut verifier_dual, &topo, &params, &mut cache_dual, &data.s0, d, d);
+            let _ = verify_gdn_hola_tree_into(
+                &mut verifier_dual,
+                &topo,
+                &params,
+                &mut cache_dual,
+                &data.s0,
+                d,
+                d,
+            );
         }
         for _ in 0..3 {
             let _ = verify_gdn_tree_into(&mut verifier_gdn, &topo, &params, &data.s0, d, d);
         }
 
-        let n_iters = if t <= 16 { 500 } else if t <= 32 { 200 } else if t <= 64 { 80 } else { 20 };
+        let n_iters = if t <= 16 {
+            500
+        } else if t <= 32 {
+            200
+        } else if t <= 64 {
+            80
+        } else {
+            20
+        };
 
         // Dual-path.
         let start = std::time::Instant::now();
         for _ in 0..n_iters {
-            let _ = verify_gdn_hola_tree_into(&mut verifier_dual, &topo, &params, &mut cache_dual, &data.s0, d, d);
+            let _ = verify_gdn_hola_tree_into(
+                &mut verifier_dual,
+                &topo,
+                &params,
+                &mut cache_dual,
+                &data.s0,
+                d,
+                d,
+            );
         }
         let dual_us = start.elapsed().as_secs_f64() / n_iters as f64 * 1e6;
 
@@ -265,7 +294,10 @@ fn g2_perf_one_shape<F: Fn(usize, usize, u32) -> TreeData>(
             if pass_subbar { "✅" } else { "⚠️" }
         );
     }
-    println!("║ {label}: gate {} (dual ≤ gdn+hola at T≥32)", if all_pass { "PASS" } else { "CHECK" });
+    println!(
+        "║ {label}: gate {} (dual ≤ gdn+hola at T≥32)",
+        if all_pass { "PASS" } else { "CHECK" }
+    );
 }
 
 fn g2_perf() {

@@ -1673,9 +1673,8 @@ pub fn d2f_decode_block_soft(
                 &mut softmax_scratch[..vocab_size],
                 -max_val,
             );
-            let sum_exp: f32 = katgpt_core::simd::simd_exp_sum_inplace(
-                &mut softmax_scratch[..vocab_size],
-            );
+            let sum_exp: f32 =
+                katgpt_core::simd::simd_exp_sum_inplace(&mut softmax_scratch[..vocab_size]);
             let conf = if sum_exp > 0.0 {
                 1.0 / sum_exp
             } else {
@@ -1777,7 +1776,6 @@ pub fn d2f_decode_block_soft(
         state: D2fBlockState::FullyActivated,
     }
 }
-
 
 #[cfg(test)]
 mod tests;

@@ -110,11 +110,7 @@ impl FlowDirection {
                     return 0;
                 }
                 let move_sign: i32 = if dx > 0 { 1 } else { -1 };
-                if move_sign != self.sign as i32 {
-                    1
-                } else {
-                    0
-                }
+                if move_sign != self.sign as i32 { 1 } else { 0 }
             }
             CorridorAxis::Vertical => {
                 if dy == 0 {
@@ -122,11 +118,7 @@ impl FlowDirection {
                     return 0;
                 }
                 let move_sign: i32 = if dy > 0 { 1 } else { -1 };
-                if move_sign != self.sign as i32 {
-                    1
-                } else {
-                    0
-                }
+                if move_sign != self.sign as i32 { 1 } else { 0 }
             }
         }
     }
@@ -395,8 +387,7 @@ fn is_2wide_corridor_h(map: &GridMap, x: usize, y: usize, w: usize, h: usize) ->
     };
 
     // Partner below (dy = +1): wall above, passable below, wall below-partner.
-    let partner_below =
-        yi + 1 < h as i32
+    let partner_below = yi + 1 < h as i32
         && map.is_passable(x, y + 1)
         && is_blocked(map, xi, yi - 1, w, h)
         && is_blocked(map, xi, yi + 2, w, h)
@@ -440,8 +431,7 @@ fn is_2wide_corridor_v(map: &GridMap, x: usize, y: usize, w: usize, h: usize) ->
     };
 
     // Partner right (dx = +1): wall left, passable right, wall right-partner.
-    let partner_right =
-        xi + 1 < w as i32
+    let partner_right = xi + 1 < w as i32
         && map.is_passable(x + 1, y)
         && is_blocked(map, xi - 1, yi, w, h)
         && is_blocked(map, xi + 2, yi, w, h)

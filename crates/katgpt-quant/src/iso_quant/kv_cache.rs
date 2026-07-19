@@ -131,13 +131,9 @@ impl IsoQuantKVCache {
             layers,
             key_codebook,
             val_codebook,
-            key_indices: vec![
-                0u8; config.n_layers * config.max_seq_len * packed_key_len
-            ],
+            key_indices: vec![0u8; config.n_layers * config.max_seq_len * packed_key_len],
             key_norms: vec![0.0f32; config.n_layers * config.max_seq_len],
-            val_indices: vec![
-                0u8; config.n_layers * config.max_seq_len * packed_val_len
-            ],
+            val_indices: vec![0u8; config.n_layers * config.max_seq_len * packed_val_len],
             val_norms: vec![0.0f32; config.n_layers * config.max_seq_len],
             pos: 0,
             max_used_pos: 0,
@@ -258,8 +254,11 @@ impl IsoQuantKVCache {
         }
 
         let off = self.key_off(layer, pos);
-        let indices =
-            unpack_indices(&self.key_indices[off..off + self.key_packed_len], self.key_bits, self.kv_dim);
+        let indices = unpack_indices(
+            &self.key_indices[off..off + self.key_packed_len],
+            self.key_bits,
+            self.kv_dim,
+        );
         let centroids = &self.key_codebook.centroids;
         let rotated: Vec<f32> = indices.iter().map(|&i| centroids[i as usize]).collect();
 
@@ -288,8 +287,11 @@ impl IsoQuantKVCache {
         }
 
         let off = self.val_off(layer, pos);
-        let indices =
-            unpack_indices(&self.val_indices[off..off + self.val_packed_len], self.val_bits, self.kv_dim);
+        let indices = unpack_indices(
+            &self.val_indices[off..off + self.val_packed_len],
+            self.val_bits,
+            self.kv_dim,
+        );
         let centroids = &self.val_codebook.centroids;
         let rotated: Vec<f32> = indices.iter().map(|&i| centroids[i as usize]).collect();
 

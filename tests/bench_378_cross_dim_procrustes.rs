@@ -256,7 +256,9 @@ struct SgdConfig<'a> {
 #[allow(clippy::needless_range_loop)]
 fn train_sgd_projection(cfg: SgdConfig<'_>) -> Vec<f32> {
     // Initialize P (warm-start from Procrustes if provided, else Xavier random)
-    let mut p = cfg.init_p.unwrap_or_else(|| random_matrix_f32(cfg.d, cfg.dd, cfg.seed));
+    let mut p = cfg
+        .init_p
+        .unwrap_or_else(|| random_matrix_f32(cfg.d, cfg.dd, cfg.seed));
 
     let n = cfg.h_targets_train.len();
     let mut epoch_kl = 0.0f32;
@@ -343,13 +345,20 @@ fn train_sgd_projection(cfg: SgdConfig<'_>) -> Vec<f32> {
 
         epoch_kl = total_kl / n as f32;
         if epoch < 5 || epoch % 50 == 0 || epoch == cfg.epochs - 1 {
-            println!("    [SGD] epoch {:>4}/{}: train KL = {:.6}  (lr={:.4})",
-                epoch + 1, cfg.epochs, epoch_kl, effective_lr);
+            println!(
+                "    [SGD] epoch {:>4}/{}: train KL = {:.6}  (lr={:.4})",
+                epoch + 1,
+                cfg.epochs,
+                epoch_kl,
+                effective_lr
+            );
         }
     }
 
-    println!("    [SGD] final train KL = {:.6} (base_lr={}, epochs={}, clip={})",
-        epoch_kl, cfg.lr, cfg.epochs, cfg.grad_clip);
+    println!(
+        "    [SGD] final train KL = {:.6} (base_lr={}, epochs={}, clip={})",
+        epoch_kl, cfg.lr, cfg.epochs, cfg.grad_clip
+    );
     p
 }
 
@@ -421,11 +430,26 @@ fn bench_378_cross_dim_procrustes() {
         let pos = 0usize;
 
         let mut t_cache = MultiLayerKVCache::new(&target_config);
-        let t_logits = forward(&mut t_ctx, &target_weights, &mut t_cache, token, pos, &target_config).to_vec();
+        let t_logits = forward(
+            &mut t_ctx,
+            &target_weights,
+            &mut t_cache,
+            token,
+            pos,
+            &target_config,
+        )
+        .to_vec();
         let h_t = t_ctx.hidden_state[..target_n_embd].to_vec();
 
         let mut d_cache = MultiLayerKVCache::new(&draft_config);
-        let _d_logits = forward(&mut d_ctx, &draft_weights, &mut d_cache, token, pos, &draft_config);
+        let _d_logits = forward(
+            &mut d_ctx,
+            &draft_weights,
+            &mut d_cache,
+            token,
+            pos,
+            &draft_config,
+        );
         let h_d = d_ctx.hidden_state[..draft_n_embd].to_vec();
 
         target_logits_all.push(t_logits);
@@ -433,8 +457,14 @@ fn bench_378_cross_dim_procrustes() {
         h_drafts.push(h_d);
     }
 
-    println!("  Target: n_embd={}, Draft: n_embd={}, vocab={}", target_n_embd, draft_n_embd, vocab);
-    println!("  Samples: {} train + {} test = {}", n_train, n_test, n_total);
+    println!(
+        "  Target: n_embd={}, Draft: n_embd={}, vocab={}",
+        target_n_embd, draft_n_embd, vocab
+    );
+    println!(
+        "  Samples: {} train + {} test = {}",
+        n_train, n_test, n_total
+    );
     println!();
 
     // ── Step 2: Compute Procrustes from training samples ────────────────
@@ -454,7 +484,10 @@ fn bench_378_cross_dim_procrustes() {
 
     // ── Step 2b: Train SGD projection on KL divergence (Issue 378 task 2) ──
     println!("── SGD Projection Training (Issue 378 acceptance criterion 2) ──");
-    println!("  Training on {} paired samples, {} epochs, lr=0.1", n_train, 500);
+    println!(
+        "  Training on {} paired samples, {} epochs, lr=0.1",
+        n_train, 500
+    );
     println!();
     let draft_lm_head_ref = &draft_weights.lm_head;
     let sgd_p = train_sgd_projection(SgdConfig {
@@ -520,10 +553,18 @@ fn bench_378_cross_dim_procrustes() {
     // compute KL(target_logits, projected_logits).
     let draft_lm_head = &draft_weights.lm_head;
 
-    println!("┌──────────────────────────────┬──────────────┬──────────────┬──────────────┬──────────┐");
-    println!("│ Projection                   │ KL div       │ Cosine sim   │ Norm ratio   │ G2 finite│");
-    println!("│                              │ (vs target)  │ (vs h_draft) │ (proj/draft) │ (logits) │");
-    println!("├──────────────────────────────┼──────────────┼──────────────┼──────────────┼──────────┤");
+    println!(
+        "┌──────────────────────────────┬──────────────┬──────────────┬──────────────┬──────────┐"
+    );
+    println!(
+        "│ Projection                   │ KL div       │ Cosine sim   │ Norm ratio   │ G2 finite│"
+    );
+    println!(
+        "│                              │ (vs target)  │ (vs h_draft) │ (proj/draft) │ (logits) │"
+    );
+    println!(
+        "├──────────────────────────────┼──────────────┼──────────────┼──────────────┼──────────┤"
+    );
 
     let mut results: Vec<VariantResult> = Vec::new();
     let mut all_g2_pass = true;
@@ -549,14 +590,17 @@ fn bench_378_cross_dim_procrustes() {
                 target_config.mtp_activation_threshold,
             );
 
-            let projected_logits =
-                apply_lm_head(&h_projected, draft_lm_head, vocab, draft_n_embd);
+            let projected_logits = apply_lm_head(&h_projected, draft_lm_head, vocab, draft_n_embd);
 
             let kl = kl_divergence(&softmax(target_logits), &softmax(&projected_logits));
             let cos = cosine_similarity(h_d, &h_projected);
             let draft_norm = l2_norm(h_d);
             let proj_norm = l2_norm(&h_projected);
-            let norm_ratio = if draft_norm > 1e-12 { proj_norm / draft_norm } else { 0.0 };
+            let norm_ratio = if draft_norm > 1e-12 {
+                proj_norm / draft_norm
+            } else {
+                0.0
+            };
             let finite = all_finite(&projected_logits);
 
             total_kl += kl;
@@ -590,11 +634,17 @@ fn bench_378_cross_dim_procrustes() {
             avg_kl,
             avg_cos,
             avg_norm_ratio,
-            if all_finite_flag { "✅ PASS" } else { "❌ FAIL" }
+            if all_finite_flag {
+                "✅ PASS"
+            } else {
+                "❌ FAIL"
+            }
         );
     }
 
-    println!("└──────────────────────────────┴──────────────┴──────────────┴──────────────┴──────────┘");
+    println!(
+        "└──────────────────────────────┴──────────────┴──────────────┴──────────────┴──────────┘"
+    );
     println!();
 
     // ── Step 5: Also measure draft's own KL (baseline, no projection) ───
@@ -607,17 +657,32 @@ fn bench_378_cross_dim_procrustes() {
         draft_own_kl += kl;
     }
     draft_own_kl /= n_test as f32;
-    println!("  Draft's own KL (no projection, draft's own hidden): {:.6}", draft_own_kl);
+    println!(
+        "  Draft's own KL (no projection, draft's own hidden): {:.6}",
+        draft_own_kl
+    );
     println!();
 
     // ── Step 6: GOAT gate ───────────────────────────────────────────────
     let g1_threshold = 0.1f32;
 
-    let procrustes_result = results.iter().find(|r| r.name.starts_with("Procrustes")).unwrap();
+    let procrustes_result = results
+        .iter()
+        .find(|r| r.name.starts_with("Procrustes"))
+        .unwrap();
     let truncate_result = results.iter().find(|r| r.name.starts_with("None")).unwrap();
-    let sgd_cold_result = results.iter().find(|r| r.name.starts_with("SGD (cold")).unwrap();
-    let sgd_warm_result = results.iter().find(|r| r.name.starts_with("SGD (warm")).unwrap();
-    let random_result = results.iter().find(|r| r.name.starts_with("Random")).unwrap();
+    let sgd_cold_result = results
+        .iter()
+        .find(|r| r.name.starts_with("SGD (cold"))
+        .unwrap();
+    let sgd_warm_result = results
+        .iter()
+        .find(|r| r.name.starts_with("SGD (warm"))
+        .unwrap();
+    let random_result = results
+        .iter()
+        .find(|r| r.name.starts_with("Random"))
+        .unwrap();
 
     // Pick the best of all trained variants for the GOAT gate
     let best_trained = [procrustes_result, sgd_cold_result, sgd_warm_result]
@@ -631,7 +696,10 @@ fn bench_378_cross_dim_procrustes() {
     let g1_beats_random = best_trained.kl_div < random_result.kl_div;
     let g3_pass = best_trained.cosine_sim >= 0.5;
 
-    println!("── GOAT Gate (best trained variant: {}) ─────────", best_trained.name);
+    println!(
+        "── GOAT Gate (best trained variant: {}) ─────────",
+        best_trained.name
+    );
     println!(
         "  G1 (quality): best trained KL ≤ {:.2}? → {:.6} {}",
         g1_threshold,
@@ -642,13 +710,21 @@ fn bench_378_cross_dim_procrustes() {
         "  G1b (vs truncate): best trained KL < truncate/pad KL? → {:.6} < {:.6} {}",
         best_trained.kl_div,
         truncate_result.kl_div,
-        if g1_beats_truncate { "✅ PASS" } else { "❌ FAIL" }
+        if g1_beats_truncate {
+            "✅ PASS"
+        } else {
+            "❌ FAIL"
+        }
     );
     println!(
         "  G1c (vs random): best trained KL < random KL? → {:.6} < {:.6} {}",
         best_trained.kl_div,
         random_result.kl_div,
-        if g1_beats_random { "✅ PASS" } else { "❌ FAIL" }
+        if g1_beats_random {
+            "✅ PASS"
+        } else {
+            "❌ FAIL"
+        }
     );
     println!(
         "  G2 (no-regression): all logits finite? → {}",
@@ -672,20 +748,38 @@ fn bench_378_cross_dim_procrustes() {
     println!("── Verdict ───────────────────────────────────────────────────");
     if g1_pass && g1_beats_truncate {
         println!("  A trained/Procrustes projection PASSES the GOAT gate.");
-        println!("  Cross-dim MTP projection is closed (KL ≤ {:.2}).", g1_threshold);
+        println!(
+            "  Cross-dim MTP projection is closed (KL ≤ {:.2}).",
+            g1_threshold
+        );
         println!();
-        println!("  → Issue 378 acceptance criterion 3 (GOAT gate): MET by {}", best_trained.name);
+        println!(
+            "  → Issue 378 acceptance criterion 3 (GOAT gate): MET by {}",
+            best_trained.name
+        );
     } else if g1_beats_truncate {
-        println!("  Best trained projection ({}) BEATS truncate/pad but doesn't meet KL ≤ {:.2}.",
-            best_trained.name, g1_threshold);
-        println!("  Best trained KL = {:.6} vs truncate/pad KL = {:.6}",
-            best_trained.kl_div, truncate_result.kl_div);
+        println!(
+            "  Best trained projection ({}) BEATS truncate/pad but doesn't meet KL ≤ {:.2}.",
+            best_trained.name, g1_threshold
+        );
+        println!(
+            "  Best trained KL = {:.6} vs truncate/pad KL = {:.6}",
+            best_trained.kl_div, truncate_result.kl_div
+        );
         println!("  vs random control KL = {:.6}", random_result.kl_div);
         println!();
-        println!("  Root cause (rank deficiency): draft_lm_head [{v}×{d}] @ P [{d}×{D}]",
-            v = vocab, d = draft_n_embd, D = target_n_embd);
-        println!("  has rank ≤ {d}, but target_lm_head [{v}×{D}] has rank up to {D}.",
-            d = draft_n_embd, v = vocab, D = target_n_embd);
+        println!(
+            "  Root cause (rank deficiency): draft_lm_head [{v}×{d}] @ P [{d}×{D}]",
+            v = vocab,
+            d = draft_n_embd,
+            D = target_n_embd
+        );
+        println!(
+            "  has rank ≤ {d}, but target_lm_head [{v}×{D}] has rank up to {D}.",
+            d = draft_n_embd,
+            v = vocab,
+            D = target_n_embd
+        );
         println!("  KL=0 is mathematically impossible when target rank > draft rank.");
         println!("  This is fundamental for random-init models with dim mismatch.");
         println!("  Same-family trained models (e.g. Gemma-2-2B + pruned Gemma)");
@@ -695,15 +789,20 @@ fn bench_378_cross_dim_procrustes() {
         println!("  → Issue 378 acceptance criterion 3 (GOAT gate): ❌ FAIL on random models");
         println!("  → Needs real trained model pairs to evaluate properly");
     } else {
-        println!("  Best trained projection ({}) does NOT beat truncate/pad.",
-            best_trained.name);
+        println!(
+            "  Best trained projection ({}) does NOT beat truncate/pad.",
+            best_trained.name
+        );
         println!();
         println!("  → Issue 378 acceptance criterion 3 (GOAT gate): ❌ FAIL");
     }
     println!();
 
     // Assert basic sanity (G2 must always pass — no NaN/Inf)
-    assert!(all_g2_pass, "G2 FAIL: some projections produced non-finite logits");
+    assert!(
+        all_g2_pass,
+        "G2 FAIL: some projections produced non-finite logits"
+    );
 
     println!("═══════════════════════════════════════════════════════════════");
 }
@@ -832,8 +931,8 @@ fn bench_378_synthetic_linear_fixture() {
     target_config.mtp_activation_threshold = 1;
 
     let target_n_embd = target_config.n_embd; // 16
-    let draft_n_embd = draft_config.n_embd;   // 8
-    let vocab = target_config.vocab_size;     // 27
+    let draft_n_embd = draft_config.n_embd; // 8
+    let vocab = target_config.vocab_size; // 27
 
     let mut rng = Rng::new(99);
     let draft_weights = TransformerWeights::new(&draft_config, &mut rng);
@@ -860,18 +959,42 @@ fn bench_378_synthetic_linear_fixture() {
         let token = i % (vocab - 1);
         let pos = 0usize;
         let mut t_cache = MultiLayerKVCache::new(&target_config);
-        let _ = forward(&mut t_ctx, &base_target_weights, &mut t_cache, token, pos, &target_config);
+        let _ = forward(
+            &mut t_ctx,
+            &base_target_weights,
+            &mut t_cache,
+            token,
+            pos,
+            &target_config,
+        );
         let h_t = t_ctx.hidden_state[..target_n_embd].to_vec();
         let mut d_cache = MultiLayerKVCache::new(&draft_config);
-        let _ = forward(&mut d_ctx, &draft_weights, &mut d_cache, token, pos, &draft_config);
+        let _ = forward(
+            &mut d_ctx,
+            &draft_weights,
+            &mut d_cache,
+            token,
+            pos,
+            &draft_config,
+        );
         let h_d = d_ctx.hidden_state[..draft_n_embd].to_vec();
         h_targets.push(h_t);
         h_drafts.push(h_d);
     }
 
-    println!("  Target: n_embd={}, Draft: n_embd={}, vocab={}", target_n_embd, draft_n_embd, vocab);
-    println!("  Samples: {} train + {} test = {}", n_train, n_test, n_total);
-    println!("  Ground-truth W: [{d}×{D}] (seed=77777)", d = draft_n_embd, D = target_n_embd);
+    println!(
+        "  Target: n_embd={}, Draft: n_embd={}, vocab={}",
+        target_n_embd, draft_n_embd, vocab
+    );
+    println!(
+        "  Samples: {} train + {} test = {}",
+        n_train, n_test, n_total
+    );
+    println!(
+        "  Ground-truth W: [{d}×{D}] (seed=77777)",
+        d = draft_n_embd,
+        D = target_n_embd
+    );
     println!();
 
     // Sweep noise levels to show graceful degradation
@@ -882,7 +1005,10 @@ fn bench_378_synthetic_linear_fixture() {
     let mut summary_rows: Vec<(&'static str, f32, f32, f32, f32, bool)> = Vec::new();
 
     for &noise_sigma in noise_levels {
-        println!("── Noise sigma = {:.4} ─────────────────────────────────────", noise_sigma);
+        println!(
+            "── Noise sigma = {:.4} ─────────────────────────────────────",
+            noise_sigma
+        );
 
         // Build the synthetic target_lm_head for this noise level
         let synthetic_lm_head = build_synthetic_target_lm_head(
@@ -953,8 +1079,10 @@ fn bench_378_synthetic_linear_fixture() {
             draft_n_embd,
             mtp_threshold: target_config.mtp_activation_threshold,
         });
-        println!("    [diag] P=W_gt    KL = {:.6}  cos = {:.4}  (theoretical optimum at noise=0)",
-            gt_kl, gt_cos);
+        println!(
+            "    [diag] P=W_gt    KL = {:.6}  cos = {:.4}  (theoretical optimum at noise=0)",
+            gt_kl, gt_cos
+        );
 
         // Evaluate all variants on held-out test set
         let (trunc_kl, trunc_cos, _) = eval_projection(EvalConfig {
@@ -1000,13 +1128,31 @@ fn bench_378_synthetic_linear_fixture() {
             1.0 => "noise=1.0",
             _ => "noise=?",
         };
-        summary_rows.push((label, trunc_kl, proc_kl, sgd_kl, sgd_cos, g1_pass && sgd_finite));
+        summary_rows.push((
+            label,
+            trunc_kl,
+            proc_kl,
+            sgd_kl,
+            sgd_cos,
+            g1_pass && sgd_finite,
+        ));
 
-        println!("    truncate/pad KL = {:.6}  cos = {:.4}", trunc_kl, trunc_cos);
-        println!("    Procrustes  KL = {:.6}  cos = {:.4}  G1={}",
-            proc_kl, proc_cos, if g1_proc { "✅" } else { "❌" });
-        println!("    SGD         KL = {:.6}  cos = {:.4}  G1(KL≤0.1)={}",
-            sgd_kl, sgd_cos, if g1_pass { "✅" } else { "❌" });
+        println!(
+            "    truncate/pad KL = {:.6}  cos = {:.4}",
+            trunc_kl, trunc_cos
+        );
+        println!(
+            "    Procrustes  KL = {:.6}  cos = {:.4}  G1={}",
+            proc_kl,
+            proc_cos,
+            if g1_proc { "✅" } else { "❌" }
+        );
+        println!(
+            "    SGD         KL = {:.6}  cos = {:.4}  G1(KL≤0.1)={}",
+            sgd_kl,
+            sgd_cos,
+            if g1_pass { "✅" } else { "❌" }
+        );
         println!();
 
         if noise_sigma == 0.0 && !g1_pass {
@@ -1016,21 +1162,40 @@ fn bench_378_synthetic_linear_fixture() {
 
     // Summary table
     println!("── Synthetic Fixture Summary (Issue 378 validation) ─────────");
-    println!("┌──────────────┬──────────────┬──────────────┬──────────────┬──────────────┬──────────┐");
-    println!("│ Noise sigma  │ truncate/pad │ Procrustes   │ SGD          │ cosine sim   │ G1≤0.1   │");
-    println!("├──────────────┼──────────────┼──────────────┼──────────────┼──────────────┼──────────┤");
+    println!(
+        "┌──────────────┬──────────────┬──────────────┬──────────────┬──────────────┬──────────┐"
+    );
+    println!(
+        "│ Noise sigma  │ truncate/pad │ Procrustes   │ SGD          │ cosine sim   │ G1≤0.1   │"
+    );
+    println!(
+        "├──────────────┼──────────────┼──────────────┼──────────────┼──────────────┼──────────┤"
+    );
     for &(label, trunc, proc, sgd, cos, pass) in &summary_rows {
-        println!("│ {:<12} │ {:>12.6} │ {:>12.6} │ {:>12.6} │ {:>12.6} │ {:>8} │",
-            label, trunc, proc, sgd, cos, if pass { "✅ PASS" } else { "❌ FAIL" });
+        println!(
+            "│ {:<12} │ {:>12.6} │ {:>12.6} │ {:>12.6} │ {:>12.6} │ {:>8} │",
+            label,
+            trunc,
+            proc,
+            sgd,
+            cos,
+            if pass { "✅ PASS" } else { "❌ FAIL" }
+        );
     }
-    println!("└──────────────┴──────────────┴──────────────┴──────────────┴──────────────┴──────────┘");
+    println!(
+        "└──────────────┴──────────────┴──────────────┴──────────────┴──────────────┴──────────┘"
+    );
     println!();
 
     // Validation assertion: at noise=0, SGD MUST achieve KL ≤ 0.1
     // This proves the method works when the linear precondition holds.
     let noise_zero = &summary_rows[0]; // first entry is noise=0.0
-    assert!(noise_zero.5, "VALIDATION FAIL: at noise=0.0 SGD should achieve KL ≤ 0.1 (got KL={:.6}). \
-        The method should recover W exactly when target_lm_head = draft_lm_head @ W.", noise_zero.3);
+    assert!(
+        noise_zero.5,
+        "VALIDATION FAIL: at noise=0.0 SGD should achieve KL ≤ 0.1 (got KL={:.6}). \
+        The method should recover W exactly when target_lm_head = draft_lm_head @ W.",
+        noise_zero.3
+    );
     assert!(!any_noise_zero_fail, "noise=0.0 should pass G1");
 
     println!("── Verdict ──────────────────────────────────────────────────");

@@ -52,8 +52,12 @@ fn main() {
     ];
 
     for (name, config) in &configs {
-        println!("╔══ Config: {name} (n_layer={}, n_embd={}, kv_dim={}) ══╗",
-                 config.n_layer, config.n_embd, types::kv_dim(config));
+        println!(
+            "╔══ Config: {name} (n_layer={}, n_embd={}, kv_dim={}) ══╗",
+            config.n_layer,
+            config.n_embd,
+            types::kv_dim(config)
+        );
 
         all_pass &= g1_correctness(config, name);
         all_pass &= g2_perf(config, name);
@@ -62,7 +66,10 @@ fn main() {
     }
 
     println!("╔════════════════════════════════════╗");
-    println!("║  Overall: {}                        ║", if all_pass { "✅ PASS" } else { "❌ FAIL" });
+    println!(
+        "║  Overall: {}                        ║",
+        if all_pass { "✅ PASS" } else { "❌ FAIL" }
+    );
     println!("╚════════════════════════════════════╝");
     std::process::exit(if all_pass { 0 } else { 1 });
 }
@@ -96,11 +103,20 @@ fn g1_correctness(config: &Config, label: &str) -> bool {
             .all(|(a, b)| {
                 a.key.len() == b.key.len()
                     && a.value.len() == b.value.len()
-                    && a.key.iter().zip(&b.key).all(|(x, y)| x.to_bits() == y.to_bits())
-                    && a.value.iter().zip(&b.value).all(|(x, y)| x.to_bits() == y.to_bits())
+                    && a.key
+                        .iter()
+                        .zip(&b.key)
+                        .all(|(x, y)| x.to_bits() == y.to_bits())
+                    && a.value
+                        .iter()
+                        .zip(&b.value)
+                        .all(|(x, y)| x.to_bits() == y.to_bits())
             });
 
-    println!("  G1 ({label}): snapshot_into == snapshot → {}", if pass { "✅" } else { "❌" });
+    println!(
+        "  G1 ({label}): snapshot_into == snapshot → {}",
+        if pass { "✅" } else { "❌" }
+    );
     pass
 }
 
@@ -203,7 +219,11 @@ fn g4_alloc_audit(config: &Config, label: &str) -> bool {
     println!(
         "  G4 ({label}): per-layer capacities stable after warmup ({} layers) → {}",
         caps_after_warmup.len(),
-        if pass { "✅ zero-growth (0 allocs)" } else { "❌ capacity grew" }
+        if pass {
+            "✅ zero-growth (0 allocs)"
+        } else {
+            "❌ capacity grew"
+        }
     );
     pass
 }

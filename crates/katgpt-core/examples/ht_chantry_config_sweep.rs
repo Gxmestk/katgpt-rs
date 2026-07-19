@@ -182,14 +182,14 @@ fn run_sim_inner(
         .collect();
 
     let map_clone = map.clone();
-    let mut guidance = SpaceTimeGuidance::new(cfg)
-        .with_neighbors(move |p| map_clone.passable_neighbors(p));
+    let mut guidance =
+        SpaceTimeGuidance::new(cfg).with_neighbors(move |p| map_clone.passable_neighbors(p));
     let mut hindrance_blocking = BlockingCount::new();
     let mut hindrance_counter = CounterFlowHindrance::new().with_gamma(gamma);
     let warm = WarmStartCache::new(WarmStartScheme::default(), cfg.w_phi);
     let map_clone2 = map.clone();
-    let mut lacam = LifelongLaCam::new(warm)
-        .with_neighbors(move |p| map_clone2.passable_neighbors(p));
+    let mut lacam =
+        LifelongLaCam::new(warm).with_neighbors(move |p| map_clone2.passable_neighbors(p));
 
     let mut current = config;
     let mut goals = goals;
@@ -207,7 +207,13 @@ fn run_sim_inner(
         }
         if counter_flow {
             hindrance_counter.set_goals(&goals);
-            let action = lacam.tick(&current, &goals, &mut guidance, &mut hindrance_counter, &mut rng);
+            let action = lacam.tick(
+                &current,
+                &goals,
+                &mut guidance,
+                &mut hindrance_counter,
+                &mut rng,
+            );
             for i in 0..n_agents {
                 if action.moves[i] == current.positions[i] {
                     let x = current.positions[i].x;
@@ -222,7 +228,13 @@ fn run_sim_inner(
             }
             current = JointConfig::new(action.moves);
         } else {
-            let action = lacam.tick(&current, &goals, &mut guidance, &mut hindrance_blocking, &mut rng);
+            let action = lacam.tick(
+                &current,
+                &goals,
+                &mut guidance,
+                &mut hindrance_blocking,
+                &mut rng,
+            );
             for i in 0..n_agents {
                 if action.moves[i] == current.positions[i] {
                     let x = current.positions[i].x;
@@ -283,8 +295,10 @@ fn main() {
     }
 
     // Also test at higher density for the best configs.
-    println!("
-Density scaling (w_phi=5, alpha=1.0, rounds=2 — paper default):");
+    println!(
+        "
+Density scaling (w_phi=5, alpha=1.0, rounds=2 — paper default):"
+    );
     println!("Throughput vs agent count reveals corridor saturation:\n");
     for &n_agents in &[50, 100, 200, 400, 600] {
         let cfg = GuidanceConfig::default();
@@ -315,8 +329,15 @@ Density scaling (w_phi=5, alpha=1.0, rounds=2 — paper default):");
         let elapsed = start.elapsed().as_secs_f64();
         println!(
             "  gamma={:>4.1}: throughput={:>6.2}, max_stops={:>4}, time={:.1}s {}",
-            gamma, throughput, max_stops, elapsed,
-            if gamma == 0.0 { "[baseline]" } else { "[counter-flow]" }
+            gamma,
+            throughput,
+            max_stops,
+            elapsed,
+            if gamma == 0.0 {
+                "[baseline]"
+            } else {
+                "[counter-flow]"
+            }
         );
     }
 
@@ -334,8 +355,15 @@ Density scaling (w_phi=5, alpha=1.0, rounds=2 — paper default):");
         let elapsed = start.elapsed().as_secs_f64();
         println!(
             "  gamma={:>4.1}: throughput={:>6.2}, max_stops={:>4}, time={:.1}s {}",
-            gamma, throughput, max_stops, elapsed,
-            if gamma == 0.0 { "[baseline]" } else { "[counter-flow]" }
+            gamma,
+            throughput,
+            max_stops,
+            elapsed,
+            if gamma == 0.0 {
+                "[baseline]"
+            } else {
+                "[counter-flow]"
+            }
         );
     }
 }

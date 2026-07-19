@@ -1647,11 +1647,7 @@ mod tests {
             .map(|idx| {
                 let row = idx / n;
                 let col = idx % n;
-                if row == col {
-                    (n - row) as f32
-                } else {
-                    0.0
-                }
+                if row == col { (n - row) as f32 } else { 0.0 }
             })
             .collect();
         let mut work = SvdScratch::with_capacity(n, m);
@@ -1661,7 +1657,10 @@ mod tests {
         // All 128 singular triples present.
         assert_eq!(result.len(), 128, "128×128 should give 128 triples");
         // The largest singular value is σ = 128 (the (0,0) entry).
-        assert!((result.singular_value(0) - 128.0).abs() < 0.1, "σ_max ≈ 128");
+        assert!(
+            (result.singular_value(0) - 128.0).abs() < 0.1,
+            "σ_max ≈ 128"
+        );
         // The smallest is σ = 1 (the (127,127) entry).
         assert!((result.singular_value(127) - 1.0).abs() < 0.1, "σ_min ≈ 1");
         // Full rank.

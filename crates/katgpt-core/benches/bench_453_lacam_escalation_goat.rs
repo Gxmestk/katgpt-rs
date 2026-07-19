@@ -185,8 +185,10 @@ fn run_g6c(
     let map_clone = map.clone();
     let neighbors_fn = move |p: &GridPos| map_clone.passable_neighbors(p);
 
-    let mut guidance = SpaceTimeGuidance::new(cfg)
-        .with_neighbors({ let m = map.clone(); move |p| m.passable_neighbors(p) });
+    let mut guidance = SpaceTimeGuidance::new(cfg).with_neighbors({
+        let m = map.clone();
+        move |p| m.passable_neighbors(p)
+    });
     let mut hindrance = BlockingCount::new();
     let warm = WarmStartCache::new(WarmStartScheme::default(), cfg.w_phi);
     let flow = GridFlowField::from_map(map);
@@ -254,9 +256,7 @@ fn g6c_starts_goals(map: &GridMap) -> (Vec<GridPos>, Vec<GridPos>) {
 
     let starts: Vec<GridPos> = left.iter().take(n).cloned().collect();
     // Goals: right-side cells, paired by index (mirror order).
-    let goals: Vec<GridPos> = (0..n)
-        .map(|i| right[i % right.len()])
-        .collect();
+    let goals: Vec<GridPos> = (0..n).map(|i| right[i % right.len()]).collect();
     (starts, goals)
 }
 
@@ -280,8 +280,10 @@ fn run_latency_sweep(
         rounds: 2,
         max_expansions: 0,
     };
-    let mut guidance = SpaceTimeGuidance::new(cfg)
-        .with_neighbors({ let m = map.clone(); move |p| m.passable_neighbors(p) });
+    let mut guidance = SpaceTimeGuidance::new(cfg).with_neighbors({
+        let m = map.clone();
+        move |p| m.passable_neighbors(p)
+    });
     let mut hindrance = BlockingCount::new();
 
     let mut guidance_scratch: Guidance<GridPos> = Vec::new();
@@ -340,56 +342,120 @@ fn main() {
 
     let map = g6c_bottleneck_map();
     let (starts, goals) = g6c_starts_goals(&map);
-    println!("  Map: {}×{}, wall at x=10, gap rows 7..=12 (6 cells)", map.width, map.height);
-    println!("  Agents: {} starts on left (x<10), goals on right (x>10)", starts.len());
+    println!(
+        "  Map: {}×{}, wall at x=10, gap rows 7..=12 (6 cells)",
+        map.width, map.height
+    );
+    println!(
+        "  Agents: {} starts on left (x<10), goals on right (x>10)",
+        starts.len()
+    );
     println!();
 
     // LaCAM path (orchestrator with lacam_escalation feature ON).
     let lacam_metrics = run_g6c(&map, &starts, &goals, 200, 42, true);
     println!("  LaCAM (constraint tree + recursive PIBT):");
-    println!("    collision-free: {}/{} ({:.1}%)", lacam_metrics.collision_free_ticks, lacam_metrics.ticks, lacam_metrics.collision_free_rate() * 100.0);
-    println!("    vertex collisions: {}/{} ({:.1}%)", lacam_metrics.vertex_collision_ticks, lacam_metrics.ticks, lacam_metrics.vertex_collision_ticks as f64 / lacam_metrics.ticks as f64 * 100.0);
-    println!("    edge collisions:   {}/{} ({:.1}%)", lacam_metrics.edge_collision_ticks, lacam_metrics.ticks, lacam_metrics.edge_collision_ticks as f64 / lacam_metrics.ticks as f64 * 100.0);
-    println!("    first collision at tick: {:?}", lacam_metrics.first_collision_tick);
+    println!(
+        "    collision-free: {}/{} ({:.1}%)",
+        lacam_metrics.collision_free_ticks,
+        lacam_metrics.ticks,
+        lacam_metrics.collision_free_rate() * 100.0
+    );
+    println!(
+        "    vertex collisions: {}/{} ({:.1}%)",
+        lacam_metrics.vertex_collision_ticks,
+        lacam_metrics.ticks,
+        lacam_metrics.vertex_collision_ticks as f64 / lacam_metrics.ticks as f64 * 100.0
+    );
+    println!(
+        "    edge collisions:   {}/{} ({:.1}%)",
+        lacam_metrics.edge_collision_ticks,
+        lacam_metrics.ticks,
+        lacam_metrics.edge_collision_ticks as f64 / lacam_metrics.ticks as f64 * 100.0
+    );
+    println!(
+        "    first collision at tick: {:?}",
+        lacam_metrics.first_collision_tick
+    );
     println!();
 
     // Naive baseline (no planner).
     let naive_metrics = run_g6c(&map, &starts, &goals, 200, 42, false);
     println!("  Naive (no planner — Stern et al. 2019 baseline):");
-    println!("    collision-free: {}/{} ({:.1}%)", naive_metrics.collision_free_ticks, naive_metrics.ticks, naive_metrics.collision_free_rate() * 100.0);
-    println!("    vertex collisions: {}/{} ({:.1}%)", naive_metrics.vertex_collision_ticks, naive_metrics.ticks, naive_metrics.vertex_collision_ticks as f64 / naive_metrics.ticks as f64 * 100.0);
-    println!("    edge collisions:   {}/{} ({:.1}%)", naive_metrics.edge_collision_ticks, naive_metrics.ticks, naive_metrics.edge_collision_ticks as f64 / naive_metrics.ticks as f64 * 100.0);
+    println!(
+        "    collision-free: {}/{} ({:.1}%)",
+        naive_metrics.collision_free_ticks,
+        naive_metrics.ticks,
+        naive_metrics.collision_free_rate() * 100.0
+    );
+    println!(
+        "    vertex collisions: {}/{} ({:.1}%)",
+        naive_metrics.vertex_collision_ticks,
+        naive_metrics.ticks,
+        naive_metrics.vertex_collision_ticks as f64 / naive_metrics.ticks as f64 * 100.0
+    );
+    println!(
+        "    edge collisions:   {}/{} ({:.1}%)",
+        naive_metrics.edge_collision_ticks,
+        naive_metrics.ticks,
+        naive_metrics.edge_collision_ticks as f64 / naive_metrics.ticks as f64 * 100.0
+    );
     println!();
 
     let g6c_delta = lacam_metrics.collision_free_rate() - naive_metrics.collision_free_rate();
-    println!("  G6c delta = {:.3} − {:.3} = {:.3}", lacam_metrics.collision_free_rate(), naive_metrics.collision_free_rate(), g6c_delta);
-    let g6c_verdict = if g6c_delta >= 0.50 { "PASS (≥ 0.50)" } else { "FAIL (< 0.50)" };
+    println!(
+        "  G6c delta = {:.3} − {:.3} = {:.3}",
+        lacam_metrics.collision_free_rate(),
+        naive_metrics.collision_free_rate(),
+        g6c_delta
+    );
+    let g6c_verdict = if g6c_delta >= 0.50 {
+        "PASS (≥ 0.50)"
+    } else {
+        "FAIL (< 0.50)"
+    };
     println!("  G6c gate: {} (threshold ≥ 0.50)", g6c_verdict);
     println!();
 
     // ─── Latency sweep ─────────────────────────────────────────────────────
-    println!("─── Latency sweep — max_nodes ∈ {{100, 500, 1000, 5000}}, 60 agents, 200 ticks ───\n");
-    println!("  {:>10}  {:>14}  {:>14}  {:>18}", "max_nodes", "median (µs)", "max (µs)", "collision-free %");
+    println!(
+        "─── Latency sweep — max_nodes ∈ {{100, 500, 1000, 5000}}, 60 agents, 200 ticks ───\n"
+    );
+    println!(
+        "  {:>10}  {:>14}  {:>14}  {:>18}",
+        "max_nodes", "median (µs)", "max (µs)", "collision-free %"
+    );
     println!("  {}", "─".repeat(62));
 
     for &max_nodes in &[100usize, 500, 1000, 5000] {
         let budget = EscalationBudget {
             max_nodes,
             time_budget_us: 5_000_000, // 5s — generous, let max_nodes be the binding constraint
-            max_depth: 8,               // Issue 546 multi-step: same default as EscalationBudget::default
-            target_stuck_agents: false,  // Legacy Plan 453 behavior for this bench
+            max_depth: 8, // Issue 546 multi-step: same default as EscalationBudget::default
+            target_stuck_agents: false, // Legacy Plan 453 behavior for this bench
         };
         let (median_us, max_us, rate) = run_latency_sweep(&map, &starts, &goals, 200, 42, budget);
-        println!("  {:>10}  {:>14.1}  {:>14.1}  {:>17.1}%", max_nodes, median_us, max_us, rate * 100.0);
+        println!(
+            "  {:>10}  {:>14.1}  {:>14.1}  {:>17.1}%",
+            max_nodes,
+            median_us,
+            max_us,
+            rate * 100.0
+        );
     }
     println!();
 
     // ─── Summary ───────────────────────────────────────────────────────────
     println!("─── Summary ───\n");
     println!("  G6c delta: {:.3} ({})", g6c_delta, g6c_verdict);
-    println!("  G-col gate: vertex collision rate {:.1}% (target ≤ 10%)", lacam_metrics.vertex_collision_ticks as f64 / lacam_metrics.ticks as f64 * 100.0);
+    println!(
+        "  G-col gate: vertex collision rate {:.1}% (target ≤ 10%)",
+        lacam_metrics.vertex_collision_ticks as f64 / lacam_metrics.ticks as f64 * 100.0
+    );
     println!();
     println!("  Note: G1 throughput is measured by re-running bench_440_lllg_paper_repro");
-    println!("  compiled with --features lacam_escalation. See .benchmarks/453_lacam_escalation_goat.md");
+    println!(
+        "  compiled with --features lacam_escalation. See .benchmarks/453_lacam_escalation_goat.md"
+    );
     println!("  for the full results table.");
 }

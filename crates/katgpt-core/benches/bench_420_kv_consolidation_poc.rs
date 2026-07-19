@@ -94,7 +94,9 @@ impl SimpleRng {
 }
 
 fn rand_vec(n: usize, rng: &mut SimpleRng, scale: f32) -> Vec<f32> {
-    (0..n).map(|_| (rng.uniform() * 2.0 - 1.0) * scale).collect()
+    (0..n)
+        .map(|_| (rng.uniform() * 2.0 - 1.0) * scale)
+        .collect()
 }
 
 // ─── Micro-GPT (single-layer, adapted from bench_313) ───────────────────────
@@ -343,13 +345,7 @@ fn consolidate(
 
     // 2. Consolidation: move recent step values toward mean
     for j in rsw_start..step_end {
-        apply_value_update(
-            &mut cache.v[j * d..(j + 1) * d],
-            &mu_v,
-            gate,
-            mode,
-            rng,
-        );
+        apply_value_update(&mut cache.v[j * d..(j + 1) * d], &mu_v, gate, mode, rng);
     }
 
     // 3. Reconsolidation: top-k prior positions by attention mass
@@ -375,17 +371,15 @@ fn consolidate(
                     }
                 }
             }
-            attn_mass[j] = if count > 0 {
-                total / count as f64
-            } else {
-                0.0
-            };
+            attn_mass[j] = if count > 0 { total / count as f64 } else { 0.0 };
         }
 
         // Top-k selection (partial sort)
         let mut indices: Vec<usize> = (0..step_start).collect();
         indices.sort_by(|&a, &b| {
-            attn_mass[b].partial_cmp(&attn_mass[a]).unwrap_or(std::cmp::Ordering::Equal)
+            attn_mass[b]
+                .partial_cmp(&attn_mass[a])
+                .unwrap_or(std::cmp::Ordering::Equal)
         });
 
         let max_mass = indices
@@ -640,7 +634,11 @@ fn aggregate(results: &[EvalResult]) -> AggregatedMetrics {
     let ta: f64 = results.iter().map(|r| r.token_accuracy as f64).sum::<f64>() / n as f64;
     let nll: f64 = results.iter().map(|r| r.nll as f64).sum::<f64>() / n as f64;
     let dm: f64 = results.iter().map(|r| r.digit_mass as f64).sum::<f64>() / n as f64;
-    let cc: f64 = results.iter().map(|r| r.consolidation_count as f64).sum::<f64>() / n as f64;
+    let cc: f64 = results
+        .iter()
+        .map(|r| r.consolidation_count as f64)
+        .sum::<f64>()
+        / n as f64;
     AggregatedMetrics {
         exact_match_rate: em,
         token_accuracy: ta,
@@ -748,16 +746,32 @@ fn self_test() -> bool {
 
     let all_pass = keys_ok && vals_changed && recon_changed && all_finite;
     println!("─── Self-test ───");
-    println!("  Keys unchanged:     {}", if keys_ok { "PASS" } else { "FAIL" });
-    println!("  Values changed:     {}", if vals_changed { "PASS" } else { "FAIL" });
-    println!("  Recon changed:      {}", if recon_changed { "PASS" } else { "FAIL" });
-    println!("  All finite:         {}", if all_finite { "PASS" } else { "FAIL" });
+    println!(
+        "  Keys unchanged:     {}",
+        if keys_ok { "PASS" } else { "FAIL" }
+    );
+    println!(
+        "  Values changed:     {}",
+        if vals_changed { "PASS" } else { "FAIL" }
+    );
+    println!(
+        "  Recon changed:      {}",
+        if recon_changed { "PASS" } else { "FAIL" }
+    );
+    println!(
+        "  All finite:         {}",
+        if all_finite { "PASS" } else { "FAIL" }
+    );
     println!(
         "  Variance {} → {} ({:.1}% reduction): {}",
         var_before,
         var_after,
         (1.0 - var_after / var_before.max(1e-10)) * 100.0,
-        if var_after < var_before { "PASS (reduced)" } else { "WARN (not reduced)" }
+        if var_after < var_before {
+            "PASS (reduced)"
+        } else {
+            "WARN (not reduced)"
+        }
     );
     println!("  Overall: {}", if all_pass { "PASS" } else { "FAIL" });
     println!();
@@ -766,14 +780,9 @@ fn self_test() -> bool {
 
 // ─── Hyperparameter sweep (T1.5) ───────────────────────────────────────────
 
-fn run_sweep(
-    model: &MicroGpt,
-    problems: &[Problem],
-) {
+fn run_sweep(model: &MicroGpt, problems: &[Problem]) {
     println!("─── T1.5 Hyperparameter Sweep ───");
-    println!(
-        "  (single layer → λ is degenerate; fixed at 4.0, gate = g_max · 0.5)"
-    );
+    println!("  (single layer → λ is degenerate; fixed at 4.0, gate = g_max · 0.5)");
     println!();
 
     let g_max_vals = [0.1f32, 0.3, 0.5];
@@ -800,12 +809,25 @@ fn run_sweep(
             let mut rng = SimpleRng::new(999);
             let results: Vec<EvalResult> = problems
                 .iter()
-                .map(|p| evaluate(model, p, ConsolidationMode::Consolidation, &config, &mut rng))
+                .map(|p| {
+                    evaluate(
+                        model,
+                        p,
+                        ConsolidationMode::Consolidation,
+                        &config,
+                        &mut rng,
+                    )
+                })
                 .collect();
             let agg = aggregate(&results);
             println!(
                 "{:<8.1} {:<6} {:<10.4} {:<10.4} {:<10.4} {:<10.4}",
-                g_max, k, agg.token_accuracy, agg.mean_nll, agg.exact_match_rate, agg.mean_digit_mass
+                g_max,
+                k,
+                agg.token_accuracy,
+                agg.mean_nll,
+                agg.exact_match_rate,
+                agg.mean_digit_mass
             );
             if agg.token_accuracy > best_ta {
                 best_ta = agg.token_accuracy;
@@ -814,7 +836,10 @@ fn run_sweep(
         }
     }
     println!();
-    println!("  Best config (by token accuracy): {} → ta={:.4}", best_config, best_ta);
+    println!(
+        "  Best config (by token accuracy): {} → ta={:.4}",
+        best_config, best_ta
+    );
     println!();
 }
 
@@ -956,7 +981,9 @@ fn main() {
 
     println!("  Verdict:");
     if goat_confirmed {
-        println!("    ✅ GOAT CONFIRMED — consolidation beats baseline by ≥2pp AND beats random-rewrite.");
+        println!(
+            "    ✅ GOAT CONFIRMED — consolidation beats baseline by ≥2pp AND beats random-rewrite."
+        );
         println!("    Proceed to Phase 2 (feature flag).");
     } else if refuted {
         println!("    ❌ QUALITY GAIN REFUTED — consolidation ≈ baseline (<1pp difference).");

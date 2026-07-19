@@ -2,9 +2,9 @@
 //!
 //! Extracted from `players.rs` (Issue 175).
 
-use super::*;
 use super::helpers::{action_index, move_target};
-use crate::pruners::bomber::{ArenaGrid, BomberAction, GameEvent, GridPos, BOMB_FUSE_TICKS};
+use super::*;
+use crate::pruners::bomber::{ArenaGrid, BOMB_FUSE_TICKS, BomberAction, GameEvent, GridPos};
 use fastrand::Rng;
 
 fn empty_grid() -> ArenaGrid {

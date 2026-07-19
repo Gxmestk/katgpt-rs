@@ -88,7 +88,13 @@ fn gate_g1_correctness() -> bool {
 
     let mut scratch = [0.0f32; 2];
     let max_possible = 10.0f32;
-    let good_score = imauve_score(&good, &good_points, &good_points, &mut scratch, max_possible);
+    let good_score = imauve_score(
+        &good,
+        &good_points,
+        &good_points,
+        &mut scratch,
+        max_possible,
+    );
     let bad_score = imauve_score(&bad, &bad_points, &bad_points, &mut scratch, max_possible);
 
     println!(
@@ -125,7 +131,10 @@ fn gate_g1_correctness() -> bool {
 
 fn gate_g2_perf() -> bool {
     println!();
-    println!("── G2: perf at n={} × d={} ─────────────────────────────", N_ANCHORS, DIM);
+    println!(
+        "── G2: perf at n={} × d={} ─────────────────────────────",
+        N_ANCHORS, DIM
+    );
 
     let space = EuclideanLatentSpace::<DIM>;
     let mut rng = FixtureRng::new(42);
@@ -272,10 +281,7 @@ fn main() {
     println!();
     println!("──────────────────────────────────────────────────────────────");
     println!("Gate summary:");
-    println!(
-        "  G1 correctness:    {}",
-        if g1 { "PASS" } else { "FAIL" }
-    );
+    println!("  G1 correctness:    {}", if g1 { "PASS" } else { "FAIL" });
     println!(
         "  G2 perf (n={}, d={}, < {}):  {}",
         N_ANCHORS,
@@ -283,10 +289,7 @@ fn main() {
         format_duration(Duration::from_millis(G2_TARGET_MS)),
         if g2 { "PASS" } else { "FAIL" }
     );
-    println!(
-        "  G4 zero-alloc:     {}",
-        if g4 { "PASS" } else { "FAIL" }
-    );
+    println!("  G4 zero-alloc:     {}", if g4 { "PASS" } else { "FAIL" });
     println!();
 
     let all_pass = g1 && g2 && g4;

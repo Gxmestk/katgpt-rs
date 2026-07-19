@@ -267,8 +267,7 @@ impl CellComplex {
         let e_y = |x: usize, y: usize, z: usize| n_x_edges + (z * (h - 1) + y) * w + x;
         let e_z = |x: usize, y: usize, z: usize| n_x_edges + n_y_edges + z * (w * h) + y * w + x;
         let f_xy = |x: usize, y: usize, z: usize| (z * (h - 1) + y) * (w - 1) + x;
-        let f_xz =
-            |x: usize, y: usize, z: usize| n_xy_faces + (y * (d - 1) + z) * (w - 1) + x;
+        let f_xz = |x: usize, y: usize, z: usize| n_xy_faces + (y * (d - 1) + z) * (w - 1) + x;
         let f_yz = |x: usize, y: usize, z: usize| {
             n_xy_faces + n_xz_faces + (x * (d - 1) + z) * (h - 1) + y
         };
@@ -1304,12 +1303,16 @@ mod tests {
     fn grid_3d_b3_is_populated() {
         // grid_2d leaves B₃ empty (zero volumes); grid_3d must populate it.
         let cx_2d = CellComplex::grid_2d(4, 4);
-        assert!(cx_2d.boundary_entries(2).is_empty(),
-            "grid_2d B₃ must be empty (sanity check)");
+        assert!(
+            cx_2d.boundary_entries(2).is_empty(),
+            "grid_2d B₃ must be empty (sanity check)"
+        );
 
         let cx_3d = CellComplex::grid_3d(3, 3, 3);
-        assert!(!cx_3d.boundary_entries(2).is_empty(),
-            "grid_3d B₃ must be populated (the rank-3 boundary matrix)");
+        assert!(
+            !cx_3d.boundary_entries(2).is_empty(),
+            "grid_3d B₃ must be populated (the rank-3 boundary matrix)"
+        );
     }
 
     #[cfg(feature = "grid_3d")]
@@ -1349,7 +1352,10 @@ mod tests {
         let prod = matmul_i8(&b1, &b2);
         for (i, row) in prod.iter().enumerate() {
             for (j, &val) in row.iter().enumerate() {
-                assert_eq!(val, 0, "B₁·B₂ != 0 at ({i},{j}) — orientation is inconsistent");
+                assert_eq!(
+                    val, 0,
+                    "B₁·B₂ != 0 at ({i},{j}) — orientation is inconsistent"
+                );
             }
         }
     }
@@ -1364,7 +1370,10 @@ mod tests {
         let prod = matmul_i8(&b2, &b3);
         for (i, row) in prod.iter().enumerate() {
             for (j, &val) in row.iter().enumerate() {
-                assert_eq!(val, 0, "B₂·B₃ != 0 at ({i},{j}) — orientation is inconsistent");
+                assert_eq!(
+                    val, 0,
+                    "B₂·B₃ != 0 at ({i},{j}) — orientation is inconsistent"
+                );
             }
         }
     }
@@ -1378,7 +1387,10 @@ mod tests {
         // grid_dims (2D accessor) returns None for 3D grids (back-compat contract)
         assert_eq!(cx.grid_dims(), None);
         // grid_dims_full returns the discriminated enum
-        assert_eq!(cx.grid_dims_full(), Some(GridDims::Dim3 { w: 4, h: 3, d: 2 }));
+        assert_eq!(
+            cx.grid_dims_full(),
+            Some(GridDims::Dim3 { w: 4, h: 3, d: 2 })
+        );
     }
 
     #[cfg(feature = "grid_3d")]

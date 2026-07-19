@@ -105,7 +105,9 @@ pub use motor_gated::{evolve_motor_gated_field, relu_gate_into};
 // civ-engine city-growth consumer (T9 caveat: no such consumer exists today —
 // see birth_death.rs docs).
 #[cfg(feature = "grid_3d")]
-pub use birth_death::{BirthDeathParams, SplitMix64, argmax_block_type, stochastic_birth_death_step};
+pub use birth_death::{
+    BirthDeathParams, SplitMix64, argmax_block_type, stochastic_birth_death_step,
+};
 
 #[cfg(feature = "heat_kernel_trajectory")]
 pub use heat_kernel::{
@@ -144,7 +146,9 @@ pub use sheaf_admm::{
 // Multi-scale V-cycle via selector restriction maps — opt-in. Composes the
 // single-complex DEC operators into a two-level fine→coarse→fine hierarchy.
 #[cfg(feature = "htno_v_cycle")]
-pub use htno::{VCycleRestriction, VCycleScratch, grid_coarsen_2x2, htno_v_cycle, htno_v_cycle_into};
+pub use htno::{
+    VCycleRestriction, VCycleScratch, grid_coarsen_2x2, htno_v_cycle, htno_v_cycle_into,
+};
 
 // Continuous cochain point sampler (Plan 422, Research 404) — Whitney/de-Rham
 // reconstruction for continuous field queries inside primitives.

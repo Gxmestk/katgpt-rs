@@ -167,12 +167,7 @@ impl RotationSchedule {
     /// Returns [`GrapeApError::ShapeMismatch`] if `x.len() != out.len()` or
     /// `x.len() != 2 * half_d`.
     #[inline]
-    pub fn rotate_into(
-        &self,
-        ell: usize,
-        x: &[f32],
-        out: &mut [f32],
-    ) -> Result<(), GrapeApError> {
+    pub fn rotate_into(&self, ell: usize, x: &[f32], out: &mut [f32]) -> Result<(), GrapeApError> {
         if ell >= self.l_max {
             return Err(GrapeApError::IndexOutOfBounds);
         }
@@ -381,11 +376,7 @@ impl GrapeApGate {
     ///
     /// Returns [`GrapeApError::IndexOutOfBounds`] if `t > l_max`.
     /// Returns [`GrapeApError::ShapeMismatch`] if `out.len() != t`.
-    pub fn bias_row_into(
-        &self,
-        t: usize,
-        out: &mut [f32],
-    ) -> Result<(), GrapeApError> {
+    pub fn bias_row_into(&self, t: usize, out: &mut [f32]) -> Result<(), GrapeApError> {
         if t > self.schedule.l_max {
             return Err(GrapeApError::IndexOutOfBounds);
         }
@@ -445,7 +436,10 @@ mod tests {
         // σ(0) = 0.5, log(0.5) = -log(2) ≈ -0.693.
         let got = log_sigmoid(0.0);
         let want = -((2.0f32).ln());
-        assert!((got - want).abs() < 1e-6, "log_sigmoid(0) = {got}, want {want}");
+        assert!(
+            (got - want).abs() < 1e-6,
+            "log_sigmoid(0) = {got}, want {want}"
+        );
     }
 
     #[test]
@@ -455,7 +449,10 @@ mod tests {
         for i in 0..100 {
             let z = -5.0 + (i as f32) * 0.1;
             let v = log_sigmoid(z);
-            assert!(v >= prev, "log_sigmoid not monotone at z={z}: v={v}, prev={prev}");
+            assert!(
+                v >= prev,
+                "log_sigmoid not monotone at z={z}: v={v}, prev={prev}"
+            );
             prev = v;
         }
     }
@@ -474,7 +471,10 @@ mod tests {
         let v = log_sigmoid(-100.0);
         assert!(v.is_finite(), "log_sigmoid(-100) = {v}, should be finite");
         // Should be approximately -100 (since log(σ(z)) ≈ z for very negative z).
-        assert!((v - (-50.0)).abs() < 1.0, "log_sigmoid(-100) = {v}, expected ≈ -50 (clamped)");
+        assert!(
+            (v - (-50.0)).abs() < 1.0,
+            "log_sigmoid(-100) = {v}, expected ≈ -50 (clamped)"
+        );
     }
 
     // ── RotationSchedule ──────────────────────────────────────────────────
@@ -599,7 +599,8 @@ mod tests {
             assert!(
                 (bias[j] - bias2[j]).abs() < 1e-6,
                 "Wall reduction failed at j={j}: bias={}, bias2={}",
-                bias[j], bias2[j]
+                bias[j],
+                bias2[j]
             );
         }
     }
@@ -633,10 +634,7 @@ mod tests {
         let mut gate = GrapeApGate::new(d, l_max, 1.0, schedule, log_sigmoid);
         gate.reset_query(10); // out of bounds but reset_query doesn't check
         let p = [0f32; 8];
-        assert_eq!(
-            gate.observe(&p, &p, 5),
-            Err(GrapeApError::IndexOutOfBounds)
-        );
+        assert_eq!(gate.observe(&p, &p, 5), Err(GrapeApError::IndexOutOfBounds));
     }
 
     #[test]
@@ -754,7 +752,10 @@ mod tests {
         };
         // Sanity: A and B should be approximately orthogonal.
         let dot_ab: f32 = p_a.iter().zip(p_b.iter()).map(|(a, b)| a * b).sum();
-        assert!(dot_ab.abs() < 0.1, "A and B should be ~orthogonal, got dot={dot_ab}");
+        assert!(
+            dot_ab.abs() < 0.1,
+            "A and B should be ~orthogonal, got dot={dot_ab}"
+        );
 
         // Matched workload: query from A, keys from A.
         let mut gate_matched = GrapeApGate::new(
@@ -769,7 +770,9 @@ mod tests {
             gate_matched.observe(&p_a, &p_a, ell).unwrap();
         }
         let mut bias_matched = [0f32; 64];
-        gate_matched.bias_row_into(l_max, &mut bias_matched).unwrap();
+        gate_matched
+            .bias_row_into(l_max, &mut bias_matched)
+            .unwrap();
         let total_matched = bias_matched[0];
 
         // Mismatched workload: query from A, keys from B.

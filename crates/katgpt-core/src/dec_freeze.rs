@@ -47,7 +47,10 @@ impl CochainFreezeEnvelope {
             payload.extend_from_slice(&f.to_le_bytes());
         }
         let commitment = *blake3::hash(&payload).as_bytes();
-        Self { commitment, payload }
+        Self {
+            commitment,
+            payload,
+        }
     }
 
     /// Verify that the envelope's commitment matches its payload.
@@ -158,7 +161,10 @@ mod tests {
         env.payload[5] ^= 0x01;
 
         assert!(!env.verify(), "verify should fail on tampered payload");
-        assert!(env.thaw().is_none(), "thaw should return None on tampered payload");
+        assert!(
+            env.thaw().is_none(),
+            "thaw should return None on tampered payload"
+        );
     }
 
     /// Tamper with the commitment → verify fails.
@@ -197,7 +203,10 @@ mod tests {
         payload.push(rank);
         payload.extend_from_slice(&nan_bytes);
         let commitment = *blake3::hash(&payload).as_bytes();
-        let env = CochainFreezeEnvelope { commitment, payload };
+        let env = CochainFreezeEnvelope {
+            commitment,
+            payload,
+        };
 
         // Commitment is valid (verify passes), but NaN is rejected on deserialize.
         assert!(env.verify(), "commitment should match the crafted payload");
@@ -211,8 +220,16 @@ mod tests {
         let env_a = CochainFreezeEnvelope::freeze(&cf);
         let env_b = CochainFreezeEnvelope::freeze(&cf);
 
-        assert_eq!(env_a.commitment(), env_b.commitment(), "commitments should be deterministic");
-        assert_eq!(env_a.payload(), env_b.payload(), "payloads should be identical");
+        assert_eq!(
+            env_a.commitment(),
+            env_b.commitment(),
+            "commitments should be deterministic"
+        );
+        assert_eq!(
+            env_a.payload(),
+            env_b.payload(),
+            "payloads should be identical"
+        );
     }
 
     /// Same data, different rank → different commitment.

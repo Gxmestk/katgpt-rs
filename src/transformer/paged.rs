@@ -1,5 +1,5 @@
-use crate::types::{self};
 use super::*;
+use crate::types::{self};
 
 /// Forward pass using `PagedKVCache` instead of `MultiLayerKVCache`.
 ///
@@ -132,8 +132,20 @@ pub fn forward_paged<'a>(
         #[cfg(feature = "gated_mlp")]
         {
             // SwiGLU: SiLU(W_gate·h) ⊙ W_up·h → W_down·hidden
-            types::matmul(&mut ctx.hidden, &layer_weights.mlp_w1, &ctx.x, config.mlp_hidden, n);
-            types::matmul(&mut ctx.hidden2, &layer_weights.mlp_w_up, &ctx.x, config.mlp_hidden, n);
+            types::matmul(
+                &mut ctx.hidden,
+                &layer_weights.mlp_w1,
+                &ctx.x,
+                config.mlp_hidden,
+                n,
+            );
+            types::matmul(
+                &mut ctx.hidden2,
+                &layer_weights.mlp_w_up,
+                &ctx.x,
+                config.mlp_hidden,
+                n,
+            );
             types::swiglu_inplace(&mut ctx.hidden, &ctx.hidden2);
         }
         #[cfg(not(feature = "gated_mlp"))]

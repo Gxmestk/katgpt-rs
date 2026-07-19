@@ -391,9 +391,7 @@ impl TreeBuilder {
                     let mut best_idx = usize::MAX;
                     let mut best_prob = 0.0f32;
                     for (i, &prob) in depth_marginal.iter().enumerate() {
-                        if prob > best_prob
-                            && pruner.is_valid(next_depth, i, parent_tokens)
-                        {
+                        if prob > best_prob && pruner.is_valid(next_depth, i, parent_tokens) {
                             best_idx = i;
                             best_prob = prob;
                         }
@@ -403,8 +401,7 @@ impl TreeBuilder {
                             score: best.score + log_m[best_idx],
                             depth: next_depth,
                             token_idx: best_idx,
-                            parent_path: (best.parent_path << 16)
-                                | (best_idx as u128),
+                            parent_path: (best.parent_path << 16) | (best_idx as u128),
                         });
                     }
                 } else {

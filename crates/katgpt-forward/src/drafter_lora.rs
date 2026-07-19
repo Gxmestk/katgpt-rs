@@ -360,7 +360,11 @@ fn forward_drafter_with_lora(
         let mut max_score = f32::NEG_INFINITY;
         for t in 0..t_n {
             let k_off = t * kvd + kv_off;
-            let dot = katgpt_core::simd::simd_dot_f32(&q[q_off..q_off + hd], &key_cache[k_off..k_off + hd], hd);
+            let dot = katgpt_core::simd::simd_dot_f32(
+                &q[q_off..q_off + hd],
+                &key_cache[k_off..k_off + hd],
+                hd,
+            );
             let score = dot * scale;
             scores[t] = score;
             max_score = max_score.max(score);
@@ -378,7 +382,12 @@ fn forward_drafter_with_lora(
         for t in 0..t_n {
             let weight = scores[t] * inv_sum;
             let v_off = t * kvd + kv_off;
-            katgpt_core::simd::simd_fused_scale_acc(&mut attn_out[q_off..q_off + hd], &value_cache[v_off..v_off + hd], weight, hd);
+            katgpt_core::simd::simd_fused_scale_acc(
+                &mut attn_out[q_off..q_off + hd],
+                &value_cache[v_off..v_off + hd],
+                weight,
+                hd,
+            );
         }
     }
 

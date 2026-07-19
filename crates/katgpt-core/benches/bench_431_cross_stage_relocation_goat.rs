@@ -358,9 +358,7 @@ fn bench_g1_classify_latency() {
 }
 
 fn main() {
-    println!(
-        "=== Plan 431 — Cross-Stage Residual Relocation GOAT Bench ==="
-    );
+    println!("=== Plan 431 — Cross-Stage Residual Relocation GOAT Bench ===");
     println!("Paper: arXiv:2607.08393 (Knowing-Using Gap, Dai/Rao/Wang NeurIPS 2026)");
     println!("Research 417, Plan 431 Phases 1–2.\n");
 

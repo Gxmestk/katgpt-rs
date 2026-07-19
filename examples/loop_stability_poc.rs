@@ -412,10 +412,7 @@ fn main() {
     let base_us = results[0].us;
 
     println!("Verdict:");
-    println!(
-        "- G1 (norm control, keep ratio < 10x initial {:.4}):",
-        init
-    );
+    println!("- G1 (norm control, keep ratio < 10x initial {:.4}):", init);
     for r in &results {
         let ratio = r.norms[T_LOOPS - 1] / r.norms[0].max(1e-8);
         let pass = ratio < 10.0;
@@ -479,10 +476,7 @@ fn main() {
             } else {
                 0.0
             };
-            ratio < 10.0
-                && r.kls[T_LOOPS - 1] < 1.0
-                && oh < 5.0
-                && r.steps[T_LOOPS - 1] < 0.1
+            ratio < 10.0 && r.kls[T_LOOPS - 1] < 1.0 && oh < 5.0 && r.steps[T_LOOPS - 1] < 0.1
         })
         .map(|r| r.name)
         .collect();
@@ -497,12 +491,8 @@ fn main() {
     let base = &results[0];
     let inj = &results[3];
     if (base.norms[T_LOOPS - 1] - inj.norms[T_LOOPS - 1]).abs() < 1e-6 {
-        println!(
-            "  NOTE: AttnInj == Baseline (norms identical). For single-position attention,"
-        );
-        println!(
-            "        Q does not affect the output (softmax of 1 element = 1.0, attn = V)."
-        );
+        println!("  NOTE: AttnInj == Baseline (norms identical). For single-position attention,");
+        println!("        Q does not affect the output (softmax of 1 element = 1.0, attn = V).");
         println!("        Attention Injection is a no-op in this single-token regime.");
     }
 

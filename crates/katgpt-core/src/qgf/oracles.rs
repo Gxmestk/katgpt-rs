@@ -787,7 +787,10 @@ mod dual_leo_oracle {
             let g_single = single_on_uvfa.q_gradient_at(&state, &());
             let g_dual = dual.q_gradient_at(&state, &());
             assert_eq!(g_single, vec![100.0, 200.0, 300.0, 400.0]);
-            assert_eq!(g_dual, g_single, "UvfaOnly must bit-match LeoHeadOracle on UVFA");
+            assert_eq!(
+                g_dual, g_single,
+                "UvfaOnly must bit-match LeoHeadOracle on UVFA"
+            );
         }
 
         #[test]

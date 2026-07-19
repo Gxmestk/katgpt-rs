@@ -39,7 +39,7 @@
 //! cache path. This asymmetry is correct: global solve vs local attention.
 
 use super::{
-    verify_gdn_tree_into, GdnLayerParams, GdnMultiHeadParams, GdnTreeVerifier, TreeTopology,
+    GdnLayerParams, GdnMultiHeadParams, GdnTreeVerifier, TreeTopology, verify_gdn_tree_into,
 };
 use crate::hippocampal_cache_dyn::HippocampalCacheDyn;
 use crate::types::rmsnorm_with_gamma;
@@ -255,7 +255,11 @@ pub fn verify_gdn_hola_tree_into<'a>(
     );
     debug_assert_eq!(cache.d(), d_k, "cache head dim must equal d_k");
     let t = topo.n_nodes;
-    debug_assert!(t <= verifier.max_t, "tree size {t} > max_t {}", verifier.max_t);
+    debug_assert!(
+        t <= verifier.max_t,
+        "tree size {t} > max_t {}",
+        verifier.max_t
+    );
 
     // Step 1: GDN path (Plan 424 masked triangular solve) → writes to inner scratch_out.
     verify_gdn_tree_into(&mut verifier.inner, topo, params, s0, d_k, d_v);
@@ -268,7 +272,17 @@ pub fn verify_gdn_hola_tree_into<'a>(
         let block_kv_typed = &mut verifier.block_kv_typed;
         let ancestor_path = &mut verifier.ancestor_path_scratch;
         let tree_keys_norm = &mut verifier.tree_keys_norm[..t * d];
-        compute_out_hola(o_hola, block_kv_ptrs, block_kv_typed, ancestor_path, tree_keys_norm, topo, params, cache, d);
+        compute_out_hola(
+            o_hola,
+            block_kv_ptrs,
+            block_kv_typed,
+            ancestor_path,
+            tree_keys_norm,
+            topo,
+            params,
+            cache,
+            d,
+        );
     }
 
     // Step 3: residual-add O[i] = O_gdn[i] + O_hola[i] into the inner scratch_out.
@@ -454,7 +468,7 @@ pub fn commit_accepted_dual_multihead(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::gdn_tree_verify::{build_topology, GdnLayerParams};
+    use crate::gdn_tree_verify::{GdnLayerParams, build_topology};
 
     fn rng(seed: u32) -> impl FnMut() -> f32 {
         let mut state = seed;
@@ -472,8 +486,9 @@ mod tests {
     fn test_dual_path_chain_matches_sequential() {
         // Chain tree: 0 ← 1 ← 2 ← ... ← T-1 (linear).
         let (t, d) = (8, 16);
-        let parents: Vec<usize> =
-            (0..t).map(|i| if i == 0 { usize::MAX } else { i - 1 }).collect();
+        let parents: Vec<usize> = (0..t)
+            .map(|i| if i == 0 { usize::MAX } else { i - 1 })
+            .collect();
         let mut rng = rng(42);
         let keys: Vec<f32> = (0..t * d).map(|_| rng()).collect();
         let values: Vec<f32> = (0..t * d).map(|_| rng()).collect();
@@ -525,7 +540,10 @@ mod tests {
             block_kv.clear();
             for &ak in &ancestor_path {
                 let orig_j = topo.topo_order[ak];
-                block_kv.push((&keys[orig_j * d..(orig_j + 1) * d], &values[orig_j * d..(orig_j + 1) * d]));
+                block_kv.push((
+                    &keys[orig_j * d..(orig_j + 1) * d],
+                    &values[orig_j * d..(orig_j + 1) * d],
+                ));
             }
 
             let orig_i = topo.topo_order[i];
@@ -540,7 +558,10 @@ mod tests {
             let expected = gdn_ref[i] + hola_ref[i];
             max_err = max_err.max((dual_out[i] - expected).abs());
         }
-        assert!(max_err < tol, "dual-path chain: max error {max_err:.6} >= {tol}");
+        assert!(
+            max_err < tol,
+            "dual-path chain: max error {max_err:.6} >= {tol}"
+        );
     }
 
     // ── T2.2: dual-path commit matches sequential ──
@@ -548,8 +569,9 @@ mod tests {
     #[test]
     fn test_dual_path_commit_matches_sequential() {
         let (t, d) = (6, 8);
-        let parents: Vec<usize> =
-            (0..t).map(|i| if i == 0 { usize::MAX } else { i - 1 }).collect();
+        let parents: Vec<usize> = (0..t)
+            .map(|i| if i == 0 { usize::MAX } else { i - 1 })
+            .collect();
         let mut rng = rng(99);
         let keys: Vec<f32> = (0..t * d).map(|_| rng()).collect();
         let values: Vec<f32> = (0..t * d).map(|_| rng()).collect();
@@ -572,7 +594,15 @@ mod tests {
         let mut s0_dual = s0_init.clone();
         let mut cache_dual = HippocampalCacheDyn::new_with_ones_gamma(d, 64);
         let accepted_leaf = t - 1;
-        commit_accepted_dual(&topo, accepted_leaf, &params, &mut s0_dual, &mut cache_dual, d, d);
+        commit_accepted_dual(
+            &topo,
+            accepted_leaf,
+            &params,
+            &mut s0_dual,
+            &mut cache_dual,
+            d,
+            d,
+        );
 
         // Reference: sequential GDN2 commit + HOLA observe.
         let mut s0_ref = s0_init.clone();
@@ -613,7 +643,10 @@ mod tests {
         for i in 0..d * d {
             max_s_err = max_s_err.max((s0_dual[i] - s0_ref[i]).abs());
         }
-        assert!(max_s_err < tol, "S₀ mismatch after dual commit: {max_s_err:.6}");
+        assert!(
+            max_s_err < tol,
+            "S₀ mismatch after dual commit: {max_s_err:.6}"
+        );
 
         // Compare cache: same tokens observed with same scores → same cache contents.
         assert_eq!(cache_dual.len(), cache_ref.len(), "cache length mismatch");
@@ -640,8 +673,9 @@ mod tests {
         // (The compile-time G3 gate — "with hippocampal_cache OFF, the dual-path
         // function doesn't exist" — is trivially true by the feature flag.)
         let (t, d) = (4, 8);
-        let parents: Vec<usize> =
-            (0..t).map(|i| if i == 0 { usize::MAX } else { i - 1 }).collect();
+        let parents: Vec<usize> = (0..t)
+            .map(|i| if i == 0 { usize::MAX } else { i - 1 })
+            .collect();
         let mut rng = rng(7);
         let keys: Vec<f32> = (0..t * d).map(|_| rng()).collect();
         let values: Vec<f32> = (0..t * d).map(|_| rng()).collect();
@@ -691,7 +725,10 @@ mod tests {
             block_kv.clear();
             for &ak in &ancestor_path {
                 let orig_j = topo.topo_order[ak];
-                block_kv.push((&keys[orig_j * d..(orig_j + 1) * d], &values[orig_j * d..(orig_j + 1) * d]));
+                block_kv.push((
+                    &keys[orig_j * d..(orig_j + 1) * d],
+                    &values[orig_j * d..(orig_j + 1) * d],
+                ));
             }
             let orig_i = topo.topo_order[i];
             let q_i = &queries[orig_i * d..(orig_i + 1) * d];
@@ -705,7 +742,10 @@ mod tests {
             let expected = gdn_ref[i] + hola_ref[i];
             max_err = max_err.max((dual_out[i] - expected).abs());
         }
-        assert!(max_err < tol, "GDN component perturbed: max_err={max_err:.6}");
+        assert!(
+            max_err < tol,
+            "GDN component perturbed: max_err={max_err:.6}"
+        );
     }
 
     // ── T4.1 (G1): correctness on random branching trees ──
@@ -773,7 +813,10 @@ mod tests {
             block_kv.clear();
             for &ak in &ancestor_path {
                 let orig_j = topo.topo_order[ak];
-                block_kv.push((&keys[orig_j * d..(orig_j + 1) * d], &values[orig_j * d..(orig_j + 1) * d]));
+                block_kv.push((
+                    &keys[orig_j * d..(orig_j + 1) * d],
+                    &values[orig_j * d..(orig_j + 1) * d],
+                ));
             }
 
             let orig_i = topo.topo_order[i];
@@ -787,7 +830,10 @@ mod tests {
             let expected = gdn_ref[i] + hola_ref[i];
             max_err = max_err.max((dual_out[i] - expected).abs());
         }
-        assert!(max_err < tol, "dual-path random tree: max error {max_err:.6} >= {tol}");
+        assert!(
+            max_err < tol,
+            "dual-path random tree: max error {max_err:.6} >= {tol}"
+        );
     }
 
     // ── T4.1 (G1): correctness at T=16,32,64,128 ──
@@ -798,8 +844,9 @@ mod tests {
         // Chain trees are the worst case for the GDN masked solve (deepest paths).
         for &t in &[16usize, 32, 64, 128] {
             let d = 8;
-            let parents: Vec<usize> =
-                (0..t).map(|i| if i == 0 { usize::MAX } else { i - 1 }).collect();
+            let parents: Vec<usize> = (0..t)
+                .map(|i| if i == 0 { usize::MAX } else { i - 1 })
+                .collect();
             let mut rng = rng(t as u32 * 7 + 13);
             // Small-magnitude keys to avoid forward-sub overflow on deep chains.
             let keys: Vec<f32> = (0..t * d).map(|_| 0.05 * rng()).collect();
@@ -847,7 +894,10 @@ mod tests {
                 block_kv.clear();
                 for &ak in &ancestor_path {
                     let orig_j = topo.topo_order[ak];
-                    block_kv.push((&keys[orig_j * d..(orig_j + 1) * d], &values[orig_j * d..(orig_j + 1) * d]));
+                    block_kv.push((
+                        &keys[orig_j * d..(orig_j + 1) * d],
+                        &values[orig_j * d..(orig_j + 1) * d],
+                    ));
                 }
                 let orig_i = topo.topo_order[i];
                 let q_i = &queries[orig_i * d..(orig_i + 1) * d];
@@ -860,10 +910,7 @@ mod tests {
                 let expected = gdn_ref[i] + hola_ref[i];
                 max_err = max_err.max((dual_out[i] - expected).abs());
             }
-            assert!(
-                max_err < tol,
-                "G1 T={t}: max error {max_err:.6} >= {tol}"
-            );
+            assert!(max_err < tol, "G1 T={t}: max error {max_err:.6} >= {tol}");
         }
     }
 
@@ -877,8 +924,9 @@ mod tests {
         // since scratch buffers are private, we verify determinism + finiteness
         // (which proves no realloc corruption).
         let (t, d) = (32, 8);
-        let parents: Vec<usize> =
-            (0..t).map(|i| if i == 0 { usize::MAX } else { i - 1 }).collect();
+        let parents: Vec<usize> = (0..t)
+            .map(|i| if i == 0 { usize::MAX } else { i - 1 })
+            .collect();
         let mut rng = rng(77);
         let keys: Vec<f32> = (0..t * d).map(|_| 0.05 * rng()).collect();
         let values: Vec<f32> = (0..t * d).map(|_| 0.05 * rng()).collect();
@@ -904,14 +952,17 @@ mod tests {
         let topo = build_topology(&parents, &alphas);
         let mut verifier = GdnHolaTreeVerifier::new(t, d, d, t);
 
-        let out1 =
-            verify_gdn_hola_tree_into(&mut verifier, &topo, &params, &mut cache, &s0, d, d).to_vec();
-        let out2 =
-            verify_gdn_hola_tree_into(&mut verifier, &topo, &params, &mut cache, &s0, d, d).to_vec();
+        let out1 = verify_gdn_hola_tree_into(&mut verifier, &topo, &params, &mut cache, &s0, d, d)
+            .to_vec();
+        let out2 = verify_gdn_hola_tree_into(&mut verifier, &topo, &params, &mut cache, &s0, d, d)
+            .to_vec();
 
         // Determinism: repeated calls produce identical output (scratch reuse
         // does not leak stale state).
-        assert_eq!(out1, out2, "repeated dual-path verify must be deterministic");
+        assert_eq!(
+            out1, out2,
+            "repeated dual-path verify must be deterministic"
+        );
 
         // All finite (no NaN/Inf from corrupted scratch).
         for &v in &out1 {

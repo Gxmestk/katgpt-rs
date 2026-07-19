@@ -149,12 +149,7 @@ pub trait LocalGuidanceSource<P: Position> {
     /// PIBT's lexicographic cost first term `Ind[Φ[i][0] ≠ u]`.
     ///
     /// The result is written into `out` (cleared and refilled).
-    fn compute_guidance(
-        &mut self,
-        config: &JointConfig<P>,
-        goals: &[P],
-        out: &mut Guidance<P>,
-    );
+    fn compute_guidance(&mut self, config: &JointConfig<P>, goals: &[P], out: &mut Guidance<P>);
 
     /// Supply warm-start data for the next [`compute_guidance`](Self::compute_guidance)
     /// call (Issue 140 T2 — the LLLG mechanism (b) warm-start integration).
@@ -1211,12 +1206,7 @@ impl<P: Position> FlatAstarScratch<P> {
 }
 
 impl<P: Position> LocalGuidanceSource<P> for SpaceTimeGuidance<P> {
-    fn compute_guidance(
-        &mut self,
-        config: &JointConfig<P>,
-        goals: &[P],
-        out: &mut Guidance<P>,
-    ) {
+    fn compute_guidance(&mut self, config: &JointConfig<P>, goals: &[P], out: &mut Guidance<P>) {
         // Paper-faithful uniform alpha — delegates to the shared refinement
         // loop with a constant closure. The closure captures `self.cfg.alpha`
         // by copy (f32 is Copy), avoiding any borrow conflict with the mutable

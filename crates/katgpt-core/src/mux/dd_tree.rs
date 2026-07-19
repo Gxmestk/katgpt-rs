@@ -156,11 +156,7 @@ pub(crate) fn compositional_width(peaks: &[f32], base: usize) -> usize {
 /// redundant `peaks.iter().sum()` (one full scan over ≤ `MAX_TOP_K`
 /// floats) on every BFS leaf expansion.
 #[cfg(feature = "comp_width")]
-pub(crate) fn compositional_width_with_total(
-    peaks: &[f32],
-    base: usize,
-    total: f32,
-) -> usize {
+pub(crate) fn compositional_width_with_total(peaks: &[f32], base: usize, total: f32) -> usize {
     let entropy = shannon_entropy_with_total(peaks, total);
     // max entropy for uniform distribution over len items: ln(n)
     let max_entropy = (peaks.len() as f32).ln();
@@ -257,7 +253,8 @@ impl MuxDdTree {
             for j in 0..child_len {
                 tokens.push((offset + j) as u32);
             }
-            node.children.push(MuxNode::new(tokens, Arc::clone(&child_weights)));
+            node.children
+                .push(MuxNode::new(tokens, Arc::clone(&child_weights)));
         }
 
         // Track maximum depth

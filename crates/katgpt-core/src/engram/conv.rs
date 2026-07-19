@@ -394,7 +394,10 @@ pub fn conv_temporal_step_backward_truncated_into(
         "conv_temporal_step_backward_truncated_into: len mismatch"
     );
     let k = kernel.len();
-    debug_assert!(k >= 1, "conv_temporal_step_backward_truncated_into: kernel empty");
+    debug_assert!(
+        k >= 1,
+        "conv_temporal_step_backward_truncated_into: kernel empty"
+    );
     // Only the current tap (kernel[K-1]) contributes under truncation.
     let current_weight = kernel[k - 1];
     for j in 0..d {
@@ -652,7 +655,10 @@ mod tests {
         let mut out = [99.0f32; 5];
         let kernel = vec![0.0f32; 12];
         conv_causal_dyn_into(&v_tilde, &mut out, &kernel, 1);
-        assert!(out.iter().all(|&v| v == 0.0), "K=12 zero kernel → all zeros");
+        assert!(
+            out.iter().all(|&v| v == 0.0),
+            "K=12 zero kernel → all zeros"
+        );
     }
 
     // ── Temporal conv (conv_temporal_step_into) ─────────────────────────────
@@ -672,7 +678,11 @@ mod tests {
         let kernel_avg = [0.25f32; 4];
         conv_temporal_step_into(&history, &v_current, &mut out, &kernel_avg, 1);
         for i in 0..4 {
-            assert!((out[i] - 0.25 * v_current[i]).abs() < 1e-6, "out[{i}] = {}", out[i]);
+            assert!(
+                (out[i] - 0.25 * v_current[i]).abs() < 1e-6,
+                "out[{i}] = {}",
+                out[i]
+            );
         }
     }
 
@@ -696,11 +706,7 @@ mod tests {
         // kernel = [0.25; 4], 3 past v's + current = 4 taps, all weighted 1/4.
         // out[j] = 0.25 * (v_hist[0][j] + v_hist[1][j] + v_hist[2][j] + v_current[j])
         let v_current = [4.0f32, 8.0];
-        let history = vec![
-            vec![1.0, 2.0],
-            vec![2.0, 4.0],
-            vec![3.0, 6.0],
-        ];
+        let history = vec![vec![1.0, 2.0], vec![2.0, 4.0], vec![3.0, 6.0]];
         let mut out = [0.0f32; 2];
         let kernel = [0.25f32; 4];
         conv_temporal_step_into(&history, &v_current, &mut out, &kernel, 1);
@@ -738,7 +744,10 @@ mod tests {
         // timesteps_ago = (K-1-0) * 2 = 6. Need H >= 6. We have H = 2. → zero.
         let kernel_oldest = [1.0f32, 0.0, 0.0, 0.0];
         conv_temporal_step_into(&history, &v_current, &mut out, &kernel_oldest, 2);
-        assert!(out.iter().all(|&v| v == 0.0), "oldest tap OOR with dilation 2");
+        assert!(
+            out.iter().all(|&v| v == 0.0),
+            "oldest tap OOR with dilation 2"
+        );
     }
 
     #[test]

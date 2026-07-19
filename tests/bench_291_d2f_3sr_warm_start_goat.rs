@@ -30,11 +30,11 @@
 
 use katgpt_core::Config;
 use katgpt_core::Rng;
+use katgpt_core::dllm_solver::{RcdConfig, ThreeStateReuseConfig};
 use katgpt_rs::dllm::{
     NoConstraint, denoise_loop, denoise_loop_rcd, denoise_loop_rcd_3sr, denoising_accuracy,
     generate_pattern_dataset, train_mini_dllm,
 };
-use katgpt_core::dllm_solver::{RcdConfig, ThreeStateReuseConfig};
 use katgpt_rs::transformer::TransformerWeights;
 
 // ─── Config knobs ─────────────────────────────────────────────────────────

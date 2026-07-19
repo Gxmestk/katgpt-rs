@@ -91,10 +91,7 @@ fn main() {
     let ideal = (m as f32) * (k as f32) / (n as f32);
 
     println!("── Baseline (no bias) ──────────────────────────────────────");
-    println!(
-        "expert selection counts: {:?}",
-        counts_before
-    );
+    println!("expert selection counts: {:?}", counts_before);
     println!(
         "ideal count per expert:  {:.1} (m·k/n = {}·{}/{})",
         ideal, m, k, n
@@ -117,10 +114,7 @@ fn main() {
         "α (per-token, first 8):  {:?}…",
         &result.alpha[..8.min(result.alpha.len())]
     );
-    println!(
-        "expert selection counts: {:?}",
-        counts_after
-    );
+    println!("expert selection counts: {:?}", counts_after);
     println!(
         "MaxVio (max relative deviation): {:.4}  (was {:.4}, reduction {:.1}×)",
         maxvio_after,
@@ -159,10 +153,7 @@ fn main() {
         f32::INFINITY
     };
     if reduction >= 2.0 {
-        println!(
-            "✓ QB reduced MaxVio by {:.1}× (≥2× gate PASS)",
-            reduction
-        );
+        println!("✓ QB reduced MaxVio by {:.1}× (≥2× gate PASS)", reduction);
     } else {
         println!(
             "△ QB reduced MaxVio by {:.1}× (<2× — check calibration batch size)",

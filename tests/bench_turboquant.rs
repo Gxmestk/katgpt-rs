@@ -13,11 +13,11 @@
 use std::hint::black_box;
 use std::time::Instant;
 
-use katgpt_rs::transformer::TransformerWeights;
 use katgpt_quant::turboquant::TurboQuantKVCache;
 use katgpt_quant::turboquant::forward::{
     attention_turboquant, cosine_similarity, dequantize_keys_flat, dequantize_values_flat,
 };
+use katgpt_rs::transformer::TransformerWeights;
 use katgpt_rs::types::{Config, Rng, kv_dim};
 
 /// Generate a synthetic key/value vector for position `pos`.

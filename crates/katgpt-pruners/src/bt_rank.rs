@@ -105,11 +105,7 @@ impl BtScores {
     /// Ties are broken by index (lower index first for stability).
     pub fn rank(&self) -> Vec<usize> {
         let mut ranked: Vec<usize> = (0..self.scores.len()).collect();
-        ranked.sort_by(|&a, &b| {
-            self.scores[b]
-                .total_cmp(&self.scores[a])
-                .then(a.cmp(&b))
-        });
+        ranked.sort_by(|&a, &b| self.scores[b].total_cmp(&self.scores[a]).then(a.cmp(&b)));
         ranked
     }
 

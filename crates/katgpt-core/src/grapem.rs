@@ -282,16 +282,7 @@ impl Rank2Plane {
             return Ok(());
         }
         grapem_apply_inner(
-            &self.a,
-            &self.b,
-            self.alpha,
-            self.beta,
-            self.gamma,
-            self.s,
-            self.s_sq,
-            x,
-            n,
-            omega,
+            &self.a, &self.b, self.alpha, self.beta, self.gamma, self.s, self.s_sq, x, n, omega,
             out,
         );
         Ok(())
@@ -632,7 +623,11 @@ mod tests {
         grapem_apply_into(&a, &b, &x, 1.0, core::f32::consts::FRAC_PI_2, &mut out).unwrap();
         // Expected: out = [cos(π/2), 0, -sin(π/2), 0] = [0, 0, -1, 0].
         assert!((out[0]).abs() < 1e-6, "out[0] should be 0, got {}", out[0]);
-        assert!((out[2] + 1.0).abs() < 1e-6, "out[2] should be -1, got {}", out[2]);
+        assert!(
+            (out[2] + 1.0).abs() < 1e-6,
+            "out[2] should be -1, got {}",
+            out[2]
+        );
         assert!((out[1]).abs() < 1e-6 && (out[3]).abs() < 1e-6);
     }
 
@@ -704,7 +699,10 @@ mod tests {
         let mut no_alias = [0f32; 4];
         grapem_apply_into(&a, &b, &original, 1.0, 0.7, &mut no_alias).unwrap();
         for i in 0..4 {
-            assert!((x[i] - no_alias[i]).abs() < 1e-7, "alias path diverges at {i}");
+            assert!(
+                (x[i] - no_alias[i]).abs() < 1e-7,
+                "alias path diverges at {i}"
+            );
         }
         // And it actually rotated (not identity).
         let moved = (0..4).map(|i| (x[i] - original[i]).abs()).sum::<f32>();

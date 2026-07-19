@@ -233,13 +233,7 @@ impl QuantLut for Int8Lut {
 /// ```
 #[inline]
 #[allow(clippy::needless_return)] // return is needed for cfg-gated arch dispatch
-pub fn dequant_via_lut<L: QuantLut>(
-    codes: &[u8],
-    lut: &L,
-    shift: u32,
-    mask: u8,
-    out: &mut [f32],
-) {
+pub fn dequant_via_lut<L: QuantLut>(codes: &[u8], lut: &L, shift: u32, mask: u8, out: &mut [f32]) {
     let lut_slice = lut.as_f32_slice();
     #[cfg(target_arch = "aarch64")]
     {
@@ -302,7 +296,7 @@ unsafe fn dequant_via_lut_neon(
     out: &mut [f32],
 ) {
     use core::arch::aarch64::{
-        vand_u8, vdup_n_s8, vdup_n_u8, vget_lane_u8, vld1q_f32, vld1_u8, vshl_u8, vst1q_f32,
+        vand_u8, vdup_n_s8, vdup_n_u8, vget_lane_u8, vld1_u8, vld1q_f32, vshl_u8, vst1q_f32,
     };
 
     unsafe {
@@ -315,7 +309,11 @@ unsafe fn dequant_via_lut_neon(
         // For INT8 (256 entries, mask_bits=8), all u8 values are valid indices.
         // For INT4 (16 entries, mask_bits=4), mask to prevent OOB from stray bits.
         // `1u8 << 8` overflows, so cap at 8 and use 0xFF as the index mask.
-        let idx_mask: u8 = if mask_bits >= 8 { 0xFF } else { (1u8 << mask_bits) - 1 };
+        let idx_mask: u8 = if mask_bits >= 8 {
+            0xFF
+        } else {
+            (1u8 << mask_bits) - 1
+        };
 
         // Process 8 bytes at a time: load 8 codes, shift+mask, scalar gather, NEON store.
         let mut i = 0;
@@ -377,8 +375,8 @@ unsafe fn dequant_via_lut_avx2(
     out: &mut [f32],
 ) {
     use core::arch::x86_64::{
-        _mm256_and_si256, _mm256_castsi128_si256, _mm256_i32gather_ps, _mm256_set1_epi32,
-        _mm256_srli_epi32, _mm256_storeu_ps, _mm_cvtepu8_epi32, _mm_loadl_epi64,
+        _mm_cvtepu8_epi32, _mm_loadl_epi64, _mm256_and_si256, _mm256_castsi128_si256,
+        _mm256_i32gather_ps, _mm256_set1_epi32, _mm256_srli_epi32, _mm256_storeu_ps,
     };
 
     unsafe {
@@ -390,9 +388,7 @@ unsafe fn dequant_via_lut_avx2(
         let mut i = 0;
         while i + 8 <= n {
             // Load 8 bytes (low 64 bits of __m128i), zero-extend to 8× i32.
-            let raw_bytes = _mm_cvtepu8_epi32(_mm_loadl_epi64(
-                codes.as_ptr().add(i) as *const _,
-            ));
+            let raw_bytes = _mm_cvtepu8_epi32(_mm_loadl_epi64(codes.as_ptr().add(i) as *const _));
             // Widen to 256-bit, shift right + mask on i32 lanes.
             let idx256 = _mm256_castsi128_si256(raw_bytes);
             let shifted = _mm256_srli_epi32(idx256, shift as i32);
@@ -495,10 +491,18 @@ pub fn dequant_dot_via_lut_scalar(
             let idx1 = ((codes[i + 1] >> shift) & mask) as usize & (mask_len - 1);
             let idx2 = ((codes[i + 2] >> shift) & mask) as usize & (mask_len - 1);
             let idx3 = ((codes[i + 3] >> shift) & mask) as usize & (mask_len - 1);
-            acc[0] = lut_slice.get_unchecked(idx0).mul_add(*x.get_unchecked(i), acc[0]);
-            acc[1] = lut_slice.get_unchecked(idx1).mul_add(*x.get_unchecked(i + 1), acc[1]);
-            acc[2] = lut_slice.get_unchecked(idx2).mul_add(*x.get_unchecked(i + 2), acc[2]);
-            acc[3] = lut_slice.get_unchecked(idx3).mul_add(*x.get_unchecked(i + 3), acc[3]);
+            acc[0] = lut_slice
+                .get_unchecked(idx0)
+                .mul_add(*x.get_unchecked(i), acc[0]);
+            acc[1] = lut_slice
+                .get_unchecked(idx1)
+                .mul_add(*x.get_unchecked(i + 1), acc[1]);
+            acc[2] = lut_slice
+                .get_unchecked(idx2)
+                .mul_add(*x.get_unchecked(i + 2), acc[2]);
+            acc[3] = lut_slice
+                .get_unchecked(idx3)
+                .mul_add(*x.get_unchecked(i + 3), acc[3]);
         }
         i += 4;
     }
@@ -506,7 +510,9 @@ pub fn dequant_dot_via_lut_scalar(
     while i < n {
         let idx = ((codes[i] >> shift) & mask) as usize & (mask_len - 1);
         unsafe {
-            sum = lut_slice.get_unchecked(idx).mul_add(*x.get_unchecked(i), sum);
+            sum = lut_slice
+                .get_unchecked(idx)
+                .mul_add(*x.get_unchecked(i), sum);
         }
         i += 1;
     }
@@ -525,8 +531,8 @@ unsafe fn dequant_dot_via_lut_neon(
     mask: u8,
 ) -> f32 {
     use core::arch::aarch64::{
-        vaddq_f32, vdup_n_s8, vdup_n_u8, vdupq_n_f32, vfmaq_f32, vget_lane_u8, vld1q_f32,
-        vld1_u8, vand_u8, vshl_u8,
+        vaddq_f32, vand_u8, vdup_n_s8, vdup_n_u8, vdupq_n_f32, vfmaq_f32, vget_lane_u8, vld1_u8,
+        vld1q_f32, vshl_u8,
     };
 
     unsafe {
@@ -535,7 +541,11 @@ unsafe fn dequant_dot_via_lut_neon(
         let shift_vec = vdup_n_s8(neg_shift);
         let mask_vec = vdup_n_u8(mask);
         let mask_bits = lut_slice.len().trailing_zeros() as u8;
-        let idx_mask: u8 = if mask_bits >= 8 { 0xFF } else { (1u8 << mask_bits) - 1 };
+        let idx_mask: u8 = if mask_bits >= 8 {
+            0xFF
+        } else {
+            (1u8 << mask_bits) - 1
+        };
 
         // 4 independent accumulators (float32x4_t each) to hide FMA latency.
         let mut acc0 = vdupq_n_f32(0.0);
@@ -620,9 +630,9 @@ unsafe fn dequant_dot_via_lut_avx2(
     mask: u8,
 ) -> f32 {
     use core::arch::x86_64::{
-        _mm256_add_ps, _mm256_and_si256, _mm256_castsi128_si256, _mm256_fmadd_ps,
-        _mm256_i32gather_ps, _mm256_loadu_ps, _mm256_set1_epi32, _mm256_setzero_ps,
-        _mm256_srli_epi32, _mm_cvtepu8_epi32, _mm_loadl_epi64,
+        _mm_cvtepu8_epi32, _mm_loadl_epi64, _mm256_add_ps, _mm256_and_si256,
+        _mm256_castsi128_si256, _mm256_fmadd_ps, _mm256_i32gather_ps, _mm256_loadu_ps,
+        _mm256_set1_epi32, _mm256_setzero_ps, _mm256_srli_epi32,
     };
 
     unsafe {
@@ -638,9 +648,8 @@ unsafe fn dequant_dot_via_lut_avx2(
         // Process 16 elements per iteration (2× float32x8_t FMA).
         while i + 16 <= n {
             for (slot, &off) in [0, 8].iter().enumerate() {
-                let raw = _mm_cvtepu8_epi32(_mm_loadl_epi64(
-                    codes.as_ptr().add(i + off) as *const _,
-                ));
+                let raw =
+                    _mm_cvtepu8_epi32(_mm_loadl_epi64(codes.as_ptr().add(i + off) as *const _));
                 let idx256 = _mm256_castsi128_si256(raw);
                 let shifted = _mm256_srli_epi32(idx256, shift as i32);
                 let masked = _mm256_and_si256(shifted, mask_vec);
@@ -658,9 +667,7 @@ unsafe fn dequant_dot_via_lut_avx2(
         // Process remaining 8-element chunk.
         let mut acc = _mm256_add_ps(acc0, acc1);
         if i + 8 <= n {
-            let raw = _mm_cvtepu8_epi32(_mm_loadl_epi64(
-                codes.as_ptr().add(i) as *const _,
-            ));
+            let raw = _mm_cvtepu8_epi32(_mm_loadl_epi64(codes.as_ptr().add(i) as *const _));
             let idx256 = _mm256_castsi128_si256(raw);
             let shifted = _mm256_srli_epi32(idx256, shift as i32);
             let masked = _mm256_and_si256(shifted, mask_vec);
@@ -747,12 +754,9 @@ mod tests {
         for i in 0..16u8 {
             let expected = (i as f32 - 3.0) * 2.0;
             assert_eq!(
-                lut.0[i as usize],
-                expected,
+                lut.0[i as usize], expected,
                 "UInt4Lut[{}] = {} != expected {}",
-                i,
-                lut.0[i as usize],
-                expected
+                i, lut.0[i as usize], expected
             );
         }
     }
@@ -767,8 +771,7 @@ mod tests {
         for i in 8..16u8 {
             let signed = i as i8 - 16; // 8→-8, 9→-7, ..., 15→-1
             assert_eq!(
-                lut.0[i as usize],
-                signed as f32,
+                lut.0[i as usize], signed as f32,
                 "Int4Lut signed region {}",
                 i
             );
@@ -784,8 +787,7 @@ mod tests {
         for i in 128..=255u8 {
             let signed = i as i8; // 128→-128, ..., 255→-1
             assert_eq!(
-                lut.0[i as usize],
-                signed as f32,
+                lut.0[i as usize], signed as f32,
                 "Int8Lut signed region {}",
                 i
             );
@@ -801,7 +803,12 @@ mod tests {
         let mut out = [0.0_f32; 4];
         dequant_via_lut(&codes, &lut, 0, 0x0F, &mut out);
         // Low nibbles: 2, 4, 0xB=11, 0xD=13
-        let expected = [(2.0 - 8.0) * 0.5, (4.0 - 8.0) * 0.5, (11.0 - 8.0) * 0.5, (13.0 - 8.0) * 0.5];
+        let expected = [
+            (2.0 - 8.0) * 0.5,
+            (4.0 - 8.0) * 0.5,
+            (11.0 - 8.0) * 0.5,
+            (13.0 - 8.0) * 0.5,
+        ];
         assert_eq!(out, expected);
     }
 
@@ -812,7 +819,12 @@ mod tests {
         let mut out = [0.0_f32; 4];
         dequant_via_lut(&codes, &lut, 4, 0x0F, &mut out);
         // High nibbles: 1, 3, 0xA=10, 0xC=12
-        let expected = [(1.0 - 8.0) * 0.5, (3.0 - 8.0) * 0.5, (10.0 - 8.0) * 0.5, (12.0 - 8.0) * 0.5];
+        let expected = [
+            (1.0 - 8.0) * 0.5,
+            (3.0 - 8.0) * 0.5,
+            (10.0 - 8.0) * 0.5,
+            (12.0 - 8.0) * 0.5,
+        ];
         assert_eq!(out, expected);
     }
 
@@ -874,7 +886,10 @@ mod tests {
                 max_diff = diff;
             }
         }
-        assert_eq!(max_diff, 0.0, "Int4LUT path must be bit-exact vs arithmetic");
+        assert_eq!(
+            max_diff, 0.0,
+            "Int4LUT path must be bit-exact vs arithmetic"
+        );
     }
 
     #[test]
@@ -894,7 +909,10 @@ mod tests {
                 max_diff = diff;
             }
         }
-        assert_eq!(max_diff, 0.0, "Int8LUT path must be bit-exact vs arithmetic");
+        assert_eq!(
+            max_diff, 0.0,
+            "Int8LUT path must be bit-exact vs arithmetic"
+        );
     }
 
     // ── Edge cases ───────────────────────────────────────────────────────
@@ -975,7 +993,10 @@ mod tests {
         let mut out_scalar = vec![0.0_f32; 100];
         dequant_via_lut(&codes, &lut, 0, 0x0F, &mut out_simd);
         dequant_via_lut_scalar(&codes, lut_slice, 0, 0x0F, &mut out_scalar);
-        assert_eq!(out_simd, out_scalar, "SIMD path must be bit-exact vs scalar");
+        assert_eq!(
+            out_simd, out_scalar,
+            "SIMD path must be bit-exact vs scalar"
+        );
     }
 
     #[test]
@@ -990,7 +1011,10 @@ mod tests {
         let mut out_scalar = vec![0.0_f32; 300];
         dequant_via_lut(&codes, &lut, 0, 0xFF, &mut out_simd);
         dequant_via_lut_scalar(&codes, lut_slice, 0, 0xFF, &mut out_scalar);
-        assert_eq!(out_simd, out_scalar, "SIMD path must be bit-exact vs scalar");
+        assert_eq!(
+            out_simd, out_scalar,
+            "SIMD path must be bit-exact vs scalar"
+        );
     }
 
     #[test]

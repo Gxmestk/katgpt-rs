@@ -183,9 +183,7 @@ impl EvolutionArena {
         self.round += 1;
         self.total_generated += 1;
 
-        self.pending
-            .pop_front()
-            .unwrap_or(self.base_config)
+        self.pending.pop_front().unwrap_or(self.base_config)
     }
 
     /// Refill the pending queue with mutated configs + base config (control).

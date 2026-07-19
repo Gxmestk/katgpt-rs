@@ -30,8 +30,8 @@
 mod counting_allocator;
 
 use katgpt_dec::{
-    BirthDeathParams, CellComplex, CochainField, SplitMix64,
-    operators::graph_laplacian_into, stochastic_birth_death_step,
+    BirthDeathParams, CellComplex, CochainField, SplitMix64, operators::graph_laplacian_into,
+    stochastic_birth_death_step,
 };
 use std::hint::black_box;
 use std::sync::atomic::Ordering;
@@ -204,7 +204,12 @@ fn run_det_3d(cx: &CellComplex, steps: usize) -> CochainField {
 }
 
 /// Competitor 4: full 3D NCA (grid_3d + 7-point stencil + birth/death).
-fn run_nca_3d(cx: &CellComplex, params: &BirthDeathParams, seed: u64, steps: usize) -> CochainField {
+fn run_nca_3d(
+    cx: &CellComplex,
+    params: &BirthDeathParams,
+    seed: u64,
+    steps: usize,
+) -> CochainField {
     let mut field = CochainField::zeros(0, cx.n_vertices(), DIM);
     let mut scratch = CochainField::zeros(0, cx.n_vertices(), DIM);
     let mut dropout = vec![0u8; cx.n_vertices()];
@@ -294,30 +299,26 @@ fn g1b_roughness() -> (f64, f64, f64, BirthDeathParams, bool) {
                     // competition mechanism). NEG_INFINITY = disabled
                     // (baseline). Values > 0 prune interior voxels.
                     for &crowding in &[f32::NEG_INFINITY, 0.5, 1.5, 2.5] {
-                    let p = BirthDeathParams {
-                        diffusion_dt: 0.1,
-                        alive_threshold: threshold,
-                        birth_rate: birth,
-                        consumption_rate: consumption,
-                        dropout_prob: dropout,
-                        decay_rate: 0.5,
-                        crowding_threshold: crowding,
-                    };
-                    let (rough, vol, _) = nca_3d_metrics(&cx, &p);
-                    // Skip trivially-small structures (volume < 10 = no real growth).
-                    if vol < 10 {
-                        continue;
-                    }
-                    let r = if rough_3 > 1e-9 {
-                        rough / rough_3
-                    } else {
-                        0.0
-                    };
-                    if r > best_ratio {
-                        best_ratio = r;
-                        best_params = p;
-                        best_rough_4 = rough;
-                    }
+                        let p = BirthDeathParams {
+                            diffusion_dt: 0.1,
+                            alive_threshold: threshold,
+                            birth_rate: birth,
+                            consumption_rate: consumption,
+                            dropout_prob: dropout,
+                            decay_rate: 0.5,
+                            crowding_threshold: crowding,
+                        };
+                        let (rough, vol, _) = nca_3d_metrics(&cx, &p);
+                        // Skip trivially-small structures (volume < 10 = no real growth).
+                        if vol < 10 {
+                            continue;
+                        }
+                        let r = if rough_3 > 1e-9 { rough / rough_3 } else { 0.0 };
+                        if r > best_ratio {
+                            best_ratio = r;
+                            best_params = p;
+                            best_rough_4 = rough;
+                        }
                     } // crowding
                 }
             }
@@ -343,7 +344,14 @@ fn g2_regeneration() -> (f64, bool) {
     let mut rng = SplitMix64::new(7);
     seed_field(&mut field);
     for _ in 0..STEPS {
-        stochastic_birth_death_step(&cx, &mut field, &params, &mut rng, &mut scratch, &mut dropout);
+        stochastic_birth_death_step(
+            &cx,
+            &mut field,
+            &params,
+            &mut rng,
+            &mut scratch,
+            &mut dropout,
+        );
     }
 
     // Step 2: record originally-alive voxels in the center 8×8×8 region.
@@ -380,7 +388,14 @@ fn g2_regeneration() -> (f64, bool) {
 
     // Step 4: run 40 re-growth steps.
     for _ in 0..40 {
-        stochastic_birth_death_step(&cx, &mut field, &params, &mut rng, &mut scratch, &mut dropout);
+        stochastic_birth_death_step(
+            &cx,
+            &mut field,
+            &params,
+            &mut rng,
+            &mut scratch,
+            &mut dropout,
+        );
     }
 
     // Step 5: measure % of destroyed-alive voxels that are regrown.
@@ -417,7 +432,11 @@ fn g4_latency() -> (f64, f64, bool, bool) {
     }
     let start = Instant::now();
     for _ in 0..iters {
-        graph_laplacian_into(black_box(&cx2), black_box(&field2), black_box(&mut scratch2));
+        graph_laplacian_into(
+            black_box(&cx2),
+            black_box(&field2),
+            black_box(&mut scratch2),
+        );
     }
     let t_2d = start.elapsed().as_nanos() as f64 / iters as f64 / n2 as f64;
 
@@ -435,7 +454,11 @@ fn g4_latency() -> (f64, f64, bool, bool) {
     }
     let start = Instant::now();
     for _ in 0..iters {
-        graph_laplacian_into(black_box(&cx3), black_box(&field3), black_box(&mut scratch3));
+        graph_laplacian_into(
+            black_box(&cx3),
+            black_box(&field3),
+            black_box(&mut scratch3),
+        );
     }
     let t_3d = start.elapsed().as_nanos() as f64 / iters as f64 / n3 as f64;
 
@@ -454,13 +477,24 @@ fn g4_latency() -> (f64, f64, bool, bool) {
     // Measure bare Laplacian on the 3D grid.
     let start = Instant::now();
     for _ in 0..iters {
-        graph_laplacian_into(black_box(&cx3), black_box(&field_bd), black_box(&mut scratch_bd));
+        graph_laplacian_into(
+            black_box(&cx3),
+            black_box(&field_bd),
+            black_box(&mut scratch_bd),
+        );
     }
     let t_lap = start.elapsed().as_nanos() as f64 / iters as f64;
 
     // Measure full birth/death step.
     for _ in 0..10 {
-        stochastic_birth_death_step(&cx3, &mut field_bd, &params, &mut rng, &mut scratch_bd, &mut dropout_bd);
+        stochastic_birth_death_step(
+            &cx3,
+            &mut field_bd,
+            &params,
+            &mut rng,
+            &mut scratch_bd,
+            &mut dropout_bd,
+        );
     }
     let start = Instant::now();
     for _ in 0..iters {
@@ -508,13 +542,27 @@ fn g5_zero_alloc() -> (usize, bool) {
     seed_field(&mut field);
 
     // Warmup: 1 tick (allocations during setup are allowed).
-    stochastic_birth_death_step(&cx, &mut field, &params, &mut rng, &mut scratch, &mut dropout);
+    stochastic_birth_death_step(
+        &cx,
+        &mut field,
+        &params,
+        &mut rng,
+        &mut scratch,
+        &mut dropout,
+    );
 
     let before = ALLOC_COUNT.load(Ordering::Relaxed);
 
     // Measured run: 100 ticks.
     for _ in 0..100 {
-        stochastic_birth_death_step(&cx, &mut field, &params, &mut rng, &mut scratch, &mut dropout);
+        stochastic_birth_death_step(
+            &cx,
+            &mut field,
+            &params,
+            &mut rng,
+            &mut scratch,
+            &mut dropout,
+        );
     }
 
     let after = ALLOC_COUNT.load(Ordering::Relaxed);
@@ -563,7 +611,14 @@ fn verdict(pass: bool) -> &'static str {
 fn main() {
     println!("╔═════════════════════════════════════════════════════════════════════╗");
     println!("║  Plan 454 T7 — 3D NCA GOAT Gate (G1a/G1b/G2/G3/G4/G5/G6)           ║");
-    println!("║  Grid: {W}×{H}×{D} = {N_VOXELS} voxels, {STEPS} steps                       ║", W = W, H = H, D = D, N_VOXELS = N_VOXELS, STEPS = STEPS);
+    println!(
+        "║  Grid: {W}×{H}×{D} = {N_VOXELS} voxels, {STEPS} steps                       ║",
+        W = W,
+        H = H,
+        D = D,
+        N_VOXELS = N_VOXELS,
+        STEPS = STEPS
+    );
     println!("╚═════════════════════════════════════════════════════════════════════╝");
     println!();
 
@@ -596,8 +651,11 @@ fn main() {
         };
         println!(
             "    best params: birth_rate={:.2}, consumption_rate={:.2}, dropout_prob={:.2}, alive_threshold={:.2}, crowding_threshold={}",
-            best_params.birth_rate, best_params.consumption_rate, best_params.dropout_prob,
-            best_params.alive_threshold, crowding_str
+            best_params.birth_rate,
+            best_params.consumption_rate,
+            best_params.dropout_prob,
+            best_params.alive_threshold,
+            crowding_str
         );
     }
     gain_pass &= g1b;
@@ -668,30 +726,39 @@ fn main() {
     let (surf4, vol4) = surface_area_and_volume(&field4);
     let reach4 = chebyshev_reach(&field4);
     let rough4 = roughness_ratio(surf4, vol4);
-    println!("  {:<12} {:>8} {:>8} {:>10} {:>6}", "Competitor", "Volume", "Surface", "Roughness", "Reach");
-    println!("  {:<12} {:>8} {:>8} {:>10} {:>6}", "Frozen", vol1, "—", "—", reach1);
-    println!("  {:<12} {:>8} {:>8} {:>10.3} {:>6}", "Det 3D", vol3, surf3, rough3, reach3);
-    println!("  {:<12} {:>8} {:>8} {:>10.3} {:>6}", "NCA 3D", vol4, surf4, rough4, reach4);
+    println!(
+        "  {:<12} {:>8} {:>8} {:>10} {:>6}",
+        "Competitor", "Volume", "Surface", "Roughness", "Reach"
+    );
+    println!(
+        "  {:<12} {:>8} {:>8} {:>10} {:>6}",
+        "Frozen", vol1, "—", "—", reach1
+    );
+    println!(
+        "  {:<12} {:>8} {:>8} {:>10.3} {:>6}",
+        "Det 3D", vol3, surf3, rough3, reach3
+    );
+    println!(
+        "  {:<12} {:>8} {:>8} {:>10.3} {:>6}",
+        "NCA 3D", vol4, surf4, rough4, reach4
+    );
     // Also show the G1b winner (the branched-morphology regime) if G1b passed.
     if g1b {
         let field4b = run_nca_3d(&cx, &best_params, 7, STEPS);
         let (surf4b, vol4b) = surface_area_and_volume(&field4b);
         let reach4b = chebyshev_reach(&field4b);
         let rough4b = roughness_ratio(surf4b, vol4b);
-        println!("  {:<12} {:>8} {:>8} {:>10.3} {:>6}", "NCA branched", vol4b, surf4b, rough4b, reach4b);
+        println!(
+            "  {:<12} {:>8} {:>8} {:>10.3} {:>6}",
+            "NCA branched", vol4b, surf4b, rough4b, reach4b
+        );
     }
 
     // --- Final verdict ---
     println!();
     println!("═══════════════════════════════════════════════════════════════");
-    println!(
-        "GAIN GATES (G1a + G1b + G2 + G6):  {}",
-        verdict(gain_pass)
-    );
-    println!(
-        "ENGINEERING GATES (G3 + G4 + G5):   {}",
-        verdict(eng_pass)
-    );
+    println!("GAIN GATES (G1a + G1b + G2 + G6):  {}", verdict(gain_pass));
+    println!("ENGINEERING GATES (G3 + G4 + G5):   {}", verdict(eng_pass));
     if gain_pass && eng_pass {
         println!("══ ALL GATES PASS — promote grid_3d to default ══");
     } else if gain_pass {

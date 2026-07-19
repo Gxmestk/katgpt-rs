@@ -40,9 +40,9 @@
 #![cfg(feature = "canvas_schema")]
 
 use katgpt_core::canvas::{
-    build_flow_graph, can_reach, causal_chain, compile_schema, dense, isolated, region_indices,
-    reachability_horizon, CanvasBounds, CanvasLayout, CanvasSchema, CompiledCanvas, Connection,
-    RegionId, RegionSpec, SemanticType, TransitiveClosure, SEMANTIC_EMBED_DIM,
+    CanvasBounds, CanvasLayout, CanvasSchema, CompiledCanvas, Connection, RegionId, RegionSpec,
+    SEMANTIC_EMBED_DIM, SemanticType, TransitiveClosure, build_flow_graph, can_reach, causal_chain,
+    compile_schema, dense, isolated, reachability_horizon, region_indices,
 };
 use std::hint::black_box;
 use std::sync::atomic::Ordering;
@@ -62,10 +62,18 @@ struct GateResult {
 
 impl GateResult {
     fn pass(name: &'static str, detail: impl Into<String>) -> Self {
-        Self { name, passed: true, detail: detail.into() }
+        Self {
+            name,
+            passed: true,
+            detail: detail.into(),
+        }
     }
     fn fail(name: &'static str, detail: impl Into<String>) -> Self {
-        Self { name, passed: false, detail: detail.into() }
+        Self {
+            name,
+            passed: false,
+            detail: detail.into(),
+        }
     }
 }
 
@@ -112,7 +120,10 @@ fn icu_scale_schema() -> CanvasSchema {
             .collect(),
     };
     let chain: Vec<RegionId> = (0..N_REGIONS_ICU).map(RegionId::new).collect();
-    CanvasSchema { layout, topology: causal_chain(&chain) }
+    CanvasSchema {
+        layout,
+        topology: causal_chain(&chain),
+    }
 }
 
 /// A small 3-region canvas for the G1/G2 correctness assertions.
@@ -153,7 +164,10 @@ fn three_region_schema() -> CanvasSchema {
         ],
     };
     let chain: Vec<RegionId> = vec![RegionId::new(0), RegionId::new(1), RegionId::new(2)];
-    CanvasSchema { layout, topology: causal_chain(&chain) }
+    CanvasSchema {
+        layout,
+        topology: causal_chain(&chain),
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -171,11 +185,16 @@ fn g1_reachability_soundness() -> GateResult {
         if can_reach(&g, RegionId::new(0), RegionId::new(1), horizon) {
             return GateResult::fail(
                 "G1",
-                format!("isolated topology: region 0 reached region 1 at horizon {horizon} (must be impossible)"),
+                format!(
+                    "isolated topology: region 0 reached region 1 at horizon {horizon} (must be impossible)"
+                ),
             );
         }
     }
-    GateResult::pass("G1", "isolated topology: absent edge ⟹ can_reach == false for all horizons (exact marginal independence)")
+    GateResult::pass(
+        "G1",
+        "isolated topology: absent edge ⟹ can_reach == false for all horizons (exact marginal independence)",
+    )
 }
 
 /// G2 — horizon bound: `can_reach(A, C, 1) == false` but `can_reach(A, C, 2)
@@ -186,16 +205,25 @@ fn g2_horizon_bound() -> GateResult {
     let r1 = can_reach(&g, RegionId::new(0), RegionId::new(2), 1);
     let r2 = can_reach(&g, RegionId::new(0), RegionId::new(2), 2);
     if r1 {
-        return GateResult::fail("G2", "can_reach(A,C,1) was true (must be false: path length 2 > horizon 1)");
+        return GateResult::fail(
+            "G2",
+            "can_reach(A,C,1) was true (must be false: path length 2 > horizon 1)",
+        );
     }
     if !r2 {
-        return GateResult::fail("G2", "can_reach(A,C,2) was false (must be true: A→B→C path of length 2)");
+        return GateResult::fail(
+            "G2",
+            "can_reach(A,C,2) was false (must be true: A→B→C path of length 2)",
+        );
     }
     // reachability_horizon = n_blocks * n_steps invariant.
     if reachability_horizon(4, 3) != 12 {
         return GateResult::fail("G2", "reachability_horizon(4,3) != 12");
     }
-    GateResult::pass("G2", "can_reach(A,C,1)=false, can_reach(A,C,2)=true, reachability_horizon=n_blocks*n_steps")
+    GateResult::pass(
+        "G2",
+        "can_reach(A,C,1)=false, can_reach(A,C,2)=true, reachability_horizon=n_blocks*n_steps",
+    )
 }
 
 /// G3 — no-regression: the 3-region schema compiles end-to-end and the mask
@@ -207,12 +235,21 @@ fn g3_no_regression() -> GateResult {
     let cc = compile_schema(&schema);
     // 3 regions, each 1 position wide on a 3-position canvas.
     if cc.region_indices.len() != 3 {
-        return GateResult::fail("G3", format!("expected 3 region ranges, got {}", cc.region_indices.len()));
+        return GateResult::fail(
+            "G3",
+            format!("expected 3 region ranges, got {}", cc.region_indices.len()),
+        );
     }
     if cc.mask.n_positions != 3 {
-        return GateResult::fail("G3", format!("expected n_positions=3, got {}", cc.mask.n_positions));
+        return GateResult::fail(
+            "G3",
+            format!("expected n_positions=3, got {}", cc.mask.n_positions),
+        );
     }
-    GateResult::pass("G3", "3-region schema compiles; mask/loss structures sane (all-features/no-default checked externally)")
+    GateResult::pass(
+        "G3",
+        "3-region schema compiles; mask/loss structures sane (all-features/no-default checked externally)",
+    )
 }
 
 /// G4 — alloc-free hot path. The zero-alloc queries are
@@ -248,7 +285,12 @@ fn g4_alloc_free_hot_path() -> (GateResult, usize, usize) {
     let result = if hot == 0 {
         GateResult::pass("G4", "hot path 0 allocs/1000 reaches + 0/1000 horizon (compile_schema allocates at load, not gated)".to_string())
     } else {
-        GateResult::fail("G4", format!("hot path allocated {hot} bytes (reaches={reaches_allocs}, horizon={horizon_allocs}); must be 0"))
+        GateResult::fail(
+            "G4",
+            format!(
+                "hot path allocated {hot} bytes (reaches={reaches_allocs}, horizon={horizon_allocs}); must be 0"
+            ),
+        )
     };
     (result, reaches_allocs, horizon_allocs)
 }
@@ -284,7 +326,10 @@ fn g5_perf() -> (GateResult, u64, u64) {
     samples.sort_unstable();
     let reach_p50 = samples[samples.len() / 2];
 
-    let mut detail = format!("compile_schema(199 regions)={}ns (budget {}ns); reaches p50={}ns (budget {}ns)", compile_ns_per, G5_COMPILE_BUDGET_NS, reach_p50, G5_REACH_BUDGET_NS);
+    let mut detail = format!(
+        "compile_schema(199 regions)={}ns (budget {}ns); reaches p50={}ns (budget {}ns)",
+        compile_ns_per, G5_COMPILE_BUDGET_NS, reach_p50, G5_REACH_BUDGET_NS
+    );
     let _ = &mut detail; // silence unused-mut on some toolchains
     let passed = compile_ns_per <= G5_COMPILE_BUDGET_NS && reach_p50 <= G5_REACH_BUDGET_NS;
     let result = if passed {
@@ -322,7 +367,11 @@ fn main() {
     println!();
     for r in &results {
         let mark = if r.passed { "✓ PASS" } else { "✗ FAIL" };
-        println!("  {mark}  {name}: {detail}", name = r.name, detail = r.detail);
+        println!(
+            "  {mark}  {name}: {detail}",
+            name = r.name,
+            detail = r.detail
+        );
     }
     // Print the raw G4/G5 numbers for the benchmark record.
     println!();

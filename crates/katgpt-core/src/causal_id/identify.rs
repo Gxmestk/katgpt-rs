@@ -286,11 +286,7 @@ fn identify_inner(
     let g_va = &scratch.sub_va_step3;
     scratch.an_y_in_gva.clear();
     scratch.frontier.clear();
-    g_va.ancestors_with_frontier_into(
-        effect,
-        &mut scratch.an_y_in_gva,
-        &mut scratch.frontier,
-    );
+    g_va.ancestors_with_frontier_into(effect, &mut scratch.an_y_in_gva, &mut scratch.frontier);
     // Compute W = (V\A) \ An(Y in G[V\A]). The filter reads v_minus_a +
     // an_y_in_gva while writing w; capture immutable snapshots so the
     // borrow checker can prove disjointness.
@@ -298,9 +294,12 @@ fn identify_inner(
     {
         let v_minus_a = &scratch.v_minus_a;
         let an_y_in_gva = &scratch.an_y_in_gva;
-        scratch
-            .w
-            .extend(v_minus_a.iter().copied().filter(|n| !an_y_in_gva.contains(n)));
+        scratch.w.extend(
+            v_minus_a
+                .iter()
+                .copied()
+                .filter(|n| !an_y_in_gva.contains(n)),
+        );
     }
     if !scratch.w.is_empty() {
         scratch.new_v.clear();
@@ -485,7 +484,15 @@ fn identify_inner_owned_slice(
     effect_head: NodeId,
 ) -> Result<AdmgSignature, IdentificationError> {
     let mut scratch = Scratch::new();
-    identify_inner(g, cause, effect, depth, cause_head, effect_head, &mut scratch)
+    identify_inner(
+        g,
+        cause,
+        effect,
+        depth,
+        cause_head,
+        effect_head,
+        &mut scratch,
+    )
 }
 
 /// Pick the first two nodes from `set` for hedge diagnostics. Returns
@@ -510,7 +517,9 @@ mod tests {
     fn scenario_a_frontdoor() -> (Admg, NodeId, NodeId) {
         let (a, m, y) = (n(0), n(1), n(2));
         let mut g = Admg::new(vec![a, m, y]);
-        g.directed_edge(a, m).directed_edge(m, y).bidirected_edge(a, y);
+        g.directed_edge(a, m)
+            .directed_edge(m, y)
+            .bidirected_edge(a, y);
         (g, a, y)
     }
 
@@ -519,7 +528,9 @@ mod tests {
     fn scenario_b_backdoor() -> (Admg, NodeId, NodeId) {
         let (z, a, y) = (n(0), n(1), n(2));
         let mut g = Admg::new(vec![z, a, y]);
-        g.directed_edge(z, a).directed_edge(a, y).directed_edge(z, y);
+        g.directed_edge(z, a)
+            .directed_edge(a, y)
+            .directed_edge(z, y);
         (g, a, y)
     }
 
@@ -531,7 +542,9 @@ mod tests {
         let (npc1, npc2, npc3) = (n(5), n(6), n(7));
         let (e1, e2, outcome) = (n(8), n(9), n(10));
         let (mood1, mood2) = (n(11), n(12));
-        let mut g = Admg::new(vec![f1, f2, f3, r1, r2, npc1, npc2, npc3, e1, e2, outcome, mood1, mood2]);
+        let mut g = Admg::new(vec![
+            f1, f2, f3, r1, r2, npc1, npc2, npc3, e1, e2, outcome, mood1, mood2,
+        ]);
         g.directed_edge(f1, npc1)
             .directed_edge(f2, npc2)
             .directed_edge(f3, npc3)

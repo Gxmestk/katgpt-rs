@@ -38,18 +38,17 @@
 
 #[cfg(target_os = "macos")]
 use coreml_proto::proto::{
-    feature_type::Type as FeatureTypeKind,
-    model::Type as ModelType,
-    neural_network_layer::Layer as LayerKind,
     ArrayFeatureType, FeatureDescription, FeatureType, InnerProductLayerParams, Model,
     ModelDescription, NeuralNetwork, NeuralNetworkLayer, WeightParams,
+    feature_type::Type as FeatureTypeKind, model::Type as ModelType,
+    neural_network_layer::Layer as LayerKind,
 };
 
 #[cfg(target_os = "macos")]
 fn main() {
     use coreml_native::{BorrowedTensor, ComputeUnits, Model as NativeModel};
     use katgpt_core::ane_roofline::{
-        ane_estimate, ane_fused_estimate, AneDataDep, AneOpShape, AneFamily, AnePeaks, Dtype,
+        AneDataDep, AneFamily, AneOpShape, AnePeaks, Dtype, ane_estimate, ane_fused_estimate,
     };
     use prost::Message;
 
@@ -59,23 +58,27 @@ fn main() {
 
     // ── Detect chip ────────────────────────────────────────────────────────
     let chip = AneFamily::detect().unwrap_or(AneFamily::A13);
-    let peaks = AnePeaks::for_family(chip)
-        .expect("detected chip family must have calibrated peaks");
-    eprintln!("Chip family: {chip:?} (dispatch floor: {} ms)", peaks.dispatch_floor_ms);
+    let peaks =
+        AnePeaks::for_family(chip).expect("detected chip family must have calibrated peaks");
+    eprintln!(
+        "Chip family: {chip:?} (dispatch floor: {} ms)",
+        peaks.dispatch_floor_ms
+    );
 
     // ── Weights (deterministic, non-zero) ──────────────────────────────────
     let weights_a: Vec<f32> = (0..DIM * DIM).map(|i| ((i as f32) * 0.001) - 0.5).collect();
-    let weights_b: Vec<f32> =
-        (0..DIM * DIM).map(|i| (((i + 1000) as f32) * 0.001) - 0.5).collect();
-    let weights_c: Vec<f32> =
-        (0..DIM * DIM).map(|i| (((i + 2000) as f32) * 0.001) - 0.5).collect();
+    let weights_b: Vec<f32> = (0..DIM * DIM)
+        .map(|i| (((i + 1000) as f32) * 0.001) - 0.5)
+        .collect();
+    let weights_c: Vec<f32> = (0..DIM * DIM)
+        .map(|i| (((i + 2000) as f32) * 0.001) - 0.5)
+        .collect();
 
     // ── Build CoreML model specs ───────────────────────────────────────────
     let spec_a = build_single_linear("linear_a", &weights_a, DIM);
     let spec_b = build_single_linear("linear_b", &weights_b, DIM);
     let spec_c = build_single_linear("linear_c", &weights_c, DIM);
-    let spec_fused =
-        build_fused_3linear("fused_3linear", &weights_a, &weights_b, &weights_c, DIM);
+    let spec_fused = build_fused_3linear("fused_3linear", &weights_a, &weights_b, &weights_c, DIM);
 
     let compute = ComputeUnits::CpuAndNeuralEngine;
 
@@ -100,8 +103,7 @@ fn main() {
 
     // ── Prepare input ──────────────────────────────────────────────────────
     let input: Vec<f32> = (0..DIM).map(|i| ((i as f32) * 0.01) - 0.5).collect();
-    let input_tensor =
-        BorrowedTensor::from_f32(&input, &[DIM, 1, 1]).expect("create input tensor");
+    let input_tensor = BorrowedTensor::from_f32(&input, &[DIM, 1, 1]).expect("create input tensor");
 
     // Intermediate buffers for unfused DRAM round-trips
     let mut buf1 = vec![0.0f32; DIM];
@@ -111,7 +113,9 @@ fn main() {
     eprintln!("Warming up ({WARMUP} iterations each)...");
     for _ in 0..WARMUP {
         // Unfused path
-        let pa = model_a.predict(&[("input", &input_tensor)]).expect("warmup a");
+        let pa = model_a
+            .predict(&[("input", &input_tensor)])
+            .expect("warmup a");
         let (oa, _) = pa.get_f32("output").expect("warmup a output");
         let t1 = BorrowedTensor::from_f32(&oa, &[DIM, 1, 1]).unwrap();
         let pb = model_b.predict(&[("input", &t1)]).expect("warmup b");
@@ -130,7 +134,9 @@ fn main() {
     let unfused_start = std::time::Instant::now();
     for _ in 0..N_ITERS {
         // Dispatch 1: input → model_a → buf1
-        let pa = model_a.predict(&[("input", &input_tensor)]).expect("predict a");
+        let pa = model_a
+            .predict(&[("input", &input_tensor)])
+            .expect("predict a");
         let (oa, _) = pa.get_f32("output").expect("output a");
         buf1.copy_from_slice(&oa);
 
@@ -204,16 +210,13 @@ fn main() {
     println!("║  Plan 439 Phase 2.5 — ANE Fused-Chain Real-Hardware Validation  ║");
     println!("╚══════════════════════════════════════════════════════════════════╝");
     println!();
-    println!(
-        "Hardware: {} (chip detect: {chip:?})",
-        {
-            let devs = coreml_native::available_devices();
-            devs.iter()
-                .map(|d| format!("{d}"))
-                .collect::<Vec<_>>()
-                .join(", ")
-        }
-    );
+    println!("Hardware: {} (chip detect: {chip:?})", {
+        let devs = coreml_native::available_devices();
+        devs.iter()
+            .map(|d| format!("{d}"))
+            .collect::<Vec<_>>()
+            .join(", ")
+    });
     println!("Shape:    GEMV({DIM}×{DIM}, F32) × 3 ops");
     println!("Iters:    {N_ITERS} (after {WARMUP} warmup each)");
     println!();
@@ -361,13 +364,7 @@ fn build_single_linear(name: &str, weights: &[f32], dim: usize) -> Model {
 }
 
 #[cfg(target_os = "macos")]
-fn build_fused_3linear(
-    name: &str,
-    w1: &[f32],
-    w2: &[f32],
-    w3: &[f32],
-    dim: usize,
-) -> Model {
+fn build_fused_3linear(name: &str, w1: &[f32], w2: &[f32], w3: &[f32], dim: usize) -> Model {
     let layers = vec![
         nn_layer(
             &format!("{name}_linear_0"),

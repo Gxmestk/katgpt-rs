@@ -300,12 +300,7 @@ impl ManceTangentCache {
     /// Copies neighbor indices, tangent basis, and singular values from the
     /// provided slices into the cache's internal buffers.
     #[inline]
-    fn update(
-        &mut self,
-        indices: &[usize],
-        basis: &[f32],
-        sigma: &[f32],
-    ) {
+    fn update(&mut self, indices: &[usize], basis: &[f32], sigma: &[f32]) {
         let k = indices.len().min(self.k);
         let d_r = basis.len().min(self.d * self.r);
         let r = sigma.len().min(self.r);
@@ -549,8 +544,8 @@ fn estimate_local_tangent_into(
 #[allow(clippy::too_many_arguments)] // buffer-passing API: gradient, basis, sigma, 2 scalars, 2 output slices
 pub fn tangent_erasure_direction_into(
     gradient: &[f32],
-    basis: &[f32],     // d×r, column-major
-    sigma: &[f32],     // r entries
+    basis: &[f32], // d×r, column-major
+    sigma: &[f32], // r entries
     alpha: f32,
     d: usize,
     r: usize,
@@ -629,7 +624,7 @@ pub fn tangent_erasure_direction_into(
 #[inline]
 fn local_radius_step(
     x: &[f32],
-    direction: &[f32], // û, unit norm
+    direction: &[f32],          // û, unit norm
     neighbor_distances: &[f32], // L2 distances to k neighbors
     epsilon: f32,
     lambda_max: f32,
@@ -779,7 +774,14 @@ pub fn manifold_erasure_step_into(
 
     // T1.6: trust-bounded step size.
     let direction = &scratch.tangent_direction;
-    let lambda = local_radius_step(x, direction, distances, config.epsilon, config.lambda_max, d);
+    let lambda = local_radius_step(
+        x,
+        direction,
+        distances,
+        config.epsilon,
+        config.lambda_max,
+        d,
+    );
 
     // Apply: out = x - λ · <x, û> · û
     let x_proj = simd_dot_f32(x, direction, d);
@@ -819,7 +821,8 @@ pub fn manifold_erasure_step(
     let d = x.len();
     let mut scratch = ManceScratch::with_capacity(d, config.k, config.r);
     let mut out = vec![0.0; d];
-    let info = manifold_erasure_step_into(x, gradient, natural_pool, n, config, &mut scratch, &mut out)?;
+    let info =
+        manifold_erasure_step_into(x, gradient, natural_pool, n, config, &mut scratch, &mut out)?;
     Ok((out, info))
 }
 
@@ -895,12 +898,16 @@ pub fn manifold_erasure_step_cached_into(
     let cache_hit = cache.is_valid_for(&scratch.neighbor_indices[..k]);
     if cache_hit {
         #[cfg(feature = "manifold_erasure")]
-        { cache.cache_hits += 1; }
+        {
+            cache.cache_hits += 1;
+        }
         // Reuse cached B/σ — copy into scratch.
         cache.copy_to(&mut scratch.tangent_basis, &mut scratch.singular_values);
     } else {
         #[cfg(feature = "manifold_erasure")]
-        { cache.cache_misses += 1; }
+        {
+            cache.cache_misses += 1;
+        }
         // Cache miss — recompute tangent basis via SVD.
         estimate_local_tangent_into(
             natural_pool,
@@ -952,7 +959,14 @@ pub fn manifold_erasure_step_cached_into(
 
     // T1.6: trust-bounded step size.
     let direction = &scratch.tangent_direction;
-    let lambda = local_radius_step(x, direction, distances, config.epsilon, config.lambda_max, d);
+    let lambda = local_radius_step(
+        x,
+        direction,
+        distances,
+        config.epsilon,
+        config.lambda_max,
+        d,
+    );
 
     // Apply: out = x - λ · <x, û> · û
     let x_proj = simd_dot_f32(x, direction, d);
@@ -1240,12 +1254,27 @@ where
     }
 
     // LEACE preprocessing.
-    leace_first_moment_into(x, class_mean_pos, class_mean_neg, &mut scratch.tangent_direction, out)?;
+    leace_first_moment_into(
+        x,
+        class_mean_pos,
+        class_mean_neg,
+        &mut scratch.tangent_direction,
+        out,
+    )?;
 
     // MANCE loop on preprocessed state.
     // Copy out to avoid aliasing &out and &mut out in the loop.
     let preprocessed = out.to_vec();
-    manifold_erasure_loop_into(&preprocessed, gradient_fn, natural_pool, n, config, n_rounds, scratch, out)
+    manifold_erasure_loop_into(
+        &preprocessed,
+        gradient_fn,
+        natural_pool,
+        n,
+        config,
+        n_rounds,
+        scratch,
+        out,
+    )
 }
 
 /// T2.4 — MANCE++ step (LEACE + CovMatch preprocessing + MANCE loop).
@@ -1276,7 +1305,13 @@ where
     }
 
     // LEACE preprocessing.
-    leace_first_moment_into(x, class_mean_pos, class_mean_neg, &mut scratch.tangent_direction, out)?;
+    leace_first_moment_into(
+        x,
+        class_mean_pos,
+        class_mean_neg,
+        &mut scratch.tangent_direction,
+        out,
+    )?;
 
     // CovMatch preprocessing (in-place on the LEACE output).
     // Need a temp buffer for the Gram-Schmidt orthonormalized v2.
@@ -1292,7 +1327,16 @@ where
     // MANCE loop on preprocessed state.
     // Copy out to avoid aliasing &out and &mut out in the loop.
     let preprocessed = out.to_vec();
-    manifold_erasure_loop_into(&preprocessed, gradient_fn, natural_pool, n, config, n_rounds, scratch, out)
+    manifold_erasure_loop_into(
+        &preprocessed,
+        gradient_fn,
+        natural_pool,
+        n,
+        config,
+        n_rounds,
+        scratch,
+        out,
+    )
 }
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
@@ -1309,7 +1353,9 @@ mod tests {
         for i in 0..n {
             for j in 0..d {
                 // Simple LCG for deterministic pseudo-random data.
-                s = s.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+                s = s
+                    .wrapping_mul(6364136223846793005)
+                    .wrapping_add(1442695040888963407);
                 let r = ((s >> 33) as f32) / (1u64 << 31) as f32;
                 pool[i * d + j] = r * 2.0 - 1.0; // [-1, 1)
             }
@@ -1343,7 +1389,8 @@ mod tests {
             k,
             &mut scratch.neighbor_distances,
             &mut scratch.neighbor_indices,
-        ).unwrap();
+        )
+        .unwrap();
 
         // The 3 nearest points should be at distances 1, 2, 3.
         let mut sorted = distances.to_vec();
@@ -1372,7 +1419,8 @@ mod tests {
             &mut scratch.singular_values,
             &mut scratch.svd_result,
             &mut scratch.svd_work,
-        ).unwrap();
+        )
+        .unwrap();
         let basis = &scratch.tangent_basis;
 
         // Check BᵀB ≈ I_r (each column should be unit norm and mutually orthogonal).
@@ -1454,7 +1502,9 @@ mod tests {
         let mut scratch = ManceScratch::with_capacity(d, k, r);
         let mut out = vec![0.0; d];
 
-        let info = manifold_erasure_step_into(&x, &gradient, &pool, n, &config, &mut scratch, &mut out).unwrap();
+        let info =
+            manifold_erasure_step_into(&x, &gradient, &pool, n, &config, &mut scratch, &mut out)
+                .unwrap();
 
         let _displacement = simd_dot_f32(&out, &out, d).sqrt();
         let _x_norm = simd_dot_f32(&x, &x, d).sqrt();
@@ -1482,14 +1532,20 @@ mod tests {
         let n = 20;
         let k = 8;
         let r = 4;
-        let config = ManceConfig { k, r, ..Default::default() };
+        let config = ManceConfig {
+            k,
+            r,
+            ..Default::default()
+        };
         let pool = make_pool(n, d, 999);
         let x = vec![0.3, -0.5, 0.7, 0.1, -0.2, 0.8, -0.4, 0.6];
         let gradient = vec![0.0; d];
         let mut scratch = ManceScratch::with_capacity(d, k, r);
         let mut out = vec![0.0; d];
 
-        let info = manifold_erasure_step_into(&x, &gradient, &pool, n, &config, &mut scratch, &mut out).unwrap();
+        let info =
+            manifold_erasure_step_into(&x, &gradient, &pool, n, &config, &mut scratch, &mut out)
+                .unwrap();
 
         assert_eq!(out, x, "Zero gradient should produce bit-identical output");
         assert_eq!(info.lambda, 0.0);
@@ -1503,13 +1559,17 @@ mod tests {
         let n = 20;
         let k = 8;
         let r = 2;
-        let config = ManceConfig { k, r, ..Default::default() };
+        let config = ManceConfig {
+            k,
+            r,
+            ..Default::default()
+        };
 
         // Create a pool where the tangent basis is clearly in the e1-e2 plane.
         // Points vary only in dimensions 0 and 1.
         let mut pool = vec![0.0; n * d];
         for i in 0..n {
-            pool[i * d] = (i as f32) * 0.1 - 1.0;     // dim 0 varies
+            pool[i * d] = (i as f32) * 0.1 - 1.0; // dim 0 varies
             pool[i * d + 1] = (i as f32) * 0.05 - 0.5; // dim 1 varies
             // dims 2, 3 stay 0
         }
@@ -1520,9 +1580,14 @@ mod tests {
         let mut scratch = ManceScratch::with_capacity(d, k, r);
         let mut out = vec![0.0; d];
 
-        let info = manifold_erasure_step_into(&x, &gradient, &pool, n, &config, &mut scratch, &mut out).unwrap();
+        let info =
+            manifold_erasure_step_into(&x, &gradient, &pool, n, &config, &mut scratch, &mut out)
+                .unwrap();
 
-        assert_eq!(out, x, "Orthogonal gradient should produce bit-identical output");
+        assert_eq!(
+            out, x,
+            "Orthogonal gradient should produce bit-identical output"
+        );
         assert_eq!(info.lambda, 0.0);
     }
 
@@ -1533,14 +1598,19 @@ mod tests {
         let n = 50;
         let k = 8;
         let r = 4;
-        let config = ManceConfig { k, r, ..Default::default() };
+        let config = ManceConfig {
+            k,
+            r,
+            ..Default::default()
+        };
         let pool = make_pool(n, d, 777);
         let x = vec![0.5; d];
         let gradient = vec![1.0, 0.5, -0.3, 0.8, -0.1, 0.4, 0.2, -0.6];
         let mut scratch = ManceScratch::with_capacity(d, k, r);
         let mut out = vec![0.0; d];
 
-        manifold_erasure_step_into(&x, &gradient, &pool, n, &config, &mut scratch, &mut out).unwrap();
+        manifold_erasure_step_into(&x, &gradient, &pool, n, &config, &mut scratch, &mut out)
+            .unwrap();
 
         // Normalize gradient for comparison.
         let grad_norm = simd_dot_f32(&gradient, &gradient, d).sqrt();
@@ -1572,7 +1642,14 @@ mod tests {
         let mut scratch = ManceScratch::with_capacity(d, 8, 4);
         let mut out = vec![0.0; d];
 
-        leace_first_moment_into(&x, &mean_pos, &mean_neg, &mut scratch.tangent_direction, &mut out).unwrap();
+        leace_first_moment_into(
+            &x,
+            &mean_pos,
+            &mean_neg,
+            &mut scratch.tangent_direction,
+            &mut out,
+        )
+        .unwrap();
 
         // d_mean = [1.0; d]
         let d_mean: Vec<f32> = (0..d).map(|i| mean_pos[i] - mean_neg[i]).collect();
@@ -1601,11 +1678,27 @@ mod tests {
         covmatch_second_moment_into(&x, &eigvecs, &mut scratch.mean_neighbor, &mut out).unwrap();
 
         // After projecting out e1 and e2, the first two components should be 0.
-        assert!(out[0].abs() < 1e-5, "e1 component should be zeroed: {}", out[0]);
-        assert!(out[1].abs() < 1e-5, "e2 component should be zeroed: {}", out[1]);
+        assert!(
+            out[0].abs() < 1e-5,
+            "e1 component should be zeroed: {}",
+            out[0]
+        );
+        assert!(
+            out[1].abs() < 1e-5,
+            "e2 component should be zeroed: {}",
+            out[1]
+        );
         // Components 2 and 3 should be preserved.
-        assert!((out[2] - 0.3).abs() < 1e-5, "e3 should be preserved: {}", out[2]);
-        assert!((out[3] - 0.7).abs() < 1e-5, "e4 should be preserved: {}", out[3]);
+        assert!(
+            (out[2] - 0.3).abs() < 1e-5,
+            "e3 should be preserved: {}",
+            out[2]
+        );
+        assert!(
+            (out[3] - 0.7).abs() < 1e-5,
+            "e4 should be preserved: {}",
+            out[3]
+        );
     }
 
     /// `preprocessing_preserves_orthogonal_directions` — directions ⊥ the erased
@@ -1620,7 +1713,14 @@ mod tests {
         let mut scratch = ManceScratch::with_capacity(d, 8, 4);
         let mut out = vec![0.0; d];
 
-        leace_first_moment_into(&x, &mean_pos, &mean_neg, &mut scratch.tangent_direction, &mut out).unwrap();
+        leace_first_moment_into(
+            &x,
+            &mean_pos,
+            &mean_neg,
+            &mut scratch.tangent_direction,
+            &mut out,
+        )
+        .unwrap();
 
         // e2, e3, e4 should be preserved.
         assert!((out[1] - 0.7).abs() < 1e-5, "e2 preserved: {}", out[1]);
@@ -1644,22 +1744,46 @@ mod tests {
         let mut scratch_u = ManceScratch::with_capacity(d, config.k, config.r);
         let mut out_uncached = vec![0.0; d];
         let info_u = manifold_erasure_step_into(
-            &x, &gradient, &pool, n, &config, &mut scratch_u, &mut out_uncached,
-        ).unwrap();
+            &x,
+            &gradient,
+            &pool,
+            n,
+            &config,
+            &mut scratch_u,
+            &mut out_uncached,
+        )
+        .unwrap();
 
         // Cached step (first call — cache miss, same as uncached).
         let mut scratch_c = ManceScratch::with_capacity(d, config.k, config.r);
         let mut cache = ManceTangentCache::with_capacity(d, config.k, config.r);
         let mut out_cached = vec![0.0; d];
         let info_c = manifold_erasure_step_cached_into(
-            &x, &gradient, &pool, n, &config, &mut scratch_c, &mut cache, &mut out_cached,
-        ).unwrap();
+            &x,
+            &gradient,
+            &pool,
+            n,
+            &config,
+            &mut scratch_c,
+            &mut cache,
+            &mut out_cached,
+        )
+        .unwrap();
 
         // Results must be bit-identical.
-        assert_eq!(out_uncached, out_cached, "Cached step output must match uncached");
+        assert_eq!(
+            out_uncached, out_cached,
+            "Cached step output must match uncached"
+        );
         assert_eq!(info_u.lambda, info_c.lambda, "lambda must match");
-        assert_eq!(info_u.displacement, info_c.displacement, "displacement must match");
-        assert_eq!(info_u.local_radius, info_c.local_radius, "local_radius must match");
+        assert_eq!(
+            info_u.displacement, info_c.displacement,
+            "displacement must match"
+        );
+        assert_eq!(
+            info_u.local_radius, info_c.local_radius,
+            "local_radius must match"
+        );
         assert_eq!(info_u.alignment, info_c.alignment, "alignment must match");
     }
 
@@ -1680,13 +1804,29 @@ mod tests {
 
         // First call — cache miss, populates cache.
         let info1 = manifold_erasure_step_cached_into(
-            &x, &gradient, &pool, n, &config, &mut scratch, &mut cache, &mut out1,
-        ).unwrap();
+            &x,
+            &gradient,
+            &pool,
+            n,
+            &config,
+            &mut scratch,
+            &mut cache,
+            &mut out1,
+        )
+        .unwrap();
 
         // Second call with same x — cache hit, should produce identical result.
         let info2 = manifold_erasure_step_cached_into(
-            &x, &gradient, &pool, n, &config, &mut scratch, &mut cache, &mut out2,
-        ).unwrap();
+            &x,
+            &gradient,
+            &pool,
+            n,
+            &config,
+            &mut scratch,
+            &mut cache,
+            &mut out2,
+        )
+        .unwrap();
 
         assert_eq!(out1, out2, "Cache hit must produce identical output");
         assert_eq!(info1.lambda, info2.lambda);
@@ -1712,8 +1852,16 @@ mod tests {
         let mut scratch_u = ManceScratch::with_capacity(d, config.k, config.r);
         let mut out_uncached = vec![0.0; d];
         let infos_u = manifold_erasure_loop_into(
-            &x, gf, &pool, n, &config, 10, &mut scratch_u, &mut out_uncached,
-        ).unwrap();
+            &x,
+            gf,
+            &pool,
+            n,
+            &config,
+            10,
+            &mut scratch_u,
+            &mut out_uncached,
+        )
+        .unwrap();
 
         // Cached loop.
         let grad_ref2 = &gradient;
@@ -1724,16 +1872,36 @@ mod tests {
         let mut cache = ManceTangentCache::with_capacity(d, config.k, config.r);
         let mut out_cached = vec![0.0; d];
         let infos_c = manifold_erasure_loop_cached_into(
-            &x, gf2, &pool, n, &config, 10, &mut scratch_c, &mut cache, &mut out_cached,
-        ).unwrap();
+            &x,
+            gf2,
+            &pool,
+            n,
+            &config,
+            10,
+            &mut scratch_c,
+            &mut cache,
+            &mut out_cached,
+        )
+        .unwrap();
 
         // Results must be bit-identical.
-        assert_eq!(out_uncached, out_cached, "Cached loop output must match uncached");
+        assert_eq!(
+            out_uncached, out_cached,
+            "Cached loop output must match uncached"
+        );
         assert_eq!(infos_u.len(), infos_c.len(), "Round count must match");
         for (i, (iu, ic)) in infos_u.iter().zip(infos_c.iter()).enumerate() {
             assert_eq!(iu.lambda, ic.lambda, "Round {} lambda mismatch", i);
-            assert_eq!(iu.displacement, ic.displacement, "Round {} displacement mismatch", i);
-            assert_eq!(iu.local_radius, ic.local_radius, "Round {} local_radius mismatch", i);
+            assert_eq!(
+                iu.displacement, ic.displacement,
+                "Round {} displacement mismatch",
+                i
+            );
+            assert_eq!(
+                iu.local_radius, ic.local_radius,
+                "Round {} local_radius mismatch",
+                i
+            );
             assert_eq!(iu.alignment, ic.alignment, "Round {} alignment mismatch", i);
         }
     }
@@ -1744,7 +1912,11 @@ mod tests {
     fn cache_invalidation_when_neighbors_change() {
         let d = 4;
         let n = 20;
-        let config = ManceConfig { k: 4, r: 2, ..Default::default() };
+        let config = ManceConfig {
+            k: 4,
+            r: 2,
+            ..Default::default()
+        };
         // Pool with points spread across [-1, 1] in each dim.
         let pool = make_pool(n, d, 999);
 
@@ -1756,15 +1928,31 @@ mod tests {
         // Step 1: x near origin.
         let x1 = vec![0.0; d];
         let info1 = manifold_erasure_step_cached_into(
-            &x1, &gradient, &pool, n, &config, &mut scratch, &mut cache, &mut out,
-        ).unwrap();
+            &x1,
+            &gradient,
+            &pool,
+            n,
+            &config,
+            &mut scratch,
+            &mut cache,
+            &mut out,
+        )
+        .unwrap();
         assert!(cache.valid, "Cache should be valid after first step");
 
         // Step 2: same x — cache hit, same result.
         let mut out2 = vec![0.0; d];
         let info2 = manifold_erasure_step_cached_into(
-            &x1, &gradient, &pool, n, &config, &mut scratch, &mut cache, &mut out2,
-        ).unwrap();
+            &x1,
+            &gradient,
+            &pool,
+            n,
+            &config,
+            &mut scratch,
+            &mut cache,
+            &mut out2,
+        )
+        .unwrap();
         assert_eq!(out, out2, "Same x should produce same output");
         assert_eq!(info1.lambda, info2.lambda);
 
@@ -1773,16 +1961,34 @@ mod tests {
         let x3 = vec![0.9, -0.9, 0.9, -0.9];
         let mut out3 = vec![0.0; d];
         let _info3 = manifold_erasure_step_cached_into(
-            &x3, &gradient, &pool, n, &config, &mut scratch, &mut cache, &mut out3,
-        ).unwrap();
+            &x3,
+            &gradient,
+            &pool,
+            n,
+            &config,
+            &mut scratch,
+            &mut cache,
+            &mut out3,
+        )
+        .unwrap();
 
         // Verify: uncached step with x3 should match cached step.
         let mut scratch_u = ManceScratch::with_capacity(d, config.k, config.r);
         let mut out_uncached = vec![0.0; d];
         manifold_erasure_step_into(
-            &x3, &gradient, &pool, n, &config, &mut scratch_u, &mut out_uncached,
-        ).unwrap();
-        assert_eq!(out3, out_uncached, "Cached step after invalidation must match uncached");
+            &x3,
+            &gradient,
+            &pool,
+            n,
+            &config,
+            &mut scratch_u,
+            &mut out_uncached,
+        )
+        .unwrap();
+        assert_eq!(
+            out3, out_uncached,
+            "Cached step after invalidation must match uncached"
+        );
     }
 
     /// Cache invalidate() resets to invalid state.
@@ -1804,6 +2010,9 @@ mod tests {
         // Invalidate.
         cache.invalidate();
         assert!(!cache.valid, "Cache should be invalid after invalidate()");
-        assert!(!cache.is_valid_for(&[0, 1, 2, 3, 4, 5, 6, 7]), "Invalidated cache should not be valid");
+        assert!(
+            !cache.is_valid_for(&[0, 1, 2, 3, 4, 5, 6, 7]),
+            "Invalidated cache should not be valid"
+        );
     }
 }

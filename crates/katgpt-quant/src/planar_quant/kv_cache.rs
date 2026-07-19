@@ -107,13 +107,9 @@ impl PlanarQuantKVCache {
 
         Self {
             layers,
-            key_indices: vec![
-                0u8; config.n_layers * config.max_seq_len * packed_key_len
-            ],
+            key_indices: vec![0u8; config.n_layers * config.max_seq_len * packed_key_len],
             key_norms: vec![0.0f32; config.n_layers * config.max_seq_len],
-            val_indices: vec![
-                0u8; config.n_layers * config.max_seq_len * packed_val_len
-            ],
+            val_indices: vec![0u8; config.n_layers * config.max_seq_len * packed_val_len],
             val_norms: vec![0.0f32; config.n_layers * config.max_seq_len],
             pos: 0,
             max_used_pos: 0,
@@ -244,8 +240,11 @@ impl PlanarQuantKVCache {
         }
 
         let off = self.key_off(layer, pos);
-        let indices =
-            unpack_indices(&self.key_indices[off..off + self.key_packed_len], self.key_bits, self.kv_dim);
+        let indices = unpack_indices(
+            &self.key_indices[off..off + self.key_packed_len],
+            self.key_bits,
+            self.kv_dim,
+        );
         let rotated: Vec<f32> = indices
             .iter()
             .map(|&i| dequantize_index(i, &layer_state.key_centroids))
@@ -271,8 +270,11 @@ impl PlanarQuantKVCache {
         }
 
         let off = self.val_off(layer, pos);
-        let indices =
-            unpack_indices(&self.val_indices[off..off + self.val_packed_len], self.val_bits, self.kv_dim);
+        let indices = unpack_indices(
+            &self.val_indices[off..off + self.val_packed_len],
+            self.val_bits,
+            self.kv_dim,
+        );
         let rotated: Vec<f32> = indices
             .iter()
             .map(|&i| dequantize_index(i, &layer_state.val_centroids))

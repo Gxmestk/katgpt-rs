@@ -138,12 +138,12 @@ pub use katgpt_forward::forward::forward_decode_stage;
 // ---------------------------------------------------------------------------
 
 mod generators;
-mod variants;
 mod paged;
 mod prefill;
 mod quantized;
 mod raven;
 mod tf_loop;
+mod variants;
 
 // Re-export all public items so `crate::transformer::*` callers resolve
 // unchanged. Each sub-module's public API is preserved 1:1.
@@ -160,11 +160,11 @@ pub use variants::forward_looped;
 #[cfg(feature = "domain_latent")]
 pub use variants::forward_with_domain_latent;
 
-pub use generators::{generate, generate_batch, generate_into, generate_with_prefill};
-#[cfg(feature = "domain_latent")]
-pub use generators::generate_with_prefill_and_domain_latent;
 #[cfg(feature = "collapse_aware_thinking")]
 pub use generators::generate_with_collapse_detection;
+#[cfg(feature = "domain_latent")]
+pub use generators::generate_with_prefill_and_domain_latent;
+pub use generators::{generate, generate_batch, generate_into, generate_with_prefill};
 
 pub use paged::forward_paged;
 pub use prefill::forward_prefill;
@@ -177,10 +177,10 @@ pub use raven::{
     raven_readout_into, raven_update, tokens_to_string,
 };
 
-#[cfg(feature = "tf_loop")]
-pub use tf_loop::forward_training_free_loop;
 #[cfg(feature = "delta_routing")]
 pub use tf_loop::depth_route_weights;
+#[cfg(feature = "tf_loop")]
+pub use tf_loop::forward_training_free_loop;
 
 // `depth_route` is a test-only helper (private impl, exercised by the norm-
 // stability test). Re-exported at `pub(crate)` visibility so the in-module test

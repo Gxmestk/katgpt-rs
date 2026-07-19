@@ -108,37 +108,91 @@ unsafe fn neon_binary_matvec(w: &BinaryWeights, x: &[f32], y: &mut [f32]) {
                 let mut col = 0usize;
                 while col < chunks32 {
                     fma_scaled_nibble8(
-                        &mut acc0, &w.sign_bits, sign_base, col, g_start, x,
-                        mask_lo, mask_hi, one_u, neg_2scale, neg_scale,
+                        &mut acc0,
+                        &w.sign_bits,
+                        sign_base,
+                        col,
+                        g_start,
+                        x,
+                        mask_lo,
+                        mask_hi,
+                        one_u,
+                        neg_2scale,
+                        neg_scale,
                     );
                     col += 8;
                     fma_scaled_nibble8(
-                        &mut acc1, &w.sign_bits, sign_base, col, g_start, x,
-                        mask_lo, mask_hi, one_u, neg_2scale, neg_scale,
+                        &mut acc1,
+                        &w.sign_bits,
+                        sign_base,
+                        col,
+                        g_start,
+                        x,
+                        mask_lo,
+                        mask_hi,
+                        one_u,
+                        neg_2scale,
+                        neg_scale,
                     );
                     col += 8;
                     fma_scaled_nibble8(
-                        &mut acc2, &w.sign_bits, sign_base, col, g_start, x,
-                        mask_lo, mask_hi, one_u, neg_2scale, neg_scale,
+                        &mut acc2,
+                        &w.sign_bits,
+                        sign_base,
+                        col,
+                        g_start,
+                        x,
+                        mask_lo,
+                        mask_hi,
+                        one_u,
+                        neg_2scale,
+                        neg_scale,
                     );
                     col += 8;
                     fma_scaled_nibble8(
-                        &mut acc3, &w.sign_bits, sign_base, col, g_start, x,
-                        mask_lo, mask_hi, one_u, neg_2scale, neg_scale,
+                        &mut acc3,
+                        &w.sign_bits,
+                        sign_base,
+                        col,
+                        g_start,
+                        x,
+                        mask_lo,
+                        mask_hi,
+                        one_u,
+                        neg_2scale,
+                        neg_scale,
                     );
                     col += 8;
                 }
                 while col + 8 <= remaining {
                     fma_scaled_nibble8(
-                        &mut acc0, &w.sign_bits, sign_base, col, g_start, x,
-                        mask_lo, mask_hi, one_u, neg_2scale, neg_scale,
+                        &mut acc0,
+                        &w.sign_bits,
+                        sign_base,
+                        col,
+                        g_start,
+                        x,
+                        mask_lo,
+                        mask_hi,
+                        one_u,
+                        neg_2scale,
+                        neg_scale,
                     );
                     col += 8;
                 }
                 if col + 4 <= remaining {
                     fma_scaled_nibble4(
-                        &mut acc0, &w.sign_bits, sign_base, col, g_start, x,
-                        mask_lo, mask_hi, one_u, neg_2scale, neg_scale,
+                        &mut acc0,
+                        &w.sign_bits,
+                        sign_base,
+                        col,
+                        g_start,
+                        x,
+                        mask_lo,
+                        mask_hi,
+                        one_u,
+                        neg_2scale,
+                        neg_scale,
                     );
                     col += 4;
                 }
@@ -285,30 +339,70 @@ unsafe fn avx2_binary_matvec(w: &BinaryWeights, x: &[f32], y: &mut [f32]) {
                 let mut col = 0usize;
                 while col < chunks32 {
                     fma_scaled_byte8_avx2(
-                        &mut acc0, &w.sign_bits, sign_base, col, g_start, x,
-                        mask_byte, zero_i, neg_2scale, neg_scale,
+                        &mut acc0,
+                        &w.sign_bits,
+                        sign_base,
+                        col,
+                        g_start,
+                        x,
+                        mask_byte,
+                        zero_i,
+                        neg_2scale,
+                        neg_scale,
                     );
                     col += 8;
                     fma_scaled_byte8_avx2(
-                        &mut acc1, &w.sign_bits, sign_base, col, g_start, x,
-                        mask_byte, zero_i, neg_2scale, neg_scale,
+                        &mut acc1,
+                        &w.sign_bits,
+                        sign_base,
+                        col,
+                        g_start,
+                        x,
+                        mask_byte,
+                        zero_i,
+                        neg_2scale,
+                        neg_scale,
                     );
                     col += 8;
                     fma_scaled_byte8_avx2(
-                        &mut acc2, &w.sign_bits, sign_base, col, g_start, x,
-                        mask_byte, zero_i, neg_2scale, neg_scale,
+                        &mut acc2,
+                        &w.sign_bits,
+                        sign_base,
+                        col,
+                        g_start,
+                        x,
+                        mask_byte,
+                        zero_i,
+                        neg_2scale,
+                        neg_scale,
                     );
                     col += 8;
                     fma_scaled_byte8_avx2(
-                        &mut acc3, &w.sign_bits, sign_base, col, g_start, x,
-                        mask_byte, zero_i, neg_2scale, neg_scale,
+                        &mut acc3,
+                        &w.sign_bits,
+                        sign_base,
+                        col,
+                        g_start,
+                        x,
+                        mask_byte,
+                        zero_i,
+                        neg_2scale,
+                        neg_scale,
                     );
                     col += 8;
                 }
                 while col + 8 <= remaining {
                     fma_scaled_byte8_avx2(
-                        &mut acc0, &w.sign_bits, sign_base, col, g_start, x,
-                        mask_byte, zero_i, neg_2scale, neg_scale,
+                        &mut acc0,
+                        &w.sign_bits,
+                        sign_base,
+                        col,
+                        g_start,
+                        x,
+                        mask_byte,
+                        zero_i,
+                        neg_2scale,
+                        neg_scale,
                     );
                     col += 8;
                 }
@@ -570,7 +664,11 @@ mod tests {
         for b in 0..batch {
             let x_off = b * bw.cols;
             let y_off = b * bw.rows;
-            simd_binary_matvec(&bw, &x[x_off..x_off + bw.cols], &mut y_seq[y_off..y_off + bw.rows]);
+            simd_binary_matvec(
+                &bw,
+                &x[x_off..x_off + bw.cols],
+                &mut y_seq[y_off..y_off + bw.rows],
+            );
         }
         // Batch (parallel)
         simd_binary_matmul_batch(&bw, &x, batch, &mut y_par);

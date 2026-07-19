@@ -922,17 +922,39 @@ mod tests {
         let mut sa = vec![0.0f32; n];
 
         set_sigmoid_attention_into(
-            &states, &w, &w, None, &mut out_dense, &cfg_dense,
-            n, d, k, &mut sq, &mut sk, &mut sa,
-        ).unwrap();
+            &states,
+            &w,
+            &w,
+            None,
+            &mut out_dense,
+            &cfg_dense,
+            n,
+            d,
+            k,
+            &mut sq,
+            &mut sk,
+            &mut sa,
+        )
+        .unwrap();
         // Reset scratches (the kernel writes into them).
         sq.iter_mut().for_each(|x| *x = 0.0);
         sk.iter_mut().for_each(|x| *x = 0.0);
         sa.iter_mut().for_each(|x| *x = 0.0);
         set_sigmoid_attention_into(
-            &states, &w, &w, None, &mut out_topk, &cfg_topk,
-            n, d, k, &mut sq, &mut sk, &mut sa,
-        ).unwrap();
+            &states,
+            &w,
+            &w,
+            None,
+            &mut out_topk,
+            &cfg_topk,
+            n,
+            d,
+            k,
+            &mut sq,
+            &mut sk,
+            &mut sa,
+        )
+        .unwrap();
 
         for i in 0..n * d {
             // Algebraically identical (both normalise by N when k_max=n), but
@@ -942,7 +964,10 @@ mod tests {
             assert!(
                 (out_dense[i] - out_topk[i]).abs() < 1e-5,
                 "topk path diverged from dense at index {}: dense={}, topk={}, Δ={}",
-                i, out_dense[i], out_topk[i], out_dense[i] - out_topk[i]
+                i,
+                out_dense[i],
+                out_topk[i],
+                out_dense[i] - out_topk[i]
             );
         }
     }
@@ -967,23 +992,47 @@ mod tests {
         let mut sa = vec![0.0f32; n];
 
         set_sigmoid_attention_into(
-            &states, &w, &w, None, &mut out_topk, &cfg_topk,
-            n, d, k, &mut sq, &mut sk, &mut sa,
-        ).unwrap();
+            &states,
+            &w,
+            &w,
+            None,
+            &mut out_topk,
+            &cfg_topk,
+            n,
+            d,
+            k,
+            &mut sq,
+            &mut sk,
+            &mut sa,
+        )
+        .unwrap();
         sq.iter_mut().for_each(|x| *x = 0.0);
         sk.iter_mut().for_each(|x| *x = 0.0);
         sa.iter_mut().for_each(|x| *x = 0.0);
         set_sigmoid_attention_into(
-            &states, &w, &w, None, &mut out_dense, &cfg_dense,
-            n, d, k, &mut sq, &mut sk, &mut sa,
-        ).unwrap();
+            &states,
+            &w,
+            &w,
+            None,
+            &mut out_dense,
+            &cfg_dense,
+            n,
+            d,
+            k,
+            &mut sq,
+            &mut sk,
+            &mut sa,
+        )
+        .unwrap();
 
         // All outputs finite.
         for v in &out_topk {
             assert!(v.is_finite(), "topk output not finite: {}", v);
         }
         // With k_max=1 the sparse path must differ from dense (which uses all 5).
-        let any_diff = out_topk.iter().zip(out_dense.iter())
+        let any_diff = out_topk
+            .iter()
+            .zip(out_dense.iter())
             .any(|(a, b)| (a - b).abs() > 1e-6);
         assert!(any_diff, "k_max=1 should differ from dense (all-N) path");
     }

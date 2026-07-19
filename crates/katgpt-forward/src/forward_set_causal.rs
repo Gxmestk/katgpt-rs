@@ -370,7 +370,11 @@ mod tests {
         let (_, attn) = forward_set_causal_positions(&weights, &tokens, &config, &position_order);
 
         let attn_stride = config.n_head * tokens.len();
-        for (q, attn_row) in attn.chunks_exact(attn_stride).enumerate().take(tokens.len()) {
+        for (q, attn_row) in attn
+            .chunks_exact(attn_stride)
+            .enumerate()
+            .take(tokens.len())
+        {
             for h in 0..config.n_head {
                 for t in 0..tokens.len() {
                     let w = attn_row[h * tokens.len() + t];

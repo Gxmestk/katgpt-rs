@@ -104,14 +104,12 @@ fn main() {
 
                 // Baseline MaxVio (no bias).
                 let beta_zero = vec![0.0f32; n];
-                let maxvio_pre =
-                    compute_balance_violation(&s, m, n, k, &beta_zero);
+                let maxvio_pre = compute_balance_violation(&s, m, n, k, &beta_zero);
 
                 // QB compute (best-of-N timing — this is the per-snapshot cost).
                 let mut scratch = QbScratch::new(m, n);
                 let qb_us = bench_us(3, 20, || {
-                    let _res =
-                        quantile_balance_router(&s, m, n, k, &cfg, &mut scratch);
+                    let _res = quantile_balance_router(&s, m, n, k, &cfg, &mut scratch);
                     std::hint::black_box(&_res);
                 });
 
@@ -124,8 +122,7 @@ fn main() {
                 let s_row = &s[0..n];
                 let mut out_scores = vec![0.0f32; n];
                 let route_us = bench_us(5, 500, || {
-                    let _topk =
-                        route_with_bias(s_row, &res.beta, k, &mut out_scores);
+                    let _topk = route_with_bias(s_row, &res.beta, k, &mut out_scores);
                     std::hint::black_box(&_topk);
                 });
 
@@ -154,7 +151,10 @@ fn main() {
         "  MaxVio pre  (no bias)  = {:.4}",
         compute_balance_violation(&s, m, n, k, &vec![0.0f32; n])
     );
-    println!("  MaxVio post (with β)   = {:.4}", res.final_balance_violation);
+    println!(
+        "  MaxVio post (with β)   = {:.4}",
+        res.final_balance_violation
+    );
     println!(
         "  G4 (sub-ms): {}",
         if dt.as_secs_f64() < 1e-3 {

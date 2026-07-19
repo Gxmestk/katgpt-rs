@@ -682,13 +682,8 @@ mod tests {
     fn new_rejects_non_unit_norm_loadings() {
         let mut bad_axis = identity_loadings::<4, 2>();
         bad_axis[0][0] = 2.0; // norm > 1
-        let result = RegionSubspaceField::<4, 1, 2>::new(
-            [[0f32; 4]],
-            [bad_axis],
-            [0f32],
-            [1f32; 4],
-            1e-5,
-        );
+        let result =
+            RegionSubspaceField::<4, 1, 2>::new([[0f32; 4]], [bad_axis], [0f32], [1f32; 4], 1e-5);
         assert_eq!(result.unwrap_err(), RegionSubspaceError::NotOrthonormal);
     }
 
@@ -697,13 +692,8 @@ mod tests {
         // Two axes that are parallel (dot = 1).
         let mut bad = identity_loadings::<4, 2>();
         bad[1] = bad[0]; // axis 1 = axis 0 → dot = 1
-        let result = RegionSubspaceField::<4, 1, 2>::new(
-            [[0f32; 4]],
-            [bad],
-            [0f32],
-            [1f32; 4],
-            1e-5,
-        );
+        let result =
+            RegionSubspaceField::<4, 1, 2>::new([[0f32; 4]], [bad], [0f32], [1f32; 4], 1e-5);
         assert_eq!(result.unwrap_err(), RegionSubspaceError::NotOrthonormal);
     }
 
@@ -723,13 +713,8 @@ mod tests {
     #[test]
     fn new_accepts_valid_field() {
         let loadings = identity_loadings::<4, 2>();
-        let field = RegionSubspaceField::<4, 1, 2>::new(
-            [[1f32; 4]],
-            [loadings],
-            [0f32],
-            [1f32; 4],
-            1e-5,
-        );
+        let field =
+            RegionSubspaceField::<4, 1, 2>::new([[1f32; 4]], [loadings], [0f32], [1f32; 4], 1e-5);
         assert!(field.is_ok());
     }
 
@@ -803,9 +788,17 @@ mod tests {
         let gates = field.membership_gates(&state, 0.0);
         // Gate 0 should be at the midpoint (0.5 for uniform priors at centroid).
         // Gate 1 should be ~0 (far centroid).
-        assert!((gates[0] - 0.5).abs() < 0.01, "gate[0] should be ~0.5 at centroid with uniform prior, got {}", gates[0]);
+        assert!(
+            (gates[0] - 0.5).abs() < 0.01,
+            "gate[0] should be ~0.5 at centroid with uniform prior, got {}",
+            gates[0]
+        );
         assert!(gates[0] > gates[1], "near gate should exceed far gate");
-        assert!(gates[1] < 0.01, "gate[1] should be near 0, got {}", gates[1]);
+        assert!(
+            gates[1] < 0.01,
+            "gate[1] should be near 0, got {}",
+            gates[1]
+        );
 
         // With a positive prior bias (log_pi[0]=5), the gate at the centroid
         // approaches 1 (sigmoid(5) ≈ 0.993).
@@ -816,7 +809,11 @@ mod tests {
             [1f32; 4],
         );
         let gates_biased = field_biased.membership_gates(&state, 0.0);
-        assert!(gates_biased[0] > 0.99, "biased gate[0] should be near 1, got {}", gates_biased[0]);
+        assert!(
+            gates_biased[0] > 0.99,
+            "biased gate[0] should be near 1, got {}",
+            gates_biased[0]
+        );
     }
 
     #[test]
@@ -852,12 +849,8 @@ mod tests {
     fn steer_centroid_alpha_zero_is_identity() {
         let centroids = [[5f32; 4]];
         let loadings = [identity_loadings::<4, 2>()];
-        let field = RegionSubspaceField::<4, 1, 2>::new_unchecked(
-            centroids,
-            loadings,
-            [0f32],
-            [1f32; 4],
-        );
+        let field =
+            RegionSubspaceField::<4, 1, 2>::new_unchecked(centroids, loadings, [0f32], [1f32; 4]);
         let original = [1f32, 2f32, 3f32, 4f32];
         let mut state = original;
         field.steer_centroid(&mut state, 0, 0.0);
@@ -868,12 +861,8 @@ mod tests {
     fn steer_centroid_alpha_one_replaces_with_centroid() {
         let centroids = [[5f32; 4]];
         let loadings = [identity_loadings::<4, 2>()];
-        let field = RegionSubspaceField::<4, 1, 2>::new_unchecked(
-            centroids,
-            loadings,
-            [0f32],
-            [1f32; 4],
-        );
+        let field =
+            RegionSubspaceField::<4, 1, 2>::new_unchecked(centroids, loadings, [0f32], [1f32; 4]);
         let mut state = [1f32, 2f32, 3f32, 4f32];
         field.steer_centroid(&mut state, 0, 1.0);
         assert_eq!(state, [5f32; 4]);
@@ -883,12 +872,8 @@ mod tests {
     fn steer_centroid_alpha_half_is_midpoint() {
         let centroids = [[10f32; 4]];
         let loadings = [identity_loadings::<4, 2>()];
-        let field = RegionSubspaceField::<4, 1, 2>::new_unchecked(
-            centroids,
-            loadings,
-            [0f32],
-            [1f32; 4],
-        );
+        let field =
+            RegionSubspaceField::<4, 1, 2>::new_unchecked(centroids, loadings, [0f32], [1f32; 4]);
         let mut state = [0f32; 4];
         field.steer_centroid(&mut state, 0, 0.5);
         // (1-0.5)*0 + 0.5*10 = 5
@@ -901,12 +886,8 @@ mod tests {
     fn steer_local_adds_weighted_offset() {
         let centroids = [[0f32; 4]];
         let loadings = [identity_loadings::<4, 2>()];
-        let field = RegionSubspaceField::<4, 1, 2>::new_unchecked(
-            centroids,
-            loadings,
-            [0f32],
-            [1f32; 4],
-        );
+        let field =
+            RegionSubspaceField::<4, 1, 2>::new_unchecked(centroids, loadings, [0f32], [1f32; 4]);
         let mut state = [0f32; 4];
         let offset = [3f32, 7f32]; // only first 2 dims (R=2)
         field.steer_local(&mut state, 0, &offset);
@@ -993,12 +974,8 @@ mod tests {
         // scaled equally), not exact recovery.
         let centroids = [[0f32; 4]];
         let loadings = [identity_loadings::<4, 4>()]; // R=D=4
-        let field = RegionSubspaceField::<4, 1, 4>::new_unchecked(
-            centroids,
-            loadings,
-            [0f32],
-            [1f32; 4],
-        );
+        let field =
+            RegionSubspaceField::<4, 1, 4>::new_unchecked(centroids, loadings, [0f32], [1f32; 4]);
         let state = [1f32, 2f32, 3f32, 4f32];
         let decomp = field.decompose(&state, 0.0);
         let recon = reconstruct(&decomp, &field);
@@ -1023,12 +1000,8 @@ mod tests {
         // For W = I_R (R=D), Ψ^{-1} = I: Z = (I + I)^{-1} I = 0.5 I.
         let centroids = [[0f32; 4]];
         let loadings = [identity_loadings::<4, 4>()];
-        let field = RegionSubspaceField::<4, 1, 4>::new_unchecked(
-            centroids,
-            loadings,
-            [0f32],
-            [1f32; 4],
-        );
+        let field =
+            RegionSubspaceField::<4, 1, 4>::new_unchecked(centroids, loadings, [0f32], [1f32; 4]);
         for r in 0..4 {
             for d in 0..4 {
                 let expected = if r == d { 0.5 } else { 0.0 };
@@ -1046,12 +1019,8 @@ mod tests {
         // When state = centroid, local coords should be zero (x − μ = 0).
         let centroids = [[5f32; 4]];
         let loadings = [identity_loadings::<4, 2>()];
-        let field = RegionSubspaceField::<4, 1, 2>::new_unchecked(
-            centroids,
-            loadings,
-            [0f32],
-            [1f32; 4],
-        );
+        let field =
+            RegionSubspaceField::<4, 1, 2>::new_unchecked(centroids, loadings, [0f32], [1f32; 4]);
         let state = [5f32; 4]; // at centroid
         let coords = field.local_coordinates(&state, 0);
         for (r, coord) in coords.iter().enumerate() {

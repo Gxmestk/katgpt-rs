@@ -69,9 +69,9 @@
 pub mod config;
 pub mod flow;
 pub mod hindrance;
-pub mod local_guidance;
 #[cfg(feature = "lacam_escalation")]
 pub(crate) mod lacam;
+pub mod local_guidance;
 pub mod pibt;
 pub mod position;
 pub mod warm_start;
@@ -81,17 +81,17 @@ mod tests;
 
 pub use config::{AgentId, GoalAssignment, JointAction, JointConfig, UniformGoals};
 pub use flow::{CorridorAxis, FlowDirection, FlowField, GridFlowField, NoFlow};
-pub use hindrance::{BlockingCount, CounterFlowHindrance, HindranceEstimator, WeightedBlockingCount};
-pub use local_guidance::{
-    Guidance, GuidanceConfig, LocalGuidanceSource, SpaceTimeGuidance,
+pub use hindrance::{
+    BlockingCount, CounterFlowHindrance, HindranceEstimator, WeightedBlockingCount,
 };
-pub use pibt::{pibt_step, Deadlock, NeighborFn};
+pub use local_guidance::{Guidance, GuidanceConfig, LocalGuidanceSource, SpaceTimeGuidance};
 use pibt::pibt_step_with_budget;
-pub use position::{soft_cost, GridMap, GridPos, Position};
+pub use pibt::{Deadlock, NeighborFn, pibt_step};
+pub use position::{GridMap, GridPos, Position, soft_cost};
 pub use warm_start::{WarmStartCache, WarmStartScheme};
 
 #[cfg(feature = "lacam_escalation")]
-pub use lacam::{lacam_escalation_step, EscalationBudget};
+pub use lacam::{EscalationBudget, lacam_escalation_step};
 
 // ─────────────────────────────────────────────────────────────────────
 // CostFn trait — pluggable seam #1 (Plan 440 T1.2)

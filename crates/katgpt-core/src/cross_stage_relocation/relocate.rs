@@ -66,11 +66,7 @@ impl RelocateOp {
     /// `snapshot_anchor_at` / `overwrite_anchor_at` define the precise
     /// behavior; this method only forwards the indices.
     #[inline]
-    pub fn apply_into<F: RelocatingForward + ?Sized>(
-        &self,
-        host: &mut F,
-        scratch: &mut [f32],
-    ) {
+    pub fn apply_into<F: RelocatingForward + ?Sized>(&self, host: &mut F, scratch: &mut [f32]) {
         // Snapshot src → scratch, then scratch → dst. Two memcpys; the host
         // owns the forward-pass machinery and the actual residual buffers.
         // This method orchestrates only.
@@ -95,11 +91,7 @@ pub enum RelocatePair {
     /// Custom pair — caller specifies both source fractions and the shared
     /// destination fraction. Fractions are in `[0, 1]`; `to_ops` rounds to
     /// the nearest stage index.
-    Custom {
-        src_a: f32,
-        src_b: f32,
-        dst: f32,
-    },
+    Custom { src_a: f32, src_b: f32, dst: f32 },
 }
 
 impl RelocatePair {
@@ -370,7 +362,10 @@ mod tests {
         // Stage 1 is unchanged (snapshot, not move).
         let still_there = host.read(1, 0);
         for (i, (&a, &b)) in answer.iter().zip(still_there.iter()).enumerate() {
-            assert!((a - b).abs() < 1e-6, "stage 1 dim {i}: expected {a}, got {b}");
+            assert!(
+                (a - b).abs() < 1e-6,
+                "stage 1 dim {i}: expected {a}, got {b}"
+            );
         }
     }
 
@@ -403,7 +398,10 @@ mod tests {
 
         let final_state = host.read(3, 0);
         for (i, (&a, &b)) in answer.iter().zip(final_state.iter()).enumerate() {
-            assert!((a - b).abs() < 1e-6, "readout dim {i}: expected {a}, got {b}");
+            assert!(
+                (a - b).abs() < 1e-6,
+                "readout dim {i}: expected {a}, got {b}"
+            );
         }
     }
 

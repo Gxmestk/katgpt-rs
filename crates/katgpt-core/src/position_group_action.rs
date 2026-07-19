@@ -213,7 +213,10 @@ impl RopeAction {
     /// `dim` must be even and ≥ 2; `theta` must be > 1.0 (the standard
     /// range is `[10000, 500000]` for long-context extensions).
     pub fn with_theta(dim: usize, theta: f32) -> Self {
-        assert!(dim >= 2 && dim.is_multiple_of(2), "RoPE requires even dim >= 2");
+        assert!(
+            dim >= 2 && dim.is_multiple_of(2),
+            "RoPE requires even dim >= 2"
+        );
         assert!(theta > 1.0, "RoPE theta must be > 1.0");
         let half = dim / 2;
         let omegas: Vec<f32> = (0..half)
@@ -309,9 +312,7 @@ impl AlibiAction {
     /// For `h = 4`: `[1/2^8, 1/2^9, 1/2^10, 1/2^11]` = the standard 4-head schedule.
     pub fn slope_schedule(h: usize) -> Vec<f32> {
         let start = 2f32.powf(-8.0); // 1/256
-        (0..h)
-            .map(|i| start / 2f32.powi(i as i32))
-            .collect()
+        (0..h).map(|i| start / 2f32.powi(i as i32)).collect()
     }
 }
 

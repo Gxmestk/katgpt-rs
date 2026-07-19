@@ -1,4 +1,3 @@
-
 use super::*;
 use katgpt_types::Config;
 
@@ -671,11 +670,19 @@ fn test_deep_argmax_none_matches_build_dd_tree() {
     let tree_normal = build_dd_tree(&mv, &config);
     let tree_none = build_dd_tree_deep_argmax(&mv, &config, None);
 
-    assert_eq!(tree_normal.len(), tree_none.len(), "None threshold should match build_dd_tree");
+    assert_eq!(
+        tree_normal.len(),
+        tree_none.len(),
+        "None threshold should match build_dd_tree"
+    );
     for (a, b) in tree_normal.iter().zip(tree_none.iter()) {
         assert_eq!(a.token_idx, b.token_idx, "token mismatch");
         assert_eq!(a.depth, b.depth, "depth mismatch");
-        assert_eq!(a.score.to_bits(), b.score.to_bits(), "score mismatch (bit-exact)");
+        assert_eq!(
+            a.score.to_bits(),
+            b.score.to_bits(),
+            "score mismatch (bit-exact)"
+        );
     }
 }
 
@@ -697,22 +704,51 @@ fn test_deep_argmax_restricts_deep_branching() {
     let tree = build_dd_tree_deep_argmax(&mv, &config, Some(0));
 
     // Depth 0 (NOT > threshold 0): multiple tokens expected.
-    let d0: std::collections::HashSet<usize> =
-        tree.iter().filter(|n| n.depth == 0).map(|n| n.token_idx).collect();
-    assert!(d0.len() > 1, "depth 0 should have multiple tokens, got {:?}", d0);
+    let d0: std::collections::HashSet<usize> = tree
+        .iter()
+        .filter(|n| n.depth == 0)
+        .map(|n| n.token_idx)
+        .collect();
+    assert!(
+        d0.len() > 1,
+        "depth 0 should have multiple tokens, got {:?}",
+        d0
+    );
 
     // Depth 1 (> 0): only argmax token 0.
-    let d1: std::collections::HashSet<usize> =
-        tree.iter().filter(|n| n.depth == 1).map(|n| n.token_idx).collect();
-    assert_eq!(d1.len(), 1, "depth 1 should have exactly one distinct token");
-    assert_eq!(*d1.iter().next().unwrap(), 0, "depth 1 argmax should be token 0");
+    let d1: std::collections::HashSet<usize> = tree
+        .iter()
+        .filter(|n| n.depth == 1)
+        .map(|n| n.token_idx)
+        .collect();
+    assert_eq!(
+        d1.len(),
+        1,
+        "depth 1 should have exactly one distinct token"
+    );
+    assert_eq!(
+        *d1.iter().next().unwrap(),
+        0,
+        "depth 1 argmax should be token 0"
+    );
 
     // Depth 2 (> 0): only argmax token 1.
-    let d2: std::collections::HashSet<usize> =
-        tree.iter().filter(|n| n.depth == 2).map(|n| n.token_idx).collect();
+    let d2: std::collections::HashSet<usize> = tree
+        .iter()
+        .filter(|n| n.depth == 2)
+        .map(|n| n.token_idx)
+        .collect();
     if !d2.is_empty() {
-        assert_eq!(d2.len(), 1, "depth 2 should have exactly one distinct token");
-        assert_eq!(*d2.iter().next().unwrap(), 1, "depth 2 argmax should be token 1");
+        assert_eq!(
+            d2.len(),
+            1,
+            "depth 2 should have exactly one distinct token"
+        );
+        assert_eq!(
+            *d2.iter().next().unwrap(),
+            1,
+            "depth 2 argmax should be token 1"
+        );
     }
 }
 
@@ -733,16 +769,30 @@ fn test_deep_argmax_threshold_2_only_restricts_deep() {
     let tree = build_dd_tree_deep_argmax(&mv, &config, Some(2));
 
     // Depths ≤ 2 (NOT > 2): should have multiple distinct tokens.
-    let d2: std::collections::HashSet<usize> =
-        tree.iter().filter(|n| n.depth == 2).map(|n| n.token_idx).collect();
-    assert!(d2.len() > 1, "depth 2 (≤ threshold) should have multiple tokens, got {:?}", d2);
+    let d2: std::collections::HashSet<usize> = tree
+        .iter()
+        .filter(|n| n.depth == 2)
+        .map(|n| n.token_idx)
+        .collect();
+    assert!(
+        d2.len() > 1,
+        "depth 2 (≤ threshold) should have multiple tokens, got {:?}",
+        d2
+    );
 
     // Depth 3 (> 2): only argmax token 2.
-    let d3: std::collections::HashSet<usize> =
-        tree.iter().filter(|n| n.depth == 3).map(|n| n.token_idx).collect();
+    let d3: std::collections::HashSet<usize> = tree
+        .iter()
+        .filter(|n| n.depth == 3)
+        .map(|n| n.token_idx)
+        .collect();
     if !d3.is_empty() {
         assert_eq!(d3.len(), 1, "depth 3 should have one distinct token");
-        assert_eq!(*d3.iter().next().unwrap(), 2, "depth 3 argmax should be token 2");
+        assert_eq!(
+            *d3.iter().next().unwrap(),
+            2,
+            "depth 3 argmax should be token 2"
+        );
     }
 }
 
@@ -862,7 +912,12 @@ fn test_deep_argmax_acceptance_benchmark() {
             };
             eprintln!(
                 "  {:<8} {:<14} {:>5} {:>5} {:>5} {:>10.4}",
-                budget, label, tree.len(), path.len(), acc, score
+                budget,
+                label,
+                tree.len(),
+                path.len(),
+                acc,
+                score
             );
         }
         eprintln!();
@@ -893,7 +948,11 @@ fn test_deep_argmax_builder_setter_matches_free_fn() {
     let tree_builder = builder.build(&mv, &config, &NoPruner, false).to_vec();
     let tree_fn = build_dd_tree_deep_argmax(&mv, &config, Some(0));
 
-    assert_eq!(tree_builder.len(), tree_fn.len(), "builder vs free-fn size mismatch");
+    assert_eq!(
+        tree_builder.len(),
+        tree_fn.len(),
+        "builder vs free-fn size mismatch"
+    );
     for (a, b) in tree_builder.iter().zip(tree_fn.iter()) {
         assert_eq!(a.token_idx, b.token_idx);
         assert_eq!(a.depth, b.depth);

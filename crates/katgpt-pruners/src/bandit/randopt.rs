@@ -98,4 +98,3 @@ pub fn select_arms_top_p(q_values: &[f32], ucb_bonus: &[f32], p: f32) -> Vec<usi
     }
     selected
 }
-

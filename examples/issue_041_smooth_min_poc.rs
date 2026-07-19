@@ -152,7 +152,10 @@ fn make_embeddings(rng: &mut Rng) -> Embeddings {
         }
     }
 
-    Embeddings { words, word_cluster }
+    Embeddings {
+        words,
+        word_cluster,
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -294,7 +297,12 @@ fn recall_curve(
 ) -> Vec<(usize, f32)> {
     let ks = [1, 3, 5, 10, 20];
     ks.iter()
-        .map(|&k| (k, recall_at_k(catalog, queries, emb, k, use_smooth_min, beta)))
+        .map(|&k| {
+            (
+                k,
+                recall_at_k(catalog, queries, emb, k, use_smooth_min, beta),
+            )
+        })
         .collect()
 }
 
@@ -345,7 +353,11 @@ fn beta_sensitivity(catalog: &[Item], queries: &[Query], emb: &Embeddings) {
     println!("  ────────── ─────────");
     for &beta in &betas {
         let recall = recall_at_k(catalog, queries, emb, 5, true, beta);
-        let marker = if (beta - 1e4).abs() < 0.5 { " ← paper" } else { "" };
+        let marker = if (beta - 1e4).abs() < 0.5 {
+            " ← paper"
+        } else {
+            ""
+        };
         println!("  {:>10.0e} {:.4}{}", beta, recall, marker);
     }
 }
@@ -408,18 +420,14 @@ fn main() {
     println!("── Sample query (q=0) ──");
     println!(
         "  Correct item [{}]: cosines = {:?}",
-        sample_q.correct_item_idx,
-        correct_cosines
+        sample_q.correct_item_idx, correct_cosines
     );
     println!(
         "    plain={:.4}  smooth_min={:.4}",
         correct_plain, correct_smooth
     );
     if let Some((idx, cosines, plain, smooth)) = best_distractor {
-        println!(
-            "  Top distractor [{}]: cosines = {:?}",
-            idx, cosines
-        );
+        println!("  Top distractor [{}]: cosines = {:?}", idx, cosines);
         println!("    plain={:.4}  smooth_min={:.4}", plain, smooth);
         println!(
             "  → Plain margin:    {:.4} (correct - distractor)",
@@ -441,7 +449,13 @@ fn main() {
     println!("  ───── ───────────── ───────────── ──────");
     for (plain, smooth) in plain_curve.iter().zip(smooth_curve.iter()) {
         let gain = smooth.1 - plain.1;
-        let marker = if gain > 0.0 { " ✅" } else if gain < 0.0 { " ❌" } else { "" };
+        let marker = if gain > 0.0 {
+            " ✅"
+        } else if gain < 0.0 {
+            " ❌"
+        } else {
+            ""
+        };
         println!(
             "  {:<5} {:.4}        {:.4}        {:+.4}{}",
             plain.0, plain.1, smooth.1, gain, marker

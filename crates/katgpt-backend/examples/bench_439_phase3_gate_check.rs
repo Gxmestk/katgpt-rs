@@ -28,10 +28,10 @@
 
 #[cfg(target_os = "macos")]
 use coreml_proto::proto::{
+    ArrayFeatureType, ConvolutionLayerParams, FeatureDescription, FeatureType, Model,
+    ModelDescription, NeuralNetwork, NeuralNetworkLayer, SamePadding, WeightParams,
     convolution_layer_params::ConvolutionPaddingType, feature_type::Type as FeatureTypeKind,
-    model::Type as ModelType, neural_network_layer::Layer as LayerKind, ArrayFeatureType,
-    ConvolutionLayerParams, FeatureDescription, FeatureType, Model, ModelDescription,
-    NeuralNetwork, NeuralNetworkLayer, SamePadding, WeightParams,
+    model::Type as ModelType, neural_network_layer::Layer as LayerKind,
 };
 
 /// Conv spatial height (module-level so builder helpers can access it).
@@ -47,7 +47,7 @@ const KW: u64 = 3;
 fn main() {
     use coreml_native::{BorrowedTensor, ComputeUnits, Model as NativeModel};
     use katgpt_core::ane_roofline::{
-        ane_estimate, ane_fused_estimate, AneDataDep, AneFamily, AneOpShape, AnePeaks, Dtype,
+        AneDataDep, AneFamily, AneOpShape, AnePeaks, Dtype, ane_estimate, ane_fused_estimate,
     };
     use prost::Message;
 
@@ -68,12 +68,17 @@ fn main() {
 
     // ── Detect chip ────────────────────────────────────────────────────────
     let chip = AneFamily::detect().unwrap_or(AneFamily::A13);
-    let peaks = AnePeaks::for_family(chip)
-        .expect("detected chip family must have calibrated peaks");
-    eprintln!("Chip family: {chip:?} (dispatch floor: {} ms)", peaks.dispatch_floor_ms);
+    let peaks =
+        AnePeaks::for_family(chip).expect("detected chip family must have calibrated peaks");
+    eprintln!(
+        "Chip family: {chip:?} (dispatch floor: {} ms)",
+        peaks.dispatch_floor_ms
+    );
 
     // ── Deterministic non-zero weights ─────────────────────────────────────
-    let w1: Vec<f32> = (0..WEIGHT_ELEMS).map(|i| ((i as f32) * 0.0001) - 0.5).collect();
+    let w1: Vec<f32> = (0..WEIGHT_ELEMS)
+        .map(|i| ((i as f32) * 0.0001) - 0.5)
+        .collect();
     let w2: Vec<f32> = (0..WEIGHT_ELEMS)
         .map(|i| (((i + 10_000) as f32) * 0.0001) - 0.5)
         .collect();
@@ -90,12 +95,17 @@ fn main() {
     let compute = ComputeUnits::CpuAndNeuralEngine;
 
     eprintln!("Compiling 4 CoreML models (CpuAndNeuralEngine)...");
+    eprintln!("  Conv shape: {}×{}×{} (CHW), 3×3 SAME, F32", C, H, W);
     eprintln!(
-        "  Conv shape: {}×{}×{} (CHW), 3×3 SAME, F32",
-        C, H, W
+        "  Weight per layer: {} floats ({} KB)",
+        WEIGHT_ELEMS,
+        WEIGHT_ELEMS * 4 / 1024
     );
-    eprintln!("  Weight per layer: {} floats ({} KB)", WEIGHT_ELEMS, WEIGHT_ELEMS * 4 / 1024);
-    eprintln!("  Intermediate: {} floats ({} KB)", SPATIAL, SPATIAL * 4 / 1024);
+    eprintln!(
+        "  Intermediate: {} floats ({} KB)",
+        SPATIAL,
+        SPATIAL * 4 / 1024
+    );
 
     let model_a = NativeModel::load_from_bytes(&spec_a.encode_to_vec(), compute)
         .expect("load spec_a")
@@ -117,8 +127,7 @@ fn main() {
 
     // ── Prepare input [1, C, H, W] ─────────────────────────────────────────
     let input: Vec<f32> = (0..SPATIAL).map(|i| ((i as f32) * 0.001) - 0.5).collect();
-    let input_tensor =
-        BorrowedTensor::from_f32(&input, &SHAPE).expect("input tensor");
+    let input_tensor = BorrowedTensor::from_f32(&input, &SHAPE).expect("input tensor");
 
     // Intermediate buffers for unfused DRAM round-trips
     let mut buf1 = vec![0.0f32; SPATIAL];
@@ -127,7 +136,9 @@ fn main() {
     // ── Warmup ─────────────────────────────────────────────────────────────
     eprintln!("Warming up ({WARMUP} iterations each)...");
     for _ in 0..WARMUP {
-        let pa = model_a.predict(&[("input", &input_tensor)]).expect("warmup a");
+        let pa = model_a
+            .predict(&[("input", &input_tensor)])
+            .expect("warmup a");
         let (oa, _) = pa.get_f32("output").expect("warmup a output");
         let t1 = BorrowedTensor::from_f32(&oa, &SHAPE).unwrap();
         let pb = model_b.predict(&[("input", &t1)]).expect("warmup b");
@@ -143,7 +154,9 @@ fn main() {
     // ── Measure unfused: 3 dispatches + 2 DRAM round-trips ─────────────────
     let unfused_start = std::time::Instant::now();
     for _ in 0..N_ITERS {
-        let pa = model_a.predict(&[("input", &input_tensor)]).expect("predict a");
+        let pa = model_a
+            .predict(&[("input", &input_tensor)])
+            .expect("predict a");
         let (oa, _) = pa.get_f32("output").expect("output a");
         buf1.copy_from_slice(&oa);
         let t1 = BorrowedTensor::from_f32(&buf1, &SHAPE).unwrap();
@@ -217,19 +230,14 @@ fn main() {
     println!("║  Plan 439 Phase 3 Gate Check — T3.3 Compute-Heavy Conv Chain      ║");
     println!("╚════════════════════════════════════════════════════════════════════╝");
     println!();
-    println!(
-        "Hardware: {} (chip detect: {chip:?})",
-        {
-            let devs = coreml_native::available_devices();
-            devs.iter()
-                .map(|d| format!("{d}"))
-                .collect::<Vec<_>>()
-                .join(", ")
-        }
-    );
-    println!(
-        "Shape:    Conv2d(3×3, SAME) Cin=Cout={C}, H=W={H}, F32 × {N_OPS} ops"
-    );
+    println!("Hardware: {} (chip detect: {chip:?})", {
+        let devs = coreml_native::available_devices();
+        devs.iter()
+            .map(|d| format!("{d}"))
+            .collect::<Vec<_>>()
+            .join(", ")
+    });
+    println!("Shape:    Conv2d(3×3, SAME) Cin=Cout={C}, H=W={H}, F32 × {N_OPS} ops");
     println!("Iters:    {N_ITERS} (after {WARMUP} warmup each)");
     println!();
 
@@ -242,22 +250,20 @@ fn main() {
     let ane_likely = fused_us < fused_compute_us * 4.0;
     println!(
         "ANE residency: {} (fused {} µs vs 3×single-op compute {} µs on FP16 peaks)",
-        if ane_likely { "LIKELY ✅" } else { "CPU FALLBACK ⚠️" },
+        if ane_likely {
+            "LIKELY ✅"
+        } else {
+            "CPU FALLBACK ⚠️"
+        },
         fused_us as u64,
         fused_compute_us as u64,
     );
     println!();
 
     println!("─── Measured (wall-clock, CpuAndNeuralEngine) ─────────────────────");
-    println!(
-        "  Unfused ({N_OPS} dispatches + 2 DRAM round-trips): {unfused_us:>9.1} µs/iter"
-    );
-    println!(
-        "  Fused   (1 dispatch, {N_OPS} ops internally):      {fused_us:>9.1} µs/iter"
-    );
-    println!(
-        "  Measured savings:   {measured_savings_us:>9.1} µs ({measured_savings_pct:.1}%)"
-    );
+    println!("  Unfused ({N_OPS} dispatches + 2 DRAM round-trips): {unfused_us:>9.1} µs/iter");
+    println!("  Fused   (1 dispatch, {N_OPS} ops internally):      {fused_us:>9.1} µs/iter");
+    println!("  Measured savings:   {measured_savings_us:>9.1} µs ({measured_savings_pct:.1}%)");
     println!();
 
     println!("─── Cost model predictions (ane_fused_estimate) ───────────────────");
@@ -266,16 +272,12 @@ fn main() {
         single.bound,
         single.runtime_ms * 1000.0
     );
-    println!(
-        "  Unfused predicted:  {pred_unfused_us:>9.1} µs ({N_OPS} × single)"
-    );
+    println!("  Unfused predicted:  {pred_unfused_us:>9.1} µs ({N_OPS} × single)");
     println!(
         "  Fused predicted:    {pred_fused_us:>9.1} µs ({:?})",
         fused_cost.base.bound
     );
-    println!(
-        "  Predicted savings:  {pred_savings_us:>9.1} µs ({pred_savings_pct:.1}%)"
-    );
+    println!("  Predicted savings:  {pred_savings_us:>9.1} µs ({pred_savings_pct:.1}%)");
     println!(
         "  Eliminated bytes:   {} ({} bytes × {} deps, n_fused={})",
         fused_cost.eliminated_bytes,
@@ -309,9 +311,7 @@ fn main() {
             "FAIL ❌"
         }
     );
-    println!(
-        "     measured={measured_savings_us:.1}µs  predicted={pred_savings_us:.1}µs"
-    );
+    println!("     measured={measured_savings_us:.1}µs  predicted={pred_savings_us:.1}µs");
 
     // G3: fused measured/predicted ratio — THE PHASE 3 TRIGGER
     // If fused_pred_ratio < 0.5, the real ANE is >2× faster than predicted.
@@ -327,9 +327,7 @@ fn main() {
             "CHECK ⚠️ — model under-predicts"
         }
     );
-    println!(
-        "     measured_fused={fused_us:.1}µs  predicted_fused={pred_fused_us:.1}µs"
-    );
+    println!("     measured_fused={fused_us:.1}µs  predicted_fused={pred_fused_us:.1}µs");
     println!();
 
     // ── Verdict ────────────────────────────────────────────────────────────
@@ -406,13 +404,7 @@ fn build_single_conv(name: &str, weights: &[f32], channels: usize) -> Model {
 }
 
 #[cfg(target_os = "macos")]
-fn build_fused_3conv(
-    name: &str,
-    w1: &[f32],
-    w2: &[f32],
-    w3: &[f32],
-    channels: usize,
-) -> Model {
+fn build_fused_3conv(name: &str, w1: &[f32], w2: &[f32], w3: &[f32], channels: usize) -> Model {
     let layers = vec![
         conv_layer(
             &format!("{name}_conv_0"),

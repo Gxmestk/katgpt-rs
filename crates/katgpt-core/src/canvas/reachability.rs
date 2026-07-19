@@ -131,7 +131,11 @@ pub fn build_flow_graph(topology: &CanvasTopology, n_regions: usize) -> FlowGrap
         neighbors[s..e].sort_unstable();
     }
 
-    FlowGraph { n_nodes: n_regions, offsets, neighbors }
+    FlowGraph {
+        n_nodes: n_regions,
+        offsets,
+        neighbors,
+    }
 }
 
 /// Returns the causal horizon: max path length reachable in `n_blocks`
@@ -291,7 +295,7 @@ fn set_bit(bits: &mut [u64], from: usize, to: usize, n: usize) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::canvas::{build_flow_graph_via_compile, causal_chain, isolated, RegionId};
+    use crate::canvas::{RegionId, build_flow_graph_via_compile, causal_chain, isolated};
 
     #[test]
     fn horizon_is_product() {

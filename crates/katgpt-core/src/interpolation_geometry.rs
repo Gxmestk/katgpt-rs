@@ -818,13 +818,7 @@ mod tests {
         assert_eq!(score, ImauveScore::default());
 
         // max_possible_distance <= 0 → unnormalized report.
-        let score = imauve_score(
-            &space,
-            &[[1.0, 1.0]],
-            &[[2.0, 2.0]],
-            &mut scratch,
-            0.0,
-        );
+        let score = imauve_score(&space, &[[1.0, 1.0]], &[[2.0, 2.0]], &mut scratch, 0.0);
         assert_eq!(score, ImauveScore::default());
     }
 
@@ -879,7 +873,13 @@ mod tests {
         // (radius 5, two antipodal points), so use 10 as the L2 normalization.
         let max_possible = 10.0f32;
 
-        let good_score = imauve_score(&good, &good_points, &good_points, &mut scratch, max_possible);
+        let good_score = imauve_score(
+            &good,
+            &good_points,
+            &good_points,
+            &mut scratch,
+            max_possible,
+        );
         let bad_score = imauve_score(&bad, &bad_points, &bad_points, &mut scratch, max_possible);
 
         // The headline assertion: good geometry scores strictly higher.
@@ -942,7 +942,11 @@ mod tests {
         let report = intervention_battery(&space, &anchor, &donors, 7, &mut z, &mut m, &mut n);
 
         // All four interventions must exceed the matched baseline (0).
-        assert!(report.shuffled > 0.5, "shuffled diverges: {}", report.shuffled);
+        assert!(
+            report.shuffled > 0.5,
+            "shuffled diverges: {}",
+            report.shuffled
+        );
         assert!(report.zero > 0.5, "zero diverges: {}", report.zero);
         assert!(report.mean > 0.5, "mean diverges: {}", report.mean);
         assert!(report.noise > 0.5, "noise diverges: {}", report.noise);

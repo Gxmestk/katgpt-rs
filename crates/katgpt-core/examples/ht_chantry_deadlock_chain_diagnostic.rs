@@ -151,7 +151,10 @@ fn main() {
         .filter(|(x, y)| map.is_passable(*x, *y))
         .count();
     println!("═══ Issue 546 Deadlock-Chain-Length Diagnostic ═══");
-    println!("Map: ht_chantry-real ({}×{}, {n_passable} passable)", map.width, map.height);
+    println!(
+        "Map: ht_chantry-real ({}×{}, {n_passable} passable)",
+        map.width, map.height
+    );
 
     // Same parameters as bench_440's G1 gate (the failing scenario).
     let n_agents: usize = 800;
@@ -196,8 +199,8 @@ fn main() {
         max_expansions: 0,
     };
     let map_clone = map.clone();
-    let mut guidance = SpaceTimeGuidance::new(cfg)
-        .with_neighbors(move |p| map_clone.passable_neighbors(p));
+    let mut guidance =
+        SpaceTimeGuidance::new(cfg).with_neighbors(move |p| map_clone.passable_neighbors(p));
     let mut hindrance = BlockingCount::new();
     let warm = WarmStartCache::new(WarmStartScheme::default(), cfg.w_phi);
     let flow = GridFlowField::from_map(&map);
@@ -250,8 +253,7 @@ fn main() {
             fast_path_ticks += 1;
         } else {
             // Build blocking graph + find components.
-            let components =
-                blocking_components(&stuck_indices, &current.positions, &neighbors_fn);
+            let components = blocking_components(&stuck_indices, &current.positions, &neighbors_fn);
             let tick_max = components.iter().copied().max().unwrap_or(0);
             *per_tick_max.entry(tick_max).or_insert(0) += 1;
             for &size in &components {
@@ -269,13 +271,17 @@ fn main() {
     // ─── Report ───────────────────────────────────────────────────────────
     println!("─── Result ───");
     println!("Throughput: {throughput:.3} completions/step");
-    println!("Fast-path ticks (zero stuck): {fast_path_ticks}/{steps} ({:.1}%)",
-        100.0 * fast_path_ticks as f64 / steps as f64);
+    println!(
+        "Fast-path ticks (zero stuck): {fast_path_ticks}/{steps} ({:.1}%)",
+        100.0 * fast_path_ticks as f64 / steps as f64
+    );
     println!("Total stuck-clusters observed: {total_clusters}");
     println!("Total stuck-agent observations: {total_stuck_observations}");
     if total_clusters > 0 {
-        println!("Mean cluster size: {:.3} agents",
-            total_stuck_observations as f64 / total_clusters as f64);
+        println!(
+            "Mean cluster size: {:.3} agents",
+            total_stuck_observations as f64 / total_clusters as f64
+        );
     }
     println!();
 
@@ -299,7 +305,9 @@ fn main() {
 
     println!("─── Per-tick max-cluster-size distribution (depth-K sufficiency) ───");
     println!("This is the load-bearing table for depth-K LaCAM budgeting.");
-    println!("A tick with max-cluster-size K needs depth ≥ K to resolve all stuck clusters that tick.");
+    println!(
+        "A tick with max-cluster-size K needs depth ≥ K to resolve all stuck clusters that tick."
+    );
     println!();
     println!("max-size | ticks   | %-ticks | cumulative %-ticks (≤ this size)");
     println!("---------|---------|---------|--------------------------------");
@@ -344,11 +352,15 @@ fn main() {
     }
 
     match p95_k {
-        Some(k) => println!("P95 max-cluster-size = {k} (depth ≥ {k} resolves ≥95% of stuck ticks)"),
+        Some(k) => {
+            println!("P95 max-cluster-size = {k} (depth ≥ {k} resolves ≥95% of stuck ticks)")
+        }
         None => println!("P95 max-cluster-size = N/A (insufficient data)"),
     }
     match p99_k {
-        Some(k) => println!("P99 max-cluster-size = {k} (depth ≥ {k} resolves ≥99% of stuck ticks)"),
+        Some(k) => {
+            println!("P99 max-cluster-size = {k} (depth ≥ {k} resolves ≥99% of stuck ticks)")
+        }
         None => println!("P99 max-cluster-size = N/A (insufficient data)"),
     }
     println!("Max cluster size observed: {max_size}");

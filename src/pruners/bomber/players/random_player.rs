@@ -6,9 +6,7 @@ use std::any::Any;
 
 use fastrand::Rng;
 
-use super::{
-    ALL_ACTIONS, ArenaGrid, BomberAction, BomberPlayer, GameEvent, GridPos, move_target,
-};
+use super::{ALL_ACTIONS, ArenaGrid, BomberAction, BomberPlayer, GameEvent, GridPos, move_target};
 
 /// P1: Modelless baseline — uniform random action selection.
 ///

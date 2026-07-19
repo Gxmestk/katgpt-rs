@@ -38,7 +38,7 @@
 #![allow(clippy::needless_range_loop)]
 
 use katgpt_core::types::{self, Config};
-use katgpt_transformer::{PagedKVCache, PAGE_SIZE};
+use katgpt_transformer::{PAGE_SIZE, PagedKVCache};
 use std::hint::black_box;
 use std::time::Instant;
 
@@ -166,9 +166,9 @@ fn g1_correctness(config: &Config, label: &str) -> bool {
             .zip(&legacy.layer_page_tables)
             .all(|(f, l)| {
                 f.len() == l.len()
-                    && f.iter()
-                        .zip(l.iter())
-                        .all(|(ft, lt)| ft.len() == lt.len() && ft.iter().zip(lt.iter()).all(|(a, b)| a == b))
+                    && f.iter().zip(l.iter()).all(|(ft, lt)| {
+                        ft.len() == lt.len() && ft.iter().zip(lt.iter()).all(|(a, b)| a == b)
+                    })
             });
 
     // Also verify free-list and ref-count consistency (both should have recycled
@@ -285,8 +285,7 @@ fn g4_alloc_audit(config: &Config, label: &str) -> bool {
 
     // Also verify page-table lengths are back to CYCLES (rollback→re-alloc is
     // a perfect cycle — no leak, no growth).
-    let lens_correct: bool = (0..n_layer)
-        .all(|l| cache.layer_page_tables[l][0].len() == CYCLES);
+    let lens_correct: bool = (0..n_layer).all(|l| cache.layer_page_tables[l][0].len() == CYCLES);
 
     let pass = caps_stable && lens_correct;
 

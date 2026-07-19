@@ -842,7 +842,11 @@ impl std::fmt::Display for WeaverCorrectError {
                 f,
                 "marginals shape mismatch: expected {expected} (= depth*vocab), got {actual}"
             ),
-            Self::HiddenShape { context, expected, actual } => write!(
+            Self::HiddenShape {
+                context,
+                expected,
+                actual,
+            } => write!(
                 f,
                 "{context} shape mismatch: expected {expected}, got {actual}"
             ),
@@ -963,7 +967,12 @@ pub fn weaver_forward(weights: &WeaverWeights, input: &WeaverInput) -> WeaverOut
         for j in 0..h {
             post_buf[j] = u[j] + tmp[j];
         }
-        rmsnorm_into(&post_buf, &weights.norm_attn, eps, &mut u_attn_normed[pos * h..(pos + 1) * h]);
+        rmsnorm_into(
+            &post_buf,
+            &weights.norm_attn,
+            eps,
+            &mut u_attn_normed[pos * h..(pos + 1) * h],
+        );
     }
 
     // ── Step 5: SwiGLU MLP + residual + post-MLP RMSNorm ──
@@ -983,7 +992,12 @@ pub fn weaver_forward(weights: &WeaverWeights, input: &WeaverInput) -> WeaverOut
         for j in 0..h {
             post_buf[j] = u_row[j] + down[j];
         }
-        rmsnorm_into(&post_buf, &weights.norm_mlp, eps, &mut u_final[pos * h..(pos + 1) * h]);
+        rmsnorm_into(
+            &post_buf,
+            &weights.norm_mlp,
+            eps,
+            &mut u_final[pos * h..(pos + 1) * h],
+        );
     }
 
     // ── Steps 6 + 7: Top-K gather + residual add + softmax over K ──
@@ -1001,7 +1015,12 @@ pub fn weaver_forward(weights: &WeaverWeights, input: &WeaverInput) -> WeaverOut
         // Gather K embedding rows.
         for (ki, &tid) in ids.iter().enumerate() {
             let tid = tid as usize;
-            debug_assert!(tid < input.vocab_size, "topk id {} >= vocab {}", tid, input.vocab_size);
+            debug_assert!(
+                tid < input.vocab_size,
+                "topk id {} >= vocab {}",
+                tid,
+                input.vocab_size
+            );
             let row = &input.embedding[tid * h..(tid + 1) * h];
             gathered[ki * h..(ki + 1) * h].copy_from_slice(row);
         }
@@ -1090,7 +1109,10 @@ pub fn weaver_forward_into(
         debug_assert_eq!(input.topk_ids[di].len(), k);
         debug_assert_eq!(input.dflash_logits[di].len(), k);
     }
-    debug_assert!(seq_len <= cfg.max_depth + 1, "seq_len exceeds scratch capacity");
+    debug_assert!(
+        seq_len <= cfg.max_depth + 1,
+        "seq_len exceeds scratch capacity"
+    );
 
     // Borrow disjoint scratch slices once.
     let WeaverScratch {
@@ -1222,7 +1244,12 @@ pub fn weaver_forward_into(
         let g_off = di * k * h;
         for (ki, &tid) in ids.iter().enumerate() {
             let tid = tid as usize;
-            debug_assert!(tid < input.vocab_size, "topk id {} >= vocab {}", tid, input.vocab_size);
+            debug_assert!(
+                tid < input.vocab_size,
+                "topk id {} >= vocab {}",
+                tid,
+                input.vocab_size
+            );
             let row = &input.embedding[tid * h..(tid + 1) * h];
             gathered[g_off + ki * h..g_off + (ki + 1) * h].copy_from_slice(row);
         }
@@ -1299,7 +1326,10 @@ pub fn weaver_forward_parallel(
     let seq_len = d_depth + 1;
 
     debug_assert_eq!(input.h_verifier.len(), h);
-    debug_assert!(seq_len <= cfg.max_depth + 1, "seq_len exceeds scratch capacity");
+    debug_assert!(
+        seq_len <= cfg.max_depth + 1,
+        "seq_len exceeds scratch capacity"
+    );
 
     // Borrow scratch fields. We need mutable access to per-position rows.
     // Rayon requires Sync/Send on the closure captures. All our buffers are
@@ -1551,7 +1581,10 @@ pub fn weaver_forward_parallel_f16(
     let seq_len = d_depth + 1;
 
     debug_assert_eq!(input.h_verifier.len(), h);
-    debug_assert!(seq_len <= cfg.max_depth + 1, "seq_len exceeds scratch capacity");
+    debug_assert!(
+        seq_len <= cfg.max_depth + 1,
+        "seq_len exceeds scratch capacity"
+    );
 
     let WeaverScratch {
         u_cond,
@@ -1670,7 +1703,13 @@ pub fn weaver_forward_parallel_f16(
                         let post = &mut post[..h];
                         let down = &mut down[..h];
 
-                        matmul_vec_f16(&attn_out[pos * h..(pos + 1) * h], &weights.w_o, h, h, tmp_o);
+                        matmul_vec_f16(
+                            &attn_out[pos * h..(pos + 1) * h],
+                            &weights.w_o,
+                            h,
+                            h,
+                            tmp_o,
+                        );
                         for j in 0..h {
                             post[j] = uc[j] + tmp_o[j];
                         }
@@ -1986,7 +2025,9 @@ impl std::fmt::Display for WeaverLoadError {
             Self::MetadataParse { key, value } => {
                 write!(f, "cannot parse metadata '{key}' from value '{value}'")
             }
-            Self::TensorMissing { name, .. } => write!(f, "tensor '{name}' not found in checkpoint"),
+            Self::TensorMissing { name, .. } => {
+                write!(f, "tensor '{name}' not found in checkpoint")
+            }
             Self::ShapeMismatch {
                 tensor,
                 expected,
@@ -2022,9 +2063,7 @@ fn parse_safetensors_header(bytes: &[u8]) -> Result<String, WeaverLoadError> {
     }
     std::str::from_utf8(&bytes[8..8 + header_len])
         .map(String::from)
-        .map_err(|_| WeaverLoadError::SafetensorsParse(
-            safetensors::SafeTensorError::InvalidHeader,
-        ))
+        .map_err(|_| WeaverLoadError::SafetensorsParse(safetensors::SafeTensorError::InvalidHeader))
 }
 
 /// Search the JSON header for a metadata value like `"hidden_dim":"2048"`.
@@ -2048,10 +2087,12 @@ fn extract_meta(header: &str, key: &str) -> Result<usize, WeaverLoadError> {
             value: "<unterminated>".to_string(),
         })?;
     let val_str = &header[val_start..val_start + val_end];
-    val_str.parse::<usize>().map_err(|_| WeaverLoadError::MetadataParse {
-        key: key.to_string(),
-        value: val_str.to_string(),
-    })
+    val_str
+        .parse::<usize>()
+        .map_err(|_| WeaverLoadError::MetadataParse {
+            key: key.to_string(),
+            value: val_str.to_string(),
+        })
 }
 
 // ── Tests ────────────────────────────────────────────────────────────────
@@ -2086,17 +2127,25 @@ mod tests {
         let mut dflash_logits: Vec<&'static [f32]> = Vec::with_capacity(d);
         for di in 0..d {
             h_dflash.push(Box::leak(
-                (0..h).map(|i| 0.3 + 0.01 * (di + i) as f32).collect::<Vec<f32>>().into_boxed_slice(),
+                (0..h)
+                    .map(|i| 0.3 + 0.01 * (di + i) as f32)
+                    .collect::<Vec<f32>>()
+                    .into_boxed_slice(),
             ));
             topk_ids.push(Box::leak(
-                (0..k).map(|i| (i as u32) % vocab_size as u32).collect::<Vec<u32>>().into_boxed_slice(),
+                (0..k)
+                    .map(|i| (i as u32) % vocab_size as u32)
+                    .collect::<Vec<u32>>()
+                    .into_boxed_slice(),
             ));
             dflash_logits.push(Box::leak(
-                (0..k).map(|i| (i as f32) * 0.1).collect::<Vec<f32>>().into_boxed_slice(),
+                (0..k)
+                    .map(|i| (i as f32) * 0.1)
+                    .collect::<Vec<f32>>()
+                    .into_boxed_slice(),
             ));
         }
-        let emb: &'static [f32] =
-            Box::leak(vec![0.1f32; vocab_size * h].into_boxed_slice());
+        let emb: &'static [f32] = Box::leak(vec![0.1f32; vocab_size * h].into_boxed_slice());
 
         WeaverInput {
             h_verifier,
@@ -2161,8 +2210,14 @@ mod tests {
         for di in 0..out.depth {
             for ki in 0..out.k {
                 assert!(out.corrected_probs[di][ki].is_finite(), "NaN/Inf in probs");
-                assert!(out.corrected_logits[di][ki].is_finite(), "NaN/Inf in logits");
-                assert!(out.weaver_residual[di][ki].is_finite(), "NaN/Inf in residual");
+                assert!(
+                    out.corrected_logits[di][ki].is_finite(),
+                    "NaN/Inf in logits"
+                );
+                assert!(
+                    out.weaver_residual[di][ki].is_finite(),
+                    "NaN/Inf in residual"
+                );
             }
         }
     }
@@ -2178,7 +2233,10 @@ mod tests {
         for di in 0..out.depth {
             for ki in 0..out.k {
                 let diff = (out.corrected_logits[di][ki] - input.dflash_logits[di][ki]).abs();
-                assert!(diff < 1e-6, "corrected != dflash at di={di} ki={ki}: diff={diff}");
+                assert!(
+                    diff < 1e-6,
+                    "corrected != dflash at di={di} ki={ki}: diff={diff}"
+                );
             }
         }
     }
@@ -2210,9 +2268,7 @@ mod tests {
 
         // With non-zero norm scales, u_final should be non-zero, so residuals
         // should be non-zero (dot of non-zero vector with non-zero embedding).
-        let any_nonzero = (0..out.depth)
-        .flat_map(|_di| 0..out.k)
-        .any(|_| true);
+        let any_nonzero = (0..out.depth).flat_map(|_di| 0..out.k).any(|_| true);
         assert!(any_nonzero, "output should have entries");
 
         // At least some residuals should be non-zero with non-zero norms.
@@ -2234,8 +2290,8 @@ mod tests {
 
     #[test]
     fn safetensors_roundtrip() {
-        use safetensors::tensor::TensorView;
         use safetensors::Dtype;
+        use safetensors::tensor::TensorView;
 
         let cfg = WeaverConfig {
             hidden_dim: 16,
@@ -2254,18 +2310,114 @@ mod tests {
         let md = cfg.max_depth;
 
         let tensors: Vec<(String, safetensors::tensor::TensorView)> = vec![
-            ("w_c".to_string(),      TensorView::new(Dtype::F32, vec![original.w_c.len()],      bytemuck::cast_slice(&original.w_c)).unwrap()),
-            ("w_q".to_string(),      TensorView::new(Dtype::F32, vec![original.w_q.len()],      bytemuck::cast_slice(&original.w_q)).unwrap()),
-            ("w_k".to_string(),      TensorView::new(Dtype::F32, vec![original.w_k.len()],      bytemuck::cast_slice(&original.w_k)).unwrap()),
-            ("w_v".to_string(),      TensorView::new(Dtype::F32, vec![original.w_v.len()],      bytemuck::cast_slice(&original.w_v)).unwrap()),
-            ("w_o".to_string(),      TensorView::new(Dtype::F32, vec![original.w_o.len()],      bytemuck::cast_slice(&original.w_o)).unwrap()),
-            ("w_gate".to_string(),   TensorView::new(Dtype::F32, vec![original.w_gate.len()],   bytemuck::cast_slice(&original.w_gate)).unwrap()),
-            ("w_up".to_string(),     TensorView::new(Dtype::F32, vec![original.w_up.len()],     bytemuck::cast_slice(&original.w_up)).unwrap()),
-            ("w_down".to_string(),   TensorView::new(Dtype::F32, vec![original.w_down.len()],   bytemuck::cast_slice(&original.w_down)).unwrap()),
-            ("norm_cond".to_string(), TensorView::new(Dtype::F32, vec![original.norm_cond.len()], bytemuck::cast_slice(&original.norm_cond)).unwrap()),
-            ("norm_attn".to_string(), TensorView::new(Dtype::F32, vec![original.norm_attn.len()], bytemuck::cast_slice(&original.norm_attn)).unwrap()),
-            ("norm_mlp".to_string(), TensorView::new(Dtype::F32, vec![original.norm_mlp.len()], bytemuck::cast_slice(&original.norm_mlp)).unwrap()),
-            ("pos_emb".to_string(),  TensorView::new(Dtype::F32, vec![original.pos_emb.len()],  bytemuck::cast_slice(&original.pos_emb)).unwrap()),
+            (
+                "w_c".to_string(),
+                TensorView::new(
+                    Dtype::F32,
+                    vec![original.w_c.len()],
+                    bytemuck::cast_slice(&original.w_c),
+                )
+                .unwrap(),
+            ),
+            (
+                "w_q".to_string(),
+                TensorView::new(
+                    Dtype::F32,
+                    vec![original.w_q.len()],
+                    bytemuck::cast_slice(&original.w_q),
+                )
+                .unwrap(),
+            ),
+            (
+                "w_k".to_string(),
+                TensorView::new(
+                    Dtype::F32,
+                    vec![original.w_k.len()],
+                    bytemuck::cast_slice(&original.w_k),
+                )
+                .unwrap(),
+            ),
+            (
+                "w_v".to_string(),
+                TensorView::new(
+                    Dtype::F32,
+                    vec![original.w_v.len()],
+                    bytemuck::cast_slice(&original.w_v),
+                )
+                .unwrap(),
+            ),
+            (
+                "w_o".to_string(),
+                TensorView::new(
+                    Dtype::F32,
+                    vec![original.w_o.len()],
+                    bytemuck::cast_slice(&original.w_o),
+                )
+                .unwrap(),
+            ),
+            (
+                "w_gate".to_string(),
+                TensorView::new(
+                    Dtype::F32,
+                    vec![original.w_gate.len()],
+                    bytemuck::cast_slice(&original.w_gate),
+                )
+                .unwrap(),
+            ),
+            (
+                "w_up".to_string(),
+                TensorView::new(
+                    Dtype::F32,
+                    vec![original.w_up.len()],
+                    bytemuck::cast_slice(&original.w_up),
+                )
+                .unwrap(),
+            ),
+            (
+                "w_down".to_string(),
+                TensorView::new(
+                    Dtype::F32,
+                    vec![original.w_down.len()],
+                    bytemuck::cast_slice(&original.w_down),
+                )
+                .unwrap(),
+            ),
+            (
+                "norm_cond".to_string(),
+                TensorView::new(
+                    Dtype::F32,
+                    vec![original.norm_cond.len()],
+                    bytemuck::cast_slice(&original.norm_cond),
+                )
+                .unwrap(),
+            ),
+            (
+                "norm_attn".to_string(),
+                TensorView::new(
+                    Dtype::F32,
+                    vec![original.norm_attn.len()],
+                    bytemuck::cast_slice(&original.norm_attn),
+                )
+                .unwrap(),
+            ),
+            (
+                "norm_mlp".to_string(),
+                TensorView::new(
+                    Dtype::F32,
+                    vec![original.norm_mlp.len()],
+                    bytemuck::cast_slice(&original.norm_mlp),
+                )
+                .unwrap(),
+            ),
+            (
+                "pos_emb".to_string(),
+                TensorView::new(
+                    Dtype::F32,
+                    vec![original.pos_emb.len()],
+                    bytemuck::cast_slice(&original.pos_emb),
+                )
+                .unwrap(),
+            ),
         ];
 
         let metadata = Some(std::collections::HashMap::from([
@@ -2386,17 +2538,21 @@ mod tests {
         let mut orig_topk: Vec<(usize, f32)> = Vec::new();
         for di in 0..depth {
             let row = &marginals[di * vocab..(di + 1) * vocab];
-            let mut sorted: Vec<(usize, f32)> =
-                row.iter().cloned().enumerate().filter(|(_, p)| *p > 0.0).collect();
+            let mut sorted: Vec<(usize, f32)> = row
+                .iter()
+                .cloned()
+                .enumerate()
+                .filter(|(_, p)| *p > 0.0)
+                .collect();
             sorted.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
             orig_topk.extend(sorted.into_iter().take(k));
         }
 
         // Hidden states + embedding (arbitrary non-degenerate values).
         let h_verifier: Vec<f32> = vec![0.5; h];
-        let h_dflash_owned: Vec<Vec<f32>> = (0..depth).map(|di| {
-            (0..h).map(|j| 0.3 + 0.01 * (di * h + j) as f32).collect()
-        }).collect();
+        let h_dflash_owned: Vec<Vec<f32>> = (0..depth)
+            .map(|di| (0..h).map(|j| 0.3 + 0.01 * (di * h + j) as f32).collect())
+            .collect();
         let h_dflash: Vec<&[f32]> = h_dflash_owned.iter().map(|v| v.as_slice()).collect();
         let embedding: Vec<f32> = vec![0.1; vocab * h];
 
@@ -2427,12 +2583,22 @@ mod tests {
         // (0.05) is rank 5 — below K, gets zeroed.
         for di in 0..depth {
             let row = &marginals[di * vocab..(di + 1) * vocab];
-            assert!(row[di] > 1e-6, "depth {di}: original peak at {di} lost mass");
-            assert!(row[vocab - 1] > 1e-6, "depth {di}: original peak at {} lost mass", vocab - 1);
+            assert!(
+                row[di] > 1e-6,
+                "depth {di}: original peak at {di} lost mass"
+            );
+            assert!(
+                row[vocab - 1] > 1e-6,
+                "depth {di}: original peak at {} lost mass",
+                vocab - 1
+            );
             assert!(row[10] > 1e-6, "depth {di}: original peak at 10 lost mass");
             assert!(row[11] > 1e-6, "depth {di}: original peak at 11 lost mass");
             // Token 12 was rank 5 — below K=4, should be zeroed.
-            assert!(row[12] < 1e-10, "depth {di}: rank-5 token at 12 should be zeroed");
+            assert!(
+                row[12] < 1e-10,
+                "depth {di}: rank-5 token at 12 should be zeroed"
+            );
         }
     }
 
@@ -2453,9 +2619,18 @@ mod tests {
         // Wrong marginals length (depth * vocab + 1).
         let mut bad_marginals = vec![0.0f32; depth * vocab + 1];
         let err = corrector
-            .correct_marginals_inplace(&mut bad_marginals, &h_verifier, &h_dflash, &embedding, vocab)
+            .correct_marginals_inplace(
+                &mut bad_marginals,
+                &h_verifier,
+                &h_dflash,
+                &embedding,
+                vocab,
+            )
             .unwrap_err();
-        assert!(matches!(err, super::WeaverCorrectError::MarginalsShape { .. }));
+        assert!(matches!(
+            err,
+            super::WeaverCorrectError::MarginalsShape { .. }
+        ));
 
         // Wrong h_verifier length.
         let mut marginals = vec![0.0f32; depth * vocab];
@@ -2470,9 +2645,18 @@ mod tests {
         let too_deep: Vec<&[f32]> = too_deep_owned.iter().map(|v| v.as_slice()).collect();
         let mut deep_marginals = vec![0.0f32; (depth + 1) * vocab];
         let err = corrector
-            .correct_marginals_inplace(&mut deep_marginals, &h_verifier, &too_deep, &embedding, vocab)
+            .correct_marginals_inplace(
+                &mut deep_marginals,
+                &h_verifier,
+                &too_deep,
+                &embedding,
+                vocab,
+            )
             .unwrap_err();
-        assert!(matches!(err, super::WeaverCorrectError::DepthExceedsConfig { .. }));
+        assert!(matches!(
+            err,
+            super::WeaverCorrectError::DepthExceedsConfig { .. }
+        ));
     }
 
     // ── G4: Scratch path equivalence + latency (Issue 131 G4) ──
@@ -2611,7 +2795,13 @@ mod tests {
 
         // Run both paths.
         corrector
-            .correct_marginals_inplace(&mut marginals_alloc, &h_verifier, &h_dflash, &embedding, vocab)
+            .correct_marginals_inplace(
+                &mut marginals_alloc,
+                &h_verifier,
+                &h_dflash,
+                &embedding,
+                vocab,
+            )
             .expect("allocating path should succeed");
 
         let mut scratch = WeaverScratch::new(&cfg);
@@ -2648,13 +2838,21 @@ mod tests {
         let (depth, k) = weaver_forward_into(&weights, &input, &mut scratch);
 
         for di in 0..depth {
-            let sum: f32 = (0..k).map(|ki| scratch.corrected_probs_flat[di * k + ki]).sum();
+            let sum: f32 = (0..k)
+                .map(|ki| scratch.corrected_probs_flat[di * k + ki])
+                .sum();
             assert!((sum - 1.0).abs() < 1e-4, "probs at di={di} sum to {sum}");
             for ki in 0..k {
                 let cp = scratch.corrected_probs_flat[di * k + ki];
-                assert!(cp.is_finite(), "NaN/Inf in corrected_probs at di={di} ki={ki}");
+                assert!(
+                    cp.is_finite(),
+                    "NaN/Inf in corrected_probs at di={di} ki={ki}"
+                );
                 let cl = scratch.corrected_logits_flat[di * k + ki];
-                assert!(cl.is_finite(), "NaN/Inf in corrected_logits at di={di} ki={ki}");
+                assert!(
+                    cl.is_finite(),
+                    "NaN/Inf in corrected_logits at di={di} ki={ki}"
+                );
             }
         }
     }
@@ -2684,16 +2882,25 @@ mod tests {
         for di in 0..depth_seq {
             for ki in 0..k_seq {
                 let idx = di * k_seq + ki;
-                let diff_r = (scratch_seq.residual_flat[idx] - scratch_par.residual_flat[idx]).abs();
+                let diff_r =
+                    (scratch_seq.residual_flat[idx] - scratch_par.residual_flat[idx]).abs();
                 assert!(diff_r < 1e-4, "residual mismatch di={di} ki={ki}: {diff_r}");
 
-                let diff_cl =
-                    (scratch_seq.corrected_logits_flat[idx] - scratch_par.corrected_logits_flat[idx]).abs();
-                assert!(diff_cl < 1e-4, "corrected_logits mismatch di={di} ki={ki}: {diff_cl}");
+                let diff_cl = (scratch_seq.corrected_logits_flat[idx]
+                    - scratch_par.corrected_logits_flat[idx])
+                    .abs();
+                assert!(
+                    diff_cl < 1e-4,
+                    "corrected_logits mismatch di={di} ki={ki}: {diff_cl}"
+                );
 
-                let diff_cp =
-                    (scratch_seq.corrected_probs_flat[idx] - scratch_par.corrected_probs_flat[idx]).abs();
-                assert!(diff_cp < 1e-4, "corrected_probs mismatch di={di} ki={ki}: {diff_cp}");
+                let diff_cp = (scratch_seq.corrected_probs_flat[idx]
+                    - scratch_par.corrected_probs_flat[idx])
+                    .abs();
+                assert!(
+                    diff_cp < 1e-4,
+                    "corrected_probs mismatch di={di} ki={ki}: {diff_cp}"
+                );
             }
         }
     }
@@ -2808,8 +3015,7 @@ mod tests {
         let k = cfg.k_candidates;
         for idx in 0..depth * k {
             assert_eq!(
-                scratch_fn.corrected_probs_flat[idx],
-                scratch_wrap.corrected_probs_flat[idx],
+                scratch_fn.corrected_probs_flat[idx], scratch_wrap.corrected_probs_flat[idx],
                 "corrector wrapper mismatch at idx={idx}"
             );
         }

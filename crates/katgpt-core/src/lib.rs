@@ -212,8 +212,8 @@ pub use similarity::{recos_sim, recos_sim_ranking, recos_sim_slice, recos_sim_sl
 pub mod elasticity_gated_update;
 #[cfg(feature = "elasticity_gated_update")]
 pub use elasticity_gated_update::{
-    ElasticityConfig, compute_error, effective_neighborhood_size,
-    elasticity_gated_update_into, neighborhood_weight,
+    ElasticityConfig, compute_error, effective_neighborhood_size, elasticity_gated_update_into,
+    neighborhood_weight,
 };
 // Plan 429 Phase 5 T5.1: Error-weighted graph Laplacian — DSOM neighborhood
 // weights composed with the DEC graph Laplacian. Requires both
@@ -448,20 +448,20 @@ pub use traits::{AllGoalsUpdate, LeoHead, sigmoid_bounded_q};
 // Re-export key types at crate root for convenience
 #[allow(deprecated)]
 pub use shard_embedding::{EMBED_DIM, JlProjectionMatrix, STYLE_DIM as JL_STYLE_DIM};
-#[allow(deprecated)]
-pub use types::sample_token;
+#[cfg(feature = "loop_stability_fix")]
+pub use types::LoopStabilityMode;
 #[allow(deprecated)]
 pub use types::ShardEmbedding;
+#[allow(deprecated)]
+pub use types::sample_token;
 pub use types::{
     AttentionMode, AttentionProjection, CacheLayout, CalibrationMode, Config, ConvergenceSelector,
     DashAttnConfig, DilationConfig, HlaMode, HybridPattern, InferenceOverrides, InferenceResult,
     LoopMode, LoraAdapter, LoraPair, ModelArchitecture, ResidualGate, RetrievalHeadRole, Rng,
-    RtTurboConfig, SdpaOutputGate, WeightDtype, kv_dim, lora_apply, matmul,
-    matmul_f16, matmul_f16_parallel, matmul_parallel, matmul_relu, rmsnorm, sample_token_into,
-    softmax, softmax_scaled,
+    RtTurboConfig, SdpaOutputGate, WeightDtype, kv_dim, lora_apply, matmul, matmul_f16,
+    matmul_f16_parallel, matmul_parallel, matmul_relu, rmsnorm, sample_token_into, softmax,
+    softmax_scaled,
 };
-#[cfg(feature = "loop_stability_fix")]
-pub use types::LoopStabilityMode;
 
 #[cfg(feature = "domain_latent")]
 pub use types::DomainLatent;
@@ -767,10 +767,10 @@ pub use subspace_phase_gate::{
 
 #[cfg(feature = "group_invariance_probe")]
 pub use group_invariance_probe::{
-    GroupAction, Matrix, SubgroupClass, SubgroupReport, classify_subgroup,
-    classify_subgroup_with, commutant_basis, commutant_binary_association,
-    commutant_of_matrices, commutant_shift, discover_subgroup,
-    discover_subgroup_into, invariance_score, score_concentration, score_variance,
+    GroupAction, Matrix, SubgroupClass, SubgroupReport, classify_subgroup, classify_subgroup_with,
+    commutant_basis, commutant_binary_association, commutant_of_matrices, commutant_shift,
+    discover_subgroup, discover_subgroup_into, invariance_score, score_concentration,
+    score_variance,
 };
 
 #[cfg(feature = "causal_head_importance")]
@@ -800,8 +800,8 @@ pub use causal_head_importance::{adaptive_partition, suspect_indices};
 pub mod cross_stage_relocation;
 #[cfg(feature = "cross_stage_relocation")]
 pub use cross_stage_relocation::{
-    ClusterClass, PermeationMap, RelocateOp, RelocatePair, RelocatingForward,
-    permeation_scan_into, permeation_scan_square_into,
+    ClusterClass, PermeationMap, RelocateOp, RelocatePair, RelocatingForward, permeation_scan_into,
+    permeation_scan_square_into,
 };
 
 #[cfg(feature = "latent_trajectory_geometry")]
@@ -1038,8 +1038,8 @@ pub use latent_steering::{
 pub mod subspace_steering;
 #[cfg(feature = "subspace_steering")]
 pub use subspace_steering::{
-    SubspaceSteeringError, SubspaceSteeringField, apply_subspace_steering,
-    block_energy, compute_block_commitment, walk_manifold,
+    SubspaceSteeringError, SubspaceSteeringField, apply_subspace_steering, block_energy,
+    compute_block_commitment, walk_manifold,
 };
 
 // Region-Conditioned Subspace Field — MFA local-geometry steering (Plan 416,
@@ -1058,8 +1058,8 @@ pub use subspace_steering::{
 pub mod region_subspace;
 #[cfg(feature = "region_subspace_steering")]
 pub use region_subspace::{
-    RegionDecomposition, RegionSubspaceError, RegionSubspaceField,
-    compute_field_commitment, reconstruct,
+    RegionDecomposition, RegionSubspaceError, RegionSubspaceField, compute_field_commitment,
+    reconstruct,
 };
 
 // Phase-Modulated Subspace Rotation Gate — norm-preserving latent coupling
@@ -1434,8 +1434,8 @@ pub use engram::{
     EngramTableBuilder, EngramTableId, HashHead, IDENTITY_KERNEL, InMemoryEngramTable, K_MAX,
     SigmoidFusionConfig, StagingEngramTable, StagingError, SurjectiveMap, SurjectiveMapLoadError,
     TokenId, TokenizerSpec, ZipfianCacheHierarchy, ZipfianStats, ZipfianStatsSnapshot,
-    build_merkle_root, build_surjective_map, compress_token, conv_causal_dyn_into, conv_causal_into,
-    fuse_into_hidden_state, multi_head_hash, rmsnorm_into, sigmoid_fuse_into,
+    build_merkle_root, build_surjective_map, compress_token, conv_causal_dyn_into,
+    conv_causal_into, fuse_into_hidden_state, multi_head_hash, rmsnorm_into, sigmoid_fuse_into,
     sigmoid_fuse_multi_branch_into, try_compress_token,
 };
 
@@ -1903,7 +1903,9 @@ pub mod gdn_tree_verify;
 #[cfg(feature = "tilr_invariant_subspace")]
 pub mod tilr;
 #[cfg(feature = "tilr_invariant_subspace")]
-pub use tilr::{TilrError, TilrScratch, check_orthonormal, tilr_refine, tilr_refine_apply, tilr_refine_into};
+pub use tilr::{
+    TilrError, TilrScratch, check_orthonormal, tilr_refine, tilr_refine_apply, tilr_refine_into,
+};
 // Phase 3 calibration helper needs Plan 301's thin SVD — gated on both features.
 #[cfg(all(feature = "tilr_invariant_subspace", feature = "subspace_phase_gate"))]
 pub use tilr::discover_invariant_subspace;
@@ -1917,11 +1919,9 @@ pub mod manifold_erasure;
 #[cfg(all(feature = "manifold_erasure", feature = "subspace_phase_gate"))]
 pub use manifold_erasure::{
     ManceConfig, ManceError, ManceScratch, ManceStepInfo, ManceTangentCache,
-    covmatch_second_moment_into, leace_first_moment_into,
-    mance_plus_plus_step_into, mance_plus_step_into,
-    manifold_erasure_loop_cached_into, manifold_erasure_loop_into,
-    manifold_erasure_step, manifold_erasure_step_cached_into,
-    manifold_erasure_step_into,
+    covmatch_second_moment_into, leace_first_moment_into, mance_plus_plus_step_into,
+    mance_plus_step_into, manifold_erasure_loop_cached_into, manifold_erasure_loop_into,
+    manifold_erasure_step, manifold_erasure_step_cached_into, manifold_erasure_step_into,
 };
 
 // Lifelong LaCAM Multi-Agent Pathfinding Substrate (Plan 440, Research 424,
@@ -1948,10 +1948,9 @@ pub mod multi_agent_path;
 pub mod poincare;
 #[cfg(all(feature = "poincare_navigator", feature = "subspace_phase_gate"))]
 pub use poincare::{
-    LATENT_DIM_MAX, PHI_HIDDEN_DEFAULT, PHI_OUT_DEFAULT, RIDGE_ALPHA_DEFAULT, TARGET_DIM_MAX,
-    FitConfig, PoincareAdapter, PoincareFitError,
-    accumulate_pinv_into, eval_phi_into, fit_poincare_adapter,
-    poincare_multi_step_into, poincare_navigate_into,
+    FitConfig, LATENT_DIM_MAX, PHI_HIDDEN_DEFAULT, PHI_OUT_DEFAULT, PoincareAdapter,
+    PoincareFitError, RIDGE_ALPHA_DEFAULT, TARGET_DIM_MAX, accumulate_pinv_into, eval_phi_into,
+    fit_poincare_adapter, poincare_multi_step_into, poincare_navigate_into,
 };
 
 // Test-only `#[global_allocator]` so `alloc::tests::*` pass when running

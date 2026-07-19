@@ -407,8 +407,7 @@ pub fn forward_block_causal_positions(
         all_attn_weights[attn_base..attn_base + attn_row_stride].fill(0.0f32);
         for h in 0..config.n_head {
             let dst = attn_base + h * seq_len;
-            all_attn_weights[dst..dst + t_n]
-                .copy_from_slice(&attn_w_buf[h * t_n..h * t_n + t_n]);
+            all_attn_weights[dst..dst + t_n].copy_from_slice(&attn_w_buf[h * t_n..h * t_n + t_n]);
         }
 
         matmul(&mut x_proj, &layer.attn_wo, &attn_out_buf, n, n);
@@ -480,7 +479,11 @@ mod tests {
         // and MLP, producing differences up to ~1e-4 on logit magnitudes ~10.)
         // Both logits_bc and logits_sc are now FLAT row-major.
         let vocab = config.vocab_size;
-        assert_eq!(logits_bc.len(), logits_sc.len(), "flat logits length mismatch");
+        assert_eq!(
+            logits_bc.len(),
+            logits_sc.len(),
+            "flat logits length mismatch"
+        );
         assert_eq!(logits_bc.len(), tokens.len() * vocab);
         for q in 0..tokens.len() {
             for v in 0..vocab {

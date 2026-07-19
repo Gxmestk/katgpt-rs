@@ -28,11 +28,11 @@
 #![cfg(feature = "clr")]
 
 use fastrand::Rng;
-use katgpt_core::simd::simd_dot_f32;
 use katgpt_claim::clr::{
     Claim, ClaimVerifier, ClrConfig, ClrScratch, Cluster, DirectionVectorSource, FnClaimExtractor,
     SigmoidProjectionVerifier, Trajectory, brevity_tiebreak, clr_vote,
 };
+use katgpt_core::simd::simd_dot_f32;
 
 // ──────────────────────────────────────────────────────────────────────────
 // Shared helpers (also reused conceptually by the G4 binary)

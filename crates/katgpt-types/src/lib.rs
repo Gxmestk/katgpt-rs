@@ -52,6 +52,9 @@ pub use depth_invariance::{
     DepthInvarianceConfig, DepthInvarianceDiagnostic, DepthInvarianceKind, MagnitudeRegularization,
     Scratch, apply_magnitude_regularization, classify_chain, classify_chain_batched,
 };
+/// Binary `{-1,+1}` bit-plane packed weights (Issue 145, `binary_plasma` feature).
+#[cfg(feature = "binary_plasma")]
+pub mod binary;
 mod enums;
 mod gpart;
 mod hydra;
@@ -79,9 +82,6 @@ pub mod simd;
 pub mod slod;
 pub mod temporal;
 mod ternary;
-/// Binary `{-1,+1}` bit-plane packed weights (Issue 145, `binary_plasma` feature).
-#[cfg(feature = "binary_plasma")]
-pub mod binary;
 
 #[cfg(test)]
 mod tests_types;
@@ -89,6 +89,8 @@ mod tests_types;
 // Re-export the entire public surface so `katgpt_types::*` paths are
 // available at the crate root. Feature gates mirror the gates on the
 // underlying items.
+#[cfg(feature = "binary_plasma")]
+pub use binary::{BinaryWeights, GROUP_SIZE};
 pub use config::{Config, InferenceOverrides, kv_dim};
 #[cfg(feature = "domain_latent")]
 pub use domain::DomainLatent;
@@ -101,8 +103,7 @@ pub use enums::WallConfig;
 pub use enums::{
     AttentionMode, AttentionProjection, CacheLayout, CalibrationMode, ConvergenceSelector,
     DashAttnConfig, DepthTier, HlaMode, HybridPattern, LoopMode, LoopStabilityMode,
-    ModelArchitecture, ResidualGate, RetrievalHeadRole, RtTurboConfig, SdpaOutputGate,
-    WeightDtype,
+    ModelArchitecture, ResidualGate, RetrievalHeadRole, RtTurboConfig, SdpaOutputGate, WeightDtype,
 };
 #[cfg(feature = "sr2am_configurator")]
 pub use enums::{ConfiguratorContext, PlanningDecision};
@@ -131,15 +132,13 @@ pub use merkle::{
     MERKLE_OCTREE_LEAVES, MERKLE_OCTREE_NODES, MerkleOctree, MerkleProof,
 };
 pub use rng::Rng;
-pub use sense::{DilationConfig, SenseKind, SenseModule, TernaryDir};
 #[allow(deprecated)]
 pub use sense::ShardEmbedding;
+pub use sense::{DilationConfig, SenseKind, SenseModule, TernaryDir};
 pub use slod::ScaleBoundary;
 pub use temporal::{TemporalDerivativeKernel, sigmoid_surprise_gate};
 #[cfg(feature = "plasma_path")]
 pub use ternary::TernaryWeights;
-#[cfg(feature = "binary_plasma")]
-pub use binary::{BinaryWeights, GROUP_SIZE};
 
 // Internal helpers (read_u32_le / read_f32_le / read_u16_le) live in
 // `domain.rs` and are crate-private — not re-exported here. If other modules

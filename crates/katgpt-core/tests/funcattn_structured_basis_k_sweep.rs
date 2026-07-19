@@ -31,9 +31,7 @@ const N: usize = 20;
 // `random_orthonormal_w`) are bit-identical to `funcattn_structured_basis_g1.rs`.
 #[path = "common/basis_harness.rs"]
 mod basis_harness;
-use basis_harness::{
-    cosine, gram_schmidt_rows, l2_normalize, lcg_next, random_orthonormal_w,
-};
+use basis_harness::{cosine, gram_schmidt_rows, l2_normalize, lcg_next, random_orthonormal_w};
 
 /// Build the multi-scale input X (matches the Phase 0 probe exactly).
 fn make_multiscale_x(seed: u64, n_scales: usize) -> (Vec<f32>, Vec<f32>) {

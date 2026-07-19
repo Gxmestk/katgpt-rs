@@ -171,8 +171,7 @@ impl PermeationMap {
         let mut quadrant_mean = [[0.0f32; 3]; 3]; // [src_third][dst_third]
         for (s_third, (s_lo, s_hi)) in src_bounds.iter().enumerate() {
             for (d_third, (d_lo, d_hi)) in dst_bounds.iter().enumerate() {
-                let area = (s_hi.saturating_sub(*s_lo))
-                    * (d_hi.saturating_sub(*d_lo));
+                let area = (s_hi.saturating_sub(*s_lo)) * (d_hi.saturating_sub(*d_lo));
                 if area == 0 {
                     continue;
                 }
@@ -269,11 +268,21 @@ pub enum ClusterClass {
 ///   `(src_stage, dst_stage)` pair.
 /// - `out` — pre-allocated `PermeationMap` of size `n_src × n_dst`. Must
 ///   match the dimensions the closure expects.
-pub fn permeation_scan_into<F>(m_clean: f32, m_corrupt: f32, patched_readout: F, out: &mut PermeationMap)
-where
+pub fn permeation_scan_into<F>(
+    m_clean: f32,
+    m_corrupt: f32,
+    patched_readout: F,
+    out: &mut PermeationMap,
+) where
     F: FnMut(usize, usize) -> f32,
 {
-    scan_into_inner(m_clean, m_corrupt, patched_readout, out, /* strict_dims */ false);
+    scan_into_inner(
+        m_clean,
+        m_corrupt,
+        patched_readout,
+        out,
+        /* strict_dims */ false,
+    );
 }
 
 /// Like [`permeation_scan_into`] but asserts `out.n_src == out.n_dst` (the
@@ -290,7 +299,13 @@ pub fn permeation_scan_square_into<F>(
 ) where
     F: FnMut(usize, usize) -> f32,
 {
-    scan_into_inner(m_clean, m_corrupt, patched_readout, out, /* strict_dims */ true);
+    scan_into_inner(
+        m_clean,
+        m_corrupt,
+        patched_readout,
+        out,
+        /* strict_dims */ true,
+    );
 }
 
 fn scan_into_inner<F>(
@@ -522,7 +537,10 @@ mod tests {
         let cls = m.classify_two_cluster();
         assert!(matches!(
             cls,
-            ClusterClass::EarlyToMid | ClusterClass::LateToMid | ClusterClass::Both | ClusterClass::None
+            ClusterClass::EarlyToMid
+                | ClusterClass::LateToMid
+                | ClusterClass::Both
+                | ClusterClass::None
         ));
     }
 

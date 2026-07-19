@@ -146,11 +146,7 @@ fn speculate_one_round(first_digit: u8) -> usize {
     // Commit the deepest path.
     let best = tree
         .iter()
-        .max_by(|a, b| {
-            a.depth
-                .cmp(&b.depth)
-                .then(a.score.total_cmp(&b.score))
-        })
+        .max_by(|a, b| a.depth.cmp(&b.depth).then(a.score.total_cmp(&b.score)))
         .unwrap();
 
     let path = katgpt_rs::speculative::extract_parent_tokens(best.parent_path, best.depth + 1);

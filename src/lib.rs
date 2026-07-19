@@ -31,17 +31,20 @@ pub mod benchmark;
 // ── DashAttention module-scoped re-export ──────────────────────────────────
 #[cfg(feature = "dash_attn")]
 pub mod dash_attn {
-    pub use katgpt_attn::dash_attn::{
-        adaptive_k, block_topk, channel_aware, chunk_summary, entmax, entmax_router, forward,
-        kv_outer_prefill, meta_router, msa_distill, routing, sat_analysis, value_energy, vortex_flow,
-    };
     pub use katgpt_attn::dash_attn::chunk_summary::{
         ChunkSummaryCache, ChunkSummaryQuery, summarize_chunk_with_entropy,
     };
     pub use katgpt_attn::dash_attn::entmax::{entmax_1p5, entmax_gqa_aggregate, entmax_support};
-    pub use katgpt_attn::dash_attn::forward::{forward_dash_attn_decode, forward_dash_attn_prefill};
+    pub use katgpt_attn::dash_attn::forward::{
+        forward_dash_attn_decode, forward_dash_attn_prefill,
+    };
     pub use katgpt_attn::dash_attn::routing::{
         compute_routing_bias, score_blocks_entmax, score_blocks_entmax_with_entropy,
+    };
+    pub use katgpt_attn::dash_attn::{
+        adaptive_k, block_topk, channel_aware, chunk_summary, entmax, entmax_router, forward,
+        kv_outer_prefill, meta_router, msa_distill, routing, sat_analysis, value_energy,
+        vortex_flow,
     };
 
     #[cfg(feature = "msa_adaptive_k")]
@@ -73,8 +76,8 @@ pub mod dash_attn {
     pub use katgpt_attn::dash_attn::value_energy::{ValueEnergyCache, ValueEnergyRouter};
     #[cfg(feature = "vortex_flow")]
     pub use katgpt_attn::dash_attn::vortex_flow::{
-        RoutingDecision, VortexFlow, VortexFlowConfig, VortexFlowExt, VortexRouter, VortexRouterCache,
-        VortexScratch, build_vortex_router,
+        RoutingDecision, VortexFlow, VortexFlowConfig, VortexFlowExt, VortexRouter,
+        VortexRouterCache, VortexScratch, build_vortex_router,
     };
 }
 
@@ -103,19 +106,13 @@ pub mod data_probe {
     #[cfg(feature = "sink_aware_attn")]
     pub mod sink_classify {
         pub use katgpt_core::data_probe::{
-            CachedSinkClassification, SinkAwarePolicy, SinkClassifierConfig, SinkDiagnostic, SinkKind,
-            StableRankScratch, apply_dual_policy_gate, apply_dual_policy_gate_cached,
+            CachedSinkClassification, SinkAwarePolicy, SinkClassifierConfig, SinkDiagnostic,
+            SinkKind, StableRankScratch, apply_dual_policy_gate, apply_dual_policy_gate_cached,
             apply_dual_policy_gate_cached_flat, apply_dual_policy_gate_flat, classify_all_sinks,
             classify_all_sinks_flat, classify_sink_at, classify_sink_at_flat,
             stable_rank_update_into, stable_rank_update_into_flat,
         };
     }
-    pub use katgpt_core::data_probe::{
-        ClaimCard, Intervention, MarkovChain, Regime, RegimeDistribution, ValidityVerdict,
-        average_nll, classify_regime, consecutive_adjacency, functor_adjacency,
-        generate_markov_chain, kv_cache_dirichlet_energy, nll_profile, regime_distribution,
-        sample_sequence,
-    };
     #[cfg(feature = "sink_aware_attn")]
     pub use katgpt_core::data_probe::{
         CachedSinkClassification, GeometryReport, LayerSinkSummary, SinkAwarePolicy,
@@ -125,6 +122,12 @@ pub mod data_probe {
         classify_all_sinks_flat, classify_sink_at, classify_sink_at_flat, effective_rank,
         representation_geometry_report, stable_rank_update_into, stable_rank_update_into_flat,
         summarize_layer_sinks,
+    };
+    pub use katgpt_core::data_probe::{
+        ClaimCard, Intervention, MarkovChain, Regime, RegimeDistribution, ValidityVerdict,
+        average_nll, classify_regime, consecutive_adjacency, functor_adjacency,
+        generate_markov_chain, kv_cache_dirichlet_energy, nll_profile, regime_distribution,
+        sample_sequence,
     };
 }
 
@@ -153,14 +156,14 @@ pub mod dllm;
 // ── GDN2 module-scoped re-export ───────────────────────────────────────────
 #[cfg(feature = "gdn2_attention")]
 pub mod gdn2 {
-    pub use katgpt_attn::gdn2::{kernel, types};
     pub use katgpt_attn::gdn2::forward::{forward_gdn2, generate_gdn2_into};
+    #[cfg(feature = "gdn_tree_verify")]
+    pub use katgpt_attn::gdn2::tree_verify_bridge;
     pub use katgpt_attn::gdn2::{
         Gdn2GateConfig, Gdn2HeadState, Gdn2LayerState, MultiLayerGdn2Cache, gdn2_recurrent_step,
         gdn2_state_readout, gdn2_state_update, l2_normalize, sigmoid,
     };
-    #[cfg(feature = "gdn_tree_verify")]
-    pub use katgpt_attn::gdn2::tree_verify_bridge;
+    pub use katgpt_attn::gdn2::{kernel, types};
     // Plan 436 T4.8: re-export `forward_tree_gdn2` so riir-gpu can build the
     // GPU-corrector speculative step without a direct katgpt-attn dep (cycle
     // safety: the GPU orchestration lives in riir-gpu, which reaches the tree
@@ -172,17 +175,17 @@ pub mod gdn2 {
 // ── HLA module-scoped re-export ────────────────────────────────────────────
 #[cfg(feature = "hla_attention")]
 pub mod hla {
-    pub use katgpt_core::hla::{kernel, types};
-    pub use katgpt_forward::{forward_ahla, forward_hla, generate_ahla_into, generate_hla_into};
     pub use katgpt_core::hla::{
-        AhlaLayerState, AhlaQHeadState, HlaLayerState, HlaQHeadState, HlaVariant, MultiLayerAhlaCache,
-        MultiLayerHlaCache, MultiLayerParallaxAhlaCache, ParallaxAhlaLayerState,
-        ParallaxAhlaQHeadState,
+        AhlaLayerState, AhlaQHeadState, HlaLayerState, HlaQHeadState, HlaVariant,
+        MultiLayerAhlaCache, MultiLayerHlaCache, MultiLayerParallaxAhlaCache,
+        ParallaxAhlaLayerState, ParallaxAhlaQHeadState,
     };
     pub use katgpt_core::hla::{
         ahla_denom, ahla_layer_step, ahla_step, hla_denom, hla_layer_readout, hla_layer_update,
         hla_readout, hla_readout_normalized, hla_state_update,
     };
+    pub use katgpt_core::hla::{kernel, types};
+    pub use katgpt_forward::{forward_ahla, forward_hla, generate_ahla_into, generate_hla_into};
 }
 
 // ── CompressionDrafter re-export (Plan 285, gated) ───────────────────────
@@ -202,8 +205,8 @@ pub mod pruners;
 // ── DenseMesh module-scoped re-export ──────────────────────────────────────
 #[cfg(feature = "dense_mesh")]
 pub mod dense_mesh {
-    pub use katgpt_transformer::dense_mesh::*;
     pub use katgpt_forward::TransformerNode;
+    pub use katgpt_transformer::dense_mesh::*;
 }
 
 // ── Sleep consolidation (genuine root module) ──────────────────────────────

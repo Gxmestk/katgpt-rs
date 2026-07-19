@@ -142,7 +142,10 @@ mod tests {
         g.bidirected_edge(n(0), n(4));
         // From seed {0}, hops=1 should pick up 4 via the bidirected edge.
         let sub = extract_relevant_subgraph(&g, &[n(0)], 1);
-        assert!(sub.contains_node(n(4)), "bidirected edge should be traversed");
+        assert!(
+            sub.contains_node(n(4)),
+            "bidirected edge should be traversed"
+        );
     }
 
     #[test]

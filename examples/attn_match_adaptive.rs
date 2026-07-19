@@ -15,8 +15,8 @@
 //! ```
 
 use katgpt_attn_match::{online::OnlineCompactor, types::AmConfig};
-use katgpt_rs::attn_match_adaptive_cot::AdaptiveTraceCompactor;
 use katgpt_pruners::freq_bandit::FrequencyBand;
+use katgpt_rs::attn_match_adaptive_cot::AdaptiveTraceCompactor;
 
 fn synth_kv(t_len: usize, d: usize, seed: u32) -> (Vec<f32>, Vec<f32>) {
     let mut keys = vec![0.0f32; t_len * d];

@@ -216,14 +216,8 @@ impl KvOuterPrefill {
                 // Fixed 256-f32 stack buffer covers head_dim ≤ 256 and
                 // block_size ≤ 256 (both hold for all current configs). The
                 // debug_assert makes silent truncation visible in tests.
-                debug_assert!(
-                    bs <= 256,
-                    "block_size {bs} exceeds 256-f32 score buffer"
-                );
-                debug_assert!(
-                    hd <= 256,
-                    "head_dim {hd} exceeds 256-f32 local_out buffer"
-                );
+                debug_assert!(bs <= 256, "block_size {bs} exceeds 256-f32 score buffer");
+                debug_assert!(hd <= 256, "head_dim {hd} exceeds 256-f32 local_out buffer");
                 let mut scores = [0.0f32; 256];
                 let actual_bs = bs.min(256);
                 compute_scores(

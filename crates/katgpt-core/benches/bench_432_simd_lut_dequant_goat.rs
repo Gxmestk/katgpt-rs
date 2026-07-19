@@ -48,8 +48,8 @@
 #![cfg(feature = "simd_lut_dequant")]
 
 use katgpt_core::simd_lut_dequant::{
-    dequant_arithmetic_ref, dequant_dot_via_lut, dequant_via_lut, dequant_via_lut_scalar,
-    Int4Lut, Int8Lut, QuantLut, UInt4Lut,
+    Int4Lut, Int8Lut, QuantLut, UInt4Lut, dequant_arithmetic_ref, dequant_dot_via_lut,
+    dequant_via_lut, dequant_via_lut_scalar,
 };
 use std::hint::black_box;
 use std::time::Instant;
@@ -114,10 +114,18 @@ struct GateResult {
 
 impl GateResult {
     fn pass(name: &'static str, detail: impl Into<String>) -> Self {
-        Self { name, passed: true, detail: detail.into() }
+        Self {
+            name,
+            passed: true,
+            detail: detail.into(),
+        }
     }
     fn fail(name: &'static str, detail: impl Into<String>) -> Self {
-        Self { name, passed: false, detail: detail.into() }
+        Self {
+            name,
+            passed: false,
+            detail: detail.into(),
+        }
     }
 }
 

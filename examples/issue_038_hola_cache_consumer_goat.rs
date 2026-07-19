@@ -20,7 +20,7 @@
 #![cfg(feature = "hippocampal_cache")]
 
 use katgpt_core::HippocampalCache;
-use katgpt_rs::gdn2::{gdn2_recurrent_step, Gdn2GateConfig};
+use katgpt_rs::gdn2::{Gdn2GateConfig, gdn2_recurrent_step};
 use std::hint::black_box;
 use std::time::Instant;
 
@@ -91,10 +91,7 @@ fn generate_stream(seed: u64) -> (Vec<TokenTriple>, Vec<Needle>) {
 }
 
 /// Run bare GDN2 (no cache) and return the output at each needle position.
-fn run_bare_gdn2(
-    tokens: &[TokenTriple],
-    needles: &[Needle],
-) -> Vec<(usize, f32)> {
+fn run_bare_gdn2(tokens: &[TokenTriple], needles: &[Needle]) -> Vec<(usize, f32)> {
     let dk = D;
     let dv = D;
     let mut s = vec![0.0f32; dk * dv];
@@ -146,10 +143,7 @@ fn run_bare_gdn2(
 }
 
 /// Run GDN2 + cache (observe + read) and return the output at each needle position.
-fn run_gdn2_with_cache(
-    tokens: &[TokenTriple],
-    needles: &[Needle],
-) -> Vec<(usize, f32)> {
+fn run_gdn2_with_cache(tokens: &[TokenTriple], needles: &[Needle]) -> Vec<(usize, f32)> {
     let dk = D;
     let dv = D;
     let mut s = vec![0.0f32; dk * dv];
@@ -275,8 +269,20 @@ fn gate_g1_quality() -> bool {
     let mut s_bare = vec![0.0f32; dk * dv];
     for (k, v, _q) in &tokens {
         gdn2_recurrent_step(
-            k, v, _q, &mut s_bare, &alpha, &b, 0.5, &w_channel,
-            &mut out, &mut temp, &mut delta, dk, dv, Gdn2GateConfig::EraseOnly,
+            k,
+            v,
+            _q,
+            &mut s_bare,
+            &alpha,
+            &b,
+            0.5,
+            &w_channel,
+            &mut out,
+            &mut temp,
+            &mut delta,
+            dk,
+            dv,
+            Gdn2GateConfig::EraseOnly,
         );
     }
 
@@ -287,8 +293,20 @@ fn gate_g1_quality() -> bool {
     let mut cache_out = [0.0f32; D];
     for (k, v, _q) in &tokens {
         gdn2_recurrent_step(
-            k, v, _q, &mut s_cache, &alpha, &b, 0.5, &w_channel,
-            &mut out, &mut temp, &mut delta, dk, dv, Gdn2GateConfig::EraseOnly,
+            k,
+            v,
+            _q,
+            &mut s_cache,
+            &alpha,
+            &b,
+            0.5,
+            &w_channel,
+            &mut out,
+            &mut temp,
+            &mut delta,
+            dk,
+            dv,
+            Gdn2GateConfig::EraseOnly,
         );
         let delta_norm: f32 = delta.iter().map(|x| x * x).sum::<f32>().sqrt();
         let beta = 0.5;
@@ -375,8 +393,20 @@ fn gate_g2_latency() -> bool {
     // Warm up
     for _ in 0..1000 {
         gdn2_recurrent_step(
-            &k, &v, &q, &mut s, &alpha, &b, 0.5, &w_channel,
-            &mut out, &mut temp, &mut delta, dk, dv, Gdn2GateConfig::EraseOnly,
+            &k,
+            &v,
+            &q,
+            &mut s,
+            &alpha,
+            &b,
+            0.5,
+            &w_channel,
+            &mut out,
+            &mut temp,
+            &mut delta,
+            dk,
+            dv,
+            Gdn2GateConfig::EraseOnly,
         );
     }
 
@@ -385,9 +415,20 @@ fn gate_g2_latency() -> bool {
     let start = Instant::now();
     for _ in 0..n_iters {
         gdn2_recurrent_step(
-            black_box(&k), black_box(&v), black_box(&q),
-            &mut s, &alpha, &b, 0.5, &w_channel,
-            &mut out, &mut temp, &mut delta, dk, dv, Gdn2GateConfig::EraseOnly,
+            black_box(&k),
+            black_box(&v),
+            black_box(&q),
+            &mut s,
+            &alpha,
+            &b,
+            0.5,
+            &w_channel,
+            &mut out,
+            &mut temp,
+            &mut delta,
+            dk,
+            dv,
+            Gdn2GateConfig::EraseOnly,
         );
     }
     let bare_ns = start.elapsed().as_nanos() as f64 / n_iters as f64;
@@ -396,9 +437,20 @@ fn gate_g2_latency() -> bool {
     let start = Instant::now();
     for _ in 0..n_iters {
         gdn2_recurrent_step(
-            black_box(&k), black_box(&v), black_box(&q),
-            &mut s, &alpha, &b, 0.5, &w_channel,
-            &mut out, &mut temp, &mut delta, dk, dv, Gdn2GateConfig::EraseOnly,
+            black_box(&k),
+            black_box(&v),
+            black_box(&q),
+            &mut s,
+            &alpha,
+            &b,
+            0.5,
+            &w_channel,
+            &mut out,
+            &mut temp,
+            &mut delta,
+            dk,
+            dv,
+            Gdn2GateConfig::EraseOnly,
         );
         let delta_norm: f32 = delta.iter().map(|x| x * x).sum::<f32>().sqrt();
         cache.observe(black_box(&k), black_box(&v), 0.5, delta_norm);
@@ -414,7 +466,10 @@ fn gate_g2_latency() -> bool {
     println!("  GDN2 + cache (obs+rd):{:>8.1} ns", cache_ns);
     println!("  overhead:             {:>8.1} ns", overhead_ns);
     println!("  target:               < 1000 ns");
-    println!("  result:               {}", if pass { "✅ PASS" } else { "❌ FAIL" });
+    println!(
+        "  result:               {}",
+        if pass { "✅ PASS" } else { "❌ FAIL" }
+    );
 
     pass
 }
@@ -443,8 +498,20 @@ fn gate_g3_no_regression() -> bool {
     let mut delta_a = vec![0.0f32; dv];
     for (k, v, q) in &tokens {
         gdn2_recurrent_step(
-            k, v, q, &mut s_a, &alpha, &b, 0.5, &w_channel,
-            &mut out_a, &mut temp_a, &mut delta_a, dk, dv, Gdn2GateConfig::EraseOnly,
+            k,
+            v,
+            q,
+            &mut s_a,
+            &alpha,
+            &b,
+            0.5,
+            &w_channel,
+            &mut out_a,
+            &mut temp_a,
+            &mut delta_a,
+            dk,
+            dv,
+            Gdn2GateConfig::EraseOnly,
         );
     }
 
@@ -458,8 +525,20 @@ fn gate_g3_no_regression() -> bool {
     let mut cache_out = [0.0f32; D];
     for (k, v, q) in &tokens {
         gdn2_recurrent_step(
-            k, v, q, &mut s_b, &alpha, &b, 0.5, &w_channel,
-            &mut out_b, &mut temp_b, &mut delta_b, dk, dv, Gdn2GateConfig::EraseOnly,
+            k,
+            v,
+            q,
+            &mut s_b,
+            &alpha,
+            &b,
+            0.5,
+            &w_channel,
+            &mut out_b,
+            &mut temp_b,
+            &mut delta_b,
+            dk,
+            dv,
+            Gdn2GateConfig::EraseOnly,
         );
         // Read from empty cache — should return zeros
         let q_arr: [f32; D] = q[..D].try_into().unwrap();
@@ -486,9 +565,18 @@ fn gate_g3_no_regression() -> bool {
 
     let pass = state_match && out_match;
     println!("  === G3: No-regression (empty cache = bare GDN2) ===");
-    println!("  state byte-identical:  {}", if state_match { "✅" } else { "❌" });
-    println!("  output byte-identical: {}", if out_match { "✅" } else { "❌" });
-    println!("  result:                {}", if pass { "✅ PASS" } else { "❌ FAIL" });
+    println!(
+        "  state byte-identical:  {}",
+        if state_match { "✅" } else { "❌" }
+    );
+    println!(
+        "  output byte-identical: {}",
+        if out_match { "✅" } else { "❌" }
+    );
+    println!(
+        "  result:                {}",
+        if pass { "✅ PASS" } else { "❌ FAIL" }
+    );
 
     pass
 }
@@ -515,9 +603,18 @@ fn main() {
     println!("╔══════════════════════════════════════════════════════════════╗");
     println!("║  GOAT Gate Summary                                           ║");
     println!("╠══════════════════════════════════════════════════════════════╣");
-    println!("║  G1 (quality):     {}                                        ║", if g1 { "✅ PASS" } else { "❌ FAIL" });
-    println!("║  G2 (latency):     {}                                        ║", if g2 { "✅ PASS" } else { "❌ FAIL" });
-    println!("║  G3 (no-regress):  {}                                        ║", if g3 { "✅ PASS" } else { "❌ FAIL" });
+    println!(
+        "║  G1 (quality):     {}                                        ║",
+        if g1 { "✅ PASS" } else { "❌ FAIL" }
+    );
+    println!(
+        "║  G2 (latency):     {}                                        ║",
+        if g2 { "✅ PASS" } else { "❌ FAIL" }
+    );
+    println!(
+        "║  G3 (no-regress):  {}                                        ║",
+        if g3 { "✅ PASS" } else { "❌ FAIL" }
+    );
     println!("║  G4 (alloc-free):  ✅ PASS                                   ║");
     println!("╚══════════════════════════════════════════════════════════════╝");
 

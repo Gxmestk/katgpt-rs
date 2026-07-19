@@ -71,10 +71,14 @@ const LARGE: Scale = Scale {
 // ─── Deterministic data generation ────────────────────────────────────────────
 
 fn gen_vector(kv_dim: usize, pos: usize, salt: u64) -> Vec<f32> {
-    let mut state = (pos as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15).wrapping_add(salt);
+    let mut state = (pos as u64)
+        .wrapping_mul(0x9E37_79B9_7F4A_7C15)
+        .wrapping_add(salt);
     let mut v = Vec::with_capacity(kv_dim);
     for _ in 0..kv_dim {
-        state = state.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        state = state
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
         let f = ((state >> 33) as f32) / (1u64 << 31) as f32 - 0.5;
         v.push(f * 2.0);
     }
@@ -154,8 +158,8 @@ macro_rules! bench_codec {
                 $store_val(&mut cache, 0, p, &vals[p]);
             }
         }
-        let store_ns = store_start.elapsed().as_nanos() as f64
-            / (LATENCY_ITERS * STORE_POSITIONS) as f64;
+        let store_ns =
+            store_start.elapsed().as_nanos() as f64 / (LATENCY_ITERS * STORE_POSITIONS) as f64;
 
         // ── Dequant latency ──
         let dequant_start = Instant::now();
@@ -165,8 +169,8 @@ macro_rules! bench_codec {
                 $dequant_val(&mut cache, 0, p, &mut val_out);
             }
         }
-        let dequant_ns = dequant_start.elapsed().as_nanos() as f64
-            / (LATENCY_ITERS * STORE_POSITIONS) as f64;
+        let dequant_ns =
+            dequant_start.elapsed().as_nanos() as f64 / (LATENCY_ITERS * STORE_POSITIONS) as f64;
 
         CodecResult {
             name: $name,
@@ -186,11 +190,22 @@ fn main() {
     println!();
 
     for scale in [&SMALL, &MEDIUM, &LARGE] {
-        let Scale { name, n_layers, kv_dim, max_seq_len } = *scale;
+        let Scale {
+            name,
+            n_layers,
+            kv_dim,
+            max_seq_len,
+        } = *scale;
 
         println!("┌─ {} ", name);
-        println!("│ n_layers={}, kv_dim={}, max_seq_len={}", n_layers, kv_dim, max_seq_len);
-        println!("│ store/dequant: {} positions, layer 0, {} iters", STORE_POSITIONS, LATENCY_ITERS);
+        println!(
+            "│ n_layers={}, kv_dim={}, max_seq_len={}",
+            n_layers, kv_dim, max_seq_len
+        );
+        println!(
+            "│ store/dequant: {} positions, layer 0, {} iters",
+            STORE_POSITIONS, LATENCY_ITERS
+        );
         println!("├──────────────────────────────────────────────────────────────────");
 
         let mut results: Vec<CodecResult> = Vec::new();
@@ -202,7 +217,12 @@ fn main() {
             results.push(bench_codec!(
                 "turboquant",
                 TurboQuantKVCache::with_config(&TurboQuantKVCacheConfig {
-                    n_layers, kv_dim, max_seq_len, seed: 42, key_bits: 3, val_bits: 3,
+                    n_layers,
+                    kv_dim,
+                    max_seq_len,
+                    seed: 42,
+                    key_bits: 3,
+                    val_bits: 3,
                 }),
                 kv_dim,
                 TurboQuantKVCache::store_key,
@@ -215,11 +235,16 @@ fn main() {
         // ── planar_quant ──
         #[cfg(feature = "planar_quant")]
         {
-            use katgpt_quant::planar_quant::{PlanarQuantKVCache, PlanarQuantConfig};
+            use katgpt_quant::planar_quant::{PlanarQuantConfig, PlanarQuantKVCache};
             results.push(bench_codec!(
                 "planar_quant",
                 PlanarQuantKVCache::with_config(&PlanarQuantConfig {
-                    n_layers, kv_dim, max_seq_len, seed: 42, key_bits: 3, val_bits: 3,
+                    n_layers,
+                    kv_dim,
+                    max_seq_len,
+                    seed: 42,
+                    key_bits: 3,
+                    val_bits: 3,
                 }),
                 kv_dim,
                 PlanarQuantKVCache::store_key,
@@ -232,12 +257,17 @@ fn main() {
         // ── iso_quant ──
         #[cfg(feature = "iso_quant")]
         {
-            use katgpt_quant::iso_quant::{IsoQuantKVCache, IsoQuantConfig, IsoQuantMode};
+            use katgpt_quant::iso_quant::{IsoQuantConfig, IsoQuantKVCache, IsoQuantMode};
             results.push(bench_codec!(
                 "iso_quant",
                 IsoQuantKVCache::new(&IsoQuantConfig {
-                    n_layers, kv_dim, max_seq_len, seed: 42,
-                    mode: IsoQuantMode::Full, key_bits: 3, val_bits: 3,
+                    n_layers,
+                    kv_dim,
+                    max_seq_len,
+                    seed: 42,
+                    mode: IsoQuantMode::Full,
+                    key_bits: 3,
+                    val_bits: 3,
                 }),
                 kv_dim,
                 IsoQuantKVCache::store_key,
@@ -250,13 +280,18 @@ fn main() {
         // ── octopus ──
         #[cfg(feature = "octopus")]
         {
-            use katgpt_quant::octopus::{OctopusKVCache, OctopusConfig};
+            use katgpt_quant::octopus::{OctopusConfig, OctopusKVCache};
             results.push(bench_codec!(
                 "octopus",
                 OctopusKVCache::with_config(&OctopusConfig {
-                    seed: 42, n_layers, kv_dim, max_seq_len,
-                    val_bits: 3, key_bits: 3,
-                    use_qjl_residual: false, use_joint_rounding: true,
+                    seed: 42,
+                    n_layers,
+                    kv_dim,
+                    max_seq_len,
+                    val_bits: 3,
+                    key_bits: 3,
+                    use_qjl_residual: false,
+                    use_joint_rounding: true,
                 }),
                 kv_dim,
                 OctopusKVCache::store_key,
@@ -269,12 +304,17 @@ fn main() {
         // ── hybrid_oct_pq ──
         #[cfg(feature = "hybrid_oct_pq")]
         {
-            use katgpt_quant::hybrid_oct_pq::{HybridOctPqKVCache, HybridOctPqConfig};
+            use katgpt_quant::hybrid_oct_pq::{HybridOctPqConfig, HybridOctPqKVCache};
             results.push(bench_codec!(
                 "hybrid_oct_pq",
                 HybridOctPqKVCache::with_config(&HybridOctPqConfig {
-                    seed: 42, n_layers, kv_dim, max_seq_len,
-                    key_bits: 3, val_bits: 3, use_joint_rounding: true,
+                    seed: 42,
+                    n_layers,
+                    kv_dim,
+                    max_seq_len,
+                    key_bits: 3,
+                    val_bits: 3,
+                    use_joint_rounding: true,
                 }),
                 kv_dim,
                 HybridOctPqKVCache::store_key,
@@ -292,8 +332,13 @@ fn main() {
             results.push(bench_codec!(
                 "kvarn",
                 KVarNKVCache::with_config(&KVarNConfig {
-                    n_layers, kv_dim, max_seq_len, bits: 3, tile_size: 128,
-                    var_norm: VarNormConfig::default(), hadamard: false,
+                    n_layers,
+                    kv_dim,
+                    max_seq_len,
+                    bits: 3,
+                    tile_size: 128,
+                    var_norm: VarNormConfig::default(),
+                    hadamard: false,
                     #[cfg(feature = "targeted_precision")]
                     precision_budget: None,
                 }),
@@ -312,10 +357,19 @@ fn main() {
             use katgpt_spectral::types::SpectralQuantKVCacheConfig;
 
             let sq_config = SpectralQuantKVCacheConfig {
-                seed: 42, n_layers, kv_dim, max_seq_len,
-                lloyd_max_iter: 20, calibration_samples: 64, qjl_dim: 16,
-                avg_bits: 3.0, min_tail_bits: 1, max_bits: 8,
-                wf_min_bits: 1, wf_max_bits: 6, use_water_fill: true,
+                seed: 42,
+                n_layers,
+                kv_dim,
+                max_seq_len,
+                lloyd_max_iter: 20,
+                calibration_samples: 64,
+                qjl_dim: 16,
+                avg_bits: 3.0,
+                min_tail_bits: 1,
+                max_bits: 8,
+                wf_min_bits: 1,
+                wf_max_bits: 6,
+                use_water_fill: true,
             };
             let key_samples: Vec<Vec<f32>> = (0..64)
                 .map(|i| gen_vector(kv_dim, i, 0x5351_5F00))
@@ -340,10 +394,20 @@ fn main() {
             use katgpt_spectral::spectral::participation_ratio;
 
             let config = ShardConfig {
-                avg_bits_k: 4.0, avg_bits_v: 2.0, min_tail_bits: 1, max_bits: 8,
-                n_layers, kv_dim, head_dim: kv_dim, max_seq_len,
-                sink_tokens: 4, window_tokens: 4, seed: 42,
-                v_vq_group_size: 4, v_vq_codebook_size: 256, decode_stream_bits: 8,
+                avg_bits_k: 4.0,
+                avg_bits_v: 2.0,
+                min_tail_bits: 1,
+                max_bits: 8,
+                n_layers,
+                kv_dim,
+                head_dim: kv_dim,
+                max_seq_len,
+                sink_tokens: 4,
+                window_tokens: 4,
+                seed: 42,
+                v_vq_group_size: 4,
+                v_vq_codebook_size: 256,
+                decode_stream_bits: 8,
             };
             let head_dim = kv_dim;
             let mut eigenvectors = vec![0.0f32; head_dim * head_dim];
@@ -355,13 +419,18 @@ fn main() {
                 .collect();
             let d_eff = participation_ratio(&eigenvalues);
             let cal = ShardCalibration {
-                k_eigenvectors: eigenvectors, k_eigenvalues: eigenvalues,
-                k_d_eff: d_eff, head_dim,
+                k_eigenvectors: eigenvectors,
+                k_eigenvalues: eigenvalues,
+                k_d_eff: d_eff,
+                head_dim,
             };
 
             results.push(bench_codec!(
                 "shard_kv",
-                ShardKVCache::from_calibration(&config, &(0..n_layers).map(|_| cal.clone()).collect::<Vec<_>>()),
+                ShardKVCache::from_calibration(
+                    &config,
+                    &(0..n_layers).map(|_| cal.clone()).collect::<Vec<_>>()
+                ),
                 kv_dim,
                 ShardKVCache::store_key,
                 ShardKVCache::store_value,

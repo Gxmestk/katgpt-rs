@@ -1323,12 +1323,7 @@ unsafe fn avx2_fused_scale_acc(dst: &mut [f32], src: &[f32], scale: f32, len: us
 /// elements). The scalar fallback mirrors `scalar_fused_scale_acc` with
 /// `half::f16::to_f32()` widening.
 #[inline]
-pub fn simd_fused_scale_acc_f16(
-    dst: &mut [f32],
-    src_f16: &[half::f16],
-    scale: f32,
-    len: usize,
-) {
+pub fn simd_fused_scale_acc_f16(dst: &mut [f32], src_f16: &[half::f16], scale: f32, len: usize) {
     #[cfg(target_arch = "aarch64")]
     {
         unsafe { neon_fused_scale_acc_f16(dst, src_f16, scale, len) }
@@ -1367,12 +1362,7 @@ pub(super) fn scalar_fused_scale_acc_f16(
 
 #[cfg(target_arch = "aarch64")]
 #[inline]
-unsafe fn neon_fused_scale_acc_f16(
-    dst: &mut [f32],
-    src_f16: &[half::f16],
-    scale: f32,
-    len: usize,
-) {
+unsafe fn neon_fused_scale_acc_f16(dst: &mut [f32], src_f16: &[half::f16], scale: f32, len: usize) {
     use core::arch::aarch64::{vdupq_n_f32, vfmaq_f32, vld1q_f32, vst1q_f32};
 
     unsafe {
@@ -1410,15 +1400,8 @@ unsafe fn neon_fused_scale_acc_f16(
 #[cfg(target_arch = "x86_64")]
 #[target_feature(enable = "avx2,fma")]
 #[inline]
-unsafe fn avx2_fused_scale_acc_f16(
-    dst: &mut [f32],
-    src_f16: &[half::f16],
-    scale: f32,
-    len: usize,
-) {
-    use core::arch::x86_64::{
-        _mm256_fmadd_ps, _mm256_loadu_ps, _mm256_set1_ps, _mm256_storeu_ps,
-    };
+unsafe fn avx2_fused_scale_acc_f16(dst: &mut [f32], src_f16: &[half::f16], scale: f32, len: usize) {
+    use core::arch::x86_64::{_mm256_fmadd_ps, _mm256_loadu_ps, _mm256_set1_ps, _mm256_storeu_ps};
 
     unsafe {
         let scale_vec = _mm256_set1_ps(scale);

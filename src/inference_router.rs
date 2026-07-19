@@ -15,10 +15,10 @@
 use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 use std::time::Instant;
 
-use katgpt_backend::InferenceBackend;
 use crate::transformer::{ForwardContext, MultiLayerKVCache, TransformerWeights};
-use katgpt_core::trigger_gate::{ComputeTier, TriggerGate, TriggerGateConfig};
 use crate::types::{Config, Rng};
+use katgpt_backend::InferenceBackend;
+use katgpt_core::trigger_gate::{ComputeTier, TriggerGate, TriggerGateConfig};
 
 #[cfg(feature = "rv_gated_routing")]
 use crate::pruners::acceptance_variance::AcceptanceVarianceTracker;
@@ -27,7 +27,9 @@ use crate::pruners::acceptance_variance::AcceptanceVarianceTracker;
 use katgpt_core::trigger_gate::RvThresholds;
 
 #[cfg(all(feature = "critical_interval_gate", feature = "rv_gated_routing"))]
-use katgpt_core::dllm_solver::{CriticalIntervalConfig, CriticalTierDecision, critical_tier_decision};
+use katgpt_core::dllm_solver::{
+    CriticalIntervalConfig, CriticalTierDecision, critical_tier_decision,
+};
 
 #[cfg(feature = "rcd_residual")]
 use katgpt_core::dllm_solver::{ResidualMode, tier_to_residual_mode};

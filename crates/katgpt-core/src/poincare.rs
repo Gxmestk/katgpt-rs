@@ -238,12 +238,48 @@ impl PoincareAdapter {
     /// [`verify`](Self::verify) and by the freeze/thaw envelope (riir-neuron-db).
     pub fn recompute_blake3(&self) -> [u8; 32] {
         let mut hasher = Hasher::new();
-        hasher.update(&self.phi_w1.iter().flat_map(|f| f.to_le_bytes()).collect::<Vec<_>>());
-        hasher.update(&self.phi_b1.iter().flat_map(|f| f.to_le_bytes()).collect::<Vec<_>>());
-        hasher.update(&self.phi_w2.iter().flat_map(|f| f.to_le_bytes()).collect::<Vec<_>>());
-        hasher.update(&self.phi_b2.iter().flat_map(|f| f.to_le_bytes()).collect::<Vec<_>>());
-        hasher.update(&self.W.iter().flat_map(|f| f.to_le_bytes()).collect::<Vec<_>>());
-        hasher.update(&self.W_pinv.iter().flat_map(|f| f.to_le_bytes()).collect::<Vec<_>>());
+        hasher.update(
+            &self
+                .phi_w1
+                .iter()
+                .flat_map(|f| f.to_le_bytes())
+                .collect::<Vec<_>>(),
+        );
+        hasher.update(
+            &self
+                .phi_b1
+                .iter()
+                .flat_map(|f| f.to_le_bytes())
+                .collect::<Vec<_>>(),
+        );
+        hasher.update(
+            &self
+                .phi_w2
+                .iter()
+                .flat_map(|f| f.to_le_bytes())
+                .collect::<Vec<_>>(),
+        );
+        hasher.update(
+            &self
+                .phi_b2
+                .iter()
+                .flat_map(|f| f.to_le_bytes())
+                .collect::<Vec<_>>(),
+        );
+        hasher.update(
+            &self
+                .W
+                .iter()
+                .flat_map(|f| f.to_le_bytes())
+                .collect::<Vec<_>>(),
+        );
+        hasher.update(
+            &self
+                .W_pinv
+                .iter()
+                .flat_map(|f| f.to_le_bytes())
+                .collect::<Vec<_>>(),
+        );
         *hasher.finalize().as_bytes()
     }
 
@@ -261,7 +297,9 @@ impl PoincareAdapter {
     /// Suitable for `MerkleFrozenEnvelope` (riir-neuron-db Plan 007).
     pub fn canonical_bytes(&self) -> Vec<u8> {
         let total = 5
-            + (self.phi_w1.len() + self.phi_b1.len() + self.phi_w2.len()
+            + (self.phi_w1.len()
+                + self.phi_b1.len()
+                + self.phi_w2.len()
                 + self.phi_b2.len()
                 + self.W.len()
                 + self.W_pinv.len())
@@ -339,8 +377,7 @@ impl PoincareAdapter {
         let take = |n: usize, c: &mut usize| -> Vec<f32> {
             let mut v = Vec::with_capacity(n);
             for _ in 0..n {
-                let bytes: [u8; 4] =
-                    buf[*c..*c + 4].try_into().ok().unwrap_or([0; 4]);
+                let bytes: [u8; 4] = buf[*c..*c + 4].try_into().ok().unwrap_or([0; 4]);
                 v.push(f32::from_le_bytes(bytes));
                 *c += 4;
             }
@@ -354,9 +391,9 @@ impl PoincareAdapter {
         let W = take(n_w, &mut cursor);
         let W_pinv = take(n_pinv, &mut cursor);
 
-        let blake3: [u8; 32] = buf[cursor..cursor + 32].try_into().map_err(|_| {
-            PoincareFitError::MalformedBuffer
-        })?;
+        let blake3: [u8; 32] = buf[cursor..cursor + 32]
+            .try_into()
+            .map_err(|_| PoincareFitError::MalformedBuffer)?;
 
         let adapter = Self {
             phi_w1,
@@ -407,8 +444,16 @@ pub fn eval_phi_into(
     let phi_hidden = adapter.phi_hidden();
     let phi_out = adapter.phi_out();
     debug_assert_eq!(z.len(), latent_dim, "z.len != latent_dim");
-    debug_assert_eq!(hidden_scratch.len(), phi_hidden, "hidden_scratch.len != phi_hidden");
-    debug_assert_eq!(phi_out_scratch.len(), phi_out, "phi_out_scratch.len != phi_out");
+    debug_assert_eq!(
+        hidden_scratch.len(),
+        phi_hidden,
+        "hidden_scratch.len != phi_hidden"
+    );
+    debug_assert_eq!(
+        phi_out_scratch.len(),
+        phi_out,
+        "phi_out_scratch.len != phi_out"
+    );
 
     // Hidden layer: hidden[i] = tanh(Σ_j W1[i*latent + j] · z[j] + b1[i])
     for i in 0..phi_hidden {
@@ -440,7 +485,11 @@ pub fn accumulate_pinv_into(
 ) {
     let phi_out = adapter.phi_out();
     let target_dim = adapter.target_dim();
-    debug_assert_eq!(delta_target.len(), target_dim, "delta_target.len != target_dim");
+    debug_assert_eq!(
+        delta_target.len(),
+        target_dim,
+        "delta_target.len != target_dim"
+    );
     debug_assert_eq!(phi_scratch.len(), phi_out, "phi_scratch.len != phi_out");
 
     // phi_scratch[k] += Σ_j W_pinv[k*target + j] · delta_target[j]
@@ -744,7 +793,20 @@ pub fn fit_poincare_adapter(
     let mut hidden = vec![0.0f32; phi_hidden_eff];
     let mut phi_row = vec![0.0f32; phi_out];
     for (i, z) in z_samples.iter().enumerate() {
-        eval_phi_into(z, &dummy_adapter(&phi_w1, &phi_b1, &phi_w2, &phi_b2, latent_dim, phi_out, phi_hidden_eff), &mut phi_row, &mut hidden);
+        eval_phi_into(
+            z,
+            &dummy_adapter(
+                &phi_w1,
+                &phi_b1,
+                &phi_w2,
+                &phi_b2,
+                latent_dim,
+                phi_out,
+                phi_hidden_eff,
+            ),
+            &mut phi_row,
+            &mut hidden,
+        );
         for k in 0..phi_out {
             phi_z[i * phi_out + k] = phi_row[k];
         }
@@ -1008,11 +1070,7 @@ mod tests {
             eval_phi_into(&z, &adapter, &mut phi, &mut hidden);
             let mut t_hat = vec![0.0f32; target_dim];
             for j in 0..target_dim {
-                t_hat[j] = simd_dot_f32(
-                    &adapter.W[j * phi_out..(j + 1) * phi_out],
-                    &phi,
-                    phi_out,
-                );
+                t_hat[j] = simd_dot_f32(&adapter.W[j * phi_out..(j + 1) * phi_out], &phi, phi_out);
             }
             for j in 0..target_dim {
                 let err = (t_truth[j] - t_hat[j]).abs();
@@ -1076,7 +1134,14 @@ mod tests {
         let mut z_out = vec![0.0f32; latent_dim];
         let mut phi = vec![0.0f32; phi_out];
         let mut hidden = vec![0.0f32; adapter.phi_hidden()];
-        poincare_navigate_into(&z_src, &delta_target, &adapter, &mut z_out, &mut phi, &mut hidden);
+        poincare_navigate_into(
+            &z_src,
+            &delta_target,
+            &adapter,
+            &mut z_out,
+            &mut phi,
+            &mut hidden,
+        );
 
         // Project z_out back: W · φ(z_out) − W · φ(z_src) ≈ delta_target.
         eval_phi_into(&z_src, &adapter, &mut phi, &mut hidden);
@@ -1093,9 +1158,12 @@ mod tests {
         let dx1 = w_phi_out[1] - w_phi_src[1];
         // The recovery is approximate (tanh warp + W2 = I + PCA scaling).
         // Direction must match; magnitude may shrink.
-        let direction_match =
-            (dx0 * delta_target[0] + dx1 * delta_target[1]) > 0.0;
-        assert!(direction_match, "navigator moved the wrong way: dx=({dx0:.4}, {dx1:.4}), Δtarget=({0}, {1})", delta_target[0], delta_target[1]);
+        let direction_match = (dx0 * delta_target[0] + dx1 * delta_target[1]) > 0.0;
+        assert!(
+            direction_match,
+            "navigator moved the wrong way: dx=({dx0:.4}, {dx1:.4}), Δtarget=({0}, {1})",
+            delta_target[0], delta_target[1]
+        );
     }
 
     #[test]
@@ -1206,10 +1274,24 @@ mod tests {
         let mut hidden = vec![0.0f32; adapter.phi_hidden()];
         let mut delta_step = vec![0.0f32; target_dim];
         poincare_multi_step_into(
-            &z_src, &delta, 4, &adapter, &mut z_a, &mut phi, &mut hidden, &mut delta_step,
+            &z_src,
+            &delta,
+            4,
+            &adapter,
+            &mut z_a,
+            &mut phi,
+            &mut hidden,
+            &mut delta_step,
         );
         poincare_multi_step_into(
-            &z_src, &delta, 4, &adapter, &mut z_b, &mut phi, &mut hidden, &mut delta_step,
+            &z_src,
+            &delta,
+            4,
+            &adapter,
+            &mut z_b,
+            &mut phi,
+            &mut hidden,
+            &mut delta_step,
         );
         for j in 0..latent_dim {
             assert!(
@@ -1226,7 +1308,9 @@ mod tests {
         // Static check: the navigator signature uses only &[f32] / &mut [f32]
         // / &PoincareAdapter. No MapPos / SyncBlock / ChainConsensus. Enforced
         // by the type signature itself — this test exists to pin the API.
-        let _ = std::any::TypeId::of::<fn(&[f32], &[f32], &PoincareAdapter, &mut [f32], &mut [f32], &mut [f32])>();
+        let _ = std::any::TypeId::of::<
+            fn(&[f32], &[f32], &PoincareAdapter, &mut [f32], &mut [f32], &mut [f32]),
+        >();
         // If the type signature changes to leak a sync/chain/game type, this
         // line will fail to compile (rustc will complain about the missing
         // type parameter).

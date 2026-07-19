@@ -14,9 +14,7 @@
 //! cargo run --release --bench attn_match_router_bench --features attn_match
 //! ```
 
-use katgpt_attn_match::router::{
-    SolverBackend, SolverRouter, SolverRouterConfig, pick_backend,
-};
+use katgpt_attn_match::router::{SolverBackend, SolverRouter, SolverRouterConfig, pick_backend};
 
 fn main() {
     println!("=== Attention Matching Router Benchmark (Plan 271 Phase 2) ===\n");

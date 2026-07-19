@@ -81,8 +81,8 @@ fn g1_fused_correctness() -> (bool, Vec<ChainVerdict>) {
     }];
     let fused_a = ane_fused_estimate(&[conv, relu], &deps_a, dtype, &m1);
 
-    let sequential_a = ane_estimate(conv, dtype, &m1).runtime_ms
-        + ane_estimate(relu, dtype, &m1).runtime_ms;
+    let sequential_a =
+        ane_estimate(conv, dtype, &m1).runtime_ms + ane_estimate(relu, dtype, &m1).runtime_ms;
     let bandwidth_bytes_per_ms = m1.bandwidth_gbs * 1_000_000.0; // GB/s → bytes/ms
     let memory_savings_bound = intermediate as f64 / bandwidth_bytes_per_ms;
     // The model captures TWO fusion savings sources:
@@ -142,8 +142,8 @@ fn g1_fused_correctness() -> (bool, Vec<ChainVerdict>) {
     let exceeds_no_savings = fused_b.fusion_savings_ms == 0.0;
     let exceeds_n_fused_zero = fused_b.n_fused_deps == 0;
     // Fallback path: base == sequential_cost (sum of individual estimates).
-    let sequential_b = ane_estimate(gemm, dtype, &m1).runtime_ms
-        + ane_estimate(bias, dtype, &m1).runtime_ms;
+    let sequential_b =
+        ane_estimate(gemm, dtype, &m1).runtime_ms + ane_estimate(bias, dtype, &m1).runtime_ms;
     let exceeds_runtime_ok =
         (fused_b.base.runtime_ms - sequential_b).abs() < 1e-9 * sequential_b.max(1.0);
     let pass_b =
@@ -256,10 +256,7 @@ fn g3_single_op_parity() -> (bool, f64, f64) {
 // ─── G4 (latency): ane_fused_estimate p50 < 1 µs for 8-op chain ───────────
 
 /// Time median over `iterations` runs. Returns ns.
-fn time_median_ns_fused(
-    f: &mut dyn FnMut() -> AneFusedCost,
-    iterations: usize,
-) -> f64 {
+fn time_median_ns_fused(f: &mut dyn FnMut() -> AneFusedCost, iterations: usize) -> f64 {
     let mut times = Vec::with_capacity(iterations);
     for _ in 0..iterations {
         let start = std::time::Instant::now();
@@ -370,7 +367,12 @@ fn main() {
     let (g1_pass, g1_results) = g1_fused_correctness();
     println!("── G1 (correctness): Conv→ReLU fits + GEMM→Bias exceeds ──");
     for v in &g1_results {
-        println!("   {}: {}  [{}]", v.name, if v.pass { "PASS ✓" } else { "FAIL ✗" }, v.note);
+        println!(
+            "   {}: {}  [{}]",
+            v.name,
+            if v.pass { "PASS ✓" } else { "FAIL ✗" },
+            v.note
+        );
     }
     println!(
         "   Result:                {}",
@@ -431,7 +433,9 @@ fn main() {
     println!("   cargo check                                            clean ✓ (informational)");
     println!("   cargo check --features ane_fused_chain                 clean ✓ (informational)");
     println!("   cargo check --all-features                             clean ✓ (informational)");
-    println!("   Feature is DEFAULT-ON (promoted 2026-07-14); ane_fused_chain implies ane_roofline.");
+    println!(
+        "   Feature is DEFAULT-ON (promoted 2026-07-14); ane_fused_chain implies ane_roofline."
+    );
     println!("   Result:                PASS ✓ (verified separately)");
     println!();
 

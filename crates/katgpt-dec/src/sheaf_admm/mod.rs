@@ -1217,6 +1217,5 @@ fn sheaf_laplacian_matvec(
     }
 }
 
-
 #[cfg(test)]
 mod tests;

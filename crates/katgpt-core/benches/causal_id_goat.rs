@@ -32,28 +32,54 @@ counting_allocator!();
 
 /// Construct Scenario A — classic front-door. `A→M→Y, A↔Y`.
 fn scenario_a() -> (Admg, NodeId, NodeId) {
-    let (a, m, y) = (NodeId::from_u32(0), NodeId::from_u32(1), NodeId::from_u32(2));
+    let (a, m, y) = (
+        NodeId::from_u32(0),
+        NodeId::from_u32(1),
+        NodeId::from_u32(2),
+    );
     let mut g = Admg::new(vec![a, m, y]);
-    g.directed_edge(a, m).directed_edge(m, y).bidirected_edge(a, y);
+    g.directed_edge(a, m)
+        .directed_edge(m, y)
+        .bidirected_edge(a, y);
     (g, a, y)
 }
 
 /// Construct Scenario B — classic back-door. `Z→A→Y, Z→Y`.
 fn scenario_b() -> (Admg, NodeId, NodeId) {
-    let (z, a, y) = (NodeId::from_u32(0), NodeId::from_u32(1), NodeId::from_u32(2));
+    let (z, a, y) = (
+        NodeId::from_u32(0),
+        NodeId::from_u32(1),
+        NodeId::from_u32(2),
+    );
     let mut g = Admg::new(vec![z, a, y]);
-    g.directed_edge(z, a).directed_edge(a, y).directed_edge(z, y);
+    g.directed_edge(z, a)
+        .directed_edge(a, y)
+        .directed_edge(z, y);
     (g, a, y)
 }
 
 /// Construct Scenario C — 13-node game KG with `NPC1 ↔ NPC2` confounder.
 fn scenario_c() -> (Admg, NodeId, NodeId) {
-    let (f1, f2, f3) = (NodeId::from_u32(0), NodeId::from_u32(1), NodeId::from_u32(2));
+    let (f1, f2, f3) = (
+        NodeId::from_u32(0),
+        NodeId::from_u32(1),
+        NodeId::from_u32(2),
+    );
     let (r1, r2) = (NodeId::from_u32(3), NodeId::from_u32(4));
-    let (npc1, npc2, npc3) = (NodeId::from_u32(5), NodeId::from_u32(6), NodeId::from_u32(7));
-    let (e1, e2, outcome) = (NodeId::from_u32(8), NodeId::from_u32(9), NodeId::from_u32(10));
+    let (npc1, npc2, npc3) = (
+        NodeId::from_u32(5),
+        NodeId::from_u32(6),
+        NodeId::from_u32(7),
+    );
+    let (e1, e2, outcome) = (
+        NodeId::from_u32(8),
+        NodeId::from_u32(9),
+        NodeId::from_u32(10),
+    );
     let (mood1, mood2) = (NodeId::from_u32(11), NodeId::from_u32(12));
-    let mut g = Admg::new(vec![f1, f2, f3, r1, r2, npc1, npc2, npc3, e1, e2, outcome, mood1, mood2]);
+    let mut g = Admg::new(vec![
+        f1, f2, f3, r1, r2, npc1, npc2, npc3, e1, e2, outcome, mood1, mood2,
+    ]);
     g.directed_edge(f1, npc1)
         .directed_edge(f2, npc2)
         .directed_edge(f3, npc3)
@@ -144,16 +170,31 @@ fn bench_identify(c: &mut Criterion) {
     );
     // err_d is NotIdentifiable — no further check needed.
     let _ = err_d;
-    assert!(sig_32.contains(eff_32), "G1 32-node: signature contains Outcome");
+    assert!(
+        sig_32.contains(eff_32),
+        "G1 32-node: signature contains Outcome"
+    );
 
     println!("\n┌─────────────────────────────────────────────────────────────────┐");
     println!("│ G1 soundness (Issue 545 verdict reproduction):                  │");
     println!("├─────────────────────────────────────────────────────────────────┤");
-    println!("│ Scenario A (front-door):     Ok  signature size = {:2}            │", sig_a.len());
-    println!("│ Scenario B (back-door):      Ok  signature size = {:2}            │", sig_b.len());
-    println!("│ Scenario C (game KG):        Ok  signature size = {:2}            │", sig_c.len());
+    println!(
+        "│ Scenario A (front-door):     Ok  signature size = {:2}            │",
+        sig_a.len()
+    );
+    println!(
+        "│ Scenario B (back-door):      Ok  signature size = {:2}            │",
+        sig_b.len()
+    );
+    println!(
+        "│ Scenario C (game KG):        Ok  signature size = {:2}            │",
+        sig_c.len()
+    );
     println!("│ Scenario D (bow-arc):        Err (NotIdentifiable)              │");
-    println!("│ Scenario 32-node:            Ok  signature size = {:2}            │", sig_32.len());
+    println!(
+        "│ Scenario 32-node:            Ok  signature size = {:2}            │",
+        sig_32.len()
+    );
     println!("└─────────────────────────────────────────────────────────────────┘");
 
     // ── G2 perf gate ───────────────────────────────────────────────────
@@ -183,7 +224,11 @@ fn bench_identify(c: &mut Criterion) {
     });
     group.bench_function("scenario_32node_perf_gate", |b| {
         b.iter(|| {
-            let r = identify(black_box(&g_32), black_box(&[cause_32]), black_box(&[eff_32]));
+            let r = identify(
+                black_box(&g_32),
+                black_box(&[cause_32]),
+                black_box(&[eff_32]),
+            );
             let _ = black_box(r);
         });
     });
@@ -213,14 +258,25 @@ fn bench_identify(c: &mut Criterion) {
     // and provides a regression baseline.
     let (_, alloc_delta_g32) = alloc_delta(|| {
         for _ in 0..100 {
-            let _ = identify(black_box(&g_32), black_box(&[cause_32]), black_box(&[eff_32]));
+            let _ = identify(
+                black_box(&g_32),
+                black_box(&[cause_32]),
+                black_box(&[eff_32]),
+            );
         }
     });
     let per_call_g32 = alloc_delta_g32 / 100;
     println!("\n── G4: alloc audit (Issue 183 + P4, 100-call steady-state, 32-node scenario) ──");
     println!("   total allocs / 100 calls: {alloc_delta_g32}");
     println!("   per-call average:          {per_call_g32}");
-    println!("   AdmgSignature variant:     {}", if sig_32.is_inline() { "Inline (zero heap)" } else { "Heap (1 alloc)" });
+    println!(
+        "   AdmgSignature variant:     {}",
+        if sig_32.is_inline() {
+            "Inline (zero heap)"
+        } else {
+            "Heap (1 alloc)"
+        }
+    );
     println!("   Gate: INFORMATIONAL — Issue 183 does not require zero allocs.");
     println!("   Remaining: Scratch::new() first-push grows (~12 slots × ~6 frames)");
 
@@ -234,7 +290,14 @@ fn bench_identify(c: &mut Criterion) {
     println!("\n── G4: alloc audit (13-node game KG, single-step recursion) ──");
     println!("   total allocs / 100 calls: {alloc_delta_g13}");
     println!("   per-call average:          {per_call_g13}");
-    println!("   AdmgSignature variant:     {}", if sig_c.is_inline() { "Inline (zero heap)" } else { "Heap (1 alloc)" });
+    println!(
+        "   AdmgSignature variant:     {}",
+        if sig_c.is_inline() {
+            "Inline (zero heap)"
+        } else {
+            "Heap (1 alloc)"
+        }
+    );
 }
 
 criterion_group!(benches, bench_identify);

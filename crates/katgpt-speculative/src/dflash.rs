@@ -234,8 +234,7 @@ where
         let h_end = h_start + n_embd;
         if h_end <= h_dflash_captured.len() {
             let n_copy = hidden.len().min(n_embd);
-            h_dflash_captured[h_start..h_start + n_copy]
-                .copy_from_slice(&hidden[..n_copy]);
+            h_dflash_captured[h_start..h_start + n_copy].copy_from_slice(&hidden[..n_copy]);
             // If hidden_state is somehow shorter than n_embd, zero-pad.
             // (Shouldn't happen in well-formed configs, but defensive.)
             if n_copy < n_embd {

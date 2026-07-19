@@ -807,7 +807,13 @@ pub fn commutant_binary_association(associations: &[(usize, usize)], d: usize) -
         row[i] = 1.0; // default: self-map
     }
     for &(a, b) in associations {
-        debug_assert!(a < d && b < d, "association ({}, {}) out of range for d={}", a, b, d);
+        debug_assert!(
+            a < d && b < d,
+            "association ({}, {}) out of range for d={}",
+            a,
+            b,
+            d
+        );
         c[a][a] = 0.0; // clear diagonal
         c[b][b] = 0.0;
         c[a][b] = 1.0; // cross-map
@@ -944,9 +950,7 @@ fn null_space(a: &mut [Vec<f32>], n_cols: usize) -> Vec<Vec<f32>> {
     }
 
     // Free columns → null space basis vectors.
-    let free_cols: Vec<usize> = (0..n_cols)
-        .filter(|c| !pivot_cols.contains(c))
-        .collect();
+    let free_cols: Vec<usize> = (0..n_cols).filter(|c| !pivot_cols.contains(c)).collect();
 
     let mut basis = Vec::with_capacity(free_cols.len());
     for &free_col in &free_cols {
@@ -1214,7 +1218,10 @@ mod tests {
                 assert!(
                     (wu[i][j] - uw[i][j]).abs() < tol,
                     "matrices don't commute at ({},{}): WU={} UW={}",
-                    i, j, wu[i][j], uw[i][j]
+                    i,
+                    j,
+                    wu[i][j],
+                    uw[i][j]
                 );
             }
         }
@@ -1238,8 +1245,10 @@ mod tests {
         // partner(0)=3, partner(3)=0, partner(1)=4, partner(4)=1, partner(2)=2.
         let partner = |i: usize| -> usize {
             match i {
-                0 => 3, 3 => 0,
-                1 => 4, 4 => 1,
+                0 => 3,
+                3 => 0,
+                1 => 4,
+                4 => 1,
                 2 => 2,
                 _ => unreachable!(),
             }
@@ -1247,8 +1256,14 @@ mod tests {
         for i in 0..d {
             for j in 0..d {
                 let expected = if j == partner(i) { 1.0 } else { 0.0 };
-                assert!((basis[1][i][j] - expected).abs() < 1e-6,
-                    "C[{}][{}] = {}, expected {}", i, j, basis[1][i][j], expected);
+                assert!(
+                    (basis[1][i][j] - expected).abs() < 1e-6,
+                    "C[{}][{}] = {}, expected {}",
+                    i,
+                    j,
+                    basis[1][i][j],
+                    expected
+                );
             }
         }
     }
@@ -1263,8 +1278,12 @@ mod tests {
         for i in 0..d {
             for j in 0..d {
                 let expected = if i == j { 1.0 } else { 0.0 };
-                assert!((cc[i][j] - expected).abs() < 1e-5,
-                    "C² should be identity at ({},{})", i, j);
+                assert!(
+                    (cc[i][j] - expected).abs() < 1e-5,
+                    "C² should be identity at ({},{})",
+                    i,
+                    j
+                );
             }
         }
     }
@@ -1301,8 +1320,12 @@ mod tests {
         for i in 0..d {
             for j in 0..d {
                 let expected = if i == j { 1.0 } else { 0.0 };
-                assert!((m_d[i][j] - expected).abs() < 1e-5,
-                    "M^d should be identity at ({},{})", i, j);
+                assert!(
+                    (m_d[i][j] - expected).abs() < 1e-5,
+                    "M^d should be identity at ({},{})",
+                    i,
+                    j
+                );
             }
         }
     }
@@ -1330,9 +1353,14 @@ mod tests {
         let generators = vec![shift.clone()];
         let basis = commutant_of_matrices(&generators, d);
 
-        assert_eq!(basis.len(), d,
+        assert_eq!(
+            basis.len(),
+            d,
             "commutant of C_{} should have dimension {}, got {}",
-            d, d, basis.len());
+            d,
+            d,
+            basis.len()
+        );
 
         // Every basis element must commute with the shift.
         for w in &basis {
@@ -1345,8 +1373,13 @@ mod tests {
         // No generators → no constraints → full Mat_{d×d}, dimension d².
         let d = 3;
         let basis = commutant_of_matrices(&[], d);
-        assert_eq!(basis.len(), d * d,
-            "no generators should give d²={}, got {}", d * d, basis.len());
+        assert_eq!(
+            basis.len(),
+            d * d,
+            "no generators should give d²={}, got {}",
+            d * d,
+            basis.len()
+        );
     }
 
     #[test]
@@ -1358,8 +1391,13 @@ mod tests {
             identity[i][i] = 1.0;
         }
         let basis = commutant_of_matrices(&[identity], d);
-        assert_eq!(basis.len(), d * d,
-            "identity generator should give d²={}, got {}", d * d, basis.len());
+        assert_eq!(
+            basis.len(),
+            d * d,
+            "identity generator should give d²={}, got {}",
+            d * d,
+            basis.len()
+        );
     }
 
     #[test]
@@ -1371,8 +1409,12 @@ mod tests {
 
         // With 64 samples from C₈ (|G|=8), we expect all 8 elements sampled,
         // so the commutant should be exactly 8-dimensional.
-        assert_eq!(basis.len(), 8,
-            "commutant of C₈ should have dim 8, got {}", basis.len());
+        assert_eq!(
+            basis.len(),
+            8,
+            "commutant of C₈ should have dim 8, got {}",
+            basis.len()
+        );
 
         // Verify each basis element commutes with the shift k=1.
         let mut shift_mat = vec![vec![0.0_f32; 8]; 8];

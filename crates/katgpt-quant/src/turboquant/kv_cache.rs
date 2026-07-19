@@ -155,13 +155,9 @@ impl TurboQuantKVCache {
 
         Self {
             layers,
-            key_indices: vec![
-                0u8; tq_config.n_layers * tq_config.max_seq_len * packed_key_len
-            ],
+            key_indices: vec![0u8; tq_config.n_layers * tq_config.max_seq_len * packed_key_len],
             key_norms: vec![0.0f32; tq_config.n_layers * tq_config.max_seq_len],
-            val_indices: vec![
-                0u8; tq_config.n_layers * tq_config.max_seq_len * packed_val_len
-            ],
+            val_indices: vec![0u8; tq_config.n_layers * tq_config.max_seq_len * packed_val_len],
             val_norms: vec![0.0f32; tq_config.n_layers * tq_config.max_seq_len],
             pos: 0,
             max_used_pos: 0,

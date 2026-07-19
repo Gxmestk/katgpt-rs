@@ -15,12 +15,12 @@
 
 use std::time::Instant;
 
+use katgpt_quant::turboquant::TurboQuantKVCache;
 use katgpt_rs::sp_kv::forward::forward_sp_kv_quant;
 use katgpt_rs::sp_kv::{
     GateBiasBuffer, SpKvConfig, SpKvForwardContext, SpKvGateMode, SpKvPredictors, SpKvQuantCache,
 };
 use katgpt_rs::transformer::{ForwardContext, TransformerWeights};
-use katgpt_quant::turboquant::TurboQuantKVCache;
 use katgpt_rs::types::{Config, Rng, kv_dim};
 
 /// Number of iterations for timing benchmarks.

@@ -18,7 +18,9 @@ fn main() {
     let runs = 5;
 
     println!("=== Issue 036 Re-evaluation Trigger Check ===");
-    println!("BanditPruner update() — {iters} iters, {warmup} warmup, {num_arms} arms, {runs} runs");
+    println!(
+        "BanditPruner update() — {iters} iters, {warmup} warmup, {num_arms} arms, {runs} runs"
+    );
     println!("Re-evaluation trigger: consistently below 420M across 5+ runs");
     println!();
 
@@ -48,7 +50,10 @@ fn main() {
     }
 
     let min = throughputs.iter().cloned().fold(f64::INFINITY, f64::min);
-    let max = throughputs.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+    let max = throughputs
+        .iter()
+        .cloned()
+        .fold(f64::NEG_INFINITY, f64::max);
     let mean = throughputs.iter().sum::<f64>() / runs as f64;
 
     println!();

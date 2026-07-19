@@ -647,7 +647,11 @@ mod tests {
         )
         .unwrap();
         assert_eq!(gamma, 0.0);
-        assert!(out.iter().zip(state.iter()).all(|(a, b)| a.to_bits() == b.to_bits()));
+        assert!(
+            out.iter()
+                .zip(state.iter())
+                .all(|(a, b)| a.to_bits() == b.to_bits())
+        );
     }
 
     // ── G1b: full-correction parity (γ = 1) ───────────────────────────────
@@ -1032,9 +1036,15 @@ mod tests {
         let mut state = original;
         let direction = [0.0, 0.0, 1.0, 0.0]; // orthogonal to basis → γ = 0
         let mut scratch = TilrScratch::with_capacity(d, r);
-        let gamma = tilr_refine_apply(&mut state, &direction, &basis, r, 0.5, 1e-12, &mut scratch).unwrap();
+        let gamma =
+            tilr_refine_apply(&mut state, &direction, &basis, r, 0.5, 1e-12, &mut scratch).unwrap();
         assert_eq!(gamma, 0.0);
-        assert!(state.iter().zip(original.iter()).all(|(a, b)| a.to_bits() == b.to_bits()));
+        assert!(
+            state
+                .iter()
+                .zip(original.iter())
+                .all(|(a, b)| a.to_bits() == b.to_bits())
+        );
     }
 
     // ── TilrScratch capacity ──────────────────────────────────────────────
@@ -1111,7 +1121,10 @@ mod tests {
         );
         // dims 3..8 should be unchanged (d_proj is zero there).
         for i in 3..d {
-            assert!((out[i] - state[i]).abs() < 1e-6, "dim {i} changed unexpectedly");
+            assert!(
+                (out[i] - state[i]).abs() < 1e-6,
+                "dim {i} changed unexpectedly"
+            );
         }
     }
 
@@ -1298,7 +1311,9 @@ mod tests {
             &mut out,
         )
         .unwrap();
-        assert!((gamma - 1.0).abs() < 0.01, "expected γ≈1.0 for in-span direction, got {gamma}");
+        assert!(
+            (gamma - 1.0).abs() < 0.01,
+            "expected γ≈1.0 for in-span direction, got {gamma}"
+        );
     }
-
 }

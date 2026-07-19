@@ -89,12 +89,12 @@
 #![cfg(debug_assertions)]
 
 use fastrand::Rng;
-use katgpt_core::simd::simd_dot_f32;
-use katgpt_core::alloc::{get_alloc_stats, reset_alloc_stats};
 use katgpt_claim::clr::{
     Claim, ClaimExtractor, ClrConfig, ClrScratch, DirectionVectorSource, FnClaimExtractor,
     SigmoidProjectionVerifier, Trajectory, clr_vote_minimal,
 };
+use katgpt_core::alloc::{get_alloc_stats, reset_alloc_stats};
+use katgpt_core::simd::simd_dot_f32;
 
 // ──────────────────────────────────────────────────────────────────────────
 // Synthetic data (mirrors bench_284_clr_goat.rs helpers, kept local to avoid

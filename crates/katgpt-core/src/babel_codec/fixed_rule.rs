@@ -443,20 +443,14 @@ fn parse_pipeline(line: &str) -> Option<Vec<String>> {
     if line.contains('>') && !line.contains(' ') {
         // Single pass: split, reject-empty, collect. Avoids the intermediate
         // Vec<&str> + second iter that the prior collect-then-all pattern built.
-        let stages: Vec<String> = line
-            .split('>')
-            .map(|s| s.to_string())
-            .collect();
+        let stages: Vec<String> = line.split('>').map(|s| s.to_string()).collect();
         if stages.len() >= 2 && stages.iter().all(|s| !s.is_empty()) {
             return Some(stages);
         }
     }
     // Verbose: `A then B then C` — split on " then ".
     if line.contains(" then ") {
-        let stages: Vec<String> = line
-            .split(" then ")
-            .map(|s| s.trim().to_string())
-            .collect();
+        let stages: Vec<String> = line.split(" then ").map(|s| s.trim().to_string()).collect();
         if stages.len() >= 2 && stages.iter().all(|s| !s.is_empty()) {
             return Some(stages);
         }

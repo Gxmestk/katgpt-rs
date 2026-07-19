@@ -342,11 +342,7 @@ where
         // Deepest, highest-score path.
         let best = tree
             .iter()
-            .max_by(|a, b| {
-                a.depth
-                    .cmp(&b.depth)
-                    .then(a.score.total_cmp(&b.score))
-            })
+            .max_by(|a, b| a.depth.cmp(&b.depth).then(a.score.total_cmp(&b.score)))
             .unwrap();
         let path = extract_parent_tokens(best.parent_path, best.depth + 1);
 

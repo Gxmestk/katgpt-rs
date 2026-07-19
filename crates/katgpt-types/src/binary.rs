@@ -23,10 +23,10 @@ use half::f16;
 pub struct BinaryWeights {
     pub rows: usize,
     pub cols: usize,
-    pub blocks64: usize,        // (cols + 63) / 64
-    pub groups_per_row: usize,  // (cols + 127) / 128
-    pub sign_bits: Vec<u64>,    // [rows * blocks64]
-    pub group_scale: Vec<f16>,  // [rows * groups_per_row]
+    pub blocks64: usize,       // (cols + 63) / 64
+    pub groups_per_row: usize, // (cols + 127) / 128
+    pub sign_bits: Vec<u64>,   // [rows * blocks64]
+    pub group_scale: Vec<f16>, // [rows * groups_per_row]
 }
 
 /// Group size for group-wise scaling (Bonsai default).
@@ -96,9 +96,7 @@ impl BinaryWeights {
     /// weights to convert from; this cross-format bridge is only meaningful
     /// when both formats are available.
     #[cfg(feature = "plasma_path")]
-    pub fn from_ternary_no_zeros(
-        ternary: &crate::TernaryWeights,
-    ) -> Option<Self> {
+    pub fn from_ternary_no_zeros(ternary: &crate::TernaryWeights) -> Option<Self> {
         let n_words = ternary.rows * ternary.blocks64;
         for i in 0..n_words {
             // Binary subset invariant: pos XOR neg must be all-ones (no both-clear = zero).
@@ -133,7 +131,11 @@ impl BinaryWeights {
     /// with error compensation mirrors Ciot's row-wise scheme but applied
     /// per 128-weight group for finer fidelity.
     pub fn quantize_from_f32(weights: &[f32], rows: usize, cols: usize) -> Self {
-        assert_eq!(weights.len(), rows * cols, "weights slice must be rows*cols");
+        assert_eq!(
+            weights.len(),
+            rows * cols,
+            "weights slice must be rows*cols"
+        );
         let mut bw = Self::new(rows, cols);
         let groups_per_row = bw.groups_per_row;
 

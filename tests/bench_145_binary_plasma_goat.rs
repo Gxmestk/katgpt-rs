@@ -11,7 +11,9 @@
 //! G5 (modelless): quantization is PTQ (no training) — structural, verified
 //!     by reading BinaryWeights::quantize_from_f32 (deterministic, no gradient).
 
-use katgpt_core::{BinaryWeights, TernaryWeights, binary_matvec_scalar, simd_binary_matvec, simd_ternary_matvec};
+use katgpt_core::{
+    BinaryWeights, TernaryWeights, binary_matvec_scalar, simd_binary_matvec, simd_ternary_matvec,
+};
 
 /// Group size for binary weight scaling (Bonsai default = 128).
 const GROUP_SIZE: usize = 128;
@@ -115,7 +117,10 @@ fn g1b_scalar_vs_simd_parity() {
         .zip(y_simd.iter())
         .map(|(a, b)| (a - b).abs())
         .fold(0.0f32, f32::max);
-    assert!(max_diff < 1e-3, "G1b FAIL: scalar vs simd max_diff={max_diff}");
+    assert!(
+        max_diff < 1e-3,
+        "G1b FAIL: scalar vs simd max_diff={max_diff}"
+    );
 }
 
 // ── G2: Latency (Gate A) ─────────────────────────────────────
@@ -209,7 +214,10 @@ fn g4_zero_alloc_binary_matvec() {
     // reads/writes into borrowed slices. This is structurally guaranteed
     // by the borrow checker. We run it once more to confirm no panic.
     simd_binary_matvec(&bw, &x, &mut y);
-    assert!(y.iter().all(|&v| v.is_finite()), "G4: output must be finite");
+    assert!(
+        y.iter().all(|&v| v.is_finite()),
+        "G4: output must be finite"
+    );
 }
 
 // ── Quantization fidelity (informational) ────────────────────

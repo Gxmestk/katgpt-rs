@@ -8,7 +8,7 @@
 use std::collections::VecDeque;
 
 use super::{
-    BOMB_FUSE_TICKS, DEFAULT_BLAST_RANGE, ArenaGrid, BomberAction, GameEvent, GridPos, KnownBomb,
+    ArenaGrid, BOMB_FUSE_TICKS, BomberAction, DEFAULT_BLAST_RANGE, GameEvent, GridPos, KnownBomb,
     KnownOpponent,
 };
 use crate::pruners::bomber::{ARENA_H, ARENA_W, Cell};

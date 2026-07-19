@@ -69,7 +69,11 @@ pub fn gdn2_scalar_alpha(layer: &Gdn2LayerState) -> f32 {
         first
     } else {
         // Geometric mean: exp(mean(ln(α)))
-        let log_sum: f64 = alpha.iter().filter(|&&a| a > 0.0).map(|&a| (a as f64).ln()).sum();
+        let log_sum: f64 = alpha
+            .iter()
+            .filter(|&&a| a > 0.0)
+            .map(|&a| (a as f64).ln())
+            .sum();
         let n = alpha.len() as f64;
         (log_sum / n).exp() as f32
     }
@@ -225,8 +229,7 @@ pub fn commit_gdn2_tree_layer(
 
     // Borrow heads mutably.
     let heads = &mut cache.layers[layer_idx].heads;
-    let mut s0_per_head: Vec<&mut [f32]> =
-        heads.iter_mut().map(|h| h.s.as_mut_slice()).collect();
+    let mut s0_per_head: Vec<&mut [f32]> = heads.iter_mut().map(|h| h.s.as_mut_slice()).collect();
 
     commit_accepted_multihead(topo, accepted_leaf, &params, &mut s0_per_head, d_k, d_v);
 }
@@ -342,13 +345,18 @@ pub fn commit_gdn2_hola_tree_layer(
 
     let layer = &mut cache.layers[layer_idx];
     let heads = &mut layer.heads;
-    let mut s0_per_head: Vec<&mut [f32]> =
-        heads.iter_mut().map(|h| h.s.as_mut_slice()).collect();
+    let mut s0_per_head: Vec<&mut [f32]> = heads.iter_mut().map(|h| h.s.as_mut_slice()).collect();
     let mut cache_refs: Vec<&mut HippocampalCacheDyn> =
         layer.hippocampal_caches.iter_mut().collect();
 
     commit_accepted_dual_multihead(
-        topo, accepted_leaf, &params, &mut s0_per_head, &mut cache_refs, d_k, d_k,
+        topo,
+        accepted_leaf,
+        &params,
+        &mut s0_per_head,
+        &mut cache_refs,
+        d_k,
+        d_k,
     );
 }
 
@@ -447,7 +455,10 @@ mod tests {
         let alpha = gdn2_scalar_alpha(&layer);
         // Geometric mean of [0.8, 0.9, 0.8, 0.8]
         let expected = (0.25f64 * (0.8f64.ln() * 3.0 + 0.9f64.ln())).exp() as f32;
-        assert!((alpha - expected).abs() < 1e-5, "got {alpha}, expected {expected}");
+        assert!(
+            (alpha - expected).abs() < 1e-5,
+            "got {alpha}, expected {expected}"
+        );
     }
 
     #[test]
@@ -575,9 +586,7 @@ mod tests {
         let topo = build_topology(&parents, &[alpha; T]);
 
         // --- Sequential reference: replay full chain ---
-        let mut seq_s0: Vec<Vec<f32>> = (0..n_kv_heads)
-            .map(|_| vec![0.0f32; d_k * d_v])
-            .collect();
+        let mut seq_s0: Vec<Vec<f32>> = (0..n_kv_heads).map(|_| vec![0.0f32; d_k * d_v]).collect();
         for head in 0..n_kv_heads {
             let k_stride = t * d_k;
             let v_stride = t * d_v;
@@ -688,7 +697,11 @@ mod tests {
             let tree_head_out = &tree_out[head * v_stride..(head + 1) * v_stride];
             for orig_node in 0..t {
                 // Find topo index for this original node
-                let topo_idx = topo.topo_order.iter().position(|&x| x == orig_node).unwrap();
+                let topo_idx = topo
+                    .topo_order
+                    .iter()
+                    .position(|&x| x == orig_node)
+                    .unwrap();
                 for d in 0..d_v {
                     let tree_val = tree_head_out[topo_idx * d_v + d];
                     let ref_val = ref_out[orig_node * d_v + d];

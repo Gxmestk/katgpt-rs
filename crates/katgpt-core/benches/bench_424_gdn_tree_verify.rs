@@ -64,7 +64,13 @@ fn gen_tree(t: usize, d_k: usize, d_v: usize, seed: u32) -> TreeData {
         rs
     };
     let parents: Vec<usize> = (0..t)
-        .map(|i| if i == 0 { usize::MAX } else { (next() as usize) % i })
+        .map(|i| {
+            if i == 0 {
+                usize::MAX
+            } else {
+                (next() as usize) % i
+            }
+        })
         .collect();
 
     let mut frng = xorshift_rng(seed.wrapping_mul(7));
@@ -75,16 +81,20 @@ fn gen_tree(t: usize, d_k: usize, d_v: usize, seed: u32) -> TreeData {
     let betas: Vec<f32> = (0..t).map(|_| 0.4 + 0.4 * frng()).collect();
     let s0: Vec<f32> = (0..d_k * d_v).map(|_| 0.1 * frng()).collect();
 
-    TreeData { parents, keys, values, queries, alphas, betas, s0 }
+    TreeData {
+        parents,
+        keys,
+        values,
+        queries,
+        alphas,
+        betas,
+        s0,
+    }
 }
 
 /// Per-branch sequential reference: replay the delta-rule from root to each
 /// node, then read the output. This is the baseline the tree-verify beats.
-fn reference_verify(
-    data: &TreeData,
-    d_k: usize,
-    d_v: usize,
-) -> Vec<f32> {
+fn reference_verify(data: &TreeData, d_k: usize, d_v: usize) -> Vec<f32> {
     let t = data.parents.len();
     let mut outputs = vec![0.0f32; t * d_v];
     let scale = 1.0 / (d_k as f32).sqrt();
@@ -186,12 +196,7 @@ fn g2_perf() {
     // the per-branch sequential is O(T·depth·d_k·d_v). For shallow trees (depth
     // ~log T), sequential does less total work. For deep trees (depth ~T),
     // tree-verify wins big.
-    let sizes: &[(usize, &str)] = &[
-        (16, "T=16"),
-        (32, "T=32"),
-        (64, "T=64"),
-        (128, "T=128"),
-    ];
+    let sizes: &[(usize, &str)] = &[(16, "T=16"), (32, "T=32"), (64, "T=64"), (128, "T=128")];
 
     println!("\n╔══ G2: Perf — tree-verify vs per-branch sequential ═══════════╗");
     println!("║ d_k={d_k}, d_v={d_v}, release mode, single-threaded           ║");
@@ -202,8 +207,11 @@ fn g2_perf() {
         let data = gen_tree(t, d_k, d_v, 100 + t as u32);
         let topo = build_topology(&data.parents, &data.alphas);
         let params = GdnLayerParams {
-            keys: &data.keys, values: &data.values,
-            queries: &data.queries, alphas: &data.alphas, betas: &data.betas,
+            keys: &data.keys,
+            values: &data.values,
+            queries: &data.queries,
+            alphas: &data.alphas,
+            betas: &data.betas,
         };
         let mut verifier = GdnTreeVerifier::new(t, d_k, d_v);
 
@@ -211,7 +219,13 @@ fn g2_perf() {
             let _ = verify_gdn_tree_into(&mut verifier, &topo, &params, &data.s0, d_k, d_v);
         }
 
-        let n_iters = if t <= 32 { 500 } else if t <= 64 { 200 } else { 50 };
+        let n_iters = if t <= 32 {
+            500
+        } else if t <= 64 {
+            200
+        } else {
+            50
+        };
 
         let start = std::time::Instant::now();
         for _ in 0..n_iters {
@@ -226,9 +240,7 @@ fn g2_perf() {
         let seq_us = start.elapsed().as_secs_f64() / n_iters as f64 * 1e6;
 
         let speedup = seq_us / tree_us;
-        println!(
-            "║   {label:8} tree={tree_us:8.1}µs  seq={seq_us:8.1}µs  speedup={speedup:5.2}×"
-        );
+        println!("║   {label:8} tree={tree_us:8.1}µs  seq={seq_us:8.1}µs  speedup={speedup:5.2}×");
     }
 
     println!("║ ── Chain tree (deep, depth = T) ──                           ║");
@@ -244,12 +256,23 @@ fn g2_perf() {
         let alphas: Vec<f32> = (0..t).map(|_| 0.75 + 0.15 * frng()).collect();
         let betas: Vec<f32> = (0..t).map(|_| 0.4 + 0.4 * frng()).collect();
         let s0: Vec<f32> = (0..d_k * d_v).map(|_| 0.1 * frng()).collect();
-        let data = TreeData { parents: chain_parents, keys, values, queries, alphas, betas, s0 };
+        let data = TreeData {
+            parents: chain_parents,
+            keys,
+            values,
+            queries,
+            alphas,
+            betas,
+            s0,
+        };
 
         let topo = build_topology(&data.parents, &data.alphas);
         let params = GdnLayerParams {
-            keys: &data.keys, values: &data.values,
-            queries: &data.queries, alphas: &data.alphas, betas: &data.betas,
+            keys: &data.keys,
+            values: &data.values,
+            queries: &data.queries,
+            alphas: &data.alphas,
+            betas: &data.betas,
         };
         let mut verifier = GdnTreeVerifier::new(t, d_k, d_v);
 
@@ -257,7 +280,13 @@ fn g2_perf() {
             let _ = verify_gdn_tree_into(&mut verifier, &topo, &params, &data.s0, d_k, d_v);
         }
 
-        let n_iters = if t <= 32 { 200 } else if t <= 64 { 50 } else { 10 };
+        let n_iters = if t <= 32 {
+            200
+        } else if t <= 64 {
+            50
+        } else {
+            10
+        };
 
         let start = std::time::Instant::now();
         for _ in 0..n_iters {
@@ -272,9 +301,7 @@ fn g2_perf() {
         let seq_us = start.elapsed().as_secs_f64() / n_iters as f64 * 1e6;
 
         let speedup = seq_us / tree_us;
-        println!(
-            "║   {label:8} tree={tree_us:8.1}µs  seq={seq_us:8.1}µs  speedup={speedup:5.2}×"
-        );
+        println!("║   {label:8} tree={tree_us:8.1}µs  seq={seq_us:8.1}µs  speedup={speedup:5.2}×");
     }
 
     println!("╠══════════════════════════════════════════════════════════════╣");

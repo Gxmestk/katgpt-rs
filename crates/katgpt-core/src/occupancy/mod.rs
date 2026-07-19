@@ -131,11 +131,7 @@ impl<H: LogRatioClass> OccupancyRatioEstimator<H> {
     /// `FORE_THETA_TOL` (relative infinity norm) between iterations — this
     /// indicates convergence to the FORE fixed point.
     #[must_use]
-    pub fn fit(
-        &self,
-        transitions: &TransitionBatch<'_>,
-        initial: &InitialMoments<'_>,
-    ) -> Vec<f32>
+    pub fn fit(&self, transitions: &TransitionBatch<'_>, initial: &InitialMoments<'_>) -> Vec<f32>
     where
         H::Params: AsRef<[f32]> + AsMut<[f32]>,
     {

@@ -260,7 +260,11 @@ pub fn elasticity_gated_update_into(
     out: &mut [f32],
 ) {
     let dim = state.len();
-    debug_assert_eq!(target.len(), dim, "state and target must have the same length");
+    debug_assert_eq!(
+        target.len(),
+        dim,
+        "state and target must have the same length"
+    );
     debug_assert_eq!(out.len(), dim, "out must have the same length as state");
     debug_assert_eq!(
         neighbor_states.len(),
@@ -418,9 +422,15 @@ pub fn error_weighted_graph_laplacian_into(
     eta: f32,
     output: &mut CochainField,
 ) {
-    debug_assert_eq!(potential.rank, 0, "error_weighted_graph_laplacian requires rank-0 cochain");
+    debug_assert_eq!(
+        potential.rank, 0,
+        "error_weighted_graph_laplacian requires rank-0 cochain"
+    );
     debug_assert_eq!(output.rank, 0, "output must be rank-0");
-    debug_assert_eq!(potential.dim, output.dim, "potential and output dim mismatch");
+    debug_assert_eq!(
+        potential.dim, output.dim,
+        "potential and output dim mismatch"
+    );
     debug_assert_eq!(
         edge_errors.len(),
         cx.n_edges(),
@@ -441,10 +451,7 @@ pub fn error_weighted_graph_laplacian_into(
     for pair in entries.chunks_exact(2) {
         let (v_tail, edge_idx, _sign_t) = pair[0];
         let (v_head, _e2, _sign_h) = pair[1];
-        debug_assert_eq!(
-            edge_idx, _e2,
-            "boundary entry pair edge indices must match"
-        );
+        debug_assert_eq!(edge_idx, _e2, "boundary entry pair edge indices must match");
 
         let error = edge_errors[edge_idx];
         let weight = neighborhood_weight(1.0, error, eta);
@@ -459,13 +466,17 @@ pub fn error_weighted_graph_laplacian_into(
 
         for c in 0..chunks {
             let off = c * 4;
-            let diff0 = (potential.data[tail_start + off] - potential.data[head_start + off]) * weight;
-            let diff1 =
-                (potential.data[tail_start + off + 1] - potential.data[head_start + off + 1]) * weight;
-            let diff2 =
-                (potential.data[tail_start + off + 2] - potential.data[head_start + off + 2]) * weight;
-            let diff3 =
-                (potential.data[tail_start + off + 3] - potential.data[head_start + off + 3]) * weight;
+            let diff0 =
+                (potential.data[tail_start + off] - potential.data[head_start + off]) * weight;
+            let diff1 = (potential.data[tail_start + off + 1]
+                - potential.data[head_start + off + 1])
+                * weight;
+            let diff2 = (potential.data[tail_start + off + 2]
+                - potential.data[head_start + off + 2])
+                * weight;
+            let diff3 = (potential.data[tail_start + off + 3]
+                - potential.data[head_start + off + 3])
+                * weight;
             output.data[tail_start + off] += diff0;
             output.data[head_start + off] -= diff0;
             output.data[tail_start + off + 1] += diff1;
@@ -496,7 +507,10 @@ pub fn error_weighted_graph_laplacian(
     edge_errors: &[f32],
     eta: f32,
 ) -> CochainField {
-    debug_assert_eq!(potential.rank, 0, "error_weighted_graph_laplacian requires rank-0 cochain");
+    debug_assert_eq!(
+        potential.rank, 0,
+        "error_weighted_graph_laplacian requires rank-0 cochain"
+    );
     let mut output = CochainField::zeros(0, cx.n_vertices(), potential.dim);
     error_weighted_graph_laplacian_into(cx, potential, edge_errors, eta, &mut output);
     output
@@ -754,12 +768,7 @@ mod tests {
         for run in 0..100 {
             let mut out = [0.0f32; 5];
             elasticity_gated_update_into(
-                &state,
-                &target,
-                &neighbors,
-                &distances,
-                &config,
-                &mut out,
+                &state, &target, &neighbors, &distances, &config, &mut out,
             );
             for i in 0..5 {
                 assert_eq!(
@@ -858,7 +867,11 @@ mod tests {
         let mut out2 = vec![0.0f32; dim];
         elasticity_gated_update_into(&state, &target, &neighbors, &distances, &config, &mut out2);
         for i in 0..dim {
-            assert_eq!(out[i].to_bits(), out2[i].to_bits(), "non-deterministic at lane {i}");
+            assert_eq!(
+                out[i].to_bits(),
+                out2[i].to_bits(),
+                "non-deterministic at lane {i}"
+            );
         }
     }
 
@@ -869,14 +882,22 @@ mod tests {
         let state = [0.0f32, 0.0];
         let target = [3.0f32, 4.0]; // L2 distance = 5.0
         let error = compute_error(&state, &target, 10.0);
-        assert!((error - 0.5).abs() < 1e-6, "error should be 0.5, got {}", error);
+        assert!(
+            (error - 0.5).abs() < 1e-6,
+            "error should be 0.5, got {}",
+            error
+        );
     }
 
     #[test]
     fn compute_error_zero() {
         let state = [1.0f32, 2.0, 3.0];
         let error = compute_error(&state, &state, 1.0);
-        assert!(error < ZERO_ERROR_THRESHOLD, "error should be ~0, got {}", error);
+        assert!(
+            error < ZERO_ERROR_THRESHOLD,
+            "error should be ~0, got {}",
+            error
+        );
     }
 
     // ── effective_neighborhood_size unit tests ───────────────────────────
@@ -918,7 +939,11 @@ mod tests {
     fn neighborhood_weight_zero_distance() {
         // d=0 → weight = exp(0) = 1.0 (the winner itself)
         let w = neighborhood_weight(0.0, 0.5, 1.0);
-        assert!((w - 1.0).abs() < 1e-6, "zero distance → weight=1, got {}", w);
+        assert!(
+            (w - 1.0).abs() < 1e-6,
+            "zero distance → weight=1, got {}",
+            w
+        );
     }
 
     #[test]
@@ -927,7 +952,12 @@ mod tests {
         let eta = 1.0;
         let w1 = neighborhood_weight(0.1, error, eta);
         let w2 = neighborhood_weight(0.5, error, eta);
-        assert!(w1 > w2, "closer neighbor should have higher weight: {} vs {}", w1, w2);
+        assert!(
+            w1 > w2,
+            "closer neighbor should have higher weight: {} vs {}",
+            w1,
+            w2
+        );
     }
 
     #[test]
@@ -1001,8 +1031,7 @@ mod tests {
             let edge_errors = vec![100.0f32; cx.n_edges()];
             let eta = 1.0;
 
-            let weighted =
-                error_weighted_graph_laplacian(&cx, &potential, &edge_errors, eta);
+            let weighted = error_weighted_graph_laplacian(&cx, &potential, &edge_errors, eta);
             let uniform = graph_laplacian(&cx, &potential);
 
             // With error=100, weight = exp(-1/(1*10000)) = exp(-0.0001) ≈ 0.99990.
@@ -1041,10 +1070,8 @@ mod tests {
             let small_errors = vec![0.05f32];
             let large_errors = vec![0.5f32];
 
-            let small_out =
-                error_weighted_graph_laplacian(&cx, &potential, &small_errors, eta);
-            let large_out =
-                error_weighted_graph_laplacian(&cx, &potential, &large_errors, eta);
+            let small_out = error_weighted_graph_laplacian(&cx, &potential, &small_errors, eta);
+            let large_out = error_weighted_graph_laplacian(&cx, &potential, &large_errors, eta);
 
             // Vertex 0: output = w * (0.0 - 1.0) = -w
             // Vertex 1: output = w * (1.0 - 0.0) = +w
@@ -1114,8 +1141,7 @@ mod tests {
             // Edge 0: high error (diffuses). Edge 1: zero error (no diffusion).
             let edge_errors = vec![0.5f32, 0.0];
 
-            let output =
-                error_weighted_graph_laplacian(&cx, &potential, &edge_errors, 1.0);
+            let output = error_weighted_graph_laplacian(&cx, &potential, &edge_errors, 1.0);
 
             let w0 = neighborhood_weight(1.0, 0.5, 1.0);
             // Vertex 0: only edge 0 contributes. diff = 0.0 - 1.0 = -1.0.
@@ -1170,8 +1196,7 @@ mod tests {
             // weights.
             let edge_errors = vec![0.3f32; cx.n_edges()];
 
-            let output =
-                error_weighted_graph_laplacian(&cx, &potential, &edge_errors, 1.0);
+            let output = error_weighted_graph_laplacian(&cx, &potential, &edge_errors, 1.0);
 
             // Interior vertices should have zero Laplacian.
             for y in 1..2 {

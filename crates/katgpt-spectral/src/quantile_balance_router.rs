@@ -503,7 +503,12 @@ fn quantile_in_place(data: &mut [f32], q: f32) -> f32 {
 ///
 /// `Vec<usize>` of selected expert indices in descending biased-score order.
 /// Length `min(k, n)`.
-pub fn route_with_bias(s_row: &[f32], beta: &[f32], k: usize, out_scores: &mut [f32]) -> Vec<usize> {
+pub fn route_with_bias(
+    s_row: &[f32],
+    beta: &[f32],
+    k: usize,
+    out_scores: &mut [f32],
+) -> Vec<usize> {
     debug_assert_eq!(s_row.len(), beta.len(), "s_row / beta length mismatch");
     debug_assert_eq!(out_scores.len(), s_row.len(), "out_scores length mismatch");
     let n = s_row.len();
@@ -582,10 +587,7 @@ mod tests {
     fn g1_beta_shape_and_determinism() {
         // 4 tokens × 4 experts, k=2.
         let s = vec![
-            1.0, 0.5, 0.1, 0.0,
-            0.9, 0.4, 0.2, 0.1,
-            1.1, 0.6, 0.0, 0.1,
-            0.8, 0.3, 0.1, 0.2,
+            1.0, 0.5, 0.1, 0.0, 0.9, 0.4, 0.2, 0.1, 1.1, 0.6, 0.0, 0.1, 0.8, 0.3, 0.1, 0.2,
         ];
         let m = 4;
         let n = 4;
@@ -628,14 +630,8 @@ mod tests {
         // picked and expert 3 is never picked (heavy imbalance).
         // Each row: [high, mid, mid, low].
         let s = vec![
-            1.0, 0.5, 0.3, 0.0,
-            1.1, 0.4, 0.2, 0.0,
-            1.2, 0.6, 0.3, 0.0,
-            1.0, 0.5, 0.2, 0.0,
-            0.9, 0.4, 0.3, 0.0,
-            1.1, 0.5, 0.2, 0.0,
-            1.0, 0.6, 0.3, 0.0,
-            1.2, 0.4, 0.2, 0.0,
+            1.0, 0.5, 0.3, 0.0, 1.1, 0.4, 0.2, 0.0, 1.2, 0.6, 0.3, 0.0, 1.0, 0.5, 0.2, 0.0, 0.9,
+            0.4, 0.3, 0.0, 1.1, 0.5, 0.2, 0.0, 1.0, 0.6, 0.3, 0.0, 1.2, 0.4, 0.2, 0.0,
         ];
         let m = 8;
         let n = 4;
@@ -673,10 +669,7 @@ mod tests {
         // Each expert should be picked exactly 2 times.
         // Use a Latin-square-like structure.
         let s = vec![
-            1.0, 1.0, 0.0, 0.0,
-            1.0, 0.0, 1.0, 0.0,
-            0.0, 1.0, 0.0, 1.0,
-            0.0, 0.0, 1.0, 1.0,
+            1.0, 1.0, 0.0, 0.0, 1.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0,
         ];
         let m = 4;
         let n = 4;
@@ -738,8 +731,14 @@ mod tests {
         let mut scratch5 = QbScratch::new(m, n);
         let mut scratch10 = QbScratch::new(m, n);
 
-        let cfg5 = QbConfig { iters: 5, ..Default::default() };
-        let cfg10 = QbConfig { iters: 10, ..Default::default() };
+        let cfg5 = QbConfig {
+            iters: 5,
+            ..Default::default()
+        };
+        let cfg10 = QbConfig {
+            iters: 10,
+            ..Default::default()
+        };
 
         let r5 = quantile_balance_router(&s, m, n, k, &cfg5, &mut scratch5);
         let r10 = quantile_balance_router(&s, m, n, k, &cfg10, &mut scratch10);
@@ -774,22 +773,22 @@ mod tests {
     fn honest_over_iteration_can_worsen_maxvio() {
         // Reuse the G2 test input (heavy skew).
         let s = vec![
-            1.0, 0.5, 0.3, 0.0,
-            1.1, 0.4, 0.2, 0.0,
-            1.2, 0.6, 0.3, 0.0,
-            1.0, 0.5, 0.2, 0.0,
-            0.9, 0.4, 0.3, 0.0,
-            1.1, 0.5, 0.2, 0.0,
-            1.0, 0.6, 0.3, 0.0,
-            1.2, 0.4, 0.2, 0.0,
+            1.0, 0.5, 0.3, 0.0, 1.1, 0.4, 0.2, 0.0, 1.2, 0.6, 0.3, 0.0, 1.0, 0.5, 0.2, 0.0, 0.9,
+            0.4, 0.3, 0.0, 1.1, 0.5, 0.2, 0.0, 1.0, 0.6, 0.3, 0.0, 1.2, 0.4, 0.2, 0.0,
         ];
         let m = 8;
         let n = 4;
         let k = 2;
         let mut scratch5 = QbScratch::new(m, n);
         let mut scratch50 = QbScratch::new(m, n);
-        let cfg5 = QbConfig { iters: 5, ..Default::default() };
-        let cfg50 = QbConfig { iters: 50, ..Default::default() };
+        let cfg5 = QbConfig {
+            iters: 5,
+            ..Default::default()
+        };
+        let cfg50 = QbConfig {
+            iters: 50,
+            ..Default::default()
+        };
         let r5 = quantile_balance_router(&s, m, n, k, &cfg5, &mut scratch5);
         let r50 = quantile_balance_router(&s, m, n, k, &cfg50, &mut scratch50);
         // Document (not enforce) that iters=50 MaxVio can exceed iters=5.
@@ -797,8 +796,7 @@ mod tests {
         // is later improved to be monotonic); we just print the comparison.
         eprintln!(
             "honest_over_iteration: MaxVio(iters=5)={:.4}, MaxVio(iters=50)={:.4} — drift finding",
-            r5.final_balance_violation,
-            r50.final_balance_violation
+            r5.final_balance_violation, r50.final_balance_violation
         );
         // The only hard assertion: iters=5 is at least as good as iters=50
         // on this input (if this fails, the default `iters=5` is wrong).
@@ -828,17 +826,18 @@ mod tests {
         // On all-equal input, the LP optimum is β = 0 (any other bias would
         // *create* imbalance where there is none).
         for &b in &r.beta {
-            assert!(b.abs() < 1e-6, "β should be ~0 on all-equal input, got {}", b);
+            assert!(
+                b.abs() < 1e-6,
+                "β should be ~0 on all-equal input, got {}",
+                b
+            );
         }
     }
 
     // Sanity: degenerate k = n case (every expert picked) returns zero bias.
     #[test]
     fn sanity_k_equals_n() {
-        let s = vec![
-            1.0, 0.5, 0.0,
-            0.9, 0.4, 0.1,
-        ];
+        let s = vec![1.0, 0.5, 0.0, 0.9, 0.4, 0.1];
         let m = 2;
         let n = 3;
         let k = 3; // k == n
@@ -849,7 +848,10 @@ mod tests {
         for &b in &r.beta {
             assert!(b.abs() < 1e-6, "β should be zero when k == n, got {}", b);
         }
-        assert_eq!(r.converged_iter, 0, "converged_iter should be 0 when k == n");
+        assert_eq!(
+            r.converged_iter, 0,
+            "converged_iter should be 0 when k == n"
+        );
     }
 
     // Sanity: route_with_bias returns top-k indices in descending order.
@@ -884,7 +886,10 @@ mod tests {
         let ptr_before = scratch.row_buf.as_ptr();
         scratch.resize(8, 4);
         let ptr_after = scratch.row_buf.as_ptr();
-        assert_eq!(ptr_before, ptr_after, "resize to same size must not realloc");
+        assert_eq!(
+            ptr_before, ptr_after,
+            "resize to same size must not realloc"
+        );
     }
 
     // Sanity: quantile_in_place matches reference values.
@@ -894,12 +899,24 @@ mod tests {
         // Sorted: [1, 1, 2, 3, 4, 5, 6, 9], n=8.
         // q=0.5 → pos=3.5 → interp(data[3], data[4]) = interp(3, 4) = 3.5.
         let median = quantile_in_place(&mut data.clone(), 0.5);
-        assert!((median - 3.5).abs() < 1e-6, "median should be 3.5, got {}", median);
+        assert!(
+            (median - 3.5).abs() < 1e-6,
+            "median should be 3.5, got {}",
+            median
+        );
         // q=0.0 → min = 1.0.
         let min = quantile_in_place(&mut data.clone(), 0.0);
-        assert!((min - 1.0).abs() < 1e-6, "q=0 should be min=1.0, got {}", min);
+        assert!(
+            (min - 1.0).abs() < 1e-6,
+            "q=0 should be min=1.0, got {}",
+            min
+        );
         // q=1.0 → max = 9.0.
         let max = quantile_in_place(&mut data.clone(), 1.0);
-        assert!((max - 9.0).abs() < 1e-6, "q=1 should be max=9.0, got {}", max);
+        assert!(
+            (max - 9.0).abs() < 1e-6,
+            "q=1 should be max=9.0, got {}",
+            max
+        );
     }
 }

@@ -42,9 +42,7 @@ const K: usize = 8;
 // `random_orthonormal_w`) are bit-identical to `funcattn_structured_basis_k_sweep.rs`.
 #[path = "common/basis_harness.rs"]
 mod basis_harness;
-use basis_harness::{
-    cosine, gram_schmidt_rows, l2_normalize, lcg_next, random_orthonormal_w,
-};
+use basis_harness::{cosine, gram_schmidt_rows, l2_normalize, lcg_next, random_orthonormal_w};
 
 /// Build the multi-scale input X (matches the Phase 0 probe exactly so the
 /// +0.11 cos hand-crafted gain is the upper bound we measure against).

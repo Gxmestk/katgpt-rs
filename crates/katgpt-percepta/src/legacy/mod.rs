@@ -906,6 +906,5 @@ impl StreamingSolver {
     }
 }
 
-
 #[cfg(test)]
 mod tests;

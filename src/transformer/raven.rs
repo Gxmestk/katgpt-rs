@@ -1,5 +1,5 @@
-use crate::types::{self};
 use super::*;
+use crate::types::{self};
 
 /// Convert token ids to readable characters (a-z, _ for BOS).
 pub fn tokens_to_string(tokens: &[usize]) -> String {
@@ -339,8 +339,20 @@ pub fn forward_raven<'a>(
         #[cfg(feature = "gated_mlp")]
         {
             // SwiGLU: SiLU(W_gate·h) ⊙ W_up·h → W_down·hidden
-            types::matmul(&mut ctx.hidden, &layer_weights.mlp_w1, &ctx.x, config.mlp_hidden, n);
-            types::matmul(&mut ctx.hidden2, &layer_weights.mlp_w_up, &ctx.x, config.mlp_hidden, n);
+            types::matmul(
+                &mut ctx.hidden,
+                &layer_weights.mlp_w1,
+                &ctx.x,
+                config.mlp_hidden,
+                n,
+            );
+            types::matmul(
+                &mut ctx.hidden2,
+                &layer_weights.mlp_w_up,
+                &ctx.x,
+                config.mlp_hidden,
+                n,
+            );
             types::swiglu_inplace(&mut ctx.hidden, &ctx.hidden2);
         }
         #[cfg(not(feature = "gated_mlp"))]

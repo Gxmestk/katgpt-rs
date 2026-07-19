@@ -83,18 +83,33 @@ pub fn rerank(
     // MaxSim path doesn't need these — skip 2 heap allocations.
     // SmoothMin reuses the d_norms scratch from cosine_score_into.
     let (mut q_mean, mut d_mean, mut d_norms, mut sm_scratch) = match method {
-        RerankMethod::Cosine => (vec![0.0f32; dim], vec![0.0f32; dim], Vec::<f32>::new(), Vec::<f32>::new()),
+        RerankMethod::Cosine => (
+            vec![0.0f32; dim],
+            vec![0.0f32; dim],
+            Vec::<f32>::new(),
+            Vec::<f32>::new(),
+        ),
         RerankMethod::MaxSim => (Vec::new(), Vec::new(), Vec::<f32>::new(), Vec::<f32>::new()),
         #[cfg(feature = "smooth_min_rerank")]
         RerankMethod::SmoothMin { .. } => {
             let max_ld = doc_lengths.iter().copied().max().unwrap_or(0);
-            (Vec::new(), Vec::new(), vec![0.0f32; max_ld], vec![0.0f32; lq])
+            (
+                Vec::new(),
+                Vec::new(),
+                vec![0.0f32; max_ld],
+                vec![0.0f32; lq],
+            )
         }
         #[cfg(feature = "smooth_min_rerank")]
         RerankMethod::SmoothMinAligned { .. } => {
             // Aligned variant needs min(lq, ld) cosines (scratch) + lq query norms
             // (pre-computed once, reused per-doc).
-            (Vec::new(), vec![0.0f32; lq], Vec::<f32>::new(), vec![0.0f32; lq])
+            (
+                Vec::new(),
+                vec![0.0f32; lq],
+                Vec::<f32>::new(),
+                vec![0.0f32; lq],
+            )
         }
     };
 
@@ -150,13 +165,27 @@ pub fn rerank(
                 ),
                 RerankMethod::MaxSim => maxsim_score(query, doc_data, lq, ld, dim),
                 #[cfg(feature = "smooth_min_rerank")]
-                RerankMethod::SmoothMin { beta } => {
-                    smooth_min_score_into(query, doc_data, lq, ld, dim, beta, &mut d_norms, &mut sm_scratch)
-                }
+                RerankMethod::SmoothMin { beta } => smooth_min_score_into(
+                    query,
+                    doc_data,
+                    lq,
+                    ld,
+                    dim,
+                    beta,
+                    &mut d_norms,
+                    &mut sm_scratch,
+                ),
                 #[cfg(feature = "smooth_min_rerank")]
-                RerankMethod::SmoothMinAligned { beta } => {
-                    smooth_min_aligned_score_into(query, doc_data, lq, ld, dim, beta, &d_mean, &mut sm_scratch)
-                }
+                RerankMethod::SmoothMinAligned { beta } => smooth_min_aligned_score_into(
+                    query,
+                    doc_data,
+                    lq,
+                    ld,
+                    dim,
+                    beta,
+                    &d_mean,
+                    &mut sm_scratch,
+                ),
             };
             RerankedDoc {
                 doc_index: i,
@@ -758,8 +787,18 @@ mod tests {
         let mut d_norms_d = vec![0.0f32; 2];
         let mut max_cos_c = vec![0.0f32; 2];
         let mut max_cos_d = vec![0.0f32; 2];
-        let score_correct = smooth_min_score_into(&q, &correct, 2, 2, dim, 1e4, &mut d_norms_c, &mut max_cos_c);
-        let score_distractor = smooth_min_score_into(&q, &distractor, 2, 2, dim, 1e4, &mut d_norms_d, &mut max_cos_d);
+        let score_correct =
+            smooth_min_score_into(&q, &correct, 2, 2, dim, 1e4, &mut d_norms_c, &mut max_cos_c);
+        let score_distractor = smooth_min_score_into(
+            &q,
+            &distractor,
+            2,
+            2,
+            dim,
+            1e4,
+            &mut d_norms_d,
+            &mut max_cos_d,
+        );
 
         assert!(
             score_correct > score_distractor,
@@ -860,7 +899,8 @@ mod tests {
         let d = vec![1.0, 0.0, 0.0, 0.0];
         let q_norms = vec![1.0f32];
         let mut cos_scratch = vec![0.0f32; 1];
-        let score = smooth_min_aligned_score_into(&q, &d, 1, 1, dim, 1e4, &q_norms, &mut cos_scratch);
+        let score =
+            smooth_min_aligned_score_into(&q, &d, 1, 1, dim, 1e4, &q_norms, &mut cos_scratch);
         assert!(
             approx_eq(score, 1.0, 1e-4),
             "identical vectors should give 1.0, got {score}"
@@ -872,7 +912,8 @@ mod tests {
     fn smooth_min_aligned_empty_returns_zero() {
         let q_norms = vec![];
         let mut cos_scratch = vec![];
-        let score = smooth_min_aligned_score_into(&[], &[], 0, 0, 4, 1e4, &q_norms, &mut cos_scratch);
+        let score =
+            smooth_min_aligned_score_into(&[], &[], 0, 0, 4, 1e4, &q_norms, &mut cos_scratch);
         assert!(approx_eq(score, 0.0, 1e-5));
     }
 
@@ -954,7 +995,8 @@ mod tests {
         // Pre-compute query norms: |q0|=1, |q1|=1.
         let q_norms = vec![1.0f32, 1.0f32, 1.0f32, 1.0f32];
         let mut cos_scratch = vec![0.0f32; 4];
-        let score = smooth_min_aligned_score_into(&q, &d, 4, 2, dim, 1e4, &q_norms, &mut cos_scratch);
+        let score =
+            smooth_min_aligned_score_into(&q, &d, 4, 2, dim, 1e4, &q_norms, &mut cos_scratch);
         // smooth_min([1.0, 0.0]) penalizes the 0.0 → score < 0.5
         assert!(
             score < 0.5,

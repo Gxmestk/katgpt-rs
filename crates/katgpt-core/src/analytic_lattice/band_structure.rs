@@ -163,7 +163,9 @@ impl BandStructureReport {
     /// Returns `true` iff all modes are `Propagating` (the clean case).
     #[inline]
     pub fn is_all_propagating(&self) -> bool {
-        self.band_classes.iter().all(|c| *c == BandClass::Propagating)
+        self.band_classes
+            .iter()
+            .all(|c| *c == BandClass::Propagating)
     }
 
     /// Returns `true` iff any mode is `Growing` (the unstable case — usually
@@ -358,7 +360,11 @@ pub fn band_classify_into(
         } else {
             abs_lam.powf(inv_n)
         };
-        let signed_mu = if lam.is_sign_negative() { -abs_mu } else { abs_mu };
+        let signed_mu = if lam.is_sign_negative() {
+            -abs_mu
+        } else {
+            abs_mu
+        };
         out.bloch_factors[i] = signed_mu;
         out.band_classes[i] = BandClass::from_bloch_factor(abs_mu, epsilon);
     }
@@ -392,7 +398,14 @@ pub fn analyze_chain(
     let mut compose_scratch = Vec::with_capacity(k * k);
     let mut sym_scratch = vec![0.0f32; k * k];
     let mut out = BandStructureReport::zeros(k);
-    analyze_chain_into(ops, epsilon, &mut compose_scratch, &mut sym_scratch, &mut composite, &mut out)?;
+    analyze_chain_into(
+        ops,
+        epsilon,
+        &mut compose_scratch,
+        &mut sym_scratch,
+        &mut composite,
+        &mut out,
+    )?;
     // analyze_chain_into writes eigenvalues into out via the symmetric eigensolver;
     // we still need to set n_periods correctly (band_classify_into does this).
     let _ = n_periods; // already set inside analyze_chain_into
@@ -670,15 +683,27 @@ mod tests {
 
     #[test]
     fn band_class_propagating_at_one() {
-        assert_eq!(BandClass::from_bloch_factor(1.0, 1e-4), BandClass::Propagating);
-        assert_eq!(BandClass::from_bloch_factor(1.0 + 1e-5, 1e-4), BandClass::Propagating);
-        assert_eq!(BandClass::from_bloch_factor(1.0 - 1e-5, 1e-4), BandClass::Propagating);
+        assert_eq!(
+            BandClass::from_bloch_factor(1.0, 1e-4),
+            BandClass::Propagating
+        );
+        assert_eq!(
+            BandClass::from_bloch_factor(1.0 + 1e-5, 1e-4),
+            BandClass::Propagating
+        );
+        assert_eq!(
+            BandClass::from_bloch_factor(1.0 - 1e-5, 1e-4),
+            BandClass::Propagating
+        );
     }
 
     #[test]
     fn band_class_decaying_below_one() {
         assert_eq!(BandClass::from_bloch_factor(0.5, 1e-4), BandClass::Decaying);
-        assert_eq!(BandClass::from_bloch_factor(0.99, 1e-4), BandClass::Decaying);
+        assert_eq!(
+            BandClass::from_bloch_factor(0.99, 1e-4),
+            BandClass::Decaying
+        );
         assert_eq!(BandClass::from_bloch_factor(0.0, 1e-4), BandClass::Decaying);
     }
 
@@ -686,12 +711,18 @@ mod tests {
     fn band_class_growing_above_one() {
         assert_eq!(BandClass::from_bloch_factor(1.5, 1e-4), BandClass::Growing);
         assert_eq!(BandClass::from_bloch_factor(1.01, 1e-4), BandClass::Growing);
-        assert_eq!(BandClass::from_bloch_factor(100.0, 1e-4), BandClass::Growing);
+        assert_eq!(
+            BandClass::from_bloch_factor(100.0, 1e-4),
+            BandClass::Growing
+        );
     }
 
     #[test]
     fn band_class_nan_is_decaying() {
-        assert_eq!(BandClass::from_bloch_factor(f32::NAN, 1e-4), BandClass::Decaying);
+        assert_eq!(
+            BandClass::from_bloch_factor(f32::NAN, 1e-4),
+            BandClass::Decaying
+        );
     }
 
     // ── band_classify_into: basic cases ───────────────────────────────────
@@ -720,11 +751,19 @@ mod tests {
         // Diagonal matrix diag(0.5, 0.5) → eigenvalues 0.5, 0.5 → Decaying.
         let eig = [0.5f32, 0.5];
         let report = band_classify(&eig, 10, DEFAULT_BAND_EPSILON);
-        assert!(report.band_classes.iter().all(|c| *c == BandClass::Decaying));
+        assert!(
+            report
+                .band_classes
+                .iter()
+                .all(|c| *c == BandClass::Decaying)
+        );
         // Bloch factor 0.5^{1/10} ≈ 0.933.
         let expected_mu = 0.5f32.powf(1.0 / 10.0);
         for mu in &report.bloch_factors {
-            assert!((mu - expected_mu).abs() < 1e-5, "mu = {mu}, expected = {expected_mu}");
+            assert!(
+                (mu - expected_mu).abs() < 1e-5,
+                "mu = {mu}, expected = {expected_mu}"
+            );
         }
         assert!((report.spectral_radius - 0.5).abs() < 1e-6);
     }
@@ -773,7 +812,12 @@ mod tests {
         // diag(0.5, 0.5)
         let op = op_from_slice(2, &[0.5, 0.0, 0.0, 0.5]);
         let report = analyze_periodic(&op, 10, DEFAULT_BAND_EPSILON).unwrap();
-        assert!(report.band_classes.iter().all(|c| *c == BandClass::Decaying));
+        assert!(
+            report
+                .band_classes
+                .iter()
+                .all(|c| *c == BandClass::Decaying)
+        );
         assert!((report.spectral_radius - 0.5).abs() < 1e-5);
     }
 
@@ -802,10 +846,18 @@ mod tests {
         let op = op_from_slice(2, &[0.5, 0.3, 0.3, 0.5]);
         let report = analyze_periodic(&op, 5, DEFAULT_BAND_EPSILON).unwrap();
         // Both modes decay (eigenvalues 0.8 and 0.2, both |λ|<1).
-        assert!(report.band_classes.iter().all(|c| *c == BandClass::Decaying));
+        assert!(
+            report
+                .band_classes
+                .iter()
+                .all(|c| *c == BandClass::Decaying)
+        );
         // Spectral radius ≈ 0.8.
-        assert!((report.spectral_radius - 0.8).abs() < 1e-4,
-            "spectral_radius = {}", report.spectral_radius);
+        assert!(
+            (report.spectral_radius - 0.8).abs() < 1e-4,
+            "spectral_radius = {}",
+            report.spectral_radius
+        );
     }
 
     #[test]
@@ -820,8 +872,11 @@ mod tests {
         assert!(report.has_growing_mode());
         // Sorted descending: first mode is the growing one (≈2.207).
         assert_eq!(report.band_classes[0], BandClass::Growing);
-        assert!((report.spectral_radius - 2.207).abs() < 1e-3,
-            "spectral_radius = {}", report.spectral_radius);
+        assert!(
+            (report.spectral_radius - 2.207).abs() < 1e-3,
+            "spectral_radius = {}",
+            report.spectral_radius
+        );
     }
 
     // ── analyze_chain: composition + analysis ────────────────────────────
@@ -844,9 +899,17 @@ mod tests {
         let report = analyze_chain(&ops, DEFAULT_BAND_EPSILON).unwrap();
         // Composite eigenvalues should be 0.25 (both). For n_periods=2:
         // |μ| = 0.25^{1/2} = 0.5 → Decaying.
-        assert!(report.band_classes.iter().all(|c| *c == BandClass::Decaying));
-        assert!((report.spectral_radius - 0.25).abs() < 1e-5,
-            "spectral_radius = {}", report.spectral_radius);
+        assert!(
+            report
+                .band_classes
+                .iter()
+                .all(|c| *c == BandClass::Decaying)
+        );
+        assert!(
+            (report.spectral_radius - 0.25).abs() < 1e-5,
+            "spectral_radius = {}",
+            report.spectral_radius
+        );
     }
 
     #[test]
@@ -935,9 +998,17 @@ mod tests {
         jacobi_eigenvalues_symmetric_inplace(&mut mat, 3, 100);
         let mut eigs: Vec<f32> = (0..3).map(|i| mat[i * 3 + i]).collect();
         eigs.sort_by(|a, b| a.partial_cmp(b).unwrap());
-        assert!((eigs[0] - (2.0 - std::f32::consts::SQRT_2)).abs() < 1e-4, "eigs = {:?}", eigs);
+        assert!(
+            (eigs[0] - (2.0 - std::f32::consts::SQRT_2)).abs() < 1e-4,
+            "eigs = {:?}",
+            eigs
+        );
         assert!((eigs[1] - 2.0).abs() < 1e-4, "eigs = {:?}", eigs);
-        assert!((eigs[2] - (2.0 + std::f32::consts::SQRT_2)).abs() < 1e-4, "eigs = {:?}", eigs);
+        assert!(
+            (eigs[2] - (2.0 + std::f32::consts::SQRT_2)).abs() < 1e-4,
+            "eigs = {:?}",
+            eigs
+        );
     }
 
     // ── Report helpers ──────────────────────────────────────────────────

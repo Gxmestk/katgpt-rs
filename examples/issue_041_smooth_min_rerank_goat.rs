@@ -183,7 +183,10 @@ fn main() {
         ("Cosine (mean-pooled)", RerankMethod::Cosine),
         ("MaxSim (late-interaction)", RerankMethod::MaxSim),
         ("SmoothMin (β=10⁴)", RerankMethod::SmoothMin { beta: 1e4 }),
-        ("SmoothMinAligned (β=10⁴)", RerankMethod::SmoothMinAligned { beta: 1e4 }),
+        (
+            "SmoothMinAligned (β=10⁴)",
+            RerankMethod::SmoothMinAligned { beta: 1e4 },
+        ),
     ];
 
     let ks = [1, 3, 5, 10, 20];
@@ -244,7 +247,10 @@ fn main() {
     println!(
         "  SmoothMinAligned vs Cosine @ k=5: {smoothmin_aligned_recall5:.4} vs {cosine_recall5:.4} = {aligned_gain:+.4} pp"
     );
-    println!("  G1 (quality): {}", if g1_pass { "PASS ✅" } else { "FAIL ❌" });
+    println!(
+        "  G1 (quality): {}",
+        if g1_pass { "PASS ✅" } else { "FAIL ❌" }
+    );
 
     // ── G2: Latency gate ─────────────────────────────────────
 
@@ -255,7 +261,13 @@ fn main() {
 
     // Warmup.
     for _ in 0..10 {
-        let _ = rerank(sample_query, &catalog, &doc_lengths, DIM, RerankMethod::Cosine);
+        let _ = rerank(
+            sample_query,
+            &catalog,
+            &doc_lengths,
+            DIM,
+            RerankMethod::Cosine,
+        );
         let _ = rerank(
             sample_query,
             &catalog,
@@ -322,7 +334,10 @@ fn main() {
     println!("  SmoothMinAligned:  {aligned_ns:.0} ns/query");
     println!("  Aligned/Cosine ratio: {ratio:.2}× (target: < 3×)");
     println!("  Aligned overhead:  {overhead_ns:+.0} ns/query");
-    println!("  G2 (latency): {}", if g2_pass { "PASS ✅" } else { "FAIL ❌" });
+    println!(
+        "  G2 (latency): {}",
+        if g2_pass { "PASS ✅" } else { "FAIL ❌" }
+    );
 
     // ── G3: No-regression gate ───────────────────────────────
 
@@ -353,7 +368,10 @@ fn main() {
         .collect();
     let cosine_ok = bad_cosine.is_empty();
     if !cosine_ok {
-        println!("  [debug] out-of-range cosine scores: {:?}", &bad_cosine[..bad_cosine.len().min(5)]);
+        println!(
+            "  [debug] out-of-range cosine scores: {:?}",
+            &bad_cosine[..bad_cosine.len().min(5)]
+        );
     }
     // MaxSim should produce finite scores.
     let maxsim_ok = maxsim_ranked.iter().all(|d| d.score.is_finite());
@@ -381,7 +399,10 @@ fn main() {
     println!("  MaxSim scores finite:            {maxsim_ok}");
     println!("  SmoothMin scores finite:         {smoothmin_ok}");
     println!("  SmoothMinAligned scores finite:  {aligned_ok}");
-    println!("  G3 (no-regression): {}", if g3_pass { "PASS ✅" } else { "FAIL ❌" });
+    println!(
+        "  G3 (no-regression): {}",
+        if g3_pass { "PASS ✅" } else { "FAIL ❌" }
+    );
 
     // ── Verdict ──────────────────────────────────────────────
 

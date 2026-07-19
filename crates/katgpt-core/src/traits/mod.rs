@@ -1478,7 +1478,6 @@ pub trait BestBuddyAligner: Send + Sync {
 
 // ── LEO Tests (Plan 155, T7) ────────────────────────────────────
 
-
 // Tests (extracted to sibling files — see Issue 174)
 mod tests_leo;
 

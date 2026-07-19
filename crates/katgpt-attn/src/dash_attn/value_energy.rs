@@ -111,7 +111,10 @@ impl VortexFlow for ValueEnergyRouter {
                     let k_start = t * head_dim;
                     let v_start = t * head_dim;
                     // Centroid accumulation via SIMD add
-                    katgpt_core::simd::simd_add_inplace(centroid, &keys[k_start..k_start + head_dim]);
+                    katgpt_core::simd::simd_add_inplace(
+                        centroid,
+                        &keys[k_start..k_start + head_dim],
+                    );
                     // Value ‖v‖ via 4-way unrolled sum-of-squares (auto-vectorizes).
                     let mut n0 = 0.0f32;
                     let mut n1 = 0.0f32;

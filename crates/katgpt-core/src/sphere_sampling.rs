@@ -356,11 +356,7 @@ pub fn jacobian_logdet_cot_correction(
 /// `O(d)`, zero allocation. One SIMD sum-of-squares, one sqrt, two trig,
 /// one chunked 2-term FMA mix.
 #[inline]
-pub fn sphere_exp_map_into(
-    x: &[f32],
-    v: &[f32],
-    out: &mut [f32],
-) -> Result<(), SphereError> {
+pub fn sphere_exp_map_into(x: &[f32], v: &[f32], out: &mut [f32]) -> Result<(), SphereError> {
     let d = x.len();
     if v.len() != d || out.len() != d {
         return Err(SphereError::ShapeMismatch);
@@ -437,7 +433,10 @@ mod tests {
     /// space (subtract the normal component).
     fn tangent_at(p: &[f32], w: &[f32]) -> Vec<f32> {
         let pn = dot(p, w);
-        w.iter().zip(p.iter()).map(|(wi, pi)| wi - pn * pi).collect()
+        w.iter()
+            .zip(p.iter())
+            .map(|(wi, pi)| wi - pn * pi)
+            .collect()
     }
 
     // ── T1.1 Parallel transport ─────────────────────────────────
@@ -568,7 +567,10 @@ mod tests {
             (l2_norm(&v_in) - l2_norm(&v_out)).abs() < 1e-5,
             "norm not preserved at d=8"
         );
-        assert!(dot(&v_out, &xt).abs() < 1e-5, "v_out not tangent at xt (d=8)");
+        assert!(
+            dot(&v_out, &xt).abs() < 1e-5,
+            "v_out not tangent at xt (d=8)"
+        );
     }
 
     // ── T1.2 Jacobian log-det cot correction ────────────────────
@@ -587,7 +589,13 @@ mod tests {
                 let r = jacobian_logdet_cot_correction(t, omega, d, &x1_dot, &mut out);
                 assert!(r.is_ok(), "t={} omega={} failed: {:?}", t, omega, r);
                 for v in &out {
-                    assert!(v.is_finite(), "non-finite at t={} omega={}: {}", t, omega, v);
+                    assert!(
+                        v.is_finite(),
+                        "non-finite at t={} omega={}: {}",
+                        t,
+                        omega,
+                        v
+                    );
                 }
             }
         }
@@ -743,7 +751,9 @@ mod tests {
         // ω_1 = arccos(X_1 · x_0) — between mu (taken as X_1) and x_0.
         let s = dot(&mu, &x0).clamp(-1.0, 1.0);
         let omega_1 = (1.0f32 - s * s).max(0.0).sqrt().atan2(s);
-        let omega_1 = omega_1.max(COT_FLOOR).min(core::f32::consts::PI - COT_FLOOR);
+        let omega_1 = omega_1
+            .max(COT_FLOOR)
+            .min(core::f32::consts::PI - COT_FLOOR);
 
         // Ẋ_1 = ω_1·sin(0)·X_1 + cos(0)·Ẋ_init = Ẋ_init, where Ẋ_init is
         // the initial unit-tangent (perp to x_0). Use the projection of mu

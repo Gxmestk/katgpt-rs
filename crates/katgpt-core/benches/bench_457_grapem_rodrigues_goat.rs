@@ -262,12 +262,8 @@ fn g2_latency_smoke_vs_phase_rotation() -> (bool, f64, f64, f64) {
     let grapem_cached_ns = elapsed_cached.as_secs_f64() * 1e9 / N_CALLS as f64;
     let phase_rot_ns = elapsed_pr.as_secs_f64() * 1e9 / N_CALLS as f64;
     let ratio = grapem_cached_ns / phase_rot_ns.max(1e-9);
-    println!(
-        "   grapem (Rank2Plane, cached): {grapem_cached_ns:.1} ns/call  ← production path"
-    );
-    println!(
-        "   phase_rot (full scalar):     {phase_rot_ns:.1} ns/call"
-    );
+    println!("   grapem (Rank2Plane, cached): {grapem_cached_ns:.1} ns/call  ← production path");
+    println!("   phase_rot (full scalar):     {phase_rot_ns:.1} ns/call");
     println!("   ratio (cached/pr):           {ratio:.2}×");
 
     // Gate target: grapem cached ≤ 30 ns/call at d=8 (the HLA scale).
@@ -288,7 +284,9 @@ fn g2_latency_smoke_vs_phase_rotation() -> (bool, f64, f64, f64) {
     // but is not the gate.
     const TARGET_NS: f64 = 30.0;
     let pass = grapem_cached_ns <= TARGET_NS;
-    println!("   target:                       ≤ {TARGET_NS:.0} ns/call (HLA-scale absolute budget)");
+    println!(
+        "   target:                       ≤ {TARGET_NS:.0} ns/call (HLA-scale absolute budget)"
+    );
     (pass, grapem_cached_ns, phase_rot_ns, ratio)
 }
 
@@ -475,10 +473,16 @@ fn main() {
     }
 
     let (constructs_ok, constructs_n) = rank2plane_new_does_two_allocs();
-    println!("   Rank2Plane::new:          allocs={constructs_n} (expected exactly 2 for a, b Box<[f32]>)");
+    println!(
+        "   Rank2Plane::new:          allocs={constructs_n} (expected exactly 2 for a, b Box<[f32]>)"
+    );
     println!(
         "   construct:                {}",
-        if constructs_ok { "PASS ✓ (informational)" } else { "WARN (doc drift)" }
+        if constructs_ok {
+            "PASS ✓ (informational)"
+        } else {
+            "WARN (doc drift)"
+        }
     );
     println!();
 

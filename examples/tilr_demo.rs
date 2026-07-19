@@ -13,7 +13,7 @@
 //! Plan 425, Research 408, arXiv:2606.29164 (ICML 2026 Mech Interp Workshop).
 
 use katgpt_core::tilr::{
-    check_orthonormal, discover_invariant_subspace, tilr_refine_into, TilrScratch,
+    TilrScratch, check_orthonormal, discover_invariant_subspace, tilr_refine_into,
 };
 
 fn main() {
@@ -45,9 +45,7 @@ fn main() {
         .map(|_| {
             let w1 = 1.0 + lcg(&mut seed) * 2.0;
             let w2 = 1.0 + lcg(&mut seed) * 2.0;
-            (0..d)
-                .map(|i| scale * (w1 * a1[i] + w2 * a2[i]))
-                .collect()
+            (0..d).map(|i| scale * (w1 * a1[i] + w2 * a2[i])).collect()
         })
         .collect();
     let diff_refs: Vec<&[f32]> = diffs.iter().map(|v| v.as_slice()).collect();
@@ -111,10 +109,17 @@ fn main() {
     println!("    state:   {:?}", state_b);
     println!("    out:     {:?}", out_b);
     println!("    shift:   {:?}", {
-        let shift: Vec<f32> = out_b.iter().zip(state_b.iter()).map(|(o, s)| o - s).collect();
+        let shift: Vec<f32> = out_b
+            .iter()
+            .zip(state_b.iter())
+            .map(|(o, s)| o - s)
+            .collect();
         shift
     });
-    assert!((gamma_b - 1.0).abs() < 0.01, "expected γ≈1.0 for in-span direction");
+    assert!(
+        (gamma_b - 1.0).abs() < 0.01,
+        "expected γ≈1.0 for in-span direction"
+    );
 
     // (c) Graceful intermediate: direction partially aligned → 0 < γ < 1.
     let state_c = [0.1f32, 0.2, 0.3, 0.4, 0.5, 0.6];
@@ -132,16 +137,28 @@ fn main() {
         &mut out_c,
     )
     .unwrap();
-    let in_norm: f32 = direction_mixed[..4].iter().map(|x| x * x).sum::<f32>().sqrt();
+    let in_norm: f32 = direction_mixed[..4]
+        .iter()
+        .map(|x| x * x)
+        .sum::<f32>()
+        .sqrt();
     let full_norm: f32 = direction_mixed.iter().map(|x| x * x).sum::<f32>().sqrt();
     let expected_gamma = in_norm / full_norm;
     println!("\n(c) Graceful intermediate (direction partially aligned):");
     println!("    γ = {gamma_c:.6} (expected ≈ {expected_gamma:.6})");
     println!("    step size η = eta_base × γ = {:.6}", eta_base * gamma_c);
-    println!("    dims 4-5 unchanged (out-of-span): {}",
-        (4..6).all(|i| (out_c[i] - state_c[i]).abs() < 1e-6));
-    assert!((gamma_c - expected_gamma).abs() < 0.01, "γ should match alignment ratio");
-    assert!(gamma_c > 0.0 && gamma_c < 1.0, "γ should be strictly intermediate");
+    println!(
+        "    dims 4-5 unchanged (out-of-span): {}",
+        (4..6).all(|i| (out_c[i] - state_c[i]).abs() < 1e-6)
+    );
+    assert!(
+        (gamma_c - expected_gamma).abs() < 0.01,
+        "γ should match alignment ratio"
+    );
+    assert!(
+        gamma_c > 0.0 && gamma_c < 1.0,
+        "γ should be strictly intermediate"
+    );
 
     println!("\n=== All three behaviors verified. TILR no-harm contract holds. ===");
 }

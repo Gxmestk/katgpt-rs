@@ -336,12 +336,8 @@ impl FlowFieldCache {
         if actions_per_cell_leo == 0 {
             return None;
         }
-        let mut grid_leo = LeoPotentialGrid::from_q_values(
-            grid_w,
-            grid_h,
-            q_leo,
-            actions_per_cell_leo,
-        );
+        let mut grid_leo =
+            LeoPotentialGrid::from_q_values(grid_w, grid_h, q_leo, actions_per_cell_leo);
 
         let q_uvfa_all = head_uvfa.all_goals_q(state);
         let q_uvfa = head_uvfa.q_for_goal(&q_uvfa_all, goal_idx);
@@ -349,12 +345,8 @@ impl FlowFieldCache {
         if actions_per_cell_uvfa == 0 {
             return None;
         }
-        let grid_uvfa = LeoPotentialGrid::from_q_values(
-            grid_w,
-            grid_h,
-            q_uvfa,
-            actions_per_cell_uvfa,
-        );
+        let grid_uvfa =
+            LeoPotentialGrid::from_q_values(grid_w, grid_h, q_uvfa, actions_per_cell_uvfa);
 
         // Resolve effective alpha from the mixer's acting mode. The post-max
         // blend only has a scalar α knob (no per-action max/min semantics),
@@ -376,9 +368,7 @@ impl FlowFieldCache {
         // Reuse `grid_leo` as the working grid: overwrite its potential with
         // the blended values. Safe because `grid_leo`'s original potential has
         // already been read by `blend_into` and is now stale.
-        grid_leo
-            .potential_mut()[..total_cells]
-            .copy_from_slice(&self.potential_buf[..total_cells]);
+        grid_leo.potential_mut()[..total_cells].copy_from_slice(&self.potential_buf[..total_cells]);
 
         // OR the UVFA grid's blocked bitfield into the LEO grid's (an obstacle
         // on either side is an obstacle).
@@ -399,12 +389,7 @@ impl FlowFieldCache {
     /// Returns `Some(cached_valid)` if the call should proceed (with `cached_valid=true`
     /// meaning "hot cache hit, skip compute"), or `None` if the call should early-return `None`.
     #[inline]
-    fn check_cache(
-        &self,
-        goal_id: u64,
-        tick: u64,
-        npc_count: u16,
-    ) -> Option<bool> {
+    fn check_cache(&self, goal_id: u64, tick: u64, npc_count: u16) -> Option<bool> {
         if npc_count < self.min_npcs {
             return None;
         }
@@ -952,7 +937,10 @@ mod tests {
     #[cfg(feature = "dual_leo")]
     impl LeoHead for ConstantHead {
         fn all_goals_q(&self, _state: &[f32]) -> Vec<f32> {
-            vec![self.value; self.goals * (self.grid_w as usize) * (self.grid_h as usize) * self.actions]
+            vec![
+                self.value;
+                self.goals * (self.grid_w as usize) * (self.grid_h as usize) * self.actions
+            ]
         }
         #[inline]
         fn goal_count(&self) -> usize {
@@ -986,7 +974,9 @@ mod tests {
         };
         let mixer = TestMixer(crate::traits::ActingMode::LeoOnly);
 
-        let single = cache_a.get_or_compute(7, &head_leo, &[0.0], 0, 4, 4, 0, 5).unwrap();
+        let single = cache_a
+            .get_or_compute(7, &head_leo, &[0.0], 0, 4, 4, 0, 5)
+            .unwrap();
         let dual = cache_b
             .get_or_compute_dual(7, &head_leo, &head_uvfa, &mixer, 0.3, &[0.0], 0, 4, 4, 0, 5)
             .unwrap();
@@ -1020,7 +1010,9 @@ mod tests {
         };
         let mixer = TestMixer(crate::traits::ActingMode::UvfaOnly);
 
-        let direct = cache_a.get_or_compute(7, &head_uvfa, &[0.0], 0, 4, 4, 0, 5).unwrap();
+        let direct = cache_a
+            .get_or_compute(7, &head_uvfa, &[0.0], 0, 4, 4, 0, 5)
+            .unwrap();
         let dual = cache_b
             .get_or_compute_dual(7, &head_leo, &head_uvfa, &mixer, 0.0, &[0.0], 0, 4, 4, 0, 5)
             .unwrap();
@@ -1050,8 +1042,19 @@ mod tests {
         };
         let mixer = TestMixer(crate::traits::ActingMode::Lc);
 
-        let dual = cache
-            .get_or_compute_dual(11, &head_leo, &head_uvfa, &mixer, 0.3, &[0.0], 0, 4, 4, 0, 5);
+        let dual = cache.get_or_compute_dual(
+            11,
+            &head_leo,
+            &head_uvfa,
+            &mixer,
+            0.3,
+            &[0.0],
+            0,
+            4,
+            4,
+            0,
+            5,
+        );
         assert!(dual.is_some(), "dual Lc path should produce a field");
         let dual = dual.unwrap();
         assert_eq!(dual.width(), 4);
@@ -1077,15 +1080,43 @@ mod tests {
 
         // First call at α=0.3 — populates cache under goal_id=42.
         let f_first = cache
-            .get_or_compute_dual(42, &head_leo, &head_uvfa, &mixer, 0.3, &[0.0], 0, 4, 4, 0, 5)
+            .get_or_compute_dual(
+                42,
+                &head_leo,
+                &head_uvfa,
+                &mixer,
+                0.3,
+                &[0.0],
+                0,
+                4,
+                4,
+                0,
+                5,
+            )
             .unwrap();
         let first_lookup = f_first.lookup(0, 0);
 
         // Second call at α=0.9, same goal_id=42, same tick → cache hit, returns the α=0.3 field.
         let f_cached = cache
-            .get_or_compute_dual(42, &head_leo, &head_uvfa, &mixer, 0.9, &[0.0], 0, 4, 4, 0, 5)
+            .get_or_compute_dual(
+                42,
+                &head_leo,
+                &head_uvfa,
+                &mixer,
+                0.9,
+                &[0.0],
+                0,
+                4,
+                4,
+                0,
+                5,
+            )
             .unwrap();
-        assert_eq!(f_cached.lookup(0, 0), first_lookup, "cache key is goal_id only; α is not part of the key");
+        assert_eq!(
+            f_cached.lookup(0, 0),
+            first_lookup,
+            "cache key is goal_id only; α is not part of the key"
+        );
     }
 
     /// Dual path respects npc_count gate (same as single path).
@@ -1104,7 +1135,17 @@ mod tests {
         let mixer = TestMixer(crate::traits::ActingMode::Lc);
 
         let result = cache.get_or_compute_dual(
-            42, &head_leo, &head_uvfa, &mixer, 0.3, &[0.0], 0, 4, 4, 0, 2,
+            42,
+            &head_leo,
+            &head_uvfa,
+            &mixer,
+            0.3,
+            &[0.0],
+            0,
+            4,
+            4,
+            0,
+            2,
         );
         assert!(result.is_none(), "dual path should respect npc_count gate");
     }
@@ -1131,9 +1172,23 @@ mod tests {
         };
         let mixer = TestMixer(crate::traits::ActingMode::LeoOnly);
 
-        let single = cache_a.get_or_compute(7, &head_leo, &[0.0], 0, 4, 4, 0, 5).unwrap();
+        let single = cache_a
+            .get_or_compute(7, &head_leo, &[0.0], 0, 4, 4, 0, 5)
+            .unwrap();
         let dual_postmax = cache_b
-            .get_or_compute_dual_postmax(7, &head_leo, &head_uvfa, &mixer, 0.3, &[0.0], 0, 4, 4, 0, 5)
+            .get_or_compute_dual_postmax(
+                7,
+                &head_leo,
+                &head_uvfa,
+                &mixer,
+                0.3,
+                &[0.0],
+                0,
+                4,
+                4,
+                0,
+                5,
+            )
             .unwrap();
 
         assert_eq!(single.width(), dual_postmax.width());
@@ -1168,9 +1223,23 @@ mod tests {
         };
         let mixer = TestMixer(crate::traits::ActingMode::UvfaOnly);
 
-        let direct = cache_a.get_or_compute(7, &head_uvfa, &[0.0], 0, 4, 4, 0, 5).unwrap();
+        let direct = cache_a
+            .get_or_compute(7, &head_uvfa, &[0.0], 0, 4, 4, 0, 5)
+            .unwrap();
         let dual_postmax = cache_b
-            .get_or_compute_dual_postmax(7, &head_leo, &head_uvfa, &mixer, 0.0, &[0.0], 0, 4, 4, 0, 5)
+            .get_or_compute_dual_postmax(
+                7,
+                &head_leo,
+                &head_uvfa,
+                &mixer,
+                0.0,
+                &[0.0],
+                0,
+                4,
+                4,
+                0,
+                5,
+            )
             .unwrap();
 
         for y in 0..direct.height() {
@@ -1202,7 +1271,17 @@ mod tests {
         let mixer = TestMixer(crate::traits::ActingMode::Lc);
 
         let dual = cache.get_or_compute_dual_postmax(
-            11, &head_leo, &head_uvfa, &mixer, 0.3, &[0.0], 0, 4, 4, 0, 5,
+            11,
+            &head_leo,
+            &head_uvfa,
+            &mixer,
+            0.3,
+            &[0.0],
+            0,
+            4,
+            4,
+            0,
+            5,
         );
         assert!(dual.is_some(), "postmax Lc path should produce a field");
         let dual = dual.unwrap();
@@ -1226,8 +1305,21 @@ mod tests {
         let mixer = TestMixer(crate::traits::ActingMode::Lc);
 
         let result = cache.get_or_compute_dual_postmax(
-            42, &head_leo, &head_uvfa, &mixer, 0.3, &[0.0], 0, 4, 4, 0, 2,
+            42,
+            &head_leo,
+            &head_uvfa,
+            &mixer,
+            0.3,
+            &[0.0],
+            0,
+            4,
+            4,
+            0,
+            2,
         );
-        assert!(result.is_none(), "postmax dual path should respect npc_count gate");
+        assert!(
+            result.is_none(),
+            "postmax dual path should respect npc_count gate"
+        );
     }
 }

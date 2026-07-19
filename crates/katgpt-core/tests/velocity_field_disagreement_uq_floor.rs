@@ -125,16 +125,14 @@ fn generate_ar1(n: usize, phi: f32, sigma: f32, seed: u64) -> Vec<f32> {
 /// Generate 1D bimodal markov-switching series:
 /// `x_{t+1} = μ_{s_t} + ε`, where `s_t ∈ {0,1}`, `μ_0 = +mode`, `μ_1 = -mode`,
 /// `ε ~ N(0, σ²)`, and the regime switches with probability `switch_prob` per step.
-fn generate_bimodal(
-    n: usize,
-    mode: f32,
-    sigma: f32,
-    switch_prob: f32,
-    seed: u64,
-) -> Vec<f32> {
+fn generate_bimodal(n: usize, mode: f32, sigma: f32, switch_prob: f32, seed: u64) -> Vec<f32> {
     let mut rng = SplitMix64::new(seed);
     let mut series = Vec::with_capacity(n);
-    let mut regime: u8 = if rng.next_u64().is_multiple_of(2) { 0 } else { 1 };
+    let mut regime: u8 = if rng.next_u64().is_multiple_of(2) {
+        0
+    } else {
+        1
+    };
     for _ in 0..n {
         let mu = if regime == 0 { mode } else { -mode };
         series.push(mu + rng.gaussian(sigma));
@@ -172,11 +170,7 @@ fn ar1_residual_std(series: &[f32], phi: f32) -> f32 {
         residuals.push(series[t + 1] - phi * series[t]);
     }
     let mean = residuals.iter().sum::<f32>() / n as f32;
-    let var = residuals
-        .iter()
-        .map(|r| (r - mean).powi(2))
-        .sum::<f32>()
-        / n as f32;
+    let var = residuals.iter().map(|r| (r - mean).powi(2)).sum::<f32>() / n as f32;
     var.sqrt().max(1e-3)
 }
 
@@ -415,11 +409,7 @@ fn mean_crps(predictions: &[f32], actuals: &[f32], interval_half_width: f32) -> 
 /// constructs the interval, and measures mean CRPS. Returns the best λ.
 ///
 /// This is modelless (grid search, no gradient descent).
-fn calibrate_lambda_ar1(
-    phi: [f32; 2],
-    sigma_ale: f32,
-    train_series: &[f32],
-) -> (f32, f32) {
+fn calibrate_lambda_ar1(phi: [f32; 2], sigma_ale: f32, train_series: &[f32]) -> (f32, f32) {
     let n = train_series.len() - 1;
 
     // Pre-compute VFD scores for each training point y_t.
@@ -542,7 +532,10 @@ fn vfd_vs_floor_ar1() {
     println!("=== AR(1) VFD Floor Comparison Setup ===");
     println!("True φ = {AR1_PHI}, σ = {AR1_SIGMA}");
     println!("Member 0 φ̂ = {phi_0:.6} (fit on first {half} pairs)");
-    println!("Member 1 φ̂ = {phi_1:.6} (fit on last {} pairs)", N_TRAIN - half);
+    println!(
+        "Member 1 φ̂ = {phi_1:.6} (fit on last {} pairs)",
+        N_TRAIN - half
+    );
     println!("|φ_0 - φ_1| = {:.6}", (phi_0 - phi_1).abs());
     println!("σ_ale = {sigma_ale:.6}");
     println!();
@@ -602,11 +595,10 @@ fn vfd_vs_floor_ar1() {
     );
     println!(
         "Floor:          CRPS={:.4}, Winkler={:.4}, Cov={:.4}",
-        report.floor.mean_crps_interval,
-        report.floor.mean_winkler,
-        report.floor.coverage
+        report.floor.mean_crps_interval, report.floor.mean_winkler, report.floor.coverage
     );
-    let vfd_helps = report.primitive.mean_crps_interval < baseline_report.primitive.mean_crps_interval;
+    let vfd_helps =
+        report.primitive.mean_crps_interval < baseline_report.primitive.mean_crps_interval;
     let vfd_verdict = if vfd_helps { "HELPS" } else { "does NOT help" };
     println!("\nVFD epistemic scaling {vfd_verdict} (λ* CRPS < λ=0 CRPS)");
     println!("Overall verdict (λ={best_lambda}): {:?}", report.overall);
@@ -632,11 +624,8 @@ fn vfd_vs_floor_bimodal() {
 
     // σ_ale: residual std of the training series around the ensemble mean (0).
     let train_mean = train.iter().sum::<f32>() / train.len() as f32;
-    let train_var = train
-        .iter()
-        .map(|x| (x - train_mean).powi(2))
-        .sum::<f32>()
-        / train.len() as f32;
+    let train_var =
+        train.iter().map(|x| (x - train_mean).powi(2)).sum::<f32>() / train.len() as f32;
     let sigma_ale = train_var.sqrt().max(1e-3);
 
     println!("=== Bimodal VFD Floor Comparison Setup ===");
@@ -699,11 +688,10 @@ fn vfd_vs_floor_bimodal() {
     );
     println!(
         "Floor:          CRPS={:.4}, Winkler={:.4}, Cov={:.4}",
-        report.floor.mean_crps_interval,
-        report.floor.mean_winkler,
-        report.floor.coverage
+        report.floor.mean_crps_interval, report.floor.mean_winkler, report.floor.coverage
     );
-    let vfd_helps = report.primitive.mean_crps_interval < baseline_report.primitive.mean_crps_interval;
+    let vfd_helps =
+        report.primitive.mean_crps_interval < baseline_report.primitive.mean_crps_interval;
     let vfd_verdict = if vfd_helps { "HELPS" } else { "does NOT help" };
     println!("\nVFD epistemic scaling {vfd_verdict} (λ* CRPS < λ=0 CRPS)");
     println!("Overall verdict (λ={best_lambda}): {:?}", report.overall);

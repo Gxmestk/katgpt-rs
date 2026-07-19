@@ -43,11 +43,7 @@ const GAMMA: f64 = 0.95;
 /// Feature value for each state index (0..6). Upper states → 0.1, lower → 1.0.
 #[inline]
 fn feature(s: usize) -> f32 {
-    if s < N_UPPER {
-        0.1
-    } else {
-        1.0
-    }
+    if s < N_UPPER { 0.1 } else { 1.0 }
 }
 
 // ── Deterministic SplitMix64 PRNG (matches conformal_coverage.rs — no `rand` dep)
@@ -454,6 +450,14 @@ fn t34b_fore_converges_with_more_data() {
     // Smaller n + different seed → more sampling noise. 5% gate catches
     // algorithmic divergence (>50% for the inv_nz bug) while tolerating
     // the finite-sample variance at n=50000.
-    assert!(rel_err_upper < 0.05, "n={N}: upper rel err {:.4}%", rel_err_upper * 100.0);
-    assert!(rel_err_lower < 0.05, "n={N}: lower rel err {:.4}%", rel_err_lower * 100.0);
+    assert!(
+        rel_err_upper < 0.05,
+        "n={N}: upper rel err {:.4}%",
+        rel_err_upper * 100.0
+    );
+    assert!(
+        rel_err_lower < 0.05,
+        "n={N}: lower rel err {:.4}%",
+        rel_err_lower * 100.0
+    );
 }

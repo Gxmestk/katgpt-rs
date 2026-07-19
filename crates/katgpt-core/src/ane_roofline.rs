@@ -901,7 +901,11 @@ pub fn ane_fused_estimate(
     let total_flops: u64 = ops.iter().map(|o| o.flops).sum();
     let total_bytes_raw: u64 = ops.iter().map(|o| o.bytes_moved).sum();
     let total_bytes_fused: u64 = total_bytes_raw.saturating_sub(eliminated_bytes);
-    let largest_operand: u64 = ops.iter().map(|o| o.largest_operand_bytes).max().unwrap_or(0);
+    let largest_operand: u64 = ops
+        .iter()
+        .map(|o| o.largest_operand_bytes)
+        .max()
+        .unwrap_or(0);
     // The chain is gated by the highest family requirement of any op.
     let min_family: AneFamily = ops
         .iter()
@@ -1244,7 +1248,10 @@ mod fused_tests {
         let peaks = AnePeaks::m1();
         let single = ane_estimate(op, Dtype::F16, &peaks);
         let fused = ane_fused_estimate(&[op], &[], Dtype::F16, &peaks);
-        assert_eq!(fused.base, single, "single-op chain must match ane_estimate");
+        assert_eq!(
+            fused.base, single,
+            "single-op chain must match ane_estimate"
+        );
         assert_eq!(fused.n_ops, 1);
         assert_eq!(fused.n_fused_deps, 0);
         assert_eq!(fused.fusion_savings_ms, 0.0);
@@ -1260,7 +1267,10 @@ mod fused_tests {
         let conv = AneOpShape::conv_3x3(64, 64, 8, 8, Dtype::F16);
         let relu = AneOpShape::elementwise(64 * 8 * 8, Dtype::F16);
         let intermediate = 64 * 8 * 8 * 2; // 8192 bytes
-        assert!(intermediate <= peaks.working_set_bytes, "test setup: must fit");
+        assert!(
+            intermediate <= peaks.working_set_bytes,
+            "test setup: must fit"
+        );
         let deps = vec![AneDataDep {
             from_op: 0,
             to_op: 1,
@@ -1298,9 +1308,15 @@ mod fused_tests {
             intermediate_bytes: intermediate,
         }];
         let fused = ane_fused_estimate(&[gemm, bias], &deps, Dtype::F16, &peaks);
-        assert_eq!(fused.n_fused_deps, 0, "oversize intermediate must not be eliminated");
+        assert_eq!(
+            fused.n_fused_deps, 0,
+            "oversize intermediate must not be eliminated"
+        );
         assert_eq!(fused.eliminated_bytes, 0);
-        assert_eq!(fused.fusion_savings_ms, 0.0, "no fusion when intermediates don't fit");
+        assert_eq!(
+            fused.fusion_savings_ms, 0.0,
+            "no fusion when intermediates don't fit"
+        );
     }
 
     // ── T1.8d: Three-op chain, two of three intermediates fit ───────────
@@ -1314,13 +1330,28 @@ mod fused_tests {
         let small = 1024 * 2; // 2 KB, fits
         let big = 3 * 1024 * 1024; // 3 MB, doesn't fit
         let deps = vec![
-            AneDataDep { from_op: 0, to_op: 1, intermediate_bytes: small },
-            AneDataDep { from_op: 1, to_op: 2, intermediate_bytes: small },
+            AneDataDep {
+                from_op: 0,
+                to_op: 1,
+                intermediate_bytes: small,
+            },
+            AneDataDep {
+                from_op: 1,
+                to_op: 2,
+                intermediate_bytes: small,
+            },
             // Non-linear dep (skip connection) with a big intermediate.
-            AneDataDep { from_op: 0, to_op: 2, intermediate_bytes: big },
+            AneDataDep {
+                from_op: 0,
+                to_op: 2,
+                intermediate_bytes: big,
+            },
         ];
         let fused = ane_fused_estimate(&[op0, op1, op2], &deps, Dtype::F16, &peaks);
-        assert_eq!(fused.n_fused_deps, 2, "two small intermediates fit, one big doesn't");
+        assert_eq!(
+            fused.n_fused_deps, 2,
+            "two small intermediates fit, one big doesn't"
+        );
         assert_eq!(fused.eliminated_bytes, small * 2);
     }
 
@@ -1364,7 +1395,10 @@ mod fused_tests {
         }];
         let fused = ane_fused_estimate(&[op0, op1], &deps, Dtype::F16, &peaks);
         assert_eq!(fused.base.bound, AneBound::FamilyGated);
-        assert_eq!(fused.fusion_savings_ms, 0.0, "family-gated: no fusion benefit");
+        assert_eq!(
+            fused.fusion_savings_ms, 0.0,
+            "family-gated: no fusion benefit"
+        );
         assert!(!fused.fusion_savings_ms.is_nan(), "must not be NaN");
     }
 
@@ -1405,8 +1439,22 @@ mod fused_tests {
         ];
         let deps = AneDataDep::chain(&ops, &[1000, 2000]);
         assert_eq!(deps.len(), 2);
-        assert_eq!(deps[0], AneDataDep { from_op: 0, to_op: 1, intermediate_bytes: 1000 });
-        assert_eq!(deps[1], AneDataDep { from_op: 1, to_op: 2, intermediate_bytes: 2000 });
+        assert_eq!(
+            deps[0],
+            AneDataDep {
+                from_op: 0,
+                to_op: 1,
+                intermediate_bytes: 1000
+            }
+        );
+        assert_eq!(
+            deps[1],
+            AneDataDep {
+                from_op: 1,
+                to_op: 2,
+                intermediate_bytes: 2000
+            }
+        );
     }
 
     #[test]
@@ -1475,20 +1523,29 @@ mod fused_tests {
         let peaks = AnePeaks::m1();
         let test_chains: &[(&[AneOpShape], u64)] = &[
             // Compute-bound chain.
-            (&[
-                AneOpShape::conv_3x3(128, 128, 8, 8, Dtype::F16),
-                AneOpShape::conv_3x3(128, 128, 8, 8, Dtype::F16),
-            ], 128 * 8 * 8 * 2),
+            (
+                &[
+                    AneOpShape::conv_3x3(128, 128, 8, 8, Dtype::F16),
+                    AneOpShape::conv_3x3(128, 128, 8, 8, Dtype::F16),
+                ],
+                128 * 8 * 8 * 2,
+            ),
             // Memory-bound chain.
-            (&[
-                AneOpShape::elementwise(100_000, Dtype::F16),
-                AneOpShape::elementwise(100_000, Dtype::F16),
-            ], 100_000 * 2),
+            (
+                &[
+                    AneOpShape::elementwise(100_000, Dtype::F16),
+                    AneOpShape::elementwise(100_000, Dtype::F16),
+                ],
+                100_000 * 2,
+            ),
             // Dispatch-bound chain.
-            (&[
-                AneOpShape::gemm(32, 32, 32, Dtype::F16),
-                AneOpShape::gemm(32, 32, 32, Dtype::F16),
-            ], 32 * 32 * 2),
+            (
+                &[
+                    AneOpShape::gemm(32, 32, 32, Dtype::F16),
+                    AneOpShape::gemm(32, 32, 32, Dtype::F16),
+                ],
+                32 * 32 * 2,
+            ),
         ];
         for (ops, intermediate) in test_chains {
             let deps = vec![AneDataDep {

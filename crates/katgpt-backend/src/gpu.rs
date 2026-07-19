@@ -1005,9 +1005,7 @@ mod tests {
     #[test]
     fn test_gpu_forward_matches_cpu() {
         if !transformer::CPU_FORWARD_USES_DEVICE_BASE_PATH {
-            eprintln!(
-                "Skipping: CPU forward uses a feature-gated path the GPU doesn't implement"
-            );
+            eprintln!("Skipping: CPU forward uses a feature-gated path the GPU doesn't implement");
             return;
         }
         let (config, weights, _, _) = micro_fixtures();
@@ -1046,9 +1044,7 @@ mod tests {
     #[test]
     fn test_gpu_forward_multi_token_matches_cpu() {
         if !transformer::CPU_FORWARD_USES_DEVICE_BASE_PATH {
-            eprintln!(
-                "Skipping: CPU forward uses a feature-gated path the GPU doesn't implement"
-            );
+            eprintln!("Skipping: CPU forward uses a feature-gated path the GPU doesn't implement");
             return;
         }
         let (config, weights, _, _) = micro_fixtures();
@@ -1155,9 +1151,7 @@ mod tests {
     #[test]
     fn test_goat_gpu_forward_matches_cpu() {
         if !transformer::CPU_FORWARD_USES_DEVICE_BASE_PATH {
-            eprintln!(
-                "Skipping: CPU forward uses a feature-gated path the GPU doesn't implement"
-            );
+            eprintln!("Skipping: CPU forward uses a feature-gated path the GPU doesn't implement");
             return;
         }
         let (config, weights, _, _) = micro_fixtures();

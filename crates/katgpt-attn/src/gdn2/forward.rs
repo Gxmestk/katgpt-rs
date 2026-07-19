@@ -147,18 +147,8 @@ pub fn forward_gdn2<'a>(
             // Zero overhead when hippocampal_caches is empty.
             #[cfg(feature = "hippocampal_cache")]
             if !layer_cache.hippocampal_caches.is_empty() {
-                let delta_norm: f32 = layer_cache
-                    .delta
-                    .iter()
-                    .map(|x| x * x)
-                    .sum::<f32>()
-                    .sqrt();
-                layer_cache.hippocampal_caches[g].observe(
-                    k_h,
-                    v_h,
-                    write_w_scalar,
-                    delta_norm,
-                );
+                let delta_norm: f32 = layer_cache.delta.iter().map(|x| x * x).sum::<f32>().sqrt();
+                layer_cache.hippocampal_caches[g].observe(k_h, v_h, write_w_scalar, delta_norm);
             }
         }
 
@@ -201,8 +191,20 @@ pub fn forward_gdn2<'a>(
         #[cfg(feature = "gated_mlp")]
         {
             // SwiGLU: SiLU(W_gate·h) ⊙ W_up·h → W_down·hidden
-            types::matmul(&mut ctx.hidden, &layer_weights.mlp_w1, &ctx.x, config.mlp_hidden, n);
-            types::matmul(&mut ctx.hidden2, &layer_weights.mlp_w_up, &ctx.x, config.mlp_hidden, n);
+            types::matmul(
+                &mut ctx.hidden,
+                &layer_weights.mlp_w1,
+                &ctx.x,
+                config.mlp_hidden,
+                n,
+            );
+            types::matmul(
+                &mut ctx.hidden2,
+                &layer_weights.mlp_w_up,
+                &ctx.x,
+                config.mlp_hidden,
+                n,
+            );
             types::swiglu_inplace(&mut ctx.hidden, &ctx.hidden2);
         }
         #[cfg(not(feature = "gated_mlp"))]
@@ -496,14 +498,28 @@ mod tests {
         // Run without cache.
         let mut ctx1 = ForwardContext::new(&config);
         let mut cache1 = MultiLayerGdn2Cache::new(&config);
-        let logits1 =
-            forward_gdn2(&mut ctx1, &weights, &mut cache1, config.bos_token, 0, &config).to_vec();
+        let logits1 = forward_gdn2(
+            &mut ctx1,
+            &weights,
+            &mut cache1,
+            config.bos_token,
+            0,
+            &config,
+        )
+        .to_vec();
 
         // Run with cache enabled but W=0 (zero capacity — can't store anything).
         let mut ctx2 = ForwardContext::new(&config);
         let mut cache2 = MultiLayerGdn2Cache::with_hippocampal_cache(&config, 0);
-        let logits2 =
-            forward_gdn2(&mut ctx2, &weights, &mut cache2, config.bos_token, 0, &config).to_vec();
+        let logits2 = forward_gdn2(
+            &mut ctx2,
+            &weights,
+            &mut cache2,
+            config.bos_token,
+            0,
+            &config,
+        )
+        .to_vec();
 
         // Outputs should be identical — W=0 means the cache never stores
         // anything, and the read returns zeros.
@@ -590,10 +606,7 @@ mod tests {
         let mut cache = MultiLayerGdn2Cache::with_hippocampal_cache(&config, 8);
 
         // Verify one cache per KV head (not per Q head).
-        assert_eq!(
-            cache.layers[0].hippocampal_caches.len(),
-            config.n_kv_head
-        );
+        assert_eq!(cache.layers[0].hippocampal_caches.len(), config.n_kv_head);
 
         let logits = forward_gdn2(&mut ctx, &weights, &mut cache, config.bos_token, 0, &config);
         assert_eq!(logits.len(), config.vocab_size);

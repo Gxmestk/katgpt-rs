@@ -450,13 +450,11 @@ mod tests {
     /// `new` rejects out-of-range alphas.
     #[test]
     fn new_rejects_alpha_out_of_range() {
-        let block = [
-            {
-                let mut v = [0f32; 8];
-                v[0] = 1.0;
-                v
-            },
-        ];
+        let block = [{
+            let mut v = [0f32; 8];
+            v[0] = 1.0;
+            v
+        }];
         let err = SubspaceSteeringField::<8, 1>::new(block, [1.5], 1e-5).unwrap_err();
         assert_eq!(err, SubspaceSteeringError::AlphaOutOfRange);
         let err = SubspaceSteeringField::<8, 1>::new(block, [-0.1], 1e-5).unwrap_err();
@@ -483,7 +481,10 @@ mod tests {
         let seeds = [[1u8; 8], [2u8; 8]];
         let block = gram_schmidt_block::<8, 2>(seeds);
         let field = SubspaceSteeringField::<8, 2>::new(block, [0.3, 0.7], 1e-4).unwrap();
-        assert!(field.verify(1e-4), "verify must pass for a freshly-built field");
+        assert!(
+            field.verify(1e-4),
+            "verify must pass for a freshly-built field"
+        );
     }
 
     /// `compute_block_commitment` is deterministic (same inputs → same hash).
@@ -553,15 +554,14 @@ mod tests {
     #[test]
     fn k1_parity_with_plan_309() {
         // Plan 309 ships DEFAULT-ON, so it's always available.
-        use crate::latent_steering::{apply_latent_steering, LatentSteeringVector};
+        use crate::latent_steering::{LatentSteeringVector, apply_latent_steering};
 
         const D: usize = 8;
         let direction_v = make_unit_direction_1d(42, D);
         let alpha = 0.3f32;
 
         // Plan 309 reference.
-        let steering =
-            LatentSteeringVector::new_unchecked(direction_v.clone(), alpha);
+        let steering = LatentSteeringVector::new_unchecked(direction_v.clone(), alpha);
 
         // Plan 412 K=1 field from the same direction + alpha.
         let mut block = [[0f32; D]];
@@ -642,8 +642,14 @@ mod tests {
         block[1][1] = 1.0;
         let state = [0.3f32, 0.7, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
         let energy = block_energy(&block, &state);
-        assert!((energy[0] - 0.3).abs() < 1e-6, "axis 0 energy = dot(e_0, state) = 0.3");
-        assert!((energy[1] - 0.7).abs() < 1e-6, "axis 1 energy = dot(e_1, state) = 0.7");
+        assert!(
+            (energy[0] - 0.3).abs() < 1e-6,
+            "axis 0 energy = dot(e_0, state) = 0.3"
+        );
+        assert!(
+            (energy[1] - 0.7).abs() < 1e-6,
+            "axis 1 energy = dot(e_1, state) = 0.7"
+        );
     }
 
     /// `block_energy` on a state aligned with block[0] returns high energy on
@@ -661,10 +667,22 @@ mod tests {
         let state = block[0];
         let energy = block_energy(&block, &state);
         // Energy on axis 0 = dot(block[0], block[0]) = 1.0 (unit norm).
-        assert!((energy[0] - 1.0).abs() < 1e-6, "aligned axis energy ~ 1.0, got {}", energy[0]);
+        assert!(
+            (energy[0] - 1.0).abs() < 1e-6,
+            "aligned axis energy ~ 1.0, got {}",
+            energy[0]
+        );
         // Energy on orthogonal axes ~ 0 (by orthonormality).
-        assert!(energy[1].abs() < 1e-6, "orthogonal axis 1 energy ~ 0, got {}", energy[1]);
-        assert!(energy[2].abs() < 1e-6, "orthogonal axis 2 energy ~ 0, got {}", energy[2]);
+        assert!(
+            energy[1].abs() < 1e-6,
+            "orthogonal axis 1 energy ~ 0, got {}",
+            energy[1]
+        );
+        assert!(
+            energy[2].abs() < 1e-6,
+            "orthogonal axis 2 energy ~ 0, got {}",
+            energy[2]
+        );
     }
 
     /// `walk_manifold` produces steered states at each grid point.
@@ -699,10 +717,7 @@ mod tests {
     fn k2_walk_preserves_norm_bounds() {
         const D: usize = 8;
         // Distinct per-element seeds for well-conditioned Gram-Schmidt.
-        let seeds = [
-            [1u8, 2, 3, 4, 5, 6, 7, 8],
-            [8u8, 7, 6, 5, 4, 3, 2, 1],
-        ];
+        let seeds = [[1u8, 2, 3, 4, 5, 6, 7, 8], [8u8, 7, 6, 5, 4, 3, 2, 1]];
         let block = gram_schmidt_block::<D, 2>(seeds);
         let field = SubspaceSteeringField::<D, 2>::new(block, [0.0, 0.0], 1e-4).unwrap();
 
@@ -740,22 +755,14 @@ mod tests {
     fn k2_walk_covers_grid() {
         const D: usize = 8;
         // Distinct per-element seeds for well-conditioned Gram-Schmidt.
-        let seeds = [
-            [1u8, 2, 3, 4, 5, 6, 7, 8],
-            [8u8, 7, 6, 5, 4, 3, 2, 1],
-        ];
+        let seeds = [[1u8, 2, 3, 4, 5, 6, 7, 8], [8u8, 7, 6, 5, 4, 3, 2, 1]];
         let block = gram_schmidt_block::<D, 2>(seeds);
         let field = SubspaceSteeringField::<D, 2>::new(block, [0.0, 0.0], 1e-4).unwrap();
 
         let state = [0.0f32; D];
         // 4 distinct alpha pairs → 4 distinct output states (block rows are
         // linearly independent, so different alpha pairs give different sums).
-        let alpha_grid = [
-            [0.0f32, 0.0],
-            [1.0, 0.0],
-            [0.0, 1.0],
-            [1.0, 1.0],
-        ];
+        let alpha_grid = [[0.0f32, 0.0], [1.0, 0.0], [0.0, 1.0], [1.0, 1.0]];
         let mut out_grid = [[0f32; D]; 4];
         walk_manifold(&state, &field.block, &alpha_grid, &mut out_grid);
 
@@ -774,7 +781,10 @@ mod tests {
         let alpha_repeat = [[0.5f32, 0.5], [0.5, 0.5]];
         let mut out_repeat = [[0f32; D]; 2];
         walk_manifold(&state, &field.block, &alpha_repeat, &mut out_repeat);
-        assert_eq!(out_repeat[0], out_repeat[1], "repeated alphas must give identical outputs");
+        assert_eq!(
+            out_repeat[0], out_repeat[1],
+            "repeated alphas must give identical outputs"
+        );
     }
 
     // ──────────────────────────────────────────────────────────────────────
@@ -809,15 +819,19 @@ mod tests {
         for i in 0..K {
             for j in (i + 1)..K {
                 let dot = dot_product(&field.block[i], &field.block[j]);
-                assert!(dot.abs() < 1e-4,
-                    "block[{i}]·block[{j}]={dot} must be < 1e-4 (NS orthogonality)");
+                assert!(
+                    dot.abs() < 1e-4,
+                    "block[{i}]·block[{j}]={dot} must be < 1e-4 (NS orthogonality)"
+                );
             }
         }
         // Each row must be unit-norm (renormalization post-pass).
         for k in 0..K {
             let n = row_norm(&field.block[k]);
-            assert!((n - 1.0).abs() < 1e-4,
-                "block[{k}] norm {n} must be ~1.0 (renormalized)");
+            assert!(
+                (n - 1.0).abs() < 1e-4,
+                "block[{k}] norm {n} must be ~1.0 (renormalized)"
+            );
         }
     }
 
@@ -836,7 +850,10 @@ mod tests {
         directions[1] = [1.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0];
         // The raw input is far from orthogonal.
         let raw_dot = dot_product(&directions[0], &directions[1]);
-        assert!(raw_dot.abs() > 0.5, "fixture guard: raw input must be far from orthogonal");
+        assert!(
+            raw_dot.abs() > 0.5,
+            "fixture guard: raw input must be far from orthogonal"
+        );
 
         // Gram-Schmidt is exact — tight tolerance is appropriate.
         let field = SubspaceSteeringField::<D, K>::from_directions_orthonormalize(
@@ -847,11 +864,17 @@ mod tests {
         .expect("Gram-Schmidt must orthogonalize arbitrary input exactly");
 
         // Output block must be orthonormal.
-        assert!(field.verify(1e-4), "orthogonalized block must be orthonormal");
+        assert!(
+            field.verify(1e-4),
+            "orthogonalized block must be orthonormal"
+        );
         // The dot product must be ~0 (Gram-Schmidt is exact).
         let clean_dot = dot_product(&field.block[0], &field.block[1]);
-        assert!(clean_dot.abs() < 1e-4,
-            "orthogonalized block rows must be orthogonal, got dot = {}", clean_dot);
+        assert!(
+            clean_dot.abs() < 1e-4,
+            "orthogonalized block rows must be orthogonal, got dot = {}",
+            clean_dot
+        );
     }
 
     /// `from_directions_orthonormalize` propagates the alpha-range check

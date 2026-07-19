@@ -84,12 +84,7 @@ fn build_quad_workload() -> (CellComplex, CochainField, [f32; 8]) {
 }
 
 /// Triangle workload: single triangle [[0,0],[4,0],[0,4]], dim=8 field.
-fn build_tri_workload() -> (
-    CochainField,
-    [[f32; 2]; 3],
-    [usize; 3],
-    PointSamplerScratch,
-) {
+fn build_tri_workload() -> (CochainField, [[f32; 2]; 3], [usize; 3], PointSamplerScratch) {
     let dim = 8usize;
     let mut field = CochainField::zeros(0, 3, dim);
     let mut rng = SplitMix64::new(0x4221_0710_2026);
@@ -334,11 +329,7 @@ fn g5_latency_tri() -> f64 {
 // ---------------------------------------------------------------------------
 
 fn verdict(pass: bool) -> &'static str {
-    if pass {
-        "PASS ✅"
-    } else {
-        "FAIL ❌"
-    }
+    if pass { "PASS ✅" } else { "FAIL ❌" }
 }
 
 fn main() {
@@ -373,14 +364,10 @@ fn main() {
     all_pass &= g5;
 
     let ns_sincos = g5_latency_quad_full_sincos();
-    println!(
-        "  [report] quad full (Sincos n=4):     {ns_sincos:.1} ns/call"
-    );
+    println!("  [report] quad full (Sincos n=4):     {ns_sincos:.1} ns/call");
 
     let ns_tri = g5_latency_tri();
-    println!(
-        "  [report] tri full (BarycentricSort):  {ns_tri:.1} ns/call"
-    );
+    println!("  [report] tri full (BarycentricSort):  {ns_tri:.1} ns/call");
 
     println!();
     if all_pass {

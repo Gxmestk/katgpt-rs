@@ -552,13 +552,7 @@ pub mod pi_sensitivity {
 
         // Theoretical bound (same for all draws at fixed z).
         // Reuse dz_scratch (dz_baseline is done being computed).
-        let bound = pi_sensitivity_bound(
-            &blend.pi,
-            blend.tau,
-            fields,
-            z,
-            &mut dz_scratch,
-        );
+        let bound = pi_sensitivity_bound(&blend.pi, blend.tau, fields, z, &mut dz_scratch);
 
         let k = k_draws.clamp(1, 8) as usize;
         let mut per_draw = [0.0f32; 8];
@@ -1215,12 +1209,8 @@ mod tests {
                 let z: Vec<f32> = (0..32).map(|_| rng.f32() * 2.0 - 1.0).collect();
 
                 let score = committed_blend_pi_sensitivity::<3, 32, 32>(
-                    &blend,
-                    &fields,
-                    &z,
-                    0.01, // small δ — first-order bound is tight
-                    8,
-                    &mut rng,
+                    &blend, &fields, &z, 0.01, // small δ — first-order bound is tight
+                    8, &mut rng,
                 );
 
                 if !score.accepted {
@@ -1294,9 +1284,8 @@ mod tests {
             let z = vec![0.5f32; 32];
 
             let mut rng = Rng::with_seed(99);
-            let score = committed_blend_pi_sensitivity::<3, 32, 32>(
-                &blend, &fields, &z, 0.01, 8, &mut rng,
-            );
+            let score =
+                committed_blend_pi_sensitivity::<3, 32, 32>(&blend, &fields, &z, 0.01, 8, &mut rng);
 
             // NaN comparison: mean_drift <= scaled_bound is false when mean_drift is NaN.
             assert!(!score.accepted, "NaN in pi should produce accepted=false");
@@ -1353,9 +1342,8 @@ mod tests {
             let z = vec![1.0f32; 32];
 
             let mut rng = Rng::with_seed(7);
-            let score = committed_blend_pi_sensitivity::<3, 32, 32>(
-                &blend, &fields, &z, 0.01, 8, &mut rng,
-            );
+            let score =
+                committed_blend_pi_sensitivity::<3, 32, 32>(&blend, &fields, &z, 0.01, 8, &mut rng);
 
             // The π-bound uses the ACTUAL ‖f_j(z)‖ = 5·√32 ≈ 28.3, NOT the
             // under-reported lipschitz_bound = 0.005. So bound > 0.
@@ -1385,9 +1373,8 @@ mod tests {
             let z = vec![0.5f32; 32];
 
             let mut rng = Rng::with_seed(1);
-            let score = committed_blend_pi_sensitivity::<3, 32, 32>(
-                &blend, &fields, &z, 0.01, 4, &mut rng,
-            );
+            let score =
+                committed_blend_pi_sensitivity::<3, 32, 32>(&blend, &fields, &z, 0.01, 4, &mut rng);
 
             // Smoke: all fields populated, drift is finite, bound is finite.
             assert!(score.mean_drift.is_finite());

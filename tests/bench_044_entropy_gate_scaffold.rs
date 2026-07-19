@@ -25,7 +25,7 @@
 //! Run: `cargo test --features dash_attn --test bench_044_entropy_gate_scaffold -- --nocapture`
 
 use katgpt_rs::dash_attn::{
-    score_blocks_entmax, score_blocks_entmax_with_entropy, ChunkSummaryQuery,
+    ChunkSummaryQuery, score_blocks_entmax, score_blocks_entmax_with_entropy,
     summarize_chunk_with_entropy,
 };
 use katgpt_rs::types::DashAttnConfig;
@@ -36,8 +36,7 @@ use katgpt_rs::types::DashAttnConfig;
 fn make_vec(dim: usize, seed: usize) -> Vec<f32> {
     (0..dim)
         .map(|i| {
-            let x =
-                ((i.wrapping_mul(2654435761)).wrapping_add(seed.wrapping_mul(40503))) as f32;
+            let x = ((i.wrapping_mul(2654435761)).wrapping_add(seed.wrapping_mul(40503))) as f32;
             (x * 0.0001).sin() * 0.5 + 0.5
         })
         .collect()
@@ -83,32 +82,19 @@ fn bench_entropy_changes_routing_at_scale() {
         // Entropy-blind routing (the pre-Issue-044 behavior).
         let blind = score_blocks_entmax(&query, &summaries, &config);
         // Entropy-aware routing (the Issue 044 mechanism).
-        let aware =
-            score_blocks_entmax_with_entropy(&query, &summaries, &entropy_profile, &config);
+        let aware = score_blocks_entmax_with_entropy(&query, &summaries, &entropy_profile, &config);
 
         if active_sets_differ(&blind, &aware) {
             n_changed += 1;
         }
     }
 
-    println!(
-        "┌──────────────────────────────────────────────────────────────┐"
-    );
-    println!(
-        "│ Entropy Gate Scaffold: routing decisions changed by b'_c     │"
-    );
-    println!(
-        "├──────────────────────────────────────────────────────────────┤"
-    );
-    println!(
-        "│ Chunks: {n_chunks}, Queries: 50, Alternating entropy profile   │"
-    );
-    println!(
-        "│ Routing changed: {n_changed}/50 queries                          │"
-    );
-    println!(
-        "└──────────────────────────────────────────────────────────────┘"
-    );
+    println!("┌──────────────────────────────────────────────────────────────┐");
+    println!("│ Entropy Gate Scaffold: routing decisions changed by b'_c     │");
+    println!("├──────────────────────────────────────────────────────────────┤");
+    println!("│ Chunks: {n_chunks}, Queries: 50, Alternating entropy profile   │");
+    println!("│ Routing changed: {n_changed}/50 queries                          │");
+    println!("└──────────────────────────────────────────────────────────────┘");
 
     // The entropy bias MUST change routing for at least some queries when
     // the entropy profile is non-uniform. If it never changes, the mechanism
@@ -141,31 +127,18 @@ fn bench_uniform_entropy_preserves_ranking() {
     for seed in 0..50 {
         let query = make_vec(dim, 20_000 + seed);
         let blind = score_blocks_entmax(&query, &summaries, &config);
-        let aware =
-            score_blocks_entmax_with_entropy(&query, &summaries, &uniform_entropy, &config);
+        let aware = score_blocks_entmax_with_entropy(&query, &summaries, &uniform_entropy, &config);
         if active_sets_differ(&blind, &aware) {
             n_changed += 1;
         }
     }
 
-    println!(
-        "┌──────────────────────────────────────────────────────────────┐"
-    );
-    println!(
-        "│ Dormant-at-uniform guarantee: uniform b'_c = no change      │"
-    );
-    println!(
-        "├──────────────────────────────────────────────────────────────┤"
-    );
-    println!(
-        "│ Chunks: {n_chunks}, Queries: 50, Uniform entropy = ln(64)      │"
-    );
-    println!(
-        "│ Routing changed: {n_changed}/50 queries (MUST be 0)             │"
-    );
-    println!(
-        "└──────────────────────────────────────────────────────────────┘"
-    );
+    println!("┌──────────────────────────────────────────────────────────────┐");
+    println!("│ Dormant-at-uniform guarantee: uniform b'_c = no change      │");
+    println!("├──────────────────────────────────────────────────────────────┤");
+    println!("│ Chunks: {n_chunks}, Queries: 50, Uniform entropy = ln(64)      │");
+    println!("│ Routing changed: {n_changed}/50 queries (MUST be 0)             │");
+    println!("└──────────────────────────────────────────────────────────────┘");
 
     // Uniform entropy (constant across chunks) MUST NOT change routing —
     // this is the dormant-at-zero-init guarantee.
@@ -212,27 +185,13 @@ fn bench_entropy_boosts_high_entropy_chunks() {
         }
     }
 
-    println!(
-        "┌──────────────────────────────────────────────────────────────┐"
-    );
-    println!(
-        "│ Directionality: high-entropy chunks selected more often     │"
-    );
-    println!(
-        "├──────────────────────────────────────────────────────────────┤"
-    );
-    println!(
-        "│ Chunks: {n_chunks} (half high-entropy, half low), Queries: 100  │"
-    );
-    println!(
-        "│ High-entropy selections: {high_entropy_selected:<5}                │"
-    );
-    println!(
-        "│ Low-entropy selections:  {low_entropy_selected:<5}                │"
-    );
-    println!(
-        "└──────────────────────────────────────────────────────────────┘"
-    );
+    println!("┌──────────────────────────────────────────────────────────────┐");
+    println!("│ Directionality: high-entropy chunks selected more often     │");
+    println!("├──────────────────────────────────────────────────────────────┤");
+    println!("│ Chunks: {n_chunks} (half high-entropy, half low), Queries: 100  │");
+    println!("│ High-entropy selections: {high_entropy_selected:<5}                │");
+    println!("│ Low-entropy selections:  {low_entropy_selected:<5}                │");
+    println!("└──────────────────────────────────────────────────────────────┘");
 
     // High-entropy chunks should be selected at least as often as low-entropy
     // chunks (the entropy bias boosts their logit, making them more likely
@@ -269,7 +228,9 @@ fn bench_entropy_boosts_high_entropy_chunks() {
 fn topk_indices(scores: &[f32], k: usize) -> Vec<usize> {
     let mut idx: Vec<usize> = (0..scores.len()).collect();
     idx.sort_by(|&a, &b| {
-        scores[b].partial_cmp(&scores[a]).unwrap_or(std::cmp::Ordering::Equal)
+        scores[b]
+            .partial_cmp(&scores[a])
+            .unwrap_or(std::cmp::Ordering::Equal)
     });
     idx.truncate(k);
     idx
@@ -353,7 +314,10 @@ fn goat_044_entropy_bias_improves_topk_vs_full_attention() {
 
     // Precondition: entropy must vary across chunks for a meaningful gate.
     let min_entropy = entropy_biases.iter().cloned().fold(f32::INFINITY, f32::min);
-    let max_entropy = entropy_biases.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
+    let max_entropy = entropy_biases
+        .iter()
+        .cloned()
+        .fold(f32::NEG_INFINITY, f32::max);
     let entropy_spread = max_entropy - min_entropy;
     assert!(
         entropy_spread > 0.01,
@@ -369,8 +333,10 @@ fn goat_044_entropy_bias_improves_topk_vs_full_attention() {
         // Queries near the centroid (realistic: q and k share the same space).
         let query: Vec<f32> = (0..hd)
             .map(|d| {
-                let noise = ((seed.wrapping_mul(hd).wrapping_add(d).wrapping_mul(2654435761))
-                    as f32
+                let noise = ((seed
+                    .wrapping_mul(hd)
+                    .wrapping_add(d)
+                    .wrapping_mul(2654435761)) as f32
                     * 0.001)
                     .sin();
                 centroid[d] + noise * 0.5
@@ -430,25 +396,28 @@ fn goat_044_entropy_bias_improves_topk_vs_full_attention() {
     let delta = aware_acc - blind_acc;
     let chance = top_k as f32 / n_chunks as f32;
 
-    println!(
-        "┌──────────────────────────────────────────────────────────────────┐"
-    );
-    println!(
-        "│ GOAT Gate (modelless): entropy bias vs full-attention LogSumExp  │"
-    );
-    println!(
-        "├──────────────────────────────────────────────────────────────────┤"
-    );
+    println!("┌──────────────────────────────────────────────────────────────────┐");
+    println!("│ GOAT Gate (modelless): entropy bias vs full-attention LogSumExp  │");
+    println!("├──────────────────────────────────────────────────────────────────┤");
     println!("│ q_cls = global key centroid (deterministic, zero training)      │");
-    println!("│ Chunks: {n_chunks}, chunk_size: {chunk_size}, queries: {n_queries}, top-k: {top_k}     ");
-    println!("│ D={hd}, entropy range: [{min_entropy:.3}, {max_entropy:.3}] (spread {entropy_spread:.3})  ");
-    println!("│ Chance baseline: {chance:.4}                                       ");
-    println!("│ Blind accuracy:  {blind_acc:.4}  ({blind_hits}/{total_possible})                    ");
-    println!("│ Aware accuracy:  {aware_acc:.4}  ({aware_hits}/{total_possible})                    ");
-    println!("│ Delta: {delta:+.4} ({:+.1}%)                                        ", delta * 100.0);
     println!(
-        "└──────────────────────────────────────────────────────────────────┘"
+        "│ Chunks: {n_chunks}, chunk_size: {chunk_size}, queries: {n_queries}, top-k: {top_k}     "
     );
+    println!(
+        "│ D={hd}, entropy range: [{min_entropy:.3}, {max_entropy:.3}] (spread {entropy_spread:.3})  "
+    );
+    println!("│ Chance baseline: {chance:.4}                                       ");
+    println!(
+        "│ Blind accuracy:  {blind_acc:.4}  ({blind_hits}/{total_possible})                    "
+    );
+    println!(
+        "│ Aware accuracy:  {aware_acc:.4}  ({aware_hits}/{total_possible})                    "
+    );
+    println!(
+        "│ Delta: {delta:+.4} ({:+.1}%)                                        ",
+        delta * 100.0
+    );
+    println!("└──────────────────────────────────────────────────────────────────┘");
 
     // GOAT gate G1 (quality): aware must STRICTLY beat blind. The Prop 3.1
     // entropy bias removes the systematic ~b'_c underestimation, so top-k
@@ -513,7 +482,10 @@ fn goat_044_zero_init_preserves_full_attention_ranking_correlation() {
     for seed in 0usize..100 {
         let query: Vec<f32> = (0..hd)
             .map(|d| {
-                ((seed.wrapping_mul(hd).wrapping_add(d).wrapping_mul(2654435761)) as f32
+                ((seed
+                    .wrapping_mul(hd)
+                    .wrapping_add(d)
+                    .wrapping_mul(2654435761)) as f32
                     * 0.001)
                     .sin()
             })

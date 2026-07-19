@@ -397,8 +397,8 @@ mod goat_structural_proof {
 
 #[cfg(feature = "rv_gated_routing")]
 mod goat_benchmarks {
-    use katgpt_rs::pruners::AcceptanceVarianceTracker;
     use katgpt_core::trigger_gate::{ComputeTier, RvThresholds, TriggerGate, TriggerGateConfig};
+    use katgpt_rs::pruners::AcceptanceVarianceTracker;
     use std::time::Instant;
 
     /// Simulated compute cost: CPU path is fast, GPU path has dispatch overhead.

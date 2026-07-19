@@ -165,7 +165,10 @@ impl HippocampalCacheDyn {
             self.scores[slot] = score;
             // Pre-normalize key for the fast read path.
             self.keys_norm[slot * d..(slot + 1) * d].copy_from_slice(&k[..d]);
-            rmsnorm_with_gamma(&mut self.keys_norm[slot * d..(slot + 1) * d], &self.gamma[..]);
+            rmsnorm_with_gamma(
+                &mut self.keys_norm[slot * d..(slot + 1) * d],
+                &self.gamma[..],
+            );
         } else if self.w > 0 {
             // Full: replace heap-min if new score is strictly higher.
             let (min_bits, min_slot) = unpack(self.heap[0]);
@@ -177,7 +180,10 @@ impl HippocampalCacheDyn {
                 self.vals[slot * d..(slot + 1) * d].copy_from_slice(&v[..d]);
                 self.scores[slot] = score;
                 self.keys_norm[slot * d..(slot + 1) * d].copy_from_slice(&k[..d]);
-                rmsnorm_with_gamma(&mut self.keys_norm[slot * d..(slot + 1) * d], &self.gamma[..]);
+                rmsnorm_with_gamma(
+                    &mut self.keys_norm[slot * d..(slot + 1) * d],
+                    &self.gamma[..],
+                );
             }
             // else: reject — new score too low.
         }
@@ -197,7 +203,12 @@ impl HippocampalCacheDyn {
         block_kv: &[(&[f32], &[f32])],
         out: &mut [f32],
     ) {
-        debug_assert!(out.len() >= self.d, "out.len()={} < d={}", out.len(), self.d);
+        debug_assert!(
+            out.len() >= self.d,
+            "out.len()={} < d={}",
+            out.len(),
+            self.d
+        );
         let d = self.d;
 
         if self.heap_len == 0 && block_kv.is_empty() {
@@ -244,7 +255,13 @@ impl HippocampalCacheDyn {
             }
             rmsnorm_with_gamma(kt, &gamma[..d]);
             let logit = simd_dot_f32(qt, kt, d) / sqrt_d;
-            streaming_softmax_acc_dyn(&mut out[..d], logit, &v[..kv_len], &mut max_logit, &mut sum_exp);
+            streaming_softmax_acc_dyn(
+                &mut out[..d],
+                logit,
+                &v[..kv_len],
+                &mut max_logit,
+                &mut sum_exp,
+            );
         }
 
         // Null sink: logit = 0.0, v = [0; d]. Contributes weight but zero value.
@@ -269,7 +286,12 @@ impl HippocampalCacheDyn {
     /// `out.len()` must be >= `d`. This is the production read path when γ is
     /// fixed (the common case).
     pub fn read_cache_into_fast(&mut self, q: &[f32], out: &mut [f32]) {
-        debug_assert!(out.len() >= self.d, "out.len()={} < d={}", out.len(), self.d);
+        debug_assert!(
+            out.len() >= self.d,
+            "out.len()={} < d={}",
+            out.len(),
+            self.d
+        );
         let d = self.d;
 
         if self.heap_len == 0 {
@@ -328,7 +350,12 @@ impl HippocampalCacheDyn {
         block_kv: &[(&[f32], &[f32])],
         out: &mut [f32],
     ) {
-        debug_assert!(out.len() >= self.d, "out.len()={} < d={}", out.len(), self.d);
+        debug_assert!(
+            out.len() >= self.d,
+            "out.len()={} < d={}",
+            out.len(),
+            self.d
+        );
         let d = self.d;
 
         if self.heap_len == 0 && block_kv.is_empty() {
@@ -371,7 +398,13 @@ impl HippocampalCacheDyn {
             }
             rmsnorm_with_gamma(kt, &self.gamma[..d]);
             let logit = simd_dot_f32(qt, kt, d) / sqrt_d;
-            streaming_softmax_acc_dyn(&mut out[..d], logit, &v[..kv_len], &mut max_logit, &mut sum_exp);
+            streaming_softmax_acc_dyn(
+                &mut out[..d],
+                logit,
+                &v[..kv_len],
+                &mut max_logit,
+                &mut sum_exp,
+            );
         }
 
         // Null sink: logit = 0.0, v = [0; d].
@@ -404,7 +437,12 @@ impl HippocampalCacheDyn {
         block_kv: &[(&[f32], &[f32])],
         out: &mut [f32],
     ) {
-        debug_assert!(out.len() >= self.d, "out.len()={} < d={}", out.len(), self.d);
+        debug_assert!(
+            out.len() >= self.d,
+            "out.len()={} < d={}",
+            out.len(),
+            self.d
+        );
         let d = self.d;
 
         if self.heap_len == 0 && block_kv.is_empty() {
@@ -724,8 +762,12 @@ mod tests {
         }
 
         // External block_kv: 3 (k, v) pairs.
-        let block_keys: Vec<Vec<f32>> = (0..3).map(|_| (0..D).map(|_| rng.f32()).collect()).collect();
-        let block_vals: Vec<Vec<f32>> = (0..3).map(|_| (0..D).map(|_| rng.f32()).collect()).collect();
+        let block_keys: Vec<Vec<f32>> = (0..3)
+            .map(|_| (0..D).map(|_| rng.f32()).collect())
+            .collect();
+        let block_vals: Vec<Vec<f32>> = (0..3)
+            .map(|_| (0..D).map(|_| rng.f32()).collect())
+            .collect();
         let q: Vec<f32> = (0..D).map(|_| rng.f32()).collect();
 
         // Non-prenorm: raw block_kv.
@@ -822,7 +864,10 @@ mod tests {
 
         // Top-3 by score are entries 4, 3, 2 (scores 5, 4, 3).
         let min_score = cache.min_score().unwrap();
-        assert!((min_score - 3.0).abs() < 1e-6, "min score should be 3.0, got {min_score}");
+        assert!(
+            (min_score - 3.0).abs() < 1e-6,
+            "min score should be 3.0, got {min_score}"
+        );
     }
 
     /// NaN score is rejected.

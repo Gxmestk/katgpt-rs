@@ -51,15 +51,15 @@ use katgpt_types::Rng;
 
 mod environment;
 mod randopt;
+mod session;
 #[cfg(feature = "bandit")]
 mod shared_stats;
-mod session;
 
 pub use environment::*;
 pub use randopt::*;
+pub use session::*;
 #[cfg(feature = "bandit")]
 pub use shared_stats::*;
-pub use session::*;
 
 // ── Strategy ────────────────────────────────────────────────────
 

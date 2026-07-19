@@ -64,11 +64,7 @@ fn cosine_sim(a: &[f32], b: &[f32]) -> f32 {
         nb += b[i] * b[i];
     }
     let denom = na.sqrt() * nb.sqrt();
-    if denom > 1e-8 {
-        dot / denom
-    } else {
-        0.0
-    }
+    if denom > 1e-8 { dot / denom } else { 0.0 }
 }
 
 /// Check if all values are finite.
@@ -109,8 +105,8 @@ fn dominant_eigenvalue(matrix: &[f32], rows: usize, cols: usize, max_iters: usiz
 /// weight[out_dim × in_dim] += scale * B[out_dim × rank] @ A[rank × in_dim]
 fn apply_lora_delta(
     weight: &mut [f32],
-    a: &[f32],      // [rank × in_dim]
-    b: &[f32],      // [out_dim × rank]
+    a: &[f32], // [rank × in_dim]
+    b: &[f32], // [out_dim × rank]
     out_dim: usize,
     in_dim: usize,
     rank: usize,
@@ -134,8 +130,10 @@ fn apply_lora_delta(
 fn apply_mlp_lora(
     weights: &mut TransformerWeights,
     config: &Config,
-    w1_a: &[f32], w1_b: &[f32],
-    w2_a: &[f32], w2_b: &[f32],
+    w1_a: &[f32],
+    w1_b: &[f32],
+    w2_a: &[f32],
+    w2_b: &[f32],
     rank: usize,
     alpha: f32,
 ) {
@@ -145,16 +143,8 @@ fn apply_mlp_lora(
 
     for layer in 0..config.n_layer {
         let layer_ref = &mut weights.layers[layer];
-        apply_lora_delta(
-            &mut layer_ref.mlp_w1,
-            w1_a, w1_b,
-            mlp_h, n, rank, scale,
-        );
-        apply_lora_delta(
-            &mut layer_ref.mlp_w2,
-            w2_a, w2_b,
-            n, mlp_h, rank, scale,
-        );
+        apply_lora_delta(&mut layer_ref.mlp_w1, w1_a, w1_b, mlp_h, n, rank, scale);
+        apply_lora_delta(&mut layer_ref.mlp_w2, w2_a, w2_b, n, mlp_h, rank, scale);
     }
 }
 
@@ -186,10 +176,7 @@ fn construct_spectral_lora(
     let mlp_h = config.mlp_hidden;
 
     // Estimate λ_max of mlp_w1
-    let lambda_max = dominant_eigenvalue(
-        &weights.layers[0].mlp_w1,
-        mlp_h, n, 50,
-    ).max(1e-6);
+    let lambda_max = dominant_eigenvalue(&weights.layers[0].mlp_w1, mlp_h, n, 50).max(1e-6);
 
     let scale_factor = 1.0 / lambda_max.sqrt();
 
@@ -209,19 +196,19 @@ fn construct_spectral_lora(
     }
 
     MlpLoraParams {
-        w1_a, w1_b, w2_a, w2_b,
-        rank, alpha: 8.0,
+        w1_a,
+        w1_b,
+        w2_a,
+        w2_b,
+        rank,
+        alpha: 8.0,
         name: format!("spectral 1/λ_max (λ={:.3})", lambda_max),
     }
 }
 
 /// Variant 3: Orthogonal-init — random orthogonal rows/columns.
 /// Preserves information norm, no amplification or attenuation.
-fn construct_orthogonal_lora(
-    config: &Config,
-    rank: usize,
-    rng: &mut Rng,
-) -> MlpLoraParams {
+fn construct_orthogonal_lora(config: &Config, rank: usize, rng: &mut Rng) -> MlpLoraParams {
     let n = config.n_embd;
     let mlp_h = config.mlp_hidden;
 
@@ -275,8 +262,12 @@ fn construct_orthogonal_lora(
     }
 
     MlpLoraParams {
-        w1_a, w1_b, w2_a, w2_b,
-        rank, alpha: 8.0,
+        w1_a,
+        w1_b,
+        w2_a,
+        w2_b,
+        rank,
+        alpha: 8.0,
         name: "orthogonal-init".to_string(),
     }
 }
@@ -284,10 +275,7 @@ fn construct_orthogonal_lora(
 /// Variant 4: Fourier-direction — construct LoRA to project along sinusoidal
 /// frequency directions. This tests whether injecting Fourier structure into
 /// the MLP pathway (via LoRA) can help.
-fn construct_fourier_direction_lora(
-    config: &Config,
-    rank: usize,
-) -> MlpLoraParams {
+fn construct_fourier_direction_lora(config: &Config, rank: usize) -> MlpLoraParams {
     let n = config.n_embd;
     let mlp_h = config.mlp_hidden;
 
@@ -350,8 +338,12 @@ fn construct_fourier_direction_lora(
     }
 
     MlpLoraParams {
-        w1_a, w1_b, w2_a, w2_b,
-        rank, alpha: 8.0,
+        w1_a,
+        w1_b,
+        w2_a,
+        w2_b,
+        rank,
+        alpha: 8.0,
         name: "fourier-direction".to_string(),
     }
 }
@@ -379,18 +371,19 @@ fn construct_scaled_identity_lora(
     }
 
     MlpLoraParams {
-        w1_a, w1_b, w2_a, w2_b,
-        rank, alpha: 8.0,
+        w1_a,
+        w1_b,
+        w2_a,
+        w2_b,
+        rank,
+        alpha: 8.0,
         name: format!("scaled-identity α={:.1}", scale_factor),
     }
 }
 
 /// Variant 6: Negative-scaling — attenuate the MLP response.
 /// Tests whether reducing MLP influence helps (since MLP-only diverges).
-fn construct_attenuate_lora(
-    config: &Config,
-    rank: usize,
-) -> MlpLoraParams {
+fn construct_attenuate_lora(config: &Config, rank: usize) -> MlpLoraParams {
     let n = config.n_embd;
     let mlp_h = config.mlp_hidden;
 
@@ -408,8 +401,12 @@ fn construct_attenuate_lora(
     }
 
     MlpLoraParams {
-        w1_a, w1_b, w2_a, w2_b,
-        rank, alpha: 8.0,
+        w1_a,
+        w1_b,
+        w2_a,
+        w2_b,
+        rank,
+        alpha: 8.0,
         name: "attenuate -0.5".to_string(),
     }
 }
@@ -467,10 +464,7 @@ fn student_ahla_with_lora(
 ) -> Vec<Vec<f32>> {
     // Apply LoRA
     apply_mlp_lora(
-        weights, config,
-        &lora.w1_a, &lora.w1_b,
-        &lora.w2_a, &lora.w2_b,
-        lora.rank, lora.alpha,
+        weights, config, &lora.w1_a, &lora.w1_b, &lora.w2_a, &lora.w2_b, lora.rank, lora.alpha,
     );
 
     let mut ctx = ForwardContext::new(config);
@@ -532,14 +526,21 @@ fn bench_483_ahla_mlp_modelless_goat() {
     let weights_orig = TransformerWeights::new(&config, &mut rng);
 
     // Generate test tokens
-    let tokens: Vec<usize> = (0..seq_len).map(|i| (i * 3 + 1) % config.vocab_size).collect();
+    let tokens: Vec<usize> = (0..seq_len)
+        .map(|i| (i * 3 + 1) % config.vocab_size)
+        .collect();
 
     // Teacher: SDPA forward
     let teacher_logits = teacher_forward(&weights_orig, &tokens, &config);
-    assert!(all_logits_finite(&teacher_logits), "Teacher logits must be finite");
+    assert!(
+        all_logits_finite(&teacher_logits),
+        "Teacher logits must be finite"
+    );
 
-    println!("Config: n_embd={}, n_layer={}, mlp_hidden={}, vocab={}",
-             config.n_embd, config.n_layer, config.mlp_hidden, config.vocab_size);
+    println!(
+        "Config: n_embd={}, n_layer={}, mlp_hidden={}, vocab={}",
+        config.n_embd, config.n_layer, config.mlp_hidden, config.vocab_size
+    );
     println!("Tokens: {:?}", tokens);
     println!();
 
@@ -552,9 +553,14 @@ fn bench_483_ahla_mlp_modelless_goat() {
     println!("┌─────────────────────────────────────────────────────────────────────┐");
     println!("│ Variant                          │ KL(div) │ Cosine  │ Finite │ KL% │");
     println!("├─────────────────────────────────────────────────────────────────────┤");
-    println!("│ {:<32} │ {:>7.4} │ {:>7.4} │ {:>6} │ {:>3}% │",
-             "baseline (no LoRA)", baseline_kl, baseline_cos,
-             if baseline_finite { "✅" } else { "❌" }, 100);
+    println!(
+        "│ {:<32} │ {:>7.4} │ {:>7.4} │ {:>6} │ {:>3}% │",
+        "baseline (no LoRA)",
+        baseline_kl,
+        baseline_cos,
+        if baseline_finite { "✅" } else { "❌" },
+        100
+    );
 
     // ── Deterministic LoRA Variants ──
     let variants: Vec<MlpLoraParams> = vec![
@@ -582,9 +588,14 @@ fn bench_483_ahla_mlp_modelless_goat() {
 
         let kl_pct = (kl / baseline_kl.max(1e-10) * 100.0) as i32;
 
-        println!("│ {:<32} │ {:>7.4} │ {:>7.4} │ {:>6} │ {:>3}% │",
-                 lora.name, kl, cos,
-                 if finite { "✅" } else { "❌" }, kl_pct);
+        println!(
+            "│ {:<32} │ {:>7.4} │ {:>7.4} │ {:>6} │ {:>3}% │",
+            lora.name,
+            kl,
+            cos,
+            if finite { "✅" } else { "❌" },
+            kl_pct
+        );
 
         if !finite {
             all_g1_pass = false;
@@ -602,13 +613,23 @@ fn bench_483_ahla_mlp_modelless_goat() {
     let g4_pass = improvement_pct < 20.0; // G4: no variant improves > 20%
 
     println!("── GOAT Gate Assessment ──────────────────────────────────────────");
-    println!("  G1 (stability):  all logits finite = {}", if all_g1_pass { "✅ PASS" } else { "❌ FAIL" });
+    println!(
+        "  G1 (stability):  all logits finite = {}",
+        if all_g1_pass { "✅ PASS" } else { "❌ FAIL" }
+    );
     println!("  G2 (KL gap):     baseline KL = {:.4}", baseline_kl);
     println!("  G3 (cosine):     baseline cos = {:.4}", baseline_cos);
     println!("  G4 (no modelless fix > 20%):");
     println!("    best variant:  {} (KL={:.4})", best_name, best_kl);
     println!("    improvement:   {:.1}%", improvement_pct);
-    println!("    G4 verdict:    {}", if g4_pass { "✅ PASS — MLP gap NOT modelless-correctable" } else { "❌ FAIL — MLP gap IS modelless-correctable" });
+    println!(
+        "    G4 verdict:    {}",
+        if g4_pass {
+            "✅ PASS — MLP gap NOT modelless-correctable"
+        } else {
+            "❌ FAIL — MLP gap IS modelless-correctable"
+        }
+    );
     println!();
 
     if g4_pass {
@@ -634,16 +655,28 @@ fn bench_483_ahla_mlp_modelless_goat() {
     } else {
         println!("── Verdict ───────────────────────────────────────────────────────");
         println!("  The aHLA MLP gap IS modelless-correctable!");
-        println!("  Variant '{}' improved KL by {:.1}%.", best_name, improvement_pct);
+        println!(
+            "  Variant '{}' improved KL by {:.1}%.",
+            best_name, improvement_pct
+        );
         println!("  → T7.3: NOT needed — modelless construction suffices.");
     }
 
     // ── Assertions ──
-    assert!(all_g1_pass, "G1 FAIL: some variants produced non-finite logits");
-    assert!(baseline_kl > 0.0, "Baseline KL must be positive (AHLA ≠ SDPA)");
+    assert!(
+        all_g1_pass,
+        "G1 FAIL: some variants produced non-finite logits"
+    );
+    assert!(
+        baseline_kl > 0.0,
+        "Baseline KL must be positive (AHLA ≠ SDPA)"
+    );
 
     // The key assertion: if G4 passes, the MLP gap is not modelless-correctable
     // This is the expected outcome (the hypothesis is confirmed)
     println!();
-    println!("Assert: G4 = {} (expected: PASS — MLP gap not modelless-correctable)", g4_pass);
+    println!(
+        "Assert: G4 = {} (expected: PASS — MLP gap not modelless-correctable)",
+        g4_pass
+    );
 }

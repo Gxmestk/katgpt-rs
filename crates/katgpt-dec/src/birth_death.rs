@@ -233,7 +233,10 @@ pub fn stochastic_birth_death_step(
     let n = field.n_cells();
     let len = n * dim;
 
-    debug_assert_eq!(field.rank, 0, "stochastic_birth_death_step requires rank-0 field");
+    debug_assert_eq!(
+        field.rank, 0,
+        "stochastic_birth_death_step requires rank-0 field"
+    );
     debug_assert!(
         dim >= 2,
         "stochastic_birth_death_step requires dim >= 2 (alive + morphogen), got {dim}"
@@ -331,10 +334,7 @@ pub fn stochastic_birth_death_step(
     // born. The alive channel is purely the binarized OUTPUT of this gate.
     let field_chunks = field.data[..len].chunks_exact_mut(dim);
     let lap_chunks = scratch_lap.data[..len].chunks_exact(dim);
-    for ((voxel, &mask), lap) in field_chunks
-        .zip(scratch_dropout.iter())
-        .zip(lap_chunks)
-    {
+    for ((voxel, &mask), lap) in field_chunks.zip(scratch_dropout.iter()).zip(lap_chunks) {
         // (A) Diffusion: apply `-diffusion_dt · Δlap` to morphogen channels.
         let dt_scale = if mask != 0 { 0.5 } else { 1.0 } * params.diffusion_dt;
         for ch in 1..dim {
@@ -490,7 +490,11 @@ mod tests {
         }
         // Different seed → different first output (extremely likely).
         let mut c = SplitMix64::new(43);
-        assert_ne!(a.next_u64(), c.next_u64(), "different seeds produced same output");
+        assert_ne!(
+            a.next_u64(),
+            c.next_u64(),
+            "different seeds produced same output"
+        );
     }
 
     #[test]
@@ -533,12 +537,20 @@ mod tests {
 
         for _ in 0..10 {
             stochastic_birth_death_step(
-                &cx, &mut field_a, &params, &mut rng_a,
-                &mut scratch_lap_a, &mut dropout_a,
+                &cx,
+                &mut field_a,
+                &params,
+                &mut rng_a,
+                &mut scratch_lap_a,
+                &mut dropout_a,
             );
             stochastic_birth_death_step(
-                &cx, &mut field_b, &params, &mut rng_b,
-                &mut scratch_lap_b, &mut dropout_b,
+                &cx,
+                &mut field_b,
+                &params,
+                &mut rng_b,
+                &mut scratch_lap_b,
+                &mut dropout_b,
             );
         }
 
@@ -590,8 +602,12 @@ mod tests {
         let initial_alive = 1usize;
         for _ in 0..20 {
             stochastic_birth_death_step(
-                &cx, &mut field, &params, &mut rng,
-                &mut scratch_lap, &mut dropout,
+                &cx,
+                &mut field,
+                &params,
+                &mut rng,
+                &mut scratch_lap,
+                &mut dropout,
             );
         }
         let final_alive: usize = (0..cx.n_vertices())
@@ -639,7 +655,14 @@ mod tests {
         //   step 2 reaction: (dead → skipped)
         //   step 4 gate:     sigmoid(-1.0) ≈ 0.27 < 0.5   →  stays dead
         //   step 5 decay:    morph *= decay_rate = 0.5     →  morph = -0.5
-        stochastic_birth_death_step(&cx, &mut field, &params, &mut rng, &mut scratch_lap, &mut dropout);
+        stochastic_birth_death_step(
+            &cx,
+            &mut field,
+            &params,
+            &mut rng,
+            &mut scratch_lap,
+            &mut dropout,
+        );
         for v in 0..cx.n_vertices() {
             let morph = field.data[v * dim + 1];
             assert!(
@@ -654,7 +677,14 @@ mod tests {
         // starting from -1.0 the trajectory is monotone toward 0 in magnitude
         // after the first tick). Just assert it stays bounded and dead.
         for _ in 0..5 {
-            stochastic_birth_death_step(&cx, &mut field, &params, &mut rng, &mut scratch_lap, &mut dropout);
+            stochastic_birth_death_step(
+                &cx,
+                &mut field,
+                &params,
+                &mut rng,
+                &mut scratch_lap,
+                &mut dropout,
+            );
         }
         for v in 0..cx.n_vertices() {
             assert_eq!(field.data[v * dim], 0.0, "voxel {v} should stay dead");
@@ -677,7 +707,11 @@ mod tests {
         // Seed a random-ish alive/morphogen pattern.
         let mut rng_field = SplitMix64::new(2024);
         for v in 0..cx.n_vertices() {
-            field.data[v * dim] = if rng_field.next_u32().is_multiple_of(2) { 1.0 } else { 0.0 };
+            field.data[v * dim] = if rng_field.next_u32().is_multiple_of(2) {
+                1.0
+            } else {
+                0.0
+            };
             field.data[v * dim + 1] = rng_field.next_u32() as f32 / u32::MAX as f32;
         }
         let mut scratch_lap = zero_field_3d(&cx, dim);
@@ -685,7 +719,14 @@ mod tests {
         let mut rng = SplitMix64::new(55);
 
         for tick in 0..15 {
-            stochastic_birth_death_step(&cx, &mut field, &params, &mut rng, &mut scratch_lap, &mut dropout);
+            stochastic_birth_death_step(
+                &cx,
+                &mut field,
+                &params,
+                &mut rng,
+                &mut scratch_lap,
+                &mut dropout,
+            );
             for v in 0..cx.n_vertices() {
                 let alive = field.data[v * dim];
                 assert!(
@@ -711,8 +752,8 @@ mod tests {
             alive_threshold: 0.5,
             birth_rate: 0.0,
             consumption_rate: 0.0,
-            dropout_prob: 0.0, // will override per run
-            decay_rate: 1.0,   // no decay
+            dropout_prob: 0.0,                     // will override per run
+            decay_rate: 1.0,                       // no decay
             crowding_threshold: f32::NEG_INFINITY, // disabled
         };
 
@@ -728,7 +769,14 @@ mod tests {
         let mut rng = SplitMix64::new(3);
         let mut p_no_drop = base_params;
         p_no_drop.dropout_prob = 0.0;
-        stochastic_birth_death_step(&cx, &mut field_full, &p_no_drop, &mut rng, &mut scratch, &mut dropout);
+        stochastic_birth_death_step(
+            &cx,
+            &mut field_full,
+            &p_no_drop,
+            &mut rng,
+            &mut scratch,
+            &mut dropout,
+        );
 
         // Run with full dropout (same seed + initial field).
         let mut field_half = zero_field_3d(&cx, dim);
@@ -739,7 +787,14 @@ mod tests {
         let mut rng2 = SplitMix64::new(3);
         let mut p_drop = base_params;
         p_drop.dropout_prob = 1.0;
-        stochastic_birth_death_step(&cx, &mut field_half, &p_drop, &mut rng2, &mut scratch, &mut dropout);
+        stochastic_birth_death_step(
+            &cx,
+            &mut field_half,
+            &p_drop,
+            &mut rng2,
+            &mut scratch,
+            &mut dropout,
+        );
 
         // The dropout path should have applied half the diffusion Δ to each
         // morphogen voxel. Compare morphogen channels.
@@ -783,7 +838,7 @@ mod tests {
             birth_rate: 0.0,
             consumption_rate: 0.0,
             dropout_prob: 0.0,
-            decay_rate: 1.0, // no decay
+            decay_rate: 1.0,         // no decay
             crowding_threshold: 2.5, // kill if lap[0] < 2.5
         };
 
@@ -793,9 +848,12 @@ mod tests {
         field.data[center * dim] = 1.0;
         field.data[center * dim + 1] = 5.0;
         let neighbors = [
-            vidx(0, 1, 1, w, h), vidx(2, 1, 1, w, h), // ±x
-            vidx(1, 0, 1, w, h), vidx(1, 2, 1, w, h), // ±y
-            vidx(1, 1, 0, w, h), vidx(1, 1, 2, w, h), // ±z
+            vidx(0, 1, 1, w, h),
+            vidx(2, 1, 1, w, h), // ±x
+            vidx(1, 0, 1, w, h),
+            vidx(1, 2, 1, w, h), // ±y
+            vidx(1, 1, 0, w, h),
+            vidx(1, 1, 2, w, h), // ±z
         ];
         for &n in &neighbors {
             field.data[n * dim] = 1.0;
@@ -807,18 +865,25 @@ mod tests {
         let mut rng = SplitMix64::new(1);
 
         stochastic_birth_death_step(
-            &cx, &mut field, &params, &mut rng, &mut scratch_lap, &mut dropout,
+            &cx,
+            &mut field,
+            &params,
+            &mut rng,
+            &mut scratch_lap,
+            &mut dropout,
         );
 
         // Center voxel: all 6 neighbors alive → lap[0] = 6 - 6 = 0 < 2.5 → KILLED.
         assert_eq!(
-            field.data[center * dim], 0.0,
+            field.data[center * dim],
+            0.0,
             "center voxel (fully surrounded) should be killed by crowding death"
         );
         // Face-neighbors: 1 alive neighbor (center) → lap[0] = 6 - 1 = 5 >= 2.5 → SURVIVE.
         for &n in &neighbors {
             assert_eq!(
-                field.data[n * dim], 1.0,
+                field.data[n * dim],
+                1.0,
                 "face-neighbor {n} (exposed) should survive crowding death"
             );
         }
@@ -845,8 +910,14 @@ mod tests {
         let center = vidx(1, 1, 1, w, h);
         field.data[center * dim] = 1.0;
         field.data[center * dim + 1] = 5.0;
-        for &n in &[vidx(0, 1, 1, w, h), vidx(2, 1, 1, w, h), vidx(1, 0, 1, w, h),
-                     vidx(1, 2, 1, w, h), vidx(1, 1, 0, w, h), vidx(1, 1, 2, w, h)] {
+        for &n in &[
+            vidx(0, 1, 1, w, h),
+            vidx(2, 1, 1, w, h),
+            vidx(1, 0, 1, w, h),
+            vidx(1, 2, 1, w, h),
+            vidx(1, 1, 0, w, h),
+            vidx(1, 1, 2, w, h),
+        ] {
             field.data[n * dim] = 1.0;
             field.data[n * dim + 1] = 5.0;
         }
@@ -856,11 +927,17 @@ mod tests {
         let mut rng = SplitMix64::new(1);
 
         stochastic_birth_death_step(
-            &cx, &mut field, &params, &mut rng, &mut scratch_lap, &mut dropout,
+            &cx,
+            &mut field,
+            &params,
+            &mut rng,
+            &mut scratch_lap,
+            &mut dropout,
         );
 
         assert_eq!(
-            field.data[center * dim], 1.0,
+            field.data[center * dim],
+            1.0,
             "center should survive when crowding death is disabled"
         );
     }
@@ -939,7 +1016,11 @@ mod tests {
 
         let mut out = [99u8; 1];
         argmax_block_type(&field, 2, &mut out);
-        assert_eq!(out, [1], "n_classes=2 should pick channel 1, ignoring channel 3");
+        assert_eq!(
+            out,
+            [1],
+            "n_classes=2 should pick channel 1, ignoring channel 3"
+        );
     }
 
     #[test]
@@ -1009,8 +1090,12 @@ mod tests {
 
         for _ in 0..10 {
             stochastic_birth_death_step(
-                &cx, &mut field, &params, &mut rng,
-                &mut scratch_lap, &mut dropout,
+                &cx,
+                &mut field,
+                &params,
+                &mut rng,
+                &mut scratch_lap,
+                &mut dropout,
             );
         }
 

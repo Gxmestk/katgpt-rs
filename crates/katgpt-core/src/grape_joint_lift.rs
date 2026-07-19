@@ -379,10 +379,7 @@ mod tests {
     fn softplus_is_non_negative() {
         for &z in &[-10.0_f32, -1.0, -0.1, 0.0, 0.1, 1.0, 10.0, 50.0] {
             let val = softplus(z);
-            assert!(
-                val >= 0.0,
-                "softplus({z}) = {val} should be >= 0"
-            );
+            assert!(val >= 0.0, "softplus({z}) = {val} should be >= 0");
         }
     }
 
@@ -412,10 +409,7 @@ mod tests {
         let val = softplus(100.0);
         assert!(val.is_finite(), "softplus(100) = {val} should be finite");
         // softplus(100) ≈ 100
-        assert!(
-            (val - 100.0).abs() < 1e-3,
-            "softplus(100) ≈ 100, got {val}"
-        );
+        assert!((val - 100.0).abs() < 1e-3, "softplus(100) ≈ 100, got {val}");
     }
 
     #[test]
@@ -510,7 +504,8 @@ mod tests {
         let mut scratch = vec![0.0; 4];
         let mut out = 0.0;
         assert_eq!(
-            lift.score_into(q, k, 0, &mut scratch, &mut out).unwrap_err(),
+            lift.score_into(q, k, 0, &mut scratch, &mut out)
+                .unwrap_err(),
             JointLiftError::ShapeMismatch
         );
     }
@@ -524,7 +519,8 @@ mod tests {
         let mut scratch = vec![0.0; 3]; // wrong
         let mut out = 0.0;
         assert_eq!(
-            lift.score_into(q, k, 0, &mut scratch, &mut out).unwrap_err(),
+            lift.score_into(q, k, 0, &mut scratch, &mut out)
+                .unwrap_err(),
             JointLiftError::ShapeMismatch
         );
     }
@@ -535,7 +531,8 @@ mod tests {
         let lift = GrapeJointLift::new(plane, 1.0, 1.0, &[], &[]).unwrap();
         let mut out = 99.0;
         let mut scratch: [f32; 0] = [];
-        lift.score_into(&[], &[], 5, &mut scratch, &mut out).unwrap();
+        lift.score_into(&[], &[], 5, &mut scratch, &mut out)
+            .unwrap();
         assert_eq!(out, 0.0);
     }
 
@@ -556,17 +553,14 @@ mod tests {
 
     /// Manual reference: compute the joint score by calling Rank2Plane directly
     /// + explicit gate computation. Used as ground truth for G1.
-    fn ref_score(
-        lift: &GrapeJointLift,
-        q: &[f32],
-        k: &[f32],
-        m: i32,
-    ) -> f32 {
+    fn ref_score(lift: &GrapeJointLift, q: &[f32], k: &[f32], m: i32) -> f32 {
         let d = lift.dim();
         let sqrt_d = (d as f32).sqrt();
         // Rotary: q̂ = exp(m·ω_rot·L)·q
         let mut q_rot = vec![0.0_f32; d];
-        lift.plane().apply_into(q, m as f32, lift.omega_rot(), &mut q_rot).unwrap();
+        lift.plane()
+            .apply_into(q, m as f32, lift.omega_rot(), &mut q_rot)
+            .unwrap();
         let rotary_logit = simd_dot_f32(&q_rot, k, d) / sqrt_d;
         // Additive: m·ω_add·(softplus(v·q/√d) + softplus(u·k/√d))
         let lambda_q = softplus(simd_dot_f32(lift.v_gate(), q, d) / sqrt_d);
@@ -581,8 +575,8 @@ mod tests {
         let lift = build_lift(
             &[1.0, 0.0, 0.0, 0.0],
             &[0.0, 1.0, 0.0, 0.0],
-            0.5,  // omega_rot
-            0.0,  // omega_add = 0
+            0.5, // omega_rot
+            0.0, // omega_add = 0
             &[0.1, 0.2, 0.3, 0.4],
             &[0.5, 0.6, 0.7, 0.8],
         );
@@ -590,7 +584,8 @@ mod tests {
         let k = [0.4_f32, 0.7, -0.6, 0.9];
         let mut scratch = [0.0_f32; 4];
         let mut score = 0.0;
-        lift.score_into(&q, &k, 7, &mut scratch, &mut score).unwrap();
+        lift.score_into(&q, &k, 7, &mut scratch, &mut score)
+            .unwrap();
 
         // Reference: pure rotary logit only.
         let mut q_rot = [0.0_f32; 4];
@@ -608,8 +603,8 @@ mod tests {
         let lift = build_lift(
             &[1.0, 0.0, 0.0, 0.0],
             &[0.0, 1.0, 0.0, 0.0],
-            0.0,  // omega_rot = 0
-            1.0,  // omega_add
+            0.0, // omega_rot = 0
+            1.0, // omega_add
             &[0.1, 0.2, 0.3, 0.4],
             &[0.5, 0.6, 0.7, 0.8],
         );
@@ -617,7 +612,8 @@ mod tests {
         let k = [0.4_f32, 0.7, -0.6, 0.9];
         let mut scratch = [0.0_f32; 4];
         let mut score = 0.0;
-        lift.score_into(&q, &k, -3, &mut scratch, &mut score).unwrap();
+        lift.score_into(&q, &k, -3, &mut scratch, &mut score)
+            .unwrap();
 
         // Reference: pure additive.
         let dot_qk = simd_dot_f32(&q, &k, 4);
@@ -641,15 +637,13 @@ mod tests {
             &[0.1, 0.2, 0.3, 0.4],
             &[0.5, 0.6, 0.7, 0.8],
         );
-        assert!(
-            lift.plane().s() < 1e-6,
-            "parallel a,b should give s ≈ 0"
-        );
+        assert!(lift.plane().s() < 1e-6, "parallel a,b should give s ≈ 0");
         let q = [0.3_f32, -0.2, 0.5, 0.1];
         let k = [0.4_f32, 0.7, -0.6, 0.9];
         let mut scratch = [0.0_f32; 4];
         let mut score = 0.0;
-        lift.score_into(&q, &k, 5, &mut scratch, &mut score).unwrap();
+        lift.score_into(&q, &k, 5, &mut scratch, &mut score)
+            .unwrap();
 
         // Reference: pure additive (rotary = identity).
         let dot_qk = simd_dot_f32(&q, &k, 4);
@@ -677,7 +671,8 @@ mod tests {
         let k = [0.4_f32, 0.7, -0.6, 0.9];
         let mut scratch = [0.0_f32; 4];
         let mut score = 0.0;
-        lift.score_into(&q, &k, 0, &mut scratch, &mut score).unwrap();
+        lift.score_into(&q, &k, 0, &mut scratch, &mut score)
+            .unwrap();
 
         let expected = simd_dot_f32(&q, &k, 4) / 2.0;
         assert!(
@@ -702,7 +697,8 @@ mod tests {
         let k = [0.4_f32, 0.7, -0.6, 0.9];
         let mut scratch = [0.0_f32; 4];
         let mut score = 0.0;
-        lift.score_into(&q, &k, -4, &mut scratch, &mut score).unwrap();
+        lift.score_into(&q, &k, -4, &mut scratch, &mut score)
+            .unwrap();
 
         // Reference: rotary + m·ω_add·2·log(2).
         let mut q_rot = [0.0_f32; 4];
@@ -732,10 +728,13 @@ mod tests {
         for m in [-1_i32, -3, -10, -50] {
             let mut scratch = [0.0_f32; 4];
             let mut score = 0.0;
-            lift.score_into(&q, &k, m, &mut scratch, &mut score).unwrap();
+            lift.score_into(&q, &k, m, &mut scratch, &mut score)
+                .unwrap();
             // Rotary-only score (omega_add = 0 reference).
             let mut q_rot = [0.0_f32; 4];
-            lift.plane().apply_into(&q, m as f32, 0.3, &mut q_rot).unwrap();
+            lift.plane()
+                .apply_into(&q, m as f32, 0.3, &mut q_rot)
+                .unwrap();
             let rotary_only = simd_dot_f32(&q_rot, &k, 4) / 2.0;
             assert!(
                 score <= rotary_only + 1e-6,
@@ -800,7 +799,8 @@ mod tests {
                 let lift = build_lift(&a, &b, omega_rot, omega_add, &u, &v);
                 let mut scratch = vec![0.0; d];
                 let mut score = 0.0;
-                lift.score_into(&q, &k, m, &mut scratch, &mut score).unwrap();
+                lift.score_into(&q, &k, m, &mut scratch, &mut score)
+                    .unwrap();
 
                 let expected = ref_score(&lift, &q, &k, m);
 
@@ -842,7 +842,8 @@ mod tests {
         for _ in &pairs {
             let mut scratch = [0.0_f32; 8];
             let mut score = 0.0;
-            lift.score_into(&q, &k, m, &mut scratch, &mut score).unwrap();
+            lift.score_into(&q, &k, m, &mut scratch, &mut score)
+                .unwrap();
             scores.push(score);
         }
         // All scores must be bit-identical — the API encodes relativity by
@@ -882,7 +883,8 @@ mod tests {
         let mut acc_fused = 0.0_f32;
         for i in 0..n_iter {
             let mut score = 0.0;
-            lift.score_into(&q, &k, (i as i32) % 50 - 25, &mut scratch, &mut score).unwrap();
+            lift.score_into(&q, &k, (i as i32) % 50 - 25, &mut scratch, &mut score)
+                .unwrap();
             acc_fused += score;
         }
         let elapsed_fused = start_fused.elapsed().as_nanos();
@@ -894,7 +896,9 @@ mod tests {
         for i in 0..n_iter {
             let m = (i as i32) % 50 - 25;
             let mut q_rot = vec![0.0; d];
-            lift.plane().apply_into(&q, m as f32, 0.5, &mut q_rot).unwrap();
+            lift.plane()
+                .apply_into(&q, m as f32, 0.5, &mut q_rot)
+                .unwrap();
             let rotary = simd_dot_f32(&q_rot, &k, d) / sqrt_d;
             let lambda_q = softplus(simd_dot_f32(&v, &q, d) / sqrt_d);
             let lambda_k = softplus(simd_dot_f32(&u, &k, d) / sqrt_d);
@@ -926,12 +930,11 @@ mod tests {
     /// lives in a sibling integration test (matches Issue 161's pattern).
     #[test]
     fn g4_score_into_takes_only_borrowed_slices() {
-        let plane = Rank2Plane::new(&[1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
-                                    &[0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]);
-        let lift = GrapeJointLift::new(
-            plane, 1.0, 1.0,
-            &[0.1; 8], &[0.2; 8],
-        ).unwrap();
+        let plane = Rank2Plane::new(
+            &[1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+            &[0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+        );
+        let lift = GrapeJointLift::new(plane, 1.0, 1.0, &[0.1; 8], &[0.2; 8]).unwrap();
         let q = [0.5; 8];
         let k = [0.3; 8];
         let mut scratch = [0.0; 8];

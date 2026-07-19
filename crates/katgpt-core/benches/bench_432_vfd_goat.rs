@@ -113,9 +113,7 @@ fn median_u64(v: &mut [u64]) -> u64 {
 // ── Gates ─────────────────────────────────────────────────────────────────
 
 fn gate_g4_vfd_latency() -> bool {
-    println!(
-        "\n=== G4: vfd_score_into latency (M={M}, D={D}, N_s={N_STEPS}, B={BATCH}) ==="
-    );
+    println!("\n=== G4: vfd_score_into latency (M={M}, D={D}, N_s={N_STEPS}, B={BATCH}) ===");
     println!("Target: ≤ {TARGET_US} µs per call");
 
     let fields = build_fields();
@@ -165,7 +163,9 @@ fn gate_g4_vfd_latency() -> bool {
         println!("  ✅ PASS: {med_us:.2} µs ≤ {TARGET_US} µs target");
     } else {
         println!("  ❌ FAIL: {med_us:.2} µs > {TARGET_US} µs target");
-        println!("  (Failure does NOT block ship — constrains deployment regime. See Plan 432 Risk Note #2.)");
+        println!(
+            "  (Failure does NOT block ship — constrains deployment regime. See Plan 432 Risk Note #2.)"
+        );
     }
     passed
 }
@@ -213,6 +213,16 @@ fn main() {
     let g3 = gate_g3_zero_alloc();
 
     println!("\n=== Plan 432 Phase 2 G3/G4 Summary ===");
-    println!("G3 (zero-alloc):    {}", if g3 { "✅ PASS" } else { "❌ FAIL" });
-    println!("G4 (≤{TARGET_US} µs):   {}", if g4 { "✅ PASS" } else { "❌ FAIL (non-blocking)" });
+    println!(
+        "G3 (zero-alloc):    {}",
+        if g3 { "✅ PASS" } else { "❌ FAIL" }
+    );
+    println!(
+        "G4 (≤{TARGET_US} µs):   {}",
+        if g4 {
+            "✅ PASS"
+        } else {
+            "❌ FAIL (non-blocking)"
+        }
+    );
 }

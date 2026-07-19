@@ -1328,6 +1328,5 @@ impl Default for GraphBuilder {
 
 // ── Tests ──────────────────────────────────────────────────────
 
-
 #[cfg(test)]
 mod tests;

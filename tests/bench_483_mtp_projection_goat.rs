@@ -216,9 +216,20 @@ fn bench_483_mtp_projection_goat() {
     let target_logits = forward(&mut ctx, &weights, &mut cache, token, pos, &config).to_vec();
     let h_target = ctx.hidden_state[..n_embd].to_vec();
 
-    println!("  Config: n_embd={}, vocab={}, n_layer={}", n_embd, vocab, config.n_layer);
-    println!("  Target hidden state: {} dims, ||h|| = {:.6}", n_embd, l2_norm(&h_target));
-    println!("  Target logits: {} dims, finite = {}", vocab, all_finite(&target_logits));
+    println!(
+        "  Config: n_embd={}, vocab={}, n_layer={}",
+        n_embd, vocab, config.n_layer
+    );
+    println!(
+        "  Target hidden state: {} dims, ||h|| = {:.6}",
+        n_embd,
+        l2_norm(&h_target)
+    );
+    println!(
+        "  Target logits: {} dims, finite = {}",
+        vocab,
+        all_finite(&target_logits)
+    );
     println!();
 
     // Spectral analysis of Wq (for informational purposes)
@@ -252,10 +263,18 @@ fn bench_483_mtp_projection_goat() {
     ];
 
     // Results table
-    println!("┌──────────────────────────────┬──────────────┬──────────────┬──────────────┬──────────┐");
-    println!("│ Projection                   │ KL div       │ Cosine sim   │ Norm ratio   │ G2 finite│");
-    println!("│                              │ (vs target)  │ (vs original)│ (proj/orig)  │ (logits) │");
-    println!("├──────────────────────────────┼──────────────┼──────────────┼──────────────┼──────────┤");
+    println!(
+        "┌──────────────────────────────┬──────────────┬──────────────┬──────────────┬──────────┐"
+    );
+    println!(
+        "│ Projection                   │ KL div       │ Cosine sim   │ Norm ratio   │ G2 finite│"
+    );
+    println!(
+        "│                              │ (vs target)  │ (vs original)│ (proj/orig)  │ (logits) │"
+    );
+    println!(
+        "├──────────────────────────────┼──────────────┼──────────────┼──────────────┼──────────┤"
+    );
 
     let mut results: Vec<VariantResult> = Vec::new();
     let mut all_g2_pass = true;
@@ -280,7 +299,11 @@ fn bench_483_mtp_projection_goat() {
         let cos = cosine_similarity(&h_target, &h_projected);
         let orig_norm = l2_norm(&h_target);
         let proj_norm = l2_norm(&h_projected);
-        let norm_ratio = if orig_norm > 1e-12 { proj_norm / orig_norm } else { 0.0 };
+        let norm_ratio = if orig_norm > 1e-12 {
+            proj_norm / orig_norm
+        } else {
+            0.0
+        };
         let finite = all_finite(&projected_logits);
 
         if !finite {
@@ -305,7 +328,9 @@ fn bench_483_mtp_projection_goat() {
         );
     }
 
-    println!("└──────────────────────────────┴──────────────┴──────────────┴──────────────┴──────────┘");
+    println!(
+        "└──────────────────────────────┴──────────────┴──────────────┴──────────────┴──────────┘"
+    );
     println!();
 
     // Find identity baseline KL (should be ~0 when same model)
@@ -327,8 +352,7 @@ fn bench_483_mtp_projection_goat() {
     let g1_threshold = 0.1f32;
     let g1_pass = results.iter().any(|r| {
         // Non-identity, non-None deterministic constructions
-        !(r.name.starts_with("Identity") || r.name.starts_with("None"))
-            && r.kl_div <= g1_threshold
+        !(r.name.starts_with("Identity") || r.name.starts_with("None")) && r.kl_div <= g1_threshold
     });
 
     // G3: Cosine similarity ≥ 0.5 for deterministic constructions
@@ -337,8 +361,14 @@ fn bench_483_mtp_projection_goat() {
 
     // Analysis
     println!("── Analysis ──────────────────────────────────────────────────");
-    println!("  Identity baseline KL = {:.6} (perfect when same model)", identity_kl);
-    println!("  None (truncate/pad) KL = {:.6} (same as identity when dims match)", none_kl);
+    println!(
+        "  Identity baseline KL = {:.6} (perfect when same model)",
+        identity_kl
+    );
+    println!(
+        "  None (truncate/pad) KL = {:.6} (same as identity when dims match)",
+        none_kl
+    );
     println!();
     println!("  When target and drafter share the same model + same dims:");
     println!("    - None/Identity = lossless copy → KL ≈ 0");
@@ -396,7 +426,10 @@ fn bench_483_mtp_projection_goat() {
     println!();
 
     // Assert basic sanity (G2 must always pass — no NaN/Inf)
-    assert!(all_g2_pass, "G2 FAIL: some projections produced non-finite logits");
+    assert!(
+        all_g2_pass,
+        "G2 FAIL: some projections produced non-finite logits"
+    );
 
     println!("═══════════════════════════════════════════════════════════════");
 }

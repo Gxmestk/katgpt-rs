@@ -34,12 +34,7 @@ use super::types::{AttentionMaskSpec, CanvasLayout, CanvasTopology, Connection, 
 ///
 /// `t_i` is the query position's frame, `t_j` the key position's frame.
 #[inline]
-pub fn temporal_aligns(
-    t_src: Option<i32>,
-    t_dst: Option<i32>,
-    t_i: u32,
-    t_j: u32,
-) -> bool {
+pub fn temporal_aligns(t_src: Option<i32>, t_dst: Option<i32>, t_i: u32, t_j: u32) -> bool {
     match (t_src, t_dst) {
         (None, None) => true,
         // Single-sided: the set side determines ref, the free side is unconstrained.
@@ -108,7 +103,14 @@ pub fn build_attention_mask(
         if !conn.is_present() {
             continue;
         }
-        let Connection { src, dst, weight, t_src, t_dst, .. } = conn;
+        let Connection {
+            src,
+            dst,
+            weight,
+            t_src,
+            t_dst,
+            ..
+        } = conn;
         let src_range = &region_indices[src.get()];
         let dst_range = &region_indices[dst.get()];
 
@@ -148,11 +150,7 @@ pub fn build_attention_mask(
 #[inline]
 fn frame_of(flat: usize, h_extent: usize, w_extent: usize) -> u32 {
     let hw = h_extent.saturating_mul(w_extent);
-    if hw == 0 {
-        0
-    } else {
-        (flat / hw) as u32
-    }
+    if hw == 0 { 0 } else { (flat / hw) as u32 }
 }
 
 /// Build the per-position loss-weight mask.
@@ -198,7 +196,9 @@ mod tests {
     use crate::canvas::types::{
         AttentionFnFamily, CanvasBounds, CanvasTopology, RegionId, RegionSpec,
     };
-    use crate::canvas::{causal_chain, compile_schema, dense, isolated, CanvasLayout, CanvasSchema};
+    use crate::canvas::{
+        CanvasLayout, CanvasSchema, causal_chain, compile_schema, dense, isolated,
+    };
 
     /// A 2-region canvas: region 0 = output, region 1 = input-only.
     fn two_region_layout() -> CanvasLayout {
@@ -249,8 +249,11 @@ mod tests {
     #[test]
     fn loss_weight_mask_zeroes_non_output_regions() {
         let layout = two_region_layout();
-        let indices: Vec<Range<usize>> =
-            layout.regions.iter().map(|r| crate::canvas::region_indices(r, &layout)).collect();
+        let indices: Vec<Range<usize>> = layout
+            .regions
+            .iter()
+            .map(|r| crate::canvas::region_indices(r, &layout))
+            .collect();
         let mask = build_loss_weight_mask(&layout, &indices);
         // Region 0 (output) covers positions [0,2), region 1 (input) covers [2,4).
         assert_eq!(mask.weights.len(), 4);
@@ -265,8 +268,11 @@ mod tests {
         // Two regions of size 2 each. Dense topology → 2×2 = 4 edges (each region
         // also self-attends: connections from A→A, A→B, B→A, B→B).
         let layout = two_region_layout();
-        let indices: Vec<Range<usize>> =
-            layout.regions.iter().map(|r| crate::canvas::region_indices(r, &layout)).collect();
+        let indices: Vec<Range<usize>> = layout
+            .regions
+            .iter()
+            .map(|r| crate::canvas::region_indices(r, &layout))
+            .collect();
         // dense over both regions: 4 connections, each contributing 2×2 = 4 → 16 edges.
         let topo = dense(&[RegionId(0), RegionId(1)]);
         let mask = build_attention_mask(&topo, &indices, &layout);
@@ -277,8 +283,11 @@ mod tests {
     #[test]
     fn build_mask_isolated_topology_is_block_diagonal() {
         let layout = two_region_layout();
-        let indices: Vec<Range<usize>> =
-            layout.regions.iter().map(|r| crate::canvas::region_indices(r, &layout)).collect();
+        let indices: Vec<Range<usize>> = layout
+            .regions
+            .iter()
+            .map(|r| crate::canvas::region_indices(r, &layout))
+            .collect();
         let topo = isolated(&[RegionId(0), RegionId(1)]);
         let mask = build_attention_mask(&topo, &indices, &layout);
         // Each region self-attends: 2×2 + 2×2 = 8 edges.
@@ -328,8 +337,11 @@ mod tests {
                 ),
             ],
         };
-        let indices: Vec<Range<usize>> =
-            layout.regions.iter().map(|r| crate::canvas::region_indices(r, &layout)).collect();
+        let indices: Vec<Range<usize>> = layout
+            .regions
+            .iter()
+            .map(|r| crate::canvas::region_indices(r, &layout))
+            .collect();
         // causal_chain(A→B→C): every region self-attends (3) plus chain[1] queries
         // chain[0] and chain[2] queries chain[1] (2). Each region has size 1,
         // so each present connection contributes exactly 1 edge. Total = 5.
@@ -339,8 +351,17 @@ mod tests {
         // Of those 5 edges, the 2 *directed* (non-self) edges are query=B reads
         // key=A, and query=C reads key=B (paper convention: src queries dst;
         // causal_chain emits Connection(current, predecessor)).
-        let non_self: Vec<_> = mask.edges.iter().filter(|(i, j, _)| i != j).copied().collect();
-        assert_eq!(non_self.len(), 2, "expected exactly 2 non-self edges, got {non_self:?}");
+        let non_self: Vec<_> = mask
+            .edges
+            .iter()
+            .filter(|(i, j, _)| i != j)
+            .copied()
+            .collect();
+        assert_eq!(
+            non_self.len(),
+            2,
+            "expected exactly 2 non-self edges, got {non_self:?}"
+        );
         assert!(non_self.contains(&(1, 0, 1.0)), "B(1) should query A(0)");
         assert!(non_self.contains(&(2, 1, 1.0)), "C(2) should query B(1)");
     }
@@ -361,7 +382,10 @@ mod tests {
     #[test]
     fn empty_topology_produces_empty_mask() {
         let layout = two_region_layout();
-        let schema = CanvasSchema { layout, topology: CanvasTopology::new() };
+        let schema = CanvasSchema {
+            layout,
+            topology: CanvasTopology::new(),
+        };
         let compiled = compile_schema(&schema);
         assert_eq!(compiled.mask.n_edges(), 0);
     }

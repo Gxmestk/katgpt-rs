@@ -93,12 +93,7 @@ impl NodeId {
             }
             i += 1;
         }
-        Some(
-            ((b[0] as u32) << 24)
-                | ((b[1] as u32) << 16)
-                | ((b[2] as u32) << 8)
-                | (b[3] as u32),
-        )
+        Some(((b[0] as u32) << 24) | ((b[1] as u32) << 16) | ((b[2] as u32) << 8) | (b[3] as u32))
     }
 }
 
@@ -161,7 +156,11 @@ pub struct Admg {
 impl Admg {
     /// Construct an empty ADMG over the given node set (no edges).
     pub fn new(nodes: Vec<NodeId>) -> Self {
-        Self { nodes, directed: Vec::new(), bidirected: Vec::new() }
+        Self {
+            nodes,
+            directed: Vec::new(),
+            bidirected: Vec::new(),
+        }
     }
 
     /// Add a directed edge `parent → child`. Builder-style.
@@ -336,10 +335,7 @@ pub enum IdentificationError {
     /// A fixing sequence could not be completed (every greedy ordering got
     /// stuck). Treated identically to `NotIdentifiable` from the caller's
     /// perspective but kept distinct for diagnostics.
-    FixFailed {
-        cause: NodeId,
-        effect: NodeId,
-    },
+    FixFailed { cause: NodeId, effect: NodeId },
     /// The query was empty — `identify()` was called with no cause nodes
     /// and no effect nodes, or with disjoint / out-of-graph node sets.
     EmptyQuery,
@@ -348,7 +344,11 @@ pub enum IdentificationError {
 impl core::fmt::Display for IdentificationError {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
-            Self::NotIdentifiable { cause, effect, hedge } => match hedge {
+            Self::NotIdentifiable {
+                cause,
+                effect,
+                hedge,
+            } => match hedge {
                 Some((a, b)) => write!(
                     f,
                     "not identifiable: hedge ({a}, {b}) blocks Σ_{{{effect}|do({cause})}}"
@@ -358,10 +358,9 @@ impl core::fmt::Display for IdentificationError {
                     "not identifiable: Σ_{{{effect}|do({cause})}} has no derivation"
                 ),
             },
-            Self::FixFailed { cause, effect } => write!(
-                f,
-                "fix sequence failed for Σ_{{{effect}|do({cause})}}"
-            ),
+            Self::FixFailed { cause, effect } => {
+                write!(f, "fix sequence failed for Σ_{{{effect}|do({cause})}}")
+            }
             Self::EmptyQuery => write!(f, "empty query: cause or effect set is empty"),
         }
     }
@@ -410,13 +409,16 @@ mod tests {
 
     #[test]
     fn signature_inline_below_cap_heap_above() {
-        let small: Vec<NodeId> = (0..INLINE_SIGNATURE_CAP as u32).map(NodeId::from_u32).collect();
+        let small: Vec<NodeId> = (0..INLINE_SIGNATURE_CAP as u32)
+            .map(NodeId::from_u32)
+            .collect();
         let sig = AdmgSignature::from_nodes(small.iter().copied());
         assert!(sig.is_inline());
         assert_eq!(sig.len(), INLINE_SIGNATURE_CAP);
 
-        let big: Vec<NodeId> =
-            (0..(INLINE_SIGNATURE_CAP + 1) as u32).map(NodeId::from_u32).collect();
+        let big: Vec<NodeId> = (0..(INLINE_SIGNATURE_CAP + 1) as u32)
+            .map(NodeId::from_u32)
+            .collect();
         let sig_big = AdmgSignature::from_nodes(big.iter().copied());
         assert!(!sig_big.is_inline());
         assert_eq!(sig_big.len(), INLINE_SIGNATURE_CAP + 1);

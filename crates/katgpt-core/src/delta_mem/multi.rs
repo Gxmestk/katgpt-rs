@@ -82,10 +82,8 @@ impl MultiDomainMemory {
     /// Get or create a domain's state.
     pub fn ensure_domain(&mut self, domain: &str) {
         if !self.states.contains_key(domain) {
-            self.states.insert(
-                domain.to_string(),
-                DeltaMemoryState::new(self.config),
-            );
+            self.states
+                .insert(domain.to_string(), DeltaMemoryState::new(self.config));
         }
     }
 

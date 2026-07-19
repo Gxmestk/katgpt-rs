@@ -60,9 +60,7 @@ const LATENCY_ITERS: usize = 500;
 /// Build a micro config with `loop_count = R_MAX`, Uniform hybrid, AHLA mode.
 fn make_config() -> Config {
     let mut config = Config::micro();
-    config.loop_mode = LoopMode::WeightShared {
-        loop_count: R_MAX,
-    };
+    config.loop_mode = LoopMode::WeightShared { loop_count: R_MAX };
     config.hybrid_pattern = HybridPattern::Uniform;
     config.hla_mode = katgpt_rs::types::HlaMode::Ahla;
     config
@@ -167,7 +165,8 @@ fn run_regime(
 
         for pos in 0..N_POSITIONS {
             // Compute reference distribution at R_MAX.
-            let logits_rmax = run_once(config, &weights, residual_gate, sdpa_gate, pos, Some(R_MAX));
+            let logits_rmax =
+                run_once(config, &weights, residual_gate, sdpa_gate, pos, Some(R_MAX));
             let p_rmax = softmax(&logits_rmax);
 
             for r in 1..=R_MAX {
@@ -218,7 +217,15 @@ fn print_header(title: &str) {
 }
 
 fn print_regime_table(r: &RegimeResult) {
-    println!("\n  Gate regime: {} {}", r.name, if r.monotonic { "✅ MONOTONIC" } else { "❌ NON-MONOTONIC" });
+    println!(
+        "\n  Gate regime: {} {}",
+        r.name,
+        if r.monotonic {
+            "✅ MONOTONIC"
+        } else {
+            "❌ NON-MONOTONIC"
+        }
+    );
     println!("  ┌──────┬──────────────────┬──────────────────┐");
     println!("  │  R   │  KL(P_R‖P_Rmax)  │  Latency (ns)    │");
     println!("  ├──────┼──────────────────┼──────────────────┤");
@@ -228,7 +235,13 @@ fn print_regime_table(r: &RegimeResult) {
             r_val,
             r.mean_kl_vs_rmax[i],
             r.mean_latency_ns[i] as u64,
-            if r_val == R_MAX { "  ← R_max (ref)" } else if r_val == 1 { "  ← Baseline" } else { "" }
+            if r_val == R_MAX {
+                "  ← R_max (ref)"
+            } else if r_val == 1 {
+                "  ← Baseline"
+            } else {
+                ""
+            }
         );
     }
     println!("  └──────┴──────────────────┴──────────────────┘");
@@ -242,8 +255,16 @@ fn anytime_lt2_validation() {
     let config = make_config();
 
     print_header("Issue 156 T2 — Any-Time LT2 Validation PoC");
-    println!("  Config: {} layers, dim={}, heads={}, R_MAX={}", config.n_layer, config.n_embd, config.n_head, R_MAX);
-    println!("  Samples: {} seeds × {} positions = {} weight draws", N_SEEDS, N_POSITIONS, N_SEEDS * N_POSITIONS);
+    println!(
+        "  Config: {} layers, dim={}, heads={}, R_MAX={}",
+        config.n_layer, config.n_embd, config.n_head, R_MAX
+    );
+    println!(
+        "  Samples: {} seeds × {} positions = {} weight draws",
+        N_SEEDS,
+        N_POSITIONS,
+        N_SEEDS * N_POSITIONS
+    );
     println!("  Measurement: KL(softmax(logits_R) ‖ softmax(logits_R_max)) + latency");
     println!("  Any-Time holds iff KL decreases monotonically as R → R_MAX.");
 

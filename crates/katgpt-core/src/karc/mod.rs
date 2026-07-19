@@ -571,12 +571,7 @@ where
 /// which would change the floating-point operation count and break the
 /// byte-identical-equivalence contract on those paths.
 #[inline]
-fn accumulate_gram_upper_triangle(
-    gram: &mut [f64],
-    features_buf: &[f32],
-    d_h: usize,
-    n: usize,
-) {
+fn accumulate_gram_upper_triangle(gram: &mut [f64], features_buf: &[f32], d_h: usize, n: usize) {
     debug_assert!(gram.len() >= d_h * d_h, "gram buffer too small");
     for row_idx in 0..n {
         let row = &features_buf[row_idx * d_h..(row_idx + 1) * d_h];
@@ -920,7 +915,9 @@ pub fn low_rank_fit(
         *v = 0.0;
     }
 
-    low_rank_fit_with_init(gram, cov, d_h, d_out, r, lambda, max_iters, tol, a_out, b_out, scratch)
+    low_rank_fit_with_init(
+        gram, cov, d_h, d_out, r, lambda, max_iters, tol, a_out, b_out, scratch,
+    )
 }
 
 /// ALS loop body shared by [`low_rank_fit`] (deterministic zero/identity init)
@@ -1120,7 +1117,14 @@ fn low_rank_fit_with_init(
         scratch.kron_z.resize(rd_h, 0.0);
         scratch.kron_x.resize(rd_h, 0.0);
         cholesky_f64(&mut scratch.kron_chol, &scratch.kron_m, rd_h);
-        chol_solve_f64(&mut scratch.kron_x, &mut scratch.kron_z, &scratch.kron_chol, &scratch.kron_rhs, rd_h, 1);
+        chol_solve_f64(
+            &mut scratch.kron_x,
+            &mut scratch.kron_z,
+            &scratch.kron_chol,
+            &scratch.kron_rhs,
+            rd_h,
+            1,
+        );
         // 5. Unpack vec(B) → B (r × d_h, row-major: b_out[k*d_h+j] = kron_x[k*d_h+j]).
         b_out[..rd_h].copy_from_slice(&scratch.kron_x[..rd_h]);
 
@@ -1239,7 +1243,9 @@ pub fn low_rank_fit_warm_start(
     a_out[..d_out * r].copy_from_slice(&a_init[..d_out * r]);
     b_out[..r * d_h].copy_from_slice(&b_init[..r * d_h]);
 
-    low_rank_fit_with_init(gram, cov, d_h, d_out, r, lambda, max_iters, tol, a_out, b_out, scratch)
+    low_rank_fit_with_init(
+        gram, cov, d_h, d_out, r, lambda, max_iters, tol, a_out, b_out, scratch,
+    )
 }
 
 /// Single B-step ridge solve with a **frozen** `A` — solves
@@ -1384,7 +1390,14 @@ pub fn low_rank_fit_b_with_frozen_a(
     scratch.kron_z.resize(rd_h, 0.0);
     scratch.kron_x.resize(rd_h, 0.0);
     cholesky_f64(&mut scratch.kron_chol, &scratch.kron_m, rd_h);
-    chol_solve_f64(&mut scratch.kron_x, &mut scratch.kron_z, &scratch.kron_chol, &scratch.kron_rhs, rd_h, 1);
+    chol_solve_f64(
+        &mut scratch.kron_x,
+        &mut scratch.kron_z,
+        &scratch.kron_chol,
+        &scratch.kron_rhs,
+        rd_h,
+        1,
+    );
     // 5. Unpack vec(B) → B (r × d_h, row-major).
     b_out[..rd_h].copy_from_slice(&scratch.kron_x[..rd_h]);
     // NOTE: no scale rebalancing here — A is frozen, so rebalancing would
@@ -2243,7 +2256,6 @@ impl core::fmt::Display for FitError {
 impl std::error::Error for FitError {}
 
 // ── Inline unit tests ─────────────────────────────────────────────────────
-
 
 #[cfg(test)]
 mod tests;

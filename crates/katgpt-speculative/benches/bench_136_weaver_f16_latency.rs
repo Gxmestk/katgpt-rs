@@ -16,8 +16,8 @@
 //! ```
 
 use katgpt_speculative::weaver::{
-    WeaverConfig, WeaverCorrector, WeaverCorrectorF16, WeaverInput, WeaverScratch,
-    WeaverWeights, weaver_forward_parallel,
+    WeaverConfig, WeaverCorrector, WeaverCorrectorF16, WeaverInput, WeaverScratch, WeaverWeights,
+    weaver_forward_parallel,
 };
 
 /// Real-data config (matches the trained checkpoint: Gemma2-2B hidden=2304).
@@ -130,9 +130,8 @@ fn real_input(cfg: &WeaverConfig) -> WeaverInput<'static> {
 fn main() {
     let cfg = real_config();
     let weights_f32 = real_weights(&cfg);
-    let corrector_f16 = WeaverCorrectorF16::from_f32(&WeaverCorrector::from_weights(
-        weights_f32.clone(),
-    ));
+    let corrector_f16 =
+        WeaverCorrectorF16::from_f32(&WeaverCorrector::from_weights(weights_f32.clone()));
     let input = real_input(&cfg);
 
     // Warmup: 5 iterations on each path to stabilize caches / thread pool.
@@ -199,22 +198,34 @@ fn main() {
     );
     println!("└──────────────────┴──────────┴──────────┴────────────┘");
     println!();
-    println!("Config: hidden={}, d_ff={}, seq_len={}, K={}",
-        cfg.hidden_dim, cfg.d_ff, cfg.max_depth + 1, cfg.k_candidates);
+    println!(
+        "Config: hidden={}, d_ff={}, seq_len={}, K={}",
+        cfg.hidden_dim,
+        cfg.d_ff,
+        cfg.max_depth + 1,
+        cfg.k_candidates
+    );
     println!("Iterations: {}", N);
     println!();
 
     if speedup >= 1.5 {
         println!("✅ G2 PASS: f16 is {:.2}× faster (≥1.5× target)", speedup);
     } else if speedup >= 1.2 {
-        println!("⚠️  G2 MARGINAL: f16 is {:.2}× faster (≥1.2× but <1.5× target)", speedup);
+        println!(
+            "⚠️  G2 MARGINAL: f16 is {:.2}× faster (≥1.2× but <1.5× target)",
+            speedup
+        );
     } else {
-        println!("❌ G2 FAIL: f16 is {:.2}× faster (<1.2× — f16 conversion overhead exceeds bandwidth savings)", speedup);
+        println!(
+            "❌ G2 FAIL: f16 is {:.2}× faster (<1.2× — f16 conversion overhead exceeds bandwidth savings)",
+            speedup
+        );
     }
 
     // Also measure the f32→f16 conversion cost (one-time at load time).
     let conv_start = std::time::Instant::now();
-    let _f16_weights = WeaverCorrectorF16::from_f32(&WeaverCorrector::from_weights(weights_f32.clone()));
+    let _f16_weights =
+        WeaverCorrectorF16::from_f32(&WeaverCorrector::from_weights(weights_f32.clone()));
     let conv_ms = conv_start.elapsed().as_secs_f64() * 1000.0;
     println!();
     println!("f32→f16 conversion (one-time load cost): {:.1} ms", conv_ms);

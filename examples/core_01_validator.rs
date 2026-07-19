@@ -12,8 +12,8 @@
 use std::sync::Arc;
 
 use katgpt_rs::speculative::{NoPruner, build_dd_tree, build_dd_tree_pruned};
-use katgpt_tokenizer::{BpeTokenizerImpl, BpeTrainer};
 use katgpt_rs::types::Config;
+use katgpt_tokenizer::{BpeTokenizerImpl, BpeTrainer};
 use katgpt_validator::{CompilerFeedback, ErrorKind, PartialParser, SynPruner};
 
 /// Sample Rust code corpus for BPE training.

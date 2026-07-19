@@ -7,8 +7,8 @@
 //! 4. Warm-start cache correctness.
 //! 5. Hindrance estimator correctness.
 
-use super::*;
 use super::position::*;
+use super::*;
 use fastrand::Rng;
 
 fn make_guidance(map: &GridMap, cfg: GuidanceConfig) -> SpaceTimeGuidance<GridPos> {
@@ -102,12 +102,8 @@ fn test_throughput_sanity() {
     let map = GridMap::empty(10, 10);
     let n = 10;
     let mut rng = Rng::with_seed(123);
-    let starts: Vec<GridPos> = (0..n)
-        .map(|i| GridPos::new(i * 10 / n, 0))
-        .collect();
-    let goals: Vec<GridPos> = (0..n)
-        .map(|i| GridPos::new(i * 10 / n, 9))
-        .collect();
+    let starts: Vec<GridPos> = (0..n).map(|i| GridPos::new(i * 10 / n, 0)).collect();
+    let goals: Vec<GridPos> = (0..n).map(|i| GridPos::new(i * 10 / n, 9)).collect();
     let config = JointConfig::new(starts.clone());
     let cfg = GuidanceConfig {
         w_phi: 5,
@@ -377,8 +373,8 @@ fn test_lacam_with_flow_field_no_regression() {
 
     let cfg = GuidanceConfig::default();
     let map_clone = map.clone();
-    let mut guidance = SpaceTimeGuidance::new(cfg)
-        .with_neighbors(move |p| map_clone.passable_neighbors(p));
+    let mut guidance =
+        SpaceTimeGuidance::new(cfg).with_neighbors(move |p| map_clone.passable_neighbors(p));
     let mut hindrance = BlockingCount::new();
     let mut rng = Rng::with_seed(42);
 
@@ -785,17 +781,11 @@ fn test_from_movingai_rejects_malformed() {
     // Missing 'map' marker.
     assert!(GridMap::from_movingai("type octile\nheight 2\nwidth 2\n").is_none());
     // Non-numeric height.
-    assert!(
-        GridMap::from_movingai("type octile\nheight x\nwidth 2\nmap\n..\n..\n")
-            .is_none()
-    );
+    assert!(GridMap::from_movingai("type octile\nheight x\nwidth 2\nmap\n..\n..\n").is_none());
     // Empty input.
     assert!(GridMap::from_movingai("").is_none());
     // Zero dimensions.
-    assert!(
-        GridMap::from_movingai("type octile\nheight 0\nwidth 0\nmap\n")
-            .is_none()
-    );
+    assert!(GridMap::from_movingai("type octile\nheight 0\nwidth 0\nmap\n").is_none());
 }
 
 #[test]
@@ -911,10 +901,7 @@ fn test_set_warm_start_consumed_once() {
     let baseline_len = out.iter().map(|p| p.len()).sum::<usize>();
 
     // Set warm-start with one-step paths.
-    let warm = vec![
-        vec![GridPos::new(1, 0)],
-        vec![GridPos::new(3, 4)],
-    ];
+    let warm = vec![vec![GridPos::new(1, 0)], vec![GridPos::new(3, 4)]];
     guidance.set_warm_start(warm);
     guidance.compute_guidance(&config, &goals, &mut out);
     // Warm-start is one-shot — should be consumed.
@@ -936,12 +923,14 @@ fn test_set_warm_start_consumed_once() {
 #[test]
 fn test_astar_guidance_path_length() {
     let map = GridMap::empty(10, 10);
-    let cfg = GuidanceConfig { w_phi: 5, alpha: 1.0, rounds: 2, max_expansions: 0 };
+    let cfg = GuidanceConfig {
+        w_phi: 5,
+        alpha: 1.0,
+        rounds: 2,
+        max_expansions: 0,
+    };
     let mut guidance = make_guidance(&map, cfg);
-    let config = JointConfig::new(vec![
-        GridPos::new(0, 0),
-        GridPos::new(9, 9),
-    ]);
+    let config = JointConfig::new(vec![GridPos::new(0, 0), GridPos::new(9, 9)]);
     let goals = vec![GridPos::new(9, 9), GridPos::new(0, 0)];
     let mut out = Vec::new();
     guidance.compute_guidance(&config, &goals, &mut out);
@@ -963,7 +952,12 @@ fn test_astar_guidance_path_length() {
 #[test]
 fn test_astar_guidance_moves_toward_goal() {
     let map = GridMap::empty(10, 10);
-    let cfg = GuidanceConfig { w_phi: 5, alpha: 1.0, rounds: 1, max_expansions: 0 };
+    let cfg = GuidanceConfig {
+        w_phi: 5,
+        alpha: 1.0,
+        rounds: 1,
+        max_expansions: 0,
+    };
     let mut guidance = make_guidance(&map, cfg);
     let start_a = GridPos::new(0, 0);
     let goal_a = GridPos::new(9, 9);
@@ -1027,14 +1021,17 @@ fn test_lacam_no_collision_on_dense_map() {
     let map = GridMap::empty(10, 10);
     let n = 30;
     let mut rng = Rng::with_seed(999);
-    let starts: Vec<GridPos> = (0..n)
-        .map(|i| GridPos::new(i % 10, i / 10))
-        .collect();
+    let starts: Vec<GridPos> = (0..n).map(|i| GridPos::new(i % 10, i / 10)).collect();
     let goals: Vec<GridPos> = (0..n)
         .map(|i| GridPos::new((i + 50) % 10, (i + 50) / 10 % 10))
         .collect();
     let config = JointConfig::new(starts);
-    let cfg = GuidanceConfig { w_phi: 5, alpha: 1.0, rounds: 2, max_expansions: 0 };
+    let cfg = GuidanceConfig {
+        w_phi: 5,
+        alpha: 1.0,
+        rounds: 2,
+        max_expansions: 0,
+    };
     let mut guidance = make_guidance(&map, cfg);
     let mut hindrance = BlockingCount::new();
     let map_clone = map.clone();
@@ -1080,7 +1077,12 @@ fn test_flat_occupancy_produces_identical_guidance_as_hashmap() {
     // The flat-array occupancy path MUST produce bit-identical guidance paths
     // to the HashMap path. This is the correctness gate for T1a.
     let map = GridMap::empty(10, 10);
-    let cfg = GuidanceConfig { w_phi: 5, alpha: 3.0, rounds: 2, max_expansions: 0 };
+    let cfg = GuidanceConfig {
+        w_phi: 5,
+        alpha: 3.0,
+        rounds: 2,
+        max_expansions: 0,
+    };
     let config = JointConfig::new(vec![
         GridPos::new(0, 0),
         GridPos::new(9, 9),
@@ -1104,7 +1106,10 @@ fn test_flat_occupancy_produces_identical_guidance_as_hashmap() {
 
     assert_eq!(out_hash.len(), out_flat.len(), "output length mismatch");
     for (i, (path_h, path_f)) in out_hash.iter().zip(out_flat.iter()).enumerate() {
-        assert_eq!(path_h, path_f, "agent {i}: flat-array path differs from HashMap path");
+        assert_eq!(
+            path_h, path_f,
+            "agent {i}: flat-array path differs from HashMap path"
+        );
     }
 }
 
@@ -1124,7 +1129,11 @@ fn test_flat_occupancy_respects_walls() {
     assert_eq!(out[0].len(), cfg.w_phi);
     // Should NOT pass through the wall at x=5.
     for pos in &out[0] {
-        assert!(pos.x != 5 || pos.y > 2, "path passes through wall at (5, {})", pos.y);
+        assert!(
+            pos.x != 5 || pos.y > 2,
+            "path passes through wall at (5, {})",
+            pos.y
+        );
     }
 }
 
@@ -1133,17 +1142,18 @@ fn test_flat_occupancy_multi_round_refinement_identical() {
     // Multi-round refinement (unrecord/re-record) must also be identical.
     // This exercises the flat-array record_path/unrecord_path/clear_occupancy.
     let map = GridMap::empty(8, 8);
-    let cfg = GuidanceConfig { w_phi: 5, alpha: 2.0, rounds: 3, max_expansions: 0 }; // 3 rounds!
+    let cfg = GuidanceConfig {
+        w_phi: 5,
+        alpha: 2.0,
+        rounds: 3,
+        max_expansions: 0,
+    }; // 3 rounds!
     let config = JointConfig::new(vec![
         GridPos::new(0, 0),
         GridPos::new(7, 7),
         GridPos::new(3, 3),
     ]);
-    let goals = vec![
-        GridPos::new(7, 7),
-        GridPos::new(0, 0),
-        GridPos::new(0, 7),
-    ];
+    let goals = vec![GridPos::new(7, 7), GridPos::new(0, 0), GridPos::new(0, 7)];
 
     let mut gh = make_guidance(&map, cfg);
     let mut gf = make_flat_guidance(&map, cfg);
@@ -1341,8 +1351,8 @@ fn test_swap_no_collision_in_wide_corridor() {
 
 #[cfg(feature = "lacam_escalation")]
 mod lacam_escalation_tests {
-    use super::*;
     use super::lacam::EscalationBudget;
+    use super::*;
 
     /// Helper: run N ticks, return the number of ticks with vertex collisions.
     fn count_vertex_collisions(
@@ -1506,10 +1516,16 @@ mod lacam_escalation_tests {
     fn test_escalation_budget_default() {
         let b = EscalationBudget::default();
         assert!(b.max_nodes > 0, "default max_nodes should be positive");
-        assert!(b.time_budget_us > 0, "default time_budget_us should be positive");
+        assert!(
+            b.time_budget_us > 0,
+            "default time_budget_us should be positive"
+        );
         // Issue 546 multi-step extension: default budget should NOT target
         // stuck agents (preserves Plan 453 paper-faithful behavior).
-        assert!(!b.target_stuck_agents, "default should not target stuck agents");
+        assert!(
+            !b.target_stuck_agents,
+            "default should not target stuck agents"
+        );
         assert!(b.max_depth > 0, "default max_depth should be positive");
     }
 
@@ -1518,10 +1534,22 @@ mod lacam_escalation_tests {
     #[test]
     fn test_escalation_budget_multistep_default() {
         let b = EscalationBudget::multistep_default();
-        assert!(b.target_stuck_agents, "multistep should target stuck agents");
-        assert_eq!(b.max_depth, 8, "multistep max_depth should be 8 (P95 ht_chantry)");
-        assert!(b.max_nodes >= 10_000, "multistep max_nodes should allow deep search");
-        assert!(b.time_budget_us >= 10_000, "multistep time budget should allow deep search");
+        assert!(
+            b.target_stuck_agents,
+            "multistep should target stuck agents"
+        );
+        assert_eq!(
+            b.max_depth, 8,
+            "multistep max_depth should be 8 (P95 ht_chantry)"
+        );
+        assert!(
+            b.max_nodes >= 10_000,
+            "multistep max_nodes should allow deep search"
+        );
+        assert!(
+            b.time_budget_us >= 10_000,
+            "multistep time budget should allow deep search"
+        );
     }
 
     /// T2.6g (Issue 546): with_escalation_budget wires the budget through tick.
@@ -1601,6 +1629,9 @@ mod lacam_escalation_tests {
             }
             current = JointConfig::new(action.moves);
         }
-        assert_eq!(collisions, 0, "open map + multistep budget should have 0 collisions");
+        assert_eq!(
+            collisions, 0,
+            "open map + multistep budget should have 0 collisions"
+        );
     }
 }

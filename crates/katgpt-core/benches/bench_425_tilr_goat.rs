@@ -39,7 +39,7 @@
 
 #![cfg(feature = "tilr_invariant_subspace")]
 
-use katgpt_core::tilr::{tilr_refine_into, TilrScratch};
+use katgpt_core::tilr::{TilrScratch, tilr_refine_into};
 use std::hint::black_box;
 use std::time::Instant;
 
@@ -88,7 +88,10 @@ fn gram_schmidt_basis(d: usize, r: usize, rng: &mut Rng) -> Vec<f32> {
                 basis[i * d + x] -= dot * basis[j * d + x];
             }
         }
-        let norm: f32 = (0..d).map(|x| basis[i * d + x] * basis[i * d + x]).sum::<f32>().sqrt();
+        let norm: f32 = (0..d)
+            .map(|x| basis[i * d + x] * basis[i * d + x])
+            .sum::<f32>()
+            .sqrt();
         if norm > 1e-12 {
             for x in 0..d {
                 basis[i * d + x] /= norm;
@@ -131,10 +134,18 @@ struct GateResult {
 
 impl GateResult {
     fn pass(name: &'static str, detail: impl Into<String>) -> Self {
-        Self { name, passed: true, detail: detail.into() }
+        Self {
+            name,
+            passed: true,
+            detail: detail.into(),
+        }
     }
     fn fail(name: &'static str, detail: impl Into<String>) -> Self {
-        Self { name, passed: false, detail: detail.into() }
+        Self {
+            name,
+            passed: false,
+            detail: detail.into(),
+        }
     }
 }
 
@@ -158,8 +169,7 @@ fn gate_g1_no_harm_bit_identity() -> GateResult {
             let mut direction = vec![0.0f32; d];
             rng.fill(&mut direction);
             for k in 0..r {
-                let coeff: f32 =
-                    (0..d).map(|x| direction[x] * basis[k * d + x]).sum();
+                let coeff: f32 = (0..d).map(|x| direction[x] * basis[k * d + x]).sum();
                 for x in 0..d {
                     direction[x] -= coeff * basis[k * d + x];
                 }
@@ -330,8 +340,9 @@ fn gate_g3_latency() -> GateResult {
     let mut rng_shard = Rng::new(0xC0DE_0040);
     let basis_shard = gram_schmidt_basis(d_shard, r_shard, &mut rng_shard);
     let state_shard: Vec<f32> = (0..d_shard).map(|i| (i as f32) * 0.01).collect();
-    let direction_shard: Vec<f32> =
-        (0..d_shard).map(|i| ((i * 7) as f32) * 0.02 - 0.5).collect();
+    let direction_shard: Vec<f32> = (0..d_shard)
+        .map(|i| ((i * 7) as f32) * 0.02 - 0.5)
+        .collect();
     let mut out_shard = vec![0.0f32; d_shard];
     let mut scratch_shard = TilrScratch::with_capacity(d_shard, r_shard);
 
@@ -409,7 +420,10 @@ fn gate_g4_zero_alloc() -> GateResult {
     });
 
     if allocs == 0 {
-        GateResult::pass("G4", format!("0 allocations over {iters} steady-state calls"))
+        GateResult::pass(
+            "G4",
+            format!("0 allocations over {iters} steady-state calls"),
+        )
     } else {
         GateResult::fail(
             "G4",

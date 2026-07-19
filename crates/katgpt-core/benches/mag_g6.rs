@@ -19,8 +19,8 @@
 #![cfg(feature = "mag_mining")]
 
 use katgpt_core::mag::{
-    mine_contrast_direction, mine_direction, rank_candidates, reconstruction_error,
-    DataSet, TransferMetric,
+    DataSet, TransferMetric, mine_contrast_direction, mine_direction, rank_candidates,
+    reconstruction_error,
 };
 use std::hint::black_box;
 use std::time::Instant;
@@ -106,7 +106,10 @@ fn main() {
         let _ = black_box(mine_direction(black_box(&with), black_box(&without)));
     }
     for _ in 0..WARMUP {
-        let _ = black_box(mine_contrast_direction(black_box(&positive), black_box(&negative)));
+        let _ = black_box(mine_contrast_direction(
+            black_box(&positive),
+            black_box(&negative),
+        ));
     }
     for _ in 0..WARMUP {
         let ds = DataSet::new(&acts, &labels);
@@ -140,8 +143,7 @@ fn main() {
     // G6b: mine_contrast_direction 250+250×64 — target < 100µs.
     let t0 = Instant::now();
     for _ in 0..ITERS {
-        let dir =
-            mine_contrast_direction(black_box(&positive), black_box(&negative)).unwrap();
+        let dir = mine_contrast_direction(black_box(&positive), black_box(&negative)).unwrap();
         let _ = black_box(dir);
     }
     let contrast_ns = t0.elapsed().as_nanos() as f64 / ITERS as f64;
@@ -228,9 +230,5 @@ fn main() {
 }
 
 fn pass_fail(ok: bool) -> &'static str {
-    if ok {
-        "✓ PASS"
-    } else {
-        "✗ FAIL"
-    }
+    if ok { "✓ PASS" } else { "✗ FAIL" }
 }

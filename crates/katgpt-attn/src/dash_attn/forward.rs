@@ -90,8 +90,9 @@ pub fn forward_dash_attn_prefill(
     // chunk_size, producing k/hd instead of the correct mean), and (b)
     // activates the HiLS Prop 3.1 entropy bias (Issue 044) — at zero-init,
     // b'_c = ln(chunk_size) instead of ln(1) = 0.
-    let mut chunk_keys_buf: Vec<Vec<f32>> =
-        (0..config.n_kv_head).map(|_| vec![0.0f32; chunk_size * hd]).collect();
+    let mut chunk_keys_buf: Vec<Vec<f32>> = (0..config.n_kv_head)
+        .map(|_| vec![0.0f32; chunk_size * hd])
+        .collect();
 
     for (pos, &token) in tokens.iter().enumerate() {
         let tok_off = token * n;
@@ -118,8 +119,20 @@ pub fn forward_dash_attn_prefill(
             #[cfg(feature = "gated_mlp")]
             {
                 // SwiGLU: SiLU(W_gate·h) ⊙ W_up·h → W_down·hidden
-                types::matmul(&mut ctx.hidden, &layer_weights.mlp_w1, &ctx.x, config.mlp_hidden, n);
-                types::matmul(&mut ctx.hidden2, &layer_weights.mlp_w_up, &ctx.x, config.mlp_hidden, n);
+                types::matmul(
+                    &mut ctx.hidden,
+                    &layer_weights.mlp_w1,
+                    &ctx.x,
+                    config.mlp_hidden,
+                    n,
+                );
+                types::matmul(
+                    &mut ctx.hidden2,
+                    &layer_weights.mlp_w_up,
+                    &ctx.x,
+                    config.mlp_hidden,
+                    n,
+                );
                 types::swiglu_inplace(&mut ctx.hidden, &ctx.hidden2);
             }
             #[cfg(not(feature = "gated_mlp"))]
@@ -154,7 +167,11 @@ pub fn forward_dash_attn_prefill(
         let is_seq_end = pos == tokens.len() - 1;
         if is_chunk_end || is_seq_end {
             let chunk_idx = pos / chunk_size;
-            let actual_size = if is_chunk_end { chunk_size } else { chunk_local + 1 };
+            let actual_size = if is_chunk_end {
+                chunk_size
+            } else {
+                chunk_local + 1
+            };
             if chunk_idx < summary_cache.n_chunks() {
                 for (h, buf) in chunk_keys_buf.iter().enumerate() {
                     let slot = &mut summary_cache.summaries[chunk_idx][h];
@@ -252,8 +269,20 @@ pub fn forward_dash_attn_decode<'a>(
         #[cfg(feature = "gated_mlp")]
         {
             // SwiGLU: SiLU(W_gate·h) ⊙ W_up·h → W_down·hidden
-            types::matmul(&mut ctx.hidden, &layer_weights.mlp_w1, &ctx.x, config.mlp_hidden, n);
-            types::matmul(&mut ctx.hidden2, &layer_weights.mlp_w_up, &ctx.x, config.mlp_hidden, n);
+            types::matmul(
+                &mut ctx.hidden,
+                &layer_weights.mlp_w1,
+                &ctx.x,
+                config.mlp_hidden,
+                n,
+            );
+            types::matmul(
+                &mut ctx.hidden2,
+                &layer_weights.mlp_w_up,
+                &ctx.x,
+                config.mlp_hidden,
+                n,
+            );
             types::swiglu_inplace(&mut ctx.hidden, &ctx.hidden2);
         }
         #[cfg(not(feature = "gated_mlp"))]

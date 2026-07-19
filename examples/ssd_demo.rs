@@ -10,11 +10,11 @@ use std::hint::black_box;
 
 use katgpt_core::ConstraintPruner;
 use katgpt_core::cumprodsum::{context_freshness, cumprodsum_batched, cumprodsum_batched_simd};
-use katgpt_rs::pruners::SemiseparablePruner;
-use katgpt_rs::speculative::{ThinkingConfig, ThinkingController};
 use katgpt_core::ssd_block::{
     SsdBlockConfig, SsdScratch, auto_block_len, ssd_block_forward, ssd_naive,
 };
+use katgpt_rs::pruners::SemiseparablePruner;
+use katgpt_rs::speculative::{ThinkingConfig, ThinkingController};
 
 const WARMUP: usize = 100;
 const ITERS: usize = 1_000;

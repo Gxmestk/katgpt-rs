@@ -381,11 +381,11 @@ pub fn forward_sp_kv<'a>(
     gate_mode: crate::sp_kv::types::SpKvGateMode,
     #[cfg(feature = "domain_latent")] domain_latent: Option<&crate::types::DomainLatent>,
 ) -> &'a mut [f32] {
-    use crate::types::{kv_dim, matmul, rmsnorm};
     #[cfg(not(feature = "gated_mlp"))]
     use crate::types::matmul_relu;
     #[cfg(feature = "gated_mlp")]
     use crate::types::swiglu_inplace;
+    use crate::types::{kv_dim, matmul, rmsnorm};
 
     let n = config.n_embd;
     let hd = config.head_dim;
@@ -522,8 +522,20 @@ pub fn forward_sp_kv<'a>(
         #[cfg(feature = "gated_mlp")]
         {
             // SwiGLU: SiLU(W_gate·h) ⊙ W_up·h → W_down·hidden
-            matmul(&mut ctx.hidden, &layer_weights.mlp_w1, &ctx.x, config.mlp_hidden, n);
-            matmul(&mut ctx.hidden2, &layer_weights.mlp_w_up, &ctx.x, config.mlp_hidden, n);
+            matmul(
+                &mut ctx.hidden,
+                &layer_weights.mlp_w1,
+                &ctx.x,
+                config.mlp_hidden,
+                n,
+            );
+            matmul(
+                &mut ctx.hidden2,
+                &layer_weights.mlp_w_up,
+                &ctx.x,
+                config.mlp_hidden,
+                n,
+            );
             swiglu_inplace(&mut ctx.hidden, &ctx.hidden2);
         }
         #[cfg(not(feature = "gated_mlp"))]
@@ -636,11 +648,11 @@ pub fn forward_sp_kv_quant<'a, C: crate::types::QuantizedKVCache>(
     gate_mode: crate::sp_kv::types::SpKvGateMode,
     #[cfg(feature = "domain_latent")] domain_latent: Option<&crate::types::DomainLatent>,
 ) -> &'a mut [f32] {
-    use crate::types::{kv_dim, matmul, rmsnorm};
     #[cfg(not(feature = "gated_mlp"))]
     use crate::types::matmul_relu;
     #[cfg(feature = "gated_mlp")]
     use crate::types::swiglu_inplace;
+    use crate::types::{kv_dim, matmul, rmsnorm};
 
     let n = config.n_embd;
     let hd = config.head_dim;
@@ -782,8 +794,20 @@ pub fn forward_sp_kv_quant<'a, C: crate::types::QuantizedKVCache>(
         #[cfg(feature = "gated_mlp")]
         {
             // SwiGLU: SiLU(W_gate·h) ⊙ W_up·h → W_down·hidden
-            matmul(&mut ctx.hidden, &layer_weights.mlp_w1, &ctx.x, config.mlp_hidden, n);
-            matmul(&mut ctx.hidden2, &layer_weights.mlp_w_up, &ctx.x, config.mlp_hidden, n);
+            matmul(
+                &mut ctx.hidden,
+                &layer_weights.mlp_w1,
+                &ctx.x,
+                config.mlp_hidden,
+                n,
+            );
+            matmul(
+                &mut ctx.hidden2,
+                &layer_weights.mlp_w_up,
+                &ctx.x,
+                config.mlp_hidden,
+                n,
+            );
             swiglu_inplace(&mut ctx.hidden, &ctx.hidden2);
         }
         #[cfg(not(feature = "gated_mlp"))]

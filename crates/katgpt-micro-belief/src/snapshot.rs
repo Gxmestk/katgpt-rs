@@ -162,8 +162,7 @@ impl MicroRecurrentKernelSnapshot {
     /// detection at the bundle level; the per-block `verify()` is the
     /// integrity check at the snapshot level.
     pub fn to_bytes(&self) -> Vec<u8> {
-        let mut buf =
-            Vec::with_capacity(1 + 8 + 8 + self.weights_blob.len() + 32 + 8);
+        let mut buf = Vec::with_capacity(1 + 8 + 8 + self.weights_blob.len() + 32 + 8);
         buf.push(self.family as u8);
         buf.extend_from_slice(&(self.dim as u64).to_le_bytes());
         buf.extend_from_slice(&(self.weights_blob.len() as u64).to_le_bytes());
@@ -197,10 +196,11 @@ impl MicroRecurrentKernelSnapshot {
             return None;
         }
         let weights_blob = buf[17..17 + blob_len].to_vec();
-        let blake3: [u8; 32] =
-            buf[17 + blob_len..17 + blob_len + 32].try_into().ok()?;
+        let blake3: [u8; 32] = buf[17 + blob_len..17 + blob_len + 32].try_into().ok()?;
         let version = u64::from_le_bytes(
-            buf[17 + blob_len + 32..17 + blob_len + 32 + 8].try_into().ok()?,
+            buf[17 + blob_len + 32..17 + blob_len + 32 + 8]
+                .try_into()
+                .ok()?,
         );
         Some(Self {
             family,
@@ -316,11 +316,9 @@ mod tests {
     #[test]
     fn bytes_roundtrip_preserves_all_fields() {
         let k = AttractorKernel::from_seed(42, 32);
-        let snap =
-            MicroRecurrentKernelSnapshot::from_kernel(&k, k.to_snapshot_blob(), 7);
+        let snap = MicroRecurrentKernelSnapshot::from_kernel(&k, k.to_snapshot_blob(), 7);
         let bytes = snap.to_bytes();
-        let back =
-            MicroRecurrentKernelSnapshot::from_bytes(&bytes).expect("deserialize");
+        let back = MicroRecurrentKernelSnapshot::from_bytes(&bytes).expect("deserialize");
         assert_eq!(back.family, snap.family);
         assert_eq!(back.dim, snap.dim);
         assert_eq!(back.weights_blob, snap.weights_blob);
@@ -343,8 +341,7 @@ mod tests {
         let bytes = snap.to_bytes();
         // family(1) + dim(8) + blob_len(8) + blob(0) + blake3(32) + version(8) = 57
         assert_eq!(bytes.len(), 57);
-        let back =
-            MicroRecurrentKernelSnapshot::from_bytes(&bytes).expect("deserialize");
+        let back = MicroRecurrentKernelSnapshot::from_bytes(&bytes).expect("deserialize");
         assert_eq!(back.family, RecurrenceFamily::DeltaRule);
         assert_eq!(back.dim, 0);
         assert!(back.weights_blob.is_empty());
@@ -361,8 +358,7 @@ mod tests {
     #[test]
     fn from_bytes_rejects_truncated_blob() {
         let k = AttractorKernel::from_seed(42, 32);
-        let snap =
-            MicroRecurrentKernelSnapshot::from_kernel(&k, k.to_snapshot_blob(), 1);
+        let snap = MicroRecurrentKernelSnapshot::from_kernel(&k, k.to_snapshot_blob(), 1);
         let bytes = snap.to_bytes();
         // Clip the tail — declares a blob_len that the remaining bytes can't satisfy.
         let truncated = &bytes[..bytes.len() - 1];
@@ -372,8 +368,7 @@ mod tests {
     #[test]
     fn from_bytes_rejects_unknown_family() {
         let k = AttractorKernel::from_seed(42, 32);
-        let snap =
-            MicroRecurrentKernelSnapshot::from_kernel(&k, k.to_snapshot_blob(), 1);
+        let snap = MicroRecurrentKernelSnapshot::from_kernel(&k, k.to_snapshot_blob(), 1);
         let mut bytes = snap.to_bytes();
         bytes[0] = 99; // Invalid family discriminant.
         assert!(MicroRecurrentKernelSnapshot::from_bytes(&bytes).is_none());
@@ -396,7 +391,9 @@ mod tests {
         let tail_offset = 17 + blob.len();
         assert_eq!(&bytes[tail_offset..tail_offset + 32], &snap.blake3);
         let version = u64::from_le_bytes(
-            bytes[tail_offset + 32..tail_offset + 40].try_into().unwrap(),
+            bytes[tail_offset + 32..tail_offset + 40]
+                .try_into()
+                .unwrap(),
         );
         assert_eq!(version, snap.version);
         assert_eq!(bytes.len(), 17 + blob.len() + 32 + 8);
@@ -405,8 +402,7 @@ mod tests {
     #[test]
     fn bytes_roundtrip_is_deterministic() {
         let k = AttractorKernel::from_seed(42, 32);
-        let snap =
-            MicroRecurrentKernelSnapshot::from_kernel(&k, k.to_snapshot_blob(), 1);
+        let snap = MicroRecurrentKernelSnapshot::from_kernel(&k, k.to_snapshot_blob(), 1);
         let b1 = snap.to_bytes();
         for _ in 0..100 {
             let b2 = snap.to_bytes();
@@ -421,8 +417,8 @@ mod tests {
             RecurrenceFamily::LatentThought,
             RecurrenceFamily::DeltaRule,
         ] {
-            let back = RecurrenceFamily::from_u8(variant as u8)
-                .expect("known variant must round-trip");
+            let back =
+                RecurrenceFamily::from_u8(variant as u8).expect("known variant must round-trip");
             assert_eq!(back, variant);
         }
         assert!(RecurrenceFamily::from_u8(99).is_none());

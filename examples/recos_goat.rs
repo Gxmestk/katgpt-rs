@@ -401,7 +401,14 @@ fn main() {
         };
         println!(
             "  {:>4}  {:>10.4} {:>10.4} {:>10.4} {:>10.4}  {:>+8.4}{} {:>+8.4}{}",
-            seed, r.r1_cosine, r.r1_recos, r.r5_cosine, r.r5_recos, r1_diff, r1_mark, r5_diff,
+            seed,
+            r.r1_cosine,
+            r.r1_recos,
+            r.r5_cosine,
+            r.r5_recos,
+            r1_diff,
+            r1_mark,
+            r5_diff,
             r5_mark,
         );
         r1_cos_sum += r.r1_cosine as f64;
@@ -429,8 +436,14 @@ fn main() {
     let r5_win_rate = r5_wins as f64 / n;
 
     println!();
-    println!("  Mean recall@1: cosine={r1_cos_mean:.4}  recos={r1_rec_mean:.4}  Δ={:+.4}", r1_rec_mean - r1_cos_mean);
-    println!("  Mean recall@5: cosine={r5_cos_mean:.4}  recos={r5_rec_mean:.4}  Δ={:+.4}", r5_rec_mean - r5_cos_mean);
+    println!(
+        "  Mean recall@1: cosine={r1_cos_mean:.4}  recos={r1_rec_mean:.4}  Δ={:+.4}",
+        r1_rec_mean - r1_cos_mean
+    );
+    println!(
+        "  Mean recall@5: cosine={r5_cos_mean:.4}  recos={r5_rec_mean:.4}  Δ={:+.4}",
+        r5_rec_mean - r5_cos_mean
+    );
     println!(
         "  Win rate (recos > cosine):  r@1={:.1}% ({} wins, {} ties, {} losses)  r@5={:.1}% ({} wins, {} ties, {} losses)",
         r1_win_rate * 100.0,
@@ -449,12 +462,29 @@ fn main() {
     let g1_winrate_pass = r1_win_rate >= 0.80 && r5_win_rate >= 0.80;
     let g1_pass = g1_r1_pass && g1_r5_pass && g1_winrate_pass;
     println!();
-    println!("  G1 r@1 mean:   {}", if g1_r1_pass { "✅ PASS" } else { "❌ FAIL" });
-    println!("  G1 r@5 mean:   {}", if g1_r5_pass { "✅ PASS" } else { "❌ FAIL" });
-    println!("  G1 win rate:   {}", if g1_winrate_pass { "✅ PASS" } else { "❌ FAIL" });
+    println!(
+        "  G1 r@1 mean:   {}",
+        if g1_r1_pass { "✅ PASS" } else { "❌ FAIL" }
+    );
+    println!(
+        "  G1 r@5 mean:   {}",
+        if g1_r5_pass { "✅ PASS" } else { "❌ FAIL" }
+    );
+    println!(
+        "  G1 win rate:   {}",
+        if g1_winrate_pass {
+            "✅ PASS"
+        } else {
+            "❌ FAIL"
+        }
+    );
     println!(
         "  G1 verdict:    {}",
-        if g1_pass { "✅ PASS (promote candidate)" } else { "❌ FAIL (do NOT promote)" }
+        if g1_pass {
+            "✅ PASS (promote candidate)"
+        } else {
+            "❌ FAIL (do NOT promote)"
+        }
     );
     println!();
 
@@ -462,13 +492,23 @@ fn main() {
     println!("── G2: Latency gate (single-pair + 3-pair rerank) ──");
     let (cos1, rec1) = measure_latency_single();
     let (cos3, rec3) = measure_latency_3pair();
-    println!("  Single-pair:  cosine={cos1:.1}ns  recos={rec1:.1}ns  ratio={:.2}×", rec1 / cos1);
-    println!("  3-pair rerank: cosine={cos3:.1}ns  recos={rec3:.1}ns  ratio={:.2}×  overhead={:.1}ns", rec3 / cos3, rec3 - cos3);
+    println!(
+        "  Single-pair:  cosine={cos1:.1}ns  recos={rec1:.1}ns  ratio={:.2}×",
+        rec1 / cos1
+    );
+    println!(
+        "  3-pair rerank: cosine={cos3:.1}ns  recos={rec3:.1}ns  ratio={:.2}×  overhead={:.1}ns",
+        rec3 / cos3,
+        rec3 - cos3
+    );
     // G2 is informational for the Phase 4 decision; the gate threshold X is
     // the query-path latency budget headroom, set per-consumer. We record the
     // raw numbers here; the promote/demote call uses them.
     println!();
-    println!("  G2 verdict: informational (3-pair overhead = {:.1} ns);", rec3 - cos3);
+    println!(
+        "  G2 verdict: informational (3-pair overhead = {:.1} ns);",
+        rec3 - cos3
+    );
     println!("    Phase 4 promote decision uses this vs the query-path budget.");
     println!();
 
@@ -476,19 +516,40 @@ fn main() {
     println!("══════════════════════════════════════════════════════");
     if g1_pass {
         println!("  ✅ G1 PASS — recos beats cosine on OUR embedding regime.");
-        println!("    Mean recall@1 gain: {:+.4} ({:+.1}pp)", r1_rec_mean - r1_cos_mean, (r1_rec_mean - r1_cos_mean) * 100.0);
-        println!("    Mean recall@5 gain: {:+.4} ({:+.1}pp)", r5_rec_mean - r5_cos_mean, (r5_rec_mean - r5_cos_mean) * 100.0);
+        println!(
+            "    Mean recall@1 gain: {:+.4} ({:+.1}pp)",
+            r1_rec_mean - r1_cos_mean,
+            (r1_rec_mean - r1_cos_mean) * 100.0
+        );
+        println!(
+            "    Mean recall@5 gain: {:+.4} ({:+.1}pp)",
+            r5_rec_mean - r5_cos_mean,
+            (r5_rec_mean - r5_cos_mean) * 100.0
+        );
         println!("    → Promote `recos` to default in katgpt-core (G1+G2 gate).");
         println!("    → Phase 3 (cold MAG) + Phase 4 (hot ShardIndex) unblocked.");
     } else {
         println!("  ❌ G1 FAIL — recos adds no signal on OUR embeddings.");
-        println!("    Mean recall@1: cosine={r1_cos_mean:.4} recos={r1_rec_mean:.4} (Δ={:+.4})", r1_rec_mean - r1_cos_mean);
-        println!("    Mean recall@5: cosine={r5_cos_mean:.4} recos={r5_rec_mean:.4} (Δ={:+.4})", r5_rec_mean - r5_cos_mean);
-        println!("    Win rate r@1={:.1}% r@5={:.1}% (bar ≥80%)", r1_win_rate * 100.0, r5_win_rate * 100.0);
+        println!(
+            "    Mean recall@1: cosine={r1_cos_mean:.4} recos={r1_rec_mean:.4} (Δ={:+.4})",
+            r1_rec_mean - r1_cos_mean
+        );
+        println!(
+            "    Mean recall@5: cosine={r5_cos_mean:.4} recos={r5_rec_mean:.4} (Δ={:+.4})",
+            r5_rec_mean - r5_cos_mean
+        );
+        println!(
+            "    Win rate r@1={:.1}% r@5={:.1}% (bar ≥80%)",
+            r1_win_rate * 100.0,
+            r5_win_rate * 100.0
+        );
         println!("    → Keep `recos` opt-in as diagnostic; do NOT promote.");
         println!("    → Document the negative result in .benchmarks/437_recos_goat.md.");
     }
     println!();
-    println!("Latency (3-pair rerank): cosine={cos3:.1}ns recos={rec3:.1}ns ({:.2}×)", rec3 / cos3);
+    println!(
+        "Latency (3-pair rerank): cosine={cos3:.1}ns recos={rec3:.1}ns ({:.2}×)",
+        rec3 / cos3
+    );
     println!("  → Phase 4 (hot ShardIndex::query) viable iff overhead fits the query budget.");
 }

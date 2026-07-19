@@ -36,8 +36,7 @@ fn synthetic_input_for_gemma2_config() -> WeaverInput<'static> {
     let d = 4_usize;
     let vocab = 911_usize; // matches the 20-problem compact vocab
 
-    let h_verifier: &'static [f32] =
-        Box::leak(vec![0.5f32; h].into_boxed_slice());
+    let h_verifier: &'static [f32] = Box::leak(vec![0.5f32; h].into_boxed_slice());
 
     let mut h_dflash: Vec<&'static [f32]> = Vec::with_capacity(d);
     let mut topk_ids: Vec<&'static [u32]> = Vec::with_capacity(d);
@@ -134,7 +133,10 @@ fn real_checkpoint_loads_and_produces_nonzero_residual() {
     for di in 0..out.depth {
         for ki in 0..out.k {
             assert!(out.corrected_probs[di][ki].is_finite(), "NaN/Inf in probs");
-            assert!(out.corrected_logits[di][ki].is_finite(), "NaN/Inf in logits");
+            assert!(
+                out.corrected_logits[di][ki].is_finite(),
+                "NaN/Inf in logits"
+            );
             assert!(
                 out.weaver_residual[di][ki].is_finite(),
                 "NaN/Inf in residual"
@@ -242,30 +244,65 @@ fn real_checkpoint_loads_and_produces_nonzero_residual() {
     eprintln!("  Config: hidden=2304, K=32, depth=4, heads=8");
     eprintln!();
     eprintln!("  Path 1 — Allocating (correct / weaver_forward):");
-    eprintln!("    Median: {:.1} µs ({:.2} ms)", median_alloc_us, median_alloc_us / 1000.0);
-    eprintln!("    P99:    {:.1} µs ({:.2} ms)", p99_alloc_us, p99_alloc_us / 1000.0);
-    eprintln!("    Overhead: {:.1}% of a verifier step", median_alloc_us / verifier_step_us * 100.0);
+    eprintln!(
+        "    Median: {:.1} µs ({:.2} ms)",
+        median_alloc_us,
+        median_alloc_us / 1000.0
+    );
+    eprintln!(
+        "    P99:    {:.1} µs ({:.2} ms)",
+        p99_alloc_us,
+        p99_alloc_us / 1000.0
+    );
+    eprintln!(
+        "    Overhead: {:.1}% of a verifier step",
+        median_alloc_us / verifier_step_us * 100.0
+    );
     eprintln!();
     eprintln!("  Path 2 — Scratch (correct_with_scratch / weaver_forward_into):");
-    eprintln!("    Median: {:.1} µs ({:.2} ms)", median_scratch_us, median_scratch_us / 1000.0);
-    eprintln!("    P99:    {:.1} µs ({:.2} ms)", p99_scratch_us, p99_scratch_us / 1000.0);
-    eprintln!("    Overhead: {:.1}% of a verifier step", median_scratch_us / verifier_step_us * 100.0);
+    eprintln!(
+        "    Median: {:.1} µs ({:.2} ms)",
+        median_scratch_us,
+        median_scratch_us / 1000.0
+    );
+    eprintln!(
+        "    P99:    {:.1} µs ({:.2} ms)",
+        p99_scratch_us,
+        p99_scratch_us / 1000.0
+    );
+    eprintln!(
+        "    Overhead: {:.1}% of a verifier step",
+        median_scratch_us / verifier_step_us * 100.0
+    );
     eprintln!("    Speedup: {:.2}× vs allocating", speedup_scratch);
     eprintln!();
     eprintln!("  Path 3 — Parallel (correct_parallel / weaver_forward_parallel):");
-    eprintln!("    Median: {:.1} µs ({:.2} ms)", median_parallel_us, median_parallel_us / 1000.0);
-    eprintln!("    P99:    {:.1} µs ({:.2} ms)", p99_parallel_us, p99_parallel_us / 1000.0);
-    eprintln!("    Overhead: {:.1}% of a verifier step", median_parallel_us / verifier_step_us * 100.0);
+    eprintln!(
+        "    Median: {:.1} µs ({:.2} ms)",
+        median_parallel_us,
+        median_parallel_us / 1000.0
+    );
+    eprintln!(
+        "    P99:    {:.1} µs ({:.2} ms)",
+        p99_parallel_us,
+        p99_parallel_us / 1000.0
+    );
+    eprintln!(
+        "    Overhead: {:.1}% of a verifier step",
+        median_parallel_us / verifier_step_us * 100.0
+    );
     eprintln!("    Speedup: {:.2}× vs allocating", speedup_parallel);
     eprintln!();
     eprintln!("  Runs:    {} (warmup: {})", MEASURED_RUNS, WARMUP_RUNS);
     eprintln!();
-    eprintln!("  Verdict (parallel path): {}",
+    eprintln!(
+        "  Verdict (parallel path): {}",
         if median_parallel_us < verifier_step_us {
             "✅ G4 PASSES — parallel path is faster than a single verifier step"
         } else if median_parallel_us < verifier_step_us * 3.0 {
             "⚠️  G4 MARGINAL — parallel path within 3× of verifier step (break-even ~3 verifier steps saved)"
         } else {
             "❌ G4 STILL FAILS — parallel path still slow (needs GPU port)"
-        });
+        }
+    );
 }

@@ -1168,7 +1168,10 @@ mod tests {
                     break;
                 }
             }
-            assert!(any_diff, "hidden states identical across steps (unexpected)");
+            assert!(
+                any_diff,
+                "hidden states identical across steps (unexpected)"
+            );
         }
 
         // Vocab_size used to silence unused-var lint if draft_lookahead == 0.
@@ -1187,7 +1190,9 @@ mod tests {
     #[cfg(feature = "weaver_runtime")]
     #[test]
     fn test_dflash_predict_with_weaver_zero_weights_preserves_g1() {
-        use katgpt_speculative::weaver::{WeaverConfig, WeaverCorrector, WeaverScratch, WeaverWeights};
+        use katgpt_speculative::weaver::{
+            WeaverConfig, WeaverCorrector, WeaverScratch, WeaverWeights,
+        };
 
         let (weights, config) = make_draft();
         let n_embd = config.n_embd;

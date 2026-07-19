@@ -77,9 +77,24 @@ struct Size {
 
 fn g2_perf() -> bool {
     let sizes = [
-        Size { label: "Small  (8×8, dim=1)",   grid: 8,  dim: 1, rank: 0 },
-        Size { label: "Medium (32×32, dim=1)", grid: 32, dim: 1, rank: 0 },
-        Size { label: "Large  (64×64, dim=8)", grid: 64, dim: 8, rank: 1 },
+        Size {
+            label: "Small  (8×8, dim=1)",
+            grid: 8,
+            dim: 1,
+            rank: 0,
+        },
+        Size {
+            label: "Medium (32×32, dim=1)",
+            grid: 32,
+            dim: 1,
+            rank: 0,
+        },
+        Size {
+            label: "Large  (64×64, dim=8)",
+            grid: 64,
+            dim: 8,
+            rank: 1,
+        },
     ];
 
     println!("── G2 (perf): freeze + thaw latency (median over 10,000 iters) ──");

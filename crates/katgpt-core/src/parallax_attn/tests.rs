@@ -3,669 +3,656 @@
 //! Split from the historical monolithic `src/parallax_attn.rs` (Issue 167, 2026-07-17).
 //! Tests are exempt from the 2048-line soft limit per Issue 162.
 
-    use super::*;
+use super::*;
 
-    /// With R_proj = zero matrix, rho should be all zeros.
-    #[test]
-    fn test_rho_zero_init() {
-        let d = 8;
-        let r_proj = vec![0.0f32; d * d];
-        let x: Vec<f32> = (1..=d).map(|i| i as f32).collect();
-        let mut rho = vec![0.0f32; d];
+/// With R_proj = zero matrix, rho should be all zeros.
+#[test]
+fn test_rho_zero_init() {
+    let d = 8;
+    let r_proj = vec![0.0f32; d * d];
+    let x: Vec<f32> = (1..=d).map(|i| i as f32).collect();
+    let mut rho = vec![0.0f32; d];
 
-        compute_rho(&r_proj, &x, &mut rho);
+    compute_rho(&r_proj, &x, &mut rho);
 
-        for (i, &v) in rho.iter().enumerate() {
-            assert!(
-                v == 0.0,
-                "rho[{}] should be 0.0 with zero R_proj, got {}",
-                i,
-                v
-            );
-        }
-    }
-
-    /// With identity sigma_kv, correction should equal rho.
-    #[test]
-    fn test_correction_identity() {
-        let d = 8;
-        let mut sigma_kv = vec![0.0f32; d * d];
-        // Identity matrix
-        for i in 0..d {
-            sigma_kv[i * d + i] = 1.0;
-        }
-        let rho: Vec<f32> = (1..=d).map(|i| i as f32 * 0.5).collect();
-        let mut correction = vec![0.0f32; d];
-
-        parallax_correction(&sigma_kv, &rho, &mut correction);
-
-        for (i, (&c, &r)) in correction.iter().zip(rho.iter()).enumerate() {
-            let expected = r;
-            assert!(
-                (c - expected).abs() < 1e-5,
-                "correction[{}] should be {} (identity sigma), got {}",
-                i,
-                expected,
-                c
-            );
-        }
-    }
-
-    /// With gate_scale=0, the output should equal standard softmax attention.
-    #[test]
-    fn test_parallax_recovers_softmax_gate_zero() {
-        let d = 4;
-        let n = 3;
-        let scale = 1.0 / (d as f32).sqrt();
-
-        let q: Vec<f32> = (0..n * d).map(|i| (i as f32 * 0.1).sin()).collect();
-        let k: Vec<f32> = (0..n * d).map(|i| (i as f32 * 0.2).cos()).collect();
-        let v: Vec<f32> = (0..n * d).map(|i| (i as f32 * 0.3).sin()).collect();
-
-        // R projection — non-zero, but gate_scale=0 should cancel it
-        let r: Vec<f32> = (0..d * d).map(|i| (i as f32 * 0.05).cos()).collect();
-        let x: Vec<f32> = (0..d).map(|i| (i as f32 * 0.1).sin()).collect();
-
-        let config = ParallaxConfig {
-            gate_scale: 0.0,
-            zero_init: false,
-            activation: ParallaxActivation::Softmax,
-            ..Default::default()
-        };
-
-        let mut output_parallax = vec![0.0f32; n * d];
-        tiled_attention_parallax_forward(
-            &q,
-            &k,
-            &v,
-            &mut output_parallax,
-            n,
-            d,
-            scale,
-            &r,
-            &x,
-            &config,
-            None,
-        );
-
-        // Compute reference: standard softmax attention
-        let mut output_ref = vec![0.0f32; n * d];
-        tiled_attention_core(
-            &q,
-            &k,
-            &v,
-            &mut output_ref,
-            n,
-            d,
-            scale,
-            None,
-            ParallaxActivation::Softmax,
-            None,
-            #[cfg(feature = "ssmax_temperature")]
-            None,
-        );
-
-        for (i, (&a, &b)) in output_parallax.iter().zip(output_ref.iter()).enumerate() {
-            assert!(
-                (a - b).abs() < 1e-5,
-                "output[{}]: parallax ({}) should match softmax ({}) with gate_scale=0",
-                i,
-                a,
-                b
-            );
-        }
-    }
-
-    /// With zero R_proj, the output should equal standard softmax attention
-    /// regardless of gate_scale (since rho = 0 implies correction = 0).
-    #[test]
-    fn test_parallax_recovers_softmax_zero_r() {
-        let d = 4;
-        let n = 3;
-        let scale = 1.0 / (d as f32).sqrt();
-
-        let q: Vec<f32> = (0..n * d).map(|i| (i as f32 * 0.1).sin()).collect();
-        let k: Vec<f32> = (0..n * d).map(|i| (i as f32 * 0.2).cos()).collect();
-        let v: Vec<f32> = (0..n * d).map(|i| (i as f32 * 0.3).sin()).collect();
-
-        // Zero R projection weights
-        let r = vec![0.0f32; d * d];
-        let x: Vec<f32> = (0..d).map(|i| (i as f32 * 0.1).sin()).collect();
-
-        let config = ParallaxConfig {
-            gate_scale: 1.0,
-            zero_init: true,
-            activation: ParallaxActivation::Softmax,
-            ..Default::default()
-        };
-
-        let mut output_parallax = vec![0.0f32; n * d];
-        tiled_attention_parallax_forward(
-            &q,
-            &k,
-            &v,
-            &mut output_parallax,
-            n,
-            d,
-            scale,
-            &r,
-            &x,
-            &config,
-            None,
-        );
-
-        // Compute reference: standard softmax attention
-        let mut output_ref = vec![0.0f32; n * d];
-        tiled_attention_core(
-            &q,
-            &k,
-            &v,
-            &mut output_ref,
-            n,
-            d,
-            scale,
-            None,
-            ParallaxActivation::Softmax,
-            None,
-            #[cfg(feature = "ssmax_temperature")]
-            None,
-        );
-
-        for (i, (&a, &b)) in output_parallax.iter().zip(output_ref.iter()).enumerate() {
-            assert!(
-                (a - b).abs() < 1e-5,
-                "output[{}]: parallax ({}) should match softmax ({}) with zero R",
-                i,
-                a,
-                b
-            );
-        }
-    }
-
-    /// Verify that compute_rho produces correct matrix-vector product.
-    #[test]
-    fn test_compute_rho_correct() {
-        let d = 4;
-        // R = [[1, 0, 0, 0], [0, 2, 0, 0], [0, 0, 3, 0], [0, 0, 0, 4]]
-        let mut r_proj = vec![0.0f32; d * d];
-        for i in 0..d {
-            r_proj[i * d + i] = (i + 1) as f32;
-        }
-        let x = vec![1.0f32; d];
-        let mut rho = vec![0.0f32; d];
-
-        compute_rho(&r_proj, &x, &mut rho);
-
-        let expected = [1.0f32, 2.0, 3.0, 4.0];
-        for (i, (&r, &e)) in rho.iter().zip(expected.iter()).enumerate() {
-            assert!(
-                (r - e).abs() < 1e-5,
-                "rho[{}] should be {}, got {}",
-                i,
-                e,
-                r
-            );
-        }
-    }
-
-    /// Verify that parallax_correction with a known sigma produces the right result.
-    #[test]
-    fn test_correction_known_sigma() {
-        let d = 3;
-        // sigma_kv = [[2, 0, 0], [0, 2, 0], [0, 0, 2]] (2 * identity)
-        let mut sigma_kv = vec![0.0f32; d * d];
-        for i in 0..d {
-            sigma_kv[i * d + i] = 2.0;
-        }
-        let rho = vec![1.0f32, 2.0, 3.0];
-        let mut correction = vec![0.0f32; d];
-
-        parallax_correction(&sigma_kv, &rho, &mut correction);
-
-        let expected = [2.0f32, 4.0, 6.0];
-        for (i, (&c, &e)) in correction.iter().zip(expected.iter()).enumerate() {
-            assert!(
-                (c - e).abs() < 1e-5,
-                "correction[{}] should be {}, got {}",
-                i,
-                e,
-                c
-            );
-        }
-    }
-
-    // ── Sigmoid-specific tests ──────────────────────────────────────
-
-    /// With gate_scale=0 and sigmoid activation, output should equal pure sigmoid attention.
-    #[test]
-    fn test_parallax_sigmoid_recovers_base() {
-        let d = 4;
-        let n = 3;
-        let scale = 1.0 / (d as f32).sqrt();
-
-        let q: Vec<f32> = (0..n * d).map(|i| (i as f32 * 0.1).sin()).collect();
-        let k: Vec<f32> = (0..n * d).map(|i| (i as f32 * 0.2).cos()).collect();
-        let v: Vec<f32> = (0..n * d).map(|i| (i as f32 * 0.3).sin()).collect();
-
-        let r: Vec<f32> = (0..d * d).map(|i| (i as f32 * 0.05).cos()).collect();
-        let x: Vec<f32> = (0..d).map(|i| (i as f32 * 0.1).sin()).collect();
-
-        let config = ParallaxConfig {
-            gate_scale: 0.0,
-            zero_init: false,
-            activation: ParallaxActivation::Sigmoid,
-            ..Default::default()
-        };
-
-        let mut output_parallax = vec![0.0f32; n * d];
-        tiled_attention_parallax_forward(
-            &q,
-            &k,
-            &v,
-            &mut output_parallax,
-            n,
-            d,
-            scale,
-            &r,
-            &x,
-            &config,
-            None,
-        );
-
-        let mut output_ref = vec![0.0f32; n * d];
-        tiled_attention_core(
-            &q,
-            &k,
-            &v,
-            &mut output_ref,
-            n,
-            d,
-            scale,
-            None,
-            ParallaxActivation::Sigmoid,
-            None,
-            #[cfg(feature = "ssmax_temperature")]
-            None,
-        );
-
-        for (i, (&a, &b)) in output_parallax.iter().zip(output_ref.iter()).enumerate() {
-            assert!(
-                (a - b).abs() < 1e-5,
-                "output[{}]: sigmoid parallax ({}) should match base sigmoid ({}) with gate_scale=0",
-                i,
-                a,
-                b
-            );
-        }
-    }
-
-    /// Sigmoid attention weights should be non-negative and sum to 1 per row.
-    #[test]
-    fn test_sigmoid_weights_normalized() {
-        let d = 4;
-        let n = 5;
-        let scale = 1.0 / (d as f32).sqrt();
-
-        let q: Vec<f32> = (0..n * d).map(|i| (i as f32 * 0.37).sin()).collect();
-        let k: Vec<f32> = (0..n * d).map(|i| (i as f32 * 0.53).cos()).collect();
-        let v: Vec<f32> = (0..n * d).map(|i| (i as f32 * 0.71).sin()).collect();
-
-        // Run with gate_scale=0 so we get pure sigmoid attention
-        let r = vec![0.0f32; d * d];
-        let x = vec![0.0f32; d];
-        let config = ParallaxConfig {
-            gate_scale: 0.0,
-            zero_init: true,
-            activation: ParallaxActivation::Sigmoid,
-            ..Default::default()
-        };
-
-        let mut output = vec![0.0f32; n * d];
-        tiled_attention_parallax_forward(
-            &q,
-            &k,
-            &v,
-            &mut output,
-            n,
-            d,
-            scale,
-            &r,
-            &x,
-            &config,
-            None,
-        );
-
-        // Output should be finite (no NaN/Inf from numerical issues)
-        for (i, &v) in output.iter().enumerate() {
-            assert!(v.is_finite(), "output[{}] should be finite, got {}", i, v);
-        }
-    }
-
-    /// Sigmoid and softmax should produce different outputs (different kernels).
-    #[test]
-    fn test_sigmoid_differs_from_softmax() {
-        let d = 4;
-        let n = 3;
-        let scale = 1.0 / (d as f32).sqrt();
-
-        let q: Vec<f32> = (0..n * d).map(|i| (i as f32 * 0.1).sin()).collect();
-        let k: Vec<f32> = (0..n * d).map(|i| (i as f32 * 0.2).cos()).collect();
-        let v: Vec<f32> = (0..n * d).map(|i| (i as f32 * 0.3).sin()).collect();
-
-        let r = vec![0.0f32; d * d];
-        let x = vec![0.0f32; d];
-
-        let mut out_sm = vec![0.0f32; n * d];
-        let mut out_sig = vec![0.0f32; n * d];
-
-        let config_sm = ParallaxConfig {
-            gate_scale: 0.0,
-            zero_init: true,
-            activation: ParallaxActivation::Softmax,
-            ..Default::default()
-        };
-        let config_sig = ParallaxConfig {
-            gate_scale: 0.0,
-            zero_init: true,
-            activation: ParallaxActivation::Sigmoid,
-            ..Default::default()
-        };
-
-        tiled_attention_parallax_forward(
-            &q,
-            &k,
-            &v,
-            &mut out_sm,
-            n,
-            d,
-            scale,
-            &r,
-            &x,
-            &config_sm,
-            None,
-        );
-        tiled_attention_parallax_forward(
-            &q,
-            &k,
-            &v,
-            &mut out_sig,
-            n,
-            d,
-            scale,
-            &r,
-            &x,
-            &config_sig,
-            None,
-        );
-
-        let any_differs = out_sm
-            .iter()
-            .zip(out_sig.iter())
-            .any(|(&a, &b)| (a - b).abs() > 1e-5);
+    for (i, &v) in rho.iter().enumerate() {
         assert!(
-            any_differs,
-            "sigmoid and softmax should produce different outputs"
+            v == 0.0,
+            "rho[{}] should be 0.0 with zero R_proj, got {}",
+            i,
+            v
         );
     }
+}
 
-    /// With non-zero R projection, sigmoid Parallax should modify the output.
-    #[test]
-    fn test_sigmoid_parallax_correction_applied() {
-        let d = 4;
-        let n = 3;
-        let scale = 1.0 / (d as f32).sqrt();
+/// With identity sigma_kv, correction should equal rho.
+#[test]
+fn test_correction_identity() {
+    let d = 8;
+    let mut sigma_kv = vec![0.0f32; d * d];
+    // Identity matrix
+    for i in 0..d {
+        sigma_kv[i * d + i] = 1.0;
+    }
+    let rho: Vec<f32> = (1..=d).map(|i| i as f32 * 0.5).collect();
+    let mut correction = vec![0.0f32; d];
 
-        let q: Vec<f32> = (0..n * d).map(|i| (i as f32 * 0.1).sin()).collect();
-        let k: Vec<f32> = (0..n * d).map(|i| (i as f32 * 0.2).cos()).collect();
-        let v: Vec<f32> = (0..n * d).map(|i| (i as f32 * 0.3).sin()).collect();
+    parallax_correction(&sigma_kv, &rho, &mut correction);
 
-        let r: Vec<f32> = (0..d * d).map(|i| (i as f32 * 0.05).cos()).collect();
-        let x: Vec<f32> = (0..d).map(|i| (i as f32 * 0.1).sin()).collect();
-
-        let config_no_corr = ParallaxConfig {
-            gate_scale: 0.0,
-            zero_init: false,
-            activation: ParallaxActivation::Sigmoid,
-            ..Default::default()
-        };
-        let config_with_corr = ParallaxConfig {
-            gate_scale: 1.0,
-            zero_init: false,
-            activation: ParallaxActivation::Sigmoid,
-            ..Default::default()
-        };
-
-        let mut out_no = vec![0.0f32; n * d];
-        let mut out_yes = vec![0.0f32; n * d];
-
-        tiled_attention_parallax_forward(
-            &q,
-            &k,
-            &v,
-            &mut out_no,
-            n,
-            d,
-            scale,
-            &r,
-            &x,
-            &config_no_corr,
-            None,
-        );
-        tiled_attention_parallax_forward(
-            &q,
-            &k,
-            &v,
-            &mut out_yes,
-            n,
-            d,
-            scale,
-            &r,
-            &x,
-            &config_with_corr,
-            None,
-        );
-
-        let any_differs = out_no
-            .iter()
-            .zip(out_yes.iter())
-            .any(|(&a, &b)| (a - b).abs() > 1e-5);
+    for (i, (&c, &r)) in correction.iter().zip(rho.iter()).enumerate() {
+        let expected = r;
         assert!(
-            any_differs,
-            "sigmoid parallax correction should modify output vs base sigmoid"
+            (c - expected).abs() < 1e-5,
+            "correction[{}] should be {} (identity sigma), got {}",
+            i,
+            expected,
+            c
         );
     }
+}
 
-    // ── Plan 289 tests ──────────────────────────────────────────────
-    // Covers: retained-attention forward correctness (always-on, parallax_attn
-    // only), and sink-aware composition parity (Uniform + DualPolicy) + G2.
-    // The latency G3 microbench lives in benches/ (T3.5).
+/// With gate_scale=0, the output should equal standard softmax attention.
+#[test]
+fn test_parallax_recovers_softmax_gate_zero() {
+    let d = 4;
+    let n = 3;
+    let scale = 1.0 / (d as f32).sqrt();
 
-    /// Deterministic LCG for reproducible test inputs. Cheap, no deps.
-    fn lcg_fill(seed: u64, buf: &mut [f32]) {
-        let mut s = seed
+    let q: Vec<f32> = (0..n * d).map(|i| (i as f32 * 0.1).sin()).collect();
+    let k: Vec<f32> = (0..n * d).map(|i| (i as f32 * 0.2).cos()).collect();
+    let v: Vec<f32> = (0..n * d).map(|i| (i as f32 * 0.3).sin()).collect();
+
+    // R projection — non-zero, but gate_scale=0 should cancel it
+    let r: Vec<f32> = (0..d * d).map(|i| (i as f32 * 0.05).cos()).collect();
+    let x: Vec<f32> = (0..d).map(|i| (i as f32 * 0.1).sin()).collect();
+
+    let config = ParallaxConfig {
+        gate_scale: 0.0,
+        zero_init: false,
+        activation: ParallaxActivation::Softmax,
+        ..Default::default()
+    };
+
+    let mut output_parallax = vec![0.0f32; n * d];
+    tiled_attention_parallax_forward(
+        &q,
+        &k,
+        &v,
+        &mut output_parallax,
+        n,
+        d,
+        scale,
+        &r,
+        &x,
+        &config,
+        None,
+    );
+
+    // Compute reference: standard softmax attention
+    let mut output_ref = vec![0.0f32; n * d];
+    tiled_attention_core(
+        &q,
+        &k,
+        &v,
+        &mut output_ref,
+        n,
+        d,
+        scale,
+        None,
+        ParallaxActivation::Softmax,
+        None,
+        #[cfg(feature = "ssmax_temperature")]
+        None,
+    );
+
+    for (i, (&a, &b)) in output_parallax.iter().zip(output_ref.iter()).enumerate() {
+        assert!(
+            (a - b).abs() < 1e-5,
+            "output[{}]: parallax ({}) should match softmax ({}) with gate_scale=0",
+            i,
+            a,
+            b
+        );
+    }
+}
+
+/// With zero R_proj, the output should equal standard softmax attention
+/// regardless of gate_scale (since rho = 0 implies correction = 0).
+#[test]
+fn test_parallax_recovers_softmax_zero_r() {
+    let d = 4;
+    let n = 3;
+    let scale = 1.0 / (d as f32).sqrt();
+
+    let q: Vec<f32> = (0..n * d).map(|i| (i as f32 * 0.1).sin()).collect();
+    let k: Vec<f32> = (0..n * d).map(|i| (i as f32 * 0.2).cos()).collect();
+    let v: Vec<f32> = (0..n * d).map(|i| (i as f32 * 0.3).sin()).collect();
+
+    // Zero R projection weights
+    let r = vec![0.0f32; d * d];
+    let x: Vec<f32> = (0..d).map(|i| (i as f32 * 0.1).sin()).collect();
+
+    let config = ParallaxConfig {
+        gate_scale: 1.0,
+        zero_init: true,
+        activation: ParallaxActivation::Softmax,
+        ..Default::default()
+    };
+
+    let mut output_parallax = vec![0.0f32; n * d];
+    tiled_attention_parallax_forward(
+        &q,
+        &k,
+        &v,
+        &mut output_parallax,
+        n,
+        d,
+        scale,
+        &r,
+        &x,
+        &config,
+        None,
+    );
+
+    // Compute reference: standard softmax attention
+    let mut output_ref = vec![0.0f32; n * d];
+    tiled_attention_core(
+        &q,
+        &k,
+        &v,
+        &mut output_ref,
+        n,
+        d,
+        scale,
+        None,
+        ParallaxActivation::Softmax,
+        None,
+        #[cfg(feature = "ssmax_temperature")]
+        None,
+    );
+
+    for (i, (&a, &b)) in output_parallax.iter().zip(output_ref.iter()).enumerate() {
+        assert!(
+            (a - b).abs() < 1e-5,
+            "output[{}]: parallax ({}) should match softmax ({}) with zero R",
+            i,
+            a,
+            b
+        );
+    }
+}
+
+/// Verify that compute_rho produces correct matrix-vector product.
+#[test]
+fn test_compute_rho_correct() {
+    let d = 4;
+    // R = [[1, 0, 0, 0], [0, 2, 0, 0], [0, 0, 3, 0], [0, 0, 0, 4]]
+    let mut r_proj = vec![0.0f32; d * d];
+    for i in 0..d {
+        r_proj[i * d + i] = (i + 1) as f32;
+    }
+    let x = vec![1.0f32; d];
+    let mut rho = vec![0.0f32; d];
+
+    compute_rho(&r_proj, &x, &mut rho);
+
+    let expected = [1.0f32, 2.0, 3.0, 4.0];
+    for (i, (&r, &e)) in rho.iter().zip(expected.iter()).enumerate() {
+        assert!(
+            (r - e).abs() < 1e-5,
+            "rho[{}] should be {}, got {}",
+            i,
+            e,
+            r
+        );
+    }
+}
+
+/// Verify that parallax_correction with a known sigma produces the right result.
+#[test]
+fn test_correction_known_sigma() {
+    let d = 3;
+    // sigma_kv = [[2, 0, 0], [0, 2, 0], [0, 0, 2]] (2 * identity)
+    let mut sigma_kv = vec![0.0f32; d * d];
+    for i in 0..d {
+        sigma_kv[i * d + i] = 2.0;
+    }
+    let rho = vec![1.0f32, 2.0, 3.0];
+    let mut correction = vec![0.0f32; d];
+
+    parallax_correction(&sigma_kv, &rho, &mut correction);
+
+    let expected = [2.0f32, 4.0, 6.0];
+    for (i, (&c, &e)) in correction.iter().zip(expected.iter()).enumerate() {
+        assert!(
+            (c - e).abs() < 1e-5,
+            "correction[{}] should be {}, got {}",
+            i,
+            e,
+            c
+        );
+    }
+}
+
+// ── Sigmoid-specific tests ──────────────────────────────────────
+
+/// With gate_scale=0 and sigmoid activation, output should equal pure sigmoid attention.
+#[test]
+fn test_parallax_sigmoid_recovers_base() {
+    let d = 4;
+    let n = 3;
+    let scale = 1.0 / (d as f32).sqrt();
+
+    let q: Vec<f32> = (0..n * d).map(|i| (i as f32 * 0.1).sin()).collect();
+    let k: Vec<f32> = (0..n * d).map(|i| (i as f32 * 0.2).cos()).collect();
+    let v: Vec<f32> = (0..n * d).map(|i| (i as f32 * 0.3).sin()).collect();
+
+    let r: Vec<f32> = (0..d * d).map(|i| (i as f32 * 0.05).cos()).collect();
+    let x: Vec<f32> = (0..d).map(|i| (i as f32 * 0.1).sin()).collect();
+
+    let config = ParallaxConfig {
+        gate_scale: 0.0,
+        zero_init: false,
+        activation: ParallaxActivation::Sigmoid,
+        ..Default::default()
+    };
+
+    let mut output_parallax = vec![0.0f32; n * d];
+    tiled_attention_parallax_forward(
+        &q,
+        &k,
+        &v,
+        &mut output_parallax,
+        n,
+        d,
+        scale,
+        &r,
+        &x,
+        &config,
+        None,
+    );
+
+    let mut output_ref = vec![0.0f32; n * d];
+    tiled_attention_core(
+        &q,
+        &k,
+        &v,
+        &mut output_ref,
+        n,
+        d,
+        scale,
+        None,
+        ParallaxActivation::Sigmoid,
+        None,
+        #[cfg(feature = "ssmax_temperature")]
+        None,
+    );
+
+    for (i, (&a, &b)) in output_parallax.iter().zip(output_ref.iter()).enumerate() {
+        assert!(
+            (a - b).abs() < 1e-5,
+            "output[{}]: sigmoid parallax ({}) should match base sigmoid ({}) with gate_scale=0",
+            i,
+            a,
+            b
+        );
+    }
+}
+
+/// Sigmoid attention weights should be non-negative and sum to 1 per row.
+#[test]
+fn test_sigmoid_weights_normalized() {
+    let d = 4;
+    let n = 5;
+    let scale = 1.0 / (d as f32).sqrt();
+
+    let q: Vec<f32> = (0..n * d).map(|i| (i as f32 * 0.37).sin()).collect();
+    let k: Vec<f32> = (0..n * d).map(|i| (i as f32 * 0.53).cos()).collect();
+    let v: Vec<f32> = (0..n * d).map(|i| (i as f32 * 0.71).sin()).collect();
+
+    // Run with gate_scale=0 so we get pure sigmoid attention
+    let r = vec![0.0f32; d * d];
+    let x = vec![0.0f32; d];
+    let config = ParallaxConfig {
+        gate_scale: 0.0,
+        zero_init: true,
+        activation: ParallaxActivation::Sigmoid,
+        ..Default::default()
+    };
+
+    let mut output = vec![0.0f32; n * d];
+    tiled_attention_parallax_forward(&q, &k, &v, &mut output, n, d, scale, &r, &x, &config, None);
+
+    // Output should be finite (no NaN/Inf from numerical issues)
+    for (i, &v) in output.iter().enumerate() {
+        assert!(v.is_finite(), "output[{}] should be finite, got {}", i, v);
+    }
+}
+
+/// Sigmoid and softmax should produce different outputs (different kernels).
+#[test]
+fn test_sigmoid_differs_from_softmax() {
+    let d = 4;
+    let n = 3;
+    let scale = 1.0 / (d as f32).sqrt();
+
+    let q: Vec<f32> = (0..n * d).map(|i| (i as f32 * 0.1).sin()).collect();
+    let k: Vec<f32> = (0..n * d).map(|i| (i as f32 * 0.2).cos()).collect();
+    let v: Vec<f32> = (0..n * d).map(|i| (i as f32 * 0.3).sin()).collect();
+
+    let r = vec![0.0f32; d * d];
+    let x = vec![0.0f32; d];
+
+    let mut out_sm = vec![0.0f32; n * d];
+    let mut out_sig = vec![0.0f32; n * d];
+
+    let config_sm = ParallaxConfig {
+        gate_scale: 0.0,
+        zero_init: true,
+        activation: ParallaxActivation::Softmax,
+        ..Default::default()
+    };
+    let config_sig = ParallaxConfig {
+        gate_scale: 0.0,
+        zero_init: true,
+        activation: ParallaxActivation::Sigmoid,
+        ..Default::default()
+    };
+
+    tiled_attention_parallax_forward(
+        &q,
+        &k,
+        &v,
+        &mut out_sm,
+        n,
+        d,
+        scale,
+        &r,
+        &x,
+        &config_sm,
+        None,
+    );
+    tiled_attention_parallax_forward(
+        &q,
+        &k,
+        &v,
+        &mut out_sig,
+        n,
+        d,
+        scale,
+        &r,
+        &x,
+        &config_sig,
+        None,
+    );
+
+    let any_differs = out_sm
+        .iter()
+        .zip(out_sig.iter())
+        .any(|(&a, &b)| (a - b).abs() > 1e-5);
+    assert!(
+        any_differs,
+        "sigmoid and softmax should produce different outputs"
+    );
+}
+
+/// With non-zero R projection, sigmoid Parallax should modify the output.
+#[test]
+fn test_sigmoid_parallax_correction_applied() {
+    let d = 4;
+    let n = 3;
+    let scale = 1.0 / (d as f32).sqrt();
+
+    let q: Vec<f32> = (0..n * d).map(|i| (i as f32 * 0.1).sin()).collect();
+    let k: Vec<f32> = (0..n * d).map(|i| (i as f32 * 0.2).cos()).collect();
+    let v: Vec<f32> = (0..n * d).map(|i| (i as f32 * 0.3).sin()).collect();
+
+    let r: Vec<f32> = (0..d * d).map(|i| (i as f32 * 0.05).cos()).collect();
+    let x: Vec<f32> = (0..d).map(|i| (i as f32 * 0.1).sin()).collect();
+
+    let config_no_corr = ParallaxConfig {
+        gate_scale: 0.0,
+        zero_init: false,
+        activation: ParallaxActivation::Sigmoid,
+        ..Default::default()
+    };
+    let config_with_corr = ParallaxConfig {
+        gate_scale: 1.0,
+        zero_init: false,
+        activation: ParallaxActivation::Sigmoid,
+        ..Default::default()
+    };
+
+    let mut out_no = vec![0.0f32; n * d];
+    let mut out_yes = vec![0.0f32; n * d];
+
+    tiled_attention_parallax_forward(
+        &q,
+        &k,
+        &v,
+        &mut out_no,
+        n,
+        d,
+        scale,
+        &r,
+        &x,
+        &config_no_corr,
+        None,
+    );
+    tiled_attention_parallax_forward(
+        &q,
+        &k,
+        &v,
+        &mut out_yes,
+        n,
+        d,
+        scale,
+        &r,
+        &x,
+        &config_with_corr,
+        None,
+    );
+
+    let any_differs = out_no
+        .iter()
+        .zip(out_yes.iter())
+        .any(|(&a, &b)| (a - b).abs() > 1e-5);
+    assert!(
+        any_differs,
+        "sigmoid parallax correction should modify output vs base sigmoid"
+    );
+}
+
+// ── Plan 289 tests ──────────────────────────────────────────────
+// Covers: retained-attention forward correctness (always-on, parallax_attn
+// only), and sink-aware composition parity (Uniform + DualPolicy) + G2.
+// The latency G3 microbench lives in benches/ (T3.5).
+
+/// Deterministic LCG for reproducible test inputs. Cheap, no deps.
+fn lcg_fill(seed: u64, buf: &mut [f32]) {
+    let mut s = seed
+        .wrapping_mul(6364136223846793005)
+        .wrapping_add(1442695040888963407);
+    for x in buf.iter_mut() {
+        s = s
             .wrapping_mul(6364136223846793005)
             .wrapping_add(1442695040888963407);
-        for x in buf.iter_mut() {
-            s = s
-                .wrapping_mul(6364136223846793005)
-                .wrapping_add(1442695040888963407);
-            *x = (((s >> 33) as f32) / (u32::MAX as f32)) * 2.0 - 1.0;
+        *x = (((s >> 33) as f32) / (u32::MAX as f32)) * 2.0 - 1.0;
+    }
+}
+
+/// Reference row-by-row attention matrix computation. Independent of the
+/// forward's internal accumulation — recomputes scores + normalization.
+fn reference_attn_matrix(
+    q: &[f32],
+    k: &[f32],
+    n: usize,
+    d: usize,
+    scale: f32,
+    activation: ParallaxActivation,
+    am: &mut [f32],
+) {
+    let mut row = vec![0.0f32; n];
+    for i in 0..n {
+        let q_off = i * d;
+        for (j, row_slot) in row.iter_mut().enumerate().take(n) {
+            let k_off = j * d;
+            *row_slot =
+                crate::simd::simd_dot_f32(&q[q_off..q_off + d], &k[k_off..k_off + d], d) * scale;
+        }
+        normalize_attention_weights(&mut row, activation);
+        am[i * n..(i + 1) * n].copy_from_slice(&row);
+    }
+}
+
+/// Helper: build (q, k, v) where attention concentrates strongly on position
+/// `sink_pos` (mean column strength ≈ 0.94, well above τ_sink=0.5) but
+/// `v[sink_pos]` is optionally zero (NOP) or normal content (Broadcast).
+///
+/// Construction:
+/// - q[i] = [i*0.5, 0, ...] for i in 0..n (varies across queries).
+/// - k[sink] = [+10, 0, ...] → σ(q·k) saturates to ≈1 for i≥1.
+/// - k[j≠sink] = [-10, 0, ...] → σ(q·k) ≈ 0 for i≥1.
+/// - v[j] = ones (or zeros at sink for NOP case).
+///
+/// Result: column `sink_pos` receives mean strength ≈ 0.94 across rows,
+/// dominating all other columns. The AV update is rank-1 (output rows
+/// proportional to v[sink]) when v[sink] is non-zero.
+fn build_sink_case(
+    n: usize,
+    d: usize,
+    sink_pos: usize,
+    sink_v_zero: bool,
+) -> (Vec<f32>, Vec<f32>, Vec<f32>) {
+    let mut q = vec![0.0f32; n * d];
+    let mut k = vec![0.0f32; n * d];
+    let mut v = vec![0.0f32; n * d];
+    for i in 0..n {
+        q[i * d] = (i as f32) * 0.5;
+    }
+    // Sink column attracts strongly.
+    k[sink_pos * d] = 10.0;
+    // Other columns strongly repel.
+    for j in 0..n {
+        if j != sink_pos {
+            k[j * d] = -10.0;
+        }
+        for c in 0..d {
+            v[j * d + c] = if j == sink_pos && sink_v_zero {
+                0.0
+            } else {
+                1.0
+            };
         }
     }
+    (q, k, v)
+}
 
-    /// Reference row-by-row attention matrix computation. Independent of the
-    /// forward's internal accumulation — recomputes scores + normalization.
-    fn reference_attn_matrix(
-        q: &[f32],
-        k: &[f32],
-        n: usize,
-        d: usize,
-        scale: f32,
-        activation: ParallaxActivation,
-        am: &mut [f32],
-    ) {
-        let mut row = vec![0.0f32; n];
-        for i in 0..n {
-            let q_off = i * d;
-            for (j, row_slot) in row.iter_mut().enumerate().take(n) {
-                let k_off = j * d;
-                *row_slot =
-                    crate::simd::simd_dot_f32(&q[q_off..q_off + d], &k[k_off..k_off + d], d)
-                        * scale;
-            }
-            normalize_attention_weights(&mut row, activation);
-            am[i * n..(i + 1) * n].copy_from_slice(&row);
-        }
+/// T1.3 — retained attention matrix matches row-by-row reference (Sigmoid).
+#[test]
+fn plan289_retained_attn_matches_per_row_sigmoid() {
+    let n = 16;
+    let d = 8;
+    let scale = 1.0 / (d as f32).sqrt();
+    let mut q = vec![0.0f32; n * d];
+    let mut k = vec![0.0f32; n * d];
+    let v = vec![0.0f32; n * d];
+    let mut output = vec![0.0f32; n * d];
+    let mut am_actual = vec![0.0f32; n * n];
+    let mut am_expected = vec![0.0f32; n * n];
+    lcg_fill(0xC0DE, &mut q);
+    lcg_fill(0xFEED, &mut k);
+
+    let cfg = ParallaxConfig {
+        gate_scale: 0.0,
+        zero_init: true,
+        activation: ParallaxActivation::Sigmoid,
+        ..Default::default()
+    };
+    let r = vec![0.0f32; d * d];
+    let x = vec![0.0f32; d];
+
+    tiled_attention_parallax_forward_retaining(
+        &q,
+        &k,
+        &v,
+        &mut output,
+        n,
+        d,
+        scale,
+        &r,
+        &x,
+        &cfg,
+        Some(&mut am_actual),
+        None,
+    );
+    reference_attn_matrix(
+        &q,
+        &k,
+        n,
+        d,
+        scale,
+        ParallaxActivation::Sigmoid,
+        &mut am_expected,
+    );
+
+    for i in 0..(n * n) {
+        assert_eq!(am_actual[i], am_expected[i], "am[{}] mismatch (Sigmoid)", i);
     }
+}
 
-    /// Helper: build (q, k, v) where attention concentrates strongly on position
-    /// `sink_pos` (mean column strength ≈ 0.94, well above τ_sink=0.5) but
-    /// `v[sink_pos]` is optionally zero (NOP) or normal content (Broadcast).
-    ///
-    /// Construction:
-    /// - q[i] = [i*0.5, 0, ...] for i in 0..n (varies across queries).
-    /// - k[sink] = [+10, 0, ...] → σ(q·k) saturates to ≈1 for i≥1.
-    /// - k[j≠sink] = [-10, 0, ...] → σ(q·k) ≈ 0 for i≥1.
-    /// - v[j] = ones (or zeros at sink for NOP case).
-    ///
-    /// Result: column `sink_pos` receives mean strength ≈ 0.94 across rows,
-    /// dominating all other columns. The AV update is rank-1 (output rows
-    /// proportional to v[sink]) when v[sink] is non-zero.
-    fn build_sink_case(
-        n: usize,
-        d: usize,
-        sink_pos: usize,
-        sink_v_zero: bool,
-    ) -> (Vec<f32>, Vec<f32>, Vec<f32>) {
-        let mut q = vec![0.0f32; n * d];
-        let mut k = vec![0.0f32; n * d];
-        let mut v = vec![0.0f32; n * d];
-        for i in 0..n {
-            q[i * d] = (i as f32) * 0.5;
-        }
-        // Sink column attracts strongly.
-        k[sink_pos * d] = 10.0;
-        // Other columns strongly repel.
-        for j in 0..n {
-            if j != sink_pos {
-                k[j * d] = -10.0;
-            }
-            for c in 0..d {
-                v[j * d + c] = if j == sink_pos && sink_v_zero {
-                    0.0
-                } else {
-                    1.0
-                };
-            }
-        }
-        (q, k, v)
+/// T1.3 — retained attention matrix matches row-by-row reference (Softmax).
+#[test]
+fn plan289_retained_attn_matches_per_row_softmax() {
+    let n = 16;
+    let d = 8;
+    let scale = 1.0 / (d as f32).sqrt();
+    let mut q = vec![0.0f32; n * d];
+    let mut k = vec![0.0f32; n * d];
+    let v = vec![0.0f32; n * d];
+    let mut output = vec![0.0f32; n * d];
+    let mut am_actual = vec![0.0f32; n * n];
+    let mut am_expected = vec![0.0f32; n * n];
+    lcg_fill(0x1234, &mut q);
+    lcg_fill(0x5678, &mut k);
+
+    let cfg = ParallaxConfig {
+        gate_scale: 0.0,
+        zero_init: true,
+        activation: ParallaxActivation::Softmax,
+        ..Default::default()
+    };
+    let r = vec![0.0f32; d * d];
+    let x = vec![0.0f32; d];
+
+    tiled_attention_parallax_forward_retaining(
+        &q,
+        &k,
+        &v,
+        &mut output,
+        n,
+        d,
+        scale,
+        &r,
+        &x,
+        &cfg,
+        Some(&mut am_actual),
+        None,
+    );
+    reference_attn_matrix(
+        &q,
+        &k,
+        n,
+        d,
+        scale,
+        ParallaxActivation::Softmax,
+        &mut am_expected,
+    );
+
+    for i in 0..(n * n) {
+        assert_eq!(am_actual[i], am_expected[i], "am[{}] mismatch (Softmax)", i);
     }
-
-    /// T1.3 — retained attention matrix matches row-by-row reference (Sigmoid).
-    #[test]
-    fn plan289_retained_attn_matches_per_row_sigmoid() {
-        let n = 16;
-        let d = 8;
-        let scale = 1.0 / (d as f32).sqrt();
-        let mut q = vec![0.0f32; n * d];
-        let mut k = vec![0.0f32; n * d];
-        let v = vec![0.0f32; n * d];
-        let mut output = vec![0.0f32; n * d];
-        let mut am_actual = vec![0.0f32; n * n];
-        let mut am_expected = vec![0.0f32; n * n];
-        lcg_fill(0xC0DE, &mut q);
-        lcg_fill(0xFEED, &mut k);
-
-        let cfg = ParallaxConfig {
-            gate_scale: 0.0,
-            zero_init: true,
-            activation: ParallaxActivation::Sigmoid,
-            ..Default::default()
-        };
-        let r = vec![0.0f32; d * d];
-        let x = vec![0.0f32; d];
-
-        tiled_attention_parallax_forward_retaining(
-            &q,
-            &k,
-            &v,
-            &mut output,
-            n,
-            d,
-            scale,
-            &r,
-            &x,
-            &cfg,
-            Some(&mut am_actual),
-            None,
-        );
-        reference_attn_matrix(
-            &q,
-            &k,
-            n,
-            d,
-            scale,
-            ParallaxActivation::Sigmoid,
-            &mut am_expected,
-        );
-
-        for i in 0..(n * n) {
-            assert_eq!(am_actual[i], am_expected[i], "am[{}] mismatch (Sigmoid)", i);
-        }
-    }
-
-    /// T1.3 — retained attention matrix matches row-by-row reference (Softmax).
-    #[test]
-    fn plan289_retained_attn_matches_per_row_softmax() {
-        let n = 16;
-        let d = 8;
-        let scale = 1.0 / (d as f32).sqrt();
-        let mut q = vec![0.0f32; n * d];
-        let mut k = vec![0.0f32; n * d];
-        let v = vec![0.0f32; n * d];
-        let mut output = vec![0.0f32; n * d];
-        let mut am_actual = vec![0.0f32; n * n];
-        let mut am_expected = vec![0.0f32; n * n];
-        lcg_fill(0x1234, &mut q);
-        lcg_fill(0x5678, &mut k);
-
-        let cfg = ParallaxConfig {
-            gate_scale: 0.0,
-            zero_init: true,
-            activation: ParallaxActivation::Softmax,
-            ..Default::default()
-        };
-        let r = vec![0.0f32; d * d];
-        let x = vec![0.0f32; d];
-
-        tiled_attention_parallax_forward_retaining(
-            &q,
-            &k,
-            &v,
-            &mut output,
-            n,
-            d,
-            scale,
-            &r,
-            &x,
-            &cfg,
-            Some(&mut am_actual),
-            None,
-        );
-        reference_attn_matrix(
-            &q,
-            &k,
-            n,
-            d,
-            scale,
-            ParallaxActivation::Softmax,
-            &mut am_expected,
-        );
-
-        for i in 0..(n * n) {
-            assert_eq!(am_actual[i], am_expected[i], "am[{}] mismatch (Softmax)", i);
-        }
-    }
+}
 
 // ── Plan 289 sink-aware tests (require sink_aware_attn feature) ───
 

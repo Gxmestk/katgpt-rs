@@ -448,7 +448,11 @@ pub(crate) mod tests {
             .expect("from_bytes must succeed on correct-length input");
         assert_eq!(thawed.w, k.w, "w must round-trip");
         assert_eq!(thawed.config(), &config, "config must round-trip");
-        assert_eq!(thawed.r_expected(), k.r_expected(), "r_expected must round-trip");
+        assert_eq!(
+            thawed.r_expected(),
+            k.r_expected(),
+            "r_expected must round-trip"
+        );
     }
 
     #[test]
@@ -459,7 +463,10 @@ pub(crate) mod tests {
         );
         let bytes = k.to_bytes();
         // Truncate by one byte.
-        assert!(PersonalityWeightedComposition::<3, 32>::from_bytes(&bytes[..bytes.len() - 1]).is_none());
+        assert!(
+            PersonalityWeightedComposition::<3, 32>::from_bytes(&bytes[..bytes.len() - 1])
+                .is_none()
+        );
         // Expand by one byte.
         let mut expanded = bytes.clone();
         expanded.push(0);
@@ -468,10 +475,19 @@ pub(crate) mod tests {
 
     #[test]
     fn to_bytes_is_deterministic() {
-        let config = PersonalityConfig { tau: 1.5, alpha: 0.03, w_max: 6.0, ema_decay: 0.88 };
+        let config = PersonalityConfig {
+            tau: 1.5,
+            alpha: 0.03,
+            w_max: 6.0,
+            ema_decay: 0.88,
+        };
         let w = [0.1, 0.2, 0.3];
         let k1 = PersonalityWeightedComposition::<3, 32>::new(config, w);
         let k2 = PersonalityWeightedComposition::<3, 32>::new(config, w);
-        assert_eq!(k1.to_bytes(), k2.to_bytes(), "same state must produce identical bytes");
+        assert_eq!(
+            k1.to_bytes(),
+            k2.to_bytes(),
+            "same state must produce identical bytes"
+        );
     }
 }

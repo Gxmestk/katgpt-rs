@@ -1,7 +1,7 @@
 #[cfg(feature = "tf_loop")]
-use crate::types::{self};
-#[cfg(feature = "tf_loop")]
 use super::*;
+#[cfg(feature = "tf_loop")]
+use crate::types::{self};
 
 // ---------------------------------------------------------------------------
 // Training-Free Loop Wrapper (Plan 136, Research 94)
@@ -309,8 +309,20 @@ fn forward_single_layer(
     #[cfg(feature = "gated_mlp")]
     {
         // SwiGLU: SiLU(W_gate·h) ⊙ W_up·h → W_down·hidden
-        types::matmul(&mut ctx.hidden, &layer_weights.mlp_w1, &ctx.x, config.mlp_hidden, n);
-        types::matmul(&mut ctx.hidden2, &layer_weights.mlp_w_up, &ctx.x, config.mlp_hidden, n);
+        types::matmul(
+            &mut ctx.hidden,
+            &layer_weights.mlp_w1,
+            &ctx.x,
+            config.mlp_hidden,
+            n,
+        );
+        types::matmul(
+            &mut ctx.hidden2,
+            &layer_weights.mlp_w_up,
+            &ctx.x,
+            config.mlp_hidden,
+            n,
+        );
         types::swiglu_inplace(&mut ctx.hidden, &ctx.hidden2);
     }
     #[cfg(not(feature = "gated_mlp"))]
