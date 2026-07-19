@@ -174,7 +174,7 @@ After running an audit, produce a per-feature verdict table:
 |---|---|---|---|---|---|---|
 | `npc_sleep_time` | ✅ L44-66 | ✅ L629-642 | ✅ engine default-on | ✅ civ opt-in by design | ✅ bench 341 | deliberate-split |
 | `<feature>` | ✅/❌ + line | ✅/❌ + line | ✅/❌ + line | ✅/❌ + line | ✅/❌ + file | see verdicts |
-| `conformal_predictive_intervals` (post-Plan-468 audit, 2026-07-20) | ✅ no stale `//!` claims in `crates/katgpt-core/src/conformal/` | ✅ `crates/katgpt-core/src/lib.rs` L75-97 — promotion comment accurate (DEFAULT-ON since Plan 468, consumer gates STAY opt-in) | ✅ in `default = [...]` with Phase 21 comment | ✅ 7 consumer gates stay opt-in (deliberate three-layer split — see Defense 3 table) | ✅ Bench 340 + 560/562/563/564/565/567/568 all accurate | deliberate-split (clean) |
+| `conformal_predictive_intervals` (post-Plan-468 audit, 2026-07-20) | ✅ no stale `//!` claims in `crates/katgpt-core/src/conformal/` | ✅ `crates/katgpt-core/src/lib.rs` L75-97 — promotion comment accurate (DEFAULT-ON since Plan 468, consumer gates STAY opt-in) | ✅ in `default = [...]` with Phase 21 comment | ✅ 7 consumer gates stay opt-in (deliberate three-layer split — see Defense 3 table) | ✅ Bench 340 + 560/562/563/564/565/567/568 all accurate | deliberate-split (clean after re-audit caught 3 missed surfaces: Bench 565 L7 header, `conformal_uq.md` §1.3 table rows 1/4/5, Plan 508 L8 Feature Gate line — all exhibited the append-only anti-pattern: header was updated, body was not) |
 
 **Verdicts:**
 
