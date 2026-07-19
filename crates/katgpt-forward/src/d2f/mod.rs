@@ -688,10 +688,9 @@ pub fn d2f_decode_block_with_prompt_with(
                 )
             } else {
                 sample_greedy(
-                    logits_p,
+                    &sample_exp_buf,
                     mask,
                     vocab,
-                    max_logit,
                     sum_exp,
                     depth,
                     parent_tokens,
@@ -884,10 +883,9 @@ pub fn d2f_decode_block_with_prompt_with_sampler(
                 )
             } else {
                 sample_greedy(
-                    logits_p,
+                    &sample_exp_buf,
                     mask,
                     vocab,
-                    max_logit,
                     sum_exp,
                     depth,
                     parent_tokens,
@@ -1051,20 +1049,26 @@ fn sample_temperatured(
 ) -> (usize, f32) {
     let inv_temp = 1.0 / temperature;
 
-    // Single-pass exp computation into the caller-provided buffer.
-    // Avoids recomputing exp() in the second (sampling) pass — exp is ~10-20 cycles.
-    exp_buf.clear();
-    exp_buf.reserve(vocab);
+    // Bulk SIMD exp((logits - max_logit) * inv_temp) into exp_buf.
+    // Replaces per-token scalar .exp() (~10-20 cycles each) with a single
+    // NEON/AVX2 pass (~2-4 cycles/elem). Then a scalar masked pass applies
+    // the pruner/screener gating and accumulates scaled_sum.
+    exp_buf.resize(vocab, 0.0);
+    let buf = &mut exp_buf[..vocab];
+    for t in 0..vocab {
+        buf[t] = (logits[t] - max_logit) * inv_temp;
+    }
+    simd_exp_inplace(buf);
+
     let mut scaled_sum = 0.0f32;
     for t in 0..vocab {
         if t == mask || !pruner.is_valid(depth, t, parent_tokens) {
-            exp_buf.push(0.0); // invalid token — zero weight, index-aligned
+            buf[t] = 0.0; // invalid token — zero weight, index-aligned
             continue;
         }
         let relevance = screener.relevance(depth, t, parent_tokens);
-        let e = ((logits[t] - max_logit) * inv_temp).exp() * relevance;
-        exp_buf.push(e);
-        scaled_sum += e;
+        buf[t] *= relevance;
+        scaled_sum += buf[t];
     }
 
     if scaled_sum == 0.0 {
@@ -1088,11 +1092,14 @@ fn sample_temperatured(
 
 /// Greedy sampling with temperature=1.0 from valid tokens.
 /// Returns (token, probability).
+///
+/// `exp_buf` is the precomputed `exp(logits - max_logit)` vector (the same
+/// one used to compute `sum_exp`). Reusing it avoids recomputing exp per
+/// sampled token during the cumulative-distribution scan.
 fn sample_greedy(
-    logits: &[f32],
+    exp_buf: &[f32],
     mask: usize,
     vocab: usize,
-    max_logit: f32,
     sum_exp: f32,
     depth: usize,
     parent_tokens: &[usize],
@@ -1107,7 +1114,7 @@ fn sample_greedy(
         if t == mask || !pruner.is_valid(depth, t, parent_tokens) {
             continue;
         }
-        let prob = (logits[t] - max_logit).exp() * inv_sum;
+        let prob = exp_buf[t] * inv_sum;
         cumsum += prob;
         if cumsum >= r {
             return (t, prob);
@@ -1368,10 +1375,9 @@ impl<'a> D2fPipeline<'a> {
                         )
                     } else {
                         sample_greedy(
-                            logits_p,
+                            &sample_exp_buf,
                             mask,
                             vocab,
-                            max_logit,
                             sum_exp,
                             depth,
                             parent_tokens,
