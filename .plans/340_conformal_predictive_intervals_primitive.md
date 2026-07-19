@@ -6,7 +6,7 @@
 **Source paper:** [arXiv:2605.03789](https://arxiv.org/abs/2605.03789) — Manokhin, *Training-Free Probabilistic Time-Series Forecasting with Conformal Seasonal Pools*, 2026
 **Companion paper:** [arXiv:2606.09473](https://arxiv.org/abs/2606.09473) — *Report the Floor* (conformal interval as mandatory baseline)
 **Target:** `katgpt-rs/crates/katgpt-core/src/conformal/mod.rs` (new module) + Cargo feature `conformal_predictive_intervals`
-**Status:** Phases 1 + 2 + 2.5 COMPLETE (2026-06-30). Open primitive skeleton (Phase 1), KARC adapter + Lorenz-63 coverage demo (Phase 2), and "Report the Floor" comparison harness (Phase 2.5, Issue 010 T2) all shipped behind `conformal_predictive_intervals` (opt-in). Phase 3 (riir-ai runtime integration) and Phase 4 (riir-neuron-db + riir-chain) filed as separate cross-repo plans. GOAT gate: `.benchmarks/340_conformal_goat.md`. The `ConformalIntervalCalibrator<SeasonalNaiveForecaster>` m=1 instance is the canonical UQ floor (per the "Report the Floor" rule).
+**Status:** Phases 1 + 2 + 2.5 COMPLETE (2026-06-30). Open primitive skeleton (Phase 1), KARC adapter + Lorenz-63 coverage demo (Phase 2), and "Report the Floor" comparison harness (Phase 2.5, Issue 010 T2) all shipped. **PROMOTED TO DEFAULT-ON 2026-07-20 (Plan 468)** — Plan 340 T1.14's deferral condition ("pending a runtime consumer that demonstrably beats its simpler heuristic counterpart") satisfied by Bench 564 (MCTS collapse G3 PASS) + Bench 565 (Salience Tri-Gate G3 PASS, ΔF1=+0.3145 at 6.3× gate margin). Consumer-level gates stay opt-in. Phase 3 (riir-ai runtime integration) landed across Plans 508-513 + Benches 562-568 (2 PASS, 2 FAIL, 1 correctness fix, 1 MIXED probe — see Research 165 §1.3 for the meta-pattern). Phase 4 (riir-neuron-db + riir-chain) filed as separate cross-repo plans. GOAT gate: `.benchmarks/340_conformal_goat.md`. The `ConformalIntervalCalibrator<SeasonalNaiveForecaster>` m=1 instance is the canonical UQ floor (per the "Report the Floor" rule).
 
 ---
 
@@ -192,7 +192,7 @@ impl PointForecaster for SeasonalPoolForecaster {
 
 ## Phase 1 — Unblocking Skeleton (CORE) ✅ COMPLETE (2026-06-30)
 
-GOAT gate PASSED — see [`.benchmarks/340_conformal_goat.md`](../.benchmarks/340_conformal_goat.md). G1 coverage [0.9445, 0.9493] (target [0.93, 0.97]), G2 interval_into H=1 = 642ns (target ≤ 1µs), G3 zero-alloc, G4 bit-reproducible. AirPassengers CRPS 115.06 vs ±2σ baseline 468.75 (4× sharper). Opt-in — promotion deferred to Plan 342.
+GOAT gate PASSED — see [`.benchmarks/340_conformal_goat.md`](../.benchmarks/340_conformal_goat.md). G1 coverage [0.9445, 0.9493] (target [0.93, 0.97]), G2 interval_into H=1 = 642ns (target ≤ 1µs), G3 zero-alloc, G4 bit-reproducible. AirPassengers CRPS 115.06 vs ±2σ baseline 468.75 (4× sharper). Originally opt-in — promotion deferred per T1.14. **Promotion landed 2026-07-20 (Plan 468)** after two runtime consumers (Bench 564 + Bench 565) demonstrated gains over their simpler heuristic counterparts.
 
 ### Tasks
 
@@ -214,7 +214,7 @@ GOAT gate PASSED — see [`.benchmarks/340_conformal_goat.md`](../.benchmarks/34
   - **Result:** Conformal CRPS 115.06 vs ±2σ baseline 468.75 (4× sharper, gate holds).
 - [x] **T1.13** Implement CRPS / Winkler interval score / empirical coverage utility functions in `conformal.rs` (or a `conformal_metrics.rs` submodule). These are the GOAT gate framework for any future UQ-bearing primitive.
   - **Shipped as:** `crates/katgpt-core/src/conformal/metrics.rs` with `crps`, `crps_interval`, `winkler_score`, `empirical_coverage`, `mean_crps_interval`, `mean_winkler`.
-- [x] **T1.14** Run the GOAT gate (G1–G4). Document results in `.benchmarks/340_conformal_goat.md`. Promote to default-on only if all four gates pass AND the gain is modelless (it is — no training). **Promotion deferred** until the riir-ai runtime integration (Plan 342) confirms the curiosity false-positive win (G3 in the private guide) — the open primitive's gates prove the math; the runtime gates prove the utility.
+- [x] **T1.14** Run the GOAT gate (G1–G4). Document results in `.benchmarks/340_conformal_goat.md`. Promote to default-on only if all four gates pass AND the gain is modelless (it is — no training). **Promotion deferred** until the riir-ai runtime integration (Plan 342) confirms the curiosity false-positive win (G3 in the private guide) — the open primitive's gates prove the math; the runtime gates prove the utility. **UPDATE 2026-07-20: Promotion LANDED in Plan 468.** The deferral condition was satisfied by two runtime consumers (Bench 564 MCTS collapse + Bench 565 Salience Tri-Gate, both G3 PASS). The curiosity axis (Bench 562) FAILED but the Cargo.toml language required only one consumer win; two landed. See `.benchmarks/340_conformal_goat.md` §"Promotion decision" for the full record.
 
 ### Phase 1 verdict criteria
 

@@ -75,12 +75,14 @@ pub use best_belief::{best_belief_score, best_belief_scores, select_best_belief}
 // coverage-guaranteed predictive intervals. The
 // ConformalIntervalCalibrator<SeasonalNaiveForecaster> with m=1 is the
 // canonical conformal-naive floor per the "Report the Floor" rule (Issue 010,
-// AGENTS.md Feature Flag Discipline). STAYS OPT-IN — primitive-level G1–G4 GOAT
-// PASS (Bench 340, 2026-06-30); promotion to default-on deferred pending a
-// runtime consumer that demonstrably beats its simpler heuristic counterpart.
-// The Plan 508 curiosity-detector consumer (riir-ai Bench 562, 2026-07-19)
-// FAILED G3 — conformal intervals wider than 5×EMA on the L2 surprise signal.
-// Other consumers (Sleep-Time, MCTS, Salience) remain open.
+// AGENTS.md Feature Flag Discipline). DEFAULT-ON (Plan 468 promotion,
+// 2026-07-20): primitive-level G1–G4 GOAT PASSed (Bench 340, 2026-06-30);
+// runtime-consumer promotion gate satisfied by Bench 564 (MCTS collapse) +
+// Bench 565 (Salience Tri-Gate ΔF1=+0.3145 at 6.3× margin). Plan 513 width-
+// definition fix vindicated Bench 565 bit-identically. Consumer-level gates
+// (riir-engine karc_conformal_width + salience_conformal_width + 4 probes)
+// STAY opt-in — this promotion removes the katgpt-core re-forward friction
+// only; consumers still choose.
 #[cfg(feature = "conformal_predictive_intervals")]
 pub mod conformal;
 #[cfg(feature = "conformal_predictive_intervals")]

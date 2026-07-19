@@ -177,6 +177,35 @@ with `m=1` on CRPS / coverage / Winkler at their GOAT gate.
 
 ## Promotion decision
 
+**DEFAULT-ON as of 2026-07-20 (Plan 468).** The deferral language in Plan
+340 T1.14 — "promotion deferred until the riir-ai runtime integration confirms
+the curiosity false-positive win" — was satisfied by two runtime consumers:
+
+- **Bench 564** (MCTS collapse, 2026-07-19): G3 PASS — per-NPC calibrated τ
+  beats fixed magic number on the collapse-detection F1 axis.
+- **Bench 565** (Salience Tri-Gate, 2026-07-19): G3 PASS — interval-width
+  Delegate nudge beats KARC anticipation by ΔF1 = +0.3145 (6.3× gate margin).
+
+Two consumers FAILED (Bench 562 curiosity, Bench 563 sleep-time) — the
+Cargo.toml language required only one consumer win; two landed. Plan 513
+(2026-07-20) fixed a width-definition semantic bug in the Salience consumer's
+`KarcConformalSidecar::interval_width()` and re-verified Bench 565's G3 PASS
+bit-identically.
+
+The primitive was opt-in from 2026-06-30 (Plan 340 Phase 1) → 2026-07-20
+(Plan 468 promotion), 20 days. Consumer-level gates
+(`karc_conformal_width`, `salience_conformal_width`, the four probe features)
+STAY opt-in — the promotion only removes the katgpt-core-level re-forward
+friction, does not auto-enable any consumer.
+
+---
+
+## Pre-promotion history (preserved for context)
+
+The original Phase 1 decision (preserved below) was opt-in pending a runtime
+consumer that demonstrably beats its simpler heuristic counterpart. That
+condition is now satisfied.
+
 **Opt-in (NOT default-on).** Per Plan 340 T1.14:
 
 > Promotion deferred until the riir-ai runtime integration (Plan 342) confirms
