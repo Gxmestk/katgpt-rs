@@ -274,7 +274,12 @@ impl SpectralQuantKVCache {
             // Pre-allocate scratch buffers outside the loop to avoid per-iteration alloc.
             let mut scratch_x = vec![0.0f32; head_dim];
             let mut scratch_rotated = vec![0.0f32; head_dim];
-            let mut synthetic_rotated: Vec<Vec<f32>> = Vec::with_capacity(n_synthetic);
+            // Flat storage: a single Vec<f32> of length n_synthetic * head_dim,
+            // row-major. Each synthetic sample occupies a contiguous
+            // head_dim-element row. Avoids n_synthetic separate allocations
+            // (one per Vec<Vec<f32>> inner) and the per-iteration
+            // `scratch_rotated.clone()` memcpy + alloc.
+            let mut synthetic_rotated: Vec<f32> = Vec::with_capacity(n_synthetic * head_dim);
             for _ in 0..n_synthetic {
                 // Step 1: random vector
                 for v in scratch_x.iter_mut() {
@@ -295,7 +300,9 @@ impl SpectralQuantKVCache {
                         scratch_rotated[j] += row[j] * xi;
                     }
                 }
-                synthetic_rotated.push(scratch_rotated.clone());
+                // Append the rotated sample to the flat buffer (one memcpy,
+                // zero allocations — capacity is pre-reserved).
+                synthetic_rotated.extend_from_slice(&scratch_rotated);
             }
 
             // Fit tail codebook from tail dims (d_eff..head_dim).
@@ -303,7 +310,7 @@ impl SpectralQuantKVCache {
             // contributes `(head_dim − d_eff)` tail values.
             let tail_len = head_dim.saturating_sub(d_eff);
             let mut tail_data = Vec::with_capacity(n_synthetic * tail_len);
-            for s in &synthetic_rotated {
+            for s in synthetic_rotated.chunks(head_dim) {
                 tail_data.extend(s.iter().skip(d_eff).copied());
             }
             let mut tail_q = LloydMaxQuantizer::new(
@@ -319,7 +326,7 @@ impl SpectralQuantKVCache {
                 // v1: shared semantic codebook — all semantic dims pooled.
                 // Pre-allocate capacity = n_synthetic * d_eff.
                 let mut semantic_data = Vec::with_capacity(n_synthetic * d_eff);
-                for s in &synthetic_rotated {
+                for s in synthetic_rotated.chunks(head_dim) {
                     semantic_data.extend(s.iter().take(d_eff).copied());
                 }
                 let mut sem_q = LloydMaxQuantizer::new(
@@ -337,7 +344,13 @@ impl SpectralQuantKVCache {
                 let mut dim_data = Vec::with_capacity(n_synthetic);
                 for (dim, cb) in per_dim.iter_mut().enumerate() {
                     dim_data.clear();
-                    dim_data.extend(synthetic_rotated.iter().map(|s| s[dim]));
+                    // Strided iteration over the flat buffer: element `dim` of
+                    // each head_dim-wide row.
+                    dim_data.extend(
+                        synthetic_rotated
+                            .chunks(head_dim)
+                            .map(|row| row[dim]),
+                    );
                     let bits_for_dim = bits
                         .and_then(|b| b.get(dim).copied())
                         .unwrap_or(b_high)
