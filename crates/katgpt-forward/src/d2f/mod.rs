@@ -26,7 +26,7 @@
 // `crate::types::*` → `katgpt_types::*`.
 
 use crate::d2f_context::{D2fContext, denoising_accuracy, forward_block_causal_with};
-use katgpt_core::simd::simd_max_f32;
+use katgpt_core::simd::{simd_add_scalar_inplace, simd_exp_inplace, simd_max_f32};
 use katgpt_core::traits::{ConstraintPruner, ScreeningPruner};
 use katgpt_transformer::TransformerWeights;
 use katgpt_types::Config;
@@ -647,6 +647,13 @@ pub fn d2f_decode_block_with_prompt_with(
             // Compute relevance-weighted softmax denominator over valid tokens only.
             // ScreeningPruner relevance ∈ [0.0, 1.0] multiplies the softmax exponent,
             // boosting semantically relevant tokens and dampening irrelevant ones.
+            //
+            // Perf: bulk SIMD exp into sample_exp_buf, then scalar masked accumulate.
+            // The exp is the dominant cost (~10-20 cycles/elem scalar); SIMD cuts it
+            // to ~2-4 cycles/elem. The mask + pruner branches are not SIMD-amenable
+            // (dyn dispatch via trait objects) so they stay scalar.
+            sample_exp_buf.resize(vocab, 0.0);
+            bulk_exp_shift_into(logits_p, max_logit, &mut sample_exp_buf[..]);
             let mut sum_exp = 0.0f32;
             for t in 0..vocab {
                 if t == mask {
@@ -656,7 +663,7 @@ pub fn d2f_decode_block_with_prompt_with(
                     continue;
                 }
                 let relevance = screener.relevance(depth, t, parent_tokens);
-                sum_exp += (logits_p[t] - max_logit).exp() * relevance;
+                sum_exp += sample_exp_buf[t] * relevance;
             }
 
             if sum_exp == 0.0 {
@@ -842,6 +849,10 @@ pub fn d2f_decode_block_with_prompt_with_sampler(
             let parent_tokens = &tokens[block_start..p];
 
             let mut sum_exp = 0.0f32;
+            // Perf: bulk SIMD exp into sample_exp_buf, then scalar masked accumulate
+            // (see site 1 for rationale).
+            sample_exp_buf.resize(vocab, 0.0);
+            bulk_exp_shift_into(logits_p, max_logit, &mut sample_exp_buf[..]);
             for t in 0..vocab {
                 if t == mask {
                     continue;
@@ -850,7 +861,7 @@ pub fn d2f_decode_block_with_prompt_with_sampler(
                     continue;
                 }
                 let relevance = screener.relevance(depth, t, parent_tokens);
-                sum_exp += (logits_p[t] - max_logit).exp() * relevance;
+                sum_exp += sample_exp_buf[t] * relevance;
             }
 
             if sum_exp == 0.0 {
@@ -1002,6 +1013,23 @@ pub fn d2f_decode_block_with_target_with(
 // ---------------------------------------------------------------------------
 // Sampling helpers
 // ---------------------------------------------------------------------------
+
+/// Bulk exp(logits - max_logit) into `exp_buf` using SIMD.
+///
+/// `exp_buf` must be at least `logits.len()` long. The result is the standard
+/// softmax numerator: `exp(logit_t - max_logit)`, used by both the sum_exp
+/// precheck loop and (with an extra `* inv_temp` factor) the temperature-scaled
+/// sampler. Doing the exp once in bulk via SIMD replaces vocab scalar `.exp()`
+/// calls (10-20 cycles each) with a single NEON/AVX2 pass (2-4 cycles/elem).
+#[inline]
+fn bulk_exp_shift_into(logits: &[f32], max_logit: f32, exp_buf: &mut [f32]) {
+    let vocab = logits.len();
+    exp_buf[..vocab].copy_from_slice(logits);
+    // exp_buf -= max_logit (SIMD)
+    simd_add_scalar_inplace(&mut exp_buf[..vocab], -max_logit);
+    // exp_buf = exp(exp_buf) (SIMD)
+    simd_exp_inplace(&mut exp_buf[..vocab]);
+}
 
 /// Temperature-scaled sampling from valid tokens.
 /// Returns (token, probability).
@@ -1306,12 +1334,16 @@ impl<'a> D2fPipeline<'a> {
                     let parent_tokens = &seq_tokens[block_start..p];
 
                     let mut sum_exp = 0.0f32;
+                    // Perf: bulk SIMD exp into sample_exp_buf, then scalar masked accumulate
+                    // (see site 1 for rationale).
+                    sample_exp_buf.resize(vocab, 0.0);
+                    bulk_exp_shift_into(logits_p, max_logit, &mut sample_exp_buf[..]);
                     for t in 0..vocab {
                         if t == mask || !pruner.is_valid(depth, t, parent_tokens) {
                             continue;
                         }
                         let relevance = screener.relevance(depth, t, parent_tokens);
-                        sum_exp += (logits_p[t] - max_logit).exp() * relevance;
+                        sum_exp += sample_exp_buf[t] * relevance;
                     }
 
                     if sum_exp == 0.0 {
