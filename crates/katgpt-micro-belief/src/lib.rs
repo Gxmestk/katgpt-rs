@@ -33,8 +33,9 @@
 //!
 //! # Feature gate
 //!
-//! This module is gated behind the `micro_belief` Cargo feature (default-off
-//! until G1 passes). The orchestrator wires it in `lib.rs` via
+//! This module is gated behind the `micro_belief` Cargo feature (transitively
+//! DEFAULT-ON in katgpt-core via `bom_sampling → micro_belief` chain since Plan
+//! 281 T2.4 promotion, 2026-06-17. The orchestrator wires it in `lib.rs` via
 //! `#[cfg(feature = "micro_belief")] pub mod micro_belief;`.
 //!
 //! # References

@@ -961,7 +961,7 @@ pub mod bfcp_lfu_shard;
 // ── BFCF × LSH × CMS × Roaring — Bitmap Membership (Plan 220 Phase 3) ─────
 //
 // Custom Roaring-like CompactBitmap replacing Vec<bool> for region membership.
-// Feature-gated behind `bfcf_lsh_cms` — opt-in until GOAT proved.
+// Feature-gated behind `bfcf_lsh_cms` — opt-in at the leaf crate; DEFAULT-ON at the root (Plan 220 GOAT 10/10 PASS).
 
 #[cfg(feature = "bfcf_lsh_cms")]
 pub mod roaring_membership;

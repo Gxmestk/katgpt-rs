@@ -179,8 +179,8 @@ pub mod ssmax;
 // integer-arithmetic INT→FP cast with a pre-computed f32 LUT lookup. INT4 LUT
 // is [f32;16] = one cache line; INT8 is [f32;256] = 1 KB. Phase 1 ships the
 // scalar reference; NEON/AVX2 inner loops land in Phase 2; fused dequant+dot
-// in Phase 3. Opt-in until the GOAT gate (Phase 4 G1 bit-exact + G2 latency)
-// settles the promote/demote decision. Realistic target 1.0-1.5x (the paper's
+// in Phase 3. DEFAULT-ON (2026-07-18): G1+G2 PASS — see .benchmarks/432_simd_lut_dequant_goat.md.
+// Realistic target 1.0-1.5x (the paper's
 // 7x is hardware-only). Pure modelless (LUT build + indexed reads).
 #[cfg(feature = "simd_lut_dequant")]
 pub mod simd_lut_dequant;
@@ -379,7 +379,7 @@ pub mod pruners;
 // Temporal Derivative Kernel — dual fast/slow EMA surprise signal (Plan 277, Research 243).
 // Turns any streaming latent vector into a signed "surprise" signal — the implicit
 // prediction-error channel for credit assignment, computed locally with no backprop.
-// Opt-in until ≥2 fusion gates (G2–G5) pass.
+// DEFAULT-ON (Plan 277, 2026-06-16): 4/4 fusion gates PASS — see .benchmarks/277_temporal_deriv_goat.md.
 #[cfg(feature = "temporal_deriv")]
 pub mod temporal_deriv;
 #[cfg(feature = "temporal_deriv")]
@@ -705,8 +705,8 @@ pub mod zone_manifold;
 // LRU with tier-transition / density-drift / TTL invalidation rules). Sibling to
 // Plan 305 cognitive gating (Plan 305 gates learning compute; this gates
 // movement compute) — they compose orthogonally, NOT overlap. Population is
-// raw/synced; mobility/tier/cache_key are latent/local. Opt-in until G5a
-// (Shannon entropy ≥+15% vs mean-agg) + G5b (≥50% compute saved on dense-dominated)
+// raw/synced; mobility/tier/cache_key are latent/local. DEFAULT-ON (Plan 351 Phase 3, 2026-06-29): GOAT PASS —
+// G5a (Shannon entropy ≥+15% vs mean-agg) + G5b (≥50% compute saved on dense-dominated)
 // + G5c (zero stale reads during stampede) all pass. No UQ claim — mobility is
 // a deterministic [0,1] weight, not a probability/interval/coverage.
 #[cfg(feature = "zone_density_routing")]
@@ -717,8 +717,7 @@ pub mod zone_density;
 // arbitrary-conditional forward p(xe | xc) via position-aware copies of xc at
 // the front and a [xc-bidirectional | causal-everywhere-else] attention mask
 // (Lu et al., Mila, arXiv:2606.14943, Plan 313, Research 295). Phase 1 ships
-// types + bit math only — no attention kernel dep, no SVD. Opt-in until G1–G4
-// GOAT gates pass.
+// types + bit math only — no attention kernel dep, no SVD. DEFAULT-ON (Plan 313, 2026-06-24): G1–G4 PASS via modelless Path 2 (`attends_dedup`) — see .benchmarks/313_ac_prefix_modelless.md. Multi-layer equivalence remains a non-blocking riir-train follow-up.
 #[cfg(feature = "ac_prefix")]
 pub mod ac_prefix;
 
@@ -843,12 +842,12 @@ pub use flow::{
 //   continuation for non-periodic latent fields — closed-form polynomial
 //   periodic extension so the FFT does not produce Gibbs ringing at the
 //   boundaries. The one modelless FNO primitive the codebase genuinely
-//   lacked (Research 307 §3 candidate plan #1). Opt-in until G1–G4 pass.
+//   lacked (Research 307 §3 candidate plan #1). DEFAULT-ON (Plan 323, 2026-06-25): G1–G4 ALL PASS.
 // - `differentiation` (feature `spectral_differentiation`, Plan 325):
 //   standalone FFT-based spectral differentiation on periodic uniform 1D
 //   grids — multiply FFT coefficients by `(iω)^m`, IFFT back. The
 //   specialized 1D-periodic case where DEC `exterior_derivative` is
-//   overkill. Opt-in until G1–G4 pass.
+//   overkill. DEFAULT-ON (Plan 323, 2026-06-25): G1–G4 ALL PASS.
 #[cfg(any(feature = "fourier_continuation", feature = "spectral_differentiation"))]
 pub mod spectral;
 #[cfg(feature = "fourier_continuation")]
@@ -1055,8 +1054,8 @@ pub use subspace_steering::{
 // more expressive: multi-region membership). Pure modelless consumer of a frozen
 // MFA-like artifact {μ_k, W_k, Ψ, π} (trained offline via riir-train GD, or
 // deterministically constructed via K-means + per-region PCA). At the degenerate
-// limit (K=1, μ=0, W=I) steer_local is bit-identical to Plan 412. Opt-in until
-// G1–G5 GOAT gate passes (G1 K=1 parity is the load-bearing gate).
+// limit (K=1, μ=0, W=I) steer_local is bit-identical to Plan 412. DEFAULT-ON (Plan 416 Phase 4, 2026-07-09):
+// G1–G5 ALL PASS (G1 K=1 parity is the load-bearing gate).
 #[cfg(feature = "region_subspace_steering")]
 pub mod region_subspace;
 #[cfg(feature = "region_subspace_steering")]
@@ -1072,8 +1071,8 @@ pub use region_subspace::{
 // additive / convex-combo / dot-projection / wedge-detection / linear-transport
 // / spatial-sum — none has the `sin²α+cos²α=1` Pythagorean norm-preservation
 // invariant. §3.5 modelless Path 2 unblock: the trained `γ_θ` is replaced with
-// `α = sigmoid(⟨state, direction⟩ · λ) · π/2` (closed-form). Opt-in until the
-// G1–G4 GOAT gate passes (G1 norm-preservation <1e-4 is the kill switch).
+// `α = sigmoid(⟨state, direction⟩ · λ) · π/2` (closed-form). DEFAULT-ON (Plan 322 Phase 2, 2026-06-25):
+// G1–G4 ALL PASS (G1 norm-preservation <1e-4 is the kill switch).
 #[cfg(feature = "phase_rotation_coupling")]
 pub mod phase_rotation;
 #[cfg(feature = "phase_rotation_coupling")]
@@ -1382,7 +1381,7 @@ pub mod occupancy;
 //
 // Consumed by riir-ai Plan 327 (runtime wiring) — the game-specific 7-layer
 // mapping, archetype table, taming transition stay private in riir-ai.
-// Opt-in until G4 (<1µs/entity) + G5 (zero alloc) GOAT gate passes.
+// DEFAULT-ON (Plan 297 Phase 4): G4 (79.585ns < 1µs target) + G5 (zero alloc) PASS.
 //
 // Substrate lives in the katgpt-personality crate (Issue 007 Phase E Tier 2
 // #5, 2026-06-28). Re-exported here as `katgpt_core::personality_composition`
@@ -1430,7 +1429,7 @@ pub use committed_field_blend::{ArchetypeFieldSource, CommittedFieldBlend, TriAr
 //
 // Open half of the Engram Super-GOAT: private selling-point guide lives in
 // riir-ai Guide 147; chain commitment bridge is riir-chain R001 (TODO).
-// Opt-in until G1–G7 GOAT gate passes.
+// Compiled in default transitively via cognitive_architecture_root → engram chain (Issue 039). G1+G2+G4 PASS; G6 (effective depth) deferred to riir-ai integration (requires live inference pipeline).
 #[cfg(feature = "engram")]
 pub mod engram;
 #[cfg(feature = "engram")]
@@ -1550,7 +1549,7 @@ pub use set_attention::{
 // micro_belief, engram, Raven); for frozen MLPs (BeliefDrafter) the fix
 // requires retraining → riir-train.
 // Plan 306 Phase 1+5; Research 286; arXiv:2605.09992 Eldenk et al.
-// Opt-in until G1 (8 correctness tests) passes.
+// DEFAULT-ON (Plan 306 T7.4, 2026-06-23): G1 8/8 PASS + G4 re-spec'd to absolute-latency PASS.
 #[cfg(feature = "depth_invariance")]
 pub use katgpt_types::depth_invariance;
 #[cfg(feature = "depth_invariance")]
@@ -1635,7 +1634,7 @@ pub use arg::{
 // BAKE × CLR × MCGS × Engram × ARG × closure-instrument × Salience into a new
 // capability class: per-NPC continual adaptation without catastrophic
 // forgetting. Composes with arg_protocol LifecycleState when both features on.
-// Opt-in until G1–G5 GOAT gate passes (Phase 3).
+// DEFAULT-ON (Plan 329 Phase 3, 2026-06-26): G1–G5 ALL PASS.
 #[cfg(feature = "non_interference_branches")]
 pub mod branching;
 #[cfg(feature = "non_interference_branches")]
@@ -1668,7 +1667,7 @@ pub use branching::{
 // noise whose CDF is sigmoid(x/β), making the categorical sample a
 // sigmoid-family operation without any exp/softmax normalization.
 //
-// Opt-in until Plan 377 Phase 3 GOAT gate (G1 correctness ≥90%, G2 router
+// DEFAULT-ON (Plan 377 Phase 3, 2026-07-04): GOAT PASS — G1 correctness ≥90%, G2 router
 // latency <1µs at K=3 D=64, G3 K=1 bit-identical to standard decode, G4
 // alloc-free hot path, G5 modelless, G6 sigmoid-not-softmax).
 #[cfg(feature = "local_branch_routing")]
@@ -1736,7 +1735,7 @@ pub use paired_loss::{
 // Theorem 3.1 modelless reframe: similar loss vectors across K extrapolated
 // checkpoints ⇒ similar gradients along v during the next weight-mutation cycle.
 // Composes with ac_prefix::ConditionalLogprob, HLA surprise, RavenSlotLossKernel
-// (riir-neuron-db Plan 005). Opt-in until G1–G5 GOAT gate passes.
+// (riir-neuron-db Plan 005). DEFAULT-ON (Plan 341 Phase 2, 2026-06-29): G1–G5 ALL PASS.
 #[cfg(feature = "temp_loss_fingerprint")]
 pub mod diversity;
 #[cfg(feature = "temp_loss_fingerprint")]
@@ -1757,7 +1756,7 @@ pub use diversity::temp::extrapolated_snapshot_schedule_qmc;
 // descent + per-arm non-stationary Bayesian filtering. Closes the contextual +
 // non-stationary bandit gap (Plans 030/032/025). The BMC training curriculum
 // routes to riir-train; this ships the modelless inference-time routing
-// primitive. Opt-in until G1–G5 GOAT gate passes.
+// primitive. DEFAULT-ON (Plan 370 Phase 2, 2026-07-03): G1+G3+G4+G5 PASS; G2 FAIL is plan-level expectation (curriculum-learning-specific).
 #[cfg(feature = "manifold_bandit")]
 pub mod manifold_bandit;
 
@@ -1771,7 +1770,7 @@ pub mod manifold_bandit;
 // missing 20% — the crowd-scale mean-field view + oscillatory-instability
 // detector + regime taxonomy. Extends Plan 301's `subspace_phase_gate` from
 // real-eigenvalue phase transitions (`N ≥ d` input sufficiency) to complex-
-// eigenvalue (Hopf) phase transitions. Opt-in until the G1–G5 GOAT gate +
+// eigenvalue (Hopf) phase transitions. DEFAULT-ON (Plan 371 Phase 6, 2026-07-03): G1+G2+G3+G4+G5 PASS +
 // mandatory defend-wrong PoC (Plan 371 Phase 5 T5.1) pass.
 #[cfg(feature = "mean_field_regime")]
 pub mod mean_field;
@@ -1823,7 +1822,7 @@ pub use factorized_action::{
 // with D*_t = α_t γ_t / β_t) as a decoupled utility — composes with any drift
 // source, not just the ensemble.
 //
-// Opt-in until the G1–G4 GOAT gate (Plan 376 Phase 3) passes. G2 (cross-domain
+// DEFAULT-ON (Plan 376 Phase 3, 2026-07-04): G1–G4 ALL PASS. G2 (cross-domain
 // quality) is the make-or-break gate — the paper proves cross-domain
 // composition for image generation only; Phase 2 PoC is mandatory before any
 // quality-parity claim for game AI.
@@ -1912,7 +1911,7 @@ pub mod gdn_tree_verify;
 // uncorrected input (strict no-harm guarantee). Pure linear algebra — flat
 // &[f32] slices + SIMD dot products, zero `crate::` deps. Consumes a
 // pre-computed SVD basis (Plan 301 thin_svd_into); does not compute it.
-// Opt-in until G1–G4 GOAT gate passes.
+// DEFAULT-ON (2026-07-09): G1–G4 ALL PASS — see .benchmarks/425_tilr_goat.md.
 #[cfg(feature = "tilr_invariant_subspace")]
 pub mod tilr;
 #[cfg(feature = "tilr_invariant_subspace")]
@@ -1955,8 +1954,8 @@ pub mod multi_agent_path;
 //
 // Pure modelless (closed-form PCA + ridge + SVD pseudoinverse; no gradient
 // descent). Reuses Plan 301's `thin_svd_into` + Plan 308's
-// `ridge_solve_direct_f32`. Gated on `subspace_phase_gate` for the SVD. Opt-in
-// until the G1–G7 GOAT gate passes (Plan 449 Phase 2).
+// `ridge_solve_direct_f32`. Gated on `subspace_phase_gate` for the SVD. DEFAULT-ON
+// (Plan 449 Phase 3, 2026-07-18): G1–G7 ALL PASS — see .benchmarks/449_poincare_goat.md.
 #[cfg(all(feature = "poincare_navigator", feature = "subspace_phase_gate"))]
 pub mod poincare;
 #[cfg(all(feature = "poincare_navigator", feature = "subspace_phase_gate"))]
