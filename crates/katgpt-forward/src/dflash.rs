@@ -815,13 +815,12 @@ pub fn domino_correct_marginals(
             marginal[v] = (marginal[v] + correction[v]).max(0.0);
         }
 
-        // Re-normalize via reciprocal multiply (single division per vocab)
-        let sum: f32 = marginal.iter().sum();
+        // Re-normalize via reciprocal multiply. SIMD sum + scale matches the
+        // pattern used in marginal_fusion_blend; reassociative at ULP level,
+        // well within probability-normalization tolerance.
+        let sum = katgpt_core::simd::simd_sum_f32(marginal);
         if sum > f32::EPSILON {
-            let inv_sum = 1.0 / sum;
-            for v in marginal.iter_mut() {
-                *v *= inv_sum;
-            }
+            katgpt_core::simd::simd_scale_inplace(marginal, 1.0 / sum);
         }
     }
 }
@@ -860,26 +859,24 @@ pub fn marginal_fusion_blend(
         "output buffer too small"
     );
 
-    output
-        .iter_mut()
-        .take(max_steps * vocab_size)
-        .for_each(|v| *v = 0.0);
+    output[..max_steps * vocab_size].fill(0.0);
 
     for (src, &alpha) in sources.iter().zip(alpha_weights.iter()) {
         let len = (max_steps * vocab_size).min(src.len());
         katgpt_core::simd::simd_fused_scale_acc(&mut output[..len], &src[..len], alpha, len);
     }
 
-    // Re-normalize each position to sum to 1.0
+    // Re-normalize each position to sum to 1.0. SIMD sum + scale matches the
+    // pattern already used for the source accumulation above (simd_fused_scale_acc)
+    // and elsewhere in the codebase (e.g. distill/trd.rs branch_score). Sum is
+    // reassociative at the ULP level but well within the 1e-5 tolerance the
+    // callers and tests rely on for probability normalization.
     for step in 0..max_steps {
         let start = step * vocab_size;
         let end = start + vocab_size;
-        let sum: f32 = output[start..end].iter().sum();
+        let sum = katgpt_core::simd::simd_sum_f32(&output[start..end]);
         if sum > 0.0 {
-            let inv_sum = 1.0 / sum;
-            for v in &mut output[start..end] {
-                *v *= inv_sum;
-            }
+            katgpt_core::simd::simd_scale_inplace(&mut output[start..end], 1.0 / sum);
         }
     }
 }
