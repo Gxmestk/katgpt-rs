@@ -12,7 +12,7 @@
 #![allow(clippy::needless_range_loop)]
 
 use super::hadamard;
-use super::var_norm::{VarNormConfig, VarianceNormScales, variance_normalize_into};
+use super::var_norm::{VarNormConfig, VarianceNormScales, variance_normalize_into_scales};
 
 #[cfg(feature = "targeted_precision")]
 use crate::targeted_precision::PrecisionBudget;
@@ -167,6 +167,23 @@ pub struct KVarNKVCache {
     varn_log_s_row_best: Vec<f32>,
     /// Hadamard column-transform scratch (length = kv_dim; reused by quantize_key_tile).
     hadamard_col_buf: Vec<f32>,
+    /// RTN scratch: per-row scales output of rtn_quantize_rows* (length =
+    /// max(kv_dim, tile_size) * max groups_per_row). Reused across quantize calls.
+    scratch_rtn_scales: Vec<f32>,
+    /// RTN scratch: per-row zero-points output of rtn_quantize_rows* (same size as scratch_rtn_scales).
+    scratch_rtn_zp: Vec<f32>,
+    /// RTN scratch: packed bytes output of rtn_quantize_rows* (length =
+    /// max(key_tile_packed_len, val_tile_packed_len)). Reused across quantize calls.
+    scratch_rtn_packed: Vec<u8>,
+    /// VarianceNormScales scratch: s_col output (length = max(kv_dim, tile_size)).
+    /// Holds the col-scale vector written by variance_normalize_into and the
+    /// static-cal/skip_varn fill paths, replacing the per-call vec![1.0; cols]
+    /// allocation in the skip_varn branch.
+    scratch_var_s_col: Vec<f32>,
+    /// VarianceNormScales scratch: s_row output (length = max(kv_dim, tile_size)).
+    /// Holds the row-scale vector written by variance_normalize_into / static_cal
+    /// / skip_varn, replacing the per-call vec![1.0; rows] allocation.
+    scratch_var_s_row: Vec<f32>,
     // ── Scalar config (usize: 8 bytes each) ──
     /// Current write position.
     pos: usize,
@@ -275,6 +292,21 @@ impl KVarNKVCache {
         let varn_max_dim = cfg.kv_dim.max(tile_size);
         let varn_tile_size = varn_max_dim * varn_max_dim;
 
+        // RTN scratch sizes: cover both K (rows=kv_dim, cols=tile_size) and V
+        // (rows=tile_size, cols=kv_dim) tile shapes, plus the optional
+        // sub-channel grouping factor (groups_per_row = cols/group_size).
+        // Max scales/zps entries = max_rows * max_groups_per_row.
+        let rtn_max_rows = varn_max_dim;
+        let rtn_max_cols = varn_max_dim;
+        let rtn_max_groups = if cfg.bits <= 2 {
+            // 2-bit path uses group_size=4; ceil(cols/4) groups per row.
+            rtn_max_cols.div_ceil(4)
+        } else {
+            1
+        };
+        let rtn_scales_len = rtn_max_rows * rtn_max_groups;
+        let rtn_packed_len = key_tile_packed_len.max(val_tile_packed_len);
+
         Self {
             key_quantized,
             key_tiles,
@@ -295,6 +327,11 @@ impl KVarNKVCache {
             varn_log_s_col_best: vec![0.0f32; varn_max_dim],
             varn_log_s_row_best: vec![0.0f32; varn_max_dim],
             hadamard_col_buf: vec![0.0f32; cfg.kv_dim],
+            scratch_rtn_scales: vec![0.0f32; rtn_scales_len],
+            scratch_rtn_zp: vec![0.0f32; rtn_scales_len],
+            scratch_rtn_packed: vec![0u8; rtn_packed_len],
+            scratch_var_s_col: vec![1.0f32; varn_max_dim],
+            scratch_var_s_row: vec![1.0f32; varn_max_dim],
             pos: 0,
             n_layers: cfg.n_layers,
             kv_dim: cfg.kv_dim,
@@ -710,7 +747,7 @@ impl KVarNKVCache {
 
         // Reuse the pre-allocated scratch_tile buffer (kv_dim * tile_size floats).
         // Drop the mutable borrow before writing back to storage fields.
-        let (var_scales, rtn_scales, rtn_zp, packed, bits) = {
+        let (rtn_scales_len, packed_len, bits) = {
             let tile_data = &mut self.scratch_tile[..rows * cols];
 
             // Strided copy: key_buffer is [kv_dim, tile_size] row-major; compact to [rows, cols].
@@ -727,12 +764,17 @@ impl KVarNKVCache {
                 hadamard::hadamard_cols_into(tile_data, rows, cols, &mut self.hadamard_col_buf);
             }
 
-            // Step 1: Variance normalization
+            // Step 1: Variance normalization — write s_col/s_row directly into scratch.
             //   Static cal tables: O(1) lookup replaces Sinkhorn iterations (Plan 227 Phase 1)
             #[cfg(feature = "static_cal_tables")]
-            let var_scales = if let Some(ref cal) = self.static_cal {
-                // Use static per-head scales instead of iterative Sinkhorn
-                let s_row: Vec<f32> = (0..rows).map(|ch| cal.get_scale(layer, ch)).collect();
+            if let Some(ref cal) = self.static_cal {
+                // Use static per-head scales instead of iterative Sinkhorn.
+                let s_row = &mut self.scratch_var_s_row[..rows];
+                for ch in 0..rows {
+                    s_row[ch] = cal.get_scale(layer, ch);
+                }
+                // s_col = ones (no column scaling).
+                self.scratch_var_s_col[..cols].fill(1.0);
                 // Apply static scales to tile (reciprocal-multiply: one division per row,
                 // not per element — vectorizer-friendly inner loop).
                 for ch in 0..rows {
@@ -742,25 +784,16 @@ impl KVarNKVCache {
                         tile_data[row_off + t] *= inv_scale;
                     }
                 }
-                VarianceNormScales {
-                    s_col: vec![1.0f32; cols],
-                    s_row,
-                }
             } else if self.skip_varn {
-                VarianceNormScales {
-                    s_col: vec![1.0f32; cols],
-                    s_row: vec![1.0f32; rows],
-                }
+                self.scratch_var_s_col[..cols].fill(1.0);
+                self.scratch_var_s_row[..rows].fill(1.0);
             } else {
                 let config = VarNormConfig {
                     tile_size: self.tile_size,
                     ..Default::default()
                 };
-                variance_normalize_into(
-                    tile_data,
-                    rows,
-                    cols,
-                    &config,
+                variance_normalize_into_scales(
+                    tile_data, rows, cols, &config,
                     &mut self.varn_cur[..rows * cols],
                     &mut self.varn_col_s[..cols],
                     &mut self.varn_row_s[..rows],
@@ -771,25 +804,22 @@ impl KVarNKVCache {
                     &mut self.varn_log_s_row[..rows],
                     &mut self.varn_log_s_col_best[..cols],
                     &mut self.varn_log_s_row_best[..rows],
-                )
-            };
+                    &mut self.scratch_var_s_col[..cols],
+                    &mut self.scratch_var_s_row[..rows],
+                );
+            }
 
             #[cfg(not(feature = "static_cal_tables"))]
-            let var_scales = if self.skip_varn {
-                VarianceNormScales {
-                    s_col: vec![1.0f32; cols],
-                    s_row: vec![1.0f32; rows],
-                }
+            if self.skip_varn {
+                self.scratch_var_s_col[..cols].fill(1.0);
+                self.scratch_var_s_row[..rows].fill(1.0);
             } else {
                 let config = VarNormConfig {
                     tile_size: self.tile_size,
                     ..Default::default()
                 };
-                variance_normalize_into(
-                    tile_data,
-                    rows,
-                    cols,
-                    &config,
+                variance_normalize_into_scales(
+                    tile_data, rows, cols, &config,
                     &mut self.varn_cur[..rows * cols],
                     &mut self.varn_col_s[..cols],
                     &mut self.varn_row_s[..rows],
@@ -800,8 +830,10 @@ impl KVarNKVCache {
                     &mut self.varn_log_s_row[..rows],
                     &mut self.varn_log_s_col_best[..cols],
                     &mut self.varn_log_s_row_best[..rows],
-                )
-            };
+                    &mut self.scratch_var_s_col[..cols],
+                    &mut self.scratch_var_s_row[..rows],
+                );
+            }
 
             // Step 2: RTN quantization
             //   Targeted precision: use budget-allocated bits (Plan 227 Phase 2)
@@ -815,22 +847,49 @@ impl KVarNKVCache {
             #[cfg(not(feature = "targeted_precision"))]
             let bits = self.bits;
 
-            let (rtn_scales, rtn_zp, packed) = if self.group_size > 0 {
-                rtn_quantize_rows_grouped(tile_data, rows, cols, bits, self.group_size)
+            let bpr = packed_bytes_per_row(cols, bits);
+            let packed_len = rows * bpr;
+            let (scales_len, packed_len) = if self.group_size > 0 {
+                let groups_per_row = cols.div_ceil(self.group_size);
+                rtn_quantize_rows_grouped_into(
+                    tile_data,
+                    rows,
+                    cols,
+                    bits,
+                    self.group_size,
+                    &mut self.scratch_rtn_scales[..rows * groups_per_row],
+                    &mut self.scratch_rtn_zp[..rows * groups_per_row],
+                    &mut self.scratch_rtn_packed[..packed_len],
+                );
+                (rows * groups_per_row, packed_len)
             } else {
-                rtn_quantize_rows(tile_data, rows, cols, bits)
+                rtn_quantize_rows_into(
+                    tile_data,
+                    rows,
+                    cols,
+                    bits,
+                    &mut self.scratch_rtn_scales[..rows],
+                    &mut self.scratch_rtn_zp[..rows],
+                    &mut self.scratch_rtn_packed[..packed_len],
+                );
+                (rows, packed_len)
             };
-
-            (var_scales, rtn_scales, rtn_zp, packed, bits)
+            (scales_len, packed_len, bits)
         };
 
-        // Store
+        // Store: copy scratch → TileMeta using clear+extend (preserves Vec capacity
+        // across calls → zero alloc in steady state after first quantize).
         let bpr = packed_bytes_per_row(cols, bits);
         let meta = &mut self.key_tiles[Self::tile_meta_idx(self.n_tiles, layer, tile_idx)];
         meta.count = count;
-        meta.var_scales = var_scales;
-        meta.rtn_scales = rtn_scales;
-        meta.rtn_zp = rtn_zp;
+        meta.var_scales.s_col.clear();
+        meta.var_scales.s_col.extend_from_slice(&self.scratch_var_s_col[..cols]);
+        meta.var_scales.s_row.clear();
+        meta.var_scales.s_row.extend_from_slice(&self.scratch_var_s_row[..rows]);
+        meta.rtn_scales.clear();
+        meta.rtn_scales.extend_from_slice(&self.scratch_rtn_scales[..rtn_scales_len]);
+        meta.rtn_zp.clear();
+        meta.rtn_zp.extend_from_slice(&self.scratch_rtn_zp[..rtn_scales_len]);
 
         let off = self.key_tile_off(layer, tile_idx);
         let quantized = &mut self.key_quantized[off..off + self.key_tile_packed_len];
@@ -839,7 +898,7 @@ impl KVarNKVCache {
         // The slot is pre-sized for a full tile (tile_size cols); actual packed
         // data may be shorter for partial tiles.
         quantized.fill(0);
-        quantized[..expected_len].copy_from_slice(&packed);
+        quantized[..expected_len].copy_from_slice(&self.scratch_rtn_packed[..packed_len]);
     }
 
     /// Quantize a value tile: [tile_size, kv_dim] with variance normalization.
@@ -849,7 +908,7 @@ impl KVarNKVCache {
 
         // Reuse the pre-allocated scratch_tile buffer (tile_size * kv_dim floats).
         // Drop the mutable borrow before writing back to storage fields.
-        let (var_scales, rtn_scales, rtn_zp, packed, bits) = {
+        let (rtn_scales_len, packed_len, bits) = {
             let tile_data = &mut self.scratch_tile[..rows * cols];
 
             // val_buffer is already [tile_size, kv_dim] row-major contiguous; copy directly.
@@ -860,14 +919,15 @@ impl KVarNKVCache {
                 hadamard::hadamard_rows(tile_data, cols);
             }
 
-            // Step 1: Variance normalization
+            // Step 1: Variance normalization — write s_col/s_row directly into scratch.
             //   Static cal tables: O(1) lookup replaces Sinkhorn iterations (Plan 227 Phase 1)
             #[cfg(feature = "static_cal_tables")]
-            let var_scales = if let Some(ref cal) = self.static_cal {
-                // Use static per-head scales instead of iterative Sinkhorn
-                let s_row: Vec<f32> = (0..rows).map(|ch| cal.get_scale(layer, ch)).collect();
-                // Apply static scales to tile (reciprocal-multiply: one division per row,
-                // not per element — vectorizer-friendly inner loop).
+            if let Some(ref cal) = self.static_cal {
+                let s_row = &mut self.scratch_var_s_row[..rows];
+                for ch in 0..rows {
+                    s_row[ch] = cal.get_scale(layer, ch);
+                }
+                self.scratch_var_s_col[..cols].fill(1.0);
                 for ch in 0..rows {
                     let inv_scale = 1.0 / s_row[ch];
                     let row_off = ch * cols;
@@ -875,25 +935,16 @@ impl KVarNKVCache {
                         tile_data[row_off + t] *= inv_scale;
                     }
                 }
-                VarianceNormScales {
-                    s_col: vec![1.0f32; cols],
-                    s_row,
-                }
             } else if self.skip_varn {
-                VarianceNormScales {
-                    s_col: vec![1.0f32; cols],
-                    s_row: vec![1.0f32; rows],
-                }
+                self.scratch_var_s_col[..cols].fill(1.0);
+                self.scratch_var_s_row[..rows].fill(1.0);
             } else {
                 let config = VarNormConfig {
                     tile_size: self.tile_size,
                     ..Default::default()
                 };
-                variance_normalize_into(
-                    tile_data,
-                    rows,
-                    cols,
-                    &config,
+                variance_normalize_into_scales(
+                    tile_data, rows, cols, &config,
                     &mut self.varn_cur[..rows * cols],
                     &mut self.varn_col_s[..cols],
                     &mut self.varn_row_s[..rows],
@@ -904,25 +955,22 @@ impl KVarNKVCache {
                     &mut self.varn_log_s_row[..rows],
                     &mut self.varn_log_s_col_best[..cols],
                     &mut self.varn_log_s_row_best[..rows],
-                )
-            };
+                    &mut self.scratch_var_s_col[..cols],
+                    &mut self.scratch_var_s_row[..rows],
+                );
+            }
 
             #[cfg(not(feature = "static_cal_tables"))]
-            let var_scales = if self.skip_varn {
-                VarianceNormScales {
-                    s_col: vec![1.0f32; cols],
-                    s_row: vec![1.0f32; rows],
-                }
+            if self.skip_varn {
+                self.scratch_var_s_col[..cols].fill(1.0);
+                self.scratch_var_s_row[..rows].fill(1.0);
             } else {
                 let config = VarNormConfig {
                     tile_size: self.tile_size,
                     ..Default::default()
                 };
-                variance_normalize_into(
-                    tile_data,
-                    rows,
-                    cols,
-                    &config,
+                variance_normalize_into_scales(
+                    tile_data, rows, cols, &config,
                     &mut self.varn_cur[..rows * cols],
                     &mut self.varn_col_s[..cols],
                     &mut self.varn_row_s[..rows],
@@ -933,8 +981,10 @@ impl KVarNKVCache {
                     &mut self.varn_log_s_row[..rows],
                     &mut self.varn_log_s_col_best[..cols],
                     &mut self.varn_log_s_row_best[..rows],
-                )
-            };
+                    &mut self.scratch_var_s_col[..cols],
+                    &mut self.scratch_var_s_row[..rows],
+                );
+            }
 
             // Step 2: RTN quantization
             //   Targeted precision: use budget-allocated bits (Plan 227 Phase 2)
@@ -948,21 +998,47 @@ impl KVarNKVCache {
             #[cfg(not(feature = "targeted_precision"))]
             let bits = self.bits;
 
-            let (rtn_scales, rtn_zp, packed) = if self.group_size > 0 {
-                rtn_quantize_rows_grouped(tile_data, rows, cols, bits, self.group_size)
+            let bpr = packed_bytes_per_row(cols, bits);
+            let packed_len = rows * bpr;
+            let (scales_len, packed_len) = if self.group_size > 0 {
+                let groups_per_row = cols.div_ceil(self.group_size);
+                rtn_quantize_rows_grouped_into(
+                    tile_data,
+                    rows,
+                    cols,
+                    bits,
+                    self.group_size,
+                    &mut self.scratch_rtn_scales[..rows * groups_per_row],
+                    &mut self.scratch_rtn_zp[..rows * groups_per_row],
+                    &mut self.scratch_rtn_packed[..packed_len],
+                );
+                (rows * groups_per_row, packed_len)
             } else {
-                rtn_quantize_rows(tile_data, rows, cols, bits)
+                rtn_quantize_rows_into(
+                    tile_data,
+                    rows,
+                    cols,
+                    bits,
+                    &mut self.scratch_rtn_scales[..rows],
+                    &mut self.scratch_rtn_zp[..rows],
+                    &mut self.scratch_rtn_packed[..packed_len],
+                );
+                (rows, packed_len)
             };
-
-            (var_scales, rtn_scales, rtn_zp, packed, bits)
+            (scales_len, packed_len, bits)
         };
 
         let bpr = packed_bytes_per_row(cols, bits);
         let meta = &mut self.val_tiles[Self::tile_meta_idx(self.n_tiles, layer, tile_idx)];
         meta.count = count;
-        meta.var_scales = var_scales;
-        meta.rtn_scales = rtn_scales;
-        meta.rtn_zp = rtn_zp;
+        meta.var_scales.s_col.clear();
+        meta.var_scales.s_col.extend_from_slice(&self.scratch_var_s_col[..cols]);
+        meta.var_scales.s_row.clear();
+        meta.var_scales.s_row.extend_from_slice(&self.scratch_var_s_row[..rows]);
+        meta.rtn_scales.clear();
+        meta.rtn_scales.extend_from_slice(&self.scratch_rtn_scales[..rtn_scales_len]);
+        meta.rtn_zp.clear();
+        meta.rtn_zp.extend_from_slice(&self.scratch_rtn_zp[..rtn_scales_len]);
 
         let off = self.val_tile_off(layer, tile_idx);
         let quantized = &mut self.val_quantized[off..off + self.val_tile_packed_len];
@@ -971,7 +1047,7 @@ impl KVarNKVCache {
         // The slot is pre-sized for a full tile (tile_size rows); actual packed
         // data may be shorter for partial tiles.
         quantized.fill(0);
-        quantized[..expected_len].copy_from_slice(&packed);
+        quantized[..expected_len].copy_from_slice(&self.scratch_rtn_packed[..packed_len]);
     }
 }
 
@@ -1019,19 +1095,58 @@ pub fn packed_bytes_per_row(cols: usize, bits: u8) -> usize {
 ///
 /// For each row: find min/max, compute scale = (max - min) / (levels - 1),
 /// quantize each element to [0, levels-1], pack into bits.
+///
+/// This is the allocating convenience wrapper. Hot-path callers should prefer
+/// [`rtn_quantize_rows_into`] with a reusable scratch buffer.
 pub fn rtn_quantize_rows(
     tile: &[f32],
     rows: usize,
     cols: usize,
     bits: u8,
 ) -> (Vec<f32>, Vec<f32>, Vec<u8>) {
-    let levels = 1u32 << bits;
-    let half_levels = (levels - 1) as f32;
     let bpr = packed_bytes_per_row(cols, bits);
     let mut packed = vec![0u8; rows * bpr];
     let mut scales = vec![1.0f32; rows];
     let mut zps = vec![0.0f32; rows];
+    rtn_quantize_rows_into(tile, rows, cols, bits, &mut scales, &mut zps, &mut packed);
+    (scales, zps, packed)
+}
 
+/// In-place RTN quantize rows of a 2D tile into caller-provided buffers.
+///
+/// - `scales.len() >= rows` (row-major per-row scale)
+/// - `zps.len() >= rows`
+/// - `packed.len() >= rows * packed_bytes_per_row(cols, bits)`
+///
+/// The first `rows` entries of `scales`/`zps` and the first
+/// `rows * bpr` bytes of `packed` are overwritten; trailing bytes are untouched.
+/// On degenerate rows (constant value), `scales[r] = 0.0` and `zps[r] = lo`,
+/// and the packed bytes for that row are left untouched (dequant reads
+/// `q.mul_add(0.0, lo) = lo` for any q, so zero-init packed is fine).
+pub fn rtn_quantize_rows_into(
+    tile: &[f32],
+    rows: usize,
+    cols: usize,
+    bits: u8,
+    scales: &mut [f32],
+    zps: &mut [f32],
+    packed: &mut [u8],
+) {
+    let levels = 1u32 << bits;
+    let half_levels = (levels - 1) as f32;
+    let bpr = packed_bytes_per_row(cols, bits);
+    // Zero the output prefix so the degenerate-row early-continue path below
+    // (constant-value rows) leaves zero packed bytes for that row, matching
+    // the allocating wrapper's `vec![0u8; rows * bpr]` initialization.
+    // Without this, reused scratch would leak stale packed bytes from prior calls.
+    packed[..rows * bpr].fill(0);
+    // Initialise the scales/zps prefixes to the defaults the allocating
+    // wrapper used (scales=1.0, zps=0.0) so the degenerate-row early-continue
+    // path produces bit-identical TileMeta contents.
+    for r in 0..rows {
+        scales[r] = 1.0;
+        zps[r] = 0.0;
+    }
     for r in 0..rows {
         let row_off = r * cols;
         let row = &tile[row_off..row_off + cols];
@@ -1065,8 +1180,6 @@ pub fn rtn_quantize_rows(
             pack_value(&mut packed[r * bpr..], c, q, bits as usize);
         }
     }
-
-    (scales, zps, packed)
 }
 
 /// RTN quantize with sub-channel grouping.
@@ -1076,6 +1189,9 @@ pub fn rtn_quantize_rows(
 /// Returns (scales[rows * groups_per_row], zps[rows * groups_per_row], packed data).
 ///
 /// The packed data layout is identical to `rtn_quantize_rows`.
+///
+/// This is the allocating convenience wrapper. Hot-path callers should prefer
+/// [`rtn_quantize_rows_grouped_into`] with a reusable scratch buffer.
 pub fn rtn_quantize_rows_grouped(
     tile: &[f32],
     rows: usize,
@@ -1083,13 +1199,50 @@ pub fn rtn_quantize_rows_grouped(
     bits: u8,
     group_size: usize,
 ) -> (Vec<f32>, Vec<f32>, Vec<u8>) {
-    let levels = 1u32 << bits;
-    let half_levels = (levels - 1) as f32;
     let bpr = packed_bytes_per_row(cols, bits);
     let mut packed = vec![0u8; rows * bpr];
     let groups_per_row = cols.div_ceil(group_size);
     let mut scales = vec![1.0f32; rows * groups_per_row];
     let mut zps = vec![0.0f32; rows * groups_per_row];
+    rtn_quantize_rows_grouped_into(
+        tile, rows, cols, bits, group_size, &mut scales, &mut zps, &mut packed,
+    );
+    (scales, zps, packed)
+}
+
+/// In-place RTN quantize with sub-channel grouping into caller-provided buffers.
+///
+/// - `scales.len() >= rows * cols.div_ceil(group_size)`
+/// - `zps.len() >= rows * cols.div_ceil(group_size)`
+/// - `packed.len() >= rows * packed_bytes_per_row(cols, bits)`
+#[allow(clippy::too_many_arguments)]
+pub fn rtn_quantize_rows_grouped_into(
+    tile: &[f32],
+    rows: usize,
+    cols: usize,
+    bits: u8,
+    group_size: usize,
+    scales: &mut [f32],
+    zps: &mut [f32],
+    packed: &mut [u8],
+) {
+    let levels = 1u32 << bits;
+    let half_levels = (levels - 1) as f32;
+    let bpr = packed_bytes_per_row(cols, bits);
+    let groups_per_row = cols.div_ceil(group_size);
+    // Zero the output prefix so the degenerate-group early-continue path below
+    // (constant-value groups) leaves zero packed bytes for that group's row
+    // segment, matching the allocating wrapper's `vec![0u8; rows * bpr]` init.
+    // Without this, reused scratch would leak stale packed bytes from prior calls.
+    packed[..rows * bpr].fill(0);
+    // Initialise the scales/zps prefixes to the defaults the allocating
+    // wrapper used (scales=1.0, zps=0.0) so the degenerate-group early-continue
+    // path produces bit-identical TileMeta contents.
+    let total_entries = rows * groups_per_row;
+    for idx in 0..total_entries {
+        scales[idx] = 1.0;
+        zps[idx] = 0.0;
+    }
 
     for r in 0..rows {
         let row_off = r * cols;
@@ -1128,8 +1281,6 @@ pub fn rtn_quantize_rows_grouped(
             }
         }
     }
-
-    (scales, zps, packed)
 }
 
 /// Pack a value at given position into a bit-packed row.

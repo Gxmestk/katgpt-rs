@@ -231,6 +231,95 @@ pub fn variance_normalize_into(
     VarianceNormScales { s_col, s_row }
 }
 
+/// Same as [`variance_normalize_into`] but writes the resulting s_col / s_row
+/// directly into caller-owned slices instead of allocating two new Vecs.
+///
+/// - `out_s_col.len() >= cols`
+/// - `out_s_row.len() >= rows`
+///
+/// Equivalent to `variance_normalize_into` followed by reading `.s_col` /
+/// `.s_row` — bit-identical numerics, two fewer heap allocations.
+pub fn variance_normalize_into_scales(
+    tile: &mut [f32],
+    rows: usize,
+    cols: usize,
+    config: &VarNormConfig,
+    cur: &mut [f32],
+    col_s: &mut [f32],
+    row_s: &mut [f32],
+    mean: &mut [f32],
+    inv_row: &mut [f32],
+    inv_col: &mut [f32],
+    log_s_col: &mut [f32],
+    log_s_row: &mut [f32],
+    log_s_col_best: &mut [f32],
+    log_s_row_best: &mut [f32],
+    out_s_col: &mut [f32],
+    out_s_row: &mut [f32],
+) {
+    assert_eq!(out_s_col.len(), cols, "out_s_col size mismatch");
+    assert_eq!(out_s_row.len(), rows, "out_s_row size mismatch");
+
+    if rows == 0 || cols == 0 {
+        return;
+    }
+
+    let log_clamp_lo = config.log_clamp_lo;
+    let log_clamp_hi = config.log_clamp_hi;
+
+    log_s_col[..cols].fill(0.0);
+    log_s_row[..rows].fill(0.0);
+
+    cur.copy_from_slice(tile);
+    apply_dual_scale_into(cur, rows, cols, log_s_row, log_s_col, inv_row, inv_col);
+
+    col_stds_into(cur, rows, cols, col_s, mean);
+    row_stds_into(cur, rows, cols, row_s);
+    let mut imb_best = imbalance(col_s, row_s);
+    log_s_col_best[..cols].copy_from_slice(&log_s_col[..cols]);
+    log_s_row_best[..rows].copy_from_slice(&log_s_row[..rows]);
+
+    for _k in 0..config.iterations {
+        for (j, &s) in col_s[..cols].iter().enumerate() {
+            let log_s = s.ln();
+            let clamped = log_s.clamp(log_clamp_lo, log_clamp_hi);
+            log_s_col[j] = (log_s_col[j] + clamped).clamp(log_clamp_lo, log_clamp_hi);
+        }
+
+        cur.copy_from_slice(tile);
+        apply_dual_scale_into(cur, rows, cols, log_s_row, log_s_col, inv_row, inv_col);
+
+        row_stds_into(cur, rows, cols, row_s);
+        for (i, &s) in row_s[..rows].iter().enumerate() {
+            let log_s = s.ln();
+            let clamped = log_s.clamp(log_clamp_lo, log_clamp_hi);
+            log_s_row[i] = (log_s_row[i] + clamped).clamp(log_clamp_lo, log_clamp_hi);
+        }
+
+        cur.copy_from_slice(tile);
+        apply_dual_scale_into(cur, rows, cols, log_s_row, log_s_col, inv_row, inv_col);
+
+        col_stds_into(cur, rows, cols, col_s, mean);
+        let imb_cur = imbalance(col_s, row_s);
+
+        if imb_cur <= imb_best {
+            imb_best = imb_cur;
+            log_s_col_best[..cols].copy_from_slice(&log_s_col[..cols]);
+            log_s_row_best[..rows].copy_from_slice(&log_s_row[..rows]);
+        }
+    }
+
+    // Write s_col / s_row directly into caller-owned slices and reuse
+    // `inv_col` as the per-column reciprocal scratch for `apply_scales_into`.
+    for (j, &l) in log_s_col_best[..cols].iter().enumerate() {
+        out_s_col[j] = l.exp();
+    }
+    for (i, &l) in log_s_row_best[..rows].iter().enumerate() {
+        out_s_row[i] = l.exp();
+    }
+    apply_scales_into(tile, rows, cols, out_s_row, out_s_col, inv_col);
+}
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
