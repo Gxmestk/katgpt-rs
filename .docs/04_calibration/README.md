@@ -14,6 +14,7 @@
    cce_moderator.md (calibrated confidence at the token level)
         │
         ├── causal_head_importance.md (which attention heads carry causal signal)
+        ├── conformal_predictive_intervals.md (coverage-guaranteed UQ + the "Report the Floor" rule)
         └── faithfulness_probe.md (did the injected memory actually change the answer?)
               │
               ▼
@@ -24,6 +25,7 @@
 |---|---|
 | [`cce_moderator.md`](cce_moderator.md) | CCE Moderator — API reference & worked examples |
 | [`causal_head_importance.md`](causal_head_importance.md) | CausalHeadImportance — causal head-importance calibration + scale-normalized fusion |
+| [`conformal_predictive_intervals.md`](conformal_predictive_intervals.md) | Conformal Predictive Intervals — modelless UQ overlay + the canonical "Report the Floor" rule (Plan 340 + Plan 468 promotion, DEFAULT-ON) |
 | [`faithfulness_probe.md`](faithfulness_probe.md) | FaithfulnessProbe — causal-intervention diagnostic for injected memory (Plan 278) |
 | [`interpolation_geometry.md`](interpolation_geometry.md) | iMAUVE + 5-way intervention probe for committed latent substrates (Issue 158, Research 445) |
 | [`salience_tri_gate.md`](salience_tri_gate.md) | Salience Tri-Gate — per-tick `Speak` / `Silent` / `Delegate` (Plan 303) |
