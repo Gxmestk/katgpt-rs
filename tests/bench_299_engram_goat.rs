@@ -439,7 +439,19 @@ fn main() {
     if all_pass {
         println!("✅ G1 + G2 + G4 PASS.");
         println!("⏸️  G6 (effective depth) is deferred to riir-ai integration.");
-        println!("📌 Per the spec, the `engram` feature STAYS OPT-IN until G6 lands.");
+        // Post-Promotion update (2026-07-18, Issue 039): the `engram` feature is
+        // now transitively DEFAULT-ON at the katgpt-core leaf via
+        // `cognitive_architecture_root` → `engram` chain. The pre-promotion
+        // "STAYS OPT-IN until G6 lands" verdict below was accurate pre-2026-07-18
+        // but is now stale — G6 remains deferred (it needs a live inference
+        // pipeline that katgpt-core cannot host), yet the feature ships
+        // default-on because the primitive-level G1/G2/G4 gates PASS and the
+        // cognitive architecture root activates it. This root-level forwarder
+        // in katgpt-rs/Cargo.toml stays opt-in for explicit consumer control.
+        println!("📌 katgpt-core leaf is transitively DEFAULT-ON via");
+        println!("📌 `cognitive_architecture_root → engram` (Issue 039, 2026-07-18).");
+        println!("📌 G6 (effective-depth) remains deferred to riir-ai integration;");
+        println!("📌 the feature ships default-on because G1/G2/G4 PASS modellessly.");
         println!("📌 See `.benchmarks/299_engram_goat.md` for the promotion decision.");
     } else {
         println!("❌ At least one gate failed — see above for details.");

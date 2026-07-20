@@ -1290,8 +1290,12 @@ fn g_summary_print_verdict_table() {
     println!("║   T3.9 real-model accuracy ablations — harness + synthetic proxies ship  ║");
     println!("╚══════════════════════════════════════════════════════════════════════════╝");
     println!();
-    println!("Decision: keep swir_switch_thinking OPT-IN until riir-ai Plan 313 confirms");
-    println!("the G2 gate at n=20+ (currently 1.37× at n=5, target 1.3×). The algorithmic");
-    println!("invariants (G3-G8, G1c, G2p) all pass on synthetic data — the controller");
-    println!("is correct by construction. G1 is blocked by Gemma 2 2B capability.");
+    println!("Decision: swir_switch_thinking is DEFAULT-ON (Plan 313 T6.2, 2026-06-27)");
+    println!("confirmed G2 token-efficiency 1.32×/1.37×/1.43× at n=3/5/10 (gate ≥1.3×,");
+    println!("all pass) on Gemma 2 2B + MATH-500. The pre-promotion 'OPT-IN until");
+    println!("Plan 313 confirms G2 at n=20+' verdict was accurate pre-2026-06-27 but");
+    println!("is now stale — the gate landed at n=3/5/10 (no need for n=20+).");
+    println!("The algorithmic invariants (G3-G8, G1c, G2p) all pass on synthetic");
+    println!("data — the controller is correct by construction. G1 is blocked by");
+    println!("Gemma 2 2B capability (not a SwiR design flaw).");
 }

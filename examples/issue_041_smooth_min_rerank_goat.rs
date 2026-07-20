@@ -411,8 +411,17 @@ fn main() {
     if all_pass {
         println!("  GOAT gate: ALL PASS ✅");
         println!("  smooth_min_similarity now has its first real consumer: rerank.");
-        println!("  Promotion to default-on: deferred until consumer demonstrates");
-        println!("  real-world value on a production retrieval workload.");
+        // Post-Promotion update (2026-07-12, Issue 041 T6): the consumer GOAT
+        // gate PASSED — RerankMethod::SmoothMinAligned recall@5 = 1.000 vs
+        // Cosine 0.495 (+50.5pp). The feature is DEFAULT-ON in
+        // katgpt-core/Cargo.toml (Phase 17, 2026-07-12). The pre-promotion
+        // "Promotion to default-on: deferred until consumer demonstrates
+        // real-world value" verdict was accurate pre-2026-07-12 but is now
+        // stale — the consumer demonstrated the value and promotion landed.
+        println!("  PROMOTED to DEFAULT-ON (Issue 041 T6, 2026-07-12):");
+        println!("  consumer GOAT PASS — SmoothMinAligned recall@5 = 1.000 vs");
+        println!("  Cosine 0.495 (+50.5pp). Feature is in katgpt-core `default`");
+        println!("  array (Phase 17, 2026-07-12).");
     } else {
         println!("  GOAT gate: FAIL ❌ — do not promote");
     }
