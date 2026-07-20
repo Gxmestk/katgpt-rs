@@ -1543,3 +1543,239 @@ fn g1_dh_29160_k10_lambda_sweep() {
 
     // No assertion — this is a measurement test, not a pass/fail gate.
 }
+
+/// Phase 5.3 G1 — R=1 K=8/M=24 λ-sweep at d_h=576 (2026-07-21).
+///
+/// The last unexplored single-config gate-pass candidate. Phase 1 ran this
+/// exact config at λ=5e-3 and got threshold **8.16 LT (PASS)** but NRMSE
+/// 4.79e-3 (FAIL, ~5× above the 1e-3 target). Phase 5.2 confirmed K is
+/// exhausted (threshold plateaus at K≥8) and M is the only remaining
+/// threshold lever — but M≥16 at R=2 explodes d_h (72_576, infeasible).
+///
+/// **The untested hypothesis:** at d_h=576 (well-determined with N≈4050
+/// samples), λ=5e-3 is *too large* — the K=4 sweep showed the optimal λ
+/// scales with d_h (5e-3 at d_h=4752, 5e-2 at d_h=18_720 when underdetermined).
+/// For d_h=576 with N/d_h ≈ 7:1, smaller λ should give a strictly better
+/// fit. If even one λ in {5e-4, 1e-3, 5e-3, 5e-2} brings NRMSE ≤ 1e-3 while
+/// threshold stays ≥ 8 LT, we have a **clean single-config gate pass** and
+/// promotion is straightforward — no gate re-spec needed.
+///
+/// Cost: seconds (d_h=576 is 32× smaller than d_h=18_720; Gram is 2.6 MB,
+/// Cholesky is microseconds). This is the cheapest experiment with the
+/// highest potential payoff in the entire KARC gate saga.
+#[test]
+fn g1_r1_k8_m24_dh576_lambda_sweep() {
+    use std::time::Instant;
+
+    const K_R1: usize = 8;
+    const M_R1: usize = 24;
+    const R_R1: usize = 1;
+    const D_H_R1: usize = K_R1 * D * M_R1; // 576 — R=1 means no outer products
+    const N_R1: usize = 4000;
+
+    println!(
+        "Phase 5.3 R=1 K=8/M=24 λ-sweep: d_h={}, N={}",
+        D_H_R1, N_R1
+    );
+    println!("  Reference (Phase 1, λ=5e-3): NRMSE 4.79e-3, threshold 8.16 LT");
+
+    // Build trajectory + normalize
+    let traj_raw = generate_double_scroll(N_R1 + K_R1 + 50, DT, 1000, SUBSTEPS);
+    let mut traj = traj_raw.clone();
+    let mut scale = [1.0f32; D];
+    let mut offset = [0.0f32; D];
+    for d in 0..D {
+        let mut lo = f32::INFINITY;
+        let mut hi = f32::NEG_INFINITY;
+        for i in 0..(traj.len() / D) {
+            let v = traj[i * D + d];
+            if v < lo {
+                lo = v;
+            }
+            if v > hi {
+                hi = v;
+            }
+        }
+        let range = (hi - lo).max(1e-6);
+        offset[d] = (hi + lo) * 0.5;
+        scale[d] = 2.0 / range;
+        for i in 0..(traj.len() / D) {
+            traj[i * D + d] = (traj[i * D + d] - offset[d]) * scale[d];
+        }
+    }
+    let n_total = traj.len() / D;
+    let n_pairs = n_total - K_R1;
+
+    // Build features + targets (R=1 path)
+    let mut features = vec![0.0f32; n_pairs * D_H_R1];
+    let mut targets = vec![0.0f32; n_pairs * D];
+    let basis_r1 = ChebyshevBasis::<M_R1>::new();
+    let mut row_buf = vec![0.0f32; D_H_R1];
+    for (pair_idx, t) in ((K_R1 - 1)..(n_total - 1)).enumerate() {
+        let mut delay = [0.0f32; K_R1 * D];
+        for lag in 0..K_R1 {
+            let idx = t - lag;
+            for d in 0..D {
+                delay[lag * D + d] = traj[idx * D + d];
+            }
+        }
+        feature_expand_higher_order::<ChebyshevBasis<M_R1>, M_R1, R_R1>(
+            &delay, &basis_r1, &mut row_buf,
+        );
+        features[pair_idx * D_H_R1..(pair_idx + 1) * D_H_R1].copy_from_slice(&row_buf);
+        for d in 0..D {
+            targets[pair_idx * D + d] = traj[(t + 1) * D + d];
+        }
+    }
+
+    // Build unregularized Gram + Cov (ONCE)
+    let mut gram_unreg = vec![0.0f64; D_H_R1 * D_H_R1];
+    let feature_iter = (0..n_pairs).map(|i| &features[i * D_H_R1..(i + 1) * D_H_R1] as &[f32]);
+    chunked_gram_into(feature_iter, &mut gram_unreg, 0.0, D_H_R1);
+    let mut cov = vec![0.0f64; D_H_R1 * D];
+    for p in 0..n_pairs {
+        let row = &features[p * D_H_R1..(p + 1) * D_H_R1];
+        let target = &targets[p * D..(p + 1) * D];
+        for i in 0..D_H_R1 {
+            let ri = row[i] as f64;
+            for d in 0..D {
+                cov[i * D + d] += ri * target[d] as f64;
+            }
+        }
+    }
+    drop(features);
+
+    // Reusable buffers
+    let mut gram_work = vec![0.0f64; D_H_R1 * D_H_R1];
+    let mut chol = vec![0.0f64; D_H_R1 * D_H_R1];
+    let mut z = vec![0.0f64; D_H_R1 * D];
+    let mut wt = vec![0.0f64; D_H_R1 * D];
+    let mut wout = vec![0.0f32; D * D_H_R1];
+    let mut psi = vec![0.0f32; D_H_R1];
+
+    // λ sweep — focus on the small-λ regime (d_h=576 is well-determined,
+    // N/d_h ≈ 7:1, so smaller λ should strictly improve the fit).
+    let lambdas: [f64; 5] = [5e-4, 1e-3, 5e-3, 1e-2, 5e-2];
+    let mut results: Vec<(f64, f32, f64)> = Vec::with_capacity(lambdas.len());
+
+    println!("{:>10} {:>15} {:>15}", "λ", "NRMSE(1 LT)", "threshold(LT)");
+    for &lambda in &lambdas {
+        // Copy unreg Gram + add λI
+        gram_work.copy_from_slice(&gram_unreg);
+        for i in 0..D_H_R1 {
+            gram_work[i * D_H_R1 + i] += lambda;
+        }
+
+        // Cholesky + solve
+        let t_fit = Instant::now();
+        ridge_solve_direct_f64(&mut wt, &mut chol, &mut z, &gram_work, &cov, D_H_R1, D);
+        let fit_dt = t_fit.elapsed();
+
+        // Build Wout (D × d_h, f32) = transpose of wt
+        for d in 0..D {
+            for j in 0..D_H_R1 {
+                wout[d * D_H_R1 + j] = wt[j * D + d] as f32;
+            }
+        }
+
+        // Autonomous rollout over 10 LT (extended to see threshold behavior)
+        let horizon = (10.0 * SAMPLES_PER_LT).ceil() as usize;
+        let seed_t = n_total - 1;
+        let mut delay = [0.0f32; K_R1 * D];
+        for lag in 0..K_R1 {
+            let idx = seed_t - lag;
+            for d in 0..D {
+                delay[lag * D + d] = traj[idx * D + d];
+            }
+        }
+        let mut true_state: [f64; 3] = [
+            traj_raw[seed_t * D] as f64,
+            traj_raw[seed_t * D + 1] as f64,
+            traj_raw[seed_t * D + 2] as f64,
+        ];
+        let mut pred = Vec::with_capacity(horizon * D);
+        let mut truth = Vec::with_capacity(horizon * D);
+        let mut cur_delay = delay;
+        for _ in 0..horizon {
+            rk4_step_substepped(&mut true_state, DT, SUBSTEPS);
+            truth.push(true_state[0] as f32);
+            truth.push(true_state[1] as f32);
+            truth.push(true_state[2] as f32);
+            feature_expand_higher_order::<ChebyshevBasis<M_R1>, M_R1, R_R1>(
+                &cur_delay, &basis_r1, &mut psi,
+            );
+            let mut out_norm = [0.0f32; D];
+            for d in 0..D {
+                let mut s = 0.0f32;
+                for j in 0..D_H_R1 {
+                    s += wout[d * D_H_R1 + j] * psi[j];
+                }
+                out_norm[d] = s;
+            }
+            for d in 0..D {
+                pred.push(out_norm[d] / scale[d] + offset[d]);
+            }
+            let mut new_delay = [0.0f32; K_R1 * D];
+            new_delay[..D].copy_from_slice(&out_norm);
+            new_delay[D..].copy_from_slice(&cur_delay[..(K_R1 - 1) * D]);
+            cur_delay = new_delay;
+        }
+
+        let n_one_lt = (1.0 * SAMPLES_PER_LT).ceil() as usize;
+        let n_one_lt = n_one_lt.max(1).min(pred.len() / D);
+        let nrmse_one_lt = nrmse(&pred[..n_one_lt * D], &truth[..n_one_lt * D], D);
+        let sigma = mean_sigma(&truth, D);
+        let thr_sample = threshold_time(&pred, &truth, D, 0.1, sigma);
+        let thr_lt = thr_sample as f64 / SAMPLES_PER_LT;
+
+        println!(
+            "{:>10.0e} {:>15.6e} {:>15.2}   (fit {:?})",
+            lambda, nrmse_one_lt, thr_lt, fit_dt
+        );
+        results.push((lambda, nrmse_one_lt, thr_lt));
+    }
+
+    println!();
+    let nrmse_target = 1.0e-3_f64;
+    let threshold_target = 8.0_f64;
+    let mut any_nrmse_pass = false;
+    let mut any_threshold_pass = false;
+    let mut any_both_pass = false;
+    for &(lambda, nrmse_v, thr_v) in &results {
+        let nrmse_pass = (nrmse_v as f64) <= nrmse_target;
+        let thr_pass = thr_v >= threshold_target;
+        any_nrmse_pass |= nrmse_pass;
+        any_threshold_pass |= thr_pass;
+        any_both_pass |= nrmse_pass && thr_pass;
+        let mark = if nrmse_pass && thr_pass {
+            "✅✅ BOTH PASS"
+        } else if nrmse_pass {
+            "   NRMSE pass"
+        } else if thr_pass {
+            "         thr pass"
+        } else {
+            ""
+        };
+        println!(
+            "  λ={:.0e}: NRMSE={:.6e} {}, threshold={:.2} LT {}{}",
+            lambda,
+            nrmse_v,
+            if nrmse_pass { "✅" } else { "❌" },
+            thr_v,
+            if thr_pass { "✅" } else { "❌" },
+            mark
+        );
+    }
+
+    println!();
+    if any_both_pass {
+        println!("  ✅✅✅ CLEAN SINGLE-CONFIG GATE PASS — promote to default-on.");
+    } else if any_nrmse_pass && any_threshold_pass {
+        println!("  ⚠️  SPLIT PASS — NRMSE and threshold pass at different λ values.");
+        println!("     Proceed to gate re-spec (Issue 186 Path D).");
+    } else {
+        println!("  ❌ No clean pass. Proceed to gate re-spec (Issue 186 Path D).");
+    }
+
+    // No assertion — this is a measurement test, not a pass/fail gate.
+}
