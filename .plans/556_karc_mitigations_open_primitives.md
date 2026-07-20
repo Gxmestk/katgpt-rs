@@ -148,7 +148,7 @@ Promotion rule: each primitive ships behind its own feature flag (`karc_regime_g
 - [x] **T4.3** Promotion decision per primitive: if G1–G4 pass AND the Plan 514 runtime integration demonstrates a measured gain → promote to default-on. Else: keep opt-in with documented reason. **DECISION (2026-07-20):**
   - **`KarcRegimeGate`**: stays opt-in. G1-G4 PASS, but promotion requires a real production-corpus gain (Plan 514 Phase 1 has synthetic-corpus G1=92.45% MAE reduction — not enough for default-on without production evidence).
   - **`karc_batched_matvec`**: stays opt-in indefinitely. G2 PARTIAL PASS — the primitive is correct but the per-NPC-Wout architecture doesn't amortize. Promotion requires Plan 514 Phase 3 cell-shared design.
-  - **`KarcLodTier`**: stays opt-in. G1-G4 PASS, but promotion requires Plan 514 Phase 2 (LOD tier dispatch) to demonstrate a measured gain on a real NPC corpus.
+  - **`KarcLodTier`**: stays opt-in. G1-G4 PASS at the primitive level, but **Plan 514 Phase 2 measured G2 FAIL at the runtime integration level** (10k NPCs mixed-tier = 13.5 ms vs 5 ms target; mixed_lod0_heavy ≈ uniform_lod1 because the dormant-Lod1 memory overhead cancels the compute savings — see `riir-ai/.benchmarks/514_karc_lod_dispatch_goat.md`). The primitive is correct; the runtime architecture needs a pure-enum redesign (breaks `forecaster()` API for freeze/cross_game/mcts_collapse) before the theoretical compute savings materialize at crowd scale.
 
 ---
 
