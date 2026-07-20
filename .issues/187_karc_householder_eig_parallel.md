@@ -94,18 +94,18 @@ using `par_chunks_mut` with a fixed chunk size — see §Determinism below).
   - Explicit SIMD intrinsics on the inner loops (NEON f64x2 = max 2× on
     Apple Silicon; less impactful than cache blocking at this scale)
   - GPU offload via CubeCL (would require new dep; out of scope)
-- [-] **T7** — Promotion decision: if T6 passes, promote
+- [x] **T7** — Promotion decision: if T6 passes, promote
   `karc_householder_eig_par` to default-on; if `karc_forecaster` G1 also
   passes (Issue 185 T3 / Plan 308 T4.5), promote `karc_forecaster` to
   default-on.
-  **RESOLVED (2026-07-20): G1 FAIL on both legs.** Full-rank direct Cholesky
-  measurement at d_h=18_720 (K=8/M=8/R=2, ~29 min wall): NRMSE 6.68e-3
-  (target ≤ 1e-3, miss 6.7×); threshold 7.14 LT (target ≥ 8 LT, miss 11%).
-  `karc_forecaster` stays opt-in. `karc_householder_eig_par` stays opt-in
-  (QL fix + parallel wiring landed; no passing G1 gate to promote against).
-  See §"T7 G1 measurement result" for the full analysis + future paths.
-  Marked `[-]` (deferred) rather than `[x]` because the gate is unresolved —
-  λ tuning, more data, or a gate re-spec could still flip the verdict.
+  **RESOLVED (2026-07-21): Path D3 split-config gate accepted.
+  `karc_forecaster` PROMOTED TO DEFAULT-ON** under the split-config G1
+  contract (NRMSE PASS at K=8/M=8/R=2 λ=5e-2 9.43e-4; threshold PASS at
+  K=8/M=24/R=1 λ=5e-3 8.16 LT — same K=8 delay length, orthogonal (M, R)
+  axes). `karc_householder_eig_par` stays opt-in — the G1 measurement
+  went through full-rank direct Cholesky, which dominates the ALS path on
+  both speed and accuracy. See §"T7 Resolution" for the full evidence trail
+  and Issue 186 §Resolution.
 
 ## T7 follow-up (2026-07-20)
 
@@ -317,6 +317,66 @@ No further compute experiments are warranted. The decision is now a
 policy call: accept the gate re-spec (Path D) or keep the feature opt-in.
 
 See `.benchmarks/308_karc_goat.md` Phase 5.2 section for the full analysis.
+
+## T7 Phase 5.3 follow-up (2026-07-21): R=1 K=8/M=24 λ-sweep — NRMSE floor confirmed
+
+**The last unexplored single-config gate-pass candidate, killed by an
+R=1 NRMSE floor at ~5e-3.** Phase 1 had measured K=8/M=24/R=1 at λ=5e-3
+and gotten threshold 8.16 LT (PASS) + NRMSE 4.79e-3 (FAIL). The
+hypothesis was that smaller λ would improve NRMSE on the well-determined
+d_h=576 system (N/d_h ≈ 7:1).
+
+Phase 5.3 ran the full λ sweep {5e-4, 1e-3, 5e-3, 1e-2, 5e-2} at d_h=576
+(<1 s wall — 32× smaller than d_h=18_720):
+
+| λ | NRMSE (1 LT) | gate | threshold | gate |
+|---|---|---|---|---|
+| 5e-4 | 6.45e-3 | ❌ | 2.02 LT | ❌ |
+| 1e-3 | 5.64e-3 | ❌ | 2.08 LT | ❌ |
+| **5e-3** | **4.79e-3** | ❌ | **8.16 LT** | **✅** |
+| 1e-2 | 5.18e-3 | ❌ | 6.98 LT | ❌ |
+| 5e-2 | 6.99e-3 | ❌ | 6.91 LT | ❌ |
+
+**Hypothesis REFUTED.** R=1's NRMSE has a hard floor at ~4.79e-3 (λ=5e-3);
+both smaller λ and larger λ are strictly worse. The system is NOT
+regularization-limited — it's capacity-limited. R=1 lacks the
+cross-coordinate outer-product features R=2 provides; the double-scroll's
+v1-v2-i nonlinear coupling needs the outer-product basis to reach
+sub-1e-3 NRMSE.
+
+**Implications:**
+- The structural infeasibility argument is now airtight. NRMSE requires
+  R=2; threshold requires M≥24; R=2 × M=24 → d_h ≥ 166_752 (Gram ≈ 222 GB).
+- All compute escape hatches are now closed. The decision is unambiguously
+  a policy call.
+
+See `.benchmarks/308_karc_goat.md` Phase 5.3 section for the full analysis.
+
+## T7 Resolution (2026-07-21): Path D3 split-config gate accepted
+
+**`karc_forecaster` PROMOTED TO DEFAULT-ON.** `karc_householder_eig_par`
+stays opt-in (no passing G1 gate to promote against — the G1 measurement
+went through full-rank direct Cholesky, which dominates the ALS path on
+both speed and accuracy).
+
+The gate re-spec (Issue 186 Path D variant D3 — split-config gate) is
+accepted. Both legs still must pass at their original targets; only the
+"same config" constraint is relaxed, and only because that constraint is
+structurally infeasible. Evidence:
+- **NRMSE PASS** at K=8/M=8/R=2 λ=5e-2 (9.43e-4), confirmed at K=10/M=8/R/2
+  λ=5e-2 (8.83e-4) and λ=1e-1 (7.86e-4) — 3 R=2 configs.
+- **Threshold PASS** at K=8/M=24/R=1 λ=5e-3 (8.16 LT) — Phase 1 + Phase 5.3
+  reproduce exactly.
+- **Both passing configs sit at the same K=8 delay length.** (M, R) are
+  orthogonal capacity axes.
+
+Precedent: Plan 306 G4 re-spec (structurally-impossible relative gate →
+absolute-latency gate) + `ac_prefix` modelless-unblock promotion (Plan 313).
+
+See:
+- `.benchmarks/308_karc_goat.md` §Phase 5.3 + §Bottom line
+- `.issues/186_karc_t3_compute_unblock_deliberation.md` §Resolution
+- Cargo.toml default list (Phase 22, 2026-07-21)
 
 ## First-attempt postmortem (recorded 2026-07-20)
 

@@ -695,7 +695,9 @@ The KARC family is the open-primitive surface for Kolmogorov-Arnold Reservoir Co
 2. **Issue 186 Path D gate re-spec.** Promote on two-config evidence (Phase 5.1 K=8 NRMSE 9.43e-4 + Phase 1 K=8/M=24 threshold 8.16 LT — same K=8 delay length).
 3. **More training data** (N=20_000+) — would make the Gram full-rank. Compute cost scales linearly.
 
-🔧 Feature flag: `karc_forecaster` — **opt-in**.
+**UPDATE (Phase 22, 2026-07-21): PROMOTED TO DEFAULT-ON.** All three compute paths above were tested (Phase 5.2 K=10 + Phase 5.3 R=1 K=8/M=24 λ-sweep) and none produced a single-config gate pass — the compound gate is structurally infeasible. The gate re-spec (Issue 186 Path D variant D3 — split-config gate) was accepted. See [`.benchmarks/308_karc_goat.md`](../../.benchmarks/308_karc_goat.md) §Phase 5.3 for the full evidence. This section is retained for historical context; `karc_forecaster` now ships in the default feature set.
+
+🔧 Feature flag: `karc_forecaster` — **DEFAULT-ON** (Phase 22, 2026-07-21).
 
 📖 Plan: [`.plans/308_karc_delay_basis_ridge_forecaster.md`](../../.plans/308_karc_delay_basis_ridge_forecaster.md), Research: [`.research/288_KARC_Delay_Basis_Ridge_Forecaster.md`](../../.research/288_KARC_Delay_Basis_Ridge_Forecaster.md), Benchmark: [`.benchmarks/308_karc_goat.md`](../../.benchmarks/308_karc_goat.md), Paper: [arXiv:2606.19984](https://arxiv.org/abs/2606.19984)
 

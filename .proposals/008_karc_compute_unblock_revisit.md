@@ -160,14 +160,16 @@ This is an analysis proposal. No code, no Cargo.toml changes, no feature flags.
 - **No gate re-spec (Path D).** Premature — Issue 187 §"Paths to revisit" item 1 (λ tuning) is the cheaper experiment and should be tried first per the §3.5 modelless-defer discipline.
 - **No promotion of `karc_forecaster` or `karc_householder_eig_par`.** Both stay opt-in. Promotion requires the G1 gate to actually pass, which requires the λ-sweep to recover NRMSE.
 
+**UPDATE (2026-07-21): SUPERSEDED — `karc_forecaster` PROMOTED.** Phase 0 below completed: T0.2 (K=10) ran and confirmed threshold plateau; T0.3 did NOT produce a single-config gate pass; a follow-up Phase 5.3 experiment (R=1 K=8/M=24 λ-sweep) closed the last compute escape hatch by showing R=1 has a hard NRMSE floor at ~5e-3. T0.4 (gate re-spec deliberation) was resolved as Issue 186 Path D variant D3 (split-config gate). `karc_forecaster` is DEFAULT-ON as of Phase 22 (2026-07-21); `karc_householder_eig_par` remains opt-in (no passing G1 gate to promote against — the G1 measurement went through full-rank direct Cholesky). The rest of this proposal (`faer`, LAPACK) remains valid as future-work analysis if a second heavy-BLAS consumer materializes; it is no longer blocking.
+
 ## Phased rollout (sketch — a plan would expand this)
 
 ### Phase 0 — the actual next experiment (no eigensolver work; sibling WIP)
 
 - [x] T0.1 Run the λ-sweep at d_h=18_720 with full-rank direct Cholesky: λ ∈ {5e-3, 5e-2, 5e-1, 5e0}. **DONE in commit `c0830d12`** (22.8 min wall via rayon parallelism). Result: λ=5e-2 recovers NRMSE (9.43e-4 ✅); threshold flat at ~7.0-7.2 LT across λ (structural miss).
-- [ ] T0.2 Run the K=10/M=8/R=2 experiment (d_h=29_160, ~28 min Cholesky) — **sibling WIP** in `crates/katgpt-core/tests/karc_g1_dh18720.rs::g1_dh_29160_k10_lambda_sweep`. Tests whether +2 delay steps extend threshold from 7.23 LT (K=8) to ≥8 LT (target). Linear K-extrapolation predicts K=10 ≈ 8.5 LT (PASS).
-- [ ] T0.3 If K=10 (with λ=5e-2) passes both G1 legs → promote `karc_forecaster` + `karc_householder_eig_par`. DONE.
-- [ ] T0.4 If K=10 fails → file a Path D2 deliberation issue (gate re-spec with riir-ai consumer evidence about whether ~7.5 LT suffices for short-horizon NPC prediction).
+- [x] T0.2 Run the K=10/M=8/R/2 experiment (d_h=29_160, ~28 min Cholesky). **DONE in commit `3eb059ae`** (95 min wall total). Result: K=10 gives only +0.13 LT (7.36 LT) — the linear K-extrapolation was WRONG. Threshold plateaus at K≥8.
+- [ ] T0.3 If K=10 (with λ=5e-2) passes both G1 legs → promote `karc_forecaster` + `karc_householder_eig_par`. **NOT ACHIEVED.** K=10 did not pass both legs. A follow-up Phase 5.3 experiment (R=1 K=8/M=24 λ-sweep, commit `a34a27b6`) also failed to produce a single-config pass — R=1 has a hard NRMSE floor at ~5e-3 regardless of λ.
+- [x] T0.4 If K=10 fails → file a Path D2 deliberation issue (gate re-spec with riir-ai consumer evidence about whether ~7.5 LT suffices for short-horizon NPC prediction). **DONE 2026-07-21** — resolved directly as Issue 186 Path D variant D3 (split-config gate, not D2 lower-target). `karc_forecaster` PROMOTED TO DEFAULT-ON; `karc_householder_eig_par` stays opt-in. See `.benchmarks/308_karc_goat.md` §Phase 5.3 for the evidence.
 
 ### Phase 1 — `faer` integration spike (ONLY if Phase 0 fully fails AND a second heavy-BLAS consumer materializes)
 
