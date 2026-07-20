@@ -272,10 +272,20 @@ fn tqli_implicit_shift_par(
     for l in 0..n {
         let mut iter = 0;
         loop {
+            // LAPACK `dsteqr`-style global convergence scale — see the serial
+            // path in `super::tqli_implicit_shift` for the full rationale.
+            // The NR-local check `|e[m]| + dd == dd` does not fire for tiny
+            // eigenvalues (near-singular Grams from higher-order R=2 features
+            // when `n_samples < d_h`); the OR with `|e[m]| ≤ eps · max(|d|)`
+            // provides the global-scale fallback. Bit-identical to the serial
+            // path (same check, same OR).
+            let global_max_d: f64 = d.iter().take(n).map(|x| x.abs()).fold(0.0_f64, f64::max);
+            let reltol = f64::EPSILON * global_max_d;
+
             let mut m = l;
             while m < n - 1 {
                 let dd = d[m].abs() + d[m + 1].abs();
-                if e[m].abs() + dd == dd {
+                if e[m].abs() + dd == dd || e[m].abs() <= reltol {
                     break;
                 }
                 m += 1;

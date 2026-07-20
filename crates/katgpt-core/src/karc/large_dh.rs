@@ -177,16 +177,23 @@ fn low_rank_fit_jacobi_with_init(
     // ── One-time: eigendecompose G = Q_g · Λ_g · Q_gᵀ (d_h × d_h) ──
     // This replaces low_rank_fit_with_init's pre-compute of chol(G + λI).
     //
-    // Two eigensolver paths (Issue 186):
+    // Three eigensolver paths (Issues 186 + 187):
     //   - Default (no feature): in-tree `jacobi_eigen` (Plan 308 T2.3).
     //     Classic cyclic Jacobi with sign-bug fix from Issue 185.
     //     O(d_h³·n_sweeps) cost — infeasible at d_h > ~5000.
     //   - `karc_householder_eig` feature: `linalg::symmetric_eig` (Issue 186
-    //     Path B). Householder tridiag + implicit-shift QL. ~5-10× faster
-    //     at d_h ≥ 256, feasible at d_h = 18_720 (~5-15 min one-time wall).
-    // Both paths produce bit-identical (eigvals, eigvecs) modulo eigenvector
-    // sign — verified by `tests/karc_low_rank_jacobi_vs_kronecker.rs` under
-    // the `karc_householder_eig` feature flag.
+    //     Path B). Serial Householder tridiag + implicit-shift QL. ~5-10×
+    //     faster than Jacobi at d_h ≥ 256.
+    //   - `karc_householder_eig_par` feature (implies the above): row-parallel
+    //     rayon variant `linalg::symmetric_eig::par::symmetric_eig_par`
+    //     (Issue 187). 6-8× over serial at n ≥ 1024 on 16 cores; brings
+    //     d_h = 18_720 from ~12 h projected serial to ~87 min wall.
+    // All three paths produce bit-identical (eigvals, eigvecs) modulo
+    // eigenvector sign — the parallel path is bit-identical to serial by
+    // construction (row-parallel, no cross-row reductions); verified by
+    // `tests/karc_low_rank_jacobi_vs_kronecker.rs` + `symmetric_eig/tests.rs`
+    // `par_vs_serial_*` parity tests under the `karc_householder_eig_par`
+    // feature flag.
     #[cfg(not(feature = "karc_householder_eig"))]
     {
         // The Jacobi sweep count is bounded: for SPD Grams, ~10 sweeps typically
@@ -206,11 +213,24 @@ fn low_rank_fit_jacobi_with_init(
             g_max_sweeps,
         );
     }
-    #[cfg(feature = "karc_householder_eig")]
+    #[cfg(all(feature = "karc_householder_eig", not(feature = "karc_householder_eig_par")))]
     {
         // Numerical Recipes default: 30 QL iterations per eigenvalue before
         // declaring non-convergence. For SPD Grams, ~2-5 iterations suffice.
         crate::linalg::symmetric_eig::symmetric_eig(
+            &mut scratch.eigvals_g[..d_h],
+            &mut scratch.eigvecs_g[..d_h * d_h],
+            gram,
+            &mut scratch.symmetric_eig,
+            d_h,
+            30,
+        );
+    }
+    #[cfg(feature = "karc_householder_eig_par")]
+    {
+        // Same algorithm + same max-iter as the serial Householder path; only
+        // the parallelism differs (row-parallel rayon — bit-identical output).
+        crate::linalg::symmetric_eig::par::symmetric_eig_par(
             &mut scratch.eigvals_g[..d_h],
             &mut scratch.eigvecs_g[..d_h * d_h],
             gram,

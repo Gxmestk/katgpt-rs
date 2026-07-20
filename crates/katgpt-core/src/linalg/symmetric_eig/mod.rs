@@ -340,6 +340,24 @@ fn tqli_implicit_shift(
     for l in 0..n {
         let mut iter = 0;
         loop {
+            // LAPACK `dsteqr`-style global convergence scale: the NR-local
+            // check `|e[m]| + dd == dd` (with `dd = |d[m]| + |d[m+1]|`) only
+            // fires when `|e[m]|` is negligible relative to the LOCAL
+            // eigenvalue magnitudes. For matrices with tiny eigenvalues
+            // (near-singular Grams from higher-order R=2 features when
+            // `n_samples < d_h`, e.g. KARC large-d_h configs), `dd` is O(1e-10)
+            // and the local check requires `|e[m]| < ~1e-26` — below machine
+            // precision relative to the OVERALL matrix scale, so QL never
+            // deflates and spins forever.
+            //
+            // Fix: also deflate when `|e[m]| ≤ eps · max(|d|)` over the full
+            // diagonal. This is the LAPACK `RELTOL = eps · max(|D|)` criterion.
+            // For O(1) eigenvalues this is equivalent to the NR check (the OR
+            // is dominated by whichever fires first); for tiny-eigenvalue
+            // matrices it provides the missing global-scale fallback.
+            let global_max_d: f64 = d.iter().take(n).map(|x| x.abs()).fold(0.0_f64, f64::max);
+            let reltol = f64::EPSILON * global_max_d;
+
             // Find smallest m in [l, n-1) with |e[m]| negligible relative to
             // (|d[m]| + |d[m+1]|). This is the bottom of the active block [l, m]:
             // the matrix splits there, so we can deflate [l, m] independently.
@@ -348,7 +366,9 @@ fn tqli_implicit_shift(
                 let dd = d[m].abs() + d[m + 1].abs();
                 // NR's exact check: (|e[m]| + dd) == dd, i.e. |e[m]| is below
                 // the rounding threshold of dd.
-                if e[m].abs() + dd == dd {
+                //
+                // OR the LAPACK global-scale check: |e[m]| ≤ eps · max(|d|).
+                if e[m].abs() + dd == dd || e[m].abs() <= reltol {
                     break;
                 }
                 m += 1;

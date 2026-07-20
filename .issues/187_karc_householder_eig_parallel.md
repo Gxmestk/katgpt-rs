@@ -99,6 +99,58 @@ using `par_chunks_mut` with a fixed chunk size — see §Determinism below).
   passes (Issue 185 T3 / Plan 308 T4.5), promote `karc_forecaster` to
   default-on.
 
+## T7 follow-up (2026-07-20)
+
+**QL convergence bug found and fixed.** The first attempt to run the G1
+measurement at the small config (K=4, M=8, R=2, d_h=4752 — the smoke test)
+panicked with `QL failed to converge at l=0 after 30 iterations` on BOTH
+serial and parallel paths. Root cause: the NR-style local convergence check
+`|e[m]| + dd == dd` (with `dd = |d[m]| + |d[m+1]|`) cannot deflate when
+the Gram has tiny eigenvalues (O(1e-10)) — which is the case for higher-order
+R=2 features when `n_samples < d_h` (the Gram is rank-deficient).
+
+**Fix:** added the LAPACK `dsteqr` global-scale criterion `|e[m]| ≤ eps ·
+max(|d|)` as an OR condition in both `symmetric_eig::tqli_implicit_shift`
+(serial) and `par::tqli_implicit_shift_par` (parallel). For O(1) eigenvalues
+this is dominated by the NR check (fires first); for tiny-eigenvalue matrices
+it provides the missing global-scale fallback. All 1761 lib tests + 4 ALS
+parity tests + 3 parallel bit-identity tests still PASS — the fix is
+behaviour-preserving for non-degenerate inputs.
+
+**Parallel eig now wired into `low_rank_fit_jacobi_bstep`.** Previously the
+large-d_h ALS path only checked `karc_householder_eig` (serial), not
+`karc_householder_eig_par`. Added a `#[cfg(feature = "karc_householder_eig_par")]`
+branch that calls `symmetric_eig_par`. The three cfg branches now read:
+- `not(karc_householder_eig)` → Jacobi
+- `karc_householder_eig and not(karc_householder_eig_par)` → serial Householder
+- `karc_householder_eig_par` → parallel Householder
+
+**Smoke test finding (NRMSE 4.71e-3 at d_h=4752, rank-8 ALS):** the K=4/M=8/R=2
+smoke test (`smoke_k4_m8_r2_dh4752_pipeline_healthy`) PASSES the wiring-
+correctness bound (< 5e-3) but the NRMSE is 28× worse than Phase 2's direct-
+Cholesky full-rank reference (1.67e-4). Two causes:
+1. **Rank-8 ALS vs full-rank** — the Phase 2 reference used `ridge_solve_direct_f64`
+   (full-rank d_h×d_h Cholesky); the ALS path finds a rank-8 approximation.
+   At d_h=4752 the effective rank of the solution exceeds 8, so rank-8 loses
+   signal.
+2. **ALS did not converge** — hit max_iters=100 without reaching tol=1e-10.
+   The ALS loop is making slow progress, not oscillating.
+
+**Implication for the d_h=18_720 measurement:** the rank-8 ALS path may not
+pass the G1 NRMSE gate (≤ 1e-3) even though the full-rank solution would.
+Three options before running the 90-min measurement:
+1. **Increase rank** (r=16, 32, 64) — check at small config first whether
+   higher rank recovers the NRMSE. Each doubling of r roughly doubles ALS
+   per-iter cost (still O(r·d_h²)).
+2. **Use full-rank direct Cholesky at d_h=18_720** — the 2.8 GB Cholesky is
+   feasible (~5-10 min with a good solver) and gives the Phase 2 quality.
+   This bypasses the ALS rank question entirely but doesn't validate the
+   low-rank KarcShard storage path.
+3. **Run the rank-8 measurement anyway** — the d_h=18_720 config has 4× more
+   features than d_h=4752, so rank-8 might capture more of the signal. The
+   threshold gate (≥ 8 LT) is driven by K=8 (delay length), which should
+   pass regardless of rank.
+
 ## First-attempt postmortem (recorded 2026-07-20)
 
 The first parallel implementation parallelized each Givens rotation

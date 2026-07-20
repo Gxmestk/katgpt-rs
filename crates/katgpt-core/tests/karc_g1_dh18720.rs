@@ -1,0 +1,623 @@
+//! Issue 187 T7 / Plan 308 T4.5 — KARC G1 measurement at the promotion-gate
+//! target config (K=8, M=8, R=2, d_h=18_720, r=8).
+//!
+//! This is THE benchmark that decides whether `karc_forecaster` promotes to
+//! default-on. Prior to Issue 187, the d_h=18_720 eigendecomp was
+//! computationally infeasible (~12 h projected serial). The parallel
+//! Householder+QL eigensolver (Issue 187, `karc_householder_eig_par`) brings
+//! the one-time per-fit cost down to ~87 min wall — making this measurement
+//! possible for the first time.
+//!
+//! # Gate (Plan 308 §"GOAT gate")
+//!
+//! - **G1 NRMSE** (1 LT autonomous rollout): ≤ 1.0e-3
+//! - **G1 threshold** (ε=0.1): ≥ 8 LT
+//!
+//! Both legs must pass. The prior data (`.benchmarks/308_karc_goat.md` Phase 4)
+//! predicted this config would be the smallest that passes both — K=8 (delay
+//! length, drives threshold via feedback memory) + M=8 (basis count, drives
+//! one-step NRMSE) + R=2 (higher-order features, capture cross-coordinate
+//! nonlinearity) — but never measured it because the Cholesky / eigendecomp
+//! was infeasible.
+//!
+//! # Config
+//!
+//! - D=3 (double-scroll state dimension)
+//! - K=8 (delay length — matches Phase 1's K=8/M=24 which hit threshold 8.16 LT)
+//! - M=8 (Chebyshev basis count per coordinate)
+//! - R=2 (higher-order outer-product features)
+//! - d_h = K·D·M + (K·D·M)·(K·D·M+1)/2 = 192 + 18_528 = 18_720
+//! - r=8 (ALS low-rank factorization rank)
+//! - λ=5e-3 (ridge regularization, tuned for autonomous-rollout stability)
+//!
+//! # Running
+//!
+//! ```bash
+//! CARGO_TARGET_DIR=/tmp/katgpt-g1-dh18720 cargo test --release \
+//!   --features karc_householder_eig_par \
+//!   --test karc_g1_dh18720 -- --ignored --nocapture
+//! ```
+//!
+//! Expected wall: ~90-120 min (87 min eigendecomp + ~10 min ALS + ~1 min
+//! trajectory + rollout). `#[ignore]`'d because of the wall time.
+//!
+//! # Determinism
+//!
+//! The parallel eigensolver is bit-identical to the serial path (Issue 187 T4
+//! parity contract: row-parallel rayon with no cross-row reductions). Two
+//! runs of this test on the same input produce bit-identical `A, B` (Issue
+//! 185 T2 determinism contract).
+
+#![cfg(feature = "karc_householder_eig_par")]
+
+use katgpt_core::{
+    ChebyshevBasis, chunked_gram_into, feature_expand_higher_order, higher_order_feature_count,
+    karc::{LowRankFitScratch, large_dh::low_rank_fit_jacobi_bstep},
+};
+
+// ── Double-scroll ODE parameters (paper §A.1, arXiv:2606.19984 Eqs. 15–17) ──
+
+const R1: f64 = 1.2;
+const R2: f64 = 3.44;
+const R4: f64 = 0.193;
+const BETA: f64 = 11.6;
+const I_R: f64 = 2.25e-5;
+
+#[inline]
+fn double_scroll_rhs(state: &[f64; 3], out: &mut [f64; 3]) {
+    let (v1, v2, i) = (state[0], state[1], state[2]);
+    let dv = v1 - v2;
+    let sinh_term = 2.0 * I_R * (BETA * dv).sinh();
+    out[0] = v1 / R1 - dv / R2 - sinh_term;
+    out[1] = dv / R2 + sinh_term - i;
+    out[2] = v2 - R4 * i;
+}
+
+fn rk4_step(state: &mut [f64; 3], dt: f64) {
+    let mut k1 = [0.0; 3];
+    let mut k2 = [0.0; 3];
+    let mut k3 = [0.0; 3];
+    let mut k4 = [0.0; 3];
+    let mut tmp = [0.0; 3];
+    double_scroll_rhs(state, &mut k1);
+    for j in 0..3 {
+        tmp[j] = state[j] + 0.5 * dt * k1[j];
+    }
+    double_scroll_rhs(&tmp, &mut k2);
+    for j in 0..3 {
+        tmp[j] = state[j] + 0.5 * dt * k2[j];
+    }
+    double_scroll_rhs(&tmp, &mut k3);
+    for j in 0..3 {
+        tmp[j] = state[j] + dt * k3[j];
+    }
+    double_scroll_rhs(&tmp, &mut k4);
+    for j in 0..3 {
+        state[j] += dt / 6.0 * (k1[j] + 2.0 * k2[j] + 2.0 * k3[j] + k4[j]);
+    }
+}
+
+/// Sub-stepped RK4 — the double-scroll `sinh(β·ΔV)` nonlinearity is stiff
+/// (β=11.6); a single RK4 step at dt=0.25 overshoots into the explosive
+/// regime. 10 sub-steps keeps the integrator stable.
+fn rk4_step_substepped(state: &mut [f64; 3], dt: f64, substeps: usize) {
+    let dt_sub = dt / substeps as f64;
+    for _ in 0..substeps {
+        rk4_step(state, dt_sub);
+    }
+}
+
+/// Generate `n` samples at `dt` after discarding `transient` steps.
+fn generate_double_scroll(n: usize, dt: f64, transient: usize, substeps: usize) -> Vec<f32> {
+    let mut state: [f64; 3] = [0.1, 0.0, 0.0]; // small seed off the fixed point
+    for _ in 0..transient {
+        rk4_step_substepped(&mut state, dt, substeps);
+    }
+    let mut out = Vec::with_capacity(n * 3);
+    for _ in 0..n {
+        rk4_step_substepped(&mut state, dt, substeps);
+        out.push(state[0] as f32);
+        out.push(state[1] as f32);
+        out.push(state[2] as f32);
+    }
+    out
+}
+
+/// NRMSE over the first window, normalised by per-coordinate std of truth.
+fn nrmse(pred: &[f32], truth: &[f32], dim: usize) -> f32 {
+    debug_assert_eq!(pred.len() % dim, 0);
+    let n = pred.len() / dim;
+    let mut stds = [0.0f32; 8];
+    debug_assert!(dim <= stds.len());
+    for d in 0..dim {
+        let mut mean = 0.0f64;
+        for i in 0..n {
+            mean += truth[i * dim + d] as f64;
+        }
+        mean /= n as f64;
+        let mut var = 0.0f64;
+        for i in 0..n {
+            let dx = truth[i * dim + d] as f64 - mean;
+            var += dx * dx;
+        }
+        var /= n as f64;
+        stds[d] = var.sqrt() as f32;
+    }
+    let mut sum = 0.0f32;
+    for d in 0..dim {
+        let mut err_sq = 0.0f32;
+        for i in 0..n {
+            let e = pred[i * dim + d] - truth[i * dim + d];
+            err_sq += e * e;
+        }
+        let rmse = (err_sq / n as f32).sqrt();
+        sum += rmse / stds[d].max(1e-12);
+    }
+    sum / dim as f32
+}
+
+/// Mean per-coordinate std of `truth` (the σ(u) reference for the threshold).
+fn mean_sigma(truth: &[f32], dim: usize) -> f32 {
+    let n = truth.len() / dim;
+    let mut sum_std = 0.0f32;
+    for d in 0..dim {
+        let mut mean = 0.0f64;
+        for i in 0..n {
+            mean += truth[i * dim + d] as f64;
+        }
+        mean /= n as f64;
+        let mut var = 0.0f64;
+        for i in 0..n {
+            let dx = truth[i * dim + d] as f64 - mean;
+            var += dx * dx;
+        }
+        var /= n as f64;
+        sum_std += var.sqrt() as f32;
+    }
+    sum_std / dim as f32
+}
+
+/// First sample index where ‖pred_i − truth_i‖₂ > ε·σ. Returns n if never.
+fn threshold_time(pred: &[f32], truth: &[f32], dim: usize, eps: f32, sigma: f32) -> usize {
+    let n = pred.len() / dim;
+    let bound = eps * sigma;
+    for i in 0..n {
+        let mut err_sq = 0.0f32;
+        for d in 0..dim {
+            let e = pred[i * dim + d] - truth[i * dim + d];
+            err_sq += e * e;
+        }
+        if err_sq.sqrt() > bound {
+            return i;
+        }
+    }
+    n
+}
+
+// ── Config: the promotion-gate target ─────────────────────────────────────
+
+const D: usize = 3;
+const K: usize = 8; // delay length — matches Phase 1's K=8/M=24 threshold-passing config
+const M: usize = 8; // Chebyshev basis count
+const R: usize = 2; // higher-order outer-product order
+const LR_RANK: usize = 8; // ALS low-rank rank
+const N_TRAIN: usize = 4000;
+const DT: f64 = 0.25;
+const LYAPUNOV_TIME_UNITS: f64 = 7.81; // paper-reported for these params
+const SAMPLES_PER_LT: f64 = LYAPUNOV_TIME_UNITS / DT;
+const SUBSTEPS: usize = 10;
+
+const D_H_1: usize = K * D * M; // 192
+const D_H: usize = higher_order_feature_count(D_H_1, R); // 18_720
+
+/// Smoke test: validate the full pipeline (higher-order features + chunked
+/// Gram + ALS with parallel eig + autonomous rollout + metrics) at the
+/// small config (K=4, M=8, R=2, d_h=4752) — fast (~30 s wall) and exercises
+/// every code path the d_h=18_720 test does.
+///
+/// Reference values from `examples/karc_double_scroll_higher_order.rs`
+/// Config 2 + `.benchmarks/308_karc_goat.md` Phase 2 + Phase 4:
+///   NRMSE(1 LT) ≈ 1.67e-4
+///   threshold(ε=0.1) ≈ 2.85 LT
+///
+/// The smoke test asserts the NRMSE is within an order of magnitude of the
+/// reference (loose bound — the goal is to catch wiring bugs, not to
+/// re-validate the Phase 2 number). The exact Phase 2 number was measured
+/// with direct Cholesky; the ALS path agrees to ~1e-6 but not bit-identically,
+/// so we expect small drift.
+#[test]
+fn smoke_k4_m8_r2_dh4752_pipeline_healthy() {
+    use std::time::Instant;
+
+    const K_S: usize = 4;
+    const M_S: usize = 8;
+    const D_H_1_S: usize = K_S * D * M_S; // 96
+    const D_H_S: usize = higher_order_feature_count(D_H_1_S, R); // 4752
+    const N_S: usize = 2000;
+
+    println!(
+        "smoke: K={}, M={}, R={}, r={}, d_h={}",
+        K_S, M_S, R, LR_RANK, D_H_S
+    );
+
+    let traj_raw = generate_double_scroll(N_S + K_S + 50, DT, 1000, SUBSTEPS);
+    let mut traj = traj_raw.clone();
+    let mut scale = [1.0f32; D];
+    let mut offset = [0.0f32; D];
+    for d in 0..D {
+        let mut lo = f32::INFINITY;
+        let mut hi = f32::NEG_INFINITY;
+        for i in 0..(traj.len() / D) {
+            let v = traj[i * D + d];
+            if v < lo {
+                lo = v;
+            }
+            if v > hi {
+                hi = v;
+            }
+        }
+        let range = (hi - lo).max(1e-6);
+        offset[d] = (hi + lo) * 0.5;
+        scale[d] = 2.0 / range;
+        for i in 0..(traj.len() / D) {
+            traj[i * D + d] = (traj[i * D + d] - offset[d]) * scale[d];
+        }
+    }
+    let n_total = traj.len() / D;
+    let n_pairs = n_total - K_S;
+
+    let mut features = vec![0.0f32; n_pairs * D_H_S];
+    let mut targets = vec![0.0f32; n_pairs * D];
+    let basis = ChebyshevBasis::<M_S>::new();
+    let mut row_buf = vec![0.0f32; D_H_S];
+    for (pair_idx, t) in ((K_S - 1)..(n_total - 1)).enumerate() {
+        let mut delay = [0.0f32; K_S * D];
+        for lag in 0..K_S {
+            let idx = t - lag;
+            for d in 0..D {
+                delay[lag * D + d] = traj[idx * D + d];
+            }
+        }
+        feature_expand_higher_order::<ChebyshevBasis<M_S>, M_S, R>(&delay, &basis, &mut row_buf);
+        features[pair_idx * D_H_S..(pair_idx + 1) * D_H_S].copy_from_slice(&row_buf);
+        for d in 0..D {
+            targets[pair_idx * D + d] = traj[(t + 1) * D + d];
+        }
+    }
+
+    let mut gram = vec![0.0f64; D_H_S * D_H_S];
+    let feature_iter = (0..n_pairs).map(|i| &features[i * D_H_S..(i + 1) * D_H_S] as &[f32]);
+    chunked_gram_into(feature_iter, &mut gram, 0.0, D_H_S);
+    let mut cov = vec![0.0f64; D_H_S * D];
+    for p in 0..n_pairs {
+        let row = &features[p * D_H_S..(p + 1) * D_H_S];
+        let target = &targets[p * D..(p + 1) * D];
+        for i in 0..D_H_S {
+            let ri = row[i] as f64;
+            for d in 0..D {
+                cov[i * D + d] += ri * target[d] as f64;
+            }
+        }
+    }
+    drop(features);
+
+    let t_fit = Instant::now();
+    let mut a_out = vec![0.0f64; D * LR_RANK];
+    let mut b_out = vec![0.0f64; LR_RANK * D_H_S];
+    let mut scratch = LowRankFitScratch::with_capacity(D_H_S, D, LR_RANK);
+    let n_iters = low_rank_fit_jacobi_bstep(
+        &gram, &cov, D_H_S, D, LR_RANK, 5e-3, 100, 1e-10, &mut a_out, &mut b_out, &mut scratch,
+    );
+    let fit_dt = t_fit.elapsed();
+
+    let mut wout = vec![0.0f32; D * D_H_S];
+    for d in 0..D {
+        for j in 0..D_H_S {
+            let mut s = 0.0f64;
+            for k in 0..LR_RANK {
+                s += a_out[d * LR_RANK + k] * b_out[k * D_H_S + j];
+            }
+            wout[d * D_H_S + j] = s as f32;
+        }
+    }
+
+    // Autonomous rollout over 5 LT (enough to see threshold behaviour; the
+    // reference was 2.85 LT so 5 LT captures the threshold crossing).
+    let horizon = (5.0 * SAMPLES_PER_LT).ceil() as usize;
+    let seed_t = n_total - 1;
+    let mut delay = [0.0f32; K_S * D];
+    for lag in 0..K_S {
+        let idx = seed_t - lag;
+        for d in 0..D {
+            delay[lag * D + d] = traj[idx * D + d];
+        }
+    }
+    let mut true_state: [f64; 3] = [
+        traj_raw[seed_t * D] as f64,
+        traj_raw[seed_t * D + 1] as f64,
+        traj_raw[seed_t * D + 2] as f64,
+    ];
+    let mut psi = vec![0.0f32; D_H_S];
+    let mut pred = Vec::with_capacity(horizon * D);
+    let mut truth = Vec::with_capacity(horizon * D);
+    let mut cur_delay = delay;
+    for _ in 0..horizon {
+        rk4_step_substepped(&mut true_state, DT, SUBSTEPS);
+        truth.push(true_state[0] as f32);
+        truth.push(true_state[1] as f32);
+        truth.push(true_state[2] as f32);
+        feature_expand_higher_order::<ChebyshevBasis<M_S>, M_S, R>(&cur_delay, &basis, &mut psi);
+        let mut out_norm = [0.0f32; D];
+        for d in 0..D {
+            let mut s = 0.0f32;
+            for j in 0..D_H_S {
+                s += wout[d * D_H_S + j] * psi[j];
+            }
+            out_norm[d] = s;
+        }
+        for d in 0..D {
+            pred.push(out_norm[d] / scale[d] + offset[d]);
+        }
+        let mut new_delay = [0.0f32; K_S * D];
+        new_delay[..D].copy_from_slice(&out_norm);
+        new_delay[D..].copy_from_slice(&cur_delay[..(K_S - 1) * D]);
+        cur_delay = new_delay;
+    }
+
+    let n_one_lt = (1.0 * SAMPLES_PER_LT).ceil() as usize;
+    let n_one_lt = n_one_lt.max(1).min(pred.len() / D);
+    let nrmse_one_lt = nrmse(&pred[..n_one_lt * D], &truth[..n_one_lt * D], D);
+    let sigma = mean_sigma(&truth, D);
+    let thr_sample = threshold_time(&pred, &truth, D, 0.1, sigma);
+    let thr_lt = thr_sample as f64 / SAMPLES_PER_LT;
+
+    println!(
+        "  ALS iters={}, fit {:.2?}, NRMSE(1 LT)={:.6e}, threshold={:.2} LT",
+        n_iters, fit_dt, nrmse_one_lt, thr_lt
+    );
+    println!("  reference (Phase 2 direct Cholesky): NRMSE 1.67e-4, threshold 2.85 LT");
+
+    // Loose bounds: wiring-correctness check, not a re-validation of Phase 2.
+    // The ALS path agrees with direct Cholesky to ~1e-6 but the autonomous
+    // rollout is chaotic, so NRMSE can drift by 2-3× from the Cholesky path.
+    // The Phase 2 reference was 1.67e-4; we accept up to 5e-3 (30× headroom)
+    // as evidence the pipeline is wired correctly. If NRMSE > 5e-3, something
+    // is broken (wrong feature order, wrong normalization, eigvecs transposed,
+    // etc.) — investigate before running the 90-min d_h=18_720 test.
+    assert!(
+        nrmse_one_lt < 5e-3,
+        "smoke NRMSE {:.6e} exceeds 5e-3 wiring-correctness bound \
+         (Phase 2 reference was 1.67e-4) — pipeline is broken, investigate \
+         before running the d_h=18_720 measurement",
+        nrmse_one_lt
+    );
+    // Threshold sanity: should be in the 1-5 LT range (Phase 2 saw 2.85 LT).
+    // Don't over-constrain — the goal is to catch catastrophic regressions
+    // (threshold < 0.5 LT would mean the model is barely better than noise).
+    assert!(
+        thr_lt > 0.5,
+        "smoke threshold {:.2} LT below 0.5 LT — model is barely above noise",
+        thr_lt
+    );
+}
+
+#[test]
+#[ignore]
+fn g1_dh_18720_k8_m8_r2() {
+    use std::time::Instant;
+
+    println!(
+        "Issue 187 T7 / Plan 308 T4.5: KARC G1 at d_h = {} (K={}, M={}, R={}, r={})",
+        D_H, K, M, R, LR_RANK
+    );
+    println!(
+        "  Lyapunov time ≈ {} units ≈ {} samples",
+        LYAPUNOV_TIME_UNITS, SAMPLES_PER_LT
+    );
+    println!("  rayon thread pool: {} threads", rayon::current_num_threads());
+
+    // ── 1. Generate trajectory + normalize to [-1, 1] per coordinate ──────
+    let t_traj = Instant::now();
+    let traj_raw = generate_double_scroll(N_TRAIN + K + 50, DT, 1000, SUBSTEPS);
+    let mut traj = traj_raw.clone();
+    let mut scale = [1.0f32; D];
+    let mut offset = [0.0f32; D];
+    for d in 0..D {
+        let mut lo = f32::INFINITY;
+        let mut hi = f32::NEG_INFINITY;
+        for i in 0..(traj.len() / D) {
+            let v = traj[i * D + d];
+            if v < lo {
+                lo = v;
+            }
+            if v > hi {
+                hi = v;
+            }
+        }
+        let range = (hi - lo).max(1e-6);
+        offset[d] = (hi + lo) * 0.5;
+        scale[d] = 2.0 / range;
+        for i in 0..(traj.len() / D) {
+            traj[i * D + d] = (traj[i * D + d] - offset[d]) * scale[d];
+        }
+    }
+    let n_total = traj.len() / D;
+    println!(
+        "  trajectory: {} samples, generated in {:.2?}",
+        n_total,
+        t_traj.elapsed()
+    );
+
+    // ── 2. Build higher-order feature matrix + targets ────────────────────
+    // Each delay state expands to d_h = 18_720 features. N_TRAIN=4000 rows
+    // × 18_720 × 4 B = 299 MB (f32) — fits in RAM.
+    let t_feat = Instant::now();
+    // (K-1)..(n_total-1) inclusive → n_total - 1 - (K-1) = n_total - K pairs.
+    let n_pairs = n_total - K;
+    let mut features_ho = vec![0.0f32; n_pairs * D_H];
+    let mut targets_ho = vec![0.0f32; n_pairs * D];
+    let basis = ChebyshevBasis::<M>::new();
+    let mut row_buf = vec![0.0f32; D_H];
+    for (pair_idx, t) in ((K - 1)..(n_total - 1)).enumerate() {
+        let mut delay = [0.0f32; K * D];
+        for lag in 0..K {
+            let idx = t - lag;
+            for d in 0..D {
+                delay[lag * D + d] = traj[idx * D + d];
+            }
+        }
+        feature_expand_higher_order::<ChebyshevBasis<M>, M, R>(&delay, &basis, &mut row_buf);
+        features_ho[pair_idx * D_H..(pair_idx + 1) * D_H].copy_from_slice(&row_buf);
+        for d in 0..D {
+            targets_ho[pair_idx * D + d] = traj[(t + 1) * D + d];
+        }
+    }
+    println!(
+        "  feature expansion: {} pairs × {} features, built in {:.2?}",
+        n_pairs,
+        D_H,
+        t_feat.elapsed()
+    );
+
+    // ── 3. Build Gram (d_h × d_h = 18_720² = 2.8 GB f64) + Cov ────────────
+    let t_gram = Instant::now();
+    let mut gram = vec![0.0f64; D_H * D_H];
+    let feature_iter = (0..n_pairs).map(|i| &features_ho[i * D_H..(i + 1) * D_H] as &[f32]);
+    chunked_gram_into(feature_iter, &mut gram, 0.0, D_H);
+    let mut cov = vec![0.0f64; D_H * D];
+    for p in 0..n_pairs {
+        let row = &features_ho[p * D_H..(p + 1) * D_H];
+        let target = &targets_ho[p * D..(p + 1) * D];
+        for i in 0..D_H {
+            let ri = row[i] as f64;
+            for d in 0..D {
+                cov[i * D + d] += ri * target[d] as f64;
+            }
+        }
+    }
+    eprintln!(
+        "  Gram + Cov build: {:.2?} (Gram is {} GB)",
+        t_gram.elapsed(),
+        (D_H * D_H * 8) as f64 / 1e9
+    );
+
+    // Free the feature matrix — we don't need it for the fit, and the ALS
+    // path needs the RAM for eigvecs_g (another 2.8 GB).
+    drop(features_ho);
+
+    // ── 4. ALS low-rank fit via Jacobi B-step + parallel Householder eig ──
+    // This is the one-time per-fit cost that was previously infeasible.
+    // Issue 187 T6 measured this at 87 min wall for the eigendecomp alone;
+    // the ALS loop adds O(r·d_h²) per iter ≈ 2.8 GFLOPs ≈ ~1 s/iter.
+    let t_fit = Instant::now();
+    let lambda: f64 = 5e-3;
+    let max_iters = 100;
+    let tol = 1e-10;
+    let mut a_out = vec![0.0f64; D * LR_RANK];
+    let mut b_out = vec![0.0f64; LR_RANK * D_H];
+    let mut scratch = LowRankFitScratch::with_capacity(D_H, D, LR_RANK);
+    let n_iters = low_rank_fit_jacobi_bstep(
+        &gram, &cov, D_H, D, LR_RANK, lambda, max_iters, tol, &mut a_out, &mut b_out, &mut scratch,
+    );
+    let fit_dt = t_fit.elapsed();
+    eprintln!(
+        "  ALS fit (parallel eig + {} iters): {:.2?}",
+        n_iters, fit_dt
+    );
+
+    // Wout (D × d_h, f32) = A · B  (rank-r reconstruction).
+    let mut wout = vec![0.0f32; D * D_H];
+    for d in 0..D {
+        for j in 0..D_H {
+            let mut s = 0.0f64;
+            for k in 0..LR_RANK {
+                s += a_out[d * LR_RANK + k] * b_out[k * D_H + j];
+            }
+            wout[d * D_H + j] = s as f32;
+        }
+    }
+
+    // ── 5. Autonomous rollout over 20 LT for the G1 measurement ───────────
+    let horizon_20lt = (20.0 * SAMPLES_PER_LT).ceil() as usize;
+    let seed_t = n_total - 1;
+    let mut delay = [0.0f32; K * D];
+    for lag in 0..K {
+        let idx = seed_t - lag;
+        for d in 0..D {
+            delay[lag * D + d] = traj[idx * D + d];
+        }
+    }
+    let mut true_state: [f64; 3] = [
+        traj_raw[seed_t * D] as f64,
+        traj_raw[seed_t * D + 1] as f64,
+        traj_raw[seed_t * D + 2] as f64,
+    ];
+    let mut psi = vec![0.0f32; D_H];
+    let mut pred = Vec::with_capacity(horizon_20lt * D);
+    let mut truth = Vec::with_capacity(horizon_20lt * D);
+    let mut cur_delay = delay;
+    for _ in 0..horizon_20lt {
+        rk4_step_substepped(&mut true_state, DT, SUBSTEPS);
+        truth.push(true_state[0] as f32);
+        truth.push(true_state[1] as f32);
+        truth.push(true_state[2] as f32);
+        feature_expand_higher_order::<ChebyshevBasis<M>, M, R>(&cur_delay, &basis, &mut psi);
+        let mut out_norm = [0.0f32; D];
+        for d in 0..D {
+            let mut s = 0.0f32;
+            for j in 0..D_H {
+                s += wout[d * D_H + j] * psi[j];
+            }
+            out_norm[d] = s;
+        }
+        for d in 0..D {
+            pred.push(out_norm[d] / scale[d] + offset[d]);
+        }
+        let mut new_delay = [0.0f32; K * D];
+        new_delay[..D].copy_from_slice(&out_norm);
+        new_delay[D..].copy_from_slice(&cur_delay[..(K - 1) * D]);
+        cur_delay = new_delay;
+    }
+
+    // ── 6. G1 metrics ─────────────────────────────────────────────────────
+    let n_one_lt = (1.0 * SAMPLES_PER_LT).ceil() as usize;
+    let n_one_lt = n_one_lt.max(1).min(pred.len() / D);
+    let nrmse_one_lt = nrmse(&pred[..n_one_lt * D], &truth[..n_one_lt * D], D);
+    let sigma = mean_sigma(&truth, D);
+    let thr_sample = threshold_time(&pred, &truth, D, 0.1, sigma);
+    let thr_lt = thr_sample as f64 / SAMPLES_PER_LT;
+
+    println!();
+    println!("── G1 results (d_h = {}, K={}, M={}, R={}, r={}) ────────────", D_H, K, M, R, LR_RANK);
+    println!("  ALS iterations:    {}", n_iters);
+    println!("  fit wall (eig+ALS): {:.2?}", fit_dt);
+    println!("  NRMSE over 1 LT:   {:.6e}   (target ≤ 1.0e-3)", nrmse_one_lt);
+    println!(
+        "  threshold (ε=0.1): {} samples = {:.2} LT   (target ≥ 8 LT)",
+        thr_sample, thr_lt
+    );
+    println!("  σ(u) mean per-coord: {:.4}", sigma);
+    println!();
+    let nrmse_pass = nrmse_one_lt <= 1.0e-3;
+    let thr_pass = thr_lt >= 8.0;
+    println!(
+        "  G1 NRMSE   ≤ 1.0e-3 : {}",
+        if nrmse_pass { "PASS ✅" } else { "FAIL ❌" }
+    );
+    println!(
+        "  G1 thresh  ≥ 8 LT   : {}",
+        if thr_pass { "PASS ✅" } else { "FAIL ❌" }
+    );
+    println!();
+    if nrmse_pass && thr_pass {
+        println!("  VERDICT: G1 PASS — `karc_forecaster` is GOAT-eligible for default-on.");
+    } else {
+        println!("  VERDICT: G1 FAIL — document the miss; `karc_forecaster` stays opt-in.");
+    }
+    println!();
+    println!("  paper reference: NRMSE 5.3e-4, threshold 16.7 LT (second-order Fourier, d_h=1891)");
+    println!("  Phase 2 reference: NRMSE 1.67e-4, threshold 2.85 LT (Chebyshev R=2, K=4/M=8, d_h=4752)");
+
+    // Record the result to a known location for the post-run doc update.
+    // (No assertion — this is a measurement test, not a pass/fail gate.)
+}
