@@ -442,3 +442,87 @@ K=10/M=8 ≈ 8.5 LT — passes).
 The NRMSE gate is now passable. The threshold gate is 10% short and needs
 either K=10 (delay) or a gate re-spec. Path 1 (K=10) is the cheapest direct
 measurement to settle the threshold question.
+
+---
+
+## Phase 5.2 G1 — K=10 λ-sweep at d_h=29_160 (2026-07-21)
+
+**K=10 does NOT extend the threshold meaningfully. The linear extrapolation
+was WRONG.** Going from K=8 (7.23 LT) to K=10 (7.36 LT) gained only 0.13
+LT — the threshold has plateaued at ~7.2-7.4 LT for M=8/R=2 regardless of
+K once K ≥ 8.
+
+### K=10 sweep result (d_h=29_160, 2 λ values, 78.8 min sweep wall)
+
+Build: Gram 978 s (~16 min, 6.8 GB) + parallel Cholesky 4728 s (~79 min,
+2 threads × ~79 min each — cubic scaling from K=8 gives 3.77× more FLOPs).
+Total wall: 5706 s (~95 min).
+
+| Config | λ | NRMSE (1 LT) | gate | Threshold (ε=0.1) | gate |
+|--------|---|--------------|------|-------------------|------|
+| K=8, M=8, R=2 (Phase 5.1) | 5e-2 | 9.43e-4 | ✅ | 7.23 LT | ❌ |
+| **K=10, M=8, R=2 (Phase 5.2)** | **5e-2** | **8.83e-4** | **✅** | **7.36 LT** | **❌** |
+| **K=10, M=8, R=2 (Phase 5.2)** | **1e-1** | **7.86e-4** | **✅** | **7.23 LT** | **❌** |
+
+### What K=10 confirms
+
+- **NRMSE is solidly passable** at K=10 — both λ values pass with margin
+  (8.83e-4 and 7.86e-4 vs the 1e-3 target). K=10 is slightly better than
+  K=8 (9.43e-4) due to the larger feature space.
+- **Threshold plateaus at ~7.2-7.4 LT regardless of K (once K ≥ 8).** The
+  Phase 5.1 linear extrapolation (K=4=2.85 LT, K=8=7.23 LT → K=10 ≈ 8.5 LT)
+  was WRONG. The K=4→K=8 jump was apparently a phase transition (from
+  short-memory to sufficient-memory regime), not a linear effect. Beyond
+  K=8, additional delay memory does NOT extend the rollout stability.
+- **M is the ONLY remaining threshold lever.** K=12 or K=14 won't help
+  (plateau confirmed). Higher M (M=16+, still computationally infeasible
+  at K≥8/R=2 with d_h ≥ 72_576) is the only structural path to ≥8 LT.
+
+### Updated config sweep (with Phase 5.2 column)
+
+| Config | d_h | λ | NRMSE (1 LT) | Threshold (ε=0.1) | G1 NRMSE | G1 Thr |
+|--------|-----|---|--------------|-------------------|----------|--------|
+| K=4, M=8, R=2 (Phase 2) | 4752 | 5e-3 | **1.67e-4** | 2.85 LT | ✅ | ❌ |
+| K=8, M=4, R=2 (Phase 4) | 4752 | 5e-3 | 6.19e-3 | 1.31 LT | ❌ | ❌ |
+| K=8, M=8, R=2 (Phase 5) | 18_720 | 5e-3 | 6.68e-3 | 7.14 LT | ❌ | ❌ |
+| K=8, M=8, R=2 (Phase 5.1) | 18_720 | 5e-2 | **9.43e-4** | 7.23 LT | **✅** | ❌ |
+| **K=10, M=8, R=2 (Phase 5.2)** | **29_160** | **5e-2** | **8.83e-4** | **7.36 LT** | **✅** | ❌ |
+| **K=10, M=8, R=2 (Phase 5.2)** | **29_160** | **1e-1** | **7.86e-4** | **7.23 LT** | **✅** | ❌ |
+| Phase 1: K=8, M=24, first-order | 576 | 5e-3 | 4.79e-3 | **8.16 LT** | ❌ | ✅ |
+
+### Updated promotion paths (post-Phase 5.2)
+
+1. **Gate re-spec (Issue 186 Path D) — NOW THE PRIMARY PATH.** The K=10
+   experiment definitively rules out K as a path to the threshold gate.
+   The evidence for promotion is now:
+   - **NRMSE gate: PASS** at K=8/M=8/R=2 λ=5e-2 (9.43e-4), confirmed at
+     K=10/M=8/R=2 λ=5e-2 (8.83e-4) and λ=1e-1 (7.86e-4). Three passing
+     configs, all 6-27% under the 1e-3 target.
+   - **Threshold gate: PASS** at K=8/M=24/R=1 λ=5e-3 (8.16 LT, Phase 1).
+     This is a different config (first-order, smaller d_h=576) but at the
+     same K=8 delay length. M=24's extra basis capacity is what extends
+     the threshold — and M=24 is computationally infeasible at R=2.
+   Two configs at the same K=8 delay, each passing one G1 leg. The
+   compound gate (NRMSE AND threshold in ONE config) is infeasible at
+   R=2 due to the d_h explosion blocking M≥16.
+2. **K=12 or K=14 at M=8/R=2** — NOT RECOMMENDED. K=10 confirmed the
+   threshold plateau; more K won't help. (Also: cubic compute cost makes
+   K=12 at d_h=41_904 take ~6 h Cholesky.)
+3. **M=16+ at K=8/R=2** — infeasible. d_h=72_576, Gram=44 GB, Cholesky
+   ~6 h single-threaded. Would need the ALS low-rank path (Issue 185 T2,
+   `low_rank_fit_jacobi_bstep`) — but rank-8 ALS gave 28× worse NRMSE
+   than full-rank at d_h=4752 (smoke test). The ALS path is not ready
+   for production-quality G1 measurement.
+4. **More training data** (N=20_000+) — unlikely to help threshold
+   (plateau confirmed; limiting factor is M, not fit quality).
+
+### Bottom line
+
+The G1 gate as specified (NRMSE ≤ 1e-3 AND threshold ≥ 8 LT in a SINGLE
+config) cannot be passed at the current compute budget with Chebyshev
+basis + R=2 features. The NRMSE leg is solidly passable (3 configs). The
+threshold leg passes only at M=24 first-order (Phase 1), which is
+incompatible with R=2 (d_h explodes).
+
+The gate re-spec (Issue 186 Path D) is the honest path forward. The feature
+stays opt-in until the re-spec decision is made.

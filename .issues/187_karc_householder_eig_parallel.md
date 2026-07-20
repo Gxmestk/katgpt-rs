@@ -277,6 +277,47 @@ gate.
 See `.benchmarks/308_karc_goat.md` Phase 5.1 section for the full data +
 the M-vs-K threshold analysis.
 
+## T7 Phase 5.2 follow-up (2026-07-21): K=10 threshold plateau
+
+**K=10 does NOT extend the threshold meaningfully. The linear extrapolation
+was WRONG.** The K=10 sweep at d_h=29_160 (same M=8/R=2 config, +2 delay
+steps, 95 min wall including 79 min parallel Cholesky) produced:
+
+| Config | λ | NRMSE (1 LT) | gate | threshold | gate |
+|---|---|---|---|---|---|
+| K=8/M=8/R=2 (Phase 5.1) | 5e-2 | 9.43e-4 | ✅ | 7.23 LT | ❌ |
+| K=10/M=8/R/2 | 5e-2 | 8.83e-4 | ✅ | **7.36 LT** | ❌ |
+| K=10/M=8/R/2 | 1e-1 | 7.86e-4 | ✅ | 7.23 LT | ❌ |
+
+The K=8→K=10 threshold gain was only **+0.13 LT** (7.23 → 7.36 LT) — the
+linear extrapolation from K=4=2.85 LT, K=8=7.23 LT predicting K=10 ≈ 8.5
+LT was wrong. The K=4→K=8 jump was apparently a phase transition (from
+short-memory to sufficient-memory regime), not a linear effect. Beyond
+K=8, additional delay memory does NOT extend the rollout stability.
+
+**Implications:**
+- K is ruled out as a path to the threshold gate. K=12/K=14 won't help.
+- M is the ONLY remaining threshold lever, but M≥16 at K≥8/R=2 gives
+  d_h ≥ 72_576 (Gram 44 GB, Cholesky ~6 h — infeasible).
+- **Gate re-spec (Issue 186 Path D) is now the primary path.** Evidence:
+  - NRMSE gate PASSES at 3 configs: K=8/M=8/R/2 λ=5e-2 (9.43e-4),
+    K=10/M=8/R/2 λ=5e-2 (8.83e-4), K=10/M=8/R/2 λ=1e-1 (7.86e-4).
+  - Threshold gate PASSES at K=8/M=24/R=1 (8.16 LT, Phase 1) — same K=8
+    delay length, first-order only (d_h=576).
+  - The compound gate (both legs in ONE config) is structurally infeasible
+    at R=2 due to the d_h explosion blocking M≥16.
+
+The G1 measurement question is now fully settled. All compute paths have
+been exhausted:
+- Phase 5: λ=5e-3 at K=8/M=8/R=2 → FAIL NRMSE, FAIL threshold
+- Phase 5.1: λ-sweep at K=8/M=8/R/2 → PASS NRMSE (λ=5e-2), FAIL threshold
+- Phase 5.2: λ-sweep at K=10/M=8/R/2 → PASS NRMSE (λ=5e-2, 1e-1), FAIL threshold
+
+No further compute experiments are warranted. The decision is now a
+policy call: accept the gate re-spec (Path D) or keep the feature opt-in.
+
+See `.benchmarks/308_karc_goat.md` Phase 5.2 section for the full analysis.
+
 ## First-attempt postmortem (recorded 2026-07-20)
 
 The first parallel implementation parallelized each Givens rotation
