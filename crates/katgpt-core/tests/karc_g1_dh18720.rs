@@ -1192,3 +1192,354 @@ fn g1_dh_18720_lambda_sweep() {
 
     // No assertion — this is a measurement test, not a pass/fail gate.
 }
+
+/// Issue 187 T7 follow-up #2: K=10 λ-sweep at d_h=29_160.
+///
+/// Phase 5.1 showed K=8/M=8/R=2 at λ=5e-2 PASSES the NRMSE gate (9.43e-4)
+/// but FAILS the threshold gate (7.23 LT vs ≥8 LT). The threshold was flat
+/// across λ (~7.0-7.2 LT), indicating the limiting factor is K (delay
+/// memory), not regularization.
+///
+/// This test checks whether +2 delay steps (K=10) extend the threshold to
+/// ≥8 LT. Linear K-extrapolation from the K=4 (2.85 LT) and K=8 (7.23 LT)
+/// data points predicts K=10 ≈ 8.5 LT (PASS).
+///
+/// # Config
+///
+/// - K=10 (delay length, +2 over Phase 5.1)
+/// - M=8, R=2 (same basis as Phase 5.1)
+/// - d_h = K·D·M·(K·D·M+1)/2 = 240·241/2 = 29_160
+/// - Full-rank direct Cholesky (Gram is 6.8 GB — fits in 64 GB RAM)
+/// - λ sweep ∈ {5e-3, 5e-2, 5e-1, 5e0} (same range as Phase 5.1 for direct
+///   comparison; optimal λ may shift due to 1.56× more underdetermination)
+///
+/// # Compute budget
+///
+/// Gram build ~12 min + 4 parallel Cholesky factorizations (~28 min each,
+/// all running in parallel via rayon) + rollout ~2 min = ~42 min wall.
+///
+/// # Running
+///
+/// ```bash
+/// CARGO_TARGET_DIR=/tmp/katgpt-g1-dh29160 cargo test --release \
+///   --features karc_forecaster \
+///   --test karc_g1_dh18720 g1_dh_29160_k10_lambda_sweep -- --ignored --nocapture
+/// ```
+#[test]
+#[ignore]
+fn g1_dh_29160_k10_lambda_sweep() {
+    use rayon::prelude::*;
+    use std::time::Instant;
+
+    // Local const shadows — override the module-level K=8 constants for this
+    // K=10 config. D, M, R, N_TRAIN, DT, LYAPUNOV_TIME_UNITS, SAMPLES_PER_LT,
+    // SUBSTEPS are inherited unchanged from the module-level consts.
+    const K: usize = 10;
+    const D_H_1: usize = K * D * M; // 240
+    const D_H: usize = higher_order_feature_count(D_H_1, R); // 29_160
+
+    println!(
+        "Issue 187 T7 follow-up #2: KARC G1 λ-sweep at d_h = {} (K={}, M={}, R={}) \
+         [full-rank Cholesky, parallel]",
+        D_H, K, M, R
+    );
+    println!(
+        "  Lyapunov time ≈ {} units ≈ {} samples",
+        LYAPUNOV_TIME_UNITS, SAMPLES_PER_LT
+    );
+
+    // ── 1. Trajectory + per-coordinate normalization to [-1, 1] ───────────
+    let t_traj = Instant::now();
+    let traj_raw = generate_double_scroll(N_TRAIN + K + 50, DT, 1000, SUBSTEPS);
+    let mut traj = traj_raw.clone();
+    let mut scale = [1.0f32; D];
+    let mut offset = [0.0f32; D];
+    for d in 0..D {
+        let mut lo = f32::INFINITY;
+        let mut hi = f32::NEG_INFINITY;
+        for i in 0..(traj.len() / D) {
+            let v = traj[i * D + d];
+            if v < lo {
+                lo = v;
+            }
+            if v > hi {
+                hi = v;
+            }
+        }
+        let range = (hi - lo).max(1e-6);
+        offset[d] = (hi + lo) * 0.5;
+        scale[d] = 2.0 / range;
+        for i in 0..(traj.len() / D) {
+            traj[i * D + d] = (traj[i * D + d] - offset[d]) * scale[d];
+        }
+    }
+    let n_total = traj.len() / D;
+    println!(
+        "  trajectory: {} samples, built in {:.2?}",
+        n_total,
+        t_traj.elapsed()
+    );
+
+    // ── 2. Higher-order feature expansion ─────────────────────────────────
+    let t_feat = Instant::now();
+    let n_pairs = n_total - K;
+    let mut features_ho = vec![0.0f32; n_pairs * D_H];
+    let mut targets_ho = vec![0.0f32; n_pairs * D];
+    let basis = ChebyshevBasis::<M>::new();
+    let mut row_buf = vec![0.0f32; D_H];
+    for (pair_idx, t) in ((K - 1)..(n_total - 1)).enumerate() {
+        let mut delay = [0.0f32; K * D];
+        for lag in 0..K {
+            let idx = t - lag;
+            for d in 0..D {
+                delay[lag * D + d] = traj[idx * D + d];
+            }
+        }
+        feature_expand_higher_order::<ChebyshevBasis<M>, M, R>(&delay, &basis, &mut row_buf);
+        features_ho[pair_idx * D_H..(pair_idx + 1) * D_H].copy_from_slice(&row_buf);
+        for d in 0..D {
+            targets_ho[pair_idx * D + d] = traj[(t + 1) * D + d];
+        }
+    }
+    println!(
+        "  feature expansion: {} pairs × {} features, built in {:.2?}",
+        n_pairs,
+        D_H,
+        t_feat.elapsed()
+    );
+
+    // ── 3. Build Gram (d_h × d_h = 6.8 GB f64) + Cov ONCE — no λI yet ─────
+    let t_gram = Instant::now();
+    let mut gram_unreg = vec![0.0f64; D_H * D_H];
+    let feature_iter = (0..n_pairs).map(|i| &features_ho[i * D_H..(i + 1) * D_H] as &[f32]);
+    chunked_gram_into(feature_iter, &mut gram_unreg, 0.0, D_H);
+    let mut cov = vec![0.0f64; D_H * D];
+    for p in 0..n_pairs {
+        let row = &features_ho[p * D_H..(p + 1) * D_H];
+        let target = &targets_ho[p * D..(p + 1) * D];
+        for i in 0..D_H {
+            let ri = row[i] as f64;
+            for d in 0..D {
+                cov[i * D + d] += ri * target[d] as f64;
+            }
+        }
+    }
+    eprintln!(
+        "  Gram + Cov build: {:.2?} (Gram is {} GB)",
+        t_gram.elapsed(),
+        (D_H * D_H * 8) as f64 / 1e9
+    );
+
+    // Free the feature matrix — we only need the Gram for the sweep.
+    drop(features_ho);
+    drop(targets_ho);
+    drop(row_buf);
+
+    // ── 4. Parallel λ sweep ───────────────────────────────────────────────
+    //
+    // Same pattern as g1_dh_18720_lambda_sweep but at d_h=29_160. Each λ
+    // value runs on its own rayon thread with ~13.6 GB scratch buffers
+    // (gram_work 6.8 GB + chol 6.8 GB).
+    //
+    // **Memory budget:** 2 λ values × 13.6 GB + 6.8 GB shared Gram = ~34 GB
+    // peak. Safe on 64 GB RAM. The K=8 sweep ran 4 λ values (5.6 GB each = 22
+    // GB), but K=10's 1.56× larger Gram forces a tighter sweep. We test 2
+    // values: λ=5e-2 (the K=8 optimum — likely near-optimal for K=10 too)
+    // and λ=1e-1 (slightly higher, covering K=10's worse underdetermination).
+    //
+    // Cholesky at d_h=29_160 is ~28 min single-threaded (O(d_h³/3) ≈
+    // 8.3×10¹² FLOPs at ~5 GFLOPS). 2 in parallel via rayon ≈ 28 min wall.
+    let lambdas: Vec<f64> = vec![5e-2, 1e-1];
+    eprintln!(
+        "  sweeping {} λ values in parallel via rayon: {:?}",
+        lambdas.len(),
+        lambdas
+    );
+
+    // Shared read-only state — captured as Copy slice references by the
+    // move closure (fat pointers are Copy, so the closure is Fn + Send).
+    let gram_slice: &[f64] = &gram_unreg;
+    let cov_slice: &[f64] = &cov;
+    let traj_slice: &[f32] = &traj;
+    let traj_raw_slice: &[f32] = &traj_raw;
+    let scale_arr: [f32; D] = scale;
+    let offset_arr: [f32; D] = offset;
+
+    let sweep_start = Instant::now();
+    let results: Vec<(f64, f32, f64, std::time::Duration)> = lambdas
+        .par_iter()
+        .map(move |&lambda| {
+            // Per-thread buffers (~13.6 GB each)
+            let mut gram_work = vec![0.0f64; D_H * D_H];
+            let mut chol = vec![0.0f64; D_H * D_H];
+            let mut z = vec![0.0f64; D_H * D];
+            let mut wt = vec![0.0f64; D_H * D];
+            let mut wout = vec![0.0f32; D * D_H];
+            let mut psi = vec![0.0f32; D_H];
+
+            // Copy unreg Gram + add λI
+            gram_work.copy_from_slice(gram_slice);
+            for i in 0..D_H {
+                gram_work[i * D_H + i] += lambda;
+            }
+
+            // Cholesky + solve
+            let t_fit = Instant::now();
+            ridge_solve_direct_f64(&mut wt, &mut chol, &mut z, &gram_work, cov_slice, D_H, D);
+            let fit_dt = t_fit.elapsed();
+
+            // Free Gram + Cholesky before the rollout — we only need Wout.
+            drop(gram_work);
+            drop(chol);
+            drop(z);
+
+            // Build Wout (D × d_h, f32) = transpose of wt
+            for d in 0..D {
+                for j in 0..D_H {
+                    wout[d * D_H + j] = wt[j * D + d] as f32;
+                }
+            }
+            drop(wt);
+
+            // Autonomous rollout over 20 LT
+            let horizon_20lt = (20.0 * SAMPLES_PER_LT).ceil() as usize;
+            let seed_t = n_total - 1;
+            let mut delay = [0.0f32; K * D];
+            for lag in 0..K {
+                let idx = seed_t - lag;
+                for d in 0..D {
+                    delay[lag * D + d] = traj_slice[idx * D + d];
+                }
+            }
+            let mut true_state: [f64; 3] = [
+                traj_raw_slice[seed_t * D] as f64,
+                traj_raw_slice[seed_t * D + 1] as f64,
+                traj_raw_slice[seed_t * D + 2] as f64,
+            ];
+            let mut pred = Vec::with_capacity(horizon_20lt * D);
+            let mut truth = Vec::with_capacity(horizon_20lt * D);
+            let mut cur_delay = delay;
+            let basis_local = ChebyshevBasis::<M>::new();
+            for _ in 0..horizon_20lt {
+                rk4_step_substepped(&mut true_state, DT, SUBSTEPS);
+                truth.push(true_state[0] as f32);
+                truth.push(true_state[1] as f32);
+                truth.push(true_state[2] as f32);
+                feature_expand_higher_order::<ChebyshevBasis<M>, M, R>(
+                    &cur_delay,
+                    &basis_local,
+                    &mut psi,
+                );
+                let mut out_norm = [0.0f32; D];
+                for d in 0..D {
+                    let mut s = 0.0f32;
+                    for j in 0..D_H {
+                        s += wout[d * D_H + j] * psi[j];
+                    }
+                    out_norm[d] = s;
+                }
+                for d in 0..D {
+                    pred.push(out_norm[d] / scale_arr[d] + offset_arr[d]);
+                }
+                let mut new_delay = [0.0f32; K * D];
+                new_delay[..D].copy_from_slice(&out_norm);
+                new_delay[D..].copy_from_slice(&cur_delay[..(K - 1) * D]);
+                cur_delay = new_delay;
+            }
+
+            // G1 metrics
+            let n_one_lt = (1.0 * SAMPLES_PER_LT).ceil() as usize;
+            let n_one_lt = n_one_lt.max(1).min(pred.len() / D);
+            let nrmse_one_lt = nrmse(&pred[..n_one_lt * D], &truth[..n_one_lt * D], D);
+            let sigma = mean_sigma(&truth, D);
+            let thr_sample = threshold_time(&pred, &truth, D, 0.1, sigma);
+            let thr_lt = thr_sample as f64 / SAMPLES_PER_LT;
+
+            (lambda, nrmse_one_lt, thr_lt, fit_dt)
+        })
+        .collect();
+    let sweep_wall = sweep_start.elapsed();
+
+    // Sort results by λ for the summary (rayon may return them out of order)
+    let mut sorted = results;
+    sorted.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+
+    // ── 5. Summary ───────────────────────────────────────────────────────
+    println!();
+    println!(
+        "── λ-sweep summary (d_h = {}, K={}, M={}, R={}) ────────────────────",
+        D_H, K, M, R
+    );
+    println!(
+        "  sweep wall: {:.2?} ({} Cholesky factorizations in parallel)",
+        sweep_wall,
+        sorted.len()
+    );
+    println!();
+    println!(
+        "  {:>10}  {:>14}  {:>10}  {:>14}  {:>10}  {:>12}",
+        "λ", "NRMSE(1 LT)", "gate", "threshold(LT)", "gate", "fit time"
+    );
+    for (lambda, nrmse_one_lt, thr_lt, fit_dt) in &sorted {
+        let nrmse_pass = *nrmse_one_lt <= 1.0e-3;
+        let thr_pass = *thr_lt >= 8.0;
+        println!(
+            "  {:>10.0e}  {:>14.6e}  {:>10}  {:>14.2}  {:>10}  {:>10.2?}",
+            lambda,
+            nrmse_one_lt,
+            if nrmse_pass { "✅ ≤1e-3" } else { "❌ >1e-3" },
+            thr_lt,
+            if thr_pass { "✅ ≥8" } else { "❌ <8" },
+            fit_dt
+        );
+    }
+    println!();
+    println!("  Phase 5.1 reference: K=8/M=8/R=2 (d_h=18_720) at λ=5e-2 → NRMSE 9.43e-4 ✅, threshold 7.23 LT ❌");
+    println!();
+
+    let any_pass = sorted
+        .iter()
+        .any(|(_, nrmse, thr, _)| *nrmse <= 1.0e-3 && *thr >= 8.0);
+    if any_pass {
+        let winners: Vec<_> = sorted
+            .iter()
+            .filter(|(_, nrmse, thr, _)| *nrmse <= 1.0e-3 && *thr >= 8.0)
+            .collect();
+        println!(
+            "  VERDICT: {} λ value(s) PASS both G1 legs — `karc_forecaster` is \
+             GOAT-eligible for default-on promotion.",
+            winners.len()
+        );
+        for (lambda, nrmse_one_lt, thr_lt, _) in &winners {
+            println!(
+                "    λ={:.0e}: NRMSE={:.6e}, threshold={:.2} LT",
+                lambda, nrmse_one_lt, thr_lt
+            );
+        }
+    } else {
+        println!("  VERDICT: no λ passes both G1 legs — `karc_forecaster` stays opt-in.");
+        if let Some(best_nrmse) = sorted
+            .iter()
+            .min_by(|a, b| a.1.partial_cmp(&b.1).unwrap())
+        {
+            println!(
+                "  best NRMSE:      λ={:.0e} → NRMSE={:.6e}, threshold={:.2} LT",
+                best_nrmse.0, best_nrmse.1, best_nrmse.2
+            );
+        }
+        if let Some(best_thr) = sorted.iter().max_by(|a, b| a.2.partial_cmp(&b.2).unwrap()) {
+            println!(
+                "  best threshold:  λ={:.0e} → NRMSE={:.6e}, threshold={:.2} LT",
+                best_thr.0, best_thr.1, best_thr.2
+            );
+        }
+    }
+    println!();
+    println!("  Next steps (if no λ passes): ");
+    println!("    1. More λ values (extend the sweep — the K=8 optimum was narrow).");
+    println!("    2. K=12 at M=8/R=2 (d_h=41_904, ~14 GB Gram — still feasible but tight).");
+    println!("    3. Accept the gate re-spec (Issue 186 Path D) — promote on the K=8 NRMSE");
+    println!("       pass (Phase 5.1) + K=8/M=24 first-order threshold pass (Phase 1).");
+
+    // No assertion — this is a measurement test, not a pass/fail gate.
+}

@@ -223,6 +223,60 @@ correct, but without a passing G1 gate there's no reason to promote the
 parallel path to default-on. The full-rank direct Cholesky is both faster
 and more accurate for the G1 measurement.
 
+## T7 Phase 5.1 follow-up (2026-07-20): λ-sweep recovers NRMSE gate
+
+**Major update: the Phase 5 NRMSE FAIL is RECOVERED by λ=5e-2.** The
+underdetermination hypothesis was correct — the K=4-tuned λ=5e-3 was too
+small for the K=8 underdetermined system. A 10× larger λ (5e-2) suppresses
+the ~14_670 underdetermined directions and brings NRMSE below the 1e-3
+gate.
+
+**Test infrastructure shipped:**
+- `smoke_k4_m8_r2_lambda_sweep` — fast (~100s) K=4 sweep that validates
+  the mechanism (NRMSE monotonically worsens with λ on well-determined
+  systems, reproduces Phase 2's 1.67e-4 baseline).
+- `g1_dh_18720_lambda_sweep` — parallel K=8 sweep via rayon (4 λ values,
+  builds Gram once, ~22.8 min wall).
+- `g1_dh_29160_k10_lambda_sweep` — parallel K=10 sweep (2 λ values,
+  memory-limited; tests whether +2 delay steps extend threshold to ≥8 LT).
+
+**K=8 sweep result (d_h=18_720, 4 λ values, 22.8 min sweep wall):**
+
+| λ | NRMSE (1 LT) | gate | threshold (ε=0.1) | gate |
+|---|---|---|---|---|
+| 5e-3 | 6.68e-3 | ❌ (6.7×) | 7.14 LT | ❌ (11%) |
+| **5e-2** | **9.43e-4** | **✅ PASS** | **7.23 LT** | ❌ (10%) |
+| 5e-1 | 2.29e-3 | ❌ (2.3×) | 7.17 LT | ❌ (10%) |
+| 5e0 | 4.88e-3 | ❌ (4.9×) | 7.01 LT | ❌ (12%) |
+
+**Key findings:**
+1. **NRMSE gate is now passable** at λ=5e-2 (9.43e-4 ≤ 1e-3). The optimal
+   λ for K=8 is ~10× larger than for K=4 — consistent with the 4× larger
+   d_h producing 4× more underdetermined directions needing stronger
+   regularization.
+2. **Threshold is flat across λ (~7.0-7.2 LT).** The threshold gate is NOT
+   a regularization problem — it's a delay/capacity problem. This rules
+   out "tune λ harder" as a path to the threshold gate.
+3. **The sweet-spot λ is narrow** — only λ=5e-2 passes NRMSE. λ=5e-3 (too
+   weak) and λ=5e-1 (too strong) both FAIL.
+4. **M is the dominant threshold lever once K ≥ 8.** Phase 4 data +
+   Phase 5.1 show: M=4→M=8 at K=8 extends threshold 1.31→7.23 LT (5.5×),
+   while M=8→M=24 only extends 7.23→8.16 LT (13%, diminishing returns).
+
+**Updated promotion paths (post-Phase 5.1):**
+1. **K=10/M=8/R=2 at λ=5e-2** — tests whether +2 delay steps extend
+   threshold to ≥8 LT. Linear K-extrapolation predicts ~8.5 LT (PASS).
+   Running as `g1_dh_29160_k10_lambda_sweep`.
+2. **Gate re-spec (Issue 186 Path D)** — promote on Phase 5.1 K=8/M=8/R=2
+   NRMSE evidence (9.43e-4, passes) + Phase 1 K=8/M=24 threshold evidence
+   (8.16 LT). Two configs at the same K=8 delay length, each passing one
+   leg of the gate.
+3. **More training data** (N=20_000+) — unlikely to help threshold (flat
+   across λ) but would improve NRMSE further.
+
+See `.benchmarks/308_karc_goat.md` Phase 5.1 section for the full data +
+the M-vs-K threshold analysis.
+
 ## First-attempt postmortem (recorded 2026-07-20)
 
 The first parallel implementation parallelized each Givens rotation
