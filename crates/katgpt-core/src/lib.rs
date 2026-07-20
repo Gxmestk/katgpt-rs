@@ -1623,6 +1623,13 @@ pub use karc::{
     forecast_low_rank_apply, higher_order_feature_count, low_rank_fit, low_rank_fit_warm_start,
 };
 
+// KARC Regime Gate re-export — Plan 556 Phase 1 (2026-07-20).
+// The gate itself is a sibling submodule under `karc::`; the public surface
+// is re-exported here for caller ergonomics so consumers don't need to
+// reach into the `karc::regime_gate` path.
+#[cfg(feature = "karc_regime_gate")]
+pub use karc::regime_gate::{KarcRegime, KarcRegimeGate, RegimeVerdict, WelfordVariance};
+
 // KarcShard DP Output Perturbation (Issue 370 T4) — post-hoc Gaussian noise
 // on a fitted ridge Wout matrix to provide formal (ε,δ)-DP for the committed
 // KarcShard parameters. Defends PARAMETER-INSPECTION MI (attacker reads Wout

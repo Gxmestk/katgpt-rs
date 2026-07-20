@@ -91,6 +91,19 @@ use crate::simd;
 // 2048-line guideline.
 pub mod large_dh;
 
+// ── Regime Gate (Plan 556 Phase 1) ─────────────────────────────────────
+//
+// Closed-form residual-variance mux between this forecaster (KARC) and the
+// SeasonalNaiveForecaster floor. Directly fixes the structural periodic-
+// blindness documented in `.benchmarks/010_report_the_floor_consolidated.md`
+// §T7 (2026-07-20 K-sweep): KARC is a chaotic-regime specialist and *loses*
+// on periodic data regardless of K. The gate routes each trajectory to the
+// right forecaster by comparing rolling Welford variance of their residuals.
+// Gated on `karc_regime_gate` (which implies `karc_forecaster`). Pure
+// modelless (Welford + sigmoid). Zero runtime cost unless constructed.
+#[cfg(feature = "karc_regime_gate")]
+pub mod regime_gate;
+
 // ── Sealed trait machinery ────────────────────────────────────────────────
 
 mod sealed {
