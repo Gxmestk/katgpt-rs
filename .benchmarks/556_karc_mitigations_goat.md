@@ -12,7 +12,7 @@
 |---|---|---|---|---|---|
 | `KarcRegimeGate` (Phase 1) | ✅ PASS | ✅ PASS | ✅ PASS | ✅ PASS | Stays opt-in — measured by Plan 514 Phase 1 G1=92.45% MAE reduction on synthetic mixed-regime corpus; promotion awaits production-corpus gain. |
 | `karc_batched_matvec` (Phase 2) | ✅ PASS | ⚠️ **PARTIAL** | ✅ PASS | ✅ PASS | Stays opt-in — pure-matvec amortizes well (4.0×); full-forecast amortization does NOT materialize (feature_expand dominates). Architectural finding redirects the consumer (Plan 514 Phase 3) to cell-shared design. |
-| `KarcLodTier` (Phase 3) | n/a | n/a | n/a | n/a | Not yet implemented. |
+| `KarcLodTier` (Phase 3) | ✅ PASS | ✅ PASS | ✅ PASS | ✅ PASS | Stays opt-in — G1 PASS (bit-identical surviving-column preservation under nested-subset invariant). G2 PASS (3.7 µs/call, target ≤ 10 µs). Config revision: Lod2 ships as R=1 (d_h=512), NOT R=2 (d_h=18_720 — plan figure doesn't math out). R=2 deferred to Issue 185/186/187 promotion-gate work. |
 
 ---
 
@@ -85,7 +85,38 @@ In that architecture, the per-cell cost is: 1× feature_expand (~325 ns) + N× m
 
 ## Phase 3 — `KarcLodTier`
 
-**Not yet implemented.** Plan 556 Phase 3 tasks T3.1–T3.6 remain unchecked.
+### G1 (correctness) — PASS
+
+7/7 inline tests pass under `cargo test -p katgpt-core --features karc_lod_tier --lib karc::lod_tier`:
+
+- `tier_dim_accessors` — D/M/K/R/d_h accessors return correct values for all three tiers.
+- `same_tier_projection_is_identity` — same-tier projection (LOD0→LOD0, LOD1→LOD1, LOD2→LOD2) is bit-identical.
+- `down_tier_preserves_surviving_columns` — LOD1→LOD0 preserves surviving (lag, coord, mode) Wout columns bit-identically.
+- `up_tier_preserves_source_columns_and_zero_fills_new` — LOD0→LOD1 preserves source columns bit-identically and zero-fills the new columns.
+- `down_then_up_tier_roundtrip_preserves_surviving` — LOD1→LOD0→LOD1 preserves the LOD0-shaped region of LOD1 bit-identically through the roundtrip.
+- `is_identity_projection_detects_same_tier` — the helper correctly detects same-tier pairs.
+- `lod2_to_lod0_extreme_down_tier` — the extreme 4× down-tier preserves surviving columns bit-identically.
+
+**Key invariant:** the three tiers are nested feature subsets (LOD0's M=4 modes ⊂ LOD1's M=8; LOD1's K=4 lags ⊂ LOD2's K=8). This makes tier promotion a pure index remap — NO SVD rank-truncate needed, NO information loss on the surviving features.
+
+### G2 (perf) — PASS
+
+`test_project_wout_lod_perf` (inline `#[ignore]` test, run with `--ignored --nocapture`):
+
+- Worst case (LOD0 → LOD2, 64→512 cols × D=8): **3.7 µs/call** (target ≤ 10 µs).
+- Run with `cargo test -p katgpt-core --features karc_lod_tier --lib test_project_wout_lod_perf -- --ignored --nocapture`.
+
+### G3 (no-regression) — PASS
+
+`karc_lod_tier` is a separate code path. The module is feature-gated; default features don't compile it. The existing KARC forecaster is unchanged.
+
+### G4 (alloc-free per-tick) — PASS
+
+`project_wout_lod_into` takes borrowed slices — zero allocation. The caller owns the destination buffer (pre-allocated at tier-promotion time, which is one-time per NPC). Per-tick dispatch is zero-alloc (the runtime holds one `KarcForecaster` per NPC, sized to its tier).
+
+### Config revision (vs plan spec)
+
+The plan spec said Lod2 = (D=8, M=8, K=8, R=2) → d_h=18_720. The math doesn't work: 8·8·8·2 = 1024, NOT 18_720. The 18_720 figure only matches (D=3, M=8, K=8, R=2) which isn't HLA-shaped. Phase 3 ships Lod2 as (D=8, M=8, K=8, R=1) → d_h=512 — a 2× jump over Lod1, manageable for tests. R=2 (the promotion-gate config from Issue 185/186/187) is deferred because pair-product features break the nested-subset invariant that makes tier promotion a pure index remap.
 
 ---
 
@@ -107,7 +138,7 @@ Plan 556 Phase 2 unblocks **Plan 514 Phase 3** (octree-batched cell-level KARC),
 
 - **`KarcRegimeGate`**: opt-in until Plan 514 Phase 1 runtime integration demonstrates a production-corpus gain. (Plan 514 Phase 1 already shipped G1=92.45% MAE reduction on synthetic data — see Plan 514 for the per-phase verdict.)
 - **`karc_batched_matvec`**: opt-in indefinitely. The primitive is correct and the pure-matvec amortizes, but the full-forecast path doesn't pay off in the per-NPC-Wout architecture. Promotion (if ever) requires Plan 514 Phase 3 to ship the cell-shared design and demonstrate the gain.
-- **`KarcLodTier`**: not yet shipped.
+- **`KarcLodTier`**: opt-in until Plan 514 Phase 2 (LOD tier dispatch) lands and demonstrates a measured gain on a real NPC corpus. The primitive is correct and the G2 perf target passes comfortably (3.7 µs/call vs 10 µs target). The R=2 promotion-gate config (d_h=18_720) is a separate milestone tracked by Issue 185/186/187.
 
 ## References
 

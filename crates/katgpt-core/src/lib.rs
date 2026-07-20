@@ -1637,6 +1637,13 @@ pub use karc::regime_gate::{KarcRegime, KarcRegimeGate, RegimeVerdict, WelfordVa
 #[cfg(feature = "karc_batched_matvec")]
 pub use karc::batched::{KarcBatchForecaster, karc_batched_matvec_into};
 
+// Plan 556 Phase 3 — KARC LOD Tier. Config tag + tier-promotion Wout
+// projection. Three nested tiers map to different KarcForecaster configs;
+// promotion is a pure index remap (no re-fit required for forecast continuity
+// on the surviving features). Re-exported here for caller ergonomics.
+#[cfg(feature = "karc_lod_tier")]
+pub use karc::lod_tier::{KarcLodTier, is_identity_projection, project_wout_lod_into};
+
 // KarcShard DP Output Perturbation (Issue 370 T4) — post-hoc Gaussian noise
 // on a fitted ridge Wout matrix to provide formal (ε,δ)-DP for the committed
 // KarcShard parameters. Defends PARAMETER-INSPECTION MI (attacker reads Wout

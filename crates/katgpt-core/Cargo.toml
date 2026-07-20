@@ -517,6 +517,13 @@ name = "bench_556_karc_batched_matvec_g2"
 harness = false
 required-features = ["karc_batched_matvec"]
 
+# Plan 556 Phase 3 — KARC LOD Tier G2 perf bench. Four transitions
+# (down/up/extreme-down) at the HLA config. Target: tier promotion ≤ 10 µs.
+[[bench]]
+name = "bench_556_karc_lod_tier_g2"
+harness = false
+required-features = ["karc_lod_tier"]
+
 # Plan 312 Phase 4 T4.9 — Viable Manifold Graph GOAT bench:
 #   pullback_volume < 5µs (R^4 → R^4), random_walk < 100ns/step (k=4),
 #   build_safe_manifold_graph < 10ms (1000 samples).
@@ -675,15 +682,16 @@ name = "karc_dh_18720_timing_trial"
 required-features = ["karc_householder_eig_par"]
 
 # Issue 187 T7 / Plan 308 T4.5 — the actual KARC G1 measurement at the
-# promotion-gate target config (K=8/M=8/R=2, d_h=18_720). `#[ignore]`'d because
-# the full run takes ~90-120 min wall (87 min parallel eigendecomp + ALS +
-# rollout). Run with:
+# promotion-gate target config (K=8/M=8/R=2, d_h=18_720). Uses full-rank
+# direct Cholesky (faster + more accurate than the ALS+eigendecomp path).
+# `#[ignore]`'d because the full run takes ~30-45 min wall (2.8 GB Gram
+# build + ~10 min Cholesky + rollout). Run with:
 #   CARGO_TARGET_DIR=/tmp/katgpt-g1-dh18720 cargo test --release \
-#     --features karc_householder_eig_par \
+#     --features karc_forecaster \
 #     --test karc_g1_dh18720 -- --ignored --nocapture
 [[test]]
 name = "karc_g1_dh18720"
-required-features = ["karc_householder_eig_par"]
+required-features = ["karc_forecaster"]
 
 # Plan 331 — BabelCodec GOAT gate. G1 round-trip fidelity + G2 compression
 # ratio (the make-or-break — same gate that killed CompressionDrafter twice) +

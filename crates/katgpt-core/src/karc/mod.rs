@@ -116,6 +116,18 @@ pub mod regime_gate;
 #[cfg(feature = "karc_batched_matvec")]
 pub mod batched;
 
+// ── LOD Tier (Plan 556 Phase 3) ────────────────────────────────────────
+//
+// LOD (Level-of-Detail) tier tag + tier-promotion Wout projection. Three
+// nested tiers (LOD0 background / LOD1 midground / LOD2 hero) map to
+// different KarcForecaster const-generic configs; the nested-subset structure
+// makes tier promotion a pure index remap (down-tier preserves surviving
+// columns; up-tier zero-fills new columns). Phase 3 ships R=1 only; the R=2
+// promotion-gate config (d_h=18_720, Issue 185/186/187) is deferred.
+// Gated on `karc_lod_tier` (which implies `karc_forecaster`).
+#[cfg(feature = "karc_lod_tier")]
+pub mod lod_tier;
+
 // ── Sealed trait machinery ────────────────────────────────────────────────
 
 mod sealed {
