@@ -1,5 +1,6 @@
-//! KARC Regime Gate — closed-form residual-variance mux between KARC and
-//! Seasonal forecasters (Plan 556 Phase 1).
+//! KARC Regime Gate — closed-form residual-MSE mux between KARC and
+//! Seasonal forecasters (Plan 556 Phase 1; revised to MSE 2026-07-20 after
+//! Plan 514 Phase 1 integration surfaced a variance-only failure mode).
 //!
 //! # The problem this fixes
 //!
@@ -14,9 +15,20 @@
 //!
 //! The fix is not to make KARC fit periodic data — it is to **route each
 //! per-NPC trajectory to the right forecaster for its current regime**. This
-//! gate does that with zero training: it compares rolling residual variance
-//! of the two forecasters and picks the lower-variance one, with a sigmoid
-//! confidence to avoid flip-flop.
+//! gate does that with zero training: it compares rolling residual MSE
+//! (mean squared error, = variance + bias²) of the two forecasters and picks
+//! the lower-MSE one, with a sigmoid confidence to avoid flip-flop.
+//!
+//! # Why MSE, not variance
+//!
+//! The original Plan 556 spec said "rolling residual variance". The first
+//! runtime integration (Plan 514 Phase 1) exposed the failure mode: a
+//! consistently-biased forecaster has variance 0 but a large error. The gate
+//! would prefer the biased forecaster over a more-accurate-but-volatile one —
+//! categorically wrong for the regime-mux use case. MSE = Var(r) + (E[r])²
+//! penalizes both bias and dispersion; for the regime-mux question "which
+//! forecaster has smaller error on this regime?", MSE is the right metric.
+//! Variance alone is insufficient.
 //!
 //! # Algorithm
 //!
@@ -27,8 +39,8 @@
 //!
 //! ```text
 //! if n < min_pool:           return Seasonal  (cold-start floor)
-//! else:                      pick argmin(σ²_karc, σ²_seasonal)
-//!                            confidence = sigmoid(β · |σ²_karc − σ²_seasonal|)
+//! else:                      pick argmin(MSE_karc, MSE_seasonal)
+//!                            confidence = sigmoid(β · |MSE_high − MSE_low|)
 //! ```
 //!
 //! Cold-start defaults to `Seasonal` because `SeasonalNaiveForecaster` is the
@@ -66,6 +78,10 @@
 //!   `tests/conformal_karc_no_regression.rs` which already enforces this
 //!   composition pattern).
 //! - **G4**: 0 allocs/100 calls on the hot path.
+//! - **G1-extension (MSE revision)**: a consistently-biased forecaster
+//!   (variance 0, large mean) must NOT win over a less-biased one. The
+//!   `seasonal_low_residual_routes_to_seasonal` regression test in
+//!   `riir-engine::karc_bridge::regime_mux` enforces this end-to-end.
 //!
 //! # References
 //!
@@ -136,12 +152,40 @@ mod imp {
         }
 
         /// Sample variance `M2 / (n − 1)`, or `None` until `n >= 2`.
+        ///
+        /// Captures dispersion only — NOT bias. Two forecasters with the same
+        /// variance can have very different accuracies if their biases differ.
+        /// For the regime mux's "which forecaster has smaller error" question,
+        /// use [`mse`](Self::mse) instead.
         #[inline]
         pub fn variance(&self) -> Option<f32> {
             if self.count < 2 {
                 None
             } else {
                 Some((self.m2 / ((self.count - 1) as f64)) as f32)
+            }
+        }
+
+        /// Mean squared error vs zero target: `MSE = Var_pop + mean²`.
+        ///
+        /// This is the right metric for the regime mux — it captures BOTH
+        /// dispersion (variance) and bias (mean²). A consistently-biased
+        /// forecaster (variance 0, large mean) gets a large MSE, so the gate
+        /// correctly routes away from it. Returns `None` until at least one
+        /// observation has been pushed (single observation gives MSE = x²).
+        ///
+        /// Computed as `M2/n + mean²` (the population-variance form, which
+        /// matches the residual stream's true second moment `E[r²]`). The
+        /// sample-variance `M2/(n-1)` form is exposed separately as
+        /// [`variance`](Self::variance) for diagnostics.
+        #[inline]
+        pub fn mse(&self) -> Option<f32> {
+            if self.count < 1 {
+                None
+            } else {
+                let var_pop = self.m2 / (self.count as f64);
+                let mean_sq = self.mean * self.mean;
+                Some((var_pop + mean_sq) as f32)
             }
         }
 
@@ -170,24 +214,29 @@ mod imp {
 
     /// Gate verdict returned by [`KarcRegimeGate::decide`].
     ///
-    /// `confidence ∈ [0.5, 1.0]` — `sigmoid(β · |Δσ²|)`; 0.5 at a tie, →1.0
-    /// as the variance gap widens. Never below 0.5 by construction (the gate
+    /// `confidence ∈ [0.5, 1.0]` — `sigmoid(β · |ΔMSE|)`; 0.5 at a tie, →1.0
+    /// as the MSE gap widens. Never below 0.5 by construction (the gate
     /// reports the winning side's confidence, not a directional sign).
+    ///
+    /// The fields hold MSE (variance + bias²), not variance alone — see the
+    /// module-level "Why MSE, not variance" section for the rationale. The
+    /// field names use `mse_*` (not `sigma_sq_*`) to make the semantics
+    /// unambiguous at the call site.
     #[derive(Clone, Copy, Debug, PartialEq)]
     pub struct RegimeVerdict {
         /// Which forecaster to apply this tick.
         pub preferred: KarcRegime,
-        /// `sigmoid(β · |σ²_high − σ²_low|)`, in `[0.5, 1.0]`.
+        /// `sigmoid(β · |MSE_high − MSE_low|)`, in `[0.5, 1.0]`.
         pub confidence: f32,
-        /// KARC's current sample variance (or `f32::INFINITY` if undefined).
-        pub sigma_sq_karc: f32,
-        /// Seasonal's current sample variance (or `f32::INFINITY` if undefined).
-        pub sigma_sq_seas: f32,
+        /// KARC's current MSE vs zero target (or `f32::INFINITY` if undefined).
+        pub mse_karc: f32,
+        /// Seasonal's current MSE vs zero target (or `f32::INFINITY` if undefined).
+        pub mse_seas: f32,
         /// Number of accumulated residual pairs.
         pub n: usize,
     }
 
-    /// Closed-form residual-variance regime gate.
+    /// Closed-form residual-MSE regime gate.
     ///
     /// Holds two [`WelfordVariance`] accumulators (one per forecaster). The
     /// caller pushes both residuals per tick via [`observe_residuals`]; the
@@ -203,7 +252,7 @@ mod imp {
         /// [`KarcRegime::Seasonal`] (the floor). Default 16.
         min_pool: usize,
         /// Sigmoid inverse temperature. Default 8.0 — picks a moderate
-        /// transition: at `|Δσ²| = 0.5`, confidence ≈ 0.92; at `|Δσ²| = 0.1`,
+        /// transition: at `|ΔMSE| = 0.5`, confidence ≈ 0.92; at `|ΔMSE| = 0.1`,
         /// confidence ≈ 0.69.
         beta: f32,
     }
@@ -271,11 +320,15 @@ mod imp {
         /// **Cold-start:** until `n >= min_pool`, returns `Regime::Seasonal`
         /// with `confidence = 0.5` (the floor — no claim until evidence).
         ///
-        /// **Steady-state:** picks the lower-variance forecaster; confidence
-        /// is `sigmoid(β · |σ²_high − σ²_low|)` ∈ `[0.5, 1.0]`.
+        /// **Steady-state:** picks the lower-MSE forecaster; confidence
+        /// is `sigmoid(β · |MSE_high − MSE_low|)` ∈ `[0.5, 1.0]`.
         ///
-        /// **Edge case:** if both variances are undefined (n < 2), returns
+        /// **Edge case:** if both MSEs are undefined (n < 1), returns
         /// `Seasonal` at `confidence = 0.5`.
+        ///
+        /// **MSE vs variance:** uses MSE (= variance + bias²) — not variance
+        /// alone — so a consistently-biased forecaster with variance 0 still
+        /// gets a large MSE and the gate correctly routes away from it.
         #[inline]
         pub fn decide(&self) -> RegimeVerdict {
             // Cold-start floor.
@@ -283,20 +336,20 @@ mod imp {
                 return RegimeVerdict {
                     preferred: KarcRegime::Seasonal,
                     confidence: 0.5,
-                    sigma_sq_karc: self.karc_var.variance().unwrap_or(f32::INFINITY),
-                    sigma_sq_seas: self.seas_var.variance().unwrap_or(f32::INFINITY),
+                    mse_karc: self.karc_var.mse().unwrap_or(f32::INFINITY),
+                    mse_seas: self.seas_var.mse().unwrap_or(f32::INFINITY),
                     n: self.n(),
                 };
             }
 
-            // Both variances must be defined (n >= min_pool >= 2).
-            let sigma_sq_karc = self.karc_var.variance().unwrap_or(f32::INFINITY);
-            let sigma_sq_seas = self.seas_var.variance().unwrap_or(f32::INFINITY);
+            // Both MSEs must be defined (n >= min_pool >= 1).
+            let mse_karc = self.karc_var.mse().unwrap_or(f32::INFINITY);
+            let mse_seas = self.seas_var.mse().unwrap_or(f32::INFINITY);
 
-            let (preferred, gap) = if sigma_sq_karc <= sigma_sq_seas {
-                (KarcRegime::Karc, sigma_sq_seas - sigma_sq_karc)
+            let (preferred, gap) = if mse_karc <= mse_seas {
+                (KarcRegime::Karc, mse_seas - mse_karc)
             } else {
-                (KarcRegime::Seasonal, sigma_sq_karc - sigma_sq_seas)
+                (KarcRegime::Seasonal, mse_karc - mse_seas)
             };
 
             // sigmoid(β · gap) ∈ (0.5, 1.0]. Use the standard logistic:
@@ -309,8 +362,8 @@ mod imp {
             RegimeVerdict {
                 preferred,
                 confidence,
-                sigma_sq_karc,
-                sigma_sq_seas,
+                mse_karc,
+                mse_seas,
                 n: self.n(),
             }
         }
@@ -492,9 +545,9 @@ mod tests {
         let mut g_large = KarcRegimeGate::with_config(2, 8.0);
         for i in 0..20 {
             let t = i as f32 * 0.1;
-            // Small-gap stream: |σ²_karc − σ²_seas| ≈ 0.1
+            // Small-gap stream: |MSE_karc − MSE_seas| ≈ 0.1
             g_small.observe_residuals(t.sin() * 0.1, t.sin() * 0.15);
-            // Large-gap stream: |σ²_karc − σ²_seas| ≈ 5.0
+            // Large-gap stream: |MSE_karc − MSE_seas| ≈ 5.0
             g_large.observe_residuals(t.sin() * 0.1, t.sin() * 2.0);
         }
         let v_small = g_small.decide();

@@ -4,7 +4,7 @@
 **Companion:** [riir-ai/.plans/514_karc_mitigations_runtime.md](../../riir-ai/.plans/514_karc_mitigations_runtime.md) (runtime integration)
 **Source design analysis:** conversation 2026-07-20 — KARC pros/cons review + user-proposed mitigations (fusion, batching, LOD, 2-way KARC, dual LEO+KARC, mux, octree, DDTree)
 **Target:** `katgpt-rs/crates/katgpt-core/src/karc/regime_gate.rs` + `katgpt-rs/crates/katgpt-core/src/karc/batched_bucket.rs` (new modules) + Cargo features
-**Status:** Phase 1 🟡 IN-PROGRESS — primitive scaffold + GOAT bench landed; awaiting integration via riir-ai Plan 514 to validate against real NPC HLA trajectories.
+**Status:** Phase 1 ✅ **COMPLETE + INTEGRATED (2026-07-20)** — `KarcRegimeGate` primitive shipped + Plan 514 runtime integration landed with **G1 PASS (92.45% MAE reduction on mixed-regime NPC corpus)** + **G2 essentially at-budget (89 ns/tick)**. **Primitive revised from variance-only to MSE** (variance + bias²) after Plan 514 surfaced the failure mode where a consistently-biased forecaster has variance 0 but large error — see `regime_gate.rs` module docstring "Why MSE, not variance" section. Phases 2–3 remain TODO (`karc_batched_matvec` + `KarcLodTier`).
 
 ---
 
