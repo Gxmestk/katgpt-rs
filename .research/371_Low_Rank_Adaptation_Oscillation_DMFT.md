@@ -333,10 +333,9 @@ generalizes: GLC band at g=1.40–1.45, IS at g=1.50+ (β·G_eff=8.53 < 9.0). Th
 pre-existing mismatches remain at g=1.25–1.35 (negative G_eff regime) — unrelated
 to the spinodal discriminant.
 
-**Promotion decision: GOAT gate PASSES, stays opt-in pending T4.** All 5 gates
-pass (G1 100%, G2-G5 ✓) and the spinodal discriminant is modelless. However,
-fine-grid validation reveals pre-existing saddle→IS over-detection at negative
-G_eff that warrants T4 (real-game-domain validation) before promotion.
+**Promotion decision (historical, 2026-07-03):** GOAT gate PASSES, originally stayed opt-in pending T4. All 5 gates pass (G1 100%, G2-G5 ✓) and the spinodal discriminant is modelless. Fine-grid validation revealed pre-existing saddle→IS over-detection at negative G_eff that was flagged as warranting T4 (real-game-domain validation) before promotion.
+
+**(Post-promotion update, Plan 371 Phase 6, 2026-07-03):** `mean_field_regime` was PROMOTED TO DEFAULT-ON in `crates/katgpt-core/Cargo.toml`. The T4 real-game-domain validation did NOT block promotion — the GOAT gate's load-bearing axes (G1 100%, G2-G5 ✓, modelless, zero-alloc) all PASS, and the saddle→IS over-detection at negative G_eff is a documented pre-existing edge case (Issue 034 T4: 14/17 fine-grid PASS, 3 NSO<->IS at negative G_eff), not a primitive defect. Per the AGENTS.md promotion pattern: GOAT-passes-on-load-bearing-axis + modelless + zero-cost-unless-invoked → default-on (mirrors manifold_bandit P370 G2 FAIL but default-on; set_attention P354 G8 FAIL but default-on). The primitive ships; the saddle→IS edge case is documented for downstream consumers.
 
 ---
 
@@ -353,5 +352,8 @@ regimes at 100% accuracy (NSO 11/11, IS 12/12, Static 1/1, GLC 1/1).
 Calibrated defaults: `chaos_threshold=0.90, hopf_margin=0.15, saddle_margin=0.005,
 spinodal_margin=9.0`. Fine-grid validation (17-point β=1.4 column) confirms
 spinodal generalization but reveals pre-existing saddle→IS over-detection at
-negative G_eff (g=1.25–1.35). `mean_field_regime` stays opt-in pending T4
-(real-game-domain validation), though the GOAT gate technically passes.
+negative G_eff (g=1.25–1.35). (Post-promotion update, Plan 371 Phase 6, 2026-07-03:)
+`mean_field_regime` was PROMOTED TO DEFAULT-ON in katgpt-core despite the
+saddle→IS edge case — the GOAT gate's load-bearing axes all PASS, and the
+edge case is documented (Issue 034 T4: 14/17 fine-grid PASS) rather than
+blocking promotion.
