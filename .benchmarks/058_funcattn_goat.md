@@ -571,11 +571,14 @@ stands.
 
 ### Demotion / promotion decision
 
-**`funcattn`: eligible for default-on promotion (human decision pending).**
+**`funcattn`: PROMOTED TO DEFAULT-ON on 2026-07-18** (cargo-comment sync).
 Per Plan 286 T4.4, G6 now PASSES (FUNCATTN acc=1.000 ≥ SDPA acc=1.000).
 The original "stays opt-in" verdict was based on the pre-D4 null result
-and is superseded. The primitive remains opt-in in `full` until a human
-flips it into the default feature list per T4.4's promotion protocol.
+and is superseded. (Post-promotion update, 2026-07-18): the prior "human
+decision pending" qualifier below was overtaken — the cargo-comment sync
+landed the promotion directly in `katgpt-rs/Cargo.toml` (root forwards to
+`katgpt-core/funcattn`). The feature is in `default = [...]` as of the 2026-07-07
+post-Issue-049 D4 G6 fix and the comment was synced to match on 2026-07-18.
 
 ---
 

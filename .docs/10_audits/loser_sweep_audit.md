@@ -168,14 +168,16 @@ These 4 features have zero active code. Remove the feature line from root
 ## Notable stale Cargo.toml comments (fix regardless of exile)
 
 These should be corrected in a separate docs pass — they're not exile decisions,
-but the audit surfaced them:
+but the audit surfaced them. **Status as of feature-gate-audit extension IX (2026-07-20):**
 
-1. **`spectral_threat`** L200 — says "GOAT PASS 46.9%" but Plan 241 says "GOAT gate not yet passed". "46.9%" appears nowhere in benchmarks.
-2. **`flow_field_nav`** L98 — same fabricated "46.9%"; Plan 242 shows no GOAT PASS.
-3. **`ac_prefix`** L148 — says "Opt-in until G1–G4 pass" but `.benchmarks/313_ac_prefix_modelless.md` says "PROMOTED TO DEFAULT-ON" — not reflected in `default` array.
-4. **`rv_gated_thinking`** / **`rv_bandit_pruning`** L393-394 — "default-ON via rv_gated_routing" is misleading (dependency direction is reversed; these are genuinely opt-in despite GOAT passing).
-5. **`compression_drafter`** L338 — "Opt-in until GOAT gate passes" but gate already ran and FAILED (`.benchmarks/285`).
-6. **`cs_kv_probe`** L470 — says "opt-in until G2 duality gate passes" but Plan 280 says "GOAT gate G1/G2/G3 green". Comment is stale.
+1. **`spectral_threat`** L200 — says "GOAT PASS 46.9%" but Plan 241 says "GOAT gate not yet passed". "46.9%" appears nowhere in benchmarks. **STILL OUTSTANDING** — Cargo.toml comment still has the fabricated 46.9% claim.
+2. **`flow_field_nav`** L98 — same fabricated "46.9%"; Plan 242 (Fourier-Smoothed Flow Fields) has no documented GOAT PASS (the bench file `flow_field_bench.rs` measures against a >20% CPU improvement criterion and contains no 46.9% figure). **STILL OUTSTANDING** — Cargo.toml comment still has the fabricated 46.9% claim.
+3. **`ac_prefix`** L148 — **RESOLVED 2026-06-24** (Plan 313 Phase 4 + Issue 003 Phase 0 RESOLVED). Cargo.toml now says "DEFAULT-ON (Plan 313 Phase 4 ...)".
+4. **`rv_gated_thinking`** / **`rv_bandit_pruning`** L393-394 — **RESOLVED 2026-07-18** (cargo-comment sync). Cargo.toml now correctly says these are opt-in (the prior "default-ON via rv_gated_routing" claim was direction-confused).
+5. **`compression_drafter`** L338 — **RESOLVED**. Cargo.toml now correctly says "Opt-in — GOAT gate RAN + FAILED (2 runs per .plans/285_...)".
+6. **`cs_kv_probe`** L470 — **RESOLVED**. Cargo.toml now correctly says "Plan 280 GOAT G1/G2/G3 ALL PASS"; the prior "opt-in until G2 duality gate passes" caveat is gone. The feature still ships opt-in as a probe (not a default routing primitive) — that part of the comment is accurate, only the stale gate-status was fixed.
+
+Items 3-6 are now closed. Items 1-2 remain open and are tracked here as the canonical "still-needs-correction" record.
 
 ---
 

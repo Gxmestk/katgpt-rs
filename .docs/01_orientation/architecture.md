@@ -2044,7 +2044,7 @@ Attractor demoted to Gain (G1.4 latency ~273ns; G2.1 coherence 569× more flip-f
 leaky). The `evolve_hla` refactor (Phase 2) made `evolve_hla` delegate to the ungated
 `leaky_core::leaky_step` — zero behavior change, no `micro_belief` feature coupling.
 
-Feature gate: `micro_belief` (transitively default-on: `bom_sampling` [in `default`] enables `micro_belief` via `bom_sampling = ["micro_belief", ...]`. Originally opt-in per Plan 276; promoted transitively when `bom_sampling` [Plan 281 T2.4] landed default-on 2026-06-17. The Plan 276 "opt-in until G1.1–G1.5" comment in `crates/katgpt-core/Cargo.toml` is also stale — the G1.4 attractor latency gate documented in this bench failed, but the LeakyIntegrator-only path is what's actually pulled in via `bom_sampling`, so the promotion is sound.)
+Feature gate: `micro_belief` (transitively default-on: `bom_sampling` [in `default`] enables `micro_belief` via `bom_sampling = ["micro_belief", ...]`. Originally opt-in per Plan 276; promoted transitively when `bom_sampling` [Plan 281 T2.4] landed default-on 2026-06-17. The Plan 276 "opt-in until G1.1–G1.5" comment in `crates/katgpt-core/Cargo.toml` was stale and was updated 2026-07-18 (cargo-comment sync) — the G1.4 attractor latency gate documented in this bench failed, but the LeakyIntegrator-only path is what's actually pulled in via `bom_sampling`, so the promotion is sound.)
 
 > **UPDATE 2026-07-18 (status sync):** the previous label said
 > `micro_belief` (opt-in). The `bom_sampling` promotion made `micro_belief`

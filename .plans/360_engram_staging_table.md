@@ -5,7 +5,7 @@
 **Parent plan:** [katgpt-rs/.plans/299_Engram_Hash_Addressed_Pattern_Memory.md](299_Engram_Hash_Addressed_Pattern_Memory.md) (Phase 2 — `InMemoryEngramTable`, `EngramTableBuilder`)
 **Target:** `katgpt-rs/crates/katgpt-core/src/engram/staging.rs` (new module)
 **Cargo feature:** `engram` (existing — no new feature flag; sibling to `table.rs`)
-**Status:** Active — Phase 1 DONE (2026-07-03). 17/17 staging tests pass, 112/112 engram tests pass, 666/666 default-feature tests pass (no regression). Phase 2 (GOAT gate) + Phase 3 (docs wiring) + Phase 4 (promotion decision) pending. Ship behind existing `engram` (still default-off, gated on Plan 299 G6).
+**Status:** Active — Phase 1 DONE (2026-07-03). 17/17 staging tests pass, 112/112 engram tests pass, 666/666 default-feature tests pass (no regression). Phase 2 (GOAT gate) + Phase 3 (docs wiring) + Phase 4 (promotion decision) pending. Ship behind existing `engram` (Post-promotion update 2026-07-18, Issue 039: the katgpt-core leaf `engram` is now transitively DEFAULT-ON via `cognitive_architecture_root → engram` chain — the prior "still default-off, gated on Plan 299 G6" framing was accurate at Plan 360 writing time but went stale on 2026-07-18. G6 remains deferred but does not block transitive default-on because primitive-level G1/G2/G4 PASS modellessly. The katgpt-rs root forwarder stays opt-in for explicit consumer control.)
 
 ---
 

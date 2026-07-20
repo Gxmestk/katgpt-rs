@@ -89,7 +89,7 @@ The katgpt retrieval stack now has **four distinct complexity classes**, each op
 | Retriever | Cost | Slot ceiling | Sparsity axis | Status |
 |---|---|---|---|---|
 | Raven RSM | O(1) routing | ~10³ experts | conditional computation | DEFAULT-ON |
-| Engram | O(1) hash | ~10⁵ slots (hash-collides above) | content-addressed | opt-in (G6 deferred to riir-ai) |
+| Engram | O(1) hash | ~10⁵ slots (hash-collides above) | content-addressed | transitively default-on at katgpt-core leaf (G6 deferred to riir-ai; primitive-level gates PASS modellessly) |
 | δ-Mem | O(r) associative | rank-r bounded | associative | DEFAULT-ON (via `delta_mem`) |
 | **PKM** | **O(√N) factored** | **~10⁶ slots** | **similarity-ranked** | **DEFAULT-ON (this gate)** |
 

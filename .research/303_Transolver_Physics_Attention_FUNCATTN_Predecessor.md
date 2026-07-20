@@ -63,7 +63,7 @@ The transferable primitive is **soft-cluster reduce-scatter attention**: project
 
 | Cousin | File / Plan | What it has that Transolver doesn't |
 |---|---|---|
-| **FUNCATTN (R257)** | `crates/katgpt-core/src/funcattn/mod.rs` (Plan 286, Gain-tier pending) | Closed-form Tikhonov k×k ridge solve `(1-α)·K̃ᵀK̃ + α·I` replacing softmax M-attention. Beats Transolver 6–26% on the same benchmarks. Lipschitz-bounded by α. Resolution-invariant. |
+| **FUNCATTN (R257)** | `crates/katgpt-core/src/funcattn/mod.rs` (Plan 286, DEFAULT-ON since 2026-07-07 post-Issue-049 D4 G6 fix; cargo-comment synced 2026-07-18) | Closed-form Tikhonov k×k ridge solve `(1-α)·K̃ᵀK̃ + α·I` replacing softmax M-attention. Beats Transolver 6–26% on the same benchmarks. Lipschitz-bounded by α. Resolution-invariant. |
 | **FAME CommittedFieldBlend (R302)** | `crates/katgpt-core/src/committed_field_blend.rs` (Plan 321, Super-GOAT, today) | Per-ENTITY FIXED MoE blend computed ONCE from trajectory summary then frozen. M slices = K archetype operator fields, weights π committed via BLAKE3, sampling-invariant. |
 | **latent_functor rank-1 (R123)** | `crates/katgpt-percepta/src/wasm/interpreter/arithmetic.rs` (Plan 303, shipped) | The k=1, λ=0, basis-free special case. `extract_functor: f = mean_k(target_k - source_k)`, apply via `out = source + f`. Rank-1 operator between two latent spaces. |
 

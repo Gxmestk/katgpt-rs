@@ -3,7 +3,7 @@
 **Date:** 2026-06-16
 **Plan:** [276_micro_recurrent_belief_state.md](../.plans/276_micro_recurrent_belief_state.md)
 **Issue:** originally tracked in `024_micro_belief_g1_4_attractor_latency.md` (closed + removed; this benchmark is the canonical record)
-**Features:** `micro_belief` (transitively default-on: `bom_sampling` [in `default`] enables `micro_belief`. Plan 281 T2.4 promotion of `bom_sampling` on 2026-06-17 made `micro_belief` transitively default-on because `bom_sampling = ["micro_belief", ...]`. The standalone feature is still exposed for `--no-default-features` consumers; the original Plan 276 "opt-in until G1.1–G1.5" comment in `crates/katgpt-core/Cargo.toml` is also stale and should be updated separately.)
+**Features:** `micro_belief` (transitively default-on: `bom_sampling` [in `default`] enables `micro_belief`. Plan 281 T2.4 promotion of `bom_sampling` on 2026-06-17 made `micro_belief` transitively default-on because `bom_sampling = ["micro_belief", ...]`. The standalone feature is still exposed for `--no-default-features` consumers. The original Plan 276 "opt-in until G1.1–G1.5" comment in `crates/katgpt-core/Cargo.toml` was stale and was updated 2026-07-18 (cargo-comment sync) to read `**DEFAULT-ON (2026-07-18 cargo-comment sync):** transitively in katgpt-core default via bom_sampling → micro_belief chain (Plan 281 T2.4 promotion); the "Opt-in until G1.1–G1.5 GOAT gate passes" caveat is stale.`)
 
 > **UPDATE 2026-07-18 (status sync):** the previous label said
 > `micro_belief` (opt-in). That label (and the matching Cargo comment) went

@@ -22,7 +22,7 @@ optimal for a different slot-count regime:
 | Retriever | Cost | Slot ceiling | Sparsity axis | Feature |
 |---|---|---|---|---|
 | Raven RSM | O(1) routing | ~10³ experts | conditional computation | always compiled |
-| Engram | O(1) hash | ~10⁵ slots (hash-collides above) | content-addressed | `engram` (opt-in) |
+| Engram | O(1) hash | ~10⁵ slots (hash-collides above) | content-addressed | `engram` (transitively default-on at katgpt-core leaf via `cognitive_architecture_root → engram`; root forwarder stays opt-in) |
 | δ-Mem | O(r) associative | rank-r bounded | associative | `delta_mem` |
 | **PKM (this)** | **O(√N) factored** | **~10⁶ slots** | **similarity-ranked** | `product_key_memory` (default) |
 
