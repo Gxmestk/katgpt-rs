@@ -12,7 +12,7 @@
 |---|---|---|---|---|---|
 | `KarcRegimeGate` (Phase 1) | ✅ PASS | ✅ PASS | ✅ PASS | ✅ PASS | Stays opt-in — measured by Plan 514 Phase 1 G1=92.45% MAE reduction on synthetic mixed-regime corpus; promotion awaits production-corpus gain. |
 | `karc_batched_matvec` (Phase 2) | ✅ PASS | ⚠️ **PARTIAL** | ✅ PASS | ✅ PASS | Stays opt-in — pure-matvec amortizes well (4.0×); full-forecast amortization does NOT materialize (feature_expand dominates). Architectural finding redirects the consumer (Plan 514 Phase 3) to cell-shared design. |
-| `KarcLodTier` (Phase 3) | ✅ PASS | ✅ PASS | ✅ PASS | ✅ PASS | Stays opt-in — G1 PASS (bit-identical surviving-column preservation under nested-subset invariant). G2 PASS (3.7 µs/call, target ≤ 10 µs). Config revision: Lod2 ships as R=1 (d_h=512), NOT R=2 (d_h=18_720 — plan figure doesn't math out). R=2 deferred to Issue 185/186/187 promotion-gate work. |
+| `KarcLodTier` (Phase 3) | ✅ PASS | ✅ PASS | ✅ PASS | ✅ PASS | Stays opt-in — tier-promotion is a pure index remap (nested-subset invariant), worst-case 831 ns (Lod1→Lod2 release) vs 10 µs target. G1 PASS (bit-identical surviving-column preservation). Config revision: Lod2 ships as R=1 (d_h=512), NOT R=2 (d_h=18_720 — plan figure doesn't math out). R=2 deferred to Issue 185/186/187 promotion-gate work. |
 
 ---
 
@@ -101,9 +101,22 @@ In that architecture, the per-cell cost is: 1× feature_expand (~325 ns) + N× m
 
 ### G2 (perf) — PASS
 
-`test_project_wout_lod_perf` (inline `#[ignore]` test, run with `--ignored --nocapture`):
+Two measurements:
 
-- Worst case (LOD0 → LOD2, 64→512 cols × D=8): **3.7 µs/call** (target ≤ 10 µs).
+**Criterion bench** (`benches/bench_556_karc_lod_tier_g2.rs`, release, --sample-size 30):
+
+| Transition | Latency | Notes |
+|---|---|---|
+| Lod1 → Lod0 (down-tier, drop 75% features) | 347 ns | Surviving block is small (K=2 lags × M=4 modes). |
+| Lod0 → Lod1 (up-tier, 4× features) | 367 ns | Zero-pad dominant; small source. |
+| Lod1 → Lod2 (worst case up-tier, 2× features) | **831 ns** | Largest surviving block (K=4 × M=8). |
+| Lod2 → Lod0 (extreme down-tier, drop 87.5%) | 342 ns | Tiny surviving block. |
+
+**Target: ≤ 10 µs.** Worst case (Lod1→Lod2) is 831 ns — **12× under target**. At 1000 simultaneous tier-transitions (catastrophic case), total cost is 0.83 ms — negligible vs the 50 ms frame budget.
+
+**Inline perf test** (`test_project_wout_lod_perf`, `#[ignore]`, run with `--ignored --nocapture`):
+
+- Debug build: 3.6 µs/call (Lod0→Lod2 worst case).
 - Run with `cargo test -p katgpt-core --features karc_lod_tier --lib test_project_wout_lod_perf -- --ignored --nocapture`.
 
 ### G3 (no-regression) — PASS
@@ -138,7 +151,7 @@ Plan 556 Phase 2 unblocks **Plan 514 Phase 3** (octree-batched cell-level KARC),
 
 - **`KarcRegimeGate`**: opt-in until Plan 514 Phase 1 runtime integration demonstrates a production-corpus gain. (Plan 514 Phase 1 already shipped G1=92.45% MAE reduction on synthetic data — see Plan 514 for the per-phase verdict.)
 - **`karc_batched_matvec`**: opt-in indefinitely. The primitive is correct and the pure-matvec amortizes, but the full-forecast path doesn't pay off in the per-NPC-Wout architecture. Promotion (if ever) requires Plan 514 Phase 3 to ship the cell-shared design and demonstrate the gain.
-- **`KarcLodTier`**: opt-in until Plan 514 Phase 2 (LOD tier dispatch) lands and demonstrates a measured gain on a real NPC corpus. The primitive is correct and the G2 perf target passes comfortably (3.7 µs/call vs 10 µs target). The R=2 promotion-gate config (d_h=18_720) is a separate milestone tracked by Issue 185/186/187.
+- **`KarcLodTier`**: opt-in until Plan 514 Phase 2 (LOD tier dispatch) lands and demonstrates a measured gain on a real NPC corpus. The primitive is correct and the G2 perf target passes comfortably (831 ns/call release vs 10 µs target — 12× headroom). The R=2 promotion-gate config (d_h=18_720) is a separate milestone tracked by Issue 185/186/187.
 
 ## References
 
