@@ -94,10 +94,18 @@ using `par_chunks_mut` with a fixed chunk size — see §Determinism below).
   - Explicit SIMD intrinsics on the inner loops (NEON f64x2 = max 2× on
     Apple Silicon; less impactful than cache blocking at this scale)
   - GPU offload via CubeCL (would require new dep; out of scope)
-- [ ] **T7** — Promotion decision: if T6 passes, promote
+- [-] **T7** — Promotion decision: if T6 passes, promote
   `karc_householder_eig_par` to default-on; if `karc_forecaster` G1 also
   passes (Issue 185 T3 / Plan 308 T4.5), promote `karc_forecaster` to
   default-on.
+  **RESOLVED (2026-07-20): G1 FAIL on both legs.** Full-rank direct Cholesky
+  measurement at d_h=18_720 (K=8/M=8/R=2, ~29 min wall): NRMSE 6.68e-3
+  (target ≤ 1e-3, miss 6.7×); threshold 7.14 LT (target ≥ 8 LT, miss 11%).
+  `karc_forecaster` stays opt-in. `karc_householder_eig_par` stays opt-in
+  (QL fix + parallel wiring landed; no passing G1 gate to promote against).
+  See §"T7 G1 measurement result" for the full analysis + future paths.
+  Marked `[-]` (deferred) rather than `[x]` because the gate is unresolved —
+  λ tuning, more data, or a gate re-spec could still flip the verdict.
 
 ## T7 follow-up (2026-07-20)
 
@@ -150,6 +158,70 @@ Three options before running the 90-min measurement:
    features than d_h=4752, so rank-8 might capture more of the signal. The
    threshold gate (≥ 8 LT) is driven by K=8 (delay length), which should
    pass regardless of rank.
+
+**Decision (2026-07-20): pursued option 2 (full-rank direct Cholesky).** The
+2.8 GB Gram + 2.8 GB Cholesky factor fit in RAM; the O(d_h³/3) ≈ 2.2·10¹²
+FLOP factorization ran in 1295 s (~22 min) single-threaded — both faster
+AND more accurate than the ALS+eigendecomp path. Matches Phase 2's
+methodology for the cleanest comparison.
+
+## T7 G1 measurement result (2026-07-20, full-rank Cholesky)
+
+**VERDICT: G1 FAIL on BOTH legs.** The K=8/M=8/R=2 config does NOT pass the
+G1 gate — contrary to the Phase 4 prediction in `.benchmarks/308_karc_goat.md`
+which interpolated (but never measured) that it would be the smallest config
+to pass both.
+
+```
+Config: D=3, K=8, M=8, R=2, d_h=18_720, full-rank direct Cholesky, λ=5e-3
+  Gram build:    466 s (2.8 GB, 4050 samples × 18_720 features)
+  Cholesky fit:  1295 s (~22 min, single-threaded)
+  Total wall:    1761 s (~29 min)
+
+G1 NRMSE   = 6.68e-3   (target ≤ 1.0e-3)  ❌ FAIL (6.7×)
+G1 thresh  = 7.14 LT   (target ≥ 8 LT)    ❌ FAIL (11%)
+```
+
+**The NRMSE surprise.** Going from K=4/M=8/R=2 (d_h=4752, NRMSE 1.67e-4) to
+K=8/M=8/R=2 (d_h=18_720, NRMSE 6.68e-3) made NRMSE **40× worse** despite
+4× more features. The likely cause: heavy underdetermination. With N=4050
+samples and d_h=18_720 features, the Gram has rank ≤ 4050 — at least 14_670
+zero eigenvalues. The ridge λ=5e-3 was tuned for K=4 configs and is too
+small to regularize the K=8 underdetermined system. The Chebyshev basis
+at M=8 produces large-valued high-order cross-terms that dominate the
+unregularized directions.
+
+**The threshold result is close.** 7.14 LT vs 8 LT target — within 11%.
+K=8 does extend the threshold vs K=4's 2.85 LT (2.5× improvement), confirming
+the Phase 4 insight that K drives threshold time. But it's not quite enough.
+
+**What this means for promotion.** `karc_forecaster` stays opt-in. No
+feasible config passes both G1 legs:
+- K=4 configs: pass NRMSE (1.67e-4), fail threshold (2.85 LT)
+- K=8/M=8/R=2: fail BOTH (6.68e-3, 7.14 LT) — underdetermined
+- Larger M or higher λ might help NRMSE but M is bounded by Chebyshev
+  stability (|x| ≤ 1) and higher λ trades NRMSE for threshold.
+
+**Paths to revisit (future work, not this issue):**
+1. **Tune λ for K=8.** λ=5e-3 was tuned for K=4. A larger λ (e.g. 1e-2 or
+   5e-2) might tame the underdetermined system. Quick to test (~30 min run).
+2. **More training data.** N=4050 with d_h=18_720 is heavily underdetermined.
+   N=20_000+ would make the Gram full-rank. Compute cost scales linearly.
+3. **K=8/M=16 or K=8/M=24 with R=2.** Larger M gives more basis capacity,
+   but d_h grows quadratically with the first-order count (K·D·M).
+4. **Accept the gate re-spec (Issue 186 Path D).** Promote on the K=4/M=8/R=2
+   NRMSE evidence (1.67e-4, 6× better than target) and document the threshold
+   miss as a known limitation. The paper's 16.7 LT threshold is on a different
+   basis (Fourier) and not directly comparable.
+
+The G1 measurement at d_h=18_720 is now FEASIBLE (~29 min wall) — so any of
+these paths can be tested quickly. The blocker was compute; that's resolved.
+
+**Feature `karc_householder_eig_par` stays opt-in.** The QL convergence fix
+landed (critical bug fix for near-singular Grams) and the parallel wiring is
+correct, but without a passing G1 gate there's no reason to promote the
+parallel path to default-on. The full-rank direct Cholesky is both faster
+and more accurate for the G1 measurement.
 
 ## First-attempt postmortem (recorded 2026-07-20)
 

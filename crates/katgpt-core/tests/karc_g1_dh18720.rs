@@ -1,12 +1,23 @@
 //! Issue 187 T7 / Plan 308 T4.5 — KARC G1 measurement at the promotion-gate
-//! target config (K=8, M=8, R=2, d_h=18_720, r=8).
+//! target config (K=8, M=8, R=2, d_h=18_720).
 //!
 //! This is THE benchmark that decides whether `karc_forecaster` promotes to
-//! default-on. Prior to Issue 187, the d_h=18_720 eigendecomp was
-//! computationally infeasible (~12 h projected serial). The parallel
-//! Householder+QL eigensolver (Issue 187, `karc_householder_eig_par`) brings
-//! the one-time per-fit cost down to ~87 min wall — making this measurement
-//! possible for the first time.
+//! default-on. Prior to Issue 187, the d_h=18_720 fit was computationally
+//! infeasible (~12 h projected serial eigendecomp for the ALS path). Two
+//! developments make this measurement possible:
+//!
+//! 1. **Parallel Householder+QL eigensolver** (Issue 187, `karc_householder_eig_par`)
+//!    — brings the ALS path's one-time eigendecomp from ~12 h to ~87 min.
+//! 2. **Direct full-rank Cholesky at d_h=18_720 is feasible** — discovered
+//!    during T7: the 2.8 GB Gram + 2.8 GB Cholesky factor fit in RAM, and
+//!    the O(d_h³/3) ≈ 2.2·10¹² FLOP factorization runs in ~5-10 min
+//!    single-threaded. This is both FASTER than the ALS+eigendecomp path
+//!    AND more accurate (full-rank vs rank-8 approximation).
+//!
+//! The smoke test at d_h=4752 showed rank-8 ALS gives NRMSE 4.71e-3 (28×
+//! worse than full-rank 1.67e-4). The full-rank direct Cholesky path avoids
+//! the rank approximation entirely and matches Phase 2's methodology —
+//! giving the cleanest comparison with the existing Phase 2 data.
 //!
 //! # Gate (Plan 308 §"GOAT gate")
 //!
@@ -17,8 +28,7 @@
 //! predicted this config would be the smallest that passes both — K=8 (delay
 //! length, drives threshold via feedback memory) + M=8 (basis count, drives
 //! one-step NRMSE) + R=2 (higher-order features, capture cross-coordinate
-//! nonlinearity) — but never measured it because the Cholesky / eigendecomp
-//! was infeasible.
+//! nonlinearity) — but never measured it because the fit was infeasible.
 //!
 //! # Config
 //!
@@ -27,32 +37,31 @@
 //! - M=8 (Chebyshev basis count per coordinate)
 //! - R=2 (higher-order outer-product features)
 //! - d_h = K·D·M + (K·D·M)·(K·D·M+1)/2 = 192 + 18_528 = 18_720
-//! - r=8 (ALS low-rank factorization rank)
+//! - Full-rank direct Cholesky solve (`ridge_solve_direct_f64`)
 //! - λ=5e-3 (ridge regularization, tuned for autonomous-rollout stability)
 //!
 //! # Running
 //!
 //! ```bash
 //! CARGO_TARGET_DIR=/tmp/katgpt-g1-dh18720 cargo test --release \
-//!   --features karc_householder_eig_par \
+//!   --features karc_forecaster \
 //!   --test karc_g1_dh18720 -- --ignored --nocapture
 //! ```
 //!
-//! Expected wall: ~90-120 min (87 min eigendecomp + ~10 min ALS + ~1 min
-//! trajectory + rollout). `#[ignore]`'d because of the wall time.
+//! Expected wall: ~30-45 min (2.8 GB Gram build + ~10 min Cholesky + rollout).
+//! `#[ignore]`'d because of the wall time.
 //!
 //! # Determinism
 //!
-//! The parallel eigensolver is bit-identical to the serial path (Issue 187 T4
-//! parity contract: row-parallel rayon with no cross-row reductions). Two
-//! runs of this test on the same input produce bit-identical `A, B` (Issue
-//! 185 T2 determinism contract).
+//! The Cholesky factorization is bit-deterministic given the same input
+//! (no parallelism, fixed iteration order). Two runs on the same input
+//! produce bit-identical Wout.
 
-#![cfg(feature = "karc_householder_eig_par")]
+#![cfg(feature = "karc_forecaster")]
 
 use katgpt_core::{
-    ChebyshevBasis, chunked_gram_into, feature_expand_higher_order, higher_order_feature_count,
-    karc::{LowRankFitScratch, large_dh::low_rank_fit_jacobi_bstep},
+    ChebyshevBasis, chunked_gram_into, feature_expand_higher_order,
+    higher_order_feature_count, linalg::ridge_solve_direct_f64,
 };
 
 // ── Double-scroll ODE parameters (paper §A.1, arXiv:2606.19984 Eqs. 15–17) ──
@@ -200,7 +209,6 @@ const D: usize = 3;
 const K: usize = 8; // delay length — matches Phase 1's K=8/M=24 threshold-passing config
 const M: usize = 8; // Chebyshev basis count
 const R: usize = 2; // higher-order outer-product order
-const LR_RANK: usize = 8; // ALS low-rank rank
 const N_TRAIN: usize = 4000;
 const DT: f64 = 0.25;
 const LYAPUNOV_TIME_UNITS: f64 = 7.81; // paper-reported for these params
@@ -211,7 +219,7 @@ const D_H_1: usize = K * D * M; // 192
 const D_H: usize = higher_order_feature_count(D_H_1, R); // 18_720
 
 /// Smoke test: validate the full pipeline (higher-order features + chunked
-/// Gram + ALS with parallel eig + autonomous rollout + metrics) at the
+/// Gram + full-rank direct Cholesky + autonomous rollout + metrics) at the
 /// small config (K=4, M=8, R=2, d_h=4752) — fast (~30 s wall) and exercises
 /// every code path the d_h=18_720 test does.
 ///
@@ -220,11 +228,10 @@ const D_H: usize = higher_order_feature_count(D_H_1, R); // 18_720
 ///   NRMSE(1 LT) ≈ 1.67e-4
 ///   threshold(ε=0.1) ≈ 2.85 LT
 ///
-/// The smoke test asserts the NRMSE is within an order of magnitude of the
-/// reference (loose bound — the goal is to catch wiring bugs, not to
-/// re-validate the Phase 2 number). The exact Phase 2 number was measured
-/// with direct Cholesky; the ALS path agrees to ~1e-6 but not bit-identically,
-/// so we expect small drift.
+/// The smoke test asserts the NRMSE is within 3× of the reference (loose
+/// bound — the goal is to catch wiring bugs, not to re-validate Phase 2).
+/// The exact reproduction depends on trajectory seed + sample count matching
+/// the example exactly; small drift is expected from f32 accumulation order.
 #[test]
 fn smoke_k4_m8_r2_dh4752_pipeline_healthy() {
     use std::time::Instant;
@@ -236,8 +243,8 @@ fn smoke_k4_m8_r2_dh4752_pipeline_healthy() {
     const N_S: usize = 2000;
 
     println!(
-        "smoke: K={}, M={}, R={}, r={}, d_h={}",
-        K_S, M_S, R, LR_RANK, D_H_S
+        "smoke: K={}, M={}, R={}, d_h={} (full-rank Cholesky)",
+        K_S, M_S, R, D_H_S
     );
 
     let traj_raw = generate_double_scroll(N_S + K_S + 50, DT, 1000, SUBSTEPS);
@@ -285,6 +292,9 @@ fn smoke_k4_m8_r2_dh4752_pipeline_healthy() {
         }
     }
 
+    // Build Gram + λI (regularized) + Cov. Same pattern as the Phase 2
+    // example: λ added to the Gram diagonal BEFORE the Cholesky.
+    let lambda: f64 = 5e-3;
     let mut gram = vec![0.0f64; D_H_S * D_H_S];
     let feature_iter = (0..n_pairs).map(|i| &features[i * D_H_S..(i + 1) * D_H_S] as &[f32]);
     chunked_gram_into(feature_iter, &mut gram, 0.0, D_H_S);
@@ -300,29 +310,27 @@ fn smoke_k4_m8_r2_dh4752_pipeline_healthy() {
         }
     }
     drop(features);
+    for i in 0..D_H_S {
+        gram[i * D_H_S + i] += lambda;
+    }
 
+    // Full-rank direct Cholesky solve: Wᵀ = (G + λI)⁻¹ Cov.
     let t_fit = Instant::now();
-    let mut a_out = vec![0.0f64; D * LR_RANK];
-    let mut b_out = vec![0.0f64; LR_RANK * D_H_S];
-    let mut scratch = LowRankFitScratch::with_capacity(D_H_S, D, LR_RANK);
-    let n_iters = low_rank_fit_jacobi_bstep(
-        &gram, &cov, D_H_S, D, LR_RANK, 5e-3, 100, 1e-10, &mut a_out, &mut b_out, &mut scratch,
-    );
+    let mut chol = vec![0.0f64; D_H_S * D_H_S];
+    let mut z = vec![0.0f64; D_H_S * D];
+    let mut wt = vec![0.0f64; D_H_S * D]; // d_h × D, transposed Wout
+    ridge_solve_direct_f64(&mut wt, &mut chol, &mut z, &gram, &cov, D_H_S, D);
     let fit_dt = t_fit.elapsed();
 
+    // Wout (D × d_h, f32) = transpose of wt.
     let mut wout = vec![0.0f32; D * D_H_S];
     for d in 0..D {
         for j in 0..D_H_S {
-            let mut s = 0.0f64;
-            for k in 0..LR_RANK {
-                s += a_out[d * LR_RANK + k] * b_out[k * D_H_S + j];
-            }
-            wout[d * D_H_S + j] = s as f32;
+            wout[d * D_H_S + j] = wt[j * D + d] as f32;
         }
     }
 
-    // Autonomous rollout over 5 LT (enough to see threshold behaviour; the
-    // reference was 2.85 LT so 5 LT captures the threshold crossing).
+    // Autonomous rollout over 5 LT.
     let horizon = (5.0 * SAMPLES_PER_LT).ceil() as usize;
     let seed_t = n_total - 1;
     let mut delay = [0.0f32; K_S * D];
@@ -372,31 +380,25 @@ fn smoke_k4_m8_r2_dh4752_pipeline_healthy() {
     let thr_lt = thr_sample as f64 / SAMPLES_PER_LT;
 
     println!(
-        "  ALS iters={}, fit {:.2?}, NRMSE(1 LT)={:.6e}, threshold={:.2} LT",
-        n_iters, fit_dt, nrmse_one_lt, thr_lt
+        "  Cholesky fit {:.2?}, NRMSE(1 LT)={:.6e}, threshold={:.2} LT",
+        fit_dt, nrmse_one_lt, thr_lt
     );
     println!("  reference (Phase 2 direct Cholesky): NRMSE 1.67e-4, threshold 2.85 LT");
 
-    // Loose bounds: wiring-correctness check, not a re-validation of Phase 2.
-    // The ALS path agrees with direct Cholesky to ~1e-6 but the autonomous
-    // rollout is chaotic, so NRMSE can drift by 2-3× from the Cholesky path.
-    // The Phase 2 reference was 1.67e-4; we accept up to 5e-3 (30× headroom)
-    // as evidence the pipeline is wired correctly. If NRMSE > 5e-3, something
-    // is broken (wrong feature order, wrong normalization, eigvecs transposed,
-    // etc.) — investigate before running the 90-min d_h=18_720 test.
+    // Wiring-correctness bounds. Phase 2 reference was 1.67e-4; we accept
+    // up to 5e-4 (3× headroom) to allow for f32 accumulation order drift
+    // between this test and the example. If NRMSE > 5e-4, the pipeline is
+    // broken — investigate before running the 30-min d_h=18_720 test.
     assert!(
-        nrmse_one_lt < 5e-3,
-        "smoke NRMSE {:.6e} exceeds 5e-3 wiring-correctness bound \
+        nrmse_one_lt < 5e-4,
+        "smoke NRMSE {:.6e} exceeds 5e-4 wiring-correctness bound \
          (Phase 2 reference was 1.67e-4) — pipeline is broken, investigate \
          before running the d_h=18_720 measurement",
         nrmse_one_lt
     );
-    // Threshold sanity: should be in the 1-5 LT range (Phase 2 saw 2.85 LT).
-    // Don't over-constrain — the goal is to catch catastrophic regressions
-    // (threshold < 0.5 LT would mean the model is barely better than noise).
     assert!(
-        thr_lt > 0.5,
-        "smoke threshold {:.2} LT below 0.5 LT — model is barely above noise",
+        thr_lt > 1.0,
+        "smoke threshold {:.2} LT below 1.0 LT — model is barely above noise",
         thr_lt
     );
 }
@@ -407,14 +409,13 @@ fn g1_dh_18720_k8_m8_r2() {
     use std::time::Instant;
 
     println!(
-        "Issue 187 T7 / Plan 308 T4.5: KARC G1 at d_h = {} (K={}, M={}, R={}, r={})",
-        D_H, K, M, R, LR_RANK
+        "Issue 187 T7 / Plan 308 T4.5: KARC G1 at d_h = {} (K={}, M={}, R={}) [full-rank Cholesky]",
+        D_H, K, M, R
     );
     println!(
         "  Lyapunov time ≈ {} units ≈ {} samples",
         LYAPUNOV_TIME_UNITS, SAMPLES_PER_LT
     );
-    println!("  rayon thread pool: {} threads", rayon::current_num_threads());
 
     // ── 1. Generate trajectory + normalize to [-1, 1] per coordinate ──────
     let t_traj = Instant::now();
@@ -501,39 +502,37 @@ fn g1_dh_18720_k8_m8_r2() {
         (D_H * D_H * 8) as f64 / 1e9
     );
 
-    // Free the feature matrix — we don't need it for the fit, and the ALS
-    // path needs the RAM for eigvecs_g (another 2.8 GB).
+    // Free the feature matrix — we don't need it for the fit.
     drop(features_ho);
 
-    // ── 4. ALS low-rank fit via Jacobi B-step + parallel Householder eig ──
-    // This is the one-time per-fit cost that was previously infeasible.
-    // Issue 187 T6 measured this at 87 min wall for the eigendecomp alone;
-    // the ALS loop adds O(r·d_h²) per iter ≈ 2.8 GFLOPs ≈ ~1 s/iter.
-    let t_fit = Instant::now();
+    // ── 4. Add λI to Gram diagonal (regularization) ──────────────────────
     let lambda: f64 = 5e-3;
-    let max_iters = 100;
-    let tol = 1e-10;
-    let mut a_out = vec![0.0f64; D * LR_RANK];
-    let mut b_out = vec![0.0f64; LR_RANK * D_H];
-    let mut scratch = LowRankFitScratch::with_capacity(D_H, D, LR_RANK);
-    let n_iters = low_rank_fit_jacobi_bstep(
-        &gram, &cov, D_H, D, LR_RANK, lambda, max_iters, tol, &mut a_out, &mut b_out, &mut scratch,
-    );
-    let fit_dt = t_fit.elapsed();
-    eprintln!(
-        "  ALS fit (parallel eig + {} iters): {:.2?}",
-        n_iters, fit_dt
-    );
+    for i in 0..D_H {
+        gram[i * D_H + i] += lambda;
+    }
 
-    // Wout (D × d_h, f32) = A · B  (rank-r reconstruction).
+    // ── 5. Full-rank direct Cholesky solve: Wᵀ = (G + λI)⁻¹ Cov ──────────
+    // O(d_h³/3) ≈ 2.2·10¹² FLOPs single-threaded. At ~5 GFLOPS this is ~7 min.
+    // Faster than the ALS+eigendecomp path (87 min) AND more accurate (full-rank
+    // vs rank-8 approximation — the smoke test at d_h=4752 showed rank-8 ALS
+    // gives 28× worse NRMSE than full-rank).
+    let t_fit = Instant::now();
+    let mut chol = vec![0.0f64; D_H * D_H]; // 2.8 GB Cholesky factor
+    let mut z = vec![0.0f64; D_H * D];
+    let mut wt = vec![0.0f64; D_H * D]; // d_h × D, transposed Wout
+    ridge_solve_direct_f64(&mut wt, &mut chol, &mut z, &gram, &cov, D_H, D);
+    let fit_dt = t_fit.elapsed();
+    eprintln!("  Cholesky fit: {:.2?}", fit_dt);
+
+    // Free the Gram + Cholesky factor — we only need Wout for the rollout.
+    drop(gram);
+    drop(chol);
+
+    // Wout (D × d_h, f32) = transpose of wt.
     let mut wout = vec![0.0f32; D * D_H];
     for d in 0..D {
         for j in 0..D_H {
-            let mut s = 0.0f64;
-            for k in 0..LR_RANK {
-                s += a_out[d * LR_RANK + k] * b_out[k * D_H + j];
-            }
-            wout[d * D_H + j] = s as f32;
+            wout[d * D_H + j] = wt[j * D + d] as f32;
         }
     }
 
@@ -588,9 +587,8 @@ fn g1_dh_18720_k8_m8_r2() {
     let thr_lt = thr_sample as f64 / SAMPLES_PER_LT;
 
     println!();
-    println!("── G1 results (d_h = {}, K={}, M={}, R={}, r={}) ────────────", D_H, K, M, R, LR_RANK);
-    println!("  ALS iterations:    {}", n_iters);
-    println!("  fit wall (eig+ALS): {:.2?}", fit_dt);
+    println!("── G1 results (d_h = {}, K={}, M={}, R={}) ────────────────────", D_H, K, M, R);
+    println!("  Cholesky fit wall: {:.2?}", fit_dt);
     println!("  NRMSE over 1 LT:   {:.6e}   (target ≤ 1.0e-3)", nrmse_one_lt);
     println!(
         "  threshold (ε=0.1): {} samples = {:.2} LT   (target ≥ 8 LT)",

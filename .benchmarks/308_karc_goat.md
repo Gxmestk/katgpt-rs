@@ -259,3 +259,78 @@ threshold ≥ 8 LT). No feasible config passes both simultaneously:
 The Phase 2 implementation (higher-order features + chunked Gram + ALS
 low-rank) is correct and validated — the blocker is purely the compute budget
 for the full-config Cholesky, not a mathematical or implementation gap.
+
+---
+
+## Phase 5 G1 — d_h=18_720 actual measurement (2026-07-20, Issue 187 T7)
+
+**The Phase 4 prediction was WRONG.** Phase 4 interpolated (without measuring)
+that K=8/M=8/R=2 (d_h=18_720) would be the smallest config to pass both G1
+legs. Issue 187's parallel eigensolver + the discovery that full-rank direct
+Cholesky at d_h=18_720 is feasible (~29 min wall) made the actual measurement
+possible. The result:
+
+```
+Config: D=3, K=8, M=8, R=2, d_h=18_720, full-rank direct Cholesky, λ=5e-3
+  N_TRAIN = 4050 samples (4000 + K + 50 transient headroom)
+  Gram build:    466 s (2.8 GB)
+  Cholesky fit:  1295 s (~22 min, single-threaded)
+  Total wall:    1761 s (~29 min)
+
+G1 NRMSE   = 6.68e-3   (target ≤ 1.0e-3)  ❌ FAIL (6.7×)
+G1 thresh  = 7.14 LT   (target ≥ 8 LT)    ❌ FAIL (11%)
+```
+
+### Why NRMSE got WORSE vs Phase 2's K=4 config
+
+Phase 2's K=4/M=8/R=2 (d_h=4752) achieved NRMSE 1.67e-4. Going to K=8 (d_h
+4× larger) made NRMSE **40× worse** — counterintuitive. Root cause:
+**heavy underdetermination.** With N=4050 samples and d_h=18_720 features,
+the Gram G = XᵀX has rank ≤ 4050, so at least 14_670 zero eigenvalues. The
+ridge λ=5e-3 was tuned for K=4 configs and is too small to regularize the
+K=8 underdetermined system. The Chebyshev basis at M=8 produces large-valued
+high-order cross-terms that dominate the unregularized directions.
+
+### Updated config sweep
+
+| Config | d_h | NRMSE (1 LT) | Threshold (ε=0.1) | G1 NRMSE | G1 Thr |
+|--------|-----|--------------|-------------------|----------|--------|
+| K=4, M=8, R=2 (Phase 2) | 4752 | **1.67e-4** | 2.85 LT | ✅ | ❌ |
+| K=8, M=4, R=2 (Phase 4) | 4752 | 6.19e-3 | 1.31 LT | ❌ | ❌ |
+| **K=8, M=8, R=2 (Phase 5, NEW)** | **18_720** | **6.68e-3** | **7.14 LT** | ❌ | ❌ |
+| Phase 1: K=8, M=24, first-order | 576 | 4.79e-3 | **8.16 LT** | ❌ | ✅ |
+
+### What the K=8 result does confirm
+
+- **K drives threshold time** — going from K=4 (2.85 LT) to K=8 (7.14 LT)
+  extended the threshold 2.5×, matching the Phase 4 insight.
+- **The threshold target is within reach** — 7.14 LT vs 8 LT target is only
+  11% short. A slightly larger K (K=10?), more training data (N=10_000+),
+  or higher λ might close the gap.
+- **The compute blocker is resolved** — d_h=18_720 is now feasible at ~29 min
+  wall (full-rank Cholesky). Any future config sweep is cheap to test.
+
+### Updated promotion paths
+
+1. **Tune λ for K=8.** λ=5e-3 was tuned for K=4. A sweep over λ ∈ {1e-2, 5e-2,
+   1e-1} might tame the underdetermined system and recover NRMSE. ~30 min/run.
+2. **More training data.** N=4050 with d_h=18_720 is heavily underdetermined.
+   N=20_000+ would make the Gram full-rank. Compute cost scales linearly
+   with N (Gram build) — ~3-4 h at N=20_000.
+3. **K=8/M=16 or K=8/M=24 with R=2.** Larger M gives more basis capacity,
+   but d_h grows quadratically: K=8/M=16/R=2 → d_h=72_576, Cholesky ~6 h.
+4. **Accept the gate re-spec (Issue 186 Path D).** Promote on K=4/M=8/R=2
+   NRMSE evidence (1.67e-4, 6× better than target) + the Phase 1 K=8/M=24
+   threshold evidence (8.16 LT). Document that no single config passes both
+   as a known limitation of the Chebyshev basis at the current compute budget.
+
+### Issue 187 fallout
+
+The parallel eigensolver work (`karc_householder_eig_par`) landed a critical
+QL convergence fix for near-singular Grams (the NR-local check `|e[m]| + dd
+== dd` cannot deflate tiny-eigenvalue matrices; added the LAPACK `dsteqr`
+global-scale criterion). The fix affects both serial and parallel paths. The
+parallel path itself stays opt-in — the full-rank direct Cholesky is both
+faster and more accurate for the G1 measurement, so there's no immediate
+need to promote the parallel eigensolver. The fix ships regardless because
+the serial Householder path is the default when `karc_householder_eig` is on.
