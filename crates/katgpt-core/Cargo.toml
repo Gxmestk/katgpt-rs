@@ -635,6 +635,16 @@ required-features = ["karc_forecaster"]
 name = "karc_reproducibility"
 required-features = ["karc_forecaster"]
 
+# Issue 185 — KARC large-d_h Jacobi B-step parity gate. Verifies that the
+# Jacobi-eigen ALS path (`low_rank_fit_jacobi_bstep`) produces solutions
+# agreeing with the Kronecker path (`low_rank_fit`) to ~1e-6 on configs where
+# both are feasible (d_h ≤ ~200). Also pins the bit-reproducibility contract
+# for the Jacobi path itself. Gated on `karc_forecaster` so default features
+# compile cleanly.
+[[test]]
+name = "karc_low_rank_jacobi_vs_kronecker"
+required-features = ["karc_forecaster"]
+
 # Plan 331 — BabelCodec GOAT gate. G1 round-trip fidelity + G2 compression
 # ratio (the make-or-break — same gate that killed CompressionDrafter twice) +
 # G3 latency + G4 alloc-free hot path + G5 determinism. The corpus is a

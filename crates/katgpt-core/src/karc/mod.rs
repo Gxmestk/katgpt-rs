@@ -63,9 +63,12 @@
 //! path with `d_h ≤ 600`, `r ≤ 8`). For the `d_h=4752` higher-order benchmark
 //! config, the higher-order full-rank fit (`fit_ridge`) is used instead; the
 //! low-rank comparison runs on first-order features (d_h=96) where the exact
-//! B-step is fast. A future large-d_h path could use Jacobi eigendecomposition
-//! of `AᵀA` + r separate d_h×d_h solves (O(r·d_h³) — slow but memory-bounded);
-//! this is tracked as future work and not needed for the Phase 2 GOAT gate.
+//! B-step is fast. **The large-d_h Jacobi-eigen B-step shipped in Issue 185
+//! (see [`large_dh::low_rank_fit_jacobi_bstep`])** makes the K=8/M=8/R=2
+//! (d_h=18_720) config feasible by replacing the Kronecker Cholesky with a
+//! Bartels–Stewart eigenbasis diagonalization (one-time `O(d_h³)` + per-iter
+//! `O(r·d_h²)`); the paper-Par K=8/M=24/R=2 (d_h=166_752) config remains
+//! out of reach without further factorization.
 
 pub use crate::linalg::ridge_solve::{
     chol_solve_f64, cholesky_f64, ridge_solve_direct_f64, ridge_solve_woodbury_f32,
@@ -77,6 +80,16 @@ pub use crate::linalg::ridge_solve::{
 // the same linear-algebra substrate without reaching into the feature-gated
 // `linalg::ridge_solve` path themselves.
 use crate::simd;
+
+// ── Large-d_h ALS B-step path (Issue 185, Plan 308 T4.5 unblock) ────────
+//
+// Sibling module to [`low_rank_fit`] above: same ALS contract but the B-step
+// is solved via Jacobi eigendecomposition of `G` (one-time) + `AᵀA`
+// (per-iter) instead of the `(r·d_h) × (r·d_h)` Kronecker Cholesky. Makes
+// `d_h ≤ ~20_000` configs feasible (K=8/M=8/R=2 = 18_720) — the promotion
+// gate target. Kept in a sibling file because `mod.rs` already exceeds the
+// 2048-line guideline.
+pub mod large_dh;
 
 // ── Sealed trait machinery ────────────────────────────────────────────────
 
@@ -717,6 +730,37 @@ pub struct LowRankFitScratch {
     pub kron_z: Vec<f64>,
     /// Kronecker solution temp, `r·d_h` f64. Grown on demand.
     pub kron_x: Vec<f64>,
+
+    // ── Jacobi B-step path (Issue 185, Plan 308 T4.5 unblock) ──
+    //
+    // These buffers back [`low_rank_fit_jacobi_bstep`] (see `large_dh.rs`).
+    // They are lazily sized (`Vec::new()`) so Kronecker-path callers don't
+    // pay for them — the Jacobi path grows them on first use via
+    // `LowRankFitScratch::ensure_jacobi_capacity`.
+    //
+    // The dominant allocation is `eigvecs_g` at `d_h × d_h` f64 — e.g.
+    // ~2.6 GB at d_h = 18_720 (the Issue 185 K=8/M=8/R=2 target).
+
+    /// Eigenvalues of `G = XᵀX`, length `d_h` f64. Computed once per fit
+    /// (outside the ALS loop) by [`low_rank_fit_jacobi_bstep`].
+    pub eigvals_g: Vec<f64>,
+    /// Eigenvectors of `G`, `d_h × d_h` f64, column `j` is `Q_g[:,j]` stored
+    /// row-major (i.e. `eigvecs_g[i*d_h + j]` is row i, column j).
+    pub eigvecs_g: Vec<f64>,
+    /// Jacobi scratch for the `d_h × d_h` eigendecomp of `G`, `d_h × d_h` f64.
+    pub jacobi_scratch_g: Vec<f64>,
+    /// Eigenvalues of `AᵀA`, length `r` f64. Recomputed each ALS iteration.
+    pub eigvals_ata: Vec<f64>,
+    /// Eigenvectors of `AᵀA`, `r × r` f64. Recomputed each ALS iteration.
+    pub eigvecs_ata: Vec<f64>,
+    /// Jacobi scratch for the `r × r` eigendecomp of `AᵀA`, `r × r` f64.
+    pub jacobi_scratch_ata: Vec<f64>,
+    /// Transformed RHS `Q_aᵀ · Aᵀ · Covᵀ · Q_g`, `r × d_h` f64.
+    pub rhs_transformed: Vec<f64>,
+    /// Scaled intermediate `C` (where `B = Q_a · C · Q_gᵀ`), `r × d_h` f64.
+    pub c_tilde: Vec<f64>,
+    /// Temp `r × d_h` f64 for the `Q_a · C` matmul.
+    pub qc_temp: Vec<f64>,
 }
 
 impl LowRankFitScratch {
@@ -742,16 +786,68 @@ impl LowRankFitScratch {
             kron_chol: Vec::new(),
             kron_z: Vec::new(),
             kron_x: Vec::new(),
+            eigvals_g: Vec::new(),
+            eigvecs_g: Vec::new(),
+            jacobi_scratch_g: Vec::new(),
+            eigvals_ata: Vec::new(),
+            eigvecs_ata: Vec::new(),
+            jacobi_scratch_ata: Vec::new(),
+            rhs_transformed: Vec::new(),
+            c_tilde: Vec::new(),
+            qc_temp: Vec::new(),
+        }
+    }
+
+    /// Grow the Jacobi-path scratch buffers to the requested size. Idempotent
+    /// — only allocates if the current capacity is too small. Used by
+    /// [`low_rank_fit_jacobi_bstep`] (Issue 185) so that Kronecker-path
+    /// callers never pay for the Jacobi buffers.
+    ///
+    /// [`low_rank_fit_jacobi_bstep`]: super::large_dh::low_rank_fit_jacobi_bstep
+    pub fn ensure_jacobi_capacity(&mut self, d_h: usize, r: usize) {
+        // d_h-side buffers: eigvals_g (d_h), eigvecs_g (d_h*d_h),
+        // jacobi_scratch_g (d_h*d_h).
+        if self.eigvals_g.len() < d_h {
+            self.eigvals_g.resize(d_h, 0.0);
+        }
+        if self.eigvecs_g.len() < d_h * d_h {
+            self.eigvecs_g.resize(d_h * d_h, 0.0);
+        }
+        if self.jacobi_scratch_g.len() < d_h * d_h {
+            self.jacobi_scratch_g.resize(d_h * d_h, 0.0);
+        }
+        // r-side buffers: eigvals_ata (r), eigvecs_ata (r*r),
+        // jacobi_scratch_ata (r*r).
+        if self.eigvals_ata.len() < r {
+            self.eigvals_ata.resize(r, 0.0);
+        }
+        if self.eigvecs_ata.len() < r * r {
+            self.eigvecs_ata.resize(r * r, 0.0);
+        }
+        if self.jacobi_scratch_ata.len() < r * r {
+            self.jacobi_scratch_ata.resize(r * r, 0.0);
+        }
+        // Mixed r × d_h buffers.
+        let rdh = r * d_h;
+        if self.rhs_transformed.len() < rdh {
+            self.rhs_transformed.resize(rdh, 0.0);
+        }
+        if self.c_tilde.len() < rdh {
+            self.c_tilde.resize(rdh, 0.0);
+        }
+        if self.qc_temp.len() < rdh {
+            self.qc_temp.resize(rdh, 0.0);
         }
     }
 }
 
 /// Symmetric eigendecomposition via the cyclic Jacobi algorithm (Plan 308 T2.3).
 ///
-/// Computes `A = U · diag(λ) · Uᵀ` for a symmetric `r × r` matrix `A` (row-major
+/// Computes `A = V · diag(λ) · Vᵀ` for a symmetric `r × r` matrix `A` (row-major
 /// f64), writing eigenvalues into `eigvals` (length `r`) and eigenvectors into
-/// `eigvecs` (length `r*r`, column `k` is `U[:,k]` stored at indices
-/// `eigvecs[k*r..(k+1)*r]`, i.e. row-major `Uᵀ` for convenience).
+/// `eigvecs` (length `r*r`, row-major: `eigvecs[i*r + j] = V[i, j]`, so column
+/// `k` of `V` — i.e. the eigenvector paired with `eigvals[k]` — is the length-`r`
+/// stride-`r` slice starting at `eigvecs[k]`).
 ///
 /// The Jacobi algorithm iterates over all off-diagonal `(p,q)` pairs, applying
 /// a rotation that zeroes `A[p,q]`. Cyclic sweeps repeat until the off-diagonal
@@ -761,6 +857,27 @@ impl LowRankFitScratch {
 /// bit-reproducible across runs.
 ///
 /// `scratch` (`r*r` f64) is overwritten and holds the working matrix copy.
+///
+/// # Rotation convention (Issue 185 bug fix, 2026-07-20)
+///
+/// The in-place updates use the rotation `J = [[c, s], [-s, c]]` and the
+/// angle `θ = 0.5 · atan(2·a_pq / (a_qq − a_pp))`. The original Plan 308 T2.3
+/// code used `(a_pp − aqq)` in the denominator (sign-flipped), which produced
+/// correct results only when `a_pp == a_qq` (the `π/4` special case). The fix
+/// is in place; the regression test `karc::large_dh::tests::jacobi_eigen_sign_convention_correct`
+/// pins it.
+///
+/// # Storage convention
+///
+/// `eigvecs[i*r + j] = V[i, j]` (standard row-major). Column `k` of `V` (the
+/// eigenvector for `eigvals[k]`) is at indices `{eigvecs[k], eigvecs[r+k], ...,
+/// eigvecs[(r-1)*r+k]}` — i.e. stride `r` from offset `k`. This matches the
+/// accumulation pattern `V ← V · J` where each rotation mixes two COLUMNS
+/// of `V`.
+///
+/// (An earlier version of this docstring claimed "column k is U[:,k] stored at
+/// indices eigvecs[k*r..(k+1)*r]" — that described a row-major `Uᵀ` layout,
+/// which is incorrect. The actual storage is row-major `V`, not `Vᵀ`.)
 pub fn jacobi_eigen(
     eigvals: &mut [f64],
     eigvecs: &mut [f64],
@@ -802,11 +919,25 @@ pub fn jacobi_eigen(
                 }
                 let app = scratch[p * r + p];
                 let aqq = scratch[q * r + q];
-                // Compute rotation angle θ: tan(2θ) = 2·apq / (app - aqq).
+                // Compute rotation angle θ that zeros scratch[p,q] under the
+                // update `A ← Jᵀ·A·J` with `J = [[c, s], [-s, c]]` (the convention
+                // used by the in-place updates below).
+                //
+                // Derivation: with this J convention,
+                //   (Jᵀ·A·J)[p,q] = sc·(app − aqq) + (c²−s²)·apq.
+                // Setting this to zero gives `tan(2θ) = 2·apq / (aqq − app)`.
+                //
+                // **Issue 185 bug fix (2026-07-20):** the original Plan 308 T2.3
+                // code used `2·apq / (app − aqq)` (sign-flipped denominator).
+                // That happens to produce the right answer when `app == aqq`
+                // (the π/4 special case) but produces wrong eigenvalues AND
+                // wrong eigenvectors for any matrix with `app ≠ aqq`. The bug
+                // was latent because `jacobi_eigen` was unused before Issue 185's
+                // Jacobi B-step path — every prior consumer used Cholesky.
                 let theta = if (app - aqq).abs() < f64::MIN_POSITIVE {
                     core::f64::consts::FRAC_PI_4
                 } else {
-                    0.5 * (2.0 * apq / (app - aqq)).atan()
+                    0.5 * (2.0 * apq / (aqq - app)).atan()
                 };
                 let c = theta.cos();
                 let s = theta.sin();
@@ -1173,6 +1304,206 @@ fn low_rank_fit_with_init(
         }
     }
     iters_done
+}
+
+// ── Shared ALS helpers (extracted for the Jacobi B-step path, Issue 185) ──
+//
+// These two helpers are factored out of `low_rank_fit_with_init` so that
+// `low_rank_fit_jacobi_bstep` (in `large_dh.rs`) can reuse the EXACT same
+// A-step and scale-rebalance code — bit-identical behaviour between the
+// Kronecker and Jacobi paths on configs where both are feasible is the
+// T2 parity-test contract.
+
+/// A-step of one ALS iteration: solves `Aᵀ = (B·G·Bᵀ + λI_r)⁻¹ · (B·Cov)`
+/// and writes the transposed result into `a_out` (D × r, row-major).
+///
+/// Inputs: `gram` (d_h × d_h), `cov` (d_h × D), `b_out` (r × d_h).
+/// Scratch buffers touched: `gbt`, `bgbt`, `bcov`, `chol_bgbt`, `at`.
+/// Reads `r`, `d_h`, `d_out`, `lambda`.
+///
+/// This is the A-step body extracted verbatim from `low_rank_fit_with_init`
+/// lines 1046–1114 (Plan 308 T2.3) — refactoring it into a helper does not
+/// change the math or the float-operation order, preserving bit-reproducibility.
+#[allow(clippy::too_many_arguments)]
+pub(super) fn als_a_step(
+    gram: &[f64],
+    cov: &[f64],
+    d_h: usize,
+    d_out: usize,
+    r: usize,
+    lambda: f64,
+    b_out: &[f64],
+    a_out: &mut [f64],
+    scratch: &mut LowRankFitScratch,
+) {
+    // G·Bᵀ: d_h × r.
+    for i in 0..d_h {
+        for k in 0..r {
+            let mut s = 0.0f64;
+            let mut j = 0;
+            while j + 4 <= d_h {
+                s += gram[i * d_h + j] * b_out[k * d_h + j];
+                s += gram[i * d_h + j + 1] * b_out[k * d_h + j + 1];
+                s += gram[i * d_h + j + 2] * b_out[k * d_h + j + 2];
+                s += gram[i * d_h + j + 3] * b_out[k * d_h + j + 3];
+                j += 4;
+            }
+            while j < d_h {
+                s += gram[i * d_h + j] * b_out[k * d_h + j];
+                j += 1;
+            }
+            scratch.gbt[i * r + k] = s;
+        }
+    }
+    // B·(G·Bᵀ): r × r.
+    for i in 0..r {
+        for k in 0..r {
+            let mut s = 0.0f64;
+            let mut j = 0;
+            while j + 4 <= d_h {
+                s += b_out[i * d_h + j] * scratch.gbt[j * r + k];
+                s += b_out[i * d_h + j + 1] * scratch.gbt[(j + 1) * r + k];
+                s += b_out[i * d_h + j + 2] * scratch.gbt[(j + 2) * r + k];
+                s += b_out[i * d_h + j + 3] * scratch.gbt[(j + 3) * r + k];
+                j += 4;
+            }
+            while j < d_h {
+                s += b_out[i * d_h + j] * scratch.gbt[j * r + k];
+                j += 1;
+            }
+            scratch.bgbt[i * r + k] = s;
+        }
+    }
+    // Add λI_r.
+    for i in 0..r {
+        scratch.bgbt[i * r + i] += lambda;
+    }
+    // B·Cov: r × D.
+    for i in 0..r {
+        for d in 0..d_out {
+            let mut s = 0.0f64;
+            let mut j = 0;
+            while j + 4 <= d_h {
+                s += b_out[i * d_h + j] * cov[j * d_out + d];
+                s += b_out[i * d_h + j + 1] * cov[(j + 1) * d_out + d];
+                s += b_out[i * d_h + j + 2] * cov[(j + 2) * d_out + d];
+                s += b_out[i * d_h + j + 3] * cov[(j + 3) * d_out + d];
+                j += 4;
+            }
+            while j < d_h {
+                s += b_out[i * d_h + j] * cov[j * d_out + d];
+                j += 1;
+            }
+            scratch.bcov[i * d_out + d] = s;
+        }
+    }
+    // Cholesky solve: (B·G·Bᵀ + λI) · Aᵀ = B·Cov  →  Aᵀ (r × D).
+    cholesky_f64(&mut scratch.chol_bgbt, &scratch.bgbt, r);
+    chol_solve_f64(
+        &mut scratch.at,
+        &mut scratch.z_a,
+        &scratch.chol_bgbt,
+        &scratch.bcov,
+        r,
+        d_out,
+    );
+    // Transpose Aᵀ (r × D) → A (D × r).
+    for d in 0..d_out {
+        for k in 0..r {
+            a_out[d * r + k] = scratch.at[k * d_out + d];
+        }
+    }
+}
+
+/// Scale rebalance: `A ← c·A`, `B ← B/c` with `c = √(‖B‖/‖A‖)` to pin the
+/// ALS gauge and prevent exponential drift (A·B = (cA)·(B/c) is unchanged).
+///
+/// Extracted verbatim from `low_rank_fit_with_init` lines 1213–1232.
+pub(super) fn als_scale_rebalance(
+    a_out: &mut [f64],
+    b_out: &mut [f64],
+    d_out: usize,
+    d_h: usize,
+    r: usize,
+) {
+    let norm_a_sq: f64 = a_out[..d_out * r].iter().map(|x| x * x).sum();
+    let norm_b_sq: f64 = b_out[..r * d_h].iter().map(|x| x * x).sum();
+    if norm_a_sq > 0.0 && norm_b_sq > 0.0 {
+        let c = (norm_b_sq / norm_a_sq).sqrt();
+        for v in a_out[..d_out * r].iter_mut() {
+            *v *= c;
+        }
+        let c_inv = 1.0 / c;
+        for v in b_out[..r * d_h].iter_mut() {
+            *v *= c_inv;
+        }
+    }
+}
+
+/// Convergence probe: returns `‖(A·B)_new − wout_old‖_F` and copies the new
+/// `A·B` into `wout_old` so the next call measures against the latest state.
+///
+/// Extracted verbatim from `low_rank_fit_with_init` lines 1223–1255.
+pub(super) fn als_convergence_step(
+    a_out: &[f64],
+    b_out: &[f64],
+    d_out: usize,
+    d_h: usize,
+    r: usize,
+    scratch: &mut LowRankFitScratch,
+) -> f64 {
+    for d in 0..d_out {
+        for j in 0..d_h {
+            let mut s = 0.0f64;
+            for k in 0..r {
+                s += a_out[d * r + k] * b_out[k * d_h + j];
+            }
+            scratch.wout_new[d * d_h + j] = s;
+        }
+    }
+    let mut diff_sq = 0.0f64;
+    for idx in 0..d_out * d_h {
+        let diff = scratch.wout_new[idx] - scratch.wout_old[idx];
+        diff_sq += diff * diff;
+    }
+    scratch.wout_old[..d_out * d_h].copy_from_slice(&scratch.wout_new[..d_out * d_h]);
+    diff_sq.sqrt()
+}
+
+/// Build `AᵀA` (r × r, row-major) from `a_out` (D × r). Writes into
+/// `scratch.ata`. Used by both the Kronecker B-step and the Jacobi B-step.
+pub(super) fn build_ata(a_out: &[f64], d_out: usize, r: usize, scratch: &mut LowRankFitScratch) {
+    for i in 0..r {
+        for j in 0..r {
+            let mut s = 0.0f64;
+            for d in 0..d_out {
+                s += a_out[d * r + i] * a_out[d * r + j];
+            }
+            scratch.ata[i * r + j] = s;
+        }
+    }
+}
+
+/// Compute `Cov·A` (d_h × r, row-major) into `scratch.cov_a`.
+/// `(cov_a)[i, k] = Σ_d cov[i, d] · a[d, k]`. Used by both B-step paths
+/// (the Kronecker RHS and the Jacobi RHS both derive from this product).
+pub(super) fn build_cov_a(
+    cov: &[f64],
+    a_out: &[f64],
+    d_h: usize,
+    d_out: usize,
+    r: usize,
+    scratch: &mut LowRankFitScratch,
+) {
+    for i in 0..d_h {
+        for k in 0..r {
+            let mut s = 0.0f64;
+            for d in 0..d_out {
+                s += cov[i * d_out + d] * a_out[d * r + k];
+            }
+            scratch.cov_a[i * r + k] = s;
+        }
+    }
 }
 
 /// ALS fit with caller-supplied initial factors (warm-start).

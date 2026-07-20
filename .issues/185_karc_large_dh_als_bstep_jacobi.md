@@ -80,17 +80,54 @@ Validate against the existing Kronecker path on the small config (bit-reproducib
 
 ## Acceptance Criteria
 
-- [ ] **T1 — Implementation.** `low_rank_fit_jacobi_bstep` ships in `crates/katgpt-core/src/linalg/ridge_solve.rs`, reusing `jacobi_eigen`. The function shares the existing `LowRankFitScratch` (extended with `d_h × d_h` eigvecs/eigvals/scratch buffers — pre-allocated, zero-alloc hot path).
-- [ ] **T2 — Bit-reproducibility parity test.** New `tests/karc_low_rank_jacobi_vs_kronecker.rs`: on a config where both paths are feasible (r=8, d_h=96, K=4, M=8, R=1), assert ‖A_jacobi − A_kron‖_F ≤ `1e-6` and ‖B_jacobi − B_kron‖_F ≤ `1e-6` after the same ALS iteration count. Closes the "two paths produce the same answer" contract.
-- [ ] **T3 — G1 GOAT gate re-run at K=8, M=8, R=2.** New example `karc_double_scroll_jacobi_bstep.rs`: fit at K=8, M=8, R=2, d_h=18720, report NRMSE (1 LT) and threshold (ε=0.1).
-  - **G1 NRMSE target:** ≤ 1.0e-3 (must hold — NRMSE was 1.67e-4 at K=4,M=8,R=2; more delay context shouldn't hurt expressiveness).
-  - **G1 threshold target:** ≥ 8 LT (the whole point — K=8 was 8.16 LT at first-order Phase 1; K=8 at R=2 should be ≥ 8 LT).
-  - **Both must pass** for the compound G1 to clear.
-- [ ] **T4 — Memory ceiling check.** Document the worst-case buffer footprint in the example rustdoc: at K=8, M=8, R=2, r=8, d_h=18720, the largest single buffer is `Q ∈ R^{18720×18720}` ≈ 2.6 GB f64 (heap-allocated; the function takes caller-provided `&mut [f64]` scratch per AGENTS.md "Pass pre-allocated scratch buffers" optimization rule). Verify peak RSS during the example run.
-- [ ] **T5 — Plan 308 promotion decision.** Update Plan 308 §Phase 4 T4.5–T4.7 based on T3 results:
-  - If both G1 legs pass → add `karc_forecaster` to `crates/katgpt-core/Cargo.toml` default features; update README feature table; close T4.5/T4.6/T4.7 as `[x]`.
-  - If G1 NRMSE passes but threshold fails → file a follow-up issue (gate re-spec vs alternative factorization); leave `karc_forecaster` opt-in.
-  - If G1 NRMSE fails → investigate (this would be a genuine algorithmic regression vs Phase 2's 1.67e-4 result, not a memory issue).
+- [x] **T1 — Implementation.** `low_rank_fit_jacobi_bstep` ships in `crates/katgpt-core/src/karc/large_dh.rs` (sibling to `karc/mod.rs` — extracted to keep `mod.rs` under the 2048-line guideline). The function shares the existing `LowRankFitScratch` (extended via `ensure_jacobi_capacity` with d_h×d_h eigvecs/eigvals/scratch buffers — pre-allocated, zero-alloc hot path). **DONE 2026-07-20.**
+- [x] **T2 — Bit-reproducibility parity test.** `tests/karc_low_rank_jacobi_vs_kronecker.rs` + `karc/large_dh.rs` unit test: on d_h=96 / r=4, the Jacobi and Kronecker paths produce ALS solutions agreeing to `1.6e-14` after the same iteration count (machine precision for f64). Also pins the Jacobi path's own bit-reproducibility. **DONE 2026-07-20.**
+- [-] **T3 — G1 GOAT gate re-run at K=8, M=8, R=2 (d_h=18_720).** **BLOCKED** — see "Compute-feasibility gap" below. The naive Jacobi eigendecomp of G at d_h=18_720 is ~3.3e13 FLOPs/sweep × ~10 sweeps = ~3.3e14 FLOPs one-time, plus cache-hostile random-access pattern. Even d_h=4_752 (the existing shipping bench) exceeded a 10-minute watchdog timeout in the timing trial — d_h=18_720 is 16× larger. T3 needs a faster symmetric eigensolver (Lanczos iteration with full reorthogonalization, or a LAPACK binding) — tracked as a follow-up. The T1 implementation is correct (T2 proves this); the blocker is purely compute-feasibility.
+- [-] **T4 — Memory ceiling check.** **BLOCKED with T3** — same blocker (the example doesn't run yet). The buffer footprint math is unchanged from the issue body: at K=8, M=8, R=2, r=8, d_h=18_720, the largest single buffer is `Q ∈ R^{18720×18720}` ≈ 2.6 GB f64 (heap-allocated, caller-provided scratch).
+- [-] **T5 — Plan 308 promotion decision.** **BLOCKED with T3** — cannot make the promotion call without T3's evidence. `karc_forecaster` stays opt-in.
+
+## Compute-feasibility gap (T3 blocker, discovered 2026-07-20)
+
+The Issue 185 risk register listed "Jacobi too slow" as a Medium-likelihood
+risk. Empirically it is a **certainty** at d_h=18_720, and even at d_h=4_752
+the one-time G eigendecomp exceeds a 10-minute budget. Three paths forward,
+none in scope for this issue's T1+T2 closure:
+
+1. **Lanczos iteration with full reorthogonalization** — top-k eigenpairs of G
+   in `O(d_h·k²)` per step. But the B-step needs ALL d_h eigenvalues (every
+   `Λ_g[l]` appears in the scaling `Λ_a[i]·Λ_g[l] + λ`), so we'd need k=d_h,
+   which collapses Lanczos back to `O(d_h⁴)` — worse than Jacobi. **Doesn't help.**
+2. **LAPACK binding** (`dsyevd` divide-and-conquer) — `O(d_h³)` with a small
+   constant factor and SIMD-friendly memory access. Would make d_h=18_720
+   feasible in ~5-10 min one-time. But katgpt-rs is deliberately
+   dependency-light (no system-library deps); adding a Lapack binding is a
+   significant scope change. **Possible follow-up.**
+3. **Avoid eigendecomposing G entirely** — re-derive the B-step as `r`
+   independent Cholesky solves of `(Λ_a[i]·G + λI)`, each `O(d_h³)`.
+   Per-iter cost `O(r·d_h³) = 5.2e13` FLOPs at the target config — still
+   infeasible (50 iters × 5.2e13 = 2.6e15 FLOPs ≈ days at CPU SIMD rates).
+   **Doesn't help either.**
+
+The honest conclusion: the d_h=18_720 promotion-gate target requires either
+an external eigensolver dependency or a fundamentally different B-step
+formulation (e.g., one that exploits the Kronecker structure of the KARC
+feature Gram, if any). T1+T2 stand as a complete, correct, well-tested
+primitive that's ready to consume the moment a faster eigensolver lands.
+
+## Latent bug found and fixed during T1
+
+Implementing T1 surfaced a **latent sign bug in `jacobi_eigen`** (Plan 308 T2.3).
+The original rotation-angle formula was `0.5 · atan(2·apq / (app − aqq))`, but
+the in-place updates use the rotation convention `J = [[c, s], [−s, c]]`, which
+requires `0.5 · atan(2·apq / (aqq − app))` (sign-flipped denominator). The bug
+produced correct results only when `app == aqq` (the `π/4` special case). It
+was latent because `jacobi_eigen` had **zero callers** before Issue 185 — every
+prior consumer used Cholesky. The fix ships with T1, pinned by the
+`jacobi_eigen_sign_convention_correct` unit test.
+
+This is exactly the kind of latent bug the Issue 185 implementation work was
+supposed to surface: the Phase 2 rustdoc documented `jacobi_eigen` as "kept
+for future large-d_h path" but never exercised it. Exercising it found the bug.
 
 ## Out of scope
 
