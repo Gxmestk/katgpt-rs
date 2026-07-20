@@ -41,6 +41,11 @@
 #[cfg(test)]
 mod tests;
 
+/// Parallel variant (row-parallel rayon). Gated by `karc_householder_eig_par`.
+/// See [`par::symmetric_eig_par`] for the entry point.
+#[cfg(feature = "karc_householder_eig_par")]
+pub mod par;
+
 /// Scratch buffers for [`symmetric_eig`]. Owns ~`n²` f64 for the working copy
 /// of A plus `O(n)`-sized temps. Lazily sized via [`ensure_capacity`].
 ///

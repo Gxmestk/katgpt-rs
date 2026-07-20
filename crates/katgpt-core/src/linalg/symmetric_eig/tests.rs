@@ -485,3 +485,212 @@ fn timing_householder_vs_jacobi() {
         );
     }
 }
+
+// ─── Parallel-path parity tests (Issue 187 T4 bit-identity contract) ────────
+//
+// These run only under the `karc_householder_eig_par` feature. They verify
+// that `symmetric_eig_par` produces bit-identical (eigvals, eigvecs) output
+// to the serial `symmetric_eig` on the same input. The parallel path uses
+// row-parallel rayon with no cross-row reductions, so the per-row numerical
+// work is identical; these tests pin that contract.
+
+#[cfg(feature = "karc_householder_eig_par")]
+#[test]
+fn par_vs_serial_bit_identity_small() {
+    use super::par::symmetric_eig_par;
+
+    let mut state: u64 = 0xfeed_beef_dead_1234;
+    for &n in &[1_usize, 2, 3, 4, 8, 16, 17, 31, 32, 33, 64] {
+        let mut a = vec![0.0_f64; n * n];
+        random_spd(&mut state, &mut a, n);
+
+        // Serial
+        let mut eigvals_s = vec![0.0; n];
+        let mut eigvecs_s = vec![0.0; n * n];
+        let mut scratch_s = SymmetricEigScratch::new();
+        symmetric_eig(&mut eigvals_s, &mut eigvecs_s, &a, &mut scratch_s, n, 30);
+
+        // Parallel
+        let mut eigvals_p = vec![0.0; n];
+        let mut eigvecs_p = vec![0.0; n * n];
+        let mut scratch_p = SymmetricEigScratch::new();
+        symmetric_eig_par(
+            &mut eigvals_p,
+            &mut eigvecs_p,
+            &a,
+            &mut scratch_p,
+            n,
+            30,
+        );
+
+        // Bit-identity check: bytes must match exactly.
+        let eigvals_match = eigvals_s.iter().zip(&eigvals_p).all(|(a, b)| a.to_bits() == b.to_bits());
+        let eigvecs_match = eigvecs_s.iter().zip(&eigvecs_p).all(|(a, b)| a.to_bits() == b.to_bits());
+        assert!(
+            eigvals_match,
+            "n={}: eigvals differ between serial and parallel",
+            n
+        );
+        assert!(
+            eigvecs_match,
+            "n={}: eigvecs differ between serial and parallel (first diff at index {:?})",
+            n,
+            eigvecs_s
+                .iter()
+                .zip(&eigvecs_p)
+                .position(|(a, b)| a.to_bits() != b.to_bits())
+        );
+    }
+}
+
+#[cfg(feature = "karc_householder_eig_par")]
+#[test]
+fn par_vs_serial_bit_identity_medium() {
+    use super::par::symmetric_eig_par;
+
+    // Larger sizes that exercise more Householder reflections + more QL
+    // rotations — where any scheduling-dependent drift would compound.
+    let mut state: u64 = 0xface_feed_1234_5678;
+    for &n in &[128_usize, 256] {
+        let mut a = vec![0.0_f64; n * n];
+        random_spd(&mut state, &mut a, n);
+
+        let mut eigvals_s = vec![0.0; n];
+        let mut eigvecs_s = vec![0.0; n * n];
+        let mut scratch_s = SymmetricEigScratch::new();
+        symmetric_eig(&mut eigvals_s, &mut eigvecs_s, &a, &mut scratch_s, n, 30);
+
+        let mut eigvals_p = vec![0.0; n];
+        let mut eigvecs_p = vec![0.0; n * n];
+        let mut scratch_p = SymmetricEigScratch::new();
+        symmetric_eig_par(
+            &mut eigvals_p,
+            &mut eigvecs_p,
+            &a,
+            &mut scratch_p,
+            n,
+            30,
+        );
+
+        // Bit-identity on eigenvalues.
+        for (i, (vs, vp)) in eigvals_s.iter().zip(&eigvals_p).enumerate() {
+            assert_eq!(
+                vs.to_bits(),
+                vp.to_bits(),
+                "n={}, i={}: eigval bits differ ({} vs {})",
+                n,
+                i,
+                vs,
+                vp
+            );
+        }
+        // Bit-identity on eigenvectors.
+        let first_diff = eigvecs_s
+            .iter()
+            .zip(&eigvecs_p)
+            .position(|(a, b)| a.to_bits() != b.to_bits());
+        assert!(
+            first_diff.is_none(),
+            "n={}: first eigvec diff at byte-index {:?}",
+            n,
+            first_diff
+        );
+    }
+}
+
+#[cfg(feature = "karc_householder_eig_par")]
+#[test]
+fn par_vs_serial_diagonal_identity() {
+    use super::par::symmetric_eig_par;
+
+    // Diagonal matrix — eigenvalues are the diagonal entries; eigenvectors
+    // are the standard basis. Both serial and parallel must reconstruct
+    // this exactly.
+    let n = 64;
+    let mut a = vec![0.0_f64; n * n];
+    for i in 0..n {
+        a[i * n + i] = (i as f64) + 1.0;
+    }
+
+    let mut eigvals_s = vec![0.0; n];
+    let mut eigvecs_s = vec![0.0; n * n];
+    let mut scratch_s = SymmetricEigScratch::new();
+    symmetric_eig(&mut eigvals_s, &mut eigvecs_s, &a, &mut scratch_s, n, 30);
+
+    let mut eigvals_p = vec![0.0; n];
+    let mut eigvecs_p = vec![0.0; n * n];
+    let mut scratch_p = SymmetricEigScratch::new();
+    symmetric_eig_par(
+        &mut eigvals_p,
+        &mut eigvecs_p,
+        &a,
+        &mut scratch_p,
+        n,
+        30,
+    );
+
+    assert!(
+        eigvals_s
+            .iter()
+            .zip(&eigvals_p)
+            .all(|(a, b)| a.to_bits() == b.to_bits())
+    );
+    assert!(
+        eigvecs_s
+            .iter()
+            .zip(&eigvecs_p)
+            .all(|(a, b)| a.to_bits() == b.to_bits())
+    );
+}
+
+#[cfg(feature = "karc_householder_eig_par")]
+#[test]
+#[ignore]
+fn timing_par_vs_serial() {
+    // Issue 187 T5 benchmark gate: ≥4× speedup at n ≥ 256. The bar is lower
+    // than the Issue 186 T4 serial-vs-Jacobi gate (≥5×) because rayon's
+    // speedup is bounded by core count; this test exists to confirm the
+    // parallel path is actually using the cores.
+    use super::par::symmetric_eig_par;
+    use std::time::Instant;
+
+    let mut state: u64 = 0xabc_def_123_456;
+    for &n in &[256_usize, 512, 1024, 2048] {
+        let mut a = vec![0.0_f64; n * n];
+        random_spd(&mut state, &mut a, n);
+
+        // Time serial (min of 3).
+        let mut s_min = u128::MAX;
+        for _ in 0..3 {
+            let mut eigvals = vec![0.0; n];
+            let mut eigvecs = vec![0.0; n * n];
+            let mut scratch = SymmetricEigScratch::new();
+            let t0 = Instant::now();
+            symmetric_eig(&mut eigvals, &mut eigvecs, &a, &mut scratch, n, 30);
+            let dt = t0.elapsed().as_nanos();
+            if dt < s_min {
+                s_min = dt;
+            }
+        }
+
+        // Time parallel (min of 3).
+        let mut p_min = u128::MAX;
+        for _ in 0..3 {
+            let mut eigvals = vec![0.0; n];
+            let mut eigvecs = vec![0.0; n * n];
+            let mut scratch = SymmetricEigScratch::new();
+            let t0 = Instant::now();
+            symmetric_eig_par(&mut eigvals, &mut eigvecs, &a, &mut scratch, n, 30);
+            let dt = t0.elapsed().as_nanos();
+            if dt < p_min {
+                p_min = dt;
+            }
+        }
+
+        let speedup = s_min as f64 / p_min as f64;
+        eprintln!(
+            "n={:>5}: serial={:>10} ns  parallel={:>10} ns  speedup={:>5.2}×",
+            n, s_min, p_min, speedup
+        );
+    }
+}
