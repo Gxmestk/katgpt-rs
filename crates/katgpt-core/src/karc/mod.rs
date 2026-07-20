@@ -128,7 +128,13 @@ pub mod batched;
 #[cfg(feature = "karc_lod_tier")]
 pub mod lod_tier;
 
-// ── Sealed trait machinery ────────────────────────────────────────────────
+// Re-export the LOD tier API at `katgpt_core::karc::` so callers can use the
+// consistent `karc::` namespace for all KARC primitives. The top-level
+// `katgpt_core::` re-export (lib.rs) stays for caller ergonomics.
+#[cfg(feature = "karc_lod_tier")]
+pub use lod_tier::{KarcLodTier, is_identity_projection, project_wout_lod_into};
+
+// ── Sealed trait machinery ────────────────────────────────────────────────────
 
 mod sealed {
     /// Seals [`super::KarcBasis`] so only the three shipped implementations
