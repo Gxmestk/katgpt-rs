@@ -671,9 +671,9 @@ fn main() {
     println!(
         "\nOverall: {}",
         if all_pass {
-            "ALL PASS — primitive is GOAT-validated, eligible for promotion decision"
+            "ALL PASS — primitive is GOAT-validated. poincare_navigator was\n             PROMOTED TO DEFAULT-ON (Plan 449 Phase 3, katgpt-core/Cargo.toml\n             Phase 19, 2026-07-18). This bench was the gate evidence."
         } else {
-            "ONE OR MORE GATES FAILED — see notes above; this is informative, not catastrophic (per PoC §3.6)"
+            "ONE OR MORE GATES FAILED — note: poincare_navigator was previously\n             promoted 2026-07-18; a regression here would warrant re-audit.\n             (Per PoC §3.6, gate failure is informative, not catastrophic.)"
         }
     );
 
