@@ -873,7 +873,7 @@ ThinkingController (Plan 194)
 | Direct mode overhead | 0% | GOAT 1 ✅ |
 | Fold overhead | <5% | GOAT 4 ✅ |
 
-Feature gate: `chain_fold` (depends on `thinking_cot`, default-OFF until GOAT proof on real model).
+Feature gate: `chain_fold` (depends on `thinking_cot`, DEFAULT-ON — GOAT Plan 195 16/16 validated by Plan 228).
 
 ### 🛑 Collapse-Aware Adaptive Thinking (Plan 212)
 
