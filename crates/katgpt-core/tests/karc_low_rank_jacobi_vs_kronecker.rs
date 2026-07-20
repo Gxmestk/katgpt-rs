@@ -186,3 +186,80 @@ fn als_jacobi_warm_start_matches_kronecker_warm_start() {
     for v in &a_kron { assert!(v.is_finite()); }
     for v in &b_kron { assert!(v.is_finite()); }
 }
+
+// ─── Issue 186 (Path B): Householder+QL G-path parity ──────────────────────
+//
+// When the `karc_householder_eig` feature is on, `low_rank_fit_jacobi_bstep`
+// uses `linalg::symmetric_eig` (Householder tridiag + implicit-shift QL)
+// instead of `karc::jacobi_eigen` for the one-time G eigendecomp. This test
+// verifies the swap is transparent: the ALS solution still matches the
+// Kronecker path to the same tolerance as the Jacobi-path test above.
+//
+// Same input shape, same tolerance, same assertions. The only difference
+// from `als_jacobi_matches_kronecker_d96_r4` is that the underlying G-path
+// eigensolver is Householder+QL rather than Jacobi. Both must agree with the
+// Kronecker reference — proving the wiring is correct and the new eigensolver
+// produces ALS-compatible eigenpairs.
+
+#[cfg(feature = "karc_householder_eig")]
+#[test]
+fn als_householder_matches_kronecker_d96_r4() {
+    let d_h = 96usize;
+    let d_out = 4usize;
+    let r = 4usize;
+    let lambda = 1e-3f64;
+    let max_iters = 50usize;
+    let tol = 1e-10f64;
+    let (gram, cov) = build_synthetic_problem(d_h, d_out);
+
+    // Kronecker reference.
+    let mut a_kron = vec![0.0f64; d_out * r];
+    let mut b_kron = vec![0.0f64; r * d_h];
+    let mut scr_kron = LowRankFitScratch::with_capacity(d_h, d_out, r);
+    let iters_kron = low_rank_fit(
+        &gram, &cov, d_h, d_out, r, lambda, max_iters, tol,
+        &mut a_kron, &mut b_kron, &mut scr_kron,
+    );
+
+    // Householder+QL path (via the same `low_rank_fit_jacobi_bstep` entry
+    // point — the feature flag flips the internal G-path eigensolver).
+    let mut a_hh = vec![0.0f64; d_out * r];
+    let mut b_hh = vec![0.0f64; r * d_h];
+    let mut scr_hh = LowRankFitScratch::with_capacity(d_h, d_out, r);
+    let iters_hh = low_rank_fit_jacobi_bstep(
+        &gram, &cov, d_h, d_out, r, lambda, max_iters, tol,
+        &mut a_hh, &mut b_hh, &mut scr_hh,
+    );
+
+    // Iteration count must match (same optimization landscape; only the
+    // per-iter B-step decomposition differs).
+    assert_eq!(
+        iters_kron, iters_hh,
+        "iteration count mismatch: kron={}, householder={}",
+        iters_kron, iters_hh
+    );
+
+    // Frobenius-norm differences must be well under the convergence tol.
+    let mut a_diff_sq = 0.0f64;
+    for i in 0..d_out * r {
+        let diff = a_hh[i] - a_kron[i];
+        a_diff_sq += diff * diff;
+    }
+    let mut b_diff_sq = 0.0f64;
+    for i in 0..r * d_h {
+        let diff = b_hh[i] - b_kron[i];
+        b_diff_sq += diff * diff;
+    }
+    let a_diff = a_diff_sq.sqrt();
+    let b_diff = b_diff_sq.sqrt();
+    assert!(
+        a_diff < 1e-6,
+        "Householder path: ‖A_hh − A_kron‖_F = {:e} exceeds 1e-6",
+        a_diff
+    );
+    assert!(
+        b_diff < 1e-6,
+        "Householder path: ‖B_hh − B_kron‖_F = {:e} exceeds 1e-6",
+        b_diff
+    );
+}

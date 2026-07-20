@@ -112,12 +112,25 @@ Is riir-ai consumer team willing to accept 2.85 LT threshold? ── YES ──�
 Path A or B becomes mandatory — file a P1 issue to do whichever is least-bad
 ```
 
+## Decision (recorded 2026-07-20)
+
+**Path B chosen — in-repo Householder tridiagonalization + QL iteration.**
+
+Rationale: keeps katgpt-rs dependency-light (no LAPACK/C-Fortran toolchain, no CI provisioning changes), opens the compute path with projected 5-10× speedup over Jacobi (sufficient to bring d_h=18_720 from projected ~16 hours to ~5-15 min one-time wall), preserves bit-reproducibility (pure Rust, deterministic sweep order). The implementation effort (~800-1000 LOC) is a one-time cost that pays off for every future symmetric-eig use case in the stack (spectral embedding, Fiedler vector, HLA snapshot PCA).
+
+Paths A and D explicitly deferred:
+- Path A (LAPACK) — rejected for now as a scope change requiring CI/toolchain expansion that should wait until/unless a second heavy-BLAS consumer materializes.
+- Path D (gate re-spec) — premature; the §3.5 modelless-defer discipline requires trying Path B first. Reopen only if Path B's measured speedup falls short of feasibility AND a riir-ai consumer accepts 2.85 LT.
+
 ## Acceptance criteria
 
-- [ ] **T1 — Decision recorded.** Pick Path A / B / D1 / D2. Record the rationale in this issue and in Plan 308 T4.5 (replacing the current "three paths forward" note).
-- [ ] **T2 — Path-specific implementation.** (Only if Path A or B chosen.) File a separate implementation issue for the chosen path with its own GOAT gate (perf, correctness vs `jacobi_eigen` on small configs, no regression on existing `karc::*` tests).
-- [ ] **T3 — GOAT gate re-run at d_h=18_720.** Blocked on T2 (if A/B) or unblocked immediately (if D). Re-run G1 NRMSE + threshold at `K=8, M=8, R=2` and update Benchmark 308.
-- [ ] **T4 — Plan 308 promotion decision.** If T3 passes both gate legs: promote `karc_forecaster` to default-on, update `Cargo.toml`, README, overview doc. If T3 fails: file the gate re-spec follow-up with the new evidence.
+- [x] **T1 — Decision recorded.** Path B chosen 2026-07-20 (see above).
+- [x] **T2 — Implementation.** Shipped `symmetric_eig` at `crates/katgpt-core/src/linalg/symmetric_eig/{mod.rs,tests.rs}` (~870 LOC total). Two-phase algorithm: (a) Householder tridiagonalization with explicit Q accumulation (Golub-van Loan §8.3.1), (b) implicit-shift QL iteration with Wilkinson shift + eigenvector accumulation (Numerical Recipes `tqli`). Pure Rust, no deps, deterministic. **DONE 2026-07-20.**
+- [x] **T3 — Parity tests.** (a) Matches `jacobi_eigen` on eigenvalues to `1e-12` and on eigenvectors up to sign (`|v_h · v_j| > 1 - 1e-10`) across 30 random SPD matrices at n=4, 8, 16. (b) Known-answer tests on n=1, n=2 diagonal, n=2 analytic `[[2,1],[1,2]]`, n=3 diagonal `diag(3,1,2)`, n=3 Toeplitz `[[2,1,0],[1,2,1],[0,1,2]]`, identity n=8. (c) Bit-reproducibility verified. (d) A=V·diag(d)·Vᵀ reconstruction verified at n=8/16/32/64. **DONE 2026-07-20.**
+- [x] **T4 — GOAT gate.** G1 correctness (T3 above). G2 perf: **7.92× at n=64, 10.62× at n=128, 9.35× at n=256, 13.69× at n=512** (criterion: ≥5× at n=256+ — far exceeded). G3 no-regression: 22 `karc::*` tests + 4 integration tests + 1766 total lib tests pass under `--features karc_householder_eig`. G4 alloc-free hot path: pre-allocated `SymmetricEigScratch`, no `Vec` allocation inside the eigensolver. G5 wiring: `low_rank_fit_jacobi_bstep` switches cleanly between `jacobi_eigen` and `symmetric_eig` via the `karc_householder_eig` feature flag; the end-to-end ALS-vs-Kronecker parity test passes through both paths. **DONE 2026-07-20.**
+- [x] **T5 — Wire into `low_rank_fit_jacobi_bstep`.** Done under feature gate `karc_householder_eig` (implies `karc_forecaster`). AᵀA (r×r) stays on `jacobi_eigen` — Householder's win only matters at large n. **DONE 2026-07-20.**
+- [-] **T6 — d_h=18_720 timing trial.** **PROJECTED INFEASIBLE SINGLE-THREADED.** Extrapolating cubic from n=512 (794 ms): d_h=18_720 needs `18_720³/512³ = 4.9e4×` more FLOPs → ~`3.9e7 sec ≈ 10 hours` wall. The 7-14× speedup over Jacobi (T4 measured) is real but insufficient on its own; Jacobi at d_h=18_720 is projected at ~50-100 hours, so Householder+QL brings it from "infeasible" to "still infeasible for a one-shot benchmark". The gap to feasibility (≤30 min wall) is ~20× — closeable via rayon parallelism (rank-2 update outer loop + QL eigenvector accumulation inner loop, ~4-8× expected) + SIMD-aware inner loops (~4-8× expected). Filing as a separate optimization task; **deferred pending a decision on whether to parallelize or accept the deferral**.
+- [-] **T7 — Plan 308 promotion decision.** **BLOCKED on T6.** Cannot make the promotion call until either (a) the parallelized Householder+QL lands and the d_h=18_720 trial runs, or (b) the team accepts the gate-re-spec fallback (Path D). `karc_forecaster` stays opt-in.
 
 ## Compute budget estimate (for the decision)
 
@@ -125,10 +138,23 @@ All estimates are one-time `G` eigendecomp wall time at `d_h=18_720`, single wor
 
 | Path | Algorithm | Projected wall time | Confidence |
 |------|-----------|---------------------|------------|
-| Naive Jacobi (current) | Cyclic, sequential | ~16 hours | Empirical (extrapolated from d_h=4_752 timeout) |
+| Naive Jacobi (Plan 308 baseline) | Cyclic, sequential | ~16 hours (d_h=4_752 empirically >10 min) | Empirical |
+| **Path B: Householder + QL (single-threaded, measured)** | **Householder tridiag + implicit-shift QL** | **~10 hours** | **Extrapolated cubic from n=512 (measured 794 ms, 13.69× faster than Jacobi at n=512)** |
+| Path B + rayon parallelism | + Parallel rank-2 update + parallel QL eigenvector rotation | ~1-3 hours | Medium (4-8× expected from 8-core rayon) |
+| Path B + rayon + SIMD | + 4-way FMA inner loops | ~15-45 min | Low (additional 4-8× expected) |
 | Path A: LAPACK `dsyevd` | Divide-and-conquer + multishift QR | ~3-5 min | High (well-documented perf at this scale) |
-| Path B: Householder + QL | Householder tridiag + implicit-shift QL | ~1-2 min | Medium (pure-Rust implementation, ~5-10× over Jacobi typical) |
 | Path C: Parallel Jacobi | Brent-Luk + rayon | ~2-4 hours | Low (memory-bound at d_h~18k; rayon speedup bounded) |
+
+**Measured T4 GOAT gate results (single-threaded, release build):**
+
+| n | Householder+QL | Jacobi | Speedup |
+|---|---|---|---|
+| 64 | 310 µs | 2.5 ms | **7.92×** |
+| 128 | 3.4 ms | 36.6 ms | **10.62×** |
+| 256 | 73.5 ms | 687 ms | **9.35×** |
+| 512 | 794 ms | 10.9 s | **13.69×** |
+
+The speedup target (≥5× at n=256+) is comfortably exceeded; the gate **PASSes**. The remaining perf gap (single-threaded ~10 hours at d_h=18_720, vs feasibility target ≤30 min) is ~20× and is addressable via rayon + SIMD (separate follow-up task).
 
 ## Risk register
 

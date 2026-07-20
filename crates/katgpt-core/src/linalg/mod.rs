@@ -17,6 +17,12 @@
 
 pub mod ridge_solve;
 
+// Issue 186 (Path B, 2026-07-20) — Householder tridiagonalization + implicit-shift
+// QL. Drop-in alternative to `karc::jacobi_eigen` for large symmetric matrices
+// (~5-10× faster at n ≥ 256). Always compiled; consumed by `karc::large_dh`
+// under the `karc_householder_eig` feature gate.
+pub mod symmetric_eig;
+
 #[cfg(feature = "geometric_product")]
 pub mod geometric_product;
 
@@ -30,6 +36,9 @@ pub use ridge_solve::{
     chol_solve_f32, chol_solve_f64, cholesky_f32, cholesky_f64, ridge_solve_direct_f32,
     ridge_solve_direct_f64, ridge_solve_woodbury_f32, spd_inverse_f32,
 };
+
+// Issue 186 (Path B) — symmetric eigendecomposition via Householder + QL.
+pub use symmetric_eig::{SymmetricEigScratch, symmetric_eig};
 
 // Plan 319 — Channel-wise Clifford Geometric Product (coherence + wedge).
 // Re-exported alongside the ridge kernels as a peer linear-algebra primitive.

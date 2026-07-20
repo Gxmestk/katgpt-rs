@@ -761,6 +761,16 @@ pub struct LowRankFitScratch {
     pub c_tilde: Vec<f64>,
     /// Temp `r × d_h` f64 for the `Q_a · C` matmul.
     pub qc_temp: Vec<f64>,
+
+    // ── Householder+QL B-step path (Issue 186 Path B, 2026-07-20) ──
+    //
+    // Drop-in alternative to `jacobi_eigen` for the G-path eigendecomp.
+    // ~5-10× faster at d_h ≥ 256 due to Householder's cache-friendly blocked
+    // reduction + tridiagonal QL's O(n²) per sweep (vs Jacobi's O(n³) per
+    // sweep). Wired in `large_dh::low_rank_fit_jacobi_bstep` under the
+    // `karc_householder_eig` feature gate. Lazily sized via
+    // `ensure_jacobi_capacity` (which calls `symmetric_eig.ensure_capacity`).
+    pub symmetric_eig: crate::linalg::symmetric_eig::SymmetricEigScratch,
 }
 
 impl LowRankFitScratch {
@@ -795,6 +805,7 @@ impl LowRankFitScratch {
             rhs_transformed: Vec::new(),
             c_tilde: Vec::new(),
             qc_temp: Vec::new(),
+            symmetric_eig: crate::linalg::symmetric_eig::SymmetricEigScratch::new(),
         }
     }
 
@@ -838,6 +849,10 @@ impl LowRankFitScratch {
         if self.qc_temp.len() < rdh {
             self.qc_temp.resize(rdh, 0.0);
         }
+        // Issue 186 Path B — Householder+QL scratch for the G-path eigendecomp.
+        // Grown unconditionally (idempotent); only consumed when the
+        // `karc_householder_eig` feature is on.
+        self.symmetric_eig.ensure_capacity(d_h);
     }
 }
 
