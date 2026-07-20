@@ -12,7 +12,7 @@
 
 parakeet.cpp implements **phrase boosting** via a token-level Context Trie that tracks active phrase-matching states during autoregressive decode. At each timestep, the trie advances all active states on the emitted token and boosts log-probs of child tokens by `boost_score` (default 5.0). This biases the decoder toward domain-specific vocabulary without modifying the model.
 
-**Verdict: MODERATE GAIN — The Context Trie pattern maps directly to our DDTree + ScreeningPruner pipeline as a lightweight `ScreeningPruner` that boosts domain-relevant tokens. Zero-model-cost bias injection. Feature-gate as `phrase_boost`. Default-OFF until GOAT proves gain on our game/inference workload.**
+**Verdict: MODERATE GAIN — The Context Trie pattern maps directly to our DDTree + ScreeningPruner pipeline as a lightweight `ScreeningPruner` that boosts domain-relevant tokens. Zero-model-cost bias injection. Feature-gate as `phrase_boost`. Default-OFF until GOAT proves gain on our game/inference workload.** *(Post-promotion update: GOAT PASS; `phrase_boost` is now DEFAULT-ON in root Cargo.toml default array.)
 
 ---
 

@@ -360,7 +360,7 @@ Phase 2: Channel-Aware routing SIMD calibration                 (4x routing spee
 Phase 3: Meta-Routing Bandit                                    (Online algorithm selection)
 ```
 
-Feature gate: `vortex_flow` — default-OFF until GOAT proof passes.
+Feature gate: `vortex_flow` — default-OFF until GOAT proof passes. *(Post-promotion update: Plan 196 GOAT 72/72 PASS; `vortex_flow` is now DEFAULT-ON in root Cargo.toml default array.)*
 
 ### Skip
 
@@ -391,6 +391,6 @@ Vortex's two-stage decomposition (`forward_cache` + `forward_indexer`) is a **ma
 
 **Repo verification confirms:** `venergy_gated_centroid` (our Idea B variant) achieves 1.00 accuracy and competitive throughput — it's not a niche algorithm. The actual "CUDA trick" (Triton batched-paged-ragged matmul) solves GPU memory layout problems we don't have on CPU.
 
-**Implement A → B → E. Skip C, D, F, G.** Feature gate `vortex_flow`, default-OFF until GOAT proof.
+**Implement A → B → E. Skip C, D, F, G.** Feature gate `vortex_flow`, default-OFF until GOAT proof. *(Post-promotion update: GOAT PASS; `vortex_flow` is now DEFAULT-ON in root Cargo.toml default array.)*
 
 What doesn't transfer: vTensor paging (wrong domain), stochastic top-k (wrong scale), MLA insight (already followed), kernel fusion (too expensive to build). These aren't bad ideas — they're solving problems we don't have or already handle differently.

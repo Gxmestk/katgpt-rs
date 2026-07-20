@@ -207,7 +207,7 @@ Per AGENTS.md latent-vs-raw rules: info brain (real `MapPos`, synced) vs think b
 
 **One-line reasoning:** SwiR's three mechanisms (block-relative entropy switch + asymmetric dwell + switch count controller) compose into a training-free controller that fills the exact gaps Research 187 identified in our thinking-cot stack ("no signal to stop thinking mid-reasoning", "no per-instance early exit", "resamples from same distribution — no mode switch"). Paper reports +1.8–3.1pp accuracy and 1.36–6.8× efficiency gains, plug-and-play at inference time.
 
-**Routing:** Plan only in `katgpt-rs/.plans/275_swir_switch_thinking.md`. Feature flag `swir_switch_thinking`, default-off until GOAT proof. No riir-ai guide (per skill: GOAT verdict → plan only, no guide). Fusion C (NPC think-brain) flagged as future riir-ai research if Super-GOAT validation passes.
+**Routing:** Plan only in `katgpt-rs/.plans/275_swir_switch_thinking.md`. Feature flag `swir_switch_thinking`, default-off until GOAT proof. No riir-ai guide (per skill: GOAT verdict → plan only, no guide). Fusion C (NPC think-brain) flagged as future riir-ai research if Super-GOAT validation passes. *(Post-promotion update: Plan 313 T6.2 GOAT G2 token-efficiency PASS; `swir_switch_thinking` is now DEFAULT-ON in root Cargo.toml default array.)*
 
 **GOAT gate (must pass before promoting to default):**
 - G1: ≥ +1.5pp avg accuracy on internal reasoning benchmark vs `thinking_cot` baseline (paper reports +2.17pp avg on Qwen3-8B).

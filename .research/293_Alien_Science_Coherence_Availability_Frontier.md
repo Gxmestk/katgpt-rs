@@ -160,7 +160,7 @@ where
 
 Plus a `MedianTopMAvailability` struct that takes a `&[Vec<f32>]` community bank + `embedding_fn` and implements `AvailabilityScorer` via the paper's `median over top-m cosines` rule (the load-bearing community-aggregation trick from §1.4).
 
-Feature flag: `alien_sampler`. Default-OFF until GOAT gate passes.
+Feature flag: `alien_sampler`. Default-OFF until GOAT gate passes. *(Post-GOAT update: GOAT 2/4 PASS (initially 1/4, G3 closed via Rayon; G1 borderline + G2 fail are the demotion drivers); explicitly demoted + exiled to katgpt-deprecated per Plan 311 Phase 3. Re-exported for back-compat.)*
 
 ### 4.1 What stays private (riir-ai consumer)
 

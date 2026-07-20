@@ -272,7 +272,7 @@ The `DynamicPairRouter` should be implemented as an extension to `PolytopeLoraRo
 - [x] **T2: `DynamicRankPruner<P>` wrapper** — wraps any `ScreeningPruner`, runs diagnostic on first call, applies prefix-correction if static detected. ~100 LOC.
 - [x] **T3: Integration with `BanditPruner`** — add `with_dynamic_rank()` builder method. Forward `relevance()` through wrapper. ~30 LOC.
 - [x] **T4: GOAT proof test** — `tests/bench_dynamic_rank_goat.rs`. Compare BanditPruner acceptance rate with/without wrapper on bomber arena. Must show ≥2% improvement. ~80 LOC.
-- [x] **T5: Feature gate** — add `dynamic_rank = []` to Cargo.toml, default-off until proof passes.
+- [x] **T5: Feature gate** — add `dynamic_rank = []` to Cargo.toml, default-off until proof passes. *(Post-promotion update: proof PASS; `dynamic_rank` is now DEFAULT-ON in root Cargo.toml default array.)*
 
 ### riir-ai (Plan 090 — `dynamic_pair_routing` feature)
 
