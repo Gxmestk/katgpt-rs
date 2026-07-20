@@ -744,7 +744,8 @@ fn main() {
         println!("  ── ALL THREE GATES PASS (G2/G3/G4) ──");
         println!("  GOAT gate matrix complete (G1 mechanics + G5 isolation already");
         println!("  shipped in Plan 304 T1.5/T3.5). Recommendation: keep `gain_cost_halt`");
-        println!("  opt-in (default-off) until riir-ai Plan 330 wires real game loops;");
+        println!("  opt-in (default-off) — Plan 304 GOAT G1-G5 ALL PASS (2026-06-23); Plan 330");
+        println!("  wired gain_cost_halt into civ via crates/riir-games-civ/src/civ/map_tick/npc_clr.rs");
         println!("  the synthetic harness confirms the kernel's savings/regression/");
         println!("  oscillation-detection contract on all reference regimes.");
         std::process::exit(0);
