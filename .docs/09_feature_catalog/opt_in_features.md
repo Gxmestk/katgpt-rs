@@ -669,3 +669,122 @@ Closes the GRAPE composition story: today Wall *replaces* RoPE in our stack; thi
 🔧 Feature flag: `grape_joint_lift` (in `katgpt-core`, implies `grapem_rodrigues`) — **opt-in**.
 
 📖 Research: [`.research/446_GRAPE_Group_Representational_Position_Encoding.md`](../../.research/446_GRAPE_Group_Representational_Position_Encoding.md), Benchmark: [`.benchmarks/460_grape_joint_lift_goat.md`](../../.benchmarks/460_grape_joint_lift_goat.md), Paper: [arXiv:2512.07805](https://arxiv.org/abs/2512.07805)
+
+## 24. KARC Family — Delay-Basis Ridge Forecaster + Mitigations + Eigensolver (Plan 308 + Plan 556 + Issues 186/187)
+
+The KARC family is the open-primitive surface for Kolmogorov-Arnold Reservoir Computing (Huang/Kurths/Tang 2026, arXiv:2606.19984). One core forecaster + one large-d_h eigensolver path (Issues 186/187) + three Plan 556 mitigations (regime gate, batched matvec, LOD tier) that address KARC's structural cons (periodic-blindness, crowd-scale per-NPC cost, tiered compute) without changing the core algorithm. All six features are opt-in; the core forecaster's promotion is blocked on the G1 threshold leg (10% short at K=8/M=8/R=2 d_h=18_720).
+
+### 24.1 Core Forecaster — `karc_forecaster` (Plan 308)
+
+`KarcForecaster<D, M, K>` × sealed `KarcBasis` trait (Fourier/Chebyshev/BSpline shipped) × closed-form ridge readout `Wout = YH^T(HH^T + λI)^{-1}`. Phase 2 ships higher-order R=2 (pair-product features, paper Eq. 32) + chunked Gram + ALS low-rank `Wout ≈ A·B` (the form that persists into a `KarcShard` in riir-neuron-db).
+
+| Gate | Target | Result (Phase 5.1, 2026-07-20) | Verdict |
+|------|--------|------------------------------|---------|
+| **G1 NRMSE** | double-scroll Table I ≤ 1.0×10⁻³ (paper: 5.3×10⁻⁴) | **9.43e-4** (K=8/M=8/R=2 d_h=18_720, λ=5e-2 λ-sweep) | ✅ PASS |
+| **G1 threshold** | ≥ 8 Lyapunov times | 2.85 LT (K=4) / **7.23 LT** (K=8/M=8/R=2, 10% short) / 8.16 LT (Phase 1 K=8/M=24 first-order) | ❌ FAIL |
+| **G2** | ≤ 500 ns/call forecast (HLA config) | 381 ns | ✅ PASS |
+| **G3** | zero-alloc `forecast_into` | 0 allocs | ✅ PASS |
+| **G4** | bit-reproducibility | byte-identical `Wout` | ✅ PASS |
+
+**Phase 5 history (load-bearing negative result):** Phase 4 *interpolated* (without measuring) that K=8/M=8/R=2 d_h=18_720 would be the smallest config to pass both G1 legs. Phase 5 measured it directly: BOTH legs FAILED at λ=5e-3 — NRMSE 6.68e-3 (6.7× miss) because the K=8 system is heavily underdetermined (N=4050 samples, d_h=18_720 features → ≥14_670 zero eigenvalues; λ=5e-3 tuned for K=4 is too small to regularize K=8). Phase 5.1 ran the λ-sweep and recovered NRMSE at λ=5e-2 (10× larger). The threshold leg remains flat across λ (~7.0–7.2 LT) — confirming it's a capacity/delay problem, not a regularization problem.
+
+**Compute blocker resolved.** Before Issue 186 Path B, d_h=18_720 was projected infeasible (~6 h via Jacobi eigendecomp). Householder+QL + full-rank direct Cholesky brought it to ~29 min wall. Any future config sweep is now cheap to test.
+
+**Promotion paths (all open, all cheap to test):**
+1. **K=10/M=8/R=2 at λ=5e-2** (~28 min Cholesky). Linear K-extrapolation from K=4=2.85 LT, K=8=7.23 LT predicts ~8.5 LT — PASS.
+2. **Issue 186 Path D gate re-spec.** Promote on two-config evidence (Phase 5.1 K=8 NRMSE 9.43e-4 + Phase 1 K=8/M=24 threshold 8.16 LT — same K=8 delay length).
+3. **More training data** (N=20_000+) — would make the Gram full-rank. Compute cost scales linearly.
+
+🔧 Feature flag: `karc_forecaster` — **opt-in**.
+
+📖 Plan: [`.plans/308_karc_delay_basis_ridge_forecaster.md`](../../.plans/308_karc_delay_basis_ridge_forecaster.md), Research: [`.research/288_KARC_Delay_Basis_Ridge_Forecaster.md`](../../.research/288_KARC_Delay_Basis_Ridge_Forecaster.md), Benchmark: [`.benchmarks/308_karc_goat.md`](../../.benchmarks/308_karc_goat.md), Paper: [arXiv:2606.19984](https://arxiv.org/abs/2606.19984)
+
+### 24.2 Large-d_h Eigensolver — `karc_householder_eig` + `karc_householder_eig_par` (Issues 186 + 187)
+
+The ALS B-step's original eigendecomp (`karc::jacobi_eigen`, O(d_h³·n_sweeps)) is infeasible at d_h > ~5000 — blocking Plan 308's K=8/M=24/R=2 config (d_h=18_720). Issue 186 Path B swaps in `linalg::symmetric_eig` (Householder tridiag + implicit-shift QL), which is ~5-10× faster at d_h ≥ 256 and feasible at d_h=18_720. The eigensolver is always compiled as a generic `linalg` primitive; the feature gates only the wiring in `karc::large_dh`.
+
+**Measured speedup** (single-threaded, release build):
+
+| n | Householder+QL | Jacobi | Speedup |
+|---|---|---|---|
+| 64 | 310 µs | 2.5 ms | 7.92× |
+| 128 | 3.4 ms | 36.6 ms | 10.62× |
+| 256 | 73.5 ms | 687 ms | 9.35× |
+| 512 | 794 ms | 10.9 s | 13.69× |
+
+`karc_householder_eig_par` (Issue 187) adds a row-parallel rayon variant. Four row-parallel hot loops (Householder matvec, rank-2 update, Q accumulation, QL eigenvector rotation) parallelize across rows via `par_chunk_mut(n)`; each row's work is fully sequential so the result is bit-identical to the serial path. **Landed a critical QL convergence fix** for near-singular Grams (the NR-local check `|e[m]| + dd == dd` cannot deflate tiny-eigenvalue matrices; added the LAPACK `dsteqr` global-scale criterion — affects both serial and parallel paths).
+
+**Why both stay opt-in despite T1-T6 PASS.** The Phase 5 G1 measurement at d_h=18_720 showed the full-rank direct Cholesky path is BOTH faster and more accurate than Householder+QL for the actual G1 measurement (direct Cholesky ~22 min vs parallel eigendecomp ~87 min; NRMSE 6.68e-3 vs ALS-rank-8 4.71e-3 — 28× worse). The parallel path landed a critical bug fix that ships regardless (it affects the serial Householder path too), but there is no passing G1 gate to promote against. The serial `karc_householder_eig` path stays opt-in for the same reason.
+
+🔧 Feature flags: `karc_householder_eig` (implies `karc_forecaster`) — **opt-in**; `karc_householder_eig_par` (implies `karc_householder_eig`) — **opt-in**.
+
+📖 Issue: [`.issues/187_karc_householder_eig_parallel.md`](../../.issues/187_karc_householder_eig_parallel.md), Benchmark: [`.benchmarks/308_karc_goat.md`](../../.benchmarks/308_karc_goat.md) §Phase 5.
+
+### 24.3 Regime Gate — `karc_regime_gate` (Plan 556 Phase 1)
+
+Closed-form residual-MSE mux between `KarcForecaster` (chaotic-regime specialist) and `SeasonalNaiveForecaster` (periodic-regime floor). Directly fixes KARC's structural periodic-blindness documented in [`.benchmarks/010_report_the_floor_consolidated.md`](../../.benchmarks/010_report_the_floor_consolidated.md) §T7 (K-sweep 2026-07-20 refuted the "K=4 too shallow" hypothesis: KARC's Chebyshev basis can't fit periodic data regardless of K).
+
+Two `WelfordMse` accumulators + sigmoid confidence + cold-start floor. **Revised from variance-only to MSE (variance + bias²)** after Plan 514 surfaced the failure mode where a consistently-biased forecaster has variance 0 but large error. Implies `karc_forecaster` (the gate routes to KARC) + `conformal_predictive_intervals` (the floor the gate routes to in the periodic regime and during cold-start).
+
+| Gate | Target | Result | Verdict |
+|------|--------|--------|---------|
+| **G1** | KARC ≥95% ticks on Lorenz-63; Seasonal ≥95% on period=12; mix ≤5% | PASS (Plan 514 Phase 1) | ✅ PASS |
+| **G2** | `decide()` ≤ 50 ns/call | 37 ns median | ✅ PASS |
+| **G3** | enabling gate does not perturb KARC forecasts | bit-identical (conformal_karc_no_regression.rs) | ✅ PASS |
+| **G4** | 0 allocs/100 calls | 0 allocs | ✅ PASS |
+
+**Runtime integration gain (riir-ai Plan 514 Phase 1):** G1 PASS — **92.45% MAE reduction** on mixed-regime NPC corpus (synthetic). G2 ~at-budget — 89 ns/tick. Pure modelless (two Welford accumulators + sigmoid).
+
+**Why opt-in.** Primitive-level GOAT PASS + positive synthetic-corpus runtime gain. Stays opt-in pending a production-corpus gain measurement.
+
+🔧 Feature flag: `karc_regime_gate` (implies `karc_forecaster` + `conformal_predictive_intervals`) — **opt-in**.
+
+📖 Plan: [`.plans/556_karc_mitigations_open_primitives.md`](../../.plans/556_karc_mitigations_open_primitives.md), Benchmark: [`.benchmarks/556_karc_mitigations_goat.md`](../../.benchmarks/556_karc_mitigations_goat.md), Companion runtime: [`riir-ai/.plans/514_karc_mitigations_runtime.md`](../../riir-ai/.plans/514_karc_mitigations_runtime.md).
+
+### 24.4 Batched MatVec — `karc_batched_matvec` (Plan 556 Phase 2)
+
+SIMD-batched forecast across N forecasters of identical (D, M, K) shape. Crowd-scale perf primitive: amortizes memory bandwidth by laying out N `Wout` matrices contiguously and hoisting the per-output-row `simd::simd_matvec` call across the batch. Ships `KarcBatchForecaster` + `karc_batched_matvec_into`.
+
+**G2 partial PASS (architectural finding).** Pure-matvec amortizes well, but full-forecast amortization does NOT materialize because `feature_expand` dominates the per-forecast cost.
+
+| N | pure_matvec | batched_forecast_full | sequential_baseline | matvec amortization | full amortization |
+|---|---|---|---|---|---|
+| 1 | 104 ns | 408 ns | 411 ns | 1.0× | 1.0× |
+| 8 | **815 ns** | **3.42 µs** | **3.33 µs** | **4.0×** | **0.97×** |
+| 32 | 3.77 µs | 13.6 µs | 14.8 µs | **7.0×** | 1.09× |
+
+The original G2 target (5.3× full-forecast amortization at N=8) assumed the matvec was the dominant cost. Measurement showed it's only ~25% — `feature_expand` is ~75% (delay state → ψ basis expansion, per-NPC, not amortizable by the batched matvec).
+
+**Architectural redirect (Plan 514 Phase 3).** The right consumer for this primitive is cell-shared-KARC + per-NPC latent_functor deviation — ONE feature_expand per cell, batched matvec across N NPC Wouts — not per-NPC-Wout batching. A future `feature_expand_batched` primitive could also close the gap.
+
+🔧 Feature flag: `karc_batched_matvec` (implies `karc_forecaster`) — **opt-in**.
+
+📖 Plan: [`.plans/556_karc_mitigations_open_primitives.md`](../../.plans/556_karc_mitigations_open_primitives.md), Benchmark: [`.benchmarks/556_karc_mitigations_goat.md`](../../.benchmarks/556_karc_mitigations_goat.md), Companion runtime: [`riir-ai/.plans/514_karc_mitigations_runtime.md`](../../riir-ai/.plans/514_karc_mitigations_runtime.md).
+
+### 24.5 LOD Tier — `karc_lod_tier` (Plan 556 Phase 3)
+
+Config tag + tier-promotion Wout projection. Three nested tiers (LOD0 background D=8/M=4/K=2 d_h=64 / LOD1 midground D=8/M=8/K=4 d_h=256 / LOD2 hero D=8/M=8/K=8 d_h=512) map to different `KarcForecaster` const-generic monomorphizations. The nested-subset structure (LOD0 features are a strict prefix of LOD1; LOD1 of LOD2) makes tier promotion a pure index remap — down-tier preserves surviving Wout columns bit-identically; up-tier zero-fills new columns.
+
+| Gate | Target | Result | Verdict |
+|------|--------|--------|---------|
+| **G1** | tier promotion preserves surviving Wout columns bit-identically | bit-identical | ✅ PASS |
+| **G2** | tier promotion ≤ 10 µs (one-time) | worst-case 831 ns (Lod1→Lod2 release) | ✅ PASS |
+| **G3** | default (LOD1) path unchanged | bit-identical | ✅ PASS |
+| **G4** | per-tick dispatch zero-alloc | 0 allocs/tick | ✅ PASS |
+
+**Config revision (load-bearing).** Lod2 ships as (D=8, M=8, K=8, R=1) → d_h=512, NOT the plan's original (8, 8, 8, 2) → d_h=18_720. The plan's figure doesn't math out (8·8·8·2 = 1024, not 18_720). R=2 promotion-gate config (the real d_h=18_720 from Issue 185/186/187) deferred — pair-product features break the nested-subset invariant.
+
+**Runtime integration — honest split verdict (riir-ai Plan 514 Phase 2).** The primitive itself is correct (G1-G4 all PASS). The runtime integration's G2 has a split verdict:
+
+| Scale | Savings | Verdict |
+|---|---|---|
+| **1k NPCs (production scale)** | 14.7% (re-validated 2026-07-20), 5.3× headroom | ✅ PASS |
+| **10k NPCs (crowd scale)** | 4.9% | ❌ FAIL |
+
+**Root cause of the 10k FAIL.** 10k-NPC state (~20 MB) exceeds L3 cache, so memory bandwidth dominates and the compute savings vanish. The dormant-Lod1 memory overhead cancels Lod0's 4× compute advantage at crowd scale. LOD is a **per-node compute optimization, not a per-cluster one** — 10k+ NPC scale belongs in a **sharding layer** (across game-server nodes) that does NOT exist yet in this stack (tracked at `riir-ai/.issues/556_npc_sharding_for_crowd_scale.md`). Plan 514 Phase 3/4 G2 targets revised from "10k NPCs on a single node" to "1k NPCs per shard".
+
+**Why opt-in.** Primitive-level GOAT PASS + 1k-scale runtime PASS. Stays opt-in until either a pure-enum redesign (breaks `forecaster()` API) or a positive gain on a smaller-scale corpus.
+
+🔧 Feature flag: `karc_lod_tier` (implies `karc_forecaster`) — **opt-in**.
+
+📖 Plan: [`.plans/556_karc_mitigations_open_primitives.md`](../../.plans/556_karc_mitigations_open_primitives.md), Benchmark: [`.benchmarks/556_karc_mitigations_goat.md`](../../.benchmarks/556_karc_mitigations_goat.md), Runtime bench: [`riir-ai/.benchmarks/514_karc_lod_dispatch_goat.md`](../../riir-ai/.benchmarks/514_karc_lod_dispatch_goat.md), Sharding gap: [`riir-ai/.issues/556_npc_sharding_for_crowd_scale.md`](../../riir-ai/.issues/556_npc_sharding_for_crowd_scale.md).
