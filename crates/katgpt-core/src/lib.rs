@@ -1630,6 +1630,13 @@ pub use karc::{
 #[cfg(feature = "karc_regime_gate")]
 pub use karc::regime_gate::{KarcRegime, KarcRegimeGate, RegimeVerdict, WelfordVariance};
 
+// Plan 556 Phase 2 — KARC Batched MatVec. SIMD-batched forecast across N
+// forecasters of identical (D, M, K) shape. Crowd-scale perf primitive
+// (unblocks Plan 514 Phase 3 octree-batched dispatch). Pure modelless
+// (linear algebra only). Re-exported here for caller ergonomics.
+#[cfg(feature = "karc_batched_matvec")]
+pub use karc::batched::{KarcBatchForecaster, karc_batched_matvec_into};
+
 // KarcShard DP Output Perturbation (Issue 370 T4) — post-hoc Gaussian noise
 // on a fitted ridge Wout matrix to provide formal (ε,δ)-DP for the committed
 // KarcShard parameters. Defends PARAMETER-INSPECTION MI (attacker reads Wout

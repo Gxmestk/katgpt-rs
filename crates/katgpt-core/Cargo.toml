@@ -277,6 +277,7 @@ karc_forecaster = []  # KARC — Kolmogorov-Arnold Reservoir Computing delay-bas
 karc_householder_eig = ["karc_forecaster"]  # Issue 186 Path B (2026-07-20): switch the G-path eigendecomp in `low_rank_fit_jacobi_bstep` from `karc::jacobi_eigen` (O(d_h³·n_sweeps), infeasible at d_h > ~5000) to `linalg::symmetric_eig` (Householder tridiag + implicit-shift QL, ~5-10× faster at d_h ≥ 256, feasible at d_h = 18_720). The new eigensolver is always compiled as a generic `linalg` primitive; this feature gates only the wiring in `karc::large_dh`. Implies `karc_forecaster`. Opt-in until the d_h = 18_720 timing trial (T6) confirms feasibility AND the resulting G1 gate (Issue 185 T3) passes both legs.
 karc_householder_eig_par = ["karc_householder_eig"]  # Issue 187 (2026-07-20): row-parallel rayon variant of `linalg::symmetric_eig` for the d_h = 18_720 timing trial. The four row-parallel hot loops (Householder matvec, rank-2 update, Q accumulation, QL eigenvector rotation) parallelize across rows via `par_chunk_mut(n)`; each row's work is fully sequential so the result is bit-identical to the serial path. Implies `karc_householder_eig`. Opt-in until T5 benchmark (≥4× speedup at n ≥ 256) + T6 (d_h=18_720 ≤30 min wall) both pass.
 karc_regime_gate = ["karc_forecaster", "conformal_predictive_intervals"]  # Plan 556 Phase 1 (2026-07-20): KARC Regime Gate — closed-form residual-variance mux between KarcForecaster (chaotic-regime specialist) and SeasonalNaiveForecaster (periodic-regime floor). Directly fixes the structural periodic-blindness documented in `.benchmarks/010_report_the_floor_consolidated.md` §T7 (K-sweep 2026-07-20 refuted the "K=4 too shallow" hypothesis: KARC's basis can't fit periodic data regardless of K). Pure modelless (two WelfordVariance accumulators + sigmoid confidence + cold-start floor). Zero runtime cost unless constructed. Implies `karc_forecaster` (the gate routes to KARC) + `conformal_predictive_intervals` (the floor the gate routes to in the periodic regime and during cold-start). Opt-in until Plan 556 GOAT G2 perf bench + Plan 514 riir-ai runtime-integration gain both pass.
+karc_batched_matvec = ["karc_forecaster"]  # Plan 556 Phase 2 (2026-07-20): KARC Batched MatVec — SIMD-batched forecast across N forecasters of identical (D, M, K) shape. Crowd-scale perf primitive: amortizes memory bandwidth by laying out N `Wout` matrices contiguously and hoisting the per-output-row `simd::simd_matvec` call across the batch. **G2 PARTIAL PASS** (.benchmarks/556_karc_mitigations_goat.md, 2026-07-20): pure-matvec amortizes well (102 ns/forecast at N=8 vs 411 ns sequential = 4.0× amortization, target was 5.3× — close); full-forecast amortization does NOT materialize (416 ns/forecast at N=8 ≈ sequential) because per-NPC `feature_expand` dominates and does not amortize. **Architectural finding:** the right consumer for this primitive is NOT per-NPC-Wout batching (Plan 514 Phase 3's original design) — it's cell-shared-KARC + per-NPC latent_functor deviation (Plan 514 Phase 3 revised), where ONE feature_expand is shared across the cell and the matvec amortization re-emerges as the dominant win. Pure modelless (linear algebra only). Zero runtime cost unless constructed. Implies `karc_forecaster` (operates on KarcForecaster's Wout). Opt-in until Plan 514 Phase 3 cell-shared design demonstrates the gain.
 cross_resolution_transport = ["funcattn"]  # Cross-Resolution Spectral Transport — asymmetric-basis FUNCATTN (Plan 310, Research 291, arXiv:2605.31559). Generalizes FUNCATTN to `d_src ≠ d_dst`, enabling train-on-small-deploy-on-large latent transfer. Implies `funcattn` for solver/C-operator reuse. DEFAULT-ON (Plan 310 Phase 4, 2026-06-23): G1 mean cos 0.8944≥0.85, G2-A rank preservation mean cos 0.9300≥0.85 (Super-GOAT headline claim holds), G3 elbow at k=intrinsic_k=8, G4 0 allocs/1000 transports. Promoted per AGENTS.md rule 'GOAT pass → promote to default'.
 latent_field_steering = []  # Latent Field Steering — top-down direction-vector injection into mutable latent state (Plan 309, Research 290, CAA + functional emotions). Zero-alloc SIMD SAXPY + sigmoid-falloff localized support (radius/zone). DEFAULT-ON (Plan 309 Phase 4, 2026-06-23): G1-G5 all PASS — G1 fear-axis 1.50×≥1.30, G2 mean cos 0.9958≥0.95 min cos 0.9667≥0.90, G3 leakage 4.5e-5<0.01, G4 19.2µs<1ms, G5 0 allocs. Caveat: 8% argmax flip at α=0.3 — keep α≤0.3 for hot-path.
 phase_rotation_coupling = []  # Phase-Modulated Subspace Rotation Gate — norm-preserving latent coupling `cos α ⊙ a + sin α ⊙ b` with phase from a sigmoid projection onto a frozen direction vector (Plan 322, Research 305, arxiv 2605.12700 UFO). The genuinely-new operation class: every other latent op in the crate is additive / convex-combo / dot-projection / wedge-detection / linear-transport / spatial-sum — none has the `sin²α+cos²α=1` Pythagorean norm-preservation invariant. §3.5 modelless Path 2 unblock: trained γ_θ replaced with `α = sigmoid(⟨state, direction⟩ · λ) · π/2` (closed-form). DEFAULT-ON (Plan 322 Phase 2, 2026-06-25): G1 per-channel Pythagorean drift 5.96e-8<1e-4, G2 0 reversals across 100-step sweep (monotone), G3 D=8 scalar+mix 18.9ns<50ns + D=64 per-channel+mix 355.7ns<1500ns, G4 0 allocs/100 calls, G6 sigmoid(0)=0.5→cos=sin=1/√2 confirmed.
@@ -506,6 +507,15 @@ name = "karc_forecast_bench"
 harness = false
 required-features = ["karc_forecaster"]
 
+# Plan 556 Phase 2 — KARC Batched MatVec G2 perf bench. Three sub-benches:
+# pure matvec (no feature_expand), full batched forecast (with feature_expand),
+# and the N-sequential baseline. Target: N=8 batched ≤ 575 ns (≥5.3×
+# amortization vs N-sequential).
+[[bench]]
+name = "bench_556_karc_batched_matvec_g2"
+harness = false
+required-features = ["karc_batched_matvec"]
+
 # Plan 312 Phase 4 T4.9 — Viable Manifold Graph GOAT bench:
 #   pullback_volume < 5µs (R^4 → R^4), random_walk < 100ns/step (k=4),
 #   build_safe_manifold_graph < 10ms (1000 samples).
@@ -637,6 +647,14 @@ required-features = ["karc_forecaster"]
 name = "karc_reproducibility"
 required-features = ["karc_forecaster"]
 
+# Plan 556 Phase 2 — KARC Batched MatVec zero-allocation GOAT gate (G4).
+# Separate test binary (matches the karc_alloc_check / analytic_lattice_alloc_check
+# pattern) so the CountingAllocator doesn't pick up allocations from parallel
+# GOAT tests.
+[[test]]
+name = "karc_batched_matvec_alloc_check"
+required-features = ["karc_batched_matvec"]
+
 # Issue 185 — KARC large-d_h Jacobi B-step parity gate. Verifies that the
 # Jacobi-eigen ALS path (`low_rank_fit_jacobi_bstep`) produces solutions
 # agreeing with the Kronecker path (`low_rank_fit`) to ~1e-6 on configs where
@@ -654,6 +672,17 @@ required-features = ["karc_forecaster"]
 [[test]]
 name = "karc_dh_18720_timing_trial"
 required-features = ["karc_householder_eig_par"]
+
+# Issue 187 T7 / Plan 308 T4.5 — the actual KARC G1 measurement at the
+# promotion-gate target config (K=8/M=8/R=2, d_h=18_720). `#[ignore]`'d because
+# the full run takes ~90-120 min wall (87 min parallel eigendecomp + ALS +
+# rollout). Run with:
+#   CARGO_TARGET_DIR=/tmp/katgpt-g1-dh18720 cargo test --release \
+#     --features karc_householder_eig_par \
+#     --test karc_g1_dh18720 -- --ignored --nocapture
+[[test]]
+name = "karc_g1_dh18720"
+required-features = ["karc_householder_eig"]
 
 # Plan 331 — BabelCodec GOAT gate. G1 round-trip fidelity + G2 compression
 # ratio (the make-or-break — same gate that killed CompressionDrafter twice) +

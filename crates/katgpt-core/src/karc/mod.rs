@@ -104,6 +104,18 @@ pub mod large_dh;
 #[cfg(feature = "karc_regime_gate")]
 pub mod regime_gate;
 
+// ── Batched MatVec (Plan 556 Phase 2) ──────────────────────────────────
+//
+// SIMD-batched forecast across N forecasters of identical (D, M, K) shape.
+// Each NPC owns its own `Wout`; the basis is shared across the batch. The
+// amortization comes from contiguous layout + loop hoisting, *not* from
+// parallelism — at N ≤ 32 (realistic octree-cell size) the per-forecast cost
+// is ~75ns, far below rayon's ~5µs scheduling overhead. Crowd-scale perf
+// primitive: unblocks Plan 514 Phase 3 (octree-batched cell-level KARC).
+// Gated on `karc_batched_matvec` (which implies `karc_forecaster`).
+#[cfg(feature = "karc_batched_matvec")]
+pub mod batched;
+
 // ── Sealed trait machinery ────────────────────────────────────────────────
 
 mod sealed {
