@@ -6,7 +6,11 @@
 //! decision point has a known ground-truth "best lever" label.
 //!
 //! This completes the T2 GOAT gate (T3.4 size-overhead is integrated as G3).
-//! Both must pass before `active_state_trial_slot` can be promoted to default-on.
+//! Both halves PASSED 2026-06-26 — `active_state_trial_slot` was PROMOTED TO
+//! DEFAULT-ON (Plan 310 T4.2, riir-games/Cargo.toml). This bench was the gate
+//! evidence; promotion has already landed. See `riir-games/Cargo.toml` L9
+//! for the canonical promotion record (T2 GOAT 5/5 PASS: T3.3 regret -488.2/-65%,
+//! T3.4 size 8.50%<10%).
 //!
 //! ## Why a controlled corpus (not bomber_17)?
 //!
@@ -605,10 +609,12 @@ fn main() {
 
     if all_pass {
         println!("  ✅ T2 QUALITY GOAT PASSED — active-state trace improves lever selection.");
-        println!("     `active_state_trial_slot` is a T4.2 promotion candidate.");
+        println!("     `active_state_trial_slot` was PROMOTED TO DEFAULT-ON 2026-06-26");
+        println!("     (Plan 310 T4.2, riir-games/Cargo.toml). This bench was the gate evidence.");
     } else {
         println!("  ❌ T2 QUALITY GOAT FAILED — one or more gates failed.");
-        println!("     Keep `active_state_trial_slot` opt-in; investigate before promoting.");
+        println!("     Note: `active_state_trial_slot` was previously promoted 2026-06-26;");
+        println!("     a regression here would warrant a re-audit of that promotion.");
     }
     println!("═══════════════════════════════════════════════════════════════");
     println!();
