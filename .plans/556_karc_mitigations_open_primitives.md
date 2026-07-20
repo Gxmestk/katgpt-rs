@@ -143,9 +143,12 @@ Promotion rule: each primitive ships behind its own feature flag (`karc_regime_g
 
 ## Phase 4 — GOAT Gate + Promotion Decision
 
-- [ ] **T4.1** Run all three primitives' GOAT benches together: `cargo bench --features karc_regime_gate,karc_batched_matvec,karc_lod_tier`.
-- [ ] **T4.2** Document results in `.benchmarks/556_karc_mitigations_goat.md`.
-- [ ] **T4.3** Promotion decision per primitive: if G1–G4 pass AND the Plan 514 runtime integration demonstrates a measured gain → promote to default-on. Else: keep opt-in with documented reason.
+- [x] **T4.1** Run all three primitives' GOAT benches together: `cargo bench --features karc_regime_gate,karc_batched_matvec,karc_lod_tier`. **DONE (2026-07-20)** — combo builds clean (`cargo clippy --features karc_regime_gate,karc_batched_matvec,karc_lod_tier` passes); bench_556_karc_batched_matvec_g2 + bench_556_karc_lod_tier_g2 run together without feature conflicts. The regime_gate's G2 is inlined in Plan 514 Phase 1's bench (it's a consumer-side measurement, not a primitive-side bench).
+- [x] **T4.2** Document results in `.benchmarks/556_karc_mitigations_goat.md`. **DONE (2026-07-20)** — the bench doc covers all three primitives with per-gate verdicts (Phase 1 PASS, Phase 2 PARTIAL, Phase 3 PASS) and the cross-cutting "amortization mirage" lesson.
+- [x] **T4.3** Promotion decision per primitive: if G1–G4 pass AND the Plan 514 runtime integration demonstrates a measured gain → promote to default-on. Else: keep opt-in with documented reason. **DECISION (2026-07-20):**
+  - **`KarcRegimeGate`**: stays opt-in. G1-G4 PASS, but promotion requires a real production-corpus gain (Plan 514 Phase 1 has synthetic-corpus G1=92.45% MAE reduction — not enough for default-on without production evidence).
+  - **`karc_batched_matvec`**: stays opt-in indefinitely. G2 PARTIAL PASS — the primitive is correct but the per-NPC-Wout architecture doesn't amortize. Promotion requires Plan 514 Phase 3 cell-shared design.
+  - **`KarcLodTier`**: stays opt-in. G1-G4 PASS, but promotion requires Plan 514 Phase 2 (LOD tier dispatch) to demonstrate a measured gain on a real NPC corpus.
 
 ---
 
