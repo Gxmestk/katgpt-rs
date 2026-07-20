@@ -334,3 +334,111 @@ parallel path itself stays opt-in — the full-rank direct Cholesky is both
 faster and more accurate for the G1 measurement, so there's no immediate
 need to promote the parallel eigensolver. The fix ships regardless because
 the serial Householder path is the default when `karc_householder_eig` is on.
+
+---
+
+## Phase 5.1 G1 — λ-sweep at d_h=18_720 (2026-07-20, follow-up to Phase 5)
+
+**The Phase 5 NRMSE FAIL is RECOVERED by λ=5e-2.** The underdetermination
+hypothesis was correct: λ=5e-3 (tuned for K=4) was too small for the K=8
+underdetermined system. A 10× larger λ (5e-2) suppresses the ~14_670
+underdetermined directions and brings NRMSE below the 1e-3 gate.
+
+**Sweep mechanism validation.** A fast K=4 λ-sweep (`smoke_k4_m8_r2_lambda_sweep`)
+at d_h=4752 (well-determined, N=2050) reproduced Phase 2's baseline (1.67e-4)
+and showed the expected NRMSE WORSENS monotonically with λ:
+
+| λ | K=4 NRMSE(1 LT) | K=4 threshold(LT) |
+|---|---|---|
+| 5e-3 | 1.67e-4 ✅ | 2.43 |
+| 5e-2 | 9.88e-4 | 3.07 |
+| 5e-1 | 3.37e-3 | 2.21 |
+| 5e0  | 4.96e-3 | 2.11 |
+
+This confirms regularization hurts on well-determined systems (K=4) but is
+expected to help on underdetermined systems (K=8). Mechanism validated.
+
+### K=8 λ-sweep at d_h=18_720 (4 λ values in parallel, 22.8 min wall)
+
+The sweep builds the 2.8 GB Gram ONCE (405 s), then runs 4 λ values in
+parallel via rayon (each thread allocates ~5.6 GB scratch buffers + does its
+own ~22 min Cholesky). Total sweep wall: 1370 s (~22.8 min) — a 4× speedup
+vs sequential (~88 min for 4 Cholesky factorizations).
+
+| λ | NRMSE(1 LT) | gate | Threshold (ε=0.1) | gate | Cholesky wall |
+|---|---|---|---|---|---|
+| 5e-3 | 6.68e-3 | ❌ (6.7×) | 7.14 LT | ❌ (11%) | 1370 s |
+| **5e-2** | **9.43e-4** | **✅ PASS** | **7.23 LT** | ❌ (10%) | 1370 s |
+| 5e-1 | 2.29e-3 | ❌ (2.3×) | 7.17 LT | ❌ (10%) | 1370 s |
+| 5e0  | 4.88e-3 | ❌ (4.9×) | 7.01 LT | ❌ (12%) | 1370 s |
+
+### What the sweep confirms
+
+- **The underdetermination hypothesis is correct.** λ=5e-2 (10× larger than
+  the K=4-tuned baseline) recovers NRMSE from 6.68e-3 → 9.43e-4 (7×
+  improvement), passing the ≤1e-3 gate. The optimal λ for K=8 is ~10×
+  larger than for K=4 — consistent with the 4× larger d_h producing 4×
+  more underdetermined directions that need stronger regularization.
+- **Threshold is flat across λ (~7.0-7.2 LT).** The threshold gate is NOT
+  a regularization problem — it's a capacity/delay problem. K=8/M=8/R=2's
+  delay+basis configuration gives ~7.2 LT regardless of how the fit is
+  regularized. This rules out "tune λ harder" as a path to the threshold
+  gate.
+- **The sweet-spot λ is narrow.** Only λ=5e-2 passes NRMSE. λ=5e-3 (too
+  weak) and λ=5e-1 (too strong) both FAIL. The optimal λ balances bias
+  vs variance tightly on this underdetermined system.
+
+### Updated config sweep (with Phase 5.1 column)
+
+| Config | d_h | λ | NRMSE (1 LT) | Threshold (ε=0.1) | G1 NRMSE | G1 Thr |
+|--------|-----|---|--------------|-------------------|----------|--------|
+| K=4, M=8, R=2 (Phase 2) | 4752 | 5e-3 | **1.67e-4** | 2.85 LT | ✅ | ❌ |
+| K=8, M=4, R=2 (Phase 4) | 4752 | 5e-3 | 6.19e-3 | 1.31 LT | ❌ | ❌ |
+| K=8, M=8, R=2 (Phase 5) | 18_720 | 5e-3 | 6.68e-3 | 7.14 LT | ❌ | ❌ |
+| **K=8, M=8, R=2 (Phase 5.1)** | **18_720** | **5e-2** | **9.43e-4** | **7.23 LT** | **✅** | ❌ |
+| Phase 1: K=8, M=24, first-order | 576 | 5e-3 | 4.79e-3 | **8.16 LT** | ❌ | ✅ |
+
+### What drives the threshold gate (M vs K, from the full sweep)
+
+Phase 4 noted K drives threshold. The Phase 5.1 sweep adds a wrinkle: **at
+fixed K=8, M matters more than K for threshold.**
+
+| Config | M | K | Threshold |
+|--------|---|---|----------|
+| K=8, M=4, R=2 | 4 | 8 | 1.31 LT |
+| K=8, M=8, R=2 | 8 | 8 | 7.23 LT |
+| K=8, M=24, R=1 | 24 | 8 | 8.16 LT |
+
+Going from M=4 to M=8 at K=8: 1.31 → 7.23 LT (**5.5× improvement**).
+Going from M=8 to M=24 at K=8: 7.23 → 8.16 LT (only 13% improvement —
+diminishing returns past M=8).
+
+**M is the dominant threshold lever once K ≥ 8.** The 12% threshold gap
+(7.23 → 8 LT) likely closes with M=10 or M=12 (interpolating the
+M=8 → M=24 trend gives M=10 ≈ 7.6 LT, M=12 ≈ 7.9 LT — still short).
+Alternatively K=10 at M=8 might extend threshold via more delay memory
+(linear extrapolation from K=4/M=8=2.85 LT, K=8/M=8=7.23 LT gives
+K=10/M=8 ≈ 8.5 LT — passes).
+
+### Updated promotion paths (post-Phase 5.1)
+
+1. **K=10/M=8/R=2 at λ=5e-2** (~28 min Cholesky) — tests whether +2 delay
+   steps extend threshold to ≥8 LT. d_h=29_160 (same as K=8/M=10/R=2 by
+   coincidence — d_h_1=240 in both). Gram 6.8 GB, feasible. Linear
+   K-extrapolation predicts ~8.5 LT (PASS). **Highest expected value.**
+2. **K=8/M=10/R=2 at λ=5e-2** (~28 min Cholesky) — tests whether +2 basis
+   functions extend threshold. d_h=29_160 (same compute). M-extrapolation
+   predicts ~7.6 LT (still FAIL) — lower expected value than K=10.
+3. **Fine λ sweep around 5e-2** (λ ∈ {2e-2, 5e-2, 8e-2}) — unlikely to help
+   (threshold is flat across λ), but would confirm the NRMSE sweet spot.
+4. **Accept the gate re-spec (Issue 186 Path D)** — promote on Phase 5.1
+   K=8/M=8/R=2 NRMSE evidence (9.43e-4, passes the ≤1e-3 gate) + Phase 1
+   K=8/M=24 threshold evidence (8.16 LT). Two configs, each passing one
+   leg of the same gate, at the same K=8 delay length.
+5. **More training data** (N=20_000+) — would help NRMSE further (already
+   passes at λ=5e-2) but unlikely to help threshold (flat across λ,
+   suggesting the limiting factor is basis/delay capacity, not fit quality).
+
+The NRMSE gate is now passable. The threshold gate is 10% short and needs
+either K=10 (delay) or a gate re-spec. Path 1 (K=10) is the cheapest direct
+measurement to settle the threshold question.
