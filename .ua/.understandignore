@@ -1,0 +1,35 @@
+# Local privacy guardrails for Understand-Anything.
+# Syntax: .gitignore-compatible. These rules supplement built-in exclusions.
+
+# Environment and credentials
+.env
+.env.*
+!.env.example
+!.env.sample
+**/secrets/
+**/credentials*
+**/.aws/
+**/.ssh/
+**/id_rsa*
+**/id_ed25519*
+
+# Private keys, certificates, and credential stores
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+
+# Local databases, model artifacts, and runtime output
+*.db
+*.sqlite
+*.sqlite3
+.raw/
+checkpoints/
+output/
+.logs/
+
+# Analyzer/runtime metadata is not project source
+.ua/
+.understand-anything/

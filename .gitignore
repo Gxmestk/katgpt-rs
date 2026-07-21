@@ -42,3 +42,13 @@ CLAUDE.md
 # cargo heal runtime state — self-evolve trajectory store + miss queue
 # (machine-local WAL + key seed, never committed; riir-clippy Issue 037)
 .heal/
+
+# Understand-Anything knowledge graph. The graph itself is tracked so the
+# architecture map is shared/versioned (knowledge-graph.json, meta.json,
+# config.json, .understandignore); scratch and regenerable files stay local.
+.ua/intermediate/
+.ua/tmp/
+.ua/.trash-*/
+.ua/fingerprints.json
+.ua/diff-overlay.json
+.ua/RESCAN-RUNBOOK.md
