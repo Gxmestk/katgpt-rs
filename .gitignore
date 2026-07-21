@@ -12,6 +12,9 @@ output/
 /go_lora*.bin
 /domino_lora*.bin
 
+# Local Claude Code session state — per-machine, never commit.
+.claude/
+
 # Trained model artifacts — must never ship in public MIT repo.
 # Trained weights belong in riir-train (source) / riir-ai/assets (runtime).
 *.mlpackage/
