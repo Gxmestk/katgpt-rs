@@ -5,6 +5,7 @@
 > **Date:** 2025-06-15
 > **Related Plans:** Plan 072 (katgpt-rs, modelless SDAR gate), Plan 073 (riir-ai, model-based SDAR loss)
 > **Supersedes:** None — extends Plan 071/072 (ROPD) with token-level gated distillation
+> **PASS-Redirects (synthesis):** D-OPSD [arXiv:2605.05204 "D-OPSD: Distillation for On-Policy Self-Distillation"] — image-diffusion training paradigm extending OPSD with multimodal richer-context teacher; the LLM-text variant of OPSD+privileged-context-teacher is already what SDAR ships. Novelty is multimodal richer context for image-diffusion velocity fields, a model class we don't ship → riir-train only.
 
 ## Executive Summary
 

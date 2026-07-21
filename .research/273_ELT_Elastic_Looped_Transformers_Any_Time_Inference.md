@@ -6,6 +6,7 @@
 > **Validation:** Any-Time property **empirically validated** 2026-07-16 (`tests/issue_156_anytime_lt2_poc.rs` — permanent regression guard). All 4 gate regimes exhibit monotonic KL decrease as R → R_max with random untrained weights — structural Any-Time holds WITHOUT the ILSD training ELT requires. (Issue 156 resolved and removed per noise-reduction rule; full PoC results table preserved in this note's git history + the test file.)
 > **Related Research:** 073 (LT2 — architecture we already ship), 097 (Training-Free Loop), 114 (AMUSE Anytime Muon), 148 (HydraBudget early_exit_layer), 051 (Mosaic of Small Elastic Models)
 > **Related Plans:** 108 (LT2 Looped Pipeline — ✅ shipped, GOAT 8/8, default-on), 136 (Training-Free Loop Wrapper — ✅ shipped), 212 (Collapse-Aware early exit), 231 (PathwayTracker stability early exit), 283 (Self-Advantage Gate)
+> **PASS-Redirects (synthesis):** Loopie [arXiv:2607.16051 "Loop the Loopies!"] — training-only layer-loop ordering variant, no inference-quality evidence; we already ship elastic any-time loop counts via LT2 + ReestimationScheduler.
 > **Cross-ref (riir-ai):** Research 128 (Zone-Density Dynamic Functor Gating — elastic budget per zone), Research 136 (Per-NPC Runtime Test-Time Scaling Guide), riir-ai/crates/riir-engine/src/latent_functor/reestimation/mod.rs (`set_active_budget`, `set_zone_gating`)
 > **Classification:** Public
 

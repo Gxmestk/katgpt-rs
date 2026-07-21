@@ -5,6 +5,7 @@
 > **Date:** 2026-05, distilled 2025-07
 > **Related Research:** 28 (HLA), 70 (Gated DeltaNet-2), 71 (DashAttention), 55 (Nemotron TriMode), 58 (GRAM), 057 (Higher-order LA), 097 (Delta Attention Residuals)
 > **Related Plans:** 108 (LT2 Looped Inference Pipeline)
+> **PASS-Redirects (synthesis):** Loopie [arXiv:2607.16051 "Loop the Loopies!"] — layer-loop swap `for layer { for tau }` **conflicts** with our LT2 rank-T state-upgrade math which requires model-loop ordering `for tau { for layer }` (shipped as `forward_looped`); paper's training-only contributions (Recipe/SPT/GSPO+DAPO RL) → riir-train. Loopie's §8 admits "we have not yet conducted systematic studies of inference-time computation".
 > **Verdict: HIGH VALUE — LT2's looped weight-sharing is a natural fit for our parameter-constrained CPU inference. The rank-T state upgrade from looping directly amplifies our existing HLA/AHLA recurrent states. Hybrid (Full+GDN) with 1:4 ratio is the flagship recipe. SDPA output gate is a free lunch (+0.3–0.5 avg points). Feature-gate as `lt2_looped`. Priority: looped AHLA (our existing linear attention) first, then hybrid with windowed SDPA.**
 
 ---

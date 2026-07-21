@@ -4,6 +4,7 @@
 > **Date:** 2026-05-25
 > **Related Research:** 073 (LT2 — training-time looped transformers), 034 (D2F), 055 (Nemotron TriMode), 073 (LT2), 035 (Attractor/Fixed-Point)
 > **Related Plans:** 108 (LT2 Looped Inference Pipeline — completed), 136 (Training-Free Loop Wrapper)
+> **PASS-Redirects (synthesis):** Loopie [arXiv:2607.16051 "Loop the Loopies!"] — layer-loop alternative ordering is training-only (no inference-quality evidence in the paper) and conflicts with our model-loop LT2; not relevant to our training-free loop wrapper.
 > **Verdict: HIGH VALUE — Complements our existing LT2 (Plan 108) with a zero-training inference-time wrapper. Our LT2 is training-time weight-sharing; this is training-free ODE-motivated refinement. Both can coexist. The damped Euler sub-stepping, block-vs-layer-mode, and depth-fraction rule map directly onto our existing `LoopMode`/`HybridPattern` dispatch. Priority: add as `LoopMode::TrainingFree` variant with RK sub-stepping strategy, then validate on our micro benchmarks.**
 
 ---

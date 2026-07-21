@@ -4,6 +4,7 @@
 > Date: 2026-05, distilled 2026-06
 > Code: `.raw/delta-Mem/deltamem/` (local source audit)
 > **Verdict: HIGH VALUE — The delta-rule update mechanism is self-contained and doesn't require neural training. Modelless distillation to feature-hashed associative memory in Rust.**
+> **PASS-Redirects (synthesis):** S-TTT [arXiv:2607.09415] — paper's finding that "selective writes beat random writes" is empirically validated by our δ-Mem `write_gated()` (Plan 053) selective-write primitive; Stage 2's per-instance gradient TTT → riir-train.
 
 ## TL;DR
 

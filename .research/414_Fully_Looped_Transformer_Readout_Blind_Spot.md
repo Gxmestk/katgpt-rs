@@ -6,6 +6,7 @@
 > **Status:** Active
 > **Related Research:** 073 (LT2 — architecture we ship), 097 (Training-Free Loop), 273 (ELT elastic any-time), 282 (LoopCoder-v2 gain/cost halting)
 > **Related Plans:** 108 (LT2 — shipped, GOAT 8/8), 428 (this plan — loop-stability PoC + implementation)
+> **PASS-Redirects (synthesis):** Loopie [arXiv:2607.16051 "Loop the Loopies!"] — training-time compute-matched sizing; our loop-stability work targets parameter-free inference-time fixes (inter-loop RMSNorm, FLA, Attention Injection) instead. Loopie's layer-loop variant conflicts with our model-loop LT2.
 > **Cross-ref (riir-ai):** Proposal 018 §5.1 (T-pass: both §3.5 paths 2 and 3 are UNTRIED)
 > **Classification:** Public
 
