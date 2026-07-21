@@ -1037,6 +1037,408 @@ mod dual_leo_oracle {
 pub use dual_leo_oracle::DualLeoOracle;
 
 // ──────────────────────────────────────────────────────────────────────────
+// CommitDualLeoOracle — Hot tier (feature: leo_all_goals + dual_leo)
+// Sibling to `DualLeoOracle`. Fuses LEO teacher + UVFA student via a
+// **sigmoid confidence gate** rather than a linear α-blend, addressing
+// Issue 188's three failure modes of average-then-argmax.
+// ──────────────────────────────────────────────────────────────────────────
+
+#[cfg(all(feature = "leo_all_goals", feature = "dual_leo"))]
+mod commit_dual_leo_oracle {
+    use super::*;
+    use crate::sigmoid;
+    use crate::traits::LeoHead;
+
+    /// Hot-tier oracle fusing a LEO teacher + UVFA student via a **sigmoid
+    /// confidence gate** (Issue 188).
+    ///
+    /// Unlike [`DualLeoOracle`] (which does a fixed-α linear blend of the
+    /// two heads' Q-slices, then lets the QGF consumer argmax over the
+    /// blended slice), this oracle gates the blend by *which head is more
+    /// confident on the current state*:
+    ///
+    /// ```text
+    /// conf_t = max_a Q_leo(s, a)
+    /// conf_s = max_a Q_uvfa(s, a)
+    /// gate   = σ(β · (conf_t − conf_s))
+    /// grad[a] = gate · Q_leo(s, a) + (1 − gate) · Q_uvfa(s, a)
+    /// ```
+    ///
+    /// The `β` parameter spans a continuous design space:
+    ///
+    /// - **β = 0**: `gate = 0.5` always → reduces to [`DualLeoOracle`] at
+    ///   α = 0.5 (the G1 regression sanity check).
+    /// - **0 < β < ∞**: sigmoid-gated soft switch — "use sigmoid instead of
+    ///   average" (Issue 188 hypothesis #1).
+    /// - **β → ∞**: hard commit-then-fuse — "wrap up later instead of each"
+    ///   (Issue 188 hypothesis #2). Approached asymptotically by β = 64 or
+    ///   larger (sigmoid saturates by then for typical Q-value magnitudes).
+    ///
+    /// # Plan 460 invariant
+    ///
+    /// No operator sits between this gradient and the QGF consumer. The
+    /// sigmoid gate is *part of the gradient computation itself* (it picks
+    /// the blend weights), so the consumer still receives a per-action
+    /// Q-slice directly — no nonlinearity is re-introduced downstream.
+    ///
+    /// # What this does NOT fix
+    ///
+    /// If one head is untrained noise (Bench 558's setup), the gate still
+    /// injects noise into the gradient whenever `conf_s ≈ conf_t` (gate ≈
+    /// 0.5). The fix for that is a trained student, not a different gate.
+    /// See Issue 188 §"What this does NOT do".
+    ///
+    /// # Confidence
+    ///
+    /// Both heads are deterministic cached lookups → confidence `1.0`.
+    /// Matches [`DualLeoOracle`]'s contract (and inherits its "determinism =
+    /// quality" lie — Proposal 007 caveat 5).
+    ///
+    /// [`DualLeoOracle`]: super::DualLeoOracle
+    pub struct CommitDualLeoOracle<H1, H2>
+    where
+        H1: LeoHead,
+        H2: LeoHead,
+    {
+        head_leo: H1,
+        head_uvfa: H2,
+        /// Gate sharpness. 0 = linear α=0.5 blend; ∞ = hard commit-then-fuse.
+        beta: f32,
+        goal_idx: usize,
+    }
+
+    impl<H1, H2> CommitDualLeoOracle<H1, H2>
+    where
+        H1: LeoHead,
+        H2: LeoHead,
+    {
+        /// Wrap a LEO teacher + UVFA student with a sigmoid confidence gate.
+        ///
+        /// `beta` controls gate sharpness:
+        /// - `0.0` reduces to α=0.5 linear blend (matches [`DualLeoOracle`] at
+        ///   α=0.5 — use as a G1 regression check).
+        /// - `4.0`–`16.0` is a typical soft-switch range.
+        /// - `≥ 64.0` approaches hard commit-then-fuse (sigmoid saturated).
+        #[inline]
+        pub fn new(head_leo: H1, head_uvfa: H2, beta: f32, goal_idx: usize) -> Self {
+            Self {
+                head_leo,
+                head_uvfa,
+                beta,
+                goal_idx,
+            }
+        }
+
+        /// Borrow the LEO teacher head.
+        #[inline]
+        pub fn head_leo(&self) -> &H1 {
+            &self.head_leo
+        }
+
+        /// Borrow the UVFA student head.
+        #[inline]
+        pub fn head_uvfa(&self) -> &H2 {
+            &self.head_uvfa
+        }
+
+        /// Current β (gate sharpness).
+        #[inline]
+        pub const fn beta(&self) -> f32 {
+            self.beta
+        }
+
+        /// Current goal index used for gradient extraction.
+        #[inline]
+        pub const fn goal_idx(&self) -> usize {
+            self.goal_idx
+        }
+
+        /// Switch to a different goal's Q-slice.
+        #[inline]
+        pub fn set_goal_idx(&mut self, goal_idx: usize) {
+            self.goal_idx = goal_idx;
+        }
+
+        /// Compute the sigmoid gate value for a given (q_leo, q_uvfa) slice
+        /// pair. Exposed for benchmarks / diagnostics; the gradient path
+        /// calls this inline.
+        ///
+        /// Returns `σ(β · (max(q_leo) − max(q_uvfa)))`.
+        #[inline]
+        pub fn gate_value(&self, q_leo: &[f32], q_uvfa: &[f32]) -> f32 {
+            let conf_t = q_leo.iter().copied().fold(f32::NEG_INFINITY, f32::max);
+            let conf_s = q_uvfa.iter().copied().fold(f32::NEG_INFINITY, f32::max);
+            sigmoid(self.beta * (conf_t - conf_s))
+        }
+    }
+
+    impl<H1, H2> QGradientOracle for CommitDualLeoOracle<H1, H2>
+    where
+        H1: LeoHead,
+        H2: LeoHead,
+    {
+        type State = Vec<f32>;
+        type Action = ();
+
+        fn q_gradient_at(&self, state: &Self::State, _projected_action: &Self::Action) -> Vec<f32> {
+            let q_leo_all = self.head_leo.all_goals_q(state);
+            let q_uvfa_all = self.head_uvfa.all_goals_q(state);
+            if self.goal_idx >= self.head_leo.goal_count()
+                || self.goal_idx >= self.head_uvfa.goal_count()
+            {
+                return Vec::new();
+            }
+            let q_leo = self.head_leo.q_for_goal(&q_leo_all, self.goal_idx);
+            let q_uvfa = self.head_uvfa.q_for_goal(&q_uvfa_all, self.goal_idx);
+            let n = q_leo.len().min(q_uvfa.len());
+            let gate = self.gate_value(&q_leo[..n], &q_uvfa[..n]);
+            let mut out = vec![0.0f32; n];
+            for (o, (&ql, &qu)) in out
+                .iter_mut()
+                .zip(q_leo[..n].iter().zip(q_uvfa[..n].iter()))
+            {
+                *o = gate * ql + (1.0 - gate) * qu;
+            }
+            out
+        }
+
+        fn q_gradient_into(
+            &self,
+            state: &Self::State,
+            _projected_action: &Self::Action,
+            out: &mut [f32],
+        ) {
+            let q_leo_all = self.head_leo.all_goals_q(state);
+            let q_uvfa_all = self.head_uvfa.all_goals_q(state);
+            if self.goal_idx >= self.head_leo.goal_count()
+                || self.goal_idx >= self.head_uvfa.goal_count()
+            {
+                out.fill(0.0);
+                return;
+            }
+            let q_leo = self.head_leo.q_for_goal(&q_leo_all, self.goal_idx);
+            let q_uvfa = self.head_uvfa.q_for_goal(&q_uvfa_all, self.goal_idx);
+            let n = q_leo.len().min(q_uvfa.len()).min(out.len());
+            let gate = self.gate_value(&q_leo[..n], &q_uvfa[..n]);
+            for (o, (&ql, &qu)) in out
+                .iter_mut()
+                .zip(q_leo[..n].iter().zip(q_uvfa[..n].iter()))
+            {
+                *o = gate * ql + (1.0 - gate) * qu;
+            }
+            for slot in &mut out[n..] {
+                *slot = 0.0;
+            }
+        }
+
+        // Deterministic cached lookup → confidence 1.0 (default).
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+        use crate::traits::LeoHead;
+
+        /// Mock LEO head — same matrix as `DualLeoOracle`'s tests so we can
+        /// verify β=0 reduces to α=0.5 blend bit-identically. Goal-major:
+        /// goal 0 = [1, 2, 3, 4], goal 1 = [10, 20, 30, 40].
+        struct MockLeo {
+            goals: usize,
+            actions: usize,
+        }
+
+        impl LeoHead for MockLeo {
+            fn all_goals_q(&self, _state: &[f32]) -> Vec<f32> {
+                if self.goals == 2 && self.actions == 4 {
+                    vec![1.0, 2.0, 3.0, 4.0, 10.0, 20.0, 30.0, 40.0]
+                } else {
+                    (0..(self.goals * self.actions)).map(|i| i as f32).collect()
+                }
+            }
+
+            #[inline]
+            fn goal_count(&self) -> usize {
+                self.goals
+            }
+
+            #[inline]
+            fn action_count(&self) -> usize {
+                self.actions
+            }
+        }
+
+        /// Mock UVFA head — DIFFERENT Q-values, higher confidence.
+        /// goal 0 = [100, 200, 300, 400], goal 1 = [1000, 2000, 3000, 4000].
+        struct MockUvfa {
+            goals: usize,
+            actions: usize,
+        }
+
+        impl LeoHead for MockUvfa {
+            fn all_goals_q(&self, _state: &[f32]) -> Vec<f32> {
+                if self.goals == 2 && self.actions == 4 {
+                    vec![100.0, 200.0, 300.0, 400.0, 1000.0, 2000.0, 3000.0, 4000.0]
+                } else {
+                    (0..(self.goals * self.actions))
+                        .map(|i| (i as f32) * 10.0)
+                        .collect()
+                }
+            }
+
+            #[inline]
+            fn goal_count(&self) -> usize {
+                self.goals
+            }
+
+            #[inline]
+            fn action_count(&self) -> usize {
+                self.actions
+            }
+        }
+
+        #[test]
+        fn test_commit_dual_leo_beta_zero_reduces_to_alpha_half_blend() {
+            // G1 regression: β=0 → gate=σ(0)=0.5 → 0.5·leo + 0.5·uvfa.
+            // This must bit-match DualLeoOracle at α=0.5 on the same heads.
+            let oracle = CommitDualLeoOracle::new(
+                MockLeo { goals: 2, actions: 4 },
+                MockUvfa { goals: 2, actions: 4 },
+                0.0, // β=0
+                0,
+            );
+            let state = vec![0.0; 8];
+            let grad = oracle.q_gradient_at(&state, &());
+            // Goal 0: leo=[1,2,3,4], uvfa=[100,200,300,400]
+            // 0.5·leo + 0.5·uvfa = [50.5, 101, 151.5, 202]
+            assert_eq!(grad, vec![50.5, 101.0, 151.5, 202.0]);
+        }
+
+        #[test]
+        fn test_commit_dual_leo_gate_picks_higher_confidence_head() {
+            // UVFA is much more confident than LEO on every goal (max 400 vs
+            // max 4 on goal 0). For any β > 0, Δconf = 4 − 400 = −396 < 0
+            // → gate = σ(β·(−396)) → 0 as β grows → blend → uvfa-only.
+            // At β=1: gate = σ(−396) ≈ 0 (underflows to exactly 0.0 in f32).
+            let oracle = CommitDualLeoOracle::new(
+                MockLeo { goals: 2, actions: 4 },
+                MockUvfa { goals: 2, actions: 4 },
+                1.0,
+                0,
+            );
+            let state = vec![0.0; 8];
+            let grad = oracle.q_gradient_at(&state, &());
+            // gate ≈ 0 → grad ≈ uvfa only.
+            assert_eq!(grad, vec![100.0, 200.0, 300.0, 400.0]);
+        }
+
+        #[test]
+        fn test_commit_dual_leo_bit_identical_to_dual_leo_oracle_at_alpha_half() {
+            // Cross-oracle G1: at β=0, CommitDualLeoOracle must produce the
+            // same gradient as DualLeoOracle at α=0.5 on the same heads.
+            use super::super::DualLeoOracle;
+            use crate::traits::{ActingMode, DualLeoMixer};
+
+            struct LcMixer;
+            impl DualLeoMixer for LcMixer {
+                fn acting_mode(&self) -> ActingMode {
+                    ActingMode::Lc
+                }
+            }
+
+            let commit = CommitDualLeoOracle::new(
+                MockLeo { goals: 2, actions: 4 },
+                MockUvfa { goals: 2, actions: 4 },
+                0.0,
+                1,
+            );
+            let blend = DualLeoOracle::new(
+                MockLeo { goals: 2, actions: 4 },
+                MockUvfa { goals: 2, actions: 4 },
+                LcMixer,
+                0.5,
+                1,
+            );
+            let state = vec![0.0; 8];
+            let g_commit = commit.q_gradient_at(&state, &());
+            let g_blend = blend.q_gradient_at(&state, &());
+            assert_eq!(
+                g_commit, g_blend,
+                "β=0 must bit-match DualLeoOracle at α=0.5"
+            );
+        }
+
+        #[test]
+        fn test_commit_dual_leo_into_matches_at() {
+            // `q_gradient_into` and `q_gradient_at` must agree.
+            let oracle = CommitDualLeoOracle::new(
+                MockLeo { goals: 2, actions: 4 },
+                MockUvfa { goals: 2, actions: 4 },
+                2.0,
+                1,
+            );
+            let state = vec![0.0; 8];
+            let via_at = oracle.q_gradient_at(&state, &());
+            let mut via_into = [0.0f32; 4];
+            oracle.q_gradient_into(&state, &(), &mut via_into);
+            assert_eq!(via_at, via_into.to_vec());
+        }
+
+        #[test]
+        fn test_commit_dual_leo_out_of_range_goal_zeros() {
+            // Out-of-range goal → empty gradient (mirrors DualLeoOracle edge).
+            let oracle = CommitDualLeoOracle::new(
+                MockLeo { goals: 2, actions: 4 },
+                MockUvfa { goals: 2, actions: 4 },
+                4.0,
+                99,
+            );
+            let state = vec![0.0; 8];
+            let grad = oracle.q_gradient_at(&state, &());
+            assert!(grad.is_empty(), "out-of-range goal must yield empty grad");
+        }
+
+        #[test]
+        fn test_commit_dual_leo_large_beta_approximates_hard_commit() {
+            // G1 stretch: β=64 → sigmoid saturates → grad ≈ pure higher-conf
+            // head. UVFA has higher max on every goal → grad ≈ uvfa.
+            let oracle = CommitDualLeoOracle::new(
+                MockLeo { goals: 2, actions: 4 },
+                MockUvfa { goals: 2, actions: 4 },
+                64.0,
+                0,
+            );
+            let state = vec![0.0; 8];
+            let grad = oracle.q_gradient_at(&state, &());
+            // gate = σ(64·(4 − 100)) = σ(−6144) → exactly 0.0 in f32.
+            // grad = 0·leo + 1·uvfa = uvfa.
+            assert_eq!(grad, vec![100.0, 200.0, 300.0, 400.0]);
+        }
+
+        #[test]
+        fn test_commit_dual_leo_symmetric_when_leo_more_confident() {
+            // If we swap which head is more confident, the gate should flip.
+            // Use MockUvfa as "teacher" (higher values) and MockLeo as
+            // "student" — gate should → 1 → return teacher (= MockUvfa).
+            let oracle = CommitDualLeoOracle::new(
+                MockUvfa { goals: 2, actions: 4 }, // as "leo" slot
+                MockLeo { goals: 2, actions: 4 }, // as "uvfa" slot
+                8.0,
+                0,
+            );
+            let state = vec![0.0; 8];
+            let grad = oracle.q_gradient_at(&state, &());
+            // Δconf = max(MockUvfa[goal 0]) - max(MockLeo[goal 0])
+            //       = 400 - 4 = 396 → gate = σ(8·396) → 1.0 (overflows).
+            // grad = 1·MockUvfa + 0·MockLeo = MockUvfa's slice.
+            assert_eq!(grad, vec![100.0, 200.0, 300.0, 400.0]);
+        }
+    }
+}
+
+#[cfg(all(feature = "leo_all_goals", feature = "dual_leo"))]
+pub use commit_dual_leo_oracle::CommitDualLeoOracle;
+
+// ──────────────────────────────────────────────────────────────────────────
 // ActionBridgeOracle — Plasma tier (feature: action_bridge)
 // ──────────────────────────────────────────────────────────────────────────
 
