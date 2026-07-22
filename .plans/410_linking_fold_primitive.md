@@ -128,7 +128,7 @@ All five gates have been measured. **Issue 050 resolved (Option A, 2026-07-07):*
 
 ## Phase 5 — Cross-references + commit
 
-**STATUS: IN-PROGRESS (2026-07-07) — T5.1 done (table fix in Research 391), T5.2 being executed in this commit.**
+**STATUS: ✅ COMPLETE (2026-07-07) — T5.1 + T5.2 both `[x]`. This line previously said "IN-PROGRESS ... T5.2 being executed in this commit" but the commit landed and the line was never updated. Plan-level status (line 7) already reflects COMPLETE.**
 
 ### Tasks
 

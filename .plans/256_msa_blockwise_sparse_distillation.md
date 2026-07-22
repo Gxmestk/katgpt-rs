@@ -2,7 +2,7 @@
 
 ## Date: 2026-06-12
 ## Research: 225_MSA_Blockwise_Sparse_Attention_Distillation
-## Status: Active
+## Status: COMPLETE ❌ GOAT FAIL — all tasks `[x]`; all 3 Phase 2 GOAT gates FAILED (per-group 1.003×, KV-outer 1.14× @ 128K, adaptive-k recall 0.629). `msa_sparse` stays opt-in permanently. Arena benchmark deferred to Issue 014 (closed+removed) — requires trained weights + RULER, not feasible modellessly.
 ## Feature Gate: `msa_sparse` (GOAT gate, opt-in until proven)
 
 ## Overview
