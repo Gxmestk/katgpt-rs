@@ -878,6 +878,13 @@ required-features = ["variable_rank_domain_expert"]
 name = "variable_rank_domain_expert_alloc"
 required-features = ["variable_rank_domain_expert"]
 
+# Issue 189 T2 — macro router (variable_rank_router_static!) G4 alloc-free audit.
+# CountingAllocator audit of the monomorphized tick path (1000 iters, with and
+# without override_cluster_pi).
+[[test]]
+name = "variable_rank_domain_expert_macro_alloc"
+required-features = ["variable_rank_domain_expert"]
+
 # Plan 323 — Fourier Continuation GOAT gate. G1 (FFT-based Gibbs suppression)
 # needs rustfft, which is listed as a dev-dependency in this crate so the
 # bench can use it without coupling to an unrelated feature.

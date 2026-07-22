@@ -231,6 +231,12 @@ pub struct ClusterHolder<const K: usize, const L: usize> {
 }
 
 impl<const K: usize, const L: usize> ClusterHolder<K, L> {
+    /// This cluster's latent rank `L` (the projection dimension).
+    pub const LATENT_DIM: usize = L;
+
+    /// This cluster's expert count `K`.
+    pub const EXPERT_COUNT: usize = K;
+
     /// Construct from an owned blend + boxed archetype fields.
     pub fn new(
         blend: CommittedFieldBlend<K, L>,
@@ -243,28 +249,21 @@ impl<const K: usize, const L: usize> ClusterHolder<K, L> {
     pub fn blend_mut(&mut self) -> &mut CommittedFieldBlend<K, L> {
         &mut self.blend
     }
-}
 
-impl<const K: usize, const L: usize> ErasedCluster for ClusterHolder<K, L> {
-    fn apply_blended(&self, z_proj: &[f32], scratch: &mut [f32], dz_out: &mut [f32]) -> usize {
-        debug_assert!(
-            z_proj.len() >= L,
-            "z_proj too short: {} < {}",
-            z_proj.len(),
-            L
-        );
-        debug_assert!(
-            scratch.len() >= L,
-            "scratch too short: {} < {}",
-            scratch.len(),
-            L
-        );
-        debug_assert!(
-            dz_out.len() >= L,
-            "dz_out too short: {} < {}",
-            dz_out.len(),
-            L
-        );
+    /// Apply the blended field at projected state `z_proj` (length `L`),
+    /// writing the dynamics update into `dz_out` (same length). Returns the
+    /// winning archetype index for caller entropy bookkeeping.
+    ///
+    /// **Inherent method** — callable without trait-object dispatch. This is
+    /// the zero-vtable path used by the [`variable_rank_router_static!`] macro
+    /// router. Same logic as [`ErasedCluster::apply_blended`].
+    ///
+    /// The caller-supplied scratch buffer must be at least `L` elements.
+    #[inline]
+    pub fn apply_direct(&self, z_proj: &[f32], scratch: &mut [f32], dz_out: &mut [f32]) -> usize {
+        debug_assert!(z_proj.len() >= L, "z_proj too short: {} < {}", z_proj.len(), L);
+        debug_assert!(scratch.len() >= L, "scratch too short: {} < {}", scratch.len(), L);
+        debug_assert!(dz_out.len() >= L, "dz_out too short: {} < {}", dz_out.len(), L);
         let fields_ref: [&dyn ArchetypeFieldSource<L>; K] =
             std::array::from_fn(|i| self.fields[i].as_ref());
         let z_slice = &z_proj[..L];
@@ -285,6 +284,24 @@ impl<const K: usize, const L: usize> ErasedCluster for ClusterHolder<K, L> {
         winner
     }
 
+    /// Override the committed pi weights for this tick. **Inherent method** —
+    /// zero-vtable path used by the [`variable_rank_router_static!`] macro router.
+    /// Same logic as [`ErasedCluster::override_pi`].
+    ///
+    /// `pi` length must equal `EXPERT_COUNT` (`K`).
+    #[inline]
+    pub fn override_pi_direct(&mut self, pi: &[f32]) {
+        debug_assert!(pi.len() >= K, "override_pi slice too short: {} < {}", pi.len(), K);
+        self.blend.pi[..K].copy_from_slice(&pi[..K]);
+    }
+}
+
+impl<const K: usize, const L: usize> ErasedCluster for ClusterHolder<K, L> {
+    fn apply_blended(&self, z_proj: &[f32], scratch: &mut [f32], dz_out: &mut [f32]) -> usize {
+        // DRY: delegate to the inherent method (Issue 189 T2).
+        self.apply_direct(z_proj, scratch, dz_out)
+    }
+
     fn commitment(&self) -> [u8; 32] {
         self.blend.blake3
     }
@@ -298,8 +315,8 @@ impl<const K: usize, const L: usize> ErasedCluster for ClusterHolder<K, L> {
     }
 
     fn override_pi(&mut self, pi: &[f32]) {
-        debug_assert!(pi.len() >= K, "override_pi slice too short: {} < {}", pi.len(), K);
-        self.blend.pi[..K].copy_from_slice(&pi[..K]);
+        // DRY: delegate to the inherent method (Issue 189 T2).
+        self.override_pi_direct(pi)
     }
 }
 
@@ -432,6 +449,160 @@ impl<const DOMAINS: usize, const D_FULL: usize, const A: usize>
     pub fn projection_indices(&self, domain: usize) -> &[usize] {
         &self.projection_indices[domain]
     }
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Monomorphization escape hatch — the `variable_rank_router_static!` macro
+// (Issue 189 T2). Generates a router struct with typed cluster fields +
+// match-based dispatch (no `Box<dyn>`, no vtable). The ergonomic dynamic
+// `VariableRankRouter` stays for consumers who need runtime domain-count
+// flexibility; this macro is the zero-vtable fast path.
+// ────────────────────────────────────────────────────────────────────────────
+
+/// Generate a variable-rank router struct with **monomorphized dispatch** —
+/// no `Box<dyn ErasedCluster>`, no vtable. Each domain becomes a typed
+/// `ClusterHolder<K, L>` field; the gate dispatches via a `match` on the
+/// domain index (CPU-predictable jump table, not an indirect call).
+///
+/// This is the Issue 189 T2 escape hatch for eliminating the ~50 ns vtable
+/// tax that makes the dynamic [`VariableRankRouter`] 2× slower than the
+/// uniform baseline. The trade-off: the domain count is fixed at compile
+/// time (each macro invocation produces a concrete struct).
+///
+/// # Syntax
+///
+/// ```text
+/// variable_rank_router_static! {
+///     $(#[doc = $struct_doc])*
+///     $vis:vis struct $name:ident
+///         < $domains:literal, $d_full:literal, $a:literal >;
+///
+///     $idx:literal => $field:ident : $cluster_ty:ty => $indices:expr;
+///     ...
+/// }
+/// ```
+///
+/// - `$domains`: domain count (e.g. `3` for move/combat/quest).
+/// - `$d_full`: full state dimension (e.g. `32`).
+/// - `$a`: activity vector dimension (the gate's input).
+/// - Per domain: explicit `0..N` index, field name, cluster type
+///   (`ClusterHolder<K, L>`), and projection indices array.
+///
+/// The macro generates: the struct, a `new()` constructor, a `tick()`
+/// method (same API as [`VariableRankRouter::tick`]), and an
+/// `override_cluster_pi()` method (zero-vtable pi override).
+///
+/// # Example
+///
+/// ```
+/// use katgpt_core::committed_field_blend::{ArchetypeFieldSource, CommittedFieldBlend};
+/// use katgpt_core::variable_rank_domain_expert::{ClusterHolder, variable_rank_router_static};
+///
+/// variable_rank_router_static! {
+///     /// 2-domain test router: move (L=4) + combat (L=2).
+///     pub struct TestRouter<2, 4, 2>;
+///
+///     0 => move_cluster:   ClusterHolder<4, 4> => [0, 1, 2, 3];
+///     1 => combat_cluster: ClusterHolder<2, 2> => [0, 1];
+/// }
+/// ```
+///
+/// # Contract
+///
+/// Domain indices MUST be `0..N` contiguous (debug_asserted). Projection
+/// indices must be in bounds (`< D_FULL`) and match the cluster's `L`.
+#[macro_export]
+macro_rules! variable_rank_router_static {
+    (
+        $(#[doc = $struct_doc:literal])*
+        $vis:vis struct $name:ident
+        < $domains:literal, $d_full:literal, $a:literal >;
+
+        $( $idx:literal => $field:ident : $cluster_ty:ty => $indices:expr );+ $(;)?
+    ) => {
+        $(#[doc = $struct_doc])*
+        $vis struct $name {
+            $( $field: $cluster_ty, )+
+            domain_directions: [[f32; $a]; $domains],
+        }
+
+        impl $name {
+            /// Construct from owned clusters + domain gate directions.
+            ///
+            /// # Panics (debug only)
+            ///
+            /// Debug-asserts that domain indices are `0..N` contiguous.
+            pub fn new(
+                $( $field: $cluster_ty, )+
+                domain_directions: [[f32; $a]; $domains],
+            ) -> Self {
+                #[cfg(debug_assertions)]
+                {
+                    let mut expected: usize = 0;
+                    $(
+                        debug_assert_eq!($idx, expected, "domain index must be 0..N contiguous");
+                        expected += 1;
+                    )+
+                    debug_assert_eq!(expected, $domains, "domain count must match <DOMAINS>");
+                }
+                Self {
+                    $( $field, )+
+                    domain_directions,
+                }
+            }
+
+            /// Override committed pi for domain `d`. Direct field access —
+            /// **zero vtable dispatch** (unlike [`$crate::variable_rank_domain_expert::VariableRankRouter::cluster_mut`]
+            /// which goes through `&mut dyn ErasedCluster`).
+            #[inline]
+            pub fn override_cluster_pi(&mut self, domain: usize, pi: &[f32]) {
+                match domain {
+                    $( $idx => self.$field.override_pi_direct(pi), )+
+                    _ => unreachable!("domain {} out of range 0..{}", domain, $domains),
+                }
+            }
+
+            /// Route + apply for one NPC this tick. **Zero vtable dispatch** —
+            /// all cluster calls are monomorphized inherent method calls.
+            ///
+            /// Same API contract as
+            /// [`VariableRankRouter::tick`].
+            pub fn tick(
+                &self,
+                z_full: &[f32; $d_full],
+                activity: &[f32; $a],
+                scratch_full: &mut [f32],
+                dz_out_full: &mut [f32; $d_full],
+            ) -> $crate::variable_rank_domain_expert::RoutingVerdict {
+                let domain = $crate::variable_rank_domain_expert::pick_domain::<$domains, $a>(
+                    activity,
+                    &self.domain_directions,
+                );
+                let winner = match domain {
+                    $( $idx => {
+                        let cluster = &self.$field;
+                        let proj: &[usize] = &$indices;
+                        let l = proj.len();
+                        let (z_proj_region, rest) = scratch_full.split_at_mut(l);
+                        let (blend_scratch_region, dz_proj_region) = rest.split_at_mut(l);
+                        let z_proj = &mut z_proj_region[..l];
+                        let blend_scratch = &mut blend_scratch_region[..l];
+                        let dz_proj = &mut dz_proj_region[..l];
+                        for i in 0..l {
+                            z_proj[i] = z_full[proj[i]];
+                        }
+                        let w = cluster.apply_direct(z_proj, blend_scratch, dz_proj);
+                        for i in 0..l {
+                            dz_out_full[proj[i]] = dz_proj[i];
+                        }
+                        w
+                    } )+
+                    _ => unreachable!("domain {} out of range 0..{}", domain, $domains),
+                };
+                $crate::variable_rank_domain_expert::RoutingVerdict { domain, winner }
+            }
+        }
+    };
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -717,6 +888,186 @@ mod tests {
             for v in dz_out.iter() {
                 assert!(v.is_finite(), "NaN in dz_out: {:?}", dz_out);
             }
+        }
+    }
+
+    // ─── G1-macro: variable_rank_router_static! dispatch ───────────────────
+    //
+    // The same 2-domain fixture as the dynamic router tests, but using the
+    // monomorphized macro router (Issue 189 T2). Verifies the macro generates
+    // the same dispatch behavior with zero-vtable path.
+
+    variable_rank_router_static! {
+        /// 2-domain test router: move (K=4, L=4) + combat (K=2, L=2).
+        struct StaticRouter2<2, 4, 2>;
+
+        0 => move_cluster:   ClusterHolder<4, 4> => [0, 1, 2, 3];
+        1 => combat_cluster: ClusterHolder<2, 2> => [0, 1];
+    }
+
+    fn make_two_domain_static_router() -> StaticRouter2 {
+        // Domain 0: "move" — L=4 (no projection), K=4 archetypes.
+        let mut move_blend = CommittedFieldBlend::<4, 4>::uncommitted();
+        move_blend.pi = [0.5, -0.3, 0.8, 0.1];
+        move_blend.tau = 1.0;
+        let move_fields: [Box<dyn ArchetypeFieldSource<4>>; 4] = [
+            make_fixture_field::<4>(100, 1.0),
+            make_fixture_field::<4>(200, 1.0),
+            make_fixture_field::<4>(300, 1.0),
+            make_fixture_field::<4>(400, 1.0),
+        ];
+        let move_cluster = ClusterHolder::<4, 4>::new(move_blend, move_fields);
+
+        // Domain 1: "combat" — L=2 (project to dims [0,1]), K=2 archetypes.
+        let mut combat_blend = CommittedFieldBlend::<2, 2>::uncommitted();
+        combat_blend.pi = [0.6, -0.2];
+        combat_blend.tau = 1.0;
+        let combat_fields: [Box<dyn ArchetypeFieldSource<2>>; 2] = [
+            make_fixture_field::<2>(500, 1.0),
+            make_fixture_field::<2>(600, 1.0),
+        ];
+        let combat_cluster = ClusterHolder::<2, 2>::new(combat_blend, combat_fields);
+
+        StaticRouter2::new(
+            move_cluster,
+            combat_cluster,
+            [[1.0, 0.0], [0.0, 1.0]],
+        )
+    }
+
+    #[test]
+    fn g1_macro_router_dispatch_move_domain() {
+        let router = make_two_domain_static_router();
+        let z = [1.0f32, 2.0, 3.0, 4.0];
+        let activity = [0.9, 0.1]; // domain 0 (move) wins
+        let mut scratch = [0.0f32; 16];
+        let mut dz_out = [0.0f32; 4];
+        let verdict = router.tick(&z, &activity, &mut scratch, &mut dz_out);
+        assert_eq!(verdict.domain, 0, "high activity[0] → domain 0");
+    }
+
+    #[test]
+    fn g1_macro_router_dispatch_combat_domain() {
+        let router = make_two_domain_static_router();
+        let z = [1.0f32, 2.0, 3.0, 4.0];
+        let activity = [0.1, 0.9]; // domain 1 (combat) wins
+        let mut scratch = [0.0f32; 16];
+        let mut dz_out = [0.0f32; 4];
+        let verdict = router.tick(&z, &activity, &mut scratch, &mut dz_out);
+        assert_eq!(verdict.domain, 1, "high activity[1] → domain 1");
+    }
+
+    #[test]
+    fn g1_macro_router_scatter_back_zeros_non_projected_dims() {
+        // Combat domain projects to dims [0,1]. After tick, dz_out[2] and
+        // dz_out[3] should stay zero (caller pre-zeroed).
+        let router = make_two_domain_static_router();
+        let z = [1.0f32, 2.0, 3.0, 4.0];
+        let activity = [0.1, 0.9]; // combat
+        let mut scratch = [0.0f32; 16];
+        let mut dz_out = [0.0f32; 4]; // pre-zeroed
+        router.tick(&z, &activity, &mut scratch, &mut dz_out);
+        assert!(
+            dz_out[2] == 0.0 && dz_out[3] == 0.0,
+            "non-projected dims must stay zero, got {:?}",
+            dz_out
+        );
+        assert!(dz_out[0].is_finite() && dz_out[1].is_finite());
+    }
+
+    #[test]
+    fn g1_macro_router_override_cluster_pi() {
+        // Verify override_cluster_pi works — override domain 0's pi, check
+        // the winner changes. With pi=[0.5,-0.3,0.8,0.1], winner=2 (0.8 is
+        // highest). After override to [0.1,0.1,0.1,0.9], winner=3.
+        let mut router = make_two_domain_static_router();
+        let z = [1.0f32, 2.0, 3.0, 4.0];
+        let activity = [0.9, 0.1]; // domain 0 (move)
+
+        // Before override — winner should be 2 (pi[2]=0.8 is highest).
+        let mut scratch = [0.0f32; 16];
+        let mut dz_out = [0.0f32; 4];
+        let v1 = router.tick(&z, &activity, &mut scratch, &mut dz_out);
+        assert_eq!(v1.domain, 0);
+        assert_eq!(v1.winner, 2, "pi=[0.5,-0.3,0.8,0.1] → winner=2");
+
+        // Override pi for domain 0 — now winner should be 3 (pi[3]=0.9).
+        router.override_cluster_pi(0, &[0.1, 0.1, 0.1, 0.9]);
+        let mut scratch2 = [0.0f32; 16];
+        let mut dz_out2 = [0.0f32; 4];
+        let v2 = router.tick(&z, &activity, &mut scratch2, &mut dz_out2);
+        assert_eq!(v2.domain, 0);
+        assert_eq!(v2.winner, 3, "overridden pi=[0.1,0.1,0.1,0.9] → winner=3");
+    }
+
+    #[test]
+    fn g1_macro_router_no_nan_across_10k_inputs() {
+        // Port of g3_router_no_nan_across_random_inputs to the macro router.
+        let router = make_two_domain_static_router();
+        let mut rng_state = 0x1234_5678_9abc_def0u64;
+        for _ in 0..10_000 {
+            rng_state ^= rng_state >> 13;
+            rng_state ^= rng_state << 7;
+            rng_state ^= rng_state >> 17;
+            let mut z = [0.0f32; 4];
+            for slot in z.iter_mut() {
+                rng_state = rng_state.wrapping_mul(6364136223846793005).wrapping_add(1);
+                *slot = ((rng_state >> 11) as f32 / (1u64 << 53) as f32) * 4.0 - 2.0;
+            }
+            rng_state = rng_state.wrapping_mul(6364136223846793005).wrapping_add(1);
+            let activity = [
+                ((rng_state >> 11) as f32 / (1u64 << 53) as f32),
+                ((rng_state >> 21) as f32 / (1u64 << 53) as f32),
+            ];
+            let mut scratch = [0.0f32; 16];
+            let mut dz_out = [0.0f32; 4];
+            let verdict = router.tick(&z, &activity, &mut scratch, &mut dz_out);
+            assert!(verdict.domain < 2);
+            for v in dz_out.iter() {
+                assert!(v.is_finite(), "NaN in dz_out: {:?}", dz_out);
+            }
+        }
+    }
+
+    #[test]
+    fn g1_macro_router_bit_identical_to_dynamic() {
+        // The macro router must produce the SAME results as the dynamic
+        // VariableRankRouter — same math, only the dispatch path differs.
+        // This is the G1 parity gate (Issue 189 risk: "G1 regression from
+        // monomorphization").
+        let dyn_router = make_two_domain_router();
+        let static_router = make_two_domain_static_router();
+
+        let mut rng_state = 0xabcd_ef01_2345_6789u64;
+        for i in 0..500 {
+            rng_state ^= rng_state >> 13;
+            rng_state ^= rng_state << 7;
+            rng_state ^= rng_state >> 17;
+            let mut z = [0.0f32; 4];
+            for slot in z.iter_mut() {
+                rng_state = rng_state.wrapping_mul(6364136223846793005).wrapping_add(1);
+                *slot = ((rng_state >> 11) as f32 / (1u64 << 53) as f32) * 4.0 - 2.0;
+            }
+            rng_state = rng_state.wrapping_mul(6364136223846793005).wrapping_add(1);
+            let activity = [
+                ((rng_state >> 11) as f32 / (1u64 << 53) as f32),
+                ((rng_state >> 21) as f32 / (1u64 << 53) as f32),
+            ];
+
+            let mut s1 = [0.0f32; 16];
+            let mut dz1 = [0.0f32; 4];
+            let v1 = dyn_router.tick(&z, &activity, &mut s1, &mut dz1);
+
+            let mut s2 = [0.0f32; 16];
+            let mut dz2 = [0.0f32; 4];
+            let v2 = static_router.tick(&z, &activity, &mut s2, &mut dz2);
+
+            assert_eq!(v1, v2, "verdict mismatch at iter {}: {:?} vs {:?}", i, v1, v2);
+            assert_eq!(
+                dz1, dz2,
+                "dz_out bit-mismatch at iter {}: {:?} vs {:?}",
+                i, dz1, dz2
+            );
         }
     }
 }

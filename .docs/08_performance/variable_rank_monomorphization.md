@@ -4,7 +4,7 @@
 **Issue:** [189](../../.issues/189_variable_rank_domain_expert_monomorphization_escape_hatch.md)
 **Plan:** [558](../../.plans/558_variable_rank_domain_expert_clusters.md)
 **Benchmark:** [558](../../.benchmarks/558_variable_rank_domain_expert_goat.md)
-**Status:** T1 DECISION — Option B (single generic `macro_rules!` with explicit indices) recommended. T2–T4 pending.
+**Status:** T1 DECISION — Option B (single generic `macro_rules!` with explicit indices) recommended. **T2 IMPLEMENTED** — macro shipped, G1+G4 gates pass. T3–T4 pending.
 
 ## TL;DR
 
@@ -270,3 +270,35 @@ T3 re-runs G2 with both shapes:
 - `g2_perf_production_shape` (per-NPC-owned-router — realistic case)
 
 T4 promotion decision based on T3 results, per Issue 189 acceptance criteria.
+
+## T2 verdict — IMPLEMENTED (2026-07-22)
+
+**DONE.** All 5 T2 deliverables shipped:
+
+1. **`variable_rank_router_static!` macro** — `#[macro_export]` at crate root.
+   Syntax: `pub struct Name<DOMAINS, D_FULL, A>;` + per-domain entries
+   (`$idx => $field: ClusterHolder<K, L> => [indices];`). Generates a
+   non-generic struct with typed fields + `new()` / `tick()` /
+   `override_cluster_pi()` methods. The `tick()` body is a `match` on the
+   domain index — zero vtable dispatch.
+2. **Inherent helper methods on `ClusterHolder`**: `LATENT_DIM` +
+   `EXPERT_COUNT` (associated consts) + `apply_direct()` +
+   `override_pi_direct()` (inherent methods). The `ErasedCluster` impl
+   delegates to these (DRY — one logic path).
+3. **G1 correctness ported**: 7 new lib tests — dispatch (move/combat),
+   scatter-back zeros, `override_cluster_pi` winner-change, 10K-input
+   no-NaN, and the **bit-identical-to-dynamic parity gate** (500 random
+   inputs, verdict + dz_out byte-for-byte identical to the dynamic
+   `VariableRankRouter`).
+4. **G4 alloc-free ported**: `variable_rank_domain_expert_macro_alloc.rs`
+   (2-phase audit: plain tick + override_pi path, both 0 bytes / 1000
+   ticks).
+5. **Dynamic `VariableRankRouter` preserved** — unchanged, still the
+   ergonomic opt-in path.
+
+**Validation**: 1786 lib tests + 2 alloc tests pass. `--all-features` +
+`--no-default-features` + `clippy --all-targets` all clean. File is 1071
+lines (well under the 2048 limit).
+
+**Next**: T3 re-runs the G2 bench with the macro router to measure the
+vtable-elimination gain.
