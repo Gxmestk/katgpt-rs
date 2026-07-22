@@ -76,7 +76,7 @@ variable_rank_router_3_domains!(Router3MoveCombatQuest,
 
 This trades code-size (one monomorphized router per domain-count instantiation) for dispatch cost (zero virtual calls). It's the standard Rust pattern for heterogeneous const-generic dispatch (same shape as `bevy_ecs`'s `Bundle` macro).
 
-**Promotion criteria for future work:** (tracked in [Issue 189](../.issues/189_variable_rank_domain_expert_monomorphization_escape_hatch.md))
+**Promotion criteria for future work:** (tracked in Issue 189, now closed — see §"Re-evaluation triggers" below)
 1. Implement the macro-generated router.
 2. Re-run G2. If latency drops to ≤1.0× baseline, promote to default-on.
 3. If still >1.0×, the variable-rank pattern is fundamentally more expensive per tick (the domain gate + projection can't be elided), and the feature stays opt-in forever — the entropy gain is the selling point, not the latency.
@@ -263,3 +263,19 @@ cargo test -p katgpt-core --features variable_rank_domain_expert \
   --test bench_558_variable_rank_domain_expert_goat --release \
   -- --nocapture --ignored --test-threads=1 'g2_perf_variable_rank'
 ```
+
+### Re-evaluation triggers (Issue 189 closed; preserved here)
+
+Issue 189 (the monomorphization escape hatch) is fully closed — all 4
+tasks (T1-T4) done, feature stays opt-in forever. The issue file was
+removed per the noise-reduction rule; its unique content (re-evaluation
+triggers) is preserved here. Reopen the work if any of these fire:
+
+- **A concrete consumer** (riir-ai runtime, riir-game-sdk,
+  seal-online-remaster) requests default-on `variable_rank_domain_expert`
+  and is willing to absorb the ~1.7× latency — re-prioritize.
+- **A new modelless technique** (e.g., const-generic specialization,
+  `min_specialization` stabilization) makes vtable elimination possible
+  without the macro — re-evaluate the implementation path.
+- **The entropy gain (G3) becomes load-bearing** for a downstream
+  benchmark — re-prioritize.

@@ -1,7 +1,7 @@
 # Variable-Rank Domain Expert — Monomorphization Escape Hatch (T1 Macro Design)
 
 **Date:** 2026-07-22
-**Issue:** [189](../../.issues/189_variable_rank_domain_expert_monomorphization_escape_hatch.md)
+**Issue:** 189 (closed; re-eval triggers preserved in [Benchmark 558](../../.benchmarks/558_variable_rank_domain_expert_goat.md) §"Re-evaluation triggers")
 **Plan:** [558](../../.plans/558_variable_rank_domain_expert_clusters.md)
 **Benchmark:** [558](../../.benchmarks/558_variable_rank_domain_expert_goat.md)
 **Status:** T1 DECISION — Option B (single generic `macro_rules!` with explicit indices) recommended. **T2 IMPLEMENTED** — macro shipped, G1+G4 gates pass. **T3-T4 DONE** — G2 re-gate ran, G2 still FAILS (~1.7× macro shared, ~1.95× production-shape). Feature stays opt-in forever.
