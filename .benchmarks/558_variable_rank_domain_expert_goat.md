@@ -76,7 +76,7 @@ variable_rank_router_3_domains!(Router3MoveCombatQuest,
 
 This trades code-size (one monomorphized router per domain-count instantiation) for dispatch cost (zero virtual calls). It's the standard Rust pattern for heterogeneous const-generic dispatch (same shape as `bevy_ecs`'s `Bundle` macro).
 
-**Promotion criteria for future work:**
+**Promotion criteria for future work:** (tracked in [Issue 189](../.issues/189_variable_rank_domain_expert_monomorphization_escape_hatch.md))
 1. Implement the macro-generated router.
 2. Re-run G2. If latency drops to ≤1.0× baseline, promote to default-on.
 3. If still >1.0×, the variable-rank pattern is fundamentally more expensive per tick (the domain gate + projection can't be elided), and the feature stays opt-in forever — the entropy gain is the selling point, not the latency.
