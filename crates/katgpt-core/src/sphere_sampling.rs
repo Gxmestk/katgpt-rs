@@ -751,9 +751,7 @@ mod tests {
         // ω_1 = arccos(X_1 · x_0) — between mu (taken as X_1) and x_0.
         let s = dot(&mu, &x0).clamp(-1.0, 1.0);
         let omega_1 = (1.0f32 - s * s).max(0.0).sqrt().atan2(s);
-        let omega_1 = omega_1
-            .max(COT_FLOOR)
-            .min(core::f32::consts::PI - COT_FLOOR);
+        let omega_1 = omega_1.clamp(COT_FLOOR, core::f32::consts::PI - COT_FLOOR);
 
         // Ẋ_1 = ω_1·sin(0)·X_1 + cos(0)·Ẋ_init = Ẋ_init, where Ẋ_init is
         // the initial unit-tangent (perp to x_0). Use the projection of mu

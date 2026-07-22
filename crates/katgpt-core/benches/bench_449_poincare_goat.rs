@@ -105,8 +105,8 @@ fn forward_decode(z: &[f32], adapter: &PoincareAdapter) -> Vec<f32> {
     let mut t = vec![0.0f32; adapter.target_dim()];
     katgpt_core::poincare::eval_phi_into(z, adapter, &mut phi, &mut hidden);
     let phi_out = adapter.phi_out();
-    for j in 0..adapter.target_dim() {
-        t[j] = simd_dot_f32(&adapter.W[j * phi_out..(j + 1) * phi_out], &phi, phi_out);
+    for (j, tj) in t.iter_mut().enumerate() {
+        *tj = simd_dot_f32(&adapter.W[j * phi_out..(j + 1) * phi_out], &phi, phi_out);
     }
     t
 }

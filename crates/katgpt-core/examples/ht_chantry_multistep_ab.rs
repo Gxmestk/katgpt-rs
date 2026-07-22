@@ -67,17 +67,16 @@ fn run_with_budget(map: &GridMap, budget_name: &str, multistep: bool) -> (f64, f
     };
 
     let mut current = config;
-    let mut goals = goals;
     let mut completions = 0usize;
     let mut tick_times_ms: Vec<f64> = Vec::with_capacity(STEPS);
 
     for _ in 0..STEPS {
         // Reassign goals for agents that reached theirs (lifelong).
-        for i in 0..AGENTS {
-            if current.positions[i] == goals[i] {
+        for (i, goal) in goals.iter_mut().enumerate().take(AGENTS) {
+            if current.positions[i] == *goal {
                 completions += 1;
                 let idx = rng.usize(0..passable.len());
-                goals[i] = passable[idx];
+                *goal = passable[idx];
             }
         }
 
@@ -89,7 +88,7 @@ fn run_with_budget(map: &GridMap, budget_name: &str, multistep: bool) -> (f64, f
     }
 
     let throughput = completions as f64 / STEPS as f64;
-    tick_times_ms.sort_by(|a, b| a.partial_cmp(&b).unwrap());
+    tick_times_ms.sort_by(|a, b| a.partial_cmp(b).unwrap());
     let median_ms = tick_times_ms[tick_times_ms.len() / 2];
 
     println!(
