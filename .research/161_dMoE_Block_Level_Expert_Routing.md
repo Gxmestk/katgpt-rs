@@ -4,6 +4,7 @@
 > **Authors:** Sicheng Feng, Zigeng Chen, Gongfan Fang, Xinyin Ma, Xinchao Wang (NUS)
 > **Date:** June 2026
 > **Verdict:** ✅ GAIN — Two modelless distillations, one modelless enhancement, one model-based fusion.
+> **PASS-Redirects (synthesis):** LatentMoE [arXiv:2601.18089 "LatentMoE: Toward Optimal Accuracy per FLOP and Parameter in Mixture of Experts"] (NVIDIA, 2026-01) — PASS: from-scratch MoE training architecture (project tokens to latent dim ℓ=d/α, scale expert count N' and top-k K' by α). Value is the architecture + training recipe, not modelless math (§3.5 Path 0 N/A — no closed-form training-target to decompose). Post-training low-rank expert compression angle is MoLAE [arXiv:2503.23100] (different paper, explicitly contrasted). Our stack has no transformer MoE FFN layers (dMoE's block-level coreset routing in this note is the closest MoE-routing distillation, operating on token/action granularity not transformer experts). → riir-train for the training recipe; the roofline insight (memory-bound at low batch) is deployment-level, already baked into our Plasma→Hot tier design.
 > **GOAT Pillar:** ❌ Not a pillar — general inference optimization. Evaluated against [MMO GOAT Pillars](../../riir-ai/.docs/27_mmo_goat_pillars_decision_matrix.md): passes LoRA-independent (required) but fails MMO-product (required). Stays in `katgpt-rs` domain for modelless, `riir-ai` for LoRA routing.
 > **Domain:** `katgpt-rs` (modelless) + `riir-ai` (LoRA routing fusion)
 

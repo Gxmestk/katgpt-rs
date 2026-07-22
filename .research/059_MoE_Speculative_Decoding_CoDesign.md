@@ -6,6 +6,7 @@
 > **Related Research:** 02 (Speculative Decoding), 06 (Raven RSM), 08 (Sparse MLP TwELL), 09 (EMO), 22 (Lighthouse Attention)
 > **Related Plans:** 022 (Sparse MLP), 044 (PFlash), 026 (Inference Budget), 055 (MTP Drafter)
 > **Verdict: PARTIAL VALUE — Three distillations: (1) Amdahl decomposition for LeviathanVerifier cost model, (2) batch-size-aware sparse MLP sparsity threshold, (3) Raven slot routing overlap metric. Core MoE routing findings do NOT apply (no MoE architecture). The arithmetic intensity framework and co-design principle are conceptual validation of our existing approach.**
+> **PASS-Redirects (synthesis):** LatentMoE [arXiv:2601.18089 "LatentMoE: Toward Optimal Accuracy per FLOP and Parameter in Mixture of Experts"] (NVIDIA, 2026-01, adopted in Nemotron-3) — PASS: from-scratch MoE training architecture that projects tokens into a latent dim ℓ=d/α before expert computation and scales N' and K' by α. LatentMoE's roofline analysis (§2.1: MoE experts memory-bound at t_exp < 1418 on GB200; §2.2: all-to-all comm dominates at 9× compute ratio) is the same arithmetic-intensity co-design lens this note distills from Cohere MoESD — the deployment insight is already captured here, no new primitive. The architecture (shared W↓/W↑ projection + α-scaled expert pool) requires from-scratch training → riir-train. Our stack has no transformer MoE layers to apply it to.
 
 ---
 
