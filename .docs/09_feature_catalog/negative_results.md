@@ -231,3 +231,28 @@ Without concentration, the compound gain cannot exist (SAR cannot widen the reac
 - **Zero runtime consumers** at deprecation time: SenseModule uses TernaryDir, BFCF uses region centroids.
 
 Option D (deprecate, mark `#[deprecated]`) was chosen over Option B (PCA rescue) because PCA requires a real-data intrinsic-rank measurement that cannot be done modellessly without the corpus existing (per the §3.5 modelless-unblock protocol — a training-dependent measurement path is not a clean modelless gain). `JlProjectionMatrix` + `ShardEmbedding` are kept for back-compat but emit deprecation warnings; bench_230 + diag_230 tests removed. 📖 Plan: [`.plans/230_shard_embedding_projection.md`](../../.plans/230_shard_embedding_projection.md) (close-out note preserves empirical evidence). (Issue 139 closed + removed per noise-reduction rule; git `3e33d7d8`.)
+
+## 13. RoVE — Rotary Value Embeddings Retrofit (Plan 557) — RETROFIT HURTS
+
+**Hypothesis:** Rotary Value Embeddings (arXiv:2606.11275 García-Castellanos/Weiler/Bekkers, Jul 2026) extend RoPE from Q/K to the V projection + inverse-rotate the aggregated output, yielding an attentive convolution ỹ_i = Σ_j A_ij · (R_{j−i} · W_V) · x_j with offset-indexed block-Toeplitz kernel ψ_δ = R_δ·W_V. Parameter-free, FlashAttention-compatible. The open question was whether applying RoVE's V-rotation **at inference time** onto an already-RoPE-trained checkpoint recovers the paper's equivalence.
+
+**RETROFIT HURTS (2026-07-22, Phase 5 A/B on gemma-2-2b-it).** The paper's RoPE↔RoVE equivalence is a **training-time** result: a model must be *trained* under RoVE for the V-rotation to compose correctly with the learned attention pattern. Applying the V-rotation at inference onto a RoPE-trained checkpoint:
+
+- short text (65 tok): loss **+12.5%**
+- longer text (162 tok): **+153% perplexity**
+
+All 7 GOAT gates PASS (the substrate is correct + parameter-free + FlashAttention-compatible) — the failure is the *application mode*, not the primitive. **Feature `rotary_value_embedding` stays opt-in for forward-compat** (a future RoVE-trained checkpoint would compose correctly). Implies `position_group_action` (first hot-path consumer of GRAPE's `PositionGroupAction` trait).
+
+📖 Plan: [`.plans/557_rotary_value_embeddings.md`](../../.plans/557_rotary_value_embeddings.md). Benchmark: [`.benchmarks/557_rotary_value_embedding_goat.md`](../../.benchmarks/557_rotary_value_embedding_goat.md) + [`.benchmarks/557_rove_retrofit_poc.md`](../../.benchmarks/557_rove_retrofit_poc.md). Research: [`.research/452_RoVE_Rotary_Value_Embeddings_Attentive_Convolution.md`](../../.research/452_RoVE_Rotary_Value_Embeddings_Attentive_Convolution.md).
+
+## 14. Variable-Rank Domain Expert Clusters (Plan 558) — G2 FAIL (STAYS OPT-IN)
+
+**Hypothesis:** LatentMoE-style variable-rank domain expert clusters (arXiv:2601.18089, Research 453) — `pick_domain` + `project_guided` + `VariableRankRouter` over heterogeneous-rank `CommittedFieldBlend` clusters — distribute per-NPC cognition across move/combat/quest domains with per-cluster rank budgets. PoC confirmed 1.63× entropy gain.
+
+**G2 FAIL — stays opt-in (2026-07-22).** The entropy gain is **real and larger than the PoC**: 2.63× archetype-utilization entropy vs uniform `<3,32>` baseline at iso `K×D=96` compute (G3 PASS, exceeds PoC's 1.63×). But the **latency cost is also real**: ~2× slower per tick (2.224× at 1K NPCs, 1.990× at 10K) — trait-object dispatch (`Box<dyn ErasedCluster>`) + per-NPC `override_pi` virtual calls dominate (~50 ns of the 63 ns overhead vs a 51 ns baseline).
+
+Gate results: G1/G3/G4/G5 PASS; **G2 FAIL** (target ≤1.0×). Absolute numbers (52–104 ns/NPC) are well under the 500 µs/tick MMO budget, and latency scales linearly 1K→10K (MMO-scalable), but the 2× relative cost fails the G2 gate.
+
+**The promotion path** (Plan 558 §Honest Risks #1) is the **macro monomorphization escape hatch** (`variable_rank_router_static!`, Issue 189): generate a per-domain-count monomorphized router enum instead of `Box<dyn ErasedCluster>`, eliminating the vtable tax. Shipped as a macro so consumers opt in to the codegen; the ergonomic `Box<dyn>` path remains for prototyping.
+
+📖 Plan: [`.plans/558_variable_rank_domain_expert_clusters.md`](../../.plans/558_variable_rank_domain_expert_clusters.md). Benchmark: [`.benchmarks/558_variable_rank_domain_expert_goat.md`](../../.benchmarks/558_variable_rank_domain_expert_goat.md). Research: [`.research/453_Variable_Rank_Domain_Expert_Clusters.md`](../../.research/453_Variable_Rank_Domain_Expert_Clusters.md). Monomorphization escape hatch: [`.docs/08_performance/variable_rank_monomorphization.md`](../08_performance/variable_rank_monomorphization.md) + Issue 189.
