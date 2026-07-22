@@ -2,11 +2,13 @@
 
 > **Source:** Fusion inspired by [LatentMoE: Toward Optimal Accuracy per FLOP and Parameter in MoE](https://arxiv.org/abs/2601.18089) (NVIDIA, 2026-01). LatentMoE itself is PASS (Research 161/059/037 cross-refs). This note distills the TRANSFERABLE PRINCIPLE, not the paper's architecture.
 > **Date:** 2026-07-22
-> **Status:** Active — PoC phase
+> **Status:** Promoted to Plan 558 — GOAT G2 FAIL (2.0× latency in release; trait-object dispatch overhead), stays opt-in. G1/G3/G4/G5 PASS (G3 entropy 2.63×). See [.benchmarks/558_variable_rank_domain_expert_goat.md](../.benchmarks/558_variable_rank_domain_expert_goat.md). Monomorphization escape hatch documented as the path to promotion.
 > **Related Research:** 302 (FAME / CommittedFieldBlend — the per-entity MoE substrate), 290 (Latent Field Steering — the projection mechanism), 196 (KG Latent Octree — the spatial index), 013 (Quest Grammar Engine — archetype construction), 230 (Shard Embedding — **cautionary flag: blind projection fails**), 279 (subspace clustering — NPC domains are NOT orthogonal)
 > **Related Plans:** 321 (CommittedFieldBlend), 309 (Latent Field Steering), 221 (KG Latent Octree), 418 (MAG direction mining)
 > **Classification:** Public (katgpt-rs engine note)
 > **Verdict: Gain — novel composition of existing primitives; needs PoC to validate core hypothesis before GOAT/feature-flag commitment.**
+>
+> **Update 2026-07-22 (post-Plan-558):** PoC H1 confirmed (1.63× entropy). Promoted to Plan 558 production primitive. GOAT gate: G1/G3/G4/G5 PASS, **G2 FAIL** (2.0× release latency — the PoC §4 finding #3 prediction that release overhead would be "negligible" was wrong; the trait-object dispatch dominates the 51 ns baseline). Stays opt-in; monomorphization escape hatch documented.
 
 ---
 
@@ -194,4 +196,4 @@ If H1 is refuted → the overspecification doesn't matter in practice (D=32 is c
 3. **Latency overhead is 1.23×** in debug builds (domain gate + projection dispatch). In release builds the overhead is expected to be negligible (branch prediction + cache-friendly small arrays). The gate criterion was ≤2.0×.
 4. **Domain split is ~uniform** (move 325, combat 361, quest 314 of 1000 NPCs), confirming the domain gate produces meaningful routing.
 
-**Verdict update:** Gain → GOAT candidate. The PoC confirms the core hypothesis (H1). Next step: promote to a feature-flagged plan + release-mode benchmark at 10K+ NPCs to validate the Plasma-tier bandwidth claim.
+**Verdict update:** Gain → GOAT candidate. The PoC confirms the core hypothesis (H1). **Promoted to Plan 558** — GOAT gate ran 2026-07-22: G1/G3/G4/G5 ALL PASS (G3 entropy 2.63× vs baseline, exceeding PoC's 1.63×), but **G2 perf FAIL** (2.0× latency in release — trait-object dispatch overhead dominates the 51 ns baseline). Stays opt-in per Plan 558 T4.3. The monomorphization escape hatch (macro-generated per-domain-count routers) is the documented path to promotion. See [.benchmarks/558_variable_rank_domain_expert_goat.md](../.benchmarks/558_variable_rank_domain_expert_goat.md).
