@@ -720,7 +720,7 @@ The ALS B-step's original eigendecomp (`karc::jacobi_eigen`, O(d_h³·n_sweeps))
 
 🔧 Feature flags: `karc_householder_eig` (implies `karc_forecaster`) — **opt-in**; `karc_householder_eig_par` (implies `karc_householder_eig`) — **opt-in**.
 
-📖 Issue: [`.issues/187_karc_householder_eig_parallel.md`](../../.issues/187_karc_householder_eig_parallel.md), Benchmark: [`.benchmarks/308_karc_goat.md`](../../.benchmarks/308_karc_goat.md) §Phase 5.
+📖 Benchmark: [`.benchmarks/308_karc_goat.md`](../../.benchmarks/308_karc_goat.md) §Phase 5 (issues 185/186/187 resolved + removed; resolution captured here).
 
 ### 24.3 Regime Gate — `karc_regime_gate` (Plan 556 Phase 1)
 

@@ -3,8 +3,8 @@
 Status: **draft (analysis + recommendation; no implementation)**
 Branch: `develop` (per global rule — no feature branches)
 Owner: unassigned
-Fusion of: [Issue 186](../.issues/186_karc_t3_compute_unblock_deliberation.md) (Path A–D deliberation, Path B chosen + shipped) × [Issue 187](../.issues/187_karc_householder_eig_parallel.md) (parallelization + actual G1 measurement — supersedes 186's compute framing) × commit `c0830d12` (λ-sweep — recovers NRMSE, threshold 10% short, structural) × prior-art survey (faer / OxiBLAS / LAPACK thread-safety)
-Related: [Issue 185](../.issues/185_karc_large_dh_als_bstep_jacobi.md), [Plan 308](../.plans/308_karc_delay_basis_ridge_forecaster.md), [Benchmark 308](../.benchmarks/308_karc_goat.md), [Benchmark 010](../.benchmarks/010_report_the_floor_consolidated.md) T7
+Fusion of: [Issue 186](../.benchmarks/308_karc_goat.md) §Phase 5 (Path A–D deliberation, Path B chosen + shipped) × [Issue 187](../.benchmarks/308_karc_goat.md) §Phase 5 (parallelization + actual G1 measurement — supersedes 186's compute framing) × commit `c0830d12` (λ-sweep — recovers NRMSE, threshold 10% short, structural) × prior-art survey (faer / OxiBLAS / LAPACK thread-safety)
+Related: [Issue 185](../.benchmarks/308_karc_goat.md) §Phase 5, [Plan 308](../.plans/308_karc_delay_basis_ridge_forecaster.md), [Benchmark 308](../.benchmarks/308_karc_goat.md), [Benchmark 010](../.benchmarks/010_report_the_floor_consolidated.md) T7
 
 ## TL;DR
 
@@ -125,9 +125,9 @@ Issue 186 dismissed the "pure-Rust LAPACK-quality" option by name-checking `nalg
 
 This proposal fuses three existing artifacts:
 
-1. **[Issue 186](../.issues/186_karc_t3_compute_unblock_deliberation.md)** — the original four-path deliberation (Path A/B/C/D). Provides the path taxonomy, the recommended decision protocol, and the recorded Path B decision. **This proposal extends Issue 186** by re-examining all paths in light of Issue 187's data + adding Path E (`faer`).
+1. **[Issue 186](../.benchmarks/308_karc_goat.md) §Phase 5** — the original four-path deliberation (Path A/B/C/D). Provides the path taxonomy, the recommended decision protocol, and the recorded Path B decision. **This proposal extends Issue 186** by re-examining all paths in light of Issue 187's data + adding Path E (`faer`).
 
-2. **[Issue 187](../.issues/187_karc_householder_eig_parallel.md)** — the parallelization + actual G1 measurement. **Supersedes Issue 186's compute framing.** Provides the empirical evidence that (a) the compute blocker is resolved (87 min wall measured, 29 min via direct Cholesky), and (b) the actual blocker shifted to algorithmic (G1 NRMSE fail, λ tuning hypothesis).
+2. **[Issue 187](../.benchmarks/308_karc_goat.md) §Phase 5** — the parallelization + actual G1 measurement. **Supersedes Issue 186's compute framing.** Provides the empirical evidence that (a) the compute blocker is resolved (87 min wall measured, 29 min via direct Cholesky), and (b) the actual blocker shifted to algorithmic (G1 NRMSE fail, λ tuning hypothesis).
 
 3. **Prior-art survey** (`faer`, OxiBLAS, LAPACK thread-safety) — provides the new Path E option + confirms LAPACK's known downsides (`dsyevr` thread-safety, ndarray-linalg build pain, per-OS backend selection). The `faer` finding is what makes Path E viable where Issue 186's `nalgebra` mention was not.
 
@@ -201,10 +201,10 @@ Not sketched. If we get here, the situation has changed enough that a new propos
 
 ## References
 
-1. **[Issue 186 — KARC Plan 308 T3 Compute-Unlock deliberation](../.issues/186_karc_t3_compute_unblock_deliberation.md)** — original four-path analysis + Path B decision. **Cited as the baseline this proposal extends.**
-2. **[Issue 187 — KARC Householder+QL Parallelization](../.issues/187_karc_householder_eig_parallel.md)** — parallelization + actual G1 measurement (λ=5e-3 FAIL on both legs). **Cited as the evidence that supersedes Issue 186's compute framing.**
+1. **[Issue 186 — KARC Plan 308 T3 Compute-Unlock deliberation](../.benchmarks/308_karc_goat.md) §Phase 5** — original four-path analysis + Path B decision. **Cited as the baseline this proposal extends.**
+2. **[Issue 187 — KARC Householder+QL Parallelization](../.benchmarks/308_karc_goat.md) §Phase 5** — parallelization + actual G1 measurement (λ=5e-3 FAIL on both legs). **Cited as the evidence that supersedes Issue 186's compute framing.**
 2a. **Commit `c0830d12`** (2026-07-20, λ-sweep) — λ=5e-2 recovers NRMSE gate (9.43e-4); threshold flat across λ (structural). **The post-Issue-187 data point this proposal incorporates.**
-3. **[Issue 185 — KARC Large-d_h ALS B-step (Jacobi)](../.issues/185_karc_large_dh_als_bstep_jacobi.md)** — source issue, T1+T2 implementation + the compute-feasibility gap that spawned Issue 186.
+3. **[Issue 185 — KARC Large-d_h ALS B-step (Jacobi)](../.benchmarks/308_karc_goat.md) §Phase 5** — source issue, T1+T2 implementation + the compute-feasibility gap that spawned Issue 186.
 4. **[Plan 308 — KARC Delay-Basis Ridge Forecaster](../.plans/308_karc_delay_basis_ridge_forecaster.md)** — parent plan; T4.5–T4.7 promotion gate.
 5. **[Benchmark 308 — KARC GOAT](../.benchmarks/308_karc_goat.md)** — the G1 gate evidence.
 6. **[Benchmark 010 — Report the Floor consolidated](../.benchmarks/010_report_the_floor_consolidated.md)** T7 — the K-sweep establishing K=8 as the promotion-target config (now complicated by Issue 187's G1 FAIL at K=8).
