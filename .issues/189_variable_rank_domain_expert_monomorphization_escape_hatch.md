@@ -84,7 +84,9 @@ The existing `pick_domain` / `project_guided` / `scatter_guided` primitives stay
 
 ## Acceptance Criteria
 
-- [ ] **T1 — Macro design.** Decide between (a) a single macro that takes a domain count + cluster-type list, or (b) per-count specialized macros (`router_2_domains!`, `router_3_domains!`, ...). Document the trade-off (generality vs macro complexity). The minimum useful count is 3 (move/combat/quest — the Research 453 configuration); higher counts are nice-to-have.
+- [x] **T1 — Macro design.** **DONE 2026-07-22.** Decision: **Option B — single generic `macro_rules!` with explicit indices** (`variable_rank_router_static!`). Considered 6 options (A: per-count specialized macros, B: generic+explicit-idx, C: TT-munching counter, D: proc-macro, E: fn-pointer array, F: `min_specialization`); B is Pareto-optimal (stable Rust, one macro for any count, matches codebase `macro_rules!` convention, eliminates all 4 vtable calls). Full analysis + tradeoff matrix in [`.docs/08_performance/variable_rank_monomorphization.md`](../.docs/08_performance/variable_rank_monomorphization.md).
+
+  **Honest caveat recorded:** even after monomorphization, the realistic floor is ~1.6× baseline (shared-router bench) or ~1.3× (production per-NPC-owned-router shape) — the `override_pi` cost + irreducible domain-gate/projection work are not recoverable. G2 may still FAIL. The ≤1.0× target may be structurally unreachable for variable-rank. T3 will measure both shapes honestly; T4 decides based on data.
 - [ ] **T2 — Implementation.** Ship the macro in `crates/katgpt-core/src/variable_rank_domain_expert.rs` (or a sibling `macro.rs` module if line-count warrants). The macro-generated router MUST:
   - Expose the same public API as `VariableRankRouter` (route + apply + override_pi).
   - Preserve G1 correctness (10K inputs, no NaN) — port the existing G1 test.

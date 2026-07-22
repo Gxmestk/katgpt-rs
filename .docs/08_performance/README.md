@@ -8,6 +8,7 @@
 | Doc | Role |
 |---|---|
 | [`engineering.md`](engineering.md) | Performance engineering — throughput tables, SIMD matmul/HLA kernels, benchmark methodology |
+| [`variable_rank_monomorphization.md`](variable_rank_monomorphization.md) | T1 macro design — monomorphization escape hatch for `variable_rank_domain_expert` (Issue 189, Plan 558 G2 FAIL path to promotion) |
 
 ## See also
 
