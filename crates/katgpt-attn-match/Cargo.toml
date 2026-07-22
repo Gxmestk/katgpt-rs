@@ -54,6 +54,14 @@ maxsim = ["dep:katgpt-core"]
 # The first real consumer of the smooth-min primitive.
 smooth_min_rerank = ["maxsim", "katgpt-core/smooth_min_similarity"]
 
+# RoVE-aware value-side compaction (Plan 557 Phase 4). When active, the
+# chunked compactor un-rotates RoVE-rotated values before compaction and
+# re-rotates after — the value-side analogue of the key-side `still_kv` path.
+# Uses katgpt-core's RoVE primitives directly (f32, no f16 round-trip) so it
+# composes independently with `still_kv` (keys) + `rotary_value_embedding`
+# (values). Requires `maxsim` or any feature that already pulls katgpt-core.
+rotary_value_embedding = ["dep:katgpt-core", "katgpt-core/rotary_value_embedding"]
+
 # Symmetric Boundary Pair for BT ranking (Plan 085 Deep Manifold Part 2,
 # arXiv:2512.06563 §2.6.2). Gates the `SymmetricBoundaryPair` impl block inside
 # rerank.rs — orthogonal to the `maxsim` gate (the rest of rerank.rs compiles

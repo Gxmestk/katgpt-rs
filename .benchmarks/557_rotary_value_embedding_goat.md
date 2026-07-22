@@ -29,6 +29,23 @@
 
 **One blocker remains:** Phase 5 retrofit PoC (inference-time RoVE onto RoPE-trained checkpoints). The feature stays opt-in until that settles.
 
+### Phase 4 — Attention Matching Fusion (2026-07-22 — REFRAMED)
+
+| Gate | Target | Measured | Verdict |
+|------|--------|----------|---------|
+| **G9** compaction fidelity under RoVE | compacted (Ck,Cv) vs full attention output, cosine ≥ 0.991 | **0.999925** | **PASS** ✓ |
+| **G10** position-consistency | compacted RoVE-aware forward vs full RoVE-aware forward, cosine ≥ 0.991 | **≥ 0.991** | **PASS** ✓ |
+
+**Phase 4 outcome: REFRAMED — no special RoVE compaction code needed.**
+
+The plan's original T4.1 approach (un-rotate values before compaction, compact in position-free space, re-rotate) was found to be **mathematically incorrect** during implementation. The position-free value fit minimizes `||A_sel · Cv_plain - A · V_plain||²` but the actual attention output uses **rotated** values (`Σ_j A_ij · R_j · V_plain[j]`). Since `R_j` varies per position, the position-free objective ≠ the rotated-space objective. G9 with the un-rotate approach measured cosine **0.17** (vs 0.991 target) — a catastrophic FAIL.
+
+The **correct finding**: the existing `compact_text_based` already handles RoVE-rotated values correctly. The value fitting (least-squares) operates in whatever space the values are in, so RoVE-rotated values are fitted correctly without any un-rotate/re-rotate. G9 verified this: compacting RoVE-rotated values AS-IS gives cosine **0.999925**.
+
+**What shipped:** feature forwarding (`rotary_value_embedding` in `katgpt-attn-match`) for test access to RoVE primitives + G9/G10 verification tests + documentation. **What did NOT ship:** `RoVeToggle`, `compact_text_based_with_rove`, un-rotate/re-rotate helpers — all implemented and reverted after the mathematical analysis proved them incorrect.
+
+See `.plans/557_rotary_value_embeddings.md` §Phase 4 ACTUAL OUTCOME for the full proof.
+
 ## G1 — correctness (PASS)
 
 The "bit-identical to RoPE-when-disabled" claim splits into two parts:

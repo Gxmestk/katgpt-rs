@@ -165,7 +165,7 @@ Goal: when RoVE + Attention Matching both active, fit `C_V` in position-free V s
 
 ### Tasks
 
-- [ ] **T4.1** In `ChunkedCompactor::compact_text_based` (`katgpt-attn-match/src/chunked.rs`), the existing key-side path is:
+- [-] **T4.1** In `ChunkedCompactor::compact_text_based` (`katgpt-attn-match/src/chunked.rs`), the existing key-side path is:
   ```rust
   let pf = PositionFreeBridge::new(ROPE_THETA, d);
   let pos_free_keys = pf.un_rotate_f32(chunk_keys, chunk.start_pos);
@@ -178,14 +178,68 @@ Goal: when RoVE + Attention Matching both active, fit `C_V` in position-free V s
   // ... compact pos_free_values together with pos_free_keys ...
   // ... re-rotate at compacted position ...
   ```
-- [ ] **T4.2** Update the `ChunkedCompactor` API to accept an optional `rove_active: bool` flag (or a `RoVeToggle`). When true, the compactor un-rotates V before compaction and re-rotates after; when false, the path is unchanged.
-- [ ] **T4.3** Write integration tests:
-  - **G9 compaction fidelity under RoVE:** when RoVE is active, the compacted `(Ck, Cv)` produces attention output within the same fidelity bound as without RoVE (≥0.991 cosine, matching Plan 297 Phase A's existing gate).
-  - **G10 position-consistency:** the re-rotated `Cv` at the compacted position, when fed back into a RoVE-aware forward path, produces output consistent with the un-compacted RoVE-aware forward path (within the same fidelity bound).
+- [-] **T4.2** Update the `ChunkedCompactor` API to accept an optional `rove_active: bool` flag (or a `RoVeToggle`). When true, the compactor un-rotates V before compaction and re-rotates after; when false, the path is unchanged.
+- [x] **T4.3** Write integration tests (reframed as verification tests — see Phase 4 ACTUAL OUTCOME):
+  - **G9 compaction fidelity under RoVE:** PASS — cosine 0.999925.
+  - **G10 position-consistency:** PASS — cosine ≥ 0.991.
 
 ### Phase 4 Exit Criteria
-- [ ] `cargo test --features rotary_value_embedding,attention_matching -p katgpt-attn-match` passes.
-- [ ] The two features compose cleanly with no fidelity regression.
+- [x] `cargo test --features attn_match,rotary_value_embedding -p katgpt-attn-match` passes.
+- [x] The two features compose cleanly with no fidelity regression.
+
+### Phase 4 ACTUAL OUTCOME (2026-07-22 — REFRAMED)
+
+**The plan's original T4.1 approach (un-rotate values before compaction, compact in
+position-free space, re-rotate) was found to be MATHEMATICALLY INCORRECT during
+implementation. The tasks T4.1 + T4.2 are marked `[-]` (deferred/abandoned) and
+NO un-rotate/re-rotate code ships.**
+
+**The mathematical proof (why position-free value compaction is wrong):**
+
+The value fitting (least-squares) minimizes `||A_sel · Cv - A · V||²` where A is
+the attention weight matrix and V is the values. When we un-rotate values first,
+the fit optimizes `||A_sel · Cv_plain - A · V_plain||²` — but the actual attention
+output uses **rotated** values: `out_i = Σ_j A_ij · R_j · V_plain[j]`. Since `R_j`
+varies per position (each token has a different rotation angle), the position-free
+objective ≠ the rotated-space objective.
+
+Concretely: `Σ_j A_ij · R_j · Cv_plain[j] ≠ R_k · Σ_j A_ij · Cv_plain[j]` for any
+single k, because R_j is different for each j. The position-free fit can't account
+for the per-position rotation mixing.
+
+**Measured evidence:** G9 with the un-rotate approach measured cosine **0.17** (vs
+0.991 target) — a catastrophic FAIL, confirming the mathematical analysis.
+
+**The CORRECT finding:** the existing `compact_text_based` already handles
+RoVE-rotated values correctly — NO special code is needed. The value fitting
+(least-squares) operates in whatever space the values are in, so RoVE-rotated
+values are fitted correctly by the existing compaction. G9 verified this: compacting
+RoVE-rotated values AS-IS gives cosine **0.999925**.
+
+**What shipped (Plan 557 Phase 4):**
+
+1. **`rotary_value_embedding` feature in `katgpt-attn-match`** — pulls
+   `katgpt-core/rotary_value_embedding` for test access to RoVE primitives.
+2. **Root `Cargo.toml` feature forwarding** — the root `rotary_value_embedding`
+   feature now also forwards to `katgpt-attn-match/rotary_value_embedding`.
+3. **G9 + G10 verification tests** — confirm the existing compaction is
+   RoVE-transparent (cosine ≥ 0.991).
+4. **Documentation** on `compact_text_based` noting it handles RoVE-rotated
+   values correctly as-is.
+
+**What did NOT ship (and why):**
+
+- No `RoVeToggle` enum, no `compact_text_based_with_rove` method, no un-rotate/
+  re-rotate helpers. These were implemented and then reverted after the
+  mathematical analysis proved them incorrect.
+- No `RoveFeatureOff` error variant.
+
+**Future work (if token relocation is ever needed):** The only case where RoVE-
+aware value handling matters is RELOCATION (moving compacted tokens to different
+positions). The current code uses `new_pos = start_pos` (no relocation), so the
+issue doesn't arise. If relocation is needed in the future, a correct approach
+would require fitting in the ROTATED domain at the TARGET positions, not
+position-free fitting — a non-trivial extension that's out of scope for Plan 557.
 
 ---
 
