@@ -5,7 +5,7 @@
 **Source paper:** [arXiv:2606.11275](https://arxiv.org/abs/2606.11275) — García-Castellanos, Weiler, Bekkers, Jul 2026 (RoVE)
 **Source code:** [github.com/AGarciaCast/RoVE](https://github.com/AGarciaCast/RoVE)
 **Target:** `katgpt-rs/crates/katgpt-core/src/rotary_value_embedding.rs` (new module, sibling to `position_group_action.rs`) + Cargo feature `rotary_value_embedding` (re-exported from root `katgpt-rs/Cargo.toml` as `rotary_value_embedding = ["katgpt-core/rotary_value_embedding"]`). Wiring in `katgpt-rs/crates/katgpt-attn/src/` (Phase 3) + `katgpt-rs/crates/katgpt-attn-match/src/chunked.rs` (Phase 4).
-**Status:** Active — Phase 1 DONE (commit pending).
+**Status:** Active — Phases 1–4 DONE + committed. Phase 3 original tasks (T3.1–T3.5) marked MOOT (target was a stub); replaced by T3.A (substrate G2 unblock, DONE) + T3.B (cross-repo wiring to riir-ai, DEFERRED pending Phase 5). Phase 5 (retrofit PoC) is the sole remaining phase — **BLOCKED** on riir-train from-scratch pretraining infrastructure (see Phase 5 §Blocker).
 
 > **Numbering note.** Research note 452 + Plan 557 deliberately use *different* numbers because `.research/` and `.plans/` are independent namespaces with independent highwater markers — `.research/` was at 451 (next free = 452), `.plans/` was at 556 (next free = 557). The number collision in `.plans/452` (`452_simd_lut_dequant.md` already exists) is what forces the plan to 557. The research note at `.research/452_*.md` is the design doc; this plan is the execution tracker.
 
@@ -113,22 +113,16 @@ Goal: add an opt-in forward path that calls `rotate_values_into` and `inverse_ro
 
 ### Tasks
 
-- [ ] **T3.1** Identify the RoPE-on-QK call site in `katgpt-attn/src/dash_attn/forward.rs`. Per the codebase grep (Research 452 §2.1), RoPE is currently applied to Q and K but never to V. Document the exact line + helper function (`apply_rope_phase_shift` or in-place `RopeFreqs::apply`).
-- [ ] **T3.2** Add an opt-in RoVE branch in the same forward path, gated by `#[cfg(feature = "rotary_value_embedding")]`:
-  - After `types::matmul(&mut ctx.v, &layer_weights.attn_wv, &ctx.x, kv_dim, n)` (line ~113), if RoVE is enabled: `rotate_values_into(&rope_action, pos, &ctx.v, &mut ctx.v_rot)`.
-  - After the softmax-weighted sum is computed into `ctx.attn_out`, if RoVE is enabled: `inverse_rotate_output_into(&rope_action, pos, &ctx.attn_out, &mut ctx.attn_out_final)`.
-  - `ctx.v_rot` and `ctx.attn_out_final` are pre-allocated scratch buffers in `ForwardContext` (zero-alloc per token; reused across tokens in the prefill loop).
-- [ ] **T3.3** Repeat T3.2 for `forward_dash_attn_decode` (the decode path).
-- [ ] **T3.4** Add a feature-gated `RoVeToggle` to the dash_attn `Config` (mirror the existing `wall_config: Option<WallConfig>` pattern from Plan 173). When `Some`, RoVE is active; when `None`, RoVE is off and the code path is identical to today.
-- [ ] **T3.5** Write integration tests in `katgpt-attn`:
-  - **G6 output change:** with RoVE on, the forward path output differs from RoVE off (the value rotation is non-trivial — `R_{j−i} ≠ I` for `j ≠ i`).
-  - **G7 determinism:** two runs with identical input produce bit-identical output (RoPE rotations are pure float arithmetic; no RNG).
-  - **G8 no-panic on edge cases:** single-token sequence (no aggregation; `R_{−0} · R_0 · V = V`), zero-position (identity), large-position (rotation by large angle — verify finiteness, not correctness).
+- [-] **T3.1** ~~Identify the RoPE-on-QK call site in `katgpt-attn/src/dash_attn/forward.rs`.~~ **MOOT** — see Phase 3 ACTUAL OUTCOME below. The target (`dash_attn/forward.rs`) is an MVP stub that never applies RoPE to Q/K and doesn't do real attention. The real RoPE-on-QK call site is in `riir-engine/src/transformer/gemma2.rs` (riir-ai, cross-repo). Replaced by T3.A (substrate G2 unblock, DONE) + T3.B (cross-repo wiring to riir-ai, DEFERRED pending Phase 5).
+- [-] **T3.2** ~~Add an opt-in RoVE branch in the same forward path.~~ **MOOT** — the target forward path doesn't exist as a real attention implementation. See T3.B for the real wiring target.
+- [-] **T3.3** ~~Repeat T3.2 for `forward_dash_attn_decode`.~~ **MOOT** — same reason as T3.2.
+- [-] **T3.4** ~~Add a feature-gated `RoVeToggle` to the dash_attn `Config`.~~ **MOOT** — the toggle belongs in the riir-ai consumer, not the katgpt-attn stub. See T3.B.
+- [-] **T3.5** ~~Write integration tests in `katgpt-attn`.~~ **MOOT** — the substrate-level G8 tests (forward bit-identical to scalar, inverse ≤1 ULP) already landed in T3.A. Integration tests for the real wiring belong in riir-ai (T3.B).
 
 ### Phase 3 Exit Criteria
-- [ ] `cargo build --features rotary_value_embedding,dash_attn -p katgpt-attn` compiles clean.
-- [ ] `cargo test --features rotary_value_embedding,dash_attn -p katgpt-attn` passes.
-- [ ] The dash_attn forward path supports RoVE as an opt-in toggle.
+- [-] ~~`cargo build --features rotary_value_embedding,dash_attn -p katgpt-attn` compiles clean.~~ **MOOT** — the dash_attn forward path is a stub; the real wiring target is riir-ai's gemma2.rs (T3.B).
+- [-] ~~`cargo test --features rotary_value_embedding,dash_attn -p katgpt-attn` passes.~~ **MOOT** — substrate tests already pass (14/14 in katgpt-core); integration tests belong in riir-ai.
+- [-] ~~The dash_attn forward path supports RoVE as an opt-in toggle.~~ **MOOT** — replaced by the substrate-level fast path (`batch_rotate_values_into_fast` / `batch_inverse_rotate_output_into_fast`) which is the API the real consumer (riir-ai gemma2.rs) will call.
 
 ### Phase 3 ACTUAL OUTCOME (2026-07-22 — reframed)
 
@@ -270,6 +264,37 @@ Goal: settle whether RoVE as an inference-time retrofit onto RoPE-trained checkp
 ### Phase 5 Exit Criteria
 - [ ] `.benchmarks/557_rove_retrofit_poc.md` written.
 - [ ] Promotion decision recorded (default-on vs opt-in) with honest justification.
+
+### Blocker (identified 2026-07-22)
+
+**Phase 5 is blocked on riir-train from-scratch pretraining infrastructure.**
+
+The current `riir-train-gpu::Trainer` is a **LoRA adapter trainer** — its
+`Trainer::new()` takes pre-existing `TransformerWeights` and trains LoRA
+adapters on top. It does NOT support from-scratch pretraining (random weight
+initialization → gradient descent on the full parameter set). T5.1 requires
+the latter.
+
+**Options to unblock:**
+1. **Extend riir-train-gpu with a from-scratch pretraining loop** — the GPU
+   kernels (forward/backward) exist for the transformer layers; what's missing
+   is the weight initialization + full-parameter optimizer (AdamW) + data
+   pipeline for FineWebEdu tokenization. This is a multi-day infrastructure
+   task.
+2. **Use an existing RoPE-trained checkpoint** (e.g. `gemma-2-2b-it-f16.gguf`
+   in `riir-train/data/`) for a **partial Phase 5** (A vs B only, no C
+   control). This would answer the retrofit question (does applying V
+   rotation at inference help or hurt?) but cannot validate our RoVE impl
+   against the paper (that needs the C control: RoVE-trained from scratch).
+   Requires T3.B (RoVE wiring into riir-ai's gemma2.rs forward path) to be
+   landed first.
+3. **Outsource the training** — use an external pretraining run (e.g. OLMo,
+   Pythia) and load the checkpoint. Not aligned with the repo's Rust-native
+   training stack, but would give a proper RoPE-trained baseline.
+
+**Recommended path:** option 2 (partial Phase 5 with existing checkpoint) as
+an interim measure, with option 1 (riir-train from-scratch loop) tracked as
+a separate riir-train issue for the full A/B/C comparison.
 
 ---
 
