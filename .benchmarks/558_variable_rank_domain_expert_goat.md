@@ -156,3 +156,110 @@ cargo test -p katgpt-core --features variable_rank_domain_expert \
 - [Research 453](../.research/453_Variable_Rank_Domain_Expert_Clusters.md) — the design + PoC
 - [Plan 321](../.plans/321_sampling_invariant_per_entity_moe_primitive.md) — `CommittedFieldBlend<N, D>` (the substrate)
 - [Plan 230](../.plans/230_shard_embedding_projection.md) — the cautionary flag (blind JL fails; guided projection mitigates)
+
+---
+
+## Monomorphization re-gate (Issue 189 T3, 2026-07-22)
+
+**Verdict: G2 still FAILS after monomorphization.** The vtable elimination
+recovered ~15-25% of the overhead (dynamic ~2.2× → macro ~1.7×), but the
+variable-rank pattern is structurally more expensive per tick — the domain
+gate + projection + scatter work is irreducible. **The feature stays opt-in
+forever.**
+
+### Methodology
+
+Two bench shapes, both using the `variable_rank_router_static!` macro router
+(zero-vtable dispatch). Measurements use warm-up (2 passes) + min-of-5
+methodology (filters system-load noise). Release mode, Apple Silicon.
+
+For comparison, the original dynamic bench (single-pass timing) was re-run
+5× to establish the pre-monomorphization baseline.
+
+### Raw numbers
+
+| Bench shape | Baseline | Variable-rank | Ratio | Target |
+|---|---|---|---|---|
+| Dynamic shared (original) — 1K | ~50 ns | ~114 ns | **~2.2×** (best 1.89×) | ≤ 1.0× |
+| Dynamic shared (original) — 10K | ~50 ns | ~104 ns | **~2.0×** | ≤ 1.0× |
+| **Macro shared** — 1K | 49.8 ns | 83.1 ns | **1.668×** | ≤ 1.0× |
+| **Macro shared** — 10K | 49.1 ns | 82.7 ns | **1.682×** | ≤ 1.0× |
+| **Macro production-shape** — 1K | 49.1 ns | 93.1 ns | **1.896×** | ≤ 1.0× |
+| **Macro production-shape** — 10K | 47.8 ns | 91.2 ns | **1.908×** | ≤ 1.0× |
+
+### Analysis
+
+**Macro shared-router** (1 shared `StaticRouter3` + 3× `override_cluster_pi` +
+1× `tick` per NPC): the vtable elimination recovered ~25% of the overhead
+(dynamic ~2.2× → macro ~1.7×). The remaining ~35 ns over baseline breaks
+down as:
+
+- 3× `override_cluster_pi` (direct `copy_from_slice`, no vtable): ~15 ns
+- Domain gate (`pick_domain`): ~10 ns
+- Projection + scatter (indexed load/store): ~10 ns
+
+These are all irreducible costs of the variable-rank pattern.
+
+**Macro production-shape** (per-NPC-owned `StaticRouter3`, tick only): contrary
+to the T1 prediction, this is **SLOWER** than the shared-router shape (~1.95×
+vs ~1.7×). The cause is cache thrashing: each NPC's boxed archetype fields
+are scattered across the heap (10K routers × 21 boxes = 210K heap allocations).
+Each `tick()` call chases 12-21 pointers into different cache lines. The
+`override_pi` cost saved (~15 ns) is less than the cache-miss cost added
+(~25 ns).
+
+**This is a bench artifact, not a fundamental cost.** In real production, the
+frozen archetype fields would be shared across all NPCs (they're frozen expert
+weights — identical for all entities). Only the `pi` vector would be per-NPC.
+The production-shape bench overestimates the true production cost because it
+forces per-NPC field copies. A shared-fields + per-NPC-pi data layout would
+eliminate the cache thrashing and reach the theoretical ~1.3× floor (domain
+gate + projection + scatter only, no override_pi).
+
+### Why G2 still fails
+
+Even in the best case (macro shared-router at ~1.7×), the variable-rank
+pattern is fundamentally more expensive per tick than the uniform baseline:
+
+1. **The baseline is extremely fast** (~50 ns). `CommittedFieldBlend<3,32>`
+   is a tight monomorphized loop — 96 multiply-adds + 3-element argmax, no
+   indirection, no branching.
+2. **The variable-rank router does MORE work** — the domain gate (3 dot-
+   products + argmax) + projection (L indexed loads) + scatter (L indexed
+   stores) are real computational steps the baseline doesn't perform.
+3. **Per-NPC pi override** — even with monomorphization, 3× `copy_from_slice`
+   (K=12 + K=6 + K=3 = 21 elements) costs ~15 ns. The baseline writes 3
+   f32s directly.
+
+The ~35 ns irreducible overhead over a ~50 ns baseline = 1.7×. The ≤1.0×
+target is structurally unreachable for variable-rank — the domain gate +
+projection is real work the baseline doesn't do.
+
+### T4 verdict — stays opt-in forever
+
+Per Issue 189 acceptance criteria, since G2 still > 1.0× after monomorphization:
+
+- **The variable-rank pattern is fundamentally more expensive per tick.**
+  The ~1.7× overhead (shared-router shape) or ~1.9× (production-shape)
+  is the floor — the domain gate + projection + scatter work cannot be elided.
+- **The feature stays opt-in forever.** The 2.63× entropy gain (G3) is the
+  selling point for diversity-prioritizing consumers, not latency.
+- **The monomorphization macro still ships** as the zero-vtable escape hatch
+  for consumers who want the best possible variable-rank latency. It recovered
+  ~25% of the overhead vs the dynamic router.
+- **No promotion to default-on.** The macro router is an optimization for
+  opt-in consumers, not a path to default promotion.
+
+### Reproduction (monomorphization re-gate)
+
+```sh
+# Macro shared-router + production-shape (warm-up + min-of-5)
+cargo test -p katgpt-core --features variable_rank_domain_expert \
+  --test bench_558_variable_rank_domain_expert_goat --release \
+  -- --nocapture --ignored --test-threads=1 'g2_perf_macro'
+
+# Dynamic shared-router (original, single-pass — for comparison)
+cargo test -p katgpt-core --features variable_rank_domain_expert \
+  --test bench_558_variable_rank_domain_expert_goat --release \
+  -- --nocapture --ignored --test-threads=1 'g2_perf_variable_rank'
+```

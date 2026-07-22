@@ -39,6 +39,7 @@ use katgpt_core::variable_rank_domain_expert::{
     pick_domain, project_guided, scatter_guided, ClusterHolder, RoutingVerdict,
     VariableRankRouter,
 };
+use katgpt_core::variable_rank_router_static;
 use std::time::Instant;
 
 // ─── Deterministic direction field (shared with bench_453 PoC shape) ─────────
@@ -213,6 +214,68 @@ fn make_router() -> VariableRankRouter<3, 32, 3> {
     )
 }
 
+// ─── Monomorphized macro router: 3 domains (Issue 189 T2/T3) ────────────────
+//
+// Same 3-domain topology as the dynamic `make_router()` above, but generated
+// by the `variable_rank_router_static!` macro — zero `Box<dyn>`, zero vtable
+// dispatch. This is the monomorphization escape hatch that eliminates the 4
+// virtual calls per tick (3× override_pi + 1× apply_blended).
+
+variable_rank_router_static! {
+    /// 3-domain monomorphized router: move (K=12, L=8) + combat (K=6, L=16) + quest (K=3, L=32).
+    /// Same topology as the dynamic `VariableRankRouter<3, 32, 3>` but with zero-vtable dispatch.
+    pub struct StaticRouter3<3, 32, 3>;
+
+    0 => move_cluster:   ClusterHolder<12, 8>  => [0, 1, 2, 3, 4, 5, 6, 7];
+    1 => combat_cluster: ClusterHolder<6, 16>  => [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
+    2 => quest_cluster:  ClusterHolder<3, 32>  => [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
+                                                   16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31];
+}
+
+/// Build a macro router with the same cluster topology + seeds as `make_router()`.
+fn make_static_router_3domain() -> StaticRouter3 {
+    let mut move_blend = CommittedFieldBlend::<12, 8>::uncommitted();
+    move_blend.tau = 1.0;
+    let move_fields: [Box<dyn ArchetypeFieldSource<8>>; 12] =
+        std::array::from_fn(|i| boxed_field::<8>(1000 + i) as Box<dyn ArchetypeFieldSource<8>>);
+    let move_cluster = ClusterHolder::<12, 8>::new(move_blend, move_fields);
+
+    let mut combat_blend = CommittedFieldBlend::<6, 16>::uncommitted();
+    combat_blend.tau = 1.0;
+    let combat_fields: [Box<dyn ArchetypeFieldSource<16>>; 6] =
+        std::array::from_fn(|i| boxed_field::<16>(2000 + i) as Box<dyn ArchetypeFieldSource<16>>);
+    let combat_cluster = ClusterHolder::<6, 16>::new(combat_blend, combat_fields);
+
+    let mut quest_blend = CommittedFieldBlend::<3, 32>::uncommitted();
+    quest_blend.tau = 1.0;
+    let quest_fields: [Box<dyn ArchetypeFieldSource<32>>; 3] = [
+        boxed_field(3000) as Box<dyn ArchetypeFieldSource<32>>,
+        boxed_field(3100) as Box<dyn ArchetypeFieldSource<32>>,
+        boxed_field(3200) as Box<dyn ArchetypeFieldSource<32>>,
+    ];
+    let quest_cluster = ClusterHolder::<3, 32>::new(quest_blend, quest_fields);
+
+    StaticRouter3::new(
+        move_cluster,
+        combat_cluster,
+        quest_cluster,
+        [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]],
+    )
+}
+
+/// Build a macro router with per-NPC pi pre-baked (production shape).
+fn make_static_router_3domain_with_pi(
+    pi_move: &[f32; 12],
+    pi_combat: &[f32; 6],
+    pi_quest: &[f32; 3],
+) -> StaticRouter3 {
+    let mut router = make_static_router_3domain();
+    router.override_cluster_pi(0, pi_move);
+    router.override_cluster_pi(1, pi_combat);
+    router.override_cluster_pi(2, pi_quest);
+    router
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // G1 — Correctness (no NaN, no panic across 10K random inputs)
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -245,6 +308,47 @@ fn g1_correctness_no_nan_across_10k_inputs() {
 const N_NPCS_1K: usize = 1_000;
 const N_NPCS_10K: usize = 10_000;
 
+/// NPC data tuple: (state, activity, pi_baseline, pi_move, pi_combat, pi_quest).
+type NpcData = ([f32; 32], [f32; 3], [f32; 3], [f32; 12], [f32; 6], [f32; 3]);
+
+/// Run `body` `passes` times and return the **minimum** elapsed time in ns.
+/// The minimum filters out noise from system load / frequency scaling — it's
+/// the best-case timing, which is the closest to the true instruction cost.
+/// The first 2 iterations act as warm-up (cache + branch predictor priming).
+fn time_min_passes(passes: usize, mut body: impl FnMut()) -> f64 {
+    // Warm-up passes (2) — prime the cache + branch predictor.
+    body();
+    body();
+    let mut best_ns = u128::MAX;
+    for _ in 0..passes {
+        let t0 = Instant::now();
+        body();
+        let elapsed = t0.elapsed().as_nanos();
+        if elapsed < best_ns {
+            best_ns = elapsed;
+        }
+    }
+    best_ns as f64
+}
+
+/// Generate NPC states + per-NPC pi vectors (simulating per-entity committed
+/// personalities — in production each NPC has its own CommittedFieldBlend
+/// with a distinct pi; the bench simulates this by overriding the shared
+/// router's cluster pi per-NPC before each tick).
+fn generate_npcs(n_npcs: usize) -> Vec<NpcData> {
+    (0..n_npcs)
+        .map(|i| {
+            let seed = (i as u64).wrapping_add(1).wrapping_mul(6364136223846793005);
+            let (state, activity) = npc_state(seed);
+            let pi_baseline = [prng(seed + 10), prng(seed + 20), prng(seed + 30)];
+            let pi_move = std::array::from_fn(|k| prng(seed + 100 + k as u64));
+            let pi_combat = std::array::from_fn(|k| prng(seed + 200 + k as u64));
+            let pi_quest = [prng(seed + 300), prng(seed + 310), prng(seed + 320)];
+            (state, activity, pi_baseline, pi_move, pi_combat, pi_quest)
+        })
+        .collect()
+}
+
 #[test]
 #[ignore = "GOAT G2 perf bench — run with --ignored in release mode"]
 fn g2_perf_variable_rank_vs_baseline_1k() {
@@ -258,21 +362,7 @@ fn g2_perf_variable_rank_vs_baseline_10k() {
 }
 
 fn g2_perf_inner(n_npcs: usize, label: &str) {
-    // Generate NPC states + per-NPC pi vectors (simulating per-entity committed
-    // personalities — in production each NPC has its own CommittedFieldBlend
-    // with a distinct pi; the bench simulates this by overriding the shared
-    // router's cluster pi per-NPC before each tick).
-    let npcs: Vec<([f32; 32], [f32; 3], [f32; 3], [f32; 12], [f32; 6], [f32; 3])> = (0..n_npcs)
-        .map(|i| {
-            let seed = (i as u64).wrapping_add(1).wrapping_mul(6364136223846793005);
-            let (state, activity) = npc_state(seed);
-            let pi_baseline = [prng(seed + 10), prng(seed + 20), prng(seed + 30)];
-            let pi_move = std::array::from_fn(|k| prng(seed + 100 + k as u64));
-            let pi_combat = std::array::from_fn(|k| prng(seed + 200 + k as u64));
-            let pi_quest = [prng(seed + 300), prng(seed + 310), prng(seed + 320)];
-            (state, activity, pi_baseline, pi_move, pi_combat, pi_quest)
-        })
-        .collect();
+    let npcs = generate_npcs(n_npcs);
 
     // ── Baseline run ─────────────────────────────────────────────────
     // Baseline has 3 archetypes → entropy max = log2(3) ≈ 1.585 bits.
@@ -336,6 +426,123 @@ fn g2_perf_inner(n_npcs: usize, label: &str) {
         "G3 FAIL: entropy ratio {entropy_ratio:.3}× < 1.5× target. \
          Variable-rank did not produce sufficient archetype diversity gain."
     );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// G2 — Monomorphization re-gate (Issue 189 T3)
+// ═══════════════════════════════════════════════════════════════════════════════
+//
+// Two bench shapes measure the macro router's vtable-elimination gain:
+//
+// 1. **Shared-router** (conservative bound): 1 shared `StaticRouter3` + per-NPC
+//    `override_cluster_pi`. Same shape as the dynamic bench above, but with
+//    zero-vtable dispatch. Recovers the 4 vtable calls (3× override_pi +
+//    1× apply_blended).
+//
+// 2. **Production-shape** (realistic): per-NPC-owned `StaticRouter3` routers
+//    with pre-baked pi. Hot loop calls `tick()` only — zero override_pi, zero
+//    vtable. This is the production lower bound (domain gate + projection +
+//    apply + scatter).
+//
+// Caveat on the production shape: each NPC owns its own boxed archetype fields,
+// scattered across the heap → cache misses during iteration. In production the
+// frozen fields would be shared; only pi is per-NPC. This bench overestimates
+// production cost — the true floor is lower.
+
+#[test]
+#[ignore = "GOAT G2 perf bench — run with --ignored in release mode"]
+fn g2_perf_macro_shared_router_1k() {
+    g2_perf_macro_shared_inner(N_NPCS_1K, "1K");
+}
+
+#[test]
+#[ignore = "GOAT G2 perf bench — run with --ignored in release mode"]
+fn g2_perf_macro_shared_router_10k() {
+    g2_perf_macro_shared_inner(N_NPCS_10K, "10K");
+}
+
+fn g2_perf_macro_shared_inner(n_npcs: usize, label: &str) {
+    let npcs = generate_npcs(n_npcs);
+
+    // Baseline run (same baseline as the dynamic bench).
+    let mut baseline = Baseline::new();
+    let baseline_latency_ns = time_min_passes(5, || {
+        for (state, _, pi_baseline, _, _, _) in &npcs {
+            baseline.tick(state, pi_baseline);
+        }
+    }) / n_npcs as f64;
+
+    // Macro shared-router run: 3× override_cluster_pi + 1× tick per NPC.
+    // This is the conservative bound — same work as the dynamic router but
+    // with zero vtable dispatch (all monomorphized inherent method calls).
+    let mut router = make_static_router_3domain();
+    let macro_latency_ns = time_min_passes(5, || {
+        for (state, activity, _, pi_move, pi_combat, pi_quest) in &npcs {
+            router.override_cluster_pi(0, pi_move);
+            router.override_cluster_pi(1, pi_combat);
+            router.override_cluster_pi(2, pi_quest);
+            let mut scratch = [0.0f32; 96];
+            let mut dz_out = [0.0f32; 32];
+            router.tick(state, activity, &mut scratch, &mut dz_out);
+        }
+    }) / n_npcs as f64;
+
+    let ratio = macro_latency_ns / baseline_latency_ns;
+    println!("\n═══ Issue 189 T3 — Macro Shared-Router ({label} NPCs) ═══");
+    println!("  Baseline <3,32>:    {baseline_latency_ns:.1} ns/NPC");
+    println!("  Macro shared:       {macro_latency_ns:.1} ns/NPC");
+    println!("  Latency ratio:      {ratio:.3}× (target: ≤ 1.0×)");
+    println!("═══════════════════════════════════════════════\n");
+}
+
+#[test]
+#[ignore = "GOAT G2 perf bench — run with --ignored in release mode"]
+fn g2_perf_macro_production_1k() {
+    g2_perf_macro_production_inner(N_NPCS_1K, "1K");
+}
+
+#[test]
+#[ignore = "GOAT G2 perf bench — run with --ignored in release mode"]
+fn g2_perf_macro_production_10k() {
+    g2_perf_macro_production_inner(N_NPCS_10K, "10K");
+}
+
+fn g2_perf_macro_production_inner(n_npcs: usize, label: &str) {
+    let npcs = generate_npcs(n_npcs);
+
+    // Pre-construct per-NPC routers with pre-baked pi (NOT timed).
+    // Each NPC owns its own StaticRouter3 with its own committed pi.
+    let routers: Vec<StaticRouter3> = npcs
+        .iter()
+        .map(|(_, _, _, pi_move, pi_combat, pi_quest)| {
+            make_static_router_3domain_with_pi(pi_move, pi_combat, pi_quest)
+        })
+        .collect();
+
+    // Baseline run (same baseline as the dynamic bench).
+    let mut baseline = Baseline::new();
+    let baseline_latency_ns = time_min_passes(5, || {
+        for (state, _, pi_baseline, _, _, _) in &npcs {
+            baseline.tick(state, pi_baseline);
+        }
+    }) / n_npcs as f64;
+
+    // Macro production run: tick() only — no override_pi, no vtable.
+    let macro_latency_ns = time_min_passes(5, || {
+        for (i, (state, activity, _, _, _, _)) in npcs.iter().enumerate() {
+            let mut scratch = [0.0f32; 96];
+            let mut dz_out = [0.0f32; 32];
+            routers[i].tick(state, activity, &mut scratch, &mut dz_out);
+        }
+    }) / n_npcs as f64;
+
+    let ratio = macro_latency_ns / baseline_latency_ns;
+    println!("\n═══ Issue 189 T3 — Macro Production-Shape ({label} NPCs) ═══");
+    println!("  Baseline <3,32>:    {baseline_latency_ns:.1} ns/NPC");
+    println!("  Macro production:   {macro_latency_ns:.1} ns/NPC");
+    println!("  Latency ratio:      {ratio:.3}× (target: ≤ 1.0×)");
+    println!("  (per-NPC-owned router, tick only — no override_pi)");
+    println!("═══════════════════════════════════════════════\n");
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

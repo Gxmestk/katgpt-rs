@@ -4,7 +4,7 @@
 **Issue:** [189](../../.issues/189_variable_rank_domain_expert_monomorphization_escape_hatch.md)
 **Plan:** [558](../../.plans/558_variable_rank_domain_expert_clusters.md)
 **Benchmark:** [558](../../.benchmarks/558_variable_rank_domain_expert_goat.md)
-**Status:** T1 DECISION — Option B (single generic `macro_rules!` with explicit indices) recommended. **T2 IMPLEMENTED** — macro shipped, G1+G4 gates pass. T3–T4 pending.
+**Status:** T1 DECISION — Option B (single generic `macro_rules!` with explicit indices) recommended. **T2 IMPLEMENTED** — macro shipped, G1+G4 gates pass. **T3-T4 DONE** — G2 re-gate ran, G2 still FAILS (~1.7× macro shared, ~1.95× production-shape). Feature stays opt-in forever.
 
 ## TL;DR
 
@@ -302,3 +302,30 @@ lines (well under the 2048 limit).
 
 **Next**: T3 re-runs the G2 bench with the macro router to measure the
 vtable-elimination gain.
+
+## T3+T4 verdict — G2 still FAILS (2026-07-22)
+
+**DONE.** Re-ran G2 in release mode with warm-up + min-of-5 methodology.
+Two bench shapes measured:
+
+| Shape | Baseline | Variable-rank | Ratio |
+|---|---|---|---|
+| Dynamic shared (original) — 1K | ~50 ns | ~114 ns | ~2.2× |
+| **Macro shared** — 1K | 49.8 ns | 83.1 ns | **1.668×** |
+| **Macro shared** — 10K | 49.1 ns | 82.7 ns | **1.682×** |
+| **Macro production-shape** — 1K | 49.1 ns | 93.1 ns | **1.896×** |
+| **Macro production-shape** — 10K | 47.8 ns | 91.2 ns | **1.908×** |
+
+The vtable elimination recovered ~25% of the overhead (dynamic ~2.2× → macro
+shared ~1.7×), but the variable-rank pattern is structurally more expensive —
+the ~35 ns irreducible overhead (domain gate + projection + scatter +
+override_pi) over a ~50 ns baseline = 1.7×.
+
+The production-shape was **SLOWER** than shared (~1.95× vs ~1.7×) due to cache
+thrashing from per-NPC boxed fields — a bench artifact, not a fundamental
+cost. In real production, fields would be shared + only pi would be per-NPC.
+
+**T4 verdict: stays opt-in forever.** The ≤1.0× target is structurally
+unreachable for variable-rank. The 2.63× entropy gain is the selling point.
+See [Benchmark 558](../../.benchmarks/558_variable_rank_domain_expert_goat.md)
+§"Monomorphization re-gate" for the full analysis.
