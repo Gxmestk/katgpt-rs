@@ -11,7 +11,7 @@
 
 **Source:** [Research 223 — maderix/ANE Distillation](../.research/223_maderix_ANE_Distillation_Verdict.md) + [Research 224 — coremltools Public API](../.research/224_coremltools_Public_API_ANE_Distillation_Verdict.md)
 **Related:** Plan 176 (GPU/ANE Offload), Plan 148 (PlasmaPath SIMD), Plan 240 (Sense Compression), Issue 004 (ANE CoreML Model Generation)
-**Status:** Pending GOAT
+**Status:** COMPLETE ✅ (negative result) — GOAT FAILED; `ane_npc` stays OPT-IN. Cosine 0.999995 (output equivalence PASS), ANE latency 286µs < 1ms (PASS), arena outcome rel diff 0.0047% (PASS), CPU utilization ratio 94.5%→53.3% (PASS). FAIL on wall-clock: ANE is 26× SLOWER than CPU SIMD (286µs vs 10.9µs/1000 NPCs) — ternary projection is too lightweight to benefit from ANE batch dispatch. Infrastructure (trait + router + CoreML gen + residency check) ships opt-in for future heavier NPC brain models. See `.benchmarks/053` + Plan 176.
 **Goal:** Move NPC "think brain" compute (sense reconstruction, emotion projection, zone attention) from CPU SIMD to ANE batch dispatch. CPU free for physics/combat/anti-cheat. 1000 NPCs × 20Hz → one ANE batch.
 
 ---

@@ -4,7 +4,7 @@
 **Research:** [katgpt-rs/.research/244_Self_Evolver_Faithfulness_Cognitive_Integrity.md](../.research/244_Self_Evolver_Faithfulness_Cognitive_Integrity.md)
 **Source paper:** [arxiv 2601.22436](https://arxiv.org/pdf/2601.22436) — Zhao et al. 2026 (ICML), "Large Language Model Agents Are Not Always Faithful Self-Evolvers"
 **Target:** `crates/katgpt-core/src/faithfulness/` (new module in katgpt-core, moved from `katgpt-rs/src/faithfulness/` so riir-engine Plan 308 can consume via katgpt-core) + Cargo features `faithfulness_probe`, `triggered_injection` (defined in katgpt-core, forwarded as passthroughs from the katgpt root crate)
-**Status:** Active — Phase 1 (unblocking skeleton)
+**Status:** COMPLETE ✅ — Phases 1–4 done. GOAT gate G1/G1b/G2/G3/G8 all PASS (G1 100% faithful + 100% unfaithful detection; G2 Spearman ρ=1.0000; G3 50% skip / 0.63% quality delta; G8 0% default-off regression). `triggered_injection` promoted to **DEFAULT-ON** (2.6ns/call gate, 50% compute savings); `faithfulness_probe` stays **OPT-IN** (diagnostic). 24/24 unit tests. See `.benchmarks/278_faithfulness_probe_goat.md`. Unblocks Plan 308.
 
 ---
 

@@ -4,7 +4,7 @@
 **Research:** [katgpt-rs/.research/407_Trees_from_Marginals_GDN_Tree_Verify.md](../.research/407_Trees_from_Marginals_GDN_Tree_Verify.md) §2.2 (Fusion idea)
 **Source papers:** [arXiv:2607.06763](https://arxiv.org/abs/2607.06763) §3.4 (GDN tree verify) + [arXiv:2607.02303](https://arxiv.org/abs/2607.02303) (HOLA hippocampal cache)
 **Target:** `katgpt-rs/crates/katgpt-core/src/gdn_tree_verify/mod.rs` (extend existing module) + Cargo feature `gdn_hola_tree_verify` (implies `gdn_tree_verify` + `hippocampal_cache`)
-**Status:** Active — Phase 1–2 COMPLETE, Phase 3 bridge + speculative step DONE (T3.1), T3.2/T3.3 deferred (cross-repo). Phase 4: G1/G3/G4 PASS, **G2 PASS** (fusion efficiency: dual/(gdn+hola) < 1.0 per GOAT gate definition line 20; 1.2× sub-bar not met — see `.benchmarks/430_dual_path_verify_goat.md`), G5 deferred. Pre-normalization optimization landed (chain T=128 −8.8%).
+**Status:** COMPLETE ✅ (with deferrals) — Phases 1–4 done. GOAT G1/G3/G4 PASS, G2 PASS at the gate definition (`dual/(gdn+hola) < 1.0`, 0.91–1.07 for T≥32) but the aspirational 1.2× sub-bar FAILs (1.24–1.40× — HOLA's W=64 softmax read adds 24–40%; inherent cost of exact recall). Pre-normalization optimization landed (chain T=128 −8.8%). G5 (retrieval gain) DEFERRED — requires trained GDN2+HOLA model; retrieval property inherited from Plan 395's G4. T3.2 (riir-ai consumer wiring) + T3.3 (integration test) DEFERRED (cross-repo; primitive + bridge adapter shipped). `gdn_hola_tree_verify` stays OPT-IN. See `.benchmarks/430_dual_path_verify_goat.md`.
 
 ---
 

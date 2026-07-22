@@ -12,7 +12,7 @@
 - **Private guide:** [`riir-ai/.research/127_*.md`](../../../riir-ai/.research/127_Implicit_Microcognition_Crowd_NPC_Guide.md) — **reframed as GOAT design context** (verdict revised from Super-GOAT after `evolve_hla` prior-art check)
 **Source paper:** [arXiv:2604.17121](https://arxiv.org/abs/2604.17121) — Mozer, Siddiqui, Liu (DeepMind, Jun 2026), "The Topological Trouble With Transformers"
 **Target:** Extend `katgpt-rs/crates/katgpt-core/src/sense/` (refactor `evolve_hla` into a trait + add attractor family) + new `micro_belief/` submodule for the trait + snapshot + bridge + Cargo feature `micro_belief`
-**Status:** Active — Phase 0 (planning). **Verdict revised same day: Super-GOAT → GOAT** after prior-art check found `evolve_hla` already implements Family C.
+**Status:** COMPLETE ✅ (with deferrals + negative result) — All phases done. Verdict Super-GOAT → GOAT (prior-art check found `evolve_hla` already implements Family C). Shippable output: trait unification + `LeakyIntegrator` wrapper (zero-behavior-change refactor, byte-identical to `evolve_hla`). Attractor family G2.1 FAILS (569× more flip-flops than leaky on coherence bench) and G1.4 latency FAILS (~270ns vs 100ns target, Issue 024) — demoted to Gain, stays behind `micro_belief` flag. `LatentThoughtKernel` ships as opt-in experiment. Cross-plan composability test (Plan 136) deferred. See `.benchmarks/276_micro_belief_goat.md` + `.issues/024`.
 
 ---
 

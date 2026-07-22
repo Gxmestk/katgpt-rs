@@ -4,7 +4,7 @@
 **Research:** [katgpt-rs/.research/311_Analytic_Lattice_Encoder_Decoder_Primitive.md](../.research/311_Analytic_Lattice_Encoder_Decoder_Primitive.md)
 **Source paper:** Synthesis (R311 §2) — Functional Attention × PJ-RoPE × Gyrocalculus fusion
 **Target:** `katgpt-rs/crates/katgpt-core/src/analytic_lattice/` (new module) + Cargo feature `analytic_lattice_encoder`
-**Status:** Active. katgpt-core half (Phases 0, 1a, 2, 2.5, 3, 4) COMPLETE + committed. riir-engine Phase 1b (ASOC cascade `ComposerTick: GpuFuture` + `Join3` + `PrevTickJoinObserver`) WIRED 2026-07-02 — the orphaned `analytic_lattice/` module is now feature-gated (`analytic_lattice_runtime`) + lib.rs-registered + 6/6 GOAT tests pass (G1 determinism, G1b non-blocking, G1c stash-refresh, G4 latency sanity, T1b.8 reflection). Phase 5 promotion deferred pending a real GPU executor + the full G1–G6 gate.
+**Status:** COMPLETE ✅ (with deferrals) — katgpt-core math primitives (Phases 0, 1a, 2, 2.5, 3, 4) ALL DONE + GOAT G1/G2/G3/G5/G6 PASS (see `.benchmarks/330_analytic_lattice_goat.md`). riir-engine Phase 1b ASOC cascade (`ComposerTick: GpuFuture` + `Join3`) WIRED 2026-07-02 with 6/6 runtime GOAT tests passing (G1 determinism, G1b non-blocking, G1c stash-refresh, G4 latency sanity). Phase 5 T5.3 promotion DEFERRED: `analytic_lattice`/`analytic_lattice_runtime` stay OPT-IN until Phase 1b headline consumer has a real GPU executor + full G1–G6 gate (math-only promotion would add a default feature with no consumer).
 
 > **Revision note (2026-06-26):** Original Phase 1 (`AnalyticLatticeEncoder`
 > trait + 3 reference impls) is **DROPPED** — it is redundant with

@@ -4,7 +4,7 @@
 **Research:** [katgpt-rs/.research/414_Fully_Looped_Transformer_Readout_Blind_Spot.md](../.research/414_Fully_Looped_Transformer_Readout_Blind_Spot.md)
 **Source papers:** [arXiv:2605.18797](https://arxiv.org/abs/2605.18797) (Fully Looped Transformer) + [arXiv:2606.24898](https://arxiv.org/abs/2606.24898) (Readout Blind Spot)
 **Target:** `katgpt-rs/examples/loop_stability_poc.rs` (PoC benchmark) + `katgpt-rs/crates/katgpt-percepta/src/transformer.rs` (implementation behind feature flag)
-**Status:** Active — Phase 1 (PoC)
+**Status:** COMPLETE ✅ (with deferrals) — Phases 1–3 done. Phase 1 PoC defend-wrong verdict: only Inter-loop RMSNorm works (3.34× norm control); FLA-res DROPPED (2.2B× catastrophic explosion), AttnInj DROPPED (no-op for single-position softmax). Phase 2 GOAT gate G1/G2/G3/G4 all PASS (byte-identical when `None`, finite logits, 2.3% latency overhead, 0.88× norm ratio). `loop_stability_fix` stays OPT-IN (micro model doesn't exhibit explosion; promotion requires a real-world model that exhibits T-pass norm explosion). Model-based path documented in Proposal 018 §7.3. See `.benchmarks/428`.
 
 ---
 

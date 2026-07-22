@@ -4,7 +4,7 @@
 **Research:** [katgpt-rs/.research/277_DiffusionGemma_Transparency_Smearing_Faithfulness.md](../.research/277_DiffusionGemma_Transparency_Smearing_Faithfulness.md)
 **Source paper:** [arXiv:2606.20560](https://arxiv.org/abs/2606.20560) — Engels et al., "How Transparent is DiffusionGemma?", DeepMind, Jun 2026
 **Target:** `katgpt-rs/crates/katgpt-core/src/faithfulness/smear.rs` (new module) + Cargo feature `smear_classifier` (depends on `faithfulness_probe`)
-**Status:** Active — Phase 1 complete, Phases 2-4 pending
+**Status:** COMPLETE ✅ (with deferral) — Phases 1–4 done. GOAT G1/G2/G3 all PASS (G2 2.11× ≥ 2.0× discrimination PASS; G3 107.6ns ≤ 200ns PASS). `smear_classifier` stays **OPT-IN** (diagnostic; promotion requires real-workload evidence from riir-ai Cognitive Integrity Layer integration). T4.3 cross-repo riir-ai `.research/129` vocabulary adoption SKIPPED (out of scope for this single-repo task). See `.benchmarks/298_smear_classifier_goat.md`.
 
 ---
 

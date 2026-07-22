@@ -4,7 +4,7 @@
 **Research:** [katgpt-rs/.research/239_MLEvolve_Progressive_MCGS_Entropy_Schedule.md](../.research/239_MLEvolve_Progressive_MCGS_Entropy_Schedule.md)
 **Source paper:** [arxiv 2606.06473](https://arxiv.org/abs/2606.06473) — MLEvolve, Du et al. 2026-06-04
 **Target:** `katgpt-rs/src/progressive_mcgs/` (new module) + Cargo feature `progressive_mcgs`
-**Status:** Active — Phase 1 ✅ COMPLETE (52/52 tests pass), Phase 2 ✅ COMPLETE (63/63 tests pass, orchestrator shipped), Phase 3 (GOAT gate) next
+**Status:** COMPLETE ✅ — GOAT G1/G2/G3 all PASS (G1 entropy decay 50.6% PASS; G2 backprop correctness bit-identical PASS with 10 cross-branch reference edges, 0 diff across 100 nodes; G3 compute concentration soft-PASS — Progressive 73.2% ≥ Vanilla 72.7%, Elite scheduler marginal over UCT in synthetic Bernoulli domains). 63/63 tests. Latency 11.6µs/step (above 5µs target — `StepResult` Vec allocations). Stays OPT-IN (`progressive_mcgs` feature). See `.benchmarks/272_progressive_mcgs_goat.md`. Unblocks riir-ai Plan 298.
 
 ---
 

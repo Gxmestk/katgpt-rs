@@ -4,7 +4,7 @@
 **Research:** [katgpt-rs/.research/393_Block_Sparse_Featurizer_Subspace_Concept_Primitive.md](../.research/393_Block_Sparse_Featurizer_Subspace_Concept_Primitive.md)
 **Source paper:** [arXiv:2606.25234](https://arxiv.org/abs/2606.25234) — Goodfire, Block-Sparse Featurizers
 **Target:** `katgpt-rs/crates/katgpt-core/src/subspace_steering.rs` (new module) + Cargo feature `subspace_steering`
-**Status:** Active — Phase 1 (unblocking skeleton)
+**Status:** COMPLETE ✅ — Phases 1–5 done. GOAT G1–G5 ALL PASS (G1 0 mismatches / 800 comparisons K=1↔Plan 309 bit-identical; G3 0 allocs/1000 calls; G4 sizes 68/104/176 bytes exact; G5 commitment + walk_manifold deterministic). `subspace_steering` promoted to **DEFAULT-ON** (2026-07-08). Algorithm change: Gram-Schmidt (not Newton-Schulz — NS diverges on K<D). 18/18 tests. Coexists with Plan 309 (1D sibling, distinct niche).
 
 ---
 
