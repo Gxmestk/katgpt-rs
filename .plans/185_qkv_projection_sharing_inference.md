@@ -2,7 +2,7 @@
 
 **Date:** 2026-06-05
 **Research:** 165 (Q-K=V Projection Sharing)
-**Status:** Planning
+**Status:** COMPLETE ✅ — 8/8 tasks done. GOAT 7/7 PASS. `kv_share` PROMOTED to DEFAULT-ON.
 **Scope:** katgpt-rs (modelless, inference-time only)
 
 ---
