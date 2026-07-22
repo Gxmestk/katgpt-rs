@@ -5,7 +5,7 @@
 **Source paper:** [arXiv:2606.11275](https://arxiv.org/abs/2606.11275) — García-Castellanos, Weiler, Bekkers, Jul 2026 (RoVE)
 **Source code:** [github.com/AGarciaCast/RoVE](https://github.com/AGarciaCast/RoVE)
 **Target:** `katgpt-rs/crates/katgpt-core/src/rotary_value_embedding.rs` (new module, sibling to `position_group_action.rs`) + Cargo feature `rotary_value_embedding` (re-exported from root `katgpt-rs/Cargo.toml` as `rotary_value_embedding = ["katgpt-core/rotary_value_embedding"]`). Wiring in `katgpt-rs/crates/katgpt-attn/src/` (Phase 3) + `katgpt-rs/crates/katgpt-attn-match/src/chunked.rs` (Phase 4).
-**Status:** Active — Phases 1–4 DONE + committed. Phase 3 original tasks (T3.1–T3.5) marked MOOT (target was a stub); replaced by T3.A (substrate G2 unblock, DONE) + T3.B (cross-repo wiring to riir-ai, DONE — riir-ai Issue 562, with a convention-mismatch finding that redirected the forward-path V rotation to riir-engine's own rotate-half RoPE). Phase 5 (retrofit PoC) is the sole remaining phase — **BLOCKED** on riir-train from-scratch pretraining infrastructure (see Phase 5 §Blocker).
+**Status:** All phases DONE. Substrate (Phases 1-4) + wiring (T3.B) + retrofit PoC (Phase 5 partial, Option 2). **Verdict: RoVE retrofit HURTS perplexity (+12.5% loss, +48.2% ppl) on RoPE-trained checkpoints.** Feature stays opt-in permanently. The C control (RoVE-trained-from-scratch, riir-train Issue 379) remains a non-blocking validation follow-up.
 
 > **Numbering note.** Research note 452 + Plan 557 deliberately use *different* numbers because `.research/` and `.plans/` are independent namespaces with independent highwater markers — `.research/` was at 451 (next free = 452), `.plans/` was at 556 (next free = 557). The number collision in `.plans/452` (`452_simd_lut_dequant.md` already exists) is what forces the plan to 557. The research note at `.research/452_*.md` is the design doc; this plan is the execution tracker.
 
@@ -243,29 +243,55 @@ Goal: settle whether RoVE as an inference-time retrofit onto RoPE-trained checkp
 
 **This phase is honest research, not a feature gate.** The output is a `.benchmarks/557_rove_retrofit_poc.md` document recording the result. No matter the outcome, Phase 5 informs the promotion decision.
 
-### Tasks
+### Phase 5 ACTUAL OUTCOME (2026-07-22 — Partial Phase 5 via Option 2)
 
-- [ ] **T5.1** Train a toy GPT-2 (12 layers, 12 heads, d=768 — the paper's small config, ~124M params) on FineWebEdu-10B *without* RoVE. **This requires GPU training → riir-train.** Coordinate with riir-train to land a small training run; the resulting checkpoint is the "RoPE-trained baseline".
-- [ ] **T5.2** At inference, benchmark the RoPE-trained checkpoint in three configurations:
-  - **A) RoPE-only** (today's baseline).
-  - **B) RoVE retrofit** (apply V rotation at inference, even though the model was trained without it).
-  - **C) RoVE-trained from scratch** (control — train a second checkpoint WITH RoVE; this should match the paper's numbers and validates our RoVE impl).
-- [ ] **T5.3** Measure on the same three benchmarks as the paper:
-  - Core ICL accuracy (DCLM-Core few-shot).
-  - OOD perplexity at 512, 1024, 2048, 4096 tokens.
-  - RULER long-context retrieval at 4k (NIAH, Variable Tracking).
-- [ ] **T5.4** Write `.benchmarks/557_rove_retrofit_poc.md` with:
-  - A vs B comparison (retrofit effect on RoPE-trained model).
-  - A vs C comparison (validates our RoVE impl against the paper).
-  - Honest verdict: if B > A → retrofit helps, RoVE is a default-on candidate. If B ≤ A → retrofit is neutral or harmful, RoVE stays opt-in for forward-compat only.
-- [ ] **T5.5** If T5.4 verdict is "retrofit helps" AND Phase 2 G1–G5 PASS → promote `rotary_value_embedding` to default-on. Update `katgpt-rs/Cargo.toml` default features, update README Feature Showcase, update `.benchmarks/557_*_promotion_session.md` with the promotion record.
-- [ ] **T5.6** If T5.4 verdict is "retrofit neutral or harmful" → keep `rotary_value_embedding` opt-in. Document the rationale in `.benchmarks/557_rove_retrofit_poc.md` and in the README Feature Showcase entry.
+**The retrofit question is ANSWERED: RoVE retrofit HURTS perplexity. The feature
+stays opt-in permanently for RoPE-trained checkpoints.**
+
+Per the plan's recommended path (§Blocker option 2), we used the existing
+gemma-2-2b-it checkpoint instead of training a from-scratch toy GPT-2. This
+tested A (RoPE-only) vs B (RoVE retrofit) — the core retrofit question. The C
+control (RoVE-trained-from-scratch) requires GPU training (riir-train Issue
+379) and remains a non-blocking follow-up.
+
+**Measured results** (65 predictions, gemma-2-2b-it, CPU):
+
+| Configuration | Avg Loss | Perplexity | Δ Loss |
+|---|---|---|---|
+| A) RoPE-only (baseline) | 3.142952 | 23.172 | — |
+| B) RoVE retrofit | 3.536450 | 34.345 | **+12.5%** |
+
+**Verdict: B > A in loss (worse).** The V rotation perturbs the OV circuit in
+a way the RoPE-trained model has not learned to compensate for. This is the
+expected result — the paper's equivalence is a training-time claim, not an
+inference-time retrofit claim. See `.benchmarks/557_rove_retrofit_poc.md` for
+the full analysis + honest caveats.
+
+### Tasks (updated)
+
+- [-] **T5.1** Train a toy GPT-2 on FineWebEdu-10B without RoVE. **DEFERRED** —
+  requires GPU training (riir-train Issue 379). Option 2 (existing gemma-2-2b-it
+  checkpoint) was used instead, which answers the core retrofit question without
+  needing from-scratch training. The C control (RoVE-trained-from-scratch) still
+  needs this, but it's a non-blocking validation, not a promotion blocker.
+- [x] **T5.2** Benchmark A (RoPE-only) vs B (RoVE retrofit) using gemma-2-2b-it.
+  Harness: `riir-ai/crates/riir-engine/tests/bench_557_rove_retrofit.rs`.
+- [-] **T5.3** Measure on Core ICL, OOD perplexity, RULER. **PARTIALLY DONE** —
+  perplexity on fixed English text measured (the headline metric). Core ICL +
+  RULER require additional dataset infrastructure (math-500, RULER harness);
+  the perplexity signal (+12.5% loss) is strong enough to settle the promotion
+  question without them.
+- [x] **T5.4** Write `.benchmarks/557_rove_retrofit_poc.md` — DONE. A vs B
+  comparison recorded with honest verdict.
+- [-] **T5.5** (N/A — verdict is "retrofit hurts", not "helps". The promotion path is T5.6, not T5.5.)
+- [x] **T5.6** Keep `rotary_value_embedding` opt-in. Documented in
+  `.benchmarks/557_rove_retrofit_poc.md`.
 
 ### Phase 5 Exit Criteria
-- [ ] `.benchmarks/557_rove_retrofit_poc.md` written.
-- [ ] Promotion decision recorded (default-on vs opt-in) with honest justification.
+- [x] `.benchmarks/557_rove_retrofit_poc.md` written.
+- [x] Promotion decision recorded: **stay opt-in** (retrofit hurts, +12.5% loss).
 
-### Blocker (identified 2026-07-22)
+### Blocker (RESOLVED 2026-07-22 via Option 2)
 
 **Phase 5 is blocked on riir-train from-scratch pretraining infrastructure.**
 
@@ -295,6 +321,10 @@ the latter.
 **Recommended path:** option 2 (partial Phase 5 with existing checkpoint) as
 an interim measure, with option 1 (riir-train from-scratch loop) tracked as
 a separate riir-train issue for the full A/B/C comparison.
+
+**Update (2026-07-22):** T3.B (RoVE wiring into gemma2.rs) is now DONE
+(sibling agent, riir-ai commit `cd62e6cd6`). Option 2 is unblocked —
+the perplexity comparison harness is the next step.
 
 ---
 

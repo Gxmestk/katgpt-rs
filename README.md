@@ -572,6 +572,7 @@ Path-Aware:  100 nodes, 100 accumulated-valid (100.0%)
 | CompressionDrafter (Plan 285) | **GOAT FAILED (2 runs)** | G1 1.50× (<3× target), G2 1077× (>2× target). Beam search structurally loses to template selection at Hot-tier |
 | Alien Sampler (Plan 311) | **GOAT FAILED (2/4)** | G1+G2 FAIL (β phase-transition at β≈0.4 — no β satisfies both motif-collapse and quality-preservation on synthetic NPC scenario). G3 PASS post-rayon (38.42×→4.56×). G4 PASS. Mechanism validated (2× concentration reduction); domain transfer unvalidated |
 | KV Consolidation (Plan 420) | **QUALITY GAIN REFUTED** | §3.6 PoC: Δtoken_acc = −0.06pp, ΔNLL = +0.0001; zero hyperparameter sensitivity. riir-train Plan 313 confirmed on TRAINED model (31% accuracy, 0.00pp gain). Paper's quality benefit is inseparable from TRAINED Cache Processor; modelless mean-shift is inert. No feature flag ships. |
+| RoVE Retrofit (Plan 557) | **RETROFIT HURTS** | Phase 5 A/B: applying RoVE V rotation at inference to RoPE-trained gemma-2-2b-it increases loss **+12.5%** (3.14→3.54) and perplexity **+48.2%** (23.2→34.3). The paper's equivalence is training-time, not inference-time. All 7 GOAT gates PASS (substrate is correct); feature stays opt-in for forward-compat only. |
 
 📖 **Full negative result detail + replaced feature audit:** [`.docs/09_feature_catalog/negative_results.md`](.docs/09_feature_catalog/negative_results.md).
 
