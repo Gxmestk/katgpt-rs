@@ -1136,6 +1136,18 @@ pub use position_group_action::{
     AlibiAction, FoxAction, GrapeMAction, NopeAction, PositionGroupAction, RopeAction, WallAction,
 };
 
+// RoVE — Rotary Value Embeddings Attention (Plan 557, Research 452,
+// arXiv:2606.11275). Extends RoPE from Q/K to the V projection + inverse-
+// rotates the aggregated output, yielding an attentive convolution with
+// offset-indexed block-Toeplitz kernel ψ_δ = R_δ·W_V. Parameter-free,
+// FlashAttention-compatible. The first hot-path consumer of GRAPE's
+// PositionGroupAction trait — turns the "vocabulary bridge" into a real
+// attention variant. Implies position_group_action (consumes RopeAction).
+// STAYS OPT-IN until Phase 5 retrofit PoC settles the open question of
+// whether inference-time RoVE onto RoPE-trained checkpoints helps or hurts.
+#[cfg(feature = "rotary_value_embedding")]
+pub mod rotary_value_embedding;
+
 // GRAPE-AP — Vector-Similarity Path-Integral Decay Gates (GRAPE §5).
 // Content-aware extension of Wall Attention: ψ_h(t,ℓ) = α·g(⟨p_t, R_ℓ·p_ℓ⟩/d)
 // with g = log_sigmoid. Tokens whose positional embedding matches the query's
