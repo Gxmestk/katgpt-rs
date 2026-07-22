@@ -4,7 +4,7 @@
 **Research:** [katgpt-rs/.research/379_Hierarchical_Global_Attention_Chunk_Group_Routing.md](../.research/379_Hierarchical_Global_Attention_Chunk_Group_Routing.md)
 **Source paper:** [arxiv 2606.30709](https://arxiv.org/abs/2606.30709) — Hierarchical Global Attention (Frank, Fedosov, Grinenko, BMW Group, Jun 2026)
 **Target:** `katgpt-rs/crates/katgpt-core/src/hga/` (new module) + `katgpt-rs/crates/katgpt-core/src/tiered_kv/` (new module) + Cargo feature `hga`
-**Status:** Active — Phase 1 complete, Phase 2 GOAT gate G2-proxy FAIL (negative result, keep opt-in). G5 latency PASS (1.12×). Phase 3 decision: T3.3 (keep opt-in, document negative result).
+**Status:** COMPLETE ✅ (negative result) — Phase 2 GOAT gate G2-proxy FAIL; Phase 3 decision T3.3: keep opt-in, document negative result. G5 latency PASS (1.12×).
 
 ---
 

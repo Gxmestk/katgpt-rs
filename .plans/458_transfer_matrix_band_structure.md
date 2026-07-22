@@ -8,7 +8,7 @@
 - Martin & Mahoney, *Implicit Self-Regularization in Deep Neural Networks*, [arXiv:1810.01075](https://arxiv.org/abs/1810.01075); *Traditional and Heavy-Tailed Self Regularization*, [arXiv:1901.08276](https://arxiv.org/abs/1901.08276) — weight-matrix ESD as a model-quality signal.
 **Target:** `katgpt-rs/crates/katgpt-core/src/analytic_lattice/band_structure.rs` (new module)
 **Cargo feature:** `transfer_matrix_band_structure` (new, opt-in)
-**Status:** Active — Phase 1, 2, 3, 4 DONE (2026-07-18). Promotion decision: KEEP OPT-IN (T4.2 path — symmetric-only Jacobi is a real limitation for non-symmetric operators). See `.benchmarks/458_transfer_matrix_band_structure_goat.md` for the full GOAT gate report.
+**Status:** COMPLETE ✅ (2026-07-18) — Phases 1-4 done. Promotion decision: KEEP OPT-IN (T4.2 — symmetric-only Jacobi is a real limitation for non-symmetric operators). See `.benchmarks/458_transfer_matrix_band_structure_goat.md`.
 
 ---
 
