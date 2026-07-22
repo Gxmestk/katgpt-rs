@@ -2,15 +2,17 @@
 
 **Date:** 2026-07-22
 **Status:** COMPLETE — Partial Phase 5 (Option 2: A vs B only, no C control)
-**Verdict:** **RoVE retrofit HURTS perplexity** — +12.5% loss, +48.2% perplexity.
-Keep `rotary_value_embedding` opt-in.
+**Verdict:** **RoVE retrofit HURTS perplexity** — +12.5% loss (short text) to
++153% perplexity (longer text). Keep `rotary_value_embedding` opt-in.
 
 ## TL;DR
 
 Applying RoVE V rotation at inference to a RoPE-trained checkpoint (gemma-2-2b-it)
-**significantly degrades** language modeling quality. Average loss increases
-from 3.143 → 3.536 (+12.5%), and perplexity increases from 23.17 → 34.34
-(+48.2%). The retrofit is **harmful**, not neutral. The feature stays opt-in.
+**significantly degrades** language modeling quality. On a short passage
+(65 predictions): average loss increases from 3.143 → 3.536 (+12.5%),
+perplexity from 23.17 → 34.34 (+48.2%). On a longer passage (162 predictions):
+perplexity increases from 10.64 → 26.89 (+152.8%). The retrofit is **harmful**,
+not neutral. The feature stays opt-in.
 
 ## Background
 
@@ -75,14 +77,32 @@ all positions. Perplexity = `exp(average_loss)`.
 
 ## Results
 
+### Measurement 1 — Short text (65 predictions, harness: `bench_557_rove_retrofit.rs`)
+
 | Configuration | Avg Loss | Perplexity | Δ Loss | Δ Perplexity |
 |---|---|---|---|---|
 | **A) RoPE-only** (baseline) | 3.142952 | 23.172 | — | — |
 | **B) RoVE retrofit** | 3.536450 | 34.345 | +0.394 (+12.5%) | +11.17 (+48.2%) |
 
+### Measurement 2 — Longer text (162 predictions, harness: `rove_perplexity_poc.rs` + `scripts/rove_retrofit_poc.sh`)
+
+The longer Wizard of Oz passage (~200 words, 162 predictions) produces an even
+stronger signal — the V rotation perturbation accumulates across diverse
+contexts.
+
+| Configuration | Avg Loss | Perplexity | Δ Perplexity |
+|---|---|---|---|
+| **A) RoPE-only** (baseline) | 2.364 | 10.635 | — |
+| **B) RoVE retrofit** | 3.292 | 26.888 | **+152.8%** |
+
+**Both measurements agree: RoVE retrofit HURTS perplexity.** The shorter text
+shows +48% degradation; the longer text shows +153% degradation. The signal is
+unambiguous and far beyond any measurement noise.
+
 **Run details:**
-- 66 tokens (65 predictions), 0.1s/token on CPU
-- Both runs use the same model checkpoint, same token sequence, same forward code
+- Measurement 1: 66 tokens (65 predictions), 0.1s/token on CPU
+- Measurement 2: 163 tokens (162 predictions), 170ms/token on CPU
+- Both use the same model checkpoint (gemma-2-2b-it-f16.gguf)
 
 ## Analysis
 

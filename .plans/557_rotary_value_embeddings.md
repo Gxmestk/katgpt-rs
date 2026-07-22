@@ -254,18 +254,20 @@ tested A (RoPE-only) vs B (RoVE retrofit) — the core retrofit question. The C
 control (RoVE-trained-from-scratch) requires GPU training (riir-train Issue
 379) and remains a non-blocking follow-up.
 
-**Measured results** (65 predictions, gemma-2-2b-it, CPU):
+**Measured results** (gemma-2-2b-it, CPU):
 
-| Configuration | Avg Loss | Perplexity | Δ Loss |
-|---|---|---|---|
-| A) RoPE-only (baseline) | 3.142952 | 23.172 | — |
-| B) RoVE retrofit | 3.536450 | 34.345 | **+12.5%** |
+| Text | Predictions | Config | Avg Loss | Perplexity | Δ Loss |
+|---|---|---|---|---|---|
+| Short | 65 | A) RoPE-only | 3.143 | 23.17 | — |
+| Short | 65 | B) RoVE retrofit | 3.536 | 34.34 | **+12.5%** |
+| Longer (Wizard of Oz) | 162 | A) RoPE-only | 2.364 | 10.64 | — |
+| Longer (Wizard of Oz) | 162 | B) RoVE retrofit | 3.292 | 26.89 | **+39.2%** (+153% ppl) |
 
-**Verdict: B > A in loss (worse).** The V rotation perturbs the OV circuit in
-a way the RoPE-trained model has not learned to compensate for. This is the
-expected result — the paper's equivalence is a training-time claim, not an
-inference-time retrofit claim. See `.benchmarks/557_rove_retrofit_poc.md` for
-the full analysis + honest caveats.
+**Verdict: B > A in loss (worse) on both measurements.** The V rotation
+perturbs the OV circuit in a way the RoPE-trained model has not learned to
+compensate for. This is the expected result — the paper's equivalence is a
+training-time claim, not an inference-time retrofit claim. See
+`.benchmarks/557_rove_retrofit_poc.md` for the full analysis + honest caveats.
 
 ### Tasks (updated)
 
