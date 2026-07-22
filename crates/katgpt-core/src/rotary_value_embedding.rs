@@ -158,6 +158,13 @@ pub fn inverse_rotate_output_into(
 ///
 /// - **Zero allocation** in the loop (per-token slice borrows only).
 /// - This is the API the attention forward path calls once per layer (Phase 3).
+///
+/// - **Hot-path note (Plan 557 Phase 3):** this scalar path recomputes
+///   `cos`/`sin` per pair per token — the dominant cost. For batch rotation
+///   of `n` tokens at contiguous positions `0..n`, prefer
+///   [`batch_rotate_values_into_fast`] with a precomputed [`RoVeRotationTable`],
+///   which eliminates transcendental calls from the inner loop entirely.
+///   The scalar path is kept as the bit-identical reference (G1 contract).
 pub fn batch_rotate_values_into(
     action: &RopeAction,
     positions: &[usize],
@@ -201,6 +208,206 @@ pub fn batch_inverse_rotate_output_into(
             &aggregated[start..start + dim],
             &mut out[start..start + dim],
         );
+    }
+}
+
+// ── Fast batch primitives (precomputed cos/sin table — Phase 3 G2 unblock) ──
+//
+// The scalar [`batch_rotate_values_into`] / [`batch_inverse_rotate_output_into`]
+// recompute `cos(angle)` / `sin(angle)` per pair per token. For `n=1024, d=768`,
+// that is `1024 × 384 × 2 = 786,432` transcendental calls per layer. On a
+// typical ARM core each `sincos` call is ~30–100 cycles — the transcendentals
+// dominate the rotation cost entirely.
+//
+// The fast path precomputes the cos/sin table ONCE per `(theta, dim, max_pos)`
+// triple, then the per-token inner loop is pure `mul_add` arithmetic. This is
+// the G2 unblock for Plan 557 Phase 2's honest FAIL (6.45% → target < 5%).
+//
+// The table is `max_pos × dim` entries, storing interleaved `(cos, sin)` per
+// pair — matching the AoS input layout so the rotation inner loop reads
+// contiguous `(c, s)` pairs and writes contiguous `(x0', x1')` pairs. The
+// inner loop uses `f32::mul_add` which lowers to a single FMA on hardware
+// that has it (NEON vfmaq_n_f32_lane, AVX2 vfmadd213ps) — matching the
+// scalar reference's rounding exactly (single-rounding FMA semantics).
+//
+// Auto-vectorization note: the AoS pair layout does NOT auto-vectorize as
+// cleanly as SoA, but LLVM's SLP vectorizer does catch the 2-wide pair
+// pattern on aarch64 (confirmed via `cargo asm` spot-check). The dominant
+// win is eliminating the transcendentals; SIMD on the FMA is a secondary
+// gain that the bench measures honestly.
+
+/// Precomputed cos/sin table for RoVE batch rotation.
+///
+/// Stores `(cos, sin)` for every `(position, pair)` combination, laid out as
+/// `max_pos × dim` interleaved pairs: position `pos`, pair `i` lives at
+/// `table[pos * dim + 2*i]` (cos) and `table[pos * dim + 2*i + 1]` (sin).
+///
+/// Build once per forward pass (or once per layer — the table is
+/// position-only, so it's reused across layers when positions don't change).
+/// The fast batch functions then read from this table with zero
+/// transcendental calls in the inner loop.
+///
+/// **Memory cost:** `max_pos × dim × 4` bytes. For `max_pos=1024, dim=768`,
+/// that's 3 MB — acceptable for inference-time scratch (freed when the table
+/// drops). For long-context (max_pos=8192+), consider a streaming table that
+/// computes cos/sin on demand for a window of positions — not implemented
+/// here (out of scope for the G2 unblock).
+pub struct RoVeRotationTable {
+    /// Interleaved `(cos, sin)` pairs: `table[pos * dim + 2*i] = cos(pos·ω_i)`,
+    /// `table[pos * dim + 2*i + 1] = sin(pos·ω_i)`.
+    table: Vec<f32>,
+    dim: usize,
+    max_pos: usize,
+}
+
+impl RoVeRotationTable {
+    /// Build the cos/sin table for positions `0..max_pos` at the given `dim`
+    /// and `theta`.
+    ///
+    /// `dim` must be even and `>= 2` (delegates to [`RopeAction::with_theta`]
+    /// for validation). `max_pos` must be `>= 1`.
+    pub fn new(dim: usize, theta: f32, max_pos: usize) -> Self {
+        // Validate dim + theta by constructing a RopeAction (panics on invalid).
+        let action = RopeAction::with_theta(dim, theta);
+        assert!(max_pos >= 1, "max_pos must be >= 1");
+        let omegas = action.omegas();
+
+        let mut table = vec![0.0f32; max_pos * dim];
+        for pos in 0..max_pos {
+            let pos_f = pos as f32;
+            let row = &mut table[pos * dim..(pos + 1) * dim];
+            for (i, &omega) in omegas.iter().enumerate() {
+                let angle = pos_f * omega;
+                // Match the scalar RopeAction::apply_at path EXACTLY: separate
+                // .cos() and .sin() calls, NOT .sin_cos(). The fused sin_cos()
+                // uses a different internal argument-reduction path on some
+                // libm implementations and produces a 1-ULP difference vs
+                // separate cos()/sin() calls. Bit-identical output to the
+                // scalar path requires matching the transcendental call pattern.
+                row[2 * i] = angle.cos();
+                row[2 * i + 1] = angle.sin();
+            }
+        }
+
+        Self { table, dim, max_pos }
+    }
+
+    /// Dimension of the vectors being rotated.
+    #[inline]
+    pub fn dim(&self) -> usize {
+        self.dim
+    }
+
+    /// Maximum position covered by the table (exclusive upper bound).
+    #[inline]
+    pub fn max_pos(&self) -> usize {
+        self.max_pos
+    }
+
+    /// Raw access to the interleaved `(cos, sin)` table (for testing).
+    pub fn as_slice(&self) -> &[f32] {
+        &self.table
+    }
+}
+
+/// Fast batch value rotation using a precomputed cos/sin table.
+///
+/// For each token `t` at position `positions[t]`, computes
+/// `out[t] = R_{positions[t]} · values[t]` using the precomputed table —
+/// zero transcendental calls in the inner loop.
+///
+/// **Panics** if any `positions[t] >= table.max_pos()`.
+///
+/// **Bit-identical to [`batch_rotate_values_into`]?** Yes — the forward
+/// direction uses the same positive-angle `cos`/`sin` and the same `mul_add`
+/// rotation formula as the scalar path, so the two paths produce bit-for-bit
+/// identical output for the same `(theta, dim, positions)`. This is verified
+/// by the G8 test (forward direction, tol 0.0).
+pub fn batch_rotate_values_into_fast(
+    table: &RoVeRotationTable,
+    positions: &[usize],
+    values: &[f32],
+    out: &mut [f32],
+) {
+    let dim = table.dim();
+    debug_assert_eq!(values.len(), positions.len() * dim, "values buffer length mismatch");
+    debug_assert_eq!(out.len(), positions.len() * dim, "out buffer length mismatch");
+    let half = dim / 2;
+    let tbl = table.as_slice();
+
+    for (t, &pos) in positions.iter().enumerate() {
+        assert!(pos < table.max_pos(), "position {pos} >= table.max_pos() {}", table.max_pos());
+        let in_start = t * dim;
+        let out_start = t * dim;
+        let tbl_start = pos * dim;
+
+        // Inner loop: pure mul_add arithmetic, no transcendentals.
+        // Reads contiguous `(c, s)` pairs from the table and contiguous
+        // `(x0, x1)` pairs from the input — cache-friendly streaming access.
+        for i in 0..half {
+            let c = tbl[tbl_start + 2 * i];
+            let s = tbl[tbl_start + 2 * i + 1];
+            let x0 = values[in_start + 2 * i];
+            let x1 = values[in_start + 2 * i + 1];
+            // out[2i]   = c·x0 − s·x1 = c.mul_add(x0, -(s·x1))
+            // out[2i+1] = s·x0 + c·x1 = s.mul_add(x0,  c·x1)
+            out[out_start + 2 * i] = c.mul_add(x0, -(s * x1));
+            out[out_start + 2 * i + 1] = s.mul_add(x0, c * x1);
+        }
+    }
+}
+
+/// Fast batch inverse output rotation using a precomputed cos/sin table.
+///
+/// For each query `i` at position `positions[i]`, computes
+/// `out[i] = R_{−positions[i]} · aggregated[i]`. The inverse rotation uses
+/// `(cos, −sin)` from the forward table — no separate inverse table needed.
+///
+/// **Panics** if any `positions[t] >= table.max_pos()`.
+///
+/// **Bit-identical to [`batch_inverse_rotate_output_into`]?** No — the
+/// scalar inverse path calls `apply_at(-n)` which recomputes `cos(-angle)`
+/// / `sin(-angle)`, while this fast path uses `cos(angle)` / `sin(angle)`
+/// from the forward table and negates the sin algebraically. Library
+/// `cosf` / `sinf` are not guaranteed to be even/odd functions in the last
+/// bit, so the two paths differ by ≤1 ULP on some inputs. The G8 test
+/// verifies the inverse direction with tol 1e-6 (matching Phase 2 G1's
+/// round-trip ULP budget).
+pub fn batch_inverse_rotate_output_into_fast(
+    table: &RoVeRotationTable,
+    positions: &[usize],
+    aggregated: &[f32],
+    out: &mut [f32],
+) {
+    let dim = table.dim();
+    debug_assert_eq!(
+        aggregated.len(),
+        positions.len() * dim,
+        "aggregated buffer length mismatch"
+    );
+    debug_assert_eq!(out.len(), positions.len() * dim, "out buffer length mismatch");
+    let half = dim / 2;
+    let tbl = table.as_slice();
+
+    for (t, &pos) in positions.iter().enumerate() {
+        assert!(pos < table.max_pos(), "position {pos} >= table.max_pos() {}", table.max_pos());
+        let in_start = t * dim;
+        let out_start = t * dim;
+        let tbl_start = pos * dim;
+
+        // Inverse rotation: negate the sin component.
+        // (c, s) → (c, −s): out[2i] = c·x0 − (−s)·x1 = c·x0 + s·x1,
+        //                   out[2i+1] = (−s)·x0 + c·x1 = −s·x0 + c·x1.
+        // Written as mul_add: out[2i]   = c.mul_add(x0, s·x1)
+        //                     out[2i+1] = c.mul_add(x1, -(s·x0))
+        for i in 0..half {
+            let c = tbl[tbl_start + 2 * i];
+            let s = tbl[tbl_start + 2 * i + 1];
+            let x0 = aggregated[in_start + 2 * i];
+            let x1 = aggregated[in_start + 2 * i + 1];
+            out[out_start + 2 * i] = c.mul_add(x0, s * x1);
+            out[out_start + 2 * i + 1] = c.mul_add(x1, -(s * x0));
+        }
     }
 }
 
@@ -411,5 +618,105 @@ mod tests {
         rotate_values_into(&action, 1, &v, &mut out);
         // Non-trivial rotation at pos 1.
         assert!((out[0] - v[0]).abs() > 0.01 || (out[1] - v[1]).abs() > 0.01);
+    }
+
+    // ── G8: fast batch path — bit-identical to scalar (Plan 557 Phase 3) ──
+
+    /// The fast batch path produces bit-identical output to the scalar batch
+    /// path for the FORWARD direction. The INVERSE direction differs by ≤1
+    /// ULP because the scalar path calls `cos(-angle)` / `sin(-angle)`
+    /// (negating the angle before the transcendental), while the fast path
+    /// uses `cos(angle)` / `sin(angle)` from the forward table and negates
+    /// algebraically (`-s` instead of `sin(-angle)`). Library `cosf` / `sinf`
+    /// are not guaranteed to be even/odd functions in the last bit, so the
+    /// two formulations produce a 1-ULP difference on some inputs. This is
+    /// the same ULP-floor class as Phase 2 G1's round-trip budget (1e-6).
+    #[test]
+    fn g8_fast_batch_bit_identical_to_scalar() {
+        let dim = 32usize;
+        let theta = 10000.0f32;
+        let n = 64usize;
+        let max_pos = n;
+        let action = RoVeConfig::new(theta).build_rope_action(dim);
+        let table = RoVeRotationTable::new(dim, theta, max_pos);
+
+        // Deterministic pseudo-random input.
+        let positions: Vec<usize> = (0..n).collect();
+        let values: Vec<f32> = (0..n * dim)
+            .map(|i| ((i as f32) * 0.0123).sin() * 0.5)
+            .collect();
+
+        // Scalar path.
+        let mut scalar_out = vec![0.0f32; n * dim];
+        batch_rotate_values_into(&action, &positions, &values, &mut scalar_out, dim);
+
+        // Fast path.
+        let mut fast_out = vec![0.0f32; n * dim];
+        batch_rotate_values_into_fast(&table, &positions, &values, &mut fast_out);
+
+        // Forward direction: bit-identical (both use positive angle, same cos/sin).
+        approx_eq(&scalar_out, &fast_out, 0.0);
+
+        // Inverse direction: ≤1 ULP difference (cos(-x) vs cos(x) floor).
+        let mut scalar_inv = vec![0.0f32; n * dim];
+        batch_inverse_rotate_output_into(&action, &positions, &scalar_out, &mut scalar_inv, dim);
+
+        let mut fast_inv = vec![0.0f32; n * dim];
+        batch_inverse_rotate_output_into_fast(&table, &positions, &fast_out, &mut fast_inv);
+
+        // Budget 1e-6 matches Phase 2 G1's round-trip budget — the 1-ULP floor
+        // from library transcendental even/odd asymmetry.
+        approx_eq(&scalar_inv, &fast_inv, 1e-6);
+    }
+
+    /// The fast path round-trips: rotate then inverse-rotate recovers the
+    /// original (to f32 precision, same as the scalar path G2).
+    #[test]
+    fn g8_fast_batch_round_trip() {
+        let dim = 16usize;
+        let theta = 10000.0f32;
+        let n = 32usize;
+        let table = RoVeRotationTable::new(dim, theta, n);
+
+        let positions: Vec<usize> = (0..n).collect();
+        let values: Vec<f32> = (0..n * dim)
+            .map(|i| ((i as f32) * 0.07).sin() * 0.3)
+            .collect();
+
+        let mut rotated = vec![0.0f32; n * dim];
+        batch_rotate_values_into_fast(&table, &positions, &values, &mut rotated);
+
+        let mut recovered = vec![0.0f32; n * dim];
+        batch_inverse_rotate_output_into_fast(&table, &positions, &rotated, &mut recovered);
+
+        approx_eq(&values, &recovered, 1e-5);
+    }
+
+    /// Position 0 is identity in the fast path too (cos=1, sin=0).
+    #[test]
+    fn g8_fast_batch_identity_at_pos_zero() {
+        let dim = 8usize;
+        let table = RoVeRotationTable::new(dim, 10000.0, 4);
+        let v = [1.0f32, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0];
+        let mut out = vec![0.0f32; dim];
+        batch_rotate_values_into_fast(&table, &[0], &v, &mut out);
+        approx_eq(&v, &out, 1e-6);
+    }
+
+    /// Out-of-range position panics (defensive bound check).
+    #[test]
+    #[should_panic(expected = "position 10 >= table.max_pos() 5")]
+    fn g8_fast_batch_pos_out_of_range_panics() {
+        let table = RoVeRotationTable::new(8, 10000.0, 5);
+        let v = vec![1.0f32; 8];
+        let mut out = vec![0.0f32; 8];
+        batch_rotate_values_into_fast(&table, &[10], &v, &mut out);
+    }
+
+    /// Odd dim panics at table construction (delegates to RopeAction).
+    #[test]
+    #[should_panic(expected = "RoPE requires even dim >= 2")]
+    fn g8_fast_table_odd_dim_panics() {
+        let _ = RoVeRotationTable::new(7, 10000.0, 4);
     }
 }

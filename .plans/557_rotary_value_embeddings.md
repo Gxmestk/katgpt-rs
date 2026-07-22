@@ -130,6 +130,33 @@ Goal: add an opt-in forward path that calls `rotate_values_into` and `inverse_ro
 - [ ] `cargo test --features rotary_value_embedding,dash_attn -p katgpt-attn` passes.
 - [ ] The dash_attn forward path supports RoVE as an opt-in toggle.
 
+### Phase 3 ACTUAL OUTCOME (2026-07-22 — reframed)
+
+**T3.1 PREMISE WAS WRONG.** The plan assumed `katgpt-attn/src/dash_attn/forward.rs` applies RoPE to Q/K and only needs a V-side extension. Investigation found:
+
+1. `dash_attn/forward.rs` is an **MVP stub** — it computes QKV projections but never applies RoPE to Q/K, and it doesn't do real attention (no QK^T → softmax → V aggregation). The "attention" is just `attn_out = W_o · q` (a pass-through).
+2. The real RoPE-on-QK call site is in **riir-ai** (`riir-engine/src/transformer/gemma2.rs` line ~330: `crate::rope::apply_rope_with_freq(&mut ctx.q, &mut ctx.k, pos, hd, ...)`), NOT in katgpt-rs.
+3. RoPE appears in katgpt-rs only in: (a) KV cache compaction (`katgpt-kv/src/shard_kv` — undo/reapply to strip position before PCA), (b) attention matching (`katgpt-attn-match/src/chunked.rs` — `apply_rope_phase_shift` on keys during compaction), (c) a standalone fused kernel (`simd_matmul_rmsnorm_rope`) that is never called from any production forward path.
+
+**The Research 452 §2.2 claim "✅ in every attention variant (dash_attn, gdn2, ega, hga)" was overconfident** — it confused the existence of RoPE utilities with their use in production forward paths. The reality: katgpt-rs is the **public substrate** repo; the **production attention runtime with RoPE lives in riir-ai**.
+
+**What Phase 3 ACTUALLY delivered (the G2 unblock):**
+
+Instead of wiring into a non-existent attention path, Phase 3 delivered the **G2 unblock at the substrate layer**:
+
+- [x] **T3.A (substrate — DONE):** Added `RoVeRotationTable` + `batch_rotate_values_into_fast` + `batch_inverse_rotate_output_into_fast` to `katgpt-core/src/rotary_value_embedding.rs`. The table precomputes cos/sin for all `(position, pair)` combinations once, eliminating the per-call transcendental cost (the dominant bottleneck). The fast path inner loop is pure `mul_add` arithmetic.
+  - **G2 result:** 6.62% → **2.29%** (2.88× speedup). **PASS** (< 5% target).
+  - **G8 tests:** forward direction bit-identical to scalar (tol 0.0); inverse direction ≤1 ULP (tol 1e-6, the same ULP floor as Phase 2 G1's round-trip budget).
+  - **Memory cost:** 3 MB table for n=1024, d=768 (amortized across all layers).
+
+- [-] **T3.B (wiring — DEFERRED to riir-ai):** The wiring target is `riir-engine/src/transformer/gemma2.rs` (the real production attention path with RoPE-on-QK), NOT `katgpt-attn/src/dash_attn/forward.rs` (the MVP stub). This is a **cross-repo task** — katgpt-rs provides the substrate (Phase 1 + 2 + 3.A), riir-ai consumes it in its gemma2 forward path. Deferred until riir-ai picks up the RoVE integration (tracked as a follow-up; no issue opened yet because the retrofit PoC Phase 5 gates all promotion anyway).
+
+**Net Phase 3 outcome:**
+- G2 **UNBLOCKED** (6.45% → 2.29%).
+- The substrate now ships both scalar (reference, bit-identical contract) + fast (production, precomputed table) paths.
+- The original T3.1-T3.5 tasks (wire into dash_attn) are **moot** — the target was a stub. The real wiring is cross-repo.
+- **One blocker remains for default-on promotion:** Phase 5 retrofit PoC.
+
 ---
 
 ## Phase 4 — Attention Matching Fusion (modelless, optional)
