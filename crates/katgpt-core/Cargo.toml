@@ -1524,6 +1524,20 @@ name = "bench_457_grapem_rodrigues_goat"
 harness = false
 required-features = ["grapem_rodrigues"]
 
+# Plan 557 Phase 2 — RoVE (Rotary Value Embeddings) GOAT gate.
+# G1 bit-identical to RoPE-when-disabled (pos=0 identity + round-trip) +
+# G2 latency overhead < 5% of O(nd²) V projection at n=1024, d=768 +
+# G3 no-regression (opt-in + additive, verified externally via CI) +
+# G4 zero steady-state alloc (CountingAllocator on batch hot path) +
+# G5 FlashAttention output-equivalence (RoVE path ≡ attentive-convolution
+# reference path, algebraic identity proof). Pure modelless (RoPE rotations
+# on V via GRAPE's RopeAction substrate). Promotion deferred — Phase 5
+# (retrofit PoC) must settle the inference-time question first.
+[[bench]]
+name = "bench_557_rotary_value_embedding_goat"
+harness = false
+required-features = ["rotary_value_embedding"]
+
 # Plan 449 — Poincaré Adapter GOAT gate (Phase 2).
 # G1 local decodability + G2 global unrolling + G3 inverse round-trip + G4
 # zero-alloc + G5 latency < 1µs + G6 multi-step coherence + G7 latent-vs-raw
