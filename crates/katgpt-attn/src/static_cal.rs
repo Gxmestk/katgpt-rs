@@ -127,9 +127,10 @@ pub struct HeadStats {
 }
 
 /// Sigmoid activation — used instead of softmax for independent per-head normalization.
+/// Delegates to [`katgpt_core::simd::fast_sigmoid`] (Cephes polynomial).
 #[inline]
 fn sigmoid(x: f32) -> f32 {
-    1.0 / (1.0 + (-x).exp())
+    katgpt_core::simd::fast_sigmoid(x)
 }
 
 /// Run calibration pass over representative prompts.

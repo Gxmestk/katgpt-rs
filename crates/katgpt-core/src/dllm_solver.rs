@@ -325,10 +325,11 @@ pub fn q_sample_refine(
 
 /// Sigmoid activation: σ(x) = 1 / (1 + exp(-x)).
 /// Used instead of softmax for independent per-token probability gating.
+/// Delegates to [`crate::simd::fast_sigmoid`] (Cephes polynomial).
 #[cfg(any(feature = "q_sample_solver", feature = "self_cond_draft"))]
 #[inline]
 fn sigmoid(x: f32) -> f32 {
-    1.0 / (1.0 + (-x).exp())
+    crate::simd::fast_sigmoid(x)
 }
 
 /// Find argmax index from a probability-like array.

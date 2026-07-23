@@ -162,9 +162,10 @@ pub fn bridge_attention_into<K: AsRef<[f32]>, V: AsRef<[f32]>>(
 ///
 /// Used for all attention weights in this module. NOT softmax per project
 /// constraints — each weight is independent and they don't sum to 1.
+/// Delegates to [`katgpt_core::simd::fast_sigmoid`] (Cephes polynomial).
 #[inline(always)]
 fn sigmoid(x: f32) -> f32 {
-    1.0 / (1.0 + (-x).exp())
+    katgpt_core::simd::fast_sigmoid(x)
 }
 
 /// Compute the bridge gate α = sigmoid(⟨query, gdn2_readout⟩).

@@ -34,9 +34,11 @@ const EPS: f32 = 1e-8;
 // ── Helper functions ──────────────────────────────────────────
 
 /// Standard sigmoid: σ(x) = 1 / (1 + exp(-x)).
+/// Delegates to [`katgpt_core::simd::fast_sigmoid`] (Cephes polynomial,
+/// ~1.7× faster than libm on aarch64).
 #[inline]
 pub fn sigmoid(x: f32) -> f32 {
-    1.0 / (1.0 + (-x).exp())
+    katgpt_core::simd::fast_sigmoid(x)
 }
 
 /// Z-normalize scores in-place: (x - μ) / (σ + ε).

@@ -77,23 +77,18 @@ impl<T> ClaimVerifier<T> for SigmoidProjectionVerifier<'_> {
 
 /// Numerically stable logistic sigmoid: `1 / (1 + exp(-x))`.
 ///
-/// Branching form avoids the intermediate `+inf` produced by `(-x).exp()`
-/// when `x` is very negative — both branches stay finite for all finite
-/// inputs. Bit-identical to the closed form `1.0 / (1.0 + (-x).exp())` for
-/// all finite inputs that don't overflow the closed form.
+/// Delegates to [`katgpt_core::simd::fast_sigmoid`] (Cephes 6th-order polynomial
+/// for `exp`, ~1 ULP accurate, ~1.7× faster than libm `exp` on aarch64). The
+/// prior branching form avoided `(-x).exp()` overflow for very negative `x`;
+/// Cephes handles this by construction via its `n < -126` early-exit, so the
+/// branch is unnecessary. Result is in `(0, 1)` for all finite inputs.
 ///
 /// Scalar path — for batched sigmoid over a slice, use
 /// `katgpt_core::simd::simd_exp_inplace` on a negated slice. We do NOT use softmax
 /// anywhere (per project convention).
 #[inline(always)]
 fn sigmoid(x: f32) -> f32 {
-    if x >= 0.0 {
-        let e = (-x).exp();
-        1.0 / (1.0 + e)
-    } else {
-        let e = x.exp();
-        e / (1.0 + e)
-    }
+    katgpt_core::simd::fast_sigmoid(x)
 }
 
 #[cfg(test)]

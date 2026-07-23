@@ -437,9 +437,10 @@ fn direction_norm(direction: &[f32]) -> f32 {
     direction.iter().map(|x| x * x).sum::<f32>().sqrt()
 }
 
+/// Sigmoid via Cephes polynomial (`crate::simd::fast_sigmoid`).
 #[inline]
 fn sigmoid(x: f32) -> f32 {
-    1.0 / (1.0 + (-x).exp())
+    crate::simd::fast_sigmoid(x)
 }
 
 // ── Tests ─────────────────────────────────────────────────────────
