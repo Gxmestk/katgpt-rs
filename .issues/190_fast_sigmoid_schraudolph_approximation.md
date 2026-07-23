@@ -6,6 +6,33 @@
 > **Severity:** MEDIUM — attacks the transcendental floor (30-40% of CGSP cycle time)
 > **Status:** PARTIALLY RESOLVED — sigmoid component addressed via Cephes (2026-07-24)
 
+## Update 2 (2026-07-24): codebase-wide sigmoid DRY consolidation
+
+The initial Cephes win was scoped to the CGSP hot path. A broader audit
+found the SAME DRY violation across the entire 7-repo stack: **100+ local
+`fn sigmoid` definitions** using libm `exp()` (or the `libm` crate's
+`expf` for no_std paths) existed in parallel with the canonical
+`fast_sigmoid` (Cephes). Every one has been consolidated to delegate.
+
+**Shipped (5 commits):**
+- `2e3be549` — katgpt-core/attn/claim (13 files)
+- `120339a6` — katgpt-pruners/speculative/kv/transformer/forward/personality/spectral (59 files)
+- `e50bb744` — `entropy_nats_zero_alloc` (acceptance_forecast hot path): Cephes exp + SIMD max
+- `f4fc4862` — `entropy_f32` (DDtree hot path): Cephes exp in the 4-wide unrolled loop
+- `047043467` (riir-ai) — riir-engine + riir-games (42 files)
+
+**Total: ~120 files across 2 repos.** All sigmoid paths now use Cephes.
+Bonus: removes the `libm` crate dependency from 6+ no_std paths in riir-engine
+(integrity, latent_functor, ict_runtime, post_action_router).
+
+The two failure modes caught during the bulk edit:
+1. `posterior::surprise::sigmoid_bounds` test asserted open interval (0,1] for
+   sigmoid(-100); corrected to [0,1] (sigmoid(-100) = 0.0 in f32 for any
+   correct implementation — the true value 3.7e-44 rounds to subnormal-zero).
+2. `precision_aware_draft::proximity_with` sign error: `1/(1+exp(X))` is
+   `sigmoid(-X)`, not `sigmoid(X)`. The bulk edit missed the sign; caught by
+   the test suite before commit.
+
 ## Update (2026-07-24): sigmoid floor addressed
 
 The original issue proposed Schraudolph bit-manipulation exp for the sigmoid
