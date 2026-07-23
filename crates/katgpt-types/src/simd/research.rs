@@ -1500,6 +1500,11 @@ pub fn entropy_f32(logprobs: &[f32]) -> f32 {
     // Single pass: accumulate Z = Σexp(logp) and S = Σ exp(logp)·logp together.
     // The `if e > 0.0 { e * logp } else { 0.0 }` form compiles to a branch-free
     // select (cmov), enabling LLVM to vectorize the whole loop body.
+    //
+    // Uses cephes_exp_scalar (~1.7× faster than libm exp on aarch64) which is
+    // branch-free after range reduction — gives much better auto-vectorization
+    // than libm exp (which has special-case branches for inf/nan/denormals).
+    use crate::simd::cephes_exp_scalar;
     let mut sum_exp = 0.0f32;
     let mut sum_exp_logp = 0.0f32;
     for i in 0..chunks {
@@ -1508,13 +1513,14 @@ pub fn entropy_f32(logprobs: &[f32]) -> f32 {
         let l1 = logprobs[base + 1];
         let l2 = logprobs[base + 2];
         let l3 = logprobs[base + 3];
-        let e0 = l0.exp();
-        let e1 = l1.exp();
-        let e2 = l2.exp();
-        let e3 = l3.exp();
+        let e0 = cephes_exp_scalar(l0);
+        let e1 = cephes_exp_scalar(l1);
+        let e2 = cephes_exp_scalar(l2);
+        let e3 = cephes_exp_scalar(l3);
         sum_exp += e0 + e1 + e2 + e3;
         // Branch-free guard: 0·(-∞) = NaN in IEEE 754; select 0 when e == 0
-        // (which happens iff logp = -∞). Equivalent to old `if p_norm > 0.0`.
+        // (which happens iff logp = -∞, where cephes_exp_scalar returns 0.0 via
+        // its n < -126 early-exit — equivalent to libm's exp(-∞) = 0).
         sum_exp_logp += if e0 > 0.0 { e0 * l0 } else { 0.0 };
         sum_exp_logp += if e1 > 0.0 { e1 * l1 } else { 0.0 };
         sum_exp_logp += if e2 > 0.0 { e2 * l2 } else { 0.0 };
@@ -1523,7 +1529,7 @@ pub fn entropy_f32(logprobs: &[f32]) -> f32 {
     for i in 0..remainder {
         let idx = chunks * 4 + i;
         let l = logprobs[idx];
-        let e = l.exp();
+        let e = cephes_exp_scalar(l);
         sum_exp += e;
         sum_exp_logp += if e > 0.0 { e * l } else { 0.0 };
     }
