@@ -185,8 +185,13 @@ unsafe fn avx2_reciprocal_inplace(x: &mut [f32]) {
 /// Scalar Cephes exp approximation: accurate to ~1 ULP for |x| < 88.
 /// Uses range reduction: exp(x) = exp(g) * 2^n where g = x - n*ln2, n = round(x/ln2).
 /// The reduced argument g is in [-0.5*ln2, 0.5*ln2] for minimal polynomial error.
+///
+/// Exposed publicly so scalar sigmoid/exp call sites (e.g.
+/// `cgsp::types::sigmoid`, `fast_sigmoid`) can share one Cephes implementation
+/// instead of each calling `f32::exp()` (libm). On aarch64 this is ~1.7×
+/// faster than libm `exp`.
 #[inline(always)]
-fn cephes_exp_scalar(x: f32) -> f32 {
+pub fn cephes_exp_scalar(x: f32) -> f32 {
     // Range reduction: n = round(x / ln2)
     let n = (x * CEPHES_INV_LN2).round() as i32;
 

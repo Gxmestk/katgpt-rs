@@ -586,15 +586,16 @@ fn snapshot_id_now() -> [u8; 16] {
 // ── Math helpers (sigmoid never softmax) ──────────────────────────────────
 
 /// Numerically stable sigmoid.
+///
+/// Delegates to [`katgpt_types::simd::fast_sigmoid`] which uses the Cephes
+/// polynomial exp (~1.7× faster than libm on aarch64, ~1 ULP accuracy).
+/// The previous two-branch form was a numerical-stability optimization for
+/// libm `exp` (avoiding `exp(large_positive)` overflow); `fast_sigmoid`'s
+/// Cephes kernel handles the full range correctly via its own early exits,
+/// making the branch unnecessary.
 #[inline(always)]
 pub fn sigmoid(x: f32) -> f32 {
-    if x >= 0.0 {
-        let z = (-x).exp();
-        1.0 / (1.0 + z)
-    } else {
-        let z = x.exp();
-        z / (1.0 + z)
-    }
+    crate::simd::fast_sigmoid(x)
 }
 
 /// Shannon entropy (nats) of a probability-like vector.

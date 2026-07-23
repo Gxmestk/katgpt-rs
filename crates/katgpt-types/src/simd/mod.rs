@@ -85,8 +85,8 @@ use sparse::scalar_sparse_dot_f32;
 // after the file → folder split. Existing call sites (e.g. `simd::simd_dot_f32`,
 // `simd::SimdLevel`) continue to resolve without modification.
 pub use activations::{
-    fast_sigmoid, simd_exp_inplace, simd_exp_sum_inplace, simd_reciprocal_inplace,
-    simd_sigmoid_inplace, simd_sigmoid_tanh_clamp_inplace,
+    cephes_exp_scalar, fast_sigmoid, simd_exp_inplace, simd_exp_sum_inplace,
+    simd_reciprocal_inplace, simd_sigmoid_inplace, simd_sigmoid_tanh_clamp_inplace,
 };
 pub use argmax::simd_argmax_f32;
 pub use dot::{
