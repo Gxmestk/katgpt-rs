@@ -157,9 +157,9 @@ impl Baseline {
         // Winning archetype = highest pi (sigmoid monotonicity)
         let mut winner = 0usize;
         let mut best = pi_override[0];
-        for k in 1..3 {
-            if pi_override[k] > best {
-                best = pi_override[k];
+        for (k, &p) in pi_override.iter().enumerate().skip(1) {
+            if p > best {
+                best = p;
                 winner = k;
             }
         }

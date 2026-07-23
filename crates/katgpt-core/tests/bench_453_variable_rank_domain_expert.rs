@@ -31,9 +31,9 @@ struct DirectionField<const D: usize> {
 impl<const D: usize> DirectionField<D> {
     fn new(seed: usize) -> Self {
         let mut direction = [0.0f32; D];
-        for i in 0..D {
+        for (i, d) in direction.iter_mut().enumerate() {
             let x = (seed * 37 + i * 13) as f32;
-            direction[i] = ((x * 0.1).sin() + (x * 0.07).cos()) * 0.5;
+            *d = ((x * 0.1).sin() + (x * 0.07).cos()) * 0.5;
         }
         // Normalize to unit length
         let norm: f32 = direction.iter().map(|v| v * v).sum::<f32>().sqrt().max(1e-8);
@@ -52,9 +52,9 @@ impl<const D: usize> DirectionField<D> {
 impl<const D: usize> ArchetypeFieldSource<D> for DirectionField<D> {
     fn evolve<'a>(&self, z: &[f32], dz_scratch: &'a mut [f32]) -> &'a mut [f32] {
         // f_k(z) = direction_k · dot(z, direction_k)
-        let dot: f32 = (0..D).map(|i| z[i] * self.direction[i]).sum();
-        for i in 0..D {
-            dz_scratch[i] = self.direction[i] * dot;
+        let dot: f32 = z.iter().zip(self.direction.iter()).map(|(zi, di)| zi * di).sum();
+        for (dz, di) in dz_scratch[..D].iter_mut().zip(self.direction.iter()) {
+            *dz = di * dot;
         }
         &mut dz_scratch[..D]
     }
@@ -103,8 +103,8 @@ fn prng(seed: u64) -> f32 {
 /// Deterministic NPC state generator (D=32).
 fn npc_state(seed: u64) -> ([f32; 32], [f32; 3]) {
     let mut state = [0.0f32; 32];
-    for i in 0..32 {
-        state[i] = prng(seed.wrapping_mul(31).wrapping_add(i as u64));
+    for (i, s) in state.iter_mut().enumerate() {
+        *s = prng(seed.wrapping_mul(31).wrapping_add(i as u64));
     }
     // Activity vector: which domain is this NPC currently engaged in?
     let activity = [
@@ -284,6 +284,9 @@ impl QuestCluster {
 
 const N_NPCS: usize = 1000;
 
+/// (state, pi_baseline, pi_move, pi_combat, domain) per generated NPC.
+type NpcRecord = ([f32; 32], [f32; 3], [f32; 12], [f32; 6], usize);
+
 #[test]
 #[ignore = "PoC bench — run with --ignored"]
 fn poc_variable_rank_domain_expert() {
@@ -293,7 +296,7 @@ fn poc_variable_rank_domain_expert() {
     let mut quest_cluster = QuestCluster::new();
 
     // Generate NPC states + per-NPC pi vectors + pre-computed domain
-    let npcs: Vec<([f32; 32], [f32; 3], [f32; 12], [f32; 6], usize)> = (0..N_NPCS)
+    let npcs: Vec<NpcRecord> = (0..N_NPCS)
         .map(|i| {
             let seed = (i as u64).wrapping_add(1).wrapping_mul(6364136223846793005);
             let (state, activity) = npc_state(seed);

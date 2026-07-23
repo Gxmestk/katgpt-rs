@@ -820,25 +820,26 @@ mod tests {
         for i in 0..n {
             let mut scores = vec![0.0f32; t];
             let mut max_score = f32::NEG_INFINITY;
-            for j in 0..t {
+            for (score, k_row) in scores.iter_mut().zip(k.chunks(d)) {
                 let mut dot = 0.0f32;
                 for dd in 0..d {
-                    dot += q[i * d + dd] * k[j * d + dd];
+                    dot += q[i * d + dd] * k_row[dd];
                 }
-                scores[j] = dot * scale;
-                if scores[j] > max_score {
-                    max_score = scores[j];
+                *score = dot * scale;
+                if *score > max_score {
+                    max_score = *score;
                 }
             }
             let mut sum_exp = 0.0f32;
-            for j in 0..t {
-                scores[j] = (scores[j] - max_score).exp();
-                sum_exp += scores[j];
+            for score in scores.iter_mut() {
+                *score = (*score - max_score).exp();
+                sum_exp += *score;
             }
-            for j in 0..t {
-                let w = scores[j] / sum_exp;
-                for dd in 0..d {
-                    out[i * d + dd] += w * v[j * d + dd];
+            let out_row = &mut out[i * d..i * d + d];
+            for (&score, v_row) in scores.iter().zip(v.chunks(d)) {
+                let w = score / sum_exp;
+                for (o, vv) in out_row.iter_mut().zip(v_row) {
+                    *o += w * vv;
                 }
             }
         }
@@ -893,7 +894,7 @@ mod tests {
         let compactor = ChunkedCompactor::new(t_len, 0);
         let cfg = AmConfig::highest_attn(16);
         let compacted = compactor
-            .compact_text_based(&[chunk], &[queries.clone()], &cfg)
+            .compact_text_based(&[chunk], std::slice::from_ref(&queries), &cfg)
             .expect("compact");
         assert!(compacted.total_compact_len > 0, "should compact some tokens");
 
@@ -962,7 +963,7 @@ mod tests {
         let compactor = ChunkedCompactor::new(t_len, 0);
         let cfg = AmConfig::highest_attn(16);
         let compacted = compactor
-            .compact_text_based(&[chunk], &[queries.clone()], &cfg)
+            .compact_text_based(&[chunk], std::slice::from_ref(&queries), &cfg)
             .expect("compact");
 
         // 2. Attend with compacted (Ck, Cv).
