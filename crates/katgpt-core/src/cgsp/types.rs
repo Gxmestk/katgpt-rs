@@ -29,6 +29,34 @@ pub const DEFAULT_POOL_SIZE: usize = 64;
 
 // ── Latent types ──────────────────────────────────────────────────────────
 
+/// 4-accumulator FMA dot product: `Σ a[i] * b[i]`.
+///
+/// Four independent accumulators hide the ~4-cycle FMA pipeline latency
+/// (single-accumulator dot is latency-bound; 4 parallel accumulators keep
+/// the pipeline full). Per-element rounding is single-rounding FMA
+/// (`a.mul_add(b, acc)`); only the reduction tree changes (4 partial sums
+/// summed at the end). Deterministic. Mirrors the scalar fallback in
+/// `katgpt_types::simd::dot::scalar_dot_f32`.
+#[inline]
+fn dot_f32_fma4(a: &[f32], b: &[f32]) -> f32 {
+    let mut acc = [0.0f32; 4];
+    let chunks = a.len() / 4;
+    let mut i = 0;
+    for _ in 0..chunks {
+        acc[0] = a[i].mul_add(b[i], acc[0]);
+        acc[1] = a[i + 1].mul_add(b[i + 1], acc[1]);
+        acc[2] = a[i + 2].mul_add(b[i + 2], acc[2]);
+        acc[3] = a[i + 3].mul_add(b[i + 3], acc[3]);
+        i += 4;
+    }
+    let mut sum = acc[0] + acc[1] + acc[2] + acc[3];
+    while i < a.len() {
+        sum = a[i].mul_add(b[i], sum);
+        i += 1;
+    }
+    sum
+}
+
 /// A latent direction vector. POD-style fixed-size buffer.
 ///
 /// Operates in latent space — never crosses the sync boundary. The
@@ -62,28 +90,30 @@ impl Direction {
     }
 
     /// Dot product with another direction. Returns 0.0 if dims mismatch.
+    ///
+    /// Uses 4 independent FMA accumulators to hide the ~4-cycle FMA pipeline
+    /// latency (a single-accumulator dot is latency-bound at one FMA per
+    /// ~4 cycles; 4 parallel accumulators keep the pipeline full at one FMA
+    /// per cycle). Same pattern as `simd::scalar_dot_f32` in katgpt-types.
+    /// Per-element rounding is still single-rounding FMA (`a.mul_add(b, acc)`);
+    /// only the accumulation *tree* changes (4 partial sums reduced at the
+    /// end instead of one running sum). Deterministic — same input always
+    /// yields the same output.
     #[inline]
     pub fn dot(&self, other: &Self) -> f32 {
         if self.coords.len() != other.coords.len() {
             return 0.0;
         }
-        let mut sum = 0.0f32;
-        for (a, b) in self.coords.iter().zip(other.coords.iter()) {
-            // FMA: sum = a * b + sum (single rounding, matches bridge::dot_f32_i8).
-            sum = a.mul_add(*b, sum);
-        }
-        sum
+        dot_f32_fma4(&self.coords, &other.coords)
     }
 
     /// L2 norm squared.
+    ///
+    /// Same 4-accumulator FMA unroll as [`Self::dot`] — see its doc comment
+    /// for the latency rationale.
     #[inline]
     pub fn norm_sq(&self) -> f32 {
-        let mut s = 0.0f32;
-        for c in &self.coords {
-            // FMA: s = c * c + s (single rounding).
-            s = c.mul_add(*c, s);
-        }
-        s
+        dot_f32_fma4(&self.coords, &self.coords)
     }
 
     /// Mutable coordinate access.
