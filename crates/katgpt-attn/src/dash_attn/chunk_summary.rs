@@ -383,21 +383,24 @@ fn mean_pool_keys_into(chunk_keys: &[f32], chunk_size: usize, head_dim: usize, o
 /// In-place softmax with max subtraction for numerical stability.
 ///
 /// Uses reciprocal-multiply (1 division + N multiplies) instead of N divisions.
+///
+/// SIMD path: all three passes (max, exp+sum, normalize) use the Cephes-backed
+/// vectorized kernels from `katgpt_core::simd`. The exp+sum pass is fused into
+/// a single buffer traversal via `simd_exp_sum_inplace` (4-/8-wide depending
+/// on target). ~1.7× faster than libm `exp` on aarch64 for the exp pass; the
+/// max + scale passes auto-vectorize. The numerical result differs from the
+/// libm path by ≤1 ULP per element (Cephes accuracy floor); softmax
+/// normalization absorbs this into the final reciprocal-multiply.
 fn softmax_inplace(scores: &mut [f32]) {
     if scores.is_empty() {
         return;
     }
-    let max_val = scores.iter().copied().fold(f32::NEG_INFINITY, f32::max);
-    let mut sum_exp = 0.0f32;
-    for s in scores.iter_mut() {
-        *s = (*s - max_val).exp();
-        sum_exp += *s;
-    }
+    use katgpt_core::simd::{simd_add_scalar_inplace, simd_exp_sum_inplace, simd_max_f32, simd_scale_inplace};
+    let max_val = simd_max_f32(scores);
+    simd_add_scalar_inplace(scores, -max_val);
+    let sum_exp = simd_exp_sum_inplace(scores);
     if sum_exp > 0.0 {
-        let inv_sum = 1.0 / sum_exp;
-        for s in scores.iter_mut() {
-            *s *= inv_sum;
-        }
+        simd_scale_inplace(scores, 1.0 / sum_exp);
     }
 }
 

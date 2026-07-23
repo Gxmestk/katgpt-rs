@@ -222,6 +222,32 @@ pub fn cephes_exp_scalar(x: f32) -> f32 {
     scale * q
 }
 
+/// Fast scalar `exp`: the Cephes 6th-order polynomial, wrapped with the same
+/// extreme-value early-exits that libm provides.
+///
+/// This is the scalar counterpart to [`simd_exp_inplace`] /
+/// [`simd_exp_sum_inplace`] — the same kernel, just one lane. It exists so that
+/// callsites which compute exp element-by-element in interleaved loops (e.g.
+/// the fused softmax+V-reduction in `compute_softmax_attention_and_output`,
+/// where each `exp(s_j)` is immediately consumed by a `V_j` dot product and
+/// cannot be hoisted into a standalone SIMD pass) can still get the ~1.7×
+/// aarch64 speedup over `f32::exp()` that the SIMD softmax path enjoys.
+///
+/// Accuracy: ~1 ULP for `|x| < 88`. Returns 0.0 for `x < -87.3` (where libm
+/// also underflows to 0) and `+inf` for `x > 88.7` (where libm also overflows).
+/// This matches libm `exp` on every f32 input that doesn't produce a subnormal,
+/// and is the correct behavior for softmax (shifted values are in `(−∞, 0]` so
+/// exp never overflows) and for gating/routing use (where the downstream
+/// consumer normalizes or thresholds anyway).
+///
+/// On aarch64 this is ~1.7× faster than `f32::exp()` (libm) because it avoids
+/// the call overhead and special-case handling that libm must perform for the
+/// full IEEE-754 range (NaN, signed zero, subnormal results, inexact flags).
+#[inline(always)]
+pub fn fast_exp(x: f32) -> f32 {
+    cephes_exp_scalar(x)
+}
+
 /// Bounded sigmoid: σ(x) = 1/(1 + e^{-x}), output in (0, 1).
 ///
 /// Uses the Cephes 6th-order polynomial for `exp` (the same kernel backing

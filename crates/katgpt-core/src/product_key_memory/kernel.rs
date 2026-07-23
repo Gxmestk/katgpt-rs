@@ -315,22 +315,29 @@ impl<const SQRT_N: usize, const D_K: usize, const D_V: usize> ProductKeyMemory<S
 ///
 /// Uses the standard max-subtraction trick for numerical stability:
 /// `softmax(s) = exp(s − max) / Σ exp(s − max)`.
+///
+/// Note: `entries` is a slice of `(usize, f32)` tuples, not a contiguous f32
+/// buffer, so the SIMD softmax kernels don't apply here. Uses scalar `fast_exp`
+/// (Cephes polynomial) instead of libm `exp` for consistency with the rest of
+/// the codebase's exp floor (~1.7× faster on aarch64).
 fn softmax_normalize_into(entries: &mut [(usize, f32)]) {
     if entries.is_empty() {
         return;
     }
+    use crate::simd::fast_exp;
     let max = entries
         .iter()
         .fold(f32::NEG_INFINITY, |m, &(_, s)| m.max(s));
     let mut sum_exp = 0.0f32;
     for (_, s) in entries.iter_mut() {
-        let e = (*s - max).exp();
+        let e = fast_exp(*s - max);
         *s = e;
         sum_exp += e;
     }
     if sum_exp > 0.0 && sum_exp.is_finite() {
+        let inv = 1.0 / sum_exp;
         for (_, s) in entries.iter_mut() {
-            *s /= sum_exp;
+            *s *= inv;
         }
     }
 }

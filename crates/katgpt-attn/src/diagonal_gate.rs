@@ -251,12 +251,16 @@ fn apply_exp_rescale(gate_values: &[f32], target: &mut [f32], negate: bool) {
         i += CHUNK;
     }
 
-    // Scalar tail — `f32::exp` is more accurate than the Cephes approximation,
-    // which is desirable for the short remainder where SIMD setup cost dominates.
+    // Scalar tail — `cephes_exp_scalar` (via `fast_exp`) matches the SIMD
+    // Cephes kernel used in the chunked path above, so the tail produces
+    // bit-identical values to what the chunked path would have produced for
+    // the same inputs. This matters for `apply_inverse` round-trip tests:
+    // mixing libm exp (tail) with Cephes exp (chunks) would break exactness.
+    use katgpt_core::simd::fast_exp;
     while i < d {
         let g = unsafe { *gate_values.get_unchecked(i) };
         let e = if negate { -g } else { g };
-        target[i] *= e.exp();
+        target[i] *= fast_exp(e);
         i += 1;
     }
 }

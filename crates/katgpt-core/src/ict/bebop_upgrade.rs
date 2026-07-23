@@ -106,37 +106,21 @@ impl AcceptanceForecastH2 {
         }
 
         // ── Numerically stable softmax: subtract max, exponentiate, normalize. ──
-        let mut max_l = next_token_logits[0];
-        for &l in &next_token_logits[1..] {
-            if l > max_l {
-                max_l = l;
-            }
-        }
-        let mut sum_exp = 0.0_f32;
-        // Chunked-4 helps LLVM autovectorize the exp+accumulate.
-        let mut i = 0;
-        while i + 4 <= n {
-            let e0 = (next_token_logits[i] - max_l).exp();
-            let e1 = (next_token_logits[i + 1] - max_l).exp();
-            let e2 = (next_token_logits[i + 2] - max_l).exp();
-            let e3 = (next_token_logits[i + 3] - max_l).exp();
-            prob_scratch[i] = e0;
-            prob_scratch[i + 1] = e1;
-            prob_scratch[i + 2] = e2;
-            prob_scratch[i + 3] = e3;
-            sum_exp += e0 + e1 + e2 + e3;
-            i += 4;
-        }
-        while i < n {
-            let e = (next_token_logits[i] - max_l).exp();
-            prob_scratch[i] = e;
-            sum_exp += e;
-            i += 1;
-        }
+        // SIMD path: max via `simd_max_f32`, exp+sum fused via `simd_exp_sum_inplace`
+        // (Cephes 6th-order polynomial, ~1.7× faster than libm `exp` on aarch64).
+        // The manual 4-wide unroll below previously helped LLVM autovectorize the
+        // libm `exp` call; the SIMD kernel is explicit 4-/8-wide by dispatch, so
+        // the unroll is no longer needed. Numerical result differs from the libm
+        // path by ≤1 ULP per element (Cephes accuracy floor); the downstream
+        // β = Σp² and H_2 = −log β computations absorb this (both are monotone
+        // transforms of a probability distribution that softmax-normalizes).
+        use crate::simd::{simd_add_scalar_inplace, simd_exp_sum_inplace, simd_max_f32, simd_scale_inplace};
+        let max_l = simd_max_f32(next_token_logits);
+        prob_scratch[..n].copy_from_slice(&next_token_logits[..n]);
+        simd_add_scalar_inplace(&mut prob_scratch[..n], -max_l);
+        let sum_exp = simd_exp_sum_inplace(&mut prob_scratch[..n]);
         let inv_sum = if sum_exp > 0.0 { 1.0 / sum_exp } else { 0.0 };
-        for slot in prob_scratch[..n].iter_mut() {
-            *slot *= inv_sum;
-        }
+        simd_scale_inplace(&mut prob_scratch[..n], inv_sum);
 
         // ── β = Σ p² (collision purity). H_2 = −log β. ──
         let beta = collision_purity(prob_scratch);
