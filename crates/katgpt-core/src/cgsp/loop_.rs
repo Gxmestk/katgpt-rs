@@ -266,22 +266,21 @@ where
             cdf_scratch,
         );
 
-        // ── Step 2: Guide scores each candidate ──────────────────────────
+        // ── Step 2+3: Guide scores + difficulty-filter admission (fused) ──
+        // Previously two separate loops over `0..k`; fused into one pass
+        // because the admission check only depends on the guide score just
+        // computed in the same iteration. Saves one loop's worth of bounds
+        // checks + counter updates (k=8 default).
+        //
+        // Difficulty filter context: we use the guide score as the proxy for
+        // estimated solve rate (very high guide ≈ aligned with target → easy;
+        // very low guide ≈ orthogonal → hard). This is a coarse but
+        // allocation-free stand-in for the true breakeven_complexity router;
+        // production callers should swap in their own DifficultyFilter.
         for (i, c) in candidates.iter().enumerate() {
-            guide_scores[i] = self.guide.score(target, &c.direction);
-        }
-
-        // ── Step 3: Difficulty filter (breakeven-style admission) ────────
-        // First, get an *estimate* of solve rate from the solver's perspective
-        // by probing once on a tiny budget. To stay zero-allocation we instead
-        // use the guide score as the proxy: very high guide ≈ aligned with
-        // target → easy; very low guide ≈ orthogonal → hard. This is a coarse
-        // but allocation-free stand-in for the true breakeven_complexity
-        // router; production callers should swap in their own DifficultyFilter.
-        for i in 0..k {
-            let gs = guide_scores[i];
-            let est = gs; // proxy; real impl replaces via with_difficulty_filter.
-            admitted[i] = self.difficulty_filter.admit(gs, est);
+            let gs = self.guide.score(target, &c.direction);
+            guide_scores[i] = gs;
+            admitted[i] = self.difficulty_filter.admit(gs, gs);
         }
 
         // ── Step 4: Solver attempts admitted candidates ──────────────────
