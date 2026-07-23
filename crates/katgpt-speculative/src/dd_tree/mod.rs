@@ -1427,10 +1427,11 @@ where
 
 // ── Belief-Drafter DDTree (Plan 217, feature: belief_drafter) ───────
 
+/// Delegates to `katgpt_core::simd::fast_sigmoid` (Cephes polynomial).
 #[cfg(feature = "belief_drafter")]
 #[inline]
 fn belief_sigmoid(x: f32) -> f32 {
-    1.0 / (1.0 + (-x).exp())
+    katgpt_core::simd::fast_sigmoid(x)
 }
 
 /// Build DDTree from belief-state draft tokens.

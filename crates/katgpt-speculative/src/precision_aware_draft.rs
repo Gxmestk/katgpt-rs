@@ -87,7 +87,10 @@ impl BoundaryPenalty {
         // How close to the midpoint between grid points (the boundary).
         let boundary_dist = (dist - inv.half_scale).abs();
         if boundary_dist < inv.near_threshold {
-            1.0 / (1.0 + (boundary_dist * inv.inv_scale_20 - 5.0).exp())
+            // Original form was 1/(1+exp(X)) where X = boundary_dist*inv_scale_20 - 5;
+            // that's sigmoid(-X) = sigmoid(5 - boundary_dist*inv_scale_20).
+            // Higher boundary_dist → lower proximity (further from boundary midpoint).
+            katgpt_core::simd::fast_sigmoid(5.0 - boundary_dist * inv.inv_scale_20)
         } else {
             0.0
         }

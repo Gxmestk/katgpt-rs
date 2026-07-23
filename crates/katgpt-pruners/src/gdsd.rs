@@ -263,7 +263,7 @@ pub fn identity_advantage(x: f32) -> f32 {
 ///
 /// Bounded in (0, 1). Good for raw Q-value advantages.
 pub fn sigmoid_advantage(x: f32) -> f32 {
-    1.0 / (1.0 + (-x).exp())
+    katgpt_core::simd::fast_sigmoid(x)
 }
 
 /// Tanh advantage function: A(x) = tanh(x).

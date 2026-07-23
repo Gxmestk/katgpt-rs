@@ -11,9 +11,11 @@
 //!   4. Clamp each to min_budget, adjust so total sums to total_budget
 
 /// Sigmoid activation: `1 / (1 + exp(-x))`.
+///
+/// Delegates to `katgpt_core::simd::fast_sigmoid` (Cephes polynomial).
 #[inline]
 fn sigmoid(x: f32) -> f32 {
-    1.0 / (1.0 + (-x).exp())
+    katgpt_core::simd::fast_sigmoid(x)
 }
 
 /// Compute sigmoid-weighted ratios for each score relative to the mean.

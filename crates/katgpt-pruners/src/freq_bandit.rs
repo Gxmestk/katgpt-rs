@@ -250,7 +250,7 @@ pub fn token_stream_spectrum(tokens: &[usize], window_size: usize) -> FrequencyP
 /// Used for all activation in this module. NOT softmax per project constraint.
 #[inline]
 pub fn sigmoid(x: f32) -> f32 {
-    1.0 / (1.0 + (-x).exp())
+    katgpt_core::simd::fast_sigmoid(x)
 }
 
 /// Apply sigmoid to band energies to get activation weights.

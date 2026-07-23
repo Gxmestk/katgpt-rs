@@ -20,15 +20,11 @@ use katgpt_core::ConstraintPruner;
 use katgpt_core::Rng;
 use katgpt_core::speculative::sampling::sample_from_distribution;
 
-/// Sigmoid function (numerically stable).
-/// Duplicated locally to avoid feature-gated dependency chains.
+/// Sigmoid function.
+///
+/// Delegates to `katgpt_core::simd::fast_sigmoid` (Cephes polynomial).
 fn sigmoid(x: f32) -> f32 {
-    if x >= 0.0 {
-        1.0 / (1.0 + (-x).exp())
-    } else {
-        let ex = x.exp();
-        ex / (1.0 + ex)
-    }
+    katgpt_core::simd::fast_sigmoid(x)
 }
 
 // ── FailurePoint: Where and why a branch failed ──────────────

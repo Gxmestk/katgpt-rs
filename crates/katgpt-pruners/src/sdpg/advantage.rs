@@ -98,7 +98,7 @@ pub fn sigmoid_advantage(student_q: &[f32], teacher_q: &[f32], temperature: f32)
 /// Scalar sigmoid: σ(x) = 1 / (1 + exp(-x))
 #[inline]
 fn sigmoid(x: f32) -> f32 {
-    1.0 / (1.0 + (-x).exp())
+    katgpt_core::simd::fast_sigmoid(x)
 }
 
 /// Raw Q-value delta advantage — simplest possible teacher signal.

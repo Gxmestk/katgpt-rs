@@ -9,7 +9,7 @@ use super::bfcf_types::{BFCP, RegionLabel};
 
 #[inline]
 fn sigmoid(x: f32) -> f32 {
-    1.0 / (1.0 + (-x).exp())
+    katgpt_core::simd::fast_sigmoid(x)
 }
 
 // ── ComputePath ─────────────────────────────────────────────────

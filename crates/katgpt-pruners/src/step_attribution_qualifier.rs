@@ -487,15 +487,11 @@ fn dot(a: &[f32], b: &[f32]) -> f32 {
     katgpt_core::simd::simd_dot_f32(a, b, a.len())
 }
 
-/// Numerically stable sigmoid. Per AGENTS.md: sigmoid not softmax.
+/// Sigmoid. Per AGENTS.md: sigmoid not softmax. Delegates to
+/// `katgpt_core::simd::fast_sigmoid` (Cephes polynomial).
 #[inline]
 fn stable_sigmoid(x: f32) -> f32 {
-    if x >= 0.0 {
-        1.0 / (1.0 + (-x).exp())
-    } else {
-        let e = x.exp();
-        e / (1.0 + e)
-    }
+    katgpt_core::simd::fast_sigmoid(x)
 }
 
 // ─────────────────────────────────────────────────────────────────────────

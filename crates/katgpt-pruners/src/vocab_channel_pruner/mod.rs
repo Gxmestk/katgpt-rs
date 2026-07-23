@@ -138,12 +138,11 @@ pub fn householder_apply(h: &[f32], x: &[f32]) -> Vec<f32> {
     out
 }
 
-/// Sigmoid function. Clamps input to avoid overflow in exp.
+/// Sigmoid function. Delegates to `katgpt_core::simd::fast_sigmoid` (Cephes polynomial).
 #[cfg(test)]
 #[inline]
 fn sigmoid(x: f32) -> f32 {
-    let clamped = x.clamp(-20.0, 20.0);
-    1.0 / (1.0 + (-clamped).exp())
+    katgpt_core::simd::fast_sigmoid(x)
 }
 
 /// Project a single neuron weight vector through the LM head to get vocabulary logits.

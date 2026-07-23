@@ -12,7 +12,7 @@ use super::substrate_types::{SubstrateMask, SubstrateRouter};
 #[inline]
 #[allow(dead_code)]
 fn sigmoid(x: f32) -> f32 {
-    1.0 / (1.0 + (-x).exp())
+    katgpt_core::simd::fast_sigmoid(x)
 }
 
 // ── apply_substrate_mask ───────────────────────────────────────

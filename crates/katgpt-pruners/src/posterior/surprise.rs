@@ -37,17 +37,11 @@ impl SurpriseComputer {
         }
     }
 
-    /// Sigmoid function. Uses the numerically stable form:
-    /// sigmoid(x) = 1 / (1 + exp(-x)) for x >= 0
-    /// sigmoid(x) = exp(x) / (1 + exp(x)) for x < 0
+    /// Sigmoid function. Delegates to
+    /// `katgpt_core::simd::fast_sigmoid` (Cephes polynomial).
     #[inline]
     fn sigmoid(x: f32) -> f32 {
-        if x >= 0.0 {
-            1.0 / (1.0 + (-x).exp())
-        } else {
-            let ex = x.exp();
-            ex / (1.0 + ex)
-        }
+        katgpt_core::simd::fast_sigmoid(x)
     }
 
     /// Compute surprise gate from a KL divergence value.
@@ -93,11 +87,14 @@ mod tests {
 
     #[test]
     fn sigmoid_bounds() {
-        // Sigmoid should be in (0, 1] for finite inputs
-        // Note: f32 precision means sigmoid(100) rounds to exactly 1.0
+        // Sigmoid should be in [0, 1] for finite inputs in f32 precision.
+        // For |x| > ~88 the true sigmoid drops below the smallest positive
+        // subnormal f32 (~1.4e-45); for |x| > ~18 it rounds to 0.0 or 1.0 in
+        // normal precision. The fast_sigmoid early-exit at |x| > 40 returns
+        // exactly 0.0 / 1.0, which is equivalent for all downstream gating use.
         for x in [-100.0, -10.0, -1.0, 0.0, 1.0, 10.0, 100.0] {
             let s = SurpriseComputer::sigmoid(x);
-            assert!(s > 0.0 && s <= 1.0, "sigmoid({x}) = {s}, expected (0, 1]");
+            assert!(s >= 0.0 && s <= 1.0, "sigmoid({x}) = {s}, expected [0, 1]");
         }
     }
 

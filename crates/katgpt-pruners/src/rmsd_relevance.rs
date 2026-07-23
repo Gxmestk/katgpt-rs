@@ -364,15 +364,7 @@ pub fn rmsd_loss(selected: &[usize], teacher_q: &[f32], student_q: &[f32], beta:
         let gap = teacher_val - student_val;
 
         // SDAR sigmoid gate
-        let gate = {
-            let z = beta * gap;
-            if z >= 0.0 {
-                1.0 / (1.0 + (-z).exp())
-            } else {
-                let ez = z.exp();
-                ez / (1.0 + ez)
-            }
-        };
+        let gate = katgpt_core::simd::fast_sigmoid(beta * gap);
 
         // Reverse KL proxy: |Δ|
         let kl_proxy = gap.abs();

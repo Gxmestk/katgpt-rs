@@ -79,13 +79,6 @@ impl Default for EnvPredictorConfig {
 }
 
 // ── Helpers ─────────────────────────────────────────────────
-/// Sigmoid activation. Delegates to `katgpt_core::simd::fast_sigmoid`
-/// which adds early-exit for `|x| > 40` (where σ saturates in f32).
-#[inline]
-fn sigmoid(x: f32) -> f32 {
-    fast_sigmoid(x)
-}
-
 /// Cosine similarity in a single fused pass over both slices.
 ///
 /// Accumulates `dot`, `norm_a²`, `norm_b²` together so the data only
@@ -178,7 +171,7 @@ where
         }
         let denom = (np.max(0.0).sqrt()).max(1e-8) * (na.max(0.0).sqrt()).max(1e-8);
         let cosine = dot / denom;
-        sigmoid(cosine / self.config.temperature)
+        fast_sigmoid(cosine / self.config.temperature)
     }
 }
 

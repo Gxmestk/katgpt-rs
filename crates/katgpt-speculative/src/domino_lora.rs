@@ -435,9 +435,11 @@ fn read_f32_slice(data: &[u8], offset: &mut usize, count: usize) -> Vec<f32> {
 }
 
 /// Standard sigmoid function.
+///
+/// Delegates to `katgpt_core::simd::fast_sigmoid` (Cephes polynomial).
 #[inline]
 fn sigmoid(x: f32) -> f32 {
-    1.0 / (1.0 + (-x).exp())
+    katgpt_core::simd::fast_sigmoid(x)
 }
 
 #[cfg(test)]

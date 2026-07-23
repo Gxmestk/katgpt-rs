@@ -59,7 +59,7 @@ impl PathwayTracker {
             return 0.5;
         }
         let ratio = matches as f32 / comparisons as f32;
-        1.0 / (1.0 + (-(ratio - 0.5) * 4.0).exp())
+        katgpt_core::simd::fast_sigmoid((ratio - 0.5) * 4.0)
     }
 
     /// Check if pathway has converged.

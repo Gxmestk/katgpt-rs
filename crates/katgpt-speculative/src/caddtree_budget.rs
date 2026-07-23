@@ -24,9 +24,11 @@ use katgpt_core::speculative::types::SpecCostSnapshot;
 // ─────────────────────────────────────────────────────────────────────────────
 
 /// Sigmoid activation (never softmax, per project convention).
+///
+/// Delegates to `katgpt_core::simd::fast_sigmoid` (Cephes polynomial).
 #[inline]
 fn sigmoid(x: f32) -> f32 {
-    1.0 / (1.0 + (-x).exp())
+    katgpt_core::simd::fast_sigmoid(x)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

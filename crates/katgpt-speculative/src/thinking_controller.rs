@@ -476,9 +476,11 @@ impl ThinkingController {
     // ── T5: Adaptive Thinking Budget via Cumprodsum Freshness ────
 
     /// Fast sigmoid: `1 / (1 + e^{-x})`.
+    ///
+    /// Delegates to `katgpt_core::simd::fast_sigmoid` (Cephes polynomial).
     #[inline(always)]
     fn sigmoid(x: f32) -> f32 {
-        1.0 / (1.0 + (-x.clamp(-50.0, 50.0)).exp())
+        katgpt_core::simd::fast_sigmoid(x)
     }
 
     /// Compute adaptive thinking budget based on context freshness.

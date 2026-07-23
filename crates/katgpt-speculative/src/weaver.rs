@@ -1957,10 +1957,12 @@ fn rmsnorm_into(x: &[f32], scale: &[f32], eps: f32, output: &mut [f32]) {
     }
 }
 
-/// SiLU / Swish activation: `x / (1 + e^{-x})`.
+/// SiLU / Swish activation: `x * σ(x)`.
+///
+/// Delegates to `katgpt_core::simd::fast_sigmoid` (Cephes polynomial).
 #[inline]
 fn silu(x: f32) -> f32 {
-    x / (1.0 + (-x).exp())
+    x * katgpt_core::simd::fast_sigmoid(x)
 }
 
 /// Dot product — delegates to `simd_dot_f32` for NEON/AVX2 dispatch.

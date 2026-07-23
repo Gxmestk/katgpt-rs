@@ -137,19 +137,11 @@ impl BtScores {
 
 // ── Core Functions ──────────────────────────────────────────────
 
-/// Numerically stable logistic sigmoid: σ(z) = 1 / (1 + exp(-z)).
-///
-/// Two-branch implementation avoids overflow in `exp()`:
-/// - `z >= 0`: `1 / (1 + exp(-z))`
-/// - `z < 0`: `exp(z) / (1 + exp(z))`
+/// Logistic sigmoid: σ(z) = 1 / (1 + exp(-z)). Delegates to
+/// `katgpt_core::simd::fast_sigmoid` (Cephes polynomial).
 #[inline]
 pub fn sigmoid(z: f32) -> f32 {
-    if z >= 0.0 {
-        1.0 / (1.0 + (-z).exp())
-    } else {
-        let ez = z.exp();
-        ez / (1.0 + ez)
-    }
+    katgpt_core::simd::fast_sigmoid(z)
 }
 
 /// Fit Bradley-Terry scores from pairwise comparisons via gradient ascent.

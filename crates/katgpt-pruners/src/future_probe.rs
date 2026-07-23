@@ -37,16 +37,11 @@ use std::sync::{Arc, RwLock};
 use katgpt_core::simd::simd_dot_f32;
 use katgpt_core::traits::{FeatureClass, ScreeningPruner};
 
-/// σ(x) — numerically stable logistic sigmoid. Never softmax (per AGENTS.md).
+/// σ(x) — logistic sigmoid. Delegates to
+/// `katgpt_core::simd::fast_sigmoid` (Cephes polynomial). Never softmax (per AGENTS.md).
 #[inline(always)]
 fn sigmoid(x: f32) -> f32 {
-    if x >= 0.0 {
-        let z = (-x).exp();
-        1.0 / (1.0 + z)
-    } else {
-        let z = x.exp();
-        z / (1.0 + z)
-    }
+    katgpt_core::simd::fast_sigmoid(x)
 }
 
 /// Immutable probe data. Hash is computed once at construction and never

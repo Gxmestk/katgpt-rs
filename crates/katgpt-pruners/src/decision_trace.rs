@@ -13,7 +13,7 @@ use super::rule_extractor::ExtractedRule;
 /// Sigmoid function: `1 / (1 + exp(-x))`. Bounded to (0, 1).
 #[inline]
 fn sigmoid(x: f32) -> f32 {
-    1.0 / (1.0 + (-x).exp())
+    katgpt_core::simd::fast_sigmoid(x)
 }
 
 // ── DecisionTrace ──────────────────────────────────────────────────

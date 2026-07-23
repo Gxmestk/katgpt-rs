@@ -324,7 +324,7 @@ pub fn region_radius(base_radius: f32, freq: f32, freq_scale: f32) -> f32 {
 
 #[inline]
 fn sigmoid(x: f32) -> f32 {
-    1.0 / (1.0 + (-x).exp())
+    katgpt_core::simd::fast_sigmoid(x)
 }
 
 // ── Tests ─────────────────────────────────────────────────────────

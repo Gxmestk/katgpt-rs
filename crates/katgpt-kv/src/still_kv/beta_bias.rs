@@ -158,16 +158,11 @@ pub fn compute_beta_vortex_flow(
 }
 
 /// Standard sigmoid function.
-/// `sigmoid(x) = 1 / (1 + exp(-x))`
+///
+/// Delegates to `katgpt_core::simd::fast_sigmoid` (Cephes polynomial).
 #[inline]
 fn sigmoid(x: f32) -> f32 {
-    // Numerically stable: use the positive/negative split
-    if x >= 0.0 {
-        1.0 / (1.0 + (-x).exp())
-    } else {
-        let exp_x = x.exp();
-        exp_x / (1.0 + exp_x)
-    }
+    katgpt_core::simd::fast_sigmoid(x)
 }
 
 // ---------------------------------------------------------------------------

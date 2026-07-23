@@ -70,7 +70,7 @@ impl ScreeningPruner for CompiledSpec {
 
 #[inline]
 fn sigmoid(x: f32) -> f32 {
-    1.0 / (1.0 + (-x).exp())
+    katgpt_core::simd::fast_sigmoid(x)
 }
 
 #[inline]

@@ -214,10 +214,10 @@ fn resolve_token_indices(token_strings: &[&str], vocab: &[String]) -> Vec<usize>
 /// Uses sigmoid of pattern length as a smooth confidence function.
 fn compute_confidence(pattern: &str, _prompt: &str) -> f32 {
     let len = pattern.len() as f32;
-    // Sigmoid: σ(x) = 1 / (1 + exp(-x))
+    // σ(x) = 1 / (1 + exp(-x)) — delegates to `katgpt_core::simd::fast_sigmoid`.
     // Use pattern length scaled so ~10 chars → ~0.7 confidence
     let x = (len - 5.0) * 0.5;
-    1.0 / (1.0 + (-x).exp())
+    katgpt_core::simd::fast_sigmoid(x)
 }
 
 // ── FolPruner ──────────────────────────────────────────────────────

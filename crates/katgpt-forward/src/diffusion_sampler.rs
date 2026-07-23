@@ -821,14 +821,10 @@ impl DiffusionSampler {
 // ── Activation Functions ──────────────────────────────────────
 
 /// Sigmoid: σ(x) = 1 / (1 + exp(-x)).
+///
+/// Delegates to `katgpt_core::simd::fast_sigmoid` (Cephes polynomial).
 fn sigmoid(x: f32) -> f32 {
-    match x >= 0.0 {
-        true => 1.0 / (1.0 + (-x).exp()),
-        false => {
-            let ex = x.exp();
-            ex / (1.0 + ex)
-        }
-    }
+    katgpt_core::simd::fast_sigmoid(x)
 }
 
 /// ReLU: max(0, x).
