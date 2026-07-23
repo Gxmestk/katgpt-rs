@@ -4,7 +4,33 @@
 > **Date:** 2026-07-24
 > **Type:** optimization (transcendental-function approximation)
 > **Severity:** MEDIUM — attacks the transcendental floor (30-40% of CGSP cycle time)
-> **Status:** OPEN (needs GOAT gate)
+> **Status:** PARTIALLY RESOLVED — sigmoid component addressed via Cephes (2026-07-24)
+
+## Update (2026-07-24): sigmoid floor addressed
+
+The original issue proposed Schraudolph bit-manipulation exp for the sigmoid
+floor. Instead, the rust-optimize continuation session found a better path:
+the codebase ALREADY shipped a Cephes 6th-order polynomial exp
+(`cephes_exp_scalar` in `katgpt_types::simd::activations`) used as the scalar
+tail of the SIMD exp kernels. It was ~1 ULP accurate and ~1.7× faster than
+libm `exp` on aarch64 (Apple Silicon), but was private and not used by the
+scalar sigmoid paths.
+
+**Shipped (4 commits):**
+- `7d868801` — `fast_sigmoid` → Cephes exp (1.7× vs libm)
+- `1e2559b4` — `cgsp::types::sigmoid` → delegates to `fast_sigmoid`; `cephes_exp_scalar` made `pub`
+- `0aa4d7b54` (riir-ai) — DRY dedup of 3 local sigmoid impls in cgsp_runtime
+- `f1a532b0` — `staleness_weight` → Cephes exp
+
+All libm `exp()` calls eliminated from the CGSP hot path. The sigmoid
+component of the transcendental floor is now at Cephes polynomial speed.
+
+**The ln component remains on libm.** Micro-benchmark confirmed libm `ln()`
+on Apple Silicon is at hardware floor (~1.9 ns/call, auto-vectorized) — a
+scalar Cephes polynomial for ln is SLOWER than libm on this platform
+(measured: 227 ns vs 183 ns for a 64-element entropy_nats call). The
+`entropy_nats` function (64 ln calls per CGSP cycle) is at its practical
+floor on aarch64.
 
 ## Context
 
