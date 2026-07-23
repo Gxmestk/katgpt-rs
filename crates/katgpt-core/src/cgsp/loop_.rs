@@ -612,7 +612,7 @@ pub fn staleness_weight(k_npc: u8, lambda: f32) -> f32 {
     if k_npc <= 1 || !lambda.is_finite() || lambda <= 0.0 {
         return 1.0;
     }
-    (-(lambda * (k_npc as f32 - 1.0))).exp()
+    crate::simd::cephes_exp_scalar(-(lambda * (k_npc as f32 - 1.0)))
 }
 
 // ── KnpcSelector (Issue 364 T4) ──────────────────────────────────────────
