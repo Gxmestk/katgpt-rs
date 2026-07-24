@@ -87,6 +87,7 @@ use sparse::scalar_sparse_dot_f32;
 pub use activations::{
     cephes_exp_scalar, fast_exp, fast_sigmoid, fast_tanh, simd_exp_inplace, simd_exp_sum_inplace,
     simd_reciprocal_inplace, simd_sigmoid_inplace, simd_sigmoid_tanh_clamp_inplace,
+    simd_tanh_inplace,
 };
 pub use argmax::simd_argmax_f32;
 pub use dot::{
