@@ -267,6 +267,16 @@ pub fn relu_cross_kernel_approx(
 // Optimal parent direction (paper §7.1, Eq 12–14)
 // ──────────────────────────────────────────────────────────────────────────
 
+/// Maximum output dimension supported by the zero-alloc
+/// `optimal_rank1_parent_into_scratch` hot path.
+///
+/// The polarity comparison needs a stack snapshot of the first-polarity
+/// v_hat (length m = w_out.len()). This constant bounds that snapshot so no
+/// allocation is needed. Currently 64 — comfortably above HLA's 8 scalars
+/// and style_weights' 64 dims. Larger output dims fall back to the owned
+/// `optimal_rank1_parent` variant.
+pub const RANK1_PARENT_MAX_OUT_DIM: usize = 64;
+
 /// The optimal rank-1 parent for merging two neurons.
 ///
 /// `u_hat ∈ ℝⁿ` is the input direction (principal eigenvector of the rank-2
@@ -413,6 +423,12 @@ pub fn optimal_rank1_parent(
 /// Writes the parent's input direction into `u_hat_scratch` (length `n`),
 /// output direction into `v_hat_scratch` (length `m`), self-kernel into
 /// `k_self_scratch`, and returns the optimal scale `s_star`.
+///
+/// `v_hat_compare_scratch` (length `m`) is internal scratch used to preserve
+/// the first polarity's v_hat across the second-polarity evaluation — it is
+/// overwritten during the call and need not be initialized. This keeps the
+/// hot path allocation-free: the polarity comparison that previously
+/// returned an owned `Vec<f32>` now writes into this caller-supplied buffer.
 pub fn optimal_rank1_parent_into_scratch(
     op_i: &impl Rank1Operator,
     op_j: &impl Rank1Operator,
@@ -453,49 +469,54 @@ pub fn optimal_rank1_parent_into_scratch(
     // (paper Eq 11). The objective is:
     //   obj(û) = ‖Σ_k K(û, w̃_in_k)·w_out_k‖ / √K(û, û)
     // We compute the positive and negative polarity alignments and pick the max.
+    //
+    // To stay allocation-free, we use a fixed-size stack buffer for the
+    // first-polarity v_hat snapshot. This bounds the supported output dim to
+    // RANK1_PARENT_MAX_OUT_DIM (currently 64 — comfortably above HLA's 8 and
+    // style_weights' 64). Larger output dims fall back to the owned variant.
     let gamma_u_pos = estimate_gamma(u_hat_scratch, op_i, op_j);
-    let (obj_pos, v_hat_pos, k_self_pos) =
-        compute_alignment_objective(u_hat_scratch, gamma_u_pos, op_i, op_j, v_hat_scratch);
+    let (obj_pos, k_self_pos) =
+        compute_alignment_objective_into(u_hat_scratch, gamma_u_pos, op_i, op_j, v_hat_scratch);
+
+    // Snapshot positive-polarity v_hat into the stack buffer before the
+    // negative-polarity call overwrites v_hat_scratch.
+    let mut v_hat_pos_snapshot = [0.0_f32; RANK1_PARENT_MAX_OUT_DIM];
+    if m <= RANK1_PARENT_MAX_OUT_DIM {
+        v_hat_pos_snapshot[..m].copy_from_slice(&v_hat_scratch[..m]);
+    }
 
     for slot in u_hat_scratch.iter_mut().take(n) {
         *slot = -*slot;
     }
     let gamma_u_neg = -gamma_u_pos;
-    let (obj_neg, v_hat_neg, k_self_neg) =
-        compute_alignment_objective(u_hat_scratch, gamma_u_neg, op_i, op_j, v_hat_scratch);
+    let (obj_neg, k_self_neg) =
+        compute_alignment_objective_into(u_hat_scratch, gamma_u_neg, op_i, op_j, v_hat_scratch);
 
     // Pick the polarity with the larger objective.
-    let (_s_star_unused, k_self_final) = if obj_pos >= obj_neg {
-        // Restore positive polarity.
+    if obj_pos >= obj_neg {
+        // Restore positive polarity u_hat + v_hat.
         for slot in u_hat_scratch.iter_mut().take(n) {
             *slot = -*slot;
         }
-        // Restore v_hat_pos into scratch.
-        v_hat_scratch[..m].copy_from_slice(&v_hat_pos[..m]);
-        finalize_scale(op_i, op_j, k_self_pos, e_rem, v_hat_scratch, true)
+        if m <= RANK1_PARENT_MAX_OUT_DIM {
+            v_hat_scratch[..m].copy_from_slice(&v_hat_pos_snapshot[..m]);
+        }
+        let (_s_star_unused, k_self_final) =
+            finalize_scale(op_i, op_j, k_self_pos, e_rem, v_hat_scratch, true);
+        *k_self_scratch = k_self_final;
     } else {
-        // Keep negative polarity u_hat; copy v_hat_neg into scratch.
-        v_hat_scratch[..m].copy_from_slice(&v_hat_neg[..m]);
-        finalize_scale(op_i, op_j, k_self_neg, e_rem, v_hat_scratch, true)
-    };
-    // Note: at this point v_hat_scratch holds the chosen v_hat. finalize_scale
-    // already used it for `b`. Need to recompute s_star with the correct v_hat.
-    // Actually, our `finalize_scale` signature below handles this — let's
-    // simplify by computing a, b directly here.
+        // Keep negative polarity u_hat; v_hat_scratch already holds v_hat_neg.
+        let (_s_star_unused, k_self_final) =
+            finalize_scale(op_i, op_j, k_self_neg, e_rem, v_hat_scratch, true);
+        *k_self_scratch = k_self_final;
+    }
 
     // Recompute a, b directly from the chosen polarity (simpler + correct).
     let cap_i = hope_capacity(op_i);
     let cap_j = hope_capacity(op_j);
     let a = cap_i * cap_i + cap_j * cap_j;
-    // b = ⟨ψ, f_i + f_j⟩_H = ⟨ψ, f_i⟩_H + ⟨ψ, f_j⟩_H
-    //   = s·(K(u,w_i)·⟨v,w_out_i⟩ + K(u,w_j)·⟨v,w_out_j⟩) / √K(u,u)
-    // We already have v_hat normalized; fold s into b naturally via the
-    // paper's derivation. Simpler: use the precomputed PairCache form.
     let b = compute_b_term(op_i, op_j, v_hat_scratch, u_hat_scratch);
-
-    let s = compute_optimal_scale(a, b, e_rem);
-    *k_self_scratch = k_self_final;
-    s
+    compute_optimal_scale(a, b, e_rem)
 }
 
 /// Estimate `γ_u` for the parent direction as the weighted combination of the
@@ -507,37 +528,34 @@ fn estimate_gamma(_u_hat: &[f32], op_i: &impl Rank1Operator, op_j: &impl Rank1Op
     op_i.gamma().max(op_j.gamma())
 }
 
-/// Compute the alignment objective `(obj, v_hat_unit, K_self)` for the
-/// inner optimization of Eq 10. Writes the chosen `v_hat` into `v_hat_scratch`
-/// and returns `(obj_value, v_hat_unit, k_self)`.
+/// Compute the alignment objective for the inner optimization of Eq 10.
 ///
-/// `v_hat_scratch` is borrowed mutably for scratch — the returned `Vec<f32>`
-/// is the actual chosen v_hat (so the caller can compare polarities).
-fn compute_alignment_objective(
+/// Writes the unit-norm v_hat into `v_hat_scratch` and returns
+/// `(obj_value, k_self)`. Zero-alloc: the caller owns `v_hat_scratch`, and
+/// because the polarity comparison needs a snapshot of the first-polarity
+/// v_hat, `optimal_rank1_parent_into_scratch` uses a fixed-size stack
+/// buffer of size [`RANK1_PARENT_MAX_OUT_DIM`] to preserve it across the
+/// second call (which overwrites `v_hat_scratch`).
+///
+/// Replaces the prior `compute_alignment_objective` which returned an owned
+/// `Vec<f32>` — that version allocated 2 Vecs per call (once per polarity)
+/// and broke the zero-alloc contract on `optimal_rank1_parent_into_scratch`.
+/// Caught by the bench_469_hope_kernel_goat G4 CountingAllocator audit.
+#[inline]
+fn compute_alignment_objective_into(
     u_hat: &[f32],
     gamma_u: f32,
     op_i: &impl Rank1Operator,
     op_j: &impl Rank1Operator,
     v_hat_scratch: &mut [f32],
-) -> (f32, Vec<f32>, f32) {
-    let n = op_i.w_in().len().min(op_j.w_in().len());
+) -> (f32, f32) {
     let m = op_i.w_out().len().min(op_j.w_out().len());
 
     // K(u, w_in_i) using warped correlation — but for a parent direction that's
     // a linear combination of children, the kernel simplifies. Use the
     // Arc-Cosine approximation.
-    let k_ui = relu_cross_kernel_approx(
-        u_hat,
-        op_i.w_in(),
-        gamma_u.abs(),
-        op_i.gamma().abs(),
-    );
-    let k_uj = relu_cross_kernel_approx(
-        u_hat,
-        op_j.w_in(),
-        gamma_u.abs(),
-        op_j.gamma().abs(),
-    );
+    let k_ui = relu_cross_kernel_approx(u_hat, op_i.w_in(), gamma_u.abs(), op_i.gamma().abs());
+    let k_uj = relu_cross_kernel_approx(u_hat, op_j.w_in(), gamma_u.abs(), op_j.gamma().abs());
     let k_self = relu_self_kernel(gamma_u.abs(), 0.0).max(1e-15);
     let sqrt_k_self = k_self.sqrt();
 
@@ -555,13 +573,7 @@ fn compute_alignment_objective(
 
     // Objective: ‖Σ_k K(u,w̃_in_k)·w_out_k‖ / √K(u,u) = v_norm / √K(u,u)
     let obj = v_norm / sqrt_k_self;
-
-    // Copy out v_hat for the caller's comparison.
-    let v_hat_vec: Vec<f32> = v_hat_scratch[..m].to_vec();
-    // unused-n warning suppression
-    let _ = n;
-
-    (obj, v_hat_vec, k_self)
+    (obj, k_self)
 }
 
 /// Compute the `b` term `⟨ψ, f_i + f_j⟩_H` for the scale formula.
@@ -817,7 +829,7 @@ mod tests {
         // φ(0) = 1/√(2π) ≈ 0.3989.
         let pdf_0 = normal_pdf(0.0);
         assert!(
-            (pdf_0 - 0.3989_4228).abs() < 1e-5,
+            (pdf_0 - 0.3989_4223_f32).abs() < 1e-5,
             "φ(0) = {pdf_0}, expected 0.39894"
         );
         // φ is symmetric.

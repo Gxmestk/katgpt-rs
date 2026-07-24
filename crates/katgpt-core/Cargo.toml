@@ -1580,3 +1580,16 @@ required-features = ["poincare_navigator"]
 name = "causal_id_goat"
 harness = false
 required-features = ["causal_identification"]
+
+# Plan 469 Phase 4 T4.1 — HOPE Hilbert-Schmidt Capacity Kernel GOAT gate.
+# G1 correctness sanity + G2 latency (9 kernels at D=8 HLA scale) + G3
+# no-regression (informational — verified externally via lib tests) + G4
+# alloc-free hot path (CountingAllocator, 9 kernels × 100 calls). The owned
+# `optimal_rank1_parent` is caller-controlled alloc; the zero-alloc contract
+# is on the `_into_scratch` variant (which IS measured). Pure modelless
+# (erf approximation + rank-2 closed-form eigendecomp + arithmetic).
+# std::time::Instant + CountingAllocator + harness = false (mirrors bench_370).
+[[bench]]
+name = "bench_469_hope_kernel_goat"
+harness = false
+required-features = ["hope_capacity"]
