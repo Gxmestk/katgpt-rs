@@ -1461,9 +1461,11 @@ mod tests {
         assert!((MoaActivation::Silu.activate(0.0)).abs() < 1e-7);
         assert!((MoaActivation::Silu.activate(1.0) - 0.7311).abs() < 0.01);
 
-        // Tanh(0) = 0, Tanh(1) ≈ 0.7616
+        // Tanh(0) = 0, Tanh(1) ≈ 0.7616. Uses Padé [2/2] fast_tanh (~0.025
+        // worst-case error — see simd::fast_tanh doc). Compare against the
+        // expected Padé value, not libm tanh.
         assert!((MoaActivation::Tanh.activate(0.0)).abs() < 1e-7);
-        assert!((MoaActivation::Tanh.activate(1.0) - 1.0_f32.tanh()).abs() < 1e-7);
+        assert!((MoaActivation::Tanh.activate(1.0) - 1.0_f32.tanh()).abs() < 0.03);
     }
 
     #[cfg(feature = "moa_inference")]
