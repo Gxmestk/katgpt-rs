@@ -159,6 +159,7 @@ pub fn compute_error(state: &[f32], target: &[f32], support_diameter: f32) -> f3
 /// prevents division by near-zero `error²`).
 #[inline]
 pub fn neighborhood_weight(lattice_distance: f32, error: f32, eta: f32) -> f32 {
+    use crate::simd::fast_exp;
     if error < ZERO_ERROR_THRESHOLD {
         return 0.0;
     }
@@ -166,7 +167,7 @@ pub fn neighborhood_weight(lattice_distance: f32, error: f32, eta: f32) -> f32 {
     let eta_sq = eta * eta;
     let error_sq = error * error;
     let arg = -d_sq / (eta_sq * error_sq);
-    arg.exp()
+    fast_exp(arg)
 }
 
 /// Compute the effective neighborhood size (participation ratio).

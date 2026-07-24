@@ -90,6 +90,7 @@ impl SeasonalPoolForecaster {
     /// If the history is shorter than `L_h`, the forecast falls back to the
     /// most recent observation (or `0.0` if history is empty).
     pub fn forecast(&self, h: usize) -> f32 {
+        use crate::simd::fast_exp;
         let n = self.history.len();
         if n == 0 {
             return 0.0;
@@ -121,7 +122,7 @@ impl SeasonalPoolForecaster {
                 None => break,
             };
             let age = step as f32;
-            let w = (-self.exp_lambda * age).exp();
+            let w = fast_exp(-self.exp_lambda * age);
             wsum += w * y;
             wtotal += w;
             step += 1;

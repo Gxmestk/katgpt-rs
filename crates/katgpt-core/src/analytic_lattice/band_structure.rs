@@ -244,6 +244,7 @@ pub fn band_classify_into(
     epsilon: f32,
     out: &mut BandStructureReport,
 ) {
+    use crate::simd::fast_exp;
     assert!(n_periods >= 1, "n_periods must be >= 1, got {n_periods}");
     let k = eigenvalues.len();
     if out.eigenvalues.len() != k {
@@ -276,7 +277,7 @@ pub fn band_classify_into(
     let n_periods_f = n_periods as f32;
     let k_f = k.max(1) as f32;
     out.geometric_mean_attenuation = if valid_det {
-        (log_abs_det / (n_periods_f * k_f)).exp()
+        fast_exp(log_abs_det / (n_periods_f * k_f))
     } else {
         0.0
     };

@@ -586,15 +586,16 @@ fn streaming_softmax_acc<const D: usize>(
     max_logit: &mut f32,
     sum_exp: &mut f32,
 ) {
+    use crate::simd::fast_exp;
     if logit > *max_logit {
-        let rescale = (*max_logit - logit).exp();
+        let rescale = fast_exp(*max_logit - logit);
         *sum_exp = *sum_exp * rescale + 1.0;
         for d in 0..D {
             out[d] = out[d] * rescale + val[d];
         }
         *max_logit = logit;
     } else {
-        let weight = (logit - *max_logit).exp();
+        let weight = fast_exp(logit - *max_logit);
         *sum_exp += weight;
         for d in 0..D {
             out[d] += weight * val[d];
@@ -611,9 +612,10 @@ fn streaming_softmax_acc_slice<const D: usize>(
     max_logit: &mut f32,
     sum_exp: &mut f32,
 ) {
+    use crate::simd::fast_exp;
     let d = val.len();
     if logit > *max_logit {
-        let rescale = (*max_logit - logit).exp();
+        let rescale = fast_exp(*max_logit - logit);
         *sum_exp = *sum_exp * rescale + 1.0;
         for j in 0..d {
             out[j] = out[j] * rescale + val[j];
@@ -624,7 +626,7 @@ fn streaming_softmax_acc_slice<const D: usize>(
         }
         *max_logit = logit;
     } else {
-        let weight = (logit - *max_logit).exp();
+        let weight = fast_exp(logit - *max_logit);
         *sum_exp += weight;
         for j in 0..d {
             out[j] += weight * val[j];

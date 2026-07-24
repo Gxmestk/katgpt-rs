@@ -388,12 +388,13 @@ fn ln_gamma(x: f64) -> f64 {
 /// Returns the **actual pdf** (not log-pdf), clamped to ≥ 0.
 #[inline]
 fn beta_pdf_ln(x: f32, a: f32, b: f32, ln_beta: f32) -> f32 {
+    use crate::simd::fast_exp;
     // pdf = x^{a-1} (1-x)^{b-1} / B(a, b)
     // ln pdf = (a-1) ln x + (b-1) ln(1-x) - ln_beta
     let ln_x = x.max(X_MIN).ln();
     let ln_1mx = (1.0 - x).max(X_MIN).ln();
     let ln_pdf = (a - 1.0) * ln_x + (b - 1.0) * ln_1mx - ln_beta;
-    ln_pdf.exp()
+    fast_exp(ln_pdf)
 }
 
 /// Regularized incomplete beta `I_x(a, b)` via the standard split:
@@ -403,6 +404,7 @@ fn beta_pdf_ln(x: f32, a: f32, b: f32, ln_beta: f32) -> f32 {
 /// Numerical Recipes §6.4 `betai` + `betacf`.
 #[inline]
 fn reg_inc_beta(x: f32, a: f32, b: f32, ln_beta: f32) -> f32 {
+    use crate::simd::fast_exp;
     if x <= 0.0 {
         return 0.0;
     }
@@ -412,7 +414,7 @@ fn reg_inc_beta(x: f32, a: f32, b: f32, ln_beta: f32) -> f32 {
     // Prefactor `bt = x^a (1-x)^b / B(a,b)` (the NR "front" term).
     // The `/a` (or `/b` in the symmetry branch) is applied by the caller.
     let ln_front = a * x.ln() + b * (1.0 - x).ln() - ln_beta;
-    let bt = ln_front.exp();
+    let bt = fast_exp(ln_front);
 
     let thresh = (a + 1.0) / (a + b + 2.0);
     if x < thresh {

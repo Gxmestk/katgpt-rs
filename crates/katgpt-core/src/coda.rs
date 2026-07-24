@@ -53,11 +53,12 @@ impl GateActivation {
     /// Apply the activation function to a single value.
     #[inline(always)]
     pub fn activate(&self, x: f32) -> f32 {
+        use crate::simd::fast_sigmoid;
         match self {
             Self::Relu => x.max(0.0),
             Self::Silu => {
-                let sigmoid = 1.0 / (1.0 + (-x).exp());
-                x * sigmoid
+                // SiLU = x · σ(x). Uses Cephes-backed fast_sigmoid.
+                x * fast_sigmoid(x)
             }
             Self::GegeluTanh => {
                 // sqrt(2/π) — f32 cannot represent more than ~7 significant digits.
@@ -68,8 +69,8 @@ impl GateActivation {
                 0.5 * x * (1.0 + inner.tanh())
             }
             Self::Gegelu => {
-                let sigmoid = 1.0 / (1.0 + (-1.702 * x).exp());
-                x * sigmoid
+                // GELU sigmoid approximation: x · σ(1.702 · x).
+                x * fast_sigmoid(1.702 * x)
             }
         }
     }
@@ -118,6 +119,7 @@ impl MoaActivation {
     /// Apply the MoA activation function to a single value.
     #[inline(always)]
     pub fn activate(&self, x: f32) -> f32 {
+        use crate::simd::fast_sigmoid;
         match self {
             Self::Id => x,
             Self::Relu => x.max(0.0),
@@ -130,13 +132,12 @@ impl MoaActivation {
                 if x >= 0.0 { x } else { ETA * x }
             }
             Self::Gelu => {
-                // Sigmoid approximation: x * sigmoid(1.702 * x)
-                let sigmoid = 1.0 / (1.0 + (-1.702 * x).exp());
-                x * sigmoid
+                // Sigmoid approximation: x * sigmoid(1.702 * x).
+                x * fast_sigmoid(1.702 * x)
             }
             Self::Silu => {
-                let sigmoid = 1.0 / (1.0 + (-x).exp());
-                x * sigmoid
+                // SiLU = x · σ(x). Uses Cephes-backed fast_sigmoid.
+                x * fast_sigmoid(x)
             }
             Self::Tanh => x.tanh(),
         }
@@ -212,11 +213,12 @@ pub type MoaConfig = ();
 #[cfg(feature = "moa_inference")]
 #[inline(always)]
 fn compute_moa_gates(input: &[f32], gating: &[f32], d_model: usize) -> [f32; MOA_DICT_SIZE] {
+    use crate::simd::fast_sigmoid;
     let mut weights = [0.0f32; MOA_DICT_SIZE];
     for (k, w) in weights.iter_mut().enumerate() {
         let offset = k * d_model;
         let dot = simd_dot_f32(&gating[offset..offset + d_model], input, d_model);
-        *w = 1.0 / (1.0 + (-dot).exp()); // sigmoid
+        *w = fast_sigmoid(dot); // sigmoid — Cephes-backed
     }
     weights
 }

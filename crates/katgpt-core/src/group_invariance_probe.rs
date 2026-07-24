@@ -125,18 +125,10 @@
 /// indifference.
 #[inline]
 pub fn invariance_score(distance: f32, beta: f32) -> f32 {
-    // σ(β·(1 − d)). Inline sigmoid to avoid the `simd` module dependency
-    // from this pure-numeric substrate; the call site is not on a SIMD
-    // hot path.
+    // σ(β·(1 − d)). Uses the codebase-wide Cephes-backed fast_sigmoid
+    // (~1 ULP accurate, ~1.7× faster than libm exp on aarch64).
     let x = beta * (1.0 - distance);
-    // Numerically stable sigmoid (matches `simd::fast_sigmoid` semantics).
-    if x >= 0.0 {
-        let z = (-x).exp();
-        1.0 / (1.0 + z)
-    } else {
-        let z = x.exp();
-        z / (1.0 + z)
-    }
+    crate::simd::fast_sigmoid(x)
 }
 
 // ── Score variance (the discrete-vs-continuous classifier) ───────────────

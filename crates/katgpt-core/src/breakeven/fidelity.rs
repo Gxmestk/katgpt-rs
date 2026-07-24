@@ -256,10 +256,11 @@ impl CompressionSweep {
 /// Numerically-stable cross-entropy computation.
 /// logits = raw logit scores, target = index of ground-truth token.
 fn cross_entropy(logits: &[f32], target: usize) -> f32 {
+    use crate::simd::fast_exp;
     let max_val = logits.iter().copied().fold(f32::NEG_INFINITY, f32::max);
     let mut sum_exp = 0.0f32;
     for &val in logits {
-        sum_exp += (val - max_val).exp();
+        sum_exp += fast_exp(val - max_val);
     }
     -(logits[target] - max_val) + sum_exp.ln()
 }
