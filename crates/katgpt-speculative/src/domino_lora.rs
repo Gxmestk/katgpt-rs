@@ -9,7 +9,7 @@
 
 use std::path::Path;
 
-use katgpt_core::simd::simd_add_inplace;
+use katgpt_core::simd::{fast_tanh, simd_add_inplace};
 use katgpt_types::matmul;
 
 // ── Binary format constants ──────────────────────────────────
@@ -122,7 +122,7 @@ impl DominoGRU {
         // multi-array: h_out[i] read+write paired with bn[i]
         #[allow(clippy::needless_range_loop)]
         for i in 0..hs {
-            h_out[i] = (h_out[i] + self.bn[i]).tanh();
+            h_out[i] = fast_tanh(h_out[i] + self.bn[i]);
         }
 
         // Output: h' = (1-z)⊙h_prev + z⊙n

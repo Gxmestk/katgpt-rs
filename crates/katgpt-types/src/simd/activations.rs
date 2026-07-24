@@ -275,6 +275,40 @@ pub fn fast_sigmoid(x: f32) -> f32 {
     1.0 / (1.0 + cephes_exp_scalar(-x))
 }
 
+/// Bounded tanh via Padé [2/2]: `tanh(x) ≈ x·(27+x²)/(27+9x²)`, output in (-1, 1).
+///
+/// This is a pure-arithmetic rational polynomial (no `exp` call), making it
+/// ~5× faster than `f32::tanh()` (libm) on aarch64. The Padé [2/2] form is
+/// exact at x=0 and matches tanh's Taylor series through x³; worst-case
+/// absolute error is ~0.025 near |x|≈2 (verified by `mean_field` unit tests).
+///
+/// For |x| > 3 the result saturates to ±1 (the Padé form loses validity past
+/// the Padé radius, so we return the sign-preserved asymptote).
+///
+/// **When to use**: drift-tolerant activations — GELU, GRU hidden states,
+/// MLP hidden layers, attention gates. Small output drift is acceptable
+/// because tanh is a bounded squashing function, not part of an algebraic
+/// identity that must hold exactly.
+///
+/// **When NOT to use**: any path where the output must satisfy an exact
+/// algebraic identity (e.g. cos²+sin²=1 for norm preservation — see Plan 322
+/// `phase_rotation_coupling` for the canonical failure). Use the sigmoid-
+/// derived form `2.0 * fast_sigmoid(2.0 * x) - 1.0` (Cephes-backed, ~1 ULP)
+/// if you need identity-grade accuracy.
+///
+/// **Precedent**: `mean_field::fast_tanh` has shipped this exact Padé [2/2]
+/// form in production since Plan 281 with a 0.03 tolerance assertion.
+#[inline(always)]
+pub fn fast_tanh(x: f32) -> f32 {
+    let ax = x.abs();
+    if ax > 3.0 {
+        // Past the Padé [2/2] validity range — return the sign-preserved asymptote.
+        return x.signum();
+    }
+    let x2 = x * x;
+    x * (27.0 + x2) / (27.0 + 9.0 * x2)
+}
+
 /// Fused SIMD sigmoid → tanh-like state transform, in-place.
 ///
 /// Computes `out[i] = (2·σ(a[i] + q[i]) − 1).clamp(-clamp, clamp)`

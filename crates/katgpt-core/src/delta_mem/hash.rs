@@ -85,9 +85,10 @@ impl FeatureHasher {
     /// the same `features` and an equally-sized `out` buffer.
     pub fn hash_key_into(&self, features: &[f32], out: &mut [f32]) {
         self.project_into(features, out);
-        // tanh in-place
+        // tanh in-place (Padé [2/2] — pure f32 arithmetic, more deterministic
+        // across platforms than libm tanh which can differ in the last ULP).
         for val in out.iter_mut() {
-            *val = val.tanh();
+            *val = crate::simd::fast_tanh(*val);
         }
         // L2 normalize in-place (prevents state explosion — verified from source).
         // SIMD-accelerated sum-of-squares for the norm denominator.

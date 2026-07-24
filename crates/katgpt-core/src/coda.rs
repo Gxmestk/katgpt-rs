@@ -53,7 +53,7 @@ impl GateActivation {
     /// Apply the activation function to a single value.
     #[inline(always)]
     pub fn activate(&self, x: f32) -> f32 {
-        use crate::simd::fast_sigmoid;
+        use crate::simd::{fast_sigmoid, fast_tanh};
         match self {
             Self::Relu => x.max(0.0),
             Self::Silu => {
@@ -66,7 +66,7 @@ impl GateActivation {
                 // Cubic via mul_add for FMA fusion: 0.044715 * x³ + x.
                 let x_sq = x * x;
                 let inner = SQRT_2_OVER_PI * 0.044_715_f32.mul_add(x * x_sq, x);
-                0.5 * x * (1.0 + inner.tanh())
+                0.5 * x * (1.0 + fast_tanh(inner))
             }
             Self::Gegelu => {
                 // GELU sigmoid approximation: x · σ(1.702 · x).
@@ -139,7 +139,7 @@ impl MoaActivation {
                 // SiLU = x · σ(x). Uses Cephes-backed fast_sigmoid.
                 x * fast_sigmoid(x)
             }
-            Self::Tanh => x.tanh(),
+            Self::Tanh => fast_tanh(x),
         }
     }
 

@@ -960,15 +960,21 @@ fn dummy_adapter(
 
 // ── Numerics: tanh ───────────────────────────────────────────────
 
-/// Fast, deterministic tanh. Uses `libm` `tanh` — IEEE-754 deterministic
-/// across runs on the same host. Bound to `(−1, 1)`.
+/// Fast tanh for MLP hidden-layer activations. Delegates to
+/// [`simd::fast_tanh`] (Padé [2/2] rational polynomial, ~0.025 worst-case
+/// absolute error near |x|≈2, saturates to ±1 for |x|>3).
 ///
-/// A Pade approximation would be faster but introduces platform-specific
-/// drift (see Plan 322 `phase_rotation_coupling` for the canonical failure
-/// mode). `libm` is the floor of correctness.
+/// Safe for the `eval_phi_into` hidden-layer activation use case (bounded
+/// scalar squashing — drift is acceptable, no algebraic identity to preserve).
+///
+/// **NOT safe for norm-preservation identities** (cos²+sin²=1 etc.) — see
+/// Plan 322 `phase_rotation_coupling` for the canonical failure mode where
+/// independent Padé approximations drifted the Pythagorean identity by ~5e-3.
+/// This function is only used in `eval_phi_into`, never in the geodesic /
+/// exp-map / norm-preservation paths.
 #[inline]
 fn fast_tanh(x: f32) -> f32 {
-    x.tanh()
+    crate::simd::fast_tanh(x)
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

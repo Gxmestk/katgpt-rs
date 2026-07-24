@@ -142,7 +142,7 @@ pub fn gegelu_tanh(hidden: &mut [f32], gate: &[f32], up: &[f32]) {
     for i in i..hidden.len() {
         let g = gate[i];
         let inner = SQRT_2_OVER_PI * (g + 0.044715 * g * g * g);
-        let gelu_val = 0.5 * g * (1.0 + inner.tanh());
+        let gelu_val = 0.5 * g * (1.0 + crate::simd::fast_tanh(inner));
         hidden[i] = gelu_val * up[i];
     }
 }

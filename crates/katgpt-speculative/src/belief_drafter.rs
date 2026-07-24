@@ -37,7 +37,7 @@ use std::path::Path;
 
 use katgpt_core::{Config, SpeculativeGenerator};
 
-use katgpt_core::simd::{simd_dot_f32, simd_sum_f32};
+use katgpt_core::simd::{fast_tanh, simd_dot_f32, simd_sum_f32};
 
 // ── Magic & Version ────────────────────────────────────────────
 const MAGIC: &[u8; 4] = b"NLDM";
@@ -50,7 +50,7 @@ const VERSION: u32 = 1;
 fn gelu(x: f32) -> f32 {
     const SQRT_2_OVER_PI: f32 = 0.797_884_6; // sqrt(2/pi)
     let inner = SQRT_2_OVER_PI * (x + 0.044_715 * x * x * x);
-    0.5 * x * (1.0 + inner.tanh())
+    0.5 * x * (1.0 + fast_tanh(inner))
 }
 
 // ── LayerNorm ──────────────────────────────────────────────────
