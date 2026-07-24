@@ -119,7 +119,7 @@ impl MoaActivation {
     /// Apply the MoA activation function to a single value.
     #[inline(always)]
     pub fn activate(&self, x: f32) -> f32 {
-        use crate::simd::fast_sigmoid;
+        use crate::simd::{fast_sigmoid, fast_tanh};
         match self {
             Self::Id => x,
             Self::Relu => x.max(0.0),
