@@ -1245,12 +1245,13 @@ fn advantage_margin_hla(
     adv[5] = post_lsm[5] - pre_lsm[5];
 
     // E_{a∼π+}[A(a)] = Σ_a π+(a) · A(a) = Σ_a exp(post_lsm[a]) · adv[a] = KL(π+‖π̂).
-    let expectation = post_lsm[0].exp() * adv[0]
-        + post_lsm[1].exp() * adv[1]
-        + post_lsm[2].exp() * adv[2]
-        + post_lsm[3].exp() * adv[3]
-        + post_lsm[4].exp() * adv[4]
-        + post_lsm[5].exp() * adv[5];
+    use katgpt_types::simd::fast_exp;
+    let expectation = fast_exp(post_lsm[0]) * adv[0]
+        + fast_exp(post_lsm[1]) * adv[1]
+        + fast_exp(post_lsm[2]) * adv[2]
+        + fast_exp(post_lsm[3]) * adv[3]
+        + fast_exp(post_lsm[4]) * adv[4]
+        + fast_exp(post_lsm[5]) * adv[5];
 
     adv[candidate] - expectation
 }
@@ -1283,12 +1284,13 @@ fn log_softmax_into6(x: &[f32], out: &mut [f32]) {
     }
 
     // Σ exp(x[i] − max)
-    let lse = (x[0] - max_val).exp()
-        + (x[1] - max_val).exp()
-        + (x[2] - max_val).exp()
-        + (x[3] - max_val).exp()
-        + (x[4] - max_val).exp()
-        + (x[5] - max_val).exp();
+    use katgpt_types::simd::fast_exp;
+    let lse = fast_exp(x[0] - max_val)
+        + fast_exp(x[1] - max_val)
+        + fast_exp(x[2] - max_val)
+        + fast_exp(x[3] - max_val)
+        + fast_exp(x[4] - max_val)
+        + fast_exp(x[5] - max_val);
     let log_lse = lse.ln();
 
     out[0] = x[0] - max_val - log_lse;
