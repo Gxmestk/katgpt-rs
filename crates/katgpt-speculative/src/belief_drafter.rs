@@ -417,11 +417,12 @@ impl LatentDynamicsMLP {
 /// Returns entropy in nats.
 #[inline]
 fn entropy_from_log_probs(log_probs: &[f32]) -> f32 {
+    use katgpt_core::simd::fast_exp;
     let mut h = 0.0f32;
     for &lp in log_probs {
         if lp > -50.0 {
             // skip near-zero probs to avoid -0 * inf
-            let p = lp.exp();
+            let p = fast_exp(lp);
             h -= p * lp;
         }
     }
@@ -436,10 +437,15 @@ fn log_softmax_inplace(logits: &mut [f32]) {
     // subtract ln(sum_exp). Result: x_i − max − ln(sum_exp) = log_softmax(x_i).
     // This avoids the old exp→store→sum→per-element ln() undo path that
     // issued N ln() calls; now there is exactly one ln() call total.
+    //
+    // Scalar `fast_exp` (Cephes) instead of mutating `simd_exp_sum_inplace`:
+    // the shifted logits must survive this pass to receive the final
+    // `- log_sum` correction in the loop below.
+    use katgpt_core::simd::fast_exp;
     let mut sum_exp = 0.0f32;
     for v in logits.iter_mut() {
         *v -= max;
-        sum_exp += v.exp();
+        sum_exp += fast_exp(*v);
     }
     let log_sum = sum_exp.ln();
     for v in logits.iter_mut() {

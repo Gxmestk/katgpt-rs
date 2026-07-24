@@ -84,7 +84,9 @@ impl DefaultManifoldGenerator {
 
         // Compute weights once, reuse for total + sampling. Capacity hint
         // avoids the realloc-on-first-push.
-        let weights: Vec<f32> = q_goals.iter().map(|q| (q - max_q).exp()).collect();
+        // (`fast_exp` = Cephes scalar exp; iterator `.map()` pattern per SIMD rule.)
+        use katgpt_core::simd::fast_exp;
+        let weights: Vec<f32> = q_goals.iter().map(|q| fast_exp(q - max_q)).collect();
         let total: f32 = weights.iter().copied().sum();
         if total <= 0.0 {
             return rng.uniform() * TAU;

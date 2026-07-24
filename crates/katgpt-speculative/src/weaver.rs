@@ -949,11 +949,11 @@ pub fn weaver_forward(weights: &WeaverWeights, input: &WeaverInput) -> WeaverOut
                     max_s = s;
                 }
             }
-            let mut sum_e = 0.0;
-            for s in scores[..=qi].iter_mut() {
-                *s = (*s - max_s).exp();
-                sum_e += *s;
-            }
+            // Fused softmax: SIMD shift + exp-sum in one pass over `scores[..=qi]`.
+            use katgpt_core::simd::{simd_add_scalar_inplace, simd_exp_sum_inplace};
+            let s_row = &mut scores[..=qi];
+            simd_add_scalar_inplace(s_row, -max_s);
+            let sum_e = simd_exp_sum_inplace(s_row);
             let inv_sum = 1.0 / sum_e;
             let out_row = &mut attn_out[qi * h + ho..qi * h + ho + head_dim];
             for kj in 0..=qi {
@@ -1048,12 +1048,13 @@ pub fn weaver_forward(weights: &WeaverWeights, input: &WeaverInput) -> WeaverOut
                 max_c = *cl;
             }
         }
-        let mut sum_e = 0.0;
-        for ki in 0..k {
-            let e = (corrected_logits[di][ki] - max_c).exp();
-            corrected_probs[di][ki] = e;
-            sum_e += e;
-        }
+        // Softmax over K candidates (SIMD exp-sum into corrected_probs).
+        use katgpt_core::simd::{simd_add_scalar_inplace, simd_exp_sum_inplace};
+        let cl_row = &corrected_logits[di][..k];
+        corrected_probs[di][..k].copy_from_slice(cl_row);
+        let cp_row = &mut corrected_probs[di][..k];
+        simd_add_scalar_inplace(cp_row, -max_c);
+        let sum_e = simd_exp_sum_inplace(cp_row);
         let inv_sum = 1.0 / sum_e;
         for cp in corrected_probs[di][..k].iter_mut() {
             *cp *= inv_sum;
@@ -1186,11 +1187,11 @@ pub fn weaver_forward_into(
                     max_s = s;
                 }
             }
-            let mut sum_e = 0.0;
-            for s in scores[..=qi].iter_mut() {
-                *s = (*s - max_s).exp();
-                sum_e += *s;
-            }
+            // Fused softmax: SIMD shift + exp-sum in one pass over `scores[..=qi]`.
+            use katgpt_core::simd::{simd_add_scalar_inplace, simd_exp_sum_inplace};
+            let s_row = &mut scores[..=qi];
+            simd_add_scalar_inplace(s_row, -max_s);
+            let sum_e = simd_exp_sum_inplace(s_row);
             let inv_sum = 1.0 / sum_e;
             let out_row = &mut attn_out[qi * h + ho..qi * h + ho + head_dim];
             // attn_out was zeroed above; now AXPY in the weighted values.
@@ -1273,15 +1274,16 @@ pub fn weaver_forward_into(
                 max_c = cl;
             }
         }
-        let mut sum_e = 0.0;
-        for ki in 0..k {
-            let e = (corrected_logits_flat[cl_off + ki] - max_c).exp();
-            corrected_probs_flat[cp_off + ki] = e;
-            sum_e += e;
-        }
+        // Softmax over K (SIMD exp-sum into corrected_probs_flat).
+        use katgpt_core::simd::{simd_add_scalar_inplace, simd_exp_sum_inplace};
+        corrected_probs_flat[cp_off..cp_off + k]
+            .copy_from_slice(&corrected_logits_flat[cl_off..cl_off + k]);
+        let cp_row = &mut corrected_probs_flat[cp_off..cp_off + k];
+        simd_add_scalar_inplace(cp_row, -max_c);
+        let sum_e = simd_exp_sum_inplace(cp_row);
         let inv_sum = 1.0 / sum_e;
-        for ki in 0..k {
-            corrected_probs_flat[cp_off + ki] *= inv_sum;
+        for cp in corrected_probs_flat[cp_off..cp_off + k].iter_mut() {
+            *cp *= inv_sum;
         }
     }
 
@@ -1419,11 +1421,11 @@ pub fn weaver_forward_parallel(
                     max_s = s;
                 }
             }
-            let mut sum_e = 0.0;
-            for s in scores[..=qi].iter_mut() {
-                *s = (*s - max_s).exp();
-                sum_e += *s;
-            }
+            // Fused softmax: SIMD shift + exp-sum in one pass over `scores[..=qi]`.
+            use katgpt_core::simd::{simd_add_scalar_inplace, simd_exp_sum_inplace};
+            let s_row = &mut scores[..=qi];
+            simd_add_scalar_inplace(s_row, -max_s);
+            let sum_e = simd_exp_sum_inplace(s_row);
             let inv_sum = 1.0 / sum_e;
             let out_row = &mut attn_out[qi * h + ho..qi * h + ho + head_dim];
             for kj in 0..=qi {
@@ -1527,12 +1529,11 @@ pub fn weaver_forward_parallel(
                     max_c = cl;
                 }
             }
-            let mut sum_e = 0.0;
-            for ki in 0..k {
-                let e = (cl_row[ki] - max_c).exp();
-                cp_row[ki] = e;
-                sum_e += e;
-            }
+            // SIMD softmax over K: copy cl_row → cp_row, shift, exp-sum.
+            use katgpt_core::simd::{simd_add_scalar_inplace, simd_exp_sum_inplace};
+            cp_row[..k].copy_from_slice(&cl_row[..k]);
+            simd_add_scalar_inplace(&mut cp_row[..k], -max_c);
+            let sum_e = simd_exp_sum_inplace(&mut cp_row[..k]);
             let inv_sum = 1.0 / sum_e;
             for cp in cp_row.iter_mut().take(k) {
                 *cp *= inv_sum;
@@ -1647,11 +1648,11 @@ pub fn weaver_forward_parallel_f16(
                     max_s = s;
                 }
             }
-            let mut sum_e = 0.0;
-            for s in scores[..=qi].iter_mut() {
-                *s = (*s - max_s).exp();
-                sum_e += *s;
-            }
+            // Fused softmax: SIMD shift + exp-sum in one pass over `scores[..=qi]`.
+            use katgpt_core::simd::{simd_add_scalar_inplace, simd_exp_sum_inplace};
+            let s_row = &mut scores[..=qi];
+            simd_add_scalar_inplace(s_row, -max_s);
+            let sum_e = simd_exp_sum_inplace(s_row);
             let inv_sum = 1.0 / sum_e;
             let out_row = &mut attn_out[qi * h + ho..qi * h + ho + head_dim];
             for kj in 0..=qi {
@@ -1746,12 +1747,11 @@ pub fn weaver_forward_parallel_f16(
                     max_c = cl;
                 }
             }
-            let mut sum_e = 0.0;
-            for ki in 0..k {
-                let e = (cl_row[ki] - max_c).exp();
-                cp_row[ki] = e;
-                sum_e += e;
-            }
+            // SIMD softmax over K: copy cl_row → cp_row, shift, exp-sum.
+            use katgpt_core::simd::{simd_add_scalar_inplace, simd_exp_sum_inplace};
+            cp_row[..k].copy_from_slice(&cl_row[..k]);
+            simd_add_scalar_inplace(&mut cp_row[..k], -max_c);
+            let sum_e = simd_exp_sum_inplace(&mut cp_row[..k]);
             let inv_sum = 1.0 / sum_e;
             for cp in cp_row.iter_mut().take(k) {
                 *cp *= inv_sum;

@@ -87,16 +87,14 @@ fn softmax_scores_into(scores: &[f32], out: &mut [f32]) {
     // Pass 1: max reduction via SIMD helper (aarch64 NEON / x86_64 AVX2).
     let max_val = katgpt_core::simd::simd_max_f32(scores);
 
-    // Pass 2: per-element `exp(s - max)` written into `out`, plus a scalar sum
-    // computed at the same time (avoids a second exp pass).
-    let mut sum = 0.0f32;
-    for (i, &s) in scores.iter().enumerate() {
-        let e = (s - max_val).exp();
-        out[i] = e;
-        sum += e;
-    }
+    // Pass 2+3 fused: copy shifted scores into `out`, then in-place exp+sum
+    // via `simd_exp_sum_inplace` (single buffer traversal). Cephes-backed,
+    // ~1 ULP accurate for |x| < 88.
+    out[..scores.len()].copy_from_slice(scores);
+    katgpt_core::simd::simd_add_scalar_inplace(out, -max_val);
+    let sum = katgpt_core::simd::simd_exp_sum_inplace(out);
 
-    // Pass 3: normalize. `1.0 / sum` once, then a single multiply per element.
+    // Normalize. `1.0 / sum` once, then a single multiply per element.
     if sum > 0.0 {
         let inv = 1.0 / sum;
         for v in out.iter_mut() {
@@ -321,14 +319,11 @@ pub fn select_top_p_blockwise(scores: &[f32], top_p: f32, block_size: usize) -> 
     for (i, &(_, s)) in candidate_entries.iter().enumerate() {
         candidate_probs[i] = s;
     }
-    // In-place softmax: find max via SIMD reduction, rewrite as exp, normalize.
+    // In-place softmax: shift by -max via SIMD, then fused exp+sum.
+    // Cephes-backed exp (~1 ULP for |x| < 88) replaces libm `f32::exp`.
     let max_val = katgpt_core::simd::simd_max_f32(&candidate_probs);
-    let mut sum = 0.0f32;
-    for v in &mut candidate_probs {
-        let e = (*v - max_val).exp();
-        *v = e;
-        sum += e;
-    }
+    katgpt_core::simd::simd_add_scalar_inplace(&mut candidate_probs, -max_val);
+    let sum = katgpt_core::simd::simd_exp_sum_inplace(&mut candidate_probs);
     if sum > 0.0 {
         let inv = 1.0 / sum;
         for v in &mut candidate_probs {

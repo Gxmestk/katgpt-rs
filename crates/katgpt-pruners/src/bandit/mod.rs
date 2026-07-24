@@ -1162,7 +1162,10 @@ impl<P: ScreeningPruner> BanditPruner<P> {
             }
         };
         let inv_tau = 1.0 / tau;
-        weights.extend(scores.iter().map(|&s| ((s - max_score) * inv_tau).exp()));
+        weights.extend(scores.iter().map(|&s| {
+            use katgpt_core::simd::fast_exp;
+            fast_exp((s - max_score) * inv_tau)
+        }));
         let weight_sum: f32 = weights.iter().sum();
 
         if weight_sum <= 0.0 {

@@ -51,11 +51,15 @@ fn log_softmax_into(logits: &[f32], out: &mut [f32]) {
     }
 
     // Pass 2: accumulate shifted exp + write shifted logits.
+    // Uses scalar Cephes `fast_exp` (same kernel as the SIMD exp path) — the
+    // loop interleaves a write to `out[i]` with the exp accumulation, so it
+    // cannot be hoisted into a standalone SIMD pass without an extra alloc.
+    use katgpt_core::simd::fast_exp;
     let mut lse = 0.0f32; // Σ exp(x[i] - max), un-logged
     for i in 0..n {
         let shifted = logits[i] - max_val;
         out[i] = shifted;
-        lse += shifted.exp();
+        lse += fast_exp(shifted);
     }
     let log_lse = lse.ln();
 

@@ -140,7 +140,10 @@ impl CurvatureInfluenceScorer for EosProxyScorer {
         let max_score = scores.iter().copied().fold(f32::NEG_INFINITY, f32::max);
         self.softmax_scratch.clear();
         self.softmax_scratch
-            .extend(scores.iter().map(|&s| (s - max_score).exp()));
+            .extend(scores.iter().map(|&s| {
+                use katgpt_core::simd::fast_exp;
+                fast_exp(s - max_score)
+            }));
         let sum: f32 = self.softmax_scratch.iter().sum();
         if sum <= 0.0 {
             self.alignment[group] = 0.0;

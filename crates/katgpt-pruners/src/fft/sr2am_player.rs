@@ -83,7 +83,8 @@ fn shannon_entropy(scores: &[f32; NUM_ACTIONS]) -> f32 {
         exps[i] = if s <= f32::NEG_INFINITY {
             0.0
         } else {
-            (s - max_val).exp()
+            use katgpt_core::simd::fast_exp;
+            fast_exp(s - max_val)
         };
     }
     let sum: f32 = exps.iter().sum();

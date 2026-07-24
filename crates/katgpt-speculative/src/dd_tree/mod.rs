@@ -469,9 +469,11 @@ pub fn inject_sde_noise_into(
             }
 
             // Convert to log-space, add γ * N(0,1), convert back
+            // (`fast_exp` = Cephes scalar exp, ~1 ULP for |x| < 88).
+            use katgpt_core::simd::fast_exp;
             let log_p = prob.ln();
             let noisy_log_p = log_p + sde_config.gamma * rng.normal();
-            *prob = noisy_log_p.exp().max(0.0);
+            *prob = fast_exp(noisy_log_p).max(0.0);
             sum += *prob;
         }
 
@@ -1466,7 +1468,9 @@ pub fn build_dd_tree_belief(
         // by a full overwrite pass.
         //
         // Compute residual up front (does not depend on the per-slot index).
-        let confidence = (draft_token.log_prob.exp()).max(0.5);
+        // `fast_exp` = Cephes scalar exp (~1 ULP for |x| < 88).
+        use katgpt_core::simd::fast_exp;
+        let confidence = fast_exp(draft_token.log_prob).max(0.5);
         let residual = (1.0 - confidence) / (vocab_size - 1).max(1) as f32;
         let mut marginal = vec![residual; vocab_size];
         marginal[draft_token.token_idx] = confidence;

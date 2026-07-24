@@ -542,9 +542,10 @@ pub fn build_dd_tree_adaptive_mux_residual(
     }
 
     let mut path_scores: Vec<f32> = Vec::with_capacity(path_count);
+    use katgpt_core::simd::fast_exp;
     for n in &tree {
         if n.depth == position {
-            path_scores.push((n.score - max_score).exp());
+            path_scores.push(fast_exp(n.score - max_score));
         }
     }
 

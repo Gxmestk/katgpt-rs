@@ -554,12 +554,11 @@ fn forward_fft_with_lora(
             max_score = max_score.max(score);
         }
 
-        // Pass 2: exp and accumulate sum.
-        let mut sum = 0.0f32;
-        for t in 0..t_n {
-            scores[t] = (scores[t] - max_score).exp();
-            sum += scores[t];
-        }
+        // Pass 2: subtract max, then fused SIMD exp+sum (Cephes 6th-order poly).
+        // The max-subtract guarantees numerical stability (largest exponent = 0).
+        use katgpt_core::simd::{simd_add_scalar_inplace, simd_exp_sum_inplace};
+        simd_add_scalar_inplace(&mut scores[..t_n], -max_score);
+        let sum = simd_exp_sum_inplace(&mut scores[..t_n]);
         let inv_sum = 1.0 / sum;
 
         // Pass 3: weighted value accumulation.

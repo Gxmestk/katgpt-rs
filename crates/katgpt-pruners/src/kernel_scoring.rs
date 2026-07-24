@@ -30,7 +30,8 @@ pub fn kernel_score(query: &[f32], candidate: &[f32], kind: KernelKind) -> f32 {
                 let d = query[i] - candidate[i];
                 dist_sq += d * d;
             }
-            (-dist_sq / sigma_sq).exp()
+            use katgpt_core::simd::fast_exp;
+            fast_exp(-dist_sq / sigma_sq)
         }
         KernelKind::Polynomial { degree, c } => {
             let mut dot = 0.0f32;
@@ -51,7 +52,8 @@ pub fn kernel_score_simd_gaussian(query: &[f32], candidate: &[f32], sigma: f32) 
     let len = query.len().min(candidate.len());
     let sigma_sq = sigma * sigma;
     let dist_sq = katgpt_core::simd::simd_dist_sq(query, candidate, len);
-    (-dist_sq / sigma_sq).exp()
+    use katgpt_core::simd::fast_exp;
+    fast_exp(-dist_sq / sigma_sq)
 }
 
 #[cfg(test)]

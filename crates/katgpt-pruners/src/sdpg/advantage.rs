@@ -131,7 +131,10 @@ pub fn softmax_scaled(logits: &[f32], temperature: f32) -> Vec<f32> {
     let max_val = katgpt_types::simd::simd_max_f32(logits);
     let mut exps: Vec<f32> = logits
         .iter()
-        .map(|&v| (v - max_val).mul_add(inv_temp, 0.0).exp())
+        .map(|&v| {
+            use katgpt_core::simd::fast_exp;
+            fast_exp((v - max_val).mul_add(inv_temp, 0.0))
+        })
         .collect();
     let sum: f32 = katgpt_types::simd::simd_sum_f32(&exps);
     if sum == 0.0 {
