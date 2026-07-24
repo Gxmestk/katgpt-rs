@@ -370,12 +370,13 @@ fn forward_drafter_with_lora(
             max_score = max_score.max(score);
         }
 
-        // Pass 2: exp and accumulate sum
-        let mut sum = 0.0f32;
-        for t in 0..t_n {
-            scores[t] = (scores[t] - max_score).exp();
-            sum += scores[t];
-        }
+        // Pass 2: exp and accumulate sum. Pure exp+sum on a contiguous
+        // `&mut [f32]` range (no branches) → fused SIMD pattern:
+        //   shift by -max, then single SIMD pass computing exp + sum.
+        use katgpt_core::simd::{simd_add_scalar_inplace, simd_exp_sum_inplace};
+        let active = &mut scores[..t_n];
+        simd_add_scalar_inplace(active, -max_score);
+        let sum = simd_exp_sum_inplace(active);
         let inv_sum = 1.0 / sum;
 
         // Pass 3: weighted value accumulation (t-outer, d-inner → contiguous value reads)
@@ -536,10 +537,11 @@ fn run_drafter_sequence<'a>(
 /// Cross-entropy loss: -log(softmax(logits)[target]).
 /// Numerically stable via log-sum-exp trick.
 fn cross_entropy(logits: &[f32], target: usize) -> f32 {
+    use katgpt_core::simd::fast_exp;
     let max_val = logits.iter().copied().fold(f32::NEG_INFINITY, f32::max);
     let mut sum_exp = 0.0f32;
     for &val in logits {
-        sum_exp += (val - max_val).exp();
+        sum_exp += fast_exp(val - max_val);
     }
     -(logits[target] - max_val) + sum_exp.ln()
 }

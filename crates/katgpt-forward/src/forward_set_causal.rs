@@ -183,10 +183,11 @@ pub fn forward_set_causal_positions(
             // Pass 2: exp(score - max) for eligible positions, 0 for ineligible.
             // Scalar exp (not SIMD) because the eligible set is typically
             // non-contiguous and we must not feed garbage to the polynomial exp.
+            // Uses Cephes-backed `fast_exp` instead of libm `.exp()`.
             let mut sum_exp = 0.0f32;
             for t in 0..seq_len {
                 if position_order[t] <= q_gen_step {
-                    let e = (scores_buf[t] - max_score).exp();
+                    let e = simd::fast_exp(scores_buf[t] - max_score);
                     scores_buf[t] = e;
                     sum_exp += e;
                 } else {

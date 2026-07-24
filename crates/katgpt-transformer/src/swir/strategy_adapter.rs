@@ -133,9 +133,10 @@ impl SwiRStrategyAdapter {
             }
             return view;
         }
+        use katgpt_core::simd::fast_exp;
         let mut sum_exp = 0.0f32;
         for (i, &l) in logits.iter().enumerate() {
-            let e = (l - max_logit).exp();
+            let e = fast_exp(l - max_logit);
             view[i] = e;
             sum_exp += e;
         }

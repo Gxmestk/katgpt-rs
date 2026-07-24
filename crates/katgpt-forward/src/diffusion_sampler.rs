@@ -98,6 +98,9 @@ impl SamplerFeatures {
         // (order preserved under division by sum_exp → top-3 exp == top-3 prob).
         // Also accumulate Σ e·log(e) for entropy via the identity
         //   H = -Σ p·log(p) = -(Σ e·log(e))/sum + log(sum).
+        // Scalar `fast_exp` (not SIMD): top-3 tracking branches are interleaved
+        // with the exp, preventing clean SIMD vectorization.
+        use katgpt_core::simd::fast_exp;
         let mut sum_exp = 0.0f32;
         let mut sum_e_log_e = 0.0f32;
         // Top-3 trackers (exp values). Initialized to -1 so any valid exp >= 0 wins.
@@ -108,7 +111,7 @@ impl SamplerFeatures {
             if t == mask {
                 continue;
             }
-            let e = (logit - max_logit).exp();
+            let e = fast_exp(logit - max_logit);
             sum_exp += e;
             // Branchless top-3 update: shift down only if e exceeds current tier.
             // Compiles to cmov / fmax sequences — no data-dependent branches.
@@ -756,11 +759,12 @@ pub fn collect_trajectories(
                 // ── Confidence remasking / token commit (was loop 2) ──
                 // Reuses `top1` and `top1_val` from the single argmax above;
                 // the old code recomputed both in a second O(vocab) scan.
+                use katgpt_core::simd::fast_exp;
                 let sum_exp: f32 = (0..vocab)
                     .filter(|&t| t != mask)
-                    .map(|t| (logits_p[t] - top1_val).exp())
+                    .map(|t| fast_exp(logits_p[t] - top1_val))
                     .sum();
-                let top1_prob = (logits_p[top1] - top1_val).exp() / sum_exp;
+                let top1_prob = fast_exp(logits_p[top1] - top1_val) / sum_exp;
 
                 if top1_prob >= decode_config.confidence_threshold {
                     tokens[p] = top1;

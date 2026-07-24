@@ -217,6 +217,8 @@ fn fill_with_anchors(
             // exact semantics by caching `exp(logit-max)` in `exp_scratch` and
             // `exp(logit-max) * relevance` in `weights_scratch`. The second
             // pass reads from `exp_scratch` instead of recomputing `.exp()`.
+            // Scalar `fast_exp` (not SIMD): mask + pruner branches are interleaved.
+            use katgpt_core::simd::fast_exp;
             let mut sum_exp = 0.0f32;
             for t in 0..vocab {
                 if t == mask {
@@ -228,7 +230,7 @@ fn fill_with_anchors(
                     continue;
                 }
                 let relevance = screener.relevance(depth, t, parent_tokens);
-                let e = (logits_p[t] - max_logit).exp();
+                let e = fast_exp(logits_p[t] - max_logit);
                 exp_scratch[t] = e;
                 // The original code's sum_exp multiplied by relevance (even for
                 // negative relevance, which is unusual but kept for parity).

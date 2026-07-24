@@ -487,6 +487,8 @@ fn sample_token(
 ) -> (usize, f32) {
     debug_assert_eq!(logits.len(), vocab, "logits length must equal vocab_size");
 
+    use katgpt_core::simd::fast_exp;
+
     // Find max for numerical stability (skip mask token).
     //
     // max_logit doubles as argmax_logit — the argmax token is by definition
@@ -512,7 +514,7 @@ fn sample_token(
             if t == mask {
                 continue;
             }
-            sum_exp += (logit - max_logit).exp();
+            sum_exp += fast_exp(logit - max_logit);
         }
         // argmax_logit == max_logit by construction, so its exp is exp(0) = 1.
         let prob = if sum_exp > 0.0 { 1.0 / sum_exp } else { 0.0 };
@@ -532,7 +534,7 @@ fn sample_token(
             continue;
         }
         let scaled = (logit - max_logit) / temperature;
-        sum_exp += scaled.exp();
+        sum_exp += fast_exp(scaled);
     }
     if sum_exp <= 0.0 {
         return (argmax_token, 0.0);
@@ -545,7 +547,7 @@ fn sample_token(
             continue;
         }
         let scaled = (logit - max_logit) / temperature;
-        let prob_t = scaled.exp();
+        let prob_t = fast_exp(scaled);
         cumulative += prob_t;
         if cumulative >= target {
             return (t, prob_t / sum_exp);

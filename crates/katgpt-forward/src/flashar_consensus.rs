@@ -444,10 +444,13 @@ impl SpeculativeVerifier for FlashARConsensusVerifier<'_> {
                     [logits_offset..logits_offset + draft_config.vocab_size];
                 let max_logit = simd_max_f32(logits_p);
                 // Fused pass: accumulate sum_exp and track top1 prob.
+                // Scalar `fast_exp` (not SIMD): top1 tracking branch interleaved
+                // with the exp.
+                use katgpt_core::simd::fast_exp;
                 let mut sum_exp = 0.0f32;
                 let mut top1 = 0.0f32;
                 for &l in logits_p {
-                    let p = (l - max_logit).exp();
+                    let p = fast_exp(l - max_logit);
                     sum_exp += p;
                     if p > top1 {
                         top1 = p;

@@ -224,8 +224,9 @@ pub fn variance_normalize_into(
     // The return value still owns two Vecs (unavoidable with the current API),
     // but we reuse `inv_col` as the per-column reciprocal scratch inside
     // `apply_scales_into` instead of allocating a fresh one.
-    let s_col: Vec<f32> = log_s_col_best[..cols].iter().map(|&l| l.exp()).collect();
-    let s_row: Vec<f32> = log_s_row_best[..rows].iter().map(|&l| l.exp()).collect();
+    use katgpt_core::simd::fast_exp;
+    let s_col: Vec<f32> = log_s_col_best[..cols].iter().map(|&l| fast_exp(l)).collect();
+    let s_row: Vec<f32> = log_s_row_best[..rows].iter().map(|&l| fast_exp(l)).collect();
     apply_scales_into(tile, rows, cols, &s_row, &s_col, inv_col);
 
     VarianceNormScales { s_col, s_row }
@@ -311,11 +312,12 @@ pub fn variance_normalize_into_scales(
 
     // Write s_col / s_row directly into caller-owned slices and reuse
     // `inv_col` as the per-column reciprocal scratch for `apply_scales_into`.
+    use katgpt_core::simd::fast_exp;
     for (j, &l) in log_s_col_best[..cols].iter().enumerate() {
-        out_s_col[j] = l.exp();
+        out_s_col[j] = fast_exp(l);
     }
     for (i, &l) in log_s_row_best[..rows].iter().enumerate() {
-        out_s_row[i] = l.exp();
+        out_s_row[i] = fast_exp(l);
     }
     apply_scales_into(tile, rows, cols, out_s_row, out_s_col, inv_col);
 }
@@ -343,11 +345,12 @@ fn apply_dual_scale_into(
 ) {
     // Precompute exp of log scales into caller-owned scratch.
     // `1.0 / l.exp()` ≡ `(-l).exp()`: one exp call instead of exp + division.
+    use katgpt_core::simd::fast_exp;
     for (i, &l) in log_s_row.iter().enumerate() {
-        inv_row[i] = (-l).exp();
+        inv_row[i] = fast_exp(-l);
     }
     for (j, &l) in log_s_col.iter().enumerate() {
-        inv_col[j] = (-l).exp();
+        inv_col[j] = fast_exp(-l);
     }
 
     for i in 0..rows {

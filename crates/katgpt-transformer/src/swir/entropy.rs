@@ -101,8 +101,11 @@ pub fn entropy_from_logits(logits: &[f32]) -> f32 {
         return 0.0;
     }
     // Single pass: shifted_exp[i] = exp(logits[i] - max_logit).
+    // Cephes-backed `fast_exp` for consistency with the rest of the codebase's
+    // exp floor (~1.7x faster than libm on aarch64, ~1 ULP accuracy).
+    use katgpt_core::simd::fast_exp;
     let mut shifted_exp: Vec<f32> = Vec::with_capacity(logits.len());
-    shifted_exp.extend(logits.iter().map(|&l| (l - max_logit).exp()));
+    shifted_exp.extend(logits.iter().map(|&l| fast_exp(l - max_logit)));
     let sum_exp: f32 = shifted_exp.iter().copied().sum();
     if sum_exp <= 0.0 || !sum_exp.is_finite() {
         return 0.0;

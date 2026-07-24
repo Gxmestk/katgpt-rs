@@ -309,10 +309,14 @@ impl WallPrefixState {
             }
             d += 4;
         }
+        // Scalar tail: handles the `hd % 4` remainder after the chunk-4 SIMD
+        // pass above. Uses the Cephes-backed `fast_exp` for consistency with
+        // the SIMD exp kernel (same ~1 ULP accuracy floor).
+        use katgpt_core::simd::fast_exp;
         while d < hd {
             let gate_accumulated = ps[offset + d];
             let gate_in_block = gate_accumulated * block_span * inv_current;
-            let retention = gate_in_block.exp();
+            let retention = fast_exp(gate_in_block);
             min_ret = min_ret.min(retention);
             d += 1;
         }
