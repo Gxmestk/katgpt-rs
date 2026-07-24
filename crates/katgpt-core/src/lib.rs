@@ -1689,6 +1689,20 @@ pub mod karc_dp;
 #[cfg(feature = "karc_forecaster")]
 pub use karc_dp::{KarcDpNoiseConfig, apply_dp_noise_to_wout};
 
+// HOPE — Hilbert-Schmidt Capacity Kernel + Optimal Rank-1 Parent (Plan 469,
+// Research 454, arXiv:2607.21366 Mobahi & Bartlett, Google DeepMind 2026-07-24).
+// Closed-form math for scale-invariant capacity metric + optimal rank-1 merge
+// of two PH-1 neurons modeled as rank-1 Hilbert-Schmidt operators.
+// Distilled modelless core (ReLU self/cross kernels, principal eigenvector of
+// rank-2 AᵀA, optimal scale s*=(a+b·E_rem)/(2·E_rem+b), capacity + prune/merge/
+// block-eviction costs, Dantzig greedy selection). Fixes the AM single-query
+// rank-1 collapse failure documented in Issue 001 / Plan 319 T5.6 G5 FAIL.
+// Pure modelless — no training, no gradient descent. Zero runtime cost unless
+// a caller invokes hope_capacity / optimal_rank1_parent / hope_greedy_select.
+// Opt-in — Plan 469 Phase 1 unblocking skeleton; G1–G4 GOAT gate pending.
+#[cfg(feature = "hope_capacity")]
+pub mod hope;
+
 // ARG Protocol Primitives — open half of the ARG × Latent Substrate Super-GOAT
 // fusion (Plan 327 Phases 1-3, Research 309, Guide 160 private). Five generic
 // protocol primitives distilled from the ARG Standard
