@@ -4,7 +4,74 @@
 > **Date:** 2026-07-24
 > **Type:** optimization (transcendental-function approximation)
 > **Severity:** MEDIUM — attacks the transcendental floor (30-40% of CGSP cycle time)
-> **Status:** PARTIALLY RESOLVED — sigmoid component addressed via Cephes (2026-07-24)
+> **Status:** RESOLVED — sigmoid + exp components addressed via Cephes (2026-07-24)
+
+## Update 3 (2026-07-24): softmax exp loop + fast_exp codebase-wide consolidation
+
+The prior updates addressed `fn sigmoid` definitions. This update addresses
+the OTHER class of libm `exp()` calls: **softmax exp loops** and **scalar
+exp callsites** that were not sigmoid-wrapped.
+
+**New primitive:** `fast_exp` added to `katgpt_types::simd::activations` —
+the scalar counterpart to `simd_exp_inplace` / `simd_exp_sum_inplace`.
+Wraps `cephes_exp_scalar` (same Cephes 6th-order polynomial, ~1 ULP
+accurate for |x| < 88, ~1.7× faster than libm exp on aarch64). Re-exported
+at `katgpt_core::simd::fast_exp`.
+
+**SIMD softmax pattern adopted** in hot paths where the data is a
+contiguous `&mut [f32]` and the loop is a pure exp+sum (no branches):
+`simd_max_f32` + `simd_add_scalar_inplace` + `simd_exp_sum_inplace` +
+`simd_scale_inplace`. This fuses the exp and sum into one buffer traversal.
+
+**Shipped (8 commits, ~60 files):**
+- `d5440da4` — add `fast_exp` + SIMD softmax in katgpt-attn (chunk_summary,
+  kv_outer_prefill, diagonal_gate) + katgpt-core (bebop_upgrade ICT softmax,
+  product_key_memory softmax) + katgpt-types (re-export)
+- `636581df` — SIMD softmax + fast_exp across katgpt-speculative (weaver 7
+  sites, rt_turbo, kurtosis_gate) + katgpt-pruners (boltzmann, lora_player,
+  kernel_scoring, etc.) — 19 files
+- `b6cbcebe` — katgpt-core remaining: coda.rs SiLU/GELU activations,
+  compute_moa_gates sigmoid loop, conformal decay weights, best_belief
+  beta pdf, hippocampal_cache streaming softmax, etc. — 10 files
+- `5cc3918d` — katgpt-forward (drafter_lora SIMD softmax, diffusion_sampler,
+  flashar, set_diffusion) + katgpt-kv (var_norm) + katgpt-transformer
+  (context, swir) — 10 files
+- `ebfd3cc6` — katgpt-core remaining: grape softplus/log_sigmoid, mag RBF
+  kernel, spectral_hierarchy Gram matrix + katgpt-claim (mgpo) +
+  katgpt-band (InfoNCE, bckvss) — 9 files
+- `78b8c574` — CRITICAL: the root `katgpt_core::sigmoid` (lib.rs pub fn)
+  now delegates to `fast_sigmoid`. This was the highest-impact missed site.
+  Also pipeline_pruner, memory_soup_lora, hippocampal_cache_dyn — 5 files
+- `b35dd1f6` — last 3 missed sigmoids (spectral_lod, set_attention,
+  similarity edit_penalty) — 3 files
+- `3782b2e6` — katgpt-sense reconstruction 6-wide exp loops — 1 file
+
+**Critical finds during this sweep:**
+1. The root `katgpt_core::sigmoid` in `lib.rs` was STILL using libm exp
+   despite the prior sigmoid sweep. Every caller of `katgpt_core::sigmoid`
+   was routing through libm. Now delegates to `fast_sigmoid`.
+2. `coda.rs` SiLU/GELU activations had inline `1/(1+(-x).exp())` patterns —
+   these are ML activation hot paths that should use `fast_sigmoid`.
+3. Multiple local `fn sigmoid` definitions survived the prior sweep:
+   `region_subspace`, `pipeline_pruner`, `set_attention`, `spectral_lod`,
+   `memory_soup_lora::sigmoid_gate`, `group_invariance_probe`. All fixed.
+
+**Untouched (by design):**
+- `katgpt-attn-match` core `attn_match` feature — zero-dep by design
+  (no katgpt-core dep). Its softmax loops stay libm.
+- `katgpt-dec` — zero-dep by design (no katgpt-core/katgpt-types dep).
+  Has its own `fast_sigmoid` that uses libm exp as the foundation.
+- f64 exp calls (`breakeven/mod.rs::sigmoid`, `occupancy/linear.rs`,
+  `gdn_tree_verify/mod.rs`) — `fast_exp` is f32-only.
+- Test reference implementations (geometric_product.rs `silu_ref`, etc.) —
+  these are the ground truth for accuracy tests; must stay libm.
+
+**Test adjustments:**
+- `similarity::tests::edit_penalty_always_in_unit_interval`: relaxed from
+  open (0,1] to closed [0,1] — `exp(-100)` returns 0.0 under Cephes
+  (same subnormal-to-zero behavior as the sigmoid_bounds test in Update 2).
+
+**Validation:** 6738 workspace tests pass. Clippy clean workspace-wide.
 
 ## Update 2 (2026-07-24): codebase-wide sigmoid DRY consolidation
 
