@@ -1703,6 +1703,16 @@ pub use karc_dp::{KarcDpNoiseConfig, apply_dp_noise_to_wout};
 #[cfg(feature = "hope_capacity")]
 pub mod hope;
 
+// Hebbian Kernel Memory — Closed-Form Fact-Storing MLP Construction + MLP Swap
+// (Plan 559, Research 455, arXiv:2607.10034 Garcia et al., Stanford/UB 2026-07-10).
+// Bilinear sketched-K₂ feature map + ridge-whitened readout achieves the
+// information-theoretic optimal fact-storage capacity W=Θ(F·log F). Closed-form,
+// no GD. HOPE × this primitive = Super-GOAT dual (HOPE measures capacity;
+// this constructs it). Opt-in — Plan 559 Phase 1 (P0 unblocking skeleton);
+// G1–G4 GOAT gate PENDING; G5 quality axis PENDING PoC (riir-neuron-db/.issues/027).
+#[cfg(feature = "hebbian_kernel_memory")]
+pub mod hebbian_kernel_memory;
+
 // ARG Protocol Primitives — open half of the ARG × Latent Substrate Super-GOAT
 // fusion (Plan 327 Phases 1-3, Research 309, Guide 160 private). Five generic
 // protocol primitives distilled from the ARG Standard
