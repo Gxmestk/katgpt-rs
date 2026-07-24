@@ -665,17 +665,11 @@ fn topk_accumulate(
 /// inference requires.
 #[inline(always)]
 fn sigmoid(x: f32) -> f32 {
-    // Numerically stable form (not branch-free — the branch selects which of
-    // two overflow-safe formulations to use). Avoids overflow for large
-    // negative x (the naive 1/(1+e^-x) overflows there). Uses std `f32::exp`
-    // (libm on std, compiler-builtins on no_std); no extra crate dep.
-    // LLVM typically lowers the branch to a branchless `select` after inline.
-    if x >= 0.0 {
-        1.0 / (1.0 + (-x).exp())
-    } else {
-        let z = x.exp();
-        z / (1.0 + z)
-    }
+    // Delegates to the codebase-wide Cephes-backed fast_sigmoid
+    // (~1 ULP accurate, ~1.7× faster than libm exp on aarch64). The two-branch
+    // form was a workaround for libm exp overflow; fast_sigmoid handles this
+    // internally via +-40 early-exits.
+    crate::simd::fast_sigmoid(x)
 }
 
 // ─────────────────────────────────────────────────────────────────────

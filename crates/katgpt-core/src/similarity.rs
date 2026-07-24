@@ -135,7 +135,7 @@ pub fn smooth_min_similarity(cosines: &[f32], beta: f32) -> f32 {
 /// ```
 #[inline]
 pub fn edit_penalty(norm_sq: f32, gamma: f32) -> f32 {
-    (-norm_sq / gamma).exp()
+    crate::simd::fast_exp(-norm_sq / gamma)
 }
 
 // ── recos — Rearrangement-Inequality Cosine Similarity ───────────────────
@@ -449,12 +449,17 @@ mod tests {
 
     #[test]
     fn edit_penalty_always_in_unit_interval() {
-        // For non-negative norm_sq, penalty is in (0, 1]
+        // For non-negative norm_sq, penalty is in [0, 1]. The open-interval (0,...)
+        // bound is relaxed to [0,...] because Cephes `fast_exp` (the codebase-wide
+        // exp floor) returns exactly 0.0 for arguments < -87.3 (where libm `exp`
+        // would return a subnormal ~3.7e-44). For norm_sq=100, gamma=1.0:
+        // exp(-100) is mathematically ~3.7e-44, which rounds to 0.0 in f32 for
+        // any correct implementation that doesn't preserve subnormals.
         for &norm_sq in &[0.0, 0.1, 0.5, 1.0, 2.0, 10.0, 100.0] {
             let p = edit_penalty(norm_sq, 1.0);
             assert!(
-                p > 0.0 && p <= 1.0,
-                "penalty {p} not in (0,1] for norm_sq={norm_sq}"
+                p >= 0.0 && p <= 1.0,
+                "penalty {p} not in [0,1] for norm_sq={norm_sq}"
             );
         }
     }
