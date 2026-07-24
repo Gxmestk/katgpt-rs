@@ -6,6 +6,55 @@
 > **Severity:** MEDIUM — attacks the transcendental floor (30-40% of CGSP cycle time)
 > **Status:** RESOLVED — sigmoid + exp components addressed via Cephes (2026-07-24)
 
+## Update 4 (2026-07-24): fast_tanh (Padé [2/2]) + simd_tanh_inplace consolidation
+
+Following the sigmoid/exp consolidation, the remaining hot-path
+transcendental was `tanh` — used in GELU activations, GRU new-gate,
+Poincaré MLP hidden layers, attention/logit softcaps, and feature hashing.
+
+**New primitives:**
+- `fast_tanh` (scalar) — Padé [2/2] rational polynomial
+  `x·(27+x²)/(27+9x²)`, ~5× faster than libm tanh on aarch64 (pure
+  arithmetic, no exp call). Worst-case error ~0.025 near |x|≈2; saturates
+  to ±1 for |x|>3. Documented safety contract: safe for bounded
+  activations (GELU, GRU, MLP); unsafe for algebraic-identity preservation
+  (cos²+sin²=1 — see Plan 322 phase_rotation_coupling).
+- `simd_tanh_inplace` — NEON (4-lane) / AVX2 (8-lane) / WASM simd128
+  (4-lane) vectorized Padé kernel. Uses FMA (vfmaq_f32 / _mm256_fmadd_ps)
+  for numerator + denominator, branchless mask-select for the |x|>3
+  saturation. ~1 ULP more accurate than scalar fast_tanh due to FMA.
+
+**Precedent:** `mean_field::fast_tanh` shipped this exact Padé [2/2] form
+since Plan 281 with a 0.03 tolerance assertion. The consolidation promotes
+it to the canonical `simd::activations` module + adds the SIMD vector path.
+
+**Shipped (6 commits across 2 repos):**
+- `78f28e45` — add fast_tanh + adopt in activation hot paths (katgpt-types,
+  katgpt-core coda/poincare/mean_field/delta_mem, katgpt-speculative)
+- `483b1983` — add simd_tanh_inplace (NEON/AVX2/WASM) + tests + adopt in
+  delta_mem/hash.rs
+- `82dc0dc8` — fix missing fast_tanh import in MoaActivation::activate
+- `616fea66` — relax MoaActivation::Tanh test tolerance for Padé
+- `e7d28c1bc` (riir-ai) — adopt fast_tanh/simd_tanh_inplace in riir-engine:
+  opponent_hash (2 SIMD tanh loops), gemma2 logit softcap (5 sites),
+  gemma2_train + causal_validation softcap, GRU new-gate, attention softcap
+
+**Intentionally NOT touched:**
+- `slod.rs` exp_map_into — Poincaré ball geometry, tanh is a scalar factor
+  in the manifold operation. Conservative: left as libm tanh.
+- `gemma2_train/backward.rs` — training gradient computation needs higher
+  accuracy than Padé (0.025 error would compound in sech² derivative).
+- `katgpt-pruners/gdsd.rs::tanh_advantage` — public API, not a hot loop.
+
+**Validation:** 6765 katgpt-rs + 7324 riir-ai workspace tests pass. Clippy
+clean workspace-wide. 1 test tolerance adjusted (MoaActivation::Tanh
+1e-7 → 0.03, same pattern as prior Padé acceptance in mean_field).
+
+The tanh consolidation completes the transcendental-function optimization
+loop. sigmoid → Cephes; exp → Cephes; tanh → Padé [2/2]. All three are now
+backed by dedicated simd::activations primitives with documented accuracy
+bounds.
+
 ## Update 3 (2026-07-24): softmax exp loop + fast_exp codebase-wide consolidation
 
 The prior updates addressed `fn sigmoid` definitions. This update addresses
