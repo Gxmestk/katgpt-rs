@@ -589,15 +589,16 @@ fn streaming_softmax_acc_dyn(
 /// `sum_exp`. No val accumulation is needed since val=0.
 #[inline]
 fn apply_null_sink(out: &mut [f32], logit: f32, max_logit: &mut f32, sum_exp: &mut f32) {
+    use crate::simd::fast_exp;
     if logit > *max_logit {
-        let rescale = (*max_logit - logit).exp();
+        let rescale = fast_exp(*max_logit - logit);
         *sum_exp = *sum_exp * rescale + 1.0;
         for v in out.iter_mut() {
             *v *= rescale;
         }
         *max_logit = logit;
     } else {
-        let weight = (logit - *max_logit).exp();
+        let weight = fast_exp(logit - *max_logit);
         *sum_exp += weight;
     }
 }

@@ -89,11 +89,12 @@ pub fn smooth_min_similarity(cosines: &[f32], beta: f32) -> f32 {
     assert!(!cosines.is_empty(), "cosines must not be empty");
 
     let log_beta = beta.ln();
+    use crate::simd::fast_exp;
     // Σ(β^(1-c_i) - 1) + 1
     // mul_add for FMA fusion: (1-c) * ln(β) computed in one instruction.
     let sum = cosines
         .iter()
-        .map(|&c| (1.0f32 - c).mul_add(log_beta, 0.0).exp() - 1.0)
+        .map(|&c| fast_exp((1.0f32 - c).mul_add(log_beta, 0.0)) - 1.0)
         .sum::<f32>()
         + 1.0;
 
