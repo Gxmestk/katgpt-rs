@@ -137,14 +137,15 @@ pub enum JointLiftError {
 /// (`m ≤ 0, ω > 0, Λ ≥ 0`).
 #[inline]
 pub fn softplus(z: f32) -> f32 {
+    use crate::simd::fast_exp;
     if z >= 0.0 {
         // z + log(1 + e^{-z}): for z >= 0, e^{-z} ∈ (0, 1], so the exp never
         // overflows. ln_1p gives an accurate log(1 + small).
-        z + (-z).exp().ln_1p()
+        z + fast_exp(-z).ln_1p()
     } else {
         // log(1 + e^z): for z < 0, e^z ∈ (0, 1), so the exp never overflows.
         // ln_1p gives an accurate log(1 + small).
-        z.exp().ln_1p()
+        fast_exp(z).ln_1p()
     }
 }
 

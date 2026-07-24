@@ -562,8 +562,9 @@ fn streaming_softmax_acc_dyn(
     sum_exp: &mut f32,
 ) {
     let d = val.len();
+    use crate::simd::fast_exp;
     if logit > *max_logit {
-        let rescale = (*max_logit - logit).exp();
+        let rescale = fast_exp(*max_logit - logit);
         *sum_exp = *sum_exp * rescale + 1.0;
         for j in 0..d {
             out[j] = out[j] * rescale + val[j];
@@ -574,7 +575,7 @@ fn streaming_softmax_acc_dyn(
         }
         *max_logit = logit;
     } else {
-        let weight = (logit - *max_logit).exp();
+        let weight = fast_exp(logit - *max_logit);
         *sum_exp += weight;
         for j in 0..d {
             out[j] += weight * val[j];

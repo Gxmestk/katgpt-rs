@@ -657,7 +657,7 @@ pub fn perplexity_proxy(query: &QueryEmb, segments: &[KvSegment], retained: &[us
     if count == 0 {
         return f32::INFINITY;
     }
-    (sum_log / count as f32).exp()
+    katgpt_core::simd::fast_exp(sum_log / count as f32)
 }
 
 // ── Tests ───────────────────────────────────────────────────────────────────

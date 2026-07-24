@@ -348,7 +348,7 @@ mod tests {
                     let lca_depth = leading_zeros_total.saturating_sub(32 - depth);
                     2 * (depth - lca_depth)
                 };
-                *cell = alpha * (-beta * dist as f32).exp();
+                *cell = alpha * crate::simd::fast_exp(-beta * dist as f32);
             }
         }
         gram

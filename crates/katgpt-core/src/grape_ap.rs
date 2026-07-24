@@ -83,17 +83,18 @@ pub enum GrapeApError {
 /// log1p form `-(log1p(e^{-z}))` for accuracy.
 #[inline]
 pub fn log_sigmoid(z: f32) -> f32 {
+    use crate::simd::fast_exp;
     if z >= 0.0 {
         // log(σ(z)) = -log(1 + e^{-z}). For z >= 0, e^{-z} <= 1, so this is
         // well-conditioned via log1p.
-        -(((-z).exp() + 1.0).ln())
+        -((fast_exp(-z) + 1.0).ln())
     } else {
         // log(σ(z)) = z - log(1 + e^{z}). For z < 0, factor out z to avoid
         // overflow in e^{z}.
         // Equivalent: -log(1 + e^{-z}) with z < 0 means e^{-z} > 1; use
         // the form z - log1p(e^z) for accuracy.
         let z_clamped = z.max(-50.0); // avoid -inf in log1p
-        z_clamped - ((z_clamped.exp() + 1.0).ln())
+        z_clamped - ((fast_exp(z_clamped) + 1.0).ln())
     }
 }
 

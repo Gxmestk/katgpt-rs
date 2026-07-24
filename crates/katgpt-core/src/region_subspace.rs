@@ -590,13 +590,9 @@ fn dot_product<const D: usize>(a: &[f32; D], b: &[f32; D]) -> f32 {
 
 #[inline]
 fn sigmoid(x: f32) -> f32 {
-    // Numerically stable sigmoid. Matches latent_steering.rs.
-    if x >= 0.0 {
-        1.0 / (1.0 + (-x).exp())
-    } else {
-        let e = x.exp();
-        e / (1.0 + e)
-    }
+    // Delegates to the codebase-wide Cephes-backed fast_sigmoid
+    // (~1 ULP accurate, ~1.7× faster than libm exp on aarch64).
+    crate::simd::fast_sigmoid(x)
 }
 
 // ── Tests ───────────────────────────────────────────────────────────────────

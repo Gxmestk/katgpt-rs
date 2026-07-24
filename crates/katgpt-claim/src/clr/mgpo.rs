@@ -43,7 +43,7 @@ use katgpt_core::simd::simd_sum_f32;
 /// Weight in `(0, 1]`. `p = 0.5` always returns `1.0` regardless of `γ`.
 #[inline]
 pub fn mgpo_sampling_weight(p: f32, gamma: f32) -> f32 {
-    (-gamma * (2.0 * p - 1.0).abs()).exp()
+    katgpt_core::simd::fast_exp(-gamma * (2.0 * p - 1.0).abs())
 }
 
 /// Distribute a fixed total sample budget proportionally to per-seed weights.

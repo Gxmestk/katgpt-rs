@@ -494,7 +494,7 @@ fn rbf_kernel(a: &[f32], b: &[f32], gamma: f32) -> f32 {
         let diff = a[j] - b[j];
         dist_sq += diff * diff;
     }
-    (-gamma * dist_sq).exp()
+    crate::simd::fast_exp(-gamma * dist_sq)
 }
 
 /// 1D Wasserstein-1 distance averaged over dimensions.

@@ -456,10 +456,10 @@ pub fn conditional_dependence_infonce(
     critic: InfoNceCritic,
     config: InfoNceConfig,
 ) -> f32 {
-    let pos = critic(x_emb, y_emb, z_emb).exp();
+    let pos = katgpt_core::simd::fast_exp(critic(x_emb, y_emb, z_emb));
     let mut denom = pos;
     for neg in negatives.iter().take(config.n_negatives) {
-        denom += critic(x_emb, neg, z_emb).exp();
+        denom += katgpt_core::simd::fast_exp(critic(x_emb, neg, z_emb));
     }
     // InfoNCE lower bound on CMI: log(pos/denom).
     let nce = (pos / denom).max(f32::MIN_POSITIVE).ln();
