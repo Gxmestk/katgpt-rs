@@ -8,6 +8,7 @@
 > **Cross-ref (riir-neuron-db):** [riir-neuron-db/.research/302](../../riir-neuron-db/.research/302_HOPE_Shard_Capacity_Metric_SuperGOAT_Guide.md) — **the Super-GOAT private guide** (selling-point owner: shard compaction pillar)
 > **Cross-ref (riir-ai):** Plan 515 (swarm extraction), MAG direction mining (Plan 418), Committed Personality Runtime (Plan 336) — runtime consumer cross-refs
 > **Classification:** Public — open-primitive layer (generic math, no game/chain/shard IP)
+> **PASS-Redirects (NAME COLLISION flag):** Behrouz et al. [arXiv:2512.24695 "Nested Learning: The Illusion of Deep Learning Architectures"] — this is a DIFFERENT paper that ALSO uses the name "Hope" (their Hope architecture = Self-modifying Titans + Continuum Memory System, a training-time sequence model). Our shipped HOPE (this note, Research 454, arXiv:2607.21366, Mobahi & Bartlett) is the Hilbert-Schmidt Capacity Kernel — completely unrelated math, completely unrelated authors (though both are Google-affiliated). The name collision is coincidental. NL's Hope architecture is training-only → riir-train; our HOPE kernel is modelless and shipped. Grep `hope_bridge.rs` / `hope_compactor.rs` / `hope.rs` hits OUR kernel, not theirs.
 
 ---
 

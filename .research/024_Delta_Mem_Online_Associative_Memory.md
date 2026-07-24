@@ -5,6 +5,7 @@
 > Code: `.raw/delta-Mem/deltamem/` (local source audit)
 > **Verdict: HIGH VALUE — The delta-rule update mechanism is self-contained and doesn't require neural training. Modelless distillation to feature-hashed associative memory in Rust.**
 > **PASS-Redirects (synthesis):** S-TTT [arXiv:2607.09415] — paper's finding that "selective writes beat random writes" is empirically validated by our δ-Mem `write_gated()` (Plan 053) selective-write primitive; Stage 2's per-instance gradient TTT → riir-train.
+> **PASS-Redirects (synthesis):** Behrouz et al. [arXiv:2512.24695 "Nested Learning: The Illusion of Deep Learning Architectures"] — NL §4.5 "Delta Gradient Descent" (DGD, Eq 56–57) is the SAME math as our delta-rule state update, applied to weight training instead of inference-time state. DGD's state-dependent decay term `(I − η' x_t x_t^T)` is the Sherman-Morrison form of the delta rule we already ship in `delta_mem::state::DeltaMemoryState` (Plan 053). NL's DGD-as-training-optimizer → riir-train; the modelless inference-time delta rule already ships here.
 
 ## TL;DR
 

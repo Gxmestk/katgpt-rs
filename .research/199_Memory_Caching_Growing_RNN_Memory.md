@@ -4,6 +4,7 @@
 **Status:** GOAT Verified — Modelless Inference-Time Enhancement
 **Paper:** [Memory Caching: RNNs with Growing Memory](https://arxiv.org/pdf/2602.24281)
 **Authors:** Ali Behrouz, Zeman Li, Yuan Deng, Peilin Zhong, Meisam Razaviyayn, Vahab Mirrokni (Google)
+> **PASS-Redirects (synthesis):** Behrouz et al. [arXiv:2512.24695 "Nested Learning: The Illusion of Deep Learning Architectures"] — successor paper by the same Google team. NL generalizes MC's segment-boundary checkpoint caching into a unified framework of nested multi-level optimization problems (NSAM) with per-level context flow + update frequency. All of NL's new contributions (M3 optimizer, Delta Gradient Descent, Delta Momentum, Hope architecture, Self-referential Titans, Continuum Memory System) require backprop → riir-train. The modelless-relevant insight — that multi-frequency state blocks at different update cadences prevent catastrophic forgetting — ALREADY ships as our per-NPC runtime stack: HLA (fast/tick) + KARC (medium/tick-batched) + Committed Personality (slow/BLAKE3-frozen) + Sleep-Time Anticipator + Raven/δ-Mem consolidation (slowest/sleep-cycle). No new katgpt-rs primitive; NL is a theoretical-framing validation of the architecture we already ship, plus training methods for riir-train.
 
 ---
 
