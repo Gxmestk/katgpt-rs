@@ -1645,7 +1645,8 @@ pub mod linalg;
 // (Plan 308, Research 288, arXiv:2606.19984). Modelless, inference-time
 // trajectory forecaster: delay-embedding × sealed KarcBasis (Fourier/Chebyshev/
 // BSpline) × closed-form ridge readout, with a zero-alloc forecast matvec.
-// Opt-in until G1–G4 GOAT gate passes (no root-feature alias in Phase 1).
+// DEFAULT-ON (Phase 22, 2026-07-21, Plan 308 promotion under Issue 186 Path D3
+// split-config G1 gate contract — see Cargo.toml default block + Bench 308).
 #[cfg(feature = "karc_forecaster")]
 pub mod karc;
 #[cfg(feature = "karc_forecaster")]
@@ -1699,7 +1700,8 @@ pub use karc_dp::{KarcDpNoiseConfig, apply_dp_noise_to_wout};
 // rank-1 collapse failure documented in Issue 001 / Plan 319 T5.6 G5 FAIL.
 // Pure modelless — no training, no gradient descent. Zero runtime cost unless
 // a caller invokes hope_capacity / optimal_rank1_parent / hope_greedy_select.
-// Opt-in — Plan 469 Phase 1 unblocking skeleton; G1–G4 GOAT gate pending.
+// DEFAULT-ON (Phase 23, 2026-07-24, Plan 469 Phase 4 T4.6 promotion — G1+G2+G3+G4
+// ALL PASS per bench_469_hope_kernel_goat; see Cargo.toml default block).
 #[cfg(feature = "hope_capacity")]
 pub mod hope;
 

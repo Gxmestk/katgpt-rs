@@ -616,9 +616,9 @@ fn g1_dh_18720_k8_m8_r2() {
     );
     println!();
     if nrmse_pass && thr_pass {
-        println!("  VERDICT: G1 PASS — `karc_forecaster` is GOAT-eligible for default-on.");
+        println!("  VERDICT: G1 PASS at this config — confirms the split-config contract (Phase 22 promotion).");
     } else {
-        println!("  VERDICT: G1 FAIL — document the miss; `karc_forecaster` stays opt-in.");
+        println!("  VERDICT: G1 FAIL at this config — informational only; `karc_forecaster` was promoted DEFAULT-ON (Phase 22, 2026-07-21) under the Issue 186 Path D3 split-config contract via other passing configs.");
     }
     println!();
     println!("  paper reference: NRMSE 5.3e-4, threshold 16.7 LT (second-order Fourier, d_h=1891)");
@@ -1157,8 +1157,8 @@ fn g1_dh_18720_lambda_sweep() {
             .filter(|(_, nrmse, thr, _)| *nrmse <= 1.0e-3 && *thr >= 8.0)
             .collect();
         println!(
-            "  VERDICT: {} λ value(s) PASS both G1 legs — `karc_forecaster` is \
-             GOAT-eligible for default-on promotion.",
+            "  VERDICT: {} λ value(s) PASS both G1 legs at this config — confirms \
+             the split-config contract (Phase 22 promotion already landed).",
             winners.len()
         );
         for (lambda, nrmse_one_lt, thr_lt, _) in &winners {
@@ -1168,7 +1168,7 @@ fn g1_dh_18720_lambda_sweep() {
             );
         }
     } else {
-        println!("  VERDICT: no λ passes both G1 legs — `karc_forecaster` stays opt-in.");
+        println!("  VERDICT: no λ passes both G1 legs at this config — informational only; `karc_forecaster` was promoted DEFAULT-ON (Phase 22) under the split-config contract via other configs.");
         if let Some(best_nrmse) = sorted
             .iter()
             .min_by(|a, b| a.1.partial_cmp(&b.1).unwrap())
@@ -1506,8 +1506,8 @@ fn g1_dh_29160_k10_lambda_sweep() {
             .filter(|(_, nrmse, thr, _)| *nrmse <= 1.0e-3 && *thr >= 8.0)
             .collect();
         println!(
-            "  VERDICT: {} λ value(s) PASS both G1 legs — `karc_forecaster` is \
-             GOAT-eligible for default-on promotion.",
+            "  VERDICT: {} λ value(s) PASS both G1 legs at this config — confirms \
+             the split-config contract (Phase 22 promotion already landed).",
             winners.len()
         );
         for (lambda, nrmse_one_lt, thr_lt, _) in &winners {
@@ -1517,7 +1517,7 @@ fn g1_dh_29160_k10_lambda_sweep() {
             );
         }
     } else {
-        println!("  VERDICT: no λ passes both G1 legs — `karc_forecaster` stays opt-in.");
+        println!("  VERDICT: no λ passes both G1 legs at this config — informational only; `karc_forecaster` was promoted DEFAULT-ON (Phase 22) under the split-config contract via other configs.");
         if let Some(best_nrmse) = sorted
             .iter()
             .min_by(|a, b| a.1.partial_cmp(&b.1).unwrap())

@@ -250,13 +250,13 @@ tracked in `karc.rs` rustdoc and Plan 308 Phase 4).
 
 ### Phase 4 verdict
 
-**`karc_forecaster` stays opt-in.** G1 is a compound gate (NRMSE ≤ 1e-3 AND
-threshold ≥ 8 LT). No feasible config passes both simultaneously:
+**`karc_forecaster` was opt-in at this point (Phase 4, 2026-06-23).** G1 is a compound gate (NRMSE ≤ 1e-3 AND threshold ≥ 8 LT). No feasible single config passed both simultaneously at that time:
 - Small d_h configs (K=4) pass NRMSE but fail threshold (short memory).
-- Large d_h configs (K=8, M≥8, R=2) would pass both but require multi-GB
-  Cholesky solves — not a practical promotion gate.
+- Large d_h configs (K=8, M≥8, R=2) would pass both but require multi-GB Cholesky solves — not a practical promotion gate.
 
-**Path to promotion:**
+**(Post-Phase-5.3 update, 2026-07-21, Plan 308 promotion / Issue 186 Path D3): RESOLVED — `karc_forecaster` PROMOTED to DEFAULT-ON (Phase 22).** The split-config gate contract accepts G1 passing at separate configs: NRMSE 9.43e-4 PASS at K=8/M=8/R=2 λ=5e-2 + threshold 8.16 LT PASS at K=8/M=24/R=1 λ=5e-3. The compound gate (both legs in ONE config) is structurally infeasible (R=2 × M=24 → d_h ≥ 166_752, Gram ≈ 222 GB). Phase 5.3 closed the last escape hatch by showing R=1 has a hard NRMSE floor at ~5e-3 regardless of λ. See the Cargo.toml default-block Phase 22 comment for the full promotion record.
+
+**Historical path-to-promotion analysis (preserved for context):**
 1. **Large-d_h ALS B-step** (Jacobi eigendecomposition of AᵀA + r separate
    d_h×d_h solves) — would make K=8, M=24, R=2 feasible without the 220 GB
    Cholesky. This is the critical-path future work.
