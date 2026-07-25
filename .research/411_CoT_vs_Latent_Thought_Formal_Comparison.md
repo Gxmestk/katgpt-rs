@@ -237,7 +237,7 @@ Re-cast the paper's core mechanism as a latent-to-latent operation on the seven 
 |---|---|---|
 | Research note (this file) | `katgpt-rs/.research/411_*.md` | ✅ Created |
 | Complexity-class-gated routing fusion | `.issues/134_complexity_class_gated_routing_fusion.md` | ✅ Filed (P3 track-only — requires a complexity-class classifier not provided by the paper) |
-| FPRAS routing criterion for BoM/QuasiMoTTo | `.issues/135_fpras_routing_criterion.md` | ✅ Filed (P3 track-only — needs a self-reducibility detector; sub-component of Issue 134, can ship independently) |
+| FPRAS routing criterion for BoM/QuasiMoTTo | `.issues/134_complexity_class_gated_routing_fusion.md` (consolidated 2026-07-25) | ✅ Filed 2026-07-12 as `.issues/135_*`, consolidated into Issue 134 2026-07-25 — same detector gap blocked both; the FPRAS arm now lives as the #P-detection half of Issue 134 |
 | Experimental training (looped TF / CoT training) | → riir-train | Out of scope (training-side validation of theoretical results) |
 
 ---
@@ -290,7 +290,7 @@ Re-cast the paper's core mechanism as a latent-to-latent operation on the seven 
 - [x] **T5:** Novelty gate Q1–Q4. DONE — Q2 fails (no new capability class); verdict Gain.
 - [x] **T6:** MOAT gate (katgpt-rs domain). DONE — in scope, partially strengthens moat, no primitive to ship.
 - [x] **T7:** File `.issues/` entry for the complexity-class-gated routing fusion (SwiR × Breakeven × k_selector × DEC × BoM). DONE — `.issues/134_complexity_class_gated_routing_fusion.md` (P3 track-only; implementation deferred within the issue, blocked on a complexity-class classifier).
-- [x] **T8:** File `.issues/` entry for the FPRAS routing criterion (route self-reducible #P problems to BoM/QuasiMoTTo stochastic sampling). DONE — `.issues/135_fpras_routing_criterion.md` (P3 track-only; sub-component of Issue 134, can ship independently; implementation deferred within the issue, blocked on a self-reducibility detector).
+- [x] **T8:** File `.issues/` entry for the FPRAS routing criterion (route self-reducible #P problems to BoM/QuasiMoTTo stochastic sampling). DONE 2026-07-12 as `.issues/135_fpras_routing_criterion.md`. **CONSOLIDATED into Issue 134 on 2026-07-25** — both issues are P3 track-only blocked on the same open research problem (a runtime complexity-class / self-reducibility detector the paper does not provide). The narrower slice was not independently shippable in practice; maintaining two parallel blocked issues was noise. The FPRAS criterion now lives as the #P-detection half of Issue 134's classifier. See Issue 134 re-evaluation trigger for the consolidated FPRAS arm rationale.
 - [ ] **T9 (optional):** If a future plan wants to add a complexity-class classifier to SwiR, cite this note + Research 344 as the theoretical foundation. The classifier would detect whether the current problem is TC^K-parallelizable (→ latent iteration) or #P-self-reducible (→ stochastic sampling). Out of scope for this session.
 
 ---

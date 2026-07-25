@@ -3,7 +3,7 @@
 **Filed:** 2026-07-12
 **Priority:** P3 (track-only — blocked on a missing complexity-class classifier)
 **Related:** `.research/411_CoT_vs_Latent_Thought_Formal_Comparison.md`, `.research/241_swir.md` (Plan 275), `.research/218_breakeven_complexity_router.md` (Plan 250), `.research/344_implicit_fp_rnn.md`, Plan 318 (k_selector), Plan 251 (DEC operators), Plan 281 (BoMSampler), `.research/367_quasimotto.md`
-**Origin:** Research 411 §2.6 (fusion candidate) + §3 (routing table) — deferred T7
+**Origin:** Research 411 §2.6 (fusion candidate) + §3 (routing table) — deferred T7. **Issue 135 (FPRAS routing criterion) consolidated into this issue 2026-07-25** — both are blocked on the same open research problem (a runtime complexity-class / self-reducibility detector); maintaining two parallel P3-track-only issues was noise without signal.
 
 ## Context
 
@@ -44,8 +44,8 @@ confident right now?"). The fusion would switch on **complexity class** (a struc
 signal that says "is this problem parallelizable or does it need stochastic sampling?"):
 
 - For parallelizable problems (TC^K) → route to latent iteration with K from `k_selector`.
-- For self-reducible `#P` problems → route to BoM/QuasiMoTTo stochastic sampling (see
-  Issue 135 for the FPRAS-specific criterion).
+- For self-reducible `#P` problems → route to BoM/QuasiMoTTo stochastic sampling (the
+  FPRAS-eligible arm — formerly tracked as a separate Issue 135, now consolidated here).
 - The Breakeven Bandit adds the cost dimension.
 - The DEC substrate provides the DAG on which depth-bounded iteration runs.
 
@@ -111,8 +111,12 @@ Revisit if any of the following lands:
 - A paper ships a runtime complexity-class classifier (not just theorems).
 - A modelless heuristic classifier is developed and GOAT-gated to beat SwiR's entropy
   signal on a representative benchmark suite.
-- Issue 135 (FPRAS routing criterion) ships independently and demonstrates the
-  stochastic-sampling arm's value, making the full fusion economically justified.
+- A FPRAS routing rule for self-reducible `#P` problems is independently shippable
+  (BoMSampler / QuasiMoTTo are FPRAS-eligible arms; route to them when a #P
+  self-reducibility detector fires). This was formerly tracked as Issue 135; it
+  consolidates back here because the same detector gap blocks both — a #P
+  self-reducibility detector is just the #P-half of the complexity-class classifier.
+  See Research 411 §2.3 + T8 (deferred).
 
 ## TL;DR
 
@@ -120,4 +124,5 @@ Research 411 proves latent thought captures TC^k (parallelizable) and CoT captur
 FPRAS (#P counting). The natural fusion — route by complexity class via SwiR ×
 Breakeven × k_selector × DEC × BoM — is a GOAT candidate, but is blocked on a
 complexity-class classifier the paper does not provide. Track only; revisit if a
-modelless classifier lands or if Issue 135 (the FPRAS arm) ships first.
+modelless classifier lands. (Issue 135 — the FPRAS arm — consolidated here
+2026-07-25: same detector gap blocked both.)
