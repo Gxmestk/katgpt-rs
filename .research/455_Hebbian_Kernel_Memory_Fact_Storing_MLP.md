@@ -332,8 +332,13 @@ pub struct HebbianCommitment {
 
 ```toml
 [features]
-hebbian_kernel_memory = []   # opt-in; promote to default after G5 PASSes
+hebbian_kernel_memory = []   # DEFAULT-ON since 2026-07-25 (Plan 559 Phase 3, Benchmark 469)
 ```
+
+The open primitive is **DEFAULT-ON** in `katgpt-core` (promoted after G1–G5
+ALL PASS). The private IP-bearing bridge `hebbian_fact_store` in
+riir-neuron-db STAYS opt-in — see feature-gate-audit Defense 3 layer split
+(Benchmark 469).
 
 ---
 

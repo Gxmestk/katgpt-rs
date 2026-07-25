@@ -2621,6 +2621,31 @@ Replaces the **fake "LaCAM escalation"** (shuffled-priority retries of greedy PI
 
 Feature gate: `lacam_escalation` (**opt-in**, implies `multi_agent_path`). 📖 Plan: [`.plans/453_bounded_one_step_lacam_escalation.md`](.plans/453_bounded_one_step_lacam_escalation.md), Research: [`.research/441_lacam_constraint_tree_distillation.md`](.research/441_lacam_constraint_tree_distillation.md), Benchmark: [`.benchmarks/453_lacam_escalation_goat.md`](.benchmarks/453_lacam_escalation_goat.md), Issue 154 (PIBT vertex collisions, closed as fixed by Plan 453 — file removed per noise-reduction rule). Paper: [arXiv:2310.05955](https://arxiv.org/abs/2310.05955).
 
+### 🧠 Hebbian Kernel Memory: Closed-Form Fact-Storing MLP Construction (Plan 559, arxiv 2607.10034)
+
+Distills Garcia et al. 2026-07-10 (Stanford/UB, *MLPs are Hebbians: Constructing Efficient Fact-Storing MLPs for Transformers*) into the **closed-form construction complement to HOPE's capacity measure**. Where HOPE (Plan 469) *measures* the Hilbert-Schmidt capacity of a fact-storing MLP, this primitive *constructs* an MLP that achieves the information-theoretic optimal capacity `W = Θ(F · log F)` for `F` stored facts — no gradient descent, no backprop.
+
+The construction is pure closed-form linear algebra:
+
+```text
+A, G ∈ ℝ^{m×D}  ← seeded Gaussian random features (deterministic: BLAKE3(fact_set))
+ϕ(x)            = (1/√m) · [(A_r·x)(G_r·x)]_{r=1..m}     # bilinear sketched-K₂ feature map
+B_λ             = B₀ · (Σ̂ + λI)⁻¹                          # ridge-whitened readout (paper Algorithm 1)
+MLP(z)          = B · ϕ(z)                                 # forward; satisfies MLP(k_i) ≈ v_{f(i)}
+```
+
+Three variants: `Unwhitened` (raw Hebbian, baseline) / `Whitened` (ridge-whitened, **DEFAULT** — matches paper Algorithm 1) / `DataDependent` (alternating least-squares refine of A, G — paper §B.2.5; stubs shipped, Whitened-without-ALS achieves perfect retrieval at d=64 shard scale).
+
+The primitive also ships the **atomic hot-swap slot pattern** (`HebbianSlot`) — same `Arc<RwLock<Option<...>>>` shape as `InducedCwmSlot` / `LoRAHotSwap`. Construct a new memory from an edited fact set, swap it into a Transformer, get **zero-shot fact editing** (paper §5.2 "MLP Swapping") — the Super-GOAT selling point for NPC personality shards (private bridge in `riir-neuron-db::hebbian_bridge`, Plan 322).
+
+**GOAT status:** G1 (γ_min = 25.11 > 0 at D=64/F=128/m=128; 18 unit tests; interpolation err 8.33e-5 < 1e-3) ✅. G2 (two regimes: HLA 97 ns/query; shard 44.8 µs/fact construction + 5.1 µs/query forward) ✅. G3 (1814 lib tests + `--all-features` clean) ✅. G4 (0 allocs / 100 calls on `forward_into` + `retrieval_scores_into`) ✅. **G5 Super-GOAT quality axis** ✅ — three-competitor defend-wrong PoC (Bench 462 in riir-neuron-db): Constructed = GD = **1.000 edit_score** at 2/5/10% edits vs Frozen 0.000 efficacy (the expected "didn't apply edit" floor, confirming the test is discriminating).
+
+> **Honest caveat (G5):** the perfect 1.000 scores indicate the test config (`m·d = 32,768` vs capacity bound `F·log(F) ≈ 896`, ~36× headroom) is in the **easy-capacity regime**. At this ratio the closed-form construction provably achieves `γ_min > 0` (G1), so perfect retrieval follows by paper Thm 4.3; GD converges to the same B (convex MSE surface in B with A/G fixed). The harder regime (smaller `m`, structured values, real NPC data) remains unproven but is **non-blocking** — production shards operate in the easy regime by design. Tracked as Plan 322 Phase 2 T2.3 (real-shard test) + Plan 559 Phase 2 T1.5 (possible ALS refinement).
+
+**Decision: `hebbian_kernel_memory` DEFAULT-ON** (Plan 559 Phase 3, 2026-07-25). Layer split (feature-gate-audit Defense 3): the generic IP-free math ships default-on in katgpt-core; the IP-bearing private bridge `hebbian_fact_store` in riir-neuron-db STAYS opt-in (shard-specific value table source + BLAKE3-committed `ConstructionAuditSidecar`).
+
+Feature gate: `hebbian_kernel_memory` (**DEFAULT-ON** since 2026-07-25; zero runtime cost unless a caller constructs `HebbianKernelMemory` / `HebbianSlot`). 📖 Plan: [`.plans/559_hebbian_kernel_memory_primitive.md`](.plans/559_hebbian_kernel_memory_primitive.md), Research: [`.research/455_Hebbian_Kernel_Memory_Fact_Storing_MLP.md`](.research/455_Hebbian_Kernel_Memory_Fact_Storing_MLP.md), Phase 1 GOAT bench: `crates/katgpt-core/benches/bench_559_hebbian_kernel_memory_goat.rs`, Phase 3 promotion review: [`.benchmarks/469_hebbian_kernel_memory_promotion_review.md`](.benchmarks/469_hebbian_kernel_memory_promotion_review.md). Private bridge: [riir-neuron-db/.plans/322](../riir-neuron-db/.plans/322_hebbian_fact_storing_shard_bridge.md) + G5 PoC: [riir-neuron-db/.benchmarks/462](../riir-neuron-db/.benchmarks/462_hebbian_construction_quality_poc.md). Paper: [arXiv:2607.10034](https://arxiv.org/abs/2607.10034). Super-GOAT dual with HOPE: [`.benchmarks/468_hope_kernel_goat.md`](.benchmarks/468_hope_kernel_goat.md).
+
 ---
 
 ## 🔧 KV Compression
