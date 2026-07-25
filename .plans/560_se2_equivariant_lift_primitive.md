@@ -42,7 +42,7 @@ This de-defers the "SE(2)-equivariant game maps" item from Research 321 §2.4 pe
 - [x] **T3.2** Create `riir-ai/.research/325_SE2_Equivariant_NPC_Perception_Guide.md` (private Super-GOAT moat doc).
 - [x] **T3.3** Update Research 321 §2.4 to note the SE(2) item is no longer deferred.
 - [x] **T3.4** Update `katgpt-dec/Cargo.toml` feature comment block to reflect the new primitive.
-- [ ] **T3.5** Update `katgpt-rs/README.md` feature-flag table if/when promoted.
+- [x] **T3.5** Update `katgpt-rs/README.md` feature-flag table if/when promoted.
 
 ## Notes
 
