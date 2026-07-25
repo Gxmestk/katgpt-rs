@@ -214,9 +214,17 @@ and unblocks the riir-neuron-db Super-GOAT integration (Plan 321).
 
 ### Gate
 
-- [ ] **T4.G5** (deferred to riir-neuron-db Plan 321 Phase 3) — Super-GOAT G5
+- [x] **T4.G5** (deferred to riir-neuron-db Plan 321 Phase 3) — Super-GOAT G5
       compaction quality gate runs in riir-neuron-db, not here. The open primitive
       only owns G1–G4.
+      **RESOLVED 2026-07-25:** Plan 321 T3.G5 PASS (2026-07-24) — HOPE
+      `intrinsic_dim = 1.9690 ≥ 1.6×` on the Plan 319 T5.6 wedge workload,
+      beating both AM single-query (1.000) and AM multi-query (1.6152).
+      Super-GOAT CONFIRMED. See
+      [riir-neuron-db/.benchmarks/461_hope_compaction_g5_quality.md](../../riir-neuron-db/.benchmarks/461_hope_compaction_g5_quality.md).
+      `compact_hope` stays opt-in (O(N²) cold-path cost not forced on
+      non-HOPE consumers); eligible for default promotion when a downstream
+      consumer needs it.
 
 ---
 
