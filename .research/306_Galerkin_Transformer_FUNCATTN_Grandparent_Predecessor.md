@@ -3,8 +3,8 @@
 > **Source:** [Choose a Transformer: Fourier or Galerkin](https://arxiv.org/abs/2105.14995) — Shuhao Cao, NeurIPS 2021 (arXiv:2105.14995v4, 1 Nov 2021)
 > **Date:** 2026-06-25
 > **Status:** Done
-> **Related Research:** 257 (FUNCATTN — strictly stronger successor), 291 (Cross-Resolution Spectral Transport — asymmetric-basis FUNCATTN), 303 (Transolver — intermediate predecessor), 219 (DEC operators — vocabulary substrate), 296 (Stokes/DEC vocabulary crosswalk), 051 (Deep Manifold — previously dismissed "Galerkin implementation not needed")
-> **Related Plans:** 286 (FUNCATTN open primitive — covers all Galerkin use cases strictly better), 310 (Cross-Resolution Spectral Transport), 318 (latent_functor rank-k upgrade — the headline fusion target via FUNCATTN)
+> **Related Research:** 257 (FUNCATTN — strictly stronger successor), 291 (Cross-Resolution Spectral Transport — asymmetric-basis FUNCATTN), 303 (Transolver — intermediate predecessor), 219 (DEC operators — vocabulary substrate), 296 (Stokes/DEC vocabulary crosswalk), 051 (Deep Manifold — previously dismissed "Galerkin implementation not needed"), [454 (HOPE — closest Hilbert framing, rank-1 capacity kernel)](454_HOPE_Hilbert_Schmidt_Capacity_Kernel.md)
+> **Related Plans:** 286 (FUNCATTN open primitive — covers all Galerkin use cases strictly better), 310 (Cross-Resolution Spectral Transport), 318 (latent_functor rank-k upgrade — the headline fusion target via FUNCATTN), [469 (HOPE primitive — Hilbert-Schmidt capacity)](../.plans/469_hilbert_schmidt_capacity_kernel_primitive.md)
 > **Classification:** Public
 
 ---

@@ -3,8 +3,8 @@
 > **Source:** [FAME: Adaptive Functional Attention with Expert Routing for Function-on-Function Regression](https://arxiv.org/abs/2510.00621) — Gao, Chen, Zhang (Tsinghua / U-Iowa), NeurIPS 2025
 > **Date:** 2026-06-25
 > **Status:** Active — Super-GOAT via fusion; primitive + plan + private guide created this session
-> **Related Research:** 276 (PersonalityWeightedComposition — per-layer cousin), 288 (KARC — per-NPC forecaster cousin, the "backward" Bi-NCDE pass), 257 (FuncAttn — **vocabulary collision, different mechanism**), 242 (MicroRecurrentBeliefState), 296 (Stokes/DEC — sampling-invariant substrate), 219 (TNO/DEC)
-> **Related Plans:** 321 (this primitive — open), 297 (PersonalityWeightedComposition), 308 (KARC), 314 (Stokes wrappers — `line_integral`)
+> **Related Research:** 276 (PersonalityWeightedComposition — per-layer cousin), 288 (KARC — per-NPC forecaster cousin, the "backward" Bi-NCDE pass), 257 (FuncAttn — **vocabulary collision, different mechanism**), 242 (MicroRecurrentBeliefState), 296 (Stokes/DEC — sampling-invariant substrate), 219 (TNO/DEC), [454 (HOPE — rank-1 capacity kernel)](454_HOPE_Hilbert_Schmidt_Capacity_Kernel.md)
+> **Related Plans:** 321 (this primitive — open), 297 (PersonalityWeightedComposition), 308 (KARC), 314 (Stokes wrappers — `line_integral`), [469 (HOPE primitive — rank-1 parent selection)](../.plans/469_hilbert_schmidt_capacity_kernel_primitive.md)
 > **Cross-ref (riir-ai):** Research 158 — *Per-NPC Committed Personality Blend Guide* (private Super-GOAT moat)
 > **Cross-ref (riir-chain):** Research 003 (LatCal-Committed Karc Readout — the sync-boundary bridge this extends)
 > **Cross-ref (riir-neuron-db):** Research 003 (KarcShard Storage Crossref — the freeze substrate this reuses)

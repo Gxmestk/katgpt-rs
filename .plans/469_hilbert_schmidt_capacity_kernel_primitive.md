@@ -254,11 +254,12 @@ and unblocks the riir-neuron-db Super-GOAT integration (Plan 321).
       (verified via `#print axioms`). The cross-kernel diagonal + Cauchy-
       Schwarz tests were descoped to a future extension — they require the
       full `normalCdf` (non-constant), which needs `erf`.
-- [ ] **T5.3** Cross-link from `katgpt-rs/.research/233` (AM closest cousin),
+- [x] **T5.3** Cross-link from `katgpt-rs/.research/233` (AM closest cousin),
       `katgpt-rs/.research/302` (FAME), `katgpt-rs/.research/306` (Galerkin).
-      **DEFERRED** — doc-sync task; the research notes already reference HOPE
-      via Plan 469 + Research 454. A focused doc-sync pass would add explicit
-      "see also: HOPE (Plan 469)" cross-links at the top of each note.
+      **DONE 2026-07-25.** Added HOPE (Plan 469 / Research 454) to the
+      "Related Research" + "Related Plans" header lines of all three notes.
+      The cross-link from Research 454 → 233/302/306 already existed; this
+      task added the reverse direction (233/302/306 → 454/469).
 
 ---
 
