@@ -4,7 +4,7 @@
 **Research:** [katgpt-rs/.research/455](../.research/455_Hebbian_Kernel_Memory_Fact_Storing_MLP.md)
 **Source paper:** [arXiv:2607.10034](https://arxiv.org/abs/2607.10034) — Garcia et al., "MLPs are Hebbians" (Stanford / UB, 2026-07-10)
 **Target:** `katgpt-rs/crates/katgpt-core/src/hebbian_kernel_memory.rs` (new module) + Cargo feature `hebbian_kernel_memory`
-**Status:** Active — Phase 1 (P0 unblocking skeleton) **COMPLETE** (G1+G2+G3+G4 ALL PASS, bench_559_hebbian_kernel_memory_goat). Phase 2 (Super-GOAT confirmation) + Phase 3 (default promotion) BLOCKED on Issue 027 PoC.
+**Status:** Active — Phase 1 (P0 unblocking skeleton) **COMPLETE** (G1+G2+G3+G4 ALL PASS, bench_559_hebbian_kernel_memory_goat). Phase 2 (Super-GOAT confirmation) **G5 PASS 2026-07-25** (Benchmark 462 — Constructed = GD = 1.000 edit_score; easy-regime caveat noted); T2.3 (real-shard test) still open. Phase 3 (default promotion) **UNBLOCKED 2026-07-25**.
 
 ---
 
@@ -46,17 +46,20 @@ Bench: `katgpt-rs/crates/katgpt-core/benches/bench_559_hebbian_kernel_memory_goa
 - [x] **G3 no-regression** — `cargo test --features hebbian_kernel_memory --lib` (1814 green = 1796 default + 18 new); `cargo check --all-features` clean; clippy clean (only pre-existing `similarity.rs` warning).
 - [x] **G4 alloc-free hot path** — `CountingAllocator` audit on `forward_into` + `retrieval_scores_into` (100 calls each, after warmup): **0 allocs / 0 deallocs** on both.
 
-## Phase 2 — Super-GOAT Confirmation (P1, DEFERRED to Plan 559 Phase 2 + Issue 027)
+## Phase 2 — Super-GOAT Confirmation (P1; **G5 PASS 2026-07-25**, T2.3 still open)
 
 These tasks ship in this plan's Phase 2 AFTER the riir-neuron-db shard bridge (Plan 322) ships its bridge. They are tracked here for visibility but executed after Plan 322 P1.
 
-- [ ] **T2.1** Add the d=64, F=128 synthetic fact-edit PoC to `riir-poc/benches/hebbian_quality_poc.rs` (in riir-ai workspace). Three competitors: (a) Hebbian data-dependent, (b) GD-trained reference, (c) frozen baseline.
-- [ ] **T2.2** **G5 quality gate** — PoC must show constructed Hebbian shard achieves edit score ≥ 0.95 at 10% edits, OR within 5% of GD-trained. Per §3.6, if FAIL: honestly revise verdict to "quality axis PENDING", keep feature opt-in, document in this plan + R455.
+- [x] **T2.1** Add the d=64, F=128 synthetic fact-edit PoC to `riir-poc/benches/hebbian_quality_poc.rs` (in riir-ai workspace). Three competitors: (a) Hebbian data-dependent, (b) GD-trained reference, (c) frozen baseline.
+  - **DONE 2026-07-25** (commit pending). Shipped as `riir-poc/benches/hebbian_quality_poc.rs` (riir-ai). riir-poc adds `riir-neuron-db` dev-dep.
+- [x] **T2.2** **G5 quality gate** — PoC must show constructed Hebbian shard achieves edit score ≥ 0.95 at 10% edits, OR within 5% of GD-trained. Per §3.6, if FAIL: honestly revise verdict to "quality axis PENDING", keep feature opt-in, document in this plan + R455.
+  - **✅ PASS 2026-07-25.** Constructed edit_score = 1.000 at all edit fractions (2/5/10%), matching GD-trained (1.000) + beating Frozen (0.000 efficacy). See [riir-neuron-db/.benchmarks/462](../../riir-neuron-db/.benchmarks/462_hebbian_construction_quality_poc.md) + [riir-neuron-db/.issues/027](../../riir-neuron-db/.issues/027_hebbian_construction_quality_poc.md). Honest caveat: test is in the easy regime (`m·d = 32,768` vs capacity bound `F·log(F) ≈ 896`, ~36× headroom); harder regime (smaller m, structured values) remains unproven.
 - [ ] **T2.3** Add real-shard test (uses riir-neuron-db fixture): construct from `NeuronShard` fact set via the bridge, verify margin.
 
-## Phase 3 — Default Promotion (P3, deferred)
+## Phase 3 — Default Promotion (P3, **UNBLOCKED 2026-07-25**)
 
 - [ ] **T3.1** If G5 PASSes → promote `hebbian_kernel_memory` to default-on in katgpt-core. Demote the loser (no loser in this case — the primitive is additive, not replacing anything).
+  - **UNBLOCKED 2026-07-25** — G5 PASSed (Benchmark 462). Promotion is now eligible. Decision: do it as a separate focused plan/issue (promotion is a single-line Cargo.toml change but needs the full GOAT re-gate + R455 update + README update).
 - [ ] **T3.2** Update `katgpt-rs/README.md` Feature Showcase with a section on Hebbian Kernel Memory.
 
 ## Constraints (per AGENTS.md)
