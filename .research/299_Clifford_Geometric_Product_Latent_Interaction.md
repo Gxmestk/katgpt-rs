@@ -3,9 +3,11 @@
 > **Source:** [CliffordNet: All You Need is Geometric Algebra](https://arxiv.org/abs/2601.06793) — Zhongping Ji, arXiv:2601.06793v2, Feb 2026
 > **Date:** 2026-06-25
 > **Status:** Active
-> **Related Research:** 219 (DEC parent), 296 (Stokes/DEC vocabulary crosswalk), 065 (RotorQuant — Clifford rotors for quantization), 020 (OFT — skew-symmetric Cayley, riir-ai), 024 (Neuro-Symbolic Chain — skew-symmetric role embeddings, riir-ai)
+> **Related Research:** 219 (DEC parent), 296 (Stokes/DEC vocabulary crosswalk), 065 (RotorQuant — Clifford rotors for quantization), 020 (OFT — skew-symmetric Cayley, riir-ai), 024 (Neuro-Symbolic Chain — skew-symmetric role embeddings, riir-ai), 458 (TropicalGeometricProduct PASS — see below)
 > **Related Plans:** 251 (DEC operators), 314 (Stokes wrappers), 318 (latent functor rank-k — first-order cross-product), 214 (LinOSS symplectic, riir-ai), 319 (this primitive — new)
 > **Classification:** Public
+>
+> **PASS-Redirects (synthesis, added 2026-07-25):** Research 458 §1.4 (TropicalGeometricProduct) — evaluated `max_s W_s[u,v]` (max-plus accumulation across spectral shifts of the wedge) as a potential tropical lift of this primitive. PASS: the wedge is anti-symmetric in (u,v), so replacing `Σ_s W_s[c]` with `max_s W_s[c]` is (a) information-lossy (sign cancellations destroyed), (b) non-invertible (max+anti-symmetric breaks the rotor algebra property that downstream consumers may rely on), and (c) already achievable by the consumer calling `geometric_product_wedge_into` per-shift and taking their own max if bottleneck-wedge is needed. No new primitive shipped.
 
 ---
 

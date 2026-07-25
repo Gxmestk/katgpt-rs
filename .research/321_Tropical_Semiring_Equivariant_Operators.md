@@ -7,6 +7,8 @@
 > **Related Plans:** 337 (this note's plan — tropical semiring primitive + G1 non-redundancy gate), 319 (geometric product — the gate template), 251 (DEC operators — the substrate the tropical variant fuses with)
 > **Cross-ref (riir-ai):** Research 164 (Tropical Game-Map Worst-Case Threat Guide — private Super-GOAT selling-point doc)
 > **Classification:** Public
+>
+> **PASS-Redirects (synthesis, added 2026-07-25):** Research 458 (Tropical Remains Consolidated) — verdicts on the 4 §2.4 Tropical-fusion candidates after the user's "dont skip remains" instruction: (1) TropicalFunctor already ships as `tropical_extract_functor_into` in `riir-engine/latent_functor/arithmetic/mod.rs:316` (gated by `tropical_algebra`); (2) TropicalShardRetrieval — no modelless gain over cosine retrieval; (3) TropicalLatCal — breaks the homomorphism contract; (4) TropicalGeometricProduct — loses wedge anti-symmetry. See Research 458 §1 for the per-candidate analysis + Research 458 §2 for the general "tropical-ify every aggregation" failure rule.
 
 ---
 
