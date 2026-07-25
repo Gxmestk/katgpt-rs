@@ -70,6 +70,8 @@ pub mod nonlinear_heat_kernel;
 pub mod operators;
 #[cfg(feature = "cochain_point_sampler")]
 pub mod point_sampler;
+#[cfg(feature = "se2_equivariant_lift")]
+pub mod se2_lift;
 #[cfg(feature = "sheaf_admm")]
 pub mod sheaf_admm;
 pub mod simd;
@@ -108,6 +110,11 @@ pub use motor_gated::{evolve_motor_gated_field, relu_gate_into};
 pub use birth_death::{
     BirthDeathParams, SplitMix64, argmax_block_type, stochastic_birth_death_step,
 };
+
+// Plan 560 — SE(2)-equivariant lifting layer (Smets §3.4.1).
+// DEFAULT-ON (Phase 2 GOAT G1+G2 ALL PASS 2026-07-25).
+#[cfg(feature = "se2_equivariant_lift")]
+pub use se2_lift::{se2_lift_into, se2_project_integrate_into, se2_project_max_into};
 
 #[cfg(feature = "heat_kernel_trajectory")]
 pub use heat_kernel::{

@@ -128,7 +128,7 @@ Closest cousins across all five repos:
 
 - **TropicalDEC** (DEC × tropical) — *strongest*. New capability: "bottleneck path" and "worst-case flux" cochain fields, orthogonal to existing sum-based fields. Multiplies DEC (shipped) × game maps (riir-ai) × shard retrieval (riir-neuron-db). **This is what the Plan 337 gate tests.**
 - **TropicalFunctor** (latent_functor × tropical) — *strong*. New signal: "max-pair displacement coherence" vs "mean-pair displacement coherence". Multiplies latent_functor × HLA × shard retrieval.
-- **SE(2)-equivariant game maps** (DEC × Lie-group equivariance) — *strong but large build and primarily riir-ai territory*. New capability: rotation-equivariant threat/occupancy fields for NPCs. The generic open primitive in katgpt-rs would be a "homogeneous-space operator framework" — textbook math, large surface. **Deferred to riir-ai follow-up, not a katgpt-rs plan.**
+- **SE(2)-equivariant game maps** (DEC × Lie-group equivariance) — *de-deferred 2026-07-25 per user request, shipped as Research 457 / Plan 560 / katgpt-dec feature `se2_equivariant_lift` / riir-ai guide Research 325.* The G1 π/2 rotation equivariance test passes (≤1e-3 abs diff); G2 perf 225µs @ 32×32×8×5×5 (4.4× under 1ms target). No longer a deferred item.
 - **TropicalShardRetrieval** (shard retrieval × tropical) — *speculative*. May be redundant with max-wedge-span diverse retrieval.
 - **TropicalLatCal** (LatCal × tropical) — *speculative*. No clear modelless unblock. Flag for riir-chain follow-up.
 - **TropicalGeometricProduct** (Clifford × tropical) — *speculative*. Max-plus wedge; unclear added value over default-on `geometric_product`.
@@ -159,7 +159,7 @@ Closest cousins across all five repos:
 
 **Promotion complete (2026-06-28).** Plan 337 G1 passed 3/3 substrates. G2 passed after NEON specialization (the auto-vec baseline was 4-9× slower than simd_matvec due to a serial max-chain latency bottleneck; mirroring simd_dot_f32's 4-independent-accumulator pattern closed the gap). `tropical_algebra` promoted to default-on in `katgpt-core/Cargo.toml`. This note amended to Super-GOAT. Mandatory riir-ai guide at `riir-ai/.research/164_Tropical_Game_Map_Worst_Case_Threat_Guide.md`.
 
-**SE(2)-equivariant game maps** are flagged as a riir-ai follow-up (separate `.research/` note in `riir-ai/.research/` when scoped), not pre-committed here. The generic homogeneous-space framework is textbook math with a large surface; the game-side selling point ("rotation-equivariant NPC perception") is the moat, and that's riir-ai territory.
+**SE(2)-equivariant game maps** — **SHIPPED 2026-07-25** as Plan 560 / Research 457 / feature `se2_equivariant_lift` in katgpt-dec (DEFAULT-ON). The riir-ai selling-point guide lives at `riir-ai/.research/325_SE2_Equivariant_NPC_Perception_Guide.md`. No longer a deferred item.
 
 ---
 
