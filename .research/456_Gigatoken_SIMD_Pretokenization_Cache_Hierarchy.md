@@ -113,7 +113,7 @@ Initial verdict was PASS on two weak grounds: (a) "gigatoken is a GitHub project
 - (a) The research workflow explicitly covers systems papers and blog posts; R418's substrate-≠-value guard *mandates* translating SIMD substrate to software-SIMD technique before PASS. The technique IS the value, and the technique IS in the codebase's wheelhouse.
 - (b) "At the boundary" is not "irrelevant". The Input Layer is part of the E2E inference flow (README §"Input Layer"); a 1000× speedup there matters for streaming-corpus consumers (`riir-data`, `riir-train`). The boundary is exactly where modelless preprocessing lives.
 
-The actionable improvement is real: `katgpt-tokenizer/src/bpe.rs` ships a slow O(n²) baseline; a `fast_bpe` feature flag with either a gigatoken cargo dep or a port of the four techniques is a clean Gain with a measurable GOAT gate. Tracked in [Issue 191](../.issues/191_fast_bpe_via_gigatoken.md).
+The actionable improvement is real: `katgpt-tokenizer/src/bpe.rs` ships a slow O(n²) baseline; a `fast_bpe` feature flag with either a gigatoken cargo dep or a port of the four techniques is a clean Gain with a measurable GOAT gate. Tracked in Issue 191 (RESOLVED 2026-07-25 — Phase 0-2.7 DONE, Phase 3 promotion deferred for honest reasons; see [Benchmark 191](../.benchmarks/191_fast_bpe_goat.md) for the lasting resolution record).
 
 ### 3.2 Why this is not Super-GOAT
 
@@ -151,4 +151,4 @@ If G1–G4 pass → promote `fast_bpe` to default in `katgpt-tokenizer` and re-e
 - **Orthogonal axis (vocab quality, not throughput):** [Research 081/082](082_ToaST_Tokenization_Split_Trees.md) ToaST, [Research 087](087_ConvexTok_Tokenisation_via_Convex_Relaxations.md) ConvexTok. These optimize *what* the vocabulary is; gigatoken optimizes *how fast* a fixed vocabulary encodes.
 - **Substrate precedent:** [Research 110](110_Ciot_Ternary_Inference_CPU_Distillation.md) — canonical proof the codebase simulates hardware SIMD techniques in software (Plasma tier = ternary SIMD, Cold tier = Q4_K dequant-on-read). Gigatoken's techniques are a new client of the same substrate.
 - **Cache-hierarchy structural cousins:** Engram `ZipfianCacheHierarchy` (Plan 299 Phase 6, cited in Research 385 §2.2), `riir-neuron-db/src/item_index.rs::ItemEmbedIndex`. Same Zipf assumption; gigatoken's long-tail growth-management trick may be retroactively portable.
-- **Actionable task:** [Issue 191](../.issues/191_fast_bpe_via_gigatoken.md) — `fast_bpe` feature flag + GOAT gate.
+- **Actionable task:** Issue 191 (RESOLVED + removed 2026-07-25) — `fast_bpe` feature flag + GOAT gate. Lasting record: [Benchmark 191](../.benchmarks/191_fast_bpe_goat.md).

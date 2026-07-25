@@ -1,10 +1,11 @@
 # Benchmark 191: `fast_bpe` GOAT Gate
 
 **Date:** 2026-07-25
-**Issue:** [191 — Fast BPE via Gigatoken](../.issues/191_fast_bpe_via_gigatoken.md)
-**Research:** [456 — Gigatoken SIMD Pretokenization + Cache Hierarchy](../.research/456_Gigatoken_SIMD_Pretokenization_Cache_Hierarchy.md)
+**Origin:** Issue 191 (Fast BPE via Gigatoken — RESOLVED + removed per noise-reduction
+rule 2026-07-25; this benchmark is the lasting resolution record). Research:
+[456 — Gigatoken SIMD Pretokenization + Cache Hierarchy](../.research/456_Gigatoken_SIMD_Pretokenization_Cache_Hierarchy.md).
 **Hardware:** Apple M-series (aarch64 Darwin), stable Rust 1.93.0, release profile
-**Status:** Phase 1 + Phase 2 + Phase 2.5 + Phase 2.6 DONE — gate **PASSES all four on the production path** (G4 was deferred at Phase 2, landed in Phase 2.5; Phase 2.6 added the pretokenized + cached path). Per-call `encode_fast` path is a documented regression on short inputs only.
+**Status:** Phase 1 + Phase 2 + Phase 2.5 + Phase 2.6 + Phase 2.7 DONE — gate **PASSES all six on the production path** (G4 was deferred at Phase 2, landed in Phase 2.5; Phase 2.6 added the pretokenized + cached path; Phase 2.7 wired ShortPretokenCache). Per-call `encode_fast` path is a documented regression on short inputs only. Phase 3 promotion to default-on is **DEFERRED** — see §"Phase 3 verdict" for the honest rationale + triggers.
 
 ---
 
@@ -23,7 +24,7 @@ The vendored gigatoken BPE core (PairRankTable + heap+linked-list merge loop) sh
 
 ## Phase 0 verdict — Option 1.5 (vendor)
 
-See the [issue file](../.issues/191_fast_bpe_via_gigatoken.md) §"Phase 0 verdict" for the full decision. Summary: cargo dep on full gigatoken is **blocked** by (1) nightly `portable_simd`, (2) unconditional `pyo3`/`numpy`/`parquet`/`arrow` deps, (3) the workspace's stable-Rust + leaf-clean constraints. Vendoring the pure-Rust `bpe/` core (~2k LOC of MIT code) is the right path — proven portable to stable 1.93 + wasm32-unknown-unknown via the `/tmp/gigatoken-probe/` probe crate.
+See §"Phase 0 verdict (Option 1.5 — vendor)" in the (now-removed) Issue 191 file for the full decision. Summary: cargo dep on full gigatoken is **blocked** by (1) nightly `portable_simd`, (2) unconditional `pyo3`/`numpy`/`parquet`/`arrow` deps, (3) the workspace's stable-Rust + leaf-clean constraints. Vendoring the pure-Rust `bpe/` core (~2k LOC of MIT code) is the right path — proven portable to stable 1.93 + wasm32-unknown-unknown via the `/tmp/gigatoken-probe/` probe crate.
 
 ---
 
