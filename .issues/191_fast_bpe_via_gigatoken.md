@@ -5,7 +5,7 @@
 **Source:** [gigatoken](https://github.com/marcelroed/gigatoken) (Marcel Rød, MIT, ~2.5k★) — ~1000× faster than HF `tokenizers`
 **Target crate:** `crates/katgpt-tokenizer/` (the BPE substrate that would benefit)
 **Verdict:** Gain, GOAT candidate pending gate
-**Status:** Phase 0 DONE — Option 1.5 (vendor the pure-Rust `bpe/` core). Phase 1 in flight.
+**Status:** Phase 0 DONE — Option 1.5 (vendor the pure-Rust `bpe/` core). Phase 1 + Phase 2 + Phase 2.5 DONE — all four GOAT gates PASS on the production path. Phase 3 DEFERRED with documented triggers.
 
 ---
 
@@ -102,8 +102,8 @@ Per global AGENTS.md: "Create issue at .issues for poc, proof, optimization or r
   **DONE (adapted scope):** `tests/fast_bpe_goat.rs::g2_perf_smoke_*` (4 tests) measures on 7-char + 64KB inputs. The 100MB / 1GB scope was Research 456's estimate for the full gigatoken pipeline; without pretokenization the gate floor of 100× is unreachable on this crate's whole-text BPE. Honest measured gain: 86× on 64KB, 0.66× ratio on 7-char (amortized). The 1000× is real only after pretokenization lands — Phase 3 trigger.
 - [x] **T2.3 (G3 no-regression)** Run `cargo test -p katgpt-tokenizer --all-features` — all existing BPE / ToaST / ConvexTok tests pass (the new path is feature-gated; the existing `bpe.rs::encode` is untouched).
   **DONE:** 70 lib tests + 7 GOAT gate tests pass under `--all-features --release`.
-- [-] **T2.4 (G4 alloc-free)** Add `tests/fast_bpe_goat.rs::g4_zero_alloc_steady_state` — `CountingAllocator` audit: 0 allocations in 100 steady-state `encode_fast()` calls after warmup (gigatoken claims this; we verify).
-  **DEFERRED:** `FastBpeEncoder` reuses `MergeScratch` across calls but `Vec<TokenId>` for symbols is still allocated per `encode()` (same as the slow `encode()`). The test is `#[ignore]`'d with the unblocker (push symbols buffer into the encoder as reusable scratch) documented. Not failed — same allocation pattern as the existing path.
+- [x] **T2.4 (G4 alloc-free)** Add `tests/fast_bpe_goat.rs::g4_zero_alloc_steady_state` — `CountingAllocator` audit: 0 allocations in 100 steady-state `encode_fast()` calls after warmup (gigatoken claims this; we verify).
+  **DONE (Phase 2.5, 2026-07-25):** `FastBpeEncoder::encode_into` is the zero-alloc API — writes into a caller-owned `&mut Vec<usize>`, reuses `symbols: Vec<TokenId>` scratch + `MergeScratch` across calls. Audit lives in `tests/fast_bpe_goat_g4_alloc.rs` (own file — global `CountingAllocator` needs uncontended counter): both the small-path (n ≤ 32) and long-path (n > 32 → BinaryHeap merge with drained-heap capacity reuse) audit **0 allocations** in steady state. `g4_encode_into_bit_identical_to_encode` is the correctness floor (in the main GOAT file). The per-call `encode_fast` + `FastBpeEncoder::encode` are NOT alloc-free (they return `Vec<usize>`); the zero-alloc contract is on `encode_into` only.
 - [x] **T2.5** Record results in `.benchmarks/191_fast_bpe_goat.md`. **DONE.**
 
 ---
@@ -123,7 +123,7 @@ Per global AGENTS.md: "Create issue at .issues for poc, proof, optimization or r
 
 If G1–G4 FAIL: keep `fast_bpe` opt-in, document which gate failed and why in `.benchmarks/191_fast_bpe_goat.md`, close this issue with the verdict.
 
-**Actual outcome:** G1 ✅, G2 amortized ✅, G3 ✅, G4 deferred-not-failed. The gate passes on the production path (`FastBpeEncoder`). Promotion is deferred for honest reasons (substrate not wired, no consumer, 1000× claim not honest) — see `.benchmarks/191_fast_bpe_goat.md` §"Phase 3 verdict" for triggers.
+**Actual outcome:** G1 ✅, G2 amortized ✅, G3 ✅, G4 ✅ (Phase 2.5). The gate passes on the production path (`FastBpeEncoder`). Promotion is deferred for honest reasons (substrate not wired, no consumer, 1000× claim not honest) — see `.benchmarks/191_fast_bpe_goat.md` §"Phase 3 verdict" for triggers.
 
 ---
 

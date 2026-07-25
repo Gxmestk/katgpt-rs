@@ -4,7 +4,7 @@
 **Issue:** [191 — Fast BPE via Gigatoken](../.issues/191_fast_bpe_via_gigatoken.md)
 **Research:** [456 — Gigatoken SIMD Pretokenization + Cache Hierarchy](../.research/456_Gigatoken_SIMD_Pretokenization_Cache_Hierarchy.md)
 **Hardware:** Apple M-series (aarch64 Darwin), stable Rust 1.93.0, release profile
-**Status:** Phase 1 + Phase 2 DONE — gate **PARTIALLY PASS** (amortized path PASSES all gates; per-call path is documented regression on short inputs only).
+**Status:** Phase 1 + Phase 2 + Phase 2.5 DONE — gate **PASSES all four on the production path** (G4 was deferred at Phase 2, landed in Phase 2.5). Per-call `encode_fast` path is a documented regression on short inputs only.
 
 ---
 
@@ -36,9 +36,10 @@ See the [issue file](../.issues/191_fast_bpe_via_gigatoken.md) §"Phase 0 verdic
 | `crates/katgpt-tokenizer/src/fast_bpe/pair_rank_table.rs` | `PairRankTable` + `MergeScratch` + branchless merge cores (small / short_scalar / short_neon) | ~730 |
 | `crates/katgpt-tokenizer/src/fast_bpe/pretoken_cache.rs` | `ShortPretokenCache` (shipped, not wired — substrate for future pretokenization) | ~480 |
 | `crates/katgpt-tokenizer/src/fast_bpe/pretokenize_keys.rs` | `pack_pretoken_key` + `pretoken_key_hash` (substrate for future pretokenization) | ~190 |
-| `crates/katgpt-tokenizer/src/bpe.rs::FastBpeEncoder` | The amortized encoder — wraps `&BpeTokenizer` with cached `PairRankTable` + scratch | ~90 |
+| `crates/katgpt-tokenizer/src/bpe.rs::FastBpeEncoder` | The amortized encoder — wraps `&BpeTokenizer` with cached `PairRankTable` + scratch + reusable `symbols` buffer | ~110 |
 | `crates/katgpt-tokenizer/src/bpe.rs::BpeTokenizerImpl::encode_fast` | One-shot per-call convenience function (delegates to `FastBpeEncoder`) | ~5 |
-| `crates/katgpt-tokenizer/tests/fast_bpe_goat.rs` | GOAT gate (G1 correctness + G2 perf smoke + G4 deferred) | ~250 |
+| `crates/katgpt-tokenizer/tests/fast_bpe_goat.rs` | GOAT gate (G1 correctness + G2 perf smoke + G4 correctness floor) | ~280 |
+| `crates/katgpt-tokenizer/tests/fast_bpe_goat_g4_alloc.rs` | G4 alloc-free audit (CountingAllocator — own file so the global counter is uncontended) | ~150 |
 
 Vendored line count: ~1520 LOC. Adaptation delta vs upstream: ~50 LOC (module path + dropped SentencePiece variants + dropped `madvise_hugepage`).
 
@@ -83,15 +84,25 @@ Vendored line count: ~1520 LOC. Adaptation delta vs upstream: ~50 LOC (module pa
 
 ### G4 — alloc-free steady state
 
-**DEFERRED.** The amortized `FastBpeEncoder` reuses its `MergeScratch` across calls, but `Vec<TokenId>` for the symbol sequence is still allocated per `encode()` call (matching `encode`'s behavior). The `PairRankTable::build` allocation is one-time per encoder, not per call. A future Phase 2.5 could push the symbols buffer into the encoder as reusable scratch to make `encode()` truly alloc-free after the first call — but `encode()` (the slow path) has the same allocation pattern, so this isn't a regression. G4 is **deferred, not failed**: the test is `#[ignore]`'d in `tests/fast_bpe_goat.rs::g4_zero_alloc_steady_state` with the unblocker documented.
+**✅ PASS (Phase 2.5, 2026-07-25).** The new `FastBpeEncoder::encode_into` API writes its output into a caller-owned `&mut Vec<usize>` buffer, reusing the encoder's `symbols: Vec<TokenId>` scratch + `MergeScratch` across calls. After warmup, steady-state `encode_into` performs **zero heap allocations** on both the small-path (n ≤ 32 → stack-resident linked-list merge) and the long-path (n > 32 → BinaryHeap merge with drained-heap capacity reuse).
 
-**G4 verdict: ⏸️ DEFERRED (not failed).**
+The audit lives in `tests/fast_bpe_goat_g4_alloc.rs` (its own file — the global `CountingAllocator` counter is uncontended only when the file has a single test). Both paths audited in `g4_zero_alloc_audit_combined`: small-path 0/100, long-path 0/20.
+
+The per-call `BpeTokenizerImpl::encode_fast` + `FastBpeEncoder::encode` (which returns `Vec<usize>`) are NOT alloc-free — they allocate the return value per call. The zero-alloc contract is on `encode_into` only.
+
+| Test | Result |
+|---|---|
+| `g4_zero_alloc_audit_combined` (small-path, 100 calls, n ≤ 32) | ✅ PASS — **0 allocations** in steady state |
+| `g4_zero_alloc_audit_combined` (long-path, 20 calls, n > 32 → BinaryHeap) | ✅ PASS — **0 allocations** in steady state |
+| `g4_encode_into_bit_identical_to_encode` (correctness floor) | ✅ PASS — `encode_into` bit-identical to `encode` across short + whole-corpus inputs |
+
+**G4 verdict: ✅ PASS.**
 
 ---
 
 ## Phase 3 verdict — DEFER promotion
 
-The gate **PASSES on the production path** (G1 ✅, G2 amortized ✅, G3 ✅, G4 deferred-not-failed). But promoting `fast_bpe` to default-on is **deferred** for three honest reasons:
+The gate **PASSES on the production path** (G1 ✅, G2 amortized ✅, G3 ✅, G4 ✅ — all four gates green). But promoting `fast_bpe` to default-on is **deferred** for three honest reasons:
 
 1. **Substrate not yet wired.** The vendored module ships four substrate pieces (PairRankTable + merge cores + ShortPretokenCache + pretoken key utilities); only two are wired into `encode_fast` (PairRankTable + merge cores). The other two are explicitly substrate for future pretokenization work. Promoting to default before the substrate is wired would be advertising capability we don't have.
 
@@ -133,6 +144,11 @@ cd katgpt-rs
 # Run the GOAT gate (release mode for accurate perf measurement).
 CARGO_TARGET_DIR=/tmp/katgpt-fast-bpe cargo test -p katgpt-tokenizer \
     --features fast_bpe --test fast_bpe_goat --release -- --nocapture
+
+# Run the G4 alloc-free audit (own test file — the global CountingAllocator
+# counter needs to be uncontended).
+CARGO_TARGET_DIR=/tmp/katgpt-fast-bpe cargo test -p katgpt-tokenizer \
+    --features fast_bpe --test fast_bpe_goat_g4_alloc --release -- --nocapture
 
 # Run the lib unit tests (differential fuzz tests for the merge cores).
 CARGO_TARGET_DIR=/tmp/katgpt-fast-bpe cargo test -p katgpt-tokenizer \

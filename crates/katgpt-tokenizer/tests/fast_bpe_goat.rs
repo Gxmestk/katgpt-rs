@@ -17,10 +17,11 @@
 //!   Honest gain target: 2× on 1KB inputs, 10×+ on 64KB+ inputs.
 //! - **G3 (no-regression)**: `cargo test -p katgpt-tokenizer --all-features`
 //!   passes (no existing ConvexTok/ToaST/datrie test broke).
-//! - **G4 (alloc-free steady-state)**: deferred — `encode_fast` rebuilds the
-//!   `PairRankTable` per call in v1; caching the table on the tokenizer is a
-//!   follow-up. Marked `#[ignore]` here so the gate is honest about what's
-//!   measured.
+//! - **G4 (alloc-free steady-state)**: lives in its own test file
+//!   `tests/fast_bpe_goat_g4_alloc.rs` because the CountingAllocator audit
+//!   needs to be the only test in the process (other tests' allocations
+//!   would otherwise be counted). See that file for the contract: zero
+//!   heap allocations in steady state on `FastBpeEncoder::encode_into`.
 //!
 //! # Honest scope note
 //!
@@ -288,14 +289,40 @@ fn g2_perf_smoke_amortized_gain_on_long_input() {
 }
 
 // ---------------------------------------------------------------------------
-// G4 — alloc-free steady state (deferred — v1 rebuilds table per call)
+// G4 — alloc-free steady state lives in tests/fast_bpe_goat_g4_alloc.rs
+// (CountingAllocator audits must run in their own process — other tests'
+// allocations would be counted by the global allocator).
+//
+// `encode_into` correctness floor lives here (this file is not
+// allocation-sensitive — no global allocator installed).
 // ---------------------------------------------------------------------------
 
 #[test]
-#[ignore = "v1 rebuilds PairRankTable per call (Issue 191 Phase 1 honest scope). \
-            Caching the table on BpeTokenizer (Phase 2.5) is the unblocker."]
-fn g4_zero_alloc_steady_state() {
-    // Placeholder — when caching lands, this becomes a CountingAllocator
-    // audit asserting zero allocations across 100 steady-state calls after
-    // warmup. Skipped now because v1 WILL allocate per call (table build).
+fn g4_encode_into_bit_identical_to_encode() {
+    // Correctness floor for the new zero-alloc `encode_into` API: it must
+    // produce the same sequence as `encode` + `encode_fast`.
+    let corpus = include_str!("../src/bpe.rs");
+    let tokenizer = BpeTrainer::train(corpus, 1024);
+    let texts = [
+        "",
+        "fn foo() -> usize { 42 }",
+        "use std::collections::HashMap;",
+        "the quick brown fox jumps over the lazy dog",
+        corpus, // whole corpus
+    ];
+    let mut encoder = FastBpeEncoder::from_tokenizer(&tokenizer);
+    let mut out = Vec::new();
+    for text in &texts {
+        let reference = BpeTokenizerImpl::encode(&tokenizer, text);
+        encoder.encode_into(text, &mut out);
+        assert_eq!(
+            out, reference,
+            "G4 encode_into divergence (len={}): first diff at {}",
+            text.len(),
+            out.iter()
+                .zip(reference.iter())
+                .position(|(a, b)| a != b)
+                .unwrap_or(out.len())
+        );
+    }
 }

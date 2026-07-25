@@ -173,6 +173,12 @@ pub struct FastBpeEncoder<'tok> {
     /// Reused across `encode` calls — no per-call allocation for the
     /// linked-list or merge heap after the first call.
     scratch: crate::fast_bpe::MergeScratch,
+    /// Reused across `encode`/`encode_into` calls — the per-call `symbols`
+    /// buffer (char→ID map input to the merge loop). Cleared + refilled
+    /// each call; only reallocates when an input exceeds the prior peak.
+    /// This is the Phase 2.5 G4 unblocker (Issue 191) — v1 allocated a
+    /// fresh `Vec` per call.
+    symbols: Vec<crate::fast_bpe::TokenId>,
 }
 
 #[cfg(feature = "fast_bpe")]
@@ -201,46 +207,79 @@ impl<'tok> FastBpeEncoder<'tok> {
             pair_ranks,
             merges,
             scratch: crate::fast_bpe::MergeScratch::default(),
+            symbols: Vec::new(),
         }
     }
 
     /// Encode `text` to token IDs, reusing the cached `PairRankTable` + scratch.
     /// Bit-identical to [`BpeTokenizerImpl::encode`].
+    ///
+    /// This allocates the returned `Vec<usize>` per call. For zero-alloc
+    /// steady-state (e.g. hot loops, batched encoding), use
+    /// [`Self::encode_into`] with a caller-owned reusable output buffer.
     pub fn encode(&mut self, text: &str) -> Vec<usize> {
+        let mut out = Vec::new();
+        self.encode_into(text, &mut out);
+        out
+    }
+
+    /// Zero-alloc encode path — writes token IDs into the caller-owned `out`
+    /// buffer (cleared first). After warmup (the first call seeds `symbols`
+    /// and `scratch` to the prior peak), steady-state `encode_into` performs
+    /// **zero heap allocations** for any input ≤ the prior peak size — the
+    /// G4 gate (`tests/fast_bpe_goat.rs::g4_zero_alloc_steady_state`) audits
+    /// this with a `CountingAllocator`.
+    ///
+    /// Bit-identical to [`BpeTokenizerImpl::encode`] + [`Self::encode`].
+    pub fn encode_into(&mut self, text: &str, out: &mut Vec<usize>) {
+        out.clear();
         if text.is_empty() {
-            return Vec::new();
+            return;
         }
 
-        // Map each char to its token ID up front — same as `encode`.
+        // Map each char to its token ID up front — same as `encode`. The
+        // `symbols` buffer is reused across calls; only reallocates if this
+        // input exceeds the prior peak length.
         let unk = self.tokenizer.unk_id();
         let char_count = text.chars().count();
-        let mut symbols: Vec<crate::fast_bpe::TokenId> = Vec::with_capacity(char_count);
+        self.symbols.clear();
+        self.symbols.reserve(char_count);
         let mut buf = [0u8; 4];
         for c in text.chars() {
             let s = c.encode_utf8(&mut buf);
             let id = self.tokenizer.vocab_to_id.get(s).copied().unwrap_or(unk);
-            symbols.push(crate::fast_bpe::TokenId(id as u32));
+            self.symbols.push(crate::fast_bpe::TokenId(id as u32));
         }
 
         // Fast path: no merges configured.
         if self.tokenizer.merge_ranks_id.is_empty() {
-            return symbols.iter().map(|t| t.0 as usize).collect();
+            out.extend(self.symbols.iter().map(|t| t.0 as usize));
+            return;
         }
 
         match &self.pair_ranks {
             Some(table) => {
-                crate::fast_bpe::bpe_merge_symbols_by_rank(table, &mut symbols, &mut self.scratch);
+                crate::fast_bpe::bpe_merge_symbols_by_rank(table, &mut self.symbols, &mut self.scratch);
             }
             None => {
                 crate::fast_bpe::bpe_merge_symbols_by_rank_with_lookup(
                     &|a, b| self.merges.get(&(a, b)).map_or(u32::MAX, |m| m.0),
-                    &mut symbols,
+                    &mut self.symbols,
                     &mut self.scratch,
                 );
             }
         }
 
-        symbols.iter().map(|t| t.0 as usize).collect()
+        out.extend(self.symbols.iter().map(|t| t.0 as usize));
+    }
+
+    /// Diagnostic: current capacity of the internal `symbols` scratch buffer.
+    /// After warmup this reflects the peak input size the encoder has seen.
+    /// Exposed so callers in hot loops can confirm steady-state capacity has
+    /// been reached before relying on the G4 zero-alloc contract.
+    #[doc(hidden)]
+    pub fn symbols_capacity(&self) -> usize {
+        self.symbols.capacity()
     }
 }
 
