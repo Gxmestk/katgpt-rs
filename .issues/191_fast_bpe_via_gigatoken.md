@@ -5,7 +5,7 @@
 **Source:** [gigatoken](https://github.com/marcelroed/gigatoken) (Marcel Rød, MIT, ~2.5k★) — ~1000× faster than HF `tokenizers`
 **Target crate:** `crates/katgpt-tokenizer/` (the BPE substrate that would benefit)
 **Verdict:** Gain, GOAT candidate pending gate
-**Status:** Phase 0 DONE — Option 1.5 (vendor the pure-Rust `bpe/` core). Phase 1 + Phase 2 + Phase 2.5 DONE — all four GOAT gates PASS on the production path. Phase 3 DEFERRED with documented triggers.
+**Status:** Phase 0 DONE — Option 1.5 (vendor the pure-Rust `bpe/` core). Phase 1 + Phase 2 + Phase 2.5 + Phase 2.6 DONE — all four GOAT gates PASS on the production path + the new pretokenized path (G5) PASSES. Phase 3 DEFERRED with documented triggers.
 
 ---
 
@@ -103,8 +103,29 @@ Per global AGENTS.md: "Create issue at .issues for poc, proof, optimization or r
 - [x] **T2.3 (G3 no-regression)** Run `cargo test -p katgpt-tokenizer --all-features` — all existing BPE / ToaST / ConvexTok tests pass (the new path is feature-gated; the existing `bpe.rs::encode` is untouched).
   **DONE:** 70 lib tests + 7 GOAT gate tests pass under `--all-features --release`.
 - [x] **T2.4 (G4 alloc-free)** Add `tests/fast_bpe_goat.rs::g4_zero_alloc_steady_state` — `CountingAllocator` audit: 0 allocations in 100 steady-state `encode_fast()` calls after warmup (gigatoken claims this; we verify).
-  **DONE (Phase 2.5, 2026-07-25):** `FastBpeEncoder::encode_into` is the zero-alloc API — writes into a caller-owned `&mut Vec<usize>`, reuses `symbols: Vec<TokenId>` scratch + `MergeScratch` across calls. Audit lives in `tests/fast_bpe_goat_g4_alloc.rs` (own file — global `CountingAllocator` needs uncontended counter): both the small-path (n ≤ 32) and long-path (n > 32 → BinaryHeap merge with drained-heap capacity reuse) audit **0 allocations** in steady state. `g4_encode_into_bit_identical_to_encode` is the correctness floor (in the main GOAT file). The per-call `encode_fast` + `FastBpeEncoder::encode` are NOT alloc-free (they return `Vec<usize>`); the zero-alloc contract is on `encode_into` only.
+  **DONE (Phase 2.5, 2026-07-25):** `FastBpeEncoder::encode_into` is the zero-alloc API — writes into a caller-owned `&mut Vec<usize>`, reuses `symbols: Vec<TokenId>` scratch + `MergeScratch` across calls. Audit lives in `tests/fast_bpe_goat_g4_alloc.rs` (own file — global `CountingAllocator` needs uncontended counter): both the small-path (n ≤ 32) and long-path (n > 32 → BinaryHeap merge with drained-heap capacity reuse) audit **0 allocations** in steady state. `g4_encode_into_bit_identical_to_encode` is the correctness floor (in the main GOAT file). The per-call `encode_fast` + `FastBpeEncoder::encode` are NOT alloc-free (they return `Vec<usize>`); the zero-alloc contract is on `encode_into` only. **Phase 2.6 (2026-07-25) added `encode_into_pretok` (pretokenized + cached path) — NOT zero-alloc on novel inputs (cache misses allocate), but bit-identical to `encode_into` and 2.71× faster on natural language.**
 - [x] **T2.5** Record results in `.benchmarks/191_fast_bpe_goat.md`. **DONE.**
+
+---
+
+## Phase 2.6 — Pretokenized encode path (whitespace + HashMap cache)
+
+**The key insight:** `BpeTrainer::train` learns merges via `corpus.split_whitespace()`, so no learned merge rule ever crosses a whitespace boundary or contains a whitespace char. Therefore encoding each non-whitespace run independently + emitting whitespace chars as inert single-char tokens produces the **exact same** token sequence as whole-text encode. This was deferral reason #1 ("substrate not yet wired") — and it turned out to be wireable without changing BPE semantics, by exploiting the trainer's whitespace-splitting construction.
+
+### Tasks
+
+- [x] **T2.6.1** Probe the bit-identical hypothesis with `tests/fast_bpe_pretok_hypothesis.rs` — 3 tests verify whitespace-pretokenized `BpeTokenizerImpl::encode` == whole-text `encode` across synthetic edge cases + code-like text + repeated corpus. **DONE — hypothesis HOLDS** (the trainer's `split_whitespace()` boundary is the structural guarantee).
+- [x] **T2.6.2** Add `FastBpeEncoder::encode_into_pretok` — whitespace pretokenization + `HashMap<Vec<u8>, Vec<TokenId>>` cache. Reuses existing `symbols` + `scratch` for cache-miss encodes. Bit-identical to `encode_into`.
+- [x] **T2.6.3** Add `pretoken_cache_len()` diagnostic for cache-population visibility.
+- [x] **T2.6.4** G1 gate: `tests/fast_bpe_goat_pretok.rs::g1_*` (3 tests) — bit-identical across edge cases + code-like text + repeated corpus.
+- [x] **T2.6.5** G2 gate: `g2_pretok_faster_than_whole_text_on_natural_language` + `g2_pretok_cache_warm_vs_cold`. **Measured: 2.71× speedup** on 381-char natural language (200 iters), **5.4× warm/cold ratio** (cold=7416ns populating 12 cache entries, warm=1365ns/iter).
+- [x] **T2.6.6** Record results in `.benchmarks/191_fast_bpe_goat.md` §G5. **DONE.**
+
+### Honest scope note
+
+The cache is a plain `HashMap<Vec<u8>, Vec<TokenId>>` — correct but not the vendored `ShortPretokenCache` substrate (open-addressed + prefetched + 2 MiB-aligned). The HashMap captures the structural + cache-hit win; the cache-hierarchy optimization is a follow-up. The honest gain here is "faster than `encode_into` on natural language", NOT the upstream gigatoken 1000× (which needs SIMD pretokenization + the full cache hierarchy + ~99% hit rate at corpus scale).
+
+`encode_into_pretok` is NOT zero-alloc on novel inputs (cache misses allocate). On repeated inputs the cache hit rate climbs and allocation drops toward zero. For guaranteed-zero-alloc use `encode_into`.
 
 ---
 

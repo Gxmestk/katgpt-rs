@@ -16,7 +16,10 @@
 //
 // ALGORITHM IS BIT-IDENTICAL TO UPSTREAM.
 
-#![allow(dead_code)] // Shipped for the day someone adds a pretokenizer that consumes it (Issue 191 Phase 1 §"What's NOT here").
+#![allow(dead_code)] // Substrate for the future ShortPretokenCache wiring. A simpler HashMap cache
+                     // IS now wired via `FastBpeEncoder::encode_into_pretok` (Phase 2.6, 2026-07-25);
+                     // this module's open-addressed + prefetched + 2 MiB-aligned cache is the
+                     // follow-up optimization for when the HashMap's hash overhead matters.
 
 use crate::fast_bpe::pretokenize_keys::pretoken_key_hash;
 use std::alloc::{Layout, alloc, dealloc, handle_alloc_error};
@@ -165,8 +168,12 @@ fn prefetch_line<const L1: bool>(p: *const Entry) {
     let _ = p;
 }
 
-/// The short-pretoken cache. Not wired into `encode_fast` yet — see the
-/// module-level "What's NOT here" note.
+/// The short-pretoken cache. **Wiring status (Phase 2.6, 2026-07-25):** a
+/// SIMPLER HashMap-based pretoken cache IS now wired into
+/// `FastBpeEncoder::encode_into_pretok` (`crate::bpe`). This module's
+/// open-addressed + prefetched + 2 MiB-aligned cache is the follow-up
+/// optimization for when the HashMap stand-in's hash overhead matters. See
+/// `.benchmarks/191_fast_bpe_goat.md` §G5.
 pub(crate) struct ShortPretokenCache {
     slots: Slots,
     /// `cap - 1` (capacity is a power of two).

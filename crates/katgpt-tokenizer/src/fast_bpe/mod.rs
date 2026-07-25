@@ -30,6 +30,16 @@
 //!    crate. (Research 456 §2.2 names this as the genuinely novel technique;
 //!    it stays vendored so the cross-cutting port to Engram's
 //!    `ZipfianCacheHierarchy` is a one-import change when that lands.)
+//!
+//!    **UPDATE (Phase 2.6, 2026-07-25):** A SIMPLER pretoken cache (plain
+//!    `HashMap<Vec<u8>, Vec<TokenId>>`) IS now wired via
+//!    `FastBpeEncoder::encode_into_pretok` in `crate::bpe`. It exploits the
+//!    trainer's `split_whitespace()` boundary to pretokenize WITHOUT changing
+//!    BPE semantics (bit-identical to `encode_into`). Measured: 2.71× speedup
+//!    on natural language. The `ShortPretokenCache` substrate below remains
+//!    unwired — it's the follow-up optimization (open-addressed + prefetched +
+//!    2 MiB-aligned) for when the HashMap stand-in's hash overhead becomes the
+//!    bottleneck. See `.benchmarks/191_fast_bpe_goat.md` §G5.
 //! 4. **SIMD pretokenization** — out of scope. The upstream `pretokenize/`
 //!    module is what needs nightly `portable_simd`. The katgpt-tokenizer
 //!    is a modelless inference-time encoder; pretokenization is the

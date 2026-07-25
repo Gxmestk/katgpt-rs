@@ -179,6 +179,18 @@ pub struct FastBpeEncoder<'tok> {
     /// This is the Phase 2.5 G4 unblocker (Issue 191) — v1 allocated a
     /// fresh `Vec` per call.
     symbols: Vec<crate::fast_bpe::TokenId>,
+    /// Pretoken cache for `encode_into_pretok` (Issue 191 Phase 2.6). Maps
+    /// pretoken bytes → merged token IDs. Grown on demand; reused across
+    /// calls. The key is the pretoken's UTF-8 bytes (no allocation for
+    /// short pretokens that hit the inline-key fast path of
+    /// [`crate::fast_bpe::pack_pretoken_key`], once that's wired).
+    ///
+    /// Currently keyed on `Vec<u8>` — a simpler stand-in for the vendored
+    /// [`crate::fast_bpe::ShortPretokenCache`] substrate. The HashMap is
+    /// correct but slower than the open-addressed + prefetched cache; it
+    /// captures the structural + cache-hit win while leaving the cache-
+    /// hierarchy optimization as a follow-up.
+    pretoken_cache: HashMap<Vec<u8>, Vec<crate::fast_bpe::TokenId>>,
 }
 
 #[cfg(feature = "fast_bpe")]
@@ -208,6 +220,7 @@ impl<'tok> FastBpeEncoder<'tok> {
             merges,
             scratch: crate::fast_bpe::MergeScratch::default(),
             symbols: Vec::new(),
+            pretoken_cache: HashMap::new(),
         }
     }
 
@@ -271,6 +284,149 @@ impl<'tok> FastBpeEncoder<'tok> {
         }
 
         out.extend(self.symbols.iter().map(|t| t.0 as usize));
+    }
+
+    /// Pretokenized zero-alloc encode path (Issue 191 Phase 2.6 — whitespace
+    /// pretokenization + per-pretoken cache).
+    ///
+    /// **Bit-identical to [`BpeTokenizerImpl::encode`] + [`Self::encode`] +
+    /// [`Self::encode_into`]** for any tokenizer trained by [`BpeTrainer`].
+    /// The correctness invariant is structural: [`BpeTrainer::train`] learns
+    /// merges via `corpus.split_whitespace()`, so no learned merge rule ever
+    /// crosses a whitespace boundary or contains a whitespace char. Therefore
+    /// encoding each non-whitespace run independently and emitting whitespace
+    /// chars as inert single-char tokens produces the exact same sequence as
+    /// whole-text encode. See `tests/fast_bpe_pretok_hypothesis.rs` for the
+    /// regression guard.
+    ///
+    /// # Wins vs [`Self::encode_into`]
+    ///
+    /// 1. **Structural win (always)**: each non-whitespace run is encoded
+    ///    independently with a much smaller heap. The total merge work is
+    ///    sum of O(k log k) per pretoken vs O(n log n) on the whole text —
+    ///    a substantial reduction on natural language where pretokens are
+    ///    short (avg ~5 chars).
+    /// 2. **Cache-hit win (repeated pretokens)**: repeated words like "the",
+    ///    "function", "return" hit the cache after first encoding, skipping
+    ///    the merge loop entirely. The cache is keyed on pretoken bytes.
+    ///
+    /// The cache is a plain `HashMap<Vec<u8>, Vec<TokenId>>` for now — the
+    /// vendored [`crate::fast_bpe::ShortPretokenCache`] substrate (open-
+    /// addressed + prefetched + 2 MiB-aligned) is a follow-up optimization
+    /// for when the simple cache's hash overhead becomes the bottleneck.
+    ///
+    /// # Allocation note
+    ///
+    /// This path is NOT zero-alloc in steady state on novel inputs (cache
+    /// misses allocate the key `Vec<u8>` + value `Vec<TokenId>`). On repeated
+    /// inputs (e.g. encoding the same document many times, or natural
+    /// language with high word repetition) the cache hit rate climbs and
+    /// allocation drops toward zero. For a guaranteed-zero-alloc path use
+    /// [`Self::encode_into`].
+    pub fn encode_into_pretok(&mut self, text: &str, out: &mut Vec<usize>) {
+        out.clear();
+        if text.is_empty() {
+            return;
+        }
+
+        // Fast path: no merges configured — degenerates to char-by-char emit,
+        // same as `encode_into`. Skip the pretokenization overhead.
+        if self.tokenizer.merge_ranks_id.is_empty() {
+            self.encode_into(text, out);
+            return;
+        }
+
+        let unk = self.tokenizer.unk_id();
+        let mut buf = [0u8; 4];
+
+        // Iterate the text classifying each char as whitespace or not. A
+        // non-whitespace run accumulates into `pretoken_bytes` (reused
+        // across pretokens — no per-pretoken allocation except the cache
+        // key clone on miss). A whitespace char is emitted directly as a
+        // single token (it can never be part of any merge rule, per the
+        // trainer's `split_whitespace()` construction).
+        //
+        // `char::is_whitespace()` matches Unicode `White_Space` + `​`...
+        // — same predicate Rust's `str::split_whitespace` uses, so the
+        // pretoken boundaries here exactly match the trainer's word
+        // boundaries. That's what makes the result bit-identical.
+        let mut pretoken_bytes: Vec<u8> = Vec::new();
+
+        // Helper: flush the current non-ws run through the cache + merge
+        // loop, appending to `out`. Inlined by hand because the borrow
+        // checker doesn't like closing over `&mut self` fields.
+        macro_rules! flush_run {
+            () => {{
+                if !pretoken_bytes.is_empty() {
+                    // Cache lookup. HashMap key is the pretoken bytes.
+                    if let Some(cached) = self.pretoken_cache.get(&pretoken_bytes) {
+                        out.extend(cached.iter().map(|t| t.0 as usize));
+                    } else {
+                        // Cache miss: encode the pretoken using the fast
+                        // merge path. Reuse `symbols` + `scratch`.
+                        // SAFETY: `pretoken_bytes` is valid UTF-8 (we
+                        // appended whole `char`s' UTF-8 encodings).
+                        let s = std::str::from_utf8(&pretoken_bytes)
+                            .expect("pretoken_bytes is built from chars; qed");
+                        self.symbols.clear();
+                        for c in s.chars() {
+                            let cs = c.encode_utf8(&mut buf);
+                            let id = self.tokenizer.vocab_to_id.get(cs).copied().unwrap_or(unk);
+                            self.symbols.push(crate::fast_bpe::TokenId(id as u32));
+                        }
+                        match &self.pair_ranks {
+                            Some(table) => {
+                                crate::fast_bpe::bpe_merge_symbols_by_rank(
+                                    table,
+                                    &mut self.symbols,
+                                    &mut self.scratch,
+                                );
+                            }
+                            None => {
+                                crate::fast_bpe::bpe_merge_symbols_by_rank_with_lookup(
+                                    &|a, b| self.merges.get(&(a, b)).map_or(u32::MAX, |m| m.0),
+                                    &mut self.symbols,
+                                    &mut self.scratch,
+                                );
+                            }
+                        }
+                        // Insert into cache (clones the key + value).
+                        let key = pretoken_bytes.clone();
+                        let val = self.symbols.clone();
+                        self.pretoken_cache.insert(key, val);
+                        out.extend(self.symbols.iter().map(|t| t.0 as usize));
+                    }
+                    pretoken_bytes.clear();
+                }
+            }};
+        }
+
+        for c in text.chars() {
+            if c.is_whitespace() {
+                // Flush the current non-ws run (if any).
+                flush_run!();
+                // Emit the whitespace char as its own token (same as
+                // `encode` — it can never merge with anything).
+                let s = c.encode_utf8(&mut buf);
+                let id = self.tokenizer.vocab_to_id.get(s).copied().unwrap_or(unk);
+                out.push(id);
+            } else {
+                // Accumulate into the current non-ws run.
+                let s = c.encode_utf8(&mut buf);
+                pretoken_bytes.extend_from_slice(s.as_bytes());
+            }
+        }
+        // Flush any trailing non-ws run.
+        flush_run!();
+    }
+
+    /// Diagnostic: number of entries in the pretoken cache (Issue 191 Phase 2.6).
+    /// After encoding a natural-language corpus this should grow toward the
+    /// unique-word count of the corpus. The hit rate is the perf signal: high
+    /// hit rate = the pretokenized path is paying off.
+    #[doc(hidden)]
+    pub fn pretoken_cache_len(&self) -> usize {
+        self.pretoken_cache.len()
     }
 
     /// Diagnostic: current capacity of the internal `symbols` scratch buffer.

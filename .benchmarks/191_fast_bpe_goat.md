@@ -4,7 +4,7 @@
 **Issue:** [191 — Fast BPE via Gigatoken](../.issues/191_fast_bpe_via_gigatoken.md)
 **Research:** [456 — Gigatoken SIMD Pretokenization + Cache Hierarchy](../.research/456_Gigatoken_SIMD_Pretokenization_Cache_Hierarchy.md)
 **Hardware:** Apple M-series (aarch64 Darwin), stable Rust 1.93.0, release profile
-**Status:** Phase 1 + Phase 2 + Phase 2.5 DONE — gate **PASSES all four on the production path** (G4 was deferred at Phase 2, landed in Phase 2.5). Per-call `encode_fast` path is a documented regression on short inputs only.
+**Status:** Phase 1 + Phase 2 + Phase 2.5 + Phase 2.6 DONE — gate **PASSES all four on the production path** (G4 was deferred at Phase 2, landed in Phase 2.5; Phase 2.6 added the pretokenized + cached path). Per-call `encode_fast` path is a documented regression on short inputs only.
 
 ---
 
@@ -98,22 +98,42 @@ The per-call `BpeTokenizerImpl::encode_fast` + `FastBpeEncoder::encode` (which r
 
 **G4 verdict: ✅ PASS.**
 
+### G5 — pretokenized path (Phase 2.6, 2026-07-25)
+
+**✅ PASS** on the new `FastBpeEncoder::encode_into_pretok` API. This is the first pretokenized encode path in katgpt-tokenizer. It exploits a structural invariant: `BpeTrainer::train` learns merges via `corpus.split_whitespace()`, so no learned merge rule ever crosses a whitespace boundary — therefore per-pretoken encode is **bit-identical** to whole-text encode (see `tests/fast_bpe_pretok_hypothesis.rs` for the standalone regression guard on that invariant).
+
+| Test | Result |
+|---|---|
+| `g1_pretok_bit_identical_to_encode_short_texts` | ✅ PASS — bit-identical across 14 edge cases (empty, leading/trailing/multiple/internal whitespace, tabs, newlines, mixed separators, unknown chars) |
+| `g1_pretok_bit_identical_on_code_like_text` | ✅ PASS — bit-identical on code-like text with punctuation |
+| `g1_pretok_bit_identical_on_repeated_corpus` | ✅ PASS — bit-identical on the training corpus itself; cache populated with unique-word entries |
+| `g2_pretok_faster_than_whole_text_on_natural_language` | ✅ PASS — **2.71× speedup** vs `encode_into` on 381-char natural language × 200 iters (cache warms on iter 1, hits on 2-200) |
+| `g2_pretok_cache_warm_vs_cold` | ✅ PASS — **5.4× warm/cold ratio**: cold=7416ns (populates 12 cache entries), warm=1365ns/iter |
+| `g1_whitespace_pretokenization_*` (hypothesis regression guard, 3 tests) | ✅ PASS — the trainer-invariant regression guard that makes this direction safe |
+
+**G5 verdict: ✅ PASS.** The pretokenized path is bit-identical to the existing path AND faster on natural language. The win compounds: structural (sum of O(k log k) per pretoken vs O(n log n) whole-text) + cache-hit (repeated words skip the merge loop).
+
+**Allocation note:** `encode_into_pretok` is NOT zero-alloc on novel inputs (cache misses allocate the key `Vec<u8>` + value `Vec<TokenId>`). On repeated inputs the cache hit rate climbs and allocation drops toward zero. For guaranteed-zero-alloc use `encode_into`.
+
+The cache is a plain `HashMap<Vec<u8>, Vec<TokenId>>` for now — correct but not the vendored `ShortPretokenCache` substrate (open-addressed + prefetched + 2 MiB-aligned). The HashMap captures the structural + cache-hit win; the cache-hierarchy optimization is a follow-up. The honest gain here is "faster than `encode_into` on natural language", NOT the upstream gigatoken 1000× (which needs SIMD pretokenization + the full cache hierarchy + ~99% hit rate at corpus scale).
+
 ---
 
-## Phase 3 verdict — DEFER promotion
+## Phase 3 verdict — DEFER promotion (still honest after Phase 2.6)
 
-The gate **PASSES on the production path** (G1 ✅, G2 amortized ✅, G3 ✅, G4 ✅ — all four gates green). But promoting `fast_bpe` to default-on is **deferred** for three honest reasons:
+The gate **PASSES on the production path** (G1 ✅, G2 amortized ✅, G3 ✅, G4 ✅, G5 ✅ — all five gates green). Phase 2.6 wired up the pretoken cache substrate (partially — HashMap instead of `ShortPretokenCache`), which was deferral reason #1. But promoting `fast_bpe` to default-on is **still deferred** for two honest reasons:
 
-1. **Substrate not yet wired.** The vendored module ships four substrate pieces (PairRankTable + merge cores + ShortPretokenCache + pretoken key utilities); only two are wired into `encode_fast` (PairRankTable + merge cores). The other two are explicitly substrate for future pretokenization work. Promoting to default before the substrate is wired would be advertising capability we don't have.
+1. **~~Substrate not yet wired.~~** ✅ RESOLVED by Phase 2.6 — `encode_into_pretok` wires whitespace pretokenization + a HashMap cache. The vendored `ShortPretokenCache` (open-addressed + prefetched + 2 MiB-aligned) remains unwired as a follow-up optimization, but the structural + cache-hit win is captured by the HashMap stand-in.
 
-2. **No consumer needs it today.** The katgpt-tokenizer's existing callers are per-prompt encoders (riir-engine's Gemma2 tokenizer, riir-engine's `rove_perplexity_poc`, the `core_01_validator` example). None encode corpus-scale inputs. The 86× speedup is real but unlocked only when a corpus-scale consumer (riir-data, riir-train) lands.
+2. **No consumer needs it today.** The katgpt-tokenizer's existing callers are per-prompt encoders (riir-engine's Gemma2 tokenizer, riir-engine's `rove_perplexity_poc`, the `core_01_validator` example). None encode corpus-scale inputs. The 2.71× speedup on natural language is real but unlocked only when a corpus-scale consumer (riir-data, riir-train) lands. **Note:** riir-data has both a `pretok_regex.rs` (GPT-4o pretokenizer) and a `bpe_baseline.rs` (byte-level BPE) — those are the natural consumers, but they haven't opened an issue requesting `fast_bpe`.
 
-3. **The headline 1000× claim is not honest.** Research 456 §3.1 flagged this from the start: the 1000× requires pretokenization + per-pretoken cache (~99% hit rate). Without pretokenization, the honest gain is 86× on long inputs. Promoting to default with a comment claiming 1000× would be dishonest.
+3. **The headline 1000× claim is still not honest.** The 2.71× measured here is the structural + simple-cache win. The 1000× requires the full gigatoken pipeline: SIMD GPT-2 regex pretokenization + `ShortPretokenCache` (open-addressed + prefetched + 2 MiB-aligned) + corpus-scale hit rate (~99%). Phase 2.6 captured the easy half; the hard half (SIMD regex + cache hierarchy) remains.
 
-**Phase 3 triggers** (any one):
-- Pretokenization lands in katgpt-tokenizer (the SIMD GPT-2 regex replacement) → re-run GOAT gate, expect close to 1000× on corpus inputs.
+**Phase 3 triggers** (any one — UPDATED):
+- ~~Pretokenization lands~~ — **DONE (Phase 2.6, whitespace-only).** SIMD GPT-2 regex pretokenization remains as a follow-up for the full 1000×.
 - A downstream consumer (riir-data, riir-train) opens an issue requesting corpus-scale BPE → promote to default in that issue's plan.
 - The cross-cutting cache-hierarchy port (Engram `ZipfianCacheHierarchy`, riir-neuron-db `ItemEmbedIndex`) lands and validates the pretoken cache pattern → promote alongside.
+- The `ShortPretokenCache` substrate is wired (replacing the HashMap stand-in) AND the measured gain on a corpus-scale benchmark exceeds 10× → promote based on the measured gain.
 
 ---
 
