@@ -349,6 +349,7 @@ thicket_variance_probe = ["rv_gated_routing", "katgpt-pruners/thicket_variance_p
 toast_tokenizer = ["katgpt-tokenizer/toast_tokenizer"]  # ToaST split-tree tokenization (Plan 122, Research 081). Forwards to katgpt-tokenizer (Issue 014).
 convex_tok = ["katgpt-tokenizer/convex_tok"]  # ConvexTok LP vocabulary optimizer (Plan 127, Research 087). Forwards to katgpt-tokenizer (Issue 014); good_lp lives there now.
 datrie_vocab = ["katgpt-tokenizer/datrie_vocab"]  # Alias: forwards to katgpt-tokenizer toast_tokenizer (datrie is auto-routed) + benchmark examples (Research 137)
+fast_bpe = ["katgpt-tokenizer/fast_bpe"]  # Fast BPE encode path (Issue 191, Research 456). Forwards to katgpt-tokenizer (gigatoken-derived PairRankTable + branchless merge cores). Default-off pending Phase 3 GOAT gate promotion.
 event_log = ["katgpt-pruners/event_log"]  # Event-sourced game traces with fork-and-diff (Plan 124, Research 081)
 vpd_em_distill = ["sdar_gate", "bandit", "katgpt-pruners/vpd_em_distill"]  # VPD EM-style co-evolutionary distillation (Plan 120, Research 080)
 progressive_mcgs = ["katgpt-speculative/progressive_mcgs"]  # Progressive MCGS — graph search with reference edges + entropy-gated schedule (Plan 272, Research 239). Phase 12 (2026-07-04): module moved to katgpt-speculative; root forwards.

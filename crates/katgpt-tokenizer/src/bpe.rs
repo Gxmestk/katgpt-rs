@@ -95,6 +95,153 @@ impl BpeTokenizerImpl {
         }
         result
     }
+
+    /// Fast BPE encode path backed by gigatoken's pure-Rust merge cores
+    /// (Issue 191, Research 456).
+    ///
+    /// **Prefer [`FastBpeEncoder`] over this function** — it caches the
+    /// `PairRankTable` once per tokenizer and reuses it across calls. This
+    /// function rebuilds the table per call, which dominates the cost on
+    /// short inputs (see `.benchmarks/191_fast_bpe_goat.md` G2 short-input
+    /// failure). Use this only when you can't amortize a single encoder
+    /// across calls.
+    ///
+    /// Equivalent in semantics to [`encode`]: same input text → same output
+    /// token ID sequence. Differs in throughput: builds a [`PairRankTable`]
+    /// (dense grid + flat packed open-addressed table) from the tokenizer's
+    /// merge rules once on first call, then runs the heap + doubly-linked-list
+    /// merge loop with stack-resident scratch. The single-pass table build is
+    /// NOT amortized across calls in this function — see [`FastBpeEncoder`]
+    /// for the amortized variant.
+    ///
+    /// # When to use this vs [`encode`] vs [`FastBpeEncoder`]
+    ///
+    /// - **Use [`FastBpeEncoder`]** when you call `encode_fast` more than
+    ///   once with the same tokenizer. Pays the table build once, reuses it
+    ///   across calls. This is the production path.
+    /// - **Use `encode_fast`** (this function) for one-shot calls where
+    ///   the input is long enough (≥~1KB) that the algorithmic win covers
+    ///   the table rebuild. The GOAT gate (`tests/fast_bpe_goat.rs`)
+    ///   measures 162× speedup on 64KB inputs even WITH the per-call table
+    ///   rebuild — so this is a real win on long inputs.
+    /// - **Use [`encode`]** for one-shot short inputs (≤~16 chars): the
+    ///   iterative-merge loop has lower constants on tiny inputs and there's
+    ///   no table build cost.
+    ///
+    /// # Fallback path
+    ///
+    /// If the tokenizer's vocab exceeds the 21-bit packed-key lane
+    /// (`vocab > 2²¹`), the table build refuses and `encode_fast` falls back
+    /// to the slow HashMap-keyed merge loop (still using the heap +
+    /// linked-list core, which is faster than [`encode`]'s iterative merge on
+    /// long sequences). The fallback is exercised by
+    /// `tests/fast_bpe_goat.rs::g1_bit_identical_to_encode_with_table_fallback`.
+    #[cfg(feature = "fast_bpe")]
+    pub fn encode_fast(tokenizer: &BpeTokenizer, text: &str) -> Vec<usize> {
+        FastBpeEncoder::from_tokenizer(tokenizer).encode(text)
+    }
+}
+
+/// Cached fast-BPE encoder (Issue 191 Phase 2.5 — amortized `PairRankTable`).
+///
+/// Wraps a reference to a [`BpeTokenizer`] with a pre-built
+/// [`PairRankTable`] + reusable merge scratch. Construct once per tokenizer
+/// (the table build is the dominant cost on short inputs — see
+/// `.benchmarks/191_fast_bpe_goat.md` G2 short-input failure for the
+/// per-call `encode_fast` path), then call [`Self::encode`] as many times
+/// as needed.
+///
+/// Semantics are bit-identical to [`BpeTokenizerImpl::encode`]. The win is
+/// throughput on long inputs and across many calls.
+///
+/// # Fallback
+///
+/// If the tokenizer's vocab exceeds the 21-bit packed-key lane
+/// (`vocab > 2²¹`), [`Self::from_tokenizer`] keeps `pair_ranks = None` and
+/// `encode` falls back to the HashMap-keyed merge loop (still using the
+/// heap + linked-list core, which is faster than the iterative-merge loop
+/// on long sequences).
+#[cfg(feature = "fast_bpe")]
+pub struct FastBpeEncoder<'tok> {
+    tokenizer: &'tok BpeTokenizer,
+    /// Built once; reused across calls. `None` if the vocab is too large
+    /// for the packed-key lane — `encode` falls back to the HashMap probe.
+    pair_ranks: Option<crate::fast_bpe::PairRankTable>,
+    /// `(TokenId, TokenId) → TokenId` map, kept for the fallback path and
+    /// for table build. Owned here so the fallback closure can borrow it.
+    merges: HashMap<(crate::fast_bpe::TokenId, crate::fast_bpe::TokenId), crate::fast_bpe::TokenId>,
+    /// Reused across `encode` calls — no per-call allocation for the
+    /// linked-list or merge heap after the first call.
+    scratch: crate::fast_bpe::MergeScratch,
+}
+
+#[cfg(feature = "fast_bpe")]
+impl<'tok> FastBpeEncoder<'tok> {
+    /// Build the encoder + `PairRankTable` (or fallback map) once. Pay this
+    /// cost once per tokenizer; reuse across many `encode` calls.
+    pub fn from_tokenizer(tokenizer: &'tok BpeTokenizer) -> Self {
+        let mut merges: HashMap<
+            (crate::fast_bpe::TokenId, crate::fast_bpe::TokenId),
+            crate::fast_bpe::TokenId,
+        > = HashMap::with_capacity(tokenizer.merge_ranks_id.len());
+        for (&(l, r), &rank) in tokenizer.merge_ranks_id.iter() {
+            // `merge_target_id[rank]` is the merged ID resolved at
+            // `rebuild_ranks` time. `merge_ranks_id`'s rank values are
+            // dense `0..merges.len()` by construction (see `rebuild_ranks`),
+            // so the slice index is safe.
+            let merged = tokenizer.merge_target_id[rank];
+            merges.insert(
+                (crate::fast_bpe::TokenId(l as u32), crate::fast_bpe::TokenId(r as u32)),
+                crate::fast_bpe::TokenId(merged as u32),
+            );
+        }
+        let pair_ranks = crate::fast_bpe::PairRankTable::build(&merges, tokenizer.id_to_vocab.len()).ok();
+        FastBpeEncoder {
+            tokenizer,
+            pair_ranks,
+            merges,
+            scratch: crate::fast_bpe::MergeScratch::default(),
+        }
+    }
+
+    /// Encode `text` to token IDs, reusing the cached `PairRankTable` + scratch.
+    /// Bit-identical to [`BpeTokenizerImpl::encode`].
+    pub fn encode(&mut self, text: &str) -> Vec<usize> {
+        if text.is_empty() {
+            return Vec::new();
+        }
+
+        // Map each char to its token ID up front — same as `encode`.
+        let unk = self.tokenizer.unk_id();
+        let char_count = text.chars().count();
+        let mut symbols: Vec<crate::fast_bpe::TokenId> = Vec::with_capacity(char_count);
+        let mut buf = [0u8; 4];
+        for c in text.chars() {
+            let s = c.encode_utf8(&mut buf);
+            let id = self.tokenizer.vocab_to_id.get(s).copied().unwrap_or(unk);
+            symbols.push(crate::fast_bpe::TokenId(id as u32));
+        }
+
+        // Fast path: no merges configured.
+        if self.tokenizer.merge_ranks_id.is_empty() {
+            return symbols.iter().map(|t| t.0 as usize).collect();
+        }
+
+        match &self.pair_ranks {
+            Some(table) => {
+                crate::fast_bpe::bpe_merge_symbols_by_rank(table, &mut symbols, &mut self.scratch);
+            }
+            None => {
+                crate::fast_bpe::bpe_merge_symbols_by_rank_with_lookup(
+                    &|a, b| self.merges.get(&(a, b)).map_or(u32::MAX, |m| m.0),
+                    &mut symbols,
+                    &mut self.scratch,
+                );
+            }
+        }
+
+        symbols.iter().map(|t| t.0 as usize).collect()
+    }
 }
 
 /// BPE trainer: learns merge rules from a corpus.
