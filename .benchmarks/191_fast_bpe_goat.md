@@ -228,6 +228,13 @@ CARGO_TARGET_DIR=/tmp/katgpt-fast-bpe cargo check -p katgpt-tokenizer \
     --features fast_bpe --target wasm32-unknown-unknown
 ```
 
+**GOAT gate wall-clock runtime** (all 8 `fast_bpe_goat.rs` tests, `--release`):
+
+| Date | Runtime | Notes |
+|---|---|---|
+| 2026-07-25 (Phase 2.7 ship) | ~142 s | Dominated by `BpeTrainer::train(corpus, 1024)` setup in 5 tests — pre-Issue-192 O(N²) trainer |
+| 2026-07-25 (post-Issue-192) | **15.7 s** | Trainer fix (Issue 192) memoizes per-word tokenization state — 9.1× speedup on the gate. Encoder path unchanged. |
+
 ---
 
 ## Cross-cutting follow-up (flagged, not scoped)

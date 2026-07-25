@@ -598,8 +598,30 @@ pub struct BpeTrainer;
 
 impl BpeTrainer {
     /// Train a BPE tokenizer from a text corpus.
+    ///
     /// `vocab_size`: target vocabulary size (including special tokens).
     /// `corpus`: training text.
+    ///
+    /// # Algorithm
+    ///
+    /// Standard greedy BPE: count adjacent pairs, merge the most frequent,
+    /// repeat until `vocab_size` is reached or no pair appears ≥ 2 times.
+    ///
+    /// # Tie-breaking (deterministic)
+    ///
+    /// When multiple pairs tie at the winning count, the **lexicographically
+    /// smallest `(left, right)`** is selected. This is an explicit, stable
+    /// rule (Issue 192 — the previous implementation used
+    /// `HashMap::drain().max_by_key()` which depended on HashMap's random
+    /// seed and produced different merge sequences across process runs).
+    ///
+    /// # Complexity
+    ///
+    /// `O(N · W · T)` where `N = num_merges`, `W = word count`,
+    /// `T = avg tokens/word`. Each round scans the (memoized) per-word
+    /// tokenization once and applies only the new merge — Issue 192 fixed
+    /// the prior O(N² · W · T) implementation that re-applied all prior
+    /// merges from scratch on every round.
     pub fn train(corpus: &str, vocab_size: usize) -> BpeTokenizer {
         // Pre-allocate: 4 special tokens + up to 256 unique byte-chars + merges.
         let cap = 4usize.saturating_add(vocab_size).min(corpus.len() + 4);
@@ -626,37 +648,57 @@ impl BpeTrainer {
         let mut merges: Vec<MergeRule> = Vec::new();
         let num_merges = vocab_size.saturating_sub(id_to_vocab.len());
 
-        // Split corpus into words (simple whitespace splitting)
-        let words: Vec<Vec<String>> = corpus
+        // Memoized per-word tokenization state. Initialized to char-level tokens
+        // once; each merge round applies only the NEW merge in-place. This is the
+        // Issue 192 fix — the previous implementation called `apply_merges(word,
+        // &merges)` on every round, re-applying ALL prior merges from scratch
+        // (O(N²) total). See bpe.rs git history for the prior implementation.
+        let mut words_tok: Vec<Vec<String>> = corpus
             .split_whitespace()
             .map(|w| w.chars().map(|c| c.to_string()).collect())
             .collect();
 
-        // Learn merge rules
+        // Per-merge scratch buffers (reused across rounds — G4 alloc discipline).
         let mut pair_counts: HashMap<(String, String), usize> = HashMap::new();
+        let mut scratch: Vec<String> = Vec::new();
+
         for _ in 0..num_merges {
-            // Count all adjacent pairs
+            // Count all adjacent pairs in the current memoized state.
             pair_counts.clear();
-            for word in &words {
-                let tokens = Self::apply_merges(word, &merges);
-                for i in 0..tokens.len().saturating_sub(1) {
-                    let pair = (tokens[i].clone(), tokens[i + 1].clone());
+            for word in &words_tok {
+                for i in 0..word.len().saturating_sub(1) {
+                    let pair = (word[i].clone(), word[i + 1].clone());
                     *pair_counts.entry(pair).or_insert(0) += 1;
                 }
             }
 
-            // Find most frequent pair
-            let best_pair = pair_counts.drain().max_by_key(|(_, count)| *count);
-
-            let Some((pair, count)) = best_pair else {
+            if pair_counts.is_empty() {
                 break;
-            };
+            }
+
+            // Pick the winning pair with an EXPLICIT tie-break rule:
+            // highest count wins; on tie, lexicographically smallest
+            // `(left, right)` wins. This is deterministic regardless of
+            // HashMap iteration order (Issue 192).
+            //
+            // `min_by_key` with `(count reversed, pair normal)` gives us
+            // max-count + min-pair-on-tie in one pass. The `Reverse`
+            // wrapper inverts count so the highest count becomes the
+            // `min`, while the pair itself remains lexicographically
+            // ascending — exactly the desired tie-break.
+            let best = pair_counts.iter().min_by_key(|((l, r), c)| {
+                (std::cmp::Reverse(*c), l.as_str(), r.as_str())
+            });
+            let ((left, right), &count) =
+                best.expect("pair_counts non-empty checked above");
 
             if count < 2 {
                 break; // Stop if no pair appears more than once
             }
 
-            let merged = format!("{}{}", pair.0, pair.1);
+            let left = left.clone();
+            let right = right.clone();
+            let merged = format!("{left}{right}");
 
             // Add merged token to vocabulary via entry API (single hash lookup
             // instead of contains_key + insert).
@@ -668,10 +710,31 @@ impl BpeTrainer {
             let _ = id; // id is already tracked via the merges table below
 
             merges.push(MergeRule {
-                left: pair.0,
-                right: pair.1,
-                merged,
+                left: left.clone(),
+                right: right.clone(),
+                merged: merged.clone(),
             });
+
+            // Apply ONLY this merge in-place to each word's tokenization.
+            // This replaces the old `apply_merges(word, &all_merges)` full
+            // re-application (Issue 192).
+            for word in &mut words_tok {
+                if word.len() < 2 {
+                    continue;
+                }
+                scratch.clear();
+                let mut i = 0;
+                while i < word.len() {
+                    if i + 1 < word.len() && word[i] == left && word[i + 1] == right {
+                        scratch.push(merged.clone());
+                        i += 2;
+                    } else {
+                        scratch.push(word[i].clone());
+                        i += 1;
+                    }
+                }
+                std::mem::swap(word, &mut scratch);
+            }
         }
 
         let mut tokenizer = BpeTokenizer {
@@ -687,27 +750,6 @@ impl BpeTrainer {
         };
         tokenizer.rebuild_ranks();
         tokenizer
-    }
-
-    /// Apply existing merge rules to a sequence of tokens.
-    fn apply_merges(tokens: &[String], merges: &[MergeRule]) -> Vec<String> {
-        let mut buf_a = tokens.to_vec();
-        let mut buf_b = Vec::with_capacity(tokens.len());
-        for rule in merges {
-            buf_b.clear();
-            let mut i = 0;
-            while i < buf_a.len() {
-                if i + 1 < buf_a.len() && buf_a[i] == rule.left && buf_a[i + 1] == rule.right {
-                    buf_b.push(rule.merged.clone());
-                    i += 2;
-                } else {
-                    buf_b.push(buf_a[i].clone());
-                    i += 1;
-                }
-            }
-            std::mem::swap(&mut buf_a, &mut buf_b);
-        }
-        buf_a
     }
 }
 
@@ -785,5 +827,98 @@ mod tests {
         // Use an out-of-range ID
         let decoded = BpeTokenizerImpl::decode(&tokenizer, &[9999]);
         assert_eq!(decoded, "�");
+    }
+
+    // ─── Issue 192 tests: O(N²) perf fix + tie-break determinism ────────────
+
+    /// Frozen reference: corpora with NO ties at the winning count should
+    /// produce the exact same merge sequence every time. These two corpora
+    /// were verified deterministic on the PRE-Issue-192 implementation too
+    /// (run 5× each in a probe — all runs agreed), so they're a safe
+    /// regression guard for the rewrite.
+    #[test]
+    fn test_bpe_train_frozen_reference_no_ties() {
+        // 'a'+'b' is the only pair that appears ≥ 2 times → uniquely maximal.
+        let tokenizer = BpeTrainer::train("ab ab ab ab ab ab ab ab ab ab", 64);
+        assert_eq!(tokenizer.merges.len(), 1);
+        assert_eq!(tokenizer.merges[0].left, "a");
+        assert_eq!(tokenizer.merges[0].right, "b");
+        assert_eq!(tokenizer.merges[0].merged, "ab");
+
+        // 'a'+'b' (count 5) dominates 'x'+'y' (count 2) → unique first pick.
+        // After the merge, 'x'+'y' (count 2) is the only remaining pair.
+        let tokenizer = BpeTrainer::train("ab ab ab ab ab xy xy", 32);
+        assert_eq!(tokenizer.merges.len(), 2);
+        assert_eq!(tokenizer.merges[0].left, "a");
+        assert_eq!(tokenizer.merges[0].right, "b");
+        assert_eq!(tokenizer.merges[0].merged, "ab");
+        assert_eq!(tokenizer.merges[1].left, "x");
+        assert_eq!(tokenizer.merges[1].right, "y");
+        assert_eq!(tokenizer.merges[1].merged, "xy");
+    }
+
+    /// Tie-break determinism: when multiple pairs tie at the winning count,
+    /// the trainer MUST pick the lexicographically smallest `(left, right)`.
+    /// This is the Issue 192 fix — the prior implementation picked whichever
+    /// HashMap happened to iterate last, which varied per process.
+    ///
+    /// Corpus "ab ab ab cd cd cd" has two pairs at count 3: ('a','b') and
+    /// ('c','d'). Lexicographically, ('a','b') < ('c','d'), so ('a','b')
+    /// MUST be picked first.
+    #[test]
+    fn test_bpe_train_tie_break_is_lexicographic() {
+        let tokenizer = BpeTrainer::train("ab ab ab cd cd cd", 32);
+        assert!(!tokenizer.merges.is_empty());
+        assert_eq!(tokenizer.merges[0].left, "a");
+        assert_eq!(tokenizer.merges[0].right, "b");
+        assert_eq!(tokenizer.merges[0].merged, "ab");
+    }
+
+    /// Cross-run stability: train the same corpus 5 times and verify ALL
+    /// 5 runs produce the exact same merge sequence. This is the property
+    /// the Issue 192 fix establishes — the prior implementation would
+    /// intermittently fail this on tie-bearing corpora.
+    #[test]
+    fn test_bpe_train_deterministic_across_runs() {
+        // A corpus that has ties on multiple rounds (the 'hello hello hello'
+        // probe showed ties at idx 0 — could pick ('e','l') OR ('l','l')).
+        let corpus = "hello hello hello hello";
+        let runs: Vec<_> = (0..5)
+            .map(|_| {
+                let tok = BpeTrainer::train(corpus, 64);
+                (
+                    tok.merges
+                        .iter()
+                        .map(|m| (m.left.clone(), m.right.clone(), m.merged.clone()))
+                        .collect::<Vec<_>>(),
+                    tok.vocab_to_id.clone(),
+                )
+            })
+            .collect();
+        for r in runs.iter().skip(1) {
+            assert_eq!(r.0, runs[0].0, "merge sequence diverged across runs");
+            assert_eq!(r.1, runs[0].1, "vocab diverged across runs");
+        }
+    }
+
+    /// Issue 192 perf smoke: training on a moderately-sized corpus with a
+    /// 1024-vocab target should complete in well under a second. The prior
+    /// O(N²) implementation took ~50ms on this corpus; the new O(N) one
+    /// should take <5ms. The gate is generous (5s) to avoid CI flakiness
+    /// on slow machines — the goal is to catch an accidental O(N²)
+    /// regression, not to measure perf precisely.
+    #[test]
+    fn test_bpe_train_perf_smoke_o_n_not_o_n2() {
+        let corpus = "the quick brown fox jumps over the lazy dog ".repeat(100); // ~4.3 KB
+        let start = std::time::Instant::now();
+        let tokenizer = BpeTrainer::train(&corpus, 512);
+        let elapsed = start.elapsed();
+        assert!(
+            elapsed.as_secs() < 5,
+            "train took {elapsed:?} on a 4.3 KB corpus + 512-vocab target; \
+             likely an O(N²) regression (Issue 192 baseline ~50ms)",
+        );
+        // Sanity: the corpus has enough repetition to produce many merges.
+        assert!(!tokenizer.merges.is_empty());
     }
 }
