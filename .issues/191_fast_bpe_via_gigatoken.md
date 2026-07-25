@@ -129,22 +129,47 @@ The cache is a plain `HashMap<Vec<u8>, Vec<TokenId>>` — correct but not the ve
 
 ---
 
+## Phase 2.7 — ShortPretokenCache wiring (replaces HashMap stand-in)
+
+**Trigger:** the Phase 2.6 corpus-scale characterization (`g2_pretok_corpus_scale_scaling_curve`, added in the same session) showed the HashMap stand-in plateaued at **6.38×** at 1M chars with **100% cache coverage** — the residual bottleneck was the HashMap's hash + bucket-walk + key-compare overhead, NOT cache hit rate. That's the evidence the vendored `ShortPretokenCache` substrate was waiting for.
+
+### Tasks
+
+- [x] **T2.7.1** Add corpus-scale characterization test `g2_pretok_corpus_scale_scaling_curve` (synthetic Zipfian corpus at 1K/10K/100K/1M chars; `#[ignore]`d, run with `--ignored`). Establishes the Phase 2.6 baseline curve: 3.42× → 4.29× → 4.73× → 6.38×.
+- [x] **T2.7.2** Re-export `ShortPretokenCache` + `pack_pretoken_key` + `pretoken_key_hash` from `fast_bpe/mod.rs` (was `pub(crate)` but the modules are private — needed `pub(crate) use` at the mod root).
+- [x] **T2.7.3** Make `ShortPretokenCache::with_pow2_capacity` `pub(crate)` so we can pick a small initial size (256 slots = 8 KB, fits in L1) instead of the corpus-scale `with_at_least` floor (2^16 = 2 MB).
+- [x] **T2.7.4** Replace `FastBpeEncoder.pretoken_cache: HashMap<Vec<u8>, Vec<TokenId>>` with three fields: `short_cache: ShortPretokenCache` (fast path, ≤ 15-byte pretokens) + `long_values: Vec<Box<[u32]>>` (spill storage for merged sequences > 2 tokens) + `long_pretokens: HashMap<Vec<u8>, Box<[u32]>>` (spill for > 15-byte pretokens).
+- [x] **T2.7.5** Implement value packing: `val = (t0 << 32) | t1`, `ext = count` for ≤ 2 tokens (the ~98% common case); `val = u64::MAX` sentinel + `ext = long_values index` for ≥ 3 tokens. Disambiguate via `val == u64::MAX` check in `emit_cached` BEFORE branching on `ext` (avoids index/count collision when spill index is 1 or 2).
+- [x] **T2.7.6** Refactor `encode_into_pretok` to extract `flush_pretoken` + `encode_pretoken_tokens` + `pack_value` + `emit_cached` helpers (the borrow checker doesn't close over `&mut self` fields, so the previous macro was getting unwieldy with the two-tier lookup).
+- [x] **T2.7.7** G1 re-verify (all 3 existing pretok tests + 3 hypothesis tests PASS — bit-identical to `encode` held).
+- [x] **T2.7.8** G2 re-verify (381-char speedup: 2.72× → **4.62×**; corpus-scale: 6.38× → **7.59×** at 1M chars).
+- [x] **T2.7.9** G4 re-verify (alloc-free audit on `encode_into` unaffected — 149s run PASS; `encode_into_pretok` is documented non-zero-alloc).
+- [x] **T2.7.10** Update `.benchmarks/191_fast_bpe_goat.md` §G6 + Phase 3 verdict + cross-cutting follow-up + comparison table.
+
+### Honest scope note
+
+The Phase 2.7 wiring covers the **per-pretoken hot path** (`get_or_slot` + `insert_at`). The chunk-level **prefetch pipeline** (`ProbeView::probe_pair` + `prefetch_l2` + `ProbeView::prefetch`) remains unwired — it's the future SIMD-batched pretokenization pipeline (Research 456 §2.2) that would stage hundreds of lookups ahead of demand, hiding DRAM latency. That pipeline only pays off at corpus scale with SIMD regex pretokenization producing batches; without the batched producer, the per-pretoken path is the right granularity.
+
+The value packing handles ≤ 2 tokens inline (covers ~98% of natural-language pretokens per upstream measurement on OWT). The upstream design packs ≤ 4 tokens inline; we chose ≤ 2 for v1 simplicity. The 2-token spill threshold means pretokens that encode to 3-4 tokens go through the side-`Vec` spill path (one extra cache-line access). On natural language this is rare (~2% of pretokens); on highly-agglomerative tokenizers (small vocab, long merges) it could be more common — revisit if a real consumer shows the spill path is hot.
+
+---
+
 ## Phase 3 — Promote to default (only if G1–G4 PASS)
 
 ### Tasks
 
 - [-] **T3.1** If G1–G4 pass: move `fast_bpe` from opt-in to the `default` array in `crates/katgpt-tokenizer/Cargo.toml`. Update the katgpt-tokenizer README's feature table.
-  **DEFERRED** per `.benchmarks/191_fast_bpe_goat.md` §"Phase 3 verdict". The gate passes on the amortized path but three honest reasons block promotion: (1) substrate not yet wired, (2) no consumer needs it today, (3) the 1000× claim would be dishonest without pretokenization. Triggers documented in the benchmark file.
+  **DEFERRED** per `.benchmarks/191_fast_bpe_goat.md` §"Phase 3 verdict". The gate passes on all six gates (G1–G6, after Phase 2.7) but two honest reasons block promotion: (1) no consumer needs it today, (2) the 10× claim would be dishonest without SIMD regex pretokenization. Phase 2.7 wired ShortPretokenCache (was deferral reason #1's follow-up) and measured 7.59× at 1M chars — below the 10× corpus-scale threshold. Triggers documented in the benchmark file.
 - [-] **T3.2** Demote the existing `bpe.rs::encode` (slow path) to a `#[cfg(not(feature = "fast_bpe"))]` fallback OR delete it if `fast_bpe` becomes always-on. Keep it as the wasm32 fallback if T1.3 found gigatoken is wasm32-incompatible.
   **DEFERRED** (depends on T3.1). Note: T1.3 confirmed wasm32 compatibility — no fallback needed for that reason.
 - [-] **T3.3** Update root `katgpt-rs/Cargo.toml` default features if appropriate, and the root README's "Input Layer" section to note GB/s tokenization.
-  **DEFERRED** (depends on T3.1). The GB/s claim is honest only after pretokenization lands; current honest gain is 86× on long inputs.
+  **DEFERRED** (depends on T3.1). The GB/s claim is honest only after SIMD pretokenization lands; current honest gain is 7.59× at corpus scale (1M chars).
 - [-] **T3.4** doc-sync: update `.docs/` references to BPE throughput.
   **DEFERRED** (depends on T3.1).
 
 If G1–G4 FAIL: keep `fast_bpe` opt-in, document which gate failed and why in `.benchmarks/191_fast_bpe_goat.md`, close this issue with the verdict.
 
-**Actual outcome:** G1 ✅, G2 amortized ✅, G3 ✅, G4 ✅ (Phase 2.5). The gate passes on the production path (`FastBpeEncoder`). Promotion is deferred for honest reasons (substrate not wired, no consumer, 1000× claim not honest) — see `.benchmarks/191_fast_bpe_goat.md` §"Phase 3 verdict" for triggers.
+**Actual outcome:** G1 ✅, G2 amortized ✅, G3 ✅, G4 ✅ (Phase 2.5), G5 ✅ (Phase 2.6), G6 ✅ (Phase 2.7). The gate passes on the production path (`FastBpeEncoder`). Promotion is deferred for honest reasons (no consumer, 10× claim not honest without SIMD) — see `.benchmarks/191_fast_bpe_goat.md` §"Phase 3 verdict" for triggers.
 
 ---
 

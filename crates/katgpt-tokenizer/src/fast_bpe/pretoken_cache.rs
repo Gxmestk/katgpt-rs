@@ -16,10 +16,11 @@
 //
 // ALGORITHM IS BIT-IDENTICAL TO UPSTREAM.
 
-#![allow(dead_code)] // Substrate for the future ShortPretokenCache wiring. A simpler HashMap cache
-                     // IS now wired via `FastBpeEncoder::encode_into_pretok` (Phase 2.6, 2026-07-25);
-                     // this module's open-addressed + prefetched + 2 MiB-aligned cache is the
-                     // follow-up optimization for when the HashMap's hash overhead matters.
+#![allow(dead_code)] // ProbeView + prefetch_l2 + probe_pair remain substrate for the
+                     // future SIMD-batched pretokenization pipeline (the chunk-level prefetch
+                     // path — see Research 456 §2.2). ShortPretokenCache::get_or_slot +
+                     // insert_at + with_pow2_capacity ARE wired via
+                     // `FastBpeEncoder::flush_pretoken` (Issue 191 Phase 2.7, 2026-07-25).
 
 use crate::fast_bpe::pretokenize_keys::pretoken_key_hash;
 use std::alloc::{Layout, alloc, dealloc, handle_alloc_error};
@@ -168,12 +169,14 @@ fn prefetch_line<const L1: bool>(p: *const Entry) {
     let _ = p;
 }
 
-/// The short-pretoken cache. **Wiring status (Phase 2.6, 2026-07-25):** a
-/// SIMPLER HashMap-based pretoken cache IS now wired into
-/// `FastBpeEncoder::encode_into_pretok` (`crate::bpe`). This module's
-/// open-addressed + prefetched + 2 MiB-aligned cache is the follow-up
-/// optimization for when the HashMap stand-in's hash overhead matters. See
-/// `.benchmarks/191_fast_bpe_goat.md` §G5.
+/// The short-pretoken cache. **Wiring status (Phase 2.7, 2026-07-25):**
+/// WIRED into `FastBpeEncoder::flush_pretoken` (the per-pretoken path of
+/// `encode_into_pretok`). `get_or_slot` + `insert_at` + `with_pow2_capacity`
+/// drive the hot path. The `ProbeView` + `prefetch_l2` + `probe_pair` chunk-
+/// level prefetch API remains unwired — it's the future SIMD-batched
+/// pretokenization pipeline (Research 456 §2.2) that the encode loop would
+/// use to stage hundreds of lookups ahead of demand. See
+/// `.benchmarks/191_fast_bpe_goat.md` §G5 + §G6.
 pub(crate) struct ShortPretokenCache {
     slots: Slots,
     /// `cap - 1` (capacity is a power of two).
@@ -182,7 +185,7 @@ pub(crate) struct ShortPretokenCache {
 }
 
 impl ShortPretokenCache {
-    fn with_pow2_capacity(cap: usize) -> Self {
+    pub(crate) fn with_pow2_capacity(cap: usize) -> Self {
         debug_assert!(cap.is_power_of_two() && cap >= 2);
         Self {
             slots: Slots::new_zeroed(cap),

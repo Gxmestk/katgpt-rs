@@ -228,3 +228,128 @@ fn g2_pretok_cache_warm_vs_cold() {
         "Warm pretok ({warm_ns}ns) not faster than cold ({cold_ns}ns) — cache not paying off"
     );
 }
+
+// ---------------------------------------------------------------------------
+// G2 (characterization) — corpus-scale scaling curve
+// ---------------------------------------------------------------------------
+//
+// Ignored by default (run with `-- --ignored`). Characterizes how the pretok
+// speedup scales with corpus size, to inform Issue 191 Phase 3 trigger #3
+// ("ShortPretokenCache wired AND measured gain on corpus-scale benchmark
+// exceeds 10×"). This test answers the question: does the structural +
+// HashMap-cache win ALONE (no ShortPretokenCache, no SIMD pretokenization)
+// reach 10× at corpus scale? If yes, Phase 3 trigger #3's gain half is met
+// and only the ShortPretokenCache wiring half remains. If no, the 10×
+// trigger is unreachable without SIMD regex pretokenization (out of scope
+// for Issue 191) and Phase 3 deferral is honest with evidence.
+//
+// Synthetic Zipfian corpus: ~1000 unique words, frequency ∝ 1/rank, mixed
+// word lengths (3–10 chars). Gives a realistic cache hit rate (~50% of
+// tokens come from the top ~100 words) without a real-text dependency.
+// Trained at vocab=1024 so the trainer actually learns merges (the
+// structural win only materializes when merges exist).
+
+/// Build a synthetic corpus of approximately `target_chars` characters by
+/// sampling words from a Zipfian vocabulary until the target length is hit.
+/// Words are `word_NN` with N varying, so lengths span 6–9 chars and the
+/// vocabulary is bounded by `vocab_size`.
+fn build_zipfian_corpus(target_chars: usize, vocab_size: usize) -> String {
+    use std::cell::RefCell;
+    // Per-test-invocation LCG state — deterministic per (vocab_size, target_chars)
+    // pair so re-runs reproduce. Seed mixes both params.
+    let seed = (vocab_size as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15)
+        ^ ((target_chars as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15).rotate_left(13));
+    let state = RefCell::new(seed);
+    let next_rand = || {
+        let mut s = state.borrow_mut();
+        // xorshift64*
+        *s ^= *s >> 12;
+        *s ^= *s << 25;
+        *s ^= *s >> 27;
+        (*s).wrapping_mul(0x2545_F491_4F6C_DD1D)
+    };
+    // Build the vocabulary.
+    let words: Vec<String> = (0..vocab_size).map(|i| format!("word{i}")).collect();
+    // Precompute the cumulative Zipfian CDF for fast sampling. Frequency
+    // ∝ 1/rank; normalize so the total is 1.0.
+    let harmonic: f64 = (1..=vocab_size).map(|r| 1.0 / r as f64).sum();
+    let mut cdf = Vec::with_capacity(vocab_size);
+    let mut acc = 0.0_f64;
+    for r in 1..=vocab_size {
+        acc += (1.0 / r as f64) / harmonic;
+        cdf.push(acc);
+    }
+    let mut out = String::with_capacity(target_chars + 16);
+    while out.len() < target_chars {
+        let u = (next_rand() >> 11) as f64 / (1u64 << 53) as f64;
+        // Binary search for the smallest index whose CDF ≥ u.
+        let idx = match cdf.binary_search_by(|p| p.partial_cmp(&u).unwrap_or(std::cmp::Ordering::Equal)) {
+            Ok(i) => i,
+            Err(i) => i.min(vocab_size - 1),
+        };
+        if !out.is_empty() {
+            out.push(' ');
+        }
+        out.push_str(&words[idx]);
+    }
+    out
+}
+
+#[test]
+#[ignore]
+fn g2_pretok_corpus_scale_scaling_curve() {
+    let vocab_size = 1000;
+    // Train on the largest corpus we'll benchmark against, so the trainer
+    // sees the full vocabulary and learns realistic merges.
+    let training_corpus = build_zipfian_corpus(50_000, vocab_size);
+    let tokenizer = BpeTrainer::train(&training_corpus, 1024);
+
+    let scales: &[(usize, &str)] = &[
+        (1_000, "1K"),
+        (10_000, "10K"),
+        (100_000, "100K"),
+        (1_000_000, "1M"),
+    ];
+
+    eprintln!("scale   chars    plain_ns   pretok_ns  speedup  cache_entries  unique_pretokens");
+    eprintln!("----- --------- ---------- ---------- -------- -------------- ----------------");
+
+    for &(target_chars, label) in scales {
+        let corpus = build_zipfian_corpus(target_chars, vocab_size);
+        let actual_chars = corpus.len();
+        // Count unique whitespace-delimited tokens for context on cache coverage.
+        let unique_pretokens = corpus.split_whitespace().collect::<std::collections::HashSet<_>>().len();
+
+        // Whole-text path (no pretokenization, no cache). Single encode — the
+        // corpus is large enough that one pass dominates measurement noise.
+        let mut encoder_plain = FastBpeEncoder::from_tokenizer(&tokenizer);
+        let mut out = Vec::new();
+        // Warmup the symbols/scratch buffers to the corpus size once.
+        encoder_plain.encode_into(&corpus, &mut out);
+        let t_plain = std::time::Instant::now();
+        encoder_plain.encode_into(&corpus, &mut out);
+        let plain_ns = t_plain.elapsed().as_nanos();
+
+        // Pretokenized path (with cache). First call populates; second call
+        // is the steady-state warm measurement.
+        let mut encoder_pretok = FastBpeEncoder::from_tokenizer(&tokenizer);
+        encoder_pretok.encode_into_pretok(&corpus, &mut out); // cold
+        let t_pretok = std::time::Instant::now();
+        encoder_pretok.encode_into_pretok(&corpus, &mut out); // warm
+        let pretok_ns = t_pretok.elapsed().as_nanos();
+        let cache_entries = encoder_pretok.pretoken_cache_len();
+
+        let speedup = plain_ns as f64 / pretok_ns as f64;
+        eprintln!(
+            "{label:<5} {actual_chars:>8}  {plain_ns:>8.0}  {pretok_ns:>8.0}  {speedup:>6.2}x  {cache_entries:>12}  {unique_pretokens:>15}"
+        );
+
+        // G1 spot-check at each scale: pretok must still be bit-identical to
+        // encode_into on the corpus-scale input.
+        let mut a = Vec::new();
+        let mut b = Vec::new();
+        encoder_plain.encode_into(&corpus, &mut a);
+        encoder_pretok.encode_into_pretok(&corpus, &mut b);
+        assert_eq!(a, b, "G1 pretok divergence at {label} chars ({actual_chars})");
+    }
+}

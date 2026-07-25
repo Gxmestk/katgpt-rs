@@ -179,18 +179,29 @@ pub struct FastBpeEncoder<'tok> {
     /// This is the Phase 2.5 G4 unblocker (Issue 191) — v1 allocated a
     /// fresh `Vec` per call.
     symbols: Vec<crate::fast_bpe::TokenId>,
-    /// Pretoken cache for `encode_into_pretok` (Issue 191 Phase 2.6). Maps
-    /// pretoken bytes → merged token IDs. Grown on demand; reused across
-    /// calls. The key is the pretoken's UTF-8 bytes (no allocation for
-    /// short pretokens that hit the inline-key fast path of
-    /// [`crate::fast_bpe::pack_pretoken_key`], once that's wired).
+    /// Short-pretoken cache (Issue 191 Phase 2.7 — replaces the Phase 2.6
+    /// `HashMap<Vec<u8>, Vec<TokenId>>` stand-in with the vendored
+    /// [`crate::fast_bpe::ShortPretokenCache`] substrate). Open-addressed +
+    /// 2 MiB-aligned + prefetched; probes one cache line per lookup. Keys
+    /// are packed `u128` (≤ 15 pretoken bytes + length tag) via
+    /// [`crate::fast_bpe::pack_pretoken_key`]; hashes via
+    /// [`crate::fast_bpe::pretoken_key_hash`] (hardware CRC32 where available).
     ///
-    /// Currently keyed on `Vec<u8>` — a simpler stand-in for the vendored
-    /// [`crate::fast_bpe::ShortPretokenCache`] substrate. The HashMap is
-    /// correct but slower than the open-addressed + prefetched cache; it
-    /// captures the structural + cache-hit win while leaving the cache-
-    /// hierarchy optimization as a follow-up.
-    pretoken_cache: HashMap<Vec<u8>, Vec<crate::fast_bpe::TokenId>>,
+    /// Values are inline-packed for the common case (≤ 2 merged tokens per
+    /// pretoken, ~98% per upstream measurement on OWT): `val = (t0 << 32) |
+    /// t1`, `ext = count` (1 or 2). Longer merged sequences spill into
+    /// [`Self::long_values`]; pretokens > 15 bytes (too long for the inline
+    /// key) spill into [`Self::long_pretokens`].
+    short_cache: crate::fast_bpe::ShortPretokenCache,
+    /// Spill storage for merged sequences longer than 2 tokens. Indexed by
+    /// `ext` in the short-cache entry (sentinel `ext = u64::MAX` flags
+    /// "spilled, look up here"). Monotonically grows; indices are stable.
+    long_values: Vec<Box<[u32]>>,
+    /// Spill storage for pretokens longer than 15 bytes (whose packed key
+    /// doesn't fit `u128`). Plain `HashMap` — the long-pretoken case is rare
+    /// (< 0.1% of natural-language pretokens), so the SipHash overhead is
+    /// immaterial here. The fast path is [`Self::short_cache`].
+    long_pretokens: HashMap<Vec<u8>, Box<[u32]>>,
 }
 
 #[cfg(feature = "fast_bpe")]
@@ -220,7 +231,13 @@ impl<'tok> FastBpeEncoder<'tok> {
             merges,
             scratch: crate::fast_bpe::MergeScratch::default(),
             symbols: Vec::new(),
-            pretoken_cache: HashMap::new(),
+            // Start small (256 slots = 8 KB, fits in L1) and grow on demand
+            // at the 3/4-load threshold. For corpus-scale use the table grows
+            // to millions of slots via the vendored doubling logic; for small
+            // tokenizers the upfront cost stays bounded.
+            short_cache: crate::fast_bpe::ShortPretokenCache::with_pow2_capacity(256),
+            long_values: Vec::new(),
+            long_pretokens: HashMap::new(),
         }
     }
 
@@ -286,8 +303,12 @@ impl<'tok> FastBpeEncoder<'tok> {
         out.extend(self.symbols.iter().map(|t| t.0 as usize));
     }
 
-    /// Pretokenized zero-alloc encode path (Issue 191 Phase 2.6 — whitespace
-    /// pretokenization + per-pretoken cache).
+    /// Pretokenized encode path.
+    ///
+    /// Issue 191 Phase 2.6 (2026-07-25) shipped whitespace pretokenization
+    /// with a HashMap cache. Phase 2.7 (2026-07-25, same day) replaced the
+    /// HashMap stand-in with the vendored `ShortPretokenCache` substrate
+    /// (open-addressed + 2 MiB-aligned + prefetched).
     ///
     /// **Bit-identical to [`BpeTokenizerImpl::encode`] + [`Self::encode`] +
     /// [`Self::encode_into`]** for any tokenizer trained by [`BpeTrainer`].
@@ -308,21 +329,27 @@ impl<'tok> FastBpeEncoder<'tok> {
     ///    short (avg ~5 chars).
     /// 2. **Cache-hit win (repeated pretokens)**: repeated words like "the",
     ///    "function", "return" hit the cache after first encoding, skipping
-    ///    the merge loop entirely. The cache is keyed on pretoken bytes.
+    ///    the merge loop entirely.
     ///
-    /// The cache is a plain `HashMap<Vec<u8>, Vec<TokenId>>` for now — the
-    /// vendored [`crate::fast_bpe::ShortPretokenCache`] substrate (open-
-    /// addressed + prefetched + 2 MiB-aligned) is a follow-up optimization
-    /// for when the simple cache's hash overhead becomes the bottleneck.
+    /// # Cache hierarchy (Phase 2.7)
+    ///
+    /// The cache is the vendored [`crate::fast_bpe::ShortPretokenCache`]
+    /// (open-addressed + 2 MiB-aligned + prefetched; one cache line per probe).
+    /// Keys are packed `u128` (≤ 15 pretoken bytes + length tag); hashes use
+    /// hardware CRC32 where available. Values are inline-packed for the
+    /// common case (≤ 2 merged tokens, ~98% of pretokens on OWT):
+    /// `val = (t0 << 32) | t1`, `ext = count`. Longer sequences spill into a
+    /// side [`Vec<Box<[u32]>>`][Self::long_values]; pretokens > 15 bytes
+    /// spill into a side [`HashMap`][Self::long_pretokens] (rare).
     ///
     /// # Allocation note
     ///
-    /// This path is NOT zero-alloc in steady state on novel inputs (cache
-    /// misses allocate the key `Vec<u8>` + value `Vec<TokenId>`). On repeated
-    /// inputs (e.g. encoding the same document many times, or natural
-    /// language with high word repetition) the cache hit rate climbs and
-    /// allocation drops toward zero. For a guaranteed-zero-alloc path use
-    /// [`Self::encode_into`].
+    /// This path is NOT zero-alloc in steady state on novel inputs: cache
+    /// misses allocate the merged-token `Vec<u32>` (then moves it into the
+    /// spill store or drops it after inlining). On repeated inputs (e.g.
+    /// encoding the same document many times, or natural language with high
+    /// word repetition) the cache hit rate climbs and allocation drops toward
+    /// zero. For a guaranteed-zero-alloc path use [`Self::encode_into`].
     pub fn encode_into_pretok(&mut self, text: &str, out: &mut Vec<usize>) {
         out.clear();
         if text.is_empty() {
@@ -341,8 +368,7 @@ impl<'tok> FastBpeEncoder<'tok> {
 
         // Iterate the text classifying each char as whitespace or not. A
         // non-whitespace run accumulates into `pretoken_bytes` (reused
-        // across pretokens — no per-pretoken allocation except the cache
-        // key clone on miss). A whitespace char is emitted directly as a
+        // across pretokens). A whitespace char is emitted directly as a
         // single token (it can never be part of any merge rule, per the
         // trainer's `split_whitespace()` construction).
         //
@@ -358,44 +384,7 @@ impl<'tok> FastBpeEncoder<'tok> {
         macro_rules! flush_run {
             () => {{
                 if !pretoken_bytes.is_empty() {
-                    // Cache lookup. HashMap key is the pretoken bytes.
-                    if let Some(cached) = self.pretoken_cache.get(&pretoken_bytes) {
-                        out.extend(cached.iter().map(|t| t.0 as usize));
-                    } else {
-                        // Cache miss: encode the pretoken using the fast
-                        // merge path. Reuse `symbols` + `scratch`.
-                        // SAFETY: `pretoken_bytes` is valid UTF-8 (we
-                        // appended whole `char`s' UTF-8 encodings).
-                        let s = std::str::from_utf8(&pretoken_bytes)
-                            .expect("pretoken_bytes is built from chars; qed");
-                        self.symbols.clear();
-                        for c in s.chars() {
-                            let cs = c.encode_utf8(&mut buf);
-                            let id = self.tokenizer.vocab_to_id.get(cs).copied().unwrap_or(unk);
-                            self.symbols.push(crate::fast_bpe::TokenId(id as u32));
-                        }
-                        match &self.pair_ranks {
-                            Some(table) => {
-                                crate::fast_bpe::bpe_merge_symbols_by_rank(
-                                    table,
-                                    &mut self.symbols,
-                                    &mut self.scratch,
-                                );
-                            }
-                            None => {
-                                crate::fast_bpe::bpe_merge_symbols_by_rank_with_lookup(
-                                    &|a, b| self.merges.get(&(a, b)).map_or(u32::MAX, |m| m.0),
-                                    &mut self.symbols,
-                                    &mut self.scratch,
-                                );
-                            }
-                        }
-                        // Insert into cache (clones the key + value).
-                        let key = pretoken_bytes.clone();
-                        let val = self.symbols.clone();
-                        self.pretoken_cache.insert(key, val);
-                        out.extend(self.symbols.iter().map(|t| t.0 as usize));
-                    }
+                    self.flush_pretoken(&pretoken_bytes, out, &mut buf, unk);
                     pretoken_bytes.clear();
                 }
             }};
@@ -420,13 +409,178 @@ impl<'tok> FastBpeEncoder<'tok> {
         flush_run!();
     }
 
+    /// Encode one non-whitespace pretoken through the two-tier cache.
+    ///
+    /// Tier 1 (fast path, common case): pretoken ≤ 15 bytes → pack key into
+    /// `u128` → probe [`Self::short_cache`]. On hit, decode the inline value
+    /// (count 1 or 2) or follow the spill index into [`Self::long_values`].
+    /// On miss, encode via the merge loop, then inline-pack (count ≤ 2) or
+    /// spill (count ≥ 3) and insert.
+    ///
+    /// Tier 2 (rare): pretoken > 15 bytes → key doesn't fit `u128` → fall
+    /// back to [`Self::long_pretokens`] (plain `HashMap`).
+    ///
+    /// `buf` is the caller's per-iter scratch for `char::encode_utf8`.
+    #[inline]
+    fn flush_pretoken(
+        &mut self,
+        pretoken_bytes: &[u8],
+        out: &mut Vec<usize>,
+        buf: &mut [u8; 4],
+        unk: usize,
+    ) {
+        // Try the short-cache fast path (pretoken ≤ 15 bytes).
+        if let Some(key) = crate::fast_bpe::pack_pretoken_key(pretoken_bytes) {
+            // Key 0 (empty pretoken) is reserved as the short-cache empty
+            // sentinel — pack_pretoken_key returns Some(0) for the empty
+            // case. We never reach here with an empty `pretoken_bytes`
+            // (flush_run! guards on `!is_empty()`), but the comment documents
+            // why pack_pretoken_key's `Some(0)` return for empty input is
+            // safe to pass straight to the short cache: the encode loop's
+            // `!pretoken_bytes.is_empty()` check routes empty input to the
+            // merge path's early return, not here.
+            let h = crate::fast_bpe::pretoken_key_hash(key);
+            match self.short_cache.get_or_slot(key, h) {
+                Ok((val, ext)) => {
+                    // Hit. Decode inline value.
+                    self.emit_cached(val, ext, out);
+                    return;
+                }
+                Err(slot) => {
+                    // Miss. Encode the pretoken via the merge loop.
+                    let tokens = self.encode_pretoken_tokens(pretoken_bytes, buf, unk);
+                    // Emit first (borrow tokens), then store.
+                    out.extend(tokens.iter().map(|&t| t as usize));
+                    let (val, ext) = Self::pack_value(&tokens, &mut self.long_values);
+                    self.short_cache.insert_at(slot, key, h, val, ext);
+                    return;
+                }
+            }
+        }
+        // Tier 2: long pretoken (> 15 bytes) → HashMap spill.
+        if let Some(cached) = self.long_pretokens.get(pretoken_bytes) {
+            out.extend(cached.iter().map(|&t| t as usize));
+            return;
+        }
+        let tokens = self.encode_pretoken_tokens(pretoken_bytes, buf, unk);
+        out.extend(tokens.iter().map(|&t| t as usize));
+        // Store in the long-pretoken map. Clone the key (pretoken_bytes is
+        // borrowed from the caller's reuse buffer).
+        let key_owned = pretoken_bytes.to_vec();
+        let val_owned: Box<[u32]> = tokens.into_boxed_slice();
+        self.long_pretokens.insert(key_owned, val_owned);
+    }
+
+    /// Encode a single pretoken's bytes through the merge loop, returning
+    /// the merged token IDs. Reuses [`Self::symbols`] + [`Self::scratch`]
+    /// (no per-call allocation after warmup).
+    ///
+    /// # Panics
+    ///
+    /// Panics if `pretoken_bytes` is not valid UTF-8. The pretoken
+    /// accumulation loop builds it from `char::encode_utf8` outputs, so it's
+    /// always valid UTF-8 in practice.
+    #[inline]
+    fn encode_pretoken_tokens(
+        &mut self,
+        pretoken_bytes: &[u8],
+        buf: &mut [u8; 4],
+        unk: usize,
+    ) -> Vec<u32> {
+        // SAFETY: `pretoken_bytes` is built from `char`s' UTF-8 encodings
+        // in the caller's accumulation loop; qed.
+        let s = std::str::from_utf8(pretoken_bytes)
+            .expect("pretoken_bytes is built from chars; qed");
+        self.symbols.clear();
+        for c in s.chars() {
+            let cs = c.encode_utf8(buf);
+            let id = self.tokenizer.vocab_to_id.get(cs).copied().unwrap_or(unk);
+            self.symbols.push(crate::fast_bpe::TokenId(id as u32));
+        }
+        match &self.pair_ranks {
+            Some(table) => {
+                crate::fast_bpe::bpe_merge_symbols_by_rank(
+                    table,
+                    &mut self.symbols,
+                    &mut self.scratch,
+                );
+            }
+            None => {
+                crate::fast_bpe::bpe_merge_symbols_by_rank_with_lookup(
+                    &|a, b| self.merges.get(&(a, b)).map_or(u32::MAX, |m| m.0),
+                    &mut self.symbols,
+                    &mut self.scratch,
+                );
+            }
+        }
+        self.symbols.iter().map(|t| t.0).collect()
+    }
+
+    /// Pack merged tokens into the (val, ext) inline encoding, spilling to
+    /// `long_values` when the sequence doesn't fit inline (count ≥ 3).
+    ///
+    /// # Encoding
+    ///
+    /// - `count = 1`: `val = t0 as u64`, `ext = 1`.
+    /// - `count = 2`: `val = (t0 << 32) | t1`, `ext = 2`.
+    /// - `count ≥ 3`: `val = u64::MAX` (sentinel), `ext = index` into
+    ///   `long_values`. The full sequence is copied into `long_values`.
+    ///
+    /// `ext` values 1 and 2 (the inline counts) never collide with spill
+    /// indices because we always allocate spill indices ≥ 0 and disambiguate
+    /// via `val == u64::MAX`. (A count-1 inline value with `t0 = u32::MAX`
+    /// produces `val = u32::MAX as u64`, not `u64::MAX`, so no collision.)
+    #[inline]
+    fn pack_value(tokens: &[u32], long_values: &mut Vec<Box<[u32]>>) -> (u64, u64) {
+        match tokens.len() {
+            1 => (tokens[0] as u64, 1),
+            2 => (((tokens[0] as u64) << 32) | tokens[1] as u64, 2),
+            _ => {
+                let idx = long_values.len();
+                long_values.push(tokens.to_vec().into_boxed_slice());
+                (u64::MAX, idx as u64)
+            }
+        }
+    }
+
+    /// Emit a cached (val, ext) pair into `out`. The inverse of
+    /// [`Self::pack_value`].
+    ///
+    /// Disambiguates the spill sentinel FIRST: `val == u64::MAX` means
+    /// "spilled, `ext` is the index into `long_values`", regardless of
+    /// `ext`'s value. Without this check, a spill at index 1 or 2 would
+    /// collide with the inline-count encoding (`ext == 1` or `ext == 2`).
+    #[inline]
+    fn emit_cached(&self, val: u64, ext: u64, out: &mut Vec<usize>) {
+        if val == u64::MAX {
+            // Spill: ext is the index into long_values.
+            let idx = ext as usize;
+            let tokens = &self.long_values[idx];
+            out.extend(tokens.iter().map(|&t| t as usize));
+            return;
+        }
+        match ext {
+            1 => out.push(val as u32 as usize),
+            2 => {
+                out.push((val >> 32) as u32 as usize);
+                out.push(val as u32 as usize);
+            }
+            _ => unreachable!(
+                "ext is 1, 2, or spill-flagged via val==u64::MAX; got val={val:#x} ext={ext}"
+            ),
+        }
+    }
+
     /// Diagnostic: number of entries in the pretoken cache (Issue 191 Phase 2.6).
     /// After encoding a natural-language corpus this should grow toward the
     /// unique-word count of the corpus. The hit rate is the perf signal: high
     /// hit rate = the pretokenized path is paying off.
+    ///
+    /// Counts both the short-cache entries (≤ 15-byte pretokens) and the
+    /// long-pretoken spill-map entries (> 15-byte pretokens, rare).
     #[doc(hidden)]
     pub fn pretoken_cache_len(&self) -> usize {
-        self.pretoken_cache.len()
+        self.short_cache.len() + self.long_pretokens.len()
     }
 
     /// Diagnostic: current capacity of the internal `symbols` scratch buffer.

@@ -23,23 +23,24 @@
 //! # What's NOT here (deferred to a follow-up issue if pretokenization lands)
 //!
 //! 3. **Pretoken cache hierarchy** — `ShortPretokenCache` is shipped in
-//!    `pretoken_cache.rs` but not wired into `encode_fast`. The katgpt
-//!    `BpeTokenizer` does whole-text BPE (no pretokenization); the cache
-//!    only pays off when the same pretoken repeats across calls. Kept for
-//!    the day someone adds a GPT-2 regex pretokenizer here or in a sibling
-//!    crate. (Research 456 §2.2 names this as the genuinely novel technique;
-//!    it stays vendored so the cross-cutting port to Engram's
-//!    `ZipfianCacheHierarchy` is a one-import change when that lands.)
+//!    `pretoken_cache.rs` AND WIRED (Phase 2.7, 2026-07-25) into
+//!    `FastBpeEncoder::flush_pretoken` (the per-pretoken path of
+//!    `encode_into_pretok`). The hot path uses `get_or_slot` + `insert_at`;
+//!    the chunk-level `ProbeView` + `prefetch_l2` + `probe_pair` prefetch API
+//!    remains unwired — it's the future SIMD-batched pretokenization pipeline
+//!    that would stage hundreds of lookups ahead of demand. (Research 456 §2.2
+//!    names the prefetch path as the genuinely novel technique; it stays
+//!    vendored so the cross-cutting port to Engram's `ZipfianCacheHierarchy`
+//!    is a one-import change when that lands.)
 //!
-//!    **UPDATE (Phase 2.6, 2026-07-25):** A SIMPLER pretoken cache (plain
-//!    `HashMap<Vec<u8>, Vec<TokenId>>`) IS now wired via
-//!    `FastBpeEncoder::encode_into_pretok` in `crate::bpe`. It exploits the
-//!    trainer's `split_whitespace()` boundary to pretokenize WITHOUT changing
-//!    BPE semantics (bit-identical to `encode_into`). Measured: 2.71× speedup
-//!    on natural language. The `ShortPretokenCache` substrate below remains
-//!    unwired — it's the follow-up optimization (open-addressed + prefetched +
-//!    2 MiB-aligned) for when the HashMap stand-in's hash overhead becomes the
-//!    bottleneck. See `.benchmarks/191_fast_bpe_goat.md` §G5.
+//!    **History:** Phase 2.6 (2026-07-25) first wired whitespace
+//!    pretokenization with a plain `HashMap<Vec<u8>, Vec<TokenId>>` stand-in
+//!    (bit-identical correctness, 2.71× speedup on 381-char natural
+//!    language). Phase 2.7 (2026-07-25) replaced the HashMap with the
+//!    vendored `ShortPretokenCache` substrate after the corpus-scale
+//!    benchmark showed the HashMap's hash overhead was the bottleneck
+//!    (gain plateaued at 6.38× at 1M chars with 100% cache coverage).
+//!    See `.benchmarks/191_fast_bpe_goat.md` §G5 (Phase 2.6) + §G6 (Phase 2.7).
 //! 4. **SIMD pretokenization** — out of scope. The upstream `pretokenize/`
 //!    module is what needs nightly `portable_simd`. The katgpt-tokenizer
 //!    is a modelless inference-time encoder; pretokenization is the
@@ -74,3 +75,9 @@ pub use pair_rank_table::{MergeScratch, SHORT_MERGE_MAX, bpe_merge_symbols_short
 #[cfg(target_arch = "aarch64")]
 #[allow(unused_imports)] // substrate for future pretokenization work
 pub use pair_rank_table::bpe_merge_symbols_short_neon;
+
+// Pretoken-cache substrate (Issue 191 Phase 2.7 — wired into
+// `FastBpeEncoder::flush_pretoken`). Re-exported `pub(crate)` so `bpe.rs`
+// can build the two-tier (short inline + long spill) cache.
+pub(crate) use pretoken_cache::ShortPretokenCache;
+pub(crate) use pretokenize_keys::{pack_pretoken_key, pretoken_key_hash};
