@@ -98,7 +98,10 @@ pub use procrustes_adapter::ProcrustesAdapter;
 #[cfg(feature = "canon_subspace")]
 pub mod subspace_adapter;
 #[cfg(feature = "canon_subspace")]
-pub use subspace_adapter::{JointSvdFitScratch, SubspaceAdapter, SubspaceFit, fit_joint_svd_pair};
+pub use subspace_adapter::{
+    JointSvdFitScratch, SubspaceAdapter, SubspaceFit, fit_joint_svd_pair,
+    fit_joint_svd_pair_with_cfg,
+};
 
 /// Lottery-ticket mask application (modelless apply; discovery in riir-train).
 #[cfg(feature = "canon_mask")]

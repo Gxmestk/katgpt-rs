@@ -71,12 +71,56 @@ pub struct SubspaceFit {
     pub v_b: Vec<f32>,
     /// Row-major `k × k`. Orthogonal rotation aligning A's subspace to B's.
     pub rotation: Vec<f32>,
+    /// Top-`k` singular values of the joint matrix `M = [A | B]`, descending.
+    /// Carried for diagnostics (energy spectrum, sharedness ratio ||V_A||/||V_B||).
+    /// Empty if the fit was constructed via [`SubspaceFit::from_parts`] without
+    /// supplying them; otherwise length == `k`.
+    pub singular_values: Vec<f32>,
     /// Model-A latent dim.
     pub d_a: usize,
     /// Model-B latent dim.
     pub d_b: usize,
     /// Subspace dim (number of joint SVD components kept).
     pub k: usize,
+}
+
+impl SubspaceFit {
+    /// Reference to the top-k singular values (descending). Empty if the fit
+    /// was constructed without them.
+    #[inline]
+    pub fn singular_values(&self) -> &[f32] {
+        &self.singular_values
+    }
+
+    /// Per-direction sharedness ratio `||V_A[:,j]|| / ||V_B[:,j]||` for the
+    /// `j`-th basis vector. Returns `f32::INFINITY` if `||V_B[:,j]||` is
+    /// near zero. Useful diagnostic: a ratio near 1.0 means both models
+    /// contribute roughly equal energy to this direction; a large ratio
+    /// means model A dominates it.
+    ///
+    /// Out-of-range `j` panics in debug, returns 1.0 in release.
+    pub fn sharedness_ratio(&self, j: usize) -> f32 {
+        if j >= self.k {
+            debug_assert!(j < self.k, "sharedness_ratio: j={j} >= k={}", self.k);
+            return 1.0;
+        }
+        let v_a_col = &self.v_a[j * self.d_a..(j + 1) * self.d_a];
+        let v_b_col = &self.v_b[j * self.d_b..(j + 1) * self.d_b];
+        let na: f32 = v_a_col.iter().map(|x| x * x).sum::<f32>().sqrt();
+        let nb: f32 = v_b_col.iter().map(|x| x * x).sum::<f32>().sqrt();
+        if nb > 1e-12 {
+            na / nb
+        } else {
+            f32::INFINITY
+        }
+    }
+
+    /// Total energy across the top-k singular values: sum(σ²). Useful as the
+    /// denominator for "energy fraction in direction j" = σ[j]² / total.
+    /// Returns 0.0 if `singular_values` is empty.
+    pub fn total_energy(&self) -> f32 {
+        self.singular_values.iter().map(|s| s * s).sum()
+    }
 }
 
 /// Joint-SVD fit scratch — owns the SVD + Procrustes workspaces.
@@ -215,19 +259,7 @@ pub fn fit_joint_svd_pair(
     // 5. Fit Procrustes R (k × k) aligning a_proj → b_proj.
     let mut rotation = vec![0.0f32; k * k];
     scratch.procrustes_scratch = ProcrustesScratch::new(n, k);
-    let cfg = ProcrustesConfig {
-        // We want to align the two models' subspace frames; do NOT center
-        // (the canonical direction lives at the origin — centering would
-        // subtract each model's centroid and lose the location information
-        // we need for downstream discrimination).
-        center: false,
-        special_orthogonal: false,
-        compute_residual: false,
-        compute_det: false,
-        // min_anchors = 0 → runtime falls back to 2*k. With n anchors and
-        // k-dim subspace, we need n >= 2*k for the fit to be determined.
-        min_anchors: 0,
-    };
+    let cfg = default_procrustes_cfg();
     let _ = orthogonal_procrustes(
         &scratch.a_proj_buf,
         &scratch.b_proj_buf,
@@ -238,10 +270,167 @@ pub fn fit_joint_svd_pair(
         &cfg,
     );
 
+    // 6. Capture top-k singular values for diagnostics (energy spectrum,
+    //    sharedness ratios). Cheap — already computed by the SVD.
+    let mut singular_values = vec![0.0f32; k];
+    for (j, sv) in singular_values.iter_mut().enumerate().take(k) {
+        *sv = scratch.svd_result.singular_value(j);
+    }
+
     SubspaceFit {
         v_a,
         v_b,
         rotation,
+        singular_values,
+        d_a,
+        d_b,
+        k,
+    }
+}
+
+/// Default Procrustes config used by [`fit_joint_svd_pair`]. Exposed as a
+/// private helper so [`fit_joint_svd_pair_with_cfg`] can document what the
+/// default is. We do NOT center: the canonical direction lives at the origin
+/// (centering would subtract each model's centroid and lose the location
+/// information needed for downstream discrimination).
+///
+/// **Important parity note:** this differs from `ProcrustesConfig::default()`,
+/// which has `center: true`. The P1 harness (Bench 423) used
+/// `ProcrustesConfig::default()` (with `min_anchors: 1`); harnesses that need
+/// bit-identical parity with Bench 423 should call
+/// [`fit_joint_svd_pair_with_cfg`] with `ProcrustesConfig::default()`.
+fn default_procrustes_cfg() -> ProcrustesConfig {
+    ProcrustesConfig {
+        center: false,
+        special_orthogonal: false,
+        compute_residual: false,
+        compute_det: false,
+        // min_anchors = 0 → runtime falls back to 2*k. With n anchors and
+        // k-dim subspace, we need n >= 2*k for the fit to be determined.
+        min_anchors: 0,
+    }
+}
+
+/// Fit a joint-SVD subspace + Procrustes rotation with a caller-supplied
+/// [`ProcrustesConfig`].
+///
+/// This is the parity-preserving variant of [`fit_joint_svd_pair`] for
+/// harnesses that need to control the Procrustes step (centering on/off,
+/// residual computation, `min_anchors` floor). The SVD step is identical;
+/// only the final Procrustes rotation uses `procrustes_cfg` instead of the
+/// crate default.
+///
+/// # When to use this vs [`fit_joint_svd_pair`]
+///
+/// - Use [`fit_joint_svd_pair`] for the production path (adapter
+///   construction). The crate default (`center: false`) is correct for the
+///   canonical-intent use case.
+/// - Use `fit_joint_svd_pair_with_cfg` when reproducing a prior benchmark
+///   that used a different Procrustes config (e.g. Bench 423 used
+///   `ProcrustesConfig::default()` with `center: true`).
+///
+/// See [`fit_joint_svd_pair`] for the algorithm + panic contract.
+#[allow(clippy::too_many_arguments)] // numerics API: individual scalar args are clearer than a config struct
+pub fn fit_joint_svd_pair_with_cfg(
+    a: &[f32],
+    b: &[f32],
+    n: usize,
+    d_a: usize,
+    d_b: usize,
+    k: usize,
+    scratch: &mut JointSvdFitScratch,
+    procrustes_cfg: &ProcrustesConfig,
+) -> SubspaceFit {
+    assert_eq!(a.len(), n * d_a, "a.len() != n * d_a");
+    assert_eq!(b.len(), n * d_b, "b.len() != n * d_b");
+    assert!(
+        k <= n.min(d_a).min(d_b),
+        "k ({k}) must be <= min(n, d_a, d_b) = {}",
+        n.min(d_a).min(d_b)
+    );
+
+    let total_d = d_a + d_b;
+
+    // 1. Build M^T directly (column-major M[i][j] → mt[j][i]).
+    scratch.mt_buf.clear();
+    scratch.mt_buf.reserve(total_d * n);
+    for j in 0..total_d {
+        for i in 0..n {
+            let m_ij = if j < d_a {
+                a[i * d_a + j]
+            } else {
+                b[i * d_b + (j - d_a)]
+            };
+            scratch.mt_buf.push(m_ij);
+        }
+    }
+
+    // 2. SVD M^T → left singular vectors (length total_d).
+    scratch.svd_result = SvdResultScratch::with_capacity(total_d, n);
+    scratch.svd_work = SvdScratch::with_capacity(n, total_d);
+    thin_svd_into(&scratch.mt_buf, total_d, n, &mut scratch.svd_result, &mut scratch.svd_work);
+
+    // 3. Extract top-k left singular vectors, partition into V_A + V_B.
+    let mut v_a = vec![0.0f32; k * d_a];
+    let mut v_b = vec![0.0f32; k * d_b];
+    for j in 0..k {
+        let v_full = scratch.svd_result.left_singular_vector(j);
+        for r in 0..d_a {
+            v_a[j * d_a + r] = v_full[r];
+        }
+        for r in 0..d_b {
+            v_b[j * d_b + r] = v_full[d_a + r];
+        }
+    }
+
+    // 4. Project anchors into the shared subspace.
+    scratch.a_proj_buf.clear();
+    scratch.a_proj_buf.reserve(n * k);
+    scratch.b_proj_buf.clear();
+    scratch.b_proj_buf.reserve(n * k);
+    for i in 0..n {
+        for j in 0..k {
+            let mut sa = 0.0f32;
+            let mut sb = 0.0f32;
+            let a_row = &a[i * d_a..(i + 1) * d_a];
+            let b_row = &b[i * d_b..(i + 1) * d_b];
+            let v_a_col = &v_a[j * d_a..(j + 1) * d_a];
+            let v_b_col = &v_b[j * d_b..(j + 1) * d_b];
+            for (ar, var) in a_row.iter().zip(v_a_col.iter()) {
+                sa += ar * var;
+            }
+            for (br, vbr) in b_row.iter().zip(v_b_col.iter()) {
+                sb += br * vbr;
+            }
+            scratch.a_proj_buf.push(sa);
+            scratch.b_proj_buf.push(sb);
+        }
+    }
+
+    // 5. Fit Procrustes with the caller-supplied config.
+    let mut rotation = vec![0.0f32; k * k];
+    scratch.procrustes_scratch = ProcrustesScratch::new(n, k);
+    let _ = orthogonal_procrustes(
+        &scratch.a_proj_buf,
+        &scratch.b_proj_buf,
+        n,
+        k,
+        &mut rotation,
+        &mut scratch.procrustes_scratch,
+        procrustes_cfg,
+    );
+
+    // 6. Capture top-k singular values for diagnostics.
+    let mut singular_values = vec![0.0f32; k];
+    for (j, sv) in singular_values.iter_mut().enumerate().take(k) {
+        *sv = scratch.svd_result.singular_value(j);
+    }
+
+    SubspaceFit {
+        v_a,
+        v_b,
+        rotation,
+        singular_values,
         d_a,
         d_b,
         k,
@@ -534,5 +723,175 @@ mod tests {
             fit_joint_svd_pair(&a, &b, 2, 2, 2, 4, &mut s) // k=4 > min(2,2,2)=2
         });
         assert!(result.is_err(), "k > min(n, d_a, d_b) must panic");
+    }
+
+    /// `singular_values` is populated by `fit_joint_svd_pair` (length k) and is
+    /// sorted descending (SVD contract). This is the diagnostic the P1 harness
+    /// uses for the energy spectrum printout.
+    #[test]
+    fn singular_values_populated_and_sorted() {
+        let (a, b) = planted_pair(8, 4, 3, 2, 0xABC0_FFFE);
+        let mut s = JointSvdFitScratch::with_capacity(7, 8, 2);
+        let fit = fit_joint_svd_pair(&a, &b, 8, 4, 3, 2, &mut s);
+        let sv = fit.singular_values();
+        assert_eq!(sv.len(), 2, "singular_values length should == k");
+        for x in sv {
+            assert!(x.is_finite(), "singular value must be finite");
+            assert!(*x >= 0.0, "singular value must be non-negative");
+        }
+        assert!(sv[0] >= sv[1], "singular values must be sorted descending");
+    }
+
+    /// `sharedness_ratio(j)` matches the hand-computed `||V_A[:,j]|| / ||V_B[:,j]||`.
+    /// This is the diagnostic the P1 harness uses to detect model dominance
+    /// (one model contributing all the energy in a direction).
+    #[test]
+    fn sharedness_ratio_matches_manual() {
+        let (a, b) = planted_pair(8, 4, 3, 2, 0xABC0_FFFE);
+        let mut s = JointSvdFitScratch::with_capacity(7, 8, 2);
+        let fit = fit_joint_svd_pair(&a, &b, 8, 4, 3, 2, &mut s);
+        for j in 0..2 {
+            let v_a_col = &fit.v_a[j * fit.d_a..(j + 1) * fit.d_a];
+            let v_b_col = &fit.v_b[j * fit.d_b..(j + 1) * fit.d_b];
+            let na: f32 = v_a_col.iter().map(|x| x * x).sum::<f32>().sqrt();
+            let nb: f32 = v_b_col.iter().map(|x| x * x).sum::<f32>().sqrt();
+            let expected = if nb > 1e-12 { na / nb } else { f32::INFINITY };
+            let actual = fit.sharedness_ratio(j);
+            assert!(
+                (actual - expected).abs() < 1e-5,
+                "sharedness_ratio({j}): expected {expected}, got {actual}"
+            );
+        }
+    }
+
+    /// `total_energy()` returns sum(σ²) — the denominator for "energy fraction
+    /// in direction j" = σ[j]² / total.
+    #[test]
+    fn total_energy_is_sum_of_squares() {
+        let (a, b) = planted_pair(8, 4, 3, 2, 0xABC0_FFFE);
+        let mut s = JointSvdFitScratch::with_capacity(7, 8, 2);
+        let fit = fit_joint_svd_pair(&a, &b, 8, 4, 3, 2, &mut s);
+        let expected: f32 = fit.singular_values().iter().map(|x| x * x).sum();
+        assert!((fit.total_energy() - expected).abs() < 1e-5);
+    }
+
+    /// `fit_joint_svd_pair_with_cfg` with `ProcrustesConfig::default()` (center=true)
+    /// produces a DIFFERENT rotation than `fit_joint_svd_pair` (center=false) when
+    /// the projected anchors have non-zero column means. This is the parity
+    /// contract: harnesses that need Bench 423 numbers use the _with_cfg variant.
+    #[test]
+    fn with_cfg_can_differ_from_default_on_noncentered_anchors() {
+        // Plant anchors with a non-zero mean offset so centering matters.
+        // A + offset, B + offset*2 → column means differ from zero.
+        let (a_base, b_base) = planted_pair(8, 4, 3, 2, 0xFEED_FACE);
+        let a: Vec<f32> = a_base.iter().map(|x| x + 1.5).collect();
+        let b: Vec<f32> = b_base.iter().map(|x| x + 3.0).collect();
+
+        let mut s1 = JointSvdFitScratch::with_capacity(7, 8, 2);
+        let fit_no_center = fit_joint_svd_pair(&a, &b, 8, 4, 3, 2, &mut s1);
+
+        let mut s2 = JointSvdFitScratch::with_capacity(7, 8, 2);
+        let fit_center = fit_joint_svd_pair_with_cfg(
+            &a,
+            &b,
+            8,
+            4,
+            3,
+            2,
+            &mut s2,
+            &ProcrustesConfig::default(), // center=true
+        );
+
+        // The V_A/V_B/singular_values are IDENTICAL (SVD doesn't care about
+        // Procrustes config). Only the rotation may differ.
+        for (x, y) in fit_no_center.v_a.iter().zip(fit_center.v_a.iter()) {
+            assert!((x - y).abs() < 1e-6, "V_A must not depend on Procrustes cfg");
+        }
+        for (x, y) in fit_no_center.singular_values.iter().zip(fit_center.singular_values.iter()) {
+            assert!((x - y).abs() < 1e-6, "singular values must not depend on Procrustes cfg");
+        }
+
+        // With the non-zero offset, centering SHOULD change the rotation.
+        // (We don't assert they're always different — that depends on the
+        // specific data. But we verify the rotations are at least WELL-FORMED.)
+        for x in fit_center.rotation.iter() {
+            assert!(x.is_finite(), "centered rotation must be finite");
+        }
+        for x in fit_no_center.rotation.iter() {
+            assert!(x.is_finite(), "non-centered rotation must be finite");
+        }
+        // Both rotations should be k×k.
+        assert_eq!(fit_center.rotation.len(), 4);
+        assert_eq!(fit_no_center.rotation.len(), 4);
+    }
+
+    /// `sharedness_ratio` on out-of-range `j` returns 1.0 in release + panics in debug.
+    #[test]
+    fn sharedness_ratio_out_of_range_returns_one() {
+        let (a, b) = planted_pair(8, 4, 3, 2, 0xABC0_FFFE);
+        let mut s = JointSvdFitScratch::with_capacity(7, 8, 2);
+        let fit = fit_joint_svd_pair(&a, &b, 8, 4, 3, 2, &mut s);
+        // j=5 is out of range (k=2). Release returns 1.0; debug asserts.
+        #[cfg(not(debug_assertions))]
+        {
+            assert_eq!(fit.sharedness_ratio(5), 1.0);
+        }
+        #[cfg(debug_assertions)]
+        {
+            let r = std::panic::catch_unwind(|| fit.sharedness_ratio(5));
+            assert!(r.is_err(), "debug_assert should panic on out-of-range j");
+        }
+    }
+
+    /// Planted shared-subspace pair (deterministic, low noise).
+    /// Used by multiple tests above for the singular_values / sharedness /
+    /// total_energy / with_cfg diagnostics.
+    fn planted_pair(
+        n: usize,
+        d_a: usize,
+        d_b: usize,
+        k: usize,
+        seed: u32,
+    ) -> (Vec<f32>, Vec<f32>) {
+        // Minimal xorshift32 PRNG.
+        let mut state = if seed == 0 { 0xDEAD_BEEF } else { seed };
+        let mut next_f32 = || {
+            state ^= state << 13;
+            state ^= state >> 17;
+            state ^= state << 5;
+            (state as f32 / u32::MAX as f32) * 2.0 - 1.0
+        };
+
+        // Random bases.
+        let mut a_basis = vec![0.0f32; k * d_a];
+        let mut b_basis = vec![0.0f32; k * d_b];
+        for x in a_basis.iter_mut() {
+            *x = next_f32();
+        }
+        for x in b_basis.iter_mut() {
+            *x = next_f32();
+        }
+
+        let mut a = vec![0.0f32; n * d_a];
+        let mut b = vec![0.0f32; n * d_b];
+        for i in 0..n {
+            // Random k-dim coords (shared signal).
+            let coords: Vec<f32> = (0..k).map(|_| next_f32()).collect();
+            for r in 0..d_a {
+                let mut acc = 0.0f32;
+                for j in 0..k {
+                    acc += coords[j] * a_basis[j * d_a + r];
+                }
+                a[i * d_a + r] = acc + 0.1 * next_f32();
+            }
+            for r in 0..d_b {
+                let mut acc = 0.0f32;
+                for j in 0..k {
+                    acc += coords[j] * b_basis[j * d_b + r];
+                }
+                b[i * d_b + r] = acc + 0.1 * next_f32();
+            }
+        }
+        (a, b)
     }
 }
