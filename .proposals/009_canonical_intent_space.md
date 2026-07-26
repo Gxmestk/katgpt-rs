@@ -193,7 +193,8 @@ Per "Report the Floor" rule (Research 322), G1/G6 floor is **good system prompt*
 ### P3 — Rust-style canonical direction + G6 (the real test)
 - [x] T4.1 Construct `d_Rust_idiom` canonical direction (modelless centroid + difference-of-means, Bench 424)
 - [ ] T4.2 G6a: measure cross-arch discrimination of canonical direction on Rust vs non-Rust (Bench 424 — **FAIL for centroid, PARTIAL for d_diff**)
-- [ ] T4.2a Intermediate-layer probe (layers 6/12/18 of 24-26) — highest-value next experiment per Git Re-Basin
+- [ ] T4.2a Intermediate-layer probe (layers 6/12/18 of 24-26) — highest-value next experiment per Git Re-Basin. **P3b RAN 2026-07-26 (Bench 425): Git Re-Basin hypothesis CONTRADICTED — layer 0 discriminates best (+0.19 Python margin), not middle layers (+0.06-0.14); monotonic decrease layer 0→25. The centroid captures surface/lexical features, not semantic Rust-idiom-ness. Cross-arch layer-0 probe still worth running (would need `forward_llama_trace` substrate).**
+- [ ] T4.2a.1 Cross-arch layer-0 probe — add `forward_llama_trace` to riir-engine (~150 LOC mirroring Gemma variant) and re-run P3 G6a at layer 0 for both models
 - [ ] T4.2b Length-normalized projections (address the JS token-count confound)
 - [ ] T4.2c Larger contrastive corpus for d_diff (30-50 Python prompts vs current 10)
 - [ ] T4.3 G6b: steer Gemma and MiniCPM via the same canonical direction; measure Rust eval delta vs sysprompt floor (REQUIRES `forward_llama_with_embedding` substrate in riir-engine — deferred until G6a passes)
