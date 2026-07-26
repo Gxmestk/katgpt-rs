@@ -622,6 +622,17 @@ impl BpeTrainer {
     /// tokenization once and applies only the new merge — Issue 192 fixed
     /// the prior O(N² · W · T) implementation that re-applied all prior
     /// merges from scratch on every round.
+    ///
+    /// # ID-indexed training loop
+    ///
+    /// The hot path operates on `Vec<Vec<usize>>` (token IDs), not
+    /// `Vec<Vec<String>>`. Pair counting and merge application are pure
+    /// integer arithmetic — no `String` allocation or `clone()` per pair.
+    /// `String`s are only materialized for the final `MergeRule` table and
+    /// `vocab_to_id` map (one allocation per learned merge + per unique
+    /// char, not per pair-per-round). On the Issue 192 perf-smoke corpus
+    /// (~4.3 KB / 512 merges), this cuts allocations in the inner loops
+    /// from O(N·W·T·L) (L = avg string length) to O(N·W·T) integers copied.
     pub fn train(corpus: &str, vocab_size: usize) -> BpeTokenizer {
         // Pre-allocate: 4 special tokens + up to 256 unique byte-chars + merges.
         let cap = 4usize.saturating_add(vocab_size).min(corpus.len() + 4);
@@ -648,26 +659,41 @@ impl BpeTrainer {
         let mut merges: Vec<MergeRule> = Vec::new();
         let num_merges = vocab_size.saturating_sub(id_to_vocab.len());
 
-        // Memoized per-word tokenization state. Initialized to char-level tokens
-        // once; each merge round applies only the NEW merge in-place. This is the
-        // Issue 192 fix — the previous implementation called `apply_merges(word,
-        // &merges)` on every round, re-applying ALL prior merges from scratch
-        // (O(N²) total). See bpe.rs git history for the prior implementation.
-        let mut words_tok: Vec<Vec<String>> = corpus
+        // Memoized per-word tokenization state — ID-indexed (NOT String).
+        // Each token is the `id_to_vocab` index of the char/subword. Pair
+        // counting and merge application become integer arithmetic — no
+        // String clone() per pair, no String allocation in the merge loop.
+        // This is the Issue 192 fix (each round applies only the NEW merge
+        // in-place) layered on top of the ID-indexing refactor.
+        let mut words_tok: Vec<Vec<usize>> = corpus
             .split_whitespace()
-            .map(|w| w.chars().map(|c| c.to_string()).collect())
+            .map(|w| {
+                w.chars()
+                    .map(|c| {
+                        // Char tokens were inserted above; lookup never misses.
+                        // Inline the buffer to avoid the per-lookup alloc.
+                        let mut buf = [0u8; 4];
+                        let s = c.encode_utf8(&mut buf);
+                        vocab_to_id[s]
+                    })
+                    .collect()
+            })
             .collect();
 
         // Per-merge scratch buffers (reused across rounds — G4 alloc discipline).
-        let mut pair_counts: HashMap<(String, String), usize> = HashMap::new();
-        let mut scratch: Vec<String> = Vec::new();
+        let mut pair_counts: HashMap<(usize, usize), usize> = HashMap::new();
+        let mut scratch: Vec<usize> = Vec::new();
 
         for _ in 0..num_merges {
             // Count all adjacent pairs in the current memoized state.
+            // IDs are `usize` (Copy) — zero allocation per pair.
             pair_counts.clear();
             for word in &words_tok {
-                for i in 0..word.len().saturating_sub(1) {
-                    let pair = (word[i].clone(), word[i + 1].clone());
+                if word.len() < 2 {
+                    continue;
+                }
+                for i in 0..word.len() - 1 {
+                    let pair = (word[i], word[i + 1]);
                     *pair_counts.entry(pair).or_insert(0) += 1;
                 }
             }
@@ -678,36 +704,37 @@ impl BpeTrainer {
 
             // Pick the winning pair with an EXPLICIT tie-break rule:
             // highest count wins; on tie, lexicographically smallest
-            // `(left, right)` wins. This is deterministic regardless of
-            // HashMap iteration order (Issue 192).
+            // `(left_str, right_str)` wins. This is deterministic regardless
+            // of HashMap iteration order (Issue 192).
             //
-            // `min_by_key` with `(count reversed, pair normal)` gives us
-            // max-count + min-pair-on-tie in one pass. The `Reverse`
-            // wrapper inverts count so the highest count becomes the
-            // `min`, while the pair itself remains lexicographically
-            // ascending — exactly the desired tie-break.
-            let best = pair_counts.iter().min_by_key(|((l, r), c)| {
-                (std::cmp::Reverse(*c), l.as_str(), r.as_str())
+            // IDs map 1:1 to vocab strings (id_to_vocab[id]); since IDs are
+            // assigned in insertion order, two tokens that share an ID always
+            // share a string — comparing by string recovers lexicographic
+            // order. (We can't compare by ID directly: ID order is insertion
+            // order, not lexicographic order.)
+            let best = pair_counts.iter().min_by_key(|&((l_id, r_id), c)| {
+                let l_str = id_to_vocab.get(*l_id).map(String::as_str).unwrap_or("");
+                let r_str = id_to_vocab.get(*r_id).map(String::as_str).unwrap_or("");
+                (std::cmp::Reverse(*c), l_str, r_str)
             });
-            let ((left, right), &count) =
+            let (&(left_id, right_id), &count) =
                 best.expect("pair_counts non-empty checked above");
 
             if count < 2 {
                 break; // Stop if no pair appears more than once
             }
 
-            let left = left.clone();
-            let right = right.clone();
+            // Resolve merged token string + add to vocabulary (one String
+            // allocation per learned merge — NOT per pair-per-round).
+            let left = id_to_vocab[left_id].clone();
+            let right = id_to_vocab[right_id].clone();
             let merged = format!("{left}{right}");
 
-            // Add merged token to vocabulary via entry API (single hash lookup
-            // instead of contains_key + insert).
-            let id = *vocab_to_id.entry(merged.clone()).or_insert_with(|| {
+            let merged_id = *vocab_to_id.entry(merged.clone()).or_insert_with(|| {
                 let id = id_to_vocab.len();
                 id_to_vocab.push(merged.clone());
                 id
             });
-            let _ = id; // id is already tracked via the merges table below
 
             merges.push(MergeRule {
                 left: left.clone(),
@@ -716,8 +743,7 @@ impl BpeTrainer {
             });
 
             // Apply ONLY this merge in-place to each word's tokenization.
-            // This replaces the old `apply_merges(word, &all_merges)` full
-            // re-application (Issue 192).
+            // Pure integer writes — no String clone() per token.
             for word in &mut words_tok {
                 if word.len() < 2 {
                     continue;
@@ -725,11 +751,11 @@ impl BpeTrainer {
                 scratch.clear();
                 let mut i = 0;
                 while i < word.len() {
-                    if i + 1 < word.len() && word[i] == left && word[i + 1] == right {
-                        scratch.push(merged.clone());
+                    if i + 1 < word.len() && word[i] == left_id && word[i + 1] == right_id {
+                        scratch.push(merged_id);
                         i += 2;
                     } else {
-                        scratch.push(word[i].clone());
+                        scratch.push(word[i]);
                         i += 1;
                     }
                 }
