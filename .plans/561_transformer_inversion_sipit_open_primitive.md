@@ -224,3 +224,38 @@ There is no `simd_dot_f32` / `forward_looped` / CNA-style modelless decompositio
 - The "validate CORE contrastive reflection integration" framing mixed up the two — fabricated a primitive (Δ_CORE) that's actually CNA, then attributed it to a paper (CORE) that does something else entirely.
 
 **Lesson:** A confident-sounding framing with file-path-implying specificity is not the same as a real primitive. Always grep before agreeing to "validate" an integration target. (Same anti-pattern as the initial PASS verdict — accepting a confident framing without verification. I made this mistake twice in this session — once on the PASS tier, once on "t-pass doesn't exist".)
+
+## Verified answer to the "is CNA wired into the tick loop?" question (2026-07-26)
+
+The plan above left open: *"the question is just whether riir-ai's tick loop currently consumes CNA (separate grep)."* That grep is now done.
+
+**Answer: CNA itself is NOT consumed in riir-ai — but that's because the premise ("CNA is the right primitive for NPC cognition") is a category error. The right primitive for NPC cognition contrastive direction mining is MAG, and MAG IS already wired in.**
+
+### Verified facts (grep across all 7 repos)
+
+| Primitive | Math | Consumers in riir-ai? |
+|---|---|---|
+| **CNA** (Plan 087, default-on) | `δ_j = mean(a_j(y⁺)) - mean(a_j(y⁻))` per **MLP neuron** | ❌ Zero. Only consumers are 3 katgpt-rs example harnesses (`bomber`/`go`/`fft` ContrastivePairProviders) + 1 bench. `ForwardContext.cna_modulator` field is never populated by any external caller. |
+| **MAG** (Plan 418 / Plan 461) | Mean-difference direction mining ("identical math to EmotionDirections" per `katgpt-core/src/mag/mod.rs` L110) | ✅ **YES** — `riir-engine/src/cgsp_runtime/mag_bridge.rs` wires MAG's `transfer_score` onto the CGSP runtime as a curiosity-target source. End-to-end tested (`mag_target_admits_candidates_in_cgsp_loop`, `mag_directed_curiosity_steers_toward_transfer_direction`). |
+| **EmotionDirections** (Plan 162) | Read-side dot-product projection onto pre-computed direction vectors | Used as the latency cousin baseline in `fpcg_probe_forecast_bench.rs`; provides the detection-side projection for HLA affect. |
+| **LatentFieldSteering** (Plan 309) | Write-side SIMD SAXPY + sigmoid-falloff direction injection into mutable latent state | Ships in `katgpt-core/src/latent_steering.rs`; the "fourth quadrant" primitive that closes the CNA-mutates-neurons vs EmotionDirections-read-only gap. |
+
+### Why CNA's narrow scope is correct
+
+The codebase has an explicit four-quadrant taxonomy (`katgpt-core/src/lib.rs` L1028-1032):
+
+> "The missing fourth quadrant: CNA mutates neurons, EmotionDirections is read-only, FPCG refuses mutation — this injects directly into the latent state on the hot path."
+
+- **CNA** operates at the **MLP neuron** level (sparse circuit discovery for transformer forward passes). Its consumers are game harnesses where the activation IS an MLP output.
+- **NPC cognition** operates at the **HLA direction vector** level (64-dim per `DEFAULT_HLA_DIM`). The right primitives for that substrate are MAG (mine directions from activation data) + EmotionDirections (read-side project) + LatentFieldSteering (write-side inject).
+
+The "wire CNA into NPC cognition" pivot conflated two different substrates. CNA's transformer-MLP-neuron scope is correct as-is.
+
+### Net result
+
+- **No new plan or issue is needed for CNA integration.** The gap was a mirage.
+- The right primitives (MAG/EmotionDirections/LatentFieldSteering) are already shipped and consumed.
+- Plan 561 stays parked at Gain (SipIt is still a real open primitive, unrelated to this CNA clarification).
+- The CORE paper (arXiv:2605.28742) remains a separate riir-train candidate if its NL-insight capability is ever wanted — modelless decomposition is not possible (R368 LLM-as-mechanism).
+
+**Second lesson:** When a grep shows "primitive X has no consumers," the next question is NOT "how do we add a consumer?" — it's "is primitive X even the right shape for the proposed consumer?" CNA having zero riir-ai consumers is correct, not a gap. The category error was considering CNA for a substrate it doesn't operate on.
