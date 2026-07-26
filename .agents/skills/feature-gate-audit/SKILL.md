@@ -200,7 +200,7 @@ riir-neuron-db/         ← leaf crate (re-exported by riir-chain)
 riir-train/             ← training-method research
 riir-game-sdk/          ← game-vocabulary facade over riir-ai
 seal-online-remaster/   ← consumer (seal-core / mmorpg)
-poc-maxman/             ← consumer (pacman-like reasoning POC)
+riir-mmorpg-examples/   ← consumer (orchard multiplayer POC)
 ```
 
 For each repo, **read its `AGENTS.md` first** — it documents the

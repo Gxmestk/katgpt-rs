@@ -49,7 +49,7 @@ riir-chain         ← private chain (LatCal, quorum, sync-boundary bridge)
 riir-neuron-db     ← private neuron-shard leaf (Pod, freeze, consolidation, AnyRAG)
 riir-train         ← private training vault (training-only methods — research-only routing)
 riir-game-sdk      ← private game-vocabulary facade + dev-tool workspace
-                      (consumers: poc-maxman, seal-online-remaster; vocabulary source is
+                      (consumers: riir-mmorpg-examples, seal-online-remaster; vocabulary source is
                       riir-games-shared in riir-ai workspace, re-exported via facade)
 riir-armageddon    ← private arena/game-product domain types
 ```
