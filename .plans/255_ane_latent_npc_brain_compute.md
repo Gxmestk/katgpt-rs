@@ -6,8 +6,11 @@
 > `npc_brain_router` modules moved from this repo (katgpt-rs) to
 > `riir-ai/crates/riir-engine/`. The `ane_npc` feature flag now lives in
 > `riir-engine/Cargo.toml` (still opt-in — GOAT FAILED per `.benchmarks/053`,
-> and ANE training itself is deferred per `riir-train/.issues/266` until 50M+
-> params). Historical task records below reflect the original locations.
+> and ANE training itself is deferred until 50M+ params — see
+> `riir-train/.research/111_maderix_ANE_Training_Distillation_Verdict.md`;
+> ~~`riir-train/.issues/266`~~ closed + removed 2026-07-26 as the deferral
+> is physical, not effort-based). Historical task records below reflect the
+> original locations.
 
 **Source:** [Research 223 — maderix/ANE Distillation](../.research/223_maderix_ANE_Distillation_Verdict.md) + [Research 224 — coremltools Public API](../.research/224_coremltools_Public_API_ANE_Distillation_Verdict.md)
 **Related:** Plan 176 (GPU/ANE Offload), Plan 148 (PlasmaPath SIMD), Plan 240 (Sense Compression), Issue 004 (ANE CoreML Model Generation)

@@ -5,7 +5,7 @@
 **Source paper:** [arXiv:2606.11275](https://arxiv.org/abs/2606.11275) — García-Castellanos, Weiler, Bekkers, Jul 2026 (RoVE)
 **Source code:** [github.com/AGarciaCast/RoVE](https://github.com/AGarciaCast/RoVE)
 **Target:** `katgpt-rs/crates/katgpt-core/src/rotary_value_embedding.rs` (new module, sibling to `position_group_action.rs`) + Cargo feature `rotary_value_embedding` (re-exported from root `katgpt-rs/Cargo.toml` as `rotary_value_embedding = ["katgpt-core/rotary_value_embedding"]`). Wiring in `katgpt-rs/crates/katgpt-attn/src/` (Phase 3) + `katgpt-rs/crates/katgpt-attn-match/src/chunked.rs` (Phase 4).
-**Status:** All phases DONE. Substrate (Phases 1-4) + wiring (T3.B) + retrofit PoC (Phase 5 partial, Option 2). **Verdict: RoVE retrofit HURTS perplexity (+12.5% loss, +48.2% ppl) on RoPE-trained checkpoints.** Feature stays opt-in permanently. The C control (RoVE-trained-from-scratch, riir-train Issue 379) remains a non-blocking validation follow-up.
+**Status:** All phases DONE. Substrate (Phases 1-4) + wiring (T3.B) + retrofit PoC (Phase 5 partial, Option 2). **Verdict: RoVE retrofit HURTS perplexity (+12.5% loss, +48.2% ppl) on RoPE-trained checkpoints.** Feature stays opt-in permanently. The C control (RoVE-trained-from-scratch, ~~riir-train Issue 379~~ closed 2026-07-26) remains a non-blocking validation follow-up.
 
 > **Numbering note.** Research note 452 + Plan 557 deliberately use *different* numbers because `.research/` and `.plans/` are independent namespaces with independent highwater markers — `.research/` was at 451 (next free = 452), `.plans/` was at 556 (next free = 557). The number collision in `.plans/452` (`452_simd_lut_dequant.md` already exists) is what forces the plan to 557. The research note at `.research/452_*.md` is the design doc; this plan is the execution tracker.
 
@@ -272,10 +272,12 @@ training-time claim, not an inference-time retrofit claim. See
 ### Tasks (updated)
 
 - [-] **T5.1** Train a toy GPT-2 on FineWebEdu-10B without RoVE. **DEFERRED** —
-  requires GPU training (riir-train Issue 379). Option 2 (existing gemma-2-2b-it
-  checkpoint) was used instead, which answers the core retrofit question without
-  needing from-scratch training. The C control (RoVE-trained-from-scratch) still
-  needs this, but it's a non-blocking validation, not a promotion blocker.
+  requires GPU training. Option 2 (existing gemma-2-2b-it checkpoint) was used
+  instead, which answers the core retrofit question without needing from-scratch
+  training. The C control (RoVE-trained-from-scratch) remains a non-blocking
+  validation follow-up; ~~riir-train Issue 379~~ closed 2026-07-26 (promotion
+  question settled — stay opt-in per A vs B comparison; C control re-file as a
+  fresh issue if/when paper-fidelity validation becomes load-bearing).
 - [x] **T5.2** Benchmark A (RoPE-only) vs B (RoVE retrofit) using gemma-2-2b-it.
   Harness: `riir-ai/crates/riir-engine/tests/bench_557_rove_retrofit.rs`.
 - [-] **T5.3** Measure on Core ICL, OOD perplexity, RULER. **PARTIALLY DONE** —

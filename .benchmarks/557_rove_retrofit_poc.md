@@ -159,17 +159,19 @@ RoVE remains valuable for:
    architecture-independent.
 
 4. **No C control.** Configuration C (RoVE-trained-from-scratch) was not tested
-   because it requires GPU training (riir-train Issue 379). The C control would
-   validate our RoVE implementation against the paper's numbers. Without it, we
-   can't confirm our RoVE forward is correct — but the smoke test
-   (`test_rove_values_matches_qk_rotation` in `rope.rs`) already confirms the V
-   rotation uses the correct convention (rotate-half, matching Q/K RoPE).
+   because it requires GPU training. The C control would validate our RoVE
+   implementation against the paper's numbers. Without it, we can't confirm our
+   RoVE forward is correct — but the smoke test (`test_rove_values_matches_qk_rotation`
+   in `rope.rs`) already confirms the V rotation uses the correct convention
+   (rotate-half, matching Q/K RoPE). ~~riir-train Issue 379~~ closed 2026-07-26
+   (promotion question settled — stay opt-in; C control re-file as a fresh
+   issue if/when paper-fidelity validation becomes load-bearing).
 
 ## Files
 
 - **Harness:** `riir-ai/crates/riir-engine/tests/bench_557_rove_retrofit.rs`
 - **Plan:** `katgpt-rs/.plans/557_rotary_value_embeddings.md` (Phase 5)
-- **Issue:** `riir-train/.issues/379_rove_retrofit_baseline_training.md`
+- **Issue:** ~~`riir-train/.issues/379_rove_retrofit_baseline_training.md`~~ (closed + removed 2026-07-26 — promotion question settled; C control is non-blocking)
 
 ## Reproduction
 
