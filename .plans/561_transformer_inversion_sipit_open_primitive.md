@@ -5,7 +5,7 @@
 **Source paper:** [arXiv:2510.15511](https://arxiv.org/abs/2510.15511) — Nikolaou, Mencattini, Crisostomi, Santilli, Panagakis, Rodolà, *Language Models are Injective and Hence Invertible*, ICLR 2026
 **Reference impl:** <https://github.com/giorgosnikolaou/SIPIT>
 **Target:** `katgpt-rs/crates/katgpt-core/src/inversion/` (new module) + Cargo feature `transformer_inversion`
-**Status:** Active — Phase 1 (skeleton + random policy) pending consumer
+**Status:** Parked Gain tier — Phase 1-4 deferred pending consumer (commit `d032d354`, re-verified 2026-07-26: zero consumers across all 7 repos). Phase 5 T5.1/T5.2 are decision gates awaiting their condition (consumer / 3-month timeout 2026-10-26). Do NOT implement without amending this plan.
 
 ---
 
@@ -122,42 +122,52 @@ pub fn invert_sequence<F: InversionForward>(
 
 ## Phases
 
-### Phase 1 — Skeleton + Random Policy + G1 (CORE)
+### Phase 1 — Skeleton + Random Policy + G1 (essential)
 
-- [ ] **T1.1** Create `crates/katgpt-core/src/inversion/` module skeleton with `#[cfg(feature = "transformer_inversion")]`. Add `transformer_inversion = []` feature to `crates/katgpt-core/Cargo.toml`. Export from `crates/katgpt-core/src/lib.rs` behind feature gate.
-- [ ] **T1.2** Implement `ObservedStates`, `InversionConfig`, `InversionPolicy::Random`, `InversionResult`, `InversionError` in `mod.rs` + `verifier.rs`.
-- [ ] **T1.3** Implement `InversionForward` trait + `RandomPolicy` enumeration (uniform-without-replacement via fastrand permutation).
-- [ ] **T1.4** Implement `invert_sequence` driver in `recovery.rs` — outer T-loop × inner |V|-loop with early break on acceptance. Zero-allocation hot path (verify with `dhat` bench in Phase 3).
-- [ ] **T1.5** Add unit tests in `tests.rs`:
+> **State:** Deferred pending consumer (parked Gain tier, commit `d032d354`). Phase 1 implementation is gated on a concrete consumer materializing — do NOT implement without amending this plan + re-running the GOAT gate.
+
+- [-] **T1.1** Create `crates/katgpt-core/src/inversion/` module skeleton with `#[cfg(feature = "transformer_inversion")]`. Add `transformer_inversion = []` feature to `crates/katgpt-core/Cargo.toml`. Export from `crates/katgpt-core/src/lib.rs` behind feature gate.
+- [-] **T1.2** Implement `ObservedStates`, `InversionConfig`, `InversionPolicy::Random`, `InversionResult`, `InversionError` in `mod.rs` + `verifier.rs`.
+- [-] **T1.3** Implement `InversionForward` trait + `RandomPolicy` enumeration (uniform-without-replacement via fastrand permutation).
+- [-] **T1.4** Implement `invert_sequence` driver in `recovery.rs` — outer T-loop × inner |V|-loop with early break on acceptance. Zero-allocation hot path (verify with `dhat` bench in Phase 3).
+- [-] **T1.5** Add unit tests in `tests.rs`:
   - Toy 2-layer decoder-only transformer (GELU activation, d=16, |V|=32, T=8), random init.
   - `g1_exact_recovery_random_init` — generate random prompts, run forward to get `H̆^(ℓ)`, run `invert_sequence`, assert exact recovery.
   - `g1_recovers_when_two_prompts_differ_only_at_position_t` — direct test of the paper's causality argument (Lemma D.2).
   - `g1_no_false_positive_on_mismatched_observed` — wrong `H̆` does not produce the original prompt.
-- [ ] **T1.6** `cargo clippy -p katgpt-core --features transformer_inversion --all-targets` clean. `cargo test -p katgpt-core --features transformer_inversion --lib inversion::` green.
+- [-] **T1.6** `cargo clippy -p katgpt-core --features transformer_inversion --all-targets` clean. `cargo test -p katgpt-core --features transformer_inversion --lib inversion::` green.
 
 ### Phase 2 — Gradient-Guided Policy (paper Alg 3)
 
-- [ ] **T2.1** Implement `InversionGradient` trait in `policy.rs`. Caller supplies `∇_e F` via a closure (no autodiff dep).
-- [ ] **T2.2** Implement `GradientGuidedPolicy` with step size γ, gradient clipping at norm 1, periodic projection to nearest vocab embedding every K=50 proposals (paper §E.1).
-- [ ] **T2.3** Test: same toy transformer, verify gradient-guided finds the token in < 0.5% · |V| trials on average (paper reports <0.25% for |V|=32K-128K; we should be in the same ballpark relative to |V|).
-- [ ] **T2.4** `cargo clippy` + `cargo test` clean.
+> **State:** Deferred pending consumer (depends on Phase 1).
+
+- [-] **T2.1** Implement `InversionGradient` trait in `policy.rs`. Caller supplies `∇_e F` via a closure (no autodiff dep).
+- [-] **T2.2** Implement `GradientGuidedPolicy` with step size γ, gradient clipping at norm 1, periodic projection to nearest vocab embedding every K=50 proposals (paper §E.1).
+- [-] **T2.3** Test: same toy transformer, verify gradient-guided finds the token in < 0.5% · |V| trials on average (paper reports <0.25% for |V|=32K-128K; we should be in the same ballpark relative to |V|).
+- [-] **T2.4** `cargo clippy` + `cargo test` clean.
 
 ### Phase 3 — G2 Latency + G4 Alloc-Free Bench
 
-- [ ] **T3.1** Add `benches/inversion_bench.rs` — criterion bench on the toy transformer, measuring median time per position for random vs gradient-guided policy. Compare to paper's "28s for 20-token GPT-2 Small" baseline (note: paper measures on A100 + 50257 vocab; we measure on CPU + tiny vocab, so direct comparison is not meaningful — instead establish the linear-in-|V| scaling claim).
-- [ ] **T3.2** G2 gate: median time per position scales linearly with |V| for the random policy; gradient-guided is sub-linear (paper Fig 4 reports <0.25% of |V|).
-- [ ] **T3.3** G4 alloc-free: `dhat` bench shows 0 bytes allocated steady-state (excluding the prefix `Vec` growth of 4 bytes/position, which is amortized via `Vec::push`).
+> **State:** Deferred pending consumer (depends on Phase 1+2).
+
+- [-] **T3.1** Add `benches/inversion_bench.rs` — criterion bench on the toy transformer, measuring median time per position for random vs gradient-guided policy. Compare to paper's "28s for 20-token GPT-2 Small" baseline (note: paper measures on A100 + 50257 vocab; we measure on CPU + tiny vocab, so direct comparison is not meaningful — instead establish the linear-in-|V| scaling claim).
+- [-] **T3.2** G2 gate: median time per position scales linearly with |V| for the random policy; gradient-guided is sub-linear (paper Fig 4 reports <0.25% of |V|).
+- [-] **T3.3** G4 alloc-free: `dhat` bench shows 0 bytes allocated steady-state (excluding the prefix `Vec` growth of 4 bytes/position, which is amortized via `Vec::push`).
 
 ### Phase 4 — Robustness (paper Thm 3.2)
 
-- [ ] **T4.1** Implement `ObservedStates` with optional perturbation `ę_t = h_t + e_t`, `‖e_t‖ < ε < Δ_π,t / 2`.
-- [ ] **T4.2** Test: inject noise at varying ε, verify recovery holds while `ε < Δ/2` and fails when `ε > Δ/2`. Direct empirical measurement of the margin `Δ_π,t` on the toy transformer.
-- [ ] **T4.3** Document the relationship to quantization (paper Table 2: FP4/INT8 quantization preserves injectivity in practice, more than doubles the minimum distance). Add a note in the module doc.
+> **State:** Deferred pending consumer (depends on Phase 1).
+
+- [-] **T4.1** Implement `ObservedStates` with optional perturbation `ę_t = h_t + e_t`, `‖e_t‖ < ε < Δ_π,t / 2`.
+- [-] **T4.2** Test: inject noise at varying ε, verify recovery holds while `ε < Δ/2` and fails when `ε > Δ/2`. Direct empirical measurement of the margin `Δ_π,t` on the toy transformer.
+- [-] **T4.3** Document the relationship to quantization (paper Table 2: FP4/INT8 quantization preserves injectivity in practice, more than doubles the minimum distance). Add a note in the module doc.
 
 ### Phase 5 — Promotion / Demotion Decision
 
-- [ ] **T5.1** If a concrete consumer materializes in riir-ai (e.g., a transparency/audit feature on a text-LLM path) — wire it, run the GOAT gate at the consumer level, promote `transformer_inversion` to opt-in-recommended in the docs.
-- [ ] **T5.2** If no consumer materializes within ~3 months — keep as opt-in research infrastructure. Do NOT promote to default (no consumer = no GOAT gain to measure).
+> **State:** Awaiting condition (consumer or 3-month timeout). NOT deferred — these are decision gates, not work items.
+
+- [ ] **T5.1** If a concrete consumer materializes in riir-ai (e.g., a transparency/audit feature on a text-LLM path) — wire it, run the GOAT gate at the consumer level, promote `transformer_inversion` to opt-in-recommended in the docs. Condition unmet as of 2026-07-26 (grep verified: zero `transformer_inversion` consumers across all `.rs` files in the 7-repo stack).
+- [ ] **T5.2** If no consumer materializes within ~3 months — keep as opt-in research infrastructure. Do NOT promote to default (no consumer = no GOAT gain to measure). Re-evaluate 2026-10-26.
 - [-] **T5.3** (deferred) If a future text-LLM consumer in katgpt-rs itself (e.g., a speculative-decode audit mode) wants this — wire it then. Speculative today uses the drafter's own hidden states; no inversion needed.
 
 ---
