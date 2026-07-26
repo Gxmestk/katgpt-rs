@@ -65,24 +65,53 @@ impl IrreducibilityGate {
     /// Uses Shannon entropy of the quantized byte distribution as the primary
     /// Kolmogorov complexity proxy. Low entropy = low complexity = reducible.
     /// For high-entropy matrices, falls back to RLE compression ratio.
+    ///
+    /// # Single-pass fusion
+    ///
+    /// The prior implementation iterated `matrix.payoffs` three times
+    /// (quantize → payoff_stats → freq). Fused into one pass: quantize each
+    /// payoff into a byte, accumulate `freq[byte]`, and accumulate
+    /// `sum_abs` + `sum_abs_sq` for the (mean, variance) computation. The
+    /// output is `Vec<u8>` plus the two scalar accumulators; the entropy
+    /// + variance math runs once over the freq table + scalars, not over
+    ///   the matrix again.
     pub fn analyze(&self, matrix: &WinMatrix) -> IrreducibilityResult {
-        let raw = self.quantize_matrix(matrix);
-
-        // Compute byte frequency distribution.
+        let n = matrix.payoffs.len();
+        // Upper bound on raw byte count — actual may be less if rows are
+        // short, but this avoids grow calls during the fused push loop.
+        let mut raw = Vec::with_capacity(n.saturating_mul(n));
         let mut freq = [0u32; 256];
-        let total = raw.len() as u32;
-        for &b in &raw {
-            freq[b as usize] += 1;
+        // Payoff-stat accumulators (mean + variance of |payoff|).
+        let mut sum_abs = 0.0f64;
+        let mut sum_abs_sq = 0.0f64;
+        let mut count = 0usize;
+
+        for row in &matrix.payoffs {
+            for &val in row {
+                // Quantize [-1, 1] → [0, 255].
+                let normalized = ((val + 1.0) * 127.5).clamp(0.0, 255.0);
+                let q = normalized as u8;
+                raw.push(q);
+                freq[q as usize] += 1;
+                // Payoff stats — |val| not quantized.
+                let abs_val = val.abs();
+                sum_abs += abs_val;
+                sum_abs_sq += abs_val * abs_val;
+                count += 1;
+            }
         }
+
+        let total = raw.len() as u32;
 
         // Shannon entropy of byte distribution (bits).
         let entropy = if total == 0 {
             0.0f32
         } else {
             let mut h = 0.0f32;
-            for &count in &freq {
-                if count > 0 {
-                    let p = count as f32 / total as f32;
+            let inv_total = 1.0 / total as f32;
+            for &cnt in &freq {
+                if cnt > 0 {
+                    let p = cnt as f32 * inv_total;
                     h -= p * p.log2();
                 }
             }
@@ -114,7 +143,13 @@ impl IrreducibilityGate {
             normalized_entropy
         };
 
-        let (mean, variance) = self.payoff_stats(matrix);
+        let (mean, variance) = if count == 0 {
+            (0.0, 0.0)
+        } else {
+            let mean = sum_abs / count as f64;
+            let variance = sum_abs_sq / count as f64 - mean * mean;
+            (mean, variance.max(0.0)) // numerical guard
+        };
 
         IrreducibilityResult {
             compression_ratio,
@@ -127,45 +162,6 @@ impl IrreducibilityGate {
     /// Quick check: is the game irreducible?
     pub fn is_irreducible(&self, matrix: &WinMatrix) -> bool {
         self.analyze(matrix).is_irreducible
-    }
-
-    /// Quantize payoff matrix to bytes for compression.
-    /// Maps [-1, 1] → [0, 255].
-    fn quantize_matrix(&self, matrix: &WinMatrix) -> Vec<u8> {
-        let n = matrix.payoffs.len();
-        let mut result = Vec::with_capacity(n * n);
-        for row in &matrix.payoffs {
-            for &val in row {
-                // Map [-1, 1] → [0, 255]
-                let normalized = ((val + 1.0) * 127.5).clamp(0.0, 255.0);
-                result.push(normalized as u8);
-            }
-        }
-        result
-    }
-
-    /// Compute mean absolute payoff and variance.
-    fn payoff_stats(&self, matrix: &WinMatrix) -> (f64, f64) {
-        let mut sum = 0.0f64;
-        let mut sum_sq = 0.0f64;
-        let mut count = 0usize;
-
-        for row in &matrix.payoffs {
-            for &val in row {
-                let abs_val = val.abs();
-                sum += abs_val;
-                sum_sq += abs_val * abs_val;
-                count += 1;
-            }
-        }
-
-        if count == 0 {
-            return (0.0, 0.0);
-        }
-
-        let mean = sum / count as f64;
-        let variance = sum_sq / count as f64 - mean * mean;
-        (mean, variance.max(0.0)) // numerical guard
     }
 }
 
