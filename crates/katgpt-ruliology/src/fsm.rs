@@ -323,6 +323,16 @@ impl FsmEnumerator {
     /// win matrix with payoffs and rankings.
     ///
     /// Complexity: O(n² × rounds) where n = strategies.len().
+    ///
+    /// # Last-action-only hot path
+    ///
+    /// All `SimpleProgram` impls in this crate (FSM/TM/CA) read only
+    /// `opponent_history.last()` — the full history Vec was a vestige of the
+    /// trait contract. The tournament hot loop now tracks the last action as
+    /// a single `u8` per player and passes a 1-element slice. This is
+    /// bit-identical to the prior Vec<push> implementation (the impls never
+    /// observe history beyond `[len-1]`) but eliminates 2× `Vec::push` per
+    /// round per pair — O(rounds) heap writes dropped to zero.
     pub fn tournament(
         strategies: &[FsmStrategy],
         rounds: u32,
@@ -331,10 +341,9 @@ impl FsmEnumerator {
         let n = strategies.len();
         let mut payoffs = vec![vec![0.0f64; n]; n];
 
-        // Hoisted out of the i/j pair loop — cleared per pair instead of
-        // re-allocated n*(n-1) times.
-        let mut history_i: Vec<u8> = Vec::with_capacity(rounds as usize);
-        let mut history_j: Vec<u8> = Vec::with_capacity(rounds as usize);
+        // First-round sentinel: empty slice (no prior opponent move).
+        // Subsequent rounds pass a 1-element slice of the prior action.
+        let empty: [u8; 0] = [];
 
         for i in 0..n {
             for j in 0..n {
@@ -347,19 +356,23 @@ impl FsmEnumerator {
                 si.reset();
                 sj.reset();
 
-                history_i.clear();
-                history_j.clear();
-
                 let mut total_payoff = 0.0f64;
+                let mut last_action_i: u8 = 0; // only read after round 0
+                let mut last_action_j: u8 = 0;
+                let mut first_round = true;
 
                 for _ in 0..rounds {
-                    let action_i = si.next_action(&history_j);
-                    let action_j = sj.next_action(&history_i);
+                    // Round k reads the opponent's action from round k-1.
+                    let hist_j: &[u8] = if first_round { &empty } else { std::slice::from_ref(&last_action_j) };
+                    let hist_i: &[u8] = if first_round { &empty } else { std::slice::from_ref(&last_action_i) };
+                    let action_i = si.next_action(hist_j);
+                    let action_j = sj.next_action(hist_i);
 
                     total_payoff += payoff_fn(action_i, action_j);
 
-                    history_i.push(action_i);
-                    history_j.push(action_j);
+                    last_action_i = action_i;
+                    last_action_j = action_j;
+                    first_round = false;
                 }
 
                 payoffs[i][j] = total_payoff / rounds as f64;

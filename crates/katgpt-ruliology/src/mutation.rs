@@ -264,6 +264,15 @@ pub fn delta_gated_co_evolve(
 ///
 /// Returns mean payoff across all opponent pairings, averaged over `rounds`
 /// iterations per opponent.
+///
+/// # Last-action-only hot path
+///
+/// All `SimpleProgram` impls in this crate read only `opponent_history.last()`.
+/// Tracking the last action as a single `u8` per player (instead of pushing
+/// to a `Vec<u8>` per round) is bit-identical and eliminates the per-round
+/// heap writes — `Vec::push` may still hit the allocator on first round
+/// (initial grow) and is wasted work after that since the contents are
+/// never observed.
 fn evaluate_vs_opponents(
     strategy: &FsmStrategy,
     opponents: &[FsmStrategy],
@@ -277,10 +286,8 @@ fn evaluate_vs_opponents(
     let mut total = 0.0f64;
     let mut count = 0usize;
 
-    // Hoisted out of the `for opp in opponents` loop — `clear()` + reuse per
-    // opponent instead of `n_opponents` × 2 allocations of `Vec<u8>`.
-    let mut hist_s: Vec<u8> = Vec::with_capacity(rounds as usize);
-    let mut hist_o: Vec<u8> = Vec::with_capacity(rounds as usize);
+    // Empty slice for the first round (no prior opponent move).
+    let empty: [u8; 0] = [];
 
     for opp in opponents {
         let mut s = strategy.clone();
@@ -288,16 +295,20 @@ fn evaluate_vs_opponents(
         s.reset();
         o.reset();
 
-        hist_s.clear();
-        hist_o.clear();
         let mut payoff = 0.0f64;
+        let mut last_a_s: u8 = 0;
+        let mut last_a_o: u8 = 0;
+        let mut first_round = true;
 
         for _ in 0..rounds {
-            let a_s = s.next_action(&hist_o);
-            let a_o = o.next_action(&hist_s);
+            let hist_o: &[u8] = if first_round { &empty } else { std::slice::from_ref(&last_a_o) };
+            let hist_s: &[u8] = if first_round { &empty } else { std::slice::from_ref(&last_a_s) };
+            let a_s = s.next_action(hist_o);
+            let a_o = o.next_action(hist_s);
             payoff += payoff_fn(a_s, a_o);
-            hist_s.push(a_s);
-            hist_o.push(a_o);
+            last_a_s = a_s;
+            last_a_o = a_o;
+            first_round = false;
         }
 
         total += payoff / rounds as f64;
