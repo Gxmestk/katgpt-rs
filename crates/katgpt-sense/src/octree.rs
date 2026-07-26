@@ -124,14 +124,18 @@ impl SenseOctreeBuilder {
         let mut neg_bits = 0u64;
         let mut scale_sum = 0.0f32;
 
-        // Branchless: use bool-as-u64 to conditionally apply masks
+        // Branchless: use bool-as-u64 to conditionally apply masks.
+        // `is_pos | is_neg` is 0 (both false) or 1 (either true); the cast
+        // chain `(u64) as u8 as f32` is preserved bit-for-bit but goes
+        // through u8 unnecessarily — `(is_pos | is_neg) as f32` is the same
+        // value (0.0 or 1.0) and skips the narrowing step.
         for (i, &val) in embedding.iter().enumerate() {
             let mask = 1u64 << i;
             let is_pos = (val > 0.01) as u64;
             let is_neg = (val < -0.01) as u64;
             pos_bits |= mask & is_pos.wrapping_neg();
             neg_bits |= mask & is_neg.wrapping_neg();
-            scale_sum += val.abs() * (is_pos | is_neg) as u8 as f32;
+            scale_sum += val.abs() * (is_pos | is_neg) as f32;
         }
 
         let row_scale = if scale_sum > 0.0 {
