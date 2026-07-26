@@ -175,7 +175,7 @@ fn simd_tanh_inplace_handles_boundaries() {
     let mut buf: Vec<f32> = (0..100).map(|_| (rng.f32() * 20.0) - 10.0).collect();
     simd_tanh_inplace(&mut buf);
     for (i, &v) in buf.iter().enumerate() {
-        assert!(v >= -1.0 && v <= 1.0, "idx={i}: tanh output {v} out of [-1,1]");
+        assert!((-1.0..=1.0).contains(&v), "idx={i}: tanh output {v} out of [-1,1]");
     }
 }
 

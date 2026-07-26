@@ -458,7 +458,7 @@ mod tests {
         for &norm_sq in &[0.0, 0.1, 0.5, 1.0, 2.0, 10.0, 100.0] {
             let p = edit_penalty(norm_sq, 1.0);
             assert!(
-                p >= 0.0 && p <= 1.0,
+                (0.0..=1.0).contains(&p),
                 "penalty {p} not in [0,1] for norm_sq={norm_sq}"
             );
         }
