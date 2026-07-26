@@ -123,11 +123,15 @@ impl IrreducibilityGate {
         let normalized_entropy = entropy / 8.0;
 
         // RLE compression ratio as secondary signal.
-        let compressed = rle_compress(&raw);
+        // `rle_compressed_len` is the zero-alloc variant of `rle_compress`:
+        // the analyzer only needs the LENGTH of the RLE output (to compute
+        // the ratio), not the output bytes themselves. The original path
+        // built a full Vec<u8> every call just to read its .len() afterward.
+        let compressed_len = rle_compressed_len(&raw);
         let rle_ratio = if raw.is_empty() {
             0.0
         } else {
-            compressed.len() as f32 / raw.len() as f32
+            compressed_len as f32 / raw.len() as f32
         };
 
         // Effective compression ratio: use entropy when it's low (structured data),
@@ -169,6 +173,13 @@ impl IrreducibilityGate {
 
 /// Simple run-length encoding compression.
 /// Returns (value, count) pairs as a flat byte sequence.
+///
+/// Kept for callers that need the actual compressed bytes. The irreducibility
+/// analyzer uses [`rle_compressed_len`] instead — zero allocation, same length.
+/// Compiled only under `cfg(test)` because the production analyzer is the
+/// sole caller of the length variant; tests still need the byte-accurate form
+/// to lock the parity invariant.
+#[cfg(test)]
 fn rle_compress(data: &[u8]) -> Vec<u8> {
     if data.is_empty() {
         return Vec::new();
@@ -192,6 +203,35 @@ fn rle_compress(data: &[u8]) -> Vec<u8> {
     result.push(count);
 
     result
+}
+
+/// Length of `rle_compress(data)` without allocating the output Vec.
+///
+/// Each RLE run produces exactly 2 output bytes (value + count). The length
+/// is just `2 * number_of_runs`. Walks `data` once, counting run boundaries —
+/// the same predicate `rle_compress` uses to decide when to flush a run. Used
+/// by [`IrreducibilityGate::analyze`] which only needs the ratio
+/// (compressed_len / raw_len), not the bytes.
+#[inline]
+fn rle_compressed_len(data: &[u8]) -> usize {
+    if data.is_empty() {
+        return 0;
+    }
+    // One run for the first element, +1 for every boundary where byte changes
+    // OR the run hits the 255 cap (matches rle_compress's flush predicate).
+    let mut runs = 1usize;
+    let mut current = data[0];
+    let mut count: u8 = 1;
+    for &byte in &data[1..] {
+        if byte == current && count < 255 {
+            count += 1;
+        } else {
+            runs += 1;
+            current = byte;
+            count = 1;
+        }
+    }
+    runs * 2
 }
 
 // ── Tests ─────────────────────────────────────────────────────
@@ -295,6 +335,66 @@ mod tests {
         assert_eq!(compressed.len(), 2, "all-same should compress to 2 bytes");
         assert_eq!(compressed[0], 42);
         assert_eq!(compressed[1], 100);
+    }
+
+    /// `rle_compressed_len` MUST agree with `rle_compress(..).len()` on every
+    /// input. The irreducibility analyzer's hot path uses the zero-alloc
+    /// variant; this parity test guards the invariant against drift.
+    #[test]
+    fn test_rle_compressed_len_matches_rle_compress() {
+        // Empty, single-element, all-same, mixed, and a case that exercises
+        // the 255-cap flush boundary.
+        let cases: &[&[u8]] = &[
+            &[],
+            &[7],
+            &[42; 1],
+            &[42; 100],
+            &[1, 1, 2, 2, 3],
+            &[1, 2, 3, 4, 5],
+            &[0; 256],   // 255 + 1 → one full run + a 1-byte tail run
+            &[0; 510],   // 255 + 255 → two full runs
+            &[0; 255],   // exactly one full run
+        ];
+        for (i, data) in cases.iter().enumerate() {
+            let expected = rle_compress(data).len();
+            let got = rle_compressed_len(data);
+            assert_eq!(
+                got, expected,
+                "case {i} (len={}): rle_compressed_len={} vs rle_compress.len()={}",
+                data.len(),
+                got,
+                expected,
+            );
+        }
+
+        // Randomized cross-check: 200 random byte sequences with random
+        // lengths and run distributions.
+        let mut state: u64 = 0xC0FFEE;
+        for _ in 0..200 {
+            // Length in [0, 600] — covers empty, short, and 255-cap cases.
+            state = state.wrapping_mul(6364136223846793005).wrapping_add(1);
+            let len = (state >> 40) as usize % 601;
+            let mut data = Vec::with_capacity(len);
+            for _ in 0..len {
+                state = state.wrapping_mul(6364136223846793005).wrapping_add(1);
+                // Bias toward repeats: 70% chance of repeating the prior byte.
+                let byte = if !data.is_empty() && (state & 7) < 5 {
+                    *data.last().unwrap()
+                } else {
+                    (state >> 33) as u8
+                };
+                data.push(byte);
+            }
+            let expected = rle_compress(&data).len();
+            let got = rle_compressed_len(&data);
+            assert_eq!(
+                got, expected,
+                "random case (len={}): rle_compressed_len={} vs rle_compress.len()={}",
+                data.len(),
+                got,
+                expected,
+            );
+        }
     }
 
     /// Benchmark: analyze() should be sub-millisecond for a 22x22 matrix.
