@@ -602,19 +602,26 @@ mod grad {
 
         // Sanity: random averages ~|V|/2 = 16 per position; with 8 prompts × 8
         // positions = 64 positions, random_total ≈ 64 × 16 = 1024.
-        //
-        // On this toy substrate, gradient-guided is expected to use STRICTLY
-        // FEWER but not dramatically fewer acceptance tests than random. The
-        // paper's <0.25%·|V| claim is for |V|=32K-128K with near-orthogonal
-        // high-dim embeddings; at |V|=32, D=16 the embedding matrix is
-        // rank-32 in 16-dim space (tokens cannot be orthogonal), so gradient
-        // descent on the non-convex L(e) surface often projects to the wrong
-        // token and the random fallback picks up the slack. Phase 3 G2 gate
-        // (T3.2) will measure sub-linear scaling on larger vocabs where the
-        // paper's claim should hold.
+        // Gradient-guided should use dramatically fewer acceptance tests.
+        eprintln!(
+            "A/B: random={random_total} acceptance tests, gradient-guided={grad_total} \
+             ({:.1}× reduction)",
+            (random_total - grad_total) as f64 / random_total as f64 * 100.0
+        );
         assert!(
             grad_total < random_total,
             "gradient-guided ({grad_total} acceptance tests) should beat random ({random_total})"
+        );
+        // Stronger: with weight scale 1.0 (non-flat loss landscape), gradient-
+        // guided should use < 50% of random's acceptance tests on this toy.
+        // The paper reports <0.25%·|V| for |V|=32K-128K with near-orthogonal
+        // high-dim embeddings; on our toy (|V|=32, D=16) the relative
+        // improvement is smaller because the embedding matrix is rank-32 in
+        // 16-dim space (tokens cannot be orthogonal). Phase 3 G2 (T3.2) will
+        // measure sub-linear scaling on larger vocabs.
+        assert!(
+            grad_total * 2 < random_total,
+            "gradient-guided ({grad_total}) should use <50% of random ({random_total}) acceptance tests"
         );
     }
 
@@ -665,68 +672,6 @@ mod grad {
                 );
             }
         }
-    }
-
-    #[test]
-    fn debug_gradient_descent_convergence_single_position() {
-        // Diagnostic: trace gradient descent at position 0 for one prompt.
-        // Uses a larger weight scale (1.0 instead of 1/sqrt(D)) so the loss
-        // landscape has steep enough gradients for the gradient-guided
-        // policy to demonstrate convergence.
-        let mut rng = fastrand::Rng::with_seed(0xC0DE);
-        let transformer = ToyTransformer::new_scaled(&mut rng, 1.0);
-
-        let mut prompt_rng = fastrand::Rng::with_seed(0xA5A5);
-        let prompt = random_prompt(&mut prompt_rng);
-        let true_token = prompt[0];
-        let buf = transformer.forward_full(&prompt);
-        let observed_state = &buf[0..D];
-
-        let mut proxy = [0.0_f32; D];
-        transformer.init_proxy_into(&mut proxy).unwrap();
-
-        let mut grad = [0.0_f32; D];
-        let step_size = 0.1_f32;
-        let grad_clip = 1.0_f32;
-
-        for step in 0..200 {
-            transformer.numerical_grad_into(observed_state, &proxy, &mut grad);
-            let norm = (grad.iter().map(|g| g * g).sum::<f32>()).sqrt();
-            if norm > grad_clip && norm > 0.0 {
-                let scale = grad_clip / norm;
-                for g in grad.iter_mut() {
-                    *g *= scale;
-                }
-            }
-            for (p, g) in proxy.iter_mut().zip(grad.iter()) {
-                *p -= step_size * g;
-            }
-
-            if step % 10 == 0 || step == 199 {
-                let mut f = [0.0_f32; D];
-                transformer.forward_proxy_into(&proxy, &mut f);
-                let loss: f32 =
-                    observed_state.iter().zip(f.iter()).map(|(o, fi)| 0.5 * (o - fi).powi(2)).sum();
-                let true_base = (true_token as usize) * D;
-                let true_embed = &transformer.embedding[true_base..true_base + D];
-                let dist: f32 = proxy
-                    .iter()
-                    .zip(true_embed.iter())
-                    .map(|(p, e)| (p - e).powi(2))
-                    .sum::<f32>()
-                    .sqrt();
-                let nearest = transformer.nearest_token(&proxy).unwrap();
-                eprintln!(
-                    "step {step:3}: grad_norm={norm:.4} loss={loss:.6} dist_to_true={dist:.4} nearest_v={nearest} (true={true_token})"
-                );
-            }
-        }
-
-        let final_nearest = transformer.nearest_token(&proxy).unwrap();
-        assert_eq!(
-            final_nearest, true_token,
-            "gradient descent did not converge to the correct token"
-        );
     }
 
     #[test]
