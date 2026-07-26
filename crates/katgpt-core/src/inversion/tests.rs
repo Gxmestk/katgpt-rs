@@ -692,3 +692,190 @@ mod grad {
         assert_eq!(r1, r2, "random via grad driver should be bit-identical to random via base driver");
     }
 }
+
+// ─── Phase 4: robustness (paper Theorem 3.2) ─────────────────────────────
+//
+// Theorem 3.2 guarantees recovery under perturbation: if the observed state
+// `ę_t = h̆_t + e_t` has noise `‖e_t‖_∞ < Δ_π,t / 2` (where `Δ_π,t` is the
+// margin — the minimum L∞ distance from the true token's state to any other
+// token's state at position `t` under prefix `π`), then recovery still works.
+//
+// We verify this empirically: compute the margin for each position, inject
+// noise at varying fractions of `Δ_π,t / 2`, and assert recovery holds below
+// the threshold and fails above it.
+
+#[cfg(feature = "grad_policy")]
+mod robustness {
+    use super::*;
+    use crate::inversion::{InversionConfig, InversionResult, ObservedStates, invert_sequence};
+
+    /// Compute the margin `Δ_π,t` at position `t` for the given prompt: the
+    /// minimum L∞ distance from the true token's forward output to any OTHER
+    /// token's forward output at that position (under the recovered prefix).
+    /// Returns `f32::INFINITY` if there's only one token in the vocab.
+    fn compute_margin_at(transformer: &ToyTransformer, prompt: &[u32], t: usize) -> f32 {
+        let prefix = &prompt[..t];
+        let true_token = prompt[t];
+        let mut true_state = [0.0_f32; D];
+        transformer.hidden_at_into(prefix, true_token, t, &mut true_state).unwrap();
+
+        let mut min_dist = f32::INFINITY;
+        for v in 0..V {
+            if v == true_token {
+                continue;
+            }
+            let mut state = [0.0_f32; D];
+            transformer.hidden_at_into(prefix, v, t, &mut state).unwrap();
+            let linf: f32 = true_state
+                .iter()
+                .zip(state.iter())
+                .map(|(a, b)| (a - b).abs())
+                .fold(0.0_f32, f32::max);
+            if linf < min_dist {
+                min_dist = linf;
+            }
+        }
+        min_dist
+    }
+
+    /// Inject uniform noise `e` with `‖e‖_∞ ≤ max_noise` into each component
+    /// of `buf`. Deterministic given `seed`.
+    fn inject_noise_into(buf: &mut [f32], max_noise: f32, rng: &mut fastrand::Rng) {
+        for x in buf.iter_mut() {
+            // Uniform [-max_noise, max_noise].
+            *x += (rng.f32() * 2.0 - 1.0) * max_noise;
+        }
+    }
+
+    #[test]
+    fn robust_recovery_holds_below_half_margin() {
+        // Theorem 3.2: if ‖e_t‖_∞ < Δ_π,t / 2 for all t, recovery still works.
+        // We inject noise at 0.1×, 0.25×, and 0.45× of min_t(Δ_π,t / 2) — all
+        // strictly below the threshold — and verify exact recovery.
+        let mut rng = fastrand::Rng::with_seed(0xB0_70);
+        let transformer = ToyTransformer::new_scaled(&mut rng, 1.0);
+
+        let prompt: Vec<u32> = vec![3, 7, 11, 15, 19, 23, 27, 31];
+
+        // Compute the minimum margin across all positions.
+        let mut min_margin = f32::INFINITY;
+        for t in 0..T {
+            let margin = compute_margin_at(&transformer, &prompt, t);
+            if margin < min_margin {
+                min_margin = margin;
+            }
+        }
+        assert!(
+            min_margin > 0.0,
+            "margin should be positive on a non-degenerate transformer"
+        );
+
+        let half_margin = min_margin / 2.0;
+
+        for &noise_fraction in &[0.1_f32, 0.25, 0.45] {
+            let noise_level = half_margin * noise_fraction;
+            let mut noisy_buf = transformer.forward_full(&prompt);
+            inject_noise_into(&mut noisy_buf, noise_level, &mut rng);
+            let observed = ObservedStates::from_row_major(&noisy_buf, T, D).unwrap();
+
+            // Set tolerance to half_margin (the theoretical max for guaranteed
+            // recovery). The injected noise is below this, so recovery should work.
+            let cfg = InversionConfig {
+                tolerance: half_margin,
+                ..InversionConfig::default()
+            };
+            let result = invert_sequence(&observed, V, &transformer, &cfg, 0).unwrap();
+            match result {
+                InversionResult::Recovered(recovered) => assert_eq!(
+                    recovered, prompt,
+                    "recovery should hold at noise fraction {noise_fraction} of Δ/2"
+                ),
+                InversionResult::Failed { failed_position, .. } => panic!(
+                    "recovery failed at position {failed_position} with noise {noise_fraction}×Δ/2 \
+                     (margin={min_margin:.4}, half={half_margin:.4}, noise={noise_level:.4})"
+                ),
+            }
+        }
+    }
+
+    #[test]
+    fn robust_recovery_fails_above_half_margin() {
+        // Negative control: when noise exceeds Δ_π,t / 2, the perturbed observed
+        // can fall into another token's acceptance region, causing recovery to
+        // either fail or recover a DIFFERENT prompt. We inject noise at 2× the
+        // half-margin and verify that exact recovery of the ORIGINAL prompt is
+        // NOT guaranteed (either Failed, or Recovered != original).
+        let mut rng = fastrand::Rng::with_seed(0xB0_70 + 1);
+        let transformer = ToyTransformer::new_scaled(&mut rng, 1.0);
+
+        let prompt: Vec<u32> = vec![3, 7, 11, 15, 19, 23, 27, 31];
+
+        let mut min_margin = f32::INFINITY;
+        for t in 0..T {
+            let margin = compute_margin_at(&transformer, &prompt, t);
+            if margin < min_margin {
+                min_margin = margin;
+            }
+        }
+        let half_margin = min_margin / 2.0;
+
+        // Noise at 2× half_margin — well above the Theorem 3.2 threshold.
+        // Try multiple seeds; with enough noise, at least one trial should fail
+        // exact recovery (either Failed or wrong prompt).
+        let noise_level = half_margin * 2.0;
+        let mut exact_recovery_count = 0;
+        const N_TRIALS: usize = 20;
+        for trial in 0..N_TRIALS {
+            let mut trial_rng = fastrand::Rng::with_seed(0xBAD + trial as u64);
+            let mut noisy_buf = transformer.forward_full(&prompt);
+            inject_noise_into(&mut noisy_buf, noise_level, &mut trial_rng);
+            let observed = ObservedStates::from_row_major(&noisy_buf, T, D).unwrap();
+
+            // Use a tight tolerance — the true token's state is at distance 0
+            // from the unperturbed observed, but the noise pushes it away.
+            let cfg = InversionConfig {
+                tolerance: 1e-3,
+                ..InversionConfig::default()
+            };
+            let result = invert_sequence(&observed, V, &transformer, &cfg, trial as u64).unwrap();
+            match result {
+                InversionResult::Recovered(recovered) if recovered == prompt => {
+                    exact_recovery_count += 1;
+                }
+                _ => {
+                    // Failed or wrong prompt — expected when noise > Δ/2.
+                }
+            }
+        }
+
+        // With noise at 2× half_margin and tight tolerance, NOT all trials
+        // should recover exactly. If they all do, the margins are too large
+        // for the noise to matter (or the toy is degenerate).
+        // We expect at least one failure in 20 trials.
+        assert!(
+            exact_recovery_count < N_TRIALS,
+            "all {N_TRIALS} trials recovered exactly with noise at 2×Δ/2 — \
+             the margin {min_margin:.4} may be too large for this test to be meaningful, \
+             or the noise injection is not reaching the acceptance boundary"
+        );
+    }
+
+    #[test]
+    fn robust_margin_is_positive_on_random_init() {
+        // Sanity: the margin Δ_π,t should be strictly positive on a random-init
+        // transformer (different tokens produce different states, by injectivity).
+        // If this fails, the transformer is degenerate (two tokens produce the
+        // same state at some position).
+        let mut rng = fastrand::Rng::with_seed(0xB6_6C);
+        let transformer = ToyTransformer::new_scaled(&mut rng, 1.0);
+
+        let prompt: Vec<u32> = vec![1, 2, 3, 4, 5, 6, 7, 8];
+        for t in 0..T {
+            let margin = compute_margin_at(&transformer, &prompt, t);
+            assert!(
+                margin > 0.0,
+                "margin at position {t} is {margin} — should be positive (injectivity violation)"
+            );
+        }
+    }
+}

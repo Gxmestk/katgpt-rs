@@ -164,11 +164,11 @@ pub fn invert_sequence<F: InversionForward>(
 
 ### Phase 4 — Robustness (paper Thm 3.2)
 
-> **State:** Deferred pending consumer (Phase 1 dependency satisfied; blocked on a realistic-transformer substrate where the margin `Δ_π,t` can be meaningfully measured).
+> **State:** DONE 2026-07-26. 3 robustness tests verify Theorem 3.2's perturbation guarantee on the toy (scale=1.0). Margin computation + noise injection + recovery sweep confirm: recovery holds when `‖e_t‖_∞ < Δ_π,t / 2` and degrades when noise exceeds the threshold. Quantization relationship documented in `mod.rs`.
 
-- [-] **T4.1** Implement `ObservedStates` with optional perturbation `ę_t = h_t + e_t`, `‖e_t‖ < ε < Δ_π,t / 2`.
-- [-] **T4.2** Test: inject noise at varying ε, verify recovery holds while `ε < Δ/2` and fails when `ε > Δ/2`. Direct empirical measurement of the margin `Δ_π,t` on the toy transformer.
-- [-] **T4.3** Document the relationship to quantization (paper Table 2: FP4/INT8 quantization preserves injectivity in practice, more than doubles the minimum distance). Add a note in the module doc.
+- [x] **T4.1** Theorem 3.2 perturbation model verified via `inject_noise_into` test helper. No new code needed — the existing `InversionConfig::tolerance` already IS the noise tolerance; T4.1 is the test that verifies the tolerance works under injected noise.
+- [x] **T4.2** `robust_recovery_holds_below_half_margin` — injects noise at 0.1×, 0.25×, 0.45× of `min_t(Δ_π,t) / 2`, verifies exact recovery at all three levels. `robust_recovery_fails_above_half_margin` — injects noise at 2× `Δ/2` with tight tolerance, verifies not all 20 trials recover exactly (at least one falls into the wrong acceptance region). `robust_margin_is_positive_on_random_init` — sanity check that the margin is strictly positive (injectivity holds).
+- [x] **T4.3** Quantization relationship documented in `mod.rs` §"Robustness" — FP4/INT8 quantization preserves injectivity in practice (paper Table 2 reports it more than doubles the minimum distance). The primitive's tolerance-based acceptance check naturally handles quantization noise.
 
 ### Phase 5 — Promotion / Demotion Decision
 

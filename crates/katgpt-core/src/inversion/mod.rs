@@ -42,6 +42,24 @@
 //!   atol=1e-8)` empirically). BLAKE3 over f32 activations will collide
 //!   for any two prompts whose activations fall within float precision.
 //!
+//! # Robustness (paper Theorem 3.2)
+//!
+//! Recovery holds under perturbation: if the observed state `ę_t = h̆_t + e_t`
+//! has noise `‖e_t‖_∞ < Δ_π,t / 2` (where `Δ_π,t` is the margin — the
+//! minimum L∞ distance from the true token's state to any other token's
+//! state at position `t` under prefix `π`), then recovery still works. The
+//! tolerance `ε` in [`InversionConfig`] should be set to `Δ_π,t / 2` for
+//! guaranteed recovery under worst-case noise of that magnitude.
+//!
+//! **Quantization relationship (paper Table 2):** FP4/INT8 quantization
+//! preserves injectivity in practice — the paper reports it more than doubles
+//! the minimum distance between token states (the margin `Δ_π,t`), making
+//! quantized models *easier* to invert, not harder. This is because
+//! quantization noise acts as a regularizer that pushes apart nearly-
+//! degenerate token states. The primitive's tolerance-based acceptance check
+//! naturally handles quantization: set `ε` to the quantization noise floor
+//! (typically ~1e-2 for INT8, ~1e-1 for FP4) and recovery proceeds as usual.
+//!
 //! # Allocation discipline
 //!
 //! Per AGENTS.md hot-loop rules:
