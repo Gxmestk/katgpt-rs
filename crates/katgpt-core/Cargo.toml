@@ -1609,3 +1609,15 @@ required-features = ["hope_capacity"]
 name = "bench_559_hebbian_kernel_memory_goat"
 harness = false
 required-features = ["hebbian_kernel_memory"]
+
+# Plan 561 Phase 3 — SipIt Transformer Inversion GOAT gate (G2 latency + G4
+# alloc-free). G2 measures per-position latency for random vs gradient-guided
+# policy across |V| ∈ {32, 128, 512}. G4 verifies the _into driver variant is
+# alloc-free in steady state (CountingAllocator). Uses an alloc-free toy
+# 2-layer GELU forward impl to isolate driver allocations. G1 (correctness)
+# is the 28-test inversion::* unit suite; G3 is the feature-flag build matrix.
+# std::time::Instant + CountingAllocator + harness = false.
+[[bench]]
+name = "bench_561_inversion_goat"
+harness = false
+required-features = ["grad_policy"]
