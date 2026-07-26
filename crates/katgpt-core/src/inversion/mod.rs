@@ -85,6 +85,11 @@ pub use policy::{InversionPolicy, RandomPolicy};
 pub use recovery::{invert_sequence, invert_sequence_into};
 pub use verifier::{AcceptanceRegion, accept_observation, accept_observation_into};
 
+#[cfg(feature = "grad_policy")]
+pub use policy::GradientGuidedPolicy;
+#[cfg(feature = "grad_policy")]
+pub use recovery::{invert_sequence_grad, invert_sequence_grad_into};
+
 /// Observed per-position layer-ℓ hidden states `H̆^(ℓ) ∈ R^{T×d}`, row-major.
 ///
 /// Borrows the underlying buffer; does not own it. `states.len()` must equal
@@ -181,21 +186,61 @@ pub trait InversionForward {
     ) -> Result<(), InversionError>;
 }
 
-/// Gradient hook (only used by `GradientGuidedPolicy`, Phase 2). Caller
-/// supplies `∇_e F` evaluated at the proxy embedding `proxy` for position
-/// `t`. Writes the gradient (same shape as `proxy`) into `out`.
+/// Gradient + projection hooks (only used by `GradientGuidedPolicy`,
+/// Phase 2). The caller owns the transformer's embedding matrix and
+/// differentiates its forward pass; the primitive consumes the loss
+/// gradient + nearest-token projection without any autodiff dependency.
 ///
-/// Phase 1 random policy never calls this; the `grad` argument to
-/// [`recovery::invert_sequence`] is `None`.
+/// Phase 1 random policy never calls this; it is only reached when
+/// [`InversionConfig::policy`] is [`InversionPolicy::GradientGuided`] and
+/// the caller invokes [`recovery::invert_sequence_grad_into`].
 #[cfg(feature = "grad_policy")]
 pub trait InversionGradient {
+    /// Gradient of `L(e) = ½·‖h̆_t − F(e; π, t)‖²` with respect to the proxy
+    /// embedding `e`, evaluated at `proxy`. `observed_state` is the target
+    /// row `h̆_t` (passed in so the caller can compute the residual).
+    ///
+    /// Writes the length-`d` gradient vector into `out`. Implementations
+    /// may use analytical, autodiff, or finite-difference gradients — the
+    /// primitive is agnostic. Returns [`InversionError::ForwardFailed`] if
+    /// the underlying evaluation fails.
     fn grad_hidden_at_into(
         &self,
         prefix: &[u32],
+        observed_state: &[f32],
         proxy: &[f32],
         position: usize,
         out: &mut [f32],
     ) -> Result<(), InversionError>;
+
+    /// Project a continuous proxy embedding to the nearest vocabulary token:
+    /// returns `argmin_v ‖proxy − embedding[v]‖²`. The caller owns the
+    /// embedding matrix and chooses the search strategy (linear scan for
+    /// small `|V|`, KD-tree / FAISS / etc. for large `|V|`).
+    ///
+    /// This is the bridge from the continuous gradient trajectory back to
+    /// the discrete vocabulary — paper Alg 3 step "project to nearest vocab
+    /// embedding". Allocation-free implementations are preferred but not
+    /// required (this is called at most `max_grad_steps / projection_period`
+    /// times per position, not per gradient step).
+    fn nearest_token(&self, proxy: &[f32]) -> Result<u32, InversionError>;
+
+    /// Initialize the proxy embedding for a new position. Default: zeros.
+    ///
+    /// Paper §E.1 recommends the mean of all vocabulary embeddings (closer
+    /// to every individual embedding than zeros, so the gradient basin is
+    /// more likely to contain the correct token). Callers that can compute
+    /// the mean cheaply should override this; the default zeros works for
+    /// symmetric embedding distributions but may converge slower.
+    ///
+    /// Called once per position by the driver; allocation-free (writes into
+    /// the reused `proxy` buffer).
+    fn init_proxy_into(&self, out: &mut [f32]) -> Result<(), InversionError> {
+        for x in out.iter_mut() {
+            *x = 0.0;
+        }
+        Ok(())
+    }
 }
 
 /// Outcome of an inversion run.

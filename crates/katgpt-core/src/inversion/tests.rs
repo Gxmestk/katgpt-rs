@@ -51,15 +51,21 @@ struct ToyTransformer {
 }
 
 impl ToyTransformer {
-    /// Random init with a deterministic seed.
+    /// Random init with a deterministic seed, standard scale `1/sqrt(D)`.
     fn new(rng: &mut fastrand::Rng) -> Self {
+        Self::new_scaled(rng, 1.0 / (D as f32).sqrt())
+    }
+
+    /// Random init with a caller-specified weight scale. Larger scales
+    /// (e.g. `1.0`) produce a steeper loss landscape with larger gradients,
+    /// suitable for exercising the Phase 2 gradient-guided policy; the
+    /// Phase 1 default `1/sqrt(D)` is the standard stable-init scale.
+    fn new_scaled(rng: &mut fastrand::Rng, scale: f32) -> Self {
         let mut embedding = vec![0.0_f32; (V as usize) * D];
         let mut w1_up = vec![0.0_f32; D * 4 * D];
         let mut w1_down = vec![0.0_f32; 4 * D * D];
         let mut w2_up = vec![0.0_f32; D * 4 * D];
         let mut w2_down = vec![0.0_f32; 4 * D * D];
-        // Small Gaussian-ish init via uniform [-1/sqrt(D), 1/sqrt(D)].
-        let scale = 1.0 / (D as f32).sqrt();
         for x in embedding.iter_mut() {
             *x = (rng.f32() * 2.0 - 1.0) * scale;
         }
@@ -322,5 +328,422 @@ fn g1_no_false_positive_on_mismatched_observed() {
                 "inversion recovered prompt A from corrupted-A observed — false positive"
             );
         }
+    }
+}
+
+// ─── Phase 2: gradient-guided policy ────────────────────────────────────
+//
+// The gradient-guided policy (paper Alg 3) refines a continuous proxy embedding
+// via gradient descent on L(e) = ½·‖h̆_t − F(e;π,t)‖², then projects to the
+// nearest vocab token. We implement `InversionGradient` for the toy via
+// *central finite differences* — no autodiff dep. The production caller
+// (e.g. a real transformer audit tool) would supply an analytical gradient.
+//
+// Test target (Plan 561 T2.3): gradient-guided recovers exactly AND uses
+// strictly fewer acceptance tests than uniform-random on average. The
+// paper's <0.25%·|V| claim is for |V|=32K–128K; on our toy |V|=32 the
+// meaningful assertion is the relative speedup vs random's |V|/2 average.
+
+#[cfg(feature = "grad_policy")]
+mod grad {
+    use super::*;
+    use crate::inversion::{
+        InversionError, InversionGradient, InversionPolicy, invert_sequence_grad,
+    };
+
+    impl ToyTransformer {
+        /// Forward pass from a continuous proxy embedding (no token lookup).
+        /// Writes the layer-2 hidden state at position `position` into `out`.
+        ///
+        /// The toy has no attention between positions, so the proxy forward
+        /// is just `apply_layer(w2, apply_layer(w1, proxy))` — prefix is
+        /// irrelevant for this architecture (a real transformer's impl would
+        /// attend over the prefix).
+        fn forward_proxy_into(&self, proxy: &[f32], out: &mut [f32]) {
+            debug_assert_eq!(proxy.len(), D);
+            debug_assert_eq!(out.len(), D);
+            out.copy_from_slice(proxy);
+            self.apply_layer_into(&self.w1_up, &self.w1_down, out);
+            self.apply_layer_into(&self.w2_up, &self.w2_down, out);
+        }
+
+        /// Central finite-difference gradient of `L(e) = ½·‖h̆ − F(e)‖²` w.r.t.
+        /// `e`. O(D) forward evals per call — fine for the test; production
+        /// callers supply an analytical gradient.
+        fn numerical_grad_into(
+            &self,
+            observed_state: &[f32],
+            proxy: &[f32],
+            out: &mut [f32],
+        ) {
+            debug_assert_eq!(proxy.len(), D);
+            debug_assert_eq!(out.len(), D);
+            let eps = 1.0e-3_f32;
+            let mut f_plus = [0.0_f32; D];
+            let mut f_minus = [0.0_f32; D];
+            let mut e_plus = [0.0_f32; D];
+            let mut e_minus = [0.0_f32; D];
+            for i in 0..D {
+                e_plus.copy_from_slice(proxy);
+                e_minus.copy_from_slice(proxy);
+                e_plus[i] += eps;
+                e_minus[i] -= eps;
+                self.forward_proxy_into(&e_plus, &mut f_plus);
+                self.forward_proxy_into(&e_minus, &mut f_minus);
+                // L(e) = ½·Σ_o (h̆_o − F(e)_o)²
+                // ∂L/∂e_i ≈ [L(e+eps·î) − L(e−eps·î)] / (2·eps)
+                let l_plus: f32 = observed_state
+                    .iter()
+                    .zip(f_plus.iter())
+                    .map(|(o, f)| 0.5 * (o - f).powi(2))
+                    .sum();
+                let l_minus: f32 = observed_state
+                    .iter()
+                    .zip(f_minus.iter())
+                    .map(|(o, f)| 0.5 * (o - f).powi(2))
+                    .sum();
+                out[i] = (l_plus - l_minus) / (2.0 * eps);
+            }
+        }
+    }
+
+    impl InversionGradient for ToyTransformer {
+        fn grad_hidden_at_into(
+            &self,
+            _prefix: &[u32],
+            observed_state: &[f32],
+            proxy: &[f32],
+            _position: usize,
+            out: &mut [f32],
+        ) -> Result<(), InversionError> {
+            self.numerical_grad_into(observed_state, proxy, out);
+            Ok(())
+        }
+
+        fn nearest_token(&self, proxy: &[f32]) -> Result<u32, InversionError> {
+            // Linear scan — fine for |V|=32; production callers use KD-tree /
+            // FAISS / etc.
+            let mut best_v = 0_u32;
+            let mut best_dist = f32::INFINITY;
+            for v in 0..V {
+                let base = (v as usize) * D;
+                let embed = &self.embedding[base..base + D];
+                let dist: f32 = proxy
+                    .iter()
+                    .zip(embed.iter())
+                    .map(|(p, e)| (p - e).powi(2))
+                    .sum();
+                if dist < best_dist {
+                    best_dist = dist;
+                    best_v = v;
+                }
+            }
+            Ok(best_v)
+        }
+
+        fn init_proxy_into(&self, out: &mut [f32]) -> Result<(), InversionError> {
+            // Paper §E.1: start at the mean of all vocabulary embeddings.
+            // This is closer to every individual embedding than zeros, so
+            // the gradient basin is more likely to contain the correct
+            // token.
+            for x in out.iter_mut() {
+                *x = 0.0;
+            }
+            for v in 0..V {
+                let base = (v as usize) * D;
+                for (out_i, embed_val) in out.iter_mut().zip(&self.embedding[base..base + D]) {
+                    *out_i += *embed_val;
+                }
+            }
+            let inv = 1.0 / V as f32;
+            for x in out.iter_mut() {
+                *x *= inv;
+            }
+            Ok(())
+        }
+    }
+
+    /// Count total acceptance tests (hidden_at + accept calls) across a full
+    /// inversion run, by intercepting via a wrapper forward.
+    struct CountingForward<'a, F: InversionForward> {
+        inner: &'a F,
+        count: std::cell::Cell<usize>,
+    }
+
+    impl<'a, F: InversionForward> InversionForward for CountingForward<'a, F> {
+        fn hidden_at_into(
+            &self,
+            prefix: &[u32],
+            candidate: u32,
+            position: usize,
+            out: &mut [f32],
+        ) -> Result<(), InversionError> {
+            self.count.set(self.count.get() + 1);
+            self.inner.hidden_at_into(prefix, candidate, position, out)
+        }
+    }
+
+    impl<'a, F: InversionForward> InversionGradient for CountingForward<'a, F>
+    where
+        F: InversionGradient,
+    {
+        fn grad_hidden_at_into(
+            &self,
+            prefix: &[u32],
+            observed_state: &[f32],
+            proxy: &[f32],
+            position: usize,
+            out: &mut [f32],
+        ) -> Result<(), InversionError> {
+            self.inner
+                .grad_hidden_at_into(prefix, observed_state, proxy, position, out)
+        }
+
+        fn nearest_token(&self, proxy: &[f32]) -> Result<u32, InversionError> {
+            self.inner.nearest_token(proxy)
+        }
+
+        fn init_proxy_into(&self, out: &mut [f32]) -> Result<(), InversionError> {
+            self.inner.init_proxy_into(out)
+        }
+    }
+
+    #[test]
+    fn grad_guided_recovers_all_random_prompts() {
+        // Phase 2 headline: same prompts as g1_exact_recovery_random_init,
+        // but using gradient-guided policy. All must recover exactly.
+        //
+        // Uses weight scale 1.0 (vs Phase 1's 1/sqrt(D)) because the
+        // gradient-guided policy needs a non-flat loss landscape to produce
+        // meaningful gradients. The standard 1/sqrt(D) init produces near-
+        // zero intermediate activations (GELU saturates near the origin),
+        // making the Jacobian tiny and convergence glacial.
+        let mut rng = fastrand::Rng::with_seed(0xC0DE);
+        let transformer = ToyTransformer::new_scaled(&mut rng, 1.0);
+
+        const N_PROMPTS: usize = 8;
+        let mut recovered_count = 0;
+        for prompt_seed in 0..N_PROMPTS {
+            let mut prompt_rng = fastrand::Rng::with_seed(0xA5A5 + prompt_seed as u64);
+            let prompt = random_prompt(&mut prompt_rng);
+
+            let buf = transformer.forward_full(&prompt);
+            let observed = ObservedStates::from_row_major(&buf, T, D).unwrap();
+            let cfg = InversionConfig {
+                policy: InversionPolicy::gradient_guided_default(),
+                ..InversionConfig::default()
+            };
+            let result =
+                invert_sequence_grad(&observed, V, &transformer, &transformer, &cfg, prompt_seed as u64)
+                    .unwrap();
+            match result {
+                InversionResult::Recovered(recovered) => {
+                    assert_eq!(recovered, prompt, "prompt {prompt:?} not recovered via gradient-guided");
+                    recovered_count += 1;
+                }
+                InversionResult::Failed {
+                    failed_position,
+                    candidates_tried,
+                } => panic!(
+                    "gradient-guided failed at position {failed_position} after {candidates_tried} \
+                     candidates (prompt {prompt:?})"
+                ),
+            }
+        }
+        assert_eq!(recovered_count, N_PROMPTS);
+    }
+
+    #[test]
+    fn grad_guided_uses_fewer_acceptance_tests_than_random() {
+        // Direct A/B comparison: gradient-guided vs uniform-random on the
+        // same prompts. Assert gradient-guided uses strictly fewer acceptance
+        // tests (hidden_at calls) total across all 8 prompts × 8 positions.
+        // Uses scale 1.0 (see `grad_guided_recovers_all_random_prompts` for
+        // why the standard 1/sqrt(D) scale is too flat for gradient-guided).
+        let mut rng = fastrand::Rng::with_seed(0xC0DE);
+        let transformer = ToyTransformer::new_scaled(&mut rng, 1.0);
+
+        const N_PROMPTS: usize = 8;
+        let mut random_total = 0_usize;
+        let mut grad_total = 0_usize;
+
+        for prompt_seed in 0..N_PROMPTS {
+            let mut prompt_rng = fastrand::Rng::with_seed(0xA5A5 + prompt_seed as u64);
+            let prompt = random_prompt(&mut prompt_rng);
+            let buf = transformer.forward_full(&prompt);
+            let observed = ObservedStates::from_row_major(&buf, T, D).unwrap();
+
+            // Random-policy baseline.
+            let random_cfg = InversionConfig::default();
+            let random_counter = CountingForward {
+                inner: &transformer,
+                count: std::cell::Cell::new(0),
+            };
+            let r = invert_sequence(&observed, V, &random_counter, &random_cfg, prompt_seed as u64)
+                .unwrap();
+            assert!(matches!(r, InversionResult::Recovered(_)), "random baseline failed");
+            random_total += random_counter.count.get();
+
+            // Gradient-guided.
+            let grad_cfg = InversionConfig {
+                policy: InversionPolicy::gradient_guided_default(),
+                ..InversionConfig::default()
+            };
+            let grad_counter = CountingForward {
+                inner: &transformer,
+                count: std::cell::Cell::new(0),
+            };
+            let r =
+                invert_sequence_grad(&observed, V, &grad_counter, &grad_counter, &grad_cfg, prompt_seed as u64)
+                    .unwrap();
+            assert!(matches!(r, InversionResult::Recovered(_)), "gradient-guided failed");
+            grad_total += grad_counter.count.get();
+        }
+
+        // Sanity: random averages ~|V|/2 = 16 per position; with 8 prompts × 8
+        // positions = 64 positions, random_total ≈ 64 × 16 = 1024.
+        //
+        // On this toy substrate, gradient-guided is expected to use STRICTLY
+        // FEWER but not dramatically fewer acceptance tests than random. The
+        // paper's <0.25%·|V| claim is for |V|=32K-128K with near-orthogonal
+        // high-dim embeddings; at |V|=32, D=16 the embedding matrix is
+        // rank-32 in 16-dim space (tokens cannot be orthogonal), so gradient
+        // descent on the non-convex L(e) surface often projects to the wrong
+        // token and the random fallback picks up the slack. Phase 3 G2 gate
+        // (T3.2) will measure sub-linear scaling on larger vocabs where the
+        // paper's claim should hold.
+        assert!(
+            grad_total < random_total,
+            "gradient-guided ({grad_total} acceptance tests) should beat random ({random_total})"
+        );
+    }
+
+    #[test]
+    fn grad_guided_no_false_positive_on_corrupted_observed() {
+        // Negative control: corrupted observed should NOT recover the original
+        // prompt (same shape as g1_no_false_positive_on_mismatched_observed).
+        let mut rng = fastrand::Rng::with_seed(0xFEED);
+        let transformer = ToyTransformer::new_scaled(&mut rng, 1.0);
+
+        let prompt_a: Vec<u32> = vec![1, 2, 3, 4, 5, 6, 7, 8];
+        let mut buf_a = transformer.forward_full(&prompt_a);
+        // Corrupt position 0's first coordinate by 100.0 (way above tolerance 1e-3,
+        // and large relative to the scale-1.0 hidden-state magnitudes ~O(50)).
+        buf_a[0] += 100.0;
+
+        let observed = ObservedStates::from_row_major(&buf_a, T, D).unwrap();
+        let cfg = InversionConfig {
+            policy: InversionPolicy::gradient_guided_default(),
+            ..InversionConfig::default()
+        };
+        let result =
+            invert_sequence_grad(&observed, V, &transformer, &transformer, &cfg, 0).unwrap();
+        match result {
+            InversionResult::Failed { .. } => {
+                // Cleanest: corrupted observed → no match.
+            }
+            InversionResult::Recovered(recovered) => {
+                // Allow recovery of some prompt whose forward matches the
+                // corrupted observed within tolerance — but it must not be
+                // prompt_a (because observed was corrupted away from it).
+                let re_buf = transformer.forward_full(&recovered);
+                for t in 0..T {
+                    let diff: f32 = observed
+                        .row(t)
+                        .iter()
+                        .zip(re_buf[t * D..(t + 1) * D].iter())
+                        .map(|(o, c)| (o - c).abs())
+                        .fold(0.0_f32, f32::max);
+                    assert!(
+                        diff <= cfg.tolerance,
+                        "recovered prompt's forward diverges from observed at position {t}: {diff}"
+                    );
+                }
+                assert_ne!(
+                    recovered, prompt_a,
+                    "gradient-guided recovered prompt A from corrupted-A observed — false positive"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn debug_gradient_descent_convergence_single_position() {
+        // Diagnostic: trace gradient descent at position 0 for one prompt.
+        // Uses a larger weight scale (1.0 instead of 1/sqrt(D)) so the loss
+        // landscape has steep enough gradients for the gradient-guided
+        // policy to demonstrate convergence.
+        let mut rng = fastrand::Rng::with_seed(0xC0DE);
+        let transformer = ToyTransformer::new_scaled(&mut rng, 1.0);
+
+        let mut prompt_rng = fastrand::Rng::with_seed(0xA5A5);
+        let prompt = random_prompt(&mut prompt_rng);
+        let true_token = prompt[0];
+        let buf = transformer.forward_full(&prompt);
+        let observed_state = &buf[0..D];
+
+        let mut proxy = [0.0_f32; D];
+        transformer.init_proxy_into(&mut proxy).unwrap();
+
+        let mut grad = [0.0_f32; D];
+        let step_size = 0.1_f32;
+        let grad_clip = 1.0_f32;
+
+        for step in 0..200 {
+            transformer.numerical_grad_into(observed_state, &proxy, &mut grad);
+            let norm = (grad.iter().map(|g| g * g).sum::<f32>()).sqrt();
+            if norm > grad_clip && norm > 0.0 {
+                let scale = grad_clip / norm;
+                for g in grad.iter_mut() {
+                    *g *= scale;
+                }
+            }
+            for (p, g) in proxy.iter_mut().zip(grad.iter()) {
+                *p -= step_size * g;
+            }
+
+            if step % 10 == 0 || step == 199 {
+                let mut f = [0.0_f32; D];
+                transformer.forward_proxy_into(&proxy, &mut f);
+                let loss: f32 =
+                    observed_state.iter().zip(f.iter()).map(|(o, fi)| 0.5 * (o - fi).powi(2)).sum();
+                let true_base = (true_token as usize) * D;
+                let true_embed = &transformer.embedding[true_base..true_base + D];
+                let dist: f32 = proxy
+                    .iter()
+                    .zip(true_embed.iter())
+                    .map(|(p, e)| (p - e).powi(2))
+                    .sum::<f32>()
+                    .sqrt();
+                let nearest = transformer.nearest_token(&proxy).unwrap();
+                eprintln!(
+                    "step {step:3}: grad_norm={norm:.4} loss={loss:.6} dist_to_true={dist:.4} nearest_v={nearest} (true={true_token})"
+                );
+            }
+        }
+
+        let final_nearest = transformer.nearest_token(&proxy).unwrap();
+        assert_eq!(
+            final_nearest, true_token,
+            "gradient descent did not converge to the correct token"
+        );
+    }
+
+    #[test]
+    fn grad_guided_with_random_policy_uses_grad_path_as_random() {
+        // When the policy is Random but the caller uses invert_sequence_grad,
+        // the driver should dispatch to the random path (no grad hook needed).
+        // Verify bit-identical result to invert_sequence with the same seed.
+        let mut rng = fastrand::Rng::with_seed(0x1234);
+        let transformer = ToyTransformer::new_scaled(&mut rng, 1.0);
+        let prompt = vec![5_u32, 10, 15, 20, 25, 30, 3, 7];
+        let buf = transformer.forward_full(&prompt);
+        let observed = ObservedStates::from_row_major(&buf, T, D).unwrap();
+
+        let cfg_random = InversionConfig::default();
+        let r1 = invert_sequence(&observed, V, &transformer, &cfg_random, 99).unwrap();
+        let r2 =
+            invert_sequence_grad(&observed, V, &transformer, &transformer, &cfg_random, 99).unwrap();
+        assert_eq!(r1, r2, "random via grad driver should be bit-identical to random via base driver");
     }
 }
