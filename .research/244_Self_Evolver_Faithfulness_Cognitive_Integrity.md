@@ -7,6 +7,8 @@
 > **Related Plans:** 054 (path-hacking detector), 212 (collapse-aware), 274 (curiosity-guided self-play), 278 (this doc — FaithfulnessProbe primitive)
 > **Cross-ref (riir-ai):** Research 129 (Cognitive Integrity Layer Guide — private selling-point doc), Plan 308 (Cognitive Integrity Layer runtime integration)
 > **Classification:** Public — generic inference-time diagnostic primitive + design discipline. No game IP, no chain IP.
+>
+> **PASS-Redirects (synthesis):** Nikolaou & Mencattini [arXiv:2510.15511 "Language Models are Injective and Hence Invertible"] (ICLR 2026) — PASS. Theorem (decoder-only text transformers w/ real-analytic activations are almost-surely injective prompt→last-token maps, preserved under GD) + SIPIT (modelless linear-time prompt recovery from layer-ℓ hidden states via per-position vocabulary search with a gradient-guided policy on a continuous proxy embedding — no backprop through weights). Connects to this note's `FaithfulnessProbe`/`ActivationExtractor` lineage by proving the encoding FaithfulnessProbe intervenes on is *lossless*: the last-token hidden state identifies the input almost surely, so a probe that fails to find behavioral influence cannot blame "missing information". But no actionable improvement to our stack: HLA (the cognitive substrate FaithfulnessProbe intervenes on) is a sigmoid-bounded per-NPC kernel, not a decoder-only text transformer — the injectivity theorem doesn't transfer; and we don't commit transformer hidden states anywhere, so SIPIT has no consumer. Theoretical-lens PASS only.
 
 ---
 

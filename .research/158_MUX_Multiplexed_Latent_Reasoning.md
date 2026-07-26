@@ -12,6 +12,8 @@
 > **Related Research:** 043 (Interventional SFT), 097 (Training-Free Looped Transformers), 151 (GDSD Guided Denoiser), 153 (Thinking Pixel), 156 (Speculative Reconciliation), 037 (REAP Model-Based/Modelless Duality)
 > **Related Plans:** 172 (RiM Reasoning Buffer Slots ✅), 171 (FrozenBaseGuard ✅), 136 (Training-Free Loop Wrapper), 177 (Speculative Reconciliation)
 > **Verdict: HIGH VALUE — Six modelless distillations, three model-based. The superposition-as-search-space idea is a genuine architectural fusion with our DDTree/BanditPruner/ConstraintPruner stack, not a rebranding. The anti-collapse guarantee (Proposition 9) gives us a theoretical foundation for why RiM slots don't degrade.**
+>
+> **PASS-Redirects (synthesis):** Nikolaou & Mencattini [arXiv:2510.15511 "Language Models are Injective and Hence Invertible"] (ICLR 2026) — PASS. Same "lossless latent encoding" theme as MUX (Proposition 9's lossless separation condition) but a different mechanism: MUX encodes losslessly via vocabulary simplex superposition + deterministic demultiplexing; that paper proves that the standard decoder-only transformer map (prompt→last-token state) is *already* almost-surely injective (real-analyticity + measure-zero collision sets, preserved under GD). Plus SIPIT — modelless linear-time prompt recovery from layer-ℓ hidden states via per-position vocabulary search. No actionable improvement to our stack: HLA is not a text transformer (theorem doesn't apply); we don't commit transformer hidden states to chain (no privacy leak to fix); no consumer needs prompt recovery. Theoretical lens — adds external theoretical support to the "latent encodings are lossless" intuition MUX already exploits.
 ---
 
 ## TL;DR
