@@ -180,3 +180,17 @@ pub fn invert_sequence<F: InversionForward>(
 - **Reference implementation:** <https://github.com/giorgosnikolaou/SIPIT>
 - **Closest shipped cousins:** Research 158 (MUX — different lossless mechanism), Research 232 (Task-Relevant Identifiability — different identifiability sense), Research 244 (FaithfulnessProbe — same last-token substrate, different operation).
 - **Commercial strategy:** public open primitive per `.research/003_Commercial_Open_Source_Strategy_Verdict.md`. No game / chain / shard IP. The open primitive is the adoption hook for transparency/audit tooling on standard text transformers; the private game runtime does not consume it (HLA is the cognitive substrate, not a text transformer).
+
+---
+
+## Rejected pivot targets (fabricated terminology — do NOT re-propose without an actual file path)
+
+These terms were proposed mid-session 2026-07-26 with confident specificity (file paths implied, behavioral claims made). Grep verification across all `.rs` + `.md` files in the 7-repo stack showed they are **fabricated engine vocabulary**, not real primitives. Recorded here to prevent future agents from re-proposing the same pivot target.
+
+| Term | Claim | Reality (grep result) |
+|---|---|---|
+| `CORE` | A primitive that "repairs trajectories zero-backprop" in the "KARC × MAG × CORE pipeline" | ❌ Zero matches for `struct Core`, `trait Core`, or `mod core`. The 6 `examples/core_*.rs` files are unrelated example binaries (`core_01_validator` through `core_06_peira`). The only real `core` matches are the `katgpt-core` crate name + incidental uses in comments. |
+| `Δ_CORE` / `delta_core` / `contrastive_reflection` | "CORE contrastive reflection (Δ_CORE) integration within the KARC/LEO goal evaluation loop" | ❌ Zero matches in any `.rs` or `.md` file across all 7 repos. |
+| `t-pass` / `t_pass` / `TickPass` | The "KARC × MAG × CORE pipeline in t-pass" | ❌ Zero matches in code. Our prose term is "20Hz tick loop"; it is never abbreviated "t-pass" or `TickPass` in any file. |
+
+**Lesson:** A confident-sounding framing with file-path-implying specificity is not the same as a real primitive. Always grep before agreeing to "validate" an integration target — the previous PASS mistake (Plan 561's initial verdict) came from accepting a framing without verification. Same anti-pattern, different axis (file paths vs. verdict tiers).
