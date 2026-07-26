@@ -75,17 +75,32 @@ impl WinMatrix {
         let n = self.ids.len();
         debug_assert_eq!(complexities.len(), n);
 
-        // Build (id, avg_payoff, complexity) from IDs + complexity lookup.
+        // Reuse the precomputed avg payoff from `self.rankings` (built once at
+        // `WinMatrix::new` construction). The prior form recomputed
+        // `self.payoffs[i].iter().sum() / (n-1)` per i -- duplicating the
+        // row-sum work `WinMatrix::new` already did.
+        //
+        // `rankings` carries `(id, avg_payoff)` pairs in payoff-descending
+        // order. Build a small id → avg_payoff lookup so the per-strategy
+        // tuple construction below stays O(1) per id. For the typical
+        // ruliology n (tens to low-thousands), a flat Vec parallel to
+        // `self.ids` (no HashMap allocation) is the right shape: the join
+        // is one O(n) pass matching `self.ids[i]` against `rankings[i].0`
+        // -- but `rankings` is shuffled by sort, so we still need the
+        // per-id lookup. Cheapest correct shape: a one-shot HashMap build.
+        use std::collections::HashMap;
+        let mut avg_by_id: HashMap<u64, f64> = HashMap::with_capacity(n);
+        for &(id, payoff) in &self.rankings {
+            avg_by_id.insert(id, payoff);
+        }
+
+        // Build (idx, id, avg_payoff, complexity).
         let id_to_idx: Vec<(usize, u64, f64, f32)> = self
             .ids
             .iter()
             .enumerate()
             .map(|(i, &id)| {
-                let avg = if n > 1 {
-                    self.payoffs[i].iter().sum::<f64>() / (n - 1) as f64
-                } else {
-                    0.0
-                };
+                let avg = avg_by_id.get(&id).copied().unwrap_or(0.0);
                 (i, id, avg, complexities[i])
             })
             .collect();
