@@ -324,15 +324,21 @@ impl FsmEnumerator {
     ///
     /// Complexity: O(n² × rounds) where n = strategies.len().
     ///
-    /// # Last-action-only hot path
+    /// # Last-action-only hot path (FSM-specific)
     ///
-    /// All `SimpleProgram` impls in this crate (FSM/TM/CA) read only
-    /// `opponent_history.last()` — the full history Vec was a vestige of the
-    /// trait contract. The tournament hot loop now tracks the last action as
-    /// a single `u8` per player and passes a 1-element slice. This is
-    /// bit-identical to the prior Vec<push> implementation (the impls never
-    /// observe history beyond `[len-1]`) but eliminates 2× `Vec::push` per
-    /// round per pair — O(rounds) heap writes dropped to zero.
+    /// This tournament is monomorphic over `FsmStrategy`, whose `next_action`
+    /// reads only `opponent_history.last()` (it has no memory beyond the prior
+    /// opponent move). The hot loop exploits that by tracking the last action
+    /// as a single `u8` per player and passing a 1-element slice — bit-identical
+    /// to the prior Vec<push> implementation (FSM never observes history beyond
+    /// `[len-1]`) but eliminates 2x Vec::push per round per pair.
+    ///
+    /// DO NOT copy this optimization into a generic `SimpleProgram` tournament
+    /// without first verifying the impl's history contract: `CaStrategy`'s
+    /// `next_action` reads up to `tape_width` (default 7) most-recent opponent
+    /// moves, so a CA-tournament must keep the full Vec<u8> history per player.
+    /// `TmStrategy` reads only `last()` (writes opponent's last move to the
+    /// tape at the head) so the optimization would be safe for a TM-tournament.
     pub fn tournament(
         strategies: &[FsmStrategy],
         rounds: u32,

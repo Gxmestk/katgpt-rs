@@ -265,14 +265,16 @@ pub fn delta_gated_co_evolve(
 /// Returns mean payoff across all opponent pairings, averaged over `rounds`
 /// iterations per opponent.
 ///
-/// # Last-action-only hot path
+/// # Last-action-only hot path (FSM-specific)
 ///
-/// All `SimpleProgram` impls in this crate read only `opponent_history.last()`.
-/// Tracking the last action as a single `u8` per player (instead of pushing
-/// to a `Vec<u8>` per round) is bit-identical and eliminates the per-round
-/// heap writes — `Vec::push` may still hit the allocator on first round
-/// (initial grow) and is wasted work after that since the contents are
-/// never observed.
+/// This helper is monomorphic over `FsmStrategy`, whose `next_action` reads
+/// only `opponent_history.last()`. Tracking the last action as a single `u8`
+/// per player (instead of pushing to a `Vec<u8>` per round) is bit-identical
+/// for FSM and eliminates per-round heap writes.
+///
+/// DO NOT reuse this pattern in a generic `SimpleProgram` evaluator without
+/// auditing the impl's history contract: `CaStrategy` reads up to `tape_width`
+/// (default 7) most-recent opponent moves. `TmStrategy` reads only `last()`.
 fn evaluate_vs_opponents(
     strategy: &FsmStrategy,
     opponents: &[FsmStrategy],
