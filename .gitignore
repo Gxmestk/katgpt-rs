@@ -16,3 +16,6 @@ output/
 # Python — scripts/ ships re-runnable auditors/builders; bytecode cache should not ship.
 __pycache__/
 *.pyc
+
+# Cloudlare
+.wrangler
