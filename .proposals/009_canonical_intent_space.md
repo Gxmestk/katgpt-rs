@@ -8,7 +8,7 @@
 - Universal Weight Subspace Hypothesis (arxiv 2512.05117) — shared spectral subspaces
 - Lottery Ticket Hypothesis (arxiv 1803.03635) — sparse winning subnetworks
 
-**Status:** Proposal — awaiting P2 validation before plan opens
+**Status:** Proposal — **P2 RAN 2026-07-26, G5 FAILED** (Bench 422). Cross-arch Procrustes path is NO-GO; demotes to GOAT (intra-arch only) unless SubspaceAdapter (P1) recovers signal. See [riir-train/.benchmarks/422_canon_p2_cross_model_procrustes_validation.md](../../riir-train/.benchmarks/422_canon_p2_cross_model_procrustes_validation.md). Plan remains unopened pending P1 SubspaceAdapter validation.
 **Target repos:** `katgpt-rs` (primary, public) + `riir-train` (secondary, private)
 **User constraint:** "this should be in katgpt-rs and riir-train as possible bc other riir-* is focus on game" — no files in riir-ai/chain/neuron-db for this work.
 
@@ -162,7 +162,7 @@ Per Research 459 §6. The two star gates decide Super-GOAT vs GOAT:
 | G2 perf | baseline latency | < 50µs project_into | required |
 | G3 no-regression | baseline on MMLU-lite | no capability loss | required |
 | G4 alloc-free | hot path | 0 alloc after construction | required |
-| **G5 cross-model preservation** | cosine sim floor 0.5 | **> 0.7 on held-out prompts across N≥2 same-arch models** | **GO: Super-GOAT path. NO-GO: fall back to trained stitching (riir-train).** |
+| **G5 cross-model preservation** | cosine sim floor 0.5 | **> 0.7 on held-out prompts across N≥2 same-arch models** | **GO: Super-GOAT path. NO-GO: fall back to trained stitching (riir-train).** **P2 RESULT (2026-07-26, Bench 422): G5 FAILED.** Mean cos = -0.27 (proj_dim=16) and -0.08 (proj_dim=64) on Gemma2-2B ↔ MiniCPM5-1B held-out. Negative cosine ⇒ cross-arch hidden states are not orthogonally alignable at the last-token summary position. Three structural blockers surfaced: (1) dim mismatch 2304 vs 1536, (2) O(d³) Newton-Schulz infeasible at d=1536, (3) underdetermined with n=40 ≪ 2·d. Demotes to GOAT (intra-arch) pending P1 SubspaceAdapter validation. |
 | **G6 cross-architecture gain** | baseline Llama + Rust sysprompt | canonical steering transferred Gemma → Llama beats floor on Rust eval | **GO: cross-arch Super-GOAT. NO-GO: demote to intra-arch GOAT (still ships).** |
 
 Per "Report the Floor" rule (Research 322), G1/G6 floor is **good system prompt**, not "no system prompt". Most style gains evaporate against a well-crafted prompt — G6 is the honesty gate.
