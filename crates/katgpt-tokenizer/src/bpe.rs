@@ -712,13 +712,49 @@ impl BpeTrainer {
             // share a string — comparing by string recovers lexicographic
             // order. (We can't compare by ID directly: ID order is insertion
             // order, not lexicographic order.)
-            let best = pair_counts.iter().min_by_key(|&((l_id, r_id), c)| {
-                let l_str = id_to_vocab.get(*l_id).map(String::as_str).unwrap_or("");
-                let r_str = id_to_vocab.get(*r_id).map(String::as_str).unwrap_or("");
-                (std::cmp::Reverse(*c), l_str, r_str)
-            });
-            let (&(left_id, right_id), &count) =
-                best.expect("pair_counts non-empty checked above");
+            //
+            // Hot-loop optimization: the prior `min_by_key` form built a
+            // `(Reverse(c), l_str, r_str)` tuple — and thus read two strings
+            // from `id_to_vocab` — for EVERY entry, including entries whose
+            // count was already beaten by an earlier one. The explicit loop
+            // below skips the string reads entirely when `count < best_count`,
+            // which is the common case after the first few iterations of the
+            // outer training loop establish a high best_count. The string
+            // reads are deferred to the tie-break branch only.
+            let mut best_pair = (0usize, 0usize);
+            let mut best_count = 0usize;
+            let mut best_key: (&str, &str) = ("", "");
+            let mut found = false;
+            for (&pair, &count) in &pair_counts {
+                // Fast reject: any count below the current best cannot win,
+                // and we don't need the strings to know that. This skips two
+                // id_to_vocab slice reads on the common path.
+                if found && count < best_count {
+                    continue;
+                }
+                let (l_id, r_id) = pair;
+                // Safe direct index: ids in `pair_counts` were inserted from
+                // `words_tok`, whose ids are valid `id_to_vocab` indices by
+                // construction. Skip the bounds check that `.get()` would add.
+                let l_str = id_to_vocab[l_id].as_str();
+                let r_str = id_to_vocab[r_id].as_str();
+                let take = if !found || count > best_count {
+                    true
+                } else {
+                    // Same count → lexicographic tie-break on (l_str, r_str).
+                    (l_str, r_str) < best_key
+                };
+                if take {
+                    best_pair = pair;
+                    best_count = count;
+                    best_key = (l_str, r_str);
+                    found = true;
+                }
+            }
+            // `pair_counts` was checked non-empty above; the loop sets `found`.
+            debug_assert!(found, "pair_counts was non-empty but no best found");
+            let (left_id, right_id) = best_pair;
+            let count = best_count;
 
             if count < 2 {
                 break; // Stop if no pair appears more than once
@@ -744,14 +780,21 @@ impl BpeTrainer {
 
             // Apply ONLY this merge in-place to each word's tokenization.
             // Pure integer writes — no String clone() per token.
+            //
+            // Hot-loop optimization: skip words that don't contain `left_id`
+            // at all. The full copy-to-scratch + swap path costs O(word_len)
+            // even for words that won't change; `contains(&left_id)` short-
+            // circuits on first match. For most merges the majority of words
+            // don't contain the left token, so this skips most of the copies.
             for word in &mut words_tok {
-                if word.len() < 2 {
+                if word.len() < 2 || !word.contains(&left_id) {
                     continue;
                 }
                 scratch.clear();
                 let mut i = 0;
-                while i < word.len() {
-                    if i + 1 < word.len() && word[i] == left_id && word[i + 1] == right_id {
+                let len = word.len();
+                while i < len {
+                    if i + 1 < len && word[i] == left_id && word[i + 1] == right_id {
                         scratch.push(merged_id);
                         i += 2;
                     } else {
