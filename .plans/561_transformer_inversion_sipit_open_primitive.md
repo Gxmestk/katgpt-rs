@@ -5,7 +5,7 @@
 **Source paper:** [arXiv:2510.15511](https://arxiv.org/abs/2510.15511) — Nikolaou, Mencattini, Crisostomi, Santilli, Panagakis, Rodolà, *Language Models are Injective and Hence Invertible*, ICLR 2026
 **Reference impl:** <https://github.com/giorgosnikolaou/SIPIT>
 **Target:** `katgpt-rs/crates/katgpt-core/src/inversion/` (new module) + Cargo feature `transformer_inversion`
-**Status:** Parked Gain tier — Phase 1-4 deferred pending consumer (commit `d032d354`, re-verified 2026-07-26: zero consumers across all 7 repos). Phase 5 T5.1/T5.2 are decision gates awaiting their condition (consumer / 3-month timeout 2026-10-26). Do NOT implement without amending this plan.
+**Status:** Phase 1 DONE (commit pending, 2026-07-26) — skeleton + RandomPolicy + G1 ALL PASS on toy 2-layer GELU transformer (d=16, |V|=32, T=8); 20 unit tests green; zero default-feature regression (1814 lib tests pass). Phases 2-4 stay deferred pending consumer. Phase 5 T5.1/T5.2 are decision gates awaiting their condition (consumer / 3-month timeout 2026-10-26). Promotion to default-on still requires a concrete consumer.
 
 ---
 
@@ -124,18 +124,18 @@ pub fn invert_sequence<F: InversionForward>(
 
 ### Phase 1 — Skeleton + Random Policy + G1 (essential)
 
-> **State:** Deferred pending consumer (parked Gain tier, commit `d032d354`). Phase 1 implementation is gated on a concrete consumer materializing — do NOT implement without amending this plan + re-running the GOAT gate.
+> **State:** DONE 2026-07-26. Skeleton + RandomPolicy + 3 G1 sub-tests on toy 2-layer GELU transformer (d=16, |V|=32, T=8) ALL PASS. 20 unit tests green. `--no-default-features --features transformer_inversion` clean. Default-feature regression check: 1814 lib tests pass (zero leak).
 
-- [-] **T1.1** Create `crates/katgpt-core/src/inversion/` module skeleton with `#[cfg(feature = "transformer_inversion")]`. Add `transformer_inversion = []` feature to `crates/katgpt-core/Cargo.toml`. Export from `crates/katgpt-core/src/lib.rs` behind feature gate.
-- [-] **T1.2** Implement `ObservedStates`, `InversionConfig`, `InversionPolicy::Random`, `InversionResult`, `InversionError` in `mod.rs` + `verifier.rs`.
-- [-] **T1.3** Implement `InversionForward` trait + `RandomPolicy` enumeration (uniform-without-replacement via fastrand permutation).
-- [-] **T1.4** Implement `invert_sequence` driver in `recovery.rs` — outer T-loop × inner |V|-loop with early break on acceptance. Zero-allocation hot path (verify with `dhat` bench in Phase 3).
-- [-] **T1.5** Add unit tests in `tests.rs`:
+- [x] **T1.1** Create `crates/katgpt-core/src/inversion/` module skeleton with `#[cfg(feature = "transformer_inversion")]`. Add `transformer_inversion = []` feature to `crates/katgpt-core/Cargo.toml`. Export from `crates/katgpt-core/src/lib.rs` behind feature gate.
+- [x] **T1.2** Implement `ObservedStates`, `InversionConfig`, `InversionPolicy::Random`, `InversionResult`, `InversionError` in `mod.rs` + `verifier.rs`.
+- [x] **T1.3** Implement `InversionForward` trait + `RandomPolicy` enumeration (uniform-without-replacement via fastrand permutation).
+- [x] **T1.4** Implement `invert_sequence` driver in `recovery.rs` — outer T-loop × inner |V|-loop with early break on acceptance. Zero-allocation hot path via `invert_sequence_into` (caller-supplied scratch); `invert_sequence` convenience wrapper allocates once.
+- [x] **T1.5** Add unit tests in `tests.rs`:
   - Toy 2-layer decoder-only transformer (GELU activation, d=16, |V|=32, T=8), random init.
-  - `g1_exact_recovery_random_init` — generate random prompts, run forward to get `H̆^(ℓ)`, run `invert_sequence`, assert exact recovery.
-  - `g1_recovers_when_two_prompts_differ_only_at_position_t` — direct test of the paper's causality argument (Lemma D.2).
-  - `g1_no_false_positive_on_mismatched_observed` — wrong `H̆` does not produce the original prompt.
-- [-] **T1.6** `cargo clippy -p katgpt-core --features transformer_inversion --all-targets` clean. `cargo test -p katgpt-core --features transformer_inversion --lib inversion::` green.
+  - `g1_exact_recovery_random_init` — 8 random prompts, all recover exactly. ✅ PASS
+  - `g1_recovers_when_two_prompts_differ_only_at_position_t` — Lemma D.2 causality, 8 positions mutated one-at-a-time, all recover. ✅ PASS
+  - `g1_no_false_positive_on_mismatched_observed` — corrupted observed does not produce original prompt. ✅ PASS
+- [x] **T1.6** `cargo clippy -p katgpt-core --features transformer_inversion --lib --tests` clean. `cargo test -p katgpt-core --features transformer_inversion --lib inversion::` green (20 tests).
 
 ### Phase 2 — Gradient-Guided Policy (paper Alg 3)
 

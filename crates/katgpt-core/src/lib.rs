@@ -1720,6 +1720,38 @@ pub mod hope;
 #[cfg(feature = "hebbian_kernel_memory")]
 pub mod hebbian_kernel_memory;
 
+// Transformer Inversion — SipIt open primitive (Plan 561, Research 232
+// Gain-Redirects, arXiv:2510.15511 Nikolaou et al. ICLR 2026). Modelless,
+// O(T·|V|) exact prompt recovery from a layer-ℓ hidden state matrix via
+// per-position vocabulary search. Public-engine adoption hook for
+// transparency / interpretability / audit tooling on standard decoder-only
+// text transformers; NOT applicable to HLA (sigmoid-bounded 8-dim belief
+// kernel, not a real-analytic text transformer) and NOT a sync-boundary
+// compression primitive (transmitting a T×d hidden-state matrix is a
+// ~7000× bandwidth INCREASE over the 20-byte scalar sync).
+//
+// Phase 1 (this module): skeleton + RandomPolicy (uniform-without-
+// replacement) + G1 exact-recovery tests on a toy 2-layer GELU transformer.
+// Phase 2 (gated on `grad_policy` sub-feature): GradientGuidedPolicy
+// (paper Alg 3). Phase 3 (deferred): G2 latency + G4 alloc-free benches.
+//
+// Gain-tier parking rationale: §1.55 mandates the verdict (modelless +
+// not shipped → Gain). The Gain tier routing "Plan only, behind feature
+// flag" implies code ships feature-gated; promotion to default-on
+// requires a concrete consumer that demonstrates a gain at the GOAT gate
+// (Plan 561 T5.1 — unmet as of 2026-07-26: zero consumers across the
+// 7-repo stack). The feature ships as adoption-hook infrastructure.
+#[cfg(feature = "transformer_inversion")]
+pub mod inversion;
+#[cfg(feature = "transformer_inversion")]
+pub use inversion::{
+    AcceptanceRegion, InversionConfig, InversionError, InversionForward, InversionPolicy,
+    InversionResult, ObservedStates, RandomPolicy, accept_observation, accept_observation_into,
+    invert_sequence, invert_sequence_into,
+};
+#[cfg(feature = "grad_policy")]
+pub use inversion::InversionGradient;
+
 // ARG Protocol Primitives — open half of the ARG × Latent Substrate Super-GOAT
 // fusion (Plan 327 Phases 1-3, Research 309, Guide 160 private). Five generic
 // protocol primitives distilled from the ARG Standard
