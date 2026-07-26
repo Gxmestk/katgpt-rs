@@ -1,0 +1,51 @@
+[package]
+name = "katgpt-canon"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+description = "Canonical Intent Space — architecture-neutral intent directions + per-model adapters (Proposal 009, Research 459). Composes orthogonal_procrustes (katgpt-spectral) with thin_svd_into (katgpt-core) into a CanonicalIntent × ModelAdapter → model-specific-latent functor. P0 ships CanonicalIntent + ProcrustesAdapter (same-arch); P1 ships SubspaceAdapter (cross-arch joint-SVD — Bench 423 G5 PASS at k∈{2,4}). The intra-arch path is unaffected by the P3c cross-arch exhaustion verdict."
+repository = "https://github.com/katopz/katgpt-rs"
+keywords = ["canonical", "intent", "procrustes", "subspace", "modelless"]
+categories = ["algorithms", "science"]
+
+[dependencies]
+# katgpt-core: thin_svd_into + SvdResultScratch + SvdScratch for the joint
+# SVD step in SubspaceAdapter. The `subspace_phase_gate` feature is DEFAULT-ON
+# in katgpt-core (Plan 301 Phase 5) so the substrate is always compiled; we
+# still spell it out so a future katgpt-core default-off flip can't silently
+# break the canon crate.
+katgpt-core = { path = "../katgpt-core", features = ["subspace_phase_gate"] }
+# katgpt-spectral: orthogonal_procrustes (Issue 001 / Plan 152) for the
+# ProcrustesAdapter + the k-dim alignment step inside SubspaceAdapter.
+# Always-on — both adapters depend on it. Forwards the `orthogonal_procrustes`
+# feature so the `procrustes` module is compiled (it's feature-gated in
+# katgpt-spectral itself).
+katgpt-spectral = { path = "../katgpt-spectral", features = ["orthogonal_procrustes"] }
+# blake3: BLAKE3 tag/commitment for CanonicalIntent + adapters (freeze/thaw
+# attestation + cross-node verify). Non-optional — every public surface
+# carries a [u8; 32] commitment.
+blake3 = "1"
+# bytemuck: zero-cost f32→bytes cast for blake3 commitments. Non-optional —
+# every adapter's commitment() casts an f32 slice to bytes.
+bytemuck = "1"
+
+[features]
+default = []
+
+# P0 — CanonicalIntent + ModelAdapter trait + ProcrustesAdapter (same-arch).
+# Opt-in. Promotion to default-on gated on G1–G4 GOAT (Proposal 009 §GOAT).
+# The intra-arch claim (same-dim model pairs) is unaffected by the P3c
+# cross-arch exhaustion verdict.
+canon = []
+
+# P1 — SubspaceAdapter (cross-arch joint-SVD). Implies `canon`. The
+# load-bearing result is Bench 423 (G5 GO at k∈{2,4} on Gemma2-2B ↔
+# MiniCPM5-1B held-out). Opt-in — the cross-arch canonical DIRECTION claim
+# is demoted per P3c, but the cross-arch shared SUBSPACE result (pairwise
+# alignment preservation at low k) is real and ships here.
+canon_subspace = ["canon"]
+
+# P4 — MaskAdapter (lottery-ticket mask application). Implies `canon`.
+# Mask discovery is training-side (riir-train); mask APPLICATION is
+# modelless elementwise multiply. Opt-in until P4 lands.
+canon_mask = ["canon"]

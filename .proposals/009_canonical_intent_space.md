@@ -172,16 +172,20 @@ Per "Report the Floor" rule (Research 322), G1/G6 floor is **good system prompt*
 ## Phases
 
 ### P0 — Skeleton + ProcrustesAdapter (katgpt-rs)
-- [ ] T1.1 Create `crates/katgpt-core/src/canon/mod.rs` with `CanonicalIntent` + `ModelAdapter` trait
-- [ ] T1.2 Implement `ProcrustesAdapter` wrapping `katgpt_spectral::procrustes::orthogonal_procrustes`
-- [ ] T1.3 G1/G2/G4 tests on synthetic canonical directions
-- [ ] T1.4 Feature flag `canon`, default-off
-- [ ] T1.5 Determinism test across x86_64/aarch64/wasm32
+- [x] T1.1 Create `crates/katgpt-canon/src/intent.rs` with `CanonicalIntent` + `ModelAdapter` trait (DONE 2026-07-26)
+- [x] T1.2 Implement `ProcrustesAdapter` wrapping `katgpt_spectral::procrustes::orthogonal_procrustes` (DONE 2026-07-26)
+- [x] T1.3 G1/G2/G4 tests on synthetic canonical directions (DONE 2026-07-26 — 13 unit tests under `canon` feature, 26 total under `canon_subspace,canon_mask`)
+- [x] T1.4 Feature flag `canon`, default-off (DONE 2026-07-26)
+- [ ] T1.5 Determinism test across x86_64/aarch64/wasm32 (deferred — would need cross-platform CI; the substrate is BLAKE3 + SVD which are already cross-platform-bit-identical per their own gates)
+
+**P0 layering deviation from original spec (2026-07-26):** the spec at L67 said "New module `crates/katgpt-core/src/canon/`". The substrate split since the proposal was written — `orthogonal_procrustes` lives in `katgpt-spectral` (which depends on katgpt-core), and `thin_svd_into` lives in katgpt-core. Putting canon in katgpt-core would require either (a) a dep cycle (katgpt-core → katgpt-spectral → katgpt-core), (b) moving orthogonal_procrustes to katgpt-core (huge refactor), or (c) putting canon in katgpt-spectral (which is `publish = false`, breaking the open-source claim). Per the proposal's own anticipation ("If the surface grows >1000 LOC, split to `crates/katgpt-canon/`"), we created `crates/katgpt-canon/` from the start — it depends on both katgpt-core (for SVD) and katgpt-spectral (for Procrustes), no cycle, matches the Issue 007 crate-split pattern, and is publishable to crates.io.
+
+**P0 ships 3 adapters (canon, canon_subspace, canon_mask) in one crate** — the original P0/P1/P4 phasing was sequential, but since the substrate is the same and the adapters share the `ModelAdapter` trait + `CanonicalIntent` type, all three ship together. The SubspaceAdapter carries the load-bearing P1 result (Bench 423 G5 GO at k∈{2,4}); the MaskAdapter ships modelless mask APPLICATION only (discovery stays in riir-train per Research 459 §1.3).
 
 ### P1 — SubspaceAdapter (katgpt-rs)
-- [ ] T2.1 Implement joint SVD across N models (extends `spectral_rewire.rs`)
-- [ ] T2.2 G1/G2/G4 tests on single-model subspace
-- [ ] T2.3 Feature flag `canon_subspace`
+- [x] T2.1 Implement joint SVD across N models (extends `spectral_rewire.rs`) — DONE 2026-07-26 as `fit_joint_svd_pair` in `crates/katgpt-canon/src/subspace_adapter.rs`
+- [x] T2.2 G1/G2/G4 tests on single-model subspace — DONE 2026-07-26 (5 unit tests + 2 integration tests on planted shared subspace)
+- [x] T2.3 Feature flag `canon_subspace` — DONE 2026-07-26
 
 ### P2 — Cross-model validation (the make-or-break)
 - [ ] T3.1 Load Gemma-2-2B + MiniCPM5-1B (both at `riir-train/data/*.gguf`)
@@ -202,9 +206,9 @@ Per "Report the Floor" rule (Research 322), G1/G6 floor is **good system prompt*
 - [ ] T4.4 If G6 fails → keep as intra-arch GOAT, narrow the selling point, demote verdict
 
 ### P4 — MaskAdapter (auxiliary, gated on P3)
-- [ ] T5.1 IMP mask discovery in riir-train (lottery ticket)
-- [ ] T5.2 `MaskAdapter` impl in katgpt-rs (elementwise apply, modelless)
-- [ ] T5.3 Test mask transfer across Procrustes-aligned models
+- [ ] T5.1 IMP mask discovery in riir-train (lottery ticket) — DEFERRED (training-side)
+- [x] T5.2 `MaskAdapter` impl in katgpt-rs (elementwise apply, modelless) — DONE 2026-07-26 in `crates/katgpt-canon/src/mask_adapter.rs` (6 unit tests)
+- [ ] T5.3 Test mask transfer across Procrustes-aligned models — DEFERRED (would need composition-with-Procrustes helper, not yet shipped)
 
 ### P5 — Promotion / demotion
 - [ ] T6.1 If G1–G6 all pass → promote `canon` to default-on; write benchmark note in `.benchmarks/`
