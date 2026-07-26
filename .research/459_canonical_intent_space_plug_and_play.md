@@ -5,7 +5,7 @@
 > - [The Universal Weight Subspace Hypothesis](https://arxiv.org/abs/2512.05117) — Kaushik, Dec 2025
 > - [The Lottery Ticket Hypothesis](https://arxiv.org/abs/1803.03635) — Frankle, Carbin (MIT), ICLR 2019 Best Paper
 > **Date:** 2026-07-25
-> **Status:** Active — Super-GOAT candidate (G5/G6 unproven — see §6)
+> **Status:** Active — **cross-arch modelless path exhausted (P3/P3b/P3c, Benches 424-426, 2026-07-26).** Three converging failure lines: (1) centroid agreement −0.33 after Procrustes (aligns shape, not location); (2) layer 0 discriminates best, Git Re-Basin contradicted (vocabulary signal, not semantic); (3) length detrending reverses Python discrimination (+0.19→−0.15 — the apparent Rust-idiom signal was prompt length). P1 G5 still holds (joint-SVD shared subspace preserves pairwise alignment at k∈{2,4} — a real cross-model covariance result, independent of canonical direction existence). Cross-arch Super-GOAT claim **demoted** — reopens only on riir-train Recipe C (learned contrastive direction with length-matched pairs) or non-hidden-state construction (AST/clippy). Intra-arch claim (ProcrustesAdapter for same-dim pairs) unaffected.
 > **Related Research:** 178 (Rosetta cross-model alignment), 227 (GPart isometric partition), 231 (SOPTV sparse off-principal), 238 (LoRA-Muon gauge invariant), 406 (SAR spectral rewiring), 098/214/444 (lottery ticket lineage)
 > **Related Plans:** TBD — gated on Proposal 009 GOAT-gate outcome
 > **Cross-ref (riir-train):** Research 406 (Git Re-Basin + Universal Subspace training-side counterpart)
