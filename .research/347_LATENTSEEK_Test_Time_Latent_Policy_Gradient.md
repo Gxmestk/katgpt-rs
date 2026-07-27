@@ -7,6 +7,7 @@
 > **Related Research:** 325 (Survey gap G5 — this note closes it), 019 (TTT-Discover — closest gradient-on-weights cousin, NO-GAIN), 124 (ViTTT — vision TTT, NO-GAIN), 284/255 (CLR open primitive — modelless analog), 136 (riir-ai Per-NPC CLR Runtime — modelless test-time scaling), 240 (CGSP — curiosity host), 123 (riir-ai Latent Functor Runtime Guide — coherence-driven re-estimation cousin)
 > **Related Plans:** none (no new primitive — modelless analog already ships)
 > **Classification:** Public
+> **PASS-Redirects (synthesis):** Zhang et al. [arXiv:2605.02735 "Visual Latents Know More Than They Say: Unsilencing Latent Reasoning in MLLMs"] — **PASS** (same class as LATENTSEEK — frozen-backbone test-time per-instance latent optimization via gradient-like reward signal). The two-stage mechanism (Stage I query-guided contrastive latent-visual alignment + Stage II confidence-progression NES reward on H) decomposes modellessly into: contrastive pair → direction vector (CNA Plan 087 + Latent Field Steering Plan 309 + CHaRS Plan 409 — shipped); monotonic entropy concentration along latent span (Progressive MCGS EntropyGatedScheduler, Plan 272 — shipped). The "Silenced Visual Latents" pathology is specific to MLLM joint training (autoregressive shortcut bypasses latent channel); we never train backbones so the shortcut can't form — HLA/functor/CLR channels are the only path. No new primitive.
 
 ---
 
