@@ -17,5 +17,8 @@ output/
 __pycache__/
 *.pyc
 
-# Cloudlare
+# Cloudflare
 .wrangler
+
+# Local agent tool configuration (Claude Code, etc.)
+.claude/
