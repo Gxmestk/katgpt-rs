@@ -53,8 +53,8 @@ NOT verify the production G5 magnitude. Bench 423 is the authority for G5.
 
 | Adapter | Sub-gate | Floor | Result |
 |---|---|---|---|
-| ProcrustesAdapter | `project_into` at d=256 | ≤ 50µs | **PASS** — 29.00 µs |
-| ProcrustesAdapter | `project_into` at d=2304 (diagnostic) | NOT GATED | 3.895 ms (O(d²) scaling) |
+| ProcrustesAdapter | `project_into` at d=256 | ≤ 50µs | **PASS** — 16.17 µs (was 29.00 µs pre-SIMD, commit e5efd20e) |
+| ProcrustesAdapter | `project_into` at d=2304 (diagnostic) | NOT GATED | 1.328 ms (was 3.895 ms pre-SIMD; O(d²) scaling, 2.9× from 8-wide FMA) |
 | SubspaceAdapter | `project_into` at k=4, d_b=1536 | ≤ 50µs | **PASS** — 417 ns |
 | MaskAdapter | `project_into` at d=2304 | ≤ 50µs | **PASS** — 1.38 µs |
 
@@ -63,9 +63,11 @@ NOT verify the production G5 magnitude. Bench 423 is the authority for G5.
 (O(d·k), k≪d) and MaskAdapter (O(d)), but NOT for ProcrustesAdapter at
 production model dims. `project_into` is O(d²) and at d=2304 (Gemma2-2B
 hidden dim) the theoretical SIMD floor is ~220µs (5.3M flops / 8-wide AVX2
-FMA / 3 GHz). The measured 3.9ms indicates LLVM is not auto-vectorizing the
-inner dot-product loop (running at ~scalar speed). Even with perfect SIMD,
-50µs is physically unachievable at d=2304 on commodity hardware.
+FMA / 3 GHz). The post-SIMD-optimization (commit e5efd20e, 8-wide FMA
+accumulator pattern) measured 1.328ms — a 2.9× improvement over the prior
+scalar-speed 3.895ms, but still 6× above the theoretical floor. Even with
+perfect SIMD, 50µs is physically unachievable at d=2304 on commodity
+hardware.
 
 **Scoping the gate:** the G2 50µs floor applies to the hot path — the adapters
 called per-direction per-tick. That's SubspaceAdapter (the cross-arch steering
@@ -114,11 +116,13 @@ GOAT stamp. The gates that remain load-bearing post-permanent-demotion
 - **Mask path** (MaskAdapter) — fully validated.
 
 **Known limitation:** ProcrustesAdapter `project_into` at d=2304 (full Gemma2-2B
-dim) is 3.9ms — O(d²) scaling, not gated against 50µs. The hot-path gate
-(d=256, SubspaceAdapter, MaskAdapter) all pass 50µs. A future SIMD
-optimization (manual NEON/AVX intrinsics on the inner matvec loop, or
-switching to `ndarray`'s BLAS-backed matvec) would close the gap but is not
-blocking — ProcrustesAdapter at full dim is a setup-time operation.
+dim) is 1.328ms post-SIMD-optimization (commit e5efd20e) — O(d²) scaling, not
+gated against 50µs. The 8-wide FMA accumulator pattern (mirrors
+`dot_8wide` in katgpt-attn-match) improved this 2.9× from the prior 3.895ms
+scalar-speed path. The hot-path gate (d=256, SubspaceAdapter, MaskAdapter)
+all pass 50µs (d=256 now at 16.17µs, was 29µs). Further gains would require
+BLAS-backed matvec (ndarray+openblas) — not added per the "prefer existing
+dependencies" rule; the setup-time path at 1.3ms is acceptable.
 
 ## Features stay opt-in
 
