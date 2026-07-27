@@ -61,6 +61,19 @@
 //! The intra-arch path ([`ProcrustesAdapter`] for same-dim model pairs)
 //! is unaffected.
 //!
+//! ## The G1/G2/G4 GOAT stamp (Bench 562, 2026-07-28)
+//!
+//! The substrate's hot-path gates are measured and pass:
+//!
+//! | Adapter | G1 correctness | G2 perf (target 50µs) | G4 alloc-free |
+//! |---|---|---|---|
+//! | [`ProcrustesAdapter`] | ✓ (residual ≤ 1%, round-trip ≤ 1e-4) | ✓ at d=256 (29µs); d=2304 is 3.9ms diagnostic (O(d²)) | ✓ (0 allocs/1000 calls) |
+//! | [`SubspaceAdapter`] | ✓ (heldout cosine > 0, frac pos ≥ 0.6) | ✓ at k=4, d=1536 (417ns) | ✓ (0 allocs/1000 calls) |
+//! | [`MaskAdapter`] | ✓ (all-ones = identity, half-zero correct) | ✓ at d=2304 (1.38µs) | ✓ (0 allocs/1000 calls) |
+//!
+//! See [Bench 562](../../.benchmarks/562_katgpt_canon_goat.md) for the full
+//! gate matrix + the ProcrustesAdapter d=2304 scaling limitation note.
+//!
 //! ## Layering note
 //!
 //! This crate lives at `crates/katgpt-canon/` (NOT `crates/katgpt-core/src/canon/`
