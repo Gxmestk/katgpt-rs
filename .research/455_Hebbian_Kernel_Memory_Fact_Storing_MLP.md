@@ -8,6 +8,7 @@
 > **Cross-ref (riir-neuron-db):** [riir-neuron-db/.research/303](../../riir-neuron-db/.research/303_Hebbian_Fact_Storing_Shard_SuperGOAT_Guide.md) — **the Super-GOAT private guide** (selling-point owner: closed-form shard construction + MLP-swap editing on Pillar 2)
 > **Cross-ref (riir-ai):** the runtime swap pattern (`InducedCwmSlot` / `LoRAHotSwap`); the consumer-side fact-edit API will land in a follow-up riir-ai plan once the open primitive + shard bridge ship.
 > **Classification:** Public — open-primitive layer (generic Hebbian kernel math, no game/chain/shard IP)
+> **PASS-Redirects (synthesis):** Garcia/Liu/Junkins/Ré — blog post "MLPs are Hebbian Memories: A Simple Recipe for Fact-Storing Transformers" [https://hazyresearch.stanford.edu/blog/2026-07-22-mlps-are-hebbians] (2026-07-22) — popularization of the same arXiv:2607.10034 paper this note distills. Every mechanism in the blog post (Algorithm 1 closed-form recipe `MLP(x)=B·((Ax)⊙(Gx))`, Hebbian memory view, `W=Θ(F log F)` capacity, Transformer-block noisy-query robustness `ε_attn ≤ √(d/(F log F))`, whitened + data-dependent variants) is already implemented and promoted to DEFAULT-ON in katgpt-core via Plan 559 (G1–G5 PASS, Benchmark 462 quality PoC, Benchmark 469 promotion review). Blog's "What's next" (fact-editing pretrained LLMs in-place, sequence-mixer memory, multi-layer cooperation) is unactionable future work — no config contradiction, no unmitigated failure mode, no unblocker. No new files.
 
 ---
 
