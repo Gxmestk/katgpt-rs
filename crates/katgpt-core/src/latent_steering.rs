@@ -51,20 +51,20 @@
 
 use blake3::Hasher;
 
-// ── HLA axis indices ──────────────────────────────────────────────
+// ── Belief axis indices ──────────────────────────────────────────
 
-/// Index of the valence axis in the 8-dim HLA activation vector.
-pub const HLA_VALENCE: usize = 0;
+/// Index of the valence axis in the 8-dim belief activation vector.
+pub const BELIEF_VALENCE: usize = 0;
 /// Index of the arousal axis.
-pub const HLA_AROUSAL: usize = 1;
+pub const BELIEF_AROUSAL: usize = 1;
 /// Index of the desperation axis.
-pub const HLA_DESPERATION: usize = 2;
+pub const BELIEF_DESPERATION: usize = 2;
 /// Index of the calm axis.
-pub const HLA_CALM: usize = 3;
+pub const BELIEF_CALM: usize = 3;
 /// Index of the fear axis.
-pub const HLA_FEAR: usize = 4;
-/// Standard HLA dimensionality (5 affective + 3 reserved).
-pub const HLA_DIM: usize = 8;
+pub const BELIEF_FEAR: usize = 4;
+/// Standard belief dimensionality (5 affective + 3 reserved).
+pub const BELIEF_DIM: usize = 8;
 
 // ── Errors ────────────────────────────────────────────────────────
 

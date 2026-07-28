@@ -224,7 +224,7 @@ impl<F: PointForecaster> ConformalIntervalCalibrator<F> {
     /// Construct a new calibrator.
     ///
     /// - `forecaster`: the wrapped point forecaster.
-    /// - `n_channels`: number of channels (e.g. HLA_DIM=8).
+    /// - `n_channels`: number of channels (e.g. BELIEF_DIM=8).
     /// - `max_h`: maximum horizon `h` that will be queried. Horizon buckets
     ///   beyond `max_h` wrap into the largest bucket.
     /// - `m`: seasonal period (`m=1` for non-seasonal).

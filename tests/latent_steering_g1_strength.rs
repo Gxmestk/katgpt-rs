@@ -9,7 +9,7 @@
 //! ## Setup
 //!
 //! - Baseline 8-dim state with fear-axis projection = 1.0 (moderate baseline).
-//! - Steering vector: one-hot at HLA_FEAR (index 4), unit-norm (trivially).
+//! - Steering vector: one-hot at BELIEF_FEAR (index 4), unit-norm (trivially).
 //! - α = 0.5.
 //! - Measure fear-axis projection before and after.
 //!
@@ -28,7 +28,7 @@
 
 #![cfg(feature = "latent_field_steering")]
 
-use katgpt_core::latent_steering::{HLA_FEAR, LatentSteeringVector, apply_latent_steering};
+use katgpt_core::latent_steering::{BELIEF_FEAR, LatentSteeringVector, apply_latent_steering};
 
 const ALPHA: f32 = 0.5;
 /// Required relative shift on the target axis: post/pre ≥ 1.30.
@@ -38,7 +38,7 @@ const TARGET_SHIFT_RATIO: f32 = 1.30;
 fn g1_steering_strength() {
     // ── Build the steering vector: one-hot at fear axis ────────────────
     let mut direction = vec![0.0f32; 8];
-    direction[HLA_FEAR] = 1.0; // unit-norm by construction
+    direction[BELIEF_FEAR] = 1.0; // unit-norm by construction
     let steering = LatentSteeringVector::new(direction, ALPHA, 1e-5).unwrap();
 
     // ── Baseline state: fear = 1.0, other axes = small spread ──────────
@@ -49,8 +49,8 @@ fn g1_steering_strength() {
     apply_latent_steering(&mut state, &steering);
 
     // ── Gate 1: target-axis shift ≥ 30% ────────────────────────────────
-    let fear_pre = baseline[HLA_FEAR];
-    let fear_post = state[HLA_FEAR];
+    let fear_pre = baseline[BELIEF_FEAR];
+    let fear_post = state[BELIEF_FEAR];
     let ratio = fear_post / fear_pre;
     println!(
         "G1 fear-axis: pre={fear_pre:.4} post={fear_post:.4} ratio={ratio:.4} \
@@ -66,7 +66,7 @@ fn g1_steering_strength() {
     // untouched. This verifies targeted affect shift — no leakage to other
     // emotional axes.
     for i in 0..8 {
-        if i == HLA_FEAR {
+        if i == BELIEF_FEAR {
             continue;
         }
         let delta = state[i] - baseline[i];

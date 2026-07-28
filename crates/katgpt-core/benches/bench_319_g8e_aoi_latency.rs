@@ -10,7 +10,7 @@
 //!
 //! Simulate a worst-case-density crowd: **1000 NPCs**, each with **20 AOI
 //! partner candidates** (a generous AOI for a social hub zone), at **D=64**
-//! (the CGSP `DEFAULT_HLA_DIM`). Each tick, every NPC scores every partner via
+//! (the CGSP `DEFAULT_BELIEF_DIRECTION_DIM`). Each tick, every NPC scores every partner via
 //! `geometric_product_wedge_into` + L1 norm + sigmoid + tau gate — the exact
 //! computation performed by `complementarity_target` in the shipped bridge.
 //!
@@ -53,7 +53,7 @@ use katgpt_core::linalg::geometric_product_wedge_into;
 
 // ─── Constants (mirror clifford_bridge.rs exactly) ─────────────────────────
 
-/// HLA direction dimension (CGSP `DEFAULT_HLA_DIM`).
+/// Belief direction dimension (CGSP `DEFAULT_BELIEF_DIRECTION_DIM`).
 const DIM: usize = 64;
 
 /// Cyclic shifts for D=64 (clifford_bridge `DEFAULT_SHIFTS`).

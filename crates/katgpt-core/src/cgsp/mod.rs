@@ -63,9 +63,9 @@ pub use traits::{
     NoOpBatchGate, NoOpDifficultyFilter, QualityGuide, Solver,
 };
 pub use types::{
-    Candidate, CuriosityPrioritySnapshot, CycleResult, CycleStats, DEFAULT_HLA_DIM, DEFAULT_K,
-    DEFAULT_POOL_SIZE, Direction, Priority, ScratchBuffers, SolveRate, Target, entropy_nats,
-    sigmoid,
+    Candidate, CuriosityPrioritySnapshot, CycleResult, CycleStats, DEFAULT_BELIEF_DIRECTION_DIM,
+    DEFAULT_K, DEFAULT_POOL_SIZE, Direction, Priority, ScratchBuffers, SolveRate, Target,
+    entropy_nats, sigmoid,
 };
 
 // Dual-pool re-exports (Plan 282, Research 249).

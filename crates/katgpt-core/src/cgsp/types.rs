@@ -18,8 +18,8 @@ pub(crate) const SNAPSHOT_MAGIC: [u8; 4] = *b"CGSP";
 /// Current snapshot serialization version.
 pub(crate) const SNAPSHOT_VERSION: u32 = 1;
 
-/// Default maximum supported dimension for HLA direction vectors.
-pub const DEFAULT_HLA_DIM: usize = 64;
+/// Default maximum supported dimension for belief direction vectors.
+pub const DEFAULT_BELIEF_DIRECTION_DIM: usize = 64;
 
 /// Default maximum number of candidates sampled per cycle (k).
 pub const DEFAULT_K: usize = 4;

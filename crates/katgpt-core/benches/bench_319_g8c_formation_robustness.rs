@@ -73,7 +73,7 @@ use katgpt_core::linalg::geometric_product_wedge_into;
 
 // ─── Constants ─────────────────────────────────────────────────────────────
 
-/// belief direction dimension (CGSP `DEFAULT_HLA_DIM`).
+/// belief direction dimension (CGSP `DEFAULT_BELIEF_DIRECTION_DIM`).
 const DIM: usize = 64;
 
 /// Cyclic shifts for D=64 (clifford_bridge `DEFAULT_SHIFTS`).

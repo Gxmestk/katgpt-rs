@@ -277,7 +277,7 @@ pub use cgsp::{
     CuriosityPrioritySnapshot,
     CycleResult,
     CycleStats,
-    DEFAULT_HLA_DIM,
+    DEFAULT_BELIEF_DIRECTION_DIM,
     DEFAULT_K,
     DEFAULT_POOL_SIZE,
     DifficultyFilter,
@@ -1051,8 +1051,8 @@ pub use cross_resolution::{
 pub mod latent_steering;
 #[cfg(feature = "latent_field_steering")]
 pub use latent_steering::{
-    FieldSupport, HLA_AROUSAL, HLA_CALM, HLA_DESPERATION, HLA_DIM, HLA_FEAR, HLA_VALENCE,
-    LatentField, LatentSteeringError, LatentSteeringVector, apply_field_to_crowd,
+    BELIEF_AROUSAL, BELIEF_CALM, BELIEF_DESPERATION, BELIEF_DIM, BELIEF_FEAR, BELIEF_VALENCE,
+    FieldSupport, LatentField, LatentSteeringError, LatentSteeringVector, apply_field_to_crowd,
     apply_latent_steering, apply_latent_steering_weighted, kernel_weight,
 };
 
