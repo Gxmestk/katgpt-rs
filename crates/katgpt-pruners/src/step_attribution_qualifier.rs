@@ -399,7 +399,7 @@ impl ScoreAggregator<f32> for MeanAggregator {
 ///   `∈ (0, 1)`. The argmax is the responsible direction.
 ///
 /// This is the generic consumer-facing localizer. Game-specific localizers
-/// (e.g. riir-ai's `HlaDeltaStepLocalizer`, Plan 313 T1.6) can wrap this or
+/// (e.g. riir-ai's `BeliefDeltaStepLocalizer`, Plan 313 T1.6) can wrap this or
 /// implement `StepLocalizer` directly with domain-specific fault predicates.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct DotProductLocalizer {
