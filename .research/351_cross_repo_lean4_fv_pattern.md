@@ -25,7 +25,7 @@ The pattern is a **Super-GOAT capture protocol** in the sense of Research 003 §
 | `KatgptProof` | `katgpt-rs` (public) | `v4.31.0` | 3 | 0 | Sigmoid ranking preservation (`action_bridge_ranking_preserved` + `'` variant + `action_bridge_argmax_preserved`). The public adoption hook. |
 | `RiirChainProof` | `riir-chain` (private) | `v4.31.0` | 32 | 0 | LatCal round-trip (3), quorum determinism (5) + tier/block root funcs (2), chain-side `merkle_root` init (4), slashing monotonicity (8), split-key security (10). |
 | `NeuronDbProof` | `riir-neuron-db` (private) | `v4.31.0` | 28 | 0 | Shard layout consistency + `merkle_root` init (16), freeze gate contract (8), Merkle tamper-evidence (4, parameterized over injective `hashFn`). |
-| `RiirAiProof` | `riir-ai` (private) | `v4.32.0-rc1` | 16 | 1† | HLA scalar boundedness (14), freeze/thaw reader invariant (2, `propext`-only). |
+| `RiirAiProof` | `riir-ai` (private) | `v4.32.0-rc1` | 16 | 1† | belief scalar boundedness (14), freeze/thaw reader invariant (2, `propext`-only). |
 | **Total** | | | **79** | **1†** | |
 
 † `arcswap_store_atomicity` in `RiirAiProof/Runtime/Basic.lean` is **documentation-only** — the actual theorems depend only on `[propext]`. See §3.2.

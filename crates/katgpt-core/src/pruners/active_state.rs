@@ -38,7 +38,7 @@
 /// horizon as stall detection.
 ///
 /// This trait is intentionally minimal — it carries no gameplay types and
-/// no integrity hashes. The IP-heavy `ActiveStateEvent` struct (HLA scalars,
+/// no integrity hashes. The IP-heavy `ActiveStateEvent` struct (belief scalars,
 /// BLAKE3 commitment) stays in riir-games and exposes only these three
 /// scalars through a thin adapter impl.
 pub trait ActiveStateTrace {

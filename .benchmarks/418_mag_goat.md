@@ -125,6 +125,6 @@ The latency margins (10–30× headroom) make SIMD verification non-blocking.
    cold-start fallback; MAG (unsupervised) mines directions at runtime.
 3. **Real-corpus transfer validation** — G4 uses synthetic data. Independent
    validation on a real game-experience corpus is a riir-ai follow-up (G8).
-4. **Low-dim HLA separability** — G2 validates on d=64. Whether 8-dim HLA scalars
+4. **Low-dim HLA separability** — G2 validates on d=64. Whether 8-dim belief scalars
    support separable contrast directions is a host-side concern (Open Question 1
    in Plan 418).

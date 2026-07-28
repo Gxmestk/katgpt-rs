@@ -92,7 +92,7 @@ pub const PHI_OUT_DEFAULT: usize = 20;
 pub const PHI_HIDDEN_DEFAULT: usize = PHI_OUT_DEFAULT;
 
 /// Maximum supported target dimension. SE(3) is 6 (3 rotation + 3
-/// translation); SE(2) + HLA scalars are ≤ 8. Anything larger suggests the
+/// translation); SE(2) + belief scalars are ≤ 8. Anything larger suggests the
 /// target space should be factored.
 pub const TARGET_DIM_MAX: usize = 8;
 

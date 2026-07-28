@@ -84,7 +84,7 @@ Dormant subspaces **carry forward** via `gamma` decay (no recomputation — the 
 - It connects to **freeze/thaw** (the subspace profile per NPC personality is snapshot-versioned — different NPC personalities have different ×-shapes).
 - It connects to **cgsp_runtime** (curiosity signal drives WHICH subspace to activate — high curiosity on economic axis → economic subspace widens).
 
-**The LatCal bridge (sync boundary):** the per-stage subspace activation is a latent-space operation (which HLA dims are active), but the **decision** of which stage the NPC is in crosses the sync boundary as a raw scalar (stage_id, confidence). LatCal commits this as a fixed-point value so deterministic replay reconstructs the exact subspace schedule. The HLA scalar projections (valence/arousal/desperation/calm/fear) cross the wire as raw scalars per AGENTS.md; the full 8-dim vector stays local. This respects the raw-vs-latent boundary exactly.
+**The LatCal bridge (sync boundary):** the per-stage subspace activation is a latent-space operation (which HLA dims are active), but the **decision** of which stage the NPC is in crosses the sync boundary as a raw scalar (stage_id, confidence). LatCal commits this as a fixed-point value so deterministic replay reconstructs the exact subspace schedule. The belief scalar projections (valence/arousal/desperation/calm/fear) cross the wire as raw scalars per AGENTS.md; the full 8-dim vector stays local. This respects the raw-vs-latent boundary exactly.
 
 ### 2.3 The SECONDARY fusion (GOAT-tier fallback) — Shape-Adaptive Adapter Routing
 

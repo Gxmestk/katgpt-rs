@@ -40,7 +40,7 @@
 //!
 //! This module is **IP-clean for the public MIT repo** (katgpt-rs). It
 //! defines a generic `ActiveStateTrace` trait with three `f32` accessors
-//! — no gameplay types, no HLA scalars beyond the single `arousal` field
+//! — no gameplay types, no belief scalars beyond the single `arousal` field
 //! used for diagnostics, no sync-boundary types. The riir-games
 //! `ActiveStateEvent` (which carries the full `[f32; 5]` HLA bridge
 //! scalars + BLAKE3 hash) implements this trait via a thin adapter; the

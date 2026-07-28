@@ -136,7 +136,7 @@ Per the fusion protocol, the 2–3 closest existing fusions are:
 | Use sigmoid not softmax | ⚠️ Paper uses softmax (Eq. 1). Research 257 §F2 already mandates sigmoid-normalized basis for FUNCATTN; same fix applies to Transolver. (Moot — Plan 286 handles it.) |
 | Freeze/thaw over fine-tuning | ✅ Slice projection matrices are perfect freeze/thaw candidates. (Moot.) |
 | 5-repo discipline | ✅ Public note in katgpt-rs; no IP leak. |
-| Raw scalars at sync boundary | ✅ In the game-AI reframing, the 5 HLA scalars (valence/arousal/desperation/calm/fear) are the sync boundary; the slice weights and M-centroid tokens stay local. (Moot — covered by FAME R302 §2.4(d).) |
+| Raw scalars at sync boundary | ✅ In the game-AI reframing, the 5 belief scalars (valence/arousal/desperation/calm/fear) are the sync boundary; the slice weights and M-centroid tokens stay local. (Moot — covered by FAME R302 §2.4(d).) |
 
 ---
 

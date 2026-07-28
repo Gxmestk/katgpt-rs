@@ -120,7 +120,7 @@ This is **exactly** the FUNCATTN mechanism (Research 257, Plan 286): `Φ^T Q` (e
 | Fixed-radius neighborhood definition (§3.4) | `katgpt-rs/crates/katgpt-core/src/zone_density.rs` + spatial partitioning in `riir-games` | Covered |
 | Positional encoding (coordinate concatenation, §3.7) | Standard pattern across HLA / CGSP / Fourier MCTS (`encode_offset(dx,dy)` in `riir-engine::fourier`) | Covered |
 | Pointwise operators (Nemytskii, §3.2) | Trivial — all activations ship as pointwise by construction | Covered |
-| Function-space mean/variance (Eq 16) | DEC-weighted aggregations; HLA scalar projections | Covered |
+| Function-space mean/variance (Eq 16) | DEC-weighted aggregations; belief scalar projections | Covered |
 | Spectral commitment crossing sync boundary | `riir-chain/src/encoding/latcal_fixed.rs::LatCalSpectralFixed` (Plan 265) | **Shipped** — `(freq × 10⁶, amp × 10⁶, phase × 10⁶)` fixed-point Fourier coefficients for chain commitment |
 | Per-NPC HLA field over a zone grid as FNO input | `apply_field_to_crowd` (Plan 309 latent steering) | **Shipped** — crowd-scale HLA field is a 2D field of 8-ch latents, natural FNO input |
 

@@ -107,7 +107,7 @@ Three fusion angles, in priority order:
 
 **Fusion B — Declarative schema × `KgTripleTemplate` × BLAKE3 commitment.** `vibe.rs` already ships `KgTripleTemplate { subject, predicate, object: [u8; 32] }`. Extending it with a `τ ∈ {Intrinsic, Relational}` field per template slot, frozen via `freeze_with_merkle`, yields a committable, inspectable schema artifact. *Engineering refinement; GAIN.*
 
-**Fusion C — OntoKG intrinsic/relational × SLoD (Research 208) continuous zoom.** At coarse SLoD σ, only relational modules visible (cross-cutting social skeleton); at fine σ, intrinsic attributes also visible (per-NPC HLA scalars). Hierarchical schema resolution. *Speculative; needs SLoD to ship first.*
+**Fusion C — OntoKG intrinsic/relational × SLoD (Research 208) continuous zoom.** At coarse SLoD σ, only relational modules visible (cross-cutting social skeleton); at fine σ, intrinsic attributes also visible (per-NPC belief scalars). Hierarchical schema resolution. *Speculative; needs SLoD to ship first.*
 
 **Why NOT Super-GOAT:** the intrinsic/relational distinction is (a) well-known prior art (property graph model, Angles 2018, Hogan et al. 2021 — both cited in OntoKG §2.4), (b) *already implicit* in our raw/latent boundary rule per Research 141 §1.3, and (c) explicitly rated LOW priority for our use case per Research 141 §3.3 #7. The novelty gate Q1 (no prior art) fails on both axes (global literature + our codebase). Q2 (new class of behavior) fails — it's making explicit what's implicit. Q3 (product selling point) is weak. Q4 (force multiplier) is partial. Per the no-candidate-escape-hatch rule, fusion angles with novelty TBD are filed as **Issues**, not committed as Super-GOAT in this note.
 

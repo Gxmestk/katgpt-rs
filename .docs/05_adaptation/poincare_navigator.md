@@ -48,7 +48,7 @@ Constants cap the supported dimensions:
 | `LATENT_DIM_MAX` | 64 | HLA=8, LLM-block=64, shard `style_weights`=64 — anything larger reduces first |
 | `PHI_OUT_DEFAULT` | 20 | Paper sweet spot for vision features |
 | `PHI_HIDDEN_DEFAULT` | `PHI_OUT_DEFAULT` | Modelless path is single linear + tanh |
-| `TARGET_DIM_MAX` | 8 | SE(3)=6, SE(2)+HLA scalars ≤ 8 |
+| `TARGET_DIM_MAX` | 8 | SE(3)=6, SE(2)+belief scalars ≤ 8 |
 | `RIDGE_ALPHA_DEFAULT` | 1.0 | Matches paper's α=1.0 |
 
 ## Why modelless

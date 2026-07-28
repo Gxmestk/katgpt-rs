@@ -181,7 +181,7 @@ At X8: saving 8× encode + 8× decode per patch = ~800ns saved per patch at 256 
 | `segment_id` | 4 bytes | Public index |
 | `weights: [f32; 8]` | 32 bytes | Superposition in vocab space, not raw tokens. Fourier shell protects. |
 | `BLAKE3 commitment` | 32 bytes | Tamper evidence |
-| **5 HLA scalar projections** | 20 bytes | Bridge outputs per AGENTS.md rule (not 64-dim vector) |
+| **5 belief scalar projections** | 20 bytes | Bridge outputs per AGENTS.md rule (not 64-dim vector) |
 
 ### What Does NOT Go on the Wire (Per AGENTS.md Anti-Patterns)
 

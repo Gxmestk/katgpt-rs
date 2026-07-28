@@ -183,7 +183,7 @@ Per the fusion protocol, the 2–3 closest existing fusions are:
 | Use sigmoid not softmax | ⚠️ Paper uses softmax (axial attention α, β weights; CATO-PC α_ij). R257 §F2 already mandates sigmoid-normalized basis for FUNCATTN; same fix applies to any CATO-inspired composition. (Moot — Plan 286 handles it.) |
 | Freeze/thaw over fine-tuning | ✅ Chart-equivalent bases (R291) are BLAKE3-committed; principal-direction bases (R279) are runtime-SVD-extracted (deterministic, no training). (Moot.) |
 | 5-repo discipline | ✅ Public note in katgpt-rs; no IP leak. |
-| Raw scalars at sync boundary | ✅ In any game-AI reframing, the 5 HLA scalars are the sync boundary; the chart coordinates and basis coefficients stay local. (Moot — covered by R291 §4.) |
+| Raw scalars at sync boundary | ✅ In any game-AI reframing, the 5 belief scalars are the sync boundary; the chart coordinates and basis coefficients stay local. (Moot — covered by R291 §4.) |
 | §3.5 modelless unblock protocol | ✅ Moot — nothing to unblock. CATO presents no GOAT gate or plan task to defer. |
 
 ---

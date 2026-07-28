@@ -62,7 +62,7 @@
 //!   on the consumer side, not a free lunch.
 //! - **Continuous high-dimensional state spaces** are the paper's acknowledged
 //!   limitation (§7). The log-ratio class must approximate `ω_π,γ` in
-//!   `L²(ν)`. For 8-dim HLA scalars or 64-dim `style_weights`, this is
+//!   `L²(ν)`. For 8-dim belief scalars or 64-dim `style_weights`, this is
 //!   feasible. For raw pixel state or 1000+-d transformer activations, it is
 //!   not. Do not over-promote.
 //! - **The DEC codifferential isomorphism** (Research 423 §2.2 — "adjoint

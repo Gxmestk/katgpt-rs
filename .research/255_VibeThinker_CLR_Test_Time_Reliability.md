@@ -165,7 +165,7 @@ The closest cousins are not enough on their own:
 | Learning-Potential `S_LP` | Existing CGSP (Plan 274) reward shaping + NeuronShard memory write gate | New curiosity signal: prioritizes memory writes / direction-vector updates for trajectories that are *reliable* (CLR-passing) AND *surprising* (high `S_LP` under frozen brain). |
 | Long2Short zero-sum tiebreak | NEW `brevity_tiebreak()` in `katgpt-rs/src/clr/` | Among clusters tied on `Σ r_k`, pick shorter representative. Composes with MUX-Latent (Plan 238) for token-budget-aware routing. |
 | Diversity-Exploring Distillation (paper §2.1.2) | Existing adapter routing (Dynamic Pair Plan 260, dMoE R161) + `MUX` (Plan 238) | At sample time, route K candidates through *different* frozen adapters / directions, not the same adapter K times. Pass@K-diversity, not Pass@1-optimality. |
-| Claim extraction (paper §3.1) | Trait `ClaimExtractor` — domain-specific. For LLMs: parser over reasoning trace. For game NPCs (private side): projection onto HLA scalar outcomes. For chain: state-predicate extractor. | Open trait; concrete extractors live in the consumer crate. |
+| Claim extraction (paper §3.1) | Trait `ClaimExtractor` — domain-specific. For LLMs: parser over reasoning trace. For game NPCs (private side): projection onto belief scalar outcomes. For chain: state-predicate extractor. | Open trait; concrete extractors live in the consumer crate. |
 | Freeze/thaw versioning | Existing `LoRAHotSwap` (riir-ai) + `ZoneExpertBundle` snapshot | Direction vectors `direction_vec_m` are versioned + BLAKE3-committed, atomic hot-swap, readers never see torn snapshots. |
 
 ### 2.3 The saCLR Loop (zero-allocation, hot-path-safe)
