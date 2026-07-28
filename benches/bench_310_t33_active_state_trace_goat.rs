@@ -194,8 +194,8 @@ struct ActiveStateSignal {
     compression_ratio_mean: f32,
     /// Slope of active_constraint_count over the window (rising > 0, falling < 0).
     constraint_trend: f32,
-    /// HLA arousal scalar (correlated with urgency / staleness).
-    hla_arousal: f32,
+    /// Emotion arousal scalar (correlated with urgency / staleness).
+    emotion_arousal: f32,
 }
 
 /// A single decision point in the corpus.
@@ -211,8 +211,8 @@ struct DecisionSample {
     weights_stale: bool,
 }
 
-/// Production `ActiveStateEvent` byte size (tick + count + hla_scalars + ratio + hash).
-/// tick=8, active_constraint_count=4, hla_scalars=[f32;5]=20, compression_ratio=4,
+/// Production `ActiveStateEvent` byte size (tick + count + emotion_scalars + ratio + hash).
+/// tick=8, active_constraint_count=4, emotion_scalars=[f32;5]=20, compression_ratio=4,
 /// event_hash=[u8;32]=32 → 68 bytes (no padding with natural alignment).
 const ACTIVE_STATE_EVENT_BYTES: usize = 68;
 
@@ -266,7 +266,7 @@ fn generate_corpus(n: usize, seed: u64) -> Vec<DecisionSample> {
             (comp, trend, delta, stall)
         };
 
-        let hla_arousal = if weights_stale {
+        let emotion_arousal = if weights_stale {
             rng.next_normal(0.7, 0.15).clamp(0.0, 1.0)
         } else {
             rng.next_normal(0.3, 0.15).clamp(0.0, 1.0)
@@ -278,7 +278,7 @@ fn generate_corpus(n: usize, seed: u64) -> Vec<DecisionSample> {
             trace: ActiveStateSignal {
                 compression_ratio_mean,
                 constraint_trend,
-                hla_arousal,
+                emotion_arousal,
             },
             weights_stale,
         });

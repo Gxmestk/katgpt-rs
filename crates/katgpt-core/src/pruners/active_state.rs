@@ -30,7 +30,7 @@
 /// Implementors summarize a slice of active-state events into three scalars:
 /// - `compression_ratio_mean` — mean compression_ratio over the window.
 /// - `constraint_trend` — signed slope of active_constraint_count (rising > 0).
-/// - `hla_arousal` — HLA arousal scalar (diagnostic only, not in the decision).
+/// - `emotion_arousal` — emotion arousal scalar (diagnostic only, not in the decision).
 ///
 /// The windowing strategy (last N events, last T ticks, exponentially
 /// weighted) is the implementor's choice. A reasonable default is
@@ -38,7 +38,7 @@
 /// horizon as stall detection.
 ///
 /// This trait is intentionally minimal — it carries no gameplay types and
-/// no integrity hashes. The IP-heavy `ActiveStateEvent` struct (belief scalars,
+/// no integrity hashes. The IP-heavy `ActiveStateEvent` struct (emotion scalars,
 /// BLAKE3 commitment) stays in riir-games and exposes only these three
 /// scalars through a thin adapter impl.
 pub trait ActiveStateTrace {
@@ -54,11 +54,11 @@ pub trait ActiveStateTrace {
     /// Returns 0.0 when the trace has fewer than 2 events (slope undefined).
     fn constraint_trend(&self) -> f32;
 
-    /// HLA arousal scalar over the window (diagnostic, not in the decision).
+    /// Emotion arousal scalar over the window (diagnostic, not in the decision).
     ///
     /// Included in the trait so callers can log it alongside the decision
     /// without needing a second adapter. Not read by the wrapper's policy.
-    fn hla_arousal(&self) -> f32;
+    fn emotion_arousal(&self) -> f32;
 }
 
 /// An empty trace — the default before any MUX-Latent compression events land.
@@ -79,7 +79,7 @@ impl ActiveStateTrace for EmptyTrace {
         0.0
     }
     #[inline]
-    fn hla_arousal(&self) -> f32 {
+    fn emotion_arousal(&self) -> f32 {
         0.0
     }
 }
