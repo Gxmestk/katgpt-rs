@@ -6,7 +6,7 @@
 > **Status:** Done — verdict locked (**GAIN for katgpt-rs** [diagnostics]; training recipe → riir-train)
 > **Classification:** Public (this note). Training recipe → riir-train.
 > **Related Research:** 374 (OTF-LAM — factorized cousin; different solution to related problem), 360 (AdaJEPA — JEPA world-model PASS precedent), 053 (CNA — modelless contrastive cousin), 324 (Latent Trajectory Geometry — geometric diagnostic cousin, different axis), 457→causal_id (graph-level confounder identification cousin, different abstraction level), 276 (PersonalityWeightedComposition — direction vector consumer), 418 (MAG — runtime-mined directions, primary audit target), 425 (TILR — trajectory-invariant refinement, audit target), 309 (Latent Field Steering — runtime direction updates, audit target), 321 (Committed Personality Blend — archetype directions, audit target)
-> **Related Plans:** TBD via Issue 194 (the `LatentConfounderAudit` primitive implementation)
+> **Related Plans:** Shipped via Issue 194 (commit `3c80389a`, 2026-07-28). See [Bench 194](../.benchmarks/194_latent_confounder_audit_goat.md) for GOAT results.
 > **Domain:** katgpt-rs (this note, public — the generic diagnostic primitive)
 
 > **Correction note (2026-07-28):** this paper was initially verdicted PASS in commit `feb2273b` on the grounds that "OTF-LAM solves the same problem." That was a false-PASS — OTF-LAM factorizes transitions (different problem, different solution), and the diagnostic framework (§III-B + Appendix A) is a transferable modelless primitive that does not ship. The verdict was revised to GAIN for the diagnostic half after deeper grep + property-level vocabulary translation. See §7 for the honest correction record.
@@ -221,7 +221,9 @@ The diagnostics are not subject to §3.5 — they are already modelless by const
 
 ## 9. Verdict
 
-**GAIN for katgpt-rs** — the diagnostic framework is a modelless, novel, actionable primitive. Ship behind `latent_confounder_audit` feature flag. GOAT gate in Issue 194.
+**GAIN for katgpt-rs** — the diagnostic framework is a modelless, novel, actionable primitive. Ship behind `latent_confounder_audit` feature flag.
+
+**Resolution (2026-07-28):** Shipped in commit `3c80389a` (Issue 194). All four primitive-level GOAT gates PASS modellessly (G1 12 tests, G2 292 ns/call at HLA d=8, G3 no-regression clean, G4 alloc-free sentinel-verified). **Stays opt-in** — diagnostic primitives promote only when a concrete consumer (MAG/TILR/Steering/Blend) benchmarks a real-bug-caught gain; no consumer yet. Full GOAT results + design decisions in [`.benchmarks/194_latent_confounder_audit_goat.md`](../.benchmarks/194_latent_confounder_audit_goat.md). Issue 194 removed per noise-reduction rule; this research note + the benchmark file are the durable homes.
 
 **Training recipe → riir-train** — L_emb + L_ctr + L_cal + three-stage pipeline. §3.5 Path 0 confirmed: genuinely gradient-descent losses.
 
@@ -231,4 +233,4 @@ The diagnostics are not subject to §3.5 — they are already modelless by const
 
 ## TL;DR
 
-CD-LAM's training recipe (three debiasing losses + fine-tuning pipeline) is genuinely → riir-train. But the paper's **diagnostic framework** — three forward-pass metrics (zero-transition response, shift-invariance, shortcut leakage) that audit any conditioning latent for confounder purity — is a modelless, novel, actionable primitive for katgpt-rs. It doesn't ship. It applies to our runtime-mined direction vectors (MAG, TILR, Latent Field Steering) where confounders could leak in without detection. Verdict: GAIN. Tracked in Issue 194.
+CD-LAM's training recipe (three debiasing losses + fine-tuning pipeline) is genuinely → riir-train. But the paper's **diagnostic framework** — three forward-pass metrics (zero-transition response, shift-invariance, shortcut leakage) that audit any conditioning latent for confounder purity — is a modelless, novel, actionable primitive for katgpt-rs. It applies to our runtime-mined direction vectors (MAG, TILR, Latent Field Steering) where confounders could leak in without detection. Verdict: GAIN. **Shipped 2026-07-28** (commit `3c80389a`, G1–G4 PASS, opt-in `latent_confounder_audit` feature); full results in [Bench 194](../.benchmarks/194_latent_confounder_audit_goat.md).
