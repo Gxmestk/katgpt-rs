@@ -60,3 +60,13 @@ name = "canon_goat"
 path = "benches/canon_goat.rs"
 required-features = ["canon_subspace", "canon_mask"]
 harness = false
+
+# ─── P1 smoke test — SubspaceAdapter on a planted shared subspace. Imports
+# CanonicalIntent / ModelAdapter / SubspaceAdapter / fit_joint_svd_pair /
+# JointSvdFitScratch, all of which live behind `canon_subspace` (the first two
+# behind `canon`, which it implies). Declared explicitly so the default
+# no-feature `--all-targets` build skips it instead of failing to resolve the
+# imports.
+[[test]]
+name = "subspace_planted_signal"
+required-features = ["canon_subspace"]

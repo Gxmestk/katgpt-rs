@@ -814,6 +814,10 @@ mod tests {
     // verify this: compacting RoVE-rotated values AS-IS gives cosine ≥ 0.991.
 
     /// Simple single-head attention for testing: Q·Kᵀ → softmax → ·V.
+    ///
+    /// Only the RoVE-gated G9/G10 tests below use this, so it carries the same
+    /// cfg — otherwise it's dead code in the default feature set.
+    #[cfg(feature = "rotary_value_embedding")]
     fn simple_attention(q: &[f32], k: &[f32], v: &[f32], n: usize, t: usize, d: usize) -> Vec<f32> {
         let mut out = vec![0.0f32; n * d];
         let scale = 1.0 / (d as f32).sqrt();
@@ -846,7 +850,9 @@ mod tests {
         out
     }
 
-    /// Cosine similarity between two flat vectors.
+    /// Cosine similarity between two flat vectors. RoVE-gated alongside
+    /// `simple_attention` — the G9/G10 tests are its only callers.
+    #[cfg(feature = "rotary_value_embedding")]
     fn cosine_sim(a: &[f32], b: &[f32]) -> f32 {
         let dot: f32 = a.iter().zip(b).map(|(&x, &y)| x * y).sum();
         let na: f32 = a.iter().map(|x| x * x).sum::<f32>().sqrt();

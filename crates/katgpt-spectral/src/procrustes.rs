@@ -1248,8 +1248,8 @@ mod tests {
         let d = 16_usize;
         let mut m = vec![0.0_f32; d * d];
         for j in 0..d {
-            m[0 * d + j] = 1.0; // row 0 = all ones
-            m[1 * d + j] = 1.0; // row 1 = all ones (linearly dependent)
+            m[j] = 1.0; // row 0 = all ones
+            m[d + j] = 1.0; // row 1 = all ones (linearly dependent)
         }
         let det = determinant_d(&m, d);
         assert!(
