@@ -816,40 +816,7 @@ Enables latent-to-latent streaming, freeze/thaw patching, federated context, and
 
 #### MUX-Latent Wire Patch (Plan 243)
 
-Latent-to-latent patching over the wire — no decompress/recompress round-trip. Patches MUX latent slots as KG octree leaf nodes. 68-byte wire format (4B segment_id + 32B weights + 32B BLAKE3). SIMD batch at ≥100K/sec. Feature gate: `mux_latent_wire`.
-
-```
-Client (Plasma/Hot)           Wire (Fourier Shell)         Server (Warm/Cold)
-─────────────────────         ────────────────────         ──────────────────
-MUX encode 256 tokens → 32 slots
-    │
-    ├─ Dirty check → 3 slots changed
-    │
-    └─ LatentPatchBatch ──────► Fourier shell encodes ──────► SIMD 4-wide BLAKE3 verify
-       {patches: [(sid, δ, blake3)×3]}                       │
-                                                              ├─ Patch CompressedContext
-                                                              ├─ Reinject via DomainLatent
-                                                              │
-                                    ◄── PatchReceipt ─────────┘
-                                        {committed: [sid×3]}
-```
-
-| Metric | Target |
-|--------|--------|
-| Single patch encode | ≤ 50ns |
-| SIMD batch 256 verify | ≤ 10μs |
-| E2E round-trip | ≤ 500μs |
-| Throughput | ≥ 100K patches/sec |
-
-**Security:** BLAKE3 commitment + scalar projections only on wire (no 64-dim HLA). Fourier shell on write path. Chain-layer: full validation (mod 1).
-
-```sh
-cargo run --example mux_latent_wire_patch --features mux_latent_wire
-cargo run --example mux_latent_octree_bridge --features mux_latent_wire
-cargo test --features mux_latent_wire --test bench_243_mux_latent_wire_goat -- --nocapture
-```
-
-📖 Plan: [`.plans/243_mux_latent_wire_patch.md`](.plans/243_mux_latent_wire_patch.md).
+Latent-to-latent patching over the wire — no decompress/recompress round-trip. Patches MUX latent slots as KG octree leaf nodes. 68-byte wire format (4B segment_id + 32B weights + 32B BLAKE3). SIMD batch at ≥100K patches/sec. BLAKE3 commitment + scalar projections only on wire (no 64-dim HLA). Feature gate: `mux_latent_wire`. 📖 Plan: [`.plans/243_mux_latent_wire_patch.md`](.plans/243_mux_latent_wire_patch.md).
 
 ### 🧵 ThoughtFold: Inference-Time Chain Folding (Plan 195)
 
@@ -2259,26 +2226,7 @@ See `.proposals/003_src_consolidation_master.md` for the full Phase 0–12 histo
 
 ---
 
-### 🌡️ SSMax + GoldShare — Length-Aware Attention Temperature + Content-Specific Dilution Diagnostic (Plan 411, arxiv 2607.01538)
-
-Two modelless primitives distilled from Gollapudi et al., *Can Language Models Actually Retrieve In-Context? Drowning in Documents at Million Token Scale*:
-
-- **SSMax** (`ssmax_temperature`) — multiplicative pre-attention logit rescaling `s̃ = s_L · log(N) · s` that cancels the attention dilution bound `α_gold ≈ 1/(1 + (N−1)·N^{−s·Δ})`. Default `s_L = 1.0` is truly modelless (zero training, zero new params). Composes with sigmoid parallax (`ParallaxConfig.ssmax`) and standard SDPA (`tiled_attention_forward_ssmax`). Does NOT apply to `funcattn` (Research 261 closed negative: basis-mode has no `(n,n)` attention matrix → no dilution).
-- **GoldShare** (`gold_share_probe`) — `‖a^G_L‖ / ‖a_L‖` content-specific output-fraction diagnostic. Detects the paper's recall-generation gap: the signal is in the heads but lost in the residual stream. Complements `effective_rank` (content-agnostic aggregate) and `stable_rank_update` (per-sink degeneracy). Cross-referenced with the sink-aware classifier: `SinkDiagnostic.gold_share` field captures the "broadcast that failed" signature.
-
-**GOAT gate** (all PASS, see [`.benchmarks/411_ssmax_goldshare_goat.md`](.benchmarks/411_ssmax_goldshare_goat.md)):
-
-| Gate | SSMax | GoldShare |
-|---|---|---|
-| G1 (correctness) | ✅ argmax preserved at N ∈ {64, 1k, 10k, 100k}; gold mass 185× (Fixed) / 29,000× (Adaptive) recovery at N=100k | — |
-| G2 (quality) | ✅ retrieval recall cos(output, v_gold): base 0.25 → SSMax Adaptive 0.97 at N ∈ {1k, 10k} | ✅ gold_share collapses 27× (1.006 → 0.037) while `‖a_L‖` stays constant |
-| G3 (latency) | ✅ ~50ns/call (apply_ssmax_inplace) | — |
-| G4 (alloc-free) | ✅ 0 allocs/1000 calls | ✅ 0 allocs/1000 calls |
-| G5 (no-regression) | ✅ identical argmax at N=64 | — |
-
-**Promotion**: `ssmax_temperature` is **DEFAULT-ON** (Plan 411 Phase 5, 2026-07-07) — all five GOAT gates pass; zero runtime cost unless invoked (`ParallaxConfig.ssmax` defaults `None`; `ssmax_none_is_bit_identical_to_base` test verifies zero default-behavior change). `gold_share_probe` stays **opt-in** diagnostic (promote only when a downstream consumer depends on it).
-
-📖 Plan: [`.plans/411_ssmax_goldshare.md`](.plans/411_ssmax_goldshare.md). Research: [`.research/392_Attention_Dilution_SSMax_GoldShare.md`](.research/392_Attention_Dilution_SSMax_GoldShare.md). Paper: [arXiv:2607.01538](https://arxiv.org/abs/2607.01538).
+### 🌡️ SSMax + GoldShare (Plan 411, arxiv 2607.01538) — already detailed in the Attention section above
 
 ---
 
