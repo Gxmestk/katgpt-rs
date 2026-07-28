@@ -173,9 +173,11 @@ pub fn invert_sequence<F: InversionForward>(
 ### Phase 5 — Promotion / Demotion Decision
 
 > **State:** Awaiting condition (consumer or 3-month timeout). NOT deferred — these are decision gates, not work items.
+>
+> **2026-07-29 re-verification:** re-ran the consumer grep (`transformer_inversion` / `katgpt_core::inversion` across all 7 repos' `*.rs` + `*.toml`). Result: zero external consumers — only self-references in `katgpt-core/src/inversion/`, `benches/bench_561_inversion_goat.rs`, and `katgpt-core/src/lib.rs`. Also re-verified the Phase 1-4 DONE claims: 31 inversion tests pass (`--features grad_policy`), 1814 default lib tests pass (zero leak), clippy clean, bench compiles, no TODO/FIXME in production code. Both gates remain honestly open; `lib.rs` L1757 comment updated with the 2026-07-29 re-verification timestamp.
 
-- [ ] **T5.1** If a concrete consumer materializes in riir-ai (e.g., a transparency/audit feature on a text-LLM path) — wire it, run the GOAT gate at the consumer level, promote `transformer_inversion` to opt-in-recommended in the docs. Condition unmet as of 2026-07-26 (grep verified: zero `transformer_inversion` consumers across all `.rs` files in the 7-repo stack).
-- [ ] **T5.2** If no consumer materializes within ~3 months — keep as opt-in research infrastructure. Do NOT promote to default (no consumer = no GOAT gain to measure). Re-evaluate 2026-10-26.
+- [ ] **T5.1** If a concrete consumer materializes in riir-ai (e.g., a transparency/audit feature on a text-LLM path) — wire it, run the GOAT gate at the consumer level, promote `transformer_inversion` to opt-in-recommended in the docs. Condition unmet as of 2026-07-26; **re-verified unmet 2026-07-29** (grep across all 7 repos: zero `transformer_inversion` / `katgpt_core::inversion` consumers — only self-references in the module + bench + lib.rs export).
+- [ ] **T5.2** If no consumer materializes within ~3 months — keep as opt-in research infrastructure. Do NOT promote to default (no consumer = no GOAT gain to measure). Re-evaluate 2026-10-26. **Status 2026-07-29: 3 days into the 3-month window; gate remains open.**
 - [-] **T5.3** (deferred) If a future text-LLM consumer in katgpt-rs itself (e.g., a speculative-decode audit mode) wants this — wire it then. Speculative today uses the drafter's own hidden states; no inversion needed.
 
 ---

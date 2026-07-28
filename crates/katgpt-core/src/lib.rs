@@ -1754,8 +1754,11 @@ pub mod hebbian_kernel_memory;
 // not shipped → Gain). The Gain tier routing "Plan only, behind feature
 // flag" implies code ships feature-gated; promotion to default-on
 // requires a concrete consumer that demonstrates a gain at the GOAT gate
-// (Plan 561 T5.1 — unmet as of 2026-07-26: zero consumers across the
-// 7-repo stack). The feature ships as adoption-hook infrastructure.
+// (Plan 561 T5.1 — unmet as of 2026-07-29: zero consumers across the
+// 7-repo stack; re-verified via grep for `transformer_inversion` /
+// `katgpt_core::inversion` across all 7 repos — only self-references in
+// this module + bench_561 + this lib.rs export). The feature ships as
+// adoption-hook infrastructure. Re-evaluate at the 2026-10-26 timeout (T5.2).
 #[cfg(feature = "transformer_inversion")]
 pub mod inversion;
 #[cfg(feature = "grad_policy")]
