@@ -48,10 +48,10 @@ pub enum RecurrenceFamily {
     LatentThought = 1,
     /// Family C — delta-rule SSM / leaky integrator: `s_t = (1-α)·s + β·x`.
     ///
-    /// Always-stable linear update. The existing `ReconstructionState::evolve_hla`
+    /// Always-stable linear update. The existing `ReconstructionState::evolve_belief`
     /// shipped implementation is structurally a leaky integrator and is the
     /// battle-tested baseline. `leaky.rs` provides a standalone mirror of that
-    /// math; Plan 276 Phase 2 (T2.1) will eventually make `evolve_hla` delegate
+    /// math; Plan 276 Phase 2 (T2.1) will eventually make `evolve_belief` delegate
     /// to it (zero-behavior-change refactor, out of scope for Phase 1).
     DeltaRule = 2,
 }

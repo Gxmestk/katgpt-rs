@@ -11,14 +11,14 @@
 //! because the diverse party can neutralize more threat types.
 //!
 //! The Clifford wedge `h_A ∧ h_B` measures structural divergence between two
-//! NPCs' HLA directions. A **complementarity-weighted** formation selects NPCs
+//! NPCs' belief directions. A **complementarity-weighted** formation selects NPCs
 //! whose directions are orthogonal (high wedge) → diverse roles. A
 //! **similarity-weighted** formation selects NPCs whose directions are aligned
 //! (high dot product) → same role.
 //!
 //! # The model (minimal but honest)
 //!
-//! 1. **NPC roles**: Each NPC's 64-dim HLA direction is projected onto 4 role
+//! 1. **NPC roles**: Each NPC's 64-dim belief direction is projected onto 4 role
 //!    axes (Tank, Healer, DPS, Support). Role competency = projection magnitude.
 //!    A direction aligned with one axis is strong in that role and weak in
 //!    others.
@@ -73,7 +73,7 @@ use katgpt_core::linalg::geometric_product_wedge_into;
 
 // ─── Constants ─────────────────────────────────────────────────────────────
 
-/// HLA direction dimension (CGSP `DEFAULT_HLA_DIM`).
+/// belief direction dimension (CGSP `DEFAULT_HLA_DIM`).
 const DIM: usize = 64;
 
 /// Cyclic shifts for D=64 (clifford_bridge `DEFAULT_SHIFTS`).
@@ -143,10 +143,10 @@ impl Rng {
 
 // ─── NPC model ─────────────────────────────────────────────────────────────
 
-/// An NPC with a 64-dim HLA direction and derived role competencies.
+/// An NPC with a 64-dim belief direction and derived role competencies.
 struct Npc {
-    /// Unit-normalized 64-dim HLA direction.
-    hla: Vec<f32>,
+    /// Unit-normalized 64-dim belief direction.
+    belief: Vec<f32>,
     /// Role competency per role (projection onto role axis, clamped ≥ 0).
     /// Length N_ROLES. A direction aligned with role `r` has high `roles[r]`
     /// and low `roles[other]`.
@@ -164,13 +164,13 @@ fn role_axes() -> [[f32; DIM]; N_ROLES] {
     axes
 }
 
-/// Compute role competencies from an HLA direction.
-fn role_competencies(hla: &[f32], axes: &[[f32; DIM]; N_ROLES]) -> [f32; N_ROLES] {
+/// Compute role competencies from an belief direction.
+fn role_competencies(belief: &[f32], axes: &[[f32; DIM]; N_ROLES]) -> [f32; N_ROLES] {
     let mut roles = [0.0f32; N_ROLES];
     for r in 0..N_ROLES {
         let mut dot = 0.0f32;
         for d in 0..DIM {
-            dot += hla[d] * axes[r][d];
+            dot += belief[d] * axes[r][d];
         }
         roles[r] = dot.abs(); // competency = alignment magnitude
     }
@@ -191,13 +191,13 @@ fn normalize_in_place(v: &mut [f32]) {
     }
 }
 
-/// Generate the NPC pool: 100 NPCs with random unit-norm HLA directions.
+/// Generate the NPC pool: 100 NPCs with random unit-norm belief directions.
 fn generate_pool(seed: u32) -> Vec<Npc> {
     let mut rng = Rng::new(seed);
     let axes = role_axes();
     let mut pool = Vec::with_capacity(POOL_SIZE);
     for _ in 0..POOL_SIZE {
-        let mut hla = vec![0.0f32; DIM];
+        let mut belief = vec![0.0f32; DIM];
         // 80% of NPCs are "specialists" (clustered near one role axis),
         // 20% are "generalists" (random direction). This mirrors real games
         // where most NPCs specialize but some are flexible.
@@ -211,26 +211,26 @@ fn generate_pool(seed: u32) -> Vec<Npc> {
                 let u1 = rng.uniform().max(1e-10);
                 let u2 = rng.uniform();
                 let g = (-2.0f32 * u1.ln()).sqrt() * (2.0f32 * std::f32::consts::PI * u2).cos();
-                hla[d] = axes[role][d] + noise_sigma * g;
+                belief[d] = axes[role][d] + noise_sigma * g;
             }
         } else {
-            for h in hla.iter_mut().take(DIM) {
+            for h in belief.iter_mut().take(DIM) {
                 let u1 = rng.uniform().max(1e-10);
                 let u2 = rng.uniform();
                 let g = (-2.0f32 * u1.ln()).sqrt() * (2.0f32 * std::f32::consts::PI * u2).cos();
                 *h = g;
             }
         }
-        normalize_in_place(&mut hla);
-        let roles = role_competencies(&hla, &axes);
-        pool.push(Npc { hla, roles });
+        normalize_in_place(&mut belief);
+        let roles = role_competencies(&belief, &axes);
+        pool.push(Npc { belief, roles });
     }
     pool
 }
 
 // ─── Party formation ───────────────────────────────────────────────────────
 
-/// Wedge L1 norm between two HLA directions (structural divergence).
+/// Wedge L1 norm between two belief directions (structural divergence).
 /// Uses the same `geometric_product_wedge_into` primitive as clifford_bridge.
 #[inline]
 fn wedge_l1(
@@ -244,7 +244,7 @@ fn wedge_l1(
     scratch_w[..DIM].iter().map(|x| x.abs()).sum()
 }
 
-/// Dot product between two HLA directions (alignment/similarity).
+/// Dot product between two belief directions (alignment/similarity).
 #[inline]
 fn dot_product(a: &[f32], b: &[f32]) -> f32 {
     let mut dot = 0.0f32;
@@ -277,8 +277,8 @@ fn form_complementarity_party(
             let mut min_wedge = f32::MAX;
             for &s in &selected {
                 let w = wedge_l1(
-                    &pool[candidate].hla,
-                    &pool[s].hla,
+                    &pool[candidate].belief,
+                    &pool[s].belief,
                     scratch_w,
                     scratch_su,
                     scratch_sv,
@@ -314,7 +314,7 @@ fn form_similarity_party(pool: &[Npc]) -> Vec<usize> {
             // Score = min dot to all selected NPCs (max-min similarity).
             let mut min_dot = f32::MAX;
             for &s in &selected {
-                let d = dot_product(&pool[candidate].hla, &pool[s].hla);
+                let d = dot_product(&pool[candidate].belief, &pool[s].belief);
                 if d < min_dot {
                     min_dot = d;
                 }

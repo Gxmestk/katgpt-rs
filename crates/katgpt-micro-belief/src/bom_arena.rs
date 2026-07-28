@@ -959,7 +959,7 @@ pub fn bom_minimax_attractor(
 
 /// Build a BoM minimax planner over [`LeakyIntegrator`] with sensible defaults.
 pub fn bom_minimax_leaky(dim: usize, cfg: NoiseQueryConfig) -> BoMMinimaxPlanner<LeakyIntegrator> {
-    let kernel = LeakyIntegrator::hla_default(dim);
+    let kernel = LeakyIntegrator::belief_default(dim);
     BoMMinimaxPlanner::new(kernel, cfg)
 }
 
@@ -1142,7 +1142,7 @@ mod tests {
     #[test]
     fn g2c_hypotheses_stay_bounded_across_episode_leaky() {
         let cfg = NoiseQueryConfig::default().with_sigma(0.5).with_k(8);
-        let kernel = LeakyIntegrator::hla_default(TEST_DIM);
+        let kernel = LeakyIntegrator::belief_default(TEST_DIM);
         let dim = kernel.dim();
         let k = cfg.k;
 

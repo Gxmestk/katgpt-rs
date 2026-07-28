@@ -141,7 +141,7 @@ pub trait StepLocalizer<Dir, W> {
     /// Given a trajectory of per-tick state-deltas + CLR scores + a direction
     /// set, return the first actionable fault + responsibility weights.
     ///
-    /// - `trajectory_deltas[t]` — the state-delta at tick `t` (e.g. HLA-delta).
+    /// - `trajectory_deltas[t]` — the state-delta at tick `t` (e.g. belief-delta).
     /// - `trajectory_scores[t]` — the CLR `r_k` score at tick `t`.
     /// - `directions[j]` — the `j`-th direction to project onto (e.g. branch
     ///   direction vectors).
@@ -202,7 +202,7 @@ pub struct TickFaultSite<Dir, W> {
     pub violated: String,
     /// Per-direction responsibility weights (SkillAdaptor eq. 6 output).
     ///
-    /// `weights[j] = sigmoid(dot(hla_delta_at_t_star, direction_j))`.
+    /// `weights[j] = sigmoid(dot(belief_delta_at_t_star, direction_j))`.
     /// Higher weight = more responsible for the fault.
     pub responsibility: Vec<W>,
     /// Argmax direction index — the "responsible skill/branch".
@@ -210,7 +210,7 @@ pub struct TickFaultSite<Dir, W> {
     /// When ties occur, the consumer picks the higher-priority direction
     /// (e.g. lower branch_id per R161 §2.2 spawn order).
     pub responsible_idx: usize,
-    /// Marker for the generic direction type (e.g. HLA direction vector).
+    /// Marker for the generic direction type (e.g. belief direction vector).
     pub _marker: PhantomData<Dir>,
 }
 

@@ -33,8 +33,8 @@
 //!
 //! [`LocalGuidanceSource`] is the primary extension point for the Super-GOAT
 //! fusion (riir-ai/318 Extension A). The default [`SpaceTimeGuidance`] is
-//! paper-faithful (uniform `α`). A private consumer plugs in HLA-projected
-//! guidance where `α_i = α_base · (1 + β · σ(dot(HLA_i, D_frustration)))`
+//! paper-faithful (uniform `α`). A private consumer plugs in belief-projected
+//! guidance where `α_i = α_base · (1 + β · σ(dot(belief_i, D_frustration)))`
 //! so crowded cells cost more for stressed NPCs.
 
 use super::config::{AgentId, JointConfig};
@@ -72,27 +72,27 @@ pub type Guidance<P> = Vec<Vec<P>>;
 /// # Primary extension point (Super-GOAT fusion hook)
 ///
 /// A private consumer (riir-ai/318 Extension A) replaces the uniform `α` with
-/// a per-NPC **HLA-projected** penalty so that crowded cells cost more for
+/// a per-NPC **belief-projected** penalty so that crowded cells cost more for
 /// stressed NPCs. The collision term `α·Ind[χ>0]` from Eq. 1 becomes:
 ///
 /// ```text
-/// α_i = α_base · (1 + β · σ(dot(HLA_i, D_frustration)))
+/// α_i = α_base · (1 + β · σ(dot(belief_i, D_frustration)))
 /// ```
 ///
-/// where `HLA_i` is agent `i`'s 5-scalar affect vector (valence, arousal,
+/// where `belief_i` is agent `i`'s 5-scalar affect vector (valence, arousal,
 /// desperation, calm, fear), `D_frustration` is a learned direction vector,
 /// and `σ` is the sigmoid bridge. This is **entirely modelless** — the
 /// direction vector is freeze/thaw-swapped, not trained.
 ///
-/// # Example: a custom HLA-projected guidance source
+/// # Example: a custom belief-projected guidance source
 ///
 /// ```no_run
 /// use katgpt_core::multi_agent_path::*;
 /// use katgpt_core::multi_agent_path::position::*;
 ///
-/// /// Per-NPC HLA projection (the latent→raw bridge).
+/// /// Per-NPC belief projection (the latent→raw bridge).
 /// ///
-/// /// In the real runtime this reads from the NPC's `HlaCacheProxy`; here we
+/// /// In the real runtime this reads from the NPC's `BeliefCacheProxy`; here we
 /// /// stub a lookup table indexed by `AgentId`. The bridge is a dot-product
 /// /// projection onto a pre-computed `D_frustration` direction vector, gated
 /// /// by sigmoid (never softmax — per AGENTS.md).
@@ -100,7 +100,7 @@ pub type Guidance<P> = Vec<Vec<P>>;
 ///     /// Base collision penalty shared by all agents (paper `α`).
 ///     alpha_base: f32,
 ///     /// Per-agent frustration scalar in `[0, 1]`, computed once per tick
-///     /// from `σ(dot(HLA_i, D_frustration))`. Higher = more collision-averse.
+///     /// from `σ(dot(belief_i, D_frustration))`. Higher = more collision-averse.
 ///     frustration: Vec<f32>,
 ///     /// Delegate: the underlying space-time guidance we layer onto.
 ///     inner: SpaceTimeGuidance<GridPos>,
@@ -139,7 +139,7 @@ pub type Guidance<P> = Vec<Vec<P>>;
 ///
 /// The guidance field `Φ` is **latent** (local, not synced). Only the
 /// executed first step `Π_t[1]` crosses the sync boundary as a raw `TxDelta`.
-/// The HLA projection itself never leaves the NPC's local cognition — the
+/// The belief projection itself never leaves the NPC's local cognition — the
 /// sync layer sees only the resulting move.
 pub trait LocalGuidanceSource<P: Position> {
     /// Compute the guidance field `Φ` for all agents.
@@ -830,7 +830,7 @@ impl<P: Position> SpaceTimeGuidance<P> {
     /// uniform path — only the cost of collisions varies per agent.
     ///
     /// A private consumer (riir-ai's `HlaProjectedGuidance`) computes
-    /// `alphas[i] = alpha_base * (1 + beta * sigmoid(dot(HLA_i, D_frustration)))`
+    /// `alphas[i] = alpha_base * (1 + beta * sigmoid(dot(belief_i, D_frustration)))`
     /// so frustrated NPCs take wider detours around occupied cells while calm
     /// NPCs push through — the behavioral signature the G5 gate measures.
     ///

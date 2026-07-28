@@ -38,9 +38,9 @@ fn main() {
 
     // ── Family C (LeakyIntegrator) — the promotable kernel ────────────────
     // Defaults match ReconstructionConfig (lr=0.1, max_delta=0.2) and are
-    // byte-identical to ReconstructionState::evolve_hla via the shared
+    // byte-identical to ReconstructionState::evolve_belief via the shared
     // leaky_core::leaky_step primitive.
-    let leaky = LeakyIntegrator::hla_default(dim);
+    let leaky = LeakyIntegrator::belief_default(dim);
     let mut state_c = vec![0.0f32; dim];
     for t in 0..steps {
         let x = deterministic_input(t, dim);

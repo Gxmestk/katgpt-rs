@@ -24,7 +24,7 @@ use super::position::{GridPos, Position};
 /// count). For affect-aware hindrance (fearful NPCs count more), use
 /// [`WeightedBlockingCount`] with a per-agent weight closure.
 ///
-/// # Example: affect-aware hindrance (HLA fusion)
+/// # Example: affect-aware hindrance (belief fusion)
 ///
 /// A fearful NPC blocking your path is a bigger cost than a calm NPC doing
 /// the same — the social-cost extension from riir-ai/318 Extension D. The
@@ -36,7 +36,7 @@ use super::position::{GridPos, Position};
 /// use katgpt_core::multi_agent_path::position::*;
 ///
 /// /// Per-agent fear weight table. In the real runtime this is populated
-/// /// from each NPC's `HlaCacheProxy` fear scalar (the 5th HLA component):
+/// /// from each NPC's `BeliefCacheProxy` fear scalar (the 5th belief component):
 /// /// `weight_i = 1 + γ · fear_i`.
 /// ///
 /// /// Fearful blockers cost more to displace, so agents route around them.

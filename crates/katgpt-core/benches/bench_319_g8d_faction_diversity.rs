@@ -16,7 +16,7 @@
 //!
 //! # The model
 //!
-//! 1. **NPC pool**: 100 NPCs with 64-dim HLA directions (same generation as
+//! 1. **NPC pool**: 100 NPCs with 64-dim belief directions (same generation as
 //!    G8c: 80% specialists near one of 4 role axes, 20% generalists).
 //!
 //! 2. **Faction assignment**: 4 factions. Each NPC is assigned to a faction
@@ -98,7 +98,7 @@ impl Rng {
 // ─── NPC model (shared with G8c) ───────────────────────────────────────────
 
 struct Npc {
-    hla: Vec<f32>,
+    belief: Vec<f32>,
     roles: [f32; N_ROLES],
 }
 
@@ -110,12 +110,12 @@ fn role_axes() -> [[f32; DIM]; N_ROLES] {
     axes
 }
 
-fn role_competencies(hla: &[f32], axes: &[[f32; DIM]; N_ROLES]) -> [f32; N_ROLES] {
+fn role_competencies(belief: &[f32], axes: &[[f32; DIM]; N_ROLES]) -> [f32; N_ROLES] {
     let mut roles = [0.0f32; N_ROLES];
     for r in 0..N_ROLES {
         let mut dot = 0.0f32;
         for d in 0..DIM {
-            dot += hla[d] * axes[r][d];
+            dot += belief[d] * axes[r][d];
         }
         roles[r] = dot.abs();
     }
@@ -140,7 +140,7 @@ fn generate_pool(seed: u32) -> Vec<Npc> {
     let axes = role_axes();
     let mut pool = Vec::with_capacity(POOL_SIZE);
     for _ in 0..POOL_SIZE {
-        let mut hla = vec![0.0f32; DIM];
+        let mut belief = vec![0.0f32; DIM];
         let is_specialist = rng.uniform() < 0.8;
         if is_specialist {
             let role = rng.range(N_ROLES);
@@ -149,19 +149,19 @@ fn generate_pool(seed: u32) -> Vec<Npc> {
                 let u1 = rng.uniform().max(1e-10);
                 let u2 = rng.uniform();
                 let g = (-2.0f32 * u1.ln()).sqrt() * (2.0f32 * std::f32::consts::PI * u2).cos();
-                hla[d] = axes[role][d] + noise_sigma * g;
+                belief[d] = axes[role][d] + noise_sigma * g;
             }
         } else {
-            for h in hla.iter_mut().take(DIM) {
+            for h in belief.iter_mut().take(DIM) {
                 let u1 = rng.uniform().max(1e-10);
                 let u2 = rng.uniform();
                 let g = (-2.0f32 * u1.ln()).sqrt() * (2.0f32 * std::f32::consts::PI * u2).cos();
                 *h = g;
             }
         }
-        normalize_in_place(&mut hla);
-        let roles = role_competencies(&hla, &axes);
-        pool.push(Npc { hla, roles });
+        normalize_in_place(&mut belief);
+        let roles = role_competencies(&belief, &axes);
+        pool.push(Npc { belief, roles });
     }
     pool
 }
@@ -254,8 +254,8 @@ fn assign_diverse(
                 continue;
             }
             let w = wedge_l1(
-                &pool[last].hla,
-                &pool[candidate].hla,
+                &pool[last].belief,
+                &pool[candidate].belief,
                 scratch_w,
                 scratch_su,
                 scratch_sv,
@@ -289,7 +289,7 @@ fn assign_similar(pool: &[Npc]) -> Vec<usize> {
             if used[candidate] {
                 continue;
             }
-            let d = dot_product(&pool[last].hla, &pool[candidate].hla);
+            let d = dot_product(&pool[last].belief, &pool[candidate].belief);
             if d > best_dot {
                 best_dot = d;
                 best = candidate;

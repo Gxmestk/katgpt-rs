@@ -16,7 +16,7 @@
 //!   the promotable Family C output.
 //! - **LatentThoughtKernel** — K=1 must match attractor ±5%; K=3 ~3× attractor.
 //! - **project_to_scalars bridge** — K=5 scalars over dim=32, target <50 ns.
-//! - **1000-NPC batch** — 1000 leaky kernels at dim=8 (HLA-shaped). Two
+//! - **1000-NPC batch** — 1000 leaky kernels at dim=8 (belief-shaped). Two
 //!   variants: serial baseline and rayon `par_iter`. The serial path is the
 //!   honest winner because the per-NPC step (~10 ns at dim=8) is ~500× below
 //!   rayon's ~5 µs thread-pool breakeven (AGENTS.md: "only parallelize when
@@ -50,7 +50,7 @@ use std::sync::Mutex;
 /// budget and the existing `g1_4_attractor_step_32_under_100ns` wall-clock test).
 const G1_4_DIM: usize = 32;
 
-/// HLA-shaped dim used by the 1000-NPC batch benchmark (matches
+/// belief-shaped dim used by the 1000-NPC batch benchmark (matches
 /// `ReconstructionConfig` default of `dim = 8`).
 const BATCH_DIM: usize = 8;
 
@@ -59,7 +59,7 @@ const BATCH_DIM: usize = 8;
 const BATCH_NPCS: usize = 1000;
 
 /// Number of scalar projections used by the bridge benchmark (valence, arousal,
-/// desperation, calm, fear — the 5 HLA scalars from AGENTS.md §Latent).
+/// desperation, calm, fear — the 5 belief scalars from AGENTS.md §Latent).
 const BRIDGE_K: usize = 5;
 
 // ─── G1.4: per-kernel step latency @ dim=32 ─────────────────────────────────
@@ -85,7 +85,7 @@ fn bench_leaky_step(c: &mut Criterion) {
     let mut group = c.benchmark_group("micro_belief/g1_4_step");
     group.sample_size(500);
 
-    let kernel = LeakyIntegrator::hla_default(G1_4_DIM);
+    let kernel = LeakyIntegrator::belief_default(G1_4_DIM);
     let mut state = vec![0.0f32; G1_4_DIM];
     let input = vec![0.5f32; G1_4_DIM];
 
@@ -156,12 +156,12 @@ fn bench_batch_1000_npcs(c: &mut Criterion) {
     let mut group = c.benchmark_group("micro_belief/batch_1000_npcs");
     group.sample_size(100);
 
-    // HLA-shaped leaky kernels — the promotable Family C output that riir-ai
+    // belief-shaped leaky kernels — the promotable Family C output that riir-ai
     // would actually deploy per NPC. Using `Mutex<Vec<...>>` mirrors the
     // temporal_deriv batch bench convention.
     let kernels: Mutex<Vec<LeakyIntegrator>> = Mutex::new(
         (0..BATCH_NPCS)
-            .map(|_| LeakyIntegrator::hla_default(BATCH_DIM))
+            .map(|_| LeakyIntegrator::belief_default(BATCH_DIM))
             .collect(),
     );
     // Per-NPC belief vectors (the `par_iter_mut` needs mutable state).
@@ -237,7 +237,7 @@ fn bench_bom_sample_k_states(c: &mut Criterion) {
 
     // LeakyIntegrator baseline at K=8.
     {
-        let leaky = LeakyIntegrator::hla_default(G1_4_DIM);
+        let leaky = LeakyIntegrator::belief_default(G1_4_DIM);
         let k = 8usize;
         let cfg = NoiseQueryConfig::default().with_k(k).with_sigma(0.3);
         let mut rng = fastrand::Rng::with_seed(42);

@@ -66,7 +66,7 @@ pub mod kv_cache;
 /// Shared leaky-integrator / delta-rule step primitive (Plan 276 Phase 2 T2.1).
 /// Pure inline math, zero deps. Consumed by both katgpt-micro-belief
 /// (`LeakyIntegrator::step`) and katgpt-core's sense reconstruction
-/// (`ReconstructionState::evolve_hla`). Co-located here (the leaf) so both
+/// (`ReconstructionState::evolve_belief`). Co-located here (the leaf) so both
 /// consumers can share the single source of truth without a cycle.
 pub mod leaky_core;
 mod looping;

@@ -12,11 +12,11 @@
 //! ## Why
 //!
 //! Every EMA currently in the codebase is a *single* integrator
-//! (`simd_fused_decay_write`, `evolve_hla`, etc.). The dual
+//! (`simd_fused_decay_write`, `evolve_belief`, etc.). The dual
 //! `(I_fast − I_slow)` band-pass derivative is the smallest missing
 //! primitive that upgrades four existing pillars:
 //!
-//! - **HLA companion** — `evolve_hla` tracks *what is*; derivative tracks
+//! - **belief companion** — `evolve_belief` tracks *what is*; derivative tracks
 //!   *how fast it is changing*.
 //! - **δ-Mem write gate** — writes only on surprising events.
 //! - **Collapse detector fusion** — prediction-derivative collapse is

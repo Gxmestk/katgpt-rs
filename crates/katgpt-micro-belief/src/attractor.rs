@@ -2,18 +2,18 @@
 //!
 //! `s_t = σ(W_s · s_{t-1} + W_x · x_t + b)`
 //!
-//! This is the GOAT candidate of Plan 276. Unlike HLA's leaky integrator
-//! (`ReconstructionState::evolve_hla`, Family C), the attractor update has
+//! This is the GOAT candidate of Plan 276. Unlike belief's leaky integrator
+//! (`ReconstructionState::evolve_belief`, Family C), the attractor update has
 //! fixed-point basins: beliefs exhibit hysteresis — they resist noise until
 //! evidence accumulates, then flip. Whether this reduces long-horizon
-//! flip-flops vs HLA on a coherence benchmark is the G2.1 GOAT gate.
+//! flip-flops vs belief on a coherence benchmark is the G2.1 GOAT gate.
 //!
 //! # State range choice
 //!
 //! We store the belief vector in `(−1, 1)` via `state[i] = 2·σ(·) − 1`, NOT in
-//! `(0, 1)` (the raw sigmoid output). This matches the existing `evolve_hla`
+//! `(0, 1)` (the raw sigmoid output). This matches the existing `evolve_belief`
 //! state range of `[-1, 1]` (see `reconstruction.rs` L646:
-//! `self.hla[i] = (...).clamp(-1.0, 1.0)`), so:
+//! `self.belief[i] = (...).clamp(-1.0, 1.0)`), so:
 //!   - both Family A and Family C kernels can be benchmarked against the same
 //!     bridge direction vectors,
 //!   - the G2.1 coherence benchmark compares apples to apples (same scalar

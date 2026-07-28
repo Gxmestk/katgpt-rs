@@ -2,10 +2,10 @@
 //!
 //! Multi-step active reconstruction over KG-Latent-Octree sense modules.
 //! Distilled from MRAgent (ICML 2026): Cue–Tag–Content graph with iterative
-//! HLA-state-aware navigation. Modelless: entropy bandit + dot-product + sigmoid.
+//! belief-state-aware navigation. Modelless: entropy bandit + dot-product + sigmoid.
 //!
 //! Key insight: single-shot `NpcBrain::project_all()` is passive retrieval.
-//! This module adds active reconstruction — the HLA state evolves based on
+//! This module adds active reconstruction — the belief state evolves based on
 //! accumulated evidence, producing strictly more expressive retrieval
 //! (Theorem 4.1, arXiv:2606.06036).
 
@@ -79,23 +79,23 @@ pub struct ReconstructionConfig {
     /// Enable LOD-adaptive pruning (default: true).
     /// Reduces octree depth when activation spread is narrow.
     pub lod_adaptive: bool,
-    /// Learning rate for HLA state evolution (default: 0.1).
-    pub hla_learning_rate: f32,
+    /// Learning rate for belief state evolution (default: 0.1).
+    pub belief_learning_rate: f32,
     /// Entropy threshold for early stopping (default: 0.05).
     /// Below this entropy, evidence is considered sufficient.
     pub entropy_threshold: f32,
     /// Maximum activation delta per step (default: 0.3).
-    /// Prevents HLA state from jumping too far in one step.
-    pub max_hla_delta: f32,
-    /// Fast EMA coefficient for the HLA surprise kernel (default: 0.3).
+    /// Prevents belief state from jumping too far in one step.
+    pub max_belief_delta: f32,
+    /// Fast EMA coefficient for the belief surprise kernel (default: 0.3).
     ///
     /// Plan 277 Fusion F1: the dual `(fast − slow)` band-pass derivative
-    /// tracks *how fast* the HLA is changing (vs `evolve_hla` which tracks
+    /// tracks *how fast* the belief is changing (vs `evolve_belief` which tracks
     /// *what is*). Paper's canonical ~10× ratio vs `temporal_deriv_alpha_slow`
     /// (O'Reilly 2026, arXiv:2606.08720).
     #[cfg(feature = "temporal_deriv")]
     pub temporal_deriv_alpha_fast: f32,
-    /// Slow EMA coefficient for the HLA surprise kernel (default: 0.03).
+    /// Slow EMA coefficient for the belief surprise kernel (default: 0.03).
     ///
     /// See `temporal_deriv_alpha_fast` — the ~10× ratio is the paper's
     /// canonical separation of time constants.
@@ -131,9 +131,9 @@ impl Default for ReconstructionConfig {
         Self {
             max_steps: 3,
             lod_adaptive: true,
-            hla_learning_rate: 0.1,
+            belief_learning_rate: 0.1,
             entropy_threshold: 0.05,
-            max_hla_delta: 0.3,
+            max_belief_delta: 0.3,
             #[cfg(feature = "temporal_deriv")]
             temporal_deriv_alpha_fast: 0.3,
             #[cfg(feature = "temporal_deriv")]
@@ -175,7 +175,7 @@ impl ReconstructionConfig {
     /// Check if SIMD path is beneficial for the current workload.
     ///
     /// SIMD overhead exceeds scalar for small arrays (< 16 elements).
-    /// Our HLA is 8-dim with 6 modules = 48-element matvec — borderline.
+    /// Our belief is 8-dim with 6 modules = 48-element matvec — borderline.
     /// Returns `true` if SIMD level is available and the workload justifies it.
     #[inline]
     pub fn simd_beneficial(&self) -> bool {
@@ -237,24 +237,24 @@ impl TripleEvidence {
         }
     }
 
-    /// Map HLA dimension index (0..8) → source SenseKind index (0..6).
+    /// Map belief dimension index (0..8) → source SenseKind index (0..6).
     ///
-    /// The HLA is 8-dimensional but only 6 SenseKinds feed it, so dims 6 and 7
+    /// The belief is 8-dimensional but only 6 SenseKinds feed it, so dims 6 and 7
     /// reuse kinds 0 and 1. This is the **single source of truth** for that
-    /// gather — used by both [`ReconstructionState::evolve_hla`] and
-    /// [`ReconstructionState::evolve_hla_simd`] via `kind_activations_padded`.
+    /// gather — used by both [`ReconstructionState::evolve_belief`] and
+    /// [`ReconstructionState::evolve_belief_simd`] via `kind_activations_padded`.
     ///
     /// (Plan 276 T2.1 — do NOT duplicate this constant elsewhere.)
     pub const KIND_MAP: [usize; 8] = [0, 1, 2, 3, 4, 5, 0, 1];
 
-    /// Gather the 6 per-kind activations into the 8-element HLA input vector.
+    /// Gather the 6 per-kind activations into the 8-element belief input vector.
     ///
     /// Returns `[k0,k1,k2,k3,k4,k5,k0,k1]` — the activations laid out per
     /// [`KIND_MAP`](Self::KIND_MAP). This is the `input` passed to the shared
     /// leaky-integrator core ([`katgpt_types::leaky_core::leaky_step`]).
     ///
     /// NOTE: the normalization `total` is NOT `Σ padded` — it is `Σ padded[..6]`
-    /// (the 6 distinct source activations). See `evolve_hla` and the
+    /// (the 6 distinct source activations). See `evolve_belief` and the
     /// `leaky_core` module docs for why `total` is supplied separately.
     #[inline]
     pub fn kind_activations_padded(&self) -> [f32; 8] {
@@ -277,7 +277,7 @@ impl TripleEvidence {
 /// where `sign ∈ {-1, 0, +1}` is extracted from `directions[dim]` bit `dim`.
 #[derive(Clone, Copy, Debug)]
 pub struct ProjectionWeights {
-    /// `[6 × 8]` row-major: one row per module, one column per HLA dimension.
+    /// `[6 × 8]` row-major: one row per module, one column per belief dimension.
     pub matrix: [f32; 48],
     /// Per-module confidence (sigmoid output scale).
     pub confidence: [f32; 6],
@@ -320,10 +320,10 @@ impl ProjectionWeights {
 /// Pre-computed projection weights for multi-entity batch reconstruction.
 ///
 /// Same as `ProjectionWeights` but supports N entities sharing the same brain
-/// config. The weight matrix is shared; only HLA states differ per entity.
+/// config. The weight matrix is shared; only belief states differ per entity.
 ///
 /// Layout: `matrix[module_idx * 8 + dim]` (same as single-entity).
-/// HLA states are stacked externally: `[N × 8]` row-major.
+/// belief states are stacked externally: `[N × 8]` row-major.
 //
 // Fields are read by `expand_batch`, which is gated on `sense_composition`;
 // without that feature they appear dead to clippy.
@@ -346,9 +346,9 @@ impl BatchProjectionWeights {
         }
     }
 
-    /// Batch expand: project N HLA states against shared weights.
+    /// Batch expand: project N belief states against shared weights.
     ///
-    /// `hla_batch`: `[N × 8]` row-major (entity 0's HLA, then entity 1's, etc.)
+    /// `belief_batch`: `[N × 8]` row-major (entity 0's belief, then entity 1's, etc.)
     /// `activations_out`: `[N × 6]` row-major output
     ///
     /// For each entity, computes `[6×8] × [8] → [6]` raw dots, then sigmoid + confidence.
@@ -358,15 +358,15 @@ impl BatchProjectionWeights {
     #[cfg(feature = "sense_composition")]
     pub fn expand_batch(
         &self,
-        hla_batch: &[f32],           // [N × 8]
+        belief_batch: &[f32],           // [N × 8]
         activations_out: &mut [f32], // [N × 6]
     ) {
         let n = self.n_entities;
-        debug_assert!(hla_batch.len() >= n * 8, "hla_batch too small");
+        debug_assert!(belief_batch.len() >= n * 8, "belief_batch too small");
         debug_assert!(activations_out.len() >= n * 6, "activations_out too small");
 
         for e in 0..n {
-            let hla_off = e * 8;
+            let belief_off = e * 8;
             let act_off = e * 6;
 
             // One matvec: [6×8] × [8] → [6] raw dots
@@ -374,7 +374,7 @@ impl BatchProjectionWeights {
             katgpt_types::simd::simd_matmul_rows(
                 &mut dots,
                 &self.weights.matrix,
-                &hla_batch[hla_off..hla_off + 8],
+                &belief_batch[belief_off..belief_off + 8],
                 6,
                 8,
             );
@@ -394,11 +394,11 @@ impl BatchProjectionWeights {
 
 /// Reconstruction state: tracks active traversal across the sense octree.
 ///
-/// This is the core of active reconstruction — the HLA state evolves based on
+/// This is the core of active reconstruction — the belief state evolves based on
 /// accumulated evidence, producing adaptive multi-step retrieval without LLM calls.
 pub struct ReconstructionState {
-    /// Evolving HLA state (cue). Updated by `evolve_hla()` after each step.
-    hla: [f32; 8],
+    /// Evolving belief state (cue). Updated by `evolve_belief()` after each step.
+    belief: [f32; 8],
     /// Accumulated evidence (H(t)).
     evidence: TripleEvidence,
     /// Configuration.
@@ -417,17 +417,17 @@ pub struct ReconstructionState {
     n_active: u8,
     /// Current reconstruction step.
     step: u8,
-    /// Dual fast/slow EMA surprise kernel observing the HLA output channel
+    /// Dual fast/slow EMA surprise kernel observing the belief output channel
     /// (Plan 277 Fusion F1, gated by `temporal_deriv`).
     ///
     /// `None` until first observation only if the feature is disabled at
     /// compile time (then the field is absent entirely — zero cost). When the
-    /// feature is ON the kernel is always `Some` and is fed every `evolve_hla`
-    /// tick. Tracks *how fast* the HLA is changing; `evolve_hla` itself tracks
+    /// feature is ON the kernel is always `Some` and is fed every `evolve_belief`
+    /// tick. Tracks *how fast* the belief is changing; `evolve_belief` itself tracks
     /// *what is*.
     #[cfg(feature = "temporal_deriv")]
     surprise: Option<TemporalDerivativeKernel<8>>,
-    /// Last `(fast − slow)` derivative written by `evolve_hla` (zero-init).
+    /// Last `(fast − slow)` derivative written by `evolve_belief` (zero-init).
     ///
     /// Feature-gated for byte-identical layout when `temporal_deriv` is OFF.
     /// Only written under `temporal_deriv`; read via [`surprise_vector`](Self::surprise_vector).
@@ -436,15 +436,15 @@ pub struct ReconstructionState {
 }
 
 impl ReconstructionState {
-    /// Initialize reconstruction with a starting HLA state.
+    /// Initialize reconstruction with a starting belief state.
     #[inline]
-    pub fn new(hla: [f32; 8]) -> Self {
-        Self::with_config(hla, ReconstructionConfig::default())
+    pub fn new(belief: [f32; 8]) -> Self {
+        Self::with_config(belief, ReconstructionConfig::default())
     }
 
     /// Initialize with custom config.
     #[inline]
-    pub fn with_config(hla: [f32; 8], config: ReconstructionConfig) -> Self {
+    pub fn with_config(belief: [f32; 8], config: ReconstructionConfig) -> Self {
         let mut active_nodes = [None; 8];
         active_nodes[0] = Some(OctreeNodeId::ROOT);
 
@@ -457,7 +457,7 @@ impl ReconstructionState {
         ));
 
         Self {
-            hla,
+            belief,
             evidence: TripleEvidence::default(),
             config,
             #[cfg(feature = "sense_composition")]
@@ -472,16 +472,16 @@ impl ReconstructionState {
         }
     }
 
-    /// Current HLA state (cue).
+    /// Current belief state (cue).
     #[inline]
-    pub fn hla(&self) -> &[f32; 8] {
-        &self.hla
+    pub fn belief(&self) -> &[f32; 8] {
+        &self.belief
     }
 
-    /// Mutable access to the HLA state (cue).
+    /// Mutable access to the belief state (cue).
     ///
     /// Exposed for **post-evolve steering** (Plan 309 Phase 5 / Research 153):
-    /// after `evolve_hla()` has reconciled the HLA against accumulated evidence,
+    /// after `evolve_belief()` has reconciled the belief against accumulated evidence,
     /// a game-runtime caller applies an additive latent-field overlay directly
     /// onto this slice via `apply_latent_steering` / `apply_latent_steering_weighted`.
     ///
@@ -491,17 +491,17 @@ impl ReconstructionState {
     /// scalar emotion projections cross sync afterwards via the existing bridge.
     ///
     /// Game runtimes that do not use latent-field steering have no reason to
-    /// call this — the default read path is [`hla`](Self::hla).
+    /// call this — the default read path is [`belief`](Self::belief).
     #[inline]
-    pub fn hla_mut(&mut self) -> &mut [f32; 8] {
-        &mut self.hla
+    pub fn belief_mut(&mut self) -> &mut [f32; 8] {
+        &mut self.belief
     }
 
-    /// Last `(fast − slow)` surprise derivative written by `evolve_hla`.
+    /// Last `(fast − slow)` surprise derivative written by `evolve_belief`.
     ///
     /// Returns `None` when the `temporal_deriv` feature is off (no surprise
     /// channel exists); returns `Some(&[f32; 8])` otherwise. The vector is
-    /// zero-initialized until the first `evolve_hla` tick.
+    /// zero-initialized until the first `evolve_belief` tick.
     ///
     /// Plan 277 Fusion F1, T2.3.
     #[inline]
@@ -516,7 +516,7 @@ impl ReconstructionState {
         }
     }
 
-    /// L2 norm of the current `(fast − slow)` HLA surprise derivative.
+    /// L2 norm of the current `(fast − slow)` belief surprise derivative.
     ///
     /// Returns `0.0` when the `temporal_deriv` feature is off; otherwise
     /// delegates to [`TemporalDerivativeKernel::surprise_norm`]. Bounded
@@ -539,19 +539,19 @@ impl ReconstructionState {
         }
     }
 
-    /// Inject a direct additive delta into the HLA state (per-dim clamped to
+    /// Inject a direct additive delta into the belief state (per-dim clamped to
     /// `[-1, 1]`). Does NOT touch evidence and does NOT observe into the
-    /// surprise kernel — call [`evolve_hla`](Self::evolve_hla) afterward to
-    /// feed the updated HLA into the surprise channel.
+    /// surprise kernel — call [`evolve_belief`](Self::evolve_belief) afterward to
+    /// feed the updated belief into the surprise channel.
     ///
     /// Use cases: scripted narrative events (combat onset, loot drops,
     /// encounters), benchmark event injection (Plan 277 G2 gate), and debug
-    /// introspection. The HLA field is otherwise private and only mutated
-    /// through `evolve_hla`.
+    /// introspection. The belief field is otherwise private and only mutated
+    /// through `evolve_belief`.
     #[inline]
-    pub fn inject_hla_delta(&mut self, delta: [f32; 8]) {
+    pub fn inject_belief_delta(&mut self, delta: [f32; 8]) {
         for i in 0..8 {
-            self.hla[i] = (self.hla[i] + delta[i]).clamp(-1.0, 1.0);
+            self.belief[i] = (self.belief[i] + delta[i]).clamp(-1.0, 1.0);
         }
     }
 
@@ -561,7 +561,7 @@ impl ReconstructionState {
     /// inject a controlled per-tick stimulus into the leaky integrator without
     /// going through `accumulate()` (which *adds* rather than *sets*). Only the
     /// `kind_activations` field is touched — `confidence_sum` / `count` are
-    /// unchanged (they do not feed `evolve_hla`'s math).
+    /// unchanged (they do not feed `evolve_belief`'s math).
     ///
     /// `pub(crate)` so the audit module can use it without leaking a generic
     /// setter into the public API.
@@ -571,16 +571,16 @@ impl ReconstructionState {
         self.evidence.kind_activations = activations;
     }
 
-    // NOTE: The previous `pub(crate) fn hla_mut` (Plan 331 Phase 1, gated by
+    // NOTE: The previous `pub(crate) fn belief_mut` (Plan 331 Phase 1, gated by
     // `depth_invariance`) was removed — it duplicated the unconditional
-    // `pub fn hla_mut` added by Plan 309 Phase 5 for latent-field steering.
+    // `pub fn belief_mut` added by Plan 309 Phase 5 for latent-field steering.
     // `pub` is a superset of `pub(crate)`, so the unconditional method serves
-    // both callers (`reconstruction_depth_invariance::evolve_hla_regularized`
+    // both callers (`reconstruction_depth_invariance::evolve_belief_regularized`
     // and `apply_latent_steering`). Keeping both triggered E0592 whenever
     // `depth_invariance` was enabled (its default state).
 
-    /// Feed the current HLA into the surprise kernel and cache the derivative
-    /// in `last_surprise`. Private — `evolve_hla` and `evolve_hla_simd` are
+    /// Feed the current belief into the surprise kernel and cache the derivative
+    /// in `last_surprise`. Private — `evolve_belief` and `evolve_belief_simd` are
     /// the only callers, which keeps a single observation point per tick.
     ///
     /// One predicted branch (`if let Some`); no allocation. The kernel is
@@ -590,7 +590,7 @@ impl ReconstructionState {
     #[inline]
     fn observe_surprise_inner(&mut self) {
         if let Some(ref mut s) = self.surprise {
-            self.last_surprise = s.observe(&self.hla);
+            self.last_surprise = s.observe(&self.belief);
         }
     }
 
@@ -641,7 +641,7 @@ impl ReconstructionState {
         };
         // Stack-local scratch: [pre_lsm | post_lsm | advantage] each [f32; 6].
         let mut scratch = [0.0f32; 18];
-        let margin = advantage_margin_hla(prev, curr, argmax6(curr), &mut scratch);
+        let margin = advantage_margin_belief(prev, curr, argmax6(curr), &mut scratch);
         margin < threshold
     }
 
@@ -651,7 +651,7 @@ impl ReconstructionState {
         self.step += 1;
     }
 
-    /// Expand active nodes: project each module with current HLA, rank results.
+    /// Expand active nodes: project each module with current belief, rank results.
     /// Returns activation scores per module, sorted descending.
     ///
     /// This is the `expand` step from MRAgent Algorithm 1:
@@ -659,11 +659,11 @@ impl ReconstructionState {
     pub fn expand(&mut self, modules: &[SenseModule]) -> [f32; 6] {
         let mut activations = [0.0f32; 6];
 
-        // Project all modules with current (evolved) HLA state
+        // Project all modules with current (evolved) belief state
         for module in modules {
             let kind_idx = module.kind as usize;
             if kind_idx < 6 {
-                activations[kind_idx] = module.project(&self.hla);
+                activations[kind_idx] = module.project(&self.belief);
             }
         }
 
@@ -673,15 +673,15 @@ impl ReconstructionState {
     /// SIMD-optimized expand: vectorized ternary projection across all modules.
     ///
     /// For each module, `project()` computes:
-    ///   `dot = Σ_i sign_i * hla[i] * directions[i].row_scale`
+    ///   `dot = Σ_i sign_i * belief[i] * directions[i].row_scale`
     /// where `sign_i` is extracted from direction `i`'s ternary bits at position `i`.
     ///
     /// This builds per-module sign/scale arrays and uses `simd_dot_f32` for the
     /// dot-product, letting SIMD handle the 8-element FMA chain in one vector op.
     ///
-    /// **Scaling note**: At 6 modules × 8-dim HLA, the SIMD setup overhead
+    /// **Scaling note**: At 6 modules × 8-dim belief, the SIMD setup overhead
     /// (building `sign_scaled` array per module) exceeds the compute savings.
-    /// This method wins when module count or HLA dimensionality scales up.
+    /// This method wins when module count or belief dimensionality scales up.
     /// The default `reconstruct_simd()` path keeps expand scalar for this reason.
     #[cfg(feature = "sense_composition")]
     pub fn expand_simd(&mut self, modules: &[SenseModule]) -> [f32; 6] {
@@ -704,8 +704,8 @@ impl ReconstructionState {
                 *item = (pos - neg) * dir.row_scale;
             }
 
-            // SIMD dot: sign_scaled · hla
-            let dot = katgpt_types::simd::simd_dot_f32(&sign_scaled, &self.hla, 8);
+            // SIMD dot: sign_scaled · belief
+            let dot = katgpt_types::simd::simd_dot_f32(&sign_scaled, &self.belief, 8);
 
             // Fast sigmoid * confidence. Uses katgpt_types::simd::fast_sigmoid for
             // numerical equivalence with the scalar `SenseModule::project` path
@@ -722,7 +722,7 @@ impl ReconstructionState {
     /// On first call, materializes `ProjectionWeights` from `brain.modules` and caches
     /// it in `cached_weights`. Subsequent calls reuse the cache — the matrix only
     /// depends on the module directions (immutable during reconstruction), not the
-    /// evolving HLA state.
+    /// evolving belief state.
     ///
     /// vs `expand()` (6 × module.project): replaces 6 individual 8-el ternary dot
     /// products with one `simd_matmul_rows` call. The per-row overhead (NEON load,
@@ -734,7 +734,7 @@ impl ReconstructionState {
     /// **Benchmark note**: At 6×8 = 48 f32 ops, SIMD matmul is marginal vs scalar
     /// auto-unrolled on Apple Silicon. This method shines when:
     /// - Module count scales beyond 6
-    /// - HLA dimensionality scales beyond 8
+    /// - belief dimensionality scales beyond 8
     /// - Combined with multi-entity batch (see `BatchProjectionWeights`)
     #[cfg(feature = "sense_composition")]
     #[inline(always)]
@@ -766,7 +766,7 @@ impl ReconstructionState {
     pub fn expand_with_weights(&self, weights: &ProjectionWeights) -> [f32; 6] {
         // One matvec: [6×8] × [8] → [6] raw dot products
         let mut dots = [0.0f32; 6];
-        katgpt_types::simd::simd_matmul_rows(&mut dots, &weights.matrix, &self.hla, 6, 8);
+        katgpt_types::simd::simd_matmul_rows(&mut dots, &weights.matrix, &self.belief, 6, 8);
 
         // Elementwise sigmoid + confidence. Uses katgpt_types::simd::fast_sigmoid for
         // numerical equivalence with scalar `SenseModule::project` (the rational
@@ -887,9 +887,9 @@ impl ReconstructionState {
         }
     }
 
-    /// Evolve HLA state based on accumulated evidence.
+    /// Evolve belief state based on accumulated evidence.
     ///
-    /// Bridge function per AGENTS.md: raw KG triples → latent HLA update.
+    /// Bridge function per AGENTS.md: raw KG triples → latent belief update.
     /// Uses dot-product projection + sigmoid. No softmax.
     /// Zero-allocation. Clamp to valid range [-1, 1].
     ///
@@ -899,40 +899,40 @@ impl ReconstructionState {
     /// is `Σ kind_activations[0..6]` (the 6 source activations — NOT the
     /// gathered 8; see `leaky_core` module docs). Behavior is byte-identical to
     /// the previous inline implementation.
-    pub fn evolve_hla(&mut self) {
+    pub fn evolve_belief(&mut self) {
         // total is over the 6 distinct SenseKind activations — preserved exactly
         // from the original inline math. Do not change to Σ padded (would alter
-        // scale and break the shipped HLA benchmarks).
+        // scale and break the shipped belief benchmarks).
         let total: f32 = self.evidence.kind_activations.iter().copied().sum();
         let input = self.evidence.kind_activations_padded();
         katgpt_types::leaky_core::leaky_step(
-            &mut self.hla,
+            &mut self.belief,
             &input,
             total,
-            self.config.hla_learning_rate,
-            self.config.max_hla_delta,
+            self.config.belief_learning_rate,
+            self.config.max_belief_delta,
         );
 
-        // Fusion F1 (Plan 277): feed the post-update HLA into the surprise
+        // Fusion F1 (Plan 277): feed the post-update belief into the surprise
         // kernel. Runs even when `leaky_step` no-op'd (total < 1e-8) — the
         // kernel still needs to observe the (unchanged) signal so its EMAs
-        // converge and the derivative decays to zero on a stationary HLA.
+        // converge and the derivative decays to zero on a stationary belief.
         #[cfg(feature = "temporal_deriv")]
         self.observe_surprise_inner();
     }
 
-    /// SIMD-optimized HLA evolution.
+    /// SIMD-optimized belief evolution.
     ///
     /// Uses `simd_sum_f32` for activation total and `simd_fused_sub_scale_inplace`
-    /// for the normalize-scale chain. For the 8-element HLA array, the SIMD
+    /// for the normalize-scale chain. For the 8-element belief array, the SIMD
     /// benefit is marginal but ensures the hot path uses SIMD primitives
     /// consistent with the rest of the codebase.
     ///
     /// Zero-allocation: uses stack-local `[f32; 8]` delta buffer.
     #[cfg(feature = "sense_composition")]
-    pub fn evolve_hla_simd(&mut self) {
-        let lr = self.config.hla_learning_rate;
-        let max_delta = self.config.max_hla_delta;
+    pub fn evolve_belief_simd(&mut self) {
+        let lr = self.config.belief_learning_rate;
+        let max_delta = self.config.max_belief_delta;
 
         // SIMD sum of kind activations (zero-padded to [f32; 8] — sum is over the
         // 6 distinct activations, matching the scalar path's Σ[0..6]).
@@ -955,22 +955,22 @@ impl ReconstructionState {
         let sub_val = 0.5 * total_activation;
         katgpt_types::simd::simd_fused_sub_scale_inplace(&mut delta, sub_val, scale);
 
-        // Clamp delta and apply to HLA
-        for (d, h) in delta.iter_mut().zip(self.hla.iter_mut()) {
+        // Clamp delta and apply to belief
+        for (d, h) in delta.iter_mut().zip(self.belief.iter_mut()) {
             *d = d.clamp(-max_delta, max_delta);
             *h = (*h + *d).clamp(-1.0, 1.0);
         }
 
         // Fusion F1 (Plan 277): SIMD path must feed the surprise kernel too —
         // numerical equivalence with the scalar path is asserted in
-        // `evolve_hla_surprise_simd_matches_scalar`.
+        // `evolve_belief_surprise_simd_matches_scalar`.
         #[cfg(feature = "temporal_deriv")]
         self.observe_surprise_inner();
     }
 
     /// Run full reconstruction loop (scalar path).
     ///
-    /// Combines expand → route → accumulate → evolve_hla → sufficient check
+    /// Combines expand → route → accumulate → evolve_belief → sufficient check
     /// into a single call. Returns final activations.
     ///
     /// Equivalent to MRAgent Algorithm 1, but modelless:
@@ -978,17 +978,17 @@ impl ReconstructionState {
     /// - expand: SenseModule::project (not graph traversal)
     /// - route: activation ranking (not LLM routing)
     /// - accumulate: TripleEvidence merge (not LLM summarization)
-    /// - evolve_hla: bridge function (not LLM reasoning)
+    /// - evolve_belief: bridge function (not LLM reasoning)
     pub fn reconstruct(&mut self, modules: &[SenseModule]) -> [f32; 6] {
         self.reconstruct_inner(modules, false)
     }
 
-    /// Run reconstruction using SIMD-optimized HLA evolution.
+    /// Run reconstruction using SIMD-optimized belief evolution.
     ///
-    /// Equivalent to `reconstruct()` but uses `evolve_hla_simd()` for the
-    /// HLA update step (proven win). Both paths now use `expand_matvec` for
+    /// Equivalent to `reconstruct()` but uses `evolve_belief_simd()` for the
+    /// belief update step (proven win). Both paths now use `expand_matvec` for
     /// the expand step (sense_composition feature); `use_simd` only toggles
-    /// the HLA evolution kernel.
+    /// the belief evolution kernel.
     ///
     /// Use when the reconstruction cycle is on the hot path and every
     /// nanosecond counts.
@@ -1023,7 +1023,7 @@ impl ReconstructionState {
             let activations = self.expand_matvec(modules);
             let selected = self.route(&activations);
             self.accumulate(&selected, &activations);
-            self.evolve_hla();
+            self.evolve_belief();
             self.step += 1;
             if self.sufficient() {
                 return activations;
@@ -1060,7 +1060,7 @@ impl ReconstructionState {
             let activations = self.expand_with_weights(weights);
             let selected = self.route(&activations);
             self.accumulate(&selected, &activations);
-            self.evolve_hla();
+            self.evolve_belief();
             self.step += 1;
             if self.sufficient() {
                 return activations;
@@ -1098,7 +1098,7 @@ impl ReconstructionState {
         self.reconstruct_inner(modules, use_simd)
     }
 
-    /// Shared inner loop — dispatches to SIMD `evolve_hla_simd()` when available.
+    /// Shared inner loop — dispatches to SIMD `evolve_belief_simd()` when available.
     /// Detects SIMD availability once at entry, not per-step.
     fn reconstruct_inner(&mut self, modules: &[SenseModule], use_simd: bool) -> [f32; 6] {
         // Resolve SIMD availability once at entry. Without `sense_composition`
@@ -1135,15 +1135,15 @@ impl ReconstructionState {
 
             self.accumulate(&selected, &activations);
 
-            // Evolve HLA: SIMD path wins here (8-element fused sub-scale)
+            // Evolve belief: SIMD path wins here (8-element fused sub-scale)
             #[cfg(feature = "sense_composition")]
             if simd_available {
-                self.evolve_hla_simd();
+                self.evolve_belief_simd();
             } else {
-                self.evolve_hla();
+                self.evolve_belief();
             }
             #[cfg(not(feature = "sense_composition"))]
-            self.evolve_hla();
+            self.evolve_belief();
 
             self.step += 1;
 
@@ -1200,7 +1200,7 @@ fn argmax6(v: &[f32; 6]) -> usize {
     idx
 }
 
-/// Advantage margin for the HLA reconstruction gate (Eq. 18, arxiv:2511.16886).
+/// Advantage margin for the belief reconstruction gate (Eq. 18, arxiv:2511.16886).
 ///
 /// `margin(candidate) = A(candidate) − E_{a∼π+}[A(a)]`
 ///
@@ -1219,7 +1219,7 @@ fn argmax6(v: &[f32; 6]) -> usize {
 /// within this function — no allocation.
 #[cfg(feature = "self_advantage_gate")]
 #[inline]
-fn advantage_margin_hla(
+fn advantage_margin_belief(
     prev: &[f32; 6],
     curr: &[f32; 6],
     candidate: usize,
@@ -1308,8 +1308,8 @@ pub struct ReconstructionResult {
     pub passive: [f32; 6],
     /// Active multi-step activations (reconstructed).
     pub active: [f32; 6],
-    /// HLA state delta (active - passive HLA).
-    pub hla_delta: [f32; 8],
+    /// belief state delta (active - passive belief).
+    pub belief_delta: [f32; 8],
     /// Final evidence state.
     pub evidence: TripleEvidence,
     /// Number of reconstruction steps taken.
@@ -1318,29 +1318,29 @@ pub struct ReconstructionResult {
 
 /// Run side-by-side comparison: passive vs active reconstruction.
 /// Used for GOAT proof tests and benchmarks.
-pub fn compare_reconstruction(modules: &[SenseModule], hla: [f32; 8]) -> ReconstructionResult {
+pub fn compare_reconstruction(modules: &[SenseModule], belief: [f32; 8]) -> ReconstructionResult {
     // Passive: single-shot projection
     let passive = {
         let mut acts = [0.0f32; 6];
         for module in modules {
             let idx = module.kind as usize;
             if idx < 6 {
-                acts[idx] = module.project(&hla);
+                acts[idx] = module.project(&belief);
             }
         }
         acts
     };
 
     // Active: multi-step reconstruction
-    let mut state = ReconstructionState::new(hla);
+    let mut state = ReconstructionState::new(belief);
     let active = state.reconstruct(modules);
 
-    // Compute HLA delta
-    let hla_delta = {
+    // Compute belief delta
+    let belief_delta = {
         let mut d = [0.0f32; 8];
-        let evolved = state.hla();
+        let evolved = state.belief();
         for i in 0..8 {
-            d[i] = evolved[i] - hla[i];
+            d[i] = evolved[i] - belief[i];
         }
         d
     };
@@ -1350,7 +1350,7 @@ pub fn compare_reconstruction(modules: &[SenseModule], hla: [f32; 8]) -> Reconst
         active,
         steps: state.step() as u32,
         evidence: *state.evidence(),
-        hla_delta,
+        belief_delta,
     }
 }
 
@@ -1387,7 +1387,7 @@ mod tests {
     fn reconstruction_config_default() {
         let config = ReconstructionConfig::default();
         assert_eq!(config.max_steps, 3);
-        assert!((config.hla_learning_rate - 0.1).abs() < 1e-6);
+        assert!((config.belief_learning_rate - 0.1).abs() < 1e-6);
         assert!((config.entropy_threshold - 0.05).abs() < 1e-6);
         assert!(config.lod_adaptive);
     }
@@ -1437,44 +1437,44 @@ mod tests {
         assert!(!state.sufficient()); // step 0, max_steps 3
     }
 
-    /// Verify SIMD evolve_hla produces numerically equivalent results to scalar.
+    /// Verify SIMD evolve_belief produces numerically equivalent results to scalar.
     #[cfg(feature = "sense_composition")]
     #[test]
-    fn evolve_hla_simd_matches_scalar() {
+    fn evolve_belief_simd_matches_scalar() {
         let config = ReconstructionConfig::default();
-        let hla = [0.3, 0.7, 0.1, 0.5, 0.4, 0.2, 0.6, 0.8];
+        let belief = [0.3, 0.7, 0.1, 0.5, 0.4, 0.2, 0.6, 0.8];
 
         // Run scalar path
-        let mut state_scalar = ReconstructionState::with_config(hla, config);
+        let mut state_scalar = ReconstructionState::with_config(belief, config);
         // Simulate some evidence accumulation
         let selected = [true, false, true, false, true, false];
         let activations = [0.5, 0.2, 0.8, 0.1, 0.3, 0.0];
         state_scalar.accumulate(&selected, &activations);
-        state_scalar.evolve_hla();
+        state_scalar.evolve_belief();
 
         // Run SIMD path
-        let mut state_simd = ReconstructionState::with_config(hla, config);
+        let mut state_simd = ReconstructionState::with_config(belief, config);
         state_simd.accumulate(&selected, &activations);
-        state_simd.evolve_hla_simd();
+        state_simd.evolve_belief_simd();
 
-        // Compare HLA states — should be numerically close
+        // Compare belief states — should be numerically close
         let mut max_diff = 0.0f32;
         for i in 0..8 {
-            let diff = (state_scalar.hla()[i] - state_simd.hla()[i]).abs();
+            let diff = (state_scalar.belief()[i] - state_simd.belief()[i]).abs();
             max_diff = max_diff.max(diff);
         }
         assert!(
             max_diff < 1e-4,
-            "SIMD and scalar evolve_hla should produce similar results, diff={max_diff}"
+            "SIMD and scalar evolve_belief should produce similar results, diff={max_diff}"
         );
     }
 
     /// Plan 277 T2.7 — surprise channel numerical equivalence between scalar
-    /// `evolve_hla` and SIMD `evolve_hla_simd` paths.
+    /// `evolve_belief` and SIMD `evolve_belief_simd` paths.
     ///
-    /// Both paths feed the same HLA into the `TemporalDerivativeKernel<8>` via
-    /// `observe_surprise_inner()`. Since the HLA itself is numerically
-    /// equivalent (asserted by `evolve_hla_simd_matches_scalar`) and the
+    /// Both paths feed the same belief into the `TemporalDerivativeKernel<8>` via
+    /// `observe_surprise_inner()`. Since the belief itself is numerically
+    /// equivalent (asserted by `evolve_belief_simd_matches_scalar`) and the
     /// surprise kernel is deterministic given its input, the surprise vectors
     /// and norms MUST match to within f32 rounding tolerance.
     ///
@@ -1484,17 +1484,17 @@ mod tests {
     /// `temporal_deriv` (for the surprise channel).
     #[cfg(all(feature = "sense_composition", feature = "temporal_deriv"))]
     #[test]
-    fn evolve_hla_surprise_simd_matches_scalar() {
+    fn evolve_belief_surprise_simd_matches_scalar() {
         let config = ReconstructionConfig::default();
-        let hla = [0.3, 0.7, 0.1, 0.5, 0.4, 0.2, 0.6, 0.8];
+        let belief = [0.3, 0.7, 0.1, 0.5, 0.4, 0.2, 0.6, 0.8];
         let selected = [true, false, true, false, true, false];
         let activations = [0.5, 0.2, 0.8, 0.1, 0.3, 0.0];
 
         // Run 10 ticks on each path so the surprise kernel builds up nonzero
         // (fast − slow) state — a single tick would only test the initial
         // transient, not the steady-state divergence robustness.
-        let mut state_scalar = ReconstructionState::with_config(hla, config);
-        let mut state_simd = ReconstructionState::with_config(hla, config);
+        let mut state_scalar = ReconstructionState::with_config(belief, config);
+        let mut state_simd = ReconstructionState::with_config(belief, config);
         for tick in 0..10u32 {
             // Vary activations each tick to produce a non-trivial trajectory.
             let scale = 0.5 + 0.1 * tick as f32;
@@ -1507,9 +1507,9 @@ mod tests {
                 activations[5] * scale,
             ];
             state_scalar.accumulate(&selected, &acts);
-            state_scalar.evolve_hla();
+            state_scalar.evolve_belief();
             state_simd.accumulate(&selected, &acts);
-            state_simd.evolve_hla_simd();
+            state_simd.evolve_belief_simd();
         }
 
         // Compare the surprise vectors.
@@ -1541,13 +1541,13 @@ mod tests {
 
     /// Plan 277 Fusion F1 T2.6 — G2 gate: synthetic emotional-event trace.
     ///
-    /// Embeds three step-change events into a 1000-tick HLA trace and verifies
+    /// Embeds three step-change events into a 1000-tick belief trace and verifies
     /// the dual `(fast − slow)` surprise channel detects them while the raw
-    /// HLA L2 norm does not. This is the core G2 proof that the derivative is
+    /// belief L2 norm does not. This is the core G2 proof that the derivative is
     /// an *orthogonal* signal to magnitude — it fires on change, not on level.
     ///
     /// Events (combat onset, loot drop, encounter) are injected as additive
-    /// deltas on one HLA dimension at t=200, 500, 800 via `inject_hla_delta`.
+    /// deltas on one belief dimension at t=200, 500, 800 via `inject_belief_delta`.
     /// Between events the trace is held stationary so the EMAs converge and
     /// the derivative decays back to ~0 — the canonical neocortical
     /// prediction-error shape (O'Reilly 2026).
@@ -1557,7 +1557,7 @@ mod tests {
     ///   `surprise_norm` peak. 3/3 events → 100% expected.
     /// - False positives ≤ 10%: fewer than 10% of trace ticks outside event
     ///   windows may be local peaks above the detection threshold.
-    /// - Raw vs derivative orthogonality: the raw HLA L2 norm is monotone
+    /// - Raw vs derivative orthogonality: the raw belief L2 norm is monotone
     ///   non-decreasing across each event (it steps up and stays), so it CANNOT
     ///   peak inside the event window — the derivative peaks where raw does not.
     #[cfg(feature = "temporal_deriv")]
@@ -1594,19 +1594,19 @@ mod tests {
                 _ => [0.0; 8],
             };
             if delta != [0.0; 8] {
-                state.inject_hla_delta(delta);
+                state.inject_belief_delta(delta);
             }
 
-            // Drive a no-op evolve_hla tick: zero evidence → leaky_step does
-            // nothing to HLA, but the surprise kernel still observes the
-            // (possibly just-injected) current HLA. This is exactly the scalar
+            // Drive a no-op evolve_belief tick: zero evidence → leaky_step does
+            // nothing to belief, but the surprise kernel still observes the
+            // (possibly just-injected) current belief. This is exactly the scalar
             // path's documented behavior (observe runs even on a no-op step).
-            state.evolve_hla();
+            state.evolve_belief();
 
-            // Record surprise and raw HLA L2 norm.
+            // Record surprise and raw belief L2 norm.
             surprise_trace[t] = state.surprise_norm();
-            let hla = state.hla();
-            let sq: f32 = hla.iter().map(|x| x * x).sum();
+            let belief = state.belief();
+            let sq: f32 = belief.iter().map(|x| x * x).sum();
             raw_norm_trace[t] = sq.max(0.0).sqrt();
         }
 
@@ -1669,7 +1669,7 @@ mod tests {
                 .collect::<Vec<_>>()
         );
 
-        // --- G2 proof: raw HLA norm does NOT peak at events ---------------------
+        // --- G2 proof: raw belief norm does NOT peak at events ---------------------
         // The raw norm is monotone non-decreasing by construction (each event
         // only adds magnitude and nothing subtracts). Therefore the global raw
         // peak is at the last tick, far from any event. We assert:
@@ -1695,7 +1695,7 @@ mod tests {
         let raw_near_event = EVENTS.iter().any(|&e| raw_argmax.abs_diff(e) <= WINDOW);
         assert!(
             !raw_near_event,
-            "G2: raw HLA norm must NOT peak near an event; raw_argmax={raw_argmax}, events={EVENTS:?}"
+            "G2: raw belief norm must NOT peak near an event; raw_argmax={raw_argmax}, events={EVENTS:?}"
         );
 
         // Surprise norm peaks near an event.
@@ -1717,18 +1717,18 @@ mod tests {
 
     /// Plan 276 T2.3 — zero-behavior-change regression gate.
     ///
-    /// Runs a known evidence pattern through the refactored `evolve_hla`
+    /// Runs a known evidence pattern through the refactored `evolve_belief`
     /// (now a delegate over `katgpt_types::leaky_core::leaky_step`) and asserts the
-    /// resulting HLA is **bit-for-bit identical** to the original inline math
+    /// resulting belief is **bit-for-bit identical** to the original inline math
     /// (sum-over-6 total, `KIND_MAP = [0,1,2,3,4,5,0,1]` gather, config-sourced
     /// lr / max_delta). Runs whenever `sense` compiles — `micro_belief` is NOT
     /// required, which proves the ungated core keeps `sense` decoupled.
     #[test]
-    fn evolve_hla_is_byte_identical_to_inline_reference() {
+    fn evolve_belief_is_byte_identical_to_inline_reference() {
         let config = ReconstructionConfig::default();
-        let lr = config.hla_learning_rate;
-        let max_delta = config.max_hla_delta;
-        let init_hla = [0.3, 0.7, 0.1, 0.5, 0.4, 0.2, 0.6, 0.8];
+        let lr = config.belief_learning_rate;
+        let max_delta = config.max_belief_delta;
+        let init_belief = [0.3, 0.7, 0.1, 0.5, 0.4, 0.2, 0.6, 0.8];
 
         // Accumulate a non-trivial evidence pattern with non-zero k0/k1 so the
         // KIND_MAP wrap (dims 6,7) is exercised and the sum-over-6 vs
@@ -1737,11 +1737,11 @@ mod tests {
         let activations = [0.5, 0.2, 0.8, 0.1, 0.3, 0.4];
 
         // --- Actual: refactored delegate path ---
-        let mut state_actual = ReconstructionState::with_config(init_hla, config);
+        let mut state_actual = ReconstructionState::with_config(init_belief, config);
         state_actual.accumulate(&selected, &activations);
-        state_actual.evolve_hla();
+        state_actual.evolve_belief();
 
-        // --- Reference: verbatim copy of the PRE-refactor evolve_hla body ---
+        // --- Reference: verbatim copy of the PRE-refactor evolve_belief body ---
         // total is Σ kind_activations[0..6]; gather uses KIND_MAP wrap.
         const KIND_MAP: [usize; 8] = [0, 1, 2, 3, 4, 5, 0, 1];
         let mut kind_activations = [0.0f32; 6];
@@ -1750,7 +1750,7 @@ mod tests {
                 kind_activations[i] += activations[i];
             }
         }
-        let mut hla_ref = init_hla;
+        let mut belief_ref = init_belief;
         let total_activation: f32 = kind_activations.iter().copied().sum();
         assert!(
             total_activation >= 1e-8,
@@ -1763,14 +1763,14 @@ mod tests {
             let normalized = kind_activations[KIND_MAP[i]];
             let delta = scale * (normalized - half_total);
             let clamped_delta = delta.clamp(-max_delta, max_delta);
-            hla_ref[i] = (hla_ref[i] + clamped_delta).clamp(-1.0, 1.0);
+            belief_ref[i] = (belief_ref[i] + clamped_delta).clamp(-1.0, 1.0);
         }
 
         // Bit-for-bit equality — not approximate. Any drift is a regression.
         assert_eq!(
-            *state_actual.hla(),
-            hla_ref,
-            "T2.3: refactored evolve_hla must be byte-identical to the inline reference"
+            *state_actual.belief(),
+            belief_ref,
+            "T2.3: refactored evolve_belief must be byte-identical to the inline reference"
         );
     }
 
@@ -1793,8 +1793,8 @@ mod tests {
     #[test]
     fn route_simd_matches_scalar() {
         let config = ReconstructionConfig::default();
-        let hla = [0.3, 0.7, 0.1, 0.5, 0.4, 0.2, 0.6, 0.8];
-        let state = ReconstructionState::with_config(hla, config);
+        let belief = [0.3, 0.7, 0.1, 0.5, 0.4, 0.2, 0.6, 0.8];
+        let state = ReconstructionState::with_config(belief, config);
 
         let activations = [0.5, 0.2, 0.8, 0.1, 0.3, 0.7];
         let selected_scalar = state.route(&activations);
@@ -1867,7 +1867,7 @@ mod tests {
         let curr = prev;
         let mut scratch = [0.0f32; 18];
         for candidate in 0..6 {
-            let m = advantage_margin_hla(&prev, &curr, candidate, &mut scratch);
+            let m = advantage_margin_belief(&prev, &curr, candidate, &mut scratch);
             assert!(
                 m.abs() < 1e-6,
                 "identical steps → zero margin, got {m} for candidate {candidate}"
@@ -1881,7 +1881,7 @@ mod tests {
         let prev = [0.3, 0.3, 0.3, 0.3, 0.3, 0.3];
         let curr = [0.1, 0.1, 0.9, 0.1, 0.1, 0.1];
         let mut scratch = [0.0f32; 18];
-        let m = advantage_margin_hla(&prev, &curr, 2, &mut scratch);
+        let m = advantage_margin_belief(&prev, &curr, 2, &mut scratch);
         assert!(
             m > 0.0,
             "sharpening the candidate must give positive margin, got {m}"
@@ -1894,7 +1894,7 @@ mod tests {
         let prev = [0.9, 0.1, 0.1, 0.1, 0.1, 0.1];
         let curr = [0.1, 0.1, 0.9, 0.1, 0.1, 0.1];
         let mut scratch = [0.0f32; 18];
-        let m = advantage_margin_hla(&prev, &curr, 0, &mut scratch);
+        let m = advantage_margin_belief(&prev, &curr, 0, &mut scratch);
         assert!(
             m < 0.0,
             "shifting away from candidate must give negative margin, got {m}"

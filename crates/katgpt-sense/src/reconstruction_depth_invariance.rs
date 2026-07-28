@@ -1,16 +1,16 @@
-//! Plan 331 Phase 1 — depth-invariance audit + RmsNorm wrap for HLA.
+//! Plan 331 Phase 1 — depth-invariance audit + RmsNorm wrap for belief.
 //!
 //! Sibling methods on [`ReconstructionState`] (Plan 331 T1.2 / T1.3). Gated
 //! behind the existing `depth_invariance` feature (Plan 306 Phase 1+5, shipped
 //! in katgpt-rs commit `98285db3`). The raw
-//! [`ReconstructionState::evolve_hla`](super::ReconstructionState::evolve_hla)
+//! [`ReconstructionState::evolve_belief`](super::ReconstructionState::evolve_belief)
 //! kernel is UNCHANGED — these are additive audit + regularized-variant entry
 //! points for callers that want to opt into the magnitude-hygiene
 //! defense-in-depth (Research 151 / Plan 331 / arXiv:2605.09992 §4.4).
 //!
 //! ## Latent vs raw boundary (per AGENTS.md)
 //!
-//! The HLA state is a latent 8-vector. [`ReconstructionState::evolve_hla_regularized`]
+//! The belief state is a latent 8-vector. [`ReconstructionState::evolve_belief_regularized`]
 //! operates on the latent vector directly (RmsNorm). The raw scalar bridge
 //! clamps (valence/arousal/... to `[-1,1]`) are still produced downstream by
 //! the consumer and are unaffected here — this wrap is *additional* hygiene on
@@ -20,7 +20,7 @@ use super::ReconstructionState;
 
 /// Per-tick stimulus schedule for [`ReconstructionState::audit_depth_invariance`].
 ///
-/// The leaky integrator inside `evolve_hla` consumes `evidence.kind_activations`
+/// The leaky integrator inside `evolve_belief` consumes `evidence.kind_activations`
 /// (the 6 distinct SenseKind activation strengths) as its input. The audit
 /// overwrites that field each tick with the schedule's value — exercising the
 /// actual leaky path faithfully (no shortcut).
@@ -48,17 +48,17 @@ pub enum AuditStimulus {
 }
 
 impl ReconstructionState {
-    /// Audit `evolve_hla` for the attention-drift failure mode (Plan 331 T1.2).
+    /// Audit `evolve_belief` for the attention-drift failure mode (Plan 331 T1.2).
     ///
-    /// Runs `evolve_hla` for `k` ticks under the supplied `stimulus` schedule,
-    /// capturing the HLA chain (`h_0 … h_k`, each `[f32; 8]`) into the
+    /// Runs `evolve_belief` for `k` ticks under the supplied `stimulus` schedule,
+    /// capturing the belief chain (`h_0 … h_k`, each `[f32; 8]`) into the
     /// caller-owned `states_out` buffer, then classifies the chain via
     /// [`katgpt_types::classify_chain`].
     ///
     /// **Stimulus mechanism:** each tick, `evidence.kind_activations` is
     /// overwritten with the schedule's per-tick value (not accumulated — the
     /// audit controls the drive signal exactly). This exercises the actual
-    /// leaky-integrator path inside `evolve_hla`, not a shortcut.
+    /// leaky-integrator path inside `evolve_belief`, not a shortcut.
     ///
     /// **Zero allocation in the hot path** (per AGENTS.md): `states_out` and
     /// `scratch` are caller-owned. The method `clear()`s `states_out` on entry
@@ -70,7 +70,7 @@ impl ReconstructionState {
     /// - `stimulus`: per-tick drive schedule (see [`AuditStimulus`]).
     /// - `cfg`: classifier thresholds (see [`katgpt_types::DepthInvarianceConfig`]).
     /// - `scratch`: classifier scratch (cleared + filled; not read).
-    /// - `states_out`: receives the flattened `[k+1][8]` HLA chain (caller-owned).
+    /// - `states_out`: receives the flattened `[k+1][8]` belief chain (caller-owned).
     ///
     /// Returns the diagnostic. The chain in `states_out` is left populated so
     /// the caller can re-classify under alternative thresholds without re-running.
@@ -89,13 +89,13 @@ impl ReconstructionState {
         // No-op if capacity already suffices. This is the only allocation; it is
         // amortized across calls — caller can pre-reserve to make it zero per call.
         states_out.reserve_exact((k + 1).saturating_mul(8));
-        states_out.extend_from_slice(self.hla());
+        states_out.extend_from_slice(self.belief());
 
         // ── Drive the leaky integrator for k ticks ──
         for t in 0..k {
             // Overwrite the drive signal with the per-tick stimulus. This is
             // the only mutation to evidence — confidence_sum/count are left
-            // untouched (they don't feed evolve_hla's math; only
+            // untouched (they don't feed evolve_belief's math; only
             // kind_activations does).
             let activations = match stimulus {
                 AuditStimulus::Constant { activations } => activations,
@@ -106,23 +106,23 @@ impl ReconstructionState {
             };
             self.set_kind_activations(activations);
 
-            self.evolve_hla();
-            states_out.extend_from_slice(self.hla());
+            self.evolve_belief();
+            states_out.extend_from_slice(self.belief());
         }
 
         // ── Classify the captured chain ──
         katgpt_types::classify_chain(states_out, /*d=*/ 8, cfg, scratch)
     }
 
-    /// Regularized variant of `evolve_hla` (Plan 331 T1.3).
+    /// Regularized variant of `evolve_belief` (Plan 331 T1.3).
     ///
-    /// Runs the raw [`Self::evolve_hla`] update unchanged, then applies
-    /// [`katgpt_types::MagnitudeRegularization`] in-place to the 8-dim HLA state.
+    /// Runs the raw [`Self::evolve_belief`] update unchanged, then applies
+    /// [`katgpt_types::MagnitudeRegularization`] in-place to the 8-dim belief state.
     /// This is the modelless Layer-1 magnitude-hygiene fix per Research 151 /
     /// arXiv:2605.09992 §4.4.
     ///
-    /// The raw path is byte-identical to `evolve_hla()` (the existing
-    /// `evolve_hla_is_byte_identical_to_inline_reference` test still guards it).
+    /// The raw path is byte-identical to `evolve_belief()` (the existing
+    /// `evolve_belief_is_byte_identical_to_inline_reference` test still guards it).
     /// This method is an *additional* sibling — callers opt in per Plan 331's
     /// `magnitude_hygiene` feature (wired on the riir-engine side in Phase 1).
     ///
@@ -133,17 +133,17 @@ impl ReconstructionState {
     /// - `regularization`: mode ([`katgpt_types::MagnitudeRegularization::RmsNorm`] is
     ///   the paper's prescription; `ScalarPinch` is a gentler alternative when
     ///   `RmsNorm` proves too aggressive — see Plan 331 T1.6 fallback).
-    /// - `scratch`: length-`d` caller-owned scratch (length 8 for HLA).
+    /// - `scratch`: length-`d` caller-owned scratch (length 8 for belief).
     #[inline]
-    pub fn evolve_hla_regularized(
+    pub fn evolve_belief_regularized(
         &mut self,
         regularization: katgpt_types::MagnitudeRegularization,
         scratch: &mut [f32],
     ) {
-        // Raw leaky-integrator update — byte-identical to evolve_hla().
-        self.evolve_hla();
+        // Raw leaky-integrator update — byte-identical to evolve_belief().
+        self.evolve_belief();
         // Apply magnitude regularization in-place on the 8-dim latent state.
-        katgpt_types::apply_magnitude_regularization(self.hla_mut(), regularization, scratch);
+        katgpt_types::apply_magnitude_regularization(self.belief_mut(), regularization, scratch);
     }
 }
 
@@ -163,7 +163,7 @@ mod tests {
     const AUDIT_K: usize = 1000;
 
     /// Canonical Plan 331 T1.2 stimulus: alternating positive/negative valence
-    /// activations of magnitude `hla_learning_rate * 1.0`. Exercises the leaky
+    /// activations of magnitude `belief_learning_rate * 1.0`. Exercises the leaky
     /// integrator in both directions every tick.
     ///
     /// We pick distinct positive/negative patterns (not just sign-flipped copies)
@@ -193,15 +193,15 @@ mod tests {
     /// **Hypothesis (Plan 331):** unbounded leaky integrator accumulates
     /// magnitude → expect `DepthSpecificRefinement`.
     ///
-    /// **Empirical finding (REFUTES the hypothesis):** `evolve_hla` clamps
+    /// **Empirical finding (REFUTES the hypothesis):** `evolve_belief` clamps
     /// state per-element to `[-1, 1]` (see `leaky_core::leaky_step` line ~79:
-    /// `state[i] = (state[i] + clamped_delta).clamp(-1.0, 1.0)`). The HLA is
+    /// `state[i] = (state[i] + clamped_delta).clamp(-1.0, 1.0)`). The belief is
     /// therefore bounded **by construction** — max L2 norm = √8 ≈ 2.83, max
     /// RMS = 1.0. The state saturates against the per-element clamp within a
     /// few ticks and then oscillates inside the clamp box, so `‖h_t‖` is flat
     /// (slope ≈ 0) and the chain classifies as `DepthInvariant`.
     ///
-    /// This is an informative negative result: the raw HLA kernel is *already*
+    /// This is an informative negative result: the raw belief kernel is *already*
     /// magnitude-hygienic by virtue of the per-element clamp. The Plan 331
     /// RmsNorm wrap (T1.5) is therefore a no-op-or-near-no-op on bounded
     /// stimuli; its value is as a *defense-in-depth* backstop for stimuli or
@@ -212,7 +212,7 @@ mod tests {
     /// stimulus — both must be stable since the clamp is per-element and
     /// stimulus-agnostic.
     #[test]
-    fn hla_depth_invariance_audit_classifies_drift() {
+    fn belief_depth_invariance_audit_classifies_drift() {
         let cfg = DepthInvarianceConfig::default();
         let mut scratch = Scratch::with_capacity(AUDIT_K + 1, 8);
         let mut states = Vec::with_capacity((AUDIT_K + 1) * 8);
@@ -229,7 +229,7 @@ mod tests {
         assert_eq!(
             diag.kind,
             DepthInvarianceKind::DepthInvariant,
-            "alternating stimulus: raw evolve_hla is bounded by the per-element \
+            "alternating stimulus: raw evolve_belief is bounded by the per-element \
              [-1,1] clamp → magnitude_slope should be ~0. Got diag = {diag:?}"
         );
         assert!(diag.magnitude_slope.abs() < cfg.magnitude_slope_drift);
@@ -246,14 +246,14 @@ mod tests {
         assert_eq!(
             diag.kind,
             DepthInvarianceKind::DepthInvariant,
-            "sustained stimulus: raw evolve_hla is bounded by the per-element \
+            "sustained stimulus: raw evolve_belief is bounded by the per-element \
              [-1,1] clamp → magnitude_slope should be ~0. Got diag = {diag:?}"
         );
     }
 
     // ── T1.5 — regularized variant classifies invariant ────────────────────
 
-    /// Plan 331 Phase 1 T1.5: drive `evolve_hla_regularized(RmsNorm)` for
+    /// Plan 331 Phase 1 T1.5: drive `evolve_belief_regularized(RmsNorm)` for
     /// k=1000 ticks and verify the resulting chain classifies as
     /// `DepthInvariant`.
     ///
@@ -263,7 +263,7 @@ mod tests {
     /// regression where the regularization wrap accidentally destabilizes the
     /// chain (e.g. a sign error in `apply_magnitude_regularization`).
     #[test]
-    fn hla_regularized_classifies_invariant() {
+    fn belief_regularized_classifies_invariant() {
         let cfg = DepthInvarianceConfig::default();
         let mut scratch_reg = [0.0f32; 8]; // unused by RmsNorm in Phase 1, but required by API
         let mut classify_scratch = Scratch::with_capacity(AUDIT_K + 1, 8);
@@ -271,7 +271,7 @@ mod tests {
 
         let mut state = ReconstructionState::new([0.3, -0.2, 0.5, 0.1, -0.4, 0.6, 0.0, -0.1]);
         states.clear();
-        states.extend_from_slice(state.hla());
+        states.extend_from_slice(state.belief());
         for t in 0..AUDIT_K {
             let activations = match alternating_stimulus() {
                 AuditStimulus::AlternatingSign { positive, negative } => match t % 2 == 0 {
@@ -281,8 +281,8 @@ mod tests {
                 _ => unreachable!("fixture returns AlternatingSign"),
             };
             state.set_kind_activations(activations);
-            state.evolve_hla_regularized(MagnitudeRegularization::RmsNorm, &mut scratch_reg);
-            states.extend_from_slice(state.hla());
+            state.evolve_belief_regularized(MagnitudeRegularization::RmsNorm, &mut scratch_reg);
+            states.extend_from_slice(state.belief());
         }
 
         let diag = katgpt_types::classify_chain(&states, 8, &cfg, &mut classify_scratch);
@@ -313,7 +313,7 @@ mod tests {
     /// emotional events punctuate long stretches of zero drive (T1.4 stimulus
     /// is the pathological always-on extreme). We model that here — apply a
     /// mild mixed-sign stimulus for the first 5 ticks, then 95 ticks of zero
-    /// drive (under which `evolve_hla` is a no-op via its `total < 1e-8` guard,
+    /// drive (under which `evolve_belief` is a no-op via its `total < 1e-8` guard,
     /// so both paths hold their post-event state). We then assert:
     ///
     /// 1. `cos(reg_final, reg_init) > 0.5` — the regularized path preserves
@@ -328,7 +328,7 @@ mod tests {
     /// but direction is preserved") in a regime where the assertion is
     /// well-defined.
     #[test]
-    fn hla_regularized_preserves_direction() {
+    fn belief_regularized_preserves_direction() {
         const EVENT_TICKS: usize = 5;
         const RELAX_TICKS: usize = 95;
         // Mild mixed-sign stimulus: total = 1.1, half_total = 0.55, so dim 0
@@ -349,12 +349,12 @@ mod tests {
             };
             raw.set_kind_activations(activations);
             reg.set_kind_activations(activations);
-            raw.evolve_hla();
-            reg.evolve_hla_regularized(MagnitudeRegularization::RmsNorm, &mut scratch_reg);
+            raw.evolve_belief();
+            reg.evolve_belief_regularized(MagnitudeRegularization::RmsNorm, &mut scratch_reg);
         }
 
-        let h_raw = raw.hla();
-        let h_reg = reg.hla();
+        let h_raw = raw.belief();
+        let h_reg = reg.belief();
 
         // (1) Regularized path preserves its seeded personality direction.
         let cos_vs_init = cosine_sim(h_reg, &init);
@@ -382,7 +382,7 @@ mod tests {
 
     /// Plan 331 Phase 1 T1.7: the regularized variant is NOT byte-identical to
     /// the raw path (RmsNorm rescales every tick), so it cannot satisfy the
-    /// `evolve_hla_is_byte_identical_to_inline_reference` guard. The weaker but
+    /// `evolve_belief_is_byte_identical_to_inline_reference` guard. The weaker but
     /// meaningful invariant we assert here: the regularized state stays
     /// **finite** and **RMS-bounded** (≤ 1.0 + eps) under the same evidence
     /// pattern the byte-identical test uses.
@@ -392,24 +392,24 @@ mod tests {
     /// regression guard against a future change that breaks the regularization
     /// math (e.g. NaN injection, missing divide).
     #[test]
-    fn hla_regularized_does_not_break_existing_emotion_tests() {
-        // Same fixture as `evolve_hla_is_byte_identical_to_inline_reference`.
+    fn belief_regularized_does_not_break_existing_emotion_tests() {
+        // Same fixture as `evolve_belief_is_byte_identical_to_inline_reference`.
         let config = ReconstructionConfig::default();
-        let init_hla = [0.3, 0.7, 0.1, 0.5, 0.4, 0.2, 0.6, 0.8];
+        let init_belief = [0.3, 0.7, 0.1, 0.5, 0.4, 0.2, 0.6, 0.8];
         let selected = [true, true, true, true, true, true];
         let activations = [0.5, 0.2, 0.8, 0.1, 0.3, 0.4];
         let mut scratch_reg = [0.0f32; 8];
 
-        let mut state = ReconstructionState::with_config(init_hla, config);
+        let mut state = ReconstructionState::with_config(init_belief, config);
         state.accumulate(&selected, &activations);
-        state.evolve_hla_regularized(MagnitudeRegularization::RmsNorm, &mut scratch_reg);
+        state.evolve_belief_regularized(MagnitudeRegularization::RmsNorm, &mut scratch_reg);
 
-        let h = state.hla();
+        let h = state.belief();
         // Finite (no NaN / Inf).
         for &x in h {
             assert!(
                 x.is_finite(),
-                "T1.7: regularized HLA must be finite, got {x}"
+                "T1.7: regularized belief must be finite, got {x}"
             );
         }
         // RMS-bounded: RmsNorm targets unit RMS, allow +1e-4 slack for f32

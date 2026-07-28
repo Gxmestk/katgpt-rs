@@ -157,7 +157,7 @@ pub struct SenseModule {
 }
 
 impl SenseModule {
-    /// Project HLA state onto this module's ternary directions → sigmoid scalar.
+    /// Project belief state onto this module's ternary directions → sigmoid scalar.
     ///
     /// KG weight bridge: output is scaled by module confidence so that
     /// high-confidence KG triples produce stronger sense activations and
@@ -166,7 +166,7 @@ impl SenseModule {
     /// Optimized: branch-free bit extraction via shift+AND, flat loop
     /// (LLVM auto-vectorizes better than chunked), bounded exp sigmoid.
     #[inline(always)]
-    pub fn project(&self, hla_state: &[f32; 8]) -> f32 {
+    pub fn project(&self, belief_state: &[f32; 8]) -> f32 {
         let n = self.n_directions as usize;
         let mut dot = 0.0f32;
 
@@ -174,7 +174,7 @@ impl SenseModule {
         // bool-as-u32 then cast to f32 is zero-extend (no int-to-float conversion).
         // Zip iteration elides bounds checks on `self.directions[i]` (verified safe
         // by `n_directions ≤ 8` but the runtime bound `n` defeats LLVM's elision).
-        for (i, (hla_val, dir)) in hla_state
+        for (i, (belief_val, dir)) in belief_state
             .iter()
             .zip(self.directions.iter())
             .enumerate()
@@ -182,10 +182,10 @@ impl SenseModule {
         {
             let pos = ((dir.pos_bits >> i) & 1) as u32 as f32;
             let neg = ((dir.neg_bits >> i) & 1) as u32 as f32;
-            // sign ∈ {-1, 0, +1} — single FMA: dot += (sign * hla_val) * scale.
-            // sign * hla_val is computed first, then FMA-fused with scale + dot.
+            // sign ∈ {-1, 0, +1} — single FMA: dot += (sign * belief_val) * scale.
+            // sign * belief_val is computed first, then FMA-fused with scale + dot.
             let sign = pos - neg;
-            dot = (sign * hla_val).mul_add(dir.row_scale, dot);
+            dot = (sign * belief_val).mul_add(dir.row_scale, dot);
         }
 
         // Sigmoid * confidence — uses shared crate::simd::fast_sigmoid (bounded (0,1))

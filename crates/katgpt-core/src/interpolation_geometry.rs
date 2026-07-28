@@ -8,7 +8,7 @@
 //! # What this is
 //!
 //! A generic, modelless evaluation methodology for any committed latent
-//! substrate (HLA state `[f32; 8]`, `NeuronShard::style_weights [f32; 64]`,
+//! substrate (belief state `[f32; 8]`, `NeuronShard::style_weights [f32; 64]`,
 //! `ArchetypeBlendShard` π, `KarcShard` weights, `ZoneGeometryPod`,
 //! `MerkleFrozenEnvelope` versions — the six substrates cataloged in
 //! Research 445 §2.6). It exposes two protocols distilled from the paper:
@@ -70,7 +70,7 @@
 ///
 /// Generic over the latent representation (`Point`) and the decoded/behavior
 /// representation (`Behavior`). The caller supplies the encode/decode/midpoint
-/// operations; this trait abstracts over HLA `[f32; 8]`, `style_weights
+/// operations; this trait abstracts over belief `[f32; 8]`, `style_weights
 /// [f32; 64]`, archetype-blend π, etc. (the six substrates cataloged in
 /// Research 445 §2.6).
 ///
@@ -98,7 +98,7 @@ pub trait LatentSpace {
 
     /// Decode a latent point to its behavior representation. The paper's
     /// `readout decoder`; for our substrates this is the existing
-    /// bridge path (e.g. `evolve_hla` → 5 affect scalars, KARC ridge
+    /// bridge path (e.g. `evolve_belief` → 5 affect scalars, KARC ridge
     /// readout, archetype-blend projection).
     fn decode(&self, point: &Self::Point) -> Self::Behavior;
 
@@ -608,7 +608,7 @@ impl LatentSpace for GaussianMixtureSpace {
 // ─── Generic `[f32; N]` test substrate ─────────────────────────────────────
 //
 // A const-generic Euclidean latent space for any fixed dimension N. This is
-// the substrate used to exercise HLA `[f32; 8]` and `NeuronShard::style_weights
+// the substrate used to exercise belief `[f32; 8]` and `NeuronShard::style_weights
 // [f32; 64]` shapes generically — without pulling in the private riir-engine
 // / riir-neuron-db types. The trait surface is identical; real substrates
 // just plug in their own decode.
@@ -975,11 +975,11 @@ mod tests {
         assert!((report.mean - report.zero).abs() < 1e-6);
     }
 
-    // ── Generic `[f32; N]` substrate (HLA / style_weights shape analog) ────
+    // ── Generic `[f32; N]` substrate (belief / style_weights shape analog) ────
 
     #[test]
-    fn test_euclidean_space_dim_8_hla_shape() {
-        // HLA `NpcEmotionScalars` is `[f32; 8]` in riir-engine. This test
+    fn test_euclidean_space_dim_8_belief_shape() {
+        // belief `NpcEmotionScalars` is `[f32; 8]` in riir-engine. This test
         // exercises the protocol at that dimension generically.
         let space: EuclideanLatentSpace<8> = EuclideanLatentSpace;
         assert_eq!(space.dim(), 8);
@@ -1026,7 +1026,7 @@ mod tests {
     #[test]
     fn test_imauve_on_euclidean_8d_clusters() {
         // Phase 2 modelless path: exercise iMAUVE on the 8D substrate shape
-        // (HLA `[f32; 8]` analog). Two clusters along a 1D manifold in 8D —
+        // (belief `[f32; 8]` analog). Two clusters along a 1D manifold in 8D —
         // midpoints should stay on the manifold → high iMAUVE.
         let space: EuclideanLatentSpace<8> = EuclideanLatentSpace;
 
@@ -1091,7 +1091,7 @@ mod tests {
 
     #[test]
     fn test_intervention_battery_on_euclidean_8d() {
-        // Phase 2 modelless path: intervention battery at HLA scale.
+        // Phase 2 modelless path: intervention battery at belief scale.
         let space: EuclideanLatentSpace<8> = EuclideanLatentSpace;
         let anchor = [0.5f32; 8];
 

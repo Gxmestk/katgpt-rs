@@ -9,8 +9,8 @@
 //!
 //! - ✅ [`MicroRecurrentBeliefState`] trait + [`RecurrenceFamily`] enum.
 //! - ✅ [`AttractorKernel`] — Family A (the GOAT candidate).
-//! - ✅ [`LeakyIntegrator`] — Family C (standalone mirror of `evolve_hla`;
-//!   the refactor that wires `ReconstructionState::evolve_hla` to delegate to
+//! - ✅ [`LeakyIntegrator`] — Family C (standalone mirror of `evolve_belief`;
+//!   the refactor that wires `ReconstructionState::evolve_belief` to delegate to
 //!   it is Plan 276 Phase 2 T2.1, out of scope for Phase 1).
 //! - ✅ [`MicroRecurrentKernelSnapshot`] — BLAKE3-committed freeze/thaw artifact.
 //! - ✅ Bridge: [`project_to_scalars`].

@@ -21,7 +21,7 @@
 //! - **G2 ablation parity** — `ceil_delegate = +∞` produces a bit-identical
 //!   Silent/Speak sequence to a speak-only reference. Tested in
 //!   `gate::tests::test_g2_ablation_parity`; here we re-confirm over 10k inputs.
-//! - **Latency target**: `decide()` < 50ns for D=8 (cf. `evolve_hla` ~14ns
+//! - **Latency target**: `decide()` < 50ns for D=8 (cf. `evolve_belief` ~14ns
 //!   for D=8; the gap is the second dot-product).
 //! - **Throughput target**: `decide_batch()` ≥ 50M decisions/sec for D=8, N=1000.
 
