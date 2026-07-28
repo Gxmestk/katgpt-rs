@@ -7,6 +7,7 @@
 > **Related Plans:** 077 (SpectralQuant), 138 (Stiff/Soft Subspace Anomaly Gate), 156 (Spectral Hierarchy Diagnostic), 246 (Spectral Irrep Pruner), 276 (MicroRecurrentBeliefState), 301 (this paper's open primitive), `riir-neuron-db/.plans/002` (private consolidation gate).
 > **Cross-ref (riir-neuron-db):** Research 001 — *Subspace Consolidation Quality Gate* Super-GOAT guide (private).
 > **Classification:** Public (katgpt-rs engine note). The theoretical paper is public; its distillation into runtime primitives is open (this note + Plan 301). The private Super-GOAT selling point lives at `riir-neuron-db/.research/001_*.md`.
+> **PASS-Redirects (synthesis):** Gong et al. [arXiv:2607.22531 "Twins: Learn to Predict Unified Representations with Focal Loss"] — PASS. The paper's intrinsic-dimension analysis (Two-NN: SigLIP ID≈15 vs VAE ID≈35) + the resulting "DiT underfits high-ID VAE" optimization-imbalance diagnosis reinforce the N≥d sample-sufficiency gate this note ships (Plan 301). The Twins channel-concat representation + Focal Loss are image-diffusion training infrastructure (DiT/VAE/ViT/ImageNet) we do not ship. Diagnostic stage → covered here (N≥d gate) + Research 394 (within-class effective rank, conditional alignment) + Research 409 (Two-NN local estimation); training stage → riir-train (image diffusion, out of scope).
 
 ---
 

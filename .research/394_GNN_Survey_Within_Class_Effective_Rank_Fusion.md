@@ -6,6 +6,7 @@
 > **Related Research:** 113 (NITP representation geometry — ships `effective_rank`), 123 (sigmoid margin), 219 (DEC), 296 (Stokes vocab crosswalk), 300 (closed-unit compaction rubric)
 > **Related Plans:** 151 (NITP geometry diagnostics — ships `effective_rank`), 251/252 (DEC operators), 303 (latent_functor quality gate — ships `within_class_adjacency`), 336 (committed personality blend)
 > **Classification:** Public
+> **PASS-Redirects (synthesis):** Gong et al. [arXiv:2607.22531 "Twins: Learn to Predict Unified Representations with Focal Loss"] — PASS. The paper's PCA-under-conditioning analysis of SigLIP (condition-aligned, collapses to low-dim) vs VAE (condition-independent, high-dim) is exactly the within-class-vs-global effective-rank contrast this primitive computes; the Twins representation (channel-wise concat of ViT+VAE for image diffusion) + Focal Loss training reweighting are both training-only and require image-diffusion infrastructure (DiT/VAE/ViT/ImageNet) we do not ship. Diagnostic stage → covered here + Research 279 (intrinsic dim) + Research 409 (Two-NN); training stage → riir-train (image diffusion, out of scope).
 
 ---
 

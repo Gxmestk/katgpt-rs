@@ -6,6 +6,7 @@
 > **Related Research:** 408 (TILR — alignment-gated subspace correction, the closest cousin), 406 (Spectral Rewiring — weight-delta SVD projection), 393 (Block-Sparse Featurizer → Plan 412 Subspace Steering), 294 (Viable Manifold Graph — safe-manifold navigation), 290 (Latent Field Steering — 1D direction injection), 310 (RIZZ — non-interference branches), 397 (MAG — unsupervised direction mining, the probe replacement)
 > **Related Plans:** 425 (TILR — alignment-gated subspace correction), 423 (spectral_rewire — weight-delta purification), 412 (subspace_steering — k-dim block), 329 (non_interference_branches — orthogonal direction allocation), 418 (MAG — direction mining), 309 (latent_field_steering — 1D), 426 (this primitive's plan)
 > **Classification:** Public
+> **PASS-Redirects (synthesis):** Gong et al. [arXiv:2607.22531 "Twins: Learn to Predict Unified Representations with Focal Loss"] — PASS. The paper's second diagnostic (Two-NN intrinsic dimensionality: SigLIP ID≈15 despite D=768, VAE ID≈35 despite D=128 — the "dimensionality paradox" where the semantic manifold is more compressed than the pixel manifold) is exactly the Two-NN local intrinsic-dim estimation MANCE already consumes (Step 1, k-NN + local PCA + TwoNN floor). The Twins representation + Focal Loss are image-diffusion training infrastructure we do not ship. Diagnostic stage → covered here + Research 394 (within-class effective rank, the conditional-alignment axis) + Research 279 (phase-transition N≥d gate); training stage → riir-train (image diffusion, out of scope).
 
 ---
 
