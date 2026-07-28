@@ -298,19 +298,21 @@ fn r287_s4_posterior_guided_pruner_is_l2() {
     assert!(!g.downgraded);
 }
 
-/// R287 §4 row 6: HLA `evolve_hla` (`katgpt-core/src/sense/reconstruction.rs`).
+/// R287 §4 row 6: HLA `evolve_belief` (`katgpt-core/src/sense/reconstruction.rs`).
 /// Current evidence level: L1 (state update; no downstream-causal claim).
 /// Declared L1; satisfied = L1 items. honest_level = L1.
+/// (Test name keeps the historical `hla_evolve` ID for report continuity;
+/// the kernel was renamed per Issue 195: per-NPC HLA → belief.)
 #[test]
 fn r287_s4_hla_evolve_is_l1() {
     let claim = Claim::new(
-        "the HLA evolve_hla kernel reads the 8-dim latent state update",
+        "the belief evolve_belief kernel reads the 8-dim latent state update",
         FeatureClass::Detection,
         L1,
     )
     .with_evidence(L1_ITEMS);
     let g = ClaimValidator.grade(&claim);
-    assert_eq!(g.honest_level, L1, "R287 §4 row 6: HLA evolve_hla is L1");
+    assert_eq!(g.honest_level, L1, "R287 §4 row 6: belief evolve_belief is L1");
     assert!(!g.downgraded);
 }
 

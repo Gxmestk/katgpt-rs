@@ -147,16 +147,16 @@ fn goat_gate_all_pass() {
         "§4 row 5: PosteriorGuidedPruner (L1–L2 → honest L2)"
     );
 
-    // ── R287 §4 row 6: HLA evolve_hla → L1 ──────────────────────────────
+    // ── R287 §4 row 6: belief evolve_belief → L1 ──────────────────────
     let g = validator.grade(
         &Claim::new(
-            "the HLA evolve_hla kernel reads the latent state update",
+            "the belief evolve_belief kernel reads the latent state update",
             FeatureClass::Detection,
             L1,
         )
         .with_evidence(L1_ITEMS),
     );
-    assert_eq!(g.honest_level, L1, "§4 row 6: HLA evolve_hla");
+    assert_eq!(g.honest_level, L1, "§4 row 6: belief evolve_belief");
 
     // ── R287 §4 row 7: Spectral probes → L1 ─────────────────────────────
     let g = validator.grade(
