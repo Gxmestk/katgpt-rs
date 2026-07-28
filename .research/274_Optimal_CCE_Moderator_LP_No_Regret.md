@@ -7,6 +7,7 @@
 > **Related Plans:** 030 (Multi-Armed Bandit), 137 (PrudentBanker Safe-Phased Bandit), 170 (RTS Intransitive Balancing — `PayoffTable<N>`), 213 (Ruliology Arena Cross-Paradigm), 282 (Dual-Pool Reachable Router), 295 (LP-CCE Moderator Primitive — this note's plan)
 > **Cross-ref (riir-ai):** Research 143 (Latent CCE Moderator — private selling-point guide), Plan 325 (Latent CCE Moderator Runtime — private runtime plan)
 > **Classification:** Public
+> **PASS-Redirects (synthesis):** Ding [arXiv:2607.17560 "Reinforcement Learning: From Algorithms To Foundation Models"] (Princeton PhD thesis 2026) — Part 1 (MARL in games: Nash-DQN, Nash-DQN-Exploiter w/ Double Oracle + MWU for 2P zero-sum Markov games; multi-player general-sum w/ distribution fairness) is fully covered by shipped primitives: `PayoffTable<N>::nash_equilibrium` (zero-sum stage game LP), `CceLp::solve` (general-sum Pareto-dominant CCE w/ designer Γ₀ — exactly the 'distribution fairness' angle), NS-CSG minimax-action-free PI (alternating best-response w/o normal-form solve). The thesis's RL **training** algorithms (DQN + minimax backup via GD) → riir-train; the equilibrium **concepts** they compute are modelless + already shipped here + in NS-CSG (R188).
 
 ---
 
