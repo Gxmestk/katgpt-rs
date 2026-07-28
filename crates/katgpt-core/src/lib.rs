@@ -663,6 +663,18 @@ pub mod group_invariance_probe;
 #[cfg(feature = "latent_trajectory_geometry")]
 pub mod latent_trajectory_geometry;
 
+// Latent Confounder Audit — three modelless forward-pass diagnostics
+// (R₀ zero-transition response + R_shift shift-invariance response + L
+// shortcut leakage) auditing a conditioning latent for action-irrelevant
+// confounders. Distilled from CD-LAM §III-B + Appendix A (Wei et al.,
+// arXiv:2607.09185; Research 460, Issue 194). The diagnostic half of CD-LAM
+// (the L_emb/L_ctr/L_cal training recipe → riir-train). Pure numeric over a
+// caller-supplied encoder closure; zero deps. Opt-in — diagnostic primitive,
+// not a runtime capability. Stays opt-in until a consumer (MAG/TILR/Steering)
+// benchmarks a quality gain from running the audit before deployment.
+#[cfg(feature = "latent_confounder_audit")]
+pub mod latent_confounder_audit;
+
 // Interpolation Geometry — iMAUVE + 5-way intervention probe for committed
 // latent substrates (Issue 158, Research 445 — Prabhudesai & Geng, *Latent
 // Thought Flows with Text Compression*, Jun 2026). Generic `LatentSpace`
@@ -827,6 +839,9 @@ pub use cross_stage_relocation::{
 pub use latent_trajectory_geometry::{
     BifurcationResult, LatentTrajectoryGeometry, bifurcation_ratio, fast_acos, from_states,
 };
+
+#[cfg(feature = "latent_confounder_audit")]
+pub use latent_confounder_audit::{AuditScratch, LatentConfounderAudit, audit_confounders};
 
 #[cfg(feature = "interpolation_geometry")]
 pub use interpolation_geometry::{
