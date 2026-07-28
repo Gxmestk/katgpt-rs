@@ -820,20 +820,7 @@ Latent-to-latent patching over the wire — no decompress/recompress round-trip.
 
 ### 🧵 ThoughtFold: Inference-Time Chain Folding (Plan 195)
 
-Prunes redundant reasoning steps during CoT generation using attention-based importance scoring + binary search fold verification. No LLM training — pure inference-time optimization.
-
-```text
-ThinkingController (Plan 194)
-    │
-    ├── Direct mode → no folding (zero cost)
-    │
-    └── Latent/CpuResample mode
-            │
-            ├── StepBoundaryTracker — detects \n\n, think-tags
-            ├── ChainFolder (ScreeningPruner) — attention importance + binary search
-            ├── FoldBandit — 5-arm Thompson sampling for fold budget
-            └── FoldCache — KV cache truncation/replay planning
-```
+Prunes redundant reasoning steps during CoT generation using attention-based importance scoring + binary search fold verification. No LLM training — pure inference-time optimization. Composes with `ThinkingController` (Plan 194): Direct mode → zero-cost; Latent/CpuResample mode → `StepBoundaryTracker` + `ChainFolder` + `FoldBandit` + `FoldCache`.
 
 | Metric | Target | Status |
 |--------|--------|--------|
@@ -910,35 +897,6 @@ Feature gate: `bfcf_lfu_shard` (**default-ON**). 📖 Plan: [`.plans/218_bfcf_lf
 
 Distills Hao, Long, Zhao 2026 — *"Self-Evolving MAS via Decentralized Memory"* ([arXiv:2605.22721](https://arxiv.org/abs/2605.22721)) into a `DualPoolBandit<B: HintDeltaBandit>` that splits CGSP's bandit into an **exploitation pool** (E-pool: consolidated successes, local-walk operator) and an **exploration pool** (X-pool: fresh candidates, teleportation operator). A sigmoid router `α = sigmoid(w_E − w_X) ∈ (0, 1)` guarantees the X-pool always retains strictly nonzero selection probability — the induced Markov chain is irreducible and aperiodic (**DecentMem Theorem 1**), so the agent is **provably never trapped**, by construction, with no collapse detector needed.
 
-```mermaid
-flowchart TB
-    BC["begin_cycle
-α = sigmoid(w_E − w_X)"] --> SEL{"u < α ?"}
-    SEL -->|"yes (α)"| E["E-pool
-consolidated successes
-local-walk operator"]
-    SEL -->|"no (1−α) > 0"| X["X-pool
-fresh candidates
-teleportation operator"]
-    E --> CYCLE["CgspLoop::cycle
-operates on active pool"]
-    X --> CYCLE
-    CYCLE --> EC["end_cycle"]
-    EC --> RU["route_update
-DecentMem Eq. 6/7"]
-    RU --> CON["consolidate
-DecentMem Eq. 8"]
-    CON --> BL["blend
-Phase 1: priority-blend"]
-    CON --> GR["grow
-Phase 4: push_arm"]
-    GR --> GATE["gate(arm)?
-FaithfulnessProbe
-(Plan 278)"]
-    GATE -->|"live"| PROMOTE["promote X→E"]
-    GATE -->|"dead"| REJECT["reject"]
-```
-
 **GOAT G1–G4 PASS (G5 deferred to riir-ai). Feature stays opt-in until personality divergence validated.**
 
 | Gate | Target | Actual | Verdict |
@@ -966,28 +924,6 @@ Distills Xu et al. 2026 — *"VibeThinker-3B"* ([arXiv:2606.16140](https://arxiv
 2. **`ClaimExtractor` / `ClaimVerifier` traits** — open extension points. Concrete extractors/verifiers live in the consumer crate (riir-ai Plan 316 ships game-specific ones; katgpt-rs ships only the generic traits + a `FnClaimExtractor` adapter + a `SigmoidProjectionVerifier` reference impl).
 3. **`brevity_tiebreak()`** — the Long2Short zero-sum tiebreak. Among clusters tied on Σ r_k within `ε`, pick the one whose representative trajectory has the shortest length. Pure algorithm, no quality change.
 4. **`learning_potential()` + `mgpo_sampling_weight()`** — the curiosity feedback signals. `S_LP(y) = -(1/|y|) Σ log π(y_t|...)` ("how surprising was this under the frozen brain?"). `w(p) = exp(-γ|2p-1|)` (peaks at p=0.5, the calibration boundary). Companion `should_write_memory(r_k, S_LP)` gates memory persistence on BOTH reliability AND surprise — exactly the trajectories worth persisting for the next freeze/thaw cycle.
-
-```mermaid
-flowchart TB
-    K["K trajectories
-M claims each"] --> EXTRACT["extractor.extract
-per-trajectory claims"]
-    EXTRACT --> VERIFY["verifier.verify
-v_k,m = sigmoid(dot(emb, dir_m))"]
-    VERIFY --> GATE["nonlinear gate
-r_k = (mean_m v_k,m)^M"]
-    GATE --> CLUSTER["cluster by outcome_eq
-Σ r_k per cluster"]
-    CLUSTER --> TIE["brevity_tiebreak
-shortest rep wins ties"]
-    TIE --> WIN["winner cluster"]
-    GATE -.-> LP["learning_potential
-S_LP = -(1/|y|) Σ log π"]
-    LP -.-> WRITE{"should_write_memory?
-r_k > τ_reliable ∧ S_LP > τ_curiosity"}
-    WRITE -->|yes| PERSIST["persist for freeze/thaw"]
-    WRITE -->|no| DROP["skip"]
-```
 
 **GOAT G1–G5 PASS — promoted to default-on (Phase 5 T5.6).**
 
@@ -1390,24 +1326,6 @@ Feature gate: `micro_belief` (**opt-in** — ships trait unification + attractor
 
 Distills Kerssies et al. *A Frame is Worth One Token: Efficient Generative World Modeling with Delta Tokens* (Apr 2026) into a single novel inference primitive — **K diverse next-belief-states per tick in one batched kernel evaluation**, by injecting K Gaussian noise queries at the kernel input site. `BoMSampler` trait extends `MicroRecurrentBeliefState` (Plan 276); the deterministic `step()` path is unchanged.
 
-```text
-Inputs:  s_prev ∈ ℝ^D, x ∈ ℝ^D, queries[0..K-1] ∈ ℝ^D_q
-                │
-                ▼
-  ┌─────────────────────────────────────────┐
-  │ act[i] = W_s[i]·s_prev + W_x[i]·x + b[i] │   1 matvec (D dots)
-  └───────────────────┬─────────────────────┘
-                      │
-                      ▼  add queries, sigmoid K×
-  ┌─────────────────────────────────────────┐
-  │ for k in 0..K:                            │
-  │   out[k] = σ(act + W_q·queries[k])       │  K× (D adds + D sigmoids)
-  └───────────────────┬─────────────────────┘
-                      │
-                      ▼
-  K diverse next-belief-states (single kernel eval)
-```
-
 **NoiseQueryConfig** is its OWN `commit()` (separate BLAKE3 over `sigma_le || k_le || seed_strategy_byte`); the kernel snapshot is unchanged. Paper trains K=256, evals K=20; we default **K=8 (plasma-tier budget)**.
 
 | Gate | Target | Measured | Verdict |
@@ -1469,17 +1387,6 @@ Feature gate: `hippocampal_cache` (**opt-in** — G1–G4 PASS modelless; G5 per
 ### 🛡️ Self-Advantage Gate — Dead-Compute Detector via Pre/Post Log-Ratio (Plan 283, arxiv 2511.16886)
 
 Distills Asadulaev et al. *Latent Reasoning in TRMs is Secretly a Policy Improvement Operator* (ICML 2026) into three modelless primitives. The paper proves latent recursion is a policy improvement operator in disguise; we extract the inference-time consequence — detect when a recursion step is **dead compute** and skip it.
-
-```text
-  self_advantage(pre, post, candidate) :=
-      A(candidate) - E_{a∼π_w}[A(a)]
-      where A(a) = log π+(a) - log π̂(a)
-
-  AdvantageMarginGate::should_recurse(pre, post, candidate):
-      return self_advantage_margin(pre, post, candidate, scratch) > 0
-      // positive margin → recursion benefits this candidate → recurse
-      // negative margin → dead compute → skip
-```
 
 **Three primitives, all modelless (no teacher, no oracle):**
 - `self_advantage()` — log-ratio `A(a) = log π+(a) − log π̂(a)` between pre- and post-recursion logits. Zero-alloc: writes into caller-provided scratch.
