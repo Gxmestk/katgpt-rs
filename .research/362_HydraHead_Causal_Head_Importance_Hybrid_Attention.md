@@ -6,6 +6,8 @@
 > **Related Research:** 086 (RTPurbo — sibling, attention-mass head calibration), 244 (FaithfulnessProbe — causal-intervention prior art), 233 (Attention Matching KV compaction), 259 (QK-Restore HypeNet SFT drift), 319 (Olmo Hybrid paired-token gap), 070 (GDN2), 073 (LT2), 353 (HeadSubstitutionGate, in-flight)
 > **Related Plans:** 126 (RTPurbo), 278 (FaithfulnessProbe), 287 (Sink-Aware), 182 (Luce Megakernel layer-wise hybrid, riir-ai), 353 (HeadSubstitutionGate), 358 (this note's plan — causal head-importance calibration)
 > **Classification:** Public
+>
+> **PASS-Redirects (synthesis):** Xiao et al. [arXiv:2405.08553 "Improving Transformers with Dynamically Composable Multi-Head Attention"] — PASS. DCMHA's dynamic, input-dependent cross-head composition via a trained FFN is a training-required architectural change (paper: continual pretraining fails, must train from scratch). The modelless distillates are already shipped here (Plan 358 `ScaleNormalizedFusion` static γ > dynamic softmax — DCMHA Table 5 ablation confirms; causal head-importance scoring) + in Research 276 (`PersonalityWeightedComposition` sigmoid-gated latent composition — the modelless analog of head blending) + Research 181 (Compositional Muon hybrid OV/QK projection composition — the training-side analog of DCMHA's Theorems 2.1/2.2). DCMHA's low-rank-plus-diagonal decomposition of the H×H composition map is a structural technique with no current consumer; its row+column efficiency trick has no analog needed. The architecture itself (dynamic FFN generating per-(Q,K) composition weights) → riir-train.
 
 ---
 

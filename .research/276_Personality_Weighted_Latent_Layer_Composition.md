@@ -7,6 +7,8 @@
 > **Related Research:** 242 (`MicroRecurrentBeliefState`), 111 (Analogical Reasoning)
 > **Cross-ref (riir-ai):** Research 146 (private Super-GOAT guide — game-specific 9-layer mapping, species archetype table, taming transition, validation gates)
 > **Companion Doc:** `riir-ai/.docs/60_entity_cognition_stack.md`
+>
+> **PASS-Redirects (synthesis):** Xiao et al. [arXiv:2405.08553 "Improving Transformers with Dynamically Composable Multi-Head Attention" (DCMHA/DCFormer)] — PASS. DCMHA proposes input-dependent cross-head attention composition via a trained FFN with low-rank + diagonal decomposition of an H×H composition map. The modelless analog of DCMHA's *static* diagonal composition is exactly this note's `behavior = Σᵢ sigmoid(wᵢ/τ) · belief_confidence_i · dᵢ` — sigmoid-gated per-head/layer blending. DCMHA's ablation (Table 9: static projection + dynamic gate ≈ dynamic projection; Table 5 in HydraHead confirms static γ > dynamic softmax) validates sigmoid + static weights as the right modelless design. DCMHA's *dynamic* composition (per-(Q,K) weights from trained FFN) requires training from scratch → riir-train; no modelless consumer exists today. Also cross-ref Research 362 (HydraHead) + Research 181 (Compositional Muon) for the head-mixing + OV/QK composition cousins.
 
 ---
 
