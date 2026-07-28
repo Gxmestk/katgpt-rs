@@ -256,3 +256,50 @@ Gate results: G1/G3/G4/G5 PASS; **G2 FAIL** (target ≤1.0×). Absolute numbers 
 **The promotion path** (Plan 558 §Honest Risks #1) is the **macro monomorphization escape hatch** (`variable_rank_router_static!`, Issue 189): generate a per-domain-count monomorphized router enum instead of `Box<dyn ErasedCluster>`, eliminating the vtable tax. Shipped as a macro so consumers opt in to the codegen; the ergonomic `Box<dyn>` path remains for prototyping.
 
 📖 Plan: [`.plans/558_variable_rank_domain_expert_clusters.md`](../../.plans/558_variable_rank_domain_expert_clusters.md). Benchmark: [`.benchmarks/558_variable_rank_domain_expert_goat.md`](../../.benchmarks/558_variable_rank_domain_expert_goat.md). Research: [`.research/453_Variable_Rank_Domain_Expert_Clusters.md`](../../.research/453_Variable_Rank_Domain_Expert_Clusters.md). Monomorphization escape hatch: [`.docs/08_performance/variable_rank_monomorphization.md`](../08_performance/variable_rank_monomorphization.md) + Issue 189.
+
+## 15. Canonical Intent Space — Cross-Arch Super-GOAT PERMANENTLY DEMOTED (Proposal 009 / Research 459)
+
+**Hypothesis:** A canonical intent space — `CanonicalIntent { tag, direction }` + a `ModelAdapter` trait (Procrustes / Subspace / Mask) — would let a steering direction mined on one base model (Gemma2-2B) be re-applied to a different architecture (MiniCPM5-1B, Llama) with no retraining. Plug-and-play any base model. The Super-GOAT headline: swap Gemma → Llama without retraining overlays.
+
+**Cross-arch Super-GOAT claim PERMANENTLY DEMOTED (2026-07-27, Bench 427).** Four hidden-state construction methods all failed the G6 cross-architecture discrimination gate (≥0.5 mean cosine agreement on Rust-idiom direction across architectures; floor is a good system prompt per Research 322 "Report the Floor" rule):
+
+| Phase | Method | Best cross-arch agreement | Threshold | Verdict |
+|---|---|---|---|---|
+| P3 (Bench 424) | Per-model centroid + Procrustes | **−0.33** | ≥0.5 | ❌ FAIL — Procrustes aligns shape, not location; per-model centroids point in opposite directions after rotation |
+| P3 (Bench 424) | Difference-of-means `d_diff` | +0.46 | ≥0.5 | ❌ borderline FAIL — JS discrimination negative on both models (−0.32 / −0.03); apparent signal was a token-count confound |
+| P3b (Bench 425) | Intermediate-layer probe (Git Re-Basin hypothesis) | +0.19 (layer 0) | ≥0.5 | ❌ FAIL — Git Re-Basin contradicted: layer 0 discriminates best, monotonic decrease 0→25; the centroid captures surface/lexical features, not semantic Rust-idiom-ness |
+| P3c (Bench 426) | Length-detrended `d_diff` | **−0.15** (Python) | ≥0.5 | ❌ FAIL — length detrending REVERSES Python discrimination (+0.19 → −0.15); the apparent Rust-idiom signal was prompt length |
+| Recipe D (Bench 427) | Length-matched corpus, k ∈ {2,4,8,16} sweep | **+0.009** (k=16) | ≥0.5 | ❌ FAIL — length-matching works (detrend passes) but cross-arch agreement never crosses +0.01; failure is STRUCTURAL cross-arch disagreement, not length, not noise |
+
+**The failure pattern rules out the obvious escapes:**
+- Recipe E (gradient descent stitching) NOT opened — failure is structural cross-arch disagreement (not non-linearity), so a trained stitcher would face the same wall.
+- More Python data (10 → 30 prompts) barely moved agreement (+0.4645 → +0.4755, +0.011 gain) — the ceiling is fundamental.
+- The modelless path is **declared exhausted**. Reopens only on a **non-hidden-state construction** (AST/clippy/ownership-graph features — see Proposal 010, draft).
+
+**What STILL ships (the intra-arch + substrate GOAT, Bench 562):** the `katgpt-canon` crate (3 adapters: Procrustes / Subspace / Mask) carries a measured G1/G2/G4 GOAT stamp (17/17 PASS). The SubspaceAdapter preserves the cross-arch ALIGNMENT result (Bench 423: G5 GO at k∈{2,4}, mean cosine +0.87/+0.75 on Gemma ↔ MiniCPM held-out). The cross-arch DIRECTION claim is what failed — the substrate is useful, just narrower than the Super-GOAT headline.
+
+**Features stay opt-in** (`canon`, `canon_subspace`, `canon_mask`, default-off). Promotion to default-on would require a new proposal re-arguing the substrate's value proposition post-demotion.
+
+📖 Proposal: [`.proposals/009_canonical_intent_space.md`](../../.proposals/009_canonical_intent_space.md) (status header reflects permanent demotion). Research: [`.research/459_canonical_intent_space_plug_and_play.md`](../../.research/459_canonical_intent_space_plug_and_play.md) (CLOSED). Substrate GOAT: [`.benchmarks/562_katgpt_canon_goat.md`](../../.benchmarks/562_katgpt_canon_goat.md). Cross-arch demotion benches: [`.benchmarks/424_gdn_tree_verify_goat.md`](../../.benchmarks/) (P3) → riir-train `.benchmarks/425`, `426`, `427` (P3b/P3c/Recipe D — the cross-arch probes ran on real model weights via riir-train's forward-trace substrate). Non-hidden-state follow-up: [`.proposals/010_non_hidden_state_canonical_construction.md`](../../.proposals/010_non_hidden_state_canonical_construction.md) (draft, HIGHLY SPECULATIVE).
+
+## 16. Composition Imbalance Diagnostic PoC (Issue 199) — FAILURE MODE DOES NOT TRANSFER
+
+**Hypothesis (the open question after the Twins PASS verdict).** arXiv:2607.22531 (Twins: Focal Loss for unified ViT+VAE) proves that composing two heterogeneous latent spaces into one representation causes "optimization imbalance" during training — the model silently underfits the high-intrinsic-dimension / high-frequency component because the low-ID component dominates the loss landscape. The unproven transfer claim was that our inference-time sigmoid-gated blends of heterogeneous direction fields (`CommittedFieldBlend`, `PersonalityWeightedComposition`, `BranchBank`) suffer an **analogous** imbalance class, and that our existing diagnostics (`within_class_effective_rank`, `subspace_phase_gate`, `effective_rank`) would need to catch it.
+
+**CLOSED 2026-07-28 — the failure mode does not transfer to inference.** The PoC ran three deliberately-mismatched configs through `CommittedFieldBlend<3, 32>::apply_blended` (LowId+2x HighId / LowId+HighId+HighFreq / magnitude-asymmetric `pi=[5,0,0]`) + a 3x-LowId sanity control. Result:
+
+| Config | erank | wc_erank | part_ratio | low_freq |
+|---|---|---|---|---|
+| Balanced (3x HighId) | 24.68 | 24.68 | 30.14 | 0.508 |
+| Mismatched ID | 24.39 | 24.39 | 30.59 | 0.528 |
+| Mismatched spectral | 25.61 | 25.61 | 30.12 | 0.503 |
+| Mismatched magnitude | 24.90 | 24.90 | 30.28 | 0.505 |
+| Sanity: 3x LowId (rank-≤6 expected) | **1.00** | **1.00** | **10.54** | 0.415 |
+
+The diagnostics flag the sanity config (rank collapse detected: erank 24.68 → 1.00) but MISS on all three "mismatched" configs — **by construction, not by failure**. The Twins paper's optimization imbalance is a training-dynamics phenomenon (gradient descent underfits). At inference time `apply_blended` is a closed-form weighted sum — no gradient descent, no underfitting. When heterogeneous fields are summed, the highest-ID field's contribution dominates the output covariance by linear algebra, not by failure. The sigmoid gates normalize per-field contribution magnitude; they do not (and need not) rebalance spectral / ID coverage.
+
+**The original Twins PASS verdict stands — honest justification corrected.** The original justification ("covered by shipped primitives") was architecturally sloppy (§3.6 violation: architectural coverage ≠ quality parity). The honest justification is: **the failure mode is training-specific and does not transfer to inference-time sigmoid-gated blends**. The diagnostic primitives are not load-bearing for this verdict — the closed-form math is. Filing a plan for `composition_imbalance_diagnostic` would be solving a problem we don't have (T7 N/A).
+
+**The PoC remains as a permanent regression check** at `riir-ai/crates/riir-poc/benches/composition_imbalance_modelless.rs` (the "defend-wrong" R&D crate per research skill §3.6). `PersonalityWeightedComposition` and `BranchBank` use the same sigmoid-gated-sum shape; the same closed-form argument applies (T8 N/A).
+
+📖 Issue (removed, this entry is the durable home): closed 2026-07-28 commit `e30d2b45`. Triggering PASS verdict: arXiv:2607.22531 (Twins Focal Loss) — research notes 279, 394, 409 carry the PASS-Redirects line. Site 1: [`committed_field_blend.rs:188-224`](../../crates/katgpt-core/src/committed_field_blend.rs). Site 3: [`branching/bank.rs`](../../crates/katgpt-core/src/branching/bank.rs).

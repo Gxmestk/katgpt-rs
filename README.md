@@ -2677,6 +2677,76 @@ Feature gate: `se2_equivariant_lift` (**DEFAULT-ON** in `katgpt-dec` since 2026-
 
 ---
 
+### 🧩 katgpt-canon — Canonical Intent Space Adapter Substrate (Proposal 009 / Bench 562, arxiv 2209.04836)
+
+**Cross-arch Super-GOAT PERMANENTLY DEMOTED.** Ships the intra-arch + substrate GOAT instead.
+
+The `katgpt-canon` crate ships the vocabulary for **canonical intent directions** — steering vectors that live in a model-independent canonical space, projected into a specific base model's latent space by a `ModelAdapter` at apply time. Three adapters behind independent feature gates:
+
+| Adapter | Feature | Math | Hot-path use case |
+|---|---|---|---|
+| `ProcrustesAdapter` | `canon` | Orthogonal Procrustes rotation `R`; `project_into = R·h` | Same-arch snapshot swap (setup-time; **1.3ms at d=2304**, NOT gated against 50µs) |
+| `SubspaceAdapter` | `canon_subspace` | Joint SVD `M=[A\|B] = UΣV^T`, top-k right singular vectors = shared subspace | Cross-arch steering (**417ns at k=4, d_b=1536** ≤ 50µs) |
+| `MaskAdapter` | `canon_mask` | Elementwise `mask ⊙ h` (lottery-ticket *apply*, not discovery) | Sparse-prune application (**1.38µs at d=2304** ≤ 50µs) |
+
+**GOAT status (Bench 562, all 17 sub-gates PASS):**
+- **G1 correctness:** Procrustes residual 0.0000% / round-trip 4.47e-8; Subspace held-out mean cos 0.257 (frac positive 0.78); Mask all-ones identity + half-zero preserve. All three BLAKE3-deterministic.
+- **G2 perf:** Subspace k=4 d_b=1536 **417ns** ≤ 50µs; Mask d=2304 **1.38µs** ≤ 50µs; Procrustes d=256 **16.17µs** ≤ 50µs (post-SIMD 8-wide FMA, was 29µs). Procrustes d=2304 diagnostic 1.328ms (O(d²), NOT gated — setup-time use only).
+- **G4 alloc-free:** all three hot paths 0 allocs/1000 calls (CountingAllocator).
+- **SubspaceAdapter carries Bench 423 G5 GO at k∈{2,4}** — mean cosine +0.87/+0.75 on Gemma2-2B ↔ MiniCPM5-1B real weights, held-out. The cross-arch ALIGNMENT preservation is real; the cross-arch DIRECTION claim is what failed.
+
+**Why opt-in despite GOAT PASS.** The cross-arch Super-GOAT headline ("plug-and-play any base model") was permanently demoted after four hidden-state construction methods failed G6 (Bench 424/425/426/427 — see `.docs/09_feature_catalog/negative_results.md` §15). The substrate is useful (intra-arch snapshot swap, cross-arch alignment preservation, lottery-ticket application) but no longer the headline selling point. Promotion to default-on would require a new proposal re-arguing the value proposition post-demotion.
+
+Feature gates: `canon`, `canon_subspace`, `canon_mask` (independent, **opt-in / default-off**) in the `katgpt-canon` crate. 📖 Proposal: [`.proposals/009_canonical_intent_space.md`](.proposals/009_canonical_intent_space.md), Research: [`.research/459_canonical_intent_space_plug_and_play.md`](.research/459_canonical_intent_space_plug_and_play.md) (CLOSED), Benchmark: [`.benchmarks/562_katgpt_canon_goat.md`](.benchmarks/562_katgpt_canon_goat.md), Cross-arch demotion: [`.docs/09_feature_catalog/negative_results.md`](.docs/09_feature_catalog/negative_results.md) §15, Doc: [`.docs/05_adaptation/canonical_intent_space.md`](.docs/05_adaptation/canonical_intent_space.md). Non-hidden-state follow-up (HIGHLY SPECULATIVE draft): [`.proposals/010_non_hidden_state_canonical_construction.md`](.proposals/010_non_hidden_state_canonical_construction.md).
+
+---
+
+### 🔄 SipIt Transformer Inversion — Prompt Recovery from Hidden States (Plan 561, arxiv 2510.15511)
+
+Distills Nikolaou et al. ICLR 2026 (*Language Models are Injective and Hence Invertible*) into the **open primitive for prompt recovery from observed transformer hidden states**. `invert_sequence` recovers the discrete input tokens `x ∈ V^T` from `h̆_t` at positions `t ∈ [0, T)` — the inversion the paper proves is well-posed under its injectivity theorem. Two policies: `RandomPolicy` (uniform-without-replacement, the paper's baseline) and `GradientGuidedPolicy` (paper Alg 3 — proxy hidden state + finite-difference gradient descent + periodic vocab projection + random fallback).
+
+**Phases 1-4 DONE (2026-07-26), Phase 5 awaiting consumer.** G1-G4 PASS on a toy 2-layer GELU transformer (d=16, |V|=32, T=8):
+
+| Gate | Target | Result |
+|---|---|---|
+| **G1** correctness | 8 random prompts recover exactly; Lemma D.2 causality; corrupted-observed rejects | 3/3 sub-tests PASS (20 unit tests) |
+| **G2** perf | random policy ~linear in \|V\|; gradient-guided fewer acceptance tests | random 37→130→1375µs/pos for \|V\| 32→128→512; **grad-guided 317 vs random 1075 acceptance tests across 64 positions (70.5% reduction, 3.4×)** |
+| **G3** no-regression | default features unchanged | 1814 lib tests pass (zero leak behind feature gate) |
+| **G4** alloc-free | hot path zero per-trial allocs | per-call 2 (random) / 5 (grad) allocs; steady-state 10× per-call = no per-trial leak |
+| **Phase 4 robustness** | Theorem 3.2 perturbation guarantee | recovery holds below `Δ_π/2` noise, degrades above; margin strictly positive on random init |
+
+**The honest toy-scale caveat.** Gradient-guided sub-linear scaling in |V| (the paper's <0.25%·|V| claim for |V|≥32K) is **NOT validated on the toy** — the numerical finite-difference gradient dominates latency at d=16. Validating the paper's regime requires a real transformer + analytical gradient + |V| ≥ 32K. The toy proves the mechanism is correct + the strict-improvement A/B holds.
+
+**Why opt-in.** No consumer wired yet (grep verified: zero `transformer_inversion` consumers across all 7 repos). The primitive is open research infrastructure for transparency/audit tooling on standard text transformers — the adoption hook. Phase 5 awaits a concrete consumer; if none materializes within ~3 months, it stays parked as opt-in research infrastructure (re-evaluate 2026-10-26).
+
+Feature gates: `transformer_inversion` (default-off) + `grad_policy` (adds gradient-guided driver). 📖 Plan: [`.plans/561_transformer_inversion_sipit_open_primitive.md`](.plans/561_transformer_inversion_sipit_open_primitive.md), Research cross-refs: [`.research/158`](.research/158_MUX_Multiplexed_Latent_Reasoning.md) + [`.research/232`](.research/232_Task_Relevant_Identifiability_Specialist.md) + [`.research/244`](.research/244_Self_Evolver_Faithfulness_Cognitive_Integrity.md), Paper: [arXiv:2510.15511](https://arxiv.org/abs/2510.15511), Reference impl: <https://github.com/giorgosnikolaou/SIPIT>.
+
+---
+
+### 🧪 LatentConfounderAudit — CD-LAM §III-B Confounder-Purity Diagnostics (Issue 194, arxiv 2607.09185)
+
+Distills Wei et al. 2026 (*Causally Debiased Latent Action Model for Embodied Action Conditioned World Models*, CD-LAM §III-B) into the **pre-deployment confounder audit** for direction-vector consumers (MAG / TILR / LatentFieldSteering / CommittedFieldBlend). Three modelless diagnostics:
+
+| Diagnostic | Formula | Clean value |
+|---|---|---|
+| Zero-transition response | `R₀ = RMS(‖E(x, x)‖) / D` | ≈ 0 |
+| Shift-invariance response | `R_shift = RMS(‖E(x, T(x))‖) / D` | ≈ 0 |
+| Shortcut leakage | `mean_cos(diff-action) − mean_cos(same-action)` | < 0 |
+
+Where `D = RMS(‖E(x, x′)‖) + ε` over ordinary transitions. The encoder API is `Fn(&[f32], &[f32], &mut [f32])` — output buffer as 3rd arg.
+
+**G1-G4 PASS modellessly (Bench 194, 2026-07-28):**
+- **G1:** 12 unit tests + 1 doctest on synthetic encoder `E(x,x') = A(x,x') + c·confounder(x)` with known `c`. Clean (c=0): R₀<1e-5, R_shift<1e-5, L<0. Confounded (c=2.0): R₀>0.1, R_shift>0.1, L>-0.5. Monotone across c∈{0, 0.5, 1, 2, 5}.
+- **G2:** **292 ns/call** at HLA d=8 (3.4× under 1µs). Sweep: d=32=750ns, d=64=1.38µs.
+- **G3:** feature-gated; default 1814 → 1814 (zero leak); +12 with feature on.
+- **G4:** 0 allocs / 100 audit calls (TrackingAllocator sentinel-verified).
+
+**Why opt-in.** Diagnostic primitive, not a capability. Promotion to default-on requires a concrete consumer (MAG/TILR/Steering/Blend) benchmarking a real-bug-caught gain (fewer misconfigured directions deployed). No consumer has adopted the audit yet. The CD-LAM training recipe (`L_emb + L_ctr + L_cal` + three-stage fine-tuning) is genuinely gradient-descent → routes to riir-train if a video world model is built.
+
+Feature gate: `latent_confounder_audit` (in katgpt-core, **opt-in / default-off**). 📖 Benchmark (durable home; issue removed per noise-reduction): [`.benchmarks/194_latent_confounder_audit_goat.md`](.benchmarks/194_latent_confounder_audit_goat.md), Research: [`.research/460_CD_LAM_Latent_Confounder_Audit_Diagnostics.md`](.research/460_CD_LAM_Latent_Confounder_Audit_Diagnostics.md), Doc: [`.docs/04_calibration/latent_confounder_audit.md`](.docs/04_calibration/latent_confounder_audit.md), Paper: [arXiv:2607.09185](https://arxiv.org/abs/2607.09185).
+
+---
+
 ## 🔧 KV Compression
 
 Default: **Hybrid OCT+PQ** (OCTOPUS triplet encoding + PlanarQuant 2D Givens rotation). Best MSE + 64× fewer rotation FMAs.
@@ -2771,6 +2841,9 @@ Default: **Hybrid OCT+PQ** (OCTOPUS triplet encoding + PlanarQuant 2D Givens rot
 | **Position Group Action** (`position_group_action`) | Unified `PositionGroupAction` trait — RoPE / ALiBi / FoX / Wall / NoPE / GRAPE-M as instances of `G(n) = exp(n·ω·L)` (Research 446, arXiv:2512.07805 §2.2 + §4.1). Vocabulary bridge for position-encoding-agnostic tooling. Hot-path code keeps using `PositionFreeCompactor` / `WallDiagonalGate` directly. | Opt-in — G3 no-regression. See [Benchmark 458](.benchmarks/458_position_group_action_goat.md). |
 | **GRAPE-AP Vector Gates** (`grape_ap_vector`) | Content-aware path-integral decay gates extending Wall Attention's scalar prefix-sum: `ψ_h(t,ℓ) = α·g(⟨p_t, R_ℓ·p_ℓ⟩/d)` with `g=log_sigmoid` (Research 446, arXiv:2512.07805 §5). Wall is the scalar special case. | Opt-in — G2 `< 1.5×` Wall scalar; G4 alloc-free after scratch init. See [Benchmark 459](.benchmarks/459_grape_ap_vector_goat.md). |
 | **GRAPE Joint Lift** (`grape_joint_lift`) | `GL(d+2)` block-diagonal composition of rotary (GRAPE-M) + additive (GRAPE-A) into a single group action per Appendix E of arXiv:2512.07805. Proves RoPE and Wall *compose* (vs Wall *replacing* RoPE today). Decoupled `omega_rot`/`omega_add` is a strict generalization of the paper's shared `ω`. | Opt-in — G1 bit-identical to manual composition + relativity; G2 latency smoke; G4 alloc-free. See [Benchmark 460](.benchmarks/460_grape_joint_lift_goat.md). |
+| **katgpt-canon** (`canon`, `canon_subspace`, `canon_mask`) | Canonical intent space adapter substrate — `CanonicalIntent` + `ModelAdapter` trait + 3 adapters (Procrustes / Subspace / Mask). Crate depends on katgpt-core (SVD) + katgpt-spectral (Procrustes), publishable to crates.io. | Opt-in — **G1/G2/G4 ALL PASS 17/17** (Bench 562). **Cross-arch Super-GOAT PERMANENTLY DEMOTED** (Bench 427 — 4 hidden-state methods all failed G6 ≥0.5 cross-arch agreement). Subspace carries Bench 423 G5 GO at k∈{2,4} (+0.87/+0.75 mean cos Gemma↔MiniCPM). Procrustes d=2304 = 1.3ms (O(d²), NOT gated against 50µs — setup-time use). See [`.docs/05_adaptation/canonical_intent_space.md`](.docs/05_adaptation/canonical_intent_space.md) + [negative_results.md §15](.docs/09_feature_catalog/negative_results.md). |
+| **SipIt Transformer Inversion** (`transformer_inversion`, `grad_policy`) | `invert_sequence` recovers discrete input tokens from observed transformer hidden states. Random + gradient-guided policies (paper Alg 3). | Opt-in — Phases 1-4 DONE; G1-G4 PASS on toy 2-layer GELU transformer. **Phase 5 awaiting consumer** (grep verified: zero consumers across 7 repos). Toy cannot validate the paper's |V|≥32K regime — needs real transformer + analytical gradient. Research infrastructure for transparency/audit tooling. See [Plan 561](.plans/561_transformer_inversion_sipit_open_primitive.md). |
+| **LatentConfounderAudit** (`latent_confounder_audit`) | Three CD-LAM §III-B diagnostics (zero-transition response, shift-invariance response, shortcut leakage) for pre-deployment confounder-purity audit of direction vectors. | Opt-in — G1-G4 PASS modellessly (Bench 194): 292ns/call at HLA d=8, 0 allocs, 12 unit tests + monotone in confounder coefficient. **Diagnostic primitive** — promotion requires a consumer (MAG/TILR/Steering/Blend) to benchmark a real-bug-caught gain. See [`.docs/04_calibration/latent_confounder_audit.md`](.docs/04_calibration/latent_confounder_audit.md). |
 
 📖 **Full detail for ALL opt-in features + complete feature flag reference:** [`.docs/09_feature_catalog/opt_in_features.md`](.docs/09_feature_catalog/opt_in_features.md) and [`Cargo.toml`](Cargo.toml).
 
@@ -3161,13 +3234,15 @@ Docs are grouped into numbered folders by primitive class — see
 [Causal head-importance](.docs/04_calibration/causal_head_importance.md) ·
 [Conformal predictive intervals](.docs/04_calibration/conformal_predictive_intervals.md) ·
 [Faithfulness probe](.docs/04_calibration/faithfulness_probe.md) ·
+[LatentConfounderAudit (CD-LAM diagnostics, opt-in)](.docs/04_calibration/latent_confounder_audit.md) ·
 [Salience Tri-Gate](.docs/04_calibration/salience_tri_gate.md) ·
 [sigmoid-not-softmax universality-class escape](.docs/04_calibration/universality_class_escape.md)
 
 **Adaptation** — [model adaptation](.docs/05_adaptation/model_adaptation.md) ·
 [Lucebox techniques](.docs/05_adaptation/lucebox_techniques.md) ·
 [PEIRA distillation](.docs/05_adaptation/peira_distillation.md) ·
-[Poincaré Adapter (DEFAULT-ON)](.docs/05_adaptation/poincare_navigator.md)
+[Poincaré Adapter (DEFAULT-ON)](.docs/05_adaptation/poincare_navigator.md) ·
+[Canonical Intent Space (katgpt-canon, opt-in, cross-arch Super-GOAT DEMOTED)](.docs/05_adaptation/canonical_intent_space.md)
 
 **Game Arenas** — [Sudoku](.docs/06_game_arenas/sudoku.md) ·
 [HL infrastructure](.docs/06_game_arenas/heuristic_learning.md) ·
@@ -3228,6 +3303,11 @@ Docs are grouped into numbered folders by primitive class — see
 - [Causal-ID Counterfactual NPC Reasoning (DEFAULT-ON Phase 5)](.plans/457_causal_id_counterfactual_npc_reasoning.md)
 - [QGF DualLeoOracle — 3rd `QGradientOracle` impl (G5 FAIL synthetic + civ real-network, opt-in; investigation closed per Research 322)](.plans/467_qgf_dual_leo_oracle.md)
 - [Lean Spec Self-Testing on Concrete Instances (Plan 441)](.plans/441_lean_spec_self_testing_concrete_instances.md)
+- [katgpt-canon — Canonical Intent Space (cross-arch Super-GOAT PERMANENTLY DEMOTED, intra-arch + substrate GOAT 17/17 PASS)](.docs/05_adaptation/canonical_intent_space.md)
+- [Proposal 009 — Canonical Intent Space (status: cross-arch demoted)](.proposals/009_canonical_intent_space.md)
+- [Proposal 010 — Non-Hidden-State Canonical Construction (draft, HIGHLY SPECULATIVE)](.proposals/010_non_hidden_state_canonical_construction.md)
+- [Plan 561 — SipIt Transformer Inversion (opt-in, awaiting consumer)](.plans/561_transformer_inversion_sipit_open_primitive.md)
+- [LatentConfounderAudit — CD-LAM §III-B diagnostics (opt-in)](.docs/04_calibration/latent_confounder_audit.md)
 - [Proposal 003 — src/ consolidation master (Phases 0–12)](.proposals/003_src_consolidation_master.md)
 - [Sigmoid-not-Softmax: The Universality-Class Escape (Research 315, Liu & Gore 2606.25008)](.docs/04_calibration/universality_class_escape.md)
 

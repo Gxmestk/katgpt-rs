@@ -790,3 +790,80 @@ Config tag + tier-promotion Wout projection. Three nested tiers (LOD0 background
 🔧 Feature flag: `karc_lod_tier` (implies `karc_forecaster`) — **opt-in**.
 
 📖 Plan: [`.plans/556_karc_mitigations_open_primitives.md`](../../.plans/556_karc_mitigations_open_primitives.md), Benchmark: [`.benchmarks/556_karc_mitigations_goat.md`](../../.benchmarks/556_karc_mitigations_goat.md), Runtime bench: [`riir-ai/.benchmarks/514_karc_lod_dispatch_goat.md`](../../riir-ai/.benchmarks/514_karc_lod_dispatch_goat.md), Sharding substrate + POC verdict: [`riir-ai/.benchmarks/556_npc_shard_goat.md`](../../riir-ai/.benchmarks/556_npc_shard_goat.md) (`riir-engine/src/npc_shard.rs`, feature `npc_shard`).
+
+## 25. katgpt-canon — Canonical Intent Space Substrate (Proposal 009, Research 459)
+
+**The crate.** `katgpt-canon` ships the `CanonicalIntent { tag, direction }` type + the `ModelAdapter` trait + three concrete adapters behind independent feature gates. The crate depends on `katgpt-core` (for SVD) and `katgpt-spectral` (for Procrustes) — both already in-tree; the crate itself is `publish = true` (crates.io-ready, MIT).
+
+| Adapter | Feature | Math | G1/G2/G4 verdict (Bench 562) |
+|---|---|---|---|
+| `ProcrustesAdapter` | `canon` | Orthogonal Procrustes rotation `R` (from `orthogonal_procrustes`); `project_into` = `R·h` | G1 residual 0.0000% / round-trip 4.47e-8 / BLAKE3-deterministic; **G2 d=256 16.17µs** ≤ 50µs (post-SIMD, was 29µs); G4 0 allocs hot path. ⚠️ **d=2304 diagnostic = 1.328ms** (O(d²), NOT gated against 50µs — setup-time use only). |
+| `SubspaceAdapter` | `canon_subspace` | Joint SVD `M=[A\|B] = UΣV^T`, top-k right singular vectors define the shared subspace; `project_into` = `V_k^T·h` | G1 fit shapes + no-NaN + held-out mean cos 0.257 (frac positive 0.78); **G2 k=4 d_b=1536 417ns** ≤ 50µs; G4 0 allocs. **Carries the load-bearing Bench 423 G5 GO at k∈{2,4}** (mean cosine +0.87/+0.75 on Gemma↔MiniCPM real weights). |
+| `MaskAdapter` | `canon_mask` | Elementwise mask application (lottery ticket *apply*, not discovery); `project_into` = `mask ⊙ h` | G1 all-ones identity + half-zero preserve; **G2 d=2304 1.38µs** ≤ 50µs; G4 0 allocs. Discovery routes to riir-train per Research 459 §1.3. |
+
+**All 17 GOAT sub-gates PASS** (Bench 562, 2026-07-28). The 8-wide FMA dot product SIMD optimization (commit `e5efd20e`) cut the d=256 Procrustes hot path 29→16µs and the d=2304 diagnostic 3.9→1.3ms (2.9× from the 8-wide accumulator pattern, mirroring `dot_8wide` in katgpt-attn-match).
+
+**Why opt-in despite GOAT PASS.** The cross-arch Super-GOAT headline (Proposal 009's "plug-and-play any base model") was **permanently demoted** after four hidden-state construction methods failed the G6 cross-architecture discrimination gate (Bench 424/425/426/427, see `negative_results.md` §15). The substrate is useful (intra-arch snapshot swap, cross-arch ALIGNMENT preservation) but no longer the headline selling point. Promotion to default-on would require a new proposal re-arguing the value proposition post-demotion.
+
+**Known limitation (honest).** `ProcrustesAdapter::project_into` at production model dim (d=2304, Gemma2-2B) is 1.328ms — O(d²) scaling, **not gated against the 50µs target**. The theoretical SIMD floor at d=2304 is ~220µs (5.3M flops / 8-wide AVX2 FMA / 3 GHz); even perfect SIMD can't hit 50µs. The 50µs G2 floor applies to the per-direction-per-tick hot path — that's SubspaceAdapter (O(d·k), k≪d) and MaskAdapter (O(d)). ProcrustesAdapter's use case is same-arch snapshot swap, a setup-time operation where 1.3ms is acceptable.
+
+🔧 Feature flags: `canon`, `canon_subspace`, `canon_mask` (independent, default-off). Crates: `katgpt-canon`.
+
+📖 Proposal: [`.proposals/009_canonical_intent_space.md`](../../.proposals/009_canonical_intent_space.md), Research: [`.research/459_canonical_intent_space_plug_and_play.md`](../../.research/459_canonical_intent_space_plug_and_play.md) (CLOSED), Benchmark: [`.benchmarks/562_katgpt_canon_goat.md`](../../.benchmarks/562_katgpt_canon_goat.md), Cross-arch demotion: [`negative_results.md`](negative_results.md) §15, Non-hidden-state follow-up: [`.proposals/010_non_hidden_state_canonical_construction.md`](../../.proposals/010_non_hidden_state_canonical_construction.md) (draft).
+
+## 26. SipIt Transformer Inversion (Plan 561, arxiv 2510.15511)
+
+**The primitive.** `invert_sequence` recovers the discrete input tokens `x ∈ V^T` from a transformer's observed hidden states `h̆_t` at positions `t ∈ [0, T)` — the inversion that Nikolaou et al. (ICLR 2026) prove is well-posed under the paper's injectivity theorem. Two policies: `RandomPolicy` (uniform-without-replacement enumeration, the paper's baseline) and `GradientGuidedPolicy` (paper Alg 3 — proxy hidden state + finite-difference gradient descent + periodic vocab projection + random fallback).
+
+**Phases 1-4 DONE (2026-07-26), Phase 5 awaiting consumer.** G1-G4 PASS on the toy 2-layer GELU transformer (d=16, |V|=32, T=8):
+
+| Gate | Target | Result |
+|---|---|---|
+| **G1** correctness | 8 random prompts recover exactly; Lemma D.2 causality; corrupted-observed rejects | 3/3 sub-tests PASS (20 unit tests green) |
+| **G2** perf | random policy ~linear in \|V\|; gradient-guided fewer acceptance tests | random 37→130→1375µs/pos for \|V\| 32→128→512 (linear); **grad-guided 317 vs random 1075 acceptance tests across 64 positions (70.5% reduction, 3.4×)** |
+| **G3** no-regression | default features unchanged | 1814 lib tests pass (zero leak behind feature gate) |
+| **G4** alloc-free | hot path zero per-trial allocs | per-call 2 allocs (random) / 5 (grad); steady-state 10× per-call = no per-trial leak |
+| **Phase 4 robustness** | Theorem 3.2 perturbation guarantee | recovery holds below `Δ_π/2` noise; degrades above; margin strictly positive on random init |
+
+**The honest toy-scale caveat.** Gradient-guided sub-linear scaling in |V| (the paper's <0.25%·|V| claim for |V|≥32K) is **NOT validated on the toy** — the numerical finite-difference gradient dominates latency at d=16 (O(D) forward evals per step × 200 steps). Validating the paper's regime requires a real transformer (GPT-2/Llama) with an analytical gradient (1 fwd + 1 bwd ≈ 2× fwd cost) + |V| ≥ 32K. The toy proves the mechanism is correct + the strict-improvement A/B holds; it cannot prove the production latency/speedup tradeoff.
+
+**The 1/sqrt(D) vs 1.0 weight-scale lesson (load-bearing for reproducibility).** Phase 1 used standard stable-training scale `1/sqrt(D)` — GELU saturates near the origin, the Jacobian is effectively zero, the loss landscape is flat, gradient steps move the proxy <0.1 units. Phase 2 uses `new_scaled(rng, 1.0)` explicitly — the Jacobian becomes well-conditioned, gradient norm ~700 (clipped to 1.0), proxy converges within ~20 steps. This is a **substrate-scale correction**, not hyperparameter tuning — real transformers (GPT-2, LLaMA) have weights large enough that the Jacobian is well-conditioned at `1/sqrt(D)` because they have many more layers and much larger D.
+
+**Why opt-in.** No consumer wired yet (grep verified: zero `transformer_inversion` consumers across all 7 repos). The primitive is research infrastructure for transparency/audit tooling on standard text transformers — the open adoption hook. Phase 5 (T5.1) awaits a concrete consumer (e.g. a speculative-decode audit mode, or a transparency feature in riir-ai). If no consumer materializes within ~3 months, it stays parked as opt-in research infrastructure (T5.2, re-evaluate 2026-10-26).
+
+**Rejected fusions (do NOT re-add without amending Plan 561).** Applying SipIt to HLA per-NPC state (HLA is a sigmoid-bounded kernel, not a text transformer — theorem doesn't transfer); activation-based sync compression (sync already commits 32-byte hash; transmitting activations is 96× bandwidth increase); lossless activation hashing (theorem is measure-zero over parameters, not bit-exact over f32); cold-tier prompt re-hydration (SipIt needs model weights + per-position matrix; activations are 15-1000× larger than prompts); transmitting compact h for quorum audit (violates the sync-boundary rule — sync scalars, not embeddings).
+
+🔧 Feature flag: `transformer_inversion` (in katgpt-core, default-off); `grad_policy` adds the gradient-guided driver.
+
+📖 Plan: [`.plans/561_transformer_inversion_sipit_open_primitive.md`](../../.plans/561_transformer_inversion_sipit_open_primitive.md), Research (Gain-Redirects cross-refs): [`.research/158_MUX_Multiplexed_Latent_Reasoning.md`](../../.research/158_MUX_Multiplexed_Latent_Reasoning.md) + [`.research/232_Task_Relevant_Identifiability_Specialist.md`](../../.research/232_Task_Relevant_Identifiability_Specialist.md) + [`.research/244_Self_Evolver_Faithfulness_Cognitive_Integrity.md`](../../.research/244_Self_Evolver_Faithfulness_Cognitive_Integrity.md), Paper: [arXiv:2510.15511](https://arxiv.org/abs/2510.15511), Reference impl: <https://github.com/giorgosnikolaou/SIPIT>, Bench: `crates/katgpt-core/benches/bench_561_inversion_goat.rs`.
+
+## 27. LatentConfounderAudit — CD-LAM §III-B Diagnostics (Issue 194, arxiv 2607.09185)
+
+**The primitive.** Three modelless diagnostics distilling Wei et al. 2026 (*Causally Debiased Latent Action Model*, CD-LAM §III-B + Appendix A) — the confounder-purity audit that any direction-vector consumer (MAG/TILR/LatentFieldSteering/CommittedFieldBlend) can run before deploying a mined or constructed direction:
+
+| Diagnostic | Formula | Clean value | What it tests |
+|---|---|---|---|
+| Zero-transition response | `R₀ = RMS(‖E(x, x)‖) / D` | ≈ 0 | No-op input pair should produce near-zero latent |
+| Shift-invariance response | `R_shift = RMS(‖E(x, T(x))‖) / D` | ≈ 0 | Nuisance transform should produce near-zero latent |
+| Shortcut leakage | `mean_cos(diff-action) − mean_cos(same-action)` | < 0 | Action similarity should dominate context similarity |
+
+Where `D = RMS(‖E(x, x′)‖) + ε` over ordinary transitions. `LatentConfounderAudit::audit_confounders_into` takes a pre-allocated `AuditScratch`; the convenience `audit_confounders` wraps it. The encoder API is `Fn(&[f32], &[f32], &mut [f32])` — output buffer as 3rd arg, sidestepping HRTB lifetime issues.
+
+**G1-G4 PASS modellessly (Bench 194, 2026-07-28).** 12 unit tests + 1 doctest on a synthetic encoder `E(x,x') = A(x,x') + c·confounder(x)` with known confounder coefficient `c`. Clean (c=0): R₀<1e-5, R_shift<1e-5, L<0. Confounded (c=2.0): R₀>0.1, R_shift>0.1, L>-0.5. Monotone across c∈{0, 0.5, 1, 2, 5} — the audit is a quantitative purity score, not just binary pass/fail.
+
+| Gate | Target | Result |
+|---|---|---|
+| **G1** correctness | monotone in c; 12 tests | ✅ PASS |
+| **G2** perf | sub-µs at HLA d=8 | **292 ns/call** at d=8 (3.4× under 1µs); d=32 = 750ns; d=64 = 1.38µs |
+| **G3** no-regression | feature-gated, no existing code touched | 1814 → 1814 default; +12 with feature on |
+| **G4** alloc-free | zero steady-state | 0 allocs / 100 audit calls (TrackingAllocator sentinel-verified) |
+
+**What this does NOT prove (honest).** (1) Does not prove the audit catches real bugs in production-mined direction vectors — the G1 synthetic encoder has a known injected confounder; real mined directions (MAG/TILR/Steering/Blend) could have subtler confounders the diagnostics miss. (2) The "Report the Floor" rule (Research 322 / Plan 340) does NOT apply — the three metrics are raw geometric measurements (norm ratios, cosine gaps), NOT probabilities / confidence scores / predictive intervals; no distributional claim. (3) Does not prove a quality gain in a downstream consumer.
+
+**Why opt-in.** Diagnostic primitive, not a capability. Promotion to default-on requires a concrete consumer (MAG/TILR/Steering/Blend) benchmarking a real-bug-caught gain (fewer misconfigured directions deployed). No consumer has adopted the audit yet. Re-opens when a consumer adopts + demonstrates a real-bug-caught gain. The CD-LAM training recipe (`L_emb + L_ctr + L_cal` + three-stage fine-tuning) is genuinely gradient-descent → routes to riir-train if a video world model or analogous training system is built.
+
+**The false-PASS correction (documented for future maintainers).** The initial research verdict on CD-LAM was PASS; that was revised to Gain after honest re-review — the diagnostic FRAMEWORK is a real gain (3 modelless metrics + the encoder API contract), but the original PASS implied the primitives shipped CD-LAM's debiasing capability, which they do not (that's training-side, routes to riir-train). The bench file is the durable home of the GOAT verdict; the issue file was removed per noise-reduction rule.
+
+🔧 Feature flag: `latent_confounder_audit` (in katgpt-core, default-off).
+
+📖 Issue (removed, bench is durable home): [`.benchmarks/194_latent_confounder_audit_goat.md`](../../.benchmarks/194_latent_confounder_audit_goat.md), Research: [`.research/460_CD_LAM_Latent_Confounder_Audit_Diagnostics.md`](../../.research/460_CD_LAM_Latent_Confounder_Audit_Diagnostics.md), Paper: [arXiv:2607.09185](https://arxiv.org/abs/2607.09185), Bench: `crates/katgpt-core/benches/bench_194_latent_confounder_audit_goat.rs`.
