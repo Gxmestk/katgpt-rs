@@ -3,6 +3,7 @@
 > Source: [Targeted Neuron Modulation via Contrastive Pair Search](https://arxiv.org/pdf/2605.12290) by Sam Herring, Jake Naviasky, Karan Malhotra (Nous Research), arXiv:2605.12290, May 2026
 > Date: 2026-05 (paper), distilled 2025-07
 > **Verdict: ADOPT — CNA maps directly to existing trait stack as a model-based ScreeningPruner. Feature gate `cna_steering` needed for forward-hook MLP activation capture. katgpt-rs is the correct home (model-level code, not riir-ai GPU training).**
+> **PASS-Redirects (synthesis):** Wei et al. [arXiv:2607.09185 "Causally Debiased Latent Action Model for Embodied Action Conditioned World Models"] — CD-LAM's action-centric contrastive loss (softplus on same-primitive/different-primitive pairs over a 12-way verb codebook) is the TRAINING-TIME analog of CNA's modelless contrastive-pair discovery. CD-LAM learns the latent-space structure via backprop on primitive labels; CNA discovers the structure from forward-pass activation differences without any training. CD-LAM is training-only (→ riir-train); the modelless contrastive-direction cousin already ships here as `cna_steering`.
 
 ## TL;DR
 
