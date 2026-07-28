@@ -42,9 +42,9 @@ Ship the open-primitive half of Super-GOAT Research 240: a generic, modelless, z
   - Unit tests: sample distribution matches priority weights (χ² test, p > 0.05)
   - Unit tests: zero-allocation verified (no `Vec::new` in hot path)
 
-- [x] **T1.3** Implement `QualityGuide` trait + `HlaProjectionGuide` reference impl
+- [x] **T1.3** Implement `QualityGuide` trait + `BeliefGridProjectionGuide` reference impl
   - Trait: `fn score(&self, target: &Target, candidate: &Direction) -> f32`
-  - `HlaProjectionGuide`: `score = sigmoid(λ · dot(candidate, target)) · sigmoid(−α · structural_complexity(candidate))`
+  - `BeliefGridProjectionGuide`: `score = sigmoid(λ · dot(candidate, target)) · sigmoid(−α · structural_complexity(candidate))`
   - `structural_complexity(candidate)` = weighted sum of (disjunction_count, length, redundancy) — generic, game-agnostic weights default to (0.4, 0.3, 0.3)
   - Unit tests: score ∈ [0, 1], monotone in dot-product, monotone decreasing in complexity
   - Unit tests: sigmoid not softmax (verify via numerical gradient sign)
@@ -117,7 +117,7 @@ Snapshot roundtrip works. BLAKE3 commitment verified. Ready for riir-ai Plan 299
 - [x] **T3.1** Synthetic benchmark: CGSP vs g_zero-only on transfer-to-target
   - Setup: 64-direction pool, 16 targets, 1000 cycles each
   - Baseline: g_zero Hint-δ bandit alone (no Guide, no difficulty filter)
-  - CGSP: full loop with HlaProjectionGuide + breakeven_complexity filter
+  - CGSP: full loop with BeliefGridProjectionGuide + breakeven_complexity filter
   - Metric: fraction of targets "solved" (priority of target-aligned direction > τ)
   - **Gate G1:** CGSP ≥ baseline + 5pp
   - **Result:** INFORMATIONAL — CGSP 0/64, baseline 0/64. Reward formula

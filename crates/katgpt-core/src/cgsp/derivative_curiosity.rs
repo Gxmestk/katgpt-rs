@@ -692,12 +692,12 @@ mod tests {
     /// `tau_low`. Returns `(cycles_to_recover, collapse_ever_triggered)`.
     fn cgsp_cycles_to_recover(tau_low: f32, max_cycles: usize) -> (usize, bool) {
         use crate::cgsp::conjecturer::PoolConjecturer;
-        use crate::cgsp::guide::{ComplexityWeights, HlaProjectionGuide};
+        use crate::cgsp::guide::{BeliefGridProjectionGuide, ComplexityWeights};
         use crate::cgsp::loop_::{CgspConfig, CgspLoop};
 
         let pool = make_pool(8, 8);
         let conj = PoolConjecturer::new(pool.clone(), 5);
-        let guide = HlaProjectionGuide::new(2.0, 1.0, ComplexityWeights::default());
+        let guide = BeliefGridProjectionGuide::new(2.0, 1.0, ComplexityWeights::default());
         let solver = DotSolver { sharpness: 1.0 };
         let bandit = VecBandit::uniform(8);
         let mut lp = CgspLoop::new(conj, guide, solver, bandit, CgspConfig::default());

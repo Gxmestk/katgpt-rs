@@ -6,7 +6,7 @@
 //!   - 100 cycles
 //!
 //! Shows:
-//!   1. Building the triad (PoolConjecturer + HlaProjectionGuide + DotSolver +
+//!   1. Building the triad (PoolConjecturer + BeliefGridProjectionGuide + DotSolver +
 //!      VecBandit) and wiring it into `CgspLoop`.
 //!   2. Attaching the difficulty filter + batch gate + collapse detector.
 //!   3. Running 100 cycles on a single target with pre-allocated `ScratchBuffers`.
@@ -22,9 +22,9 @@
 #![cfg(feature = "cgsp")]
 
 use katgpt_core::cgsp::{
-    BreakevenDifficultyFilter, CgspConfig, CgspLoop, ColinearityBatchGate, ComplexityWeights,
-    CuriosityPrioritySnapshot, CycleResult, Direction, EntropyCollapse, HlaProjectionGuide,
-    PoolConjecturer, Priority, ScratchBuffers, Target, entropy_nats, sigmoid,
+    BeliefGridProjectionGuide, BreakevenDifficultyFilter, CgspConfig, CgspLoop,
+    ColinearityBatchGate, ComplexityWeights, CuriosityPrioritySnapshot, CycleResult, Direction,
+    EntropyCollapse, PoolConjecturer, Priority, ScratchBuffers, Target, entropy_nats, sigmoid,
     traits::{HintDeltaBandit, Solver},
 };
 
@@ -147,7 +147,7 @@ fn main() {
     separator("Section 1: Build the CGSP triad");
 
     let conjecturer = PoolConjecturer::new(pool.clone(), 42);
-    let guide = HlaProjectionGuide::new(2.0, 1.0, ComplexityWeights::default());
+    let guide = BeliefGridProjectionGuide::new(2.0, 1.0, ComplexityWeights::default());
     let solver = DotSolver { sharpness: 1.0 };
     let bandit = VecBandit::uniform(8);
 
@@ -164,7 +164,7 @@ fn main() {
         pool.len(),
         pool[0].dim()
     );
-    println!("  Guide       : HlaProjectionGuide (λ=2.0, α=1.0)");
+    println!("  Guide       : BeliefGridProjectionGuide (λ=2.0, α=1.0)");
     println!("  Solver      : DotSolver (sharpness=1.0)");
     println!("  Bandit      : VecBandit uniform over 8 arms");
     println!("  Filters     : BreakevenDifficultyFilter + ColinearityBatchGate");

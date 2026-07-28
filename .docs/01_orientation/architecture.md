@@ -863,7 +863,7 @@ where
 ```rust
 use katgpt_rs::cgsp::{
     CgspConfig, CgspLoop, ColinearityBatchGate, EntropyCollapse,
-    BreakevenDifficultyFilter, HlaProjectionGuide, PoolConjecturer, ScratchBuffers, Target,
+    BreakevenDifficultyFilter, BeliefGridProjectionGuide, PoolConjecturer, ScratchBuffers, Target,
 };
 
 let mut lp = CgspLoop::new(conjecturer, guide, solver, bandit, CgspConfig::default())

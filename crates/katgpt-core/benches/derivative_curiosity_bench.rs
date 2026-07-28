@@ -31,8 +31,9 @@
 
 use criterion::{Criterion, black_box, criterion_group, criterion_main};
 use katgpt_core::cgsp::{
-    CgspConfig, CgspLoop, DerivativeCuriosity, Direction, EntropyCollapse, HintDeltaBandit,
-    HlaProjectionGuide, PoolConjecturer, Priority, ScratchBuffers, Solver, Target, entropy_nats,
+    BeliefGridProjectionGuide, CgspConfig, CgspLoop, DerivativeCuriosity, Direction,
+    EntropyCollapse, HintDeltaBandit, PoolConjecturer, Priority, ScratchBuffers, Solver, Target,
+    entropy_nats,
 };
 
 // ── Shared test fixtures (mirror loop_.rs / mod.rs integration tests) ──────
@@ -118,7 +119,8 @@ fn force_collapse<B: HintDeltaBandit>(bandit: &mut B) -> f32 {
 fn cgsp_cycles_to_recover(tau_low: f32, max_cycles: usize) -> (usize, bool) {
     let pool = make_8_direction_pool();
     let conj = PoolConjecturer::new(pool.clone(), 5);
-    let guide = HlaProjectionGuide::new(2.0, 1.0, katgpt_core::cgsp::ComplexityWeights::default());
+    let guide =
+        BeliefGridProjectionGuide::new(2.0, 1.0, katgpt_core::cgsp::ComplexityWeights::default());
     let solver = DotSolver { sharpness: 1.0 };
     let bandit = VecBandit::uniform(8);
     let mut lp = CgspLoop::new(conj, guide, solver, bandit, CgspConfig::default());
@@ -215,7 +217,8 @@ fn g5_functional_gate(c: &mut Criterion) {
 fn bench_cgsp_cycle_cost(c: &mut Criterion) {
     let pool = make_8_direction_pool();
     let conj = PoolConjecturer::new(pool.clone(), 5);
-    let guide = HlaProjectionGuide::new(2.0, 1.0, katgpt_core::cgsp::ComplexityWeights::default());
+    let guide =
+        BeliefGridProjectionGuide::new(2.0, 1.0, katgpt_core::cgsp::ComplexityWeights::default());
     let solver = DotSolver { sharpness: 1.0 };
     let bandit = VecBandit::uniform(8);
     let mut lp = CgspLoop::new(conj, guide, solver, bandit, CgspConfig::default());

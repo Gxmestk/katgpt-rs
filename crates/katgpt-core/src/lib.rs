@@ -258,7 +258,7 @@ pub use katgpt_types as types;
 
 // CGSP — Curiosity-Guided Self-Play modelless triad (Plan 274, Research 240).
 // Self-contained: Direction/Target/Candidate, CgspLoop, PoolConjecturer,
-// HlaProjectionGuide, BreakevenDifficultyFilter, ColinearityBatchGate,
+// BeliefGridProjectionGuide, BreakevenDifficultyFilter, ColinearityBatchGate,
 // EntropyCollapse, CuriosityPrioritySnapshot (BLAKE3-committed).
 // Consumed by riir-engine Plan 299 (NPC curiosity runtime).
 #[cfg(feature = "cgsp")]
@@ -266,6 +266,7 @@ pub mod cgsp;
 #[cfg(feature = "cgsp")]
 pub use cgsp::{
     BatchQualityGate,
+    BeliefGridProjectionGuide,
     BreakevenDifficultyFilter,
     Candidate,
     CgspConfig,
@@ -284,7 +285,6 @@ pub use cgsp::{
     Direction,
     EntropyCollapse,
     HintDeltaBandit,
-    HlaProjectionGuide,
     NoOpBatchGate,
     NoOpDifficultyFilter,
     PoolConjecturer,
@@ -1758,14 +1758,14 @@ pub mod hebbian_kernel_memory;
 // 7-repo stack). The feature ships as adoption-hook infrastructure.
 #[cfg(feature = "transformer_inversion")]
 pub mod inversion;
+#[cfg(feature = "grad_policy")]
+pub use inversion::InversionGradient;
 #[cfg(feature = "transformer_inversion")]
 pub use inversion::{
     AcceptanceRegion, InversionConfig, InversionError, InversionForward, InversionPolicy,
     InversionResult, ObservedStates, RandomPolicy, accept_observation, accept_observation_into,
     invert_sequence, invert_sequence_into,
 };
-#[cfg(feature = "grad_policy")]
-pub use inversion::InversionGradient;
 
 // ARG Protocol Primitives — open half of the ARG × Latent Substrate Super-GOAT
 // fusion (Plan 327 Phases 1-3, Research 309, Guide 160 private). Five generic

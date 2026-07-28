@@ -17,9 +17,10 @@
 #![cfg(feature = "cgsp")]
 
 use katgpt_core::cgsp::{
-    BreakevenDifficultyFilter, CgspConfig, CgspLoop, ColinearityBatchGate, ComplexityWeights,
-    CycleResult, Direction, EntropyCollapse, HlaProjectionGuide, NoOpBatchGate,
-    NoOpDifficultyFilter, PoolConjecturer, Priority, ScratchBuffers, Target, entropy_nats, sigmoid,
+    BeliefGridProjectionGuide, BreakevenDifficultyFilter, CgspConfig, CgspLoop,
+    ColinearityBatchGate, ComplexityWeights, CycleResult, Direction, EntropyCollapse,
+    NoOpBatchGate, NoOpDifficultyFilter, PoolConjecturer, Priority, ScratchBuffers, Target,
+    entropy_nats, sigmoid,
     traits::{CollapseSignal, HintDeltaBandit, Solver},
 };
 
@@ -195,7 +196,7 @@ fn main() {
 
     let cgsp_loop = {
         let conj = PoolConjecturer::new(pool.clone(), 42);
-        let guide = HlaProjectionGuide::new(2.0, 1.0, ComplexityWeights::default());
+        let guide = BeliefGridProjectionGuide::new(2.0, 1.0, ComplexityWeights::default());
         let solver = DotSolver { sharpness: 1.0 };
         let bandit = VecBandit::uniform(8);
         CgspLoop::new(
@@ -241,7 +242,7 @@ fn main() {
 
     let baseline_loop = {
         let conj = PoolConjecturer::new(pool.clone(), 42);
-        let guide = HlaProjectionGuide::new(2.0, 1.0, ComplexityWeights::default());
+        let guide = BeliefGridProjectionGuide::new(2.0, 1.0, ComplexityWeights::default());
         let solver = DotSolver { sharpness: 1.0 };
         let bandit = VecBandit::uniform(8);
         CgspLoop::new(
