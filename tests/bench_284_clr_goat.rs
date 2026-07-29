@@ -298,9 +298,10 @@ fn g1_clr_beats_best_of_n_majority() {
     let config = ClrConfig {
         k: G1_K_TOTAL, // 50 — must be >= trajectories.len()
         m: G1_M,
+        embedding_dim: G1_DIM,
         ..ClrConfig::default()
     };
-    let mut scratch = ClrScratch::new(config.k, config.m);
+    let mut scratch = ClrScratch::new(config.k, config.m, G1_DIM);
 
     let mut clr_wins = 0usize;
     let mut majority_wins = 0usize;

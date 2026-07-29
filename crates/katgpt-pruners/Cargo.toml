@@ -366,3 +366,11 @@ mux_latent_context = []
 # The historical freq_bandit check-cfg allowlist entry was removed in Phase 12
 # T4.4 (2026-07-04) — freq_bandit is now a real feature in this crate after
 # the module was moved from katgpt-rs/src/.
+
+# Plan 562 example imports `katgpt_pruners::event_log` (gated by `event_log`,
+# implied by `event_log_query`). Without this gate, `cargo clippy --all-targets`
+# with default features fails to compile the example. Matches the documented
+# run command in the example header (`--features event_log_query`).
+[[example]]
+name = "event_log_query_basic"
+required-features = ["event_log_query"]

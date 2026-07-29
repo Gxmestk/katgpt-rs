@@ -132,12 +132,13 @@ fn bench_k(k: usize) -> (f64, f64, f64) {
     let config = ClrConfig {
         k,
         m: BENCH_M,
+        embedding_dim: BENCH_DIM,
         ..ClrConfig::default()
     };
     let extractor = FnClaimExtractor::new(BENCH_M, |t: &Trajectory<u8>| t.claims.clone());
     let verifier = SigmoidProjectionVerifier::new(&directions, BENCH_DIM);
     let outcome_eq = |a: &u8, b: &u8| a == b;
-    let mut scratch = ClrScratch::new(config.k, config.m);
+    let mut scratch = ClrScratch::new(config.k, config.m, BENCH_DIM);
 
     // Warm up: prime caches, JIT (none in Rust but primes the allocator cache).
     let mut sink = 0usize;

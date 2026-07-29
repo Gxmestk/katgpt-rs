@@ -245,7 +245,6 @@ fn g2_f16_speedup_vs_f32() {
     // The f16 win only materializes when the model exceeds cache — the
     // halved bandwidth matters only for DRAM reads.
     for (label, config) in [("medium (fits L3)", medium_config()), ("large (exceeds L3)", large_config())] {
-        let config = config;
         let mut rng = katgpt_types::Rng::new(42);
         let weights = TransformerWeights::new(&config, &mut rng);
         let weights_f16 = weights.to_f16();

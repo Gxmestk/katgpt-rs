@@ -36,7 +36,7 @@
 //! > after `ClrScratch::new()`. **The only allocations are inside
 //! > `extractor.extract()`** (caller-domain).
 //!
-//! This means: after `ClrScratch::new(K, M)` warmup, the vote arithmetic +
+//! This means: after `ClrScratch::new(K, M, embedding_dim)` warmup, the vote arithmetic +
 //! reliability gate + clustering + brevity tiebreak MUST NOT allocate. The
 //! extractor path is explicitly out of contract (it's caller-domain code that
 //! the CLR runtime does not control).
@@ -65,9 +65,9 @@
 //!
 //! **What this test DOES prove instead:**
 //!
-//! 1. **Warmup allocations are bounded** — `ClrScratch::new(32, 5)` allocates
-//!    exactly 3 times (one `with_capacity` per buffer: verdicts, reliability,
-//!    cluster_id). Documented and asserted.
+//! 1. **Warmup allocations are bounded** — `ClrScratch::new(32, 5, 8)` allocates
+//!    exactly 4 times (one `with_capacity` per buffer: verdicts, reliability,
+//!    cluster_id, claim_embeddings). Documented and asserted.
 //!
 //! 2. **Steady-state per-call allocation count is CONSTANT** — call
 //!    `clr_vote_minimal` 1000 times and assert that the allocation delta
@@ -183,32 +183,34 @@ fn g4_zero_allocation() {
     let config = ClrConfig {
         k: G4_K,
         m: G4_M,
+        embedding_dim: G4_DIM,
         ..ClrConfig::default()
     };
 
     // ── Phase A: warmup — measure ClrScratch::new allocations ──────────
     //
-    // ClrScratch::new(K, M) calls Vec::with_capacity exactly 3 times:
-    //   1. verdicts:   with_capacity(K * M)
-    //   2. reliability: with_capacity(K)
-    //   3. cluster_id: with_capacity(K)
+    // ClrScratch::new(K, M, embedding_dim) calls Vec::with_capacity exactly 4 times:
+    //   1. verdicts:        with_capacity(K * M)
+    //   2. reliability:     with_capacity(K)
+    //   3. cluster_id:      with_capacity(K)
+    //   4. claim_embeddings: with_capacity(M * embedding_dim)
     //
     // Plus any incidental allocations from the test harness / println.
 
     reset_alloc_stats();
-    let mut scratch = ClrScratch::new(G4_K, G4_M);
+    let mut scratch = ClrScratch::new(G4_K, G4_M, G4_DIM);
     let warmup_allocs = snap_alloc();
 
     eprintln!("──────── G4: Zero Allocation on Vote Path ────────");
-    eprintln!("Warmup (ClrScratch::new({}, {})):", G4_K, G4_M);
+    eprintln!("Warmup (ClrScratch::new({}, {}, {})):", G4_K, G4_M, G4_DIM);
     eprintln!("  allocs: {warmup_allocs}");
-    eprintln!("  expected: 3 with_capacity calls (verdicts, reliability, cluster_id)");
+    eprintln!("  expected: 4 with_capacity calls (verdicts, reliability, cluster_id, claim_embeddings)");
 
-    // ClrScratch::new allocates exactly 3 buffers. Allow a small margin for
+    // ClrScratch::new allocates exactly 4 buffers. Allow a small margin for
     // any allocator-internal bookkeeping, but fail loudly if it's way off.
     assert!(
-        warmup_allocs <= 6,
-        "G4 warmup allocated {warmup_allocs} times — expected ~3 (one per buffer). \
+        warmup_allocs <= 7,
+        "G4 warmup allocated {warmup_allocs} times — expected ~4 (one per buffer). \
          ClrScratch::new may have regressed."
     );
 
