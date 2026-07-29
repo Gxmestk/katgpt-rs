@@ -817,6 +817,15 @@ required-features = ["best_belief"]
 name = "ssmax_01_dilution_rescaling"
 required-features = ["ssmax_temperature"]
 
+# Plan 449 — Poincaré Adapter latent navigation reference example.
+# Demonstrates the inverse navigator (given Δtarget, find the latent step),
+# forward decoder accuracy, multi-step trajectory, and BLAKE3 freeze/thaw.
+# Mirrors the poincare unit tests' synthetic linear-map regime as a readable
+# API demo.
+[[example]]
+name = "poincare_01_latent_navigation"
+required-features = ["poincare_navigator"]
+
 # Plan 340 Phase 2 T2.3 — KARC no-regression gate. Verifies the conformal
 # feature flag does not perturb KARC's forecast hot path (bit-identical
 # forecasts, wout unchanged, latency within budget). Runs under karc_forecaster

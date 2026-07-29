@@ -45,9 +45,8 @@ Re-auditing against **both** directories revealed:
 | `newton_schulz` | no examples | **no examples** ✅ confirmed | — |
 | `faithfulness` | no examples | likely no examples (opt-in, lower priority) | (only CGSP's internal "faithfulness gate" matches — different concept) |
 
-**Real gap: 4 DEFAULT-ON primitives + 1 opt-in, not 9.** The `conformal` #1
-priority was completely wrong — the mandated UQ baseline already has a 248-line
-example that demonstrates the exact API I was going to build.
+**All 3 DEFAULT-ON primitive gaps are now closed.** Remaining gaps are opt-in
+primitives (`newton_schulz`, `faithfulness`) — lower priority.
 
 ### Lesson
 
@@ -94,7 +93,19 @@ Build example harnesses prioritized by:
    SsmaxConfig caching API, and argmax-preservation invariants. 5 sections,
    ~290 LOC. Clippy clean, runs clean, 13 ssmax unit tests still pass.
    Wired in `Cargo.toml` behind `required-features = ["ssmax_temperature"]`.
-3. **`poincare`** — DEFAULT-ON, deserves at least a minimal demo.
+3. ~~**`poincare`**~~ — **DONE (2026-07-29).** Example landed at
+   `crates/katgpt-core/examples/poincare_01_latent_navigation.rs`.
+   Demonstrates: offline fit (modelless PCA + ridge, R²=0.99 on synthetic
+   linear map), forward decoder accuracy, the inverse navigator (given
+   Δtarget, find the latent step — direction matches on all trials),
+   multi-step open-loop trajectory (bit-identical determinism), and
+   BLAKE3 freeze/thaw (round-trip + tamper detection). 5 sections, ~420 LOC.
+   Clippy clean, runs clean, 6 poincare unit tests still pass. Wired in
+   `Cargo.toml` behind `required-features = ["poincare_navigator"]`.
+   Honest caveat documented: the GOAT gate's R²=0.71 on real SE(3) data
+   does NOT strictly dominate linear-only ridge (R²=0.93); the
+   load-bearing value is the closed-form inverse navigation + frozen Pod
+   commitment.
 4. Opt-in primitives (`newton_schulz`, `faithfulness`) as time permits.
 
 Each example should follow the established pattern: module doc comment with
