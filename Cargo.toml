@@ -2414,6 +2414,17 @@ name = "bench_397_hga_goat"
 path = "tests/bench_397_hga_goat.rs"
 required-features = ["hga", "dash_attn"]
 
+# Plan 562 — event_log_query GOAT gate (ship-quality: G1 correctness + G2 perf +
+# G3 no-regression + G4 alloc-free). Programmatic search over EventLog
+# (PRO-LONG distillation, Research 461). harness = false; std::time::Instant
+# (repo convention; criterion is not a katgpt-rs dev-dep).
+# Run: cargo run --release --bench bench_562_event_log_query_goat --features event_log_query
+[[bench]]
+name = "bench_562_event_log_query_goat"
+path = "benches/bench_562_event_log_query_goat.rs"
+harness = false
+required-features = ["event_log_query"]
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Workspace release/bench codegen settings — REQUIRED after the multi-crate
 # refactor (Plan 005 katgpt-pruners → Issue 003 katgpt-speculative → Proposal 003
