@@ -178,6 +178,21 @@ pub struct TrajectoryRefinedDraft<'a, P: ConstraintPruner> {
     successful_refinements: usize,
     /// Instant when the current refinement started.
     refinement_start: Option<Instant>,
+    /// Test-only override: when > 0, `is_budget_exceeded()` returns true
+    /// **after the first call per `refine_branch` invocation** (the initial
+    /// context-aware check). This lets timing-sensitive budget tests run
+    /// deterministically in release builds (where the computation is too
+    /// fast to exceed a 1µs budget): the first `is_budget_exceeded()` call
+    /// (line ~298, the bandit context check) returns false so the bandit
+    /// picks a refinement step, then the second call (inside the loop at
+    /// line ~308) returns true, aborting refinement with
+    /// `budget_exceeded: true`. Absent in non-test builds.
+    #[cfg(test)]
+    force_budget_exceeded_after_first_call: bool,
+    /// Counter for the test override — tracks calls within a single
+    /// `refine_branch` invocation. Reset to 0 at the start of each call.
+    #[cfg(test)]
+    budget_check_call_count: usize,
 }
 
 impl<'a, P: ConstraintPruner> TrajectoryRefinedDraft<'a, P> {
@@ -190,6 +205,10 @@ impl<'a, P: ConstraintPruner> TrajectoryRefinedDraft<'a, P> {
             total_refinements: 0,
             successful_refinements: 0,
             refinement_start: None,
+            #[cfg(test)]
+            force_budget_exceeded_after_first_call: false,
+            #[cfg(test)]
+            budget_check_call_count: 0,
         }
     }
 
@@ -243,12 +262,34 @@ impl<'a, P: ConstraintPruner> TrajectoryRefinedDraft<'a, P> {
     ///
     /// Returns true if a budget is set and the elapsed time since
     /// `refinement_start` exceeds it.
-    fn is_budget_exceeded(&self) -> bool {
+    fn is_budget_exceeded(&mut self) -> bool {
+        // Test override: deterministically force the budget-exceeded path
+        // after the initial context check, without relying on wall-clock
+        // timing (fragile in release builds where computation completes in
+        // <1µs). The first call per `refine_branch` returns false (so the
+        // bandit picks a refinement step); subsequent calls return true
+        // (so the loop aborts with budget_exceeded).
+        #[cfg(test)]
+        {
+            self.budget_check_call_count += 1;
+            if self.force_budget_exceeded_after_first_call && self.budget_check_call_count > 1 {
+                return true;
+            }
+        }
         match (self.config.latency_budget_us, self.refinement_start) {
             (0, _) => false,
             (_, None) => false,
             (budget_us, Some(start)) => start.elapsed().as_micros() as u64 > budget_us,
         }
+    }
+
+    /// Test-only: force `is_budget_exceeded()` to return true **after the
+    /// first call** per `refine_branch` invocation, so the budget-exceeded
+    /// fallback path can be tested deterministically without relying on
+    /// wall-clock timing.
+    #[cfg(test)]
+    fn force_budget_exceeded_after_first_call_for_test(&mut self) {
+        self.force_budget_exceeded_after_first_call = true;
     }
 
     /// Refine a failed branch at the given failure point.
@@ -270,6 +311,11 @@ impl<'a, P: ConstraintPruner> TrajectoryRefinedDraft<'a, P> {
     ) -> RefinementResult {
         // Record start time for latency budget enforcement
         self.refinement_start = Some(Instant::now());
+        // Reset the test-only budget-check call counter for this invocation.
+        #[cfg(test)]
+        {
+            self.budget_check_call_count = 0;
+        }
 
         // Context-aware bandit: if we previously exceeded budget, prefer skip
         let within_budget = !self.is_budget_exceeded();
@@ -917,7 +963,7 @@ mod tests {
     fn test_budget_guard_aborts_on_exceeded() {
         let pruner = MockPruner::new(vec![]);
         let config = TrdConfig {
-            latency_budget_us: 1, // 1 microsecond — will always be exceeded
+            latency_budget_us: 1, // 1 microsecond budget
             ..TrdConfig::default()
         };
         let mut trd = TrajectoryRefinedDraft::new(config, &pruner);
@@ -938,8 +984,13 @@ mod tests {
 
         let mut rng = Rng::new(42);
 
-        // Sleep a tiny bit to ensure the 1μs budget is exceeded
-        std::thread::sleep(std::time::Duration::from_micros(10));
+        // Deterministically force the budget-exceeded path instead of relying
+        // on wall-clock timing. The prior approach (sleep 10µs before the
+        // call) was fragile: `refine_branch` resets `refinement_start` at
+        // entry, so the sleep was irrelevant, and in release builds the
+        // internal computation completes in <1µs so the budget was never
+        // exceeded.
+        trd.force_budget_exceeded_after_first_call_for_test();
 
         let result = trd.refine_branch(&raw, &failure, &marginals, &mut rng);
 
