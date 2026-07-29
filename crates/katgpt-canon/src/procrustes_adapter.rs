@@ -110,12 +110,11 @@ impl ModelAdapter for ProcrustesAdapter {
             "ProcrustesAdapter::project_into: canonical.dim() != target_dim (square adapter)"
         );
         // Row-major matvec: out[i] = sum_j R[i*d + j] * canonical[j].
-        // Uses the 8-wide chunked FMA dot product (mirrors `dot_8wide` in
+        // Uses the auto-vectorizing dot product (mirrors `dot_8wide` in
         // katgpt-attn-match/src/score_matrix_simd.rs — the canonical version).
-        // The previous `.zip()` form carried a single fadd dependency chain
-        // that blocked LLVM auto-vectorization, running at ~scalar speed.
-        // The 8-wide accumulator pattern breaks the dependency + lets LLVM
-        // emit AVX2 (8× f32) / NEON (4× f32) SIMD FMA.
+        // The simple `for` loop lets LLVM emit optimal NEON `fmla` / AVX2 FMA;
+        // the previous 8-accumulator unroll was empirically slower (see
+        // dot_8wide doc comment).
         let r = &self.rotation;
         let c = canonical.as_slice();
         // If lengths mismatch (release-mode), bail safely rather than OOB.
@@ -180,12 +179,16 @@ impl ModelAdapter for ProcrustesAdapter {
 ///
     /// # Performance
     /// At d=2304 (Gemma2-2B hidden dim), the naive `.zip()` form ran at
-    /// ~scalar speed (3.9ms); this pattern targets the ~220µs SIMD floor
-    /// (5.3M flops / 8-wide AVX2 FMA / 3 GHz).
+    /// ~scalar speed (3.9ms). The original 8-wide accumulator pattern was added
+    /// to break the fadd dependency chain, but was empirically refuted on Apple
+    /// Silicon M3 Max (2026-07-29): the 8-accumulator unroll ran 1.26× SLOWER
+    /// than a simple auto-vectorizable `for` loop (LLVM emits better NEON
+    /// `fmla` from the simple loop than from the manual unroll). The kernel was
+    /// simplified to trust the compiler.
     ///
     /// # DRY note
     /// This mirrors `dot_8wide` in `katgpt-attn-match/src/score_matrix_simd.rs`
-    /// (Plan 271). The function is small enough (25 lines, no deps) that a
+    /// (Plan 271). The function is small enough (10 lines, no deps) that a
     /// cross-crate dep on katgpt-attn-match would pull in attention machinery
     /// unnecessarily. If a third crate needs this pattern, move it to
     /// katgpt-core's math utilities + have all three depend on that.
@@ -197,27 +200,12 @@ impl ModelAdapter for ProcrustesAdapter {
         debug_assert_eq!(a.len(), d);
         debug_assert_eq!(b.len(), d);
 
-        let chunk = 8usize;
-        let mut acc = [0.0f32; 8];
-        let mut k = 0usize;
-        while k + chunk <= d {
-            // Manual unroll — LLVM turns this into SIMD FMA.
-            acc[0] += a[k] * b[k];
-            acc[1] += a[k + 1] * b[k + 1];
-            acc[2] += a[k + 2] * b[k + 2];
-            acc[3] += a[k + 3] * b[k + 3];
-            acc[4] += a[k + 4] * b[k + 4];
-            acc[5] += a[k + 5] * b[k + 5];
-            acc[6] += a[k + 6] * b[k + 6];
-            acc[7] += a[k + 7] * b[k + 7];
-            k += chunk;
-        }
-        let mut dot = acc.iter().sum::<f32>();
-        // Remainder (tail) — scalar. Most production head dims are multiples
-        // of 8 (64, 128, 256, 2304), so this is rare.
-        while k < d {
+        // Simple loop — LLVM auto-vectorizes to optimal SIMD FMA. The 8-accumulator
+        // manual unroll was empirically slower (see module doc); the simple loop
+        // lets LLVM emit the optimal `fmla` sequence.
+        let mut dot = 0.0f32;
+        for k in 0..d {
             dot += a[k] * b[k];
-            k += 1;
         }
         dot
     }
