@@ -324,7 +324,7 @@ The diagnostics flag the sanity config (rank collapse detected: erank 24.68 → 
 
 **The honest takeaway.** f16 weight quantization for bandwidth-bound GEMV is **not a modelless perf win on this hardware class**. The hypothesis only holds when (a) activations are also f16, OR (b) f16→f32 conversion is zero-latency. Neither is true on Apple Silicon. This is a valid negative result in the sense of Research 003 / Issue 356 — the GOAT gate did its job by catching a wrong hypothesis before it reached production. The root-cause analysis is the durable value: it prevents future agents from re-attempting the same hypothesis.
 
-**Code retained as reference.** `forward_base_f16` + `forward_f16` in `crates/katgpt-forward/src/forward.rs` (L774-932) ship as `pub` opt-in paths that no internal caller dispatches to — preserved for future hardware where the hypothesis holds (e.g. AVX-512_FP16 x86, or future Apple Silicon with free FCVT), or as a reference for a full-f16 (weights + activations) follow-up.
+**Code retained as reference.** `forward_base_f16` + `forward_f16` in `crates/katgpt-forward/src/forward.rs` (L806-941) ship as `pub` opt-in paths that no internal caller dispatches to — preserved for future hardware where the hypothesis holds (e.g. AVX-512_FP16 x86, or future Apple Silicon with free FCVT), or as a reference for a full-f16 (weights + activations) follow-up.
 
 **Re-opens only on** (a) hardware where f16 loads are genuinely cheaper than f32 loads AND a hardware FCVT-equivalent is free, OR (b) a full-f16 forward context (Issue 201's line, which also failed — see section 18 below).
 
