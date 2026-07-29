@@ -36,10 +36,11 @@
 
 use katgpt_core::types;
 use katgpt_core::types::{Config, matmul, matmul_parallel};
-// `rmsnorm` is only called on the `#[cfg(not(feature = "kog_cpu_fusion"))]` branch
-// of forward_base / forward_coda. Import it conditionally to avoid the unused
-// warning under `--all-features`.
-#[cfg(not(feature = "kog_cpu_fusion"))]
+// `rmsnorm` (the non-gamma variant) is called by `forward_base` / `forward_coda`
+// on the `#[cfg(not(feature = "kog_cpu_fusion"))]` branch AND by `forward_base_f16`
+// unconditionally (the f16 path doesn't support `kog_cpu_fusion` — see its doc).
+// Because `forward_base_f16` is always compiled, the import is always used — no
+// gate needed.
 use katgpt_core::types::rmsnorm;
 use katgpt_transformer::{MultiLayerKVCache, TransformerWeights, TransformerWeightsF16};
 // `DecodeStage` is only used by `forward_decode_stage` (gated `decode_specialize`).
