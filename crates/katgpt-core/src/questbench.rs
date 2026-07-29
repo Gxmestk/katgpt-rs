@@ -394,7 +394,7 @@ pub struct UnderspecConfig {
     pub plan_extend_threshold: f32,
     /// Score above which the Cold tier (Turso) is consulted. Default: 0.7
     pub cold_tier_threshold: f32,
-    /// Score above which the Warm tier (HLA KG) is consulted. Default: 0.3
+    /// Score above which the Warm tier (belief KG) is consulted. Default: 0.3
     pub warm_tier_threshold: f32,
 }
 
@@ -633,7 +633,7 @@ impl QuestBenchDecision {
 #[repr(u8)]
 pub enum MemoryTier {
     Hot,    // CPU SIMD — standard decode
-    Warm,   // HLA KG — O(1) relation lookup
+    Warm,   // belief KG — O(1) relation lookup
     Cold,   // Turso — async episode retrieval
     Freeze, // external knowledge
 }
