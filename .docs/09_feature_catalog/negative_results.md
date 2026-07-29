@@ -303,3 +303,51 @@ The diagnostics flag the sanity config (rank collapse detected: erank 24.68 → 
 **The PoC remains as a permanent regression check** at `riir-ai/crates/riir-poc/benches/composition_imbalance_modelless.rs` (the "defend-wrong" R&D crate per research skill §3.6). `PersonalityWeightedComposition` and `BranchBank` use the same sigmoid-gated-sum shape; the same closed-form argument applies (T8 N/A).
 
 📖 Issue (removed, this entry is the durable home): closed 2026-07-28 commit `e30d2b45`. Triggering PASS verdict: arXiv:2607.22531 (Twins Focal Loss) — research notes 279, 394, 409 carry the PASS-Redirects line. Site 1: [`committed_field_blend.rs:188-224`](../../crates/katgpt-core/src/committed_field_blend.rs). Site 3: [`branching/bank.rs`](../../crates/katgpt-core/src/branching/bank.rs).
+
+## 17. f16 Weight-Only Forward Quantization (Issue 200) — G2 FAIL: 1.7–3.0× SLOWER
+
+**Hypothesis.** The production `forward_base` path is 95% matmul (GEMV) at seq=1. f32 GEMV arithmetic intensity is 0.5 FLOP/byte → firmly memory-bandwidth-bound → no kernel-level optimization can beat the bandwidth ceiling. The actionable path to ~2× speedup: **halve weight bandwidth by storing weights as f16** (`f32 8 bytes/elem → f16 4 bytes/elem`, 50% reduction). `matmul_f16` + `simd_matmul_f16_f32_rows` already ship in `katgpt-types` (f16 weights × f32 activations, dequant-on-load).
+
+**G2 FAIL (2026-07-29, Apple Silicon / aarch64).** f16 weight-only forward is **1.7–3.0× slower** than f32 across all configs. Root-cause analysis (the durable value):
+
+1. **The activation `x` is f32, not f16.** The hypothesis assumed weight-only bandwidth reduction. Reality: per dot-product element, f32 = 4 bytes (weight) + 4 bytes (activation) = 8 bytes; f16 = 2 bytes (weight) + 4 bytes (activation) = 6 bytes. **Actual bandwidth reduction: 25%, not 50%.** The halved-weight hypothesis double-counts by ignoring the f32 activation.
+2. **f16→f32 dequantization is not free.** Even with hardware FCVT (1-2 cycle latency on Apple Silicon), the conversion sits on the critical path between weight load and FMA. Combined with the only-25% bandwidth reduction, the conversion latency more than eats the bandwidth savings.
+3. **Scalar `to_f32()` (which LLVM vectorizes to FCVT) is strictly better than hand-rolled NEON bit-manipulation.** A WIP attempt (`convert_4x_f16_to_f32`, ~10 manual NEON ops per 4-element conversion) was 3× slower vs the committed 2.5× slower — discarded during G2 isolation.
+4. **Hardware FCVTL via inline asm** improved conversion speed (0.40× → 0.574×) by using the hardware instruction directly, but still net-negative because the store-to-stack-and-reload pattern (forced by `asm!` not being able to pass NEON registers directly to `vfmaq_f32`) adds a round-trip the FMA pipeline can't fully hide. A fully-inlined asm implementation (conversion + FMA in one block) might close the gap, but at that point you're writing the entire dot product in assembly — a maintenance burden disproportionate to a still-sub-2× potential win.
+
+| Gate | Target | Result |
+|---|---|---|
+| **G1** approximate correctness | max rel err <20% | ✅ **PASS** — **0.03%** on medium config, seq_len=16. f16 dequant path is numerically correct. |
+| **G2** perf ≥1.5× at seq=1 | f16 ≥1.5× f32 | ❌ **FAIL** — f16 is **1.7–3.0× SLOWER** (0.574× speedup even with FCVTL inline asm). Refutes the core hypothesis. |
+| **G3** no-regression | cargo test clean | ✅ PASS — f16 path is additive, doesn't touch f32 path. |
+| **G4** alloc-free steady state | by construction | ✅ PASS — `forward_base_f16` reuses `ForwardContext` scratch buffers. |
+
+**The honest takeaway.** f16 weight quantization for bandwidth-bound GEMV is **not a modelless perf win on this hardware class**. The hypothesis only holds when (a) activations are also f16, OR (b) f16→f32 conversion is zero-latency. Neither is true on Apple Silicon. This is a valid negative result in the sense of Research 003 / Issue 356 — the GOAT gate did its job by catching a wrong hypothesis before it reached production. The root-cause analysis is the durable value: it prevents future agents from re-attempting the same hypothesis.
+
+**Code retained as reference.** `forward_base_f16` + `forward_f16` in `crates/katgpt-forward/src/forward.rs` (L774-932) ship as `pub` opt-in paths that no internal caller dispatches to — preserved for future hardware where the hypothesis holds (e.g. AVX-512_FP16 x86, or future Apple Silicon with free FCVT), or as a reference for a full-f16 (weights + activations) follow-up.
+
+**Re-opens only on** (a) hardware where f16 loads are genuinely cheaper than f32 loads AND a hardware FCVT-equivalent is free, OR (b) a full-f16 forward context (Issue 201's line, which also failed — see section 18 below).
+
+📖 Issue: [`.issues/200_f16_weight_quantization_forward_base.md`](../../.issues/200_f16_weight_quantization_forward_base.md) (retained as negative-result reference). Substrate: `crates/katgpt-forward/src/forward.rs:774-932`. Perf doc: [`.docs/08_performance/engineering.md`](../08_performance/engineering.md) §'What We Don't Do' (updated with empirical verdict 2026-07-29 commit `9bd1eed2`).
+
+## 18. Full f16 Forward FHM Investigation (Issue 201) — G2 FAIL: 1.31× < 1.5× gate
+
+**Hypothesis.** Successor to Issue 200 (weight-only f16). The bandwidth ceiling wall hits weight-only f16 because the activation is f32 — the real fix is **full f16 (weights + activations)** so per dot-product element is 2 bytes + 2 bytes = 4 bytes (true 50% reduction). Apple Silicon's widening FMA (`fmlalb`/`fmlalt`, a.k.a. `fmlal`/`fmlal2`) does f16×f16→f32 in a single instruction (FHM = Full Half-precision Multiply-add), eliminating the explicit FCVT from Issue 200's critical path while achieving the full 50% bandwidth reduction.
+
+**G2 FAIL (2026-07-29, Apple Silicon / aarch64).** Best L3-exceeding speedup of `simd_dot_f16_f16` (FHM widening FMA) vs `simd_dot_f32` = **1.31×**, under the 1.5× gate. Phase 2 (full forward path) NOT pursued — depends on the Phase 1 gate, which failed.
+
+Root causes (full detail in Bench 563):
+
+1. **f32 is already near the bandwidth ceiling** (~95–110 GB/s at L3-exceeding sizes on Apple Silicon). f16 improves this to ~120–130 GB/s equivalent — only ~25–30% gain, NOT the theoretical 50%.
+2. **The dot kernel is NOT purely bandwidth-bound.** FMA throughput, load-use latency, and accumulator-reduction overhead consume a meaningful fraction even at L3-exceeding sizes. Halving bandwidth doesn't halve runtime.
+3. **FHM FMA throughput is the limiter** (not FCVT latency like Issue 200). The 4-accumulator unroll that hides f32 FMA latency doesn't fully hide FHM FMA's different pipeline characteristics.
+4. **f16 accumulation drift grows with vector length.** rel_err ~0.1% at in-cache sizes but **6.2% at 16M elements** — even a marginal perf pass would have needed a separate precision gate.
+5. **The L1 vs DRAM paradox.** f16 wins **1.71× at L1 (cache-resident)** but only 1.31× at DRAM — the gate fails specifically when weights spill to DRAM where f32 is already near the bandwidth ceiling. No architecture-level fix exists; the gate is structurally infeasible on this hardware class.
+
+**Toolchain note.** FHM is inaccessible on stable Rust 1.93.0 (intrinsics unstable #136306; LLVM 21.1.8 assembler rejects the `fmlalb`/`fmlalt` mnemonic in every arrangement form). The Phase 1 measurement was done via nightly toolchain's unstable intrinsics (`vfmlalq_low_f16` / `vfmlalq_high_f16`), verified correct on a known input. Production code on stable would need verified `.inst` encodings — moot given the gate failed.
+
+**Outcome.** Valid negative result (Research 003 / Issue 356 sense). The GOAT gate did its job a second time on the f16 line (Issue 200 weight-only, Issue 201 full-f16), preventing a perf-regressing "optimization" from reaching production. **f32 stays the production dtype** for `forward_base` GEMV on Apple Silicon.
+
+**The remaining quantization path with a plausible ≥1.5× win is INT8 with INT8 activations** (different dequant path: scale + zero-point). But on Apple Silicon it hits the same bandwidth-ceiling argument — INT8 GEMV arithmetic intensity is still bandwidth-bound at L3-exceeding sizes, and the dequant overhead makes it worse. Filed as a **non-goal** in both Issues 200 and 201.
+
+📖 Issue: [`.issues/201_full_f16_forward_investigation.md`](../../.issues/201_full_f16_forward_investigation.md) (retained as negative-result reference). Benchmark: [`.benchmarks/563_issue201_f16_f16_fhm_negative.md`](../../.benchmarks/563_issue201_f16_f16_fhm_negative.md). Substrate (nightly-only WIP, not on develop): `crates/katgpt-types/src/simd/dot.rs` `simd_dot_f16_f16` (sibling-agent investigation; see git history if needed).
