@@ -94,9 +94,9 @@ NEON (ARM) / AVX2 (x86_64) SIMD dispatch via `crates/katgpt-dec/src/simd.rs` (re
 | `simd_matmul_rows_parallel` | Rayon-parallel matmul (threshold-gated) | — |
 | `simd_matmul_relu_rows` | Row-parallel matmul + ReLU clamp | — |
 | `simd_fma_row` | Fused multiply-accumulate row | — |
-| `simd_dot_f16_f32` | f16/f32 mixed-precision dot product | — |
-| `simd_matmul_f16_f32_rows` | f16 weight / f32 input matmul | — |
-| `simd_matmul_f16_f32_rows_parallel` | Rayon-parallel f16/f32 matmul | — |
+| `simd_dot_f16_f32` | f16/f32 mixed-precision dot product | — (G2-failed ref, Issue 200) |
+| `simd_matmul_f16_f32_rows` | f16 weight / f32 input matmul | — (G2-failed ref, Issue 200) |
+| `simd_matmul_f16_f32_rows_parallel` | Rayon-parallel f16/f32 matmul | — (G2-failed ref, Issue 200) |
 | `simd_sparse_dot_f32` | Sparse dot product (alive mask) | — |
 | `simd_sparse_matmul_rows` | Sparse matmul with index tracking | — |
 | `simd_scale_inplace` | In-place scalar multiply | — |
@@ -480,5 +480,5 @@ Core model benchmarks ±2% stable. Infrastructure (`forward (flat)`, `forward_pa
 | Rayon parallel matmul | n_embd=16, mlp=64 — thread pool overhead dominates |
 | `std::simd` / `portable_simd` | Nightly-only; we use `core::arch` intrinsics directly (Plan 060) |
 | Cache tiling for attention | block_size=16 already fits L1 |
-| f16/bf16 weights | Would halve memory bandwidth but requires `half` crate; `simd_dot_f16_f32` kernels exist for mixed-precision matmul |
+| f16/bf16 weights | Empirically NOT a win on Apple Silicon (aarch64). Weight-only f16 is **1.7× slower** than f32 (Issue 200, G2 FAIL — f32 activations cap bandwidth reduction at 25%, FCVT latency eats the rest). Full f16 (weights + activations, FHM widening FMA) is only **1.31× faster** — short of the 1.5× promotion gate (Issue 201, Bench 563). Root cause: f32 is already near the bandwidth ceiling (~95–110 GB/s at L3-exceeding sizes) and the dot kernel is not purely bandwidth-bound (FMA throughput + accumulator reduction eat the theoretical gain). f32 stays the production dtype. The `simd_dot_f16_f32` / `matmul_f16` kernels exist as opt-in reference paths (`katgpt-forward/f16_weight_quantization` feature) but are G2-failed and not promoted to default. INT8+INT8 (the only remaining quantization-style path with plausible ≥1.5×) is filed as a non-goal — same bandwidth-ceiling argument applies, plus dequant overhead makes it worse |
 | GPU compute in inference | CPU-only for inference; GPU training is out of scope |
