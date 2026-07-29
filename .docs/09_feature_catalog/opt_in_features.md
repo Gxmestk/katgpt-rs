@@ -867,3 +867,38 @@ Where `D = RMS(‖E(x, x′)‖) + ε` over ordinary transitions. `LatentConfoun
 🔧 Feature flag: `latent_confounder_audit` (in katgpt-core, default-off).
 
 📖 Issue (removed, bench is durable home): [`.benchmarks/194_latent_confounder_audit_goat.md`](../../.benchmarks/194_latent_confounder_audit_goat.md), Research: [`.research/460_CD_LAM_Latent_Confounder_Audit_Diagnostics.md`](../../.research/460_CD_LAM_Latent_Confounder_Audit_Diagnostics.md), Paper: [arXiv:2607.09185](https://arxiv.org/abs/2607.09185), Bench: `crates/katgpt-core/benches/bench_194_latent_confounder_audit_goat.rs`.
+
+## 28. EventLog Query Combinator — PRO-LONG Programmatic Search (Plan 562, arxiv 2607.20064)
+
+**The primitive.** A deterministic query combinator over the existing `EventLog<A>` append-only event log (Plan 124). Distills PRO-LONG's load-bearing finding (Table 1): programmatic tools (grep + Python) account for +15.2 of the +18.1 gain on ARC-AGI-3 — the access pattern (search-at-read-time, decide-nothing-at-write-time) is the value, independent of the LLM that instantiates it. This primitive ships the **pattern-based search axis** (grep/regex/predicate analog) as a modelless, zero-allocation, composable API on top of the lossless log substrate.
+
+Ships:
+- `EventPredicate<A>` trait (object-safe, `Debug` supertrait) — the escape-hatch seam for consumer-defined predicates.
+- `Predicate<A>` enum: `EventTypeIs` / `EventTypeIn` / `IdRange` / `IdRangeFrom` / `And` / `Or` / `Not` / `All` / `None_` / `Custom(Box<dyn EventPredicate<A>>)`. Constructor helpers: `event_type(t)` / `id_range(lo, hi)` / `id_range_from(from)` / `.and(...)` / `.or(...)` / `!pred` (via `std::ops::Not`) / `custom(p)`.
+- `EventLog::filter(&self, &Predicate<A>) -> impl Iterator<Item = &Event<A>>` — lazy, zero-alloc. The direct "grep the log" analog.
+- `EventLog::query_window(&self, Range<EventId>, Option<EventType>) -> impl Iterator` — contiguous slice + optional type filter. Sub-µs by construction.
+- `EventLog::count_where(&self, &Predicate<A>) -> usize` — the `grep -c` analog.
+- `EventLog::first_where` / `last_where(&self, &Predicate<A>) -> Option<&Event<A>>` — early-exit (`find` / `rfind`).
+
+**G1–G4 PASS (Bench 564, 2026-07-29) — ship-quality gate, NOT promote-to-default.**
+
+| Gate | Target | Result |
+|---|---|---|
+| **G1** correctness | 13 predicate combinations on a 100-event deterministic log | ✅ PASS — all 13 (EventTypeIs, count_where All/None_, first/last_where, query_window ±type filter, And, Or, Not, Custom payload>500) |
+| **G2** perf | sub-µs / sub-100ns per operation | ✅ PASS — `filter` **4.99 ns/result-event** (200× under 1µs), `query_window` **0.46 ns/call** (217× under 100ns), `first_where`/`last_where` **4.04 / 5.71 ns** (24× / 17× under 100ns) |
+| **G3** no-regression | feature-off build clean, Plan 124 API unchanged | ✅ PASS — `existing_api_unchanged` unit test; purely additive `impl EventLog` block gated `#[cfg(feature = "event_log_query")]` |
+| **G4** alloc-free | zero steady-state allocation | ✅ PASS — filter collect capacity stable (512→512 across 1000 iterations); count/first/last/query_window zero-alloc by construction (lazy iterators / early-exit / slice) |
+
+**Why opt-in.** This is a **ship-quality gate**, not a promote-to-default gate. Per the Gain-tier verdict (Research 461), the feature is a missing capability (the programmatic-search axis did not ship), not a measurable improvement over an existing approach — there is no incumbent query API on `EventLog` to beat (only `iter()`). Promotion to default-on requires a downstream consumer to prove a measurable gain over the no-query baseline. The three trigger conditions (Plan 562 Phase 3):
+- **T3.1** riir-engine per-NPC cognition (CLR vote accuracy, KARC forecast skill, consolidation quality) — opens a riir-ai plan for the latent-predicate bridge.
+- **T3.2** riir-neuron-db Raven/δ-Mem consolidation pipeline ("find all events matching P in last N ticks" quality/latency gain) — opens a riir-neuron-db plan.
+- **T3.3** katgpt-pruners MCTS planner (`filter` for "find all evaluations matching P" search-efficiency gain) — opens a katgpt-rs plan.
+- **T3.4** If any of T3.1–T3.3 pass → promote `event_log_query` to default features.
+
+**Why this is Gain-tier, not GOAT-tier.** The gain is a missing feature, not a measurable improvement. The three retrieval axes (pattern / semantic / content-addressed) are orthogonal: the pattern axis (this primitive) composes with the semantic axis (`experience_graph` latent-seeded NS traversal, riir-neuron-db) and the content-addressed axis (`Engram` hash→slot) at the consumer layer via `Predicate::Custom`.
+
+**The PRO-LONG Table 1 finding (load-bearing for this distillation).** Programmatic tools (grep + Python) drive +15.2 of the +18.1 gain on ARC-AGI-3; Write/Edit adds only +2.9. The value is in the log + programmatic search, not in self-authored notes (clearing the workspace every call costs PRO-LONG only 0.5 points). This primitive ships the deterministic analog of the grep/Python search axis — no LLM in the loop.
+
+🔧 Feature flag: `event_log_query` (in katgpt-pruners, default-off; implies `event_log`). Root forwards via `event_log_query = ["katgpt-pruners/event_log_query"]`.
+
+📖 Plan: [`.plans/562_event_log_query_combinator.md`](../../.plans/562_event_log_query_combinator.md), Research (Gain): [`.research/461_PRO_LONG_Programmatic_Memory_Log_Search.md`](../../.research/461_PRO_LONG_Programmatic_Memory_Log_Search.md), Paper: [arXiv:2607.20064](https://arxiv.org/abs/2607.20064) PRO-LONG (Fox et al., Duke, 2026-07-23), Bench: [`.benchmarks/564_event_log_query_goat.md`](../../.benchmarks/564_event_log_query_goat.md) (numbered 564 not 562 — `.benchmarks/562` was already allocated to `katgpt-canon`), Substrate: `crates/katgpt-pruners/src/event_log.rs`, Example: `crates/katgpt-pruners/examples/event_log_query_basic.rs`.
