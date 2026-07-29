@@ -799,6 +799,15 @@ required-features = ["conformal_predictive_intervals"]
 name = "conformal_karc_overlay"
 required-features = ["conformal_predictive_intervals", "karc_forecaster"]
 
+# Issue 202 — best_belief example harness. The conservative-selection
+# counterpart to Thompson sampling: ε-quantile Beta lower bound for
+# freeze/thaw promotion under bounded evidence. Demonstrates monotonicity,
+# explore-vs-exploit contrast, a realistic 5-candidate promotion scenario,
+# incumbent tie preference, and the LUT hot path vs closed-form cold path.
+[[example]]
+name = "best_belief_01_conservative_selection"
+required-features = ["best_belief"]
+
 # Plan 340 Phase 2 T2.3 — KARC no-regression gate. Verifies the conformal
 # feature flag does not perturb KARC's forecast hot path (bit-identical
 # forecasts, wout unchanged, latency within budget). Runs under karc_forecaster
