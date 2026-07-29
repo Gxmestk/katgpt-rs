@@ -56,7 +56,7 @@ use katgpt_core::simd::simd_sum_f32;
 ///   clustering. For LLMs this is answer-equivalence; for game NPCs it's
 ///   destination-tile + action-type. Naive O(K²) — fine for K ≤ 32.
 /// * `scratch` — pre-allocated buffers. [`ClrScratch::reset_for`] is called
-///   internally with `(config.k, config.m)`, so the caller should size
+///   internally with `(config.k, config.m, config.embedding_dim)`, so the caller should size
 ///   `ClrScratch::new(config.k, config.m)` once for zero-alloc reuse.
 ///
 /// # Returns
@@ -102,9 +102,8 @@ where
     let k_count = trajectories.len();
     let m = config.m;
 
-    // Size + zero the scratch buffers for (max-K, M). config.k doubles as the
-    // trajectory-count upper bound (paper fixes K ≤ 32 == embedding dim).
-    scratch.reset_for(config.k, config.m);
+    // Size + zero the scratch buffers for (max-K, M, embedding_dim).
+    scratch.reset_for(config.k, config.m, config.embedding_dim);
 
     // Steps 1+2: extract claims + verify each (k, m). We extract into a
     // per-trajectory Vec<Claim> (this is caller-domain work and allocates —
@@ -207,21 +206,22 @@ where
     let k_count = trajectories.len();
     let m = config.m;
 
-    scratch.reset_for(config.k, config.m);
+    scratch.reset_for(config.k, config.m, config.embedding_dim);
 
     // Steps 1+2: extract embeddings + verify.
     //
-    // Zero-alloc hot path: the extractor writes M*k embedding values into
-    // `scratch.claim_embeddings` (flat, row-major), then the verifier reads
-    // each row via `verify_embedding`. No `Vec<Claim<T>>` is constructed —
-    // the claim payload `T` is irrelevant to the vote (the verifier only
-    // reads the embedding). Default `extract_embeddings_into` still
-    // allocates via `extract` — production extractors override it for true
-    // zero-alloc.
+    // Zero-alloc hot path: the extractor writes M*embedding_dim embedding
+    // values into `scratch.claim_embeddings` (flat, row-major), then the
+    // verifier reads each row via `verify_embedding`. No `Vec<Claim<T>>` is
+    // constructed — the claim payload `T` is irrelevant to the vote (the
+    // verifier only reads the embedding). Default `extract_embeddings_into`
+    // still allocates via `extract` — production extractors override it for
+    // true zero-alloc.
+    let dim = config.embedding_dim;
     for (k, traj) in trajectories.iter().enumerate() {
-        extractor.extract_embeddings_into(traj, &mut scratch.claim_embeddings, config.k);
+        extractor.extract_embeddings_into(traj, &mut scratch.claim_embeddings, dim);
         for m_idx in 0..m {
-            let emb = &scratch.claim_embeddings[m_idx * config.k..(m_idx + 1) * config.k];
+            let emb = &scratch.claim_embeddings[m_idx * dim..(m_idx + 1) * dim];
             scratch.verdicts[k * m + m_idx] = verifier.verify_embedding(emb, m_idx);
         }
     }
@@ -505,9 +505,10 @@ mod tests {
         let config = ClrConfig {
             k,
             m,
+            embedding_dim: k,
             ..ClrConfig::default()
         };
-        let mut scratch = ClrScratch::new(trajs.len(), m);
+        let mut scratch = ClrScratch::new(trajs.len(), m, k);
 
         let result = clr_vote(
             &trajs,
@@ -554,11 +555,12 @@ mod tests {
         let config = ClrConfig {
             k,
             m,
+            embedding_dim: k,
             ..ClrConfig::default()
         };
 
         // Full vote.
-        let mut scratch_full = ClrScratch::new(trajs.len(), m);
+        let mut scratch_full = ClrScratch::new(trajs.len(), m, k);
         let full = clr_vote(
             &trajs,
             &extractor,
@@ -568,7 +570,7 @@ mod tests {
             &mut scratch_full,
         );
         // Minimal vote.
-        let mut scratch_min = ClrScratch::new(trajs.len(), m);
+        let mut scratch_min = ClrScratch::new(trajs.len(), m, k);
         let (min_idx, min_rel) = clr_vote_minimal(
             &trajs,
             &extractor,
@@ -624,9 +626,10 @@ mod tests {
         let config = ClrConfig {
             k,
             m,
+            embedding_dim: k,
             ..ClrConfig::default()
         };
-        let mut scratch = ClrScratch::new(trajs.len(), m);
+        let mut scratch = ClrScratch::new(trajs.len(), m, k);
 
         let result = clr_vote(
             &trajs,
@@ -650,7 +653,7 @@ mod tests {
         let dirs = AxisDirections::new(5, 8);
         let verifier = SigmoidProjectionVerifier::new(&dirs, 8);
         let config = ClrConfig::default();
-        let mut scratch = ClrScratch::new(1, 5);
+        let mut scratch = ClrScratch::new(1, 5, 8);
         let _ = clr_vote(
             &[],
             &extractor,
@@ -679,9 +682,10 @@ mod tests {
         let config = ClrConfig {
             k,
             m,
+            embedding_dim: k,
             ..ClrConfig::default()
         };
-        let mut scratch = ClrScratch::new(config.k, config.m);
+        let mut scratch = ClrScratch::new(config.k, config.m, k);
 
         let (winner_idx, reliability) = clr_vote_minimal(
             &trajs,
