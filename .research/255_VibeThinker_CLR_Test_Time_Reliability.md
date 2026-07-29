@@ -368,6 +368,58 @@ Per `003_Commercial_Open_Source_Strategy_Verdict.md`:
 
 ---
 
-## TL;DR
+## PoC Addendum (§3.6 — REDE arXiv:2607.22098 quality-parity test)
+
+**Date:** 2026-07-29
+**PoC location:** `riir-ai/crates/riir-poc/{src/rede_poc.rs, benches/rede_poc.rs, examples/rede_quick.rs}`
+**Run:** `CARGO_TARGET_DIR=/tmp/rede_poc cargo run -p riir-poc --example rede_quick --release`
+
+The PASS-Redirects for REDE added on 2026-07-29 claim architectural coverage
+across CLR + CUCG + CausalHeadImportance. The §3.6 rule mandates a PoC for any
+parity claim. I ran one; the outcome is honest:
+
+| Competitor | AUROC | Notes |
+|---|---|---|
+| NoFilter (baseline) | 0.6435 | Linear probe on full trace (mean step + answer) |
+| REDE trained projection | 0.5543 | Linear projection (DIM_OUT=16) + kNN filter; 30 epochs; trained on truthful-only |
+| Modelless attention-direction | 0.6767 | Same supervision signal as REDE (final-answer attention), no training |
+| Modelless unsupervised (CUCG-style) | 0.6352 | kNN cosine-distance filter on raw embeddings |
+| **Oracle (upper bound)** | **0.6352** | **Uses ground-truth step categories — best possible filter** |
+
+**Verdict: INCONCLUSIVE on quality parity.** The Oracle upper bound does not
+beat NoFilter by >= 0.02 — the synthetic task I designed does not have enough
+structure for filtering to matter. None of the methods (including perfect
+filtering) can demonstrate a quality advantage on this task. The PASS verdict
+stands on architectural + latency axes (modelless is ~1000x faster: 300us vs
+170ms for REDE training+inference); **quality parity remains unproven**.
+
+Two honest limitations:
+1. **My REDE implementation may have a training bug.** AUROC 0.5543 is barely
+   above random (0.5), and on early versions (before fixing the truthful-only
+   training filter) it was BELOW random (0.46). The gradient signs look correct
+   on inspection but backprop is error-prone; a fair REDE would need a
+   reference implementation cross-check.
+2. **The synthetic task is too easy for filtering to help.** A future PoC needs
+   a task where Oracle > NoFilter by a meaningful margin (e.g., noisy steps
+   that systematically bias the trace mean in a direction that hurts the
+   detector) before any parity claim can be tested.
+
+**What this PoC DOES confirm (per §3.6 honesty rules):**
+- Architectural coverage: REDE's mechanism (trained projection + kNN filter)
+  compiles and runs; three modelless analogs also compile and run.
+- Latency advantage: modelless attention-direction is ~1000x faster than REDE
+  training+inference (300us vs 170ms).
+- Quality parity: INCONCLUSIVE — task is inadequate, REDE implementation may
+  be buggy. Cannot claim "modelless matches REDE" from this PoC.
+
+**Action:** if a future product use case needs LRM-style hallucination detection
+(NPC reasoning trace quality assessment, chain transaction validity checks),
+re-open this PoC with (a) a correct REDE reference implementation and (b) a
+task where filtering demonstrably matters. Until then, the PASS verdict stands
+on architectural + latency axes only.
+
+---
+
+## TL;DR (original)
 
 VibeThinker-3B is a **training pipeline paper → riir-train** for the post-training recipe. But the user's intuition is correct: the GOAT is in the *test-time scaling* layer the paper calls **CLR (Claim-Level Reliability Assessment)**, which lifted AIME26 from 94.3 → 97.1, HMMT25 from 89.3 → 95.4, BruMO25 from 93.8 → 99.2 — purely inference-time, zero weight updates. CLR's key trick is a **nonlinear reliability gate `r_k = (mean_m v_k,m)^M`** that exponentially penalizes any single flawed claim among M decision-relevant claims per trajectory; this is *sharp* failure-mode sensitivity that linear agreement (Plan 111 `IntrinsicSelfConsistency`) cannot reproduce. Three other primitives survive the modelless filter and are also novel to our repos: **MGPO max-entropy boundary weighting** (`exp(-γ·D_ME(p‖0.5))` for sampling budget), **Learning-Potential score** (`-(1/|y|)·Σlog π(y_t)` as a new curiosity flavor — "what the brain doesn't yet smoothly produce"), and **Long2Short zero-sum brevity tiebreak** (mean-zero reward redistribution among correct trajectories). Fusing all four with our existing HLA + Mind-Reading + CGSP + freeze/thaw + SubstrateGate + Breakeven infrastructure produces **per-entity runtime test-time scaling** — a new capability class with a one-sentence moat: *"every NPC is a frontier-3B reasoner via runtime claim-level reliability voting, no weight updates, 20Hz tick, thousands concurrent."* All 4 Super-GOAT criteria pass (no prior art via two-layer grep, new capability class, defensible selling point, ≥5-pillar force multiplier). **Mandatory outputs created this session:** open primitive note (this file) + open plan 284 + private riir-ai guide 136 + private runtime plan 316. Latent/raw boundary respected — CLR operates entirely in per-entity local latent + derived-scalar space; only the chosen action crosses sync.
