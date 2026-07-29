@@ -223,7 +223,16 @@ impl<Dir, W> TickFaultSite<Dir, W> {
         responsibility: Vec<W>,
         responsible_idx: usize,
     ) -> Self {
-        debug_assert!(
+        // `assert!` (not `debug_assert!`): this is a documented public API
+        // contract ("`responsible_idx` MUST be a valid index into
+        // `responsibility`"). A `debug_assert!` here would let release builds
+        // construct an invalid `TickFaultSite` with an out-of-bounds index,
+        // deferring the failure to whichever consumer next indexes into
+        // `responsibility[responsible_idx]` — producing a generic panic
+        // instead of this helpful message. The paired
+        // `tick_fault_site_rejects_out_of_bounds_idx` `#[should_panic]` test
+        // relies on this firing in release mode too.
+        assert!(
             responsible_idx < responsibility.len(),
             "responsible_idx out of bounds"
         );
