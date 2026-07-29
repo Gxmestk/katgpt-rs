@@ -22,9 +22,9 @@
 
 /// Reusable CLR scratch state.
 ///
-/// All three buffers are sized to `(K, M)` and zeroed by [`Self::reset_for`].
-/// The voter writes verdicts/reliability/cluster-id into these in place rather
-/// than allocating fresh `Vec`s per cycle.
+/// All four buffers are sized to `(K, M)` and zeroed by [`Self::reset_for`].
+/// The voter writes verdicts/reliability/cluster-id + claim-embeddings into
+/// these in place rather than allocating fresh `Vec`s per cycle.
 #[derive(Clone, Debug)]
 pub struct ClrScratch {
     /// Flattened verdict matrix `[K * M]`, row-major.
@@ -34,6 +34,16 @@ pub struct ClrScratch {
     pub reliability: Vec<f32>,
     /// Per-trajectory cluster id `[K]`. `u8` caps K at 256 (see module docs).
     pub cluster_id: Vec<u8>,
+    /// Flat claim-embedding buffer `[M * k]`, row-major.
+    ///
+    /// Written by `ClaimExtractor::extract_embeddings_into` once per trajectory
+    /// in the zero-alloc hot path. Row `m` occupies `[m*k..(m+1)*k]`. The
+    /// voter reads each row via `ClaimVerifier::verify_embedding` without
+    /// constructing any `Claim<T>` values.
+    ///
+    /// Not generic over `T` — only raw f32 embeddings live here (the verifier
+    /// ignores the claim payload on the vote path).
+    pub claim_embeddings: Vec<f32>,
 }
 
 impl ClrScratch {
@@ -55,6 +65,7 @@ impl ClrScratch {
             verdicts: Vec::with_capacity(k * m),
             reliability: Vec::with_capacity(k),
             cluster_id: Vec::with_capacity(k),
+            claim_embeddings: Vec::with_capacity(m * k),
         }
     }
 
@@ -64,6 +75,7 @@ impl ClrScratch {
     ///   - `verdicts.len() == k * m`, all `0.0`
     ///   - `reliability.len() == k`, all `0.0`
     ///   - `cluster_id.len() == k`, all `0`
+    ///   - `claim_embeddings.len() == m * k`, all `0.0`
     ///
     /// No allocation occurs if `k * m <= verdicts.capacity()` etc., which holds
     /// when `k, m` are within the values passed to [`Self::new`].
@@ -75,5 +87,7 @@ impl ClrScratch {
         self.reliability.resize(k, 0.0);
         self.cluster_id.clear();
         self.cluster_id.resize(k, 0);
+        self.claim_embeddings.clear();
+        self.claim_embeddings.resize(m * k, 0.0);
     }
 }

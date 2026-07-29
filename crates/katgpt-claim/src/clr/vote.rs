@@ -209,12 +209,20 @@ where
 
     scratch.reset_for(config.k, config.m);
 
-    // Steps 1+2: extract + verify.
+    // Steps 1+2: extract embeddings + verify.
+    //
+    // Zero-alloc hot path: the extractor writes M*k embedding values into
+    // `scratch.claim_embeddings` (flat, row-major), then the verifier reads
+    // each row via `verify_embedding`. No `Vec<Claim<T>>` is constructed —
+    // the claim payload `T` is irrelevant to the vote (the verifier only
+    // reads the embedding). Default `extract_embeddings_into` still
+    // allocates via `extract` — production extractors override it for true
+    // zero-alloc.
     for (k, traj) in trajectories.iter().enumerate() {
-        let claims = extractor.extract(traj);
-        debug_assert_eq!(claims.len(), m);
-        for (m_idx, claim) in claims.iter().enumerate() {
-            scratch.verdicts[k * m + m_idx] = verifier.verify(claim, m_idx);
+        extractor.extract_embeddings_into(traj, &mut scratch.claim_embeddings, config.k);
+        for m_idx in 0..m {
+            let emb = &scratch.claim_embeddings[m_idx * config.k..(m_idx + 1) * config.k];
+            scratch.verdicts[k * m + m_idx] = verifier.verify_embedding(emb, m_idx);
         }
     }
 
