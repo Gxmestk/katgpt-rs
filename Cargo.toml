@@ -351,6 +351,7 @@ convex_tok = ["katgpt-tokenizer/convex_tok"]  # ConvexTok LP vocabulary optimize
 datrie_vocab = ["katgpt-tokenizer/datrie_vocab"]  # Alias: forwards to katgpt-tokenizer toast_tokenizer (datrie is auto-routed) + benchmark examples (Research 137)
 fast_bpe = ["katgpt-tokenizer/fast_bpe"]  # Fast BPE encode path (Issue 191, Research 456). Forwards to katgpt-tokenizer (gigatoken-derived PairRankTable + branchless merge cores). Default-off pending Phase 3 GOAT gate promotion.
 event_log = ["katgpt-pruners/event_log"]  # Event-sourced game traces with fork-and-diff (Plan 124, Research 081)
+event_log_query = ["katgpt-pruners/event_log_query"]  # Plan 562: programmatic query combinator over EventLog (PRO-LONG distillation, Research 461). Opt-in until downstream consumer proves gain.
 vpd_em_distill = ["sdar_gate", "bandit", "katgpt-pruners/vpd_em_distill"]  # VPD EM-style co-evolutionary distillation (Plan 120, Research 080)
 progressive_mcgs = ["katgpt-speculative/progressive_mcgs"]  # Progressive MCGS — graph search with reference edges + entropy-gated schedule (Plan 272, Research 239). Phase 12 (2026-07-04): module moved to katgpt-speculative; root forwards.
 fastrand = ["katgpt-speculative/fastrand"]  # Forwards katgpt-speculative's fastrand feature so consumers of progressive_mcgs get the `impl RngLite for fastrand::Rng` adapter. The module itself is zero-dep; this feature only activates the optional adapter.

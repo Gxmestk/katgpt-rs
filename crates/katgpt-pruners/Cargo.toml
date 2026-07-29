@@ -179,6 +179,10 @@ game_state = []
 arena = []
 fft = ["bandit", "sr2am_configurator"]
 event_log = []
+# Plan 562: programmatic search over EventLog (PRO-LONG distillation, Research 461).
+# Generic, modelless, zero-allocation query combinator. Stays opt-in until a
+# downstream consumer proves a gain (Phase 3).
+event_log_query = ["event_log"]
 
 # MUX
 mux_pruner = []

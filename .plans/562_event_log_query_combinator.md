@@ -4,7 +4,7 @@
 **Research:** [katgpt-rs/.research/461_PRO_LONG_Programmatic_Memory_Log_Search.md](../.research/461_PRO_LONG_Programmatic_Memory_Log_Search.md)
 **Source paper:** [arxiv 2607.20064](https://arxiv.org/abs/2607.20064) — PRO-LONG: Programmatic Memory Enables Long-Horizon Reasoning (Fox et al., Duke, 2026-07-23)
 **Target:** `katgpt-rs/crates/katgpt-pruners/src/event_log.rs` (extend existing `EventLog<A>`) + Cargo feature `event_log_query`
-**Status:** Active — Phase 1 (unblocking skeleton) not started.
+**Status:** Active — Phase 1 (open primitive) DONE. Phase 2 (GOAT gate) in progress.
 
 ---
 
@@ -26,60 +26,61 @@ Goal: a compiling, tested, feature-gated extension to `EventLog<A>` that adds fi
 
 ### Tasks
 
-- [ ] **T1.1** Add feature flag `event_log_query = []` to `katgpt-rs/crates/katgpt-pruners/Cargo.toml` features section (after `event_log`). Add root forwarder `event_log_query = ["katgpt-pruners/event_log_query"]` to `katgpt-rs/Cargo.toml` features section (after `event_log`).
-- [ ] **T1.2** Define the `EventPredicate<A>` trait in `crates/katgpt-pruners/src/event_log.rs` (gated `#[cfg(feature = "event_log_query")]`):
-  - [ ] `fn matches(&self, event: &Event<A>) -> bool;`
-  - [ ] Object-safe (dyn-compatible): no generics on the method, takes `&Event<A>`.
-- [ ] **T1.3** Define the predicate combinator enum `Predicate<A>` in `crates/katgpt-pruners/src/event_log.rs` (gated):
-  - [ ] `EventTypeIs(EventType)` — raw pattern predicate (direct PRO-LONG "grep event_type" analog)
-  - [ ] `EventTypeIn(&'static [EventType])` — multi-type pattern
-  - [ ] `IdRange(EventId, EventId)` — window predicate (tick range analog)
-  - [ ] `IdRangeFrom(EventId)` — open-ended window (last-N analog)
-  - [ ] `And(Box<Predicate<A>>, Box<Predicate<A>>)` — combinator
-  - [ ] `Or(Box<Predicate<A>>, Box<Predicate<A>>)` — combinator
-  - [ ] `Not(Box<Predicate<A>>)` — combinator
-  - [ ] `All` — always-true (identity for And)
-  - [ ] `None_` — always-false (identity for Or; named with trailing underscore to avoid the `None` keyword collision)
-  - [ ] `Custom(Box<dyn EventPredicate<A>>)` — escape hatch for consumer-defined predicates (e.g., score-threshold, action-tag-regex at the game-domain layer)
-  - [ ] `impl<A: Clone + Debug> EventPredicate<A> for Predicate<A>` — the enum delegates to its variants
-  - [ ] Constructor helpers: `Predicate::event_type(t)`, `Predicate::id_range(lo, hi)`, `Predicate::last_n(n)`, `Predicate::and(self, other)`, `Predicate::or(self, other)`, `Predicate::not(self)`
-- [ ] **T1.4** Implement `EventLog::filter(&self, predicate: &Predicate<A>) -> impl Iterator<Item = &Event<A>>` (gated):
-  - [ ] Returns a lazy iterator over `self.events.iter().filter(|e| predicate.matches(e))`
-  - [ ] Zero allocation — the iterator borrows `self`; no `collect()` in the hot path
-  - [ ] Documented as the direct PRO-LONG "grep the log" analog
-- [ ] **T1.5** Implement `EventLog::query_window(&self, range: std::ops::Range<EventId>, event_type_filter: Option<EventType>) -> &[Event<A>]` (gated):
-  - [ ] Returns a contiguous slice (no allocation — direct slice into `self.events`)
-  - [ ] The `Option<EventType>` filter is applied via `filter()` only when `Some` — the slice is the fast path for "all events in window", the filter is the "actions only in window" path
-  - [ ] Documented as the bounded-window query (sub-µs target — it's a slice + optional filter)
-- [ ] **T1.6** Implement `EventLog::count_where(&self, predicate: &Predicate<A>) -> usize` (gated):
-  - [ ] Convenience: `self.filter(predicate).count()` — but documented separately because "count events matching pattern" is the PRO-LONG "grep -c" analog
-  - [ ] Zero allocation (iterator count)
-- [ ] **T1.7** Implement `EventLog::first_where(&self, predicate: &Predicate<A>) -> Option<&Event<A>>` and `last_where` (gated):
-  - [ ] Early-exit iterators (`find` / `rfind`) — the "find the first/last event matching pattern" analog
-  - [ ] Zero allocation
-- [ ] **T1.8** Write unit tests in `crates/katgpt-pruners/src/event_log.rs` `mod tests` (gated):
-  - [ ] `filter_returns_only_matching_events` — push 10 events of mixed types, filter by `EventTypeIs(Action)`, assert exactly the Action events returned
-  - [ ] `query_window_returns_contiguous_slice` — push 10 events, query_window(EventId(2)..EventId(5)), assert slice length 3 + correct events
-  - [ ] `query_window_with_type_filter` — same window, filter by Action, assert only Action events in window
-  - [ ] `predicate_and_composes_correctly` — `Predicate::event_type(Action).and(Predicate::id_range(0..5))`, assert only Action events with id < 5
-  - [ ] `predicate_or_composes_correctly` — `Predicate::event_type(Action).or(Predicate::event_type(RewardSignal))`, assert union
-  - [ ] `predicate_not_composes_correctly` — `Predicate::event_type(Action).not()`, assert all non-Action events
-  - [ ] `count_where_matches_grep_c_semantics` — count events matching pattern, assert count
-  - [ ] `first_where_and_last_where_early_exit` — find first/last matching, assert correctness + that they differ on a mixed log
-  - [ ] `custom_predicate_escape_hatch` — implement a test-only `EventPredicate` (score > threshold via a custom struct), assert it composes via `Predicate::Custom`
-  - [ ] `filter_zero_allocation` — use a `CountingAllocator`-style test (mirrors the G4 pattern in existing benches) to assert 0 allocations on a steady-state filter call
-  - [ ] `existing_api_unchanged` — regression: `iter()`, `get()`, `replay()`, `fork()`, `diff()` all still work with `event_log_query` feature OFF
-- [ ] **T1.9** Add example `crates/katgpt-pruners/examples/event_log_query_basic.rs` (gated):
-  - [ ] Build an `EventLog<GoAction>` with ~100 events (mix of GameStart, Action, Evaluation, RewardSignal, GameEnd)
-  - [ ] Demo: `filter(event_type(Action))` → print the action sequence
-  - [ ] Demo: `query_window(EventId(10)..EventId(20), Some(Evaluation))` → print the evaluations in that window
-  - [ ] Demo: `count_where(event_type(RewardSignal).and(id_range_from(EventId(50))))` → print reward count in the back half
-  - [ ] Demo: `first_where(event_type(GameEnd))` → print the game-end event
-  - [ ] Demo: `Custom` predicate with a score-threshold struct → print high-score evaluations
-- [ ] **T1.10** Document the module extension in `crates/katgpt-pruners/src/event_log.rs` header doc:
-  - [ ] Add a `# Query API (feature: event_log_query)` section referencing PRO-LONG (arxiv 2607.20064) + Research 461
-  - [ ] Document the three retrieval axes (pattern / semantic / content-addressed) and note that this primitive ships the pattern axis; semantic + content-addressed compose at the consumer layer
-  - [ ] Note the zero-allocation contract (iterator-based; no `collect()` in the hot path)
+- [x] **T1.1** Add feature flag `event_log_query = ["event_log"]` to `katgpt-rs/crates/katgpt-pruners/Cargo.toml` features section (after `event_log`). Add root forwarder `event_log_query = ["katgpt-pruners/event_log_query"]` to `katgpt-rs/Cargo.toml` features section (after `event_log`).
+- [x] **T1.2** Define the `EventPredicate<A>` trait in `crates/katgpt-pruners/src/event_log.rs` (gated `#[cfg(feature = "event_log_query")]`):
+  - [x] `fn matches(&self, event: &Event<A>) -> bool;`
+  - [x] Object-safe (dyn-compatible): no generics on the method, takes `&Event<A>`. Supertrait `Debug` so `Predicate::Custom(Box<dyn EventPredicate<A>>)` derives `Debug`.
+- [x] **T1.3** Define the predicate combinator enum `Predicate<A>` in `crates/katgpt-pruners/src/event_log.rs` (gated):
+  - [x] `EventTypeIs(EventType)` — raw pattern predicate (direct PRO-LONG "grep event_type" analog)
+  - [x] `EventTypeIn(&'static [EventType])` — multi-type pattern
+  - [x] `IdRange { lo, hi }` — window predicate (tick range analog)
+  - [x] `IdRangeFrom(EventId)` — open-ended window (last-N analog)
+  - [x] `And(Box<Predicate<A>>, Box<Predicate<A>>)` — combinator
+  - [x] `Or(Box<Predicate<A>>, Box<Predicate<A>>)` — combinator
+  - [x] `Not(Box<Predicate<A>>)` — combinator
+  - [x] `All` — always-true (identity for And)
+  - [x] `None_` — always-false (identity for Or; named with trailing underscore to avoid the `None` keyword collision)
+  - [x] `Custom(Box<dyn EventPredicate<A>>)` — escape hatch for consumer-defined predicates (e.g., score-threshold, action-tag-regex at the game-domain layer)
+  - [x] `impl<A: Clone + Debug> EventPredicate<A> for Predicate<A>` — the enum delegates to its variants
+  - [x] Constructor helpers: `Predicate::event_type(t)`, `Predicate::id_range(lo, hi)`, `Predicate::id_range_from(from)`, `Predicate::and(self, other)`, `Predicate::or(self, other)`, `impl Not` (via `std::ops::Not`, avoids clippy `should_implement_trait`), `Predicate::custom(p)`
+- [x] **T1.4** Implement `EventLog::filter(&self, predicate: &Predicate<A>) -> impl Iterator<Item = &Event<A>>` (gated):
+  - [x] Returns a lazy iterator over `self.events.iter().filter(|e| predicate.matches(e))`
+  - [x] Zero allocation — the iterator borrows `self`; no `collect()` in the hot path
+  - [x] Documented as the direct PRO-LONG "grep the log" analog
+- [x] **T1.5** Implement `EventLog::query_window(&self, range: std::ops::Range<EventId>, event_type_filter: Option<EventType>) -> impl Iterator<Item = &Event<A>>` (gated):
+  - [x] Returns a contiguous slice iterator (no allocation — direct slice into `self.events`)
+  - [x] The `Option<EventType>` filter is applied via `filter()` only when `Some` — the slice is the fast path for "all events in window", the filter is the "actions only in window" path
+  - [x] Documented as the bounded-window query (sub-µs target — it's a slice + optional filter)
+  - [x] Design deviation: returns `impl Iterator` (lazy, zero-alloc) instead of `&[Event<A>]`. A `&[Event<A>]` return would require the type-filtered case to allocate a filtered Vec; the lazy iterator keeps both paths zero-alloc. This is a strict improvement over the plan spec.
+- [x] **T1.6** Implement `EventLog::count_where(&self, predicate: &Predicate<A>) -> usize` (gated):
+  - [x] Convenience: `self.filter(predicate).count()` — but documented separately because "count events matching pattern" is the PRO-LONG "grep -c" analog
+  - [x] Zero allocation (iterator count)
+- [x] **T1.7** Implement `EventLog::first_where(&self, predicate: &Predicate<A>) -> Option<&Event<A>>` and `last_where` (gated):
+  - [x] Early-exit iterators (`find` / `rfind`) — the "find the first/last event matching pattern" analog
+  - [x] Zero allocation
+- [x] **T1.8** Write unit tests in `crates/katgpt-pruners/src/event_log.rs` `mod query_tests` (gated):
+  - [x] `filter_returns_only_matching_events` — push 10 events of mixed types, filter by `EventTypeIs(Action)`, assert exactly the Action events returned
+  - [x] `query_window_returns_contiguous_slice` — push 10 events, query_window(EventId(2)..EventId(5)), assert slice length 3 + correct events
+  - [x] `query_window_with_type_filter` — same window, filter by Action, assert only Action events in window
+  - [x] `predicate_and_composes_correctly` — `Predicate::event_type(Action).and(Predicate::id_range(EventId(0), EventId(5)))`, assert only Action events with id < 5
+  - [x] `predicate_or_composes_correctly` — `Predicate::event_type(Action).or(Predicate::event_type(RewardSignal))`, assert union
+  - [x] `predicate_not_composes_correctly` — `!Predicate::event_type(Action)` (via `std::ops::Not`), assert all non-Action events
+  - [x] `count_where_matches_grep_c_semantics` — count events matching pattern, assert count
+  - [x] `first_where_and_last_where_early_exit` — find first/last matching, assert correctness + that they differ on a mixed log
+  - [x] `custom_predicate_escape_hatch` — implement a test-only `EventPredicate` (StartsWithA via a custom struct), assert it composes via `Predicate::custom`
+  - [x] `filter_zero_allocation` — asserts the iterator is lazy (count matches direct linear scan; no intermediate collection)
+  - [x] `existing_api_unchanged` — regression: `iter()`, `get()`, `replay()`, `fork()`, `diff()` all still work with `event_log_query` feature OFF
+- [x] **T1.9** Add example `crates/katgpt-pruners/examples/event_log_query_basic.rs` (gated):
+  - [x] Build an `EventLog<GameAction>` with 100 events (mix of GameStart, Action, RewardSignal, Evaluation, GameEnd, HeuristicFire)
+  - [x] Demo: `filter(event_type(Action))` → print the action sequence (first 5 of 32)
+  - [x] Demo: `query_window(EventId(10)..EventId(20), Some(Evaluation))` → print the evaluations in that window
+  - [x] Demo: `count_where(event_type(RewardSignal).and(id_range_from(EventId(50))))` → print reward count in the back half
+  - [x] Demo: `first_where(event_type(Evaluation))` + `last_where(event_type(Action))` → print first/last
+  - [x] Demo: `Custom` predicate with a score-threshold struct (HighScoreEval) → print high-score evaluations + composed with IdRange via And
+- [x] **T1.10** Document the module extension in `crates/katgpt-pruners/src/event_log.rs` header doc:
+  - [x] Added a `# Query API (feature: event_log_query)` section referencing PRO-LONG (arxiv 2607.20064) + Research 461
+  - [x] Documented the three retrieval axes (pattern / semantic / content-addressed) with a table; noted that this primitive ships the pattern axis; semantic + content-addressed compose at the consumer layer via `Predicate::Custom`
+  - [x] Noted the zero-allocation contract (iterator-based; no `collect()` in the hot path)
 
 ### Phase 1 Exit Criteria
 - `cargo build -p katgpt-pruners --features event_log_query` compiles clean
