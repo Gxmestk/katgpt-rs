@@ -3,9 +3,9 @@
 ## Status: CLOSED — Phase 1 decision gate FAILED (2026-07-29)
 
 See [Bench 563](../.benchmarks/563_issue201_f16_f16_fhm_negative.md) for the full
-measurement + root-cause analysis. This file is removed per the noise-reduction
-rule once the verdict is recorded; the negative result is preserved in Bench 563
-+ git history (commit `f1a1a282`).
+measurement + root-cause analysis. This file is **retained** as a negative-result
+reference (mirroring Issue 200's retention); the full detail lives in Bench 563
++ git history (commits `f1a1a282` + `8caa875b`).
 
 ## Verdict
 
