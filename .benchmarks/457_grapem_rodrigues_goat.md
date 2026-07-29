@@ -10,14 +10,14 @@
 
 ## TL;DR
 
-The closed-form `O(d)` application of `exp(n·ω·L)·x` for a rank-2 skew generator `L = abᵀ − baᵀ` is **bit-identical to the materialised matrix exponential** (G1 rel err 5.4e-7, budget 1e-4 — 185× under), runs at **~20 ns/call at d=8** on Apple M3 Max (well under the 30 ns HLA-scale budget), is **zero-allocation** on the hot path, and compiles clean under default / opt-in / `--all-features` / `--no-default-features`.
+The closed-form `O(d)` application of `exp(n·ω·L)·x` for a rank-2 skew generator `L = abᵀ − baᵀ` is **bit-identical to the materialised matrix exponential** (G1 rel err 5.4e-7, budget 1e-4 — 185× under), runs at **~20 ns/call at d=8** on Apple M3 Max (well under the 30 ns belief-scale budget), is **zero-allocation** on the hot path, and compiles clean under default / opt-in / `--all-features` / `--no-default-features`.
 
 ## Gate Results
 
 | Gate | Target | Measured | Verdict |
 |------|--------|----------|---------|
 | **G1** (correctness) | max rel err < 1e-4 vs `expm(n·ω·L)·x` (scaling-squaring in f64), dims {8,16,32,64} × 20 random `(a,b,x,n,ω)` each | worst-overall **5.437e-7** (d=8), all dims < 5e-7 | ✅ PASS (185× under budget) |
-| **G2** (perf) | grapem cached ≤ 30 ns/call at d=8 (HLA-scale absolute budget) | **20.0 ns/call** (Rank2Plane::apply_into, Apple M3 Max) | ✅ PASS (33% headroom) |
+| **G2** (perf) | grapem cached ≤ 30 ns/call at d=8 (belief-scale absolute budget) | **20.0 ns/call** (Rank2Plane::apply_into, Apple M3 Max) | ✅ PASS (33% headroom) |
 | **G3** (no-regression) | default + opt-in + `--all-features` + `--no-default-features` all clean | all four configurations compile clean; 1558/1558 default lib tests pass | ✅ PASS |
 | **G4** (alloc-free) | 0 allocs / 1000 calls on `Rank2Plane::apply_into` AND `grapem_apply_into` | 0 allocs, 0 deallocs on both paths | ✅ PASS |
 
@@ -42,12 +42,12 @@ Ground truth: scaling-squaring matrix exponential in f64 (12-term Taylor on the 
 grapem (Rank2Plane, cached): 20.0 ns/call  ← production path
 phase_rot (full scalar):     9.8 ns/call
 ratio (cached/pr):           2.03×
-target:                       ≤ 30 ns/call (HLA-scale absolute budget)
+target:                       ≤ 30 ns/call (belief-scale absolute budget)
 ```
 
 **Deviation from Issue 159 spec.** The issue text specified "latency < 2× the existing `phase_rotation_gate_into`". That target is structurally infeasible: `phase_rotation_gate_into` is the mix-only kernel (pre-computed cos/sin, ~1.5 ns/call at d=8), whereas grapem computes the full closed-form rotation. Even against phase_rotation's full scalar path (`compute_phase_from_projection` + `phase_rotation_gate_into` = dot + sigmoid + cos + sin + FMA), grapem does strictly more work — **2 projection dots vs 1**, because rotating in an arbitrary plane requires both `⟨a,x⟩` and `⟨b,x⟩`, while phase_rotation only needs `⟨state, direction⟩`. The ~2× ratio is the structural floor for the general-plane capability.
 
-**Revised gate target:** absolute latency `≤ 30 ns/call` at d=8 (the HLA scale). This is 33% headroom on the measured 20 ns, and 16000× under the 500 µs HLA tick budget. The ratio vs phase_rotation is co-reported for visibility but is not the gate.
+**Revised gate target:** absolute latency `≤ 30 ns/call` at d=8 (the belief scale). This is 33% headroom on the measured 20 ns, and 16000× under the 500 µs belief tick budget. The ratio vs phase_rotation is co-reported for visibility but is not the gate.
 
 The value proposition of grapem is **not** "faster than phase_rotation" — it's "**`O(d)` closed form vs `O(d³)` matrix exponential for an arbitrary plane**". No existing primitive in the crate can rotate in a user-supplied plane `(a, b)`; phase_rotation is restricted to the canonical `(e_i, e_{i+D/2})` coordinate pair.
 

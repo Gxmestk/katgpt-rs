@@ -22,7 +22,7 @@ arXiv:2607.10034 (Garcia et al., "MLPs are Hebbians", Stanford/UB
 | Gate | Status | Evidence |
 |---|---|---|
 | **G1 correctness** | ✅ PASS | `γ_min = 25.11 > 0` at D=64, F=128, m=128. Bit-identical across two runs (deterministic SeedRng). Forward-path interpolation err `‖MLP(k_0) − v_0‖_∞ = 8.33e-5 < 1e-3`. 18 unit tests. |
-| **G2 perf** | ✅ PASS (two regimes) | HLA-scale (D=8, m=64): forward = 97 ns/query (target < 200). Shard-scale (D=64, m=512): construction = 44.8 µs/fact (target < 200); forward = 5.1 µs/query (target < 50). |
+| **G2 perf** | ✅ PASS (two regimes) | belief-scale (D=8, m=64): forward = 97 ns/query (target < 200). Shard-scale (D=64, m=512): construction = 44.8 µs/fact (target < 200); forward = 5.1 µs/query (target < 50). |
 | **G3 no-regression** | ✅ PASS | `cargo test --features hebbian_kernel_memory --lib` → 1814 green (1796 default + 18 new). `cargo check --all-features` clean. Clippy clean. |
 | **G4 alloc-free hot path** | ✅ PASS | `CountingAllocator` audit on `forward_into` + `retrieval_scores_into` (100 calls each, after warmup): **0 allocs / 0 deallocs** on both. |
 | **G5 Super-GOAT quality axis** | ✅ PASS | Bench 462 (riir-neuron-db, 2026-07-25). Three-competitor defend-wrong PoC: Constructed = GD = **1.000 edit_score** at 2/5/10% edits; Frozen = 0.000 efficacy / 1.000 specificity (expected "didn't apply edit" — confirms test is discriminating). |

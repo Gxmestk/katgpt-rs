@@ -47,7 +47,7 @@ Three measurements across an α sweep in `[0, π/2]` (1000 steps):
 
 ### G2 (smooth interpolation)
 
-HLA-scale `D = 8` halves: `a = [1, 0, 0, 0, 0, 0, 0, 0]`, `b = [0, 1, 0, 0, 0, 0, 0, 0]`. Sweep α ∈ [0, π/2] in 100 steps, compute `cos_sim(out, a)` and `cos_sim(out, b)`. Assert `sim_a` is non-increasing and `sim_b` is non-decreasing within a 1e-5 tolerance. **0 reversals** observed.
+belief-scale `D = 8` halves: `a = [1, 0, 0, 0, 0, 0, 0, 0]`, `b = [0, 1, 0, 0, 0, 0, 0, 0]`. Sweep α ∈ [0, π/2] in 100 steps, compute `cos_sim(out, a)` and `cos_sim(out, b)`. Assert `sim_a` is non-increasing and `sim_b` is non-decreasing within a 1e-5 tolerance. **0 reversals** observed.
 
 ### G3 (latency)
 
@@ -109,7 +109,7 @@ Per Research 305 §2.3, this is the **genuinely-new operation class** in the cod
 |--------|-----------|--------------------------------|
 | Latent Field Steering (Plan 309) | `s + α·v` (additive) | Inflates L2 norm by `‖α·v‖`. Phase-rotation preserves L2 by construction. |
 | CommittedFieldBlend (Plan 321) | `Σ sigmoid(π_k)·f_k` (convex combo) | Output norm varies with independent sigmoid weights — no Pythagorean identity. Phase-rotation uses cos/sin AS the weights. |
-| HLA projection | dot-product | Read-only scalar projection, not a mix. |
+| belief projection | dot-product | Read-only scalar projection, not a mix. |
 | Clifford Geometric Product (Plan 319) | `u·v + u∧v` (wedge detection) | Detects rotational structure as a signal. Phase-rotation is the actuator (applies rotation); Clifford is the sensor. |
 | Cross-Resolution Transport (Plan 310) | `Ψ · C · Φ^T` (linear Tikhonov) | Linear projection preserves L2 only approximately. Phase-rotation preserves L2 exactly. |
 | DEC operators | spatial sums on cochains | Per-cell spatial operations, not per-instance latent mixes. |

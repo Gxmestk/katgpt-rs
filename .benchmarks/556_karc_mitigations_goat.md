@@ -42,7 +42,7 @@
 
 ### G2 (perf) — **PARTIAL PASS** (architectural finding)
 
-**Bench:** `benches/bench_556_karc_batched_matvec_g2.rs` — three sub-benches × {N=1, 4, 8, 16, 32} at the HLA config (D=8, M=8, K=4 → d_h=256).
+**Bench:** `benches/bench_556_karc_batched_matvec_g2.rs` — three sub-benches × {N=1, 4, 8, 16, 32} at the belief config (D=8, M=8, K=4 → d_h=256).
 
 **Results (Apple Silicon, release, --sample-size 30):**
 
@@ -129,7 +129,7 @@ Two measurements:
 
 ### Config revision (vs plan spec)
 
-The plan spec said Lod2 = (D=8, M=8, K=8, R=2) → d_h=18_720. The math doesn't work: 8·8·8·2 = 1024, NOT 18_720. The 18_720 figure only matches (D=3, M=8, K=8, R=2) which isn't HLA-shaped. Phase 3 ships Lod2 as (D=8, M=8, K=8, R=1) → d_h=512 — a 2× jump over Lod1, manageable for tests. R=2 (the promotion-gate config from Issue 185/186/187) is deferred because pair-product features break the nested-subset invariant that makes tier promotion a pure index remap.
+The plan spec said Lod2 = (D=8, M=8, K=8, R=2) → d_h=18_720. The math doesn't work: 8·8·8·2 = 1024, NOT 18_720. The 18_720 figure only matches (D=3, M=8, K=8, R=2) which isn't belief-shaped. Phase 3 ships Lod2 as (D=8, M=8, K=8, R=1) → d_h=512 — a 2× jump over Lod1, manageable for tests. R=2 (the promotion-gate config from Issue 185/186/187) is deferred because pair-product features break the nested-subset invariant that makes tier promotion a pure index remap.
 
 ---
 

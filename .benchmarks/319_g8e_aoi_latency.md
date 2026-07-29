@@ -23,7 +23,7 @@ real time.
 Simulate a worst-case-density crowd:
 - **1000 NPCs** (social hub zone density)
 - **20 AOI partner candidates** per NPC (generous AOI)
-- **D=64** (CGSP `DEFAULT_HLA_DIM`)
+- **D=64** (CGSP `DEFAULT_BELIEF_DIRECTION_DIM`)
 - Per tick: every NPC scores every partner via `geometric_product_wedge_into`
   + L1 norm + sigmoid + tau gate (the exact `clifford_bridge::
   complementarity_target` workload)
@@ -93,7 +93,7 @@ pair is O(1) (not O(D)), so `sigmoid(1.0 × O(1)) ≈ 0.73 > tau = 0.6`. With
 curiosity targets. This is correct behavior in high dimensions — the bridge
 correctly identifies that randomly-different NPCs are complementary.
 
-In production, real HLA directions are NOT uniformly random — they cluster
+In production, real belief directions are NOT uniformly random — they cluster
 around personality archetypes (valence/arousal/desperation/calm/fear
 directions). Real hit rates will be lower because same-archetype NPC pairs
 have lower wedge norms. The 100% rate here is an artifact of the synthetic

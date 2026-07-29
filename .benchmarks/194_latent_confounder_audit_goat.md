@@ -31,7 +31,7 @@ Where `D = RMS(‖E(x, x′)‖) + ε` over ordinary transitions.
 | Gate | Criterion | Result | Status |
 |---|---|---|---|
 | **G1** correctness | Diagnostics correctly identify confounders on synthetic encoder `E(x,x') = A(x,x') + c·confounder(x)`; monotone in `c` | 12 unit tests + 1 doctest. Clean (c=0): R₀<1e-5, R_shift<1e-5, L<0. Confounded (c=2.0): R₀>0.1, R_shift>0.1, L>-0.5. Monotone across c∈{0, 0.5, 1, 2, 5}. | ✅ PASS |
-| **G2** perf | Sub-µs per audit at HLA d=8 | **292 ns/call** at d=8 (3.4× under 1µs target). Sweep: d=32 = 750 ns, d=64 = 1.38 µs. | ✅ PASS |
+| **G2** perf | Sub-µs per audit at belief d=8 | **292 ns/call** at d=8 (3.4× under 1µs target). Sweep: d=32 = 750 ns, d=64 = 1.38 µs. | ✅ PASS |
 | **G3** no-regression | New module, feature-gated, no existing code touched | `cargo check -p katgpt-core --all-features` clean. Default test count unchanged: 1814 → 1814. With feature on: 1814+12=1826. | ✅ PASS |
 | **G4** alloc-free | Pre-allocated `AuditScratch`, zero steady-state allocation | `g4_audit_confounders_zero_alloc_steady_state`: 0 allocations across 100 audit calls. TrackingAllocator sentinel-verified (skips cleanly in binaries without it installed). | ✅ PASS |
 
@@ -42,11 +42,11 @@ Median of timed runs, Apple Silicon arm64 release build. Bench source:
 
 | Shape | latent dim | per-audit time |
 |---|---|---|
-| **HLA (G2 target)** | **8**  | **292 ns** ✅ |
+| **belief (G2 target)** | **8**  | **292 ns** ✅ |
 | Shard style_weights | 32 | 750 ns |
 | Full shard          | 64 | 1.38 µs |
 
-The audit is O(d) per check (norm + cosine). At HLA scale it is essentially free;
+The audit is O(d) per check (norm + cosine). At belief scale it is essentially free;
 at shard scale (d=64) it is still sub-2µs — comfortable for an offline pre-deployment
 gate, which is the intended consumer pattern.
 
@@ -164,7 +164,7 @@ Commit: `3c80389a` on `develop` (5 files, +1414 / -8).
 ## TL;DR
 
 All four primitive-level GOAT gates PASS (G1 correctness 12 tests, G2 perf 292 ns
-at HLA d=8, G3 no-regression clean, G4 alloc-free sentinel-verified). Primitive
+at belief d=8, G3 no-regression clean, G4 alloc-free sentinel-verified). Primitive
 ships **opt-in** as a validated diagnostic; promotion to default-on is deferred
 until a concrete consumer (MAG/TILR/Steering/Blend) benchmarks a real-bug-caught
 gain. The CD-LAM training recipe routes to riir-train.
