@@ -808,6 +808,15 @@ required-features = ["conformal_predictive_intervals", "karc_forecaster"]
 name = "best_belief_01_conservative_selection"
 required-features = ["best_belief"]
 
+# Plan 411 — SSMax dilution-rescaling reference example. Demonstrates the
+# dilution problem (gold mass collapse as N grows), Fixed mode (s_L=1.0,
+# truly modelless), Adaptive mode (s_L=1/Δ, analytical oracle), the
+# SsmaxConfig caching API, and argmax-preservation invariants. Mirrors the
+# bench_411_ssmax_goat synthetic retrieval task as a readable API demo.
+[[example]]
+name = "ssmax_01_dilution_rescaling"
+required-features = ["ssmax_temperature"]
+
 # Plan 340 Phase 2 T2.3 — KARC no-regression gate. Verifies the conformal
 # feature flag does not perturb KARC's forecast hot path (bit-identical
 # forecasts, wout unchanged, latency within budget). Runs under karc_forecaster

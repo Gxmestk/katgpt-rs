@@ -86,8 +86,16 @@ Build example harnesses prioritized by:
    closed-form cold path. 5 sections, ~270 LOC. Clippy clean, runs clean,
    18 best_belief unit tests still pass. Wired in `Cargo.toml` behind
    `required-features = ["best_belief"]`.
-2. **`ssmax`** + **`poincare`** — DEFAULT-ON, deserve at least a minimal demo.
-3. Opt-in primitives (`newton_schulz`, `faithfulness`) as time permits.
+2. ~~**`ssmax`**~~ — **DONE (2026-07-29).** Example landed at
+   `crates/katgpt-core/examples/ssmax_01_dilution_rescaling.rs`.
+   Demonstrates: the dilution problem (gold mass collapse as N grows),
+   Fixed mode (s_L=1.0, truly modelless — 191× recovery at N=100k),
+   Adaptive mode (s_L=1/Δ — bounds gold mass at 0.5 regardless of N),
+   SsmaxConfig caching API, and argmax-preservation invariants. 5 sections,
+   ~290 LOC. Clippy clean, runs clean, 13 ssmax unit tests still pass.
+   Wired in `Cargo.toml` behind `required-features = ["ssmax_temperature"]`.
+3. **`poincare`** — DEFAULT-ON, deserves at least a minimal demo.
+4. Opt-in primitives (`newton_schulz`, `faithfulness`) as time permits.
 
 Each example should follow the established pattern: module doc comment with
 "what this proves / what this does NOT prove", runnable demonstration of the
