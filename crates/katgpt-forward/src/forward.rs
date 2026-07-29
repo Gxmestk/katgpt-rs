@@ -41,7 +41,7 @@ use katgpt_core::types::{Config, matmul, matmul_parallel};
 // warning under `--all-features`.
 #[cfg(not(feature = "kog_cpu_fusion"))]
 use katgpt_core::types::rmsnorm;
-use katgpt_transformer::{MultiLayerKVCache, TransformerWeights};
+use katgpt_transformer::{MultiLayerKVCache, TransformerWeights, TransformerWeightsF16};
 // `DecodeStage` is only used by `forward_decode_stage` (gated `decode_specialize`).
 // Gate the import to avoid the unused warning under default features.
 #[cfg(feature = "decode_specialize")]
@@ -769,7 +769,185 @@ pub fn forward_base<'a>(
 
     &mut ctx.logits
 }
-/// CODA-inspired fused forward pass (Research 67, Plan 103).
+
+// ── f16 Weight Forward Path (Issue 200) ──────────────────────────
+//
+// Parallel forward function for f16-stored weights. Uses `matmul_f16` for
+// all projections (f16 weights × f32 activations → f32 output, dequant-on-
+// load inside the dot kernel). Default-feature path only — if any forward-
+// altering feature is enabled at compile time, the f16 path is not available
+// and the caller should use the f32 `forward_base` instead.
+//
+// The function is kept simple on purpose: it mirrors the DEFAULT-feature
+// path of `forward_base` (standard RMSNorm + standard attention + ReLU MLP).
+// Feature-gated complexity (kog_cpu_fusion, gated_mlp, sparse_mlp,
+// wall_attention, domain_latent, delta_routing, mls_aggregate, hydra_budget)
+// is omitted. This keeps the f16 path at ~150 lines vs ~400 for the full
+// forward_base, and avoids duplicating 10 feature gates.
+//
+// If f16 + a specialized feature is ever needed, extend this function or
+// fall back to f32 `forward_base`.
+
+/// f16-weight causal decode: single token forward with f16 projection weights.
+///
+/// Default-feature path only. Activations remain f32 throughout — only
+/// weights are f16. The `matmul_f16` kernel dequantizes each f16 weight to
+/// f32 on-the-fly during the dot product, so no separate dequant pass is
+/// needed.
+///
+/// # Panics
+///
+/// This function assumes the default feature set (no `kog_cpu_fusion`,
+/// `gated_mlp`, `sparse_mlp`, `wall_attention`, `domain_latent`,
+/// `delta_routing`, `mls_aggregate`, `hydra_budget`). If any of these
+/// features are enabled, the caller should use [`forward_base`] with f32
+/// weights instead.
+pub fn forward_base_f16<'a>(
+    ctx: &'a mut ForwardContext,
+    weights: &TransformerWeightsF16,
+    cache: &mut MultiLayerKVCache,
+    token: usize,
+    pos: usize,
+    config: &Config,
+) -> &'a mut [f32] {
+    let n = config.n_embd;
+    let hd = config.head_dim;
+    let kvd = types::kv_dim(config);
+
+    // 1. Embedding: x = wte[token] + wpe[pos] (both f32, direct slice access)
+    let tok_off = token * n;
+    let pos_off_emb = pos * n;
+    katgpt_core::simd::simd_add_into(
+        &mut ctx.x[..n],
+        &weights.wte[tok_off..tok_off + n],
+        &weights.wpe[pos_off_emb..pos_off_emb + n],
+    );
+
+    // Loop-invariant values hoisted outside the layer loop
+    let scale = ctx.attn_scale;
+    let t_n = pos + 1;
+
+    // Adaptive Depth Tier: cap layer count at inference time (Plan 284 T10).
+    let max_layer = ctx
+        .depth_tier
+        .map_or(config.n_layer, |t| t.max_layers(config.n_layer));
+
+    // 2. Layer loop
+    for (layer_idx, layer_weights) in weights.layers.iter().enumerate().take(max_layer) {
+        let layer_cache = &mut cache.layers[layer_idx];
+
+        // Pre-attention: RMSNorm → save residual
+        rmsnorm(&mut ctx.x);
+        ctx.xr[..n].copy_from_slice(&ctx.x[..n]);
+
+        // QKV projections (f16 weights × f32 activation → f32 output)
+        types::matmul_f16(&mut ctx.q, &layer_weights.attn_wq, &ctx.x, n, n);
+        types::matmul_f16(&mut ctx.k, &layer_weights.attn_wk, &ctx.x, kvd, n);
+        types::matmul_f16(&mut ctx.v, &layer_weights.attn_wv, &ctx.x, kvd, n);
+
+        // Store K,V in per-layer cache
+        let pos_off = pos * kvd;
+        unsafe {
+            std::ptr::copy_nonoverlapping(
+                ctx.k.as_ptr(),
+                layer_cache.key.as_mut_ptr().add(pos_off),
+                kvd,
+            );
+            std::ptr::copy_nonoverlapping(
+                ctx.v.as_ptr(),
+                layer_cache.value.as_mut_ptr().add(pos_off),
+                kvd,
+            );
+        }
+
+        // Multi-head attention with GQA: fused score → softmax → weighted value per head
+        for h in 0..config.n_head {
+            let kv_group = ctx.kv_group_lut[h] as usize;
+            unsafe {
+                attention_head(
+                    &ctx.q,
+                    &layer_cache.key,
+                    &layer_cache.value,
+                    &mut ctx.attn_out,
+                    &mut ctx.scores,
+                    h * hd,
+                    kv_group * hd,
+                    kvd,
+                    hd,
+                    t_n,
+                    scale,
+                );
+            }
+        }
+
+        // Output projection (f16) + residual
+        types::matmul_f16(&mut ctx.x, &layer_weights.attn_wo, &ctx.attn_out, n, n);
+        katgpt_core::simd::simd_add_inplace(&mut ctx.x[..n], &ctx.xr[..n]);
+
+        // MLP: save residual → RMSNorm → ReLU MLP → residual
+        ctx.xr2[..n].copy_from_slice(&ctx.x[..n]);
+        rmsnorm(&mut ctx.x);
+        // f16 matmul + ReLU: matmul_f16 doesn't have a fused-relu variant,
+        // so we do matmul_f16 then ReLU in-place. The ReLU pass is O(mlp_hidden)
+        // and negligible vs the matmul.
+        types::matmul_f16(
+            &mut ctx.hidden,
+            &layer_weights.mlp_w1,
+            &ctx.x,
+            config.mlp_hidden,
+            n,
+        );
+        // ReLU in-place
+        for v in ctx.hidden.iter_mut().take(config.mlp_hidden) {
+            if *v < 0.0 {
+                *v = 0.0;
+            }
+        }
+        types::matmul_f16(
+            &mut ctx.x,
+            &layer_weights.mlp_w2,
+            &ctx.hidden,
+            n,
+            config.mlp_hidden,
+        );
+        katgpt_core::simd::simd_add_inplace(&mut ctx.x[..n], &ctx.xr2[..n]);
+    }
+
+    // Snapshot hidden state (for Plan 009 compatibility)
+    ctx.hidden_state[..n].copy_from_slice(&ctx.x[..n]);
+
+    // LM Head (f32 lm_head — kept f32 for logit precision)
+    standard_lm_head(
+        &mut ctx.logits,
+        &ctx.x,
+        &weights.lm_head,
+        config.vocab_size,
+        n,
+    );
+
+    &mut ctx.logits
+}
+
+/// f16-weight causal decode — public entry point (Issue 200).
+///
+/// Convenience wrapper around [`forward_base_f16`] for the common case of
+/// no LoRA adapter. This is the f16 analog of [`forward`] with no features.
+///
+/// The caller is responsible for holding the [`TransformerWeightsF16`] (e.g.
+/// via [`TransformerWeights::to_f16`]) and calling this function instead of
+/// [`forward`] when `config.weight_dtype == WeightDtype::F16`.
+#[inline(always)]
+pub fn forward_f16<'a>(
+    ctx: &'a mut ForwardContext,
+    weights: &TransformerWeightsF16,
+    cache: &mut MultiLayerKVCache,
+    token: usize,
+    pos: usize,
+    config: &Config,
+) -> &'a mut [f32] {
+    cache.advance_pos(pos);
+    forward_base_f16(ctx, weights, cache, token, pos, config)
+}
 ///
 /// Algebraic reparameterization: fuse matmul+residual+rmsnorm+activation
 /// into single-pass SIMD loops, eliminating intermediate buffer writes.

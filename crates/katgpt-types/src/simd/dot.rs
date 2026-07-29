@@ -784,6 +784,40 @@ pub(super) fn scalar_dot_f16_f32(w: &[half::f16], x: &[f32], len: usize) -> f32 
 }
 
 #[cfg(target_arch = "aarch64")]
+/// Convert 4 f16 values (8 bytes at `w_ptr`) to 4 f32 values using the
+/// hardware `fcvtl` instruction via inline asm.
+///
+/// This avoids the unstable `float16x4_t` / `vcvt_f32_f16` intrinsics
+/// (stdarch_neon_f16, issue #136306) while using a single hardware instruction
+/// instead of ~10 integer bit-manipulation ops or 4 scalar `to_f32()` calls.
+///
+/// Only clobbers v0 and v1 — does NOT use `clobber_abi("C")`, so the
+/// compiler can keep FMA accumulators in other NEON registers live
+/// across calls. This is critical for the dot-product inner loop.
+///
+/// SAFETY: requires NEON target feature. `w_ptr` must point to at least 4
+/// valid u16 values (8 bytes). `out` must point to at least 4 f32 values
+/// (16 bytes).
+#[target_feature(enable = "neon")]
+#[inline]
+unsafe fn fcvtl_4x(w_ptr: *const u16, out: *mut f32) {
+    let mut _v0: f32;
+    let mut _v1: f32;
+    unsafe {
+        core::arch::asm!(
+            "ldr d0, [{addr}]",
+            "fcvtl v1.4s, v0.4h",
+            "str q1, [{out}]",
+            addr = in(reg) w_ptr,
+            out = in(reg) out,
+            lateout("v0") _v0,
+            lateout("v1") _v1,
+            options(nostack, preserves_flags),
+        );
+    }
+}
+
+#[cfg(target_arch = "aarch64")]
 #[inline]
 unsafe fn neon_dot_f16_f32(w: &[half::f16], x: &[f32], len: usize) -> f32 {
     use core::arch::aarch64::{vaddq_f32, vaddvq_f32, vdupq_n_f32, vfmaq_f32, vld1q_f32};
@@ -795,63 +829,43 @@ unsafe fn neon_dot_f16_f32(w: &[half::f16], x: &[f32], len: usize) -> f32 {
         let mut acc2 = vdupq_n_f32(0.0);
         let mut acc3 = vdupq_n_f32(0.0);
         let mut i = 0;
-        let chunks4 = len / 16;
 
-        for _ in 0..chunks4 {
-            // Convert 4×4 f16 → f32 via scalar conversion (compiles to hardware fcvt on Apple Silicon)
-            // then vectorize the FMA. Each group of 4 f16 values becomes a NEON f32 vector.
-            let w0 = [
-                (*w.get_unchecked(i)).to_f32(),
-                (*w.get_unchecked(i + 1)).to_f32(),
-                (*w.get_unchecked(i + 2)).to_f32(),
-                (*w.get_unchecked(i + 3)).to_f32(),
-            ];
-            let w1 = [
-                (*w.get_unchecked(i + 4)).to_f32(),
-                (*w.get_unchecked(i + 5)).to_f32(),
-                (*w.get_unchecked(i + 6)).to_f32(),
-                (*w.get_unchecked(i + 7)).to_f32(),
-            ];
-            let w2 = [
-                (*w.get_unchecked(i + 8)).to_f32(),
-                (*w.get_unchecked(i + 9)).to_f32(),
-                (*w.get_unchecked(i + 10)).to_f32(),
-                (*w.get_unchecked(i + 11)).to_f32(),
-            ];
-            let w3 = [
-                (*w.get_unchecked(i + 12)).to_f32(),
-                (*w.get_unchecked(i + 13)).to_f32(),
-                (*w.get_unchecked(i + 14)).to_f32(),
-                (*w.get_unchecked(i + 15)).to_f32(),
-            ];
-            let vw0 = vld1q_f32(w0.as_ptr());
-            let vw1 = vld1q_f32(w1.as_ptr());
-            let vw2 = vld1q_f32(w2.as_ptr());
-            let vw3 = vld1q_f32(w3.as_ptr());
+        // Cast half::f16 slice to u16 pointer for fcvtl load.
+        // half::f16 is #[repr(transparent)] over u16, so this is sound.
+        let w_ptr = w.as_ptr() as *const u16;
 
-            acc0 = vfmaq_f32(acc0, vw0, vld1q_f32(x.as_ptr().add(i)));
-            acc1 = vfmaq_f32(acc1, vw1, vld1q_f32(x.as_ptr().add(i + 4)));
-            acc2 = vfmaq_f32(acc2, vw2, vld1q_f32(x.as_ptr().add(i + 8)));
-            acc3 = vfmaq_f32(acc3, vw3, vld1q_f32(x.as_ptr().add(i + 12)));
+        // Stack buffer for f16→f32 conversion. Reused across iterations.
+        let mut buf = [0.0f32; 4];
+
+        // Process 16 elements per iteration: 4× (load 4 f16 → fcvtl → FMA).
+        let chunks16 = len / 16;
+        for _ in 0..chunks16 {
+            fcvtl_4x(w_ptr.add(i), buf.as_mut_ptr());
+            let w0 = vld1q_f32(buf.as_ptr());
+            fcvtl_4x(w_ptr.add(i + 4), buf.as_mut_ptr());
+            let w1 = vld1q_f32(buf.as_ptr());
+            fcvtl_4x(w_ptr.add(i + 8), buf.as_mut_ptr());
+            let w2 = vld1q_f32(buf.as_ptr());
+            fcvtl_4x(w_ptr.add(i + 12), buf.as_mut_ptr());
+            let w3 = vld1q_f32(buf.as_ptr());
+
+            acc0 = vfmaq_f32(acc0, w0, vld1q_f32(x.as_ptr().add(i)));
+            acc1 = vfmaq_f32(acc1, w1, vld1q_f32(x.as_ptr().add(i + 4)));
+            acc2 = vfmaq_f32(acc2, w2, vld1q_f32(x.as_ptr().add(i + 8)));
+            acc3 = vfmaq_f32(acc3, w3, vld1q_f32(x.as_ptr().add(i + 12)));
             i += 16;
         }
 
         // Horizontal reduce: acc0+acc1+acc2+acc3
         let mut sum = vaddvq_f32(vaddq_f32(vaddq_f32(acc0, acc1), vaddq_f32(acc2, acc3)));
 
-        // Handle remaining elements with single accumulator
+        // Handle remaining 4-element chunks
+        let chunks4 = (len - i) / 4;
         let mut acc_rem = vdupq_n_f32(0.0);
-        let chunks = (len - i) / 4;
-        for _ in 0..chunks {
-            let w32 = [
-                (*w.get_unchecked(i)).to_f32(),
-                (*w.get_unchecked(i + 1)).to_f32(),
-                (*w.get_unchecked(i + 2)).to_f32(),
-                (*w.get_unchecked(i + 3)).to_f32(),
-            ];
-            let vw = vld1q_f32(w32.as_ptr());
-            let vx = vld1q_f32(x.as_ptr().add(i));
-            acc_rem = vfmaq_f32(acc_rem, vw, vx);
+        for _ in 0..chunks4 {
+            fcvtl_4x(w_ptr.add(i), buf.as_mut_ptr());
+            let w0 = vld1q_f32(buf.as_ptr());
+            acc_rem = vfmaq_f32(acc_rem, w0, vld1q_f32(x.as_ptr().add(i)));
             i += 4;
         }
         sum += vaddvq_f32(acc_rem);

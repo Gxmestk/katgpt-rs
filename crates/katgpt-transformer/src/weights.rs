@@ -5,7 +5,52 @@
 //! (`crate::hla`, `crate::sleep`, `crate::tf_loop`, etc.) that do not exist
 //! in this substrate crate.
 
+use half::f16;
 use katgpt_core::types::{self, Config, Rng};
+
+// ── f16 Weight Storage (Issue 200) ─────────────────────────────
+//
+// Parallel weight structs storing projection weights as `half::f16`.
+// Halves memory bandwidth for weight reads vs f32 storage, attacking the
+// GEMV bandwidth ceiling identified by the forward-pass profiling.
+//
+// Pattern mirrors riir-engine's `GemmaTransformerWeightsF16` (Plan 095):
+// separate struct + separate forward function, NOT an enum-wrapped dispatch.
+// This is additive (zero breakage to existing f32 path).
+
+/// Per-layer transformer weights with f16 storage for projection matrices.
+///
+/// Embedding / norm / gate vectors stay f32 (tiny, non-matmul, negligible
+/// bandwidth). Only the projection weights that dominate the GEMV bandwidth
+/// budget are stored as f16.
+#[derive(Clone)]
+pub struct LayerWeightsF16 {
+    pub attn_wq: Vec<f16>, // [n_embd, n_embd]
+    pub attn_wk: Vec<f16>, // [kv_dim, n_embd]
+    pub attn_wv: Vec<f16>, // [kv_dim, n_embd]
+    pub attn_wo: Vec<f16>, // [n_embd, n_embd]
+    pub mlp_w1: Vec<f16>,  // [mlp_hidden, n_embd]
+    pub mlp_w2: Vec<f16>,  // [n_embd, mlp_hidden]
+}
+
+/// Transformer weights with f16 projection storage (Issue 200).
+///
+/// Embeddings (`wte`, `wpe`) and `lm_head` stay f32 — they are accessed via
+/// random-row lookup (embedding) or benefit from f32 precision at the vocab
+/// projection (lm_head produces logits where small numerical differences
+/// could affect token sampling). The bandwidth-dominant per-layer projection
+/// matrices are f16. This captures ~95% of the bandwidth win (the per-layer
+/// projections) while keeping the logits numerically stable.
+///
+/// Construct via [`TransformerWeights::to_f16`] — a one-time conversion at
+/// model load time.
+#[derive(Clone)]
+pub struct TransformerWeightsF16 {
+    pub wte: Vec<f32>,             // [vocab_size, n_embd] — f32 (embedding lookup)
+    pub wpe: Vec<f32>,             // [block_size, n_embd] — f32 (embedding lookup)
+    pub lm_head: Vec<f32>,         // [vocab_size, n_embd] — f32 (logit precision)
+    pub layers: Vec<LayerWeightsF16>, // [n_layer]
+}
 
 /// Per-layer transformer weights.
 /// Each layer has its own attention and MLP parameters.
@@ -192,6 +237,37 @@ impl TransformerWeights {
                 }
                 v
             },
+        }
+    }
+
+    /// Convert f32 projection weights to f16 storage (Issue 200).
+    ///
+    /// One-time conversion at model load time. Embeddings (`wte`, `wpe`) and
+    /// `lm_head` stay f32 (embedding lookup + logit precision). Only per-layer
+    /// projection matrices are converted to f16 — these dominate the GEMV
+    /// bandwidth budget (~95% of per-forward weight reads).
+    ///
+    /// The returned `TransformerWeightsF16` is consumed by `forward_base_f16`,
+    /// which dispatches matmuls to `matmul_f16` (f16 weights × f32 activations,
+    /// dequant-on-load inside the dot kernel).
+    pub fn to_f16(&self) -> TransformerWeightsF16 {
+        let layers = self
+            .layers
+            .iter()
+            .map(|lw| LayerWeightsF16 {
+                attn_wq: lw.attn_wq.iter().map(|&v| f16::from_f32(v)).collect(),
+                attn_wk: lw.attn_wk.iter().map(|&v| f16::from_f32(v)).collect(),
+                attn_wv: lw.attn_wv.iter().map(|&v| f16::from_f32(v)).collect(),
+                attn_wo: lw.attn_wo.iter().map(|&v| f16::from_f32(v)).collect(),
+                mlp_w1: lw.mlp_w1.iter().map(|&v| f16::from_f32(v)).collect(),
+                mlp_w2: lw.mlp_w2.iter().map(|&v| f16::from_f32(v)).collect(),
+            })
+            .collect();
+        TransformerWeightsF16 {
+            wte: self.wte.clone(),
+            wpe: self.wpe.clone(),
+            lm_head: self.lm_head.clone(),
+            layers,
         }
     }
 

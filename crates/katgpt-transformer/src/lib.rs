@@ -41,7 +41,7 @@ pub use kv_cache::{
     preload_kv_cache,
 };
 pub use mtp::{MtpProjection, load_mtp_projection, project_target_activation};
-pub use weights::{LayerWeights, TransformerWeights};
+pub use weights::{LayerWeights, LayerWeightsF16, TransformerWeights, TransformerWeightsF16};
 
 // Contiguous ternary loader (Plan 148, gated `plasma_path`).
 #[cfg(feature = "plasma_path")]
