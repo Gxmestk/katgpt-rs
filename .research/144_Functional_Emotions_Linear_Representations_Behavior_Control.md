@@ -1,8 +1,11 @@
 # Research 144: Functional Emotions — Linear Representations for Behavior Control
 
 > **Paper:** [Emotion Concepts and their Function in a Large Language Model](https://transformer-circuits.pub/2026/emotions/index.html) — Sofroniew, Kauvar, Saunders et al. (Anthropic), Transformer Circuits Thread, 2026-04
+> **Blog summary:** [Emotion concepts and their function in a large language model](https://www.anthropic.com/research/emotion-concepts-function) (Anthropic research blog, 2026-04-02)
 > **Tweet:** [Pavel Izmailov](https://x.com/Pavel_Izmailov/status/2060409802484744330)
-> **Date:** 2026-04, distilled 2026-05
+> **Date:** 2026-04, distilled 2026-05; re-verified 2026-07-30 (paper already fully distilled + shipped — PASS, no new files)
+>
+> **PASS-Redirects (re-verification 2026-07-30):** Re-read both the blog post + full paper against current codebase. Core mechanism (linear emotion direction vectors + valence/arousal geometry) **FULLY SHIPPED**: `EmotionDirections` (Plan 162, DEFAULT-ON, detection-side dot-product projection), `NpcEmotionScalars` (5-axis persistent per-NPC state: valence/arousal/desperation/calm/fear), `EmotionAxis::ALL` (6-axis with Anger), `EmotionMux` (R317 Feeling Brain), HLA emotion proof (R032, 8/8 GOAT gates pass). **One unshipped paper concept:** "emotion deflection vectors" (separate from emotion vectors; fire when emotion is implied but not expressed — e.g. calm veneer over coercive intent). Zero grep hits for `emotion_deflection|operative_emotion|prepared_emotion|speaker_emotion`. NOT actionable now (future NPC-deception/stoic-mask feature, no current config contradiction or unmitigated failure mode) → PASS per §1.55. Design tension noted: paper finds emotion vectors are LOCAL/OPERATIVE (recalled via attention, not chronically active); our `NpcEmotionScalars` is intentionally PERSISTENT for gameplay predictability — a valid alternative design, not a gap.
 > **Related Research:** 037 (REAP Model-Based/Modelless), 061 (SLIME), 076 (SR²AM), 100 (EGA), 099 (Eigenspace Alignment)
 > **Related Plans:** 162 (Emotion Vector Inference-Time Control)
 > **Cross-repo:** [riir-ai R032](../../riir-ai/.research/032_Functional_Emotions_Civ_Engine_HLA.md) — Civ Engine HLA emotion proof (Domain B)
