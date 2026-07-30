@@ -23,8 +23,8 @@ use std::time::{Duration, Instant};
 use fastrand::Rng;
 use katgpt_rs::pruners::go::{
     DEFAULT_KOMI, GoAction, GoCell, GoGZeroPlayer, GoGreedyPlayer, GoHLPlayer, GoMctsMokaPlayer,
-    GoMctsPlayer, GoMokaSearchPlayer, GoOpeningBookSearchPlayer, GoPlayer, GoReplay, GoState,
-    GoValidatorPlayer, MokaPlayer,
+    GoMctsPlayer, GoMokaSearchPlayer, GoOpeningBookSearchPlayer, GoPlayer, GoPuctMokaPlayer,
+    GoReplay, GoState, GoValidatorPlayer, MokaPlayer,
 };
 
 const DEFAULT_NUM_GAMES: usize = 20;
@@ -47,6 +47,9 @@ struct SearchConfig {
     search_top_k: usize,
     /// `GoOpeningBookSearchPlayer`: star-point plies before delegating to search.
     opening_book_moves: usize,
+    /// `GoPuctMokaPlayer`: PUCT simulation budget + c_puct exploration constant.
+    puct_budget: usize,
+    puct_c_puct: f32,
 }
 
 fn make_player(name: &str, cfg: SearchConfig) -> Box<dyn GoPlayer> {
@@ -62,6 +65,9 @@ fn make_player(name: &str, cfg: SearchConfig) -> Box<dyn GoPlayer> {
             cfg.search_top_k,
             cfg.opening_book_moves,
         )),
+        "moka-puct" => {
+            Box::new(GoPuctMokaPlayer::new(cfg.puct_budget, cfg.puct_c_puct, cfg.search_top_k))
+        }
         "gzero" => Box::new(GoGZeroPlayer::new()),
         "moka" => Box::new(MokaPlayer::new()),
         _ => panic!("Unknown player: {name}"),
@@ -94,6 +100,10 @@ fn notify_history(player: &mut dyn GoPlayer, action: &GoAction) {
     }
     if let Some(ob) = any.downcast_mut::<GoOpeningBookSearchPlayer>() {
         ob.observe_external_move(action);
+        return;
+    }
+    if let Some(puct) = any.downcast_mut::<GoPuctMokaPlayer>() {
+        puct.observe_external_move(action);
     }
 }
 
@@ -434,6 +444,9 @@ fn main() {
     // Opening-book wrapper: star-point plies before delegating to search.
     // Only used by the `moka-openingbook` player.
     let opening_book_moves: usize = env::var("GO_OPENING_BOOK_MOVES").ok().and_then(|s| s.parse().ok()).unwrap_or(6);
+    // PUCT player: simulation budget per move + exploration constant.
+    let puct_budget: usize = env::var("GO_PUCT_BUDGET").ok().and_then(|s| s.parse().ok()).unwrap_or(100);
+    let puct_c_puct: f32 = env::var("GO_PUCT_C").ok().and_then(|s| s.parse().ok()).unwrap_or(1.5);
     // Random opening plies per game. Both Moka-family players are fully
     // deterministic, so with 0 every same-color game replays identically and
     // "N games" is really 2 samples. Non-zero makes games independent.
@@ -446,6 +459,8 @@ fn main() {
         search_depth,
         search_top_k,
         opening_book_moves,
+        puct_budget,
+        puct_c_puct,
     };
 
     if board_size != 9 {

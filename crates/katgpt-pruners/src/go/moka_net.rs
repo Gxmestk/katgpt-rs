@@ -1096,6 +1096,275 @@ impl GoPlayer for GoOpeningBookSearchPlayer {
     }
 }
 
+// ── PUCT search (AlphaZero-style: policy prior + value head + MCTS) ──────
+//
+// The last unexplored lever for >70% win rate vs Moka greedy. Unlike the
+// existing `GoMctsMokaPlayer` (UCB1 + value head — negative result, see
+// go_arena.md), this uses BOTH of Moka's heads: the POLICY head provides
+// the exploration prior P(s,a), and the VALUE head evaluates leaves. This
+// is the AlphaZero recipe, known to extract more strength from small
+// policy+value networks than fixed-depth alpha-beta.
+//
+// PUCT formula: a* = argmax_a [ Q(s,a) + c_puct * P(s,a) * sqrt(N_parent) / (1 + N(s,a)) ]
+// where Q(s,a) = mean action value, P(s,a) = policy prior, N = visit counts.
+
+struct PuctNode {
+    /// Move that led to this node. `Pass` for root.
+    action: GoAction,
+    /// Board state at this node (cloned on expansion).
+    state: GoState,
+    /// Visit count.
+    visits: u32,
+    /// Accumulated value from the perspective of the player who MOVED INTO
+    /// this node (i.e., the parent's to_play). Negamax: negate at each level.
+    total_value: f32,
+    /// Policy prior P(s,a) from the parent's policy head evaluation.
+    prior: f32,
+    /// Arena indices of children.
+    children: Vec<usize>,
+    /// Arena index of parent. None for root.
+    parent: Option<usize>,
+    /// Whether this node has been expanded (policy+value evaluated, children created).
+    expanded: bool,
+}
+
+impl PuctNode {
+    fn new_root(state: GoState) -> Self {
+        Self {
+            action: GoAction::Pass,
+            state,
+            visits: 0,
+            total_value: 0.0,
+            prior: 1.0,
+            children: Vec::new(),
+            parent: None,
+            expanded: false,
+        }
+    }
+
+    #[inline]
+    fn mean_value(&self) -> f32 {
+        if self.visits == 0 {
+            0.0
+        } else {
+            self.total_value / self.visits as f32
+        }
+    }
+}
+
+pub struct GoPuctMokaPlayer {
+    weights: MokaWeights,
+    scratch: MokaScratch,
+    history: Vec<Option<(usize, usize)>>,
+    budget: usize,
+    c_puct: f32,
+    top_k: usize,
+    /// Reused across select_move calls — avoids re-allocating the arena.
+    arena: Vec<PuctNode>,
+    nodes_evaluated: usize,
+}
+
+impl GoPuctMokaPlayer {
+    pub fn new(budget: usize, c_puct: f32, top_k: usize) -> Self {
+        Self {
+            weights: MokaWeights::load(),
+            scratch: MokaScratch::new(),
+            history: Vec::new(),
+            budget: budget.max(1),
+            c_puct,
+            top_k: top_k.max(1),
+            arena: Vec::new(),
+            nodes_evaluated: 0,
+        }
+    }
+
+    pub fn observe_external_move(&mut self, action: &GoAction) {
+        self.history.push(match *action {
+            GoAction::Place(r, c) => Some((r, c)),
+            GoAction::Pass => None,
+        });
+    }
+
+    #[inline]
+    pub fn nodes_evaluated(&self) -> usize {
+        self.nodes_evaluated
+    }
+
+    /// Expand a node: run policy+value, create children for top_k legal moves.
+    /// Returns the value head evaluation [-1,1] from this node's to_play perspective.
+    fn expand(&mut self, node_idx: usize) -> f32 {
+        // Collect parent chain BEFORE mutable borrow (Moka needs last-2-plies history).
+        let mut hist: Vec<Option<(usize, usize)>> = Vec::with_capacity(2);
+        {
+            let mut chain_actions: Vec<GoAction> = Vec::with_capacity(2);
+            let mut cur = Some(node_idx);
+            while let Some(idx) = cur {
+                if chain_actions.len() >= 2 {
+                    break;
+                }
+                let n = &self.arena[idx];
+                if n.parent.is_some() {
+                    chain_actions.push(n.action);
+                }
+                cur = n.parent;
+            }
+            for a in chain_actions.iter().rev() {
+                hist.push(match *a {
+                    GoAction::Place(r, c) => Some((r, c)),
+                    GoAction::Pass => None,
+                });
+            }
+        }
+
+        let node = &mut self.arena[node_idx];
+        node.expanded = true;
+
+        if node.state.is_terminal() {
+            return 2.0 * node.state.reward(node.state.to_play.player_id()) - 1.0;
+        }
+
+        let features = encode_features(&node.state, &hist);
+        let (policy, value) = forward_with_scratch(&self.weights, &features, &mut self.scratch);
+        self.nodes_evaluated += 1;
+
+        // Snapshot everything we need from node, then drop the mutable borrow.
+        let player = node.state.to_play;
+        let parent_state = node.state.clone();
+        let legal = parent_state.legal_moves();
+        let mut scored: Vec<(f32, GoAction)> = legal
+            .iter()
+            .map(|&(r, c)| (policy[r * BOARD_SIZE + c], GoAction::Place(r, c)))
+            .collect();
+        scored.push((policy[BOARD_AREA], GoAction::Pass));
+        scored.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(Ordering::Equal));
+        scored.truncate(self.top_k);
+
+        // Softmax the top_k priors for normalized P(s,a).
+        let max_logit = scored.iter().map(|(l, _)| *l).fold(f32::NEG_INFINITY, f32::max);
+        let exp_sum: f32 = scored.iter().map(|(l, _)| (l - max_logit).exp()).sum();
+        let inv_exp_sum = if exp_sum > 0.0 { 1.0 / exp_sum } else { 1.0 };
+
+        // Mutable borrow is now over (scored is owned). Safe to push children.
+        let children_start = self.arena.len();
+        for (logit, action) in &scored {
+            let prior = (logit - max_logit).exp() * inv_exp_sum;
+            let child_state = parent_state.advance(action, player.player_id());
+            self.arena.push(PuctNode {
+                action: *action,
+                state: child_state,
+                visits: 0,
+                total_value: 0.0,
+                prior,
+                children: Vec::new(),
+                parent: Some(node_idx),
+                expanded: false,
+            });
+        }
+        let children_end = self.arena.len();
+        self.arena[node_idx].children.extend(children_start..children_end);
+
+        value
+    }
+
+    /// Selection: traverse from root to first unexpanded leaf using PUCT.
+    /// Returns the leaf node index.
+    fn select(&self, root: usize) -> usize {
+        let mut cur = root;
+        loop {
+            let node = &self.arena[cur];
+            if !node.expanded || node.children.is_empty() {
+                return cur;
+            }
+            // Pick child with highest PUCT score.
+            // Q is negated because child.total_value is from child.to_play's
+            // perspective, but we're selecting from parent's perspective.
+            let parent_visits = node.visits.max(1) as f32;
+            let sqrt_parent = parent_visits.sqrt();
+            let mut best_idx = node.children[0];
+            let mut best_score = f32::NEG_INFINITY;
+            for &child_idx in &node.children {
+                let child = &self.arena[child_idx];
+                let q = -child.mean_value(); // negate: child's perspective → parent's
+                let u = self.c_puct * child.prior * sqrt_parent / (1.0 + child.visits as f32);
+                let score = q + u;
+                if score > best_score {
+                    best_score = score;
+                    best_idx = child_idx;
+                }
+            }
+            cur = best_idx;
+        }
+    }
+
+    /// Backpropagate value from leaf to root. Negamax: negate at each level.
+    /// `total_value` stores from the node's own `to_play` perspective (standard
+    /// MCTS negamax convention). PUCT selection negates Q when comparing children
+    /// because the parent's to_play is opposite to the child's.
+    fn backprop(&mut self, leaf_idx: usize, mut value: f32) {
+        let mut cur = Some(leaf_idx);
+        while let Some(idx) = cur {
+            let node = &mut self.arena[idx];
+            node.visits += 1;
+            node.total_value += value;
+            value = -value; // negate for parent (opponent's perspective)
+            cur = node.parent;
+        }
+    }
+}
+
+impl GoPlayer for GoPuctMokaPlayer {
+    fn select_move(&mut self, state: &GoState, legal_moves: &[(usize, usize)], _rng: &mut Rng) -> GoAction {
+        if legal_moves.is_empty() {
+            let action = GoAction::Pass;
+            self.observe_external_move(&action);
+            return action;
+        }
+
+        // Reset arena for this move's search.
+        self.arena.clear();
+        self.arena.push(PuctNode::new_root(state.clone()));
+        let root = 0;
+
+        for _ in 0..self.budget {
+            // 1. Selection
+            let leaf = self.select(root);
+
+            // 2. Expansion + Evaluation
+            let value = self.expand(leaf);
+
+            // 3. Backpropagation (negamax)
+            self.backprop(leaf, value);
+        }
+
+        // Pick most-visited child at root.
+        let root_node = &self.arena[root];
+        let mut best_action = GoAction::Pass;
+        let mut best_visits = 0u32;
+        for &child_idx in &root_node.children {
+            let child = &self.arena[child_idx];
+            if child.visits > best_visits {
+                best_visits = child.visits;
+                best_action = child.action;
+            }
+        }
+
+        self.observe_external_move(&best_action);
+        best_action
+    }
+
+    fn name(&self) -> &'static str {
+        "Moka-PUCT"
+    }
+
+    fn reset(&mut self) {
+        self.history.clear();
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
+    }
+}
+
 // ── Issue 564: ANE residency probe (stem + one residual block) ──────────
 //
 // Scoped probe, NOT the full 40-layer graph. Builds the stem conv + one

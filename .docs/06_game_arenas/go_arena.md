@@ -614,7 +614,30 @@ The user correctly identified that `OpeningBookStrategy` (riir-router `meta_rout
 | 6 | 53.0% |
 | 8 | **39.0%** |
 
-The degradation is monotonic and statistically significant (baseline 74% vs 8-ply 39%, z=5.93, p≈10⁻⁹). **Moka's policy already plays better openings than blind star-point heuristics** — it was trained on 9×9 and considers board context. Forcing star points overrides the policy's contextual judgment with a dumb "first available corner" rule. This confirms the Plan 563 audit conclusion: blind heuristics cannot improve on a trained policy within the policy's training distribution. The only remaining architectural lever for >70% is PUCT search (not yet tried); opening books are closed. Full record: `.benchmarks/204_opening_book_vs_moka_negative.md`.
+The degradation is monotonic and statistically significant (baseline 74% vs 8-ply 39%, z=5.93, p≈10⁻⁹). **Moka's policy already plays better openings than blind star-point heuristics** — it was trained on 9×9 and considers board context. Forcing star points overrides the policy's contextual judgment with a dumb "first available corner" rule. This confirms the Plan 563 audit conclusion: blind heuristics cannot improve on a trained policy within the policy's training distribution. Opening books are closed. Full record: `.benchmarks/204_opening_book_vs_moka_negative.md`.
+
+### PUCT search — the AlphaZero recipe (Bench 205, the new best)
+
+The one remaining architectural lever. `GoPuctMokaPlayer` implements PUCT (Predictor + UCB applied to Trees) — the AlphaZero search algorithm — using BOTH of Moka's heads: the **policy head** provides the exploration prior P(s,a), and the **value head** evaluates leaves. This is structurally different from the existing `GoMctsMokaPlayer` (negative result above), which used UCB1 (ignores the policy prior entirely). The PUCT formula:
+
+```
+PUCT(s,a) = Q(s,a) + c_puct · P(s,a) · √(N_parent) / (1 + N(s,a))
+```
+
+**Result: massive win.** n=100 per arm, all vs Moka greedy, GO_OPENING_MOVES=4:
+
+| Config | Win% | µs/move |
+|---|---|---|
+| Alpha-beta (depth=1, top_k=4) — prior best | 74.0% | 2,016 |
+| PUCT budget=50, c=1.5, top_k=8 | **94.0%** | 21,129 |
+| PUCT budget=100, c=1.5, top_k=8 | **96.0%** | 42,936 |
+| PUCT budget=200, c=2.5, top_k=8 | **98.0%** | 79,677 |
+
+Win rate scales with budget (94→96→98%), confirming the search adds real value. Even the cheapest PUCT (budget=50, ~21ms/move) jumps from 74% to 94% — z=4.52, p≈10⁻⁶. Baseline 74% vs PUCT-200 98%: z=5.63, p≈10⁻⁸.
+
+**Why PUCT beats alpha-beta:** the policy prior directs exploration toward moves the network rates highly (critical for Go's ~80 branching factor), and MCTS adaptively focuses simulations on promising lines (vs alpha-beta's fixed shallow depth). The existing `GoMctsMokaPlayer` (UCB1 + value head, negative result) lacked the policy prior — PUCT's addition of P(s,a) is what closes the gap.
+
+**Implementation note:** arena-based tree (`Vec<PuctNode>`), softmax-normalized top_k priors, negamax backprop with Q negated in selection. A sign bug (total_value perspective mismatch) was found and fixed during development — pre-fix scored 0W/20L (search chose worst moves), post-fix 94-98%. Full record: `.benchmarks/205_puct_search_vs_moka_win.md`.
 
 ## Plan 565 — Real browser side-by-side + wasmi (the size/speed question, answered for real)
 
