@@ -601,6 +601,21 @@ cargo run --release --features go --example go_11_moka_head_to_head  # includes 
 GO_MCTS_MOKA_BUDGET=150 GO_GAMES=4 cargo run --release --features go --example go_11_moka_head_to_head
 ```
 
+### Investigated and rejected: Opening Book star-point heuristics (Bench 204)
+
+The user correctly identified that `OpeningBookStrategy` (riir-router `meta_router/strategies.rs`) — a star-point opening book with corner 4-4/3-3, side stars, and center — was never measured against Moka. Its simulated 56% win rate in `test_go_meta_router_arena` was a **hardcoded fake number** (the test returns `0.56` by name lookup, not from real games). The real question: does forcing star-point openings on top of `GoMokaSearchPlayer` beat pure search?
+
+**Result: the opening book hurts, monotonically.** A `GoOpeningBookSearchPlayer` wrapper (Bench 204) was built to force star points for the first N plies, then delegate to the same depth=1 top_k=4 search. n=100 per arm:
+
+| Opening plies | Win% vs Moka |
+|---|---|
+| 0 (pure search, baseline) | **74.0%** |
+| 4 | 61.0% |
+| 6 | 53.0% |
+| 8 | **39.0%** |
+
+The degradation is monotonic and statistically significant (baseline 74% vs 8-ply 39%, z=5.93, p≈10⁻⁹). **Moka's policy already plays better openings than blind star-point heuristics** — it was trained on 9×9 and considers board context. Forcing star points overrides the policy's contextual judgment with a dumb "first available corner" rule. This confirms the Plan 563 audit conclusion: blind heuristics cannot improve on a trained policy within the policy's training distribution. The only remaining architectural lever for >70% is PUCT search (not yet tried); opening books are closed. Full record: `.benchmarks/204_opening_book_vs_moka_negative.md`.
+
 ## Plan 565 — Real browser side-by-side + wasmi (the size/speed question, answered for real)
 
 Every prior "Moka: ~0.5ms/move" figure in this document was **our own native port acting as its own baseline** — never the actual browser-deployed Moka. This plan closes that gap with real measurements: the real `github.com/millionco/moka` package, built from source and run in real Chrome (via Playwright, driving the actually-installed `Google Chrome.app`, not a downloaded test browser); our own port compiled to `wasm32-unknown-unknown` and run in the same real Chrome; and the same `.wasm` binary run through `wasmi` (pure interpreter, no JIT) natively. New crate: `crates/katgpt-moka-wasm` — a dependency-free reimplementation of the forward pass (no `katgpt-core`, so no `ahash`/`getrandom` wasm32 backend friction a browser build has no reason to carry) plus a from-scratch minimal 9×9 board, kept faithful to `katgpt_pruners::go::moka_net` by direct port, not reimplementation-from-memory.

@@ -980,6 +980,122 @@ impl GoPlayer for GoMokaSearchPlayer {
     }
 }
 
+// ── Opening-book wrapper (research: does star-point opening beat pure search?) ──
+//
+// Wraps `GoMokaSearchPlayer`. For the first `opening_moves` plies where a
+// star point is available and empty, plays it deterministically; otherwise
+// delegates to the inner search player. The star-point set mirrors
+// `OpeningBookStrategy::compute_star_points` from riir-router (corner 4-4,
+// 3-3, side stars, center), adapted to GoPlayer's (row, col) shape.
+//
+// Hypothesis under test: on 9×9, Moka's policy already plays good corner
+// openings (it was trained on 9×9), so forcing star points may not help —
+// could even hurt by overriding the policy's contextual preferences. Null
+// result is a valid research outcome.
+pub struct GoOpeningBookSearchPlayer {
+    inner: GoMokaSearchPlayer,
+    opening_moves: usize,
+    star_points: Vec<(usize, usize)>,
+}
+
+impl GoOpeningBookSearchPlayer {
+    /// Create with the same search config as `GoMokaSearchPlayer`, plus an
+    /// opening phase of `opening_moves` plies where star points are forced.
+    pub fn new(depth: usize, top_k: usize, opening_moves: usize) -> Self {
+        Self {
+            inner: GoMokaSearchPlayer::new(depth, top_k),
+            opening_moves,
+            star_points: Self::compute_star_points(BOARD_SIZE),
+        }
+    }
+
+    /// Forward history observations to the inner player.
+    pub fn observe_external_move(&mut self, action: &GoAction) {
+        self.inner.observe_external_move(action);
+    }
+
+    /// Star points for an N×N board, as (row, col) pairs. Mirrors
+    /// `OpeningBookStrategy::compute_star_points` from riir-router.
+    fn compute_star_points(n: usize) -> Vec<(usize, usize)> {
+        let mut pts = Vec::with_capacity(13);
+        if n < 5 {
+            return pts;
+        }
+        // Corner 4-4 points
+        pts.extend([(3, 3), (3, n - 4), (n - 4, 3), (n - 4, n - 4)]);
+        // Corner 3-3 points
+        pts.extend([(2, 2), (2, n - 3), (n - 3, 2), (n - 3, n - 3)]);
+        // Side star points (larger boards only)
+        if n >= 13 {
+            let mid = n / 2;
+            pts.extend([(3, mid), (mid, 3), (n - 4, mid), (mid, n - 4)]);
+        }
+        // Center for odd N
+        if n % 2 == 1 {
+            pts.push((n / 2, n / 2));
+        }
+        pts
+    }
+
+    /// Count stones on the board to determine opening phase. Same heuristic
+    /// as `OpeningBookStrategy::is_opening`: stones < opening_moves * 2.
+    fn is_opening(&self, state: &GoState) -> bool {
+        let threshold = self.opening_moves * 2;
+        let mut stones = 0;
+        for &cell in &state.board {
+            if cell != GoCell::Empty {
+                stones += 1;
+                if stones >= threshold {
+                    return false;
+                }
+            }
+        }
+        stones < threshold
+    }
+
+    /// First available empty star point that is also a legal move.
+    fn first_legal_star(&self, state: &GoState, legal: &[(usize, usize)]) -> Option<GoAction> {
+        for &(r, c) in &self.star_points {
+            if state.board[r * BOARD_SIZE + c] == GoCell::Empty && legal.contains(&(r, c)) {
+                return Some(GoAction::Place(r, c));
+            }
+        }
+        None
+    }
+}
+
+impl GoPlayer for GoOpeningBookSearchPlayer {
+    fn select_move(&mut self, state: &GoState, legal_moves: &[(usize, usize)], rng: &mut Rng) -> GoAction {
+        if legal_moves.is_empty() {
+            let action = GoAction::Pass;
+            self.observe_external_move(&action);
+            return action;
+        }
+
+        if self.is_opening(state)
+            && let Some(star) = self.first_legal_star(state, legal_moves)
+        {
+            self.observe_external_move(&star);
+            return star;
+        }
+
+        // Out of opening or no star point available — delegate to search.
+        self.inner.select_move(state, legal_moves, rng)
+    }
+
+    fn name(&self) -> &'static str {
+        "Moka-OpeningBook-Search"
+    }
+
+    fn reset(&mut self) {
+        self.inner.reset();
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
+    }
+}
+
 // ── Issue 564: ANE residency probe (stem + one residual block) ──────────
 //
 // Scoped probe, NOT the full 40-layer graph. Builds the stem conv + one

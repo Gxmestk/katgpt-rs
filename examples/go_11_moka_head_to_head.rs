@@ -23,7 +23,8 @@ use std::time::{Duration, Instant};
 use fastrand::Rng;
 use katgpt_rs::pruners::go::{
     DEFAULT_KOMI, GoAction, GoCell, GoGZeroPlayer, GoGreedyPlayer, GoHLPlayer, GoMctsMokaPlayer,
-    GoMctsPlayer, GoMokaSearchPlayer, GoPlayer, GoReplay, GoState, GoValidatorPlayer, MokaPlayer,
+    GoMctsPlayer, GoMokaSearchPlayer, GoOpeningBookSearchPlayer, GoPlayer, GoReplay, GoState,
+    GoValidatorPlayer, MokaPlayer,
 };
 
 const DEFAULT_NUM_GAMES: usize = 20;
@@ -44,6 +45,8 @@ struct SearchConfig {
     /// `GoMokaSearchPlayer` negamax depth (plies) + per-node branching.
     search_depth: usize,
     search_top_k: usize,
+    /// `GoOpeningBookSearchPlayer`: star-point plies before delegating to search.
+    opening_book_moves: usize,
 }
 
 fn make_player(name: &str, cfg: SearchConfig) -> Box<dyn GoPlayer> {
@@ -54,6 +57,11 @@ fn make_player(name: &str, cfg: SearchConfig) -> Box<dyn GoPlayer> {
         "mcts" => Box::new(GoMctsPlayer::new(cfg.mcts_budget, 50)),
         "mcts-moka" => Box::new(GoMctsMokaPlayer::new(cfg.mcts_moka_budget, cfg.mcts_moka_depth)),
         "moka-search" => Box::new(GoMokaSearchPlayer::new(cfg.search_depth, cfg.search_top_k)),
+        "moka-openingbook" => Box::new(GoOpeningBookSearchPlayer::new(
+            cfg.search_depth,
+            cfg.search_top_k,
+            cfg.opening_book_moves,
+        )),
         "gzero" => Box::new(GoGZeroPlayer::new()),
         "moka" => Box::new(MokaPlayer::new()),
         _ => panic!("Unknown player: {name}"),
@@ -82,6 +90,10 @@ fn notify_history(player: &mut dyn GoPlayer, action: &GoAction) {
     }
     if let Some(search) = any.downcast_mut::<GoMokaSearchPlayer>() {
         search.observe_external_move(action);
+        return;
+    }
+    if let Some(ob) = any.downcast_mut::<GoOpeningBookSearchPlayer>() {
+        ob.observe_external_move(action);
     }
 }
 
@@ -419,6 +431,9 @@ fn main() {
     // alpha-beta pruning — 2/8 is ~75 passes ≈ 220ms/move worst case.
     let search_depth: usize = env::var("GO_SEARCH_DEPTH").ok().and_then(|s| s.parse().ok()).unwrap_or(2);
     let search_top_k: usize = env::var("GO_SEARCH_TOPK").ok().and_then(|s| s.parse().ok()).unwrap_or(8);
+    // Opening-book wrapper: star-point plies before delegating to search.
+    // Only used by the `moka-openingbook` player.
+    let opening_book_moves: usize = env::var("GO_OPENING_BOOK_MOVES").ok().and_then(|s| s.parse().ok()).unwrap_or(6);
     // Random opening plies per game. Both Moka-family players are fully
     // deterministic, so with 0 every same-color game replays identically and
     // "N games" is really 2 samples. Non-zero makes games independent.
@@ -430,6 +445,7 @@ fn main() {
         mcts_moka_depth,
         search_depth,
         search_top_k,
+        opening_book_moves,
     };
 
     if board_size != 9 {

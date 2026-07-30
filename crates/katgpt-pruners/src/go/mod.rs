@@ -54,8 +54,8 @@ pub use players::{
 
 // Moka v1 native port (Plan 563)
 pub use moka_net::{
-    GoMctsMokaPlayer, GoMokaSearchPlayer, MokaHeuristic, MokaPlayer, MokaScratch, MokaWeights,
-    encode_features, forward, forward_with_scratch,
+    GoMctsMokaPlayer, GoMokaSearchPlayer, GoOpeningBookSearchPlayer, MokaHeuristic, MokaPlayer,
+    MokaScratch, MokaWeights, encode_features, forward, forward_with_scratch,
 };
 
 // Analytics
