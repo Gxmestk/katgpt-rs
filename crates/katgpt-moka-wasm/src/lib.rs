@@ -130,6 +130,10 @@ static mut WASMI_SCRATCH: Option<moka::MokaScratch> = None;
 /// Must be called once before `wasmi_infer`. Not thread-safe (fine — wasmi
 /// benchmarking is single-threaded by construction, one `Store` per test).
 #[unsafe(no_mangle)]
+// `&raw mut` is intentional: it avoids forming a reference to the `static mut`
+// (denied by Rust 2024). clippy::deref_addrof's suggested rewrite (`WASMI_WEIGHTS = ...`)
+// would reintroduce that reference, so the lint is a false positive here.
+#[allow(clippy::deref_addrof)]
 pub extern "C" fn wasmi_init() {
     unsafe {
         *(&raw mut WASMI_WEIGHTS) = Some(moka::MokaWeights::load());
@@ -157,6 +161,9 @@ pub extern "C" fn wasmi_alloc(len: usize) -> *mut f32 {
 /// `features_ptr` must point to at least `moka::INPUT_ELEMENT_COUNT` valid
 /// `f32`s, and `out_ptr` to at least 83.
 #[unsafe(no_mangle)]
+// See `wasmi_init`: `&raw const`/`&raw mut` avoid forming references to the
+// `static mut` (Rust 2024). clippy::deref_addrof is a false positive here.
+#[allow(clippy::deref_addrof)]
 pub unsafe extern "C" fn wasmi_infer(features_ptr: *const f32, out_ptr: *mut f32) {
     unsafe {
         let features = std::slice::from_raw_parts(features_ptr, moka::INPUT_ELEMENT_COUNT);

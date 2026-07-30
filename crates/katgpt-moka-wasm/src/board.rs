@@ -60,7 +60,7 @@ pub fn flood_group(cells: &[Cell], start: usize) -> (Vec<usize>, Vec<usize>) {
     }
     let mut group = Vec::new();
     let mut liberties = Vec::new();
-    let mut visited = vec![false; AREA];
+    let mut visited = [false; AREA];
     let mut stack = vec![start];
     while let Some(pos) = stack.pop() {
         if visited[pos] {
@@ -127,7 +127,7 @@ impl Board {
         self.cells[idx] = color;
 
         let mut captured = Vec::new();
-        let mut visited_opp = vec![false; AREA];
+        let mut visited_opp = [false; AREA];
         for n in neighbors(idx) {
             if self.cells[n] == opponent && !visited_opp[n] {
                 let (group, libs) = flood_group(&self.cells, n);
