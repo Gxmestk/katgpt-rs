@@ -934,3 +934,267 @@ pub fn simd_matmul_f16_f32_rows_parallel(
             });
     }
 }
+
+// ── f16 × f16 → f32 widening-FMA dot (Issue 201) ────────────────────────
+//
+// The Issue 200 weight-only path (f16 weights × f32 activations) was net-
+// negative on Apple Silicon: f32 activations limit the bandwidth reduction
+// to 25%, and the FCVT latency on the critical path more than eats the
+// savings. This f16×f16 path uses the ARMv8.2-A FP16 widening FMA
+// (`fmlal`/`fmlal2`) which does f16×f16→f32 in a single instruction — the
+// f16→f32 widening happens inside the FMA, so there is NO explicit FCVT on
+// the critical path. Combined with genuine 50% bandwidth reduction (2+2=4
+// bytes/element vs 4+4=8 for f32×f32), this is the path that could actually
+// break the f32 GEMV bandwidth ceiling.
+//
+// Requires `target_feature = "fp16"` + `target_feature = "fhm"` (FP16 FML
+// instructions). Available on Apple Silicon M1+.
+
+/// Compute `acc += (a_low × b_low)` where the low 4 f16 elements of each
+/// `uint16x8_t` are multiplied and widened to f32, then accumulated into
+/// the f32 `acc` vector. Uses the `fmlal` instruction (FEAT_FHM) — the
+/// narrow `.4h` operand view selects the bottom half of the 128-bit source
+/// registers.
+///
+/// This is the inline-asm wrapper around the unstable `vfmlalq_low_f16`
+/// intrinsic (stdarch_neon_f16, issue #136306). Uses explicit NEON register
+/// allocation (v0=acc, v1=a, v2=b) + `lateout` clobber discipline so the
+/// compiler can keep other f32 accumulators live across calls.
+#[cfg(target_arch = "aarch64")]
+#[target_feature(enable = "neon,fp16,fhm")]
+#[inline]
+unsafe fn fmlal_lo_inline(
+    acc: core::arch::aarch64::float32x4_t,
+    a: core::arch::aarch64::uint16x8_t,
+    b: core::arch::aarch64::uint16x8_t,
+) -> core::arch::aarch64::float32x4_t {
+    let mut acc = acc;
+    unsafe {
+        core::arch::asm!
+            (
+                "fmlal v0.4s, v1.4h, v2.4h",
+                inout("v0") acc,
+                in("v1") a,
+                in("v2") b,
+                lateout("v1") _,
+                lateout("v2") _,
+                options(pure, nomem, nostack, preserves_flags),
+            );
+        acc
+    }
+}
+
+/// Compute `acc += (a_high × b_high)` where the high 4 f16 elements of each
+/// `uint16x8_t` are multiplied and widened to f32. Uses `fmlal2` (FEAT_FHM) —
+/// same `.4h`-suffixed operand syntax as `fmlal`; the opcode bit (not the
+/// operand width) is what selects the top half of the physical 128-bit
+/// source registers. Confirmed empirically: the assembler rejects `.8h`
+/// operands on `fmlal2` (invalid operand for instruction).
+#[cfg(target_arch = "aarch64")]
+#[target_feature(enable = "neon,fp16,fhm")]
+#[inline]
+unsafe fn fmlal_hi_inline(
+    acc: core::arch::aarch64::float32x4_t,
+    a: core::arch::aarch64::uint16x8_t,
+    b: core::arch::aarch64::uint16x8_t,
+) -> core::arch::aarch64::float32x4_t {
+    let mut acc = acc;
+    unsafe {
+        core::arch::asm!
+            (
+                "fmlal2 v0.4s, v1.4h, v2.4h",
+                inout("v0") acc,
+                in("v1") a,
+                in("v2") b,
+                lateout("v1") _,
+                lateout("v2") _,
+                options(pure, nomem, nostack, preserves_flags),
+            );
+        acc
+    }
+}
+
+/// SIMD dot product: f16 weights × f16 activations → f32 scalar.
+///
+/// Uses the ARMv8.2-A FP16 widening FMA (`fmlal`/`fmlal2`) which performs
+/// f16×f16→f32 in a single instruction with no explicit FCVT on the critical
+/// path. Halves bandwidth for BOTH weight and activation reads vs f32×f32.
+///
+/// Falls back to scalar `to_f32().mul_add()` on non-aarch64 targets.
+///
+/// Requires `fp16` + `fhm` target features at runtime.
+#[inline(always)]
+pub fn simd_dot_f16_f16(w: &[half::f16], x: &[half::f16], len: usize) -> f32 {
+    #[cfg(target_arch = "aarch64")]
+    {
+        if std::arch::is_aarch64_feature_detected!("fp16")
+            && std::arch::is_aarch64_feature_detected!("fhm")
+        {
+            unsafe { neon_dot_f16_f16(w, x, len) }
+        } else {
+            scalar_dot_f16_f16(w, x, len)
+        }
+    }
+    #[cfg(not(target_arch = "aarch64"))]
+    {
+        scalar_dot_f16_f16(w, x, len)
+    }
+}
+
+#[inline(always)]
+#[allow(dead_code)]
+pub(super) fn scalar_dot_f16_f16(w: &[half::f16], x: &[half::f16], len: usize) -> f32 {
+    // 4 independent accumulators — mirrors scalar_dot_f32 / scalar_dot_f16_f32.
+    let mut acc = [0.0f32; 4];
+    let chunks = len / 4;
+    let mut i = 0;
+    for _ in 0..chunks {
+        unsafe {
+            acc[0] = (*w.get_unchecked(i))
+                .to_f32()
+                .mul_add((*x.get_unchecked(i)).to_f32(), acc[0]);
+            acc[1] = (*w.get_unchecked(i + 1))
+                .to_f32()
+                .mul_add((*x.get_unchecked(i + 1)).to_f32(), acc[1]);
+            acc[2] = (*w.get_unchecked(i + 2))
+                .to_f32()
+                .mul_add((*x.get_unchecked(i + 2)).to_f32(), acc[2]);
+            acc[3] = (*w.get_unchecked(i + 3))
+                .to_f32()
+                .mul_add((*x.get_unchecked(i + 3)).to_f32(), acc[3]);
+        }
+        i += 4;
+    }
+    let mut sum = acc.iter().sum::<f32>();
+    while i < len {
+        unsafe {
+            sum = (*w.get_unchecked(i))
+                .to_f32()
+                .mul_add((*x.get_unchecked(i)).to_f32(), sum);
+        }
+        i += 1;
+    }
+    sum
+}
+
+/// NEON f16×f16→f32 dot product using widening FMA (`fmlal`/`fmlal2`).
+///
+/// Processes 16 f16 elements per iteration: 2 loads of 8 f16 each, 4 widening
+/// FMAs into 4 independent f32 accumulators. The widening FMA does the
+/// f16→f32 conversion implicitly — no explicit FCVT on the critical path.
+#[cfg(target_arch = "aarch64")]
+#[target_feature(enable = "neon,fp16,fhm")]
+#[inline]
+unsafe fn neon_dot_f16_f16(w: &[half::f16], x: &[half::f16], len: usize) -> f32 {
+    use core::arch::aarch64::{
+        float32x4_t, uint16x8_t, vaddq_f32, vaddvq_f32, vdupq_n_f32, vld1q_u16,
+    };
+
+    unsafe {
+        // Cast half::f16 slices to u16 pointers. half::f16 is
+        // #[repr(transparent)] over u16, so this is sound.
+        let w_ptr = w.as_ptr() as *const u16;
+        let x_ptr = x.as_ptr() as *const u16;
+
+        // 4 independent f32 accumulators to hide FMA pipeline latency.
+        let zero = vdupq_n_f32(0.0);
+        let mut acc0: float32x4_t = zero;
+        let mut acc1: float32x4_t = zero;
+        let mut acc2: float32x4_t = zero;
+        let mut acc3: float32x4_t = zero;
+        let mut i = 0;
+
+        // Process 16 f16 elements per iteration: 2× (load 8 f16 → fmlal + fmlal2).
+        let chunks16 = len / 16;
+        for _ in 0..chunks16 {
+            let w0: uint16x8_t = vld1q_u16(w_ptr.add(i));
+            let x0: uint16x8_t = vld1q_u16(x_ptr.add(i));
+            acc0 = fmlal_lo_inline(acc0, w0, x0); // low 4 elements
+            acc1 = fmlal_hi_inline(acc1, w0, x0); // high 4 elements
+
+            let w1: uint16x8_t = vld1q_u16(w_ptr.add(i + 8));
+            let x1: uint16x8_t = vld1q_u16(x_ptr.add(i + 8));
+            acc2 = fmlal_lo_inline(acc2, w1, x1);
+            acc3 = fmlal_hi_inline(acc3, w1, x1);
+
+            i += 16;
+        }
+
+        // Horizontal reduce: acc0+acc1+acc2+acc3
+        let mut sum = vaddvq_f32(vaddq_f32(vaddq_f32(acc0, acc1), vaddq_f32(acc2, acc3)));
+
+        // Handle remaining 8-element chunks
+        let chunks8 = (len - i) / 8;
+        let mut acc_lo = zero;
+        let mut acc_hi = zero;
+        for _ in 0..chunks8 {
+            let w0: uint16x8_t = vld1q_u16(w_ptr.add(i));
+            let x0: uint16x8_t = vld1q_u16(x_ptr.add(i));
+            acc_lo = fmlal_lo_inline(acc_lo, w0, x0);
+            acc_hi = fmlal_hi_inline(acc_hi, w0, x0);
+            i += 8;
+        }
+        sum += vaddvq_f32(vaddq_f32(acc_lo, acc_hi));
+
+        // Scalar tail (0-7 elements)
+        while i < len {
+            sum += (*w.get_unchecked(i)).to_f32() * (*x.get_unchecked(i)).to_f32();
+            i += 1;
+        }
+
+        sum
+    }
+}
+
+/// SIMD f16×f16 matmul: `output[r] = dot(f16_weight_row_r, f16_input)`.
+///
+/// Replaces `simd_matmul_f16_f32_rows()` when BOTH weights and activations
+/// are stored as f16. Uses widening FMA (`fmlal`/`fmlal2`) — 50% bandwidth
+/// reduction vs f32×f32 with no explicit FCVT on the critical path.
+#[inline(always)]
+pub fn simd_matmul_f16_f16_rows(
+    output: &mut [f32],
+    weight_f16: &[half::f16],
+    input_f16: &[half::f16],
+    rows: usize,
+    cols: usize,
+) {
+    for r in 0..rows {
+        let row_off = r * cols;
+        unsafe {
+            *output.get_unchecked_mut(r) =
+                simd_dot_f16_f16(&weight_f16[row_off..row_off + cols], input_f16, cols);
+        }
+    }
+}
+
+/// Row-parallel f16×f16 matmul: splits output rows across rayon threads.
+/// Falls back to sequential for rows < 512 (thread overhead exceeds savings).
+#[inline]
+pub fn simd_matmul_f16_f16_rows_parallel(
+    output: &mut [f32],
+    weight_f16: &[half::f16],
+    input_f16: &[half::f16],
+    rows: usize,
+    cols: usize,
+) {
+    const PARALLEL_ROWS_MIN: usize = 512;
+
+    if rows < PARALLEL_ROWS_MIN {
+        simd_matmul_f16_f16_rows(output, weight_f16, input_f16, rows, cols);
+    } else {
+        use rayon::prelude::*;
+        const PARALLEL_CHUNK_ROWS: usize = 256;
+        output
+            .par_chunks_mut(PARALLEL_CHUNK_ROWS)
+            .enumerate()
+            .for_each(|(chunk_idx, out_chunk)| {
+                let start_row = chunk_idx * PARALLEL_CHUNK_ROWS;
+                for (local_r, out) in out_chunk.iter_mut().enumerate() {
+                    let r = start_row + local_r;
+                    let row_off = r * cols;
+                    *out = simd_dot_f16_f16(&weight_f16[row_off..row_off + cols], input_f16, cols);
+                }
+            });
+    }
+}

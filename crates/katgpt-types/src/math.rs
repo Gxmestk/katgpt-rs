@@ -306,6 +306,38 @@ pub fn matmul_f16_parallel(
     crate::simd::simd_matmul_f16_f32_rows_parallel(output, weight, input, rows, cols);
 }
 
+/// Matrix-vector multiply with f16 weights and f16 activations (Issue 201).
+///
+/// Output is f32. Uses the ARMv8.2-A widening FMA (`fmlalb`/`fmlalt`) which
+/// does f16×f16→f32 in a single instruction — no explicit FCVT on the critical
+/// path. Halves bandwidth for BOTH weight AND activation reads vs f32×f32
+/// (genuine 50% reduction, vs the 25% that doomed weight-only f16 in Issue 200).
+#[inline(always)]
+pub fn matmul_f16_f16(
+    output: &mut [f32],
+    weight: &[half::f16],
+    input: &[half::f16],
+    rows: usize,
+    cols: usize,
+) {
+    crate::simd::simd_matmul_f16_f16_rows(output, weight, input, rows, cols);
+}
+
+/// Row-parallel f16×f16 matrix-vector multiply (Issue 201).
+///
+/// Splits output rows across rayon threads. Falls back to sequential
+/// [`matmul_f16_f16`] for small matrices (rows < 512).
+#[inline(always)]
+pub fn matmul_f16_f16_parallel(
+    output: &mut [f32],
+    weight: &[half::f16],
+    input: &[half::f16],
+    rows: usize,
+    cols: usize,
+) {
+    crate::simd::simd_matmul_f16_f16_rows_parallel(output, weight, input, rows, cols);
+}
+
 /// Sparse matrix-vector multiply for ReLU-activated inputs (TwELL-inspired).
 ///
 /// Only processes columns where `input[c] > 0.0`, skipping dead neurons entirely.

@@ -123,9 +123,10 @@ pub use math::sample_token;
 #[cfg(feature = "sparse_mlp")]
 pub use math::sparse_matmul;
 pub use math::{
-    gegelu, gegelu_tanh, matmul, matmul_f16, matmul_f16_parallel, matmul_parallel, matmul_relu,
-    rmsnorm, rmsnorm_with_gamma, rmsnorm_with_gamma_eps, sample_token_into, silu, softmax,
-    softmax_scaled, swiglu, swiglu_inplace,
+    gegelu, gegelu_tanh, matmul, matmul_f16, matmul_f16_f16, matmul_f16_f16_parallel,
+    matmul_f16_parallel, matmul_parallel, matmul_relu, rmsnorm, rmsnorm_with_gamma,
+    rmsnorm_with_gamma_eps, sample_token_into, silu, softmax, softmax_scaled, swiglu,
+    swiglu_inplace,
 };
 pub use merkle::{
     HASH_SIZE, MERKLE_OCTREE_BRANCHING, MERKLE_OCTREE_DEPTH, MERKLE_OCTREE_INTERNAL,
