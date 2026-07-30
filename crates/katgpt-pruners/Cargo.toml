@@ -39,6 +39,14 @@ papaya = { version = "0.2", optional = true }         # lock-free HashMap (bfcf_
 rustfft = { version = "6", optional = true }          # reserved
 reqwest = { version = "0.12", features = ["blocking", "json"], optional = true }  # AutoGo REST client (go feature)
 
+[target.'cfg(target_os = "macos")'.dependencies]
+# Moka-on-ANE residency probe (Issue 564) — mirrors katgpt-backend's own
+# `ane` feature deps exactly, kept local so this crate doesn't need a new
+# cross-crate dependency for a scoped probe.
+coreml-native = { version = "0.2", optional = true }
+coreml-proto = { version = "0.1", optional = true }
+prost = { version = "0.14", optional = true }
+
 [dev-dependencies]
 tempfile = "3"
 
@@ -177,6 +185,11 @@ monopoly = ["bevy_ecs", "bandit"]
 go = ["bandit", "reqwest"]
 game_state = []
 arena = []
+
+# Moka-on-ANE residency probe (Issue 564) — macOS-only, CoreML. Answers
+# whether Moka's topology can even run on the Apple Neural Engine before
+# committing to a full 40-layer graph builder.
+moka_ane = ["go", "dep:coreml-native", "dep:coreml-proto", "dep:prost"]
 fft = ["bandit", "sr2am_configurator"]
 event_log = []
 # Plan 562: programmatic search over EventLog (PRO-LONG distillation, Research 461).

@@ -17,6 +17,7 @@ pub mod analytics;
 pub mod autogo_client;
 pub mod autoresearch;
 pub mod g_zero_player;
+pub mod moka_net;
 pub mod players;
 pub mod replay;
 pub mod replay_writer;
@@ -49,6 +50,12 @@ pub use autogo_client::{AutoGoClient, AutoGoError, AutoGoGameState};
 pub use players::{
     GoGZeroPlayer, GoGreedyPlayer, GoHLPlayer, GoMctsPlayer, GoMoveCategory, GoPlayer,
     GoRandomPlayer, GoTemplate, GoValidatorPlayer,
+};
+
+// Moka v1 native port (Plan 563)
+pub use moka_net::{
+    GoMctsMokaPlayer, GoMokaSearchPlayer, MokaHeuristic, MokaPlayer, MokaScratch, MokaWeights,
+    encode_features, forward, forward_with_scratch,
 };
 
 // Analytics

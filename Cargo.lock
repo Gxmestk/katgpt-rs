@@ -1890,6 +1890,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "katgpt-moka-wasm"
+version = "0.1.0"
+dependencies = [
+ "katgpt-types",
+ "serde",
+ "serde_json",
+ "wasm-bindgen",
+ "wasmi",
+]
+
+[[package]]
 name = "katgpt-percepta"
 version = "0.1.0"
 dependencies = [
@@ -1923,6 +1934,8 @@ dependencies = [
  "bevy_ecs",
  "blake3",
  "bytemuck",
+ "coreml-native",
+ "coreml-proto",
  "fastrand",
  "half",
  "katgpt-core",
@@ -1933,6 +1946,7 @@ dependencies = [
  "log",
  "papaya",
  "postcard",
+ "prost",
  "rayon",
  "reqwest",
  "rustfft",

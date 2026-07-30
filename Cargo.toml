@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/katgpt-attn", "crates/katgpt-attn-match", "crates/katgpt-backend", "crates/katgpt-band", "crates/katgpt-canon", "crates/katgpt-claim", "crates/katgpt-core", "crates/katgpt-dec", "crates/katgpt-deprecated", "crates/katgpt-forward", "crates/katgpt-hla", "crates/katgpt-kv", "crates/katgpt-micro-belief", "crates/katgpt-percepta", "crates/katgpt-personality", "crates/katgpt-proof-cert", "crates/katgpt-pruners", "crates/katgpt-quant", "crates/katgpt-ruliology", "crates/katgpt-sense", "crates/katgpt-sleep", "crates/katgpt-sparse", "crates/katgpt-spectral", "crates/katgpt-speculative", "crates/katgpt-tokenizer", "crates/katgpt-transformer", "crates/katgpt-types", "crates/katgpt-validator", "."]
+members = ["crates/katgpt-attn", "crates/katgpt-attn-match", "crates/katgpt-backend", "crates/katgpt-band", "crates/katgpt-canon", "crates/katgpt-claim", "crates/katgpt-core", "crates/katgpt-dec", "crates/katgpt-deprecated", "crates/katgpt-forward", "crates/katgpt-hla", "crates/katgpt-kv", "crates/katgpt-micro-belief", "crates/katgpt-moka-wasm", "crates/katgpt-percepta", "crates/katgpt-personality", "crates/katgpt-proof-cert", "crates/katgpt-pruners", "crates/katgpt-quant", "crates/katgpt-ruliology", "crates/katgpt-sense", "crates/katgpt-sleep", "crates/katgpt-sparse", "crates/katgpt-spectral", "crates/katgpt-speculative", "crates/katgpt-tokenizer", "crates/katgpt-transformer", "crates/katgpt-types", "crates/katgpt-validator", "."]
 resolver = "3"
 
 [package]
@@ -1178,6 +1178,10 @@ required-features = ["memo_reflections", "go"]
 [[example]]
 name = "go_10_sdpg_tournament"
 required-features = ["go", "sdpg_bandit"]
+
+[[example]]
+name = "go_11_moka_head_to_head"
+required-features = ["go"]
 
 [[example]]
 name = "go_replay_gen"
