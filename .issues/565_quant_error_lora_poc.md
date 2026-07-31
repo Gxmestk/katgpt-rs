@@ -3,6 +3,7 @@
 > **Filed:** 2026-07-31
 > **Updated:** 2026-07-31 (enriched with 3 additional strategies from Gemini consultation)
 > **Updated:** 2026-08-01 (T1-T7, T12 RUN — G1/T12 results recorded)
+> **Updated:** 2026-08-01 (G1-B proper-calibration Strategy B — negative result confirmed as REAL)
 > **Research:** [463](../.research/463_moka_freeze_thaw_lever_audit.md)
 > **Type:** defend-wrong PoC (per research skill §3.6)
 > **Status:** Active (G1/T12 done; G5 deferred pending G5 wiring decision)
@@ -45,6 +46,12 @@ The PoC's value is negative knowledge + reusable substrate regardless of outcome
 - [x] **T3** — Output-space SVD-LoRA implemented (`QuantErrorLora::from_error_data_aware`).
       PoC uses truncated board features as calibration (known approximation —
       a proper calibration would capture actual layer activations/patches).
+      **G1-B follow-up (2026-08-01):** proper activation-based calibration
+      landed (`forward_collecting_activations` in katgpt-moka-wasm +
+      `g1b_cosine_strategy_b_proper_calibration` test). Proper calibration
+      improved B by ~0.02 cosine over truncated-features, but B STILL HURTS
+      (Δ≈−0.05). The negative result is REAL, not a PoC artifact: data-aware
+      SVD overfits to calibration distribution on small networks.
 - [-] **T4** — D4 symmetry averaging: deferred. The forward-pass G1 results (A rank-16+
       helps, B/D hurt) make D4 a lower priority — it's orthogonal to LoRA but the
       cost concern (2× forward per leaf) + the fact that PUCT already averages
@@ -110,6 +117,41 @@ low-rank structure — enough that rank-16+ can recover >65% of the error
 energy. The Small-Kernel Paradox is real (the error isn't low-rank) but
 weaker than predicted (not full-rank either). The `policy.linear` layer
 (82×324) is the worst offender: rank-32 captures only 61%.
+
+### G1-B — Strategy B proper calibration (2026-08-01)
+
+The initial Strategy B negative result (Δ≈−0.06) was suspected to be a PoC
+artifact: truncated board features are a poor approximation of actual layer
+inputs (especially for conv layers where the input is a 3×3 im2col patch).
+
+**The fix:** `forward_collecting_activations` (katgpt-moka-wasm commit
+`0bd2e29b`) runs the same forward arithmetic but captures each layer's
+actual input vectors. The PoC collects 26,688 calibration vectors across
+60 layers (81 positions × 64 boards, subsampled to max 512/layer) and builds
+the data-aware SVD from REAL activations.
+
+| Strategy | Rank 8 | Rank 16 | Rank 32 |
+|---|---|---|---|
+| B-OLD (truncated features) | −0.066 | −0.071 | −0.064 |
+| B-PROPER (actual activations) | **−0.050** | **−0.046** | **−0.050** |
+| A (weight-space SVD, reference) | −0.006 | **+0.018** | **+0.023** |
+
+**Verdict:** proper calibration IMPROVED Strategy B by ~0.02 cosine over
+truncated features — confirming the artifact hypothesis. But Strategy B
+STILL HURTS even with proper calibration (Δ≈−0.05). The negative result is
+now REAL, not an artifact. **Strategy A (weight-space SVD) remains the
+winner.**
+
+**Why data-aware SVD underperforms weight-space SVD:** the data-aware SVD
+optimizes for `||E·X||²` on the calibration set — it captures the principal
+directions of the output error projected through inputs. On small networks
+(105K params), the weight structure dominates: the intrinsic error
+structure of the weight matrix (what weight-space SVD captures) generalizes
+better to unseen inputs than the calibration-conditioned output error.
+Data-aware SVD overfits to the calibration distribution. This is the
+opposite of what happens in large LLMs (where data-aware approaches like
+GPTQ/OBQ outperform weight-only quantization), suggesting the Small-Kernel
+Parameter Paradox applies to the data-aware axis too.
 
 ### G1 — Cosine similarity vs f32 forward (64 boards)
 

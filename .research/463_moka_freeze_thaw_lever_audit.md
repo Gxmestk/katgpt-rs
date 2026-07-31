@@ -641,13 +641,24 @@ fails on small CNNs") was too pessimistic — at rank-16+ the correction works.
 The cost is 27.8% param overhead at rank-8 (higher at rank-16/32), which is
 the Small-Kernel Paradox manifesting as a COST issue, not a QUALITY issue.
 
-**Strategy B's negative result is a PoC artifact**, not a fundamental finding.
-The bench uses truncated board features (first `in_dim` of the 972-dim board
-tensor) as the calibration set, which does NOT represent actual layer
-activations (especially for conv layers where the input is a 3×3 patch). A
-proper data-aware calibration would capture actual intermediate activations.
-Strategy B may still be strictly better than Strategy A (per §2.4.2) if
-calibrated correctly — this PoC cannot confirm or deny that.
+**Strategy B's negative result is now CONFIRMED REAL** (G1-B follow-up,
+2026-08-01). The initial PoC used truncated board features as calibration
+(known artifact). A proper activation-based calibration — capturing actual
+im2col patches + flat activations via `forward_collecting_activations`
+(26,688 vectors across 60 layers, subsampled to 512/layer) — improved
+Strategy B by ~0.02 cosine over truncated features. But B STILL HURTS
+(Δ≈−0.05 vs ternary baseline). The negative result is no longer a PoC
+artifact. **Strategy A (weight-space SVD, calibration-free) remains the
+winner.**
+
+The finding contradicts the §2.4.2 prediction that data-aware SVD would be
+strictly better than weight-space SVD. On small networks (105K params), the
+weight structure dominates: the intrinsic error structure of the weight
+matrix generalizes better to unseen inputs than calibration-conditioned
+output error. Data-aware SVD overfits to the calibration distribution. This
+is the opposite of what happens in large LLMs (GPTQ/OBQ), suggesting the
+Small-Kernel Parameter Paradox applies to the data-aware axis too: small
+networks lack the redundancy that makes data-aware compression effective.
 
 **Strategy D's negative result is real.** Sparse outlier correction
 destabilizes the output when the error is distributed (T12 confirmed 51%
