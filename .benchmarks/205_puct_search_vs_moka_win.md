@@ -16,12 +16,12 @@
 | PUCT budget=200, c_puct=2.5, top_k=8 | **98.0%** | 79,677 | ~200 |
 | PUCT budget=100, c_puct=1.5, top_k=4 (narrow beam) | **96.0%** | 40,809 | ~100 |
 
-**Issue 204 addendum — WASM (real Chrome) latency for the same configs.** The
+**Issue 204 addendum — WASM (real Chrome) latency + wasmi win-rate parity for the same configs.** The
 `GoPuctMokaPlayer` algorithm was ported into `katgpt-moka-wasm` as
 `WasmPuctPlayer` (same weights, same feature encoder, only the board wrapper
-changed). Win rates above are NATIVE (Bench 205); the WASM port is
-byte-identical in algorithm so strength parity is structural, but was NOT
-re-measured in-browser. Latency IS measured in real Chrome:
+changed). Latency IS measured in real Chrome; win rate IS measured via wasmi
+(a deterministic IEEE-754 interpreter — same binary, same moves as Chrome's
+JIT, just ~46× slower):
 
 | Config | Median ms/move (real Chrome) | Avg nodes/move | ms/node |
 |---|---|---|---|
@@ -31,9 +31,13 @@ re-measured in-browser. Latency IS measured in real Chrome:
 
 Per-node ~0.59 ms = ~0.50 ms forward pass (Table B) + ~0.09 ms tree overhead.
 wasmi upper bound (interpreted, no JIT): b200 = 5,462 ms/move (~46× slower
-than Chrome JIT, confirms JIT is where ~98% of perf lives). Full record:
-`katgpt-rs/.docs/06_game_arenas/go_arena.md` Table C +
-`.issues/204_wasm_puct_combined_measurement.md`.
+than Chrome JIT, confirms JIT is where ~98% of perf lives).
+
+**Win-rate parity (wasmi, budget=50, n=20): 20/20 = 100%.** Consistent with
+the native 94% (n=100) — at p=0.94, P(20/20) ≈ 29%, so a perfect run at n=20
+is a normal high draw, not a divergence. The parity claim is now empirically
+confirmed end-to-end through the shipped wasm binary, not just structural.
+Full record: `katgpt-rs/.docs/06_game_arenas/go_arena.md` Table C.
 
 All games use GO_OPENING_MOVES=4 (random prefix for variance). Board: 9×9.
 

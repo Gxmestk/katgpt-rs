@@ -367,3 +367,240 @@ pub unsafe extern "C" fn wasmi_puct_search(
 pub extern "C" fn wasmi_puct_nodes_evaluated() -> usize {
     unsafe { (*(&raw mut WASMI_PUCT)).as_mut() }.expect("wasmi_puct_init not called").nodes_evaluated()
 }
+
+// ── Issue 204 follow-up: full-game arena via wasmi (win-rate parity test) ──
+//
+// The latency test above answers "how fast is PUCT+WASM?". The honest gap
+// left open (documented in `go_arena.md` Table C "Strength parity note") is
+// "does the WASM port actually WIN at the native rate (94–98%)?". This
+// section closes that gap by running complete PUCT-vs-greedy-Moka games
+// entirely through the wasm binary — the strongest possible parity evidence,
+// because the exact shipped wasm code is exercised end-to-end (board rules,
+// feature encoding, forward pass, PUCT search, greedy argmax, scoring).
+//
+// wasmi is a deterministic IEEE-754 interpreter (same binary → same moves as
+// Chrome's JIT — wasm spec mandates bit-identical execution modulo host
+// bugs), so the win rate measured here IS the in-browser win rate. Slower
+// (~46×, see Table C), but the moves chosen are identical, and win rate is an
+// emergent property of move choices, not speed.
+//
+// Design: a single global `ArenaState` owns the board + move history + PUCT
+// player + greedy (Moka weights/scratch). The host is a thin driver: reset →
+// opening random moves → alternate PUCT/greedy searches (each advancing the
+// board) → score. No board logic is duplicated on the host side.
+
+struct ArenaState {
+    board: board::Board,
+    /// Full move history (last-2-plies feed the feature encoder). Mirrors the
+    /// native `MokaPlayer::history` — both players read the SAME global history
+    /// here, which is correct because both observe every ply.
+    history: Vec<Option<(usize, usize)>>,
+    puct: puct::PuctPlayer,
+    weights: moka::MokaWeights,
+    scratch: moka::MokaScratch,
+    features_buf: Vec<f32>,
+}
+
+static mut WASMI_ARENA: Option<ArenaState> = None;
+
+/// Initialize the arena: new empty board + PUCT player configured with
+/// `(budget, c_puct_bits, top_k)`. Must be called once before any other
+/// `wasmi_arena_*` function. Resets any prior game state.
+#[unsafe(no_mangle)]
+#[allow(clippy::deref_addrof)]
+pub extern "C" fn wasmi_arena_init(budget: usize, c_puct_bits: u32, top_k: usize) {
+    let c_puct = f32::from_bits(c_puct_bits);
+    let state = ArenaState {
+        board: board::Board::new(),
+        history: Vec::new(),
+        puct: puct::PuctPlayer::new(budget, c_puct, top_k),
+        weights: moka::MokaWeights::load(),
+        scratch: moka::MokaScratch::new(),
+        features_buf: vec![0.0; moka::INPUT_ELEMENT_COUNT],
+    };
+    unsafe {
+        *(&raw mut WASMI_ARENA) = Some(state);
+    }
+}
+
+fn with_arena<R>(f: impl FnOnce(&mut ArenaState) -> R) -> R {
+    // `&raw mut` avoids forming a reference to the `static mut` (Rust 2024
+    // denies that). clippy::deref_addrof's suggested rewrite (`WASMI_ARENA`)
+    // would reintroduce that reference — false positive, same as `wasmi_init`.
+    #[allow(clippy::deref_addrof)]
+    let state = unsafe { (*(&raw mut WASMI_ARENA)).as_mut() }.expect("wasmi_arena_init not called");
+    f(state)
+}
+
+/// Reset to a fresh empty board + cleared history. PUCT player config is
+/// preserved (re-init with `wasmi_arena_init` to change budget/c/top_k).
+/// Called between games in a multi-game win-rate run.
+#[unsafe(no_mangle)]
+#[allow(clippy::deref_addrof)]
+pub extern "C" fn wasmi_arena_reset() {
+    with_arena(|s| {
+        s.board = board::Board::new();
+        s.history.clear();
+    });
+}
+
+/// Play a stone at flat board index `idx` (0..81). Caller must have verified
+/// legality (the host's `wasmi_arena_legal_count`/randomized-opening path
+/// does so). Advances to_play + updates history.
+#[unsafe(no_mangle)]
+#[allow(clippy::deref_addrof)]
+pub extern "C" fn wasmi_arena_play(idx: usize) {
+    with_arena(|s| {
+        s.board.play(idx);
+        s.history.push(Some((idx / board::SIZE, idx % board::SIZE)));
+    });
+}
+
+/// Pass. Advances to_play + updates history + increments consecutive-passes.
+#[unsafe(no_mangle)]
+#[allow(clippy::deref_addrof)]
+pub extern "C" fn wasmi_arena_pass() {
+    with_arena(|s| {
+        s.board.pass();
+        s.history.push(None);
+    });
+}
+
+/// Write the current board's 81 cells (0=empty, 1=black, 2=white) into
+/// `out_ptr`. Used by the host for diagnostics; the search functions read the
+/// board internally via the global arena state, so the host does NOT need to
+/// mirror board cells.
+///
+/// # Safety
+/// `out_ptr` must point to at least 81 writable `u8`s.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn wasmi_arena_get_cells(out_ptr: *mut u8) {
+    with_arena(|s| {
+        let out = unsafe { std::slice::from_raw_parts_mut(out_ptr, board::AREA) };
+        for (i, &c) in s.board.cells.iter().enumerate() {
+            out[i] = match c {
+                board::Cell::Empty => 0,
+                board::Cell::Black => 1,
+                board::Cell::White => 2,
+            };
+        }
+    });
+}
+
+/// Current player to play: 0=black, 1=white.
+#[unsafe(no_mangle)]
+#[allow(clippy::deref_addrof)]
+pub extern "C" fn wasmi_arena_to_play() -> u8 {
+    with_arena(|s| match s.board.to_play {
+        board::Cell::Black => 0,
+        board::Cell::White => 1,
+        board::Cell::Empty => 0,
+    })
+}
+
+/// Number of legal non-pass moves at the current position. Used by the host's
+/// randomized-opening loop to pick a random legal move.
+#[unsafe(no_mangle)]
+#[allow(clippy::deref_addrof)]
+pub extern "C" fn wasmi_arena_legal_count() -> u32 {
+    with_arena(|s| s.board.legal_moves().len() as u32)
+}
+
+/// Fetch the `n`-th legal move (0-indexed, in the order `Board::legal_moves`
+/// returns — ascending flat index). Returns 255 if `n >= legal_count`. The
+/// host calls this after `legal_count` to implement a random legal opening ply.
+#[unsafe(no_mangle)]
+#[allow(clippy::deref_addrof)]
+pub extern "C" fn wasmi_arena_legal_move(n: u32) -> u32 {
+    with_arena(|s| {
+        let moves = s.board.legal_moves();
+        moves.get(n as usize).map(|&i| i as u32).unwrap_or(255)
+    })
+}
+
+/// Run a PUCT search on the current board position, PLAY the chosen move on
+/// the arena's board (advancing history + to_play), and return it: a flat
+/// board index (0..81) for a placement, or 255 for pass. This mirrors the
+/// native `GoPuctMokaPlayer::select_move` contract — the player both picks
+/// and plays, so its internal history tracking stays consistent.
+#[unsafe(no_mangle)]
+#[allow(clippy::deref_addrof)]
+pub extern "C" fn wasmi_arena_search_puct() -> u8 {
+    with_arena(|s| {
+        let mv = s.puct.select_move(&s.board);
+        match mv {
+            Some(idx) => {
+                s.board.play(idx);
+                s.history.push(Some((idx / board::SIZE, idx % board::SIZE)));
+                idx as u8
+            }
+            None => {
+                s.board.pass();
+                s.history.push(None);
+                255
+            }
+        }
+    })
+}
+
+/// Run ONE greedy forward pass (the real Moka greedy player: argmax over
+/// policy logits including pass), PLAY the chosen move, and return it:
+/// flat board index (0..81) for placement, or 255 for pass. This is the
+/// exact algorithm `select_highest_legal_move` + `WasmMoka::infer` implement
+/// for the browser — same weights, same forward pass, same argmax.
+#[unsafe(no_mangle)]
+#[allow(clippy::deref_addrof)]
+pub extern "C" fn wasmi_arena_search_greedy() -> u8 {
+    with_arena(|s| {
+        // Encode features from current board + history, forward pass.
+        moka::encode_features_into(&s.board, &s.history, &mut s.features_buf);
+        let (policy, _value) =
+            moka::forward_with_scratch(&s.weights, &s.features_buf, &mut s.scratch);
+
+        // Argmax over legal moves vs pass logit — mirrors MokaPlayer::select_move.
+        let mut best_logit = policy[board::AREA]; // pass logit at index 81
+        let mut best_move: Option<usize> = None;
+        for i in s.board.legal_moves() {
+            let logit = policy[i];
+            if logit > best_logit {
+                best_logit = logit;
+                best_move = Some(i);
+            }
+        }
+
+        match best_move {
+            Some(idx) => {
+                s.board.play(idx);
+                s.history.push(Some((idx / board::SIZE, idx % board::SIZE)));
+                idx as u8
+            }
+            None => {
+                s.board.pass();
+                s.history.push(None);
+                255
+            }
+        }
+    })
+}
+
+/// 1 if the game has ended (both players passed consecutively), else 0.
+#[unsafe(no_mangle)]
+#[allow(clippy::deref_addrof)]
+pub extern "C" fn wasmi_arena_is_over() -> u8 {
+    with_arena(|s| u8::from(s.board.is_game_over()))
+}
+
+/// Area-score reward for `color` (0=black, 1=white): 1 if `color` is strictly
+/// ahead after komi (7.5 to White), else 0. See `Board::reward`. The host
+/// uses this to determine the game winner.
+#[unsafe(no_mangle)]
+#[allow(clippy::deref_addrof)]
+pub extern "C" fn wasmi_arena_reward(color: u8) -> u8 {
+    with_arena(|s| {
+        let c = match color {
+            0 => board::Cell::Black,
+            _ => board::Cell::White,
+        };
+        u8::from(s.board.reward(c) > 0.5)
+    })
+}
