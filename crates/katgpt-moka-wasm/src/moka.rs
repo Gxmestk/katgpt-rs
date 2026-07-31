@@ -346,13 +346,19 @@ pub fn forward_with_scratch(weights: &MokaWeights, features: &[f32], scratch: &m
 }
 
 /// Encode `board` + last-two-plies `history` (`None` = pass) into Moka's
-/// 12-plane `9*9*12` HWC feature tensor. Identical to
+/// 12-plane `9*9*12` HWC feature tensor, written into `out` (length ≥
+/// [`INPUT_ELEMENT_COUNT`]). Logic identical to
 /// `katgpt_pruners::go::moka_net::encode_features`, adapted to this crate's
-/// standalone `Board`/`Cell`.
-pub fn encode_features(board: &Board, history: &[Option<(usize, usize)>]) -> Vec<f32> {
+/// standalone `Board`/`Cell`; `_into` here (unlike the native version, which
+/// still returns an owned `Vec`) because this crate's `WasmGame` holds a
+/// persistent buffer specifically so its address stays stable across calls —
+/// letting JS wrap ONE `Float32Array` view over it instead of marshalling a
+/// fresh array out of wasm on every encode.
+pub fn encode_features_into(board: &Board, history: &[Option<(usize, usize)>], out: &mut [f32]) {
     let size = BOARD_SIZE;
     let idx = |row: usize, col: usize, plane: usize| (row * size + col) * INPUT_PLANES + plane;
-    let mut feats = vec![0f32; size * size * INPUT_PLANES];
+    let feats = &mut out[..size * size * INPUT_PLANES];
+    feats.fill(0.0);
 
     let mut visited = vec![false; size * size];
     for pos in 0..size * size {
@@ -420,6 +426,4 @@ pub fn encode_features(board: &Board, history: &[Option<(usize, usize)>]) -> Vec
             feats[idx(row, col, 11)] = komi_value;
         }
     }
-
-    feats
 }

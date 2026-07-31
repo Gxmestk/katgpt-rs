@@ -572,19 +572,21 @@ Significance (n=100 each): top_k=4 vs the 50% baseline is **z = 4.80** (p ≈ 10
 1. **The 57% "final answer" was a tuning artifact, not the truth.** It was measured honestly at n=200 but at `top_k=8` — a config since shown to be significantly worse than `top_k=4` (z = 2.42). Sample size was never the problem there; the *configuration* was. Widening the sample on a badly-tuned config buys precision about the wrong thing.
 2. **Small samples still ran high, repeatedly.** 74% (n=100) → 70% (n=300), just as 63.3% (n=30) → 57% (n=200) earlier. The direction was consistently optimistic. At n=300 with p ≈ 10⁻¹² the result is no longer in doubt.
 
-### Bottom line on the whole exercise
+### Bottom line on the whole exercise (superseded — see "PUCT search" below)
 
-| | Moka v1 (greedy) | Best of ours (`GoMokaSearchPlayer`, depth 1, k=4) |
+⚠️ **This table is the honest bottom line as of the alpha-beta result only. It was superseded same-day by PUCT (Bench 205, further down this document), which reaches 98.0% — not 70.0%. Kept here unedited for the historical record of how the investigation actually progressed; do not quote 70% as "best of ours" going forward.**
+
+| | Moka v1 (greedy) | Best of ours *at the time* (`GoMokaSearchPlayer`, alpha-beta, depth 1, k=4) |
 |---|---|---|
-| Strength (9×9, n=300) | baseline | **70.0%** win rate (CI 64.8–75.2%) |
+| Strength (9×9, n=300) | baseline | 70.0% win rate (CI 64.8–75.2%) — **since superseded by PUCT's 98.0%** |
 | Params | 105,353 | same 105,353 — *it is Moka's network* |
 | Weights payload | 113,648 B | same |
-| Latency/move | ~0.4–0.54 ms | **~2.8 ms** (~5–7×) |
+| Latency/move | ~0.4–0.54 ms | ~2.8 ms (~5–7×) |
 | Forward pass | ~0.45 ms | ~0.45 ms (shared kernel) |
 
 ⚠️ **Timing caveat.** This machine's measurements are noisy: Moka's per-move latency — a control that should be constant — was observed anywhere from 404 to 942 µs across runs, and repeat runs of the same forward-pass bench gave 0.392 and 0.450 ms. Quote latency as approximate. In particular the `MokaScratch` reuse-vs-allocate comparison came out **−1.7% in one run and +22.7% in another**, i.e. the direction is inside the noise floor — no speedup should be claimed for the scratch plumbing (see the kernel section above; it is retained for timing stability, not for throughput).
 
-The honest summary: **policy-pruned search on top of Moka's own weights beats greedy Moka decisively — 70% over 300 games — at roughly 5–7× the per-move cost** (2.8 ms vs ~0.5 ms), which is ~42× better than the 119 ms/move this line of work started at. Our *modelless* players remain 0% against Moka, so the original question's answer is unchanged: **no**. And this configuration is not architecture-independent — it needs Moka's policy and value heads to function at all. What the exercise does demonstrate cleanly: (a) a correct, parity-checked native Rust port of a third-party int8 CNN, (b) an 8.7× kernel speedup with equivalence guards, mostly from reusing this workspace's own SIMD kernel, and (c) that classical policy-pruned search extracts large, measurable extra strength from a small distilled network at inference time, with **zero training** — provided the beam stays narrow enough to keep the noisier value head on a short leash.
+The summary *at this point in the investigation* was: policy-pruned search on top of Moka's own weights beats greedy Moka decisively — 70% over 300 games — at roughly 5–7× the per-move cost (2.8 ms vs ~0.5 ms), ~42× better than the 119 ms/move this line of work started at. **That conclusion no longer holds as the final word** — PUCT (below) pushes strength to 98.0% at a correspondingly higher latency (~80 ms/move at budget=200), a different point on the strength/latency curve entirely, not a small refinement of this one. What still stands unchanged from this phase: our *modelless* players remain 0% against Moka (original question's answer: **no**); this configuration is not architecture-independent (needs Moka's policy and value heads); and the underlying infrastructure — parity-checked native port, 8.7× kernel speedup with equivalence guards — is what both this result and PUCT are built on.
 
 ### Investigated and rejected: Apple Neural Engine via CoreML (Issue 564)
 
@@ -662,12 +664,41 @@ Every prior "Moka: ~0.5ms/move" figure in this document was **our own native por
 3. **`RUSTFLAGS='-C target-feature=+simd128'` + `wasm-opt --enable-simd` fixed it completely**: 8.6 ms → 0.6 ms (14.3×), landing at **10.7× faster than real Moka**, confirmed in the same real browser, same self-play-generated position, same measurement methodology.
 4. **wasmi confirms JIT compilation is where nearly all the performance lives**, not the WASM format itself: the identical (non-SIMD) binary, pure-interpreted, is 212 ms/call — 25× slower than the exact same binary JIT'd by V8. A WASM interpreter alone is not viable for this workload at any point on this ladder.
 
-### Honest final scorecard
+### Honest final scorecard — two tables, not one, on purpose
 
-| | Moka | Ours |
+Strength and speed/size come from **two entirely different experiments on two entirely different platforms** (native Rust search algorithms vs. browser WASM network inference) — an earlier version of this doc merged them into one 3-row "Moka | Ours" table, which invites reading "0.5 ms" and "98.0%" as one build's two properties. They are not. Splitting them so that reading error is structurally impossible:
+
+**A. Native strength — search algorithm comparison (no browser, no WASM, all native Rust)**
+
+| Config | Win% vs Moka | Latency/move (native) | n |
+|---|---|---|---|
+| Alpha-beta (depth=1, top_k=4) | 70.0% (n=300); **74.0% reconfirmed fresh, n=100, 1,976.8 µs/move** | ~2.0–2.8 ms | 300 |
+| PUCT (budget=50, c=1.5, top_k=8) | 94.0% | ~21 ms | 100 |
+| PUCT (budget=100, c=1.5, top_k=8) | 96.0% | ~43 ms | 100 |
+| PUCT (budget=200, c=2.5, top_k=8) | **98.0% reconfirmed fresh** (98W/2L, n=100) | **81,099.6 µs ≈ 81.1 ms** | 100 |
+
+Both rows above re-run fresh in this session, on demand, to confirm the documented figures weren't stale — both matched (74.0%/1.98ms and 98.0%/81.1ms respectively). PUCT strictly dominates alpha-beta on strength, at a real and substantial latency cost — budget=200 is **~41× slower per move** than alpha-beta (81.1 ms vs 1.98 ms), not a free upgrade. **Yes, PUCT is slower — the 0.5 ms figure below has nothing to do with PUCT.**
+
+**B. Browser speed/size — plain network inference only (no search of any kind, either algorithm)**
+
+| | Moka (real) | Ours |
 |---|---|---|
-| Strength (native, n=300, search config) | baseline | **70.0%** win rate |
-| Speed, real browser (SIMD-enabled) | 6.4 ms | **0.6 ms — 10.7× faster** |
-| Size, real browser | 140,850 B | 269,405 B — **1.9× larger** |
+| Latency/move | 6.4 ms | **0.5 ms** (zero-copy API) / 0.6 ms (marshalled API) |
+| Bundle size | 140,850 B | 273,218 B |
 
-We beat Moka on **speed** (once compiled with the right target feature) and on **strength** (via search, native only — the WASM build here is greedy/network-only, not the search config). We lose on **size** — confirmed exactly as predicted before measuring: the SIMD kernel, generic conv/linear machinery, and Rust runtime cost real bytes their hand-written 11 KB JS file doesn't pay, and no build flag fixes that. All three claims now rest on real, reproducible, side-by-side measurement — not self-comparison.
+This measures one greedy forward pass — the WASM build has no search at all, analogous to native `MokaPlayer` (argmax over the raw policy), not `GoMokaSearchPlayer`/`GoPuctMokaPlayer`. Nothing in table A has been ported to WASM.
+
+**The unambiguous take-away:** there is no single build that is simultaneously 98% strong *and* 12.8× faster than Moka. Want strength → PUCT, natively, ~80 ms/move. Want raw network speed → the WASM build with SIMD128 + zero-copy, ~0.5 ms/move, but that's Moka's own weak greedy policy on both sides, not the search-augmented one. Table A's latency is native (no browser); table B's latency is real-browser. Do not average or combine numbers across the two tables.
+
+### Follow-up: does zero-copy JS↔wasm sharing help further?
+
+`WasmMoka::infer(&[f32]) -> Vec<f32>` marshals on both sides of every call: the input slice is bulk-copied into a temporary wasm buffer, and the `Vec<f32>` return is allocated in wasm, copied out to a fresh JS array, then freed. WASM linear memory is inherently JS-visible zero-copy (`WebAssembly.Memory.buffer` wrapped directly in a `Float32Array` view, no `SharedArrayBuffer`/threads needed) — so `WasmMoka::infer_ptr`/`WasmGame::encode_features_ptr` were added: persistent, never-resized buffers with stable addresses, exposed via `wasm_bindgen::memory()`, read/written through JS-side `Float32Array` views instead of marshalled arguments/return values.
+
+**Paired same-page-load result (n=100 each, real Chrome):**
+
+| | Median | Mean |
+|---|---|---|
+| Baseline (`infer`, marshalled) | 0.60 ms | 0.55 ms |
+| Zero-copy (`infer_ptr`, shared memory view) | 0.50 ms | 0.54 ms |
+
+**Real, measurable, but modest** — roughly 15–20% at the median, with p99/min/max identical between the two. Marshalling cost is real, but it was never the dominant cost once SIMD was already enabled; the 14.3× win from Phase 1 (enabling `simd128`) dwarfs this. This widens an already-decisive lead rather than fixing a loss. Size cost of keeping both APIs side-by-side for the A/B: +3,813 B (269,405 → 273,218) — a real deployment would drop the marshalled `infer`/`encode_features` entirely rather than keep both, likely netting smaller, not larger.

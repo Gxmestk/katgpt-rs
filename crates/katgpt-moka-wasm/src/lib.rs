@@ -23,6 +23,12 @@ use wasm_bindgen::prelude::*;
 pub struct WasmGame {
     board: board::Board,
     history: Vec<Option<(usize, usize)>>,
+    /// Persistent, fixed-length, never-resized after construction — its
+    /// address in wasm linear memory is therefore stable across every
+    /// `encode_features_ptr` call. JS wraps that address in ONE
+    /// `Float32Array` view (see `bench_ours.html`) instead of receiving a
+    /// fresh marshalled array on every call.
+    features_buf: Vec<f32>,
 }
 
 #[wasm_bindgen]
@@ -32,6 +38,7 @@ impl WasmGame {
         Self {
             board: board::Board::new(),
             history: Vec::new(),
+            features_buf: vec![0.0; moka::INPUT_ELEMENT_COUNT],
         }
     }
 
@@ -52,9 +59,22 @@ impl WasmGame {
         self.history.push(None);
     }
 
-    /// Moka's 12-plane `9*9*12` HWC feature tensor for the current position.
+    /// Moka's 12-plane `9*9*12` HWC feature tensor for the current position,
+    /// marshalled out as a fresh array on every call — the baseline API,
+    /// kept for the A/B comparison against `encode_features_ptr`.
     pub fn encode_features(&self) -> Vec<f32> {
-        moka::encode_features(&self.board, &self.history)
+        let mut out = vec![0.0; moka::INPUT_ELEMENT_COUNT];
+        moka::encode_features_into(&self.board, &self.history, &mut out);
+        out
+    }
+
+    /// Writes the same tensor into `features_buf` and returns a pointer to
+    /// it — zero-copy on the wasm side. JS reads the result through a
+    /// `Float32Array` view over `wasm_memory()` instead of a marshalled
+    /// return value.
+    pub fn encode_features_ptr(&mut self) -> *const f32 {
+        moka::encode_features_into(&self.board, &self.history, &mut self.features_buf);
+        self.features_buf.as_ptr()
     }
 }
 
@@ -68,6 +88,9 @@ impl Default for WasmGame {
 pub struct WasmMoka {
     weights: moka::MokaWeights,
     scratch: moka::MokaScratch,
+    /// Persistent 83-float (`POLICY_MOVES` + value) output buffer — same
+    /// stable-address idea as `WasmGame::features_buf`, for `infer_ptr`.
+    out_buf: Vec<f32>,
 }
 
 #[wasm_bindgen]
@@ -77,17 +100,52 @@ impl WasmMoka {
         Self {
             weights: moka::MokaWeights::load(),
             scratch: moka::MokaScratch::new(),
+            out_buf: vec![0.0; moka::POLICY_MOVES + 1],
         }
     }
 
     /// Returns 83 floats: 82 policy logits (81 board points + pass at index
-    /// 81), then the value estimate as the last element.
+    /// 81), then the value estimate as the last element. Baseline API —
+    /// `features` is marshalled INTO wasm on every call (a real bulk copy of
+    /// the JS array into a temporary wasm buffer) and the `Vec<f32>` return
+    /// is marshalled back OUT (allocate in wasm, copy to a fresh JS array,
+    /// free the wasm buffer) — two real copies per call, kept for the A/B
+    /// comparison against `infer_ptr`.
     pub fn infer(&mut self, features: &[f32]) -> Vec<f32> {
         let (policy, value) = moka::forward_with_scratch(&self.weights, features, &mut self.scratch);
         let mut out = policy.to_vec();
         out.push(value);
         out
     }
+
+    /// Zero-copy variant: `features_ptr` must already point at
+    /// `INPUT_ELEMENT_COUNT` valid floats already sitting in wasm linear
+    /// memory (e.g. `WasmGame::encode_features_ptr()`'s return value — same
+    /// memory space, so handing the pointer straight through costs nothing).
+    /// Writes the result into this instance's persistent `out_buf` and
+    /// returns a pointer to it, so JS never allocates or copies on either
+    /// side of this call.
+    ///
+    /// # Safety
+    /// `features_ptr` must be non-null and point to at least
+    /// `INPUT_ELEMENT_COUNT` valid, initialized `f32`s for the lifetime of
+    /// this call. Caller-enforced — this is the entire point of the raw
+    /// pointer API (skip wasm-bindgen's safe-but-copying slice marshalling).
+    pub unsafe fn infer_ptr(&mut self, features_ptr: *const f32) -> *const f32 {
+        let features = unsafe { std::slice::from_raw_parts(features_ptr, moka::INPUT_ELEMENT_COUNT) };
+        let (policy, value) = moka::forward_with_scratch(&self.weights, features, &mut self.scratch);
+        self.out_buf[..moka::POLICY_MOVES].copy_from_slice(&policy);
+        self.out_buf[moka::POLICY_MOVES] = value;
+        self.out_buf.as_ptr()
+    }
+}
+
+/// Exposes the WASM linear memory as a JS `WebAssembly.Memory` object, so
+/// the browser harness can wrap `Float32Array` views directly over it —
+/// the standard wasm-bindgen pattern for zero-copy JS↔wasm data sharing.
+#[wasm_bindgen(js_name = wasmMemory)]
+pub fn wasm_memory() -> JsValue {
+    wasm_bindgen::memory()
 }
 
 impl Default for WasmMoka {
