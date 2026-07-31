@@ -2108,6 +2108,14 @@ pub use tilr::discover_invariant_subspace;
 // local tangent SVD (Plan 301 thin_svd_into).
 #[cfg(all(feature = "manifold_erasure", feature = "subspace_phase_gate"))]
 pub mod manifold_erasure;
+
+// Issue 565 / Research 463: Quantization-Error Compensating Reader-LoRA —
+// deterministically-constructed low-rank (weight-space SVD, output-space
+// data-aware SVD) or sparse (top-K COO bypass) correction for quantized
+// weight matrices. Pure modelless (closed-form SVD / partial-sort). Gated on
+// subspace_phase_gate for the thin SVD machinery (Plan 301).
+#[cfg(all(feature = "quant_error_lora", feature = "subspace_phase_gate"))]
+pub mod quant_error_lora;
 #[cfg(all(feature = "manifold_erasure", feature = "subspace_phase_gate"))]
 pub use manifold_erasure::{
     ManceConfig, ManceError, ManceScratch, ManceStepInfo, ManceTangentCache,
