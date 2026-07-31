@@ -7,6 +7,7 @@ description = "Canonical Intent Space — architecture-neutral intent directions
 repository = "https://github.com/katopz/katgpt-rs"
 keywords = ["canonical", "intent", "procrustes", "subspace", "modelless"]
 categories = ["algorithms", "science"]
+publish = false  # depends on katgpt-spectral (private) — not part of the katgpt-core publish family
 
 [dependencies]
 # katgpt-core: thin_svd_into + SvdResultScratch + SvdScratch for the joint
