@@ -7,6 +7,7 @@
 > **Related Research:** 110 (Ciot / PlasmaPath ternary), 132 (LoRAPrune), 202 (QAT Infusion), 229 (ProgramAsWeights F4 SpecAdapter)
 > **Related Plans:** 148 (PlasmaPath), 025 (LoraPair raw/lora hot-swap), 563 (Moka baseline)
 > **Related Issues:** 565 (defend-wrong PoC for quantization-compensating reader-LoRA)
+> **PASS-Redirects (synthesis):** HyperLoRA [arXiv:2606.06154 "Amortizing Federated Adaptation: Hypernetwork Driven LoRA for Personalized Foundation Models"] — federated LoRA TRAINING method (all three components — hypernetwork generator G_φ, product-space synthesizer S_ψ, residual corrector C_ω — are LEARNED via meta-objective Eq 18). → riir-train. Does NOT apply to Moka (single network, no federation, no aggregation problem). Does NOT replace the SVD quant-error-LoRA in this note (different problem: federated aggregation bias vs single-network quantization error). The one transferable math insight (Proposition 1: factor-wise averaging produces chimeric cross-terms B_i·A_j) is already moot in our stack because our LoRA merge is ADDITIVE (`W + B·A`, confirmed in `forward_coda`), not factor-averaged. §3.5 Path 0 decomposition: G_φ has NO modelless analog (genuinely needs learning); S_ψ decomposes to SVD (= FlexLoRA baseline, which the paper beats) + learned statefulness; C_ω decomposes to least-squares residual fit + learned conditioning. Closest shipped cousin: Research 062 (SHINE — context-to-LoRA hypernetwork, also verdicted model-based/training).
 > **Classification:** Public
 
 ---
