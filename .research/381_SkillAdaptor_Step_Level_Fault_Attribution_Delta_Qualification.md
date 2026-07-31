@@ -84,7 +84,7 @@ Applied to SkillAdaptor:
 |--------------------------------|-------------------------------|----------|
 | "skill" (textual record) | "pruner", "cognitive branch", "direction vector", "FailureSignature" | `katgpt-pruners`, `cognitive_branches_runtime`, R172 `PrunerMemory` |
 | "trajectory" | "trajectory" (literal), "replay log", "DDTree path" | `CognitiveBranchReplayLog`, `katgpt-pruners::ddtree` |
-| "first actionable fault step t\*" | "FailureSite", "earliest DDTree node where predicate violated" | `katgpt-pruners/src/trajectory_doctor.rs` |
+| "first actionable fault step t\*" | "FailureSite", "earliest DDTree node where predicate violated" | `crates/katgpt-pruners/src/trajectory_doctor.rs` |
 | "responsibility linker" / "suspect skills" | "branch routing", "BanditPruner arm credit", "FailureSignature counter" | R161 router, R172 `FailureSignature`, `BanditPruner` |
 | "REVISE existing skill" | "branch anti-pattern write", "FailureSignature bump", "bandit Q-value update" | R161 §2.3 `WriteDecision::Reject → write_failure` |
 | "GENERATE new skill" | "branch spawn (new orthogonal direction)", "new pruner registration" | R161 lifecycle, R172 bandit registration |
@@ -97,7 +97,7 @@ A paper-vocabulary-only grep for `skill_adaptor|first actionable fault|fault_cha
 
 | SkillAdaptor component | Shipped equivalent | Status |
 |------------------------|--------------------|--------|
-| **Localizer** (find first actionable fault) | `TrajectoryDoctor::localize_failure -> Option<FailureSite{depth, token_idx, violated_predicate, alternatives}>` | ✅ **SHIPPED** (`katgpt-pruners/src/trajectory_doctor.rs`, Plan 223). Multiple impls: `BracketTrajectoryDoctor`, `HoareTrajectoryDoctor`. `FailureEpisodeStore` persists sites by prompt hash for flywheel learning. |
+| **Localizer** (find first actionable fault) | `TrajectoryDoctor::localize_failure -> Option<FailureSite{depth, token_idx, violated_predicate, alternatives}>` | ✅ **SHIPPED** (`crates/katgpt-pruners/src/trajectory_doctor.rs`, Plan 223). Multiple impls: `BracketTrajectoryDoctor`, `HoareTrajectoryDoctor`. `FailureEpisodeStore` persists sites by prompt hash for flywheel learning. |
 | **Linker** (responsibility weights) | (a) `FailureSignature { pattern, count, last_seen, recovery_action }` from R172 ITSE; (b) `BanditPruner` arm credit attribution; (c) R161 cognitive-branch routing by HLA-state dot-product snap | ✅ **Partial** — bandit arm attribution + branch routing exist; the explicit weighted-responsibility-to-specific-skill is branch attribution. |
 | **Modifier — REVISE** | R161 `WriteDecision::Reject → write_failure(branch_id, ...)` writes to branch-local anti-pattern store; R172 `PrunerMemory.edge_cases` / `failure_signatures` updated post-session; `BanditPruner` Q-value decrement on negative reward | ✅ **Partial modelless analog** — branch anti-pattern write + failure signature bump + bandit credit update. NOT textual revision (which is R169 LLM-dependent). |
 | **Modifier — GENERATE** | R161 branch spawn (new orthogonal HLA direction); R172 new-pruner registration via `WasmTestGate` | ✅ **Partial** — branch spawn driven by verifier signals exists; new-pruner registration gated by WASM test exists. |
@@ -220,7 +220,7 @@ If a future agent re-evaluates this paper, do NOT re-derive a PASS verdict from 
 **Verdict: ❌ REFUTE — quality-parity claim NOT sustained by the consumer PoC.**
 
 The riir-ai Plan 313 Phase 5 PoC
-(`riir-poc/benches/step_attribution_modelless_goat.rs`) refuted the G6 PASS
+(`riir-ai/crates/riir-poc/benches/step_attribution_modelless_goat.rs`) refuted the G6 PASS
 criterion. Raw numbers (deterministic seed `0x1313_1313_1313_1313`, 1000-tick
 scenario, 20% FN/FP noise):
 

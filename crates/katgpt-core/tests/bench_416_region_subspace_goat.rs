@@ -66,9 +66,8 @@ fn g1_k1_parity_with_plan_412_100_random_offsets() {
     let log_pi = [0f32; K];
     let psi_inv = [1f32; D];
 
-    let region_field = RegionSubspaceField::<D, K, R>::new_unchecked(
-        centroids, loadings, log_pi, psi_inv,
-    );
+    let region_field =
+        RegionSubspaceField::<D, K, R>::new_unchecked(centroids, loadings, log_pi, psi_inv);
     let block_412 = identity_loadings::<D, D>();
 
     let mut rng = Lcg::new(42);
@@ -100,7 +99,10 @@ fn g1_k1_parity_with_plan_412_100_random_offsets() {
     println!("   comparisons: 100 offsets × D={D} = {} elements", 100 * D);
     println!("   mismatches:  {mismatches}");
     println!("   threshold:   0");
-    assert_eq!(mismatches, 0, "G1 FAIL: {mismatches} bit mismatches vs Plan 412");
+    assert_eq!(
+        mismatches, 0,
+        "G1 FAIL: {mismatches} bit mismatches vs Plan 412"
+    );
     println!("   G1 ✓ PASS");
 }
 
@@ -122,9 +124,8 @@ fn g2_two_mode_steering_distinct() {
     // Each region has identity loadings (same subspace for all — tests centroid distinction).
     let loadings = [identity_loadings::<D, R>(); K];
 
-    let field = RegionSubspaceField::<D, K, R>::new_unchecked(
-        centroids, loadings, [0f32; K], [1f32; D],
-    );
+    let field =
+        RegionSubspaceField::<D, K, R>::new_unchecked(centroids, loadings, [0f32; K], [1f32; D]);
 
     // G2a: centroid steering toward different regions produces distinct outputs.
     let base = [0f32; D];
@@ -167,7 +168,10 @@ fn g2_two_mode_steering_distinct() {
         diff_loadings[k][1][(2 * k + 1).min(D - 1)] = 1.0;
     }
     let diff_field = RegionSubspaceField::<D, K, R>::new_unchecked(
-        [[0f32; D]; K], diff_loadings, [0f32; K], [1f32; D],
+        [[0f32; D]; K],
+        diff_loadings,
+        [0f32; K],
+        [1f32; D],
     );
     let offset = [1f32, 1f32];
     let mut local_states = [[0f32; D]; K];
@@ -213,9 +217,8 @@ fn g4_latency_smoke_and_struct_size() {
 
     let centroids = [[0f32; D]; K];
     let loadings = [identity_loadings::<D, R>(); K];
-    let field = RegionSubspaceField::<D, K, R>::new_unchecked(
-        centroids, loadings, [0f32; K], [1f32; D],
-    );
+    let field =
+        RegionSubspaceField::<D, K, R>::new_unchecked(centroids, loadings, [0f32; K], [1f32; D]);
 
     // Structural size check.
     let expected_size = K * D * 4       // centroids
@@ -223,7 +226,7 @@ fn g4_latency_smoke_and_struct_size() {
         + K * 4                          // log_pi
         + D * 4                          // psi_inv
         + K * R * D * 4                  // projectors
-        + 32;                            // commitment
+        + 32; // commitment
     let actual_size = std::mem::size_of::<RegionSubspaceField<D, K, R>>();
     println!("── G4a: structural size ──");
     println!("   D={D} K={K} R={R}");
@@ -276,9 +279,7 @@ fn g5_determinism() {
     println!("   G5a ✓ PASS");
 
     // G5b: decompose + reconstruct bit-identical for fixed state + field.
-    let field = RegionSubspaceField::<D, K, R>::new_unchecked(
-        centroids, loadings, log_pi, psi_inv,
-    );
+    let field = RegionSubspaceField::<D, K, R>::new_unchecked(centroids, loadings, log_pi, psi_inv);
     let state = [1f32, 2f32, 3f32, 4f32, 5f32, 6f32, 7f32, 8f32];
     let decomp1: RegionDecomposition<K, R> = field.decompose(&state, 0.0);
     let decomp2: RegionDecomposition<K, R> = field.decompose(&state, 0.0);

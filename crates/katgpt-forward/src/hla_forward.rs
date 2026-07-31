@@ -137,6 +137,26 @@ pub fn forward_hla<'a>(
         // MLP: save residual → RMSNorm → MLP → residual
         ctx.xr2[..n].copy_from_slice(&ctx.x[..n]);
         types::rmsnorm(&mut ctx.x);
+        #[cfg(feature = "gated_mlp")]
+        {
+            // SwiGLU: SiLU(W_gate·h) ⊙ W_up·h → W_down·hidden
+            types::matmul(
+                &mut ctx.hidden,
+                &layer_weights.mlp_w1,
+                &ctx.x,
+                config.mlp_hidden,
+                n,
+            );
+            types::matmul(
+                &mut ctx.hidden2,
+                &layer_weights.mlp_w_up,
+                &ctx.x,
+                config.mlp_hidden,
+                n,
+            );
+            types::swiglu_inplace(&mut ctx.hidden, &ctx.hidden2);
+        }
+        #[cfg(not(feature = "gated_mlp"))]
         types::matmul_relu(
             &mut ctx.hidden,
             &layer_weights.mlp_w1,
@@ -144,7 +164,7 @@ pub fn forward_hla<'a>(
             config.mlp_hidden,
             n,
         );
-        // MLP w2: sparse when feature enabled and sparsity is high enough
+        // MLP w2 (W_down): sparse when feature enabled and sparsity is high enough
         #[cfg(feature = "sparse_mlp")]
         {
             let alive = types::sparse_matmul(
@@ -174,7 +194,6 @@ pub fn forward_hla<'a>(
             n,
             config.mlp_hidden,
         );
-        // SIMD-accelerated residual add (was an unchecked manual loop).
         simd_add_inplace(&mut ctx.x[..n], &ctx.xr2[..n]);
     }
 
@@ -281,6 +300,26 @@ pub fn forward_ahla<'a>(
         // MLP: save residual → RMSNorm → MLP → residual
         ctx.xr2[..n].copy_from_slice(&ctx.x[..n]);
         types::rmsnorm(&mut ctx.x);
+        #[cfg(feature = "gated_mlp")]
+        {
+            // SwiGLU: SiLU(W_gate·h) ⊙ W_up·h → W_down·hidden
+            types::matmul(
+                &mut ctx.hidden,
+                &layer_weights.mlp_w1,
+                &ctx.x,
+                config.mlp_hidden,
+                n,
+            );
+            types::matmul(
+                &mut ctx.hidden2,
+                &layer_weights.mlp_w_up,
+                &ctx.x,
+                config.mlp_hidden,
+                n,
+            );
+            types::swiglu_inplace(&mut ctx.hidden, &ctx.hidden2);
+        }
+        #[cfg(not(feature = "gated_mlp"))]
         types::matmul_relu(
             &mut ctx.hidden,
             &layer_weights.mlp_w1,
@@ -288,6 +327,7 @@ pub fn forward_ahla<'a>(
             config.mlp_hidden,
             n,
         );
+        // MLP w2 (W_down): sparse when feature enabled and sparsity is high enough
         #[cfg(feature = "sparse_mlp")]
         {
             let alive = types::sparse_matmul(
@@ -317,7 +357,6 @@ pub fn forward_ahla<'a>(
             n,
             config.mlp_hidden,
         );
-        // SIMD-accelerated residual add (was an unchecked manual loop).
         simd_add_inplace(&mut ctx.x[..n], &ctx.xr2[..n]);
     }
 
@@ -352,9 +391,8 @@ pub fn generate_hla_into(
     let mut token = config.bos_token;
 
     for pos in 0..n_tokens {
-        let logits = forward_hla(ctx, weights, cache, token, pos, config);
-        types::softmax_scaled(logits, 1.0 / config.temperature);
-        let next_token = types::sample_token_into(&ctx.logits, rng, &mut ctx.cdf);
+        let _ = forward_hla(ctx, weights, cache, token, pos, config);
+        let next_token = ctx.sample_next_token(config.temperature, rng);
         tokens.push(next_token);
         token = next_token;
     }
@@ -376,9 +414,8 @@ pub fn generate_ahla_into(
     let mut token = config.bos_token;
 
     for pos in 0..n_tokens {
-        let logits = forward_ahla(ctx, weights, cache, token, pos, config);
-        types::softmax_scaled(logits, 1.0 / config.temperature);
-        let next_token = types::sample_token_into(&ctx.logits, rng, &mut ctx.cdf);
+        let _ = forward_ahla(ctx, weights, cache, token, pos, config);
+        let next_token = ctx.sample_next_token(config.temperature, rng);
         tokens.push(next_token);
         token = next_token;
     }

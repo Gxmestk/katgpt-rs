@@ -1,5 +1,5 @@
 //! ARG Protocol Primitives — open generic types distilled from the ARG Standard
-//! (Iris Technologies, 2026; https://protocol.airistech.ai/arg-core.html).
+//! (Iris Technologies, 2026; <https://protocol.airistech.ai/arg-core.html>).
 //!
 //! Plan 327 Phases 1-3, Research 309 — open half of the ARG × Latent Substrate
 //! Super-GOAT fusion. Five generic protocol primitives (no game / chain /

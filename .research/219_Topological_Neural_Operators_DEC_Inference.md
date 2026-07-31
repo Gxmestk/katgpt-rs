@@ -17,7 +17,7 @@ TNOs model physical quantities as cochains on cell complexes (vertices→scalars
 
 ### 1.1 Cochain Fields (Not Just Point Fields)
 
-Current state: `FlowField` in `flow/mod.rs` stores 2D flow vectors on a grid — all rank-0 (vertex) data. TNOs show this is lossy: physical quantities have geometric type. Pressures live on vertices, circulations on edges, fluxes on faces.
+Current state: `FlowField` in `crates/katgpt-core/src/flow/mod.rs` stores 2D flow vectors on a grid — all rank-0 (vertex) data. TNOs show this is lossy: physical quantities have geometric type. Pressures live on vertices, circulations on edges, fluxes on faces.
 
 **Key equation:** A k-cochain `uₖ: Kₖ → ℝ^{dₖ}` assigns features to k-cells. Rank matters:
 - Rank 0 (vertices): scalars — potential, pressure, HP, value
@@ -92,6 +92,8 @@ NPCs currently use flow fields (rank-0 gradient of potential). TNO suggests deco
 
 This gives NPCs three qualitatively different navigation behaviors from a single decomposition — no hand-coded FSM needed.
 
+> **Cross-ref to Plan 440 (Lifelong LaCAM LLLG).** This §2.2 describes *single-agent* navigation on a Hodge-decomposed field. Plan 440 ships the *joint multi-agent* layer: `LifelongLaCam` runs PIBT over per-agent space-time A* guidance, and its hindrance estimator `χ(i→u)` (Okumura & Nagai 2025) counts how many siblings would block agent `i`'s candidate cell `u` at `t+1` — this is structurally a **codifferential** `δ` on the occupancy cochain (discrete divergence: how many agents are converging on `u`). The latent-domain fusion (HLA-projected guidance, affect-weighted hindrance) consumes the codifferential magnitude via `soft_cost(χ, β) ∈ (0,1)` as a raw→latent bridge, keeping physical `MapPos` raw/synced and only the resulting affect scalar crossing the sync boundary. See Plan 440 T3.2 `ThreatCochainCost` for the concrete bridge.
+
 ### 2.3 Conservation-by-Construction for Game Physics
 
 The identity `dₖ₊₁ ∘ dₖ = 0` gives conservation laws for free:
@@ -140,7 +142,7 @@ These become new `is_valid()` and `relevance()` signals for the pruner.
 | Dirichlet Energy | `dirichlet.rs` | Already exists — extend to Hodge energy |
 | Spectral hierarchy | `spectral_hierarchy.rs` | Extend to Hodge spectrum |
 | Betti numbers | NEW | Compute from Hodge Laplacian zero eigenvalues |
-| Flow field | `flow/mod.rs` | Extend to multi-rank cochain fields |
+| Flow field | `crates/katgpt-core/src/flow/mod.rs` | Extend to multi-rank cochain fields |
 
 ### 3.2 What's New (Novel Fusion)
 
@@ -236,5 +238,6 @@ These become new `is_valid()` and `relevance()` signals for the pruner.
 | 106 (Shock Confidence) | PDE verification → DEC operators verify physics constraints |
 | 135 (Parallax) | Parameterized local linear attention → similar to linear TNO layer |
 | 212 (Gemini Fourier LatCal) | Fourier + lattice calculus → DEC is the discrete version of this |
+| **440 (Lifelong LaCAM LLLG)** | Multi-agent pathfinding substrate. **The hindrance estimator `χ(i→u)` (count of siblings whose `t+1` neighborhood includes `u`) is structurally a codifferential `δ`** — it measures discrete divergence of the occupancy cochain at `u` (how many agents are converging on that cell). The LLLG cost `CostFn::ThreatCochainCost` reads codifferential magnitude as a latent cost contribution, using `soft_cost(χ, β)` (`position.rs:156`) as the raw→latent bridge. Navigation here is single-agent-on-a-field; Research 424 / Plan 440 ship the joint multi-agent layer. |
 
 TL;DR: TNO's DEC operators give us conservation-by-construction game spatial reasoning. Implement as modelless feature with GOAT gate. The math is open, game cochains are private.

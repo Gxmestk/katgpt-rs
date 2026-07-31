@@ -21,9 +21,9 @@ The combination yields a **controlled-utility-evolution freeze/thaw pattern**: e
 
 **Distilled for katgpt-rs (modelless, inference-time):**
 - The *training loop* (LLM-based evaluator improvement) → riir-train. Not distilled here.
-- After reading the riir-ai Super-GOAT corpus (R158/R161/R155) and grepping shipped code (`dec/cache.rs`, Plan 335 `zone_cache.rs`), the distillation **shrinks to one genuinely-new primitive**:
+- After reading the riir-ai Super-GOAT corpus (R158/R161/R155) and grepping shipped code (`crates/katgpt-dec/src/cache.rs`, Plan 335 `zone_cache.rs`), the distillation **shrinks to one genuinely-new primitive**:
   - `best_belief_score()` / `select_best_belief()` — ε-quantile Beta lower bound over `(successes, failures)` accumulators, used for conservative *selection* of frozen snapshots / archetype blend shards / zone geometry pods. Complements the existing `sample_beta` Thompson sampling (exploration) with a conservative-exploitation counterpart.
-- The originally-proposed `CriterionVersionedRecords<D>` is **NOT new** — `DecCache` (`dec/cache.rs`) and `ZoneGeometryCache` (Plan 335) already ship the criterion-versioned erasure pattern with `topology_version` + `invalidate()` + BLAKE3 source-shard validation. Downgraded to a Gain-tier DRY trait extraction (`CriterionVersionedCache<V>`) over those two existing impls.
+- The originally-proposed `CriterionVersionedRecords<D>` is **NOT new** — `DecCache` (`crates/katgpt-dec/src/cache.rs`) and `ZoneGeometryCache` (Plan 335) already ship the criterion-versioned erasure pattern with `topology_version` + `invalidate()` + BLAKE3 source-shard validation. Downgraded to a Gain-tier DRY trait extraction (`CriterionVersionedCache<V>`) over those two existing impls.
 - The Super-GOAT fusion candidate (per-NPC selective forgetting on personality swap) is **dead** — it's a paraphrase of Research 158 (Committed Personality Blend) §1.3 property #3 (sampling invariance) + §2.4 (sync boundary). See Issue 004 (CLOSED).
 
 ---
@@ -89,11 +89,11 @@ These are genuine training contributions. Per §3.5 of the research skill, the m
 
 #### 2.2.1 "Selective erasure" is ALREADY SHIPPED — `DecCache` + `ZoneGeometryCache`
 
-**Correction (2026-06-28, after reading Plan 335 + `dec/cache.rs`):** The original draft of this note proposed `CriterionVersionedRecords<D>` as a unification of "scattered instances". That framing understated the prior art. The pattern is **already shipped in two production forms**:
+**Correction (2026-06-28, after reading Plan 335 + `crates/katgpt-dec/src/cache.rs`):** The original draft of this note proposed `CriterionVersionedRecords<D>` as a unification of "scattered instances". That framing understated the prior art. The pattern is **already shipped in two production forms**:
 
-1. **`DecCache`** (`katgpt-core/src/dec/cache.rs`): single-slot criterion-versioned cache. Ships `topology_version: u64`, `is_valid(complex_version)`, `invalidate()`, `mark_face_destroyed(face, version)` (selective dirty-region tracking), AND derived-stat recomputation (`store_hodge(components, version)`, `store_betti(bettis, version)`). This is the full pattern — version tag + validity check + selective invalidation + derived stats.
+1. **`DecCache`** (`crates/katgpt-dec/src/cache.rs`): single-slot criterion-versioned cache. Ships `topology_version: u64`, `is_valid(complex_version)`, `invalidate()`, `mark_face_destroyed(face, version)` (selective dirty-region tracking), AND derived-stat recomputation (`store_hodge(components, version)`, `store_betti(bettis, version)`). This is the full pattern — version tag + validity check + selective invalidation + derived stats.
 
-2. **`ZoneGeometryCache`** (`katgpt-core/src/dec/zone_cache.rs`, Plan 335 Phase 2): multi-entry papaya lock-free HashMap of mmap-backed `ZoneGeometryPod`s. Each entry carries `topology_version: u32` + `pod_header` (BLAKE3-validated). Ships `get_or_regen(zone_hash, shard, raw_state, regen_fn)`, `invalidate(zone_hash, new_topology_version)`, `evict_lru()`, and `validate_against_shard(shard_blake3)` returning `ZoneValidationError::SourceShardHashMismatch`. This is the full pattern at multi-entry scale with BLAKE3-tagged source commitment.
+2. **`ZoneGeometryCache`** (`riir-neuron-db/src/zone_cache.rs`, Plan 335 Phase 2): multi-entry papaya lock-free HashMap of mmap-backed `ZoneGeometryPod`s. Each entry carries `topology_version: u32` + `pod_header` (BLAKE3-validated). Ships `get_or_regen(zone_hash, shard, raw_state, regen_fn)`, `invalidate(zone_hash, new_topology_version)`, `evict_lru()`, and `validate_against_shard(shard_blake3)` returning `ZoneValidationError::SourceShardHashMismatch`. This is the full pattern at multi-entry scale with BLAKE3-tagged source commitment.
 
 The value of distilling RQGM's Prop. 2 here is therefore NOT a new primitive — it's a **DRY trait extraction** (`CriterionVersionedCache<V>`) over these two existing impls, so that future caches (HLA eigenbasis cache from Issue 001, Gram cache from Plan 279, archetype-blend cache) implement one trait instead of reinventing `is_valid` / `invalidate` / source-hash-check vocabulary. That is a **Gain**, not GOAT.
 
@@ -150,8 +150,8 @@ This is the modelless analog of RQGM Algorithm 1 lines 22–31. The "anchor" in 
 **Map to existing modules:**
 - `riir-neuron-db/src/freeze.rs` `MerkleFrozenEnvelope` = the epoch freeze (BLAKE3-tagged criterion).
 - `riir-neuron-db/src/mape_k.rs` MAPE-K loop = the checkpoint schedule + replan.
-- `riir-neuron-db/src/consolidation.rs` Raven/δ-Mem = selective erasure on consolidation.
-- `riir-ai/crates/riir-engine/src/latent_functor/reestimation.rs` = the drift-triggered re-estimation scheduler (analog of "evaluator replacement triggered by drift").
+- `katgpt-rs/src/sleep/consolidation.rs` Raven/δ-Mem = selective erasure on consolidation.
+- `riir-ai/crates/riir-engine/src/latent_functor/reestimation/mod.rs` = the drift-triggered re-estimation scheduler (analog of "evaluator replacement triggered by drift").
 - `riir-ai/crates/riir-engine/src/committed_blend/` `CommittedFieldBlend` = the BLAKE3-committed archetype field (analog of "frozen evaluator with anchor lower bound").
 
 None of these today implement the full 4-part contract (epoch freeze + boundary replacement + anchor validation + selective erasure) as a unified abstraction. They each implement a slice.
@@ -206,7 +206,7 @@ Issue 004 tracks the closure with the full Q1–Q4 evidence. **No Super-GOAT gui
 
 ## TL;DR
 
-RQGM (arXiv:2606.26294) is a *training* paper at its headline (co-evolved LLM evaluators under non-stationary utilities) → the training loop routes to riir-train. The original draft of this note proposed two modelless primitives, but reading the riir-ai Super-GOAT corpus (R158 Committed Personality Blend, R161 Cognitive Branch, R155 Sub-Goal Compaction) + grepping shipped code (`dec/cache.rs` `DecCache`, Plan 335 `ZoneGeometryCache`) forced a correction:
+RQGM (arXiv:2606.26294) is a *training* paper at its headline (co-evolved LLM evaluators under non-stationary utilities) → the training loop routes to riir-train. The original draft of this note proposed two modelless primitives, but reading the riir-ai Super-GOAT corpus (R158 Committed Personality Blend, R161 Cognitive Branch, R155 Sub-Goal Compaction) + grepping shipped code (`crates/katgpt-dec/src/cache.rs` `DecCache`, Plan 335 `ZoneGeometryCache`) forced a correction:
 
 - **`best_belief_score()` / `select_best_belief()`** (ε-quantile Beta lower bound `BB_ε = I⁻¹_ε(1+S, 1+F)`) — **genuinely new**, GOAT. Grep confirms `sample_beta` exists (Jöhnk's, for Thompson *exploration*) but no inverse-CDF quantile for conservative *selection*. Complements the existing sampler.
 - **`CriterionVersionedRecords<D>`** — **NOT new**. `DecCache` and `ZoneGeometryCache` already ship criterion-versioned erasure (`topology_version` + `invalidate` + BLAKE3 source validation + derived-stat recomputation). Downgraded to a Gain-tier DRY trait extraction.

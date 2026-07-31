@@ -91,7 +91,7 @@ This is not a "distillation" — it's a complete system replacement.
 
 BLT's speedup comes from having a **lightweight Local Decoder** that can draft independently from the **heavy Global Transformer**. Our model is a standard monolithic Transformer:
 
-```katgpt-rs/src/speculative/verifier.rs#L124-131
+```crates/katgpt-forward/src/verifier.rs#L124-131
 pub struct LeviathanVerifier<'a> {
     pub target_weights: &'a TransformerWeights,
     pub target_config: &'a Config,
@@ -108,7 +108,7 @@ pub struct LeviathanVerifier<'a> {
 
 BLT-S's core mechanism (draft cheaply → verify expensively → accept up to first mismatch) is **exactly what `LeviathanVerifier` does**:
 
-```katgpt-rs/src/speculative/verifier.rs#L151-210
+```crates/katgpt-forward/src/verifier.rs#L151-210
 impl SpeculativeVerifier for LeviathanVerifier<'_> {
     fn speculate(&mut self, draft_weights, draft_config, token, pos, rng) -> Vec<usize> {
         // Phase 1: AR draft (cheap — draft model)
@@ -129,7 +129,7 @@ Both achieve the same effect. Ours doesn't require a hierarchical model.
 
 The claim that validators struggle with token IDs is addressed by our `SynPruner`:
 
-```katgpt-rs/src/validator/syn_pruner.rs#L63-74
+```katgpt-rs/crates/katgpt-validator/src/syn_pruner.rs#L63-74
 impl ConstraintPruner for SynPruner {
     fn is_valid(&self, _depth: usize, token_idx: usize, parent_tokens: &[usize]) -> bool {
         let mut all_tokens = parent_tokens.to_vec();

@@ -33,7 +33,7 @@ use std::collections::HashMap;
 #[inline]
 #[allow(dead_code)]
 fn sigmoid(x: f32) -> f32 {
-    1.0 / (1.0 + (-x).exp())
+    katgpt_core::simd::fast_sigmoid(x)
 }
 
 // ── Core Types ────────────────────────────────────────────────

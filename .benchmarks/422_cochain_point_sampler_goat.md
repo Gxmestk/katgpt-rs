@@ -36,7 +36,7 @@ or heap allocation occurs in the hot path.
 ## G5 — latency methodology
 
 **Workload:** 64×64 vertex grid (`CellComplex::grid_2d(64, 64)`), rank-0
-`CochainField` with `dim = 8` (a realistic multi-channel field, matching HLA
+`CochainField` with `dim = 8` (a realistic multi-channel field, matching belief
 scalar count). Deterministic SplitMix64 PRNG data (seed `0x4220_0710_2026`).
 
 **Measurement:** 100 warmup iterations (cache + branch predictor stabilization),

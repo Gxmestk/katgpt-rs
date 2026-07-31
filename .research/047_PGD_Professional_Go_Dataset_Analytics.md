@@ -22,7 +22,7 @@ Key finding: post-AlphaGo (2016+), professional Coincidence Rate (agreement with
 
 ### 1. We Already Have a "KataGo Lite" — `GoHeuristic`
 
-Our `GoHeuristic` (in `src/pruners/go/state.rs`) evaluates Go states using a weighted combination:
+Our `GoHeuristic` (in `crates/katgpt-pruners/src/go/state.rs`) evaluates Go states using a weighted combination:
 
 | Component | Weight | PGD Equivalent |
 |---|---|---|
@@ -67,7 +67,7 @@ Win/loss records, matchup history, and streak detection are countable from tourn
 **All PGD in-game features are computable without a neural model.** This is the highest-value, lowest-risk distillation:
 
 ```
-GoGameAnalytics (new module: src/pruners/go/analytics.rs)
+GoGameAnalytics (new module: crates/katgpt-pruners/src/go/analytics.rs)
 ├─ WinRateTrace: Vec<f32>            // GoHeuristic at each move
 ├─ ScoreTrace: Vec<f32>              // territory scoring at each move
 ├─ GarbageMoveRatio: f32             // % moves after game decided
@@ -161,7 +161,7 @@ fn coincidence_rate(replay: &GoReplay, state_seq: &[GoState]) -> f32 {
 
 ### Phase 1: Modelless Analytics (katgpt-rs, High Value, Low Risk)
 
-**File:** `src/pruners/go/analytics.rs` (new, ~300 lines)
+**File:** `crates/katgpt-pruners/src/go/analytics.rs` (new, ~300 lines)
 
 | Task | Description | Dependencies |
 |---|---|---|
@@ -179,7 +179,7 @@ fn coincidence_rate(replay: &GoReplay, state_seq: &[GoState]) -> f32 {
 
 ### Phase 2: Model-Based Prediction (riir-ai, Speculative)
 
-**Files:** `riir-engine/src/go_analytics.rs` or `riir-gpu/src/game/go.rs` extension
+**Files:** `riir-engine/src/go_analytics.rs` or `riir-ai/crates/riir-gpu/src/game/go.rs` extension
 
 | Task | Description | Dependencies |
 |---|---|---|
@@ -290,4 +290,4 @@ Plan 081 implemented modelless PGD analytics features and validated them with GO
 - Dataset: https://github.com/Gifanan/Professional-Go-Dataset
 - Our Go engine: `.docs/14_go_arena.md`, Plan 065
 - Our G-Zero self-play: Plan 049, `.plans/065_autogo_distillation.md`
-- Our heuristic: `src/pruners/go/state.rs:GoHeuristic` (L560–790)
+- Our heuristic: `crates/katgpt-pruners/src/go/state.rs:GoHeuristic` (L560–790)

@@ -36,7 +36,7 @@ Total input ≈ 6 × 32 + 4 + 8 = **204 bytes**. BLAKE3 does ~1 GB/s on modern C
 |---|---|---|
 | Primitive Transition Graph | `closure::commitment(&PrimitiveTransitionGraph) -> [u8; 32]` | `crates/katgpt-core/src/closure/mod.rs:84-90` |
 | EngramTable | `EngramTableId::from_table(&dyn EngramTable).0` | `crates/katgpt-core/src/engram/commitment.rs:62-64` |
-| NeuronShard set | `NeuronShard::merkle_root() -> [u8; 32]` (chain-set) | `riir-neuron-db/src/shard.rs` |
+| NeuronShard set | `NeuronShard::merkle_root() -> [u8; 32]` (chain-set) | `riir-neuron-db/src/shard/mod.rs` |
 | FunctorSignatureSet | **No separate type exists** — caller supplies whatever commitment they have (an `EngramTableId` if signatures live in an engram table, `[0u8; 32]` if absent) | n/a — see design note below |
 
 ### Design note — `FunctorSignatureSet`
@@ -131,7 +131,7 @@ cargo test -p katgpt-core --lib  # 1029 passed, 0 failed
 ## Cross-references
 
 - **Issue:** `katgpt-rs/.issues/039_whole_architecture_commitment.md`
-- **Component commitments:** `engram/commitment.rs` (`EngramTableId`), `closure/mod.rs:84-90` (PTG BLAKE3), `riir-neuron-db/src/shard.rs` (`NeuronShard::merkle_root`).
+- **Component commitments:** `crates/katgpt-core/src/engram/commitment.rs` (`EngramTableId`), `crates/katgpt-core/src/closure/mod.rs:84-90` (PTG BLAKE3), `riir-neuron-db/src/shard/mod.rs` (`NeuronShard::merkle_root`).
 - **Freeze/thaw Lean proof (sibling):** `riir-ai/.proofs/RiirAiProof/Runtime/FreezeThaw.lean` (Issue 348 T2). The architecture root is the natural extension target — currently freeze/thaw operates per-shard; whole-architecture freeze is the next step (out of scope here, but this primitive enables it).
 - **Chain consumer (deferred):** `riir-chain/.research/007_Engram_LatCal_Commitment_Bridge.md` — once this primitive ships, the chain can add a `SyncBlock` field carrying `CognitiveArchitectureRoot` for quorum-attested personality checkpoints. File a `riir-chain/.issues/*` when a chain consumer lands.
 

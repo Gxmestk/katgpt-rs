@@ -35,7 +35,7 @@
 //! Per AGENTS.md "Latent vs Raw Space Rules":
 //! - `MapPos { x, y }` → raw, synced. Physical domain; small `V_τ`; raw is
 //!   sufficient by Proposition 1.
-//! - `HlaCacheProxy` → latent, local. Semantic domain; large `V_τ`; latent
+//! - `BeliefCacheProxy` → latent, local. Semantic domain; large `V_τ`; latent
 //!   earns its keep. The scalar outputs (5 affect values) cross the sync
 //!   boundary via a bridge function.
 //! - `NeuronShard { style_weights, hla_moments }` → latent, committed to
@@ -173,7 +173,7 @@ fn print_raw_vs_latent_decision() {
     // Semantic domain examples (latent, local).
     let semantic: &[(&str, usize, &str)] = &[
         (
-            "HlaCacheProxy",
+            "BeliefCacheProxy",
             50_000,
             "latent, local — 5 affect scalars bridge to sync",
         ),

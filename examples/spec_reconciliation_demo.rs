@@ -5,11 +5,11 @@
 //! Run with:
 //!   cargo run --example spec_reconciliation_demo --features spec_reconciliation
 
+use katgpt_rs::types::Rng;
 use katgpt_speculative::spec_reconciliation::{
     AdaptiveReconciler, ReconciliationConfig, ReconciliationResult, ReconciliationVerdict,
     SpecReconciler, TrajectoryPoint,
 };
-use katgpt_rs::types::Rng;
 
 use std::f32::consts::PI;
 

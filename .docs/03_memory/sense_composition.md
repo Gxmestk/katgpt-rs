@@ -41,12 +41,14 @@ impl SenseModule {
 
 ## Sub-Systems
 
-### Shard Embedding (Plan 230)
+### 🪦 Shard Embedding (Plan 230) — DEPRECATED (Issue 139)
 Johnson-Lindenstrauss random orthogonal projection: `style_weights: [f32; 64]` → `ShardEmbedding: [f32; 8]`. Gram-Schmidt orthogonal rows, SIMD dot-product projection, BLAKE3 commitment. No training, no data — modelless dimension reduction.
 
-- `JlProjectionMatrix` — 64×8 random orthogonal matrix with BLAKE3 hash
-- `ShardEmbedding` — `[f32; 8]` with `cosine_similarity()`, `dist_sq()`, BLAKE3 hash
-- Always compiled (no feature gate)
+> **DEPRECATED 2026-07-16 (Issue 139):** m=8 violates the Johnson-Lindenstrauss lower bound by 200× (needs m ≥ 554 for eps=0.5, n=100). Empirically 1.4–6% NN preservation vs 90% target. Zero runtime consumers — SenseModule uses TernaryDir, BFCF uses region centroids. `JlProjectionMatrix` + `ShardEmbedding` are marked `#[deprecated]`; kept for back-compat only. Do not use in new code.
+
+- `JlProjectionMatrix` — 64×8 random orthogonal matrix with BLAKE3 hash (deprecated)
+- `ShardEmbedding` — `[f32; 8]` with `cosine_similarity()`, `dist_sq()`, BLAKE3 hash (deprecated)
+- Always compiled (no feature gate) but emits deprecation warnings
 
 ### SLoD Spectral Level-of-Detail Pruner (Plan 235)
 Modelless KG resolution control via spectral heat diffusion on hyperbolic kNN graph Laplacians. Default-ON, GOAT G1–G6 all pass.
@@ -109,13 +111,13 @@ Per the project's AGENTS.md latent/raw space rules:
 | `slod` | **Default-ON** | `spectral_hierarchy` |
 | `schema_centroid` | **Default-ON** | `dep:papaya` |
 | `bake_precision` | Opt-in (demoted) | `dep:papaya`, `sense_composition` |
-| (shard_embedding) | Always-on | None |
+| (shard_embedding) | 🪦 Deprecated (Issue 139) | None |
 | `rat_plus_bridge` | Opt-in | None |
 
 ## References
 
 - Plan 221: Sense Composition
-- Plan 230: Shard Embedding Projection
+- Plan 230: Shard Embedding Projection — **🪦 DEPRECATED (Issue 139)**
 - Plan 235: SLoD Spectral Level-of-Detail
 - Plan 236: BAKE Precision-Gated Embeddings
 - Plan 237: Schema Centroid KG Embedding Init

@@ -37,7 +37,7 @@ use std::path::Path;
 
 use katgpt_core::{Config, SpeculativeGenerator};
 
-use katgpt_core::simd::{simd_dot_f32, simd_sum_f32};
+use katgpt_core::simd::{fast_tanh, simd_dot_f32, simd_sum_f32};
 
 // ── Magic & Version ────────────────────────────────────────────
 const MAGIC: &[u8; 4] = b"NLDM";
@@ -50,7 +50,7 @@ const VERSION: u32 = 1;
 fn gelu(x: f32) -> f32 {
     const SQRT_2_OVER_PI: f32 = 0.797_884_6; // sqrt(2/pi)
     let inner = SQRT_2_OVER_PI * (x + 0.044_715 * x * x * x);
-    0.5 * x * (1.0 + inner.tanh())
+    0.5 * x * (1.0 + fast_tanh(inner))
 }
 
 // ── LayerNorm ──────────────────────────────────────────────────
@@ -417,11 +417,12 @@ impl LatentDynamicsMLP {
 /// Returns entropy in nats.
 #[inline]
 fn entropy_from_log_probs(log_probs: &[f32]) -> f32 {
+    use katgpt_core::simd::fast_exp;
     let mut h = 0.0f32;
     for &lp in log_probs {
         if lp > -50.0 {
             // skip near-zero probs to avoid -0 * inf
-            let p = lp.exp();
+            let p = fast_exp(lp);
             h -= p * lp;
         }
     }
@@ -436,10 +437,15 @@ fn log_softmax_inplace(logits: &mut [f32]) {
     // subtract ln(sum_exp). Result: x_i − max − ln(sum_exp) = log_softmax(x_i).
     // This avoids the old exp→store→sum→per-element ln() undo path that
     // issued N ln() calls; now there is exactly one ln() call total.
+    //
+    // Scalar `fast_exp` (Cephes) instead of mutating `simd_exp_sum_inplace`:
+    // the shifted logits must survive this pass to receive the final
+    // `- log_sum` correction in the loop below.
+    use katgpt_core::simd::fast_exp;
     let mut sum_exp = 0.0f32;
     for v in logits.iter_mut() {
         *v -= max;
-        sum_exp += v.exp();
+        sum_exp += fast_exp(*v);
     }
     let log_sum = sum_exp.ln();
     for v in logits.iter_mut() {
@@ -453,7 +459,7 @@ fn greedy_sample(logits: &[f32]) -> (usize, f32) {
     let (idx, &val) = logits
         .iter()
         .enumerate()
-        .max_by(|a, b| a.1.partial_cmp(b.1).unwrap_or(std::cmp::Ordering::Equal))
+        .max_by(|a, b| a.1.total_cmp(b.1))
         .unwrap_or((0, &0.0f32));
     (idx, val)
 }
@@ -832,7 +838,7 @@ impl BeliefDrafter {
     /// (Xavier init bounds FC3 output) — informative either way. See Plan 306
     /// §T3.2 doc for the random-init caveat.
     ///
-    /// Returns [`DepthInvarianceDiagnostic::kind`] == [`Insufficient`] if
+    /// Returns `DepthInvarianceDiagnostic::kind` == `Insufficient` if
     /// `max_depth + 1 < cfg.min_samples`.
     ///
     /// [`DepthSpecificRefinement`]: katgpt_core::DepthInvarianceKind::DepthSpecificRefinement

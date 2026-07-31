@@ -24,9 +24,11 @@ use katgpt_core::speculative::types::SpecCostSnapshot;
 // ─────────────────────────────────────────────────────────────────────────────
 
 /// Sigmoid activation (never softmax, per project convention).
+///
+/// Delegates to `katgpt_core::simd::fast_sigmoid` (Cephes polynomial).
 #[inline]
 fn sigmoid(x: f32) -> f32 {
-    1.0 / (1.0 + (-x).exp())
+    katgpt_core::simd::fast_sigmoid(x)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -459,7 +461,7 @@ pub fn build_dd_tree_adaptive(marginals: &[&[f32]], config: &Config) -> (Vec<Tre
 
 /// Build DDTree with adaptive budget + MUX-RCD residual (Plan 258 Task 4.2).
 ///
-/// Composes [`build_dd_tree_adaptive`] with [`compute_mux_residual`] to produce
+/// Composes [`build_dd_tree_adaptive`] with `compute_mux_residual` to produce
 /// a path-score-weighted residual embedding for the specified position. Tree
 /// nodes at `depth == position` serve as hypothesis path endpoints; their
 /// `score` field weights each path's contribution to the blended residual.
@@ -540,9 +542,10 @@ pub fn build_dd_tree_adaptive_mux_residual(
     }
 
     let mut path_scores: Vec<f32> = Vec::with_capacity(path_count);
+    use katgpt_core::simd::fast_exp;
     for n in &tree {
         if n.depth == position {
-            path_scores.push((n.score - max_score).exp());
+            path_scores.push(fast_exp(n.score - max_score));
         }
     }
 

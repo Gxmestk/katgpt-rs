@@ -8,9 +8,9 @@
 ## Tasks
 
 - [x] T1: Add `deep_manifold` feature gate to `Cargo.toml`
-- [x] T2: Implement `ManifoldResidual` trait + `L2ResidualScorer` in `src/pruners/manifold_residual.rs`
+- [x] T2: Implement `ManifoldResidual` trait + `L2ResidualScorer` in `crates/katgpt-pruners/src/manifold_residual.rs`
 - [x] T3: Add benchmark `bench_manifold_residual` — residual vs relevance scoring comparison
-- [x] T4: Implement `BoundaryAlignment` trait + `KlBoundaryAligner` in `src/pruners/boundary_alignment.rs`
+- [x] T4: Implement `BoundaryAlignment` trait + `KlBoundaryAligner` in `crates/katgpt-pruners/src/boundary_alignment.rs`
 - [x] T5: Add `federation` feature gate (depends on `bandit`)
 - [x] T6: Add benchmark `bench_boundary_alignment` — KL coupling between domain experts
 - [x] T7: Enhance `bt_rank` with `SymmetricBoundaryPair` tracking
@@ -52,7 +52,7 @@ No dependencies. Off by default (research feature).
 
 ## T2: `ManifoldResidual` Trait
 
-**File:** `src/pruners/manifold_residual.rs` (new, gated by `deep_manifold`)
+**File:** `crates/katgpt-pruners/src/manifold_residual.rs` (new, gated by `deep_manifold`)
 
 ```rust
 //! Deep Manifold Part 2 — Fixed-Point Residual Scoring (Research 51)
@@ -193,7 +193,7 @@ Compare residual-based branch selection vs relevance-based selection on DDTree c
 
 ## T4: `BoundaryAlignment` Trait
 
-**File:** `src/pruners/boundary_alignment.rs` (new, gated by `federation`)
+**File:** `crates/katgpt-pruners/src/boundary_alignment.rs` (new, gated by `federation`)
 
 ```rust
 //! Deep Manifold Part 2 — Federated Boundary Alignment (Research 51, §7.6)
@@ -317,7 +317,7 @@ Test KL coupling between bomber and go domain experts:
 
 **File:** Enhance existing `bt_rank` implementation.
 
-Add `SymmetricBoundaryPair` to existing `src/rerank.rs`:
+Add `SymmetricBoundaryPair` to existing `crates/katgpt-attn-match/src/rerank.rs`:
 
 ```rust
 /// Deep Manifold §2.6.2: Symmetric boundary pair for BT ranking.
@@ -419,9 +419,9 @@ src/pruners/
 |------|--------|-------------|
 | `Cargo.toml` | Edit (+2 features, +2 to full) | ~5 |
 | `src/pruners/mod.rs` | Edit (+2 conditional mods) | ~4 |
-| `src/pruners/manifold_residual.rs` | **NEW** | ~120 |
-| `src/pruners/boundary_alignment.rs` | **NEW** | ~80 |
-| `src/rerank.rs` | Edit (+SymmetricBoundaryPair) | ~35 |
+| `crates/katgpt-pruners/src/manifold_residual.rs` | **NEW** | ~120 |
+| `crates/katgpt-pruners/src/boundary_alignment.rs` | **NEW** | ~80 |
+| `crates/katgpt-attn-match/src/rerank.rs` | Edit (+SymmetricBoundaryPair) | ~35 |
 | `tests/bench_manifold_residual.rs` | **NEW** | ~100 |
 | `tests/bench_boundary_alignment.rs` | **NEW** | ~80 |
 | `tests/goat_deep_manifold.rs` | **NEW** | ~80 |

@@ -164,6 +164,7 @@ pub fn adaptive_window(trust: f32, base_window: usize, config: &TrustRegionConfi
 /// # Returns
 /// Sampled token index.
 pub fn blend_sample(p_dist: &[f32], q_dist: &[f32], beta: f32, rng: &mut Rng) -> usize {
+    use katgpt_core::simd::fast_exp;
     let n = p_dist.len().min(q_dist.len());
     debug_assert!(n > 0);
 
@@ -183,7 +184,7 @@ pub fn blend_sample(p_dist: &[f32], q_dist: &[f32], beta: f32, rng: &mut Rng) ->
         } else {
             -30.0
         };
-        blended[i] = (inv_beta * log_q + beta * log_p).exp();
+        blended[i] = fast_exp(inv_beta * log_q + beta * log_p);
     }
 
     // Normalize
@@ -278,9 +279,11 @@ fn compute_blend_kl_from_logs(log_p: &[f32], log_q: &[f32], beta: f32) -> f32 {
     // when degenerate (μ too small or log_p too negative). Lets LLVM
     // auto-vectorize the zip — no branch to block vectorization. The extra
     // FLOPs when masked out are far cheaper than a branch mispredict.
+    // (`fast_exp` = Cephes scalar exp; fused exp+V-reduction loop.)
+    use katgpt_core::simd::fast_exp;
     for (&lp, &lq) in log_p.iter().zip(log_q.iter()) {
         let log_mu = inv_beta * lq + beta * lp;
-        let mu = log_mu.exp();
+        let mu = fast_exp(log_mu);
         let active = ((mu > 1e-30) & (lp > -29.999)) as u8 as f32;
         kl += active * mu * (log_mu - lp);
     }

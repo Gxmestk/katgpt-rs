@@ -114,9 +114,9 @@ stripped of any game semantics:
 | Direction vector storage | `EmotionDirections` (Plan 162), `NeuronShard::style_weights` | ✅ same artifact format |
 | Sigmoid projection | `EmotionDirections::project`, FUNCATTN sigmoid basis | ✅ same math |
 | BLAKE3 commitment | `MerkleFrozenEnvelope` (`riir-neuron-db/src/freeze.rs`) | ✅ same envelope |
-| Localized support | `latent_functor/zone_gating.rs`, `SpatialBelief::visible_radius` | ✅ same spatial reasoning |
-| Crowd-scale batch | `latent_functor/npc_integration.rs` crowd loops, `crowd_mcgs` | ✅ same parallelism |
-| Atomic swap | `riir-engine/src/snapshot.rs`, `LoRAHotSwap` | ✅ same pattern |
+| Localized support | `riir-ai/crates/riir-engine/src/latent_functor/zone_gating.rs`, `SpatialBelief::visible_radius` | ✅ same spatial reasoning |
+| Crowd-scale batch | `riir-ai/crates/riir-engine/src/latent_functor/npc_integration.rs` crowd loops, `crowd_mcgs` | ✅ same parallelism |
+| Atomic swap | `riir-ai/crates/riir-engine/src/snapshot.rs`, `LoRAHotSwap` | ✅ same pattern |
 
 **Nothing here is new math.** What's new is the **control direction** (top-down
 injection vs bottom-up computation) and the **application point** (latent state

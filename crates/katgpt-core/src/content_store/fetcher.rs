@@ -1,7 +1,7 @@
 //! Chunk fetcher implementations — Phase 3 hydration backends (Plan 272 T3.1–T3.5).
 //!
-//! Three concrete backends for the [`ChunkFetcher`] trait (defined in
-//! [`super::r#trait`]):
+//! Three concrete backends for the `ChunkFetcher` trait (defined in
+//! `super::r#trait`):
 //! - [`InMemoryChunkFetcher`] — `papaya` lock-free map (test/single-process).
 //! - [`FsChunkFetcher`] — sharded filesystem layout (production local cache).
 //! - [`TieredChunkFetcher`] — composite local→fallback with optional write-back.

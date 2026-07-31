@@ -20,9 +20,9 @@
 
 use std::time::Instant;
 
-use katgpt_transformer::mbu;
 use katgpt_rs::transformer::{ForwardContext, MultiLayerKVCache, TransformerWeights, forward};
 use katgpt_rs::types::{Config, Rng};
+use katgpt_transformer::mbu;
 
 /// Create Gemma 2 scale config with reduced vocab/block to keep test feasible.
 /// The key dimensions (n_embd=2304, n_layer=26, mlp_hidden=9216) match real model.

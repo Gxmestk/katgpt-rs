@@ -315,6 +315,44 @@ fn solve_upper_triangular_transposed_strided(
     }
 }
 
+/// In-place variant of [`solve_upper_triangular_transposed_strided`] where
+/// `x` and `z` share the same buffer. This is valid because the back-substitution
+/// processes rows in strictly decreasing order of `i`: when computing row `i`,
+/// it reads `z[i]` (which was written by the prior forward-substitution and is
+/// below the current `i`, so still untouched) and reads `x[j]` for `j > i`
+/// (which were already overwritten with the final solution by earlier iterations
+/// of this back-substitution loop). Writing `x[i]` only clobbers the `z[i]`
+/// slot, which is never read again. This is the standard textbook in-place
+/// Cholesky solve and eliminates the `.to_vec()` allocation the previous call
+/// site performed.
+fn solve_upper_triangular_transposed_strided_inplace(
+    xz: &mut [f32],
+    l: &[f32],
+    k: usize,
+    n_rhs: usize,
+) {
+    for col in 0..n_rhs {
+        for ii in 0..k {
+            let i = k - 1 - ii;
+            let i_row = i * k;
+            let mut s = xz[i * n_rhs + col];
+            let mut j = i + 1;
+            while j + 4 <= k {
+                s -= l[j * k + i] * xz[j * n_rhs + col];
+                s -= l[(j + 1) * k + i] * xz[(j + 1) * n_rhs + col];
+                s -= l[(j + 2) * k + i] * xz[(j + 2) * n_rhs + col];
+                s -= l[(j + 3) * k + i] * xz[(j + 3) * n_rhs + col];
+                j += 4;
+            }
+            while j < k {
+                s -= l[j * k + i] * xz[j * n_rhs + col];
+                j += 1;
+            }
+            xz[i * n_rhs + col] = s / l[i_row + i];
+        }
+    }
+}
+
 /// Compute the inverse of an SPD matrix `A` (`k×k`) via Cholesky.
 ///
 /// Writes the `k×k` inverse into `inv`. Reuses `l_scratch` (`k×k`) and
@@ -447,9 +485,12 @@ pub fn ridge_solve_woodbury_f32(
 ) {
     cholesky_f32(l_scratch, sample_gram_reg, n);
     // Z = (X Xᵀ + λI)⁻¹ Y, shape N × n_out.
+    // Two triangular solves in-place: lower-substitute into z_scratch, then
+    // back-substitute in-place (the back-sub reads x[j] for j>i which the
+    // forward pass already wrote into z_scratch itself, so we can reuse the
+    // same buffer and avoid the previous `z_scratch.to_vec()` allocation).
     solve_lower_triangular_strided(z_scratch, l_scratch, y, n, n_out);
-    let z_owned: Vec<f32> = z_scratch[..n * n_out].to_vec();
-    solve_upper_triangular_transposed_strided(z_scratch, l_scratch, &z_owned, n, n_out);
+    solve_upper_triangular_transposed_strided_inplace(z_scratch, l_scratch, n, n_out);
     // Wᵀ = Xᵀ Z, shape d_h × n_out.  Xᵀ row i = column i of X.
     for i in 0..d_h {
         for col in 0..n_out {

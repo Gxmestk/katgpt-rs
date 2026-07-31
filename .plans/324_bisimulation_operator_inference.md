@@ -137,7 +137,7 @@ G2 passes. Schema covers the source trajectory set with no spurious operators.
   - For each `(start, goal)` pair in the source trajectory set where a path exists, `plan()` returns `Some(sequence)`.
   - Replaying the sequence against the original `TransitionGraph` (mapping class IDs back to representative states) never violates operator preconditions and reaches a state in the goal class.
 - [x] **T4.3** G3 negative test: for unreachable `(start, goal)` pairs, `plan()` returns `None`.
-- [x] **T4.4** Create `benches/bench_324_bisimulation_goat.rs` (mirrors `salience_tri_gate_bench.rs` convention — no Criterion dev-dep). Measure:
+- [x] **T4.4** Create `crates/katgpt-core/benches/bench_324_bisimulation_goat.rs` (mirrors `salience_tri_gate_bench.rs` convention — no Criterion dev-dep). Measure:
   - `partition_refine` on N ∈ {64, 256, 1024, 4096} random-transition graphs.
   - `class_id` lookup throughput (target ≥ 100M lookups/sec).
   - `infer_operators` on the resulting quotients.
@@ -174,7 +174,7 @@ GOAT gate doc committed. Feature remains opt-in by design (same policy as Induce
 - [x] **T6.2** Update `katgpt-rs/crates/katgpt-core/src/lib.rs` feature gate comment block to list `bisimulation_operator_inference`.
 - [x] **T6.3** Cross-reference from `katgpt-rs/.research/275_*.md` (CWM) §fusion: add a row noting bisimulation as the lighter-weight PDDL-side counterpart.
 - [x] **T6.4** Cross-reference from `katgpt-rs/.research/264_*.md` (CEI) §2.2 gap list: mark gap #1 (PTG data structure) as concretely instantiable via this primitive.
-- [x] **T6.5** Add example `examples/bisimulation_demo.rs`: build a small Towers-of-Hanoi transition graph, refine, infer operators, plan, print the quotient + schema + BLAKE3.
+- [x] **T6.5** Add example `crates/katgpt-core/examples/bisimulation_demo.rs`: build a small Towers-of-Hanoi transition graph, refine, infer operators, plan, print the quotient + schema + BLAKE3.
 
 ---
 

@@ -37,7 +37,7 @@ discretization of a regularized integral operator"* — i.e., the continuous-fie
 interpretation is in the paper. Research 257 §1.3 also notes **resolution
 invariance** (linear-in-n; train at n=2048, test at n=8192).
 
-But the shipped FUNCATTN primitive (`katgpt-rs/crates/katgpt-core/src/funcattn.rs`)
+But the shipped FUNCATTN primitive (`katgpt-rs/crates/katgpt-core/src/funcattn/mod.rs`)
 is **symmetric** — `d_src = d_dst = d`. The G2 benchmark
 (`tests/funcattn_g2_funcattn_vs_parallax_vs_sdpa.rs`) only tests same-dim.
 **Cross-resolution transfer (different d on input vs output) is unshipped.**

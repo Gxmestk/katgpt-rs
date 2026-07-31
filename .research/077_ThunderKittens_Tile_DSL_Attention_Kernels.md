@@ -16,7 +16,7 @@ ThunderKittens (TK) is a CUDA-embedded DSL from Stanford's Hazy Research that ab
 
 **The punchline for our stack:** We do NOT have NVIDIA Tensor Cores, TMA, or TMEM. Our GPU path is wgpu → Metal/Vulkan via CubeCL. Our CPU path is NEON/AVX2 SIMD. But TK's *architectural patterns* — not its hardware-specific instructions — are what we should distill:
 
-1. **CPU (katgpt-core):** TK's online-softmax flash attention algorithm maps directly to our SIMD matmul pipeline. We already have `softmax_scaled()` and `matmul()` in `katgpt-core/src/types.rs`. What we lack is the *tiled iteration* pattern that avoids materializing the full `N×N` attention score matrix. This is a pure algorithmic improvement, independent of GPU hardware.
+1. **CPU (katgpt-core):** TK's online-softmax flash attention algorithm maps directly to our SIMD matmul pipeline. We already have `softmax_scaled()` and `matmul()` in `crates/katgpt-types/src/lib.rs`. What we lack is the *tiled iteration* pattern that avoids materializing the full `N×N` attention score matrix. This is a pure algorithmic improvement, independent of GPU hardware.
 
 2. **GPU (riir-ai):** CubeCL already provides a tiled matmul pipeline (Plan 106 T2.4 complete). TK's LCF (load-compute-finish) template shows how to structure a *kernel template* with producer/consumer roles, pipelined SMEM staging, and persistent task scheduling. This guides our CubeCL kernel architecture.
 
@@ -217,7 +217,7 @@ tiled_attention = []  # Tiled online-softmax flash attention for CPU SIMD
 ```
 
 **Scope:**
-- Tiled attention function in `katgpt-core/src/attention.rs` (new file)
+- Tiled attention function in `crates/katgpt-core/src/attention.rs` (new file)
 - Processes Q in SIMD-width row tiles, K/V in column tiles
 - Online softmax with exp2 trick
 - Falls back to current `softmax_scaled()` for small N where tiling overhead dominates
@@ -260,7 +260,7 @@ Being honest about the limitations:
 
 ### For katgpt-rs (CPU SIMD):
 1. Add `tiled_attention` feature gate to `katgpt-core/Cargo.toml`
-2. Implement tiled online-softmax attention in `katgpt-core/src/attention.rs`
+2. Implement tiled online-softmax attention in `crates/katgpt-core/src/attention.rs`
 3. Benchmark: compare throughput and memory usage vs current full-materialization path
 4. GOAT proof: cosine similarity > 0.999 vs reference SDPA
 

@@ -6,7 +6,10 @@
 //! where every candidate has a known ground-truth "would-succeed" outcome.
 //!
 //! This is the second half of T1's GOAT gate (T3.2 was the perf half). Both
-//! must pass before `sigmoid_graded_reject` can be promoted to default-on.
+//! halves PASSED 2026-06-26 — `sigmoid_graded_reject` was PROMOTED TO DEFAULT-ON
+//! (Plan 310 T4.1, katgpt-rs root Cargo.toml). This bench was the gate evidence;
+//! promotion has already landed. See `katgpt-rs/Cargo.toml` L565 for the
+//! canonical promotion record.
 //!
 //! ## Why not bomber_17?
 //!

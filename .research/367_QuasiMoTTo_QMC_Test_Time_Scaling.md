@@ -173,7 +173,7 @@ These are **different concepts**. R158's "sampling invariance" is a determinism-
 
 ## 5. Implementation sketch (plan-worthy)
 
-**Target:** `katgpt-rs/crates/katgpt-core/src/speculative/qmc.rs` (new module) + Cargo feature `qmc_sampling` (opt-in).
+**Target:** `katgpt-rs/crates/katgpt-core/src/speculative/qmc/mod.rs` (new module) + Cargo feature `qmc_sampling` (opt-in).
 
 **Phases:**
 1. **Phase 1 — QmcSource trait + three methods** (`Lattice`, `Stratified`, `Sobol`). Zero-dep (no `rand` for the lattice/stratified; Sobol direction numbers either vendored or behind a `sobol-tables` optional dep). Unit tests: marginal uniformity (KS test), low-discrepancy (star-discrepancy ≤ i.i.d. baseline).

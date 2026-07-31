@@ -40,9 +40,11 @@ pub fn top_k_gates(query: &[f32], summaries: &[&[f32]], k: usize) -> Vec<(usize,
 }
 
 /// Sigmoid function: σ(x) = 1 / (1 + exp(-x))
+///
+/// Delegates to `katgpt_core::simd::fast_sigmoid` (Cephes polynomial).
 #[inline]
 pub fn sigmoid(x: f32) -> f32 {
-    1.0 / (1.0 + (-x).exp())
+    katgpt_core::simd::fast_sigmoid(x)
 }
 
 /// Dot product of two vectors.

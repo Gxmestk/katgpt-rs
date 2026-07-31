@@ -3,7 +3,7 @@
 **Date:** 2026-06-24
 **Status:** **COMPLETE** — committed as `3a53b8e4` on `develop`. `circulation_integral` implemented + tested + benchmarked. G-C2 fails empirically (as predicted). Primitive is correct. `stokes_calculus` stays opt-in. Resolves issue 005 (closed + removed, resolved).
 **Origin:** Issue 005 (Plan 314 Phase 3 G-C structural fail)
-**Target:** `katgpt-rs/crates/katgpt-core/src/dec/stokes_calculus.rs` (+ bench + tests)
+**Target:** `katgpt-rs/crates/katgpt-dec/src/stokes_calculus.rs` (+ bench + tests)
 **Feature gate:** `stokes_calculus` (root alias for `katgpt-core/dec_operators`) — stays opt-in.
 
 ---
@@ -68,7 +68,7 @@ the natural rank-2 Stokes companion**. The right outcome is:
   - [x] **T3.2** Constant-curl (rigid rotation) field → circulation = curl × area.
         Cross-checked against `exterior_derivative` (Stokes identity). PASS.
   - [x] **T3.3** Reversal antisymmetry: clockwise == −counterclockwise. PASS.
-- [x] **T4** Add `circulation_integral` to `dec/mod.rs` re-exports.
+- [x] **T4** Add `circulation_integral` to `crates/katgpt-core/src/babel_codec/mod.rs` re-exports.
 - [x] **T5** Run unit tests: 15/15 pass (12 existing + 3 new).
 - [x] **T6** Add G-C benchmark variant using `circulation_integral` on closed loops.
 - [x] **T7** Run the benchmark; results in `.benchmarks/317_circulation_integral_goat.md`.
@@ -85,7 +85,7 @@ the natural rank-2 Stokes companion**. The right outcome is:
 ## Architecture
 
 ```
-katgpt-rs/crates/katgpt-core/src/dec/stokes_calculus.rs
+katgpt-rs/crates/katgpt-dec/src/stokes_calculus.rs
     pub fn circulation_integral(cx, edge_field, closed_loop) -> f32
     // ↑ thin wrapper: debug_assert!(closed); line_integral(cx, edge_field, closed_loop)
     mod tests  // +3 tests (T3.1, T3.2, T3.3)

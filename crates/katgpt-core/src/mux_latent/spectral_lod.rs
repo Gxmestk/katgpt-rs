@@ -158,7 +158,7 @@ impl SpectralLOD {
 /// Sigmoid function for mapping raw scores to [0, 1].
 /// Using sigmoid (not softmax) per project guidelines.
 fn sigmoid(x: f32) -> f32 {
-    1.0 / (1.0 + (-x).exp())
+    crate::simd::fast_sigmoid(x)
 }
 
 #[cfg(test)]

@@ -314,11 +314,11 @@ SDE rollout:      noisy_logits = logits + gamma * randn
 Before any adoption, each proposal must pass:
 
 ### Modelless Proposals (tested in katgpt-rs)
-- [x] SDE noise injection: ≥2% win rate in ≥2 game domains, ≤3% latency overhead — `bench_elf_sde` in `benchmark/noise.rs`, `WidthScaleConfig` with SDE rollouts (default-ON via `elf_sde` feature)
-- [x] Logit-normal D2F schedule: ≥5% higher confidence at same step budget — `ScheduleKind::LogitNormal` with `elf_default()` in `speculative/d2f.rs`, benchmarked in `tests/bench_elf_modelless.rs`
+- [x] SDE noise injection: ≥2% win rate in ≥2 game domains, ≤3% latency overhead — `bench_elf_sde` in `src/benchmark/noise.rs`, `WidthScaleConfig` with SDE rollouts (default-ON via `elf_sde` feature)
+- [x] Logit-normal D2F schedule: ≥5% higher confidence at same step budget — `ScheduleKind::LogitNormal` with `elf_default()` in `src/speculative/d2f.rs`, benchmarked in `tests/bench_elf_modelless.rs`
 
 ### Model-Based Proposals (tested in riir-ai)
-- [x] Embedding SDAR: ≥0.5% faster convergence, no stability issues over 500 steps — `EmbeddingSdarConfig`, `embedding_sdar_loss()` in `riir-gpu/src/elf.rs`, benchmarked in `tests/bench_elf_model_based.rs`
-- [x] Training-time CFG: monotonic quality-diversity sweep at inference, no regression at ω=1.0 — `CfgGrpoConfig` with `sample_omega()` in `riir-gpu/src/elf.rs`, tested in `bench_elf_model_based.rs`
+- [x] Embedding SDAR: ≥0.5% faster convergence, no stability issues over 500 steps — `EmbeddingSdarConfig`, `embedding_sdar_loss()` in `riir-ai/crates/riir-gpu/src/elf.rs`, benchmarked in `riir-ai/crates/riir-gpu/tests/bench_elf_model_based.rs`
+- [x] Training-time CFG: monotonic quality-diversity sweep at inference, no regression at ω=1.0 — `CfgGrpoConfig` with `sample_omega()` in `riir-ai/crates/riir-gpu/src/elf.rs`, tested in `bench_elf_model_based.rs`
 
 **Failure mode:** If SDE noise injection shows no improvement in DDTree (likely because discrete token selection doesn't benefit from continuous-space noise), then the entire ELF→modelless path is dead. The model-based proposals are independent and should be evaluated separately.

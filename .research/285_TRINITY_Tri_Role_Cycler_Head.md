@@ -22,11 +22,11 @@ The **transferable primitive** is not the LLM-orchestration demo (that's RL-on-t
 
 | TRINITY mechanism | Already-shipped cousin | Where |
 |---|---|---|
-| Penultimate-hidden-state → linear head → (agent, role) logits | `SenseModule::project` (8-dim HLA projection at ~45ns) + `MetaRouter` (bandit policy head) + `role_transport.rs` (Diagonal/Orthogonal role-conditioned projection) | `katgpt-core/src/sense/`, `katgpt-rs/src/dash_attn/meta_router.rs`, `riir-engine/src/role_transport.rs` |
-| Tri-role protocol (T/W/V) | CGSP runtime triad (Solver / Conjecturer / Guide) + CLR (claim extractor / verifier / voter) + `game_sync` "one binary, three roles" | `riir-engine/src/cgsp_runtime/runtime.rs`, `riir-ai/.research/126_NPC_Curiosity_Guided_Self_Play_Guide.md`, `riir-ai/.research/136_Per_NPC_Runtime_Test_Time_Scaling_Guide.md` |
+| Penultimate-hidden-state → linear head → (agent, role) logits | `SenseModule::project` (8-dim HLA projection at ~45ns) + `MetaRouter` (bandit policy head) + `role_transport.rs` (Diagonal/Orthogonal role-conditioned projection) | `katgpt-core/src/sense/`, `katgpt-rs/crates/katgpt-attn/src/dash_attn/meta_router.rs`, `riir-ai/crates/riir-engine/src/role_transport.rs` |
+| Tri-role protocol (T/W/V) | CGSP runtime triad (Solver / Conjecturer / Guide) + CLR (claim extractor / verifier / voter) + `game_sync` "one binary, three roles" | `riir-ai/crates/riir-engine/src/cgsp_runtime/runtime.rs`, `riir-ai/.research/126_NPC_Curiosity_Guided_Self_Play_Guide.md`, `riir-ai/.research/136_Per_NPC_Runtime_Test_Time_Scaling_Guide.md` |
 | Multi-turn until verifier accepts | CLR cluster voting + Breakeven Complexity Router + MCTS Collapse Discriminator | Research 136, Plan 250, Research 125 |
-| Block-ε separability ⇒ diagonal methods | `RoleTransport::Diagonal` (element-wise) vs `Orthogonal` (full linear) — Plan 100 benchmarked this exact tradeoff empirically | `riir-engine/src/role_transport.rs`, `.benchmarks/023_block_diagonal_goat.md` |
-| Agent pool of frozen LLMs | Frozen LoRA shards (riir-neuron-db) + ZoneExpertBundle + Dynamic-Pair LoRA (Plan 260) + dMoE expert routing (Research 161) | `riir-neuron-db/src/shard.rs`, Plan 260, Research 161 |
+| Block-ε separability ⇒ diagonal methods | `RoleTransport::Diagonal` (element-wise) vs `Orthogonal` (full linear) — Plan 100 benchmarked this exact tradeoff empirically | `riir-ai/crates/riir-engine/src/role_transport.rs`, `.benchmarks/023_block_diagonal_goat.md` |
+| Agent pool of frozen LLMs | Frozen LoRA shards (riir-neuron-db) + ZoneExpertBundle + Dynamic-Pair LoRA (Plan 260) + dMoE expert routing (Research 161) | `riir-neuron-db/src/shard/mod.rs`, Plan 260, Research 161 |
 
 The **one missing piece** in our stack is the *unified per-query T→W→V cycler* — a single primitive that rotates the role projection per turn on a single problem, with verifier-accept early-exit. CGSP has persistent roles per NPC; CLR has cluster voting on K candidates; neither has the "cycle T→W→V on one problem until V says ACCEPT" protocol. **That primitive is the GOAT gain**, behind a feature flag.
 
@@ -107,7 +107,7 @@ TriRoleCycler::run(ctx_init: C, pool: &[Expert], max_turns: u8) -> Outcome
 
 The closest 3 cousins across all five repos:
 
-1. **Research 240 / Plan 274 — CGSP runtime** (`riir-engine/src/cgsp_runtime/runtime.rs`): persistent tri-role (Solver / Conjecturer / Guide) per NPC, with Hint-δ bandit updating priorities. **Persistent** roles, not per-query cycling.
+1. **Research 240 / Plan 274 — CGSP runtime** (`riir-ai/crates/riir-engine/src/cgsp_runtime/runtime.rs`): persistent tri-role (Solver / Conjecturer / Guide) per NPC, with Hint-δ bandit updating priorities. **Persistent** roles, not per-query cycling.
 2. **Research 136 / Plan 284 — Per-NPC CLR test-time scaling** (`riir-ai/.research/136_*`): K candidates × M claims × sigmoid-dot-product × cluster voting × nonlinear reliability. Has agent-pool selection + verifier-style voting, but no explicit T/W/V role rotation per turn.
 3. **Research 125 — MCTS Collapse Discriminator** (`riir-ai/.research/125_*`): provides the verifier-accept signal from MCTS-side collapse detection.
 
@@ -180,7 +180,7 @@ The tri-role per-query T→W→V cycler is a **provable-gain composition** of (r
 
 Per the skill's three documented failure modes:
 1. **`evolve_hla` failure (no notes framing at all)**: N/A — we DID find `SenseModule::project` framing in docs 02 and 24, and it IS the right cousin.
-2. **`latent_functor/reestimation.rs` failure (notes under different vocabulary)**: actively avoided — vocabulary-translated grep ("penultimate hidden state" → "HLA state / belief state / sense projection"; "tri-role T/W/V" → "Solver/Conjecturer/Guide / one-binary-three-roles / role_transport") hit Research 126 + Research 136 immediately.
+2. **`riir-ai/crates/riir-engine/src/latent_functor/reestimation/mod.rs` failure (notes under different vocabulary)**: actively avoided — vocabulary-translated grep ("penultimate hidden state" → "HLA state / belief state / sense projection"; "tri-role T/W/V" → "Solver/Conjecturer/Guide / one-binary-three-roles / role_transport") hit Research 126 + Research 136 immediately.
 3. **R269 / `> <former` failure (defaulted to adapter routing)**: actively avoided — the latent reframing (§2.2 fusion recipe) is the primary framing; adapter routing is mentioned only as one of several pool sources (ZoneExpertBundle, Dynamic-Pair LoRA, dMoE).
 
 ---
@@ -218,9 +218,9 @@ Per the skill's three documented failure modes:
 - **Shipped code (the prior art):**
   - `riir-ai/crates/riir-engine/src/role_transport.rs` — `RoleTransport::Diagonal` / `Orthogonal`, `RoleEmbeddingTable`, `apply_transport`
   - `riir-ai/crates/riir-engine/src/cgsp_runtime/runtime.rs` — `NpcCgspRuntime`, `PriorityTableBandit`, `TickReport`
-  - `katgpt-rs/crates/katgpt-core/src/sense/brain.rs` — `NpcBrain` + HLA projection
-  - `katgpt-rs/src/dash_attn/meta_router.rs` — `MetaRouter` bandit policy head
-  - `riir-neuron-db/src/shard.rs` — frozen LoRA shard pool
+  - `riir-ai/crates/riir-engine/src/sense/brain.rs` — `NpcBrain` + HLA projection
+  - `katgpt-rs/crates/katgpt-attn/src/dash_attn/meta_router.rs` — `MetaRouter` bandit policy head
+  - `riir-neuron-db/src/shard/mod.rs` — frozen LoRA shard pool
 - **Training-side redirect:** sep-CMA-ES + SVF → `riir-train/.research/` (separate note, out of scope for this session)
 
 ---

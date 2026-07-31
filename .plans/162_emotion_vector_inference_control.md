@@ -20,12 +20,12 @@ Zero extra forward pass. O(d) dot product per decode step. Already computed by m
 ### Phase 1: Infrastructure (Modelless Read)
 
 - [x] T0: Plan creation
-- [x] T1: Add `EmotionDirections` struct with pre-computed direction vectors (`desperation`, `calm`, `valence`, `arousal`) loaded from model config — `src/pruners/emotion_vector.rs`
-- [x] T2: Add `emotion_valence_sum`, `emotion_arousal_sum`, `desperation_score_sum`, `calm_score_sum`, `emotion_count` atomic fields to `ReviewMetrics` — `src/pruners/review_metrics.rs`
-- [x] T3: `EmotionDirections::project(activation, direction) -> f32` — zero-alloc O(d) dot product — `src/pruners/emotion_vector.rs`
-- [x] T4: `EmotionDirections::read_emotions(activations) -> EmotionReading` + `ReviewMetrics::record_emotion()` — `src/pruners/emotion_vector.rs` + `src/pruners/review_metrics.rs`
-- [x] T5: `is_desperate_session(threshold)` + `emotion_profile_summary()` on `ReviewMetrics` — `src/pruners/review_metrics.rs`
-- [x] T6: `ReviewMetrics::Display` updated with emotion profile — `src/pruners/review_metrics.rs`
+- [x] T1: Add `EmotionDirections` struct with pre-computed direction vectors (`desperation`, `calm`, `valence`, `arousal`) loaded from model config — `crates/katgpt-pruners/src/emotion_vector.rs`
+- [x] T2: Add `emotion_valence_sum`, `emotion_arousal_sum`, `desperation_score_sum`, `calm_score_sum`, `emotion_count` atomic fields to `ReviewMetrics` — `crates/katgpt-core/src/pruners/review_metrics.rs`
+- [x] T3: `EmotionDirections::project(activation, direction) -> f32` — zero-alloc O(d) dot product — `crates/katgpt-pruners/src/emotion_vector.rs`
+- [x] T4: `EmotionDirections::read_emotions(activations) -> EmotionReading` + `ReviewMetrics::record_emotion()` — `crates/katgpt-pruners/src/emotion_vector.rs` + `crates/katgpt-core/src/pruners/review_metrics.rs`
+- [x] T5: `is_desperate_session(threshold)` + `emotion_profile_summary()` on `ReviewMetrics` — `crates/katgpt-core/src/pruners/review_metrics.rs`
+- [x] T6: `ReviewMetrics::Display` updated with emotion profile — `crates/katgpt-core/src/pruners/review_metrics.rs`
 
 ### Phase 2: GOAT Proof (Benchmark)
 
@@ -47,13 +47,13 @@ Zero extra forward pass. O(d) dot product per decode step. Already computed by m
   - `pub mod emotion_vector;` in `mod.rs` — not behind any feature gate
   - Already default-on since Phase 1
 - [x] T11: If T8 passes (information gain), integrate desperation_score into `SR2AMConfig` context features ✅
-  - Added `desperation_bin: usize` to `ConfiguratorContext` in `katgpt-core/src/types.rs`
+  - Added `desperation_bin: usize` to `ConfiguratorContext` in `crates/katgpt-types/src/lib.rs`
   - Added `ConfiguratorContext::new()` and `with_desperation()` constructors
   - Updated `ConfiguratorBandit` HashMap key from `(domain, entropy_bin)` to `(domain, entropy_bin, desperation_bin)`
   - Updated all 28 construction sites across 5 files
   - SR²AM GOAT 6/6 still passes
 - [x] T12: Add `emotion_desperation_threshold` to domain config (with sensible default) ✅
-  - Added `emotion_desperation_threshold: f32` to `Config` in `katgpt-core/src/types.rs`
+  - Added `emotion_desperation_threshold: f32` to `Config` in `crates/katgpt-types/src/lib.rs`
   - Default: 0.5 (moderate desperation)
   - Initialized in all 9 Config constructors (micro, game, game_go, draft, small_target, gqa_draft, bpe, bpe_draft, gemma2_2b)
 - [x] T13: Update README with emotion vector monitoring section ✅
@@ -93,9 +93,9 @@ impl EmotionDirections {
 
 | File | Change |
 |------|--------|
-| `src/pruners/review_metrics.rs` | Add emotion fields, project methods, summaries |
-| `src/pruners/configurator_bandit.rs` | Add desperation/calm to context features |
-| `src/transformer.rs` | Hook emotion projection at mid-layer during decode |
+| `crates/katgpt-core/src/pruners/review_metrics.rs` | Add emotion fields, project methods, summaries |
+| `crates/katgpt-pruners/src/configurator_bandit.rs` | Add desperation/calm to context features |
+| `crates/katgpt-percepta/src/transformer.rs` | Hook emotion projection at mid-layer during decode |
 | `src/types.rs` | Add `EmotionDirections` to config |
 
 ### Feature Gate

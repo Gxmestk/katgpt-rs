@@ -125,7 +125,7 @@ pub struct SkillCatalog {
 
 ### Task 1: Per-Pruner Memory (PrunerMemory)
 
-- [x] Create `src/pruners/skill_memory.rs` with `PrunerMemory` struct
+- [x] Create `crates/katgpt-pruners/src/skill_memory.rs` with `PrunerMemory` struct
   - Append-only ring buffer per pruner (similar to MUSE's `.memory.md`)
   - Stores: arm selections, rewards, edge cases, failure modes
   - Format: binary `repr(C)` for freeze/thaw compatibility
@@ -140,7 +140,7 @@ pub struct SkillCatalog {
 
 ### Task 2: Test-Gated Registration (PrunerTestGate)
 
-- [x] Create `src/pruners/skill_test.rs` with `PrunerTestGate` trait and `TestCase`/`TestResult` types
+- [x] Create `crates/katgpt-pruners/src/skill_test.rs` with `PrunerTestGate` trait and `TestCase`/`TestResult` types
 - [x] Create `WasmTestGate` implementation — runs `validator.wasm` against known game states
 - [x] Create `BomberTestGate` — pre-built test cases for bomber arena (known-death states, known-safe states)
 - [x] Integrate with `AbsorbCompress::compress()`: before promoting an arm, run test gate
@@ -150,7 +150,7 @@ pub struct SkillCatalog {
 
 ### Task 3: Progressive Disclosure Catalog (SkillCatalog)
 
-- [x] Create `src/pruners/skill_catalog.rs` with `SkillCatalog`, `SkillDescriptor`, `TestStatus`
+- [x] Create `crates/katgpt-pruners/src/skill_catalog.rs` with `SkillCatalog`, `SkillDescriptor`, `TestStatus`
 - [x] Catalog is always in memory — lightweight (name + description + arm_index per skill)
 - [x] Full pruner loaded on-demand when bandit selects arm (lazy loading via `HotSwapPruner`)
 - [x] Integration with `BanditPruner`: bandit selects from catalog descriptors, lazy-loads the winner

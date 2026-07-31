@@ -16,10 +16,10 @@
 
 ### Phase 2: Model-Based (δ → DPO/GRPO weight updates) — ✅ Complete (Plan 059)
 
-- [x] T6: Implement `Proposer` trait + `GRPO` optimizer ✅ (`riir-gpu/src/proposer.rs` + `loss_grpo.rs`)
-- [x] T7: Implement `LengthNormalizedDPO` loss for Generator training ✅ (`riir-gpu/src/loss_dpo.rs` + `dpo_log_ratio.wgsl` + `dpo_reduce.wgsl`)
-- [x] T8: Implement `DeltaFilter` + reward hacking defenses ✅ (`riir-gpu/src/delta_filter.rs` — 6-stage filter)
-- [x] T9: Implement model-based `GZeroLoop` + crash recovery ✅ (`riir-gpu/src/gzero_loop.rs`)
+- [x] T6: Implement `Proposer` trait + `GRPO` optimizer ✅ (`riir-train/crates/riir-train-gpu/src/proposer.rs` + `loss_grpo.rs`)
+- [x] T7: Implement `LengthNormalizedDPO` loss for Generator training ✅ (`riir-train/crates/riir-train-gpu/src/loss_dpo.rs` + `dpo_log_ratio.wgsl` + `dpo_reduce.wgsl`)
+- [x] T8: Implement `DeltaFilter` + reward hacking defenses ✅ (`riir-train/crates/riir-train-gpu/src/delta_filter.rs` — 6-stage filter)
+- [x] T9: Implement model-based `GZeroLoop` + crash recovery ✅ (`riir-train/crates/riir-train-gpu/src/gzero_loop.rs`)
 - [x] T10: Update README, .docs, references ✅ (kernel count 21→26, Phase 2 ✅ in README + riir-ai README, feature flag note updated)
 
 ### Feature Gate
@@ -561,9 +561,9 @@ SelfImprovingCycle {
     ├── Path A (existing):  Export JSONL → riir-burner LoRA SFT      (modelless HL)
     ├── Path B (Phase 1):   DeltaGatedAbsorbCompress + DeltaBanditPruner (smarter modelless)
     └── Path C (Phase 2):   Proposer↔Generator self-play → DPO LoRA  (model-based G-Zero)
-                              ├─ SFT + DPO loss: riir-gpu/src/loss.rs (GpuLoss CE + DPO extension)
-                              ├─ Backward pass:  riir-gpu/src/backward.rs (LoRA grads)
-                              ├─ Optimizer:      riir-gpu/src/optimizer.rs (AdamW)
+                              ├─ SFT + DPO loss: riir-ai/crates/riir-gpu/src/loss.rs (GpuLoss CE + DPO extension)
+                              ├─ Backward pass:  riir-ai/crates/riir-engine/src/transformer/gemma2_train/backward.rs (LoRA grads)
+                              ├─ Optimizer:      crates/katgpt-core/src/skill_opt/optimizer.rs (AdamW)
                               └─ Alt SFT path:   riir-burner --backend rust (burn/Metal subprocess, SFT only)
 }
 ```
@@ -599,7 +599,7 @@ All three paths feed into `HotSwapPruner` for zero-downtime model updates.
 | `TemplateProposer` | 1 | Rule-based query-hint generation |
 | `Proposer` trait | 2 | Neural proposer with GRPO |
 | `GrpoConfig` | 2 | Group-relative policy optimization |
-| `LengthNormalizedDpo` | 2 | Per-token mean log-ratio DPO loss → `riir-gpu/src/loss.rs` extension |
+| `LengthNormalizedDpo` | 2 | Per-token mean log-ratio DPO loss → `riir-ai/crates/riir-gpu/src/loss.rs` extension |
 | `DeltaFilter` | 2 | Lower-half δ retention + quality heuristics |
 | `GZeroRound` | 2 | Round orchestration |
 
@@ -649,7 +649,7 @@ Full G-Zero reference implementation at `.raw/G-Zero/g_zero/`:
 | `hint_delta.py` | `QHScore` dataclass, `score_batch()` | `HintDelta::compute()` |
 | `phase1.py` | Challenger GRPO training (optional) | `Proposer` trait + GRPO |
 | `phase2.py` | Build DPO pool: generate (q,h), sample, score δ, filter | `DeltaFilter` + `HintDelta` |
-| `phase3.py` | Solver DPO training with length-normalized log-ratios | `LengthNormalizedDpo` in `riir-gpu/src/loss.rs` |
+| `phase3.py` | Solver DPO training with length-normalized log-ratios | `LengthNormalizedDpo` in `riir-ai/crates/riir-gpu/src/loss.rs` |
 | `multi_round.py` | Outer loop with `resume_state.json` crash recovery | `GZeroRound` + `SelfImprovingCycle` |
 | `bleu_penalty.py` | BLEU cluster diversity penalty | `bleu_duplication_penalty()` |
 | `parse.py` | `<question>/<hint>` XML extraction | N/A (our TemplateProposer uses enums) |
@@ -659,7 +659,7 @@ Key architectural difference: The source runs on **Tinker** (cloud API with `Sam
 - `SamplingClient.sample()` → `katgpt-rs` transformer forward + generate
 - `SamplingClient.compute_logprobs()` → teacher-forced forward with log-prob extraction
 - `TrainingClient.forward_backward_custom()` → `riir-gpu` custom loss pipeline
-- `TrainingClient.optim_step()` → `riir-gpu/src/optimizer.rs` AdamW
+- `TrainingClient.optim_step()` → `crates/katgpt-core/src/skill_opt/optimizer.rs` AdamW
 
 ---
 

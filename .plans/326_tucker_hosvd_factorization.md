@@ -4,7 +4,7 @@
 **Research:** [katgpt-rs/.research/307_FNO_Practical_Perspective_Spectral_Primitives_Survey.md](../.research/307_FNO_Practical_Perspective_Spectral_Primitives_Survey.md) (§3 candidate plan #3)
 **Source paper:** [arXiv:2511.05963](https://arxiv.org/abs/2511.05963) — Duruisseaux, Kossaffi, Anandkumar, *Fourier Neural Operators: A Practical Perspective* (Caltech + NVIDIA, Nov 2025)
 **Target:** `katgpt-rs/crates/katgpt-core/src/linalg/tucker.rs` (open primitive) + `riir-neuron-db/src/shard_compactor.rs` (integration), Cargo feature `tucker_factorization`
-**Status:** Active — Phase 1 implementation
+**Status:** ✅ COMPLETE (Phase 3 done) — `tucker_factorization` DEFAULT-ON in katgpt-core (G1–G4 PASS: rel-Frob ~1e-6, 71 µs, 0 allocs). Opt-in in riir-neuron-db per T2.P: AM-deep beats Tucker on raw floats at every N ≤ 16 and is ~10× faster on compaction; Tucker's value is near-lossless full-batch factorization for Cold-tier archival, not a compression win. Zero production consumers as of 2026-06-25.
 
 ---
 
@@ -84,7 +84,7 @@ Generic HOSVD on flat `&[f32]` + shape descriptor. Pure numeric, no shard/chain/
 - [x] **T1.6** Implement `tucker_reconstruct_into(core, factors, shape, out: &mut [f32])` — inverse `X̃ = S ×_1 U^(1) ×_2 U^(2) × … ×_N U^(N)`
 - [x] **T1.7** Implement `TuckerResultScratch` (SOA, hot-path) + `TuckerResult::from_scratch` convenience (owned)
 - [x] **T1.8** Add `tucker_factorization = ["subspace_phase_gate"]` to `Cargo.toml` features (initially OFF)
-- [x] **T1.9** Register `pub mod tucker;` in `linalg/mod.rs` + re-exports in `lib.rs`
+- [x] **T1.9** Register `pub mod tucker;` in `crates/katgpt-core/src/linalg/mod.rs` + re-exports in `lib.rs`
 - [x] **T1.10** Unit tests: known-rank tensor recovery, orthogonality of factors, core energy bound, reconstruction error monotonic in ranks (25 tests, all PASS)
 
 ### Phase 1 GOAT gate

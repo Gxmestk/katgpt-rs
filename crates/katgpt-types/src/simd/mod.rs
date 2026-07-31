@@ -27,20 +27,23 @@
 //! # Module layout
 //!
 //! This file is the dispatcher surface. Backends live in sibling files:
-//! - [`dot`] — dot products, outer-product, matvec, matmul
-//! - [`sparse`] — sparse dot / sparse matmul
-//! - [`elementwise`] — scale / add / sum / max / fused ops
-//! - [`activations`] — exp / sigmoid / tanh-clamp / reciprocal / fast_sigmoid
-//! - [`argmax`] — single-pass argmax
-//! - [`maxsim`] — ColBERT-style late-interaction scoring
-//! - [`ternary`] — bit-plane ternary matvec (`plasma_path`)
-//! - [`research`] — sigmoid margin, retrieval margin, Gram, entropy, norms
-//! - [`horizontal`] — shared AVX2 horizontal reducers (`pub(super)`)
+//! - `dot` — dot products, outer-product, matvec, matmul
+//! - `sparse` — sparse dot / sparse matmul
+//! - `elementwise` — scale / add / sum / max / fused ops
+//! - `activations` — exp / sigmoid / tanh-clamp / reciprocal / fast_sigmoid
+//! - `argmax` — single-pass argmax
+//! - `maxsim` — ColBERT-style late-interaction scoring
+//! - `ternary` — bit-plane ternary matvec (`plasma_path`)
+//! - `research` — sigmoid margin, retrieval margin, Gram, entropy, norms
+//! - `horizontal` — shared AVX2 horizontal reducers (`pub(super)`)
 
 // Submodule backends. Each file owns its NEON/AVX2/scalar impls verbatim;
 // only `is_avx2_fma_available` (below) and `horizontal::*` are shared.
 mod activations;
 mod argmax;
+/// Binary matvec kernels (`binary_plasma` feature, Issue 145).
+#[cfg(feature = "binary_plasma")]
+pub mod binary;
 mod dot;
 mod elementwise;
 mod horizontal;
@@ -82,14 +85,16 @@ use sparse::scalar_sparse_dot_f32;
 // after the file → folder split. Existing call sites (e.g. `simd::simd_dot_f32`,
 // `simd::SimdLevel`) continue to resolve without modification.
 pub use activations::{
-    fast_sigmoid, simd_exp_inplace, simd_exp_sum_inplace, simd_reciprocal_inplace,
-    simd_sigmoid_inplace, simd_sigmoid_tanh_clamp_inplace,
+    cephes_exp_scalar, fast_exp, fast_sigmoid, fast_tanh, simd_exp_inplace, simd_exp_sum_inplace,
+    simd_reciprocal_inplace, simd_sigmoid_inplace, simd_sigmoid_tanh_clamp_inplace,
+    simd_tanh_inplace,
 };
 pub use argmax::simd_argmax_f32;
 pub use dot::{
-    simd_dot_f16_f32, simd_dot_f32, simd_fma_row, simd_matmul_f16_f32_rows,
-    simd_matmul_f16_f32_rows_parallel, simd_matmul_relu_rows, simd_matmul_rows,
-    simd_matmul_rows_parallel, simd_matvec, simd_outer_product_acc, simd_outer_product_acc_scaled,
+    simd_dot_f16_f16, simd_dot_f16_f32, simd_dot_f32, simd_fma_row, simd_matmul_f16_f16_rows,
+    simd_matmul_f16_f16_rows_parallel, simd_matmul_f16_f32_rows, simd_matmul_f16_f32_rows_parallel,
+    simd_matmul_relu_rows, simd_matmul_rows, simd_matmul_rows_parallel, simd_matvec,
+    simd_outer_product_acc, simd_outer_product_acc_scaled,
 };
 pub use elementwise::{
     simd_add_inplace, simd_add_into, simd_add_scalar_inplace, simd_fused_decay_write,
@@ -98,11 +103,14 @@ pub use elementwise::{
 };
 // Feature-gated re-exports — mirror the `#[cfg(feature = "...")]` gates on
 // the underlying items so `cargo check --no-default-features` stays green.
+#[cfg(feature = "binary_plasma")]
+pub use binary::{binary_matvec_scalar, simd_binary_matmul_batch, simd_binary_matvec};
 #[cfg(feature = "maxsim")]
 pub use maxsim::{maxsim_score, maxsim_score_packed};
 pub use research::{
-    coincidence_score, entropy_f32, simd_dist_sq, simd_fused_scale_acc, simd_fused_sub_acc,
-    simd_gram_f32, simd_l_inf_distance_f32, simd_sum_abs_f32, simd_sum_sq, simd_sum_sq_quartic,
+    coincidence_score, entropy_f32, simd_dist_sq, simd_fused_scale_acc, simd_fused_scale_acc_f16,
+    simd_fused_sub_acc, simd_gram_f32, simd_l_inf_distance_f32, simd_sum_abs_f32, simd_sum_sq,
+    simd_sum_sq_quartic,
 };
 #[cfg(feature = "sigmoid_margin")]
 pub use research::{compute_retrieval_margin, dim_sufficiency_bound, sigmoid_margin_loss};
@@ -189,6 +197,11 @@ pub(super) fn is_avx2_fma_available() -> bool {
         use std::sync::atomic::{AtomicBool, Ordering};
         static CACHED: AtomicBool = AtomicBool::new(false);
         static INIT: std::sync::Once = std::sync::Once::new();
+        // `__cpuid` became safe in Rust 1.93 (returns a Copy struct, no memory
+        // dereference). The `unsafe` wrappers remain for older Rust; this
+        // block-level allow silences the unnecessary-unsafe-block lint under
+        // `-D warnings` on 1.93+ without affecting the inner statements.
+        #[allow(unused_unsafe)]
         INIT.call_once(|| {
             let cpuid1 = unsafe { core::arch::x86_64::__cpuid(1) };
             let has_avx = (cpuid1.ecx & (1 << 28)) != 0;

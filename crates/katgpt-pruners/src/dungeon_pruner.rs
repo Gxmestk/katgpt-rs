@@ -917,7 +917,7 @@ mod tests {
         assert_eq!(s1.inventory, 2); // Still full
 
         // Use an item (simulate by lowering inventory)
-        let mut s2 = s1.clone();
+        let mut s2 = s1;
         s2.inventory = 1;
 
         // Move back to monster with dropped item

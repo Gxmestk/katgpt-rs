@@ -348,7 +348,7 @@ the meaningful interventions.
 
 **Infrastructure is already wired.** `riir-poc` already depends on
 `faithfulness_probe` (`crates/riir-poc/Cargo.toml` line 23) and already has a
-precedent bench using it — `benches/jlens_concept_readout_goat.rs` imports
+precedent bench using it — `riir-ai/crates/riir-poc/benches/jlens_concept_readout_goat.rs` imports
 `DefaultFaithfulnessProbe` + `FaithfulnessProbe::faithfulness_profile` and runs
 the verdict at a 0.5 threshold. The canvas PoC lives in the same crate and could
 have followed this exact pattern; it reinvented a noisy correlational metric
@@ -395,7 +395,7 @@ guesswork with causal isolation.
 
 | Constituent | Primitive | Feature / status | Runtime consumer (non-test/bench)? | Showcase |
 |---|---|---|---|---|
-| Region-conditioned steering | `RegionSubspaceField` (Plan 416) | **DEFAULT-ON** in katgpt-core (`region_subspace_steering`) | **YES** — `riir-engine/src/latent_functor/region_subspace_bridge.rs` (`apply_to_zones_batch`) | Plan 426 S3 (measured) |
+| Region-conditioned steering | `RegionSubspaceField` (Plan 416) | **DEFAULT-ON** in katgpt-core (`region_subspace_steering`) | **YES** — `riir-ai/crates/riir-engine/src/latent_functor/region_subspace_bridge.rs` (`apply_to_zones_batch`) | Plan 426 S3 (measured) |
 | Additive 1D steering | `LatentSteeringVector` (Plan 309) | **DEFAULT-ON** | **YES** — `latent_functor` bridges | Plan 426 S1/S2/S4/S7 |
 | Slerp / norm-preserving | Plan 405 | opt-in→default bridge | `spherical_steering_bridge` | Plan 426 S2 (0.0 drift) |
 | AC-Prefix mask builder | `AcPrefixMask` (Plan 313) | **DEFAULT-ON** (canonical G1 lesson) | riir-engine attention path | `.benchmarks/313_*` |
@@ -428,7 +428,7 @@ head-to-head), `jlens_concept_readout_goat.rs` (`DefaultFaithfulnessProbe` prece
 
 ### The right tool for canvas's behavioral question (don't grep for this)
 
-`FaithfulnessProbe` (Plan 278, `katgpt-core/src/faithfulness/probe.rs`) is the causal-intervention probe
+`FaithfulnessProbe` (Plan 278, `crates/katgpt-core/src/faithfulness/probe.rs`) is the causal-intervention probe
 that should settle the §7 question. **It is already wired into riir-poc** (`Cargo.toml` line 23 feature
 dep) with a precedent bench (`jlens_concept_readout_goat.rs` imports `DefaultFaithfulnessProbe` +
 `faithfulness_profile`, verdict at 0.5 threshold). The canvas PoC lives in the same crate and could have

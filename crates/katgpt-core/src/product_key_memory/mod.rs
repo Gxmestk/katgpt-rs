@@ -67,8 +67,8 @@
 //!
 //! # References
 //!
-//! - Plan: [`katgpt-rs/.plans/408_Product_Key_Memory_Primitive.md`]
-//! - Research: [`katgpt-rs/.research/387_Fast_Weight_Product_Key_Memory_PKM.md`]
+//! - Plan: `katgpt-rs/.plans/408_Product_Key_Memory_Primitive.md`
+//! - Research: `katgpt-rs/.research/387_Fast_Weight_Product_Key_Memory_PKM.md`
 //! - Source paper: [arXiv:2601.00671](https://arxiv.org/abs/2601.00671) —
 //!   Zhao & Jones, "Fast-weight Product Key Memory", Sakana AI, Feb 2026
 //!   (distills the PKM factorization from Lample et al. 2019 §2.2).

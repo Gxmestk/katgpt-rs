@@ -47,7 +47,14 @@ impl CanvasBounds {
     /// Construct bounds. The convention is half-open `[start, end)` on each axis.
     #[inline]
     pub const fn new(t0: u32, t1: u32, h0: u32, h1: u32, w0: u32, w1: u32) -> Self {
-        Self { t0, t1, h0, h1, w0, w1 }
+        Self {
+            t0,
+            t1,
+            h0,
+            h1,
+            w0,
+            w1,
+        }
     }
 
     /// Number of temporal frames spanned: `t1 - t0`.
@@ -122,7 +129,10 @@ impl SemanticType {
     /// Construct a named semantic type with the given frozen embedding.
     #[inline]
     pub const fn new(name: &'static str, frozen_embedding: [f32; SEMANTIC_EMBED_DIM]) -> Self {
-        Self { name, frozen_embedding }
+        Self {
+            name,
+            frozen_embedding,
+        }
     }
 
     /// Construct a semantic type whose embedding is a single hot axis (a basis
@@ -134,7 +144,10 @@ impl SemanticType {
         if axis < SEMANTIC_EMBED_DIM {
             emb[axis] = 1.0;
         }
-        Self { name, frozen_embedding: emb }
+        Self {
+            name,
+            frozen_embedding: emb,
+        }
     }
 }
 
@@ -242,7 +255,15 @@ impl RegionSpec {
         semantic_type: Option<SemanticType>,
         default_attn: AttentionFnFamily,
     ) -> Self {
-        Self { name, bounds, period, is_output, loss_weight, semantic_type, default_attn }
+        Self {
+            name,
+            bounds,
+            period,
+            is_output,
+            loss_weight,
+            semantic_type,
+            default_attn,
+        }
     }
 }
 
@@ -278,13 +299,27 @@ impl Connection {
     /// per-edge family override (the common case).
     #[inline]
     pub const fn new(src: RegionId, dst: RegionId) -> Self {
-        Self { src, dst, weight: 1.0, t_src: None, t_dst: None, fn_family: None }
+        Self {
+            src,
+            dst,
+            weight: 1.0,
+            t_src: None,
+            t_dst: None,
+            fn_family: None,
+        }
     }
 
     /// Construct a weighted connection.
     #[inline]
     pub const fn weighted(src: RegionId, dst: RegionId, weight: f32) -> Self {
-        Self { src, dst, weight, t_src: None, t_dst: None, fn_family: None }
+        Self {
+            src,
+            dst,
+            weight,
+            t_src: None,
+            t_dst: None,
+            fn_family: None,
+        }
     }
 
     /// Whether this connection is "present" (weight > 0). Zero-weight edges are
@@ -350,7 +385,9 @@ impl CanvasTopology {
     /// Construct an empty topology (no connections — fully isolated regions).
     #[inline]
     pub fn new() -> Self {
-        Self { connections: Vec::new() }
+        Self {
+            connections: Vec::new(),
+        }
     }
 
     /// Construct a topology from a vector of connections.
@@ -467,10 +504,18 @@ mod tests {
         let b = SemanticType::basis("joints", 1);
         let a2 = SemanticType::basis("camera2", 0);
         // Dot products: same-axis → 1, diff-axis → 0.
-        let dot_same: f32 =
-            a.frozen_embedding.iter().zip(a2.frozen_embedding.iter()).map(|(x, y)| x * y).sum();
-        let dot_diff: f32 =
-            a.frozen_embedding.iter().zip(b.frozen_embedding.iter()).map(|(x, y)| x * y).sum();
+        let dot_same: f32 = a
+            .frozen_embedding
+            .iter()
+            .zip(a2.frozen_embedding.iter())
+            .map(|(x, y)| x * y)
+            .sum();
+        let dot_diff: f32 = a
+            .frozen_embedding
+            .iter()
+            .zip(b.frozen_embedding.iter())
+            .map(|(x, y)| x * y)
+            .sum();
         assert!((dot_same - 1.0).abs() < 1e-6);
         assert!(dot_diff.abs() < 1e-6);
     }
@@ -493,7 +538,13 @@ mod tests {
 
     #[test]
     fn layout_n_positions_is_product() {
-        let layout = CanvasLayout { t: 2, h: 3, w: 4, d_model: 8, regions: vec![] };
+        let layout = CanvasLayout {
+            t: 2,
+            h: 3,
+            w: 4,
+            d_model: 8,
+            regions: vec![],
+        };
         assert_eq!(layout.n_positions(), 24);
         assert_eq!(layout.n_regions(), 0);
     }

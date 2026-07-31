@@ -6,6 +6,7 @@
 > **Related Research:** 408 (TILR — alignment-gated subspace correction, the closest cousin), 406 (Spectral Rewiring — weight-delta SVD projection), 393 (Block-Sparse Featurizer → Plan 412 Subspace Steering), 294 (Viable Manifold Graph — safe-manifold navigation), 290 (Latent Field Steering — 1D direction injection), 310 (RIZZ — non-interference branches), 397 (MAG — unsupervised direction mining, the probe replacement)
 > **Related Plans:** 425 (TILR — alignment-gated subspace correction), 423 (spectral_rewire — weight-delta purification), 412 (subspace_steering — k-dim block), 329 (non_interference_branches — orthogonal direction allocation), 418 (MAG — direction mining), 309 (latent_field_steering — 1D), 426 (this primitive's plan)
 > **Classification:** Public
+> **PASS-Redirects (synthesis):** Gong et al. [arXiv:2607.22531 "Twins: Learn to Predict Unified Representations with Focal Loss"] — PASS. The paper's second diagnostic (Two-NN intrinsic dimensionality: SigLIP ID≈15 despite D=768, VAE ID≈35 despite D=128 — the "dimensionality paradox" where the semantic manifold is more compressed than the pixel manifold) is exactly the Two-NN local intrinsic-dim estimation MANCE already consumes (Step 1, k-NN + local PCA + TwoNN floor). The Twins representation + Focal Loss are image-diffusion training infrastructure we do not ship. Diagnostic stage → covered here + Research 394 (within-class effective rank, the conditional-alignment axis) + Research 279 (phase-transition N≥d gate); training stage → riir-train (image diffusion, out of scope).
 
 ---
 
@@ -73,7 +74,7 @@ MANCE takes ~8 min/panel (NVIDIA B200, 458–475s across variants). ~50% runtime
 | probe / classifier (finds the concept direction) | **direction vector** (HLA `EmotionDirections`), **MAG** `mine_contrast_direction` (Plan 418), **CNA** contrastive pair (Plan 087), **ConstraintPruner** |
 | surgicality / preserve other concepts | **non-interference** (Plan 329 — orthogonal branch allocation), **no-harm guarantee** (TILR Plan 425 — γ→0 bit-recovers input), **branch-local** |
 | natural representations X⁽⁰⁾ | **natural manifold**, **reference representations**, **baseline state** (freeze/thaw pre-edit snapshot, shard pre-consolidation state) |
-| iterative probe refit | **re-estimation** (`latent_functor/reestimation.rs` — coherence-driven re-estimation), **consolidation cycle** (`riir-neuron-db/consolidation.rs`) |
+| iterative probe refit | **re-estimation** (`riir-ai/crates/riir-engine/src/latent_functor/reestimation/mod.rs` — coherence-driven re-estimation), **consolidation cycle** (`src/sleep/consolidation.rs`) |
 | LEACE (1st-moment erasure) | **mean removal**, **centering** (shipped as a preprocessing step in many primitives), **orthogonal projection** onto mean direction |
 | CovMatch (2nd-moment, rank-2) | **covariance asymmetry projection** (NOT shipped; `dual_gram_pca` ships PCA but not class-conditional ΔΣ eigenvector projection) |
 

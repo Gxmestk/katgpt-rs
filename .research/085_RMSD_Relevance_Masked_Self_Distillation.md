@@ -125,13 +125,13 @@ Train: reverse-KL loss on only S positions
 
 | RMSD Component | Our Code | Status | Gap |
 |----------------|----------|--------|-----|
-| Reverse-KL distillation | `riir-gpu/src/distill.rs` — `kl_divergence()` | ✅ Production | Full-vocab only, no top-K |
-| Sigmoid-gated token loss | `riir-gpu/src/loss_sdar.rs` | ✅ Production | Uniform gate, no pre-filter |
-| Token masking | `riir-gpu/src/training_loop.rs` — `LossMask` | ✅ Production | Binary mask, no relevance scoring |
+| Reverse-KL distillation | `riir-train/crates/riir-train-gpu/src/distill.rs` — `kl_divergence()` | ✅ Production | Full-vocab only, no top-K |
+| Sigmoid-gated token loss | `riir-train/crates/riir-train-gpu/src/loss_sdar.rs` | ✅ Production | Uniform gate, no pre-filter |
+| Token masking | `riir-train/crates/riir-train-gpu/src/training_loop.rs` — `LossMask` | ✅ Production | Binary mask, no relevance scoring |
 | Entropy-based token weighting | `riir-gpu/src/kernels/loss_masked.wgsl` | ✅ Production | D2F importance, not relevance |
 | On-policy rollout | `GZeroLoop`, `best_of_k_rollouts` | ✅ Production | ✅ Complete |
 | Teacher forward pass (hint-conditioned) | `loss_sdar.rs` teacher branch | ✅ Production | ✅ Complete |
-| LoRA-as-Judge | `ropd/client.rs`, `LeviathanVerifier` | ✅ Production | Not used for token selection |
+| LoRA-as-Judge | `riir-ai/crates/riir-gpu/src/ropd/client.rs`, `LeviathanVerifier` | ✅ Production | Not used for token selection |
 | ScreeningPruner relevance | `katgpt-rs-core/traits.rs` | ✅ Production | Action-level, not token-level |
 | Freeze/thaw teacher update | Game bandit `freeze()`/`thaw()` | ✅ Production | Bandit Q-values, not LoRA weights |
 | SDAR asymmetric trust | `sdar_gate.rs` — σ(β·Δt) | ✅ Production | All tokens, no pre-filter |
@@ -352,7 +352,7 @@ rmsd_distill = ["sdar_gate", "bandit"]
 
 | File | Lines | Role |
 |------|-------|------|
-| `src/pruners/rmsd_relevance.rs` | ~330 | Core types, filter, loss, continuation |
+| `crates/katgpt-pruners/src/rmsd_relevance.rs` | ~330 | Core types, filter, loss, continuation |
 | `src/pruners/bomber/rmsd_player.rs` | ~800 | Bomber arena player |
 | `tests/test_125_rmsd_goat.rs` | ~620 | 44 GOAT proofs |
 | `examples/bomber_16_rmsd_tournament.rs` | ~394 | Tournament example |

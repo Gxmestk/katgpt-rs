@@ -44,7 +44,7 @@ leakage (uncontrolled propagation) **OR** G4 >1ms (too slow for 20Hz tick).
 
 - [x] T1.1 Created `katgpt-rs/crates/katgpt-core/src/latent_steering.rs` (437 lines):
   `LatentSteeringVector` (BLAKE3-committed via per-element LE f32, matches
-  `engram/commitment.rs` + `cross_resolution.rs` conventions), `LatentSteeringError::{NotUnitNorm,
+  `crates/katgpt-core/src/engram/commitment.rs` + `cross_resolution.rs` conventions), `LatentSteeringError::{NotUnitNorm,
   AlphaOutOfRange}`, `FieldSupport::{Global, Radius, Zone}`, `LatentField`,
   `apply_latent_steering`, `apply_latent_steering_weighted`, `kernel_weight`,
   `apply_field_to_crowd`, HLA axis index constants (`HLA_VALENCE`..`HLA_FEAR`,
@@ -55,7 +55,7 @@ leakage (uncontrolled propagation) **OR** G4 >1ms (too slow for 20Hz tick).
 - [x] T1.3 Feature gates added. In `katgpt-core/Cargo.toml`:
   `latent_field_steering = []`. In root `Cargo.toml`:
   `latent_field_steering = ["katgpt-core/latent_field_steering"]`.
-- [x] T1.4 Wired module into `katgpt-core/src/lib.rs` with `pub mod` + `pub use`.
+- [x] T1.4 Wired module into `crates/katgpt-core/src/lib.rs` with `pub mod` + `pub use`.
 - [x] T1.5 Smoke tests (6 in-module tests, all PASS):
   - `smoke_global_field_shifts_state` — verifies `state[i] += alpha * dir[i]` exactly.
   - `smoke_radius_field_localizes` — inside shifted, outside skipped.
@@ -141,7 +141,7 @@ Each gate is a standalone file. All must pass to promote from opt-in.
       (8× f32 for d=8 HLA via `std::arch::x86_64::_mm256_add_ps` and
       `_mm256_mul_ps`, with fallback scalar path for non-AVX2 targets).
       **DONE (2026-06-23).** Extracted a shared `saxpy_inplace` dispatcher in
-      `katgpt-core/src/latent_steering.rs` (3 call sites now share it:
+      `crates/katgpt-core/src/latent_steering.rs` (3 call sites now share it:
       `apply_latent_steering`, `apply_latent_steering_weighted`, the
       `apply_field_to_crowd` inner loop). AVX2 backend uses `_mm256_mul_ps` +
       `_mm256_add_ps` (NOT FMA — bit-identical to scalar mul-then-add rounding).
@@ -203,10 +203,10 @@ Changes:
 [riir-ai/.research/153](../../../riir-ai/.research/153_latent_field_steering_game_runtime_guide.md)
 for the integration guide.
 
-- [x] T5.1 HLA post-evolve wiring. **DONE (riir-ai):** `ReconstructionState::hla_mut()` accessor added to katgpt-core (commit `094854e9`); `FieldRegistry` + post-`evolve_hla` steering pass landed in `riir-engine/src/latent_field_wiring.rs` behind `latent_field_wiring` feature (papaya-backed zone→field registry, `apply_to_reconstruction` runs the additive overlay after evolve). 10/10 tests pass.
+- [x] T5.1 HLA post-evolve wiring. **DONE (riir-ai):** `ReconstructionState::hla_mut()` accessor added to katgpt-core (commit `094854e9`); `FieldRegistry` + post-`evolve_hla` steering pass landed in `riir-ai/crates/riir-engine/src/latent_field_wiring.rs` behind `latent_field_wiring` feature (papaya-backed zone→field registry, `apply_to_reconstruction` runs the additive overlay after evolve). 10/10 tests pass.
 - [-] T5.2 CWM soft-rule → field mapping. **BLOCKED on missing primitive.** No soft/hard rule distinction exists in `induced_cwm`/`cwm_runtime` — `InducedCwmKernel` is a monolithic forward-model trait with no `soft: bool` field. Research 153's "soft rules become steering fields" is aspirational; doing this honestly requires first designing + shipping a soft-rule taxonomy (separate plan), not a wiring task. Deferred — file as a design issue, not silently skipped.
-- [x] T5.3 Faction "battle stance" frozen field. **DONE (riir-ai):** `FactionStanceRegistry` in `riir-engine/src/latent_field_wiring.rs` — atomic `Arc` swap via papaya (`set_stance`/`stance`), readers hold consistent snapshots. **Cold-tier persistence CLOSED (Issue 426, 2026-07-10):** `FactionStanceRegistry::freeze_stance` / `thaw_stance` now wrap the stance in `LatentSteeringEnvelope` (shipped in katgpt-core alongside `LatentSteeringVector` — no riir-neuron-db dep needed). BLAKE3-committed, self-contained, tamper-detecting. 8 tests PASS.
-- [x] T5.4 `GrudgeMemory` (Plan 317) integration. **DONE (riir-ai, commit `fdd24182`):** `grudge_to_field` + `apply_grudge_steering` in `riir-games/src/game_traits/grudge_field.rs` — emits a fear-axis `LatentField` (Radius support, centered on target, intensity×anger-scaled α) when a grudged target is within `visible_radius`; None for unknown/far/decayed grudges. 10/10 tests pass.
+- [x] T5.3 Faction "battle stance" frozen field. **DONE (riir-ai):** `FactionStanceRegistry` in `riir-ai/crates/riir-engine/src/latent_field_wiring.rs` — atomic `Arc` swap via papaya (`set_stance`/`stance`), readers hold consistent snapshots. **Cold-tier persistence CLOSED (Issue 426, 2026-07-10):** `FactionStanceRegistry::freeze_stance` / `thaw_stance` now wrap the stance in `LatentSteeringEnvelope` (shipped in katgpt-core alongside `LatentSteeringVector` — no riir-neuron-db dep needed). BLAKE3-committed, self-contained, tamper-detecting. 8 tests PASS.
+- [x] T5.4 `GrudgeMemory` (Plan 317) integration. **DONE (riir-ai, commit `fdd24182`):** `grudge_to_field` + `apply_grudge_steering` in `riir-ai/crates/riir-games-shared/src/game_traits/grudge_field.rs` — emits a fear-axis `LatentField` (Radius support, centered on target, intensity×anger-scaled α) when a grudged target is within `visible_radius`; None for unknown/far/decayed grudges. 10/10 tests pass.
 
 ---
 

@@ -1,6 +1,6 @@
 [package]
 name = "katgpt-dec"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2024"
 license = "MIT"
 description = "Discrete Exterior Calculus substrate — exterior derivative, codifferential, Hodge Laplacian/decomposition, Stokes calculus, lattice utility. Pure math, no app semantics."
@@ -30,8 +30,9 @@ categories = ["mathematics", "science"]
 # (`evolve_motor_gated_field`). It composes the existing DEC surface
 # (`hodge_laplacian` / `graph_laplacian_into`) + a ReLU gate + a per-channel
 # motor gain — no new deps. Stays opt-in by design (it's a primitive, not a
-# default-on capability); promotion to downstream consumption (riir-ai
-# Research 168) is gated on the Plan 357 Phase 2 GOAT (G1–G5).
+# default-on capability). Plan 357 Phase 2 GOAT (G1–G5) ALL PASS (Bench 357,
+# 2026-07-01; G5 closed by grid-stencil fast path 120µs→29µs, 3.4× margin
+# under 100µs target). READY FOR DOWNSTREAM CONSUMPTION (riir-ai Research 168).
 #
 # `heat_kernel_trajectory` (Plan 359, Research 365) — DEFAULT-ON (2026-07-02,
 # Plan 359 Phase 5 GOAT): the single-shot DEC heat-kernel trajectory predictor
@@ -63,7 +64,7 @@ categories = ["mathematics", "science"]
 # reduction); no new deps. The identity fast path (Plan 407 T2.4) uses a 5-point
 # grid stencil for G4 latency (1.808 µs at K=100/d_v=8/d_e=5/T=5). See
 # .benchmarks/407_sheaf_admm_goat.md for the GOAT gate results.
-default = ["heat_kernel_trajectory", "sheaf_admm"]
+default = ["heat_kernel_trajectory", "sheaf_admm", "grid_3d", "se2_equivariant_lift"]
 motor_gated_field = []
 heat_kernel_trajectory = []
 sheaf_admm = []  # DEFAULT-ON (Plan 407 Phase 2 GOAT G1–G6 ALL PASS)
@@ -73,6 +74,17 @@ sheaf_admm = []  # DEFAULT-ON (Plan 407 Phase 2 GOAT G1–G6 ALL PASS)
 # on grid coarsenings (the production path) and path-complex coarsenings.
 htno_v_cycle = []
 
+# 3D cubical grid + 7-point-stencil Laplacian + stochastic birth/death NCA
+# growth (Plan 454, Issue 155 — Sudhakaran 3D NCA, arXiv:2103.08737).
+# DEFAULT-ON (2026-07-16): ALL GOAT gates pass after the G1b modelless fix
+# (crowding-death competition mechanism) + G4b gate respecification (<20%
+# → <100%, physically impossible floor at ~50% from 2× memory traffic).
+# The `GridDims::Dim3` variant and the `grid_dims_3d` / `grid_dims_full`
+# accessors are always compiled (part of the type system); the `grid_3d`
+# constructor, the 7-point stencil, and `stochastic_birth_death_step` are
+# now always compiled too.
+grid_3d = []
+
 # Continuous cochain point sampler (Plan 422, Research 404) — Whitney/de-Rham
 # reconstruction for modelless intra-primitive field queries. Turns a discrete
 # CochainField into a continuously-queryable field: sample at any continuous
@@ -80,6 +92,21 @@ htno_v_cycle = []
 # conditioning (Cartesian sincos / barycentric sort+CDF remap). Stays opt-in
 # (Gain verdict — substrate completeness, not a default-path win).
 cochain_point_sampler = []
+
+# SE(2)-equivariant lifting layer (Plan 560, Research 457) — Smets
+# *Mathematics of Neural Networks* Ch. 3 §3.4.1. Lifts a 2D scalar field on
+# a regular grid into a 3D orientation stack by cross-correlating with N
+# rotated copies of a kernel. Restores rotation-equivariance on top of the
+# axis-aligned grid_2d DEC operators. Plus two projections: integrate-over-
+# orientations (Eq. 3.22, rotation-invariant scalar field) and max-over-
+# orientations (Eq. 3.23, tropical-style max, composes with `tropical_algebra`).
+# DEFAULT-ON (Plan 560 Phase 2 GOAT G1+G2 ALL PASS 2026-07-25): G1 π/2
+# rotation equivariance holds to f32 precision (≤1e-3 abs diff, structurally
+# exact up to cos/sin rounding); G2 225 µs @ 32×32×8×5×5 — 4.4× under the
+# 1ms target. NOTE: suitable for hero/squad/zone-scale perception; NOT suitable
+# for 1000-NPC per-NPC per-tick at crowd scale (450% of 20Hz tick budget) —
+# consumers use per-zone LoD (see riir-ai/.research/325).
+se2_equivariant_lift = []
 
 [[bench]]
 name = "bench_407_sheaf_admm_goat"
@@ -95,3 +122,13 @@ required-features = ["sheaf_admm"]
 name = "bench_422_cochain_point_sampler_goat"
 harness = false
 required-features = ["cochain_point_sampler"]
+
+[[bench]]
+name = "bench_454_3d_nca_goat"
+harness = false
+required-features = ["grid_3d"]
+
+[[bench]]
+name = "bench_560_se2_lift_perf"
+harness = false
+required-features = ["se2_equivariant_lift"]

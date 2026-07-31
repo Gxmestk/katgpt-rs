@@ -236,22 +236,22 @@ pub fn entropy_nats_zero_alloc(logits: &[f32]) -> f32 {
     if logits.is_empty() {
         return 0.0;
     }
-    // Pass 1: max-shift for numerical stability.
-    let mut max_logit = f32::NEG_INFINITY;
-    for &l in logits {
-        if l > max_logit {
-            max_logit = l;
-        }
-    }
+    // Pass 1: max-shift for numerical stability (SIMD-accelerated max).
+    let max_logit = katgpt_core::simd::simd_max_f32(logits);
     if !max_logit.is_finite() {
         return 0.0;
     }
     // Pass 2: fuse Z = Σ exp(xᵢ − x_max) and S₂ = Σ exp(xᵢ − x_max) · (xᵢ − x_max).
+    //
+    // Uses cephes_exp_scalar (~1.7× faster than libm exp on aarch64, ~1 ULP
+    // accurate). The shifted values are in (−∞, 0], so exp never overflows;
+    // cephes_exp_scalar's n < -126 early-exit returns 0.0 for very negative
+    // shifts, which is correct (those tokens contribute ~0 to Z and S₂).
     let mut z = 0.0f32;
     let mut s2 = 0.0f32;
     for &l in logits {
         let shifted = l - max_logit;
-        let e = shifted.exp();
+        let e = katgpt_core::simd::cephes_exp_scalar(shifted);
         z += e;
         s2 += e * shifted;
     }

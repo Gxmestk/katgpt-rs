@@ -90,7 +90,7 @@ Cohere batch-size regimes  →  Our domain inference budget (Plan 026)
 
 ### Location
 
-`katgpt-rs/src/speculative/verifier.rs` — inside `LeviathanVerifier::speculate()`
+`crates/katgpt-forward/src/verifier.rs` — inside `LeviathanVerifier::speculate()`
 
 ### Implementation
 
@@ -129,7 +129,7 @@ Uses existing `domain_latent` feature (which gates Raven). No new feature gate n
 
 ### Location
 
-`katgpt-rs/src/speculative/verifier.rs` — new `SpecCostModel` struct
+`crates/katgpt-forward/src/verifier.rs` — new `SpecCostModel` struct
 
 ### Feature Gate
 
@@ -218,7 +218,7 @@ Only implement if T3 shows Raven slot overlap > 30% at step 1.
 
 ### Location
 
-`katgpt-rs/crates/katgpt-core/src/types.rs` — new function `sparse_matmul_delta()`
+`katgpt-rs/src/types.rs` — new function `sparse_matmul_delta()`
 
 ### Implementation Sketch
 

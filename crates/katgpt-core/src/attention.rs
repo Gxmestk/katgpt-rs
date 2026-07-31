@@ -404,70 +404,63 @@ pub fn tiled_attention_batched(
     let scores_buf_size = seq_len * seq_len;
     let o_tile_size = BR * head_dim;
 
+    // Reuse grow-only scratch buffers per OS thread via thread_local.
+    // Both sequential and parallel paths share these — the sequential path
+    // also benefits from cross-call persistence (e.g. an L-layer transformer
+    // calling this L times converts 2L allocations to ≤2 grow-only).
+    // Perf: UnsafeCell avoids RefCell's runtime borrow-check overhead.
+    // Safety: thread_local guarantees exclusive per-thread access — both
+    // for the single-threaded sequential path (trivially exclusive) and for
+    // Rayon's work-stealing parallel path (each worker thread gets its own slot).
+    thread_local! {
+        static SCORES_BUF: UnsafeCell<Vec<f32>> = const { UnsafeCell::new(Vec::new()) };
+        static O_TILE_BUF: UnsafeCell<Vec<f32>> = const { UnsafeCell::new(Vec::new()) };
+    }
+
+    let run_one = |idx: usize, out_chunk: &mut [f32]| {
+        let offset = idx * head_size;
+        SCORES_BUF.with(|scores| {
+            O_TILE_BUF.with(|o_tile| {
+                // Safety: thread_local guarantees exclusive per-thread access.
+                let scores = unsafe { &mut *scores.get() };
+                let o_tile = unsafe { &mut *o_tile.get() };
+                // `resize` zero-fills the new tail; the existing prefix is
+                // preserved but `tiled_attention_forward_impl` zeros the
+                // working range itself, so no extra fill is needed on the
+                // grow path either.
+                if scores.len() < scores_buf_size {
+                    scores.resize(scores_buf_size, 0.0);
+                }
+                if o_tile.len() < o_tile_size {
+                    o_tile.resize(o_tile_size, 0.0);
+                }
+                tiled_attention_forward_impl(
+                    &q[offset..offset + head_size],
+                    &k[offset..offset + head_size],
+                    &v[offset..offset + head_size],
+                    out_chunk,
+                    seq_len,
+                    head_dim,
+                    scale,
+                    Some(&mut scores[..scores_buf_size]),
+                    Some(&mut o_tile[..o_tile_size]),
+                );
+            });
+        });
+    };
+
     if total <= 2 || seq_len * head_dim < 1024 {
-        // Sequential fallback for tiny workloads — avoids Rayon scheduling overhead
-        let mut scores_buf = vec![0.0f32; scores_buf_size];
-        let mut o_tile_buf = vec![0.0f32; o_tile_size];
+        // Sequential fallback for tiny workloads — avoids Rayon scheduling overhead.
+        // Buffers come from the shared thread_local above (grow-only across calls).
         for idx in 0..total {
-            let offset = idx * head_size;
-            tiled_attention_forward_impl(
-                &q[offset..offset + head_size],
-                &k[offset..offset + head_size],
-                &v[offset..offset + head_size],
-                &mut output[offset..offset + head_size],
-                seq_len,
-                head_dim,
-                scale,
-                Some(&mut scores_buf[..scores_buf_size]),
-                Some(&mut o_tile_buf[..o_tile_size]),
-            );
+            run_one(idx, &mut output[idx * head_size..(idx + 1) * head_size]);
         }
     } else {
-        // Parallel for larger workloads — Rayon overhead amortized
-        // Reuse grow-only scratch buffers per OS thread via thread_local.
-        // Perf: UnsafeCell avoids RefCell's runtime borrow-check overhead.
-        // Safety: Each Rayon worker thread gets its own thread_local slot,
-        // so there is no actual concurrent access to the same cell.
-        thread_local! {
-            static SCORES_BUF: UnsafeCell<Vec<f32>> = const { UnsafeCell::new(Vec::new()) };
-            static O_TILE_BUF: UnsafeCell<Vec<f32>> = const { UnsafeCell::new(Vec::new()) };
-        }
-
+        // Parallel for larger workloads — Rayon overhead amortized.
         output
             .par_chunks_mut(head_size)
             .enumerate()
-            .for_each(|(idx, out_chunk)| {
-                let offset = idx * head_size;
-                SCORES_BUF.with(|scores| {
-                    O_TILE_BUF.with(|o_tile| {
-                        // Safety: thread_local guarantees exclusive per-thread access.
-                        // Rayon's work-stealing ensures each closure runs on one thread.
-                        let scores = unsafe { &mut *scores.get() };
-                        let o_tile = unsafe { &mut *o_tile.get() };
-                        if scores.len() < scores_buf_size {
-                            // `resize` zero-fills the new tail; the existing
-                            // prefix is preserved but `tiled_attention_forward_impl`
-                            // will zero the working range itself (L279), so no
-                            // extra fill is needed here on the grow path either.
-                            scores.resize(scores_buf_size, 0.0);
-                        }
-                        if o_tile.len() < o_tile_size {
-                            o_tile.resize(o_tile_size, 0.0);
-                        }
-                        tiled_attention_forward_impl(
-                            &q[offset..offset + head_size],
-                            &k[offset..offset + head_size],
-                            &v[offset..offset + head_size],
-                            out_chunk,
-                            seq_len,
-                            head_dim,
-                            scale,
-                            Some(&mut scores[..scores_buf_size]),
-                            Some(&mut o_tile[..o_tile_size]),
-                        );
-                    });
-                });
-            });
+            .for_each(|(idx, out_chunk)| run_one(idx, out_chunk));
     }
 }
 

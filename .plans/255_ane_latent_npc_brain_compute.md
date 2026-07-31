@@ -1,17 +1,20 @@
 # Plan 255: ANE-Latent NPC Brain Compute — Batch NPC Ops on Neural Engine
 
 > **📍 Migration note (2026-06-28, Issue 007 Phase C follow-up):** The
-> `ane_npc_*` example files referenced below (`examples/ane_npc_arena.rs`,
+> `ane_npc_*` example files referenced below (`riir-ai/crates/riir-engine/examples/ane_npc_arena.rs`,
 > `ane_npc_goat.rs`, `ane_npc_power.rs`) and the `npc_ane_backend` /
 > `npc_brain_router` modules moved from this repo (katgpt-rs) to
 > `riir-ai/crates/riir-engine/`. The `ane_npc` feature flag now lives in
 > `riir-engine/Cargo.toml` (still opt-in — GOAT FAILED per `.benchmarks/053`,
-> and ANE training itself is deferred per `riir-train/.issues/266` until 50M+
-> params). Historical task records below reflect the original locations.
+> and ANE training itself is deferred until 50M+ params — see
+> `riir-train/.research/111_maderix_ANE_Training_Distillation_Verdict.md`;
+> ~~`riir-train/.issues/266`~~ closed + removed 2026-07-26 as the deferral
+> is physical, not effort-based). Historical task records below reflect the
+> original locations.
 
 **Source:** [Research 223 — maderix/ANE Distillation](../.research/223_maderix_ANE_Distillation_Verdict.md) + [Research 224 — coremltools Public API](../.research/224_coremltools_Public_API_ANE_Distillation_Verdict.md)
 **Related:** Plan 176 (GPU/ANE Offload), Plan 148 (PlasmaPath SIMD), Plan 240 (Sense Compression), Issue 004 (ANE CoreML Model Generation)
-**Status:** Pending GOAT
+**Status:** COMPLETE ✅ (negative result) — GOAT FAILED; `ane_npc` stays OPT-IN. Cosine 0.999995 (output equivalence PASS), ANE latency 286µs < 1ms (PASS), arena outcome rel diff 0.0047% (PASS), CPU utilization ratio 94.5%→53.3% (PASS). FAIL on wall-clock: ANE is 26× SLOWER than CPU SIMD (286µs vs 10.9µs/1000 NPCs) — ternary projection is too lightweight to benefit from ANE batch dispatch. Infrastructure (trait + router + CoreML gen + residency check) ships opt-in for future heavier NPC brain models. See `.benchmarks/053` + Plan 176.
 **Goal:** Move NPC "think brain" compute (sense reconstruction, emotion projection, zone attention) from CPU SIMD to ANE batch dispatch. CPU free for physics/combat/anti-cheat. 1000 NPCs × 20Hz → one ANE batch.
 
 ---
@@ -92,7 +95,7 @@ else:
 
 ### Part 1: NpcBrainBackend Trait ✅
 
-- [x] Create `crates/katgpt-core/src/sense/backend.rs`
+- [x] Create `crates/katgpt-dec/src/backend.rs`
 - [x] Define `NpcBrainBackend` trait: `fn batch_evaluate(&mut self, inputs: &[NpcBrainInput], outputs: &mut [NpcBrainOutput]) -> Result<(), String>`
 - [x] `NpcBrainInput`: hla_state `[f32; 8]`, modules `[ModuleInput; 6]` (ternary directions), overrides, autonomous_disabled
 - [x] `NpcBrainOutput`: projections `[f32; 6]`
@@ -104,7 +107,7 @@ else:
 - [x] Write test: GM override takes precedence
 - [x] Write test: autonomous_disabled zeros unpinned projections
 - [x] Write test: length mismatch returns error
-- [x] Register module in `sense/mod.rs` with re-exports
+- [x] Register module in `riir-ai/crates/riir-engine/src/sense/mod.rs` with re-exports
 
 **Key finding**: SenseModule uses ternary bit-plane projection (not float matmul). ANE path will need ternary-to-float conversion or custom MIL kernel. CPU baseline preserves exact ternary semantics.
 
@@ -154,7 +157,7 @@ else:
   - Fixed: warmup predictions before timing (first run includes ANE pipeline compile)
 - [x] Write test: `AneNpcBrainBackend` matches `SimdNpcBrainBackend` output (cosine ≥ 0.99)
 - [x] Write benchmark: `AneNpcBrainBackend` batch latency vs `SimdNpcBrainBackend` for 10, 100, 1000 NPCs
-  - Implemented as multi-size sweep in `examples/ane_npc_goat.rs`
+  - Implemented as multi-size sweep in `riir-ai/crates/riir-engine/examples/ane_npc_goat.rs`
   - Finding: ANE flat ~280µs (dispatch-bound), CPU linear 0.1→10.6µs (10→1000 NPCs)
 
 ### Part 4: Auto-Route Integration
@@ -180,11 +183,11 @@ TriggerGate routes general inference by QPS; NPC brain routes by NPC count.
   - Measure: total CPU time freed, ANE dispatch overhead, end-to-end latency
 - [x] GOAT arena: bomber/go game with ANE NPC brain vs SIMD NPC brain
   - Verify: same game outcome, different CPU utilization
-  - Implemented as `examples/ane_npc_arena.rs` (200-tick simulation through `NpcBrainRouter`)
+  - Implemented as `riir-ai/crates/riir-engine/examples/ane_npc_arena.rs` (200-tick simulation through `NpcBrainRouter`)
   - Result: PASS — outcome rel diff 0.0047%, cosine 0.999989
 - [x] GOAT power: measure CPU utilization with/without ANE NPC brain
   - Target: CPU utilization reduced by ≥30% at 1000 NPC load
-  - Implemented as `examples/ane_npc_power.rs` (getrusage FFI, zero new deps)
+  - Implemented as `riir-ai/crates/riir-engine/examples/ane_npc_power.rs` (getrusage FFI, zero new deps)
   - Result: PASS on ratio (94.5% → 53.3% = 43.6% reduction), FAIL on absolute CPU time (13.85ms → 584ms)
 - [x] ~~If GOAT passes: promote `ane_npc` to default-on for macOS~~ — **N/A: GOAT FAILED** (see verdict below). Promotion precondition not met. Cannot execute.
 - [x] If GOAT fails: keep as opt-in, document why

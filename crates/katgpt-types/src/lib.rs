@@ -20,21 +20,21 @@
 //!
 //! # Module layout
 //!
-//! - [`enums`] — small config enums (DepthTier, HlaMode, AttentionMode, …)
+//! - `enums` — small config enums (DepthTier, HlaMode, AttentionMode, …)
 //!   plus WallConfig / ThinkingBudget
-//! - [`config`] — the `Config` struct (~1.5k lines), `InferenceOverrides`,
+//! - `config` — the `Config` struct (~1.5k lines), `InferenceOverrides`,
 //!   and `kv_dim`
-//! - [`rng`] — XorShift64 PRNG
-//! - [`math`] — SIMD-accelerated softmax / rmsnorm / matmul / sample_token
+//! - `rng` — XorShift64 PRNG
+//! - `math` — SIMD-accelerated softmax / rmsnorm / matmul / sample_token
 //!   (legacy home; candidates for relocation to `katgpt-simd::`)
-//! - [`lora`] — CPU-side LoRA adapter
-//! - [`gpart`] — GPart Isometric Partition adapter (Research 227)
-//! - [`domain`] — DomainLatent embedding (Plan 038)
-//! - [`inference`] — InferenceResult, TaskType, ProposerTask, DataGate
-//! - [`looping`] — Training-Free Loop types (Plan 136)
-//! - [`ternary`] — Bit-plane ternary weights (`plasma_path`)
-//! - [`hydra`] — Hydra Adaptive Layer Budget types
-//! - [`sense`] — ShardEmbedding + sense composition types
+//! - `lora` — CPU-side LoRA adapter
+//! - `gpart` — GPart Isometric Partition adapter (Research 227)
+//! - `domain` — DomainLatent embedding (Plan 038)
+//! - `inference` — InferenceResult, TaskType, ProposerTask, DataGate
+//! - `looping` — Training-Free Loop types (Plan 136)
+//! - `ternary` — Bit-plane ternary weights (`plasma_path`)
+//! - `hydra` — Hydra Adaptive Layer Budget types
+//! - `sense` — ShardEmbedding (DEPRECATED, Issue 139) + sense composition types
 //!
 //! Test modules live alongside their topic (e.g. `rng::tests_rng`) or in
 //! `tests_types.rs` for cross-cutting tests.
@@ -52,6 +52,9 @@ pub use depth_invariance::{
     DepthInvarianceConfig, DepthInvarianceDiagnostic, DepthInvarianceKind, MagnitudeRegularization,
     Scratch, apply_magnitude_regularization, classify_chain, classify_chain_batched,
 };
+/// Binary `{-1,+1}` bit-plane packed weights (Issue 145, `binary_plasma` feature).
+#[cfg(feature = "binary_plasma")]
+pub mod binary;
 mod enums;
 mod gpart;
 mod hydra;
@@ -63,7 +66,7 @@ pub mod kv_cache;
 /// Shared leaky-integrator / delta-rule step primitive (Plan 276 Phase 2 T2.1).
 /// Pure inline math, zero deps. Consumed by both katgpt-micro-belief
 /// (`LeakyIntegrator::step`) and katgpt-core's sense reconstruction
-/// (`ReconstructionState::evolve_hla`). Co-located here (the leaf) so both
+/// (`ReconstructionState::evolve_belief`). Co-located here (the leaf) so both
 /// consumers can share the single source of truth without a cycle.
 pub mod leaky_core;
 mod looping;
@@ -86,6 +89,8 @@ mod tests_types;
 // Re-export the entire public surface so `katgpt_types::*` paths are
 // available at the crate root. Feature gates mirror the gates on the
 // underlying items.
+#[cfg(feature = "binary_plasma")]
+pub use binary::{BinaryWeights, GROUP_SIZE};
 pub use config::{Config, InferenceOverrides, kv_dim};
 #[cfg(feature = "domain_latent")]
 pub use domain::DomainLatent;
@@ -97,8 +102,8 @@ pub use enums::ThinkingBudget;
 pub use enums::WallConfig;
 pub use enums::{
     AttentionMode, AttentionProjection, CacheLayout, CalibrationMode, ConvergenceSelector,
-    DashAttnConfig, DepthTier, HlaMode, HybridPattern, LoopMode, ModelArchitecture, ResidualGate,
-    RetrievalHeadRole, RtTurboConfig, SdpaOutputGate, WeightDtype,
+    DashAttnConfig, DepthTier, HlaMode, HybridPattern, LoopMode, LoopStabilityMode,
+    ModelArchitecture, ResidualGate, RetrievalHeadRole, RtTurboConfig, SdpaOutputGate, WeightDtype,
 };
 #[cfg(feature = "sr2am_configurator")]
 pub use enums::{ConfiguratorContext, PlanningDecision};
@@ -118,16 +123,19 @@ pub use math::sample_token;
 #[cfg(feature = "sparse_mlp")]
 pub use math::sparse_matmul;
 pub use math::{
-    gegelu, gegelu_tanh, matmul, matmul_f16, matmul_f16_parallel, matmul_parallel, matmul_relu,
-    rmsnorm, rmsnorm_with_gamma, rmsnorm_with_gamma_eps, sample_token_into, silu, softmax,
-    softmax_scaled, swiglu,
+    gegelu, gegelu_tanh, matmul, matmul_f16, matmul_f16_f16, matmul_f16_f16_parallel,
+    matmul_f16_parallel, matmul_parallel, matmul_relu, rmsnorm, rmsnorm_with_gamma,
+    rmsnorm_with_gamma_eps, sample_token_into, silu, softmax, softmax_scaled, swiglu,
+    swiglu_inplace,
 };
 pub use merkle::{
     HASH_SIZE, MERKLE_OCTREE_BRANCHING, MERKLE_OCTREE_DEPTH, MERKLE_OCTREE_INTERNAL,
     MERKLE_OCTREE_LEAVES, MERKLE_OCTREE_NODES, MerkleOctree, MerkleProof,
 };
 pub use rng::Rng;
-pub use sense::{DilationConfig, SenseKind, SenseModule, ShardEmbedding, TernaryDir};
+#[allow(deprecated)]
+pub use sense::ShardEmbedding;
+pub use sense::{DilationConfig, SenseKind, SenseModule, TernaryDir};
 pub use slod::ScaleBoundary;
 pub use temporal::{TemporalDerivativeKernel, sigmoid_surprise_gate};
 #[cfg(feature = "plasma_path")]

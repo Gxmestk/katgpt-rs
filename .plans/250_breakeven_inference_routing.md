@@ -1,7 +1,7 @@
 # Plan 250: Breakeven Complexity Inference Routing
 
 **Date:** 2026-06
-**Status:** Active
+**Status:** ✅ COMPLETE, DEFAULT-ON (`breakeven_routing` in katgpt root default) — BreakevenTracker + BreakevenBandit + FidelityMatcher shipped.
 **Research:** 218_Breakeven_Complexity_Inference_Router.md
 **Feature Flag:** `breakeven_routing`
 
@@ -39,7 +39,7 @@ Integration
 
 ### Phase 1: Core Types & Breakeven Computation
 
-- [x] T1: Create `src/breakeven/mod.rs` with `BreakevenTierPair` enum (CpuOnly→CpuGpu, CpuGpu→CpuGpuAne, CpuOnly→Speculative)
+- [x] T1: Create `crates/katgpt-core/src/breakeven/mod.rs` with `BreakevenTierPair` enum (CpuOnly→CpuGpu, CpuGpu→CpuGpuAne, CpuOnly→Speculative)
 - [x] T2: Implement `BreakevenTracker` struct tracking:
   - `upfront_cost_us: u64` — one-time setup cost for tier activation
   - `per_token_cost_us: u64` — wallclock per token at this tier
@@ -114,8 +114,8 @@ Integration
 
 | File | Action |
 |------|--------|
-| `src/breakeven/mod.rs` | NEW — BreakevenTracker, BreakevenBandit |
-| `src/breakeven/fidelity.rs` | NEW — FidelityMatcher |
+| `crates/katgpt-core/src/breakeven/mod.rs` | NEW — BreakevenTracker, BreakevenBandit |
+| `crates/katgpt-core/src/breakeven/fidelity.rs` | NEW — FidelityMatcher |
 | `src/inference_router.rs` | MODIFY — add breakeven signal integration |
 | `src/lib.rs` | MODIFY — add conditional module |
 | `Cargo.toml` | MODIFY — add feature flag |

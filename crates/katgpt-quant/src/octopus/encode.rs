@@ -1,7 +1,7 @@
 //! Triplet encoder with joint 3×3 rounding for OCTOPUS KV cache.
 //!
 //! Encoding pipeline for a rotated KV vector:
-//! 1. Decompose into ⌈d/3⌉ triplets via [`triplet::decompose`]
+//! 1. Decompose into ⌈d/3⌉ triplets via `triplet::decompose`
 //! 2. For each triplet: encode direction via octahedral map, quantize (ξ, η, ρ)
 //! 3. Joint 3×3 rounding: search 9 direction candidates to maximize
 //!    alignment `s = t · n(ξ,η)`, then pick norm nearest to `s`
@@ -264,14 +264,13 @@ pub fn pack_triplet_indices_into(
     indices: &[TripletIndices],
     dir_bits: u8,
     nrm_bits: u8,
-    out: &mut Vec<u8>,
+    out: &mut [u8],
 ) {
     let dir_bits_usize = dir_bits as usize;
     let bits_per_triplet = 2 * dir_bits_usize + nrm_bits as usize;
     let total_bits = indices.len() * bits_per_triplet;
     let byte_len = total_bits.div_ceil(8);
-    out.clear();
-    out.resize(byte_len, 0);
+    out[..byte_len].fill(0);
 
     let dir_mask = ((1u16 << dir_bits) - 1) as u32;
     let nrm_mask = ((1u16 << nrm_bits) - 1) as u32;

@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.2](https://github.com/katopz/katgpt-rs/compare/katgpt-dec-v0.1.1...katgpt-dec-v0.1.2) - 2026-07-31
+
+### Added
+
+- *(dec)* SE(2)-equivariant lift primitive (Plan 560, Research 457)
+- *(dec)* Plan 454 G1b modelless fix — crowding-death unblocks branched morphology, promote grid_3d to default
+- *(dec)* Plan 454 T5 — argmax_block_type raw→categorical bridge + T6 gating
+- stochastic_birth_death_step NCA growth + SplitMix64 PRNG (plan 454 T4)
+- graph_laplacian_grid_3d_into 7-point stencil fast path (plan 454 T3)
+- CellComplex::grid_3d 3D cubical constructor + B1/B2/B3 (plan 454 T2)
+- GridDims enum + 3D back-compat accessors (plan 454 T1)
+
+### Other
+
+- *(features)* feature-gate-audit source .rs — 17 stale lib.rs surfaces
+- *(features)* feature-gate-audit wider sweep — 5 stale comment surfaces
+- *(dec)* hoist expm scratch buffers to krylov_expmv_into call site
+- *(dec)* hoist matmul scratch out of krylov expm_small Taylor loop
+- apply rustfmt import-sorting drift pass
+- *(benches)* extract shared counting_allocator! macro for katgpt-dec
+- Issue 176 — 5 mechanical test-extraction splits for missed soft-limit files
+- sync README + .docs with Plan 454 (grid_3d DEFAULT-ON), Issue 139 (Plan 230 deprecation), Research 442/444
+- *(dec)* Plan 454 T9 scope-hallucination correction — CIV_SPECS is HLA goal-direction labels, not cochains
+- *(dec)* Plan 454 G4b optimization — fuse 4 field passes + logit gate (123.7% → 55.2% overhead)
+- *(triage)* close Issue 155 — impl done via Plan 454, GOAT G1b/G4b fail, grid_3d opt-in
+- clippy fixes across workspace
+- fix all 504 cargo doc warnings in remaining workspace crates
+
 ## [0.1.1](https://github.com/katopz/katgpt-rs/compare/katgpt-dec-v0.1.0...katgpt-dec-v0.1.1) - 2026-07-11
 
 ### Fixed

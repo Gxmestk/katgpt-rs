@@ -126,7 +126,7 @@ pub trait PerceptRouter: Send + Sync {
 ## Tasks
 
 ### Phase 1: BFCP Region Abstraction
-- [x] Add `BorelRegion`, `RegionLabel`, `HalfSpace`, `BFCP`, `PWCValueFunction` types to `src/pruners/bfcf_types.rs`
+- [x] Add `BorelRegion`, `RegionLabel`, `HalfSpace`, `BFCP`, `PWCValueFunction` types to `crates/katgpt-pruners/src/bfcf_types.rs`
 - [x] Implement `BorelRegion::contains(&self, logits: &[f32]) -> bool` — half-space membership check
 - [x] Implement `BorelRegion::intersect(&self, other: &Self) -> Option<Self>` — region intersection
 - [x] Implement `BFCP::covers_all(&self, vocab_size: usize) -> bool` — partition completeness check

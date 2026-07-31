@@ -1,4 +1,4 @@
-# Plan 385 — Unblock `dense_mesh/node_transformer.rs` by extracting `forward` to `katgpt-forward`
+# Plan 385 — Unblock `crates/katgpt-forward/src/dense_mesh_node_transformer.rs` by extracting `forward` to `katgpt-forward`
 
 **Started:** 2026-07-05
 **Status:** CLOSED
@@ -7,7 +7,7 @@
 
 ## Motivation
 
-Plan 384 (Phase 14) closed with `dense_mesh/node_transformer.rs` (334 LOC) flagged as the
+Plan 384 (Phase 14) closed with `crates/katgpt-forward/src/dense_mesh_node_transformer.rs` (334 LOC) flagged as the
 next-session candidate for re-audit. The documented blocker was
 `crate::transformer::forward` (the cognitive-primitive composer). Re-audit confirms:
 
@@ -44,9 +44,9 @@ next-session candidate for re-audit. The documented blocker was
 - [x] **T2** — Update `katgpt-forward/Cargo.toml`: added `domain_latent`, `kog_cpu_fusion`,
   `kog_cpu_fusion = ["katgpt-transformer/kog_cpu_fusion"]` features (forward trio reads
   these via `#[cfg(feature = ...)]`).
-- [x] **T3** — Update `katgpt-forward/src/lib.rs`: declared `pub mod forward;` +
+- [x] **T3** — Update `crates/katgpt-forward/src/lib.rs`: declared `pub mod forward;` +
   `pub use forward::*;` so root can `use katgpt_forward::forward_base;` etc.
-- [x] **T4** — In `src/transformer.rs`: deleted moved code (1057 LOC), replaced with
+- [x] **T4** — In `crates/katgpt-percepta/src/transformer.rs`: deleted moved code (1057 LOC), replaced with
   `pub use katgpt_forward::forward;` (for callers) and
   `use katgpt_forward::{attention_head, forward_base, forward_coda, standard_lm_head,
   clustered_lm_head, select_topk_indices, select_topk_indices_into_buf,
@@ -56,14 +56,14 @@ next-session candidate for re-audit. The documented blocker was
 - [x] **T5** — Update root `Cargo.toml` features: `domain_latent` and `kog_cpu_fusion`
   forward to `katgpt-forward` (so the cfg-gated code paths in katgpt-forward compile
   when root enables these features).
-- [x] **T6** — Moved `src/dense_mesh/node_transformer.rs` →
+- [x] **T6** — Moved `crates/katgpt-forward/src/dense_mesh_node_transformer.rs` →
   `crates/katgpt-forward/src/dense_mesh_node_transformer.rs`. Update imports:
   `crate::transformer::{forward, ForwardContext, MultiLayerKVCache, TransformerWeights}`
   → `crate::{forward::forward, ForwardContext}` (ForwardContext is already in katgpt-forward)
   + `katgpt_transformer::{MultiLayerKVCache, TransformerWeights}`. Same for `Config`/`Rng`
   via `katgpt_core::types::`. The `super::traits::DenseNode` / `super::types::*`
   references become `katgpt_transformer::dense_mesh::{traits::DenseNode, types::*}`.
-- [x] **T7** — Updated `src/dense_mesh/mod.rs` shim: re-export from katgpt-forward.
+- [x] **T7** — Updated `crates/katgpt-transformer/src/dense_mesh/mod.rs` shim: re-export from katgpt-forward.
 - [x] **T8** — GOAT gate G3 PASS. `cargo check --workspace` clean on default /
   all-features / no-default-features. katgpt-forward lib tests: 12/12 (8 hla_forward
   + 4 dense_mesh_node_transformer) with --all-features. Root lib tests: 769/769

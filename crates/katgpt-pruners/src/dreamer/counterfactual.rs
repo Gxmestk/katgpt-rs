@@ -52,24 +52,32 @@ impl CounterfactualEstimator {
 
         // Per-group utility via counterfactual dropout
         let mut utilities = Vec::with_capacity(replacement.merged.len());
+        // Reusable scratch buffers — cleared each iteration, never reallocated
+        // after first use. Avoids per-MC-sample allocation in the inner loop.
+        let mut without: Vec<usize> = Vec::with_capacity(all_indices.len());
+        let mut without_dropped: Vec<usize> = Vec::with_capacity(all_indices.len());
 
         for (group_indices, _) in &replacement.merged {
             let mut utility_sum = 0.0f32;
 
             for _ in 0..self.mc_samples {
-                // Create set without this group
-                let without: Vec<usize> = all_indices
-                    .iter()
-                    .filter(|&&i| !group_indices.contains(&i))
-                    .copied()
-                    .collect();
+                // Create set without this group (reuse scratch)
+                without.clear();
+                without.extend(
+                    all_indices
+                        .iter()
+                        .filter(|&&i| !group_indices.contains(&i))
+                        .copied(),
+                );
 
-                // Randomly drop additional fraction of other arms
-                let without_dropped: Vec<usize> = without
-                    .iter()
-                    .filter(|_| rng.uniform() > self.dropout_fraction)
-                    .copied()
-                    .collect();
+                // Randomly drop additional fraction of other arms (reuse scratch)
+                without_dropped.clear();
+                without_dropped.extend(
+                    without
+                        .iter()
+                        .filter(|_| rng.uniform() > self.dropout_fraction)
+                        .copied(),
+                );
 
                 let u_without = if without_dropped.is_empty() {
                     0.0

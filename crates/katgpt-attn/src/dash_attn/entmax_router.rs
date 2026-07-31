@@ -138,7 +138,8 @@ impl VortexFlow for EntmaxRouter {
 
         // Delegate to existing entmax routing, reusing the scratch's
         // RoutingScratch buffers (avoids 5 Vec allocations per call).
-        let result = score_blocks_entmax_into(query, summaries, &self.config, &mut scratch.routing_scratch);
+        let result =
+            score_blocks_entmax_into(query, summaries, &self.config, &mut scratch.routing_scratch);
 
         // Convert RoutingResult → RoutingDecision
         // Take top_k from active indices (already sorted by entmax support)

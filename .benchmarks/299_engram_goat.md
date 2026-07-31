@@ -13,7 +13,9 @@
 
 **G1/G2/G4 PASS.** G1 lookup latency: **48.12 ns/retrieval** (target < 200 ns) — **4× faster** than the gate. G2 sigmoid ranking: **Spearman ρ = 1.0000** (target > 0.95) — sigmoid gate preserves cosine ranking perfectly. G4 table identity: **0 mismatches / 1000 random tables** — BLAKE3 Merkle root is bit-deterministic.
 
-**G6 (effective depth) is DEFERRED to riir-ai integration.** G6 is the load-bearing gate — it requires a live inference pipeline (LogitLens divergence at layer 5 with Engram vs layer 12 without). katgpt-core is modelless and cannot run this; the gate runs in riir-ai when the Bomber/Go inference stack is wired to consume `katgpt_core::engram::fuse_into_hidden_state`. **The `engram` feature STAYS OPT-IN until G6 lands.**
+**G6 (effective depth) is DEFERRED to riir-ai integration.** G6 is the load-bearing gate — it requires a live inference pipeline (LogitLens divergence at layer 5 with Engram vs layer 12 without). katgpt-core is modelless and cannot run this; the gate runs in riir-ai when the Bomber/Go inference stack is wired to consume `katgpt_core::engram::fuse_into_hidden_state`.
+
+**Post-Promotion update (2026-07-18, Issue 039):** the pre-promotion claim *"The `engram` feature STAYS OPT-IN until G6 lands"* was accurate at the time of writing (pre-Issue-039) but is now **stale** — the katgpt-core leaf feature is **transitively DEFAULT-ON** via the `cognitive_architecture_root → engram` chain (Issue 039, 2026-07-18). G6 remains deferred (it still needs a live inference pipeline), yet the feature ships default-on because primitive-level G1/G2/G4 PASS modellessly and the cognitive architecture root activates it. The katgpt-rs root forwarder in `katgpt-rs/Cargo.toml` stays opt-in for explicit consumer control; the canonical default-on state lives at the katgpt-core leaf.
 
 This is an honest outcome: the open primitive is functionally complete (88 unit tests + 3 GOAT gates all green) and the performance primitives are validated, but the Super-GOAT claim (U-shape scaling law, hybrid Engram+Raven strictly better than either alone) can only be proven end-to-end in a live inference pipeline. Per the Engram paper itself (§3), pure-Engram alone doesn't deliver the win — the hybrid does. We cannot validate the hybrid from katgpt-core alone.
 
@@ -162,7 +164,7 @@ Plasma tier is a `papaya::HashMap` (lock-free, per AGENTS.md) with generation-co
 
 **Plan:** Wire `fuse_into_hidden_state` into the riir-ai Bomber/Go inference stack at a target layer (paper uses layer 2 of a 12-layer backbone). Log per-layer LogitLens divergence. Target: divergence at layer 5 with Engram ≤ divergence at layer 12 without. Run in riir-ai Plan TBD (file when wiring starts).
 
-**Status of feature flag:** stays opt-in until G6 lands.
+**Status of feature flag:** (Post-Promotion update 2026-07-18, Issue 039) the pre-promotion claim *"stays opt-in until G6 lands"* is now **stale** — the feature is transitively DEFAULT-ON at the katgpt-core leaf via `cognitive_architecture_root → engram`. G6 remains deferred, but the primitive-level G1/G2/G4 PASS modellessly and the cognitive architecture root activates it.
 
 ### G7 — No regressions ✅ DOCUMENTED
 
@@ -179,10 +181,12 @@ G7 is the CI guard `cargo test --workspace --all-features` clean. The scoped eng
 | G1 lookup latency | ✅ 43.87 ns/retrieval (release, target < 200); ~346 ns (debug, target < 1000 debug-scaled) | — |
 | G2 sigmoid ranking | ✅ ρ = 1.0000 (target > 0.95) | — |
 | G4 table identity | ✅ 0 mismatches / 1000 | — |
-| G6 effective depth | ⏸️ DEFERRED | **Feature stays opt-in** |
+| G6 effective depth | ⏸️ DEFERRED | **Feature stays opt-in** (pre-Issue-039); **transitively DEFAULT-ON at katgpt-core leaf since 2026-07-18** via `cognitive_architecture_root → engram` (G6 deferred, primitive-level gates PASS) |
 | G7 no regressions | ✅ scoped check clean | — |
 
-**Decision:** **`engram` stays OPT-IN.** Per the spec, "the realistic outcome of this task is: Phase 4/5/6 land cleanly, G1/G2/G4 PASS, stays opt-in until G6 lands in riir-ai." This matches the honest expected outcome. The Super-GOAT claim (U-shape scaling, hybrid Engram+Raven strictly better) requires G6 to prove — and the paper itself reports that pure-Engram alone doesn't deliver the win, only the hybrid does. We cannot validate the hybrid from katgpt-core alone.
+**Decision:** **`engram` stays OPT-IN at the katgpt-rs root forwarder.** Per the spec, "the realistic outcome of this task is: Phase 4/5/6 land cleanly, G1/G2/G4 PASS, stays opt-in until G6 lands in riir-ai." This matches the honest expected outcome. The Super-GOAT claim (U-shape scaling, hybrid Engram+Raven strictly better) requires G6 to prove — and the paper itself reports that pure-Engram alone doesn't deliver the win, only the hybrid does. We cannot validate the hybrid from katgpt-core alone.
+
+**Post-Promotion update (2026-07-18, Issue 039):** the katgpt-core leaf is now **transitively DEFAULT-ON** via `cognitive_architecture_root → engram` chain — the G6 deferral did NOT block transitive default-on at the leaf because the primitive-level G1/G2/G4 gates PASS modellessly. The katgpt-rs root forwarder in `Cargo.toml` stays opt-in for explicit consumer control. G6 (effective-depth, the Super-GOAT mechanistic claim) remains deferred to riir-ai.
 
 **Promotion path:** Once riir-ai wires `fuse_into_hidden_state` into an inference pipeline and G6 passes, file a promotion PR that adds `engram` to the `default` feature list in `crates/katgpt-core/Cargo.toml` and `Cargo.toml`. Until then, consumers opt in with `--features engram`.
 
@@ -202,4 +206,4 @@ G7 is the CI guard `cargo test --workspace --all-features` clean. The scoped eng
 
 ## TL;DR of the TL;DR
 
-All math primitives are validated. The system efficiency claim (§2.5, §6.4) is reachable via the existing primitives (plasma/warm/cold cache, BLAKE3 commitment, atomic hotswap). The mechanistic claim (§6.1 effective depth) — the actual Super-GOAT — requires a live model to run, and that's a riir-ai concern. **Feature stays opt-in. Honest.**
+All math primitives are validated. The system efficiency claim (§2.5, §6.4) is reachable via the existing primitives (plasma/warm/cold cache, BLAKE3 commitment, atomic hotswap). The mechanistic claim (§6.1 effective depth) — the actual Super-GOAT — requires a live model to run, and that's a riir-ai concern. **katgpt-rs root forwarder stays opt-in; katgpt-core leaf is transitively DEFAULT-ON since Issue 039 (2026-07-18). Honest.**

@@ -10,7 +10,7 @@
 //! ## Sink-aware aggregation (Plan 287, Research 258)
 //!
 //! [`LayerSinkSummary`] bridges the per-sink classifier
-//! ([`super::sink_classify`]) with the whole-layer [`GeometryReport`].
+//! (`sink_classify`) with the whole-layer [`GeometryReport`].
 //! The classifier is the *mechanism locator* (NOP vs Broadcast per sink
 //! column); `effective_rank` is the *aggregate symptom*. `LayerSinkSummary`
 //! aggregates the per-sink verdicts across all heads in a layer.
@@ -472,10 +472,7 @@ pub fn within_class_effective_rank(states: &[f32], dim: usize, class_labels: &[u
 ///
 /// Panics if `states` is empty, vectors have inconsistent dimensions, or
 /// `states.len() != class_labels.len()`.
-pub fn within_class_effective_rank_owned(
-    states: &[Vec<f32>],
-    class_labels: &[usize],
-) -> f32 {
+pub fn within_class_effective_rank_owned(states: &[Vec<f32>], class_labels: &[usize]) -> f32 {
     assert!(!states.is_empty(), "states must not be empty");
     assert_eq!(
         states.len(),
@@ -851,10 +848,7 @@ mod tests {
         ];
         let labels = vec![0, 0, 0, 1, 1, 1];
         let r = within_class_effective_rank_owned(&states, &labels);
-        assert!(
-            r < 0.1,
-            "identical-within-class rank should be ~0, got {r}"
-        );
+        assert!(r < 0.1, "identical-within-class rank should be ~0, got {r}");
     }
 
     #[test]
@@ -870,11 +864,19 @@ mod tests {
         let centroid0: Vec<f32> = (0..dim).map(|_| 10.0).collect();
         let centroid1: Vec<f32> = (0..dim).map(|_| -10.0).collect();
         for _ in 0..per_class {
-            states.push((0..dim).map(|j| centroid0[j] + 0.1 * gaussian_noise(&mut rng)).collect());
+            states.push(
+                (0..dim)
+                    .map(|j| centroid0[j] + 0.1 * gaussian_noise(&mut rng))
+                    .collect(),
+            );
             labels.push(0);
         }
         for _ in 0..per_class {
-            states.push((0..dim).map(|j| centroid1[j] + 0.1 * gaussian_noise(&mut rng)).collect());
+            states.push(
+                (0..dim)
+                    .map(|j| centroid1[j] + 0.1 * gaussian_noise(&mut rng))
+                    .collect(),
+            );
             labels.push(1);
         }
         let r = within_class_effective_rank_owned(&states, &labels);
@@ -1011,7 +1013,7 @@ mod tests {
         for (c, center) in centroids.iter().enumerate() {
             for _ in 0..per_class {
                 // EXACTLY identical within each class — zero within-class
-                               // variance. (No jitter: jitter would make within-class
+                // variance. (No jitter: jitter would make within-class
                 // isotropic and the rank would jump to ~dim.)
                 states.push(center.to_vec());
                 labels.push(c);

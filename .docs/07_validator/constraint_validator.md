@@ -76,7 +76,7 @@ Deterministic validation — a neuro-symbolic inference system where `rustc`/`sy
 ## Path Encoding
 
 ```rust
-// crates/katgpt-core/src/traits.rs (re-exported via speculative/types.rs)
+// crates/katgpt-core/src/traits/mod.rs (re-exported via crates/katgpt-core/src/speculative/types.rs)
 parent_path: u128  // 16 bits per depth → max token 65535, max depth 8
 ```
 - Extract: `(path >> (depth * 16)) & 0xFFFF`
@@ -87,7 +87,7 @@ parent_path: u128  // 16 bits per depth → max token 65535, max depth 8
 
 ### Core Types
 ```rust
-// tokenizer/types.rs
+// crates/katgpt-tokenizer/src/types.rs
 #[derive(Clone, Serialize, Deserialize)]
 pub struct BpeTokenizer {
     #[serde(with = "map_serde")]
@@ -126,7 +126,7 @@ pub struct MergeRule {
 
 ### Config
 ```rust
-// crates/katgpt-core/src/types.rs
+// crates/katgpt-types/src/lib.rs
 impl Config {
     pub fn bpe() -> Self {
         Self { vocab_size: 4096, block_size: 256, n_embd: 32, n_head: 4,
@@ -144,7 +144,7 @@ impl Config {
 ```
 - Total weights: ~1.1 MB (target), ~130 KB (draft)
 
-## PartialParser (`validator/partial_parser.rs`)
+## PartialParser (`crates/katgpt-validator/src/partial_parser.rs`)
 
 NOT a full Rust parser. A pragmatic DFA:
 
@@ -174,7 +174,7 @@ This is "Phase 0 Validator":
 - Near-zero false negatives (rarely prunes valid code)
 - The remaining ~80-90% pass to Tier 1 (syn) and Tier 2 (cargo check)
 
-## SynPruner (`validator/syn_pruner.rs`)
+## SynPruner (`crates/katgpt-validator/src/syn_pruner.rs`)
 
 ### Two-Tier Validation
 
@@ -225,7 +225,7 @@ pub fn validate(&mut self, code: &str) -> PruneResult {
 }
 ```
 
-## PruneResult & ErrorKind (`validator/types.rs`)
+## PruneResult & ErrorKind (`crates/katgpt-validator/src/types.rs`)
 
 ```rust
 #[derive(Debug, Clone)]
@@ -242,7 +242,7 @@ pub enum ErrorKind {
 }
 ```
 
-## CompilerFeedback (`validator/types.rs`)
+## CompilerFeedback (`crates/katgpt-validator/src/types.rs`)
 
 ```rust
 #[derive(Debug, Clone)]
@@ -268,7 +268,7 @@ validator = ["syn", "proc-macro2"]
 
 ## ConstraintPruner Trait
 
-Defined in `crates/katgpt-core/src/traits.rs`, re-exported via `speculative/types.rs`:
+Defined in `crates/katgpt-core/src/traits/mod.rs`, re-exported via `crates/katgpt-core/src/speculative/types.rs`:
 
 ```rust
 pub trait ConstraintPruner: Send + Sync {

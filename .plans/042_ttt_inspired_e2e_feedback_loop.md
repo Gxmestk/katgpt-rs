@@ -161,10 +161,10 @@ riir-burner already reads JSONL. The only addition: optional `reward` field for 
     - `screened`: reward < screening_threshold
   - Return `InferenceResult` alongside the generated text
   - Minimal change to DDTree API: wrap return in `(String, InferenceResult)`
-  - ~20 lines in `katgpt-rs/src/ddtree.rs`
+  - ~20 lines in `riir-ai/crates/riir-games/src/plasma/ddtree.rs`
 
 - [x] **Task 3: Solution cache in anyrag**
-  - New module: `crates/lib/src/cache/mod.rs` + `crates/lib/src/cache/solution_cache.rs`
+  - New module: `crates/katgpt-types/src/simd/mod.rs` + `crates/lib/src/cache/solution_cache.rs`
   - `SolutionCache` struct with:
     - `entries: papaya::HashMap<u64, CachedSolution>` (lock-free, per user's lib preference)
     - `max_entries: usize` (configurable, default 1000)
@@ -192,7 +192,7 @@ riir-burner already reads JSONL. The only addition: optional `reward` field for 
   - riir-burner: add optional `--reward-weight` flag to sample proportionally to reward
   - If `--reward-weight` is set, sample training examples weighted by `reward` field
   - Without flag, uniform sampling (backward compatible)
-  - ~40 lines in `riir-burner/src/pipeline.rs`
+  - ~40 lines in `riir-train/crates/riir-train-gpu/src/pipeline.rs`
 
 - [x] **Task 6: Wire feedback in katgpt-rs**
   - After inference, if `solution-cache` feature is enabled:
@@ -201,7 +201,7 @@ riir-burner already reads JSONL. The only addition: optional `reward` field for 
   - Make this opt-in via config: `feedback_url: Option<String>` in `Config`
   - If `feedback_url` is None, skip (no behavior change)
   - If set, fire-and-forget POST (don't block inference on cache write)
-  - ~30 lines in `katgpt-rs/src/feedback.rs` (new file)
+  - ~30 lines in `katgpt-rs/crates/katgpt-deprecated/src/feedback.rs` (new file)
 
 - [x] **Task 7: E2E validation** *(manual — requires running servers end-to-end)*
   - Run anyrag with `solution-cache` feature
@@ -224,7 +224,7 @@ riir-burner already reads JSONL. The only addition: optional `reward` field for 
 | `anyrag/crates/lib/src/cache/mod.rs` | ~5 | Module index | anyrag |
 | `anyrag/crates/lib/src/cache/solution_cache.rs` | ~120 | Cache with PUCT scoring | anyrag |
 | `anyrag/crates/server/src/handlers/cache.rs` | ~60 | Cache API endpoints | anyrag |
-| `katgpt-rs/src/feedback.rs` | ~30 | Fire-and-forget cache write | katgpt-rs |
+| `katgpt-rs/crates/katgpt-deprecated/src/feedback.rs` | ~30 | Fire-and-forget cache write | katgpt-rs |
 | `katgpt-rs/.docs/12_ttt_feedback_loop_results.md` | ~50 | E2E validation results | katgpt-rs |
 
 ### Modified files
@@ -232,13 +232,13 @@ riir-burner already reads JSONL. The only addition: optional `reward` field for 
 | File | Change | Repo |
 |------|--------|------|
 | `katgpt-rs/src/types.rs` | Add `InferenceResult` struct (~30 lines) | katgpt-rs |
-| `katgpt-rs/src/ddtree.rs` | Return `InferenceResult` alongside output (~20 lines) | katgpt-rs |
+| `riir-ai/crates/riir-games/src/plasma/ddtree.rs` | Return `InferenceResult` alongside output (~20 lines) | katgpt-rs |
 | `katgpt-rs/src/lib.rs` | `pub mod feedback;` | katgpt-rs |
-| `anyrag/crates/lib/src/lib.rs` | `pub mod cache;` + feature gate | anyrag |
+| `crates/katgpt-types/src/lib.rs` | `pub mod cache;` + feature gate | anyrag |
 | `anyrag/crates/lib/Cargo.toml` | Add `solution-cache` feature | anyrag |
 | `anyrag/crates/server/Cargo.toml` | Add `solution-cache` feature | anyrag |
 | `anyrag/crates/server/src/handlers/mod.rs` | Add cache module | anyrag |
-| `riir-burner/src/pipeline.rs` | Add `--reward-weight` sampling (~40 lines) | riir-burner |
+| `riir-train/crates/riir-train-gpu/src/pipeline.rs` | Add `--reward-weight` sampling (~40 lines) | riir-burner |
 
 ---
 

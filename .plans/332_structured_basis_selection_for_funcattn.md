@@ -1,9 +1,9 @@
 # Plan 332: Structured Basis Selection for FUNCATTN — Open Primitive
 
 **Date:** 2026-06-26
-**Origin:** Issue 001 (closed + removed, promoted to Plan 332, default-on) use case #4 — VALIDATED by probe (`tests/apollonian_basis_probe.rs`, 2026-06-26)
+**Origin:** Issue 001 (closed + removed, promoted to Plan 332, default-on) use case #4 — VALIDATED by probe (`crates/katgpt-core/tests/apollonian_basis_probe.rs`, 2026-06-26)
 **Related Research:** [257 (FUNCATTN)](../.research/257_Functional_Attention_Spectral_Transport_Operator.md), [291 (cross-resolution)](../.research/291_cross_resolution_spectral_transport_open_primitive.md), [100 (EGA — fixed<learned)](../.research/100_EGA_Energy_Gated_Attention_Spectral_Salience.md)
-**Target:** `katgpt-rs/crates/katgpt-core/src/funcattn.rs` (extend `FuncAttnBasis` enum + add basis constructors) + Cargo feature `funcattn_structured_basis`
+**Target:** `katgpt-rs/crates/katgpt-core/src/funcattn/mod.rs` (extend `FuncAttnBasis` enum + add basis constructors) + Cargo feature `funcattn_structured_basis`
 **Status:** Phase 0 (probe) COMPLETE — T5.1 "invariance" premise falsified, structured basis beats random by +0.11 cos. **Phases 1–4 COMPLETE (2026-06-26): strict G1+G2 gate FAILS on the probe signal — DCT-log hurts there; Haar-packet PASSES at τ=0.5/k≤8 (captures 77% of achievable gain) but fails at τ=0.1 and k≥16. Feature ships opt-in, NOT promoted to default. Phase 5 (true Apollonian harmonics) DEFERRED — narrow gain window doesn't justify the implementation cost. **Broadband follow-up (2026-06-26): DCT-log vindicated on realistic PDE-like signals — beats random by +0.34 cos on a traveling-wave broadband signal (4 log-spaced non-integer modes, j-cycles [1.2, 3.8, 10.1, 23.9]). The probe-signal DCT-log failure is confirmed to be a narrow-low-freq artifact, not representative of realistic PDE spectral content. DCT-log is now documented as a viable choice for broadband transport tasks.** See [.benchmarks/332_structured_basis_goat_and_k_sweep.md](../.benchmarks/332_structured_basis_goat_and_k_sweep.md) for full results.**
 
 ---
@@ -76,7 +76,7 @@ The next step up: a genuine multi-resolution basis (Haar wavelet packet at log-s
 - [x] Add `funcattn_structured_basis = ["funcattn"]` to `katgpt-rs/crates/katgpt-core/Cargo.toml`
 - [x] Add `funcattn_structured_basis = ["katgpt-core/funcattn_structured_basis"]` to `katgpt-rs/Cargo.toml`
 - [x] Gate the two constructors behind `#[cfg(feature = "funcattn_structured_basis")]`
-- [x] Add gated `pub use` re-export in `katgpt-core/src/lib.rs`
+- [x] Add gated `pub use` re-export in `crates/katgpt-core/src/lib.rs`
 
 ---
 

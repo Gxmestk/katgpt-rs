@@ -77,14 +77,14 @@ fn transpose_matvec_into(out: &mut [f32], vec: &[f32], mat: &[f32], hd: usize) {
 /// 2. Main accumulators SK, CQV, mQ
 ///
 /// # Arguments
-/// * `sk` - Key second moment for this KV group [hd × hd] (mutated in-place)
+/// * `sk` - Key second moment for this KV group `[hd × hd]` (mutated in-place)
 /// * `q_head` - Per-Q-head state (mutated in-place)
-/// * `q` - Query slice for this head [hd]
-/// * `k` - Key slice for this KV group [hd]
-/// * `v` - Value slice for this head [hd] (same as kv_dim in practice)
+/// * `q` - Query slice for this head `[hd]`
+/// * `k` - Key slice for this KV group `[hd]`
+/// * `v` - Value slice for this head `[hd]` (same as kv_dim in practice)
 /// * `hd` - Head dimension
 /// * `gamma` - Exponential decay (1.0 = no decay)
-/// * `tmp_k_cqv` - Pre-allocated temp buffer [hd] (avoided heap alloc)
+/// * `tmp_k_cqv` - Pre-allocated temp buffer `[hd]` (avoided heap alloc)
 #[allow(clippy::too_many_arguments)]
 #[inline]
 pub fn hla_state_update(
@@ -244,12 +244,12 @@ fn hla_per_head_update(
 /// auto-vectorization. Ported from riir-engine (Plan 008 Phase 2.1).
 ///
 /// # Arguments
-/// * `q` - Query for this head [hd]
-/// * `sk` - Key second moment [hd × hd]
+/// * `q` - Query for this head `[hd]`
+/// * `sk` - Key second moment `[hd × hd]`
 /// * `q_head` - Per-Q-head state (CQV, G used; mQ, h not used here)
 /// * `hd` - Head dimension
-/// * `out` - Output buffer [hd]
-/// * `tmp_u` - Pre-allocated temp buffer [hd]
+/// * `out` - Output buffer `[hd]`
+/// * `tmp_u` - Pre-allocated temp buffer `[hd]`
 #[inline]
 pub fn hla_readout(
     q: &[f32],
@@ -424,16 +424,16 @@ pub fn hla_readout_normalized(
 /// capturing second-order interactions at linear attention cost.
 ///
 /// # Arguments
-/// * `pkv` - Key-value prefix for this KV group [hd × hd] (mutated)
-/// * `mk` - Key mass for this KV group [hd] (mutated)
+/// * `pkv` - Key-value prefix for this KV group `[hd × hd]` (mutated)
+/// * `mk` - Key mass for this KV group `[hd]` (mutated)
 /// * `q_head` - Per-Q-head AHLA state (mutated)
-/// * `q` - Query slice for this head [hd]
-/// * `k` - Key slice for this KV group [hd]
-/// * `v` - Value slice [hd]
+/// * `q` - Query slice for this head `[hd]`
+/// * `k` - Key slice for this KV group `[hd]`
+/// * `v` - Value slice `[hd]`
 /// * `hd` - Head dimension
 /// * `gamma` - Exponential decay (1.0 = no decay)
-/// * `out` - Output buffer [hd]
-/// * `tmp_r` - Pre-allocated temp buffer [hd]
+/// * `out` - Output buffer `[hd]`
+/// * `tmp_r` - Pre-allocated temp buffer `[hd]`
 #[allow(clippy::too_many_arguments)]
 #[inline]
 pub fn ahla_step(
@@ -516,7 +516,7 @@ pub fn ahla_denom(q: &[f32], q_head: &AhlaQHeadState, hd: usize, eps: f32) -> f3
 /// * `v` - Full value tensor [n_head × hd] (or kv_dim if shared)
 /// * `config` - Model config for GQA mapping
 /// * `gamma` - Exponential decay
-/// * `tmp_k_cqv` - Pre-allocated temp [hd] (reused across heads)
+/// * `tmp_k_cqv` - Pre-allocated temp `[hd]` (reused across heads)
 #[allow(clippy::too_many_arguments)]
 pub fn hla_layer_update(
     layer: &mut HlaLayerState,
@@ -571,7 +571,7 @@ pub fn hla_layer_update(
 /// * `normalize` - Whether to divide by denominator
 /// * `eps` - Epsilon for normalization
 /// * `attn_out` - Output buffer [n_head × hd]
-/// * `tmp_u` - Pre-allocated temp [hd] (reused across heads)
+/// * `tmp_u` - Pre-allocated temp `[hd]` (reused across heads)
 #[allow(clippy::too_many_arguments)]
 pub fn hla_layer_readout(
     layer: &HlaLayerState,
@@ -672,7 +672,7 @@ fn ahla_per_head_step(
 /// * `normalize` - Whether to divide by denominator
 /// * `eps` - Epsilon for normalization
 /// * `attn_out` - Output buffer [n_head × hd]
-/// * `tmp_r` - Pre-allocated temp [hd] (reused across heads)
+/// * `tmp_r` - Pre-allocated temp `[hd]` (reused across heads)
 #[allow(clippy::too_many_arguments)]
 pub fn ahla_layer_step(
     layer: &mut AhlaLayerState,

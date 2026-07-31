@@ -248,7 +248,7 @@ impl PlackettLuceRater {
     /// # Arguments
     ///
     /// * `sketches` — slice of sketch entries to rate
-    /// * `rankings` — each Vec<usize> is a ranking (best first) of sketch indices
+    /// * `rankings` — each `Vec<usize>` is a ranking (best first) of sketch indices
     /// * `rng` — random number generator for Gibbs sampling
     ///
     /// # Returns

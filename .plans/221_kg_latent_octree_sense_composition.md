@@ -1,8 +1,8 @@
 # Plan 221: KG Latent Octree — Modelless Inference-Time Sense Composition
 
 > **📍 Migration note (2026-06-28, Issue 007 Phase C follow-up):** The
-> example files referenced below (`examples/sense_composition.rs`,
-> `examples/sense_bandit_demo.rs`, `tests/bench_221_kg_confidence_weight_goat.rs`)
+> example files referenced below (`riir-ai/crates/riir-engine/examples/sense_composition.rs`,
+> `riir-ai/crates/riir-engine/examples/sense_bandit_demo.rs`, `riir-ai/crates/riir-engine/tests/bench_221_kg_confidence_weight_goat.rs`)
 > moved from this repo (katgpt-rs) to `riir-ai/crates/riir-engine/`. They
 > construct `NpcBrain` (and sense::hotswap, sense::bandit) which are now
 > private NPC runtime IP per `.research/003_Commercial_Open_Source_Strategy`.
@@ -48,7 +48,7 @@ Compress game domain knowledge into fixed-type ternary bit-plane sense modules (
 
 ### Phase 1: Core Types
 
-- [x] **T1: SenseKind enum + SenseModule Pod** (`crates/katgpt-core/src/types.rs`)
+- [x] **T1: SenseKind enum + SenseModule Pod** (`crates/katgpt-types/src/lib.rs`)
   - `#[repr(u8)] pub enum SenseKind` — CommonSense(0), FighterSense(1), GameTheorySense(2), SpatialSense(3), SocialSense(4), SkillSense(5), Reserved(7)
   - `#[repr(C)] pub struct SenseModule` — kind, version, octree_depth, n_directions, octree_bits: [u64; 4], directions: [TernaryDir; 8], confidence: f32, commitment: [u8; 32]
   - `TernaryDir` — pos_bits: u64, neg_bits: u64, row_scale: f32 (20B each)
@@ -58,7 +58,7 @@ Compress game domain knowledge into fixed-type ternary bit-plane sense modules (
   - `SenseModule::query_octree(&self, level: u8, index: u8) -> Option<bool>` — 2-bit occupancy query
   - Tests: roundtrip serialize/deserialize, project nonzero changes output, octree query valid indices, BLAKE3 commitment verify
 
-- [x] **T2: Ternary dot-product kernel** (`crates/katgpt-core/src/simd.rs`)
+- [x] **T2: Ternary dot-product kernel** (`crates/katgpt-dec/src/simd.rs`)
   - `simd_ternary_dot_f32(state: &[f32], dir: &TernaryDir) -> f32` — branchless SIMD conditional add/subtract
   - Reuse existing `simd_ternary_matvec` pattern from plasma_path
   - Scalar fallback for non-SIMD platforms
@@ -81,7 +81,7 @@ Compress game domain knowledge into fixed-type ternary bit-plane sense modules (
 
 ### Phase 2: NpcBrain + GM Override
 
-- [x] **T5: NpcBrain with GM override mask** (`crates/katgpt-core/src/sense/brain.rs`)
+- [x] **T5: NpcBrain with GM override mask** (`riir-ai/crates/riir-engine/src/sense/brain.rs`)
   - `pub struct NpcBrain` — modules: Vec<SenseModule>, hla_state: [f32; 8], overrides: SenseOverride
   - `pub struct SenseOverride` — pinned: [(SenseKind, f32); MAX_OVERRIDES], autonomous_disabled: bool, script_id: Option<u64>
   - `NpcBrain::compose(modules: Vec<SenseModule>)` — load at NPC spawn time
@@ -96,7 +96,7 @@ Compress game domain knowledge into fixed-type ternary bit-plane sense modules (
   - Tests: compose 3 modules, project_all returns 3 scalars, pin overrides autonomous, disable stops all autonomous, re-enable restores
   - MAX_OVERRIDES = 8 (one per SenseKind)
 
-- [x] **T6: SenseWasmPool — per-thread WASM sense module pool** (`crates/katgpt-core/src/sense/pool.rs`)
+- [x] **T6: SenseWasmPool — per-thread WASM sense module pool** (`seal-online-remaster/crates/seal-core/src/mempool/pool.rs`)
   - Reuse BomberWasmPruner pattern: `papaya::HashMap<ThreadId, Mutex<SenseWasmInner>>`
   - WASM ABI: `project(hla_ptr, hla_len, result_ptr) -> u32`, `batch_project(...)`, `emit_triples(...)`
   - Q16.16 fixed-point return values
@@ -105,7 +105,7 @@ Compress game domain knowledge into fixed-type ternary bit-plane sense modules (
   - Tests: single module project, multiple modules compose, fuel exhaustion returns default (fail-safe)
   - Note: WASM is for community/untrusted sense modules only. Core senses use native Rust (T5).
 
-- [x] **T7: Batch sense projection** (`crates/katgpt-core/src/sense/batch.rs`)
+- [x] **T7: Batch sense projection** (`src/benchmark/batch.rs`)
   - `batch_project_all(brains: &[NpcBrain], results: &mut [Vec<f32>])` — process N NPCs
   - For WASM path: serialize all HLA states, call batch_project once, deserialize results
   - For native path: parallel via rayon if N > 64 (per optimization.md guidelines)
@@ -115,7 +115,7 @@ Compress game domain knowledge into fixed-type ternary bit-plane sense modules (
 
 ### Phase 3: Self-Learning + Hot-Swap
 
-- [x] **T8: SenseBandit — trial log for sense module quality** (`crates/katgpt-core/src/sense/bandit.rs`)
+- [x] **T8: SenseBandit — trial log for sense module quality** (`crates/katgpt-ruliology/src/bandit.rs`)
   - `SenseTrial` — npc_id: u32, sense_kind: SenseKind, activation: f32, action_taken: u32, reward: f32
   - `SenseTrialLog` — extends existing TrialLog with sense-specific fields
   - `AbsorbCompress` integration — high-reward trials reinforce direction weights
@@ -123,7 +123,7 @@ Compress game domain knowledge into fixed-type ternary bit-plane sense modules (
   - **Never overrides GM-pinned modules** — bandit feedback skips pinned senses
   - Tests: high reward increases confidence, low reward decreases confidence, pinned modules unaffected
 
-- [x] **T9: HotSwapPruner for sense modules** (`crates/katgpt-core/src/sense/hotswap.rs`)
+- [x] **T9: HotSwapPruner for sense modules** (`crates/katgpt-core/src/engram/hotswap.rs`)
   - `SenseHotSwap` — atomically replace a sense module in NpcBrain at runtime
   - Uses papaya lock-free swap: `AtomicPtr<SenseModule>` with epoch-based reclamation
   - `SenseHotSwap::swap(&self, kind: SenseKind, new_module: SenseModule)` — zero-downtime replacement
@@ -133,7 +133,7 @@ Compress game domain knowledge into fixed-type ternary bit-plane sense modules (
 
 ### Phase 4: Internal Sense API + Examples
 
-- [x] **T10: Internal Sense API — engine-level dispatch target** (`crates/katgpt-core/src/sense/gm.rs`)
+- [x] **T10: Internal Sense API — engine-level dispatch target** (`riir-ai/crates/riir-engine/src/sense/gm.rs`)
   - `pub(crate) trait GmSenseApi` — **internal-only** trait, NOT exposed as public API
   - Callers: MCP binary protocol (AI agents via `McpSupervisor`), SSH GM tools (egui dashboard)
   - No new auth layer — reuse existing `GmKeyStore` (papaya) + `EntityControlEnvelope` (Ed25519)
@@ -151,9 +151,9 @@ Compress game domain knowledge into fixed-type ternary bit-plane sense modules (
   - **Zero human-in-the-loop by default**: MCP agents (AI) handle routine sense management autonomously
   - **SSH GM tools for narrative events**: human GM via egui dashboard for scripted encounters only
   - Tests: pin overrides autonomous, inject KG triple changes octree, non-admin rejected, MCP action dispatch matches trait call
-  - **Bridge**: `riir-viz/src/gm/vibe_ctrl.rs` calls this API through existing GM Tool SSH channel
+  - **Bridge**: `riir-game-sdk/crates/riir-viz/src/gm/vibe_ctrl.rs` calls this API through existing GM Tool SSH channel
 
-- [x] **T11: Example — sense composition + GM override demo** (`examples/sense_composition.rs`)
+- [x] **T11: Example — sense composition + GM override demo** (`riir-ai/crates/riir-engine/examples/sense_composition.rs`)
   - Demonstrates: load 3 sense modules, create NpcBrain, project HLA state
   - Shows GM override: pin fighter_sense to 0.9 → NPC becomes aggressive
   - Shows scripted mode: disable_autonomous → NPC follows script
@@ -161,7 +161,7 @@ Compress game domain knowledge into fixed-type ternary bit-plane sense modules (
   - Before/after: "without sense modules" vs "with sense modules" vs "GM override"
   - Print: sense activations, decision, confidence, GM override status
 
-- [x] **T12: Example — sense bandit self-learning demo** (`examples/sense_bandit_demo.rs`)
+- [x] **T12: Example — sense bandit self-learning demo** (`riir-ai/crates/riir-engine/examples/sense_bandit_demo.rs`)
   - Demonstrates: self-play loop → sense trials → AbsorbCompress → HotSwap
   - Shows GM lock: lock module → bandit can't swap → stays at GM-chosen version
   - Shows confidence evolution over N episodes
@@ -169,7 +169,7 @@ Compress game domain knowledge into fixed-type ternary bit-plane sense modules (
 
 ### Phase 5: KG Confidence Weight Bridge (Plan 221 extension)
 
-- [x] **T13: KG confidence flows from KgEmbedding → SenseModule** (`crates/katgpt-core/src/sense/octree.rs`, `types.rs`)
+- [x] **T13: KG confidence flows from KgEmbedding → SenseModule** (`crates/katgpt-sense/src/octree.rs`, `types.rs`)
   - Add `confidence: f32` field to `KgEmbedding` — carries KG triple confidence from extraction pipeline
   - `SenseOctreeBuilder::build()` sets `SenseModule.confidence` = mean of embedding confidences
   - `SenseModule::project()` scales output: `confidence * sigmoid(dot)` — KG weight bridge

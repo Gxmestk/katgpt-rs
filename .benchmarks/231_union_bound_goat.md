@@ -1,9 +1,14 @@
 # GOAT Proof 231: Union Bound Branch Confidence
 
+> **UPDATE 2026-07-18 (status sync):** `union_bound_confidence` is
+> **default-on** in the root `Cargo.toml` (`default = [...]`, comment: "GOAT
+> 6/6, default-ON"). The `(opt-in)` label below was stale relative to the
+> Cargo.toml default list.
+
 **Date:** 2026-06-09
 **Plan:** 231
 **Research:** 205 (Deep Manifold §2.4.2)
-**Feature gate:** `union_bound_confidence` (opt-in)
+**Feature gate:** `union_bound_confidence` (**default-on in root Cargo.toml**)
 **Status:** ✅ GOAT 6/6 PASS
 
 ---
@@ -52,10 +57,10 @@ running 7 tests — 7 passed; 0 failed
 
 | Component | Tests | File |
 |-----------|-------|------|
-| `BranchConfidence` trait | 3 unit + 6 GOAT | `src/speculative/branch_confidence.rs` |
-| `MultiplicativeScorer` | 3 unit + 6 GOAT | `src/speculative/branch_confidence.rs` |
-| `UnionBoundScorer` | 4 unit + 6 GOAT | `src/speculative/branch_confidence.rs` |
-| `HybridScorer` | 3 unit + 6 GOAT | `src/speculative/branch_confidence.rs` |
+| `BranchConfidence` trait | 3 unit + 6 GOAT | `crates/katgpt-speculative/src/branch_confidence.rs` |
+| `MultiplicativeScorer` | 3 unit + 6 GOAT | `crates/katgpt-speculative/src/branch_confidence.rs` |
+| `UnionBoundScorer` | 4 unit + 6 GOAT | `crates/katgpt-speculative/src/branch_confidence.rs` |
+| `HybridScorer` | 3 unit + 6 GOAT | `crates/katgpt-speculative/src/branch_confidence.rs` |
 | GOAT proof | 7 | `tests/bench_231_union_bound_goat.rs` |
 | **Total** | **33** | |
 

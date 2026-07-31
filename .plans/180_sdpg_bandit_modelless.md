@@ -27,7 +27,7 @@
 
 The mathematical heart of SDPG — Proposition 3.1 translated to bandits.
 
-- [x] **T2: Implement `SdpgAdvantage` trait + `centered_log_ratio` function** — `src/pruners/sdpg/advantage.rs`
+- [x] **T2: Implement `SdpgAdvantage` trait + `centered_log_ratio` function** — `crates/katgpt-pruners/src/sdpg/advantage.rs`
   ```rust
   //! SDPG Proposition 3.1: centered log-ratio advantage for bandits.
   //!
@@ -89,7 +89,7 @@ The mathematical heart of SDPG — Proposition 3.1 translated to bandits.
   }
   ```
 
-- [x] **T3: Implement `BetaSchedule` struct** — `src/pruners/sdpg/schedule.rs`
+- [x] **T3: Implement `BetaSchedule` struct** — `crates/katgpt-pruners/src/sdpg/schedule.rs`
   ```rust
   /// β warmup-decay schedule from SDPG paper.
   ///
@@ -118,7 +118,7 @@ The mathematical heart of SDPG — Proposition 3.1 translated to bandits.
 
 Wrap existing `BanditPruner` with oracle-informed teacher and centered log-ratio advantage.
 
-- [x] **T4: Implement `SdpgBanditPruner<P>`** — `src/pruners/sdpg/mod.rs`
+- [x] **T4: Implement `SdpgBanditPruner<P>`** — `crates/katgpt-pruners/src/sdpg/mod.rs`
   ```rust
   //! SDPG Bandit Pruner — modelless self-distilled policy gradient.
   //!
@@ -152,7 +152,7 @@ Wrap existing `BanditPruner` with oracle-informed teacher and centered log-ratio
 
 Unnormalized KL regularization for bandit Q-values.
 
-- [x] **T6: Implement `KlAnchor` enum** — `src/pruners/sdpg/anchor.rs`
+- [x] **T6: Implement `KlAnchor` enum** — `crates/katgpt-pruners/src/sdpg/anchor.rs`
   ```rust
   //! Unnormalized KL anchoring for bandit Q-values.
   //!
@@ -254,10 +254,10 @@ Root cause analysis showed softmax-based KL has poor resolution for 5-10 bandit 
 
 | File | Changes |
 |------|---------|
-| `src/pruners/sdpg/mod.rs` | **New:** `SdpgBanditPruner<P>` wrapper |
-| `src/pruners/sdpg/advantage.rs` | **New:** `centered_log_ratio` + `softmax_scaled` |
-| `src/pruners/sdpg/schedule.rs` | **New:** `BetaSchedule` |
-| `src/pruners/sdpg/anchor.rs` | **New:** `KlAnchor` (UFKL + URKL) |
+| `crates/katgpt-pruners/src/sdpg/mod.rs` | **New:** `SdpgBanditPruner<P>` wrapper |
+| `crates/katgpt-pruners/src/sdpg/advantage.rs` | **New:** `centered_log_ratio` + `softmax_scaled` |
+| `crates/katgpt-pruners/src/sdpg/schedule.rs` | **New:** `BetaSchedule` |
+| `crates/katgpt-pruners/src/sdpg/anchor.rs` | **New:** `KlAnchor` (UFKL + URKL) |
 | `src/pruners/mod.rs` | Add `pub mod sdpg;` behind `#[cfg(feature = "sdpg_bandit")]` |
 | `Cargo.toml` | Add `sdpg_bandit = []` feature |
 | `examples/bomber_11_sdpg_tournament.rs` | **New:** Arena benchmark |
@@ -336,5 +336,5 @@ If SDPG Bandit shows no arena improvement over HL baseline:
 - Research doc: `.research/160_SDPG_Self_Distilled_Policy_Gradient.md`
 - SDAR research: `.research/038_SDAR_Self_Distilled_Agentic_RL.md`
 - ROPD research: `.research/036_ROPD_Rubric_OnPolicy_Distillation.md`
-- Bandit infrastructure: `src/pruners/bandit.rs`
-- Arena replay: `examples/bomber_04_replay_gen.rs`
+- Bandit infrastructure: `crates/katgpt-ruliology/src/bandit.rs`
+- Arena replay: `examples/bomber_05_replay_gen.rs`

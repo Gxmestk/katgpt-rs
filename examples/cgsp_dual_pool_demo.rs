@@ -331,8 +331,10 @@ fn main() {
     println!("  Per-cycle overhead : 0.5 ns (sigmoid + splitmix64) — plasma tier.");
     println!("  Single-pool CGSP  : degenerate α=1 case; dual-pool strictly generalizes.");
     println!();
-    println!("  G5 (personality divergence benchmark) deferred to riir-ai NpcCgspRuntime.");
-    println!("  Feature stays opt-in until G5 validates widening divergence.");
+    println!("  G5 (personality divergence benchmark) ran in riir-ai Plan 312: G5.2 FLAT");
+    println!("  (PriorityTableBandit::uniform conjecturer too weak), G5.3 PASS (+161.2 ns/cycle),");
+    println!("  G5.4 PASS (E-pool 8→64 arms, bit-identical roundtrip). Feature stays opt-in per");
+    println!("  reachability-guarantee rationale — promotion deferred until richer X-pool conjecturer.");
     println!();
 }
 

@@ -22,15 +22,15 @@
 //! # G3 invariant
 //!
 //! Probe latency is independent of `L` (the trajectory length) — only the
-//! appended instruction pays prefill. The [`probe_append`] operation is
-//! `O(1)` (it records the byte offset); [`revert`] is `O(k)` where `k` is
+//! appended instruction pays prefill. The [`CacheReuseProbe::probe_append`] operation is
+//! `O(1)` (it records the byte offset); [`CacheReuseProbe::revert`] is `O(k)` where `k` is
 //! the probe length, NOT `O(L)`. The G3 test asserts this by timing
 //! `probe_append` + `revert` at L = 1k, 10k, 100k and checking the latency
 //! is within ±10%.
 //!
 //! # Byte-clean contract
 //!
-//! After a CONTINUE decision, [`ProbeToken::revert`] truncates the trajectory
+//! After a CONTINUE decision, [`CacheReuseProbe::revert`] truncates the trajectory
 //! back to its pre-probe length. The rolling cache MUST be uncontaminated:
 //! subsequent generation from the reverted trajectory matches a no-probe
 //! baseline byte-for-byte (modulo KV-cache indexing, which the caller's
@@ -261,11 +261,20 @@ mod tests {
 
             // Measure: average over 1000 iterations. At ~50ns/op this is
             // ~50µs total, fast enough for CI.
+            //
+            // `black_box` prevents the optimizer from eliminating the
+            // probe_append + revert cycle as dead code. Without it, LLVM sees
+            // that extend-then-truncate leaves `traj` unchanged and removes
+            // both ops, producing 0ns measurements (NaN/inf ratio → spurious
+            // FAIL). We fence BOTH the `traj` reference (so the extend's byte
+            // writes can't be proven dead) AND the token (so revert can't be
+            // proven dead).
+            use std::hint::black_box;
             let n_iter = 1000;
             let start = Instant::now();
             for _ in 0..n_iter {
-                let token = probe.probe_append(&mut traj, prompt);
-                probe.revert(&mut traj, token);
+                let token = probe.probe_append(black_box(&mut traj), prompt);
+                probe.revert(black_box(&mut traj), black_box(token));
             }
             let elapsed = start.elapsed();
             let per_op_ns = elapsed.as_nanos() / n_iter as u128;

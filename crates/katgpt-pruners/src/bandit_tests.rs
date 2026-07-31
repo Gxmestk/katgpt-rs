@@ -1,4 +1,3 @@
-
 use super::*;
 use katgpt_speculative::NoScreeningPruner;
 

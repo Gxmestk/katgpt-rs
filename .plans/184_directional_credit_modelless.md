@@ -15,7 +15,7 @@ Apply DASD's entropy-routed directional insight to inference-time pruning. High-
 
 ## Tasks
 
-- [x] **T1: `EntropyBifurcatedPruner<P>` struct** — `src/pruners/entropy_bifurcated.rs`
+- [x] **T1: `EntropyBifurcatedPruner<P>` struct** — `crates/katgpt-pruners/src/entropy_bifurcated.rs`
   - Wrap any `ScreeningPruner` with entropy-aware routing
   - `top1_threshold: f32` (default 0.5) — below = "fork"
   - `relax_factor: f32` (default 0.3) — scale relevance at forks
@@ -52,7 +52,7 @@ Apply DASD's entropy-routed directional insight to inference-time pruning. High-
 
 - [x] **T7: Feature gate** — `Cargo.toml` + `mod.rs` wiring
   - `directional_credit` feature, default on
-  - Module under `src/pruners/entropy_bifurcated.rs`
+  - Module under `crates/katgpt-pruners/src/entropy_bifurcated.rs`
   - Re-exports in `mod.rs`
 
 - [x] **T8: Benchmark** — `.benchmarks/052_directional_credit_goat.md`

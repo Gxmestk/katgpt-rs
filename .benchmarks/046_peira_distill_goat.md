@@ -12,9 +12,9 @@
 | `PeiraConfig` | `crates/katgpt-core/src/peira.rs` | Configuration (λ, EMA rate, dim) |
 | `PeiraCovariance` | `crates/katgpt-core/src/peira.rs` | EMA covariance tracker (Σ, N) |
 | `peira_aux_loss()` | `crates/katgpt-core/src/peira.rs` | Auxiliary loss L_aux (no-backprop-through-inverse) |
-| `PeiraDistiller` | `src/distill/peira.rs` | SC-PEIRA Algorithm 1 loop |
-| `peira_alignment_score()` | `src/distill/peira.rs` | Spectral alignment metric α ∈ [0, 1] |
-| `synthetic_cca_sample()` | `src/distill/peira.rs` | Synthetic CCA data generator |
+| `PeiraDistiller` | `crates/katgpt-spectral/src/peira.rs` | SC-PEIRA Algorithm 1 loop |
+| `peira_alignment_score()` | `crates/katgpt-spectral/src/peira.rs` | Spectral alignment metric α ∈ [0, 1] |
+| `synthetic_cca_sample()` | `crates/katgpt-spectral/src/peira.rs` | Synthetic CCA data generator |
 
 ## Throughput Results (Release)
 

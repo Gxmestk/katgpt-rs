@@ -3,7 +3,7 @@
 **Date:** 2026-07-06
 **Primitive:** `StepAttributionQualifier` + `StepLocalizer` + `DotProductLocalizer` + `SumAggregator` / `MeanAggregator`
 **Module:** `crates/katgpt-pruners/src/step_attribution_qualifier.rs`
-**Feature:** `step_attribution_qualifier` (opt-in)
+**Feature:** `step_attribution_qualifier` (**default-on since 2026-07-06** — see TL;DR below; root Cargo.toml comment: "Plan 381 Phase 5, 2026-07-06")
 **Source paper:** [arXiv:2606.01311](https://arxiv.org/abs/2606.01311) — SkillAdaptor, Yu et al. 2026
 **Bench:** `benches/step_attribution_qualifier_bench.rs` (`cargo run --release --bench step_attribution_qualifier_bench --features step_attribution_qualifier`)
 
@@ -60,7 +60,7 @@ No new dependencies were added to `crates/katgpt-pruners/Cargo.toml`. The module
 
 ## Cross-references
 
-- **Plan:** `.plans/381_step_attribution_delta_qualification_primitive.md`
+- **Plan:** `.plans/450_step_attribution_delta_qualification_primitive.md`
 - **Research:** `.research/381_SkillAdaptor_Step_Level_Fault_Attribution_Delta_Qualification.md`
 - **Private guide (riir-ai):** `riir-ai/.research/313_Step_Level_Fault_Attribution_Commit_Gate_Guide.md`
 - **Runtime wiring (riir-ai):** `riir-ai/.plans/313_step_attribution_branch_wiring.md`

@@ -837,7 +837,7 @@ impl PeiraCovariance {
     /// # Performance
     ///
     /// **This method allocates 5 vectors on every call.** For hot paths,
-    /// prefer [`predictor_with_scratch()`] or [`predict_and_loss()`] which
+    /// prefer [`predictor_with_scratch()`](Self::predictor_with_scratch) or [`predict_and_loss()`](Self::predict_and_loss) which
     /// reuse pre-allocated internal buffers and are zero-alloc.
     #[deprecated(note = "allocates 5 vectors per call; use `predictor_with_scratch()` instead")]
     pub fn predictor(&self) -> (Vec<f64>, Vec<f64>) {
@@ -876,7 +876,7 @@ impl PeiraCovariance {
 
     /// Compute predictor matrices, fully zero-alloc using pre-allocated scratch.
     ///
-    /// Same as [`predictor()`] but avoids all allocations by using pre-allocated
+    /// Same as [`predictor()`](Self::predictor) but avoids all allocations by using pre-allocated
     /// internal buffers. Returns references valid until the next mutable call.
     pub fn predictor_with_scratch(&mut self) -> (&[f64], &[f64]) {
         let k = self.config.dim;
@@ -979,7 +979,7 @@ impl PeiraCovariance {
     /// with the pre-allocated `sigma_sample`, `n_sample`, and `pm` buffers.
     ///
     /// Note: `p_star` and `q_star` should come from a recent call to
-    /// [`predictor_with_scratch()`] for consistency.
+    /// [`predictor_with_scratch()`](Self::predictor_with_scratch) for consistency.
     pub fn compute_aux_loss(
         &mut self,
         student: &[f32],

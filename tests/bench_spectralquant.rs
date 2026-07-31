@@ -7,12 +7,12 @@
 use std::slice::from_ref;
 use std::time::Instant;
 
+#[cfg(feature = "turboquant")]
+use katgpt_quant::turboquant::{TurboQuantKVCache, TurboQuantKVCacheConfig};
 use katgpt_rs::spectralquant::{
     SpectralQuantCalibration, SpectralQuantKVCache, SpectralQuantKVCacheConfig,
     calibrate_eigenbasis,
 };
-#[cfg(feature = "turboquant")]
-use katgpt_quant::turboquant::{TurboQuantKVCache, TurboQuantKVCacheConfig};
 use katgpt_rs::types::Rng;
 #[cfg(feature = "turboquant")]
 use katgpt_rs::types::{Config, kv_dim};

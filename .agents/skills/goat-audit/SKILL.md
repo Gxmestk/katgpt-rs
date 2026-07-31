@@ -1,6 +1,6 @@
 ---
 name: goat-audit
-description: Audit cross-repo GOAT/gain primitive cherry-pick status across the 5-repo quintet (katgpt-rs → riir-ai / riir-chain / riir-neuron-db). Detects stalls (default-on in katgpt-rs for ≥7 days with zero runtime wiring in riir-*), DRY violations (duplicated substrate in riir-* that should consume katgpt-core), and SOLID violations. Use when auditing primitive cherry-pick coverage, before opening a plan that consumes a katgpt-rs primitive, or quarterly as a hygiene gate.
+description: Audit cross-repo GOAT/gain primitive cherry-pick status across the 7-repo stack (katgpt-rs → riir-ai / riir-chain / riir-neuron-db; riir-game-sdk + riir-armageddon are downstream consumers, typically out of cherry-pick scope). Detects stalls (default-on in katgpt-rs for ≥7 days with zero runtime wiring in riir-*), DRY violations (duplicated substrate in riir-* that should consume katgpt-core), and SOLID violations. Use when auditing primitive cherry-pick coverage, before opening a plan that consumes a katgpt-rs primitive, or quarterly as a hygiene gate.
 ---
 
 # goat-audit — Cross-Repo GOAT/Gain Cherry-Pick Audit
@@ -25,7 +25,7 @@ Use this skill when auditing whether the riir-* private repos have consumed the 
 - Single-repo refactors with no cross-repo angle.
 - Bug fixes with no architectural impact.
 
-## Repos in scope (the 5-repo quintet)
+## Repos in scope (the 7-repo stack — audit focuses on the 4 cherry-pick targets)
 
 ```
 katgpt-rs          ← public engine (substrate: katgpt-core + 16 leaf crates + root)
@@ -33,7 +33,20 @@ riir-ai            ← private runtime/game (cognitive, ARG, CLR, HLA, karc, cwm
 riir-chain         ← private chain (LatCal, quorum, asset lifecycle)
 riir-neuron-db     ← private neuron-shard leaf (Pod, freeze, consolidation, AnyRAG)
 riir-train         ← private training vault (OUT OF SCOPE — training-only methods)
+riir-game-sdk      ← private game-vocabulary facade + dev-tool workspace (OUT OF SCOPE —
+                      consumes vocabulary from riir-games-shared in riir-ai, not katgpt-rs
+                      engine primitives directly; transitively reaches katgpt-core only via
+                      the always-on path dep, no feature-flag-gated primitives to audit)
+riir-armageddon    ← private arena/game-product domain types (OUT OF SCOPE — domain types,
+                      no engine primitives)
 ```
+
+**Why SDK + armageddon are out of scope:** this audit tracks katgpt-rs default-on
+primitives (feature-flag-gated, GOAT-validated) consumed in riir-* runtimes. The
+SDK is a facade over `riir-games-shared` (in riir-ai workspace) — its primitives
+are vocabulary types, not katgpt-rs engine features. Armageddon carries
+product-domain types. Neither ships feature-flag-gated katgpt-rs primitives
+that need cherry-pick tracking.
 
 ## Workflow
 
@@ -87,6 +100,8 @@ grep "^use katgpt" <each-file-from-layer-2-results>
 - File has `use katgpt_*::SomeType` but the Layer 2 hit name is locally defined → **MERGE candidate** — the file consumes some katgpt types but re-defines the queried primitive locally; needs human review
 
 **Vocabulary translation before grepping:** list the primitive's 3–5 exported type/function names from the source file (e.g. `katgpt-rs/crates/katgpt-pruners/src/soft_reject.rs` exports `SoftRejectVerdict`, `SoftRejectConfig`, `soft_reject_decide`, `soft_reject_with_relax`, `RelaxationStrategy`, `NoRelaxation`). Grep for ALL of them, not just the feature name.
+
+**Derived-primitive grep (the T2 `smooth_min_similarity` lesson, Issue 532, 2026-07-18):** when a primitive is consumed as SUBSTRATE by a later promoted primitive (e.g. `recos` in `katgpt-core` is implemented on top of `smooth_min_similarity` — `#[cfg(feature = "recos")]` lives inside the `similarity` module and implies `smooth_min_similarity`), grepping for the substrate's own names misses consumers of the derivative. The riir-* consumer of `recos` calls `recos_sim_ranking`, not `smooth_min_similarity` — a Layer 2 grep for `smooth_min` returns 20+ katgpt-rs hits and the riir-neuron-db consumer hides on a later page. **Mitigation:** before auditing a substrate primitive, list the katgpt-core features that imply it (read each feature definition in `crates/katgpt-core/Cargo.toml` for `feature_x = ["feature_y"]` edges — `recos = ["smooth_min_similarity"]` is the canonical case), then grep for the derivative primitive's exported names too. This was the second occurrence of the paginated-grep-hides-consumer failure mode (the first was T9 `local_branch_routing`, where the consumer used `branch_routing::{DotProductRouter, PostCandidateRouter}` aliases while the grep was for `branching`).
 
 ### Step 3 — Classify each primitive
 
@@ -189,6 +204,7 @@ Report to the user:
 4. **Opt-in by design** — `closed_unit_compaction` is opt-in because compaction is a sleep-cycle op, not hot path. Don't flag unless the opt-in reason is stale.
 5. **Cross-repo transitively** — `subspace_phase_gate` is consumed via riir-neuron-db's freeze gate even though riir-ai runtime doesn't call the diagnostic directly. Mark "Partial" not "Stall".
 6. **Fork-drift false WIRED (Issue 019 class)** — Layer 2 struct-name grep hits a file, but Layer 3 reveals the file has zero `use katgpt_*::` imports and defines its own `pub struct SameName`. The primitive is NOT wired — it's locally re-implemented. Report as **Fork drift** (file de-fork task), NOT as WIRED. Without Layer 3, the audit systematically under-counts substrate-side drift in fork-derived repos. Canonical case: `riir-engine/src/transformer/mod.rs` defined local `KVCache`/`KVSnapshot`/`PAGE_SIZE` while `katgpt_transformer::{KVCache, KVSnapshot, PAGE_SIZE}` shipped upstream (the dep was even declared in `Cargo.toml` but unused — `grep "^use katgpt_transformer"` returned 0 matches). Plan 406 Phase 1/2 de-forked these bit-identical and superset types. NOTE (Issue 420, 2026-07-09): a prior version of this example cited `riir-engine/src/kvarn_quality.rs` duplicating `katgpt-kv::kvarn::KvCacheQualityReport` — that was factually wrong (katgpt-kv ships no such type); the riir-engine `KvCacheQualityReport` is a legitimately local `ThinkingController` abstraction, not fork drift.
+7. **Substrate-via-derivative consumer (Issue 532 T2 class, 2026-07-18)** — a substrate primitive IS wired in riir-*, but only transitively via a derivative primitive. `smooth_min_similarity` is substrate for `recos` (`recos` implies `smooth_min_similarity`); riir-neuron-db's `recos_rerank` calls `recos_sim_ranking`, which compiles + uses `smooth_min_similarity` transitively. A Layer 2 grep for `smooth_min` returns 20+ katgpt-rs-side hits and the riir-neuron-db consumer (using the `recos_sim_ranking` alias) hides on a later page. The audit verdicted "0 consumers in riir-*" — wrong. **Mitigation:** when a substrate primitive has derivative primitives that depend on it (read the feature implications in `crates/katgpt-core/Cargo.toml`), grep for the derivatives' exported names too, not just the substrate's own names. Same failure class as #1 (feature-name-only grep miss) but harder to spot because the alias lives in katgpt-rs, not riir-*.
 
 ## The 7-day rule (when a stall becomes actionable)
 
@@ -201,7 +217,7 @@ The 7-day window gives the open primitive time to land its bench evidence before
 ## Cross-references
 
 - `katgpt-rs/AGENTS.md` — Feature Flag Discipline (the GOAT gate contract).
-- `katgpt-rs/.agents/skills/research/SKILL.md` — research workflow (paper → 5-repo routing).
+- `katgpt-rs/.agents/skills/research/SKILL.md` — research workflow (paper → 7-repo routing).
 - `riir-ai/.issues/003_cross_repo_goat_cherry_pick_audit.md` — the canonical audit (2026-07-03). **Compromised** by the Layer 3 gap — substrate-side primitives marked WIRED in this audit need re-verification per Issue 019.
 - `riir-ai/.issues/019_riir_engine_substrate_de_fork.md` — the LLM-substrate de-fork plan (2026-07-04). Documents the fork-drift failure class and the Layer 3 fix.
 - `katgpt-rs/.plans/008_katgpt_core_substrate_extraction.md` — the cross-repo DRY closure record (cognitive substrate: hla/types/tokenizer/dd_tree).

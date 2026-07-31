@@ -17,7 +17,7 @@
 //! It does NOT ship `ComposerTick` (the `GpuFuture` impl) or `Join3` — those
 //! live in `riir-engine/src/analytic_lattice/asoc.rs` because they need
 //! `riir-gpu-async`, which is private to riir-ai. Adding that dep here would
-//! invert the 5-repo commercial boundary (katgpt-core is the leaf crate; it
+//! invert the 7-repo commercial boundary (katgpt-core is the leaf crate; it
 //! must not depend on riir-ai's private runtime).
 //!
 //! # Constraints (per AGENTS.md + Plan 330)
@@ -43,11 +43,27 @@ pub mod batch_chain;
 pub mod chain;
 pub mod decoder;
 
+// Transfer-matrix band-structure analyzer (Plan 458, Research 451).
+// Distills the Kronig-Penney delta-lattice model into a generic, modelless
+// primitive that classifies per-mode propagation behavior (propagating /
+// decaying / growing) from the eigenvalues of a transport-operator chain or
+// periodic stack. The ML anchor is Bai/Kolter DEQ Jacobian regularization
+// (arXiv:2106.14342): their ρ(J_*) < 1 is the scalar spectral-radius version
+// of this primitive's per-mode band classifier.
+#[cfg(feature = "transfer_matrix_band_structure")]
+pub mod band_structure;
+
 pub use asoc::{ComposerCtx, PlasmaDraft, RederiveOp};
 pub use audit::{AuditReport, spectral_audit};
 pub use batch_chain::{batch_compose_chain, batch_compose_chain_into};
 pub use chain::{ChainError, compose_chain, compose_chain_into};
 pub use decoder::{direction_vector_decode, direction_vector_decode_into};
+
+#[cfg(feature = "transfer_matrix_band_structure")]
+pub use band_structure::{
+    BandClass, BandStructureReport, DEFAULT_BAND_EPSILON, DEFAULT_MAX_SWEEPS, analyze_chain,
+    analyze_chain_into, analyze_periodic, analyze_periodic_into, band_classify, band_classify_into,
+};
 
 // ── Core types ─────────────────────────────────────────────────────────────
 

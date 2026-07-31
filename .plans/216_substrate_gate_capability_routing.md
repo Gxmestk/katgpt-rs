@@ -40,51 +40,51 @@ ForwardContext (transformer.rs)
 
 ### Phase 1: Core Types & Infrastructure
 
-- [x] T1: Define `SubstrateMask` type in `src/pruners/substrate_types.rs`
+- [x] T1: Define `SubstrateMask` type in `crates/katgpt-pruners/src/substrate_types.rs`
   - Packed bitmask (`Vec<u64>`) over `[layers × d_ff]` MLP channels
   - Per-layer active counts
   - Recovery score field
   - BLAKE3 hash for provenance
   - `serde` Serialize/Deserialize for `.mask` file loading
 
-- [x] T2: Define `SubstrateRouter` trait in `src/pruners/substrate_types.rs`
+- [x] T2: Define `SubstrateRouter` trait in `crates/katgpt-pruners/src/substrate_types.rs`
   - `select_mask(tokens, config) -> Option<&SubstrateMask>`
   - `register_mask(capability, mask)`
   - Default impl: `NoSubstrateRouter` (returns None, falls back to full MLP)
 
-- [x] T3: Define `SubstrateConfig` in `src/pruners/substrate_types.rs`
+- [x] T3: Define `SubstrateConfig` in `crates/katgpt-pruners/src/substrate_types.rs`
   - `masks: Vec<SubstrateMask>` — loaded at model init
   - `threshold: f32` — minimum recovery score to use mask
   - Validation: mask dimensions match model architecture
 
 ### Phase 2: Dual Sparsity Execution
 
-- [x] T4: Implement mask intersection in `src/pruners/substrate_execution.rs`
+- [x] T4: Implement mask intersection in `crates/katgpt-pruners/src/substrate_execution.rs`
   - `apply_substrate_mask()` — O(active_count) filter of ReLU-active channels
   - `apply_substrate_mask_inplace()` — zero-allocation in-place compaction
   - `active ∩ substrate` bitwise check per channel
   - Zero runtime cost when `substrate_gate` feature disabled (`#[cfg]`)
 
-- [x] T5: Implement `SubstrateExecutionContext<R>` in `src/pruners/substrate_execution.rs`
+- [x] T5: Implement `SubstrateExecutionContext<R>` in `crates/katgpt-pruners/src/substrate_execution.rs`
   - Generic over `SubstrateRouter`
   - `select_for_sequence()` — caches mask per sequence
   - `apply_to_layer()` — applies intersection with heuristic gating
 
 ### Phase 3: DDTree Integration
 
-- [x] T6: Extend DDTree branch scoring with substrate recovery in `src/pruners/substrate_ddtree.rs`
+- [x] T6: Extend DDTree branch scoring with substrate recovery in `crates/katgpt-pruners/src/substrate_ddtree.rs`
   - Each branch can specify a capability name
   - Branch score = logprob × sigmoid(recovery) × constraint_validity
   - Sigmoid (not softmax) per project conventions
 
-- [x] T7: Implement substrate-aware branch expansion in `src/pruners/substrate_ddtree.rs`
+- [x] T7: Implement substrate-aware branch expansion in `crates/katgpt-pruners/src/substrate_ddtree.rs`
   - `SubstrateBranch` struct with capability name, mask, logprob, constraint_validity
   - `expand_substrate_branches()` — scores and sorts branches
   - `select_best_branch()` — picks first viable branch above min_recovery
 
 ### Phase 4: ScreeningPruner Extension
 
-- [x] T8: Implement `SubstrateScreeningPruner` in `src/pruners/substrate_pruner.rs`
+- [x] T8: Implement `SubstrateScreeningPruner` in `crates/katgpt-pruners/src/substrate_pruner.rs`
   - `relevance(token, context) -> f32` via `ScreeningPruner` trait
   - Uses mask recovery score as base + hash-based token modulation
   - Sigmoid-gated output [0, 1]
@@ -92,13 +92,13 @@ ForwardContext (transformer.rs)
 
 ### Phase 5: Mask Loading & Export
 
-- [x] T9: Implement `.mask` file loader in `src/pruners/substrate_loader.rs`
+- [x] T9: Implement `.mask` file loader in `crates/katgpt-pruners/src/substrate_loader.rs`
   - `load_substrate_mask(json)` — parses JSON, validates version/dimensions/hash
   - `save_substrate_mask(mask)` — serializes to pretty JSON
   - `validate_mask()` — architecture + hash validation
   - Error handling: malformed file → returns None (no crash)
 
-- [x] T10: Define `.mask` file format in `src/pruners/substrate_loader.rs`
+- [x] T10: Define `.mask` file format in `crates/katgpt-pruners/src/substrate_loader.rs`
   - `SubstrateMaskFile` struct with version=1
   - Per-layer packed bitmasks (Vec<Vec<u64>>)
   - Recovery score, capability name, model ID

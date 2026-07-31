@@ -19,11 +19,11 @@
 //!    - `EmitToken(_)` → host samples / argmaxes; we return `EmitToken(0)` and
 //!      the host overwrites. (A real model host wires the sampled id here.)
 //!    - `EmitSoftEmbedding` → call [`soft_embedding`] into our scratch, apply
-//!      [`mix_thinking_signal`](crate::swir::mix_thinking_signal) if
+//!      [`mix_thinking_signal`] if
 //!      [`SwiRController::should_mix_signal`] fires, and return the buffer
 //!      cloned into the directive.
 //!    - `InjectControlToken(token)` → resolve via
-//!      [`ControlToken::resolve_via`] and wrap in `InjectTokens(vec![id])`.
+//!      `ControlToken::resolve_via` and wrap in `InjectTokens(vec![id])`.
 //!    - `Terminate` → return `Terminate`.
 //!
 //! # Allocation profile
@@ -133,9 +133,10 @@ impl SwiRStrategyAdapter {
             }
             return view;
         }
+        use katgpt_core::simd::fast_exp;
         let mut sum_exp = 0.0f32;
         for (i, &l) in logits.iter().enumerate() {
-            let e = (l - max_logit).exp();
+            let e = fast_exp(l - max_logit);
             view[i] = e;
             sum_exp += e;
         }

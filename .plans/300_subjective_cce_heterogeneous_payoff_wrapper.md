@@ -206,15 +206,15 @@ katgpt-rs/src/cce/
 
 ### Phase 1 — Trait + types
 
-- [x] **T1.1** Add `HeterogeneousPayoff<N, A>` trait to `katgpt-rs/src/cce/types.rs` with the five methods above (`n_players`, `deviations_for_player`, `reward_follow`, `reward_deviate`, `gamma0`, `gamma0_coeff`). Default impls for the last three.
-- [x] **T1.2** Re-export from `katgpt-rs/src/cce/mod.rs`: `pub use types::HeterogeneousPayoff;`
+- [x] **T1.1** Add `HeterogeneousPayoff<N, A>` trait to `katgpt-rs/crates/katgpt-core/src/cce/types.rs` with the five methods above (`n_players`, `deviations_for_player`, `reward_follow`, `reward_deviate`, `gamma0`, `gamma0_coeff`). Default impls for the last three.
+- [x] **T1.2** Re-export from `katgpt-rs/crates/katgpt-core/src/cce/mod.rs`: `pub use types::HeterogeneousPayoff;`
 - [x] **T1.3** Add unit test in `types.rs`: a 2-player trivial `HeterogeneousPayoff` impl with `N=2, A=2`, verify `gamma0` on uniform `ρ` matches hand-computed `(1/2)(γ_1 + γ_2)`.
 
 **Phase 1 exit:** `cargo test --features cce_moderator --lib cce::types::` passes. ✅ PASSED 2026-06-21 (9/9).
 
 ### Phase 2 — LP solver extension
 
-- [x] **T2.1** Implement `CceLp::solve_heterogeneous::<N, A, H>(game: &H)` in `katgpt-rs/src/cce/lp.rs`. Refactor the existing `solve` to share BFS-enumeration infrastructure with the new method (extract `enumerate_bfs(mat, rhs, n_vars, na)` helper — DRY, keeps both paths consistent).
+- [x] **T2.1** Implement `CceLp::solve_heterogeneous::<N, A, H>(game: &H)` in `katgpt-rs/crates/katgpt-core/src/cce/lp.rs`. Refactor the existing `solve` to share BFS-enumeration infrastructure with the new method (extract `enumerate_bfs(mat, rhs, n_vars, na)` helper — DRY, keeps both paths consistent).
 - [x] **T2.2** Implement `CceLp::is_heterogeneous_cce(rho, game, epsilon)` — per-player, per-deviation regret check. Early-exit on first violation.
 - [x] **T2.3** Implement `ExternalRegret::er_heterogeneous(rho, game)` — average per-player external regret.
 
@@ -222,7 +222,7 @@ katgpt-rs/src/cce/
 
 ### Phase 3 — `PerPlayerGame` default impl + tests
 
-- [x] **T3.1** Implement `PerPlayerGame<N, A, P, D>` in `katgpt-rs/src/cce/heterogeneous.rs`.
+- [x] **T3.1** Implement `PerPlayerGame<N, A, P, D>` in `katgpt-rs/crates/katgpt-core/src/cce/heterogeneous.rs`.
 - [x] **T3.2** Unit tests in `heterogeneous.rs`:
   - `homogeneous_equivalence` — `PerPlayerGame` with all players sharing the same `(P, D)` gives the same `ρ⋆` as `CceLp::solve(d, p)` on that single `(P, D)`. **Closes the "wrapper is a strict generalization" check.**
   - `two_player_prisoners_dilemma` — classic 2-player PD where each player has its own payoff tensor. **Wording corrected:** single-shot PD with constant-deviation class has a larger CCE feasible set than `{δ_(D,D)}`; the test verifies feasibility + CCE validity + per-player regret ≤ ε + γ₀ range, not cooperation (which is not incentive-compatible).
@@ -256,7 +256,7 @@ katgpt-rs/src/cce/
 
 ### Phase 5 — Documentation + feature promotion
 
-- [x] **T5.1** Add `HeterogeneousPayoff` + `PerPlayerGame` + `solve_heterogeneous` to `katgpt-rs/src/cce/mod.rs` module doc with a 10-line usage example. ✅ Module doc updated with the subjective-CCE LP formulation block.
+- [x] **T5.1** Add `HeterogeneousPayoff` + `PerPlayerGame` + `solve_heterogeneous` to `katgpt-rs/crates/katgpt-core/src/cce/mod.rs` module doc with a 10-line usage example. ✅ Module doc updated with the subjective-CCE LP formulation block.
 - [x] **T5.2** Update `katgpt-rs/.research/274_Optimal_CCE_Moderator_LP_No_Regret.md` with a "Subjective-CCE extension" section linking to this plan and to Issue 327 Path A+. ✅ Added §9.
 - [x] **T5.3** Update `riir-ai/.research/143_Latent_CCE_Moderator_Crowd_Emergent_Coordination.md` with the same pointer. ✅ Added section + cross-link row in the Plan dependency table.
 - [x] **T5.4** Feature promotion: ✅ DONE. T4.3b closed G3, so the "G1+G2+G3+G4 all PASS" condition is met. `cce_moderator` added to `default` features in `katgpt-rs/Cargo.toml` line 45 (2026-06-22). `src/lib.rs` comment updated to reflect DEFAULT-ON status. Zero non-optional deps (feature is `cce_moderator = []`); promotion is zero-cost for non-consumers since the module is `#[cfg(feature = "cce_moderator")]` gated. **Resolves the prior discrepancy** with the Plan 325 note — Plan 325 had not actually promoted the feature (Cargo.toml audit confirmed); Plan 300 T4.3b+T5.4 does the promotion with full GOAT evidence.
@@ -303,7 +303,7 @@ katgpt-rs/src/cce/
 - [x] G3 PASS (convergence rate log-log slope = -1.0; ≤ -0.5 paper bound).
 - [x] G4 PASS (<50ms on ALL scales post-T4.3b: 32-player crowd-scale = 8.9ms via primal-dual).
 - [x] All unit tests in `heterogeneous.rs` pass (5/5).
-- [~] `cargo check --all-features` clean (CI feature guard catches combo regressions per the `merkle_root` lesson). **PRE-EXISTING FAILURE** in `katgpt-core/src/dec/hodge.rs:222` (borrow-checker error in unrelated `LoraAdapter` combo) — not introduced by Plan 300. `cargo check --features cce_moderator` passes clean; `cargo check` (default features, post-T5.4 promotion) passes clean. The `--all-features` failure is in a different crate and was present before this plan. Left for the owner of the hodge/LoraAdapter work to fix.
+- [~] `cargo check --all-features` clean (CI feature guard catches combo regressions per the `merkle_root` lesson). **PRE-EXISTING FAILURE** in `crates/katgpt-dec/src/hodge.rs:222` (borrow-checker error in unrelated `LoraAdapter` combo) — not introduced by Plan 300. `cargo check --features cce_moderator` passes clean; `cargo check` (default features, post-T5.4 promotion) passes clean. The `--all-features` failure is in a different crate and was present before this plan. Left for the owner of the hodge/LoraAdapter work to fix.
 - [x] Plan 300 status → ✅ COMPLETE. Issue 327 T-A+.1 through T-A+.4 marked done.
 
 ---

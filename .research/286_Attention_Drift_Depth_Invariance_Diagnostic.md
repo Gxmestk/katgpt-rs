@@ -30,9 +30,9 @@ Two transferable primitives, both inference-time, both modelless:
    h_raw  = h_t + Δ(h_t)
    h_{t+1} = post_norm ? rmsnorm(h_raw) : h_raw * pinch(h_raw)
    ```
-   This is the *upstream* fix. The *downstream* fix (re-derive when drift exceeds τ) is `riir-ai/crates/riir-engine/src/latent_functor/reestimation.rs` ("coherence-driven re-estimation scheduler") — the two compose as defense-in-depth.
+   This is the *upstream* fix. The *downstream* fix (re-derive when drift exceeds τ) is `riir-ai/crates/riir-engine/src/latent_functor/reestimation/mod.rs` ("coherence-driven re-estimation scheduler") — the two compose as defense-in-depth.
 
-**Critical finding from codebase audit:** our existing `BeliefDrafter` (Plan 217) at `katgpt-rs/src/speculative/belief_drafter.rs:80-81, 193-197` implements exactly the paper's failure mode: `h_{t+1} = h_t + FC3(...)` with the residual path **unnormalized** (LayerNorm is on the *input* only, line 35-50). This drafter IS subject to attention/magnitude drift and the paper's diagnosis applies verbatim. For BeliefDrafter specifically, only the **diagnostic** is modelless — the post-norm *fix* requires MLP retraining (paper §4.4 Table 4: inference-time magnitude pin drops acceptance 56% on pre-norm models). For our *own* kernels (HLA, latent_functor, micro_belief, engram retrieval chains, Raven consolidation) the fix is modelless because we own the kernel — we can post-norm at runtime without retraining anything.
+**Critical finding from codebase audit:** our existing `BeliefDrafter` (Plan 217) at `katgpt-rs/crates/katgpt-speculative/src/belief_drafter.rs:80-81, 193-197` implements exactly the paper's failure mode: `h_{t+1} = h_t + FC3(...)` with the residual path **unnormalized** (LayerNorm is on the *input* only, line 35-50). This drafter IS subject to attention/magnitude drift and the paper's diagnosis applies verbatim. For BeliefDrafter specifically, only the **diagnostic** is modelless — the post-norm *fix* requires MLP retraining (paper §4.4 Table 4: inference-time magnitude pin drops acceptance 56% on pre-norm models). For our *own* kernels (HLA, latent_functor, micro_belief, engram retrieval chains, Raven consolidation) the fix is modelless because we own the kernel — we can post-norm at runtime without retraining anything.
 
 **Verdict: Super-GOAT.** Latent-to-latent reframing (mandatory per skill §1.5): the mechanism is "magnitude accumulation in recursive latent state". Re-cast on the six Super-GOAT factory modules — every one of HLA / latent_functor / cgsp_runtime / sense / neuron-shard / LatCal has a recursive latent-state kernel susceptible to this failure mode. This is not adapter routing (GOAT-tier fallback framing per R269); the primary framing is latent-state hygiene across the entire runtime substrate.
 
@@ -172,8 +172,8 @@ pub struct DepthInvarianceConfig {
 | Closest cousin | Repo | What it ships | Relation to this paper |
 |---|---|---|---|
 | **`BeliefDrafter::LatentDynamicsMLP`** (Plan 217) | katgpt-rs | Recursive `h_{t+1} = h_t + FC3(...)` with LayerNorm on input only | **HAS THE BUG** — unnormalized residual. This paper's diagnosis applies verbatim. Diagnostic-only fix (frozen MLP); retrain for post-norm. |
-| **`micro_belief/attractor.rs`** (Plan 276) | katgpt-rs | Attractor + leaky belief kernels with `clamp(-1, 1)` | **Already ships the fix pattern.** This is the bounded-magnitude recursive latent state the paper prescribes. |
-| **`latent_functor/reestimation.rs`** (riir-ai, Plan 303/317) | riir-ai | Coherence-driven re-estimation scheduler (re-derive functor when coherence < τ_reest) | **Downstream fix** (re-derive on drift). This paper provides the *upstream* fix (prevent drift at source via magnitude regularization). The two compose as defense-in-depth. |
+| **`crates/katgpt-micro-belief/src/attractor.rs`** (Plan 276) | katgpt-rs | Attractor + leaky belief kernels with `clamp(-1, 1)` | **Already ships the fix pattern.** This is the bounded-magnitude recursive latent state the paper prescribes. |
+| **`riir-ai/crates/riir-engine/src/latent_functor/reestimation/mod.rs`** (riir-ai, Plan 303/317) | riir-ai | Coherence-driven re-estimation scheduler (re-derive functor when coherence < τ_reest) | **Downstream fix** (re-derive on drift). This paper provides the *upstream* fix (prevent drift at source via magnitude regularization). The two compose as defense-in-depth. |
 | **`BeliefRankPruner`** (katgpt-rs/src/pruners/) | katgpt-rs | `effective_rank` / `flatness` of hidden states as a quality signal | **Symptom detector.** This paper's magnitude-growth-rate is the *root-cause* counterpart. |
 | **`gain_cost_halt.rs::GainCostLoopHalter`** (Plan 304) | katgpt-rs | Halts loops based on gain/cost/cos_theta; "cost = coherence decay or staleness" | **Symptom-based halter.** This paper adds *root-cause* signal (magnitude slope > τ → halt, we're in depth-specific refinement). |
 | **Sink-Aware Attention** (R258, Plan 287) | katgpt-rs | NOP/Broadcast sink classifier + dual-policy attention | **DIFFERENT mechanism.** That paper (2606.08105) is about *target-side* sink mechanisms. This paper (2605.09992) is about *drafter-side* magnitude accumulation. The two papers are frequently confused but address different layers of the stack. |
@@ -185,7 +185,7 @@ pub struct DepthInvarianceConfig {
 
 The single strongest fusion (this paper × existing shipped primitives × latent-functor reframing):
 
-**Attention-Drift × latent_functor/reestimation.rs × GainCostLoopHalter × MicroBelief attractor** → **Defense-in-Depth Recursive Latent State Hygiene**
+**Attention-Drift × riir-ai/crates/riir-engine/src/latent_functor/reestimation/mod.rs × GainCostLoopHalter × MicroBelief attractor** → **Defense-in-Depth Recursive Latent State Hygiene**
 
 Three layers, each modelless:
 
@@ -201,7 +201,7 @@ Layer 2 (detect): DepthInvarianceDiagnostic
    - Distinguishes {DepthInvariant, DepthSpecificRefinement, Collapsed}
    - Bridges to BeliefRankPruner (effective_rank) and GainCostLoopHalter (cos_theta oscillation)
 
-Layer 3 (recover): latent_functor/reestimation.rs coherence-driven re-derivation
+Layer 3 (recover): riir-ai/crates/riir-engine/src/latent_functor/reestimation/mod.rs coherence-driven re-derivation
    - When diagnostic says DepthSpecificRefinement or Collapsed AND magnitude regularization
      is unavailable (frozen kernel) OR insufficient (distribution shift pushed us out of training support)
    - Re-derive the latent state from upstream signal (the existing reestimation.rs pattern)
@@ -231,13 +231,13 @@ Layer 3 (recover): latent_functor/reestimation.rs coherence-driven re-derivation
 
 ### One-line reasoning
 
-The paper names a failure mode we **already ship in production** (BeliefDrafter's unnormalized residual), generalizes it to a universal property of recursive latent-state kernels (depth-specific refinement vs depth-invariant autoregression), and provides a clean three-signal diagnostic primitive that is the *root-cause* counterpart to four of our existing *symptom*-only detectors. Fusion with our existing `latent_functor/reestimation.rs` (downstream recovery) and `micro_belief/attractor.rs` (already-shipped prevention pattern) produces a defense-in-depth latent-state hygiene system that no competitor offers — a new capability class with a concrete MMORPG-scale selling point.
+The paper names a failure mode we **already ship in production** (BeliefDrafter's unnormalized residual), generalizes it to a universal property of recursive latent-state kernels (depth-specific refinement vs depth-invariant autoregression), and provides a clean three-signal diagnostic primitive that is the *root-cause* counterpart to four of our existing *symptom*-only detectors. Fusion with our existing `riir-ai/crates/riir-engine/src/latent_functor/reestimation/mod.rs` (downstream recovery) and `crates/katgpt-micro-belief/src/attractor.rs` (already-shipped prevention pattern) produces a defense-in-depth latent-state hygiene system that no competitor offers — a new capability class with a concrete MMORPG-scale selling point.
 
 ### Why Super-GOAT (novelty gate Q1–Q4)
 
 | Q | Answer |
 |---|---|
-| **Q1: No prior art?** | **YES.** Three-layer grep (notes + code + vocabulary-translated) across all five repos confirms: (a) `BeliefDrafter` HAS the bug but no notes framing names it as magnitude drift; (b) `micro_belief/attractor.rs` ships the *fix pattern* (clamp) but doesn't generalize it to a diagnostic; (c) `BeliefRankPruner` uses `effective_rank` as a *quality* signal, not a *depth-drift* signal; (d) `gain_cost_halt.rs` uses coherence decay (symptom), not magnitude growth rate (root cause); (e) `Config.post_norm` exists for the base transformer but not for recursive residual paths; (f) Sink-Aware (R258) is a *different paper* about *target-side* sink mechanisms, frequently confused with this one. The specific primitive — "classify recursive latent-state kernel as depth-invariant vs depth-specific-refinement via magnitude-slope + cosine-step + effective-rank-slope" — is genuinely missing. |
+| **Q1: No prior art?** | **YES.** Three-layer grep (notes + code + vocabulary-translated) across all five repos confirms: (a) `BeliefDrafter` HAS the bug but no notes framing names it as magnitude drift; (b) `crates/katgpt-micro-belief/src/attractor.rs` ships the *fix pattern* (clamp) but doesn't generalize it to a diagnostic; (c) `BeliefRankPruner` uses `effective_rank` as a *quality* signal, not a *depth-drift* signal; (d) `gain_cost_halt.rs` uses coherence decay (symptom), not magnitude growth rate (root cause); (e) `Config.post_norm` exists for the base transformer but not for recursive residual paths; (f) Sink-Aware (R258) is a *different paper* about *target-side* sink mechanisms, frequently confused with this one. The specific primitive — "classify recursive latent-state kernel as depth-invariant vs depth-specific-refinement via magnitude-slope + cosine-step + effective-rank-slope" — is genuinely missing. |
 | **Q2: New class of behavior?** | **YES.** "Provably depth-invariant recursive latent state at MMORPG scale" is a new *property class*, not an optimization. Current alternatives are caps (artificial), resets (state loss), or re-estimation thrash (current). Defense-in-depth gives O(1) magnitude hygiene with drift-triggered fallback. |
 | **Q3: Product selling point?** | **YES.** "Our NPCs run unbounded-tick cognition with O(1) magnitude-regularized recursive latent state — no coherence-collapse re-estimation thrash at 20Hz × thousands of NPCs × hours. The first MMORPG-scale runtime with provably depth-invariant per-NPC latent state." Finishes the selling-point sentence strongly. See private guide §1 for the full commercial framing. |
 | **Q4: Force multiplier?** | **YES** (≥2 pillars). Connects to: BeliefDrafter (Plan 217), micro_belief attractor (Plan 276), GainCostLoopHalter (Plan 304), latent_functor reestimation (Plan 303/317), BeliefRankPruner, HLA evolve_hla (sense/), Raven/δ-Mem consolidation (riir-neuron-db), Sink-Aware Attention (R258 — *complementary*, not duplicative). Eight pillars. |
@@ -246,13 +246,13 @@ The paper names a failure mode we **already ship in production** (BeliefDrafter'
 
 - **R269 failure mode (defaulting to adapter routing when latent-space reframing is stronger):** AVOIDED. The primary framing is recursive latent-state hygiene across the six Super-GOAT factory modules (HLA / latent_functor / cgsp_runtime / sense / neuron-shard / LatCal). Adapter routing is not even a secondary framing here — the paper isn't about adapter composition.
 - **`evolve_hla` failure mode (no notes framing at all → false Super-GOAT claim):** ADDRESSED. The private guide (riir-ai/.research/151) explicitly audits `evolve_hla` and the other recursive kernels for the bug before claiming the selling point.
-- **DiPOD / `latent_functor/reestimation.rs` failure mode (notes framing under different vocabulary → missed by paper-vocabulary grep):** ADDRESSED. The vocabulary crosswalk (§2.2) explicitly maps the paper's "depth-specific refinement / pre-norm magnitude growth" to the codebase's "depth-conditioned functor composition / leaky integrator without output bound", and the grep hit `reestimation.rs` on the first pass via this translation.
+- **DiPOD / `riir-ai/crates/riir-engine/src/latent_functor/reestimation/mod.rs` failure mode (notes framing under different vocabulary → missed by paper-vocabulary grep):** ADDRESSED. The vocabulary crosswalk (§2.2) explicitly maps the paper's "depth-specific refinement / pre-norm magnitude growth" to the codebase's "depth-conditioned functor composition / leaky integrator without output bound", and the grep hit `reestimation.rs` on the first pass via this translation.
 
 ### Mandatory outputs (created this session)
 
 | Artifact | Repo | Path | Status |
 |---|---|---|---|
-| Open primitive (math, no game semantics) | katgpt-rs | `crates/katgpt-core/src/depth_invariance.rs` (new, behind `depth_invariance` feature) | **Plan 306 — to ship** |
+| Open primitive (math, no game semantics) | katgpt-rs | `crates/katgpt-types/src/depth_invariance.rs` (new, behind `depth_invariance` feature) | **Plan 306 — to ship** |
 | Open plan | katgpt-rs | `.plans/306_depth_invariance_diagnostic.md` | **Created this session** |
 | Private selling-point guide | riir-ai | `.research/151_Recursive_Latent_State_Magnitude_Hygiene_Guide.md` | **Created this session** |
 | Private runtime audit + fix plan | riir-ai | `.plans/331_recursive_latent_state_magnitude_hygiene_runtime.md` | **Created this session** |
@@ -261,7 +261,7 @@ The paper names a failure mode we **already ship in production** (BeliefDrafter'
 
 - **G1 (correctness):** `DepthInvarianceDiagnostic` labels match hand-built ground truth on synthetic chains: flat-magnitude → `DepthInvariant`; linearly-growing-magnitude → `DepthSpecificRefinement`; rank-1 collapse → `Collapsed`; <min_samples → `Insufficient`. 8 tests.
 - **G2 (BeliefDrafter audit):** run the diagnostic on `LatentDynamicsMLP::forward_into` chain outputs at TTT=2 and TTT=8. Pre-paper-fix BeliefDrafter should classify as `DepthSpecificRefinement` at k>TTT (matching paper Figure 10 left panel). This *reproduces* the paper's finding on our own drafter — if it doesn't, our drafter is somehow immune (worth understanding why).
-- **G3 (micro_belief control):** run the diagnostic on `micro_belief/attractor.rs` chain outputs. Should classify as `DepthInvariant` (clamp bounds magnitude). This is the negative control — confirms the diagnostic correctly distinguishes healthy kernels.
+- **G3 (micro_belief control):** run the diagnostic on `crates/katgpt-micro-belief/src/attractor.rs` chain outputs. Should classify as `DepthInvariant` (clamp bounds magnitude). This is the negative control — confirms the diagnostic correctly distinguishes healthy kernels.
 - **G4 (latency):** `DepthInvarianceDiagnostic::classify_chain` overhead ≤ 5% of one forward pass of the audited kernel, on d=8..1024, k=4..64.
 - **G5 (private guide Gs, in riir-ai/.research/151):** kernel-by-kernel audit of HLA / latent_functor / cgsp_runtime / engram / Raven — each classified and (where the kernel is ours) magnitude-regularized. Benchmarked before/after on the crowd-scale coherence benchmark.
 
@@ -271,8 +271,8 @@ If G2 reproduces (our BeliefDrafter has the bug) AND G3 confirms (micro_belief i
 
 | Artifact | Repo | Path |
 |---|---|---|
-| `DepthInvarianceDiagnostic` + `MagnitudeRegularizedResidual` primitives | katgpt-rs (public, MIT) | `crates/katgpt-core/src/depth_invariance.rs` (new) |
-| `DepthInvarianceConfig` extension to existing Config | katgpt-rs | `crates/katgpt-core/src/types/config.rs` |
+| `DepthInvarianceDiagnostic` + `MagnitudeRegularizedResidual` primitives | katgpt-rs (public, MIT) | `crates/katgpt-types/src/depth_invariance.rs` (new) |
+| `DepthInvarianceConfig` extension to existing Config | katgpt-rs | `crates/katgpt-types/src/config.rs` |
 | Plan | katgpt-rs | `.plans/306_depth_invariance_diagnostic.md` |
 | BeliefDrafter audit (diagnostic-only, no fix without retrain) | katgpt-rs | `.plans/306_*.md` Phase 3 |
 | Private guide | riir-ai | `.research/151_Recursive_Latent_State_Magnitude_Hygiene_Guide.md` |

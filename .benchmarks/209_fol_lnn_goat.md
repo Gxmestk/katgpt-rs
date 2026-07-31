@@ -118,5 +118,5 @@
 
 ### Promotion Recommendation
 - **Default-on**: `fol_constraints` (G1 ✅), `reward_mem` (G3 ✅), `rule_extraction` (G2 ✅)
-- **Opt-in**: `decision_trace` (debug/audit, no perf benefit — intentional)
+- **`decision_trace`**: at Plan 209 time this was flagged "Opt-in (debug/audit, no perf benefit — intentional)". (Post-promotion update, 2026-07-18 cargo-comment sync): `decision_trace` is now transitively DEFAULT-ON via `regime_transition → decision_trace` chain (Issue 181). The audit/debug role remains accurate (cold-path, zero runtime cost unless invoked), but the feature gate itself is no longer opt-in at the Cargo level.
 - **Convenience**: `fol_lnn` = all three default-on + decision_trace

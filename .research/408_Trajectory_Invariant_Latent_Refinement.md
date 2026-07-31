@@ -75,7 +75,7 @@ Contrastive steering (CAA / ActAdd / difference-in-means) applies a correction d
 | adaptive alignment gate `γ_t` | **`river_valley::subspace_ratios` → `r_dom`** (Plan 152, identical metric), `spectral_rewire::on_manifold_fraction` (Plan 423), sigmoid gate (used everywhere but not on this ratio) |
 | reference pair `(f_good, f_bad)` | **freeze/thaw pair** (`MerkleFrozenEnvelope`), `KarcShard`/`ArchetypeBlendShard` snapshots, two epoch checkpoints |
 | residual blending `α` | **leaky integrator**, `carry-forward`, `LatentSteeringVector.alpha` (Plan 309) |
-| trajectory variance | **coherence**, **staleness**, `latent_functor/reestimation.rs` coherence decay |
+| trajectory variance | **coherence**, **staleness**, `riir-ai/crates/riir-engine/src/latent_functor/reestimation/mod.rs` coherence decay |
 | graceful degradation / no-harm | "graceful degradation" pattern (shipped in many primitives — Plan 025, 237, 316 — but not as a *bit-identical γ→0 contract* on a correction gate) |
 | truncated SVD | `thin_svd_into` + `SvdScratch` + `SvdResultScratch` (**`subspace_phase_gate.rs`**, Plan 301) |
 

@@ -2,8 +2,10 @@
 
 **Research:** `.research/236_QGF_Test_Time_Q_Guided_Flow.md`
 **Paper:** [arXiv:2606.11087](https://arxiv.org/pdf/2606.11087) — Q-Guided Flow (Zhou et al., 2026)
-**Status:** 🚧 Phase 1–4 implemented, Phase 5 katgpt-core mechanism gate DONE (2026-07-01), Phase 6 docs DONE (2026-07-01). Tests green. **Phase 5 katgpt-core mechanism gate DONE 2026-07-01** (G1 correctness + G2 regression-safety + G3 no-regression + G4 overhead/alloc + G5 stability all PASS, see `.benchmarks/268_qgf_goat.md`); downstream task-quality gates (Sudoku/DDTree/Bomber) **deferred to riir-ai** as the selling-point layer. Phase 6 T13 docs shipped (README + `.docs/01_overview.md` + 3 runnable examples). Stays opt-in until a riir-ai plan proves the downstream gain.
+**Status:** COMPLETE ✅ (with deferrals) — Phase 1–4 implemented, Phase 5 GOAT G1–G5 ALL PASS (2026-07-01, see `.benchmarks/268_qgf_goat.md`), Phase 6 docs DONE. Stays opt-in until riir-ai proves the downstream gain (Sudoku/DDTree/Bomber task-quality gates deferred to riir-ai).
 **Branch:** `develop` (no new feature branch per project rules)
+
+> **Sibling: Plan 467 `DualLeoOracle`** (2026-07-18) — QGF's 3rd `QGradientOracle` impl, fusing LEO teacher + UVFA student via `DualLeoMixer::combine_into` at the gradient level. Encodes Plan 460's "no operator between mix and consumer" invariant as a doc-comment. Plan 268 stays opt-in; Plan 467 inherits that stance. See `.plans/467_qgf_dual_leo_oracle.md` + `.benchmarks/467_qgf_dual_leo_oracle_goat.md` (G1–G4 PASS mechanistic; G5 deferred to riir-ai).
 **Feature Gates:** `qgf` (parent, default OFF until GOAT proof)
   - `qgf_projector` (F2 — FirstOrderProjector)
   - `qgf_oracle` (F3 — QGradientOracle trait)
@@ -72,7 +74,7 @@ At generation step t with prefix p_t and drafter velocity v_t:
 ### Phase 1: Core Primitives (unblock — no integration risk)
 
 #### T1: QGradientOracle trait (F3)
-- [x] Add `QGradientOracle` trait to `katgpt-core/src/traits.rs`
+- [x] Add `QGradientOracle` trait to `crates/katgpt-core/src/traits/mod.rs`
   ```rust
   pub trait QGradientOracle {
       type State;
@@ -103,13 +105,13 @@ At generation step t with prefix p_t and drafter velocity v_t:
 - [x] Doc cross-ref to `.research/236_QGF_Test_Time_Q_Guided_Flow.md` §F3
 
 #### T2: FirstOrderProjector (F2)
-- [x] Create `katgpt-core/src/qgf/projector.rs`
+- [x] Create `crates/katgpt-core/src/qgf/projector.rs`
 - [x] Implement `project_one_step` for discrete chains
 - [x] Implement batch variant `project_batch` using `generate_batch`
 - [x] Unit test: known prefix → deterministic projection (mock generator)
 - [x] Unit test: projection cost = 1 generator call (no BPTT)
 - [x] Benchmark: projection overhead < existing drafter call cost + 10%
-  - **Bench:** `katgpt-core/benches/qgf_projector_bench.rs` (criterion).
+  - **Bench:** `crates/katgpt-core/benches/qgf_projector_bench.rs` (criterion).
     Compares `project_one_step` / `project_batch` vs direct `generate()` /
     `generate_batch()` across three generator cost tiers (cheap=4 iters,
     medium=64 iters, expensive=1024 iters).
@@ -137,7 +139,7 @@ At generation step t with prefix p_t and drafter velocity v_t:
 - [x] Add `qgf` parent feature to `katgpt-core/Cargo.toml`
 - [x] Add `qgf_projector`, `qgf_oracle`, `qgf_drafter`, `qgf_adaptive` sub-features
 - [x] All OFF by default until GOAT proof
-- [x] Wire `pub mod qgf;` in `katgpt-core/src/lib.rs` under `#[cfg(feature = "qgf")]`
+- [x] Wire `pub mod qgf;` in `crates/katgpt-core/src/lib.rs` under `#[cfg(feature = "qgf")]`
 - [x] Forward features from top-level `katgpt-rs/Cargo.toml`
 
 ---
@@ -145,7 +147,7 @@ At generation step t with prefix p_t and drafter velocity v_t:
 ### Phase 2: QGuidedDrafter (F1) — the core fusion
 
 #### T4: QGuidedDrafter struct
-- [x] Create `katgpt-core/src/qgf/drafter.rs`
+- [x] Create `crates/katgpt-core/src/qgf/drafter.rs`
 - [x] Implement `QGuidedDrafter<G, O>` wrapping any `SpeculativeGenerator` + `QGradientOracle`
   ```rust
   pub struct QGuidedDrafter<G, O> {
@@ -187,7 +189,7 @@ At generation step t with prefix p_t and drafter velocity v_t:
 
 #### T6: NFCoT FlowScore fusion (unblock Plan 229) — ✅ COMPLETE
 - [x] Extend `NfFlowScore` (Plan 229) to optionally consume Q-gradient guidance
-  - **New API (in `src/speculative/nf_flow.rs`):**
+  - **New API (in `crates/katgpt-speculative/src/nf_flow.rs`):**
     - `score_with_qgf(marginals, selected, gradient, guidance_weight) -> f32`
       — applies the QGF bonus at the *last* position (the projection point).
     - `score_with_qgf_at(marginals, selected, gradient, projection_pos, weight) -> f32`
@@ -202,7 +204,7 @@ At generation step t with prefix p_t and drafter velocity v_t:
   - **Optional by construction:** when `guidance_weight == 0.0` or `gradient`
     is empty, the QGF-aware score is byte-identical to `flow_score`.
 - [x] When `qgf_drafter` + `nf_flow_score` both enabled: QGF steers generation, NFCoT scores the result
-  - **New module `src/speculative/nf_flow_qgf.rs`** (Plan 268 T6).
+  - **New module `crates/katgpt-speculative/src/nf_flow_qgf.rs`** (Plan 268 T6).
   - **`NfQgfDrafter<G, O>`** composes `QGuidedDrafter<G, O>` (Plan 268 F1)
     with `NfFlowScore` (Plan 229). Pipeline:
     1. `drafter.generate_guided(condition, rng, step)` → candidates.
@@ -240,14 +242,14 @@ At generation step t with prefix p_t and drafter velocity v_t:
   - `cargo test --features nf_flow_score --test nf_flow_goat` → 7 pass, 0 fail
   - `cargo test -p katgpt-core --features "qgf,qgf_drafter,qgf_adaptive" --lib` → 310 pass, 0 fail
   - Clippy clean on all new/modified files (pre-existing `set_len` error in
-    `src/cumprodsum.rs:167` is unrelated)
+    `crates/katgpt-core/src/cumprodsum.rs:167` is unrelated)
 
 ---
 
 ### Phase 3: VarianceAdaptiveGuidance (F4)
 
 #### T7: Adaptive guidance weight
-- [x] Create `katgpt-core/src/qgf/adaptive.rs`
+- [x] Create `crates/katgpt-core/src/qgf/adaptive.rs`
 - [x] Implement sigmoid-gated per-query guidance weight:
   ```rust
   /// guidance_weight = sigmoid(k · (confidence − threshold))
@@ -264,7 +266,7 @@ At generation step t with prefix p_t and drafter velocity v_t:
   computes `1/β` per call from `oracle.confidence(state)` (needs T4 — done).
 - [x] Reuse Thicket (Plan 267) variance probe as the confidence signal
   ✅ DONE 2026-07-02 (Plan 268 T7). The bridge is a three-layer wiring:
-  1. **katgpt-core** (`qgf/adaptive.rs`): new `QgfVarianceSignal` trait +
+  1. **katgpt-core** (`crates/katgpt-core/src/qgf/adaptive.rs`): new `QgfVarianceSignal` trait +
      `confidence_from_disagreement(d) = 1 − clamp(d, 0, 1)` bridge function +
      `adaptive_guidance_weight_from_signal(signal, τ, k)` helper. Substrate-
      agnostic: knows about "a normalized disagreement in [0,1]", not about
@@ -273,7 +275,7 @@ At generation step t with prefix p_t and drafter velocity v_t:
      for TvpSignal` — surfaces `reasoning_disagreement` (NOT format or KL:
      format is cosmetic-noise that canonicalization was built to remove; KL
      is unbounded). Defensive clamp guards against fuzzed/deserialized values.
-  3. **`QGuidedDrafter`** (`qgf/drafter.rs`): new `tilt_logits_adaptive_with_signal`
+  3. **`QGuidedDrafter`** (`crates/katgpt-core/src/qgf/drafter.rs`): new `tilt_logits_adaptive_with_signal`
      method — accepts any `&S where S: QgfVarianceSignal` and bridges it to a
      per-query `1/β` via `adaptive_guidance_weight_from_signal`. Kept as a
      separate method from `tilt_logits_adaptive` (which reads
@@ -300,7 +302,7 @@ At generation step t with prefix p_t and drafter velocity v_t:
   else { CpuSimd }
   ```
 - [x] Dispatch `q_gradient_at` to appropriate backend based on route
-  ✅ DONE 2026-07-02 (Plan 268 T8). New module `qgf/dispatch.rs` ships
+  ✅ DONE 2026-07-02 (Plan 268 T8). New module `crates/katgpt-core/src/qgf/dispatch.rs` ships
   `QgfBackendDispatch<'a, O, Gpu, Ane>` — routes batched Q-gradient queries
   via `route_for(action_space, batch)` and falls back to CPU on delegate
   failure. `dispatch_single` (batch=1) ALWAYS routes to CPU per `route_for`'s
@@ -333,13 +335,13 @@ At generation step t with prefix p_t and drafter velocity v_t:
   (`test_route_o1` verifies < 100ns/call over 100k iterations).
 
 #### T9: Plasma / Hot / Warm / Cold / Freeze tier wiring
-- [x] Document tier mapping in `qgf/mod.rs` (table from research doc §6)
+- [x] Document tier mapping in `crates/katgpt-core/src/qgf/mod.rs` (table from research doc §6)
 - [x] Plasma impl: `ActionBridgeOracle` wrapping `ActionBridge` (default for game NPCs)
 - [x] Hot impl: `LeoHeadOracle` wrapping `LeoHead` (default for active inference)
 - [x] Hot/Plasma impl: `FlowFieldOracle` wrapping `FlowField` (FFT-smoothed)
 - [x] Warm impl: GPU batched critic (training-time / large batch) — deferred to riir-gpu
   ✅ DONE 2026-07-02 (katgpt-core scope). New `WarmTierOracle<S,A,D>` in
-  `qgf/oracles.rs` adapts the `QgfGpuDelegate` trait (T8) into a
+  `crates/katgpt-core/src/qgf/oracles.rs` adapts the `QgfGpuDelegate` trait (T8) into a
   `QGradientOracle` for single-query use. GPU failure → zeroed gradient →
   safe BC fallback (self-degrading). 5 unit tests (gradient write,
   into-matches-at, failure-zeroes-buffer, confidence, accessor). The
@@ -347,7 +349,7 @@ At generation step t with prefix p_t and drafter velocity v_t:
   via `WarmTierOracle::new(my_gpu_delegate, action_space)`.
 - [x] Cold impl: Turso Q-table loader (episode-end consolidation) — deferred (needs turso)
   ✅ DONE 2026-07-02 (katgpt-core scope). New `ColdTierOracle<L>` +
-  `QTableLoader` trait in `qgf/oracles.rs`. katgpt-core ships the oracle
+  `QTableLoader` trait in `crates/katgpt-core/src/qgf/oracles.rs`. katgpt-core ships the oracle
   logic + the trait; the upper layer (`riir-engine` / `riir-chain`)
   implements `QTableLoader` with its encrypted turso/libSQL client. This
   keeps turso OUT of katgpt-core's deps (lowest layer stays dependency-
@@ -359,7 +361,7 @@ At generation step t with prefix p_t and drafter velocity v_t:
 - [x] Test: Freeze tier produces identical output to unguided generator
   (`test_zero_weight_matches_base` + `test_no_guidance_oracle_zero_gradient`)
 - [x] Test: tier promotion/demotion does not corrupt in-flight generation
-  ✅ DONE 2026-07-02. Two tests in `qgf/drafter.rs`:
+  ✅ DONE 2026-07-02. Two tests in `crates/katgpt-core/src/qgf/drafter.rs`:
   `test_tier_promotion_demotion_no_corruption` — runs tilt_logits across a
   Freeze→Plasma→Freeze mid-sequence switch (via a `SwappableOracle` whose
   `plasma_active` flag flips), verifying (a) no panic, (b) pre-swap logits
@@ -374,12 +376,12 @@ At generation step t with prefix p_t and drafter velocity v_t:
 ### Phase 5: GOAT Proof — Before vs After
 
 #### T10: GOAT benchmarks (the gate)
-- [x] Create `katgpt-core/benches/qgf_goat.rs` with feature-gated benchmarks
-  ✅ DONE 2026-07-01. Two bench files now: `benches/qgf_goat.rs` (G4a/b/c overhead) + `tests/qgf_goat.rs` (G1/G2/G4-alloc/G5 mechanism gates, 13 tests). See `.benchmarks/268_qgf_goat.md`.
+- [x] Create `crates/katgpt-core/benches/qgf_goat.rs` with feature-gated benchmarks
+  ✅ DONE 2026-07-01. Two bench files now: `crates/katgpt-core/benches/qgf_goat.rs` (G4a/b/c overhead) + `crates/katgpt-core/tests/qgf_goat.rs` (G1/G2/G4-alloc/G5 mechanism gates, 13 tests). See `.benchmarks/268_qgf_goat.md`.
 - [-] **G1: First-attempt accuracy** — Sudoku 9×9 with vs without QGF
   - Baseline: DDTree + NFCoT FlowScore (Plan 229)
   - Target: +3-8% first-attempt solve rate
-  **DEFERRED to riir-ai** (selling-point layer — needs a real Sudoku generator + DDTree harness, both outside katgpt-core). The katgpt-core mechanism-G1 (tilt shifts distribution toward higher Q, with anti-gradient + random-gradient negative controls) is done in `tests/qgf_goat.rs`.
+  **DEFERRED to riir-ai** (selling-point layer — needs a real Sudoku generator + DDTree harness, both outside katgpt-core). The katgpt-core mechanism-G1 (tilt shifts distribution toward higher Q, with anti-gradient + random-gradient negative controls) is done in `crates/katgpt-core/tests/qgf_goat.rs`.
 - [-] **G2: Speculative acceptance rate** — DDTree spec bench
   - Baseline: DDTree greedy
   - Target: +5-12% acceptance
@@ -400,7 +402,7 @@ At generation step t with prefix p_t and drafter velocity v_t:
   - Compute `cos(G(s, a_t), G(s, a_t + ε))` for QGF, OOD, BPTT estimators
   - QGF should have highest cosine similarity (lowest variance)
   ✅ DONE 2026-07-02 (katgpt-core mechanism scope). Three tests in
-  `tests/qgf_goat.rs`:
+  `crates/katgpt-core/tests/qgf_goat.rs`:
   `t11_qgf_has_highest_cosine_similarity_under_perturbation` — constructs
   QGF / BPTT-like / OOD-like estimator models and proves QGF has the highest
   mean cosine similarity under action perturbation (QGF cos ≈ 1.0 because
@@ -422,7 +424,7 @@ At generation step t with prefix p_t and drafter velocity v_t:
   implemented (the trait structurally prevents it — see
   `t11_qgf_drop_jacobian_documented_in_trait`). This matches the plan's note.
 - [x] Document result — validates the "drop Jacobian" decision
-  ✅ DONE 2026-07-02. The three T11 tests in `tests/qgf_goat.rs` document and
+  ✅ DONE 2026-07-02. The three T11 tests in `crates/katgpt-core/tests/qgf_goat.rs` document and
   prove the variance property. The trait doc in `traits.rs` already carries
   the design-decision note (Research 236 §F3): "Jacobian is intentionally
   dropped (J ≈ I). Do NOT add chain-rule backprop — it increases variance
@@ -430,7 +432,7 @@ At generation step t with prefix p_t and drafter velocity v_t:
 
 #### T12: Cross-feature integration tests
 - [x] QGF + NFCoT FlowScore (Plan 229) on Sudoku
-  ✅ Already DONE (Phase 2 T6, in root `src/speculative/nf_flow_qgf.rs`). The
+  ✅ Already DONE (Phase 2 T6, in root `crates/katgpt-speculative/src/nf_flow_qgf.rs`). The
   QGF+NFCoT synergy is tested via `test_sudoku_like_qgf_nfcoot_synergy` etc.
 - [-] QGF + ThoughtFold (Plan 195) — guide, then fold, then re-guide
   DEFERRED — ThoughtFold (Plan 195) is not implemented in katgpt-core (it's a
@@ -459,9 +461,9 @@ At generation step t with prefix p_t and drafter velocity v_t:
 #### T13: Documentation
 - [x] Add QGF section to `katgpt-rs/README.md` Feature Showcase
 - [x] Update `katgpt-rs/.docs/01_overview.md` Feature Flags table
-- [x] Add `examples/qgf_01_guided_drafter.rs` — minimal usage
-- [x] Add `examples/qgf_02_adaptive_weight.rs` — F4 adaptive guidance
-- [x] Add `examples/qgf_03_tier_routing.rs` — plasma/hot/warm/cold/freeze demo
+- [x] Add `crates/katgpt-core/examples/qgf_01_guided_drafter.rs` — minimal usage
+- [x] Add `crates/katgpt-core/examples/qgf_02_adaptive_weight.rs` — F4 adaptive guidance
+- [x] Add `crates/katgpt-core/examples/qgf_03_tier_routing.rs` — plasma/hot/warm/cold/freeze demo
 - [x] Cross-link Research 236 ↔ Plan 268 ↔ Plan 229 (NFCoT)
   ✅ Research 236 ↔ Plan 268 cross-linked in README + .docs + mod.rs rustdoc.
   Plan 229 (NFCoT) cross-linked in Phase 2 T6 below (already marked ✅ COMPLETE).
@@ -492,12 +494,12 @@ At generation step t with prefix p_t and drafter velocity v_t:
 ## Dependencies
 
 ### Existing (no new deps)
-- `SpeculativeGenerator` trait (`katgpt-core/src/traits.rs`)
-- `LeoHead` trait (`katgpt-core/src/traits.rs`, feature `leo_all_goals`)
+- `SpeculativeGenerator` trait (`crates/katgpt-core/src/traits/mod.rs`)
+- `LeoHead` trait (`crates/katgpt-core/src/traits/mod.rs`, feature `leo_all_goals`)
 - `FlowFieldCache` + `FlowField::gradient()` (`katgpt-core/src/flow/`)
 - `ActionBridge` (`katgpt-core/src/bridge/`, feature `action_bridge`)
 - NFCoT FlowScore (Plan 229, feature `nf_flow_score`)
-- `simd::dot_f32_i8`, `simd::fast_sigmoid` (`katgpt-core/src/simd.rs`)
+- `simd::dot_f32_i8`, `simd::fast_sigmoid` (`crates/katgpt-dec/src/simd.rs`)
 - `AutocurriculumSampler` (for BFN-proxy oracle, feature `dual_leo`)
 
 ### Optional (feature-gated)

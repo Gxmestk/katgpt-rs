@@ -103,7 +103,7 @@ All three modelless paths cover the *inference* use. The training-loop use (BMC 
 **Paper vocabulary grep** (`Thompson`, `BanditSampler`, `manifold bandit`, `Latent Task Tree`, `curriculum`, `Empirical Bayes`, `Bayesian Filtering`, `non-stationary`):
 
 - **Zero hits** on `Latent.Task.Tree`, `manifold.bandit`, `Empirical.Bayes`, `Bayesian.Filter` — the specific combination is novel to our corpus.
-- `Thompson` / `ThompsonSampling`: **shipped flat** in `katgpt-rs/crates/katgpt-core/src/pruners/bandit.rs` (Plan 030) — `BanditStrategy::ThompsonSampling` (Beta conjugate posterior via Jöhnk's algorithm), used by `BanditPruner`, `MetaRouter` (Plan 196), `DeltaBanditPruner`, `BanditFrameSampler` (riir-ai combat). **All flat, independent-arm.**
+- `Thompson` / `ThompsonSampling`: **shipped flat** in `katgpt-rs/crates/katgpt-ruliology/src/bandit.rs` (Plan 030) — `BanditStrategy::ThompsonSampling` (Beta conjugate posterior via Jöhnk's algorithm), used by `BanditPruner`, `MetaRouter` (Plan 196), `DeltaBanditPruner`, `BanditFrameSampler` (riir-ai combat). **All flat, independent-arm.**
 - `AutocurriculumSampler` (Plan 155, default-on SUPER GOAT): **uniform sampling** over observed goals — `sample_goal`, `observe_goal`, `update_goals_seen`. Flat, not manifold-structured.
 - `curriculum`: appears in SDAR (R038, sigmoid-gate token curriculum), Survive-or-Collapse (R075, dataset eligibility), LEO (R118, autocurriculum). None are manifold-structured hierarchical Thompson.
 - `non-stationary`: Dual-Pool CGSP (Plan 312, default-on) handles non-stationary *reward* domains via dual-pool mechanism (E-pool exploit / X-pool explore). Plan 030 explicitly lists "Non-stationary environments (adversarial bandits)" as **OUT OF SCOPE**. Plan 025 (riir-ai) and Plan 032 both defer contextual bandits as future work.
@@ -177,7 +177,7 @@ This fusion is recorded here as a **fusion idea — novelty TBD, needs Q1–Q4 c
 
 ## 4. Follow-ups
 
-- [ ] **Plan 370 (katgpt-rs)** — open primitive: `LatentTaskTree` + `HierarchicalThompsonSampler` + `BayesianFilterArm` behind `manifold_bandit` feature flag. GOAT gate: hierarchical Thompson vs flat Thompson on a structured-domain bandit (arms clustered in latent space), measuring productivity × diversity frontier. Latency budget: sub-µs per sample (plasma tier).
+- [x] **Plan 370 (katgpt-rs)** — ✅ Done via [Plan 370](../.plans/370_manifold_bandit_latent_task_tree.md) (21/21 tasks complete, GOAT gate PASS, PROMOTED to default-on). `LatentTaskTree` + `HierarchicalThompsonSampler` + `BayesianFilterArm` behind `manifold_bandit` feature flag.
 - [ ] **riir-train note** — the BMC training curriculum (GSPO/GRPO RL on Qwen3-8B) is training-only. Note "→ riir-train" with this research as cross-ref. **Not created this session** (out of scope for this workflow).
 - [ ] **Issue (katgpt-rs/.issues/)** — track the §2.5 DEC-cochain fusion as a TBD Super-GOAT candidate. If a future PoC at `riir-ai/crates/riir-poc/` proves the cochain reframing (Thompson = pushforward, Empirical Bayes = pullback) beats a naive-tree implementation *on compute*, then create the riir-ai guide and re-gate as Super-GOAT.
 

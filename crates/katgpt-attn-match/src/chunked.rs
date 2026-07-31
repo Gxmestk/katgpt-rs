@@ -11,7 +11,7 @@
 //!   turn) and arrive with explicit global positions. We un-rotate RoPE at the
 //!   chunk's `start_pos`, compact in position-free space, and re-rotate at the
 //!   compacted position. This preserves long-range positional structure at the
-//!   cost of needing [`PositionFreeCompactor`] (requires the `still_kv` feature).
+//!   cost of needing `PositionFreeCompactor` (requires the `still_kv` feature).
 //!
 //! Both modes return a [`ChunkedCompactOutput`] — the concatenated `(Ck, β, Cv)`
 //! plus per-chunk metadata so callers can inspect boundary reconstruction
@@ -226,6 +226,13 @@ impl ChunkedCompactor {
     /// If the `still_kv` feature is off, RoPE preservation is skipped and the
     /// keys are compacted as-is — see [`apply_rope_phase_shift`] for the
     /// no-op fallback contract.
+    ///
+    /// **RoVE note (Plan 557 Phase 4):** this method handles RoVE-rotated
+    /// values correctly as-is — no special un-rotate/re-rotate path is needed.
+    /// The value fitting (least-squares) operates in whatever space the values
+    /// are in, so RoVE-rotated values are fitted correctly without modification.
+    /// See `.benchmarks/557_rotary_value_embedding_goat.md` §Phase 4 for the
+    /// mathematical analysis of why position-free value compaction is wrong.
     pub fn compact_text_based(
         &self,
         chunks: &[TextChunk],
@@ -277,7 +284,7 @@ impl ChunkedCompactor {
 
             let chunk_cfg = chunk_local_config(config, chunk_len);
 
-            // Position-free path: un-rotate at original start_pos, compact,
+            // Position-free key path: un-rotate at original start_pos, compact,
             // re-rotate at compacted position. This requires still_kv.
             #[cfg(feature = "still_kv")]
             {
@@ -379,7 +386,7 @@ impl ChunkedCompactOutput {
 /// `new_pos`. This effectively "moves" the keys from one position to another
 /// without changing their semantic content (modulo f16 round-trip precision).
 ///
-/// Requires the `still_kv` feature for [`PositionFreeCompactor`]. When
+/// Requires the `still_kv` feature for `PositionFreeCompactor`. When
 /// `still_kv` is off, this returns `keys.to_vec()` unchanged — RoPE
 /// preservation is then the caller's responsibility (e.g. via an external
 /// RoPE-aware KV cache).
@@ -477,7 +484,7 @@ fn infer_d(chunks: &[TextChunk]) -> Result<usize, CompactError> {
     ))
 }
 
-/// Thin f32 adapter around [`PositionFreeCompactor`] (which is f16↔f32).
+/// Thin f32 adapter around `PositionFreeCompactor` (which is f16↔f32).
 ///
 /// Encapsulates the conversion so callers stay in f32 land.
 #[cfg(feature = "still_kv")]
@@ -788,5 +795,202 @@ mod tests {
             .compact_kv_based(&keys, &values, &queries, 32, 8, 4, &cfg)
             .unwrap_err();
         assert!(matches!(err, CompactError::DimensionMismatch(_)));
+    }
+
+    // ─── Plan 557 Phase 4: RoVE compaction verification tests ────────────
+    //
+    // The plan's original T4.1 approach (un-rotate values before compaction,
+    // compact in position-free space, re-rotate) was found to be MATHEMATICALLY
+    // INCORRECT during implementation. The position-free value fit minimizes
+    // ||A_sel · Cv_plain - A · V_plain||² but the actual attention output uses
+    // ROTATED values: Σ_j A_ij · R_j · V_plain[j]. Since R_j varies per
+    // position, the position-free objective ≠ the rotated-space objective.
+    // G9 with un-rotate measured cosine 0.17 (vs 0.991 target) — a hard FAIL.
+    //
+    // The CORRECT finding: the existing `compact_text_based` already handles
+    // RoVE-rotated values correctly — the value fitting (least-squares)
+    // operates in whatever space the values are in, so RoVE-rotated values are
+    // fitted correctly without any un-rotate/re-rotate. The G9/G10 tests below
+    // verify this: compacting RoVE-rotated values AS-IS gives cosine ≥ 0.991.
+
+    /// Simple single-head attention for testing: Q·Kᵀ → softmax → ·V.
+    ///
+    /// Only the RoVE-gated G9/G10 tests below use this, so it carries the same
+    /// cfg — otherwise it's dead code in the default feature set.
+    #[cfg(feature = "rotary_value_embedding")]
+    fn simple_attention(q: &[f32], k: &[f32], v: &[f32], n: usize, t: usize, d: usize) -> Vec<f32> {
+        let mut out = vec![0.0f32; n * d];
+        let scale = 1.0 / (d as f32).sqrt();
+        for i in 0..n {
+            let mut scores = vec![0.0f32; t];
+            let mut max_score = f32::NEG_INFINITY;
+            for (score, k_row) in scores.iter_mut().zip(k.chunks(d)) {
+                let mut dot = 0.0f32;
+                for dd in 0..d {
+                    dot += q[i * d + dd] * k_row[dd];
+                }
+                *score = dot * scale;
+                if *score > max_score {
+                    max_score = *score;
+                }
+            }
+            let mut sum_exp = 0.0f32;
+            for score in scores.iter_mut() {
+                *score = (*score - max_score).exp();
+                sum_exp += *score;
+            }
+            let out_row = &mut out[i * d..i * d + d];
+            for (&score, v_row) in scores.iter().zip(v.chunks(d)) {
+                let w = score / sum_exp;
+                for (o, vv) in out_row.iter_mut().zip(v_row) {
+                    *o += w * vv;
+                }
+            }
+        }
+        out
+    }
+
+    /// Cosine similarity between two flat vectors. RoVE-gated alongside
+    /// `simple_attention` — the G9/G10 tests are its only callers.
+    #[cfg(feature = "rotary_value_embedding")]
+    fn cosine_sim(a: &[f32], b: &[f32]) -> f32 {
+        let dot: f32 = a.iter().zip(b).map(|(&x, &y)| x * y).sum();
+        let na: f32 = a.iter().map(|x| x * x).sum::<f32>().sqrt();
+        let nb: f32 = b.iter().map(|x| x * x).sum::<f32>().sqrt();
+        if na < 1e-12 || nb < 1e-12 {
+            return 0.0;
+        }
+        dot / (na * nb)
+    }
+
+    /// G9: Compaction fidelity under RoVE.
+    ///
+    /// When values are RoVE-rotated (simulating inference-time V rotation),
+    /// the existing `compact_text_based` handles them correctly — the
+    /// least-squares value fitting operates in rotated space, producing
+    /// attention output within ≥ 0.991 cosine of the full (un-compacted) path.
+    ///
+    /// This test verifies that NO special RoVE-aware compaction code is needed:
+    /// the existing compaction is already RoVE-transparent.
+    #[cfg(feature = "rotary_value_embedding")]
+    #[test]
+    fn g9_compaction_fidelity_under_rove() {
+        use katgpt_core::rotary_value_embedding::{RoVeConfig, batch_rotate_values_into};
+
+        let d = 16usize;
+        let t_len = 64usize;
+        let n = 4usize;
+        let (keys, values_plain) = synth_kv(t_len, d, 42);
+        let queries = synth_queries(n, d, 7);
+
+        // RoVE-rotate the values (simulating the model's inference-time V rotation).
+        let action = RoVeConfig::new(ROPE_THETA).build_rope_action(d);
+        let positions: Vec<usize> = (0..t_len).collect();
+        let mut values_rove = vec![0.0f32; t_len * d];
+        batch_rotate_values_into(&action, &positions, &values_plain, &mut values_rove, d);
+
+        // Compact the RoVE-rotated values with the EXISTING compact_text_based.
+        // No special RoVE handling — the fitting operates in rotated space.
+        let chunk = TextChunk {
+            keys: keys.clone(),
+            values: values_rove.clone(),
+            start_pos: 0,
+            chunk_len: t_len,
+        };
+        let compactor = ChunkedCompactor::new(t_len, 0);
+        let cfg = AmConfig::highest_attn(16);
+        let compacted = compactor
+            .compact_text_based(&[chunk], std::slice::from_ref(&queries), &cfg)
+            .expect("compact");
+        assert!(compacted.total_compact_len > 0, "should compact some tokens");
+
+        // Full attention output with RoVE values (the reference).
+        let full_out = simple_attention(&queries, &keys, &values_rove, n, t_len, d);
+
+        // Compacted attention output with the compacted (Ck, Cv).
+        let compact_out = simple_attention(
+            &queries,
+            &compacted.compact_keys,
+            &compacted.compact_values,
+            n,
+            compacted.total_compact_len,
+            d,
+        );
+
+        let cos = cosine_sim(&full_out, &compact_out);
+        assert!(
+            cos >= 0.991,
+            "G9 FAIL: cosine sim {cos:.6} < 0.991 (compact_len={}, t_len={})",
+            compacted.total_compact_len,
+            t_len
+        );
+    }
+
+    /// G10: Position-consistency under RoVE.
+    ///
+    /// The compacted values from the RoVE-aware forward path (rotate V, attend,
+    /// inverse-rotate output) produce output consistent with the un-compacted
+    /// RoVE-aware forward path — within the same ≥ 0.991 fidelity bound.
+    #[cfg(feature = "rotary_value_embedding")]
+    #[test]
+    fn g10_position_consistency_rove() {
+        use katgpt_core::rotary_value_embedding::{
+            RoVeConfig, batch_inverse_rotate_output_into, batch_rotate_values_into,
+        };
+
+        let d = 16usize;
+        let t_len = 64usize;
+        let n = 4usize;
+        let (keys, values_plain) = synth_kv(t_len, d, 42);
+        let queries = synth_queries(n, d, 7);
+
+        let action = RoVeConfig::new(ROPE_THETA).build_rope_action(d);
+
+        // Full RoVE-aware forward path (the reference):
+        // 1. Rotate values: V_rot = R_j · V_j
+        // 2. Attend: out = softmax(Q·Kᵀ) · V_rot
+        // 3. Inverse-rotate output: ỹ = R_{-i} · out
+        let positions_kv: Vec<usize> = (0..t_len).collect();
+        let mut v_rot_full = vec![0.0f32; t_len * d];
+        batch_rotate_values_into(&action, &positions_kv, &values_plain, &mut v_rot_full, d);
+        let attn_out_full = simple_attention(&queries, &keys, &v_rot_full, n, t_len, d);
+        let q_positions: Vec<usize> = (0..n).collect();
+        let mut y_full = vec![0.0f32; n * d];
+        batch_inverse_rotate_output_into(&action, &q_positions, &attn_out_full, &mut y_full, d);
+
+        // Compacted RoVE-aware forward path:
+        // 1. Compact with compact_text_based (existing — handles rotated values).
+        let chunk = TextChunk {
+            keys: keys.clone(),
+            values: v_rot_full.clone(),
+            start_pos: 0,
+            chunk_len: t_len,
+        };
+        let compactor = ChunkedCompactor::new(t_len, 0);
+        let cfg = AmConfig::highest_attn(16);
+        let compacted = compactor
+            .compact_text_based(&[chunk], std::slice::from_ref(&queries), &cfg)
+            .expect("compact");
+
+        // 2. Attend with compacted (Ck, Cv).
+        let compact_len = compacted.total_compact_len;
+        let attn_out_compact = simple_attention(
+            &queries,
+            &compacted.compact_keys,
+            &compacted.compact_values,
+            n,
+            compact_len,
+            d,
+        );
+
+        // 3. Inverse-rotate the compacted attention output.
+        let mut y_compact = vec![0.0f32; n * d];
+        batch_inverse_rotate_output_into(&action, &q_positions, &attn_out_compact, &mut y_compact, d);
+
+        let cos = cosine_sim(&y_full, &y_compact);
+        assert!(
+            cos >= 0.991,
+            "G10 FAIL: cosine sim {cos:.6} < 0.991 (compact_len={compact_len}, t_len={t_len})"
+        );
     }
 }

@@ -106,8 +106,7 @@ impl RuliologyBandit {
         // Index strategies by id once to avoid O(n²) find() inside the
         // pareto loop below (was strategies.iter().find() per pareto entry).
         use std::collections::HashMap;
-        let by_id: HashMap<u64, &FsmStrategy> =
-            strategies.iter().map(|s| (s.id(), s)).collect();
+        let by_id: HashMap<u64, &FsmStrategy> = strategies.iter().map(|s| (s.id(), s)).collect();
         let arms: Vec<RuliologyArm> = pareto
             .iter()
             .filter(|(_, payoff, _)| *payoff >= payoff_threshold)
@@ -425,7 +424,7 @@ impl RuliologyAbsorbCompress {
             .max_by(|&&a, &&b| {
                 let pa = self.bandit.arms()[a].payoff();
                 let pb = self.bandit.arms()[b].payoff();
-                pa.partial_cmp(&pb).unwrap_or(std::cmp::Ordering::Equal)
+                pa.total_cmp(&pb)
             })
             .copied()
     }

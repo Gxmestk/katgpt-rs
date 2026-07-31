@@ -41,7 +41,7 @@ Raven replaces the standard KV cache with a fixed-slot architecture. This change
 
 | File | Content |
 |------|---------|
-| `src/transformer.rs` (~L4359) | `RavenKVCache`, `raven_update`, `raven_readout`, `forward_raven` |
+| `crates/katgpt-percepta/src/transformer.rs` (~L4359) | `RavenKVCache`, `raven_update`, `raven_readout`, `forward_raven` |
 | `src/benchmark/infrastructure.rs` | `bench_raven_vs_flat_cache()`, `bench_raven_recall()` |
 | `src/benchmark/routing.rs` | Routing/MoE benchmarks |
 | `examples/core_02_raven.rs` | Full demo |

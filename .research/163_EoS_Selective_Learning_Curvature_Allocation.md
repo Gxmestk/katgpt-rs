@@ -65,7 +65,7 @@ Where:
 
 **Why**: The paper proves that EoS naturally allocates optimization to high-curvature-influence subsets. We replicate this deterministically: positions with high epiplexity × high bandit concentration get more DDTree nodes.
 
-**Where**: `PositionWeightedBudget` in `speculative/types.rs` → add `CurvatureWeightedBudget` variant.
+**Where**: `PositionWeightedBudget` in `crates/katgpt-core/src/speculative/types.rs` → add `CurvatureWeightedBudget` variant.
 
 #### 2. Selective Verification Effort (Modelless)
 
@@ -84,7 +84,7 @@ Where:
 
 **Why**: The paper proves this selective allocation improves adversarial robustness AND OOD generalization simultaneously when the right group dominates. Our bandit can achieve the same by steering exploration toward structurally important arms.
 
-**Where**: `BanditStrategy` enum in `pruners/bandit.rs`.
+**Where**: `BanditStrategy` enum in `crates/katgpt-ruliology/src/bandit.rs`.
 
 ---
 

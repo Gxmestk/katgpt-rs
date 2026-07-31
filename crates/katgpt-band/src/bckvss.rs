@@ -23,7 +23,7 @@
 //! - [`SegmentSelector`] — trait (SRP: KV retention is distinct from
 //!   [`katgpt_core::ConstraintPruner`], which validates token structure).
 //! - [`BandConditionerSelector`] — the paper-faithful impl.
-//! - [`select_batch`] — zero-alloc hot path using caller-provided scratch.
+//! - `select_batch` — zero-alloc hot path using caller-provided scratch.
 //! - [`route_ci_test`] — CPU/SIMD/GPU routing reusing
 //!   [`crate::band_conditioner::ComputeTarget`].
 //!
@@ -341,11 +341,7 @@ impl BandConditionerSelector {
         let mut idx: Vec<usize> = (0..n).collect();
         // Sort descending by score; ties broken by ascending index for stability.
         // `total_cmp` is branch-free and NaN-deterministic vs `partial_cmp().unwrap_or(Equal)`.
-        idx.sort_unstable_by(|&a, &b| {
-            scratch[b]
-                .total_cmp(&scratch[a])
-                .then_with(|| a.cmp(&b))
-        });
+        idx.sort_unstable_by(|&a, &b| scratch[b].total_cmp(&scratch[a]).then_with(|| a.cmp(&b)));
 
         let take = budget.min(n);
         idx.into_iter()
@@ -661,7 +657,7 @@ pub fn perplexity_proxy(query: &QueryEmb, segments: &[KvSegment], retained: &[us
     if count == 0 {
         return f32::INFINITY;
     }
-    (sum_log / count as f32).exp()
+    katgpt_core::simd::fast_exp(sum_log / count as f32)
 }
 
 // ── Tests ───────────────────────────────────────────────────────────────────

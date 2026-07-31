@@ -19,7 +19,7 @@
 //! ## When the bridge is exact
 //!
 //! When the GDN2 layer is configured in "paper-compatible" mode:
-//! - `decay_alpha` is **uniform** across all channels (α[0] == α[1] == … )
+//! - `decay_alpha` is **uniform** across all channels (`α[0] == α[1] == …` )
 //! - `erase_b` is all **1.0** (no erase gate)
 //! - `write_w_scalar` is **1.0** (scalar write = 1.0, which is the GDN2 default)
 //! - `gate_config` is `Kda` or `EraseOnly`
@@ -44,6 +44,11 @@ use katgpt_core::gdn_tree_verify::{
     GdnMultiHeadParams, GdnTreeVerifier, TreeTopology, commit_accepted_multihead,
     verify_gdn_tree_multihead,
 };
+// HippocampalCacheDyn is only used by the HOLA tree-verify functions below,
+// which are gated on `hippocampal_cache`. Gate the import to match so
+// `gdn_tree_verify` alone (without `hippocampal_cache`) compiles.
+#[cfg(feature = "hippocampal_cache")]
+use katgpt_core::hippocampal_cache_dyn::HippocampalCacheDyn;
 use katgpt_core::types::Config;
 
 use super::types::{Gdn2LayerState, MultiLayerGdn2Cache};
@@ -64,7 +69,11 @@ pub fn gdn2_scalar_alpha(layer: &Gdn2LayerState) -> f32 {
         first
     } else {
         // Geometric mean: exp(mean(ln(α)))
-        let log_sum: f64 = alpha.iter().filter(|&&a| a > 0.0).map(|&a| (a as f64).ln()).sum();
+        let log_sum: f64 = alpha
+            .iter()
+            .filter(|&&a| a > 0.0)
+            .map(|&a| (a as f64).ln())
+            .sum();
         let n = alpha.len() as f64;
         (log_sum / n).exp() as f32
     }
@@ -220,19 +229,152 @@ pub fn commit_gdn2_tree_layer(
 
     // Borrow heads mutably.
     let heads = &mut cache.layers[layer_idx].heads;
-    let mut s0_per_head: Vec<&mut [f32]> =
-        heads.iter_mut().map(|h| h.s.as_mut_slice()).collect();
+    let mut s0_per_head: Vec<&mut [f32]> = heads.iter_mut().map(|h| h.s.as_mut_slice()).collect();
 
     commit_accepted_multihead(topo, accepted_leaf, &params, &mut s0_per_head, d_k, d_v);
 }
 
-// ── Tests ─────────────────────────────────────────────────────
+// ── Dual-path (GDN × HOLA) bridge — Plan 430 ──────────────────
+//
+// When the `hippocampal_cache` feature is active and the GDN2 layer has
+// non-empty `hippocampal_caches`, the tree verify can use the dual-path
+// algorithm (GDN masked solve + HOLA ancestor-masked softmax read). These
+// bridge functions wire the `MultiLayerGdn2Cache` to the dual-path primitives.
+
+/// Dual-path tree verify for a single GDN2 layer with HOLA caches.
+///
+/// Wraps [`verify_gdn_hola_tree_multihead`] with the GDN2 cache's per-head
+/// state and per-head hippocampal caches. When `hippocampal_caches` is empty,
+/// the caller should use [`verify_gdn2_tree_layer`] instead (the dual-path
+/// adds no value without a cache).
+///
+/// # Arguments
+/// * `verifier` — Pre-allocated dual-path verify scratch.
+/// * `topo` — Tree topology.
+/// * `cache` — GDN2 multi-layer cache (read-only; S₀ and caches not modified).
+/// * `layer_idx` — Which layer to verify.
+/// * `keys` / `values` / `queries` — Per-node QKV `[n_kv_heads * T * hd]`, head-major.
+/// * `config` — Model config.
+///
+/// # Returns
+/// `[n_kv_heads * T * d_v]` head-major, topo-indexed within each head.
+/// `O[i] = O_gdn[i] + O_hola[i]` (residual-add complement).
+#[cfg(feature = "hippocampal_cache")]
+#[allow(clippy::too_many_arguments)]
+pub fn verify_gdn2_hola_tree_layer(
+    verifier: &mut katgpt_core::gdn_tree_verify::hola_fusion::GdnHolaTreeVerifier,
+    topo: &TreeTopology,
+    cache: &mut MultiLayerGdn2Cache,
+    layer_idx: usize,
+    keys: &[f32],
+    values: &[f32],
+    queries: &[f32],
+    config: &Config,
+) -> Vec<f32> {
+    use katgpt_core::gdn_tree_verify::hola_fusion::{
+        GdnHolaMultiHeadParams, verify_gdn_hola_tree_multihead,
+    };
+
+    let d_k = config.head_dim;
+    let n_kv_heads = config.n_kv_head;
+    let t = topo.n_nodes;
+
+    let layer = &mut cache.layers[layer_idx];
+    let alphas = build_alphas(layer, t);
+    let betas = build_betas(layer, t);
+
+    let gdn_params = GdnMultiHeadParams {
+        keys,
+        values,
+        queries,
+        alphas: &alphas,
+        betas: &betas,
+        n_kv_heads,
+    };
+
+    let s0_per_head: Vec<&[f32]> = layer.heads.iter().map(|h| h.s.as_slice()).collect();
+
+    // Gather mutable references to per-head hippocampal caches.
+    let mut cache_refs: Vec<&mut HippocampalCacheDyn> =
+        layer.hippocampal_caches.iter_mut().collect();
+
+    let mut params = GdnHolaMultiHeadParams {
+        gdn: gdn_params,
+        caches: &mut cache_refs,
+    };
+
+    verify_gdn_hola_tree_multihead(verifier, topo, &mut params, &s0_per_head, d_k, d_k)
+}
+
+/// Dual-path commit for a single GDN2 layer with HOLA caches.
+///
+/// Wraps [`commit_accepted_dual_multihead`] with the GDN2 cache's per-head
+/// state and per-head hippocampal caches. Updates S₀ (delta-rule replay) AND
+/// observes accepted-path tokens into the cache (β·‖e‖ surprise score).
+#[cfg(feature = "hippocampal_cache")]
+#[allow(clippy::too_many_arguments)]
+pub fn commit_gdn2_hola_tree_layer(
+    topo: &TreeTopology,
+    accepted_leaf: usize,
+    cache: &mut MultiLayerGdn2Cache,
+    layer_idx: usize,
+    keys: &[f32],
+    values: &[f32],
+    queries: &[f32],
+    config: &Config,
+) {
+    use katgpt_core::gdn_tree_verify::hola_fusion::commit_accepted_dual_multihead;
+
+    let d_k = config.head_dim;
+    let n_kv_heads = config.n_kv_head;
+    let t = topo.n_nodes;
+
+    let alpha = gdn2_scalar_alpha(&cache.layers[layer_idx]);
+    let beta = gdn2_scalar_beta(&cache.layers[layer_idx]);
+    let alphas = vec![alpha; t];
+    let betas = vec![beta; t];
+
+    let params = GdnMultiHeadParams {
+        keys,
+        values,
+        queries,
+        alphas: &alphas,
+        betas: &betas,
+        n_kv_heads,
+    };
+
+    let layer = &mut cache.layers[layer_idx];
+    let heads = &mut layer.heads;
+    let mut s0_per_head: Vec<&mut [f32]> = heads.iter_mut().map(|h| h.s.as_mut_slice()).collect();
+    let mut cache_refs: Vec<&mut HippocampalCacheDyn> =
+        layer.hippocampal_caches.iter_mut().collect();
+
+    commit_accepted_dual_multihead(
+        topo,
+        accepted_leaf,
+        &params,
+        &mut s0_per_head,
+        &mut cache_refs,
+        d_k,
+        d_k,
+    );
+}
+
+// ── Tests ──────────────────────────────────────────────────────
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use katgpt_core::gdn_tree_verify::build_topology;
     use katgpt_core::types::Config;
+
+    /// Key/value head dimensions bundled as one parameter to stay under
+    /// clippy's `too_many_arguments` threshold on the reference helpers below.
+    #[derive(Copy, Clone)]
+    struct HeadDims {
+        d_k: usize,
+        d_v: usize,
+    }
 
     /// Build a GDN2 cache with paper-compatible config:
     /// uniform decay_alpha, erase_b = 1.0.
@@ -254,9 +396,10 @@ mod tests {
         alpha: f32,
         beta: f32,
         s0: &mut [f32],
-        d_k: usize,
-        d_v: usize,
+        dims: HeadDims,
     ) -> Vec<f32> {
+        let d_k = dims.d_k;
+        let d_v = dims.d_v;
         let t = keys.len() / d_k;
         let mut outputs = vec![0.0f32; t * d_v];
         let scale = 1.0 / (d_k as f32).sqrt();
@@ -312,7 +455,10 @@ mod tests {
         let alpha = gdn2_scalar_alpha(&layer);
         // Geometric mean of [0.8, 0.9, 0.8, 0.8]
         let expected = (0.25f64 * (0.8f64.ln() * 3.0 + 0.9f64.ln())).exp() as f32;
-        assert!((alpha - expected).abs() < 1e-5, "got {alpha}, expected {expected}");
+        assert!(
+            (alpha - expected).abs() < 1e-5,
+            "got {alpha}, expected {expected}"
+        );
     }
 
     #[test]
@@ -393,8 +539,7 @@ mod tests {
                 alpha,
                 beta,
                 &mut s0_seq,
-                d_k,
-                d_v,
+                HeadDims { d_k, d_v },
             );
 
             // Compare tree verify output (topo-indexed) to sequential.
@@ -441,9 +586,7 @@ mod tests {
         let topo = build_topology(&parents, &[alpha; T]);
 
         // --- Sequential reference: replay full chain ---
-        let mut seq_s0: Vec<Vec<f32>> = (0..n_kv_heads)
-            .map(|_| vec![0.0f32; d_k * d_v])
-            .collect();
+        let mut seq_s0: Vec<Vec<f32>> = (0..n_kv_heads).map(|_| vec![0.0f32; d_k * d_v]).collect();
         for head in 0..n_kv_heads {
             let k_stride = t * d_k;
             let v_stride = t * d_v;
@@ -454,8 +597,7 @@ mod tests {
                 alpha,
                 1.0,
                 &mut seq_s0[head],
-                d_k,
-                d_v,
+                HeadDims { d_k, d_v },
             );
         }
 
@@ -473,15 +615,12 @@ mod tests {
         );
 
         // Compare S₀ after commit vs sequential
-        for head in 0..n_kv_heads {
+        for (head, sequential) in seq_s0.iter().enumerate() {
             let committed = &cache_commit.layers[0].heads[head].s;
-            let sequential = &seq_s0[head];
-            for i in 0..d_k * d_v {
+            for (i, (&c, &s)) in committed.iter().zip(sequential.iter()).enumerate() {
                 assert!(
-                    (committed[i] - sequential[i]).abs() < 1e-3,
-                    "head {head} S[{i}]: committed={:.6} sequential={:.6}",
-                    committed[i],
-                    sequential[i],
+                    (c - s).abs() < 1e-3,
+                    "head {head} S[{i}]: committed={c:.6} sequential={s:.6}",
                 );
             }
         }
@@ -551,15 +690,18 @@ mod tests {
                 head_queries,
                 &alphas_arr,
                 &betas_arr,
-                d_k,
-                d_v,
+                HeadDims { d_k, d_v },
             );
 
             // Tree output is topo-indexed; gather to original order
             let tree_head_out = &tree_out[head * v_stride..(head + 1) * v_stride];
             for orig_node in 0..t {
                 // Find topo index for this original node
-                let topo_idx = topo.topo_order.iter().position(|&x| x == orig_node).unwrap();
+                let topo_idx = topo
+                    .topo_order
+                    .iter()
+                    .position(|&x| x == orig_node)
+                    .unwrap();
                 for d in 0..d_v {
                     let tree_val = tree_head_out[topo_idx * d_v + d];
                     let ref_val = ref_out[orig_node * d_v + d];
@@ -581,9 +723,10 @@ mod tests {
         queries: &[f32],
         alphas: &[f32],
         betas: &[f32],
-        d_k: usize,
-        d_v: usize,
+        dims: HeadDims,
     ) -> Vec<f32> {
+        let d_k = dims.d_k;
+        let d_v = dims.d_v;
         let t = parents.len();
         let mut outputs = vec![0.0f32; t * d_v];
         let scale = 1.0 / (d_k as f32).sqrt();

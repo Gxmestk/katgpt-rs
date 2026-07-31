@@ -1756,6 +1756,7 @@ version = "0.1.0"
 dependencies = [
  "coreml-native",
  "coreml-proto",
+ "katgpt-core",
  "katgpt-forward",
  "katgpt-transformer",
  "katgpt-types",
@@ -1773,6 +1774,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "katgpt-canon"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "bytemuck",
+ "katgpt-core",
+ "katgpt-spectral",
+]
+
+[[package]]
 name = "katgpt-claim"
 version = "0.1.0"
 dependencies = [
@@ -1783,7 +1794,7 @@ dependencies = [
 
 [[package]]
 name = "katgpt-core"
-version = "0.3.1"
+version = "0.4.0"
 dependencies = [
  "ahash",
  "arrayvec",
@@ -1816,7 +1827,7 @@ dependencies = [
 
 [[package]]
 name = "katgpt-dec"
-version = "0.1.1"
+version = "0.1.2"
 
 [[package]]
 name = "katgpt-deprecated"
@@ -1846,9 +1857,10 @@ dependencies = [
 
 [[package]]
 name = "katgpt-hla"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "katgpt-types",
+ "serde",
 ]
 
 [[package]]
@@ -1868,13 +1880,24 @@ dependencies = [
 
 [[package]]
 name = "katgpt-micro-belief"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "blake3",
  "fastrand",
  "katgpt-types",
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "katgpt-moka-wasm"
+version = "0.1.0"
+dependencies = [
+ "katgpt-types",
+ "serde",
+ "serde_json",
+ "wasm-bindgen",
+ "wasmi",
 ]
 
 [[package]]
@@ -1888,7 +1911,7 @@ dependencies = [
 
 [[package]]
 name = "katgpt-personality"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "blake3",
  "katgpt-types",
@@ -1911,6 +1934,8 @@ dependencies = [
  "bevy_ecs",
  "blake3",
  "bytemuck",
+ "coreml-native",
+ "coreml-proto",
  "fastrand",
  "half",
  "katgpt-core",
@@ -1921,6 +1946,7 @@ dependencies = [
  "log",
  "papaya",
  "postcard",
+ "prost",
  "rayon",
  "reqwest",
  "rustfft",
@@ -1940,7 +1966,7 @@ dependencies = [
 
 [[package]]
 name = "katgpt-rs"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "bevy_ecs",
  "blake3",
@@ -1998,7 +2024,7 @@ dependencies = [
 
 [[package]]
 name = "katgpt-sense"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "blake3",
  "fastrand",
@@ -2008,7 +2034,7 @@ dependencies = [
 
 [[package]]
 name = "katgpt-sleep"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "blake3",
  "katgpt-types",
@@ -2079,13 +2105,14 @@ dependencies = [
  "blake3",
  "bytemuck",
  "fastrand",
+ "half",
  "katgpt-core",
  "rayon",
 ]
 
 [[package]]
 name = "katgpt-types"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "blake3",
  "fastrand",

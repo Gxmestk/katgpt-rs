@@ -34,13 +34,13 @@ The three smallest, most foundational primitives. Ships first so the open adopti
 - [x] **T1.1** Create module `katgpt-rs/crates/katgpt-core/src/arg/` with `mod.rs` declaring submodules.
 - [x] **T1.2** Add Cargo feature `arg_protocol = []` to `katgpt-rs/crates/katgpt-core/Cargo.toml`. Default-off.
 - [x] **T1.3** Wire `#[cfg(feature = "arg_protocol")] pub mod arg;` in `katgpt-rs/crates/katgpt-core/src/lib.rs`.
-- [x] **T1.4** Write `arg/policy.rs` — `PolicyEnvelope`, `PolicyState`, `ResponseMode`, `PolicyConstraints`. ≤100 lines.
+- [x] **T1.4** Write `crates/katgpt-core/src/arg/policy.rs` — `PolicyEnvelope`, `PolicyState`, `ResponseMode`, `PolicyConstraints`. ≤100 lines.
   - `PolicyState ∈ {Allow, AllowWithRefocus, Restrict, Block}` `#[repr(u8)]` enum
   - `ResponseMode ∈ {Normal, Prudent, Refocus, Refusal}` `#[repr(u8)]` enum
   - `PolicyConstraints { allowed_labels: &[LabelId], forbidden_labels: &[LabelId], max_hops: u8, max_depth: u8, max_complexity: u16 }`
   - `PolicyEnvelope { state: PolicyState, constraints: PolicyConstraints, response_mode: ResponseMode }`
   - `PolicyEnvelope::evaluate(&self, ctx: &EvalCtx) -> PolicyDecision` — zero-alloc, returns decision + whether to short-circuit
-- [x] **T1.5** Write `arg/taxonomy.rs` — `TaxonomyNode`, `TaxonomyKind`, `LabelId`, `LabelSet`, `TaxonomyValidator`. ≤200 lines.
+- [x] **T1.5** Write `crates/katgpt-core/src/arg/taxonomy.rs` — `TaxonomyNode`, `TaxonomyKind`, `LabelId`, `LabelSet`, `TaxonomyValidator`. ≤200 lines.
   - `LabelId` = `u32` (stable identity, never recycled)
   - `TaxonomyKind ∈ {Cluster, Label, Leaf}` `#[repr(u8)]` enum
   - `TaxonomyNode { id: LabelId, kind: TaxonomyKind, parent_id: Option<LabelId>, incompatible_with: &[LabelId] }`
@@ -48,11 +48,11 @@ The three smallest, most foundational primitives. Ships first so the open adopti
   - `TaxonomyValidator` — owns `&[TaxonomyNode]` (sorted by id for binary-search lookup)
   - `TaxonomyValidator::validate_label_set(&self, candidates: &LabelSet, scratch: &mut ValidationScratch) -> ValidationResult` — enforces existence, cluster↔label compatibility, parent/child coherence, explicit incompatibilities. Zero-alloc when scratch is preallocated.
   - `TaxonomyValidator::expand_ascending(&self, leaf_set: &LabelSet, scratch: &mut ValidationScratch) -> LabelSet` — child→parent→root expansion only (no descending).
-- [x] **T1.6** Write `arg/lifecycle.rs` — `LifecycleState`, `RedirectTable`. ≤100 lines.
+- [x] **T1.6** Write `crates/katgpt-core/src/arg/lifecycle.rs` — `LifecycleState`, `RedirectTable`. ≤100 lines.
   - `LifecycleState ∈ {Active, Shadow, Deprecated, Removed}` `#[repr(u8)]` enum
   - `RedirectTable` — papaya lock-free `HashMap<LabelId, LabelId>` (deprecated → replacement); `redirect(&self, id: LabelId) -> LabelId` follows chains; `redirect_chain(&self, id) -> Vec<LabelId>` for audit
   - `RedirectTable::insert_redirect(old, new)` — chain compression on insert (avoid redirect chains longer than 3)
-- [x] **T1.7** Write `arg/lib.rs`-style facade re-exports in `arg/mod.rs`.
+- [x] **T1.7** Write `crates/katgpt-core/src/lib.rs`-style facade re-exports in `crates/katgpt-core/src/arg/mod.rs`.
 
 ### Phase 1 GOAT gate
 
@@ -71,11 +71,11 @@ The three smallest, most foundational primitives. Ships first so the open adopti
 
 ## Phase 2 — Typed Offline Candidates + Silence-Bias Scorer
 
-- [x] **T2.1** Write `arg/candidate.rs` — `TypedOfflineCandidate`, `CandidateIntent`. ≤150 lines.
+- [x] **T2.1** Write `crates/katgpt-core/src/arg/candidate.rs` — `TypedOfflineCandidate`, `CandidateIntent`. ≤150 lines.
   - `CandidateKind ∈ {Split, Merge, Edge, Taxonomy, NewNode, RegistryDedup}` `#[repr(u8)]` enum
   - `CandidateIntent { kind, target_label: LabelId, before: LabelSet, after: LabelSet, evidence_refs: &[EvidenceId] }`
   - `TypedOfflineCandidate { intent: CandidateIntent, score: Option<f32> }`
-- [x] **T2.2** Write `arg/scorer.rs` — `OfflineCandidateScorer`, `InfoOutcomeStatus`, `Evidence`. ≤200 lines.
+- [x] **T2.2** Write `crates/katgpt-core/src/arg/scorer.rs` — `OfflineCandidateScorer`, `InfoOutcomeStatus`, `Evidence`. ≤200 lines.
   - `InfoOutcomeStatus ∈ {InfoConfirmedSuccess, InfoUncertainSuccess, InfoLowConfidence}` `#[repr(u8)]` enum
   - `Evidence { outcome: InfoOutcomeStatus, weight: f32 }`
   - `OfflineCandidateScorer::score(&self, candidate: &TypedOfflineCandidate, evidence: &[Evidence]) -> f32` — computes `Gain_info_confirmed`, `Gain_info_uncertain`, `Gain_info_lowconf` separately, applies `Penalty_silent(C)` if `uncertain + lowconf > threshold`.
@@ -90,7 +90,7 @@ The three smallest, most foundational primitives. Ships first so the open adopti
 
 ## Phase 3 — Info Registry
 
-- [x] **T3.1** Write `arg/registry.rs` — `InfoRegistry`, `InfoUnit`, `InfoKey`, `InfoType`, `AccessScope`, `CompareResult`. ≤250 lines.
+- [x] **T3.1** Write `crates/katgpt-core/src/arg/registry.rs` — `InfoRegistry`, `InfoUnit`, `InfoKey`, `InfoType`, `AccessScope`, `CompareResult`. ≤250 lines.
   - `InfoType = u8` (controlled category)
   - `AccessScope = u64` (tenant/workspace id)
   - `LabelSignature = [u8; 32]` (BLAKE3 of `L_final_ids`)

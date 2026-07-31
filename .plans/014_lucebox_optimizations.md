@@ -48,7 +48,7 @@ doesn't prevent a future `half::f16` storage layer that casts to `f32` for compu
 - [x] 2. **Add Rayon threshold to `dflash_predict_parallel`** — skip `par_iter` when `config.n_embd <= 128`, fall through to sequential `dflash_predict`. Add config field `parallel_threshold: usize` defaulting to 128. Test both paths produce identical marginals.
 - [x] 3. **Create `PagedKVCache::forward_paged()` adapter** — new function in `transformer.rs` that accepts `PagedKVCache` + `seq_idx` instead of `MultiLayerKVCache`. Reuses the same `ForwardContext` and `attention_head` kernel, but reads/writes KV via `paged_cache.read_kv()` / `paged_cache.write_kv()`.
 - [x] 4. **Create `DDTreeBranchCache` struct** — wraps `PagedKVCache` with a branch allocator. Tracks `active_branches: Vec<usize>` (seq indices). Provides `fork_branch(from, at_pos) -> new_seq_idx` and `forward_branch(seq_idx, token, pos) -> logits`.
-- [x] 5. **Wire `DDTreeBranchCache` into speculative step** — added `speculative_step_rollback_paged` in `speculative/step.rs` using `DDTreeBranchCache` for draft model KV exploration with copy-on-write fork semantics. Target model verification still uses `MultiLayerKVCache` snapshot/restore as fallback.
+- [x] 5. **Wire `DDTreeBranchCache` into speculative step** — added `speculative_step_rollback_paged` in `crates/katgpt-forward/src/step.rs` using `DDTreeBranchCache` for draft model KV exploration with copy-on-write fork semantics. Target model verification still uses `MultiLayerKVCache` snapshot/restore as fallback.
 - [x] 6. **Add paged branch benchmarks** — benchmark DDTree build + speculative step with paged cache vs flat cache. Record as `bench/024_bench_result.png`.
 - [x] 7. **Verify f16 compatibility** — add a `WeightStorage` enum or trait sketch in `types.rs` that shows how `f16` storage would work without changing hot-path signatures. Document in code comments only — no implementation. Ensure `TransformerWeights` fields could be replaced with `Vec<half::f16>` without breaking `forward()`.
 - [x] 8. **Run all tests** — `cargo test --quiet`, `cargo clippy --fix --allow-dirty`, verify zero warnings
@@ -104,13 +104,13 @@ dflash_predict_parallel:
 
 | File | Changes |
 |------|---------|
-| `src/transformer.rs` | Add `forward_paged()` function, `attention_head_paged()` helper |
+| `crates/katgpt-percepta/src/transformer.rs` | Add `forward_paged()` function, `attention_head_paged()` helper |
 | `src/speculative/dd_tree.rs` | No changes — tree builder is cache-agnostic |
-| `src/speculative/step.rs` | Add paged cache branch in `speculative_step*` functions |
+| `crates/katgpt-forward/src/step.rs` | Add paged cache branch in `speculative_step*` functions |
 | `src/speculative/types.rs` | Add `DDTreeBranchCache` struct + impl |
-| `src/speculative/dflash.rs` | Add Rayon threshold guard in `dflash_predict_parallel` |
+| `crates/katgpt-speculative/src/dflash.rs` | Add Rayon threshold guard in `dflash_predict_parallel` |
 | `src/types.rs` | Add `parallel_threshold` to `Config`, document f16 path in comments |
-| `src/benchmark.rs` | Add `bench_paged_speculative` benchmark variant |
+| `src/benchmark/mod.rs` | Add `bench_paged_speculative` benchmark variant |
 
 ## What We Will NOT Do
 

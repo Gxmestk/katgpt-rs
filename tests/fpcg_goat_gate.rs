@@ -6,7 +6,7 @@
 //! recipe S=10 × M=10). Both are out of scope for the public `katgpt-rs`
 //! engine: offline training lives in `riir-train` per `AGENTS.md`, and a
 //! behavior-labeled corpus is external data. G1–G4 are therefore **BLOCKED** —
-//! see `.issues/032_fpcg_phase4_training_blocker.md` and the methodology
+//! see Issue 032 (fpcg phase4 training blocker, resolved + removed) and the methodology
 //! section of `.benchmarks/292_fpcg_goat.md`. No fabricated numbers.
 //!
 //! This file covers the **achievable-in-pure-Rust** subset of the gate:

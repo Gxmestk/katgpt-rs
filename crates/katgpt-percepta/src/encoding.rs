@@ -65,11 +65,11 @@ pub fn encode_query(q: f64, offset: f64) -> [f64; 2] {
 /// Subtract `big` from the y-component of a key.
 ///
 /// This separates the tie-breaking term from the main key value
-/// when using [`BIG`] as an offset.
+/// when using `BIG` as an offset.
 ///
 /// # Arguments
 /// * `key` — 2D key `[kx, ky]`
-/// * `big` — large constant to subtract (typically [`BIG`])
+/// * `big` — large constant to subtract (typically `BIG`)
 ///
 /// # Returns
 /// Key with `ky - big`

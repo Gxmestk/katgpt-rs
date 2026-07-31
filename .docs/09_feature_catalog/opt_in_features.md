@@ -492,7 +492,7 @@ DRY refactor extracts `apply_blended_with_pi` free function shared by production
 
 ## 15. Within-Class Effective Rank (Plan 415)
 
-Class-conditioned collapse diagnostic: the entropy-based effective rank of the **within-class residual** covariance matrix (arXiv:2412.19419 §5.3.1). Fusion of two shipped halves never combined: `effective_rank` (class-agnostic) + `within_class_adjacency` / `between_class_adjacency` (class-conditioning from `latent_functor/quality_gate.rs`).
+Class-conditioned collapse diagnostic: the entropy-based effective rank of the **within-class residual** covariance matrix (arXiv:2412.19419 §5.3.1). Fusion of two shipped halves never combined: `effective_rank` (class-agnostic) + `within_class_adjacency` / `between_class_adjacency` (class-conditioning from `riir-ai/crates/riir-engine/src/latent_functor/quality_gate.rs`).
 
 Fills the gap where the class-agnostic `effective_rank` cannot distinguish "between-class variance dominates, within-class collapsed" from "all variance is healthy and isotropic". The existing Dirichlet-energy quality gate measures *separation* (between > within) but not *within-class subspace health*.
 
@@ -535,6 +535,8 @@ The modelless SAR kernel: project a weight delta onto the base matrix's SVD subs
 
 **Stays opt-in** because the spectral concentration assumption (G1b) is unvalidated without real training deltas — a generic delta is NOT concentrated (0.12–0.18). Promotion to default is blocked on Issue 123 (real-delta test). The SVD 64-col cap (Issue 124) blocks 128×128/512×512. The cached-index path (`SpectralRewireIndex`) is the recommended hot-loop API.
 
+**LLM-scale escape hatch CLOSED (Issue 151, 2026-07-15).** The SAR concentration phenomenon was the foundational assumption for the SAR × QuasiMoTTo Pass@k fusion (Issue 151) — the hypothesis was that concentration holds at LLM scale (4096×4096 weight matrices) even though it failed at NPC scale (Issue 123). A 1.5B-scale Phase 1 PoC **refuted** concentration: 0/196 layers exceeded the 0.8 `on_manifold_fraction` threshold. The LLM-scale regime does NOT rescue the concentration assumption. See negative_results §10.
+
 | Gate | Target | Result | Verdict |
 |------|--------|--------|---------|
 | **G1a** | SVD recovery | ~8e-6 | ✅ PASS |
@@ -576,3 +578,327 @@ Phase 6 (DDTree argmax-of-marginal tuning) produced a **negative result** — th
 🔧 Feature flag: `gdn_tree_verify` — **opt-in** (complement to Plan 012's attention verify; only relevant for `QwenDeltaNet` / GDN-layer configs).
 
 📖 Plan: [`.plans/424_gdn_tree_verification_primitive.md`](../../.plans/424_gdn_tree_verification_primitive.md), Research: [`.research/407_Trees_from_Marginals_GDN_Tree_Verify.md`](../../.research/407_Trees_from_Marginals_GDN_Tree_Verify.md), Benchmark: [`.benchmarks/424_gdn_tree_verify_goat.md`](../../.benchmarks/424_gdn_tree_verify_goat.md), Paper: [arXiv:2607.06763](https://arxiv.org/abs/2607.06763)
+
+## 19. Interpolation Geometry — iMAUVE + Intervention Battery (Research 445)
+
+Modelless evaluation methodology for committed latent substrates — answers "does the *midpoint* of two committed latents decode to a coherent intermediate behavior?" Distilled from Prabhudesai & Geng, *Latent Thought Flows with Text Compression* (Jun 2026). The paper's headline metric **iMAUVE** (nearest-neighbor midpoint interpolation quality) predicts downstream generation quality with Pearson r=0.99; the **5-way intervention probe** (matched/shuffled/zero/mean/noise) extends Plan 278's binary FaithfulnessProbe to per-entity committed state.
+
+Generic `LatentSpace` trait abstracts over the **six committed-latent substrates** cataloged in Research 445 §2.6: HLA `[f32;8]`, `NeuronShard::style_weights[64]`, `ArchetypeBlendShard.pi`, `KarcShard.wout`, `ZoneGeometryPod`, `MerkleFrozenEnvelope`-versioned states. Pure evaluation methodology — NOT a training primitive.
+
+**Three-pressure audit (all six substrates PASS):**
+- **Q1 (summarize-vs-route)** — does the latent summarize the underlying trajectory, or is it a lookup key? Subsample the trajectory, recompute the latent, measure divergence. A summarizing latent is stable under subsampling.
+- **Q2 (runtime-depends-on-latent)** — does runtime behavior actually use the committed latent, or bypass via raw state? Zero/shuffle the latent (intervention battery), measure behavior delta.
+- **Q3 (local-context-vs-bypass)** — does the runtime's attention to the latent stay local? Structural code audit (decode-path purity + consumer-input audit + locality-mechanism inventory). SpKv (Plan 070) + RTPurbo (Plan 126) enforce locality at the transformer-attention layer.
+
+🔧 Feature flag: `interpolation_geometry` (in `katgpt-core`) — **opt-in**. Pure evaluation methodology, no runtime consumer.
+
+📖 Research: [`.research/445_Latent_Thought_Flows_Text_Compression.md`](../../.research/445_Latent_Thought_Flows_Text_Compression.md), Benchmark: [`.benchmarks/456_interpolation_geometry_goat.md`](../../.benchmarks/456_interpolation_geometry_goat.md), Doc: [`.docs/04_calibration/interpolation_geometry.md`](../04_calibration/interpolation_geometry.md), Source: [latent-thought.vercel.app](https://latent-thought.vercel.app) (Prabhudesai & Geng 2026 blog + MeanFlow arXiv:2601.22158)
+
+## 20. GRAPE-M Rank-2 Rodrigues Exponential (Research 446)
+
+Closed-form application of `exp(n·ω·L)` for an arbitrary rank-2 skew-symmetric generator `L = abᵀ − baᵀ ∈ so(d)` (arXiv:2512.07805 §2.3). Uses the Rodrigues formula `I + (sin s / s)·L + ((1 − cos s) / s²)·L²` with `s = ω·‖a∧b‖`, evaluated as `O(d)` work via two inner products `⟨a,x⟩`, `⟨b,x⟩` (no materialized `L` or `L²`).
+
+Generalizes `phase_rotation`'s scalar-broadcast 2D rotation (canonical basis special case where `a = e_i`, `b = e_{i+D/2}`). Pure modelless float arithmetic on a user-supplied plane `(a, b)`.
+
+| Gate | Target | Result | Verdict |
+|------|--------|--------|---------|
+| **G1** | Bit-identical to materialized `expm(L)` on random `(a,b,ω)` | 0.0 diff | ✅ PASS |
+| **G2** | Latency `< 2× phase_rotation_gate_into` | within bound | ✅ PASS |
+| **G4** | Alloc-free | 0 allocs | ✅ PASS |
+
+🔧 Feature flag: `grapem_rodrigues` (in `katgpt-core`) — **opt-in**. `Rank2Plane` retains `a, b` as `Box<[f32]>` (not just the 4 scalars) — mathematically necessary for the projections.
+
+📖 Research: [`.research/446_GRAPE_Group_Representational_Position_Encoding.md`](../../.research/446_GRAPE_Group_Representational_Position_Encoding.md), Benchmark: [`.benchmarks/457_grapem_rodrigues_goat.md`](../../.benchmarks/457_grapem_rodrigues_goat.md), Paper: [arXiv:2512.07805](https://arxiv.org/abs/2512.07805)
+
+## 21. Unified PositionGroupAction Trait (Research 446)
+
+Abstract trait unifying five position-encoding families under one `G(n) = exp(n·ω·L)` interface (arXiv:2512.07805 §2.2 + §4.1):
+
+- **RoPE** (`SO(d)` multiplicative action) — wraps `PositionFreeCompactor`'s math
+- **ALiBi / FoX / Wall** (`GL(d+2)` unipotent lift — additive bias family)
+- **NoPE** (trivial `L = 0`)
+- **GRAPE-M** (rotary generalization — wraps `Rank2Plane`)
+
+All obey the exact relative law `G(t−s) = G(s)^T·G(t)`, enabling position-encoding-agnostic tooling (KV compaction, attention matching). Hot-path code keeps using `PositionFreeCompactor` / `WallDiagonalGate` directly; the trait is for cold-path interop.
+
+| Gate | Target | Result | Verdict |
+|------|--------|--------|---------|
+| **G3** | No-regression — existing RoPE/Wall paths unchanged when feature off | bit-identical | ✅ PASS |
+
+🔧 Feature flag: `position_group_action` (in `katgpt-core`, implies `grapem_rodrigues`) — **opt-in**. 19 unit tests in-crate.
+
+📖 Research: [`.research/446_GRAPE_Group_Representational_Position_Encoding.md`](../../.research/446_GRAPE_Group_Representational_Position_Encoding.md), Benchmark: [`.benchmarks/458_position_group_action_goat.md`](../../.benchmarks/458_position_group_action_goat.md), Paper: [arXiv:2512.07805](https://arxiv.org/abs/2512.07805)
+
+## 22. GRAPE-AP Vector-Similarity Gates (Research 446)
+
+Content-aware extension of Wall Attention's scalar prefix-sum gates (arXiv:2512.07805 §5). For each head `h` and decoding step `t`, the bias from key position `j` to query `t` is a path integral of edge potentials:
+
+```
+b_h(t, j) = Σ_{ℓ=j+1}^{t} ψ_h(t, ℓ)
+ψ_h(t, ℓ) = α · g(⟨p_t, R_ℓ · p_ℓ⟩ / d)
+```
+
+with `g = log_sigmoid` (the paper's choice) and `R_ℓ = exp(ℓ·J)` a cached rotation schedule. Tokens whose positional embedding matches the query's decay slower. **Wall is the scalar special case** (endpoint-independent embeddings).
+
+| Gate | Target | Result | Verdict |
+|------|--------|--------|---------|
+| **G2** | Latency `< 1.5×` Wall's scalar path | within bound | ✅ PASS |
+| **G4** | Alloc-free after scratch init | 0 steady-state allocs | ✅ PASS |
+| **G5** | Direction-check per paper's 1/d normalization | verified | ✅ PASS |
+
+🔧 Feature flag: `grape_ap_vector` (in `katgpt-core`) — **opt-in**. 15 unit tests in-crate.
+
+📖 Research: [`.research/446_GRAPE_Group_Representational_Position_Encoding.md`](../../.research/446_GRAPE_Group_Representational_Position_Encoding.md), Benchmark: [`.benchmarks/459_grape_ap_vector_goat.md`](../../.benchmarks/459_grape_ap_vector_goat.md), Paper: [arXiv:2512.07805](https://arxiv.org/abs/2512.07805)
+
+## 23. GRAPE Joint Lift — GL(d+2) Block-Diagonal Composition (Research 446)
+
+Composes rotary (GRAPE-M) + additive (GRAPE-A) into a single block-diagonal group action per Appendix E of arXiv:2512.07805. One-pass `score_into`:
+
+```
+score(q, k) = q^T · exp(m · ω_rot · L) · k / √d  +  m · ω_add · (softplus(v · q / √d) + softplus(u · k / √d))
+```
+
+Closes the GRAPE composition story: today Wall *replaces* RoPE in our stack; this primitive proves they *compose* into a single one-parameter subgroup of `GL(d+2)` while preserving the exact relative law. The decoupled `omega_rot` / `omega_add` is a strict generalization of the paper's shared `ω`.
+
+| Gate | Target | Result | Verdict |
+|------|--------|--------|---------|
+| **G1** | Bit-identical to manual composition + relativity law | 0.0 diff | ✅ PASS |
+| **G2** | Latency smoke | within bound | ✅ PASS |
+| **G4** | Alloc-free after `new` | 0 steady-state allocs | ✅ PASS |
+
+🔧 Feature flag: `grape_joint_lift` (in `katgpt-core`, implies `grapem_rodrigues`) — **opt-in**.
+
+📖 Research: [`.research/446_GRAPE_Group_Representational_Position_Encoding.md`](../../.research/446_GRAPE_Group_Representational_Position_Encoding.md), Benchmark: [`.benchmarks/460_grape_joint_lift_goat.md`](../../.benchmarks/460_grape_joint_lift_goat.md), Paper: [arXiv:2512.07805](https://arxiv.org/abs/2512.07805)
+
+## 24. KARC Family — Delay-Basis Ridge Forecaster + Mitigations + Eigensolver (Plan 308 + Plan 556 + Issues 186/187)
+
+The KARC family is the open-primitive surface for Kolmogorov-Arnold Reservoir Computing (Huang/Kurths/Tang 2026, arXiv:2606.19984). One core forecaster + one large-d_h eigensolver path (Issues 186/187) + three Plan 556 mitigations (regime gate, batched matvec, LOD tier) that address KARC's structural cons (periodic-blindness, crowd-scale per-NPC cost, tiered compute) without changing the core algorithm. All six features are opt-in; the core forecaster's promotion is blocked on the G1 threshold leg (10% short at K=8/M=8/R=2 d_h=18_720).
+
+### 24.1 Core Forecaster — `karc_forecaster` (Plan 308)
+
+`KarcForecaster<D, M, K>` × sealed `KarcBasis` trait (Fourier/Chebyshev/BSpline shipped) × closed-form ridge readout `Wout = YH^T(HH^T + λI)^{-1}`. Phase 2 ships higher-order R=2 (pair-product features, paper Eq. 32) + chunked Gram + ALS low-rank `Wout ≈ A·B` (the form that persists into a `KarcShard` in riir-neuron-db).
+
+| Gate | Target | Result (Phase 5.1, 2026-07-20) | Verdict |
+|------|--------|------------------------------|---------|
+| **G1 NRMSE** | double-scroll Table I ≤ 1.0×10⁻³ (paper: 5.3×10⁻⁴) | **9.43e-4** (K=8/M=8/R=2 d_h=18_720, λ=5e-2 λ-sweep) | ✅ PASS |
+| **G1 threshold** | ≥ 8 Lyapunov times | 2.85 LT (K=4) / **7.23 LT** (K=8/M=8/R=2, 10% short) / 8.16 LT (Phase 1 K=8/M=24 first-order) | ❌ FAIL |
+| **G2** | ≤ 500 ns/call forecast (HLA config) | 381 ns | ✅ PASS |
+| **G3** | zero-alloc `forecast_into` | 0 allocs | ✅ PASS |
+| **G4** | bit-reproducibility | byte-identical `Wout` | ✅ PASS |
+
+**Phase 5 history (load-bearing negative result):** Phase 4 *interpolated* (without measuring) that K=8/M=8/R=2 d_h=18_720 would be the smallest config to pass both G1 legs. Phase 5 measured it directly: BOTH legs FAILED at λ=5e-3 — NRMSE 6.68e-3 (6.7× miss) because the K=8 system is heavily underdetermined (N=4050 samples, d_h=18_720 features → ≥14_670 zero eigenvalues; λ=5e-3 tuned for K=4 is too small to regularize K=8). Phase 5.1 ran the λ-sweep and recovered NRMSE at λ=5e-2 (10× larger). The threshold leg remains flat across λ (~7.0–7.2 LT) — confirming it's a capacity/delay problem, not a regularization problem.
+
+**Compute blocker resolved.** Before Issue 186 Path B, d_h=18_720 was projected infeasible (~6 h via Jacobi eigendecomp). Householder+QL + full-rank direct Cholesky brought it to ~29 min wall. Any future config sweep is now cheap to test.
+
+**Promotion paths (all open, all cheap to test):**
+1. **K=10/M=8/R=2 at λ=5e-2** (~28 min Cholesky). Linear K-extrapolation from K=4=2.85 LT, K=8=7.23 LT predicts ~8.5 LT — PASS.
+2. **Issue 186 Path D gate re-spec.** Promote on two-config evidence (Phase 5.1 K=8 NRMSE 9.43e-4 + Phase 1 K=8/M=24 threshold 8.16 LT — same K=8 delay length).
+3. **More training data** (N=20_000+) — would make the Gram full-rank. Compute cost scales linearly.
+
+**UPDATE (Phase 22, 2026-07-21): PROMOTED TO DEFAULT-ON.** All three compute paths above were tested (Phase 5.2 K=10 + Phase 5.3 R=1 K=8/M=24 λ-sweep) and none produced a single-config gate pass — the compound gate is structurally infeasible. The gate re-spec (Issue 186 Path D variant D3 — split-config gate) was accepted. See [`.benchmarks/308_karc_goat.md`](../../.benchmarks/308_karc_goat.md) §Phase 5.3 for the full evidence. This section is retained for historical context; `karc_forecaster` now ships in the default feature set.
+
+🔧 Feature flag: `karc_forecaster` — **DEFAULT-ON** (Phase 22, 2026-07-21).
+
+📖 Plan: [`.plans/308_karc_delay_basis_ridge_forecaster.md`](../../.plans/308_karc_delay_basis_ridge_forecaster.md), Research: [`.research/288_KARC_Delay_Basis_Ridge_Forecaster.md`](../../.research/288_KARC_Delay_Basis_Ridge_Forecaster.md), Benchmark: [`.benchmarks/308_karc_goat.md`](../../.benchmarks/308_karc_goat.md), Paper: [arXiv:2606.19984](https://arxiv.org/abs/2606.19984)
+
+### 24.2 Large-d_h Eigensolver — `karc_householder_eig` + `karc_householder_eig_par` (Issues 186 + 187)
+
+The ALS B-step's original eigendecomp (`karc::jacobi_eigen`, O(d_h³·n_sweeps)) is infeasible at d_h > ~5000 — blocking Plan 308's K=8/M=24/R=2 config (d_h=18_720). Issue 186 Path B swaps in `linalg::symmetric_eig` (Householder tridiag + implicit-shift QL), which is ~5-10× faster at d_h ≥ 256 and feasible at d_h=18_720. The eigensolver is always compiled as a generic `linalg` primitive; the feature gates only the wiring in `karc::large_dh`.
+
+**Measured speedup** (single-threaded, release build):
+
+| n | Householder+QL | Jacobi | Speedup |
+|---|---|---|---|
+| 64 | 310 µs | 2.5 ms | 7.92× |
+| 128 | 3.4 ms | 36.6 ms | 10.62× |
+| 256 | 73.5 ms | 687 ms | 9.35× |
+| 512 | 794 ms | 10.9 s | 13.69× |
+
+`karc_householder_eig_par` (Issue 187) adds a row-parallel rayon variant. Four row-parallel hot loops (Householder matvec, rank-2 update, Q accumulation, QL eigenvector rotation) parallelize across rows via `par_chunk_mut(n)`; each row's work is fully sequential so the result is bit-identical to the serial path. **Landed a critical QL convergence fix** for near-singular Grams (the NR-local check `|e[m]| + dd == dd` cannot deflate tiny-eigenvalue matrices; added the LAPACK `dsteqr` global-scale criterion — affects both serial and parallel paths).
+
+**Why both stay opt-in despite T1-T6 PASS.** The Phase 5 G1 measurement at d_h=18_720 showed the full-rank direct Cholesky path is BOTH faster and more accurate than Householder+QL for the actual G1 measurement (direct Cholesky ~22 min vs parallel eigendecomp ~87 min; NRMSE 6.68e-3 vs ALS-rank-8 4.71e-3 — 28× worse). The parallel path landed a critical bug fix that ships regardless (it affects the serial Householder path too), but there is no passing G1 gate to promote against. The serial `karc_householder_eig` path stays opt-in for the same reason.
+
+🔧 Feature flags: `karc_householder_eig` (implies `karc_forecaster`) — **opt-in**; `karc_householder_eig_par` (implies `karc_householder_eig`) — **opt-in**.
+
+📖 Benchmark: [`.benchmarks/308_karc_goat.md`](../../.benchmarks/308_karc_goat.md) §Phase 5 (issues 185/186/187 resolved + removed; resolution captured here).
+
+### 24.3 Regime Gate — `karc_regime_gate` (Plan 556 Phase 1)
+
+Closed-form residual-MSE mux between `KarcForecaster` (chaotic-regime specialist) and `SeasonalNaiveForecaster` (periodic-regime floor). Directly fixes KARC's structural periodic-blindness documented in [`.benchmarks/010_report_the_floor_consolidated.md`](../../.benchmarks/010_report_the_floor_consolidated.md) §T7 (K-sweep 2026-07-20 refuted the "K=4 too shallow" hypothesis: KARC's Chebyshev basis can't fit periodic data regardless of K).
+
+Two `WelfordMse` accumulators + sigmoid confidence + cold-start floor. **Revised from variance-only to MSE (variance + bias²)** after Plan 514 surfaced the failure mode where a consistently-biased forecaster has variance 0 but large error. Implies `karc_forecaster` (the gate routes to KARC) + `conformal_predictive_intervals` (the floor the gate routes to in the periodic regime and during cold-start).
+
+| Gate | Target | Result | Verdict |
+|------|--------|--------|---------|
+| **G1** | KARC ≥95% ticks on Lorenz-63; Seasonal ≥95% on period=12; mix ≤5% | PASS (Plan 514 Phase 1) | ✅ PASS |
+| **G2** | `decide()` ≤ 50 ns/call | 37 ns median | ✅ PASS |
+| **G3** | enabling gate does not perturb KARC forecasts | bit-identical (conformal_karc_no_regression.rs) | ✅ PASS |
+| **G4** | 0 allocs/100 calls | 0 allocs | ✅ PASS |
+
+**Runtime integration gain (riir-ai Plan 514 Phase 1):** G1 PASS — **92.45% MAE reduction** on mixed-regime NPC corpus (synthetic). G2 ~at-budget — 89 ns/tick. Pure modelless (two Welford accumulators + sigmoid).
+
+**Why opt-in.** Primitive-level GOAT PASS + positive synthetic-corpus runtime gain. Stays opt-in pending a production-corpus gain measurement.
+
+🔧 Feature flag: `karc_regime_gate` (implies `karc_forecaster` + `conformal_predictive_intervals`) — **opt-in**.
+
+📖 Plan: [`.plans/556_karc_mitigations_open_primitives.md`](../../.plans/556_karc_mitigations_open_primitives.md), Benchmark: [`.benchmarks/556_karc_mitigations_goat.md`](../../.benchmarks/556_karc_mitigations_goat.md), Companion runtime: [`riir-ai/.plans/514_karc_mitigations_runtime.md`](../../riir-ai/.plans/514_karc_mitigations_runtime.md).
+
+### 24.4 Batched MatVec — `karc_batched_matvec` (Plan 556 Phase 2)
+
+SIMD-batched forecast across N forecasters of identical (D, M, K) shape. Crowd-scale perf primitive: amortizes memory bandwidth by laying out N `Wout` matrices contiguously and hoisting the per-output-row `simd::simd_matvec` call across the batch. Ships `KarcBatchForecaster` + `karc_batched_matvec_into`.
+
+**G2 partial PASS (architectural finding).** Pure-matvec amortizes well, but full-forecast amortization does NOT materialize because `feature_expand` dominates the per-forecast cost.
+
+| N | pure_matvec | batched_forecast_full | sequential_baseline | matvec amortization | full amortization |
+|---|---|---|---|---|---|
+| 1 | 104 ns | 408 ns | 411 ns | 1.0× | 1.0× |
+| 8 | **815 ns** | **3.42 µs** | **3.33 µs** | **4.0×** | **0.97×** |
+| 32 | 3.77 µs | 13.6 µs | 14.8 µs | **7.0×** | 1.09× |
+
+The original G2 target (5.3× full-forecast amortization at N=8) assumed the matvec was the dominant cost. Measurement showed it's only ~25% — `feature_expand` is ~75% (delay state → ψ basis expansion, per-NPC, not amortizable by the batched matvec).
+
+**Architectural redirect (Plan 514 Phase 3).** The right consumer for this primitive is cell-shared-KARC + per-NPC latent_functor deviation — ONE feature_expand per cell, batched matvec across N NPC Wouts — not per-NPC-Wout batching. A future `feature_expand_batched` primitive could also close the gap.
+
+🔧 Feature flag: `karc_batched_matvec` (implies `karc_forecaster`) — **opt-in**.
+
+📖 Plan: [`.plans/556_karc_mitigations_open_primitives.md`](../../.plans/556_karc_mitigations_open_primitives.md), Benchmark: [`.benchmarks/556_karc_mitigations_goat.md`](../../.benchmarks/556_karc_mitigations_goat.md), Companion runtime: [`riir-ai/.plans/514_karc_mitigations_runtime.md`](../../riir-ai/.plans/514_karc_mitigations_runtime.md).
+
+### 24.5 LOD Tier — `karc_lod_tier` (Plan 556 Phase 3)
+
+Config tag + tier-promotion Wout projection. Three nested tiers (LOD0 background D=8/M=4/K=2 d_h=64 / LOD1 midground D=8/M=8/K=4 d_h=256 / LOD2 hero D=8/M=8/K=8 d_h=512) map to different `KarcForecaster` const-generic monomorphizations. The nested-subset structure (LOD0 features are a strict prefix of LOD1; LOD1 of LOD2) makes tier promotion a pure index remap — down-tier preserves surviving Wout columns bit-identically; up-tier zero-fills new columns.
+
+| Gate | Target | Result | Verdict |
+|------|--------|--------|---------|
+| **G1** | tier promotion preserves surviving Wout columns bit-identically | bit-identical | ✅ PASS |
+| **G2** | tier promotion ≤ 10 µs (one-time) | worst-case 831 ns (Lod1→Lod2 release) | ✅ PASS |
+| **G3** | default (LOD1) path unchanged | bit-identical | ✅ PASS |
+| **G4** | per-tick dispatch zero-alloc | 0 allocs/tick | ✅ PASS |
+
+**Config revision (load-bearing).** Lod2 ships as (D=8, M=8, K=8, R=1) → d_h=512, NOT the plan's original (8, 8, 8, 2) → d_h=18_720. The plan's figure doesn't math out (8·8·8·2 = 1024, not 18_720). R=2 promotion-gate config (the real d_h=18_720 from Issue 185/186/187) deferred — pair-product features break the nested-subset invariant.
+
+**Runtime integration — honest split verdict (riir-ai Plan 514 Phase 2).** The primitive itself is correct (G1-G4 all PASS). The runtime integration's G2 has a split verdict:
+
+| Scale | Savings | Verdict |
+|---|---|---|
+| **1k NPCs (production scale)** | 14.7% (re-validated 2026-07-20), 5.3× headroom | ✅ PASS |
+| **10k NPCs (crowd scale)** | 4.9% | ❌ FAIL |
+
+**Root cause of the 10k FAIL.** 10k-NPC state (~20 MB) exceeds L3 cache, so memory bandwidth dominates and the compute savings vanish. The dormant-Lod1 memory overhead cancels Lod0's 4× compute advantage at crowd scale. LOD is a **per-node compute optimization, not a per-cluster one** — 10k+ NPC scale belongs in a **sharding layer** (across game-server nodes). **The sharding substrate landed 2026-07-25** at `riir-engine/src/npc_shard.rs` (feature `npc_shard`); Issue 556 POC confirmed single-process sharding is ruled out (22% regression vs flat 10k) and multi-node distribution is required — see `riir-ai/.benchmarks/556_npc_shard_goat.md`. Plan 514 Phase 3/4 G2 targets revised from "10k NPCs on a single node" to "1k NPCs per shard".
+
+**Why opt-in.** Primitive-level GOAT PASS + 1k-scale runtime PASS. Stays opt-in until either a pure-enum redesign (breaks `forecaster()` API) or a positive gain on a smaller-scale corpus.
+
+🔧 Feature flag: `karc_lod_tier` (implies `karc_forecaster`) — **opt-in**.
+
+📖 Plan: [`.plans/556_karc_mitigations_open_primitives.md`](../../.plans/556_karc_mitigations_open_primitives.md), Benchmark: [`.benchmarks/556_karc_mitigations_goat.md`](../../.benchmarks/556_karc_mitigations_goat.md), Runtime bench: [`riir-ai/.benchmarks/514_karc_lod_dispatch_goat.md`](../../riir-ai/.benchmarks/514_karc_lod_dispatch_goat.md), Sharding substrate + POC verdict: [`riir-ai/.benchmarks/556_npc_shard_goat.md`](../../riir-ai/.benchmarks/556_npc_shard_goat.md) (`riir-engine/src/npc_shard.rs`, feature `npc_shard`).
+
+## 25. katgpt-canon — Canonical Intent Space Substrate (Proposal 009, Research 459)
+
+**The crate.** `katgpt-canon` ships the `CanonicalIntent { tag, direction }` type + the `ModelAdapter` trait + three concrete adapters behind independent feature gates. The crate depends on `katgpt-core` (for SVD) and `katgpt-spectral` (for Procrustes) — both already in-tree; the crate itself is `publish = true` (crates.io-ready, MIT).
+
+| Adapter | Feature | Math | G1/G2/G4 verdict (Bench 562) |
+|---|---|---|---|
+| `ProcrustesAdapter` | `canon` | Orthogonal Procrustes rotation `R` (from `orthogonal_procrustes`); `project_into` = `R·h` | G1 residual 0.0000% / round-trip 4.47e-8 / BLAKE3-deterministic; **G2 d=256 16.17µs** ≤ 50µs (post-SIMD, was 29µs); G4 0 allocs hot path. ⚠️ **d=2304 diagnostic = 1.328ms** (O(d²), NOT gated against 50µs — setup-time use only). |
+| `SubspaceAdapter` | `canon_subspace` | Joint SVD `M=[A\|B] = UΣV^T`, top-k right singular vectors define the shared subspace; `project_into` = `V_k^T·h` | G1 fit shapes + no-NaN + held-out mean cos 0.257 (frac positive 0.78); **G2 k=4 d_b=1536 417ns** ≤ 50µs; G4 0 allocs. **Carries the load-bearing Bench 423 G5 GO at k∈{2,4}** (mean cosine +0.87/+0.75 on Gemma↔MiniCPM real weights). |
+| `MaskAdapter` | `canon_mask` | Elementwise mask application (lottery ticket *apply*, not discovery); `project_into` = `mask ⊙ h` | G1 all-ones identity + half-zero preserve; **G2 d=2304 1.38µs** ≤ 50µs; G4 0 allocs. Discovery routes to riir-train per Research 459 §1.3. |
+
+**All 17 GOAT sub-gates PASS** (Bench 562, 2026-07-28). The 8-wide FMA dot product SIMD optimization (commit `e5efd20e`) cut the d=256 Procrustes hot path 29→16µs and the d=2304 diagnostic 3.9→1.3ms (2.9× from the 8-wide accumulator pattern, mirroring `dot_8wide` in katgpt-attn-match).
+
+**Why opt-in despite GOAT PASS.** The cross-arch Super-GOAT headline (Proposal 009's "plug-and-play any base model") was **permanently demoted** after four hidden-state construction methods failed the G6 cross-architecture discrimination gate (Bench 424/425/426/427, see `negative_results.md` §15). The substrate is useful (intra-arch snapshot swap, cross-arch ALIGNMENT preservation) but no longer the headline selling point. Promotion to default-on would require a new proposal re-arguing the value proposition post-demotion.
+
+**Known limitation (honest).** `ProcrustesAdapter::project_into` at production model dim (d=2304, Gemma2-2B) is 1.328ms — O(d²) scaling, **not gated against the 50µs target**. The theoretical SIMD floor at d=2304 is ~220µs (5.3M flops / 8-wide AVX2 FMA / 3 GHz); even perfect SIMD can't hit 50µs. The 50µs G2 floor applies to the per-direction-per-tick hot path — that's SubspaceAdapter (O(d·k), k≪d) and MaskAdapter (O(d)). ProcrustesAdapter's use case is same-arch snapshot swap, a setup-time operation where 1.3ms is acceptable.
+
+🔧 Feature flags: `canon`, `canon_subspace`, `canon_mask` (independent, default-off). Crates: `katgpt-canon`.
+
+📖 Proposal: [`.proposals/009_canonical_intent_space.md`](../../.proposals/009_canonical_intent_space.md), Research: [`.research/459_canonical_intent_space_plug_and_play.md`](../../.research/459_canonical_intent_space_plug_and_play.md) (CLOSED), Benchmark: [`.benchmarks/562_katgpt_canon_goat.md`](../../.benchmarks/562_katgpt_canon_goat.md), Cross-arch demotion: [`negative_results.md`](negative_results.md) §15, Non-hidden-state follow-up: [`.proposals/010_non_hidden_state_canonical_construction.md`](../../.proposals/010_non_hidden_state_canonical_construction.md) (draft).
+
+## 26. SipIt Transformer Inversion (Plan 561, arxiv 2510.15511)
+
+**The primitive.** `invert_sequence` recovers the discrete input tokens `x ∈ V^T` from a transformer's observed hidden states `h̆_t` at positions `t ∈ [0, T)` — the inversion that Nikolaou et al. (ICLR 2026) prove is well-posed under the paper's injectivity theorem. Two policies: `RandomPolicy` (uniform-without-replacement enumeration, the paper's baseline) and `GradientGuidedPolicy` (paper Alg 3 — proxy hidden state + finite-difference gradient descent + periodic vocab projection + random fallback).
+
+**Phases 1-4 DONE (2026-07-26), Phase 5 awaiting consumer.** G1-G4 PASS on the toy 2-layer GELU transformer (d=16, |V|=32, T=8):
+
+| Gate | Target | Result |
+|---|---|---|
+| **G1** correctness | 8 random prompts recover exactly; Lemma D.2 causality; corrupted-observed rejects | 3/3 sub-tests PASS (20 unit tests green) |
+| **G2** perf | random policy ~linear in \|V\|; gradient-guided fewer acceptance tests | random 37→130→1375µs/pos for \|V\| 32→128→512 (linear); **grad-guided 317 vs random 1075 acceptance tests across 64 positions (70.5% reduction, 3.4×)** |
+| **G3** no-regression | default features unchanged | 1814 lib tests pass (zero leak behind feature gate) |
+| **G4** alloc-free | hot path zero per-trial allocs | per-call 2 allocs (random) / 5 (grad); steady-state 10× per-call = no per-trial leak |
+| **Phase 4 robustness** | Theorem 3.2 perturbation guarantee | recovery holds below `Δ_π/2` noise; degrades above; margin strictly positive on random init |
+
+**The honest toy-scale caveat.** Gradient-guided sub-linear scaling in |V| (the paper's <0.25%·|V| claim for |V|≥32K) is **NOT validated on the toy** — the numerical finite-difference gradient dominates latency at d=16 (O(D) forward evals per step × 200 steps). Validating the paper's regime requires a real transformer (GPT-2/Llama) with an analytical gradient (1 fwd + 1 bwd ≈ 2× fwd cost) + |V| ≥ 32K. The toy proves the mechanism is correct + the strict-improvement A/B holds; it cannot prove the production latency/speedup tradeoff.
+
+**The 1/sqrt(D) vs 1.0 weight-scale lesson (load-bearing for reproducibility).** Phase 1 used standard stable-training scale `1/sqrt(D)` — GELU saturates near the origin, the Jacobian is effectively zero, the loss landscape is flat, gradient steps move the proxy <0.1 units. Phase 2 uses `new_scaled(rng, 1.0)` explicitly — the Jacobian becomes well-conditioned, gradient norm ~700 (clipped to 1.0), proxy converges within ~20 steps. This is a **substrate-scale correction**, not hyperparameter tuning — real transformers (GPT-2, LLaMA) have weights large enough that the Jacobian is well-conditioned at `1/sqrt(D)` because they have many more layers and much larger D.
+
+**Why opt-in.** No consumer wired yet (grep verified: zero `transformer_inversion` consumers across all 7 repos). The primitive is research infrastructure for transparency/audit tooling on standard text transformers — the open adoption hook. Phase 5 (T5.1) awaits a concrete consumer (e.g. a speculative-decode audit mode, or a transparency feature in riir-ai). If no consumer materializes within ~3 months, it stays parked as opt-in research infrastructure (T5.2, re-evaluate 2026-10-26).
+
+**Rejected fusions (do NOT re-add without amending Plan 561).** Applying SipIt to HLA per-NPC state (HLA is a sigmoid-bounded kernel, not a text transformer — theorem doesn't transfer); activation-based sync compression (sync already commits 32-byte hash; transmitting activations is 96× bandwidth increase); lossless activation hashing (theorem is measure-zero over parameters, not bit-exact over f32); cold-tier prompt re-hydration (SipIt needs model weights + per-position matrix; activations are 15-1000× larger than prompts); transmitting compact h for quorum audit (violates the sync-boundary rule — sync scalars, not embeddings).
+
+🔧 Feature flag: `transformer_inversion` (in katgpt-core, default-off); `grad_policy` adds the gradient-guided driver.
+
+📖 Plan: [`.plans/561_transformer_inversion_sipit_open_primitive.md`](../../.plans/561_transformer_inversion_sipit_open_primitive.md), Research (Gain-Redirects cross-refs): [`.research/158_MUX_Multiplexed_Latent_Reasoning.md`](../../.research/158_MUX_Multiplexed_Latent_Reasoning.md) + [`.research/232_Task_Relevant_Identifiability_Specialist.md`](../../.research/232_Task_Relevant_Identifiability_Specialist.md) + [`.research/244_Self_Evolver_Faithfulness_Cognitive_Integrity.md`](../../.research/244_Self_Evolver_Faithfulness_Cognitive_Integrity.md), Paper: [arXiv:2510.15511](https://arxiv.org/abs/2510.15511), Reference impl: <https://github.com/giorgosnikolaou/SIPIT>, Bench: `crates/katgpt-core/benches/bench_561_inversion_goat.rs`.
+
+## 27. LatentConfounderAudit — CD-LAM §III-B Diagnostics (Issue 194, arxiv 2607.09185)
+
+**The primitive.** Three modelless diagnostics distilling Wei et al. 2026 (*Causally Debiased Latent Action Model*, CD-LAM §III-B + Appendix A) — the confounder-purity audit that any direction-vector consumer (MAG/TILR/LatentFieldSteering/CommittedFieldBlend) can run before deploying a mined or constructed direction:
+
+| Diagnostic | Formula | Clean value | What it tests |
+|---|---|---|---|
+| Zero-transition response | `R₀ = RMS(‖E(x, x)‖) / D` | ≈ 0 | No-op input pair should produce near-zero latent |
+| Shift-invariance response | `R_shift = RMS(‖E(x, T(x))‖) / D` | ≈ 0 | Nuisance transform should produce near-zero latent |
+| Shortcut leakage | `mean_cos(diff-action) − mean_cos(same-action)` | < 0 | Action similarity should dominate context similarity |
+
+Where `D = RMS(‖E(x, x′)‖) + ε` over ordinary transitions. `LatentConfounderAudit::audit_confounders_into` takes a pre-allocated `AuditScratch`; the convenience `audit_confounders` wraps it. The encoder API is `Fn(&[f32], &[f32], &mut [f32])` — output buffer as 3rd arg, sidestepping HRTB lifetime issues.
+
+**G1-G4 PASS modellessly (Bench 194, 2026-07-28).** 12 unit tests + 1 doctest on a synthetic encoder `E(x,x') = A(x,x') + c·confounder(x)` with known confounder coefficient `c`. Clean (c=0): R₀<1e-5, R_shift<1e-5, L<0. Confounded (c=2.0): R₀>0.1, R_shift>0.1, L>-0.5. Monotone across c∈{0, 0.5, 1, 2, 5} — the audit is a quantitative purity score, not just binary pass/fail.
+
+| Gate | Target | Result |
+|---|---|---|
+| **G1** correctness | monotone in c; 12 tests | ✅ PASS |
+| **G2** perf | sub-µs at HLA d=8 | **292 ns/call** at d=8 (3.4× under 1µs); d=32 = 750ns; d=64 = 1.38µs |
+| **G3** no-regression | feature-gated, no existing code touched | 1814 → 1814 default; +12 with feature on |
+| **G4** alloc-free | zero steady-state | 0 allocs / 100 audit calls (TrackingAllocator sentinel-verified) |
+
+**What this does NOT prove (honest).** (1) Does not prove the audit catches real bugs in production-mined direction vectors — the G1 synthetic encoder has a known injected confounder; real mined directions (MAG/TILR/Steering/Blend) could have subtler confounders the diagnostics miss. (2) The "Report the Floor" rule (Research 322 / Plan 340) does NOT apply — the three metrics are raw geometric measurements (norm ratios, cosine gaps), NOT probabilities / confidence scores / predictive intervals; no distributional claim. (3) Does not prove a quality gain in a downstream consumer.
+
+**Why opt-in.** Diagnostic primitive, not a capability. Promotion to default-on requires a concrete consumer (MAG/TILR/Steering/Blend) benchmarking a real-bug-caught gain (fewer misconfigured directions deployed). No consumer has adopted the audit yet. Re-opens when a consumer adopts + demonstrates a real-bug-caught gain. The CD-LAM training recipe (`L_emb + L_ctr + L_cal` + three-stage fine-tuning) is genuinely gradient-descent → routes to riir-train if a video world model or analogous training system is built.
+
+**The false-PASS correction (documented for future maintainers).** The initial research verdict on CD-LAM was PASS; that was revised to Gain after honest re-review — the diagnostic FRAMEWORK is a real gain (3 modelless metrics + the encoder API contract), but the original PASS implied the primitives shipped CD-LAM's debiasing capability, which they do not (that's training-side, routes to riir-train). The bench file is the durable home of the GOAT verdict; the issue file was removed per noise-reduction rule.
+
+🔧 Feature flag: `latent_confounder_audit` (in katgpt-core, default-off).
+
+📖 Issue (removed, bench is durable home): [`.benchmarks/194_latent_confounder_audit_goat.md`](../../.benchmarks/194_latent_confounder_audit_goat.md), Research: [`.research/460_CD_LAM_Latent_Confounder_Audit_Diagnostics.md`](../../.research/460_CD_LAM_Latent_Confounder_Audit_Diagnostics.md), Paper: [arXiv:2607.09185](https://arxiv.org/abs/2607.09185), Bench: `crates/katgpt-core/benches/bench_194_latent_confounder_audit_goat.rs`.
+
+## 28. EventLog Query Combinator — PRO-LONG Programmatic Search (Plan 562, arxiv 2607.20064)
+
+**The primitive.** A deterministic query combinator over the existing `EventLog<A>` append-only event log (Plan 124). Distills PRO-LONG's load-bearing finding (Table 1): programmatic tools (grep + Python) account for +15.2 of the +18.1 gain on ARC-AGI-3 — the access pattern (search-at-read-time, decide-nothing-at-write-time) is the value, independent of the LLM that instantiates it. This primitive ships the **pattern-based search axis** (grep/regex/predicate analog) as a modelless, zero-allocation, composable API on top of the lossless log substrate.
+
+Ships:
+- `EventPredicate<A>` trait (object-safe, `Debug` supertrait) — the escape-hatch seam for consumer-defined predicates.
+- `Predicate<A>` enum: `EventTypeIs` / `EventTypeIn` / `IdRange` / `IdRangeFrom` / `And` / `Or` / `Not` / `All` / `None_` / `Custom(Box<dyn EventPredicate<A>>)`. Constructor helpers: `event_type(t)` / `id_range(lo, hi)` / `id_range_from(from)` / `.and(...)` / `.or(...)` / `!pred` (via `std::ops::Not`) / `custom(p)`.
+- `EventLog::filter(&self, &Predicate<A>) -> impl Iterator<Item = &Event<A>>` — lazy, zero-alloc. The direct "grep the log" analog.
+- `EventLog::query_window(&self, Range<EventId>, Option<EventType>) -> impl Iterator` — contiguous slice + optional type filter. Sub-µs by construction.
+- `EventLog::count_where(&self, &Predicate<A>) -> usize` — the `grep -c` analog.
+- `EventLog::first_where` / `last_where(&self, &Predicate<A>) -> Option<&Event<A>>` — early-exit (`find` / `rfind`).
+
+**G1–G4 PASS (Bench 564, 2026-07-29) — ship-quality gate, NOT promote-to-default.**
+
+| Gate | Target | Result |
+|---|---|---|
+| **G1** correctness | 13 predicate combinations on a 100-event deterministic log | ✅ PASS — all 13 (EventTypeIs, count_where All/None_, first/last_where, query_window ±type filter, And, Or, Not, Custom payload>500) |
+| **G2** perf | sub-µs / sub-100ns per operation | ✅ PASS — `filter` **4.99 ns/result-event** (200× under 1µs), `query_window` **0.46 ns/call** (217× under 100ns), `first_where`/`last_where` **4.04 / 5.71 ns** (24× / 17× under 100ns) |
+| **G3** no-regression | feature-off build clean, Plan 124 API unchanged | ✅ PASS — `existing_api_unchanged` unit test; purely additive `impl EventLog` block gated `#[cfg(feature = "event_log_query")]` |
+| **G4** alloc-free | zero steady-state allocation | ✅ PASS — filter collect capacity stable (512→512 across 1000 iterations); count/first/last/query_window zero-alloc by construction (lazy iterators / early-exit / slice) |
+
+**Why opt-in.** This is a **ship-quality gate**, not a promote-to-default gate. Per the Gain-tier verdict (Research 461), the feature is a missing capability (the programmatic-search axis did not ship), not a measurable improvement over an existing approach — there is no incumbent query API on `EventLog` to beat (only `iter()`). Promotion to default-on requires a downstream consumer to prove a measurable gain over the no-query baseline. The three trigger conditions (Plan 562 Phase 3):
+- **T3.1** riir-engine per-NPC cognition (CLR vote accuracy, KARC forecast skill, consolidation quality) — opens a riir-ai plan for the latent-predicate bridge.
+- **T3.2** riir-neuron-db Raven/δ-Mem consolidation pipeline ("find all events matching P in last N ticks" quality/latency gain) — opens a riir-neuron-db plan.
+- **T3.3** katgpt-pruners MCTS planner (`filter` for "find all evaluations matching P" search-efficiency gain) — opens a katgpt-rs plan.
+- **T3.4** If any of T3.1–T3.3 pass → promote `event_log_query` to default features.
+
+**Why this is Gain-tier, not GOAT-tier.** The gain is a missing feature, not a measurable improvement. The three retrieval axes (pattern / semantic / content-addressed) are orthogonal: the pattern axis (this primitive) composes with the semantic axis (`experience_graph` latent-seeded NS traversal, riir-neuron-db) and the content-addressed axis (`Engram` hash→slot) at the consumer layer via `Predicate::Custom`.
+
+**The PRO-LONG Table 1 finding (load-bearing for this distillation).** Programmatic tools (grep + Python) drive +15.2 of the +18.1 gain on ARC-AGI-3; Write/Edit adds only +2.9. The value is in the log + programmatic search, not in self-authored notes (clearing the workspace every call costs PRO-LONG only 0.5 points). This primitive ships the deterministic analog of the grep/Python search axis — no LLM in the loop.
+
+🔧 Feature flag: `event_log_query` (in katgpt-pruners, default-off; implies `event_log`). Root forwards via `event_log_query = ["katgpt-pruners/event_log_query"]`.
+
+📖 Plan: [`.plans/562_event_log_query_combinator.md`](../../.plans/562_event_log_query_combinator.md), Research (Gain): [`.research/461_PRO_LONG_Programmatic_Memory_Log_Search.md`](../../.research/461_PRO_LONG_Programmatic_Memory_Log_Search.md), Paper: [arXiv:2607.20064](https://arxiv.org/abs/2607.20064) PRO-LONG (Fox et al., Duke, 2026-07-23), Bench: [`.benchmarks/564_event_log_query_goat.md`](../../.benchmarks/564_event_log_query_goat.md) (numbered 564 not 562 — `.benchmarks/562` was already allocated to `katgpt-canon`), Substrate: `crates/katgpt-pruners/src/event_log.rs`, Example: `crates/katgpt-pruners/examples/event_log_query_basic.rs`.

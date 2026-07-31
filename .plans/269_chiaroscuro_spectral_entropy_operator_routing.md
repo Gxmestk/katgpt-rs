@@ -34,7 +34,7 @@ src/chiaroscuro/
 ```
 
 Composed with existing infra (no duplication):
-- Reuses `rustfft` (from `flow/fft.rs`), `simd` helpers, `WelfordVariance` (from reward_calibrator), `SpectralQuant` storage mechanics, `StillKV` f16 storage, `BreakevenBandit` cost matrix.
+- Reuses `rustfft` (from `crates/katgpt-core/src/flow/fft.rs`), `simd` helpers, `WelfordVariance` (from reward_calibrator), `SpectralQuant` storage mechanics, `StillKV` f16 storage, `BreakevenBandit` cost matrix.
 
 ---
 
@@ -42,19 +42,19 @@ Composed with existing infra (no duplication):
 
 ### Phase 1: Foundation — Per-Token Spectral Entropy + Streaming τ
 
-- [x] **T1:** Create `src/chiaroscuro/mod.rs` — module root, public API, feature gate
-- [x] **T2:** Create `src/chiaroscuro/entropy.rs` — `spectral_entropy_dct()` and zero-alloc variant
-  - Type-II DCT via `rustfft` (mirroring `flow/fft.rs` pattern)
+- [x] **T1:** Create `crates/katgpt-attn/src/chiaroscuro/mod.rs` — module root, public API, feature gate
+- [x] **T2:** Create `crates/katgpt-attn/src/chiaroscuro/entropy.rs` — `spectral_entropy_dct()` and zero-alloc variant
+  - Type-II DCT via `rustfft` (mirroring `crates/katgpt-core/src/flow/fft.rs` pattern)
   - SIMD-accelerated sum-of-p log p
   - Bounded to [0, 1] via `log d` normalization
-- [x] **T3:** Create `src/chiaroscuro/tau.rs` — streaming τ_lo / τ_hi calibration
+- [x] **T3:** Create `crates/katgpt-attn/src/chiaroscuro/tau.rs` — streaming τ_lo / τ_hi calibration
   - Initially tried P² algorithm — single-marker variant drifted, switched to sorted sliding window (correct + fast enough)
   - Configurable window size (default 256)
   - Initial values: τ_lo=0.855, τ_hi=0.865 (paper's cluster midpoint)
 
 ### Phase 2: Fusion A — CHIAR-KV Cache Strategy
 
-- [x] **T4:** Create `src/chiaroscuro/kv.rs` — `ChiaroscuroKv` storage strategy enum
+- [x] **T4:** Create `crates/katgpt-attn/src/chiaroscuro/kv.rs` — `ChiaroscuroKv` storage strategy enum
   - Variants: `DctTruncated { n_coeffs }`, `Quantized { bits }`, `FullPrecision`
   - `decide(key_embedding, tau_lo, tau_hi) -> ChiaroscuroKv`
 - [x] **T5:** DCT-truncated storage format spec (compression_ratio formula + DEFAULT_DCT_TRUNCATED_COEFFS=32)
@@ -66,7 +66,7 @@ Composed with existing infra (no duplication):
 
 ### Phase 3: Fusion B — ChiaroscuroOp Trait + Router
 
-- [x] **T7:** Create `src/chiaroscuro/op_trait.rs` — `ChiaroscuroOp` trait
+- [x] **T7:** Create `crates/katgpt-attn/src/chiaroscuro/op_trait.rs` — `ChiaroscuroOp` trait
   - `entropy_lo()`, `entropy_hi()`, `relative_cost()`, `forward_token()`, `name()`
 - [x] **T8:** Implement `ChiaroscuroRouter` — per-token op selection
   - Hard threshold gate (no STE — modelless)
@@ -77,14 +77,14 @@ Composed with existing infra (no duplication):
 
 ### Phase 4: Fusion C — CollapseDiscoveryHarness
 
-- [x] **T10:** Create `src/chiaroscuro/collapse.rs` — harness
+- [x] **T10:** Create `crates/katgpt-attn/src/chiaroscuro/collapse.rs` — harness
   - Sliding window + utilization entropy U
   - Survivor detection + zero-utilization demotion candidates
 - [x] **T11:** `OpPromotion` recommendation struct + `check_collapse()` + `current_snapshot()`
 
 ### Phase 5: Fusion D — ChiarRegimeGate
 
-- [x] **T12:** Create `src/chiaroscuro/regime.rs` — naturalistic gate
+- [x] **T12:** Create `crates/katgpt-attn/src/chiaroscuro/regime.rs` — naturalistic gate
   - Welford variance + sigmoid-smoothed AND gate
   - Returns `should_apply_chiar() -> bool` (true iff long AND high-variance)
 
@@ -92,7 +92,7 @@ Composed with existing infra (no duplication):
 
 - [x] **T13:** Feature flag `chiaroscuro` in `Cargo.toml` (opt-in, GOAT-proven)
 - [x] **T14:** Module declaration in `src/lib.rs`
-- [x] **T15:** Integration hook into `InferenceRouter` — `ChiarRouterHook` added to `src/chiaroscuro/mod.rs`, wired into `InferenceRouter` behind `#[cfg(feature = "chiaroscuro")]`. Exposes `observe_chiar_key()`, `observe_chiar_prompt_token()`, `chiar_stats()` methods + `RouterStats.chiar_stats` field. Observation-only (does NOT influence tier routing). 3 integration tests pass.
+- [x] **T15:** Integration hook into `InferenceRouter` — `ChiarRouterHook` added to `crates/katgpt-attn/src/chiaroscuro/mod.rs`, wired into `InferenceRouter` behind `#[cfg(feature = "chiaroscuro")]`. Exposes `observe_chiar_key()`, `observe_chiar_prompt_token()`, `chiar_stats()` methods + `RouterStats.chiar_stats` field. Observation-only (does NOT influence tier routing). 3 integration tests pass.
 - [x] **T16:** Cross-feature composition documented (orthogonal to kvarn, spectral_quant, still_kv, vortex_flow)
 
 ### Phase 7: Tests, Examples, GOAT Proof
@@ -144,7 +144,7 @@ If GOAT fails:
 
 ### Pre-existing build issue (not CHIAR's fault)
 
-`src/newton_schulz.rs:466` has a borrow-checker error introduced by Plan 270 WIP (`ns_inv_sqrt_psd_into`). When `p_cur` aliases `scratch.p_sq`, the `matmul_symmetric(p_cur, r, &mut scratch.p_sq[..rr])` call violates the aliasing rules. This blocks `cargo build` with default features. **CHIAR itself builds and tests cleanly** via `--no-default-features --features chiaroscuro`.
+`crates/katgpt-core/src/newton_schulz.rs:466` has a borrow-checker error introduced by Plan 270 WIP (`ns_inv_sqrt_psd_into`). When `p_cur` aliases `scratch.p_sq`, the `matmul_symmetric(p_cur, r, &mut scratch.p_sq[..rr])` call violates the aliasing rules. This blocks `cargo build` with default features. **CHIAR itself builds and tests cleanly** via `--no-default-features --features chiaroscuro`.
 
 ### P² algorithm abandoned
 

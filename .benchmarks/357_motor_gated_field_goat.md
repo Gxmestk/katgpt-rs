@@ -1,7 +1,7 @@
 # Plan 357 — Motor-Gated DEC Field GOAT Results
 
 **Date:** 2026-07-01 (G5 closed 2026-07-01 by grid-stencil fast path)
-**Primitive:** `evolve_motor_gated_field` (`katgpt-dec/src/motor_gated.rs`)
+**Primitive:** `evolve_motor_gated_field` (`crates/katgpt-dec/src/motor_gated.rs`)
 **Feature:** `motor_gated_field` (opt-in)
 **Bench:** `cargo bench -p katgpt-core --features motor_gated_field --bench bench_357_motor_gated_field_goat -- --nocapture`
 **Hardware:** macOS (Apple Silicon)

@@ -137,12 +137,7 @@ impl LoraEdge {
                     dot += g[i] * input_row[i];
                     i += 1;
                 }
-                if dot >= 0.0 {
-                    self.scale * (1.0 / (1.0 + (-dot).exp()))
-                } else {
-                    let e = dot.exp();
-                    self.scale * (e / (1.0 + e))
-                }
+                self.scale * katgpt_core::simd::fast_sigmoid(dot)
             }
         }
     }

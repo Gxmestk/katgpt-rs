@@ -170,13 +170,13 @@ Or simpler: just use `SimulatedVerifier { acceptance_rate: 0.80 }` as default (s
 
 ## Architecture Notes
 
-- All changes in `src/speculative.rs` — no new modules needed
+- All changes in `src/benchmark/speculative.rs` — no new modules needed
 - `SpeculativeVerifier` lives alongside `ConstraintPruner` in `speculative.rs` (same file, same pattern)
 - `dflash_predict_ar()` is additive — `dflash_predict()` stays for backward compat
 - `LeviathanVerifier` is fully implemented behind `#[cfg(feature = "leviathan")]` — real p/q rejection + residual + bonus token
 - `SimulatedVerifier` is the default used in benchmarks and production (no feature flag needed)
 - `sample_residual_distribution` and `sample_from_distribution` always compiled (shared math)
-- Benchmark changes in `src/benchmark.rs` — add `bench_speculative_ar` variant
+- Benchmark changes in `src/benchmark/mod.rs` — add `bench_speculative_ar` variant
 - `src/lib.rs` unchanged
 
 ## What We Are NOT Doing (and why)
@@ -218,5 +218,5 @@ When LoRA fine-tuning produces a draft model with high target alignment:
 | File | Changes |
 |------|---------|
 | `Cargo.toml` | Add `[features] leviathan = []` |
-| `src/speculative.rs` | Add `SpeculativeVerifier` trait, `SimulatedVerifier`, `LeviathanVerifier` (full impl), `dflash_predict_ar()`, `sample_residual_distribution()`, `sample_from_distribution()`, update `speculative_step` |
-| `src/benchmark.rs` | Add `bench_speculative_ar()` + `bench_leviathan()` (behind feature flag) |
+| `src/benchmark/speculative.rs` | Add `SpeculativeVerifier` trait, `SimulatedVerifier`, `LeviathanVerifier` (full impl), `dflash_predict_ar()`, `sample_residual_distribution()`, `sample_from_distribution()`, update `speculative_step` |
+| `src/benchmark/mod.rs` | Add `bench_speculative_ar()` + `bench_leviathan()` (behind feature flag) |

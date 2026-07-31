@@ -25,39 +25,39 @@ Goal: a compiling, tested, feature-gated module that implements the core AM algo
 - [x] **T1.1** Create `src/attn_match/` directory with empty `mod.rs`
 - [x] **T1.2** Add feature flag `attention_matching = []` to `katgpt-rs/Cargo.toml` features section (after `still_kv`)
 - [x] **T1.3** Add `#[cfg(feature = "attention_matching")] pub mod attn_match;` to `src/lib.rs` (alphabetical, after `alloc` or similar)
-- [x] **T1.4** Implement `src/attn_match/types.rs`:
+- [x] **T1.4** Implement `crates/katgpt-attn-match/src/types.rs`:
   - [x] `AmConfig` struct (compaction ratio, NNLS iters, OMP k/τ, solver choice, ridge λ, stability bounds)
   - [x] `AmResult` struct (Ck indices, β vec, Cv flat buffer, reconstruction error)
   - [x] `ScoreMethod` enum (Mean, Rms, Max)
   - [x] `KeySelector` enum/trait (HighestAttn, OMP, OmpFast)
   - [x] Re-export `still_kv::BetaBias` and `still_kv::CompactKVCache` for DRY reuse (deferred — types are independent for now, integration deferred to Phase 2+)
-- [x] **T1.5** Implement `src/attn_match/score_matrix.rs`:
+- [x] **T1.5** Implement `crates/katgpt-attn-match/src/score_matrix.rs`:
   - [x] `compute_score_matrix(queries, keys, inv_sqrt_d) -> Vec<f32>` (n×T flat f32)
   - [x] Max-shift stabilization inline (no allocation in hot loop)
   - [x] Chunked 8-wide loop for SIMD auto-vectorization
-- [x] **T1.6** Implement `src/attn_match/beta_fitter.rs` (NNLS):
+- [x] **T1.6** Implement `crates/katgpt-attn-match/src/beta_fitter.rs` (NNLS):
   - [x] `fit_beta_nnls(A: &[f32], m: &[f32], n, t, config) -> Vec<f32>` (returns β = log w)
   - [x] Projected gradient descent: `η = 1/L`, `L ≈ ||M||²` via power iteration (3 iters)
   - [x] Box constraints: `w_j ∈ [e^lo, e^hi]` (default lo=-3, hi=3 per Appendix C.2)
   - [x] Warm-start from clamped least-squares
-- [x] **T1.7** Implement `src/attn_match/value_fitter.rs` (Least Squares):
+- [x] **T1.7** Implement `crates/katgpt-attn-match/src/value_fitter.rs` (Least Squares):
   - [x] `fit_cv_least_squares(X: &[f32], Y: &[f32], n, t, d, config) -> Vec<f32>` (returns Cv flat)
   - [x] Normal equations `X^T X` and `X^T Y` (no allocation in hot loop)
   - [x] Cholesky decomposition with diagonal jitter fallback (λ=1e-6 if rank-deficient)
-- [x] **T1.8** Implement `src/attn_match/key_selection/highest_attn.rs`:
+- [x] **T1.8** Implement `crates/katgpt-attn-match/src/key_selection/highest_attn.rs`:
   - [x] `select_highest_attn_keys(K, queries, t, score_method) -> (indices, scores)`
   - [x] RMS aggregation (default), with mean and max as alternatives
   - [x] Top-t selection via partial sort (no full sort) — uses full sort for now, swap to partial_sort in Phase 2
-- [x] **T1.9** Implement `src/attn_match/key_selection/omp.rs`:
+- [x] **T1.9** Implement `crates/katgpt-attn-match/src/key_selection/omp.rs`:
   - [x] `select_omp_keys(K, queries, t, k, tau) -> (indices, weights)`
   - [x] Greedy selection with periodic NNLS refit (Algorithm 2)
   - [x] Mass feature matrix Φ construction
   - [x] Residual update
-- [x] **T1.10** Implement `src/attn_match/compact.rs` — top-level orchestrator:
+- [x] **T1.10** Implement `crates/katgpt-attn-match/src/compact.rs` — top-level orchestrator:
   - [x] `compact(K, V, queries, config) -> CompactKVCache`
   - [x] Pipeline: select Ck → fit β → fit Cv → wrap in AmResult
   - [x] Reconstruction error reporting (relative Frobenius)
-- [x] **T1.11** Write unit tests in `src/attn_match/tests.rs`:
+- [x] **T1.11** Write unit tests in `crates/katgpt-attn-match/src/tests.rs`:
   - [x] Synthetic test: known β recovery (||β − β_ref||_∞ < 0.1) → GOAT G1 ✅
   - [x] Synthetic test: Cv reconstruction (< 5% relative error) → GOAT G2 ✅
   - [x] OMP mass coverage test (residual < 5% of initial after t iters) → GOAT G3 ✅
@@ -88,7 +88,7 @@ Goal: size-aware and load-aware routing across CPU/SIMD/Rayon/GPU/ANE backends.
 
 ### Tasks
 
-- [x] **T2.1** Implement `src/attn_match/router.rs`:
+- [x] **T2.1** Implement `crates/katgpt-attn-match/src/router.rs`:
   - [x] `SolverRouterConfig` struct (cpu_max_t, simd_max_t, gpu_min_t, ane_max_t, hysteresis_pct)
   - [x] `SolverBackend` enum (CpuScalar, CpuSimd, CpuRayon, Gpu, Ane)
   - [x] `pick_backend(t: usize, T: usize, gpu_available: bool, config) -> SolverBackend`
@@ -132,20 +132,20 @@ Goal: per-head sensitivity curves + greedy swap solver, producing a model-specif
 
 ### Tasks
 
-- [x] **T3.1** Implement `src/attn_match/head_budget/curve.rs`:
+- [x] **T3.1** Implement `crates/katgpt-attn-match/src/head_budget/curve.rs`:
   - [x] `HeadSensitivityCurve` struct (head_id, ratios: Vec<f32>, deltas: Vec<f32>)
   - [x] Linear interpolation between measured points
   - [x] Smoothing (sliding window) optional *(not implemented — curves assumed pre-smoothed)*
-- [x] **T3.2** Implement `src/attn_match/head_budget/solver.rs`:
+- [x] **T3.2** Implement `crates/katgpt-attn-match/src/head_budget/solver.rs`:
   - [x] `HeadBudgetSolver::new(curves, num_layers, num_heads)`
   - [x] `solve(target_ratio) -> Vec<f32>` (per-head shares, sum=1)
   - [x] Greedy swap algorithm (Algorithm 4)
   - [x] Step size η configurable
-- [x] **T3.3** Implement `src/attn_match/head_budget/schedule.rs`:
+- [x] **T3.3** Implement `crates/katgpt-attn-match/src/head_budget/schedule.rs`:
   - [x] `HeadBudgetSchedule` struct (model_id, shares, version, blake3_hash)
   - [x] Serialize/deserialize via postcard (existing dep)
   - [x] BLAKE3 hash for tamper detection
-- [x] **T3.4** Implement `src/attn_match/head_budget/measure.rs`:
+- [x] **T3.4** Implement `crates/katgpt-attn-match/src/head_budget/measure.rs`:
   - [x] `measure_sensitivity_stub(num_heads) -> Vec<HeadSensitivityCurve>` *(stub — real impl in riir-ai)*
   - [x] Synthetic curves for testing (even=steep, odd=flat)
   - [x] Output: postcard-serialized `HeadBudgetSchedule` *(via example)*
@@ -176,7 +176,7 @@ Goal: support long contexts via per-chunk compaction.
 
 ### Tasks
 
-- [x] **T4.1** Implement `src/attn_match/chunked.rs`:
+- [x] **T4.1** Implement `crates/katgpt-attn-match/src/chunked.rs`:
   - [x] `ChunkedCompactor::new(chunk_size, overlap)`
   - [x] `compact_kv_based(full_kv, queries, config) -> ChunkedCompactOutput`
   - [x] `compact_text_based(chunks, queries_per_chunk, config) -> ChunkedCompactOutput`
@@ -211,7 +211,7 @@ Goal: compact mid-trajectory to support arbitrarily long generation.
 
 ### Tasks
 
-- [x] **T5.1** Implement `src/attn_match/online.rs`:
+- [x] **T5.1** Implement `crates/katgpt-attn-match/src/online.rs`:
   - [x] `OnlineCompactor::new(phys_budget, recent_window)`
   - [x] `maybe_compact(kv_keys, kv_values, queries, current_pos, d, n, config) -> Option<OnlineCompactResult>`
   - [x] Returns `Some` when `current_pos >= phys_budget + recent_window`, `None` otherwise
@@ -241,7 +241,7 @@ Goal: entropy-thresholded, bandit-tuned online compaction for thinking traces.
 
 ### Tasks
 
-- [x] **T6.1** Implement `src/attn_match/adaptive_cot.rs` (802 lines):
+- [x] **T6.1** Implement `src/attn_match_adaptive_cot.rs` (802 lines):
   - [x] `AdaptiveTraceCompactor` (composes `OnlineCompactor` + `FrequencyBandit`; ChainFolder has no trait so composition used instead of inheritance)
   - [x] Entropy monitoring via `observe_entropy(&[f32]) -> f32` — computes `H = -Σ p_i ln p_i` from logits, EMA-smoothed
   - [x] Thresholds: `theta_low` (compact when EMA entropy < low), `theta_high` (preserve when > high), `max_compacts` cap

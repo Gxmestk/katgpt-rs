@@ -9,9 +9,9 @@
 //!
 //! | Constraint | Method | Bound |
 //! |------------|--------|-------|
-//! | Velocity   | [`check_velocity`] | `distance / dt <= max_speed` |
-//! | Position   | [`check_position`] | position within `map_bounds` |
-//! | Kill rate  | [`check_kill_rate`] | Chebyshev: `kill_delta / dt <= μ + σ_bound × σ` |
+//! | Velocity   | `check_velocity` | `distance / dt <= max_speed` |
+//! | Position   | `check_position` | position within `map_bounds` |
+//! | Kill rate  | `check_kill_rate` | Chebyshev: `kill_delta / dt <= μ + σ_bound × σ` |
 
 use super::types::{ReconciliationConfig, TrajectoryPoint};
 use crate::ConstraintPruner;
@@ -21,7 +21,7 @@ use crate::ConstraintPruner;
 /// Hard-bound constraint pruner for game state trajectories.
 ///
 /// Wraps a [`ReconciliationConfig`] and a "previous" [`TrajectoryPoint`]
-/// for delta-based checks (velocity, kill rate). The trait method [`is_valid`]
+/// for delta-based checks (velocity, kill rate). The trait method `is_valid`
 /// performs a combined velocity + position check.
 ///
 /// # Design

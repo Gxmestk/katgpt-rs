@@ -274,7 +274,7 @@ ECHO proves that environment prediction capability **correlates with policy qual
 
 ## GOAT Gate
 
-Feature flag: `echo_env_predictor` (default-OFF until GOAT proof passes)
+Feature flag: `echo_env_predictor` (default-OFF until GOAT proof passes). *(Post-promotion update: GOAT PASS; `echo_env_predictor` is now DEFAULT-ON in root Cargo.toml default array.)*
 
 ### GOAT Proofs Required
 

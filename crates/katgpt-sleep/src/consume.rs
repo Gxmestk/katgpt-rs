@@ -164,9 +164,13 @@ where
     // Hoist `1.0 - gate` out of the blend loop (loop-invariant; LLVM usually
     // hoists it but explicit is guaranteed and clearer).
     let inv_gate = 1.0 - gate;
+    // `gate * z[j] + inv_gate * fresh[j]` written as `mul_add` to give LLVM
+    // an explicit FMA hint: `z[j].mul_add(gate, fresh[j] * inv_gate)` —
+    // one FMA + one MUL per element vs two MUL + one ADD. Auto-vectorizes
+    // to NEON `vfmla` / AVX2 `vfmadd` for D=8 (8 lanes of f32).
     let mut out = [0.0f32; D];
     for j in 0..D {
-        out[j] = gate * z[j] + inv_gate * fresh[j];
+        out[j] = z[j].mul_add(gate, inv_gate * fresh[j]);
     }
     out
 }

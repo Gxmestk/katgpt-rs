@@ -22,7 +22,7 @@ use super::types::SalienceDecision;
 /// Measured on a dev laptop via `benches/salience_tri_gate_bench.rs`
 /// (1024-call batched timing, median of 256 batches):
 /// - `decide()` latency: **9.11 ns** for D=8, 14.81 ns for D=16, 30.27 ns for D=32.
-///   Cf. the crate's reference hot-path kernel `evolve_hla` at ~14 ns for D=8 —
+///   Cf. the crate's reference hot-path kernel `evolve_belief` at ~14 ns for D=8 —
 ///   the two-sigmoid design adds ~5 ns (one extra dot-product) over a pure
 ///   single-sigmoid gate.
 /// - `decide_batch()` throughput: **120.6 M decisions/sec** for D=8, N=1000.
@@ -165,7 +165,7 @@ impl<A: Clone, const D: usize> SalienceTriGate<A, D> {
     ///
     /// # Parameters
     /// - `a`: activation vector (latent direction; the caller picks the
-    ///   space — HLA, CGSP embedding, etc.).
+    ///   space — belief, CGSP embedding, etc.).
     /// - `z`: zone-attention scalar (how much this NPC cares about the
     ///   current zone).
     /// - `c`: curiosity scalar.

@@ -13,7 +13,7 @@ MeMo validates our existing Raven RSM (O(1) retrieval) and G-Zero (multi-phase p
 ## Tasks
 
 - [x] T1: Add `memo_reflections` feature gate to `katgpt-rs/Cargo.toml`
-- [x] T2: Create `src/pruners/reflection.rs` with `ReflectionQA` struct and `synthesize_reflections()` skeleton
+- [x] T2: Create `crates/katgpt-pruners/src/reflection.rs` with `ReflectionQA` struct and `synthesize_reflections()` skeleton
 - [x] T3: Implement Step 1 (Fact Extraction) — direct + indirect extraction from game state sequences
 - [x] T4: Implement Step 2 (Consolidation) — merge related facts into multi-fact questions
 - [x] T5: Implement Step 3 (Verification) — self-containment check + rewrite
@@ -22,7 +22,7 @@ MeMo validates our existing Raven RSM (O(1) retrieval) and G-Zero (multi-phase p
 - [x] T8: Create `examples/bomber_13_reflection_qa.rs` — generate reflection QA from bomber replays
 - [x] T9: Create `examples/go_09_reflection_qa.rs` — generate reflection QA from Go replays
 - [x] T10: Add GOAT proof test in `tests/test_memo_reflections.rs`
-- [x] T11: Implement `ties_merge()` in `riir-ai/crates/riir-gpu/src/merging.rs` (or new crate)
+- [x] T11: Implement `ties_merge()` in `riir-train/crates/riir-train-engine/src/merging.rs` (or new crate)
 - [x] T12: Add `ties_merge` feature gate to riir-ai
 - [x] T13: Create merge benchmark example with compute saving estimate (≥30% verified)
 - [x] T14: Run clippy + tests, fix diagnostics
@@ -44,8 +44,8 @@ Our system already captures (1) via Raven RSM and (4) via G-Zero phases. The gap
 
 | Component | Location | Status |
 |-----------|----------|--------|
-| Freeze/Thaw pipeline | `src/pruners/freeze.rs` | ✅ Plan 092 complete |
-| Bandit knowledge arrays | `src/pruners/bandit.rs` | ✅ Working |
+| Freeze/Thaw pipeline | `crates/katgpt-pruners/src/freeze.rs` | ✅ Plan 092 complete |
+| Bandit knowledge arrays | `crates/katgpt-ruliology/src/bandit.rs` | ✅ Working |
 | Game replay data | `examples/bomber_*.rs`, `examples/go_*.rs` | ✅ Working |
 | LoRA export/load | `riir-ai/crates/riir-gpu` | ✅ Working |
 | GFlowNet distillation | `src/pruners/gflownet.rs` | ✅ Plan 052 |
@@ -200,7 +200,7 @@ pub fn ties_merge(
 }
 ```
 
-**Location:** `riir-ai/crates/riir-gpu/src/merging.rs` or new `riir-ai/crates/riir-merging/`
+**Location:** `riir-train/crates/riir-train-engine/src/merging.rs` or new `riir-ai/crates/riir-merging/`
 
 **Why in riir-ai:** Requires trained LoRA adapters from GPU training pipeline. `katgpt-rs` is inference-only.
 
@@ -236,7 +236,7 @@ Prove that TIES merging at ρ=0.3 produces usable merged adapter:
 ```
 
 **Pass criteria:**
-- [x] Merged adapter retains >70% of best individual adapter's quality per domain — ✅ Quality eval with 4 synthetic domain adapters (bomber, go, fft, mmo) at ρ=0.3: minimum cosine similarity 93.1% across all domains. Primary quality 98.1%, overlap quality 99.0%, magnitude retention 100%. Evaluation in `riir-ai/crates/riir-gpu/examples/ties_quality_eval.rs`.
+- [x] Merged adapter retains >70% of best individual adapter's quality per domain — ✅ Quality eval with 4 synthetic domain adapters (bomber, go, fft, mmo) at ρ=0.3: minimum cosine similarity 93.1% across all domains. Primary quality 98.1%, overlap quality 99.0%, magnitude retention 100%. Evaluation in `riir-train/crates/riir-train-engine/examples/ties_quality_eval.rs`.
 - [x] Compute saving ≥30% vs full retrain — ✅ TIES merge time ≪ union retrain time; compute saving ≥99% (merge-only) and varies by K. Benchmark asserts ≥30%.
 
 **Result: Both TIES merge criteria fully verified.** Quality eval (`ties_quality_eval`) + compute benchmark (`ties_merge_bench`) both pass. Synthetic adapters mirror real LoRA training structure: 25% primary specialization + 10% domain overlap. Real adapter training can use the same evaluation pipeline by swapping synthetic data for trained weights.
@@ -245,11 +245,11 @@ Prove that TIES merging at ρ=0.3 produces usable merged adapter:
 
 | File | Purpose |
 |------|---------|
-| `katgpt-rs/src/pruners/reflection.rs` | Reflection QA pipeline + types |
+| `katgpt-rs/crates/katgpt-pruners/src/reflection.rs` | Reflection QA pipeline + types |
 | `katgpt-rs/examples/bomber_13_reflection_qa.rs` | Bomber reflection QA demo |
 | `katgpt-rs/examples/go_09_reflection_qa.rs` | Go reflection QA demo |
 | `katgpt-rs/tests/test_memo_reflections.rs` | GOAT proof tests |
-| `riir-ai/crates/riir-gpu/src/merging.rs` | TIES merge implementation |
+| `riir-train/crates/riir-train-engine/src/merging.rs` | TIES merge implementation |
 
 ## Files to Modify
 

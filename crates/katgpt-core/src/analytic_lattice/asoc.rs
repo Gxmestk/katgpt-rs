@@ -11,7 +11,7 @@
 //! `RederiveOp::Fut` has NO bound at the trait level. The
 //! `GpuFuture<Output = TransportOperator>` bound is applied at the impl site
 //! in `riir-engine`. This keeps the leaf crate (`katgpt-core`) free of the
-//! `riir-gpu-async` dependency — adding it here would invert the 5-repo
+//! `riir-gpu-async` dependency — adding it here would invert the 7-repo
 //! commercial boundary (R311 §6: "Generic math, no game IP" stays in katgpt-rs).
 //!
 //! # Per-tick cascade flow (the contract these traits support)
@@ -60,14 +60,14 @@ pub trait PlasmaDraft {
 }
 
 /// Hot-tier transport-operator rederive. Produces a future (associated type
-/// `Fut`, no bound at the trait level) that resolves to a [`TransportOperator`]
+/// `Fut`, no bound at the trait level) that resolves to a [`TransportOperator`](super::TransportOperator)
 /// when the work completes. The ASOC cascade joins 3 of these per tick
 /// (`C_boss`, `C_quest`, `C_player`).
 ///
 /// # The `Fut` bound (critical for layering)
 ///
 /// `Fut` has **NO** `GpuFuture` bound at the trait level — that would require
-/// importing `riir-gpu-async` into katgpt-core, inverting the 5-repo commercial
+/// importing `riir-gpu-async` into katgpt-core, inverting the 7-repo commercial
 /// boundary. Instead, the `GpuFuture<Output = TransportOperator>` bound is
 /// applied at the **impl site** in `riir-engine` (Phase 1b):
 ///
@@ -92,7 +92,7 @@ pub trait PlasmaDraft {
 ///   impl owns its own entity-state source (see [`ComposerCtx`] shape contract).
 pub trait RederiveOp {
     /// The future type. NO `GpuFuture` bound here — applied at the impl site
-    /// in riir-engine. Resolves to a [`TransportOperator`] when the work
+    /// in riir-engine. Resolves to a [`TransportOperator`](super::TransportOperator) when the work
     /// completes.
     type Fut;
 

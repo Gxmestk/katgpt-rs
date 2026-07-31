@@ -33,7 +33,9 @@ pub mod var_norm;
 
 pub use eval::pseudo_decode_eval;
 pub use kv_cache::{
-    KVarNKVCache, packed_bytes_per_row, rtn_quantize_rows, rtn_quantize_rows_grouped,
-    pack_value, unpack_value, unpack_row,
+    KVarNKVCache, pack_value, packed_bytes_per_row, rtn_quantize_rows, rtn_quantize_rows_grouped,
+    unpack_row, unpack_value,
 };
-pub use var_norm::{VarNormConfig, VarianceNormScales, variance_normalize, variance_normalize_into};
+pub use var_norm::{
+    VarNormConfig, VarianceNormScales, variance_normalize, variance_normalize_into,
+};

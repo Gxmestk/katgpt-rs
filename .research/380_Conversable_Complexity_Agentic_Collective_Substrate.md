@@ -98,9 +98,9 @@ The paper is unusual: it does not have a per-NPC-state substrate to reframe. The
 | **Stigmergic channel** (environment artifacts) | `riir-neuron-db/src/vibe.rs` KG triple templates + `KgTripleTemplate` chain commitment + `engram_runtime` conditional pattern memory |
 | **Attributional channel** (causal responsibility) | `FaithfulnessProbe` (Plan 278) + `AttributionProbe` IG surrogate |
 | **Mechanistic channel** (causal pathway) | Bidirectional Cognitive Monitoring (Research 157) + Indicator Probe Bank (Plan 320) |
-| **Individuation** conjecture | Entity Cognition Stack committed-personality via quorum (`entity_cognition/commit.rs`) + `species_transition` (feral/tame/criminal/pack) |
+| **Individuation** conjecture | Entity Cognition Stack committed-personality via quorum (`riir-ai/crates/riir-engine/src/entity_cognition/commit.rs`) + `species_transition` (feral/tame/criminal/pack) |
 | **Inheritance** conjecture | `KarcShard` / `ArchetypeBlendShard` / `MerkleFrozenEnvelope` — descendants inherit committed artifacts |
-| **Externalised cognition** conjecture | `engram_runtime` + `cognitive_branches_runtime/scratch.rs` + `NeuronShard` consolidation (offload to fixed-size Pod artifacts) |
+| **Externalised cognition** conjecture | `engram_runtime` + `riir-ai/crates/riir-engine/src/cognitive_branches_runtime/scratch.rs` + `NeuronShard` consolidation (offload to fixed-size Pod artifacts) |
 | **Role differentiation** conjecture | `role_transport.rs` + `species::SpeciesArchetype` + faction culture vectors (Community layer) |
 | **Multi-scale** conjecture | crowd MCGS (`crowd_mcgs/`) + faction hierarchy + chain consensus |
 | **Open-endedness** conjecture | `cgsp_runtime` curiosity-driven self-play + `skill_opt` (MUSE → ITSE) |
@@ -135,7 +135,7 @@ Closest existing notes / plans across all five repos:
 ### 2.5 What is NOT new (do not re-implement)
 
 - Persistent memory, tools/skills, self-directedness, connectivity, shared environment — **all five constitutive properties of an agentic substrate already ship in riir-ai at MMORPG scale**. Do not file a plan to "add agentic-substrate support" — we are already one.
-- The seven conjecture classes — **all seven have shipped module analogs** (see §2.2 table). Do not file a plan to "add individuation support" — `entity_cognition/commit.rs` + `species_transition` already implement it.
+- The seven conjecture classes — **all seven have shipped module analogs** (see §2.2 table). Do not file a plan to "add individuation support" — `riir-ai/crates/riir-engine/src/entity_cognition/commit.rs` + `species_transition` already implement it.
 - Stigmergic interpretability — **already ships** as KG-triple audit trail + engram conditional pattern memory + NeuronShard artifact commitment.
 
 ---
@@ -152,7 +152,7 @@ The paper adds no novel mechanism — every constitutive property and every conj
 
 | Q | Answer | Reasoning |
 |---|--------|-----------|
-| **Q1 No prior art?** | **NO** | The underlying mechanisms all ship: persistent memory (`npc_memory.rs`, `engram_runtime/`), tools/skills (`skill_opt/`, MUSE), self-directedness (`cgsp_runtime/`, `sleep_time/`), KG-triple stigmergic trail (`vibe.rs`), individuation (`entity_cognition/commit.rs`), role differentiation (`role_transport.rs`, `species_transition`), externalised cognition (`scratch.rs`, `NeuronShard` consolidation). The framework is new; the substrate is not. |
+| **Q1 No prior art?** | **NO** | The underlying mechanisms all ship: persistent memory (`npc_memory.rs`, `engram_runtime/`), tools/skills (`skill_opt/`, MUSE), self-directedness (`cgsp_runtime/`, `sleep_time/`), KG-triple stigmergic trail (`vibe.rs`), individuation (`riir-ai/crates/riir-engine/src/entity_cognition/commit.rs`), role differentiation (`role_transport.rs`, `species_transition`), externalised cognition (`scratch.rs`, `NeuronShard` consolidation). The framework is new; the substrate is not. |
 | **Q2 New class of behaviour?** | **NO** | No new capability. We already run thousands of concurrent NPCs with persistent memory + tools + self-directedness at 20Hz tick. |
 | Q3 Product selling point? | YES | "First inspectable MMORPG-scale agentic ALife substrate with a 6-channel interpretability stack, KG-triple audit trail, and Cognitive Integrity Layer." |
 | Q4 Force multiplier? | YES | Unifies pillars 6 (NPC Dialog), 8 (Reasoning Pack), 2 (riir-neuron-db stigmergic artifacts), plus crowd MCGS, integrity layer, civilization engine. |

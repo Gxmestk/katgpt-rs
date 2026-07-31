@@ -123,6 +123,6 @@ cargo test --features tiled_attention --lib -- transformer
 | `crates/katgpt-core/src/attention.rs` | Tiled attention implementation (T2–T5) |
 | `crates/katgpt-core/src/lib.rs` | Re-export behind feature gate (T10) |
 | `crates/katgpt-core/Cargo.toml` | `tiled_attention` feature (T1) |
-| `src/transformer.rs` | Wire into `forward_prefill` Phase B (T6) |
+| `crates/katgpt-percepta/src/transformer.rs` | Wire into `forward_prefill` Phase B (T6) |
 | `tests/bench_tiled_attention.rs` | Benchmark tests (T7) |
 | `tests/test_tiled_attention_goat.rs` | GOAT proof (T8) |

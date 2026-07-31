@@ -51,7 +51,7 @@ Infrastructure benchmark validating width >> depth on DDTree with SDE noise. GOA
 - `get_unchecked` / `get_unchecked_mut` in inner matmul loops — eliminates bounds checks
 - `copy_nonoverlapping` for KV cache store — faster than `copy_from_slice` for known sizes
 - Edition 2024: explicit `unsafe {}` blocks inside `unsafe fn`
-- SIMD intrinsics (NEON/AVX2) in `crates/katgpt-core/src/simd.rs` (re-exported via `src/simd.rs`) — runtime detection, safe API wrapping `core::arch::{aarch64, x86_64}` (Plan 060)
+- SIMD intrinsics (NEON/AVX2) in `crates/katgpt-dec/src/simd.rs` (re-exported via `crates/katgpt-dec/src/simd.rs`) — runtime detection, safe API wrapping `core::arch::{aarch64, x86_64}` (Plan 060)
 
 ### Fused Kernels
 - **`matmul_relu`**: single-pass MLP hidden layer (avoids extra scan of hidden buffer) — SIMD-accelerated dot product + fused ReLU zero-clamp
@@ -67,7 +67,7 @@ Infrastructure benchmark validating width >> depth on DDTree with SDE noise. GOA
 
 ## SIMD Acceleration (Plan 060)
 
-NEON (ARM) / AVX2 (x86_64) SIMD dispatch via `katgpt-core/src/simd.rs` (re-exported through `src/simd.rs`). All kernels use runtime `SimdLevel` detection and provide scalar fallbacks. Public API:
+NEON (ARM) / AVX2 (x86_64) SIMD dispatch via `crates/katgpt-dec/src/simd.rs` (re-exported through `crates/katgpt-dec/src/simd.rs`). All kernels use runtime `SimdLevel` detection and provide scalar fallbacks. Public API:
 
 ### Kernel-Level Throughput (NEON, Apple Silicon, release)
 
@@ -94,9 +94,9 @@ NEON (ARM) / AVX2 (x86_64) SIMD dispatch via `katgpt-core/src/simd.rs` (re-expor
 | `simd_matmul_rows_parallel` | Rayon-parallel matmul (threshold-gated) | — |
 | `simd_matmul_relu_rows` | Row-parallel matmul + ReLU clamp | — |
 | `simd_fma_row` | Fused multiply-accumulate row | — |
-| `simd_dot_f16_f32` | f16/f32 mixed-precision dot product | — |
-| `simd_matmul_f16_f32_rows` | f16 weight / f32 input matmul | — |
-| `simd_matmul_f16_f32_rows_parallel` | Rayon-parallel f16/f32 matmul | — |
+| `simd_dot_f16_f32` | f16/f32 mixed-precision dot product | — (G2-failed ref, Issue 200) |
+| `simd_matmul_f16_f32_rows` | f16 weight / f32 input matmul | — (G2-failed ref, Issue 200) |
+| `simd_matmul_f16_f32_rows_parallel` | Rayon-parallel f16/f32 matmul | — (G2-failed ref, Issue 200) |
 | `simd_sparse_dot_f32` | Sparse dot product (alive mask) | — |
 | `simd_sparse_matmul_rows` | Sparse matmul with index tracking | — |
 | `simd_scale_inplace` | In-place scalar multiply | — |
@@ -158,12 +158,12 @@ Every `dflash_predict`, `build_dd_tree`, and speculative step was allocating `Ve
 
 ### Solution: Pre-allocated Contexts
 
-**SpeculativeContext** (`speculative/types.rs`):
+**SpeculativeContext** (`crates/katgpt-core/src/speculative/types.rs`):
 - Holds `ForwardContext`, `MultiLayerKVCache`, flat marginals buffer, probs buffer, sampled tokens, accepted tokens, path buffer, residual buffer, p_distributions buffer
 - `new(config)` allocates once, `reset()` clears for reuse
 - All `_with()` function variants accept `&mut SpeculativeContext`
 
-**TreeBuilder** (`speculative/dd_tree.rs`):
+**TreeBuilder** (`src/speculative/dd_tree.rs`):
 - Holds pre-allocated `BinaryHeap<TreeNode>`, `Vec<TreeNode>`, chain buffers
 - `build()` clears and reuses internal buffers
 - Returns `&[TreeNode]` (borrowed slice)
@@ -318,7 +318,14 @@ The benchmarks progress from individual components to full pipelines. Benchmark 
 
 Files: `src/turboquant/{mod,codebook,forward,kv_cache,rotation,types}.rs`
 
-Feature gate: `turboquant` (opt-in, NOT in default features)
+Feature gate: `turboquant` (transitively default-on: `hybrid_oct_pq` [in `default`] enables `planar_quant` which enables `turboquant`. Originally opt-in per Plan 063; promoted transitively when `hybrid_oct_pq` [Plan 101] landed default-on.)
+
+> **UPDATE 2026-07-18 (status sync):** the previous label said
+> `turboquant` (opt-in, NOT in default features). The "NOT in default"
+> claim went stale once `hybrid_oct_pq` was promoted to default-on —
+> `hybrid_oct_pq = ["planar_quant", ...]` and `planar_quant = ["turboquant", ...]`,
+> so `turboquant` is now compiled in by default. The standalone feature is
+> still exposed for `--no-default-features` consumers.
 
 ### Memory Compression
 | Bits | Bytes/token | Compression | Key cos_sim | Attention corr |
@@ -353,7 +360,7 @@ Feature gate: `spectral_quant` (**on by default** in `Cargo.toml`)
 ### Key Types
 
 ```rust
-// Per-layer calibration state (spectralquant/types.rs)
+// Per-layer calibration state (crates/katgpt-dec/src/types.rs)
 pub struct SpectralQuantLayer {
     calibration: SpectralQuantCalibration,  // eigenvectors, eigenvalues, d_eff
     qjl_signs: Vec<f32>,                    // QJL projection
@@ -363,7 +370,7 @@ pub struct SpectralQuantLayer {
     d_eff: usize, b_high: u8, b_low: u8,
 }
 
-// Zero-alloc compressed KV cache (spectralquant/spectral_kv_cache.rs)
+// Zero-alloc compressed KV cache (crates/katgpt-spectral/src/spectral_kv_cache.rs)
 pub struct SpectralQuantKVCache {
     layers: Vec<SpectralQuantLayer>,
     key_indices: Vec<Vec<Vec<u8>>>,  // variable-bit packed
@@ -473,5 +480,5 @@ Core model benchmarks ±2% stable. Infrastructure (`forward (flat)`, `forward_pa
 | Rayon parallel matmul | n_embd=16, mlp=64 — thread pool overhead dominates |
 | `std::simd` / `portable_simd` | Nightly-only; we use `core::arch` intrinsics directly (Plan 060) |
 | Cache tiling for attention | block_size=16 already fits L1 |
-| f16/bf16 weights | Would halve memory bandwidth but requires `half` crate; `simd_dot_f16_f32` kernels exist for mixed-precision matmul |
+| f16/bf16 weights | Empirically NOT a win on Apple Silicon (aarch64). Weight-only f16 is **1.7× slower** than f32 (Issue 200, G2 FAIL — f32 activations cap bandwidth reduction at 25%, FCVT latency eats the rest). Full f16 (weights + activations, FHM widening FMA) is only **1.31× faster** — short of the 1.5× promotion gate (Issue 201, Bench 563). Root cause: f32 is already near the bandwidth ceiling (~95–110 GB/s at L3-exceeding sizes) and the dot kernel is not purely bandwidth-bound (FMA throughput + accumulator reduction eat the theoretical gain). f32 stays the production dtype. The `simd_dot_f16_f32` / `matmul_f16` kernels exist as opt-in reference paths (`katgpt-forward/f16_weight_quantization` feature) but are G2-failed and not promoted to default. INT8+INT8 (the only remaining quantization-style path with plausible ≥1.5×) is filed as a non-goal — same bandwidth-ceiling argument applies, plus dequant overhead makes it worse |
 | GPU compute in inference | CPU-only for inference; GPU training is out of scope |

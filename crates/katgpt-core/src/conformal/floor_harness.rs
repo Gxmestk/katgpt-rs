@@ -336,7 +336,7 @@ impl FloorComparisonReport {
         matches!(self.overall, OverallVerdict::BeatsFloor)
     }
 
-    /// `true` iff the verdict is [`OverallVerdict::NotAppicable`].
+    /// `true` iff the verdict is [`OverallVerdict::NotApplicable`].
     #[inline]
     pub fn is_not_applicable(&self) -> bool {
         matches!(self.overall, OverallVerdict::NotApplicable { .. })

@@ -187,5 +187,167 @@ Distills [Bottlenecked Transformers (arXiv:2505.16950)](https://arxiv.org/abs/25
 | **GDSD Pruner** (`gdsd_distill`) | [GDSD Research 151](https://arxiv.org/abs/2605.08605) | **NO GAIN proven** | GOAT 0/3 gain gates. G1: +0.00% acceptance improvement (identical to baseline). G3: +181.5% overhead (nearly 3× cost). Correct implementation (7/7 structural) but zero measured benefit. |
 | **MPNS** (`multi_precision_npc`) | riir-ai Plan 252 T5 | **Negative arena result — NO GOAT** | 12/12 unit tests pass, but arena proves zero quantization robustness advantage. React weights collapse to all -1.0 (ternary kills gradient diversity). Dream weights quantize to identity (same magnitude). Root cause: simplified SGD (`loss * sigmoid(w)`) insufficient. Needs STE + adaptive optimizer. |
 | **Alien Sampler** (`alien_sampler`) | Plan 311 Coherence × Availability | **GOAT FAILED 2/4** | G1+G2 fail (β phase-transition at β≈0.4, no β satisfies both motif-collapse and quality). G3 PASS post-rayon (4.56×). G4 PASS. Mechanism validated (2× concentration reduction); domain transfer to synthetic NPC populations unvalidated. Module retained opt-in for paper reproduction. |
-| **AC-Prefix** (`ac_prefix`) | Plan 313 Arbitrary-Conditional Prefix | **GOAT PARTIAL — original G1 FAILED** | G1-original (paper equivalence to iterative-MLM at 1e-4) FAILED at 7.5e-4 on untrained micro-GPT. Subagent reformulated G1 to buffer-bit-identicality (PASS) and promoted; **reverted to opt-in on 2026-06-24 audit** (plan decision tree says "G1 ✗ → STOP", not "redefine and promote"). G2/G3/G4 PASS (27.258× speedup, 0 mismatches, 0 allocs). Primitive correct as modelless mask builder; paper's equivalence claim needs riir-train LoRA validation (Issue 003). |
+| **AC-Prefix** (`ac_prefix`) | Plan 313 Arbitrary-Conditional Prefix | **GOAT PARTIAL — original G1 FAILED, then modelless-unblocked** | G1-original (paper equivalence to iterative-MLM at 1e-4) FAILED at 7.5e-4 on untrained micro-GPT. Subagent reformulated G1 to buffer-bit-identicality (PASS) and promoted; **reverted to opt-in on 2026-06-24 audit** (plan decision tree says "G1 ✗ → STOP", not "redefine and promote"). **Re-promoted to DEFAULT-ON same day** via §3.5 modelless unblock (Issue 003 Phase 0 RESOLVED): Path 2 `attends_dedup` eliminates the doubled-signal bias bit-identically to iterative-MLM on single-layer micro-GPT (0.0 diff). G2/G3/G4 PASS (27.258× speedup, 0 mismatches, 0 allocs). Primitive correct as modelless mask builder; multi-layer equivalence remains a non-blocking riir-train follow-up. |
 | **KV Consolidation** | Plan 420 Bottlenecked Transformers | **QUALITY GAIN REFUTED** | §3.6 PoC: Δtoken_acc = −0.06pp, ΔNLL = +0.0001; zero hyperparameter sensitivity. riir-train Plan 313 confirmed on TRAINED model (31% accuracy, 0.00pp gain). Paper's quality benefit is inseparable from TRAINED Cache Processor; modelless mean-shift is inert. No feature flag ships. |
+
+## 9. MCTS State-Action Cache (Plan 451) — OPT-IN-FOREVER (G2 FAILED)
+
+Distilled the UnMaskFork state-action pair cache for MCTS over deterministic inference actions — memoize `(state, action) → child` transitions so repeated rollouts skip re-applying the same `apply()` call. Correct idea for dLLM-scale MCTS where each `apply` is a full forward pass.
+
+**G2 FAILED on re-gate (Issue 044, 2026-07-07).** The synthetic domain's `apply` is a 4-token array write (~ns), so cache hits don't translate to meaningful NFE (number of forward evaluations) savings:
+
+| Sub-gate | Target | Result | Verdict |
+|----------|--------|--------|---------|
+| **G2a** reward-convergence | ≥1 strict win | 0/6 (both arms converge to 1.000 at NFE=256) | ❌ FAIL |
+| **G2b** NFE-savings | ≥1.4× expansion | 1.01–1.03× (avg_rollout_depth 0.6–0.7 — tree reaches terminal depth before cache helps) | ❌ FAIL |
+
+**Root cause:** the synthetic domain is too cheap for cache hits to matter. Only a real dLLM PoC where each `apply` is a full forward pass can show the budget-expansion benefit. Stays **opt-in-forever** until a real dLLM PoC re-validates. Infrastructure (correctness G1 PASS) is reusable. 📖 Plan: [`.plans/451_mcts_state_action_cache_unmaskfork.md`](../../.plans/451_mcts_state_action_cache_unmaskfork.md), Issue 044 (re-gate — file removed per noise-reduction rule).
+
+## 10. SAR × QuasiMoTTo Fusion (Issue 151) — CONCENTRATION REFUTED @ 1.5B
+
+**Fusion hypothesis:** SAR (weight-delta purification, widens the reachable problem set) × QuasiMoTTo (QMC lattice sampling, covers a fixed set with 50% fewer samples) → compound Pass@k gain. The fusion operates at LLM scale (4096×4096 weight matrices) where SAR concentration is supposed to hold (paper's Fig 2, AIME 2024).
+
+**Phase 1 PoC REFUTED concentration at 1.5B scale (2026-07-15).** The foundational assumption — SAR produces a **concentrated** weight-delta spectrum where off-manifold drift is removed — does not hold empirically:
+
+- **Test:** 196 layers of a 1.5B model, measure `on_manifold_fraction` (target >0.8 for concentration to hold).
+- **Result:** **0/196 layers exceed 0.8.** The concentration phenomenon claimed by the paper is not reproducible at 1.5B scale in our setup.
+
+Without concentration, the compound gain cannot exist (SAR cannot widen the reachable set if it doesn't first concentrate the delta). Issue closed; the fusion does not survive the PoC gate. This mirrors the earlier `spectral_rewire` G1b failure (Issue 123, NPC-scale ≤64×64, on_manifold_fraction in [0.27, 0.58]) — the concentration phenomenon is not reproducible in either regime. 📖 Plan: [`.plans/423_spectral_rewire_primitive.md`](../../.plans/423_spectral_rewire_primitive.md), PoC result: `riir-train/.scratch/sar_qmc_fusion_poc/PHASE1_RESULTS.md` (Issue 151 closed + removed per noise-reduction rule; git `b7ca596c`).
+
+## 11. SAR Spectral Backdoor Detection (Issue 152) — IMPRACTICAL (FATAL SCOPE)
+
+**Hypothesis:** `spectral_rewire`'s rewiring matrix `M = UᵀΔWV` may expose a spectral signature of a planted backdoor that the backdoor's construction (R422) deliberately hides from uniform-norm tests. R422 proves the backdoor is *statistically undetectable* in TV-distance; the open question was whether SAR's *directional* decomposition breaks that undetectability.
+
+**CLOSED impractical (2026-07-15).** The fatal scope problem (identified during open-questions analysis) is confirmed: SAR operates on a **weight delta** `ΔW`, but a backdoor detector must operate on the **base weights `W`** (you don't have the honest delta to subtract). SAR's purification needs a reference point; a backdoored-in-from-scratch model has no honest baseline to purify against. The detection surface SAR provides exists only on the delta, not the deployed weights. R422's PASS verdict (backdoor is statistically undetectable) stands unbroken. (Issue 152 closed + removed per noise-reduction rule; git `2524918b`.)
+
+## 12. Shard Embedding / JL Projection (Plan 230) — DEPRECATED (Issue 139)
+
+**Hypothesis:** Johnson-Lindenstrauss random orthogonal projection `[f32;64]→[f32;8]` provides O(1) cosine similarity shard lookup at ~90% NN preservation (the JL guarantee).
+
+**DEPRECATED 2026-07-16 (Issue 139).** The projection dimension m=8 is **mathematically unsound** — it violates the Johnson-Lindenstrauss lower bound by over 200×:
+
+- JL requires m ≥ (8·ln n)/ε² for n points at distortion ε. For n=100, ε=0.5: **m ≥ 554**; the code uses **m=8**.
+- Empirically measures **1.4–6% NN preservation** vs the documented 90% target.
+- **Zero runtime consumers** at deprecation time: SenseModule uses TernaryDir, BFCF uses region centroids.
+
+Option D (deprecate, mark `#[deprecated]`) was chosen over Option B (PCA rescue) because PCA requires a real-data intrinsic-rank measurement that cannot be done modellessly without the corpus existing (per the §3.5 modelless-unblock protocol — a training-dependent measurement path is not a clean modelless gain). `JlProjectionMatrix` + `ShardEmbedding` are kept for back-compat but emit deprecation warnings; bench_230 + diag_230 tests removed. 📖 Plan: [`.plans/230_shard_embedding_projection.md`](../../.plans/230_shard_embedding_projection.md) (close-out note preserves empirical evidence). (Issue 139 closed + removed per noise-reduction rule; git `3e33d7d8`.)
+
+## 13. RoVE — Rotary Value Embeddings Retrofit (Plan 557) — RETROFIT HURTS
+
+**Hypothesis:** Rotary Value Embeddings (arXiv:2606.11275 García-Castellanos/Weiler/Bekkers, Jul 2026) extend RoPE from Q/K to the V projection + inverse-rotate the aggregated output, yielding an attentive convolution ỹ_i = Σ_j A_ij · (R_{j−i} · W_V) · x_j with offset-indexed block-Toeplitz kernel ψ_δ = R_δ·W_V. Parameter-free, FlashAttention-compatible. The open question was whether applying RoVE's V-rotation **at inference time** onto an already-RoPE-trained checkpoint recovers the paper's equivalence.
+
+**RETROFIT HURTS (2026-07-22, Phase 5 A/B on gemma-2-2b-it).** The paper's RoPE↔RoVE equivalence is a **training-time** result: a model must be *trained* under RoVE for the V-rotation to compose correctly with the learned attention pattern. Applying the V-rotation at inference onto a RoPE-trained checkpoint:
+
+- short text (65 tok): loss **+12.5%**
+- longer text (162 tok): **+153% perplexity**
+
+All 7 GOAT gates PASS (the substrate is correct + parameter-free + FlashAttention-compatible) — the failure is the *application mode*, not the primitive. **Feature `rotary_value_embedding` stays opt-in for forward-compat** (a future RoVE-trained checkpoint would compose correctly). Implies `position_group_action` (first hot-path consumer of GRAPE's `PositionGroupAction` trait).
+
+📖 Plan: [`.plans/557_rotary_value_embeddings.md`](../../.plans/557_rotary_value_embeddings.md). Benchmark: [`.benchmarks/557_rotary_value_embedding_goat.md`](../../.benchmarks/557_rotary_value_embedding_goat.md) + [`.benchmarks/557_rove_retrofit_poc.md`](../../.benchmarks/557_rove_retrofit_poc.md). Research: [`.research/452_RoVE_Rotary_Value_Embeddings_Attentive_Convolution.md`](../../.research/452_RoVE_Rotary_Value_Embeddings_Attentive_Convolution.md).
+
+## 14. Variable-Rank Domain Expert Clusters (Plan 558) — G2 FAIL (STAYS OPT-IN)
+
+**Hypothesis:** LatentMoE-style variable-rank domain expert clusters (arXiv:2601.18089, Research 453) — `pick_domain` + `project_guided` + `VariableRankRouter` over heterogeneous-rank `CommittedFieldBlend` clusters — distribute per-NPC cognition across move/combat/quest domains with per-cluster rank budgets. PoC confirmed 1.63× entropy gain.
+
+**G2 FAIL — stays opt-in (2026-07-22).** The entropy gain is **real and larger than the PoC**: 2.63× archetype-utilization entropy vs uniform `<3,32>` baseline at iso `K×D=96` compute (G3 PASS, exceeds PoC's 1.63×). But the **latency cost is also real**: ~2× slower per tick (2.224× at 1K NPCs, 1.990× at 10K) — trait-object dispatch (`Box<dyn ErasedCluster>`) + per-NPC `override_pi` virtual calls dominate (~50 ns of the 63 ns overhead vs a 51 ns baseline).
+
+Gate results: G1/G3/G4/G5 PASS; **G2 FAIL** (target ≤1.0×). Absolute numbers (52–104 ns/NPC) are well under the 500 µs/tick MMO budget, and latency scales linearly 1K→10K (MMO-scalable), but the 2× relative cost fails the G2 gate.
+
+**The promotion path** (Plan 558 §Honest Risks #1) is the **macro monomorphization escape hatch** (`variable_rank_router_static!`, Issue 189): generate a per-domain-count monomorphized router enum instead of `Box<dyn ErasedCluster>`, eliminating the vtable tax. Shipped as a macro so consumers opt in to the codegen; the ergonomic `Box<dyn>` path remains for prototyping.
+
+📖 Plan: [`.plans/558_variable_rank_domain_expert_clusters.md`](../../.plans/558_variable_rank_domain_expert_clusters.md). Benchmark: [`.benchmarks/558_variable_rank_domain_expert_goat.md`](../../.benchmarks/558_variable_rank_domain_expert_goat.md). Research: [`.research/453_Variable_Rank_Domain_Expert_Clusters.md`](../../.research/453_Variable_Rank_Domain_Expert_Clusters.md). Monomorphization escape hatch: [`.docs/08_performance/variable_rank_monomorphization.md`](../08_performance/variable_rank_monomorphization.md) + Issue 189.
+
+## 15. Canonical Intent Space — Cross-Arch Super-GOAT PERMANENTLY DEMOTED (Proposal 009 / Research 459)
+
+**Hypothesis:** A canonical intent space — `CanonicalIntent { tag, direction }` + a `ModelAdapter` trait (Procrustes / Subspace / Mask) — would let a steering direction mined on one base model (Gemma2-2B) be re-applied to a different architecture (MiniCPM5-1B, Llama) with no retraining. Plug-and-play any base model. The Super-GOAT headline: swap Gemma → Llama without retraining overlays.
+
+**Cross-arch Super-GOAT claim PERMANENTLY DEMOTED (2026-07-27, Bench 427).** Four hidden-state construction methods all failed the G6 cross-architecture discrimination gate (≥0.5 mean cosine agreement on Rust-idiom direction across architectures; floor is a good system prompt per Research 322 "Report the Floor" rule):
+
+| Phase | Method | Best cross-arch agreement | Threshold | Verdict |
+|---|---|---|---|---|
+| P3 (Bench 424) | Per-model centroid + Procrustes | **−0.33** | ≥0.5 | ❌ FAIL — Procrustes aligns shape, not location; per-model centroids point in opposite directions after rotation |
+| P3 (Bench 424) | Difference-of-means `d_diff` | +0.46 | ≥0.5 | ❌ borderline FAIL — JS discrimination negative on both models (−0.32 / −0.03); apparent signal was a token-count confound |
+| P3b (Bench 425) | Intermediate-layer probe (Git Re-Basin hypothesis) | +0.19 (layer 0) | ≥0.5 | ❌ FAIL — Git Re-Basin contradicted: layer 0 discriminates best, monotonic decrease 0→25; the centroid captures surface/lexical features, not semantic Rust-idiom-ness |
+| P3c (Bench 426) | Length-detrended `d_diff` | **−0.15** (Python) | ≥0.5 | ❌ FAIL — length detrending REVERSES Python discrimination (+0.19 → −0.15); the apparent Rust-idiom signal was prompt length |
+| Recipe D (Bench 427) | Length-matched corpus, k ∈ {2,4,8,16} sweep | **+0.009** (k=16) | ≥0.5 | ❌ FAIL — length-matching works (detrend passes) but cross-arch agreement never crosses +0.01; failure is STRUCTURAL cross-arch disagreement, not length, not noise |
+
+**The failure pattern rules out the obvious escapes:**
+- Recipe E (gradient descent stitching) NOT opened — failure is structural cross-arch disagreement (not non-linearity), so a trained stitcher would face the same wall.
+- More Python data (10 → 30 prompts) barely moved agreement (+0.4645 → +0.4755, +0.011 gain) — the ceiling is fundamental.
+- The modelless path is **declared exhausted**. Reopens only on a **non-hidden-state construction** (AST/clippy/ownership-graph features — see Proposal 010, draft).
+
+**What STILL ships (the intra-arch + substrate GOAT, Bench 562):** the `katgpt-canon` crate (3 adapters: Procrustes / Subspace / Mask) carries a measured G1/G2/G4 GOAT stamp (17/17 PASS). The SubspaceAdapter preserves the cross-arch ALIGNMENT result (Bench 423: G5 GO at k∈{2,4}, mean cosine +0.87/+0.75 on Gemma ↔ MiniCPM held-out). The cross-arch DIRECTION claim is what failed — the substrate is useful, just narrower than the Super-GOAT headline.
+
+**Features stay opt-in** (`canon`, `canon_subspace`, `canon_mask`, default-off). Promotion to default-on would require a new proposal re-arguing the substrate's value proposition post-demotion.
+
+📖 Proposal: [`.proposals/009_canonical_intent_space.md`](../../.proposals/009_canonical_intent_space.md) (status header reflects permanent demotion). Research: [`.research/459_canonical_intent_space_plug_and_play.md`](../../.research/459_canonical_intent_space_plug_and_play.md) (CLOSED). Substrate GOAT: [`.benchmarks/562_katgpt_canon_goat.md`](../../.benchmarks/562_katgpt_canon_goat.md). Cross-arch demotion benches: [`.benchmarks/424_gdn_tree_verify_goat.md`](../../.benchmarks/) (P3) → riir-train `.benchmarks/425`, `426`, `427` (P3b/P3c/Recipe D — the cross-arch probes ran on real model weights via riir-train's forward-trace substrate). Non-hidden-state follow-up: [`.proposals/010_non_hidden_state_canonical_construction.md`](../../.proposals/010_non_hidden_state_canonical_construction.md) (draft, HIGHLY SPECULATIVE).
+
+## 16. Composition Imbalance Diagnostic PoC (Issue 199) — FAILURE MODE DOES NOT TRANSFER
+
+**Hypothesis (the open question after the Twins PASS verdict).** arXiv:2607.22531 (Twins: Focal Loss for unified ViT+VAE) proves that composing two heterogeneous latent spaces into one representation causes "optimization imbalance" during training — the model silently underfits the high-intrinsic-dimension / high-frequency component because the low-ID component dominates the loss landscape. The unproven transfer claim was that our inference-time sigmoid-gated blends of heterogeneous direction fields (`CommittedFieldBlend`, `PersonalityWeightedComposition`, `BranchBank`) suffer an **analogous** imbalance class, and that our existing diagnostics (`within_class_effective_rank`, `subspace_phase_gate`, `effective_rank`) would need to catch it.
+
+**CLOSED 2026-07-28 — the failure mode does not transfer to inference.** The PoC ran three deliberately-mismatched configs through `CommittedFieldBlend<3, 32>::apply_blended` (LowId+2x HighId / LowId+HighId+HighFreq / magnitude-asymmetric `pi=[5,0,0]`) + a 3x-LowId sanity control. Result:
+
+| Config | erank | wc_erank | part_ratio | low_freq |
+|---|---|---|---|---|
+| Balanced (3x HighId) | 24.68 | 24.68 | 30.14 | 0.508 |
+| Mismatched ID | 24.39 | 24.39 | 30.59 | 0.528 |
+| Mismatched spectral | 25.61 | 25.61 | 30.12 | 0.503 |
+| Mismatched magnitude | 24.90 | 24.90 | 30.28 | 0.505 |
+| Sanity: 3x LowId (rank-≤6 expected) | **1.00** | **1.00** | **10.54** | 0.415 |
+
+The diagnostics flag the sanity config (rank collapse detected: erank 24.68 → 1.00) but MISS on all three "mismatched" configs — **by construction, not by failure**. The Twins paper's optimization imbalance is a training-dynamics phenomenon (gradient descent underfits). At inference time `apply_blended` is a closed-form weighted sum — no gradient descent, no underfitting. When heterogeneous fields are summed, the highest-ID field's contribution dominates the output covariance by linear algebra, not by failure. The sigmoid gates normalize per-field contribution magnitude; they do not (and need not) rebalance spectral / ID coverage.
+
+**The original Twins PASS verdict stands — honest justification corrected.** The original justification ("covered by shipped primitives") was architecturally sloppy (§3.6 violation: architectural coverage ≠ quality parity). The honest justification is: **the failure mode is training-specific and does not transfer to inference-time sigmoid-gated blends**. The diagnostic primitives are not load-bearing for this verdict — the closed-form math is. Filing a plan for `composition_imbalance_diagnostic` would be solving a problem we don't have (T7 N/A).
+
+**The PoC remains as a permanent regression check** at `riir-ai/crates/riir-poc/benches/composition_imbalance_modelless.rs` (the "defend-wrong" R&D crate per research skill §3.6). `PersonalityWeightedComposition` and `BranchBank` use the same sigmoid-gated-sum shape; the same closed-form argument applies (T8 N/A).
+
+📖 Issue (removed, this entry is the durable home): closed 2026-07-28 commit `e30d2b45`. Triggering PASS verdict: arXiv:2607.22531 (Twins Focal Loss) — research notes 279, 394, 409 carry the PASS-Redirects line. Site 1: [`committed_field_blend.rs:188-224`](../../crates/katgpt-core/src/committed_field_blend.rs). Site 3: [`branching/bank.rs`](../../crates/katgpt-core/src/branching/bank.rs).
+
+## 17. f16 Weight-Only Forward Quantization (Issue 200) — G2 FAIL: 1.7–3.0× SLOWER
+
+**Hypothesis.** The production `forward_base` path is 95% matmul (GEMV) at seq=1. f32 GEMV arithmetic intensity is 0.5 FLOP/byte → firmly memory-bandwidth-bound → no kernel-level optimization can beat the bandwidth ceiling. The actionable path to ~2× speedup: **halve weight bandwidth by storing weights as f16** (`f32 8 bytes/elem → f16 4 bytes/elem`, 50% reduction). `matmul_f16` + `simd_matmul_f16_f32_rows` already ship in `katgpt-types` (f16 weights × f32 activations, dequant-on-load).
+
+**G2 FAIL (2026-07-29, Apple Silicon / aarch64).** f16 weight-only forward is **1.7–3.0× slower** than f32 across all configs. Root-cause analysis (the durable value):
+
+1. **The activation `x` is f32, not f16.** The hypothesis assumed weight-only bandwidth reduction. Reality: per dot-product element, f32 = 4 bytes (weight) + 4 bytes (activation) = 8 bytes; f16 = 2 bytes (weight) + 4 bytes (activation) = 6 bytes. **Actual bandwidth reduction: 25%, not 50%.** The halved-weight hypothesis double-counts by ignoring the f32 activation.
+2. **f16→f32 dequantization is not free.** Even with hardware FCVT (1-2 cycle latency on Apple Silicon), the conversion sits on the critical path between weight load and FMA. Combined with the only-25% bandwidth reduction, the conversion latency more than eats the bandwidth savings.
+3. **Scalar `to_f32()` (which LLVM vectorizes to FCVT) is strictly better than hand-rolled NEON bit-manipulation.** A WIP attempt (`convert_4x_f16_to_f32`, ~10 manual NEON ops per 4-element conversion) was 3× slower vs the committed 2.5× slower — discarded during G2 isolation.
+4. **Hardware FCVTL via inline asm** improved conversion speed (0.40× → 0.574×) by using the hardware instruction directly, but still net-negative because the store-to-stack-and-reload pattern (forced by `asm!` not being able to pass NEON registers directly to `vfmaq_f32`) adds a round-trip the FMA pipeline can't fully hide. A fully-inlined asm implementation (conversion + FMA in one block) might close the gap, but at that point you're writing the entire dot product in assembly — a maintenance burden disproportionate to a still-sub-2× potential win.
+
+| Gate | Target | Result |
+|---|---|---|
+| **G1** approximate correctness | max rel err <20% | ✅ **PASS** — **0.03%** on medium config, seq_len=16. f16 dequant path is numerically correct. |
+| **G2** perf ≥1.5× at seq=1 | f16 ≥1.5× f32 | ❌ **FAIL** — f16 is **1.7–3.0× SLOWER** (0.574× speedup even with FCVTL inline asm). Refutes the core hypothesis. |
+| **G3** no-regression | cargo test clean | ✅ PASS — f16 path is additive, doesn't touch f32 path. |
+| **G4** alloc-free steady state | by construction | ✅ PASS — `forward_base_f16` reuses `ForwardContext` scratch buffers. |
+
+**The honest takeaway.** f16 weight quantization for bandwidth-bound GEMV is **not a modelless perf win on this hardware class**. The hypothesis only holds when (a) activations are also f16, OR (b) f16→f32 conversion is zero-latency. Neither is true on Apple Silicon. This is a valid negative result in the sense of Research 003 / Issue 356 — the GOAT gate did its job by catching a wrong hypothesis before it reached production. The root-cause analysis is the durable value: it prevents future agents from re-attempting the same hypothesis.
+
+**Code retained as reference.** `forward_base_f16` + `forward_f16` in `crates/katgpt-forward/src/forward.rs` (L806-941) ship as `pub` opt-in paths that no internal caller dispatches to — preserved for future hardware where the hypothesis holds (e.g. AVX-512_FP16 x86, or future Apple Silicon with free FCVT), or as a reference for a full-f16 (weights + activations) follow-up.
+
+**Re-opens only on** (a) hardware where f16 loads are genuinely cheaper than f32 loads AND a hardware FCVT-equivalent is free, OR (b) a full-f16 forward context (Issue 201's line, which also failed — see section 18 below).
+
+📖 Issue: [`.issues/200_f16_weight_quantization_forward_base.md`](../../.issues/200_f16_weight_quantization_forward_base.md) (retained as negative-result reference). Substrate: `crates/katgpt-forward/src/forward.rs:774-932`. Perf doc: [`.docs/08_performance/engineering.md`](../08_performance/engineering.md) §'What We Don't Do' (updated with empirical verdict 2026-07-29 commit `9bd1eed2`).
+
+## 18. Full f16 Forward FHM Investigation (Issue 201) — G2 FAIL: 1.31× < 1.5× gate
+
+**Hypothesis.** Successor to Issue 200 (weight-only f16). The bandwidth ceiling wall hits weight-only f16 because the activation is f32 — the real fix is **full f16 (weights + activations)** so per dot-product element is 2 bytes + 2 bytes = 4 bytes (true 50% reduction). Apple Silicon's widening FMA (`fmlalb`/`fmlalt`, a.k.a. `fmlal`/`fmlal2`) does f16×f16→f32 in a single instruction (FHM = Full Half-precision Multiply-add), eliminating the explicit FCVT from Issue 200's critical path while achieving the full 50% bandwidth reduction.
+
+**G2 FAIL (2026-07-29, Apple Silicon / aarch64).** Best L3-exceeding speedup of `simd_dot_f16_f16` (FHM widening FMA) vs `simd_dot_f32` = **1.31×**, under the 1.5× gate. Phase 2 (full forward path) NOT pursued — depends on the Phase 1 gate, which failed.
+
+Root causes (full detail in Bench 563):
+
+1. **f32 is already near the bandwidth ceiling** (~95–110 GB/s at L3-exceeding sizes on Apple Silicon). f16 improves this to ~120–130 GB/s equivalent — only ~25–30% gain, NOT the theoretical 50%.
+2. **The dot kernel is NOT purely bandwidth-bound.** FMA throughput, load-use latency, and accumulator-reduction overhead consume a meaningful fraction even at L3-exceeding sizes. Halving bandwidth doesn't halve runtime.
+3. **FHM FMA throughput is the limiter** (not FCVT latency like Issue 200). The 4-accumulator unroll that hides f32 FMA latency doesn't fully hide FHM FMA's different pipeline characteristics.
+4. **f16 accumulation drift grows with vector length.** rel_err ~0.1% at in-cache sizes but **6.2% at 16M elements** — even a marginal perf pass would have needed a separate precision gate.
+5. **The L1 vs DRAM paradox.** f16 wins **1.71× at L1 (cache-resident)** but only 1.31× at DRAM — the gate fails specifically when weights spill to DRAM where f32 is already near the bandwidth ceiling. No architecture-level fix exists; the gate is structurally infeasible on this hardware class.
+
+**Toolchain note.** FHM is inaccessible on stable Rust 1.93.0 (intrinsics unstable #136306; LLVM 21.1.8 assembler rejects the `fmlalb`/`fmlalt` mnemonic in every arrangement form). The Phase 1 measurement was done via nightly toolchain's unstable intrinsics (`vfmlalq_low_f16` / `vfmlalq_high_f16`), verified correct on a known input. Production code on stable would need verified `.inst` encodings — moot given the gate failed.
+
+**Outcome.** Valid negative result (Research 003 / Issue 356 sense). The GOAT gate did its job a second time on the f16 line (Issue 200 weight-only, Issue 201 full-f16), preventing a perf-regressing "optimization" from reaching production. **f32 stays the production dtype** for `forward_base` GEMV on Apple Silicon.
+
+**The remaining quantization path with a plausible ≥1.5× win is INT8 with INT8 activations** (different dequant path: scale + zero-point). But on Apple Silicon it hits the same bandwidth-ceiling argument — INT8 GEMV arithmetic intensity is still bandwidth-bound at L3-exceeding sizes, and the dequant overhead makes it worse. Filed as a **non-goal** in both Issues 200 and 201.
+
+📖 Issue: [`.issues/201_full_f16_forward_investigation.md`](../../.issues/201_full_f16_forward_investigation.md) (retained as negative-result reference). Benchmark: [`.benchmarks/563_issue201_f16_f16_fhm_negative.md`](../../.benchmarks/563_issue201_f16_f16_fhm_negative.md). Substrate (nightly-only WIP, not on develop): `crates/katgpt-types/src/simd/dot.rs` `simd_dot_f16_f16` (sibling-agent investigation; see git history if needed).

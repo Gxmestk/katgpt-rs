@@ -18,11 +18,11 @@ validators distilled from the ARG Standard (Iris Technologies, 2026).
 
 | Primitive | Module | ARG Step | Gate coverage |
 |-----------|--------|----------|---------------|
-| `PolicyEnvelope` | `arg/policy.rs` | Step 1 (hard gate) | G1, G2a, G4 |
-| `TaxonomyValidator` | `arg/taxonomy.rs` | Step 3 (label-set validation) | G1, G2b, G4 |
-| `LifecycleState` + `RedirectTable` | `arg/lifecycle.rs` | Step E (lifecycle) | G1 |
-| `TypedOfflineCandidate` + `OfflineCandidateScorer` | `arg/candidate.rs`, `arg/scorer.rs` | Step C (offline evolution) | G1, G5 |
-| `InfoRegistry` | `arg/registry.rs` | Step 9 + Step C (dedup) | G1 |
+| `PolicyEnvelope` | `crates/katgpt-core/src/arg/policy.rs` | Step 1 (hard gate) | G1, G2a, G4 |
+| `TaxonomyValidator` | `crates/katgpt-core/src/arg/taxonomy.rs` | Step 3 (label-set validation) | G1, G2b, G4 |
+| `LifecycleState` + `RedirectTable` | `crates/katgpt-core/src/arg/lifecycle.rs` | Step E (lifecycle) | G1 |
+| `TypedOfflineCandidate` + `OfflineCandidateScorer` | `crates/katgpt-core/src/arg/candidate.rs`, `crates/katgpt-core/src/arg/scorer.rs` | Step C (offline evolution) | G1, G5 |
+| `InfoRegistry` | `crates/katgpt-core/src/arg/registry.rs` | Step 9 + Step C (dedup) | G1 |
 
 ---
 
@@ -126,7 +126,7 @@ not the steady-state hot path.
 
 ## G5 — Silence-bias (scorer property tests)
 
-**Status: PASS** — 4 property tests in `arg/scorer.rs::tests`.
+**Status: PASS** — 4 property tests in `crates/katgpt-core/src/arg/scorer.rs::tests`.
 
 The silence-bias formula:
 

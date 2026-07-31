@@ -21,7 +21,7 @@ training example.
 | `output/lora_ab/game_lora_action_only.bin`   | 9316 B | `LORA` | 6 | 4 | 8.0 | 32 | 32 | `ActionOnly` |
 
 Binary structure (verified 2026-07-04 via `xxd`, offsets from
-`katgpt-types/src/lora.rs`):
+`crates/katgpt-types/src/lora.rs`):
 
 ```
 offset 0..4    magic           = b"LORA"
@@ -57,7 +57,7 @@ Both files load cleanly via:
 - `LoraAdapter::load_first(path)` → first adapter only.
 
 **Note:** `LoraPlayer::new_with_lora`, `LoraWasmPlayer::new_with_lora`, and
-`HLPlayer::new_with_secrets` (in `katgpt-rs/src/pruners/bomber/players.rs`)
+`HLPlayer::new_with_secrets` (in `seal-online-remaster/crates/seal-gm-tools/src/tabs/players.rs`)
 call `load_first` — only adapter 0 is wired into inference. Layers 1–5 are
 silently dropped on these players. This is the documented single-forward-pass
 heuristic limitation; multi-adapter full wiring requires the L2+ inference
@@ -67,7 +67,7 @@ path.
 
 These are **NOT** the same as the various `lora_final.bin` files scattered
 across `riir-ai/output/`. Per
-`riir-train/.docs/09_training_data_pipeline.md:376`
+`riir-train/.docs/02_pipelines/training_data_pipeline.md:376`
 (`cp output/lora_final.bin raw/game_lora.bin`), the convention is:
 
 ```

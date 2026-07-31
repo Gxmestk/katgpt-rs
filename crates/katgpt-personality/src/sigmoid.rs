@@ -1,27 +1,22 @@
 //! Numerically stable sigmoid helper (Plan 297 T1.5).
 //!
 //! Per AGENTS.md: sigmoid is mandated over softmax for projections onto
-//! learned direction vectors. The branching implementation below avoids
-//! overflow for large `|x|` — the negative branch computes `e^x / (1 + e^x)`
-//! instead of `1 / (1 + e^{-x})`, so `e^{-x}` never overflows for `x → -∞`.
-//!
-//! # Stability
-//!
-//! - `x ≥ 0`: `1 / (1 + e^{-x})` — `e^{-x} ∈ (0, 1]`, no overflow.
-//! - `x < 0`: `e^x / (1 + e^x)` — `e^x ∈ (0, 1)`, no overflow.
-//! - `|x| > ~18`: result saturates to `0.0` or `1.0` in f32 (correct).
-//! - `|x| > 88`: `e^{±88}` would overflow f32, but the branching avoids it.
+//! learned direction vectors. Delegates to `katgpt_types::simd::fast_sigmoid`
+//! (Cephes 6th-order polynomial for `exp`, ~1 ULP accurate, ~1.7× faster
+//! than libm on aarch64). The ±40 early-exit in `fast_sigmoid` matches the
+//! f32 precision floor (σ(±40) saturates in f32), so the prior two-branch
+//! overflow guard is unnecessary.
 
-/// Numerically stable scalar sigmoid: `σ(x) = 1 / (1 + e^{-x})`.
+/// Scalar sigmoid: `σ(x) = 1 / (1 + e^{-x})`.
 ///
-/// Branching on the sign of `x` avoids `e^{-x}` overflow for large negative
-/// `x`. The result is in `(0, 1)` for all finite inputs, and saturates to
-/// `0.0` / `1.0` for `|x| > ~18` (correct limit behaviour).
+/// Delegates to `katgpt_types::simd::fast_sigmoid` (Cephes polynomial).
+/// The result is in `(0, 1)` for all finite inputs, and saturates to
+/// `0.0` / `1.0` for `|x| > 40` (correct limit behaviour in f32 precision).
 ///
 /// # Examples
 ///
 /// ```
-/// # use katgpt_core::personality_composition::sigmoid;
+/// # use katgpt_personality::sigmoid;
 /// assert!((sigmoid(0.0) - 0.5).abs() < 1e-6);
 /// assert!(sigmoid(100.0) > 0.999999);
 /// assert!(sigmoid(-100.0) < 1e-6);
@@ -29,12 +24,7 @@
 /// ```
 #[inline]
 pub fn sigmoid(x: f32) -> f32 {
-    if x >= 0.0 {
-        1.0 / (1.0 + (-x).exp())
-    } else {
-        let e = x.exp();
-        e / (1.0 + e)
-    }
+    katgpt_types::simd::fast_sigmoid(x)
 }
 
 /// Vectorized sigmoid: `out[i] = σ(x[i])`.

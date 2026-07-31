@@ -112,16 +112,16 @@ A pairwise win is counted ONLY if both orders agree. Disagreements → treated a
 
 | Paper Concept | Our Component | Location | Type |
 |---------------|---------------|----------|------|
-| Proposer (k samples) | DDTree branch expansion | `speculative/dd_tree.rs` | Model-based |
-| Critic (m votes) | ScreeningPruner + ConstraintPruner | `speculative/types.rs` | Modelless→model-based |
-| Comparator (r votes) | BtRank pairwise tournament | `pruners/bt_rank.rs` | Model-based |
-| Copeland tournament | `BtScores::rank()` | `pruners/bt_rank.rs` | Modelless |
-| Verifier R_x | `ConstraintPruner::is_valid()` | `speculative/types.rs` | Modelless |
-| Valid state system | TreeNode state space | `speculative/types.rs` | Structural |
-| Progress rank d_x | TreeNode depth / rollout position | `speculative/types.rs` | Structural |
-| Portfolio P_N | BanditPruner strategies | `pruners/bandit.rs` | Modelless |
+| Proposer (k samples) | DDTree branch expansion | `src/speculative/dd_tree.rs` | Model-based |
+| Critic (m votes) | ScreeningPruner + ConstraintPruner | `crates/katgpt-core/src/speculative/types.rs` | Modelless→model-based |
+| Comparator (r votes) | BtRank pairwise tournament | `crates/katgpt-pruners/src/bt_rank.rs` | Model-based |
+| Copeland tournament | `BtScores::rank()` | `crates/katgpt-pruners/src/bt_rank.rs` | Modelless |
+| Verifier R_x | `ConstraintPruner::is_valid()` | `crates/katgpt-core/src/speculative/types.rs` | Modelless |
+| Valid state system | TreeNode state space | `crates/katgpt-core/src/speculative/types.rs` | Structural |
+| Progress rank d_x | TreeNode depth / rollout position | `crates/katgpt-core/src/speculative/types.rs` | Structural |
+| Portfolio P_N | BanditPruner strategies | `crates/katgpt-ruliology/src/bandit.rs` | Modelless |
 | Blind-spot floor B | Unseen states / unsolvable positions | (diagnostic) | Measurement |
-| SR²AM configurator | Budget allocator (k,m,r sizing) | `pruners/configurator_bandit.rs` | Modelless |
+| SR²AM configurator | Budget allocator (k,m,r sizing) | `crates/katgpt-pruners/src/configurator_bandit.rs` | Modelless |
 
 ### Our Stack IS the Committee Protocol
 
@@ -356,8 +356,8 @@ The conceptual alignment is near-perfect:
   - `040_OpenDeepThink_Bradley_Terry_Pairwise_Ranking.md` (BtRank design)
   - `076_SR2AM_Self_Regulated_Simulative_Reasoning.md` (budget configurator)
 - Key code:
-  - `src/pruners/bt_rank.rs` — BtRank pairwise tournament (comparator)
+  - `crates/katgpt-pruners/src/bt_rank.rs` — BtRank pairwise tournament (comparator)
   - `src/speculative/dd_tree.rs` — DDTree branch expansion (proposer)
   - `src/speculative/types.rs` — ScreeningPruner, ConstraintPruner (critic/verifier)
-  - `src/pruners/bandit.rs` — BanditPruner (diversity)
-  - `src/pruners/configurator_bandit.rs` — SR²AM (budget allocator)
+  - `crates/katgpt-ruliology/src/bandit.rs` — BanditPruner (diversity)
+  - `crates/katgpt-pruners/src/configurator_bandit.rs` — SR²AM (budget allocator)

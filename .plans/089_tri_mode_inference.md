@@ -20,13 +20,13 @@ The Nemotron paper calls this "self-speculation" and presents it as a major cont
 
 | Component | What We Already Have | Delta |
 |---|---|---|
-| Draft→Verify→Accept pattern | `speculative/step.rs` `speculative_step_rollback()` | ✅ Same pattern |
+| Draft→Verify→Accept pattern | `crates/katgpt-forward/src/step.rs` `speculative_step_rollback()` | ✅ Same pattern |
 | `SpeculativeVerifier` trait | `verifier.rs` with `SimulatedVerifier`, `LeviathanVerifier` | ✅ Abstraction ready |
 | AR verification | `forward()` with causal attention | ✅ Already there |
 | Prefix acceptance | `speculate()` in `LeviathanVerifier` | ✅ Already there |
 | DDTree path extraction | `dd_tree.rs` | ✅ Already there |
 | KV cache snapshot/rollback | `MultiLayerKVCache::snapshot()/restore()` | ✅ Already there |
-| D2F block decode (drafter) | `d2f_decode_block()` in `speculative/d2f.rs` | ✅ Already there |
+| D2F block decode (drafter) | `d2f_decode_block()` in `src/speculative/d2f.rs` | ✅ Already there |
 | D2F context (zero-alloc) | `D2fContext` in `dllm.rs` | ✅ Already there |
 | **D2F drafter verifier** | **MISSING** | ❌ ~100 lines, new `SpeculativeVerifier` impl |
 
@@ -81,7 +81,7 @@ tri_mode = ["dllm"]  # depends on dllm for D2F drafter
 - [x] Test: acceptance rate measurement on pattern data vs LeviathanVerifier (AR drafter)
 
 ### T2: DecodeStrategy Extension (katgpt-rs) ✅
-- [x] Extend `DecodeStrategy` enum in `speculative/types.rs`:
+- [x] Extend `DecodeStrategy` enum in `crates/katgpt-core/src/speculative/types.rs`:
   ```rust
   pub enum DecodeStrategy {
       Autoregressive,
@@ -95,7 +95,7 @@ tri_mode = ["dllm"]  # depends on dllm for D2F drafter
 - [x] Test: recommend() returns correct strategy per config
 
 ### T3: Wire Into Existing Pipeline (katgpt-rs) ✅
-- [x] Add `pub mod d2f_verifier;` to `speculative/mod.rs` behind `tri_mode` feature
+- [x] Add `pub mod d2f_verifier;` to `crates/katgpt-core/src/speculative/mod.rs` behind `tri_mode` feature
 - [x] Ensure `D2fDrafterVerifier` integrates with existing `ConstraintPruner`
   - D2F draft already calls pruner at each denoising step ✅
   - AR verify already prunes via `is_valid()` ✅
@@ -105,7 +105,7 @@ tri_mode = ["dllm"]  # depends on dllm for D2F drafter
   - AR verify: uses `MultiLayerKVCache` KV (causal)
   - These are separate caches — draft KV is NOT reused for verify
   - This is correct: different attention patterns need different KV states
-- [x] Add `SelfSpecConfig` to `speculative/types.rs`:
+- [x] Add `SelfSpecConfig` to `crates/katgpt-core/src/speculative/types.rs`:
   ```rust
   /// Config for D2F-drafter self-speculation mode.
   /// Wraps D2F decode config + draft width for speculative step.
@@ -118,7 +118,7 @@ tri_mode = ["dllm"]  # depends on dllm for D2F drafter
 - [x] Test: D2F+AR output matches AR-only ground truth (quality check)
 
 ### T4: Global Loss Averaging (katgpt-rs dllm.rs) ✅
-- [x] Update `masked_loss()` in `src/dllm.rs`:
+- [x] Update `masked_loss()` in `riir-ai/crates/riir-engine/src/transformer/dllm.rs`:
   ```rust
   // BEFORE (per-sequence):
   // L = (1/N) * Σ_n (1/L) * Σ_i ℓ_{n,i}

@@ -11,7 +11,7 @@
 
 ### Phase 1: Trait Definition
 
-- [x] T1: Define `GameState` trait in `src/pruners/game_state.rs` with `Action` assoc type, `advance()`, `is_terminal()`, `reward()`, `available_actions()`, `current_player()`, `tick()`
+- [x] T1: Define `GameState` trait in `riir-ai/crates/riir-engine/src/game_state.rs` with `Action` assoc type, `advance()`, `is_terminal()`, `reward()`, `available_actions()`, `current_player()`, `tick()`
 - [x] T2: Define `StateHeuristic<S: GameState>` trait for pluggable evaluation functions
 - [x] T3: Define `ActionSpaceLog` struct for per-tick action space metrics
 - [x] T4: Register `game_state` module in `src/pruners/mod.rs` with feature gate `game_state = ["bomber"]`
@@ -26,14 +26,14 @@
 
 ### Phase 3: Generic MCTS
 
-- [x] T10: Implement `mcts_search<S: GameState>()` in `src/pruners/game_state/mcts.rs` — UCB1 selection, random rollout, configurable budget (FM calls), configurable rollout depth
+- [x] T10: Implement `mcts_search<S: GameState>()` in `crates/katgpt-pruners/src/game_state/mcts.rs` — UCB1 selection, random rollout, configurable budget (FM calls), configurable rollout depth
 - [x] T11: MCTS skips opponent turns (same simplification as STRATEGA paper — only optimize current player's action sequence)
 - [x] T12: Write unit tests: MCTS returns a valid action, respects budget, prefers winning moves in trivial states
 
 ### Phase 4: Example + Benchmark
 
 - [x] T13: Create `examples/game_state_01_bomber_mcts.rs` — MCTS player vs Random/Greedy players, 100 rounds, print win rates
-- [x] T14: Add `bench_game_state()` to `src/benchmark.rs` — measure `BomberState::advance()` ops/sec and `mcts_search()` actions/sec
+- [x] T14: Add `bench_game_state()` to `src/benchmark/mod.rs` — measure `BomberState::advance()` ops/sec and `mcts_search()` actions/sec
 - [x] T15: Print `ActionSpaceLog` per tick to validate branching factor tracking
 
 ### Phase 5: Documentation

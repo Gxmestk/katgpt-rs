@@ -3,7 +3,7 @@
 **Research:** [232_Task_Relevant_Identifiability_Specialist.md](../.research/232_Task_Relevant_Identifiability_Specialist.md)
 **Paper:** arXiv 2605.12733 — From Generalist to Specialist Representation (Zheng et al., ICML 2026)
 **Date:** 2026-06-14
-**Status:** 🟢 Phase 0 complete (14 unit tests + 1 doc-test pass). Phases 1-5 pending. Unblocks Plan 264 Phase 2 and riir-ai Plan 300 Phase 0.
+**Status:** ✅ COMPLETE (2026-07-02) — All phases done, all gates PASS (G0a/G0b Phase 0; G1–G3 Fusion A BCKVSS; G4–G6 Fusion B SPLAT; G7–G9 Fusion C CCCP; G10 Phase 4 adaptive CoT). T5.3 promotion DONE 2026-07-02: `band_conditioner`, `specialist_projection`, `collider_consistency` all DEFAULT-ON in root `Cargo.toml` (modules moved to `katgpt-band` / `katgpt-sparse` crates in Phase 11, 2026-07-04). `bckvss` (Fusion A) remains opt-in — not part of T5.3 promotion scope.
 **Feature Gates:** `band_conditioner` (Fusion A), `specialist_projection` (Fusion B), `collider_consistency` (Fusion C). All opt-in until GOAT-proven.
 **Constraints:**
 - Modelless only — no LLM training (constraint 1).
@@ -22,7 +22,7 @@
 
 The three fusions share one primitive: the **band conditioning set** and the conditional-dependence test. Build it once, share it.
 
-- [x] T0.1 Create `src/band_conditioner.rs` skeleton.
+- [x] T0.1 Create `crates/katgpt-band/src/band_conditioner.rs` skeleton.
 - [x] T0.2 Implement `BandConditioningSet` struct: `{ inner: [usize; 4], task: usize }` with builder `from_segments(k, v, task, segment_len, total_steps) -> Self` per paper eq. (4). Handle out-of-range indices by omission.
 - [x] T0.3 Implement `conditional_dependence_ci(x: &[f32], y: &[f32], z_columns: &[&[f32]], n_samples: usize, alpha: f32) -> bool` — Fisher z-test on partial correlation (paper §5 setup). Sigmoid-bound the p-value to `[0,1]` for downstream consumption.
 - [x] T0.4 Implement `conditional_dependence_infonce(x_emb, y_emb, z_emb, critic, n_negatives: usize) -> f32` — the CMI surrogate from paper Appendix C, returning sigmoid-bounded score.
@@ -54,7 +54,7 @@ The three fusions share one primitive: the **band conditioning set** and the con
 
 ### Phase 2 — Fusion B: Specialist Latent Projection (SPLAT) — UNBLOCKS Plan 264
 
-- [x] T2.1 Create `src/specialist_projection.rs`.
+- [x] T2.1 Create `crates/katgpt-sparse/src/specialist_projection.rs`.
 - [x] T2.2 Implement `JacobianSupportEstimator` — given hidden activations `h ∈ R^{B×d}` and task embeddings `g ∈ R^{B×k}`, estimate `I(Ju)_{i,·}` via finite-difference Jacobian-vector products (paper Prop 2 needs `|I(Ju)|` samples; we approximate with batch finite differences).
 - [x] T2.3 Implement `SpecialistMask::from_support(support: &[Vec<u32>], shape: (usize, usize)) -> Self` — reuses `SparseTaskVector` storage from Plan 264 (DRY — single sparse representation).
 - [x] T2.4 Implement `SpecialistMask::project(&self, hidden: &mut [f32], scratch: &mut [f32])` — in-place sparsity-bound projection per Theorem 2: `h_specialist = h · M_sparse`.
@@ -66,12 +66,12 @@ The three fusions share one primitive: the **band conditioning set** and the con
 - [x] T2.10 GOAT test G4: Projected hidden state dim reduced ≥ 30% with downstream-task accuracy delta < 1% on synthetic specialist benchmark (paper Fig 5 R² gap). **PASS** (50% reduction, 0% delta).
 - [x] T2.11 GOAT test G5: Mask discovery cost ≤ `d_hidden` samples (paper Prop 2 upper bound). **PASS**.
 - [x] T2.12 GOAT test G6: SPLAT-masked attention matches dense attention quality at 50% density on synthetic attention benchmark (the density at which MSA GOAT-FAILED). **PASS** (argmax match, rel-L2 < 0.1).
-- [x] T2.13 Wire SPLAT as the inference-time consumer of `SparseTaskVector` in Plan 264 Phase 2 — closes Plan 264 T2.1-T2.3. (`SpecialistMask::as_sparse_task_vector()` exposes the underlying storage; `src/off_principal.rs` is owned by the concurrent Plan 264 subagent — not modified.)
+- [x] T2.13 Wire SPLAT as the inference-time consumer of `SparseTaskVector` in Plan 264 Phase 2 — closes Plan 264 T2.1-T2.3. (`SpecialistMask::as_sparse_task_vector()` exposes the underlying storage; `crates/katgpt-spectral/src/off_principal.rs` is owned by the concurrent Plan 264 subagent — not modified.)
 - [x] T2.14 Example: `examples/splat_vs_dense_attention.rs` showing before/after quality and FLOPs. (Source written; example build blocked by pre-existing broken manifest entry — see Known Issues.)
 
 ### Phase 3 — Fusion C: Collider-Consistency ConstraintPruner (CCCP)
 
-- [x] T3.1 Create `src/collider_pruner.rs`.
+- [x] T3.1 Create `crates/katgpt-band/src/collider_pruner.rs`.
 - [x] T3.2 Implement `ColliderConstraint` struct: holds segment boundaries + active task colliders.
 - [x] T3.3 Implement `ConstraintPruner` for `ColliderConstraint`:
   ```rust
@@ -112,16 +112,16 @@ Paper's Algorithm 1 + Theorem 1 give a *theory-backed* stopping criterion for ad
   *(Deferred: real-model comparison not available modellessly in this repo; would need riir-ai runtime data. The "demote loser" rule requires evidence the loser actually lost in production, not just on synthetic.)*
 - [x] T5.5 Update README with showcase entry under "GOAT-Proved Additions" — three new items. **DONE (2026-07-02)** — added 3 rows to the GOAT-Proved Additions table (band_conditioner G0a/G0b, specialist_projection G4-G6, collider_consistency G7-G9). Updated default-on count 144→147 in README header + E2E section.
   *(Unblocked by T5.3 promotion. Three rows follow the Plan 264 precedent of one-row-per-feature.)*
-- [x] T5.6 Mark Plan 264 Phase 2 unblocked (SPLAT is the consumer). **DONE** — `SpecialistMask::as_sparse_task_vector()` (src/specialist_projection.rs:333-337) exposes the underlying `SparseTaskVector` storage. Plan 264 Phase 2 ultimately chose an SVD-based `OffPrincipalIndex` instead (T2.1-T2.8 all `[x]`), so SPLAT remains an *available-but-unconsumed* primitive in katgpt-rs — likely consumer is riir-ai model-based training (Plan 300) for TJS-LoRA mask composition.
+- [x] T5.6 Mark Plan 264 Phase 2 unblocked (SPLAT is the consumer). **DONE** — `SpecialistMask::as_sparse_task_vector()` (crates/katgpt-sparse/src/specialist_projection.rs:333-337) exposes the underlying `SparseTaskVector` storage. Plan 264 Phase 2 ultimately chose an SVD-based `OffPrincipalIndex` instead (T2.1-T2.8 all `[x]`), so SPLAT remains an *available-but-unconsumed* primitive in katgpt-rs — likely consumer is riir-ai model-based training (Plan 300) for TJS-LoRA mask composition.
 - [-] T5.7 Cross-link Plan 300 (riir-ai model-based) — riir-ai consumes the engine primitives for TJS-LoRA training. **OUT OF SCOPE** — riir-ai repo.
   *(Deferred (cross-repo): riir-ai owns the TJS-LoRA training consumer.)*
 
 ### Phase 6 — Documentation
 
 - [x] T6.1 Add module-level docs explaining the three theorems (Thm 1, Prop 2, Thm 2) with one-paragraph summaries. (Added to all 4 new `.rs` files.)
-- [-] T6.2 Add cross-references from `ConstraintPruner` trait doc to CCCP impl. **OUT OF SCOPE** — `katgpt-core/src/traits.rs` not in write scope.
-  *(Deferred: `katgpt-core/src/traits.rs` is owned by the substrate crate; cross-ref would be a separate small docs PR.)*
-- [-] T6.3 Add cross-references from `SparseTaskVector` (Plan 264) doc to SPLAT consumer. **OUT OF SCOPE** — `src/sparse_task_vector.rs` not in write scope (owned by Plan 264).
+- [-] T6.2 Add cross-references from `ConstraintPruner` trait doc to CCCP impl. **OUT OF SCOPE** — `crates/katgpt-core/src/traits/mod.rs` not in write scope.
+  *(Deferred: `crates/katgpt-core/src/traits/mod.rs` is owned by the substrate crate; cross-ref would be a separate small docs PR.)*
+- [-] T6.3 Add cross-references from `SparseTaskVector` (Plan 264) doc to SPLAT consumer. **OUT OF SCOPE** — `crates/katgpt-sparse/src/sparse_task_vector.rs` not in write scope (owned by Plan 264).
   *(Deferred: owned by Plan 264; cross-ref would be a separate small docs PR.)*
 - [-] T6.4 Note in README that this research rescues MSA (Plan 256 GOAT-FAILED). **OUT OF SCOPE** — README not in write scope.
   *(Deferred: gated on T5.3 promotion — the MSA-rescue note belongs in the showcase entry, which is premature while features remain opt-in.)*
@@ -177,11 +177,11 @@ graph TD
 
 | File | Lines (est.) | Purpose |
 |---|---|---|
-| `src/band_conditioner.rs` | ~400 | Phase 0 shared primitive (BandConditioningSet + CI tests) |
-| `src/bckvss.rs` | ~350 | Fusion A: KV segment selector |
-| `src/specialist_projection.rs` | ~450 | Fusion B: SPLAT projection |
-| `src/collider_pruner.rs` | ~300 | Fusion C: ConstraintPruner impl |
-| `src/adaptive_cot_stopper.rs` | ~200 | Phase 4: theory-backed CoT stopping |
+| `crates/katgpt-band/src/band_conditioner.rs` | ~400 | Phase 0 shared primitive (BandConditioningSet + CI tests) |
+| `crates/katgpt-band/src/bckvss.rs` | ~350 | Fusion A: KV segment selector |
+| `crates/katgpt-sparse/src/specialist_projection.rs` | ~450 | Fusion B: SPLAT projection |
+| `crates/katgpt-band/src/collider_pruner.rs` | ~300 | Fusion C: ConstraintPruner impl |
+| `crates/katgpt-band/src/adaptive_cot_stopper.rs` | ~200 | Phase 4: theory-backed CoT stopping |
 | `examples/band_conditioning_demo.rs` | ~80 | Phase 0 doc example |
 | `examples/bckvss_vs_dense.rs` | ~120 | Fusion A before/after |
 | `examples/splat_vs_dense_attention.rs` | ~150 | Fusion B before/after + MSA rescue |

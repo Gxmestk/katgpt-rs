@@ -324,6 +324,105 @@ pub fn load_ternary_bits(path: &std::path::Path) -> std::io::Result<katgpt_core:
     })
 }
 
+/// Load a Bonsai-format `.1bits` binary weight file (Issue 145).
+///
+/// Format (little-endian):
+///   magic           8 bytes  b"BNPLSMA1"  (Bonsai Plasma 1)
+///   rows            u32
+///   cols            u32
+///   blocks64        u32
+///   groups_per_row  u32
+///   group_scale     rows × groups_per_row × f16  (2 bytes each)
+///   sign_bits       rows × blocks64 × u64         (8 bytes each)
+#[cfg(feature = "binary_plasma")]
+pub fn load_binary_bits(path: &std::path::Path) -> std::io::Result<katgpt_core::BinaryWeights> {
+    use std::io::Read;
+    let mut f = std::fs::File::open(path)?;
+    let file_len = f.metadata()?.len() as usize;
+    let mut buf = Vec::with_capacity(file_len);
+    f.read_to_end(&mut buf)?;
+
+    if buf.len() < 24 {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            "file too small for header",
+        ));
+    }
+
+    // Magic
+    if &buf[0..8] != b"BNPLSMA1" {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            "invalid magic",
+        ));
+    }
+
+    let rows = u32::from_le_bytes(buf[8..12].try_into().expect("header validated")) as usize;
+    let cols = u32::from_le_bytes(buf[12..16].try_into().expect("header validated")) as usize;
+    let blocks64 = u32::from_le_bytes(buf[16..20].try_into().expect("header validated")) as usize;
+    let groups_per_row =
+        u32::from_le_bytes(buf[20..24].try_into().expect("header validated")) as usize;
+
+    let expected_blocks = cols.div_ceil(64);
+    if blocks64 != expected_blocks {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            format!("blocks64 mismatch: header={blocks64}, expected={expected_blocks}"),
+        ));
+    }
+    let expected_groups = cols.div_ceil(128);
+    if groups_per_row != expected_groups {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            format!("groups_per_row mismatch: header={groups_per_row}, expected={expected_groups}"),
+        ));
+    }
+
+    let scale_bytes = rows * groups_per_row * 2; // f16
+    let sign_bytes = rows * blocks64 * 8; // u64
+    let expected_len = 24 + scale_bytes + sign_bytes;
+    if buf.len() < expected_len {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            "file truncated",
+        ));
+    }
+
+    let mut off = 24;
+
+    // group_scale: f16 values, bulk-copied (little-endian native).
+    let n_scales = rows * groups_per_row;
+    let mut group_scale = vec![half::f16::ZERO; n_scales];
+    unsafe {
+        std::ptr::copy_nonoverlapping(
+            buf[off..].as_ptr(),
+            group_scale.as_mut_ptr() as *mut u8,
+            n_scales * 2,
+        );
+    }
+    off += n_scales * 2;
+
+    // sign_bits: u64 values, bulk-copied.
+    let n_sign = rows * blocks64;
+    let mut sign_bits = vec![0u64; n_sign];
+    unsafe {
+        std::ptr::copy_nonoverlapping(
+            buf[off..].as_ptr(),
+            sign_bits.as_mut_ptr() as *mut u8,
+            n_sign * 8,
+        );
+    }
+
+    Ok(katgpt_core::BinaryWeights {
+        rows,
+        cols,
+        blocks64,
+        groups_per_row,
+        sign_bits,
+        group_scale,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -21,7 +21,7 @@ pub enum ThinkMode {
 
 /// Control tokens injected by the controller at switch / convergence / termination
 /// instants. The caller resolves these to concrete token ids via
-/// [`ControlToken::resolve_control_token`] (a free function in the katgpt-rs
+/// `ControlToken::resolve_control_token` (a free function in the katgpt-rs
 /// root shim, since it consumes `thinking_cot::ControlTokenIds` which can't
 /// live in this substrate crate).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -76,7 +76,7 @@ pub enum StepAction {
 /// - `max_steps` — host-provided horizon for the α_t / β_t linear schedule.
 /// - `kurtosis_escape_threshold` — excess kurtosis above which Latent mode is
 ///   bypassed (Plan 275 T3.8 G6 auto-fallback). The host supplies a per-step
-///   kurtosis scalar via [`SwiRController::observe_kurtosis`]; if it exceeds
+///   kurtosis scalar via [`SwiRController::observe_kurtosis`](crate::swir::SwiRController::observe_kurtosis); if it exceeds
 ///   this threshold, the controller refuses to enter Latent mode (rigid-
 ///   constraint tasks where soft embeddings would hallucinate). `f32::INFINITY`
 ///   disables the escape hatch. Paper doesn't specify a value; 3.0 mirrors

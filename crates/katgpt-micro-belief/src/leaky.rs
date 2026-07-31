@@ -2,36 +2,36 @@
 //!
 //! This module exposes the Family C implementation of
 //! [`MicroRecurrentBeliefState`] for Plan 276. It reuses the **shared**
-//! leaky-integrator update math that lives in [`crate::leaky_core`] — the
-//! same primitive that [`ReconstructionState::evolve_hla`] delegates to.
+//! leaky-integrator update math that lives in `crate::leaky_core` — the
+//! same primitive that `ReconstructionState::evolve_belief` delegates to.
 //!
 //! # History / scope
 //!
-//! Previously this file carried a standalone **mirror** of the `evolve_hla`
-//! math, with a note that refactoring `evolve_hla` itself to delegate here was
+//! Previously this file carried a standalone **mirror** of the `evolve_belief`
+//! math, with a note that refactoring `evolve_belief` itself to delegate here was
 //! "OUT OF SCOPE / locked". Plan 276 Phase 2 T2.1 has now landed: the math
-//! was lifted into [`crate::leaky_core`] (ungated, so `sense` can depend on it
+//! was lifted into `crate::leaky_core` (ungated, so `sense` can depend on it
 //! without pulling in the `micro_belief` feature). Both callers now share one
 //! update body:
 //!
 //! - [`LeakyIntegrator::step`] computes `total = Σ input[0..dim]` and calls
-//!   [`crate::leaky_core::leaky_step`].
-//! - [`ReconstructionState::evolve_hla`] computes `total = Σ kind_activations[0..6]`
-//!   and calls [`crate::leaky_core::leaky_step`] with the `KIND_MAP`-gathered
+//!   `crate::leaky_core::leaky_step`.
+//! - `ReconstructionState::evolve_belief` computes `total = Σ kind_activations[0..6]`
+//!   and calls `crate::leaky_core::leaky_step` with the `KIND_MAP`-gathered
 //!   8-element input.
 //!
 //! # Why the two callers pass different `total`s
 //!
-//! `evolve_hla`'s normalization mass is the 6 distinct SenseKind activations,
+//! `evolve_belief`'s normalization mass is the 6 distinct SenseKind activations,
 //! but its per-element update loop runs over 8 gathered inputs (dims 6,7 reuse
 //! kinds 0,1). The generic kernel here has no such wrap, so it sums all `dim`
 //! inputs. Both are correct for their respective call sites; the shared core
 //! takes `total` as a parameter precisely so neither quirk leaks into the
-//! primitive. See [`crate::leaky_core`] for the exact formula and rationale.
+//! primitive. See `crate::leaky_core` for the exact formula and rationale.
 //!
 //! # Stable public API (G2.1 benchmark depends on it)
 //!
-//! [`LeakyIntegrator`] exposes `new`, `hla_default`, `step`,
+//! [`LeakyIntegrator`] exposes `new`, `belief_default`, `step`,
 //! `project_to_scalars`, `family`. These are NOT changed by T2.1.
 //!
 //! Properties inherited from the shared core:
@@ -42,16 +42,16 @@
 use crate::bridge::project_to_scalars as bridge_project;
 use crate::types::{MicroRecurrentBeliefState, RecurrenceFamily};
 
-/// Family C leaky-integrator kernel — mirrors `ReconstructionState::evolve_hla`.
+/// Family C leaky-integrator kernel — mirrors `ReconstructionState::evolve_belief`.
 ///
 /// Construct with [`new`](Self::new). The kernel is stateless aside from its
 /// config (`lr`, `max_delta`, `dim`) — the belief vector lives in the caller's
 /// `&mut [f32]`.
 #[derive(Clone, Copy, Debug)]
 pub struct LeakyIntegrator {
-    /// Learning rate (`config.hla_learning_rate` in `ReconstructionState`).
+    /// Learning rate (`config.belief_learning_rate` in `ReconstructionState`).
     pub lr: f32,
-    /// Maximum per-tick delta (`config.max_hla_delta` in `ReconstructionState`).
+    /// Maximum per-tick delta (`config.max_belief_delta` in `ReconstructionState`).
     pub max_delta: f32,
     /// Belief-vector dimension.
     pub dim: usize,
@@ -67,8 +67,8 @@ impl LeakyIntegrator {
         Self { lr, max_delta, dim }
     }
 
-    /// Construct with HLA-default config (`lr=0.1`, `max_delta=0.2`).
-    pub fn hla_default(dim: usize) -> Self {
+    /// Construct with belief-default config (`lr=0.1`, `max_delta=0.2`).
+    pub fn belief_default(dim: usize) -> Self {
         Self::new(0.1, 0.2, dim)
     }
 
@@ -88,7 +88,7 @@ impl LeakyIntegrator {
     /// # Plan 306 Phase 4 (G3 — T4.3 caveat)
     ///
     /// `LeakyIntegrator::step` clamps the state to `[-1, 1]` on every tick
-    /// (per-element `.clamp(-1.0, 1.0)` in [`crate::leaky_core::leaky_step`]).
+    /// (per-element `.clamp(-1.0, 1.0)` in `crate::leaky_core::leaky_step`).
     /// It therefore **also classifies as `DepthInvariant`** by construction,
     /// like the attractor. The T4.3 negative control builds an *unclamped*
     /// leaky update inline in the test (no kernel-level support needed) so the
@@ -142,10 +142,10 @@ impl MicroRecurrentBeliefState for LeakyIntegrator {
 
     /// Advance one tick using the leaky-integrator update.
     ///
-    /// Delegates to the shared [`crate::leaky_core::leaky_step`] primitive —
-    /// the same body used by `ReconstructionState::evolve_hla`. Here `total` is
+    /// Delegates to the shared `crate::leaky_core::leaky_step` primitive —
+    /// the same body used by `ReconstructionState::evolve_belief`. Here `total` is
     /// `Σ input[0..dim]` (no KIND_MAP wrap); see the module docs for why
-    /// `evolve_hla` passes a different `total`.
+    /// `evolve_belief` passes a different `total`.
     #[inline]
     fn step(&self, state: &mut [f32], input: &[f32]) {
         debug_assert_eq!(state.len(), self.dim, "state/dim mismatch");
@@ -173,8 +173,8 @@ mod tests {
 
     #[test]
     fn zero_input_is_noop() {
-        // Matches evolve_hla: total < 1e-8 → early return, state unchanged.
-        let k = LeakyIntegrator::hla_default(8);
+        // Matches evolve_belief: total < 1e-8 → early return, state unchanged.
+        let k = LeakyIntegrator::belief_default(8);
         let mut state = [0.5f32; 8];
         let input = [0.0f32; 8];
         k.step(&mut state, &input);
@@ -198,13 +198,13 @@ mod tests {
 
     #[test]
     fn family_is_delta_rule() {
-        let k = LeakyIntegrator::hla_default(8);
+        let k = LeakyIntegrator::belief_default(8);
         assert_eq!(k.family(), RecurrenceFamily::DeltaRule);
     }
 
     #[test]
-    fn matches_evolve_hla_math_reference() {
-        // Reference implementation of the evolve_hla math, computed directly.
+    fn matches_evolve_belief_math_reference() {
+        // Reference implementation of the evolve_belief math, computed directly.
         // The kernel MUST produce identical output for the same input.
         let lr = 0.1f32;
         let max_delta = 0.2f32;
@@ -215,7 +215,7 @@ mod tests {
         let mut state_actual = [0.0f32; 8];
         let mut state_ref = [0.0f32; 8];
 
-        // Reference: verbatim evolve_hla body (without KIND_MAP — direct input).
+        // Reference: verbatim evolve_belief body (without KIND_MAP — direct input).
         let total: f32 = input.iter().sum();
         assert!(total >= 1e-8);
         let t_min = total.min(1.0);
@@ -231,14 +231,14 @@ mod tests {
         // Actual: through the kernel.
         k.step(&mut state_actual, &input);
 
-        assert_eq!(state_actual, state_ref, "kernel must match evolve_hla math");
+        assert_eq!(state_actual, state_ref, "kernel must match evolve_belief math");
     }
 
     #[test]
-    fn hla_default_matches_reconstruction_defaults() {
-        // The defaults here must match ReconstructionConfig's HLA defaults so
+    fn belief_default_matches_reconstruction_defaults() {
+        // The defaults here must match ReconstructionConfig's belief defaults so
         // the future T2.1 refactor is a true zero-behavior-change delegate.
-        let k = LeakyIntegrator::hla_default(8);
+        let k = LeakyIntegrator::belief_default(8);
         assert_eq!(k.lr, 0.1);
         assert_eq!(k.max_delta, 0.2);
         assert_eq!(k.dim, 8);

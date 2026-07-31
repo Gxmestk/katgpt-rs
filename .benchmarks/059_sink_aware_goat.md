@@ -17,7 +17,7 @@ Shipped the per-head sink classifier (`SinkKind`, `SinkDiagnostic`,
 (`SinkAwarePolicy`, `apply_dual_policy_gate`, `CachedSinkClassification`,
 `apply_dual_policy_gate_cached`) as an opt-in diagnostic primitive under
 the `sink_aware_attn` feature. The classifier lives in
-`crates/katgpt-core/src/data_probe.rs`; the root crate re-exports at
+`crates/katgpt-core/src/data_probe/mod.rs`; the root crate re-exports at
 `katgpt_rs::data_probe::sink_classify`.
 
 **NOT promoted to default features.** G1 (correctness) and the synthetic G2
@@ -34,7 +34,7 @@ G2 still DEFERRED.
 
 | Gate | Description | Status | Notes |
 |------|-------------|--------|-------|
-| **G1** | Classifier correctness on synthetic heads | ✅ PASS | 8/8 unit tests in `src/data_probe/sink_classify.rs`: NOP-only, Broadcast-only, mixed (both threshold variants), no-sink, zero-attn-column edge, degenerate-values edge, zero-matrix stable-rank. All edge cases handled without crash or NaN. |
+| **G1** | Classifier correctness on synthetic heads | ✅ PASS | 8/8 unit tests in `crates/katgpt-core/src/data_probe/sink_classify.rs`: NOP-only, Broadcast-only, mixed (both threshold variants), no-sink, zero-attn-column edge, degenerate-values edge, zero-matrix stable-rank. All edge cases handled without crash or NaN. |
 | **G2** | DualPolicy preserves Broadcast value info vs Uniform | ✅ PASS (synthetic) | 2/2 tests in `tests/sink_aware_g2_synthetic.rs`: Broadcast head — DualPolicy classifies as Broadcast → output == O unchanged; NOP head — DualPolicy classifies as NOP → output = O · σ(gate_scale). Uniform copies unchanged for both. |
 | **G2** (real ViT) | `effective_rank` preserved/improved on frozen ViT | ⏳ DEFERRED | Requires a real model + per-layer hook. Out of scope for this coding task. Synthetic G2 is the substitute. |
 | **G3** (per-call) | Latency overhead ≤5% (`DualPolicy` vs `Uniform`) | ❌ **STRUCTURAL FAIL** | 1000–3000% overhead at n=128/512, d_h=64. Memory-bandwidth bound: classifier reads attn (n²) + values (n·d); Uniform is just an n·d copy. Issue 001 T1–T5 optimizations (zero-alloc scratch, NOP fast-path, rank-1 cosine probe) brought the standalone `classify_sink_at` rank-1 path from 3.125µs → 0.625µs at n=128, but `apply_dual_policy_gate` still has to do the col_sums scan + value_norm scan, which fundamentally cannot beat a memcpy. |
@@ -62,7 +62,7 @@ G2 still DEFERRED.
 
 ## Phase 3 deliverables (DONE — scope-reduced per validation fallback)
 
-- ✅ T3.1 — `SinkAwarePolicy` enum shipped in `crates/katgpt-core/src/data_probe.rs`. **Scope reduction:** NOT wired into `ParallaxConfig` / `FuncAttnConfig` (would break backwards-compat for `Default` impls and add feature-gate complexity to the forward paths). Standalone path only.
+- ✅ T3.1 — `SinkAwarePolicy` enum shipped in `crates/katgpt-core/src/data_probe/mod.rs`. **Scope reduction:** NOT wired into `ParallaxConfig` / `FuncAttnConfig` (would break backwards-compat for `Default` impls and add feature-gate complexity to the forward paths). Standalone path only.
 - ✅ T3.2 — `apply_dual_policy_gate(attn, values, O, policy, gate_scale, scratch, out) -> SinkKind`. Standalone post-forward intervention. Classifies dominant sink; gates if NOP, copies if Broadcast/None.
 - ✅ T3.3 — Same `SinkAwarePolicy` enum + gate covers both parallax and funcattn paths (it's policy-agnostic). The funcattn-specific "scale Φ residual contribution" variant is not implemented — `apply_dual_policy_gate` operates on the post-`AV` output `O`, which is the same for both parallax and funcattn.
 - ✅ T3.4 — Synthetic G2 test `tests/sink_aware_g2_synthetic.rs` — 2/2 PASS. Real-ViT G2 DEFERRED.
@@ -71,10 +71,10 @@ G2 still DEFERRED.
 
 ## Phase 4 deliverables (DONE)
 
-- ✅ T4.1 — `LayerSinkSummary` added to `src/data_probe/geometry.rs`. Fields: `layer_index`, `n_nop_sinks`, `n_broadcast_sinks`, `dominant_kind`, `mean_broadcast_value_norm`.
+- ✅ T4.1 — `LayerSinkSummary` added to `crates/katgpt-core/src/data_probe/geometry.rs`. Fields: `layer_index`, `n_nop_sinks`, `n_broadcast_sinks`, `dominant_kind`, `mean_broadcast_value_norm`.
 - ✅ T4.2 — `summarize_layer_sinks(attn_per_head, values_per_head, cfg, scratch, layer_index) -> LayerSinkSummary`. Runs classifier across all heads, aggregates.
 - ✅ T4.3 — Example `examples/sink_phase_plot.rs`. Synthetic ViT-like activations; layers 0-3 NOP-dominant (zero CLS value), layers 4-7 would-be Broadcast (but `classify_all_sinks` doesn't pass `update_O`, so they show as None — documented in example output).
-- ✅ T4.4 — `src/data_probe/mod.rs` docstring updated with "mechanism locator vs aggregate symptom" framing.
+- ✅ T4.4 — `crates/katgpt-core/src/data_probe/mod.rs` docstring updated with "mechanism locator vs aggregate symptom" framing.
 
 ## Phase 5 deliverables (DONE)
 
@@ -220,9 +220,9 @@ The plan task text wrote `(Σσ_k)² / Σσ_k²` (nuclear-to-Frobenius ratio) bu
 We implement the **standard stable rank** because:
 1. It matches the prescribed approximation exactly.
 2. It only needs the top singular value (cheap power iteration).
-3. It is consistent with the Roy-Vetterli definition already shipped in `data_probe/geometry.rs::effective_rank`.
+3. It is consistent with the Roy-Vetterli definition already shipped in `crates/katgpt-core/src/data_probe/geometry.rs::effective_rank`.
 
-Documented in the module-level doc comment of `crates/katgpt-core/src/data_probe.rs`.
+Documented in the module-level doc comment of `crates/katgpt-core/src/data_probe/mod.rs`.
 
 ---
 
@@ -230,12 +230,12 @@ Documented in the module-level doc comment of `crates/katgpt-core/src/data_probe
 
 | File | Role | Lines |
 |------|------|-------|
-| `crates/katgpt-core/src/data_probe.rs` | Primitive: types, classifier, stable-rank, dual-policy gate. Gated `#[cfg(feature = "sink_aware_attn")]`. | ~620 |
+| `crates/katgpt-core/src/data_probe/mod.rs` | Primitive: types, classifier, stable-rank, dual-policy gate. Gated `#[cfg(feature = "sink_aware_attn")]`. | ~620 |
 | `crates/katgpt-core/src/lib.rs` | `pub mod data_probe;` + re-exports. | +16 |
 | `crates/katgpt-core/Cargo.toml` | `sink_aware_attn = []` feature. | +1 |
-| `src/data_probe/sink_classify.rs` | Root-crate re-export + 8 G1 unit tests. | ~265 |
-| `src/data_probe/mod.rs` | `pub mod sink_classify;` + re-exports + docstring. | +15 |
-| `src/data_probe/geometry.rs` | `LayerSinkSummary` + `summarize_layer_sinks`. | +108 |
+| `crates/katgpt-core/src/data_probe/sink_classify.rs` | Root-crate re-export + 8 G1 unit tests. | ~265 |
+| `crates/katgpt-core/src/data_probe/mod.rs` | `pub mod sink_classify;` + re-exports + docstring. | +15 |
+| `crates/katgpt-core/src/data_probe/geometry.rs` | `LayerSinkSummary` + `summarize_layer_sinks`. | +108 |
 | `Cargo.toml` | `data_probe` extended; `sink_aware_attn` added; 4 [[bench]]/[[test]]/[[example]] entries. | +6 +30 |
 | `benches/sink_classify_bench.rs` | Phase 2 T2.4 bench. | ~200 |
 | `benches/sink_aware_latency_bench.rs` | Phase 3 T3.5 bench. | ~140 |

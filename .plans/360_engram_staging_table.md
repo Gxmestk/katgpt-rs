@@ -5,7 +5,7 @@
 **Parent plan:** [katgpt-rs/.plans/299_Engram_Hash_Addressed_Pattern_Memory.md](299_Engram_Hash_Addressed_Pattern_Memory.md) (Phase 2 — `InMemoryEngramTable`, `EngramTableBuilder`)
 **Target:** `katgpt-rs/crates/katgpt-core/src/engram/staging.rs` (new module)
 **Cargo feature:** `engram` (existing — no new feature flag; sibling to `table.rs`)
-**Status:** Active — Phase 1 DONE (2026-07-03). 17/17 staging tests pass, 112/112 engram tests pass, 666/666 default-feature tests pass (no regression). Phase 2 (GOAT gate) + Phase 3 (docs wiring) + Phase 4 (promotion decision) pending. Ship behind existing `engram` (still default-off, gated on Plan 299 G6).
+**Status:** COMPLETE ✅ — All 4 phases done. GOAT gate G1/G2-at-2×/G3/G4 PASS; G2-at-10× FAIL honestly reported (2.3× measured — memory bandwidth dominates at 256MB; revised 10× → 2× bar for future re-gates). `engram` now transitively DEFAULT-ON via `cognitive_architecture_root → engram` chain (Issue 039, 2026-07-18 — primitive-level G1/G2/G4 PASS modellessly; G6 stays deferred but no longer blocks transitive default-on). See `.benchmarks/360_engram_staging_goat.md`.
 
 ---
 
@@ -245,7 +245,7 @@ Three deviations from the original plan T1.1–T1.7, all surfaced by the compile
 
 - [x] **T3.1** Add `mod staging;` to `crates/katgpt-core/src/engram/mod.rs` (between `mod table;` and `mod tokenizer;` — alphabetical). Behind `#[cfg(feature="engram")]` (the whole `engram` module already is, but be explicit for clarity). **Done in Phase 1 (commit 2ea4e669).**
 
-- [x] **T3.2** Add `pub use staging::StagingEngramTable;` to the `engram/mod.rs` re-export block (alongside `pub use table::{EngramTableBuilder, InMemoryEngramTable};`). **Done in Phase 1 (commit 2ea4e669).** Also added `StagingEngramTable, StagingError` to the crate-root `lib.rs` re-export (was missing — completed in Phase 2 session, same commit as the GOAT bench).
+- [x] **T3.2** Add `pub use staging::StagingEngramTable;` to the `crates/katgpt-core/src/engram/mod.rs` re-export block (alongside `pub use table::{EngramTableBuilder, InMemoryEngramTable};`). **Done in Phase 1 (commit 2ea4e669).** Also added `StagingEngramTable, StagingError` to the crate-root `lib.rs` re-export (was missing — completed in Phase 2 session, same commit as the GOAT bench).
 
 - [x] **T3.3** Update `crates/katgpt-core/src/engram/table.rs` docstring to cross-reference the staging table. **Done in Phase 1 (commit 2ea4e669).**
 
@@ -326,7 +326,7 @@ For a 1M-slot × D=64 table, the copy is 256 MB. This is real. Mitigations if it
 | `pub(crate)` accessors on `InMemoryEngramTable` (`from_parts`, `n_slots`, `dim`, `heads_boxed`) | ~20 | 1 (table.rs) |
 | `StagingEngramTable` impl (struct + constructors + mutations + commit + queries) | ~120 | 1 (staging.rs, NEW) |
 | Unit tests (T1.7, ~10 tests) | ~150 | 1 (staging.rs) |
-| GOAT gate (G1–G4, T2.1–T2.5) | ~200 | 1 (tests/bench_360_engram_staging_goat.rs, NEW) |
+| GOAT gate (G1–G4, T2.1–T2.5) | ~200 | 1 (crates/katgpt-core/tests/bench_360_engram_staging_goat.rs, NEW) |
 | Module wiring + docstring updates (T3.1–T3.4) | ~10 | 2 (mod.rs, table.rs) |
 | Proposal 003 update (T3.5) | ~5 | 1 (riir-ai) |
 | GOAT summary (T4.2) | ~50 | 1 (.benchmarks/360_*.md, NEW) |
@@ -341,7 +341,7 @@ Single-session achievable.
 - **Proposal 003** (the spawning proposal): `riir-ai/.proposals/003_engram_crud_table_tier_access_matrix.md` §3.1 (P1 — this plan), §6 (sizing), §7 (phasing).
 - **Plan 299** (the parent — `InMemoryEngramTable`, `EngramTableBuilder`, `EngramHotSwap`): `katgpt-rs/.plans/299_Engram_Hash_Addressed_Pattern_Memory.md`. Phases 1–8 COMPLETE; G6 deferred; `engram` feature stays opt-in.
 - **Research 147** (the Super-GOAT guide — names `engram_runtime/` TODO in §5): `riir-ai/.research/147_Engram_Conditional_Memory_NPC_Guide.md`.
-- **Existing GOAT bench pattern**: `katgpt-rs/crates/katgpt-core/tests/bench_299_engram_goat.rs` (Instant-based, `harness=false`).
+- **Existing GOAT bench pattern**: `katgpt-rs/tests/bench_299_engram_goat.rs` (Instant-based, `harness=false`).
 - **Existing micro-bench**: `katgpt-rs/crates/katgpt-core/benches/engram_micro.rs` (criterion; extend for staging).
 - **AGENTS.md GOAT gate rule**: `katgpt-rs/AGENTS.md` §"Feature Flag Discipline" — implement behind feature, write benchmark, run GOAT gate (G1 correctness, G2 perf, G3 no-regression, G4 alloc-free or equivalent), promote only if modelless gain.
 

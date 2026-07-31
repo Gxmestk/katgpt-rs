@@ -44,15 +44,15 @@
 //! # TL;DR
 //!
 //! [`AdaptiveTraceCompactor`] wraps [`OnlineCompactor`] with an entropy gate
-//! and a [`FrequencyBandit`] threshold tuner. Call [`observe_entropy`] every
-//! token, [`maybe_compact_adaptive`] when you'd normally consider compaction,
-//! and [`update_reward`] after each trace.
+//! and a [`FrequencyBandit`] threshold tuner. Call `observe_entropy` every
+//! token, `maybe_compact_adaptive` when you'd normally consider compaction,
+//! and `update_reward` after each trace.
 
+use crate::types::Rng;
 use katgpt_attn_match::compact::CompactError;
 use katgpt_attn_match::online::{OnlineCompactResult, OnlineCompactor};
 use katgpt_attn_match::types::AmConfig;
 use katgpt_pruners::freq_bandit::{FrequencyBand, FrequencyBandit};
-use crate::types::Rng;
 
 /// Per-trace cap on compactions. Prevents a long trace from compacting
 /// itself into oblivion — even if entropy stays low, we want a floor on
@@ -183,7 +183,7 @@ impl AdaptiveTraceCompactor {
     ///
     /// On a successful compaction, `compacts_done` is incremented and the
     /// bandit's last-selected arm is updated with the trace's eventual reward
-    /// via [`update_reward`].
+    /// via `update_reward`.
     #[allow(clippy::too_many_arguments)] // hot-path: lane buffers bundled for zero-alloc inference
     pub fn maybe_compact_adaptive(
         &mut self,

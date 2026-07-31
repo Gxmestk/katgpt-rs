@@ -120,33 +120,36 @@ impl<P: ScreeningPruner> FlowPruner<P> {
     /// High entropy = model unsure = should continue = low stop_prob.
     /// Low entropy = model confident = should stop = high stop_prob.
     pub fn set_stop_probs_from_entropy(&mut self, marginals: &[&[f32]]) {
-        self.stop_probs = marginals
-            .iter()
-            .map(|marginal| {
-                let sum: f32 = marginal.iter().copied().sum();
-                if sum <= 0.0 {
-                    return 0.5; // Unknown
+        self.stop_probs.clear();
+        self.stop_probs.reserve(marginals.len());
+        for marginal in marginals {
+            // Fused single-pass: compute sum and entropy together.
+            let mut sum = 0.0f32;
+            let mut entropy = 0.0f32;
+            for &p in *marginal {
+                sum += p;
+            }
+            if sum <= 0.0 {
+                self.stop_probs.push(0.5); // Unknown
+                continue;
+            }
+            for &p in *marginal {
+                if p > 0.0 {
+                    let pn = p / sum;
+                    entropy -= pn * pn.ln();
                 }
-                // Compute entropy
-                let entropy: f32 = marginal
-                    .iter()
-                    .filter(|&&p| p > 0.0)
-                    .map(|&p| {
-                        let pn = p / sum;
-                        -pn * pn.ln()
-                    })
-                    .sum();
-                // Max entropy for uniform distribution over vocab
-                let n = marginal.len().max(1) as f32;
-                let max_entropy = n.ln();
-                // Normalize: low entropy = high stop_prob
-                if max_entropy > 0.0 {
-                    1.0 - (entropy / max_entropy).min(1.0)
-                } else {
-                    0.5
-                }
-            })
-            .collect();
+            }
+            // Max entropy for uniform distribution over vocab
+            let n = marginal.len().max(1) as f32;
+            let max_entropy = n.ln();
+            // Normalize: low entropy = high stop_prob
+            let stop_prob = if max_entropy > 0.0 {
+                1.0 - (entropy / max_entropy).min(1.0)
+            } else {
+                0.5
+            };
+            self.stop_probs.push(stop_prob);
+        }
     }
 
     /// Get the stop probability at a given depth.

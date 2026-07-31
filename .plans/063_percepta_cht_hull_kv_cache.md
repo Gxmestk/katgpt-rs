@@ -1,5 +1,10 @@
 # Plan 063: Percepta CHT Hull KV Cache Upgrade (Phase A)
 
+> **Note on file paths (2026-07-18):** Some `*.rs` paths in this document
+> reference modules that were renamed, moved, or never landed under the
+> exact name shown. They are preserved as a **historical record** of the
+> original design intent; consult the current crate layout for the live
+> location.
 Replace Graham Scan + Ternary Search with Dynamic Convex Hull Trick (CHT) / LineContainer, matching the reference implementation at `.raw/transformer-vm/attention/hull2d_cht.h`.
 
 **Distillation strategy:** Percepta's `transformer-vm` is Apache-2.0. We distill to Rust under MIT per `.research/032_percepta_distillation_strategy.md`. This is Phase A (P0–P2: CHT + cumulative sum + parabolic encoding). Phase B (P3: ReGLU/stepglu) follows. Phase C (P4–P6: full compiler) is a pivot decision.
@@ -28,9 +33,9 @@ The reference uses a **Dynamic Convex Hull Trick** (CHT) via `std::multiset<Line
 
 - [x] **T1: Create `src/percepta/` module directory**
   - Move `src/percepta.rs` → `src/percepta/mod.rs` (re-export everything) ✅
-  - Create `src/percepta/cht.rs` for the new CHT implementation ✅
-  - Create `src/percepta/hull.rs` for the `HardAttentionHead` wrapper ✅
-  - Create `src/percepta/gates.rs` for ReGLU/stepglu primitives (deferred to TG-B)
+  - Create `crates/katgpt-percepta/src/cht.rs` for the new CHT implementation ✅
+  - Create `crates/katgpt-percepta/src/hull.rs` for the `HardAttentionHead` wrapper ✅
+  - Create `crates/katgpt-percepta/src/gates.rs` for ReGLU/stepglu primitives (deferred to TG-B)
   - Update `src/lib.rs` and any imports ✅
 
 - [x] **T2: Implement `HullMeta` value aggregation** ✅ `types.rs`

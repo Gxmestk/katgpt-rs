@@ -26,20 +26,20 @@ This is the **public open primitive** for Research 274's Super-GOAT verdict. The
 
 ### Tasks
 
-- [x] **T1.1** Create `katgpt-rs/src/cce/mod.rs` with module declaration. Add `cce_moderator` feature to `Cargo.toml` `[features]` section, default-off. Verify `cargo build --features cce_moderator` succeeds with empty module.
-- [x] **T1.2** Define core types in `katgpt-rs/src/cce/types.rs`:
+- [x] **T1.1** Create `katgpt-rs/crates/katgpt-core/src/cce/mod.rs` with module declaration. Add `cce_moderator` feature to `Cargo.toml` `[features]` section, default-off. Verify `cargo build --features cce_moderator` succeeds with empty module.
+- [x] **T1.2** Define core types in `katgpt-rs/crates/katgpt-core/src/cce/types.rs`:
   - `pub struct StateSpace<const N: usize>` — marker for finite state space of size `N`
   - `pub struct ActionSpace<const A: usize>` — marker for finite action space of size `A`
   - `pub struct OccupationMeasure<const N: usize, const A: usize>` — `Vec<f32>` of size `N·A`, normalized to sum to 1 (invariant checked on construction)
   - `pub trait DeviationClass` — `fn deviations(&self) -> &[Deviation]; fn apply(&self, κ: &Deviation, ρ: &OccupationMeasure) -> OccupationMeasure`
   - `pub struct Deviation { id: u32, kernel: [[f32; A]; N] }` — a fixed alternative policy `κ : S → P(A)`
   - `pub trait PayoffTensor<const N: usize, const A: usize>` — `fn gamma(&self, ρ: &OccupationMeasure) -> f32; fn gamma_dev(&self, ρ: &OccupationMeasure, κ: &Deviation) -> f32; fn gamma0(&self, ρ: &OccupationMeasure) -> f32`
-- [x] **T1.3** Implement `ExternalRegret<D: DeviationClass>` in `katgpt-rs/src/cce/external_regret.rs`:
+- [x] **T1.3** Implement `ExternalRegret<D: DeviationClass>` in `katgpt-rs/crates/katgpt-core/src/cce/external_regret.rs`:
   - `pub fn er(&self, ρ: &OccupationMeasure, d: &D, p: &impl PayoffTensor) -> f32` — returns `max_κ (Γ[ρ] − Γ_dev[ρ](κ))`
   - `pub fn best_deviation(&self, ρ: &OccupationMeasure, d: &D, p: &impl PayoffTensor) -> Deviation` — returns argmax_κ
   - `pub fn is_unique_maximizer(&self, ρ: &OccupationMeasure, d: &D, p: &impl PayoffTensor, ε: f32) -> bool` — Assumption 6.2 check: top-2 gap > ε
   - `pub fn linear_derivative(&self, ρ: &OccupationMeasure, m_idx: usize, d: &D, p: &impl PayoffTensor) -> f32` — `δER/δρ = F[m](m) − F[m](κ*(ρ))` per Lemma 6.5
-- [x] **T1.4** Add unit tests in `katgpt-rs/src/cce/external_regret.rs`:
+- [x] **T1.4** Add unit tests in `katgpt-rs/crates/katgpt-core/src/cce/external_regret.rs`:
   - `test_er_zero_on_nash` — for `ρ = δ_(m⋆, m⋆)` (Dirac on Nash), `ER = 0`
   - `test_er_positive_off_nash` — perturb `ρ`, `ER > 0`
   - `test_unique_maximizer_strictly_convex` — for a strictly convex deviation problem, uniqueness holds
@@ -56,19 +56,19 @@ This is the **public open primitive** for Research 274's Super-GOAT verdict. The
 
 ### Tasks
 
-- [x] **T2.1** Implement `CceLp<N, A>` in `katgpt-rs/src/cce/lp.rs`:
+- [x] **T2.1** Implement `CceLp<N, A>` in `katgpt-rs/crates/katgpt-core/src/cce/lp.rs`:
   - `pub fn solve(&self, p: &impl PayoffTensor, d: &D) -> Result<OccupationMeasure, CceLpError>` — solves the LP via Gaussian elimination on the active-set form (small N ≤ 16). Variables: `N·A` occupation-measure entries. Constraints: (i) sum = 1 (probability), (ii) consistency `marginal_A(ρ) = π_recommendation(ρ)`, (iii) regret inequalities `Γ[ρ] ≤ Γ_dev[ρ](κ)` for all `κ ∈ D`, (iv) non-negativity. Objective: minimize `Γ₀(ρ)`.
   - `pub fn is_cce(&self, ρ: &OccupationMeasure, d: &D, p: &impl PayoffTensor, ε: f32) -> bool` — verification: `ER(ρ) ≤ ε`
   - **Implementation note:** used BFS (basic-feasible-solution) enumeration instead of active-set simplex — simpler, exact for small `N·A + |D| ≤ ~25`, and avoids ~300 LOC of pivoting logic. For Phase 2's emission-abatement test (`N=4, A=4, |D|=4`): `C(20, 5) = 15504` candidates, runs in <1ms.
   - **No external LP solver dep.** ✅
-- [x] **T2.2** Implement `CcePrimalDual` in `katgpt-rs/src/cce/primal_dual.rs`:
+- [x] **T2.2** Implement `CcePrimalDual` in `katgpt-rs/crates/katgpt-core/src/cce/primal_dual.rs`:
   - `pub struct CcePrimalDual { lambda: f32, rho: Vec<f32>, rho_avg: Vec<f32>, n_iter: usize, eta: f32 }`
   - `pub fn step(&mut self, d: &D, p: &impl PayoffTensor) -> StepReport` — one primal-dual iteration per Algorithm 1
   - `pub fn run(&mut self, d: &D, p: &impl PayoffTensor, n_steps: usize) -> ConvergenceReportRaw<N, A>` — averaged iterates + regret history
   - Bregman potential: Euclidean `ψ(ρ) = ½·‖ρ‖²` (gives projection-style updates via `project_onto_simplex`). KL `ψ(ρ) = Σ ρ·log ρ` implemented in `bregman.rs` but not yet wired into the iterator (Phase 3 follow-up).
   - Primal: projected gradient (Euclidean potential → `project_onto_simplex` via Wang & Carreira-Perpiñán 2013 sort algorithm).
   - Dual: `λⁿ⁺¹ = max(0, λⁿ + (1/√N)·ER(ρⁿ⁺¹))` — per Algorithm 1. ✅
-- [x] **T2.3** Add Bregman divergence trait + Euclidean impl in `katgpt-rs/src/cce/bregman.rs`:
+- [x] **T2.3** Add Bregman divergence trait + Euclidean impl in `katgpt-rs/crates/katgpt-core/src/cce/bregman.rs`:
   - `pub trait BregmanPotential { fn divergence(&self, ρ: &OccupationMeasure, σ: &OccupationMeasure) -> f32; fn gradient(&self, ρ: &OccupationMeasure) -> Vec<f32>; }`
   - `pub struct Euclidean;` — `Dψ(ρ, σ) = ½·‖ρ − σ‖²`
   - `pub struct Kl;` — `Dψ(ρ, σ) = Σ ρ·log(ρ/σ)` (implemented, not yet wired into `CcePrimalDual`)
@@ -89,7 +89,7 @@ This is the **public open primitive** for Research 274's Super-GOAT verdict. The
 
 - [x] **T3.1** **G1 — CCE ≥ Nash benchmark** in `katgpt-rs/tests/cce_vs_nash.rs`:
   - Three canonical games: RPS (no Pareto gain, CCE = Nash), chicken (Pareto-dominant CCE exists), battle-of-sexes (Pareto-dominant CCE exists).
-  - For each: solve via `CceLp::solve` (with `Γ₀ = sum of player payoffs`); solve via `PayoffTable<N>::nash_equilibrium` (already shipped in `riir-games/src/payoff.rs`).
+  - For each: solve via `CceLp::solve` (with `Γ₀ = sum of player payoffs`); solve via `PayoffTable<N>::nash_equilibrium` (already shipped in `crates/katgpt-ruliology/src/payoff.rs`).
   - Assert: `Γ₀(ρ_CCE) ≥ Γ₀(ρ_Nash)` (with `≥` because we maximize welfare, not minimize cost); for chicken and BoS, strict `>` by ≥ 5%.
   - **Implementation note**: `PayoffTable<N>::nash_equilibrium` lives in `riir-games` (separate crate), so Nash welfare is computed analytically (chicken mixed Nash = 4.0, BoS mixed Nash = 2.4). Player-1-only CCE model used (deviation class contains only player 1's deviations); welfare numbers are an upper bound on full-game CCE welfare. Multi-player extension deferred to riir-ai Plan 325.
   - G1 PASS: chicken +37.5% (5.5 vs 4.0), BoS +108% (5.0 vs 2.4). RPS: softer sanity check (LP exploits free state distribution without dynamics constraint — documented limitation).
@@ -200,7 +200,7 @@ Estimated total LOC: ~1500 (within AGENTS.md 3200-line file budget).
 - Research: [`katgpt-rs/.research/274_Optimal_CCE_Moderator_LP_No_Regret.md`](../.research/274_Optimal_CCE_Moderator_LP_No_Regret.md)
 - Private guide: [`riir-ai/.research/143_Latent_CCE_Moderator_Crowd_Emergent_Coordination.md`](../../riir-ai/.research/143_Latent_CCE_Moderator_Crowd_Emergent_Coordination.md)
 - Private plan: [`riir-ai/.plans/325_latent_cce_moderator_runtime.md`](../../riir-ai/.plans/325_latent_cce_moderator_runtime.md)
-- Existing Nash solver (deviation class for 1v1 CCE): `riir-games/src/payoff.rs::PayoffTable<N>`
+- Existing Nash solver (deviation class for 1v1 CCE): `crates/katgpt-ruliology/src/payoff.rs::PayoffTable<N>`
 - Existing OMD machinery (dual update inspiration): `katgpt-rs/src/pruners/prudent_banker.rs`
 - Existing mean-field α router (primal update inspiration): `katgpt-rs/crates/katgpt-core/src/cgsp/dual_pool.rs`
 

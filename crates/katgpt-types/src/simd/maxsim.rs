@@ -83,13 +83,13 @@ pub fn maxsim_score(queries: &[f32], documents: &[f32], lq: usize, ld: usize, di
 /// Packed/ragged MaxSim scoring: score N (query, doc) pairs with offset arrays.
 ///
 /// Matches the Metal kernel's canonical API (maxsim README "Packed (ragged segments)").
-/// Each pair (pair_q_ids[i], pair_d_ids[i]) gets scored independently.
+/// Each pair `(pair_q_ids[i], pair_d_ids[i])` gets scored independently.
 ///
 /// # Arguments
-/// - `queries`:        flat buffer, query_offsets[i]..query_offsets[i+1] is `[dim]`
-/// - `query_offsets`:  [num_queries + 1] prefix-sum offsets
-/// - `documents`:      flat buffer, doc_offsets[i]..doc_offsets[i+1] is `[dim]`
-/// - `doc_offsets`:    [num_docs + 1] prefix-sum offsets
+/// - `queries`:        flat buffer, `query_offsets[i]..query_offsets[i+1]` is `[dim]`
+/// - `query_offsets`:  `[num_queries + 1]` prefix-sum offsets
+/// - `documents`:      flat buffer, `doc_offsets[i]..doc_offsets[i+1]` is `[dim]`
+/// - `doc_offsets`:    `[num_docs + 1]` prefix-sum offsets
 /// - `pair_q_ids`:     query index for each pair
 /// - `pair_d_ids`:     doc index for each pair
 /// - `dim`:            embedding dimension

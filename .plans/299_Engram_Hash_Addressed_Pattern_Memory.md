@@ -6,7 +6,7 @@
 **Source paper:** [arXiv:2601.07372](https://arxiv.org/pdf/2601.07372) — Engram, Cheng et al. 2026 (DeepSeek-AI / Peking U.)
 **Target:** `katgpt-rs/crates/katgpt-core/src/engram/` (new module)
 **Cargo feature:** `engram` (opt-in, default OFF — promote to default-on after G1–G7 GOAT gate passes; per AGENTS.md GOAT gate rule)
-**Status:** Active — Phases 1-8 complete. T1.7 proptest + T2.6 micro-bench landed. G1/G2/G4 GOAT gates PASS (48 ns/retrieval, ρ=1.0, bit-deterministic commitment). G3 (T6.6, Zipf workload) + G6 (T7.6, effective depth) deferred to riir-ai integration; feature stays opt-in until G6 lands.
+**Status:** ✅ COMPLETE, OPT-IN (pending G6 riir-ai integration) — Phases 1-8 complete. T1.7 proptest + T2.6 micro-bench landed. G1/G2/G4 GOAT gates PASS (48 ns/retrieval, ρ=1.0, bit-deterministic commitment). G3 (T6.6, Zipf workload) + G6 (T7.6, effective depth) deferred to riir-ai integration; feature stays opt-in until G6 lands.
 
 ---
 
@@ -137,7 +137,7 @@ Plus tests in `crates/katgpt-core/src/engram/` (unit) and `tests/bench_299_engra
 
 ### Tasks
 
-- [x] **T5.1** Define `EngramHotSwap` in `hotswap.rs` — mirror `SenseHotSwap` pattern (`sense/hotswap.rs`):
+- [x] **T5.1** Define `EngramHotSwap` in `hotswap.rs` — mirror `SenseHotSwap` pattern (`riir-ai/crates/riir-engine/src/sense/hotswap.rs`):
   - `table: AtomicPtr<Box<dyn EngramTable>>` (double-boxed so the AtomicPtr's T is Sized)
   - `lock: AtomicBool` — set during swap, cleared after
   - `current_commitment: AtomicU64` — low 8 bytes of BLAKE3, for fast identity check
@@ -229,7 +229,7 @@ Plus tests in `crates/katgpt-core/src/engram/` (unit) and `tests/bench_299_engra
 
 ### Tasks
 
-- [x] **T8.1** Module-level rustdoc in `engram/mod.rs`: what it does, when to use, the sparsity-axis framing (conditional memory vs conditional computation), reference to Research 278. Phase-status section updated; deferred TODOs removed.
+- [x] **T8.1** Module-level rustdoc in `crates/katgpt-core/src/engram/mod.rs`: what it does, when to use, the sparsity-axis framing (conditional memory vs conditional computation), reference to Research 278. Phase-status section updated; deferred TODOs removed.
 - [x] **T8.2** Added `katgpt-rs/.docs/27_engram_conditional_memory.md` covering: trait surface, when to enable, performance characteristics, comparison vs Raven (the other axis). (`26_micro_belief.md` already existed; bumped to 27.)
 - [x] **T8.3** Added `katgpt-rs/.benchmarks/299_engram_goat.md` with G1–G7 results table + promotion decision.
 - [x] **T8.4** Updated `katgpt-rs/README.md` Feature Showcase (Engram section added) + GOAT-Proved Additions table row. **Did NOT update `.docs/15_paper_feature_comparison.md`** — out of scope for this task (would require reviewing the entire matrix); documented here for orchestrator follow-up.
@@ -254,7 +254,7 @@ Plus tests in `crates/katgpt-core/src/engram/` (unit) and `tests/bench_299_engra
 | `crates/katgpt-core/src/engram/forward.rs` | fuse_into_hidden_state() end-to-end hook |
 | `tests/bench_299_engram_goat.rs` | G1–G7 GOAT gate tests |
 | `examples/engram_demo.rs` | End-to-end demo |
-| `benches/engram_micro.rs` | Criterion micro-benchmarks (lookup, sigmoid_fuse, hotswap) |
+| `crates/katgpt-core/benches/engram_micro.rs` | Criterion micro-benchmarks (lookup, sigmoid_fuse, hotswap) |
 
 **Estimated total:** ~2500–3000 LOC across engine + tests + benches + example.
 
@@ -266,7 +266,7 @@ Plus tests in `crates/katgpt-core/src/engram/` (unit) and `tests/bench_299_engra
 - **Private selling-point guide:** `riir-ai/.research/147_Engram_Conditional_Memory_NPC_Guide.md`
 - **Chain commitment half:** `riir-chain/.research/007_Engram_LatCal_Commitment_Bridge.md` (filed 2026-07-04; the chain commitment half — specifies EngramTableId commitment, 3-way integrity check extension, and slashing protocol)
 - **Existing primitives reused:**
-  - `SenseHotSwap` (`katgpt-rs/crates/katgpt-core/src/sense/hotswap.rs`) — AtomicPtr pattern
+  - `SenseHotSwap` (`katgpt-rs/crates/katgpt-core/src/engram/hotswap.rs`) — AtomicPtr pattern
   - `MerkleOctree` / `MerkleProof` (R221, P253) — binary Merkle root
   - `simd::simd_dot_f32`, `simd::simd_outer_product_acc` — SIMD kernels
   - `types::rmsnorm` — RMSNorm helper (if signature fits)

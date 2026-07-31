@@ -6,6 +6,7 @@
 > **Status:** Done — verdict locked (**GOAT for katgpt-rs**)
 > **Classification:** Public (this note). Training recipe → riir-train.
 > **Related Research:** 123 (Latent Functor Runtime — **ships the monolithic version as Super-GOAT; this paper is the factorized refinement**), 358 (SMWM — same-author Balestriero, PASS, monolithic runtime analog), 360 (AdaJEPA — PASS, monolithic runtime analog), 275 (Induced CWM — frozen forward model), 192 (NextLat — belief-state latent dynamics), 138 (LeJEPA — same-author Balestriero, LOW-MODERATE GAIN), 303 (FUNCATTN predecessor — Galerkin-style attention)
+> **Split verdict (synthesis):** Wei et al. [arXiv:2607.09185 "Causally Debiased Latent Action Model for Embodied Action Conditioned World Models"] — CD-LAM addresses a RELATED but DIFFERENT problem than this note. OTF-LAM (here) factorizes transitions into K codebook primitives to handle agent ambiguity (structural solution). CD-LAM identifies three named confounder types (zero-transition, camera-shift, shortcut leakage) and provides targeted debiasing objectives (corrective solution). **Training recipe → riir-train** (L_emb/L_ctr/L_cal are genuinely gradient-descent losses; §3.5 Path 0 fails). **Diagnostic framework → GAIN** (Research 460, Issue 194 — `LatentConfounderAudit`: three modelless forward-pass checks for confounder purity, applies to runtime-mined directions like MAG/TILR/Steering). The modelless factorized-codebook solution to a related problem ships here as `factorized_action` (Plan 375, GOAT PASS); CD-LAM's diagnostic framework is a complementary quality tool, not a duplicate.
 > **Related Plans:** 273 (latent_functor arithmetic — the monolithic baseline), 375 (this paper's open primitive), 297 (PersonalityWeightedComposition — weighted layer composition cousin), 296 (InducedCwmKernel — the frozen `g_φ`)
 > **Domain:** katgpt-rs (this note, public — the open primitive). Runtime wiring → riir-ai (cross-ref only, no guide this session — GOAT, not Super-GOAT).
 
@@ -69,20 +70,20 @@ Replace pixel-space prediction with prediction in a **frozen DINOv2 representati
 | Paper term | Codebase equivalent | Where it ships / would land |
 |---|---|---|
 | latent action `z^act_t` | action-direction vector, motor gate latent, policy latent | `latent_functor/` direction vectors; HLA motor channels |
-| observed transition `(x_t, x_{t+1})` | frame delta, TxDelta, temporal derivative, belief-state transition | `katgpt-core/src/temporal_deriv.rs` (DEFAULT-ON Plan 277); `latent_functor/arithmetic.rs` source/target pairs |
+| observed transition `(x_t, x_{t+1})` | frame delta, TxDelta, temporal derivative, belief-state transition | `crates/katgpt-core/src/temporal_deriv.rs` (DEFAULT-ON Plan 277); `crates/katgpt-percepta/src/wasm/interpreter/arithmetic.rs` source/target pairs |
 | observed-transition primitive `c(k)` | codebook entry, effect atom, shard style dimension | **DOES NOT SHIP for transitions** — codebooks exist only for KV compression (`katgpt-kv`, Lloyd-Max). This primitive would be new. |
-| motion input `o_t` (gradient/Sobel + temporal diff) | temporal derivative signal | `katgpt-core/src/temporal_deriv.rs` (DEFAULT-ON) — ships the dual fast/slow surprise signal |
+| motion input `o_t` (gradient/Sobel + temporal diff) | temporal derivative signal | `crates/katgpt-core/src/temporal_deriv.rs` (DEFAULT-ON) — ships the dual fast/slow surprise signal |
 | patchify + patchwise VQ | block quantization, patch embedding | KV-cache has K-means VQ on groups of 4 channels; no transition-patch equivalent |
 | occupancy map `M(k)_t` | spatial support mask, attention mask | DEC cochains (`terrain_cochains.rs`); zone density maps |
 | activation strength `w(k)_t` | code usage frequency, slot utilization | `ShardIndex` utilization; MoE expert load |
 | state-aware factor token `r_{t,k} = Γ(c(k), M, w, x_t)` | state-conditioned embedding, FiLM-modulated token | `ega_attn.rs` FiLM-style gating; `funcattn` cross-feature interaction |
-| sigmoid relevance gate `α_k = σ(G_θ(r))` | sigmoid gate (hard rule, never softmax) | Pervasive: `ega_attn`, `gdn2/kernel`, `rat_bridge/fuse`, `manifold_power_iter_router`, `latent_functor/arithmetic.rs::functor_gate` |
+| sigmoid relevance gate `α_k = σ(G_θ(r))` | sigmoid gate (hard rule, never softmax) | Pervasive: `ega_attn`, `gdn2/kernel`, `rat_bridge/fuse`, `manifold_power_iter_router`, `crates/katgpt-percepta/src/wasm/interpreter/arithmetic.rs::functor_gate` |
 | normalized gated average `Σ α_k r_k / (Σ α_k + ε)` | soft attention, mean-field aggregation | `mean_field/` module; `set_attention.rs`; `PersonalityWeightedComposition::compose_into` (Plan 297) |
 | frozen DINO representation space | frozen encoder, fixed embedding target | `InducedCwmKernel` (frozen `g_φ`); `BeliefInferenceFn` (observation→belief); sleep-time frozen rollforward |
-| inverse dynamics (IDM) | `extract_functor` (estimate displacement from pairs) | `latent_functor/arithmetic.rs` — **monolithic** (single mean displacement) |
-| forward dynamics (FDM) | `apply_functor` (predict target from source + functor); `InducedCwmKernel::advance` | `latent_functor/arithmetic.rs`; `katgpt-core/src/induced_cwm/` |
-| agent ambiguity / distractor entanglement | curiosity = prediction-error signal (Pathak-style distractor filter) | `katgpt-core/src/temporal_deriv.rs` (DEFAULT-ON); CGSP (Plan 274) |
-| cross-morphology / cross-carrier transfer | cross-game transfer, shard reuse across zones/archetypes | `latent_functor/cross_game.rs`; `NeuronShard` zone transfer; `ArchetypeBlendShard` |
+| inverse dynamics (IDM) | `extract_functor` (estimate displacement from pairs) | `crates/katgpt-percepta/src/wasm/interpreter/arithmetic.rs` — **monolithic** (single mean displacement) |
+| forward dynamics (FDM) | `apply_functor` (predict target from source + functor); `InducedCwmKernel::advance` | `crates/katgpt-percepta/src/wasm/interpreter/arithmetic.rs`; `katgpt-core/src/induced_cwm/` |
+| agent ambiguity / distractor entanglement | curiosity = prediction-error signal (Pathak-style distractor filter) | `crates/katgpt-core/src/temporal_deriv.rs` (DEFAULT-ON); CGSP (Plan 274) |
+| cross-morphology / cross-carrier transfer | cross-game transfer, shard reuse across zones/archetypes | `riir-ai/crates/riir-engine/src/latent_functor/cross_game.rs`; `NeuronShard` zone transfer; `ArchetypeBlendShard` |
 | behavioral cloning policy | training-only | → riir-train |
 | VQ-VAE codebook learning (k-means init + EMA + commitment loss) | training-only (OR runtime k-means — modelless unblock path) | → riir-train (trained); katgpt-rs (runtime k-means) |
 | action decoder (latent → true action) | training-only | → riir-train |
@@ -98,14 +99,14 @@ The mandatory two-layer novelty check (notes + shipped code, per the Research 24
 | Paper mechanism | Shipped prior art | Match |
 |---|---|---|
 | Monolithic latent action (`z^act` = single vector) | `extract_functor`/`apply_functor` (Research 123, Plan 273) — Super-GOAT | ✅ Monolithic version ships |
-| Inverse dynamics (`z_{t+1} ≈ z_t + ρ(a)`) | `latent_functor/arithmetic.rs` + `sleep_time::HlaSleepTimeOp` (DEFAULT-ON) | ✅ Ships (Research 358/360 PASS precedent) |
+| Inverse dynamics (`z_{t+1} ≈ z_t + ρ(a)`) | `crates/katgpt-percepta/src/wasm/interpreter/arithmetic.rs` + `sleep_time::HlaSleepTimeOp` (DEFAULT-ON) | ✅ Ships (Research 358/360 PASS precedent) |
 | Plan-execute-adapt-replan loop | `ReestimationScheduler` (Research 123, Plans 303/317) | ✅ Ships (Research 360 PASS precedent) |
 | Frozen forward model (`g_φ`) | `InducedCwmKernel: GameState` (Plan 296) | ✅ Ships |
 | Curiosity / distractor filter | Temporal Deriv Kernel (Plan 277, DEFAULT-ON) | ✅ Ships |
 | **Factorized codebook of K transition primitives** | **NOT FOUND** — codebooks exist only for KV compression (`katgpt-kv` Lloyd-Max), never for transition/observation factorization | ❌ **Novel** |
 | **Per-primitive sigmoid relevance gate over a codebook** | Sigmoid gates are pervasive, but NOT applied over a factorized transition codebook | ❌ **Novel as a combination** |
 | **Normalized gated average of codebook primitives → action latent** | `PersonalityWeightedComposition` does weighted composition over LAYERS, not over a transition codebook | ❌ **Novel as a combination** |
-| Cross-morphology codebook transfer | `latent_functor/cross_game.rs` transfers functors (monolithic); no codebook-transfer mechanism | ❌ **Novel** |
+| Cross-morphology codebook transfer | `riir-ai/crates/riir-engine/src/latent_functor/cross_game.rs` transfers functors (monolithic); no codebook-transfer mechanism | ❌ **Novel** |
 
 **The factorization is the novel angle.** The monolithic latent-action primitive already ships as Super-GOAT (Research 123). OTF-LAM is the **factorized/compositional refinement**: instead of one displacement vector, K discrete primitives combined via state-aware sigmoid gating.
 

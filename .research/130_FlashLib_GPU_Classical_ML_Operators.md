@@ -32,7 +32,7 @@ def triton_pca(X, K, *, tol=None):
     return _triton_pca_dual(X, K, tol=tol)        # X·Xᵀ → (N×N)
 ```
 
-**Our code** (`spectralquant/calibration.rs` L289):
+**Our code** (`riir-ai/crates/riir-gpu/src/spectralquant/calibration.rs` L289):
 ```rust
 // ALWAYS computes d_h × d_h covariance, even when seq_len < d_h
 let [dx, dy, dz] = dispatch_2d(d_h as usize, d_h as usize, 16, 16);

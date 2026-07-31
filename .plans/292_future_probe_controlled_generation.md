@@ -4,8 +4,8 @@
 **Research:** [`.research/267_Future_Probe_Controlled_Generation_Detection_vs_Prediction_Features.md`](../.research/267_Future_Probe_Controlled_Generation_Detection_vs_Prediction_Features.md)
 **Source paper:** [openreview 48NnVTsirb](https://openreview.net/forum?id=48NnVTsirb) — Kortukov et al., NeurIPS 2026 / Mech Interp Workshop at ICML 2026
 **Reference impl:** <https://github.com/kortukov/future_probes>
-**Target:** `katgpt-rs/src/pruners/future_probe.rs` (new module) + `katgpt-rs/src/pruners/feature_class.rs` (vocabulary tag) + Cargo features `future_probe`, `fpcg_selector`
-**Status:** Active — Phase 1 ✓ / Phase 2 ✓ / Phase 3 ✓ / Phase 4 ✓ (G1–G7 all PASS at the mechanism level via the modelless mean-difference probe path + synthetic corpus; G1–G4 real-model run remains a riir-train/riir-ai follow-up per issue 032) / Phase 5 ✓ DECIDED (features stay opt-in pending real-model evidence; Phase 1 vocabulary tag always-on)
+**Target:** `katgpt-rs/crates/katgpt-pruners/src/future_probe.rs` (new module) + `katgpt-rs/crates/katgpt-pruners/src/feature_class.rs` (vocabulary tag) + Cargo features `future_probe`, `fpcg_selector`
+**Status:** ✅ COMPLETE — Phase 1 ✓ / Phase 2 ✓ / Phase 3 ✓ / Phase 4 ✓ (G1–G7 all PASS at the mechanism level via the modelless mean-difference probe path + synthetic corpus; G1–G4 real-model run remains a riir-train/riir-ai follow-up per issue 032) / Phase 5 ✓ DECIDED (features stay opt-in pending real-model evidence; Phase 1 vocabulary tag always-on)
 
 ---
 
@@ -36,7 +36,7 @@ The smallest, highest-value output of this plan. The detection-vs-prediction dis
 
 ### Tasks
 
-- [x] **T1.1** Create `src/pruners/feature_class.rs` with `FeatureClass` enum:
+- [x] **T1.1** Create `crates/katgpt-pruners/src/feature_class.rs` with `FeatureClass` enum:
 
   ```rust
   /// Tags how a primitive reads model activations.
@@ -63,7 +63,7 @@ The smallest, highest-value output of this plan. The detection-vs-prediction dis
 
 - [x] **T1.2** Add `fn feature_class(&self) -> FeatureClass` to `ScreeningPruner` trait with default `FeatureClass::Detection` (non-breaking). All existing pruners inherit Detection by default — no migration.
 - [x] **T1.3** Add `FeatureClass::Detection` annotation to `EmotionDirections`, CNA's pruner, `FaithfulnessProbe`, `RegimeTransition`. (Document-only — they already default to Detection; this makes it explicit.)
-- [x] **T1.4** Add a doc cross-reference in `crates/katgpt-core/src/traits.rs` pointing to Research 267 for the rationale.
+- [x] **T1.4** Add a doc cross-reference in `crates/katgpt-core/src/traits/mod.rs` pointing to Research 267 for the rationale.
 - [x] **T1.5** Unit test: assert `EmotionDirections::feature_class() == Detection`. Assert that a new `FutureBehaviorProbe` (Phase 2) returns `Prediction`. Assert the default impl returns `Detection`.
 - [x] **T1.6** Add `feature_class` field to `ReviewMetrics` for telemetry (count of detection-side vs prediction-side reads per session).
 
@@ -73,11 +73,11 @@ The smallest, highest-value output of this plan. The detection-vs-prediction dis
 
 ## Phase 2 — FutureBehaviorProbe Primitive
 
-The forecast-side primitive. Single new file: `src/pruners/future_probe.rs`. Mirror `src/pruners/emotion_vector.rs` for the projection pattern.
+The forecast-side primitive. Single new file: `crates/katgpt-pruners/src/future_probe.rs`. Mirror `crates/katgpt-pruners/src/emotion_vector.rs` for the projection pattern.
 
 ### Tasks
 
-- [x] **T2.1** Define types in `src/pruners/future_probe.rs`:
+- [x] **T2.1** Define types in `crates/katgpt-pruners/src/future_probe.rs`:
 
   ```rust
   /// Frozen direction vector for forecasting future behavior probability.
@@ -149,7 +149,7 @@ The candidate-sampler + score + select loop. Mirrors the CGSP Conjecturer→Guid
 
 ### Tasks
 
-- [x] **T3.1** Define `SentenceCandidateSelector` trait (in `src/pruners/future_probe.rs` or a new `src/pruners/fpcg_selector.rs`):
+- [x] **T3.1** Define `SentenceCandidateSelector` trait (in `crates/katgpt-pruners/src/future_probe.rs` or a new `crates/katgpt-pruners/src/fpcg_selector.rs`):
 
   ```rust
   /// Generates M candidate next-utterance-spans for FPCG.
@@ -277,7 +277,7 @@ Deferred. Only kicks in if Phase 5 promotes. Sketch:
 ## Dependencies
 
 - Phase 1: none (pure trait change).
-- Phase 2: `simd` primitives from `crates/katgpt-core/src/simd.rs` (simd_dot_f32), `blake3` crate (already in workspace), `papaya` or `arc-swap` for atomic direction swap (already in workspace).
+- Phase 2: `simd` primitives from `crates/katgpt-dec/src/simd.rs` (simd_dot_f32), `blake3` crate (already in workspace), `papaya` or `arc-swap` for atomic direction swap (already in workspace).
 - Phase 3: Phase 2 + a forward-pass interface (already exists in `inference_backend.rs` / `transformer_still.rs`).
 - Phase 4: a small test model + corpus. Reuse the smallest config in `katgpt-rs/Cargo.toml` presets (`micro`).
 

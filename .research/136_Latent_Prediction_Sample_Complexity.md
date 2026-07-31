@@ -119,7 +119,7 @@ The training-time applications (latent-prediction loss for wgpu LoRA, ILC for ga
 Follows existing modelless distillation pattern (GFlowNet Plan 052, ROPD Plan 071, SDAR Plan 072):
 
 ```rust
-// Feature-gated module: katgpt-rs-core/src/distill/ilc.rs
+// Feature-gated module: crates/katgpt-speculative/src/distill/ilc.rs
 #[cfg(feature = "ilc_distill")]
 pub mod ilc {
     /// Offline: cluster episode data into synonym groups

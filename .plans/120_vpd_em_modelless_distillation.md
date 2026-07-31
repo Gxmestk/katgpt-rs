@@ -24,14 +24,14 @@ VPD identifies a critical flaw in existing self-distillation (SDPO): the feedbac
 
 | Component | Location | Role |
 |-----------|----------|------|
-| `SdarBanditPruner<P>` | `src/pruners/sdar/mod.rs` | Sigmoid-gated reward bandit — **becomes E-step target** |
-| `SdarGatedAbsorbCompress<P>` | `src/pruners/sdar/mod.rs` | Sigmoid-gated absorb — **becomes M-step distiller** |
-| `sdar_gate()` / `sdar_modulate()` | `src/pruners/sdar_gate.rs` | σ(β·x) gate function — reuse as-is |
-| `BtConfig` / `BtComparison` | `src/pruners/bt_rank.rs` | BT pairwise ranking — **extend for BCO unpaired** |
+| `SdarBanditPruner<P>` | `crates/katgpt-pruners/src/sdar/mod.rs` | Sigmoid-gated reward bandit — **becomes E-step target** |
+| `SdarGatedAbsorbCompress<P>` | `crates/katgpt-pruners/src/sdar/mod.rs` | Sigmoid-gated absorb — **becomes M-step distiller** |
+| `sdar_gate()` / `sdar_modulate()` | `crates/katgpt-pruners/src/sdar_gate.rs` | σ(β·x) gate function — reuse as-is |
+| `BtConfig` / `BtComparison` | `crates/katgpt-pruners/src/bt_rank.rs` | BT pairwise ranking — **extend for BCO unpaired** |
 | `SdarPlayer` | `src/pruners/bomber/sdar_player.rs` | SDAR bomber player — **add E/M cycle** |
-| `BanditPruner<P>` with UCB1 | `src/pruners/bandit.rs` | Core bandit — reuse Q-value tracking |
+| `BanditPruner<P>` with UCB1 | `crates/katgpt-ruliology/src/bandit.rs` | Core bandit — reuse Q-value tracking |
 | `DataGatePlayer` | `src/pruners/bomber/` | Stability gating — VPD dynamic prior is related |
-| `AbsorbCompressLayer<P>` | `src/pruners/absorb_compress.rs` | Compression/distillation — reuse as M-step core |
+| `AbsorbCompressLayer<P>` | `crates/katgpt-pruners/src/absorb_compress.rs` | Compression/distillation — reuse as M-step core |
 
 ### What's New (Implement)
 
@@ -46,7 +46,7 @@ VPD identifies a critical flaw in existing self-distillation (SDPO): the feedbac
 
 ## Tasks
 
-- [x] T1: Implement `BcoSample` and `BcoOptimizer` in `src/pruners/vpd_em.rs`
+- [x] T1: Implement `BcoSample` and `BcoOptimizer` in `crates/katgpt-pruners/src/vpd_em.rs`
 - [x] T2: Implement `VpdConfig` with paper-validated defaults (F=5, β=0.1, λ=0.01)
 - [x] T3: Implement `VpdEmCycle` — the core EM loop with asymmetric frequency
 - [x] T4: Implement `DynamicPrior` — replace static π_ref with current π_θ anchoring
@@ -62,7 +62,7 @@ VPD identifies a critical flaw in existing self-distillation (SDPO): the feedbac
 ## Test Coverage
 
 - `tests/test_120_vpd_em_goat.rs` — 10 GOAT proof tests (BCO loss, shift convergence, E-step frequency, dynamic prior, config defaults, softmax/KL)
-- `src/pruners/vpd_em.rs` — 31 internal unit tests (log_sigmoid, softmax, KL divergence, BCO optimizer, VpdConfig, VpdEmCycle)
+- `crates/katgpt-pruners/src/vpd_em.rs` — 31 internal unit tests (log_sigmoid, softmax, KL divergence, BCO optimizer, VpdConfig, VpdEmCycle)
 - `src/pruners/bomber/vpd_player.rs` — 10 internal unit tests (reward, player init, action selection, outcome, reset)
 - Run: `cargo test --features vpd_em_distill --test test_120_vpd_em_goat`
 - Run: `cargo test --features "vpd_em_distill,bomber" -p katgpt-rs --lib vpd`
@@ -85,7 +85,7 @@ tests/
 ### Key Types
 
 ```rust
-// src/pruners/vpd_em.rs
+// crates/katgpt-pruners/src/vpd_em.rs
 
 /// BCO unpaired preference sample.
 /// Unlike BtComparison (paired winner/loser), BCO operates on individual samples.

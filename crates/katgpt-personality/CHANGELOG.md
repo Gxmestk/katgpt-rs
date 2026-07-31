@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.2](https://github.com/katopz/katgpt-rs/compare/katgpt-personality-v0.1.1...katgpt-personality-v0.1.2) - 2026-07-31
+
+### Added
+
+- add to_bytes/from_bytes/restore_r_expected to PersonalityWeightedComposition (Issue 456 Phase 2)
+
+### Other
+
+- *(simd)* DRY consolidate sigmoid to fast_sigmoid across remaining crates
+- *(katgpt-personality)* fix stale doctest reference
+- apply rustfmt import-sorting drift pass
+- fix all 504 cargo doc warnings in remaining workspace crates
+
 ## [0.1.1](https://github.com/katopz/katgpt-rs/compare/katgpt-personality-v0.1.0...katgpt-personality-v0.1.1) - 2026-07-11
 
 ### Fixed

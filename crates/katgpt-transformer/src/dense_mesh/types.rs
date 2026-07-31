@@ -302,13 +302,8 @@ pub fn latent_to_raw_scalar(latent: &[f32], direction: &[f32]) -> f32 {
         dot += latent[i] * direction[i];
         i += 1;
     }
-    // Numerically stable sigmoid.
-    if dot >= 0.0 {
-        1.0 / (1.0 + (-dot).exp())
-    } else {
-        let e = dot.exp();
-        e / (1.0 + e)
-    }
+    // Delegates to `katgpt_core::simd::fast_sigmoid` (Cephes polynomial).
+    katgpt_core::simd::fast_sigmoid(dot)
 }
 
 /// Lift a raw scalar into a dense direction by scaling `direction` by `scalar`.

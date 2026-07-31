@@ -431,8 +431,9 @@ pub fn gate_sigmoid_topk_into(
         let row = &r_prime[i * d_model..(i + 1) * d_model];
         let dot = simd_dot_f32(x, row, d_model);
         let z = beta * dot;
-        // σ(z) = 1/(1+e^{-z}). Use libm exp for portability.
-        out_scores[i] = 1.0 / (1.0 + (-z).exp());
+        // σ(z) = 1/(1+e^{-z}). Delegates to `katgpt_core::simd::fast_sigmoid`
+        // (Cephes polynomial, ~1 ULP accurate).
+        out_scores[i] = katgpt_core::simd::fast_sigmoid(z);
     }
 
     // Initialize idx_buf to [0, 1, 2, ..., n_experts-1] in place.

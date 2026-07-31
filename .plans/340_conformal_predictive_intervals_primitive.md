@@ -5,8 +5,8 @@
 **Private guide:** [riir-ai/.research/165_Per_NPC_Conformal_UQ_Guide.md](../../riir-ai/.research/165_Per_NPC_Conformal_UQ_Guide.md)
 **Source paper:** [arXiv:2605.03789](https://arxiv.org/abs/2605.03789) — Manokhin, *Training-Free Probabilistic Time-Series Forecasting with Conformal Seasonal Pools*, 2026
 **Companion paper:** [arXiv:2606.09473](https://arxiv.org/abs/2606.09473) — *Report the Floor* (conformal interval as mandatory baseline)
-**Target:** `katgpt-rs/crates/katgpt-core/src/conformal.rs` (new module) + Cargo feature `conformal_predictive_intervals`
-**Status:** Phases 1 + 2 + 2.5 COMPLETE (2026-06-30). Open primitive skeleton (Phase 1), KARC adapter + Lorenz-63 coverage demo (Phase 2), and "Report the Floor" comparison harness (Phase 2.5, Issue 010 T2) all shipped behind `conformal_predictive_intervals` (opt-in). Phase 3 (riir-ai runtime integration) and Phase 4 (riir-neuron-db + riir-chain) filed as separate cross-repo plans. GOAT gate: `.benchmarks/340_conformal_goat.md`. The `ConformalIntervalCalibrator<SeasonalNaiveForecaster>` m=1 instance is the canonical UQ floor (per the "Report the Floor" rule).
+**Target:** `katgpt-rs/crates/katgpt-core/src/conformal/mod.rs` (new module) + Cargo feature `conformal_predictive_intervals`
+**Status:** Phases 1 + 2 + 2.5 COMPLETE (2026-06-30). Open primitive skeleton (Phase 1), KARC adapter + Lorenz-63 coverage demo (Phase 2), and "Report the Floor" comparison harness (Phase 2.5, Issue 010 T2) all shipped. **PROMOTED TO DEFAULT-ON 2026-07-20 (Plan 468)** — Plan 340 T1.14's deferral condition ("pending a runtime consumer that demonstrably beats its simpler heuristic counterpart") satisfied by Bench 564 (MCTS collapse G3 PASS) + Bench 565 (Salience Tri-Gate G3 PASS, ΔF1=+0.3145 at 6.3× gate margin). Consumer-level gates stay opt-in. Phase 3 (riir-ai runtime integration) landed across Plans 508-513 + Benches 562-568 (2 PASS, 2 FAIL, 1 correctness fix, 1 MIXED probe — see Research 165 §1.3 for the meta-pattern). Phase 4 (riir-neuron-db + riir-chain) filed as separate cross-repo plans. GOAT gate: `.benchmarks/340_conformal_goat.md`. The `ConformalIntervalCalibrator<SeasonalNaiveForecaster>` m=1 instance is the canonical UQ floor (per the "Report the Floor" rule).
 
 ---
 
@@ -192,29 +192,29 @@ impl PointForecaster for SeasonalPoolForecaster {
 
 ## Phase 1 — Unblocking Skeleton (CORE) ✅ COMPLETE (2026-06-30)
 
-GOAT gate PASSED — see [`.benchmarks/340_conformal_goat.md`](../.benchmarks/340_conformal_goat.md). G1 coverage [0.9445, 0.9493] (target [0.93, 0.97]), G2 interval_into H=1 = 642ns (target ≤ 1µs), G3 zero-alloc, G4 bit-reproducible. AirPassengers CRPS 115.06 vs ±2σ baseline 468.75 (4× sharper). Opt-in — promotion deferred to Plan 342.
+GOAT gate PASSED — see [`.benchmarks/340_conformal_goat.md`](../.benchmarks/340_conformal_goat.md). G1 coverage [0.9445, 0.9493] (target [0.93, 0.97]), G2 interval_into H=1 = 642ns (target ≤ 1µs), G3 zero-alloc, G4 bit-reproducible. AirPassengers CRPS 115.06 vs ±2σ baseline 468.75 (4× sharper). Originally opt-in — promotion deferred per T1.14. **Promotion landed 2026-07-20 (Plan 468)** after two runtime consumers (Bench 564 + Bench 565) demonstrated gains over their simpler heuristic counterparts.
 
 ### Tasks
 
-- [x] **T1.1** Create `crates/katgpt-core/src/conformal.rs` behind `#[cfg(feature = "conformal_predictive_intervals")]`. Empty `ConformalIntervalCalibrator<F>` struct, `PointForecaster` trait, `PredictiveInterval` struct, `ResidualMode` / `DecayUnit` enums. Wire `conformal_predictive_intervals` into `crates/katgpt-core/Cargo.toml` features list and `lib.rs` mod declaration.
+- [x] **T1.1** Create `crates/katgpt-core/src/conformal/mod.rs` behind `#[cfg(feature = "conformal_predictive_intervals")]`. Empty `ConformalIntervalCalibrator<F>` struct, `PointForecaster` trait, `PredictiveInterval` struct, `ResidualMode` / `DecayUnit` enums. Wire `conformal_predictive_intervals` into `crates/katgpt-core/Cargo.toml` features list and `lib.rs` mod declaration.
 - [x] **T1.2** Implement `ResidualRingBuffer` — per-channel × per-horizon-bucket sorted ring buffer. Configurable capacity (default 256 residuals per bucket). `push(r: f32, channel: usize, h_bucket: usize)` with O(log n) insertion sort. `quantile_into(channel, h_bucket, q, out: &mut f32)` with O(1) indexed read (the buffer is kept sorted). Exponential recency weighting applied at *quantile read time* (weights multiply the position, not the storage) — keeps the buffer write path simple.
-  - **Note:** shipped as O(n) linear insertion (not O(log n)) because the buffer is small (≤256) and vectorizes well; if G2 ever fails, swap to binary search. See `conformal/ring.rs`.
+  - **Note:** shipped as O(n) linear insertion (not O(log n)) because the buffer is small (≤256) and vectorizes well; if G2 ever fails, swap to binary search. See `crates/katgpt-core/src/conformal/ring.rs`.
 - [x] **T1.3** Implement `ConformalIntervalCalibrator::update_residual(actual, forecast, channel, h)` — computes `r = actual − forecast`, indexes the horizon bucket via `L_h = m·⌈h/m⌉` (HStep) or `L_h = m` (Paper), pushes into the ring buffer with recency weight `w = exp(−λ · age)` where `age` is in `Step` or `Cycle` units.
   - **Note:** recency weight is applied at read time, not push time; the ring stores `(residual, tick)` pairs and the weight `exp(−λ·age)` is computed during `interval_into`.
 - [x] **T1.4** Implement `ConformalIntervalCalibrator::interval_into(channel, h, alpha, out)` — reads `q_{α/2}` and `q_{1−α/2}` from the pre-sorted pool, applies `orientation` correction (`⌊(n+1)q⌋/n` / `⌈(n+1)q⌉/n`), adds the wrapped forecaster's point forecast, writes into `out: &mut PredictiveInterval`. Zero allocation.
 - [x] **T1.5** Implement `ConformalIntervalCalibrator::coverage_violation(actual, channel, h, alpha)` — calls `interval_into`, returns `!interval.contains(actual)`. The 1-bit calibrated curiosity signal.
 - [x] **T1.6** Implement `SeasonalPoolForecaster` with `RingBuffer<f32>` history, `forecast_into` via seasonal-naive + exp-recency weighted same-phase average.
 - [x] **T1.7** Implement `ConformalIntervalCalibrator::sample_predictive_distribution(channel, h, n, rng)` — CSP's mixture: `pool_weight` fraction from the seasonal pool (sampled proportional to recency weights), `(1−pool_weight)` fraction from the conformal residual (sampled uniformly from the residual pool + added to the point forecast). Allocates `Vec<f32>` of length `n`. Use for CRPS evaluation only.
-- [x] **T1.8** Write `tests/conformal_coverage.rs` — G1 gate. Generate a stationary seasonal synthetic series `y_t = sin(2π t/m) + ε_t`, `ε ~ N(0, σ)`, fit the calibrator over 10,000 ticks with a `SeasonalPoolForecaster`, assert empirical coverage at α=0.05 ∈ [0.93, 0.97]. Vary `m ∈ {12, 24, 48}`, `σ ∈ {0.1, 0.5, 1.0}`. Also test `m=1` (non-seasonal, HStep mode) — coverage should hold with widening intervals.
-- [x] **T1.9** Write `tests/conformal_reproducibility.rs` — G4 gate. Two calibrators with identical `(residual_pool, m, alpha, h, decay_config, orientation)` produce byte-identical `PredictiveInterval` bounds (verified via `f32::to_bits`). Vary `α ∈ {0.01, 0.05, 0.1, 0.2}` and `h ∈ {1, 8, 24}`.
-- [x] **T1.10** Write `tests/conformal_alloc_check.rs` — G3 gate. Use a manual `GlobalAlloc` counter; assert `update_residual` and `interval_into` perform zero allocations after warmup.
-- [x] **T1.11** Write `benches/conformal_interval_bench.rs` — G2 gate. Criterion bench: `interval_into` at H=1, H=8, H=8×8 channels. Target: ≤ 1µs at H=1, ≤ 100µs at H=8×8.
+- [x] **T1.8** Write `crates/katgpt-core/tests/conformal_coverage.rs` — G1 gate. Generate a stationary seasonal synthetic series `y_t = sin(2π t/m) + ε_t`, `ε ~ N(0, σ)`, fit the calibrator over 10,000 ticks with a `SeasonalPoolForecaster`, assert empirical coverage at α=0.05 ∈ [0.93, 0.97]. Vary `m ∈ {12, 24, 48}`, `σ ∈ {0.1, 0.5, 1.0}`. Also test `m=1` (non-seasonal, HStep mode) — coverage should hold with widening intervals.
+- [x] **T1.9** Write `crates/katgpt-core/tests/conformal_reproducibility.rs` — G4 gate. Two calibrators with identical `(residual_pool, m, alpha, h, decay_config, orientation)` produce byte-identical `PredictiveInterval` bounds (verified via `f32::to_bits`). Vary `α ∈ {0.01, 0.05, 0.1, 0.2}` and `h ∈ {1, 8, 24}`.
+- [x] **T1.10** Write `crates/katgpt-core/tests/conformal_alloc_check.rs` — G3 gate. Use a manual `GlobalAlloc` counter; assert `update_residual` and `interval_into` perform zero allocations after warmup.
+- [x] **T1.11** Write `crates/katgpt-core/benches/conformal_interval_bench.rs` — G2 gate. Criterion bench: `interval_into` at H=1, H=8, H=8×8 channels. Target: ≤ 1µs at H=1, ≤ 100µs at H=8×8.
   - **Result:** H=1 = 642ns (PASS), H=8×8 = 40.3µs (PASS). Required the `weighted_quantile_pair` optimization (compute exp-recency weights once, reuse for both q_lo and q_hi — 4× fewer `exp()` calls) to get H=1 under 1µs.
-- [x] **T1.12** Write `examples/conformal_airpassengers.rs` — reproduce CSP's AirPassengers CRPS within 2×. Load the AirPassengers series (embed a small synthetic proxy if the real data is not freely redistributable), run rolling-origin backtest at H=12 and H=24, report CRPS, RMSE, empirical coverage. Compare against Seasonal-Naive baseline. **This IS the conformal-naive floor** adopted as the mandatory baseline for all UQ-bearing primitives per the "Report the Floor" rule (Research 322, AGENTS.md Feature Flag Discipline, adopted 2026-06-28). The `ConformalIntervalCalibrator<SeasonalNaiveForecaster>` with `m=1` configuration is the canonical floor instance — every future UQ primitive's GOAT gate must beat this baseline on CRPS / coverage / Winkler.
+- [x] **T1.12** Write `crates/katgpt-core/examples/conformal_airpassengers.rs` — reproduce CSP's AirPassengers CRPS within 2×. Load the AirPassengers series (embed a small synthetic proxy if the real data is not freely redistributable), run rolling-origin backtest at H=12 and H=24, report CRPS, RMSE, empirical coverage. Compare against Seasonal-Naive baseline. **This IS the conformal-naive floor** adopted as the mandatory baseline for all UQ-bearing primitives per the "Report the Floor" rule (Research 322, AGENTS.md Feature Flag Discipline, adopted 2026-06-28). The `ConformalIntervalCalibrator<SeasonalNaiveForecaster>` with `m=1` configuration is the canonical floor instance — every future UQ primitive's GOAT gate must beat this baseline on CRPS / coverage / Winkler.
   - **Result:** Conformal CRPS 115.06 vs ±2σ baseline 468.75 (4× sharper, gate holds).
 - [x] **T1.13** Implement CRPS / Winkler interval score / empirical coverage utility functions in `conformal.rs` (or a `conformal_metrics.rs` submodule). These are the GOAT gate framework for any future UQ-bearing primitive.
-  - **Shipped as:** `conformal/metrics.rs` with `crps`, `crps_interval`, `winkler_score`, `empirical_coverage`, `mean_crps_interval`, `mean_winkler`.
-- [x] **T1.14** Run the GOAT gate (G1–G4). Document results in `.benchmarks/340_conformal_goat.md`. Promote to default-on only if all four gates pass AND the gain is modelless (it is — no training). **Promotion deferred** until the riir-ai runtime integration (Plan 342) confirms the curiosity false-positive win (G3 in the private guide) — the open primitive's gates prove the math; the runtime gates prove the utility.
+  - **Shipped as:** `crates/katgpt-core/src/conformal/metrics.rs` with `crps`, `crps_interval`, `winkler_score`, `empirical_coverage`, `mean_crps_interval`, `mean_winkler`.
+- [x] **T1.14** Run the GOAT gate (G1–G4). Document results in `.benchmarks/340_conformal_goat.md`. Promote to default-on only if all four gates pass AND the gain is modelless (it is — no training). **Promotion deferred** until the riir-ai runtime integration (Plan 342) confirms the curiosity false-positive win (G3 in the private guide) — the open primitive's gates prove the math; the runtime gates prove the utility. **UPDATE 2026-07-20: Promotion LANDED in Plan 468.** The deferral condition was satisfied by two runtime consumers (Bench 564 MCTS collapse + Bench 565 Salience Tri-Gate, both G3 PASS). The curiosity axis (Bench 562) FAILED but the Cargo.toml language required only one consumer win; two landed. See `.benchmarks/340_conformal_goat.md` §"Promotion decision" for the full record.
 
 ### Phase 1 verdict criteria
 
@@ -230,7 +230,7 @@ If G1 fails by >5% (coverage < 0.90 on any seasonal config), the math is wrong �
 ## Phase 2 — KARC Adapter (open primitive) ✅ COMPLETE (2026-06-30)
 
 GOAT-equivalent gate PASSED — adapter ships as `KarcChannelForecaster` in
-`conformal/karc_adapter.rs`, gated on BOTH features. Lorenz-63 coverage gate
+`crates/katgpt-core/src/conformal/karc_adapter.rs`, gated on BOTH features. Lorenz-63 coverage gate
 [0.90, 1.00] met on all 3 channels (x=0.9425, y=0.9520, z=0.9485 at α=0.05).
 No-regression: KARC forecast bit-identical + `wout` unchanged when conformal
 feature is compiled in. G2 `interval_into` unchanged at 640ns (Phase 1 was
@@ -269,11 +269,11 @@ The adapter is still useful for type-level composition
 
 ### Tasks
 
-- [x] **T2.1** Implement the KARC adapter as `KarcChannelForecaster<B, D, M, K>` in `conformal/karc_adapter.rs` behind `#[cfg(all(feature = "conformal_predictive_intervals", feature = "karc_forecaster"))]`. The adapter wraps `KarcForecaster::forecast_into(delay_state, out)` (which outputs all D channels) and exposes ONE configured channel as a single-channel `PointForecaster`. Pre-allocated `D`-length scratch, reused on every forecast (zero-alloc, matching KARC's G3). Horizon `h` is ignored (KARC is h=1; multi-horizon intervals come from the residual pool bucket indexing). Required the `PointForecaster::forecast_into` trait signature change from `&self` → `&mut self` (see "Design decision" above).
+- [x] **T2.1** Implement the KARC adapter as `KarcChannelForecaster<B, D, M, K>` in `crates/katgpt-core/src/conformal/karc_adapter.rs` behind `#[cfg(all(feature = "conformal_predictive_intervals", feature = "karc_forecaster"))]`. The adapter wraps `KarcForecaster::forecast_into(delay_state, out)` (which outputs all D channels) and exposes ONE configured channel as a single-channel `PointForecaster`. Pre-allocated `D`-length scratch, reused on every forecast (zero-alloc, matching KARC's G3). Horizon `h` is ignored (KARC is h=1; multi-horizon intervals come from the residual pool bucket indexing). Required the `PointForecaster::forecast_into` trait signature change from `&self` → `&mut self` (see "Design decision" above).
   - **4 unit tests:** channel extraction matches direct KARC forecast; `observe_and_update` write path works; channel-out-of-range panics; empty-delay-state panics in debug (documents the `interval_into` incompatibility).
-- [x] **T2.2** Write `examples/conformal_karc_overlay.rs` — fit KARC (`D=3, M=8, K=4, λ=1e-3`) on Lorenz-63 (normalized to [-1,1] for Chebyshev stability), wrap with the conformal overlay using the documented `interval_from_point_into` pattern, report per-channel coverage/CRPS/RMSE at α=0.05 over 2000 test ticks.
+- [x] **T2.2** Write `crates/katgpt-core/examples/conformal_karc_overlay.rs` — fit KARC (`D=3, M=8, K=4, λ=1e-3`) on Lorenz-63 (normalized to [-1,1] for Chebyshev stability), wrap with the conformal overlay using the documented `interval_from_point_into` pattern, report per-channel coverage/CRPS/RMSE at α=0.05 over 2000 test ticks.
   - **Result:** Coverage x=0.9425, y=0.9520, z=0.9485 (target [0.90, 1.00], nominal 0.95). KARC point RMSE ~0.0001–0.0005 on normalized units. ✅ All channels calibrated.
-- [x] **T2.3** Add `tests/conformal_karc_no_regression.rs` — verify the conformal overlay does NOT touch the KARC point-forecast hot path. Three active tests: (a) KARC forecast bit-identical across repeated calls (no hidden state perturbation); (b) `wout` matrix unchanged after 100 forecast calls (scratch reuse doesn't leak); (c) FourierBasis KARC also produces finite output. Plus one `#[ignore]`'d latency sanity test (authoritative gate is the criterion bench).
+- [x] **T2.3** Add `crates/katgpt-core/tests/conformal_karc_no_regression.rs` — verify the conformal overlay does NOT touch the KARC point-forecast hot path. Three active tests: (a) KARC forecast bit-identical across repeated calls (no hidden state perturbation); (b) `wout` matrix unchanged after 100 forecast calls (scratch reuse doesn't leak); (c) FourierBasis KARC also produces finite output. Plus one `#[ignore]`'d latency sanity test (authoritative gate is the criterion bench).
   - **Result:** All 3 active tests pass. The conformal feature is a pure consumer of KARC via the adapter — zero hot-path coupling.
 
 ### Phase 2 verdict criteria
@@ -295,8 +295,8 @@ Issue 010 T2 required a reusable benchmark fixture that wraps any UQ-bearing pri
 
 | File | Role |
 |---|---|
-| `src/conformal/floor_harness.rs` | The harness module. `UqPrimitiveUnderTest` trait, `FloorAdapter`, `PredictiveOutput`, `run_floor_comparison`, `TrajectoryCorpus`, `FloorComparisonReport`, `OverallVerdict`. Gated on `conformal_predictive_intervals`. |
-| `tests/conformal_floor_harness.rs` | 10 integration tests covering: floor-vs-floor tie, true-oracle win, over-wide loss, samples-only path, empty/NotApplicable path, mean-tracker beats-floor-on-white-noise, mean-tracker loses-on-seasonal, multi-corpus sweep, pretty-print smoke, alpha propagation. |
+| `crates/katgpt-core/src/conformal/floor_harness.rs` | The harness module. `UqPrimitiveUnderTest` trait, `FloorAdapter`, `PredictiveOutput`, `run_floor_comparison`, `TrajectoryCorpus`, `FloorComparisonReport`, `OverallVerdict`. Gated on `conformal_predictive_intervals`. |
+| `crates/katgpt-core/tests/conformal_floor_harness.rs` | 10 integration tests covering: floor-vs-floor tie, true-oracle win, over-wide loss, samples-only path, empty/NotApplicable path, mean-tracker beats-floor-on-white-noise, mean-tracker loses-on-seasonal, multi-corpus sweep, pretty-print smoke, alpha propagation. |
 
 ### The harness API
 
@@ -340,7 +340,7 @@ A primitive produces a `PredictiveOutput` (samples, interval, or both). The harn
 - `white_noise(σ, n, seed)` — the degenerate case where the floor (forecast=last value) is worst-case; the optimal forecast is the mean.
 - `from_slice(name, values, warmup)` — for Lorenz-63, real data, etc.
 
-All constructors use a deterministic SplitMix64 RNG (matches `examples/conformal_airpassengers.rs`) for bit-reproducible corpora.
+All constructors use a deterministic SplitMix64 RNG (matches `crates/katgpt-core/examples/conformal_airpassengers.rs`) for bit-reproducible corpora.
 
 ### What T3–T7 adapters look like
 
@@ -389,7 +389,7 @@ Summary:
 - `conformal_bridge/hla_overlay.rs` — per-channel HLA residual pool.
 - `conformal_bridge/curiosity.rs` — coverage-tested curiosity event.
 - `conformal_bridge/sleep_time.rs` — calibrated predictability scorer.
-- `conformal_bridge/mcts_collapse.rs` — confidence-interval collapse threshold.
+- `riir-ai/crates/riir-engine/src/karc_bridge/mcts_collapse.rs` — confidence-interval collapse threshold.
 - G1–G6 gates per the private guide §5 (the game-corpus gates, not the synthetic gates from Phase 1).
 
 ---

@@ -297,6 +297,10 @@ fn section_comparison() {
         let mut rng = Rng::new(99);
         let mut opp_rng = Rng::new(999);
         let mut stats = BanditStats::new(NUM_ARMS);
+        // VarianceEpsilon strategy needs variance tracking enabled.
+        if matches!(strategy, BanditStrategy::VarianceEpsilon { .. }) {
+            stats.enable_variance_tracking();
+        }
         let mut strat = strategy.clone();
         let mut total_reward = 0.0f32;
         let mut wins = 0usize;

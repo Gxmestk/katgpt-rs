@@ -8,8 +8,10 @@
 
 use std::time::Instant;
 
-use katgpt_speculative::spec_reconciliation::{ReconciliationConfig, SpecReconciler, TrajectoryPoint};
 use katgpt_rs::types::Rng;
+use katgpt_speculative::spec_reconciliation::{
+    ReconciliationConfig, SpecReconciler, TrajectoryPoint,
+};
 
 fn bench_config(k: usize) -> ReconciliationConfig {
     ReconciliationConfig {

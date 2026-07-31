@@ -87,7 +87,10 @@ impl BoundaryPenalty {
         // How close to the midpoint between grid points (the boundary).
         let boundary_dist = (dist - inv.half_scale).abs();
         if boundary_dist < inv.near_threshold {
-            1.0 / (1.0 + (boundary_dist * inv.inv_scale_20 - 5.0).exp())
+            // Original form was 1/(1+exp(X)) where X = boundary_dist*inv_scale_20 - 5;
+            // that's sigmoid(-X) = sigmoid(5 - boundary_dist*inv_scale_20).
+            // Higher boundary_dist → lower proximity (further from boundary midpoint).
+            katgpt_core::simd::fast_sigmoid(5.0 - boundary_dist * inv.inv_scale_20)
         } else {
             0.0
         }
@@ -97,7 +100,7 @@ impl BoundaryPenalty {
     /// Higher score = more penalty (closer to boundaries).
     ///
     /// Computes the per-instance invariants **once** and threads them through
-    /// [`Self::proximity_with`] — avoids re-deriving `inv_scale`,
+    /// `Self::proximity_with` — avoids re-deriving `inv_scale`,
     /// `half_scale`, `near_threshold`, and `inv_scale * 20.0` for every logit.
     pub fn compute_boundary_score(&self, token_logits: &[f32]) -> f32 {
         if token_logits.is_empty() {
@@ -114,8 +117,18 @@ impl BoundaryPenalty {
     /// Apply boundary penalty to draft scores.
     /// Returns modified scores (higher is better, penalty reduces score).
     pub fn apply_penalty(&self, draft_scores: &mut [f32], logits_per_token: &[Vec<f32>]) {
+        // Hoist per-instance invariants out of the loop — avoids recomputing
+        // 1 division + 2 multiplications per token.
+        let inv = self.invariants();
         for (score, token_logits) in draft_scores.iter_mut().zip(logits_per_token.iter()) {
-            let boundary_score = self.compute_boundary_score(token_logits);
+            if token_logits.is_empty() {
+                continue;
+            }
+            let total_proximity: f32 = token_logits
+                .iter()
+                .map(|&l| Self::proximity_with(l, &inv))
+                .sum();
+            let boundary_score = total_proximity / token_logits.len() as f32;
             // Penalty reduces the score proportionally
             *score -= self.penalty_weight * boundary_score * score.abs();
         }

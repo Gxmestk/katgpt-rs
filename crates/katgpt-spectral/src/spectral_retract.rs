@@ -12,7 +12,7 @@
 //! in `gauge_invariant.rs` uses an *implicit* two-matrix fused form
 //! (`M^T·(M·v)` without ever materializing `M^T·M`) to avoid allocation, and
 //! therefore composes its own loop — see the doc comment on
-//! [`power_iter_retract`] for the migration note.
+//! `power_iter_retract` for the migration note.
 //!
 //! # Always-On
 //!

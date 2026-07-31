@@ -1,5 +1,11 @@
 # Research: G-Zero — Self-Play for Open-Ended Generation from Zero Data (21)
 
+> **Note on file paths (2026-07-18):** Some `*.rs` paths in this document
+> reference modules that were renamed, moved, or never landed under the
+> exact name shown. They are preserved as a **historical record** of the
+> original design intent; consult the current crate layout for the live
+> location.
+
 > Source: [G-Zero](https://arxiv.org/pdf/2605.09959) by Chengsong Huang, Haolin Liu, Tong Zheng, Runpeng Dai, Langlin Huang, Jinyuan Li, Zongxia Li, Zhepei Wei, Yu Meng, Jiaxin Huang (WashU · UVA · UMD)
 > Date: 2026-05, distilled 2026-05-13
 > Raw code: not yet released
@@ -166,7 +172,7 @@ In plain English: as long as the Proposer explores enough (`α_S`) and the δ-fi
 
 ### Where Plan 042 (TTT Feedback Loop) and Plan 048 (Self-Improving Loop) currently stop
 
-Plan 042 wires `katgpt-rs/src/feedback.rs` → anyrag `/cache/export` → `riir-gpu/feedback_consumer.rs` → retraining. The **shape** of the loop is in place. The **reward signal**, however, is currently:
+Plan 042 wires `katgpt-rs/crates/katgpt-deprecated/src/feedback.rs` → anyrag `/cache/export` → `riir-train/crates/riir-train-gpu/src/feedback_consumer.rs` → retraining. The **shape** of the loop is in place. The **reward signal**, however, is currently:
 - Game-domain: win/loss (Bomberman, Monopoly).
 - Code-domain: compile success, validator pass.
 - Generic: `InferenceResult.reward` = max relevance from the screening pruner.
@@ -183,8 +189,8 @@ None of these work for **open-ended generation** (write a doc, explain a concept
 
 Hint-δ needs two log-prob evaluations per token: `log π_G(a_t | q, a_<t)` and `log π_G(a_t | q, h, a_<t)`. Both are already computed during normal decoding:
 
-- `riir-gpu/src/loss.rs` already emits a `log_probs_buf` for cross-entropy. That's the unconditioned term.
-- The hint-conditioned term is a second forward pass with `h` prepended — *or*, if we're already running with the **EmbeddingRouter + KV cache priming** (`riir-router/embedding.rs`, Plan 024), the hint is *already* in the KV prefix. We just need to also run an unconditioned pass at training data collection time.
+- `riir-ai/crates/riir-gpu/src/loss.rs` already emits a `log_probs_buf` for cross-entropy. That's the unconditioned term.
+- The hint-conditioned term is a second forward pass with `h` prepended — *or*, if we're already running with the **EmbeddingRouter + KV cache priming** (`riir-ai/crates/riir-router/src/embedding.rs`, Plan 024), the hint is *already* in the KV prefix. We just need to also run an unconditioned pass at training data collection time.
 
 Implementation surface:
 - New helper `compute_hint_delta(q, h, a) -> f32` in `riir-gpu` using two passes through `loss.rs::log_probs_buf`.
@@ -202,7 +208,7 @@ Current `AbsorbCompress` promotes heuristics based on raw environment reward (di
 
 ##### 1c. DeltaBanditPruner (High Value, Dense Reward)
 
-`katgpt-rs/src/pruners/bandit.rs` (UCB1 / Thompson / ε-greedy) already does exploration. G-Zero's δ gives it a **denser, more informative reward**:
+`katgpt-rs/crates/katgpt-ruliology/src/bandit.rs` (UCB1 / Thompson / ε-greedy) already does exploration. G-Zero's δ gives it a **denser, more informative reward**:
 
 - Arm = (domain, hint-template).
 - Reward = Hint-δ (immediate, per-token, no episode completion needed).
@@ -224,14 +230,14 @@ Rule-based query-hint generator replacing the neural Proposer for Phase 1:
 ##### 2a. Prompt Router as Proposer (High Value, Architectural Fit)
 
 The **Proposer** in G-Zero generates `(query, hint)` pairs. Our `riir-router` is *almost* this object today:
-- `riir-router/keyword.rs` and `embedding.rs` already map `query → (domain, hint-via-KV-prime)`.
-- `riir-router/registry.rs` maps domain → expert pruner + LoRA path.
+- `riir-ai/crates/riir-router/src/keyword.rs` and `embedding.rs` already map `query → (domain, hint-via-KV-prime)`.
+- `crates/katgpt-core/src/arg/registry.rs` maps domain → expert pruner + LoRA path.
 
 The router emits hints as KV-cache primes; G-Zero wants explicit hint *text* fed into the Generator. The gap is small: have the router additionally emit a textual hint (a routed example, a doc snippet, a domain prompt-prefix) into the Generator's context — which is what RAG already does. **Plan 023 (Prompt Router) + Plan 024 (Embedding Router KV Prime) together = a Proposer prototype.** What's missing is the **training** of the Proposer to *maximize* Hint-δ, rather than just retrieve nearest neighbors.
 
 ##### 2b. DPO Training in riir-gpu (High Value, New)
 
-`riir-gpu/training_loop.rs` currently has cross-entropy via `loss.rs`. DPO requires:
+`RuVector/crates/ruvllm/src/qat/training_loop.rs` currently has cross-entropy via `loss.rs`. DPO requires:
 - A *pairwise* loss: `−log σ(β · (log π_G(chosen|q) − log π_G(rejected|q) − log π_ref(chosen|q) + log π_ref(rejected|q)))`.
 - A frozen reference policy `π_ref` (= the Generator at the start of the round; can be the LoRA base before the round's delta).
 - Length normalization (divide log-probs by token count).
@@ -293,7 +299,7 @@ Our existing arenas have explicit verifiers (game outcome). But G-Zero's premise
 | **δ as bandit reward** | `DeltaBanditPruner` wrapping existing `BanditPruner` | 1 | ❌ Need to build |
 | **Template-based Proposer** | `TemplateProposer` (rule-based, bandit-weighted) | 1 | ❌ Need to build |
 | **Generator model** | Main inference model in `katgpt-rs` (draft + target) | Both | ✅ Exists |
-| **Bandit as Proposer** | `pruners/bandit.rs` UCB1/Thompson (80% of GRPO at our scale) | 1 | ✅ Exists |
+| **Bandit as Proposer** | `crates/katgpt-ruliology/src/bandit.rs` UCB1/Thompson (80% of GRPO at our scale) | 1 | ✅ Exists |
 | **Episode history** | `TrialLog` (JSONL) | Both | ✅ Direct reuse |
 | **Reward hacking defense** | `ReviewMetrics` benefit-ratio gate | Both | ✅ Similar philosophy |
 | **Hot-swap updated model** | `HotSwapPruner` | Both | ✅ Direct reuse |
@@ -331,7 +337,7 @@ Our existing arenas have explicit verifiers (game outcome). But G-Zero's premise
 
 ##### Priority 3: DeltaBanditPruner (~100 LOC)
 
-`katgpt-rs/src/pruners/delta_bandit.rs`:
+`katgpt-rs/crates/katgpt-pruners/src/g_zero/delta_bandit.rs`:
 - Wraps existing `BanditPruner<P>`.
 - `observe_delta(arm, δ)` — feed δ as dense reward.
 - `blind_spot_arms(top_k)` — arms with highest accumulated δ.
@@ -339,7 +345,7 @@ Our existing arenas have explicit verifiers (game outcome). But G-Zero's premise
 
 ##### Priority 4: TemplateProposer (~150 LOC)
 
-`katgpt-rs/src/pruners/template_proposer.rs`:
+`katgpt-rs/crates/katgpt-pruners/src/g_zero/template_proposer.rs`:
 - 6 categories from G-Zero Appendix A (Writing, Explanation, Advice, Analysis, Coding, Reasoning ≤1/6).
 - UCB1-weighted template selection biased toward `blind_spot_arms()`.
 - Emits `(query, hint)` pairs — no neural model needed.
@@ -362,7 +368,7 @@ Our existing arenas have explicit verifiers (game outcome). But G-Zero's premise
 
 ##### Priority 7: δ-Filtered Corpus Export (~100 LOC)
 
-`riir-gpu/src/feedback_consumer.rs`:
+`riir-train/crates/riir-train-gpu/src/feedback_consumer.rs`:
 - Augment polling logic to compute δ-percentile of incoming `InferenceResult`s.
 - Keep only `[0, 50]` band before triggering retrain.
 - Existing BLAKE3 dedup + hot-swap unchanged.

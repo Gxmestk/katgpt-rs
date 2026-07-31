@@ -1,5 +1,11 @@
 # Plan 249: TRDraft — Trajectory-Refined Draft for Modelless Inference
 
+> **Note on file paths (2026-07-18):** Some `*.rs` paths in this document
+> reference modules that were renamed, moved, or never landed under the
+> exact name shown. They are preserved as a **historical record** of the
+> original design intent; consult the current crate layout for the live
+> location.
+
 **Date:** 2026-06-11
 **Status:** All phases complete, GOAT proof passing
 **Feature Gate:** `trd_refined_draft` (default-OFF)
@@ -44,13 +50,13 @@ graph TD
 
 | Component | Location | Role |
 |-----------|----------|------|
-| `TrajectoryRefinedDraft` | `src/distill/trd.rs` | Trait + struct, orchestrates refinement |
-| `FailurePoint` | `src/distill/trd.rs` | Failure location (token index, entropy, rejection reason) |
-| DDTree integration | `src/speculative/ddtree.rs` | Hook: detect prefix failure → trigger TRDraft |
+| `TrajectoryRefinedDraft` | `crates/katgpt-speculative/src/distill/trd.rs` | Trait + struct, orchestrates refinement |
+| `FailurePoint` | `crates/katgpt-speculative/src/distill/trd.rs` | Failure location (token index, entropy, rejection reason) |
+| DDTree integration | `riir-ai/crates/riir-games/src/plasma/ddtree.rs` | Hook: detect prefix failure → trigger TRDraft |
 | ConstraintPruner | `src/pruners/constraint.rs` | Modelless teacher: constrain re-draft to valid continuations |
-| ELF SDE | `src/distill/elf.rs` | Controlled noise for re-draft diversity |
+| ELF SDE | `riir-ai/crates/riir-gpu/src/elf.rs` | Controlled noise for re-draft diversity |
 | BT Rank | `src/rank/bt.rs` | Pairwise ranking of raw vs refined branches |
-| BanditPruner | `src/pruners/bandit.rs` | Adaptive refinement budget (skip/1-step/2-step) |
+| BanditPruner | `crates/katgpt-ruliology/src/bandit.rs` | Adaptive refinement budget (skip/1-step/2-step) |
 | ThoughtFold | `src/distill/thoughtfold.rs` | Pre-fold redundant prefix before re-draft |
 
 ---
@@ -59,11 +65,11 @@ graph TD
 
 ### Phase 1: Core Struct + Failure Detection
 
-- [x] Create `src/distill/trd.rs` with `FailurePoint` struct (token_idx, entropy, rejection_reason, q_value_drop)
+- [x] Create `crates/katgpt-speculative/src/distill/trd.rs` with `FailurePoint` struct (token_idx, entropy, rejection_reason, q_value_drop)
 - [x] Implement `detect_prefix_failure()` — combine LeviathanVerifier rejection signal + CollapseDetector entropy spike + BanditPruner Q-value drop
 - [x] Implement `TrajectoryRefinedDraft` struct with configurable `max_refinement_steps: usize` (default: 2)
 - [x] Add feature gate `trd_refined_draft` in `Cargo.toml` with dependencies `["elf_sde", "bandit", "bt_rank"]`
-- [x] Add `#[cfg(feature = "trd_refined_draft")]` module declaration in `src/distill/mod.rs`
+- [x] Add `#[cfg(feature = "trd_refined_draft")]` module declaration in `crates/katgpt-speculative/src/distill/mod.rs`
 
 ### Phase 2: Branch Refinement
 

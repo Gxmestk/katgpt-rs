@@ -3,8 +3,8 @@
 > **Source:** [Choose a Transformer: Fourier or Galerkin](https://arxiv.org/abs/2105.14995) — Shuhao Cao, NeurIPS 2021 (arXiv:2105.14995v4, 1 Nov 2021)
 > **Date:** 2026-06-25
 > **Status:** Done
-> **Related Research:** 257 (FUNCATTN — strictly stronger successor), 291 (Cross-Resolution Spectral Transport — asymmetric-basis FUNCATTN), 303 (Transolver — intermediate predecessor), 219 (DEC operators — vocabulary substrate), 296 (Stokes/DEC vocabulary crosswalk), 051 (Deep Manifold — previously dismissed "Galerkin implementation not needed")
-> **Related Plans:** 286 (FUNCATTN open primitive — covers all Galerkin use cases strictly better), 310 (Cross-Resolution Spectral Transport), 318 (latent_functor rank-k upgrade — the headline fusion target via FUNCATTN)
+> **Related Research:** 257 (FUNCATTN — strictly stronger successor), 291 (Cross-Resolution Spectral Transport — asymmetric-basis FUNCATTN), 303 (Transolver — intermediate predecessor), 219 (DEC operators — vocabulary substrate), 296 (Stokes/DEC vocabulary crosswalk), 051 (Deep Manifold — previously dismissed "Galerkin implementation not needed"), [454 (HOPE — closest Hilbert framing, rank-1 capacity kernel)](454_HOPE_Hilbert_Schmidt_Capacity_Kernel.md)
+> **Related Plans:** 286 (FUNCATTN open primitive — covers all Galerkin use cases strictly better), 310 (Cross-Resolution Spectral Transport), 318 (latent_functor rank-k upgrade — the headline fusion target via FUNCATTN), [469 (HOPE primitive — Hilbert-Schmidt capacity)](../.plans/469_hilbert_schmidt_capacity_kernel_primitive.md)
 > **Classification:** Public
 
 ---
@@ -105,10 +105,10 @@ The transferable primitive is **softmax-free linear attention with Hilbert-space
 
 | Galerkin piece | Already shipped? | Where | Notes |
 |---|---|---|---|
-| Closed-form ridge solve `M(MᵀM+λI)⁻¹` | ✅ | `riir-ai/crates/riir-gpu/src/schur.rs` (Plan 067, riir-train) | Same math, framed as training primitive. FUNCATTN uses this directly. |
-| Softmax-free attention operator | ✅ | `katgpt-rs/crates/katgpt-core/src/funcattn.rs` (Plan 286) | FUNCATTN open primitive. Galerkin is the λ=0 special case. |
-| Linear-in-n attention | ✅ | `katgpt-rs/crates/katgpt-core/src/parallax_attn.rs` (Plan 135) | Parallax sigmoid partition-of-unity attention. GOAT-failed but shipped. |
-| Recurrent basis (per-NPC latent state) | ✅ | `katgpt-rs/crates/katgpt-core/src/sense/reconstruction.rs` (`evolve_hla`) | HLA belief kernel = per-position recurrent latent, the "Assumption 4.2 columns-as-basis-DoFs" pattern. |
+| Closed-form ridge solve `M(MᵀM+λI)⁻¹` | ✅ | `riir-train/crates/riir-train-engine/src/schur.rs` (Plan 067, riir-train) | Same math, framed as training primitive. FUNCATTN uses this directly. |
+| Softmax-free attention operator | ✅ | `katgpt-rs/crates/katgpt-core/src/funcattn/mod.rs` (Plan 286) | FUNCATTN open primitive. Galerkin is the λ=0 special case. |
+| Linear-in-n attention | ✅ | `katgpt-rs/crates/katgpt-core/src/parallax_attn/mod.rs` (Plan 135) | Parallax sigmoid partition-of-unity attention. GOAT-failed but shipped. |
+| Recurrent basis (per-NPC latent state) | ✅ | `katgpt-rs/crates/katgpt-sense/src/reconstruction.rs` (`evolve_hla`) | HLA belief kernel = per-position recurrent latent, the "Assumption 4.2 columns-as-basis-DoFs" pattern. |
 | Diagonal-dominant init `W ← ηU + δI` | ❌ not in corpus | — | **Small numerical-stability trick worth recording.** Approximated by `λ > 0` in FUNCATTN's ridge solve; not separately needed. |
 | Galerkin projection-type LN (pre-dot-product, scale-preserving) | ❌ not in corpus | — | **Small architectural detail worth recording.** Parallax and FUNCATTN both use post-attention sigmoid normalization; pre-LN is an alternative to benchmark. |
 | Petrov-Galerkin / Céa theory | Partial (R257 §1.3) | — | R257 cites "regularized integral operator" + "Intention as special case" but not the Céa/LBB theory. This note adds the vocabulary. |
@@ -177,14 +177,14 @@ Add to the standing DEC vocabulary table in the research skill and in Research 2
 | "Céa's lemma" / "quasi-optimality" | Tikhonov-regularized least-squares approximation bound | `schur.rs::solve_unconstrained` (Plan 067) |
 | "LBB inf-sup condition" / "Banach-Nečas-Babuška" | Lipschitz continuity bound controlled by λ (R257 Prop 4.5) | Documented in R257 §1.3 |
 | "Ladyzhenskaya-Babuška-Brezzi" | (same as LBB) | — |
-| "discrete Ladyzhenskaya-Babuška-Brezzi" | `d∘d=0` discrete identity (curl(grad)=0, div(curl)=0) | `dec/operators.rs` (tests verify by construction) |
+| "discrete Ladyzhenskaya-Babuška-Brezzi" | `d∘d=0` discrete identity (curl(grad)=0, div(curl)=0) | `crates/katgpt-dec/src/operators.rs` (tests verify by construction) |
 | "Fourier-type attention" `(Q̃K̃ᵀ)V/n` | Linear attention with no regularization; predecessor to Parallax sigmoid attention | `parallax_attn.rs` (Plan 135) |
 | "Galerkin-type attention" `Q(K̃ᵀṼ)/n` | Linear-in-n attention via KᵀV-first matmul reorder; predecessor to FUNCATTN `Φ·C·Ψᵀ` | `funcattn.rs` (Plan 286) |
-| "dynamic basis update" / "layer-wise change of basis" | Freeze/thaw snapshot cycle for projection matrices; latent_functor re-estimation | `latent_functor/reestimation.rs` (Plan 303) |
+| "dynamic basis update" / "layer-wise change of basis" | Freeze/thaw snapshot cycle for projection matrices; latent_functor re-estimation | `riir-ai/crates/riir-engine/src/latent_functor/reestimation/mod.rs` (Plan 303) |
 | "Galerkin projection-type layer norm" (pre-dot-product, scale-preserving) | Pre-LN attention block (alternative to post-attention sigmoid normalization) | Not in corpus — small architectural alternative worth benchmarking against post-LN in Plan 286 G3 |
 | "diagonal-dominant rescaled init" `W ← ηU + δI` | Tikhonov regularization `+λI` in the ridge solve (equivalent numerical effect) | `schur.rs` (Plan 067) — `δ` ≈ `λ` |
 | "energy decay" / "scale-preserving" | Norm preservation under attention (R305 phase-modulated coupling is the strict L2-norm-preserving cousin) | `phase_rotation_subspace_gate.rs` (Plan 322) |
-| "Assumption 4.2: columns of Q/K/V as basis DoFs" | HLA `style_weights[64]` columns as basis functions; sense projection channels as orthogonal bases | `katgpt-core/src/sense/reconstruction.rs`, `riir-neuron-db/src/shard.rs` |
+| "Assumption 4.2: columns of Q/K/V as basis DoFs" | HLA `style_weights[64]` columns as basis functions; sense projection channels as orthogonal bases | `crates/katgpt-sense/src/reconstruction.rs`, `riir-neuron-db/src/shard/mod.rs` |
 | "Fredholm equation of the second kind" | Fixed-point iteration / attractor model | `katgpt-rs/.research/035_Attractor_Models_Fixed_Point_Refinement.md` |
 
 **Caveat (per R296):** the boundary-vs-volume perf win from Stokes holds only for d ≤ 3. Galerkin's Hilbert-space theory is dimension-agnostic; the LBB condition is what guarantees n-independence, not a Stokes-type boundary trick. The DEC framing is for the *vocabulary bridge*, not for a perf claim.
@@ -198,9 +198,9 @@ Add to the standing DEC vocabulary table in the research skill and in Research 2
 | **Research 257 / Plan 286** (FUNCATTN) | notes + planned (`funcattn.rs`) | **Canonical stronger successor.** Same softmax-free attention primitive, closed-form ridge solve replaces identity basis, learnable basis replaces identity, sigmoid-normalized per AGENTS.md. Strictly generalizes Galerkin (Φ=Ψ=I, λ=0). | This note defers to 257 for all implementation and fusion. |
 | **Research 291 / Plan 310** (Cross-Resolution Spectral Transport) | notes + shipped (`cross_resolution.rs`) | **Asymmetric-basis cousin.** FUNCATTN with `d_src ≠ d_dst`. Galerkin's identity basis cannot do cross-resolution; FUNCATTN's asymmetric Φ_src/Ψ_dst can. | Strictly beyond Galerkin's capability. |
 | **Research 303** (Transolver) | notes only | **Intermediate predecessor.** Softmax M-slice attention (KL=1.8 vs Galerkin's 0.3). Verdict'd Gain for the same *a fortiori* reasoning this note applies to Galerkin. | Confirms the pattern: Galerkin is the third paper in this family verdict'd below Super-GOAT. |
-| **Research 123 / Plan 303** (latent_functor) | notes + shipped (`latent_functor/arithmetic.rs`) | Rank-1, λ=0, basis-free special case of FUNCATTN (and therefore of Galerkin's λ=0 variant). | The rank-k upgrade (Plan 318) is the path forward, not Galerkin. |
+| **Research 123 / Plan 303** (latent_functor) | notes + shipped (`crates/katgpt-percepta/src/wasm/interpreter/arithmetic.rs`) | Rank-1, λ=0, basis-free special case of FUNCATTN (and therefore of Galerkin's λ=0 variant). | The rank-k upgrade (Plan 318) is the path forward, not Galerkin. |
 | **Research 051 / Plan 085** (Deep Manifold) | notes | Previously dismissed "Galerkin method implementation" as "Our 'learned basis' is already the Transformer". | Confirms the corpus already considered and dismissed Galerkin-as-implementation. |
-| **Research 219 / Plan 251** (DEC operators) | notes + shipped (`dec/operators.rs`) | The DEC substrate. Galerkin's Petrov-Galerkin projection is a weighted instance of DEC's Hodge-Laplacian action. | Vocabulary bridge (§5 above). |
+| **Research 219 / Plan 251** (DEC operators) | notes + shipped (`crates/katgpt-dec/src/operators.rs`) | The DEC substrate. Galerkin's Petrov-Galerkin projection is a weighted instance of DEC's Hodge-Laplacian action. | Vocabulary bridge (§5 above). |
 | **Research 296 / Plan 314** (Stokes calculus wrappers) | notes + planned | The Stokes-theorem vocabulary crosswalk. | §5 adds Galerkin to the crosswalk. |
 | **Research 305 / Plan 322** (Phase-Modulated Coupling) | notes + planned (`phase_rotation_subspace_gate.rs`) | Strictly L2-norm-preserving rotation cousin. Galerkin's "scale-preserving Galerkin LN" is the looser, attention-block-local version. | Confirms the codebase already pursues norm-preservation more strictly than Galerkin. |
 | **Plan 135 / Research 140** (Parallax Sigmoid Attention) | shipped + GOAT-failed (`parallax_attn.rs`) | Sigmoid partition-of-unity linear attention; GOAT-failed but shipped. The closest shipped *attention* cousin to Galerkin's Fourier-type attention. | Confirms softmax-free linear attention is already in the stack. |

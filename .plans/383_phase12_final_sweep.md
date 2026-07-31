@@ -79,7 +79,7 @@ Anything beyond the [stay] list is a missed move — log + fix."*
         rcd_residual]. katgpt_core:: refs in dllm_solver.rs rewritten to crate::.)
       - [x] T4.3 — katgpt-core folders: mux_latent, compaction, cubical_nerve, breakeven ✅
         (4 folders moved to katgpt-core. data_probe/ DEFERRED — naming conflict
-        with existing katgpt-core/src/data_probe.rs (sink_aware_attn module,
+        with existing crates/katgpt-core/src/data_probe/mod.rs (sink_aware_attn module,
         Plan 287); root src/data_probe/ is the original Plan 141 diagnostics
         module with 8 files. Rust can't have both data_probe.rs and data_probe/
         in the same crate. Needs a rename or merge before moving.)
@@ -97,7 +97,7 @@ Anything beyond the [stay] list is a missed move — log + fix."*
         still_kv + half + fastrand optional deps. still_kv + bake_precision
         sub-features added.)
       - [x] T4.6 — katgpt-transformer cascade: thinking_cot + swir/strategy_adapter ✅
-        (thinking_cot/ 2 files + swir/strategy_adapter.rs moved to katgpt-transformer.
+        (thinking_cot/ 2 files + crates/katgpt-transformer/src/swir/strategy_adapter.rs moved to katgpt-transformer.
         Cascade unblocked: thinking_cot was the blocker that kept strategy_adapter
         in root. Now both live in katgpt-transformer; crate::thinking_cot resolves
         within the crate. Root swir/ shim deleted; root re-exports directly from
@@ -177,7 +177,7 @@ Ordered by (a) clean dep surface, (b) per-cluster LOC, (c) blast radius.
    - `progressive_mcgs/` (9 files / ~3K LOC) — completely self-contained
    - `fold/` (8 files / ~2K LOC) — needs katgpt-speculative → katgpt-kv dep add
 6. **Cascade → katgpt-transformer**: `thinking_cot/` (153 LOC, zero deps) +
-   `swir/strategy_adapter.rs` (530 LOC). Substrate side explicitly waits
+   `crates/katgpt-transformer/src/swir/strategy_adapter.rs` (530 LOC). Substrate side explicitly waits
    for thinking_cot to move.
 7. **dash_attn primitives → katgpt-attn**: 8 files. 6 are zero-dep; 2 need
    dep wiring (meta_router needs katgpt-pruners dep; sat_analysis needs
@@ -191,8 +191,8 @@ Ordered by (a) clean dep surface, (b) per-cluster LOC, (c) blast radius.
 |---|---:|---|---|
 | `benchmark/` + `plot.rs` | ~6.9K | 33 `forward*` calls across 6 files + 5 root modules (speculative/, hla/, pruners/, dllm*, breakeven/, inference_backend) | Move the root modules first, then either move transformer.rs forward family (out of scope) or rewrite benchmark to call leaf-resident forward variants |
 | `sleep/` | 707 | Phase 7 blocker: ForwardContext + crate::gdn2 root deps | forward family + gdn2 relocate first |
-| `dense_mesh/node_transformer.rs` | 334 | Calls root `crate::transformer::forward` composer | transformer.rs linchpin move (out of scope) |
-| `distill/trd.rs` + `distill/mod.rs` | 1142 | chain_fold-gated prefold_prefix depends on `crate::fold` | fold moves first (this plan T4.5 — TRD unblocks after) |
+| `crates/katgpt-forward/src/dense_mesh_node_transformer.rs` | 334 | Calls root `crate::transformer::forward` composer | transformer.rs linchpin move (out of scope) |
+| `crates/katgpt-speculative/src/distill/trd.rs` + `crates/katgpt-speculative/src/distill/mod.rs` | 1142 | chain_fold-gated prefold_prefix depends on `crate::fold` | fold moves first (this plan T4.5 — TRD unblocks after) |
 | `sparse_compose.rs` (revisit) | — | was DEFER; now MOVE-eligible (sparse_task_vector in katgpt-sparse since Phase 11) | unblocked |
 | `vocab_channel_pruner.rs` | 2048 | Gated `lattice_operad` feature path needs `crate::lattice_operad` | lattice_operad moves first (this plan T4.4 — unblocks after) |
 | `domino_lora.rs` | 561 | Imports `crate::types::matmul` | types::matmul relocation (separate plan) |

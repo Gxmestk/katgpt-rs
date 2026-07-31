@@ -138,7 +138,7 @@ where `g_max` is the max consolidation strength and λ controls the decay rate. 
 The paper uses a fixed newline trigger. §7 explicitly states: "reconsolidation appears to depend on prediction error at retrieval... surprise/PE gating (rather than a fixed newline trigger) would be more suitable."
 
 **Our codebase already ships this:**
-- δ-Mem surprise gate (`pruners/delta_mem/state.rs`) — triggers on prediction error
+- δ-Mem surprise gate (`crates/katgpt-core/src/delta_mem/state.rs`) — triggers on prediction error
 - SwiR block-relative entropy switch (Plan 275) — triggers on entropy spike
 - Temporal derivative kernel (Plan 277) — temporal surprise signal
 
@@ -185,7 +185,7 @@ The paper uses a fixed newline trigger. §7 explicitly states: "reconsolidation 
 
 | Criterion | Assessment |
 |-----------|------------|
-| Novel mechanism (no prior art in our corpus) | ✅ — confirmed: all existing KV work (213, 233, 109, 101, 083, 063, 042, 039, 165, 159) is compression/selection/quantization. NONE does periodic in-place consolidation for quality. The `cgsp/dual_pool.rs consolidate()` is for the bandit pool, not KV cache. |
+| Novel mechanism (no prior art in our corpus) | ✅ — confirmed: all existing KV work (213, 233, 109, 101, 083, 063, 042, 039, 165, 159) is compression/selection/quantization. NONE does periodic in-place consolidation for quality. The `crates/katgpt-core/src/cgsp/dual_pool.rs consolidate()` is for the bandit pool, not KV cache. |
 | Provable gain | ❌ — quality claim REFUTED on untrained AND trained models (§6 PoC Addendum). The modelless mean-shift has no measurable quality effect even when the KV cache carries learned structure (31% accuracy, Plan 313). The paper's gain comes from a TRAINED Cache Processor, not from mean-shift as an operation. |
 | New class of capability | ✅ — first KV cache operator that improves reasoning quality without reducing footprint (consolidation, not compression) |
 | Modelless | ✅ — selection mechanism transfers directly; trained Processor replaced by deterministic sigmoid-gated value mean-shift (§3.5 path 3: latent-space correction) |
@@ -268,7 +268,7 @@ Plan 420 Phases 2–4 are permanently shelved. This is NOT a modelless failure o
 
 ### riir-train follow-up — RESOLVED (Plan 313, 2026-07-09)
 
-**The trained-model validation has been completed** in riir-train Plan 313 (`tests/plan_313_kv_consolidation_trained.rs`). A micro-GPT (same architecture as bench_420: d_model=64, 8 heads, single layer) was trained from scratch on few-shot addition using a manually-backpropagated AdamW optimizer (gradient check: 18/18 weights pass, max rel_err 1.53%). The trained model achieves **31.5% train / 31.1% test token accuracy** — well above the ~10% chance floor, confirming the KV cache carries genuine learned structure.
+**The trained-model validation has been completed** in riir-train Plan 313 (`riir-train/crates/riir-train-engine/tests/plan_313_kv_consolidation_trained.rs`). A micro-GPT (same architecture as bench_420: d_model=64, 8 heads, single layer) was trained from scratch on few-shot addition using a manually-backpropagated AdamW optimizer (gradient check: 18/18 weights pass, max rel_err 1.53%). The trained model achieves **31.5% train / 31.1% test token accuracy** — well above the ~10% chance floor, confirming the KV cache carries genuine learned structure.
 
 The 3-competitor PoC was then re-run on the trained model:
 

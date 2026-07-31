@@ -1,6 +1,6 @@
 //! Bandit pruner with SDAR sigmoid-gated reward updates.
 //!
-//! Wraps [`BanditPruner`](super::super::bandit::BanditPruner) with sigmoid-gated
+//! Wraps [`BanditPruner`] with sigmoid-gated
 //! reward updates based on the asymmetric trust principle from SDAR.
 //!
 //! # Why Gate Reward Updates?

@@ -2,8 +2,15 @@
 
 **Date:** 2026-07-03
 **Primitive:** `StagingEngramTable` — COW mutation buffer over `InMemoryEngramTable`
-**Feature:** `engram` (opt-in; `engram` itself is default-off per Plan 299)
+**Feature:** `engram` (transitively default-on: `cognitive_architecture_root` [in `default`] enables `engram`. The Plan 299 "default-off" label predates the `cognitive_architecture_root` promotion.)
 **Bench:** `crates/katgpt-core/tests/bench_360_engram_staging_goat.rs`
+
+> **UPDATE 2026-07-18 (status sync):** the previous label said `engram`
+> (opt-in; `engram` itself is default-off per Plan 299). That was accurate
+> at Plan 299 time but went stale once `cognitive_architecture_root`
+> (Issue 039, 2026-07-04) was promoted to default — `cognitive_architecture_root
+> = ["engram"]`, so `engram` is now compiled in by default. The standalone
+> feature is still exposed so `--no-default-features` consumers can disable it.
 
 ## Run command
 

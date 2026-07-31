@@ -190,7 +190,7 @@ impl BcoOptimizer {
     ///   - (1/N) * Σ log σ(-(scaled_r̃ - δ))   for negative samples
     /// ```
     ///
-    /// Uses [`log_sigmoid`] for numerical stability.
+    /// Uses `log_sigmoid` for numerical stability.
     pub fn compute_loss(&self, samples: &[BcoSample]) -> f32 {
         if samples.is_empty() {
             return 0.0;

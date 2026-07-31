@@ -4,7 +4,7 @@
 **Research:** [katgpt-rs/.research/374_OTF_LAM_Factorized_Transition_Primitives.md](../.research/374_OTF_LAM_Factorized_Transition_Primitives.md)
 **Source paper:** [arXiv:2606.30544](https://arxiv.org/abs/2606.30544) — Nam et al., *Latent Actions from Factorized Transition Effects under Agent Ambiguity*, Brown, 2026-06-30
 **Target:** `katgpt-rs/crates/katgpt-core/src/factorized_action/` (new module) + Cargo feature `factorized_action`
-**Status:** Active — Phase 1 + Phase 2 + Phase 3 complete. GOAT gate executed 2026-07-04: G1+G2a+G4+G5+G6 PASS, G2b+G3 FAIL (documented "trained GateNetwork needed" outcome). Primitive stays opt-in. See [.benchmarks/375_factorized_action_goat.md](../.benchmarks/375_factorized_action_goat.md) for full results.
+**Status:** ✅ COMPLETE, OPT-IN (honest FAIL: G2b/G3 need trained GateNetwork → riir-train) — Phase 1 + Phase 2 + Phase 3 complete. GOAT gate executed 2026-07-04: G1+G2a+G4+G5+G6 PASS, G2b+G3 FAIL (documented "trained GateNetwork needed" outcome). Primitive stays opt-in. See [.benchmarks/375_factorized_action_goat.md](../.benchmarks/375_factorized_action_goat.md) for full results.
 
 ---
 
@@ -69,7 +69,7 @@ The codebook is constructed modellessly via **k-means clustering** on observed t
   factorized_action = []
   ```
 
-- [x] **T1.7** Wire module into `katgpt-core/src/lib.rs`:
+- [x] **T1.7** Wire module into `crates/katgpt-core/src/lib.rs`:
   ```rust
   #[cfg(feature = "factorized_action")]
   pub mod factorized_action;
@@ -112,7 +112,7 @@ The codebook is constructed modellessly via **k-means clustering** on observed t
 
 ### Tasks
 
-- [x] **T3.1** Create benchmark `katgpt-rs/benches/bench_375_factorized_action_goat.rs` with the **four** competitors (per Research 374 §9 + §10 code verification):
+- [x] **T3.1** Create benchmark `katgpt-rs/crates/katgpt-core/benches/bench_375_factorized_action_goat.rs` with the **four** competitors (per Research 374 §9 + §10 code verification):
   1. **Monolithic baseline** — `extract_functor` + `apply_functor` (single mean displacement).
   2. **Factorized OTF (modelless, Gate mode)** — k-means codebook (**K=128, D=32** — paper defaults) + sigmoid gate + normalized weighted average.
   3. **Factorized OTF (modelless, Mean mode)** — same codebook, `α_k = 1` uniform (the ablation from `aggregator_type: "mean"`).
@@ -187,7 +187,7 @@ The codebook is constructed modellessly via **k-means clustering** on observed t
 
 - **Paper:** Nam et al., *Latent Actions from Factorized Transition Effects under Agent Ambiguity*, arXiv:2606.30544, 2026-06-30.
 - **Research note:** [katgpt-rs/.research/374_OTF_LAM_Factorized_Transition_Primitives.md](../.research/374_OTF_LAM_Factorized_Transition_Primitives.md)
-- **Monolithic baseline:** Plan 273 (`latent_functor/arithmetic.rs`), Research 123 (Latent Functor Runtime — Super-GOAT).
+- **Monolithic baseline:** Plan 273 (`crates/katgpt-percepta/src/wasm/interpreter/arithmetic.rs`), Research 123 (Latent Functor Runtime — Super-GOAT).
 - **Codebook mechanism cousin:** `katgpt-kv` Lloyd-Max VQ (KV compression, not transition factorization).
 - **Aggregation pattern cousin:** Plan 297 (`PersonalityWeightedComposition` — weighted layer composition).
 - **Motion input cousin:** Plan 277 (Temporal Deriv Kernel — DEFAULT-ON, the `o_t` analog).

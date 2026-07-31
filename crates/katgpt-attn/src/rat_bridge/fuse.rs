@@ -83,13 +83,10 @@ pub fn bridge_attention_into<K: AsRef<[f32]>, V: AsRef<[f32]>>(
     // only after debug_asserts confirm lengths match.
     let inv_alpha = 1.0 - alpha;
 
-    // Bridge readout: out[d] = α·attn + (1-α)·(s[d]·q[d]).
-    // Pre-load the bridge contribution, then add the attention contribution on top.
-    // Both contributions are fused into the same output buffer.
-    for d in 0..dim {
-        // Bridge contribution
-        out[d] = inv_alpha * gdn2_state[d] * query[d];
-    }
+    // Bridge readout: out[d] = (1-α)·(s[d]·q[d]).
+    // Copy s into out, then element-wise multiply by q and scale by (1-α).
+    out[..dim].copy_from_slice(&gdn2_state[..dim]);
+    katgpt_core::simd::simd_scale_mul_inplace(&mut out[..dim], query, inv_alpha);
 
     if kv_keys_dilated.is_empty() {
         return;
@@ -130,9 +127,7 @@ pub fn bridge_attention_into<K: AsRef<[f32]>, V: AsRef<[f32]>>(
             let w = sigmoid(dot) * inv_weight_sum * alpha;
             let v_ref = v.as_ref();
             // out[d] += w * v[d]  (fused SIMD axpy)
-            for d in 0..dim {
-                out[d] += w * v_ref[d];
-            }
+            katgpt_core::simd::simd_fused_scale_acc(&mut out[..dim], v_ref, w, dim);
         }
     } else {
         // Storage-based path for large n_kv. Single sigmoid pass + single axpy.
@@ -158,9 +153,7 @@ pub fn bridge_attention_into<K: AsRef<[f32]>, V: AsRef<[f32]>>(
         for (w_slot, v) in weights.iter().zip(kv_vals_dilated.iter()) {
             let w = *w_slot * inv_weight_sum * alpha;
             let v_ref = v.as_ref();
-            for d in 0..dim {
-                out[d] += w * v_ref[d];
-            }
+            katgpt_core::simd::simd_fused_scale_acc(&mut out[..dim], v_ref, w, dim);
         }
     }
 }
@@ -169,9 +162,10 @@ pub fn bridge_attention_into<K: AsRef<[f32]>, V: AsRef<[f32]>>(
 ///
 /// Used for all attention weights in this module. NOT softmax per project
 /// constraints — each weight is independent and they don't sum to 1.
+/// Delegates to [`katgpt_core::simd::fast_sigmoid`] (Cephes polynomial).
 #[inline(always)]
 fn sigmoid(x: f32) -> f32 {
-    1.0 / (1.0 + (-x).exp())
+    katgpt_core::simd::fast_sigmoid(x)
 }
 
 /// Compute the bridge gate α = sigmoid(⟨query, gdn2_readout⟩).

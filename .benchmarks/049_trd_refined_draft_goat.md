@@ -9,17 +9,17 @@
 
 | Component | File | Description |
 |-----------|------|-------------|
-| `TrajectoryRefinedDraft<P>` | `src/distill/trd.rs` | Core refinement engine |
-| `FailurePoint` | `src/distill/trd.rs` | Failure detection (token_idx, entropy, reason) |
-| `RejectionReason` | `src/distill/trd.rs` | 5 rejection types (ArgmaxMismatch, RejectionSampling, EntropySpike, QValueDrop, ConstraintViolation) |
-| `TrdConfig` | `src/distill/trd.rs` | Config (max_steps, entropy_threshold, latency_budget, prefold) |
-| `RefinementResult` | `src/distill/trd.rs` | Result (refined_tokens, rank_score, steps_used, budget_exceeded) |
-| `RefinementArm` | `src/distill/trd.rs` | Bandit arms (Skip, Refine1Step, Refine2Step) |
-| `RefinementOutcome` | `src/distill/trd.rs` | Reward enum (Accepted +1.0, Rejected 0.0, BudgetExceeded -0.5) |
-| `prefold_prefix()` | `src/distill/trd.rs` | ThoughtFold pre-fold integration (feature: `chain_fold`) |
-| `find_valid_token()` | `src/distill/trd.rs` | Top-k scan via ConstraintPruner (SIMD: `plasma_path`) |
-| `branch_score()` | `src/distill/trd.rs` | Log-prob branch scoring (SIMD: `plasma_path`) |
-| `shannon_entropy()` | `src/distill/trd.rs` | CPU scalar entropy computation |
+| `TrajectoryRefinedDraft<P>` | `crates/katgpt-speculative/src/distill/trd.rs` | Core refinement engine |
+| `FailurePoint` | `crates/katgpt-speculative/src/distill/trd.rs` | Failure detection (token_idx, entropy, reason) |
+| `RejectionReason` | `crates/katgpt-speculative/src/distill/trd.rs` | 5 rejection types (ArgmaxMismatch, RejectionSampling, EntropySpike, QValueDrop, ConstraintViolation) |
+| `TrdConfig` | `crates/katgpt-speculative/src/distill/trd.rs` | Config (max_steps, entropy_threshold, latency_budget, prefold) |
+| `RefinementResult` | `crates/katgpt-speculative/src/distill/trd.rs` | Result (refined_tokens, rank_score, steps_used, budget_exceeded) |
+| `RefinementArm` | `crates/katgpt-speculative/src/distill/trd.rs` | Bandit arms (Skip, Refine1Step, Refine2Step) |
+| `RefinementOutcome` | `crates/katgpt-speculative/src/distill/trd.rs` | Reward enum (Accepted +1.0, Rejected 0.0, BudgetExceeded -0.5) |
+| `prefold_prefix()` | `crates/katgpt-speculative/src/distill/trd.rs` | ThoughtFold pre-fold integration (feature: `chain_fold`) |
+| `find_valid_token()` | `crates/katgpt-speculative/src/distill/trd.rs` | Top-k scan via ConstraintPruner (SIMD: `plasma_path`) |
+| `branch_score()` | `crates/katgpt-speculative/src/distill/trd.rs` | Log-prob branch scoring (SIMD: `plasma_path`) |
+| `shannon_entropy()` | `crates/katgpt-speculative/src/distill/trd.rs` | CPU scalar entropy computation |
 
 ## Unit Test Results
 

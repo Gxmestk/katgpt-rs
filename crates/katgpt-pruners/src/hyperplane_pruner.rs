@@ -52,7 +52,7 @@ impl<'a> HyperplanePruner<'a> {
                 let score = if has_cv {
                     let raw = pruner.manifold_score(depth, candidates[i], parent_tokens);
                     let x = (raw - 0.5) / self.temperature;
-                    1.0 / (1.0 + (-x).exp())
+                    katgpt_core::simd::fast_sigmoid(x)
                 } else {
                     let raw = pruner.manifold_score(depth, candidates[i], parent_tokens);
                     if raw > 0.5 { 1.0 } else { 0.0 }
@@ -92,7 +92,7 @@ impl ConstraintPruner for HyperplanePruner<'_> {
                     // Sigmoid-softened score
                     let raw = pruner.manifold_score(depth, token_idx, parent_tokens);
                     let x = (raw - 0.5) / self.temperature;
-                    1.0 / (1.0 + (-x).exp())
+                    katgpt_core::simd::fast_sigmoid(x)
                 }
                 None => {
                     // Binary: 1.0 or 0.0

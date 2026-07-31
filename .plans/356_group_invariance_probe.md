@@ -4,7 +4,7 @@
 **Research:** [katgpt-rs/.research/355_LieFlow_Symmetry_Discovery_Group_Orbit_Support.md](../.research/355_LieFlow_Symmetry_Discovery_Group_Orbit_Support.md)
 **Source paper:** [arXiv:2512.20043](https://arxiv.org/abs/2512.20043) — Chen et al., LieFlow, ICML 2026
 **Target:** `katgpt-rs/crates/katgpt-core/src/group_invariance_probe.rs` (new module) + Cargo feature `group_invariance_probe`
-**Status:** Active — Phase 1 (GOAT gate) COMPLETE — 8/8 gates PASS, feature ships OPT-IN
+**Status:** ✅ COMPLETE, OPT-IN — Phase 1 (GOAT gate) COMPLETE — 8/8 gates PASS, feature ships OPT-IN
 
 ---
 

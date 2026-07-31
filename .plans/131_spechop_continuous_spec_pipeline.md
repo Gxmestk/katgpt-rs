@@ -19,34 +19,34 @@ Our existing DDTree operates at **token granularity**. This plan extends specula
 ## Tasks
 
 ### Phase 1: Core Types & Cost Model
-- [x] **T1**: Create `src/spechop/mod.rs` — module index, re-exports, `#[cfg(feature = "spechop")]` gate
-- [x] **T2**: Create `src/spechop/types.rs` — `SpecHopConfig`, `HopObservation`, `SpecOutcome` enum
+- [x] **T1**: Create `crates/katgpt-speculative/src/spechop/mod.rs` — module index, re-exports, `#[cfg(feature = "spechop")]` gate
+- [x] **T2**: Create `crates/katgpt-speculative/src/spechop/types.rs` — `SpecHopConfig`, `HopObservation`, `SpecOutcome` enum
 - [x] **T3**: Implement `SpecHopConfig` with α (relative speculator latency), β (decode-to-tool ratio), p (speculator accuracy), k (thread count), auto-compute k* from α and β
-- [x] **T4**: Create `src/spechop/cost_model.rs` — `compute_optimal_k(α, β) → usize`, `oracle_rel_lat(α, β, p) → f64`, `bounded_rel_lat(α, β, p, k) → f64`, `starvation_prob(k, α, β, ν) → f64` (Theorem 4)
+- [x] **T4**: Create `crates/katgpt-speculative/src/spechop/cost_model.rs` — `compute_optimal_k(α, β) → usize`, `oracle_rel_lat(α, β, p) → f64`, `bounded_rel_lat(α, β, p, k) → f64`, `starvation_prob(k, α, β, ν) → f64` (Theorem 4)
 - [x] **T5**: Unit tests: k*=⌈(1+β)/(α+β)⌉ matches paper examples (α=0.2,β=0.15→k≈4; α=0.3,β=0.75→k≈2), RelLat formula matches paper Table 1
 - [x] **T6**: Add `spechop = ["bandit"]` feature gate to `Cargo.toml`, add `pub mod spechop` to `lib.rs`
 
 ### Phase 2: Observation Verifier
-- [x] **T7**: Create `src/spechop/verifier.rs` — `ObservationVerifier` trait with `verify(o_target: &str, o_spec: &str) -> bool`
+- [x] **T7**: Create `crates/katgpt-speculative/src/spechop/verifier.rs` — `ObservationVerifier` trait with `verify(o_target: &str, o_spec: &str) -> bool`
 - [x] **T8**: Implement `RuleBasedVerifier` — normalize, check refusal patterns, numeric consistency, Jaccard ≥ 0.55, substring match, short-answer exact match (paper Appendix D.4)
 - [x] **T9**: Implement `TokenSetJaccard` helper — remove stopwords, compute token-set Jaccard similarity
 - [x] **T10**: Unit tests: identical observations → true, different numbers → false, paraphrased → true (Jaccard ≥ 0.55), short answer mismatch → false, refusal pattern → false
 
 ### Phase 3: Hop Speculator Trait & Implementations
-- [x] **T11**: Create `src/spechop/speculator.rs` — `HopSpeculator` trait with `speculate(action: &str) -> Result<String, SpecError>`
+- [x] **T11**: Create `crates/katgpt-speculative/src/spechop/speculator.rs` — `HopSpeculator` trait with `speculate(action: &str) -> Result<String, SpecError>`
 - [x] **T12**: Implement `CacheSpeculator` — HashMap-based cache lookup, returns cached observation or error (modelless path)
 - [x] **T13**: Implement `BanditSpeculator<P: ScreeningPruner>` — uses bandit Q-values to predict high-relevance observations (modelless-model-based bridge)
 - [x] **T14**: Unit tests: CacheSpeculator hit/miss, BanditSpeculator delegates to ScreeningPruner relevance
 
 ### Phase 4: Spec Window Manager
-- [x] **T15**: Create `src/spechop/window.rs` — `SpecWindow` struct managing up to k speculative threads
+- [x] **T15**: Create `crates/katgpt-speculative/src/spechop/window.rs` — `SpecWindow` struct managing up to k speculative threads
 - [x] **T16**: Implement `SpecWindow::push_thread()` — add new speculative thread, panic if > k
 - [x] **T17**: Implement `SpecWindow::verify_earliest()` — verify oldest pending thread, return `SpecOutcome::Commit` or `SpecOutcome::Rollback`
 - [x] **T18**: Implement `SpecWindow::rollback_all()` — discard all speculative work, reset to last verified state
 - [x] **T19**: Unit tests: window capacity enforcement, commit shifts window, rollback clears downstream, sequential commits advance state
 
 ### Phase 5: Continuous Pipeline Loop
-- [x] **T20**: Create `src/spechop/pipeline.rs` — `SpecHopPipeline` struct with config, speculator, verifier, window
+- [x] **T20**: Create `crates/katgpt-speculative/src/spechop/pipeline.rs` — `SpecHopPipeline` struct with config, speculator, verifier, window
 - [x] **T21**: Implement `SpecHopPipeline::execute()` — main loop: extend window → verify earliest → repeat (Algorithm 1 from paper)
 - [x] **T22**: Implement hop-level state machine: `HopState::AwaitingTarget` | `Speculating` | `Committed` | `RolledBack`
 - [x] **T23**: Implement early termination: if verified thread reaches final answer, return immediately

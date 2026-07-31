@@ -10,7 +10,7 @@
 //! # Reduction to Family A
 //!
 //! `K = 1` reduces to Family A bit-identically (same weights, one step). This is
-//! the G1.6 correctness property enforced by [`tests::k_equals_one_is_bit_identical_to_attractor`].
+//! the G1.6 correctness property enforced by `tests::k_equals_one_is_bit_identical_to_attractor`.
 //!
 //! # Zero allocation
 //!

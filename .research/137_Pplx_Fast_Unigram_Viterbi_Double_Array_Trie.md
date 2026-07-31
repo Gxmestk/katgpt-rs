@@ -13,7 +13,7 @@
 
 Perplexity reimplemented their Unigram tokenizer's Viterbi forward pass from scratch, achieving **5× vs HuggingFace**, **2× vs SentencePiece**, **1.5× vs IREE** via three optimizations: (1) double-array trie replacing HashMap trie, (2) bitmap + inline packing (64B cache-line per node), (3) huge-page backing for the trie. Zero steady-state allocations.
 
-**Verdict: MODERATE GAIN — Data structure optimizations transferable to our ToaST/BPE vocab lookup but Viterbi-specific algorithm is NOT used in our stack. Feature-gate the double-array trie as a vocab lookup acceleration path. Default-OFF until proven on our tokenizer workload.**
+**Verdict: MODERATE GAIN — Data structure optimizations transferable to our ToaST/BPE vocab lookup but Viterbi-specific algorithm is NOT used in our stack. Feature-gate the double-array trie as a vocab lookup acceleration path. Default-OFF until proven on our tokenizer workload.** *(Post-promotion update: proven on our tokenizer workload; `datrie_vocab` is now DEFAULT-ON in root Cargo.toml default array.)*
 
 ---
 
@@ -125,7 +125,7 @@ datrie_vocab = []  # Double-array trie vocab lookup for ToaST tokenizer (Researc
   - Runtime: byte-by-byte walk, return token_id or None
   - Single `base: Vec<i32>` + `check: Vec<u32>` + `value: Vec<Option<u32>>` (token_id)
   - Zero allocations on lookup
-  - Target: `src/tokenizer/datrie.rs` behind `#[cfg(feature = "datrie_vocab")]`
+  - Target: `crates/katgpt-tokenizer/src/datrie.rs` behind `#[cfg(feature = "datrie_vocab")]`
 
 - [x] T2: Implement `DatrieTreeIndex` — double-array trie for pretoken→tree-index lookup
   - Same structure, value = index into `trees` Vec

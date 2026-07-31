@@ -22,6 +22,8 @@ bytemuck = { version = "1", features = ["derive", "extern_crate_alloc"] }  # ext
 arrayvec = "0.7"
 # Phase 9: dense_mesh's edge_bandit + edge_projection use fastrand.
 fastrand = "2"
+# Issue 145: load_binary_bits constructs half::f16 group scales directly.
+half = "2"
 
 [features]
 # All features default-on to match the historical katgpt-rs root behavior —
@@ -50,6 +52,10 @@ decode_specialize = []
 # Bit-plane ternary SIMD matvec loader (Plan 148, Research 110).
 # Gates: load_ternary_bits function in contiguous.rs.
 plasma_path = []
+
+# Binary plasma loader (Issue 145, Bonsai 27B). Gates: load_binary_bits in contiguous.rs.
+# Forwards to katgpt-core so BinaryWeights resolves.
+binary_plasma = ["katgpt-core/binary_plasma"]
 
 # ── Phase 9 absorptions (Proposal 003) — modules moved from katgpt-rs root ──
 
@@ -96,3 +102,11 @@ thinking_cot = []
 # (`BreakevenSnapshot`), no external symbols. Both root forwards.
 collapse_aware_thinking = ["katgpt-core/collapse_aware_thinking"]
 breakeven_routing = []
+
+# Gated MLP (SwiGLU) — LLaMA-style gated MLP variant (Issue 377).
+# Gates: LayerWeights.mlp_w_up field (the "up" projection; mlp_w1 becomes
+# W_gate, mlp_w2 becomes W_down). When enabled, the forward path uses
+# SwiGLU: SiLU(W_gate·h) ⊙ W_up·h → W_down·hidden. Opt-in — not default
+# because the standard ReLU MLP is the production path; gated MLP is a
+# training-target architecture for aHLA MLP LoRA (Plan 066 Experiment E).
+gated_mlp = []

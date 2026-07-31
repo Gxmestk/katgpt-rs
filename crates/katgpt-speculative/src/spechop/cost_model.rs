@@ -122,7 +122,9 @@ impl InferenceStats {
 
     /// Compute α (relative speculator latency) from measured stats.
     ///
-    /// α = E[T_spec] / E[T_target], clamped to (0, 1).
+    /// α = E\[T_spec\] / E\[T_target\], clamped to (0, 1).
+    ///
+    /// where `T_spec` = speculator latency, `T_target` = target model latency.
     pub fn alpha(&self) -> f64 {
         if self.avg_target_latency_ns <= 0.0 {
             return 0.5; // default when no data
@@ -132,7 +134,9 @@ impl InferenceStats {
 
     /// Compute β (decode-to-tool ratio) from measured stats.
     ///
-    /// β = E[T_seg] / E[T_target], clamped to (0.01, ∞).
+    /// β = E\[T_seg\] / E\[T_target\], clamped to (0.01, ∞).
+    ///
+    /// where `T_seg` = decode segment latency, `T_target` = target model latency.
     pub fn beta(&self) -> f64 {
         if self.avg_target_latency_ns <= 0.0 {
             return 0.5; // default when no data

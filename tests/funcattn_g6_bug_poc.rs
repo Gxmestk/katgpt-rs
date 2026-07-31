@@ -3,7 +3,8 @@
 //! Probes four independent hypotheses about why G6's FUNCATTN plateaus at
 //! acc=0.969 while SDPA reaches acc=1.000. If ANY single probe flips acc to
 //! 1.000, the original G6 verdict (Bench 058) is invalid and `funcattn` is
-//! prematurely demoted — see [Issue 049](../.issues/049_funcattn_g6_test_config_artifact_not_structural_ceiling.md).
+//! prematurely demoted — see Issue 049 (funcattn G6 test-config artifact,
+//! resolved + removed — CHaRS×CommittedFieldBlend eval landed in commit `2a3aff33`).
 //!
 //! ## Probes
 //!

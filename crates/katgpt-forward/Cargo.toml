@@ -272,6 +272,11 @@ tri_mode = []
 # through katgpt_core + this crate.
 dmax_spd = []
 
+# Gated MLP (SwiGLU) — LLaMA-style gated MLP variant (Issue 377).
+# Gates: ForwardContext.hidden2 buffer (the "up" projection scratch).
+# Forwards to katgpt-transformer so LayerWeights.mlp_w_up resolves.
+gated_mlp = ["katgpt-transformer/gated_mlp"]
+
 # ── Plan 400 (2026-07-05): features consumed by the moved flashar cluster ──
 # (`flashar_anchor.rs`, `flashar_consensus.rs` moved from root
 # `src/speculative/`). Each is a tracking flag here — it gates a cfg block in
@@ -296,6 +301,10 @@ flashar_consensus = []
 # feature is enabled. Forwards to katgpt-core so those symbols resolve.
 plasma_path = ["katgpt-core/plasma_path"]
 
+# Binary plasma tier (Issue 145). Forwards to katgpt-core so BinaryWeights +
+# simd_binary_matvec resolve when the root feature is enabled.
+binary_plasma = ["katgpt-core/binary_plasma"]
+
 # ── Plan 401 (2026-07-06): feature consumed by the moved forward_set_causal ──
 # (`forward_set_causal_positions` + 5 of 7 Research 376 T0.2 tests moved from
 # root `src/dllm.rs`). Empty tracking flag — gates the `pub mod forward_set_causal`
@@ -304,3 +313,11 @@ plasma_path = ["katgpt-core/plasma_path"]
 # symbols (`TransformerWeights`, `Config`, `kv_dim`/`matmul`/`matmul_relu`/
 # `rmsnorm`, `katgpt_core::simd::*`) resolve through existing deps.
 set_diffusion = []
+
+# Weaver inference-only logit corrector (Issue 131, Plan 433). Gates the
+# `dflash_predict_with_weaver` wrapper that combines DFlash predict + Weaver
+# marginal correction in a single call. Forwards to katgpt-speculative so the
+# WeaverCorrector + WeaverScratch + WeaverInput types resolve. Default-off —
+# requires a trained checkpoint to produce non-trivial gain; zero weights are a
+# safe no-op.
+weaver_runtime = ["katgpt-speculative/weaver_runtime"]

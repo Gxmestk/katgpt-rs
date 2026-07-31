@@ -448,16 +448,16 @@ From weakest to strongest:
 
 | AutoGo Concept | Our Implementation | Source File | Module |
 |----------------|-------------------|-------------|--------|
-| Go board rules (Tromp-Taylor) | `GoState` GameState impl | `go.py`, `go_game.h` | `src/pruners/go/state.rs` |
-| Legal move generation | `available_actions()` | `go.py:is_legal()`, `go_game.h` | `src/pruners/go/state.rs` |
-| Capture + ko detection | `advance()` + ko tracking | `go.py:play()`, `go_game.h` | `src/pruners/go/state.rs` |
-| Territory scoring | `reward()` via flood fill | `go.py:score()`, `go_game.h` | `src/pruners/go/state.rs` |
-| MCTS PUCT + Dirichlet | Enhance our `mcts_search()` | `mcts.py`, `mcts.h` | `src/pruners/game_state/mcts.rs` |
-| Policy/value dual head | Future: dual-head config | `model.py:GoTransformer` | `src/transformer.rs` |
+| Go board rules (Tromp-Taylor) | `GoState` GameState impl | `go.py`, `go_game.h` | `crates/katgpt-pruners/src/go/state.rs` |
+| Legal move generation | `available_actions()` | `go.py:is_legal()`, `go_game.h` | `crates/katgpt-pruners/src/go/state.rs` |
+| Capture + ko detection | `advance()` + ko tracking | `go.py:play()`, `go_game.h` | `crates/katgpt-pruners/src/go/state.rs` |
+| Territory scoring | `reward()` via flood fill | `go.py:score()`, `go_game.h` | `crates/katgpt-pruners/src/go/state.rs` |
+| MCTS PUCT + Dirichlet | Enhance our `mcts_search()` | `mcts.py`, `mcts.h` | `crates/katgpt-pruners/src/game_state/mcts.rs` |
+| Policy/value dual head | Future: dual-head config | `model.py:GoTransformer` | `crates/katgpt-percepta/src/transformer.rs` |
 | Self-play loop | G-Zero `SelfImprovingCycle` | `self_play.py` | `pruners/g_zero/` |
-| Agent registry pattern | Adapt for Go players | `agents/base.py` | `src/pruners/go/players.rs` |
-| REST API game protocol | Rust HTTP client | `play.py` | `src/pruners/go/autogo_client.rs` |
-| Replay data (NPZ → JSONL) | Our ReplayWriter format | `dataset.py`, `gameplay.py` | `src/pruners/go/replay.rs` |
+| Agent registry pattern | Adapt for Go players | `agents/base.py` | `crates/katgpt-pruners/src/go/players.rs` |
+| REST API game protocol | Rust HTTP client | `play.py` | `crates/katgpt-pruners/src/go/autogo_client.rs` |
+| Replay data (NPZ → JSONL) | Our ReplayWriter format | `dataset.py`, `gameplay.py` | `crates/katgpt-pruners/src/go/replay.rs` |
 
 ### 6.2 Skip (Not Applicable / Already Better)
 
@@ -634,20 +634,20 @@ External reviews correctly identified that `riir-ai` has every component needed 
 
 | Component | Location | Feature Gate | Go Adaptation |
 |-----------|----------|-------------|---------------|
-| Fourier spatial MCTS | `riir-engine/src/fourier/mcts.rs` | `fourier` | Implement `state_to_entities` for Go tactical shapes |
-| Generic MCTS | `riir-engine/src/mcts.rs` | `game_state` | ✅ Works on any `GameState` — zero adaptation |
-| GRPO loss | `riir-gpu/src/loss_grpo.rs` | `training` | ✅ Game-agnostic — zero adaptation |
-| DPO loss (GPU) | `riir-gpu/src/loss_dpo.rs` | `training` | ✅ Game-agnostic — WGSL kernels work as-is |
-| DeltaFilter | `riir-gpu/src/delta_filter.rs` | `training` | ✅ Game-agnostic — 6-stage pipeline works as-is |
-| GZeroLoop | `riir-gpu/src/gzero_loop.rs` | `training` | ✅ Game-agnostic — activates when Go replays exist |
-| Game replay → LoRA | `riir-gpu/src/game/trainer.rs` | `training` | Adapt `GameAction` enum → 82 Go tokens |
-| Game policy config | `riir-gpu/src/game/policy.rs` | `training` | Adapt `GameConfig` → 3 board + 82 action vocab |
+| Fourier spatial MCTS | `riir-ai/crates/riir-engine/src/fourier/mcts.rs` | `fourier` | Implement `state_to_entities` for Go tactical shapes |
+| Generic MCTS | `riir-ai/crates/riir-engine/src/mcts.rs` | `game_state` | ✅ Works on any `GameState` — zero adaptation |
+| GRPO loss | `riir-train/crates/riir-train-gpu/src/loss_grpo.rs` | `training` | ✅ Game-agnostic — zero adaptation |
+| DPO loss (GPU) | `riir-train/crates/riir-train-gpu/src/loss_dpo.rs` | `training` | ✅ Game-agnostic — WGSL kernels work as-is |
+| DeltaFilter | `riir-train/crates/riir-train-gpu/src/delta_filter.rs` | `training` | ✅ Game-agnostic — 6-stage pipeline works as-is |
+| GZeroLoop | `riir-train/crates/riir-train-gpu/src/gzero_loop.rs` | `training` | ✅ Game-agnostic — activates when Go replays exist |
+| Game replay → LoRA | `riir-ai/crates/riir-gpu/src/game/trainer.rs` | `training` | Adapt `GameAction` enum → 82 Go tokens |
+| Game policy config | `riir-ai/crates/riir-gpu/src/game/policy.rs` | `training` | Adapt `GameConfig` → 3 board + 82 action vocab |
 | WASM Validator SDK | `riir-validator-sdk/` | `go-wasm` | Compile `GoState::is_legal` → `go_validator.wasm` |
-| MTP projection cache | `riir-router/src/mtp_cache.rs` | `percepta` | Document as future: Go tokenizer → MTP projections |
-| Schur complement | `riir-gpu/src/schur.rs` | `training` | ✅ Domain-latent training — 1-shot weight updates |
-| Bandit + WASM + LoRA | `riir-examples/examples/bandit_with_real_model_demo.rs` | `bandit` | ✅ **Full pipeline proven**: Draft → DDTree → WasmPruner → Leviathan → bandit.update() |
-| Bomber tech A/B | `riir-examples/examples/bomber_tech_ab_demo.rs` | `bomber-wasm` | ✅ **Proven**: LoRA vs WASM vs LoRA+WASM vs Full HL — combined wins |
-| G-Zero arenas | `riir-examples/examples/g_zero_01_arena.rs` | `g_zero` | ✅ **Proven**: GZero beats Greedy/Validator/HL across Bomber + FFT |
+| MTP projection cache | `riir-ai/crates/riir-router/src/mtp_cache.rs` | `percepta` | Document as future: Go tokenizer → MTP projections |
+| Schur complement | `riir-train/crates/riir-train-engine/src/schur.rs` | `training` | ✅ Domain-latent training — 1-shot weight updates |
+| Bandit + WASM + LoRA | `riir-ai/crates/riir-examples/examples/bandit_with_real_model_demo.rs` | `bandit` | ✅ **Full pipeline proven**: Draft → DDTree → WasmPruner → Leviathan → bandit.update() |
+| Bomber tech A/B | `riir-ai/crates/riir-examples/examples/bomber_tech_ab_demo.rs` | `bomber-wasm` | ✅ **Proven**: LoRA vs WASM vs LoRA+WASM vs Full HL — combined wins |
+| G-Zero arenas | `riir-ai/crates/riir-examples/examples/g_zero_01_arena.rs` | `g_zero` | ✅ **Proven**: GZero beats Greedy/Validator/HL across Bomber + FFT |
 
 ### 11.2 Proven Results (Not Theory)
 
@@ -677,7 +677,7 @@ go-full = ["go-training", "go-wasm", "go-fourier", "go-mtp"]  # Everything
 
 This is how bomber does it (`bomber`, `bomber-agent`, `bomber-wasm`). Same pattern, new domain.
 
-### 11.4 Adaptation Path: `game/trainer.rs` → Go
+### 11.4 Adaptation Path: `riir-ai/crates/riir-gpu/src/game/trainer.rs` → Go
 
 **Bomberman (existing, proven):**
 ```text
@@ -699,8 +699,8 @@ Model:        ~4K params, LoRA rank 4
 ```text
 GoState::play_random_game()           (Plan 065 GoState)
   → GoReplay                          (Plan 065 T16a)
-  → game/replay.rs → samples          (adapt GameAction enum)
-  → game/trainer.rs → 82-token seq    (adapt encode_game_sample)
+  → riir-ai/crates/riir-gpu/src/game/replay.rs → samples          (adapt GameAction enum)
+  → riir-ai/crates/riir-gpu/src/game/trainer.rs → 82-token seq    (adapt encode_game_sample)
   → riir-gpu LoRA fine-tuning         (existing wgpu kernels)
   → Go LoRA adapter (.bin)            (tiny model, fast train)
   → GoLoRAPlayer                      (new player type)
@@ -708,9 +708,9 @@ GoState::play_random_game()           (Plan 065 GoState)
 
 **G-Zero model-based activation (gated behind `go-training`):**
 ```text
-GZeroLoop round (riir-gpu/src/gzero_loop.rs):
+GZeroLoop round (riir-train/crates/riir-train-gpu/src/gzero_loop.rs):
   1. GoTemplateProposer → query-hint pairs    (Plan 065 T33)
-  2. Go LoRA Generator → move predictions     (adapted game/policy.rs)
+  2. Go LoRA Generator → move predictions     (adapted riir-ai/crates/riir-gpu/src/game/policy.rs)
   3. HintDelta → intrinsic reward             (log-prob shift)
   4. DeltaFilter → preference pairs           (6-stage, game-agnostic)
   5. GRPO → train Proposer                    (loss_grpo.rs)
@@ -733,7 +733,7 @@ GZeroLoop round (riir-gpu/src/gzero_loop.rs):
 
 ### 11.6 Decision
 
-Plan 065 implements `go` feature gate (GoState + MCTS + HL + API bridge). Each subsequent feature gate (`go-training`, `go-wasm`, `go-fourier`, `go-mtp`) is unlocked by proving the previous one works via benchmarks. The `game/trainer.rs` → Go adaptation is the first unlock after Plan 065 completes.
+Plan 065 implements `go` feature gate (GoState + MCTS + HL + API bridge). Each subsequent feature gate (`go-training`, `go-wasm`, `go-fourier`, `go-mtp`) is unlocked by proving the previous one works via benchmarks. The `riir-ai/crates/riir-gpu/src/game/trainer.rs` → Go adaptation is the first unlock after Plan 065 completes.
 
 ---
 
@@ -755,14 +755,14 @@ Plan 065 implements `go` feature gate (GoState + MCTS + HL + API bridge). Each s
 - Fourier spatial MCTS: `riir-ai/crates/riir-engine/src/fourier/mcts.rs`
 - Fourier encoder: `riir-ai/crates/riir-engine/src/fourier/encoder.rs`
 - Generic MCTS: `riir-ai/crates/riir-engine/src/mcts.rs`
-- GRPO loss: `riir-ai/crates/riir-gpu/src/loss_grpo.rs`
-- DPO loss (GPU): `riir-ai/crates/riir-gpu/src/loss_dpo.rs`
-- DeltaFilter: `riir-ai/crates/riir-gpu/src/delta_filter.rs`
-- GZeroLoop: `riir-ai/crates/riir-gpu/src/gzero_loop.rs`
+- GRPO loss: `riir-train/crates/riir-train-gpu/src/loss_grpo.rs`
+- DPO loss (GPU): `riir-train/crates/riir-train-gpu/src/loss_dpo.rs`
+- DeltaFilter: `riir-train/crates/riir-train-gpu/src/delta_filter.rs`
+- GZeroLoop: `riir-train/crates/riir-train-gpu/src/gzero_loop.rs`
 - Game replay → LoRA: `riir-ai/crates/riir-gpu/src/game/trainer.rs`
 - Game policy config: `riir-ai/crates/riir-gpu/src/game/policy.rs`
 - Game replay parser: `riir-ai/crates/riir-gpu/src/game/replay.rs`
-- Schur complement: `riir-ai/crates/riir-gpu/src/schur.rs` (Plan 067 ✅ — CLEAR WIN)
+- Schur complement: `riir-train/crates/riir-train-engine/src/schur.rs` (Plan 067 ✅ — CLEAR WIN)
 - WASM Validator SDK: `riir-ai/crates/riir-validator-sdk/`
 - WASM Pruner: `riir-ai/crates/riir-wasm/src/wasm_pruner.rs`
 - MTP projection cache: `riir-ai/crates/riir-router/src/mtp_cache.rs`

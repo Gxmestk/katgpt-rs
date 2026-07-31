@@ -66,14 +66,14 @@ Under a *characteristic* kernel (Gaussian RBF, Laplacian, inverse-multiquadric �
 | Paper mechanism | Shipped cousin | File / Plan |
 |---|---|---|
 | Closed-form P×P ridge solve `η = (K + λI)^{-1} r` | **`linalg::ridge_solve`** — `ridge_solve_direct_f32`, `ridge_solve_direct_f64`, `ridge_solve_woodbury_f32`, `chol_solve_f32` | Plan 308 T1.6, `crates/katgpt-core/src/linalg/ridge_solve.rs` (the canonical P×P Cholesky path KARC + PEIRA + FuncAttn all consume) |
-| Per-NPC trajectory forecaster via delay-basis ridge | **KARC** — `KarcForecaster<D,M,K>::fit_direct / fit_woodbury` | Plan 308, Research 288, `crates/katgpt-core/src/karc.rs` |
+| Per-NPC trajectory forecaster via delay-basis ridge | **KARC** — `KarcForecaster<D,M,K>::fit_direct / fit_woodbury` | Plan 308, Research 288, `riir-ai/crates/riir-games-civ/src/civ/map_tick/karc.rs` |
 | Closed-form ridge over inter-view covariances `P* = Σ(N+λI)^{-1}` | **PEIRA** — `predictor_with_scratch` | Plan 153, `crates/katgpt-core/src/peira.rs` |
-| Closed-form Tikhonov `(1-α)K̃ᵀK̃ + αI_d` spectral transport | **FuncAttn** — `solve_convex_combo_dual` | Plan 286, Research 257, `crates/katgpt-core/src/funcattn.rs` |
+| Closed-form Tikhonov `(1-α)K̃ᵀK̃ + αI_d` spectral transport | **FuncAttn** — `solve_convex_combo_dual` | Plan 286, Research 257, `crates/katgpt-core/src/funcattn/mod.rs` |
 | Per-entity FIXED MoE blend (sigmoid projection) | **CommittedFieldBlend** — `π_k = sigmoid(g_k(s)/τ)` computed once from trajectory summary, frozen | Plan 321, Research 302, `crates/katgpt-core/src/committed_field_blend.rs` |
 | Per-layer sigmoid composition with per-tick DRIFT | **PersonalityWeightedComposition** | Plan 297, Research 276 |
 | Asymmetric basis projection (cross-resolution transport) | **CrossResolutionTransport** | Plan 310, Research 291, `crates/katgpt-core/src/cross_resolution.rs` |
 | Pre-trained velocity-field drafter (Fourier-mode token drafting) | **LinOSS ModalSpecDrafter** | Plan 189, `crates/katgpt-core/src/linoss.rs:561` |
-| BLAKE3-committed frozen artifact pool + atomic Arc-swap | **LoRAHotSwap**, **EmotionDirections loader**, **MerkleFrozenEnvelope** | riir-neuron-db/src/freeze.rs, riir-engine/src/snapshot.rs |
+| BLAKE3-committed frozen artifact pool + atomic Arc-swap | **LoRAHotSwap**, **EmotionDirections loader**, **MerkleFrozenEnvelope** | riir-neuron-db/src/freeze.rs, riir-ai/crates/riir-engine/src/snapshot.rs |
 | Raw scalar list crossing sync boundary via fixed-point | **LatCal** 2×2-block commitment | riir-chain/src/encoding/latcal.rs |
 
 ### 2.2 What the paper adds that none of the above does alone

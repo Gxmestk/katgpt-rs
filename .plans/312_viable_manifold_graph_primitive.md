@@ -5,7 +5,7 @@
 **Private Super-GOAT guide:** [riir-ai/.research/154_viable_manifold_graph_game_runtime_guide.md](../../../riir-ai/.research/154_viable_manifold_graph_game_runtime_guide.md)
 **Source paper:** [arxiv 2206.00106](https://arxiv.org/abs/2206.00106) — González-Duque et al., *Mario Plays on a Manifold*, 2022
 **Target:** `katgpt-rs/crates/katgpt-core/src/viable_manifold_graph.rs` (new module) + Cargo feature `viable_manifold_graph`
-**Status:** Active — Phase 0 complete (research + guide + this plan created in same session per Super-GOAT mandatory-output rule)
+**Status:** ✅ COMPLETE (2026-06-24) — PROMOTED to DEFAULT-ON. All gates (G1–G7 correctness + perf bench) PASS after the CSR adjacency fix closed the perf gate (7.10 ns/step ≤ 100 ns/step). `viable_manifold_graph` in `default = [...]` of both Cargo.toml files.
 
 ---
 
@@ -31,7 +31,7 @@ Ship the generic, modelless, MIT-licensed open half of the Viable Manifold Graph
 - **Sigmoid not softmax** — any blending uses sigmoid (e.g., the calibrated-decoder α(z) semaphore if we expose it). Per AGENTS.md.
 - **Latent-vs-raw boundary respected** — operates only on `&[f32]` + closures. Never touches sync. No boundary crossing by construction (G7).
 - **Reuse existing infra** — `jacobian_svd_at` (Plan 301) for the SVD; we add only the `det(J^T J)` reduction + graph + navigation.
-- **DRY** — graph storage reuses the pattern from `dense_mesh` (Vec-based, no graph crate dependency); A* reuses the pattern from `pruners/pathfinder.rs`.
+- **DRY** — graph storage reuses the pattern from `dense_mesh` (Vec-based, no graph crate dependency); A* reuses the pattern from `crates/katgpt-pruners/src/pathfinder.rs`.
 
 ---
 
@@ -69,7 +69,7 @@ This is the "what does it look like?" demo. It validates the mechanism shape end
 - [x] **T1.2** Create `katgpt-rs/crates/katgpt-core/src/viable_manifold_graph.rs` with module doc referencing R294 + paper arxiv 2206.00106.
 - [x] **T1.3** Define `pub struct VolumeFieldConfig { pub log_eps: f32, pub jacobian_eps: f32 }`. **Deviation:** added `jacobian_eps` because `JacobianSvdScratch` does not store eps (Plan 301's `jacobian_svd_at` takes it as a parameter). Default `jacobian_eps = 1e-4` via `DEFAULT_JACOBIAN_EPS`.
 - [x] **T1.4** Implement `pub fn pullback_volume<F>(f: F, z: &[f32], scratch: &mut JacobianSvdScratch, cfg: &VolumeFieldConfig) -> f32 where F: Fn(&[f32], &mut [f32])`: calls `jacobian_svd_at(f, z, cfg.jacobian_eps, scratch)`, returns `Σ_i log(σᵢ² + cfg.log_eps)`. Zero new allocations beyond SVD.
-- [x] **T1.5** Add `pub use viable_manifold_graph::{...}` to `katgpt-core/src/lib.rs` behind `#[cfg(feature = "viable_manifold_graph")]`, mirroring the `subspace_phase_gate` pattern.
+- [x] **T1.5** Add `pub use viable_manifold_graph::{...}` to `crates/katgpt-core/src/lib.rs` behind `#[cfg(feature = "viable_manifold_graph")]`, mirroring the `subspace_phase_gate` pattern.
 
 **Exit:** `cargo check -p katgpt-core --features viable_manifold_graph` clean.
 
@@ -114,7 +114,7 @@ This is the "what does it look like?" demo. It validates the mechanism shape end
 - [x] **T4.6** **G5** — `test_manifold_random_walk_validity`: build a graph, run `manifold_random_walk(src, m=25)`, verify every node on the walk satisfies the predicate. **Playability = 1.0 by construction.** **Verified 2026-06-23** — PASS.
 - [x] **T4.7** **G6** — `test_manifold_random_walk_zero_alloc_across_1000_steps`: walk for 1000 steps, verify no `Vec` capacity growth in the scratch path. Per AGENTS.md hot-loop rule. **Verified 2026-06-23** — PASS (Vec capacity == m+1, no growth).
 - [x] **T4.8** **G7** — `test_primitive_never_touches_sync`: a static check (or a doc-test) that the primitive signature accepts only `&[f32]` + closures. The lint: the module must not import anything from `riir-chain`, `riir-neuron-db`, or any sync module. (Compile-pass test.) **Verified 2026-06-23** — PASS by inspection (module imports only `crate::subspace_phase_gate::{JacobianSvdScratch, jacobian_svd_at}` + `std::collections::BinaryHeap`).
-- [x] **T4.9** Add `benches/viable_manifold_graph_bench.rs`:
+- [x] **T4.9** Add `crates/katgpt-core/benches/viable_manifold_graph_bench.rs`:
   - `pullback_volume` latency on `R^4 → R^4` (target: < 5µs, since it's one SVD call). **Measured 2026-06-23: 304.74 ns — PASS (16.4× under target). Re-measured 2026-06-24 post-CSR: 310.00 ns — still PASS.**
   - `manifold_random_walk` per-step latency (target: < 100ns/step for k=4 neighbors). **Measured 2026-06-23: 485.58 ns/step — FAIL (4.86× over target). Root cause: `for_each_neighbor` is O(E) linear scan, not O(degree). FIXED 2026-06-24 via CSR adjacency: re-measured 7.10 ns/step — PASS (68.4× speedup, 14× under target). See §Post-CSR in [`.benchmarks/312_viable_manifold_graph_goat.md`](../.benchmarks/312_viable_manifold_graph_goat.md).**
   - `build_safe_manifold_graph` on 1000 samples (target: < 10ms, dominated by 1000 SVD calls). **Measured 2026-06-23: 367.93 µs — PASS (27.2× under target). Re-measured 2026-06-24 post-CSR: 384.60 µs — still PASS (+4.9% CSR build cost, 26× margin).**
@@ -144,7 +144,7 @@ This is the "what does it look like?" demo. It validates the mechanism shape end
 This plan ships the open primitive only. The riir-ai-side wiring (G8–G12 from the private guide) is a separate plan in `riir-ai/.plans/` (TBD after Phase 5). It will:
 
 - Use `evolve_hla` as the map `f`.
-- Use `latent_functor/quality_gate.rs` coherence as the predicate `V`.
+- Use `riir-ai/crates/riir-engine/src/latent_functor/quality_gate.rs` coherence as the predicate `V`.
 - Store the per-NPC graph in the Entity Cognition Stack (Plan 327).
 - Wire `manifold_curiosity_walk`'s `weights` closure to `cgsp_runtime::curiosity_step`.
 - Add the designer-facing `schedule_persona_transition` API.

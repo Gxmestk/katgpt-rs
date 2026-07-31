@@ -226,8 +226,12 @@ fn main() {
     println!();
     let all_pass = g1 && g2 && g2a && g4;
     if all_pass {
-        println!("═══ ALL GATES PASS — eligible for default-on promotion ═══");
+        println!("═══ ALL GATES PASS — primitive is GOAT-validated. ═══");
+        println!("   ptg_functor_edges was PROMOTED TO DEFAULT-ON");
+        println!("   (Issue 040, katgpt-core/Cargo.toml, 2026-07-04). This bench was");
+        println!("   the gate evidence; promotion has already landed.");
     } else {
-        println!("═══ SOME GATES FAILED — keep opt-in ═══");
+        println!("═══ SOME GATES FAILED — note: ptg_functor_edges was previously ═══");
+        println!("   promoted 2026-07-04; a regression here would warrant re-audit.");
     }
 }

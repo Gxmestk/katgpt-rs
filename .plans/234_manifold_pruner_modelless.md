@@ -68,11 +68,11 @@ ManifoldE embeds knowledge graph triples as points near a manifold (sphere/hyper
 
 | File | Purpose | ~LOC |
 |------|---------|------|
-| `crates/katgpt-core/src/traits.rs` | Trait extensions (`manifold_score`, `constraint_vector`) | ~30 |
-| `src/pruners/hyperplane_pruner.rs` | `HyperplanePruner` half-space intersection | ~200 |
-| `src/pruners/manifold_pruner.rs` | `ManifoldPruner` soft sigmoid wrapper | ~150 |
-| `src/pruners/kernel_scoring.rs` | `KernelKind` enum + SIMD kernel functions | ~200 |
-| `src/pruners/kernel_screening_pruner.rs` | `KernelScreeningPruner<P>` wrapper | ~120 |
+| `crates/katgpt-core/src/traits/mod.rs` | Trait extensions (`manifold_score`, `constraint_vector`) | ~30 |
+| `crates/katgpt-pruners/src/hyperplane_pruner.rs` | `HyperplanePruner` half-space intersection | ~200 |
+| `crates/katgpt-pruners/src/manifold_pruner.rs` | `ManifoldPruner` soft sigmoid wrapper | ~150 |
+| `crates/katgpt-pruners/src/kernel_scoring.rs` | `KernelKind` enum + SIMD kernel functions | ~200 |
+| `crates/katgpt-pruners/src/kernel_screening_pruner.rs` | `KernelScreeningPruner<P>` wrapper | ~120 |
 | `src/pruners/mod.rs` | Module glue (feature-gated) | ~8 |
 | `tests/goat_234_manifold_pruner.rs` | GOAT proof benchmark | ~150 |
 
@@ -82,7 +82,7 @@ ManifoldE embeds knowledge graph triples as points near a manifold (sphere/hyper
 
 ### Phase 1: Trait Extensions (Backward Compatible)
 
-- [x] Add `manifold_score(&self, depth: usize, token_idx: usize, prefix: &[usize]) -> f32` default method to `ConstraintPruner` trait in `crates/katgpt-core/src/traits.rs`. Default: `if self.is_valid(depth, token_idx, prefix) { 1.0 } else { 0.0 }`. Zero cost if not overridden.
+- [x] Add `manifold_score(&self, depth: usize, token_idx: usize, prefix: &[usize]) -> f32` default method to `ConstraintPruner` trait in `crates/katgpt-core/src/traits/mod.rs`. Default: `if self.is_valid(depth, token_idx, prefix) { 1.0 } else { 0.0 }`. Zero cost if not overridden.
 - [x] Add `constraint_vector(&self, depth: usize, prefix: &[usize]) -> Option<(&[f32], f32)>` optional method to `ConstraintPruner` trait. Returns `(normal_vector, threshold)` for half-space constraint. Default: `None` (fall back to `is_valid()`).
 - [x] Add `KernelKind` enum: `Linear`, `Gaussian { sigma: f32 }`, `Polynomial { degree: f32, c: f32 }`.
 - [x] Test: default `manifold_score()` returns 1.0 for valid, 0.0 for invalid tokens (backward compat)
@@ -90,7 +90,7 @@ ManifoldE embeds knowledge graph triples as points near a manifold (sphere/hyper
 
 ### Phase 2: HyperplanePruner — Geometric Constraint Intersection (P0)
 
-- [x] Create `src/pruners/hyperplane_pruner.rs` behind `#[cfg(feature = "manifold_pruner")]`
+- [x] Create `crates/katgpt-pruners/src/hyperplane_pruner.rs` behind `#[cfg(feature = "manifold_pruner")]`
 - [x] Implement `HyperplanePruner` struct that takes a slice of `&dyn ConstraintPruner` and composes their constraint vectors via half-space intersection
 - [x] Half-space intersection: for each pruner returning `Some((normal, threshold))`, compute `normal · token_embedding >= threshold`. Valid = intersection of all half-spaces.
 - [x] For pruners returning `None`, fall back to `is_valid()` boolean check
@@ -103,7 +103,7 @@ ManifoldE embeds knowledge graph triples as points near a manifold (sphere/hyper
 
 ### Phase 3: ManifoldPruner — Soft Validity Scoring (P1)
 
-- [x] Create `src/pruners/manifold_pruner.rs` behind `#[cfg(feature = "manifold_pruner")]`
+- [x] Create `crates/katgpt-pruners/src/manifold_pruner.rs` behind `#[cfg(feature = "manifold_pruner")]`
 - [x] Implement `ManifoldPruner` wrapper that converts any `ConstraintPruner` into a soft scorer via temperature-controlled sigmoid
 - [x] `manifold_score()` returns `sigmoid(-distance / temperature)` where distance is derived from `is_valid()` boundary proximity
 - [x] For pruners with `constraint_vector()`: distance = `|normal · token - threshold|`
@@ -115,7 +115,7 @@ ManifoldE embeds knowledge graph triples as points near a manifold (sphere/hyper
 
 ### Phase 4: Kernel-Tricked Relevance (P1)
 
-- [x] Create `src/pruners/kernel_scoring.rs` with kernel scoring functions
+- [x] Create `crates/katgpt-pruners/src/kernel_scoring.rs` with kernel scoring functions
 - [x] `kernel_score(query: &[f32], candidate: &[f32], kind: KernelKind) -> f32`:
   - Linear: `dot(query, candidate)`
   - Gaussian: `exp(-||q-c||²/σ²)` — SIMD-accelerated (chunked f32, 4 or 8 per iteration)

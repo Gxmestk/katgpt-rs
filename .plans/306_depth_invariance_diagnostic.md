@@ -5,16 +5,16 @@
 **Private guide (Super-GOAT selling point):** [riir-ai/.research/151_Recursive_Latent_State_Magnitude_Hygiene_Guide.md](../../riir-ai/.research/151_Recursive_Latent_State_Magnitude_Hygiene_Guide.md)
 **Private runtime plan:** [riir-ai/.plans/331_recursive_latent_state_magnitude_hygiene_runtime.md](../../riir-ai/.plans/331_recursive_latent_state_magnitude_hygiene_runtime.md)
 **Source paper:** [arXiv:2605.09992](https://arxiv.org/abs/2605.09992) — Eldenk et al., *Attention Drift: What Autoregressive Speculative Decoding Models Learn*
-**Target:** `katgpt-rs/crates/katgpt-core/src/depth_invariance.rs` (new) + `crates/katgpt-core/src/types/config.rs` (extension) + audit hook in `katgpt-rs/src/speculative/belief_drafter.rs`
-**Status:** Active — Phase 1 ✅ complete (12 tests pass), Phase 5 ✅ complete, **Phases 3 / 4 / 6 / 7 / 8.1 / 8.3 ✅ complete** (BeliefDrafter + AttractorKernel + LeakyIntegrator audit hooks, G2 paper-finding reproduced on random-init drafter, G3 negative + positive controls both pass, G4 re-spec'd to absolute-latency + SIMD inner-loop landed, docs cross-linked). Phase 2 G1 tests rolled into Phase 1 per delegation. T8.2 (riir-neuron-db Raven audit issue) is out of scope for this repo. **T7.4 PROMOTED to default-on (parent, 2026-06-23):** G1/G2/G3 PASS, G4 re-spec'd from structurally-impossible relative gates to absolute-latency gates at HLA scale (all PASS with headroom), SIMD inner-loop landed. **HLA `evolve_hla` audit shipped via riir-ai Plan 331 Phase 1** (`katgpt-core/src/sense/reconstruction_depth_invariance.rs` — `audit_depth_invariance` + `evolve_hla_regularized`). Key finding from that audit: HLA classifies as `DepthInvariant` by construction (per-element `[-1,1]` clamp bounds magnitude), refuting the drift hypothesis for this kernel; the RmsNorm wrap is retained as a defense-in-depth backstop.
+**Target:** `katgpt-rs/crates/katgpt-types/src/depth_invariance.rs` (new) + `crates/katgpt-types/src/config.rs` (extension) + audit hook in `katgpt-rs/crates/katgpt-speculative/src/belief_drafter.rs`
+**Status:** ✅ COMPLETE, DEFAULT-ON (T7.4 promoted 2026-06-23) — Phase 1 ✅ complete (12 tests pass), Phase 5 ✅ complete, **Phases 3 / 4 / 6 / 7 / 8.1 / 8.3 ✅ complete** (BeliefDrafter + AttractorKernel + LeakyIntegrator audit hooks, G2 paper-finding reproduced on random-init drafter, G3 negative + positive controls both pass, G4 re-spec'd to absolute-latency + SIMD inner-loop landed, docs cross-linked). Phase 2 G1 tests rolled into Phase 1 per delegation. T8.2 (riir-neuron-db Raven audit issue) is out of scope for this repo. **T7.4 PROMOTED to default-on (parent, 2026-06-23):** G1/G2/G3 PASS, G4 re-spec'd from structurally-impossible relative gates to absolute-latency gates at HLA scale (all PASS with headroom), SIMD inner-loop landed. **HLA `evolve_hla` audit shipped via riir-ai Plan 331 Phase 1** (`crates/katgpt-sense/src/reconstruction_depth_invariance.rs` — `audit_depth_invariance` + `evolve_hla_regularized`). Key finding from that audit: HLA classifies as `DepthInvariant` by construction (per-element `[-1,1]` clamp bounds magnitude), refuting the drift hypothesis for this kernel; the RmsNorm wrap is retained as a defense-in-depth backstop.
 
 ---
 
 ## Goal
 
-Ship the open `DepthInvarianceDiagnostic` + `MagnitudeRegularizedResidual` primitives (modelless math, no game semantics) behind a `depth_invariance` feature flag, and audit our existing `BeliefDrafter` to confirm whether it exhibits the attention-drift failure mode the paper diagnoses. The diagnostic is the *root-cause* counterpart to four existing *symptom*-only detectors (`BeliefRankPruner`, `GainCostLoopHalter`, `latent_functor/reestimation.rs`, `micro_belief/coherence_bench.rs`).
+Ship the open `DepthInvarianceDiagnostic` + `MagnitudeRegularizedResidual` primitives (modelless math, no game semantics) behind a `depth_invariance` feature flag, and audit our existing `BeliefDrafter` to confirm whether it exhibits the attention-drift failure mode the paper diagnoses. The diagnostic is the *root-cause* counterpart to four existing *symptom*-only detectors (`BeliefRankPruner`, `GainCostLoopHalter`, `riir-ai/crates/riir-engine/src/latent_functor/reestimation/mod.rs`, `crates/katgpt-micro-belief/src/coherence_bench.rs`).
 
-**GOAT gate (open primitive):** G1 (8 correctness tests) + G2 (reproduce paper Figure 10 on BeliefDrafter — should classify as `DepthSpecificRefinement` beyond TTT) + G3 (negative control on `micro_belief/attractor.rs` — should classify as `DepthInvariant`) + G4 (≤5% latency overhead). If all four pass → promote `depth_invariance` to default-on diagnostic. The Super-GOAT gate (private side, riir-ai/.research/151 G5) is separate.
+**GOAT gate (open primitive):** G1 (8 correctness tests) + G2 (reproduce paper Figure 10 on BeliefDrafter — should classify as `DepthSpecificRefinement` beyond TTT) + G3 (negative control on `crates/katgpt-micro-belief/src/attractor.rs` — should classify as `DepthInvariant`) + G4 (≤5% latency overhead). If all four pass → promote `depth_invariance` to default-on diagnostic. The Super-GOAT gate (private side, riir-ai/.research/151 G5) is separate.
 
 **Constraint:** the *fix* (post-norm on the recursive residual) is modelless only for kernels we own (HLA, latent_functor, micro_belief, engram, Raven). For BeliefDrafter (frozen MLP), only the *diagnostic* applies — the fix requires MLP retraining and lives in riir-train. This plan ships the open diagnostic; the private MagnitudeRegularizedResidual wiring lands in riir-ai Plan 331.
 
@@ -26,7 +26,7 @@ Minimal, dependency-free classifier. Pure math over `&[f32]` flattened state cha
 
 ### Tasks
 
-- [x] **T1.1** Create `crates/katgpt-core/src/depth_invariance.rs` with module doc. Re-export from `crates/katgpt-core/src/lib.rs` behind new `depth_invariance` feature (umbrella: just this module for now; may pull in `data_probe` for shared `simd_*` helpers).
+- [x] **T1.1** Create `crates/katgpt-types/src/depth_invariance.rs` with module doc. Re-export from `crates/katgpt-core/src/lib.rs` behind new `depth_invariance` feature (umbrella: just this module for now; may pull in `data_probe` for shared `simd_*` helpers).
 - [x] **T1.2** Define types (all per AGENTS.md; `#[repr(u8)]` on the enum):
   ```rust
   #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -97,7 +97,7 @@ The paper's central empirical finding: pre-norm EAGLE-3 drafters classify as `De
 
 ---
 
-## Phase 4 — G3 negative control on `micro_belief/attractor.rs`
+## Phase 4 — G3 negative control on `crates/katgpt-micro-belief/src/attractor.rs`
 
 - [x] **T4.1** Add `audit_depth_invariance` method to `AttractorBeliefKernel` (or whichever kernel in `micro_belief/` exposes the recursive update), behind `depth_invariance` feature.
 - [x] **T4.2** G3a test: `attractor_kernel_classifies_depth_invariant`. Run the attractor for k=64 ticks under random input. Expect `DepthInvariant` (clamp bounds magnitude).
@@ -153,7 +153,7 @@ For kernels we own (HLA, latent_functor, micro_belief, engram, Raven) — NOT fo
 
 ## Phase 8 — Cross-references and issue filing
 
-- [x] **T8.1** Note in `katgpt-rs/src/speculative/belief_drafter.rs` module doc that the drafter is a known-subject of attention drift per Research 286 / Plan 306, and that the post-norm fix requires MLP retraining (riir-train territory). No code change to the drafter itself in this plan.
+- [x] **T8.1** Note in `katgpt-rs/crates/katgpt-speculative/src/belief_drafter.rs` module doc that the drafter is a known-subject of attention drift per Research 286 / Plan 306, and that the post-norm fix requires MLP retraining (riir-train territory). No code change to the drafter itself in this plan.
 - [-] **T8.2** File follow-up issue in `riir-neuron-db/.issues/` for Raven/δ-Mem consolidation chain audit (each consolidation cycle = a speculation step on `style_weights[64]`; check for magnitude drift across consolidation cycles). **DEFERRED (2026-06-23)** — out of scope for this repo (katgpt-rs owns the open diagnostic only; Raven/δ-Mem lives in riir-neuron-db). To be filed when riir-neuron-db next touches the consolidation pipeline.
 - [x] **T8.3** Cross-link from `katgpt-rs/.research/258_Attention_Sink_Dual_Mechanism_NOP_Broadcast.md` and `katgpt-rs/.plans/287_sink_aware_attention.md` to this research note, with a one-line "different paper, different mechanism" disambiguation. The two are frequently confused; the cross-link prevents future misclassification.
 

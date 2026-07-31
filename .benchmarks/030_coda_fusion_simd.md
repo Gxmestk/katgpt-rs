@@ -119,7 +119,7 @@ cargo test                             # ✅ 79 transformer tests pass
 | `crates/katgpt-core/Cargo.toml` | Added `coda_fusion` feature |
 | `crates/katgpt-core/src/lib.rs` | Added `pub mod coda` behind feature gate |
 | `crates/katgpt-core/src/coda.rs` | **New**: 6 fused SIMD kernels + 12 unit tests |
-| `src/transformer.rs` | Added `forward_coda()` + `coda_partial_sums` buffer |
+| `crates/katgpt-percepta/src/transformer.rs` | Added `forward_coda()` + `coda_partial_sums` buffer |
 | `tests/bench_103_coda_fusion_goat.rs` | **New**: 15 GOAT benchmark tests |
 
 ## Run Instructions

@@ -144,10 +144,10 @@ The paper provides *empirical evidence* that the two-brain split is the right sp
 | Existing primitive | Relationship |
 |---|---|
 | **Research 242 / Plan 276** (Topological State Tracking Recurrent Belief) | **Theoretical predecessor.** R242 (Mozer 2026) diagnosed the topological gap; this paper (Li & Merrill 2026) empirically validates it on Olmo 3 vs Olmo Hybrid and adds the diagnostic primitive + Proposition 1. R242 already established HLA `evolve_hla` = discourse-state Update operator. This paper's contribution is the *measurement framework* (paired gap + filtered evals) + the *theoretical bound* (Prop 1). |
-| **`evolve_hla`** (`katgpt-rs/crates/katgpt-core/src/sense/reconstruction.rs`) | IS the discourse-state `Update(δ_{j-1}, sent_j)` operator. This paper validates it is the right operator for state-conditioned readout. No change needed — the validation is theoretical. |
-| **`latent_functor/reestimation.rs`** (riir-engine) | Coherence-driven re-estimation IS the "state-conditioned readout triggers re-derivation" pattern. The paper's finding (state-conditioned tokens are hybrid-favored) validates this is where runtime self-learn effort should concentrate. |
+| **`evolve_hla`** (`katgpt-rs/crates/katgpt-sense/src/reconstruction.rs`) | IS the discourse-state `Update(δ_{j-1}, sent_j)` operator. This paper validates it is the right operator for state-conditioned readout. No change needed — the validation is theoretical. |
+| **`riir-ai/crates/riir-engine/src/latent_functor/reestimation/mod.rs`** (riir-engine) | Coherence-driven re-estimation IS the "state-conditioned readout triggers re-derivation" pattern. The paper's finding (state-conditioned tokens are hybrid-favored) validates this is where runtime self-learn effort should concentrate. |
 | **SalienceTriGate** (Plan 303) | Three-way per-tick emit gate (Speak/Silent/Delegate). Fusion candidate: route curiosity budget by token class — high on open-class state-conditioned tokens, low on copy/closure tokens (see §4 Fusion). |
-| **DEC Stokes operators** (`dec/operators.rs`) | Proposition 1 is a volume-of-support bound. For a cochain on a cell complex, `V_τ` = the set of values the cochain can take on a cell. Connects to boundary-vs-volume perf (Plan 314): boundary-only mass computation wins when the boundary is smaller than the interior — the *same* curse-of-dimensionality intuition as `log|V_τ|` bound. |
+| **DEC Stokes operators** (`crates/katgpt-dec/src/operators.rs`) | Proposition 1 is a volume-of-support bound. For a cochain on a cell complex, `V_τ` = the set of values the cochain can take on a cell. Connects to boundary-vs-volume perf (Plan 314): boundary-only mass computation wins when the boundary is smaller than the interior — the *same* curse-of-dimensionality intuition as `log|V_τ|` bound. |
 
 ---
 
@@ -200,7 +200,7 @@ All three are GOAT-tier (provable gain), not Super-GOAT-tier (new capability cla
 - `katgpt-rs/.research/036_Luce_Megakernel_Hybrid_DeltaNet_Attention.md` — hybrid DeltaNet/attention GPU kernel (the architecture this paper analyzes).
 - `katgpt-rs/.research/070_Gated_DeltaNet_2_Decoupled_Erase_Write_Linear_Attention.md` — GDN (the recurrent layer in Olmo Hybrid).
 - `riir-ai/.research/127_Implicit_Microcognition_Crowd_NPC_Guide.md` — design context for HLA-as-discourse-state (private).
-- `riir-ai/crates/riir-engine/src/latent_functor/reestimation.rs` — coherence-driven re-estimation = state-conditioned readout triggers re-derivation.
+- `riir-ai/crates/riir-engine/src/latent_functor/reestimation/mod.rs` — coherence-driven re-estimation = state-conditioned readout triggers re-derivation.
 
 ---
 

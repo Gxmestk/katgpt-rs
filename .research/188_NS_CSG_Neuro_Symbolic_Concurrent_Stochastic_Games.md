@@ -6,6 +6,7 @@
 **Domain:** Modelless core (`katgpt-rs`) — engine. All fusions are inference-time, no LLM training.
 **Depends on:** DDTree AND-OR decomposition (Plan 190), BanditPruner, ScreeningPruner, ConstraintPruner, SpeculativeGenerator, PrefixCorrectionTable
 **Sibling work:** 185 INSIGHT (explore→distill→explain), 186 Three-Mode Router (L4R/R4L/LR), 184 FOL-LNN (logical rules), 162 Trust Region Adaptive Speculation
+**PASS-Redirects (synthesis):** Ding [arXiv:2607.17560 "Reinforcement Learning: From Algorithms To Foundation Models"] (Princeton PhD thesis 2026) — Part 1's Nash-DQN + Nash-DQN-Exploiter (2P zero-sum Markov games via Double Oracle + DQN) map directly to our NS-CSG minimax-action-free policy iteration (alternating deterministic best response, no normal-form game solve — exactly what the thesis trains DQN to approximate). The Double Oracle mechanism's iterative best-response construction IS our `minimax_pi_step`; the thesis's MWU-comparison and non-exploitability metric are Ruliology Arena primitives (R168). The thesis's training innovations (DQN, diffusion world model, consistency distillation, RL for video gen, VRAG video world model) → riir-train; the equilibrium concept + best-response mechanics are modelless + already shipped.
 
 ---
 

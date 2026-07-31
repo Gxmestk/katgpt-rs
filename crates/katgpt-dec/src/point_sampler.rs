@@ -262,7 +262,9 @@ fn triangular_cdf(x: f32, l: f32, r: f32, m: f32) -> f32 {
 /// If the complex is not a regular grid.
 #[inline]
 pub fn lambda_coordinate_quad(cx: &CellComplex, px: f32, py: f32) -> [f32; 4] {
-    let (_w, _h) = cx.grid_dims().expect("lambda_coordinate_quad: requires regular grid");
+    let (_w, _h) = cx
+        .grid_dims()
+        .expect("lambda_coordinate_quad: requires regular grid");
     let (_fx, _fy, u_x, u_y) = locate_grid_point(cx, px, py);
     lambda_bilinear(u_x, u_y)
 }
@@ -298,8 +300,7 @@ pub fn sample_cochain_at_point_quad_into(
     out: &mut [f32],
 ) {
     debug_assert_eq!(
-        field.rank,
-        0,
+        field.rank, 0,
         "sample_cochain_at_point_quad_into: field must be rank-0, got rank {}",
         field.rank
     );
@@ -456,8 +457,7 @@ pub fn sample_cochain_at_point_tri_into(
     out: &mut [f32],
 ) {
     debug_assert_eq!(
-        field.rank,
-        0,
+        field.rank, 0,
         "sample_cochain_at_point_tri_into: field must be rank-0, got rank {}",
         field.rank
     );
@@ -470,7 +470,12 @@ pub fn sample_cochain_at_point_tri_into(
         dim
     );
 
-    let lam = barycentric_2d([px, py], tri_positions[0], tri_positions[1], tri_positions[2]);
+    let lam = barycentric_2d(
+        [px, py],
+        tri_positions[0],
+        tri_positions[1],
+        tri_positions[2],
+    );
 
     for (d, out_d) in out[..dim].iter_mut().enumerate() {
         *out_d = lam[0] * field.data[tri_indices[0] * dim + d]
@@ -483,7 +488,11 @@ pub fn sample_cochain_at_point_tri_into(
 #[inline]
 #[must_use]
 pub fn local_coordinate_tri(lambda: [f32; 3]) -> [f32; 3] {
-    [2.0 * lambda[0] - 1.0, 2.0 * lambda[1] - 1.0, 2.0 * lambda[2] - 1.0]
+    [
+        2.0 * lambda[0] - 1.0,
+        2.0 * lambda[1] - 1.0,
+        2.0 * lambda[2] - 1.0,
+    ]
 }
 
 /// Remap sorted barycentric coordinates `(a, b, c)` to `[-1,1]³` via the
@@ -500,7 +509,7 @@ pub fn local_coordinate_tri(lambda: [f32; 3]) -> [f32; 3] {
 /// components.
 ///
 /// `sorted_lambda` must be sorted descending: `sorted_lambda[0] ≥ [1] ≥ [2]`.
-/// Use [`sort_descending_3`] (re-exported as needed) or equivalent.
+/// Use `sort_descending_3` (re-exported as needed) or equivalent.
 ///
 /// # Panics (debug)
 ///
@@ -550,7 +559,12 @@ pub fn sample_point_tri_into(
         &mut scratch.state,
     );
 
-    let lam = barycentric_2d([px, py], tri_positions[0], tri_positions[1], tri_positions[2]);
+    let lam = barycentric_2d(
+        [px, py],
+        tri_positions[0],
+        tri_positions[1],
+        tri_positions[2],
+    );
 
     match encode {
         LocalCoordEncode::Raw => {
@@ -615,7 +629,10 @@ mod tests {
                 }
             }
         }
-        assert!(n_tested > 1000, "G1 should test >1000 points, got {n_tested}");
+        assert!(
+            n_tested > 1000,
+            "G1 should test >1000 points, got {n_tested}"
+        );
     }
 
     #[test]
@@ -805,7 +822,12 @@ mod tests {
         let third = 1.0f32 / 3.0;
         assert!((triangular_cdf(third, third, 1.0, 0.5) - 0.0).abs() < TOL);
         assert!((triangular_cdf(1.0, third, 1.0, 0.5) - 1.0).abs() < TOL);
-        assert!((triangular_cdf(0.5, third, 1.0, 0.5) - (0.5 - third).powi(2) / ((1.0 - third) * (0.5 - third))).abs() < TOL);
+        assert!(
+            (triangular_cdf(0.5, third, 1.0, 0.5)
+                - (0.5 - third).powi(2) / ((1.0 - third) * (0.5 - third)))
+                .abs()
+                < TOL
+        );
 
         // b ~ Tri(0, 1/2, 1/3)
         assert!((triangular_cdf(0.0, 0.0, 0.5, third) - 0.0).abs() < TOL);
@@ -816,7 +838,10 @@ mod tests {
         assert!((triangular_cdf(third, 0.0, third, 0.0) - 1.0).abs() < TOL);
         // At c = 1/6: F = 1 - (1/3 - 1/6)² / (1/3 * 1/3) = 1 - (1/6)² / (1/9) = 1 - 1/4 = 3/4
         let cdf_mid = triangular_cdf(1.0 / 6.0, 0.0, third, 0.0);
-        assert!((cdf_mid - 0.75).abs() < TOL, "c CDF at 1/6: {cdf_mid} vs 0.75");
+        assert!(
+            (cdf_mid - 0.75).abs() < TOL,
+            "c CDF at 1/6: {cdf_mid} vs 0.75"
+        );
 
         // Monotonicity: F should be non-decreasing for each distribution.
         for &(l, r, m) in &[(third, 1.0, 0.5), (0.0, 0.5, third), (0.0, third, 0.0)] {
@@ -848,10 +873,7 @@ mod tests {
         }
 
         let n_harmonics = 2u8;
-        let aug_dim = local_coord_aug_dim(
-            LocalCoordEncode::CartesianSincos { n_harmonics },
-            2,
-        );
+        let aug_dim = local_coord_aug_dim(LocalCoordEncode::CartesianSincos { n_harmonics }, 2);
         let mut scratch = PointSamplerScratch::new(3, aug_dim);
 
         sample_point_quad_into(
@@ -895,7 +917,11 @@ mod tests {
         // Point (1,1) in triangle (0,0)-(4,0)-(0,4):
         // λ0 = 1 - 1/4 - 1/4 = 0.5, λ1 = 1/4, λ2 = 1/4
         // s̄ = 0.5*10 + 0.25*20 + 0.25*30 = 5 + 5 + 7.5 = 17.5
-        assert!((scratch.state[0] - 17.5).abs() < TOL, "got {}", scratch.state[0]);
+        assert!(
+            (scratch.state[0] - 17.5).abs() < TOL,
+            "got {}",
+            scratch.state[0]
+        );
         // aug has 3 values (sorted barycentric CDF remap)
         assert_eq!(scratch.local_coord.len(), 3);
     }

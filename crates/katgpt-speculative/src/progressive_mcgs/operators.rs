@@ -87,7 +87,7 @@ pub fn cross_branch_top_n<N: Clone>(
     // Partial sort — top-N by Q-value descending.
     // For small n and small graphs, sort_by is fine; for large graphs,
     // a min-heap of size n would be faster.
-    candidates.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+    candidates.sort_by(|a, b| b.1.total_cmp(&a.1));
     candidates.into_iter().take(n).map(|(id, _)| id).collect()
 }
 
@@ -130,7 +130,7 @@ pub fn multi_branch_aggregate<N: Clone>(
             .filter(|&id| graph.branch_of(id) == branch)
             .map(|id| (id, graph.q_value(id)))
             .collect();
-        candidates.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        candidates.sort_by(|a, b| b.1.total_cmp(&a.1));
         out.extend(candidates.into_iter().take(per_branch).map(|(id, _)| id));
     }
     out

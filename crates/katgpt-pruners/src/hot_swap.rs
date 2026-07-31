@@ -22,7 +22,7 @@
 //! # Thread Safety
 //!
 //! Uses `RwLock` for the inner pruner — read-heavy (every `relevance()` call),
-//! write only on [`reload`](Self::reload). Safe to share across threads.
+//! write only on [`reload`](HotSwapPruner::reload). Safe to share across threads.
 
 use std::fs;
 use std::io::Result;

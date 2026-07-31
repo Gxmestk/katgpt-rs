@@ -22,7 +22,7 @@ Commit: `c88d1b0a`.
   - `build_dd_tree_gdsd` (gated `gdsd_distill`)
 - **Tests** (~2380 LOC, lines 177-2556): a massive `mod tests` block.
 
-The leaf `crates/katgpt-speculative/src/dd_tree.rs` (4789 LOC) already hosts the
+The leaf `crates/katgpt-core/src/mux/dd_tree.rs` (4789 LOC) already hosts the
 bulk production code + its own 652-LOC test module. Root's tests are
 **additional** coverage that exercise root-resident helpers + the dd_tree+dflash
 combination.
@@ -66,7 +66,7 @@ already has `domino_correction`. Missing 7:
 
 ## Phase 1 — Move dd_tree.rs to katgpt-forward
 
-- [x] T1.1 Copy `src/speculative/dd_tree.rs` → `crates/katgpt-forward/src/dd_tree.rs`.
+- [x] T1.1 Copy `src/speculative/dd_tree.rs` → `crates/katgpt-core/src/mux/dd_tree.rs`.
 - [x] T1.2 Rewrite imports in moved file:
   - `crate::speculative::dflash::dflash_predict` → `crate::dflash::dflash_predict`
   - `crate::speculative::types::SdeConfig` → `katgpt_core::speculative::types::SdeConfig`
@@ -82,7 +82,7 @@ already has `domino_correction`. Missing 7:
     `katgpt_core::traits::*` (traits) + `katgpt_core::speculative::types::TreeNode`
 - [x] T1.3 Add 7 tracking features to katgpt-forward/Cargo.toml + `fastrand` dev-dep.
 - [x] T1.4 Forward the 7 new features from root Cargo.toml.
-- [x] T1.5 Register module in katgpt-forward/src/lib.rs: `pub mod dd_tree;` +
+- [x] T1.5 Register module in crates/katgpt-forward/src/lib.rs: `pub mod dd_tree;` +
       feature-gated re-exports of the 2 production fns.
 - [x] T1.6 Slim root `src/speculative/dd_tree.rs` to a 23-LOC re-export shim:
       `pub use katgpt_forward::dd_tree::*;` + feature-gated re-exports of
@@ -119,7 +119,7 @@ already has `domino_correction`. Missing 7:
 | File | Before | After | Δ |
 |---|---:|---:|---:|
 | `src/speculative/dd_tree.rs` (root) | 2556 | 23 | **-2533** |
-| `crates/katgpt-forward/src/dd_tree.rs` | 0 | 2562 | +2562 |
+| `crates/katgpt-core/src/mux/dd_tree.rs` | 0 | 2562 | +2562 |
 | **Net root reduction** | | | **-2533 LOC** |
 
 ## GOAT Gate

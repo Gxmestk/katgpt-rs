@@ -8,7 +8,7 @@ the hybrid is strictly better than either axis alone (§3).
 **Research:** [`katgpt-rs/.research/278_Engram_Conditional_Memory_Latent_Lookup_Fusion.md`](../../.research/278_Engram_Conditional_Memory_Latent_Lookup_Fusion.md)
 **Plan:** [`katgpt-rs/.plans/299_Engram_Hash_Addressed_Pattern_Memory.md`](../../.plans/299_Engram_Hash_Addressed_Pattern_Memory.md)
 **Benchmark:** [`katgpt-rs/.benchmarks/299_engram_goat.md`](../../.benchmarks/299_engram_goat.md)
-**Feature flag:** `engram` (opt-in — G6 deferred to riir-ai integration)
+**Feature flag:** `engram` — transitively DEFAULT-ON at the katgpt-core leaf via `cognitive_architecture_root → engram` chain (Issue 039, 2026-07-18 cargo-comment sync); the katgpt-rs root forwarder stays opt-in for explicit consumer control. G6 (effective-depth, the Super-GOAT mechanistic claim) remains deferred to riir-ai integration — but the primitive-level G1/G2/G4 PASS modellessly, and the cognitive architecture root activates it. See `.benchmarks/299_engram_goat.md` for the promotion history.
 
 ---
 

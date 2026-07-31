@@ -4,6 +4,7 @@
 > Local: `.raw/reap/` (upstream Python), `.raw/reap-mlx/` (MLX port, TypeScript)
 > Date: 2026-03 (paper), distilled 2026-07
 > **Verdict: CONCEPTUAL ALIGNMENT — REAP's model-based/modelless spectrum is already captured by existing trait architecture. No new abstractions needed.**
+> **PASS-Redirects (synthesis):** LatentMoE [arXiv:2601.18089 "LatentMoE: Toward Optimal Accuracy per FLOP and Parameter in Mixture of Experts"] (NVIDIA, 2026-01) — PASS: from-scratch MoE training architecture (latent projection + α-scaled expert pool). The post-training compression cousin is MoLAE [arXiv:2503.23100] (low-rank factorization of trained expert weights), which IS the modelless-compression territory REAP covers at the pruning axis. LatentMoE explicitly contrasts itself with MoLAE: LatentMoE compresses ALL experts via a shared projection and scales N to compensate (training-time); MoLAE compresses only FC2 with grouped projections (post-training). Our `ScreeningPruner`/`BanditPruner`/`ConstraintPruner` trait stack (the modelless/model-based duality REAP validates) covers the inference-time routing axis; expert-weight-level low-rank compression would be a separate note if we ever serve MoE LLMs (we don't).
 
 ## TL;DR
 

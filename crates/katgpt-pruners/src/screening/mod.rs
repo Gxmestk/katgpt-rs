@@ -7,11 +7,11 @@
 //!
 //! Two open primitives:
 //!
-//! 1. [`complexity_prior::CompressionPriorSampler`] — replaces uniform candidate
+//! 1. `complexity_prior::CompressionPriorSampler` — replaces uniform candidate
 //!    sampling with `sigmoid(-α·K̃(x) - β)`-weighted sampling (per-candidate
 //!    sigmoid, **never softmax**). Pluggable `K̃` proxies: RLE ratio, Shannon
 //!    entropy, L1 norm. Latent variant operates on `&[f32]` via byte-quantization.
-//! 2. [`coincidence_gate::CoincidenceGate`] — theorem-backed cross-task transfer.
+//! 2. `coincidence_gate::CoincidenceGate` — theorem-backed cross-task transfer.
 //!    Given a found optimum `x*` for one simple objective `f1`, probe `x*` against
 //!    other simple objectives `f2_k`. Hit rate: `r / |X_O(1)|` per probe vs
 //!    `r / |X|` from random candidates (exponential lift).

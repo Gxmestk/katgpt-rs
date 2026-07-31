@@ -8,7 +8,7 @@
 >
 > **Status (Plan 071):** ROPD Rubric modelless distillation — `RubricVector`, `RubricTemplate`, `RubricGatedAbsorbCompress`, `RubricBanditPruner` behind `--features ropd_rubric` (implies `bandit`). Per-criterion gap targeting replaces scalar δ with structured multi-criteria reward. `RubricPlayer` (bomber, `g_zero`+`bomber`) and `RubricFFTPlayer` (FFT, `g_zero`+`fft`) integrate rubric reward into arena players (Plan 071 T9/T10). Benchmark: 5.3M observe_rubric/sec, 20/20 targeting accuracy, zero regression. See `.benchmarks/007_ropd_rubric_modelless.md`.
 >
-> **Status (Plan 076):** Arena Integration — cross-arena tournament infrastructure (`arena/types.rs`, `arena/scheduler.rs`, `bomber/arena_runner.rs`, `fft/arena_runner.rs`). Round-robin tournaments with ELO ratings confirm **Rubric ≈ GZero** in both Bomber (8W vs 8W) and FFT (60% vs 60%, 100% draws head-to-head). The 3-criterion rubric vector collapses to the same effective signal as scalar Hint-δ. See `.benchmarks/009_arena_integration.md`.
+> **Status (Plan 076):** Arena Integration — cross-arena tournament infrastructure (`crates/katgpt-pruners/src/arena/types.rs`, `crates/katgpt-pruners/src/arena/scheduler.rs`, `src/pruners/bomber/arena_runner.rs`, `crates/katgpt-pruners/src/fft/arena_runner.rs`). Round-robin tournaments with ELO ratings confirm **Rubric ≈ GZero** in both Bomber (8W vs 8W) and FFT (60% vs 60%, 100% draws head-to-head). The 3-criterion rubric vector collapses to the same effective signal as scalar Hint-δ. See `.benchmarks/009_arena_integration.md`.
 >
 > **Status (Plan 072):** SDAR Gated distillation modelless — `sdar_gate()`, `SdarBanditPruner`, `SdarGatedAbsorbCompress` behind `--features sdar_gate`. Asymmetric trust: sigmoid gate σ(β·x) endorses positive gaps, attenuates negative. β=5.0 paper-validated. Benchmark: 118M updates/sec, zero hot-path overhead, 97.5% targeting accuracy. See `.benchmarks/008_sdar_gated_modelless.md`.
 >
@@ -22,13 +22,13 @@
 >
 > **Status (Plan 165, Research 148):** Hydra-Aware Adaptive Layer Budget — emergent self-repair layer skipping inspired by Hydra Effect (arXiv:2307.15771). Two modes: modelless (pre-computed profiles) and model-based (logit lens scoring). 34.4% compute savings, 100% profile stability across seeds. Behind `--features hydra_budget`. GOAT 4/4 proved. **Default-on.**
 >
-> **Status (Plan 166, Research 149):** FlashAR Consensus Tri-Mode — dual-path ternary thermal routing for consensus tri-mode. Plasma hit rate 4.4%, Hot 45.5%, Warm 19.8%, Cold 30.4%. Behind `--features flashar_consensus` (requires `tri_mode`, `plasma_path`). GOAT 9/9 proved. **Default-on.**
+> **Status (Plan 166, Research 149):** FlashAR Consensus Tri-Mode — dual-path ternary thermal routing for consensus tri-mode. Plasma hit rate 4.4%, Hot 45.5%, Warm 19.8%, Cold 30.4%. Behind `--features flashar_consensus` (requires `tri_mode`, `plasma_path`). GOAT 9/9 proved. **DEMOTED from default-on** (Issue 136, 2026-07-12, removed, see git history): Plan 485 benchmark showed KL 2.9-6.5 (100× worse than Leviathan baseline 0.03) — G1 quality FAIL. DSpark entropy-skip hybrid dominates on both axes. Opt-in only.
 >
 > **Status (Plan 167, Research R050):** Budget Adaptation — compression-adaptive decode budget: PFlash ratio scales DDTree budget [0.5×, 2.0×]. Simple prompts → less search, Complex → more. ~1.3µs overhead. Behind `--features budget_adaptation`. GOAT 8/8 proved. **Default-on.**
 >
 > **Status (ILC Distillation):** Iterative Latent Clustering — synonym-aware DDTree pruning. Offline clustering + online inference path. `IlcClusterer`, `SynonymMap`, `SynonymAwarePruner`. Behind `--features ilc_distill`.
 >
-> **Status (Plan 060):** MeMo Reflection QA Pipeline — 5-step compositional data synthesis from game replays. `ReflectionStep` (DirectExtraction, IndirectExtraction, Consolidation, Verification, EntitySurfacing, CrossGameSynthesis), `ReflectionQA`, `ReflectionDomain` behind `--features memo_reflections`. Consumed by BanditPruner for training signal enrichment. See `src/pruners/reflection.rs`.
+> **Status (Plan 060):** MeMo Reflection QA Pipeline — 5-step compositional data synthesis from game replays. `ReflectionStep` (DirectExtraction, IndirectExtraction, Consolidation, Verification, EntitySurfacing, CrossGameSynthesis), `ReflectionQA`, `ReflectionDomain` behind `--features memo_reflections`. Consumed by BanditPruner for training signal enrichment. See `crates/katgpt-pruners/src/reflection.rs`.
 
 ## What is Heuristic Learning?
 
@@ -69,7 +69,7 @@ katgpt-rs is uniquely positioned for HL because of its **trait-based pruner arch
 | SDAR Sigmoid Gate | `sdar_gate()` — asymmetric trust σ(β·x), β=5.0 optimum (Plan 072) |
 | SDAR-Gated Bandit | `SdarBanditPruner` — sigmoid-gated reward updates (Plan 072) |
 | SDAR-Gated Absorb | `SdarGatedAbsorbCompress` — soft sigmoid promotion gate (Plan 072) |
-| Knowledge Persistence | `BanditPruner` → `src/pruners/freeze.rs` — `repr(C)` bandit knowledge save/load (Plan 092) |
+| Knowledge Persistence | `BanditPruner` → `crates/katgpt-pruners/src/freeze.rs` — `repr(C)` bandit knowledge save/load (Plan 092) |
 | Width Scaling | `best_of_k_rollouts()` — K parallel SDE rollouts, select best (PTRM Plan 083) |
 | Early Stop Gate | `EarlyStopGate<P>` — depth-aware pruning when relevance < threshold (PTRM Plan 083) |
 | Width Selection | `WidthSelectionMode::{BestQ, MostFrequent, Top1Converged}` — rollout selection strategy (PTRM Plan 083, EqR Plan 119) |
@@ -166,7 +166,7 @@ After N episodes:
 
 ### Freeze/Thaw Persistence (Plan 092)
 
-`BanditPruner` uses `src/pruners/freeze.rs` for `repr(C)` bandit knowledge persistence across sessions. Arena players (Bomber, FFT, Go) call `.freeze()` → `save_frozen()` to write raw bytes, and `load_frozen()` on startup to restore Q-values and visit counts. Zero-dependency binary I/O — no serde/bincode needed.
+`BanditPruner` uses `crates/katgpt-pruners/src/freeze.rs` for `repr(C)` bandit knowledge persistence across sessions. Arena players (Bomber, FFT, Go) call `.freeze()` → `save_frozen()` to write raw bytes, and `load_frozen()` on startup to restore Q-values and visit counts. Zero-dependency binary I/O — no serde/bincode needed.
 
 **Per-Move Reward Fix (Issue 065):** Initial implementation used blended reward (`α=0.3 * per_move + 0.7 * game_end`), which caused all Q-values to collapse to ~0.25 when losing 86% of games (binary game-end reward = 0 for losses). Fix: `α=1.0` (pure per-move heuristic delta) + 10× amplification. Result: **+11pp win rate** for frozen GoHL vs Validator over naive baseline. Q-values now differentiate meaningfully (Corner: 0.80 vs Defense: 0.40).
 
@@ -700,7 +700,7 @@ Multi-criteria rubric reward replaces scalar δ for Bomber arena. Uses `BomberTe
 
 ### RubricFFTPlayer (FFT Tactics Arena)
 
-`src/pruners/fft/rubric_player.rs` — behind `ropd_rubric` + `g_zero` + `fft`
+`crates/katgpt-pruners/src/fft/rubric_player.rs` — behind `ropd_rubric` + `g_zero` + `fft`
 
 Same architecture as RubricPlayer but for multi-axis FFT domain. Uses `FFTTemplateProposer` (10 strategies, UCB1) + `RubricBanditPruner` + `RubricGatedAbsorbCompress` + Q-learning over 9 action types. Class-dependent rubric scoring — each of the 6 classes weights criteria differently.
 
@@ -753,15 +753,15 @@ No backpropagation. No loss function. The memory learns a linear correction map 
 
 | Component | File | Purpose |
 |-----------|------|---------|
-| `DeltaMemoryState` | `delta_mem/state.rs` | Compact r×r associative memory with `read()`, `write()`, `adapt_gates()`, `mean_prediction_error()` |
-| `DeltaMemoryConfig` | `delta_mem/state.rs` | `rank`, `beta_init`, `couple_gates` configuration |
-| `DeltaMemorySnapshot` | `delta_mem/state.rs` | Serializable snapshot of memory state for persistence |
-| `FeatureHasher` | `delta_mem/hash.rs` | Random projection: L2-normalized keys, raw values |
-| `ContextFeatures` | `delta_mem/hash.rs` | Extracts hashable features from DDTree context (depth, parent tokens) |
-| `OutcomeFeatures` | `delta_mem/hash.rs` | Extracts hashable features from outcome (reward, acceptance) |
-| `MemorySteeredPruner<P>` | `delta_mem/pruner.rs` | `ScreeningPruner` with memory-steered corrections |
-| `MultiDomainMemory` | `delta_mem/multi.rs` | Per-domain `DeltaMemoryState` instances |
-| `MultiDomainMemoryPruner<P>` | `delta_mem/multi_pruner.rs` | Per-domain pruner routing |
+| `DeltaMemoryState` | `crates/katgpt-core/src/delta_mem/state.rs` | Compact r×r associative memory with `read()`, `write()`, `adapt_gates()`, `mean_prediction_error()` |
+| `DeltaMemoryConfig` | `crates/katgpt-core/src/delta_mem/state.rs` | `rank`, `beta_init`, `couple_gates` configuration |
+| `DeltaMemorySnapshot` | `crates/katgpt-core/src/delta_mem/state.rs` | Serializable snapshot of memory state for persistence |
+| `FeatureHasher` | `crates/katgpt-core/src/delta_mem/hash.rs` | Random projection: L2-normalized keys, raw values |
+| `ContextFeatures` | `crates/katgpt-core/src/delta_mem/hash.rs` | Extracts hashable features from DDTree context (depth, parent tokens) |
+| `OutcomeFeatures` | `crates/katgpt-core/src/delta_mem/hash.rs` | Extracts hashable features from outcome (reward, acceptance) |
+| `MemorySteeredPruner<P>` | `crates/katgpt-pruners/src/delta_mem/pruner.rs` | `ScreeningPruner` with memory-steered corrections |
+| `MultiDomainMemory` | `crates/katgpt-core/src/delta_mem/multi.rs` | Per-domain `DeltaMemoryState` instances |
+| `MultiDomainMemoryPruner<P>` | `crates/katgpt-pruners/src/delta_mem/multi_pruner.rs` | Per-domain pruner routing |
 
 ### Correction Modes
 
@@ -997,7 +997,7 @@ Based on Anthropic Transformer Circuits research (Research 144), emotion concept
 Emotion reading is a **zero-cost extension to ReviewMetrics**: one O(d) dot product per decode step, no extra forward passes, no feature gate (passes T7 overhead proof).
 
 ```rust
-// src/pruners/emotion_vector.rs
+// crates/katgpt-pruners/src/emotion_vector.rs
 pub struct EmotionDirections {
     valence: Vec<f32>,     // positive/negative sentiment [d_model]
     arousal: Vec<f32>,     // high/low activation [d_model]

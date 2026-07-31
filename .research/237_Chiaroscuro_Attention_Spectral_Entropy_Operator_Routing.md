@@ -50,14 +50,14 @@ Operator utilization entropy `U = -Σ q_o log q_o` — U→0 indicates collapse.
 
 | Component | Status | Location | CHIAR Relevance |
 |-----------|--------|----------|-----------------|
-| FreqBandit (token-stream DFT) | ✅ Default-on, GOAT | `src/freq_bandit.rs` | Spectral entropy of **token stream** (temporal). Different signal from CHIAR's per-embedding DCT. |
-| SpectralQuant KV cache | ✅ GOAT | `src/spectralquant/spectral_kv_cache.rs` | Per-**dimension** rotation+variable-bit quantization. Does NOT use per-token complexity. |
-| Spectral Budget Router (Plan 254) | ✅ GOAT | `src/spectral_budget.rs` | Power laws → NS iteration depth. Different application (Newton-Schulz). |
+| FreqBandit (token-stream DFT) | ✅ Default-on, GOAT | `crates/katgpt-pruners/src/freq_bandit.rs` | Spectral entropy of **token stream** (temporal). Different signal from CHIAR's per-embedding DCT. |
+| SpectralQuant KV cache | ✅ GOAT | `crates/katgpt-spectral/src/spectral_kv_cache.rs` | Per-**dimension** rotation+variable-bit quantization. Does NOT use per-token complexity. |
+| Spectral Budget Router (Plan 254) | ✅ GOAT | `crates/katgpt-spectral/src/spectral_budget.rs` | Power laws → NS iteration depth. Different application (Newton-Schulz). |
 | Breakeven Complexity Router (Plan 250) | ✅ GOAT | `src/breakeven/` | Cost-aware tier promotion. Natural host for "operator cost vs accuracy" routing. |
-| DiagonalGate trait (GDN2 + Wall) | ✅ Shipped | `src/diagonal_gate.rs` | Per-dim gate abstraction — same shape as per-token operator gate. |
+| DiagonalGate trait (GDN2 + Wall) | ✅ Shipped | `crates/katgpt-attn/src/diagonal_gate.rs` | Per-dim gate abstraction — same shape as per-token operator gate. |
 | VortexFlow trait (Plan 196) | ✅ GOAT 72/72 | `crates/katgpt-core/src/mux/` | Sparse attention router. Operates at KV-block level. CHIAR operates at operator level. |
-| EGA spectral salience | ✅ Plan 139 | `src/ega_attn.rs` | Per-key sigmoid gate from energy. Adjacent to CHIAR but does not switch operators. |
-| Parallax local linear attn | ✅ Shipped | `crates/katgpt-core/src/parallax_attn.rs` | Alternative operator (linear-time) — candidate "low-entropy" operator. |
+| EGA spectral salience | ✅ Plan 139 | `crates/katgpt-attn/src/ega_attn.rs` | Per-key sigmoid gate from energy. Adjacent to CHIAR but does not switch operators. |
+| Parallax local linear attn | ✅ Shipped | `crates/katgpt-core/src/parallax_attn/mod.rs` | Alternative operator (linear-time) — candidate "low-entropy" operator. |
 | DashAttention α-entmax | ✅ Plan 106 | `src/dash_attn/` | Adaptive sparse — complementary, not operator-switching. |
 | InferenceRouter | ✅ Shipped | `src/inference_router.rs` | CPU/GPU/ANE tier router. Already integrates TriggerGate, trust, RV, breakeven. |
 | FFT primitives | ✅ Shipped | `crates/katgpt-core/src/flow/fft.rs` | rustfft-based. Easily extended to DCT. |
@@ -323,7 +323,7 @@ Plan 256 (MSA blockwise sparse distillation) failed GOAT. Lessons:
 
 | New Component | Reuses | Adds |
 |---------------|--------|------|
-| `ChiaroscuroKV` (Fusion A) | `rustfft` (existing via flow/fft.rs), `WelfordVariance` (existing in reward_calibrator), SpectralQuant codebooks (per-dim mechanics), StillKV f16 storage | Per-token H(x) computation, per-token storage strategy dispatch, streaming τ calibration |
+| `ChiaroscuroKV` (Fusion A) | `rustfft` (existing via crates/katgpt-core/src/flow/fft.rs), `WelfordVariance` (existing in reward_calibrator), SpectralQuant codebooks (per-dim mechanics), StillKV f16 storage | Per-token H(x) computation, per-token storage strategy dispatch, streaming τ calibration |
 | `ChiaroscuroOp` trait (Fusion B) | `DiagonalGate` pattern (per-element abstraction), `InferenceBackend` trait (forward_token method shape) | Operator entropy range, relative_cost, utilization counter |
 | `CollapseDiscoveryHarness` (Fusion C) | `WelfordVariance`, `VecDeque` window pattern (existing in osc_kv), BreakevenBandit promotion hooks | Utilization entropy U, survivor detection, validation flow |
 | `ChiarRegimeGate` (Fusion D) | `TriggerGate`, `RegimeTransitionInference` (Plan 215) | H(x) variance signal, naturalistic threshold |

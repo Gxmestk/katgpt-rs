@@ -405,9 +405,9 @@ Re-evaluate if **all** of these conditions are met:
 
 - [-] rust-gpu reaches **v1.0 stable** with backward compatibility guarantees
 - [-] **Stable Rust** support (no nightly requirement)
-- [x] **WASM compute shader** example tested and documented — `riir-wasm/tests/compute_shader.rs` (9 tests: GEMV, softmax, pipeline), `riir-examples/examples/wasm_compute_shader.rs`, WAT-based GEMV+softmax compute shader via `wasmi`
+- [x] **WASM compute shader** example tested and documented — `riir-ai/crates/riir-wasm/tests/compute_shader.rs` (9 tests: GEMV, softmax, pipeline), `riir-ai/crates/riir-examples/examples/wasm_compute_shader.rs`, WAT-based GEMV+softmax compute shader via `wasmi`
 - [x] Our shader count grows beyond 50+ (duplication pain exceeds build complexity) — 85 WGSL shaders in `riir-gpu/src/kernels/`
-- [x] We need **shared CPU/GPU algorithm** code (e.g., for testing GPU against CPU reference) — `riir-gpu/src/cpu_reference.rs` with GEMV, softmax, RMSNorm, LoRA forward + `compare_f32()` utility; 31 tests total
+- [x] We need **shared CPU/GPU algorithm** code (e.g., for testing GPU against CPU reference) — `riir-ai/crates/riir-gpu/src/cpu_reference.rs` with GEMV, softmax, RMSNorm, LoRA forward + `compare_f32()` utility; 31 tests total
 
 ### What to Do Instead
 
@@ -498,12 +498,12 @@ Apple NEON (4× f32) and x86 AVX2 (8× f32) SIMD implemented in Plan 060:
 
 ```text
 Changes delivered (Plan 060):
-  src/simd.rs                 — NEW: SimdLevel enum, NEON/AVX2 dispatch
+  crates/katgpt-dec/src/simd.rs                 — NEW: SimdLevel enum, NEON/AVX2 dispatch
   types.rs: matmul()          → SIMD dot product (NEON vmlaq_f32 / AVX2 _mm256_mul_ps)
   types.rs: matmul_relu()     → SIMD dot + fused ReLU zero-clamp
-  hla/kernel.rs: hla_state_update → simd_outer_product_acc for SK, CQV, G
-  hla/kernel.rs: hla_readout     → simd_dot_f32 for numerator/denominator
-  hla/kernel.rs: ahla_step       → simd_outer_product_acc for PKV, E
+  riir-ai/crates/riir-engine/src/hla/kernel.rs: hla_state_update → simd_outer_product_acc for SK, CQV, G
+  riir-ai/crates/riir-engine/src/hla/kernel.rs: hla_readout     → simd_dot_f32 for numerator/denominator
+  riir-ai/crates/riir-engine/src/hla/kernel.rs: ahla_step       → simd_outer_product_acc for PKV, E
   benchmark.rs: bench_simd       → NEW: kernel + E2E throughput benchmarks
 ```
 
@@ -544,7 +544,7 @@ When GPU batching becomes necessary:
 
 ## Appendix A: rust-gpu Compute Example (Reference)
 
-The canonical compute shader from `examples/shaders/compute-shader/src/lib.rs`:
+The canonical compute shader from `crates/katgpt-hla/src/lib.rs`:
 
 ```rust
 #![cfg_attr(target_arch = "spirv", no_std)]

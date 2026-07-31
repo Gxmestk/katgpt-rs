@@ -94,12 +94,7 @@ pub const SDAR_BETA_MAX: f32 = 50.0;
 #[inline]
 pub fn sdar_gate(x: f32, beta: f32) -> f32 {
     let z = beta * x;
-    if z >= 0.0 {
-        1.0 / (1.0 + (-z).exp()) // numerically stable for z >= 0
-    } else {
-        let ez = z.exp();
-        ez / (1.0 + ez) // numerically stable for z < 0
-    }
+    katgpt_core::simd::fast_sigmoid(z)
 }
 
 /// Convenience: gate with default β=5.0.

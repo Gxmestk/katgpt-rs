@@ -91,8 +91,14 @@ impl LatentContextBuffer {
         let windows: Vec<&[u32]> = tokens.chunks(window_size).collect();
         let adaptive = slod.adaptive_ratios(&windows, config.compression_ratio);
 
-        // Re-encode with adaptive ratios per window
-        let mut segments = Vec::new();
+        // Re-encode with adaptive ratios per window. Upper bound on segments:
+        // sum over windows of ceil(window_len / window_span) + 1 raw window.
+        let max_segments = adaptive
+            .iter()
+            .map(|(w, r)| w.len().div_ceil(r.span_size().max(1)))
+            .sum::<usize>()
+            + 1;
+        let mut segments = Vec::with_capacity(max_segments);
         let mut segment_id = 0u32;
         let mut pos = 0;
 
@@ -251,24 +257,30 @@ impl LatentContextBuffer {
             return;
         }
 
-        // Find compressed segment indices to evict
-        let mut candidates: Vec<usize> = Vec::new();
+        // Find the first `excess` compressed segment indices to evict.
+        // Pre-size to `excess` (not all segments) and break early once we have
+        // enough — avoids scanning the full segment list then discarding the tail.
+        // Both policies currently resolve to oldest-first (LowestEnergy falls
+        // back until spectral analysis is wired); the match is retained so the
+        // policy field stays meaningful for future LowestEnergy-specific logic.
+        let cap = excess.min(self.context.segments.len());
+        let mut candidates: Vec<usize> = Vec::with_capacity(cap);
         for (i, seg) in self.context.segments.iter().enumerate() {
-            if let LatentSegment::Compressed { .. } = seg {
+            if matches!(seg, LatentSegment::Compressed { .. }) {
                 candidates.push(i);
+                if candidates.len() == excess {
+                    break;
+                }
             }
         }
 
         match self.eviction_policy {
             EvictionPolicy::OldestFirst => {
-                // Evict the first `excess` compressed segments (oldest)
-                let to_evict: Vec<usize> = candidates.into_iter().take(excess).collect();
-                self.evict_segments(&to_evict);
+                self.evict_segments(&candidates);
             }
             EvictionPolicy::LowestEnergy => {
                 // Would need spectral analysis — for now fallback to oldest
-                let to_evict: Vec<usize> = candidates.into_iter().take(excess).collect();
-                self.evict_segments(&to_evict);
+                self.evict_segments(&candidates);
             }
         }
     }

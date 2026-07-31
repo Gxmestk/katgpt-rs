@@ -15,7 +15,7 @@ const MIN_PEAKS: usize = 2;
 /// a valid superposition span at a given tree depth.
 #[derive(Debug, Clone, Copy)]
 pub struct MuxSpanPruner {
-    /// Geometric decay threshold: peak[i+1] / peak[i] >= decay_rate.
+    /// Geometric decay threshold: `peak[i+1] / peak[i] >= decay_rate`.
     pub decay_rate: f32,
     /// Number of top-K peaks to inspect.
     pub k: usize,

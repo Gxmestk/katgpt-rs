@@ -81,8 +81,14 @@ impl LatentTransitionCache {
     /// Look up a cached transition. Returns `Some(h_next)` on hit, `None` on miss.
     pub fn get(&self, h_t: &[f32], next_emb: &[f32]) -> Option<Vec<f32>> {
         let key = CacheKey::from_slices(h_t, next_emb);
+        self.get_with_key(&key)
+    }
+
+    /// Internal lookup using a pre-computed key — avoids recomputing BLAKE3
+    /// when the caller already has the key (e.g. `get_or_insert`).
+    fn get_with_key(&self, key: &CacheKey) -> Option<Vec<f32>> {
         let map = self.map.pin();
-        match map.get(&key) {
+        match map.get(key) {
             Some(entry) => {
                 self.counter.fetch_add(1, Ordering::Relaxed);
                 self.hits.fetch_add(1, Ordering::Relaxed);
@@ -99,6 +105,11 @@ impl LatentTransitionCache {
     /// If the cache is full, evicts an approximate-LRU entry.
     pub fn insert(&self, h_t: &[f32], next_emb: &[f32], h_next: Vec<f32>) {
         let key = CacheKey::from_slices(h_t, next_emb);
+        self.insert_with_key(&key, h_next);
+    }
+
+    /// Internal insert using a pre-computed key.
+    fn insert_with_key(&self, key: &CacheKey, h_next: Vec<f32>) {
         let count = self.counter.fetch_add(1, Ordering::Relaxed);
 
         let map = self.map.pin();
@@ -119,7 +130,7 @@ impl LatentTransitionCache {
         }
 
         let _ = map.insert(
-            key,
+            *key,
             CacheEntry {
                 h_next,
                 access_count: count,
@@ -133,11 +144,13 @@ impl LatentTransitionCache {
     where
         F: FnOnce() -> Vec<f32>,
     {
-        match self.get(h_t, next_emb) {
+        // Compute the BLAKE3 cache key once — both get and insert need it.
+        let key = CacheKey::from_slices(h_t, next_emb);
+        match self.get_with_key(&key) {
             Some(h_next) => h_next,
             None => {
                 let h_next = compute();
-                self.insert(h_t, next_emb, h_next.clone());
+                self.insert_with_key(&key, h_next.clone());
                 h_next
             }
         }

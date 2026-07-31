@@ -31,7 +31,7 @@
 //! Curiosity Pulse currently uses `u_i(t) = shannon_h1(relevance_scores)`.
 //! The ICT-correct drop-in is:
 //!
-//! ```rust,ignore
+//! ```text
 //! // Curiosity Pulse (R041) currently uses:
 //! //   u_i(t) = shannon_h1(relevance_scores)
 //! // Drop-in upgrade per ICT §1.5 + A.3.3:

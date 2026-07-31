@@ -169,9 +169,9 @@ impl OscKVCache {
         let base = pos * kv_dim;
         let y_win = &l.y[base..base + kv_dim];
         let z_win = &l.z[base..base + kv_dim];
-        for i in 0..kv_dim {
-            out[i] = y_win[i] + 0.1 * z_win[i];
-        }
+        // out = y + 0.1 * z (fused SIMD scale-acc)
+        out[..kv_dim].copy_from_slice(y_win);
+        katgpt_core::simd::simd_fused_scale_acc(&mut out[..kv_dim], z_win, 0.1, kv_dim);
     }
 
     /// Reset all oscillatory state to zero.

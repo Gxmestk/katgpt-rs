@@ -282,13 +282,13 @@ proof_sketch_evolution = ["bandit"]  # Proof Sketch Evolution (Plan 128, Researc
 |------|--------|
 | `Cargo.toml` | Added `proof_sketch_evolution = ["bandit"]` feature; added to `full` |
 | `src/pruners/mod.rs` | Added `pub mod proof` + re-exports behind `#[cfg(feature = "proof_sketch_evolution")]` |
-| `src/pruners/proof/mod.rs` | **NEW** — Module index with public re-exports |
-| `src/pruners/proof/goal_cache.rs` | **NEW** — ProofGoalCache, GoalHash, GoalResult |
-| `src/pruners/proof/sketch_types.rs` | **NEW** — SketchEntry, SketchId, ProofState, Goal, DiversityStrategy |
-| `src/pruners/proof/sketch_population.rs` | **NEW** — SketchPopulation, PopulationConfig, EvictionReport |
-| `src/pruners/proof/plackett_luce.rs` | **NEW** — PlackettLuceRater, PlackettLuceConfig, Gibbs sampling |
-| `src/pruners/proof/sketch_sampler.rs` | **NEW** — SketchSampler, P-UCB, ε-greedy, diversity injection |
-| `src/pruners/proof/parallelism.rs` | **NEW** — ParallelismGuard, SketchSelectionStrategy |
+| `crates/katgpt-pruners/src/proof/mod.rs` | **NEW** — Module index with public re-exports |
+| `crates/katgpt-pruners/src/proof/goal_cache.rs` | **NEW** — ProofGoalCache, GoalHash, GoalResult |
+| `crates/katgpt-pruners/src/proof/sketch_types.rs` | **NEW** — SketchEntry, SketchId, ProofState, Goal, DiversityStrategy |
+| `crates/katgpt-pruners/src/proof/sketch_population.rs` | **NEW** — SketchPopulation, PopulationConfig, EvictionReport |
+| `crates/katgpt-pruners/src/proof/plackett_luce.rs` | **NEW** — PlackettLuceRater, PlackettLuceConfig, Gibbs sampling |
+| `crates/katgpt-pruners/src/proof/sketch_sampler.rs` | **NEW** — SketchSampler, P-UCB, ε-greedy, diversity injection |
+| `crates/katgpt-pruners/src/proof/parallelism.rs` | **NEW** — ParallelismGuard, SketchSelectionStrategy |
 | `tests/test_128_proof_sketch_goat.rs` | **NEW** — 46 GOAT proofs |
 
 ---

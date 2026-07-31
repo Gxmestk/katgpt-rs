@@ -176,7 +176,7 @@ impl Default for SigmoidFusionConfig {
 /// RMSNorm `x → x / √(mean(x²) + eps)`, writing the result into `out`.
 ///
 /// Plan T3.2. In-place-safe: `out` MAY alias `x` (read-then-write per
-/// element, no cross-element aliasing). Uses [`simd::simd_sum_sq`] for the
+/// element, no cross-element aliasing). Uses `simd::simd_sum_sq` for the
 /// pass-1 reduction. Zero-allocation.
 ///
 /// `out.len()` MUST equal `x.len()` (debug_asserted). Empty `x` is a no-op.

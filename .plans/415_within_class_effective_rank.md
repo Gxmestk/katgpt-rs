@@ -4,14 +4,14 @@
 **Research:** [katgpt-rs/.research/394_GNN_Survey_Within_Class_Effective_Rank_Fusion.md](../.research/394_GNN_Survey_Within_Class_Effective_Rank_Fusion.md)
 **Source paper:** [arXiv:2412.19419](https://arxiv.org/abs/2412.19419) §5.3.1 + Supplementary S.1.2 — Tanis et al., MITRE/NCI GNN survey
 **Target:** `crates/katgpt-core/src/data_probe/geometry.rs` (extend) — inherits the existing `sink_aware_attn` feature gate (same as the sibling `effective_rank`)
-**Status:** Active — Phase 1 COMPLETE (all gates PASS)
+**Status:** ✅ COMPLETE, OPT-IN (extends sink_aware_attn) — Phase 1 COMPLETE (all gates PASS)
 
 ## Goal
 
 Ship `within_class_effective_rank(states, dim, class_labels) -> f32` — the entropy-based effective rank of the **within-class residual** covariance matrix (paper eq. S.1.2). This is the GOAT-distilled primitive from Research 394: a **fusion of two shipped halves** that have never been combined:
 
-1. `effective_rank` (`data_probe/geometry.rs`, Roy & Vetterli 2007) — entropy-based effective rank, but **class-agnostic** (centers by global mean).
-2. `within_class_adjacency` / `between_class_adjacency` (`riir-engine/src/latent_functor/quality_gate.rs`, Plan 303 T5.1) — the class-conditioning machinery, currently used only for Dirichlet-energy separation scoring.
+1. `effective_rank` (`crates/katgpt-core/src/data_probe/geometry.rs`, Roy & Vetterli 2007) — entropy-based effective rank, but **class-agnostic** (centers by global mean).
+2. `within_class_adjacency` / `between_class_adjacency` (`riir-ai/crates/riir-engine/src/latent_functor/quality_gate.rs`, Plan 303 T5.1) — the class-conditioning machinery, currently used only for Dirichlet-energy separation scoring.
 
 The paper (§5.3.1) claims this specific combination — effective rank applied to the within-class residual covariance — is novel. Modelless, ~40 lines, zero new dependencies (reuses the private `jacobi_eigenvalues` eigensolver).
 
@@ -23,7 +23,7 @@ The paper (§5.3.1) claims this specific combination — effective rank applied 
 
 ### Tasks
 
-- [x] **T1.1** Add `within_class_effective_rank(states: &[f32], dim: usize, class_labels: &[usize]) -> f32` to `data_probe/geometry.rs`. Reuse `jacobi_eigenvalues`; replace global-mean centering with class-mean centering. Compute pooled within-class covariance `Σ_w = (1/Σ(n_c−1)) Σ_c Σ_{i∈S_c} (x_i − μ_c)(x_i − μ_c)^T`, then `r_WC = exp(−Σ p_i log p_i)` over normalized eigenvalues.
+- [x] **T1.1** Add `within_class_effective_rank(states: &[f32], dim: usize, class_labels: &[usize]) -> f32` to `crates/katgpt-core/src/data_probe/geometry.rs`. Reuse `jacobi_eigenvalues`; replace global-mean centering with class-mean centering. Compute pooled within-class covariance `Σ_w = (1/Σ(n_c−1)) Σ_c Σ_{i∈S_c} (x_i − μ_c)(x_i − μ_c)^T`, then `r_WC = exp(−Σ p_i log p_i)` over normalized eigenvalues.
 - [x] **T1.2** Add `within_class_effective_rank_owned` convenience wrapper taking `&[Vec<f32>]` + `&[usize]` (mirrors `effective_rank`'s signature for ergonomic callers).
 - [x] **T1.3** Add `WithinClassGeometryReport { within_class_erank, global_erank_for_contrast, n_classes, n_states, dim }` + `within_class_geometry_report` convenience function (mirrors `representation_geometry_report`).
 - [x] **T1.4** Unit tests in `geometry.rs::tests`:

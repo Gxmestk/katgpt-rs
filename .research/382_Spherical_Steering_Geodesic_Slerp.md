@@ -253,7 +253,7 @@ The Slerp coefficients `(c0, c1)` and the angle `θ` are deterministic raw scala
 | 5-repo discipline | ✅ Open primitive → katgpt-rs. No game/chain/shard semantics in the primitive. |
 | Raw scalars at sync boundary | ✅ Slerp stays latent; only the 5 scalar affect outputs cross sync (same as existing HLA rule). The committed `μ_T` BLAKE3 hash and the strength `t` are raw scalars that can cross sync if needed (e.g., for replay). |
 | Zero-alloc hot path | ✅ Caller-provided scratch (`scratch_unit: &mut [f32]`); 4-wide chunked inner loop matches Plan 322 / Plan 319 pattern. |
-| Files < 2048 lines | ✅ New module `src/spherical_steering.rs` — estimated < 500 LOC (primitive + gate + tests). |
+| Files < 2048 lines | ✅ New module `crates/katgpt-core/src/spherical_steering.rs` — estimated < 500 LOC (primitive + gate + tests). |
 
 ---
 

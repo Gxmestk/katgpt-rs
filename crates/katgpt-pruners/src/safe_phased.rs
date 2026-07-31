@@ -7,7 +7,7 @@
 //! # Architecture
 //!
 //! - [`SafePhasedState`] — tracks phase, delay estimate, gap accumulation, mixing
-//! - Integration with [`BanditStrategy::SafePhased`] in the bandit module
+//! - Integration with `BanditStrategy::SafePhased` in the bandit module
 //!
 //! # Delay-Calibrated Slack
 //!
@@ -145,12 +145,7 @@ impl SafePhasedState {
         match precision_skill {
             Some(precision) => {
                 let x = lambda * (precision - precision_threshold);
-                let sigmoid = if x >= 0.0 {
-                    1.0 / (1.0 + (-x).exp())
-                } else {
-                    let ex = x.exp();
-                    ex / (1.0 + ex)
-                };
+                let sigmoid = katgpt_core::simd::fast_sigmoid(x);
                 // Blend: take the max of phase-based and precision-gated alpha
                 // This ensures precision can only INCREASE exploration, never decrease it
                 self.alpha.max(sigmoid)

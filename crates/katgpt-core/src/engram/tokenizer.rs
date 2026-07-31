@@ -94,7 +94,7 @@ impl SurjectiveMap {
     ///
     /// Layout: `[32-byte BLAKE3 commitment] || [postcard-serialized Vec<u64>]`.
     /// The commitment is over the postcard bytes only (not self-inclusive).
-    /// On load, [`load_from_bytes`] recomputes the BLAKE3 over the payload
+    /// On load, `load_from_bytes` recomputes the BLAKE3 over the payload
     /// and compares — tampered maps are rejected.
     pub fn save_to_bytes(&self) -> Vec<u8> {
         // Extract the raw u64s — CanonicalId is #[repr(transparent)] over u64

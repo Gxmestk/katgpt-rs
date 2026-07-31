@@ -112,4 +112,4 @@ WASM Memory Layout for batch call:
 ### riir-ai
 | File | Change |
 |------|--------|
-| `crates/riir-validator-sdk/examples/bomber_validator.rs` | Added `batch_is_valid`, `batch_relevance` exports + 5 batch layout tests (+277 lines) |
+| `riir-ai/crates/riir-validator-sdk/examples/bomber_validator.rs` | Added `batch_is_valid`, `batch_relevance` exports + 5 batch layout tests (+277 lines) |

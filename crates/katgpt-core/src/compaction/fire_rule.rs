@@ -1,6 +1,6 @@
 //! The `FireRule` enum — Boolean combination of predicate verdicts.
 //!
-//! A fire rule maps a [`RubricVerdict`](super::RubricVerdict)'s `Yes`/`No`
+//! A fire rule maps a [`RubricVerdict`]'s `Yes`/`No`
 //! pattern to a single `bool`: should the gate COMPRESS? The combinators are
 //! the paper's `And` / `Or` / `Not` / `Box` (compose) constructors
 //! (SelfCompact, arXiv:2606.23525, Appendix A/B).

@@ -25,22 +25,22 @@ These gaps mean: training may produce incorrect gradients, distillation quality 
 | # | Paper | Where | Status |
 |---|-------|-------|--------|
 | 00 | Neuro-Symbolic Architecture | `katgpt-rs/src/speculative/` | ✅ DFlash, DDTree, Percepta |
-| 01 | Advanced Neuro-Symbolic | `katgpt-rs/src/transformer.rs` | ✅ PagedKV, GQA, SIMD hints |
-| 02 | Speculative Decoding (Leviathan) | `katgpt-rs/src/speculative/verifier.rs` | ✅ Full rejection sampling |
+| 01 | Advanced Neuro-Symbolic | `katgpt-rs/crates/katgpt-percepta/src/transformer.rs` | ✅ PagedKV, GQA, SIMD hints |
+| 02 | Speculative Decoding (Leviathan) | `crates/katgpt-forward/src/verifier.rs` | ✅ Full rejection sampling |
 | 03 | Commercial Strategy | 4-repo architecture split | ✅ Engine/Fuel separation |
-| 04 | LoRA Architecture | `riir-gpu/src/lora.rs` | ✅ 6 targets/layer, BLAKE3 |
+| 04 | LoRA Architecture | `crates/katgpt-types/src/lora.rs` | ✅ 6 targets/layer, BLAKE3 |
 | 05 | Artifact Definition | `riir-validator-sdk/` | ✅ 10 WASM validators |
-| 06 | Raven RSM | `katgpt-rs/src/transformer.rs` | ✅ O(1) KV cache |
+| 06 | Raven RSM | `katgpt-rs/crates/katgpt-percepta/src/transformer.rs` | ✅ O(1) KV cache |
 | 07 | Screening Absolute Relevance | `katgpt-rs/src/speculative/types.rs` | ✅ Continuous [0,1] |
 | 08 | TwELL Sparse MLP | `katgpt-rs/src/types.rs` | ✅ Feature-gated sparse GEMV |
 | 09 | EMO Emergent Modularity | `riir-ai/crates/riir-router/` | ✅ ExpertRegistry + routing |
 | 11 | PPoT | `katgpt-rs/src/speculative/ppot/` | ✅ CPU logit resampling |
-| 12 | TRT (rejection knowledge) | `katgpt-rs/src/speculative/ppot/knowledge.rs` | ✅ Adaptive patterns |
-| 14 | Learning Beyond Gradients | `katgpt-rs/src/pruners/absorb_compress.rs` | ✅ Absorb+Compress |
-| 15 | Reinforced Agent (reviewer) | `katgpt-rs/src/pruners/review_metrics.rs` | ✅ Helpfulness/Harmfulness |
-| 16 | AutoTTS (β parameterization) | `riir-gpu/src/training_config.rs` | ✅ BetaConfig |
-| 18 | Free Transformer Latent Injection | `katgpt-rs/src/types.rs` (DomainLatent), `riir-gpu/src/domain_latent.rs` | 🟡 Full VAE ❌, mid-layer K/V domain embedding ✅ (Plan 038) |
-| 19 | TTT Test-Time Training | `katgpt-rs/src/feedback.rs`, `riir-burner/` | 🟡 Feedback sends, not consumed |
+| 12 | TRT (rejection knowledge) | `katgpt-rs/crates/katgpt-speculative/src/ppot/knowledge.rs` | ✅ Adaptive patterns |
+| 14 | Learning Beyond Gradients | `katgpt-rs/crates/katgpt-pruners/src/absorb_compress.rs` | ✅ Absorb+Compress |
+| 15 | Reinforced Agent (reviewer) | `katgpt-rs/crates/katgpt-core/src/pruners/review_metrics.rs` | ✅ Helpfulness/Harmfulness |
+| 16 | AutoTTS (β parameterization) | `riir-train/crates/riir-train-gpu/src/training_config.rs` | ✅ BetaConfig |
+| 18 | Free Transformer Latent Injection | `katgpt-rs/src/types.rs` (DomainLatent), `riir-ai/crates/riir-gpu/src/domain_latent.rs` | 🟡 Full VAE ❌, mid-layer K/V domain embedding ✅ (Plan 038) |
+| 19 | TTT Test-Time Training | `katgpt-rs/crates/katgpt-deprecated/src/feedback.rs`, `riir-burner/` | 🟡 Feedback sends, not consumed |
 | 20 | TurboQuant | `katgpt-rs/src/turboquant/` | ✅ CPU path, GPU kernel exists |
 
 ### Correctly Rejected (1/21 papers)
@@ -72,7 +72,7 @@ These gaps mean: training may produce incorrect gradients, distillation quality 
 
 #### Task 1: Fix Attention Backward Propagation
 
-**File:** `riir-ai/crates/riir-gpu/src/backward.rs`
+**File:** `riir-ai/crates/riir-engine/src/transformer/gemma2_train/backward.rs`
 **Problem:** Q perturbations don't propagate through attention to logits (L690-694, test disabled).
 **Root Cause:** The backward pass through attention assumes a simplified gradient path. The softmax attention gradient requires computing:
 ```
@@ -95,7 +95,7 @@ But the current code doesn't properly accumulate gradients through the multi-hea
 
 #### Task 2: Implement Real KL Divergence in Distillation
 
-**File:** `riir-ai/crates/riir-gpu/src/distill.rs`
+**File:** `riir-train/crates/riir-train-gpu/src/distill.rs`
 **Problem:** `kl_divergence: 0.0` placeholder at L531 — can't measure distillation quality.
 **Fix:**
 1. After SVD truncation, compute actual KL divergence:
@@ -128,10 +128,10 @@ But the current code doesn't properly accumulate gradients through the multi-hea
 
 #### Task 4: Wire PFlash GPU Dispatch
 
-**Files:** `riir-ai/crates/riir-gpu/src/kernels/mod.rs`, `riir-ai/crates/riir-gpu/src/forward.rs`
+**Files:** `riir-ai/crates/riir-gpu/src/kernels/mod.rs`, `riir-ai/crates/riir-gpu/src/forward/mod.rs`
 **Problem:** 4 WGSL shaders exist (`flashprefill_mean_k.wgsl`, `flashprefill_block_score.wgsl`, `flashprefill_block_select.wgsl`, `flashprefill_sparse_forward.wgsl`) but are never compiled into `GpuPipelines` or dispatched.
 
-**Current state (kernels/mod.rs GpuPipelines):**
+**Current state (riir-ai/crates/riir-gpu/src/kernels/mod.rs GpuPipelines):**
 ```rust
 pub struct GpuPipelines {
     pub matmul: PipelineBundle,
@@ -159,7 +159,7 @@ pub struct GpuPipelines {
 
 #### Task 5: Wire TurboQuant GPU Attention Scoring
 
-**Files:** `riir-ai/crates/riir-gpu/src/kernels/mod.rs`, `riir-ai/crates/riir-gpu/src/forward.rs`
+**Files:** `riir-ai/crates/riir-gpu/src/kernels/mod.rs`, `riir-ai/crates/riir-gpu/src/forward/mod.rs`
 **Problem:** `attention_score_tq.wgsl` exists but is not in `GpuPipelines` or dispatched.
 **Context:** CPU `forward_turboquant()` in `katgpt-rs` works. GPU path would accelerate the dequantize→score→attention step.
 **Fix:**
@@ -175,8 +175,8 @@ pub struct GpuPipelines {
 
 #### Task 6: Feedback Consumer Service
 
-**File:** `riir-ai/crates/riir-gpu/src/feedback.rs` (new) or extend `riir-ai/crates/riir-rest/`
-**Problem:** `katgpt-rs/src/feedback.rs` POSTs `InferenceResult` to cache endpoint (Plan 042 Task 6 ✅), but nothing reads from that endpoint to trigger retraining. Feedback goes into a void.
+**File:** `katgpt-rs/crates/katgpt-deprecated/src/feedback.rs` (new) or extend `riir-ai/crates/riir-rest/`
+**Problem:** `katgpt-rs/crates/katgpt-deprecated/src/feedback.rs` POSTs `InferenceResult` to cache endpoint (Plan 042 Task 6 ✅), but nothing reads from that endpoint to trigger retraining. Feedback goes into a void.
 **Context:** Plan 042 implemented the send side. This task implements the receive side.
 
 **Architecture:**
@@ -294,9 +294,9 @@ Separate commits per logical unit:
 
 - [x] **Task 1:** Fix attention backward propagation in `backward.rs` (~110 lines)
 - [x] **Task 2:** Implement real KL divergence in `distill.rs` (~60 lines)
-- [x] **Task 3:** Implement game replay parser in `game/replay.rs` (~45 lines)
-- [x] **Task 4:** Wire PFlash GPU dispatch in `kernels/mod.rs` + `forward.rs` (~230 lines)
-- [x] **Task 5:** Wire TurboQuant GPU attention scoring in `kernels/mod.rs` + `forward.rs` (~90 lines)
+- [x] **Task 3:** Implement game replay parser in `riir-ai/crates/riir-gpu/src/game/replay.rs` (~45 lines)
+- [x] **Task 4:** Wire PFlash GPU dispatch in `riir-ai/crates/riir-gpu/src/kernels/mod.rs` + `forward.rs` (~230 lines)
+- [x] **Task 5:** Wire TurboQuant GPU attention scoring in `riir-ai/crates/riir-gpu/src/kernels/mod.rs` + `forward.rs` (~90 lines)
 - [x] **Task 6:** Add feedback consumer for TTT retraining loop (~210 lines)
 - [x] **Task 7:** E2E validation suite — all 6 fixes proven working
 - [x] **Task 8:** Update README, docs, create research audit doc
@@ -336,7 +336,7 @@ Separate commits per logical unit:
   │  forward.rs ──▶ [PFlash GPU] ──▶ attention ──▶ [TQ GPU]     │
   │  backward.rs ──▶ [FIXED attn grad] ──▶ LoRA grads           │
   │  distill.rs ──▶ [REAL KL divergence] ──▶ quality metric     │
-  │  game/replay.rs ──▶ [REAL parse_replay] ──▶ training data   │
+  │  riir-ai/crates/riir-gpu/src/game/replay.rs ──▶ [REAL parse_replay] ──▶ training data   │
   │  feedback_consumer.rs ──▶ poll → retrain → hot-swap signal   │
   └───────────────────────────────────────────────────────────────┘
 ```
@@ -347,11 +347,11 @@ Separate commits per logical unit:
 
 | File | Change | Lines |
 |------|--------|-------|
-| `riir-gpu/src/backward.rs` | Fix attention gradient computation, re-enable test | ~110 |
-| `riir-gpu/src/distill.rs` | Replace KL placeholder with real computation | ~60 |
-| `riir-gpu/src/game/replay.rs` | Implement `parse_replay()` from stub | ~45 |
-| `riir-gpu/src/kernels/mod.rs` | Add 5 new pipelines (4 PFlash + 1 TQ) | ~30 |
-| `riir-gpu/src/forward.rs` | Add PFlash dispatch path, TQ scoring path | ~180 |
+| `riir-ai/crates/riir-engine/src/transformer/gemma2_train/backward.rs` | Fix attention gradient computation, re-enable test | ~110 |
+| `riir-train/crates/riir-train-gpu/src/distill.rs` | Replace KL placeholder with real computation | ~60 |
+| `riir-ai/crates/riir-gpu/src/game/replay.rs` | Implement `parse_replay()` from stub | ~45 |
+| `riir-ai/crates/riir-gpu/src/kernels/mod.rs` | Add 5 new pipelines (4 PFlash + 1 TQ) | ~30 |
+| `riir-ai/crates/riir-gpu/src/forward/mod.rs` | Add PFlash dispatch path, TQ scoring path | ~180 |
 | `riir-gpu/Cargo.toml` | Add `feedback-consumer` feature | ~5 |
 | `riir-ai/README.md` | Update training status, add new sections | ~30 |
 
@@ -359,8 +359,8 @@ Separate commits per logical unit:
 
 | File | Purpose | Lines |
 |------|---------|-------|
-| `riir-gpu/src/feedback_consumer.rs` | TTT retraining consumer | ~150 |
-| `riir-gpu/examples/feedback_consumer.rs` | CLI for running consumer | ~40 |
+| `riir-train/crates/riir-train-gpu/src/feedback_consumer.rs` | TTT retraining consumer | ~150 |
+| `riir-train/crates/riir-train-gpu/src/feedback_consumer.rs` | CLI for running consumer | ~40 |
 | `riir-ai/.docs/13_research_audit_results.md` | Full audit report | ~120 |
 
 ### Modified files (katgpt-rs)
@@ -391,7 +391,7 @@ The backward pass architecture is sound. Only the attention gradient path needs 
 
 ### 5. Replay parser uses existing JSONL infrastructure
 
-`parse_jsonl()` and `parse_jsonl_filtered()` already exist in `game/replay.rs`. `parse_replay()` just needs to call them and map to `GameSample`. No new parsing code.
+`parse_jsonl()` and `parse_jsonl_filtered()` already exist in `riir-ai/crates/riir-gpu/src/game/replay.rs`. `parse_replay()` just needs to call them and map to `GameSample`. No new parsing code.
 
 ---
 
@@ -504,26 +504,26 @@ Cross-reference of all 21 research papers evaluated against the riir-ai / katgpt
 
 | # | Paper | Year | Implementation | Module(s) | Status |
 |---|-------|------|----------------|-----------|--------|
-| 1 | **LoRA: Low-Rank Adaptation** (Hu et al.) | 2021 | Full LoRA A/B training pipeline | `riir-gpu/lora.rs`, `lora_a.wgsl`, `lora_b.wgsl` | ✅ Full |
+| 1 | **LoRA: Low-Rank Adaptation** (Hu et al.) | 2021 | Full LoRA A/B training pipeline | `crates/katgpt-types/src/lora.rs`, `lora_a.wgsl`, `lora_b.wgsl` | ✅ Full |
 | 2 | **FlashAttention** (Dao et al.) | 2022 | PFlash block-sparse speculative prefill (4-kernel GPU pipeline) | `forward_flashprefill.rs`, `flashprefill_*.wgsl` | ✅ Full |
 | 3 | **Speculative Decoding** (Leviathan et al.) | 2023 | DDTree speculative verification with budget-aware pruning | `katgpt-rs/src/speculative/dd_tree.rs` | ✅ Full |
 | 4 | **Grouped Query Attention** (Ainslie et al.) | 2023 | GQA kv_group mapping in attention kernels | `attention.wgsl`, `flashprefill_sparse_forward.wgsl` | ✅ Full |
-| 5 | **Knowledge Distillation** (Hinton et al.) | 2015 | Per-adapter KL divergence with effective weight distributions | `riir-gpu/distill.rs` | ✅ Full |
+| 5 | **Knowledge Distillation** (Hinton et al.) | 2015 | Per-adapter KL divergence with effective weight distributions | `riir-train/crates/riir-train-gpu/src/distill.rs` | ✅ Full |
 | 6 | **AdamW** (Loshchilov & Hutter) | 2017 | Full AdamW with warmup + cosine decay on GPU | `optimizer.rs`, `optimizer.wgsl` | ✅ Full |
 | 7 | **RMSNorm** (Zhang & Sennrich) | 2019 | GPU RMSNorm kernel (no bias) | `layernorm.wgsl` | ✅ Full |
-| 8 | **Multi-Armed Bandit Routing** | 2023 | EpsilonGreedy + UCB domain routing with episode tracking | `katgpt-rs/src/pruners/bandit.rs` | ✅ Full |
+| 8 | **Multi-Armed Bandit Routing** | 2023 | EpsilonGreedy + UCB domain routing with episode tracking | `katgpt-rs/crates/katgpt-ruliology/src/bandit.rs` | ✅ Full |
 | 9 | **Early Exit / Dynamic Depth** | 2020 | Domain inference budget with β parameterization, early exit patience | `katgpt-rs/src/speculative/dd_tree.rs` (embedded), Plan 026 | ✅ Full |
 | 10 | **Sparse Attention** (child et al.) | 2019 | Block-sparse attention with heuristic selection (sink + window + α threshold) | `flashprefill_block_select.wgsl`, `flashprefill_sparse_forward.wgsl` | ✅ Full |
 | 11 | **KV Cache Quantization** | 2023 | TurboQuant near-optimal KV cache compression with bit-packed codebooks | `forward_turboquant.rs`, `attention_score_tq.wgsl` | ✅ Full |
 | 12 | **Test-Time Training (TTT)** | 2024 | Feedback consumer: polls cache → retrains LoRA → hot-swap signal | `feedback_consumer.rs` (feature-gated) | ✅ Full |
-| 13 | **Embedding-based Retrieval** | 2020 | 3-tier embedding router with RAG fallback for prompt routing | `riir-router/src/embedding.rs`, Plan 024 | ✅ Full |
+| 13 | **Embedding-based Retrieval** | 2020 | 3-tier embedding router with RAG fallback for prompt routing | `riir-ai/crates/riir-router/src/embedding.rs`, Plan 024 | ✅ Full |
 | 14 | **WASM Sandboxing** | 2019 | WASM validator SDK with streaming events ABI, wasmi 1.0 sandbox (Plan 167 migration from wasmtime; wasmtime kept `[dev-dependency]` for comparison benchmarks) | `riir-validator-sdk/`, `WasmPruner` | ✅ Full |
 | 15 | **Constraint Decoding** | 2022 | DDTree + ConstraintPruner + ScreeningPruner trait system | `katgpt-rs/src/speculative/dd_tree.rs` | ✅ Full |
 | 16 | **Online Softmax** (Milakov & Gimelshein) | 2018 | Stable online softmax in WGSL (max subtraction, 2-pass for sparse) | `softmax.wgsl`, `flashprefill_sparse_forward.wgsl` | ✅ Full |
-| 17 | **Gradient Compression** (Aji & Heafield) | 2017 | Gradient compression for distributed training | `riir-gpu/compress.rs` | ✅ Full |
+| 17 | **Gradient Compression** (Aji & Heafield) | 2017 | Gradient compression for distributed training | `riir-train/crates/riir-train-gpu/src/compress.rs` | ✅ Full |
 | 18 | **NVIDIA Dynamo** (dynamic inference) | 2024 | Early exit + dynamic budget extracted; full framework not applicable at micro-scale | `katgpt-rs/src/speculative/dd_tree.rs` (embedded) | 🔶 Partial |
-| 19 | **BLT: Byte Latent Transformer** (Pagnoni et al.) | 2024 | Byte-level tokenization concepts absorbed into BPE pipeline | `katgpt-rs/src/tokenizer/bpe.rs` | 🔶 Distilled |
-| 20 | **Free Transformer** (routing-free inference) | 2024 | Routing-free concepts absorbed into embedding router fallback tier | `riir-router/src/embedding.rs` | 🔶 Distilled |
+| 19 | **BLT: Byte Latent Transformer** (Pagnoni et al.) | 2024 | Byte-level tokenization concepts absorbed into BPE pipeline | `katgpt-rs/crates/katgpt-tokenizer/src/bpe.rs` | 🔶 Distilled |
+| 20 | **Free Transformer** (routing-free inference) | 2024 | Routing-free concepts absorbed into embedding router fallback tier | `riir-ai/crates/riir-router/src/embedding.rs` | 🔶 Distilled |
 | 21 | **ColaDLM** (collaborative distillation) | 2024 | Evaluated and rejected — not applicable to micro-scale single-device LoRA training | N/A | ✅ Rejected |
 
 ---
@@ -535,42 +535,42 @@ Cross-reference of all 21 research papers evaluated against the riir-ai / katgpt
 
 **Resolution:** Implemented proper per-head softmax Jacobian gradient computation. Each attention head now independently computes `dL/d_scores` from `dL/d_attn_output` before propagating through the output projection.
 
-**File:** `riir-gpu/src/backward.rs`
+**File:** `riir-ai/crates/riir-engine/src/transformer/gemma2_train/backward.rs`
 
 ### Task 2: KL Divergence Fix
 **Finding:** `distill.rs` had a `0.0` placeholder for KL divergence loss, making knowledge distillation a no-op.
 
 **Resolution:** Replaced with real KL divergence computation using per-adapter effective weight distributions. Computes `KL(teacher ‖ student)` per adapter with proper log-sum-exp stability.
 
-**File:** `riir-gpu/src/distill.rs`
+**File:** `riir-train/crates/riir-train-gpu/src/distill.rs`
 
 ### Task 3: Replay Parser Implementation
-**Finding:** `game/replay.rs` had an unimplemented `parse_replay()` function.
+**Finding:** `riir-ai/crates/riir-gpu/src/game/replay.rs` had an unimplemented `parse_replay()` function.
 
 **Resolution:** Implemented full `parse_replay()` that converts `ReplayEvent` stream into `GameSamples` with quality assignment based on outcome and action coherence.
 
-**File:** `riir-gpu/src/game/replay.rs`
+**File:** `riir-ai/crates/riir-gpu/src/game/replay.rs`
 
 ### Task 4: PFlash GPU Dispatch
 **Finding:** 4 WGSL kernels existed (`flashprefill_mean_k`, `block_score`, `block_select`, `sparse_forward`) but were not wired into the Rust dispatch layer.
 
 **Resolution:** Created `GpuFlashPrefillPass` in `forward_flashprefill.rs` connecting all 4 kernels as a staged pipeline with proper buffer allocation and bind group management.
 
-**Files:** `riir-gpu/src/forward_flashprefill.rs`, `riir-gpu/src/kernels/mod.rs`
+**Files:** `riir-ai/crates/riir-gpu/src/forward_flashprefill.rs`, `riir-ai/crates/riir-gpu/src/kernels/mod.rs`
 
 ### Task 5: TurboQuant GPU Attention Scoring
 **Finding:** `attention_score_tq.wgsl` kernel existed but had no Rust dispatch wrapper.
 
 **Resolution:** Created `GpuTurboQuantScoring` in `forward_turboquant.rs` connecting the bit-packed codebook scoring kernel with orthogonal pre-rotation.
 
-**Files:** `riir-gpu/src/forward_turboquant.rs`, `riir-gpu/src/kernels/mod.rs`
+**Files:** `riir-ai/crates/riir-gpu/src/forward_turboquant.rs`, `riir-ai/crates/riir-gpu/src/kernels/mod.rs`
 
 ### Task 6: TTT Feedback Consumer
 **Finding:** No mechanism to close the TTT retraining loop from inference feedback back to LoRA retraining.
 
 **Resolution:** Implemented `FeedbackConsumer` that polls the anyrag episodic cache for new feedback samples, triggers LoRA retraining when sufficient samples accumulate, and signals hot-swap to the inference layer. Feature-gated behind `feedback-consumer`.
 
-**Files:** `riir-gpu/src/feedback_consumer.rs`, `riir-gpu/Cargo.toml`
+**Files:** `riir-train/crates/riir-train-gpu/src/feedback_consumer.rs`, `riir-gpu/Cargo.toml`
 
 ---
 

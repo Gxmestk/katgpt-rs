@@ -22,7 +22,7 @@ Ship the two modelless primitives distilled from Research 247 as a generic, MIT-
 **Non-goals (explicitly out of scope here):**
 - NPC comms wiring, fog-of-war `ca` computation, zone broadcast → riir-ai Plan 311.
 - Cross-shape projection training → riir-train.
-- Position-disentanglement (RoPE strip/restore) → already shipped in `src/shard_kv/rope.rs` (`undo_rope`/`reapply_rope`); this plan re-exports it, does not reinvent it.
+- Position-disentanglement (RoPE strip/restore) → already shipped in `crates/katgpt-kv/src/shard_kv/rope.rs` (`undo_rope`/`reapply_rope`); this plan re-exports it, does not reinvent it.
 
 ---
 
@@ -30,28 +30,28 @@ Ship the two modelless primitives distilled from Research 247 as a generic, MIT-
 
 ### Tasks
 
-- [x] **T1.1** Create `src/cs_kv_probe/mod.rs` with module root + re-exports. Add `cs_kv_probe` feature to `Cargo.toml` (opt-in, NOT in `default` or `full` until G2 passes). Gate all module code behind `#[cfg(feature = "cs_kv_probe")]`.
-- [x] **T1.2** Define types in `src/cs_kv_probe/types.rs`:
+- [x] **T1.1** Create `crates/katgpt-kv/src/cs_kv_probe/mod.rs` with module root + re-exports. Add `cs_kv_probe` feature to `Cargo.toml` (opt-in, NOT in `default` or `full` until G2 passes). Gate all module code behind `#[cfg(feature = "cs_kv_probe")]`.
+- [x] **T1.2** Define types in `crates/katgpt-kv/src/cs_kv_probe/types.rs`:
   - `pub struct Episode { pub kv_cache: Vec<f32>, pub label_success: bool }` — generic, no game semantics. `kv_cache` is the flattened `[D]` slice for one inference; `label_success` is the task outcome.
   - `pub struct AblationMask { pub bits: Vec<bool>, pub n_heads: usize }` — binary retention mask over `H` heads. `bits[h]=true` means head `h` retained.
   - `pub struct KvGroupRanking { pub scores: Vec<f32>, pub n_groups: usize }` — Lasso coefficients aggregated per KV group. Higher = more important. BLAKE3-hashable.
   - `pub struct DensityBudget { pub k_sparse: usize, pub k_dense: usize, pub d_total: usize }` — the interpolator config. Defaults: `k_sparse = round(0.035 * d_total)`, `k_dense = round(0.87 * d_total)` (paper's floors/ceilings).
-- [x] **T1.3** Implement `sample_masks` in `src/cs_kv_probe/probe.rs`:
+- [x] **T1.3** Implement `sample_masks` in `crates/katgpt-kv/src/cs_kv_probe/probe.rs`:
   - `pub fn sample_masks(n_heads: usize, m: usize, ablation_fraction: f32, rng: &mut fastrand::Rng) -> Vec<AblationMask>` — stratified random masks, each zeroing exactly `ablation_fraction` (default 0.05) of heads. Returns `Vec::with_capacity(m)`. Paper uses `M=200`, `fraction=0.05`.
-- [x] **T1.4** Implement Lasso solver in `src/cs_kv_probe/lasso.rs`:
+- [x] **T1.4** Implement Lasso solver in `crates/katgpt-kv/src/cs_kv_probe/lasso.rs`:
   - `pub fn lasso(Phi: &[[bool; HishouldBeDynamicUseVec]], y: &[f32], alpha: f32, n_iter: usize) -> Vec<f32>` — coordinate descent L1-regularized regression. Inputs: measurement matrix `Phi` (M×N bool → cast to f32), centered observations `y` (M,), regularization `alpha` (default 1e-4), iteration count (default 1000). Output: coefficient vector `x` (N,). 
   - **No external dep** — implement coordinate descent in-place with pre-allocated scratch. ~80 lines. Avoid pulling in a linear-algebra crate for a single solver.
   - Test: known-sparse ground truth (e.g. only heads 3, 17, 42 matter) → Lasso recovers them within rank tolerance.
 
 ### Phase 2 — Probe Assembly
 
-- [x] **T2.1** Implement `CsKvProbe::run` in `src/cs_kv_probe/probe.rs`:
+- [x] **T2.1** Implement `CsKvProbe::run` in `crates/katgpt-kv/src/cs_kv_probe/probe.rs`:
   - `pub fn run<Eval>(episodes: &[Episode], eval: &Eval, config: &CsProbeConfig, rng: &mut fastrand::Rng) -> KvGroupRanking where Eval: Fn(&AblationMask, &[Episode]) -> f32`
   - Steps: (1) compute `y_baseline = eval(all_ones_mask, episodes)`, (2) sample `M` masks, (3) for each mask compute `y_m = eval(mask, episodes)`, center `ỹ = y - y_baseline`, (4) build `Phi` from masks, (5) `lasso(Phi, ỹ, alpha, n_iter)`, (6) aggregate per-KV-group via `kv_group = head * n_kv_head / n_head` (existing GQA mapping), (7) return `KvGroupRanking`.
   - **Allocation discipline:** `Phi` built once as `Vec<Vec<f32>>::with_capacity(M)`; `y` as `Vec::with_capacity(M)`; both reused across the eval loop via `clear()` + overwrite. No per-iteration allocation.
-- [x] **T2.2** Implement `DensityBudget::k_for` in `src/cs_kv_probe/budget.rs`:
+- [x] **T2.2** Implement `DensityBudget::k_for` in `crates/katgpt-kv/src/cs_kv_probe/budget.rs`:
   - `pub fn k_for(&self, ca: f32) -> usize` — `round(self.k_sparse as f32 + ca * (self.k_dense - self.k_sparse) as f32) as usize`, clamped to `[1, self.d_total]`. One line, branchless if using `min`/`max`.
-- [x] **T2.3** Implement `GatedKvSlice::apply` in `src/cs_kv_probe/gate.rs`:
+- [x] **T2.3** Implement `GatedKvSlice::apply` in `crates/katgpt-kv/src/cs_kv_probe/gate.rs`:
   - `pub fn apply(ranking: &KvGroupRanking, budget: &DensityBudget, ca: f32, kv: &[f32], out_bias: &mut [f32])` — writes `out_bias[g] = log(score_normalized[g] + ε)` for top-K groups (K = `budget.k_for(ca)`), `-INFINITY` for the rest. Reuses the SP-KV `soft_gate_bias` convention (Plan 070). **Sigmoid-compatible, never softmax.**
   - **Zero-allocation:** caller passes `out_bias: &mut [f32]` of length `n_groups`. No Vec returns.
 
@@ -81,4 +81,4 @@ Ship the two modelless primitives distilled from Research 247 as a generic, MIT-
 
 ## TL;DR
 
-Open primitive for Research 247's Super-GOAT. Ships `CsKvProbe` (compressed-sensing KV-group importance via ablation + Lasso, pure inference), `DensityBudget` (the `K(ca)` interpolator, sparse floor 3.5% / dense ceiling 87%), and `GatedKvSlice` (sigmoid-gated top-K application, reuses SP-KV convention). No game semantics, no NPC wiring — that's riir-ai Plan 311. No cross-shape projection training — that's riir-train. No RoPE reinvention — reuse `shard_kv/rope.rs`. GOAT gate: G1 (CS beats random), G2 (duality shape reproduces at D=16), G3 (interpolator monotone+bounded), zero-overhead when off, zero-alloc in apply. Feature `cs_kv_probe`, opt-in until G2 passes.
+Open primitive for Research 247's Super-GOAT. Ships `CsKvProbe` (compressed-sensing KV-group importance via ablation + Lasso, pure inference), `DensityBudget` (the `K(ca)` interpolator, sparse floor 3.5% / dense ceiling 87%), and `GatedKvSlice` (sigmoid-gated top-K application, reuses SP-KV convention). No game semantics, no NPC wiring — that's riir-ai Plan 311. No cross-shape projection training — that's riir-train. No RoPE reinvention — reuse `crates/katgpt-kv/src/shard_kv/rope.rs`. GOAT gate: G1 (CS beats random), G2 (duality shape reproduces at D=16), G3 (interpolator monotone+bounded), zero-overhead when off, zero-alloc in apply. Feature `cs_kv_probe`, opt-in until G2 passes.

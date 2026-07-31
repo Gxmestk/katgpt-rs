@@ -23,37 +23,19 @@
 
 #![cfg(feature = "cochain_point_sampler")]
 
+// Shared CountingAllocator macro (mirrors katgpt-core Issue 044 T3).
+#[path = "../tests/common/counting_allocator.rs"]
+mod counting_allocator;
+
 use katgpt_dec::{
     CellComplex, CochainField, LocalCoordEncode, PointSamplerScratch,
     sample_cochain_at_point_quad_into, sample_point_quad_into, sample_point_tri_into,
 };
-use std::alloc::{GlobalAlloc, Layout, System};
 use std::hint::black_box;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::Ordering;
 use std::time::Instant;
 
-// ---------------------------------------------------------------------------
-// Inline CountingAllocator (katgpt-dec benches inline the pattern per Plan 407)
-// ---------------------------------------------------------------------------
-
-struct CountingAllocator;
-
-static ALLOC_COUNT: AtomicUsize = AtomicUsize::new(0);
-static DEALLOC_COUNT: AtomicUsize = AtomicUsize::new(0);
-
-unsafe impl GlobalAlloc for CountingAllocator {
-    unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
-        ALLOC_COUNT.fetch_add(1, Ordering::Relaxed);
-        unsafe { System.alloc(layout) }
-    }
-    unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
-        DEALLOC_COUNT.fetch_add(1, Ordering::Relaxed);
-        unsafe { System.dealloc(ptr, layout) }
-    }
-}
-
-#[global_allocator]
-static A: CountingAllocator = CountingAllocator;
+counting_allocator!();
 
 // ---------------------------------------------------------------------------
 // SplitMix64 PRNG (deterministic, no external dep)
@@ -93,8 +75,8 @@ fn build_quad_workload() -> (CellComplex, CochainField, [f32; 8]) {
     let mut rng = SplitMix64::new(0x4220_0710_2026); // 422, 2026-07-10
     for v in 0..gw * gh {
         let features = field.cell_features_mut(v);
-        for d in 0..dim {
-            features[d] = rng.next_u01() * 2.0 - 1.0;
+        for feat in features.iter_mut().take(dim) {
+            *feat = rng.next_u01() * 2.0 - 1.0;
         }
     }
     let out = [0.0f32; 8];
@@ -102,19 +84,14 @@ fn build_quad_workload() -> (CellComplex, CochainField, [f32; 8]) {
 }
 
 /// Triangle workload: single triangle [[0,0],[4,0],[0,4]], dim=8 field.
-fn build_tri_workload() -> (
-    CochainField,
-    [[f32; 2]; 3],
-    [usize; 3],
-    PointSamplerScratch,
-) {
+fn build_tri_workload() -> (CochainField, [[f32; 2]; 3], [usize; 3], PointSamplerScratch) {
     let dim = 8usize;
     let mut field = CochainField::zeros(0, 3, dim);
     let mut rng = SplitMix64::new(0x4221_0710_2026);
     for v in 0..3 {
         let features = field.cell_features_mut(v);
-        for d in 0..dim {
-            features[d] = rng.next_u01() * 2.0 - 1.0;
+        for feat in features.iter_mut().take(dim) {
+            *feat = rng.next_u01() * 2.0 - 1.0;
         }
     }
     let tri_pos = [[0.0f32, 0.0], [4.0, 0.0], [0.0, 4.0]];
@@ -352,11 +329,7 @@ fn g5_latency_tri() -> f64 {
 // ---------------------------------------------------------------------------
 
 fn verdict(pass: bool) -> &'static str {
-    if pass {
-        "PASS ✅"
-    } else {
-        "FAIL ❌"
-    }
+    if pass { "PASS ✅" } else { "FAIL ❌" }
 }
 
 fn main() {
@@ -391,14 +364,10 @@ fn main() {
     all_pass &= g5;
 
     let ns_sincos = g5_latency_quad_full_sincos();
-    println!(
-        "  [report] quad full (Sincos n=4):     {ns_sincos:.1} ns/call"
-    );
+    println!("  [report] quad full (Sincos n=4):     {ns_sincos:.1} ns/call");
 
     let ns_tri = g5_latency_tri();
-    println!(
-        "  [report] tri full (BarycentricSort):  {ns_tri:.1} ns/call"
-    );
+    println!("  [report] tri full (BarycentricSort):  {ns_tri:.1} ns/call");
 
     println!();
     if all_pass {

@@ -85,12 +85,12 @@ pub struct CombatRhythmTracker {
 
 | Component | File | Change |
 |-----------|------|--------|
-| `SpectralThreatFeatures` | `katgpt-core/src/sense/spectral_threat.rs` | New file |
-| `CombatRhythmTracker` | `katgpt-core/src/sense/spectral_threat.rs` | New file |
-| `SenseKind` | `katgpt-core/src/types.rs` | Add `SpectralThreat` variant (discriminant 6) |
-| `NpcBrain` | `katgpt-core/src/sense/brain.rs` | No change — tracker is a sense module |
-| `ThreatHeuristic` | `riir-engine/src/frame/heuristic.rs` | Optional `spectral: Option<SpectralThreatFeatures>` field |
-| `FrameSnapshot` | `riir-engine/src/frame/types.rs` | No change — spectral features are computed, not stored |
+| `SpectralThreatFeatures` | `crates/katgpt-core/src/sense_threat.rs` | New file |
+| `CombatRhythmTracker` | `crates/katgpt-core/src/sense_threat.rs` | New file |
+| `SenseKind` | `crates/katgpt-types/src/lib.rs` | Add `SpectralThreat` variant (discriminant 6) |
+| `NpcBrain` | `riir-ai/crates/riir-engine/src/sense/brain.rs` | No change — tracker is a sense module |
+| `ThreatHeuristic` | `src/benchmark/heuristic.rs` | Optional `spectral: Option<SpectralThreatFeatures>` field |
+| `FrameSnapshot` | `riir-ai/crates/riir-engine/src/frame/types.rs` | No change — spectral features are computed, not stored |
 | `Cargo.toml` | `katgpt-core/Cargo.toml` | Add `spectral_threat` feature gate |
 
 ---
@@ -98,7 +98,7 @@ pub struct CombatRhythmTracker {
 ## Tasks
 
 ### T1: Core Types — `SpectralThreatFeatures`
-- [x] Create `crates/katgpt-core/src/sense/spectral_threat.rs` behind `#[cfg(feature = "spectral_threat")]`
+- [x] Create `crates/katgpt-core/src/sense_threat.rs` behind `#[cfg(feature = "spectral_threat")]`
 - [x] Define `SpectralThreatFeatures` struct (4 × f32, `repr(C)`, 16 bytes)
 - [x] Implement `SpectralThreatFeatures::dodge_urgency(&self) -> f32` — sigmoid composite of frequency × phase
   - High frequency + phase near 0.0 → urgency near 1.0 (dodge NOW)
@@ -149,9 +149,9 @@ pub struct CombatRhythmTracker {
     - `score -= spectral_bonus` when phase indicates imminent peak (phase < 0.25)
     - `score += spectral.counter_window() * 0.15` when phase indicates cooldown (phase > 0.4)
   - Keep existing reactive logic as primary (70% weight) — spectral augments, not replaces
-- [x] Copy `SpectralThreatFeatures` struct to `riir-engine/src/frame/types.rs` (mirror, not dep)
+- [x] Copy `SpectralThreatFeatures` struct to `riir-ai/crates/riir-engine/src/frame/types.rs` (mirror, not dep)
   - Keep synchronized — both repos own their copy, no cross-repo dep for a 16-byte struct
-- [x] Tests: `ThreatHeuristic` with spectral features — 3 tests in `riir-engine/src/frame/heuristic.rs`:
+- [x] Tests: `ThreatHeuristic` with spectral features — 3 tests in `src/benchmark/heuristic.rs`:
   - `threat_heuristic_spectral_penalizes_imminent_peak`: phase < 0.25 → lower score (dodge)
   - `threat_heuristic_spectral_rewards_cooldown_window`: phase > 0.4 → higher score (counter)
   - `threat_heuristic_spectral_none_matches_reactive`: spectral: None == Default

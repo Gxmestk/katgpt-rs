@@ -81,7 +81,7 @@
 
 ### D2: Wire Fused Kernels into Forward Pass
 
-- [x] **T8**: Add `forward_coda()` in `src/transformer.rs` behind `#[cfg(feature = "coda_fusion")]`
+- [x] **T8**: Add `forward_coda()` in `crates/katgpt-percepta/src/transformer.rs` behind `#[cfg(feature = "coda_fusion")]`
   - Replaces the standard `forward_base()` layer loop with CODA-fused version
   - Layer structure changes from:
     ```
@@ -203,7 +203,7 @@ forward_coda() per layer:
 | `katgpt-rs/Cargo.toml` | Add feature gate: `coda_fusion` |
 | `crates/katgpt-core/src/coda.rs` | New: fused SIMD kernels (T3-T7) |
 | `crates/katgpt-core/src/lib.rs` | Add `pub mod coda;` behind feature gate |
-| `katgpt-rs/src/transformer.rs` | Add `forward_coda()` behind feature gate |
+| `katgpt-rs/crates/katgpt-percepta/src/transformer.rs` | Add `forward_coda()` behind feature gate |
 | `tests/bench_103_coda_fusion_goat.rs` | New: GOAT benchmark |
 | `.benchmarks/030_coda_fusion_simd.md` | New: results |
 

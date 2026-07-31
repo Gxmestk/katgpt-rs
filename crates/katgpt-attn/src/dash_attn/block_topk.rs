@@ -88,20 +88,16 @@ impl VortexFlow for BlockTopKRouter {
             return;
         }
 
-        // Compute mean of keys → centroid
+        // Compute mean of keys → centroid (SIMD accumulate + scale)
         let start = block_idx * head_dim;
         let centroid = &mut cache.centroids[start..start + head_dim];
         centroid.fill(0.0);
         for t in 0..block_size {
             let k_start = t * head_dim;
-            for d in 0..head_dim {
-                centroid[d] += keys[k_start + d];
-            }
+            katgpt_core::simd::simd_add_inplace(centroid, &keys[k_start..k_start + head_dim]);
         }
         let inv = 1.0 / block_size as f32;
-        for d in centroid.iter_mut() {
-            *d *= inv;
-        }
+        katgpt_core::simd::simd_scale_inplace(centroid, inv);
 
         cache.n_blocks = cache.n_blocks.max(block_idx + 1);
     }
@@ -639,9 +635,10 @@ pub fn argtopk_scalar_heap(scores: &[f32], k: usize, indices: &mut Vec<usize>) {
 }
 
 /// Standard sigmoid function.
+/// Delegates to [`katgpt_core::simd::fast_sigmoid`] (Cephes polynomial).
 #[inline]
 pub fn sigmoid(x: f32) -> f32 {
-    1.0 / (1.0 + (-x).exp())
+    katgpt_core::simd::fast_sigmoid(x)
 }
 
 // ---------------------------------------------------------------------------
@@ -747,10 +744,14 @@ impl VortexFlow for PerGroupTopKRouter {
         // Partition blocks into groups (round-robin assignment)
         // Group g owns blocks where block_idx % n_groups == g
         let mut decision = RoutingDecision::with_capacity(total_budget);
-        let mut group_indices = Vec::new();
-        let mut group_pairs = Vec::new();
-        let mut group_scores = Vec::new();
-        let mut local_indices = Vec::new();
+        // Pre-size per-group scratch: each group holds at most ceil(n_blocks/n_groups)
+        // blocks. Avoids the 1-3 reallocs per group that `Vec::new()` + push
+        // triggers as the allocator walks 8/16/32-byte doublings.
+        let group_cap = n_blocks.div_ceil(self.n_groups);
+        let mut group_indices: Vec<(usize, f32)> = Vec::with_capacity(group_cap);
+        let mut group_pairs: Vec<(usize, f32)> = Vec::with_capacity(group_cap);
+        let mut group_scores: Vec<f32> = Vec::with_capacity(group_cap);
+        let mut local_indices: Vec<usize> = Vec::with_capacity(per_group_k);
 
         for g in 0..self.n_groups {
             // Collect scores for blocks belonging to this group

@@ -26,7 +26,10 @@ pub fn nds_proxy(top_k_probs: &[f32]) -> f32 {
         .filter(|&&p| p > 0.0)
         .map(|p| p.ln())
         .sum();
-    let gm = (ln_sum / n).exp();
+    let gm = {
+        use katgpt_core::simd::fast_exp;
+        fast_exp(ln_sum / n)
+    };
     // Spectral flatness = gm/am ∈ [0, 1]
     // NDS proxy = 1 - flatness
     (1.0 - gm / am).clamp(0.0, 1.0)

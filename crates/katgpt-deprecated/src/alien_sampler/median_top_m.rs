@@ -31,15 +31,15 @@
 //! `n_candidates × n_bank` normalizations per cycle.
 //!
 //! # Zero-alloc hot path
-//! The [`Self::availability_embedded_with_scratch`] variant takes a
+//! The `availability_embedded_with_scratch` variant takes a
 //! caller-owned cosine scratch buffer (`&mut [f32]` of length `>= n_bank`),
 //! so the per-candidate hot path performs **no allocation**. The
-//! [`AvailabilityScorer`] trait impl uses [`Self::availability_embedded`],
+//! [`AvailabilityScorer`] trait impl uses `availability_embedded`,
 //! which lazily allocates / reuses an internal scratch buffer — convenient
 //! for cold paths and tests, but not the recommended hot-path entry point.
 //!
 //! # Inner dot product + determinism
-//! The inner dot product is [`dot_seq`] (sequential `s += a*b`). Issue 002
+//! The inner dot product is `dot_seq` (sequential `s += a*b`). Issue 002
 //! prototyped a 4-accumulator `mul_add` form (`dot_4acc`) for SIMD
 //! auto-vectorization, but benchmarks showed it slower than the sequential
 //! form without `target-cpu=native` (no autovec, added register pressure), so

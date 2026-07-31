@@ -16,13 +16,13 @@
 //!
 //! ```rust,ignore
 //! use katgpt::cgsp::{
-//!     CgspConfig, CgspLoop, ColinearityBatchGate, HlaProjectionGuide,
+//!     CgspConfig, CgspLoop, ColinearityBatchGate, BeliefGridProjectionGuide,
 //!     PoolConjecturer, BreakevenDifficultyFilter, ScratchBuffers, Target,
 //! };
 //!
 //! let pool = vec![/* direction vectors */];
 //! let conjecturer = PoolConjecturer::new(pool.clone(), 42);
-//! let guide = HlaProjectionGuide::new(2.0, 1.0, Default::default());
+//! let guide = BeliefGridProjectionGuide::new(2.0, 1.0, Default::default());
 //! // solver + bandit provided by caller
 //! let mut loop_ = CgspLoop::new(conjecturer, guide, solver, bandit, CgspConfig::default())
 //!     .with_difficulty_filter(BreakevenDifficultyFilter::default())
@@ -51,7 +51,7 @@ pub use conjecturer::PoolConjecturer;
 #[cfg(feature = "temporal_deriv")]
 pub use derivative_curiosity::DerivativeCuriosity;
 pub use filters::{BreakevenDifficultyFilter, ColinearityBatchGate};
-pub use guide::{ComplexityWeights, HlaProjectionGuide, structural_complexity};
+pub use guide::{BeliefGridProjectionGuide, ComplexityWeights, structural_complexity};
 pub use loop_::{CgspConfig, CgspLoop, EntropyCollapse};
 // Issue 364 T4 — modelless k_npc selector wrapping GainCostLoopHalter.
 // Gated on gain_cost_halt (the halter kernel feature); lives in the cgsp
@@ -63,9 +63,9 @@ pub use traits::{
     NoOpBatchGate, NoOpDifficultyFilter, QualityGuide, Solver,
 };
 pub use types::{
-    Candidate, CuriosityPrioritySnapshot, CycleResult, CycleStats, DEFAULT_HLA_DIM, DEFAULT_K,
-    DEFAULT_POOL_SIZE, Direction, Priority, ScratchBuffers, SolveRate, Target, entropy_nats,
-    sigmoid,
+    Candidate, CuriosityPrioritySnapshot, CycleResult, CycleStats, DEFAULT_BELIEF_DIRECTION_DIM,
+    DEFAULT_K, DEFAULT_POOL_SIZE, Direction, Priority, ScratchBuffers, SolveRate, Target,
+    entropy_nats, sigmoid,
 };
 
 // Dual-pool re-exports (Plan 282, Research 249).
@@ -147,7 +147,7 @@ mod integration_tests {
     fn integration_full_cycle_no_panic_no_nan() {
         let pool = make_8_direction_pool();
         let conj = PoolConjecturer::new(pool.clone(), 12345);
-        let guide = HlaProjectionGuide::new(3.0, 1.0, ComplexityWeights::default());
+        let guide = BeliefGridProjectionGuide::new(3.0, 1.0, ComplexityWeights::default());
         let solver = DotSolver { sharpness: 2.0 };
         let bandit = VecBandit::uniform(8);
         let mut lp = CgspLoop::new(conj, guide, solver, bandit, CgspConfig::default())
@@ -184,7 +184,7 @@ mod integration_tests {
         // than the median arm.
         let pool = make_8_direction_pool();
         let conj = PoolConjecturer::new(pool.clone(), 7);
-        let guide = HlaProjectionGuide::new(4.0, 0.5, ComplexityWeights::default());
+        let guide = BeliefGridProjectionGuide::new(4.0, 0.5, ComplexityWeights::default());
         let solver = DotSolver { sharpness: 2.0 };
         let bandit = VecBandit::uniform(8);
         let mut lp = CgspLoop::new(conj, guide, solver, bandit, CgspConfig::default());
@@ -210,7 +210,7 @@ mod integration_tests {
     fn integration_snapshot_persists_priorities() {
         let pool = make_8_direction_pool();
         let conj = PoolConjecturer::new(pool.clone(), 99);
-        let guide = HlaProjectionGuide::new(2.0, 1.0, ComplexityWeights::default());
+        let guide = BeliefGridProjectionGuide::new(2.0, 1.0, ComplexityWeights::default());
         let solver = DotSolver { sharpness: 1.0 };
         let bandit = VecBandit::uniform(8);
         let mut lp = CgspLoop::new(conj, guide, solver, bandit, CgspConfig::default());
@@ -240,7 +240,7 @@ mod integration_tests {
         // entropy should be measurably higher.
         let pool = make_8_direction_pool();
         let conj = PoolConjecturer::new(pool.clone(), 5);
-        let guide = HlaProjectionGuide::new(2.0, 1.0, ComplexityWeights::default());
+        let guide = BeliefGridProjectionGuide::new(2.0, 1.0, ComplexityWeights::default());
         let solver = DotSolver { sharpness: 1.0 };
         let bandit = VecBandit::uniform(8);
         let mut lp = CgspLoop::new(conj, guide, solver, bandit, CgspConfig::default());

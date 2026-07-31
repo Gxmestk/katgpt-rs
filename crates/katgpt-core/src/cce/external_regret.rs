@@ -94,9 +94,13 @@ impl ExternalRegret {
 
     /// Check Assumption 6.2 (unique maximizer up to `ε`).
     ///
-    /// Sort the per-deviation values `γ(ρ) − γ_dev(ρ, κ)` in descending order
-    /// and verify that the top-2 gap exceeds `ε`. Returns `true` if `D` has
-    /// fewer than 2 deviations (vacuously unique).
+    /// Compute the per-deviation values `γ(ρ) − γ_dev(ρ, κ)` and verify that
+    /// the top-2 gap exceeds `ε`. Returns `true` if `D` has fewer than 2
+    /// deviations (vacuously unique).
+    ///
+    /// Implementation: tracks the top-2 values in a single O(n) pass with no
+    /// allocation (vs the previous sort-the-whole-Vec approach). Ties are
+    /// broken via `total_cmp` to remain NaN-deterministic.
     pub fn is_unique_maximizer<
         const N: usize,
         const A: usize,
@@ -114,11 +118,20 @@ impl ExternalRegret {
             return true;
         }
         let gamma = p.gamma(rho);
-        let mut values: Vec<f32> = devs.iter().map(|k| gamma - p.gamma_dev(rho, k)).collect();
-        // Sort descending so values[0] is the max.
-        // `total_cmp` is branch-free and NaN-deterministic vs `partial_cmp().unwrap_or(Equal)`.
-        values.sort_by(|a, b| b.total_cmp(a));
-        (values[0] - values[1]) > eps
+        // Track the two largest values (descending). `max1 >= max2`.
+        // Initialized to -inf so the first two values populate them in order.
+        let mut max1 = f32::MIN;
+        let mut max2 = f32::MIN;
+        for k in devs {
+            let v = gamma - p.gamma_dev(rho, k);
+            if v.total_cmp(&max1).is_gt() {
+                max2 = max1;
+                max1 = v;
+            } else if v.total_cmp(&max2).is_gt() {
+                max2 = v;
+            }
+        }
+        (max1 - max2) > eps
     }
 
     /// Linear derivative `∂ER/∂ρ[m]` (Lemma 6.5) at flat index `m = (s, a)`.

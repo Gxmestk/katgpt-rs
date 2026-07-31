@@ -5,13 +5,13 @@
 **Research:** [katgpt-rs/.research/354_Cross_Datapoint_Set_Attention_NPT.md](../.research/354_Cross_Datapoint_Set_Attention_NPT.md)
 **Source paper:** [arXiv:2106.02584](https://arxiv.org/pdf/2106.02584) — Kossen et al., NeurIPS 2021 (NPT)
 **Bench:** [`crates/katgpt-core/benches/set_attention_bench.rs`](../crates/katgpt-core/benches/set_attention_bench.rs)
-**Features:** `set_attention` (opt-in)
+**Features:** `set_attention` (**default-on since 2026-07-01** — see Verdict section)
 
 ## GOAT gate results
 
 | Gate | Criterion | Target | Result | Verdict |
 |---|---|---|---|---|
-| **G1** | Permutation equivariance (bit-exact up to float reorder) | max\|Δ\| < 1e-6 over 10 random perms | PASS (see `tests/set_attention_g1_g5.rs`) | ✅ |
+| **G1** | Permutation equivariance (bit-exact up to float reorder) | max\|Δ\| < 1e-6 over 10 random perms | PASS (see `crates/katgpt-core/tests/set_attention_g1_g5.rs`) | ✅ |
 | **G2** | Identity-floor meaningfulness (2-cluster) | cluster means preserved, separation preserved, bounded | PASS | ✅ |
 | **G3** | Latency at N=64, d=8, k=4 | < 25 µs (prod target, 2000× tick headroom) | **21.96 µs** | ✅ |
 | **G4** | Zero allocations (dense path) | 0 allocs/call | **0** | ✅ |

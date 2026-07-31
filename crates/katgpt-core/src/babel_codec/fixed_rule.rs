@@ -441,16 +441,18 @@ fn parse_attribute(line: &str) -> Option<(String, String, String)> {
 fn parse_pipeline(line: &str) -> Option<Vec<String>> {
     // Compressed: `A>B>C` — split on `>`.
     if line.contains('>') && !line.contains(' ') {
-        let stages: Vec<&str> = line.split('>').collect();
+        // Single pass: split, reject-empty, collect. Avoids the intermediate
+        // Vec<&str> + second iter that the prior collect-then-all pattern built.
+        let stages: Vec<String> = line.split('>').map(|s| s.to_string()).collect();
         if stages.len() >= 2 && stages.iter().all(|s| !s.is_empty()) {
-            return Some(stages.iter().map(|s| s.to_string()).collect());
+            return Some(stages);
         }
     }
     // Verbose: `A then B then C` — split on " then ".
     if line.contains(" then ") {
-        let stages: Vec<&str> = line.split(" then ").collect();
-        if stages.len() >= 2 && stages.iter().all(|s| !s.trim().is_empty()) {
-            return Some(stages.iter().map(|s| s.trim().to_string()).collect());
+        let stages: Vec<String> = line.split(" then ").map(|s| s.trim().to_string()).collect();
+        if stages.len() >= 2 && stages.iter().all(|s| !s.is_empty()) {
+            return Some(stages);
         }
     }
     None

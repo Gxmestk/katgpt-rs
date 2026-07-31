@@ -11,12 +11,12 @@
 
 #![cfg(feature = "chain_fold")]
 
+use katgpt_rs::types::Rng;
 use katgpt_speculative::fold::{
     AttentionImportance, ChainFolder, FoldBandit, FoldCache, FoldContext, FoldDecision, FoldResult,
     FoldStats, StepBoundary, count_steps, detect_step_boundaries, fold_thinking_feedback,
     step_reduction_ratio, token_reduction_ratio,
 };
-use katgpt_rs::types::Rng;
 use std::hint::black_box;
 use std::time::Instant;
 

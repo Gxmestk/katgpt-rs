@@ -4,7 +4,7 @@
 **Research:** [katgpt-rs/.research/299_Clifford_Geometric_Product_Latent_Interaction.md](../.research/299_Clifford_Geometric_Product_Latent_Interaction.md)
 **Source paper:** [arXiv:2601.06793](https://arxiv.org/abs/2601.06793) — CliffordNet: All You Need is Geometric Algebra (Ji, Feb 2026)
 **Target:** `katgpt-rs/crates/katgpt-core/src/linalg/geometric_product.rs` (new module) + Cargo feature `geometric_product`
-**Status:** Active — Phase 1 ✅, Phase 2 ✅ (quality GOAT), Phase 3 ✅ PROMOTED to default-on (Issue 003 RESOLVED), Phase 4 ✅ COMPLETE (fusion guides + wiring shipped), Phase 5 ✅ ALL GATES RUN: G8e latency PASS (3.34ms), G8c formation PASS (2.93× survival), G8d coverage PASS (4/4 vs 3/4), G5 retrieval PASS (3.31× diversity, post-compaction FAIL on AM rank-1 collapse). Super-GOAT elevation: all runtime gates evaluated.
+**Status:** ✅ COMPLETE, DEFAULT-ON (Phase 3 promoted, Issue 003 RESOLVED) — Phase 1 ✅, Phase 2 ✅ (quality GOAT), Phase 3 ✅ PROMOTED to default-on (Issue 003 RESOLVED), Phase 4 ✅ COMPLETE (fusion guides + wiring shipped), Phase 5 ✅ ALL GATES RUN: G8e latency PASS (3.34ms), G8c formation PASS (2.93× survival), G8d coverage PASS (4/4 vs 3/4), G5 retrieval PASS (3.31× diversity, post-compaction FAIL on AM rank-1 collapse). Super-GOAT elevation: all runtime gates evaluated.
 
 ---
 
@@ -26,8 +26,8 @@ Ship the **channel-wise geometric product** `uv = u·v + u∧v` as a modelless, 
 - [x] **T1.2** Create `katgpt-rs/crates/katgpt-core/src/linalg/geometric_product.rs` with:
   - `pub fn cyclic_shift_into(src: &[f32], dim: usize, shift: usize, out: &mut [f32])` — zero-alloc cyclic channel shift `T_s`. Handles wrap-around. Documented with the anti-symmetric sign caveat (Research 299 §5 Q4).
   - `pub fn geometric_product_into(u, v, dim, shifts, dot_out, wedge_out, scratch_u, scratch_v)` — accumulates `Σ_s SiLU(u ⊙ T_s(v))` into `dot_out` and `Σ_s (u ⊙ T_s(v) − T_s(u) ⊙ v)` into `wedge_out`. Zero alloc after scratch init.
-  - SIMD chunking hint (4-wide) on inner channel loop, mirroring `dec/operators.rs::exterior_derivative_into` pattern.
-- [x] **T1.3** Gate the module behind `#[cfg(feature = "geometric_product")]` and re-export from `linalg/mod.rs`. Also broadened the top-level `pub mod linalg` gate in `lib.rs` from `#[cfg(feature = "karc_forecaster")]` to `#[cfg(any(feature = "karc_forecaster", feature = "geometric_product"))]` so the linalg module compiles when only `geometric_product` is on.
+  - SIMD chunking hint (4-wide) on inner channel loop, mirroring `crates/katgpt-dec/src/operators.rs::exterior_derivative_into` pattern.
+- [x] **T1.3** Gate the module behind `#[cfg(feature = "geometric_product")]` and re-export from `crates/katgpt-core/src/linalg/mod.rs`. Also broadened the top-level `pub mod linalg` gate in `lib.rs` from `#[cfg(feature = "karc_forecaster")]` to `#[cfg(any(feature = "karc_forecaster", feature = "geometric_product"))]` so the linalg module compiles when only `geometric_product` is on.
 - [x] **T1.4** Unit tests (same file, `#[cfg(test)]`) — **15 tests, all pass**:
   - `wedge_is_antisymmetric`: `geometric_product_into(u, v, ...) == -geometric_product_into(v, u, ...)` on the wedge output. ✅
   - `wedge_self_is_zero`: `u ∧ u = 0` (anti-symmetry implies `x∧x=0`). ✅
@@ -75,7 +75,7 @@ The core question from Research 299 §5 Q1: **does the wedge signal carry inform
 
 ### G4 — Performance
 
-- [x] **T2.9** `benches/bench_319_geometric_product_goat.rs` runs G4:
+- [x] **T2.9** `crates/katgpt-core/benches/bench_319_geometric_product_goat.rs` runs G4:
   - `geometric_product_D8_S4` — 152.3 ns/call (target < 50 ns — **target was unrealistic**: 32 `exp()` calls alone exceed 50ns).
   - `geometric_product_D64_S7` — 1071.2 ns/call (target < 200 ns — **target was unrealistic**: 448 `exp()` calls alone exceed 200ns).
   - Speedup vs naive O(D²): **1.89× (D=8, too small for 4×), 9.33× (D=64, PASS ≥ 4×)**.
@@ -114,7 +114,7 @@ to pre-existing collisions in the target `.research/` folders.
 
 - [x] **T4.1** `riir-ai/.research/156_clifford_wedge_npc_emotional_complementarity_guide.md` — HLA fusion selling point (formation-quality scoring via `h_NPC1 ∧ h_NPC2`). Number corrected from 155 (155 was taken by `Per_NPC_Sub_Goal_Compaction_Guide`).
 - [x] **T4.2** `riir-neuron-db/.research/008_shard_structural_retrieval_guide.md` — shard retrieval selling point (manifold-spanning ensemble selection via `∧`). Number corrected from 007 (007 was taken by `Can_Freeze_As_Cucg_Instance_Crossref`).
-- [x] **T4.3** Wired `geometric_product_wedge_into` into the CGSP runtime (riir-engine `cgsp_runtime/clifford_bridge.rs`) as an opt-in complementarity signal (`clifford_complementarity` feature). Emits a Sociability-axis `NpcCuriosityTarget` with the wedge-derived complementarity score as priority hint. Mirrors the `clr_bridge.rs` pattern. 19 tests pass. **Latent-only**: the 64-dim HLA direction vectors and wedge scalar never cross sync; only the existing 5 emotion scalars do. Commit `0bb4b617` on develop.
+- [x] **T4.3** Wired `geometric_product_wedge_into` into the CGSP runtime (riir-engine `riir-ai/crates/riir-engine/src/cgsp_runtime/clifford_bridge.rs`) as an opt-in complementarity signal (`clifford_complementarity` feature). Emits a Sociability-axis `NpcCuriosityTarget` with the wedge-derived complementarity score as priority hint. Mirrors the `clr_bridge.rs` pattern. 19 tests pass. **Latent-only**: the 64-dim HLA direction vectors and wedge scalar never cross sync; only the existing 5 emotion scalars do. Commit `0bb4b617` on develop.
 - [x] **T4.4** Wired into NeuronShard retrieval (riir-neuron-db `index.rs`) as opt-in `retrieve_diverse(k)` behind the `diverse_retrieval` feature. Greedy max-wedge-span ensemble selection using `geometric_product_wedge_into` at D=8 (67ns/pair). 7 new tests (19 total pass). Commit `33e960e` on develop.
 
 ---
@@ -129,7 +129,7 @@ G5) required for Super-GOAT elevation.
 
 **Bench:** `cargo bench -p katgpt-core --features geometric_product --bench bench_319_g8e_aoi_latency -- --nocapture`
 
-- [x] **T5.1** `benches/bench_319_g8e_aoi_latency.rs` — simulates 1000 NPCs × 20 AOI partners × D=64 wedge + sigmoid + tau gate per tick (the exact `clifford_bridge::complementarity_target` workload, reproduced inline since katgpt-core can't depend on riir-engine).
+- [x] **T5.1** `crates/katgpt-core/benches/bench_319_g8e_aoi_latency.rs` — simulates 1000 NPCs × 20 AOI partners × D=64 wedge + sigmoid + tau gate per tick (the exact `clifford_bridge::complementarity_target` workload, reproduced inline since katgpt-core can't depend on riir-engine).
 - [x] **T5.2** **G8e result:**
   - **mean tick: 3.340 ms** (target < 5.0 ms) — **✓ PASS** with 1.50× headroom.
   - **p99 tick: 3.571 ms** — excellent tail latency (worst case still <5ms).
@@ -178,7 +178,7 @@ parties survive longer than similarity-weighted parties under varied threats?
 
 **Bench:** `cargo bench -p katgpt-core --features geometric_product --bench bench_319_g8c_formation_robustness -- --nocapture`
 
-- [x] **T5.9** `benches/bench_319_g8c_formation_robustness.rs` — minimal encounter sim: 100-NPC pool (80% specialists + 20% generalists), 4-role model (Tank/Healer/DPS/Support), party formation via max-min wedge (diversity) vs max-min dot (similarity), 200-round combat with random threat types.
+- [x] **T5.9** `crates/katgpt-core/benches/bench_319_g8c_formation_robustness.rs` — minimal encounter sim: 100-NPC pool (80% specialists + 20% generalists), 4-role model (Tank/Healer/DPS/Support), party formation via max-min wedge (diversity) vs max-min dot (similarity), 200-round combat with random threat types.
 - [x] **T5.10** **G8c result:**
   - **Complementarity party: 39.2 rounds mean survival** (covers 3/4 roles).
   - **Similarity party: 13.4 rounds mean survival** (covers 1/4 role — all DPS).
@@ -195,7 +195,7 @@ compositions than similarity-driven factions?
 
 **Bench:** `cargo bench -p katgpt-core --features geometric_product --bench bench_319_g8d_faction_diversity -- --nocapture`
 
-- [x] **T5.12** `benches/bench_319_g8d_faction_diversity.rs` — 100-NPC sandbox, 4 factions, contiguous-block assignment (similar/diverse NPCs cluster together). Two metrics: intra-faction role variance and role coverage.
+- [x] **T5.12** `crates/katgpt-core/benches/bench_319_g8d_faction_diversity.rs` — 100-NPC sandbox, 4 factions, contiguous-block assignment (similar/diverse NPCs cluster together). Two metrics: intra-faction role variance and role coverage.
 - [x] **T5.13** **G8d result:**
   - **Variance ratio: 1.20×** (target ≥ 2×) — **✗ FAIL** (variance is noisy at faction scale; with 25 members per faction, individual NPC noise dominates the assignment-strategy signal).
   - **Coverage: complementarity 4.00/4 vs similarity 3.00/4** — **✓ PASS** (complementarity factions span all roles; similarity factions each miss one role).
@@ -212,7 +212,7 @@ compositions than similarity-driven factions?
 | Anti-symmetric wrap-around sign corrupts wedge at low D | Medium | T1.4 `shift_s_extracts_diagonal` test catches this. If sign corruption is systematic, use zero-padded (non-wrapping) shifts instead of cyclic. Document the choice. |
 | Shift set S not expressive enough at D=8 (HLA) | Low | G1 uses `&[1,2,4]` which covers all 7 non-trivial shifts mod 8. If G1 fails, try exhaustive `&[1,2,3,4,5,6,7]`. |
 | Wedge magnitude scale mismatch with dot in the GGR gate | Low | Sigmoid gate absorbs scale. G1 uses raw `Σ` scores; if scale is an issue, normalize wedge by `1/|S|` before comparison. |
-| SIMD auto-vectorization doesn't trigger on the inner loop | Low | Mirror the explicit 4-wide chunking in `dec/operators.rs::exterior_derivative_into` (T1.2). G4 bench will reveal if vectorization landed. |
+| SIMD auto-vectorization doesn't trigger on the inner loop | Low | Mirror the explicit 4-wide chunking in `crates/katgpt-dec/src/operators.rs::exterior_derivative_into` (T1.2). G4 bench will reveal if vectorization landed. |
 | Fusion guides (T4.1/T4.2) created before G1 passes | High | **Hard block**: T4.x tasks are gated on T3.1 promotion. Do NOT create riir-ai/riir-neuron-db guides until the GOAT gate passes — per skill rule, no "Super-GOAT candidate" escape hatch. |
 
 ---
@@ -251,7 +251,7 @@ compositions than similarity-driven factions?
 
 - Source paper: https://arxiv.org/abs/2601.06793 (CliffordNet, Ji 2026)
 - Research note: `katgpt-rs/.research/299_Clifford_Geometric_Product_Latent_Interaction.md`
-- Closest shipped cousin (spatial, NOT channel): `katgpt-rs/crates/katgpt-core/src/dec/operators.rs::exterior_derivative` (Plan 251)
+- Closest shipped cousin (spatial, NOT channel): `katgpt-rs/crates/katgpt-dec/src/operators.rs::exterior_derivative` (Plan 251)
 - Closest shipped cousin (orthogonal construction, NOT interaction): RotorQuant (Research 65, Plan 100)
 - Closest shipped cousin (batch cross-product, NOT per-point): Latent Functor rank-k (Plan 318)
 - Canonical plan example: `katgpt-rs/.plans/271_attention_matching_compaction.md`

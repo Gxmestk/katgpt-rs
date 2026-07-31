@@ -342,6 +342,7 @@ pub fn angular_change(curr_step: &[f32], prev_step: &[f32]) -> f32 {
 /// row, or a matrix with no variance (all eigenvalues ≈ 0).
 #[inline]
 pub fn hidden_erank(hidden: &[f32], s: usize, d: usize, scratch_sv: &mut [f32]) -> f32 {
+    use crate::simd::fast_exp;
     // ── Degenerate cases ───────────────────────────────────────────
     // Empty or single-row input has no variance to measure.
     if s == 0 || d == 0 {
@@ -463,7 +464,7 @@ pub fn hidden_erank(hidden: &[f32], s: usize, d: usize, scratch_sv: &mut [f32]) 
             entropy -= lam * lam.ln();
         }
     }
-    entropy.exp()
+    fast_exp(entropy)
 }
 
 /// In-place Jacobi eigenvalue iteration on a symmetric `dim × dim` matrix.

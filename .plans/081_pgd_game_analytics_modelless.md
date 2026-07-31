@@ -52,7 +52,7 @@ Must validate all gates before Phase 2 integration. Run via `cargo test -p katgp
 
 ### Phase 0: Data Bridge (Natsukaze → Analytics)
 
-- [x] **T0: Add `samples_to_replay()` conversion** — `src/pruners/go/analytics.rs`
+- [x] **T0: Add `samples_to_replay()` conversion** — `crates/katgpt-pruners/src/go/analytics.rs`
   - Implemented `RawGoSample` + `RawGoAction` structs (decoupled from riir-gpu's `GoGameSample`)
   - Implemented `samples_to_replay(samples: &[RawGoSample], komi: f32) -> Result<GoReplay, String>`
   - Implemented `split_samples_into_games(samples: &[RawGoSample]) -> Vec<Vec<&RawGoSample>>`
@@ -65,7 +65,7 @@ Must validate all gates before Phase 2 integration. Run via `cargo test -p katgp
 
 ### Phase 1: Core Analytics Module
 
-- [x] **T1: Create `GoGameAnalytics` struct** — `src/pruners/go/analytics.rs`
+- [x] **T1: Create `GoGameAnalytics` struct** — `crates/katgpt-pruners/src/go/analytics.rs`
   - New file with `GoGameAnalytics` struct holding all PGD-derived features
   - `pub struct GoGameAnalytics` with fields:
     - `win_rate_trace: Vec<f32>` — GoHeuristic evaluated at each move (Black perspective)
@@ -81,7 +81,7 @@ Must validate all gates before Phase 2 integration. Run via `cargo test -p katgp
   - Use `GoCellSer` from replay module for serializable winner field
   - Derive `Serialize, Deserialize, Clone, Debug`
 
-- [x] **T2: Implement `compute_analytics()` function** — `src/pruners/go/analytics.rs`
+- [x] **T2: Implement `compute_analytics()` function** — `crates/katgpt-pruners/src/go/analytics.rs`
   - Takes `&GoReplay` input, returns `GoGameAnalytics`
   - Algorithm:
     1. Replay all moves from GoReplay, building intermediate state at each step
@@ -135,7 +135,7 @@ Must validate all gates before Phase 2 integration. Run via `cargo test -p katgp
   - Requires `pub fn categorize_move()` from players.rs (make public if not already)
   - **GOAT gate:** ✅ PASS — Distribution sums to 1.000 within 0.01 tolerance across all tested games
 
-- [x] **T8: Wire into `mod.rs`** — `src/pruners/go/mod.rs`
+- [x] **T8: Wire into `mod.rs`** — `crates/katgpt-pruners/src/go/mod.rs`
   - Add `pub mod analytics;`
   - Re-export: `pub use analytics::{GoGameAnalytics, compute_analytics};`
 
@@ -215,5 +215,5 @@ Phase 2 (T10-T12) are integration tasks that use analytics features. The model-b
 - **Our data source:** Natsukaze 9×9 via Plan 083 (`.flat.zip`), Plan 084 (LoRA training)
 - Our Go engine: `.docs/14_go_arena.md`, Plan 065
 - Our G-Zero self-play: Plan 049
-- Our heuristic: `src/pruners/go/state.rs:GoHeuristic`
-- riir-ai data loading: `crates/riir-gpu/src/game/go.rs:load_flat_zip()`
+- Our heuristic: `crates/katgpt-pruners/src/go/state.rs:GoHeuristic`
+- riir-ai data loading: `riir-ai/crates/riir-gpu/src/game/go.rs:load_flat_zip()`

@@ -19,7 +19,7 @@ const HULL_TOL: f32 = 1e-4;
 
 /// Returns `true` iff `soft_embed` lies inside the per-dim
 /// `[min_v e(v)[d], max_v e(v)[d]]` box of the vocabulary embeddings, within
-/// [`HULL_TOL`] absolute slack (to absorb f32 rounding in the SIMD accumulate).
+/// `HULL_TOL` absolute slack (to absorb f32 rounding in the SIMD accumulate).
 ///
 /// `soft_embed`: length `embedding_dim`.
 /// `embedding_matrix`: flattened `[vocab, embedding_dim]` row-major.

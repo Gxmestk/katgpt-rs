@@ -1,10 +1,15 @@
 # GOAT Proof 237: Schema-Centroid Informed KG Embedding Initialization
 
+> **UPDATE 2026-07-18 (status sync):** `schema_centroid` is **default-on** in
+> the root `Cargo.toml` (`default = [...]`). The `(opt-in)` label below was
+> stale relative to the Cargo.toml default list. The "promote to default-ON
+> candidate" note in the Status line is now resolved — promotion landed.
+
 **Date:** 2026-06-09
 **Plan:** 237
 **Research:** 210 (Schema Centroid Informed Init)
-**Feature gate:** `schema_centroid` (opt-in)
-**Status:** ✅ GOAT 7/7 PASS — **promote to default-ON candidate**
+**Feature gate:** `schema_centroid` (**default-on in root Cargo.toml**)
+**Status:** ✅ GOAT 7/7 PASS — promoted to default-on (see banner above)
 
 ---
 
@@ -54,10 +59,10 @@ running 11 tests — 11 passed; 0 failed
 
 | Component | Tests | File |
 |-----------|-------|------|
-| `CentroidStats`, `compute_centroid` | 3 + 1 GOAT | `crates/katgpt-core/src/sense/schema_centroid.rs` |
-| `SchemaCentroidCache` | 2 + 1 GOAT | `crates/katgpt-core/src/sense/schema_centroid.rs` |
-| `schema_init_entity` | 5 + 1 GOAT | `crates/katgpt-core/src/sense/schema_centroid.rs` |
-| `build_from_centroid` | 2 + 1 GOAT | `crates/katgpt-core/src/sense/octree.rs` |
+| `CentroidStats`, `compute_centroid` | 3 + 1 GOAT | `crates/katgpt-sense/src/schema_centroid.rs` |
+| `SchemaCentroidCache` | 2 + 1 GOAT | `crates/katgpt-sense/src/schema_centroid.rs` |
+| `schema_init_entity` | 5 + 1 GOAT | `crates/katgpt-sense/src/schema_centroid.rs` |
+| `build_from_centroid` | 2 + 1 GOAT | `crates/katgpt-sense/src/octree.rs` |
 | GOAT proof + benchmarks | 11 | `tests/bench_237_schema_centroid_goat.rs` |
 | **Total** | **26** | |
 

@@ -4,7 +4,7 @@
 **Research:** [katgpt-rs/.research/284_Simplicity_Bias_Sampler_Coincidence_Extrema.md](../.research/284_Simplicity_Bias_Sampler_Coincidence_Extrema.md)
 **Private guide:** [riir-ai/.research/150_Algorithmic_Probability_Sampler_NPC_Guide.md](../../riir-ai/.research/150_Algorithmic_Probability_Sampler_NPC_Guide.md) — **PRIVATE, do not export**
 **Source paper:** [Dingle & Hutter, *Entropy* 28(2):226, 2026](https://www.mdpi.com/1099-4300/28/2/226) — Simplicity and Complexity in Combinatorial Optimization
-**Target:** `katgpt-rs/src/screening/complexity_prior.rs` + `katgpt-rs/src/screening/coincidence_gate.rs`
+**Target:** `katgpt-rs/crates/katgpt-pruners/src/screening/complexity_prior.rs` + `katgpt-rs/crates/katgpt-pruners/src/screening/coincidence_gate.rs`
 **Feature:** `complexity_prior_sampler` (off by default until GOAT gate passes)
 **Status:** ✅ Phase 1+2+3 complete (2026-06-23). **PROMOTED to default feature** (T2.4 — coordinator reviewed `.benchmarks/305_complexity_prior_sampler_goat.md`, confirmed G2 majority-pass + G1 5/5 safety, flipped Cargo.toml default). Phase 4 (riir-ai wiring) + Phase 5 (riir-chain/neuron-db) deferred to those repos.
 
@@ -28,10 +28,10 @@ Implement two open primitives distilled from Dingle–Hutter 2026 (Research 284)
 
 ### Tasks
 
-- [x] **T1.1** Create `katgpt-rs/src/screening/complexity_prior.rs` with: — **DEVIATION:** `ruliology/irreducibility.rs`'s `rle_compress` is private (`fn`, not `pub fn`) and operates on `WinMatrix`, not raw bytes. Implemented self-contained `rle_compressed_len` (zero-alloc, counts runs) and `shannon_entropy_bits` inline.
+- [x] **T1.1** Create `katgpt-rs/crates/katgpt-pruners/src/screening/complexity_prior.rs` with: — **DEVIATION:** `crates/katgpt-ruliology/src/irreducibility.rs`'s `rle_compress` is private (`fn`, not `pub fn`) and operates on `WinMatrix`, not raw bytes. Implemented self-contained `rle_compressed_len` (zero-alloc, counts runs) and `shannon_entropy_bits` inline.
   - `pub trait ComplexityProxy { fn k_tilde<T: AsRef<[u8]>>(&self, candidate: T) -> f32; }`
-  - `pub struct RleComplexity;` — re-export `rle_compress` from `ruliology/irreducibility.rs`, compute `compressed_len / raw_len`
-  - `pub struct EntropyComplexity;` — re-export Shannon entropy kernel from `ruliology/irreducibility.rs` (already SIMD-friendly)
+  - `pub struct RleComplexity;` — re-export `rle_compress` from `crates/katgpt-ruliology/src/irreducibility.rs`, compute `compressed_len / raw_len`
+  - `pub struct EntropyComplexity;` — re-export Shannon entropy kernel from `crates/katgpt-ruliology/src/irreducibility.rs` (already SIMD-friendly)
   - `pub struct L1Complexity;` — sum of `|x|` over the byte slice (R125 sandwich bound proxy for fixed-precision latents)
   - `pub struct Lz4Complexity;` — lazily-initialized lz4 encoder (Warm tier; behind sub-feature `lz4_proxy` to keep the default zero-dep)
   - All proxies `#[inline]`, zero-allocation, `const fn new()` where possible
@@ -50,7 +50,7 @@ Implement two open primitives distilled from Dingle–Hutter 2026 (Research 284)
   - Same `log_prob` / `sample_ix` / `top_k` API
   - Quantization is zero-allocation: caller provides scratch buffer
 
-- [x] **T1.4** Create `katgpt-rs/src/screening/coincidence_gate.rs` with: — **DEVIATION:** `SmallVec<[usize; 8]>` return type replaced with `Vec<usize>` (smallvec not in deps). Simplified `probe_transfer<F>(..., objectives: &[F], ...)` signature (per implementation hand-off). Uses `fastrand::Rng` for the random sample (not on the per-tick hot path).
+- [x] **T1.4** Create `katgpt-rs/crates/katgpt-pruners/src/screening/coincidence_gate.rs` with: — **DEVIATION:** `SmallVec<[usize; 8]>` return type replaced with `Vec<usize>` (smallvec not in deps). Simplified `probe_transfer<F>(..., objectives: &[F], ...)` signature (per implementation hand-off). Uses `fastrand::Rng` for the random sample (not on the per-tick hot path).
   - `pub struct CoincidenceGate { simple_set_size_estimate: f32 }` — threshold τ on `|X_O(1)|`; above τ → optimistic transfer probe, below τ → skip
   - `pub fn probe_transfer<F, I>(&self, x_star: &[u8], objectives: I, rank_threshold_r: usize) -> Vec<usize>` where `F: Fn(&[u8]) -> f32`, `I: IntoIterator<Item = F>` — returns indices of `f2_k` where `x*` ranks in top-r
   - `pub fn should_probe(&self, k_tilde_of_f2: f32) -> bool` — skip if `f2` is complex (high-K reward function)
@@ -61,7 +61,7 @@ Implement two open primitives distilled from Dingle–Hutter 2026 (Research 284)
   - Sub-feature `lz4_proxy` adds `lz4` dep (for `Lz4Complexity`) — **stub only in Phase 1; activation deferred to Phase 2+**
   - Sub-feature `blake3_proxy` adds `blake3` dep (for `Blake3CanonicalLengthComplexity`, used by `riir-neuron-db`) — **stub only in Phase 1; activation deferred to Phase 2+**
 
-- [x] **T1.6** Re-export from `katgpt-rs/src/screening/mod.rs` and `katgpt-rs/src/lib.rs`:
+- [x] **T1.6** Re-export from `katgpt-rs/crates/katgpt-pruners/src/screening/mod.rs` and `katgpt-rs/src/lib.rs`:
   - `pub use complexity_prior::{ComplexityProxy, CompressionPriorSampler, LatentCompressionPriorSampler, RleComplexity, EntropyComplexity, L1Complexity};`
   - `pub use coincidence_gate::CoincidenceGate;`
   - Gated by `#[cfg(feature = "complexity_prior_sampler")]`
@@ -120,16 +120,16 @@ Implement two open primitives distilled from Dingle–Hutter 2026 (Research 284)
 
 ### Tasks
 
-- [x] **T3.1** Add adapter trait impl for MCTS — **DEVIATION:** actual path is `katgpt-rs/src/pruners/game_state/mcts.rs` (NOT `katgpt-rs/src/mcts.rs` as originally written). MCTS is generic over `S: GameState` with opaque `S::Action`; direct wiring would require threading `CompressionPriorSampler<K>` + an `Action → &[u8]` encoding hook through `mcts_search_impl` / `select_inline` / `expand_and_rollout`. Too invasive for the open-primitive landing. **Adapter-only seam shipped** at `katgpt-rs/src/screening/integration_mcts.rs`: `MctsExpansionPrior` trait with `UniformExpansion` (returns 0.0, byte-identical to pre-Plan-305) and `KPriorExpansion` (delegates to `sampler.log_prob`). Module doc documents the caller-side wiring pattern (encode unexpanded actions as `&[u8]`, call `sampler.sample_ix`). Gated by `mcts_k_prior`. 3/3 tests pass.
+- [x] **T3.1** Add adapter trait impl for MCTS — **DEVIATION:** actual path is `katgpt-rs/crates/katgpt-pruners/src/game_state/mcts.rs` (NOT `katgpt-rs/crates/katgpt-core/src/mcts.rs` as originally written). MCTS is generic over `S: GameState` with opaque `S::Action`; direct wiring would require threading `CompressionPriorSampler<K>` + an `Action → &[u8]` encoding hook through `mcts_search_impl` / `select_inline` / `expand_and_rollout`. Too invasive for the open-primitive landing. **Adapter-only seam shipped** at `katgpt-rs/crates/katgpt-pruners/src/screening/integration_mcts.rs`: `MctsExpansionPrior` trait with `UniformExpansion` (returns 0.0, byte-identical to pre-Plan-305) and `KPriorExpansion` (delegates to `sampler.log_prob`). Module doc documents the caller-side wiring pattern (encode unexpanded actions as `&[u8]`, call `sampler.sample_ix`). Gated by `mcts_k_prior`. 3/3 tests pass.
   - `MctsExpansionPrior` trait with default impl `UniformExpansion`
   - New impl `KPriorExpansion<K: ComplexityProxy>` gated by `mcts_k_prior` sub-feature
   - Zero-cost when feature is off (existing `UniformExpansion` unchanged)
 
-- [x] **T3.2** Add integration for bandit — **DEVIATION:** `katgpt-rs/src/pruners/bandit.rs` has a `BanditStrategy` enum with 10+ variants, each with match arms in `arm_bandit_score` / `select_arm`. Adding a `KPrior` variant would require new arms in every match. **Adapter-only wrapper shipped** at `katgpt-rs/src/screening/integration_bandit.rs`: `KPriorBandit<K>` wraps a `CompressionPriorSampler<K>` and exposes `arm_log_prior(&[u8])` that the caller adds to their existing arm score. Does NOT implement a bandit policy — decoupled from the strategy enum. Gated by `bandit_k_prior`. 3/3 tests pass.
+- [x] **T3.2** Add integration for bandit — **DEVIATION:** `katgpt-rs/crates/katgpt-ruliology/src/bandit.rs` has a `BanditStrategy` enum with 10+ variants, each with match arms in `arm_bandit_score` / `select_arm`. Adding a `KPrior` variant would require new arms in every match. **Adapter-only wrapper shipped** at `katgpt-rs/crates/katgpt-pruners/src/screening/integration_bandit.rs`: `KPriorBandit<K>` wraps a `CompressionPriorSampler<K>` and exposes `arm_log_prior(&[u8])` that the caller adds to their existing arm score. Does NOT implement a bandit policy — decoupled from the strategy enum. Gated by `bandit_k_prior`. 3/3 tests pass.
   - New bandit variant `KPriorBandit<K>` that biases arm selection by `sigmoid(-α·K̃(arm) - β)`
   - Gated by `bandit_k_prior` sub-feature
 
-- [x] **T3.3** Add speculative drafter hook — **DEVIATION:** `katgpt-rs/src/speculative/` + `katgpt-rs/crates/katgpt-core/src/compression_drafter.rs` define many drafter flavours (NF-Flow, Domino, DFlash, Echo, Compression, Dendritic, ...) each with its own trait surface; a single wrapping trait would over-constrain the API. **Post-drafting re-ranker shipped** at `katgpt-rs/src/screening/integration_spec.rs`: `KPriorDrafter<K>::rerank(&[&[u8]], &mut [f32], &mut [f32])` adds `sampler.log_prob(draft_i)` to `scores[i]` in place; caller sorts after. Zero-allocation (caller-provided scratch). Composes cleanly with `CompressionDrafter` (R256) and `DendriticGate` (R260) since both produce `(token, score)` pairs. Gated by `spec_k_prior`. 3/3 tests pass.
+- [x] **T3.3** Add speculative drafter hook — **DEVIATION:** `katgpt-rs/src/speculative/` + `katgpt-rs/crates/katgpt-core/src/compression_drafter.rs` define many drafter flavours (NF-Flow, Domino, DFlash, Echo, Compression, Dendritic, ...) each with its own trait surface; a single wrapping trait would over-constrain the API. **Post-drafting re-ranker shipped** at `katgpt-rs/crates/katgpt-pruners/src/screening/integration_spec.rs`: `KPriorDrafter<K>::rerank(&[&[u8]], &mut [f32], &mut [f32])` adds `sampler.log_prob(draft_i)` to `scores[i]` in place; caller sorts after. Zero-allocation (caller-provided scratch). Composes cleanly with `CompressionDrafter` (R256) and `DendriticGate` (R260) since both produce `(token, score)` pairs. Gated by `spec_k_prior`. 3/3 tests pass.
   - `KPriorDrafter<K>` wraps an existing drafter, re-ranking drafts by K-prior
   - Composes cleanly with `CompressionDrafter` (R256) and `DendriticGate` (R260)
   - Gated by `spec_k_prior` sub-feature

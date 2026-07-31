@@ -36,8 +36,11 @@
 //! # Feature gate
 //!
 //! Entire module is `#[cfg(feature = "non_interference_branches")]`. Zero cost
-//! when disabled — every public API vanishes from the build. Opt-in until the
-//! G1–G5 GOAT gate passes (Phase 3).
+//! when disabled — every public API vanishes from the build. **DEFAULT-ON**
+//! since Plan 329 Phase 3 (2026-06-26) — G1–G5 GOAT gate ALL PASS (8 orthogonal
+//! directions in D=8, route 301.5ns<1µs, 0 allocs/100 calls, [] deps, 101/101
+//! tests). The feature is in `default = [...]` of both katgpt-core and katgpt-rs
+//! root. See `.benchmarks/329_*` for the GOAT gate evidence.
 //!
 //! # Composition
 //!
@@ -48,10 +51,10 @@
 //!
 //! # References
 //!
-//! - Plan: [`katgpt-rs/.plans/329_non_interference_memory_branches.md`]
-//! - Research: [`katgpt-rs/.research/310_RIZZ_Non_Interference_Memory_Branches.md`]
+//! - Plan: `katgpt-rs/.plans/329_non_interference_memory_branches.md`
+//! - Research: `katgpt-rs/.research/310_RIZZ_Non_Interference_Memory_Branches.md`
 //! - Source paper: [arXiv:2606.20638](https://arxiv.org/abs/2606.20638)
-//! - Private guide: [`riir-ai/.research/161_Per_NPC_Cognitive_Branch_Continual_Adaptation_Guide.md`]
+//! - Private guide: `riir-ai/.research/161_Per_NPC_Cognitive_Branch_Continual_Adaptation_Guide.md`
 //! - Fusion cousins: Plan 236 (BAKE), Plan 284/316 (CLR), progressive_mcgs/,
 //!   Plan 299 (Engram), Plan 327 (ARG), Plan 290 (closure-instrument),
 //!   Plan 303 (Salience)
@@ -63,6 +66,7 @@ mod composition;
 pub mod projection;
 pub mod router;
 pub mod types;
+pub(crate) mod util;
 pub mod verifier;
 
 // ── Public API re-exports ─────────────────────────────────────────────────
@@ -86,8 +90,8 @@ pub use router::{
     BranchRouter, DEFAULT_TAU_JACCARD, DEFAULT_TAU_SNAP, DEFAULT_TAU_SPAWN, RouteMode, RouteResult,
 };
 pub use types::{
-    BranchId, BranchLifecycle, BranchStats, CognitiveBranch, EpisodicEntry, FailureEntry,
-    ProceduralRule,
+    BRANCH_TYPES_WIRE_VERSION, BranchId, BranchLifecycle, BranchStats, CognitiveBranch,
+    EpisodicCodec, EpisodicEntry, FailureEntry, ProceduralRule,
 };
 pub use verifier::{
     DEFAULT_QUARANTINE_CENTROID_THRESH, DEFAULT_TAU_CURIOSITY, DEFAULT_TAU_WRITE, VerifierGate,

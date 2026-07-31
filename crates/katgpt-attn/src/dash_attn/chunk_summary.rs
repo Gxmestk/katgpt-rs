@@ -67,7 +67,7 @@ impl ChunkSummaryQuery {
     /// Check if head_cls is effectively zero (mean-pooling mode).
     ///
     /// Returns a cached bool — O(1) instead of scanning the entire vector.
-    /// Call [`recompute_zero_init_cache`] after any direct mutation of `head_cls`.
+    /// Call [`recompute_zero_init_cache`](Self::recompute_zero_init_cache) after any direct mutation of `head_cls`.
     #[inline]
     pub fn is_zero_init(&self) -> bool {
         self.zero_init_cache
@@ -134,9 +134,7 @@ impl ChunkSummaryCache {
                         .collect()
                 })
                 .collect();
-            self.entropy_biases = (0..n_chunks)
-                .map(|_| vec![0.0; self.n_kv_head])
-                .collect();
+            self.entropy_biases = (0..n_chunks).map(|_| vec![0.0; self.n_kv_head]).collect();
         }
     }
 
@@ -201,7 +199,8 @@ pub fn summarize_chunk(
     head_idx: usize,
     head_dim: usize,
 ) -> Vec<f32> {
-    let (summary, _entropy) = summarize_chunk_with_entropy(query, chunk_keys, chunk_size, head_idx, head_dim);
+    let (summary, _entropy) =
+        summarize_chunk_with_entropy(query, chunk_keys, chunk_size, head_idx, head_dim);
     summary
 }
 
@@ -274,7 +273,10 @@ pub fn summarize_chunk_into(
 /// At zero-init `head_cls`, the softmax is uniform and `*entropy_out = ln(chunk_size)`
 /// (constant across chunks → no ranking change). For a peaked distribution
 /// (learned query concentrating on one token), `*entropy_out ≈ 0`.
-#[allow(clippy::too_many_arguments, reason = "hot-path summarizer; args are distinct query/chunk/out/scratch buffers")]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "hot-path summarizer; args are distinct query/chunk/out/scratch buffers"
+)]
 pub fn summarize_chunk_into_with_entropy(
     query: &ChunkSummaryQuery,
     chunk_keys: &[f32],
@@ -341,15 +343,13 @@ pub fn summarize_chunk_into_with_entropy(
     }
     *entropy_out = entropy;
 
-    // Weighted sum of keys → summary
+    // Weighted sum of keys → summary (SIMD scale-acc inner loop)
     out[..hd].fill(0.0);
     for (score, key_chunk) in scores_buf[..chunk_size]
         .iter()
         .zip(chunk_keys.chunks_exact(hd))
     {
-        for d in 0..hd {
-            out[d] += score * key_chunk[d];
-        }
+        katgpt_core::simd::simd_fused_scale_acc(&mut out[..hd], key_chunk, *score, hd);
     }
 }
 
@@ -367,35 +367,40 @@ fn mean_pool_keys_into(chunk_keys: &[f32], chunk_size: usize, head_dim: usize, o
     if chunk_size == 0 {
         return;
     }
-    // Accumulate all tokens
+    // Accumulate all tokens via SIMD add
     for t in 0..chunk_size {
         let k_start = t * head_dim;
-        for d in 0..head_dim {
-            out[d] += chunk_keys[k_start + d];
-        }
+        katgpt_core::simd::simd_add_inplace(
+            &mut out[..head_dim],
+            &chunk_keys[k_start..k_start + head_dim],
+        );
     }
     // Scale once at the end
     let inv = 1.0 / chunk_size as f32;
-    for d in out[..head_dim].iter_mut() {
-        *d *= inv;
-    }
+    katgpt_core::simd::simd_scale_inplace(&mut out[..head_dim], inv);
 }
 
 /// In-place softmax with max subtraction for numerical stability.
+///
+/// Uses reciprocal-multiply (1 division + N multiplies) instead of N divisions.
+///
+/// SIMD path: all three passes (max, exp+sum, normalize) use the Cephes-backed
+/// vectorized kernels from `katgpt_core::simd`. The exp+sum pass is fused into
+/// a single buffer traversal via `simd_exp_sum_inplace` (4-/8-wide depending
+/// on target). ~1.7× faster than libm `exp` on aarch64 for the exp pass; the
+/// max + scale passes auto-vectorize. The numerical result differs from the
+/// libm path by ≤1 ULP per element (Cephes accuracy floor); softmax
+/// normalization absorbs this into the final reciprocal-multiply.
 fn softmax_inplace(scores: &mut [f32]) {
     if scores.is_empty() {
         return;
     }
-    let max_val = scores.iter().copied().fold(f32::NEG_INFINITY, f32::max);
-    let mut sum_exp = 0.0f32;
-    for s in scores.iter_mut() {
-        *s = (*s - max_val).exp();
-        sum_exp += *s;
-    }
+    use katgpt_core::simd::{simd_add_scalar_inplace, simd_exp_sum_inplace, simd_max_f32, simd_scale_inplace};
+    let max_val = simd_max_f32(scores);
+    simd_add_scalar_inplace(scores, -max_val);
+    let sum_exp = simd_exp_sum_inplace(scores);
     if sum_exp > 0.0 {
-        for s in scores.iter_mut() {
-            *s /= sum_exp;
-        }
+        simd_scale_inplace(scores, 1.0 / sum_exp);
     }
 }
 
@@ -569,8 +574,7 @@ mod tests {
             0.0, 2.0, 0.0, 0.0, // token 1
             0.0, 0.0, 3.0, 0.0, // token 2
         ];
-        let (_summary, entropy) =
-            summarize_chunk_with_entropy(&query, &chunk_keys, 3, 0, HEAD_DIM);
+        let (_summary, entropy) = summarize_chunk_with_entropy(&query, &chunk_keys, 3, 0, HEAD_DIM);
         // Uniform distribution over 3 tokens: H = ln(3).
         let expected = 3.0f32.ln();
         assert!(
@@ -584,8 +588,7 @@ mod tests {
     fn test_entropy_bias_single_token_is_zero() {
         let query = ChunkSummaryQuery::new(1, HEAD_DIM);
         let chunk_keys: Vec<f32> = vec![4.0, 5.0, 6.0, 7.0];
-        let (_summary, entropy) =
-            summarize_chunk_with_entropy(&query, &chunk_keys, 1, 0, HEAD_DIM);
+        let (_summary, entropy) = summarize_chunk_with_entropy(&query, &chunk_keys, 1, 0, HEAD_DIM);
         assert!(
             entropy.abs() < 1e-6,
             "single-token entropy should be 0, got {entropy}"
@@ -601,7 +604,10 @@ mod tests {
         let chunk_b: Vec<f32> = vec![5.0, 0.0, 0.0, 0.0, 0.0, 6.0, 0.0, 0.0, 0.0, 0.0, 7.0, 0.0];
         let (_s_a, e_a) = summarize_chunk_with_entropy(&query, &chunk_a, 3, 0, HEAD_DIM);
         let (_s_b, e_b) = summarize_chunk_with_entropy(&query, &chunk_b, 3, 0, HEAD_DIM);
-        assert_eq!(e_a, e_b, "same-size zero-init chunks must have identical entropy");
+        assert_eq!(
+            e_a, e_b,
+            "same-size zero-init chunks must have identical entropy"
+        );
     }
 
     /// T5: With a non-trivial (peaked) `head_cls`, the softmax concentrates on
@@ -619,8 +625,7 @@ mod tests {
             0.0, 2.0, 0.0, 0.0, // token 1
             0.0, 0.0, 3.0, 0.0, // token 2
         ];
-        let (_summary, entropy) =
-            summarize_chunk_with_entropy(&query, &chunk_keys, 3, 0, HEAD_DIM);
+        let (_summary, entropy) = summarize_chunk_with_entropy(&query, &chunk_keys, 3, 0, HEAD_DIM);
         // Near-degenerate distribution → entropy ≈ 0.
         assert!(
             entropy < 0.01,
@@ -642,11 +647,7 @@ mod tests {
         query_peaked.head_cls[0..HEAD_DIM].copy_from_slice(&[0.0, 100.0, 0.0, 0.0]);
         query_peaked.recompute_zero_init_cache();
 
-        let chunk_keys: Vec<f32> = vec![
-            1.0, 0.0, 0.0, 0.0,
-            0.0, 2.0, 0.0, 0.0,
-            0.0, 0.0, 3.0, 0.0,
-        ];
+        let chunk_keys: Vec<f32> = vec![1.0, 0.0, 0.0, 0.0, 0.0, 2.0, 0.0, 0.0, 0.0, 0.0, 3.0, 0.0];
         let (_s_u, e_uniform) =
             summarize_chunk_with_entropy(&query_uniform, &chunk_keys, 3, 0, HEAD_DIM);
         let (_s_p, e_peaked) =
@@ -664,11 +665,7 @@ mod tests {
         let mut query = ChunkSummaryQuery::new(1, HEAD_DIM);
         query.head_cls[0..HEAD_DIM].copy_from_slice(&[0.0, 100.0, 0.0, 0.0]);
         query.recompute_zero_init_cache();
-        let chunk_keys: Vec<f32> = vec![
-            1.0, 0.0, 0.0, 0.0,
-            0.0, 2.0, 0.0, 0.0,
-            0.0, 0.0, 3.0, 0.0,
-        ];
+        let chunk_keys: Vec<f32> = vec![1.0, 0.0, 0.0, 0.0, 0.0, 2.0, 0.0, 0.0, 0.0, 0.0, 3.0, 0.0];
         let plain = summarize_chunk(&query, &chunk_keys, 3, 0, HEAD_DIM);
         let (entropy_summary, _e) =
             summarize_chunk_with_entropy(&query, &chunk_keys, 3, 0, HEAD_DIM);

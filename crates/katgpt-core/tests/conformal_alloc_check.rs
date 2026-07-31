@@ -19,7 +19,7 @@ fn g3_interval_into_zero_alloc_after_warmup() {
     let forecaster = SeasonalPoolForecaster::new(64, 12, 0.0, 0.0);
     let mut cal = ConformalIntervalCalibrator::new(
         forecaster,
-        8,  // 8 channels (HLA_DIM)
+        8,  // 8 channels (BELIEF_DIM)
         8,  // max_h
         12, // m
         64, // capacity per (channel, bucket)

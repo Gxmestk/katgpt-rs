@@ -25,7 +25,7 @@ SpecHop extends speculative execution from **token-level** to **hop-level** (too
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
 │                        SpecHopPipeline                              │
-│                     (src/spechop/pipeline.rs)                       │
+│                     (crates/katgpt-speculative/src/spechop/pipeline.rs)                       │
 │                                                                     │
 │  ┌─────────────┐    ┌─────────────┐    ┌──────────────────────┐    │
 │  │   Config     │    │  Speculator │    │      Verifier        │    │
@@ -298,7 +298,7 @@ SpecHop SKIPS when α ≥ 0.3 (speculator too slow relative to target tool)
 │ Parent tracking │ parent_path: u128       │ parent_idx: Option<usize>    │
 │ Verification    │ Exact logit match       │ ObservationVerifier (fuzzy)  │
 │ Granularity     │ Single token            │ Entire tool-call hop         │
-│ Module          │ src/speculative/        │ src/spechop/hop_tree.rs      │
+│ Module          │ src/speculative/        │ crates/katgpt-speculative/src/spechop/hop_tree.rs      │
 └─────────────────┴─────────────────────────┴──────────────────────────────┘
 ```
 
@@ -383,7 +383,7 @@ spechop = ["bandit"]  # Continuous multi-hop speculation pipeline (Plan 131)
 #[cfg(feature = "spechop")]
 pub mod spechop;
 
-// spechop/mod.rs — segment_match is gated on both features
+// crates/katgpt-speculative/src/spechop/mod.rs — segment_match is gated on both features
 #[cfg(all(feature = "spechop", feature = "cache_prune"))]
 pub mod segment_match;
 ```

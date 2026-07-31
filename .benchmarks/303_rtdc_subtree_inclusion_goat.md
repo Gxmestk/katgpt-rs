@@ -179,7 +179,7 @@ default). Promotion path:
    at depth 0 or 1 MUST enable it. Cost is bounded at 4.60× depth-2 verify.
 2. **Chain wiring (next task).** Add `chain_rtdc_subtree` feature in
    riir-chain that re-exports `SubtreeProof`, `prove_subtree_inclusion`,
-   `verify_subtree_inclusion`, plus glue in `encoding/rtdc_bridge.rs` for
+   `verify_subtree_inclusion`, plus glue in `riir-chain/src/encoding/rtdc_bridge.rs` for
    encoding `SubtreeProof` into a `TxDelta`. Deferred until a consumer needs
    it (riir-ai fog-of-war WASM verifier is the natural first consumer).
 3. **Default-ON.** Hold until (a) at least one chain consumer exists and

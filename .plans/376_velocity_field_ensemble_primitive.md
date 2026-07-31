@@ -8,6 +8,7 @@
 - Phase 4 (heterogeneous-D) → SHIPPED opt-in behind `velocity_field_ensemble_heterogeneous` (2026-07-04).
 - Phase 5 (LatCal commitment) → `riir-chain/.issues/003_velocity_field_ensemble_latcal_commitment.md` (deferred — belongs to riir-chain).
 - Phase 6 (UQ conformal floor) → SHIPPED (2026-07-04). Benchmark at `.benchmarks/376_uq_floor.md`; verdict BEATS FLOOR. Primitive still ships as non-UQ — the benchmark pre-validates the gate for any future UQ-bearing caller.
+  - **Update (2026-07-13, post-Plan-432-Phase-2):** The anticipated future UQ-bearing caller — VFD (Plan 432) — ran its own G2 UQ floor gate and FAILED (optimal λ*=0 on both AR(1) + bimodal corpora; VFD's epistemic scaling adds zero calibrated-UQ value). VFD did NOT promote to default-on and does NOT activate this ensemble's UQ gate. The ensemble's UQ claim stands independently (Plan 376 Phase 6); VFD does not upgrade it. Canonical record: `.benchmarks/432_vfd_goat.md`. The hypothetical "future UQ-bearing caller" gate remains open — VFD was a candidate that did not clear it.
 
 ---
 
@@ -61,8 +62,8 @@ The §3.6 rule requires a head-to-head PoC before any quality-parity claim. Phas
 
 - [x] **T3.1** **G1 (mechanics)** — PASS. `test_fit_recovers_known_eta` recovers `η* = [0.5, 0.3, 0.2]` with `|η - η*|_∞ < 1e-4` on P=3, N=50. 9/9 unit tests pass.
 - [x] **T3.2** **G2 (cross-domain quality)** — PASS. Phase 2 PoC: ensemble beats single-best on 3/3 primary metrics (MSE, top-1, mean-rank) in the related-sources regime, with 3.5× MSE reduction. See `.benchmarks/376_velocity_field_ensemble_poc.md`.
-- [x] **T3.3** **G3 (no-regression)** — PASS. `cargo check --features velocity_field_ensemble` adds zero warnings; `cargo check --workspace --all-features` combo check passes; zero-hot-path-alloc verified via `tests/velocity_field_ensemble_alloc_check.rs` (CountingAllocator, 0 allocs/1000 calls for both `eval_into` and `eval_batch_into`).
-- [x] **T3.4** **G4 (latency)** — PASS. `benches/bench_376_velocity_field_ensemble_goat.rs`: `fit_into` (N=50, P=8, D=8) **6.27µs ≤ 50µs** (8× headroom); single `eval_into` **21ns ≤ 200ns** (9.5× headroom); `eval_batch_into` for 1000 states **20µs ≤ 5ms** (250× headroom).
+- [x] **T3.3** **G3 (no-regression)** — PASS. `cargo check --features velocity_field_ensemble` adds zero warnings; `cargo check --workspace --all-features` combo check passes; zero-hot-path-alloc verified via `crates/katgpt-core/tests/velocity_field_ensemble_alloc_check.rs` (CountingAllocator, 0 allocs/1000 calls for both `eval_into` and `eval_batch_into`).
+- [x] **T3.4** **G4 (latency)** — PASS. `crates/katgpt-core/benches/bench_376_velocity_field_ensemble_goat.rs`: `fit_into` (N=50, P=8, D=8) **6.27µs ≤ 50µs** (8× headroom); single `eval_into` **21ns ≤ 200ns** (9.5× headroom); `eval_batch_into` for 1000 states **20µs ≤ 5ms** (250× headroom).
 - [x] **T3.5** **Promotion decision** — **PROMOTED to default-on.** All 4 gates PASS + the gain is modelless (closed-form ridge solve, no training). `velocity_field_ensemble` added to the `default` feature list in `crates/katgpt-core/Cargo.toml`. Verified: `cargo check -p katgpt-core --lib` (default features) clean; 9/9 unit tests pass with default features.
 
 **Bench:** `crates/katgpt-core/benches/bench_376_velocity_field_ensemble_goat.rs`
@@ -132,7 +133,7 @@ pre-validation: if a future caller adds a UQ claim, this gate is satisfied.
 
 - [x] **T6.1** Run ensemble + integrator on a UQ benchmark (AR(1) corpus,
       N_TRAIN=200, N_TEST=200). Compute CRPS / coverage / Winkler. → Done:
-      `tests/velocity_field_ensemble_uq_floor.rs::vfe_vs_conformal_floor_ar1`.
+      `crates/katgpt-core/tests/velocity_field_ensemble_uq_floor.rs::vfe_vs_conformal_floor_ar1`.
 - [x] **T6.2** Compute the same metrics for the conformal-naive floor. → Done:
       the `run_floor_comparison` harness runs both side-by-side.
 - [-] **T6.3** If ensemble does NOT beat the floor → drop the UQ claim. →

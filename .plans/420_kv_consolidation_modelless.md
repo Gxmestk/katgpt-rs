@@ -50,11 +50,11 @@ The PoC lives in `katgpt-rs/crates/katgpt-core/benches/bench_420_kv_consolidatio
 
 ### Tasks
 
-- [-] **T2.1** Create `crates/katgpt-core/src/kv_consolidation/mod.rs` with:
+- [-] **T2.1** Create `crates/katgpt-types/src/simd/mod.rs` with:
   - `KvConsolidationConfig` struct: `g_max`, `lambda`, `k`, `rsw_len`, `trigger: ConsolidationTrigger` enum (`NewlineToken | SurpriseGate { threshold }`)
   - `KvConsolidator` struct: holds config + scratch buffers (pre-allocated, zero-alloc hot path per AGENTS.md)
   - `consolidate(&mut self, kv_cache: &mut KvCache, attention_weights: &[f32], layer: usize) -> ConsolidationReport`
-- [-] **T2.2** Implement the consolidation update in `kv_consolidation/ops.rs`:
+- [-] **T2.2** Implement the consolidation update in `cubecl/crates/cubecl-core/src/frontend/container/vector/ops.rs`:
   - `consolidate_recent(values: &mut [f32], step_indices: &[usize], gate: f32)` — mean-shift recent step values toward their centroid
   - `reconsolidate_recalled(values: &mut [f32], recalled_indices: &[usize], attention_mass: &[f32], step_centroid: &[f32], gate: f32)` — mean-shift recalled values toward step centroid, attention-weighted
   - Both: sigmoid gate, only value vectors (keys untouched), zero-allocation (use scratch buffers)

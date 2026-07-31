@@ -330,12 +330,7 @@ impl<P: ScreeningPruner> ScreeningPruner for PosteriorGuidedPruner<P> {
         // sigmoid(-λ × (precision - threshold)) gives bonus for low-precision arms
         let exploration_bonus = {
             let x = -0.5 * (avg_prec - 3.0); // λ=0.5, threshold=3.0
-            let s = if x >= 0.0 {
-                1.0 / (1.0 + (-x).exp())
-            } else {
-                let ex = x.exp();
-                ex / (1.0 + ex)
-            };
+            let s = katgpt_core::simd::fast_sigmoid(x);
             0.1 * s // Max 10% bonus, decays with precision
         };
 

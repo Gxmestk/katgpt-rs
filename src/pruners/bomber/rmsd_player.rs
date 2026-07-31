@@ -1,6 +1,6 @@
 //! RMSD-filtered bomber player — relevance-masked self-distillation.
 //!
-//! Same architecture as [`SdarPlayer`] but adds RMSD two-step relevance filtering:
+//! Same architecture as `SdarPlayer` but adds RMSD two-step relevance filtering:
 //! 1. Pre-filter actions by |Q_teacher - Q_student| magnitude
 //! 2. Select top-S most informative actions
 //! 3. Apply SDAR sigmoid gating only to selected actions
@@ -228,7 +228,7 @@ fn danger_level(pos: GridPos, grid: &ArenaGrid, bombs: &[KnownBomb]) -> f32 {
 
 /// Bomber arena player using RMSD-filtered SDAR components.
 ///
-/// Extends [`SdarPlayer`] with RMSD two-step relevance filtering:
+/// Extends `SdarPlayer` with RMSD two-step relevance filtering:
 /// only the top-S actions by |ΔQ| magnitude receive bandit updates.
 /// This concentrates learning signal on actions that carry actual information.
 pub struct RmsdPlayer {

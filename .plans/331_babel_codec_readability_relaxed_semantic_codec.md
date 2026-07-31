@@ -93,7 +93,7 @@ Ship a generic `BabelCodec` trait + two deterministic implementations:
 
 ### Tasks
 
-- [x] **T5.1** `tests/bench_331_babel_codec_goat.rs`: G1 round-trip fidelity on 1000 synthetic KG triples + entity-attribute pairs.
+- [x] **T5.1** `crates/katgpt-core/tests/bench_331_babel_codec_goat.rs`: G1 round-trip fidelity on 1000 synthetic KG triples + entity-attribute pairs.
 - [x] **T5.2** G2 compression on the **real Seal 17k corpus** (same corpus as Plan 285/287). Measure byte reduction. **Target: ≥ 2×.** Honest expectation: 2–3×.
 - [x] **T5.3** G3 latency: `std::time::Instant` batched median (matching crate convention). Target: < 200 ns / latent msg, < 2 µs / 256-byte text chunk.
 - [x] **T5.4** G4 no-regression: `cargo test -p katgpt-core --all-features` clean.
@@ -127,7 +127,7 @@ Ship a generic `BabelCodec` trait + two deterministic implementations:
 | `crates/katgpt-core/src/babel_codec/commitment.rs` | New: BLAKE3 commitment |
 | `crates/katgpt-core/Cargo.toml` | Add `babel_codec` feature (opt-in) |
 | `crates/katgpt-core/src/lib.rs` | Add `#[cfg(feature = "babel_codec")] pub mod babel_codec;` |
-| `tests/bench_331_babel_codec_goat.rs` | New: G1–G5 gate |
+| `crates/katgpt-core/tests/bench_331_babel_codec_goat.rs` | New: G1–G5 gate |
 | `.benchmarks/331_babel_codec_goat.md` | New: results (after Phase 5) |
 | `README.md` | Add BabelCodec section (after Phase 5 promotion) |
 

@@ -152,7 +152,7 @@ impl PrimitiveKind {
     /// - `UserDefined(id)` for `id < 256` → `id`.
     /// - `Composite(prefix)` → `256 + (prefix & 0xFF)` (one byte of hash prefix).
     ///
-    /// Inverse: [`from_u32`].
+    /// Inverse: [`Self::from_u32`].
     #[inline]
     #[must_use]
     pub fn to_u32(self) -> u32 {
@@ -211,7 +211,7 @@ serde_via_u8!(OperatorKind);
 ///
 /// Stored as `Option<[u8; 32]>` (Plan 290 G4 fix, 2026-06-26) so the common
 /// production case — a node with no per-node audit commitment, e.g. every
-/// node emitted by [`PtgTracedPruner::trace`] — costs 1 byte (postcard `None`
+/// node emitted by `PtgTracedPruner::trace` — costs 1 byte (postcard `None`
 /// tag) instead of 32 bytes of zeros. Callers that need tamper-evidence pass
 /// `Some(hash)`; the G4 size target (< 1MB / 10K traces) is met when the
 /// corpus is dominated by `None` nodes, which matches the production reality.

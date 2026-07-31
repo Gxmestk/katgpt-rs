@@ -28,7 +28,7 @@ impl PredicateNode {
     /// Update satisfaction using sigmoid grading.
     /// raw ∈ (-∞, +∞) → sigmoid → [0, 1]
     pub fn update_satisfaction(&mut self, raw_score: f32) {
-        self.satisfaction = 1.0 / (1.0 + (-raw_score).exp());
+        self.satisfaction = katgpt_core::simd::fast_sigmoid(raw_score);
     }
 }
 

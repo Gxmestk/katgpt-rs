@@ -4,8 +4,9 @@
 > **Date:** 2026-07-01
 > **Status:** Done — verdict locked (**PASS for katgpt-rs / riir-ai**)
 > **Classification:** Public (this note). Training recipe → riir-train.
-> **Related Research:** 138 (LeJEPA, same author Balestriero — same-domain precedent, LOW-MODERATE GAIN), 127 (EnvRL — **identical mechanism, training-only precedent**), 123 (Latent Functor Runtime — **ships the runtime version of SMWM's core insight as Super-GOAT**), 115 (PEIRA), 298 (Inverting Bellman — sibling closed-form world-model extraction), 318 (Sleep-Time — covers "offline reward-free")
+> **Related Research:** 138 (LeJEPA, same author Balestriero — same-domain precedent, LOW-MODERATE GAIN), 127 (EnvRL — **identical mechanism, training-only precedent**), 123 (Latent Functor Runtime — **ships the runtime version of SMWM's core insight as Super-GOAT**), 115 (PEIRA), 298 (Inverting Bellman — sibling closed-form world-model extraction), 318 (Sleep-Time — covers "offline reward-free"), 462 (INTACT — **extends SMWM's `L_inv` with a goal-conditioned second branch + shared operator; identical PASS verdict, same runtime-already-ships conclusion**)
 > **Domain:** katgpt-rs (this note, public). The distilled RUNTIME primitive already ships — no new public or private file.
+> **PASS-Redirects (synthesis):** Sun, Zhao, Zhang [arXiv:2607.26056 "INTACT: Isomorphic Intent-to-Action Learning for Search-Free World Models"] — extends SMWM's `L_inv` auxiliary with a stop-gradient goal-conditioned second call through the same operator (asymmetric gradient routing). Verdict: **PASS** (not Gain). Same canonical JEPA-world-model PASS class as SMWM/AdaJEPA/Temporal Straightening: the deployment primitive (`m = z_g − z_t` → `apply_functor_edge_into`) already ships modellessly; the training recipe (joint encoder + dual-call operator + forward predictor) belongs in riir-train as a multi-loss refinement of the existing JEPA-pretraining recipe. See [Research 462](462_INTACT_Isomorphic_Intent_To_Action_Search_Free_World_Models.md).
 
 ---
 
@@ -15,7 +16,7 @@ SMWM trains a JEPA-style latent world model end-to-end with a single **inverse-d
 
 **Verdict: PASS for modelless/runtime (katgpt-rs / riir-ai). Training recipe → riir-train.**
 
-The paper's distilled primitive — "the action between two latent states is recoverable as a latent displacement vector" — **is already shipped at runtime** as `latent_functor/arithmetic.rs` (Plan 273, Super-GOAT Research 123): `extract_functor` estimates `f = mean(target − source)`, `apply_functor` predicts `out = source + f`, `functor_gate` is the sigmoid trust gate. This is `z_{t+1} ≈ z_t + ρ(a)` verbatim, modelless, no training. `sleep_time::HlaSleepTimeOp` (Plan 341, **DEFAULT-ON since 2026-06-27**) inlines the same `z_i = c + dir_i` elementwise add. The training-only parts (end-to-end JEPA + inverse-dynamics loss) are a refinement of EnvRL's auxiliary ID head (Research 127, training-only verdict) and belong in `riir-train` per the precedent set there. **Honest downgrade — same-domain precedent (Research 138, same author Balestriero) was LOW-MODERATE GAIN; SMWM's runtime contribution is even smaller because Research 123 already shipped it.**
+The paper's distilled primitive — "the action between two latent states is recoverable as a latent displacement vector" — **is already shipped at runtime** as `crates/katgpt-percepta/src/wasm/interpreter/arithmetic.rs` (Plan 273, Super-GOAT Research 123): `extract_functor` estimates `f = mean(target − source)`, `apply_functor` predicts `out = source + f`, `functor_gate` is the sigmoid trust gate. This is `z_{t+1} ≈ z_t + ρ(a)` verbatim, modelless, no training. `sleep_time::HlaSleepTimeOp` (Plan 341, **DEFAULT-ON since 2026-06-27**) inlines the same `z_i = c + dir_i` elementwise add. The training-only parts (end-to-end JEPA + inverse-dynamics loss) are a refinement of EnvRL's auxiliary ID head (Research 127, training-only verdict) and belong in `riir-train` per the precedent set there. **Honest downgrade — same-domain precedent (Research 138, same author Balestriero) was LOW-MODERATE GAIN; SMWM's runtime contribution is even smaller because Research 123 already shipped it.**
 
 ---
 
@@ -48,9 +49,9 @@ CEM + MPC planning in the frozen latent space. On 4 tasks (TwoRoom, Reacher, Pus
 | Paper term | Codebase equivalent | Where it ships |
 |---|---|---|
 | latent state / embedding `z_t` | HLA per-NPC state, belief state, sense projection | `riir-engine/src/hla/`, `katgpt-core` HLA kernels |
-| forward model `g_φ` | `GameState` trait, `InducedCwmKernel` (Plan 296) | `katgpt-core/src/induced_cwm/`, `riir-engine/src/game_state.rs` |
-| inverse model `h_ψ(z_t, z_{t+1}) → a_t` | `extract_functor` (estimate displacement from pairs) | `riir-engine/src/latent_functor/arithmetic.rs` |
-| `g_a(z) ≈ z + ρ(a)` latent translation | `apply_functor: out = source + f`; `HlaSleepTimeOp: z_i = c + dir_i` | `latent_functor/arithmetic.rs`, `riir-engine/src/sleep_time/hla_op.rs` |
+| forward model `g_φ` | `GameState` trait, `InducedCwmKernel` (Plan 296) | `katgpt-core/src/induced_cwm/`, `riir-ai/crates/riir-engine/src/game_state.rs` |
+| inverse model `h_ψ(z_t, z_{t+1}) → a_t` | `extract_functor` (estimate displacement from pairs) | `crates/katgpt-percepta/src/wasm/interpreter/arithmetic.rs` |
+| `g_a(z) ≈ z + ρ(a)` latent translation | `apply_functor: out = source + f`; `HlaSleepTimeOp: z_i = c + dir_i` | `crates/katgpt-percepta/src/wasm/interpreter/arithmetic.rs`, `riir-ai/crates/riir-engine/src/sleep_time/hla_op.rs` |
 | Theorem 1 homomorphism `g_{a₂∘a₁} = g_{a₂}∘g_{a₁}` | functor composition, functor table reuse | `latent_functor/`, Research 123 §1.4 |
 | action-aligned representation | committed personality direction vectors, archetype blend | `riir-engine/src/committed_blend/`, `riir-neuron-db/src/archetype_blend_shard.rs` |
 | controllable DoF projection | direction-vector projection (sigmoid, per AGENTS.md constraint #2) | HLA emotion extraction (`civ_emotion` Plan 175), zone attention |
@@ -77,7 +78,7 @@ This is `z_{t+1} ≈ z_t + ρ(a)` verbatim. The paper's Theorem 1 homomorphism i
 
 The latent-functor arithmetic API ships exactly the paper's primitives modellessly:
 ```rust
-// latent_functor/arithmetic.rs (Plan 273, Super-GOAT Research 123)
+// crates/katgpt-percepta/src/wasm/interpreter/arithmetic.rs (Plan 273, Super-GOAT Research 123)
 extract_functor(sources, targets, dim) -> (functor_dir, coherence)
 //   f = (1/N) Σ_k (target_k − source_k)   ← mean displacement = ρ(a) estimate
 apply_functor(source, functor, out)         ← out = source + f   = z + ρ(a)
@@ -162,7 +163,7 @@ If prioritized, file a plan in `riir-train/.plans/` extending Research 127: add 
 
 **Paper:** *Sensorimotor World Models: Perception for Action via Inverse Dynamics* (Ivashkov, Balestriero, Schölkopf, arXiv:2606.20104, 2026-06-18).
 
-**Verdict:** **PASS for katgpt-rs / riir-ai.** The paper's distilled runtime primitive — "the action between two latent states is recoverable as a latent displacement vector" (`z_{t+1} ≈ z_t + ρ(a)`) — **is already shipped modellessly** as `latent_functor/arithmetic.rs::apply_functor` (Super-GOAT Research 123, Plan 273) and `sleep_time::HlaSleepTimeOp::z_i = c + dir_i` (Plan 341, **DEFAULT-ON since 2026-06-27**). The training recipe (end-to-end JEPA + inverse-dynamics loss) is the same mechanism EnvRL Research 127 already evaluated as training-only; it belongs in riir-train as a one-line refinement, not in the modelless/runtime repos.
+**Verdict:** **PASS for katgpt-rs / riir-ai.** The paper's distilled runtime primitive — "the action between two latent states is recoverable as a latent displacement vector" (`z_{t+1} ≈ z_t + ρ(a)`) — **is already shipped modellessly** as `crates/katgpt-percepta/src/wasm/interpreter/arithmetic.rs::apply_functor` (Super-GOAT Research 123, Plan 273) and `sleep_time::HlaSleepTimeOp::z_i = c + dir_i` (Plan 341, **DEFAULT-ON since 2026-06-27**). The training recipe (end-to-end JEPA + inverse-dynamics loss) is the same mechanism EnvRL Research 127 already evaluated as training-only; it belongs in riir-train as a one-line refinement, not in the modelless/runtime repos.
 
 **Files created this session:** `katgpt-rs/.research/358_Sensorimotor_World_Model_Inverse_Dynamics_Regularizer.md` (this note — the only output).
 

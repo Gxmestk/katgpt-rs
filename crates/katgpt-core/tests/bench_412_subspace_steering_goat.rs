@@ -12,10 +12,10 @@
 
 #![cfg(feature = "subspace_steering")]
 
+use katgpt_core::latent_steering::{LatentSteeringVector, apply_latent_steering};
 use katgpt_core::subspace_steering::{
-    apply_subspace_steering, compute_block_commitment, walk_manifold, SubspaceSteeringField,
+    SubspaceSteeringField, apply_subspace_steering, compute_block_commitment, walk_manifold,
 };
-use katgpt_core::latent_steering::{apply_latent_steering, LatentSteeringVector};
 use std::hint::black_box;
 use std::sync::atomic::Ordering;
 
@@ -283,7 +283,10 @@ fn g5_commitment_and_walk_are_deterministic() {
     let mut out2 = [[0f32; D]; 4];
     walk_manifold(&state, &block, &alpha_grid, &mut out1);
     walk_manifold(&state, &block, &alpha_grid, &mut out2);
-    assert_eq!(out1, out2, "G5: walk_manifold must be bit-identical for fixed alpha_grid");
+    assert_eq!(
+        out1, out2,
+        "G5: walk_manifold must be bit-identical for fixed alpha_grid"
+    );
 }
 
 fn main() {

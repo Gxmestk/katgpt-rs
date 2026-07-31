@@ -19,7 +19,7 @@
 ## Architecture
 
 ```
-VortexFlow trait (src/dash_attn/vortex_flow.rs)
+VortexFlow trait (crates/katgpt-attn/src/dash_attn/vortex_flow.rs)
 ├── type Cache
 ├── forward_cache(cache, keys, block_idx)     — query-independent
 └── forward_indexer(query, cache, top_k)      — query-dependent
@@ -80,7 +80,7 @@ Data flow:
 
 ### Tasks
 
-- [x] **T1: Define `VortexFlow` trait in `src/dash_attn/vortex_flow.rs`**
+- [x] **T1: Define `VortexFlow` trait in `crates/katgpt-attn/src/dash_attn/vortex_flow.rs`**
   - Associated type `Cache` for routing algorithm state
   - `fn forward_cache(&self, cache: &mut Self::Cache, keys: &[f32], block_idx: usize)`
   - `fn forward_indexer(&self, query: &[f32], cache: &Self::Cache, n_blocks: usize, top_k: usize, scratch: &mut RoutingScratch) -> RoutingDecision`
@@ -97,7 +97,7 @@ Data flow:
 - [x] **T3: Define `RoutingScratch` reusable buffer**
   - `scores: Vec<f32>` — block scores (capacity = max_blocks)
   - `indices: Vec<usize>` — top-k index buffer
-  - Already partially exists in `dash_attn/routing.rs` — extract and formalize
+  - Already partially exists in `crates/katgpt-attn/src/dash_attn/routing.rs` — extract and formalize
 
 - [x] **T4: Implement `BlockTopKRouter`**
   - `forward_cache`: compute `Mean(keys[block_size])` → centroid per block. Store in `BlockTopKCache { centroids: Vec<f32> }` shape `[n_blocks, head_dim]`

@@ -39,7 +39,7 @@ Each decode step: one O(d) dot product per emotion axis (valence, arousal, despe
 | `desperation +0.1` | 5% → 70% reward-hacking (**14× increase**) |
 | `calm +0.05` | baseline → **0% blackmail** |
 
-`src/pruners/emotion_vector.rs` — `EmotionDirections`, `EmotionReading`. Phase 1 ✅ complete; Phase 2 ⏳ GOAT proof in progress.
+`crates/katgpt-pruners/src/emotion_vector.rs` — `EmotionDirections`, `EmotionReading`. Phase 1 ✅ complete; Phase 2 ⏳ GOAT proof in progress.
 
 ### Entropy Anomaly Detection (Plan 061)
 

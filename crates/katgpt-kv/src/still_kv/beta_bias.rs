@@ -105,7 +105,7 @@ pub fn compute_beta_mass_matching(original_len: usize, compact_len: usize) -> Be
 ///
 /// # Formula
 /// For each latent i:
-///   concentration_i = max_j(attn[i,j])   // how peaked is this latent's attention
+///   `concentration_i = max_j(attn[i,j])`   // how peaked is this latent's attention
 ///   expected_uniform = 1.0 / T            // uniform baseline
 ///   deviation_i = sigmoid((concentration_i - expected_uniform) * T * 0.5)
 ///   beta_i = log(T/t) * deviation_i
@@ -158,16 +158,11 @@ pub fn compute_beta_vortex_flow(
 }
 
 /// Standard sigmoid function.
-/// `sigmoid(x) = 1 / (1 + exp(-x))`
+///
+/// Delegates to `katgpt_core::simd::fast_sigmoid` (Cephes polynomial).
 #[inline]
 fn sigmoid(x: f32) -> f32 {
-    // Numerically stable: use the positive/negative split
-    if x >= 0.0 {
-        1.0 / (1.0 + (-x).exp())
-    } else {
-        let exp_x = x.exp();
-        exp_x / (1.0 + exp_x)
-    }
+    katgpt_core::simd::fast_sigmoid(x)
 }
 
 // ---------------------------------------------------------------------------

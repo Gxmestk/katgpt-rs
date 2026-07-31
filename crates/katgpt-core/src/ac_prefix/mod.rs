@@ -64,9 +64,11 @@
 //!
 //! # Status
 //!
-//! Phase 1 (this module): types + bit math, no attention kernel dep, opt-in
-//! (`ac_prefix` feature flag, default-off). Stays opt-in until the G1–G4 GOAT
-//! gate passes in Phase 3.
+//! Phase 1 (this module): types + bit math, no attention kernel dep.
+//! DEFAULT-ON (Plan 313 Phase 4 + Issue 003 Phase 0 RESOLVED, 2026-06-24):
+//! G1 0.0 diff vs iterative-MLM (modelless `attends_dedup` unblock eliminates
+//! the doubled-signal bias), G2 27.258x speedup, G3 0 mismatches, G4 0 allocs.
+//! Multi-layer equivalence remains a non-blocking riir-train follow-up.
 
 mod forward;
 mod types;

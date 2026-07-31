@@ -6,6 +6,8 @@
 **Target:** `katgpt-rs` modelless inference engine — new `src/attn_match/` module
 **Status:** Verdict = **GAIN** — direct port + novel CPU/SIMD/GPU/ANE adaptive solver routing. Plan 271.
 
+> **See also (added Plan 469 T5.3, 2026-07-25):** [HOPE — Hilbert-Schmidt Capacity Kernel](454_HOPE_Hilbert_Schmidt_Capacity_Kernel.md) (Research 454 / Plan 469) — the closest shipped **compaction cousin** in our stack. AM compacts the **KV cache** (token dimension); HOPE compacts **rank-1 operators** (feature dimension via optimal rank-1 parent). Both are modelless + closed-form; complementary scopes.
+
 ---
 
 ## Paper Summary

@@ -81,18 +81,11 @@ pub(crate) fn shannon_entropy_bits(data: &[u8]) -> f32 {
     h
 }
 
-/// Numerically-stable logistic sigmoid. Clamps the input to avoid overflow.
+/// Logistic sigmoid. Delegates to `katgpt_core::simd::fast_sigmoid` (Cephes
+/// polynomial, ±40 early-exit which subsumes the prior ±18 clamp).
 #[inline(always)]
 fn sigmoid(x: f32) -> f32 {
-    // Clamp outside ±18 to keep `exp` in safe range (sigmoid(±18) ≈ 1 / 1.5e-8).
-    if x >= 18.0 {
-        1.0
-    } else if x <= -18.0 {
-        0.0
-    } else {
-        let e = (-x).exp();
-        1.0 / (1.0 + e)
-    }
+    katgpt_core::simd::fast_sigmoid(x)
 }
 
 // ── ComplexityProxy trait ─────────────────────────────────────────────────────

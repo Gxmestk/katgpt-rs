@@ -377,5 +377,5 @@ Key: `probs.gather(1, target_ids)` extracts the model's own probability for the 
 - RWR: Peters & Schaal, "Reinforcement Learning by Reward-Weighted Regression", ICML 2007
 - Our SDAR: `.research/038_SDAR_Self_Distilled_Agentic_RL.md`
 - Our ROPD: `.research/036_ROPD_Rubric_OnPolicy_Distillation.md`
-- Our KL alignment: `katgpt-rs/src/pruners/boundary_alignment.rs`
-- Our SDAR gate: `katgpt-rs/src/pruners/sdar_gate.rs`
+- Our KL alignment: `katgpt-rs/crates/katgpt-pruners/src/boundary_alignment.rs`
+- Our SDAR gate: `katgpt-rs/crates/katgpt-pruners/src/sdar_gate.rs`

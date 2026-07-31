@@ -3,8 +3,8 @@
 > **Source:** [FAME: Adaptive Functional Attention with Expert Routing for Function-on-Function Regression](https://arxiv.org/abs/2510.00621) — Gao, Chen, Zhang (Tsinghua / U-Iowa), NeurIPS 2025
 > **Date:** 2026-06-25
 > **Status:** Active — Super-GOAT via fusion; primitive + plan + private guide created this session
-> **Related Research:** 276 (PersonalityWeightedComposition — per-layer cousin), 288 (KARC — per-NPC forecaster cousin, the "backward" Bi-NCDE pass), 257 (FuncAttn — **vocabulary collision, different mechanism**), 242 (MicroRecurrentBeliefState), 296 (Stokes/DEC — sampling-invariant substrate), 219 (TNO/DEC)
-> **Related Plans:** 321 (this primitive — open), 297 (PersonalityWeightedComposition), 308 (KARC), 314 (Stokes wrappers — `line_integral`)
+> **Related Research:** 276 (PersonalityWeightedComposition — per-layer cousin), 288 (KARC — per-NPC forecaster cousin, the "backward" Bi-NCDE pass), 257 (FuncAttn — **vocabulary collision, different mechanism**), 242 (MicroRecurrentBeliefState), 296 (Stokes/DEC — sampling-invariant substrate), 219 (TNO/DEC), [454 (HOPE — rank-1 capacity kernel)](454_HOPE_Hilbert_Schmidt_Capacity_Kernel.md)
+> **Related Plans:** 321 (this primitive — open), 297 (PersonalityWeightedComposition), 308 (KARC), 314 (Stokes wrappers — `line_integral`), [469 (HOPE primitive — rank-1 parent selection)](../.plans/469_hilbert_schmidt_capacity_kernel_primitive.md)
 > **Cross-ref (riir-ai):** Research 158 — *Per-NPC Committed Personality Blend Guide* (private Super-GOAT moat)
 > **Cross-ref (riir-chain):** Research 003 (LatCal-Committed Karc Readout — the sync-boundary bridge this extends)
 > **Cross-ref (riir-neuron-db):** Research 003 (KarcShard Storage Crossref — the freeze substrate this reuses)
@@ -82,14 +82,14 @@ The Super-GOAT is the fusion: **per-NPC committed archetype blend × KARC trajec
 |---|---|---|
 | Per-entity sigmoid-gated composition of N direction vectors | **PersonalityWeightedComposition** | Plan 297, Research 276, `crates/katgpt-core/src/personality_composition.rs` — `compose_into`, `drift` |
 | Per-token MoE expert routing (block-level coreset) | **dMoE** | Research 161, Plan 181 — `top_p_coreset`, `select_arms_top_p` |
-| Per-NPC trajectory forecaster (delay-basis ridge, fits in a shard) | **KARC** | Research 288, Plan 308, `crates/katgpt-core/src/karc.rs` — `KarcForecaster<D,M,K>` |
+| Per-NPC trajectory forecaster (delay-basis ridge, fits in a shard) | **KARC** | Research 288, Plan 308, `riir-ai/crates/riir-games-civ/src/civ/map_tick/karc.rs` — `KarcForecaster<D,M,K>` |
 | Per-NPC recurrent belief state (leaky integrator, byte-identical to `evolve_hla`) | **MicroRecurrentBeliefState / LeakyIntegrator** | Plan 276, Research 242, `crates/katgpt-core/src/micro_belief/` |
-| HLA forward state evolution | **`evolve_hla`** | `crates/katgpt-core/src/sense/reconstruction.rs` |
+| HLA forward state evolution | **`evolve_hla`** | `crates/katgpt-sense/src/reconstruction.rs` |
 | Forward + backward latent passes (bidirectional prefill) | **Plan 025 bidirectional prefill** | reader LoRA (prefill) + writer LoRA (decode) — the Bi-NCDE's fwd/bwd split, modellessly |
 | Two-brain model (info brain = ground truth, think brain = belief) | **AGENTS.md §Spatial Cognition** | one-way bridge, fog-of-war gated |
 | Discretization-invariant path sum / line integral | **DEC `line_integral`** | Plan 314, Research 296, `crates/katgpt-core/src/dec/` |
-| Lipschitz-stable closed-form regression operator | **FuncAttn** (different mechanism — see vocabulary alert) | Plan 286, Research 257, `crates/katgpt-core/src/funcattn.rs` |
-| Frozen operator-field snapshots (Pod, BLAKE3, dendritic branch) | **NeuronShard** | `riir-neuron-db/src/shard.rs` — `style_weights[64]`, `hla_moments[8]` |
+| Lipschitz-stable closed-form regression operator | **FuncAttn** (different mechanism — see vocabulary alert) | Plan 286, Research 257, `crates/katgpt-core/src/funcattn/mod.rs` |
+| Frozen operator-field snapshots (Pod, BLAKE3, dendritic branch) | **NeuronShard** | `riir-neuron-db/src/shard/mod.rs` — `style_weights[64]`, `hla_moments[8]` |
 | Deterministic linear-op commitment (2×2 fixed-point blocks) | **LatCal** | `riir-chain/src/encoding/latcal.rs` — `LatCalMatrix`, `to_fixed` |
 | Per-NPC learned dynamics from trajectory (delay-embedded basis ridge) | **KARC** (again) | Plan 308 — the "backward" pass of FAME's Bi-NCDE |
 

@@ -18,7 +18,7 @@ For our stack:
 ## Tasks
 
 - [x] T1: Add `delta_routing` feature flag to `Cargo.toml` (katgpt-rs) and `katgpt-core` types
-- [x] T2: Add `DeltaRoutingConfig` to `katgpt-core/src/types.rs` — block_size, mode enum (Off/DeltaBlock/DeltaAttnRes)
+- [x] T2: Add `DeltaRoutingConfig` to `crates/katgpt-types/src/lib.rs` — block_size, mode enum (Off/DeltaBlock/DeltaAttnRes)
 - [x] T3: Add delta routing buffers to `ForwardContext` in `transformer.rs` — block_deltas Vec, delta_query weights, delta_rmsnorm weights
 - [x] T4: Implement `depth_route()` function in `transformer.rs` — softmax over delta sources, additive to residual
 - [x] T5: Integrate `depth_route()` into `forward_base()` layer loop — compute per-sublayer deltas, store block deltas, call routing at block boundaries
@@ -58,8 +58,8 @@ In our forward_base():
 ### Files Modified
 
 1. `Cargo.toml` — added `delta_routing = []` feature, added to `full` feature list
-2. `crates/katgpt-core/src/types.rs` — added `DeltaRoutingMode` enum and `DeltaRoutingConfig` struct
-4. `src/transformer.rs` — added:
+2. `crates/katgpt-types/src/lib.rs` — added `DeltaRoutingMode` enum and `DeltaRoutingConfig` struct
+4. `crates/katgpt-percepta/src/transformer.rs` — added:
    - `delta_routing_query` and `delta_routing_norm` fields to `TransformerWeights`
    - `block_deltas` and `delta_routing_logits` buffers to `ForwardContext`
    - `depth_route()` function (RMSNorm + softmax + additive routing)
@@ -75,7 +75,7 @@ In our forward_base():
 9. `riir-ai/crates/riir-engine/Cargo.toml` — Added `delta_routing` feature gate
 10. `riir-ai/crates/riir-engine/src/gemma_layer.rs` — Added `delta_routing_query`/`delta_routing_norm` to both f32 and f16 weight structs
 11. `riir-ai/crates/riir-engine/src/safetensors_loader.rs` — Zero/one-init delta routing weights on model load
-12. `riir-ai/crates/riir-engine/src/transformer.rs` — Integrated delta routing into `forward_gemma2()`, `forward_gemma2_trace()`, `forward_gemma2_f16()`
+12. `katgpt-rs/crates/katgpt-percepta/src/transformer.rs` — Integrated delta routing into `forward_gemma2()`, `forward_gemma2_trace()`, `forward_gemma2_f16()`
 13. `riir-ai/crates/riir-engine/tests/bench_097_gemma2_delta_routing_ppl.rs` — 2B-scale PPL benchmark (4 tests, all passing)
 14. `riir-ai/.benchmarks/021_gemma2_delta_routing_ppl.md` — Gemma 2 2B results
 

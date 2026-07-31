@@ -12,7 +12,14 @@
 //! "what transfers to my goal?" (MAG geometry). Consumed by CGSP curiosity
 //! routing and the AnyRAG escalation gateway in riir-ai / riir-neuron-db.
 
-use super::types::{check_dim, cosine, MagError, TransferMetric};
+use super::types::{MagError, TransferMetric, check_dim, cosine};
+
+// recos_sim_slice(_into) live in the `similarity` module (gated on `recos`).
+// When the feature is off, `TransferMetric::Recos` falls back to centroid
+// cosine — the closest available metric (recos degenerates to cosine for
+// linear relationships).
+#[cfg(feature = "recos")]
+use crate::similarity::{recos_sim_slice, recos_sim_slice_into};
 
 // ── Dataset view ───────────────────────────────────────────────────
 
@@ -40,7 +47,10 @@ impl<'a, S: AsRef<[f32]>> DataSet<'a, S> {
     /// Construct a dataset view from activations + labels.
     #[inline]
     pub fn new(activations: &'a [S], labels: &'a [bool]) -> Self {
-        Self { activations, labels }
+        Self {
+            activations,
+            labels,
+        }
     }
 
     /// Number of samples.
@@ -118,7 +128,11 @@ pub fn transfer_score<S: AsRef<[f32]>>(
         }
         TransferMetric::RbfMmd => {
             let gamma = 1.0 / d as f32;
-            Ok(-rbf_mmd_sq(candidate.activations, target.activations, gamma))
+            Ok(-rbf_mmd_sq(
+                candidate.activations,
+                target.activations,
+                gamma,
+            ))
         }
         TransferMetric::Wasserstein1d => {
             Ok(-wasserstein1d(candidate.activations, target.activations, d))
@@ -134,6 +148,21 @@ pub fn transfer_score<S: AsRef<[f32]>>(
             let t = class_centroid(target.activations, target.labels, true, d)?;
             Ok(cosine(&c, &t))
         }
+        TransferMetric::Recos => {
+            let c = centroid(candidate.activations, d);
+            let t = centroid(target.activations, d);
+            // Cold path: recos_sim_slice allocates (sort needs owned buffers).
+            // Acceptable for MAG diagnostics; the zero-alloc variant is
+            // `transfer_score_into`.
+            #[cfg(feature = "recos")]
+            {
+                Ok(recos_sim_slice(&c, &t))
+            }
+            #[cfg(not(feature = "recos"))]
+            {
+                Ok(cosine(&c, &t))
+            }
+        }
     }
 }
 
@@ -142,15 +171,19 @@ pub fn transfer_score<S: AsRef<[f32]>>(
 /// Zero-alloc variant of [`transfer_score`] for centroid-based metrics.
 ///
 /// Uses `scratch` (length `≥ 2·d`) for centroid computation, avoiding heap
-/// allocation on the hot path. Supports the four centroid-based metrics
+/// allocation on the hot path. Supports the five centroid-based metrics
 /// ([`CentroidCosine`](TransferMetric::CentroidCosine),
 /// [`Euclidean`](TransferMetric::Euclidean),
-/// [`Correlation`](TransferMetric::Correlation), and the two
-/// `ClassConditionalCosine*` variants). The distribution-based metrics
+/// [`Correlation`](TransferMetric::Correlation), the two
+/// `ClassConditionalCosine*` variants, and [`Recos`](TransferMetric::Recos)).
+/// The distribution-based metrics
 /// ([`RbfMmd`](TransferMetric::RbfMmd),
 /// [`Wasserstein1d`](TransferMetric::Wasserstein1d),
 /// [`CkaLinear`](TransferMetric::CkaLinear)) fall back to the allocating
 /// [`transfer_score`] — they are cold-path diagnostics.
+///
+/// [`Recos`](TransferMetric::Recos) sorts the scratch halves in place (the
+/// scratch is scratch — contents are unspecified after this call).
 ///
 /// Returns [`MagError::DimMismatch`] if `scratch.len() < 2 * d`.
 pub fn transfer_score_into<S: AsRef<[f32]>>(
@@ -209,6 +242,21 @@ pub fn transfer_score_into<S: AsRef<[f32]>>(
             class_centroid_into(target.activations, target.labels, true, d, st)?;
             Ok(cosine(sc, st))
         }
+        TransferMetric::Recos => {
+            // Compute centroids into the two scratch halves, then apply
+            // recos (sorts both halves in place) or fall back to cosine.
+            let (sc, st) = scratch.split_at_mut(d);
+            centroid_into(candidate.activations, d, sc);
+            centroid_into(target.activations, d, st);
+            #[cfg(feature = "recos")]
+            {
+                Ok(recos_sim_slice_into(sc, st))
+            }
+            #[cfg(not(feature = "recos"))]
+            {
+                Ok(cosine(sc, st))
+            }
+        }
         // Distribution-based metrics fall back to the allocating path.
         TransferMetric::RbfMmd | TransferMetric::Wasserstein1d | TransferMetric::CkaLinear => {
             transfer_score(candidate, target, metric)
@@ -262,10 +310,15 @@ pub fn rank_candidates<S: AsRef<[f32]>>(
 
     // Convert to percentile ranks per metric (fraction of candidates beaten).
     let mut percentiles = vec![0.0_f32; n_cand * n_metrics];
+    // Hoisted outside the metric loop — clear() + reuse per metric instead
+    // of `n_metrics` × allocations of `Vec<(f32, usize)>`.
+    let mut ranked: Vec<(f32, usize)> = Vec::with_capacity(n_cand);
     for m in 0..n_metrics {
-        let mut ranked: Vec<(f32, usize)> =
-            (0..n_cand).map(|i| (scores[i * n_metrics + m], i)).collect();
-        ranked.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
+        ranked.clear();
+        ranked.extend((0..n_cand).map(|i| (scores[i * n_metrics + m], i)));
+        // total_cmp: transfer scores are non-NaN by construction (cosine,
+        // euclidean, pearson-with-zero-denom-guard all return finite f32).
+        ranked.sort_by(|a, b| a.0.total_cmp(&b.0));
         let denom = (n_cand - 1).max(1) as f32;
         for (rank, &(_, idx)) in ranked.iter().enumerate() {
             percentiles[idx * n_metrics + m] = rank as f32 / denom;
@@ -289,11 +342,9 @@ pub fn rank_candidates<S: AsRef<[f32]>>(
         })
         .collect();
 
-    entries.sort_by(|a, b| {
-        b.mean_percentile
-            .partial_cmp(&a.mean_percentile)
-            .unwrap_or(std::cmp::Ordering::Equal)
-    });
+    // mean_percentile is sum of [0,1] values / n_metrics → non-NaN by
+    // construction. total_cmp is branch-free and NaN-deterministic.
+    entries.sort_by(|a, b| b.mean_percentile.total_cmp(&a.mean_percentile));
 
     Ok(entries)
 }
@@ -400,11 +451,7 @@ fn pearson(a: &[f32], b: &[f32]) -> f32 {
         var_b += db * db;
     }
     let denom = (var_a * var_b).sqrt();
-    if denom == 0.0 {
-        0.0
-    } else {
-        cov / denom
-    }
+    if denom == 0.0 { 0.0 } else { cov / denom }
 }
 
 /// RBF-kernel MMD² between two sample sets (biased estimator).
@@ -436,9 +483,7 @@ fn rbf_mmd_sq<S: AsRef<[f32]>>(x: &[S], y: &[S], gamma: f32) -> f32 {
         }
     }
 
-    let mmd = sum_xx / (m * m) as f32
-        + sum_yy / (n * n) as f32
-        - 2.0 * sum_xy / (m * n) as f32;
+    let mmd = sum_xx / (m * m) as f32 + sum_yy / (n * n) as f32 - 2.0 * sum_xy / (m * n) as f32;
     mmd.max(0.0) // MMD² is non-negative by construction (guard against f32 drift)
 }
 
@@ -449,7 +494,7 @@ fn rbf_kernel(a: &[f32], b: &[f32], gamma: f32) -> f32 {
         let diff = a[j] - b[j];
         dist_sq += diff * diff;
     }
-    (-gamma * dist_sq).exp()
+    crate::simd::fast_exp(-gamma * dist_sq)
 }
 
 /// 1D Wasserstein-1 distance averaged over dimensions.
@@ -510,11 +555,7 @@ fn cka_linear<S: AsRef<[f32]>>(x: &[S], y: &[S], d: usize) -> f32 {
         }
     }
     let denom = (norm_cx * norm_cy).sqrt();
-    if denom == 0.0 {
-        0.0
-    } else {
-        trace_val / denom
-    }
+    if denom == 0.0 { 0.0 } else { trace_val / denom }
 }
 
 /// Compute the d×d feature Gram matrix `XᵀX/n` (flattened row-major).
@@ -571,10 +612,22 @@ mod tests {
 
         // target: same structure → class-conditional cosine should be ~1.0
         let target = DataSet::new(&cand_acts, &cand_labels);
-        let score_mal = transfer_score(&cand, &target, TransferMetric::ClassConditionalCosineMalicious).unwrap();
-        let score_ben = transfer_score(&cand, &target, TransferMetric::ClassConditionalCosineBenign).unwrap();
-        assert!(approx_eq(score_mal, 1.0, 1e-5), "malicious cos got {score_mal}");
-        assert!(approx_eq(score_ben, 1.0, 1e-5), "benign cos got {score_ben}");
+        let score_mal = transfer_score(
+            &cand,
+            &target,
+            TransferMetric::ClassConditionalCosineMalicious,
+        )
+        .unwrap();
+        let score_ben =
+            transfer_score(&cand, &target, TransferMetric::ClassConditionalCosineBenign).unwrap();
+        assert!(
+            approx_eq(score_mal, 1.0, 1e-5),
+            "malicious cos got {score_mal}"
+        );
+        assert!(
+            approx_eq(score_ben, 1.0, 1e-5),
+            "benign cos got {score_ben}"
+        );
     }
 
     #[test]
@@ -634,12 +687,8 @@ mod tests {
             DataSet::new(&c2_acts, &labels),
         ];
 
-        let ranked = rank_candidates(
-            &candidates,
-            &target,
-            &[TransferMetric::CentroidCosine],
-        )
-        .unwrap();
+        let ranked =
+            rank_candidates(&candidates, &target, &[TransferMetric::CentroidCosine]).unwrap();
 
         assert_eq!(ranked.len(), 3);
         // Best (identical) should be first.
@@ -686,6 +735,92 @@ mod tests {
         assert_eq!(
             transfer_score(&a, &b, TransferMetric::CentroidCosine),
             Err(MagError::DimMismatch)
+        );
+    }
+
+    // ── Recos metric (Plan 437 Phase 3, gated on `recos` feature) ────
+    //
+    // These tests verify the recos-vs-cosine separation property on MAG
+    // centroids: recos saturates at 1.0 under ordinal concordance (any
+    // monotonic relationship), while cosine requires linear dependence.
+    // When `recos` is off, TransferMetric::Recos falls back to centroid
+    // cosine behavior, so these tests are feature-gated.
+
+    #[cfg(feature = "recos")]
+    #[test]
+    fn recos_metric_identical_is_one() {
+        // Identical datasets → identical centroids → recos = 1.0.
+        let acts: Vec<Vec<f32>> = vec![vec![1.0, 3.0, 2.0, 5.0], vec![2.0, 1.0, 4.0, 3.0]];
+        let labels = [true, false];
+        let ds = DataSet::new(&acts, &labels);
+        let score = transfer_score(&ds, &ds, TransferMetric::Recos).unwrap();
+        assert!(
+            (score - 1.0).abs() < 1e-5,
+            "identical centroids: recos={score}"
+        );
+    }
+
+    #[cfg(feature = "recos")]
+    #[test]
+    fn recos_metric_discordant_below_one() {
+        // Reversed centroids: discordant → recos < 1.0.
+        let cand_acts: Vec<Vec<f32>> = vec![vec![1.0, 2.0, 3.0, 4.0]];
+        let cand_labels = [true];
+        let target_acts: Vec<Vec<f32>> = vec![vec![4.0, 3.0, 2.0, 1.0]];
+        let target_labels = [true];
+        let cand = DataSet::new(&cand_acts, &cand_labels);
+        let target = DataSet::new(&target_acts, &target_labels);
+        let score = transfer_score(&cand, &target, TransferMetric::Recos).unwrap();
+        assert!(score < 1.0, "discordant centroids: recos={score} < 1.0");
+        assert!(score >= 0.0, "recos is non-negative: {score}");
+    }
+
+    #[cfg(feature = "recos")]
+    #[test]
+    fn recos_metric_distinct_from_centroid_cosine() {
+        // Nonlinear-monotonic centroids: b = a². Cosine < 1.0 (not linear),
+        // recos = 1.0 (ordinally concordant). This is the separation property.
+        // Single-sample datasets so the sample IS the centroid.
+        let cand_acts: Vec<Vec<f32>> = vec![vec![1.0, 2.0, 3.0, 4.0]];
+        let cand_labels = [true];
+        let target_acts: Vec<Vec<f32>> = vec![vec![1.0, 4.0, 9.0, 16.0]]; // = a²
+        let target_labels = [true];
+        let cand = DataSet::new(&cand_acts, &cand_labels);
+        let target = DataSet::new(&target_acts, &target_labels);
+
+        let cos = transfer_score(&cand, &target, TransferMetric::CentroidCosine).unwrap();
+        let recos = transfer_score(&cand, &target, TransferMetric::Recos).unwrap();
+
+        assert!(cos < 1.0, "cosine of nonlinear pair: cos={cos} < 1.0");
+        assert!(
+            (recos - 1.0).abs() < 1e-5,
+            "recos of monotonic pair: recos={recos} = 1.0"
+        );
+        assert!(
+            recos > cos,
+            "recos ({recos}) > cosine ({cos}) on monotonic-nonlinear pair"
+        );
+    }
+
+    #[cfg(feature = "recos")]
+    #[test]
+    fn recos_metric_into_matches_allocating() {
+        // transfer_score_into (zero-alloc) must match transfer_score (allocating)
+        // for the Recos metric.
+        let cand_acts: Vec<Vec<f32>> = vec![vec![1.0, 2.0, 3.0, 4.0], vec![0.5, 1.5, 2.5, 3.5]];
+        let cand_labels = [true, false];
+        let target_acts: Vec<Vec<f32>> = vec![vec![2.0, 4.0, 6.0, 8.0]];
+        let target_labels = [true];
+        let cand = DataSet::new(&cand_acts, &cand_labels);
+        let target = DataSet::new(&target_acts, &target_labels);
+
+        let score_alloc = transfer_score(&cand, &target, TransferMetric::Recos).unwrap();
+        let mut scratch = [0.0_f32; 8]; // 2 * d = 2 * 4
+        let score_into =
+            transfer_score_into(&cand, &target, TransferMetric::Recos, &mut scratch).unwrap();
+        assert!(
+            (score_alloc - score_into).abs() < 1e-5,
+            "alloc={score_alloc} into={score_into}"
         );
     }
 }

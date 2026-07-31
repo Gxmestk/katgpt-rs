@@ -483,7 +483,9 @@ pub fn denoise_loop_rcd(
 /// it additionally classifies per-position transitions between the previous and
 /// current token state and applies the CoFRe §1.2 warm-start lerp:
 ///
-///     h⁰_t[i] = γ[i] · h⋆_{t+1}[i] + (1 − γ[i]) · h_pre,t[i]
+/// ```text
+/// h⁰_t[i] = γ[i] · h⋆_{t+1}[i] + (1 − γ[i]) · h_pre,t[i]
+/// ```
 ///
 /// where `h_pre,t[i]` is the RCD residual embedding (RCD's output serves as the
 /// preprocessing-stack result for 3SR) and `h⋆_{t+1}[i]` is the prior step's

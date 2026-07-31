@@ -1,12 +1,12 @@
 //! Forward pass using TurboQuant compressed KV cache.
 //!
-//! The main [`forward_turboquant`] function lives in the katgpt-rs root `transformer`
+//! The main `forward_turboquant` function lives in the katgpt-rs root `transformer`
 //! module (ForwardContext fields are private to that module). This file provides
 //! helper functions used by the TurboQuant attention path.
 //!
 //! Architecture:
 //! 1. Standard embedding + RMSNorm + QKV projection (same as baseline)
-//! 2. Store K,V via [`TurboQuantKVCache::store_key`] / [`store_value`]
+//! 2. Store K,V via [`TurboQuantKVCache::store_key`] / `store_value`
 //! 3. Dequantize K,V on-the-fly during attention scoring
 //! 4. Standard MLP + residual (same as baseline)
 
@@ -18,7 +18,7 @@ use katgpt_core::types;
 /// Dequantize key vectors for positions `[0..=pos]` into a flat buffer.
 ///
 /// Layout: `[block_size * kv_dim]` row-major, compatible with the
-/// [`attention_head`] kernel's expected `key_cache` layout.
+/// `attention_head` kernel's expected `key_cache` layout.
 ///
 /// Returns `(flat_keys, pos_count)` where `flat_keys[pos * kv_dim..]`
 /// holds the reconstructed key for that position.
@@ -39,7 +39,7 @@ pub fn dequantize_keys_flat(
 /// Dequantize value vectors for positions `[0..=pos]` into a flat buffer.
 ///
 /// Layout: `[block_size * kv_dim]` row-major, compatible with the
-/// [`attention_head`] kernel's expected `value_cache` layout.
+/// `attention_head` kernel's expected `value_cache` layout.
 ///
 /// **Note:** Allocates a new Vec per call. For hot-path code, prefer
 /// [`dequantize_values_flat_into`] which reuses a pre-allocated buffer.
@@ -224,10 +224,17 @@ pub fn maxsim_score_turboquant(
     let mut key_buf = vec![0.0f32; cache.kv_dim()];
 
     let mut score = 0.0f32;
+    // Hoist the range endpoints out of the outer loop — `Range<usize>` is not
+    // `Copy`, so the previous form cloned it `lq` times. Iterating
+    // `pos_start..pos_end` creates a fresh `Range` (16-byte struct) per outer
+    // iteration without any heap traffic, and produces the identical iteration
+    // sequence.
+    let pos_start = pos_range.start;
+    let pos_end = pos_range.end;
     for i in 0..lq {
         let q_row = &queries[i * dim..(i + 1) * dim];
         let mut my_max = f32::NEG_INFINITY;
-        for t in pos_range.clone() {
+        for t in pos_start..pos_end {
             // Lazy dequantize into pre-allocated buffer: O(dim) peak memory,
             // zero heap allocation per position. Matches maxsim.metal streaming pattern.
             cache.dequantize_key_into(layer, t, &mut key_buf);

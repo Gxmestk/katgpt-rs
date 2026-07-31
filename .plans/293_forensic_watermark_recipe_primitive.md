@@ -6,7 +6,7 @@
 **Industry prior art:** Tardos 2008, Boneh–Shaw 1998, AACS / Widevine / PlayReady forensic watermarking.
 **Target:** `katgpt-rs/crates/katgpt-core/src/forensic/` (new module)
 **Cargo feature:** `forensic_watermark` (opt-in, default OFF — promote to opt-in only after G1–G4 pass)
-**Status:** Active — Phases 1-6 ✓ (31/31 unit tests green), Phase 7 ✓ (T7.1 bench harness + T7.2-T7.5 mechanism-level gates covered by primitive unit tests in `riir-chain/src/forensic/` — see note below; scale-up to N=1000/real-assets is Plan 322 integration-level, tracked in `riir-chain/tests/goat_322_asset_fingerprinting.rs`), Phase 8 ✓ (T8.1, T8.3; T8.2 README deferred until Plan 322 G1-G7 pass). Default-OFF until Plan 322 integration-level GOAT gate passes.
+**Status:** ✅ COMPLETE, OPT-IN (pending Plan 322 integration GOAT) — Phases 1-6 ✓ (31/31 unit tests green), Phase 7 ✓ (T7.1 bench harness + T7.2-T7.5 mechanism-level gates covered by primitive unit tests in `riir-chain/src/forensic/` — see note below; scale-up to N=1000/real-assets is Plan 322 integration-level, tracked in `riir-chain/tests/goat_322_asset_fingerprinting.rs`), Phase 8 ✓ (T8.1, T8.3; T8.2 README deferred until Plan 322 G1-G7 pass). Default-OFF until Plan 322 integration-level GOAT gate passes.
 
 > **Note on T7.2-T7.5 (2026-07-02):** the forensic module was relocated to `riir-chain/src/forensic/` (commit `f4ca6ea7`, OPSEC move — forensic value depends on deployment secrecy). The primitive-level mechanism tests — which cover the same properties as T7.2-T7.5 — ship as unit tests there:
 > - **G1 attribution:** `recover::tests::end_to_end_correct_recipient_high_confidence` + `wrong_recipient_low_confidence`.
@@ -60,7 +60,7 @@ katgpt-rs/crates/katgpt-core/src/forensic/
 
 ### Tasks
 
-- [x] **T1.1** Create module skeleton `crates/katgpt-core/src/forensic/mod.rs` with feature gate `#[cfg(feature = "forensic_watermark")]`. Add feature to `crates/katgpt-core/Cargo.toml`. Export from `crates/katgpt-core/src/lib.rs` behind feature gate.
+- [x] **T1.1** Create module skeleton `riir-chain/src/forensic/mod.rs` with feature gate `#[cfg(feature = "forensic_watermark")]`. Add feature to `crates/katgpt-core/Cargo.toml`. Export from `crates/katgpt-core/src/lib.rs` behind feature gate.
 - [x] **T1.2** Define `RecipeConfig` struct in `recipe.rs`:
   ```rust
   pub struct RecipeConfig {
@@ -237,7 +237,7 @@ katgpt-rs/crates/katgpt-core/src/forensic/
 
 ### Tasks
 
-- [x] **T7.1** Create `benches/forensic_watermark.rs` (criterion). Bench:
+- [x] **T7.1** Create `riir-chain/benches/forensic_watermark.rs` (criterion). Bench:
   - `derive_recipe`: target < 10 µs per recipe.
   - `apply_vertex_marks_simd` on 10⁴-vertex mesh: target < 100 µs (10ns/vertex).
   - `apply_dct_marks` on 10³ blocks: target < 50 µs.
@@ -266,10 +266,10 @@ katgpt-rs/crates/katgpt-core/src/forensic/
 
 ### Tasks
 
-- [x] **T8.1** Add module-level rustdoc to `forensic/mod.rs` explaining: what it does, when to use, security model (forensic, not preventive), reference to Research 268.
+- [x] **T8.1** Add module-level rustdoc to `riir-chain/src/forensic/mod.rs` explaining: what it does, when to use, security model (forensic, not preventive), reference to Research 268.
 - [-] **T8.2** Add `katgpt-rs/README.md` Feature Showcase entry for Forensic Watermark (after G1–G4 pass). Cross-link to Research 268 + Plan 322.  
   **NOT EXECUTED** — the code moved to riir-chain (OPSEC). The katgpt-rs README has a tombstone pointing at riir-ai Plan 322 (added in commit `f4ca6ea7`). A Showcase entry would advertise the primitive publicly, which contradicts the OPSEC rationale for the move. The README entry belongs in riir-chain (if any), gated by the Plan 322 integration-level GOAT gate.
-- [x] **T8.3** Add example `examples/forensic_watermark_demo.rs` showing: derive recipe → apply to synthetic mesh → recover → attribute. ~100 lines, runs without GPU.
+- [x] **T8.3** Add example `riir-chain/examples/forensic_watermark_demo.rs` showing: derive recipe → apply to synthetic mesh → recover → attribute. ~100 lines, runs without GPU.
 
 ---
 
@@ -303,15 +303,15 @@ katgpt-rs/crates/katgpt-core/src/forensic/
 |------|--------|
 | `crates/katgpt-core/Cargo.toml` | Add `forensic_watermark` feature (no new deps — uses blake3, bytemuck, optional chacha20) |
 | `crates/katgpt-core/src/lib.rs` | Export `forensic` module behind feature gate |
-| `crates/katgpt-core/src/forensic/mod.rs` | Public API: Recipe, RecipeConfig, apply_*, recover_*, attribute |
-| `crates/katgpt-core/src/forensic/recipe.rs` | BLAKE3-seeded recipe derivation, P_vertex constructor |
-| `crates/katgpt-core/src/forensic/tardos.rs` | Anti-collusion codebook (Tardos 2008) |
-| `crates/katgpt-core/src/forensic/vertex.rs` | Vertex perturbation (LoopWM spectral stability) |
-| `crates/katgpt-core/src/forensic/texture.rs` | DCT mid-frequency embedding + recovery |
-| `crates/katgpt-core/src/forensic/topology.rs` | Degenerate-triangle topology mark + recovery |
-| `crates/katgpt-core/src/forensic/recover.rs` | End-to-end forensic recovery + attribution |
-| `benches/forensic_watermark.rs` | Criterion benchmarks for derive/apply/recover |
-| `examples/forensic_watermark_demo.rs` | End-to-end demo |
+| `riir-chain/src/forensic/mod.rs` | Public API: Recipe, RecipeConfig, apply_*, recover_*, attribute |
+| `riir-chain/src/forensic/recipe.rs` | BLAKE3-seeded recipe derivation, P_vertex constructor |
+| `riir-chain/src/forensic/tardos.rs` | Anti-collusion codebook (Tardos 2008) |
+| `riir-chain/src/forensic/vertex.rs` | Vertex perturbation (LoopWM spectral stability) |
+| `riir-chain/src/forensic/texture.rs` | DCT mid-frequency embedding + recovery |
+| `crates/katgpt-transformer/src/dense_mesh/topology.rs` | Degenerate-triangle topology mark + recovery |
+| `riir-chain/src/forensic/recover.rs` | End-to-end forensic recovery + attribution |
+| `riir-chain/benches/forensic_watermark.rs` | Criterion benchmarks for derive/apply/recover |
+| `riir-chain/examples/forensic_watermark_demo.rs` | End-to-end demo |
 | `README.md` | Feature Showcase entry (after G1–G4 pass) |
 
 ---

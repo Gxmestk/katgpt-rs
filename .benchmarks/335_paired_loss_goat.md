@@ -216,9 +216,9 @@ pattern: diagnostics ship opt-in, inference primitives ship default-on.
   `class_sum_count`.
 - `crates/katgpt-core/src/paired_loss/mod.rs` — export `FilterScratch`.
 - `crates/katgpt-core/src/paired_loss/tagger.rs` — `CopyN(n.min(255) as u8)`.
-- `crates/katgpt-core/src/simd/elementwise.rs` — new
+- `crates/katgpt-types/src/simd/elementwise.rs` — new
   `simd_masked_sum_count_f32` dispatcher + NEON/AVX2/wasm32/scalar backends.
-- `crates/katgpt-core/src/simd/mod.rs` — export `simd_masked_sum_count_f32`.
+- `crates/katgpt-types/src/simd/mod.rs` — export `simd_masked_sum_count_f32`.
 - `crates/katgpt-core/benches/bench_335_paired_loss_goat.rs` — new GOAT gate
   bench (G1 sanity, G2 perf, G2-alloc, G3, G4 gain, Prop 1 demo).
 - `crates/katgpt-core/Cargo.toml` — register `bench_335_paired_loss_goat`.

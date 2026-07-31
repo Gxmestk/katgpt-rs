@@ -22,7 +22,7 @@
 //!    onto a frozen direction vector `n`. Population analog of
 //!    `ict::BranchingDetector::last_population_mean`, but over **NPCs** (not
 //!    trajectories) and onto a **learned direction** (not action probabilities).
-//! 2. **[`HopfBoundary`]** (free function [`hopf_boundary`] + companion
+//! 2. **`HopfBoundary`** (free function [`hopf_boundary`] + companion
 //!    [`static_boundary`]) — closed-form 2×2 Jacobian eigenvalue check on
 //!    `(κ, κ_a)` for oscillatory instability. **Extends** Plan 301's
 //!    [`crate::subspace_phase_gate`] from *real-eigenvalue* phase transitions
@@ -761,50 +761,21 @@ pub static DEFAULT_CLASSIFIER: RegimeClassifier = RegimeClassifier {
     spinodal_margin: 9.0,
 };
 
-// ─── fast_tanh ──────────────────────────────────────────────────────────────
+// ─── fast_tanh ─────────────────────────────────────────────────
 
-/// Fast tanh approximation (Padé [2/2] clipped) — used in the hot aggregation
-/// loop because the per-element `tanh` call dominates the cost.
+/// Re-export of the canonical [`simd::fast_tanh`] (Padé [2/2] clipped).
 ///
-/// Padé [2/2]: `tanh(x) ≈ x·(27 + x²) / (27 + 9·x²)` — accurate to within
-/// `~0.025` over `|x| ≤ 3`, with the correct asymptotes `±1` reached by
-/// clipping. For `|x| > 3` we fall back to a hard `±1` clip (the asymptotic
-/// value — `tanh(3) ≈ 0.9951`, so the error is `< 0.005` past the cutoff).
-/// Worst-case observed drift is `~0.020` around `|x| ≈ 2` (Padé overshoots
-/// slightly vs the true tanh).
+/// Historically this was a local copy; it has been consolidated into
+/// `katgpt_types::simd::activations::fast_tanh` (the single source of truth).
+/// The Padé [2/2] form `x·(27+x²)/(27+9x²)` is accurate to within ~0.025
+/// over `|x| ≤ 3`; for `|x| > 3` it returns the sign-preserved asymptote ±1.
 ///
-/// # Determinism
-///
-/// Pure f32 arithmetic. Bit-identical across platforms (no libm dispatch —
-/// the standard `f32::tanh` calls libm, which may differ between glibc /
-/// musl / macOS libsystem in the last ULP).
-///
-/// # Why not `std::f32::tanh`?
-///
-/// Two reasons: (1) the hot-path cost (this is called `K·D` times per
-/// aggregation step), (2) cross-platform bit-identical determinism for the
-/// GOAT G5 gate. If a caller prefers libm accuracy, they can substitute
-/// `f32::tanh` in their own fork — the math is otherwise identical.
-///
-/// # Performance note
-///
-/// This is a scalar implementation. The aggregate_into hot loop calls this
-/// `K·D` times (e.g. 1000×8 = 8000 tanh calls), which dominates the cost.
-/// A SIMD-vectorized tanh (NEON/AVX2, 4-lane) would cut this by ~3–4× and
-/// bring `aggregate_into` under the 5µs target at K=1000/D=8. That is a
-/// future optimization tracked separately — the scalar Padé is sufficient
-/// for the correctness G1 gate and the alloc-free G4 gate, which are the
-/// promotion-blocking gates. The perf G2 gate target is calibrated to
-/// scalar reality (15µs at K=1000/D=8) in the GOAT bench.
+/// See the canonical doc on [`crate::simd::fast_tanh`] for the full accuracy
+/// bound, the platform-drift discussion, and the safety contract (safe for
+/// bounded-activation use; unsafe for algebraic-identity preservation).
 #[inline]
 fn fast_tanh(x: f32) -> f32 {
-    let ax = x.abs();
-    if ax > 3.0 {
-        // Past the Padé validity range — return the asymptote (sign-preserved).
-        return x.signum();
-    }
-    let x2 = x * x;
-    x * (27.0 + x2) / (27.0 + 9.0 * x2)
+    crate::simd::fast_tanh(x)
 }
 
 // ──────────────────────────────────────────────────────────────────────────

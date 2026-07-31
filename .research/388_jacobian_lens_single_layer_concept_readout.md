@@ -146,7 +146,7 @@ The fusion-first mindset (skill §Workflow step 1) calls for combining this pape
 | | |
 |---|---|
 | **Target** | `katgpt-rs/crates/katgpt-core/src/faithfulness/` (new `concept_readout.rs` submodule) |
-| **Existing primitives fused** | `jacobian_svd_at_into` (Plan 301) × `FaithfulnessProbe` (Plan 278, shipped via `cgsp/dual_pool.rs` integration) × `CosineSmearClassifier` (Plan 298) |
+| **Existing primitives fused** | `jacobian_svd_at_into` (Plan 301) × `FaithfulnessProbe` (Plan 278, shipped via `crates/katgpt-core/src/cgsp/dual_pool.rs` integration) × `CosineSmearClassifier` (Plan 298) |
 | **Gain hypothesis** | Use ~455 ns Jacobian SVD readout as a **representational pre-check** before the <1 ms causal probe. "Is the injected concept in the top-k principal directions of the local map? If not, skip the probe — no local route exists." Pre-filter cost ~455 ns vs ~1 ms causal probe ≈ **~2000× cheaper on the rejection path**. |
 | **Verdict** | Gain → GOAT-conditional. The architectural coverage is trivially true (the math exists); the quality claim (no missed faithfulness violations) requires a defend-wrong PoC per skill §3.6. **Plan 409 sketches that PoC.** |
 | **Why it's the primary path** | (1) Cleanest measurable gain. (2) Reuses two already-shipped public primitives. (3) The PoC is a small, well-scoped bench in `riir-ai/crates/riir-poc/`. (4) The "selectivity" property from the paper (§1.2 #5) directly maps to a faithfulness-rejection criterion. |
@@ -193,7 +193,7 @@ The fusion-first mindset (skill §Workflow step 1) calls for combining this pape
 ### 3.1 MOAT gate (per domain, skill §1.6)
 
 - **`katgpt-rs` (public engine) — IN SCOPE.** The concept readout is a fundamental modelless inference primitive (Jacobian math + causal interpretation), built on Plan 301's substrate. It belongs in `katgpt-core` (leaf-clean substrate). **Strengthens moat: yes** — the engine's faithfulness/introspection story becomes a single primitive deep, not just a probe.
-- **`riir-ai` (private runtime) — POSSIBLE CONSUMER.** The PoC lives in `riir-ai/crates/riir-poc/` per skill §3.6 (the defend-wrong crate). If Fusion A promotes to GOAT, the runtime composition layer (`*_runtime` module pattern) consumes `katgpt-core::faithfulness::concept_readout` and wires it as a pre-filter inside the existing `DualPoolBandit::consolidate_growing_gated` integration (see `cgsp/dual_pool.rs:433` — the existing FaithfulnessProbe gate).
+- **`riir-ai` (private runtime) — POSSIBLE CONSUMER.** The PoC lives in `riir-ai/crates/riir-poc/` per skill §3.6 (the defend-wrong crate). If Fusion A promotes to GOAT, the runtime composition layer (`*_runtime` module pattern) consumes `katgpt-core::faithfulness::concept_readout` and wires it as a pre-filter inside the existing `DualPoolBandit::consolidate_growing_gated` integration (see `crates/katgpt-core/src/cgsp/dual_pool.rs:433` — the existing FaithfulnessProbe gate).
 - **`riir-chain` / `riir-neuron-db` — OUT OF SCOPE.** No chain commitment, no shard storage, no LatCal bridge involvement. The primitive operates on a generic smooth map; chain/shard consumers may use it later but the primary consumer is the runtime faithfulness gate.
 - **`riir-train` — DEFERRED.** The paper's counterfactual reflection training → riir-train (one-line note, no file). The modelless path (Fusion A) does not require any training.
 
@@ -201,7 +201,7 @@ The fusion-first mindset (skill §Workflow step 1) calls for combining this pape
 
 | Q | Answer |
 |---|---|
-| **Q1 — No prior art?** | **Partial.** The Jacobian + SVD math ships (Plan 301, verified by grep: `jacobian_svd_at`, `jacobian_svd_at_into` in `subspace_phase_gate.rs`). The faithfulness probe ships (Plan 278, verified by grep: `FaithfulnessProbe`, `faithfulness_profile`, `DefaultFaithfulnessProbe` in `faithfulness/probe.rs`). The *interpretation* — J-lens principal directions as a causally-faithful verbalizable basis, used as a representational pre-filter before the causal probe — **does not ship**. No `.research/` note frames the SVD's right singular vectors as "concept directions"; no code reads them as such. **Not a new class of capability** (we already have a faithfulness probe); **is a new integration point** (pre-filter vs the existing post-hoc probe). |
+| **Q1 — No prior art?** | **Partial.** The Jacobian + SVD math ships (Plan 301, verified by grep: `jacobian_svd_at`, `jacobian_svd_at_into` in `subspace_phase_gate.rs`). The faithfulness probe ships (Plan 278, verified by grep: `FaithfulnessProbe`, `faithfulness_profile`, `DefaultFaithfulnessProbe` in `crates/katgpt-core/src/faithfulness/probe.rs`). The *interpretation* — J-lens principal directions as a causally-faithful verbalizable basis, used as a representational pre-filter before the causal probe — **does not ship**. No `.research/` note frames the SVD's right singular vectors as "concept directions"; no code reads them as such. **Not a new class of capability** (we already have a faithfulness probe); **is a new integration point** (pre-filter vs the existing post-hoc probe). |
 | **Q2 — New class of behavior?** | **No.** This is an optimization (cheaper pre-check), not a capability the codebase cannot currently do. The probe already exists; the pre-filter speeds up the rejection path. |
 | **Q3 — Product selling point?** | **No, not standalone.** It is a perf optimization on an existing pillar-adjacent primitive. The selling point ("our NPCs can introspect on whether an injected memory will actually affect behavior, in 455 ns not 1 ms") is incremental, not headline. |
 | **Q4 — Force multiplier?** | **Partial.** Connects Plan 301 (subspace phase gate) × Plan 278 (FaithfulnessProbe) × Plan 298 (CosineSmearClassifier). Two pillars-touched, but the touch is perf-only, not capability. |
@@ -234,7 +234,7 @@ The fusion-first mindset (skill §Workflow step 1) calls for combining this pape
 
 Per skill §1.7, Fusion A's PoC plan consumes a katgpt-rs primitive (`jacobian_svd_at_into` from Plan 301) into a riir-ai PoC (`riir-ai/crates/riir-poc/`). The audit is not strictly required because the consumer is `riir-poc` (the defend-wrong R&D crate, not a production runtime), but the audit questions are answered inline:
 
-1. **Is the primitive already wired into riir-\*?** `jacobian_svd_at_into` is consumed by Plan 312 (`viable_manifold_graph.rs`) and Plan 301 (phase transition gate). The new PoC wiring (pre-filter inside the FaithfulnessProbe integration point at `cgsp/dual_pool.rs:433`) is **new** — it is not currently wired.
+1. **Is the primitive already wired into riir-\*?** `jacobian_svd_at_into` is consumed by Plan 312 (`viable_manifold_graph.rs`) and Plan 301 (phase transition gate). The new PoC wiring (pre-filter inside the FaithfulnessProbe integration point at `crates/katgpt-core/src/cgsp/dual_pool.rs:433`) is **new** — it is not currently wired.
 2. **Is riir-\* shipping a local duplicate of the substrate?** No. The PoC imports from `katgpt-core`; no local Jacobian-SVD implementation is being added.
 
 No `goat-audit` skill invocation required for this PoC; the implementation plan (post-PoC) will trigger the full audit.

@@ -12,7 +12,7 @@
 
 **Initial plan** proposed shipping a new `ProgramSynthesizedHead` primitive + `Box<dyn SynthesizedAttentionFn>` trait. **User-prompted re-review** ("sound like percepta? and a bit of functional attention?") identified that:
 
-1. **FuncAttn** (`katgpt-core/src/funcattn.rs`, R257 / Plan 286) already ships the `tokens → attention via external operator` primitive shape. The proposed `SynthesizedAttentionFn` trait is structurally `dyn FuncAttnKernel` — redundant.
+1. **FuncAttn** (`crates/katgpt-core/src/funcattn/mod.rs`, R257 / Plan 286) already ships the `tokens → attention via external operator` primitive shape. The proposed `SynthesizedAttentionFn` trait is structurally `dyn FuncAttnKernel` — redundant.
 2. **Percepta** (`katgpt-percepta` crate, R031 / R032 / Plan 064) already ships the programs-as-attention paradigm.
 
 The initial plan was revised: **drop `ProgramSynthesizedHead`**, ship only `HeadSubstitutionGate` as a small wrapper around FuncAttn's existing trait surface. Verdict dropped GOAT → Gain. See Research 353 §3.3 for the full revision log.
@@ -35,10 +35,10 @@ This is **not** a new primitive — FuncAttn is the primitive. This is the **con
 
 | Mechanism | Where | What's missing |
 |---|---|---|
-| **FuncAttn** (R257, Plan 286) — surrogate representation | `katgpt-core/src/funcattn.rs` | No substitution gate — FuncAttn computes attention, doesn't decide when to use itself vs a real head |
+| **FuncAttn** (R257, Plan 286) — surrogate representation | `crates/katgpt-core/src/funcattn/mod.rs` | No substitution gate — FuncAttn computes attention, doesn't decide when to use itself vs a real head |
 | **Percepta** (R031/032, Plan 064) — programs-as-attention | `katgpt-percepta` crate | Compile-time only; no runtime substitution decision |
-| `FaithfulnessProbe` causal intervention (R244, Plan 278) | `katgpt-core/src/faithfulness/probe.rs` | Detects unfaithfulness; doesn't prescribe a surrogate or gate substitution |
-| `SmearClassifier` hallucinated-feature detector (R277, Plan 298) | `katgpt-core/src/faithfulness/smear.rs` | Detects smear; doesn't gate substitution |
+| `FaithfulnessProbe` causal intervention (R244, Plan 278) | `crates/katgpt-core/src/faithfulness/probe.rs` | Detects unfaithfulness; doesn't prescribe a surrogate or gate substitution |
+| `SmearClassifier` hallucinated-feature detector (R277, Plan 298) | `crates/katgpt-core/src/faithfulness/smear.rs` | Detects smear; doesn't gate substitution |
 
 **The novel piece this plan ships:** `HeadSubstitutionGate` — a small wrapper that decides when FuncAttn should fire as a substitute for a real head, using the paper's IoU `r > 0.9` finding as the cheap-proxy gate and FaithfulnessProbe as the expensive-validation cadence.
 
@@ -49,7 +49,7 @@ This is **not** a new primitive — FuncAttn is the primitive. This is the **con
 ### Tasks
 
 - [x] **T1.1** Create module directory `katgpt-rs/crates/katgpt-core/src/functional_substitution/` with `mod.rs`, `gate.rs`, `iou.rs`.
-- [x] **T1.2** Add feature flag `functional_substitution_gate` to `katgpt-rs/crates/katgpt-core/Cargo.toml` (default-off). The feature depends on `funcattn` (for the surrogate trait) and `faithfulness_probe` (for the validation primitive). Wire into `katgpt-core/src/lib.rs` behind `#[cfg(feature = "functional_substitution_gate")]`.
+- [x] **T1.2** Add feature flag `functional_substitution_gate` to `katgpt-rs/crates/katgpt-core/Cargo.toml` (default-off). The feature depends on `funcattn` (for the surrogate trait) and `faithfulness_probe` (for the validation primitive). Wire into `crates/katgpt-core/src/lib.rs` behind `#[cfg(feature = "functional_substitution_gate")]`.
 - [x] **T1.3** Define `iou` function in `iou.rs`: `iou(a: &[f32], b: &[f32]) -> f32`. Formula per paper eq. 3: `Σ min(a,b) / Σ max(a,b)`. SIMD-friendly chunked loop, no allocations. Unit-tested against hand-computed cases (identity → 1.0, disjoint → 0.0, half-overlap → 0.5).
 - [x] **T1.4** Define `HeadSubstitutionGate` struct in `gate.rs`:
   ```rust
@@ -94,12 +94,12 @@ This is **not** a new primitive — FuncAttn is the primitive. This is the **con
 
 ### Tasks
 
-- [x] **T2.1 (G1 — correctness)** Write unit tests in `tests/functional_substitution_g1.rs`:
+- [x] **T2.1 (G1 — correctness)** Write unit tests in `crates/katgpt-core/tests/functional_substitution_g1.rs`:
   - Identity surrogate (IoU = 1.0, faithfulness delta = 0) → gate accepts.
   - Disjoint surrogate (IoU = 0.0) → gate rejects (regardless of faithfulness).
   - Partial-overlap surrogate at known IoU (e.g., 0.5) → gate accepts iff `tau_iou ≤ 0.5 AND faithfulness ≤ tau_behavior`.
   - High IoU but high behavior delta → gate rejects (faithfulness veto).
-- [x] **T2.2 (G3 — hot-path latency)** Benchmark `HeadSubstitutionGate::should_substitute` against a baseline that always returns `false`. Target: ≤ 5% overhead. Use `criterion` bench at `benches/functional_substitution_g3.rs`. Head counts: 4, 16, 144.
+- [x] **T2.2 (G3 — hot-path latency)** Benchmark `HeadSubstitutionGate::should_substitute` against a baseline that always returns `false`. Target: ≤ 5% overhead. Use `criterion` bench at `crates/katgpt-core/benches/functional_substitution_g3.rs`. Head counts: 4, 16, 144.
 - [x] **T2.3 (G4 — zero-alloc)** Add `#[inline]` to `should_substitute`. Verify the gate itself allocates nothing on the hot path (no `Vec` growth, no `Box`).
 - [x] **T2.4** Run full crate test suite to confirm no regressions: `cargo test -p katgpt-core --features functional_substitution_gate --lib`.
 
@@ -113,7 +113,7 @@ The paper's strongest empirical claim is that IoU is a valid *cheap proxy* for *
 
 ### Tasks
 
-- [x] **T3.1** Build a synthetic harness in `tests/functional_substitution_g2.rs`:
+- [x] **T3.1** Build a synthetic harness in `crates/katgpt-core/tests/functional_substitution_g2.rs`:
   - Generate a synthetic "real" attention matrix with a known structure (e.g., first-token + lower-diagonal per paper Fig 4b GPT-2 categories).
   - Generate a family of surrogates with controlled IoU (0.0, 0.2, 0.4, 0.6, 0.8, 1.0) by blending the real matrix with noise.
   - For each surrogate: measure (a) IoU against real, (b) behavioral delta — KL divergence between softmax(real_tokens) and softmax(surrogate_tokens) on a downstream "task" (a fixed linear projection to a scalar "perplexity proxy").
@@ -156,8 +156,8 @@ The paper's strongest empirical claim is that IoU is a valid *cheap proxy* for *
 ## Cross-references
 
 - **Research note:** `katgpt-rs/.research/353_Program_Synthesized_Attention_Head_Surrogates.md` (esp. §3.3 revision log)
-- **Primitive being gated:** `katgpt-core/src/funcattn.rs` (R257, Plan 286)
-- **Validation primitive:** `katgpt-core/src/faithfulness/probe.rs` (R244, Plan 278)
+- **Primitive being gated:** `crates/katgpt-core/src/funcattn/mod.rs` (R257, Plan 286)
+- **Validation primitive:** `crates/katgpt-core/src/faithfulness/probe.rs` (R244, Plan 278)
 - **Cadence pattern source:** Plan 287 (SinkAware cached-cadence)
 - **Cousin research:** 257 (FuncAttn), 031/032 (Percepta), 244 (FaithfulnessProbe), 229 (ProgramAsWeights), 277 (SmearClassifier), 178 (Rosetta Neurons), 302 (FAME — latent reframing target)
 

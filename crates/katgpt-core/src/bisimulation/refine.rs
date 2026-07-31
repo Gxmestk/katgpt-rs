@@ -163,6 +163,9 @@ pub fn partition_refine(graph: &TransitionGraph) -> BisimulationQuotient {
     // by smallest member state id). Start with the trivial single-class
     // partition — already canonical.
     let mut current_class: Vec<u32> = vec![0u32; n];
+    // Reusable buffer for the next iteration's class assignment — hoisted
+    // out of the fixed-point loop (was a fresh `vec![0u32; n]` per iter).
+    let mut new_class: Vec<u32> = vec![0u32; n];
 
     // Per-iteration scratch buffers (allocated ONCE here, reused across
     // iterations — no allocation in the fixed-point loop body).
@@ -172,7 +175,7 @@ pub fn partition_refine(graph: &TransitionGraph) -> BisimulationQuotient {
     let mut indexed_sigs: Vec<(Vec<(u8, u32)>, u32)> = Vec::with_capacity(n);
 
     loop {
-        // ── Step 1a: compute each state's signature from `current_class` ─
+        // ── Step 1a: compute each state's signature from `current_class` ──
         for sig_slot in signatures.iter_mut() {
             sig_slot.clear();
         }
@@ -198,7 +201,7 @@ pub fn partition_refine(graph: &TransitionGraph) -> BisimulationQuotient {
         indexed_sigs.sort_by(|a, b| a.0.cmp(&b.0).then(a.1.cmp(&b.1)));
 
         // Assign new class ids: first distinct signature → 0, etc.
-        let mut new_class: Vec<u32> = vec![0u32; n];
+        new_class.fill(0);
         let mut next_class: u32 = 0;
         let mut prev_full: Option<&Vec<(u8, u32)>> = None;
         for (sig, original_idx) in &indexed_sigs {
@@ -229,7 +232,8 @@ pub fn partition_refine(graph: &TransitionGraph) -> BisimulationQuotient {
             // Converged: partition is stable AND labels are canonical.
             break;
         }
-        current_class = new_class;
+        // Swap reusable buffers instead of reallocating next iteration.
+        mem::swap(&mut current_class, &mut new_class);
     }
 
     // ── Step 2: convert to StateClassId + recompute n_classes ────────────

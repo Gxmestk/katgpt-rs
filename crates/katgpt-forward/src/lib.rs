@@ -21,7 +21,7 @@
 //! of the in-root era was an artifact of same-crate access; once the type crosses
 //! the crate boundary the forward-pass callers need `pub` access.
 
-use katgpt_types::{Config, DepthTier, kv_dim};
+use katgpt_types::{Config, DepthTier, Rng, kv_dim, sample_token_into, softmax_scaled};
 // SIMD kernels (re-exported from katgpt_types as katgpt_types::simd, and by
 // katgpt_core as katgpt_core::simd). We keep the katgpt_core::simd path used by
 // the original delta-routing code so the move is byte-for-byte structural.
@@ -41,19 +41,25 @@ use katgpt_transformer::WallPrefixState;
 pub struct ForwardContext {
     // ── u64-aligned fields first (Vec, usize, arrays) ──────────────
     // Grouped by alignment to eliminate inter-field padding.
-    pub x: Vec<f32>,            // [n_embd] main activation
-    pub xr: Vec<f32>,           // [n_embd] residual
-    pub xr2: Vec<f32>,          // [n_embd] residual 2
-    pub q: Vec<f32>,            // [n_embd] query
-    pub k: Vec<f32>,            // [kv_dim] key (kv_dim = n_kv_head * head_dim)
-    pub v: Vec<f32>,            // [kv_dim] value
-    pub attn_out: Vec<f32>,     // [n_embd] attention output
-    pub scores: Vec<f32>,       // [block_size] attention scores (max possible)
-    pub hidden: Vec<f32>,       // [mlp_hidden] MLP hidden
+    pub x: Vec<f32>,        // [n_embd] main activation
+    pub xr: Vec<f32>,       // [n_embd] residual
+    pub xr2: Vec<f32>,      // [n_embd] residual 2
+    pub q: Vec<f32>,        // [n_embd] query
+    pub k: Vec<f32>,        // [kv_dim] key (kv_dim = n_kv_head * head_dim)
+    pub v: Vec<f32>,        // [kv_dim] value
+    pub attn_out: Vec<f32>, // [n_embd] attention output
+    pub scores: Vec<f32>,   // [block_size] attention scores (max possible)
+    pub hidden: Vec<f32>,   // [mlp_hidden] MLP hidden
+    // Gated MLP (Issue 377): second hidden buffer for the "up" projection.
+    // When `gated_mlp` is enabled, the forward path computes
+    // gate = W_gate·h into `hidden`, up = W_up·h into `hidden2`,
+    // then applies swiglu(hidden, hidden, hidden2).
+    #[cfg(feature = "gated_mlp")]
+    pub hidden2: Vec<f32>, // [mlp_hidden] MLP up-projection scratch
     pub logits: Vec<f32>,       // [vocab_size] output logits
     pub cdf: Vec<f32>,          // [vocab_size] pre-allocated CDF for sampling
     pub hidden_state: Vec<f32>, // [n_embd] final hidden state (Plan 009 compat)
-    /// LoRA intermediate buffer [lora_rank]. Pre-allocated, zero alloc in hot path.
+    /// LoRA intermediate buffer `[lora_rank]`. Pre-allocated, zero alloc in hot path.
     pub lora_buf: Vec<f32>,
     // CNA: contrastive neuron attribution runtime modulator (Plan 087)
     #[cfg(feature = "cna_steering")]
@@ -164,6 +170,8 @@ impl ForwardContext {
             attn_out: vec![0.0; config.n_embd],
             scores: vec![0.0; config.block_size],
             hidden: vec![0.0; config.mlp_hidden],
+            #[cfg(feature = "gated_mlp")]
+            hidden2: vec![0.0; config.mlp_hidden],
             logits: vec![0.0; config.vocab_size],
             cdf: vec![0.0; config.vocab_size],
             hidden_state: vec![0.0; config.n_embd],
@@ -263,10 +271,40 @@ impl ForwardContext {
         self.dequant_pos.fill(0);
     }
 
-    /// Backward-compat alias for [`reset_dequant`].
+    /// Backward-compat alias for [`Self::reset_dequant`].
     #[cfg(feature = "turboquant")]
     pub fn reset_tq_dequant(&mut self) {
         self.reset_dequant();
+    }
+
+    /// Fused temperature-scaled softmax + categorical sample.
+    ///
+    /// Applies `softmax_scaled(&mut self.logits, 1.0 / temperature)` in place,
+    /// then samples a token id from the resulting categorical via
+    /// [`sample_token_into`] using `self.cdf` as scratch. Returns the sampled
+    /// token id.
+    ///
+    /// This fuses the two-line pattern that appeared 7+ times across the
+    /// generator call sites (`softmax_scaled(logits, 1.0/temp);
+    /// sample_token_into(&ctx.logits, rng, &mut ctx.cdf)`) into one intent-
+    /// revealing call. Behavior is identical to the inlined sequence.
+    ///
+    /// # Pre-condition
+    ///
+    /// `self.logits` must hold the output of a preceding `forward_*` call
+    /// (i.e. `forward_base` / `forward_hla` / `forward_ahla` / `forward_gdn2`
+    /// / `self.forward(...)` on `InferenceRouter`). Those functions return a
+    /// `&mut [f32]` that is exactly `&mut self.logits` — the softmax below
+    /// mutates the same buffer the sampler then reads.
+    ///
+    /// # Zero-allocation
+    ///
+    /// Both `softmax_scaled` and `sample_token_into` operate in place on the
+    /// pre-allocated `logits` / `cdf` buffers; no allocation on the hot path.
+    #[inline]
+    pub fn sample_next_token(&mut self, temperature: f32, rng: &mut Rng) -> usize {
+        softmax_scaled(&mut self.logits, 1.0 / temperature);
+        sample_token_into(&self.logits, rng, &mut self.cdf)
     }
 
     /// Perform delta routing using pre-allocated index buffer (avoids Vec::new() per call).
@@ -405,6 +443,11 @@ impl katgpt_speculative::dflash::DflashCtx<TransformerWeights> for ForwardContex
         &self.logits
     }
 
+    #[inline]
+    fn hidden_state_slice(&self) -> &[f32] {
+        &self.hidden_state
+    }
+
     fn apply_mtp_conditioning(
         &mut self,
         weights: &TransformerWeights,
@@ -413,12 +456,7 @@ impl katgpt_speculative::dflash::DflashCtx<TransformerWeights> for ForwardContex
         vocab_size: usize,
     ) {
         let n = n_embd.min(mtp_ctx.len());
-        for i in 0..n {
-            // safety: i < n <= n_embd == hidden_state.len() and i < mtp_ctx.len()
-            unsafe {
-                *self.hidden_state.get_unchecked_mut(i) += *mtp_ctx.get_unchecked(i);
-            }
-        }
+        katgpt_core::simd::simd_add_inplace(&mut self.hidden_state[..n], &mtp_ctx[..n]);
         katgpt_types::matmul(
             &mut self.logits,
             &weights.lm_head,
@@ -448,8 +486,9 @@ pub mod forward;
 #[cfg(feature = "coda_fusion")]
 pub use forward::forward_coda;
 pub use forward::{
-    attention_head, cluster_map_from_embeddings, cluster_map_round_robin, clustered_lm_head,
-    forward, forward_base, select_topk_indices, select_topk_indices_into_buf, standard_lm_head,
+    CPU_FORWARD_USES_DEVICE_BASE_PATH, attention_head, cluster_map_from_embeddings,
+    cluster_map_round_robin, clustered_lm_head, forward, forward_base, forward_base_f16,
+    forward_f16, select_topk_indices, select_topk_indices_into_buf, standard_lm_head,
 };
 
 // DenseMesh `node_transformer` — Plan 385 (2026-07-05).

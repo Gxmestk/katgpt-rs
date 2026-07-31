@@ -23,10 +23,10 @@
 //! - **Deterministic** — same inputs → same direction, bit-for-bit.
 //! - **Closed-form** — single pass over the data, no iteration, no learning
 //!   rate, no convergence. Not "training" in the gradient-descent sense.
-//! - **Freeze/thaw compatible** — the output is a [`FutureBehaviorProbe`]
+//! - **Freeze/thaw compatible** — the output is a `FutureBehaviorProbe`
 //!   artifact with an embedded BLAKE3 hash. Load it via
-//!   [`FutureBehaviorProbe::load_from_bytes`] at runtime; swap via
-//!   [`FutureBehaviorProbe::swap_direction`].
+//!   `FutureBehaviorProbe::load_from_bytes` at runtime; swap via
+//!   `FutureBehaviorProbe::swap_direction`.
 //!
 //! # When to use this vs a riir-train probe
 //!

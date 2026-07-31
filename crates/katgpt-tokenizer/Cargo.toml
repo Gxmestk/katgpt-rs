@@ -27,3 +27,12 @@ convex_tok = ["dep:good_lp", "toast_tokenizer"]
 # Alias: enables toast_tokenizer (datrie is auto-routed above DATRIE_VOCAB_THRESHOLD)
 # + benchmark examples (Research 137).
 datrie_vocab = ["toast_tokenizer"]
+
+# fast_bpe — gigatoken-derived fast BPE encode path (Issue 191, Research 456).
+# Vendored MIT code from https://github.com/marcelroed/gigatoken's pure-Rust
+# `bpe/` core. Pairs `BpeTokenizerImpl::encode_fast` with a `PairRankTable` +
+# branchless merge cores. The ShortPretokenCache substrate ships but is not
+# wired (no pretokenization in this crate's BPE — see `fast_bpe/mod.rs` docs).
+# Zero external deps (the four substrate-independent techniques ship in pure
+# stable Rust with `core::arch::*` intrinsics + inline asm).
+fast_bpe = []

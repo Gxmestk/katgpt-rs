@@ -4,7 +4,7 @@
 **Research:** [katgpt-rs/.research/388_jacobian_lens_single_layer_concept_readout.md](../.research/388_jacobian_lens_single_layer_concept_readout.md)
 **Source paper:** [transformer-circuits.pub/2026/workspace](https://transformer-circuits.pub/2026/workspace/index.html) — Gurnee, Sofroniew, Lindsey et al., "Verbalizable Representations Form a Global Workspace in Language Models" (Anthropic, 2026-07-06)
 **Target:** `riir-ai/crates/riir-poc/` (defend-wrong PoC crate per research skill §3.6)
-**Status:** Active — Phase 1 COMPLETE; Phase 2 (latency bench) next.
+**Status:** COMPLETE ✅ (negative result — HALTED at Phase 2) — Phase 2 latency gate FAILED: Jacobian-SVD prefilter (Strategy B) is 10–70× SLOWER than the causal probe (Strategy A) at every size tested — complete inversion of the ~2000× speedup claim. Root cause is structural: Strategy B needs n+1 eval calls + SVD vs Strategy A's 5 eval calls (n ≥ 4 → prefilter structurally cannot win). Phase 3 quality bench did not run (no point measuring FN rate on a slower-than-probe prefilter). Research 388 revised to **Refuted (Fusion A latency path)**. Issue 043 (resolved) tracked SVD perf bug + misleading docstring (both fixed). PoC bench stays in `riir-poc/` as permanent regression check. No katgpt-rs production code shipped.
 
 ---
 

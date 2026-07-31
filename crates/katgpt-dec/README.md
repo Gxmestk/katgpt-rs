@@ -39,7 +39,7 @@ compatibility.
 
 ## Feature flags
 
-`default = ["heat_kernel_trajectory", "sheaf_admm"]`
+`default = ["heat_kernel_trajectory", "sheaf_admm", "grid_3d"]`
 
 | Feature | Default | Description |
 |---------|---------|-------------|
@@ -48,6 +48,7 @@ compatibility.
 | `motor_gated_field` | no | Amari-style motor-gated neural-field evolution step — Hodge Laplacian + ReLU gate + per-channel motor gain (Plan 357). |
 | `htno_v_cycle` | no | Multi-scale V-cycle on cell complexes via selector restriction maps (fine→coarse→fine hierarchy). |
 | `cochain_point_sampler` | no | Whitney/de-Rham continuous point sampler for modelless intra-primitive field queries (Plan 422). |
+| `grid_3d` | **yes** | 3D cubical `CellComplex::grid_3d(w,h,d)` constructor + 7-point-stencil `graph_laplacian_grid_3d_into` fast path + zero-alloc `stochastic_birth_death_step` NCA growth + `argmax_block_type` raw→categorical bridge (Plan 454, arxiv 2103.08737). GOAT G1a–G6 ALL PASS (growth reach 6.0×, branched morphology 1.80× roughness via modelless crowding-death, regeneration 100%, 0 allocs, bit-identical). |
 
 ## Dependencies
 

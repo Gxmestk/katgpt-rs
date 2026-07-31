@@ -92,7 +92,7 @@ else:
 
 ### Part 1: InferenceBackend Trait (Runtime Weight-Based)
 
-- [x] Create `src/inference_backend.rs` with `InferenceBackend` trait
+- [x] Create `riir-ai/crates/riir-engine/src/inference_backend.rs` with `InferenceBackend` trait
 - [x] `CpuBackend` wrapping existing `transformer::forward`
 - [x] `auto_backend()` for CPU/ANE auto-route (legacy — will be replaced by TriggerGate)
 - [x] Unit tests: CpuBackend matches direct forward
@@ -105,7 +105,7 @@ else:
 
 - [x] Add `metal = { version = "0.33", optional = true }` to macOS dependencies
 - [x] Add `gpu_inference = ["dep:metal"]` feature flag
-- [x] Create `src/gpu_backend.rs` behind `#[cfg(all(target_os = "macos", feature = "gpu_inference"))]`
+- [x] Create `crates/katgpt-backend/src/gpu.rs` behind `#[cfg(all(target_os = "macos", feature = "gpu_inference"))]`
 - [x] Implement `GpuBackend`:
   - [x] `compile()`: take `TransformerWeights`, build Metal compute pipeline for matmul + attention + FFN
   - [x] `forward()`: dispatch to GPU, wait for completion, return logits
@@ -136,7 +136,7 @@ else:
 
 ### Part 4: Trigger Gate
 
-- [x] Create `src/trigger_gate.rs`
+- [x] Create `crates/katgpt-core/src/trigger_gate.rs`
 - [x] `TriggerGateConfig` with thresholds:
   ```rust
   pub struct TriggerGateConfig {

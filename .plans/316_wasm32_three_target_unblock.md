@@ -29,7 +29,7 @@ targets. Root causes were NOT architectural — three missing cfg/feature declar
 
 ## Tasks
 
-- [x] **T1: Fix `argmax.rs` missing import** (`katgpt-core/src/simd/argmax.rs`)
+- [x] **T1: Fix `argmax.rs` missing import** (`crates/katgpt-types/src/simd/argmax.rs`)
   - Added `use crate::simd::simd_max_f32;`
   - Regression from the `simd.rs` → `simd/` folder refactor (`9d0ba6ee`). Native CI
     was green because the `aarch64`/`x86_64` branches early-return before reaching
@@ -102,6 +102,26 @@ the Vessel *projection* path (Model B) needed the getrandom + bytemuck fixes.
   which builds clean to wasm32 but does **not yet depend on katgpt-core/riir-chain**.
 - The moment `katgpt-core` is wired into `seal-edge-worker`, it inherits the
   fixes from this plan (the wasm32 build stays green).
+- **Update (2026-07-25):** Doc 56's viability claims got their first real
+  measurement, from a sibling project, not from `seal-edge-worker` itself.
+  riir-mmorpg-examples Issue 030 deployed real Cloudflare Durable Object
+  Alarms, WebSocket-message-driven catch-up, and Cloudflare Containers to
+  test whether a 20Hz/50ms game tick holds up on each — Alarms and
+  WS-catchup both measured unreliable (p99 drift up to 617ms; ~48% of
+  ticks late respectively), a properly-sized Container held p99 within ~1%
+  of target. This is directly relevant here because `seal-edge-worker`'s
+  own `Zone DO` tick (per `riir-ai/.docs/01_orientation/architecture.md`
+  §22) is documented as Alarm-driven at the same 50ms/20Hz rate — **not
+  re-verified against `seal-edge-worker` itself in that session** (the repo
+  isn't checked out in that environment). Tracked as
+  [riir-ai Issue 566](../../riir-ai/.issues/566_seal_edge_worker_alarm_reliability_recheck.md)
+  (open, blocked on someone checking the real deployment) so this doesn't
+  read as a settled "Model A is the doc-56 edge design ✅ Works" a few
+  lines above without the caveat that the *scheduling* half (not the
+  wasm32-compiles-clean half this plan is actually about) has a real,
+  measured question mark. See
+  [riir-mmorpg-examples Issue 030](../../riir-mmorpg-examples/.issues/030_cloudflare_workers_deployability.md)
+  for the full methodology + numbers.
 
 ### Known latent issues NOT fixed by this plan
 
@@ -120,7 +140,7 @@ the Vessel *projection* path (Model B) needed the getrandom + bytemuck fixes.
   `cargo check --target wasm32-unknown-unknown --features chain_node_browser`
   works out of the box. Verified: builds clean (1 pre-existing dead-code warning,
   0 errors). All three targets now compile: native ✅ browser ✅ CF Worker ✅.
-- `seal-edge-worker/src/runtime/wasm_compat.rs:213` has a `0xCA` filler standing
+- `seal-online-remaster/crates/seal-edge-worker/src/runtime/wasm_compat.rs:213` has a `0xCA` filler standing
   in for `web_sys::crypto().getRandomValues()` (`TODO(F-140)`). Any crypto path
   routing through this on CF uses non-random randomness. Audit before production.
 - WASM SIMD128 coverage gap: only `simd_ternary_matvec` has a real wasm32 SIMD128
@@ -131,7 +151,7 @@ the Vessel *projection* path (Model B) needed the getrandom + bytemuck fixes.
 
 ## Files Changed
 
-- `crates/katgpt-core/src/simd/argmax.rs` — +1 line (T1)
+- `crates/katgpt-types/src/simd/argmax.rs` — +1 line (T1)
 - `Cargo.toml` — getrandom wasm32 block (T2) + bytemuck feature (T3)
 
 ## TL;DR

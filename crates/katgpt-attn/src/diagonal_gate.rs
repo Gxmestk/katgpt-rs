@@ -2,7 +2,7 @@
 //!
 //! Both GDN2's per-channel decay (Diag(α)) and Wall's per-dimension
 //! prefix-sum gate (Diag(g_t)) are instances of the same primitive:
-//! a diagonal [d]-dimensional vector applied to attention state.
+//! a diagonal `[d]`-dimensional vector applied to attention state.
 //!
 //! This trait provides a unified interface for:
 //! - Computing gate values from projections
@@ -46,7 +46,7 @@ pub trait DiagonalGate {
 /// matrix S at each timestep: `S *= Diag(α)`. The decay values are
 /// fixed (not projected from input) and default to 0.99.
 pub struct Gdn2DiagonalGate {
-    /// Per-channel decay values [dim].
+    /// Per-channel decay values `[dim]`.
     pub alpha: Vec<f32>,
 }
 
@@ -81,7 +81,7 @@ impl DiagonalGate for Gdn2DiagonalGate {
         out[..d].copy_from_slice(&self.alpha);
     }
 
-    /// Apply decay: target[i] *= alpha[i].
+    /// Apply decay: `target[i] *= alpha[i]`.
     #[inline]
     fn apply(&self, gate_values: &[f32], target: &mut [f32]) {
         let d = self.dim();
@@ -90,15 +90,15 @@ impl DiagonalGate for Gdn2DiagonalGate {
         simd_scale_mul_inplace(&mut target[..d], gate_values, 1.0);
     }
 
-    /// Apply inverse: target[i] /= alpha[i] (for backward pass).
-    /// Uses multiply by 1/alpha to avoid repeated division.
+    /// Apply inverse: `target[i] /= alpha[i]` (for backward pass).
+    /// Uses reciprocal-multiply (1 div + N muls) instead of N divisions.
     #[inline]
     fn apply_inverse(&self, gate_values: &[f32], target: &mut [f32]) {
         let d = self.dim();
         debug_assert_eq!(gate_values.len(), d);
         debug_assert!(target.len() >= d);
         for i in 0..d {
-            target[i] /= gate_values[i];
+            target[i] *= 1.0 / gate_values[i];
         }
     }
 
@@ -119,7 +119,7 @@ impl DiagonalGate for Gdn2DiagonalGate {
 /// - Query rescale: `q̃ = exp(P) ⊙ q`
 /// - Key rescale: `k̃ = exp(-P) ⊙ k`
 pub struct WallDiagonalGate {
-    /// Per-dimension prefix sums [dim].
+    /// Per-dimension prefix sums `[dim]`.
     pub prefix: Vec<f32>,
     /// Gate max clamp value (default 0.87).
     pub gate_max: f32,
@@ -201,7 +201,7 @@ impl DiagonalGate for WallDiagonalGate {
         self.compute_gate_from_projection(input, weights, bias, out);
     }
 
-    /// Apply query rescale: target[i] *= exp(gate_values[i]).
+    /// Apply query rescale: `target[i] *= exp(gate_values[i])`.
     ///
     /// Zero-allocation. Processes 32-lane chunks through the SIMD Cephes exp
     /// kernel via a stack scratch buffer (avoids the per-element libm `exp`
@@ -212,7 +212,7 @@ impl DiagonalGate for WallDiagonalGate {
         apply_exp_rescale(gate_values, target, false);
     }
 
-    /// Apply key rescale: target[i] *= exp(-gate_values[i]).
+    /// Apply key rescale: `target[i] *= exp(-gate_values[i])`.
     #[inline]
     fn apply_inverse(&self, gate_values: &[f32], target: &mut [f32]) {
         apply_exp_rescale(gate_values, target, true);
@@ -251,12 +251,16 @@ fn apply_exp_rescale(gate_values: &[f32], target: &mut [f32], negate: bool) {
         i += CHUNK;
     }
 
-    // Scalar tail — `f32::exp` is more accurate than the Cephes approximation,
-    // which is desirable for the short remainder where SIMD setup cost dominates.
+    // Scalar tail — `cephes_exp_scalar` (via `fast_exp`) matches the SIMD
+    // Cephes kernel used in the chunked path above, so the tail produces
+    // bit-identical values to what the chunked path would have produced for
+    // the same inputs. This matters for `apply_inverse` round-trip tests:
+    // mixing libm exp (tail) with Cephes exp (chunks) would break exactness.
+    use katgpt_core::simd::fast_exp;
     while i < d {
         let g = unsafe { *gate_values.get_unchecked(i) };
         let e = if negate { -g } else { g };
-        target[i] *= e.exp();
+        target[i] *= fast_exp(e);
         i += 1;
     }
 }

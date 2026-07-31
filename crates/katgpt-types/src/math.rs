@@ -68,7 +68,7 @@ pub fn rmsnorm(x: &mut [f32]) {
 
 /// GeGLU activation: hidden = gelu(gate) * up (elementwise).
 /// Uses approximate GELU: gelu(x) ≈ x * sigmoid(1.702 * x).
-/// `gate` and `up` are [mlp_hidden], output goes to `hidden`.
+/// `gate` and `up` are `[mlp_hidden]`, output goes to `hidden`.
 ///
 /// SIMD-accelerated: exp() computed via `simd_exp_inplace` on stack buffers.
 #[inline(always)]
@@ -104,7 +104,7 @@ pub fn gegelu(hidden: &mut [f32], gate: &[f32], up: &[f32]) {
 
 /// GeGLU with tanh GELU approximation (Gemma 2 activation).
 /// tanh GELU: 0.5 * x * (1 + tanh(sqrt(2/π) * (x + 0.044715 * x³)))
-/// hidden[i] = gelu_tanh(gate[i]) * up[i]
+/// `hidden[i] = gelu_tanh(gate[i]) * up[i]`
 ///
 /// SIMD-accelerated: exp() for tanh approximation computed via `simd_exp_inplace`.
 #[inline(always)]
@@ -142,7 +142,7 @@ pub fn gegelu_tanh(hidden: &mut [f32], gate: &[f32], up: &[f32]) {
     for i in i..hidden.len() {
         let g = gate[i];
         let inner = SQRT_2_OVER_PI * (g + 0.044715 * g * g * g);
-        let gelu_val = 0.5 * g * (1.0 + inner.tanh());
+        let gelu_val = 0.5 * g * (1.0 + crate::simd::fast_tanh(inner));
         hidden[i] = gelu_val * up[i];
     }
 }
@@ -177,7 +177,7 @@ pub fn silu(x: &mut [f32]) {
 
 /// SwiGLU activation: SiLU(gate) * up.
 /// Used in LLaMA-family models (gate_proj and up_proj are separate weights).
-/// Result stored in `hidden`: hidden[i] = silu(gate[i]) * up[i]
+/// Result stored in `hidden`: `hidden[i] = silu(gate[i]) * up[i]`
 ///
 /// SIMD-accelerated: exp() computed via `simd_exp_inplace` on stack buffers.
 #[inline(always)]
@@ -210,10 +210,21 @@ pub fn swiglu(hidden: &mut [f32], gate: &[f32], up: &[f32]) {
     }
 }
 
+/// SwiGLU in-place: `hidden[j] = silu(hidden[j]) * up[j]`.
+///
+/// The [`swiglu`] implementation copies `gate` into a local SIMD buffer before
+/// writing to `hidden`, so it is safe for `hidden` to alias the gate input.
+/// This wrapper provides that aliasing without `unsafe` at call sites.
+#[inline(always)]
+pub fn swiglu_inplace(hidden: &mut [f32], up: &[f32]) {
+    let gate = unsafe { core::slice::from_raw_parts(hidden.as_ptr(), hidden.len()) };
+    swiglu(hidden, gate, up);
+}
+
 /// RMSNorm with learnable gamma (gain) vector.
 /// Gemma 2 stores gamma as (gamma-1), so +1 is added during load.
 /// `x` is normalized in-place then scaled by `gamma[i]`:
-///   x[i] = gamma[i] * x[i] / sqrt(mean_sq + eps)
+///   `x[i] = gamma[i] * x[i] / sqrt(mean_sq + eps)`
 #[inline(always)]
 pub fn rmsnorm_with_gamma(x: &mut [f32], gamma: &[f32]) {
     rmsnorm_with_gamma_eps(x, gamma, 1e-5)
@@ -293,6 +304,38 @@ pub fn matmul_f16_parallel(
     cols: usize,
 ) {
     crate::simd::simd_matmul_f16_f32_rows_parallel(output, weight, input, rows, cols);
+}
+
+/// Matrix-vector multiply with f16 weights and f16 activations (Issue 201).
+///
+/// Output is f32. Uses the ARMv8.2-A widening FMA (`fmlalb`/`fmlalt`) which
+/// does f16×f16→f32 in a single instruction — no explicit FCVT on the critical
+/// path. Halves bandwidth for BOTH weight AND activation reads vs f32×f32
+/// (genuine 50% reduction, vs the 25% that doomed weight-only f16 in Issue 200).
+#[inline(always)]
+pub fn matmul_f16_f16(
+    output: &mut [f32],
+    weight: &[half::f16],
+    input: &[half::f16],
+    rows: usize,
+    cols: usize,
+) {
+    crate::simd::simd_matmul_f16_f16_rows(output, weight, input, rows, cols);
+}
+
+/// Row-parallel f16×f16 matrix-vector multiply (Issue 201).
+///
+/// Splits output rows across rayon threads. Falls back to sequential
+/// [`matmul_f16_f16`] for small matrices (rows < 512).
+#[inline(always)]
+pub fn matmul_f16_f16_parallel(
+    output: &mut [f32],
+    weight: &[half::f16],
+    input: &[half::f16],
+    rows: usize,
+    cols: usize,
+) {
+    crate::simd::simd_matmul_f16_f16_rows_parallel(output, weight, input, rows, cols);
 }
 
 /// Sparse matrix-vector multiply for ReLU-activated inputs (TwELL-inspired).

@@ -43,7 +43,7 @@ Unchanged. The transposed cache is local to the `CrossResolutionBases` struct (p
 
 ### Tasks
 
-- [x] **T2.1** Wrote `benches/bench_417_cross_resolution_simd_encode_goat.rs`. Baseline = pre-417 strided gather-dot (verbatim copy as `project_to_spectral_strided_into`); Candidate = post-417 `simd_matmul_rows`. Sweep: `(d_src, k)` ∈ `{(16,8), (64,8), (64,16), (256,8), (256,16), (256,64)}`.
+- [x] **T2.1** Wrote `crates/katgpt-core/benches/bench_417_cross_resolution_simd_encode_goat.rs`. Baseline = pre-417 strided gather-dot (verbatim copy as `project_to_spectral_strided_into`); Candidate = post-417 `simd_matmul_rows`. Sweep: `(d_src, k)` ∈ `{(16,8), (64,8), (64,16), (256,8), (256,16), (256,64)}`.
 - [x] **T2.2** **G1 (correctness, bit-identical):** PASS at all 6 sweep points. Max observed diff 5.364e-7 at `(256, 64)`, well under the 1e-6 tol. Transpose is exact; the residual diff is FMA vs non-FMA ordering in the two paths.
 - [x] **T2.3** **G2 (perf gate):** **11-15× faster at every production point** (target was 1.5×). Honest verdict: vastly exceeded the gate — the comment "the gather is unavoidable; LLVM auto-unrolls the short inner loop well" at the pre-417 L253-256 was wrong by an order of magnitude.
 - [x] **T2.4** **G3 (no-regression):** all 6 existing tests in `cross_resolution::tests::*` PASS bit-identical.

@@ -86,16 +86,16 @@ This is the bridge to our latent-space substrate: `c'` *is* a learned representa
 |---|---|---|
 | `S(c) → c'` offline re-representation | **LLM Sleep** — N-pass recurrent consolidation of KV into GDN2 fast weights at eviction | Plan 154, Research 116, `src/sleep/` |
 | Modelless `S(c)` (no BPTT) | **AutoDreamer** — offline consolidation tick | Plan 107, Research 069 (which **already cites this paper** as "Sleep-time Compute: Lin et al. 2025 (offline pre-computation)") |
-| `S(c)` that produces *reusable artifacts* (motifs, not weights) | **Closure-Expansion Instrument** — mines motifs at every sleep-cycle boundary | Plan 290, `src/closure_mining.rs`, `crates/katgpt-core/src/closure/motif.rs` |
+| `S(c)` that produces *reusable artifacts* (motifs, not weights) | **Closure-Expansion Instrument** — mines motifs at every sleep-cycle boundary | Plan 290, `crates/katgpt-core/src/closure/mining.rs`, `crates/katgpt-core/src/closure/motif.rs` |
 | Per-NPC trajectory forecaster (the "predict what comes next" primitive) | **KARC** — closed-form delay-basis ridge readout, fits in `KarcShard` (NeuronShard subtype) | Plan 308, Research 288, `crates/katgpt-core/src/karc/` |
-| Per-NPC per-relation learned direction vector + coherence-gated apply | **latent_functor** — `extract_functor_into`, `apply_functor`, `functor_gate(coherence)` (sigmoid) | Plan 303, `riir-engine/src/latent_functor/arithmetic.rs` |
+| Per-NPC per-relation learned direction vector + coherence-gated apply | **latent_functor** — `extract_functor_into`, `apply_functor`, `functor_gate(coherence)` (sigmoid) | Plan 303, `crates/katgpt-percepta/src/wasm/interpreter/arithmetic.rs` |
 | Test-time budget `b` per-NPC adaptive halting | **Gain/Cost Loop Halting** — `halt_decision(gain, cost, tau)` | Plan 304, Research 282 |
 | Per-tick "should I think more or answer now" decision | **Salience Tri-Gate** — `Speak / Silent / Delegate` | Plan 303 (katgpt-rs), Research 281 |
 | Per-NPC hash-addressed conditional pattern memory | **Engram** — hash-keyed conditional lookup | Plan 299, Research 278 |
-| Cross-node curiosity snapshot commitment (sync-boundary bridge) | **cgsp_runtime/chain_bridge.rs** — `commit_snapshot_via_quorum`, `reload_snapshot_from_chain` | `riir-engine/src/cgsp_runtime/chain_bridge.rs` |
-| Per-NPC frozen latent state, replicable | **NeuronShard / MerkleFrozenEnvelope** | `riir-neuron-db/src/shard.rs`, `freeze.rs` |
+| Cross-node curiosity snapshot commitment (sync-boundary bridge) | **cgsp_runtime/chain_bridge.rs** — `commit_snapshot_via_quorum`, `reload_snapshot_from_chain` | `riir-ai/crates/riir-engine/src/cgsp_runtime/chain_bridge.rs` |
+| Per-NPC frozen latent state, replicable | **NeuronShard / MerkleFrozenEnvelope** | `riir-neuron-db/src/shard/mod.rs`, `freeze.rs` |
 | Warm-tier offline generation positioning (the existing "NPC sleep cycle" framing) | **CompressionDrafter** — explicit verdict: "Warm-tier offline generation — quest packs generated during NPC sleep cycles, where ms latency is fine" (Bench 285, GOAT FAILED for Hot-tier) | Plan 285, Research 137 (riir-ai) |
-| Predictability score via dot-product | **EmotionDirections / FutureBehaviorProbe::forecast** | `src/pruners/emotion_vector.rs`, `future_probe.rs` |
+| Predictability score via dot-product | **EmotionDirections / FutureBehaviorProbe::forecast** | `crates/katgpt-pruners/src/emotion_vector.rs`, `future_probe.rs` |
 | Multi-query cost amortization via warm-tier cache hit | **BFCF × LFU × Sharding** — region-keyed amortized retrieval | Plan 218, Research 193 |
 
 ### 2.2 What the paper adds that NONE of the above does alone
@@ -278,7 +278,7 @@ fn sleep_time_to_synced_scalars(hla_prime: &[f32; 8]) -> [f32; 5] {
 - **Closest shipped cousin (consolidation side):** `katgpt-rs/.research/116_LLM_Sleep_Offline_Recursive_Memory_Consolidation.md`, `katgpt-rs/.plans/154_sleep_consolidation_offline_memory.md`, `src/sleep/`
 - **Closest shipped cousin (forecast side):** `katgpt-rs/.research/288_KARC_Delay_Basis_Ridge_Forecaster.md`, `katgpt-rs/.plans/308_karc_delay_basis_ridge_forecaster.md`
 - **Closest shipped cousin (warm-tier positioning, GOAT FAILED):** `katgpt-rs/.benchmarks/285_compression_drafter_goat.md` (the explicit "NPC sleep cycle warm-tier" framing thatCompressionDrafter failed to make work at Hot-tier)
-- **Closest shipped cousin (latent-to-latent):** `riir-ai/.research/123_Latent_Functor_Runtime_Guide.md`, `riir-ai/crates/riir-engine/src/latent_functor/arithmetic.rs` (`extract_functor_into`, `functor_gate`)
+- **Closest shipped cousin (latent-to-latent):** `riir-ai/.research/123_Latent_Functor_Runtime_Guide.md`, `katgpt-rs/crates/katgpt-percepta/src/wasm/interpreter/arithmetic.rs` (`extract_functor_into`, `functor_gate`)
 - **Closest shipped cousin (cross-consumer commitment):** `riir-ai/crates/riir-engine/src/cgsp_runtime/chain_bridge.rs` (`commit_snapshot_via_quorum`, `reload_snapshot_from_chain`)
 - **Predictability↔curiosity inversion:** `katgpt-rs/.research/126` (CGSP), `katgpt-rs/.research/288` (KARC curiosity as forecast residual)
 

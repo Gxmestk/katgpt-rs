@@ -99,11 +99,11 @@ Composes with existing QJL technique:
 
 | Component | Our Codebase | OCTOPUS Equivalent |
 |-----------|-------------|-------------------|
-| Rotation | `turboquant/rotation.rs` — WHT + random sign flips | Same (sign-flipped WHT) |
-| Codebook | `turboquant/codebook.rs` — Lloyd-Max | Same algorithm, different marginals |
+| Rotation | `crates/katgpt-quant/src/turboquant/rotation.rs` — WHT + random sign flips | Same (sign-flipped WHT) |
+| Codebook | `crates/katgpt-quant/src/turboquant/codebook.rs` — Lloyd-Max | Same algorithm, different marginals |
 | KV Cache | `QuantizedKVCache` trait | Implement same trait |
-| QJL Residual | `turboquant/rotation.rs` — `qjl_matrix` | Identical technique |
-| Pack/Unpack | `turboquant/kv_cache.rs` — bit-packed indices | Same, with triplet grouping |
+| QJL Residual | `crates/katgpt-quant/src/turboquant/rotation.rs` — `qjl_matrix` | Identical technique |
+| Pack/Unpack | `crates/katgpt-quant/src/turboquant/kv_cache.rs` — bit-packed indices | Same, with triplet grouping |
 | GPU Path | `riir-gpu/spectralquant/` | Future: fused WGSL decode |
 
 ### What We Need to Add
@@ -216,5 +216,5 @@ sp_kv = []                # Composable with any above
 - Octahedral map: Cigolle et al. "A Survey of Efficient Representations for Independent Unit Vectors" JCGT 2014
 - TurboQuant: Zandieh et al. arXiv 2025 (our `turboquant/`)
 - PolarQuant: Han et al. arXiv 2025 (recursive polar angles — alternative to octahedral)
-- QJL: Zandieh et al. arXiv 2024 (our existing QJL in `turboquant/rotation.rs`)
+- QJL: Zandieh et al. arXiv 2024 (our existing QJL in `crates/katgpt-quant/src/turboquant/rotation.rs`)
 - Lloyd-Max: Lloyd 1982, Max 1960 (our existing `codebook.rs`)

@@ -4,7 +4,7 @@
 **Research:** [katgpt-rs/.research/377_Apple_Neural_Engine_Architecture_Programming_Performance.md](../.research/377_Apple_Neural_Engine_Architecture_Programming_Performance.md)
 **Source paper:** [arXiv:2606.22283](https://arxiv.org/abs/2606.22283) — Bryngelson, *Apple Neural Engine: Architecture, Programming, and Performance* (2026)
 **Target:** `katgpt-rs/crates/katgpt-core/src/ane_roofline.rs` (new module) + Cargo feature `ane_roofline`. **Refines** (does NOT replace) `riir-ai/crates/riir-engine/src/npc_brain_router.rs` (Plan 255 Part 4, shipped).
-**Status:** Active — Phase 1 ✅, Phase 2 ✅, Phase 3 ✅ (all COMPLETE 2026-07-04)
+**Status:** ✅ COMPLETE, DEFAULT-ON (2026-07-04) — Phase 1 ✅, Phase 2 ✅, Phase 3 ✅ (all COMPLETE 2026-07-04)
 
 ---
 

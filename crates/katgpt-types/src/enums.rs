@@ -394,6 +394,29 @@ pub enum HybridPattern {
     Bookend,
 }
 
+/// Loop stability mode for weight-shared looped inference (Plan 428).
+///
+/// Parameter-free architectural fixes for T-pass loop stability, validated
+/// via the §3.6 defend-wrong PoC benchmark.
+///
+/// **Only `InterLoopNorm` ships** — the PoC proved it's the sole fix that
+/// controls residual norm growth. FLA-res (direct residual addition of
+/// `prev_h` at every layer) caused catastrophic norm explosion (~2.2B× at
+/// T=12), and Attention Injection was a no-op for single-position attention
+/// (softmax of 1 element = 1.0, so Q doesn't affect the output). Both were
+/// dropped per the defend-wrong verdict.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[repr(u8)]
+pub enum LoopStabilityMode {
+    /// No inter-loop stabilization (byte-identical to pre-Plan-428 behavior).
+    #[default]
+    None,
+    /// Inter-loop RMSNorm: normalize the hidden state between loop iterations
+    /// (tau > 0), before the inner layer pass. PoC: norm ratio 3.34× vs
+    /// baseline 11.19×, KL 0.0008, step-size trend converging (14.9 → 2.05).
+    InterLoopNorm,
+}
+
 /// Head-specific sigmoid gate after SDPA, before Wo.
 /// Zero-initialized → starts at sigmoid(0) = 0.5 (neutral multiplicative identity).
 #[derive(Clone)]
@@ -413,7 +436,7 @@ impl SdpaOutputGate {
 
     /// Apply sigmoid-gated projection to attention output.
     ///
-    /// Computes: gate[i] = sigmoid(W_gate[i] · attn_out), then attn_out[i] *= gate[i].
+    /// Computes: `gate[i] = sigmoid(W_gate[i] · attn_out)`, then `attn_out[i] *= gate[i]`.
     /// Zero-init weights produce sigmoid(0) = 0.5 for all (neutral half-pass).
     /// Paper reference: +0.3–0.5 avg points on zero-shot benchmarks.
     pub fn forward(&self, attn_out: &mut [f32], dim: usize, temp: &mut [f32]) {
@@ -455,6 +478,60 @@ impl ResidualGate {
         Self {
             gates: vec![0.0; loop_count * dim],
         }
+    }
+
+    /// Deterministic loop-stable residual gates (Plan 483 T2.1, §3.5 path 2).
+    ///
+    /// Sets gates to a constant `decay` factor for τ > 0, enabling information
+    /// carry-forward between T passes. The first loop (τ=0) has zero gates
+    /// (no previous state to carry forward).
+    ///
+    /// This is a **modelless** construction — no training, no gradient descent.
+    /// The `decay` factor controls the trade-off between carry-forward strength
+    /// and stability. Conservative values (0.1–0.3) are safe for most weight
+    /// matrices; larger values risk divergence.
+    ///
+    /// Rationale: the zero-init default (`new()`) makes every T-pass effectively
+    /// independent — no hidden state carries forward between loops. This
+    /// undermines the LT2 paper's "effective depth T×n_layer" claim. A non-zero
+    /// deterministic gate restores the residual connection across loops without
+    /// requiring trained gate parameters.
+    ///
+    /// # Arguments
+    /// * `loop_count` - Number of T-passes (T)
+    /// * `dim` - Hidden dimension (n_embd)
+    /// * `decay` - Constant gate value for τ > 0 (e.g., 0.1 = conservative)
+    #[inline]
+    pub fn new_loop_stable(loop_count: usize, dim: usize, decay: f32) -> Self {
+        let mut gates = vec![0.0f32; loop_count * dim];
+        // τ=0: zero (no previous state). τ>0: constant decay.
+        for tau in 1..loop_count {
+            let offset = tau * dim;
+            gates[offset..offset + dim].fill(decay);
+        }
+        Self { gates }
+    }
+
+    /// Deterministic loop-stable residual gates with exponential decay
+    /// (Plan 483 T2.1, §3.5 path 2 variant).
+    ///
+    /// ρ_τ = `base`^(τ-1) for τ > 0 — later loops contribute exponentially less.
+    /// This schedule mirrors the spectral-radius-based stabilization where the
+    /// residual contribution decays as the hidden state converges.
+    ///
+    /// # Arguments
+    /// * `loop_count` - Number of T-passes (T)
+    /// * `dim` - Hidden dimension (n_embd)
+    /// * `base` - Decay base (e.g., 0.5 → ρ_1=1.0, ρ_2=0.5, ρ_3=0.25, ...)
+    #[inline]
+    pub fn new_loop_stable_exp_decay(loop_count: usize, dim: usize, base: f32) -> Self {
+        let mut gates = vec![0.0f32; loop_count * dim];
+        for tau in 1..loop_count {
+            let offset = tau * dim;
+            let val = base.powi((tau - 1) as i32);
+            gates[offset..offset + dim].fill(val);
+        }
+        Self { gates }
     }
 }
 
@@ -578,7 +655,7 @@ impl ConfiguratorContext {
 
 /// Selection strategy for width-scaled rollouts (EqR convergence-based selection).
 ///
-/// Maps to [`WidthSelectionMode`](crate::speculative::dd_tree::WidthSelectionMode) at runtime.
+/// Maps to `WidthSelectionMode` (in `crate::speculative::dd_tree`) at runtime.
 /// This enum lives in `katgpt-core` so Config can reference it without depending on
 /// the speculative decode module.
 ///

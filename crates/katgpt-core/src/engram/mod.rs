@@ -26,13 +26,13 @@
 //!
 //! # Phase status (this file)
 //!
-//! - ✅ Phase 1 (hashing) — [`hash`].
-//! - ✅ Phase 2 (frozen table + lookup) — [`table`].
-//! - ✅ Phase 3 (sigmoid fusion kernel, T3.1–T3.7) — [`kernel`] + [`conv`].
-//! - ✅ Phase 4 (tokenizer compression) — [`tokenizer`].
-//! - ✅ Phase 5 (commitment + hotswap) — [`commitment`] + [`hotswap`].
-//! - ✅ Phase 6 (Zipfian cache hierarchy) — [`cache`].
-//! - ✅ Phase 7 partial (T7.1–T7.2 forward fuse) — [`forward`].
+//! - ✅ Phase 1 (hashing) — `hash`.
+//! - ✅ Phase 2 (frozen table + lookup) — `table`.
+//! - ✅ Phase 3 (sigmoid fusion kernel, T3.1–T3.7) — `kernel` + `conv`.
+//! - ✅ Phase 4 (tokenizer compression) — `tokenizer`.
+//! - ✅ Phase 5 (commitment + hotswap) — `commitment` + `hotswap`.
+//! - ✅ Phase 6 (Zipfian cache hierarchy) — `cache`.
+//! - ✅ Phase 7 partial (T7.1–T7.2 forward fuse) — `forward`.
 //! - ✅ Phase 7 GOAT gates (T7.3–T7.10) — `tests/bench_299_engram_goat.rs`.
 //!   G6 (effective depth) is deferred to riir-ai integration; feature stays
 //!   opt-in until G6 lands there.
@@ -54,8 +54,8 @@
 //!
 //! # References
 //!
-//! - Plan: [`katgpt-rs/.plans/299_Engram_Hash_Addressed_Pattern_Memory.md`]
-//! - Research: [`katgpt-rs/.research/278_Engram_Conditional_Memory_Latent_Lookup_Fusion.md`]
+//! - Plan: `katgpt-rs/.plans/299_Engram_Hash_Addressed_Pattern_Memory.md`
+//! - Research: `katgpt-rs/.research/278_Engram_Conditional_Memory_Latent_Lookup_Fusion.md`
 //! - Source paper: [arXiv:2601.07372](https://arxiv.org/pdf/2601.07372) —
 //!   Engram, Cheng et al. 2026.
 
@@ -108,7 +108,10 @@ pub use cache::{
     CacheResult, CacheTier, ColdFetcher, ZipfianCacheHierarchy, ZipfianStats, ZipfianStatsSnapshot,
 };
 pub use commitment::{EngramTableId, build_merkle_root};
-pub use conv::{IDENTITY_KERNEL, SPEC_KERNEL, ZERO_KERNEL, conv_causal_into};
+pub use conv::{
+    IDENTITY_KERNEL, SPEC_KERNEL, ZERO_KERNEL, conv_causal_dyn_into, conv_causal_into,
+    conv_temporal_step_backward_truncated_into, conv_temporal_step_into,
+};
 pub use forward::{EngramConfig, fuse_into_hidden_state};
 pub use hash::{HashHead, multi_head_hash};
 pub use hotswap::EngramHotSwap;

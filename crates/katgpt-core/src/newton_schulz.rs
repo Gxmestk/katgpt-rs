@@ -708,7 +708,11 @@ fn matmul_at_bt_blocked(a: &[f32], bt: &[f32], m: usize, n: usize, k: usize, c: 
 /// per A-row load. On NEON, uses 8 accumulator registers (well within the 32
 /// NEON register file) to hide FMA pipeline latency.
 #[inline(always)]
-fn blocked_dot8(a: &[f32], bs: &[&[f32]; 8], len: usize) -> (f32, f32, f32, f32, f32, f32, f32, f32) {
+fn blocked_dot8(
+    a: &[f32],
+    bs: &[&[f32]; 8],
+    len: usize,
+) -> (f32, f32, f32, f32, f32, f32, f32, f32) {
     #[cfg(target_arch = "aarch64")]
     {
         unsafe { blocked_dot8_neon(a, bs, len) }

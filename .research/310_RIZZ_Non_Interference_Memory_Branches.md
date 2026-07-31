@@ -148,9 +148,9 @@ RIZZ (Oxford, 2026) — non-interference memory branches
 
 **Grep results (both layers, all repos):**
 - `progressive_mcgs/` has `BranchId`, `BranchStagnationState`, `ExpansionOperator::MultiBranchAggregation` — **transient search branches**, not persistent memory branches. Different lifecycle, different semantics.
-- `clr/learning_potential.rs` has `should_write_memory(r_k, S_LP)` — **reward-gated write to global store**, not branch-selected write. Different target.
-- `segment_checkpoint/memory_soup.rs` has `BranchState { segment_ids, gates, weighted_state }` — **KV-cache segment branches**, not memory-store branches. Different layer.
-- `engram/kernel.rs` has `sigmoid_fuse_into` with write gate — **single hash-addressed store**, no branching.
+- `crates/katgpt-claim/src/clr/learning_potential.rs` has `should_write_memory(r_k, S_LP)` — **reward-gated write to global store**, not branch-selected write. Different target.
+- `crates/katgpt-kv/src/segment_checkpoint/memory_soup.rs` has `BranchState { segment_ids, gates, weighted_state }` — **KV-cache segment branches**, not memory-store branches. Different layer.
+- `crates/katgpt-core/src/engram/kernel.rs` has `sigmoid_fuse_into` with write gate — **single hash-addressed store**, no branching.
 - `BAKE` (Plan 236) — **continual learning at embedding dimension granularity**, not branch granularity.
 - `ARG` (Plan 327) — **lifecycle types** (Active/Shadow/Deprecated/Removed), no spawn/merge/prune loop.
 - "non-interference" appears in 2 places: Plan 279 (MPI row orthogonality) and riir-ai Research 123 (KG null-space projection) — **both different contexts** (orthogonality of expert grams / role transport, not memory branches).

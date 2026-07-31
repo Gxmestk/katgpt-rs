@@ -58,8 +58,9 @@ pub fn compute_and_select_top_k(
         .iter()
         .map(|&(id, summary)| {
             let min_len = query.len().min(summary.len());
-            let dot: f32 = katgpt_core::simd::simd_dot_f32(&query[..min_len], &summary[..min_len], min_len);
-            let gate = 1.0 / (1.0 + (-dot).exp()); // sigmoid, NOT softmax
+            let dot: f32 =
+                katgpt_core::simd::simd_dot_f32(&query[..min_len], &summary[..min_len], min_len);
+            let gate = katgpt_core::simd::fast_sigmoid(dot); // sigmoid, NOT softmax
             (id, gate)
         })
         .collect();
@@ -133,13 +134,14 @@ impl SscDrafter {
         let n = self.context_summaries.len() as f32;
         for (i, logit) in draft_logits.iter_mut().enumerate() {
             if i < dim {
-                let avg_i = self.context_summaries
+                let avg_i = self
+                    .context_summaries
                     .iter()
                     .map(|s| s.get(i).copied().unwrap_or(0.0))
                     .sum::<f32>()
                     / n;
                 let dot = *logit * avg_i;
-                let bias = 1.0 / (1.0 + (-dot).exp()); // sigmoid
+                let bias = katgpt_core::simd::fast_sigmoid(dot); // sigmoid
                 *logit += 0.1 * bias;
             }
         }

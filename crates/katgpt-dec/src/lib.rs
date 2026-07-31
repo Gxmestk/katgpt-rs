@@ -50,6 +50,8 @@
 //! `katgpt_core::dec::*` paths continue to work unchanged.
 
 pub mod backend;
+#[cfg(feature = "grid_3d")]
+pub mod birth_death;
 #[cfg(feature = "heat_kernel_trajectory")]
 pub mod bom_heat_kernel;
 pub mod cache;
@@ -68,6 +70,8 @@ pub mod nonlinear_heat_kernel;
 pub mod operators;
 #[cfg(feature = "cochain_point_sampler")]
 pub mod point_sampler;
+#[cfg(feature = "se2_equivariant_lift")]
+pub mod se2_lift;
 #[cfg(feature = "sheaf_admm")]
 pub mod sheaf_admm;
 pub mod simd;
@@ -91,6 +95,26 @@ pub use stokes_calculus::{
 
 #[cfg(feature = "motor_gated_field")]
 pub use motor_gated::{evolve_motor_gated_field, relu_gate_into};
+
+// Plan 454 T4 — stochastic birth/death NCA growth step (modelless, opt-in).
+// The 3D sibling of `evolve_motor_gated_field`: composes the shipped DEC
+// Laplacian (7-point stencil via the `grid_3d` fast path) with a fixed-seed
+// SplitMix64 PRNG and a sigmoid alive gate. Zero-alloc, bit-identical under
+// a fixed seed (G6 quorum-safety).
+//
+// Plan 454 T5 — `argmax_block_type` raw → categorical bridge: thresholds the
+// continuous cochain into a `u8` block-class per cell. Intended for a future
+// civ-engine city-growth consumer (T9 caveat: no such consumer exists today —
+// see birth_death.rs docs).
+#[cfg(feature = "grid_3d")]
+pub use birth_death::{
+    BirthDeathParams, SplitMix64, argmax_block_type, stochastic_birth_death_step,
+};
+
+// Plan 560 — SE(2)-equivariant lifting layer (Smets §3.4.1).
+// DEFAULT-ON (Phase 2 GOAT G1+G2 ALL PASS 2026-07-25).
+#[cfg(feature = "se2_equivariant_lift")]
+pub use se2_lift::{se2_lift_into, se2_project_integrate_into, se2_project_max_into};
 
 #[cfg(feature = "heat_kernel_trajectory")]
 pub use heat_kernel::{
@@ -118,8 +142,8 @@ pub use bom_heat_kernel::{
     heat_kernel_trajectory_bom, heat_kernel_trajectory_bom_into, near_harmonic_indices,
 };
 
-// Plan 407 — Sheaf-ADMM coordination primitive (modelless, opt-in until
-// the Phase 2 GOAT gate G1–G6 passes).
+// Plan 407 — Sheaf-ADMM coordination primitive (modelless, DEFAULT-ON since
+// Phase 2 GOAT gate G1–G6 ALL PASS, 2026-07-07, Bench 407).
 #[cfg(feature = "sheaf_admm")]
 pub use sheaf_admm::{
     AdmmScratch, LocalObjective, SheafMaps, sheaf_admm_step, sheaf_admm_step_cg_into,
@@ -129,7 +153,9 @@ pub use sheaf_admm::{
 // Multi-scale V-cycle via selector restriction maps — opt-in. Composes the
 // single-complex DEC operators into a two-level fine→coarse→fine hierarchy.
 #[cfg(feature = "htno_v_cycle")]
-pub use htno::{VCycleRestriction, VCycleScratch, grid_coarsen_2x2, htno_v_cycle, htno_v_cycle_into};
+pub use htno::{
+    VCycleRestriction, VCycleScratch, grid_coarsen_2x2, htno_v_cycle, htno_v_cycle_into,
+};
 
 // Continuous cochain point sampler (Plan 422, Research 404) — Whitney/de-Rham
 // reconstruction for continuous field queries inside primitives.

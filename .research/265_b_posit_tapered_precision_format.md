@@ -90,7 +90,7 @@ Three properties, in order of near-term value:
 | **Research 065 — RotorQuant** | `katgpt-rs/.research/065_*` | Block-diagonal rotation quantization — orthogonal axis, could compose |
 | **Research 200 — Quantization Outlier Collapse Security** | `katgpt-rs/.research/200_*` | Security angle — b-posit's bounded range closes some outlier-collapse attack surface |
 | **gemv_q4k_cubecl.rs / attention_q8kv_cubecl.rs** | `riir-ai/crates/riir-gpu/src/` | Concrete FTZ/DAZ pain point b-posit eliminates |
-| **WeightDtype { F32, F16, BF16 }** | `katgpt-rs/crates/katgpt-core/src/types.rs` | The enum we would extend if we ever adopted b-posit as a storage dtype |
+| **WeightDtype { F32, F16, BF16 }** | `katgpt-rs/src/types.rs` | The enum we would extend if we ever adopted b-posit as a storage dtype |
 
 ### Fusion idea — novelty TBD, needs Q1–Q4 check before verdict
 

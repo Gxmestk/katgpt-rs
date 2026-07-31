@@ -4,6 +4,8 @@
 **Authors**: Szilvasy, Faysse, Lomeli, Douze, Mazaré, Cabannes, Yih, Jégou (Meta FAIR)
 **Date**: May 2026 | **arXiv**: 2605.14037
 
+**PASS-Redirects (synthesis):** S-TTT [arXiv:2607.09415 "Self-Guided Test-Time Training"] — paper's core diagnostic "random-span training data hurts, curated/relevant data helps" is exactly what SP-KV's utility-gated writes already enforce modellessly (`σ(f_θ(h_s))` predicts future utility → write only high-utility KV). Stage 2's gradient updates → riir-train; Stage 1's "self-select relevant evidence" pattern is shipped here.
+
 ---
 
 ## 1. Core Contribution

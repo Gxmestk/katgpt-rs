@@ -1,5 +1,11 @@
 # Plan 121: RMSD — Relevance-Masked Self-Distillation
 
+> **Note on file paths (2026-07-18):** Some `*.rs` paths in this document
+> reference modules that were renamed, moved, or never landed under the
+> exact name shown. They are preserved as a **historical record** of the
+> original design intent; consult the current crate layout for the live
+> location.
+
 > **Status:** ❌ NO GOAT — Complete (T1–T13 all done, 46 structural proofs pass), but **negative arena result**: RMSD does not improve over SDAR in tournament play. Demoted to 🪦.
 > **Branch:** `develop/feature/121_rmsd_distill`
 > **Depends on:** Plan 072 (SDAR gate ✅), Plan 073 (SDAR loss ✅), Plan 074 (Interventional SFT ✅), Plan 080 (BT rank ✅)
@@ -7,9 +13,7 @@
 > **Source:** [Relevance-Masked Self-Distillation](https://www.appliedcompute.com/research/relevance-masked-self-distillation) — Applied Compute, 2026
 > **Feature gate:** `rmsd_distill` (opt-in, depends on `sdar_gate` + `bandit`)
 > **Goal:** Extend SDAR's uniform token gating with RMSD's two-step relevance mask: pre-filter T positions by logprob magnitude, then select S most relevant positions via judge. This concentrates gradient on the ~5-10 positions that actually carry learning signal, yielding 2× data efficiency and higher performance ceiling.
-
 ## Tasks
-
 - [x] T1: Implement `LogprobMagnitudeFilter` — top-T positions by |Δlogprob| (Step 1 of RMSD)
 - [x] T2: Implement `TopKlApproximator` — top-K=500 vocabulary KL approximation for efficiency
 - [x] T3: Implement `rmsd_loss()` in `rmsd_relevance.rs` — combining SDAR gate + RMSD mask
@@ -49,18 +53,18 @@ Combined: loss[t] = sdar_gate(Δt) * is_relevant(t) * reverse_kl[t]
 
 | Component | Location | Role |
 |-----------|----------|------|
-| `sdar_gate()` / `sdar_modulate()` | `src/pruners/sdar_gate.rs` | σ(β·x) sigmoid gate — reuse as modulation layer |
-| `sdar_loss()` | `riir-gpu/src/loss_sdar.rs` | Token-level SDAR loss — **extend with RMSD mask** |
-| `kl_divergence()` | `riir-gpu/src/distill.rs` | Reverse KL — **extend with top-K approximation** |
-| `LossMask` | `riir-gpu/src/training_loop.rs` | Binary token mask — **extend with relevance scoring** |
-| `SdarBanditPruner<P>` | `src/pruners/sdar/mod.rs` | Modelless SDAR bandit — **extend with magnitude pre-filter** |
+| `sdar_gate()` / `sdar_modulate()` | `crates/katgpt-pruners/src/sdar_gate.rs` | σ(β·x) sigmoid gate — reuse as modulation layer |
+| `sdar_loss()` | `riir-train/crates/riir-train-gpu/src/loss_sdar.rs` | Token-level SDAR loss — **extend with RMSD mask** |
+| `kl_divergence()` | `riir-train/crates/riir-train-gpu/src/distill.rs` | Reverse KL — **extend with top-K approximation** |
+| `LossMask` | `riir-train/crates/riir-train-gpu/src/training_loop.rs` | Binary token mask — **extend with relevance scoring** |
+| `SdarBanditPruner<P>` | `crates/katgpt-pruners/src/sdar/mod.rs` | Modelless SDAR bandit — **extend with magnitude pre-filter** |
 | `RubricReward` | `riir-gpu/src/ropd/` | Rubric scoring — reuse judge infrastructure |
-| `VerifierClient` | `riir-gpu/src/ropd/client.rs` | Judge client — **repurpose for token selection** |
+| `VerifierClient` | `riir-ai/crates/riir-gpu/src/ropd/client.rs` | Judge client — **repurpose for token selection** |
 | `LeviathanVerifier` | Referenced in research 040 | LoRA-as-Judge — use as token relevance judge |
-| `ScreeningPruner` trait | `katgpt-rs-core/src/traits.rs` | Relevance scoring — analogue for modelless path |
+| `ScreeningPruner` trait | `crates/katgpt-core/src/traits/mod.rs` | Relevance scoring — analogue for modelless path |
 | `freeze()`/`thaw()` | `src/pruners/bomber/players.rs` | Bandit knowledge persistence — reuse pattern |
 | `loss_masked.wgsl` | `riir-gpu/src/kernels/` | GPU masked loss kernel — **extend with RMSD positions** |
-| `GZeroLoop` | `riir-gpu/src/gzero_loop.rs` | Self-play loop — integration point |
+| `GZeroLoop` | `riir-train/crates/riir-train-gpu/src/gzero_loop.rs` | Self-play loop — integration point |
 
 ### What's New (Implement)
 
@@ -73,7 +77,7 @@ Combined: loss[t] = sdar_gate(Δt) * is_relevant(t) * reverse_kl[t]
 | `RmsdConfig` | T, S, K, continuation trigger config | `riir-gpu/src/loss_rmsd.rs` |
 | `RmsdMetrics` | Logprob magnitudes, mask density, judge selections | `riir-gpu/src/loss_rmsd.rs` |
 | `TeacherContinuation` | Snapshot student → teacher on plateau | `riir-gpu/src/loss_rmsd.rs` |
-| `RmsdRelevanceFilter` | Modelless action-level magnitude pre-filter | `src/pruners/rmsd_relevance.rs` |
+| `RmsdRelevanceFilter` | Modelless action-level magnitude pre-filter | `crates/katgpt-pruners/src/rmsd_relevance.rs` |
 | `RmsdPlayer` | Bomber arena player with RMSD filtering | `src/pruners/bomber/rmsd_player.rs` |
 
 ## Architecture
@@ -421,7 +425,7 @@ fn mean(values: &[f32]) -> f32 {
 ### Modelless Architecture (katgpt-rs)
 
 ```rust
-// src/pruners/rmsd_relevance.rs
+// crates/katgpt-pruners/src/rmsd_relevance.rs
 
 /// Modelless relevance filter: action-level analogue of RMSD.
 /// Pre-filters actions by |Q_teacher(a) - Q_student(a)| magnitude
@@ -622,7 +626,7 @@ src/pruners/
 ├── mod.rs                    # MOD: Add rmsd_relevance module behind feature gate
 ├── bomber/
 │   └── rmsd_player.rs        # NEW: RmsdPlayer for bomber arena
-├── bomber/mod.rs             # MOD: Add rmsd_player module behind feature gate
+├── src/pruners/bomber/mod.rs             # MOD: Add rmsd_player module behind feature gate
 └── Cargo.toml                # MOD: Add rmsd_distill feature
 
 tests/

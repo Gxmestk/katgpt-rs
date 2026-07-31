@@ -25,11 +25,11 @@
 
 #![cfg(feature = "manifold_erasure")]
 
+use katgpt_core::simd::simd_dot_f32;
 use katgpt_core::{
     ManceConfig, ManceScratch, ManceTangentCache, manifold_erasure_loop_cached_into,
     manifold_erasure_loop_into, manifold_erasure_step_cached_into, manifold_erasure_step_into,
 };
-use katgpt_core::simd::simd_dot_f32;
 use std::hint::black_box;
 use std::time::Instant;
 
@@ -45,7 +45,9 @@ fn make_pool(n: usize, d: usize, seed: u64) -> Vec<f32> {
     let mut s = seed;
     for i in 0..n {
         for j in 0..d {
-            s = s.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+            s = s
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
             let r = ((s >> 33) as f32) / (1u64 << 31) as f32;
             pool[i * d + j] = r * 2.0 - 1.0;
         }
@@ -71,7 +73,12 @@ fn g1a_erasure_reduces_target_energy() {
     // A single step with ε=0.1 is intentionally conservative (~20% reduction,
     // the trust region bound). The iterative loop accumulates erasure across
     // rounds, which is the intended usage pattern (MANCE §3.3).
-    let config = ManceConfig { k: 16, r: 8, alpha: 0.0, ..Default::default() };
+    let config = ManceConfig {
+        k: 16,
+        r: 8,
+        alpha: 0.0,
+        ..Default::default()
+    };
     let pool = make_pool(n, d, 42);
     let x = vec![0.5; d];
     let gradient = vec![1.0, 0.5, -0.3, 0.8, -0.1, 0.4, 0.2, -0.6];
@@ -82,7 +89,8 @@ fn g1a_erasure_reduces_target_energy() {
     let gf = move |_state: &[f32], buf: &mut [f32]| {
         buf.copy_from_slice(grad_ref);
     };
-    let infos = manifold_erasure_loop_into(&x, &gf, &pool, n, &config, 10, &mut scratch, &mut out).unwrap();
+    let infos =
+        manifold_erasure_loop_into(&x, &gf, &pool, n, &config, 10, &mut scratch, &mut out).unwrap();
     let n_rounds = infos.len();
 
     let grad_norm = simd_dot_f32(&gradient, &gradient, d).sqrt();
@@ -93,15 +101,29 @@ fn g1a_erasure_reduces_target_energy() {
 
     let reduction = (before - after) / before;
     if reduction < 0.5 {
-        fail("G1a", &format!("reduction = {:.4} (< 0.5) after {} rounds, before={}, after={}", reduction, n_rounds, before, after));
+        fail(
+            "G1a",
+            &format!(
+                "reduction = {:.4} (< 0.5) after {} rounds, before={}, after={}",
+                reduction, n_rounds, before, after
+            ),
+        );
     }
-    pass(&format!("G1a erasure reduces target energy by {:.1}% after {} rounds", reduction * 100.0, n_rounds));
+    pass(&format!(
+        "G1a erasure reduces target energy by {:.1}% after {} rounds",
+        reduction * 100.0,
+        n_rounds
+    ));
 }
 
 fn g1b_preserves_orthogonal_directions() {
     let d = 4;
     let n = 50;
-    let config = ManceConfig { k: 8, r: 2, ..Default::default() };
+    let config = ManceConfig {
+        k: 8,
+        r: 2,
+        ..Default::default()
+    };
 
     // Pool varies only in dims 0,1 → tangent basis is e1-e2 plane.
     let mut pool = vec![0.0; n * d];
@@ -123,10 +145,16 @@ fn g1b_preserves_orthogonal_directions() {
     let e4_after = out[3];
 
     if (e3_after - e3_before).abs() > 1e-6 {
-        fail("G1b", &format!("e3 changed: before={}, after={}", e3_before, e3_after));
+        fail(
+            "G1b",
+            &format!("e3 changed: before={}, after={}", e3_before, e3_after),
+        );
     }
     if (e4_after - e4_before).abs() > 1e-6 {
-        fail("G1b", &format!("e4 changed: before={}, after={}", e4_before, e4_after));
+        fail(
+            "G1b",
+            &format!("e4 changed: before={}, after={}", e4_before, e4_after),
+        );
     }
     pass("G1b orthogonal directions preserved");
 }
@@ -152,7 +180,11 @@ fn g1c_zero_gradient_no_harm() {
 fn g1d_orthogonal_gradient_no_harm() {
     let d = 4;
     let n = 20;
-    let config = ManceConfig { k: 8, r: 2, ..Default::default() };
+    let config = ManceConfig {
+        k: 8,
+        r: 2,
+        ..Default::default()
+    };
 
     let mut pool = vec![0.0; n * d];
     for i in 0..n {
@@ -167,7 +199,10 @@ fn g1d_orthogonal_gradient_no_harm() {
     manifold_erasure_step_into(&x, &gradient, &pool, n, &config, &mut scratch, &mut out).unwrap();
 
     if out != x {
-        fail("G1d", "orthogonal gradient did not produce bit-identical output");
+        fail(
+            "G1d",
+            "orthogonal gradient did not produce bit-identical output",
+        );
     }
     pass("G1d orthogonal gradient no-harm (bit-identical)");
 }
@@ -182,7 +217,8 @@ fn g1e_trust_region_bound() {
     let mut scratch = ManceScratch::with_capacity(d, config.k, config.r);
     let mut out = vec![0.0; d];
 
-    let info = manifold_erasure_step_into(&x, &gradient, &pool, n, &config, &mut scratch, &mut out).unwrap();
+    let info = manifold_erasure_step_into(&x, &gradient, &pool, n, &config, &mut scratch, &mut out)
+        .unwrap();
 
     let mut diff = vec![0.0f32; d];
     for i in 0..d {
@@ -192,9 +228,18 @@ fn g1e_trust_region_bound() {
     let bound = config.epsilon * info.local_radius;
 
     if displacement > bound + 1e-5 {
-        fail("G1e", &format!("displacement {} > bound {} (r_i={})", displacement, bound, info.local_radius));
+        fail(
+            "G1e",
+            &format!(
+                "displacement {} > bound {} (r_i={})",
+                displacement, bound, info.local_radius
+            ),
+        );
     }
-    pass(&format!("G1e trust region: disp={:.6} ≤ bound={:.6}", displacement, bound));
+    pass(&format!(
+        "G1e trust region: disp={:.6} ≤ bound={:.6}",
+        displacement, bound
+    ));
 }
 
 fn g1f_spectral_weighting_correctness() {
@@ -213,7 +258,12 @@ fn g1f_spectral_weighting_correctness() {
     let mut scratch = ManceScratch::with_capacity(d, r, r);
 
     let alignment = tangent_erasure_direction_into(
-        &gradient, &basis, &sigma, 1.0, d, r,
+        &gradient,
+        &basis,
+        &sigma,
+        1.0,
+        d,
+        r,
         &mut scratch.projection_coords,
         &mut scratch.tangent_direction,
     );
@@ -228,7 +278,13 @@ fn g1f_spectral_weighting_correctness() {
     let exp_1 = expected_1 / norm;
 
     if (dir[0] - exp_0).abs() > 1e-4 || (dir[1] - exp_1).abs() > 1e-4 {
-        fail("G1f", &format!("dir=[{:.6}, {:.6}], expected=[{:.6}, {:.6}]", dir[0], dir[1], exp_0, exp_1));
+        fail(
+            "G1f",
+            &format!(
+                "dir=[{:.6}, {:.6}], expected=[{:.6}, {:.6}]",
+                dir[0], dir[1], exp_0, exp_1
+            ),
+        );
     }
     let _ = alignment;
     pass("G1f spectral weighting matches hand computation");
@@ -248,15 +304,21 @@ fn g2a_hla_scale_latency() {
 
     // Warmup
     for _ in 0..100 {
-        let _ = manifold_erasure_step_into(&x, &gradient, &pool, n, &config, &mut scratch, &mut out);
+        let _ =
+            manifold_erasure_step_into(&x, &gradient, &pool, n, &config, &mut scratch, &mut out);
     }
 
     let iters = 10_000;
     let start = Instant::now();
     for _ in 0..iters {
         let _ = manifold_erasure_step_into(
-            black_box(&x), black_box(&gradient), black_box(&pool), n,
-            black_box(&config), &mut scratch, &mut out,
+            black_box(&x),
+            black_box(&gradient),
+            black_box(&pool),
+            n,
+            black_box(&config),
+            &mut scratch,
+            &mut out,
         );
     }
     let elapsed = start.elapsed();
@@ -265,13 +327,20 @@ fn g2a_hla_scale_latency() {
     if per_call_ns > 10_000.0 {
         fail("G2a", &format!("latency = {:.0}ns > 10µs", per_call_ns));
     }
-    pass(&format!("G2a HLA scale: {:.0}ns/call (< 10µs — SVD dominates, ~4µs for 8×8 Jacobi)", per_call_ns));
+    pass(&format!(
+        "G2a HLA scale: {:.0}ns/call (< 10µs — SVD dominates, ~4µs for 8×8 Jacobi)",
+        per_call_ns
+    ));
 }
 
 fn g2b_shard_scale_latency() {
     let d = 64;
     let n = 100;
-    let config = ManceConfig { k: 16, r: 16, ..Default::default() };
+    let config = ManceConfig {
+        k: 16,
+        r: 16,
+        ..Default::default()
+    };
     let pool = make_pool(n, d, 42);
     let x = vec![0.5; d];
     let gradient = vec![1.0; d];
@@ -280,15 +349,21 @@ fn g2b_shard_scale_latency() {
 
     // Warmup
     for _ in 0..50 {
-        let _ = manifold_erasure_step_into(&x, &gradient, &pool, n, &config, &mut scratch, &mut out);
+        let _ =
+            manifold_erasure_step_into(&x, &gradient, &pool, n, &config, &mut scratch, &mut out);
     }
 
     let iters = 1_000;
     let start = Instant::now();
     for _ in 0..iters {
         let _ = manifold_erasure_step_into(
-            black_box(&x), black_box(&gradient), black_box(&pool), n,
-            black_box(&config), &mut scratch, &mut out,
+            black_box(&x),
+            black_box(&gradient),
+            black_box(&pool),
+            n,
+            black_box(&config),
+            &mut scratch,
+            &mut out,
         );
     }
     let elapsed = start.elapsed();
@@ -297,7 +372,10 @@ fn g2b_shard_scale_latency() {
     if per_call_us > 1_000.0 {
         fail("G2b", &format!("latency = {:.2}µs > 1ms", per_call_us));
     }
-    pass(&format!("G2b shard scale: {:.2}µs/call (< 1ms — 16×64 SVD dominates)", per_call_us));
+    pass(&format!(
+        "G2b shard scale: {:.2}µs/call (< 1ms — 16×64 SVD dominates)",
+        per_call_us
+    ));
 }
 
 fn g2c_loop_latency() {
@@ -325,15 +403,24 @@ fn g2c_loop_latency() {
     let start = Instant::now();
     for _ in 0..iters {
         let _ = manifold_erasure_loop_into(
-            black_box(&x), &gf, black_box(&pool), n,
-            black_box(&config), 10, &mut scratch, &mut out,
+            black_box(&x),
+            &gf,
+            black_box(&pool),
+            n,
+            black_box(&config),
+            10,
+            &mut scratch,
+            &mut out,
         );
     }
     let elapsed = start.elapsed();
     let per_call_us = elapsed.as_nanos() as f64 / iters as f64 / 1000.0;
 
     if per_call_us > 50.0 {
-        fail("G2c", &format!("10-round loop = {:.2}µs > 50µs", per_call_us));
+        fail(
+            "G2c",
+            &format!("10-round loop = {:.2}µs > 50µs", per_call_us),
+        );
     }
     pass(&format!("G2c 10-round loop: {:.2}µs (< 50µs)", per_call_us));
 }
@@ -352,19 +439,29 @@ fn g4_alloc_free_hot_path() {
 
     // Warmup
     for _ in 0..10 {
-        let _ = manifold_erasure_step_into(&x, &gradient, &pool, n, &config, &mut scratch, &mut out);
+        let _ =
+            manifold_erasure_step_into(&x, &gradient, &pool, n, &config, &mut scratch, &mut out);
     }
 
-    let (result, allocs) = alloc_delta(|| {
+    let (_, allocs) = alloc_delta(|| {
         for _ in 0..100 {
-            let _ = manifold_erasure_step_into(&x, &gradient, &pool, n, &config, &mut scratch, &mut out);
+            let _ = manifold_erasure_step_into(
+                &x,
+                &gradient,
+                &pool,
+                n,
+                &config,
+                &mut scratch,
+                &mut out,
+            );
         }
     });
 
-    let _ = result; // suppress unused
-
     if allocs > 0 {
-        fail("G4", &format!("{} allocs over 100 calls (expected 0)", allocs));
+        fail(
+            "G4",
+            &format!("{} allocs over 100 calls (expected 0)", allocs),
+        );
     }
 
     // Verify the result is non-degenerate (not just copying x).
@@ -392,7 +489,16 @@ fn g6_ablation_mance_vs_unconstrained() {
     let mut out_unconstrained = vec![0.0; d];
 
     // MANCE step.
-    let info = manifold_erasure_step_into(&x, &gradient, &pool, n, &config, &mut scratch, &mut out_mance).unwrap();
+    let info = manifold_erasure_step_into(
+        &x,
+        &gradient,
+        &pool,
+        n,
+        &config,
+        &mut scratch,
+        &mut out_mance,
+    )
+    .unwrap();
 
     // Unconstrained erasure: same λ, no tangent projection.
     // û_unconstrained = gradient / ||gradient|| (no tangent projection).
@@ -416,14 +522,21 @@ fn g6_ablation_mance_vs_unconstrained() {
     // orthogonal energy (measured as total norm minus target projection).
     let mance_norm = simd_dot_f32(&out_mance, &out_mance, d).sqrt();
     let uncon_norm = simd_dot_f32(&out_unconstrained, &out_unconstrained, d).sqrt();
-    let mance_orth = (mance_norm * mance_norm - mance_proj * mance_proj).max(0.0).sqrt();
-    let uncon_orth = (uncon_norm * uncon_norm - uncon_proj * uncon_proj).max(0.0).sqrt();
+    let mance_orth = (mance_norm * mance_norm - mance_proj * mance_proj)
+        .max(0.0)
+        .sqrt();
+    let uncon_orth = (uncon_norm * uncon_norm - uncon_proj * uncon_proj)
+        .max(0.0)
+        .sqrt();
 
     if mance_orth < uncon_orth - 1e-6 {
-        fail("G6", &format!(
-            "MANCE orthogonal energy {:.6} < unconstrained {:.6}",
-            mance_orth, uncon_orth
-        ));
+        fail(
+            "G6",
+            &format!(
+                "MANCE orthogonal energy {:.6} < unconstrained {:.6}",
+                mance_orth, uncon_orth
+            ),
+        );
     }
     pass(&format!(
         "G6 MANCE preserves ≥ orthogonal energy: mance_orth={:.6} ≥ uncon_orth={:.6}",
@@ -455,7 +568,17 @@ fn g2d_cached_loop_latency() {
 
     // Warmup
     for _ in 0..50 {
-        let _ = manifold_erasure_loop_cached_into(&x, &gf, &pool, n, &config, 10, &mut scratch, &mut cache, &mut out);
+        let _ = manifold_erasure_loop_cached_into(
+            &x,
+            &gf,
+            &pool,
+            n,
+            &config,
+            10,
+            &mut scratch,
+            &mut cache,
+            &mut out,
+        );
     }
 
     let iters = 1_000;
@@ -463,8 +586,15 @@ fn g2d_cached_loop_latency() {
     for _ in 0..iters {
         cache.invalidate(); // Fresh cache per loop (realistic use case)
         let _ = manifold_erasure_loop_cached_into(
-            black_box(&x), &gf, black_box(&pool), n,
-            black_box(&config), 10, &mut scratch, &mut cache, &mut out,
+            black_box(&x),
+            &gf,
+            black_box(&pool),
+            n,
+            black_box(&config),
+            10,
+            &mut scratch,
+            &mut cache,
+            &mut out,
         );
     }
     let elapsed = start.elapsed();
@@ -473,12 +603,21 @@ fn g2d_cached_loop_latency() {
     // G2 gate: cached loop must be < 50% of uncached loop latency.
     // Uncached loop (g2c) is typically ~49µs; cached ~11µs (4.4x speedup).
     if per_call_us > 25.0 {
-        fail("G2d", &format!("cached 10-round loop = {:.2}µs > 25µs (50% of 50µs gate)", per_call_us));
+        fail(
+            "G2d",
+            &format!(
+                "cached 10-round loop = {:.2}µs > 25µs (50% of 50µs gate)",
+                per_call_us
+            ),
+        );
     }
-    pass(&format!("G2d cached 10-round loop: {:.2}µs (< 25µs — 50% of uncached gate) — hit rate {:.1}% (hits={}, misses={})",
+    pass(&format!(
+        "G2d cached 10-round loop: {:.2}µs (< 25µs — 50% of uncached gate) — hit rate {:.1}% (hits={}, misses={})",
         per_call_us,
         cache.cache_hits as f64 / (cache.cache_hits + cache.cache_misses) as f64 * 100.0,
-        cache.cache_hits, cache.cache_misses));
+        cache.cache_hits,
+        cache.cache_misses
+    ));
 }
 
 // ─── G4c: Cached loop alloc-free (Issue 132) ─────────────────────────────────
@@ -501,24 +640,45 @@ fn g4c_cached_loop_alloc_free() {
 
     // Warmup
     for _ in 0..10 {
-        let _ = manifold_erasure_loop_cached_into(&x, &gf, &pool, n, &config, 10, &mut scratch, &mut cache, &mut out);
+        let _ = manifold_erasure_loop_cached_into(
+            &x,
+            &gf,
+            &pool,
+            n,
+            &config,
+            10,
+            &mut scratch,
+            &mut cache,
+            &mut out,
+        );
     }
 
     // Note: the loop allocates grad_buf + current per round (matching the uncached
     // loop pattern). The cache optimization itself adds 0 allocs. We measure the
     // cached step's alloc count separately to verify the cache is alloc-free.
-    let (result, allocs) = alloc_delta(|| {
+    let (_, allocs) = alloc_delta(|| {
         for _ in 0..100 {
-            let _ = manifold_erasure_loop_cached_into(&x, &gf, &pool, n, &config, 10, &mut scratch, &mut cache, &mut out);
+            let _ = manifold_erasure_loop_cached_into(
+                &x,
+                &gf,
+                &pool,
+                n,
+                &config,
+                10,
+                &mut scratch,
+                &mut cache,
+                &mut out,
+            );
         }
     });
-
-    let _ = result;
 
     // The loop's per-round allocations (grad_buf + current) are inherited from
     // the uncached loop. The cache itself adds 0. We report the total and note
     // that the cache optimization is alloc-free.
-    pass(&format!("G4c cached loop: {} allocs/100 loops (cache itself adds 0; loop allocs inherited from uncached pattern)", allocs));
+    pass(&format!(
+        "G4c cached loop: {} allocs/100 loops (cache itself adds 0; loop allocs inherited from uncached pattern)",
+        allocs
+    ));
 }
 
 // ─── G4d: Cached step alloc-free (Issue 132) ─────────────────────────────────
@@ -536,19 +696,38 @@ fn g4d_cached_step_alloc_free() {
 
     // Warmup
     for _ in 0..10 {
-        let _ = manifold_erasure_step_cached_into(&x, &gradient, &pool, n, &config, &mut scratch, &mut cache, &mut out);
+        let _ = manifold_erasure_step_cached_into(
+            &x,
+            &gradient,
+            &pool,
+            n,
+            &config,
+            &mut scratch,
+            &mut cache,
+            &mut out,
+        );
     }
 
-    let (result, allocs) = alloc_delta(|| {
+    let (_, allocs) = alloc_delta(|| {
         for _ in 0..100 {
-            let _ = manifold_erasure_step_cached_into(&x, &gradient, &pool, n, &config, &mut scratch, &mut cache, &mut out);
+            let _ = manifold_erasure_step_cached_into(
+                &x,
+                &gradient,
+                &pool,
+                n,
+                &config,
+                &mut scratch,
+                &mut cache,
+                &mut out,
+            );
         }
     });
 
-    let _ = result;
-
     if allocs > 0 {
-        fail("G4d", &format!("{} allocs over 100 cached step calls (expected 0)", allocs));
+        fail(
+            "G4d",
+            &format!("{} allocs over 100 cached step calls (expected 0)", allocs),
+        );
     }
 
     pass("G4d 0 allocs/100 cached step calls (cache hit path is pure copy_from_slice)");
@@ -576,7 +755,9 @@ fn main() {
     g2d_cached_loop_latency();
 
     println!("\n── G3: No regression ──");
-    println!("✅ GATE PASS: G3 (verified via `cargo test -p katgpt-core --lib` — 1468 tests pass, 0 new warnings)");
+    println!(
+        "✅ GATE PASS: G3 (verified via `cargo test -p katgpt-core --lib` — 1468 tests pass, 0 new warnings)"
+    );
 
     println!("\n── G4: Alloc-free hot path ──");
     g4_alloc_free_hot_path();
@@ -584,7 +765,9 @@ fn main() {
     g4d_cached_step_alloc_free();
 
     println!("\n── G5: Modelless ──");
-    println!("✅ GATE PASS: G5 (manifold_erasure = [] in Cargo.toml — only katgpt-types SIMD + subspace_phase_gate SVD, both already in katgpt-core)");
+    println!(
+        "✅ GATE PASS: G5 (manifold_erasure = [] in Cargo.toml — only katgpt-types SIMD + subspace_phase_gate SVD, both already in katgpt-core)"
+    );
 
     println!("\n── G6: Ablation (MANCE vs unconstrained) ──");
     g6_ablation_mance_vs_unconstrained();

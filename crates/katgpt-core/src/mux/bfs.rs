@@ -5,7 +5,7 @@
 
 use crate::mux::dd_tree::MuxDdTree;
 #[cfg(feature = "comp_width")]
-use crate::mux::dd_tree::compositional_width;
+use crate::mux::dd_tree::compositional_width_with_total;
 #[cfg(feature = "comp_width")]
 use crate::mux::top_k::{MAX_TOP_K, extract_top_k_into};
 #[cfg(not(feature = "comp_width"))]
@@ -49,11 +49,15 @@ impl MuxBfs {
             if peaks.len() < 2 {
                 return 1;
             }
+            // Single sum scan feeds both the `total <= 0.0` early-out AND the
+            // downstream `compositional_width_with_total` → `shannon_entropy_with_total`.
+            // Previously this was computed twice (once here, once inside
+            // `shannon_entropy`) on every BFS leaf expansion.
             let total: f32 = peaks.iter().sum();
             if total <= 0.0 {
                 return 1;
             }
-            compositional_width(peaks, self.k).max(1)
+            compositional_width_with_total(peaks, self.k, total).max(1)
         }
 
         #[cfg(not(feature = "comp_width"))]

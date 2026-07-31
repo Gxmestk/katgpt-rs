@@ -123,8 +123,8 @@ Both are follow-up work, not this plan.
 | File | Phase 5-7 Change |
 |------|------------------|
 | `katgpt-rs/crates/katgpt-core/src/compression_drafter.rs` | + `MatchScorer` trait, `Lz4MatchScorer`, `MatchLengthScorer` (inverted index), `beam_search()`, `corpus_alphabet()` + 9 new unit tests (15 total) |
-| `riir-ai/crates/riir-games/src/quest_grammar/compression_draft.rs` | + `generate_beam()` method using beam search |
-| `riir-ai/crates/riir-games/tests/bench_285_compression_drafter.rs` | G1+G2 switched to beam search; added phase history in doc comment |
+| `riir-ai/crates/riir-games-quest/src/quest_grammar/compression_draft.rs` | + `generate_beam()` method using beam search |
+| `riir-ai/crates/riir-games-quest/tests/bench_285_compression_drafter.rs` | G1+G2 switched to beam search; added phase history in doc comment |
 | `katgpt-rs/.plans/285_compression_drafter_quest_grammar.md` | + Phase 5/6/7 sections documenting the algorithm + scorer + re-bench |
 
 ---

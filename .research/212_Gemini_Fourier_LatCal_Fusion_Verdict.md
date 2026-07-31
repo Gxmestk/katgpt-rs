@@ -49,7 +49,7 @@ The Gemini output proposes 7 pillars fusing Fourier Spatial AI, LatCal, and neur
 3. **The actual anti-cheat for movement is bounds checking:** |velocity| ≤ max_speed, path doesn't intersect collision geometry, position delta consistent with tick rate. We already have this (Plan 177: spec reconciliation with velocity/position bounds).
 
 **What We Already Have (Correct Usage):**
-- LatCal determinant validation for FINANCIAL integrity (riir-chain batch/processor.rs) — ensures value conservation in matrix accounting. This is the correct use of determinant invariants.
+- LatCal determinant validation for FINANCIAL integrity (riir-chain riir-chain/src/batch/processor.rs) — ensures value conservation in matrix accounting. This is the correct use of determinant invariants.
 - Spec reconciliation (Plan 177) — velocity bounds, position bounds, kill-rate bounds with manifold verification.
 - Trust flags (Plan 212) — behavioral anomaly detection.
 
@@ -62,7 +62,7 @@ The Gemini output proposes 7 pillars fusing Fourier Spatial AI, LatCal, and neur
 **Gemini Claim:** Convert player input timestamps into frequency signatures via 1D Fourier Transform. Boss AI queries combat rhythm to anticipate combo peaks.
 
 **What We Already Have:**
-- `LinOSSCell` (katgpt-core/linoss.rs) — angular frequency ω², damping β, state-space oscillation
+- `LinOSSCell` (crates/katgpt-core/src/linoss.rs) — angular frequency ω², damping β, state-space oscillation
 - `VocabFourierBasis` — DFT top-K mode extraction from embeddings
 - `ModalSpecDrafter` — LinOSS state → modal coefficients → Fourier reconstruct → nearest token
 - LinOSS combat rhythm research (riir-ai R060) — combat actions decomposed into natural frequencies
@@ -81,8 +81,8 @@ The Gemini output proposes 7 pillars fusing Fourier Spatial AI, LatCal, and neur
 - `PayoffTable<N>` with ε-Nash convergence, Nash gap tracking
 - BFCP region extraction, polytope LoRA routing
 - `ConPwlValueFunction`, `ConPwcStrategy`, `minimax_pi_step()` — alternating best-response policy iteration
-- MatrixAccount (14 LatCalMatrix cells) with CPI chain (riir-chain programs/cpi.rs)
-- Combat heuristics (riir-engine frame/heuristic.rs) — ThreatHeuristic, CombatHeuristic
+- MatrixAccount (14 LatCalMatrix cells) with CPI chain (riir-chain riir-chain/src/programs/cpi.rs)
+- Combat heuristics (riir-engine riir-ai/crates/riir-engine/src/frame/heuristic.rs) — ThreatHeuristic, CombatHeuristic
 
 **Verdict: ALREADY GOAT. The Gemini `BossMatrixState` is literally our MatrixAccount + NS-CSG pipeline.**
 
@@ -145,8 +145,8 @@ The "merchant prices shift based on collective player HLA" is exactly what BAKE 
 - WASM validators with fuel budgeting (riir-chain wasm_validators.rs)
 - MCP entity control (chain_node_mcp, chain_mcp_entity)
 - Ephemeral WASM wallet validation (chain_wasm feature)
-- Shell matrix validation (encoding/shell.rs)
-- Fourier Pruner in shell (shell/fourier_pruner.rs)
+- Shell matrix validation (riir-chain/src/encoding/shell.rs)
+- Fourier Pruner in shell (riir-chain/src/shell/fourier_pruner.rs)
 - Fixed-point bridge for WASM boundary (latcal_fixed.rs)
 
 **Verdict: ALREADY IMPLEMENTED. Our WASM + MCP + LatCal fixed-point pipeline exceeds the Gemini proposal.**
@@ -260,11 +260,13 @@ NPC uses these to decide WHEN to dodge/counter, not just WHO to target.
 
 ## Action Items
 
-- [ ] Create GOAT-gated benchmark for Fusion A (Spectral NPC Perception Compression)
+> **Status Update (2026-07-11):** Fusion A implemented via Plan 240 (✅ GOAT PASS, promoted to default). Fusion B remains unevaluated (needs POC). Fusion C already has a plan.
+
+- [x] Create GOAT-gated benchmark for Fusion A (Spectral NPC Perception Compression) — ✅ Done via Plan 240 (GOAT PASS, promoted to default)
 - [ ] Evaluate Fusion B (LatCal Fixed-Point Fourier) — likely overengineering, needs POC
 - [x] Fusion C (LinOSS Modal Threat Prediction) — most promising, warrants plan
-- [ ] No new plans for Gemini pillars 3–6, 8 (already implemented)
-- [ ] No plans for Gemini pillars 1–2 (fundamentally flawed for stated purpose)
+- [x] No new plans for Gemini pillars 3–6, 8 (already implemented) (no action needed — already implemented)
+- [x] No plans for Gemini pillars 1–2 (fundamentally flawed for stated purpose) (no action needed — fundamentally flawed)
 
 ---
 

@@ -132,13 +132,13 @@ Combine `MeanFieldOverlap` + `HopfBoundary` + chaos-intensity `g` into the paper
 
 ### Tasks
 
-- [x] **T5.1 (PoC — `riir-ai/crates/riir-poc/`)** Implement `benches/mean_field_regime_poc.rs`:
+- [x] **T5.1 (PoC — `riir-ai/crates/riir-poc/`)** Implement `riir-ai/crates/riir-poc/benches/mean_field_regime_poc.rs`:
   - Implemented the paper's reduced 3D ODE (Eq. 55) as a modelless simulator with `(g, β)` knobs. Uses simplified `χ̄`/`Q_fp`/`G_eff` approximations (NOT the paper's exact DMFT self-consistency — see Issue 034 T1 for the upgrade path).
   - Sweeps a 5×5 `(g, β)` grid (`g ∈ {1.0, 1.2, 1.4, 1.6, 1.8}`, `β ∈ {0.0, 0.35, 0.55, 0.85, 1.4}` — paper Fig. 1 range).
   - Classifies each trajectory's qualitative regime from std-dev, sign-changes, autocorrelation.
   - Runs `RegimeClassifier::classify_with_g` on the simulated state + computed `G_eff`.
   - **Verdict: INCONCLUSIVE** — 19/25 grid points match (76%), but only 1/4 distinct regimes correctly identified. Mismatches cluster at (a) g=1.0 boundary (`chaos_threshold` calibration) and (b) intermediate β (`hopf_margin` calibration). The classifier detects the Hopf instability direction correctly but misclassifies switching vs limit-cycle. Root cause: the simplified ODE simulator is too crude (rough `χ̄`/`Q_fp` approximations vs the paper's exact DMFT). Recorded honestly as §PoC Addendum in Research 371 + Issue 034 follow-up.
-- [x] **T5.2 (G2 perf bench)** `benches/bench_371_mean_field_regime_goat.rs`:
+- [x] **T5.2 (G2 perf bench)** `crates/katgpt-core/benches/bench_371_mean_field_regime_goat.rs`:
   - `aggregate_into` over 1000 NPCs (dim=8) — **9.79µs** (target relaxed from 5µs to 15µs; scalar Padé tanh floor is ~12µs, SIMD tanh would hit ~5µs — tracked as future optimization).
   - `hopf_boundary` — **0ns** (inlined; ≤ 50ns target PASS).
   - `classify` — **0ns** (inlined; ≤ 100ns target PASS).

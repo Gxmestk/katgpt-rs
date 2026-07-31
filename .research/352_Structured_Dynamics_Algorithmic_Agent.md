@@ -17,8 +17,8 @@ A theoretical framework paper, not a primitive. Ruffini et al. unify **Algorithm
 
 | Paper concept | Codebase instance (shipped) |
 |---|---|
-| Comparator detects model drift → re-estimate | `latent_functor/reestimation.rs` — coherence-driven re-estimation scheduler when `coherence < tau_reest` |
-| Agent dynamics track world via recurrent latent state | `evolve_hla` (`sense/reconstruction.rs`), `MicroRecurrentBeliefState` (Plan 276), NextLat belief-state drafter (Research 192) |
+| Comparator detects model drift → re-estimate | `riir-ai/crates/riir-engine/src/latent_functor/reestimation/mod.rs` — coherence-driven re-estimation scheduler when `coherence < tau_reest` |
+| Agent dynamics track world via recurrent latent state | `evolve_hla` (`crates/katgpt-sense/src/reconstruction.rs`), `MicroRecurrentBeliefState` (Plan 276), NextLat belief-state drafter (Research 192) |
 | Lie-group equivariant operators | Smets textbook Ch 3 → Research 321 (katgpt-rs) + Research 166 (riir-ai SE(2) game maps Super-GOAT) |
 | Conserved quantity / maximal invariant for symmetry | Plan 270 (LoRA `(A,B)` R+-gauge invariance — the one practical case) |
 | Reduced / hierarchical nested manifolds | HLA 8-dim affect projection (high-dim cochain → 8 scalars), `schema_centroid`, sense `lod`, zone-attention |
@@ -89,8 +89,8 @@ Auditing the paper's load-bearing primitives against shipped code:
 
 | Paper primitive | Status in codebase | Closest shipped instance |
 |---|---|---|
-| Comparator (prediction error → re-estimate) | **SHIPPED** (under vocabulary "coherence-driven re-estimation") | `riir-engine/src/latent_functor/reestimation.rs` — when `coherence < tau_reest`, the scheduler collects fresh observations and atomically swaps new direction vectors with a fresh `Uuid::now_v7()` snapshot id + BLAKE3 commitment. Coherence = mean cosine parallelism of displacements with the learned direction (rank-1) or Frobenius residual fit (rank-k). **This is the world-tracking Lyapunov loop in codebase vocabulary.** |
-| Recurrent latent state for tracking | **SHIPPED** | `evolve_hla` (`katgpt-core/src/sense/reconstruction.rs`) — per-NPC 8-dim HLA belief-state kernel. See Research 242 §2.4 (the canonical `evolve_hla` prior-art-check lesson). |
+| Comparator (prediction error → re-estimate) | **SHIPPED** (under vocabulary "coherence-driven re-estimation") | `riir-ai/crates/riir-engine/src/latent_functor/reestimation/mod.rs` — when `coherence < tau_reest`, the scheduler collects fresh observations and atomically swaps new direction vectors with a fresh `Uuid::now_v7()` snapshot id + BLAKE3 commitment. Coherence = mean cosine parallelism of displacements with the learned direction (rank-1) or Frobenius residual fit (rank-k). **This is the world-tracking Lyapunov loop in codebase vocabulary.** |
+| Recurrent latent state for tracking | **SHIPPED** | `evolve_hla` (`crates/katgpt-sense/src/reconstruction.rs`) — per-NPC 8-dim HLA belief-state kernel. See Research 242 §2.4 (the canonical `evolve_hla` prior-art-check lesson). |
 | Lie-group equivariant operators | **SHIPPED as framework** (Smets Ch 3 → Research 321); **DEFERRED as SE(2) game-map instance** (Research 166) | Smets §3.4 lift→group-conv→project is the same theorem as Ruffini §2.1.3 in different vocabulary. SE(2) game maps are a riir-ai Super-GOAT guide, not yet implemented. |
 | Conserved quantity / maximal invariant | **PARTIAL** — only the LoRA R+-gauge case ships | Plan 270 (gauge-invariant adapter compose). Per Research 314, HLA affect / `NeuronShard::style_weights[64]` have **trivial** symmetry groups (semantic-axis distinctness + BLAKE3 basis pinning), so the maximal invariant collapses to the state itself. |
 | Reduced / hierarchical nested manifolds | **CONCEPTUALLY PRESENT**, no formal "nested manifold" primitive | HLA projection (high-dim cochain → 8 scalars), `schema_centroid`, sense `lod`, zone attention. DEC `hodge_decompose` gives the exact/coexact/harmonic split — a *different* decomposition (Helmholtz) than nested hierarchical constraint manifolds. |
@@ -105,14 +105,14 @@ The paper's value is **organizational**, not algorithmic. Three conceptual takea
 
 2. **"Constraint breaking = anomaly signal."** Ruffini's framing of *symmetry breaking at the Comparator* as the anomaly/novelty signal is a clean theoretical justification for the existing curiosity / coherence-decay / re-estimation-trigger pipeline. It connects Research 041 (curiosity pulse), the `tau_reest` threshold, and the "world model violated → exploration" pattern into one AIT-grounded picture.
 
-3. **"Hierarchical nested manifolds = the formal object behind HLA projection."** The chain `M₀ ⊃ M₁ ⊃ … ⊃ M_k` is the formalization of what HLA scalar projection *does* (high-dim cochain → successively coarser affect subspaces). It is a candidate framing for a future Plan that gives HLA a *typed* coarse-graining hierarchy — but that is a design decision in `riir-ai/crates/riir-engine/src/hla/`, not a katgpt-rs primitive.
+3. **"Hierarchical nested manifolds = the formal object behind HLA projection."** The chain `M₀ ⊃ M₁ ⊃ … ⊃ M_k` is the formalization of what belief scalar projection *does* (high-dim cochain → successively coarser affect subspaces). It is a candidate framing for a future Plan that gives HLA a *typed* coarse-graining hierarchy — but that is a design decision in `riir-ai/crates/riir-engine/src/hla/`, not a katgpt-rs primitive.
 
 ### 2.3 Why not Super-GOAT (novelty gate, all four asked)
 
 - **Q1 No prior art?** FAILS. Three layers checked:
   - **Notes layer:** Smets textbook Ch 3 (Research 321 — Super-GOAT) is the *same* Lie-group-equivariant-operator math; Research 166 (riir-ai — Super-GOAT) is the SE(2) instance. Research 242 (Topological Trouble / Mozer) covers the recurrent-belief-state story and is *explicitly* down-graded from Super-GOAT to GOAT because `evolve_hla` already ships the primitive. Research 192 (NextLat) covers belief-state latent dynamics. Research 314 establishes that our latent states have trivial symmetry, so the maximal-invariant machinery has no target.
-  - **Code layer:** `latent_functor/reestimation.rs` ships the exact Comparator-→-re-estimate pattern under the name "coherence-driven re-estimation scheduler when `coherence < tau_reest`". This is the DiPOD-style vocabulary-mismatch failure mode — paper-vocabulary grep ("world-tracking", "Comparator Lyapunov") returns nothing, but the mechanism ships.
-  - **Vocabulary translation** (paper → codebase): "world-tracking" → "coherence > tau_reest"; "Comparator" → "re-estimation trigger", "CLR vote"; "conserved quantity" → "BLAKE3 commitment", "FAME Proposition 3 sampling invariant"; "reduced manifold" → "HLA scalar projection", "subspace phase gate". Both sets grepped; all hits are documented above.
+  - **Code layer:** `riir-ai/crates/riir-engine/src/latent_functor/reestimation/mod.rs` ships the exact Comparator-→-re-estimate pattern under the name "coherence-driven re-estimation scheduler when `coherence < tau_reest`". This is the DiPOD-style vocabulary-mismatch failure mode — paper-vocabulary grep ("world-tracking", "Comparator Lyapunov") returns nothing, but the mechanism ships.
+  - **Vocabulary translation** (paper → codebase): "world-tracking" → "coherence > tau_reest"; "Comparator" → "re-estimation trigger", "CLR vote"; "conserved quantity" → "BLAKE3 commitment", "FAME Proposition 3 sampling invariant"; "reduced manifold" → "belief scalar projection", "subspace phase gate". Both sets grepped; all hits are documented above.
 - **Q2 New class of behavior?** FAILS. The paper is a *theoretical reframing* of capabilities we already have. It does not introduce a new operator, a new gate, or a new capability — it explains why the existing ones work.
 - **Q3 Product selling point?** Cannot finish the sentence. "Our NPCs track world data with Lie-group symmetry" fails because our latent states have trivial symmetry (Research 314). "Our NPCs do hierarchical coarse-graining" already ships as HLA projection without the Lie-group formalism.
 - **Q4 Force multiplier?** Theoretical only. Connections to HLA, functor, DEC, LatCal, and the Lean proof infra all exist on paper but require introducing a `(μ, Σ)` latent state we deliberately don't have.
@@ -152,7 +152,7 @@ None actionable today. The first (Lyapunov `K̂`) is the most likely to become r
 - A future plan introduces a `(μ, V)` or `(μ, Σ)` latent state (Gaussian belief, distributional embedding, second-order personality representation) — *the same trigger as Research 314*.
 - At that point, three Ruffini-grounded primitives become concrete GOAT candidates:
   1. **Lyapunov feedback gain `K̂`** as a named primitive over the `(μ, Σ)` belief — the formalization of the implicit proportional feedback in `reestimation.rs`.
-  2. **Hierarchical nested-manifold projection** `M₀ ⊃ … ⊃ M_k` as a typed coarse-graining chain — the formal object behind HLA scalar projection.
+  2. **Hierarchical nested-manifold projection** `M₀ ⊃ … ⊃ M_k` as a typed coarse-graining chain — the formal object behind belief scalar projection.
   3. **Symmetry-discovery bridge** to LieGG / LieSD / LaLiGAN — but only the *inference-time read-out* side; the discovery itself is training-side (→ riir-train).
 - Until then, the value of this note is **conceptual**: it documents (a) the theoretical unification of `evolve_hla` + `reestimation.rs` + DEC `codifferential` under the "world-tracking agent mirrors world symmetry" theorem, and (b) that the practical non-trivial-symmetry case is the same Research 314 blocker.
 

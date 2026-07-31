@@ -1,0 +1,583 @@
+use super::*;
+
+/// Batched forward pass — process N tokens at consecutive positions in one call (Issue 020, Path B).
+///
+/// This is the DenseMesh vertex-parameter-sharing batched entry point. The 4
+/// hidden nodes in a `[1, 4, 1]` mesh share one set of `TransformerWeights`
+/// (paper §3.3). When their forwards are batched into this single call, we
+/// amortise:
+///   - function-call overhead (1 call vs N),
+///   - `batch_logits` buffer growth (resized once, not allocated per token),
+///   - config-derived constants (hoisted outside the token loop).
+///
+/// Each `tokens[i]` is forwarded at position `pos_start + i` and writes K/V
+/// into `cache` at that position. The returned slice for token `i` spans
+/// `[i * vocab_size .. (i+1) * vocab_size]` of [`ForwardContext::batch_logits`].
+///
+/// # Safety of returned slices
+///
+/// The returned `Vec<&mut [f32]>` contains N disjoint mutable slices into a
+/// single `Vec<f32>`. This is sound because the slices are non-overlapping
+/// (each spans `vocab_size` consecutive elements), but the borrow checker
+/// cannot prove disjointness through raw pointers, so we use
+/// `slice::from_raw_parts_mut` inside a small `unsafe` block. The slices are
+/// valid for the lifetime `'a` of the `ctx` borrow. Callers must not outlive
+/// `ctx`.
+///
+/// # When to use
+///
+/// Prefer `forward_batched` when forwarding ≥ 2 tokens of the same model
+/// back-to-back (e.g. DenseMesh hidden-layer vertex batch, prefill). For a
+/// single token, use [`forward()`] — the batched path has no advantage at N=1.
+#[allow(clippy::too_many_arguments)]
+pub fn forward_batched<'a>(
+    ctx: &'a mut ForwardContext,
+    weights: &TransformerWeights,
+    cache: &mut MultiLayerKVCache,
+    tokens: &[usize],
+    pos_start: usize,
+    config: &Config,
+) -> Vec<&'a mut [f32]> {
+    let n_tokens = tokens.len();
+    let vocab = config.vocab_size;
+    debug_assert!(n_tokens > 0, "forward_batched requires at least one token");
+
+    // Grow the flat batch buffer once (no per-token alloc). `resize` is a no-op
+    // when capacity already suffices — callers that repeatedly batch the same
+    // width pay zero allocation after the first call (plasma tier).
+    ctx.batch_logits.resize(n_tokens * vocab, 0.0);
+
+    // Hoist the config-derived `vocab` stride outside the per-token loop. The
+    // per-token forward already hoists its own layer-loop invariants; we only
+    // add the batch-stride and output-index arithmetic here.
+    for (i, &token) in tokens.iter().enumerate() {
+        let pos = pos_start + i;
+        // `forward` returns `&mut ctx.logits` (single-token buffer) but also
+        // mutably borrows `ctx`. To then write into `ctx.batch_logits` we'd
+        // need a second mutable borrow of `ctx`. The borrow checker can't see
+        // that `logits` and `batch_logits` are disjoint fields, so we copy
+        // through raw pointers. SAFETY: `ctx.logits.len() == vocab` (invariant
+        // from ForwardContext::new) and `batch_logits.len() == n_tokens *
+        // vocab` (from the resize above). `out_start + vocab <= len`. The two
+        // regions never overlap because `logits` is the single-token buffer
+        // and `batch_logits` is the flat batch buffer.
+        let _logits = forward(ctx, weights, cache, token, pos, config);
+        let out_start = i * vocab;
+        // SAFETY: see comment above the loop.
+        let src = ctx.logits.as_ptr();
+        let dst = unsafe { ctx.batch_logits.as_mut_ptr().add(out_start) };
+        unsafe {
+            std::ptr::copy_nonoverlapping(src, dst, vocab);
+        }
+    }
+
+    // Return disjoint per-token mutable slices into batch_logits. The lifetime
+    // `'a` ties the slices to the `ctx` borrow. Each slice is `vocab` long.
+    // SAFETY: batch_logits has length `n_tokens * vocab`; each slice covers a
+    // disjoint `[i*vocab .. (i+1)*vocab]` range. The raw-pointer reborrow does
+    // not violate aliasing because no two returned slices overlap.
+    let base = ctx.batch_logits.as_mut_ptr();
+    let mut out: Vec<&'a mut [f32]> = Vec::with_capacity(n_tokens);
+    for i in 0..n_tokens {
+        // SAFETY: offset `i * vocab` is in-bounds (total len = n_tokens * vocab).
+        // Slice length `vocab` stays in-bounds. Slices are disjoint across `i`.
+        let ptr = unsafe { base.add(i * vocab) };
+        let slice: &'a mut [f32] = unsafe { std::slice::from_raw_parts_mut(ptr, vocab) };
+        out.push(slice);
+    }
+    out
+}
+
+/// Forward with optional LoRA and domain latent (Plan 038).
+/// Convenience wrapper for callers that need both conditioning signals.
+#[cfg(feature = "domain_latent")]
+#[allow(clippy::too_many_arguments)]
+pub fn forward_with_domain_latent<'a>(
+    ctx: &'a mut ForwardContext,
+    weights: &TransformerWeights,
+    cache: &mut MultiLayerKVCache,
+    token: usize,
+    pos: usize,
+    config: &Config,
+    lora: Option<&crate::types::LoraAdapter>,
+    domain_latent: Option<&crate::types::DomainLatent>,
+) -> &'a mut [f32] {
+    cache.advance_pos(pos);
+    #[cfg(feature = "coda_fusion")]
+    {
+        forward_coda(ctx, weights, cache, token, pos, config, lora, domain_latent)
+    }
+    #[cfg(not(feature = "coda_fusion"))]
+    {
+        forward_base(ctx, weights, cache, token, pos, config, lora, domain_latent)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// LT2 Looped Inference (Plan 108, Research 73)
+// ---------------------------------------------------------------------------
+
+/// Looped transformer forward pass — weight-shared T-pass loop.
+///
+/// Applies the same layer weights T times in succession, yielding effective
+/// depth T×n_layer with no extra parameters. Key insight from LT2: looping
+/// uniquely synergizes with subquadratic attention — T loops turn rank-1
+/// DPLR state updates into rank-T updates.
+///
+/// Per-loop residual gate: h^(τ) = h̃^(τ) + ρ_τ ⊙ h^(τ-1)
+/// Zero-init ρ_τ means first iteration is h̃^(1) (no residual from "previous").
+///
+/// Feature gate: `lt2_looped` (requires `hla_attention`).
+///
+/// # Plan 283 T2.2 — AdvantageMarginGate integration
+///
+/// When `weight_shared_advantage_gate` is enabled AND `recursion_gate` is
+/// `Some(gate)`, after each `tau` iteration the loop computes logits via the
+/// readout `lm_head` matmul and asks the gate whether the step improved the
+/// candidate's prediction. If the gate signals dead compute (`should_recurse`
+/// returns `false`), the outer loop breaks early, skipping the remaining
+/// `loop_count - tau - 1` iterations.
+///
+/// When `recursion_gate` is `None` (or the feature is off), behavior is
+/// byte-identical to the ungated baseline: the full `loop_count` iterations
+/// run and no extra work is performed.
+///
+/// # Overhead estimate (gated path only)
+///
+/// Per iteration the gate adds one `lm_head` matmul (`vocab_size × n_embd`
+/// FLOPs) plus one `should_recurse` check (`O(vocab)`, <1µs for vocab ≤ 128
+/// per Bench 056 G3). For a typical micro config (`vocab=27, n_embd=16,
+/// n_layer=1`) this is ~432 FLOPs versus ~512 FLOPs per layer pass — about
+/// 0.8× one layer's compute. At larger configs the ratio improves further
+/// (one `lm_head` matmul vs `n_layer` layer passes). The gate pays for itself
+/// if it saves ≥2 iterations (Bench 056 shows 2.68×–6.76× reduction at
+/// vocab ≤ 128). Allocations happen once on the first gated iteration, then
+/// are reused via `resize`/`clear` (no per-iteration heap traffic).
+#[cfg(feature = "lt2_looped")]
+#[allow(dead_code, clippy::too_many_arguments, clippy::needless_range_loop)]
+pub fn forward_looped<'a>(
+    ctx: &'a mut ForwardContext,
+    weights: &TransformerWeights,
+    cache: &mut MultiLayerKVCache,
+    ahla_cache: &mut crate::hla::MultiLayerAhlaCache,
+    token: usize,
+    pos: usize,
+    config: &Config,
+    residual_gate: &crate::types::ResidualGate,
+    sdpa_gate: &crate::types::SdpaOutputGate,
+    #[cfg(feature = "sleep_consolidation")] gdn2_cache: Option<
+        &'a mut crate::gdn2::MultiLayerGdn2Cache,
+    >,
+    #[cfg(feature = "sleep_consolidation")] sleep_config: Option<&'a crate::sleep::SleepConfig>,
+    // Plan 283 T2.2: optional recursion gate. `None` = byte-identical to
+    // baseline (no gate, all `loop_count` iterations run). `Some(gate)` =
+    // after each `tau > 0` iteration, compute logits and ask the gate whether
+    // the step improved the candidate; break early on dead compute.
+    #[cfg(feature = "weight_shared_advantage_gate")] recursion_gate: Option<
+        &mut crate::pruners::self_advantage::AdvantageMarginGate,
+    >,
+    // Issue 035 (Research 273 — ELT Any-Time inference): per-call elastic
+    // loop override. `None` = use `config.loop_mode`'s natural loop count
+    // (byte-identical to pre-Issue-035 behavior). `Some(L)` runs L loops
+    // clamped to `[loop_min, 2×loop_max]` per `Config::effective_loop_count`.
+    // No feature gate required (it's a parameter); zero cost when `None`.
+    elastic_loop_override: Option<usize>,
+    // Plan 304 T2.1: optional gain/cost halter. `None` = byte-identical to
+    // pre-Plan-304 behavior (all `loop_count` iterations run). `Some(halter)`
+    // = after each iteration, evaluate gain/cost scissors and break early on
+    // `HaltDecision::Halt`. Composes with `elastic_loop_override` (Issue 035):
+    // if the caller passes `Some(L)` for the override, the halter is IGNORED
+    // (static override wins — see T2.2). Feature-gated to keep the no-halter
+    // build zero-cost: when `gain_cost_halt` is off, this parameter slot does
+    // not exist in the signature, so callers don't pass it either.
+    #[cfg(feature = "gain_cost_halt")] halter: Option<
+        &mut katgpt_core::gain_cost_halt::GainCostLoopHalter,
+    >,
+) -> &'a mut [f32] {
+    cache.advance_pos(pos);
+    use crate::types::HybridPattern;
+
+    let n = config.n_embd;
+    let hd = config.head_dim;
+    let kvd = crate::types::kv_dim(config);
+
+    // Loop-invariant values hoisted outside all loops
+    let scale = ctx.attn_scale;
+    let t_n = pos + 1;
+
+    // Issue 035: derive effective loop count, applying elastic override if
+    // present. `None` is byte-identical to the prior `match config.loop_mode`
+    // block (verified by `Config::effective_loop_count` returning `base`).
+    let loop_count = config.effective_loop_count(elastic_loop_override);
+
+    // 1. Embedding: x = wte[token] + wpe[pos]
+    let tok_off = token * n;
+    let pos_off_emb = pos * n;
+    katgpt_core::simd::simd_add_into(
+        &mut ctx.x[..n],
+        &weights.wte[tok_off..tok_off + n],
+        &weights.wpe[pos_off_emb..pos_off_emb + n],
+    );
+
+    // Plan 283 T2.2 — recursion-gate scratch buffers.
+    // Declared at zero capacity so the no-gate path (`recursion_gate == None`)
+    // performs no allocation. The gated path resizes them exactly once (first
+    // gated iteration) and reuses them thereafter via `resize`/`clear`, which
+    // are no-ops once the capacity matches `vocab_size`. This honors the
+    // hot-loop rule (no allocation inside the outer loop body).
+    #[cfg(feature = "weight_shared_advantage_gate")]
+    let mut recursion_gate = recursion_gate;
+    #[cfg(feature = "weight_shared_advantage_gate")]
+    let mut _gate_scratch_logits: Vec<f32> = Vec::new();
+    #[cfg(feature = "weight_shared_advantage_gate")]
+    let mut _gate_prev_logits: Vec<f32> = Vec::new();
+
+    // Plan 304 T2.2 + T2.3 — gain/cost halter plumbing.
+    //
+    // `halter_active` is computed once outside the loop: the halter is ONLY
+    // consulted when the caller passed `Some(halter)` AND did NOT pass a static
+    // `elastic_loop_override` (T2.2 — static override wins). This bool is
+    // `false` in both feature-off builds (cfg-stripped) and feature-on builds
+    // where the caller asked for a fixed loop count — so the per-iteration
+    // halter branch is statically or branch-predicted-not-taken in all
+    // no-op paths. Zero cost when the halter is inactive.
+    //
+    // `prev_step_buf` holds the previous loop's update direction
+    // `h^(tau-1) - h^(tau-2)` so the next iteration can compute cos θ against
+    // it via `angular_change`. Allocated ONCE per `forward_looped` call (not
+    // per iteration) — honors the hot-loop rule. Matches the existing
+    // `_gate_scratch_logits` pattern: declared even in the no-halter path but
+    // never grown unless the halter fires.
+    #[cfg(feature = "gain_cost_halt")]
+    let mut halter = halter;
+    #[cfg(feature = "gain_cost_halt")]
+    let halter_active = elastic_loop_override.is_none();
+    #[cfg(feature = "gain_cost_halt")]
+    let mut prev_step_buf: Vec<f32> = Vec::with_capacity(n);
+    #[cfg(feature = "gain_cost_halt")]
+    let mut curr_step_buf: Vec<f32> = Vec::with_capacity(n);
+    // `cost_floor` is cached on the first halter evaluation (tau == 1) as
+    // `0.01 × first_step_size`, mirroring LoopCoder-v2's flat Ω(r) tax. See
+    // the plan's Open Question 1 resolution (Phase 2 ships the fixed-tax
+    // default; riir-ai can override with coherence-decay/staleness).
+    #[cfg(feature = "gain_cost_halt")]
+    let mut cost_floor: f32 = 0.0;
+
+    // 2. Outer loop: T passes over all layers
+    for tau in 0..loop_count {
+        // Plan 428 — Inter-loop RMSNorm: normalize the carry-over hidden state
+        // before it enters this loop iteration's layer pass. Applied for tau > 0
+        // (the first iteration uses the embedding directly). This controls
+        // residual norm growth in weight-shared looped inference — the PoC
+        // benchmark (examples/loop_stability_poc.rs) validated 3.34× norm ratio
+        // vs 11.19× baseline at T=12. Zero cost when LoopStabilityMode::None.
+        #[cfg(feature = "loop_stability_fix")]
+        if tau > 0 && config.loop_stability_mode == crate::types::LoopStabilityMode::InterLoopNorm {
+            crate::types::rmsnorm(&mut ctx.x[..n]);
+        }
+
+        // Save h^(τ-1) for residual gate
+        ctx.prev_h[..n].copy_from_slice(&ctx.x[..n]);
+
+        // Adaptive Depth Tier: cap layer count at inference time (Plan 284 T10).
+        // Composes with Hydra: tier sets upper bound, Hydra skips within that bound.
+        let max_layer = ctx
+            .depth_tier
+            .map_or(config.n_layer, |t| t.max_layers(config.n_layer));
+
+        // 3. Inner loop: weight-shared layer pass
+        for (layer_idx, layer_weights) in weights.layers.iter().enumerate().take(max_layer) {
+            let layer_cache = &mut cache.layers[layer_idx];
+
+            // Determine if this layer uses full SDPA or linear attention
+            let is_full = match config.hybrid_pattern {
+                HybridPattern::Uniform => true,
+                HybridPattern::Interleave { full_ratio } => {
+                    (layer_idx % full_ratio) == full_ratio - 1
+                }
+                HybridPattern::Bookend => layer_idx == 0 || layer_idx == weights.layers.len() - 1,
+            };
+
+            // Pre-attention: RMSNorm → save residual
+            crate::types::rmsnorm(&mut ctx.x);
+            ctx.xr[..n].copy_from_slice(&ctx.x[..n]);
+
+            // QKV projections
+            crate::types::matmul(&mut ctx.q, &layer_weights.attn_wq, &ctx.x, n, n);
+            crate::types::matmul(&mut ctx.k, &layer_weights.attn_wk, &ctx.x, kvd, n);
+            crate::types::matmul(&mut ctx.v, &layer_weights.attn_wv, &ctx.x, kvd, n);
+
+            if is_full {
+                // Full SDPA: store K,V in cache and compute standard attention
+                let pos_off = pos * kvd;
+                unsafe {
+                    std::ptr::copy_nonoverlapping(
+                        ctx.k.as_ptr(),
+                        layer_cache.key.as_mut_ptr().add(pos_off),
+                        kvd,
+                    );
+                    std::ptr::copy_nonoverlapping(
+                        ctx.v.as_ptr(),
+                        layer_cache.value.as_mut_ptr().add(pos_off),
+                        kvd,
+                    );
+                }
+
+                // Multi-head attention with GQA
+                for h in 0..config.n_head {
+                    let kv_group = ctx.kv_group_lut[h] as usize;
+                    unsafe {
+                        attention_head(
+                            &ctx.q,
+                            &layer_cache.key,
+                            &layer_cache.value,
+                            &mut ctx.attn_out,
+                            &mut ctx.scores,
+                            h * hd,
+                            kv_group * hd,
+                            kvd,
+                            hd,
+                            t_n,
+                            scale,
+                        );
+                    }
+                }
+            } else {
+                // Linear attention via AHLA recurrent step
+                let ahla_layer = &mut ahla_cache.layers[layer_idx];
+                ctx.attn_out[..n].fill(0.0);
+
+                for h in 0..config.n_head {
+                    let kv_group = ctx.kv_group_lut[h] as usize;
+                    let head_state = &mut ahla_layer.heads[h];
+
+                    crate::hla::ahla_step(
+                        &mut ahla_layer.pkv[kv_group],
+                        &mut ahla_layer.mk[kv_group],
+                        head_state,
+                        &ctx.q[h * hd..(h + 1) * hd],
+                        &ctx.k[kv_group * hd..(kv_group + 1) * hd],
+                        &ctx.v[kv_group * hd..(kv_group + 1) * hd],
+                        hd,
+                        ahla_cache.gamma,
+                        &mut ctx.attn_out[h * hd..(h + 1) * hd],
+                        &mut ctx.scores[..hd],
+                    );
+                }
+            }
+
+            // SDPA output gate (if configured): sigmoid(W_gate @ attn_out) ⊙ attn_out
+            // Zero-init weights → sigmoid(0) = 0.5 (neutral half-pass).
+            // Paper: +0.3–0.5 avg points on zero-shot benchmarks.
+            if config.gated_attn && is_full {
+                sdpa_gate.forward(&mut ctx.attn_out[..n], n, &mut ctx.scores[..n]);
+            }
+
+            // Output projection + residual
+            crate::types::matmul(&mut ctx.x, &layer_weights.attn_wo, &ctx.attn_out, n, n);
+            katgpt_core::simd::simd_add_inplace(&mut ctx.x[..n], &ctx.xr[..n]);
+
+            // MLP: save residual → RMSNorm → MLP → residual
+            ctx.xr2[..n].copy_from_slice(&ctx.x[..n]);
+            crate::types::rmsnorm(&mut ctx.x);
+            #[cfg(feature = "gated_mlp")]
+            {
+                // SwiGLU: SiLU(W_gate·h) ⊙ W_up·h → W_down·hidden
+                crate::types::matmul(
+                    &mut ctx.hidden,
+                    &layer_weights.mlp_w1,
+                    &ctx.x,
+                    config.mlp_hidden,
+                    n,
+                );
+                crate::types::matmul(
+                    &mut ctx.hidden2,
+                    &layer_weights.mlp_w_up,
+                    &ctx.x,
+                    config.mlp_hidden,
+                    n,
+                );
+                crate::types::swiglu_inplace(&mut ctx.hidden, &ctx.hidden2);
+            }
+            #[cfg(not(feature = "gated_mlp"))]
+            crate::types::matmul_relu(
+                &mut ctx.hidden,
+                &layer_weights.mlp_w1,
+                &ctx.x,
+                config.mlp_hidden,
+                n,
+            );
+            crate::types::matmul(
+                &mut ctx.x,
+                &layer_weights.mlp_w2,
+                &ctx.hidden,
+                n,
+                config.mlp_hidden,
+            );
+            katgpt_core::simd::simd_add_inplace(&mut ctx.x[..n], &ctx.xr2[..n]);
+        }
+
+        // Per-loop residual gate: h^(τ) = h̃^(τ) + ρ_τ ⊙ h^(τ-1)
+        // ρ_τ is zero-init → first iteration: h^(0) = h̃^(0) (no residual)
+        if tau > 0 {
+            let gate_offset = tau * n;
+            if gate_offset + n <= residual_gate.gates.len() {
+                // ctx.x += gates ⊙ prev_h  (element-wise fused multiply-accumulate)
+                ctx.hidden[..n].copy_from_slice(&ctx.prev_h[..n]);
+                katgpt_core::simd::simd_scale_mul_inplace(
+                    &mut ctx.hidden[..n],
+                    &residual_gate.gates[gate_offset..gate_offset + n],
+                    1.0,
+                );
+                katgpt_core::simd::simd_add_inplace(&mut ctx.x[..n], &ctx.hidden[..n]);
+            }
+        }
+
+        // Plan 283 T2.2 — AdvantageMarginGate dead-compute check.
+        // Only active when `weight_shared_advantage_gate` is enabled AND the
+        // caller passed `Some(gate)`. When `None`, this block is compiled out
+        // of the feature-off build and is a runtime no-op in the feature-on
+        // build, so the no-gate path stays byte-identical to baseline.
+        //
+        // The check runs only for `tau > 0` (the first iteration has no
+        // pre-recursion logits to compare against). It computes the current
+        // iteration's logits via the same `lm_head` matmul used for the final
+        // readout, then asks the gate whether the candidate's prediction
+        // improved. If not, the remaining iterations are dead compute and we
+        // break early.
+        #[cfg(feature = "weight_shared_advantage_gate")]
+        {
+            if let Some(gate) = recursion_gate.as_deref_mut() {
+                // Compute this iteration's logits into a local scratch buffer
+                // (NOT ctx.logits — that must remain untouched so the final
+                // readout at the end of the function is byte-identical to the
+                // no-gate path). `resize` is a no-op after the first call.
+                _gate_scratch_logits.resize(config.vocab_size, 0.0);
+                standard_lm_head(
+                    &mut _gate_scratch_logits,
+                    &ctx.x,
+                    &weights.lm_head,
+                    config.vocab_size,
+                    n,
+                );
+                if tau > 0 && !_gate_prev_logits.is_empty() {
+                    // Candidate = argmax of the current (post-recursion)
+                    // logits — the model's current best prediction.
+                    let candidate = _gate_scratch_logits
+                        .iter()
+                        .enumerate()
+                        .max_by(|(_, a), (_, b)| {
+                            a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal)
+                        })
+                        .map(|(i, _)| i)
+                        .unwrap_or(0);
+                    if !gate.should_recurse(&_gate_prev_logits, &_gate_scratch_logits, candidate) {
+                        // Dead compute detected: this iteration did not
+                        // improve the candidate's prediction, so further
+                        // iterations are unlikely to either. Break the outer
+                        // loop and use the current hidden state.
+                        break;
+                    }
+                }
+                // Stash this iteration's logits as the next iteration's
+                // "pre" distribution. `clear` + `extend_from_slice` reuses
+                // the existing allocation (no per-iteration heap traffic
+                // after the first call).
+                _gate_prev_logits.clear();
+                _gate_prev_logits.extend_from_slice(&_gate_scratch_logits);
+            }
+        }
+
+        // Plan 304 T2.3 — gain/cost halt evaluation.
+        //
+        // Only active when ALL of: (a) `gain_cost_halt` feature is on,
+        // (b) the caller passed `Some(halter)`, (c) no static
+        // `elastic_loop_override` was set (`halter_active`, T2.2), and
+        // (d) `tau > 0` (the first iteration has no previous hidden state
+        // to compute a step against — and `prev_step_buf` is empty). When any
+        // condition fails this block is either cfg-stripped or a runtime
+        // no-op, so the no-halter path stays byte-identical to pre-Plan-304.
+        //
+        // **DEVIATION from Plan T2.3 (documented):** the plan called for
+        // effective-rank delta as the gain signal. But the per-loop hidden
+        // state in `forward_looped` is a SINGLE vector `ctx.x[..n]` (one row,
+        // S=1), for which `hidden_erank` returns 0.0 (degenerate — the kernel
+        // short-circuits on `s == 1`). We therefore use `step_size` as the
+        // gain signal: `||h^(tau) - h^(tau-1)||₂`. This is monotone in
+        // refinement, cheaper than erank, and the kernel ships `step_size`
+        // exactly for this use (see plan Open Question 2 resolution).
+        #[cfg(feature = "gain_cost_halt")]
+        if halter_active
+            && tau > 0
+            && let Some(h) = halter.as_deref_mut()
+        {
+            // gain = ||h^(tau) - h^(tau-1)||₂. `ctx.prev_h` was saved at
+            // the top of this iteration (before the layer pass), so it
+            // holds h^(tau-1); `ctx.x` now holds h^(tau) post-pass.
+            let gain = katgpt_core::gain_cost_halt::step_size(&ctx.x[..n], &ctx.prev_h[..n]);
+
+            // cost = fixed tax (flat Ω(r), LoopCoder-v2 default).
+            // Cached on the first evaluation (tau == 1) as 0.01 × the
+            // first step size. Open Question 1 resolution: Phase 2 ships
+            // the flat-tax default; riir-ai can override with
+            // coherence-decay/staleness by not using this code path.
+            if tau == 1 {
+                cost_floor = 0.01 * gain;
+            }
+            let cost = cost_floor;
+
+            // cos θ between the current and previous update directions.
+            // curr_step = h^(tau) - h^(tau-1); prev_step_buf holds
+            // h^(tau-1) - h^(tau-2) from the prior iteration. On tau == 1
+            // there is no tau-2 state, so cos θ is 0.0 (neutral,
+            // non-oscillatory — does not trip the detector).
+            curr_step_buf.clear();
+            for (cur, prev) in ctx.x[..n].iter().zip(ctx.prev_h[..n].iter()) {
+                curr_step_buf.push(cur - prev);
+            }
+            let cos_theta = if prev_step_buf.is_empty() {
+                0.0
+            } else {
+                katgpt_core::gain_cost_halt::angular_change(&curr_step_buf, &prev_step_buf)
+            };
+
+            // The halter expects a 1-based loop index (`tau` is 0-based).
+            let decision = h.halt_decision(tau + 1, gain, cost, cos_theta);
+            if let katgpt_core::gain_cost_halt::HaltDecision::Halt { .. } = decision {
+                break;
+            }
+
+            // Roll the current step into the previous-step slot for the
+            // next iteration's cos θ. `std::mem::swap` avoids a copy;
+            // the now-swapped-in `curr_step_buf` will be `clear()`'d
+            // at the top of the next evaluation.
+            std::mem::swap(&mut curr_step_buf, &mut prev_step_buf);
+            h.update_prev_step(gain);
+        }
+    }
+
+    // Snapshot hidden state
+    ctx.hidden_state[..n].copy_from_slice(&ctx.x[..n]);
+
+    // LM Head
+    standard_lm_head(
+        &mut ctx.logits,
+        &ctx.x,
+        &weights.lm_head,
+        config.vocab_size,
+        n,
+    );
+
+    // ── Sleep consolidation hook (Plan 154: eviction boundary) ─────
+    // After the forward pass, if the KV cache is full, consolidate
+    // cached K/V into GDN2 fast-weight state and evict. This frees
+    // the cache for the next token while preserving context in S.
+    #[cfg(feature = "sleep_consolidation")]
+    if let (Some(gdn2), Some(sconf)) = (gdn2_cache, sleep_config)
+        && sconf.should_sleep(pos)
+    {
+        crate::sleep::sleep(ctx, weights, cache, gdn2, sconf, config);
+    }
+
+    &mut ctx.logits
+}

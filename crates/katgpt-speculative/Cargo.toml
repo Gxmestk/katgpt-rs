@@ -301,7 +301,8 @@ nf_flow_budget = []
 # applies the residual correction to DFlash draft logits over the top-K
 # candidate set. Opt-in — requires a trained checkpoint file to produce
 # non-trivial gain; zero weights produce zero residuals (safe no-op).
-weaver_runtime = ["dep:safetensors", "dep:bytemuck", "dep:blake3"]
+# Includes dep:half for the f16 weight path (Issue 136 — WeaverWeightsF16).
+weaver_runtime = ["dep:safetensors", "dep:bytemuck", "dep:blake3", "dep:half"]
 
 [dev-dependencies]
 # katgpt-pruners is a DEV-ONLY dep here (echo_env's GOAT test imports BanditPruner
@@ -322,3 +323,8 @@ tempfile = "3"  # rt_turbo calibration save/load roundtrip tests
 [[bench]]
 name = "bench_424_dd_tree_deep_argmax"
 harness = false
+
+[[bench]]
+name = "bench_136_weaver_f16_latency"
+harness = false
+required-features = ["weaver_runtime"]

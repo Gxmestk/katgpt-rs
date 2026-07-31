@@ -62,7 +62,7 @@ This is O(parent_tokens.len()) per check, which is O(lookahead) — negligible.
   - Test: tree with path-aware pruner is smaller than tree with static pruner
   - Test: all nodes in path-aware tree are valid against accumulated state
 
-- [x] **T6: Update `examples/sudoku_speculative.rs` with path-aware comparison**
+- [x] **T6: Update `examples/sudoku_02_speculative.rs` with path-aware comparison**
   - Add 3rd column: Static Pruner vs Path-Aware Pruner
   - Show additional branches pruned by path awareness
   - Demonstrate that path-aware pruner catches cross-depth conflicts

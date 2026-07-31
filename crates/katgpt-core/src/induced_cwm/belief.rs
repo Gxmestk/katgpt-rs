@@ -29,7 +29,7 @@
 //!
 //! Implementations SHOULD be deterministic given a fixed `seed`. The mock
 //! enumerators used in unit tests rely on this — see
-//! [`crate::induced_cwm::tests`].
+//! `crate::induced_cwm::tests`.
 
 use crate::traits::GameState;
 

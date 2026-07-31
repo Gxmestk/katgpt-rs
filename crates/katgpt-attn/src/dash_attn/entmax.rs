@@ -69,11 +69,12 @@ pub fn entmax_1p5_into(
         probs_buf[orig_idx] = v * v;
     }
 
-    // Normalize to sum to 1
+    // Normalize to sum to 1 (reciprocal-multiply: 1 div + N muls)
     let sum: f32 = probs_buf[..n].iter().sum();
     if sum > 0.0 {
+        let inv_sum = 1.0 / sum;
         for p in probs_buf[..n].iter_mut() {
-            *p /= sum;
+            *p *= inv_sum;
         }
     }
 

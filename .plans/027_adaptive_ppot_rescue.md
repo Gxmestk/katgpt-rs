@@ -33,7 +33,7 @@ TRT proves three things we can apply at token level:
 
 ## Tasks
 
-- [x] **Task 1: RejectionInsight struct and SessionKnowledge** (`src/speculative/ppot/knowledge.rs`)
+- [x] **Task 1: RejectionInsight struct and SessionKnowledge** (`crates/katgpt-speculative/src/ppot/knowledge.rs`)
   - Define `RejectionInsight` struct:
     ```rust
     pub struct RejectionInsight {
@@ -62,7 +62,7 @@ TRT proves three things we can apply at token level:
   - `SessionKnowledge::preferred_rules(position: usize) -> Vec<TokenRule>` — rules sorted by success rate
   - Unit tests: ring buffer eviction, success rate calculation, skip logic
 
-- [x] **Task 2: Adaptive position selection** (`src/speculative/ppot/entropy.rs` extension)
+- [x] **Task 2: Adaptive position selection** (`crates/katgpt-speculative/src/ppot/entropy.rs` extension)
   - `fn identify_positions_adaptive(marginals, threshold, knowledge: &SessionKnowledge) -> Vec<usize>`
     - Starts from high-entropy positions (existing logic)
     - Reorders by `position_affinity` — positions with historical success get priority
@@ -84,7 +84,7 @@ TRT proves three things we can apply at token level:
     - Returns best variant ranked by self-consistency (if multiple valid)
   - Integration test: adaptive rescue produces different variants than random rescue after warm-up
 
-- [x] **Task 4: Self-consistency ranking** (`src/speculative/ppot/rank.rs`)
+- [x] **Task 4: Self-consistency ranking** (`crates/katgpt-speculative/src/ppot/rank.rs`)
   - `fn rank_by_consistency(variants: &[Vec<usize>]) -> Vec<(usize, usize)>`
     - Returns `(variant_index, agreement_count)` sorted descending
     - Agreement: two variants match on tokens outside resampled positions
@@ -96,7 +96,7 @@ TRT proves three things we can apply at token level:
     - If none valid → None
   - Unit tests: single variant returned, tie-breaking by consistency, all-rejected returns None
 
-- [x] **Task 5: Adaptive entropy threshold** (`src/speculative/ppot/types.rs` extension)
+- [x] **Task 5: Adaptive entropy threshold** (`crates/katgpt-speculative/src/ppot/types.rs` extension)
   - Extend `PpotConfig`:
     ```rust
     pub struct PpotConfig {
@@ -115,7 +115,7 @@ TRT proves three things we can apply at token level:
   - This captures TRT's finding that models switch strategy more after failure (82%) than success (74%)
   - Unit tests: threshold adjusts correctly, bounded by min/max
 
-- [x] **Task 6: Wire adaptive rescue into speculative step** (`src/speculative/step.rs`)
+- [x] **Task 6: Wire adaptive rescue into speculative step** (`crates/katgpt-forward/src/step.rs`)
   - Add `SessionKnowledge` to `SpeculativeContext` (or thread parameter, TBD)
   - Replace `ppot_rescue()` call with `ppot_rescue_adaptive()`
   - After each rescue attempt (success or fail), record insight into knowledge
@@ -123,7 +123,7 @@ TRT proves three things we can apply at token level:
   - Add `adaptive_ppot: bool` config flag (default: true when ppot enabled)
   - Integration test: full speculative step with adaptive rescue
 
-- [x] **Task 7: Benchmarks — before/after comparison** (`src/benchmark.rs`)
+- [x] **Task 7: Benchmarks — before/after comparison** (`src/benchmark/mod.rs`)
   - **Must run AFTER Plan 026 benchmarks are recorded**
   - Benchmark: adaptive rescue vs random rescue acceptance rate
   - Benchmark: adaptive rescue overhead (should match PPoT baseline ±2%)
@@ -144,14 +144,14 @@ TRT proves three things we can apply at token level:
 
 | File | Change |
 |------|--------|
-| `src/speculative/ppot/knowledge.rs` | ✅ **New:** `RejectionInsight`, `SessionKnowledge` with ring buffer |
-| `src/speculative/ppot/rank.rs` | ✅ **New:** self-consistency ranking, best variant selection |
-| `src/speculative/ppot/entropy.rs` | ✅ **Extend:** add `identify_positions_adaptive()` |
+| `crates/katgpt-speculative/src/ppot/knowledge.rs` | ✅ **New:** `RejectionInsight`, `SessionKnowledge` with ring buffer |
+| `crates/katgpt-speculative/src/ppot/rank.rs` | ✅ **New:** self-consistency ranking, best variant selection |
+| `crates/katgpt-speculative/src/ppot/entropy.rs` | ✅ **Extend:** add `identify_positions_adaptive()` |
 | `src/speculative/ppot/resample.rs` | ✅ **Extend:** add `ppot_resample_multi_strategy()`, `ppot_rescue_adaptive()` |
-| `src/speculative/ppot/types.rs` | ✅ **Extend:** adaptive threshold fields in `PpotConfig` |
+| `crates/katgpt-speculative/src/ppot/types.rs` | ✅ **Extend:** adaptive threshold fields in `PpotConfig` |
 | `src/speculative/ppot/mod.rs` | ✅ **Update:** re-export new types, wire adaptive API |
-| `src/speculative/step.rs` | ✅ API available, integration point wired via `ppot_rescue_adaptive()` |
-| `src/benchmark.rs` | ✅ **Added:** Plan 027 adaptive rescue benchmark with Plan 026 comparison (Task 7) |
+| `crates/katgpt-forward/src/step.rs` | ✅ API available, integration point wired via `ppot_rescue_adaptive()` |
+| `src/benchmark/mod.rs` | ✅ **Added:** Plan 027 adaptive rescue benchmark with Plan 026 comparison (Task 7) |
 | `README.md` | ✅ **Update:** add Adaptive PPoT section |
 
 ---

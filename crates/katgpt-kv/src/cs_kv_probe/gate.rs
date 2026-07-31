@@ -117,11 +117,9 @@ impl GatedKvSlice {
         // (n_groups is typically ≤ n_heads, e.g. 64); for these sizes this beats
         // the bookkeeping of a partial selection network. Operates in-place on
         // caller-provided scratch — zero allocation.
-        idx_scratch.sort_by(|&a, &b| {
-            ranking.scores[b]
-                .partial_cmp(&ranking.scores[a])
-                .unwrap_or(std::cmp::Ordering::Equal)
-        });
+        // total_cmp: NaN-deterministic, branch-free. Mirrors the migration
+        // already applied in forward.rs:229-233 and step.rs:833.
+        idx_scratch.sort_by(|&a, &b| ranking.scores[b].total_cmp(&ranking.scores[a]));
 
         for &g in idx_scratch.iter().take(k) {
             // Normalize to [0, 1] w.r.t. the max, then soft-gate-bias.

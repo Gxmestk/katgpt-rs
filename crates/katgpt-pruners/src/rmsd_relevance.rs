@@ -349,7 +349,7 @@ impl TeacherContinuation {
 /// `rmsd_loss = Σ_{i∈selected} sdar_gate(Δ_i) * reverse_kl_i`
 ///
 /// In modelless path, this operates on action-level Q-values:
-/// - Δ_i = teacher_q[i] - student_q[i]
+/// - `Δ_i = teacher_q[i] - student_q[i]`
 /// - reverse_kl_i approximated by |Δ_i|
 /// - sdar_gate from existing `sdar_gate` module
 pub fn rmsd_loss(selected: &[usize], teacher_q: &[f32], student_q: &[f32], beta: f32) -> f32 {
@@ -364,15 +364,7 @@ pub fn rmsd_loss(selected: &[usize], teacher_q: &[f32], student_q: &[f32], beta:
         let gap = teacher_val - student_val;
 
         // SDAR sigmoid gate
-        let gate = {
-            let z = beta * gap;
-            if z >= 0.0 {
-                1.0 / (1.0 + (-z).exp())
-            } else {
-                let ez = z.exp();
-                ez / (1.0 + ez)
-            }
-        };
+        let gate = katgpt_core::simd::fast_sigmoid(beta * gap);
 
         // Reverse KL proxy: |Δ|
         let kl_proxy = gap.abs();

@@ -108,7 +108,7 @@ the call is a max of three divisions and a handful of comparisons — well under
 ## G2-alloc — Zero-alloc hot path
 
 1000 calls to `ane_estimate` produce **0 allocations** (measured via the
-`counting_allocator!` macro from `tests/common/mod.rs`). 🟢 PASS.
+`counting_allocator!` macro from `crates/katgpt-core/tests/common/mod.rs`). 🟢 PASS.
 
 ---
 

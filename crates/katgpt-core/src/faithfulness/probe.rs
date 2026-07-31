@@ -1,7 +1,7 @@
 //! [`FaithfulnessProbe`] trait + [`DefaultFaithfulnessProbe`] implementation.
 //!
 //! The probe runs the causal intervention suite from Research 244 §4 / Plan 278:
-//! for each [`Intervention`](super::types::Intervention), it perturbs a clone of
+//! for each [`Intervention`], it perturbs a clone of
 //! the memory, queries the consumer's behavior, and measures the delta from
 //! baseline (no-memory). The aggregated deltas form a [`FaithfulnessProfile`]
 //! whose `is_faithfully_used(threshold)` gives the verdict.
@@ -9,11 +9,11 @@
 //! # Plan 298 — Smear-aware audit (Phase 2)
 //!
 //! When the `smear_classifier` feature is on AND the probe has been wired with
-//! an optional [`SmearClassifier`](super::smear::SmearClassifier) via
+//! an optional [`SmearClassifier`] via
 //! [`DefaultFaithfulnessProbe::with_smear_classifier`], the new
 //! [`DefaultFaithfulnessProbe::probe_intervention_full`] method additionally
 //! classifies the consumer's current latent-mass distribution and emits a
-//! [`SmearReport`](super::smear::SmearReport) alongside the binary `Delta`.
+//! [`SmearReport`] alongside the binary `Delta`.
 //!
 //! **The report is a diagnostic** — it does NOT add a sync dependency, does NOT
 //! emit a chain commit, and does NOT change the existing

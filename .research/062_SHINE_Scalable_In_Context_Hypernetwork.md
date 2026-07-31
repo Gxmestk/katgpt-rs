@@ -228,11 +228,11 @@ pub fn context_to_lora(
 
 **Why it fits:** We already have `AttentionMode` enum with `Causal`, `Bidirectional`, `BlockCausal`, `SpKv`. Adding `Alternating2D` captures the M2P pattern for any grid-structured processing (not just LoRA generation).
 
-**Where it lives:** `katgpt-core/src/types.rs` (extend `AttentionMode` enum).
+**Where it lives:** `crates/katgpt-types/src/lib.rs` (extend `AttentionMode` enum).
 
 **Architecture sketch:**
 ```rust
-// In katgpt-core/src/types.rs
+// In crates/katgpt-types/src/lib.rs
 pub enum AttentionMode {
     // ... existing variants ...
     
@@ -391,7 +391,7 @@ Key findings:
 
 ### katgpt-rs (modelless side)
 
-No feature gate needed. The alternating attention pattern (D2) would extend `AttentionMode` in `katgpt-core/src/types.rs` — available to all consumers.
+No feature gate needed. The alternating attention pattern (D2) would extend `AttentionMode` in `crates/katgpt-types/src/lib.rs` — available to all consumers.
 
 ### riir-ai (model-based side)
 

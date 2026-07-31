@@ -421,3 +421,284 @@ cargo run --features go --example go_07_tui -- --seed 99
 `BomberAction` enum has 7 variants (Up, Down, Left, Right, Bomb, Wait, Detonate) but `ACTION_NAMES` and `action_counts` arrays had only 6 elements. When `Detonate` action (index 6) was selected, `action_counts[6]` panicked with "index out of bounds: the len is 6 but the index is 6".
 
 **Fix:** Changed arrays from `[T; 6]` to `[T; 7]` and added `"Detonate"` to `ACTION_NAMES`.
+
+## go_11_moka_head_to_head — Moka v1 (real weights) Head-to-Head (Plan 563)
+
+**Question:** can our modelless Go players (heuristic/bandit, zero learned parameters) beat [Moka v1](https://million.dev/moka) — a real, MIT-licensed, 105,353-parameter 9×9 Go policy/value network (`github.com/millionco/moka`, distilled from KataGo, self-reported ~2 kyu, 30% win rate vs KataGo b6c96) — on strength, size, or speed?
+
+**Method:** Moka's real weights (`go-model.bin`, 113,648 bytes, sha256-verified against the upstream manifest) were vendored and its exact architecture (`MokaGlobalResidualNetwork` — 3×3 stem, 12 nested-bottleneck residual blocks with 3 global-pooling branches, policy+value heads) reimplemented natively in Rust — `crates/katgpt-pruners/src/go/moka_net.rs` — with no Python, Node, WASM, or browser involved. Correctness was validated by an independent hand-derived closed-form check of the stem layer on an empty board (re-parsing the manifest via generic JSON, not the loader code under test) plus a finiteness/shape smoke test, both passing (`cargo test -p katgpt-pruners --features go --lib go::moka_net`). Moka plays greedy policy argmax (`temperature=0.0`, no search), matching its own arena convention.
+
+**Result (N=20 games/matchup, 9×9, komi=7.0 per Moka's own training convention, alternating colors):**
+
+| Player | W/L vs Moka | Win% | Avg moves | µs/move (ours) | µs/move (Moka) |
+|---|---|---|---|---|---|
+| Greedy | 0W/20L | 0.0% | 121.5 | 207.8 | 3378.0 |
+| Validator | 0W/20L | 0.0% | 126.0 | 104.7 | 3388.2 |
+| HL | 0W/20L | 0.0% | 111.3 | 240.5 | 3379.7 |
+| GZero | 0W/20L | 0.0% | 115.5 | 132.4 | 3385.0 |
+| MCTS (budget=200) | 0W/20L | 0.0% | 109.2 | 2436.3 | 3402.6 |
+
+Margins are large — typically 35–80 points on an 81-point board (e.g. `W+55.5`, `B+68.5`), not close games. Reference only, not run by this harness: Gemma 2 2B as a Go player (`riir-ai` Plan 393/408/410) scored 0% gain over the random baseline at ~50 s/move CPU — exhaustively benchmarked separately, cited here for scale, not re-run.
+
+**Verdict:**
+
+- **Strength: no.** Every modelless player loses every game to Moka's real weights, decisively. A 105K-parameter distilled CNN with real conv/policy/value structure beats hand-crafted heuristics and a budget-200 MCTS outright — the STRATEGA finding ("domain heuristics > generic search" from Plan 056) doesn't extend to "domain heuristics > a trained-however-tiny network." This directly answers the original question: no, our modelless Go players do not currently beat Moka.
+- **Size: yes, trivially, but it no longer matters.** Our heuristic players carry ~0 learned parameters (just a handful of Q-values/template deltas) vs Moka's 105,353 int8 params (113,648 B) — but a 100% loss rate makes the size "win" moot as a competitive claim.
+- **Speed: mixed, and much closer than assumed.** Once both sides run natively (no browser/WASM/JS overhead on Moka's side), our heuristics are still faster per move (105–241 µs for Greedy/Validator/HL/GZero) but MCTS at budget=200 (2.4 ms) is within 1.4× of Moka's own 3.3–3.4 ms/move — a real CNN forward pass, not the µs-vs-browser-ms framing assumed before vendoring the actual weights.
+- **Take-away:** the "load the real weights like we did for Gemma2" approach (this plan) produced a decisive, honest, locally-reproducible answer in under a day of work — in sharp contrast to Gemma2, where the LLM path was exhaustively benchmarked and found to have *zero* Go-playing signal at any size. Moka proves a small *trained* network beats hand-crafted heuristics on Go; Gemma2 proves a *huge* general-purpose LLM without Go-specific training does not.
+
+```bash
+cargo run --features go --example go_11_moka_head_to_head
+GO_GAMES=20 GO_MCTS_BUDGET=500 cargo run --release --features go --example go_11_moka_head_to_head
+```
+
+## GoMctsMokaPlayer — MCTS + Moka's Value Head as Leaf Evaluator (negative result)
+
+**Idea:** rather than out-heuristic a trained network from scratch, compose it with search — plug Moka's real value head into `mcts_search`'s existing pluggable `Fn(&GoState, u8) -> f32` evaluator slot (the same slot `GoMctsPlayer` uses for `GoHeuristic`), giving MCTS a genuine neural evaluator instead of random-playout-to-terminal or a hand-tuned linear formula. `MokaHeuristic` + `GoMctsMokaPlayer` (`crates/katgpt-pruners/src/go/moka_net.rs`) implement exactly this — zero additional training, pure composition of an existing generic search primitive with a frozen neural evaluator.
+
+**Result (10 games, budget=30, rollout_depth=20; also checked at budget=150 for 4 games):**
+
+| Config | W/L vs Moka | Win% | µs/move |
+|---|---|---|---|
+| MCTS-Moka, budget=30 | 0W/10L | 0.0% | 6,773 |
+| MCTS-Moka, budget=150 (5×) | 0W/4L | 0.0% | 24,101 (~5× cost, as expected) |
+
+**Still 0% — scaling the search budget 5× didn't move the needle.** Margins (52–60+ points) were statistically indistinguishable from the pure heuristics' losses.
+
+**Why, honestly:** two things this first attempt didn't fix, both real gaps rather than a training-vs-not distinction:
+
+1. **Rollout policy is still `RandomRolloutPolicy`** — the search selects moves uniformly at random for the ~20-ply rollout to the depth cutoff, and only THEN asks Moka's value head to judge the resulting position. Moka was trained on realistic self-play move distributions; a position reached by 20 random plies is likely out-of-distribution for its value head, so the "expert" evaluation may itself be unreliable at the leaf it's actually asked to judge.
+2. **Moka's policy head isn't used at all in this version** — root-level action selection is plain UCB1 with no informed prior, so the search doesn't benefit from Moka's own move preferences, only from its position judgment after already-random play.
+
+**Follow-up test (rules out the OOD hypothesis):** re-ran with `rollout_depth=0` — Moka's value head judges the position *immediately* after each candidate move, no random rollout at all (fully in-distribution for a value net trained on real self-play). **Still 0/10, same ~45–70 point margins, and ~40× slower** (133 ms/move at budget=80 vs 3.3 ms/move) for no gain. So the out-of-distribution rollout wasn't the real blocker.
+
+**Actual diagnosis:** with budget ≈ branching factor (~50–80 legal moves on 9×9), each candidate move gets visited roughly *once* on average under plain UCB1 — nowhere near enough visits per arm to differentiate them, regardless of leaf-evaluation quality. This is the textbook reason AlphaZero-style search uses **PUCT** (UCB1 biased by the policy net's move probabilities) instead of plain UCB1: the policy prior is what makes search converge at practical budgets. Neither attempt above used Moka's policy head at all — only its value head.
+
+**Next step taken:** rather than converting the generic UCB1 `mcts_search` into PUCT, the same "policy prunes / value judges" structure was implemented directly as a small alpha-beta negamax — see `GoMokaSearchPlayer` below, which is the first configuration to stop losing.
+
+## GoMokaSearchPlayer — policy-pruned negamax (first non-losing result)
+
+`GoMokaSearchPlayer` (`crates/katgpt-pruners/src/go/moka_net.rs`) uses **both** of Moka's heads: the policy head orders and prunes the move list (top-K beam, `Pass` included as a real candidate), the value head evaluates leaves, and alpha-beta negamax does the lookahead. This is the structure PUCT provides, reached without rewriting the shared UCB1 search. It also threads real move history through every search node (`SearchHistory`), fixing the empty-history approximation that `MokaHeuristic` above is stuck with, so feature planes 7–10 are correct at every node.
+
+Rationale (policy improvement): raw `MokaPlayer` is policy-argmax with *zero* lookahead. Searching D plies and backing up value estimates is a strict refinement of that same policy — the standard reason search beats its own raw policy net.
+
+**Two methodology bugs found and fixed while measuring this — both inflated/garbled earlier numbers:**
+
+1. **Move history leaked across games.** `reset()` was only called at end-of-matchup, so each game after the first began with the previous game's trailing moves still in history, corrupting the opening's last-move feature planes. Now reset per game (safe for `GoHLPlayer`/`GoGZeroPlayer`, whose `reset()` clears only per-episode trace state — bandit Q-values still persist across games as intended).
+2. **"N games" was not N samples.** Both Moka-family players are fully deterministic, so every game with the same color assignment replayed *byte-identically* — a "12 game" run was really 2 distinct games repeated 6×. Fixed with randomized opening plies (`GO_OPENING_MOVES`, default 4) — the same thing Moka's own arena does, for the same reason. Any earlier win-rate over deterministic repeats should be disregarded.
+
+**Result (60 independent games, depth=2, top_k=8, 4 random opening plies):**
+
+| Player | W/L vs Moka | Win% | 95% CI | exact 1-sided p | µs/move (ours) | µs/move (Moka) |
+|---|---|---|---|---|---|---|
+| Moka-Search (depth 2, top-K 8) | **37W/23L** | **61.7%** | [49.4%, 74.0%] | 0.046 | 119,047 | 3,379 |
+
+**Interpretation — suggestive of a real edge, but right at the threshold, not conclusive.** Exact `P(X≥37 | n=60, p=0.5) = 0.046` — marginally significant one-sided (two-sided ≈ 0.09), and the 95% CI's lower bound (49.4%) still grazes 50%. The defensible claim: **policy+value search took us from 0% (losing every game, decisively) to a likely-but-unproven edge around 60%.** Asserting "we beat Moka" outright would overclaim on n=60; a few hundred games would settle it.
+
+*Sampling note:* an earlier 16-game run (9W/7L, 56.2%) is a strict **prefix** of this 60-game run — same seed (42), same deterministic code path, so its first 16 games are identical. The two must NOT be pooled; the 60-game figure supersedes it.
+
+**Cost caveat, and it matters for the original question:** ~35× Moka's per-move latency (119 ms vs 3.4 ms at the time), because every visited search node is a full forward pass. This configuration plausibly wins on *strength* while losing on *perf* — and it isn't a "modelless" win at all: it requires Moka's own weights to function. The honest summary is "search on top of their model beats their model," not "our architecture beats theirs." The latency half of that was then attacked directly — see below.
+
+## Forward-pass kernel optimization (6.4× faster)
+
+The 119 ms/move figure above was unacceptable, and the root cause was **our own kernel, not the search**: a single forward pass cost 3.4 ms for a 105K-param net (~5.8M MACs ⇒ only **~1.7 GMAC/s**). Three defects in `moka_net.rs`, all fixed:
+
+1. **`for oc` was the outermost loop**, so the input was re-read `out_ch` times (32× for the stem). Now position is outermost: each position's `k*k*in_ch` neighbourhood is gathered **once** into a contiguous patch and reused across every output channel. The weight layout `[out,kh,kw,in]` means each output channel is then one contiguous dot product over that patch.
+2. **~50 `vec![]` allocations per forward.** Now every layer writes into a caller-held `MokaScratch`.
+3. **Single sequential f32 accumulator** — which LLVM *cannot* auto-vectorize, because FP addition isn't associative. Now `ACC_LANES = 8` independent accumulator chains, which vectorize on both AVX2 and NEON.
+
+A 1×1-conv fast path skips the gather entirely (over half the convs in this net are 1×1).
+
+**Measured (`GO_BENCH_FORWARD=1`, 300 iters, mid-game position):**
+
+| Kernel | ms/pass | GMAC/s | vs baseline |
+|---|---|---|---|
+| Original (`for oc` outer, 1 accumulator, per-layer `vec![]`) | 3.4 | ~1.7 | 1.0× |
+| Restructured + hand-rolled 8-lane accumulators | 0.535 | 10.84 | 6.4× |
+| Restructured + **`katgpt_types::simd::simd_dot_f32`** | **0.392** | **14.78** | **8.7×** |
+
+**8.7× faster overall.** Three honest notes:
+
+- **Reusing the workspace SIMD kernel beat hand-rolling it, by 1.36×.** The first pass hand-wrote 8 independent accumulator chains and hoped LLVM would widen them. `katgpt_types::simd::simd_dot_f32` — already a dependency, already used by `symbolic_expression.rs` and `step_attribution_qualifier.rs` in this same crate — is explicit NEON / AVX2-FMA intrinsics and is simply better. This was a DRY miss worth correcting on both counts. (Length discipline matters: that kernel indexes unchecked up to `len`, so call it as `a.len().min(b.len())`, the convention the other call sites use.)
+- **The allocation fix (2) was irrelevant.** Scratch reuse now measures **−1.7%** (i.e. the allocating wrapper is marginally faster, within noise). The prediction that ~50 allocs/forward mattered was simply wrong — the allocator handles that pattern for free. All of the gain came from (1) cache locality and (3) vectorization. The scratch plumbing is retained only because it removes allocator variance from search timing, not because it is a speedup.
+- **Correctness is pinned, not assumed.** (3) changes FP summation order *and* introduces fused multiply-add (single rounding instead of double), so the original naive `conv2d`/`linear` are kept verbatim in the test module as an equivalence oracle (`optimized_conv_matches_naive_reference`, `optimized_linear_matches_naive_reference`, at every layer shape the net actually uses), plus `scratch_reuse_matches_fresh_forward` asserting bit-identical output across reused buffers. Without those, a numerical regression would have surfaced only as unexplained strength drift.
+
+This speeds up **both** sides of the comparison — the baseline `MokaPlayer` port drops from 3.4 ms to ~0.54 ms/move, and the search players scale down proportionally.
+
+### Search depth: depth 2 buys nothing over depth 1
+
+With the kernel fixed, the remaining latency lever is search width/depth. 30 games at each setting, same seed:
+
+| Config | W/L vs Moka | Win% | Avg moves | µs/move (ours) | µs/move (Moka) |
+|---|---|---|---|---|---|
+| depth=1, top_k=8 | 19W/11L | 63.3% | 79.1 | **5,211** | 567 |
+| depth=2, top_k=8 | 19W/11L | 63.3% | 94.8 | 20,965 | 613 |
+
+**Identical strength, 4× the cost.** The differing average game length (79.1 vs 94.8) confirms these are genuinely different games, not an accidentally duplicated run — the two configs play differently but end up equally strong. So the extra ply is pure waste here: at depth 1 the value head is already judging the position immediately after each candidate move, and a second ply of the *same* evaluator adds no new information it can act on.
+
+**Combined latency result: 119 ms → 5.2 ms per move (~23×)** — 6.4× from the kernel, ~4× from dropping to depth 1. Against Moka's own 0.57 ms/move that is ~9× rather than the original ~35×, and 5.2 ms fits comfortably inside a real-time budget (e.g. a 20 Hz tick is 50 ms).
+
+### Beam width: narrow beats wide, on BOTH axes
+
+`top_k` turned out to be the dominant knob — and in the opposite direction to the one assumed. Depth=1, 100 games per setting, same seed:
+
+| top_k | W/L vs Moka | Win% | Avg moves |
+|---|---|---|---|
+| 2 | 61W/39L | 61.0% | 76.5 |
+| 3 | 69W/31L | 69.0% | 80.2 |
+| **4** | **74W/26L** | **74.0%** | 80.7 |
+| 6 | 68W/32L | 68.0% | 79.6 |
+| 8 | 58W/42L | 58.0% | 84.8 |
+| 16 | 60W/40L | 60.0% | 83.0 |
+
+Significance (n=100 each): top_k=4 vs the 50% baseline is **z = 4.80** (p ≈ 10⁻⁶); top_k=4 vs top_k=8 is **z = 2.42** (p ≈ 0.016), so the narrow-beam advantage is real. But top_k=4 vs 3 (z = 0.78) and vs 6 (z = 0.94) are **statistically tied** — so the honest claim is *"narrow beam (3–6) beats wide beam (8–16)"*, **not** "4 is the optimum." The point estimate peaks at 4; the plateau is 3–6.
+
+**Why narrower is stronger, not merely cheaper:** Moka's policy head is more reliable than its value head. A wide beam hands the value head authority over more candidates — including moves the policy rates poorly — and every extra candidate is another chance for value-head noise to promote a blunder above a genuinely good move. Narrowing to ~4 keeps the value head arbitrating only among moves the policy already endorses. This also retro-explains the depth-2 null result: piling on more of the *same* noisy evaluator doesn't help; **constraining its scope does.**
+
+⚠️ **Latency numbers in the sweep above are unreliable.** Moka's own per-move latency is the control and should be constant, but it varied 404→942 µs across those runs — the machine was CPU-contended, so fine per-config latency deltas from that sweep must not be quoted. Only the coarse trend (top_k=16 clearly slowest) survives. Clean isolated figures are in the summary below.
+
+### Strength history — every earlier figure was a mistuned or undersampled config
+
+| n | Config | W/L | Win% | 95% CI | exact 1-sided p | status |
+|---|---|---|---|---|---|---|
+| 30 | depth=1, k=8 | 19W/11L | 63.3% | — | ≈0.10 | n.s., undersampled |
+| 60 | depth=2, k=8 | 37W/23L | 61.7% | [49.4%, 74.0%] | 0.046 | superseded |
+| 200 | depth=1, k=8 | 114W/86L | 57.0% | [50.1%, 63.9%] | 0.028 | **mistuned** (k=8) |
+| 100 | depth=1, k=4 | 74W/26L | 74.0% | — | ~10⁻⁶ | small-sample high |
+| **300** | **depth=1, k=4** | **210W/90L** | **70.0%** | **[64.8%, 75.2%]** | **1.7×10⁻¹²** | ✅ **quote this** |
+
+**70.0% (CI 64.8–75.2%) is the number to quote.** Two lessons in that table:
+
+1. **The 57% "final answer" was a tuning artifact, not the truth.** It was measured honestly at n=200 but at `top_k=8` — a config since shown to be significantly worse than `top_k=4` (z = 2.42). Sample size was never the problem there; the *configuration* was. Widening the sample on a badly-tuned config buys precision about the wrong thing.
+2. **Small samples still ran high, repeatedly.** 74% (n=100) → 70% (n=300), just as 63.3% (n=30) → 57% (n=200) earlier. The direction was consistently optimistic. At n=300 with p ≈ 10⁻¹² the result is no longer in doubt.
+
+### Bottom line on the whole exercise (superseded — see "PUCT search" below)
+
+⚠️ **This table is the honest bottom line as of the alpha-beta result only. It was superseded same-day by PUCT (Bench 205, further down this document), which reaches 98.0% — not 70.0%. Kept here unedited for the historical record of how the investigation actually progressed; do not quote 70% as "best of ours" going forward.**
+
+| | Moka v1 (greedy) | Best of ours *at the time* (`GoMokaSearchPlayer`, alpha-beta, depth 1, k=4) |
+|---|---|---|
+| Strength (9×9, n=300) | baseline | 70.0% win rate (CI 64.8–75.2%) — **since superseded by PUCT's 98.0%** |
+| Params | 105,353 | same 105,353 — *it is Moka's network* |
+| Weights payload | 113,648 B | same |
+| Latency/move | ~0.4–0.54 ms | ~2.8 ms (~5–7×) |
+| Forward pass | ~0.45 ms | ~0.45 ms (shared kernel) |
+
+⚠️ **Timing caveat.** This machine's measurements are noisy: Moka's per-move latency — a control that should be constant — was observed anywhere from 404 to 942 µs across runs, and repeat runs of the same forward-pass bench gave 0.392 and 0.450 ms. Quote latency as approximate. In particular the `MokaScratch` reuse-vs-allocate comparison came out **−1.7% in one run and +22.7% in another**, i.e. the direction is inside the noise floor — no speedup should be claimed for the scratch plumbing (see the kernel section above; it is retained for timing stability, not for throughput).
+
+The summary *at this point in the investigation* was: policy-pruned search on top of Moka's own weights beats greedy Moka decisively — 70% over 300 games — at roughly 5–7× the per-move cost (2.8 ms vs ~0.5 ms), ~42× better than the 119 ms/move this line of work started at. **That conclusion no longer holds as the final word** — PUCT (below) pushes strength to 98.0% at a correspondingly higher latency (~80 ms/move at budget=200), a different point on the strength/latency curve entirely, not a small refinement of this one. What still stands unchanged from this phase: our *modelless* players remain 0% against Moka (original question's answer: **no**); this configuration is not architecture-independent (needs Moka's policy and value heads); and the underlying infrastructure — parity-checked native port, 8.7× kernel speedup with equivalence guards — is what both this result and PUCT are built on.
+
+### Investigated and rejected: Apple Neural Engine via CoreML (Issue 564)
+
+Asked to grep harder for unused repo primitives, a deeper search surfaced `katgpt-backend::ane` — a real CoreML/ANE execution backend (not a cost model), unused for Moka. Built a scoped probe (stem + one residual block, 9 layers) rather than the full ~60-layer graph, specifically to answer the residency question before committing to the larger build.
+
+**Result: ANE is 4.66× slower than CPU for the identical 9-layer slice** (261 µs vs 56 µs, matched workload, not a proportional estimate). Correctness was proven bit-perfect (`max_abs_diff = 5.96×10⁻⁸`, f32 epsilon) — the layout transpose work is real and correct — but the performance verdict is decisively negative. At 105K params, CoreML's fixed per-call dispatch/marshalling overhead dominates completely; the whole network only costs ~450 µs on CPU, leaving no room for a few-hundred-µs fixed overhead to amortize away even at the full graph size. Per the stop-rule set before writing any code, the remaining ~50 layers were not built. Full record: `.issues/564_moka_ane_coreml_inference.md`.
+
+**Notable asymmetry:** wins are short games with modest margins (48–82 moves, +2.5 to +18.5); losses are long games with blowout margins (116–140 moves, +41.5 to +75.5).
+
+The tempting read is "something degrades in long games," but the causality is probably the reverse, and it's rational: at depth 2 the search *can* see `pass → opponent passes → terminal → exact score`, so when it is ahead, passing is correctly valued as a locked win and it ends the game early (short game, modest winning margin). When it is behind, passing is correctly valued as a loss, so it plays on (long game). Game length is therefore mostly an *effect* of who is ahead, not a cause of losing. The real open question is narrower and harder: why it falls behind in ~44% of games in the first place — for which the natural probes are deeper search (`GO_SEARCH_DEPTH=3`) and a wider beam (`GO_SEARCH_TOPK`), since both directly buy more of the policy-improvement effect that got us from 0% to parity.
+
+```bash
+cargo run --release --features go --example go_11_moka_head_to_head  # includes mcts-moka matchup
+GO_MCTS_MOKA_BUDGET=150 GO_GAMES=4 cargo run --release --features go --example go_11_moka_head_to_head
+```
+
+### Investigated and rejected: Opening Book star-point heuristics (Bench 204)
+
+The user correctly identified that `OpeningBookStrategy` (riir-router `meta_router/strategies.rs`) — a star-point opening book with corner 4-4/3-3, side stars, and center — was never measured against Moka. Its simulated 56% win rate in `test_go_meta_router_arena` was a **hardcoded fake number** (the test returns `0.56` by name lookup, not from real games). The real question: does forcing star-point openings on top of `GoMokaSearchPlayer` beat pure search?
+
+**Result: the opening book hurts, monotonically.** A `GoOpeningBookSearchPlayer` wrapper (Bench 204) was built to force star points for the first N plies, then delegate to the same depth=1 top_k=4 search. n=100 per arm:
+
+| Opening plies | Win% vs Moka |
+|---|---|
+| 0 (pure search, baseline) | **74.0%** |
+| 4 | 61.0% |
+| 6 | 53.0% |
+| 8 | **39.0%** |
+
+The degradation is monotonic and statistically significant (baseline 74% vs 8-ply 39%, z=5.93, p≈10⁻⁹). **Moka's policy already plays better openings than blind star-point heuristics** — it was trained on 9×9 and considers board context. Forcing star points overrides the policy's contextual judgment with a dumb "first available corner" rule. This confirms the Plan 563 audit conclusion: blind heuristics cannot improve on a trained policy within the policy's training distribution. Opening books are closed. Full record: `.benchmarks/204_opening_book_vs_moka_negative.md`.
+
+### PUCT search — the AlphaZero recipe (Bench 205, the new best)
+
+The one remaining architectural lever. `GoPuctMokaPlayer` implements PUCT (Predictor + UCB applied to Trees) — the AlphaZero search algorithm — using BOTH of Moka's heads: the **policy head** provides the exploration prior P(s,a), and the **value head** evaluates leaves. This is structurally different from the existing `GoMctsMokaPlayer` (negative result above), which used UCB1 (ignores the policy prior entirely). The PUCT formula:
+
+```
+PUCT(s,a) = Q(s,a) + c_puct · P(s,a) · √(N_parent) / (1 + N(s,a))
+```
+
+**Result: massive win.** n=100 per arm, all vs Moka greedy, GO_OPENING_MOVES=4:
+
+| Config | Win% | µs/move |
+|---|---|---|
+| Alpha-beta (depth=1, top_k=4) — prior best | 74.0% | 2,016 |
+| PUCT budget=50, c=1.5, top_k=8 | **94.0%** | 21,129 |
+| PUCT budget=100, c=1.5, top_k=8 | **96.0%** | 42,936 |
+| PUCT budget=200, c=2.5, top_k=8 | **98.0%** | 79,677 |
+
+Win rate scales with budget (94→96→98%), confirming the search adds real value. Even the cheapest PUCT (budget=50, ~21ms/move) jumps from 74% to 94% — z=4.52, p≈10⁻⁶. Baseline 74% vs PUCT-200 98%: z=5.63, p≈10⁻⁸.
+
+**Why PUCT beats alpha-beta:** the policy prior directs exploration toward moves the network rates highly (critical for Go's ~80 branching factor), and MCTS adaptively focuses simulations on promising lines (vs alpha-beta's fixed shallow depth). The existing `GoMctsMokaPlayer` (UCB1 + value head, negative result) lacked the policy prior — PUCT's addition of P(s,a) is what closes the gap.
+
+**Implementation note:** arena-based tree (`Vec<PuctNode>`), softmax-normalized top_k priors, negamax backprop with Q negated in selection. A sign bug (total_value perspective mismatch) was found and fixed during development — pre-fix scored 0W/20L (search chose worst moves), post-fix 94-98%. Full record: `.benchmarks/205_puct_search_vs_moka_win.md`.
+
+## Plan 565 — Real browser side-by-side + wasmi (the size/speed question, answered for real)
+
+Every prior "Moka: ~0.5ms/move" figure in this document was **our own native port acting as its own baseline** — never the actual browser-deployed Moka. This plan closes that gap with real measurements: the real `github.com/millionco/moka` package, built from source and run in real Chrome (via Playwright, driving the actually-installed `Google Chrome.app`, not a downloaded test browser); our own port compiled to `wasm32-unknown-unknown` and run in the same real Chrome; and the same `.wasm` binary run through `wasmi` (pure interpreter, no JIT) natively. New crate: `crates/katgpt-moka-wasm` — a dependency-free reimplementation of the forward pass (no `katgpt-core`, so no `ahash`/`getrandom` wasm32 backend friction a browser build has no reason to carry) plus a from-scratch minimal 9×9 board, kept faithful to `katgpt_pruners::go::moka_net` by direct port, not reimplementation-from-memory.
+
+**Correction along the way, worth stating plainly:** Moka's actual shipped runtime is **100% hand-written TypeScript**, not WASM at all — traced every code path in the cloned repo; the only `WebAssembly` reference anywhere is ONNX Runtime running KataGo (their much bigger teacher, used as an arena opponent), unrelated to Moka itself. The comparison is therefore "our Rust→WASM vs their hand-written JS," both JIT-compiled by V8 — not "WASM vs WASM," which was the wrong initial framing.
+
+### Results (all real measurements — real Chrome via Playwright, or native wasmi — not self-benchmarked)
+
+| Engine | Median latency/move | Total payload |
+|---|---|---|
+| **Real Moka** (their actual JS, real Chrome) | **6.4 ms** | 140,850 B (11,004 JS + 16,198 manifest + 113,648 weights) |
+| Our WASM, **no SIMD** (default `wasm32-unknown-unknown`, real Chrome) | 8.6 ms — **slower than Moka** | 267,914 B (9,847 JS glue + 258,067 wasm) |
+| **Our WASM, `+simd128`** (real Chrome) | **0.6 ms — 10.7× faster than Moka** | 269,405 B (9,847 JS glue + 259,558 wasm) |
+| Our WASM via **wasmi** (pure interpreter, no JIT, no SIMD) | 212,170 µs (212 ms) — 25× slower than our own JIT'd non-SIMD build | n/a (native test, no browser payload) |
+| Native Rust (NEON, no browser at all) | ~0.45–0.54 ms | n/a |
+
+### What actually happened, in order
+
+1. **First WASM attempt lost to plain JS** (8.6 ms vs 6.4 ms) — surprising, and initially looked like WASM just isn't worth it for a model this small (echoing the ANE finding from Issue 564: fixed overhead dominating a tiny workload).
+2. **Diagnosis, not resignation:** `wasm32-unknown-unknown` defaults to no SIMD. `katgpt_types::simd::simd_dot_f32`'s wasm32 SIMD path is gated on `target_feature = "simd128"`, which isn't on by default — so the WASM build was silently running the scalar fallback, throwing away the exact vectorization advantage that made the native port fast in the first place (Plan 563's 8.7× kernel work).
+3. **`RUSTFLAGS='-C target-feature=+simd128'` + `wasm-opt --enable-simd` fixed it completely**: 8.6 ms → 0.6 ms (14.3×), landing at **10.7× faster than real Moka**, confirmed in the same real browser, same self-play-generated position, same measurement methodology.
+4. **wasmi confirms JIT compilation is where nearly all the performance lives**, not the WASM format itself: the identical (non-SIMD) binary, pure-interpreted, is 212 ms/call — 25× slower than the exact same binary JIT'd by V8. A WASM interpreter alone is not viable for this workload at any point on this ladder.
+
+### Honest final scorecard — two tables, not one, on purpose
+
+Strength and speed/size come from **two entirely different experiments on two entirely different platforms** (native Rust search algorithms vs. browser WASM network inference) — an earlier version of this doc merged them into one 3-row "Moka | Ours" table, which invites reading "0.5 ms" and "98.0%" as one build's two properties. They are not. Splitting them so that reading error is structurally impossible:
+
+**A. Native strength — search algorithm comparison (no browser, no WASM, all native Rust)**
+
+| Config | Win% vs Moka | Latency/move (native) | n |
+|---|---|---|---|
+| Alpha-beta (depth=1, top_k=4) | 70.0% (n=300); **74.0% reconfirmed fresh, n=100, 1,976.8 µs/move** | ~2.0–2.8 ms | 300 |
+| PUCT (budget=50, c=1.5, top_k=8) | 94.0% | ~21 ms | 100 |
+| PUCT (budget=100, c=1.5, top_k=8) | 96.0% | ~43 ms | 100 |
+| PUCT (budget=200, c=2.5, top_k=8) | **98.0% reconfirmed fresh** (98W/2L, n=100) | **81,099.6 µs ≈ 81.1 ms** | 100 |
+
+Both rows above re-run fresh in this session, on demand, to confirm the documented figures weren't stale — both matched (74.0%/1.98ms and 98.0%/81.1ms respectively). PUCT strictly dominates alpha-beta on strength, at a real and substantial latency cost — budget=200 is **~41× slower per move** than alpha-beta (81.1 ms vs 1.98 ms), not a free upgrade. **Yes, PUCT is slower — the 0.5 ms figure below has nothing to do with PUCT.**
+
+**B. Browser speed/size — plain network inference only (no search of any kind, either algorithm)**
+
+| | Moka (real) | Ours |
+|---|---|---|
+| Latency/move | 6.4 ms | **0.5 ms** (zero-copy API) / 0.6 ms (marshalled API) |
+| Bundle size | 140,850 B | 273,218 B |
+
+This measures one greedy forward pass — the WASM build has no search at all, analogous to native `MokaPlayer` (argmax over the raw policy), not `GoMokaSearchPlayer`/`GoPuctMokaPlayer`. Nothing in table A has been ported to WASM.
+
+**The unambiguous take-away:** there is no single build that is simultaneously 98% strong *and* 12.8× faster than Moka. Want strength → PUCT, natively, ~80 ms/move. Want raw network speed → the WASM build with SIMD128 + zero-copy, ~0.5 ms/move, but that's Moka's own weak greedy policy on both sides, not the search-augmented one. Table A's latency is native (no browser); table B's latency is real-browser. Do not average or combine numbers across the two tables.
+
+### Follow-up: does zero-copy JS↔wasm sharing help further?
+
+`WasmMoka::infer(&[f32]) -> Vec<f32>` marshals on both sides of every call: the input slice is bulk-copied into a temporary wasm buffer, and the `Vec<f32>` return is allocated in wasm, copied out to a fresh JS array, then freed. WASM linear memory is inherently JS-visible zero-copy (`WebAssembly.Memory.buffer` wrapped directly in a `Float32Array` view, no `SharedArrayBuffer`/threads needed) — so `WasmMoka::infer_ptr`/`WasmGame::encode_features_ptr` were added: persistent, never-resized buffers with stable addresses, exposed via `wasm_bindgen::memory()`, read/written through JS-side `Float32Array` views instead of marshalled arguments/return values.
+
+**Paired same-page-load result (n=100 each, real Chrome):**
+
+| | Median | Mean |
+|---|---|---|
+| Baseline (`infer`, marshalled) | 0.60 ms | 0.55 ms |
+| Zero-copy (`infer_ptr`, shared memory view) | 0.50 ms | 0.54 ms |
+
+**Real, measurable, but modest** — roughly 15–20% at the median, with p99/min/max identical between the two. Marshalling cost is real, but it was never the dominant cost once SIMD was already enabled; the 14.3× win from Phase 1 (enabling `simd128`) dwarfs this. This widens an already-decisive lead rather than fixing a loss. Size cost of keeping both APIs side-by-side for the A/B: +3,813 B (269,405 → 273,218) — a real deployment would drop the marshalled `infer`/`encode_features` entirely rather than keep both, likely netting smaller, not larger.

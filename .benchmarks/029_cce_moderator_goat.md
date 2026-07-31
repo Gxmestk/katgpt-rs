@@ -1,10 +1,16 @@
 # Bench 029 — CCE Moderator GOAT Gate Aggregation
 
+> **UPDATE 2026-07-18 (status sync):** `cce_moderator` is **default-on** in
+> `crates/katgpt-core/Cargo.toml` (Phase 10 promotion, 2026-07-04 — root
+> Cargo.toml comment: "+cce_moderator/llmexec_guard/ssd_block/salience_tri_gate").
+> The `(default-off)` label below was stale relative to the current Cargo.toml
+> default list.
+
 **Plan:** [295](../.plans/295_lp_cce_moderator_primitive.md) Phase 4, Task T4.1
 **Research:** [274](../.research/274_Optimal_CCE_Moderator_LP_No_Regret.md)
 **Paper:** [arxiv 2606.20062](https://arxiv.org/pdf/2606.20062) — Campi, Cannerozzi, Tzouanas 2026
 **Date:** 2026-06-20
-**Feature gate:** `cce_moderator` (default-off)
+**Feature gate:** `cce_moderator` (**default-on in katgpt-core since 2026-07-04**)
 
 ---
 

@@ -34,7 +34,7 @@ OPT-IN (unchanged).
 
 ## Method
 
-The `SleepTimeAnticipatorAdapter` (`tests/conformal_floor_sleep_time.rs`) wraps
+The `SleepTimeAnticipatorAdapter` (`crates/katgpt-core/tests/conformal_floor_sleep_time.rs`) wraps
 `SleepTimeAnticipator<D=4, K=4, IdentityFunctorOp, DotPredictabilityScorer>` as
 a `UqPrimitiveUnderTest`:
 

@@ -76,15 +76,15 @@ This is `O(d·r)` not `O(d²)` — the paper's headline cost claim.
 
 | Primitive | Source | Why reuse |
 |---|---|---|
-| `thin_svd_into` + `SvdScratch` + `SvdResultScratch` | `katgpt-core/subspace_phase_gate.rs` (Plan 301) | The SVD used to discover `U_r` offline. TILR consumes the output `right_singular_vectors`. |
-| `subspace_ratios` (the γ math) | `katgpt-spectral/river_valley.rs` (Plan 152) | Computes `r_dom = ‖U_k^T g‖ / ‖g‖` — **the identical metric**. Extract or re-expose the core ratio computation; do not duplicate. |
-| `simd_dot_f32`, `simd_*` | `katgpt-core/simd.rs` | SIMD-accelerated dot products for the projection + norm computations. |
+| `thin_svd_into` + `SvdScratch` + `SvdResultScratch` | `crates/katgpt-core/src/subspace_phase_gate.rs` (Plan 301) | The SVD used to discover `U_r` offline. TILR consumes the output `right_singular_vectors`. |
+| `subspace_ratios` (the γ math) | `crates/katgpt-spectral/src/river_valley.rs` (Plan 152) | Computes `r_dom = ‖U_k^T g‖ / ‖g‖` — **the identical metric**. Extract or re-expose the core ratio computation; do not duplicate. |
+| `simd_dot_f32`, `simd_*` | `maxion-protector/crates/maxion-core/src/simd.rs` | SIMD-accelerated dot products for the projection + norm computations. |
 
 **DRY decision:** the γ ratio lives in `katgpt-spectral`, but TILR lives in
 `katgpt-core` (leaf). Two options:
 - **(A)** Move the ratio helper to `katgpt-core` (leaf) and have
   `katgpt-spectral` re-export — clean dependency direction (leaf owns the math).
-- **(B)** Duplicate the ~5-line ratio computation in `katgpt-core/tilr.rs` with
+- **(B)** Duplicate the ~5-line ratio computation in `crates/katgpt-core/src/tilr.rs` with
   a cross-reference comment — avoids a refactor of `katgpt-spectral`.
 
 **Recommendation: (B) for Phase 1** (5 lines, with a `// cf. river_valley::subspace_ratios` comment). Open an issue for (A) if the duplication causes
@@ -186,7 +186,7 @@ the refactor risk.
 - [x] **T1.5** Add feature gate `tilr_invariant_subspace` to
       `katgpt-core/Cargo.toml`. Gate the module behind
       `#[cfg(feature = "tilr_invariant_subspace")]`.
-- [x] **T1.6** Register the module in `katgpt-core/src/lib.rs`:
+- [x] **T1.6** Register the module in `crates/katgpt-core/src/lib.rs`:
       `#[cfg(feature = "tilr_invariant_subspace")] pub mod tilr;`
 - [x] **T1.7** Forward the feature in root `katgpt-rs/Cargo.toml`:
       `tilr_invariant_subspace = ["katgpt-core/tilr_invariant_subspace"]` (opt-in,

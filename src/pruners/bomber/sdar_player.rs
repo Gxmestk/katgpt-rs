@@ -1,6 +1,6 @@
 //! SDAR-gated bomber player — sigmoid-gated scalar reward replaces rubric vectors.
 //!
-//! Same architecture as [`RubricPlayer`] but uses [`SdarBanditPruner`] and
+//! Same architecture as `RubricPlayer` but uses [`SdarBanditPruner`] and
 //! [`SdarGatedAbsorbCompress`] instead of rubric-vector bandit/absorb.
 //!
 //! # Architecture

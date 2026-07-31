@@ -49,7 +49,7 @@ The minimal "every trace becomes a directed graph" primitive. Zero-allocation re
 - [x] **T1.2** `trace.rs`: `PtgRecorder` — wraps any `ConstraintPruner` execution. Methods: `enter(primitive) -> NodeId`, `exit(node_id, op, child_id)`, `finish() -> PrimitiveTransitionGraph`. Use `smallvec::SmallVec<[PtgNode; 16]>` for typical short traces; spill to `Vec` only on overflow. **Zero allocations on the hot path when `closure_instrument` feature is disabled.**
 - [x] **T1.3** `serde` impls for PTG (CBOR or postcard for cold-tier; commitment = `blake3::hash(serialized)`).
 - [x] **T1.4** Property test: `PtgRecorder` output is deterministic given the same call sequence + RNG seed. Property test: serialization round-trip preserves structure.
-- [x] **T1.5** Unit test: PTG of a 4-pruner operadic composition (use `lattice_operad/composed_pruner.rs` fixture) materializes to expected `(nodes, edges)`.
+- [x] **T1.5** Unit test: PTG of a 4-pruner operadic composition (use `crates/katgpt-pruners/src/lattice_operad/composed_pruner.rs` fixture) materializes to expected `(nodes, edges)`.
 
 ### Acceptance
 
@@ -96,7 +96,7 @@ The paper's §6 evaluation metrics as runtime functions. PRI/CDG are pure-PTG-ag
 
 - PRI computation on 1K-trace corpus < 100µs (G1).
 - TaR computation on 2×100-PTG corpus < 1ms.
-- All bridge functions are `#[inline]`, zero-alloc, and SIMD-friendly (use `simd_dot_f32` from `katgpt-core/src/simd.rs`).
+- All bridge functions are `#[inline]`, zero-alloc, and SIMD-friendly (use `simd_dot_f32` from `crates/katgpt-dec/src/simd.rs`).
 
 ---
 
@@ -105,8 +105,8 @@ The paper's §6 evaluation metrics as runtime functions. PRI/CDG are pure-PTG-ag
 ### Tasks
 
 - [x] **T4.1** Create `tests/bench_290_closure_instrument_goat.rs` with all G1–G5 assertions.
-- [x] **T4.2** Wire `PtgRecorder` as an opt-in wrapper around `BanditPruner` / `AbsorbCompressLayer` (gated by `closure_instrument` feature). — Shipped as `katgpt-rs/src/closure_wire.rs`: `PtgTracedPruner<P: ScreeningPruner>` decorator auto-instruments `AbsorbCompress::absorb`/`compress`; bandit `update` traced via explicit `trace()` API. 8 unit tests + 6 integration tests pass.
-- [x] **T4.3** Wire `MotifMiner::mine_batch()` into the existing sleep-cycle scheduler (Plan 107 AutoDreamer consolidation tick). Document the schedule. — Shipped as `katgpt-rs/src/closure_mining.rs`: `mine_motifs_at_sleep_cycle()` + `fold_cdg_at_sleep_cycle()`. Backend-agnostic (usable from both `dreamer` and `sleep_consolidation`); doc includes the wake→sleep→admit schedule diagram.
+- [x] **T4.2** Wire `PtgRecorder` as an opt-in wrapper around `BanditPruner` / `AbsorbCompressLayer` (gated by `closure_instrument` feature). — Shipped as `katgpt-rs/crates/katgpt-pruners/src/closure_wire.rs`: `PtgTracedPruner<P: ScreeningPruner>` decorator auto-instruments `AbsorbCompress::absorb`/`compress`; bandit `update` traced via explicit `trace()` API. 8 unit tests + 6 integration tests pass.
+- [x] **T4.3** Wire `MotifMiner::mine_batch()` into the existing sleep-cycle scheduler (Plan 107 AutoDreamer consolidation tick). Document the schedule. — Shipped as `crates/katgpt-core/src/closure/mining.rs`: `mine_motifs_at_sleep_cycle()` + `fold_cdg_at_sleep_cycle()`. Backend-agnostic (usable from both `dreamer` and `sleep_consolidation`); doc includes the wake→sleep→admit schedule diagram.
 - [-] **T4.4** Cross-repo validation: request riir-ai to expose `AnchorProfile::translate_priorities()` benchmark traces for TaR correlation (G3). If riir-ai cannot share traces (private IP), use synthetic transfer scenarios as a proxy and downgrade G3 to "correlates with synthetic transfer" with a TODO to upgrade. — **DEFERRED**: riir-ai is private IP. G3 stays on the synthetic proxy (same-corpus=1.0, disjoint=0.0); upgrading requires riir-ai to expose transfer-acceleration traces. Out of scope for this repo.
 - [x] **T4.5** Cold-tier commitment: PTG snapshot ≤ 1MB per 10K traces (G4). Use postcard encoding + BLAKE3 hash; reuse Plan 280 Merkle-octree commitment infrastructure. — **RESOLVED (2026-06-26):** 0.296 MB / 10K traces (production-realistic all-`None` corpus). Was 1.774 MB on the pre-fix locked data model (`PtgNode.blake3_in: [u8; 32]`); the `Option<[u8; 32]>` change made the target achievable. Upper bound all-`Some` = 1.822 MB (informational). Full Merkle-octree wiring still deferred — the `commitment()` helper produces a valid 32-byte BLAKE3 hash; octree composition is a separate (non-blocking) work item.
 - [x] **T4.6** Run full benchmark suite with `--features closure_instrument`. Document results in `katgpt-rs/.benchmarks/290_closure_instrument_goat.md`.
@@ -213,7 +213,7 @@ pub struct PrimitiveTransitionGraph {
 
 - **No NPP training objective.** That is riir-train territory. This plan exposes a *runtime data structure* (`PTG`) that a future NPP trainer could consume as training targets, but does not implement the trainer.
 - **No new capability class.** This is a measurement + data-structure layer. The capability-class mechanisms (MDL admission, TaR transfer) already ship; we are making them observable.
-- **No riir-ai guide.** Verdict is GOAT, not Super-GOAT. The private selling-point doc for `AnchorProfile` already exists in `cgsp_runtime/cross_game_transfer.rs` doc comments. This plan does not duplicate or extend that.
+- **No riir-ai guide.** Verdict is GOAT, not Super-GOAT. The private selling-point doc for `AnchorProfile` already exists in `riir-ai/crates/riir-engine/src/cgsp_runtime/cross_game_transfer.rs` doc comments. This plan does not duplicate or extend that.
 - **No changes to existing default-on features.** Everything is behind `closure_instrument` feature flag until G1–G4 pass.
 - **No game semantics in katgpt-rs.** `PrimitiveKind` reserves 0–511 for engine use; game-specific primitive IDs stay in riir-ai and reference back via opaque `u32`.
 

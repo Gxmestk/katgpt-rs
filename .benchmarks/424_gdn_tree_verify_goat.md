@@ -3,7 +3,7 @@
 **Date:** 2026-07-10
 **Plan:** [katgpt-rs/.plans/424_gdn_tree_verification_primitive.md](../.plans/424_gdn_tree_verification_primitive.md)
 **Feature:** `gdn_tree_verify` (opt-in)
-**Bench:** `benches/bench_424_gdn_tree_verify.rs`
+**Bench:** `crates/katgpt-core/benches/bench_424_gdn_tree_verify.rs`
 
 ## Summary
 

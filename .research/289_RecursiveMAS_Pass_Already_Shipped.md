@@ -33,7 +33,7 @@ Reported: +8.3% avg accuracy, 1.2–2.4× inference speedup, 34.6–75.6% token 
 | **Outer RecursiveLink** — `R_out(h) = W3·h + W2·σ(W1·h)` | Cross-model latent projection for heterogeneous agent embedding alignment. Enables agent→agent latent comms without text decode. | ✅ **Already Super-GOAT, shipped at higher fidelity:** R247 + R133 + P311 + P280 (NPC mind-reading adaptive-bandwidth latent bus). Our version adds the **fog-of-war context-awareness axis** that RecursiveMAS does NOT have — sparse 3.5% when receiver has line-of-sight, dense 87% when blind, gated by `ca = sigmoid(β·coverage_overlap)`. RecursiveMAS uses a fixed `W3·h` projection only. **Our system is strictly more capable.** |
 | **System-as-loop topology** (chain agents A1→A2→…→AN→A1, R rounds) | Treat the MAS as a recursive computation where each agent is one "layer" of an RLM. | ✅ Implicitly shipped: NPCs already have per-tick HLA evolution (intra-agent recursion) + Plan 311 latent broadcast (cross-agent). Our topology is **more flexible** (pub/sub with fog-of-war gating, not a fixed loop). |
 | **Recursion depth scaling** (R=1,2,3 as inference-time compute axis) | Increase R for deeper refinement. | ✅ Shipped as LT2 `forward_looped` (R073/P108), Training-Free Loop Wrapper (R097/P136), ELT (R273). Halting primitives: Self-Advantage Recursion Gate (P283), Gain/Cost Loop Halting (P304), Depth-Invariance Diagnostic (R286/P306). |
-| **Residual projection form** `h + W2·σ(W1·h)` | 2-layer MLP with residual preservation of input semantics. | ✅ Shipped: latent_functor rank-1 (`f = mean_k(target_k - source_k)` is the rank-1 special case, P303), FuncAttn rank-k (`C = Q̃K̃ᵀ(K̃K̃ᵀ+λI)^-1`, P286+P318 generalizes to operator-valued). Both **atomic Arc-swap, BLAKE3-committed** per `latent_functor/table.rs::FunctorEntry`. |
+| **Residual projection form** `h + W2·σ(W1·h)` | 2-layer MLP with residual preservation of input semantics. | ✅ Shipped: latent_functor rank-1 (`f = mean_k(target_k - source_k)` is the rank-1 special case, P303), FuncAttn rank-k (`C = Q̃K̃ᵀ(K̃K̃ᵀ+λI)^-1`, P286+P318 generalizes to operator-valued). Both **atomic Arc-swap, BLAKE3-committed** per `riir-ai/crates/riir-engine/src/latent_functor/table.rs::FunctorEntry`. |
 | **Inner-outer loop training** (backprop through frozen LLMs) | The only genuinely additive contribution. Co-optimizes outer links via CE through full recursion trace. | ⛔ **Training → riir-train.** Out of scope for this workflow. |
 
 ### 1.2 The four collaboration patterns (§5.3)
@@ -61,8 +61,8 @@ Sequential / Mixture / Distillation / Deliberation — all are **MAS topology te
 | Recursion depth scaling (R rounds) | LT2 `forward_looped`, Training-Free Loop Wrapper | P108, P136 |
 | Recursion depth halting | Self-Advantage Gate, Gain/Cost Halter, Depth-Invariance | P283, P304, R286 |
 | Residual MLP projection form | latent_functor rank-1 (f), FuncAttn rank-k (C operator) | P273/P303, P286/P318 |
-| Freeze/thaw of projection weights | `latent_functor/table.rs::FunctorEntry` (atomic Arc-swap, BLAKE3-committed, Uuid::now_v7 versioned) | P303 |
-| Coherence-driven re-estimation on drift | `latent_functor/reestimation.rs::ReestimationScheduler` (DiPOD equivalent) | P303 |
+| Freeze/thaw of projection weights | `riir-ai/crates/riir-engine/src/latent_functor/table.rs::FunctorEntry` (atomic Arc-swap, BLAKE3-committed, Uuid::now_v7 versioned) | P303 |
+| Coherence-driven re-estimation on drift | `riir-ai/crates/riir-engine/src/latent_functor/reestimation/mod.rs::ReestimationScheduler` (DiPOD equivalent) | P303 |
 | Latent-to-text decode only at final round | Standard inference path (decode is already only-at-output by design) | existing |
 | Sequential/Mixture/Distillation/Deliberation topologies | Polytope, Dynamic Pair, dMoE, Crowd MCGS, federation | R091/P260/R161/P298/P231 |
 
@@ -98,7 +98,7 @@ Not applicable — no new boundary-crossing behavior. RecursiveMAS's latent-to-l
 - **HLA framing:** RecursiveMAS = "N NPCs each iterate HLA state, then exchange HLA slices, looping R rounds." Ours: NPCs evolve HLA per-tick AND exchange via Plan 311 every tick. The "loop R rounds before producing output" structure is *more rigid* than per-tick evolution.
 - **Latent functor framing:** `R_out` IS a latent functor direction vector (rank-1). We already ship rank-k FuncAttn (Plan 318) as the generalization.
 - **CGSP framing:** recursion-round scaling ≈ CGSP cycle scaling — already shipped, no fixed-N-loop constraint.
-- **Neuron-shard framing:** RecursiveLink weights = another freeze/thaw artifact (`MerkleFrozenEnvelope` covers it). Already covered by `latent_functor/table.rs::FunctorEntry`.
+- **Neuron-shard framing:** RecursiveLink weights = another freeze/thaw artifact (`MerkleFrozenEnvelope` covers it). Already covered by `riir-ai/crates/riir-engine/src/latent_functor/table.rs::FunctorEntry`.
 - **LatCal framing:** no natural LatCal angle — `R_out` is a learned linear map, not a deterministic committed fixed-point bridge.
 
 **No latent-space reframing yields a new capability.** Adapter-routing framing would be even weaker (we already ship Dynamic Pair, Polytope, dMoE).

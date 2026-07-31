@@ -113,7 +113,7 @@ The self-advantage fills all three gaps with a single computation.
 
 | Component | What it provides | From |
 |-----------|-----------------|------|
-| SDPG `centered_log_ratio` | The math — `A(a) = D̄ − log(p̄/q̄)` — **already shipped** at bandit-arm level | `katgpt-rs/src/pruners/sdpg/advantage.rs` |
+| SDPG `centered_log_ratio` | The math — `A(a) = D̄ − log(p̄/q̄)` — **already shipped** at bandit-arm level | `katgpt-rs/crates/katgpt-pruners/src/sdpg/advantage.rs` |
 | DIS theoretical lens | The insight that pre/post logits of a SINGLE model give the same advantage — no oracle needed | This paper |
 | EqR recursion framework | The iterative reasoning substrate (`LoopMode`, `EarlyStopGate`, latent state evolution) | Research 079 |
 
@@ -121,7 +121,7 @@ The self-advantage fills all three gaps with a single computation.
 SDPG currently needs oracle replay data (teacher Q-values from winning games). DIS-theory says: *throw away the oracle — your own model's pre/post logits ARE the teacher/student pair.* This means the dense per-step credit assignment that SDPG provides for bandits (Plan 180's main win) becomes available for **any iterative computation**, including HLA belief evolution, NPC thought cycles, and speculative draft/verify — with zero external data dependency.
 
 **Cross-pollination candidates (not yet fused, tracking for future):**
-- **HLA `evolve_hla`** (`katgpt-rs/crates/katgpt-core/src/sense/reconstruction.rs`) — the canonical "shipped without a research note" mechanism. Currently evolves latent state without a per-step improvement signal. Self-advantage could gate which HLA updates are worth keeping.
+- **HLA `evolve_hla`** (`katgpt-rs/crates/katgpt-sense/src/reconstruction.rs`) — the canonical "shipped without a research note" mechanism. Currently evolves latent state without a per-step improvement signal. Self-advantage could gate which HLA updates are worth keeping.
 - **NPC curiosity** (riir-ai Research 041, 126, 127) — thousands of NPCs each "thinking" per tick. Most thoughts are dead compute. Self-advantage gate → skip non-improving thoughts → massive 20Hz tick budget savings.
 - **Freeze/thaw** — snapshot the improvement direction vector `A(·)` per NPC personality. Versioned latent direction vectors (BLAKE3-committed).
 
@@ -189,7 +189,7 @@ SDPG currently needs oracle replay data (teacher Q-values from winning games). D
 - `katgpt-rs/.research/049_PTRM_Probabilistic_Tiny_Recursive_Model.md` — parent TRM (architecture we improve on)
 - `katgpt-rs/.research/079_EqR_Equilibrium_Reasoners.md` — recursion-as-attractor; uses fixed-point residual (different signal)
 - `katgpt-rs/.research/048_HRM_Text_Hierarchical_Recurrent_Pretraining.md` — parent HRM
-- `katgpt-rs/src/pruners/sdpg/advantage.rs` — shipped `centered_log_ratio` to reuse
+- `katgpt-rs/crates/katgpt-pruners/src/sdpg/advantage.rs` — shipped `centered_log_ratio` to reuse
 - `katgpt-rs/src/pruners/bomber/sdpg_player.rs` — shipped `SdpgPlayer` with positive-advantage gating
 
 ## 6. References

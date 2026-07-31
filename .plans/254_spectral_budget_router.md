@@ -44,7 +44,7 @@ Shipping this in the open engine:
 
 - [x] ### T1: Spectral Exponent Table + Predictive Config
 
-**File:** `src/spectral_budget.rs` (new)
+**File:** `crates/katgpt-spectral/src/spectral_budget.rs` (new)
 
 ```rust
 /// Spectral power law exponents from Magakyan et al. (2026).
@@ -102,7 +102,7 @@ pub fn predict_ns_config(
 
 - [x] ### T2: Layer-Adaptive NS Depth Selector
 
-**File:** `src/spectral_budget.rs`
+**File:** `crates/katgpt-spectral/src/spectral_budget.rs`
 
 ```rust
 /// Select NS iteration count based on predicted spectral profile.
@@ -125,7 +125,7 @@ Wire into existing `newton_schulz.rs`:
 
 - [x] ### T3: Rank-p Spectral Truncation
 
-**File:** `src/spectral_budget.rs`
+**File:** `crates/katgpt-spectral/src/spectral_budget.rs`
 
 ```rust
 /// Truncate low-value singular directions.

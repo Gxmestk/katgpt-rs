@@ -98,7 +98,7 @@ absolutely dominates the arena. This inverts the v1 result where HL (+475) >> Lo
 ### Phase 3: Dynamic Rules Proof (katgpt-rs + riir-ai)
 
 - [x] **T7: `FullHLPlayer` in riir-ai — composition-based Full HL** ✅
-  - `riir-ai` defines `FullHLPlayer` struct in `crates/riir-examples/src/bomber_full_hl.rs`
+  - `riir-ai` defines `FullHLPlayer` struct in `riir-ai/crates/riir-examples/src/bomber_full_hl.rs`
   - Impls `BomberPlayer` trait — composes LoRA v2 + WASM + Bandit adaptation
   - Hot-swap: `reload_lora()` between rounds via CLI flag
   - Architecture:
@@ -321,7 +321,7 @@ examples/
 
 ```
 crates/riir-gpu/
-  examples/train_bomber.rs    ← T4: updated defaults, --min-quality, --output flags
+  riir-train/crates/riir-train-gpu/examples/train_bomber.rs    ← T4: updated defaults, --min-quality, --output flags
 
 output/
   game_lora_v2.bin            ← T5: new trained LoRA (9.1KB, final_loss=12.67)

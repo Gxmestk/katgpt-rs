@@ -90,12 +90,11 @@ pub fn forward_gdn2<'a>(
     // 1. Embedding: x = wte[token] + wpe[pos]
     let tok_off = token * n;
     let pos_off = pos * n;
-    for i in 0..n {
-        unsafe {
-            *ctx.x.get_unchecked_mut(i) =
-                *weights.wte.get_unchecked(tok_off + i) + *weights.wpe.get_unchecked(pos_off + i);
-        }
-    }
+    katgpt_core::simd::simd_add_into(
+        &mut ctx.x[..n],
+        &weights.wte[tok_off..tok_off + n],
+        &weights.wpe[pos_off..pos_off + n],
+    );
 
     // 2. Layer loop
     for (layer_idx, layer_weights) in weights.layers.iter().enumerate() {
@@ -142,6 +141,15 @@ pub fn forward_gdn2<'a>(
                 hd,
                 gate_config,
             );
+
+            // HOLA cache observe: store (k, v) with surprise score β·‖delta‖.
+            // The cache is a pure observer — it never perturbs the GDN2 state.
+            // Zero overhead when hippocampal_caches is empty.
+            #[cfg(feature = "hippocampal_cache")]
+            if !layer_cache.hippocampal_caches.is_empty() {
+                let delta_norm: f32 = layer_cache.delta.iter().map(|x| x * x).sum::<f32>().sqrt();
+                layer_cache.hippocampal_caches[g].observe(k_h, v_h, write_w_scalar, delta_norm);
+            }
         }
 
         // Readout: once per Q head (state is shared within KV group)
@@ -150,6 +158,24 @@ pub fn forward_gdn2<'a>(
             let s = &layer_cache.heads[kv_group].s;
             let q_h = &ctx.q[h * hd..(h + 1) * hd];
             gdn2_state_readout(s, q_h, &mut layer_cache.out_buf, hd, hd);
+
+            // HOLA cache read: add cache contribution to the GDN2 readout.
+            //   o_final = o_gdn2 + cache_alpha * cache.read(q)
+            // Zero overhead when hippocampal_caches is empty (the read returns
+            // zeros, so the add is a no-op — but we skip entirely to avoid the
+            // call cost).
+            #[cfg(feature = "hippocampal_cache")]
+            if !layer_cache.hippocampal_caches.is_empty() {
+                layer_cache.hippocampal_caches[kv_group]
+                    .read_cache_into_fast(q_h, &mut layer_cache.cache_scratch);
+                let alpha = layer_cache.cache_alpha;
+                if alpha != 0.0 {
+                    for j in 0..hd {
+                        layer_cache.out_buf[j] += alpha * layer_cache.cache_scratch[j];
+                    }
+                }
+            }
+
             ctx.attn_out[h * hd..(h + 1) * hd].copy_from_slice(&layer_cache.out_buf);
         }
 
@@ -157,15 +183,31 @@ pub fn forward_gdn2<'a>(
 
         // Output projection + residual
         types::matmul(&mut ctx.x, &layer_weights.attn_wo, &ctx.attn_out, n, n);
-        for i in 0..n {
-            unsafe {
-                *ctx.x.get_unchecked_mut(i) += *ctx.xr.get_unchecked(i);
-            }
-        }
+        katgpt_core::simd::simd_add_inplace(&mut ctx.x[..n], &ctx.xr[..n]);
 
         // MLP: save residual → RMSNorm → MLP → residual
         ctx.xr2[..n].copy_from_slice(&ctx.x[..n]);
         types::rmsnorm(&mut ctx.x);
+        #[cfg(feature = "gated_mlp")]
+        {
+            // SwiGLU: SiLU(W_gate·h) ⊙ W_up·h → W_down·hidden
+            types::matmul(
+                &mut ctx.hidden,
+                &layer_weights.mlp_w1,
+                &ctx.x,
+                config.mlp_hidden,
+                n,
+            );
+            types::matmul(
+                &mut ctx.hidden2,
+                &layer_weights.mlp_w_up,
+                &ctx.x,
+                config.mlp_hidden,
+                n,
+            );
+            types::swiglu_inplace(&mut ctx.hidden, &ctx.hidden2);
+        }
+        #[cfg(not(feature = "gated_mlp"))]
         types::matmul_relu(
             &mut ctx.hidden,
             &layer_weights.mlp_w1,
@@ -173,7 +215,7 @@ pub fn forward_gdn2<'a>(
             config.mlp_hidden,
             n,
         );
-        // MLP w2: sparse when feature enabled and sparsity is high enough
+        // MLP w2 (W_down): sparse when feature enabled and sparsity is high enough
         #[cfg(feature = "sparse_mlp")]
         {
             let alive = types::sparse_matmul(
@@ -203,11 +245,7 @@ pub fn forward_gdn2<'a>(
             n,
             config.mlp_hidden,
         );
-        for i in 0..n {
-            unsafe {
-                *ctx.x.get_unchecked_mut(i) += *ctx.xr2.get_unchecked(i);
-            }
-        }
+        katgpt_core::simd::simd_add_inplace(&mut ctx.x[..n], &ctx.xr2[..n]);
     }
 
     // Snapshot hidden state
@@ -244,9 +282,8 @@ pub fn generate_gdn2_into(
     let mut token = config.bos_token;
 
     for pos in 0..n_tokens {
-        let logits = forward_gdn2(ctx, weights, cache, token, pos, config);
-        types::softmax_scaled(logits, 1.0 / config.temperature);
-        let next_token = types::sample_token_into(&ctx.logits, rng, &mut ctx.cdf);
+        let _ = forward_gdn2(ctx, weights, cache, token, pos, config);
+        let next_token = ctx.sample_next_token(config.temperature, rng);
         tokens.push(next_token);
         token = next_token;
     }
@@ -421,6 +458,177 @@ mod tests {
                     "Gate {gate_config:?}: logits[{i}] not finite: {l}"
                 );
             }
+        }
+    }
+
+    // ── HOLA cache production wiring tests (Issue 038) ─────────────────────
+
+    /// G3 (no-regression): forward_gdn2 with cache disabled (default
+    /// `MultiLayerGdn2Cache::new`) produces finite logits — the cache fields
+    /// exist but are empty, so the observe/read code paths are skipped.
+    #[cfg(feature = "hippocampal_cache")]
+    #[test]
+    fn forward_gdn2_cache_disabled_finite() {
+        let config = Config::micro();
+        let weights = random_weights(&config);
+        let mut ctx = ForwardContext::new(&config);
+        let mut cache = MultiLayerGdn2Cache::new(&config);
+
+        // Verify hippocampal_caches is empty (disabled).
+        assert!(cache.layers[0].hippocampal_caches.is_empty());
+
+        let logits = forward_gdn2(&mut ctx, &weights, &mut cache, config.bos_token, 0, &config);
+
+        assert_eq!(logits.len(), config.vocab_size);
+        for (i, &l) in logits.iter().enumerate() {
+            assert!(l.is_finite(), "logits[{i}] not finite: {l}");
+        }
+    }
+
+    /// G3 (no-regression): forward_gdn2 with cache enabled but W=0 (zero
+    /// capacity) produces the same logits as with cache disabled. This proves
+    /// the cache wiring is clean — zero capacity → no entries → read returns
+    /// zeros → adding zero doesn't change the output.
+    #[cfg(feature = "hippocampal_cache")]
+    #[test]
+    fn forward_gdn2_cache_w0_no_regression() {
+        let config = Config::micro();
+        let weights = random_weights(&config);
+
+        // Run without cache.
+        let mut ctx1 = ForwardContext::new(&config);
+        let mut cache1 = MultiLayerGdn2Cache::new(&config);
+        let logits1 = forward_gdn2(
+            &mut ctx1,
+            &weights,
+            &mut cache1,
+            config.bos_token,
+            0,
+            &config,
+        )
+        .to_vec();
+
+        // Run with cache enabled but W=0 (zero capacity — can't store anything).
+        let mut ctx2 = ForwardContext::new(&config);
+        let mut cache2 = MultiLayerGdn2Cache::with_hippocampal_cache(&config, 0);
+        let logits2 = forward_gdn2(
+            &mut ctx2,
+            &weights,
+            &mut cache2,
+            config.bos_token,
+            0,
+            &config,
+        )
+        .to_vec();
+
+        // Outputs should be identical — W=0 means the cache never stores
+        // anything, and the read returns zeros.
+        assert_eq!(logits1.len(), logits2.len());
+        for (i, (a, b)) in logits1.iter().zip(logits2.iter()).enumerate() {
+            assert!(
+                (a - b).abs() < 1e-6,
+                "W=0 no-regression failed at [{i}]: {a} vs {b}"
+            );
+        }
+    }
+
+    /// G3 (multi-token no-regression): Running multiple tokens with the cache
+    /// enabled produces finite logits at every step. The cache accumulates
+    /// entries but the output should remain stable.
+    #[cfg(feature = "hippocampal_cache")]
+    #[test]
+    fn forward_gdn2_cache_multi_token_stable() {
+        let config = Config::micro(); // block_size=16
+        let weights = random_weights(&config);
+        let mut ctx = ForwardContext::new(&config);
+        let mut cache = MultiLayerGdn2Cache::with_hippocampal_cache(&config, 8);
+        let mut rng = katgpt_core::types::Rng::new(42);
+        let mut tokens = Vec::new();
+
+        generate_gdn2_into(
+            &mut ctx,
+            &mut cache,
+            &weights,
+            &config,
+            &mut rng,
+            16, // within block_size
+            &mut tokens,
+        );
+
+        assert_eq!(tokens.len(), 16);
+        for &t in &tokens {
+            assert!(t < config.vocab_size, "Token {t} out of vocab range");
+        }
+        // The cache should be full (8 entries) after 16 tokens.
+        assert_eq!(cache.layers[0].hippocampal_caches[0].len(), 8);
+    }
+
+    /// G3 (reset clears cache): After reset, the cache is empty and the output
+    /// matches a fresh run.
+    #[cfg(feature = "hippocampal_cache")]
+    #[test]
+    fn forward_gdn2_cache_reset_clean() {
+        let config = Config::micro();
+        let weights = random_weights(&config);
+        let mut ctx = ForwardContext::new(&config);
+        let mut cache = MultiLayerGdn2Cache::with_hippocampal_cache(&config, 4);
+
+        // First run — populates the cache.
+        let logits1 =
+            forward_gdn2(&mut ctx, &weights, &mut cache, config.bos_token, 0, &config).to_vec();
+        assert!(!cache.layers[0].hippocampal_caches[0].is_empty());
+
+        // Reset.
+        cache.reset();
+        assert!(cache.layers[0].hippocampal_caches[0].is_empty());
+
+        // Second run — should match the first (same input, same fresh state).
+        let logits2 =
+            forward_gdn2(&mut ctx, &weights, &mut cache, config.bos_token, 0, &config).to_vec();
+
+        for (i, (a, b)) in logits1.iter().zip(logits2.iter()).enumerate() {
+            assert!(
+                (a - b).abs() < 1e-6,
+                "Logits[{i}] should match after reset: {a} vs {b}"
+            );
+        }
+    }
+
+    /// GQA + cache: forward_gdn2 with GQA config and cache enabled produces
+    /// finite logits. Verifies the per-KV-head cache indexing is correct when
+    /// n_head != n_kv_head.
+    #[cfg(feature = "hippocampal_cache")]
+    #[test]
+    fn forward_gdn2_cache_gqa_draft() {
+        let config = Config::gqa_draft(); // n_head=8, n_kv_head=2
+        let weights = random_weights(&config);
+        let mut ctx = ForwardContext::new(&config);
+        let mut cache = MultiLayerGdn2Cache::with_hippocampal_cache(&config, 8);
+
+        // Verify one cache per KV head (not per Q head).
+        assert_eq!(cache.layers[0].hippocampal_caches.len(), config.n_kv_head);
+
+        let logits = forward_gdn2(&mut ctx, &weights, &mut cache, config.bos_token, 0, &config);
+        assert_eq!(logits.len(), config.vocab_size);
+        for (i, &l) in logits.iter().enumerate() {
+            assert!(l.is_finite(), "GQA+cache logits[{i}] not finite: {l}");
+        }
+
+        // Multi-token streaming.
+        let mut rng = katgpt_core::types::Rng::new(42);
+        let mut tokens = Vec::new();
+        generate_gdn2_into(
+            &mut ctx,
+            &mut cache,
+            &weights,
+            &config,
+            &mut rng,
+            16,
+            &mut tokens,
+        );
+        assert_eq!(tokens.len(), 16);
+        for &t in &tokens {
+            assert!(t < config.vocab_size, "GQA+cache token {t} out of range");
         }
     }
 }

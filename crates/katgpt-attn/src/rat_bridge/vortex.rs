@@ -79,7 +79,7 @@ impl DilationBridgeRouter {
             .zip(gdn2_readout.iter())
             .map(|(q, r)| q * r)
             .sum();
-        self.last_gate = 1.0 / (1.0 + (-dot).exp()); // sigmoid
+        self.last_gate = katgpt_core::simd::fast_sigmoid(dot); // sigmoid via Cephes polynomial
 
         // Score each centroid
         self.centroids

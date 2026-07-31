@@ -28,7 +28,7 @@
 //!   component energy from queries (GOAT G3) and improves top-1 retrieval
 //!   accuracy by ≥5pp over raw cosine on synthetic OPD-style adapters (GOAT G4).
 
-use katgpt_core::simd::simd_dot_f32;
+use katgpt_core::simd::{fast_sigmoid, simd_dot_f32};
 
 /// Default sigmoid temperature for `OffPrincipalIndex::score_bounded`.
 ///
@@ -334,7 +334,7 @@ impl OffPrincipalIndex {
     ///
     /// Both `query_emb` and `adapter_emb` are projected off the principal
     /// subspace, then dotted. A scratch buffer of size `2 * (k + d)` is
-    /// allocated per call — for hot paths prefer [`project`] with a reused
+    /// allocated per call — for hot paths prefer `project` with a reused
     /// scratch and an explicit `simd_dot_f32`.
     ///
     /// **Paper §5.2**: this score is ≥5pp more discriminative than raw cosine
@@ -391,20 +391,6 @@ fn blake3_hash(bytes: &[f32]) -> [u8; 32] {
         std::slice::from_raw_parts(bytes.as_ptr() as *const u8, std::mem::size_of_val(bytes))
     };
     *blake3::hash(byte_slice).as_bytes()
-}
-
-/// Numerically stable sigmoid in `(0, 1)`. Reuses the same early-exit as
-/// `katgpt_core::simd::fast_sigmoid` but inlined here so this module compiles even
-/// if the SIMD path is disabled.
-#[inline(always)]
-fn fast_sigmoid(x: f32) -> f32 {
-    if x > 40.0 {
-        return 1.0;
-    }
-    if x < -40.0 {
-        return 0.0;
-    }
-    1.0 / (1.0 + (-x).exp())
 }
 
 // ---------------------------------------------------------------------------

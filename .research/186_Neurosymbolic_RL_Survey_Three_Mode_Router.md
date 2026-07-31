@@ -435,42 +435,44 @@ graph TD
 
 ## 9. Tasks
 
-- [ ] **F1:** Define `NeuroSymbolicMode` enum with `#[repr(u8)]` — 1 byte, 6 variants
-- [ ] **F1:** Implement `ModeFeatures` struct — 4× f32 (16 bytes, cache-line friendly)
-- [ ] **F1:** Implement `ThreeModeBandit` struct with 6 UCB1 arms
-- [ ] **F1:** Implement `compute_mixing_weights()` — sigmoid-gated, normalized to sum=1.0
-- [ ] **F1:** Implement `select_mode()` — O(1) lookup with feature-weighted arm selection
-- [ ] **F1:** Wire mode selection into DDTree step loop — before token selection
-- [ ] **F1:** Wire verification outcome back to bandit update — after compilation
-- [ ] **F1:** Feature gate: `three_mode_router`
-- [ ] **F1:** Test: verify mode switches on high-entropy vs low-entropy inputs
-- [ ] **F1:** Test: verify R4L weight increases on constraint-dense inputs
-- [ ] **F1:** Benchmark: mode selection overhead < 50ns per step
-- [ ] **F1:** GOAT gate: before/after accuracy on benchmark suite with router enabled
-- [ ] **F2:** Implement episode pattern miner (background task)
-- [ ] **F2:** Pattern extraction: frequent accepted-path token sequences with min support
-- [ ] **F2:** Acceptance rate filter: pattern must appear ≥N times with ≥90% acceptance
-- [ ] **F2:** Auto-generate ConstraintPruner rules from mined patterns
-- [ ] **F2:** Schedule mining: background between decode steps, not on hot path
-- [ ] **F2:** Feature gate: `auto_constraint_synthesis`
-- [ ] **F2:** Test: mine patterns from 100 episodes, verify constraint quality
-- [ ] **F2:** Benchmark: mining overhead < 100μs per batch
-- [ ] **F3:** Define verification tier budget configuration struct
-- [ ] **F3:** Implement `ExplorationBudget` with per-tier counters and conservative fallback
-- [ ] **F3:** Wire budget checks into verification pipeline
-- [ ] **F3:** Feature gate: `safe_exploration_budget`
-- [ ] **F3:** Test: verify budget limits are respected and conservative mode activates
-- [ ] **F3:** Benchmark: tier escalation overhead
-- [ ] **F4:** Implement `grounding_quality()` — KL divergence between pruned/unpruned marginals
-- [ ] **F4:** Wire grounding quality into ModeFeatures as fourth context feature
-- [ ] **F4:** Test: verify grounding quality correlates with mode effectiveness
-- [ ] **F4:** Benchmark: KL computation < 0.1μs per step
-- [ ] **F5:** Implement programmatic policy extraction from DDTree paths (overlaps 184 F4)
-- [ ] **F5:** Feature gate: `decision_traces` — opt-in, same gate as 184
-- [ ] **F5:** Test: verify extracted policies match manual analysis
-- [ ] **GOAT:** Run regression suite with `three_mode_router` + `auto_constraint_synthesis` enabled
-- [ ] **GOAT:** If no accuracy regression + no perf hurt → default-on for both feature gates
-- [ ] **GOAT:** CPU/GPU auto-route verification for F3 benchmark
+> **Implementation Status (2026-07-11):** All F1–F5 + GOAT tasks below implemented via [Plan 211](../.plans/211_three_mode_neuro_symbolic_router.md) — ✅ Complete (39/39 tasks done). Feature gates: `three_mode_router` (F1, DEFAULT-ON), `auto_constraint_synthesis` (F2, DEFAULT-ON), `safe_exploration_budget` (F3, opt-in), `concept_grounding` (F4, DEFAULT-ON), `decision_explain` (F5, DEFAULT-ON). The unchecked `- [ ]` markers below are stale; see Plan 211 for completion records.
+
+- [x] **F1:** Define `NeuroSymbolicMode` enum with `#[repr(u8)]` — 1 byte, 6 variants
+- [x] **F1:** Implement `ModeFeatures` struct — 4× f32 (16 bytes, cache-line friendly)
+- [x] **F1:** Implement `ThreeModeBandit` struct with 6 UCB1 arms
+- [x] **F1:** Implement `compute_mixing_weights()` — sigmoid-gated, normalized to sum=1.0
+- [x] **F1:** Implement `select_mode()` — O(1) lookup with feature-weighted arm selection
+- [x] **F1:** Wire mode selection into DDTree step loop — before token selection
+- [x] **F1:** Wire verification outcome back to bandit update — after compilation
+- [x] **F1:** Feature gate: `three_mode_router`
+- [x] **F1:** Test: verify mode switches on high-entropy vs low-entropy inputs
+- [x] **F1:** Test: verify R4L weight increases on constraint-dense inputs
+- [x] **F1:** Benchmark: mode selection overhead < 50ns per step
+- [x] **F1:** GOAT gate: before/after accuracy on benchmark suite with router enabled
+- [x] **F2:** Implement episode pattern miner (background task)
+- [x] **F2:** Pattern extraction: frequent accepted-path token sequences with min support
+- [x] **F2:** Acceptance rate filter: pattern must appear ≥N times with ≥90% acceptance
+- [x] **F2:** Auto-generate ConstraintPruner rules from mined patterns
+- [x] **F2:** Schedule mining: background between decode steps, not on hot path
+- [x] **F2:** Feature gate: `auto_constraint_synthesis`
+- [x] **F2:** Test: mine patterns from 100 episodes, verify constraint quality
+- [x] **F2:** Benchmark: mining overhead < 100μs per batch
+- [x] **F3:** Define verification tier budget configuration struct
+- [x] **F3:** Implement `ExplorationBudget` with per-tier counters and conservative fallback
+- [x] **F3:** Wire budget checks into verification pipeline
+- [x] **F3:** Feature gate: `safe_exploration_budget`
+- [x] **F3:** Test: verify budget limits are respected and conservative mode activates
+- [x] **F3:** Benchmark: tier escalation overhead
+- [x] **F4:** Implement `grounding_quality()` — KL divergence between pruned/unpruned marginals
+- [x] **F4:** Wire grounding quality into ModeFeatures as fourth context feature
+- [x] **F4:** Test: verify grounding quality correlates with mode effectiveness
+- [x] **F4:** Benchmark: KL computation < 0.1μs per step
+- [x] **F5:** Implement programmatic policy extraction from DDTree paths (overlaps 184 F4)
+- [x] **F5:** Feature gate: `decision_traces` — opt-in, same gate as 184
+- [x] **F5:** Test: verify extracted policies match manual analysis
+- [x] **GOAT:** Run regression suite with `three_mode_router` + `auto_constraint_synthesis` enabled
+- [x] **GOAT:** If no accuracy regression + no perf hurt → default-on for both feature gates
+- [x] **GOAT:** CPU/GPU auto-route verification for F3 benchmark
 
 ---
 

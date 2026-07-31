@@ -7,9 +7,9 @@ Proposal 003 Phase 8 destination map:
 
 | Item | LOC | Destination | Feature gate |
 |---|---|---|---|
-| `src/closure_wire.rs` | 451 | `katgpt-pruners/src/closure_wire.rs` | `closure_instrument` (new in katgpt-pruners) |
+| `crates/katgpt-pruners/src/closure_wire.rs` | 451 | `crates/katgpt-pruners/src/closure_wire.rs` | `closure_instrument` (new in katgpt-pruners) |
 | `src/screening/` (6 files) | 1756 | `katgpt-pruners/src/screening/` | `complexity_prior_sampler` + `mcts_k_prior`/`bandit_k_prior`/`spec_k_prior` (new in katgpt-pruners) |
-| `src/rerank.rs` | 526 | `katgpt-attn-match/src/rerank.rs` | `maxsim` + `bt_rank` (new in katgpt-attn-match) |
+| `crates/katgpt-attn-match/src/rerank.rs` | 526 | `crates/katgpt-attn-match/src/rerank.rs` | `maxsim` + `bt_rank` (new in katgpt-attn-match) |
 
 ## Pre-move audit findings
 
@@ -31,9 +31,9 @@ Proposal 003 Phase 8 destination map:
 
 ## Tasks
 
-- [x] T1. Copy `src/closure_wire.rs` → `crates/katgpt-pruners/src/closure_wire.rs`, fix imports
+- [x] T1. Copy `crates/katgpt-pruners/src/closure_wire.rs` → `crates/katgpt-pruners/src/closure_wire.rs`, fix imports
 - [x] T2. Copy `src/screening/*` → `crates/katgpt-pruners/src/screening/`, fix intra-module refs (none needed)
-- [x] T3. Copy `src/rerank.rs` → `crates/katgpt-attn-match/src/rerank.rs`, fix imports (none needed)
+- [x] T3. Copy `crates/katgpt-attn-match/src/rerank.rs` → `crates/katgpt-attn-match/src/rerank.rs`, fix imports (none needed)
 - [x] T4. Update `crates/katgpt-pruners/Cargo.toml` (new features) + `src/lib.rs` (new modules)
 - [x] T5. Update `crates/katgpt-attn-match/Cargo.toml` (add katgpt-core dep + new features) + `src/lib.rs`
 - [x] T6. Update root `Cargo.toml` (forward features to crates) + `src/lib.rs` (re-export shims)

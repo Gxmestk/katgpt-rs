@@ -120,15 +120,15 @@ impl KurtosisGate {
         self.scratch.clear();
 
         // Pass 1: max for numerical stability.
-        let max_logit = logits.iter().copied().fold(f32::NEG_INFINITY, f32::max);
+        let max_logit = katgpt_core::simd::simd_max_f32(logits);
 
-        // Pass 2: exp + running sum (no normalize — kurtosis is scale-invariant).
-        let mut sum: f32 = 0.0;
-        for &l in logits {
-            let p = (l - max_logit).exp();
-            self.scratch.push(p);
-            sum += p;
-        }
+        // Pass 2: SIMD shift + fused exp+sum into `self.scratch` (single buffer
+        // traversal). Cephes-backed exp (~1 ULP for |x| < 88) replaces libm
+        // `f32::exp`; kurtosis is scale-invariant so we skip the normalize pass.
+        self.scratch.extend_from_slice(logits);
+        let scratch = &mut self.scratch[..];
+        katgpt_core::simd::simd_add_scalar_inplace(scratch, -max_logit);
+        let sum = katgpt_core::simd::simd_exp_sum_inplace(scratch);
 
         if sum < f32::EPSILON {
             return false;

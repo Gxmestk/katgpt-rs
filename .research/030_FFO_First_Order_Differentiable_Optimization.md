@@ -117,7 +117,7 @@ The layer replaces f(x, y*) with cᵀy*(x) where c = detach(∂F/∂y*). This me
 |----------|-----------|-----------------|------|--------|
 | P0 | KKT Schur complement exact solver | riir-gpu LoRA/domain-latent training | Replace AdamW iterations with 1-shot exact solve for QP subproblems | Medium |
 | P1 | Dual-cutoff active constraint masking | ScreeningPruner variant | Better constraint activation via bandit Q-values (analogous to duals) | Small |
-| P2 | Cholesky-accelerated HLA kernel | `src/hla/kernel.rs` | Marginal throughput on AHLA update — Cholesky vs iterative solve | Medium |
+| P2 | Cholesky-accelerated HLA kernel | `riir-ai/crates/riir-engine/src/hla/kernel.rs` | Marginal throughput on AHLA update — Cholesky vs iterative solve | Medium |
 | P3 | Finite-difference hypergradient | Already covered by DDTree + BanditPruner | None — already captured by modelless distillation | N/A |
 
 ### P0: KKT Schur Complement for riir-gpu
@@ -341,7 +341,7 @@ Current ScreeningPruner uses bandit Q-values for pruning decisions. FFO's dual c
 
 ### P0: KKT Schur Complement — ✅ CLEAR WIN (Plan 067)
 
-**Implemented in** `riir-ai/crates/riir-gpu/src/schur.rs` (feature-gated `schur_exact`)
+**Implemented in** `riir-train/crates/riir-train-engine/src/schur.rs` (feature-gated `schur_exact`)
 
 | Metric | AdamW 100 steps | Schur 1-shot |
 |--------|-----------------|--------------|
@@ -355,7 +355,7 @@ Pure-Rust Cholesky decomposition (no LAPACK dependency) for small matrices (d �
 
 ### P1: Dual-Cutoff Active Masking — ❌ NO GAIN (Plan 062)
 
-**Implemented in** `katgpt-rs/src/pruners/bandit.rs` (`dual_cutoff` field, default 0.0 = disabled)
+**Implemented in** `katgpt-rs/crates/katgpt-ruliology/src/bandit.rs` (`dual_cutoff` field, default 0.0 = disabled)
 
 The plan hypothesized that ≥80% of bandit arms would already have near-zero relevance via soft `domain × bandit_q` blending, making hard cutoff redundant. **This was wrong** — with UCB1, 0% of arms had near-zero relevance because the exploration bonus inflates low-Q arm scores.
 

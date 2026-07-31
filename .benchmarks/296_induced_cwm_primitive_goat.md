@@ -184,7 +184,7 @@ Documented inline in each phase's rustdoc and in `.plans/296_induced_cwm_kernel_
 
 | Phase | Deviation | Rationale |
 |-------|-----------|-----------|
-| 1 (T1.2) | `induced_cwm_ismcts` does NOT depend on `game_state` feature | `game_state` lives in the ROOT crate, not katgpt-core. `GameState` trait is unconditional in `katgpt-core/src/traits.rs`. |
+| 1 (T1.2) | `induced_cwm_ismcts` does NOT depend on `game_state` feature | `game_state` lives in the ROOT crate, not katgpt-core. `GameState` trait is unconditional in `crates/katgpt-core/src/traits/mod.rs`. |
 | 1 (T1.4) | `CwmCommitment` uses `u64 version` not `Uuid snapshot_id` | Follows `micro_belief::MicroRecurrentKernelSnapshot` precedent. UUID deferred to swap-event layer (riir-ai Plan 326). |
 | 1 (T1.6) | `verify_transition` drops `kernel: &K` parameter | State IS the kernel under the codebase's `GameState` convention. Matches `mcts_search(state: &S, ...)` shape. |
 | 2 (T2.1) | ISMCTS simplified to per-iteration determinized MCTS with root info-set aggregation | Not full single-tree Cowling 2012. Sufficient for G2 gate on 1–2 ply decision problems. |

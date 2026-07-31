@@ -3,8 +3,8 @@
 //! Bridges the modelless [`katgpt_core::closure`] measurement layer to the
 //! concrete pruner runtimes used by the engine: [`BanditPruner`] and
 //! [`AbsorbCompressLayer`]. Provides a zero-cost decorator,
-//! [`PtgTracedPruner`], that wraps any [`ScreeningPruner`] and emits a
-//! [`PrimitiveTransitionGraph`] as a side-effect of normal operation.
+//! `PtgTracedPruner`, that wraps any `ScreeningPruner` and emits a
+//! `PrimitiveTransitionGraph` as a side-effect of normal operation.
 //!
 //! # What gets traced
 //!
@@ -17,7 +17,7 @@
 //! | compress()                     | `AbsorbCompress::compress`      | `COMPRESS_ID`       | `Branch`             |
 //!
 //! Bandit `update(arm, reward)` and any other domain-specific primitive
-//! invocations are traced via the explicit [`PtgTracedPruner::trace`]
+//! invocations are traced via the explicit `PtgTracedPruner::trace`
 //! method — call it at whatever granularity counts as a "primitive
 //! invocation" for your task family. (We don't auto-trace `update` because
 //! it is on `BanditPruner<P>`, not on `P` itself; the wrapper only sees the
@@ -26,8 +26,8 @@
 //! # Episode lifecycle
 //!
 //! PTGs are scoped per *episode* (one decode/game turn/etc.). The caller
-//! brackets an episode with [`PtgTracedPruner::start_episode`] and
-//! [`PtgTracedPruner::finish_episode`]. Between those calls, every
+//! brackets an episode with `PtgTracedPruner::start_episode` and
+//! `PtgTracedPruner::finish_episode`. Between those calls, every
 //! absorb/compress/trace event appends to the same PTG. `finish_episode`
 //! returns the materialized PTG; the caller hands it to a [`MotifMiner`]
 //! (typically via the sleep-cycle hook in `katgpt_core::mine_motifs_at_sleep_cycle`).

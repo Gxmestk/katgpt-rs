@@ -220,11 +220,7 @@ where
         };
 
         // 4. Sort by descending combined score.
-        scored.sort_unstable_by(|a, b| {
-            b.flow_score
-                .partial_cmp(&a.flow_score)
-                .unwrap_or(std::cmp::Ordering::Equal)
-        });
+        scored.sort_unstable_by(|a, b| b.flow_score.total_cmp(&a.flow_score));
 
         Ok(scored)
     }

@@ -40,7 +40,7 @@ katgpt-rs/src/dense_mesh/
 
 ### Phase 1 — Core Traits & Types (unblock) ✅
 
-- [x] Create `katgpt-rs/src/dense_mesh/mod.rs` with module declarations
+- [x] Create `katgpt-rs/crates/katgpt-transformer/src/dense_mesh/mod.rs` with module declarations
 - [x] Define `DenseHidden` type in `types.rs` — fixed-size hidden state buffer (`Box<[f32]>`), zero-alloc scratch reuse
 - [x] Define `Topology` struct in `types.rs` — `Vec<usize>` of layer widths (e.g., `[1,4,4,4,1]`), `LayerRole` enum (Input/Hidden/Output)
 - [x] Define `MeshConfig` in `types.rs` — topology, edge registry, compute thresholds
@@ -76,9 +76,9 @@ katgpt-rs/src/dense_mesh/
 ### Phase 5 — Adaptive Width & Compute Routing ✅
 
 - [x] Integrate with `CollapseAwareThinking` (P212) — entropy spike triggers width expansion
-  - **DONE 2026-06-14.** `dense_mesh/adaptive_width.rs::collapse_signal()` reads `CollapseDetector::hesitation_count()` / `threshold()` and returns `WidthDecision::{Contract,Neutral,Expand}` based on a configurable hysteresis band (default `[0.25, 0.75]`). Mirrors the `TvpExpansion` pattern in `S2FCollapseDetector`. Feature-gated on `collapse_aware_thinking`.
+  - **DONE 2026-06-14.** `crates/katgpt-transformer/src/dense_mesh/adaptive_width.rs::collapse_signal()` reads `CollapseDetector::hesitation_count()` / `threshold()` and returns `WidthDecision::{Contract,Neutral,Expand}` based on a configurable hysteresis band (default `[0.25, 0.75]`). Mirrors the `TvpExpansion` pattern in `S2FCollapseDetector`. Feature-gated on `collapse_aware_thinking`.
 - [x] Integrate with `BreakevenRouter` (P250) — breakeven analysis picks optimal width
-  - **DONE 2026-06-14.** `dense_mesh/adaptive_width.rs::breakeven_signal()` reads a `BreakevenSnapshot { cpu_to_gpu_amortized }` (constructed from `BreakevenBandit::stats()`) and returns `Expand` when the CPU→GPU upgrade has amortised, else `Contract`. Feature-gated on `breakeven_routing`.
+  - **DONE 2026-06-14.** `crates/katgpt-transformer/src/dense_mesh/adaptive_width.rs::breakeven_signal()` reads a `BreakevenSnapshot { cpu_to_gpu_amortized }` (constructed from `BreakevenBandit::stats()`) and returns `Expand` when the CPU→GPU upgrade has amortised, else `Contract`. Feature-gated on `breakeven_routing`.
   - **Decision rule:** collapse is the primary (quality) signal — non-`Neutral` collapse always wins. When collapse has no opinion, breakeven (cost signal) decides. Both `Neutral` → falls back to `Contract` (cheapest baseline, matches gate 1).
 - [x] Implement `pick_compute(width, layer_role)` in `compute_router.rs`:
   - `width == 1` → Cpu (no GPU launch overhead)
@@ -119,13 +119,13 @@ katgpt-rs/src/dense_mesh/
 
 ## Dependencies (existing modules reused — DRY)
 
-- `katgpt-rs/src/speculative/thinking_controller.rs` — ThinkingBandit (for EdgeBandit)
+- `katgpt-rs/crates/katgpt-speculative/src/thinking_controller.rs` — ThinkingBandit (for EdgeBandit)
 - `katgpt-rs/src/speculative/types.rs` — ForwardContext, scores
 - `katgpt-rs/src/types.rs` — LoRA weights, DomainLatent
 - `katgpt-rs/src/inference_router.rs` — compute target routing
-- `katgpt-rs/src/simd.rs` — SIMD primitives for aggregation
-- `katgpt-core/src/traits.rs` — ConstraintPruner pattern (for trait style)
-- `katgpt-rs/src/transformer.rs` — forward pass (DenseNode impl wraps this)
+- `katgpt-rs/crates/katgpt-dec/src/simd.rs` — SIMD primitives for aggregation
+- `crates/katgpt-core/src/traits/mod.rs` — ConstraintPruner pattern (for trait style)
+- `katgpt-rs/crates/katgpt-percepta/src/transformer.rs` — forward pass (DenseNode impl wraps this)
 
 ---
 

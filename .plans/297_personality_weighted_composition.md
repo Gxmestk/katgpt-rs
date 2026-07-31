@@ -25,18 +25,18 @@ Goal: a compiling, feature-gated module with the type surface frozen. No drift y
 - [x] **T1.1** Create `katgpt-rs/crates/katgpt-core/src/personality_composition/` directory with empty `mod.rs`
 - [x] **T1.2** Add feature flag `personality_composition = []` to `katgpt-rs/crates/katgpt-core/Cargo.toml` features section (alphabetical)
 - [x] **T1.3** Add `#[cfg(feature = "personality_composition")] pub mod personality_composition;` to `katgpt-rs/crates/katgpt-core/src/lib.rs` (alphabetical, after `peira` or similar)
-- [x] **T1.4** Implement `personality_composition/types.rs`:
+- [x] **T1.4** Implement `crates/katgpt-personality/src/types.rs`:
   - [x] `PersonalityConfig` struct (tau, alpha, w_max, ema_decay)
   - [x] `ArchetypeLabel` newtype (opaque label that seeds initial `w`; not interpreted by the kernel)
   - [x] Default impl: `tau = 1.0`, `alpha = 0.01`, `w_max = 5.0`, `ema_decay = 0.95`
-- [x] **T1.5** Implement `personality_composition/sigmoid.rs` — numerically stable sigmoid helper:
+- [x] **T1.5** Implement `crates/katgpt-personality/src/sigmoid.rs` — numerically stable sigmoid helper:
   - [x] `pub fn sigmoid(x: f32) -> f32` — branching impl per AGENTS.md (positive vs negative branch, no overflow)
   - [x] Vectorized variant `sigmoid_into(x: &[f32], out: &mut [f32])` for batch
-- [x] **T1.6** Implement `personality_composition/trait.rs`:
+- [x] **T1.6** Implement `crates/katgpt-core/src/content_store/trait.rs`:
   - [x] `pub trait LayerDirectionSource` with `direction(&self, scratch: &mut [f32]) -> &[f32]`
   - [x] `fn recent_direction(&self) -> &[f32]` (default: returns current direction)
   - [x] `fn belief_confidence(&self) -> f32 { 1.0 }` (default: plasma-tier layers)
-- [x] **T1.7** Implement `personality_composition/kernel.rs` — the composition struct:
+- [x] **T1.7** Implement `riir-ai/crates/riir-engine/src/hla/kernel.rs` — the composition struct:
   - [x] `pub struct PersonalityWeightedComposition<const N: usize, const D: usize>` with `w: [f32; N]`, config, `r_expected: [f32; N]`
   - [x] `pub fn new(config: PersonalityConfig, initial_w: [f32; N]) -> Self`
   - [x] `pub fn compose_into(&self, layers: &[&dyn LayerDirectionSource; N], scratch: &mut [f32], out: &mut [f32]) -> &mut [f32]` — the kernel: `out[j] += sigmoid(w[i]/tau) * belief_confidence[i] * d[i][j]`
@@ -45,7 +45,7 @@ Goal: a compiling, feature-gated module with the type surface frozen. No drift y
 ### Validation
 
 - [x] **T1.V1** `cargo build --features personality_composition` compiles cleanly
-- [x] **T1.V2** `cargo test --features personality_composition` — write `personality_composition/tests.rs` with: `compose_zero_weights_uniform`, `compose_extreme_positive_weight_selects_layer`, `compose_extreme_negative_weight_zeros_layer`, `compose_belief_confidence_decay_shrinks_contribution`
+- [x] **T1.V2** `cargo test --features personality_composition` — write `crates/katgpt-personality/src/tests.rs` with: `compose_zero_weights_uniform`, `compose_extreme_positive_weight_selects_layer`, `compose_extreme_negative_weight_zeros_layer`, `compose_belief_confidence_decay_shrinks_contribution`
 
 ---
 
@@ -75,7 +75,7 @@ Goal: extend `MicroRecurrentKernelSnapshot` (R242) to carry the `w` vector + arc
 
 ### Tasks
 
-- [x] **T3.1** Add `personality_composition/snapshot.rs`:
+- [x] **T3.1** Add `crates/katgpt-personality/src/snapshot.rs`:
   - [x] `pub struct PersonalitySnapshot<const N: usize>` with `w: [f32; N]`, `archetype: ArchetypeLabel`, `version: u64`, `blake3: [u8; 32]`
   - [x] `pub fn from_composition(composition: &PersonalityWeightedComposition<N, D>, archetype: ArchetypeLabel, version: u64) -> Self` — hashes `w` + archetype into BLAKE3
   - [x] `pub fn verify_blake3(&self) -> bool`
@@ -101,7 +101,7 @@ Goal: prove G4 (<1µs/entity) and G5 (zero heap allocation).
 - [x] **T4.2** SIMD auto-vectorization:
   - [x] Verify LLVM auto-vectorizes the inner `for j in 0..D { out[j] += weight * d[j] }` loop (check `cargo asm`)
   - [x] If not auto-vectorized, use `katgpt-core::simd::simd_fused_scale_acc` or similar
-- [x] **T4.3** Add `benches/personality_composition_bench.rs` (criterion):
+- [x] **T4.3** Add `riir-ai/crates/riir-engine/benches/personality_composition_bench.rs` (criterion):
   - [x] `compose_n9_d32` — N=9, D=32 (the production case)
   - [x] `compose_n9_d32_batch_10k` — 10K entities per tick (the crowd-scale case)
   - [x] `drift_n9_d32` — drift update cost
@@ -123,8 +123,8 @@ Goal: feature flag → default; README updated.
 
 - [x] **T5.1** If G4/G5 pass: add `personality_composition` to default features in `katgpt-rs/Cargo.toml`
 - [x] **T5.2** Add Feature Showcase section to `katgpt-rs/README.md` (1 paragraph + the kernel formula + the trait surface)
-- [x] **T5.3** Add `examples/personality_composition_01_basic.rs` — minimal demo: 3 layers, drift over 100 ticks, show weights converge
-- [x] **T5.4** Add `examples/personality_composition_02_taming.rs` — minimal demo: wildlife entity, food reward, show `w_COMPANIONS(player)` rises above `τ_tame` (the open-primitive half of the taming story; the species-swap happens in the host/riir-ai)
+- [x] **T5.3** Add `crates/katgpt-core/examples/personality_composition_01_basic.rs` — minimal demo: 3 layers, drift over 100 ticks, show weights converge
+- [x] **T5.4** Add `crates/katgpt-core/examples/personality_composition_02_taming.rs` — minimal demo: wildlife entity, food reward, show `w_COMPANIONS(player)` rises above `τ_tame` (the open-primitive half of the taming story; the species-swap happens in the host/riir-ai)
 - [x] **T5.5** Cross-link `katgpt-rs/.research/276_*.md` to this plan in the "Status" line
 
 ---
@@ -144,5 +144,5 @@ Goal: feature flag → default; README updated.
 
 - **Research:** [276 (this plan's parent)](../.research/276_Personality_Weighted_Latent_Layer_Composition.md)
 - **Companion (riir-ai):** [Research 146](../../../riir-ai/.research/146_Entity_Cognition_Stack_Guide.md), [Plan 327](../../../riir-ai/.plans/327_entity_cognition_stack_runtime.md) (runtime wiring)
-- **Depends on:** R242 (`MicroRecurrentKernelSnapshot` in `micro_belief/snapshot.rs`) — Phase 3 extends this
+- **Depends on:** R242 (`MicroRecurrentKernelSnapshot` in `crates/katgpt-micro-belief/src/snapshot.rs`) — Phase 3 extends this
 - **Does NOT depend on:** game systems (entity-agnostic), chain (host responsibility), LatCal (host responsibility)

@@ -10,10 +10,10 @@
 //!
 //! Run: `cargo test --features rat_plus_bridge --test goat_225_rat_bridge -- --nocapture`
 
-use katgpt_core::types::DilationConfig;
 use katgpt_attn::rat_bridge::{
     DilatedKvAccessor, DilationBridgeRouter, RatBridgeState, bridge_attention, rat_decode_step,
 };
+use katgpt_core::types::DilationConfig;
 
 // ── T6.1: Bridge Attention Output Dims ─────────────────────────
 

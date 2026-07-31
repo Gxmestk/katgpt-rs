@@ -17,13 +17,13 @@
 
 use std::time::Instant;
 
-use katgpt_speculative::spechop::{CrossHopConfig, observation_velocity};
 use katgpt_rs::speculative::{
     CrossScaleConfig, NoScreeningPruner, build_dd_tree_screened, build_dd_tree_screened_recfm,
     extract_best_path,
 };
 use katgpt_rs::tf_loop::{AccelBoundConfig, sub_step_damped_euler, sub_step_damped_euler_bounded};
 use katgpt_rs::types::Config;
+use katgpt_speculative::spechop::{CrossHopConfig, observation_velocity};
 
 // ── Helpers ──────────────────────────────────────────────────────────────
 

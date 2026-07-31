@@ -78,7 +78,7 @@ For Config::micro (embd=16): MLP has ~1.5K params. For Config::bpe (embd=32): ~6
 
 ### Phase 0: Types & MLP Forward
 - [x] Add `belief_drafter` feature gate to `crates/katgpt-core/src/lib.rs` and `src/lib.rs`
-- [x] Add `LatentDynamicsMLP` struct to `src/speculative/belief_drafter.rs`
+- [x] Add `LatentDynamicsMLP` struct to `crates/katgpt-speculative/src/belief_drafter.rs`
 - [x] Implement `forward(&self, h_t: &[f32], next_emb: &[f32]) -> Vec<f32>` with SIMD matmul
 - [x] Implement `load_from_bin(path: &Path) -> Result<LatentDynamicsMLP>` for riir-ai export
 - [x] Implement `random_init(config: &Config) -> LatentDynamicsMLP` for untrained mode

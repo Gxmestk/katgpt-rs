@@ -4,7 +4,7 @@
 **Plan:** [`katgpt-rs/.plans/419_canvas_schema_compiler.md`](../.plans/419_canvas_schema_compiler.md)
 **Research:** [`katgpt-rs/.research/398_Canvas_Engineering_Declared_Causal_Topology_Compiler.md`](../.research/398_Canvas_Engineering_Declared_Causal_Topology_Compiler.md)
 **Source paper:** Valdez, *Canvas Engineering* (CommandAGI, July 2026)
-**Bench:** `katgpt-core/benches/bench_419_canvas_schema_goat.rs`
+**Bench:** `crates/katgpt-core/benches/bench_419_canvas_schema_goat.rs`
 **Verdict:** ✅ **PASS (all gates G1–G6)**
 
 ---

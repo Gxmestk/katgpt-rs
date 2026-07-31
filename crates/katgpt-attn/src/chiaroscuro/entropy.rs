@@ -13,10 +13,10 @@
 //!
 //! # Relation to existing code
 //!
-//! - [`crate::irrep_pruner::spectral_flatness`] uses **FFT** on **logits** with
+//! - `crate::irrep_pruner::spectral_flatness` uses **FFT** on **logits** with
 //!   Wiener entropy (geometric/arithmetic mean ratio). Different signal, different
 //!   domain. CHIAR's H(x) is Shannon entropy of **DCT** of **embeddings**.
-//! - [`crate::freq_bandit`] uses temporal DFT of token streams. CHIAR uses
+//! - `crate::freq_bandit` uses temporal DFT of token streams. CHIAR uses
 //!   per-embedding DCT — same toolkit, orthogonal axis.
 //!
 //! # Complexity
@@ -137,15 +137,13 @@ pub fn spectral_entropy_dct_into(
 
 /// Standard sigmoid. Used for any gating decision (NOT softmax — per project constraint).
 ///
-/// Branches on sign to avoid `exp()` overflow for large negative inputs.
+/// Delegates to [`katgpt_core::simd::fast_sigmoid`] (Cephes 6th-order polynomial
+/// for `exp`, ~1 ULP accurate, ~1.7× faster than libm `exp` on aarch64).
+/// Result is in `(0, 1)` for all finite inputs, saturating to `0.0` / `1.0`
+/// for `|x| > 40` (the f32 precision floor).
 #[inline]
 pub fn sigmoid(x: f32) -> f32 {
-    if x >= 0.0 {
-        1.0 / (1.0 + (-x).exp())
-    } else {
-        let ex = x.exp();
-        ex / (1.0 + ex)
-    }
+    katgpt_core::simd::fast_sigmoid(x)
 }
 
 #[cfg(test)]

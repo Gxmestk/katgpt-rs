@@ -28,6 +28,7 @@
 use crate::d2f::{D2fDecodeConfig, d2f_decode_block_with_prompt_with};
 use crate::d2f_context::D2fContext;
 use crate::{ForwardContext, forward};
+use katgpt_core::simd::simd_max_f32;
 use katgpt_core::speculative::sampling::sample_from_distribution;
 use katgpt_core::traits::{NoPruner, NoScreeningPruner};
 use katgpt_speculative::SpeculativeVerifier;
@@ -176,11 +177,11 @@ pub fn dual_path_draft(
 /// Compute per-position ternary consensus code and accepted token.
 ///
 /// For each position:
-///   - ternary = 0  if h_tokens[i] == v_tokens[i] (AGREE)
-///   - ternary = +1 if h_tokens[i] != v_tokens[i] AND h_conf[i] > v_conf[i] (H wins)
-///   - ternary = -1 if h_tokens[i] != v_tokens[i] AND v_conf[i] >= h_conf[i] (V wins)
+///   - ternary = 0  if `h_tokens[i] == v_tokens[i]` (AGREE)
+///   - ternary = +1 if `h_tokens[i] != v_tokens[i]` AND `h_conf[i] > v_conf[i]` (H wins)
+///   - ternary = -1 if `h_tokens[i] != v_tokens[i]` AND `v_conf[i] >= h_conf[i]` (V wins)
 ///
-/// Accepted token is h_tokens[i] if ternary >= 0, else v_tokens[i].
+/// Accepted token is `h_tokens[i]` if ternary >= 0, else `v_tokens[i]`.
 pub fn compute_ternary_consensus(
     h_tokens: &[usize],
     v_tokens: &[usize],
@@ -441,12 +442,15 @@ impl SpeculativeVerifier for FlashARConsensusVerifier<'_> {
             if logits_offset + draft_config.vocab_size <= self.d2f_ctx.logits_flat.len() {
                 let logits_p = &self.d2f_ctx.logits_flat
                     [logits_offset..logits_offset + draft_config.vocab_size];
-                let max_logit = logits_p.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
+                let max_logit = simd_max_f32(logits_p);
                 // Fused pass: accumulate sum_exp and track top1 prob.
+                // Scalar `fast_exp` (not SIMD): top1 tracking branch interleaved
+                // with the exp.
+                use katgpt_core::simd::fast_exp;
                 let mut sum_exp = 0.0f32;
                 let mut top1 = 0.0f32;
                 for &l in logits_p {
-                    let p = (l - max_logit).exp();
+                    let p = fast_exp(l - max_logit);
                     sum_exp += p;
                     if p > top1 {
                         top1 = p;
@@ -798,7 +802,7 @@ mod tests {
                 &target_weights,
                 &config,
                 d2f_config,
-                consensus_config.clone(),
+                consensus_config,
                 4,
             );
             verifier.speculate(

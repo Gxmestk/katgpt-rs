@@ -43,6 +43,20 @@ mod datrie;
 #[cfg(feature = "toast_tokenizer")]
 pub use datrie::{DatrieTreeIndex, DatrieVocab};
 
+// ── fast_bpe — gigatoken-derived fast BPE encode path (Issue 191, Research 456) ──
+//
+// Vendored from gigatoken's pure-Rust `bpe/` core (PairRankTable + branchless
+// merge cores + ShortPretokenCache substrate). Ships behind the `fast_bpe`
+// feature flag; the GOAT gate lives in `tests/fast_bpe_goat.rs`.
+
+#[cfg(feature = "fast_bpe")]
+mod fast_bpe;
+
+#[cfg(feature = "fast_bpe")]
+pub use bpe::FastBpeEncoder;
+#[cfg(feature = "fast_bpe")]
+pub use fast_bpe::{MergeScratch, PairRankTable, PairRankTableBuildError, TokenId as FastTokenId};
+
 // ── ConvexTok LP Vocabulary Optimizer (Plan 127, Research 087) ──
 
 #[cfg(feature = "convex_tok")]

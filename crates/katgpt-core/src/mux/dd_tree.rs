@@ -95,10 +95,23 @@ impl MuxNode {
 }
 
 /// Shannon entropy of a probability distribution (in nats).
-/// Zero-alloc, branch-free inner loop.
-#[cfg(feature = "comp_width")]
+/// Zero-alloc. Inner loop uses `pmax(pn, 0.0).ln()` (compiles to `fmax`) so
+/// LLVM can auto-vectorize without a data-dependent branch per element —
+/// matches the pattern in `dllm_solver::shannon_entropy`.
+///
+/// Returns 0.0 when `total <= 0.0`. Callers that already have the sum should
+/// prefer [`shannon_entropy_with_total`] to avoid recomputing it.
+#[cfg(all(test, feature = "comp_width"))]
 pub(crate) fn shannon_entropy(peaks: &[f32]) -> f32 {
     let total: f32 = peaks.iter().sum();
+    shannon_entropy_with_total(peaks, total)
+}
+
+/// Same as [`shannon_entropy`] but skips the internal `peaks.iter().sum()`
+/// when the caller has already computed it (e.g. `detect_width_with_peaks`
+/// needs the sum for the `total <= 0.0` early-out anyway).
+#[cfg(feature = "comp_width")]
+pub(crate) fn shannon_entropy_with_total(peaks: &[f32], total: f32) -> f32 {
     if total <= 0.0 {
         return 0.0;
     }
@@ -106,14 +119,16 @@ pub(crate) fn shannon_entropy(peaks: &[f32]) -> f32 {
     let mut h = 0.0f32;
     for &p in peaks {
         let pn = p * inv_total;
-        if pn > 0.0 {
-            h -= pn * pn.ln();
-        }
+        // Branch-free: `pn.max(1e-10).ln()` compiles to `fmax`. Avoids the
+        // `0 * -inf = NaN` trap that a naive `pn.max(0.0).ln()` would hit.
+        // Matches the pattern in `dllm_solver::shannon_entropy`.
+        let lp = pn.max(1e-10).ln();
+        h -= pn * lp;
     }
     h
 }
 
-/// Compositional DDTree partner-entropy width (Plan 205, Research 181).
+/// Compositional DDtree partner-entropy width (Plan 205, Research 181).
 ///
 /// Replaces binary `PEAK_DOMINANCE_RATIO` with continuous scaling.
 /// Maps normalized entropy ∈ [0, 1] → width ∈ [1, base]:
@@ -129,9 +144,20 @@ pub(crate) fn shannon_entropy(peaks: &[f32]) -> f32 {
 ///
 /// Uses CM isotropic scale internally for the norm estimate:
 /// `s = (normalized + damping).recip().sqrt()` — one division, one sqrt, zero-alloc.
-#[cfg(feature = "comp_width")]
+#[cfg(all(test, feature = "comp_width"))]
 pub(crate) fn compositional_width(peaks: &[f32], base: usize) -> usize {
-    let entropy = shannon_entropy(peaks);
+    let total: f32 = peaks.iter().sum();
+    compositional_width_with_total(peaks, base, total)
+}
+
+/// Same as [`compositional_width`] but reuses a caller-computed `total`
+/// (Σ peaks). The hot path in `MuxBfs::detect_width_with_peaks` already
+/// needs the sum for its `total <= 0.0` early-out, so this elides a
+/// redundant `peaks.iter().sum()` (one full scan over ≤ `MAX_TOP_K`
+/// floats) on every BFS leaf expansion.
+#[cfg(feature = "comp_width")]
+pub(crate) fn compositional_width_with_total(peaks: &[f32], base: usize, total: f32) -> usize {
+    let entropy = shannon_entropy_with_total(peaks, total);
     // max entropy for uniform distribution over len items: ln(n)
     let max_entropy = (peaks.len() as f32).ln();
     if max_entropy <= 0.0 {
@@ -219,17 +245,16 @@ impl MuxDdTree {
         let child_len = peaks.len().min(self.k);
         let child_weights: Arc<[f32]> = Arc::from(&peaks[..child_len]);
         node.children.reserve(effective_width);
-        let mut child_token_buf = vec![0u32; child_len];
         for i in 0..effective_width {
-            // Distribute peaks across children: each child gets a shifted view
+            // Distribute peaks across children: each child gets a shifted view.
+            // Build the token Vec directly (avoids an intermediate buffer + clone).
             let offset = (i * self.k / effective_width).min(peaks.len());
-            for (j, slot) in child_token_buf.iter_mut().enumerate() {
-                *slot = (offset + j) as u32;
+            let mut tokens = Vec::with_capacity(child_len);
+            for j in 0..child_len {
+                tokens.push((offset + j) as u32);
             }
-            node.children.push(MuxNode::new(
-                child_token_buf.clone(),
-                Arc::clone(&child_weights),
-            ));
+            node.children
+                .push(MuxNode::new(tokens, Arc::clone(&child_weights)));
         }
 
         // Track maximum depth
@@ -315,7 +340,7 @@ impl MuxDdTree {
 
         #[cfg(feature = "comp_width")]
         {
-            let width = compositional_width(peaks, self.k);
+            let width = compositional_width_with_total(peaks, self.k, total);
             width.max(1)
         }
 

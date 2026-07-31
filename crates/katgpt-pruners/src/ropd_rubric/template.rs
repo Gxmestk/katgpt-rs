@@ -76,8 +76,8 @@ impl std::fmt::Display for RubricCriterion {
 ///
 /// # Construction
 ///
-/// Use the built-in domain constructors ([`bomber()`], [`fft_tactics()`], [`generic()`])
-/// or build custom templates with [`new()`] and [`with_criterion()`].
+/// Use the built-in domain constructors ([`bomber()`](RubricTemplate::bomber), [`fft_tactics()`](RubricTemplate::fft_tactics), [`generic()`](RubricTemplate::generic))
+/// or build custom templates with [`new()`](RubricTemplate::new) and [`with_criterion()`](RubricTemplate::with_criterion).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RubricTemplate {
     /// (criterion, weight) pairs — ordered by convention, weights > 0.

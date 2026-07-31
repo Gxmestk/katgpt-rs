@@ -37,54 +37,12 @@ const D: usize = 64;
 const N: usize = 20;
 const K: usize = 8;
 
-/// Deterministic LCG for reproducible pseudo-randomness.
-fn lcg_next(state: &mut u64) -> f32 {
-    *state = state
-        .wrapping_mul(6364136223846793005)
-        .wrapping_add(1442695040888963407);
-    ((*state >> 33) as f32) / (1u64 << 31) as f32 - 0.5
-}
-
-/// L2 normalize a vector in place.
-fn l2_normalize(v: &mut [f32]) {
-    let mut s = 0.0f32;
-    for &x in v.iter() {
-        s += x * x;
-    }
-    let norm = s.sqrt().max(1e-12);
-    for x in v.iter_mut() {
-        *x /= norm;
-    }
-}
-
-/// Gram-Schmidt orthogonalize the rows of `w` (k rows, d cols, row-major).
-fn gram_schmidt_rows(w: &mut [f32], k: usize, d: usize) {
-    for i in 0..k {
-        for j in 0..i {
-            let mut dot = 0.0f32;
-            for l in 0..d {
-                dot += w[i * d + l] * w[j * d + l];
-            }
-            for l in 0..d {
-                w[i * d + l] -= dot * w[j * d + l];
-            }
-        }
-        l2_normalize(&mut w[i * d..(i + 1) * d]);
-    }
-}
-
-/// Cosine similarity between two flattened vectors.
-fn cosine(a: &[f32], b: &[f32]) -> f32 {
-    let mut dot = 0.0f32;
-    let mut na = 0.0f32;
-    let mut nb = 0.0f32;
-    for i in 0..a.len() {
-        dot += a[i] * b[i];
-        na += a[i] * a[i];
-        nb += b[i] * b[i];
-    }
-    dot / (na.sqrt() * nb.sqrt()).max(1e-12)
-}
+// Shared Plan 332 basis-harness helpers — see `common/basis_harness.rs`.
+// All 5 helpers (`lcg_next`, `l2_normalize`, `gram_schmidt_rows`, `cosine`,
+// `random_orthonormal_w`) are bit-identical to `funcattn_structured_basis_k_sweep.rs`.
+#[path = "common/basis_harness.rs"]
+mod basis_harness;
+use basis_harness::{cosine, gram_schmidt_rows, l2_normalize, lcg_next, random_orthonormal_w};
 
 /// Build the multi-scale input X (matches the Phase 0 probe exactly so the
 /// +0.11 cos hand-crafted gain is the upper bound we measure against).
@@ -117,16 +75,7 @@ fn make_multiscale_x(seed: u64, n_scales: usize) -> (Vec<f32>, Vec<f32>) {
     (x, dirs)
 }
 
-/// Random row-orthonormal `(k, d)` matrix.
-fn random_orthonormal_w(seed: u64, k: usize, d: usize) -> Vec<f32> {
-    let mut s = seed;
-    let mut w = vec![0.0f32; k * d];
-    for v in w.iter_mut() {
-        *v = lcg_next(&mut s);
-    }
-    gram_schmidt_rows(&mut w, k, d);
-    w
-}
+// `random_orthonormal_w` lives in the `basis_harness` shared module.
 
 /// Hand-crafted structured basis aligned to the known signal directions — the
 /// UPPER BOUND from the Phase 0 probe (+0.11 cos over random). Cheats by

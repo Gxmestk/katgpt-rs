@@ -32,16 +32,16 @@ ROTATE (Rotation-Optimized Token Alignment in weighT spacE) is a data-free metho
 
 | Component | Status | Location |
 |-----------|--------|----------|
-| `excess_kurtosis()` | ✅ Shipped | `src/speculative/kurtosis_gate.rs` |
-| `KurtosisGate` | ✅ Shipped | `src/speculative/kurtosis_gate.rs` |
-| `SelectivityRouter` | ✅ Shipped | `src/speculative/selectivity_router.rs` |
-| `ConstraintPruner` trait | ✅ Shipped | `crates/katgpt-core/src/traits.rs` |
-| `ScreeningPruner` trait | ✅ Shipped | `crates/katgpt-core/src/traits.rs` |
+| `excess_kurtosis()` | ✅ Shipped | `crates/katgpt-speculative/src/kurtosis_gate.rs` |
+| `KurtosisGate` | ✅ Shipped | `crates/katgpt-speculative/src/kurtosis_gate.rs` |
+| `SelectivityRouter` | ✅ Shipped | `crates/katgpt-speculative/src/selectivity_router.rs` |
+| `ConstraintPruner` trait | ✅ Shipped | `crates/katgpt-core/src/traits/mod.rs` |
+| `ScreeningPruner` trait | ✅ Shipped | `crates/katgpt-core/src/traits/mod.rs` |
 | DDTree + kurtosis integration | ✅ Shipped | `src/speculative/dd_tree.rs` |
-| Givens rotations | ✅ Shipped | `src/planar_quant/rotation.rs` |
+| Givens rotations | ✅ Shipped | `crates/katgpt-quant/src/planar_quant/rotation.rs` |
 | `sparse_matmul` | ✅ Shipped | MLP forward with dead ReLU skip |
-| CNA neuron attribution | ✅ Shipped | `src/pruners/cna.rs` |
-| Vocabulary projection (lm_head) | ✅ Exists | `src/transformer.rs` |
+| CNA neuron attribution | ✅ Shipped | `crates/katgpt-pruners/src/cna.rs` |
+| Vocabulary projection (lm_head) | ✅ Exists | `crates/katgpt-percepta/src/transformer.rs` |
 
 ### What's Missing (the gap)
 

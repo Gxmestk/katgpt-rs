@@ -66,7 +66,7 @@ then `prefill` scorers (only test dep on `verifier`/`step`).
 - [x] T1.4 Root `src/speculative/mod.rs`: replace `pub mod drafter_lora;` with
       `pub use katgpt_forward::drafter_lora;`. Update `pub use drafter_lora::{...}`
       (lines 176-179) to keep working via the re-export.
-- [x] T1.5 Delete root `src/speculative/drafter_lora.rs`.
+- [x] T1.5 Delete root `crates/katgpt-forward/src/drafter_lora.rs`.
 - [x] T1.6 `cargo check --workspace` clean.
 
 ## Phase 2 — Move `dflash.rs` (1731 LOC, no sibling deps)
@@ -85,7 +85,7 @@ then `prefill` scorers (only test dep on `verifier`/`step`).
       (including feature-gated `_with_fusion`, `_with_domino`, `_with_routing`).
 - [x] T2.4 Root `src/speculative/mod.rs`: replace `pub mod dflash;` with
       `pub use katgpt_forward::dflash;`.
-- [x] T2.5 Delete root `src/speculative/dflash.rs`.
+- [x] T2.5 Delete root `crates/katgpt-speculative/src/dflash.rs`.
 - [x] T2.6 `cargo check --workspace` clean (default / all-features).
 
 ## Phase 3 — Move `verifier.rs` (920 LOC, depends on dflash + drafter_lora)
@@ -104,7 +104,7 @@ then `prefill` scorers (only test dep on `verifier`/`step`).
       `pub use katgpt_forward::verifier;`.
 - [x] T3.5 `d2f_verifier.rs` + `flashar_consensus.rs` continue to resolve
       `crate::speculative::verifier::SpeculativeVerifier` via the re-export.
-- [x] T3.6 Delete root `src/speculative/verifier.rs`.
+- [x] T3.6 Delete root `crates/katgpt-speculative/src/spechop/verifier.rs`.
 - [x] T3.7 `cargo check --workspace` clean (default / all-features / no-default).
 
 ## Phase 4 — Move `step.rs` (1852 LOC, depends on verifier + dflash)

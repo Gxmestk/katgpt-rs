@@ -47,13 +47,11 @@ impl SenseLodRouter {
     }
 
     pub fn route(&self, distance: f32) -> SenseLodLevel {
-        if distance <= self.sigma1 {
-            return SenseLodLevel::Full;
+        match distance {
+            d if d <= self.sigma1 => SenseLodLevel::Full,
+            d if d <= self.sigma2 => SenseLodLevel::Compressed,
+            _ => SenseLodLevel::Minimal,
         }
-        if distance <= self.sigma2 {
-            return SenseLodLevel::Compressed;
-        }
-        SenseLodLevel::Minimal
     }
 
     pub fn from_boundaries(boundaries: &[ScaleBoundary]) -> Option<Self> {

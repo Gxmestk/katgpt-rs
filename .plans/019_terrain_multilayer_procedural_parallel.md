@@ -22,7 +22,7 @@
 
 ### Tasks
 
-- [x] Create `examples/tactical_terrain.rs`
+- [x] Create `examples/tactical_02_terrain.rs`
 - [x] Define terrain maps:
   - [x] **Desert crossing**: sand (`~`) shortcut vs grass (`.`) detour
   - [x] **River crossing**: water (`w`) expensive but direct, bridge (`.`) circuitous
@@ -166,23 +166,23 @@ Each floor row shows:
 
 ### Tasks
 
-- [x] Create `src/pruners/dungeon_pruner.rs`:
+- [x] Create `crates/katgpt-pruners/src/dungeon_pruner.rs`:
   - [x] `DungeonMap` struct (floors, stairs, targets)
   - [x] `DungeonState` struct (adds `floor` field)
   - [x] `DungeonPruner` (multi-floor movement, combat, stairs)
   - [x] `DungeonPruner::apply_action` (actions 0-5)
   - [x] `DungeonPruner::terrain_cost` (per-floor terrain)
-- [x] Create `src/pruners/dungeon_pathfinder.rs`:
+- [x] Create `crates/katgpt-pruners/src/dungeon_pathfinder.rs`:
   - [x] `find_path_multifloor` (cross-floor A*)
   - [x] `find_path_on_floor` (delegates to existing `find_path`)
   - [x] `StairConnection` struct
-- [x] Create `examples/dungeon_multifloor.rs`:
+- [x] Create `examples/dungeon_02_multifloor.rs`:
   - [x] 2-floor dungeon: B1 (monsters + treasures) → B2 (more monsters + goal)
   - [x] 3-floor dungeon: F1 (start) → F2 (monsters) → F3 (goal)
   - [x] Strategic DDtree with multi-floor targets
   - [x] Print floor-by-floor solution
   - [x] Verify all assertions
-- [x] Create `examples/dungeon_tui.rs`:
+- [x] Create `examples/dungeon_01_tui.rs`:
   - [x] Floors sidebar (leftmost panel, floor list with ◀ indicator)
   - [x] Current floor map (stairs rendered as 🪜⬇/🪜⬆)
   - [x] State panel (add floor number, stairs positions)
@@ -240,14 +240,14 @@ impl MapGenerator {
 ### Tasks
 
 - [x] Add `fastrand` dependency to Cargo.toml (lightweight RNG)
-- [x] Create `src/pruners/map_generator.rs`:
+- [x] Create `crates/katgpt-pruners/src/map_generator.rs`:
   - [x] `MapGenerator` struct with configuration
   - [x] `generate_single_floor` (random solvable map)
   - [x] `generate_multi_floor` (random multi-layer dungeon)
   - [x] `ensure_connectivity` (BFS check: all targets reachable from start)
   - [x] `add_terrain_patches` (sand/water clusters)
 - [x] Add `mod map_generator` to `src/pruners/mod.rs`
-- [x] Create `examples/tactical_procedural.rs`:
+- [x] Create `examples/tactical_03_procedural.rs`:
   - [x] Generate 10 random single-floor maps
   - [x] Generate 5 random multi-floor dungeons
   - [x] Solve each, print solvability rate + stats
@@ -277,7 +277,7 @@ let results: Vec<SolveResult> = maps
 
 ### Tasks
 
-- [x] Create `examples/tactical_parallel.rs`:
+- [x] Create `examples/tactical_04_parallel.rs`:
   - [x] Generate N maps procedurally (Phase 3)
   - [x] Solve sequentially: measure total time
   - [x] Solve in parallel with rayon: measure total time

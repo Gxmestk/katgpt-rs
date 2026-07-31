@@ -70,7 +70,7 @@ impl EigenvalueTracker {
 
     /// Compute per-index z-score of `current` eigenvalue window against baseline.
     ///
-    /// Returns a vector of z-scores: (current[i] - mean[i]) / std[i].
+    /// Returns a vector of z-scores: `(current[i] - mean[i]) / std[i]`.
     /// Negative z-scores indicate eigenvalue collapse relative to baseline.
     pub fn eigenspace_zscore(&self, current: &[f32]) -> Vec<f32> {
         let mut out = Vec::with_capacity(current.len());
@@ -78,7 +78,7 @@ impl EigenvalueTracker {
         out
     }
 
-    /// Zero-allocation variant of [`eigenspace_zscore`] that writes into `out`.
+    /// Zero-allocation variant of `eigenspace_zscore` that writes into `out`.
     ///
     /// `out` is cleared and filled. Callers can pre-allocate once and reuse.
     pub fn eigenspace_zscore_into(&self, current: &[f32], out: &mut Vec<f32>) {
@@ -109,7 +109,7 @@ impl EigenvalueTracker {
         Self::eigenvalue_jaccard_with_buffers(prev, curr, top_k, false, &mut a, &mut b)
     }
 
-    /// Zero-allocation variant of [`eigenvalue_jaccard`] with reusable scratch buffers.
+    /// Zero-allocation variant of `eigenvalue_jaccard` with reusable scratch buffers.
     ///
     /// When `sorted_desc` is true, eigenvalues are assumed already sorted
     /// descending so the top-k indices are `[0..k]` (no sorting needed).

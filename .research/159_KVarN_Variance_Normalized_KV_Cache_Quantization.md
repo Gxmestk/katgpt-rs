@@ -192,7 +192,7 @@ return tile / s_col_best / s_row_best, s_col_best, s_row_best
 
 ### 4.2 Hadamard Transform (Power-of-2)
 
-Already implemented in `shard_kv/kv_cache.rs::hadamard_transform_inplace()`. KVarN uses the same Walsh-Hadamard transform. Can reuse directly.
+Already implemented in `crates/katgpt-kv/src/shard_kv/kv_cache.rs::hadamard_transform_inplace()`. KVarN uses the same Walsh-Hadamard transform. Can reuse directly.
 
 ### 4.3 Dual-Scale Dequantization
 

@@ -28,7 +28,7 @@ impl GraphBuilder {
     /// 2. Build free edges: connect adjacent vertices within each string.
     /// 3. Build priced edges: connect non-adjacent vertices (span ≥ 2 bytes).
     /// 4. Assign colours: group priced edges by byte-substring.
-    /// 5. Build flow vector: d[source] = -1, d[sink] = +1.
+    /// 5. Build flow vector: `d[source] = -1, d[sink] = +1`.
     ///
     /// # Arguments
     /// * `pretokens` — List of byte-strings (already pre-tokenized by regex)

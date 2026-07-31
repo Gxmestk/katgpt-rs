@@ -26,7 +26,7 @@ From epiplexity paper (arXiv:2601.03220): Structural information extractable by 
 ## Tasks
 
 ### T1: EpiplexityEstimator Core
-- [x] Create `src/pruners/epiplexity/mod.rs`
+- [x] Create `crates/katgpt-pruners/src/epiplexity/mod.rs`
 - [x] Implement `EpiplexityEstimator` struct
   - `fn new(capacity: usize) -> Self` — ring buffer for loss history
   - `fn record_step(&mut self, step_loss: f32)` — append per-step loss
@@ -37,7 +37,7 @@ From epiplexity paper (arXiv:2601.03220): Structural information extractable by 
 - [x] Unit tests: constant data → S≈0, random data → S≈0, structured data → S>0
 
 ### T2: EpiplexityScreeningPruner
-- [x] Create `src/pruners/epiplexity/screening.rs`
+- [x] Create `crates/katgpt-pruners/src/epiplexity/screening.rs`
 - [x] Implement `EpiplexityScreeningPruner<P: ScreeningPruner>`
   - Wraps inner pruner, weights relevance by epiplexity signal
   - `fn relevance(&self, depth, token_idx, parent_tokens) -> f32`
@@ -50,7 +50,7 @@ From epiplexity paper (arXiv:2601.03220): Structural information extractable by 
 - [x] Unit tests: wrapper preserves inner pruner behavior when α=0
 
 ### T3: Loss Curve Tracker Integration
-- [x] Create `src/pruners/epiplexity/loss_curve.rs`
+- [x] Create `crates/katgpt-pruners/src/epiplexity/loss_curve.rs`
 - [x] Implement `LossCurveTracker` — hooks into training loop
   - `fn on_batch_end(&mut self, batch_idx: usize, avg_loss: f32)`
   - `fn on_epoch_end(&mut self, epoch: usize, val_loss: f32)`
@@ -58,7 +58,7 @@ From epiplexity paper (arXiv:2601.03220): Structural information extractable by 
 - [x] Implement `PerPositionLossTracker` — for fine-grained scoring
   - Track loss at each token position across training
   - Compute per-position epiplexity contribution
-- [x] Integration point: hook into existing `masked_loss()` in `src/dllm.rs` via LossCurveTracker (loss_history → on_batch_end)
+- [x] Integration point: hook into existing `masked_loss()` in `riir-ai/crates/riir-engine/src/transformer/dllm.rs` via LossCurveTracker (loss_history → on_batch_end)
 - [x] Feature gate: `#[cfg(feature = "epiplexity_scoring")]`
 
 ### T4: SR²AM Context Extension ✅
@@ -73,7 +73,7 @@ From epiplexity paper (arXiv:2601.03220): Structural information extractable by 
 - [x] Backward compatible: existing entropy-only path preserved when feature off
 
 ### T5: Factorization Scoring for Game Traces
-- [x] Create `src/pruners/epiplexity/factorization.rs`
+- [x] Create `crates/katgpt-pruners/src/epiplexity/factorization.rs`
 - [x] Implement `FactorizationScorer`
   - `fn score_forward(&self, trace: &[f32]) -> f32` — actions→state order (last = final)
   - `fn score_reverse(&self, trace: &[f32]) -> f32` — state→actions order

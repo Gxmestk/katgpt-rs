@@ -30,10 +30,10 @@ GOAT gate: G1 (determinism + monotonicity) and G2 (two-sigmoid ablation parity) 
 
 ### Tasks
 
-- [x] **T1.1** Create `katgpt-rs/src/salience/mod.rs` with module-level doc referencing Plan 303 + Research 281.
+- [x] **T1.1** Create `katgpt-rs/crates/katgpt-core/src/salience/mod.rs` with module-level doc referencing Plan 303 + Research 281.
 - [x] **T1.2** Add Cargo feature `salience_tri_gate` to `katgpt-rs/Cargo.toml` (opt-in, default off). Gate the entire module behind it.
 - [x] **T1.3** Wire `pub mod salience;` into `katgpt-rs/src/lib.rs` behind the feature flag.
-- [x] **T1.4** Define the core types in `katgpt-rs/src/salience/types.rs`:
+- [x] **T1.4** Define the core types in `katgpt-rs/crates/katgpt-core/src/salience/types.rs`:
   ```rust
   /// First-class output of the salience gate. Silent is a decision, not a default.
   #[derive(Clone, Copy, Debug, PartialEq)]
@@ -74,7 +74,7 @@ GOAT gate: G1 (determinism + monotonicity) and G2 (two-sigmoid ablation parity) 
       ColdTier         = 3,  // result is a frozen shard (caller's persistence layer)
   }
   ```
-- [x] **T1.5** Define the gate struct in `katgpt-rs/src/salience/gate.rs`:
+- [x] **T1.5** Define the gate struct in `katgpt-rs/crates/katgpt-core/src/salience/gate.rs`:
   ```rust
   /// 3-way salience gate. Maps activation `a` + scalars `z`, `c` to one of
   /// {Speak, Silent, Delegate}. Uses two stacked sigmoids — never softmax.
@@ -117,7 +117,7 @@ GOAT gate: G1 (determinism + monotonicity) and G2 (two-sigmoid ablation parity) 
     ```
   - All branches return a `SalienceDecision<A>` — Silent is first-class.
 - [x] **T1.8** Reuse `crate::simd::fast_sigmoid` for the sigmoid (already shipped, libm-exp-bounded). Add a doc note that we never use softmax. — **DEVIATION:** `crate::simd::fast_sigmoid` does not exist in the root crate's simd module; implemented a private libm-bounded inline `sigmoid` in `gate.rs` with a TODO to hoist to `crate::simd::fast_sigmoid` when a SIMD dispatcher lands.
-- [x] **T1.9** Use `mul_add` for the dot-product accumulation (matches the `ActionBridge` pattern in `bridge/mod.rs`). Add an inline SIMD note.
+- [x] **T1.9** Use `mul_add` for the dot-product accumulation (matches the `ActionBridge` pattern in `crates/katgpt-core/src/bridge/mod.rs`). Add an inline SIMD note.
 - [x] **T1.10** Implement `SalienceTriGate::decide_batch(&self, activations: &[[f32; D]], z: &[f32], c: &[f32], payloads: &[A], tick: u64, out: &mut [SalienceDecision<A>])` — same logic, batched. Caller provides output buffer; no internal allocation.
 
 ### Phase 1 acceptance
@@ -132,7 +132,7 @@ GOAT gate: G1 (determinism + monotonicity) and G2 (two-sigmoid ablation parity) 
 
 ### Tasks
 
-- [x] **T2.1** Implement property tests in `katgpt-rs/src/salience/gate.rs::tests`:
+- [x] **T2.1** Implement property tests in `katgpt-rs/crates/katgpt-core/src/salience/gate.rs::tests`:
   - **G1 determinism**: same inputs → same decision (run `decide` twice, assert equal).
   - **G1 monotonicity in salience**: hold `a, z, c` such that `salience < tau_speak`; increase one component of `a` along `d_speak` direction; verify decision transitions Silent→Speak at exactly one threshold crossing.
   - **G1 monotonicity in delegate_dot**: hold others fixed; increase `a` along `d_delegate` direction; verify Speak→Delegate transition is monotone.
@@ -141,7 +141,7 @@ GOAT gate: G1 (determinism + monotonicity) and G2 (two-sigmoid ablation parity) 
   - Single `decide()` call latency: **D=8: 9.11 ns**, D=16: 14.81 ns, D=32: 30.27 ns. Target: < 50ns (cf. `evolve_hla` ~14ns for D=8). **PASS** — D=8 latency is ~5 ns over `evolve_hla`'s 14 ns reference (the gap is the second dot-product).
   - Batched `decide_batch()` throughput: D=8 N=1000: **120.6 M/s**, D=8 N=10000: 92.8 M/s. Target ≥ 50M decisions/sec. **PASS**. (D=32 drops to 33-36 M/s — informational only, not a gate target.)
   - Full results in `.benchmarks/303_salience_tri_gate_goat.md`.
-- [x] **T2.3** Document the G1/G2 gate criteria in the module doc with the actual numbers when the bench runs. — Updated `src/salience/gate.rs` struct doc with the 9.11 ns / 120.6 M/s numbers and the `evolve_hla` comparison.
+- [x] **T2.3** Document the G1/G2 gate criteria in the module doc with the actual numbers when the bench runs. — Updated `crates/katgpt-core/src/salience/gate.rs` struct doc with the 9.11 ns / 120.6 M/s numbers and the `evolve_hla` comparison.
 
 ### Phase 2 acceptance
 
@@ -157,7 +157,7 @@ GOAT gate: G1 (determinism + monotonicity) and G2 (two-sigmoid ablation parity) 
 ### Tasks
 
 - [x] **T3.1** Add `SalienceTriGate::build_delegate_token(&self, payload: A, tick: u64, holding_reply_idx: u8, foldback_target: FoldbackTarget) -> DelegateToken<A>` — convenience constructor. Validates `holding_reply_idx` is in range (caller's table size is caller's concern; we just store the index). **DEVIATION:** method is generic over a *separate* `A2: Clone` (independent of the gate's `A`) so callers can pass a richer handoff payload than the lightweight `decide()` payload. No range validation done — documented as caller's concern.
-- [x] **T3.2** Add a `PendingDelegateQueue<A: Clone, const CAP: usize = 2>` ring buffer in `katgpt-rs/src/salience/pending.rs`. **DEVIATION:** initialized via `[const { None }; CAP]` inline const blocks (stable since Rust 1.79; crate edition is 2024 so MSRV ≥ 1.85 — available). This is required because `DelegateToken<A>` is `Clone` but not `Copy`. Also added `Default` impl, `pop()` (FIFO) / `is_empty()` / `len()` / `capacity()` / `clear()`. `head`/`len` are `u8` ⇒ `CAP <= 255` asserted in `new()`. Ring convention: `head` = next write slot, oldest = `(head + CAP - len) % CAP`.
+- [x] **T3.2** Add a `PendingDelegateQueue<A: Clone, const CAP: usize = 2>` ring buffer in `katgpt-rs/crates/katgpt-core/src/salience/pending.rs`. **DEVIATION:** initialized via `[const { None }; CAP]` inline const blocks (stable since Rust 1.79; crate edition is 2024 so MSRV ≥ 1.85 — available). This is required because `DelegateToken<A>` is `Clone` but not `Copy`. Also added `Default` impl, `pop()` (FIFO) / `is_empty()` / `len()` / `capacity()` / `clear()`. `head`/`len` are `u8` ⇒ `CAP <= 255` asserted in `new()`. Ring convention: `head` = next write slot, oldest = `(head + CAP - len) % CAP`.
   ```rust
   pub struct PendingDelegateQueue<A: Clone, const CAP: usize = 2> {
       slots: [Option<DelegateToken<A>>; CAP],
@@ -198,7 +198,7 @@ GOAT gate: G1 (determinism + monotonicity) and G2 (two-sigmoid ablation parity) 
 
 - [x] **T5.1** Run `cargo test --features salience_tri_gate` — all G1/G2 property tests pass. (Re-confirmed at bench time: G1 determinism 1000-call re-confirm PASS, G2 ablation parity 10k-input re-confirm PASS.)
 - [x] **T5.2** Run `cargo bench --features salience_tri_gate salience_tri_gate_bench` — capture latency + throughput numbers. (9.11 ns / 120.6 M/s for D=8; see `.benchmarks/303_salience_tri_gate_goat.md`.)
-- [x] **T5.3** Fill in actual numbers in the module doc. (Done in `src/salience/gate.rs`.)
+- [x] **T5.3** Fill in actual numbers in the module doc. (Done in `crates/katgpt-core/src/salience/gate.rs`.)
 - [x] **T5.4** **GOAT promotion decision (2026-06-23):**
   - G1+G2 PASS, latency 9.11 ns < 50 ns, throughput 120.6 M/s ≥ 50 M → **PROMOTE `salience_tri_gate` to default feature** in `katgpt-rs/Cargo.toml`. ✅ DONE.
 

@@ -9,7 +9,7 @@
 
 use std::path::Path;
 
-use katgpt_core::simd::simd_add_inplace;
+use katgpt_core::simd::{fast_tanh, simd_add_inplace};
 use katgpt_types::matmul;
 
 // ── Binary format constants ──────────────────────────────────
@@ -21,8 +21,8 @@ const DOMINO_VERSION: u32 = 1;
 /// Minimal GRU cell (inference-only, no save/load needed).
 ///
 /// Standard GRU with 6 weights and 6 biases:
-/// - reset gate:    z = σ(Wz·[x,h] + bz)
-/// - update gate:   r = σ(Wr·[x,h] + br)
+/// - reset gate:    z = σ(Wz·`[x,h]` + bz)
+/// - update gate:   r = σ(Wr·`[x,h]` + br)
 /// - new gate:      n = tanh(Wn·[x, r⊙h] + bn)
 /// - output:        h' = (1-z)⊙h + z⊙n
 pub struct DominoGRU {
@@ -122,7 +122,7 @@ impl DominoGRU {
         // multi-array: h_out[i] read+write paired with bn[i]
         #[allow(clippy::needless_range_loop)]
         for i in 0..hs {
-            h_out[i] = (h_out[i] + self.bn[i]).tanh();
+            h_out[i] = fast_tanh(h_out[i] + self.bn[i]);
         }
 
         // Output: h' = (1-z)⊙h_prev + z⊙n
@@ -435,9 +435,11 @@ fn read_f32_slice(data: &[u8], offset: &mut usize, count: usize) -> Vec<f32> {
 }
 
 /// Standard sigmoid function.
+///
+/// Delegates to `katgpt_core::simd::fast_sigmoid` (Cephes polynomial).
 #[inline]
 fn sigmoid(x: f32) -> f32 {
-    1.0 / (1.0 + (-x).exp())
+    katgpt_core::simd::fast_sigmoid(x)
 }
 
 #[cfg(test)]

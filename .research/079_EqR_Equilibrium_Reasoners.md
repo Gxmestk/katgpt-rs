@@ -136,7 +136,7 @@ Result: 11.34× fewer NFEs at matched accuracy. This is structurally identical t
 
 EqR doesn't explicitly use per-loop learned gates, but our `ResidualGate` struct (per-loop ρ_τ) serves the same purpose as EqR's residual-based weighting — controlling how much the latent state changes at each iteration:
 
-```katgpt-rs/crates/katgpt-core/src/types.rs#L210-214
+```katgpt-rs/src/types.rs#L210-214
 pub struct ResidualGate {
     /// Per-loop gates: [loop_count, dim].
     /// Each ρ_τ is element-wise, zero-init.
@@ -150,7 +150,7 @@ This is a richer mechanism than EqR's fixed residual threshold. Our gates are le
 
 Our `SdpaOutputGate` (from LT2, Research 73) addresses the same problem EqR implicitly faces — attention sink compounding across loop iterations:
 
-```katgpt-rs/crates/katgpt-core/src/types.rs#L191-195
+```katgpt-rs/src/types.rs#L191-195
 pub struct SdpaOutputGate {
     /// Gate weights: [n_heads * head_dim, dim].
     /// Zero-init so gate starts at sigmoid(0) = 0.5.
@@ -199,7 +199,7 @@ Config field `width_rollouts` controls breadth. EqR validates: breadth >> depth.
 
 EqR applies the same fθ T times. Our `LoopMode` enum handles this:
 
-```katgpt-rs/crates/katgpt-core/src/types.rs#L163-170
+```katgpt-rs/src/types.rs#L163-170
 pub enum LoopMode {
     /// Standard single-pass (no looping).
     #[default]
@@ -242,7 +242,7 @@ EqR selects best trajectory by residual. Our `BanditPruner` selects by Q-values 
 
 EqR's core object is the evolving latent state z. Our `DomainLatent` provides the same:
 
-```katgpt-rs/crates/katgpt-core/src/types.rs#L1626-1629
+```katgpt-rs/src/types.rs#L1626-1629
 pub struct DomainLatent {
     /// Domain embedding vector, shape `[kv_dim]`.
     pub embedding: Vec<f32>,
@@ -401,10 +401,10 @@ EqR independently validates our existing design from the attractor dynamics pers
 
 | File | Role |
 |---|---|
-| `crates/katgpt-core/src/types.rs` | `LoopMode`, `ResidualGate`, `SdpaOutputGate`, `Config.width_rollouts`, `DomainLatent` |
+| `crates/katgpt-types/src/lib.rs` | `LoopMode`, `ResidualGate`, `SdpaOutputGate`, `Config.width_rollouts`, `DomainLatent` |
 | `src/speculative/dd_tree.rs` | `inject_sde_noise`, `best_of_k_rollouts` |
 | `src/speculative/types.rs` | `EarlyStopGate`, `SdeConfig`, `ScreeningPruner` |
-| `src/pruners/bandit.rs` | `BanditPruner<P>` with UCB1 and selection strategies |
-| `src/pruners/g_zero/types.rs` | `HintDelta` — intrinsic reward signal (analogous to EqR residual) |
-| `src/pruners/g_zero/delta_absorb.rs` | `DeltaGatedAbsorbCompress` — δ-gated state updates |
-| `src/pruners/g_zero/delta_bandit.rs` | `DeltaBanditPruner` — δ-based arm selection |
+| `crates/katgpt-ruliology/src/bandit.rs` | `BanditPruner<P>` with UCB1 and selection strategies |
+| `crates/katgpt-pruners/src/g_zero/types.rs` | `HintDelta` — intrinsic reward signal (analogous to EqR residual) |
+| `crates/katgpt-pruners/src/g_zero/delta_absorb.rs` | `DeltaGatedAbsorbCompress` — δ-gated state updates |
+| `crates/katgpt-pruners/src/g_zero/delta_bandit.rs` | `DeltaBanditPruner` — δ-based arm selection |

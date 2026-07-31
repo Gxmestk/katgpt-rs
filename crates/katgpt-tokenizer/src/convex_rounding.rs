@@ -11,8 +11,6 @@
 //!
 //! **Source:** Tempus et al. (2026). Tokenisation via Convex Relaxations. arXiv:2605.22821
 
-use std::cmp::Ordering;
-
 use super::convex_types::{
     ColourId, LpSolution, RoundedVocabulary, RoundingScheme, TokenisationGraph,
 };
@@ -33,7 +31,7 @@ impl Rounder {
     pub fn det(graph: &TokenisationGraph, solution: &LpSolution) -> RoundedVocabulary {
         let mut indexed: Vec<(usize, f64)> = solution.c.iter().copied().enumerate().collect();
 
-        indexed.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(Ordering::Equal));
+        indexed.sort_by(|a, b| b.1.total_cmp(&a.1));
 
         let selected: Vec<ColourId> = indexed
             .iter()
@@ -61,7 +59,7 @@ impl Rounder {
             })
             .collect();
 
-        scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(Ordering::Equal));
+        scored.sort_by(|a, b| b.1.total_cmp(&a.1));
 
         let selected: Vec<ColourId> = scored
             .iter()

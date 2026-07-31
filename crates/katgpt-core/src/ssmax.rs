@@ -60,7 +60,7 @@
 //! - Research 392 — distillation, novelty gate, fusion analysis
 //! - arXiv:2607.01538 — Gollapudi et al. (paper)
 //! - arXiv:2501.19399 — Uszacorek et al., *Scalable-Softmax is Superior for
-//!   Attention* (SSMax source paper, cited as [9] in 2607.01538)
+//!   Attention* (SSMax source paper, cited as `[9]` in 2607.01538)
 
 // ──────────────────────────────────────────────────────────────────────────
 // Types

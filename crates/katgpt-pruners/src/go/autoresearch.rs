@@ -17,7 +17,7 @@
 //!
 //! ## Research Player
 //!
-//! Each arm creates a [`ResearchPlayer`] that applies the arm's heuristic weights:
+//! Each arm creates a `ResearchPlayer` that applies the arm's heuristic weights:
 //! - `mcts_budget > 0` → delegates to [`GoMctsPlayer`] with budget/depth
 //! - `mcts_budget == 0` → weighted greedy scoring with `heuristic_weights`
 //!

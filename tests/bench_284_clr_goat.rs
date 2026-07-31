@@ -28,11 +28,11 @@
 #![cfg(feature = "clr")]
 
 use fastrand::Rng;
-use katgpt_core::simd::simd_dot_f32;
 use katgpt_claim::clr::{
     Claim, ClaimVerifier, ClrConfig, ClrScratch, Cluster, DirectionVectorSource, FnClaimExtractor,
     SigmoidProjectionVerifier, Trajectory, brevity_tiebreak, clr_vote,
 };
+use katgpt_core::simd::simd_dot_f32;
 
 // ──────────────────────────────────────────────────────────────────────────
 // Shared helpers (also reused conceptually by the G4 binary)
@@ -298,9 +298,10 @@ fn g1_clr_beats_best_of_n_majority() {
     let config = ClrConfig {
         k: G1_K_TOTAL, // 50 — must be >= trajectories.len()
         m: G1_M,
+        embedding_dim: G1_DIM,
         ..ClrConfig::default()
     };
-    let mut scratch = ClrScratch::new(config.k, config.m);
+    let mut scratch = ClrScratch::new(config.k, config.m, G1_DIM);
 
     let mut clr_wins = 0usize;
     let mut majority_wins = 0usize;

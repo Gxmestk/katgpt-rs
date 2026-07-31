@@ -45,7 +45,7 @@ key   = L2_norm(tanh(W_mk · x))   # unit sphere projection
 query = L2_norm(tanh(W_mq · x))   # prevents state explosion
 ```
 
-- [x] **T2: Implement `DeltaMemoryState`** — `src/pruners/delta_mem/state.rs`
+- [x] **T2: Implement `DeltaMemoryState`** — `crates/katgpt-core/src/delta_mem/state.rs`
   ```rust
   //! Compact associative memory updated by delta-rule learning.
   //!
@@ -152,7 +152,7 @@ query = L2_norm(tanh(W_mq · x))   # prevents state explosion
   }
   ```
 
-- [x] **T3: Implement `FeatureHasher`** — `src/pruners/delta_mem/hash.rs`
+- [x] **T3: Implement `FeatureHasher`** — `crates/katgpt-core/src/delta_mem/hash.rs`
   ```rust
   //! Hashes context features into a compact r-dimensional vector.
   //!
@@ -256,7 +256,7 @@ attn_output  = base.o_proj(attn) + delta_o  (L2283-2293)
 - Output-side: `adjusted_rel = inner_rel + α · correction` (additive, same as paper)
 - Paper Table 3: output-side alone (47.05%) beats query-side alone (44.51%). qo both (47.97%).
 
-- [x] **T5: Implement `MemorySteeredPruner`** — `src/pruners/delta_mem/pruner.rs`
+- [x] **T5: Implement `MemorySteeredPruner`** — `crates/katgpt-pruners/src/delta_mem/pruner.rs`
   ```rust
   //! ScreeningPruner augmented with memory-steered corrections.
   //!
@@ -398,7 +398,7 @@ The paper's Multi-State Write (MSW). Verified from `delta_impl.py`:
 
 **Modelless adaptation:** Each domain gets its own `DeltaMemoryState`. No routing needed — domain determined by PromptRouter.
 
-- [x] **T7: Implement `MultiDomainMemory`** — `src/pruners/delta_mem/multi.rs`
+- [x] **T7: Implement `MultiDomainMemory`** — `crates/katgpt-core/src/delta_mem/multi.rs`
   ```rust
   //! Parallel memory states per domain (δ-mem MSW adaptation).
   //!
@@ -445,7 +445,7 @@ The paper's Multi-State Write (MSW). Verified from `delta_impl.py`:
   }
   ```
 
-- [x] **T8: Implement `MultiDomainMemoryPruner`** — `src/pruners/delta_mem/multi_pruner.rs`
+- [x] **T8: Implement `MultiDomainMemoryPruner`** — `crates/katgpt-pruners/src/delta_mem/multi_pruner.rs`
   ```rust
   //! ScreeningPruner with per-domain memory states (MSW variant).
   //!
@@ -476,7 +476,7 @@ The paper's Multi-State Write (MSW). Verified from `delta_impl.py`:
 
 ### Phase 4: Integration & Final Benchmark
 
-- [x] **T10: Add module exports** — `src/pruners/delta_mem/mod.rs`
+- [x] **T10: Add module exports** — `crates/katgpt-pruners/src/delta_mem/mod.rs`
   ```rust
   //! δ-mem modelless distillation: associative bandit memory.
   //!
@@ -550,12 +550,12 @@ The paper's Multi-State Write (MSW). Verified from `delta_impl.py`:
 ### Files Created (New)
 | File | Lines | Purpose |
 |------|-------|---------|
-| `src/pruners/delta_mem/mod.rs` | 35 | Module index + re-exports |
-| `src/pruners/delta_mem/state.rs` | ~300 | DeltaMemoryState (r×r associative matrix) |
-| `src/pruners/delta_mem/hash.rs` | ~180 | FeatureHasher + ContextFeatures + OutcomeFeatures |
-| `src/pruners/delta_mem/pruner.rs` | ~310 | MemorySteeredPruner (low-rank correction wrapper) |
-| `src/pruners/delta_mem/multi.rs` | ~160 | MultiDomainMemory (MSW adaptation) |
-| `src/pruners/delta_mem/multi_pruner.rs` | ~240 | MultiDomainMemoryPruner |
+| `crates/katgpt-pruners/src/delta_mem/mod.rs` | 35 | Module index + re-exports |
+| `crates/katgpt-core/src/delta_mem/state.rs` | ~300 | DeltaMemoryState (r×r associative matrix) |
+| `crates/katgpt-core/src/delta_mem/hash.rs` | ~180 | FeatureHasher + ContextFeatures + OutcomeFeatures |
+| `crates/katgpt-pruners/src/delta_mem/pruner.rs` | ~310 | MemorySteeredPruner (low-rank correction wrapper) |
+| `crates/katgpt-core/src/delta_mem/multi.rs` | ~160 | MultiDomainMemory (MSW adaptation) |
+| `crates/katgpt-pruners/src/delta_mem/multi_pruner.rs` | ~240 | MultiDomainMemoryPruner |
 | `tests/bench_delta_mem_modelless.rs` | ~280 | Full benchmark suite (15 tests) |
 
 ### Files Modified
@@ -607,12 +607,12 @@ The real gain would come if we had a Transformer to correct (not just a tree sco
 
 | File | Changes |
 |------|---------|
-| `src/pruners/delta_mem/mod.rs` | **New:** Module index |
-| `src/pruners/delta_mem/state.rs` | **New:** DeltaMemoryState (r×r associative matrix) |
-| `src/pruners/delta_mem/hash.rs` | **New:** FeatureHasher + ContextFeatures + OutcomeFeatures |
-| `src/pruners/delta_mem/pruner.rs` | **New:** MemorySteeredPruner (low-rank correction wrapper) |
-| `src/pruners/delta_mem/multi.rs` | **New:** MultiDomainMemory (MSW adaptation) |
-| `src/pruners/delta_mem/multi_pruner.rs` | **New:** MultiDomainMemoryPruner |
+| `crates/katgpt-pruners/src/delta_mem/mod.rs` | **New:** Module index |
+| `crates/katgpt-core/src/delta_mem/state.rs` | **New:** DeltaMemoryState (r×r associative matrix) |
+| `crates/katgpt-core/src/delta_mem/hash.rs` | **New:** FeatureHasher + ContextFeatures + OutcomeFeatures |
+| `crates/katgpt-pruners/src/delta_mem/pruner.rs` | **New:** MemorySteeredPruner (low-rank correction wrapper) |
+| `crates/katgpt-core/src/delta_mem/multi.rs` | **New:** MultiDomainMemory (MSW adaptation) |
+| `crates/katgpt-pruners/src/delta_mem/multi_pruner.rs` | **New:** MultiDomainMemoryPruner |
 | `src/pruners/mod.rs` | Add feature-gated delta_mem module |
 | `Cargo.toml` | Add `delta_mem = ["bandit"]` feature |
 | `tests/bench_delta_mem_modelless.rs` | **New:** Full benchmark suite |
@@ -767,8 +767,8 @@ or use only for offline analysis rather than per-build correction.
 
 All types are NEW. Integration points (read-only, no changes needed):
 - `src/pruners/mod.rs` — add `delta_mem` module + exports
-- `src/pruners/bandit.rs` — `BanditPruner` as inner pruner for `MemorySteeredPruner`
-- `src/pruners/g_zero/delta_bandit.rs` — `DeltaBanditPruner` δ signal feeds `OutcomeFeatures`
+- `crates/katgpt-ruliology/src/bandit.rs` — `BanditPruner` as inner pruner for `MemorySteeredPruner`
+- `crates/katgpt-pruners/src/g_zero/delta_bandit.rs` — `DeltaBanditPruner` δ signal feeds `OutcomeFeatures`
 - `src/speculative/types.rs` — `ScreeningPruner` trait (read-only, no changes)
 - `Cargo.toml` — feature gate
 

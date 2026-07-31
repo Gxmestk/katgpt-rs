@@ -6,7 +6,7 @@
 **Chain-side plan:** [riir-chain/.plans/003_rtdc_quorum_wiring.md](../../../riir-chain/.plans/003_rtdc_quorum_wiring.md)
 **Depends On:** Plan 235 ✅ (SLoD, default-ON), Plan 253 ✅ (Merkle-Octree Curator, opt-in), Plan 258 ✅ (LatCal Fixed, in riir-chain)
 **Target:** `katgpt-rs/crates/katgpt-core/src/rtdc.rs` (new) + feature gate `rtdc`
-**Status:** Active — Phase 1 not started
+**Status:** Phase 1 skeleton shipped (`rtdc.rs`, 1373 LOC, 14 unit tests) + Phase 3 Candidate C (probabilistic `subtree_inclusion`) landed behind `rtdc_subtree_inclusion` — CG6 PASS. Candidate A (Pedersen) research closed dormant; Candidate B (FFT) closed negative. Chain wiring landed in riir-chain (`fac46d5`, `chain_rtdc_subtree` feature). `rtdc` stays opt-in — G1/G2/G4/G6 pending LatCal-backed `DeterministicLeafEncode` impl (riir-chain Plan 003).
 
 ---
 
@@ -39,7 +39,7 @@ katgpt-rs/crates/katgpt-core/src/
 ├── slod.rs          # existing — ScaleBoundary (reuse)
 ├── merkle.rs        # existing — MerkleOctree, MerkleNode, MerkleProof (reuse)
 ├── curator.rs       # existing — CuratorVerifier (extend with verify_at_depth)
-├── sense/octree.rs  # existing — KgEmbedding, SenseOctreeBuilder (reuse)
+├── crates/katgpt-sense/src/octree.rs  # existing — KgEmbedding, SenseOctreeBuilder (reuse)
 └── lib.rs           # add `#[cfg(feature = "rtdc")] pub mod rtdc;`
 ```
 
@@ -298,7 +298,7 @@ pub enum RtdcError {
 - **Domain separators added** to `roots[0]` and `roots[1]` derivations (`rtdc_global_v1`, `rtdc_regional_v1` BLAKE3 tags). Without these, `roots[1]` would equal `roots[2]` because the existing `MerkleOctree` computes its root as `BLAKE3(h₁ ‖ … ‖ h₈)` — identical to the regional-root computation. BIP-340-style tagged hashes ensure all three roots are distinct. Test `build_derives_three_distinct_roots` enforces this invariant.
 - **`DepthSelector::select` math inverted** vs the plan's pseudocode. The plan's `above_t0 + above_t1` returned the inverse of the documented semantics (low σ should map to depth 2 / fine, not depth 0 / global). Fixed to `at_or_below_t0 + at_or_below_t1` — matches the docstring and the architectural intent (low diffusion scale = sharp view = finest depth).
 - **`encode_cbor_canonical` deferred** — would require a new `ciborium` dep not currently in `Cargo.toml`. Phase 1 ships only the `DeterministicLeafEncode` trait; the CBOR helper is not on any GOAT gate, so it can land in Phase 2 alongside the LatCal-backed impl in riir-chain.
-- **`thiserror` not added** — replaced the plan's `#[derive(thiserror::Error)]` with hand-rolled `Display` + `std::error::Error` impls to match the existing convention (`engram/tokenizer.rs::SurjectiveMapLoadError`). katgpt-core stays free of the `thiserror` dep.
+- **`thiserror` not added** — replaced the plan's `#[derive(thiserror::Error)]` with hand-rolled `Display` + `std::error::Error` impls to match the existing convention (`crates/katgpt-core/src/engram/tokenizer.rs::SurjectiveMapLoadError`). katgpt-core stays free of the `thiserror` dep.
 - **Phase 1 soundness caveat made explicit**: `prove_at_depth(d=2)` is fully sound; `prove_at_depth(d∈{0,1})` are well-formed but cryptographically unsound until Phase 2's `subtree_inclusion` proof lands (Candidate C landed; Candidate A — Pedersen — research closed dormant, see `riir-chain/.research/006_RTDC_Candidate_A_Pedersen_Resolution.md`). Tests `prove_depth_0_trivial` and `prove_depth_1_well_formed_but_phase1_unsound` document this.
 - **14 unit tests, all passing** under `cargo test -p katgpt-core --features rtdc`. The pre-existing failure in `curator::tests::test_verification_weight_thresholds` is unrelated (fails with just `merkle_octree`, before `rtdc` is enabled) and was not touched.
 
@@ -358,7 +358,7 @@ The hard problem: prove that roots[d] is a faithful aggregation of roots[d+1].
       (2026-06-22). After investigating the literature and the RTDC leaf
            data model, Candidate B is a **category error**:
       1. RTDC leaves are 32-byte BLAKE3 hashes, not numerical samples.
-         `fft_smooth_into()` (Plan 242, `flow/fft.rs`) operates on
+         `fft_smooth_into()` (Plan 242, `crates/katgpt-core/src/flow/fft.rs`) operates on
          `Vec<f32>` LEO Q-values — a totally different data type.
       2. FFT batch verification (in the cryptographic sense, e.g.
          arXiv:2405.07941 OR-proofs, or FRI/STARK-based batch Merkle)

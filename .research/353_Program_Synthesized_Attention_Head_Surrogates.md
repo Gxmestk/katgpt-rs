@@ -6,6 +6,7 @@
 > **Related Research:** **257 (Functional Attention — spectral transport operator, the surrogate representation)**, **031/032 (Percepta deep dive / distillation — programs-as-attention paradigm)**, 229 (ProgramAsWeights), 244 (Self-Evolver Faithfulness — causal intervention), 178 (Rosetta Neurons — best program per head), 277 (SmearClassifier), 295 (AC-GPT arbitrary-conditional attention), 233 (Attention Matching)
 > **Related Plans:** **286 (Functional Attention spectral transport)**, **064 (Percepta full riir)**, 278 (FaithfulnessProbe — intervention primitive), 298 (SmearClassifier — hallucinated-feature detector), 313 (AC-Prefix), 271 (Attention Matching), 259 (spec_compile modelless), 353 (revised — gate only, not new primitive)
 > **Classification:** Public — generic inference-time primitive. No game IP, no chain IP, no neuron-shard IP.
+> **PASS-Redirects (synthesis):** Yin & Wang [arXiv:2501.15857 "Are Transformers Able to Reason by Connecting Separated Knowledge in Training Data? (FTCT: Fragmented at Training, Chained at Testing)"] — PASS. FTCT's Lemma 5.3 (2-layer Transformer constructively simulates the underlying program: induction head + parent retrieving) is a theoretical existence proof in the same family as Hayes et al.'s "25-40% of heads are programmable" — but FTCT's construct is closed-form analytical (not a deployable surrogate) and proves only that the program is expressible, not how to extract it. The extraction/synthesis pipeline that makes Hayes et al. actionable is exactly what FTCT lacks. The λ≥0.3 training-data phase transition is → riir-train.
 
 ---
 
@@ -17,7 +18,7 @@ Hayes et al. distill attention heads in pretrained transformers (BERT-base, GPT-
 
 The paper is **fully modelless**: no gradient descent, no weight mutation, no fine-tuning. The pipeline is (1) extract attention maps → (2) prompt an external LM to synthesize Python programs → (3) score by JSD/IoU → (4) causally validate by substitution.
 
-**After corpus review (see §3.3 revision log):** the distilled primitive is NOT a new `ProgramSynthesizedHead` struct. The "tokens → attention via an externally-supplied operator" shape is exactly what **`FuncAttn`** (R257, `katgpt-core/src/funcattn.rs`) already ships — `FuncAttn` solves for the operator C via closed-form Tikhonov; the paper's Python program is a strictly more general operator representation (Turing-complete callable vs closed-form matrix). The "programs become the attention mechanism" paradigm is exactly what **Percepta** (R031/032, the `katgpt-percepta` crate) ships — Percepta compiles C → WASM → lowered bytecode → transformer weights at compile time; the paper does the same via runtime callable substitution. Same paradigm, different point on the compile-vs-runtime spectrum.
+**After corpus review (see §3.3 revision log):** the distilled primitive is NOT a new `ProgramSynthesizedHead` struct. The "tokens → attention via an externally-supplied operator" shape is exactly what **`FuncAttn`** (R257, `crates/katgpt-core/src/funcattn/mod.rs`) already ships — `FuncAttn` solves for the operator C via closed-form Tikhonov; the paper's Python program is a strictly more general operator representation (Turing-complete callable vs closed-form matrix). The "programs become the attention mechanism" paradigm is exactly what **Percepta** (R031/032, the `katgpt-percepta` crate) ships — Percepta compiles C → WASM → lowered bytecode → transformer weights at compile time; the paper does the same via runtime callable substitution. Same paradigm, different point on the compile-vs-runtime spectrum.
 
 **What's actually novel in this paper for us** is not the primitive — it's three empirical findings + one gate:
 
@@ -81,10 +82,10 @@ Causal models are far more amenable to symbolic approximation than bidirectional
 
 | Paper term | Codebase equivalent | Where it ships |
 |---|---|---|
-| "causal head replacement" / "interchange intervention" | causal intervention, `FaithfulnessProbe`, `Intervention::Empty/Shuffle/Corrupt/Irrelevant/Filler` | R244, Plan 278, `katgpt-core/src/faithfulness/probe.rs` |
+| "causal head replacement" / "interchange intervention" | causal intervention, `FaithfulnessProbe`, `Intervention::Empty/Shuffle/Corrupt/Irrelevant/Filler` | R244, Plan 278, `crates/katgpt-core/src/faithfulness/probe.rs` |
 | "program synthesis" / "executable program approximation" | spec → compiled rule, `SpecPruner`, `SpecChain`, `SpecProof` | R229, Plan 259, `katgpt-core/src/spec_compile` |
 | "best program per head" / "library re-ranking" | "best buddies" cross-system alignment, MAP-Elites library | R178, Plan 199/201 |
-| "hallucinated structural features" | `SmearClass::TokenSmear / SequenceSmear`, `SmearClassifier` | R277, Plan 298, `katgpt-core/src/faithfulness/smear.rs` |
+| "hallucinated structural features" | `SmearClass::TokenSmear / SequenceSmear`, `SmearClassifier` | R277, Plan 298, `crates/katgpt-core/src/faithfulness/smear.rs` |
 | "attention map" / "token-pair weight" | `AcPrefix::attends`, `AttentionMatching`, `FuncAttn` | R295/R233, Plan 313/271 |
 | "IoU similarity" | cosine / IoU / edit-distance (R244 §2.1 already lists IoU as a generic behavioral-delta metric) | n/a (primitive op) |
 | "JSD ranking" | KL-divergence / JSD — already used in collapse-aware entropy gates | R212, Plan 212 |
@@ -93,7 +94,7 @@ Causal models are far more amenable to symbolic approximation than bidirectional
 
 1. **R257 / Plan 286 — FuncAttn** ships the **surrogate representation itself**. `FuncAttn(Q, K, V) = Φ · C* · Ṽ` where `C*` is a closed-form Tikhonov-regularized operator between learned bases. The paper's `π: tokens → attention_matrix` is `FuncAttn` where the operator C is **any executable program** instead of a closed-form spectral solve. **Strictly more general program representation, identical primitive shape.** The `Box<dyn SynthesizedAttentionFn>` trait I proposed in §2.2 below is structurally `dyn FuncAttnKernel` — I was reinventing FuncAttn's trait surface.
 
-2. **R031 / R032 / Plan 064 — Percepta** ships the **programs-as-attention paradigm**. The `katgpt-percepta` crate implements `C program → WASM → lowered bytecode → token prefix → transformer weights` (see `src/compile.rs`, `src/gates.rs`). Percepta bakes the program into weights at compile time via Futamura projection; the paper substitutes the program as a runtime callable. Same paradigm, different point in the compile↔runtime spectrum. Percepta's gates (`reglu`, `stepglu`, `multiply`, `persist`, `fetch`, `fetch_sum`) are the executable primitives the paper's Python programs compose at a higher level.
+2. **R031 / R032 / Plan 064 — Percepta** ships the **programs-as-attention paradigm**. The `katgpt-percepta` crate implements `C program → WASM → lowered bytecode → token prefix → transformer weights` (see `crates/katgpt-percepta/src/compile.rs`, `crates/katgpt-percepta/src/gates.rs`). Percepta bakes the program into weights at compile time via Futamura projection; the paper substitutes the program as a runtime callable. Same paradigm, different point in the compile↔runtime spectrum. Percepta's gates (`reglu`, `stepglu`, `multiply`, `persist`, `fetch`, `fetch_sum`) are the executable primitives the paper's Python programs compose at a higher level.
 
 3. **R244 / Plan 278 — FaithfulnessProbe** ships the **causal-intervention validation paradigm**: substitute a component, measure behavior delta. The paper's §2.3 "causal head replacement" is `FaithfulnessProbe` applied to an attention head with `Intervention::ReplaceWith(surrogate)`. The probe's intervention enum is a strict superset of the paper's only intervention.
 
@@ -202,10 +203,10 @@ The paper operates on **token-level attention maps** (raw, discrete). The latent
 
 | Reframing axis | Operation | Where it lands |
 |---|---|---|
-| **HLA per-NPC latent state** (`sense/`) | A "head" in HLA is one of the 8 affect projections (valence/arousal/desperation/calm/fear + 3). The analog of "program-synthesized head" is a **deterministic projection rule** that replaces a learned direction vector with a hand-authored one (validated by IoU between the projected scalar time series and the original). | `katgpt-core/src/sense/reconstruction.rs` — `evolve_hla` becomes auditable for "is this projection direction load-bearing or could a constant replace it?" |
+| **HLA per-NPC latent state** (`sense/`) | A "head" in HLA is one of the 8 affect projections (valence/arousal/desperation/calm/fear + 3). The analog of "program-synthesized head" is a **deterministic projection rule** that replaces a learned direction vector with a hand-authored one (validated by IoU between the projected scalar time series and the original). | `crates/katgpt-sense/src/reconstruction.rs` — `evolve_hla` becomes auditable for "is this projection direction load-bearing or could a constant replace it?" |
 | **Latent functor** (`riir-engine/src/latent_functor/`) | A "head" is a functor application. The analog is a **symbolic functor** (closed-form arithmetic op) replacing a learned functor, gated by coherence preservation. Direct fit with `quality_gate.rs` / `reestimation.rs`. | riir-ai runtime |
 | **CGSP runtime** (`riir-engine/src/cgsp_runtime/`) | A "head" is a curiosity branch. The analog is a **deterministic exploration policy** replacing a learned curiosity signal, validated by collapse-rate preservation. | riir-ai runtime |
-| **NeuronShard** (`riir-neuron-db/src/shard.rs`) | A "head" is one of `style_weights[64]`. The analog is a **deterministic weight column** replacing a learned one, validated by downstream-task preservation. **This is the most interesting reframing** — it gives NeuronShard consolidation an audit step: "which style weight dimensions are load-bearing, which could be replaced by a constant?" | riir-neuron-db |
+| **NeuronShard** (`riir-neuron-db/src/shard/mod.rs`) | A "head" is one of `style_weights[64]`. The analog is a **deterministic weight column** replacing a learned one, validated by downstream-task preservation. **This is the most interesting reframing** — it gives NeuronShard consolidation an audit step: "which style weight dimensions are load-bearing, which could be replaced by a constant?" | riir-neuron-db |
 | **DEC operators** (`katgpt-core/src/dec/`) | A "head" is a DEC operator application (d / δ / Δ / hodge_decompose). These are *already* deterministic programs — the paper's framework is trivially satisfied. Not interesting. | n/a |
 | **LatCal** (`riir-chain/src/encoding/`) | A "head" is a LatCal matrix entry. LatCal is *already* a deterministic 2×2 matrix program. Same as DEC — trivially satisfied. | n/a |
 
@@ -259,7 +260,7 @@ With these two layers included, the only novel piece remaining is the **gate** (
 ### 3.3 Revision log
 
 **2026-06-30 (same day, post-commit):** User prompted "sound like percepta? and a bit of funtional attention?" — corpus re-review confirmed both:
-- FuncAttn (`katgpt-core/src/funcattn.rs`, R257 / Plan 286) ships the exact `tokens → attention via external operator` primitive shape.
+- FuncAttn (`crates/katgpt-core/src/funcattn/mod.rs`, R257 / Plan 286) ships the exact `tokens → attention via external operator` primitive shape.
 - Percepta (`katgpt-percepta` crate, R031 / R032 / Plan 064) ships the programs-as-attention paradigm.
 
 Verdict revised GOAT → Gain. The proposed `ProgramSynthesizedHead` primitive is structurally redundant with FuncAttn; Plan 353 is revised to ship only `HeadSubstitutionGate` as a wrapper around FuncAttn's existing trait. This is a **vocabulary-translation failure** in the initial pass: the paper uses "arbitrary Python program" which reads as novel, but the underlying primitive shape (external operator producing attention) is FuncAttn's existing surface. The skill's standing vocabulary block does not include "external operator → attention map" as an explicit translation entry; this case suggests it should ("functional attention", "operator-valued attention", "programmatic attention" → `FuncAttn`, `dyn FuncAttnKernel`).

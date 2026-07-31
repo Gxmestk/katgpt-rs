@@ -122,24 +122,25 @@ where
         dirs: &[AnticipatedQueryDir<D>; K],
         scratch: &mut SleepTimeScratch<D>,
     ) -> AnticipatedQuerySet<D, K> {
-        // Build the slots one at a time. `AnticipatedSlot` is not `Copy`
-        // (contains `AnticipatedQueryDir` which is not Copy), so we use
-        // `from_fn` to construct the initial placeholder, then overwrite.
-        // The placeholder `AnticipatedQueryDir::new([0.0; D])` is thrown away.
-        let mut slots: [AnticipatedSlot<D>; K] = std::array::from_fn(|_| AnticipatedSlot {
-            dir: AnticipatedQueryDir::new([0.0; D]),
-            precomputed: [0.0; D],
-            predictability: 0.0,
-        });
-        for i in 0..K {
+        // Build slots directly via `array::from_fn` — the closure has the
+        // index, so we can compute (z_i, p_i) and clone the matching dir
+        // in one pass. The prior two-pass form first built K placeholder
+        // `AnticipatedSlot`s via `from_fn(|_| AnticipatedSlot { dir:
+        // AnticipatedQueryDir::new([0.0; D]), ... })` and then overwrote them —
+        // but `AnticipatedQueryDir::new` does a blake3 hash, so the placeholder
+        // pass was burning K blake3 invocations (and K clone()s) on slots that
+        // were immediately thrown away. The single-pass form below pays exactly
+        // one dir.clone() + one sleep_compute + one predictability per slot,
+        // nothing else.
+        let slots: [AnticipatedSlot<D>; K] = std::array::from_fn(|i| {
             let z = self.op.sleep_compute(c, &dirs[i], self.budgets[i], scratch);
             let p = self.scorer.predictability(c, &dirs[i]);
-            slots[i] = AnticipatedSlot {
+            AnticipatedSlot {
                 dir: dirs[i].clone(),
                 precomputed: z,
                 predictability: p,
-            };
-        }
+            }
+        });
         let blake3 = AnticipatedQuerySet::commit_slots(&slots);
         AnticipatedQuerySet {
             slots,

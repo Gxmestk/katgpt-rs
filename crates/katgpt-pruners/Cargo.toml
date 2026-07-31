@@ -39,6 +39,14 @@ papaya = { version = "0.2", optional = true }         # lock-free HashMap (bfcf_
 rustfft = { version = "6", optional = true }          # reserved
 reqwest = { version = "0.12", features = ["blocking", "json"], optional = true }  # AutoGo REST client (go feature)
 
+[target.'cfg(target_os = "macos")'.dependencies]
+# Moka-on-ANE residency probe (Issue 564) — mirrors katgpt-backend's own
+# `ane` feature deps exactly, kept local so this crate doesn't need a new
+# cross-crate dependency for a scoped probe.
+coreml-native = { version = "0.2", optional = true }
+coreml-proto = { version = "0.1", optional = true }
+prost = { version = "0.14", optional = true }
+
 [dev-dependencies]
 tempfile = "3"
 
@@ -85,7 +93,7 @@ nexus_elo = ["state_source", "proof_sketch_evolution"]
 questbench = ["katgpt-core/questbench"]
 nexus_elo_proxy = ["state_source"]
 gepa_reflective = ["bandit", "memo_reflections"]
-phrase_boost = []
+phrase_boost = ["papaya"]
 hydra_budget = ["katgpt-core/hydra_budget"]
 data_gate = ["katgpt-core/data_gate", "bandit"]
 sr2am_configurator = ["bandit", "g_zero", "katgpt-core/sr2am_configurator", "katgpt-speculative/sr2am_configurator"]
@@ -177,8 +185,17 @@ monopoly = ["bevy_ecs", "bandit"]
 go = ["bandit", "reqwest"]
 game_state = []
 arena = []
+
+# Moka-on-ANE residency probe (Issue 564) — macOS-only, CoreML. Answers
+# whether Moka's topology can even run on the Apple Neural Engine before
+# committing to a full 40-layer graph builder.
+moka_ane = ["go", "dep:coreml-native", "dep:coreml-proto", "dep:prost"]
 fft = ["bandit", "sr2am_configurator"]
 event_log = []
+# Plan 562: programmatic search over EventLog (PRO-LONG distillation, Research 461).
+# Generic, modelless, zero-allocation query combinator. Stays opt-in until a
+# downstream consumer proves a gain (Phase 3).
+event_log_query = ["event_log"]
 
 # MUX
 mux_pruner = []
@@ -192,8 +209,8 @@ mux_demux = []
 directional_credit = []
 # Phase 12 T4.4 (2026-07-04): modules moved from katgpt-rs/src/.
 freq_bandit = []  # FrequencyBandit — RV-gated pruning arm selection (Plan 202). DEFAULT-ON in root.
-rv_bandit_pruning = []  # RV Bandit Pruning — FrequencyBandit top-ρ arm suppression sub-feature (Plan 202 GOAT). DEFAULT-ON via rv_gated_routing.
-interval_pruner = []  # IntervalPruner — interval-closure for valid token sets (Plan 252 Phase 1). DEFAULT-ON in root.
+rv_bandit_pruning = []  # RV Bandit Pruning — FrequencyBandit top-ρ arm suppression sub-feature (Plan 202 GOAT). **Opt-in (2026-07-18 cargo-comment sync):** the prior "DEFAULT-ON via rv_gated_routing" claim was direction-confused — see katgpt-rs/Cargo.toml line 486 note. Confirmed NOT in any `default` closure.
+interval_pruner = []  # IntervalPruner — interval-closure for valid token sets (Plan 252 Phase 1). **Opt-in (2026-07-18 cargo-comment sync):** the prior "DEFAULT-ON in root" claim was stale — root forwards it via `interval_pruner = ["katgpt-pruners/interval_pruner"]` but neither root nor katgpt-pruners lists it in `default`. Available when `cubical_topology` is enabled.
 lattice_operad = []  # LatticeOperad — canonical AND/OR pruner composition (Plan 252 Phase 2). DEFAULT-ON in root.
 # Plan 384 (2026-07-05): module moved from katgpt-rs/src/speculative/. ROTATE-
 # derived ConstraintPruner (Plan 228). No extra deps — katgpt-transformer /
@@ -295,10 +312,15 @@ workflow_lattice = ["hoare_pruner"]
 # Step-Attribution Δ-Qualification (Plan 381, Research 381).
 # Generic modelless instantiation of SkillAdaptor's eq. 8 commit gate.
 # Sibling to `trajectory_doctor` in the cognitive-branch / skill-lifecycle
-# stack. Opt-in until the riir-ai Plan 313 G6 quality-parity PoC passes
-# (per §3.6 defend-wrong rule). Empty tracking flag — gates
-# `src/step_attribution_qualifier.rs` (traits + types + canonical
-# `DotProductLocalizer` impl). Root forwards as `step_attribution_qualifier`.
+# stack. Gate PASS — riir-ai Plan 313 Phase 5 G6 quality-parity PoC landed
+# (81.6% drift reduction vs no-attribution baseline, 63.1% vs
+# TrajectoryDoctor-only, per root Cargo.toml comment). The feature is
+# DEFAULT-ON at root (root Cargo.toml default array); this leaf flag stays
+# opt-in because katgpt-pruners ships `default = []` (all features leaf-level
+# opt-in; root activates as needed — the layer-split convention). Empty
+# tracking flag — gates `src/step_attribution_qualifier.rs` (traits + types
+# + canonical `DotProductLocalizer` impl). Root forwards as
+# `step_attribution_qualifier`.
 step_attribution_qualifier = []
 
 # Manifold / dynamic rank
@@ -357,3 +379,11 @@ mux_latent_context = []
 # The historical freq_bandit check-cfg allowlist entry was removed in Phase 12
 # T4.4 (2026-07-04) — freq_bandit is now a real feature in this crate after
 # the module was moved from katgpt-rs/src/.
+
+# Plan 562 example imports `katgpt_pruners::event_log` (gated by `event_log`,
+# implied by `event_log_query`). Without this gate, `cargo clippy --all-targets`
+# with default features fails to compile the example. Matches the documented
+# run command in the example header (`--features event_log_query`).
+[[example]]
+name = "event_log_query_basic"
+required-features = ["event_log_query"]

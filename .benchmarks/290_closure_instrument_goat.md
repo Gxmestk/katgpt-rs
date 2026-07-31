@@ -98,7 +98,7 @@ the nested HashMap with:
 2.2MB. The 32B per-node blake3 dominated.
 
 **Critical observation:** the production path
-(`PtgTracedPruner::trace` in `src/closure_wire.rs`) was *already* passing
+(`PtgTracedPruner::trace` in `crates/katgpt-pruners/src/closure_wire.rs`) was *already* passing
 `[0u8; 32]` for every node — a placeholder, not a real commitment. The wrapper
 has no insight into the inner pruner's input state. So the dominant production
 case was paying 32B/node for zeros.
@@ -182,7 +182,7 @@ T4.2 (`closure_wire.rs`) and T4.3 (`closure_mining.rs`) are already shipped.
 - GOAT test: `tests/bench_290_closure_instrument_goat.rs` (10 tests, all pass)
 - Feature flag: now in `default` of root `Cargo.toml` and `crates/katgpt-core/Cargo.toml`
 - Re-exports: `crates/katgpt-core/src/lib.rs`
-- Runtime wiring: `src/closure_wire.rs` (`PtgTracedPruner`) + `src/closure_mining.rs` (sleep-cycle hook)
+- Runtime wiring: `crates/katgpt-pruners/src/closure_wire.rs` (`PtgTracedPruner`) + `crates/katgpt-core/src/closure/mining.rs` (sleep-cycle hook)
 
 ## TL;DR
 

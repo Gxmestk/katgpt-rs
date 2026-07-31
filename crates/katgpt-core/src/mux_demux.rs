@@ -242,9 +242,12 @@ pub fn compute_mux_residual(
                 break;
             }
             let contrib = weight * p_j;
-            for (k, &e) in wte[emb_start..emb_end].iter().enumerate() {
-                out[k] += contrib * e;
-            }
+            crate::simd::simd_fused_scale_acc(
+                &mut out[..n_embd],
+                &wte[emb_start..emb_end],
+                contrib,
+                n_embd,
+            );
         }
     }
 }

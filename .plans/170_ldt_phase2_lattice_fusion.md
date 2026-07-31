@@ -39,7 +39,7 @@ Implement `ScreeningPruner` on top of `AlphaTarget`. When the α-target says a t
 
 ### Where
 
-`src/speculative/alpha.rs` — new struct behind `lattice_deduction`
+`crates/katgpt-speculative/src/alpha.rs` — new struct behind `lattice_deduction`
 
 ### Implementation
 
@@ -91,7 +91,7 @@ When a DDTree branch is flagged conflicted by `ConflictDetector`, extract the co
 
 ### Where
 
-`src/speculative/alpha.rs` — new struct behind `lattice_deduction`
+`crates/katgpt-speculative/src/alpha.rs` — new struct behind `lattice_deduction`
 
 ### Implementation
 
@@ -138,7 +138,7 @@ When `AlphaTarget.remaining_solutions() == 0`, the α-target currently returns e
 
 ### Where
 
-`src/speculative/alpha.rs` — modify `AlphaTarget`
+`crates/katgpt-speculative/src/alpha.rs` — modify `AlphaTarget`
 
 ### Implementation
 
@@ -273,7 +273,7 @@ Extended GOAT proof in `tests/bench_ldt_lattice_deduction.rs`:
 
 | File | Change | Type |
 |------|--------|------|
-| `src/speculative/alpha.rs` | `AlphaScreeningPruner`, `ConflictClauseDB`, `cached_prev` on AlphaTarget | Enhancement |
+| `crates/katgpt-speculative/src/alpha.rs` | `AlphaScreeningPruner`, `ConflictClauseDB`, `cached_prev` on AlphaTarget | Enhancement |
 | `src/speculative/types.rs` | `depth_escalation` on `EntropyConflictDetector`, depth param on `ConflictDetector` | Enhancement |
 | `src/speculative/mod.rs` | New re-exports | Enhancement |
 | `tests/bench_ldt_lattice_deduction.rs` | Extended GOAT proofs for F1-F4 | Test |

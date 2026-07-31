@@ -16,7 +16,7 @@ use super::octree::KgEmbedding;
 pub struct CentroidStats {
     /// Mean embedding of all entities in this class: v_c = (1/|E_c|) Σ e_i
     pub mean: [f32; 8],
-    /// Per-dimension standard deviation: σ_c[d] = sqrt(Var(e[d]))
+    /// Per-dimension standard deviation: `σ_c[d] = sqrt(Var(e[d]))`
     pub std_dev: [f32; 8],
     /// Number of entities used to compute this centroid
     pub count: usize,
@@ -36,11 +36,16 @@ pub fn compute_centroid(embeddings: &[KgEmbedding]) -> Option<CentroidStats> {
     let mut mean = [0.0f32; 8];
     let mut m2 = [0.0f32; 8];
 
+    // Welford's online algorithm. The per-iter `1.0 / (k+1)` division is
+    // unavoidable in the canonical form (the running-mean update needs the
+    // NEW count); hoisting it doesn't change the math. LLVM lifts the
+    // `as f32` conversion cheaply; the divide dominates and is per-iter.
     for (k, emb) in embeddings.iter().enumerate() {
-        let inv_k_plus_1 = 1.0 / (k as f32 + 1.0);
+        // k starts at 0, so k+1 is the new count after observing this sample.
+        let inv_n = 1.0 / (k as f32 + 1.0);
         for d in 0..8 {
             let delta = emb.embedding[d] - mean[d];
-            mean[d] += delta * inv_k_plus_1;
+            mean[d] += delta * inv_n;
             let delta2 = emb.embedding[d] - mean[d];
             m2[d] += delta * delta2;
         }

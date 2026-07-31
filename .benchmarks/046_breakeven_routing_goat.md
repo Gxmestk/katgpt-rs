@@ -10,9 +10,9 @@
 
 | Component | File | Role |
 |-----------|------|------|
-| `BreakevenTracker` | `src/breakeven/mod.rs` | Per-tier-pair cost tracking, N* computation, EMA updates |
-| `BreakevenBandit` | `src/breakeven/mod.rs` | Multi-tier selection with sigmoid-gated transitions |
-| `FidelityMatcher` | `src/breakeven/fidelity.rs` | Error-matched KV compression level selection |
+| `BreakevenTracker` | `crates/katgpt-core/src/breakeven/mod.rs` | Per-tier-pair cost tracking, N* computation, EMA updates |
+| `BreakevenBandit` | `crates/katgpt-core/src/breakeven/mod.rs` | Multi-tier selection with sigmoid-gated transitions |
+| `FidelityMatcher` | `crates/katgpt-core/src/breakeven/fidelity.rs` | Error-matched KV compression level selection |
 | `InferenceRouter` integration | `src/inference_router.rs` | Tier adjustment hook, timing observation, stats |
 
 ## GOAT Gates

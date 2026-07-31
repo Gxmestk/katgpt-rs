@@ -27,8 +27,8 @@
 //!   `(Σh²)² / (d·Σh⁴)` vs `t`. Collapse signal (negative slope = rank
 //!   collapsing toward 1).
 //!
-//! The classifier then decides: [`DepthInvariant`], [`DepthSpecificRefinement`],
-//! [`Collapsed`], or [`Insufficient`].
+//! The classifier then decides: [`DepthInvariant`](DepthInvarianceKind::DepthInvariant), [`DepthSpecificRefinement`](DepthInvarianceKind::DepthSpecificRefinement),
+//! [`Collapsed`](DepthInvarianceKind::Collapsed), or [`Insufficient`](DepthInvarianceKind::Insufficient).
 //!
 //! # Magnitude regularization (the fix primitive)
 //!
@@ -207,21 +207,21 @@ fn least_squares_slope_vs_index(ys: &[f32]) -> f32 {
 /// # Decision rule
 ///
 /// Per Research 286 §2.1 and Plan 306 Phase 1 T1.3:
-/// 1. `k+1 < cfg.min_samples` → [`Insufficient`].
-/// 2. `effective_rank_slope < cfg.effective_rank_collapse` → [`Collapsed`]
+/// 1. `k+1 < cfg.min_samples` → [`Insufficient`](DepthInvarianceKind::Insufficient).
+/// 2. `effective_rank_slope < cfg.effective_rank_collapse` → [`Collapsed`](DepthInvarianceKind::Collapsed)
 ///    (rank collapse is the defining feature; magnitude may be flat, growing,
 ///    or shrinking — see Research 286 enum doc "magnitude may be flat OR
 ///    growing").
 /// 3. `|magnitude_slope| > cfg.magnitude_slope_drift` →
-///    [`DepthSpecificRefinement`] (callers check `mean_cos_step >
+///    [`DepthSpecificRefinement`](DepthInvarianceKind::DepthSpecificRefinement) (callers check `mean_cos_step >
 ///    cfg.cos_step_drift_lock` for the "locked drift" sub-case).
-/// 4. Otherwise → [`DepthInvariant`].
+/// 4. Otherwise → [`DepthInvariant`](DepthInvarianceKind::DepthInvariant).
 ///
 /// **Deviation from Plan 306 T1.3 literal text:** the plan specified Collapsed
 /// as `magnitude_slope < collapse AND effective_rank_slope < collapse`.
 /// Plan 306 Phase 2 test T2.3 constructs a rank-collapse chain with *growing*
-/// magnitude and expects [`Collapsed`] — the literal AND-rule would classify
-/// it as [`DepthSpecificRefinement`]. Per the delegation instruction "fix the
+/// magnitude and expects [`Collapsed`](DepthInvarianceKind::Collapsed) — the literal AND-rule would classify
+/// it as [`DepthSpecificRefinement`](DepthInvarianceKind::DepthSpecificRefinement). Per the delegation instruction "fix the
 /// rule, not the test", rank collapse is the sole Collapsed trigger.
 /// `magnitude_slope_collapse` is retained in [`DepthInvarianceConfig`] for API
 /// stability.

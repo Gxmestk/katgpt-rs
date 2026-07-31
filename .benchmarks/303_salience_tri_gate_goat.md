@@ -45,7 +45,7 @@ The promotion is recorded in:
 
 ## Follow-ups (not blocking promotion)
 
-- **T2.3 doc update** — module-level doc in `src/salience/gate.rs` should cite these numbers (the `evolve_hla` comparison at ~14 ns is already there as a TODO). Done as part of this commit (Phase 2 T2.3).
+- **T2.3 doc update** — module-level doc in `crates/katgpt-core/src/salience/gate.rs` should cite these numbers (the `evolve_hla` comparison at ~14 ns is already there as a TODO). Done as part of this commit (Phase 2 T2.3).
 - **README "Always-On Hot Path" section update** — the README has a section listing default-on features (cf. Plan 303 T5.4 acceptance). Adding `salience_tri_gate` there is a doc-only change; deferred to a separate docs commit if the README structure is in flux from other agents.
 - **Pre-existing LCG bug in `gate::tests`** — out of scope here. Filed mentally; not blocking because the G2 parity test only checks parity, not distribution.
 - **SIMD `fast_sigmoid`** — the TODO at `gate.rs:297` (hoist `sigmoid` to `crate::simd::fast_sigmoid`) would shave a few ns off the latency. Not needed for the 50 ns gate (we're at 9 ns); would matter if D=64+ becomes a target.

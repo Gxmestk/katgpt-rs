@@ -1,4 +1,4 @@
-//! `HlaProjectionGuide` — reference `QualityGuide` impl (Plan 274 T1.3).
+//! `BeliefGridProjectionGuide` — reference `QualityGuide` impl (Plan 274 T1.3).
 //!
 //! Score combines:
 //! - Relevance: `sigmoid(λ · dot(candidate, target))`
@@ -58,10 +58,16 @@ pub fn structural_complexity(candidate: &Direction, weights: &ComplexityWeights)
     if coords.is_empty() {
         return 0.0;
     }
-    // ── Disjunction: count of sign changes ───────────────────────────────
+    // ── Single fused pass: sign changes + sum_sq + max_abs ─────────────
+    // Previously 3 separate iterations over `coords` (sign-change count,
+    // L2 norm, max-abs). Fused into one pass to cut cache traffic 3× and
+    // give the autovectorizer a wider ILP window. Bit-identical results.
     let mut sign_changes = 0u32;
     let mut prev_sign: i8 = 0;
+    let mut sum_sq = 0.0f32;
+    let mut max_abs = 0.0f32;
     for &c in coords {
+        // sign-change tracking (branching — not vectorizable, but cheap)
         let s = if c > 0.0 {
             1
         } else if c < 0.0 {
@@ -75,15 +81,23 @@ pub fn structural_complexity(candidate: &Direction, weights: &ComplexityWeights)
         if s != 0 {
             prev_sign = s;
         }
+        // L2 accumulator: plain `c * c` + `+=` to stay bit-identical with the
+        // old 3-pass version (which used `coords.iter().map(|c| c * c).sum()`).
+        // Do NOT use mul_add here — FMA changes the rounding.
+        sum_sq += c * c;
+        // max-abs tracker
+        let abs_c = c.abs();
+        if abs_c > max_abs {
+            max_abs = abs_c;
+        }
     }
     let disjunction_score = sign_changes as f32 / coords.len().max(1) as f32;
 
     // ── Length: L2 norm above nominal ────────────────────────────────────
-    let l2: f32 = coords.iter().map(|c| c * c).sum::<f32>().sqrt();
+    let l2 = sum_sq.sqrt();
     let length_excess = (l2 - weights.nominal_length).max(0.0);
 
     // ── Redundancy: max-coord share of L2 norm ──────────────────────────
-    let max_abs = coords.iter().fold(0.0f32, |a, &c| a.max(c.abs()));
     let redundancy_ratio = if l2 > 1e-9 {
         (max_abs * max_abs) / (l2 * l2)
     } else {
@@ -99,12 +113,12 @@ pub fn structural_complexity(candidate: &Direction, weights: &ComplexityWeights)
         + weights.redundancy * redundancy_excess
 }
 
-// ── HlaProjectionGuide ────────────────────────────────────────────────────
+// ── BeliefGridProjectionGuide ────────────────────────────────────────────────────
 
 /// Reference `QualityGuide` combining relevance + elegance.
 ///
 /// Score = `sigmoid(λ · dot(c, t)) · sigmoid(−α · complexity(c))`.
-pub struct HlaProjectionGuide {
+pub struct BeliefGridProjectionGuide {
     /// λ — relevance sharpness (higher = sharper preference for target-aligned).
     pub lambda: f32,
     /// α — complexity penalty sharpness (higher = sharper preference for simple).
@@ -113,7 +127,7 @@ pub struct HlaProjectionGuide {
     pub weights: ComplexityWeights,
 }
 
-impl HlaProjectionGuide {
+impl BeliefGridProjectionGuide {
     /// Build with `lambda` (relevance) and `alpha` (complexity penalty).
     pub fn new(lambda: f32, alpha: f32, weights: ComplexityWeights) -> Self {
         Self {
@@ -124,7 +138,7 @@ impl HlaProjectionGuide {
     }
 }
 
-impl QualityGuide for HlaProjectionGuide {
+impl QualityGuide for BeliefGridProjectionGuide {
     #[inline]
     fn score(&self, target: &Target, candidate: &Direction) -> f32 {
         let dot = target.direction.dot(candidate);
@@ -149,7 +163,7 @@ mod tests {
 
     #[test]
     fn score_is_in_unit_interval() {
-        let guide = HlaProjectionGuide::new(2.0, 1.0, ComplexityWeights::default());
+        let guide = BeliefGridProjectionGuide::new(2.0, 1.0, ComplexityWeights::default());
         let target = Target::new(unit(4, 0));
         for axis in 0..4 {
             let candidate = unit(4, axis);
@@ -163,7 +177,7 @@ mod tests {
     fn score_monotone_in_dot_product() {
         // For a fixed target, score should increase as candidate moves into
         // alignment with the target.
-        let guide = HlaProjectionGuide::new(4.0, 0.0, ComplexityWeights::default());
+        let guide = BeliefGridProjectionGuide::new(4.0, 0.0, ComplexityWeights::default());
         let target = Target::new(unit(2, 0));
         let orthogonal = unit(2, 1); // dot = 0
         let aligned = unit(2, 0); // dot = 1
@@ -179,7 +193,7 @@ mod tests {
     fn score_monotone_decreasing_in_complexity() {
         // For two candidates with the same dot-product, the one with higher
         // structural complexity should score lower.
-        let guide = HlaProjectionGuide::new(0.0, 4.0, ComplexityWeights::default());
+        let guide = BeliefGridProjectionGuide::new(0.0, 4.0, ComplexityWeights::default());
         let target = Target::new(unit(4, 0));
 
         // Simple: single unit coord.
@@ -208,7 +222,7 @@ mod tests {
         // positive in x, while softmax depends on the whole vector.
         // Verify that increasing the dot-product always increases the
         // relevance portion (with complexity held at zero).
-        let guide = HlaProjectionGuide::new(2.0, 0.0, ComplexityWeights::default());
+        let guide = BeliefGridProjectionGuide::new(2.0, 0.0, ComplexityWeights::default());
         let target = Target::new(unit(2, 0));
 
         let mut prev = -f32::INFINITY;

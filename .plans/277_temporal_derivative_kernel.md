@@ -8,11 +8,11 @@
 > `-p riir-engine --bench reconstruction_bench --features reconstruction_bench`.
 
 **Date:** 2026-06-16
-**Research:** [katgpt-rs/.research/243_Temporal_Derivative_Kernel_Neocortical_Learning.md](../.research/243_Temporal_Derivative_Kernel_Neocortical_Learning.md)
+**Research:** [katgpt-rs/.research/435_Temporal_Derivative_Kernel_Neocortical_Learning.md](../.research/435_Temporal_Derivative_Kernel_Neocortical_Learning.md)
 **Source paper:** [arXiv:2606.08720](https://arxiv.org/abs/2606.08720) — O'Reilly, "This is how the Neocortex Learns" (Jun 2026)
-**Target:** `crates/katgpt-core/src/temporal_deriv.rs` (new module) + fusion hooks into `sense/reconstruction.rs` (HLA), `DeltaMemoryState` (Plan 053), `CollapseDetector` (Plan 212), CGSP curiosity (Plan 274)
+**Target:** `crates/katgpt-core/src/temporal_deriv.rs` (new module) + fusion hooks into `crates/katgpt-sense/src/reconstruction.rs` (HLA), `DeltaMemoryState` (Plan 053), `CollapseDetector` (Plan 212), CGSP curiosity (Plan 274)
 **Cargo feature:** `temporal_deriv` (opt-in until GOAT gate passes)
-**Status:** Active — Phase 0 (not started)
+**Status:** ✅ COMPLETE (2026-06-16) — Phase 6 exit MET, GOAT 4/4 PASS (G2 HLA companion, G3 δ-Mem gate, G4 collapse detector, G5 derivative curiosity). `temporal_deriv` promoted to DEFAULT-ON in katgpt-core + root Cargo.toml. No demotions (all fusions additive; CGSP stays for target-seeking).
 
 ---
 
@@ -81,7 +81,7 @@ Target: `crates/katgpt-core/src/temporal_deriv.rs`. Generic, no game semantics, 
 
 ## Phase 2 — Fusion F1: HLA Companion (sense_composition)
 
-Target: extend `crates/katgpt-core/src/sense/reconstruction.rs`. Adds a per-NPC 8-dim surprise vector as an output channel of the reconstruction cycle.
+Target: extend `crates/katgpt-sense/src/reconstruction.rs`. Adds a per-NPC 8-dim surprise vector as an output channel of the reconstruction cycle.
 
 ### Tasks
 
@@ -90,7 +90,7 @@ Target: extend `crates/katgpt-core/src/sense/reconstruction.rs`. Adds a per-NPC 
 - [x] **T2.3** Add accessor `pub fn surprise_vector(&self) -> Option<&[f32; 8]>` — returns `Some(&self.last_surprise)` if feature on, `None` otherwise. Clean downstream API.
 - [x] **T2.4** Add `pub fn surprise_norm(&self) -> f32` — 0.0 when feature off, otherwise delegates to kernel.
 - [x] **T2.5** Wire `ReconstructionConfig` with `temporal_deriv_alpha_fast: f32` (default 0.3) and `temporal_deriv_alpha_slow: f32` (default 0.03). Documented as the paper's ~10× ratio.
-- [x] **T2.6** Synthetic emotional-event trace benchmark (`benches/reconstruction_bench.rs` extension):
+- [x] **T2.6** Synthetic emotional-event trace benchmark (`riir-ai/crates/riir-engine/benches/reconstruction_bench.rs` extension):
   - Generate a 1000-tick trace with embedded events (combat onset at t=200, loot at t=500, encounter at t=800) — HLA gets a step change at those ticks.
   - **G2 gate:** does `surprise_norm()` peak within ±10 ticks of each embedded event? Target: ≥80% recall of events, ≤10% false positives (peaks outside event windows).
   - Compare against baseline: raw `hla.norm()` magnitude does *not* peak at events (it's monotonic). The derivative should.
@@ -208,7 +208,7 @@ Target: extend `crates/katgpt-core/src/cgsp/` (Plan 274). Adds a derivative-driv
 
 ## Cross-References
 
-- **Research:** [243_Temporal_Derivative_Kernel_Neocortical_Learning](../.research/243_Temporal_Derivative_Kernel_Neocortical_Learning.md)
+- **Research:** [435_Temporal_Derivative_Kernel_Neocortical_Learning](../.research/435_Temporal_Derivative_Kernel_Neocortical_Learning.md)
 - **Prior art (HLA):** [242_Topological_State_Tracking_Recurrent_Belief](../.research/242_Topological_State_Tracking_Recurrent_Belief.md), [Plan 276](276_micro_recurrent_belief_state.md), [Plan 221](221_kg_latent_octree_sense_composition.md)
 - **Prior art (δ-Mem):** [Plan 053](053_delta_mem_modelless.md)
 - **Prior art (collapse):** [Plan 212](212_collapse_aware_adaptive_thinking.md), [Benchmark 212](../.benchmarks/212_collapse_aware_goat.md)

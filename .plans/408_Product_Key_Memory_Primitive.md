@@ -22,7 +22,7 @@ Ship a generic, modelless, inference-time **Product Key Memory** retrieval primi
 
 ### Tasks
 
-- [x] **T1.1** Create module `katgpt-core/src/product_key_memory/` with `mod.rs`, `types.rs`, `kernel.rs`. Register in `katgpt-core/src/lib.rs` behind `#[cfg(feature = "product_key_memory")]`. ✅ Phase 1 (2026-07-07): all three files landed; `mod.rs` re-exports `ProductKeyMemory`, `PkQuery`, `ScoreFn`, `D_K_FLOOR`, `SQRT_N_FLOOR`. **Stable-Rust layout note:** the original plan called for nested const-generic arrays (`Box<[[f32; D_K/2]; SQRT_N]>`, `Box<[[f32; D_V]; SQRT_N*SQRT_N]>`); these require the unstable `generic_const_exprs` feature. Switched to flat `Box<[f32]>` row-major layout with runtime-computed row starts (mirrors Engram's `InMemoryEngramTable`). Dims are runtime-asserted in constructors (panic on invalid monomorphization) rather than type-level.
+- [x] **T1.1** Create module `katgpt-core/src/product_key_memory/` with `mod.rs`, `types.rs`, `kernel.rs`. Register in `crates/katgpt-core/src/lib.rs` behind `#[cfg(feature = "product_key_memory")]`. ✅ Phase 1 (2026-07-07): all three files landed; `mod.rs` re-exports `ProductKeyMemory`, `PkQuery`, `ScoreFn`, `D_K_FLOOR`, `SQRT_N_FLOOR`. **Stable-Rust layout note:** the original plan called for nested const-generic arrays (`Box<[[f32; D_K/2]; SQRT_N]>`, `Box<[[f32; D_V]; SQRT_N*SQRT_N]>`); these require the unstable `generic_const_exprs` feature. Switched to flat `Box<[f32]>` row-major layout with runtime-computed row starts (mirrors Engram's `InMemoryEngramTable`). Dims are runtime-asserted in constructors (panic on invalid monomorphization) rather than type-level.
 - [x] **T1.2** Add feature `product_key_memory = []` to `katgpt-core/Cargo.toml` (opt-in, no default deps — leaf-clean per tier-0 substrate rule). ✅ Phase 1 (2026-07-07): `product_key_memory = []` added; zero deps; pure stdlib splitmix64 PRNG for test init.
 - [x] **T1.3** Define `ProductKeyMemory<SQRT_N, D_K, D_V>` in `types.rs`:
   - `keys_1: Box<[[f32; D_K/2]; SQRT_N]>` (heap, √N rows)
@@ -67,7 +67,7 @@ Ship a generic, modelless, inference-time **Product Key Memory** retrieval primi
 
 ### Tasks
 
-- [x] **T3.1** Bench `benches/bench_408_pkm_goat.rs`:
+- [x] **T3.1** Bench `crates/katgpt-core/benches/bench_408_pkm_goat.rs`:
   - **G1 — O(√N) latency:** at `SQRT_N = 1000` (N = 10⁶ slots), `D_K = 64`, `D_V = 128`, `top_k = 8`, measure `query_into` p50 latency. Compare against brute-force O(N) scan over 10⁶ slots. Target: PKM ≥100× faster than brute-force. Report both as criterion benches.
   - **G2 — top-k correctness:** on a fixed random table, for 10⁴ random queries, compute the Jaccard overlap between PKM's top-k and brute-force's top-k. Target: ≥0.95 mean Jaccard (paper's factorization is approximate by construction — the Cartesian product of per-codebook top-k may miss the global top-k if the true top-k spans codebook boundaries; characterize this gap honestly).
   - **G3 — IDW centroid-ness:** on a synthetic k-means task (10 clusters in d_k/2 = 32 dim), initialize keys via k-means centroids, run 1000 queries, measure mean intra-cluster slot access rate. Compare Dot vs IDW. Target: IDW ≥1.2× higher intra-cluster rate.
@@ -88,12 +88,12 @@ Ship a generic, modelless, inference-time **Product Key Memory** retrieval primi
 
 ### Tasks
 
-- [x] **T4.1** Add `FrozenProductKeyMemory` wrapper in `product_key_memory/freeze.rs` (gated `product_key_memory_freeze`, depends on `katgpt-core/freeze`):
+- [x] **T4.1** Add `FrozenProductKeyMemory` wrapper in `crates/katgpt-core/src/product_key_memory/freeze.rs` (gated `product_key_memory_freeze`, depends on `katgpt-core/freeze`):
   - Holds `Arc<ProductKeyMemory>` for readers, `arc_swap::ArcSwap` for atomic swap.
   - `commit(&self, new: ProductKeyMemory) -> [u8; 32]` — BLAKE3 over the three tables, atomic swap, return commitment.
   - `verify(&self, expected: &[u8; 32]) -> bool` — re-hash, compare.
   - `query_into` delegates to the current `Arc` load (lock-free read path).
-  ✅ Phase 4 (2026-07-07): wrapper landed at `crates/katgpt-core/src/product_key_memory/freeze.rs`. **Design deviation from plan** (documented): the plan called for `arc_swap::ArcSwap`, but `katgpt-core` does NOT depend on `arc-swap` (only `riir-engine` does). Per the established `induced_cwm/hot_swap.rs` precedent and the "prefer existing dependencies" rule, used `Arc<RwLock<Arc<ProductKeyMemory>>>` instead. The read critical section is one `Arc::clone()` (sub-µs); writers are rare (sleep-cycle cadence). Documented at length in the module docs with a drop-in upgrade path to `ArcSwap` if profiling ever shows `RwLock` read contention. API surface: `new`, `empty`, `commit -> [u8;32]`, `current -> Option<Arc<ProductKeyMemory>>`, `current_commitment -> Option<[u8;32]>`, `verify(&[u8;32]) -> bool`, `current_version -> u64`, `query_into` (delegates to `current()`), `is_empty`, `arc_strong_count`. `version: Arc<AtomicU64>` so clones share the counter. BLAKE3 commitment via `bytemuck::cast_slice::<f32,u8>` + domain tag `b"pkm_v1"` (LE-canonical on all our targets: x86_64, aarch64). 6 contract tests PASS (new/empty/commit/snapshot-stability/query-delegation/clone-shares).
+  ✅ Phase 4 (2026-07-07): wrapper landed at `crates/katgpt-core/src/product_key_memory/freeze.rs`. **Design deviation from plan** (documented): the plan called for `arc_swap::ArcSwap`, but `katgpt-core` does NOT depend on `arc-swap` (only `riir-engine` does). Per the established `crates/katgpt-core/src/induced_cwm/hot_swap.rs` precedent and the "prefer existing dependencies" rule, used `Arc<RwLock<Arc<ProductKeyMemory>>>` instead. The read critical section is one `Arc::clone()` (sub-µs); writers are rare (sleep-cycle cadence). Documented at length in the module docs with a drop-in upgrade path to `ArcSwap` if profiling ever shows `RwLock` read contention. API surface: `new`, `empty`, `commit -> [u8;32]`, `current -> Option<Arc<ProductKeyMemory>>`, `current_commitment -> Option<[u8;32]>`, `verify(&[u8;32]) -> bool`, `current_version -> u64`, `query_into` (delegates to `current()`), `is_empty`, `arc_strong_count`. `version: Arc<AtomicU64>` so clones share the counter. BLAKE3 commitment via `bytemuck::cast_slice::<f32,u8>` + domain tag `b"pkm_v1"` (LE-canonical on all our targets: x86_64, aarch64). 6 contract tests PASS (new/empty/commit/snapshot-stability/query-delegation/clone-shares).
 - [x] **T4.2** Stress test: 100K concurrent reads + 100 swaps, verify no torn reads (generalize the Issue 354 `concurrent_lora_no_torn_read` test to a √N×√N table). Target: 0 torn reads. ✅ Phase 4 (2026-07-07): `concurrent_commit_read_no_torn_read` — 100 commits + 100K reads, fills all three slices per-commit with version-correlated values so a torn read shows `keys_1[0] != keys_2[0] != values[0]`. **0 torn reads** (impossible-by-construction with `RwLock<Arc>` — the whole Arc is swapped atomically). Plus `concurrent_commit_read_version_monotonic` companion: 50 commits + 50K reads, verifies the version counter is monotonic. Both PASS.
 - [x] **T4.3** Bit-identity test: swap in a byte-identical table, verify commitment matches. Swap in a 1-bit-flipped table, verify commitment differs. ✅ Phase 4 (2026-07-07): `bit_identity_byte_identical_tables_match` — `from_random(123)` twice → byte-identical → commitments match (G6 determinism substrate). `bit_identity_one_bit_flip_differs` — flip lowest bit of `keys_1[0]` via `f32::from_bits(f.to_bits() ^ 1)` → commitments differ. Plus `commitment_tag_distinguishes_from_raw_slice_hash` — the `b"pkm_v1"` domain tag means our hash differs from a naive `BLAKE3(keys_1 || keys_2 || values)`. All 3 PASS. **Total: 12/12 Phase 4 tests green.**
 
@@ -103,7 +103,7 @@ Ship a generic, modelless, inference-time **Product Key Memory** retrieval primi
 
 ### Tasks
 
-- [x] **T5.1** In `product_key_memory/episodic.rs` (gated `product_key_memory_episodic`, depends on `product_key_memory` + `katgpt-core/pruners/delta_mem`):
+- [x] **T5.1** In `crates/katgpt-core/src/product_key_memory/episodic.rs` (gated `product_key_memory_episodic`, depends on `product_key_memory` + `katgpt-core/pruners/delta_mem`):
   - `PkmEpisodicStore` — wraps `FrozenProductKeyMemory` + a δ-rule write path.
   - `write(&mut self, q: &[f32; D_K], target: &[f32; D_V], gate: f32)` — δ-rule update on the top-k accessed value rows: `V[idx] += gate * (target - V[idx])` for each `idx` in the current query's top-k. This IS the modelless analog of FwPKM's `L_mem` GD step at η=1 (the gradient of `½‖target − V[idx]‖²` w.r.t. `V[idx]` is `−(target − V[idx])`, so one GD step at η=1 IS `V[idx] += (target − V[idx])`).
   - The `gate` parameter is the curiosity signal (paper's `g_t`) — sourced externally from Temporal Derivative Kernel (Plan 277) or CGSP (Plan 274), NOT computed internally. This keeps the primitive generic (no curiosity-signal dependency).
@@ -134,7 +134,7 @@ These are tracked here for visibility but executed in private repos if the GOAT 
 
 - [-] **T7.1 (riir-neuron-db)** F5 fusion: PKM × Raven consolidation. File `riir-neuron-db/.research/013_*.md` guide + `.plans/` if F5 lands. Gate G6: retention ≥80% after 5 domain shifts vs paper's <30%. **This is the fusion that re-opens the Super-GOAT question** per Research 387 §5.
 - [-] **T7.2 (riir-chain)** F6 fusion: PKM × LatCal commitment. File `riir-chain/.research/010_*.md` guide + `.plans/` if the chain wants quorum-attested PKM snapshots. Gate G8: quorum bit-identity.
-- [-] **T7.3 (riir-ai)** F2 fusion: PKM × CommittedFieldBlend gate. Wire into `riir-engine/src/npc_memory.rs` as the √N-scaled retrieval backend for `NpcMemoryStore`. Private runtime composition.
+- [-] **T7.3 (riir-ai)** F2 fusion: PKM × CommittedFieldBlend gate. Wire into `riir-ai/crates/riir-engine/src/npc_memory.rs` as the √N-scaled retrieval backend for `NpcMemoryStore`. Private runtime composition.
 
 ---
 

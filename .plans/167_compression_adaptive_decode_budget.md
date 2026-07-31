@@ -27,26 +27,26 @@ Per `.contexts/optimization.md`:
 ## Phase 1: Budget Derivation Function
 
 ### Task 1 — Add `BudgetAdaptation` enum
-- [x] T1: Add `BudgetAdaptation` enum to `speculative/types.rs` — Off/Compression/Entropy with Default=Off
+- [x] T1: Add `BudgetAdaptation` enum to `crates/katgpt-core/src/speculative/types.rs` — Off/Compression/Entropy with Default=Off
 - [x] Add to `FlashPrefillConfig.budget_adaptation` field
 - [x] Default: `Off` (current behavior preserved)
 
 ### Task 2 — Implement `adaptive_tree_budget()` function
-- [x] T2: New module `speculative/budget.rs` with `adaptive_tree_budget()` + `compression_ratio()`
+- [x] T2: New module `crates/katgpt-speculative/src/budget.rs` with `adaptive_tree_budget()` + `compression_ratio()`
   - Linear scale: f(0)=0.5, f(0.5)=1.25, f(1)=2.0, clamped [base/2, base*2]
 - [x] Unit tests: 11 tests covering all modes, clamping, edge cases, monotonicity
 
 ### Task 3 — Extract compression ratio from existing scoring
 - [x] T3: `compression_ratio()` free function in `budget.rs` — zero-alloc division
 - [x] `block_compression_ratio()` in `prefill.rs` — computes ratio from block scores + alpha threshold
-- [x] Re-exported from `speculative/mod.rs` under `budget_adaptation` feature gate
+- [x] Re-exported from `crates/katgpt-core/src/speculative/mod.rs` under `budget_adaptation` feature gate
 
 ---
 
 ## Phase 2: Wiring into DDTree Dispatch
 
 ### Task 4 — Pass adaptive budget to `speculative_step`
-- [x] T4: `effective_tree_budget()` in `speculative/budget_compat.rs` — bridges to dispatch layer
+- [x] T4: `effective_tree_budget()` in `crates/katgpt-speculative/src/budget_compat.rs` — bridges to dispatch layer
   - Feature-gated: delegates to `adaptive_tree_budget()` when enabled, returns base otherwise
   - Backward compatible: same signature in both modes
 
@@ -56,7 +56,7 @@ Per `.contexts/optimization.md`:
   - Field parsed via serde, defaults to Off
 
 ### Task 6 — Wire into DFlash marginals
-- [x] T6: `scaled_draft_lookahead()` in `speculative/budget_compat.rs`
+- [x] T6: `scaled_draft_lookahead()` in `crates/katgpt-speculative/src/budget_compat.rs`
   - sqrt scaling: 2× budget → ~1.4× lookahead, 0.5× budget → ~0.7× lookahead
   - Clamped: lookahead ∈ [1, base*2]
   - 8 unit tests covering all cases
@@ -120,8 +120,8 @@ Per `.contexts/optimization.md`:
 
 | File | Action | Description |
 |------|--------|-------------|
-| `src/speculative/budget.rs` | NEW | Core `adaptive_tree_budget()` + `compression_ratio()` + 11 unit tests |
-| `src/speculative/budget_compat.rs` | NEW | Integration layer: `effective_tree_budget()` + `scaled_draft_lookahead()` + 9 tests |
+| `crates/katgpt-speculative/src/budget.rs` | NEW | Core `adaptive_tree_budget()` + `compression_ratio()` + 11 unit tests |
+| `crates/katgpt-speculative/src/budget_compat.rs` | NEW | Integration layer: `effective_tree_budget()` + `scaled_draft_lookahead()` + 9 tests |
 | `src/speculative/types.rs` | MODIFIED | Added `BudgetAdaptation` enum + field on `FlashPrefillConfig` |
 | `src/speculative/prefill.rs` | MODIFIED | Added `block_compression_ratio()` |
 | `src/speculative/mod.rs` | MODIFIED | Module + re-exports |

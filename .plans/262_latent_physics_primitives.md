@@ -21,7 +21,7 @@ These are NOT game-specific. Any game with NPC AI that thinks in latent space ne
 ## Tasks
 
 ### Phase 0: SectorProjection
-- [x] Create `katgpt-rs-core/src/sense/sector.rs`
+- [x] Create `crates/katgpt-sense/src/sector.rs`
 - [x] Define `SectorProjection` struct:
   ```rust
   /// Multi-sector spatial projection for NPC perception.
@@ -43,7 +43,7 @@ These are NOT game-specific. Any game with NPC AI that thinks in latent space ne
 - [x] Bench: measure N=8 sector projection latency (target: < 100ns, since SenseModule is 45ns) — **37.4ns, 2.7x under target**
 
 ### Phase 1: ActionBridge
-- [x] Create `katgpt-rs-core/src/bridge/mod.rs` (new module)
+- [x] Create `crates/katgpt-core/src/bridge/mod.rs` (new module)
 - [x] Define `ActionBridge` struct:
   ```rust
   /// Bridges latent Q-values to raw game actions via sigmoid-gated projection.

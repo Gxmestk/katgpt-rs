@@ -19,7 +19,7 @@
 
 ### Phase 1 — SparseTaskVector storage (Fusion A, foundation) ✅ DONE
 
-- [x] T1.1 Create `src/sparse_task_vector.rs` module skeleton + `SparseTaskVector` struct.
+- [x] T1.1 Create `crates/katgpt-sparse/src/sparse_task_vector.rs` module skeleton + `SparseTaskVector` struct.
 - [x] T1.2 Implement `SparseTaskVector::from_dense(weight, threshold)` — extract sparse mask from dense delta.
 - [x] T1.3 Implement `SparseTaskVector::apply_to(&mut base)` — scatter-add mask into base weight buffer.
 - [x] T1.4 Implement `SparseTaskVector::apply_to_scratch(&base, scratch)` — zero-alloc variant for hot path.

@@ -299,7 +299,7 @@ Top co-occurring pairs:
 
 | Paper | What We Adopted | Where |
 |-------|----------------|-------|
-| 02 Leviathan | Speculative decoding with rejection sampling | `speculative/verifier.rs` |
+| 02 Leviathan | Speculative decoding with rejection sampling | `crates/katgpt-speculative/src/spechop/verifier.rs` |
 | 06 Raven | O(1) slot memory routing | `forward_raven()` |
 | 08 TwELL | Sparse MLP matmul for ReLU activations | `types.rs sparse_matmul` |
 | 20 TurboQuant | 3-bit KV cache quantization (legacy baseline) | `turboquant` module |
@@ -307,7 +307,7 @@ Top co-occurring pairs:
 | 70 GDN2 | Gated DeltaNet-2, decoupled erase/write gates, O(1) decode, 99.4% AHLA throughput, 87–98% memory savings, GOAT 14/14 (**default-on**) | `src/gdn2/`, `gdn2_attention` feature |
 | 39 SpectralQuant | Eigenbasis rotation + water-fill (secondary KV, 9.1× compression) | `spectralquant` module |
 | 63 OCTOPUS | Octahedral triplet codec (**primary default**, 12.2× compression, -22% to -49% MSE vs SQ) | `octopus` module |
-| 40 BT Ranking | Bradley-Terry pairwise ranking (**default**, GOAT 4/4) | `pruners/bt_rank.rs` |
+| 40 BT Ranking | Bradley-Terry pairwise ranking (**default**, GOAT 4/4) | `crates/katgpt-pruners/src/bt_rank.rs` |
 | 42 SP-KV | Self-pruned KV attention, 3-10× reduction | SP-KV module |
 | 44 ELF | SDE noise injection (**default**, 10-22× path diversity) | `inject_sde_noise` |
 | 45 MaxSim | Late-interaction scoring, CPU SIMD 7.46× | MaxSim primitive |

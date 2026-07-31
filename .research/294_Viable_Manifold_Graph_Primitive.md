@@ -80,9 +80,9 @@ Tradeoff: gain in reliability comes at a small cost in diversity of decoded samp
 | Intrinsic-dimension phase gate `N ≥ d` | `phase_transition_gate(n, d)` (same module) | ✅ Shipped. Different use (sample sufficiency), same math substrate. |
 | Sigmoid semaphore `α(z)` blend | `PersonalityWeightedComposition::compose_into` (Plan 297) kernel: `Σ sigmoid(wᵢ/τ) · belief_confidence_i · dᵢ` | ✅ Shipped, **default-on**. Same mathematical shape as the calibrated-decoder blend. |
 | Top-down direction-vector injection (the "steer toward" half) | `apply_latent_steering(state, field)` (Plan 309, R290) | ✅ Shipped, **default-on**, Super-GOAT. VMG is the "stay within" complement. |
-| Quality gate on direction vectors (Dirichlet separation ratio) | `latent_functor/quality_gate.rs::DirectionQuality` | ✅ Shipped in riir-ai. Predicate-shape analogue for *directions*, not *states*. |
-| Coherence-decay → re-estimation trigger | `latent_functor/reestimation.rs::tick` (Plan 303) | ✅ Shipped in riir-ai. The "low coherence = drift off safe manifold" signal exists; VMG adds the *graph* substrate to make drift recoverable by navigation, not just by re-estimation. |
-| Generic A* on graphs | `pruners/pathfinder.rs::find_path` (Plans 017/018, raw grid A*) | ✅ Shipped. Raw-grid, not graph-of-latent-nodes. Different substrate. |
+| Quality gate on direction vectors (Dirichlet separation ratio) | `riir-ai/crates/riir-engine/src/latent_functor/quality_gate.rs::DirectionQuality` | ✅ Shipped in riir-ai. Predicate-shape analogue for *directions*, not *states*. |
+| Coherence-decay → re-estimation trigger | `riir-ai/crates/riir-engine/src/latent_functor/reestimation/mod.rs::tick` (Plan 303) | ✅ Shipped in riir-ai. The "low coherence = drift off safe manifold" signal exists; VMG adds the *graph* substrate to make drift recoverable by navigation, not just by re-estimation. |
+| Generic A* on graphs | `crates/katgpt-pruners/src/pathfinder.rs::find_path` (Plans 017/018, raw grid A*) | ✅ Shipped. Raw-grid, not graph-of-latent-nodes. Different substrate. |
 | CAT(0) geodesic on safe nodes (raw space) | `CubicalNerve::cat0_geodesic()` (Plan 252) | ✅ Shipped. **Raw navigation space, not latent.** Direct structural cousin — same shape (shortest path on a subgraph of "safe" nodes), different domain. VMG is the latent-space upgrade. |
 | Latent node network substrate | `DenseMesh` (Plan 266) | ⚠️ Shipped but **Gate 2 FAILED** empirically (composition of untrained LoRA edges = no-op). Substrate exists; the *composition* use case failed. VMG uses a latent node graph for *navigation*, not composition — different use case, not blocked by DenseMesh's failure. |
 
@@ -111,7 +111,7 @@ Without VMG: crowd-scale curiosity-driven exploration of HLA affect space produc
 
 **Fusion B (open, secondary): VMG × jacobian_svd_at × reestimation → drift-recovery by navigation, not by re-estimation**
 
-Today, `latent_functor/reestimation.rs` triggers when coherence decays — it re-derives the direction vector from scratch. VMG offers an alternative recovery: instead of re-estimating, *navigate back* along the safe-manifold graph to the nearest coherent node. This is cheaper (graph lookup vs SVD) and preserves the learned direction (no re-derivation).
+Today, `riir-ai/crates/riir-engine/src/latent_functor/reestimation/mod.rs` triggers when coherence decays — it re-derives the direction vector from scratch. VMG offers an alternative recovery: instead of re-estimating, *navigate back* along the safe-manifold graph to the nearest coherent node. This is cheaper (graph lookup vs SVD) and preserves the learned direction (no re-derivation).
 
 **Fusion C (latent-space reframing of an existing raw-space primitive): VMG × Cubical CAT(0) → unified safe-graph navigation across raw and latent space**
 
@@ -139,7 +139,7 @@ Curiosity drives exploration. Today, exploration is a free Gaussian step in late
 
 If the safe-manifold graph itself is a chain artifact (e.g., a "faction persona manifold" committed by the faction's founding snapshot), the graph's BLAKE3-committed structure is the IP. LatCal bridges: the *graph adjacency* is committed raw; the *latent positions* of nodes stay latent. The bridge function is `manifold_graph_commitment_hash(g) → [u8; 32]` — a deterministic BLAKE3 over the sorted edge list, not over the latent coordinates.
 
-### 3.5 `NeuronShard` (`riir-neuron-db/src/shard.rs`)
+### 3.5 `NeuronShard` (`riir-neuron-db/src/shard/mod.rs`)
 
 A shard's `style_weights[64]` is a frozen latent direction. The "playable manifold around this shard" = the set of latent states reachable from the shard's projection that remain coherent. Freeze/thaw versions the manifold: each snapshot defines its own safe subgraph, and persona divergence between NPCs is measurable as graph-distance between their current node in their respective manifolds. **Cross-ref for `riir-neuron-db` follow-up**: a `shard_manifold_graph` view (gated behind a new feature) would be the shard-side analogue of Plan 301's `subspace_phase_gate` wrapper.
 
@@ -152,7 +152,7 @@ A shard's `style_weights[64]` is a frozen latent direction. The "playable manifo
 | **Q1** No prior art? | **YES** | Three-layer check done. Paper-vocab grep (`pullback`, `Riemannian`, `playability`, `Jacobian volume`, `manifold graph`) → zero code hits, zero research-note hits (except abstract math references). Codebase-vocab grep (`safe_graph`, `viable_node`, `metric_volume`, `det_JtJ`, `manifold_walk`) → zero code hits. Existing primitives cover *pieces* (`jacobian_svd_at` computes the SVD; LFS injects direction; Cubical CAT(0) does raw-space geodesic; DenseMesh is a *composition* graph that failed Gate 2), but **no shipped primitive computes the pullback volume, builds a safe-manifold subgraph, or runs geodesic/random-walk navigation on it in latent space**. |
 | **Q2** New capability class? | **YES** | Today NPC latent state evolves by `evolve_hla` (deterministic from raw inputs) or by Latent Field Steering (top-down designer injection). There is **no mechanism** for "explore the safe affect manifold" — i.e., NPCs cannot random-walk their own affect to discover emergent personas, and designers cannot interpolate between two persona shards along a coherent path. VMG adds this. New capability class (coherent exploration of latent state), not an optimization. |
 | **Q3** Product selling point? | **YES** | *"NPCs random-walk and interpolate their affect within a learned viable-manifold graph; every explored state stays coherent by construction. Designers author 'persona A → persona B' transitions and the runtime finds a coherent path through affect space — no broken intermediate states, no per-NPC training, crowd-scale at 20Hz tick."* Defensible, demoable, no flat-exploration competitor can match. |
-| **Q4** Force multiplier? | **YES** | Touches ≥6 pillars: (1) HLA kernel (`sense/reconstruction.rs`), (2) `latent_functor/reestimation` + `quality_gate`, (3) Latent Field Steering (R290), (4) cgsp curiosity exploration, (5) Cubical CAT(0) geodesic (raw→latent upgrade), (6) NeuronShard freeze/thaw (persona versioning via per-snapshot manifolds), (7) `jacobian_svd_at` (new use of existing primitive). |
+| **Q4** Force multiplier? | **YES** | Touches ≥6 pillars: (1) HLA kernel (`crates/katgpt-sense/src/reconstruction.rs`), (2) `latent_functor/reestimation` + `quality_gate`, (3) Latent Field Steering (R290), (4) cgsp curiosity exploration, (5) Cubical CAT(0) geodesic (raw→latent upgrade), (6) NeuronShard freeze/thaw (persona versioning via per-snapshot manifolds), (7) `jacobian_svd_at` (new use of existing primitive). |
 
 **All 4 YES → Super-GOAT.**
 

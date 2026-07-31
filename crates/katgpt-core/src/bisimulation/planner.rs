@@ -5,7 +5,7 @@
 //! the shortest operator-label sequence that takes `start_class` to
 //! `goal_class`. Breadth-first search over the quotient graph is sufficient
 //! for G3 (plan validity): BFS finds the minimum-length plan, and replaying
-//! it against the original [`TransitionGraph`] verifies no precondition
+//! it against the original `TransitionGraph` verifies no precondition
 //! violations.
 //!
 //! **Out of scope:** MetricFF-grade classical planning, heuristic search,

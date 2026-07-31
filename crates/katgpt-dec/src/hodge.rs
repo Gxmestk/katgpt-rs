@@ -729,7 +729,7 @@ pub(crate) fn hodge_eigendecomposition_full(
     (sorted_values, sorted_vecs_flat)
 }
 
-/// Public eigenvalues-only API (delegates to [`hodge_eigendecomposition_full`]).
+/// Public eigenvalues-only API (delegates to `hodge_eigendecomposition_full`).
 ///
 /// Backwards-compatible: the historical signature returns `Vec<f32>` (eigenvalues
 /// sorted descending). The full decomposition (Plan 359) is available via the

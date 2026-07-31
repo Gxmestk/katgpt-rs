@@ -90,7 +90,7 @@ The existing `attention_head` already accepts `t_n: usize` (number of KV positio
 - [x] **Task 1: Add `LoraAdapter` CPU struct** (`src/types.rs`)
   - Production-grade CPU-side LoRA adapter for CPU inference path.
   - Mirrors `GpuLoraAdapter` fields but uses `Vec<f32>` instead of GPU buffers.
-  - Loads from the same `.bin` format as `gpu/lora.rs::export_lora` (blake3 checksum, LORA magic).
+  - Loads from the same `.bin` format as `crates/katgpt-types/src/lora.rs::export_lora` (blake3 checksum, LORA magic).
   ```rust
   /// CPU-side LoRA adapter for CPU inference path.
   /// Loads from the same binary format as GpuLoraAdapter (Plan 008).
@@ -105,7 +105,7 @@ The existing `attention_head` already accepts `t_n: usize` (number of KV positio
   }
 
   impl LoraAdapter {
-      /// Load from binary file (same format as gpu/lora.rs::export_lora).
+      /// Load from binary file (same format as crates/katgpt-types/src/lora.rs::export_lora).
       /// Format: [LORA(4) | version(4) | blake3(32) | payload...]
       pub fn load(path: &Path) -> Result<Self, String> { ... }
   }
@@ -140,7 +140,7 @@ The existing `attention_head` already accepts `t_n: usize` (number of KV positio
   - B projection fused directly into output (no intermediate delta buffer).
   - `lora_buf` passed in from `PrefillContext` or `ForwardContext`.
 
-- [x] **Task 2: Add `PrefillContext` struct** (`src/transformer.rs`)
+- [x] **Task 2: Add `PrefillContext` struct** (`crates/katgpt-percepta/src/transformer.rs`)
   - Pre-allocated buffers for bidirectional prefill. Created once, reused across requests.
   ```rust
   /// Pre-allocated context for bidirectional prefill phase.
@@ -168,7 +168,7 @@ The existing `attention_head` already accepts `t_n: usize` (number of KV positio
   }
   ```
 
-- [x] **Task 3: Implement `forward_prefill`** (`src/transformer.rs`)
+- [x] **Task 3: Implement `forward_prefill`** (`crates/katgpt-percepta/src/transformer.rs`)
   - Bidirectional prefill: processes all prompt tokens, populates KV cache, returns logits for last prompt position.
   - Two-phase per layer: KV fill → bidirectional attention.
   - Zero-copy: reuses `ForwardContext` buffers per-position, `PrefillContext::hidden` between layers.
@@ -356,7 +356,7 @@ The existing `attention_head` already accepts `t_n: usize` (number of KV positio
   }
   ```
 
-- [x] **Task 4: Add LoRA to decode `forward`** (`src/transformer.rs`)
+- [x] **Task 4: Add LoRA to decode `forward`** (`crates/katgpt-percepta/src/transformer.rs`)
   - Add optional `lora: Option<&LoraAdapter>` parameter to `forward`.
   - Apply LoRA delta after each projection (Q, K, V, O, MLP w1, MLP w2).
   - Zero-copy: `lora_buf` added to `ForwardContext` (pre-allocated, reused).
@@ -376,7 +376,7 @@ The existing `attention_head` already accepts `t_n: usize` (number of KV positio
   - All existing call sites pass `None` (no LoRA) — zero breaking change.
   - New call sites (with LoRA) pass `Some(&writer_lora)`.
 
-- [x] **Task 5: Update call sites for `forward` signature** (`src/transformer.rs`, `src/speculative/step.rs`)
+- [x] **Task 5: Update call sites for `forward` signature** (`crates/katgpt-percepta/src/transformer.rs`, `crates/katgpt-forward/src/step.rs`)
   - `generate_into`, `generate`, `generate_batch`: pass `None`.
   - `forward_paged`: add `lora` param, pass `None` in existing call sites.
   - `forward_raven`: add `lora` param, pass `None`.
@@ -384,7 +384,7 @@ The existing `attention_head` already accepts `t_n: usize` (number of KV positio
   - All existing callers are non-breaking (new param has default `None` via wrapper).
   - Strategy: create `forward_base` with lora param, `forward` wrapper defaults to `None`.
 
-- [x] **Task 6: Add dual LoRA to `DomainConfig` and `ExpertBundle`** (`src/router/types.rs`)
+- [x] **Task 6: Add dual LoRA to `DomainConfig` and `ExpertBundle`** (`riir-ai/crates/riir-router/src/types.rs`)
   ```toml
   # domains.toml — add reader_lora / writer_lora to any domain
   ```
@@ -421,7 +421,7 @@ The existing `attention_head` already accepts `t_n: usize` (number of KV positio
   - Keep `lora_path` for backward compat. If only `lora` is specified, it becomes `writer_lora` (decode-only).
   - If both `reader_lora` and `writer_lora` are specified, full ZAYA mode.
 
-- [x] **Task 7: Load dual LoRAs in `ExpertRegistry`** (`src/router/registry.rs`)
+- [x] **Task 7: Load dual LoRAs in `ExpertRegistry`** (`crates/katgpt-core/src/arg/registry.rs`)
   ```rust
   impl ExpertRegistry {
       fn resolve_lora_pair(domain: &DomainConfig, pruner_dir: &Path) -> LoraPair {
@@ -445,7 +445,7 @@ The existing `attention_head` already accepts `t_n: usize` (number of KV positio
   - Graceful degradation: if a LoRA file fails to load, log warning, proceed without it.
   - The inference path checks `lora.is_some()` before applying — no penalty when absent.
 
-- [x] **Task 8: Add `generate_with_prefill`** (`src/transformer.rs`)
+- [x] **Task 8: Add `generate_with_prefill`** (`crates/katgpt-percepta/src/transformer.rs`)
   - End-to-end generation function that does prefill → decode with LoRA switching.
   ```rust
   /// Full generation pipeline: bidirectional prefill → causal decode.
@@ -500,7 +500,7 @@ The existing `attention_head` already accepts `t_n: usize` (number of KV positio
   }
   ```
 
-- [x] **Task 9: Unit tests** (`src/transformer.rs` tests module)
+- [x] **Task 9: Unit tests** (`crates/katgpt-percepta/src/transformer.rs` tests module)
   - `test_forward_prefill_logits_finite`: prefill produces finite logits
   - `test_forward_prefill_populates_cache`: KV cache has data for all prompt positions
   - `test_forward_prefill_logits_shape`: output shape matches vocab_size
@@ -513,7 +513,7 @@ The existing `attention_head` already accepts `t_n: usize` (number of KV positio
   - `test_no_lora_matches_existing_forward`: forward with `None` matches old behavior
   - `test_generate_with_prefill_produces_tokens`: end-to-end generates valid tokens
 
-- [x] **Task 10: Benchmark** (`examples/bidirectional_prefill_demo.rs`)
+- [x] **Task 10: Benchmark** (`examples/core_04_prefill.rs`)
   - Benchmark `forward_prefill` vs sequential `forward` for same prompt length
   - Measure: time per prefill, cache population correctness
   - Compare: causal prefill (N calls to `forward`) vs bidirectional prefill (one `forward_prefill`)
@@ -536,9 +536,9 @@ The existing `attention_head` already accepts `t_n: usize` (number of KV positio
 | File | Change |
 |------|--------|
 | `src/types.rs` | Add `LoraAdapter` struct, `lora_apply` function, `LoraAdapter::load` |
-| `src/transformer.rs` | Add `PrefillContext`, `forward_prefill`, `forward_base`, update `forward` signature, add `generate_with_prefill`, update `ForwardContext` with `lora_buf` |
-| `src/router/types.rs` | Add `reader_lora`/`writer_lora` to `DomainConfig`, add `LoraPair`, update `ExpertBundle` |
-| `src/router/registry.rs` | Add `resolve_lora_pair`, load dual LoRAs |
+| `crates/katgpt-percepta/src/transformer.rs` | Add `PrefillContext`, `forward_prefill`, `forward_base`, update `forward` signature, add `generate_with_prefill`, update `ForwardContext` with `lora_buf` |
+| `riir-ai/crates/riir-router/src/types.rs` | Add `reader_lora`/`writer_lora` to `DomainConfig`, add `LoraPair`, update `ExpertBundle` |
+| `crates/katgpt-core/src/arg/registry.rs` | Add `resolve_lora_pair`, load dual LoRAs |
 | `domains.toml` | Add `reader_lora`/`writer_lora` fields |
 | `README.md` | Add Plan 025 architecture section |
 

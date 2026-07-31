@@ -100,7 +100,7 @@ Data flow:
   - Tests: verify param counts, verify block_size >= game_seq_len
 
 - [x] **Task 2: Game data adapter in riir-gpu** ✅
-  - Add `riir-gpu/src/game/trainer.rs` with:
+  - Add `riir-ai/crates/riir-gpu/src/game/trainer.rs` with:
     - `const BOARD_VOCAB: usize = 4` (board cell types)
     - `const ACTION_OFFSET: usize = 4` (action tokens start at 4)
     - `fn encode_game_sample(sample: &GameSample) -> TrainingSample`
@@ -172,7 +172,7 @@ Data flow:
 
 | File | Lines | Purpose | Target |
 |------|-------|---------|--------|
-| `riir-gpu/src/game/trainer.rs` | ~80 | Game data encoding + training constants | riir-ai |
+| `riir-ai/crates/riir-gpu/src/game/trainer.rs` | ~80 | Game data encoding + training constants | riir-ai |
 | `riir-ai/.docs/11_e2e_training_results.md` | ~50 | E2E validation results | riir-ai |
 
 ### Modified files
@@ -180,9 +180,9 @@ Data flow:
 | File | Change | Target |
 |------|--------|--------|
 | `katgpt-rs/src/types.rs` | Add `Config::game()` (~20 lines) | katgpt-rs |
-| `riir-gpu/src/game/mod.rs` | Add `pub mod trainer;` | riir-ai |
-| `riir-gpu/src/lib.rs` | Export game trainer types | riir-ai |
-| `riir-gpu/examples/train_bomber.rs` | Rewrite: real Trainer, no dummy grads (~200→150 lines) | riir-ai |
+| `riir-ai/crates/riir-gpu/src/game/mod.rs` | Add `pub mod trainer;` | riir-ai |
+| `riir-ai/crates/riir-gpu/src/lib.rs` | Export game trainer types | riir-ai |
+| `riir-train/crates/riir-train-gpu/examples/train_bomber.rs` | Rewrite: real Trainer, no dummy grads (~200→150 lines) | riir-ai |
 
 ### Removed code
 

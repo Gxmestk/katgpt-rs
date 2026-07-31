@@ -90,7 +90,7 @@ impl GpartAdapter {
     /// trading output fidelity for reduced effective FLOPs on the downstream matmul.
     ///
     /// `group_mask.len()` must be `>= self.d`. When `group_mask` is all-true this
-    /// is identical to [`apply_with_scratch`].
+    /// is identical to [`apply_with_scratch`](Self::apply_with_scratch).
     ///
     /// Gates: `gpart_pruning` feature (Issue 008). Static top-k magnitude mask;
     /// BanditPruner-driven dynamic mask is deferred to a separate plan.
@@ -171,7 +171,7 @@ impl GpartAdapter {
     ///
     /// Returns a `Vec<bool>` of length `d` where `true` = active. When `k >= d`, all
     /// groups are active (no pruning). This is the static selection policy for
-    /// [`apply_with_scratch_masked`] — cheap to compute, deterministic, requires no
+    /// [`apply_with_scratch_masked`](Self::apply_with_scratch_masked) — cheap to compute, deterministic, requires no
     /// reward signal. Dynamic bandit-based masking is deferred to a separate plan.
     ///
     /// Gates: `gpart_pruning` feature (Issue 008).

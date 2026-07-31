@@ -1,7 +1,7 @@
 # Plan 240: Spectral NPC Perception Compression
 
 > **📍 Migration note (2026-06-28, Issue 007 Phase C follow-up):** The bench
-> referenced below (`crates/katgpt-core/benches/sense_lod.rs`) moved to
+> referenced below (`riir-ai/crates/riir-engine/benches/sense_lod.rs`) moved to
 > `riir-ai/crates/riir-engine/benches/sense_lod.rs` (NPC runtime IP — the
 > bench constructs `NpcBrain` which is private runtime code). The `sense_lod`
 > feature still exists in `katgpt-core/Cargo.toml` (gates the generic LOD
@@ -53,14 +53,14 @@ Reads `ScaleBoundary` from `SlodOperator` + NPC distance to player/centroid. Ass
 
 ## Tasks
 
-- [x] Create `SenseLodLevel` enum with `module_mask() -> &[SenseKind]` in `crates/katgpt-core/src/sense/lod.rs`
+- [x] Create `SenseLodLevel` enum with `module_mask() -> &[SenseKind]` in `crates/katgpt-sense/src/lod.rs`
 - [x] Add `active_lod: SenseLodLevel` field to `NpcBrain` (default: `Full`)
 - [x] Create `SenseLodRouter` struct — takes `&[ScaleBoundary]` + distance metric, produces `SenseLodLevel`
 - [x] Modify `NpcBrain::project_all_into` to skip modules not in LOD mask, push `0.0` for skipped
 - [x] Modify `batch_project_all` / `batch_project_all_par` to accept `SenseLodRouter` and assign LODs pre-batch
 - [x] Add `#[cfg(feature = "sense_lod")]` gate on all new code; feature requires `sense_composition` + `slod` in `Cargo.toml`
 - [x] Add unit tests: mask correctness, skip behavior, fallback when no boundaries
-- [x] Create benchmark `crates/katgpt-core/benches/sense_lod.rs`: 200 NPCs, measure CPU reduction vs behavioral delta
+- [x] Create benchmark `riir-ai/crates/riir-engine/benches/sense_lod.rs`: 200 NPCs, measure CPU reduction vs behavioral delta
 
 ## GOAT Gate
 

@@ -11,13 +11,13 @@
 ## Tasks
 
 - [x] T1: Add `union_bound_confidence` feature gate to `Cargo.toml`
-- [x] T2: Implement `BranchConfidence` trait + `UnionBoundScorer` in `src/speculative/branch_confidence.rs`
+- [x] T2: Implement `BranchConfidence` trait + `UnionBoundScorer` in `crates/katgpt-speculative/src/branch_confidence.rs`
 - [x] T3: GOAT test — prove Boole's inequality correctness + linear degradation + low overhead
 - [x] T4: Add `pathway_tracker` feature gate to `Cargo.toml`
-- [x] T5: Implement `PathwayTracker` in `src/speculative/pathway_tracker.rs`
+- [x] T5: Implement `PathwayTracker` in `crates/katgpt-speculative/src/pathway_tracker.rs`
 - [x] T6: GOAT test — prove pathway detection reduces thinking budget without quality loss
 - [x] T7: Add `federation_composer` feature gate to `Cargo.toml`
-- [x] T8: Implement `FederationComposer<C,S>` in `src/pruners/federation_composer.rs`
+- [x] T8: Implement `FederationComposer<C,S>` in `crates/katgpt-pruners/src/federation_composer.rs`
 - [x] T9: GOAT test — prove federation composer early termination saves compute
 - [x] T10: Add all three features to `full` feature set
 - [x] T11: Update README.md — Deep Manifold GOAT section
@@ -83,9 +83,9 @@ All three features promoted to **default-ON** in `Cargo.toml`.
 
 | File | Lines | Purpose |
 |------|-------|---------|
-| `src/speculative/branch_confidence.rs` | 199 | UnionBoundScorer + HybridScorer + 9 unit tests |
-| `src/speculative/pathway_tracker.rs` | 173 | PathwayTracker ring buffer + 8 unit tests |
-| `src/pruners/federation_composer.rs` | 178 | FederationComposer + ResidualCheck + 5 unit tests |
+| `crates/katgpt-speculative/src/branch_confidence.rs` | 199 | UnionBoundScorer + HybridScorer + 9 unit tests |
+| `crates/katgpt-speculative/src/pathway_tracker.rs` | 173 | PathwayTracker ring buffer + 8 unit tests |
+| `crates/katgpt-pruners/src/federation_composer.rs` | 178 | FederationComposer + ResidualCheck + 5 unit tests |
 | `tests/bench_231_union_bound_goat.rs` | 249 | GOAT proof 6/6 |
 | `tests/bench_231_pathway_tracker_goat.rs` | 306 | GOAT proof 7/7 |
 | `tests/bench_231_federation_composer_goat.rs` | ~310 | GOAT proof 7/7 |

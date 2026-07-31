@@ -7,6 +7,8 @@
 > **Related Plans:** 337 (this note's plan — tropical semiring primitive + G1 non-redundancy gate), 319 (geometric product — the gate template), 251 (DEC operators — the substrate the tropical variant fuses with)
 > **Cross-ref (riir-ai):** Research 164 (Tropical Game-Map Worst-Case Threat Guide — private Super-GOAT selling-point doc)
 > **Classification:** Public
+>
+> **PASS-Redirects (synthesis, added 2026-07-25):** Research 458 (Tropical Remains Consolidated) — verdicts on the 4 §2.4 Tropical-fusion candidates after the user's "dont skip remains" instruction: (1) TropicalFunctor already ships as `tropical_extract_functor_into` in `riir-engine/latent_functor/arithmetic/mod.rs:316` (gated by `tropical_algebra`); (2) TropicalShardRetrieval — no modelless gain over cosine retrieval; (3) TropicalLatCal — breaks the homomorphism contract; (4) TropicalGeometricProduct — loses wedge anti-symmetry. See Research 458 §1 for the per-candidate analysis + Research 458 §2 for the general "tropical-ify every aggregation" failure rule.
 
 ---
 
@@ -22,7 +24,7 @@ The textbook's distillation-worthy content is Chapter 3, and within it two disti
 
 **Distilled for katgpt-rs (modelless, inference-time):**
 - Open primitive: `tropical_matvec_into(w: &[f32], x: &[f32], out: &mut [f32])` = `(W ⊗ x)_i = max_j (W[i,j] + x[j])` — the (max, +) analog of `simd_matvec`. Zero-allocation, SIMD-vectorizable via `max` reduction. Behind `tropical_algebra` feature flag.
-- Plus three wrappers over the shipped DEC substrate: `tropical_exterior_derivative` (boundary operator in max-plus → max of boundary contributions instead of signed sum), `tropical_codifferential` (max-plus divergence → "worst-case flux" instead of net flux), `tropical_line_integral` (max-plus path cost → "bottleneck edge" geodesic instead of total work). All thin wrappers over `dec/operators.rs`, gated by `tropical_algebra`.
+- Plus three wrappers over the shipped DEC substrate: `tropical_exterior_derivative` (boundary operator in max-plus → max of boundary contributions instead of signed sum), `tropical_codifferential` (max-plus divergence → "worst-case flux" instead of net flux), `tropical_line_integral` (max-plus path cost → "bottleneck edge" geodesic instead of total work). All thin wrappers over `crates/katgpt-dec/src/operators.rs`, gated by `tropical_algebra`.
 - The fusion case (TropicalDEC producing "max-threat path" orthogonal to "sum-threat path") is the headline. Plan 337 implements the primitive + the G1 non-redundancy gate.
 
 ---
@@ -103,7 +105,7 @@ pub fn tropical_codifferential(cx: &CellComplex, input: &CochainField) -> Cochai
 pub fn tropical_line_integral(field: &CochainField, path: &[usize]) -> f32;
 ```
 
-The DEC wrappers reuse the **boundary matrices** already shipped in `dec/operators.rs::exterior_derivative_into` — they swap the inner reduction from `Σ ±ω[cell]` to `max(±∞, ω[cell])` (signed coefficients become "include / exclude" via `+0` vs `−∞`). ~30 LOC each.
+The DEC wrappers reuse the **boundary matrices** already shipped in `crates/katgpt-dec/src/operators.rs::exterior_derivative_into` — they swap the inner reduction from `Σ ±ω[cell]` to `max(±∞, ω[cell])` (signed coefficients become "include / exclude" via `+0` vs `−∞`). ~30 LOC each.
 
 ### 2.3 Latent-space reframing (mandatory)
 
@@ -128,7 +130,7 @@ Closest cousins across all five repos:
 
 - **TropicalDEC** (DEC × tropical) — *strongest*. New capability: "bottleneck path" and "worst-case flux" cochain fields, orthogonal to existing sum-based fields. Multiplies DEC (shipped) × game maps (riir-ai) × shard retrieval (riir-neuron-db). **This is what the Plan 337 gate tests.**
 - **TropicalFunctor** (latent_functor × tropical) — *strong*. New signal: "max-pair displacement coherence" vs "mean-pair displacement coherence". Multiplies latent_functor × HLA × shard retrieval.
-- **SE(2)-equivariant game maps** (DEC × Lie-group equivariance) — *strong but large build and primarily riir-ai territory*. New capability: rotation-equivariant threat/occupancy fields for NPCs. The generic open primitive in katgpt-rs would be a "homogeneous-space operator framework" — textbook math, large surface. **Deferred to riir-ai follow-up, not a katgpt-rs plan.**
+- **SE(2)-equivariant game maps** (DEC × Lie-group equivariance) — *de-deferred 2026-07-25 per user request, shipped as Research 457 / Plan 560 / katgpt-dec feature `se2_equivariant_lift` / riir-ai guide Research 325.* The G1 π/2 rotation equivariance test passes (≤1e-3 abs diff); G2 perf 225µs @ 32×32×8×5×5 (4.4× under 1ms target). No longer a deferred item.
 - **TropicalShardRetrieval** (shard retrieval × tropical) — *speculative*. May be redundant with max-wedge-span diverse retrieval.
 - **TropicalLatCal** (LatCal × tropical) — *speculative*. No clear modelless unblock. Flag for riir-chain follow-up.
 - **TropicalGeometricProduct** (Clifford × tropical) — *speculative*. Max-plus wedge; unclear added value over default-on `geometric_product`.
@@ -152,14 +154,14 @@ Closest cousins across all five repos:
 **One-line reasoning:** Zero prior art for `(max, +)` primitives across all five repos + genuinely new algebraic class + force multiplier across DEC/functor/shard + **G1 non-redundancy gate passed 3/3 substrates** + **G2 perf gate passed after NEON specialization (D=64 0.96×, D=128 1.03× vs simd_matvec)** + product selling point confirmed. See riir-ai/.research/164.
 
 **Super-GOAT criteria (re-checked 2026-06-28 after G1+G2 gates):**
-- Q1 (no prior art?): ✅ Confirmed zero hits on `tropical|max-plus|maxplus|max_plus` outside tokenizers and unrelated `INV_U32_MAX_PLUS_1` constants. The `morphological dilation` in `flow/fft.rs` (Plan 242) is **binary obstacle inflation**, not tropical convolution.
+- Q1 (no prior art?): ✅ Confirmed zero hits on `tropical|max-plus|maxplus|max_plus` outside tokenizers and unrelated `INV_U32_MAX_PLUS_1` constants. The `morphological dilation` in `crates/katgpt-core/src/flow/fft.rs` (Plan 242) is **binary obstacle inflation**, not tropical convolution.
 - Q2 (new class?): ✅ Every shipped latent op is `(ℝ, +, ·)`-linear or sigmoid-gated. `(max, +)` is a different semiring.
 - Q3 (selling point?): ✅ **Confirmed.** G1 gate showed tropical signal non-redundant on 3/3 substrates. Selling point: "NPCs compute worst-case survival paths via tropical line integrals, complementing expected-engagement sum-paths" — see riir-ai/.research/164.
 - Q4 (force multiplier?): ✅ TropicalDEC × TropicalFunctor × shard retrieval × game maps ≥ 3 pillars.
 
 **Promotion complete (2026-06-28).** Plan 337 G1 passed 3/3 substrates. G2 passed after NEON specialization (the auto-vec baseline was 4-9× slower than simd_matvec due to a serial max-chain latency bottleneck; mirroring simd_dot_f32's 4-independent-accumulator pattern closed the gap). `tropical_algebra` promoted to default-on in `katgpt-core/Cargo.toml`. This note amended to Super-GOAT. Mandatory riir-ai guide at `riir-ai/.research/164_Tropical_Game_Map_Worst_Case_Threat_Guide.md`.
 
-**SE(2)-equivariant game maps** are flagged as a riir-ai follow-up (separate `.research/` note in `riir-ai/.research/` when scoped), not pre-committed here. The generic homogeneous-space framework is textbook math with a large surface; the game-side selling point ("rotation-equivariant NPC perception") is the moat, and that's riir-ai territory.
+**SE(2)-equivariant game maps** — **SHIPPED 2026-07-25** as Plan 560 / Research 457 / feature `se2_equivariant_lift` in katgpt-dec (DEFAULT-ON). The riir-ai selling-point guide lives at `riir-ai/.research/325_SE2_Equivariant_NPC_Perception_Guide.md`. No longer a deferred item.
 
 ---
 

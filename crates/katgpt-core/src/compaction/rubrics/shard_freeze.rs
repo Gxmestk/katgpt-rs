@@ -27,7 +27,7 @@
 //! combinations of (P0, P1) and confirms the CUCG decision matches the
 //! `can_freeze` formula. This keeps the open primitive (`katgpt-rs`) free
 //! of private-runtime (`riir-neuron-db`) coupling — per AGENTS.md
-//! SOLID/DRY/Decouple and the 5-repo commercial strategy.
+//! SOLID/DRY/Decouple and the 7-repo commercial strategy.
 //!
 //! # Predicates
 //!

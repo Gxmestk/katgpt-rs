@@ -4,7 +4,7 @@
 **Research:** [katgpt-rs/.research/379_Hierarchical_Global_Attention_Chunk_Group_Routing.md](../.research/379_Hierarchical_Global_Attention_Chunk_Group_Routing.md)
 **Source paper:** [arxiv 2606.30709](https://arxiv.org/abs/2606.30709) — Hierarchical Global Attention (Frank, Fedosov, Grinenko, BMW Group, Jun 2026)
 **Target:** `katgpt-rs/crates/katgpt-core/src/hga/` (new module) + `katgpt-rs/crates/katgpt-core/src/tiered_kv/` (new module) + Cargo feature `hga`
-**Status:** Active — Phase 1 complete, Phase 2 GOAT gate G2-proxy FAIL (negative result, keep opt-in). G5 latency PASS (1.12×). Phase 3 decision: T3.3 (keep opt-in, document negative result).
+**Status:** COMPLETE ✅ (negative result) — Phase 2 GOAT gate G2-proxy FAIL; Phase 3 decision T3.3: keep opt-in, document negative result. G5 latency PASS (1.12×).
 
 ---
 
@@ -47,7 +47,7 @@ Ship three refinements of the shipped sparse-attention routing slot behind an op
   - `group_summary.rs` — `GroupSummaryCache<C, GS, D>` + `score_groups`
   - `summary.rs` — `MixedRopeSummarizer` + threshold derivation `θ_threshold = 2π / C`
   - `tests.rs` — unit tests
-  - **NOTE:** `forward.rs` moved to `katgpt-attn/src/hga_forward.rs` — it needs `dash_attn::entmax_1p5` which lives in katgpt-attn (katgpt-core cannot import katgpt-attn without a circular dep).
+  - **NOTE:** `forward.rs` moved to `crates/katgpt-attn/src/hga_forward.rs` — it needs `dash_attn::entmax_1p5` which lives in katgpt-attn (katgpt-core cannot import katgpt-attn without a circular dep).
 - [x] **T1.2** Create `katgpt-rs/crates/katgpt-core/src/tiered_kv/` module skeleton (NOT feature-gated; this is a generic primitive):
   - `mod.rs` — `TieredKvStore` trait, `SinkLocalSet`, `RouteBudget`, `WorkingSet`, `GroupSelection`
   - `in_memory.rs` — `InMemoryTieredKvStore` reference impl (hot summaries + cold Vec)
@@ -73,7 +73,7 @@ Ship three refinements of the shipped sparse-attention routing slot behind an op
   - `append_chunk(keys, values, positions)` → cold + hot tiers.
   - `fetch_working_set(sink_local, selected_chunks, group_selection)` → fetches sink+local fully + routed groups from cold tier.
 - [x] **T1.8** Implement `forward_hga(query, store, sink_local, route_budget, entmax_alpha, k_c, k_g) -> [f32; D]`:
-  - **Lives in `katgpt-attn/src/hga_forward.rs`** (needs `dash_attn::entmax_1p5`).
+  - **Lives in `crates/katgpt-attn/src/hga_forward.rs`** (needs `dash_attn::entmax_1p5`).
   - Stage 1: chunk-level entmax routing (reuses `dash_attn::entmax_1p5`).
   - Stage 2: group-level top-K routing (`GroupSummaryCache::select_top_k_groups`).
   - Stage 3: `fetch_working_set` + exact softmax SDPA over fetched real-token K/V.

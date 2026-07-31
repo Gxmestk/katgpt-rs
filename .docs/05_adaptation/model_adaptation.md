@@ -1,5 +1,11 @@
 # katgpt-rs: Model Adaptation Techniques
 
+> **Note on file paths (2026-07-18):** Some `*.rs` paths in this document
+> reference modules that were renamed, moved, or never landed under the
+> exact name shown. They are preserved as a **historical record** of the
+> original design intent; consult the current crate layout for the live
+> location.
+
 Seventeen production techniques that adapt the transformer to different tasks and domains **without modifying base weights**. All are feature-gated, zero-copy, and backward-compatible.
 
 | # | Technique | Plan | Feature Flag | What It Does |
@@ -147,7 +153,7 @@ Different phases of a task need different behavior. During prefill, the model re
 Load two LoRA adapters per domain — `reader_lora` (active during prefill) and `writer_lora` (active during decode). The switch is a reference swap at the prefill→decode boundary.
 
 ```rust
-// crates/katgpt-core/src/types.rs — LoRA pair (Plan 025)
+// crates/katgpt-types/src/lib.rs — LoRA pair (Plan 025)
 pub struct LoraPair {
     /// Active during bidirectional prefill (e.g., Python Reader).
     pub reader: Option<LoraAdapter>,
@@ -159,7 +165,7 @@ pub struct LoraPair {
 ### LoRA Application — In-Place Delta
 
 ```rust
-// crates/katgpt-core/src/types.rs
+// crates/katgpt-types/src/lib.rs
 pub struct LoraAdapter {
     pub rank: usize,
     pub in_dim: usize,
@@ -216,7 +222,7 @@ ReLU zeros out ~50% of MLP neurons by definition. With L1 regularization during 
 CPU index-packing sparse matmul for the MLP's second weight matrix (`w2 @ hidden`). Skip dead neurons to reduce FLOPs.
 
 ```rust
-// crates/katgpt-core/src/types.rs — sparse_matmul (Plan 022)
+// crates/katgpt-types/src/lib.rs — sparse_matmul (Plan 022)
 /// Pack alive neurons (input[c] > 0.0) and multiply only those.
 /// Returns alive count for diagnostics.
 pub fn sparse_matmul(
@@ -257,7 +263,7 @@ Even with `sparse_mlp` feature enabled, the actual sparsity is checked at runtim
 ### Config
 
 ```rust
-// crates/katgpt-core/src/types.rs
+// crates/katgpt-types/src/lib.rs
 pub struct Config {
     pub sparse_threshold: f32,  // default: 0.8
     // ...
@@ -308,7 +314,7 @@ LoRA adapts weights per domain, but has no mechanism for injecting an explicit d
 Distill the Free Transformer's mid-layer latent injection into a LoRA-compatible mechanism. Inject a learned domain embedding at layer `L/2` via K/V modulation.
 
 ```rust
-// crates/katgpt-core/src/types.rs — DomainLatent (Plan 038)
+// crates/katgpt-types/src/lib.rs — DomainLatent (Plan 038)
 pub struct DomainLatent {
     pub embedding: Vec<f32>,  // [kv_dim]
 }
@@ -406,7 +412,7 @@ Both reader_lora and domain_latent condition the prefill phase. The second half 
 `riir-gpu` provides training infrastructure:
 
 ```rust
-// riir-gpu/src/domain_latent.rs
+// riir-ai/crates/riir-gpu/src/domain_latent.rs
 pub struct GpuDomainLatent {
     // GPU buffers for trainable domain latent (params, grads, m, v)
 }
@@ -438,7 +444,7 @@ Two variants implemented:
 - **AHLA** (asymmetric): maintains PKV, E matrices — O(d·dv) state per head
 
 ```rust
-// hla/kernel.rs — O(1) state update (Plan 057, SIMD-accelerated Plan 060)
+// riir-ai/crates/riir-engine/src/hla/kernel.rs — O(1) state update (Plan 057, SIMD-accelerated Plan 060)
 pub fn hla_state_update(sk: &mut [f32], q_head: &mut HlaQHeadState, q: &[f32], k: &[f32], v: &[f32], hd: usize, gamma: f32, tmp_k_cqv: &mut [f32], tmp_q_g: &mut [f32])
 pub fn hla_readout(q: &[f32], sk: &[f32], q_head: &HlaQHeadState, hd: usize, out: &mut [f32], tmp_u: &mut [f32])
 pub fn ahla_step(pkv: &mut [f32], mk: &mut [f32], q_head: &mut AhlaQHeadState, q: &[f32], k: &[f32], v: &[f32], hd: usize, gamma: f32, out: &mut [f32], tmp_r: &mut [f32])
@@ -446,7 +452,7 @@ pub fn ahla_step(pkv: &mut [f32], mk: &mut [f32], q_head: &mut AhlaQHeadState, q
 
 ### SIMD Acceleration (Plan 060)
 
-All HLA kernels dispatch through `crates/katgpt-core/src/simd.rs` (re-exported via `src/simd.rs`) — runtime NEON/AVX2 detection:
+All HLA kernels dispatch through `crates/katgpt-dec/src/simd.rs` (re-exported via `crates/katgpt-dec/src/simd.rs`) — runtime NEON/AVX2 detection:
 
 | Operation | NEON Throughput (hd=4) |
 |-----------|----------------------|
@@ -460,7 +466,7 @@ Single ARM core handles 30K CCU @ 20Hz with 9.8× headroom.
 ### Forward Variants
 
 ```rust
-// hla/forward.rs — drop-in replacements for forward()
+// riir-ai/crates/riir-engine/src/hla/forward.rs — drop-in replacements for forward()
 pub fn forward_hla(ctx: &mut ForwardContext, weights: &TransformerWeights, cache: &mut MultiLayerHlaCache, token: usize, pos: usize, config: &Config) -> &mut [f32]
 pub fn forward_ahla(ctx: &mut ForwardContext, weights: &TransformerWeights, cache: &mut MultiLayerAhlaCache, token: usize, pos: usize, config: &Config) -> &mut [f32]
 ```
@@ -494,11 +500,11 @@ TurboQuant uses random rotation + uniform codebook — 5.3× compression but cos
 SpectralQuant (Plan 077) replaces random rotation with eigenbasis rotation calibrated from activation statistics, then allocates bits per dimension via water-fill optimization.
 
 ```rust
-// spectralquant/spectral.rs — eigenbasis calibration
+// crates/katgpt-spectral/src/spectral.rs — eigenbasis calibration
 pub fn calibrate_eigenbasis(samples: &[Vec<f32>], head_dim: usize) -> CalibrationResult
 pub fn waterfill_bits(eigenvalues: &[f64], total_bits: usize, min_bits: u8, max_bits: Option<u8>) -> Vec<u8>
 
-// spectralquant/nonuniform_quant.rs — Lloyd-Max scalar quantizer
+// crates/katgpt-spectral/src/nonuniform_quant.rs — Lloyd-Max scalar quantizer
 pub struct NonUniformQuantizer { /* eigenvalues, avg_bits, head_dim, per-dim codebooks */ }
 pub struct CompressedVector { /* semantic_indices, tail_indices, d_eff, bits metadata */ }
 ```
@@ -509,7 +515,7 @@ Each dimension gets bits proportional to its variance share. High-variance dimen
 ### Forward Integration
 
 ```rust
-// transformer.rs — quantized KV forward, generic over QuantizedKVCache trait (crates/katgpt-core/src/traits.rs)
+// transformer.rs — quantized KV forward, generic over QuantizedKVCache trait (crates/katgpt-core/src/traits/mod.rs)
 pub fn forward_quantized<C: types::QuantizedKVCache>(ctx, weights, cache: &mut C, ...)
 // AttentionMode::SpectralQuant dispatches to spectralquant::forward
 ```
@@ -534,14 +540,14 @@ DDTree builds homogeneous candidate trees — similar prefixes explored, wasting
 ELF SDE (Plan 079) injects logit-normal noise during tree expansion, biasing exploration toward t=0 (early tokens) where diversity matters most.
 
 ```rust
-// speculative/types.rs — SDE configuration (default-on)
+// crates/katgpt-core/src/speculative/types.rs — SDE configuration (default-on)
 pub struct SdeConfig {
     pub gamma: f32,           // noise re-injection scale
     pub confidence_floor: f32, // minimum logit magnitude for noise application
     pub preserve_top1: bool,  // keep highest-prob token clean
 }
 
-// speculative/dd_tree.rs — noise-augmented tree building
+// src/speculative/dd_tree.rs — noise-augmented tree building
 pub fn build_dd_tree_sde(...)    // SDE-augmented expansion
 pub fn build_dd_tree_balanced_sde(...) // balanced + SDE
 ```
@@ -552,7 +558,7 @@ Noise concentrates near t=0 via logit-normal distribution: 2.2× concentration a
 ### Width Scaling (PTRM, Plan 083)
 
 ```rust
-// speculative/dd_tree.rs — width scaling via best-of-K
+// src/speculative/dd_tree.rs — width scaling via best-of-K
 pub struct WidthScaleConfig {
     pub k_rollouts: usize,                // K parallel rollouts
     pub selection: WidthSelectionMode,     // how to pick winner
@@ -560,7 +566,7 @@ pub struct WidthScaleConfig {
 pub enum WidthSelectionMode { BestQ, MostFrequent, Top1Converged }
 pub fn best_of_k_rollouts(marginals, config, screener, sde_config, width_config, base_seed) -> Vec<usize>
 
-// crates/katgpt-core/src/types.rs — Config convenience fields
+// crates/katgpt-types/src/lib.rs — Config convenience fields
 pub struct Config {
     pub width_rollouts: usize,            // default: 1 (disabled)
     pub early_stop_threshold: f32,        // default: 0.0 (disabled)
@@ -586,7 +592,7 @@ Residual-stream steering (CAA) uses linear probes that ignore layer structure, a
 CNA Steering (Plan 087) discovers sparse MLP circuits via contrastive attribution, then modulates only the discovered neurons at runtime.
 
 ```rust
-// pruners/cna.rs — circuit discovery + modulation
+// crates/katgpt-pruners/src/cna.rs — circuit discovery + modulation
 pub struct CnaNeuron { pub layer: usize, pub index: usize, pub delta: f32 }
 pub struct CnaCircuit {
     pub neurons: Vec<CnaNeuron>,
@@ -630,7 +636,7 @@ BanditPruner Q-values implicitly encode residual distance, but without explicit 
 Deep Manifold (Plan 085) makes residual distance explicit via L2/KL scoring. Federation adds symmetric KL boundary alignment between experts — no data exchange needed.
 
 ```rust
-// pruners/manifold_residual.rs — fixed-point residual scoring
+// crates/katgpt-pruners/src/manifold_residual.rs — fixed-point residual scoring
 pub trait ManifoldResidual: Send + Sync {
     fn residual(&self, candidate: &[f32], base: &[f32]) -> f32;
     fn is_converged(&self, residual: f32, tolerance: f32) -> bool;
@@ -640,7 +646,7 @@ pub struct L2ResidualScorer { pub tolerance: f32 }
 pub struct KlResidualScorer { pub tolerance: f32 }
 pub struct ResidualRelevanceScorer<R: ManifoldResidual> { pub residual_scorer: R, pub residual_weight: f32 }
 
-// pruners/boundary_alignment.rs — federated KL coupling
+// crates/katgpt-pruners/src/boundary_alignment.rs — federated KL coupling
 pub trait BoundaryAlignment: Send + Sync {
     fn kl_divergence(&self, local: &[f32], ensemble: &[f32]) -> f32;
     fn coupling_weight(&self, domain: &str, neighbors: &[&str]) -> f32;
@@ -673,7 +679,7 @@ Greedy DDTree expansion wastes budget on low-value branches. No trajectory-level
 SimpleTES (Plan 086) implements RPUCG (Rollout Policy Using Credit-Guided search): full C×L×K budget loop with trajectory credit assignment bridging to G-Zero Phase 2.
 
 ```rust
-// pruners/tes_loop.rs — SimpleTES loop
+// crates/katgpt-pruners/src/tes_loop.rs — SimpleTES loop
 pub trait TesLoop: Send + Sync {
     fn config(&self) -> &TesConfig;
     fn budget(&self) -> usize;
@@ -690,7 +696,7 @@ pub struct SimpleTesLoop<E: BanditEnv> {
     best_idx: usize,
 }
 
-// speculative/types.rs — trajectory credit
+// crates/katgpt-core/src/speculative/types.rs — trajectory credit
 pub struct TrajectoryCredit {
     pub num_trajectories: usize,
     pub best_score: f32,
@@ -759,7 +765,7 @@ DDTree screening prunes candidates without domain-specific phrase awareness. Imp
 PhraseBoost (Plan 164, Research 147) adds a context trie phrase boosting layer for DDTree. Zero training cost — phrases are provided at call site. `PhraseBoostPruner` wraps any `ScreeningPruner` and adds normalized boost for phrase matches.
 
 ```rust
-// pruners/phrase_boost.rs
+// crates/katgpt-pruners/src/phrase_boost.rs
 pub struct PhraseBoostPruner<P: ScreeningPruner> {
     inner: P,
     phrase_trie: ContextTrie,
@@ -858,7 +864,7 @@ PLASMA → HOT → WARM → COLD transitions are driven by consensus confidence.
 
 | Metric | Value |
 |--------|-------|
-| Feature flag | `flashar_consensus` (default-on, requires `tri_mode`, `plasma_path`) |
+| Feature flag | `flashar_consensus` (**DEMOTED** from default-on, Issue 136, removed, see git history — KL 2.9-6.5 vs Leviathan 0.03; opt-in only) |
 | Paths | Path H (AR/MTP), Path V (D2F block) |
 | Thermal states | PLASMA / HOT / WARM / COLD |
 
@@ -1038,7 +1044,7 @@ All seventeen techniques compose without conflicts:
 | GEPA-D Config Evolution | — | ✅ config mutation | `gepa_reflective` (default, requires `bandit`, `memo_reflections`) |
 | PhraseBoost | — | ✅ phrase screening | `phrase_boost` (default) |
 | Hydra Budget | ✅ layer importance | ✅ layer skipping | `hydra_budget` (default) |
-| FlashAR Consensus | — | ✅ thermal routing | `flashar_consensus` (default, requires `tri_mode`, `plasma_path`) |
+| FlashAR Consensus | — | ✅ thermal routing | `flashar_consensus` (**DEMOTED** from default, Issue 136 — requires `tri_mode`, `plasma_path`) |
 | Budget Adaptation | — | ✅ budget scaling | `budget_adaptation` (default) |
 | Dual-Pool Router | — | ✅ CGSP bandit wrap | `cgsp_dual_pool` (opt-in, requires `cgsp`) |
 | ManifoldPruner Soft Validity | — | ✅ soft sigmoid pruning | `manifold_pruner` (opt-in, Plan 234) |

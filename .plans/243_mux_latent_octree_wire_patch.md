@@ -111,7 +111,7 @@ pub struct LatentPatch {
 /// for chain-layer validation instead.
 ///
 /// **Implemented**: `LatentPatchBatch` now implements `GameLayerValidation` in
-/// `riir-games/src/game_sync/adaptive_validation.rs`. Use `validate_adaptive()`
+/// `riir-ai/crates/riir-games/src/game_sync/adaptive_validation.rs`. Use `validate_adaptive()`
 /// to get `FullValidation` or `LightValidation` per tick. The `validation_mod`
 /// field below is set by `AdaptiveModConfig::resolve()` but the actual validation
 /// decision is made by calling `validate_adaptive(&batch, tick, config, zone_players, trust, LatentPatch)`.
@@ -181,7 +181,7 @@ At X8: saving 8× encode + 8× decode per patch = ~800ns saved per patch at 256 
 | `segment_id` | 4 bytes | Public index |
 | `weights: [f32; 8]` | 32 bytes | Superposition in vocab space, not raw tokens. Fourier shell protects. |
 | `BLAKE3 commitment` | 32 bytes | Tamper evidence |
-| **5 HLA scalar projections** | 20 bytes | Bridge outputs per AGENTS.md rule (not 64-dim vector) |
+| **5 belief scalar projections** | 20 bytes | Bridge outputs per AGENTS.md rule (not 64-dim vector) |
 
 ### What Does NOT Go on the Wire (Per AGENTS.md Anti-Patterns)
 
@@ -241,7 +241,7 @@ Spectral LOD (Plan 238 Phase 4) already controls this — high-energy windows ge
 ## Task
 
 ### Phase 1: Core Wire Types ✅ DONE
-- [x] Create `src/mux_latent/wire.rs` module
+- [x] Create `crates/katgpt-core/src/mux_latent/wire.rs` module
 - [x] Implement `LatentPatch` (fixed-size 68 bytes, `#[repr(C)]`)
 - [x] Implement `LatentPatchBatch` with SIMD 4-wide chunked BLAKE3 verify
 - [x] Implement `PatchReceipt` + `PatchRejection` enums

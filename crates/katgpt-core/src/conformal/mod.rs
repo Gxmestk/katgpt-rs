@@ -224,7 +224,7 @@ impl<F: PointForecaster> ConformalIntervalCalibrator<F> {
     /// Construct a new calibrator.
     ///
     /// - `forecaster`: the wrapped point forecaster.
-    /// - `n_channels`: number of channels (e.g. HLA_DIM=8).
+    /// - `n_channels`: number of channels (e.g. BELIEF_DIM=8).
     /// - `max_h`: maximum horizon `h` that will be queried. Horizon buckets
     ///   beyond `max_h` wrap into the largest bucket.
     /// - `m`: seasonal period (`m=1` for non-seasonal).
@@ -310,7 +310,7 @@ impl<F: PointForecaster> ConformalIntervalCalibrator<F> {
     /// residual pool for `channel`.
     ///
     /// Computes `r = actual − forecast`, indexes the horizon bucket via
-    /// [`horizon_lag`], pushes into the ring buffer tagged with the current
+    /// `horizon_lag`, pushes into the ring buffer tagged with the current
     /// `global_tick`. The exponential recency weight `w = exp(−λ · age)` is
     /// applied at *quantile read time* (not storage), keeping the write path
     /// simple and zero-alloc.
@@ -375,7 +375,7 @@ impl<F: PointForecaster> ConformalIntervalCalibrator<F> {
         out.alpha = alpha;
     }
 
-    /// As [`interval_into`] but with a caller-supplied point forecast. Use this
+    /// As [`interval_into`](Self::interval_into) but with a caller-supplied point forecast. Use this
     /// when the caller has already computed `ŷ` (e.g. KARC's `forecast_into`
     /// produces a full `D`-channel vector in one call).
     pub fn interval_from_point_into(
@@ -429,6 +429,7 @@ impl<F: PointForecaster> ConformalIntervalCalibrator<F> {
         p_lo: f32,
         p_hi: f32,
     ) -> (f32, f32) {
+        use crate::simd::fast_exp;
         let view = self.residual_pool.channel_bucket(channel, bucket);
         let n = view.len();
         if n == 0 {
@@ -449,7 +450,7 @@ impl<F: PointForecaster> ConformalIntervalCalibrator<F> {
             for (i, w_slot) in weights.iter_mut().enumerate().take(n) {
                 let (_, pushed_tick) = view.get_sorted(i);
                 let age = (tick_now.saturating_sub(pushed_tick)) as f32 / unit_scale;
-                let w = (-lambda * age).exp();
+                let w = fast_exp(-lambda * age);
                 *w_slot = w;
                 total_w += w;
             }
@@ -512,6 +513,7 @@ impl<F: PointForecaster> ConformalIntervalCalibrator<F> {
     ///
     /// [`orientation`]: ConformalIntervalCalibrator::orientation
     fn weighted_quantile(&self, channel: usize, bucket: usize, p: f32) -> f32 {
+        use crate::simd::fast_exp;
         let view = self.residual_pool.channel_bucket(channel, bucket);
         let n = view.len();
         if n == 0 {
@@ -535,7 +537,7 @@ impl<F: PointForecaster> ConformalIntervalCalibrator<F> {
             for (i, w_slot) in weights.iter_mut().enumerate().take(n) {
                 let (_, pushed_tick) = view.get_sorted(i);
                 let age = (tick_now.saturating_sub(pushed_tick)) as f32 / unit_scale;
-                let w = (-lambda * age).exp();
+                let w = fast_exp(-lambda * age);
                 *w_slot = w;
                 total_w += w;
             }
@@ -552,7 +554,7 @@ impl<F: PointForecaster> ConformalIntervalCalibrator<F> {
         for i in 0..n {
             let (_, pushed_tick) = view.get_sorted(i);
             let age = (tick_now.saturating_sub(pushed_tick)) as f32 / unit_scale;
-            total_w += (-lambda * age).exp();
+            total_w += fast_exp(-lambda * age);
         }
         if total_w <= 0.0 {
             // Degenerate (all weights zero from heavy decay) → fall back to the
@@ -568,7 +570,7 @@ impl<F: PointForecaster> ConformalIntervalCalibrator<F> {
         for i in 0..n {
             let (val, pushed_tick) = view.get_sorted(i);
             let age = (tick_now.saturating_sub(pushed_tick)) as f32 / unit_scale;
-            let w = (-lambda * age).exp();
+            let w = fast_exp(-lambda * age);
             prev_val = val;
             acc += w;
             if acc >= target {

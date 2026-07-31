@@ -64,10 +64,10 @@ Y ← Â · V                         // value aggregation
 
 | Location | Change | Complexity |
 |----------|--------|-----------|
-| `crates/katgpt-core/src/types.rs` | Add `EgaGate` struct + `ega_gates` field to Config | Low |
+| `crates/katgpt-types/src/lib.rs` | Add `EgaGate` struct + `ega_gates` field to Config | Low |
 | `crates/katgpt-core/src/attention.rs` | Add `ega_attention_forward()` with energy gate | Medium |
-| `src/transformer.rs` | Wire EGA gate into attention layers | Medium |
-| `src/weights.rs` | Serialize/deserialize EGA gate params | Low |
+| `crates/katgpt-percepta/src/transformer.rs` | Wire EGA gate into attention layers | Medium |
+| `riir-ai/crates/riir-engine/src/deltanet/weights.rs` | Serialize/deserialize EGA gate params | Low |
 
 ---
 
@@ -122,8 +122,8 @@ Train micro config (L=6, H=8, d=256) with and without EGA on character-level dat
 ## Task Breakdown
 
 ### Phase 1: Core Implementation (katgpt-rs)
-- [x] T1: Add `EgaGate` struct to `src/ega_attn.rs` behind `ega_attn` feature
-- [x] T2: Add `gate_attention()` + energy computation to `src/ega_attn.rs`
+- [x] T1: Add `EgaGate` struct to `crates/katgpt-attn/src/ega_attn.rs` behind `ega_attn` feature
+- [x] T2: Add `gate_attention()` + energy computation to `crates/katgpt-attn/src/ega_attn.rs`
 - [x] T3: Wire `ega_attn` feature gate in `Cargo.toml` + `lib.rs`
 - [x] T4: Add energy score computation + z-normalize + sigmoid gate utilities
 

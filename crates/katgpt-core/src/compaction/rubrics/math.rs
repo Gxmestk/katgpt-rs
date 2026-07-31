@@ -184,7 +184,7 @@ impl MathRubric {
 }
 
 /// Carrier for the [`MathRubric`]'s caller-supplied features (mirrors
-/// [`SearchFeatures`] for the math domain).
+/// [`SearchFeatures`](super::search::SearchFeatures) for the math domain).
 #[derive(Clone, Debug, Default)]
 pub struct MathFeatures {
     /// The current probe's scalar features.

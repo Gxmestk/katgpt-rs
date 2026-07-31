@@ -71,7 +71,7 @@
 /// 1-indexed in the paper's notation, so we shift to 0-indexed internally and
 /// store `s_1..s_T` as `0..T-1`. To preserve the paper's 1-indexed public API,
 /// we keep `state_indices()` returning 1-indexed values (matching the docstring
-/// of [`from_segments`]).
+/// of `from_segments`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct BandConditioningSet {
     /// Up to 4 state indices, 1-indexed (`s_1 = 1`). Empty slots are `0`.
@@ -456,10 +456,10 @@ pub fn conditional_dependence_infonce(
     critic: InfoNceCritic,
     config: InfoNceConfig,
 ) -> f32 {
-    let pos = critic(x_emb, y_emb, z_emb).exp();
+    let pos = katgpt_core::simd::fast_exp(critic(x_emb, y_emb, z_emb));
     let mut denom = pos;
     for neg in negatives.iter().take(config.n_negatives) {
-        denom += critic(x_emb, neg, z_emb).exp();
+        denom += katgpt_core::simd::fast_exp(critic(x_emb, neg, z_emb));
     }
     // InfoNCE lower bound on CMI: log(pos/denom).
     let nce = (pos / denom).max(f32::MIN_POSITIVE).ln();

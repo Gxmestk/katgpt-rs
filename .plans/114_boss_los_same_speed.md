@@ -221,7 +221,7 @@ but the boss is still threatening enough to kill most runs.
 | File | Changes |
 |------|---------|
 | `examples/tactical_10_fog_bench.rs` | BOSS_SPEED, boss LOS, trap luring, benchmark |
-| `examples/tactical_09_fog.rs` | Same changes for TUI version |
+| `examples/tactical_09_fog_tui.rs` | Same changes for TUI version |
 | `.plans/104_fog_of_war_exploration.md` | Add task for this redesign |
 
 ## Validation ✅

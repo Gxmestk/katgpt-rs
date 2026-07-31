@@ -11,8 +11,8 @@
 
 ### Phase 1: Types & State
 
-- [x] T1: Define `HlaQHeadState` struct in `src/hla/types.rs` — CQV `[hd×hd]`, mQ `[hd]`, G `[hd×hd]`, h `[hd]` + `new(hd)` + `reset()`
-- [x] T2: Define `AhlaQHeadState` struct in `src/hla/types.rs` — e `[hd×hd]`, n `[hd]` + `new(hd)` + `reset()`
+- [x] T1: Define `HlaQHeadState` struct in `crates/katgpt-hla/src/types.rs` — CQV `[hd×hd]`, mQ `[hd]`, G `[hd×hd]`, h `[hd]` + `new(hd)` + `reset()`
+- [x] T2: Define `AhlaQHeadState` struct in `crates/katgpt-hla/src/types.rs` — e `[hd×hd]`, n `[hd]` + `new(hd)` + `reset()`
 - [x] T3: Define `MultiLayerHlaCache` — `layers: Vec<HlaLayerState>` with SK per KV group, per-Q-head state (GQA-aware)
 - [x] T4: Define `MultiLayerAhlaCache` — same layer structure with PKV/mK per KV group, E/n per Q head
 - [x] T5: Add `new()` / `reset()` / `with_gamma()` / `memory_bytes()` for both caches
@@ -20,7 +20,7 @@
 
 ### Phase 2: Attention Kernels
 
-- [x] T7: Implement `hla_state_update()` in `src/hla/kernel.rs` — streaming recurrence with correct update ordering (cross-terms before main accumulators). Zero-alloc via pre-allocated temp buffers
+- [x] T7: Implement `hla_state_update()` in `crates/katgpt-hla/src/kernel.rs` — streaming recurrence with correct update ordering (cross-terms before main accumulators). Zero-alloc via pre-allocated temp buffers
 - [x] T8: Implement `hla_readout()` — readout `o_t = q_tᵀ(SK·CQV − G)`. Two-stage matvec, zero-alloc
 - [x] T9: Implement `ahla_step()` — combined update+readout for AHLA. Zero-alloc
 - [x] T10: Add normalization: `hla_denom()` / `ahla_denom()` + optional divide-by-denom in layer helpers
@@ -29,16 +29,16 @@
 
 ### Phase 3: Forward Integration
 
-- [x] T13: Add `forward_hla()` in `src/hla/forward.rs` — same structure as `forward_base()` with HLA cache
+- [x] T13: Add `forward_hla()` in `riir-ai/crates/riir-engine/src/hla/forward.rs` — same structure as `forward_base()` with HLA cache
 - [x] T14: Add `forward_ahla()` — same with AHLA cache
 - [x] T15: Pre-allocated temp buffers in forward functions (stack-allocated, reused across layers)
 - [x] T16: Add `generate_hla_into()` / `generate_ahla_into()` — convenience wrappers matching `generate_into()` API
 
 ### Phase 4: Benchmarks (Before/After)
 
-- [x] T17: `bench_hla_vs_flat_cache()` in `src/benchmark.rs` — compares flat KV vs symmetric HLA vs asymmetric AHLA at positions 1, 16, 64, 128, 256 across micro/game/bpe configs. Measures tok/s and µs/step
-- [x] T18: `bench_hla_memory()` in `src/benchmark.rs` — measures bytes/layer for flat KV (O(N)), symmetric HLA (O(d²)), asymmetric AHLA (O(d·dv)) across all 5 configs. Cross-checked with `HlaVariant::layer_bytes()`
-- [x] T19: `bench_hla_quality()` in `src/benchmark.rs` — logit divergence sanity check: asserts finite/non-NaN outputs, reports max/mean absolute divergence between SDPA and HLA/AHLA on random weights. Not a quality claim (models must be trained with HLA)
+- [x] T17: `bench_hla_vs_flat_cache()` in `src/benchmark/mod.rs` — compares flat KV vs symmetric HLA vs asymmetric AHLA at positions 1, 16, 64, 128, 256 across micro/game/bpe configs. Measures tok/s and µs/step
+- [x] T18: `bench_hla_memory()` in `src/benchmark/mod.rs` — measures bytes/layer for flat KV (O(N)), symmetric HLA (O(d²)), asymmetric AHLA (O(d·dv)) across all 5 configs. Cross-checked with `HlaVariant::layer_bytes()`
+- [x] T19: `bench_hla_quality()` in `src/benchmark/mod.rs` — logit divergence sanity check: asserts finite/non-NaN outputs, reports max/mean absolute divergence between SDPA and HLA/AHLA on random weights. Not a quality claim (models must be trained with HLA)
 - [x] T20: Add HLA/AHLA rows to existing benchmark CSV output and timeseries — bench functions return `Vec<BenchResult>` compatible with `save_results_csv()` + `save_timeseries_csv()`
 
 ### Phase 5: Documentation & Polish
@@ -63,14 +63,14 @@ src/hla/                         — Feature-gated module: #[cfg(feature = "hla_
 └── forward.rs                   — forward_hla(), forward_ahla(),
                                    generate_hla_into(), generate_ahla_into()
 
-src/transformer.rs
+crates/katgpt-percepta/src/transformer.rs
 └── ForwardContext               — fields made pub(crate) for HLA module access
 
 src/types.rs
 ├── HlaMode enum                 — Standard, Hla, Ahla (added in Plan 058 commit)
 └── Config.hla_mode/normalize/decay — HLA config fields (added in Plan 058 commit)
 
-src/benchmark.rs                 — Phase 4 (TODO)
+src/benchmark/mod.rs                 — Phase 4 (TODO)
 ├── bench_hla_vs_flat_cache()   — throughput comparison
 ├── bench_hla_memory()          — memory comparison
 └── bench_hla_quality()         — logit divergence sanity check

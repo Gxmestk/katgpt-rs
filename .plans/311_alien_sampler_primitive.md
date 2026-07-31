@@ -94,7 +94,7 @@ Ship the generic, modelless `AlienSampler<V, C, A>` primitive distilled from arX
   - Target: `rank` 1k ≤ 500µs SIMD, 10k ≤ 5ms; `median_top_m` bank100 ≤ 5µs, bank10k ≤ 500µs.
   - Use `std::time::Instant` + batched timing per crate convention (matches salience_tri_gate bench pattern). No Criterion dep.
 
-- [x] **T2.3** Module-level doc in `src/alien_sampler/mod.rs`:
+- [x] **T2.3** Module-level doc in `crates/katgpt-deprecated/src/alien_sampler/mod.rs`:
   - Cite paper (arXiv:2603.01092)
   - Explain the two-axis decomposition (coherence vs availability)
   - Note the load-bearing `MedianTopMAvailability` rule (median over top-m, not top-1)

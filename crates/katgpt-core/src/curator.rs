@@ -24,7 +24,7 @@ pub struct CuratorVerdict {
     /// KG consistency: dot-product of first direction with itself (self-similarity).
     /// Non-zero when directions carry meaningful signal.
     pub kg_consistency: f32,
-    /// Latent conditioning: sigmoid(dot(query_vector, direction[0])) in [0, 1].
+    /// Latent conditioning: `sigmoid(dot(query_vector, direction[0])) in [0, 1]`.
     pub latent_conditioning: f32,
     /// Spectral flatness: variance of leaf hashes exceeds entropy floor.
     pub spectral_ok: bool,

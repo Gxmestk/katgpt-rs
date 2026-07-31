@@ -3,7 +3,7 @@
 **Date:** 2026-06-30
 **Plan:** [`.plans/340_conformal_predictive_intervals_primitive.md`](../.plans/340_conformal_predictive_intervals_primitive.md) Phase 2.5
 **Issue:** 010 (T2 — RESOLVED; tracker removed; this benchmark + `.benchmarks/010_report_the_floor_consolidated.md` are the lasting record)
-**Feature flag:** `conformal_predictive_intervals` (opt-in, same as Phase 1+2)
+**Feature flag:** `conformal_predictive_intervals` (opt-in at time of writing, 2026-06-30; **promoted to DEFAULT-ON 2026-07-20 by Plan 468** — see `.benchmarks/340_conformal_goat.md` §"Promotion decision")
 **Modelless:** ✅ Yes — the harness only orchestrates and scores. No training, no learned params.
 
 ---
@@ -31,8 +31,8 @@ pass; KARC no-regression gate still passes.
 LosesToFloor / Mixed / NotApplicable across 5 canonical scenarios on standard
 corpora.
 
-**Tests:** `tests/conformal_floor_harness.rs` (10 integration tests) +
-`src/conformal/floor_harness.rs::tests` (13 unit tests).
+**Tests:** `crates/katgpt-core/tests/conformal_floor_harness.rs` (10 integration tests) +
+`crates/katgpt-core/src/conformal/floor_harness.rs::tests` (13 unit tests).
 
 ### Reference results (α=0.05, deterministic seeds)
 
@@ -105,7 +105,7 @@ single-corpus verdict.
 `corpus_white_noise_is_deterministic`.
 
 The corpus constructors use a deterministic SplitMix64 RNG (same algorithm as
-`examples/conformal_airpassengers.rs`), so corpora are bit-reproducible across
+`crates/katgpt-core/examples/conformal_airpassengers.rs`), so corpora are bit-reproducible across
 runs. Given a fixed primitive, the report is deterministic.
 
 ---
@@ -221,9 +221,9 @@ corpora across runs.
 
 | File | Role | Lines |
 |---|---|---|
-| `src/conformal/floor_harness.rs` | Harness module: trait, FloorAdapter, report types, `run_floor_comparison`, corpora, 13 unit tests | ~650 |
-| `tests/conformal_floor_harness.rs` | 10 integration tests + canonical adapter-pattern examples for T3–T7 authors | ~375 |
-| `src/conformal/mod.rs` | Wire `mod floor_harness` + re-export | +9 lines |
+| `crates/katgpt-core/src/conformal/floor_harness.rs` | Harness module: trait, FloorAdapter, report types, `run_floor_comparison`, corpora, 13 unit tests | ~650 |
+| `crates/katgpt-core/tests/conformal_floor_harness.rs` | 10 integration tests + canonical adapter-pattern examples for T3–T7 authors | ~375 |
+| `crates/katgpt-core/src/conformal/mod.rs` | Wire `mod floor_harness` + re-export | +9 lines |
 | `src/lib.rs` | Re-export harness types at crate root | +7 lines |
 | `Cargo.toml` | `[[test]] conformal_floor_harness` entry | +8 lines |
 

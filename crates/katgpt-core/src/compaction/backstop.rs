@@ -48,7 +48,7 @@ impl Backstop {
     /// `prompt_len` / `ctx_window`.
     ///
     /// - [`Backstop::None`] / [`Backstop::Never`] → always `false`.
-    /// - [`Backstop::TokenPct(p)`] → `prompt_len >= (p * ctx_window) as usize`.
+    /// - `Backstop::TokenPct(p)` → `prompt_len >= (p * ctx_window) as usize`.
     ///
     /// Zero-allocation: a single comparison on the hot path.
     #[inline]

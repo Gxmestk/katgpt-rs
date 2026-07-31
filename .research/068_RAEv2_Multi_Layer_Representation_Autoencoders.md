@@ -113,7 +113,7 @@ The pattern is: strong prediction + (strong - weak) contrast = guided output. Th
 
 Our `forward_base` currently runs all layers and uses only the **final** `ctx.x` for the LM head:
 
-```katgpt-rs/src/transformer.rs#L823-1040
+```katgpt-rs/crates/katgpt-percepta/src/transformer.rs#L823-1040
 fn forward_base<'a>(
     ctx: &'a mut ForwardContext,
     weights: &TransformerWeights,
@@ -442,7 +442,7 @@ RAEv2's core ideas transfer to LLM inference at the **mechanism level** (multi-l
 | Item | Effort | Impact | Priority | Target |
 |---|---|---|---|---|
 | 7.3 EP Accuracy@k metric | Trivial | High | HIGH | GOAT benchmark reporting |
-| 7.1 MLS residual aggregation | Medium | Medium | MEDIUM | `src/transformer.rs` + feature gate |
+| 7.1 MLS residual aggregation | Medium | Medium | MEDIUM | `crates/katgpt-percepta/src/transformer.rs` + feature gate |
 | 7.2 Self-guidance pattern | Medium | High (if it works) | LOW | Needs training pipeline first |
 
 ### 12.3 What NOT To Do
@@ -488,13 +488,13 @@ RAEv2's core ideas transfer to LLM inference at the **mechanism level** (multi-l
 
 | File | Role |
 |---|---|
-| `src/transformer.rs` | `forward_base` layer loop, `standard_lm_head`, `TransformerWeights`, `LayerWeights` |
-| `crates/katgpt-core/src/types.rs` | `Config` with `early_exit_*`, `mtp_*` fields, `InferenceOverrides` |
-| `src/speculative/verifier.rs` | `SpeculativeVerifier` trait |
+| `crates/katgpt-percepta/src/transformer.rs` | `forward_base` layer loop, `standard_lm_head`, `TransformerWeights`, `LayerWeights` |
+| `crates/katgpt-types/src/lib.rs` | `Config` with `early_exit_*`, `mtp_*` fields, `InferenceOverrides` |
+| `crates/katgpt-speculative/src/spechop/verifier.rs` | `SpeculativeVerifier` trait |
 | `src/speculative/dd_tree.rs` | `inject_sde_noise`, `build_dd_tree_sde`, early exit logic |
 | `src/speculative/types.rs` | `SdeConfig`, `DDTreeBranchCache`, screening types |
-| `src/pruners/sdar/sdar_bandit.rs` | `SdarBanditPruner<P>` sigmoid-gated bandit |
-| `src/benchmark.rs` | GOAT benchmark infrastructure, MTP benchmarks |
+| `crates/katgpt-pruners/src/sdar/sdar_bandit.rs` | `SdarBanditPruner<P>` sigmoid-gated bandit |
+| `src/benchmark/mod.rs` | GOAT benchmark infrastructure, MTP benchmarks |
 | `Cargo.toml` | Feature gates (`sdar_gate`, `elf_sde`, `delta_routing`, etc.) |
 ```
 

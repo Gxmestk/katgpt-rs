@@ -4,7 +4,7 @@
 **Research:** [302_FAME_Sampling_Invariant_Per_Entity_MoE](../.research/302_FAME_Sampling_Invariant_Per_Entity_MoE.md)
 **Source paper:** [arxiv 2510.00621](https://arxiv.org/abs/2510.00621) — FAME: Adaptive Functional Attention with Expert Routing for Function-on-Function Regression (Gao/Chen/Zhang, NeurIPS 2025)
 **Target:** `crates/katgpt-core/src/committed_field_blend.rs` (new module) + Cargo feature `committed_field_blend`
-**Status:** Active — Phase 1 ✅ + Phase 2 GOAT G1–G5 ✅ PASSED (2026-06-25)
+**Status:** ✅ COMPLETE, DEFAULT-ON (committed_field_blend in katgpt-core default) — Phase 1 ✅ + Phase 2 GOAT G1–G5 ✅ PASSED (2026-06-25)
 **Tier:** Super-GOAT (open primitive half; private guide at `riir-ai/.research/158_*.md`)
 
 ---
@@ -183,8 +183,8 @@ G2 gate tests this directly: simulate an entity with dense observations vs spars
 
 ### Tasks
 
-- [x] **T4.1** `examples/committed_blend_01_three_archetypes.rs` — K=3 synthetic archetype fields (aggressive/cautious/social analogues), 100 entities, each commits a blend from its trajectory summary, verify sampling invariance under fog-of-war gaps. **PASS** — 100/100 entities pass both pi and trajectory invariance (worst-case Δpi = 1.19e-6, worst-case Δtraj = 5.96e-6, both well under 1e-3 tolerance); 100/100 distinct committed pi vectors (test is non-vacuous).
-- [x] **T4.2** `examples/committed_blend_02_recommit_on_event.rs` — demonstrate the re-commit trigger (major personality event → `commit()` called again → new BLAKE3, new version). **PASS** — v=1 → v=2 produces distinct BLAKE3 commitments; cached-hash observer detects the swap; personality changes in the expected direction (aggressive gate 0.6341→0.0208 after fleeing, social gate 0.6225→0.9890); tamper detection still works after re-commit.
+- [x] **T4.1** `crates/katgpt-core/examples/committed_blend_01_three_archetypes.rs` — K=3 synthetic archetype fields (aggressive/cautious/social analogues), 100 entities, each commits a blend from its trajectory summary, verify sampling invariance under fog-of-war gaps. **PASS** — 100/100 entities pass both pi and trajectory invariance (worst-case Δpi = 1.19e-6, worst-case Δtraj = 5.96e-6, both well under 1e-3 tolerance); 100/100 distinct committed pi vectors (test is non-vacuous).
+- [x] **T4.2** `crates/katgpt-core/examples/committed_blend_02_recommit_on_event.rs` — demonstrate the re-commit trigger (major personality event → `commit()` called again → new BLAKE3, new version). **PASS** — v=1 → v=2 produces distinct BLAKE3 commitments; cached-hash observer detects the swap; personality changes in the expected direction (aggressive gate 0.6341→0.0208 after fleeing, social gate 0.6225→0.9890); tamper detection still works after re-commit.
 - [x] **T4.3** Update `katgpt-rs/README.md` Feature Showcase with `committed_field_blend` entry. Added: (a) row in the Opt-In & Gated Features table; (b) full `### 🧠 CommittedFieldBlend` subsection after `PersonalityWeightedComposition` (math, trait surface, defining property, re-commit lifecycle, GOAT status, examples); (c) module listing in the Project Structure tree; (d) Plan 321 link in the Documentation Index.
 - [x] **T4.4** Update `katgpt-rs/.docs/01_overview.md` Feature Flags table. Added row for `committed_field_blend` (implied dep on `personality_composition`, sampling-invariance defining property, G1–G5 ALL PASS with worst-case Δpi evidence, promotion deferred).
 
@@ -230,7 +230,7 @@ Promote `committed_field_blend` to default-on ONLY if:
 - **Closest shipped cousin (per-layer, drifting):** Plan 297 (`PersonalityWeightedComposition`)
 - **Forecast partner (Bi-NCDE backward pass):** Plan 308 (`KarcForecaster`)
 - **DEC sampling-invariance substrate:** Plan 314 (`line_integral`), Research 296
-- **Freeze substrate:** `riir-neuron-db/src/shard.rs` (NeuronShard + future ArchetypeBlendShard subtype)
+- **Freeze substrate:** `riir-neuron-db/src/shard/mod.rs` (NeuronShard + future ArchetypeBlendShard subtype)
 - **Commitment bridge:** `riir-chain/src/encoding/latcal.rs` (LatCal fixed-point commitment of K-weight vector)
 - **Private Super-GOAT guide:** `riir-ai/.research/158_per_npc_committed_personality_blend_guide.md`
 - **Runtime integration plan (filed 2026-06-25, unblocked by Phase 4):** [riir-ai/.plans/336_committed_personality_runtime_integration.md](../../riir-ai/.plans/336_committed_personality_runtime_integration.md)

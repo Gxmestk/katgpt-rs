@@ -5,8 +5,8 @@
 //! flip-flop triggers (an analog of the "bank" polysemy example from Mozer
 //! 2026, adapted to a small belief-vector regime), then compares three kernels:
 //!
-//! - [`LeakyIntegrator`] (Family C — HLA's leaky integrator, the battle-tested
-//!   baseline; byte-identical math to `ReconstructionState::evolve_hla`).
+//! - [`LeakyIntegrator`] (Family C — belief's leaky integrator, the battle-tested
+//!   baseline; byte-identical math to `ReconstructionState::evolve_belief`).
 //! - [`AttractorKernel`] (Family A — the GOAT candidate; hysteresis should
 //!   resist flip-flopping).
 //! - [`LatentThoughtKernel`] (Family B — K=3 iterations of Family A; more
@@ -310,7 +310,7 @@ impl CoherenceReport {
 /// aggregate report.
 ///
 /// Constructed kernels:
-/// - `LeakyIntegrator::hla_default(BENCH_DIM)` — `lr=0.1, max_delta=0.2`
+/// - `LeakyIntegrator::belief_default(BENCH_DIM)` — `lr=0.1, max_delta=0.2`
 ///   (matches `ReconstructionConfig::default()`).
 /// - `AttractorKernel::from_seed(42, BENCH_DIM)` — Family A.
 /// - `LatentThoughtKernel::from_seed(42, BENCH_DIM, 3)` — Family B with K=3.
@@ -321,7 +321,7 @@ pub fn run_g2_1_coherence_benchmark() -> CoherenceReport {
     let dim = BENCH_DIM;
     let seq = build_input_sequence(dim);
 
-    let leaky = LeakyIntegrator::hla_default(dim);
+    let leaky = LeakyIntegrator::belief_default(dim);
     let attractor = AttractorKernel::from_seed(42, dim);
     let latent_thought = LatentThoughtKernel::from_seed(42, dim, 3);
 

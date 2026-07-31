@@ -101,7 +101,7 @@ The distilled inference-time primitive is a **small frozen kernel** implementing
 
 ### 2.3 HLA prior art — the verdict-changing finding
 
-**`evolve_hla` already implements Family C.** `ReconstructionState::evolve_hla()` (`katgpt-rs/crates/katgpt-core/src/sense/reconstruction.rs:623`) is a gated additive recurrent update of the 8-dim HLA state, called every step in the `expand → route → accumulate → evolve_hla` loop:
+**`evolve_hla` already implements Family C.** `ReconstructionState::evolve_hla()` (`katgpt-rs/crates/katgpt-sense/src/reconstruction.rs:623`) is a gated additive recurrent update of the 8-dim HLA state, called every step in the `expand → route → accumulate → evolve_hla` loop:
 
 ```rust
 self.hla[i] = (self.hla[i] + clamped_delta).clamp(-1.0, 1.0);

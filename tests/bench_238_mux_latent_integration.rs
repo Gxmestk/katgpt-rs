@@ -288,10 +288,12 @@ fn adaptive_vs_fixed_compression() {
 
     // The adaptive buffer should have at least one segment that isn't span_size=8
     // (diverse windows should get smaller spans, repetitive should get larger)
-    let fixed_all_same = fixed_ctx
-        .segments
-        .iter()
-        .all(|seg| matches!(seg, katgpt_core::mux_latent::LatentSegment::Compressed { .. }));
+    let fixed_all_same = fixed_ctx.segments.iter().all(|seg| {
+        matches!(
+            seg,
+            katgpt_core::mux_latent::LatentSegment::Compressed { .. }
+        )
+    });
     assert!(
         fixed_all_same,
         "fixed X8 should have all compressed segments"

@@ -67,7 +67,7 @@ impl FeatureExtractor for DefaultFeatureExtractor {
         let max_score = inner_scores
             .iter()
             .copied()
-            .max_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
+            .max_by(|a, b| a.total_cmp(b))
             .unwrap_or(0.0);
 
         vec![

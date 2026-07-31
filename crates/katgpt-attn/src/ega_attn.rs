@@ -34,9 +34,11 @@ const EPS: f32 = 1e-8;
 // ── Helper functions ──────────────────────────────────────────
 
 /// Standard sigmoid: σ(x) = 1 / (1 + exp(-x)).
+/// Delegates to [`katgpt_core::simd::fast_sigmoid`] (Cephes polynomial,
+/// ~1.7× faster than libm on aarch64).
 #[inline]
 pub fn sigmoid(x: f32) -> f32 {
-    1.0 / (1.0 + (-x).exp())
+    katgpt_core::simd::fast_sigmoid(x)
 }
 
 /// Z-normalize scores in-place: (x - μ) / (σ + ε).
@@ -61,7 +63,7 @@ pub fn z_normalize(scores: &mut [f32]) {
 
 /// Compute the energy gate vector g from energy scores.
 ///
-/// Returns g[j] = σ(α · (ẽ[j] - τ)) where ẽ is the z-normalized energy.
+/// Returns `g[j] = σ(α · (ẽ[j] - τ))` where ẽ is the z-normalized energy.
 pub fn compute_energy_gate(energy: &[f32], alpha: f32, tau: f32) -> Vec<f32> {
     let mut out = vec![0.0; energy.len()];
     compute_energy_gate_into(energy, alpha, tau, &mut out);
@@ -102,7 +104,7 @@ pub fn compute_energy_gate_into(energy: &[f32], alpha: f32, tau: f32, out: &mut 
 /// Field order: Vec (24 bytes) before f32s (4 bytes each) eliminates padding.
 #[derive(Clone, Debug)]
 pub struct EgaGate {
-    /// Learned energy projection vector [head_dim].
+    /// Learned energy projection vector `[head_dim]`.
     pub w_proj: Vec<f32>,
     /// Gate sharpness parameter. Higher α → sharper gate transition.
     pub alpha: f32,
@@ -145,7 +147,7 @@ impl EgaGate {
         out
     }
 
-    /// Zero-alloc variant of [`energy_scores`].
+    /// Zero-alloc variant of [`energy_scores`](Self::energy_scores).
     ///
     /// Writes energy scores into `out[..seq_len]`.
     #[inline]
@@ -171,7 +173,7 @@ impl EgaGate {
     /// Âᵢⱼ = Aᵢⱼ · gⱼ / Σₖ(Aᵢₖ · gₖ + ε)
     ///
     /// **Note:** This allocates a gate buffer internally. For decode loops, prefer
-    /// [`gate_attention_into`] to avoid per-call heap allocation.
+    /// [`gate_attention_into`](Self::gate_attention_into) to avoid per-call heap allocation.
     pub fn gate_attention(
         &self,
         attn_weights: &mut [f32],
@@ -186,7 +188,7 @@ impl EgaGate {
         self.gate_attention_into(attn_weights, energy, seq_len, gate_buf);
     }
 
-    /// Zero-alloc variant of [`gate_attention`] that reuses a pre-allocated gate buffer.
+    /// Zero-alloc variant of [`gate_attention`](Self::gate_attention) that reuses a pre-allocated gate buffer.
     ///
     /// Pass a `gate_buf` of length `>= seq_len` to avoid per-call `vec![0.0; seq_len]` allocation.
     #[inline]

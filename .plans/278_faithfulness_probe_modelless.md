@@ -4,7 +4,7 @@
 **Research:** [katgpt-rs/.research/244_Self_Evolver_Faithfulness_Cognitive_Integrity.md](../.research/244_Self_Evolver_Faithfulness_Cognitive_Integrity.md)
 **Source paper:** [arxiv 2601.22436](https://arxiv.org/pdf/2601.22436) — Zhao et al. 2026 (ICML), "Large Language Model Agents Are Not Always Faithful Self-Evolvers"
 **Target:** `crates/katgpt-core/src/faithfulness/` (new module in katgpt-core, moved from `katgpt-rs/src/faithfulness/` so riir-engine Plan 308 can consume via katgpt-core) + Cargo features `faithfulness_probe`, `triggered_injection` (defined in katgpt-core, forwarded as passthroughs from the katgpt root crate)
-**Status:** Active — Phase 1 (unblocking skeleton)
+**Status:** COMPLETE ✅ — Phases 1–4 done. GOAT gate G1/G1b/G2/G3/G8 all PASS (G1 100% faithful + 100% unfaithful detection; G2 Spearman ρ=1.0000; G3 50% skip / 0.63% quality delta; G8 0% default-off regression). `triggered_injection` promoted to **DEFAULT-ON** (2.6ns/call gate, 50% compute savings); `faithfulness_probe` stays **OPT-IN** (diagnostic). 24/24 unit tests. See `.benchmarks/278_faithfulness_probe_goat.md`. Unblocks Plan 308.
 
 ---
 
@@ -20,7 +20,7 @@ Ship the open, generic half of the Cognitive Integrity Layer (private half: `rii
 
 ### Tasks
 
-- [x] **T1.1** Create `katgpt-rs/src/faithfulness/mod.rs` with module doc + feature gate `#![cfg(feature = "faithfulness_probe")]`.
+- [x] **T1.1** Create `katgpt-rs/crates/katgpt-core/src/faithfulness/mod.rs` with module doc + feature gate `#![cfg(feature = "faithfulness_probe")]`.
   **Implementation:** Module doc present; no inner `cfg` (parent module gate in lib.rs handles feature gating).
 - [x] **T1.2** Define `Intervention` enum (`Empty`, `Shuffle`, `Corrupt`, `Irrelevant`, `Filler`) — `#[repr(u8)]`, `#[derive(Clone, Copy, Debug, PartialEq, Eq)]`. Zero-alloc.
 - [x] **T1.3** Define `FaithfulnessProfile<D>` struct (`empty_delta`, `shuffle_or_corrupt_delta`, `irrelevant_delta`, `filler_delta`) — POD, `D: PartialOrd + Copy + Default`. Implement `is_faithfully_used(threshold)` per Research 244 §4.
@@ -75,11 +75,11 @@ Ship the open, generic half of the Cognitive Integrity Layer (private half: `rii
 ### Tasks
 
 - [x] **T3.1** **G1 + G1b** — extend Phase 1 unit tests to a property test: `proptest` over random faithful/unfaithful synthetic consumers; `is_faithfully_used` returns correct verdict ≥99% of the time.
-  **DONE (2026-06-16):** Hand-rolled property test with `fastrand` (per katgpt-rs convention — `proptest`/`quickcheck` are not katgpt-rs dev-deps; see `crates/katgpt-core/src/micro_belief/tests.rs:137`). 400 randomized trials: **100.0% faithful detection (200/200)**, **100.0% unfaithful detection (200/200)**, **100.0% overall**. See `src/faithfulness/goat_gate.rs::g1_g1b_extended_detection_rate_at_least_99_percent`.
+  **DONE (2026-06-16):** Hand-rolled property test with `fastrand` (per katgpt-rs convention — `proptest`/`quickcheck` are not katgpt-rs dev-deps; see `crates/katgpt-micro-belief/src/tests.rs:137`). 400 randomized trials: **100.0% faithful detection (200/200)**, **100.0% unfaithful detection (200/200)**, **100.0% overall**. See `crates/katgpt-core/src/faithfulness/goat_gate.rs::g1_g1b_extended_detection_rate_at_least_99_percent`.
 - [x] **T3.2** **G2** — IG surrogate validation: pick a small transformer (or a synthetic non-linear consumer with computable IG); compute reference IG; compute `FiniteDifferenceAttributionProbe` ranking; assert Spearman ρ ≥ 0.8 across ≥50 segments.
-  **DONE (2026-06-16):** Non-linear consumer `behavior = Σ w_i·m_i + ½·Σ m_i²` with analytically computable exact gradient norm `‖√(Σ (w_i + m_i)²)`. **Spearman ρ = 1.0000** across 64 segments (≥50 required). See `src/faithfulness/goat_gate.rs::g2_attribution_spearman_rho_at_least_0p8_across_50_segments`.
+  **DONE (2026-06-16):** Non-linear consumer `behavior = Σ w_i·m_i + ½·Σ m_i²` with analytically computable exact gradient norm `‖√(Σ (w_i + m_i)²)`. **Spearman ρ = 1.0000** across 64 segments (≥50 required). See `crates/katgpt-core/src/faithfulness/goat_gate.rs::g2_attribution_spearman_rho_at_least_0p8_across_50_segments`.
 - [x] **T3.3** **G3** — triggered-injection gain: on a saturated-regime benchmark (synthetic: consumer where prior suffices, so memory is redundant), `EntropyThresholdGate` skips ≥50% of injections with quality parity ±2% vs always-inject.
-  **DONE (2026-06-16):** Saturated regime (α=0.05 memory contribution). **50.0% skip rate** (1000/2000), **0.63% quality delta** (≤2% required). See `src/faithfulness/goat_gate.rs::g3_triggered_injection_skips_at_least_50pct_with_quality_parity`.
+  **DONE (2026-06-16):** Saturated regime (α=0.05 memory contribution). **50.0% skip rate** (1000/2000), **0.63% quality delta** (≤2% required). See `crates/katgpt-core/src/faithfulness/goat_gate.rs::g3_triggered_injection_skips_at_least_50pct_with_quality_parity`.
 - [x] **T3.4** **G8** — default-off zero-overhead: run existing katgpt-rs benchmark suite (HLA reconstruction bench, DDTree bench) with both features OFF; assert 0% regression.
   **DONE (2026-06-16):** (1) `cargo build --no-default-features --features sparse_mlp` clean. (2) `nm` on `libkatgpt_rs.rlib` shows **0 matches** for `faithfulness`/`triggered_injection`. (3) Default test suite: **3628 tests pass, 0 failures** (0% regression). (4) `lib.rs` gates module behind `#[cfg(any(feature="faithfulness_probe", feature="triggered_injection"))]`.
 - [x] **T3.5** Record gate results in `katgpt-rs/.benchmarks/278_faithfulness_probe_goat.md`.

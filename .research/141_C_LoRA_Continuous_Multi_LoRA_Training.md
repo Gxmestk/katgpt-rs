@@ -131,4 +131,4 @@ Unified memory on Apple Silicon gives us an additional advantage C-LoRA doesn't 
 - SGMV paper: https://arxiv.org/pdf/2310.18547
 - Related our research: `004_LoRA_Architecture_Verdict.md`, `037_REAP_Model-Based_Modelless_Duality.md`
 - Related our plans: `049_g_zero_self_play.md` (G-Zero), `092_self_play_freeze_thaw.md` (Freeze/Thaw), `094_memo_reflections_ties_merging.md` (TIES)
-- Related our code: `riir-ai/crates/riir-gpu/src/gemv_cubecl.rs`, `riir-ai/crates/riir-gpu/src/forward.rs` (L2707 dispatch_lora_merge)
+- Related our code: `riir-ai/crates/riir-gpu/src/gemv_cubecl.rs`, `riir-ai/crates/riir-gpu/src/forward/mod.rs` (L2707 dispatch_lora_merge)

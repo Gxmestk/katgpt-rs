@@ -1,16 +1,17 @@
 //! Shared leaky-integrator / delta-rule step primitive (Plan 276 Phase 2, T2.1).
 //!
-//! This is the **single source of truth** for the HLA leaky-integrator update
+//! This is the **single source of truth** for the belief leaky-integrator update
 //! math. It is compiled UNGATED (no `micro_belief` feature required) so that
-//! `sense::reconstruction::ReconstructionState::evolve_hla` can delegate to it
+//! `sense::reconstruction::ReconstructionState::evolve_belief` can delegate to it
 //! without forcing the opt-in `micro_belief` feature on whenever `sense`
-//! compiles — preserving the G1.4 latency gate decision (`.issues/024_*`).
+//! compiles — preserving the G1.4 latency gate decision (Issue 024, resolved +
+//! removed).
 //!
 //! Two callers, one math:
-//! - [`crate::sense::reconstruction::ReconstructionState::evolve_hla`] passes
+//! - `crate::sense::reconstruction::ReconstructionState::evolve_belief` passes
 //!   `total = Σ kind_activations[0..6]` (the 6 source SenseKind activations)
 //!   and an 8-element `input` gathered via `KIND_MAP = [0,1,2,3,4,5,0,1]`.
-//! - [`crate::micro_belief::leaky::LeakyIntegrator::step`] passes
+//! - `crate::micro_belief::leaky::LeakyIntegrator::step` passes
 //!   `total = Σ input[0..dim]` and a flat `dim`-element `input`.
 //!
 //! # Why `total` is a parameter, not computed inside
@@ -22,7 +23,7 @@
 //! half-total, per-element delta/clamp/apply). The body is identical bytes for
 //! both callers given the same `(state, input, total, lr, max_delta)`.
 //!
-//! # Math (verbatim from the original `evolve_hla` body)
+//! # Math (verbatim from the original `evolve_belief` body)
 //!
 //! ```text
 //! if total < 1e-8: return                     // div-by-zero guard, no update
@@ -59,7 +60,7 @@ pub fn leaky_step(state: &mut [f32], input: &[f32], total: f32, lr: f32, max_del
         "leaky_step: state/input length mismatch"
     );
 
-    // Div-by-zero / degenerate-input guard — verbatim from evolve_hla.
+    // Div-by-zero / degenerate-input guard — verbatim from evolve_belief.
     if total < 1e-8 {
         return;
     }
@@ -69,7 +70,7 @@ pub fn leaky_step(state: &mut [f32], input: &[f32], total: f32, lr: f32, max_del
     let half_total = 0.5 * total;
 
     // Direct indexing (not iterator) over the fixed-length loop lets LLVM
-    // unroll; for the 8-element HLA this fully unrolls.
+    // unroll; for the 8-element belief this fully unrolls.
     let n = state.len();
     for i in 0..n {
         let normalized = input[i];
@@ -83,7 +84,7 @@ pub fn leaky_step(state: &mut [f32], input: &[f32], total: f32, lr: f32, max_del
 mod tests {
     use super::*;
 
-    /// Zero total → early return, state untouched (mirrors evolve_hla guard).
+    /// Zero total → early return, state untouched (mirrors evolve_belief guard).
     #[test]
     fn zero_total_is_noop() {
         let mut state = [0.5f32; 8];
@@ -135,7 +136,7 @@ mod tests {
         );
     }
 
-    /// Evolve_hla's sum-over-6 quirk: passing `total = Σ[0..6]` while looping
+    /// Evolve_belief's sum-over-6 quirk: passing `total = Σ[0..6]` while looping
     /// over 8 gathered inputs must produce a different (and correct) result
     /// than summing all 8. This pins the contract callers rely on.
     #[test]

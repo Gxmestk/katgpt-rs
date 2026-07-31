@@ -235,9 +235,13 @@ fn main() {
     let all_pass = g1 && g2 && g3 && g4;
     println!();
     if all_pass {
-        println!("ALL GATES PASS — primitive is GOAT-eligible for default-on promotion.");
+        println!("ALL GATES PASS — primitive is GOAT-validated.");
+        println!("   tucker_factorization was PROMOTED TO DEFAULT-ON");
+        println!("   (katgpt-core/Cargo.toml Phase 2, 2026-06). This bench was");
+        println!("   the gate evidence; promotion has already landed.");
     } else {
-        println!("ONE OR MORE GATES FAILED — keep opt-in, do not promote to default.");
+        println!("ONE OR MORE GATES FAILED — note: tucker_factorization was previously");
+        println!("promoted to default-on; a regression here would warrant re-audit.");
         std::process::exit(1);
     }
 }

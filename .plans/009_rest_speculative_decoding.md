@@ -78,7 +78,7 @@ matmul(&mut ctx.logits, &weights.lm_head, &ctx.x, config.vocab_size, n);
 ### REST Client
 
 ```rust
-// src/rest/mod.rs (new module, feature-gated behind "rest" feature)
+// RuVector/examples/vibecast-7sense/crates/sevensense-api/src/rest/mod.rs (new module, feature-gated behind "rest" feature)
 
 pub struct RestClient {
     base_url: String,     // e.g., "http://localhost:9090"
@@ -108,7 +108,7 @@ impl RestClient {
 ### DDTree Merge
 
 ```rust
-// speculative/dd_tree.rs — add retrieved branches to tree
+// src/speculative/dd_tree.rs — add retrieved branches to tree
 
 /// Inject retrieved token sequences into the DDTree as candidate branches.
 /// Each retrieved sequence becomes a path in the tree with score = similarity * weight.
@@ -150,7 +150,7 @@ pub fn merge_retrieved_branches(
 ### Integration Point
 
 ```rust
-// speculative/step.rs — extended speculative step with REST
+// crates/katgpt-forward/src/step.rs — extended speculative step with REST
 
 #[cfg(feature = "rest")]
 pub async fn speculative_step_rest(
@@ -212,14 +212,14 @@ rest = ["reqwest", "tokio"]   # Retrieval-based speculative decoding
 
 ### Phase 2: REST Client Module
 - [x] 2.1 Add `reqwest` and `tokio` to `Cargo.toml` behind `rest` feature
-- [x] 2.2 Create `src/rest/mod.rs` with feature gate
-- [x] 2.3 Create `src/rest/client.rs` — `RestClient`, `RetrievalResult`
-- [x] 2.4 Create `src/rest/types.rs` — request/response types matching anyrag API
+- [x] 2.2 Create `RuVector/examples/vibecast-7sense/crates/sevensense-api/src/rest/mod.rs` with feature gate
+- [x] 2.3 Create `riir-ai/crates/riir-rest/src/client.rs` — `RestClient`, `RetrievalResult`
+- [x] 2.4 Create `riir-ai/crates/riir-rest/src/types.rs` — request/response types matching anyrag API
 - [x] 2.5 Add `pub mod rest;` to `src/lib.rs` behind `#[cfg(feature = "rest")]`
 - [x] 2.6 Add tests: mock REST response parsing
 
 ### Phase 3: DDTree Merge
-- [x] 3.1 Add `merge_retrieved_branches()` to `speculative/dd_tree.rs`
+- [x] 3.1 Add `merge_retrieved_branches()` to `src/speculative/dd_tree.rs`
 - [x] 3.2 Implement score blending: `(1-w) * log(draft_prob) + w * log(retrieval_score)`
 - [x] 3.3 Implement path reconstruction from retrieved sequences
 - [x] 3.4 Add test: merge preserves tree_budget
@@ -227,7 +227,7 @@ rest = ["reqwest", "tokio"]   # Retrieval-based speculative decoding
 - [x] 3.6 Add test: merge with empty retrieval is no-op
 
 ### Phase 4: Integration
-- [x] 4.1 Create `speculative_step_rest()` in `speculative/step.rs`
+- [x] 4.1 Create `speculative_step_rest()` in `crates/katgpt-forward/src/step.rs`
 - [x] 4.2 Wire: DFlash → DDTree → target forward → REST query → merge → verify
 - [x] 4.3 Add benchmark: `Speculative (REST)` vs `Speculative (Simulated)` acceptance rate
 - [x] 4.4 Add example: `examples/rest_demo.rs` (behind `rest` feature)
@@ -266,15 +266,15 @@ full = ["leviathan", "sudoku", "validator", "rest", "training", "gpu"]  # previo
 
 | File | Action | Phase |
 |------|--------|-------|
-| `src/transformer.rs` | Add `hidden_state` field + copy | 1 |
+| `crates/katgpt-percepta/src/transformer.rs` | Add `hidden_state` field + copy | 1 |
 | `Cargo.toml` | Add `reqwest`, `tokio`, `rest` feature | 2 |
-| `src/rest/mod.rs` | New | 2 |
-| `src/rest/client.rs` | New | 2 |
-| `src/rest/types.rs` | New | 2 |
+| `RuVector/examples/vibecast-7sense/crates/sevensense-api/src/rest/mod.rs` | New | 2 |
+| `riir-ai/crates/riir-rest/src/client.rs` | New | 2 |
+| `riir-ai/crates/riir-rest/src/types.rs` | New | 2 |
 | `src/lib.rs` | Add `mod rest` behind feature gate | 2 |
 | `src/speculative/dd_tree.rs` | Add `merge_retrieved_branches` | 3 |
-| `src/speculative/step.rs` | Add `speculative_step_rest` | 4 |
-| `src/benchmark.rs` | Add REST benchmark | 4 |
+| `crates/katgpt-forward/src/step.rs` | Add `speculative_step_rest` | 4 |
+| `src/benchmark/mod.rs` | Add REST benchmark | 4 |
 | `examples/rest_demo.rs` | New | 4 |
 
 ## References

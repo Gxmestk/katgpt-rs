@@ -12,7 +12,7 @@
 
 ## TL;DR
 
-FwPKM unifies **Product Key Memory** (PKM, Lample et al. 2019 — O(√N) factored retrieval over millions of slots) with **Test-Time Training** (gradient descent on a sparse memory at inference). The paper's headline — sparse TTT generalizing from 4K-trained to 128K-context Needle-in-a-Haystack — rests on the gradient-descent half, which is **forbidden by the modelless mandate** (constraint #1: no gradient descent at runtime). The §3.5 modelless-unblock check returns: the "fast weight update" is already shipped as `delta_mem`'s delta rule (Plan 053, a Hebbian-style associative update, not backprop); the curiosity-driven write gate ships as Plan 277 G3; the catastrophic-forgetting problem the paper flags as "future work" (§4.5) is already solved by Raven/δ-Mem consolidation in `riir-neuron-db/src/consolidation.rs`.
+FwPKM unifies **Product Key Memory** (PKM, Lample et al. 2019 — O(√N) factored retrieval over millions of slots) with **Test-Time Training** (gradient descent on a sparse memory at inference). The paper's headline — sparse TTT generalizing from 4K-trained to 128K-context Needle-in-a-Haystack — rests on the gradient-descent half, which is **forbidden by the modelless mandate** (constraint #1: no gradient descent at runtime). The §3.5 modelless-unblock check returns: the "fast weight update" is already shipped as `delta_mem`'s delta rule (Plan 053, a Hebbian-style associative update, not backprop); the curiosity-driven write gate ships as Plan 277 G3; the catastrophic-forgetting problem the paper flags as "future work" (§4.5) is already solved by Raven/δ-Mem consolidation in `katgpt-rs/src/sleep/consolidation.rs`.
 
 **What IS genuinely novel and modelless: the PKM factorization itself.** Splitting a query into two halves, scoring two √N codebooks independently, then taking the top-k of the k×k Cartesian product yields **O(√N)** scoring instead of O(N). This unlocks retrieval over ~10⁶ slots with ~10³ score computations — a complexity class none of our sparse retrievers (Raven RSM, Engram, NPC Memory Store, delta_mem) currently reach. Our grep confirms zero prior art for "product key" / "PKM" / "factorized key" in any repo (only tokenizer-vocab hits).
 
@@ -65,7 +65,7 @@ The "fast weight update" minimizes a chunk-level reconstruction loss `L_mem = Σ
 
 The paper's continual-learning experiment (Fig 6) shows FwPKM adapts quickly to a new domain but "previously stored fast-weight knowledge is flushed and replaced." The paper explicitly flags: *"This motivates developing a memory retention mechanism to realize long-term continual learning in future work."*
 
-**This is exactly what Raven/δ-Mem consolidation solves** (`riir-neuron-db/src/consolidation.rs`). The consolidation sleep-cycle promotes transient episodic state into frozen committed shards (semantic memory), so the episodic buffer can be overwritten without loss. The paper's "future work" is our shipped default-on substrate.
+**This is exactly what Raven/δ-Mem consolidation solves** (`katgpt-rs/src/sleep/consolidation.rs`). The consolidation sleep-cycle promotes transient episodic state into frozen committed shards (semantic memory), so the episodic buffer can be overwritten without loss. The paper's "future work" is our shipped default-on substrate.
 
 ### 1.5 Interpretability findings (§5) — map to existing curiosity signals
 
@@ -83,17 +83,17 @@ The paper's continual-learning experiment (Fig 6) shows FwPKM adapts quickly to 
 |---|---|---|
 | fast weights / fast-weight memory | runtime latent state, δ-Mem associative matrix, HLA per-NPC state | `katgpt-core/src/pruners/delta_mem/`, `riir-engine/src/hla/` |
 | product key / PKM | **NEW** — `ProductKeyMemory` primitive | `katgpt-core/src/product_key_memory/` (this plan) |
-| memory slot / value row | δ-Mem rank-r slot, Engram table entry, NeuronShard slot | `delta_mem/state.rs`, `engram/`, `riir-neuron-db/src/shard.rs` |
-| top-k sparse retrieval | DDTree top-k, NPC Memory Store heapselect, Raven routing | `katgpt-core/src/mcts.rs`, `riir-engine/src/npc_memory.rs`, `examples/core_02_raven.rs` |
-| TTT-style gradient updates | **FORBIDDEN** → δ-rule update (`DeltaMemoryState::write_segment`) | `delta_mem/state.rs` (Plan 053) |
-| addressing loss (entropy on keys) | **FORBIDDEN (GD)** → TEMP diversity selector (slot spread) | `riir-neuron-db/src/consolidation.rs` (Plan 005) |
-| gated residual `g·v̂ + (1−g)·v` | CommittedFieldBlend, PersonalityWeightedComposition, NPC Memory Store gate | `katgpt-core/src/committed_field_blend.rs`, `katgpt-core/src/sense/`, `riir-engine/src/npc_memory.rs` |
+| memory slot / value row | δ-Mem rank-r slot, Engram table entry, NeuronShard slot | `crates/katgpt-core/src/delta_mem/state.rs`, `engram/`, `riir-neuron-db/src/shard/mod.rs` |
+| top-k sparse retrieval | DDTree top-k, NPC Memory Store heapselect, Raven routing | `crates/katgpt-core/src/mcts.rs`, `riir-ai/crates/riir-engine/src/npc_memory.rs`, `examples/core_02_raven.rs` |
+| TTT-style gradient updates | **FORBIDDEN** → δ-rule update (`DeltaMemoryState::write_segment`) | `crates/katgpt-core/src/delta_mem/state.rs` (Plan 053) |
+| addressing loss (entropy on keys) | **FORBIDDEN (GD)** → TEMP diversity selector (slot spread) | `katgpt-rs/src/sleep/consolidation.rs` (Plan 005) |
+| gated residual `g·v̂ + (1−g)·v` | CommittedFieldBlend, PersonalityWeightedComposition, NPC Memory Store gate | `crates/katgpt-core/src/committed_field_blend.rs`, `katgpt-core/src/sense/`, `riir-ai/crates/riir-engine/src/npc_memory.rs` |
 | IDW scoring (inverse distance) | **NEW scoring mode** — centroid-finding alternative to dot product | this plan (optional) |
 | episodic memory | HLA session state, δ-Mem, Engram runtime table | HLA, δ-Mem, Engram |
-| semantic memory | frozen NeuronShard `style_weights`, committed personality | `riir-neuron-db/src/shard.rs` |
-| novelty detection via gating `g_t` | Temporal Derivative curiosity, CGSP reward | `katgpt-core/src/temporal_deriv.rs` (Plan 277), `cgsp/` |
+| semantic memory | frozen NeuronShard `style_weights`, committed personality | `riir-neuron-db/src/shard/mod.rs` |
+| novelty detection via gating `g_t` | Temporal Derivative curiosity, CGSP reward | `crates/katgpt-core/src/temporal_deriv.rs` (Plan 277), `cgsp/` |
 | iterative reading (n-iter) | Sleep Consolidation N-pass | `katgpt-rs/src/sleep/` (Plan 154) |
-| catastrophic forgetting (future work) | Raven/δ-Mem consolidation (shipped) | `riir-neuron-db/src/consolidation.rs` |
+| catastrophic forgetting (future work) | Raven/δ-Mem consolidation (shipped) | `katgpt-rs/src/sleep/consolidation.rs` |
 | slot collapse | TEMP `sleep_diverse` diversity, BranchBank quarantine | `riir-neuron-db`, `katgpt-core/src/branching/` |
 | lookahead target `v_{t+1}` | next-token prediction target (standard) | transformer forward pass |
 
@@ -225,7 +225,7 @@ The PKM factorization alone is a known public technique (Lample et al. 2019, 7 y
   - Plan 321 (CommittedFieldBlend) — the sigmoid output gate `g·v̂ + (1−g)·v`.
   - Plan 005 (TEMP `sleep_diverse`) — the diversity selector that replaces the addressing loss.
 - **Private fusion targets:**
-  - `riir-neuron-db/src/consolidation.rs` (Raven/δ-Mem) — F5 closes the paper's future-work gap.
+  - `katgpt-rs/src/sleep/consolidation.rs` (Raven/δ-Mem) — F5 closes the paper's future-work gap.
   - `riir-neuron-db/src/freeze.rs` (`MerkleFrozenEnvelope`) — F4 freeze/thaw the value table.
   - `riir-chain/src/encoding/latcal*.rs` — F6 LatCal commitment of PKM readout.
 - **Source paper:** [arXiv:2601.00671](https://arxiv.org/abs/2601.00671) — Zhao & Jones, Sakana AI, Feb 2026.

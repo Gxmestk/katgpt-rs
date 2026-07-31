@@ -26,11 +26,11 @@
 //! (K, V, Q, α, β per node), and committed prefix state S₀:
 //!
 //! 1. Build topology: ancestor bitmasks + cumulative log-decay + topo order.
-//! 2. Build interaction matrix X[i][j] = 𝟙[j≺i]·(aᵢ/aⱼ)·βᵢ·kᵢᵀkⱼ.
-//! 3. Compute folded RHS: RHS[i] = βᵢvᵢ − βᵢaᵢ(kᵢᵀS₀).
+//! 2. Build interaction matrix `X[i][j] = 𝟙[j≺i]·(aᵢ/aⱼ)·βᵢ·kᵢᵀkⱼ`.
+//! 3. Compute folded RHS: `RHS[i] = βᵢvᵢ − βᵢaᵢ(kᵢᵀS₀)`.
 //! 4. Forward substitution: solve `(I+X)U' = RHS` → U'.
-//! 5. Compute outputs: O[i] = (1/√dₖ)(aᵢqᵢᵀS₀ + Σ_{j⪯i} Y[i][j]·U'[j]),
-//!    where Y[i][j] = 𝟙[j⪯i]·(aᵢ/aⱼ)·qᵢᵀkⱼ.
+//! 5. Compute outputs: `O[i] = (1/√dₖ)(aᵢqᵢᵀS₀ + Σ_{j⪯i} Y[i][j]·U'[j])`,
+//!    where `Y[i][j] = 𝟙[j⪯i]·(aᵢ/aⱼ)·qᵢᵀkⱼ`.
 //!
 //! # Promotion
 //!
@@ -225,8 +225,9 @@ pub struct GdnTreeVerifier {
     scratch_rhs: Vec<f32>,
     /// Solution U': `[max_t × d_v]`.
     scratch_u: Vec<f32>,
-    /// Output buffer: `[max_t × d_v]`.
-    scratch_out: Vec<f32>,
+    /// Output buffer: `[max_t × d_v]`. `pub(super)` so the dual-path fusion
+    /// (Plan 430 `hola_fusion` submodule) can residual-add into it.
+    pub(super) scratch_out: Vec<f32>,
 }
 
 impl GdnTreeVerifier {
@@ -300,13 +301,7 @@ fn build_rhs(
 /// Solve `(I + X)U = rhs` via forward substitution (unit-lower-triangular).
 ///
 /// X is `t × t` lower-triangular in topo order. Writes solution to `u_buf`.
-fn forward_sub(
-    u_buf: &mut [f32],
-    x: &[f32],
-    rhs: &[f32],
-    t: usize,
-    d_v: usize,
-) {
+fn forward_sub(u_buf: &mut [f32], x: &[f32], rhs: &[f32], t: usize, d_v: usize) {
     u_buf[..t * d_v].copy_from_slice(&rhs[..t * d_v]);
     for i in 0..t {
         let x_row = &x[i * t..i * t + t];
@@ -534,7 +529,13 @@ impl<'a> GdnMultiHeadParams<'a> {
     ///
     /// K and Q use the same head stride (both indexed by key heads);
     /// V uses the value-head stride. With MHA (H_k == H_v) both are equal.
-    fn head_params(&self, h: usize, t: usize, d_k: usize, d_v: usize) -> GdnLayerParams<'a> {
+    pub(super) fn head_params(
+        &self,
+        h: usize,
+        t: usize,
+        d_k: usize,
+        d_v: usize,
+    ) -> GdnLayerParams<'a> {
         let k_stride = t * d_k;
         let v_stride = t * d_v;
         GdnLayerParams {
@@ -673,16 +674,14 @@ pub fn build_topology_from_tree_nodes(
         if node.depth > 0 {
             // Parent's parent_path = this node's parent_path >> 16
             let parent_key = (node.depth - 1, node.parent_path >> 16);
-            let parent_idx = *index
-                .get(&parent_key)
-                .unwrap_or_else(|| {
-                    panic!(
-                        "DDTree node at depth {} has no matching parent (depth {}, path {:#x})",
-                        node.depth,
-                        node.depth - 1,
-                        node.parent_path >> 16
-                    )
-                });
+            let parent_idx = *index.get(&parent_key).unwrap_or_else(|| {
+                panic!(
+                    "DDTree node at depth {} has no matching parent (depth {}, path {:#x})",
+                    node.depth,
+                    node.depth - 1,
+                    node.parent_path >> 16
+                )
+            });
             parents[i] = parent_idx;
         }
     }
@@ -690,6 +689,13 @@ pub fn build_topology_from_tree_nodes(
     let topo = build_topology(&parents, &alphas);
     (topo, token_ids)
 }
+
+// ── Dual-path GDN × HOLA fusion (Plan 430) ───────────────────
+// Gated on `gdn_hola_tree_verify` which implies both `gdn_tree_verify`
+// and `hippocampal_cache`. See `hola_fusion.rs` for the dual-path verify
+// and commit primitives.
+#[cfg(feature = "gdn_hola_tree_verify")]
+pub mod hola_fusion;
 
 // ── Tests ──────────────────────────────────────────────────────
 
@@ -709,6 +715,7 @@ mod tests {
 
     /// Reference: sequential per-branch GDN2 verify — replay the delta-rule
     /// from root to each node through its ancestors, then read the output.
+    #[allow(clippy::too_many_arguments)] // test helper mirrors algorithm's natural parameter set
     fn reference_verify(
         parents: &[usize],
         keys: &[f32],
@@ -825,13 +832,18 @@ mod tests {
     fn test_build_topology_large_two_words() {
         // T=70 → n_words = 2
         let t = 70;
-        let parents: Vec<usize> = (0..t).map(|i| if i == 0 { usize::MAX } else { i - 1 }).collect();
+        let parents: Vec<usize> = (0..t)
+            .map(|i| if i == 0 { usize::MAX } else { i - 1 })
+            .collect();
         let alphas: Vec<f32> = (0..t).map(|i| 0.99 - (i as f32) * 0.001).collect();
         let topo = build_topology(&parents, &alphas);
         assert_eq!(topo.n_words(), 2);
         // Node 69's ancestors = {0..68}
         for j in 0..69 {
-            assert!(topo.is_proper_ancestor(j, 69), "{j} should be ancestor of 69");
+            assert!(
+                topo.is_proper_ancestor(j, 69),
+                "{j} should be ancestor of 69"
+            );
         }
         assert!(!topo.is_proper_ancestor(69, 69));
     }
@@ -841,7 +853,9 @@ mod tests {
     #[test]
     fn test_linear_chain_matches_sequential() {
         let (t, d_k, d_v) = (8, 16, 16);
-        let parents: Vec<usize> = (0..t).map(|i| if i == 0 { usize::MAX } else { i - 1 }).collect();
+        let parents: Vec<usize> = (0..t)
+            .map(|i| if i == 0 { usize::MAX } else { i - 1 })
+            .collect();
         let mut rng = rng(12345);
         let keys: Vec<f32> = (0..t * d_k).map(|_| rng()).collect();
         let values: Vec<f32> = (0..t * d_v).map(|_| rng()).collect();
@@ -849,18 +863,29 @@ mod tests {
         let alphas: Vec<f32> = (0..t).map(|_| 0.8 + 0.15 * rng()).collect();
         let betas: Vec<f32> = (0..t).map(|_| 0.5 + 0.4 * rng()).collect();
         let s0: Vec<f32> = (0..d_k * d_v).map(|_| 0.1 * rng()).collect();
-        let params = GdnLayerParams { keys: &keys, values: &values, queries: &queries, alphas: &alphas, betas: &betas };
+        let params = GdnLayerParams {
+            keys: &keys,
+            values: &values,
+            queries: &queries,
+            alphas: &alphas,
+            betas: &betas,
+        };
         let topo = build_topology(&parents, &alphas);
         let mut verifier = GdnTreeVerifier::new(t, d_k, d_v);
         let tree_out = verify_gdn_tree_into(&mut verifier, &topo, &params, &s0, d_k, d_v);
-        let ref_out = reference_verify(&parents, &keys, &values, &queries, &alphas, &betas, &s0, d_k, d_v);
+        let ref_out = reference_verify(
+            &parents, &keys, &values, &queries, &alphas, &betas, &s0, d_k, d_v,
+        );
 
         let tol = 1e-3f32;
         let mut max_err = 0.0f32;
         for i in 0..t * d_v {
             max_err = max_err.max((tree_out[i] - ref_out[i]).abs());
         }
-        assert!(max_err < tol, "linear chain: max error {max_err:.6} >= {tol}");
+        assert!(
+            max_err < tol,
+            "linear chain: max error {max_err:.6} >= {tol}"
+        );
     }
 
     // ── T2.5: branching tree ──
@@ -876,15 +901,24 @@ mod tests {
         let alphas: Vec<f32> = (0..t).map(|_| 0.7 + 0.2 * rng()).collect();
         let betas: Vec<f32> = (0..t).map(|_| 0.3 + 0.5 * rng()).collect();
         let s0: Vec<f32> = (0..d_k * d_v).map(|_| 0.1 * rng()).collect();
-        let params = GdnLayerParams { keys: &keys, values: &values, queries: &queries, alphas: &alphas, betas: &betas };
+        let params = GdnLayerParams {
+            keys: &keys,
+            values: &values,
+            queries: &queries,
+            alphas: &alphas,
+            betas: &betas,
+        };
         let topo = build_topology(&parents, &alphas);
         let mut verifier = GdnTreeVerifier::new(t, d_k, d_v);
         let tree_topo = verify_gdn_tree_into(&mut verifier, &topo, &params, &s0, d_k, d_v);
-        let ref_out = reference_verify(&parents, &keys, &values, &queries, &alphas, &betas, &s0, d_k, d_v);
+        let ref_out = reference_verify(
+            &parents, &keys, &values, &queries, &alphas, &betas, &s0, d_k, d_v,
+        );
 
         let mut tree_orig = vec![0.0f32; t * d_v];
         for (k, &orig) in topo.topo_order.iter().enumerate() {
-            tree_orig[orig * d_v..(orig + 1) * d_v].copy_from_slice(&tree_topo[k * d_v..(k + 1) * d_v]);
+            tree_orig[orig * d_v..(orig + 1) * d_v]
+                .copy_from_slice(&tree_topo[k * d_v..(k + 1) * d_v]);
         }
 
         let tol = 1e-3f32;
@@ -892,7 +926,10 @@ mod tests {
         for i in 0..t * d_v {
             max_err = max_err.max((tree_orig[i] - ref_out[i]).abs());
         }
-        assert!(max_err < tol, "branching tree: max error {max_err:.6} >= {tol}");
+        assert!(
+            max_err < tol,
+            "branching tree: max error {max_err:.6} >= {tol}"
+        );
     }
 
     // ── T3.1: commit_path ──
@@ -900,7 +937,9 @@ mod tests {
     #[test]
     fn test_commit_path_matches_sequential() {
         let (t, d_k, d_v) = (6, 8, 8);
-        let parents: Vec<usize> = (0..t).map(|i| if i == 0 { usize::MAX } else { i - 1 }).collect();
+        let parents: Vec<usize> = (0..t)
+            .map(|i| if i == 0 { usize::MAX } else { i - 1 })
+            .collect();
         let mut rng = rng(42);
         let keys: Vec<f32> = (0..t * d_k).map(|_| rng()).collect();
         let values: Vec<f32> = (0..t * d_v).map(|_| rng()).collect();
@@ -908,7 +947,13 @@ mod tests {
         let alphas: Vec<f32> = (0..t).map(|_| 0.85).collect();
         let betas: Vec<f32> = (0..t).map(|_| 0.5).collect();
         let s0_init: Vec<f32> = (0..d_k * d_v).map(|_| 0.1 * rng()).collect();
-        let params = GdnLayerParams { keys: &keys, values: &values, queries: &queries, alphas: &alphas, betas: &betas };
+        let params = GdnLayerParams {
+            keys: &keys,
+            values: &values,
+            queries: &queries,
+            alphas: &alphas,
+            betas: &betas,
+        };
         let topo = build_topology(&parents, &alphas);
 
         let mut s0_committed = s0_init.clone();
@@ -921,14 +966,30 @@ mod tests {
             let v = &values[node * d_v..(node + 1) * d_v];
             let (alpha, beta) = (alphas[node], betas[node]);
             let mut r = vec![0.0f32; d_v];
-            for m in 0..d_k { for d in 0..d_v { r[d] += s0_ref[m*d_v+d] * k[m]; } }
-            for val in s0_ref[..d_k*d_v].iter_mut() { *val *= alpha; }
-            for m in 0..d_k { let bkm = beta*k[m]; for d in 0..d_v { s0_ref[m*d_v+d] += bkm*(v[d]-alpha*r[d]); } }
+            for m in 0..d_k {
+                for d in 0..d_v {
+                    r[d] += s0_ref[m * d_v + d] * k[m];
+                }
+            }
+            for val in s0_ref[..d_k * d_v].iter_mut() {
+                *val *= alpha;
+            }
+            for m in 0..d_k {
+                let bkm = beta * k[m];
+                for d in 0..d_v {
+                    s0_ref[m * d_v + d] += bkm * (v[d] - alpha * r[d]);
+                }
+            }
         }
 
         let tol = 1e-5f32;
-        let max_err = (0..d_k*d_v).map(|i| (s0_committed[i]-s0_ref[i]).abs()).fold(0.0f32, f32::max);
-        assert!(max_err < tol, "commit_path: max error {max_err:.8} >= {tol}");
+        let max_err = (0..d_k * d_v)
+            .map(|i| (s0_committed[i] - s0_ref[i]).abs())
+            .fold(0.0f32, f32::max);
+        assert!(
+            max_err < tol,
+            "commit_path: max error {max_err:.8} >= {tol}"
+        );
     }
 
     // ── T5.1: random trees at T={16,32,64,128} ──
@@ -938,28 +999,52 @@ mod tests {
         let (d_k, d_v) = (16, 16);
         for (t, seed) in [(16, 1u32), (32, 2), (64, 3), (128, 4)] {
             let mut rs = seed;
-            let mut next = || { rs ^= rs << 13; rs ^= rs >> 17; rs ^= rs << 5; rs };
-            let parents: Vec<usize> = (0..t).map(|i| if i == 0 { usize::MAX } else { (next() as usize) % i }).collect();
+            let mut next = || {
+                rs ^= rs << 13;
+                rs ^= rs >> 17;
+                rs ^= rs << 5;
+                rs
+            };
+            let parents: Vec<usize> = (0..t)
+                .map(|i| {
+                    if i == 0 {
+                        usize::MAX
+                    } else {
+                        (next() as usize) % i
+                    }
+                })
+                .collect();
             let mut frng = rng(seed.wrapping_mul(7));
-            let keys: Vec<f32> = (0..t*d_k).map(|_| frng()).collect();
-            let values: Vec<f32> = (0..t*d_v).map(|_| frng()).collect();
-            let queries: Vec<f32> = (0..t*d_k).map(|_| frng()).collect();
-            let alphas: Vec<f32> = (0..t).map(|_| 0.75 + 0.15*frng()).collect();
-            let betas: Vec<f32> = (0..t).map(|_| 0.4 + 0.4*frng()).collect();
-            let s0: Vec<f32> = (0..d_k*d_v).map(|_| 0.1*frng()).collect();
-            let params = GdnLayerParams { keys: &keys, values: &values, queries: &queries, alphas: &alphas, betas: &betas };
+            let keys: Vec<f32> = (0..t * d_k).map(|_| frng()).collect();
+            let values: Vec<f32> = (0..t * d_v).map(|_| frng()).collect();
+            let queries: Vec<f32> = (0..t * d_k).map(|_| frng()).collect();
+            let alphas: Vec<f32> = (0..t).map(|_| 0.75 + 0.15 * frng()).collect();
+            let betas: Vec<f32> = (0..t).map(|_| 0.4 + 0.4 * frng()).collect();
+            let s0: Vec<f32> = (0..d_k * d_v).map(|_| 0.1 * frng()).collect();
+            let params = GdnLayerParams {
+                keys: &keys,
+                values: &values,
+                queries: &queries,
+                alphas: &alphas,
+                betas: &betas,
+            };
             let topo = build_topology(&parents, &alphas);
             let mut verifier = GdnTreeVerifier::new(t, d_k, d_v);
             let tree_topo = verify_gdn_tree_into(&mut verifier, &topo, &params, &s0, d_k, d_v);
-            let ref_out = reference_verify(&parents, &keys, &values, &queries, &alphas, &betas, &s0, d_k, d_v);
+            let ref_out = reference_verify(
+                &parents, &keys, &values, &queries, &alphas, &betas, &s0, d_k, d_v,
+            );
 
-            let mut tree_orig = vec![0.0f32; t*d_v];
+            let mut tree_orig = vec![0.0f32; t * d_v];
             for (k, &orig) in topo.topo_order.iter().enumerate() {
-                tree_orig[orig*d_v..(orig+1)*d_v].copy_from_slice(&tree_topo[k*d_v..(k+1)*d_v]);
+                tree_orig[orig * d_v..(orig + 1) * d_v]
+                    .copy_from_slice(&tree_topo[k * d_v..(k + 1) * d_v]);
             }
 
             let tol = 1e-3f32;
-            let max_err = (0..t*d_v).map(|i| (tree_orig[i]-ref_out[i]).abs()).fold(0.0f32, f32::max);
+            let max_err = (0..t * d_v)
+                .map(|i| (tree_orig[i] - ref_out[i]).abs())
+                .fold(0.0f32, f32::max);
             assert!(max_err < tol, "T={t}: max error {max_err:.6} >= {tol}");
         }
     }
@@ -979,7 +1064,13 @@ mod tests {
 
         // Random tree: node 0 = root, others pick a random earlier parent.
         let parents: Vec<usize> = (0..t)
-            .map(|i| if i == 0 { usize::MAX } else { (frng() as u32) as usize % i })
+            .map(|i| {
+                if i == 0 {
+                    usize::MAX
+                } else {
+                    (frng() as u32) as usize % i
+                }
+            })
             .collect();
         let alphas: Vec<f32> = (0..t).map(|_| 0.75 + 0.15 * frng()).collect();
         let betas: Vec<f32> = (0..t).map(|_| 0.4 + 0.4 * frng()).collect();
@@ -990,8 +1081,9 @@ mod tests {
         let queries: Vec<f32> = (0..h * t * d_k).map(|_| frng()).collect();
 
         // Per-head S₀.
-        let s0_heads: Vec<Vec<f32>> =
-            (0..h).map(|_| (0..d_k * d_v).map(|_| 0.1 * frng()).collect()).collect();
+        let s0_heads: Vec<Vec<f32>> = (0..h)
+            .map(|_| (0..d_k * d_v).map(|_| 0.1 * frng()).collect())
+            .collect();
         let s0_refs: Vec<&[f32]> = s0_heads.iter().map(|s| s.as_slice()).collect();
 
         let mh_params = GdnMultiHeadParams {
@@ -1005,7 +1097,8 @@ mod tests {
         let topo = build_topology(&parents, &alphas);
         let mut verifier = GdnTreeVerifier::new(t, d_k, d_v);
 
-        let mh_out = verify_gdn_tree_multihead(&mut verifier, &topo, &mh_params, &s0_refs, d_k, d_v);
+        let mh_out =
+            verify_gdn_tree_multihead(&mut verifier, &topo, &mh_params, &s0_refs, d_k, d_v);
 
         // Compare each head against independent single-head verify.
         let tol = 1e-5f32;
@@ -1017,7 +1110,10 @@ mod tests {
             let max_err = (0..t * d_v)
                 .map(|i| (mh_head[i] - single_out[i]).abs())
                 .fold(0.0f32, f32::max);
-            assert!(max_err < tol, "head {head}: max error {max_err:.6} >= {tol}");
+            assert!(
+                max_err < tol,
+                "head {head}: max error {max_err:.6} >= {tol}"
+            );
         }
     }
 
@@ -1040,8 +1136,9 @@ mod tests {
         let keys: Vec<f32> = (0..h * t * d_k).map(|_| frng()).collect();
         let values: Vec<f32> = (0..h * t * d_v).map(|_| frng()).collect();
         let queries: Vec<f32> = (0..h * t * d_k).map(|_| frng()).collect();
-        let s0_heads: Vec<Vec<f32>> =
-            (0..h).map(|_| (0..d_k * d_v).map(|_| 0.1 * frng()).collect()).collect();
+        let s0_heads: Vec<Vec<f32>> = (0..h)
+            .map(|_| (0..d_k * d_v).map(|_| 0.1 * frng()).collect())
+            .collect();
         let s0_refs: Vec<&[f32]> = s0_heads.iter().map(|s| s.as_slice()).collect();
 
         let mh_params = GdnMultiHeadParams {
@@ -1054,7 +1151,8 @@ mod tests {
         };
         let topo = build_topology(&parents, &alphas);
         let mut verifier = GdnTreeVerifier::new(t, d_k, d_v);
-        let mh_out = verify_gdn_tree_multihead(&mut verifier, &topo, &mh_params, &s0_refs, d_k, d_v);
+        let mh_out =
+            verify_gdn_tree_multihead(&mut verifier, &topo, &mh_params, &s0_refs, d_k, d_v);
 
         let tol = 1e-3f32;
         for head in 0..h {
@@ -1062,7 +1160,15 @@ mod tests {
             let v_h = &values[head * t * d_v..(head + 1) * t * d_v];
             let q_h = &queries[head * t * d_k..(head + 1) * t * d_k];
             let ref_out = reference_verify(
-                &parents, k_h, v_h, q_h, &alphas, &betas, &s0_heads[head], d_k, d_v,
+                &parents,
+                k_h,
+                v_h,
+                q_h,
+                &alphas,
+                &betas,
+                &s0_heads[head],
+                d_k,
+                d_v,
             );
             // Gather topo → original order.
             let mh_head = &mh_out[head * t * d_v..(head + 1) * t * d_v];
@@ -1074,7 +1180,10 @@ mod tests {
             let max_err = (0..t * d_v)
                 .map(|i| (mh_orig[i] - ref_out[i]).abs())
                 .fold(0.0f32, f32::max);
-            assert!(max_err < tol, "head {head}: max error {max_err:.6} >= {tol}");
+            assert!(
+                max_err < tol,
+                "head {head}: max error {max_err:.6} >= {tol}"
+            );
         }
     }
 
@@ -1089,7 +1198,13 @@ mod tests {
         let mut frng = rng(seed);
 
         let parents: Vec<usize> = (0..t)
-            .map(|i| if i == 0 { usize::MAX } else { (frng() as u32) as usize % i })
+            .map(|i| {
+                if i == 0 {
+                    usize::MAX
+                } else {
+                    (frng() as u32) as usize % i
+                }
+            })
             .collect();
         let alphas: Vec<f32> = (0..t).map(|_| 0.85 + 0.1 * frng()).collect();
         let betas: Vec<f32> = (0..t).map(|_| 0.5 + 0.3 * frng()).collect();
@@ -1098,8 +1213,9 @@ mod tests {
         let values: Vec<f32> = (0..h * t * d_v).map(|_| frng()).collect();
         let queries: Vec<f32> = (0..h * t * d_k).map(|_| frng()).collect();
 
-        let s0_init: Vec<Vec<f32>> =
-            (0..h).map(|_| (0..d_k * d_v).map(|_| 0.1 * frng()).collect()).collect();
+        let s0_init: Vec<Vec<f32>> = (0..h)
+            .map(|_| (0..d_k * d_v).map(|_| 0.1 * frng()).collect())
+            .collect();
         // Mutable copies for the commit call.
         let mut s0_committed: Vec<Vec<f32>> = s0_init.clone();
         let mut s0_refs: Vec<&mut [f32]> =
@@ -1156,7 +1272,10 @@ mod tests {
             let max_err = (0..d_k * d_v)
                 .map(|i| (s0_committed[head][i] - s_ref[i]).abs())
                 .fold(0.0f32, f32::max);
-            assert!(max_err < tol, "head {head} commit: max error {max_err:.6} >= {tol}");
+            assert!(
+                max_err < tol,
+                "head {head} commit: max error {max_err:.6} >= {tol}"
+            );
         }
     }
 
@@ -1202,7 +1321,13 @@ mod tests {
         let values: Vec<f32> = (0..max_t * d_v).map(|_| 0.05 * frng()).collect();
         let queries: Vec<f32> = (0..max_t * d_k).map(|_| 0.05 * frng()).collect();
         let s0: Vec<f32> = (0..d_k * d_v).map(|_| 0.05 * frng()).collect();
-        let params = GdnLayerParams { keys: &keys, values: &values, queries: &queries, alphas: &alphas, betas: &betas };
+        let params = GdnLayerParams {
+            keys: &keys,
+            values: &values,
+            queries: &queries,
+            alphas: &alphas,
+            betas: &betas,
+        };
         let topo = build_topology(&parents, &alphas);
 
         let out1 = verify_gdn_tree_into(&mut verifier, &topo, &params, &s0, d_k, d_v).to_vec();
@@ -1224,12 +1349,17 @@ mod tests {
         let mh_keys: Vec<f32> = (0..h * max_t * d_k).map(|_| 0.05 * frng()).collect();
         let mh_values: Vec<f32> = (0..h * max_t * d_v).map(|_| 0.05 * frng()).collect();
         let mh_queries: Vec<f32> = (0..h * max_t * d_k).map(|_| 0.05 * frng()).collect();
-        let s0_heads: Vec<Vec<f32>> =
-            (0..h).map(|_| (0..d_k * d_v).map(|_| 0.05 * frng()).collect()).collect();
+        let s0_heads: Vec<Vec<f32>> = (0..h)
+            .map(|_| (0..d_k * d_v).map(|_| 0.05 * frng()).collect())
+            .collect();
         let s0_refs: Vec<&[f32]> = s0_heads.iter().map(|s| s.as_slice()).collect();
         let mh_params = GdnMultiHeadParams {
-            keys: &mh_keys, values: &mh_values, queries: &mh_queries,
-            alphas: &alphas, betas: &betas, n_kv_heads: h,
+            keys: &mh_keys,
+            values: &mh_values,
+            queries: &mh_queries,
+            alphas: &alphas,
+            betas: &betas,
+            n_kv_heads: h,
         };
         let mh1 = verify_gdn_tree_multihead(&mut verifier, &topo, &mh_params, &s0_refs, d_k, d_v);
         let mh2 = verify_gdn_tree_multihead(&mut verifier, &topo, &mh_params, &s0_refs, d_k, d_v);
@@ -1244,7 +1374,12 @@ mod tests {
     use crate::speculative::types::TreeNode;
 
     fn make_node(depth: usize, token_idx: usize, parent_path: u128, score: f32) -> TreeNode {
-        TreeNode { depth, token_idx, parent_path, score }
+        TreeNode {
+            depth,
+            token_idx,
+            parent_path,
+            score,
+        }
     }
 
     #[test]

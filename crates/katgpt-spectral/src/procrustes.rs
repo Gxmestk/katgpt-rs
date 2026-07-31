@@ -16,7 +16,7 @@
 //! The classical solution uses SVD: form `M = B^T A`, take SVD `M = U Σ V^T`,
 //! then `R* = U V^T`. This module avoids LAPACK by observing that **the
 //! Procrustes solution `R* = U V^T` is exactly the orthogonal polar factor
-//! of `M`**, which [`newton_schulz`] computes in 5 fixed-point iterations
+//! of `M`**, which `newton_schulz` computes in 5 fixed-point iterations
 //! with no eigensolver. The algorithm:
 //!
 //! 1. (Optional) Center `A` and `B` by subtracting their column means.
@@ -80,9 +80,13 @@ pub struct ProcrustesConfig {
     /// If `true`, compute the residual `‖B − A R^T‖_F / ‖B‖_F` and include
     /// it in the report. Adds an `O(n d²)` pass. Default: `true`.
     pub compute_residual: bool,
-    /// If `true`, compute `det(R)` and include it in the report. Adds an
-    /// `O(d³)` recursive expansion. Default: `false` (only needed for
-    /// debugging the special-orthogonal correction).
+    /// If `true`, compute `det(R)` and include it in the report. Default:
+    /// `false` (only needed for debugging the special-orthogonal correction).
+    ///
+    /// Cost: O(d³) via LU decomposition with partial pivoting for `d > 6`
+    /// (cofactor expansion for `d ≤ 6`). The historical O(d!) cofactor path
+    /// was a footgun (Issue 193 — 16! ≈ 5 hours) and is now fixed; callers
+    /// can safely turn this on at any `d` for diagnostics.
     pub compute_det: bool,
     /// Minimum number of anchors required for a well-determined Procrustes
     /// solution. Below this the system is rank-deficient and the rotation
@@ -643,10 +647,20 @@ fn polar_iteration(x: &[f32], d: usize, out: &mut [f32], xtx: &mut [f32], x_new:
     }
 }
 
-/// Compute the determinant of a `d × d` row-major matrix via cofactor
-/// expansion. `O(d!)` — only call for small `d` (≤ 8 typical for KG
-/// embeddings). For large `d`, callers should disable
-/// [`ProcrustesConfig::compute_det`] and use a different method.
+/// Compute the determinant of a `d × d` row-major matrix.
+///
+/// - For `d ≤ 6`: cofactor expansion (faster constant factor).
+/// - For `d > 6`: LU decomposition with partial pivoting (O(d³)).
+///
+/// The cofactor path is O(d!) and was the historical footgun (Issue 193):
+/// `compute_det = true` at d=16 silently ran 16! ≈ 2e13 ops. The LU path
+/// makes the determinant cheap at any d, so callers can safely turn
+/// `compute_det` on for diagnostic purposes without asymptotic surprise.
+///
+/// The LU decomposition is deterministic across platforms (no eigensolver,
+/// no convergence loop — matches the substrate's documented determinism
+/// guarantee). Partial pivoting selects the largest-magnitude pivot at
+/// each step, breaking ties by lowest row index.
 #[inline]
 fn determinant_d(m: &[f32], d: usize) -> f32 {
     debug_assert_eq!(m.len(), d * d, "determinant_d: matrix size mismatch");
@@ -658,29 +672,104 @@ fn determinant_d(m: &[f32], d: usize) -> f32 {
             m[0] * (m[4] * m[8] - m[5] * m[7]) - m[1] * (m[3] * m[8] - m[5] * m[6])
                 + m[2] * (m[3] * m[7] - m[4] * m[6])
         }
-        _ => {
-            // Cofactor expansion along the first row. O(d!) — use sparingly.
-            let mut det = 0.0_f32;
-            let mut sub = vec![0.0_f32; (d - 1) * (d - 1)];
-            for j in 0..d {
-                // Build the (d-1)×(d-1) minor by excluding row 0 and column j.
-                for r in 1..d {
-                    let mut sub_col = 0;
-                    for c in 0..d {
-                        if c == j {
-                            continue;
-                        }
-                        sub[(r - 1) * (d - 1) + sub_col] = m[r * d + c];
-                        sub_col += 1;
-                    }
+        4..=6 => determinant_d_cofactor(m, d),
+        _ => determinant_lu(m, d),
+    }
+}
+
+/// Cofactor expansion along the first row. O(d!) — kept for d ∈ {4, 5, 6}
+/// where the constant factor beats LU. Callers should use [`determinant_d`]
+/// (which dispatches automatically) rather than calling this directly.
+fn determinant_d_cofactor(m: &[f32], d: usize) -> f32 {
+    debug_assert!((2..=6).contains(&d), "determinant_d_cofactor: d out of range");
+    let mut det = 0.0_f32;
+    let mut sub = vec![0.0_f32; (d - 1) * (d - 1)];
+    for j in 0..d {
+        // Build the (d-1)×(d-1) minor by excluding row 0 and column j.
+        for r in 1..d {
+            let mut sub_col = 0;
+            for c in 0..d {
+                if c == j {
+                    continue;
                 }
-                let cofactor = determinant_d(&sub, d - 1);
-                let sign = if j % 2 == 0 { 1.0 } else { -1.0 };
-                det += sign * m[j] * cofactor;
+                sub[(r - 1) * (d - 1) + sub_col] = m[r * d + c];
+                sub_col += 1;
             }
-            det
+        }
+        let cofactor = determinant_d(&sub, d - 1);
+        let sign = if j % 2 == 0 { 1.0 } else { -1.0 };
+        det += sign * m[j] * cofactor;
+    }
+    det
+}
+
+/// LU decomposition with partial pivoting. O(d³). Returns `det(M)`.
+///
+/// Algorithm (standard textbook — Golub & Van Loan §3.1):
+/// 1. Copy `m` into a mutable `a` (row-major d×d).
+/// 2. For each column `k`: find the pivot row (max |a[i,k]| for i ≥ k),
+///    swap rows, track the sign, eliminate below.
+/// 3. `det = sign · ∏ a[i,i]` (product of the upper-triangular diagonal).
+///
+/// If the matrix is singular (a zero pivot is encountered after pivoting),
+/// returns 0.0 — the determinant is genuinely zero.
+///
+/// Determinism: partial pivoting breaks ties by lowest row index, so the
+/// decomposition is unique for a given input matrix (no platform dependence).
+/// This matches the substrate's documented determinism guarantee.
+fn determinant_lu(m: &[f32], d: usize) -> f32 {
+    debug_assert!(d > 6, "determinant_lu: use cofactor path for d ≤ 6");
+    // Work on a mutable copy — we destroy it during elimination.
+    let mut a = m.to_vec();
+    let mut sign: f32 = 1.0;
+
+    for k in 0..d {
+        // Find pivot: largest |a[i,k]| for i in [k, d).
+        let mut pivot_row = k;
+        let mut pivot_mag = a[k * d + k].abs();
+        for i in (k + 1)..d {
+            let mag = a[i * d + k].abs();
+            if mag > pivot_mag {
+                pivot_mag = mag;
+                pivot_row = i;
+            }
+        }
+
+        // If the pivot is zero, the matrix is singular → det = 0.
+        if pivot_mag < 1e-30 {
+            return 0.0;
+        }
+
+        // Swap rows k and pivot_row if needed. Track the sign flip.
+        if pivot_row != k {
+            for c in 0..d {
+                let off_a = k * d + c;
+                let off_b = pivot_row * d + c;
+                a.swap(off_a, off_b);
+            }
+            sign = -sign;
+        }
+
+        // Eliminate below the pivot.
+        let pivot = a[k * d + k];
+        for i in (k + 1)..d {
+            let factor = a[i * d + k] / pivot;
+            if factor != 0.0 {
+                for c in (k + 1)..d {
+                    a[i * d + c] -= factor * a[k * d + c];
+                }
+            }
+            // The eliminated column entry is now zero (we don't store it
+            // explicitly — we only need the upper-triangular diagonal).
         }
     }
+
+    // det = sign · product of the upper-triangular diagonal.
+    let mut det = sign;
+    for i in 0..d {
+        det *= a[i * d + i];
+    }
+    det
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────
@@ -1111,6 +1200,121 @@ mod tests {
             approx_eq(d3, 1.0, 1e-6),
             "3×3 identity det should be 1, got {}",
             d3
+        );
+    }
+
+    #[test]
+    fn determinant_lu_matches_known_analytical_values() {
+        // LU correctness verified against known analytical determinant values
+        // (independent of the cofactor path, which is numerically unstable at d > 6).
+        //
+        // Upper-triangular matrix: det = product of diagonal entries.
+        // (LU of an upper-triangular matrix is itself — no row swaps needed.)
+        let d = 8_usize;
+        let mut m = vec![0.0_f32; d * d];
+        for i in 0..d {
+            for j in i..d {
+                // Upper triangular with 1..=8 on diagonal, 0.5 above.
+                m[i * d + j] = if i == j { (i + 1) as f32 } else { 0.5 };
+            }
+        }
+        let det = determinant_d(&m, d);
+        let expected = (1..=d).fold(1.0_f32, |acc, i| acc * (i as f32)); // 8! = 40320
+        assert!(
+            approx_eq(det, expected, 1e-3),
+            "d={d}: upper-triangular det should be {expected}, got {det}"
+        );
+    }
+
+    #[test]
+    fn determinant_lu_identity_large_d() {
+        // Identity matrix at any d has det = 1.
+        for &d in &[7_usize, 16, 32, 64] {
+            let mut m = vec![0.0_f32; d * d];
+            for i in 0..d {
+                m[i * d + i] = 1.0;
+            }
+            let det = determinant_d(&m, d);
+            assert!(
+                approx_eq(det, 1.0, 1e-4),
+                "d={d}: identity det should be 1, got {det}"
+            );
+        }
+    }
+
+    #[test]
+    fn determinant_lu_singular_returns_zero() {
+        // A rank-deficient matrix (two identical rows) has det = 0.
+        let d = 16_usize;
+        let mut m = vec![0.0_f32; d * d];
+        for j in 0..d {
+            m[j] = 1.0; // row 0 = all ones
+            m[d + j] = 1.0; // row 1 = all ones (linearly dependent)
+        }
+        let det = determinant_d(&m, d);
+        assert!(
+            det.abs() < 1e-3,
+            "singular matrix det should be ~0, got {det}"
+        );
+    }
+
+    #[test]
+    fn determinant_lu_diagonal_matrix() {
+        // Diagonal matrix det = product of diagonal entries.
+        let d = 16_usize;
+        let mut m = vec![0.0_f32; d * d];
+        for i in 0..d {
+            m[i * d + i] = (i as f32) + 1.0; // diagonal = 1, 2, ..., 16
+        }
+        let det = determinant_d(&m, d);
+        // 16! = 20922789888000
+        let expected = (1..=d).fold(1.0_f32, |acc, i| acc * (i as f32));
+        assert!(
+            approx_eq(det, expected, 1e-3),
+            "d={d}: diagonal det should be {expected}, got {det}"
+        );
+    }
+
+    #[test]
+    fn compute_det_at_d16_returns_quickly() {
+        // Regression test for Issue 193: compute_det = true at d = 16 used to
+        // run 16! ≈ 2e13 cofactor ops ≈ 5-6 hours. Now uses LU (O(d³)) and
+        // should return in well under a second.
+        let d = 16_usize;
+        let n = 2 * d; // determined
+        // Use a well-conditioned matrix pair: identity-like anchors so the
+        // polar factor is a proper rotation (det = ±1).
+        let mut a = vec![0.0_f32; n * d];
+        let mut b = vec![0.0_f32; n * d];
+        for i in 0..n {
+            for j in 0..d {
+                // Diagonal-heavy anchors + small off-diagonal noise.
+                let diag = if i == j { 1.0 } else { 0.0 };
+                let noise = (((i * 31 + j * 17) as f32) * 0.001).sin() * 0.01;
+                a[i * d + j] = diag + noise;
+                b[i * d + j] = diag + noise * 1.1; // slightly different frame
+            }
+        }
+        let mut rot = vec![0.0_f32; d * d];
+        let mut scratch = ProcrustesScratch::new(n, d);
+        let cfg = ProcrustesConfig {
+            compute_det: true, // <- the footgun before Issue 193
+            ..Default::default()
+        };
+        let t0 = std::time::Instant::now();
+        let report = orthogonal_procrustes(&a, &b, n, d, &mut rot, &mut scratch, &cfg)
+            .expect("should succeed");
+        let elapsed = t0.elapsed();
+        assert!(
+            elapsed.as_millis() < 1000,
+            "compute_det at d=16 should return in < 1s, took {elapsed:?} (Issue 193 regression)"
+        );
+        // The polar factor of a well-conditioned matrix has det = ±1.
+        let det_abs = report.det.abs();
+        assert!(
+            det_abs > 0.99 && det_abs < 1.01,
+            "polar factor |det| should be ~1, got {det_abs} (det={})",
+            report.det
         );
     }
 

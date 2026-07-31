@@ -69,7 +69,7 @@
 //!
 //! The coherence-term SiLU gate uses a **branchless Padé [2/2] tanh
 //! approximation** (Issue 003 perf unblock) — no `exp()` in the hot path, enabling
-//! full NEON/AVX2 auto-vectorisation. See [`silu`] for the error bound.
+//! full NEON/AVX2 auto-vectorisation. See `silu` for the error bound.
 //!
 //! For cold-path callers that only need the structural wedge (shard retrieval,
 //! CGSP curiosity), [`geometric_product_wedge_into`] skips the dot/SiLU path
@@ -150,10 +150,10 @@ pub fn cyclic_shift_into(src: &[f32], dim: usize, shift: usize, out: &mut [f32])
         out.len(),
         dim
     );
-    let s = if dim == 0 { 0 } else { shift % dim };
     if dim == 0 {
         return;
     }
+    let s = shift % dim;
     // out[c] = src[(c + s) mod dim] — split into two contiguous copies so LLVM
     // sees a memcpy-style pair and the caller can reuse `out` as a scratch without
     // aliasing `src`.

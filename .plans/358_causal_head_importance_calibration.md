@@ -3,7 +3,7 @@
 **Date:** 2026-07-02
 **Research:** [katgpt-rs/.research/362_HydraHead_Causal_Head_Importance_Hybrid_Attention.md](../.research/362_HydraHead_Causal_Head_Importance_Hybrid_Attention.md)
 **Source paper:** [arXiv:2606.20097](https://arxiv.org/abs/2606.20097) — Tan et al., HydraHead, Alibaba, Jun 2026
-**Target:** `katgpt-rs/crates/katgpt-core/src/causal_head_importance/` (new module) + Cargo feature `causal_head_importance` (opt-in); RTPurbo wiring in `katgpt-rs/src/rt_turbo/calibration.rs`
+**Target:** `katgpt-rs/crates/katgpt-core/src/causal_head_importance/` (new module) + Cargo feature `causal_head_importance` (opt-in); RTPurbo wiring in `katgpt-rs/crates/katgpt-speculative/src/rt_turbo/calibration.rs`
 **Status:** ✅ FULLY COMPLETE — All 5 phases done (G1/G2/G3/G4 PASS; promote/demote = opt-in, AttentionMass stays default; docs + cross-refs shipped).
 
 ---
@@ -35,7 +35,7 @@ Ship two modelless, inference-time primitives distilled from HydraHead (arXiv:26
 ### Tasks
 
 - [x] **T1.1** Create module directory `katgpt-rs/crates/katgpt-core/src/causal_head_importance/` with `mod.rs`, `readout.rs`, `patching.rs`, `scorer.rs`, `fusion.rs`.
-- [x] **T1.2** Add feature flag `causal_head_importance` to `katgpt-rs/crates/katgpt-core/Cargo.toml` (default-off). No new heavy deps — the primitive operates on `&[f32]` slices and callbacks. Wire into `katgpt-core/src/lib.rs` behind `#[cfg(feature = "causal_head_importance")]`.
+- [x] **T1.2** Add feature flag `causal_head_importance` to `katgpt-rs/crates/katgpt-core/Cargo.toml` (default-off). No new heavy deps — the primitive operates on `&[f32]` slices and callbacks. Wire into `crates/katgpt-core/src/lib.rs` behind `#[cfg(feature = "causal_head_importance")]`.
 - [x] **T1.3** Define `SpanLogitDiffReadout` in `readout.rs` (paper Eq 9):
   ```rust
   /// Span-level logit-difference readout with exponential decay (paper Eq 9).
@@ -322,7 +322,7 @@ Ship two modelless, inference-time primitives distilled from HydraHead (arXiv:26
 
 ### Tasks
 
-- [x] **T2.1 (G1 — correctness)** Unit tests in `tests/causal_head_importance_g1.rs`:
+- [x] **T2.1 (G1 — correctness)** Unit tests in `crates/katgpt-core/tests/causal_head_importance_g1.rs`:
   - Synthetic FA head harness: `n_heads` heads, of which a known `k_load_bearing` subset writes the signal into the readout, and `n_heads − k_load_bearing` are *correlated bystanders* (attend to the needle but project to zero in the readout direction).
   - Compute IE scores via the closure-based patched-forward-pass (mock the forward pass as a linear map so `m_patched` is exactly computable).
   - Assert: load-bearing heads all have IE > threshold (0.01); bystanders all have IE < threshold; ranking puts load-bearing above bystanders (Spearman ρ = 1.0 on this clean synthetic).
@@ -369,7 +369,7 @@ The paper's strongest quality claim for the causal score is that it filters *cor
 
 ### Tasks
 
-- [x] **T4.1** Add `calibrate_from_causal_scores` to `katgpt-rs/src/rt_turbo/calibration.rs` as a sibling to the existing `calibrate_from_scores` (attention-mass). Same output type (`HeadCalibration`), different input score semantics. Document the semantic difference (causal necessity vs observational mass) in the docstring. **DONE** — delegates to `calibrate_from_scores` (partition logic is identical; only the input-score semantics differ, documented in the docstring table).
+- [x] **T4.1** Add `calibrate_from_causal_scores` to `katgpt-rs/crates/katgpt-speculative/src/rt_turbo/calibration.rs` as a sibling to the existing `calibrate_from_scores` (attention-mass). Same output type (`HeadCalibration`), different input score semantics. Document the semantic difference (causal necessity vs observational mass) in the docstring. **DONE** — delegates to `calibrate_from_scores` (partition logic is identical; only the input-score semantics differ, documented in the docstring table).
 - [x] **T4.2** Add a `CalibrationMode` enum to `katgpt-rs/src/types.rs` (or `rt_turbo/types.rs`): `AttentionMass` (current default) | `CausalNecessity` (this plan, requires `causal_head_importance` feature). Wire into `RtTurboConfig`. **DONE** — `CalibrationMode` in `crates/katgpt-types/src/enums.rs` (`#[repr(u8)]`, `#[default] AttentionMass`), `RtTurboConfig.calibration_mode` field added, re-exported through katgpt-types → katgpt-core. Fixed struct-literal sites (`forward.rs`, `test_126_rt_turbo_goat.rs`, `rt_turbo_02_decode_bench.rs`) with `..RtTurboConfig::default()` spread.
 - [x] **T4.3** Update `examples/rt_turbo_01_calibration.rs` to demonstrate both modes side-by-side on the synthetic harness from Phase 3. **DONE** — Step 6 added (behind `#[cfg(feature = "causal_head_importance")]`): demonstrates `CalibrationMode::CausalNecessity` + `calibrate_from_causal_scores`, prints the partition contrast. Runs clean with `--features rt_turbo causal_head_importance`.
 - [x] **T4.4** **Promote/demote decision (per §Goal):**

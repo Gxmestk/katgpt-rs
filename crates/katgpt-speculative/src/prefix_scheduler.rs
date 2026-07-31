@@ -304,7 +304,7 @@ impl HardwareAwarePrefixScheduler {
 
     /// Schedule from raw per-token acceptance probabilities `c_k` instead of
     /// pre-computed `a_{r,j}`. Computes `a_{r,j} = Π_{i≤j} c_{r,i}` internally
-    /// via [`cumprod`] and delegates to [`schedule_with_scratch`].
+    /// via [`cumprod`] and delegates to [`Self::schedule_with_scratch`].
     ///
     /// # Arguments
     /// * `token_probs` - One slice per request, indexed `[r][k]`. Each value
@@ -387,9 +387,7 @@ impl HardwareAwarePrefixScheduler {
         }
 
         // Global sort descending by a_{r,j}.
-        candidates.sort_unstable_by(|(a1, _, _), (a2, _, _)| {
-            a2.partial_cmp(a1).unwrap_or(std::cmp::Ordering::Equal)
-        });
+        candidates.sort_unstable_by(|(a1, _, _), (a2, _, _)| a2.total_cmp(a1));
 
         // Greedy admission with non-anticipating early-stop.
         //

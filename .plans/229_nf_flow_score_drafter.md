@@ -20,7 +20,7 @@ This is a diagonal affine normalizing flow constructed from existing inference-t
 ## Tasks
 
 ### T1: Core FlowScore Computation
-- [x] Create `src/speculative/nf_flow.rs` with `NfFlowScore` struct
+- [x] Create `crates/katgpt-speculative/src/nf_flow.rs` with `NfFlowScore` struct
 - [x] Implement `fn flow_score(marginals: &[Vec<f32>], selected: &[usize]) -> f32`
   - base_logprob = Σ log marginals[i][selected[i]]
   - σ_i = sigmoid(entropy of marginals[i])  // entropy of categorical distribution

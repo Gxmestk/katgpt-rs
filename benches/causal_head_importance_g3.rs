@@ -20,8 +20,8 @@ use std::hint::black_box;
 use std::time::Instant;
 
 use katgpt_core::causal_head_importance::partition_by_causal_score;
-use katgpt_speculative::rt_turbo::calibrate_from_scores;
 use katgpt_rs::types::RtTurboConfig;
+use katgpt_speculative::rt_turbo::calibrate_from_scores;
 
 fn synthetic_scores(n_heads: usize, seed: u64) -> Vec<f32> {
     // Deterministic xorshift* scores in [0, 1); a realistic spread so the sort

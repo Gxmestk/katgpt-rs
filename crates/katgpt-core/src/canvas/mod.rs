@@ -20,7 +20,7 @@
 //!
 //! This ships on structural/correctness merits, like the DEC `d∘d=0` identity
 //! (Plan 251). The *behavioral* gain (paper §5's 1.73× parameter efficiency)
-//! is training-dependent and tracked separately in `.issues/043`.
+//! is training-dependent and tracked separately in Issue 043 (resolved + removed).
 //!
 //! ## Quick start
 //!
@@ -86,7 +86,7 @@
 //! operators. A systematically biased topology can be *declared* and *verified*
 //! modellessly; only *exploiting* it for a behavioral gain needs riir-train.
 //!
-//! ## Fusion (the Super-GOAT angle, tracked in `.issues/043`)
+//! ## Fusion (the Super-GOAT angle, tracked in Issue 043 — resolved + removed)
 //!
 //! - **F1**: Canvas compiler × DEC reachability → declared causal topology on
 //!   latent positions with graph-theoretic independence guarantees.
@@ -112,13 +112,13 @@ pub mod types;
 // Re-export the public API at the module root for ergonomic access.
 pub use mask::{build_attention_mask, build_loss_weight_mask, temporal_aligns};
 pub use reachability::{
-    build_flow_graph, can_reach, reachability_horizon, FlowGraph, TransitiveClosure,
+    FlowGraph, TransitiveClosure, build_flow_graph, can_reach, reachability_horizon,
 };
 pub use transfer::{compatible_regions, compatible_regions_in_layout, transfer_distance};
 pub use types::{
-    AttentionFnFamily, AttentionMaskSpec, CanvasBounds, CanvasLayout, CanvasSchema,
-    CanvasTopology, CompiledCanvas, Connection, LossWeightMask, RegionId, RegionSpec, SemanticType,
-    SEMANTIC_EMBED_DIM,
+    AttentionFnFamily, AttentionMaskSpec, CanvasBounds, CanvasLayout, CanvasSchema, CanvasTopology,
+    CompiledCanvas, Connection, LossWeightMask, RegionId, RegionSpec, SEMANTIC_EMBED_DIM,
+    SemanticType,
 };
 
 use core::ops::Range;
@@ -215,7 +215,7 @@ pub fn hub_spoke(hub: RegionId, spokes: &[RegionId]) -> CanvasTopology {
 /// `(r, r)`, and for each `k ≥ 1` the connection `Connection(r_k, r_{k-1})` —
 /// i.e. `r_k` queries `r_{k-1}`. Because information flows `dst → src` (the
 /// key-value region influences the querier; see
-/// [`reachability`](crate::canvas::reachability)), the resulting information-flow
+/// [`crate::canvas::reachability`]), the resulting information-flow
 /// arcs are `r_{k-1} → r_k`, i.e. `r0 → r1 → … → rn`.
 ///
 /// This direction is what makes Plan 419 T3.6 hold: for `causal_chain([A,B,C])`,
@@ -283,7 +283,11 @@ pub fn compile_schema(schema: &CanvasSchema) -> CompiledCanvas {
         .collect();
     let mask = build_attention_mask(&schema.topology, &region_indices, &schema.layout);
     let loss_mask = build_loss_weight_mask(&schema.layout, &region_indices);
-    CompiledCanvas { region_indices, mask, loss_mask }
+    CompiledCanvas {
+        region_indices,
+        mask,
+        loss_mask,
+    }
 }
 
 /// Convenience: build the flow graph directly from a topology + region count.
@@ -303,7 +307,13 @@ mod tests {
 
     #[test]
     fn region_indices_returns_contiguous_slab() {
-        let layout = CanvasLayout { t: 1, h: 1, w: 4, d_model: 8, regions: vec![] };
+        let layout = CanvasLayout {
+            t: 1,
+            h: 1,
+            w: 4,
+            d_model: 8,
+            regions: vec![],
+        };
         // Region covering w=[2,4) on a 1×1×4 canvas → base 2, volume 2.
         let spec = RegionSpec::new(
             "r",
@@ -322,7 +332,13 @@ mod tests {
     fn region_indices_2d_layout_base_arithmetic() {
         // 1×2×2 canvas (h=2, w=2): positions are
         //   (h0,w0)=0, (h0,w1)=1, (h1,w0)=2, (h1,w1)=3.
-        let layout = CanvasLayout { t: 1, h: 2, w: 2, d_model: 8, regions: vec![] };
+        let layout = CanvasLayout {
+            t: 1,
+            h: 2,
+            w: 2,
+            d_model: 8,
+            regions: vec![],
+        };
         // Region covering h=[1,2), w=[0,2) → base = 1*2 + 0 = 2, volume = 1*2 = 2.
         let spec = RegionSpec::new(
             "r",
@@ -365,8 +381,14 @@ mod tests {
         // Each region self-attends (3) + chain[1] queries chain[0], chain[2] queries
         // chain[1] (2) = 5. Information arcs (dst→src) are 0→1→2.
         assert_eq!(topo.n_edges(), 5);
-        assert!(topo.connections.contains(&Connection::new(RegionId(1), RegionId(0))));
-        assert!(topo.connections.contains(&Connection::new(RegionId(2), RegionId(1))));
+        assert!(
+            topo.connections
+                .contains(&Connection::new(RegionId(1), RegionId(0)))
+        );
+        assert!(
+            topo.connections
+                .contains(&Connection::new(RegionId(2), RegionId(1)))
+        );
     }
 
     #[test]

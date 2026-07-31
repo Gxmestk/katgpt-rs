@@ -27,16 +27,12 @@ use std::collections::VecDeque;
 
 // ── Sigmoid helper ────────────────────────────────────────────
 
-/// Sigmoid function: `1 / (1 + exp(-x))`.
+/// Sigmoid function: `1 / (1 + exp(-x))`. Delegates to
+/// `katgpt_core::simd::fast_sigmoid` (Cephes polynomial).
 /// Used for confidence bounding — never softmax per project rules.
 #[inline]
 fn sigmoid(x: f32) -> f32 {
-    if x >= 0.0 {
-        1.0 / (1.0 + (-x).exp())
-    } else {
-        let ex = x.exp();
-        ex / (1.0 + ex)
-    }
+    katgpt_core::simd::fast_sigmoid(x)
 }
 
 // ── Regime ────────────────────────────────────────────────────

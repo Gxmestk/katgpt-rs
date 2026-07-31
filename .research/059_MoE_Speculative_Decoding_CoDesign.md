@@ -6,6 +6,7 @@
 > **Related Research:** 02 (Speculative Decoding), 06 (Raven RSM), 08 (Sparse MLP TwELL), 09 (EMO), 22 (Lighthouse Attention)
 > **Related Plans:** 022 (Sparse MLP), 044 (PFlash), 026 (Inference Budget), 055 (MTP Drafter)
 > **Verdict: PARTIAL VALUE — Three distillations: (1) Amdahl decomposition for LeviathanVerifier cost model, (2) batch-size-aware sparse MLP sparsity threshold, (3) Raven slot routing overlap metric. Core MoE routing findings do NOT apply (no MoE architecture). The arithmetic intensity framework and co-design principle are conceptual validation of our existing approach.**
+> **PASS-Redirects (synthesis):** LatentMoE [arXiv:2601.18089 "LatentMoE: Toward Optimal Accuracy per FLOP and Parameter in Mixture of Experts"] (NVIDIA, 2026-01, adopted in Nemotron-3) — PASS: from-scratch MoE training architecture that projects tokens into a latent dim ℓ=d/α before expert computation and scales N' and K' by α. LatentMoE's roofline analysis (§2.1: MoE experts memory-bound at t_exp < 1418 on GB200; §2.2: all-to-all comm dominates at 9× compute ratio) is the same arithmetic-intensity co-design lens this note distills from Cohere MoESD — the deployment insight is already captured here, no new primitive. The architecture (shared W↓/W↑ projection + α-scaled expert pool) requires from-scratch training → riir-train. Our stack has no transformer MoE layers to apply it to.
 
 ---
 
@@ -102,10 +103,10 @@ Shared experts reduce verification cost at low BS but raise effective k/N, pushi
 | Cohere Concept | Our Equivalent | Location | Match |
 |----------------|---------------|----------|-------|
 | MoE top-k expert routing | Raven RSM: top-k slot routing | `transformer.rs` `raven_update` | ✅ Structural analog |
-| Sparse expert activation | Sparse MLP: index packing for alive neurons | `katgpt-core/types.rs` `sparse_matmul` | ✅ Unstructured analog |
-| Speculative decoding verification | `LeviathanVerifier` | `speculative/verifier.rs` | ✅ Direct match |
+| Sparse expert activation | Sparse MLP: index packing for alive neurons | `crates/katgpt-types/src/lib.rs` `sparse_matmul` | ✅ Unstructured analog |
+| Speculative decoding verification | `LeviathanVerifier` | `crates/katgpt-speculative/src/spechop/verifier.rs` | ✅ Direct match |
 | Draft model (small, fast) | `Config::draft()` / `Config::bpe_draft()` | `types.rs` | ✅ Direct match |
-| Arithmetic intensity (k/N) | Sparsity ratio in `sparse_matmul` alive count | `katgpt-core/types.rs` | 🟡 Analogous concept |
+| Arithmetic intensity (k/N) | Sparsity ratio in `sparse_matmul` alive count | `crates/katgpt-types/src/lib.rs` | 🟡 Analogous concept |
 | Batch-size regimes | Domain inference budget (`tree_budget`, `beta`) | riir-ai Plan 026 | 🟡 Config-level only |
 | Temporal correlation | Raven slot reuse across positions | Not measured | ❌ Gap (T1 below) |
 | Amdahl decomposition | Not modeled for LeviathanVerifier | Not implemented | ❌ Gap (T2 below) |

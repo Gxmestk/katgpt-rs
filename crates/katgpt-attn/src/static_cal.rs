@@ -127,14 +127,15 @@ pub struct HeadStats {
 }
 
 /// Sigmoid activation — used instead of softmax for independent per-head normalization.
+/// Delegates to [`katgpt_core::simd::fast_sigmoid`] (Cephes polynomial).
 #[inline]
 fn sigmoid(x: f32) -> f32 {
-    1.0 / (1.0 + (-x).exp())
+    katgpt_core::simd::fast_sigmoid(x)
 }
 
 /// Run calibration pass over representative prompts.
 /// Takes a closure that simulates model forward pass and returns per-head activation stats.
-/// The closure receives (prompt_index) and should return Vec<HeadStats>.
+/// The closure receives (prompt_index) and should return `Vec<HeadStats>`.
 pub fn run_calibration_pass<F>(table: &mut StaticCalTable, num_prompts: usize, forward_fn: F)
 where
     F: Fn(usize) -> Vec<HeadStats>,

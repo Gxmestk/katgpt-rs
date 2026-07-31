@@ -56,7 +56,7 @@ Token + Position
 
 ---
 
-## DDTree (`speculative/dd_tree.rs`)
+## DDTree (`src/speculative/dd_tree.rs`)
 
 ### TreeNode
 
@@ -132,7 +132,7 @@ pub struct TreeBuilder {
 
 ---
 
-## DFlash (`speculative/dflash.rs`)
+## DFlash (`crates/katgpt-speculative/src/dflash.rs`)
 
 Draft-Flash produces marginal distributions over future tokens. It runs the draft model in a single forward pass per depth level, avoiding autoregressive serialization.
 
@@ -157,7 +157,7 @@ All `_with` variants accept a `&mut SpeculativeContext` and write results into p
 
 ---
 
-## SpeculativeVerifier (`speculative/verifier.rs`)
+## SpeculativeVerifier (`crates/katgpt-speculative/src/spechop/verifier.rs`)
 
 ### Trait
 
@@ -217,7 +217,7 @@ Implements the full Algorithm 1 from Leviathan et al. 2022 ("Fast Inference from
 - `set_drafter_lora(&mut self, lora, draft_config)` — set LoRA on existing verifier.
 - `has_drafter_lora(&self) → bool` — check if LoRA is attached.
 
-### D2fDrafterVerifier (`speculative/d2f_verifier.rs`, behind `"tri_mode"` feature)
+### D2fDrafterVerifier (`src/speculative/d2f_verifier.rs`, behind `"tri_mode"` feature)
 
 Self-speculation mode — uses the same model for both drafting and verification (Plan 089: Tri-Mode Inference). D2F block decode acts as the drafter (parallel, bidirectional within block), standard AR forward pass acts as the verifier.
 
@@ -246,7 +246,7 @@ Self-speculation mode — uses the same model for both drafting and verification
 | `d2f_config` | `D2fDecodeConfig::default()` | D2F decode parameters |
 | `sampler` | `None` | Optional `DiffusionSampler` for adaptive confidence (Plan 116) |
 
-### ParallelProbeVerifier (`speculative/parallel_probe.rs`, behind `"parallel_probe"` feature)
+### ParallelProbeVerifier (`crates/katgpt-speculative/src/parallel_probe.rs`, behind `"parallel_probe"` feature)
 
 Multi-branch speculative decoding with answer extraction and consensus-based early stopping. Runs multiple branches in parallel, extracts answers, and stops when branches agree.
 
@@ -264,7 +264,7 @@ Multi-branch speculative decoding with answer extraction and consensus-based ear
 
 ---
 
-## Sampling (`speculative/sampling.rs`)
+## Sampling (`crates/katgpt-core/src/speculative/sampling.rs`)
 
 Low-level sampling primitives used by verifiers and tree builders.
 
@@ -276,7 +276,7 @@ Low-level sampling primitives used by verifiers and tree builders.
 
 ---
 
-## Step Functions (`speculative/step.rs`)
+## Step Functions (`crates/katgpt-forward/src/step.rs`)
 
 High-level entry points that compose the full speculative decoding pipeline.
 
@@ -295,7 +295,7 @@ High-level entry points that compose the full speculative decoding pipeline.
 
 ---
 
-## D2F: Discrete Diffusion Forcing (`speculative/d2f.rs`, behind `"dllm"` feature)
+## D2F: Discrete Diffusion Forcing (`src/speculative/d2f.rs`, behind `"dllm"` feature)
 
 A third decode strategy alongside autoregressive and speculative. D2F decodes entire blocks of tokens in parallel via iterative denoising, using block-causal attention: **bidirectional within each block** (intra-block positions attend to each other), **causal across blocks** (inter-block attention is strictly left-to-right). This preserves standard KV cache semantics — previously decoded blocks accumulate KV entries that subsequent blocks reuse without recomputation.
 
@@ -490,7 +490,7 @@ pub struct RetrievalResult {
 
 ---
 
-## SpeculativeContext (`speculative/types.rs`)
+## SpeculativeContext (`crates/katgpt-core/src/speculative/types.rs`)
 
 Pre-allocated buffer struct for zero-alloc speculative decoding across all pipeline stages.
 
@@ -533,7 +533,7 @@ pub struct DDTreeBranchCache {
 
 Methods: `new(config, max_branches)`, `fork_branch(...)`, `forward_branch(...)`, `rollback_branch(...)`, `discard_branch(...)`, `reset()`.
 
-### SelfSpecConfig (`speculative/types.rs`, behind `"tri_mode"` feature)
+### SelfSpecConfig (`crates/katgpt-core/src/speculative/types.rs`, behind `"tri_mode"` feature)
 
 Configuration for D2F self-speculation mode (used by `D2fDrafterVerifier`).
 
@@ -559,7 +559,7 @@ pub struct SdeConfig {
 
 ---
 
-## ConstraintPruner (`speculative/types.rs`)
+## ConstraintPruner (`crates/katgpt-core/src/speculative/types.rs`)
 
 Trait for filtering invalid token branches during tree construction.
 
@@ -606,7 +606,7 @@ pub struct EarlyStopGate<P: ScreeningPruner> {
 
 Depth-aware early stopping gate (PTRM Plan 083). Wraps any `ScreeningPruner` and prunes branches where relevance falls below `confidence_threshold` at depth > 0. At depth 0, always passthrough. Behind `"elf_sde"` feature.
 
-### FlowPruner (`speculative/flow_pruner.rs`, behind `"bandit"` feature)
+### FlowPruner (`crates/katgpt-speculative/src/flow_pruner.rs`, behind `"bandit"` feature)
 
 GFlowNet-inspired stop-probability regularization. Wraps any `ScreeningPruner` and adds a multiplicative flow bonus:
 
@@ -621,7 +621,7 @@ Key methods:
 - `set_stop_probs_from_entropy(marginals)` — use entropy as proxy.
 - `flow_bonus(depth) -> f32` — get the flow bonus at a given depth.
 
-### PeiraPruner (`speculative/peira_pruner.rs`, behind `"peira_distill"` feature)
+### PeiraPruner (`crates/katgpt-speculative/src/peira_pruner.rs`, behind `"peira_distill"` feature)
 
 PEIRA alignment-modulated ScreeningPruner. Wraps any `ScreeningPruner` and modulates its relevance signal using PEIRA's spectral alignment score:
 
@@ -637,7 +637,7 @@ Key methods:
 
 ---
 
-## Event & Diagnostic Types (`speculative/types.rs`)
+## Event & Diagnostic Types (`crates/katgpt-core/src/speculative/types.rs`)
 
 ```rust
 pub enum RejectionReason {
@@ -707,7 +707,7 @@ Presets for `FlashPrefillConfig`: `metal()`, `long_context()`, `short_context()`
 
 ---
 
-## Speculative Prefill (`speculative/prefill.rs`)
+## Speculative Prefill (`src/speculative/prefill.rs`)
 
 PFlash-inspired prompt compression for reducing Time-To-First-Token (TTFT) on long prompts.
 
@@ -755,7 +755,7 @@ Pipeline steps:
 
 ---
 
-## Drafter LoRA (`speculative/drafter_lora.rs`)
+## Drafter LoRA (`crates/katgpt-forward/src/drafter_lora.rs`)
 
 LoRA-trained drafter weights for improved speculative decoding quality (Plan 117: MTP LoRA Drafter).
 
@@ -791,7 +791,7 @@ pub struct DrafterForwardContext { /* internal buffers */ }
 
 ---
 
-## Alpha: Lattice Deduction (`speculative/alpha.rs`, behind `"lattice_deduction"` feature)
+## Alpha: Lattice Deduction (`crates/katgpt-speculative/src/alpha.rs`, behind `"lattice_deduction"` feature)
 
 LDT α-operator for progressive multi-solution supervision (Plan 088).
 
@@ -824,7 +824,7 @@ Methods: `new(len, solutions)`, `commit(pos, val)`, `uncommit(pos)`, `reset()`, 
 
 ---
 
-## Answer Extraction (`speculative/answer_extract.rs`, behind `"parallel_probe"` feature)
+## Answer Extraction (`crates/katgpt-speculative/src/answer_extract.rs`, behind `"parallel_probe"` feature)
 
 Extracts answers from token streams for parallel probe consensus.
 
@@ -837,7 +837,7 @@ Extracts answers from token streams for parallel probe consensus.
 
 ---
 
-## DiffusionSampler (`speculative/diffusion_sampler.rs`, behind `"tri_mode"` feature)
+## DiffusionSampler (`src/speculative/diffusion_sampler.rs`, behind `"tri_mode"` feature)
 
 Learned accept/reject decisions for D2F denoising steps (Plan 116).
 
@@ -941,7 +941,7 @@ DFlash → DDTree → Verify
 
 ---
 
-## FlashAR Anchor-Then-Fill (`speculative/flashar_anchor.rs`, behind `"flashar_anchor"` feature)
+## FlashAR Anchor-Then-Fill (`src/speculative/flashar_anchor.rs`, behind `"flashar_anchor"` feature)
 
 Requires `"dllm"` feature. Two-round decoding strategy that reduces the D2F denoising search space.
 
@@ -959,7 +959,7 @@ By constraining the D2F block with high-confidence anchor tokens at regular inte
 
 ---
 
-## FlashAR Consensus Tri-Mode (`speculative/flashar_consensus.rs`, behind `"flashar_consensus"` feature)
+## FlashAR Consensus Tri-Mode (`src/speculative/flashar_consensus.rs`, behind `"flashar_consensus"` feature)
 
 Requires `"tri_mode"` and `"plasma_path"` features. Replaces tri_mode's prefix-match acceptance with a dual-path consensus mechanism and ternary thermal routing.
 
@@ -993,7 +993,7 @@ Based on the ternary verdict and confidence levels, each position is routed to o
 
 ---
 
-## Budget Adaptation (`speculative/budget.rs`, behind `"budget_adaptation"` feature)
+## Budget Adaptation (`crates/katgpt-speculative/src/budget.rs`, behind `"budget_adaptation"` feature)
 
 Adaptive tree budget scaling based on compression ratio. The tree budget is dynamically adjusted within `[base/2, base*2]` to match the current workload characteristics.
 

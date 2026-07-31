@@ -62,7 +62,7 @@ pub fn direction_vector_decode<const N: usize>(
 /// vectors, writing the scores into `out`.
 ///
 /// This is the ASOC hot-path variant — used when one composite operator decodes
-/// against multiple action-type direction vectors (e.g. 5 HLA scalars, or 8
+/// against multiple action-type direction vectors (e.g. 5 belief scalars, or 8
 /// action-type one-hots).
 ///
 /// # Contract

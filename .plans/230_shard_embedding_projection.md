@@ -1,7 +1,7 @@
 # Plan 230: Shard Embedding Projection — Modelless Linear Weight-to-Vector
 
 **Date:** 2026-06-09
-**Status:** ⚠️ GOAT FAILED G1 — NN preservation 6% (need ≥90%). 64→8 too aggressive. Needs higher dim or PCA. Keep opt-in.
+**Status:** ❌ DEPRECATED (Issue 139, 2026-07-16) — JL projection at m=8 is mathematically unsound (violates JL lower bound by over 200×). Empirically measures 1.4-6% NN preservation vs documented 90% target. Zero runtime consumers — BFCF uses region centroids, SenseModule uses TernaryDir. Option D (deprecate) chosen; `ShardEmbedding` + `JlProjectionMatrix` marked `#[deprecated]`, bench/diag tests removed.
 **Research:** Distilled from inr2vec asymmetric shard split concept
 **Depends On:** Plan 218 ✅ (BFCF × LFU × Sharding), Plan 154 ✅ (Sleep Consolidation)
 **Classification:** MIT (modelless, inference-time)
@@ -54,7 +54,7 @@ Option 2 (random orthogonal) is the GOAT for modelless: zero training, zero data
 
 ## T1: ShardEmbedding Type
 
-**File:** `crates/katgpt-core/src/types.rs` (extends)
+**File:** `crates/katgpt-types/src/lib.rs` (extends)
 
 ```rust
 /// Low-dimensional projection of NeuronShard style_weights for fast similarity search.
@@ -113,3 +113,57 @@ shard_embedding = []  # opt-in
 | G2 | Cosine similarity < 100ns | < 100ns | ✅ 326ns (debug), expected <100ns release |
 | G3 | Commitment integrity | verify passes | ✅ PASS |
 | G4 | Projection SIMD < 200ns | < 200ns | ⚠️ 4204ns (debug), expected <200ns release |
+
+---
+
+## Close-out Note (Issue 139, 2026-07-16)
+
+**Decision: Option D — Deprecate.** The primitive is mathematically unsound as
+specified. No matrix construction (random Gaussian, Achlioptas sparse, FJLT/
+Hadamard) can rescue it at m=8 — the Johnson-Lindenstrauss lower bound
+(`m ≥ (4 ln n) / (ε²/2 − ε³/3)`) requires m ≥ 554 for ε=0.5, n=100; Plan 230
+uses m=8, undershooting by over 200×.
+
+**Empirical sweep (n=100, Euclidean NN, release build, M3 Max):**
+
+| m | top1 | top5 | top10 |
+|------|------|------|-------|
+| 8 (Plan 230) | 5.0% | 13.3% | 21.4% |
+| 32 | 19.0% | 32.5% | 39.3% |
+| 48 | 40.3% | 52.4% | 58.6% |
+| 64 (identity) | 100% | 100% | 100% |
+
+Only m=64 (= identity, a no-op) gives 100%. JL ≥ 90% top-1 is unreachable below
+m=64 for random data.
+
+**Option B (PCA rescue) was probed and rejected.** Synthetic PCA at m=8
+satisfies G1 for intrinsic rank ≤ 8 with noise σ ≤ 0.1, but the real-data
+intrinsic-rank measurement requires a hook into the sleep consolidation
+pipeline to dump actual `style_weights` samples — this cannot be done
+modellessly without the corpus existing. Per the §3.5 modelless-unblock
+protocol, the deferral to a training-dependent measurement path means Option B
+is not a clean modelless gain. Deprecation is the honest resolution.
+
+**Zero consumer impact verified:**
+- `SenseModule` uses `TernaryDir` direction vectors, NOT `ShardEmbedding`.
+- BFCF region cache (`BfcfQueryBank`, `BfcpLfuShard`) uses region centroids
+  (means of token groups), NOT shard embeddings.
+- `riir-ai/crates/riir-poc/src/jl_backdoor_poc.rs` references Plan 230's `ShardEmbedding` in doc
+  comments only; it defines its own self-contained `Matrix`/`ToyShard` types
+  and does not import the katgpt-core primitive.
+- Cross-repo grep (riir-ai, riir-chain, riir-neuron-db) confirms zero code
+  consumers.
+
+**Actions taken:**
+- `ShardEmbedding` (crates/katgpt-types/src/sense.rs) + `JlProjectionMatrix`
+  (crates/katgpt-core/src/shard_embedding.rs) marked `#[deprecated]`.
+- Feature gate prose updated: `shard_embedding = []  # DEPRECATED ...`
+- `tests/bench_230_shard_embedding_goat.rs` + `tests/diag_230_embed_dim_sweep.rs`
+  removed (testing deprecated code with no consumers).
+- Re-exports wrapped in `#[allow(deprecated)]` for back-compat.
+- `cargo clippy --features shard_embedding --lib` clean; 1556 katgpt-core
+  lib tests pass.
+
+**Future path (if approximate shard similarity is ever needed):** Option C
+(LSH — SimHash or p-stable LSH) is the right tool for approximate NN at low
+dimension. It belongs in a new plan, not a fix to 230.

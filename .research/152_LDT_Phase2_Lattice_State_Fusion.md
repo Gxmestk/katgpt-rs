@@ -28,7 +28,7 @@ All four are modelless (zero training), behind existing `lattice_deduction` feat
 
 **Why it's fusion (not direct mapping):** The paper never connects α-operator to a pruner interface. It uses α as a training target. We use α as a **runtime pruning signal** — a completely different application of the same formalism. The ScreeningPruner trait provides the interface; AlphaTarget provides the lattice state; the fusion gives us a pruner that's **sound by construction** (never prunes a token that appears in any surviving solution).
 
-**Where:** `src/speculative/alpha.rs` — new struct `AlphaScreeningPruner`
+**Where:** `crates/katgpt-speculative/src/alpha.rs` — new struct `AlphaScreeningPruner`
 
 **Performance:** `HashSet::contains` — O(1) per token, sub-100ns. Interior mutability via `std::cell::RefCell<AlphaTarget>` for lazy cache.
 
@@ -38,7 +38,7 @@ All four are modelless (zero training), behind existing `lattice_deduction` feat
 
 **Why it's fusion (not direct mapping):** LDT doesn't implement clause learning — it uses random branching. We fuse LDT's conflict detection (T2) with CDCL's clause learning to create a **modelless search accelerator** for DDTree. This is a novel combination: constraint-solver clause learning applied to speculative decoding trees.
 
-**Where:** `src/speculative/alpha.rs` — new struct `ConflictClauseDb`
+**Where:** `crates/katgpt-speculative/src/alpha.rs` — new struct `ConflictClauseDb`
 
 **Performance:** HashSet comparison per branch — O(k × c) where k = number of clauses, c = avg clause size. With k ≤ 64, this is < 1µs. Bounded by `max_clauses` to prevent unbounded growth.
 
@@ -48,7 +48,7 @@ All four are modelless (zero training), behind existing `lattice_deduction` feat
 
 **Why it's fusion:** The paper uses this for training loss stabilization. We apply it to **runtime pruning signal stabilization** — when the search has committed past all valid solutions, the cached target still provides useful information about which candidates were viable before the conflict.
 
-**Where:** `src/speculative/alpha.rs` — modify `AlphaTarget`
+**Where:** `crates/katgpt-speculative/src/alpha.rs` — modify `AlphaTarget`
 
 **Performance:** One `Option` check — zero cost.
 

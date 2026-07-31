@@ -24,7 +24,7 @@ promotion to default-on (Phase 5 decision); GoldShare stays opt-in diagnostic.
 
 ## G1 (correctness) — SSMax gold mass preservation
 
-**Bench**: `benches/bench_411_ssmax_goat.rs` → G1 section
+**Bench**: `crates/katgpt-core/benches/bench_411_ssmax_goat.rs` → G1 section
 **Setup**: synthetic retrieval task, Δ = 0.5 (gold-distractor pre-softmax gap),
 N ∈ {64, 1k, 10k, 100k}. Gold position has logit `1.0 + Δ`; distractors have
 logit `1.0 + noise[0, 0.01)`. SSMax rescales logits by `s_L · log(N)`.
@@ -49,7 +49,7 @@ mass over base; Adaptive must recover ≥10× base.
 
 ## G2 (quality) — SSMax retrieval recall
 
-**Bench**: `benches/bench_411_ssmax_goat.rs` → G2 section
+**Bench**: `crates/katgpt-core/benches/bench_411_ssmax_goat.rs` → G2 section
 **Setup**: same retrieval task, but each key has a distinct one-hot value
 vector `v_j = e_{j mod d_model}` (d_model=16). The attention output
 `o = Σ_j α_j v_j` should point toward `v_gold`. Measure cosine similarity
@@ -70,7 +70,7 @@ being diluted across all distractor values (cos ~0.25).
 
 ## G2 (diagnostic quality) — GoldShare differentiating power
 
-**Bench**: `benches/bench_411_gold_share_goat.rs`
+**Bench**: `crates/katgpt-core/benches/bench_411_gold_share_goat.rs`
 **Setup**: 4-head, 16-key, d_head=8 synthetic attention. Gold keys carry a
 unit-norm signal vector; noise keys carry random unit-norm vectors. The
 `gold_mass` parameter sweeps from 0.91 (healthy) → 0.01 (diluted). Values are
@@ -97,7 +97,7 @@ the content swap that aggregate-norm metrics miss.
 
 ## G3 (latency) — SSMax overhead
 
-**Bench**: `benches/bench_411_ssmax_goat.rs` → G3 section
+**Bench**: `crates/katgpt-core/benches/bench_411_ssmax_goat.rs` → G3 section
 **Setup**: `apply_ssmax_inplace` on n_kv=1024 logits, 10000 iterations,
 `std::time::Instant` timing.
 
@@ -124,7 +124,7 @@ CountingAllocator test in the test suite. PASS.
 
 ## G5 (no-regression) — small-N behavior
 
-**Bench**: `benches/bench_411_ssmax_goat.rs` → G5 section
+**Bench**: `crates/katgpt-core/benches/bench_411_ssmax_goat.rs` → G5 section
 **Setup**: N=64, Δ=0.5. Compare argmax with and without SSMax Fixed {s_L=1.0}.
 
 | Metric | Value |

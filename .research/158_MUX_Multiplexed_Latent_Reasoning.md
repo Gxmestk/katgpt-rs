@@ -1,12 +1,19 @@
 # Research 158: MUX — Multiplexed Latent Reasoning via Vocabulary Superposition
 
+> **Note on file paths (2026-07-18):** Some `*.rs` paths in this document
+> reference modules that were renamed, moved, or never landed under the
+> exact name shown. They are preserved as a **historical record** of the
+> original design intent; consult the current crate layout for the live
+> location.
+
 > **Paper:** [MUX: Continuous Reasoning via Multiplexed Tokens](https://misakitaro0414.github.io/mux/) — Suleymanzade, Gozeten, Bronstein, Ceylan, Kim (AITHYRA, Michigan, Oxford, TU Wien, KAIST), June 2026
 > **Local:** `.raw/mux/` (upstream Python, CODI framework + PCCoT parallel variant)
 > **Date:** 2026-06, distilled 2026-07
 > **Related Research:** 043 (Interventional SFT), 097 (Training-Free Looped Transformers), 151 (GDSD Guided Denoiser), 153 (Thinking Pixel), 156 (Speculative Reconciliation), 037 (REAP Model-Based/Modelless Duality)
 > **Related Plans:** 172 (RiM Reasoning Buffer Slots ✅), 171 (FrozenBaseGuard ✅), 136 (Training-Free Loop Wrapper), 177 (Speculative Reconciliation)
 > **Verdict: HIGH VALUE — Six modelless distillations, three model-based. The superposition-as-search-space idea is a genuine architectural fusion with our DDTree/BanditPruner/ConstraintPruner stack, not a rebranding. The anti-collapse guarantee (Proposition 9) gives us a theoretical foundation for why RiM slots don't degrade.**
-
+>
+> **Gain-Redirects (synthesis, verdict revised 2026-07-26):** Nikolaou & Mencattini [arXiv:2510.15511 "Language Models are Injective and Hence Invertible"] (ICLR 2026) — **Gain**, not PASS (revised up: SipIt is modelless + doesn't ship → §1.55 mandates Gain-or-higher). Same "lossless latent encoding" theme as MUX (Proposition 9's lossless separation condition) but a different mechanism: MUX encodes losslessly via vocabulary simplex superposition + deterministic demultiplexing; that paper proves that the standard decoder-only transformer map (prompt→last-token state) is *already* almost-surely injective (real-analyticity + measure-zero collision sets, preserved under GD). Open primitive ships as `katgpt-core::inversion` (Plan 561) — SipIt as a generic vector-to-token reconstruction operator for text transformers. The broader fusions proposed (activation-based sync compression, lossless activation hashing, Cold-tier prompt re-hydration) do NOT hold up — see Research 232's Gain-Redirects line for the technical reasons.
 ---
 
 ## TL;DR
@@ -274,7 +281,7 @@ MUX is the theoretical foundation we didn't know we needed. RiM slots worked emp
 
 ### D1: MuxSpanPruner (ConstraintPruner in Vocabulary Simplex)
 - **What:** Prune branches whose logit distribution doesn't form a valid superposition
-- **Where:** `src/pruners/mux_span.rs` (new file)
+- **Where:** `crates/katgpt-pruners/src/mux_span.rs` (new file)
 - **Depends on:** `ConstraintPruner` trait
 - **Cost:** O(V · log K) per branch — negligible (K ≤ 8)
 - **Feature gate:** `mux_pruner`
@@ -302,7 +309,7 @@ MUX is the theoretical foundation we didn't know we needed. RiM slots worked emp
 
 ### D5: MuxDemux Verifier
 - **What:** Deterministic recovery of token spans from superposition; WASM-compatible
-- **Where:** `src/validator/mux_demux.rs` (new file)
+- **Where:** `crates/katgpt-core/src/mux_demux.rs` (new file)
 - **Depends on:** None (pure math)
 - **Cost:** O(V · log K) — sorting top-K logits
 - **Feature gate:** `mux_demux`
@@ -388,10 +395,10 @@ MUX is the theoretical foundation we didn't know we needed. RiM slots worked emp
 
 | Gate | Depends On | Default | File |
 |------|-----------|---------|------|
-| `mux_pruner` | — | off | `src/pruners/mux_span.rs` |
+| `mux_pruner` | — | off | `crates/katgpt-pruners/src/mux_span.rs` |
 | `mux_ddtree` | `mux_pruner` | off | `src/tree/mux_dd_tree.rs` |
-| `mux_bandit_width` | `bandit`, `rim_slots` | off | `src/pruners/bandit.rs` (extend) |
-| `mux_demux` | — | off | `src/validator/mux_demux.rs` |
+| `mux_bandit_width` | `bandit`, `rim_slots` | off | `crates/katgpt-ruliology/src/bandit.rs` (extend) |
+| `mux_demux` | — | off | `crates/katgpt-core/src/mux_demux.rs` |
 | `mux_bfs` | `mux_ddtree` | off | `src/tree/mux_dd_tree.rs` (extend) |
 | `mux_freeze_thaw` | `rim_slots` | off | `src/memory/neuron_shard.rs` (extend) |
 

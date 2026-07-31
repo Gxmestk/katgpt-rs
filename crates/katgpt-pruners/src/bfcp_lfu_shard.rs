@@ -213,21 +213,19 @@ impl BfcpLfuShard {
         #[cfg(not(feature = "freq_bandit"))]
         let tier = static_tier;
 
-        let assignments: Vec<(usize, FreqTier)> = partition
-            .regions
-            .iter()
-            .map(|region| {
-                let shard = self.shard_map.assign_shard(region.label, tier);
-                (shard, tier)
-            })
-            .collect();
+        let mut assignments: Vec<(usize, FreqTier)> = Vec::with_capacity(partition.regions.len());
+        for region in &partition.regions {
+            let shard = self.shard_map.assign_shard(region.label, tier);
+            assignments.push((shard, tier));
+        }
 
         (partition, assignments)
     }
 
     /// Batch accept tokens from partition regions (up to `max_tokens`).
     pub fn batch_process(&self, partition: &BFCP, max_tokens: usize) -> Vec<usize> {
-        let regions: Vec<&BorelRegion> = partition.regions.iter().collect();
+        let mut regions: Vec<&BorelRegion> = Vec::with_capacity(partition.regions.len());
+        regions.extend(partition.regions.iter());
         self.batcher.batch_accept(&regions, max_tokens)
     }
 
@@ -246,7 +244,7 @@ impl BfcpLfuShard {
         self.cache.decay(lambda);
     }
 
-    /// Feed reward signal to the tier bandit (hit=1.0, miss=0.0, or any [0,1]).
+    /// Feed reward signal to the tier bandit (hit=1.0, miss=0.0, or any `[0,1]`).
     ///
     /// Only available with `freq_bandit` feature. No-op otherwise.
     #[cfg(feature = "freq_bandit")]
@@ -326,7 +324,7 @@ pub fn region_radius(base_radius: f32, freq: f32, freq_scale: f32) -> f32 {
 
 #[inline]
 fn sigmoid(x: f32) -> f32 {
-    1.0 / (1.0 + (-x).exp())
+    katgpt_core::simd::fast_sigmoid(x)
 }
 
 // ── Tests ─────────────────────────────────────────────────────────

@@ -80,7 +80,7 @@ impl SamplerFeatures {
     /// Zero-allocation: tracks top-3 probabilities via branchless comparisons
     /// during the exp/sum pass (order preserved under division by `sum_exp`).
     /// Entropy computed via the identity `Σ p·log(p) = (Σ e·log(e))/sum - log(sum)`
-    /// to avoid per-element division. Previously allocated 2 Vec<f32> of
+    /// to avoid per-element division. Previously allocated 2 `Vec<f32>` of
     /// vocab_size and did a full O(n log n) sort for top-3 mass.
     pub fn from_logits(
         logits_p: &[f32],
@@ -98,6 +98,9 @@ impl SamplerFeatures {
         // (order preserved under division by sum_exp → top-3 exp == top-3 prob).
         // Also accumulate Σ e·log(e) for entropy via the identity
         //   H = -Σ p·log(p) = -(Σ e·log(e))/sum + log(sum).
+        // Scalar `fast_exp` (not SIMD): top-3 tracking branches are interleaved
+        // with the exp, preventing clean SIMD vectorization.
+        use katgpt_core::simd::fast_exp;
         let mut sum_exp = 0.0f32;
         let mut sum_e_log_e = 0.0f32;
         // Top-3 trackers (exp values). Initialized to -1 so any valid exp >= 0 wins.
@@ -108,7 +111,7 @@ impl SamplerFeatures {
             if t == mask {
                 continue;
             }
-            let e = (logit - max_logit).exp();
+            let e = fast_exp(logit - max_logit);
             sum_exp += e;
             // Branchless top-3 update: shift down only if e exceeds current tier.
             // Compiles to cmov / fmax sequences — no data-dependent branches.
@@ -303,11 +306,11 @@ impl LogisticSampler {
 /// medium-scale models where feature interactions matter.
 #[derive(Clone, Debug)]
 pub struct MlpSampler {
-    /// Input → hidden weights [hidden_dim × N_FEATURES].
+    /// Input → hidden weights `[hidden_dim × N_FEATURES]`.
     pub w1: Vec<f32>,
-    /// Hidden bias [hidden_dim].
+    /// Hidden bias `[hidden_dim]`.
     pub b1: Vec<f32>,
-    /// Hidden → output weights [hidden_dim].
+    /// Hidden → output weights `[hidden_dim]`.
     pub w2: Vec<f32>,
     /// Output bias.
     pub b2: f32,
@@ -756,11 +759,12 @@ pub fn collect_trajectories(
                 // ── Confidence remasking / token commit (was loop 2) ──
                 // Reuses `top1` and `top1_val` from the single argmax above;
                 // the old code recomputed both in a second O(vocab) scan.
+                use katgpt_core::simd::fast_exp;
                 let sum_exp: f32 = (0..vocab)
                     .filter(|&t| t != mask)
-                    .map(|t| (logits_p[t] - top1_val).exp())
+                    .map(|t| fast_exp(logits_p[t] - top1_val))
                     .sum();
-                let top1_prob = (logits_p[top1] - top1_val).exp() / sum_exp;
+                let top1_prob = fast_exp(logits_p[top1] - top1_val) / sum_exp;
 
                 if top1_prob >= decode_config.confidence_threshold {
                     tokens[p] = top1;
@@ -821,14 +825,10 @@ impl DiffusionSampler {
 // ── Activation Functions ──────────────────────────────────────
 
 /// Sigmoid: σ(x) = 1 / (1 + exp(-x)).
+///
+/// Delegates to `katgpt_core::simd::fast_sigmoid` (Cephes polynomial).
 fn sigmoid(x: f32) -> f32 {
-    match x >= 0.0 {
-        true => 1.0 / (1.0 + (-x).exp()),
-        false => {
-            let ex = x.exp();
-            ex / (1.0 + ex)
-        }
-    }
+    katgpt_core::simd::fast_sigmoid(x)
 }
 
 /// ReLU: max(0, x).

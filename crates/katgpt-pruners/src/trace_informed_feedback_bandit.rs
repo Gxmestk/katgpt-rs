@@ -40,7 +40,7 @@
 //!
 //! This module is **IP-clean for the public MIT repo** (katgpt-rs). It
 //! defines a generic `ActiveStateTrace` trait with three `f32` accessors
-//! — no gameplay types, no HLA scalars beyond the single `arousal` field
+//! — no gameplay types, no belief scalars beyond the single `arousal` field
 //! used for diagnostics, no sync-boundary types. The riir-games
 //! `ActiveStateEvent` (which carries the full `[f32; 5]` HLA bridge
 //! scalars + BLAKE3 hash) implements this trait via a thin adapter; the
@@ -200,7 +200,7 @@ mod tests {
     struct StubTrace {
         compression_ratio_mean: f32,
         constraint_trend: f32,
-        hla_arousal: f32,
+        emotion_arousal: f32,
     }
 
     impl ActiveStateTrace for StubTrace {
@@ -213,8 +213,8 @@ mod tests {
             self.constraint_trend
         }
         #[inline]
-        fn hla_arousal(&self) -> f32 {
-            self.hla_arousal
+        fn emotion_arousal(&self) -> f32 {
+            self.emotion_arousal
         }
     }
 
@@ -228,7 +228,7 @@ mod tests {
         let t = StubTrace {
             compression_ratio_mean: 3.0,
             constraint_trend: 0.5,
-            hla_arousal: 0.0,
+            emotion_arousal: 0.0,
         };
         assert!((trace_signal(&t) - 4.5).abs() < 1e-6);
     }
@@ -240,7 +240,7 @@ mod tests {
         let t = StubTrace {
             compression_ratio_mean: 3.0,
             constraint_trend: -0.8,
-            hla_arousal: 0.0,
+            emotion_arousal: 0.0,
         };
         // 3.0 × (1 + max(-0.8, 0)) = 3.0 × 1.0 = 3.0
         assert!((trace_signal(&t) - 3.0).abs() < 1e-6);
@@ -296,7 +296,7 @@ mod tests {
         let stale_trace = StubTrace {
             compression_ratio_mean: 3.0, // ×(1+0.5) = 4.5 ≥ 3.5 threshold
             constraint_trend: 0.5,
-            hla_arousal: 0.9,
+            emotion_arousal: 0.9,
         };
         let decision = wrapper.select(ctx(), &stale_trace);
         assert!(
@@ -313,7 +313,7 @@ mod tests {
         let fresh_trace = StubTrace {
             compression_ratio_mean: 1.2,
             constraint_trend: 0.0,
-            hla_arousal: 0.2,
+            emotion_arousal: 0.2,
         };
         let _ = wrapper.select(ctx(), &fresh_trace);
         // No assertion on the decision — the inner UCB1 picks. We just verify
@@ -348,7 +348,7 @@ mod tests {
         let extreme = StubTrace {
             compression_ratio_mean: 100.0,
             constraint_trend: 100.0,
-            hla_arousal: 1.0,
+            emotion_arousal: 1.0,
         };
         let _ = wrapper.select(ctx(), &extreme);
         // No forced WeightUpdate; inner bandit's normal UCB1 ran.

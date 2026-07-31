@@ -311,16 +311,16 @@ pub mod spec_compile;
 
 | File | Change |
 |------|--------|
-| `src/pruners/spec_compile/mod.rs` | Module index, re-exports, feature gates |
-| `src/pruners/spec_compile/types.rs` | SpecRule, CompiledSpec, CompactBitmap, SpecType, CompilationResult |
-| `src/pruners/spec_compile/compiler.rs` | SpecCompiler — NL → rules for all spec types |
-| `src/pruners/spec_compile/pruner.rs` | ConstraintPruner impl for CompiledSpec |
-| `src/pruners/spec_compile/screening.rs` | ScreeningPruner impl with sigmoid relevance |
-| `src/pruners/spec_compile/marginals.rs` | SpecMarginals, TokenBias, spec_to_marginals |
-| `src/pruners/spec_compile/dfa.rs` | SpecDFA, FormatDfaBuilder — email/phone/date/URL |
-| `src/pruners/spec_compile/proof.rs` | SpecProof, SpecCommitment — BLAKE3 commitment |
-| `src/pruners/spec_compile/chain.rs` | SpecChain, ChainOp — AND/OR composition |
-| `src/pruners/spec_compile/router.rs` | SpecRouter, SpecComplexity, ComputeTier |
+| `crates/katgpt-pruners/src/spec_compile/mod.rs` | Module index, re-exports, feature gates |
+| `crates/katgpt-pruners/src/spec_compile/types.rs` | SpecRule, CompiledSpec, CompactBitmap, SpecType, CompilationResult |
+| `crates/katgpt-pruners/src/spec_compile/compiler.rs` | SpecCompiler — NL → rules for all spec types |
+| `crates/katgpt-pruners/src/spec_compile/pruner.rs` | ConstraintPruner impl for CompiledSpec |
+| `crates/katgpt-pruners/src/spec_compile/screening.rs` | ScreeningPruner impl with sigmoid relevance |
+| `crates/katgpt-pruners/src/spec_compile/marginals.rs` | SpecMarginals, TokenBias, spec_to_marginals |
+| `crates/katgpt-pruners/src/spec_compile/dfa.rs` | SpecDFA, FormatDfaBuilder — email/phone/date/URL |
+| `crates/katgpt-pruners/src/spec_compile/proof.rs` | SpecProof, SpecCommitment — BLAKE3 commitment |
+| `crates/katgpt-pruners/src/spec_compile/chain.rs` | SpecChain, ChainOp — AND/OR composition |
+| `crates/katgpt-pruners/src/spec_compile/router.rs` | SpecRouter, SpecComplexity, ComputeTier |
 | `.benchmarks/259_spec_compile_goat.md` | NEW: This file |
 
 ---

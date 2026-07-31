@@ -1,6 +1,6 @@
 # Research 351: Cross-Repo Lean 4 Formal Verification Pattern — The Super-GOAT Capture Protocol
 
-> **Cross-reference note.** Coordinator: `katgpt-rs/.issues/012_cross_repo_fv_lean4_rollout_coordinator.md` (Phases 1–4 COMPLETE).
+> **Cross-reference note.** Coordinator: `katgpt-rs/.issues/012_cross_repo_fv_lean4_rollout_coordinator.md` (Phases 1–4 COMPLETE; issue removed post-rollout, commit `a357e8a1`).
 > Capability-face doc: `riir-ai/.research/003_Commercial_Open_Source_Strategy_Verdict.md` §"Formal Verification".
 > Bug-finding case study: `riir-ai/.issues/354_lora_weight_version_torn_read.md` (riir-ai issue, closed + removed; all tasks DONE).
 > Predecessor (gap analysis): `katgpt-rs/.research/292_Bridge_Neuro_Symbolic_Formal_Verification_Gap.md` (written when zero proofs existed).
@@ -25,7 +25,7 @@ The pattern is a **Super-GOAT capture protocol** in the sense of Research 003 §
 | `KatgptProof` | `katgpt-rs` (public) | `v4.31.0` | 3 | 0 | Sigmoid ranking preservation (`action_bridge_ranking_preserved` + `'` variant + `action_bridge_argmax_preserved`). The public adoption hook. |
 | `RiirChainProof` | `riir-chain` (private) | `v4.31.0` | 32 | 0 | LatCal round-trip (3), quorum determinism (5) + tier/block root funcs (2), chain-side `merkle_root` init (4), slashing monotonicity (8), split-key security (10). |
 | `NeuronDbProof` | `riir-neuron-db` (private) | `v4.31.0` | 28 | 0 | Shard layout consistency + `merkle_root` init (16), freeze gate contract (8), Merkle tamper-evidence (4, parameterized over injective `hashFn`). |
-| `RiirAiProof` | `riir-ai` (private) | `v4.32.0-rc1` | 16 | 1† | HLA scalar boundedness (14), freeze/thaw reader invariant (2, `propext`-only). |
+| `RiirAiProof` | `riir-ai` (private) | `v4.32.0-rc1` | 16 | 1† | belief scalar boundedness (14), freeze/thaw reader invariant (2, `propext`-only). |
 | **Total** | | | **79** | **1†** | |
 
 † `arcswap_store_atomicity` in `RiirAiProof/Runtime/Basic.lean` is **documentation-only** — the actual theorems depend only on `[propext]`. See §3.2.
@@ -152,7 +152,7 @@ When starting a new FV instance (a new repo, a new invariant class), follow this
 6. **Write the spec-match test** (C3) — the test must exercise the f32/NaN/edge-case paths Lean can't model. If the test can't distinguish the correct implementation from the buggy one, the test is insufficient (this is exactly the `concurrent_lora_update_read` failure — strengthen it before proceeding).
 7. **Document regeneration** (C6) — the README must tell the next agent what to re-check when the Rust side changes.
 8. **Add the CI hook** (C5) — `lake build` as a separate layer, skipping if `elan` absent.
-9. **Update the coordinator** (`katgpt-rs/.issues/012_*`) — add the instance to the state table with theorem count.
+9. **Update the coordinator** (`katgpt-rs/.issues/012_*` — removed post-rollout, commit `a357e8a1`; update each repo's `AGENTS.md` §"Cross-repo FV coordination" instead) — add the instance to the state table with theorem count.
 
 The scaffold is deliberately small. The pattern's value is that it's *repeatable* — four instances in seven days, one of which found a real bug.
 
@@ -169,7 +169,7 @@ The scaffold is deliberately small. The pattern's value is that it's *repeatable
 
 ## 7. Cross-references
 
-- **Coordinator:** `katgpt-rs/.issues/012_cross_repo_fv_lean4_rollout_coordinator.md` (Phases 1–4 COMPLETE, 79 thms)
+- **Coordinator:** ~~`katgpt-rs/.issues/012_cross_repo_fv_lean4_rollout_coordinator.md`~~ (Phases 1–4 COMPLETE, 79 thms; removed post-rollout, commit `a357e8a1` — see each repo's `AGENTS.md` §"Cross-repo FV coordination")
 - **Capability-face:** `riir-ai/.research/003_Commercial_Open_Source_Strategy_Verdict.md` §"Formal Verification"
 - **Predecessor (gap analysis):** `katgpt-rs/.research/292_Bridge_Neuro_Symbolic_Formal_Verification_Gap.md`
 - **Bug-finding case study:** `riir-ai/.issues/354_lora_weight_version_torn_read.md` (riir-ai issue, closed + removed; all tasks DONE)

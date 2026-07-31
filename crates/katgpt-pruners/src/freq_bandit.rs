@@ -250,7 +250,7 @@ pub fn token_stream_spectrum(tokens: &[usize], window_size: usize) -> FrequencyP
 /// Used for all activation in this module. NOT softmax per project constraint.
 #[inline]
 pub fn sigmoid(x: f32) -> f32 {
-    1.0 / (1.0 + (-x).exp())
+    katgpt_core::simd::fast_sigmoid(x)
 }
 
 /// Apply sigmoid to band energies to get activation weights.
@@ -502,7 +502,7 @@ impl FrequencyBandit {
             _ => {
                 // Sort variances to find quantile
                 let mut sorted = variances;
-                sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+                sorted.sort_by(|a, b| a.total_cmp(b));
                 // (1 - ρ) quantile index
                 let idx = ((1.0 - rho) * 2.0) as usize;
                 sorted[idx.min(2)]
@@ -546,7 +546,7 @@ impl Default for FrequencyBandit {
 ///
 /// Analyzes token streams via spectral methods and translates the dominant
 /// frequency band into a [`ComputeTier`] recommendation suitable for
-/// [`InferenceRouter`](crate::inference_router::InferenceRouter).
+/// `InferenceRouter`.
 pub struct FreqTierAdapter {
     bandit: FrequencyBandit,
 }

@@ -47,7 +47,7 @@ fn edit_budget_at_step()                Game-specific prompt templates
 **Types to define:**
 
 ```rust
-// src/skill_opt/edit.rs
+// crates/katgpt-core/src/skill_opt/edit.rs
 pub enum EditOp {
     Append,
     InsertAfter,
@@ -65,7 +65,7 @@ pub struct SkillEdit {
 
 pub enum EditSource { Failure, Success, SlowUpdate, MetaSkill }
 
-// src/skill_opt/gate.rs
+// crates/katgpt-core/src/skill_opt/gate.rs
 pub struct ValidationGate {
     pub accepted: bool,
     pub candidate_score: f64,
@@ -81,7 +81,7 @@ pub struct RejectedEdit {
     pub step: usize,
 }
 
-// src/skill_opt/schedule.rs
+// crates/katgpt-core/src/skill_opt/schedule.rs
 pub enum EditBudgetSchedule {
     Constant { budget: usize },
     Linear { start: usize, end: usize, total_steps: usize },
@@ -93,14 +93,14 @@ impl EditBudgetSchedule {
     pub fn budget_at_step(&self, step: usize) -> usize { ... }
 }
 
-// src/skill_opt/apply.rs
+// crates/katgpt-core/src/skill_opt/apply.rs
 pub fn apply_edits(skill: &str, edits: &[SkillEdit], budget: usize) -> String { ... }
 ```
 
 **Trait:**
 
 ```rust
-// src/skill_opt/optimizer.rs
+// crates/katgpt-core/src/skill_opt/optimizer.rs
 pub trait SkillOptimizer {
     /// Propose edits given scored trajectories and current skill
     fn propose_edits(
@@ -166,7 +166,7 @@ skill_opt = []
 
 - [x] **T2: Edit Application Engine (katgpt-rs, `skill_opt` feature)**
 
-**Location:** `src/skill_opt/apply.rs`
+**Location:** `crates/katgpt-core/src/skill_opt/apply.rs`
 
 The `apply_edits()` function applies bounded edits to a text skill document:
 
@@ -202,7 +202,7 @@ pub fn apply_edits(skill: &str, edits: &[SkillEdit], budget: usize) -> ApplyResu
 
 - [x] **T3: Rejected-Edit Buffer (katgpt-rs, `skill_opt` feature)**
 
-**Location:** `src/skill_opt/buffer.rs`
+**Location:** `crates/katgpt-core/src/skill_opt/buffer.rs`
 
 ```rust
 pub struct RejectedEditBuffer {
@@ -344,7 +344,7 @@ fn compute_epoch_comparison(
 
 - [x] **T6: Skill Optimization Binary (riir-ai, private) 🔒**
 
-**Location:** `crates/riir-games/examples/bomber_skill_opt.rs`
+**Location:** `riir-ai/crates/riir-games/examples/bomber_skill_opt.rs`
 
 CLI tool to run skill optimization:
 

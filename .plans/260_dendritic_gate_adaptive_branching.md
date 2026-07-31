@@ -3,7 +3,7 @@
 **Date**: 2026-06-12
 **Status**: ✅ COMPLETE (GOAT PASS — promoted to default)
 **Feature**: `dendritic_gate`
-**Research**: `.research/228_TwinProp_Dendritic_Inference_Compute.md`
+**Research**: `.research/434_TwinProp_Dendritic_Inference_Compute.md`
 
 ---
 
@@ -25,20 +25,20 @@ Implement physics-inspired NMDA-gated adaptive tree expansion in DDTree. Uses en
   - `fn compute_gate(&self, entropy: f32, coincidence: f32) -> f32` — returns `sigmoid(sensitivity * (entropy - threshold)) * coincidence`
   - All methods must be `#[inline]`, zero-allocation, stack-only
 
-- [x] Add SIMD-accelerated `entropy_f32(logprobs: &[f32]) -> f32` to `crates/katgpt-core/src/simd.rs`
+- [x] Add SIMD-accelerated `entropy_f32(logprobs: &[f32]) -> f32` to `crates/katgpt-dec/src/simd.rs`
   - Use existing `simd_dot_f32` pattern
   - Chunk-4 unrolled for auto-vectorization
   - Handle log-space: `entropy = -Σ p·log(p)` where `p = exp(logprobs[i])` normalized
 
-- [x] Add `coincidence_score(top_k: &[usize], parent_path: &[usize]) -> f32` to `crates/katgpt-core/src/simd.rs`
+- [x] Add `coincidence_score(top_k: &[usize], parent_path: &[usize]) -> f32` to `crates/katgpt-dec/src/simd.rs`
   - Count agreement between top-K candidates and parent path within window
   - Returns `agreement_count / window_size` ∈ [0, 1]
 
-- [x] Create `src/speculative/dendritic_gate.rs` re-exporting from katgpt-core
+- [x] Create `crates/katgpt-speculative/src/dendritic_gate.rs` re-exporting from katgpt-core
 
 ### Phase 2: ThinkingController Integration
 
-- [x] Add `ThinkingMode::Dendritic` variant to `ThinkingMode` enum in `src/speculative/thinking_controller.rs`
+- [x] Add `ThinkingMode::Dendritic` variant to `ThinkingMode` enum in `crates/katgpt-speculative/src/thinking_controller.rs`
   - Uses `DendriticGate` for budget allocation instead of bandit
   - Deterministic: same input always produces same budget
 
@@ -59,7 +59,7 @@ Implement physics-inspired NMDA-gated adaptive tree expansion in DDTree. Uses en
   - Early exit when `nmda_gate < 0.1` (proximal dendrite sufficient)
   - Chain-seed support for greedy backbone
 
-- [x] Wire into `speculative/mod.rs` re-exports via feature gate
+- [x] Wire into `crates/katgpt-core/src/speculative/mod.rs` re-exports via feature gate
   - `#[cfg(feature = "dendritic_gate")]` conditional
   - `dendritic_gate` feature enables `katgpt-core/dendritic_gate`
 

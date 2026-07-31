@@ -86,7 +86,7 @@ These categories mirror what Seal Online dialog/quest/KG data would look like in
    - `SigmoidLatentCodec<D, K>` — generic latent projection codec (API-uniformity facade over `DensityBudget`), 11 unit tests (`sigmoid_latent.rs`)
    - `BabelCommitment` — BLAKE3 `[u8; 32]` newtype, 12 unit tests (`commitment.rs`)
    - **45/45 unit tests pass** under both `--features babel_codec` and `--all-features`.
-2. **GOAT bench** (`tests/bench_331_babel_codec_goat.rs`) — G1/G3/G4/G5 pass, G2 fails honestly.
+2. **GOAT bench** (`crates/katgpt-core/tests/bench_331_babel_codec_goat.rs`) — G1/G3/G4/G5 pass, G2 fails honestly.
 3. **Feature stays opt-in** (`babel_codec = []`), NOT in `default`. No promotion.
 
 ---
@@ -121,7 +121,7 @@ These categories mirror what Seal Online dialog/quest/KG data would look like in
 `cargo test -p katgpt-core --all-features` reports 1869 passed / 2 failed. The 2 failures are **pre-existing and unrelated** to babel_codec:
 
 1. `curator::tests::test_verification_weight_thresholds` — a float-precision/logic issue in `curator.rs` (not touched by this plan). Fails identically with or without `babel_codec`.
-2. `rtdc::tests::subtree::cg6_verify_cost_within_5x_of_depth_2` — a latency gate flake (5.628× vs 5.5× budget under full-suite load). **Passes in isolation.** Not caused by babel_codec.
+2. `rtdc::tests::subtree::cg6_verify_cost_within_5x_of_depth_2` — a latency gate flake (5.628× vs 5.5× budget under full-suite load). **Passes in isolation.** Not caused by babel_codec. **Resolved 2026-07-17** (separate commit): test marked `#[ignore]` — canonical CG6.1 measurement lives in the criterion bench `rtdc_subtree_bench` (`.benchmarks/303`, 4.60× in release).
 
 All **45 babel_codec tests pass** cleanly under both `--features babel_codec` and `--all-features`.
 
@@ -136,7 +136,7 @@ All **45 babel_codec tests pass** cleanly under both `--features babel_codec` an
 - [x] **Phase 5 executed**: GOAT bench. G1/G3/G4/G5 PASS, G2 FAIL (1.14× < 2×).
 - [x] **Final demotion**: `babel_codec` stays opt-in. No promotion to default.
 - [x] **Honest negative result documented** (this file).
-- [ ] **Issue #002**: close as moot unless a learned codec (riir-train) raises the ratio above 2× — the 1.14× byte savings will not survive LatCal commitment-gas overhead (BG4 predicted exactly this failure).
+- [x] **Issue #002**: closed as moot (issue removed — the 1.14× byte savings will not survive LatCal commitment-gas overhead, BG4 predicted exactly this failure). A learned codec (riir-train) would need to raise the ratio above 2× to reconsider.
 
 ---
 

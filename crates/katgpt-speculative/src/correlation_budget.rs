@@ -135,7 +135,7 @@ impl CorrelationBudgetAllocator {
                 let mut remaining = max_budget - current;
                 // Distribute to highest-agreement depths first
                 let mut indexed: Vec<(usize, f32)> = rates.iter().copied().enumerate().collect();
-                indexed.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+                indexed.sort_by(|a, b| b.1.total_cmp(&a.1));
                 for (i, _) in indexed {
                     if remaining == 0 {
                         break;
@@ -148,7 +148,7 @@ impl CorrelationBudgetAllocator {
                 let mut excess = current - max_budget;
                 // Trim from lowest-agreement depths first
                 let mut indexed: Vec<(usize, f32)> = rates.iter().copied().enumerate().collect();
-                indexed.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
+                indexed.sort_by(|a, b| a.1.total_cmp(&b.1));
                 for (i, _) in indexed {
                     if excess == 0 {
                         break;

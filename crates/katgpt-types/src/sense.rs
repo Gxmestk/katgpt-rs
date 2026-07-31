@@ -3,15 +3,31 @@
 // ---------------------------------------------------------------------------
 // Shard Embedding — JL Random Orthogonal Projection (Plan 230)
 // ---------------------------------------------------------------------------
+// DEPRECATED (Issue 139, 2026-07-16): The JL projection at m=8 violates the
+// Johnson-Lindenstrauss lower bound by over 200× (needs m ≥ 554 for ε=0.5, n=100;
+// uses m=8). Empirically measures 1.4-6% NN preservation vs the documented
+// 90% target. Zero runtime consumers — BFCF uses region centroids, SenseModule
+// uses TernaryDir. The primitive is mathematically unsound as specified.
+// Option D (deprecate) chosen over Option B (PCA rescue) because PCA requires
+// a real-data intrinsic-rank measurement that cannot be done modellessly.
 
 /// Low-dimensional projection of NeuronShard style_weights for fast similarity search.
 /// Produced by Johnson-Lindenstrauss random orthogonal projection.
 /// 8 × f32 = 32 bytes — fits in cache line, suitable for SIMD cosine similarity.
 ///
 /// Plan 230: Shard Embedding Projection — modelless linear weight-to-vector.
+///
+/// # Deprecated
+///
+/// Mathematically unsound at m=8 — violates the JL lower bound by over 200×.
+/// See Issue 139 / Plan 230 close-out note.
+#[deprecated(
+    note = "JL projection at m=8 is mathematically unsound (Issue 139). Zero runtime consumers. Use region centroids for shard similarity."
+)]
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct ShardEmbedding(pub [f32; 8]);
 
+#[allow(deprecated)]
 impl ShardEmbedding {
     pub const ZERO: Self = Self([0.0; 8]);
     pub const DIM: usize = 8;
@@ -39,6 +55,7 @@ impl ShardEmbedding {
     }
 }
 
+#[allow(deprecated)]
 impl Default for ShardEmbedding {
     fn default() -> Self {
         Self::ZERO
@@ -46,6 +63,7 @@ impl Default for ShardEmbedding {
 }
 
 // Hash for use as HashMap key (bit-level, NOT semantic hash)
+#[allow(deprecated)]
 impl std::hash::Hash for ShardEmbedding {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         // Single write of all 32 bytes — fewer virtual calls than four write_u64.
@@ -53,6 +71,7 @@ impl std::hash::Hash for ShardEmbedding {
     }
 }
 
+#[allow(deprecated)]
 impl Eq for ShardEmbedding {}
 
 // ---------------------------------------------------------------------------
@@ -138,7 +157,7 @@ pub struct SenseModule {
 }
 
 impl SenseModule {
-    /// Project HLA state onto this module's ternary directions → sigmoid scalar.
+    /// Project belief state onto this module's ternary directions → sigmoid scalar.
     ///
     /// KG weight bridge: output is scaled by module confidence so that
     /// high-confidence KG triples produce stronger sense activations and
@@ -147,7 +166,7 @@ impl SenseModule {
     /// Optimized: branch-free bit extraction via shift+AND, flat loop
     /// (LLVM auto-vectorizes better than chunked), bounded exp sigmoid.
     #[inline(always)]
-    pub fn project(&self, hla_state: &[f32; 8]) -> f32 {
+    pub fn project(&self, belief_state: &[f32; 8]) -> f32 {
         let n = self.n_directions as usize;
         let mut dot = 0.0f32;
 
@@ -155,7 +174,7 @@ impl SenseModule {
         // bool-as-u32 then cast to f32 is zero-extend (no int-to-float conversion).
         // Zip iteration elides bounds checks on `self.directions[i]` (verified safe
         // by `n_directions ≤ 8` but the runtime bound `n` defeats LLVM's elision).
-        for (i, (hla_val, dir)) in hla_state
+        for (i, (belief_val, dir)) in belief_state
             .iter()
             .zip(self.directions.iter())
             .enumerate()
@@ -163,10 +182,10 @@ impl SenseModule {
         {
             let pos = ((dir.pos_bits >> i) & 1) as u32 as f32;
             let neg = ((dir.neg_bits >> i) & 1) as u32 as f32;
-            // sign ∈ {-1, 0, +1} — single FMA: dot += (sign * hla_val) * scale.
-            // sign * hla_val is computed first, then FMA-fused with scale + dot.
+            // sign ∈ {-1, 0, +1} — single FMA: dot += (sign * belief_val) * scale.
+            // sign * belief_val is computed first, then FMA-fused with scale + dot.
             let sign = pos - neg;
-            dot = (sign * hla_val).mul_add(dir.row_scale, dot);
+            dot = (sign * belief_val).mul_add(dir.row_scale, dot);
         }
 
         // Sigmoid * confidence — uses shared crate::simd::fast_sigmoid (bounded (0,1))

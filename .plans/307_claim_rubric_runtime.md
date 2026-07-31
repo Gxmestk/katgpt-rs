@@ -67,7 +67,7 @@ claim_rubric` (zero-dep baseline).
       < L3`, where `L0 = "no evidence"` is the auto-downgrade target).
       Derive `Ord, PartialOrd` so `Grade::max_satisfied()` is a one-liner.
 - [x] **T1.5** Implement `FeatureClass` re-export from `katgpt_core::traits`
-      (do not duplicate — same shim pattern as `src/pruners/feature_class.rs`).
+      (do not duplicate — same shim pattern as `crates/katgpt-pruners/src/feature_class.rs`).
 - [x] **T1.6** Encode the R287 §2.2 rubric as data:
       `EvidenceLevel::L1.requirements() -> &'static [EvidenceItemId]`,
       similarly L2 (inherits L1 + adds), L3 (inherits L2 + adds).

@@ -20,7 +20,7 @@
 //! convention and the user's `AGENTS.md` rule).
 
 use crate::clr::traits::{ClaimVerifier, DirectionVectorSource};
-use crate::clr::types::{Claim, Verdict};
+use crate::clr::types::Verdict;
 
 /// Sigmoid-projection verifier: `sigmoid(dot(emb, dir[idx]))`.
 ///
@@ -50,9 +50,12 @@ impl<'a> SigmoidProjectionVerifier<'a> {
 }
 
 impl<T> ClaimVerifier<T> for SigmoidProjectionVerifier<'_> {
-    /// Compute the sigmoid verdict for `claim` projected onto direction `idx`.
+    /// Compute the sigmoid verdict for `embedding` projected onto direction `idx`.
+    ///
+    /// This is the core computation. [`Self::verify`] delegates here via
+    /// `claim.embedding`.
     #[inline(always)]
-    fn verify(&self, claim: &Claim<T>, direction_idx: usize) -> Verdict {
+    fn verify_embedding(&self, embedding: &[f32], direction_idx: usize) -> Verdict {
         let d = self.directions.direction(direction_idx);
         debug_assert_eq!(
             d.len(),
@@ -62,14 +65,14 @@ impl<T> ClaimVerifier<T> for SigmoidProjectionVerifier<'_> {
             self.direction_dim
         );
         debug_assert_eq!(
-            claim.embedding.len(),
+            embedding.len(),
             self.direction_dim,
-            "SigmoidProjectionVerifier: claim embedding dim mismatch (got {}, expected {})",
-            claim.embedding.len(),
+            "SigmoidProjectionVerifier: embedding dim mismatch (got {}, expected {})",
+            embedding.len(),
             self.direction_dim
         );
         // SIMD dot on the full k-dim vectors.
-        let dot = katgpt_core::simd::simd_dot_f32(&claim.embedding, d, self.direction_dim);
+        let dot = katgpt_core::simd::simd_dot_f32(embedding, d, self.direction_dim);
         // Scalar sigmoid — single value, not a vector path; f32::exp is fine.
         sigmoid(dot)
     }
@@ -77,17 +80,24 @@ impl<T> ClaimVerifier<T> for SigmoidProjectionVerifier<'_> {
 
 /// Numerically stable logistic sigmoid: `1 / (1 + exp(-x))`.
 ///
+/// Delegates to [`katgpt_core::simd::fast_sigmoid`] (Cephes 6th-order polynomial
+/// for `exp`, ~1 ULP accurate, ~1.7× faster than libm `exp` on aarch64). The
+/// prior branching form avoided `(-x).exp()` overflow for very negative `x`;
+/// Cephes handles this by construction via its `n < -126` early-exit, so the
+/// branch is unnecessary. Result is in `(0, 1)` for all finite inputs.
+///
 /// Scalar path — for batched sigmoid over a slice, use
 /// `katgpt_core::simd::simd_exp_inplace` on a negated slice. We do NOT use softmax
 /// anywhere (per project convention).
 #[inline(always)]
 fn sigmoid(x: f32) -> f32 {
-    1.0 / (1.0 + (-x).exp())
+    katgpt_core::simd::fast_sigmoid(x)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::clr::types::Claim;
     use crate::clr::traits::DirectionVectorSource;
     use blake3::Hasher;
 

@@ -97,8 +97,8 @@ Replaces uniform candidate generation in any inference-time search with `sigmoid
 
 | `K̃` proxy | Source | Cost | When to use |
 |-----------|--------|------|-------------|
-| RLE compression ratio | `ruliology/irreducibility.rs` (R188) | sub-µs, SIMD-able | Discrete candidate sets (bandit arms, MCTS branches) |
-| Shannon entropy of byte-quantized latent | `ruliology/irreducibility.rs` (R188) | sub-µs | Latent vectors quantized to u8 |
+| RLE compression ratio | `crates/katgpt-ruliology/src/irreducibility.rs` (R188) | sub-µs, SIMD-able | Discrete candidate sets (bandit arms, MCTS branches) |
+| Shannon entropy of byte-quantized latent | `crates/katgpt-ruliology/src/irreducibility.rs` (R188) | sub-µs | Latent vectors quantized to u8 |
 | `‖θ‖_1` (weight norm) | R125 sandwich bound | already computed by AdamW | Adapter / LoRA selection |
 | lz4/gzip compression length | `compression_drafter` (R256) | µs-scale (Warm tier) | Long byte corpuses (quest grammars, NPC dialog) |
 | BLAKE3-canonical-encoding length | chain layer | ns-scale after hash | Cold-tier shard selection |
@@ -141,16 +141,16 @@ The latent-to-latent operation is the primary Super-GOAT framing. Adapter routin
 
 **On `cgsp_runtime/` curiosity** (`riir-ai/crates/riir-engine/src/cgsp_runtime/`): curiosity signal = `KL(p_sampled || p_K_prior)`. When the runtime samples a high-K candidate (deviating from the algorithmic-probability baseline), curiosity spikes. This unifies curiosity-driven exploration (R240 SGS) with algorithmic-probability sampling under one signal.
 
-**On `NeuronShard::style_weights[64]`** (`riir-neuron-db/src/shard.rs`): the per-zone K-prior is committed as part of the shard — BLAKE3-hashed, Merkle-tree-leaf, freeze/thaw-enveloped. The `(α, β)` scalars are stored alongside `style_weights` as part of the shard's "algorithmic-probability signature". Cold-tier retrieval uses K-prior to bias shard selection (`ShardCompactor` already operates on compressibility).
+**On `NeuronShard::style_weights[64]`** (`riir-neuron-db/src/shard/mod.rs`): the per-zone K-prior is committed as part of the shard — BLAKE3-hashed, Merkle-tree-leaf, freeze/thaw-enveloped. The `(α, β)` scalars are stored alongside `style_weights` as part of the shard's "algorithmic-probability signature". Cold-tier retrieval uses K-prior to bias shard selection (`ShardCompactor` already operates on compressibility).
 
 **On LatCal** (`riir-chain/src/encoding/latcal_fixed.rs`): the bridge from latent `(α, β)` to chain-committed raw scalars. `α_latcal = latcal_fixed::to_fixed(α)`, ditto `β`. These become part of the `MerkleFrozenEnvelope` and are quorum-committed. **Raw at sync, latent at runtime** — exactly the AGENTS.md sync-boundary rule.
 
-**On `sense/` HLA reconstruction** (`katgpt-rs/crates/katgpt-core/src/sense/reconstruction.rs`, `evolve_hla`): the existing per-NPC recurrent belief-state kernel becomes a *sampling* kernel — at each tick, candidate next-beliefs are sampled by `sigmoid(-α·K̃(v_candidate) - β)`, not by Gaussian noise. The same kernel that *evolves* belief also *biases* it toward low-K trajectories.
+**On `sense/` HLA reconstruction** (`katgpt-rs/crates/katgpt-sense/src/reconstruction.rs`, `evolve_hla`): the existing per-NPC recurrent belief-state kernel becomes a *sampling* kernel — at each tick, candidate next-beliefs are sampled by `sigmoid(-α·K̃(v_candidate) - β)`, not by Gaussian noise. The same kernel that *evolves* belief also *biases* it toward low-K trajectories.
 
 **Adapter routing / MCTS / speculative decode applications** (secondary framings):
 - `polytope_router.rs`: select adapter by K-prior over the polytope vertex weights.
 - `mcts.rs`: replace uniform child expansion with K-prior-weighted expansion.
-- `speculative/dendritic_gate.rs`: K-prior on candidate tokens (entropy already shipped as `entropy_f32` — K-prior is the deterministic companion).
+- `crates/katgpt-speculative/src/dendritic_gate.rs`: K-prior on candidate tokens (entropy already shipped as `entropy_f32` — K-prior is the deterministic companion).
 
 ### 2.4 What is genuinely new vs. the underlying Levin Search
 
@@ -174,7 +174,7 @@ The Super-GOAT novelty for our codebase is **not** "we invented algorithmic-prob
 | **Q1: No prior art?** | **YES** | Three-layer grep confirms: (a) `IrreducibilityGate` (R188, shipped) uses RLE as a *binary diagnostic*, not a sampling prior; (b) `CompressionDrafter` (R256, shipped) uses compression for *text generation only*, not general combinatorial search; (c) R125 (note only) is *theoretical*, no algorithm; (d) `DendriticGate` (R260) uses "coincidence" in a different sense (top-K agreement within a tree path, NMDA-inspired — *not* the Dingle–Hutter cross-objective theorem); (e) zero matches for `algorithmic_probability`, `levin_search`, `solomonoff`, `speed_prior`, `compression_prior` in any `.rs` file across all five repos. Coincidence-of-extrema as a runtime transfer primitive has no shipped or notes-level prior art. |
 | **Q2: New capability class?** | **YES** | A universal modelless sampling prior that subsumes MCTS expansion / bandit arm selection / speculative drafting / adapter routing under one theoretical frame, **plus** a theorem-backed cross-task transfer primitive (`CoincidenceGate`) that gives a *quantitative* exponential-over-random guarantee — replacing the empirical heuristics in R178 (Rosetta) and R231 (Sparse OPD). |
 | **Q3: Product selling point?** | **YES** | "Our NPCs find optimal behaviors exponentially faster than uniform search (algorithmic-probability-weighted sampling), with a theoretical safety guarantee of never being worse. Any one found skill is exponentially more likely to also be optimal for other simple tasks — a free transfer theorem that no competitor implements." Concretely: faster NPC skill discovery + free cross-task skill transfer, both with theoretical bounds. |
-| **Q4: Force multiplier?** | **YES** | Connects to ≥5 pillars: R188 (diagnostic→prior upgrade), R256 (text→general upgrade), R125 (theory→algorithm upgrade), R218 (breakeven always wins), R178/R231 (empirical→theoretical cross-task). Touches 4 of 6 Super-GOAT factory modules: `sense/` (HLA K-prior), `latent_functor/` (C-matrix K-prior via `dirichlet_energy`), `cgsp_runtime/` (curiosity = KL surplus), `neuron-db/src/shard.rs` (BLAKE3-committed K-prior), `chain/src/encoding/latcal_fixed.rs` (raw bridge). |
+| **Q4: Force multiplier?** | **YES** | Connects to ≥5 pillars: R188 (diagnostic→prior upgrade), R256 (text→general upgrade), R125 (theory→algorithm upgrade), R218 (breakeven always wins), R178/R231 (empirical→theoretical cross-task). Touches 4 of 6 Super-GOAT factory modules: `sense/` (HLA K-prior), `latent_functor/` (C-matrix K-prior via `dirichlet_energy`), `cgsp_runtime/` (curiosity = KL surplus), `neuron-db/src/shard.rs` (BLAKE3-committed K-prior), `riir-chain/src/encoding/latcal_fixed.rs` (raw bridge). |
 
 **One-line reasoning:** the paper converts five existing shipped-but-narrow primitives (IrreducibilityGate diagnostic, CompressionDrafter text-only, Weight-Norm-K theoretical, Rosetta empirical, Sparse-OPD observational) into one universal sampler + one theorem-backed transfer gate, with the latent-to-latent reframing on HLA / functor / shard as the primary Super-GOAT framing and the sync-boundary bridge via LatCal as the chain commitment path.
 
@@ -185,7 +185,7 @@ The Super-GOAT novelty for our codebase is **not** "we invented algorithmic-prob
 Two new modules in `katgpt-rs/src/screening/`:
 
 ```rust
-//katgpt-rs/src/screening/complexity_prior.rs
+crates/katgpt-pruners/src/screening/complexity_prior.rs
 pub trait ComplexityProxy {
     /// O(1) or O(n) computable K̃(x). Lower = simpler.
     fn k_tilde<T: AsRef<[u8]>>(&self, candidate: T) -> f32;
@@ -217,7 +217,7 @@ impl<K: ComplexityProxy> CompressionPriorSampler<K> {
     pub fn top_k(&self, candidates: &[&[u8]], k: usize, out: &mut [usize]);
 }
 
-//katgpt-rs/src/screening/coincidence_gate.rs
+crates/katgpt-pruners/src/screening/coincidence_gate.rs
 pub struct CoincidenceGate {
     /// Threshold τ on |X_O(1)| estimate. Above τ → optimistic transfer probe.
     /// Below τ → skip (treat as random).

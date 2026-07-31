@@ -71,7 +71,7 @@ FMLM★ achieves SOTA among entropy-preserving (≈5.44 nats) few-step baselines
 
 | FMLM mechanism | Shipped cousin | File / Plan |
 |---|---|---|
-| **Iterated fixed-point block** (the entire §3.2 mechanism — `z_{j+1} = D̂(x, z_j)`) | `LoopMode::WeightShared { loop_count }` — default-on, GOAT 8/8 | Plan 108, `crates/katgpt-core/src/types.rs`, `forward_looped` |
+| **Iterated fixed-point block** (the entire §3.2 mechanism — `z_{j+1} = D̂(x, z_j)`) | `LoopMode::WeightShared { loop_count }` — default-on, GOAT 8/8 | Plan 108, `crates/katgpt-types/src/lib.rs`, `forward_looped` |
 | ODE-motivated iterated block (strictly more general than Picard FP) | `LoopMode::TrainingFree` + `TrainingFreeLoopConfig` (K-stage RK β=0.5) — default-on, GOAT 4/4 | Plan 136, `tf_loop` |
 | **FP convergence halt** (Prop 3.5 iteration count) | `ResidualRelevanceScorer.is_converged` — default-on, GOAT 6/6 | Plan 085, `manifold_residual.rs` |
 | **Self-conditioning** (the z = sg(D(x,0)) trick) | `self_cond_draft` — 2-pass self-conditioned speculative draft (pass 1 → estimate → pass 2 with SC) | Plan 222, `critical_interval_gate` + `self_cond_draft` feature |
@@ -105,7 +105,7 @@ The ONE finding in FMLM not explicitly stated in CoFRe (R265) or Research 344:
 Re-casting the FP mechanism as a latent-to-latent op on the seven Super-GOAT factory modules:
 
 - **(a) HLA per-NPC latent state:** running HLA's `evolve_hla` as a FP iteration = exactly what Plan 276 (AttractorKernel) tried and **null-resulted** (Research 344 §3.2: *"random-init attractors flip-flop, G2.1 coherence FAIL 569× flip-flops vs leaky"*, *"the paper's RNN-equivalence requires trained dynamics; per-NPC deliberation via FP would require a trained attractor per NPC, which doesn't scale to 10k NPCs"*). Dead end.
-- **(b) `latent_functor/reestimation.rs`:** already ships "coherence-driven re-estimation when coherence < tau_reest" — a *triggered* re-derivation, not a FP iteration. Different mechanism; no fusion gain.
+- **(b) `riir-ai/crates/riir-engine/src/latent_functor/reestimation/mod.rs`:** already ships "coherence-driven re-estimation when coherence < tau_reest" — a *triggered* re-derivation, not a FP iteration. Different mechanism; no fusion gain.
 - **(c) `cgsp_runtime/` curiosity:** not a FP-on-a-denoiser mechanism.
 - **(d) LatCal fixed-point:** a *numeric format* for deterministic chain commitment (raw scalar bridge), NOT a functional FP iteration. Completely different sense of "fixed-point."
 - **(e) NeuronShard consolidation:** sleep-cycle consolidation toward a stable shard is FP-*ish* but already shipped (Raven/δ-Mem) and is a different mechanism (experience replay averaging, not Picard iteration on a function).

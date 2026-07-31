@@ -7,6 +7,7 @@
 > **Related Research:** 325 (Survey gap G5 — this note closes it), 019 (TTT-Discover — closest gradient-on-weights cousin, NO-GAIN), 124 (ViTTT — vision TTT, NO-GAIN), 284/255 (CLR open primitive — modelless analog), 136 (riir-ai Per-NPC CLR Runtime — modelless test-time scaling), 240 (CGSP — curiosity host), 123 (riir-ai Latent Functor Runtime Guide — coherence-driven re-estimation cousin)
 > **Related Plans:** none (no new primitive — modelless analog already ships)
 > **Classification:** Public
+> **PASS-Redirects (synthesis):** Zhang et al. [arXiv:2605.02735 "Visual Latents Know More Than They Say: Unsilencing Latent Reasoning in MLLMs"] — **PASS**. Same class as LATENTSEEK: frozen-backbone test-time per-instance latent optimization via a reward signal on H (paper uses NES gradient estimator `H_{i+1} = H_i + ασ²·R(H̃)·ε`; derivative-free bandit search → RandOpt R080 pattern). Stage I (query-guided contrastive latent–visual alignment with chunk-wise disjoint pos/neg patch sets) decomposes modellessly to the closed-form argmin of InfoNCE = mean-difference direction vector (CNA Plan 087 + Latent Field Steering Plan 309 + CHaRS Plan 409 — shipped). Stage II (monotone output-distribution entropy decrease along the latent span, `E(h_{k+1}) ≤ E(h_k)`) is **genuinely unshipped as a named primitive** — earlier draft of this cross-ref incorrectly cited Progressive MCGS (Plan 272) as coverage, but that decays *branch-selection* entropy over *search time*, a different axis. The Stage II primitive is trivially constructable (one sigmoid gate per position with monotone scalar schedule `1 − k/K·α`) and tracks in `.issues/` if a sequential-latent consumer materializes; today no consumer needs it (HLA/functor/CLR paths are single-state, not latent sequences). The generalized "silenced channel" pathology (latent exists but isn't load-bearing in the decision path) is covered architecturally by `FaithfulnessProbe` (Plan 278) — causal intervention (zero the channel, measure decision change); the paper's specific MLLM-visual observation is N/A.
 
 ---
 
@@ -16,7 +17,7 @@ LATENTSEEK does test-time instance-level adaptation (TTIA) by running **REINFORC
 
 **Distilled for katgpt-rs (modelless, inference-time):** **No new primitive.** The §3.5 modelless-unblock check succeeds: the *deterministic-construct modelless analog* of LATENTSEEK's reward-guided latent refinement is **already shipped** across three modules —
 1. `cgsp_runtime` (`riir-ai`) — runtime curiosity-guided self-play with `solve_rate = sigmoid(sharpness · dot(candidate, target))` priority-table updates (no gradient).
-2. `latent_functor/reestimation.rs` (`riir-ai`) — coherence-driven re-estimation scheduler that recomputes direction vectors when `coherence < tau_reest` and atomically swaps BLAKE3-committed entries (no gradient).
+2. `riir-ai/crates/riir-engine/src/latent_functor/reestimation/mod.rs` (`riir-ai`) — coherence-driven re-estimation scheduler that recomputes direction vectors when `coherence < tau_reest` and atomically swaps BLAKE3-committed entries (no gradient).
 3. CLR Per-NPC Runtime Test-Time Scaling (R136/R284) — nonlinear reliability voting `(mean(v))^M` over M dot-product + sigmoid claim checks against BLAKE3-committed direction vectors (no gradient).
 
 The one transferable *theoretical* insight is LATENTSEEK's **independence assumption** (§2.2, §C.2): treating latent positions as independent provably enlarges the exploration space vs. autoregressive conditioning, and the MIP-Bounded = MIP = NEXP complexity argument (Thm C.10, C.11) bounds the loss. This is a *justification* for our existing per-position dot-product + sigmoid direction-vector approach (CLR, Salience Tri-Gate, latent_functor) — not a new mechanism.
@@ -104,7 +105,7 @@ YES — and we already ship three independent instances of this replacement:
 | LATENTSEEK component | Modelless analog (shipped) | Mechanism |
 |---|---|---|
 | `z ← z + η∇_z J(z)` (per-position gradient ascent) | `cgsp_runtime` priority-table update (`riir-ai/crates/riir-engine/src/cgsp_runtime/`) | `solve_rate = sigmoid(sharpness · dot(candidate, target))`; bandit absorbs rewards into priority table; NO gradient |
-| Reward-guided latent refinement loop | `latent_functor/reestimation.rs` ("coherence-driven re-estimation scheduler") | When `coherence < tau_reest`, recompute direction vector from fresh observations, atomic swap with new `Uuid::now_v7()` snapshot + BLAKE3 commitment; NO gradient |
+| Reward-guided latent refinement loop | `riir-ai/crates/riir-engine/src/latent_functor/reestimation/mod.rs` ("coherence-driven re-estimation scheduler") | When `coherence < tau_reest`, recompute direction vector from fresh observations, atomic swap with new `Uuid::now_v7()` snapshot + BLAKE3 commitment; NO gradient |
 | Self-reward `R(x,c) ∼ π(·|x,c,prompt)` evaluating trajectory quality | CLR Per-NPC Runtime Test-Time Scaling (R136/R284, riir-ai Plan 316) | Sample K candidates → extract M claims → `v[k][m] = sigmoid(dot(claim_vec, direction_vec))` → reliability `r[k] = pow(mean_m v[k][m], M)` → vote; NO gradient |
 
 **Path 3 SUCCEEDS — modelless-validable.** The deterministic-construct modelless analog of LATENTSEEK already ships. No new primitive needed.
@@ -134,7 +135,7 @@ Following the fusion protocol (§Workflow step 1), I grepped all five repos (bot
 **Closest cousins (in priority order):**
 
 1. **R136 (riir-ai) + R284/255 (katgpt-rs) — CLR Per-NPC Runtime Test-Time Scaling.** This IS the modelless analog of LATENTSEEK. Same paradigm (test-time instance-level adaptation, no weight updates), same shape (sample K candidates, score with reward-like signal, vote/refine), different mechanism (dot-product + sigmoid + nonlinear reliability voting vs. REINFORCE gradient). **Fusion: redundant — already shipped.**
-2. **R123 (riir-ai) — Latent Functor Runtime Guide + `latent_functor/reestimation.rs`.** Coherence-driven re-estimation is the modelless analog of LATENTSEEK's iterative latent refinement. Same trigger (reward/coherence signal crosses threshold), different update (recompute from observations vs. gradient step). **Fusion: redundant — already shipped.**
+2. **R123 (riir-ai) — Latent Functor Runtime Guide + `riir-ai/crates/riir-engine/src/latent_functor/reestimation/mod.rs`.** Coherence-driven re-estimation is the modelless analog of LATENTSEEK's iterative latent refinement. Same trigger (reward/coherence signal crosses threshold), different update (recompute from observations vs. gradient step). **Fusion: redundant — already shipped.**
 3. **R019 — TTT-Discover.** Closest *gradient-on-weights* cousin. Explicitly concluded NO-GAIN because per-query full-LoRA training at test time ($500/problem) is not production-viable. LATENTSEEK is cheaper (LM-head backward only) but still 4 orders of magnitude too slow for 20Hz tick. **Fusion: already declined.**
 4. **R124 — ViTTT.** Vision TTT. Explicitly NO-GAIN — vision-specific, causal-mismatch, no game-domain connection. **Fusion: already declined.**
 5. **R240 — CGSP (Curiosity-Guided Self-Play).** The runtime host for curiosity-driven exploration. Already integrated with CLR (R136 §1.2 step 7) and latent_functor (R123). **Fusion: already integrated.**
@@ -203,7 +204,7 @@ The reframing confirms: **the latent-to-latent operation LATENTSEEK performs is 
 - **Survey 325 §7.2 gap G5** — closed by this note.
 - **R019 (TTT-Discover)**, **R124 (ViTTT)** — closest gradient-on-weights / vision-TTT cousins, both NO-GAIN.
 - **R136 (riir-ai CLR Per-NPC Runtime) + R284/255 (katgpt-rs CLR open primitive)** — the modelless analog that already ships.
-- **R123 (riir-ai Latent Functor Runtime Guide)** + `latent_functor/reestimation.rs` — coherence-driven re-estimation, the iterative-refinement modelless analog.
+- **R123 (riir-ai Latent Functor Runtime Guide)** + `riir-ai/crates/riir-engine/src/latent_functor/reestimation/mod.rs` — coherence-driven re-estimation, the iterative-refinement modelless analog.
 - **R240 (CGSP)** — curiosity-guided self-play host.
 - **R281 (Salience Tri-Gate)** — another per-position independence design that LATENTSEEK §C.2 justifies theoretically.
 

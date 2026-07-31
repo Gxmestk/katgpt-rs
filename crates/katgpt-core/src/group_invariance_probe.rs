@@ -70,6 +70,36 @@
 //!
 //! `group_invariance_probe` — opt-in. Pure numeric substrate, no extra
 //! deps. Sibling of `subspace_phase_gate`.
+//!
+//! # Commutant basis (closed-form alternative to discovery)
+//!
+//! When the group's commutant `C(G) = {W : WU = UW ∀ U ∈ G}` has a known
+//! closed form (finite, permutation, or shift groups), the
+//! [`commutant_of_matrices`] / [`commutant_binary_association`] /
+//! [`commutant_shift`] constructors compute the invariant-operator basis
+//! directly in `O(m · d⁴)` — exact, deterministic, no sampling noise.
+//! Distilled from IMIR (Musat et al., arXiv:2607.11875, 2026;
+//! see `katgpt-rs/.research/444_Invariant_Manifold_Inductive_Reasoning_IMIR.md`).
+//!
+//! **When to use which:**
+//! - **[`discover_subgroup_into`]** — general case: you have a [`GroupAction`]
+//!   and want to *classify* the discovered subgroup
+//!   (Discrete/Continuous/Partial/None) from sampled invariance scores.
+//!   MC-based, `O(n_samples · d²)`, gives a classification + diagnostics.
+//!   Works on any group — including continuous Lie groups where the
+//!   commutant has no finite closed form.
+//! - **[`commutant_of_matrices`]** — you have explicit generator matrices and
+//!   want the exact invariant-operator basis. `O(m · d⁴)`, deterministic.
+//!   Best for finite/permutation groups where generators are known.
+//! - **[`commutant_basis`]** — bridges [`GroupAction`] to generator matrices
+//!   via sampling + basis-vector probing, then calls [`commutant_of_matrices`].
+//!   Combines MC sampling with exact linear algebra. Exact only if samples
+//!   generate the full group (high probability for finite groups with
+//!   `n_samples ≥ 2 · |G|`).
+//! - **[`commutant_binary_association`] / [`commutant_shift`]** —
+//!   paper-specific closed forms from IMIR §3.2. No sampling, no linear
+//!   system — direct construction. Use when the group matches one of these
+//!   known structures.
 
 // ── Invariance score ───────────────────────────────────────────────────────
 
@@ -95,18 +125,10 @@
 /// indifference.
 #[inline]
 pub fn invariance_score(distance: f32, beta: f32) -> f32 {
-    // σ(β·(1 − d)). Inline sigmoid to avoid the `simd` module dependency
-    // from this pure-numeric substrate; the call site is not on a SIMD
-    // hot path.
+    // σ(β·(1 − d)). Uses the codebase-wide Cephes-backed fast_sigmoid
+    // (~1 ULP accurate, ~1.7× faster than libm exp on aarch64).
     let x = beta * (1.0 - distance);
-    // Numerically stable sigmoid (matches `simd::fast_sigmoid` semantics).
-    if x >= 0.0 {
-        let z = (-x).exp();
-        1.0 / (1.0 + z)
-    } else {
-        let z = x.exp();
-        z / (1.0 + z)
-    }
+    crate::simd::fast_sigmoid(x)
 }
 
 // ── Score variance (the discrete-vs-continuous classifier) ───────────────
@@ -594,10 +616,352 @@ where
     }
 }
 
+// ── Commutant basis (closed-form alternative to discovery) ─────────────────
+//
+// Distilled from IMIR (Musat et al., arXiv:2607.11875, 2026; R444). The
+// paper proves that the invariant operator basis of a data-symmetry group
+// is its *commutant* — the set of matrices that commute with every group
+// element. For finite/permutation/shift groups this has a closed form;// for general groups it reduces to a null-space computation on the
+// constraint WU = UW.
+
+/// A row-major `d × d` matrix of `f32`.
+pub type Matrix = Vec<Vec<f32>>;
+
+/// Compute the commutant basis `C(G) = {W : WU = UW ∀ U ∈ G}` from explicit
+/// generator matrices.
+///
+/// This is the **closed-form alternative** to [`discover_subgroup_into`]:
+/// instead of sampling `g ∈ G` and scoring invariance stochastically, we
+/// directly solve the linear system `WU = UW` for all generator matrices `U`.
+/// For finite/permutation groups this is exact; for continuous groups the
+/// caller should supply Lie-algebra generators (the commutant of the Lie
+/// algebra equals the commutant of the connected component of the group).
+///
+/// Distilled from IMIR (Musat et al., arXiv:2607.11875, 2026;
+/// see `katgpt-rs/.research/444_...`) and LieFlow (R355).
+///
+/// # Arguments
+///
+/// * `generators` — a generating set of `d × d` matrices for the group `G`.
+///   Need not be the full group — a generating set suffices (the commutant
+///   of `<generators>` equals the commutant of the group they generate).
+///   If empty, returns the full `Mat_{d×d}` standard basis (no constraints).
+/// * `d` — ambient dimension (each matrix is `d × d`).
+///
+/// # Returns
+///
+/// A basis `{W_1, ..., W_r}` for the commutant, where `r = dim C(G)`. Each
+/// `W_i` is a `d × d` matrix. The basis is RREF-derived (coefficients are
+/// exact 0/1/rationals approximated by f32).
+///
+/// # Complexity
+///
+/// `O(m · d⁴)` where `m = generators.len()`. Building the constraint matrix
+/// produces `m · d²` rows × `d²` columns; Gaussian elimination is
+/// `O(m · d⁴)`. Practical for `d ≤ 64`.
+pub fn commutant_of_matrices(generators: &[Matrix], d: usize) -> Vec<Matrix> {
+    if d == 0 {
+        return Vec::new();
+    }
+    if generators.is_empty() {
+        // No constraints → full Mat_{d×d}. Return standard basis {E_{ij}}.
+        let mut basis = Vec::with_capacity(d * d);
+        for i in 0..d {
+            for j in 0..d {
+                let mut e = vec![vec![0.0_f32; d]; d];
+                e[i][j] = 1.0;
+                basis.push(e);
+            }
+        }
+        return basis;
+    }
+
+    // Build constraint matrix A for vec(W): each generator U contributes
+    // d² rows (one per (i,j) entry of WU - UW = 0).
+    //   (WU - UW)_{ij} = Σ_k W_{ik}·U_{kj} − Σ_k U_{ik}·W_{kj}
+    // With vec(W)[i*d + j] = W_{ij}, the row for (i,j) of generator g is:
+    //   +U[k][j] at column (i*d + k)  for each k
+    //   −U[i][k] at column (k*d + j)  for each k
+    let n_cols = d * d;
+    let n_rows = generators.len() * n_cols;
+    let mut a = vec![vec![0.0_f32; n_cols]; n_rows];
+
+    for (gen_idx, u) in generators.iter().enumerate() {
+        for i in 0..d {
+            for j in 0..d {
+                let row = gen_idx * n_cols + i * d + j;
+                for k in 0..d {
+                    a[row][i * d + k] += u[k][j]; // from Σ_k W_{ik} U_{kj}
+                    a[row][k * d + j] -= u[i][k]; // from −Σ_k U_{ik} W_{kj}
+                }
+            }
+        }
+    }
+
+    // Find null space of A, reshape each d²-vector to d×d.
+    null_space(&mut a, n_cols)
+        .into_iter()
+        .map(|v| {
+            let mut w = vec![vec![0.0_f32; d]; d];
+            for i in 0..d {
+                for j in 0..d {
+                    w[i][j] = v[i * d + j];
+                }
+            }
+            w
+        })
+        .collect()
+}
+
+/// Compute the commutant basis by sampling group elements from a
+/// [`GroupAction`], reconstructing their matrix representations, and
+/// solving the commutant linear system.
+///
+/// This bridges the [`GroupAction`] trait (which exposes `act` on vectors
+/// but not the matrix form) by probing with standard basis vectors:
+/// `U[:, i] = g · e_i`. After reconstructing `n_samples` generator matrices,
+/// delegates to [`commutant_of_matrices`].
+///
+/// Distilled from IMIR (Musat et al., arXiv:2607.11875, 2026; R444).
+///
+/// # Caveat
+///
+/// The result is exact only if the sampled elements generate the full
+/// group (for finite groups) or a generating set of the Lie algebra (for
+/// continuous groups). For small finite groups, `n_samples ≥ 2·|G|`
+/// suffices with high probability. For continuous groups, prefer
+/// [`commutant_of_matrices`] with explicit Lie-algebra generators.
+///
+/// # Complexity
+///
+/// `O(n_samples · d²)` for matrix reconstruction + `O(n_samples · d⁴)`
+/// for the linear solve.
+pub fn commutant_basis<U: GroupAction>(
+    group: &U,
+    d: usize,
+    n_samples: usize,
+    rng: &mut impl Rng,
+) -> Vec<Matrix> {
+    if d == 0 || n_samples == 0 {
+        return commutant_of_matrices(&[], d);
+    }
+
+    let mut generators: Vec<Matrix> = Vec::with_capacity(n_samples);
+    let mut basis_vec = vec![0.0_f32; d];
+    let mut e = vec![0.0_f32; d];
+
+    for _ in 0..n_samples {
+        let g = group.sample(rng);
+        let mut u = vec![vec![0.0_f32; d]; d];
+        for col in 0..d {
+            e.iter_mut().for_each(|x| *x = 0.0);
+            e[col] = 1.0;
+            group.act(&g, &e, &mut basis_vec);
+            for row in 0..d {
+                u[row][col] = basis_vec[row];
+            }
+        }
+        generators.push(u);
+    }
+
+    commutant_of_matrices(&generators, d)
+}
+
+/// Closed-form commutant of the **binary-association permutation group**.
+///
+/// Given a set of token associations `(a_i, b_i)`, the commutant (on
+/// centered vectors) is `span{I, C}` where `C` is the association matrix:
+/// `C[a_i][b_i] = C[b_i][a_i] = 1` for each association pair, and
+/// `C[j][j] = 1` for tokens not in any association.
+///
+/// Distilled from IMIR §3.2 (Musat et al., arXiv:2607.11875, 2026; R444).
+///
+/// # Arguments
+///
+/// * `associations` — pairs of associated token indices. Each pair `(a, b)`
+///   means token `a` associates with token `b` (and vice versa).
+/// * `d` — token vocabulary size (matrix dimension).
+///
+/// # Returns
+///
+/// A fixed array `[I, C]` of two `d × d` matrices: the identity and the
+/// association matrix.
+pub fn commutant_binary_association(associations: &[(usize, usize)], d: usize) -> [Matrix; 2] {
+    // Identity.
+    let mut identity = vec![vec![0.0_f32; d]; d];
+    for (i, row) in identity.iter_mut().enumerate() {
+        row[i] = 1.0;
+    }
+
+    // Association matrix C: swap associated pairs, fix unassociated tokens.
+    let mut c = vec![vec![0.0_f32; d]; d];
+    for (i, row) in c.iter_mut().enumerate() {
+        row[i] = 1.0; // default: self-map
+    }
+    for &(a, b) in associations {
+        debug_assert!(
+            a < d && b < d,
+            "association ({}, {}) out of range for d={}",
+            a,
+            b,
+            d
+        );
+        c[a][a] = 0.0; // clear diagonal
+        c[b][b] = 0.0;
+        c[a][b] = 1.0; // cross-map
+        c[b][a] = 1.0;
+    }
+
+    [identity, c]
+}
+
+/// Closed-form commutant of the **k-step cyclic shift group** on `ℝᵈ`.
+///
+/// Returns `{I, M, M², ..., M^{k-1}}` where `M` is the `d × d` cyclic shift
+/// matrix: `M[i][(i+1) % d] = 1`. These are circulant matrices and form the
+/// commutant of the cyclic group `C_d`. For `k = d` this is the full
+/// commutant (dimension `d`); for `k < d` it is a subset.
+///
+/// Distilled from IMIR §3.2 (Musat et al., arXiv:2607.11875, 2026; R444).
+///
+/// # Arguments
+///
+/// * `k` — number of circulant powers to return (must be `≤ d`).
+/// * `d` — ambient dimension.
+pub fn commutant_shift(k: usize, d: usize) -> Vec<Matrix> {
+    debug_assert!(d > 0, "d must be > 0");
+    debug_assert!(k <= d, "k ({}) must be ≤ d ({})", k, d);
+
+    let k = k.min(d);
+    if k == 0 {
+        return Vec::new();
+    }
+
+    // Build shift matrix M: cyclic shift by 1.
+    let mut shift = vec![vec![0.0_f32; d]; d];
+    for i in 0..d {
+        shift[i][(i + 1) % d] = 1.0;
+    }
+
+    let mut result = Vec::with_capacity(k);
+    // M^0 = I.
+    let mut identity = vec![vec![0.0_f32; d]; d];
+    for (i, row) in identity.iter_mut().enumerate() {
+        row[i] = 1.0;
+    }
+    result.push(identity);
+
+    // M^1, M^2, ..., M^{k-1} by repeated multiplication.
+    let mut current = shift.clone();
+    for _ in 1..k {
+        result.push(current.clone());
+        current = mat_mul(&current, &shift, d);
+    }
+
+    result
+}
+
+/// `d × d` matrix multiplication. Private helper.
+fn mat_mul(a: &[Vec<f32>], b: &[Vec<f32>], d: usize) -> Matrix {
+    let mut result = vec![vec![0.0_f32; d]; d];
+    for i in 0..d {
+        for j in 0..d {
+            let mut sum = 0.0_f32;
+            for k in 0..d {
+                sum += a[i][k] * b[k][j];
+            }
+            result[i][j] = sum;
+        }
+    }
+    result
+}
+
+/// Null space of `A` (modified in place to RREF). Returns basis vectors for
+/// `{x ∈ ℝⁿ : Ax = 0}` where `n = n_cols`.
+///
+/// Uses Gaussian elimination with partial pivoting (f32). For matrices with
+/// integer/rational entries (permutation matrices, etc.) the arithmetic is
+/// exact in f32.
+fn null_space(a: &mut [Vec<f32>], n_cols: usize) -> Vec<Vec<f32>> {
+    let n_rows = a.len();
+    if n_rows == 0 || n_cols == 0 {
+        // No constraints → null space is all of ℝ^{n_cols}.
+        let mut basis = Vec::with_capacity(n_cols);
+        for j in 0..n_cols {
+            let mut v = vec![0.0_f32; n_cols];
+            v[j] = 1.0;
+            basis.push(v);
+        }
+        return basis;
+    }
+
+    // Gaussian elimination with partial pivoting → RREF.
+    let mut pivot_cols: Vec<usize> = Vec::new();
+    let mut pivot_row = 0usize;
+
+    for col in 0..n_cols {
+        if pivot_row >= n_rows {
+            break;
+        }
+        // Find pivot: largest |a[r][col]| for r >= pivot_row.
+        let mut max_row = pivot_row;
+        let mut max_val = a[pivot_row][col].abs();
+        for (r, row) in a.iter().enumerate().take(n_rows).skip(pivot_row + 1) {
+            let val = row[col].abs();
+            if val > max_val {
+                max_val = val;
+                max_row = r;
+            }
+        }
+        if max_val < 1e-9 {
+            continue; // free column — no pivot
+        }
+        // Swap pivot_row ↔ max_row.
+        a.swap(pivot_row, max_row);
+        // Scale pivot row so pivot = 1.
+        let pivot_val = a[pivot_row][col];
+        for entry in a[pivot_row].iter_mut().take(n_cols).skip(col) {
+            *entry /= pivot_val;
+        }
+        // Eliminate all other rows.
+        let pivot_row_data: Vec<f32> = a[pivot_row][col..n_cols].to_vec();
+        for (r, row) in a.iter_mut().enumerate() {
+            if r == pivot_row {
+                continue;
+            }
+            let factor = row[col];
+            if factor.abs() < 1e-12 {
+                continue;
+            }
+            for (c, entry) in row.iter_mut().take(n_cols).skip(col).enumerate() {
+                *entry -= factor * pivot_row_data[c];
+            }
+        }
+        pivot_cols.push(col);
+        pivot_row += 1;
+    }
+
+    // Free columns → null space basis vectors.
+    let free_cols: Vec<usize> = (0..n_cols).filter(|c| !pivot_cols.contains(c)).collect();
+
+    let mut basis = Vec::with_capacity(free_cols.len());
+    for &free_col in &free_cols {
+        let mut v = vec![0.0_f32; n_cols];
+        v[free_col] = 1.0;
+        // For each pivot row: v[pivot_col] = −a[row][free_col].
+        for (row_idx, &pivot_col) in pivot_cols.iter().enumerate() {
+            v[pivot_col] = -a[row_idx][free_col];
+        }
+        basis.push(v);
+    }
+    basis
+}
+
 // ── Tests ──────────────────────────────────────────────────────────────────
 
 #[cfg(test)]
 #[cfg(feature = "group_invariance_probe")]
+#[allow(clippy::needless_range_loop)]
 mod tests {
     use super::*;
 
@@ -833,5 +1197,231 @@ mod tests {
             "max score should be >0.95 (C₄ shifts give d=0), got {}",
             report.max_score
         );
+    }
+
+    // ── commutant_basis tests (Issue 157 T3) ─────────────────────────────
+
+    /// Helper: verify two d×d matrices commute (WU ≈ UW).
+    fn assert_commute(w: &[Vec<f32>], u: &[Vec<f32>], d: usize, tol: f32) {
+        let wu = mat_mul(w, u, d);
+        let uw = mat_mul(u, w, d);
+        for i in 0..d {
+            for j in 0..d {
+                assert!(
+                    (wu[i][j] - uw[i][j]).abs() < tol,
+                    "matrices don't commute at ({},{}): WU={} UW={}",
+                    i,
+                    j,
+                    wu[i][j],
+                    uw[i][j]
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn commutant_binary_association_returns_identity_and_c() {
+        let d = 5;
+        let basis = commutant_binary_association(&[(0, 3), (1, 4)], d);
+        assert_eq!(basis.len(), 2);
+
+        // First element = identity.
+        for i in 0..d {
+            for j in 0..d {
+                let expected = if i == j { 1.0 } else { 0.0 };
+                assert!((basis[0][i][j] - expected).abs() < 1e-6);
+            }
+        }
+
+        // Second element = association matrix C.
+        // partner(0)=3, partner(3)=0, partner(1)=4, partner(4)=1, partner(2)=2.
+        let partner = |i: usize| -> usize {
+            match i {
+                0 => 3,
+                3 => 0,
+                1 => 4,
+                4 => 1,
+                2 => 2,
+                _ => unreachable!(),
+            }
+        };
+        for i in 0..d {
+            for j in 0..d {
+                let expected = if j == partner(i) { 1.0 } else { 0.0 };
+                assert!(
+                    (basis[1][i][j] - expected).abs() < 1e-6,
+                    "C[{}][{}] = {}, expected {}",
+                    i,
+                    j,
+                    basis[1][i][j],
+                    expected
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn commutant_binary_association_c_is_involution() {
+        // C² = I (the association matrix is self-inverse).
+        let d = 6;
+        let basis = commutant_binary_association(&[(0, 5), (1, 3), (2, 4)], d);
+        let c = &basis[1];
+        let cc = mat_mul(c, c, d);
+        for i in 0..d {
+            for j in 0..d {
+                let expected = if i == j { 1.0 } else { 0.0 };
+                assert!(
+                    (cc[i][j] - expected).abs() < 1e-5,
+                    "C² should be identity at ({},{})",
+                    i,
+                    j
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn commutant_shift_returns_circulant_powers() {
+        let d = 4;
+        let basis = commutant_shift(d, d);
+        assert_eq!(basis.len(), d); // k=d → d powers
+
+        // M^0 = I.
+        for i in 0..d {
+            for j in 0..d {
+                let expected = if i == j { 1.0 } else { 0.0 };
+                assert!((basis[0][i][j] - expected).abs() < 1e-6);
+            }
+        }
+
+        // M^1 = cyclic shift: M[i][(i+1)%d] = 1.
+        for i in 0..d {
+            for j in 0..d {
+                let expected = if j == (i + 1) % d { 1.0 } else { 0.0 };
+                assert!((basis[1][i][j] - expected).abs() < 1e-6);
+            }
+        }
+    }
+
+    #[test]
+    fn commutant_shift_cyclic_identity() {
+        // M^d = I (cyclic group of order d).
+        let d = 5;
+        let basis = commutant_shift(d, d);
+        let m_d = mat_mul(&basis[d - 1], &basis[1], d);
+        for i in 0..d {
+            for j in 0..d {
+                let expected = if i == j { 1.0 } else { 0.0 };
+                assert!(
+                    (m_d[i][j] - expected).abs() < 1e-5,
+                    "M^d should be identity at ({},{})",
+                    i,
+                    j
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn commutant_shift_basis_commutes_with_shift() {
+        // Every circulant power M^a should commute with M^1.
+        let d = 6;
+        let basis = commutant_shift(d, d);
+        let shift = &basis[1];
+        for w in &basis {
+            assert_commute(w, shift, d, 1e-5);
+        }
+    }
+
+    #[test]
+    fn commutant_of_matrices_cyclic_group_is_circulant() {
+        // The commutant of a single cyclic shift generator on ℝ^d is the
+        // circulant algebra of dimension d.
+        let d = 4;
+        let mut shift = vec![vec![0.0_f32; d]; d];
+        for i in 0..d {
+            shift[i][(i + 1) % d] = 1.0;
+        }
+        let generators = vec![shift.clone()];
+        let basis = commutant_of_matrices(&generators, d);
+
+        assert_eq!(
+            basis.len(),
+            d,
+            "commutant of C_{} should have dimension {}, got {}",
+            d,
+            d,
+            basis.len()
+        );
+
+        // Every basis element must commute with the shift.
+        for w in &basis {
+            assert_commute(w, &shift, d, 1e-4);
+        }
+    }
+
+    #[test]
+    fn commutant_of_matrices_no_generators_is_full_matrix() {
+        // No generators → no constraints → full Mat_{d×d}, dimension d².
+        let d = 3;
+        let basis = commutant_of_matrices(&[], d);
+        assert_eq!(
+            basis.len(),
+            d * d,
+            "no generators should give d²={}, got {}",
+            d * d,
+            basis.len()
+        );
+    }
+
+    #[test]
+    fn commutant_of_matrices_identity_only_is_full_matrix() {
+        // Generator = identity → trivial constraint → full Mat_{d×d}.
+        let d = 3;
+        let mut identity = vec![vec![0.0_f32; d]; d];
+        for i in 0..d {
+            identity[i][i] = 1.0;
+        }
+        let basis = commutant_of_matrices(&[identity], d);
+        assert_eq!(
+            basis.len(),
+            d * d,
+            "identity generator should give d²={}, got {}",
+            d * d,
+            basis.len()
+        );
+    }
+
+    #[test]
+    fn commutant_basis_sampled_on_c8() {
+        // Sample from C₈ via GroupAction; the commutant of the full cyclic
+        // group C₈ on ℝ⁸ is the circulant algebra of dimension 8.
+        let mut rng = SplitMix64::new(0xDEAD_BEEF_CAFE_BABE);
+        let basis = commutant_basis(&C8Action, 8, 64, &mut rng);
+
+        // With 64 samples from C₈ (|G|=8), we expect all 8 elements sampled,
+        // so the commutant should be exactly 8-dimensional.
+        assert_eq!(
+            basis.len(),
+            8,
+            "commutant of C₈ should have dim 8, got {}",
+            basis.len()
+        );
+
+        // Verify each basis element commutes with the shift k=1.
+        let mut shift_mat = vec![vec![0.0_f32; 8]; 8];
+        let mut e = vec![0.0_f32; 8];
+        let mut out = vec![0.0_f32; 8];
+        for col in 0..8 {
+            e.iter_mut().for_each(|x| *x = 0.0);
+            e[col] = 1.0;
+            C8Action.act(&1u8, &e, &mut out);
+            for row in 0..8 {
+                shift_mat[row][col] = out[row];
+            }
+        }
+        for w in &basis {
+            assert_commute(w, &shift_mat, 8, 1e-3);
+        }
     }
 }

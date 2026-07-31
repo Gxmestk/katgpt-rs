@@ -58,9 +58,9 @@
 #![cfg(test)]
 
 use katgpt_core::cgsp::{
-    BreakevenDifficultyFilter, CgspConfig, CgspLoop, ColinearityBatchGate, ComplexityWeights,
-    CuriosityPrioritySnapshot, CycleResult, Direction, EntropyCollapse, HlaProjectionGuide,
-    PoolConjecturer, Priority, ScratchBuffers, Target, entropy_nats, sigmoid,
+    BeliefGridProjectionGuide, BreakevenDifficultyFilter, CgspConfig, CgspLoop,
+    ColinearityBatchGate, ComplexityWeights, CuriosityPrioritySnapshot, CycleResult, Direction,
+    EntropyCollapse, PoolConjecturer, Priority, ScratchBuffers, Target, entropy_nats, sigmoid,
     traits::{
         CollapseSignal, HintDeltaBandit, NoOpBatchGate, NoOpDifficultyFilter, QualityGuide, Solver,
     },
@@ -227,7 +227,7 @@ fn build_cgsp_loop(
     seed: u64,
 ) -> CgspLoop<
     PoolConjecturer,
-    HlaProjectionGuide,
+    BeliefGridProjectionGuide,
     DotSolver,
     VecBandit,
     EntropyCollapse,
@@ -235,7 +235,7 @@ fn build_cgsp_loop(
     ColinearityBatchGate,
 > {
     let conj = PoolConjecturer::new(pool, seed);
-    let guide = HlaProjectionGuide::new(2.0, 1.0, ComplexityWeights::default());
+    let guide = BeliefGridProjectionGuide::new(2.0, 1.0, ComplexityWeights::default());
     let solver = DotSolver { sharpness: 1.0 };
     let bandit = VecBandit::uniform(POOL_SIZE);
     CgspLoop::new(

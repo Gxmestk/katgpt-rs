@@ -32,7 +32,7 @@ The key insight from the paper: **reranking generalizes better than verify rules
 - [x] Add `support_count: usize` field to the absorb log entry (already tracked implicitly via win count)
 - [x] Document that `support_count` is available for future regularization gate
 - [x] Do NOT add acceptance gate — just instrument for observability
-- **Files:** `src/pruners/absorb_compress.rs` (doc comment + field documentation)
+- **Files:** `crates/katgpt-pruners/src/absorb_compress.rs` (doc comment + field documentation)
 - **No behavioral change** — documentation + observability only
 
 ### T3: GOAT Proof — Verify HL Loop Doesn't Overfit on Bomber 🐐

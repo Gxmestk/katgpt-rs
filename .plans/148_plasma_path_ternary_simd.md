@@ -8,15 +8,15 @@
 
 ## Task Index
 
-- [x] T1: TernaryWeights Type — `katgpt-core/src/types.rs` L2248–2379
-- [x] T2: Scalar Ternary Matvec — `katgpt-core/src/simd.rs` L1734
-- [x] T3: NEON Ternary Matvec — `katgpt-core/src/simd.rs` L1756
-- [x] T4: AVX2 Ternary Matvec — `katgpt-core/src/simd.rs` L1854
-- [x] T5: Dispatch Wrapper — `katgpt-core/src/simd.rs` L1949
-- [x] T6: Batched Ternary Matmul — `katgpt-core/src/simd.rs` L1961
-- [x] T7: `.bits` File Loader — `katgpt-rs/src/weights.rs` L224
+- [x] T1: TernaryWeights Type — `crates/katgpt-types/src/lib.rs` L2248–2379
+- [x] T2: Scalar Ternary Matvec — `crates/katgpt-dec/src/simd.rs` L1734
+- [x] T3: NEON Ternary Matvec — `crates/katgpt-dec/src/simd.rs` L1756
+- [x] T4: AVX2 Ternary Matvec — `crates/katgpt-dec/src/simd.rs` L1854
+- [x] T5: Dispatch Wrapper — `crates/katgpt-dec/src/simd.rs` L1949
+- [x] T6: Batched Ternary Matmul — `crates/katgpt-dec/src/simd.rs` L1961
+- [x] T7: `.bits` File Loader — `riir-ai/crates/riir-engine/src/deltanet/weights.rs` L224
 - [x] T8: Forward Pass Dispatch — `LayerWeights` integration not yet wired
-- [x] T9: Quantization Utility — `katgpt-core/src/types.rs` L2322
+- [x] T9: Quantization Utility — `crates/katgpt-types/src/lib.rs` L2322
 - [x] T10: GOAT Proof Tests — `tests/bench_148_plasma_path_goat.rs`
 - [x] T11: Benchmark Harness — In GOAT test file
 
@@ -25,6 +25,15 @@
 Distill the core technique from [Cintu07/ciot](https://github.com/Cintu07/ciot) — bit-plane ternary weight encoding with branchless SIMD conditional accumulation — into `katgpt-core`. This adds a **Plasma** compute tier: multiplication-free ternary matvec using only SIMD add/subtract. **Measured: 7.57 Gop/s at 277µs/1024², 2.56× faster than scalar FP32 but 0.70× of NEON FMA** — Plasma's advantage is memory density (20× less traffic), not raw compute speed vs optimized FMA.
 
 ## Five-Tier Hierarchy (aligned with Issue 014)
+
+> **Forward-note (Issue 145, 2026-07-15):** This plan shipped ternary as the
+> Plasma tier. Issue 145 has since reclassified the tiers: **binary is now
+> the Plasma tier** (feature `binary_plasma`, opt-in), and **ternary (this
+> plan's substrate) moved down to Hot** (feature `plasma_path`, still
+> DEFAULT-ON). The table below is the historical state at plan-completion;
+> see Research 110 §"Binary Plasma Refinement" for the current state. The
+> `plasma_path` feature flag name is retained for minimal churn — it now
+> gates the Hot-tier ternary CPU path, not the Plasma-tier binary.
 
 ```
 Tier       Compute                          Memory             Latency
@@ -40,7 +49,7 @@ Freeze     Disk-backed (Turso/libSQL)       Variable          ~10ms+
 
 ## Tasks
 
-### T1: TernaryWeights Type (`katgpt-core/src/types.rs`)
+### T1: TernaryWeights Type (`crates/katgpt-types/src/lib.rs`)
 
 Add bit-plane ternary weight storage:
 
@@ -71,7 +80,7 @@ Methods:
 - `TernaryWeights::get(row, col) -> i8` — get ternary value
 - `TernaryWeights::quantize_from_f32(weights: &[f32], rows: usize, cols: usize) -> Self` — row-wise error-compensated quantization (from ciot's `pack_ternary.py`)
 
-### T2: Scalar Ternary Matvec (`katgpt-core/src/simd.rs`)
+### T2: Scalar Ternary Matvec (`crates/katgpt-dec/src/simd.rs`)
 
 Reference implementation for correctness testing:
 
@@ -96,7 +105,7 @@ pub fn ternary_matvec_scalar(w: &TernaryWeights, x: &[f32], y: &mut [f32]) {
 }
 ```
 
-### T3: NEON Ternary Matvec (`katgpt-core/src/simd.rs`)
+### T3: NEON Ternary Matvec (`crates/katgpt-dec/src/simd.rs`)
 
 RIIR of ciot's `matvec_ternary_native` for `target_arch = "aarch64"`:
 
@@ -114,7 +123,7 @@ unsafe fn neon_ternary_matvec(w: &TernaryWeights, x: &[f32], y: &mut [f32]) {
 }
 ```
 
-### T4: AVX2 Ternary Matvec (`katgpt-core/src/simd.rs`)
+### T4: AVX2 Ternary Matvec (`crates/katgpt-dec/src/simd.rs`)
 
 RIIR of ciot's AVX2 path for `target_arch = "x86_64"`:
 
@@ -129,7 +138,7 @@ unsafe fn avx2_ternary_matvec(w: &TernaryWeights, x: &[f32], y: &mut [f32]) {
 }
 ```
 
-### T5: Dispatch Wrapper (`katgpt-core/src/simd.rs`)
+### T5: Dispatch Wrapper (`crates/katgpt-dec/src/simd.rs`)
 
 ```rust
 /// SIMD-accelerated ternary matvec: y = W_ternary × x
@@ -148,7 +157,7 @@ pub fn simd_ternary_matvec(w: &TernaryWeights, x: &[f32], y: &mut [f32]) {
 }
 ```
 
-### T6: Batched Ternary Matmul (`katgpt-core/src/simd.rs`)
+### T6: Batched Ternary Matmul (`crates/katgpt-dec/src/simd.rs`)
 
 ```rust
 /// Batched ternary matmul: for each row batch[i], compute y[i] = W × batch[i].
@@ -163,7 +172,7 @@ pub fn simd_ternary_matmul_batch(w: &TernaryWeights, x: &[f32], batch: usize, y:
 }
 ```
 
-### T7: `.bits` File Loader (`katgpt-rs/src/weights.rs`)
+### T7: `.bits` File Loader (`riir-ai/crates/riir-engine/src/deltanet/weights.rs`)
 
 Load ciot-format `.bits` binary files:
 
@@ -182,7 +191,7 @@ Load ciot-format `.bits` binary files:
 pub fn load_ternary_bits(path: &std::path::Path) -> std::io::Result<TernaryWeights> { ... }
 ```
 
-### T8: Forward Pass Dispatch (`katgpt-rs/src/transformer.rs`) — ⏳ Not Yet Wired
+### T8: Forward Pass Dispatch (`katgpt-rs/crates/katgpt-percepta/src/transformer.rs`) — ⏳ Not Yet Wired
 
 Add ternary weight dispatch to `forward_base()`:
 
@@ -207,7 +216,7 @@ pub struct LayerWeights {
 
 **Status:** The `.bits` loader and SIMD kernels are complete. The `LayerWeights` struct does not yet have `Option<TernaryWeights>` fields and forward pass dispatch is not wired. This is the plug point for private `riir-ai` game integration (Plan 145).
 
-### T9: Quantization Utility (`katgpt-core/src/types.rs`)
+### T9: Quantization Utility (`crates/katgpt-types/src/lib.rs`)
 
 Row-wise error-compensated ternary quantization (from ciot's `pack_ternary.py`):
 
@@ -294,10 +303,10 @@ T1 (TernaryWeights type)
 | File | Change |
 |------|--------|
 | `crates/katgpt-core/Cargo.toml` | Added `plasma_path` feature gate |
-| `crates/katgpt-core/src/types.rs` | Added `TernaryWeights` struct + `new/set/get/quantize_from_f32/checksum` |
-| `crates/katgpt-core/src/simd.rs` | Added `ternary_matvec_scalar`, `neon_ternary_matvec`, `avx2_ternary_matvec`, `simd_ternary_matvec`, `simd_ternary_matmul_batch` |
+| `crates/katgpt-types/src/lib.rs` | Added `TernaryWeights` struct + `new/set/get/quantize_from_f32/checksum` |
+| `crates/katgpt-dec/src/simd.rs` | Added `ternary_matvec_scalar`, `neon_ternary_matvec`, `avx2_ternary_matvec`, `simd_ternary_matvec`, `simd_ternary_matmul_batch` |
 | `crates/katgpt-core/src/lib.rs` | Re-exports for `TernaryWeights`, ternary matvec functions |
 | `Cargo.toml` | Added `plasma_path` feature gate (default-on) |
-| `src/weights.rs` | Added `load_ternary_bits()` `.bits` file loader |
+| `riir-ai/crates/riir-engine/src/deltanet/weights.rs` | Added `load_ternary_bits()` `.bits` file loader |
 | `tests/bench_148_plasma_path_goat.rs` | NEW: GOAT proof tests |
 | `.benchmarks/044_plasma_path_goat.md` | NEW: GOAT proof results |

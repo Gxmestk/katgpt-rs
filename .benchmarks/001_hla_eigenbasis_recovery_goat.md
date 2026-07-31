@@ -150,7 +150,7 @@ synthetic data.
 
 | File | Role |
 |------|------|
-| `src/hla_eigenbasis.rs` | Primitive: `recover_eigenbasis_from_window*`, `EigenbasisTracker`, `compute_window_hash`, `energy_ratio`, `window_total_energy`. 10 unit tests. |
+| `crates/katgpt-spectral/src/hla_eigenbasis.rs` | Primitive: `recover_eigenbasis_from_window*`, `EigenbasisTracker`, `compute_window_hash`, `energy_ratio`, `window_total_energy`. 10 unit tests. |
 | `benches/hla_eigenbasis_bench.rs` | GOAT gate (G1 fast/tracker/full, G2, G3, G4, G5). |
 | `tests/hla_eigenbasis_determinism.rs` | Within-binary determinism + cross-platform protocol docs. 3 tests. |
 | `Cargo.toml` | `hla_eigenbasis_recovery` feature, `uuid` dep, bench registration. |

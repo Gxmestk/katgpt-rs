@@ -153,16 +153,12 @@ fn feature_index(p: PrimitiveKind, n: usize) -> usize {
 }
 
 /// Numerically stable logistic sigmoid. Per AGENTS.md: sigmoid, not softmax.
+/// Delegates to [`crate::simd::fast_sigmoid`] (Cephes polynomial, ~1.7× faster
+/// than libm on aarch64; the prior two-branch form is unnecessary given
+/// Cephes's `n < -126` early-exit which handles overflow by construction).
 #[inline(always)]
 fn sigmoid(x: f32) -> f32 {
-    // Branch-free form: avoids overflow on large negatives.
-    if x >= 0.0 {
-        let z = (-x).exp();
-        1.0 / (1.0 + z)
-    } else {
-        let z = x.exp();
-        z / (1.0 + z)
-    }
+    crate::simd::fast_sigmoid(x)
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────

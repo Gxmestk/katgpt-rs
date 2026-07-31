@@ -5,6 +5,7 @@
 > **Status:** Done — verdict locked (**PASS for katgpt-rs / riir-ai / riir-chain / riir-neuron-db**)
 > **Classification:** Public (this note). Training recipe → riir-train.
 > **Related Research:** 358 (SMWM — **identical verdict, same author Balestriero, same JEPA domain, runtime analog already ships**), 138 (LeJEPA — same author Balestriero, LOW-MODERATE GAIN precedent), 123 (Latent Functor Runtime — **ships the runtime version of AdaJEPA's core insight as Super-GOAT**), 275 (Induced CWM — the `g_φ` forward-model + `BeliefInferenceFn` encoder), 318/riir-ai 163 (Sleep-Time — offline consolidation, the "frozen world model rolls forward" half), 359/riir-ai 168 (Motor-Gated DEC World Model — closest selling-point cousin, written the same day), 243 (Temporal Deriv Kernel — prediction-error curiosity, DEFAULT-ON)
+> **Split verdict (synthesis):** Wei et al. [arXiv:2607.09185 "Causally Debiased Latent Action Model for Embodied Action Conditioned World Models"] — CD-LAM is a training-method paper for video ACWMs (three fine-tuning losses + three-stage pipeline). Same training-only verdict as this note for the recipe half: §3.5 Path 0 fails because the losses are genuinely gradient-descent. **Training recipe → riir-train.** BUT the diagnostic framework (§III-B: zero-transition response, shift-invariance, shortcut leakage) is modelless and transferable → **GAIN** (Research 460, Issue 194 — `LatentConfounderAudit` primitive). The runtime analog (plan-execute-adapt-replan via `ReestimationScheduler`) already ships; the latent-action-confounding problem CD-LAM targets has a modelless factorized solution via Research 374 / Plan 375 (`factorized_action`).
 > **Domain:** katgpt-rs (this note, public). The distilled RUNTIME primitive already ships — no new public or private file.
 
 ---
@@ -15,7 +16,7 @@ AdaJEPA adapts a JEPA latent world model **inside closed-loop MPC**: at every re
 
 **Verdict: PASS for modelless/runtime (katgpt-rs / riir-ai / riir-chain / riir-neuron-db). Training recipe → riir-train (one-line note).**
 
-The paper's distilled primitive — "the action-conditional latent predictor is recalibrated online from its own rollout consequences, then atomically reused for the next planning cycle" — **is already shipped modellessly** as `riir-ai/crates/riir-engine/src/latent_functor/reestimation.rs::ReestimationScheduler` (Super-GOAT Research 123, Plans 303/317): `ObservationBuffer` = the online `recent-N` buffer; `tau_reest` = the recalibration trigger; `tick()` = the recalibration step (`extract_functor` re-estimates the action→latent-displacement map from the buffer, no gradient); atomic swap = the next planning cycle reuses the updated functors. This is plan-execute-adapt-replan, modellessly, with no backprop. The training-only parts (GD on JEPA encoder+predictor at every MPC step) belong in `riir-train` per the precedent set by Research 358 (SMWM, same author Balestriero, identical PASS verdict). **Honest downgrade — the runtime analog was the DiPOD canonical vocabulary-mismatch failure case documented in the research skill itself; the structure is identical under different vocabulary.**
+The paper's distilled primitive — "the action-conditional latent predictor is recalibrated online from its own rollout consequences, then atomically reused for the next planning cycle" — **is already shipped modellessly** as `riir-ai/crates/riir-engine/src/latent_functor/reestimation/mod.rs::ReestimationScheduler` (Super-GOAT Research 123, Plans 303/317): `ObservationBuffer` = the online `recent-N` buffer; `tau_reest` = the recalibration trigger; `tick()` = the recalibration step (`extract_functor` re-estimates the action→latent-displacement map from the buffer, no gradient); atomic swap = the next planning cycle reuses the updated functors. This is plan-execute-adapt-replan, modellessly, with no backprop. The training-only parts (GD on JEPA encoder+predictor at every MPC step) belong in `riir-train` per the precedent set by Research 358 (SMWM, same author Balestriero, identical PASS verdict). **Honest downgrade — the runtime analog was the DiPOD canonical vocabulary-mismatch failure case documented in the research skill itself; the structure is identical under different vocabulary.**
 
 ---
 
@@ -61,18 +62,18 @@ The paper frames the result as: *"latent world models should continue to be trai
 |---|---|---|
 | latent state `z_t` | HLA per-NPC 8-dim state, belief state, sense projection | `riir-engine/src/hla/`, `katgpt-core` HLA kernels |
 | JEPA encoder `ℰ_s` + predictor `f_θ` | `InducedCwmKernel: GameState` (frozen forward model) + `BeliefInferenceFn` (observation→belief sampler) | `katgpt-core/src/induced_cwm/`, Research 275 / Plan 296 |
-| action encoder `ℰ_a` | `extract_functor` (estimate displacement from (source, target) pairs) | `riir-engine/src/latent_functor/arithmetic.rs` |
-| plan-execute-adapt-replan (Algorithm 1) | CGSP/MCTS plan → NPC acts → `ReestimationScheduler::observe()` → `tick()` re-estimates functors → next planning cycle reuses | `riir-engine/src/latent_functor/reestimation.rs`, `cgsp_runtime/` |
+| action encoder `ℰ_a` | `extract_functor` (estimate displacement from (source, target) pairs) | `crates/katgpt-percepta/src/wasm/interpreter/arithmetic.rs` |
+| plan-execute-adapt-replan (Algorithm 1) | CGSP/MCTS plan → NPC acts → `ReestimationScheduler::observe()` → `tick()` re-estimates functors → next planning cycle reuses | `riir-ai/crates/riir-engine/src/latent_functor/reestimation/mod.rs`, `cgsp_runtime/` |
 | online buffer ℬ (capacity N) | `ObservationBuffer` (capacity-capped ring buffer) | `reestimation.rs::ObservationBuffer` |
 | `recent-N` vs `hard-N` strategy | FIFO ring buffer (`head`/`len` wraps oldest) — the `recent-N` default; `JsUniquenessTrigger` + TEMP `sleep_diverse` cover the `hard-N` spirit (rare/diverse preservation) | `reestimation.rs`, `riir-neuron-db/.plans/005` |
-| adaptation loss `L_ada` | `extract_functor` MSE over `(source, target)` pairs = `(1/N) Σ_k (target_k − source_k)` mean displacement | `latent_functor/arithmetic.rs` |
-| stop-gradient anti-collapse | freeze/thaw atomicity (readers keep old snapshot; writers commit new); coherence gate `functor_gate(coherence, β, τ) = sigmoid(β·(c−τ))` | `MerkleFrozenEnvelope`, `latent_functor/arithmetic.rs` |
+| adaptation loss `L_ada` | `extract_functor` MSE over `(source, target)` pairs = `(1/N) Σ_k (target_k − source_k)` mean displacement | `crates/katgpt-percepta/src/wasm/interpreter/arithmetic.rs` |
+| stop-gradient anti-collapse | freeze/thaw atomicity (readers keep old snapshot; writers commit new); coherence gate `functor_gate(coherence, β, τ) = sigmoid(β·(c−τ))` | `MerkleFrozenEnvelope`, `crates/katgpt-percepta/src/wasm/interpreter/arithmetic.rs` |
 | adapted parameters Ω (last layer) | functor direction vectors (the only mutable state); base operator frozen | `LatentSteeringVector`, `apply_functor` |
 | `coherence < threshold` trigger (implicit: prediction error grows → adapt) | `coherence < tau_reest` re-estimation trigger | `reestimation.rs::ReestimationScheduler::tick` |
 | MPC replan | MCTS rollout / CGSP cycle / decision stage | `cgsp_runtime/`, `mcts_collapse_bridge.rs` |
 | distribution shift → frozen model fails | coherence decay → staleness → re-estimation trigger | `reestimation.rs`, DiPOD-class pattern |
 | one gradient step per replan | one `tick()` per decision stage (modelless, no gradient) | `reestimation.rs::tick` |
-| single GD step on last layers | `extract_functor` re-derives the displacement from the buffer (closed-form, no gradient) | `latent_functor/arithmetic.rs` |
+| single GD step on last layers | `extract_functor` re-derives the displacement from the buffer (closed-form, no gradient) | `crates/katgpt-percepta/src/wasm/interpreter/arithmetic.rs` |
 
 ---
 
@@ -82,7 +83,7 @@ The paper frames the result as: *"latent world models should continue to be trai
 
 The paper's headline loop is **exactly** the DiPOD-class pattern that the research skill flags as the canonical vocabulary-mismatch failure case:
 
-> *"DiPOD's 'self-distillation when ELBO drifts' is shipped as `riir-ai/crates/riir-engine/src/latent_functor/reestimation.rs` 'coherence-driven re-estimation scheduler when coherence < tau_reest'."* — SKILL §1.5
+> *"DiPOD's 'self-distillation when ELBO drifts' is shipped as `riir-ai/crates/riir-engine/src/latent_functor/reestimation/mod.rs` 'coherence-driven re-estimation scheduler when coherence < tau_reest'."* — SKILL §1.5
 
 The runtime structure is:
 
@@ -110,7 +111,7 @@ AdaJEPA's per-episode adaptation (each episode starts from the pretrained model,
 
 ### 3.4 Prediction-error-driven recalibration — **already DEFAULT-ON**
 
-AdaJEPA's signal is the latent prediction error `ℓ(ẑ_{t+1}, z_{t+1})`. The Temporal Derivative Kernel (Research 243, Plan 277, **DEFAULT-ON**) ships curiosity = prediction-error signal. `latent_functor/reestimation.rs::tick` triggers re-estimation on coherence decay, which is the same signal under a different name (coherence is `1 − normalized prediction error`).
+AdaJEPA's signal is the latent prediction error `ℓ(ẑ_{t+1}, z_{t+1})`. The Temporal Derivative Kernel (Research 243, Plan 277, **DEFAULT-ON**) ships curiosity = prediction-error signal. `riir-ai/crates/riir-engine/src/latent_functor/reestimation/mod.rs::tick` triggers re-estimation on coherence decay, which is the same signal under a different name (coherence is `1 − normalized prediction error`).
 
 ### 3.5 Closest cousins across all 5 repos
 
@@ -191,7 +192,7 @@ The only genuinely transferable *runtime* nugget — AdaJEPA's `hard-N` buffer (
 
 **Paper:** *AdaJEPA: An Adaptive Latent World Model* (Wang, Bounou, LeCun, Ren, arXiv:2606.32026, 2026-06-30).
 
-**Verdict:** **PASS for katgpt-rs / riir-ai / riir-chain / riir-neuron-db.** The paper's distilled runtime primitive — "the action-conditional latent predictor is recalibrated online from its own rollout consequences, then atomically reused for the next planning cycle" — **is already shipped modellessly** as `riir-ai/crates/riir-engine/src/latent_functor/reestimation.rs::ReestimationScheduler` (Super-GOAT Research 123, Plans 303/317/357): `ObservationBuffer` = the online `recent-N` buffer; `tau_reest` = the recalibration trigger; `tick()` = the recalibration step (`extract_functor` re-estimates the action→latent-displacement map from the buffer, no gradient); atomic swap = the next planning cycle reuses the updated functors. The training recipe (per-MPC-step GD on JEPA encoder+predictor) is a refinement of the same mechanism Research 358 (SMWM, same author Balestriero) already evaluated as training-only; it belongs in riir-train as a one-line refinement, not in the modelless/runtime repos. This is the DiPOD canonical vocabulary-mismatch failure case documented in the research skill — the structure is identical under different vocabulary.
+**Verdict:** **PASS for katgpt-rs / riir-ai / riir-chain / riir-neuron-db.** The paper's distilled runtime primitive — "the action-conditional latent predictor is recalibrated online from its own rollout consequences, then atomically reused for the next planning cycle" — **is already shipped modellessly** as `riir-ai/crates/riir-engine/src/latent_functor/reestimation/mod.rs::ReestimationScheduler` (Super-GOAT Research 123, Plans 303/317/357): `ObservationBuffer` = the online `recent-N` buffer; `tau_reest` = the recalibration trigger; `tick()` = the recalibration step (`extract_functor` re-estimates the action→latent-displacement map from the buffer, no gradient); atomic swap = the next planning cycle reuses the updated functors. The training recipe (per-MPC-step GD on JEPA encoder+predictor) is a refinement of the same mechanism Research 358 (SMWM, same author Balestriero) already evaluated as training-only; it belongs in riir-train as a one-line refinement, not in the modelless/runtime repos. This is the DiPOD canonical vocabulary-mismatch failure case documented in the research skill — the structure is identical under different vocabulary.
 
 **Files created this session:** `katgpt-rs/.research/360_AdaJEPA_Adaptive_Latent_World_Model.md` (this note — the only output).
 

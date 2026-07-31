@@ -47,7 +47,7 @@ fn goat_p1_cpu_backend_matches_direct_forward() {
 // P2: auto_backend with Cpu forced always returns CPU
 #[test]
 fn goat_p2_auto_backend_cpu_forced() {
-    let backend = auto_backend(BackendKind::Cpu, None);
+    let backend = auto_backend(BackendKind::Cpu);
     assert_eq!(backend.device_name(), "CPU");
 }
 
@@ -59,7 +59,7 @@ fn goat_p2_auto_backend_cpu_forced() {
 // build selects ANE, not CPU.
 #[test]
 fn goat_p3_auto_backend_auto_fallback() {
-    let backend = auto_backend(BackendKind::Auto, None);
+    let backend = auto_backend(BackendKind::Auto);
     #[cfg(all(target_os = "macos", feature = "ane"))]
     {
         // ANE feature is active on macOS — auto selects ANE.

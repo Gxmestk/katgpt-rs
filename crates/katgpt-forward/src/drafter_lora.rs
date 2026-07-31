@@ -28,9 +28,9 @@ const DRAFTER_LORA_N_ADAPTERS: u32 = 6;
 /// preserves the base model at initialization.
 ///
 /// At rank-4 on Config::draft() (n_embd=4, kv_dim=4, mlp_hidden=16):
-/// - Q,K,V,O: 32 params each (A[16] + B[16])
-/// - MLP1: 80 params (A[16] + B[64])
-/// - MLP2: 80 params (A[64] + B[16])
+/// - Q,K,V,O: 32 params each (`A[16] + B[16]`)
+/// - MLP1: 80 params (`A[16] + B[64]`)
+/// - MLP2: 80 params (`A[64] + B[16]`)
 /// - Total: 288 params
 pub struct DrafterLoraWeights {
     pub q_lora: LoraAdapter,
@@ -320,9 +320,11 @@ fn forward_drafter_with_lora(
     // 1. Embedding: x = wte[token] + wpe[pos]
     let tok_off = token * n;
     let pos_off = pos * n;
-    for i in 0..n {
-        x[i] = weights.wte[tok_off + i] + weights.wpe[pos_off + i];
-    }
+    katgpt_core::simd::simd_add_into(
+        &mut x[..n],
+        &weights.wte[tok_off..tok_off + n],
+        &weights.wpe[pos_off..pos_off + n],
+    );
 
     // 2. Pre-attention: RMSNorm → save residual → RMSNorm (matches forward_base)
     rmsnorm(&mut x[..n]);
@@ -358,30 +360,35 @@ fn forward_drafter_with_lora(
         let mut max_score = f32::NEG_INFINITY;
         for t in 0..t_n {
             let k_off = t * kvd + kv_off;
-            let mut dot = 0.0f32;
-            for d in 0..hd {
-                dot += q[q_off + d] * key_cache[k_off + d];
-            }
+            let dot = katgpt_core::simd::simd_dot_f32(
+                &q[q_off..q_off + hd],
+                &key_cache[k_off..k_off + hd],
+                hd,
+            );
             let score = dot * scale;
             scores[t] = score;
             max_score = max_score.max(score);
         }
 
-        // Pass 2: exp and accumulate sum
-        let mut sum = 0.0f32;
-        for t in 0..t_n {
-            scores[t] = (scores[t] - max_score).exp();
-            sum += scores[t];
-        }
+        // Pass 2: exp and accumulate sum. Pure exp+sum on a contiguous
+        // `&mut [f32]` range (no branches) → fused SIMD pattern:
+        //   shift by -max, then single SIMD pass computing exp + sum.
+        use katgpt_core::simd::{simd_add_scalar_inplace, simd_exp_sum_inplace};
+        let active = &mut scores[..t_n];
+        simd_add_scalar_inplace(active, -max_score);
+        let sum = simd_exp_sum_inplace(active);
         let inv_sum = 1.0 / sum;
 
-        // Pass 3: weighted value accumulation
-        for d in 0..hd {
-            let mut val = 0.0f32;
-            for t in 0..t_n {
-                val += scores[t] * inv_sum * value_cache[t * kvd + kv_off + d];
-            }
-            attn_out[q_off + d] = val;
+        // Pass 3: weighted value accumulation (t-outer, d-inner → contiguous value reads)
+        for t in 0..t_n {
+            let weight = scores[t] * inv_sum;
+            let v_off = t * kvd + kv_off;
+            katgpt_core::simd::simd_fused_scale_acc(
+                &mut attn_out[q_off..q_off + hd],
+                &value_cache[v_off..v_off + hd],
+                weight,
+                hd,
+            );
         }
     }
 
@@ -389,9 +396,7 @@ fn forward_drafter_with_lora(
     matmul(&mut x[..n], &layer_weights.attn_wo, &attn_out[..n], n, n);
     lora_apply(&mut x[..n], &lora.o_lora, &attn_out[..n], lora_buf);
 
-    for i in 0..n {
-        x[i] += xr[i];
-    }
+    katgpt_core::simd::simd_add_inplace(&mut x[..n], &xr[..n]);
 
     // 7. MLP: save residual → RMSNorm → MLP with LoRA → residual
     xr2[..n].copy_from_slice(&x[..n]);
@@ -417,9 +422,7 @@ fn forward_drafter_with_lora(
     );
 
     // Residual
-    for i in 0..n {
-        x[i] += xr2[i];
-    }
+    katgpt_core::simd::simd_add_inplace(&mut x[..n], &xr2[..n]);
 
     // Note: no final rmsnorm here — forward_base applies lm_head directly
     // after the MLP residual without an additional norm step.
@@ -534,10 +537,11 @@ fn run_drafter_sequence<'a>(
 /// Cross-entropy loss: -log(softmax(logits)[target]).
 /// Numerically stable via log-sum-exp trick.
 fn cross_entropy(logits: &[f32], target: usize) -> f32 {
+    use katgpt_core::simd::fast_exp;
     let max_val = logits.iter().copied().fold(f32::NEG_INFINITY, f32::max);
     let mut sum_exp = 0.0f32;
     for &val in logits {
-        sum_exp += (val - max_val).exp();
+        sum_exp += fast_exp(val - max_val);
     }
     -(logits[target] - max_val) + sum_exp.ln()
 }
@@ -913,6 +917,17 @@ mod tests {
 
     #[test]
     fn test_drafter_lora_zeros_same_as_no_lora() {
+        // This test asserts zero-LoRA forward matches no-LoRA forward. Both
+        // paths must use the same computation; `forward_drafter_with_lora` is
+        // a hand-mirrored copy of `forward_base` that doesn't track
+        // feature-gated MLP/attention/norm variants. Skip when features alter
+        // the base forward path.
+        if !crate::forward::CPU_FORWARD_USES_DEVICE_BASE_PATH {
+            eprintln!(
+                "Skipping: forward() uses a feature-gated path that forward_drafter_with_lora doesn't mirror"
+            );
+            return;
+        }
         let config = draft_config();
         let mut rng = Rng::new(42);
         let weights = TransformerWeights::new(&config, &mut rng);

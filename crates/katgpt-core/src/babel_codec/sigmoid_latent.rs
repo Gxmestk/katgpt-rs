@@ -34,17 +34,13 @@ use crate::babel_codec::commitment::BabelCommitment;
 
 /// Numerically stable scalar sigmoid: `σ(x) = 1 / (1 + e^{-x})`.
 ///
-/// Branching on the sign of `x` avoids `e^{-x}` overflow for large negative
-/// `x` (same convention as `personality_composition::sigmoid`). Result is in
-/// `(0, 1)` for all finite inputs, saturating to `0.0` / `1.0` for `|x| > ~18`.
+/// Delegates to [`crate::simd::fast_sigmoid`] (Cephes 6th-order polynomial
+/// for `exp`, ~1 ULP accurate, ~1.7× faster than libm `exp` on aarch64).
+/// Result is in `(0, 1)` for all finite inputs, saturating to `0.0` / `1.0`
+/// for `|x| > 40` (the f32 precision floor).
 #[inline]
 pub fn sigmoid(x: f32) -> f32 {
-    if x >= 0.0 {
-        1.0 / (1.0 + (-x).exp())
-    } else {
-        let e = x.exp();
-        e / (1.0 + e)
-    }
+    crate::simd::fast_sigmoid(x)
 }
 
 /// Fixed-size container for the top-k projected latent scores.
@@ -56,7 +52,7 @@ pub fn sigmoid(x: f32) -> f32 {
 /// in place.
 ///
 /// `#[repr(C)]` + `Copy` so it can cross FFI / sync boundaries as a POD blob
-/// (relevant for the future LatCal commitment bridge, `.issues/002`).
+/// (relevant for the future LatCal commitment bridge, Issue 002 — resolved + removed).
 #[derive(Clone, Copy, Debug)]
 #[repr(C)]
 pub struct CompressedLatent<const K: usize> {

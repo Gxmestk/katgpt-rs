@@ -3,7 +3,7 @@
 //! Defines the [`InferenceBackend`] trait that decouples the high-level generate
 //! loop from the concrete compute backend (CPU, Apple Neural Engine, etc.).
 //!
-//! The default [`CpuBackend`] delegates to [`katgpt_forward::forward`].
+//! The default [`CpuBackend`] delegates to [`katgpt_forward::forward()`].
 //!
 //! _Extracted to this leaf crate (Issue 413)._ Previously root-resident per
 //! Issue 033 §C's circular-dependency argument ("the trait cannot move without
@@ -180,12 +180,7 @@ pub enum BackendKind {
 ///    - Otherwise: use CPU.
 ///
 /// Logs which backend was selected via `log::info!`.
-///
-/// TODO: Remove `model_path` parameter — no longer needed with runtime compilation.
-pub fn auto_backend(
-    kind: BackendKind,
-    model_path: Option<&std::path::Path>,
-) -> Box<dyn InferenceBackend> {
+pub fn auto_backend(kind: BackendKind) -> Box<dyn InferenceBackend> {
     match kind {
         BackendKind::Cpu => {
             log::info!("Backend: CPU (forced)");
@@ -193,10 +188,10 @@ pub fn auto_backend(
         }
         BackendKind::Ane => {
             // Will be caught below if ANE is not available
-            try_ane_backend(model_path).expect("ANE backend requested but unavailable")
+            try_ane_backend().expect("ANE backend requested but unavailable")
         }
         BackendKind::Auto => {
-            let backend = try_ane_backend(model_path);
+            let backend = try_ane_backend();
             match backend {
                 Ok(b) => b,
                 Err(reason) => {
@@ -218,9 +213,7 @@ pub fn auto_backend(
 ///
 /// Creates an uncompiled `AneBackend` — the caller must call `compile()`
 /// before the first `forward()` pass.
-fn try_ane_backend(
-    _model_path: Option<&std::path::Path>,
-) -> Result<Box<dyn InferenceBackend>, String> {
+fn try_ane_backend() -> Result<Box<dyn InferenceBackend>, String> {
     #[cfg(all(target_os = "macos", feature = "ane"))]
     {
         use crate::ane::AneBackend;
@@ -314,13 +307,13 @@ mod tests {
 
     #[test]
     fn test_auto_backend_cpu_forced() {
-        let backend = auto_backend(BackendKind::Cpu, None);
+        let backend = auto_backend(BackendKind::Cpu);
         assert_eq!(backend.device_name(), "CPU");
     }
 
     #[test]
     fn test_auto_backend_auto_falls_back_to_cpu() {
-        let backend = auto_backend(BackendKind::Auto, None);
+        let backend = auto_backend(BackendKind::Auto);
         #[cfg(all(target_os = "macos", feature = "ane"))]
         {
             // ANE feature is active on macOS — auto selects ANE

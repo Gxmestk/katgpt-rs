@@ -87,7 +87,7 @@ These are all composition-of-known-parts. The contribution is: **(a) the demonst
 | Error accumulation | Per-step Euler error compounding `O(T·dt²)` | Well-known numerical analysis; our `tau_reest` re-estimation trigger exists BECAUSE of it |
 | Material conditioning (rigid/elastic) | Motor-gated channels (multiplicative gain on specific channels) | `evolve_motor_gated_field`, Plan 357 |
 | Generative uncertainty (5 diverse futures) | K-hypothesis trajectory sampling (BoMSampler extended to trajectories) | `best_belief.rs` (single-step); trajectory-level NOT shipped |
-| Factorized attention (time/space/object) | Alternating attention (SHINE M2P transformer) | `riir-gpu/src/hypernet/m2p_transformer.rs` (hypernet, not game NPC) |
+| Factorized attention (time/space/object) | Alternating attention (SHINE M2P transformer) | `riir-ai/crates/riir-gpu/src/hypernet/m2p_transformer.rs` (hypernet, not game NPC) |
 | Register tokens (global context) | Standard ViT technique | N/A for DEC (DEC has no attention) |
 
 **Grep verification:** paper-vocabulary grep (`PhysiFormer|mesh.*diffusion|vertex.*trajectory|single.shot.*diffusion`) returned **zero hits** across all five repos. Codebase-vocabulary grep (`evolve_motor_gated|heat_kernel|hodge_laplacian|expm`) hit: `evolve_motor_gated_field` (Plan 357, step-by-step), `heat_kernel_weights` (slod.rs, KG only), no DEC trajectory exponential. **The single-shot DEC heat kernel trajectory primitive does not ship.**

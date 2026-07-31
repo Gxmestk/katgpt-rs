@@ -59,13 +59,13 @@ in softmax/attention. Measure before/after with release benchmarks.
 | File | Changes |
 |---|---|
 | `src/types.rs` | Added `softmax_scaled()` — fused temperature+softmax |
-| `src/transformer.rs` | Added 3 buffers to `ForwardContext`, eliminated `forward_paged` allocs, added `raven_compute_router_into`, added 2 buffers to `RavenKVCache`, fixed `forward_raven` allocs, fused `generate_into` softmax |
-| `src/speculative/verifier.rs` | Eliminated 4× `logits.to_vec()` in `LeviathanVerifier::speculate`, used `softmax_scaled` |
-| `src/speculative/step.rs` | Replaced 11× temp-div+softmax with `softmax_scaled` across 5 functions |
-| `src/speculative/dflash.rs` | Replaced 4× temp-div+softmax with `softmax_scaled` |
-| `src/speculative/ppot/entropy.rs` | Added `_with_entropy_into` variants for zero-double-compute entropy+positions |
+| `crates/katgpt-percepta/src/transformer.rs` | Added 3 buffers to `ForwardContext`, eliminated `forward_paged` allocs, added `raven_compute_router_into`, added 2 buffers to `RavenKVCache`, fixed `forward_raven` allocs, fused `generate_into` softmax |
+| `crates/katgpt-speculative/src/spechop/verifier.rs` | Eliminated 4× `logits.to_vec()` in `LeviathanVerifier::speculate`, used `softmax_scaled` |
+| `crates/katgpt-forward/src/step.rs` | Replaced 11× temp-div+softmax with `softmax_scaled` across 5 functions |
+| `crates/katgpt-speculative/src/dflash.rs` | Replaced 4× temp-div+softmax with `softmax_scaled` |
+| `crates/katgpt-speculative/src/ppot/entropy.rs` | Added `_with_entropy_into` variants for zero-double-compute entropy+positions |
 | `src/speculative/ppot/resample.rs` | Updated `ppot_rescue_adaptive` to use new entropy functions |
-| `src/benchmark.rs` | Replaced 2× temp-div+softmax with `softmax_scaled` |
+| `src/benchmark/mod.rs` | Replaced 2× temp-div+softmax with `softmax_scaled` |
 
 ## Key Design Decisions
 1. **`softmax_scaled(x, inv_temp)`** as a new function rather than modifying `softmax` signature — backward compatible, callers opt-in

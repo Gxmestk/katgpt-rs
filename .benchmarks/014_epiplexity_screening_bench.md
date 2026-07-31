@@ -129,8 +129,8 @@ cargo test -p katgpt-rs --features epiplexity_scoring --test test_130_epiplexity
 # GOAT proofs
 cargo test -p katgpt-rs --features epiplexity_scoring --test test_130_epiplexity_goat
 
-# All together
-cargo test -p katgpt-rs --features epiplexity_scoring --test test_130_epiplexity
+# All together (run both test files)
+cargo test -p katgpt-rs --features epiplexity_scoring --test test_130_epiplexity_integration --test test_130_epiplexity_goat
 ```
 
 ---

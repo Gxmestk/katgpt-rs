@@ -13,7 +13,7 @@
 /// from the full vocabulary (unrestricted).
 ///
 /// Support sets are heuristic defaults for character-level tokenizers.
-/// BPE tokenizers should override via [`PpotConfig::custom_support`].
+/// BPE tokenizers should override via `PpotConfig::with_cached_support`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[repr(u8)]
 pub enum TokenRule {
@@ -47,7 +47,7 @@ impl TokenRule {
     /// Returns the support set (allowed token IDs) for this rule.
     ///
     /// For character-level tokenizers, these are direct mappings.
-    /// For BPE tokenizers, use [`PpotConfig::custom_support`] to override.
+    /// For BPE tokenizers, use `PpotConfig::with_cached_support` to override.
     pub fn support(&self, vocab_size: usize) -> Vec<usize> {
         match self {
             TokenRule::Digit => (0..10.min(vocab_size)).collect(),
@@ -342,7 +342,7 @@ impl PpotConfig {
         self
     }
 
-    /// Returns `true` if cached support sets have been pre-computed via [`with_cached_support`].
+    /// Returns `true` if cached support sets have been pre-computed via [`Self::with_cached_support`].
     #[inline]
     pub fn has_cached_support(&self) -> bool {
         self.cached_support.is_some()
@@ -350,7 +350,7 @@ impl PpotConfig {
 
     /// Return the cached support set for `rule`.
     ///
-    /// **Panics** if [`with_cached_support`] was not called before this method.
+    /// **Panics** if [`Self::with_cached_support`] was not called before this method.
     /// Zero-allocation hot path — returns a slice into the pre-computed array.
     #[inline]
     pub fn support_for(&self, rule: TokenRule) -> &[usize] {

@@ -128,8 +128,9 @@ impl Default for MarginalBestBuddyAligner {
 impl BestBuddyAligner for MarginalBestBuddyAligner {
     fn mutual_agreement(&self, draft_top_k: &[f32], target_top_k: &[f32]) -> f32 {
         let corr = pearson_correlation(draft_top_k, target_top_k);
-        // Sigmoid maps [-1, 1] → [0, 1] with threshold sensitivity
-        1.0 / (1.0 + (-(corr - self.threshold) * 5.0).exp())
+        // Sigmoid maps [-1, 1] → [0, 1] with threshold sensitivity.
+        // Delegates to `katgpt_core::simd::fast_sigmoid` (Cephes polynomial).
+        katgpt_core::simd::fast_sigmoid((corr - self.threshold) * 5.0)
     }
 
     fn batch_alignment_confidence(

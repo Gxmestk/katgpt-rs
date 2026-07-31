@@ -11,8 +11,8 @@ Implemented `D2fDrafterVerifier` — a speculative verifier that uses D2F diffus
 | Aspect | Result |
 |--------|--------|
 | Feature gate | `tri_mode` (depends on `dllm`) |
-| New files | `speculative/d2f_verifier.rs`, `tests/test_d2f_verifier.rs` |
-| Modified files | `speculative/types.rs`, `speculative/mod.rs`, `dllm.rs` |
+| New files | `src/speculative/d2f_verifier.rs`, `tests/test_d2f_verifier.rs` |
+| Modified files | `crates/katgpt-core/src/speculative/types.rs`, `crates/katgpt-core/src/speculative/mod.rs`, `dllm.rs` |
 | Lines added | ~250 (impl + tests) |
 | Zero regressions | ✅ All 668 existing tests pass |
 
@@ -95,9 +95,9 @@ The existing `masked_loss()` already implemented global averaging. The new enum 
 | `src/speculative/d2f_verifier.rs` | **NEW**: `D2fDrafterVerifier` — SpeculativeVerifier impl |
 | `src/speculative/types.rs` | Added `SelfSpeculation` variant, `SelfSpecConfig`, updated `recommend()` |
 | `src/speculative/mod.rs` | Added `d2f_verifier` module + re-exports |
-| `src/dllm.rs` | Added `LossAveraging` enum, updated `masked_loss()` signature |
+| `riir-ai/crates/riir-engine/src/transformer/dllm.rs` | Added `LossAveraging` enum, updated `masked_loss()` signature |
 | `tests/test_d2f_verifier.rs` | **NEW**: 5 GOAT proof tests |
-| `src/dllm.rs`, `src/speculative/d2f.rs`, tests/ | Fixed `Config::dllm_micro()` → `Config::micro_dllm()` |
+| `riir-ai/crates/riir-engine/src/transformer/dllm.rs`, `src/speculative/d2f.rs`, tests/ | Fixed `Config::dllm_micro()` → `Config::micro_dllm()` |
 
 ## Deferred Tasks
 

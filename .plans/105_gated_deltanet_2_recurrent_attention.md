@@ -71,7 +71,7 @@ Implement Gated DeltaNet-2 (GDN2) recurrent attention as an alternative to HLA/A
 ### Phase 6: Documentation
 - [x] **T19:** Update `README.md` — add GDN2 section under HLA, with benchmark table placeholder
 - [x] **T20:** Update `.docs/15_paper_feature_comparison.md` — add GDN2 row
-- [x] **T21:** Update `src/gdn2/mod.rs` doc comment with usage example and state size comparison table
+- [x] **T21:** Update `crates/katgpt-attn/src/gdn2/mod.rs` doc comment with usage example and state size comparison table
 
 ## Architecture
 

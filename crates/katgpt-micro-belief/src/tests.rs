@@ -221,7 +221,7 @@ fn g1_4_attractor_step_32_under_100ns() {
     // Bottleneck: 32 `fast_sigmoid` calls (each ~5ns due to `exp()`) + 64
     // `simd_dot_f32` calls of length 32 (function-call overhead dominates
     // at this small dim). The attractor does a full dim×dim matvec, which is
-    // fundamentally more work than HLA's leaky integrator (the baseline).
+    // fundamentally more work than belief's leaky integrator (the baseline).
     //
     // Per Plan 276 R2 mitigation: tracked in
     // `.benchmarks/276_micro_belief_goat.md` (originally Issue 024,
@@ -380,11 +380,11 @@ fn g1_5_snapshot_atomicity() {
 // TODO(Plan 276 Phase 5 T5.0): Build the G2.1 coherence benchmark — a
 // synthetic 1000-step input sequence with injected ambiguity / flip-flop
 // triggers (analog of the paper's "bank" polysemy adapted to NPC dialogue).
-// Run `LeakyIntegrator` (HLA default) vs `AttractorKernel` (Family A). Measure
+// Run `LeakyIntegrator` (belief default) vs `AttractorKernel` (Family A). Measure
 // flip-flop rate + belief stability over a sliding window.
 //
 // This is the ACTUAL GOAT gate for the attractor quality claim: does attractor
-// update reduce long-horizon flip-flops vs HLA's leaky integrator? If yes →
+// update reduce long-horizon flip-flops vs belief's leaky integrator? If yes →
 // promote `micro_belief_attractor` as opt-in variant. If no → demote to Gain.
 //
 // Out of scope for Phase 1 — requires a longer input generator + a flip-flop
@@ -402,7 +402,7 @@ fn g1_5_snapshot_atomicity() {
 fn trait_is_object_safe_and_dispatches() {
     let kernels: Vec<Box<dyn MicroRecurrentBeliefState>> = vec![
         Box::new(AttractorKernel::from_seed(42, 32)),
-        Box::new(crate::leaky::LeakyIntegrator::hla_default(32)),
+        Box::new(crate::leaky::LeakyIntegrator::belief_default(32)),
     ];
     let mut state = vec![0.0f32; 32];
     let input = vec![0.3f32; 32];

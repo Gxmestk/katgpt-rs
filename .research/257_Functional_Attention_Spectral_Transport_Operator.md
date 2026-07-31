@@ -21,7 +21,7 @@ $$\text{FUNCATTN}(Q,K,V) = \Phi \, C^* \, \tilde V$$
 
 Complexity is **linear in n** (`O(ndk + dk·min(k,d) + min(k,d)³)`, k≪n), the operator is **resolution-invariant** (train at n=2048, test at n=8192), and **Lipschitz continuity is bounded by λ** (Prop 4.5: ‖∂A‖ ≤ (C₁/λ + C₂/λ²)·‖ΔX‖). The paper shows SOTA on 6 PDE benchmarks + RNA segmentation + OOD AirfRANS, beating Transolver 6–26%.
 
-**Distilled for katgpt-rs (modelless, inference-time):** the *closed-form Tikhonov solve in spectral space* is a fully inference-time primitive — given pre-trained basis matrices Φ, Ψ (small `d→k` projections), the attention output is pure linear algebra (one small Cholesky/Schur solve + three matmuls). No gradient, no in-place weight mutation. The mechanism **recovers Intention (Garnelo & Czarnecki 2023) as a special case** when Φ=Ψ=orthonormal full basis. It also **recovers the Schur-complement least-squares solver already shipped in `riir-gpu/schur.rs`** (Plan 067) — meaning the math is already in our stack, just framed as a *training* primitive rather than as an *attention operator*.
+**Distilled for katgpt-rs (modelless, inference-time):** the *closed-form Tikhonov solve in spectral space* is a fully inference-time primitive — given pre-trained basis matrices Φ, Ψ (small `d→k` projections), the attention output is pure linear algebra (one small Cholesky/Schur solve + three matmuls). No gradient, no in-place weight mutation. The mechanism **recovers Intention (Garnelo & Czarnecki 2023) as a special case** when Φ=Ψ=orthonormal full basis. It also **recovers the Schur-complement least-squares solver already shipped in `riir-train/crates/riir-train-engine/src/schur.rs`** (Plan 067) — meaning the math is already in our stack, just framed as a *training* primitive rather than as an *attention operator*.
 
 **Verdict: GOAT.** Reasoning below (§3).
 
@@ -110,12 +110,12 @@ All steps are matmuls or a single k×k Cholesky/Schur solve (k=64 typically). No
 
 | Paper piece | Already shipped? | Where | Notes |
 |---|---|---|---|
-| Closed-form ridge solve `M(M^TM+λI)^{-1}` | ✅ | `riir-ai/crates/riir-gpu/src/schur.rs` (Plan 067, riir-train) | SchurSolver::solve_unconstrained solves `Qz*=-p` with `Q=X^TX+λI` via Cholesky. Same math, framed as training primitive. |
-| Eigenbasis / spectral basis | ✅ | `katgpt-rs/src/spectralquant/spectral.rs` (Plan 077) | `calibrate_eigenbasis` from sample covariance. SpectralQuant's per-dim eigenbasis rotation IS the "fixed basis" ablation row in Tab 7. |
-| Linear attention + sigmoid basis | ✅ | `katgpt-rs/crates/katgpt-core/src/parallax_attn.rs` (Plan 135) | `ParallaxActivation::Sigmoid` is the default — partition-of-unity kernel `K(x,y)=σ(x·y·s)`. Different operator (NW correction), same sigmoid-partition-of-unity idea. |
+| Closed-form ridge solve `M(M^TM+λI)^{-1}` | ✅ | `riir-train/crates/riir-train-engine/src/schur.rs` (Plan 067, riir-train) | SchurSolver::solve_unconstrained solves `Qz*=-p` with `Q=X^TX+λI` via Cholesky. Same math, framed as training primitive. |
+| Eigenbasis / spectral basis | ✅ | `katgpt-rs/crates/katgpt-spectral/src/spectral.rs` (Plan 077) | `calibrate_eigenbasis` from sample covariance. SpectralQuant's per-dim eigenbasis rotation IS the "fixed basis" ablation row in Tab 7. |
+| Linear attention + sigmoid basis | ✅ | `katgpt-rs/crates/katgpt-core/src/parallax_attn/mod.rs` (Plan 135) | `ParallaxActivation::Sigmoid` is the default — partition-of-unity kernel `K(x,y)=σ(x·y·s)`. Different operator (NW correction), same sigmoid-partition-of-unity idea. |
 | Streaming second-order state | ✅ | `katgpt-rs/src/hla/` (Plan 057) | O(1) outer-product accumulator. Different math (no closed-form solve) but solves the same problem (linear attention with bounded state). |
-| Latent operator between spaces | ✅ (rank-1) | `riir-ai/crates/riir-engine/src/latent_functor/arithmetic.rs` (Plan 303) | `extract_functor`: `f = mean_k(target_k - source_k)`, coherence `mean_k cos(...)`. **This is the rank-1 special case of FUNCATTN's k×k operator C.** Apply via `out = source + f` (additive). |
-| Per-NPC recurrent belief kernel | ✅ | `katgpt-rs/crates/katgpt-core/src/sense/reconstruction.rs` (`evolve_hla`) | No research note framing it as such — per the workflow's canonical failure mode. |
+| Latent operator between spaces | ✅ (rank-1) | `katgpt-rs/crates/katgpt-percepta/src/wasm/interpreter/arithmetic.rs` (Plan 303) | `extract_functor`: `f = mean_k(target_k - source_k)`, coherence `mean_k cos(...)`. **This is the rank-1 special case of FUNCATTN's k×k operator C.** Apply via `out = source + f` (additive). |
+| Per-NPC recurrent belief kernel | ✅ | `katgpt-rs/crates/katgpt-sense/src/reconstruction.rs` (`evolve_hla`) | No research note framing it as such — per the workflow's canonical failure mode. |
 | Freeze/thaw snapshot of direction vectors | ✅ | `riir-ai/crates/riir-engine/src/latent_functor/table.rs` | `FunctorEntry { direction, coherence, version: Uuid::now_v7(), commitment: [u8;32] }`. Atomic Arc-swap. Versioned. BLAKE3-committed. |
 
 ### 2.3 Closest cousins (3)
@@ -130,7 +130,7 @@ All steps are matmuls or a single k×k Cholesky/Schur solve (k=64 typically). No
 
 #### Fusion F1 (PRIMARY — riir-ai): Latent Functor rank-1 → rank-k
 
-**The combination:** `latent_functor/arithmetic.rs` × FUNCATTN × SchurSolver × `latent_functor/reestimation.rs` (Plan 303's coherence-driven scheduler).
+**The combination:** `crates/katgpt-percepta/src/wasm/interpreter/arithmetic.rs` × FUNCATTN × SchurSolver × `riir-ai/crates/riir-engine/src/latent_functor/reestimation/mod.rs` (Plan 303's coherence-driven scheduler).
 
 Today `extract_functor` learns `f = mean_k(target_k - source_k)` — a single displacement vector per (NPC, relation). This captures only **monotonic translational** relations: "if A fears B, A's embedding shifts by f". It cannot represent **rotational / multi-axis** relations like "A's fear of B is high-arousal-low-valence but A's admiration of C is low-arousal-high-valence" — those bend multiple semantic axes simultaneously and need a k×k operator, not a single direction.
 
@@ -214,7 +214,7 @@ The paper uses softmax for its basis (Eq. 9). AGENTS.md mandates sigmoid. **The 
 
 FUNCATTN is the **functional-maps framework applied to attention**: replace softmax pairwise affinities with a closed-form ridge-regularized k×k operator between learned adaptive bases. Linear-in-n, resolution-invariant, Lipschitz-bounded by λ. The math (ridge solve, eigenbasis, sigmoid partition-of-unity) is already distributed across our stack (Schur/SpectralQuant/Parallax/latent_functor). **GOAT verdict**: primary value is the riir-ai rank-1 → rank-k latent_functor upgrade (concrete game-domain gain, extends existing Super-GOAT 123/303); katgpt-rs open primitive is Gain-tier behind feature flag (paper itself hasn't shown NLP gain). Not Super-GOAT because (a) no novel math, (b) extends an existing pillar rather than creating one. **Fusion F1 is the headline** — rank-k functor with closed-form ridge re-estimation unblocks multi-axis NPC relations, the difference between linear-affine and manifold-aware NPC minds.
 
-**Issue 363 Update (2026-07-02):** Fusion F1's rank-k operator has been extended to **n-ary coalitions** via `HyperKgFunctorEdge` (`riir-ai/crates/riir-engine/src/kg_hyperedge.rs` Phase 5). The operator maps the mean-pool of participant states to coalition-level state, generalizing from pairwise `(A→B)` to coalition `({A,B,C,...}→state)`. This is the functional edge × hyperedge fusion that the original F1 framing gestured at ("non-translational relations") but didn't wire for n-ary. O(N) coalition prediction vs O(N²) pairwise. See Research 123 §Issue 363 Update for the full gain table.
+**Issue 363 Update (2026-07-02):** Fusion F1's rank-k operator has been extended to **n-ary coalitions** via `HyperKgFunctorEdge` (`riir-ai/crates/riir-engine/src/kg_hyperedge/mod.rs` Phase 5). The operator maps the mean-pool of participant states to coalition-level state, generalizing from pairwise `(A→B)` to coalition `({A,B,C,...}→state)`. This is the functional edge × hyperedge fusion that the original F1 framing gestured at ("non-translational relations") but didn't wire for n-ary. O(N) coalition prediction vs O(N²) pairwise. See Research 123 §Issue 363 Update for the full gain table.
 
 ---
 

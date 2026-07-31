@@ -474,7 +474,7 @@ The biggest architectural gap. We need:
 
 5. **Serialization**: Save/load calibration data (eigenvalues, eigenvectors, d_eff, spectral gap) per (layer, head). JSON or binary.
 
-Estimated size: ~500 lines in new `src/turboquant/calibration.rs`.
+Estimated size: ~500 lines in new `crates/katgpt-speculative/src/rt_turbo/calibration.rs`.
 
 ### Priority 2: Spectral Rotation (Extends `rotation.rs`)
 

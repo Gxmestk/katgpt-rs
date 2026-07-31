@@ -50,7 +50,7 @@ pub enum FoldDecision {
 }
 
 impl FoldDecision {
-    /// Relevance score for [`ScreeningPruner`] integration.
+    /// Relevance score for `ScreeningPruner` integration.
     ///
     /// Returns `1.0` for kept/anchor steps, `0.0` for folded steps.
     #[inline]

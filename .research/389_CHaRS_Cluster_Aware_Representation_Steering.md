@@ -213,7 +213,7 @@ pub fn chars_steering_into<const K: usize, const D: usize>(
 
 **F1 (PRIMARY — katgpt-rs + riir-ai, candidate): CHaRS × CommittedFieldBlend × latent_functor re-estimation = "per-NPC archetype-routing steering that adapts when the NPC's latent region shifts"**
 
-CommittedFieldBlend commits an NPC's personality as a fixed K=3 archetype blend. CHaRS gives **per-input soft routing** over an anchor bank. Fuse: the anchor bank `{a_i, b_j, v_ij}` is the NPC's **committed archetype library** (the K frozen fields), and CHaRS computes the per-tick routing weight from the NPC's *current HLA position* in latent space. When the NPC drifts into a new latent region (e.g., from social to combat), the RBF gate shifts weight to the combat archetype's translation vector automatically. The `ReestimationScheduler` (latent_functor/reestimation.rs) triggers a bank re-commit when coherence drops below `tau_reest`.
+CommittedFieldBlend commits an NPC's personality as a fixed K=3 archetype blend. CHaRS gives **per-input soft routing** over an anchor bank. Fuse: the anchor bank `{a_i, b_j, v_ij}` is the NPC's **committed archetype library** (the K frozen fields), and CHaRS computes the per-tick routing weight from the NPC's *current HLA position* in latent space. When the NPC drifts into a new latent region (e.g., from social to combat), the RBF gate shifts weight to the combat archetype's translation vector automatically. The `ReestimationScheduler` (riir-ai/crates/riir-engine/src/latent_functor/reestimation/mod.rs) triggers a bank re-commit when coherence drops below `tau_reest`.
 
 **Selling point (candidate):** "NPCs that are steered by their *current* affective region, not a single global personality vector — a wolf in hunt-mode is steered by the hunt archetype's translation, the same wolf in pack-mode by the social archetype's, with smooth sigmoid-gated transitions as its HLA state moves between regions."
 
@@ -341,7 +341,7 @@ If the F1 fusion (Issue 039) promotes to Super-GOAT candidate, §3.6 applies in 
 
 6. **Compositional ordering with CommittedFieldBlend.** If an NPC has both a committed archetype blend π (Plan 321) and a CHaRS anchor bank, in what order do they apply? `π-blend then CHaRS-steer` (F1 fusion) or `CHaRS-steer then π-blend`? Non-commutative. **Mitigation:** F1 Issue 039 must specify the ordering and verify it preserves CommittedFieldBlend's sampling-invariance contract (FAME Prop. 3).
 
-7. **OT plan drift under contrastive-corpus shift.** The frozen OT plan `P⋆` is computed once offline. If the contrastive corpora drift (new game content, new NPC archetypes), the plan becomes stale. **Mitigation:** `ReestimationScheduler` (latent_functor/reestimation.rs) triggers a re-fit when coherence drops below `tau_reest` — same mechanism as F1 fusion. Re-fit cost is offline, not hot-path.
+7. **OT plan drift under contrastive-corpus shift.** The frozen OT plan `P⋆` is computed once offline. If the contrastive corpora drift (new game content, new NPC archetypes), the plan becomes stale. **Mitigation:** `ReestimationScheduler` (riir-ai/crates/riir-engine/src/latent_functor/reestimation/mod.rs) triggers a re-fit when coherence drops below `tau_reest` — same mechanism as F1 fusion. Re-fit cost is offline, not hot-path.
 
 ---
 

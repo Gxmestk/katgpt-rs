@@ -2,7 +2,7 @@
 
 **Date:** 2026-06-18
 **Plan:** [291_d2f_three_state_warm_start.md](../.plans/291_d2f_three_state_warm_start.md)
-**Research:** [265_CoFRe_FP_MGM_Three_State_Reuse.md](../.research/265_CoFRe_FP_MGM_Three_State_Reuse.md)
+**Research:** [437_CoFRe_FP_MGM_Three_State_Reuse.md](../.research/437_CoFRe_FP_MGM_Three_State_Reuse.md)
 **Source paper:** [arXiv:2605.31215](https://arxiv.org/abs/2605.31215) — Miele et al., "Fixed-Point Masked Generative Modeling" (CoFRe)
 **Feature flag:** `d2f_3sr_warm_start` (opt-in, **NOT promoted to default — D2F is opt-in research**)
 **Test:** `tests/bench_291_d2f_3sr_warm_start_goat.rs`
@@ -115,7 +115,7 @@ All 11 tests pass. The feature is sound — it just doesn't show measurable gain
 
 ## Files
 
-- Implementation: `src/dllm_solver.rs` (ThreeStateReuseConfig + 3SR primitives, ~279 lines added); `src/dllm.rs` (BidirectionalContext extension + `denoise_loop_rcd_3sr`, ~462 lines added).
+- Implementation: `crates/katgpt-core/src/dllm_solver.rs` (ThreeStateReuseConfig + 3SR primitives, ~279 lines added); `riir-ai/crates/riir-engine/src/transformer/dllm.rs` (BidirectionalContext extension + `denoise_loop_rcd_3sr`, ~462 lines added).
 - Feature flag: `d2f_3sr_warm_start = ["rcd_residual", "lt2_looped", "dllm"]` in root `Cargo.toml`.
 - GOAT test: `tests/bench_291_d2f_3sr_warm_start_goat.rs` (3 tests, all pass).
 

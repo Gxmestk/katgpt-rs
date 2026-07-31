@@ -52,7 +52,7 @@ IterativeChunkCompactor
 ## Tasks
 
 ### Phase 1: Core Infrastructure
-- [x] T1: Create `src/still_kv/mod.rs` with feature gate `still_kv`
+- [x] T1: Create `crates/katgpt-kv/src/still_kv/mod.rs` with feature gate `still_kv`
 - [x] T2: Implement `PositionFreeCompactor` — RoPE un-rotate/re-rotate using existing RoPE infra
 - [x] T3: Implement `CompactKVCache` struct with `position_offset` field
 - [x] T4: Extend `QuantizedKVCache` trait with `compact_into()` method (default impl returns error)

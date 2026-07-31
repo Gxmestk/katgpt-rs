@@ -73,13 +73,13 @@ use crate::types::rmsnorm_with_gamma;
 /// high 32 bits so that `u64` comparison orders by score first (min-heap by
 /// score), then by slot index for deterministic tie-breaking.
 #[inline(always)]
-fn pack(score_bits: u32, slot: u32) -> u64 {
+pub(crate) fn pack(score_bits: u32, slot: u32) -> u64 {
     ((score_bits as u64) << 32) | (slot as u64)
 }
 
 /// Unpack a `u64` heap entry into `(score_bits, slot_idx)`.
 #[inline(always)]
-fn unpack(packed: u64) -> (u32, u32) {
+pub(crate) fn unpack(packed: u64) -> (u32, u32) {
     let score_bits = (packed >> 32) as u32;
     let slot = packed as u32;
     (score_bits, slot)
@@ -88,7 +88,7 @@ fn unpack(packed: u64) -> (u32, u32) {
 /// Sift-up for a min-heap stored as `&mut [u64]`. Bubbles the element at index
 /// `i` up until the heap property is restored. O(log n).
 #[inline]
-fn sift_up(heap: &mut [u64], mut i: usize) {
+pub(crate) fn sift_up(heap: &mut [u64], mut i: usize) {
     while i > 0 {
         let parent = (i - 1) / 2;
         if heap[i] < heap[parent] {
@@ -103,7 +103,7 @@ fn sift_up(heap: &mut [u64], mut i: usize) {
 /// Sift-down for a min-heap stored as `&mut [u64]`. Bubbles the element at
 /// index `i` down until the heap property is restored. O(log n).
 #[inline]
-fn sift_down(heap: &mut [u64], mut i: usize, len: usize) {
+pub(crate) fn sift_down(heap: &mut [u64], mut i: usize, len: usize) {
     loop {
         let left = 2 * i + 1;
         let right = 2 * i + 2;
@@ -586,15 +586,16 @@ fn streaming_softmax_acc<const D: usize>(
     max_logit: &mut f32,
     sum_exp: &mut f32,
 ) {
+    use crate::simd::fast_exp;
     if logit > *max_logit {
-        let rescale = (*max_logit - logit).exp();
+        let rescale = fast_exp(*max_logit - logit);
         *sum_exp = *sum_exp * rescale + 1.0;
         for d in 0..D {
             out[d] = out[d] * rescale + val[d];
         }
         *max_logit = logit;
     } else {
-        let weight = (logit - *max_logit).exp();
+        let weight = fast_exp(logit - *max_logit);
         *sum_exp += weight;
         for d in 0..D {
             out[d] += weight * val[d];
@@ -611,9 +612,10 @@ fn streaming_softmax_acc_slice<const D: usize>(
     max_logit: &mut f32,
     sum_exp: &mut f32,
 ) {
+    use crate::simd::fast_exp;
     let d = val.len();
     if logit > *max_logit {
-        let rescale = (*max_logit - logit).exp();
+        let rescale = fast_exp(*max_logit - logit);
         *sum_exp = *sum_exp * rescale + 1.0;
         for j in 0..d {
             out[j] = out[j] * rescale + val[j];
@@ -624,7 +626,7 @@ fn streaming_softmax_acc_slice<const D: usize>(
         }
         *max_logit = logit;
     } else {
-        let weight = (logit - *max_logit).exp();
+        let weight = fast_exp(logit - *max_logit);
         *sum_exp += weight;
         for j in 0..d {
             out[j] += weight * val[j];

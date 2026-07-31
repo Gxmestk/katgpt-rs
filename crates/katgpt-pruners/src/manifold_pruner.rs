@@ -37,14 +37,14 @@ impl<P: ConstraintPruner> ConstraintPruner for ManifoldPruner<P> {
                 // Has geometric constraint: use sigmoid softened score
                 let raw = self.inner.manifold_score(depth, token_idx, parent_tokens);
                 let x = (raw - 0.5) / self.temperature;
-                1.0 / (1.0 + (-x).exp())
+                katgpt_core::simd::fast_sigmoid(x)
             }
             None => {
                 // Binary fallback: sigmoid around boundary
                 let valid = self.inner.is_valid(depth, token_idx, parent_tokens);
                 match valid {
-                    true => 1.0 / (1.0 + (-1.0 / self.temperature).exp()),
-                    false => 1.0 / (1.0 + (1.0 / self.temperature).exp()),
+                    true => katgpt_core::simd::fast_sigmoid(1.0 / self.temperature),
+                    false => katgpt_core::simd::fast_sigmoid(-1.0 / self.temperature),
                 }
             }
         }

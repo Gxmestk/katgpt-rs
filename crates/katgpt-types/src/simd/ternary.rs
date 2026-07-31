@@ -6,7 +6,20 @@
 #![allow(clippy::needless_range_loop, clippy::too_many_arguments)]
 
 #[cfg(feature = "plasma_path")]
-use super::{SimdLevel, simd_level};
+use super::simd_level;
+// `SimdLevel` is only referenced inside target_arch-gated match arms (NEON/
+// AVX2/WasmSimd128). On targets where none of those arms compile (e.g. plain
+// wasm32 without simd128, or scalar fallbacks), the bare import would trigger
+// an unused-import warning under `-D warnings`. Gate it to match the arms.
+#[cfg(all(
+    feature = "plasma_path",
+    any(
+        target_arch = "aarch64",
+        target_arch = "x86_64",
+        all(target_arch = "wasm32", target_feature = "simd128"),
+    ),
+))]
+use super::SimdLevel;
 
 // `horizontal_sum_256` is only used by the AVX2 ternary kernel, which itself
 // requires both `plasma_path` and `x86_64`. Gate the import identically so
@@ -17,7 +30,7 @@ use super::horizontal::horizontal_sum_256;
 #[cfg(feature = "plasma_path")]
 use crate::TernaryWeights;
 
-/// Scalar reference ternary matvec: y[r] = row_scale[r] * Σ(col → sign(pos_bit, neg_bit) * x[col])
+/// Scalar reference ternary matvec: `y[r] = row_scale[r] * Σ(col → sign(pos_bit, neg_bit) * x[col])`
 #[cfg(feature = "plasma_path")]
 #[allow(clippy::needless_range_loop)]
 pub fn ternary_matvec_scalar(w: &TernaryWeights, x: &[f32], y: &mut [f32]) {
@@ -523,7 +536,7 @@ pub fn simd_ternary_matvec(w: &TernaryWeights, x: &[f32], y: &mut [f32]) {
     }
 }
 
-/// Batched ternary matmul: for each batch[i], compute y[i] = W × batch[i].
+/// Batched ternary matmul: for each `batch[i]`, compute `y[i] = W × batch[i]`.
 #[cfg(feature = "plasma_path")]
 #[inline]
 pub fn simd_ternary_matmul_batch(w: &TernaryWeights, x: &[f32], batch: usize, y: &mut [f32]) {

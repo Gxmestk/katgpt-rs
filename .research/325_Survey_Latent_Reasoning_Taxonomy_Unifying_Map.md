@@ -6,7 +6,8 @@
 > **Related Research:** 028 (HLA), 034 (D2F), 035 (Attractor), 048 (HRM), 073 (LT2), 097 (Training-Free Looped), 158 (MUX), 175 (ThoughtFold), 192 (NextLat), 230 (SSD duality), 241 (SwiR switch), 242 (Topological recurrent belief), 263 (Latent Thought Flow), 265 (CoFRe FP-MGM), 266 (FPRM damped halting), 273 (ELT), 282 (LoopCoder-V2), 317 (Reasoning as attractor)
 > **Related Plans:** 025 (bidirectional prefill), 066 (D2F), 108 (LT2 looped), 136 (TF Loop), 217 (NextLat drafter), 276 (MicroRecurrentBeliefState), 291 (D2F 3SR warm-start)
 > **Classification:** Public
-> **Verdict: Gain** — survey, not a new mechanism. Value is a unifying taxonomy that maps the codebase's scattered latent-reasoning corpus to a single frame, prevents future false-Super-GOAT claims in this saturated corner, and surfaces two narrow fusion gaps (bidirectional dKV-Cache for diffusion; explicit "depth-from-optimization-over-time" bridge framing for `latent_functor/reestimation.rs`).
+> **PASS-Redirects (synthesis):** Zhang et al. [arXiv:2605.02735 "Visual Latents Know More Than They Say: Unsilencing Latent Reasoning in MLLMs"] — **PASS**. Falls under the survey's **vertical recurrence / activation-based** family (§3.1, sub-family "hidden-state feedback" with Coconut/CoTFormer). Refinement of LATENTSEEK (R347) for the MLLM-visual setting: Stage I (contrastive latent alignment) decomposes to CNA/Latent Field Steering/CHaRS — shipped; Stage II (monotone output-entropy concentration along the latent span) is **genuinely unshipped** as a named primitive (an earlier draft of this cross-ref incorrectly cited Progressive MCGS Plan 272 — that's branch-selection entropy over search time, a different axis). The Stage II primitive is trivially constructable (one sigmoid gate per position with monotone schedule) but has no consumer today (HLA/functor/CLR paths are single-state, not latent sequences). Adds no new family to the §2 vocabulary crosswalk.
+> **Verdict: Gain** — survey, not a new mechanism. Value is a unifying taxonomy that maps the codebase's scattered latent-reasoning corpus to a single frame, prevents future false-Super-GOAT claims in this saturated corner, and surfaces two narrow fusion gaps (bidirectional dKV-Cache for diffusion; explicit "depth-from-optimization-over-time" bridge framing for `riir-ai/crates/riir-engine/src/latent_functor/reestimation/mod.rs`).
 
 ---
 
@@ -94,7 +95,7 @@ This is the load-bearing section. **Every survey family is already represented.*
 | horizontal recurrence / hidden state | HLA, AHLA, Raven RSM, δ-Mem, MicroBelief | `katgpt-core/src/sense/`, Raven RSM slot memory |
 | linear-state recurrence | HLA / AHLA second-order SK accumulator | Research 028; `AHLAState` |
 | gradient-state recurrence / fast weights | LoRA reader-writer hot-swap, raw/lora (deterministic) | `LoraPair`, `dispatch_lora_merge` (riir-ai) |
-| hidden state as fast weights / TTT | `latent_functor/reestimation.rs` coherence-driven re-estimation | riir-ai (the canonical vocabulary-mismatch example) |
+| hidden state as fast weights / TTT | `riir-ai/crates/riir-engine/src/latent_functor/reestimation/mod.rs` coherence-driven re-estimation | riir-ai (the canonical vocabulary-mismatch example) |
 | Pre/Loop/Coda | `LoopMode::{None, Count}`, hybrid SDPA+AHLA 1:4 | Plan 108, `.benchmarks/033_lt2_looped_goat.md` |
 | early-exit / `max_t Δh < ε` | FPRM damped halting, LoopCoder-V2 gain-cost halting | Research 266, 282; `GainCostLoopHalter` |
 | attractor / fixed-point | Attractor kernel (Family A), FPRM | Research 035, 266, 317 |
@@ -123,7 +124,7 @@ This is the load-bearing section. **Every survey family is already represented.*
 - **HLA / AHLA (Research 028)** — higher-order linear attention, second-order SK accumulator, O(d·dv) state. This IS the survey's "linear-state recurrence" family, shipped before the survey.
 - **Raven RSM (Research 006)** — O(1) routing slot memory.
 - **δ-Mem / Dual-Pool Reachable Router (Research 024, 249; Plan 282)** — online associative memory, non-trapping router.
-- **MicroBelief / LeakyIntegrator (Plan 276)** — Family C, byte-identical to `evolve_hla` (`katgpt-core/src/sense/reconstruction.rs`).
+- **MicroBelief / LeakyIntegrator (Plan 276)** — Family C, byte-identical to `evolve_hla` (`crates/katgpt-sense/src/reconstruction.rs`).
 - **Topological Recurrent Belief (Research 242, Plan 276)** — Mozer et al. taxonomy (recurrence axis × tokens-per-step). This is the closest cousin to the new survey's recurrent-belief subset; verdict was revised Super-GOAT → GOAT after the HLA prior-art check (the canonical "grep shipped code, not just notes" lesson).
 - **SSD Duality (Research 230)** — semiseparable state-space duality, Mamba-2 algebra.
 
@@ -163,7 +164,7 @@ x_{l+1}^t   = f_τ(x_l^t, S_l^t)          (bidirectional block using cache)
 
 ### 3.2 "Depth from optimization over time" explicit framing for `reestimation.rs` (framing gap)
 
-The survey's §5.2 unification — "depth emerges from optimization over time, hidden state = fast-weight layer refined per token" — is the **conceptual bridge** between vertical and horizontal recurrence. Our `riir-ai/crates/riir-engine/src/latent_functor/reestimation.rs` ships exactly this pattern under the name "coherence-driven re-estimation scheduler when coherence < tau_reest" — DiPOD's "self-distillation when ELBO drifts" in codebase vocabulary.
+The survey's §5.2 unification — "depth emerges from optimization over time, hidden state = fast-weight layer refined per token" — is the **conceptual bridge** between vertical and horizontal recurrence. Our `riir-ai/crates/riir-engine/src/latent_functor/reestimation/mod.rs` ships exactly this pattern under the name "coherence-driven re-estimation scheduler when coherence < tau_reest" — DiPOD's "self-distillation when ELBO drifts" in codebase vocabulary.
 
 **Gap:** no `.research/` note frames `reestimation.rs` in the survey's "fast-weight optimization over time" vocabulary. This is the canonical vocabulary-mismatch failure the skill warns about. A future note (or a one-paragraph addendum to an existing riir-ai functor note) closing this vocabulary gap would prevent the next paper-vocabulary-only grep from missing it.
 
@@ -171,7 +172,7 @@ The survey's §5.2 unification — "depth emerges from optimization over time, h
 
 ### 3.3 Fusion idea (novelty TBD — NOT a Super-GOAT claim)
 
-Survey's "gradient-state recurrence = optimization over time" × our `latent_functor/reestimation.rs` × our KARC reservoir (Plan 308/332, `KarcShard`) → a per-NPC primitive where the KARC reservoir's delay-basis ridge update is **driven by the functor's coherence signal** as the online "loss", unifying horizontal recurrence (reservoir state) with vertical (functor re-estimation trigger) under one optimization-over-time frame.
+Survey's "gradient-state recurrence = optimization over time" × our `riir-ai/crates/riir-engine/src/latent_functor/reestimation/mod.rs` × our KARC reservoir (Plan 308/332, `KarcShard`) → a per-NPC primitive where the KARC reservoir's delay-basis ridge update is **driven by the functor's coherence signal** as the online "loss", unifying horizontal recurrence (reservoir state) with vertical (functor re-estimation trigger) under one optimization-over-time frame.
 
 **Novelty TBD.** This crosses the §3.5 modelless-unblock boundary cautiously: the reservoir update is deterministic ridge regression (modelless), the functor coherence signal is latent (modelless), but the *coupling* (coherence as loss) needs a closed-form construction before it qualifies. Do NOT promote to Super-GOAT without running Q1–Q4 of the novelty gate. Track in `.issues/` if pursued.
 
@@ -206,7 +207,7 @@ Survey's "gradient-state recurrence = optimization over time" × our `latent_fun
 
 ## 6. Action items
 
-- [ ] **None in this session.** This note is the deliverable. No code, no feature flag, no benchmark — Gain verdict.
+- [x] **None in this session.** This note is the deliverable. No code, no feature flag, no benchmark — Gain verdict.
 - [-] **Deferred:** dKV-Cache primitive (§3.1) — track when dLLM inference hits the product roadmap. Not Super-GOAT; not GOAT; not now.
 - [-] **Deferred:** reestimation-vocabulary bridge addendum (§3.2) — documentation fix in riir-ai, not blocking.
 - [-] **Deferred:** §3.3 fusion idea — file in `.issues/` if pursued; do NOT promote without Q1–Q4 novelty gate.

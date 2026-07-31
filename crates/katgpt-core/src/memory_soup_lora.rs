@@ -195,8 +195,9 @@ pub fn import_memory_soup_artifact(data: &[u8]) -> Option<MemorySoupArtifact> {
 /// Sigmoid gate (clamped to prevent overflow). Matches riir-gpu's `sigmoid_gate`.
 #[inline]
 pub fn sigmoid_gate(score: f32) -> f32 {
-    let clamped = score.clamp(-20.0, 20.0);
-    1.0 / (1.0 + (-clamped).exp())
+    // fast_sigmoid already clamps at ±40 (well beyond the ±20 here), so the
+    // explicit clamp is redundant but preserved for API compatibility.
+    crate::simd::fast_sigmoid(score.clamp(-20.0, 20.0))
 }
 
 /// Compute γ-weighted interpolation of checkpoint deltas for a query.

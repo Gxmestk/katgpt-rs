@@ -1,7 +1,7 @@
 # Plan 197: Domino Causal Correction — Modelless Decoupled Pattern
 
 > **Source:** Research 177 — Domino Decoupled Causal Speculative Decoding (Modelless Distillation)
-> **Depends On:** DDTree (`speculative/dd_tree.rs`), DFlash (`speculative/dflash.rs`), ConstraintPruner trait
+> **Depends On:** DDTree (`src/speculative/dd_tree.rs`), DFlash (`crates/katgpt-speculative/src/dflash.rs`), ConstraintPruner trait
 **Feature Gate:** `domino_correction` (default ON, GOAT proof passed)
 > **Status:** ✅ Complete — GOAT PASSED (25/25 tests, -22.8% build time), promoted to default-ON
 
@@ -48,21 +48,21 @@ No model training. No LoRA. Pure inference-time pattern extraction.
 
 ### Phase 1: DominoCorrector Core
 
-- [x] **T1: Add `PrefixCorrectionTable` struct in `speculative/types.rs`**
+- [x] **T1: Add `PrefixCorrectionTable` struct in `crates/katgpt-core/src/speculative/types.rs`**
   - Pre-computed table of prefix-token → correction vectors
   - Hash-based: `HashMap<u64, Vec<f32>>` where key = blake3(prefix_tokens) truncated to u64
   - Correction vectors are small: only top-K token adjustments (sparse, not full vocab)
   - Zero-alloc lookup: `fn lookup(&self, prefix_hash: u64) -> &[f32]`
   - Builder pattern for construction from constraint rules
 
-- [x] **T2: Add `domino_correct_marginals` function in `speculative/dflash.rs`**
+- [x] **T2: Add `domino_correct_marginals` function in `crates/katgpt-speculative/src/dflash.rs`**
   - Signature: `fn domino_correct_marginals(marginals: &mut [Vec<f32>], sampled_tokens: &[usize], table: &PrefixCorrectionTable)`
   - For depth i > 0: compute prefix hash from `sampled_tokens[0..i]`, lookup correction, apply as logit residual
   - Re-normalize each marginal after correction
   - Zero allocation: correction is applied in-place on marginals
   - Guard: if table is empty, no-op (zero cost)
 
-- [x] **T3: Add `domino_score` tree expansion priority in `speculative/dd_tree.rs`**
+- [x] **T3: Add `domino_score` tree expansion priority in `src/speculative/dd_tree.rs`**
   - New scoring function alongside existing `score` in TreeNode
   - `domino_score = base_score * prefix_strength^depth` where prefix_strength = product of parent marginal probs
   - Integrate into `build_dd_tree_pruned` as an option
@@ -70,7 +70,7 @@ No model training. No LoRA. Pure inference-time pattern extraction.
 
 ### Phase 2: DominoPruner Trait Extension
 
-- [x] **T4: Add `DominoPruner` trait extending `ConstraintPruner` in `katgpt-core/src/traits.rs`**
+- [x] **T4: Add `DominoPruner` trait extending `ConstraintPruner` in `crates/katgpt-core/src/traits/mod.rs`**
   - `fn causal_correction(&self, depth: usize, token: usize, prefix: &[usize], base_valid: bool) -> bool`
   - Default impl: returns `base_valid` (no-op)
   - SudokuPruner impl: checks row/col/box constraints given the *specific prefix path*
@@ -128,10 +128,10 @@ No model training. No LoRA. Pure inference-time pattern extraction.
 
 | File | Change |
 |------|--------|
-| `katgpt-core/src/traits.rs` | Add `DominoPruner` trait |
-| `speculative/types.rs` | Add `PrefixCorrectionTable` |
-| `speculative/dflash.rs` | Add `domino_correct_marginals` |
-| `speculative/dd_tree.rs` | Add `domino_score` + wire into `build_dd_tree_pruned` |
+| `crates/katgpt-core/src/traits/mod.rs` | Add `DominoPruner` trait |
+| `crates/katgpt-core/src/speculative/types.rs` | Add `PrefixCorrectionTable` |
+| `crates/katgpt-speculative/src/dflash.rs` | Add `domino_correct_marginals` |
+| `src/speculative/dd_tree.rs` | Add `domino_score` + wire into `build_dd_tree_pruned` |
 | `Cargo.toml` | Add `domino_correction` feature |
 | `examples/domino_sudoku.rs` | New example |
 | `examples/domino_code.rs` | New example (feature: validator) |

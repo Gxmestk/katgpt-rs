@@ -10,8 +10,8 @@
 
 | Player | File | Bandit | Absorb | Feature |
 |--------|------|--------|--------|---------|
-| `SdarPlayer` | `bomber/sdar_player.rs` | `SdarBanditPruner` | `SdarGatedAbsorbCompress` | `sdar_gate` |
-| `SdarFFTPlayer` | `fft/sdar_player.rs` | `SdarBanditPruner` | `SdarGatedAbsorbCompress` | `sdar_gate` |
+| `SdarPlayer` | `src/pruners/bomber/sdar_player.rs` | `SdarBanditPruner` | `SdarGatedAbsorbCompress` | `sdar_gate` |
+| `SdarFFTPlayer` | `crates/katgpt-pruners/src/fft/sdar_player.rs` | `SdarBanditPruner` | `SdarGatedAbsorbCompress` | `sdar_gate` |
 
 ## Technology Stack Comparison
 
@@ -157,7 +157,7 @@ Despite no arena improvement, the SDAR module provides:
 | File | Role |
 |------|------|
 | `src/pruners/bomber/sdar_player.rs` | SDAR-gated Bomber player (788 lines) |
-| `src/pruners/fft/sdar_player.rs` | SDAR-gated FFT player |
+| `crates/katgpt-pruners/src/fft/sdar_player.rs` | SDAR-gated FFT player |
 | `examples/bomber_10_sdar_tournament.rs` | 7-player Bomber tournament with SDAR |
 | `examples/fft_03_sdar_tournament.rs` | 7-strategy FFT round-robin with SDAR |
 
@@ -167,7 +167,7 @@ Despite no arena improvement, the SDAR module provides:
 |------|--------|
 | `src/pruners/bomber/mod.rs` | Added `sdar_player` module + export |
 | `src/pruners/bomber/arena_runner.rs` | Added `update_if_sdar` for learning |
-| `src/pruners/fft/mod.rs` | Added `sdar_player` module + export |
+| `crates/katgpt-pruners/src/fft/mod.rs` | Added `sdar_player` module + export |
 | `Cargo.toml` | Added `bomber_10_sdar_tournament` and `fft_03_sdar_tournament` examples |
 
 ## Tests

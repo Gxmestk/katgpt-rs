@@ -10,7 +10,7 @@ use std::fmt;
 /// A move in Go: place a stone or pass.
 ///
 /// Ported from `go.py:GoState` action representation (`(row, col)` tuple or `None`).
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum GoAction {
     /// Place a stone at (row, col).
     Place(usize, usize),

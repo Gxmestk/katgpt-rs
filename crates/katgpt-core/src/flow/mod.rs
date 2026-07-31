@@ -20,6 +20,7 @@ pub use steering::{blend_steering, flow_steering, should_use_flow_field};
 ///
 /// One per goal (or per goal-group for shared goals).
 /// Vectors are stored row-major as `[w * h * 2]` with `(dx, dy)` pairs.
+#[derive(Clone)]
 pub struct FlowField {
     /// Flow vectors: `[w * h * 2]` — `(dx, dy)` per cell, row-major.
     /// Normalised to unit length or zero for blocked cells.
@@ -210,6 +211,53 @@ impl LeoPotentialGrid {
     pub fn set_potential(&mut self, x: u16, y: u16, val: f32) {
         if x < self.w && y < self.h {
             self.potential[(y as usize) * (self.w as usize) + (x as usize)] = val;
+        }
+    }
+
+    /// Linear post-max blend of two potential fields into a caller-provided buffer.
+    ///
+    /// For each cell `i`, writes `alpha * self.potential[i] + (1 - alpha) * other.potential[i]`.
+    /// The buffer must be at least `self.w * self.h` long. **No allocation.**
+    ///
+    /// # Plan 460 — post-max dual fusion primitive
+    ///
+    /// Unlike pre-max Q-slice mixing (Plan 459, which mixes raw Q per action *before*
+    /// `from_q_values` applies `max-over-actions`), this is **linear in the field the
+    /// FFT sees**. The nonlinearity of `max_a (·)` is already resolved inside each
+    /// input grid; blending the resulting scalar potentials is an affine combination,
+    /// which commutes with the FFT low-pass.
+    ///
+    /// The `blocked` bitfield is NOT touched here — callers (notably
+    /// `FlowFieldCache::get_or_compute_dual_postmax`) are responsible for OR-ing the
+    /// two source grids' blocked bitfields into the destination grid. An obstacle on
+    /// either side is an obstacle.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `other` has different dimensions from `self`, or if `out.len() <
+    /// self.w * self.h`.
+    #[inline]
+    pub fn blend_into(&self, other: &Self, alpha: f32, out: &mut [f32]) {
+        let cells = (self.w as usize) * (self.h as usize);
+        assert_eq!(
+            (other.w, other.h),
+            (self.w, self.h),
+            "blend_into: dimension mismatch (self={}x{}, other={}x{})",
+            self.w,
+            self.h,
+            other.w,
+            other.h
+        );
+        assert!(
+            out.len() >= cells,
+            "blend_into: out buffer too short ({} < {} cells)",
+            out.len(),
+            cells
+        );
+        let s = &self.potential[..cells];
+        let o = &other.potential[..cells];
+        for (i, out_cell) in out.iter_mut().take(cells).enumerate() {
+            *out_cell = alpha * s[i] + (1.0 - alpha) * o[i];
         }
     }
 
@@ -420,6 +468,90 @@ mod tests {
         let g = LeoPotentialGrid::new(4, 4);
         assert!(!g.is_blocked(4, 0));
         assert!(!g.is_blocked(0, 4));
+    }
+
+    // --- LeoPotentialGrid::blend_into (Plan 460 post-max primitive) ---
+
+    #[test]
+    fn blend_into_alpha_one_is_self() {
+        // T4.1: α=1.0 → out bit-identical to self.potential.
+        let mut g1 = LeoPotentialGrid::new(2, 2);
+        g1.set_potential(0, 0, 1.0);
+        g1.set_potential(1, 0, 2.0);
+        g1.set_potential(0, 1, 3.0);
+        g1.set_potential(1, 1, 4.0);
+        let g2 = LeoPotentialGrid::new(2, 2); // all zeros
+
+        let mut out = vec![f32::NAN; 4];
+        g1.blend_into(&g2, 1.0, &mut out);
+
+        // Expect g1's potentials in row-major order.
+        assert_eq!(out, vec![1.0, 2.0, 3.0, 4.0]);
+    }
+
+    #[test]
+    fn blend_into_alpha_zero_is_other() {
+        // T4.2: α=0.0 → out bit-identical to other.potential.
+        let g1 = LeoPotentialGrid::new(2, 2); // all zeros
+        let mut g2 = LeoPotentialGrid::new(2, 2);
+        g2.set_potential(0, 0, 10.0);
+        g2.set_potential(1, 0, 20.0);
+        g2.set_potential(0, 1, 30.0);
+        g2.set_potential(1, 1, 40.0);
+
+        let mut out = vec![f32::NAN; 4];
+        g1.blend_into(&g2, 0.0, &mut out);
+
+        assert_eq!(out, vec![10.0, 20.0, 30.0, 40.0]);
+    }
+
+    #[test]
+    fn blend_into_alpha_half_is_mean() {
+        // T4.3: α=0.5 → elementwise mean.
+        let mut g1 = LeoPotentialGrid::new(2, 1);
+        g1.set_potential(0, 0, 0.0);
+        g1.set_potential(1, 0, 2.0);
+        let mut g2 = LeoPotentialGrid::new(2, 1);
+        g2.set_potential(0, 0, 10.0);
+        g2.set_potential(1, 0, 4.0);
+
+        let mut out = vec![f32::NAN; 2];
+        g1.blend_into(&g2, 0.5, &mut out);
+
+        // 0.5*0 + 0.5*10 = 5; 0.5*2 + 0.5*4 = 3
+        assert_eq!(out, vec![5.0, 3.0]);
+    }
+
+    #[test]
+    #[should_panic(expected = "blend_into: out buffer too short")]
+    fn blend_into_panics_on_short_buffer() {
+        // T4.4: panic on out.len() < cells.
+        let g1 = LeoPotentialGrid::new(4, 4); // 16 cells
+        let g2 = LeoPotentialGrid::new(4, 4);
+        let mut out = vec![0.0f32; 15]; // too short
+        g1.blend_into(&g2, 0.5, &mut out);
+    }
+
+    #[test]
+    #[should_panic(expected = "blend_into: dimension mismatch")]
+    fn blend_into_panics_on_dim_mismatch() {
+        // T4.4 (companion): panic on dimension mismatch.
+        let g1 = LeoPotentialGrid::new(4, 4);
+        let g2 = LeoPotentialGrid::new(2, 8); // same area, different shape
+        let mut out = vec![0.0f32; 16];
+        g1.blend_into(&g2, 0.5, &mut out);
+    }
+
+    #[test]
+    fn blend_into_respects_larger_out_buffer() {
+        // Out buffer larger than cells is fine — only the first `cells` are written.
+        let g1 = LeoPotentialGrid::new(2, 2);
+        let g2 = LeoPotentialGrid::new(2, 2);
+        let mut out = vec![f32::NAN; 10];
+        g1.blend_into(&g2, 0.5, &mut out);
+        // First 4 are 0 (0.5*0 + 0.5*0), rest untouched (still NaN).
+        assert_eq!(&out[..4], &[0.0, 0.0, 0.0, 0.0]);
+        assert!(out[4..].iter().all(|v| v.is_nan()));
     }
 
     #[test]

@@ -216,14 +216,8 @@ impl KvOuterPrefill {
                 // Fixed 256-f32 stack buffer covers head_dim ≤ 256 and
                 // block_size ≤ 256 (both hold for all current configs). The
                 // debug_assert makes silent truncation visible in tests.
-                debug_assert!(
-                    bs <= 256,
-                    "block_size {bs} exceeds 256-f32 score buffer"
-                );
-                debug_assert!(
-                    hd <= 256,
-                    "head_dim {hd} exceeds 256-f32 local_out buffer"
-                );
+                debug_assert!(bs <= 256, "block_size {bs} exceeds 256-f32 score buffer");
+                debug_assert!(hd <= 256, "head_dim {hd} exceeds 256-f32 local_out buffer");
                 let mut scores = [0.0f32; 256];
                 let actual_bs = bs.min(256);
                 compute_scores(
@@ -273,8 +267,9 @@ impl KvOuterPrefill {
                     }
                     lse_prev => {
                         let lse_new = logaddexp(lse_prev, lse_local);
-                        let old_scale = (lse_prev - lse_new).exp();
-                        let new_scale = (lse_local - lse_new).exp();
+                        use katgpt_core::simd::fast_exp;
+                        let old_scale = fast_exp(lse_prev - lse_new);
+                        let new_scale = fast_exp(lse_local - lse_new);
 
                         let out_slice = &mut output[q_start..q_start + actual_hd];
                         for (o, &l) in out_slice.iter_mut().zip(local_out[..actual_hd].iter()) {
@@ -351,11 +346,12 @@ fn accumulate_scaled(out: &mut [f32], values: &[f32], w: f32) {
 /// Numerically stable log-add-exp: `log(exp(a) + exp(b))`.
 #[inline]
 fn logaddexp(a: f32, b: f32) -> f32 {
+    use katgpt_core::simd::fast_exp;
     match (a, b) {
         (a, b) if a == f32::NEG_INFINITY => b,
         (a, b) if b == f32::NEG_INFINITY => a,
-        (a, b) if a >= b => a + (1.0 + (b - a).exp()).ln(),
-        (_, b) => b + (1.0 + (a - b).exp()).ln(),
+        (a, b) if a >= b => a + (1.0 + fast_exp(b - a)).ln(),
+        (_, b) => b + (1.0 + fast_exp(a - b)).ln(),
     }
 }
 

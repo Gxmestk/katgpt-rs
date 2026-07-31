@@ -32,7 +32,7 @@ positions from the start. This makes BF = AI = Hybrid because:
 ## Architecture
 
 ### New File
-- `examples/tactical_09_fog.rs` — self-contained fog-of-war tactical puzzle
+- `examples/tactical_09_fog_tui.rs` — self-contained fog-of-war tactical puzzle
 
 ### Vision System
 
@@ -151,7 +151,7 @@ across all 25 seeds), the fog-of-war version produces **measurably different** o
 
 | File | Purpose |
 |------|---------|
-| `examples/tactical_09_fog.rs` | Full TUI with fog rendering, 3-round flow |
+| `examples/tactical_09_fog_tui.rs` | Full TUI with fog rendering, 3-round flow |
 | `examples/tactical_10_fog_bench.rs` | Headless benchmark across 30 seeds |
 
 ## Status: ✅ Complete — Graduated to Plan 107

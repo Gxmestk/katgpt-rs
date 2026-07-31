@@ -48,7 +48,7 @@ pub use katgpt_core::mcts::{mcts_search, mcts_search_informed};
 ///
 /// # Action Mapping
 /// The `action_to_index` closure maps `S::Action` → bandit arm index.
-/// For [`BomberAction`](crate::bomber::BomberAction), use
+/// For `BomberAction`, use
 /// `|a: &BomberAction| a.as_usize()`.
 ///
 /// # Exploration (ε)

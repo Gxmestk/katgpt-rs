@@ -4,7 +4,7 @@
 **Research:** [katgpt-rs/.research/311_Analytic_Lattice_Encoder_Decoder_Primitive.md](../.research/311_Analytic_Lattice_Encoder_Decoder_Primitive.md)
 **Source paper:** Synthesis (R311 §2) — Functional Attention × PJ-RoPE × Gyrocalculus fusion
 **Target:** `katgpt-rs/crates/katgpt-core/src/analytic_lattice/` (new module) + Cargo feature `analytic_lattice_encoder`
-**Status:** Active. katgpt-core half (Phases 0, 1a, 2, 2.5, 3, 4) COMPLETE + committed. riir-engine Phase 1b (ASOC cascade `ComposerTick: GpuFuture` + `Join3` + `PrevTickJoinObserver`) WIRED 2026-07-02 — the orphaned `analytic_lattice/` module is now feature-gated (`analytic_lattice_runtime`) + lib.rs-registered + 6/6 GOAT tests pass (G1 determinism, G1b non-blocking, G1c stash-refresh, G4 latency sanity, T1b.8 reflection). Phase 5 promotion deferred pending a real GPU executor + the full G1–G6 gate.
+**Status:** COMPLETE ✅ (with deferrals) — katgpt-core math primitives (Phases 0, 1a, 2, 2.5, 3, 4) ALL DONE + GOAT G1/G2/G3/G5/G6 PASS (see `.benchmarks/330_analytic_lattice_goat.md`). riir-engine Phase 1b ASOC cascade (`ComposerTick: GpuFuture` + `Join3`) WIRED 2026-07-02 with 6/6 runtime GOAT tests passing (G1 determinism, G1b non-blocking, G1c stash-refresh, G4 latency sanity). Phase 5 T5.3 promotion DEFERRED: `analytic_lattice`/`analytic_lattice_runtime` stay OPT-IN until Phase 1b headline consumer has a real GPU executor + full G1–G6 gate (math-only promotion would add a default feature with no consumer).
 
 > **Revision note (2026-06-26):** Original Phase 1 (`AnalyticLatticeEncoder`
 > trait + 3 reference impls) is **DROPPED** — it is redundant with
@@ -48,7 +48,7 @@ Ship the primitives identified as genuinely novel in R311 (revised):
    - **Layer split:** the generic **trait shapes** (`PlasmaDraft`, `RederiveOp`)
      ship in `katgpt-core` (no `GpuFuture` import — they use an associated
      `type Fut`). The `GpuFuture` **impl** (`ComposerTick` + `Join3`) ships in
-     `riir-engine/src/analytic_lattice/asoc.rs` (the only place with both
+     `crates/katgpt-core/src/analytic_lattice/asoc.rs` (the only place with both
      `katgpt-core` + `riir-gpu-async` in scope). See revision note above.
 2. **`compose_chain`** — cross-entity operator product
    `C[n-1] × ... × C[1] × C[0]` for an arbitrary-length chain of `f32`
@@ -65,7 +65,7 @@ Ship the primitives identified as genuinely novel in R311 (revised):
 
 **Redundant (NOT shipped here):** `AnalyticLatticeEncoder` trait. The
 encoder half is already shipped as `FourierEncoder::encode_*_into` in
-`riir-engine/src/fourier/encoder.rs` — we reuse it instead of re-shipping.
+`crates/katgpt-core/src/mux_latent/encoder.rs` — we reuse it instead of re-shipping.
 
 All four primitives: zero-alloc, SIMD-first, ARM64/x86_64/wasm32-portable,
 behind ONE feature flag. GOAT gate G1–G6 (per R311 §5) must pass before
@@ -80,7 +80,7 @@ promotion to `default`.
 ### Tasks
 
 - [x] **T0.1** Add Cargo feature `analytic_lattice = []` to `katgpt-rs/crates/katgpt-core/Cargo.toml`. NOT default-on. (Name changed from `analytic_lattice_encoder` — the encoder is dropped per revision note; this flag now covers only the math primitives + traits that stay in katgpt-core.)
-- [x] **T0.2** Create `analytic_lattice/mod.rs` with module doc + sub-module declarations. **Note:** the originally-planned `encoder.rs` submodule is DROPPED (redundant with `fourier/encoder.rs`). New submodule set: `asoc.rs`, `chain.rs`, `batch_chain.rs`, `decoder.rs`, `audit.rs`.
+- [x] **T0.2** Create `crates/katgpt-core/src/analytic_lattice/mod.rs` with module doc + sub-module declarations. **Note:** the originally-planned `encoder.rs` submodule is DROPPED (redundant with `riir-ai/crates/riir-engine/src/fourier/encoder.rs`). New submodule set: `asoc.rs`, `chain.rs`, `batch_chain.rs`, `decoder.rs`, `audit.rs`.
 - [x] **T0.3** Define the typed-slot lattice vector and transport operator:
 
 ```rust
@@ -98,7 +98,7 @@ pub struct TransportOperator {
 }
 ```
 
-- [x] **T0.4** Wire into `katgpt-core/src/lib.rs` behind the feature flag.
+- [x] **T0.4** Wire into `crates/katgpt-core/src/lib.rs` behind the feature flag.
 
 ---
 
@@ -253,7 +253,7 @@ where
 
 - [x] **T1b.4** G1 test (determinism): same `(ctx, plasma, rederive)` inputs →
       byte-identical action when the join is `Ready`. Stale-draft fallback
-      path tested separately (see T1b.5). **DONE 2026-07-02** — `g1_determinism_ready_path` in `tests/analytic_lattice_runtime_goat.rs`.
+      path tested separately (see T1b.5). **DONE 2026-07-02** — `g1_determinism_ready_path` in `riir-ai/crates/riir-engine/tests/analytic_lattice_runtime_goat.rs`.
 
 - [x] **T1b.5** G1b test (non-blocking contract): inject a `MockRederiveOp`
       that returns `Poll::Pending` indefinitely. Assert `ComposerTick::poll`
@@ -302,7 +302,7 @@ where
 
 ### Phase 1b completion notes (2026-07-02)
 
-The orphaned-code problem: `asoc.rs` + `mod.rs` + `tests/analytic_lattice_runtime_goat.rs` were committed by a prior session but **never wired** — no Cargo feature, no `pub mod` in `lib.rs`, no `riir-gpu-async` dep. The module was dead code (unreachable from the crate root). This is the same pattern as Plan 359 (`motor_gated_rehearsal`). The wiring:
+The orphaned-code problem: `asoc.rs` + `mod.rs` + `riir-ai/crates/riir-engine/tests/analytic_lattice_runtime_goat.rs` were committed by a prior session but **never wired** — no Cargo feature, no `pub mod` in `lib.rs`, no `riir-gpu-async` dep. The module was dead code (unreachable from the crate root). This is the same pattern as Plan 359 (`motor_gated_rehearsal`). The wiring:
 
 1. `riir-gpu-async = { path = "../riir-gpu-async", optional = true }` added to `crates/riir-engine/Cargo.toml` deps.
 2. `analytic_lattice_runtime = ["katgpt-core/analytic_lattice", "dep:riir-gpu-async"]` feature added.
@@ -637,7 +637,7 @@ pub fn direction_vector_decode<const N: usize>(
 - Chain length > 16 — defer until G3 holds at length 16.
 - Cross-resolution transport (Plan 310) composition — separate primitive, may fuse later.
 - Refactoring `riir-games::scalar_projection.rs` to call `direction_vector_decode` — noted as cleanup follow-up, not in this plan.
-- ~~`AnalyticLatticeEncoder` trait~~ — DROPPED, redundant with `riir-engine/src/fourier/encoder.rs`.
+- ~~`AnalyticLatticeEncoder` trait~~ — DROPPED, redundant with `crates/katgpt-core/src/mux_latent/encoder.rs`.
 
 ## TL;DR
 
@@ -647,6 +647,6 @@ verifier (spectral audit) behind `analytic_lattice_encoder` feature flag.
 7-gate GOAT (G1 determinism, G1b non-blocking contract, G2 ranking, G3
 associativity, G4 latency + batch speedup, G5 zero-alloc, G6 spectral audit).
 Promotes to default if all pass. The originally-planned `AnalyticLatticeEncoder`
-trait is DROPPED — redundant with the already-shipped `fourier/encoder.rs`.
+trait is DROPPED — redundant with the already-shipped `riir-ai/crates/riir-engine/src/fourier/encoder.rs`.
 Game-side schemas live in riir-ai (Plan 339 demo, R162 guide). Math is generic —
 no game IP leaks to katgpt-rs.

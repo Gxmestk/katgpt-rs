@@ -2,7 +2,7 @@
 //! controllers (Plan 194, extended by Plan 275 / Plan 212 / Plan 195).
 //!
 //! `thinking_cot` is a *meta-feature* that pulls in the bandit, prune, and
-//! probe machinery required by [`ThinkingController`](crate::speculative) plus
+//! probe machinery required by `ThinkingController` (from `katgpt-speculative`) plus
 //! any number of [`ThinkingStrategy`] implementations. A strategy is a small
 //! state machine that sits inside the decode loop and, given the current
 //! step's logits, decides what the loop should emit next.

@@ -81,7 +81,10 @@ fn g3_zero_shift_recon_error_is_one() {
 
     let (recon, _cos) = reconstruction_error(&with, &data, &v, alpha).unwrap();
 
-    println!("G3 zero shift: ϵ_Q = {:.6} (expected 1.0 by convention)", recon);
+    println!(
+        "G3 zero shift: ϵ_Q = {:.6} (expected 1.0 by convention)",
+        recon
+    );
     assert!(
         (recon - 1.0).abs() < 1e-6,
         "G3 FAIL: zero shift should give ϵ_Q = 1.0 by convention, got {:.6}",
@@ -149,8 +152,7 @@ fn g3_mine_then_recon_roundtrip() {
     let dir = mine_direction(&with, &without).unwrap();
     // The mined direction is unit-norm. The actual shift is shift_scale * v.
     // calibrate_alpha would give alpha = shift_scale (for unit-norm dir).
-    let (recon, cos) =
-        reconstruction_error(&with, &without, dir.as_slice(), shift_scale).unwrap();
+    let (recon, cos) = reconstruction_error(&with, &without, dir.as_slice(), shift_scale).unwrap();
 
     println!(
         "G3 roundtrip: ϵ_Q = {:.8}, cos = {:.6} (mined direction, calibrated alpha)",

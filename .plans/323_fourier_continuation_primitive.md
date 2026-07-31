@@ -159,12 +159,12 @@ orthonormal-basis stabilization if a benchmark shows it's needed.
 
 ## Tasks
 
-- [x] T1 — Create `src/spectral/mod.rs` + `src/spectral/continuation.rs` skeleton with the API above.
+- [x] T1 — Create `crates/katgpt-core/src/spectral/mod.rs` + `crates/katgpt-core/src/spectral/continuation.rs` skeleton with the API above.
 - [x] T2 — Implement `fourier_continue_into`: **final algorithm is C¹-matched linear extrapolation + x[0] wrap target** (NOT the polynomial-blend originally proposed — see G1 GOAT iteration history in `.benchmarks/322_*`).
 - [x] T3 — Add the `fourier_continuation` feature flag in both `Cargo.toml` files.
 - [x] T4 — Register `pub mod spectral;` in `lib.rs` under `#[cfg(feature = "fourier_continuation")]`.
 - [x] T5 — Unit tests: 13 tests covering passthrough, sample preservation, interior smoothness, wrap reduction, linear-fit continuity, error paths, high-order finiteness, scratch stability, alloc-vs-into equivalence, repeated-call determinism.
-- [x] T6 — Write `benches/bench_323_fourier_continuation_goat.rs` with G1–G4 + informational spectral-derivative diagnostic.
+- [x] T6 — Write `crates/katgpt-core/benches/bench_323_fourier_continuation_goat.rs` with G1–G4 + informational spectral-derivative diagnostic.
 - [x] T7 — Run the GOAT gate; recorded in `.benchmarks/322_fourier_continuation_goat.md`. **All 4 gates PASS.**
 - [x] T8 — G1+G2+G3+G4 all PASS → promoted `fourier_continuation` to `default` in both `Cargo.toml`s.
 - N/A T9 — No gate failed; no issue opened.

@@ -56,8 +56,8 @@ End-to-end draft generation comparison.
 | File | Role |
 |------|------|
 | `src/benchmark/speculative.rs` | `bench_domino_lora_correction()`, `bench_dflash_ar_domino_vs_baseline()` |
-| `src/speculative/domino_lora.rs` | `DominoLoraCorrection::new_for_test()`, `correct()`, `gru_step()` |
-| `src/speculative/dflash.rs` | `dflash_predict_ar_with_domino()` — zero-alloc GRU step |
+| `crates/katgpt-speculative/src/domino_lora.rs` | `DominoLoraCorrection::new_for_test()`, `correct()`, `gru_step()` |
+| `crates/katgpt-speculative/src/dflash.rs` | `dflash_predict_ar_with_domino()` — zero-alloc GRU step |
 | `src/benchmark/mod.rs` | Re-exports behind `#[cfg(feature = "domino_lora")]` |
 
 ---

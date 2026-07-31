@@ -3,7 +3,7 @@
 //! Implements Plan 266 Phase 5: picks between a narrow and a wide
 //! [`Topology`] per query, driven by two external signals:
 //!
-//! 1. **CollapseAwareThinking (Plan 212)** — when the [`CollapseDetector`]
+//! 1. **CollapseAwareThinking (Plan 212)** — when the `CollapseDetector`
 //!    reports that hesitation is approaching the collapse threshold, the
 //!    controller expands the topology width to give the mesh more capacity.
 //!    This mirrors the `TvpExpansion` pattern in `S2FCollapseDetector`:
@@ -12,7 +12,7 @@
 //!    by a sigmoid — when it crosses an activation band the controller
 //!    switches to the wide topology.
 //!
-//! 2. **BreakevenRouter (Plan 250)** — when the [`BreakevenBandit`] reports
+//! 2. **BreakevenRouter (Plan 250)** — when the `BreakevenBandit` reports
 //!    that the CPU→GPU upgrade has amortised (`cpu_to_gpu_amortized`), wide
 //!    topologies (which cross the `gpu_width_threshold`) become "free" in
 //!    the amortised-cost sense, so the controller prefers wide. Conversely,
@@ -178,7 +178,7 @@ impl AdaptiveWidthConfig {
 // Feature-gated on `collapse_aware_thinking` — callers without the feature
 // compile out the collapse path entirely (zero cost).
 
-/// Derive the collapse-driven width decision from a [`CollapseDetector`].
+/// Derive the collapse-driven width decision from a `CollapseDetector`.
 ///
 /// Reads `hesitation_count()` and `threshold()` and returns:
 ///

@@ -29,7 +29,7 @@ impl KlAnchor {
 
     /// Compute per-arm anchoring adjustment to subtract from Q-values.
     ///
-    /// Returns Vec<f32> of adjustments. Subtract from Q to apply anchoring.
+    /// Returns `Vec<f32>` of adjustments. Subtract from Q to apply anchoring.
     pub fn anchor_loss(&self, q: &[f32], q_ref: &[f32]) -> Vec<f32> {
         assert_eq!(q.len(), q_ref.len());
         match self {

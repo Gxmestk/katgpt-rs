@@ -55,7 +55,7 @@ Wire existing GDN2 recurrent state as a "bridge" for dilated sparse attention du
 
 ### Phase 1: Core Infrastructure
 
-- [x] **T1.1** Add `DilationConfig` enum to `katgpt-core/src/types.rs`
+- [x] **T1.1** Add `DilationConfig` enum to `crates/katgpt-types/src/lib.rs`
   ```rust
   #[repr(u8)]
   #[derive(Clone, Copy, Debug, PartialEq)]
@@ -66,7 +66,7 @@ Wire existing GDN2 recurrent state as a "bridge" for dilated sparse attention du
 
 - [x] **T1.2** Add `rat_plus_bridge` feature flag to `katgpt-core/Cargo.toml` and `Cargo.toml`
 
-- [x] **T1.3** Create `src/rat_bridge/mod.rs` with module structure
+- [x] **T1.3** Create `crates/katgpt-attn/src/rat_bridge/mod.rs` with module structure
   - `bridge.rs` — GDN2 state → bridge projection (RatBridgeState + sigmoid gate)
   - `dilated_kv.rs` — strided KV cache access (DilatedKvAccessor + dilated_indices + dilated_len)
   - `fuse.rs` — fused bridge attention (α-blend via bridge_attention())
@@ -110,7 +110,7 @@ Wire existing GDN2 recurrent state as a "bridge" for dilated sparse attention du
   - Low RV (flat) layers → stay at D=1
   - `DilationRouter` struct with per-layer RV scores + QPS thresholds
 
-- [x] **T4.3** Register `dilation_router` module in `rat_bridge/mod.rs`
+- [x] **T4.3** Register `dilation_router` module in `crates/katgpt-attn/src/rat_bridge/mod.rs`
   - Feature-gated behind `rat_plus_bridge`
   - Re-exported via `pub use dilation_router::*`
 
@@ -120,9 +120,9 @@ Wire existing GDN2 recurrent state as a "bridge" for dilated sparse attention du
   - `compute_centroids`: store dilated KV centroids from D-strided keys
   - `score_blocks`: GDN2 bridge + dilated centroids for block scoring (sigmoid gate)
   - Demonstrates RAT+ insight: recurrence improves block scoring
-  - File: `src/rat_bridge/vortex.rs` (4 tests)
+  - File: `crates/katgpt-attn/src/rat_bridge/vortex.rs` (4 tests)
 
-- [x] **T5.2** Register `vortex` module in `rat_bridge/mod.rs`
+- [x] **T5.2** Register `vortex` module in `crates/katgpt-attn/src/rat_bridge/mod.rs`
   - Feature-gated behind `rat_plus_bridge`
   - Re-exported via `pub use vortex::*`
 

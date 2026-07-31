@@ -11,9 +11,11 @@
 //!   4. Clamp each to min_budget, adjust so total sums to total_budget
 
 /// Sigmoid activation: `1 / (1 + exp(-x))`.
+///
+/// Delegates to `katgpt_core::simd::fast_sigmoid` (Cephes polynomial).
 #[inline]
 fn sigmoid(x: f32) -> f32 {
-    1.0 / (1.0 + (-x).exp())
+    katgpt_core::simd::fast_sigmoid(x)
 }
 
 /// Compute sigmoid-weighted ratios for each score relative to the mean.
@@ -68,11 +70,7 @@ pub fn normalize_budget(raw: &[f32], total: usize) -> Vec<usize> {
     let mut remaining = total - allocated;
     if remaining > 0 {
         let mut indices: Vec<usize> = (0..remainders.len()).collect();
-        indices.sort_by(|&a, &b| {
-            remainders[b]
-                .partial_cmp(&remainders[a])
-                .unwrap_or(std::cmp::Ordering::Equal)
-        });
+        indices.sort_by(|&a, &b| remainders[b].total_cmp(&remainders[a]));
         for &i in &indices {
             if remaining == 0 {
                 break;

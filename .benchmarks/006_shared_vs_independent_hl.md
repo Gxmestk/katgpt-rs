@@ -123,6 +123,6 @@ Shared pulls = 16,395, Independent pulls = 17,984. Counter-intuitively, shared d
 | File | Purpose |
 |------|---------|
 | `riir-ai/crates/riir-examples/examples/g_zero_06_shared_vs_independent_hl.rs` | Benchmark runner |
-| `katgpt-rs/src/pruners/bomber/players.rs` | `HLPlayer::with_shared_stats()`, public accessors |
-| `katgpt-rs/src/pruners/bandit.rs` | `SharedBanditStats` |
+| `seal-online-remaster/crates/seal-gm-tools/src/tabs/players.rs` | `HLPlayer::with_shared_stats()`, public accessors |
+| `katgpt-rs/crates/katgpt-ruliology/src/bandit.rs` | `SharedBanditStats` |
 | _Issue 051 multi_agent_hl (closed + removed; this benchmark is the canonical record)_ | Issue tracking |

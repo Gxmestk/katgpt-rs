@@ -1,5 +1,5 @@
 //! Indicator Similarity Matrix — pairwise cosine structure of an
-//! [`IndicatorProbeBank`](super::indicator_probe_bank::IndicatorProbeBank)'s
+//! [`super::indicator_probe_bank::IndicatorProbeBank`]'s
 //! direction vectors (Plan 320 Phase 2, Research 301).
 //!
 //! Paper Fig. 6 finding: the indicators form a shared "misaligned-reasoning"

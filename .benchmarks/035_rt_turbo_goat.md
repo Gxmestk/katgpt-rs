@@ -72,11 +72,11 @@
 
 | Module | Purpose | Tests |
 |--------|---------|-------|
-| `src/rt_turbo/calibration.rs` | Offline needle-based per-head retrieval scoring | 14 |
-| `src/rt_turbo/projection.rs` | Low-dim pre-RoPE W_Q/W_K projection | 27 |
-| `src/rt_turbo/top_p.rs` | Dynamic top-p token/block selection | 11 |
-| `src/rt_turbo/forward.rs` | Head-wise sparse decode/prefill routing + cache | 11 |
-| `src/rt_turbo/tests.rs` | Integration tests (combined workflow) | 22 |
+| `crates/katgpt-speculative/src/rt_turbo/calibration.rs` | Offline needle-based per-head retrieval scoring | 14 |
+| `crates/katgpt-speculative/src/rt_turbo/projection.rs` | Low-dim pre-RoPE W_Q/W_K projection | 27 |
+| `crates/katgpt-speculative/src/rt_turbo/top_p.rs` | Dynamic top-p token/block selection | 11 |
+| `crates/katgpt-speculative/src/rt_turbo/forward.rs` | Head-wise sparse decode/prefill routing + cache | 11 |
+| `crates/katgpt-speculative/src/rt_turbo/tests.rs` | Integration tests (combined workflow) | 22 |
 | `tests/test_126_rt_turbo_goat.rs` | 6 GOAT proofs | 6 |
 
 ### Test Statistics

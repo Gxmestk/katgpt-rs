@@ -474,7 +474,13 @@ impl TuckerResultScratch {
         let mut shape = [0usize; MAX_MODES];
         let mut ranks = [0usize; MAX_MODES];
         let mut factor_offsets = [0usize; MAX_MODES];
-        let mut factors_flat = Vec::new();
+        // Pre-compute total capacity to avoid reallocation during extend.
+        // (Cold-tier reload path, but a single reserve is cheaper than up to
+        // MAX_MODES reallocations and keeps the cold path tidy.)
+        let total_factor_len: usize = (0..nmodes)
+            .map(|n| result.factor_shapes[n].0 * result.factor_shapes[n].1)
+            .sum();
+        let mut factors_flat = Vec::with_capacity(total_factor_len);
         let mut acc = 0usize;
         for n in 0..nmodes {
             let (i_n, r_n) = result.factor_shapes[n];
@@ -835,10 +841,13 @@ pub fn tucker_decompose_into(
         );
 
         // Y = A^(n)^T · unfold, shape (r_n, m). A^(n) is col-major (I_n, r_n):
-        // A^(n)[i, j] = factors[offset_n + j*I_n + i].
+        //   A^(n)[i, j] = factors[offset_n + j*I_n + i].
         // Y[j, k] = Σ_i factors[offset_n + j*I_n + i] · unfold[i*m + k].
         // Loop order (i outer, j middle, k inner) treats each i as a rank-1 update
-        // Y += a_col_j ⊗ unfold_row_i. Inner (j, k) block is SIMD-friendly.
+        // Y += a_col_j ⊗ unfold_row_i. The inner k-loop is an AXPY
+        // (y_row += a_ij * b_row) which `simd_fused_scale_acc` accelerates
+        // via NEON/AVX2 FMA — beats scalar += on m >= 16 (the common case
+        // for tensor contraction where m = product of remaining dims).
         let y_slice = &mut scratch.y_buf[..r_n * m];
         y_slice.fill(0.0);
         for i in 0..i_n {
@@ -846,9 +855,7 @@ pub fn tucker_decompose_into(
             for j in 0..r_n {
                 let a_ij = result.factors[factor_offsets[n] + j * i_n + i];
                 let y_row = &mut scratch.y_buf[j * m..(j + 1) * m];
-                for k in 0..m {
-                    y_row[k] += a_ij * b_row[k];
-                }
+                crate::simd::simd_fused_scale_acc(y_row, b_row, a_ij, m);
             }
         }
 
@@ -948,9 +955,7 @@ pub fn tucker_reconstruct_into(
             for (i, &a_ij) in a_col.iter().enumerate().take(i_n) {
                 // stride math: y_row index = i * m..(i + 1) * m
                 let y_row = &mut scratch.y_buf[i * m..(i + 1) * m];
-                for k in 0..m {
-                    y_row[k] += a_ij * b_row[k];
-                }
+                crate::simd::simd_fused_scale_acc(y_row, b_row, a_ij, m);
             }
         }
 

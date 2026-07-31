@@ -1,5 +1,11 @@
 # Plan 147: Shard-Inspired Asymmetric Codec KV Cache Compression
 
+> **Note on file paths (2026-07-18):** Some `*.rs` paths in this document
+> reference modules that were renamed, moved, or never landed under the
+> exact name shown. They are preserved as a **historical record** of the
+> original design intent; consult the current crate layout for the live
+> location.
+
 > **Origin:** Research 109 (Shard — Drop-In 10× KV Cache)
 **Status:** ✅ COMPLETE — DRAFT (high-value research, pending GOAT proof validation)
 > **GOAT Pillar:** Infrastructure (supports all 4 pillars via memory efficiency)
@@ -8,7 +14,6 @@
 > **Related Research:** 109 (Shard), 81 (Asymmetric K/V), 39 (SpectralQuant), 63 (OCTOPUS), 20 (TurboQuant)
 > **Depends on:** `spectralquant` (eigenbasis), `turboquant` (Lloyd-Max codebook, rotation)
 > **Blocks:** Nothing
-
 ---
 
 ## Task Index
@@ -50,9 +55,9 @@ After:  raw K → undo RoPE → eigenbasis → water-fill → quantize
 ```
 
 **Files to modify:**
-- `src/spectralquant/spectral.rs` — add `undo_rope()` before eigendecomposition
-- `src/spectralquant/spectral_rotation.rs` — store RoPE angles in calibration struct
-- `src/spectralquant/forward.rs` — reapply RoPE after dequant (or use Shard's Δ-identity)
+- `crates/katgpt-spectral/src/spectral.rs` — add `undo_rope()` before eigendecomposition
+- `crates/katgpt-spectral/src/spectral_rotation.rs` — store RoPE angles in calibration struct
+- `crates/katgpt-spectral/src/forward.rs` — reapply RoPE after dequant (or use Shard's Δ-identity)
 
 **GOAT proof targets:**
 1. Eigenvalue concentration improves: d_eff drops (more variance in fewer components)
@@ -78,7 +83,7 @@ V path (prefill):
   3. pack indices
 
 Decode streaming:
-  1. Lloyd-Max 8-bit (reuse turboquant/codebook.rs)
+  1. Lloyd-Max 8-bit (reuse crates/katgpt-quant/src/turboquant/codebook.rs)
   2. Bit-exact lossless path
 
 Sink + window:
@@ -87,13 +92,13 @@ Sink + window:
 ```
 
 **New files:**
-- `src/shard_kv/mod.rs` — module index
-- `src/shard_kv/types.rs` — `ShardConfig`, `ShardLayer`, `ShardCalibration`
-- `src/shard_kv/rope.rs` — RoPE undo/reapply utilities
+- `crates/katgpt-kv/src/shard_kv/mod.rs` — module index
+- `crates/katgpt-kv/src/shard_kv/types.rs` — `ShardConfig`, `ShardLayer`, `ShardCalibration`
+- `crates/katgpt-kv/src/shard_kv/rope.rs` — RoPE undo/reapply utilities
 - `src/shard_kv/k_pca.rs` — PCA compression path for K
 - `src/shard_kv/v_vq.rs` — Hadamard + k-means VQ for V
 - `src/shard_kv/dp_bits.rs` — DP bit allocation with drop penalty
-- `src/shard_kv/kv_cache.rs` — `ShardKVCache` struct
+- `crates/katgpt-kv/src/shard_kv/kv_cache.rs` — `ShardKVCache` struct
 - `src/shard_kv/forward.rs` — dequant + attention paths
 - `src/shard_kv/sink_window.rs` — attention sink + recency window management
 
@@ -134,7 +139,7 @@ This phase stays in riir-ai because:
 
 | Task | Description | Est. | Depends |
 |------|-------------|------|---------|
-| T1 | Add `undo_rope()` to `spectralquant/spectral.rs` | 2h | — |
+| T1 | Add `undo_rope()` to `crates/katgpt-spectral/src/spectral.rs` | 2h | — |
 | T2 | Extend `SpectralQuantCalibration` to store RoPE parameters | 1h | — |
 | T3 | Modify `spectral_rotation.rs` to operate on no-RoPE basis | 2h | T1, T2 |
 | T4 | Update `forward.rs` to reapply RoPE after dequant (or use Δ-identity) | 3h | T3 |
@@ -259,8 +264,8 @@ Phase 1:
 
 Phase 2:
   + spectralquant/ (from Phase 1)
-  + turboquant/codebook.rs (Lloyd-Max reuse)
-  + turboquant/rotation.rs (Hadamard reuse)
+  + crates/katgpt-quant/src/turboquant/codebook.rs (Lloyd-Max reuse)
+  + crates/katgpt-quant/src/turboquant/rotation.rs (Hadamard reuse)
   + NEW: shard_kv/ module
 
 Phase 3 (riir-ai):

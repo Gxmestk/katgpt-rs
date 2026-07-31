@@ -54,7 +54,7 @@ subterranean = ["bandit"]  # ProcedureGraph + PathSampler for compiling workflow
 
 ## T1: ProcedureGraph Trait
 
-**File:** `src/pruners/subterranean/mod.rs` (new)
+**File:** `crates/katgpt-pruners/src/subterranean/mod.rs` (new)
 **Feature gate:** `subterranean`
 
 ```rust
@@ -76,7 +76,7 @@ pub trait ProcedureGraph {
 }
 ```
 
-**Types file:** `src/pruners/subterranean/types.rs`
+**Types file:** `crates/katgpt-pruners/src/subterranean/types.rs`
 
 ```rust
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -110,7 +110,7 @@ pub struct Trajectory<NodeId> {
 
 ## T2: PathEnumerator
 
-**File:** `src/pruners/subterranean/path_enumerator.rs`
+**File:** `crates/katgpt-pruners/src/subterranean/path_enumerator.rs`
 **Feature gate:** `subterranean`
 
 Implements exhaustive acyclic path enumeration using DFS with visited tracking.
@@ -149,7 +149,7 @@ impl<'a, G: ProcedureGraph> PathEnumerator<'a, G> {
 
 ## T3: PathSampler
 
-**File:** `src/pruners/subterranean/path_sampler.rs`
+**File:** `crates/katgpt-pruners/src/subterranean/path_sampler.rs`
 **Feature gate:** `subterranean`
 
 Generates training data from sampled trajectories by mapping graph nodes to game actions.
@@ -192,7 +192,7 @@ impl<G: ProcedureGraph> PathSampler<'_, G> {
 
 ## T4: ProcedureCostModel
 
-**File:** `src/pruners/subterranean/cost_model.rs`
+**File:** `crates/katgpt-pruners/src/subterranean/cost_model.rs`
 **Feature gate:** `subterranean`
 
 ```rust
@@ -235,7 +235,7 @@ impl ProcedureCostModel {
 
 ## T5: GOAT Proof — Bomber Procedure Graph
 
-**File:** `src/pruners/subterranean/bomber_procedure.rs`
+**File:** `crates/katgpt-pruners/src/subterranean/bomber_procedure.rs`
 **Feature gate:** `subterranean`
 **Benchmark:** `.benchmarks/024_subterranean_bomber_procedure.md`
 
@@ -266,7 +266,7 @@ pub struct BomberProcedure {
 
 ## T6: GOAT Proof — Go Procedure Graph
 
-**File:** `src/pruners/subterranean/go_procedure.rs`
+**File:** `crates/katgpt-pruners/src/subterranean/go_procedure.rs`
 **Feature gate:** `subterranean`
 **Benchmark:** `.benchmarks/025_subterranean_go_procedure.md`
 
@@ -297,7 +297,7 @@ pub struct GoProcedure {
 
 ## T7: Integration — ProcedureGraph ↔ GameState Bridge
 
-**File:** `src/pruners/subterranean/game_bridge.rs`
+**File:** `crates/katgpt-pruners/src/subterranean/game_bridge.rs`
 **Feature gate:** `subterranean`, `game_state`
 
 ```rust
@@ -322,7 +322,7 @@ pub trait ProcedureGameState: ProcedureGraph + GameState {
 
 ## T8: Integration — PathSampler → Bandit Training Data
 
-**File:** `src/pruners/subterranean/bandit_bridge.rs`
+**File:** `crates/katgpt-pruners/src/subterranean/bandit_bridge.rs`
 **Feature gate:** `subterranean`
 
 ```rust
@@ -356,7 +356,7 @@ pub fn graph_trajectories_to_sessions<G: ProcedureGraph>(
 
 ## T9: Full Fine-Tuning Flag — Productions Config
 
-**File:** `src/pruners/subterranean/training_mode.rs`
+**File:** `crates/katgpt-pruners/src/subterranean/training_mode.rs`
 **Feature gate:** `subterranean`
 
 ```rust

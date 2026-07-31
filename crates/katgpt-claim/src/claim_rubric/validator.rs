@@ -12,7 +12,7 @@
 //!    **not** change `honest_level` (silently forcing it down would hide the
 //!    violation). Vocabulary is enforced separately at step 5.
 //! 3. **Missing for declared** — items required at `declared_level` but
-//!    absent from `satisfied`. Drives [`Self::promote_advice`].
+//!    absent from `satisfied`. Drives `promote_advice`.
 //! 4. **Vocabulary violations** —
 //!    [`crate::claim_rubric::vocabulary::scan`] is called with
 //!    `honest_level` (the evidence-backed level). Verbs whose minimum level

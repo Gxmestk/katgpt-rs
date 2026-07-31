@@ -12,7 +12,7 @@
 ## Summary
 
 Shipped the FUNCATTN primal operator as a Gain-tier open primitive in
-`crates/katgpt-core/src/funcattn.rs`, matching the reference implementation's
+`crates/katgpt-core/src/funcattn/mod.rs`, matching the reference implementation's
 **dual form** (d×d convex-combo regularization `(1-α)·K̃ᵀK̃ + α·I_d`, column-
 normalized slice tokens, per-slice-token to_q/to_k/to_v linear projections).
 All 13 unit tests pass against a scalar reference. **Promoted to DEFAULT-ON**
@@ -363,7 +363,7 @@ primary value path and will share the basis infrastructure shipped here.
 
 | File | Role |
 |------|------|
-| `crates/katgpt-core/src/funcattn.rs` | Module (1344 lines including tests) |
+| `crates/katgpt-core/src/funcattn/mod.rs` | Module (1344 lines including tests) |
 | `crates/katgpt-core/src/lib.rs` | `pub mod funcattn;` + re-exports |
 | `crates/katgpt-core/Cargo.toml` | `funcattn = []` feature |
 | `Cargo.toml` | `funcattn = ["tiled_attention", "katgpt-core/funcattn"]`, added to `full` |
@@ -571,11 +571,14 @@ stands.
 
 ### Demotion / promotion decision
 
-**`funcattn`: eligible for default-on promotion (human decision pending).**
+**`funcattn`: PROMOTED TO DEFAULT-ON on 2026-07-18** (cargo-comment sync).
 Per Plan 286 T4.4, G6 now PASSES (FUNCATTN acc=1.000 ≥ SDPA acc=1.000).
 The original "stays opt-in" verdict was based on the pre-D4 null result
-and is superseded. The primitive remains opt-in in `full` until a human
-flips it into the default feature list per T4.4's promotion protocol.
+and is superseded. (Post-promotion update, 2026-07-18): the prior "human
+decision pending" qualifier below was overtaken — the cargo-comment sync
+landed the promotion directly in `katgpt-rs/Cargo.toml` (root forwards to
+`katgpt-core/funcattn`). The feature is in `default = [...]` as of the 2026-07-07
+post-Issue-049 D4 G6 fix and the comment was synced to match on 2026-07-18.
 
 ---
 

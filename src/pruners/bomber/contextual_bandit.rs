@@ -48,10 +48,10 @@
 //! `Q_score = sigmoid(Q_raw)` ∈ (0, 1). This keeps the bandit contribution in
 //! `(-1, 1)` and follows the global "sigmoid not softmax" rule.
 
-use super::blend_context::{CONTEXT_DIM, sigmoid};
-use super::players::ACTION_COUNT;
 #[cfg(test)]
 use super::blend_context::compute_phi;
+use super::blend_context::{CONTEXT_DIM, sigmoid};
+use super::players::ACTION_COUNT;
 #[cfg(test)]
 use super::players::KnownBomb;
 

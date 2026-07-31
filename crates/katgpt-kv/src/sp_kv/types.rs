@@ -224,11 +224,11 @@ impl SpKvCache {
 pub struct UtilityPredictorWeights {
     /// First layer weights [hidden, d_model], row-major.
     pub w1: Vec<f32>,
-    /// First layer bias [hidden]. Initialized to 0.
+    /// First layer bias `[hidden]`. Initialized to 0.
     pub b1: Vec<f32>,
     /// Second layer weights [n_kv_heads, hidden], row-major.
     pub w2: Vec<f32>,
-    /// Second layer bias [n_kv_heads]. Initialized to +5.0 for open gates.
+    /// Second layer bias `[n_kv_heads]`. Initialized to +5.0 for open gates.
     pub b2: Vec<f32>,
 }
 
@@ -307,7 +307,7 @@ impl SpKvPredictors {
 /// Built from utility predictions before the attention loop.
 /// Avoids recomputing log(u) or threshold decisions per head per position.
 pub struct GateBiasBuffer {
-    /// Gate bias per position [block_size].
+    /// Gate bias per position `[block_size]`.
     /// Soft: log(u + ε), Hard: 0.0 or -∞, Tahg: blended.
     pub bias: Vec<f32>,
 }
@@ -322,7 +322,7 @@ impl GateBiasBuffer {
 
     /// Build gate biases for soft gating mode (training phase 1).
     ///
-    /// bias[s] = log(utility[s] + ε) for positions outside window.
+    /// `bias[s] = log(utility[s] + ε)` for positions outside window.
     /// Inside window: bias = 0.0 (always attend).
     #[allow(clippy::needless_range_loop)]
     pub fn build_soft(&mut self, utilities: &[f32], pos: usize, window: usize) {
@@ -339,7 +339,7 @@ impl GateBiasBuffer {
 
     /// Build gate biases for hard gating mode (inference).
     ///
-    /// bias[s] = 0.0 if retained (utility ≥ τ or in window), else -∞.
+    /// `bias[s] = 0.0` if retained (utility ≥ τ or in window), else -∞.
     pub fn build_hard(
         &mut self,
         utilities: &[f32],

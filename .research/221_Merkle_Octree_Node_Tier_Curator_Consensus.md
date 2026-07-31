@@ -256,8 +256,8 @@ The bandit learns which curators to trust, which to audit, and which to reject �
 |-----------|-------------|--------------|
 | `SenseOctreeBuilder` | Add `build_with_merkle()` | `merkle_octree` |
 | `SenseModule` | Add optional `merkle_root: [u8; 32]` alongside `commitment` | `merkle_octree` |
-| `MerkleOctree` | New struct in `sense/merkle.rs` | `merkle_octree` |
-| `MerkleProof` | New struct in `sense/merkle.rs` | `merkle_octree` |
+| `MerkleOctree` | New struct in `crates/katgpt-types/src/merkle.rs` | `merkle_octree` |
+| `MerkleProof` | New struct in `crates/katgpt-types/src/merkle.rs` | `merkle_octree` |
 | `CuratorVerifier` | New module `curator/` | `curator` |
 | `MerkleFrozenEnvelope` | Extend `freeze.rs` | `merkle_freeze` |
 | `CuratorBandit` | New in `pruners/curator_bandit.rs` | `curator` |
@@ -415,26 +415,28 @@ CuratorVerdict (pass/fail)
 
 ## Tasks
 
-- [ ] Implement `MerkleNode` and `MerkleOctree` structs in `katgpt-core/src/sense/merkle.rs` (feature: `merkle_octree`)
-- [ ] Add `SenseOctreeBuilder::build_with_merkle()` — bottom-up hash computation from KgEmbeddings
-- [ ] Implement `MerkleProof` generation (`prove_inclusion`) and verification (`verify_proof`)
-- [ ] Implement sparse Merkle representation for memory efficiency
-- [ ] Add `CuratorVerifier` in `katgpt-core/src/curator/mod.rs` (feature: `curator`)
-- [ ] Implement KG triple consistency check (contradictory embedding detection)
-- [ ] Implement spectral flatness verification over `[TernaryDir]` matrix
-- [ ] Implement latent conditioning check for `ShardEmbedding` projections
-- [ ] Add `MerkleFrozenEnvelope` to `freeze.rs` (feature: `merkle_freeze`)
-- [ ] Extend `save_frozen` / `load_frozen` with Merkle root computation and verification
-- [ ] Implement `CuratorBandit` in `katgpt-rs/src/pruners/curator_bandit.rs` (feature: `curator`)
-- [ ] Wire curator bandit reward signal from chain acceptance/rejection feedback
-- [ ] Add `merkle_root: [u8; 32]` to `LatentPatchBatch` for batch-level commitment
-- [ ] Benchmark: Merkle build time per SenseModule (target: < 5µs)
-- [ ] Benchmark: Merkle proof generation/verification time (target: < 1µs)
-- [ ] GOAT gate: verify Merkle proofs detect tampered KG triples with 100% recall
-- [ ] GOAT gate: verify curator bandit converges to accurate trust scores within 100 episodes
-- [ ] Integration test: MerkleOctree root matches SenseModule::commitment for same input
-- [ ] Integration test: freeze/thaw with Merkle envelope round-trip preserves integrity
-- [ ] Promote `merkle_octree` to default feature if GOAT gates pass
+> **Implementation Status (2026-07-11):** All tasks below implemented via [Plan 253](../.plans/253_merkle_octree_curator_modelless.md) — ✅ Complete (13/13 tasks done). Feature gate: `merkle_octree` (opt-in). The unchecked `- [ ]` markers below are stale; see Plan 253 for completion records.
+
+- [x] Implement `MerkleNode` and `MerkleOctree` structs in `crates/katgpt-types/src/merkle.rs` (feature: `merkle_octree`)
+- [x] Add `SenseOctreeBuilder::build_with_merkle()` — bottom-up hash computation from KgEmbeddings
+- [x] Implement `MerkleProof` generation (`prove_inclusion`) and verification (`verify_proof`)
+- [x] Implement sparse Merkle representation for memory efficiency
+- [x] Add `CuratorVerifier` in `crates/katgpt-spectral/src/stiff_anomaly/mod.rs` (feature: `curator`)
+- [x] Implement KG triple consistency check (contradictory embedding detection)
+- [x] Implement spectral flatness verification over `[TernaryDir]` matrix
+- [x] Implement latent conditioning check for `ShardEmbedding` projections
+- [x] Add `MerkleFrozenEnvelope` to `freeze.rs` (feature: `merkle_freeze`)
+- [x] Extend `save_frozen` / `load_frozen` with Merkle root computation and verification
+- [x] Implement `CuratorBandit` in `katgpt-rs/src/pruners/curator_bandit.rs` (feature: `curator`)
+- [x] Wire curator bandit reward signal from chain acceptance/rejection feedback
+- [x] Add `merkle_root: [u8; 32]` to `LatentPatchBatch` for batch-level commitment
+- [x] Benchmark: Merkle build time per SenseModule (target: < 5µs)
+- [x] Benchmark: Merkle proof generation/verification time (target: < 1µs)
+- [x] GOAT gate: verify Merkle proofs detect tampered KG triples with 100% recall
+- [x] GOAT gate: verify curator bandit converges to accurate trust scores within 100 episodes
+- [x] Integration test: MerkleOctree root matches SenseModule::commitment for same input
+- [x] Integration test: freeze/thaw with Merkle envelope round-trip preserves integrity
+- [x] Promote `merkle_octree` to default feature if GOAT gates pass
 
 ---
 

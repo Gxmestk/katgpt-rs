@@ -47,7 +47,7 @@
 //! [`TilrScratch`] once and reuses it across calls. [`tilr_refine`] is the
 //! allocating convenience wrapper for non-hot paths.
 
-use crate::simd::simd_dot_f32;
+use crate::simd::{simd_dot_f32, simd_fused_scale_acc};
 
 // Phase 3 calibration helper needs Plan 301's thin SVD. Gated separately so the
 // core primitive (tilr_refine_into) stays zero-`crate::`-dep. In the default
@@ -295,9 +295,7 @@ pub fn tilr_refine_into(
     for k in 0..r {
         let c = coeffs[k];
         let row = &basis[k * d..(k + 1) * d];
-        for i in 0..d {
-            d_proj[i] += c * row[i];
-        }
+        simd_fused_scale_acc(d_proj, row, c, d);
     }
 
     // ── Step 3: alignment ratio γ = ‖d_proj‖ / ‖d‖ ────────────────────────
@@ -320,11 +318,9 @@ pub fn tilr_refine_into(
     let eta = eta_base * gamma;
 
     // ── Step 5: apply s' = s + η · d_proj ─────────────────────────────────
-    // O(d) SAXPY. Element-wise read-then-write (aliasing-safe by construction,
-    // though the safe API prevents `out` from aliasing `state`).
-    for i in 0..d {
-        out[i] = state[i] + eta * d_proj[i];
-    }
+    // O(d) SAXPY: copy state, then accumulate η · d_proj via SIMD.
+    out[..d].copy_from_slice(&state[..d]);
+    simd_fused_scale_acc(&mut out[..d], d_proj, eta, d);
 
     Ok(gamma)
 }
@@ -432,9 +428,7 @@ pub fn tilr_refine_apply(
     for k in 0..r {
         let c = coeffs[k];
         let row = &basis[k * d..(k + 1) * d];
-        for i in 0..d {
-            d_proj[i] += c * row[i];
-        }
+        simd_fused_scale_acc(d_proj, row, c, d);
     }
     let d_proj_norm_sq = simd_dot_f32(d_proj, d_proj, d);
     let d_norm_sq = simd_dot_f32(direction, direction, d);
@@ -446,9 +440,7 @@ pub fn tilr_refine_apply(
     let eta = eta_base * gamma;
 
     // Step 5: in-place SAXPY — state[i] += eta * d_proj[i].
-    for i in 0..d {
-        state[i] += eta * d_proj[i];
-    }
+    simd_fused_scale_acc(&mut state[..d], d_proj, eta, d);
     Ok(gamma)
 }
 
@@ -655,7 +647,11 @@ mod tests {
         )
         .unwrap();
         assert_eq!(gamma, 0.0);
-        assert!(out.iter().zip(state.iter()).all(|(a, b)| a.to_bits() == b.to_bits()));
+        assert!(
+            out.iter()
+                .zip(state.iter())
+                .all(|(a, b)| a.to_bits() == b.to_bits())
+        );
     }
 
     // ── G1b: full-correction parity (γ = 1) ───────────────────────────────
@@ -1040,9 +1036,15 @@ mod tests {
         let mut state = original;
         let direction = [0.0, 0.0, 1.0, 0.0]; // orthogonal to basis → γ = 0
         let mut scratch = TilrScratch::with_capacity(d, r);
-        let gamma = tilr_refine_apply(&mut state, &direction, &basis, r, 0.5, 1e-12, &mut scratch).unwrap();
+        let gamma =
+            tilr_refine_apply(&mut state, &direction, &basis, r, 0.5, 1e-12, &mut scratch).unwrap();
         assert_eq!(gamma, 0.0);
-        assert!(state.iter().zip(original.iter()).all(|(a, b)| a.to_bits() == b.to_bits()));
+        assert!(
+            state
+                .iter()
+                .zip(original.iter())
+                .all(|(a, b)| a.to_bits() == b.to_bits())
+        );
     }
 
     // ── TilrScratch capacity ──────────────────────────────────────────────
@@ -1119,7 +1121,10 @@ mod tests {
         );
         // dims 3..8 should be unchanged (d_proj is zero there).
         for i in 3..d {
-            assert!((out[i] - state[i]).abs() < 1e-6, "dim {i} changed unexpectedly");
+            assert!(
+                (out[i] - state[i]).abs() < 1e-6,
+                "dim {i} changed unexpectedly"
+            );
         }
     }
 
@@ -1306,7 +1311,9 @@ mod tests {
             &mut out,
         )
         .unwrap();
-        assert!((gamma - 1.0).abs() < 0.01, "expected γ≈1.0 for in-span direction, got {gamma}");
+        assert!(
+            (gamma - 1.0).abs() < 0.01,
+            "expected γ≈1.0 for in-span direction, got {gamma}"
+        );
     }
-
 }

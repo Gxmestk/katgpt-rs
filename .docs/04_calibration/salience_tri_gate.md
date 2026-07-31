@@ -4,7 +4,7 @@
 **Research:** [281](../../.research/281_Per_Tick_Salience_Tri_Gate_Speak_Silent_Delegate.md)
 **Source paper:** [arxiv 2606.14777](https://arxiv.org/abs/2606.14777) — JoyAI-VL-Interaction (Yao et al., JD.com, Jun 2026)
 **Status:** Phase 1 + Phase 3 + Phase 4 shipped. Phase 2 (latency bench, T2.2) deferred.
-**Feature flag:** `salience_tri_gate` (opt-in, **not** default — pending Phase 5 GOAT promotion decision).
+**Feature flag:** `salience_tri_gate` (**DEFAULT-ON** since Phase 5 GOAT PASS 2026-06-23).
 
 ---
 
@@ -142,7 +142,7 @@ can distinguish "nothing to say" from "explicitly chose silence".
 `decide` and `decide_batch` perform no heap allocation. All temporaries are
 stack scalars. `decide_batch` takes a caller-owned output buffer. The dot
 products use `f32::mul_add` for single-rounding FMA contraction (matches the
-`bridge/mod.rs` / `cumprodsum.rs` convention).
+`crates/katgpt-core/src/bridge/mod.rs` / `cumprodsum.rs` convention).
 
 ### `PendingDelegateQueue` is a fixed-size ring
 

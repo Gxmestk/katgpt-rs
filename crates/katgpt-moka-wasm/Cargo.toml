@@ -1,0 +1,19 @@
+[package]
+name = "katgpt-moka-wasm"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+description = "Minimal standalone WASM build of the Moka v1 port (Plan 565) — no katgpt-core dependency, so no ahash/getrandom wasm32 backend friction. A real browser deployment shouldn't carry hashmap-DoS-resistance RNG machinery it never uses."
+publish = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+katgpt-types = { path = "../katgpt-types" }
+wasm-bindgen = "0.2"
+
+[dev-dependencies]
+wasmi = "1.0"

@@ -4,6 +4,12 @@
 //! pre-generated random orthogonal matrix. JL lemma guarantees pairwise distance
 //! preservation within (1±ε) with high probability.
 //!
+//! # DEPRECATED (Issue 139, 2026-07-16)
+//!
+//! The JL projection at m=8 violates the Johnson-Lindenstrauss lower bound by
+//! over 200×. Empirically measures 1.4-6% NN preservation vs the documented 90%
+//! target. Zero runtime consumers. See Plan 230 close-out note.
+//!
 //! # Architecture
 //!
 //! ```text
@@ -12,6 +18,8 @@
 //!
 //! The projection matrix W is generated once (at consolidation time or init)
 //! and stored alongside the shard. No training needed.
+
+#![allow(deprecated)]
 
 use crate::types::ShardEmbedding;
 
@@ -23,6 +31,13 @@ pub const EMBED_DIM: usize = 8;
 
 /// Projection matrix: 8 rows × 64 columns, stored row-major.
 /// Each row is a unit vector (orthogonal to other rows).
+///
+/// # Deprecated
+///
+/// The JL projection is mathematically unsound at m=8 — see Issue 139.
+#[deprecated(
+    note = "JL projection at m=8 is mathematically unsound (Issue 139). Zero runtime consumers."
+)]
 #[derive(Clone, Debug)]
 pub struct JlProjectionMatrix {
     /// Row-major: `rows[i][j]` = element at row i, column j.
@@ -31,6 +46,7 @@ pub struct JlProjectionMatrix {
     commitment: [u8; 32],
 }
 
+#[allow(deprecated)]
 impl JlProjectionMatrix {
     /// Generate a random orthogonal projection matrix using Gram-Schmidt.
     ///

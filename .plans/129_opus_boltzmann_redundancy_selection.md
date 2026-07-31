@@ -23,7 +23,7 @@ This is the **highest-value distillation** from OPUS — composable, simple, dir
 ## Tasks
 
 ### T1: CountSketch Primitive
-- [x] Create `src/pruners/opus/count_sketch.rs`
+- [x] Create `crates/katgpt-pruners/src/opus/count_sketch.rs`
 - [x] Implement `CountSketch` struct with hash/sign pairs
 - [x] `fn sketch(&self, vec: &[f32]) -> Vec<f32>` — O(d) → O(m) projection
 - [x] `fn inner_product_estimate(&self, a: &[f32], b: &[f32]) -> f32` — unbiased estimator
@@ -31,15 +31,15 @@ This is the **highest-value distillation** from OPUS — composable, simple, dir
 - [x] Micro-bench: sketch speed vs full inner product
 
 ### T2: Boltzmann Sampler
-- [x] Create `src/pruners/opus/boltzmann.rs`
+- [x] Create `crates/katgpt-pruners/src/opus/boltzmann.rs`
 - [x] `fn boltzmann_sample(utilities: &[f32], temperature: f32, rng: &mut Rng) -> usize`
 - [x] `fn boltzmann_sample_batch(utilities: &[f32], temperature: f32, k: usize, rng: &mut Rng) -> Vec<usize>`
 - [x] Temperature τ controls exploration: τ→0 greedy, τ→∞ uniform
 - [x] Unit tests: probability distribution validity, edge cases (τ=0, τ=∞, single arm)
 
 ### T3: OpusBanditPruner<P>
-- [x] Create `src/pruners/opus/types.rs` with `OpusConfig`, `OpusBanditPruner<P>`
-- [x] Create `src/pruners/opus/mod.rs` (index only)
+- [x] Create `crates/katgpt-pruners/src/opus/types.rs` with `OpusConfig`, `OpusBanditPruner<P>`
+- [x] Create `crates/katgpt-pruners/src/opus/mod.rs` (index only)
 - [x] Implement `ScreeningPruner` for `OpusBanditPruner<P>`
 - [x] Core scoring: `U_z = alignment - redundancy_weight * ⟨ϕ(z), Φ_selected⟩`
 - [x] Maintain running history `Φ_selected` of sketch features
@@ -123,5 +123,5 @@ src/pruners/opus/
 
 - Research 089: `.research/089_OPUS_Optimizer_Induced_Projected_Utility_Selection.md`
 - OPUS paper: arXiv:2602.05400v2
-- Existing bandit: `src/pruners/bandit.rs` (Plan 030)
+- Existing bandit: `crates/katgpt-ruliology/src/bandit.rs` (Plan 030)
 - CountSketch: Cormode & Muthukrishnan 2005

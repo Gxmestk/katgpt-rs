@@ -70,7 +70,7 @@ use katgpt_types::Rng;
 
 /// Configuration for set-diffusion decoding.
 ///
-/// Mirrors [`crate::speculative::d2f::D2fDecodeConfig`] but for the
+/// Mirrors `crate::speculative::d2f::D2fDecodeConfig` but for the
 /// set-causal generalization. The key difference: instead of a fixed
 /// `block_size`, the decode region's position ordering is specified
 /// per-call via `gen_steps` (the output of `PositionOffsetSchedule`'s
@@ -487,19 +487,21 @@ fn sample_token(
 ) -> (usize, f32) {
     debug_assert_eq!(logits.len(), vocab, "logits length must equal vocab_size");
 
+    use katgpt_core::simd::fast_exp;
+
     // Find max for numerical stability (skip mask token).
+    //
+    // max_logit doubles as argmax_logit — the argmax token is by definition
+    // the one holding the max logit, so tracking them separately is dead
+    // work (was two `if logit > X` branches per element; now one).
     let mut max_logit = f32::NEG_INFINITY;
     let mut argmax_token = 0usize;
-    let mut argmax_logit = f32::NEG_INFINITY;
     for (t, &logit) in logits.iter().enumerate().take(vocab) {
         if t == mask {
             continue;
         }
         if logit > max_logit {
             max_logit = logit;
-        }
-        if logit > argmax_logit {
-            argmax_logit = logit;
             argmax_token = t;
         }
     }
@@ -512,13 +514,10 @@ fn sample_token(
             if t == mask {
                 continue;
             }
-            sum_exp += (logit - max_logit).exp();
+            sum_exp += fast_exp(logit - max_logit);
         }
-        let prob = if sum_exp > 0.0 {
-            (argmax_logit - max_logit).exp() / sum_exp
-        } else {
-            0.0
-        };
+        // argmax_logit == max_logit by construction, so its exp is exp(0) = 1.
+        let prob = if sum_exp > 0.0 { 1.0 / sum_exp } else { 0.0 };
         return (argmax_token, prob);
     }
 
@@ -535,7 +534,7 @@ fn sample_token(
             continue;
         }
         let scaled = (logit - max_logit) / temperature;
-        sum_exp += scaled.exp();
+        sum_exp += fast_exp(scaled);
     }
     if sum_exp <= 0.0 {
         return (argmax_token, 0.0);
@@ -548,14 +547,15 @@ fn sample_token(
             continue;
         }
         let scaled = (logit - max_logit) / temperature;
-        let prob_t = scaled.exp();
+        let prob_t = fast_exp(scaled);
         cumulative += prob_t;
         if cumulative >= target {
             return (t, prob_t / sum_exp);
         }
     }
     // Fallback (numerical drift): return argmax.
-    let p_max = ((argmax_logit - max_logit) / temperature).exp() / sum_exp;
+    // argmax_logit == max_logit → exp(0/temperature) = 1.0.
+    let p_max = 1.0 / sum_exp;
     (argmax_token, p_max)
 }
 

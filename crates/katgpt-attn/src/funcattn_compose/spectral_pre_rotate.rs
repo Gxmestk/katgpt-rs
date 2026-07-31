@@ -10,7 +10,7 @@
 //! `W_Φ' = W_Φ · Vᵀ` in place, where `V` is the eigenbasis (columns =
 //! eigenvectors, sorted by eigenvalue descending). This module is the
 //! **composition glue**: it calls SpectralQuant's
-//! [`calibrate_eigenbasis`](crate::spectralquant::calibrate_eigenbasis) to
+//! `calibrate_eigenbasis` (in `crate::spectralquant`) to
 //! obtain `V` from calibration samples, then feeds it to the pre-rotator, and
 //! exposes the spectral-concentration diagnostics that connect FUNCATTN's `k`
 //! to SpectralQuant's cumulative-variance thresholds.

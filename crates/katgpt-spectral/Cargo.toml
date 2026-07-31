@@ -78,6 +78,16 @@ gauge_invariant = ["katgpt-core/newton_schulz"]
 # for snapshot hashing.
 manifold_power_iter_router = ["blake3"]
 
+# Quantile Balancing MoE Router (Plan 455, Research 447 §2.4) — sibling to
+# manifold_power_iter_router. One-shot per-expert bias `β` computation at
+# freeze/thaw snapshot swap via alternating-coordinate descent on the
+# balanced-assignment LP (Su blog Feb 2026 + Marin 32B-A5B validation). No
+# deps — quantile via std::slice::select_nth_unstable. Promoted to
+# DEFAULT-ON at root (2026-07-17) after Plan 455 Phase 3 Case C: composition
+# with manifold_power_iter_router strictly beats either alone (MPI fixes
+# alignment λ, QB fixes balance MaxVio on orthogonal axes).
+quantile_balance_router = []
+
 # Off-Principal Task Vector Retrieval (Plan 264 Phase 2, Research 231).
 # Needs newton_schulz for the principal-direction recovery and blake3 for the
 # source-weight hash. Also enables the local `newton_schulz` feature so the
@@ -121,8 +131,11 @@ hla_eigenbasis_recovery = ["uuid", "blake3"]
 # W₀'s top-rank SVD subspace, extracting the compact rewiring matrix M = U_rᵀΔWV_r
 # and the purified on-manifold delta ΔW* = U_r M V_rᵀ. The on-principal complement
 # of `off_principal_retrieval` (Plan 264). Needs katgpt-core/subspace_phase_gate
-# for thin_svd_into + SvdResultScratch + SvdScratch. Opt-in until the Plan 423
-# GOAT gate passes (G1 spectral concentration at NPC scale is the make-or-break).
+# for thin_svd_into + SvdResultScratch + SvdScratch. STAYS OPT-IN (Plan 423 Phase 3
+# GOAT, 2026-07-10): all mechanism gates PASS (G1a numerical stability, G2/G3/G4/G5/G6),
+# but the spectral concentration assumption (G1b) does NOT hold at NPC scale (≤64×64)
+# — verified via riir-train Issue 374 (trained LoRA deltas produce on_manifold_fraction
+# in [0.27, 0.58], far below the SAR threshold > 0.8). Stays cold-tier only.
 spectral_rewire = ["katgpt-core/subspace_phase_gate"]
 
 # Plan 423 Phase 3 — Spectral Rewiring GOAT gate bench (G1–G6).
@@ -133,3 +146,19 @@ name = "bench_423_spectral_rewire_goat"
 path = "benches/bench_423_spectral_rewire_goat.rs"
 required-features = ["spectral_rewire"]
 harness = false
+
+# Plan 455 Phase 2 — Quantile Balancing MoE Router N/M/k sweep benchmark.
+# std::time::Instant + harness=false (matches Plan 279 bench convention).
+[[bench]]
+name = "quantile_balance_router_bench"
+path = "benches/quantile_balance_router_bench.rs"
+required-features = ["quantile_balance_router"]
+harness = false
+
+# Plan 455 Phase 3 — Head-to-head: QB (Plan 455) vs MPI (Plan 279) vs composed.
+# Integration test (not a bench) — asserts orthogonality of the two axes and
+# prints the decision matrix used for the T3.6 promotion verdict.
+[[test]]
+name = "bench_455_phase3_head_to_head"
+path = "tests/bench_455_phase3_head_to_head.rs"
+required-features = ["quantile_balance_router", "manifold_power_iter_router"]

@@ -2,7 +2,7 @@
 
 **Date:** 2026-05-31
 **Research:** `.research/146_RLM_GEPA_Reflective_Prompt_Evolution.md`
-**Status:** Implementing
+**Status:** COMPLETE ✅ — 27/27 tasks done. GOAT 11/11 PASS. `gepa_reflective` feature shipped (opt-in).
 **Feature Gate:** `gepa_reflective = ["bandit", "memo_reflections"]` — **off by default** until GOAT proof
 
 ---
@@ -37,10 +37,10 @@ Episode → TrialLog → MeMo Reflection
 
 | Component | Type | Location |
 |-----------|------|----------|
-| `ReflectionScore` | Struct | `src/pruners/gepa_reflective.rs` |
-| `ParetoConfigFrontier` | Struct | `src/pruners/gepa_reflective.rs` |
-| `ReflectiveBanditPruner<P>` | Generic wrapper | `src/pruners/gepa_reflective.rs` |
-| `ConfigVariant` | Enum | `src/pruners/gepa_reflective.rs` |
+| `ReflectionScore` | Struct | `crates/katgpt-pruners/src/gepa_reflective.rs` |
+| `ParetoConfigFrontier` | Struct | `crates/katgpt-pruners/src/gepa_reflective.rs` |
+| `ReflectiveBanditPruner<P>` | Generic wrapper | `crates/katgpt-pruners/src/gepa_reflective.rs` |
+| `ConfigVariant` | Enum | `crates/katgpt-pruners/src/gepa_reflective.rs` |
 
 ---
 

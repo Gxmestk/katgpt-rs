@@ -138,8 +138,8 @@ pub fn simd_exp_inplace(x: &mut [f32])
 
 | File | Change |
 |------|--------|
-| `crates/katgpt-core/src/simd.rs` | Added `simd_scale_mul_inplace`, `simd_exp_inplace`, NEON/AVX2/scalar backends |
-| `crates/katgpt-core/src/types.rs` | `rmsnorm_with_gamma_eps`: `simd_dot_f32` for sum_sq, `simd_scale_mul_inplace` for fused scale+gamma |
+| `crates/katgpt-dec/src/simd.rs` | Added `simd_scale_mul_inplace`, `simd_exp_inplace`, NEON/AVX2/scalar backends |
+| `crates/katgpt-types/src/lib.rs` | `rmsnorm_with_gamma_eps`: `simd_dot_f32` for sum_sq, `simd_scale_mul_inplace` for fused scale+gamma |
 | `tests/bench_core_optimization.rs` | New comprehensive benchmark (9 sections, all hot-path components) |
 
 ## Remaining Optimization Candidates

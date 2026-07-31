@@ -42,7 +42,7 @@ Key findings per crate:
 - **Feature name mismatches**: `collider_pruner` is gated by feature
   `collider_consistency`; `adaptive_cot_stopper` by `adaptive_cot_identifiability`.
   Preserve these names in the new crate.
-- **External inbound edge**: `src/specialist_projection.rs:44` imports
+- **External inbound edge**: `crates/katgpt-sparse/src/specialist_projection.rs:44` imports
   `crate::band_conditioner::ComputeTarget` — will become
   `crate::katgpt_band::ComputeTarget` via root shim (back-compat preserved).
 - **External crate deps**: `katgpt_core::sigmoid` (all 4);
@@ -74,7 +74,7 @@ Key findings per crate:
 
 ### `katgpt-claim`
 - **Two siblings, no internal coupling** (claim_rubric ↔ clr do NOT reference
-  each other). The bridge lives in `riir-ai/npc_clr/claim_rubric_bridge.rs`
+  each other). The bridge lives in `riir-ai/crates/riir-games-civ/src/npc_clr/claim_rubric_bridge.rs`
   (consumer-side).
 - **External crate deps**: `katgpt_core::traits::FeatureClass` (claim_rubric);
   `katgpt_core::simd` + `blake3` test-only (clr).
@@ -213,7 +213,7 @@ Key findings per crate:
   - Commit `f18b128b` on `develop`. 52 files changed: 5 new crate Cargo.toml +
     5 new crate lib.rs + 38 renames (src/* → crates/*/src/*) + root Cargo.toml
     feature forwards + root src/lib.rs shims + Cargo.lock + Plan 382 +
-    Proposal 003 Phase 11 entry + 1 delete (validator/mod.rs superseded by
+    Proposal 003 Phase 11 entry + 1 delete (riir-chain/src/validator/mod.rs superseded by
     lib.rs).
 
 ## GOAT gate G3 (per crate)

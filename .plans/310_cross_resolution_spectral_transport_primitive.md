@@ -45,7 +45,7 @@ G2 cos <0.75 (transport destroys personality) — either demotes to Gain.
 
 - [x] T1.1 Create `katgpt-rs/crates/katgpt-core/src/cross_resolution.rs`:
   Shipped with `CrossResolutionBases` (BLAKE3-committed via per-element LE f32 →
-  matches `engram/commitment.rs::build_merkle_root` convention), `CrossResScratch`,
+  matches `crates/katgpt-core/src/engram/commitment.rs::build_merkle_root` convention), `CrossResScratch`,
   `CrossResolutionError::{RankDeficient, ShapeMismatch}` (rank-deficiency guard
   from Research 291 §5.4), `project_to_spectral_into`, `reconstruct_from_spectral_into`
   (uses `simd::simd_dot_f32` for contiguous dst-row dots), `transport_cross_resolution_into`,
@@ -63,7 +63,7 @@ G2 cos <0.75 (transport destroys personality) — either demotes to Gain.
   cross_resolution_transport = ["katgpt-core/cross_resolution_transport"]  # ...
   ```
 
-- [x] T1.3 Wire module into `katgpt-core/src/lib.rs`:
+- [x] T1.3 Wire module into `crates/katgpt-core/src/lib.rs`:
   ```rust
   #[cfg(feature = "cross_resolution_transport")]
   pub mod cross_resolution;
@@ -184,9 +184,9 @@ Changes:
 for the integration guide.
 
 - [-] T5.1 `NeuronShard::transport_to_tier(d_dst, bases) -> NeuronShard` in
-      `riir-neuron-db/src/shard.rs`. **DEFERRED to riir-neuron-db Plan 004.**
+      `riir-neuron-db/src/shard/mod.rs`. **DEFERRED to riir-neuron-db Plan 004.**
 - [-] T5.2 `ShardIndex::get_at_tier(zone_hash, d_dst, bases) -> NeuronShard` in
-      `riir-neuron-db/src/index.rs`. **DEFERRED to riir-neuron-db Plan 004.**
+      `seal-online-remaster/crates/seal-asset-explorer/src/index.rs`. **DEFERRED to riir-neuron-db Plan 004.**
 - [-] T5.3 Consolidation integration (`Raven/δ-Mem` low-res → high-res commit). **DEFERRED to riir-neuron-db Plan 004.**
 - [-] T5.4 AnyRAG escalation gateway transport. **DEFERRED to riir-neuron-db Plan 004.**
 

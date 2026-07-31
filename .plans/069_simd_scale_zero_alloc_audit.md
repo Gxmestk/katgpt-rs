@@ -23,7 +23,7 @@ Deep audit of `src/` against `.agent/optimization.md` after Issue 057. Implement
 
 ## T1: Add `simd_scale_inplace` (Category A foundation)
 
-**File**: `src/simd.rs` — place before `horizontal_sum_256` (~L549)
+**File**: `crates/katgpt-dec/src/simd.rs` — place before `horizontal_sum_256` (~L549)
 
 Add `simd_scale_inplace(x: &mut [f32], scale: f32)` with:
 - NEON (`vmulq_f32`) — 4× f32 per op
@@ -53,7 +53,7 @@ pub fn simd_scale_inplace(x: &mut [f32], scale: f32) {
 
 ## T3: Wire `simd_scale_inplace` into HLA decay (A3)
 
-**File**: `src/hla/kernel.rs`
+**File**: `crates/katgpt-hla/src/kernel.rs`
 
 Replace all `for x in slice.iter_mut() { *x *= gamma; }` patterns:
 - `hla_state_update` (~L99-113): 5 decay loops → 5 `simd_scale_inplace` calls
@@ -65,7 +65,7 @@ Replace all `for x in slice.iter_mut() { *x *= gamma; }` patterns:
 
 ## T4: Wire `simd_scale_inplace` into TurboQuant (A4)
 
-**File**: `src/turboquant/kv_cache.rs`
+**File**: `crates/katgpt-quant/src/turboquant/kv_cache.rs`
 
 - `store_key` normalize (~L159-163): replace scalar normalize loop
 - `store_value` normalize (~L203-207): same
@@ -74,14 +74,14 @@ Replace all `for x in slice.iter_mut() { *x *= gamma; }` patterns:
 
 ## T5: Replace TurboQuant scalar matmul with `simd_matmul_rows` (B1)
 
-**File**: `src/turboquant/kv_cache.rs`
+**File**: `crates/katgpt-quant/src/turboquant/kv_cache.rs`
 
 - `mat_vec_into` (~L402-415): delegate to `simd_matmul_rows`
-- `mat_vec_t_into` (~L426-438): add new `simd_matvec_transpose` to `src/simd.rs` if needed, or use column-wise `simd_dot_f32`
+- `mat_vec_t_into` (~L426-438): add new `simd_matvec_transpose` to `crates/katgpt-dec/src/simd.rs` if needed, or use column-wise `simd_dot_f32`
 
 ## T6: Replace HLA readout scalar matvec with `simd_matvec` (B2)
 
-**File**: `src/hla/kernel.rs`
+**File**: `crates/katgpt-hla/src/kernel.rs`
 
 - `hla_readout` qᵀ·SK (~L238-247): use `simd_matvec`
 - `hla_denom` qᵀ·SK (~L279-288): use `simd_matvec`
@@ -92,7 +92,7 @@ Note: HLA readout is `qᵀ · SK` (row vector × matrix), verify calling convent
 
 ## T7: Use `simd_dot_f32` in cosine_similarity (B3)
 
-**File**: `src/turboquant/forward.rs` (~L128-134)
+**File**: `crates/katgpt-quant/src/turboquant/forward.rs` (~L128-134)
 
 Replace scalar dot + norms:
 ```rust
@@ -103,7 +103,7 @@ let nb = simd_dot_f32(b, b, b.len()).sqrt();
 
 ## T8: Fuse forward_prefill Phase A+B embedding (C1)
 
-**File**: `src/transformer.rs`
+**File**: `crates/katgpt-percepta/src/transformer.rs`
 
 - For single-layer: compute embedding once, reuse across phases
 - For multi-layer: store pre-rmsnorm hidden state to avoid recomputation
@@ -111,14 +111,14 @@ let nb = simd_dot_f32(b, b, b.len()).sqrt();
 
 ## T9: Optimize `extract_ddtree_paths` + `extract_best_path` (D2)
 
-**File**: `src/speculative/step.rs`, `src/speculative/dd_tree.rs`
+**File**: `crates/katgpt-forward/src/step.rs`, `src/speculative/dd_tree.rs`
 
 - Pre-index tree nodes by depth: `[Vec<&TreeNode>; MAX_DEPTH]` built in O(N)
 - Replace O(D × N) `.iter().filter()` scans with O(1) depth lookups
 
 ## T10: Document `speculative_step_rollback` / `_paged` as deprecated (D1)
 
-**File**: `src/speculative/step.rs`
+**File**: `crates/katgpt-forward/src/step.rs`
 
 Add `#[deprecated(note = "Use speculative_step_rollback_with for zero-alloc production path")]` to benchmark-only functions.
 

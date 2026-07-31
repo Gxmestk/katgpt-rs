@@ -12,9 +12,7 @@
 //! cargo run --example attn_match_head_budget --features attn_match --release
 //! ```
 
-use katgpt_attn_match::head_budget::{
-    HeadBudgetSchedule, HeadBudgetSolver, HeadSensitivityCurve,
-};
+use katgpt_attn_match::head_budget::{HeadBudgetSchedule, HeadBudgetSolver, HeadSensitivityCurve};
 
 fn main() {
     println!("=== Attention Matching — Head Budget Solver (Plan 271 Phase 3) ===\n");

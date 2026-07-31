@@ -13,9 +13,9 @@
 //! ΔW⊥ = ΔW − ΔW*          (off-manifold residual)
 //! ```
 //!
-//! The rewiring matrix M is compact (r×r). Its off-diagonal elements M[i][j]
+//! The rewiring matrix M is compact (r×r). Its off-diagonal elements `M[i][j]`
 //! (i≠j) represent cross-skill "rewiring" — many-to-one logical synthesis.
-//! Its diagonal elements M[i][i] represent in-skill strength modulation.
+//! Its diagonal elements `M[i][i]` represent in-skill strength modulation.
 //!
 //! # Modelless
 //!
@@ -36,9 +36,13 @@
 //!
 //! # Feature gate
 //!
-//! Opt-in until the Plan 423 GOAT gate passes. The make-or-break gate is G1:
-//! spectral concentration at NPC scale (the paper proves it for 1.5B–32B LLM
-//! weights; our 64×64 / 128×128 matrices are unvalidated).
+//! STAYS OPT-IN — Plan 423 Phase 3 GOAT (Bench 423, 2026-07-10): all mechanism
+//! gates PASS (G1a/G2/G3/G4/G5/G6), but the spectral concentration assumption
+//! (G1b) does NOT hold at NPC scale (≤64×64), verified via riir-train Issue 374
+//! (trained LoRA deltas produce on_manifold_fraction in [0.27, 0.58], far
+//! below the SAR threshold > 0.8). The paper proves spectral concentration for
+//! 1.5B–32B LLM weights; our 64×64 / 128×128 matrices are unvalidated at that
+//! scale. See `.benchmarks/423_*`.
 
 use katgpt_core::simd::simd_dot_f32;
 use katgpt_core::{SvdResultScratch, SvdScratch, thin_svd_into};
@@ -194,7 +198,10 @@ pub fn spectral_rewire_into<'a>(
         "spectral_rewire_into: delta.len() {} != d_out*d_in = {total}",
         delta.len()
     );
-    assert!(rank >= 1, "spectral_rewire_into: rank must be >= 1, got {rank}");
+    assert!(
+        rank >= 1,
+        "spectral_rewire_into: rank must be >= 1, got {rank}"
+    );
     let r = rank.min(d_out.min(d_in));
 
     scratch.ensure_capacity(d_out, d_in, r);
@@ -504,7 +511,14 @@ impl SpectralRewireIndex {
             singular_values[i] = svd_result.singular_value(i);
         }
 
-        Self { u_r, v_r, singular_values, d_out, d_in, rank: r }
+        Self {
+            u_r,
+            v_r,
+            singular_values,
+            d_out,
+            d_in,
+            rank: r,
+        }
     }
 
     /// The cached rank.
@@ -636,7 +650,7 @@ pub struct RewiringDiagnostics {
 
 /// Compute [`RewiringDiagnostics`] for a row-major `rank × rank` rewiring
 /// matrix `M`, using the default negligibility threshold
-/// ([`DEFAULT_SPARSITY_REL_THRESHOLD`], 1% of the max-magnitude entry).
+/// (`DEFAULT_SPARSITY_REL_THRESHOLD`, 1% of the max-magnitude entry).
 ///
 /// For a custom threshold, use [`rewiring_matrix_diagnostics_with_threshold`].
 ///
@@ -909,13 +923,18 @@ mod tests {
         let result = spectral_rewire(&w0, &delta, d_out, d_in, r);
 
         // delta_star + residual == delta
-        for idx in 0..d_out * d_in {
-            let recon = result.delta_star[idx] + result.residual[idx];
-            let rel = (recon - delta[idx]).abs() / delta[idx].abs().max(1e-10);
+        for (idx, ((&delta_star, &residual), &delta)) in result
+            .delta_star
+            .iter()
+            .zip(result.residual.iter())
+            .zip(delta.iter())
+            .enumerate()
+        {
+            let recon = delta_star + residual;
+            let rel = (recon - delta).abs() / delta.abs().max(1e-10);
             assert!(
                 rel < 1e-5,
-                "reconstruction failed at idx {idx}: ΔW_on+ΔW_off={recon:.6e}, ΔW={:.6e}, rel={rel:.2e}",
-                delta[idx]
+                "reconstruction failed at idx {idx}: ΔW_on+ΔW_off={recon:.6e}, ΔW={delta:.6e}, rel={rel:.2e}"
             );
         }
     }
@@ -1012,19 +1031,31 @@ mod tests {
     fn diagnostics_identity_matrix_is_all_diagonal() {
         // Pure diagonal M (3×3) — all energy on the diagonal, no cross-skill
         // rewiring. Every off-diagonal entry is exactly zero.
-        let m: &[f32] = &[
-            1.0, 0.0, 0.0,
-            0.0, 2.0, 0.0,
-            0.0, 0.0, 3.0,
-        ];
+        let m: &[f32] = &[1.0, 0.0, 0.0, 0.0, 2.0, 0.0, 0.0, 0.0, 3.0];
         let d = rewiring_matrix_diagnostics(m, 3);
 
-        assert!((d.diagonal_energy - 1.0).abs() < 1e-6, "diagonal_energy = {}", d.diagonal_energy);
-        assert!(d.off_diagonal_energy.abs() < 1e-6, "off_diagonal_energy = {}", d.off_diagonal_energy);
+        assert!(
+            (d.diagonal_energy - 1.0).abs() < 1e-6,
+            "diagonal_energy = {}",
+            d.diagonal_energy
+        );
+        assert!(
+            d.off_diagonal_energy.abs() < 1e-6,
+            "off_diagonal_energy = {}",
+            d.off_diagonal_energy
+        );
         // ∞-norm = max row sum = max(1, 2, 3) = 3.0.
-        assert!((d.spectral_norm_estimate - 3.0).abs() < 1e-6, "norm = {}", d.spectral_norm_estimate);
+        assert!(
+            (d.spectral_norm_estimate - 3.0).abs() < 1e-6,
+            "norm = {}",
+            d.spectral_norm_estimate
+        );
         // All 6 off-diagonals are zero → fully sparse.
-        assert!((d.rewiring_sparsity - 1.0).abs() < 1e-6, "sparsity = {}", d.rewiring_sparsity);
+        assert!(
+            (d.rewiring_sparsity - 1.0).abs() < 1e-6,
+            "sparsity = {}",
+            d.rewiring_sparsity
+        );
     }
 
     // ── T2.2: rewiring_matrix_diagnostics on pure off-diagonal M ─────────
@@ -1033,19 +1064,31 @@ mod tests {
     fn diagnostics_pure_off_diagonal_matrix_is_all_rewiring() {
         // Zero diagonal, all off-diagonal entries equal — pure cross-skill
         // rewiring, fully dense (no negligible off-diagonals).
-        let m: &[f32] = &[
-            0.0, 1.0, 1.0,
-            1.0, 0.0, 1.0,
-            1.0, 1.0, 0.0,
-        ];
+        let m: &[f32] = &[0.0, 1.0, 1.0, 1.0, 0.0, 1.0, 1.0, 1.0, 0.0];
         let d = rewiring_matrix_diagnostics(m, 3);
 
-        assert!(d.diagonal_energy.abs() < 1e-6, "diagonal_energy = {}", d.diagonal_energy);
-        assert!((d.off_diagonal_energy - 1.0).abs() < 1e-6, "off_diagonal_energy = {}", d.off_diagonal_energy);
+        assert!(
+            d.diagonal_energy.abs() < 1e-6,
+            "diagonal_energy = {}",
+            d.diagonal_energy
+        );
+        assert!(
+            (d.off_diagonal_energy - 1.0).abs() < 1e-6,
+            "off_diagonal_energy = {}",
+            d.off_diagonal_energy
+        );
         // ∞-norm = max row sum = 2.0 (each row sums |1|+|1| on off-diagonals).
-        assert!((d.spectral_norm_estimate - 2.0).abs() < 1e-6, "norm = {}", d.spectral_norm_estimate);
+        assert!(
+            (d.spectral_norm_estimate - 2.0).abs() < 1e-6,
+            "norm = {}",
+            d.spectral_norm_estimate
+        );
         // No off-diagonal is below 1% of max_abs (1.0) → sparsity = 0.0.
-        assert!(d.rewiring_sparsity.abs() < 1e-6, "sparsity = {}", d.rewiring_sparsity);
+        assert!(
+            d.rewiring_sparsity.abs() < 1e-6,
+            "sparsity = {}",
+            d.rewiring_sparsity
+        );
     }
 
     // ── T2.2: rewiring_matrix_diagnostics on mixed M + edge cases ────────
@@ -1054,35 +1097,47 @@ mod tests {
     fn diagnostics_mixed_and_edge_cases() {
         // Mixed: dominant diagonal (10²) plus one moderate off-diagonal (3²).
         // diagonal_energy = 100 / (100 + 9 + 9) = 100/118 ≈ 0.847.
-        let m: &[f32] = &[
-            10.0, 3.0,
-            3.0, 0.0,
-        ];
+        let m: &[f32] = &[10.0, 3.0, 3.0, 0.0];
         let d = rewiring_matrix_diagnostics(m, 2);
-        assert!((d.diagonal_energy - (100.0_f32 / 118.0)).abs() < 1e-5,
-            "diagonal_energy = {} expected ~0.847", d.diagonal_energy);
-        assert!((d.diagonal_energy + d.off_diagonal_energy - 1.0).abs() < 1e-6,
-            "diagonal + off-diagonal must sum to 1.0");
+        assert!(
+            (d.diagonal_energy - (100.0_f32 / 118.0)).abs() < 1e-5,
+            "diagonal_energy = {} expected ~0.847",
+            d.diagonal_energy
+        );
+        assert!(
+            (d.diagonal_energy + d.off_diagonal_energy - 1.0).abs() < 1e-6,
+            "diagonal + off-diagonal must sum to 1.0"
+        );
         // ∞-norm = max(|10|+|3|, |3|+|0|) = 13.0.
         assert!((d.spectral_norm_estimate - 13.0).abs() < 1e-6);
         // Off-diagonals are both 3.0; threshold = 0.01*10 = 0.1; neither < 0.1
         // → sparsity = 0/2 = 0.0.
-        assert!(d.rewiring_sparsity.abs() < 1e-6, "sparsity = {}", d.rewiring_sparsity);
+        assert!(
+            d.rewiring_sparsity.abs() < 1e-6,
+            "sparsity = {}",
+            d.rewiring_sparsity
+        );
 
         // Raising the threshold to 50% makes 3.0 < 0.5*10 = 5.0 → both negligible.
         let d2 = rewiring_matrix_diagnostics_with_threshold(m, 2, 0.5);
-        assert!((d2.rewiring_sparsity - 1.0).abs() < 1e-6,
-            "sparsity at 50% threshold = {}", d2.rewiring_sparsity);
+        assert!(
+            (d2.rewiring_sparsity - 1.0).abs() < 1e-6,
+            "sparsity at 50% threshold = {}",
+            d2.rewiring_sparsity
+        );
 
         // All-zero M: total energy 0 → zeroed diagnostics, vacuously sparse.
         let z: &[f32] = &[0.0, 0.0, 0.0, 0.0];
         let dz = rewiring_matrix_diagnostics(z, 2);
-        assert_eq!(dz, RewiringDiagnostics {
-            diagonal_energy: 0.0,
-            off_diagonal_energy: 0.0,
-            spectral_norm_estimate: 0.0,
-            rewiring_sparsity: 1.0,
-        });
+        assert_eq!(
+            dz,
+            RewiringDiagnostics {
+                diagonal_energy: 0.0,
+                off_diagonal_energy: 0.0,
+                spectral_norm_estimate: 0.0,
+                rewiring_sparsity: 1.0,
+            }
+        );
 
         // rank == 1: no off-diagonal entries → sparsity vacuously 1.0; the
         // single diagonal entry carries all energy.
@@ -1198,10 +1253,10 @@ mod tests {
         for i in 0..d_out {
             for j in 0..d_in {
                 let mut acc = 0.0;
-                for k in 0..r {
+                for (k, &m_true_k) in m_true.iter().enumerate().take(r) {
                     let u_k = svd_result.left_singular_vector(k);
                     let v_k = svd_result.right_singular_vector(k);
-                    acc += u_k[i] * m_true[k] * v_k[j];
+                    acc += u_k[i] * m_true_k * v_k[j];
                 }
                 delta[i * d_in + j] = acc;
             }
@@ -1210,13 +1265,19 @@ mod tests {
         let result = spectral_rewire(&w0, &delta, d_out, d_in, r);
 
         // On-manifold fraction should be ~1.0 (delta lives in the subspace).
-        assert!(result.on_manifold_fraction > 0.999,
-            "on_manifold_fraction = {}", result.on_manifold_fraction);
+        assert!(
+            result.on_manifold_fraction > 0.999,
+            "on_manifold_fraction = {}",
+            result.on_manifold_fraction
+        );
 
         // Diagnostics on the recovered M: diagonal should dominate.
         let d = rewiring_matrix_diagnostics(&result.rewiring_matrix, r);
-        assert!(d.diagonal_energy > 0.95,
-            "diagonal_energy = {} (expected diagonal-dominant from diag M_true)", d.diagonal_energy);
+        assert!(
+            d.diagonal_energy > 0.95,
+            "diagonal_energy = {} (expected diagonal-dominant from diag M_true)",
+            d.diagonal_energy
+        );
         assert!((d.diagonal_energy + d.off_diagonal_energy - 1.0).abs() < 1e-5);
         assert!((0.0..=1.0).contains(&d.rewiring_sparsity));
         assert!(d.spectral_norm_estimate > 0.0);
@@ -1226,7 +1287,7 @@ mod tests {
     //
     // The make-or-break for Issue 123 (Fusion B promotion) is whether REAL
     // training deltas are concentrated. That requires riir-train (no trained
-    // weights exist in the 5-repo quintet). But we CAN validate the MEASUREMENT
+    // weights exist in the 7-repo stack). But we CAN validate the MEASUREMENT
     // is trustworthy: construct deltas with KNOWN on/off mixing ratios and
     // verify the primitive measures the correct fraction. When real deltas
     // eventually arrive, this test guarantees the diagnostic is calibrated.
@@ -1272,8 +1333,11 @@ mod tests {
 
         // Pure on-manifold should be ≈ 1.0.
         let out_on = spectral_rewire_into(&w0, &delta_on, d_out, d_in, r, &mut scratch);
-        assert!(out_on.on_manifold_fraction > 0.999,
-            "pure on-manifold should be ≈1.0, got {}", out_on.on_manifold_fraction);
+        assert!(
+            out_on.on_manifold_fraction > 0.999,
+            "pure on-manifold should be ≈1.0, got {}",
+            out_on.on_manifold_fraction
+        );
 
         // Energies.
         let e_on: f32 = delta_on.iter().map(|v| v * v).sum();
@@ -1328,9 +1392,9 @@ mod tests {
         for i in 0..d_out {
             for j in 0..d_in {
                 let mut acc = 0.0;
-                for k in 0..r {
+                for (k, &m_diag_k) in m_diag.iter().enumerate().take(r) {
                     acc += svd_result.left_singular_vector(k)[i]
-                        * m_diag[k]
+                        * m_diag_k
                         * svd_result.right_singular_vector(k)[j];
                 }
                 delta_on[i * d_in + j] = acc;

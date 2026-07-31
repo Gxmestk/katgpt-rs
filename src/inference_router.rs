@@ -15,10 +15,10 @@
 use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 use std::time::Instant;
 
-use katgpt_backend::InferenceBackend;
 use crate::transformer::{ForwardContext, MultiLayerKVCache, TransformerWeights};
+use crate::types::{Config, Rng};
+use katgpt_backend::InferenceBackend;
 use katgpt_core::trigger_gate::{ComputeTier, TriggerGate, TriggerGateConfig};
-use crate::types::{Config, Rng, sample_token_into, softmax_scaled};
 
 #[cfg(feature = "rv_gated_routing")]
 use crate::pruners::acceptance_variance::AcceptanceVarianceTracker;
@@ -27,7 +27,9 @@ use crate::pruners::acceptance_variance::AcceptanceVarianceTracker;
 use katgpt_core::trigger_gate::RvThresholds;
 
 #[cfg(all(feature = "critical_interval_gate", feature = "rv_gated_routing"))]
-use katgpt_core::dllm_solver::{CriticalIntervalConfig, CriticalTierDecision, critical_tier_decision};
+use katgpt_core::dllm_solver::{
+    CriticalIntervalConfig, CriticalTierDecision, critical_tier_decision,
+};
 
 #[cfg(feature = "rcd_residual")]
 use katgpt_core::dllm_solver::{ResidualMode, tier_to_residual_mode};
@@ -201,7 +203,7 @@ pub struct InferenceRouter {
 impl InferenceRouter {
     /// Create a new router.
     ///
-    /// Starts at [`ComputeTier::CpuOnly`] with a [`CpuBackend`].
+    /// Starts at [`ComputeTier::CpuOnly`] with a `CpuBackend`.
     /// GPU backend is initialised if `gpu_available` and the `gpu_inference` feature
     /// is enabled with a Metal device present. ANE backend uses the same pattern.
     pub fn new(
@@ -866,9 +868,8 @@ impl InferenceRouter {
 
             self.record_queue_depth(1);
             self.forward(ctx, weights, cache, token, pos);
-            softmax_scaled(&mut ctx.logits, 1.0 / self.config.temperature);
 
-            let next_token = sample_token_into(&ctx.logits, rng, &mut ctx.cdf);
+            let next_token = ctx.sample_next_token(self.config.temperature, rng);
             tokens.push(next_token);
 
             if next_token == self.config.bos_token {

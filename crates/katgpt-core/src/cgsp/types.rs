@@ -18,8 +18,8 @@ pub(crate) const SNAPSHOT_MAGIC: [u8; 4] = *b"CGSP";
 /// Current snapshot serialization version.
 pub(crate) const SNAPSHOT_VERSION: u32 = 1;
 
-/// Default maximum supported dimension for HLA direction vectors.
-pub const DEFAULT_HLA_DIM: usize = 64;
+/// Default maximum supported dimension for belief direction vectors.
+pub const DEFAULT_BELIEF_DIRECTION_DIM: usize = 64;
 
 /// Default maximum number of candidates sampled per cycle (k).
 pub const DEFAULT_K: usize = 4;
@@ -28,6 +28,34 @@ pub const DEFAULT_K: usize = 4;
 pub const DEFAULT_POOL_SIZE: usize = 64;
 
 // ── Latent types ──────────────────────────────────────────────────────────
+
+/// 4-accumulator FMA dot product: `Σ a[i] * b[i]`.
+///
+/// Four independent accumulators hide the ~4-cycle FMA pipeline latency
+/// (single-accumulator dot is latency-bound; 4 parallel accumulators keep
+/// the pipeline full). Per-element rounding is single-rounding FMA
+/// (`a.mul_add(b, acc)`); only the reduction tree changes (4 partial sums
+/// summed at the end). Deterministic. Mirrors the scalar fallback in
+/// `katgpt_types::simd::dot::scalar_dot_f32`.
+#[inline]
+fn dot_f32_fma4(a: &[f32], b: &[f32]) -> f32 {
+    let mut acc = [0.0f32; 4];
+    let chunks = a.len() / 4;
+    let mut i = 0;
+    for _ in 0..chunks {
+        acc[0] = a[i].mul_add(b[i], acc[0]);
+        acc[1] = a[i + 1].mul_add(b[i + 1], acc[1]);
+        acc[2] = a[i + 2].mul_add(b[i + 2], acc[2]);
+        acc[3] = a[i + 3].mul_add(b[i + 3], acc[3]);
+        i += 4;
+    }
+    let mut sum = acc[0] + acc[1] + acc[2] + acc[3];
+    while i < a.len() {
+        sum = a[i].mul_add(b[i], sum);
+        i += 1;
+    }
+    sum
+}
 
 /// A latent direction vector. POD-style fixed-size buffer.
 ///
@@ -62,28 +90,30 @@ impl Direction {
     }
 
     /// Dot product with another direction. Returns 0.0 if dims mismatch.
+    ///
+    /// Uses 4 independent FMA accumulators to hide the ~4-cycle FMA pipeline
+    /// latency (a single-accumulator dot is latency-bound at one FMA per
+    /// ~4 cycles; 4 parallel accumulators keep the pipeline full at one FMA
+    /// per cycle). Same pattern as `simd::scalar_dot_f32` in katgpt-types.
+    /// Per-element rounding is still single-rounding FMA (`a.mul_add(b, acc)`);
+    /// only the accumulation *tree* changes (4 partial sums reduced at the
+    /// end instead of one running sum). Deterministic — same input always
+    /// yields the same output.
     #[inline]
     pub fn dot(&self, other: &Self) -> f32 {
         if self.coords.len() != other.coords.len() {
             return 0.0;
         }
-        let mut sum = 0.0f32;
-        for (a, b) in self.coords.iter().zip(other.coords.iter()) {
-            // FMA: sum = a * b + sum (single rounding, matches bridge::dot_f32_i8).
-            sum = a.mul_add(*b, sum);
-        }
-        sum
+        dot_f32_fma4(&self.coords, &other.coords)
     }
 
     /// L2 norm squared.
+    ///
+    /// Same 4-accumulator FMA unroll as [`Self::dot`] — see its doc comment
+    /// for the latency rationale.
     #[inline]
     pub fn norm_sq(&self) -> f32 {
-        let mut s = 0.0f32;
-        for c in &self.coords {
-            // FMA: s = c * c + s (single rounding).
-            s = c.mul_add(*c, s);
-        }
-        s
+        dot_f32_fma4(&self.coords, &self.coords)
     }
 
     /// Mutable coordinate access.
@@ -556,31 +586,41 @@ fn snapshot_id_now() -> [u8; 16] {
 // ── Math helpers (sigmoid never softmax) ──────────────────────────────────
 
 /// Numerically stable sigmoid.
+///
+/// Delegates to [`katgpt_types::simd::fast_sigmoid`] which uses the Cephes
+/// polynomial exp (~1.7× faster than libm on aarch64, ~1 ULP accuracy).
+/// The previous two-branch form was a numerical-stability optimization for
+/// libm `exp` (avoiding `exp(large_positive)` overflow); `fast_sigmoid`'s
+/// Cephes kernel handles the full range correctly via its own early exits,
+/// making the branch unnecessary.
 #[inline(always)]
 pub fn sigmoid(x: f32) -> f32 {
-    if x >= 0.0 {
-        let z = (-x).exp();
-        1.0 / (1.0 + z)
-    } else {
-        let z = x.exp();
-        z / (1.0 + z)
-    }
+    crate::simd::fast_sigmoid(x)
 }
 
 /// Shannon entropy (nats) of a probability-like vector.
 ///
 /// Used for collapse detection: low entropy = degenerate priority table.
+///
+/// Inner loop is branch-free: `p.max(1e-10).ln()` compiles to `fmax`, so LLVM
+/// can auto-vectorize over the priority table without a data-dependent branch
+/// per arm. Matches the pattern in `dllm_solver::shannon_entropy` and
+/// `mux::dd_tree::shannon_entropy_with_total`. Bit-identical to the previous
+/// `if w > 0.0` form for non-negative weights (the only valid input here).
 pub fn entropy_nats(weights: &[f32]) -> f32 {
     let total: f32 = weights.iter().copied().sum();
     if total <= 0.0 || weights.is_empty() {
         return 0.0;
     }
+    let inv_total = 1.0 / total;
     let mut h = 0.0f32;
     for &w in weights {
-        if w > 0.0 {
-            let p = w / total;
-            h -= p * p.ln();
-        }
+        let p = w * inv_total;
+        // `p.max(1e-10).ln()`: when p == 0, this yields ln(1e-10) ≈ -23.03,
+        // and `p * ln(1e-10) == 0 * -23.03 == 0` — no contribution to h,
+        // matching the previous `if w > 0.0` skip.
+        let lp = p.max(1e-10).ln();
+        h -= p * lp;
     }
     h
 }

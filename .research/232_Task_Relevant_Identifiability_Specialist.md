@@ -7,6 +7,8 @@
 **Related Plans:** 265 (this research's implementation plan, katgpt-rs modelless); 297 (riir-ai model-based counterpart, private)
 **Related Research:** 003 (commercial strategy), 138 (LeJEPA — Gaussian-only identifiability, weaker), 231 (OPD sparse task vector — parameter geometry), 213 (Still perceiver — KV compaction), 176 (Vortex sparse attention), 225/256 (MSA GOAT-FAILED — this research fixes the missing theory), 082 (ToaST segment tokens), 043 (Interventional SFT causal masking — colliders)
 
+> **Gain-Redirects (synthesis, verdict revised 2026-07-26):** Nikolaou & Mencattini [arXiv:2510.15511 "Language Models are Injective and Hence Invertible"] (ICLR 2026) — **Gain**, not PASS (revised up: SipIt is modelless + doesn't ship → §1.55 mandates Gain-or-higher). Distinct identifiability concept from this note: that paper proves decoder-only text transformers w/ real-analytic activations are almost-surely **injective** prompt→last-token maps (preserved under GD via measure-zero collision sets + absolute-continuity-of-parameter-law argument), plus SipIt — linear-time exact prompt recovery from layer-ℓ hidden states via per-position vocabulary search with a gradient-guided policy on a continuous proxy embedding (no backprop through weights). Open primitive ships as `katgpt-core::inversion` (Plan 561). **Applications that do NOT transfer** (rejected fusions, documented to prevent re-litigation): (a) HLA injectivity — HLA is a sigmoid-bounded per-NPC kernel, not a text transformer; theorem doesn't apply; (b) activation-based sync compression — sync boundary already commits 32-byte BLAKE3 hash + 72-byte POD, transmitting a 768-dim f32 activation would be a 96× bandwidth increase, not a decrease; (c) lossless activation hashing — theorem is measure-zero over parameters, not bit-exact over f32 (paper itself uses `torch.allclose(1e-5, 1e-8)`); (d) Cold-tier prompt re-hydration — SipIt needs model weights + per-position hidden state matrix, and activations are 15-1000× larger than the prompts they encode. Theoretical lens still useful for FaithfulnessProbe / ActivationExtractor discussions.
+
 ---
 
 ## TL;DR
@@ -164,7 +166,7 @@ All collapse into "band-conditioning CI test against current query."
 - G2: Selection MCC ≥ 0.85 on synthetic SCM test (paper Fig 3 level).
 - G3: KV cache size reduction ≥ 40% with no quality drop on long-context benchmark.
 
-**Integration point:** New file `src/band_conditioner.rs` + trait extension on `ConstraintPruner` (or new `SegmentSelector` trait to keep SRP).
+**Integration point:** New file `crates/katgpt-band/src/band_conditioner.rs` + trait extension on `ConstraintPruner` (or new `SegmentSelector` trait to keep SRP).
 
 #### Fusion B: Specialist Latent Projection (SPLAT)
 
@@ -188,7 +190,7 @@ The mask `M_sparse` is computed once per (query, adapter) pair via:
 - G5: Mask discovery cost ≤ `|I(Ju)|` samples (paper Prop 2's `N_i` cardinality).
 - G6: MSA rescue — SPLAT-masked attention matches dense attention quality at 50% density (where MSA failed).
 
-**Integration point:** New file `src/specialist_projection.rs`. Consumes `SparseTaskVector` from Plan 264. Feature gate `specialist_projection` (depends on `sparse_task_vector`).
+**Integration point:** New file `crates/katgpt-sparse/src/specialist_projection.rs`. Consumes `SparseTaskVector` from Plan 264. Feature gate `specialist_projection` (depends on `sparse_task_vector`).
 
 #### Fusion C: Collider-Consistency ConstraintPruner (CCCP)
 
@@ -211,7 +213,7 @@ If no such `g_i` exists, the branch is dead — it cannot be part of any coheren
 - G8: Combined with bandit, improves DDTree efficiency by ≥ 25% (fewer expansions to find goal).
 - G9: Zero overhead when no tasks are tracked (early return).
 
-**Integration point:** New file `src/collider_pruner.rs`. Implements `ConstraintPruner` trait. Feature gate `collider_consistency`.
+**Integration point:** New file `crates/katgpt-band/src/collider_pruner.rs`. Implements `ConstraintPruner` trait. Feature gate `collider_consistency`.
 
 ---
 

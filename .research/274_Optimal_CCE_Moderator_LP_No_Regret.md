@@ -7,6 +7,7 @@
 > **Related Plans:** 030 (Multi-Armed Bandit), 137 (PrudentBanker Safe-Phased Bandit), 170 (RTS Intransitive Balancing — `PayoffTable<N>`), 213 (Ruliology Arena Cross-Paradigm), 282 (Dual-Pool Reachable Router), 295 (LP-CCE Moderator Primitive — this note's plan)
 > **Cross-ref (riir-ai):** Research 143 (Latent CCE Moderator — private selling-point guide), Plan 325 (Latent CCE Moderator Runtime — private runtime plan)
 > **Classification:** Public
+> **PASS-Redirects (synthesis):** Ding [arXiv:2607.17560 "Reinforcement Learning: From Algorithms To Foundation Models"] (Princeton PhD thesis 2026) — Part 1 (MARL in games: Nash-DQN, Nash-DQN-Exploiter w/ Double Oracle + MWU for 2P zero-sum Markov games; multi-player general-sum w/ distribution fairness) is fully covered by shipped primitives: `PayoffTable<N>::nash_equilibrium` (zero-sum stage game LP), `CceLp::solve` (general-sum Pareto-dominant CCE w/ designer Γ₀ — exactly the 'distribution fairness' angle), NS-CSG minimax-action-free PI (alternating best-response w/o normal-form solve). The thesis's RL **training** algorithms (DQN + minimax backup via GD) → riir-train; the equilibrium **concepts** they compute are modelless + already shipped here + in NS-CSG (R188).
 
 ---
 
@@ -128,14 +129,14 @@ Two examples — simple flocking (linear-quadratic, explicit Nash) and emission 
 
 | Paper component | Our shipped equivalent | Evidence |
 |---|---|---|
-| Nash equilibrium solver | `PayoffTable<N>::nash_equilibrium` (Cramer + support enumeration) | `riir-games/src/payoff.rs` |
+| Nash equilibrium solver | `PayoffTable<N>::nash_equilibrium` (Cramer + support enumeration) | `crates/katgpt-ruliology/src/payoff.rs` |
 | No-regret bandit convergence to Nash | `bandit_05_rps.rs` example (UCB1 vs ε-greedy → 33/33/33) | `katgpt-rs/examples/bandit_05_rps.rs` |
 | Mean-field α router with O(log T) regret | `DualPoolBandit` (Plan 282, G2 PASS: regret 24.6 ≤ 5·log(10k)) | `katgpt-rs/crates/katgpt-core/src/cgsp/dual_pool.rs`, `katgpt-rs/.benchmarks/028_dualpool_g2_log_regret.md` |
 | Mirror descent / OMD with delay | PrudentBanker (R098, Plan 137) — Banker-OMD, O(log T + √D) regret | `katgpt-rs/src/pruners/prudent_banker.rs` |
 | Equilibrium reasoners | EqR residual-based convergence (R079) | — |
 | Cross-paradigm arena with Nash meta-game | Ruliology (R168, Plan 213) | `katgpt-rs/src/ruliology/`, `katgpt-rs/examples/ruliology_demo.rs` |
 | Population welfare via economic selection | WealthPruner (R167) — coordinator with own objective per-arm wealth | (R167 §Fusion 1) |
-| Coherence-driven re-estimation scheduler | `latent_functor/reestimation.rs` (self-healing on coherence < τ_reest) | `riir-ai/crates/riir-engine/src/latent_functor/reestimation.rs` |
+| Coherence-driven re-estimation scheduler | `riir-ai/crates/riir-engine/src/latent_functor/reestimation/mod.rs` (self-healing on coherence < τ_reest) | `riir-ai/crates/riir-engine/src/latent_functor/reestimation/mod.rs` |
 
 ### 2.3 What's missing (the Super-GOAT novelty)
 
@@ -182,7 +183,7 @@ The dual update `λⁿ⁺¹ = λⁿ + (1/√N)·ER(ρⁿ⁺¹)` is a PrudentBank
 The moderator's `Γ₀` is WealthPruner's wealth-flows-promote-success applied at the *population* level. Each NPC's CGSP conjecturer pool is the deviation class; the moderator's recommendation policy is the wealth-promoted conjecturer. **Bankruptcy (WealthPruner) ↔ deviation-profitability (CCE)** — both remove underperformers, but CCE removes them *correlatedly* across the population via the shared signal, while WealthPruner removes them independently per arm.
 
 **Fusion D — CCE × Latent Functor re-estimation (coherence-decay triggers re-moderation):**
-`latent_functor/reestimation.rs` triggers re-estimation when `coherence < τ_reest`. The CCE primal-dual iterator should *also* trigger re-moderation when `coherence < τ_reest` — the moderator's `ρ` becomes stale as the population drifts. This fuses DiPOD's "self-distillation when ELBO drifts" pattern with CCE's "re-moderation when regret drifts". **The two schedulers are the same scheduler** under different vocabulary.
+`riir-ai/crates/riir-engine/src/latent_functor/reestimation/mod.rs` triggers re-estimation when `coherence < τ_reest`. The CCE primal-dual iterator should *also* trigger re-moderation when `coherence < τ_reest` — the moderator's `ρ` becomes stale as the population drifts. This fuses DiPOD's "self-distillation when ELBO drifts" pattern with CCE's "re-moderation when regret drifts". **The two schedulers are the same scheduler** under different vocabulary.
 
 **Fusion E — CCE × ICT Distributional Branching (gate expensive moderator updates):**
 Per-NPC cognitive economics (R270, R143) says only ~10% of moments are real decisions. The moderator doesn't need to update `ρ` every tick — only at branching points. **The ICT BranchingMask gates the primal-dual update itself.** This gives crowd-scale CCE updates at ~10× lower cost without losing decision quality.
@@ -224,7 +225,7 @@ Per-NPC cognitive economics (R270, R143) says only ~10% of moments are real deci
 | CGSP conjecturer pool as deviation class | — | ✅ game-specific (CGSP runtime) |
 | LatCal commitment of correlation signal | — | ✅ chain-specific (LatCal fixed-point bridge) |
 | Moderator objective `Γ₀` per game mode | — | ✅ game-specific (economy/faction/narrative) |
-| Latent Functor re-estimation trigger fusion | — | ✅ game-specific (latent_functor/reestimation.rs) |
+| Latent Functor re-estimation trigger fusion | — | ✅ game-specific (riir-ai/crates/riir-engine/src/latent_functor/reestimation/mod.rs) |
 | ICT BranchingMask gating of moderator updates | — | ✅ game-specific (per-NPC cognitive economics) |
 
 **Commercial principle (R003):** the public primitive is the adoption hook (generic LP-CCE math, no game semantics). The private guide is the moat (HLA + zone mood + CGSP pool + LatCal + game-specific `Γ₀`). Training know-how (neural-network parametrization, Adam optimizer on policy parameters) → riir-train, never leaks.
@@ -295,10 +296,10 @@ GOAT gate rule: `cce_moderator` feature flag default-off. Promote to considerati
 
 | Code | Connection |
 |---|---|
-| `riir-games/src/payoff.rs` (`PayoffTable<N>`) | Nash solver; deviation class for 1v1 CCE |
+| `crates/katgpt-ruliology/src/payoff.rs` (`PayoffTable<N>`) | Nash solver; deviation class for 1v1 CCE |
 | `katgpt-rs/src/pruners/prudent_banker.rs` | OMD primal-dual machinery |
 | `katgpt-rs/crates/katgpt-core/src/cgsp/dual_pool.rs` | Mean-field α router + O(log T) regret bound |
-| `riir-ai/crates/riir-engine/src/latent_functor/reestimation.rs` | Coherence-driven re-estimation scheduler (Fusion D) |
+| `riir-ai/crates/riir-engine/src/latent_functor/reestimation/mod.rs` | Coherence-driven re-estimation scheduler (Fusion D) |
 | `riir-ai/crates/riir-engine/src/hla/` | HLA channel — signal `ζ` broadcast medium |
 | `riir-ai/crates/riir-chain/src/encoding/latcal*.rs` | LatCal fixed-point bridge — sync commitment of `ζ` |
 | `riir-ai/crates/riir-engine/src/cgsp_runtime/` | CGSP conjecturer pool = deviation class `D` |
@@ -309,8 +310,8 @@ GOAT gate rule: `cce_moderator` feature flag default-off. Promote to considerati
 
 - Paper: [arXiv:2606.20062](https://arxiv.org/pdf/2606.20062) — Campi, Cannerozzi, Tzouanas, 18 Jun 2026
 - Code: https://github.com/JannTzou/Learning-Algorithm-for-Mean-Field-CCE.git (JAX reference, training-flavored)
-- Our payoff: `riir-ai/crates/riir-games/src/payoff.rs`
-- Our bandit: `katgpt-rs/src/pruners/bandit.rs`, `prudent_banker.rs`
+- Our payoff: `katgpt-rs/crates/katgpt-ruliology/src/payoff.rs`
+- Our bandit: `katgpt-rs/crates/katgpt-ruliology/src/bandit.rs`, `prudent_banker.rs`
 - Our dual pool: `katgpt-rs/crates/katgpt-core/src/cgsp/dual_pool.rs`
 - Our latent functor: `riir-ai/crates/riir-engine/src/latent_functor/`
 - Our HLA: `riir-ai/crates/riir-engine/src/hla/`
@@ -325,23 +326,23 @@ shared across all deviation constraints. The subjective-CCE generalization —
 each NPC `i` evaluates deviations against its own `J_i^{CWM_i}` — requires a
 thin wrapper primitive, shipped in Plan 300:
 
-- **New trait `HeterogeneousPayoff<N,A>`** (`katgpt-rs/src/cce/types.rs`):
+- **New trait `HeterogeneousPayoff<N,A>`** (`katgpt-rs/crates/katgpt-core/src/cce/types.rs`):
   `n_players`, `deviations_for_player`, per-player `reward_follow` /
   `reward_deviate` / `gamma_player` / `gamma_dev_player`, plus moderator
   objective `gamma0 = (1/P) Σ_i γ_i(ρ)` and linear `gamma0_coeff`.
-- **New method `CceLp::solve_heterogeneous`** (`katgpt-rs/src/cce/lp.rs`):
+- **New method `CceLp::solve_heterogeneous`** (`katgpt-rs/crates/katgpt-core/src/cce/lp.rs`):
   builds `Σ_i |D_i|` constraint rows, each using player `i`'s cost tensor.
   Shares BFS-enumeration infrastructure with `solve` (DRY refactor —
   `enumerate_bfs` helper).
-- **New struct `PerPlayerGame<N,A,P,D>`** (`katgpt-rs/src/cce/heterogeneous.rs`):
+- **New struct `PerPlayerGame<N,A,P,D>`** (`katgpt-rs/crates/katgpt-core/src/cce/heterogeneous.rs`):
   default concrete impl backed by per-player `(PayoffTensor, DeviationClass)`
   slices.
 - **New methods `CcePrimalDual::step_heterogeneous` + `run_heterogeneous`**
-  (`katgpt-rs/src/cce/primal_dual.rs`, Plan 300 T4.3b): per-player subgradient
+  (`katgpt-rs/crates/katgpt-core/src/cce/primal_dual.rs`, Plan 300 T4.3b): per-player subgradient
   oracle caches best deviation `κ_i*(ρ)` once per step, then aggregates
   `grad[m] = gamma0_coeff(m) + λ · (1/P) Σ_i [cost_i(s,a) − reward_deviate(i, s, κ_i*)]`.
 - **New method `ExternalRegret::linear_derivative_heterogeneous`**
-  (`katgpt-rs/src/cce/external_regret.rs`, Plan 300 T4.3b): public per-(s,a)
+  (`katgpt-rs/crates/katgpt-core/src/cce/external_regret.rs`, Plan 300 T4.3b): public per-(s,a)
   subgradient for testing / single-index callers.
 
 **Regret bound transfer (doc 62 §2):** `ER(ρ̄_T) ≤ O(T⁻¹ᐟ²)` holds as-is — each

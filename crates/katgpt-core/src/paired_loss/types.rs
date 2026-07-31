@@ -94,7 +94,7 @@ impl TokenClass {
     /// readout positions where the paper's Patterns i/ii show the largest
     /// Transformer–Hybrid separation.
     ///
-    /// Used by [`super::gap::PairedLossGap::filtered_mean`] to build a
+    /// Used by [`PairedLossGap::filtered_mean`] to build a
     /// branchless mask for the single-pass fast path.
     #[inline(always)]
     pub fn is_open_class(self) -> bool {
@@ -267,7 +267,7 @@ impl FilterScratch {
 /// Per-class annotation row pairing the observed mean gap with the
 /// Proposition 1 class-size bound (Plan 335 Phase 3 T3.1).
 ///
-/// Produced by [`super::gap::PairedLossGap::annotate_with_class_bounds`].
+/// Produced by [`PairedLossGap::annotate_with_class_bounds`].
 /// The `gap_to_bound_ratio = mean_gap / log_v_tau` tells you how much of
 /// the theoretical ceiling the observed A/B gap has consumed:
 ///
@@ -291,7 +291,7 @@ pub struct ClassGapRow {
     /// Number of positions in `classes` with this tag.
     pub count: u32,
     /// Mean `Δ_i = ℓ_A − ℓ_B` over positions of this class. Equal to
-    /// [`super::gap::PairedLossGap::mean_gap_for_class`] for this class.
+    /// [`PairedLossGap::mean_gap_for_class`] for this class.
     /// Sign: positive = B-favored.
     pub mean_gap: f32,
     /// `log|V_τ|` from the [`ClassSizeBound`] for this class, or `NaN` if no
@@ -312,14 +312,14 @@ pub struct ClassGapRow {
 /// has the richer feature already saturated the available room?").
 ///
 /// Produced by
-/// [`super::gap::PairedLossGap::annotate_with_class_bounds`].
+/// [`PairedLossGap::annotate_with_class_bounds`].
 ///
 /// # Zero-alloc note
 ///
 /// This is a **cold-path reporting API**, not a hot-path query. It allocates
 /// the `rows` Vec once (one `Vec::with_capacity(distinct_classes)` + one
 /// `HashMap` for accumulation). Use it once per eval report, not per token.
-/// The hot path is [`super::gap::PairedLossGap::filtered_mean_with_scratch`].
+/// The hot path is [`PairedLossGap::filtered_mean_with_scratch`].
 #[derive(Clone, Debug, Default)]
 pub struct ClassGapReport {
     /// One row per distinct class present in the input, sorted by

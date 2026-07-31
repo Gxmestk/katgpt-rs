@@ -500,9 +500,9 @@ pub struct RavenKVCache {
     // Pre-allocated buffers for zero-alloc router computation
     pub router_scored: Vec<(usize, f32)>, // [num_slots]
     pub router_r_t: Vec<f32>,             // [num_slots]
-    /// Pre-allocated score buffer for raven_readout_into [num_slots]
+    /// Pre-allocated score buffer for raven_readout_into `[num_slots]`
     pub readout_scores: Vec<f32>,
-    /// Pre-allocated output buffer for raven_readout_into [kv_dim]
+    /// Pre-allocated output buffer for raven_readout_into `[kv_dim]`
     pub readout_output: Vec<f32>,
     // ── usize fields (8-byte aligned, no padding after Vecs) ──
     /// Number of memory slots

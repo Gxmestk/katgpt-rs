@@ -30,14 +30,14 @@
 use std::time::{Duration, Instant};
 
 use katgpt_forward::TransformerNode;
-use katgpt_transformer::dense_mesh::{
-    DenseEdge, DenseHidden, DenseNode, EdgeBandit, EdgeBanditArm, IdentityEdge, LayerwiseTopology,
-    LoraEdge, MeshConfig, MeshScratch, Topology,
-};
 use katgpt_rs::transformer::{
     ForwardContext, MultiLayerKVCache, TransformerWeights, forward, forward_batched,
 };
 use katgpt_rs::types::{Config, Rng};
+use katgpt_transformer::dense_mesh::{
+    DenseEdge, DenseHidden, DenseNode, EdgeBandit, EdgeBanditArm, IdentityEdge, LayerwiseTopology,
+    LoraEdge, MeshConfig, MeshScratch, Topology,
+};
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 

@@ -127,6 +127,64 @@ impl BranchLifecycle {
     }
 }
 
+// ─── Episodic codec (caller-supplied E serializer) ────────────────────────
+//
+// `BranchBank<E>` / `CognitiveBranch<E>` / `EpisodicEntry<E>` /
+// `FailureEntry<E>` are generic over the caller-defined episodic payload type
+// `E`. Migration serialization needs to know how to encode/decode `E` — the
+// `EpisodicCodec` trait is the decoupled seam. The caller (riir-ai's
+// `BranchEpisodicPayload`) implements it; katgpt-core stays agnostic to the
+// concrete payload shape.
+//
+// # Determinism contract
+//
+// `encode_to` MUST be deterministic (same `E` → same bytes). The migration
+// envelope's Merkle root is BLAKE3 over the serialized bytes; non-determinism
+// breaks the G4 determinism gate.
+//
+// # Wire format
+//
+// The codec is responsible for length-prefixing itself. The reader side
+// (`decode_from`) consumes exactly the bytes the writer side wrote and returns
+// the unconsumed tail. This lets `BranchBank` compose the codec into a larger
+// length-prefixed framing without knowing `E`'s shape.
+//
+// # Blanket impls
+//
+// No blanket impl is provided. The production `BranchEpisodicPayload` carries
+// a data-bearing enum (`ActionClass::Other(u8)`) that breaks `Pod`, so a
+// blanket over `bytemuck::Pod` wouldn't cover it anyway. Each caller writes a
+// small manual impl. Unit-type `E = ()` has a manual impl here as the
+// reference codec (and the unit-test codec).
+
+/// Caller-supplied encode/decode for the `E` payload in `EpisodicEntry<E>` /
+/// `FailureEntry<E>`.
+///
+/// Implement this on your concrete `E` type to enable migration serialization
+/// of `NpcCognitiveBranches<E>` / `BranchBank<E>`. See the module docs above
+/// for the determinism + framing contract.
+pub trait EpisodicCodec: Sized {
+    /// Append the canonical encoding of `self` to `out`. MUST be deterministic.
+    fn encode_to(&self, out: &mut Vec<u8>);
+
+    /// Decode `Self` from `bytes`, returning the decoded value and the
+    /// unconsumed tail. Returns `None` on any structural failure (truncated,
+    /// bad magic, etc.).
+    fn decode_from(bytes: &[u8]) -> Option<(Self, &[u8])>;
+}
+
+/// Reference codec for `E = ()` — the minimal episodic payload (pure
+/// direction-based memory, no payload content). Encodes as zero bytes.
+impl EpisodicCodec for () {
+    #[inline]
+    fn encode_to(&self, _out: &mut Vec<u8>) {}
+
+    #[inline]
+    fn decode_from(bytes: &[u8]) -> Option<(Self, &[u8])> {
+        Some(((), bytes))
+    }
+}
+
 // ─── Episodic entry ───────────────────────────────────────────────────────
 
 /// A verifier-approved episodic example stored in a branch.
@@ -348,6 +406,410 @@ impl<E> CognitiveBranch<E> {
     }
 }
 
+// ─── Migration serialization (Issue 456 Phase 2: npc_branch_runtimes) ──────
+//
+// These serializers cover the per-NPC cognitive branch memory for NPC
+// migration (Issue 456). Wire format (all little-endian):
+//
+// `EpisodicEntry<E>`:
+//   `emb_len(u32) || emb(f32 × emb_len) || payload_bytes(E) || reward(f32)
+//     || scope_present(u8: 0|1) || [scope(u64)] || tick(u64)`
+//
+// `FailureEntry<E>`:
+//   `emb_len(u32) || emb(f32 × emb_len) || payload_bytes(E) || tick(u64)`
+//
+// `ProceduralRule` (no E):
+//   `dir_len(u32) || dir(f32 × dir_len) || antecedent([u8;32]) || strategy([u8;32])
+//     || helpful(u32) || harmful(u32)`
+//
+// `BranchStats` (Pod-compatible, 20 bytes):
+//   `n_writes(u32) || n_reads(u32) || avg_reward(f32) || last_touch_tick(u64)`
+//
+// `CognitiveBranch<E>`:
+//   `id(u32) || anchor_len(u32) || anchor(f32 × anchor_len)
+//     || tokens_len(u32) || tokens(u64 × tokens_len)
+//     || episodic_len(u32) || (episodic_bytes)*
+//     || procedural_len(u32) || (procedural_bytes)*
+//     || failures_len(u32) || (failures_bytes)*
+//     || scope_ctx_present(u8) || [scope_ctx(u64)]
+//     || stats(20 bytes) || lifecycle(u8)`
+//
+// Each `Vec<T>` slot is length-prefixed. `Option<u64>` slots encode as a
+// presence byte (0/1) + optional 8-byte payload. The lifecycle byte is the
+// `#[repr(u8)]` discriminant (0..=3, matching both standalone + arg_protocol).
+//
+// # Determinism
+//
+// All collections are flat `Vec`s with stable insertion order — no HashMap,
+// no papaya iteration. The encoder iterates in natural order; the decoder
+// reconstructs in the same order. G4 determinism holds by construction.
+
+/// Wire-format version for the branching-types migration serializers.
+///
+/// Bump on any incompatible change to the per-type wire formats documented
+/// above. The version is NOT embedded in each `EpisodicEntry` / etc. — it's
+/// carried by the outer `BranchBank` + `NpcCognitiveBranches` envelope. The
+/// per-type decoders assume the envelope version has already been checked.
+pub const BRANCH_TYPES_WIRE_VERSION: u64 = 1;
+
+// ── Small read helpers ──────────────────────────────────────────────────
+//
+// Keeping these local to types.rs avoids a new submodule; the same helpers are
+// duplicated (intentionally — each is ~3 lines) in bank.rs and projection.rs.
+// They are NOT public API.
+
+#[inline]
+fn read_u32_le(bytes: &[u8]) -> Option<(u32, &[u8])> {
+    let (head, tail) = bytes.split_first_chunk::<4>()?;
+    Some((u32::from_le_bytes(*head), tail))
+}
+
+#[inline]
+fn read_u64_le(bytes: &[u8]) -> Option<(u64, &[u8])> {
+    let (head, tail) = bytes.split_first_chunk::<8>()?;
+    Some((u64::from_le_bytes(*head), tail))
+}
+
+#[inline]
+fn read_f32_le(bytes: &[u8]) -> Option<(f32, &[u8])> {
+    let (head, tail) = bytes.split_first_chunk::<4>()?;
+    Some((f32::from_le_bytes(*head), tail))
+}
+
+#[inline]
+fn read_u8(bytes: &[u8]) -> Option<(u8, &[u8])> {
+    Some((bytes.first().copied()?, &bytes[1..]))
+}
+
+#[inline]
+fn read_vec_f32(bytes: &[u8]) -> Option<(Vec<f32>, &[u8])> {
+    let (len, rest) = read_u32_le(bytes)?;
+    let len = len as usize;
+    if rest.len() < len.checked_mul(4)? {
+        return None;
+    }
+    let mut v = Vec::with_capacity(len);
+    let mut tail = rest;
+    for _ in 0..len {
+        let (x, t) = read_f32_le(tail)?;
+        v.push(x);
+        tail = t;
+    }
+    Some((v, tail))
+}
+
+#[inline]
+fn read_vec_u64(bytes: &[u8]) -> Option<(Vec<u64>, &[u8])> {
+    let (len, rest) = read_u32_le(bytes)?;
+    let len = len as usize;
+    if rest.len() < len.checked_mul(8)? {
+        return None;
+    }
+    let mut v = Vec::with_capacity(len);
+    let mut tail = rest;
+    for _ in 0..len {
+        let (x, t) = read_u64_le(tail)?;
+        v.push(x);
+        tail = t;
+    }
+    Some((v, tail))
+}
+
+#[inline]
+fn write_vec_f32(out: &mut Vec<u8>, v: &[f32]) {
+    out.extend_from_slice(&(v.len() as u32).to_le_bytes());
+    for x in v {
+        out.extend_from_slice(&x.to_le_bytes());
+    }
+}
+
+#[inline]
+fn write_vec_u64(out: &mut Vec<u8>, v: &[u64]) {
+    out.extend_from_slice(&(v.len() as u32).to_le_bytes());
+    for x in v {
+        out.extend_from_slice(&x.to_le_bytes());
+    }
+}
+
+// ── EpisodicEntry<E> serializer ─────────────────────────────────────────
+
+impl<E: EpisodicCodec> EpisodicEntry<E> {
+    /// Append the canonical encoding of this entry to `out`.
+    ///
+    /// The payload codec is responsible for length-prefixing itself; this
+    /// method does NOT add an extra length prefix around `payload_bytes`.
+    /// The contract: `from_bytes_tail(payload_tail)` must consume exactly the
+    /// bytes `E::encode_to` wrote and return the unconsumed tail.
+    #[inline]
+    pub fn encode_to(&self, out: &mut Vec<u8>) {
+        write_vec_f32(out, &self.embedding);
+        self.payload.encode_to(out);
+        out.extend_from_slice(&self.reward.to_le_bytes());
+        // scope: presence byte + optional u64.
+        match self.scope {
+            Some(s) => {
+                out.push(1u8);
+                out.extend_from_slice(&s.to_le_bytes());
+            }
+            None => out.push(0u8),
+        }
+        out.extend_from_slice(&self.tick.to_le_bytes());
+    }
+
+    /// Decode an `EpisodicEntry<E>` from `bytes`, returning the entry and the
+    /// unconsumed tail. Returns `None` on any structural failure.
+    #[inline]
+    pub fn from_bytes_tail(bytes: &[u8]) -> Option<(Self, &[u8])> {
+        let (embedding, rest) = read_vec_f32(bytes)?;
+        let (payload, rest) = E::decode_from(rest)?;
+        let (reward, rest) = read_f32_le(rest)?;
+        let (scope_present, rest) = read_u8(rest)?;
+        let (scope, rest) = match scope_present {
+            0 => (None, rest),
+            1 => {
+                let (s, t) = read_u64_le(rest)?;
+                (Some(s), t)
+            }
+            _ => return None,
+        };
+        let (tick, rest) = read_u64_le(rest)?;
+        Some((
+            Self {
+                embedding,
+                payload,
+                reward,
+                scope,
+                tick,
+            },
+            rest,
+        ))
+    }
+}
+
+// ── FailureEntry<E> serializer ──────────────────────────────────────────
+
+impl<E: EpisodicCodec> FailureEntry<E> {
+    /// Append the canonical encoding of this entry to `out`.
+    #[inline]
+    pub fn encode_to(&self, out: &mut Vec<u8>) {
+        write_vec_f32(out, &self.embedding);
+        self.payload.encode_to(out);
+        out.extend_from_slice(&self.tick.to_le_bytes());
+    }
+
+    /// Decode a `FailureEntry<E>` from `bytes`, returning the entry and tail.
+    #[inline]
+    pub fn from_bytes_tail(bytes: &[u8]) -> Option<(Self, &[u8])> {
+        let (embedding, rest) = read_vec_f32(bytes)?;
+        let (payload, rest) = E::decode_from(rest)?;
+        let (tick, rest) = read_u64_le(rest)?;
+        Some((
+            Self {
+                embedding,
+                payload,
+                tick,
+            },
+            rest,
+        ))
+    }
+}
+
+// ── ProceduralRule serializer (no E) ────────────────────────────────────
+
+impl ProceduralRule {
+    /// Append the canonical encoding of this rule to `out`.
+    #[inline]
+    pub fn encode_to(&self, out: &mut Vec<u8>) {
+        write_vec_f32(out, &self.direction);
+        out.extend_from_slice(&self.antecedent);
+        out.extend_from_slice(&self.strategy);
+        out.extend_from_slice(&self.helpful.to_le_bytes());
+        out.extend_from_slice(&self.harmful.to_le_bytes());
+    }
+
+    /// Decode a `ProceduralRule` from `bytes`, returning the rule and tail.
+    #[inline]
+    pub fn from_bytes_tail(bytes: &[u8]) -> Option<(Self, &[u8])> {
+        let (direction, rest) = read_vec_f32(bytes)?;
+        let (antecedent, rest) = rest.split_first_chunk::<32>()?;
+        let (strategy, rest) = rest.split_first_chunk::<32>()?;
+        let (helpful, rest) = read_u32_le(rest)?;
+        let (harmful, rest) = read_u32_le(rest)?;
+        Some((
+            Self {
+                direction,
+                antecedent: *antecedent,
+                strategy: *strategy,
+                helpful,
+                harmful,
+            },
+            rest,
+        ))
+    }
+}
+
+// ── BranchStats serializer (Pod-compatible, 20 bytes) ───────────────────
+
+impl BranchStats {
+    /// Append the canonical encoding of these stats to `out`. 20 bytes.
+    #[inline]
+    pub fn encode_to(&self, out: &mut Vec<u8>) {
+        out.extend_from_slice(&self.n_writes.to_le_bytes());
+        out.extend_from_slice(&self.n_reads.to_le_bytes());
+        out.extend_from_slice(&self.avg_reward.to_le_bytes());
+        out.extend_from_slice(&self.last_touch_tick.to_le_bytes());
+    }
+
+    /// Decode `BranchStats` from `bytes`, returning the stats and tail.
+    /// Exactly 20 bytes consumed.
+    #[inline]
+    pub fn from_bytes_tail(bytes: &[u8]) -> Option<(Self, &[u8])> {
+        let (n_writes, rest) = read_u32_le(bytes)?;
+        let (n_reads, rest) = read_u32_le(rest)?;
+        let (avg_reward, rest) = read_f32_le(rest)?;
+        let (last_touch_tick, rest) = read_u64_le(rest)?;
+        Some((
+            Self {
+                n_writes,
+                n_reads,
+                avg_reward,
+                last_touch_tick,
+            },
+            rest,
+        ))
+    }
+}
+
+// ── BranchLifecycle serializer (1 byte discriminant) ────────────────────
+//
+// `BranchLifecycle` is either the local enum (no `arg_protocol`) or a type
+// alias for `arg::LifecycleState` (with `arg_protocol`). Both are `#[repr(u8)]`
+// with identical discriminants 0..=3 (Active/Shadow/Deprecated/Removed). The
+// serializer treats it as a raw `u8` on the wire; the decoder rejects unknown
+// discriminants (>3) for forwards-compat.
+
+/// Encode a `BranchLifecycle` as a single `u8` discriminant.
+#[inline]
+pub(crate) fn encode_lifecycle(out: &mut Vec<u8>, lifecycle: BranchLifecycle) {
+    out.push(lifecycle as u8);
+}
+
+/// Decode a `BranchLifecycle` from the leading byte, rejecting unknown
+/// discriminants (>3).
+#[inline]
+pub(crate) fn decode_lifecycle(bytes: &[u8]) -> Option<(BranchLifecycle, &[u8])> {
+    let (b, rest) = read_u8(bytes)?;
+    let lc = match b {
+        0 => BranchLifecycle::Active,
+        1 => BranchLifecycle::Shadow,
+        2 => BranchLifecycle::Deprecated,
+        3 => BranchLifecycle::Removed,
+        _ => return None,
+    };
+    Some((lc, rest))
+}
+
+// ── CognitiveBranch<E> serializer ───────────────────────────────────────
+
+impl<E: EpisodicCodec> CognitiveBranch<E> {
+    /// Append the canonical encoding of this branch to `out`.
+    ///
+    /// The 9 fields are written in declaration order: id, spawn_anchor,
+    /// token_signature, episodic, procedural, failures, scope_ctx, stats,
+    /// lifecycle. Each `Vec<T>` is length-prefixed; `Option<u64>` is a presence
+    /// byte + optional payload; `BranchStats` is 20 flat bytes; `lifecycle`
+    /// is 1 byte.
+    #[inline]
+    pub fn encode_to(&self, out: &mut Vec<u8>) {
+        out.extend_from_slice(&self.id.0.to_le_bytes());
+        write_vec_f32(out, &self.spawn_anchor);
+        write_vec_u64(out, &self.token_signature);
+        // episodic: length-prefix + each entry's self-framed bytes.
+        out.extend_from_slice(&(self.episodic.len() as u32).to_le_bytes());
+        for entry in &self.episodic {
+            entry.encode_to(out);
+        }
+        // procedural: length-prefix + each rule's self-framed bytes.
+        out.extend_from_slice(&(self.procedural.len() as u32).to_le_bytes());
+        for rule in &self.procedural {
+            rule.encode_to(out);
+        }
+        // failures: length-prefix + each entry's self-framed bytes.
+        out.extend_from_slice(&(self.failures.len() as u32).to_le_bytes());
+        for entry in &self.failures {
+            entry.encode_to(out);
+        }
+        // scope_ctx: presence byte + optional u64.
+        match self.scope_ctx {
+            Some(s) => {
+                out.push(1u8);
+                out.extend_from_slice(&s.to_le_bytes());
+            }
+            None => out.push(0u8),
+        }
+        self.stats.encode_to(out);
+        encode_lifecycle(out, self.lifecycle);
+    }
+
+    /// Decode a `CognitiveBranch<E>` from `bytes`, returning the branch and tail.
+    #[inline]
+    pub fn from_bytes_tail(bytes: &[u8]) -> Option<(Self, &[u8])> {
+        let (id_raw, rest) = read_u32_le(bytes)?;
+        let (spawn_anchor, rest) = read_vec_f32(rest)?;
+        let (token_signature, rest) = read_vec_u64(rest)?;
+        // episodic
+        let (n, mut rest) = read_u32_le(rest)?;
+        let mut episodic = Vec::with_capacity(n as usize);
+        for _ in 0..n {
+            let (entry, t) = EpisodicEntry::<E>::from_bytes_tail(rest)?;
+            episodic.push(entry);
+            rest = t;
+        }
+        // procedural
+        let (n, mut rest) = read_u32_le(rest)?;
+        let mut procedural = Vec::with_capacity(n as usize);
+        for _ in 0..n {
+            let (rule, t) = ProceduralRule::from_bytes_tail(rest)?;
+            procedural.push(rule);
+            rest = t;
+        }
+        // failures
+        let (n, mut rest) = read_u32_le(rest)?;
+        let mut failures = Vec::with_capacity(n as usize);
+        for _ in 0..n {
+            let (entry, t) = FailureEntry::<E>::from_bytes_tail(rest)?;
+            failures.push(entry);
+            rest = t;
+        }
+        // scope_ctx
+        let (scope_present, rest) = read_u8(rest)?;
+        let (scope_ctx, rest) = match scope_present {
+            0 => (None, rest),
+            1 => {
+                let (s, t) = read_u64_le(rest)?;
+                (Some(s), t)
+            }
+            _ => return None,
+        };
+        let (stats, rest) = BranchStats::from_bytes_tail(rest)?;
+        let (lifecycle, rest) = decode_lifecycle(rest)?;
+        Some((
+            Self {
+                id: BranchId(id_raw),
+                spawn_anchor,
+                token_signature,
+                episodic,
+                procedural,
+                failures,
+                scope_ctx,
+                stats,
+                lifecycle,
+            },
+            rest,
+        ))
+    }
+}
+
 // ─── Tests ────────────────────────────────────────────────────────────────
 
 #[cfg(test)]
@@ -487,5 +949,224 @@ mod tests {
         assert_eq!(cloned.episodic.len(), 1);
         assert_eq!(cloned.episodic[0].payload, "hello");
         assert_eq!(cloned.stats.n_writes, 5);
+    }
+
+    // ── Migration serialization tests (Issue 456 Phase 2) ──────────────
+    //
+    // The mock codec `U32Codec` wraps a `u32` as a 4-byte LE blob. It's the
+    // simplest non-trivial codec (length-prefixed by fixed size). The unit
+    // codec (`E = ()`) is also exercised for zero-payload round-trips.
+
+    /// Mock codec wrapping a `u32` — 4 bytes LE, no length prefix (fixed size).
+    #[derive(Clone, Debug, PartialEq)]
+    struct U32Codec(u32);
+
+    impl EpisodicCodec for U32Codec {
+        fn encode_to(&self, out: &mut Vec<u8>) {
+            out.extend_from_slice(&self.0.to_le_bytes());
+        }
+        fn decode_from(bytes: &[u8]) -> Option<(Self, &[u8])> {
+            let (head, tail) = bytes.split_first_chunk::<4>()?;
+            Some((Self(u32::from_le_bytes(*head)), tail))
+        }
+    }
+
+    #[test]
+    fn episodic_entry_round_trip_with_u32_codec() {
+        let entry = EpisodicEntry {
+            embedding: vec![0.1, 0.2, 0.3],
+            payload: U32Codec(42),
+            reward: 0.75,
+            scope: Some(99),
+            tick: 7,
+        };
+        let mut buf = Vec::new();
+        entry.encode_to(&mut buf);
+        let (decoded, tail) = EpisodicEntry::<U32Codec>::from_bytes_tail(&buf).expect("decode");
+        assert!(tail.is_empty(), "no trailing bytes");
+        assert_eq!(decoded.embedding, entry.embedding);
+        assert_eq!(decoded.payload, entry.payload);
+        assert_eq!(decoded.reward.to_bits(), entry.reward.to_bits());
+        assert_eq!(decoded.scope, entry.scope);
+        assert_eq!(decoded.tick, entry.tick);
+    }
+
+    #[test]
+    fn episodic_entry_scope_none_round_trip() {
+        let entry = EpisodicEntry::<()> {
+            embedding: vec![],
+            payload: (),
+            reward: 0.0,
+            scope: None,
+            tick: 0,
+        };
+        let mut buf = Vec::new();
+        entry.encode_to(&mut buf);
+        let (decoded, tail) = EpisodicEntry::<()>::from_bytes_tail(&buf).expect("decode");
+        assert!(tail.is_empty());
+        assert_eq!(decoded.scope, None);
+    }
+
+    #[test]
+    fn episodic_entry_truncated_returns_none() {
+        let entry = EpisodicEntry::<U32Codec> {
+            embedding: vec![1.0],
+            payload: U32Codec(1),
+            reward: 0.5,
+            scope: None,
+            tick: 1,
+        };
+        let mut buf = Vec::new();
+        entry.encode_to(&mut buf);
+        // Truncate at every position 0..len-1; each must return None.
+        for cut in 0..buf.len() - 1 {
+            assert!(
+                EpisodicEntry::<U32Codec>::from_bytes_tail(&buf[..cut]).is_none(),
+                "expected None at cut={cut}"
+            );
+        }
+    }
+
+    #[test]
+    fn failure_entry_round_trip() {
+        let entry = FailureEntry {
+            embedding: vec![-1.0, 2.5],
+            payload: U32Codec(7),
+            tick: 99,
+        };
+        let mut buf = Vec::new();
+        entry.encode_to(&mut buf);
+        let (decoded, tail) = FailureEntry::<U32Codec>::from_bytes_tail(&buf).expect("decode");
+        assert!(tail.is_empty());
+        assert_eq!(decoded.embedding, entry.embedding);
+        assert_eq!(decoded.payload, entry.payload);
+        assert_eq!(decoded.tick, entry.tick);
+    }
+
+    #[test]
+    fn procedural_rule_round_trip() {
+        let rule = ProceduralRule {
+            direction: vec![0.5, 0.5],
+            antecedent: [1u8; 32],
+            strategy: [2u8; 32],
+            helpful: 10,
+            harmful: 3,
+        };
+        let mut buf = Vec::new();
+        rule.encode_to(&mut buf);
+        let (decoded, tail) = ProceduralRule::from_bytes_tail(&buf).expect("decode");
+        assert!(tail.is_empty());
+        assert_eq!(decoded.direction, rule.direction);
+        assert_eq!(decoded.antecedent, rule.antecedent);
+        assert_eq!(decoded.strategy, rule.strategy);
+        assert_eq!(decoded.helpful, rule.helpful);
+        assert_eq!(decoded.harmful, rule.harmful);
+    }
+
+    #[test]
+    fn branch_stats_round_trip() {
+        let stats = BranchStats {
+            n_writes: 100,
+            n_reads: 250,
+            avg_reward: 0.625,
+            last_touch_tick: 1234,
+        };
+        let mut buf = Vec::new();
+        stats.encode_to(&mut buf);
+        assert_eq!(buf.len(), 20);
+        let (decoded, tail) = BranchStats::from_bytes_tail(&buf).expect("decode");
+        assert!(tail.is_empty());
+        assert_eq!(decoded, stats);
+    }
+
+    #[test]
+    fn cognitive_branch_round_trip_full() {
+        let mut branch = CognitiveBranch::<U32Codec>::new(BranchId::new(2), vec![0.0, 1.0, 0.0]);
+        branch.push_token(15);
+        branch.push_token(7);
+        branch.episodic.push(EpisodicEntry {
+            embedding: vec![0.1, 0.2],
+            payload: U32Codec(100),
+            reward: 0.9,
+            scope: Some(42),
+            tick: 10,
+        });
+        branch.procedural.push(ProceduralRule {
+            direction: vec![1.0],
+            antecedent: [0xaa; 32],
+            strategy: [0xbb; 32],
+            helpful: 1,
+            harmful: 0,
+        });
+        branch.failures.push(FailureEntry {
+            embedding: vec![-0.5],
+            payload: U32Codec(200),
+            tick: 11,
+        });
+        branch.scope_ctx = Some(99);
+        branch.stats = BranchStats {
+            n_writes: 1,
+            n_reads: 0,
+            avg_reward: 0.9,
+            last_touch_tick: 10,
+        };
+
+        let mut buf = Vec::new();
+        branch.encode_to(&mut buf);
+        let (decoded, tail) = CognitiveBranch::<U32Codec>::from_bytes_tail(&buf).expect("decode");
+        assert!(tail.is_empty());
+
+        // Verify every field.
+        assert_eq!(decoded.id, branch.id);
+        assert_eq!(decoded.spawn_anchor, branch.spawn_anchor);
+        assert_eq!(decoded.token_signature, branch.token_signature);
+        assert_eq!(decoded.episodic.len(), 1);
+        assert_eq!(decoded.episodic[0].payload, U32Codec(100));
+        assert_eq!(decoded.episodic[0].reward.to_bits(), 0.9f32.to_bits());
+        assert_eq!(decoded.episodic[0].scope, Some(42));
+        assert_eq!(decoded.episodic[0].tick, 10);
+        assert_eq!(decoded.procedural.len(), 1);
+        assert_eq!(decoded.procedural[0].helpful, 1);
+        assert_eq!(decoded.failures.len(), 1);
+        assert_eq!(decoded.failures[0].payload, U32Codec(200));
+        assert_eq!(decoded.scope_ctx, Some(99));
+        assert_eq!(decoded.stats, branch.stats);
+        assert_eq!(decoded.lifecycle, branch.lifecycle);
+    }
+
+    #[test]
+    fn cognitive_branch_round_trip_empty() {
+        // Minimal branch: just an id + anchor, no memory. Exercises the
+        // length-zero Vec paths.
+        let branch = CognitiveBranch::<()>::new(BranchId::new(0), vec![1.0]);
+        let mut buf = Vec::new();
+        branch.encode_to(&mut buf);
+        let (decoded, tail) = CognitiveBranch::<()>::from_bytes_tail(&buf).expect("decode");
+        assert!(tail.is_empty());
+        assert_eq!(decoded.id, branch.id);
+        assert!(decoded.episodic.is_empty());
+        assert!(decoded.procedural.is_empty());
+        assert!(decoded.failures.is_empty());
+    }
+
+    #[test]
+    fn cognitive_branch_round_trip_shadow_lifecycle() {
+        // Non-default lifecycle — exercises the lifecycle encoder/decoder.
+        let mut branch = CognitiveBranch::<()>::new(BranchId::new(0), vec![1.0]);
+        branch.lifecycle = BranchLifecycle::Shadow;
+        let mut buf = Vec::new();
+        branch.encode_to(&mut buf);
+        let (decoded, tail) = CognitiveBranch::<()>::from_bytes_tail(&buf).expect("decode");
+        assert!(tail.is_empty());
+        assert_eq!(decoded.lifecycle, BranchLifecycle::Shadow);
+    }
+
+    #[test]
+    fn cognitive_branch_rejects_truncated_header() {
+        let branch = CognitiveBranch::<()>::new(BranchId::new(0), vec![1.0]);
+        let mut buf = Vec::new();
+        branch.encode_to(&mut buf);
+        // Truncate to 2 bytes (only partial id).
+        assert!(CognitiveBranch::<()>::from_bytes_tail(&buf[..2]).is_none());
     }
 }

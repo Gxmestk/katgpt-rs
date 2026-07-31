@@ -497,7 +497,7 @@ impl<P: ScreeningPruner> AbsorbCompress for AbsorbCompressLayer<P> {
             .collect();
 
         // Sort by score ascending (worst first)
-        candidates.sort_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+        candidates.sort_by(|(_, a), (_, b)| a.total_cmp(b));
 
         // Take top promote_count worst arms
         let promoted: Vec<usize> = candidates

@@ -26,7 +26,7 @@ The block decomposition gives adaptive CPU/SIMD/GPU routing: small chunks → SI
 ## Tasks
 
 ### Phase 1: Cumprodsum Primitive (Foundation) ✅
-- [x] Create `src/cumprodsum.rs` module with:
+- [x] Create `crates/katgpt-core/src/cumprodsum.rs` module with:
   - `cumprodsum_scalar(a, x, h_init, out)` — O(T) scalar recurrence
   - `cumprodsum_batched(a, x, h_init, out, n_channels)` — channel-batched version
   - `segsum(a, out)` — segment sum (exp(segsum) produces 1-SS mask, per Listing 1)
@@ -40,7 +40,7 @@ The block decomposition gives adaptive CPU/SIMD/GPU routing: small chunks → SI
 - [x] **21+3=24 tests passing**
 
 ### Phase 2: Dual-Mode Block Decomposition ✅
-- [x] Create `src/ssd_block.rs` module with:
+- [x] Create `crates/katgpt-core/src/ssd_block.rs` module with:
   - `SsdBlockConfig { block_len, state_dim, head_dim }` — configuration
   - `ssd_block_forward(x, a, b, c, config, out)` — the 4-step block decomposition:
     1. Diagonal blocks: quadratic attention per chunk (matmul)
@@ -56,7 +56,7 @@ The block decomposition gives adaptive CPU/SIMD/GPU routing: small chunks → SI
 - [x] Benchmark: SSD block vs standard attention at T=512, 1024, 2048, 4096 — **2-661× speedup (T=512: 157×, T=1024: 661×)**
 
 ### Phase 3: Semiseparable Pruner ✅
-- [x] Create `src/pruners/ss_pruner.rs` implementing `ConstraintPruner`:
+- [x] Create `crates/katgpt-pruners/src/ss_pruner.rs` implementing `ConstraintPruner`:
   - `SemiseparablePruner { decay_factors, threshold }`
   - Uses cumprodsum to compute temporal influence along token paths
   - Prunes branches where cumulative influence < threshold
@@ -122,7 +122,7 @@ The block decomposition gives adaptive CPU/SIMD/GPU routing: small chunks → SI
 
 | Decision | Choice | Why |
 |----------|--------|-----|
-| Module location | `src/cumprodsum.rs`, `src/ssd_block.rs` | Modelless engine, not crate-level |
+| Module location | `crates/katgpt-core/src/cumprodsum.rs`, `crates/katgpt-core/src/ssd_block.rs` | Modelless engine, not crate-level |
 | Feature gating | `ssd_block`, `ss_pruner` (both default-ON after GOAT) | GOAT gate — proven gain → default |
 | SIMD strategy | NEON 4-wide strided FMA across channels | Cumprodsum is per-channel independent |
 | Chunk size | Adaptive: 64 for CPU, 128 for GPU | Matches SSD paper crossover benchmarks |

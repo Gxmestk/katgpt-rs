@@ -62,21 +62,21 @@ Unifies all three. The DEC module ships `d` (exterior derivative) and `δ` (codi
 
 | Stokes-theorem term | DEC / codebase equivalent | Where it ships |
 |---|---|---|
-| Exterior derivative `d` (coboundary operator) | `exterior_derivative(cx, field)` | `dec/operators.rs` |
-| Codifferential `δ` (adjoint of `d`, discrete divergence on rank-1) | `codifferential(cx, field)` | `dec/operators.rs` |
-| Hodge Laplacian `Δ = δd + dδ` | `hodge_laplacian(cx, field)` | `dec/operators.rs` |
-| Graph Laplacian (rank-0 special case) | `graph_laplacian`, `graph_laplacian_into` | `dec/operators.rs` |
-| Hodge star `*` (metric mass matrix) | `hodge_star(rank)` (identity for uniform grids) | `dec/operators.rs` |
-| Hodge decomposition (exact ⊕ harmonic ⊕ coexact) | `hodge_decompose(cx, field)` | `dec/hodge.rs` |
-| Betti numbers `βₖ` (topological holes) | `betti_numbers(cx)` (count zero eigenvalues of Δₖ) | `dec/hodge.rs` |
-| Harmonic projector `P_harm` | `harmonic_projector(cx)` | `dec/hodge.rs` |
-| Gradient `∇φ` (rank-0 → rank-1, exact) | `exact_flow(cx, potential)` / `d₀` | `dec/flow.rs` |
-| Curl `∇×F` (rank-1 → rank-2) | `d₁` | `dec/operators.rs` |
-| Divergence `∇·F` (rank-2 → rank-3, or rank-1 → rank-0 via δ) | `codifferential` / `δ₁` | `dec/operators.rs` |
-| Conservative / exact field (curl-free) | `DecFlowField::exact` | `dec/flow.rs` |
-| Solenoidal / coexact field (divergence-free) | `DecFlowField::coexact` | `dec/flow.rs` |
-| Topological / harmonic field (both-free) | `DecFlowField::harmonic` | `dec/flow.rs` |
-| `∫_M dω = ∫_∂M ω` (Generalized Stokes) | identity `d∘d=0` enforced by construction; tests `curl_of_gradient_is_zero`, `divergence_of_curl_is_zero` | `dec/operators.rs` tests |
+| Exterior derivative `d` (coboundary operator) | `exterior_derivative(cx, field)` | `crates/katgpt-dec/src/operators.rs` |
+| Codifferential `δ` (adjoint of `d`, discrete divergence on rank-1) | `codifferential(cx, field)` | `crates/katgpt-dec/src/operators.rs` |
+| Hodge Laplacian `Δ = δd + dδ` | `hodge_laplacian(cx, field)` | `crates/katgpt-dec/src/operators.rs` |
+| Graph Laplacian (rank-0 special case) | `graph_laplacian`, `graph_laplacian_into` | `crates/katgpt-dec/src/operators.rs` |
+| Hodge star `*` (metric mass matrix) | `hodge_star(rank)` (identity for uniform grids) | `crates/katgpt-dec/src/operators.rs` |
+| Hodge decomposition (exact ⊕ harmonic ⊕ coexact) | `hodge_decompose(cx, field)` | `crates/katgpt-dec/src/hodge.rs` |
+| Betti numbers `βₖ` (topological holes) | `betti_numbers(cx)` (count zero eigenvalues of Δₖ) | `crates/katgpt-dec/src/hodge.rs` |
+| Harmonic projector `P_harm` | `harmonic_projector(cx)` | `crates/katgpt-dec/src/hodge.rs` |
+| Gradient `∇φ` (rank-0 → rank-1, exact) | `exact_flow(cx, potential)` / `d₀` | `crates/katgpt-dec/src/flow.rs` |
+| Curl `∇×F` (rank-1 → rank-2) | `d₁` | `crates/katgpt-dec/src/operators.rs` |
+| Divergence `∇·F` (rank-2 → rank-3, or rank-1 → rank-0 via δ) | `codifferential` / `δ₁` | `crates/katgpt-dec/src/operators.rs` |
+| Conservative / exact field (curl-free) | `DecFlowField::exact` | `crates/katgpt-dec/src/flow.rs` |
+| Solenoidal / coexact field (divergence-free) | `DecFlowField::coexact` | `crates/katgpt-dec/src/flow.rs` |
+| Topological / harmonic field (both-free) | `DecFlowField::harmonic` | `crates/katgpt-dec/src/flow.rs` |
+| `∫_M dω = ∫_∂M ω` (Generalized Stokes) | identity `d∘d=0` enforced by construction; tests `curl_of_gradient_is_zero`, `divergence_of_curl_is_zero` | `crates/katgpt-dec/src/operators.rs` tests |
 | Divergence theorem `∫_V ∇·F dV = ∮_∂V F·n dS` | `codifferential` gives `∇·F`; **no `boundary_flux_mass()` wrapper yet** | **gap → Plan 314** |
 | Continuity equation / Fokker-Planck `∂_t p = -div(pu)` | `codifferential` gives the divergence; **no `fokker_planck_validator()` wrapper yet** | **gap → Plan 314** (also flagged by Research 271 §2) |
 | Line integral `∫_C F·dr` | rank-1 `CochainField` supports edge fields; **no `line_integral()` wrapper yet** | **gap → Plan 314** |
@@ -100,7 +100,7 @@ HLA is a second-order linear-attention streaming recurrence (verified in Researc
 
 ### 3.2 `latent_functor/` (`zone_gating`, `reestimation`, `arithmetic`, `cross_game`, `k_selector`, `quality_gate`)
 
-`latent_functor/arithmetic.rs` already treats functor application as a vector op. The Stokes lens says: a functor `F: latent → latent` is a vector field. Its **divergence** (via `codifferential` after discretization) tells you whether the functor is contractive (converging to a fixed point = attractor) or expansive (diverging = unstable). This is a modelless **stability diagnostic** that could feed `quality_gate.rs` and `reestimation.rs`. Not new machinery — a new *signal* derived from shipped operators.
+`crates/katgpt-percepta/src/wasm/interpreter/arithmetic.rs` already treats functor application as a vector op. The Stokes lens says: a functor `F: latent → latent` is a vector field. Its **divergence** (via `codifferential` after discretization) tells you whether the functor is contractive (converging to a fixed point = attractor) or expansive (diverging = unstable). This is a modelless **stability diagnostic** that could feed `quality_gate.rs` and `reestimation.rs`. Not new machinery — a new *signal* derived from shipped operators.
 
 ### 3.3 `cgsp_runtime/` (curiosity-guided self-play)
 
@@ -110,7 +110,7 @@ Curiosity = "where is the belief field expanding?" = **positive divergence** of 
 
 LatCal is the deterministic raw↔latent bridge. The Stokes lens says: the 5 committed scalars (valence/arousal/desperation/calm/fear) are the **boundary flux** of the latent belief region across the sync boundary. Research 271 §3.4 already frames the "5 scalars across sync boundary" heuristic as a rate-distortion point; the Stokes lens adds that those 5 scalars are precisely the surface integral that (by the divergence theorem) determines the interior belief mass if the field is mostly exact. **Boundary-only commitment is the Super-GOAT-shaped idea** — commit the boundary, derive the interior — but it requires the field to be curl-free (verifiable via `hodge_decompose`), and the curse of dimensionality caps the win at d ≤ 3. For 8-dim HLA and 64-dim shards, the boundary is larger than the interior, so this is NOT a storage win there. It IS a win for 2D game maps and KG triple embeddings. → GOAT, scoped to low-dim.
 
-### 3.5 `NeuronShard` (`riir-neuron-db/src/shard.rs`)
+### 3.5 `NeuronShard` (`riir-neuron-db/src/shard/mod.rs`)
 
 `style_weights[64]` is a 64-dim vector — too high-dim for boundary-only commitment (curse of dimensionality). The Stokes lens does **not** give a storage win here. It DOES give a **validation** primitive: a frozen shard's `style_weights` should define a (mostly) harmonic field (it is a learned direction vector); `hodge_decompose` on a shard-derived cochain can flag shards whose field has unexpectedly large exact or coexact components (= drifted / corrupted shard). This is a `mape_k.rs` self-healing signal, modelless. → Gain-tier for riir-neuron-db.
 
@@ -171,7 +171,7 @@ pub fn line_integral(
 ) -> f32;
 ```
 
-**Fuses:** DEC `CochainField` (shipped) + Plan 312 `manifold_geodesic` (the path) + `latent_functor/arithmetic.rs` (functor as vector field).
+**Fuses:** DEC `CochainField` (shipped) + Plan 312 `manifold_geodesic` (the path) + `crates/katgpt-percepta/src/wasm/interpreter/arithmetic.rs` (functor as vector field).
 
 **GOAT gate:** A/B — does `line_integral`-weighted geodesic beat unweighted `manifold_geodesic` on NPC navigation smoothness (fewer direction reversals)? Target: ≥20% fewer reversals at equal path length.
 

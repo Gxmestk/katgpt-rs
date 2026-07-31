@@ -48,7 +48,7 @@ G5 PASS: 0.000 allocs/call (mean), 0 total across 1000 calls.
 ```
 
 Verified via `katgpt_rs::alloc::TrackingAllocator` (debug-only, per-thread
-counters — see `src/alloc.rs`). All scratch buffers are pre-allocated in
+counters — see `crates/katgpt-core/src/alloc.rs`). All scratch buffers are pre-allocated in
 `BranchingDetector::new`:
 
 - `scratch_p_avg: Vec<f32>` — length `action_dim`

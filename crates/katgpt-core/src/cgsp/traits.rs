@@ -119,7 +119,7 @@ pub trait Solver {
     /// solve-rates do not corrupt the hint priority table.
     ///
     /// Distilled from G-RRM §3 (arXiv 2607.02491, Bertram et al.) — see
-    /// `.issues/037` for the deferred rationale.
+    /// Issue 037 (resolved + removed) for the deferred rationale.
     #[inline]
     fn hint_receptivity(&self) -> HintPolicy {
         HintPolicy::OrderOnly

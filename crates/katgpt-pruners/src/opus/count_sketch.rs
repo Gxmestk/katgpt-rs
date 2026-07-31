@@ -68,7 +68,7 @@ impl CountSketch {
 
     /// Unbiased inner product estimate via sketch dot product.
     ///
-    /// E[estimate] = ⟨a, b⟩. Variance ≈ O(2/m) · ‖a‖² · ‖b‖².
+    /// `E[estimate]` = ⟨a, b⟩. Variance ≈ O(2/m) · ‖a‖² · ‖b‖².
     pub fn inner_product_estimate(&self, a: &[f32], b: &[f32]) -> f32 {
         // Sketch both vectors into a single allocation to avoid two heap allocs
         let mut buf = vec![0.0f32; self.sketch_dim * 2];
@@ -106,9 +106,9 @@ impl CountSketch {
 
 // ── Helpers ─────────────────────────────────────────────────────
 
-/// Dot product of two f32 slices.
+/// Dot product of two f32 slices — delegates to SIMD dispatch.
 fn dot(a: &[f32], b: &[f32]) -> f32 {
-    a.iter().zip(b.iter()).map(|(&x, &y)| x * y).sum()
+    katgpt_core::simd::simd_dot_f32(a, b, a.len().min(b.len()))
 }
 
 /// Compute exact inner product ⟨a, b⟩.

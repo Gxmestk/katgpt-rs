@@ -5,6 +5,7 @@
 > **Date:** 2026-06, distilled 2026-06
 > **Related Research:** 038 (SDAR), 072 (ROPD), 073 (SDAR gate), 090 (ASFT), 111 (Data Gate), 112 (SR²AM), 171 (FrozenBaseGuard), 194 (Adaptive CoT)
 > **Verdict: SUPER GOAT — Direction-adaptive credit as default-on modelless inference. Zero training cost. Entropy already computed in softmax. Both papers validate the same core principle (direction > magnitude) from independent angles.**
+> **PASS-Redirects (synthesis):** GEPO [arXiv:2607.16850 "Group Entropy-Controlled Policy Optimization"] — entropy-conditioned asymmetric advantage shaping for GRPO RL post-training. Training-only (shapes RL gradient signals → riir-train). Core insight (entropy-conditioned asymmetric signal treatment) is the same principle DASD already ships modellessly: high-entropy → preserve exploration, low-entropy → stabilize execution. GEPO's specific contributions (group-level entropy vs token-level, adaptive thresholds from batch statistics, α_high < α_low asymmetry) are training-specific refinements — no modelless analog needed beyond DASD's inference-time entropy routing.
 
 ---
 
@@ -214,7 +215,7 @@ Reasons:
 ## 7. Implementation Sketch
 
 ```rust
-// katgpt-rs/src/pruners/entropy_bifurcated.rs
+// katgpt-rs/crates/katgpt-pruners/src/entropy_bifurcated.rs
 
 /// Entropy-bifurcated screening — DASD's directional insight applied to pruning.
 /// Low-entropy scaffolding: full screening (stabilize execution)

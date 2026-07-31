@@ -3,7 +3,7 @@
 ## Overview
 The transformer is a from-scratch GPT-2 style implementation. No frameworks — weights are `Vec<f32>`, ops are hand-written matmul/softmax/rmsnorm. Supports multi-layer, grouped-query attention (GQA), and zero-allocation inference.
 
-## Config (`crates/katgpt-core/src/types.rs`, re-exported via `src/types.rs`)
+## Config (`crates/katgpt-types/src/lib.rs`, re-exported via `src/types.rs`)
 ```rust
 pub struct Config {
     pub vocab_size: usize,
@@ -109,7 +109,7 @@ pub struct Config {
 - Validation: `n_head % n_kv_head == 0`, `n_embd == n_head * head_dim`
 - `kv_dim()` helper returns `n_kv_head * head_dim`
 
-### Key Enums (`crates/katgpt-core/src/types.rs`)
+### Key Enums (`crates/katgpt-types/src/lib.rs`)
 
 ```rust
 #[repr(u8)]
@@ -271,7 +271,7 @@ pub enum GateDecision {
 }
 ```
 
-### Wall Attention (`crates/katgpt-core/src/types.rs`, Plan 173)
+### Wall Attention (`crates/katgpt-types/src/lib.rs`, Plan 173)
 
 Feature-gated behind `wall_attention`.
 
@@ -283,14 +283,14 @@ pub struct WallConfig {
 }
 ```
 
-### RiM Reasoning Buffer Slots (`crates/katgpt-core/src/types.rs`, Plan 172, Research 192)
+### RiM Reasoning Buffer Slots (`crates/katgpt-types/src/lib.rs`, Plan 172, Research 192)
 
 Feature-gated behind `rim_slots`. Fields on `Config`:
 - `rim_block_count: usize` — number of reasoning buffer blocks (K in RiM paper), 0 = disabled
 - `rim_tokens_per_block: usize` — tokens per buffer block (M), default 2
 - `rim_buffer_token: usize` — token ID used for buffer positions (default: bos_token)
 
-### Hydra Types (`crates/katgpt-core/src/types.rs`, Research 148, Plan 165)
+### Hydra Types (`crates/katgpt-types/src/lib.rs`, Research 148, Plan 165)
 
 Feature-gated behind `hydra_budget`.
 
@@ -311,7 +311,7 @@ pub struct HydraBudgetConfig {
 }
 ```
 
-### Training-Free Loop (`crates/katgpt-core/src/types.rs`, Plan 136)
+### Training-Free Loop (`crates/katgpt-types/src/lib.rs`, Plan 136)
 
 Used when `Config.loop_mode = TrainingFree`.
 
@@ -326,7 +326,7 @@ pub struct TrainingFreeLoopConfig {
 }
 ```
 
-### Problem Mutator (`crates/katgpt-core/src/traits.rs`, feature `problem_mutator`)
+### Problem Mutator (`crates/katgpt-core/src/traits/mod.rs`, feature `problem_mutator`)
 
 FrontierSmith closed→open problem synthesis: mutate game configs into harder variants.
 
@@ -352,7 +352,7 @@ pub struct MutantConfig {
 }
 ```
 
-### Data Gate (`crates/katgpt-core/src/types.rs`, feature `data_gate`)
+### Data Gate (`crates/katgpt-types/src/lib.rs`, feature `data_gate`)
 
 Task-level admission gate for self-play training pool.
 
@@ -366,7 +366,7 @@ pub struct ProposerTask {
 }
 ```
 
-### InferenceOverrides (`crates/katgpt-core/src/types.rs`)
+### InferenceOverrides (`crates/katgpt-types/src/lib.rs`)
 
 Runtime override fields that can be applied per-inference call without modifying the base `Config`:
 
@@ -410,7 +410,7 @@ pub struct InferenceOverrides {
 
 Overrides are merged onto a base `Config` at inference time, allowing per-request parameter tuning without cloning or mutating the shared config.
 
-### InferenceResult (`crates/katgpt-core/src/types.rs`)
+### InferenceResult (`crates/katgpt-types/src/lib.rs`)
 
 Output of a single inference pass with reward signal for feedback loop:
 
@@ -583,7 +583,7 @@ When `n_kv_head < n_head`, K/V heads are shared:
 - K/V projection outputs `kv_dim` instead of `n_embd`
 - 4× KV cache reduction for `n_head=8, n_kv_head=2`
 
-## Math Kernels (`crates/katgpt-core/src/types.rs`)
+## Math Kernels (`crates/katgpt-types/src/lib.rs`)
 All hot-path kernels are `#[inline(always)]` with `unsafe get_unchecked`:
 - `matmul(out, w, x, rows, cols)` — out = W @ x — SIMD-accelerated via `simd_dot_f32` (Plan 060)
 - `matmul_relu(out, w, x, rows, cols)` — fused matmul + ReLU — SIMD-accelerated with fused ReLU zero-clamp (Plan 060)
@@ -599,7 +599,7 @@ All hot-path kernels are `#[inline(always)]` with `unsafe get_unchecked`:
 - `rmsnorm_with_gamma(x, gamma)` — RMSNorm with learnable gain parameter
 - `rmsnorm_with_gamma_eps(x, gamma, eps)` — RMSNorm with gain and custom epsilon
 
-## SIMD Kernels (`crates/katgpt-core/src/simd.rs`, Plan 060)
+## SIMD Kernels (`crates/katgpt-dec/src/simd.rs`, Plan 060)
 
 Runtime SIMD detection and dispatch for hot-path operations:
 - `SimdLevel` enum: `Scalar`, `Neon` (ARM), `Avx2` (x86_64)
@@ -656,7 +656,7 @@ For τ = 1..T:
 Output: lm_head(h)
 ```
 
-**Key types** (`crates/katgpt-core/src/types.rs`):
+**Key types** (`crates/katgpt-types/src/lib.rs`):
 
 | Type | Description |
 |------|-------------|
@@ -786,7 +786,7 @@ Score formula: `blended = parent_score + ln(P_llm) + ln(R)`
 
 `config.screening_threshold` (default `0.0`) controls hard-trim cutoff. Set `> 0.0` to aggressively trim low-relevance branches.
 
-## Freeze/Thaw (`src/pruners/freeze.rs`, Plan 092)
+## Freeze/Thaw (`crates/katgpt-pruners/src/freeze.rs`, Plan 092)
 
 Shared freeze/thaw disk I/O for `repr(C)` bandit knowledge structs. Zero-dependency binary persistence — raw `std::fs::write`/`read` on `repr(C)` data with magic bytes + version validation on load. No serde/bincode needed.
 
@@ -863,7 +863,7 @@ where
 ```rust
 use katgpt_rs::cgsp::{
     CgspConfig, CgspLoop, ColinearityBatchGate, EntropyCollapse,
-    BreakevenDifficultyFilter, HlaProjectionGuide, PoolConjecturer, ScratchBuffers, Target,
+    BreakevenDifficultyFilter, BeliefGridProjectionGuide, PoolConjecturer, ScratchBuffers, Target,
 };
 
 let mut lp = CgspLoop::new(conjecturer, guide, solver, bandit, CgspConfig::default())
@@ -874,7 +874,7 @@ let mut scratch = ScratchBuffers::new(k, pool_size);
 let result = lp.cycle(&target, &mut scratch);
 ```
 
-See `examples/cgsp_minimal.rs` and `examples/cgsp_collapse_recovery.rs` for full runnable demos. Implementation lives in `crates/katgpt-core/src/cgsp/` so `riir-engine` (Plan 299) can consume it without depending on the root application crate; `src/cgsp.rs` is a thin re-export shim preserving the `katgpt_rs::cgsp::*` import path.
+See `examples/cgsp_minimal.rs` and `examples/cgsp_collapse_recovery.rs` for full runnable demos. Implementation lives in `crates/katgpt-core/src/cgsp/` so `riir-engine` (Plan 299) can consume it without depending on the root application crate; `crates/katgpt-core/src/cgsp/mod.rs` is a thin re-export shim preserving the `katgpt_rs::cgsp::*` import path.
 
 ## SpeculativeVerifier (Strategy Pattern)
 
@@ -1082,7 +1082,7 @@ pub struct MoaConfig {
 | `moa_swiglu(hidden, gate_proj, up_proj, input, moa)` | Token-adaptive bi-MoA SwiGLU: Σ_k ρ_k σ_k(y) ⊙ Σ_ℓ π_ℓ σ_ℓ(z) |
 | `simd_matmul_moa(...)` | Fused kernel: matmul + delayed RMSNorm + MoA mixing |
 
-**Feature gate:** `moa_inference` (opt-in)
+**Feature gate:** `moa_inference` (**default-on**, Plan 158 GOAT 3/3)
 
 ## Tiled Attention (`crates/katgpt-core/src/attention.rs`, Plan 115)
 
@@ -1105,7 +1105,7 @@ Threshold: tiled path activates when N > 128 (score matrix > L1 cache)
 
 **Feature gate:** `tiled_attention`
 
-## Newton-Schulz Orthogonalization (`src/newton_schulz.rs`, Plan 152, Research 114)
+## Newton-Schulz Orthogonalization (`crates/katgpt-core/src/newton_schulz.rs`, Plan 152, Research 114)
 
 5-iteration cubic fixed-point iteration that projects any matrix to its nearest orthogonal factor. Generic building block for Muon-family optimizers.
 
@@ -1129,7 +1129,7 @@ Constants from the AMUSE paper (converges for σ ∈ [0, 1]):
 
 **GOAT:** 25/25 (Bench 050)
 
-## River-Valley Diagnostics (`src/river_valley.rs`, Plan 152, Research 114)
+## River-Valley Diagnostics (`crates/katgpt-spectral/src/river_valley.rs`, Plan 152, Research 114)
 
 Modelless training diagnostics that reveal why optimization is (or isn't) converging. Pure scalar arithmetic, no external dependencies.
 
@@ -1143,7 +1143,7 @@ Modelless training diagnostics that reveal why optimization is (or isn't) conver
 
 **GOAT:** 25/25 (Bench 050)
 
-## Energy-Gated Attention (`src/ega_attn.rs`, Plan 139)
+## Energy-Gated Attention (`crates/katgpt-attn/src/ega_attn.rs`, Plan 139)
 
 Spectral salience gating for attention. Gates value aggregation by the spectral energy of key token embeddings — each key position's attention weight is scaled by a learned sigmoid gate derived from dot-product energy of the input embedding with a learned projection vector.
 
@@ -1296,7 +1296,7 @@ Operator types: `Gemv`, `Gemm`, `Elementwise`, `Reduction`. Calibrated via `Hard
 
 **Feature gate:** `roofline_cost` (default-on)
 
-## Dual-Gram PCA (`crates/katgpt-core/src/simd.rs`, Research R130, Plan 159)
+## Dual-Gram PCA (`crates/katgpt-dec/src/simd.rs`, Research R130, Plan 159)
 
 Dual-Gram PCA routing for short-sequence calibration. When `seq_len < 4 * head_dim`, computes the Gram matrix G = X·Xᵀ (seq_len × seq_len) instead of the covariance C = Xᵀ·X (d_h × d_h), yielding correct eigenvectors without O(d²) work.
 
@@ -1309,7 +1309,7 @@ Reference: FlashLib `primitives/pca/triton/pca.py` L73–116 (Research R130).
 
 **Feature gate:** `dual_gram_pca` (default-on)
 
-## Consolidated Traits (`crates/katgpt-core/src/traits.rs`, Plan 107 Phase 0)
+## Consolidated Traits (`crates/katgpt-core/src/traits/mod.rs`, Plan 107 Phase 0)
 
 Shared traits for game AI and speculative decoding, consolidated from katgpt-rs and riir-engine to eliminate duplication. Both crates depend on `katgpt-core`, so moving traits here requires zero new dependency edges.
 
@@ -1392,7 +1392,7 @@ Re-exported from both `katgpt-core` and `katgpt-rs`.
 
 LoRA application is fused in-place after each projection: `output += (α/r) × B @ (A @ input)`. Zero intermediate buffers — the delta accumulates directly into the output.
 
-## Parallax Attention (`crates/katgpt-core/src/parallax_attn.rs`, Plan 135)
+## Parallax Attention (`crates/katgpt-core/src/parallax_attn/mod.rs`, Plan 135)
 
 Streaming covariance-correction layer on top of tiled online-softmax flash attention. Reduces the regression gap between local-linear kernel attention and full SDPA from O(N²) computation to O(N) outer products via column-sum factorization.
 
@@ -1438,7 +1438,7 @@ pub struct ParallaxScratch {
 
 **Feature gate:** `parallax_attn` (requires `tiled_attention`, `newton_schulz`). **opt-in** — requires Muon-trained W_R weights.
 
-## Emotion Vector Inference (`src/pruners/emotion_vector.rs`, Plan 162, Research 144)
+## Emotion Vector Inference (`crates/katgpt-pruners/src/emotion_vector.rs`, Plan 162, Research 144)
 
 Zero-cost read of emotion directions from mid-layer residual-stream activations during speculative decoding. Based on Anthropic Transformer Circuits research showing linear emotion representations causally drive behavior (desperation steering → 14× reward-hacking increase at +0.1 offset).
 
@@ -1537,7 +1537,7 @@ pub struct ConsensusConfig {
 | `route_thermal_path(ternary, conf_h, conf_v, config)` → `ThermalPath` | Classify each position into thermal path |
 | `ternary_consensus(token_h, conf_h, token_v, conf_v)` → (i8, token) | Compute ternary signal + winner |
 
-## Budget Adaptation (`src/speculative/budget.rs`, Plan 167)
+## Budget Adaptation (`crates/katgpt-speculative/src/budget.rs`, Plan 167)
 
 Compression-adaptive decode budget — uses PFlash scoring ratio (a free byproduct of prefill) to dynamically scale DDTree budget per-prompt. Feature-gated behind `budget_adaptation`.
 
@@ -1562,7 +1562,7 @@ r=0.5 → scale=1.25 (budget slightly above base)
 r=1.0 → scale=2.0  (budget doubled, complex prompt)
 ```
 
-## ILC Distillation (`src/distill/ilc.rs`, Plan 164)
+## ILC Distillation (`crates/katgpt-speculative/src/distill/ilc.rs`, Plan 164)
 
 Iterative Latent Clustering — synonym-aware DDTree pruning. Distilled from arXiv:2605.27734 (Korchinski, Favero, Wyart). Feature-gated behind `ilc_distill`.
 
@@ -1613,11 +1613,11 @@ markov → nll → typical_set → claim
 
 **Key types:** `MarkovChain`, `Regime` (Conservative/Typical/Uncertain), `ClaimCard`, `GeometryReport`, `ValidityVerdict`.
 
-## Depth-Invariance Diagnostic (`crates/katgpt-core/src/depth_invariance.rs`, Plan 306)
+## Depth-Invariance Diagnostic (`crates/katgpt-types/src/depth_invariance.rs`, Plan 306)
 
 Root-cause counterpart to four existing symptom-only detectors
-(`BeliefRankPruner`, `GainCostLoopHalter`, `latent_functor/reestimation.rs`,
-`micro_belief/coherence_bench.rs`). Modelless math over flattened `&[f32]`
+(`BeliefRankPruner`, `GainCostLoopHalter`, `riir-ai/crates/riir-engine/src/latent_functor/reestimation/mod.rs`,
+`crates/katgpt-micro-belief/src/coherence_bench.rs`). Modelless math over flattened `&[f32]`
 state chains from any recursive latent-state kernel. Detects
 `DepthSpecificRefinement` (monotonically growing magnitude — the paper's
 primary signal), `Collapsed` (effective rank trending to 1), `DepthInvariant`
@@ -1632,9 +1632,9 @@ recursive kernel: h_{t+1} = f(h_t, x_t)
 | Module | Description |
 |--------|-------------|
 | `depth_invariance.rs` | The primitive: `classify_chain`, `classify_chain_batched`, `Scratch`, `DepthInvarianceConfig`, `DepthInvarianceKind` (`#[repr(u8)]`), `MagnitudeRegularization` enum, `apply_magnitude_regularization`. Zero-alloc hot path (caller-owned `Scratch`). |
-| `speculative/belief_drafter.rs::BeliefDrafter::audit_depth_invariance` | Plan 306 Phase 3 G2 audit hook (behind `depth_invariance` × `belief_drafter`). Also `capture_chain` for the G2c inference-time RmsNorm demonstration. |
-| `micro_belief/attractor.rs::AttractorKernel::audit_depth_invariance` | Plan 306 Phase 4 G3a negative control (behind `depth_invariance` × `micro_belief`). Attractor clamps to `(-1,1)` → classifies `DepthInvariant`. |
-| `micro_belief/leaky.rs::LeakyIntegrator::audit_depth_invariance` | Plan 306 Phase 4 audit hook. The shipped `LeakyIntegrator` also clamps to `[-1,1]`, so it too classifies `DepthInvariant`; the G3b positive control strips the clamp inline in the test (no kernel-level support needed). |
+| `crates/katgpt-speculative/src/belief_drafter.rs::BeliefDrafter::audit_depth_invariance` | Plan 306 Phase 3 G2 audit hook (behind `depth_invariance` × `belief_drafter`). Also `capture_chain` for the G2c inference-time RmsNorm demonstration. |
+| `crates/katgpt-micro-belief/src/attractor.rs::AttractorKernel::audit_depth_invariance` | Plan 306 Phase 4 G3a negative control (behind `depth_invariance` × `micro_belief`). Attractor clamps to `(-1,1)` → classifies `DepthInvariant`. |
+| `crates/katgpt-micro-belief/src/leaky.rs::LeakyIntegrator::audit_depth_invariance` | Plan 306 Phase 4 audit hook. The shipped `LeakyIntegrator` also clamps to `[-1,1]`, so it too classifies `DepthInvariant`; the G3b positive control strips the clamp inline in the test (no kernel-level support needed). |
 
 **GOAT verdict (Plan 306):** G1 (8 correctness tests) + G2 (paper finding
 reproduced on random-init `BeliefDrafter`: `DepthSpecificRefinement`,
@@ -1658,8 +1658,9 @@ arXiv:2606.08105). The two are frequently confused:
 | Diagnostic | `magnitude_slope` on the hidden-state chain | `value_norm_ratio` + `stable_rank_of_update` per attention head |
 | Fix | Post-norm on the recursive residual (retrain for BeliefDrafter) | Dual-policy attention (sigmoid gate for NOP heads, regular for Broadcast) |
 
-Feature gate: `depth_invariance` (opt-in). Promotion to default is a
-deliberate parent decision pending — G1–G3 pass, G4 is aspirational.
+Feature gate: `depth_invariance` (**DEFAULT-ON** since Plan 306 T7.4,
+2026-06-23). G1–G3 pass, G4 re-spec to absolute-latency at HLA scale
+(all PASS); SIMD inner-loop landed. Zero runtime cost unless invoked.
 
 ## SkillOpt (`src/skill_opt/`, Plan 144)
 
@@ -1709,7 +1710,7 @@ SAT + rolling hash + sensitivity masking for KV cache analysis. All modelless �
 | `rolling_hash` | `RollingHash`, `CachedSegment`, `KvSegmentPool` — O(n) variable-length segment matching |
 | `sensitivity` | `SensitivityDetector` trait, `StrictDetector`, `OpenDetector` — selective KV sharing |
 
-## Hydra Budget (`src/pruners/hydra_budget.rs`, Research 148, Plan 165)
+## Hydra Budget (`crates/katgpt-pruners/src/hydra_budget.rs`, Research 148, Plan 165)
 
 Hydra-Aware Adaptive Layer Budget — emergent self-repair layer skipping. Distills the Hydra Effect (arXiv:2307.15771, McGrath et al.) into adaptive layer skipping. Feature-gated behind `hydra_budget`.
 
@@ -1738,7 +1739,7 @@ pub struct HydraBudgetResult {
 
 **Skip Rules:** Never skips layers with `backup_frequency > 0.1` (Hydra backups) or non-erasure layers with significant `mean_de`. Erasure MLPs skipped during draft if `skip_erasure_draft` is set.
 
-## GEPA-D Reflective (`src/pruners/gepa_reflective.rs`)
+## GEPA-D Reflective (`crates/katgpt-pruners/src/gepa_reflective.rs`)
 
 Pareto bandit config evolution via reflective distillation. Evolves system-level config (rubric weights, template hints, bandit params) from MeMo trajectory reflection using Pareto-frontier bandit selection. Feature-gated behind `gepa_reflective` (requires `bandit`, `memo_reflections`).
 
@@ -1756,7 +1757,7 @@ pub struct ConfigVariant {
 
 Total arms = 4 × 4 × 4 × 4 = 256. Uses UCB1 selection. Rubric presets: balanced, relevance-heavy, novelty-heavy, uniform.
 
-## PhraseBoost (`src/pruners/phrase_boost.rs` + `phrase_trie.rs`, Plan 164)
+## PhraseBoost (`crates/katgpt-pruners/src/phrase_boost.rs` + `phrase_trie.rs`, Plan 164)
 
 Context trie phrase boosting for DDTree. Zero training cost — phrases provided at call site. Feature-gated behind `phrase_boost`.
 
@@ -1875,13 +1876,31 @@ pub enum SenseKind {
 - **SNSE Serialization** — Binary format with BLAKE3 verification for persistent sense state
 - **GM Override** — `SenseOverride` pins specific senses or disables autonomous mode for scripted NPCs
 
-Feature gate: `sense_composition` (opt-in, requires `plasma_path`, `domain_latent`).
+Feature gate: `sense_composition` (transitively default-on: `sense_lod` [in `default`] enables `sense_composition`. Originally opt-in, promoted transitively when `sense_lod` [Plan 240] landed default-on. Requires `plasma_path`, `domain_latent`.)
+
+> **UPDATE 2026-07-18 (status sync):** the previous label said
+> `sense_composition` (opt-in, requires `plasma_path`, `domain_latent`).
+> The dep statement is still accurate; the opt-in label went stale once
+> `sense_lod` was promoted to default-on with
+> `sense_lod = ["sense_composition", "slod", ...]`.
 
 ---
 
-## Shard Embedding (Plan 230)
+## Shard Embedding (Plan 230) — 🪦 DEPRECATED (Issue 139)
 
-Johnson-Lindenstrauss random orthogonal projection for O(1) cosine similarity shard lookup.
+> **DEPRECATED 2026-07-16 (Issue 139):** JL projection at m=8 is mathematically
+> unsound — violates the Johnson-Lindenstrauss lower bound by over 200× (needs
+> m ≥ 554 for eps=0.5, n=100; uses m=8). Empirically measures 1.4–6% NN
+> preservation vs the documented 90% target. Zero runtime consumers: SenseModule
+> uses TernaryDir, BFCF uses region centroids. `JlProjectionMatrix` +
+> `ShardEmbedding` are marked `#[deprecated]`; re-exports wrapped in
+> `#[allow(deprecated)]` for back-compat. PCA rescue (Option B) deferred —
+> requires a real-data intrinsic-rank measurement that cannot be done
+> modellessly without the corpus existing (per the §3.5 modelless-unblock
+> protocol). The close-out note preserving empirical evidence lives in
+> [`.plans/230_shard_embedding_projection.md`](../../.plans/230_shard_embedding_projection.md).
+
+Johnson-Lindenstrauss random orthogonal projection for O(1) cosine similarity shard lookup (historical reference — do not use in new code).
 
 ```rust
 /// 64→8 random orthogonal projection matrix
@@ -2013,11 +2032,11 @@ pub trait MicroRecurrentBeliefState: Send + Sync {
 
 | Module | Family | Status |
 |---|---|---|
-| `micro_belief/attractor.rs` | A — `s_t = 2·σ(W_s·s + W_x·x + b) − 1` | Opt-in experiment (G1.4 + G2.1 FAIL) |
-| `micro_belief/latent_thought.rs` | B — K iters of Family A per tick | Opt-in experiment (G1.6: K=1 bit-identical to A) |
-| `micro_belief/leaky.rs` | C — monotone additive, `±max_delta` clamp | **Promotable** — byte-identical to `evolve_hla` |
-| `micro_belief/snapshot.rs` | freeze/thaw — BLAKE3-committed weights | Opt-in (per-NPC personality divergence) |
-| `micro_belief/bridge.rs` | `project_to_scalars` — sigmoid(dot) | Shared bridge (all families delegate) |
+| `crates/katgpt-micro-belief/src/attractor.rs` | A — `s_t = 2·σ(W_s·s + W_x·x + b) − 1` | Opt-in experiment (G1.4 + G2.1 FAIL) |
+| `crates/katgpt-micro-belief/src/latent_thought.rs` | B — K iters of Family A per tick | Opt-in experiment (G1.6: K=1 bit-identical to A) |
+| `crates/katgpt-micro-belief/src/leaky.rs` | C — monotone additive, `±max_delta` clamp | **Promotable** — byte-identical to `evolve_hla` |
+| `crates/katgpt-micro-belief/src/snapshot.rs` | freeze/thaw — BLAKE3-committed weights | Opt-in (per-NPC personality divergence) |
+| `crates/katgpt-micro-belief/src/bridge.rs` | `project_to_scalars` — sigmoid(dot) | Shared bridge (all families delegate) |
 | `leaky_core.rs` (ungated) | shared `leaky_step` primitive | Single source of truth for Family C math |
 
 **GOAT verdict:** trait unification + `LeakyIntegrator` are the promotable outputs.
@@ -2025,4 +2044,10 @@ Attractor demoted to Gain (G1.4 latency ~273ns; G2.1 coherence 569× more flip-f
 leaky). The `evolve_hla` refactor (Phase 2) made `evolve_hla` delegate to the ungated
 `leaky_core::leaky_step` — zero behavior change, no `micro_belief` feature coupling.
 
-Feature gate: `micro_belief` (opt-in).
+Feature gate: `micro_belief` (transitively default-on: `bom_sampling` [in `default`] enables `micro_belief` via `bom_sampling = ["micro_belief", ...]`. Originally opt-in per Plan 276; promoted transitively when `bom_sampling` [Plan 281 T2.4] landed default-on 2026-06-17. The Plan 276 "opt-in until G1.1–G1.5" comment in `crates/katgpt-core/Cargo.toml` was stale and was updated 2026-07-18 (cargo-comment sync) — the G1.4 attractor latency gate documented in this bench failed, but the LeakyIntegrator-only path is what's actually pulled in via `bom_sampling`, so the promotion is sound.)
+
+> **UPDATE 2026-07-18 (status sync):** the previous label said
+> `micro_belief` (opt-in). The `bom_sampling` promotion made `micro_belief`
+> transitively default-on; the standalone feature is still exposed for
+> `--no-default-features` consumers. See also the matching note in
+> `.benchmarks/276_micro_belief_goat.md`.

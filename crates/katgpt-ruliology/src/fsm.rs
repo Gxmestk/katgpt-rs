@@ -34,6 +34,11 @@ pub struct FsmStrategy {
     n_states: u8,
     /// Cached complexity (computed once at construction).
     complexity: f32,
+    /// Cached blake3 id (computed once at construction).
+    ///
+    /// Eliminates blake3 calls from `PartialEq`/`Hash`/`id()` — these are
+    /// called per `HashSet` lookup in tournament/bandit hot loops.
+    id: u64,
 }
 
 impl FsmStrategy {
@@ -53,6 +58,7 @@ impl FsmStrategy {
         debug_assert!((initial_state as usize) < (n_states as usize));
 
         let complexity = Self::compute_complexity(n_states, &transitions, &outputs);
+        let id = Self::compute_id(n_states, &transitions, &outputs);
 
         Self {
             transitions,
@@ -60,6 +66,7 @@ impl FsmStrategy {
             state: initial_state,
             n_states,
             complexity,
+            id,
         }
     }
 
@@ -73,24 +80,73 @@ impl FsmStrategy {
         outputs: &[u8; MAX_STATES],
     ) -> f32 {
         let n = n_states as usize;
-        let mut vals = Vec::with_capacity(3 * n);
-
-        for s in 0..n {
-            vals.push(transitions[s][0]);
-            vals.push(transitions[s][1]);
-            vals.push(outputs[s]);
-        }
-
-        vals.sort();
-        vals.dedup();
-
-        let distinct = vals.len() as f32;
-        let max_distinct = (3 * n) as f32;
-
-        if max_distinct == 0.0 {
+        // Fixed-size stack buffer (3 * MAX_STATES = 12 bytes). Avoids a heap
+        // allocation on every FsmStrategy::new — the enumerator builds up to
+        // (n*n*2)^n strategies (e.g. ~1M for n=4), so this is on a hot path.
+        // The manual stable sort + dedup below is bit-identical to Vec::sort +
+        // Vec::dedup on the same byte sequence (total order on u8, equal runs
+        // collapsed to the first occurrence).
+        //
+        // n=0 early return matches the original's `max_distinct == 0.0` branch
+        // (kept here so the dedup logic below can assume len >= 1).
+        if n == 0 {
             return 0.0;
         }
+        let mut vals = [0u8; 3 * MAX_STATES];
+        let mut len = 0usize;
+
+        for s in 0..n {
+            vals[len] = transitions[s][0];
+            vals[len + 1] = transitions[s][1];
+            vals[len + 2] = outputs[s];
+            len += 3;
+        }
+
+        // Stable insertion-sort on the active prefix. Byte domain is tiny, so
+        // the quadratic constant is negligible; the win is avoiding the heap
+        // trip. Equality semantics match slice::sort (total order on u8).
+        let active = &mut vals[..len];
+        for i in 1..active.len() {
+            let key = active[i];
+            let mut j = i;
+            while j > 0 && active[j - 1] > key {
+                active[j] = active[j - 1];
+                j -= 1;
+            }
+            active[j] = key;
+        }
+
+        // Dedup in-place (matches slice::dedup: collapse runs of equal
+        // elements to a single occurrence).
+        let mut write = 1usize;
+        for read in 1..active.len() {
+            if active[read] != active[write - 1] {
+                active[write] = active[read];
+                write += 1;
+            }
+        }
+        let distinct = write as f32;
+        let max_distinct = (3 * n) as f32;
+
         distinct / max_distinct
+    }
+
+    /// Blake3 hash of transitions + outputs → u64 ID. Computed once at
+    /// construction and cached in `self.id` to avoid blake3 calls on every
+    /// `HashSet` lookup (was 2 blake3 invocations per `contains`/`insert`).
+    fn compute_id(
+        n_states: u8,
+        transitions: &[[u8; 2]; MAX_STATES],
+        outputs: &[u8; MAX_STATES],
+    ) -> u64 {
+        let mut hasher = blake3::Hasher::new();
+        for s in 0..n_states as usize {
+            hasher.update(&[transitions[s][0], transitions[s][1], outputs[s]]);
+        }
+        hasher.update(&[n_states]);
+        let hash = hasher.finalize();
+        let bytes: [u8; 8] = hash.as_bytes()[..8].try_into().unwrap_or([0u8; 8]);
+        u64::from_le_bytes(bytes)
     }
 
     /// Reset FSM to initial state for a new game.
@@ -139,23 +195,10 @@ impl SimpleProgram for FsmStrategy {
         self.outputs[self.state as usize]
     }
 
-    /// Blake3 hash of transitions + outputs → u64 ID.
+    /// Blake3 hash of transitions + outputs → u64 ID (cached at construction).
+    #[inline]
     fn id(&self) -> u64 {
-        let mut hasher = blake3::Hasher::new();
-
-        for s in 0..self.n_states as usize {
-            hasher.update(&[
-                self.transitions[s][0],
-                self.transitions[s][1],
-                self.outputs[s],
-            ]);
-        }
-        // Include n_states to differentiate padding.
-        hasher.update(&[self.n_states]);
-
-        let hash = hasher.finalize();
-        let bytes: [u8; 8] = hash.as_bytes()[..8].try_into().unwrap_or([0u8; 8]);
-        u64::from_le_bytes(bytes)
+        self.id
     }
 
     /// Complexity score (cached at construction).
@@ -166,15 +209,17 @@ impl SimpleProgram for FsmStrategy {
 }
 
 impl PartialEq for FsmStrategy {
+    #[inline]
     fn eq(&self, other: &Self) -> bool {
-        self.id() == other.id()
+        self.id == other.id
     }
 }
 impl Eq for FsmStrategy {}
 
 impl std::hash::Hash for FsmStrategy {
+    #[inline]
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.id().hash(state);
+        self.id.hash(state);
     }
 }
 
@@ -217,13 +262,16 @@ impl FsmEnumerator {
         let mut distinct: Vec<FsmStrategy> = Vec::with_capacity(raw.len());
 
         let mut fingerprint = Vec::with_capacity(n_sequences * test_horizon);
+        // Hoisted out of the seq_idx loop — avoids n_sequences * raw.len()
+        // allocations of a Vec<u8> per behavioral fingerprint test.
+        let mut history: Vec<u8> = Vec::with_capacity(test_horizon);
 
         for mut fsm in raw {
             fingerprint.clear();
 
             for seq_idx in 0..n_sequences {
                 fsm.reset();
-                let mut history: Vec<u8> = Vec::with_capacity(test_horizon);
+                history.clear();
 
                 for bit in 0..test_horizon {
                     let input = ((seq_idx >> bit) & 1) as u8;
@@ -275,6 +323,22 @@ impl FsmEnumerator {
     /// win matrix with payoffs and rankings.
     ///
     /// Complexity: O(n² × rounds) where n = strategies.len().
+    ///
+    /// # Last-action-only hot path (FSM-specific)
+    ///
+    /// This tournament is monomorphic over `FsmStrategy`, whose `next_action`
+    /// reads only `opponent_history.last()` (it has no memory beyond the prior
+    /// opponent move). The hot loop exploits that by tracking the last action
+    /// as a single `u8` per player and passing a 1-element slice — bit-identical
+    /// to the prior Vec<push> implementation (FSM never observes history beyond
+    /// `[len-1]`) but eliminates 2x Vec::push per round per pair.
+    ///
+    /// DO NOT copy this optimization into a generic `SimpleProgram` tournament
+    /// without first verifying the impl's history contract: `CaStrategy`'s
+    /// `next_action` reads up to `tape_width` (default 7) most-recent opponent
+    /// moves, so a CA-tournament must keep the full Vec<u8> history per player.
+    /// `TmStrategy` reads only `last()` (writes opponent's last move to the
+    /// tape at the head) so the optimization would be safe for a TM-tournament.
     pub fn tournament(
         strategies: &[FsmStrategy],
         rounds: u32,
@@ -282,6 +346,10 @@ impl FsmEnumerator {
     ) -> WinMatrix {
         let n = strategies.len();
         let mut payoffs = vec![vec![0.0f64; n]; n];
+
+        // First-round sentinel: empty slice (no prior opponent move).
+        // Subsequent rounds pass a 1-element slice of the prior action.
+        let empty: [u8; 0] = [];
 
         for i in 0..n {
             for j in 0..n {
@@ -294,19 +362,23 @@ impl FsmEnumerator {
                 si.reset();
                 sj.reset();
 
-                let mut history_i: Vec<u8> = Vec::with_capacity(rounds as usize);
-                let mut history_j: Vec<u8> = Vec::with_capacity(rounds as usize);
-
                 let mut total_payoff = 0.0f64;
+                let mut last_action_i: u8 = 0; // only read after round 0
+                let mut last_action_j: u8 = 0;
+                let mut first_round = true;
 
                 for _ in 0..rounds {
-                    let action_i = si.next_action(&history_j);
-                    let action_j = sj.next_action(&history_i);
+                    // Round k reads the opponent's action from round k-1.
+                    let hist_j: &[u8] = if first_round { &empty } else { std::slice::from_ref(&last_action_j) };
+                    let hist_i: &[u8] = if first_round { &empty } else { std::slice::from_ref(&last_action_i) };
+                    let action_i = si.next_action(hist_j);
+                    let action_j = sj.next_action(hist_i);
 
                     total_payoff += payoff_fn(action_i, action_j);
 
-                    history_i.push(action_i);
-                    history_j.push(action_j);
+                    last_action_i = action_i;
+                    last_action_j = action_j;
+                    first_round = false;
                 }
 
                 payoffs[i][j] = total_payoff / rounds as f64;

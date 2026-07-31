@@ -23,7 +23,7 @@ This is the standard scoring function for ColBERT/PyLate late-interaction retrie
 
 ### 2.1 The Algorithm is Three Primitives Composed (maxsim.metal)
 
-The entire kernel decomposes into operations we already have in `src/simd.rs`:
+The entire kernel decomposes into operations we already have in `crates/katgpt-dec/src/simd.rs`:
 
 | MaxSim Operation | Our Existing Primitive |
 |---|---|
@@ -82,7 +82,7 @@ SpectralQuant already implements fused dequantize + scoring:
 
 The **only** difference is the reduction: SpectralQuant uses `softmax(Q·K)·V` (sum), MaxSim uses `max_j` per query token. Adding a `ScoreReduction` enum (`SoftmaxSum` | `MaxSim`) to the existing kernel is a ~20 LOC change, not a new pipeline.
 
-Similarly for TurboQuant: `attention_turboquant` in `src/turboquant/forward.rs` already fuses dequantize + Q·K scoring. Adding a max-reduction mode is a minor extension.
+Similarly for TurboQuant: `attention_turboquant` in `crates/katgpt-quant/src/turboquant/forward.rs` already fuses dequantize + Q·K scoring. Adding a max-reduction mode is a minor extension.
 
 ### 2.6 REST Retrieval Reranking is the Natural Use Case (Plan 009)
 
@@ -102,10 +102,10 @@ This applies MaxSim in its **original design context** (retrieval reranking) wit
 
 | Technique | Target Module | Path | Risk |
 |---|---|---|---|
-| Fused `maxsim_score()` | `src/simd.rs` | CPU SIMD | Low — composing existing primitives |
+| Fused `maxsim_score()` | `crates/katgpt-dec/src/simd.rs` | CPU SIMD | Low — composing existing primitives |
 | PFlash maxsim block scoring | `src/speculative/prefill.rs` | CPU | Low — replace mean-K with maxsim |
 | REST reranking with maxsim | Plan 009 bridge | CPU | Low — scoring function change |
-| `ScoreReduction::MaxSim` mode | `src/turboquant/forward.rs` | CPU | Low — minor extension of existing kernel |
+| `ScoreReduction::MaxSim` mode | `crates/katgpt-quant/src/turboquant/forward.rs` | CPU | Low — minor extension of existing kernel |
 | `ScoreReduction::MaxSim` mode | `riir-gpu` SpectralQuant | GPU | Low — minor extension of existing WGSL |
 | Size-gated MaxSim dispatch | `riir-gpu` `maxsim` feature | GPU | ✅ Done — Plan 085, `maxsim_score.wgsl` + `MaxSimScorer` (threshold=256) |
 | Fused SQ + MaxSim kernel | `riir-gpu` dual feature gate | GPU | ✅ Done — Plan 085 T5, `spectralquant_maxsim.wgsl`, dequant + MaxSim in one pass |
@@ -114,7 +114,7 @@ This applies MaxSim in its **original design context** (retrieval reranking) wit
 
 | Technique | Target Module | Path | Risk |
 |---|---|---|---|
-| Packed/ragged batch maxsim | `src/simd.rs` | CPU | Low — new API surface |
+| Packed/ragged batch maxsim | `crates/katgpt-dec/src/simd.rs` | CPU | Low — new API surface |
 | WGSL `maxsim_block_score` kernel | `riir-gpu` PFlash pipeline | GPU | Medium — new shader |
 
 ### ❌ Not Distillable (Architecture Incompatibility)
@@ -215,7 +215,7 @@ This applies MaxSim in its **original design context** (retrieval reranking) wit
 - `maxsim_score()` CPU SIMD — composition of existing tested primitives, provably correct
 - `ScoreReduction::MaxSim` for TurboQuant/SpectralQuant — one-parameter extension of existing kernels
 - PFlash block maxsim scoring — **371% better** needle separation vs mean-K (T7 GOAT passed)
-- REST reranking with MaxSim — `src/rerank.rs` module, `RerankMethod` enum, NDCG@10 proven ≥2% better than cosine (T12 GOAT passed, Benchmark 014)
+- REST reranking with MaxSim — `crates/katgpt-attn-match/src/rerank.rs` module, `RerankMethod` enum, NDCG@10 proven ≥2% better than cosine (T12 GOAT passed, Benchmark 014)
 - GPU MaxSim dispatch — `maxsim_score.wgsl` + `MaxSimScorer` (Plan 085), GPU **41–74× faster** for large batches, threshold=256 (T11 GOAT passed)
 - Fused SQ + MaxSim kernel — `spectralquant_maxsim.wgsl`, dequant + MaxSim in one GPU pass (Plan 085 T5)
 
@@ -255,7 +255,7 @@ This applies MaxSim in its **original design context** (retrieval reranking) wit
 ### Modelless Proposals (tested in katgpt-rs)
 - [x] `maxsim_score()`: matches naive materialized result within 1e-6, **7.46× faster** (48.3µs vs 360.0µs, Lq=32, Ld=256, dim=128, release build) — Plan 080 T2/T4
 - [x] PFlash block maxsim: **371% more** needle blocks selected (4.71× better separation: 20× vs 4.25× for mean-K) — Plan 080 T7
-- [x] REST maxsim reranking: ≥2% better retrieval NDCG vs cosine similarity — `src/rerank.rs` module (`RerankMethod` enum, `ndcg_at`, `rerank`), `bench_maxsim_rerank` test, Benchmark 014 — Plan 080 T12
+- [x] REST maxsim reranking: ≥2% better retrieval NDCG vs cosine similarity — `crates/katgpt-attn-match/src/rerank.rs` module (`RerankMethod` enum, `ndcg_at`, `rerank`), `bench_maxsim_rerank` test, Benchmark 014 — Plan 080 T12
 
 ### Model-Based Proposals (tested in katgpt-rs CPU)
 - [x] TurboQuant `ScoreReduction::MaxSim`: matches uncompressed maxsim within 0.95% at 4-bit; **40.54% error at 3-bit** — Plan 080 T9

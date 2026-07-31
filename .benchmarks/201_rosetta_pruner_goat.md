@@ -31,7 +31,7 @@ cargo run --features rosetta_pruner --example rosetta_01_bench
 
 ## Files
 
-- Implementation: `src/pruners/rosetta.rs`
+- Implementation: `crates/katgpt-pruners/src/rosetta.rs`
 - ConstraintPruner impl: fast-path O(1) + slow-path majority vote ✅
 - ScreeningPruner impl: agreement-weighted relevance ✅
 - Benchmark: `examples/rosetta_01_bench.rs`

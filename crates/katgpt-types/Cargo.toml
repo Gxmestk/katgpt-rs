@@ -1,6 +1,6 @@
 [package]
 name = "katgpt-types"
-version = "0.1.1"
+version = "0.2.0"
 edition = "2024"
 license = "MIT"
 description = "Shared configuration, RNG, math utilities, LoRA, domain embeddings, and inference types for katgpt-rs / riir-engine. Pure substrate leaf — no katgpt-* deps."
@@ -59,6 +59,15 @@ sparse_mlp = []
 # Bit-plane ternary weights for multiplication-free inference (Plan 148).
 plasma_path = []
 
+# Binary {−1,+1} plasma tier — single bit-plane, group-wise FP16 scale (Issue 145).
+# Strict subset of ternary encoding (pos_bits = sign_bits, neg_bits = !sign_bits).
+# The new Plasma tier; ternary (plasma_path) moved to Hot. STAYS OPT-IN by design
+# (Issue 145 Phase 2 T2.4, 2026-07-15): GOAT gate PASSED, but promotion to default
+# requires BOTH ≥1.5× latency AND ≥1.5× storage. Measured 1.22× latency (FAILS)
+# + 1.82× storage (PASSES). Conjunction fails → binary remains opt-in for
+# memory-constrained edge deployments.
+binary_plasma = []
+
 # MaxSim late-interaction scoring (Plan 080, Research 073).
 maxsim = []
 
@@ -68,6 +77,10 @@ sigmoid_margin = ["maxsim"]
 
 # RiM Reasoning Buffer Slots config fields (Plan 172, Research 192).
 rim_slots = []
+
+# Loop stability mode for weight-shared looped inference (Plan 428).
+# Gates the LoopStabilityMode enum + Config.loop_stability_mode field.
+loop_stability_fix = []
 
 # NextLat Belief-State Speculative Drafter config fields (Plan 217).
 belief_drafter = []

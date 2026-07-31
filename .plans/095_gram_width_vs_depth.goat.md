@@ -47,7 +47,7 @@ architecture where K independent SDE-perturbed trees compete via bandit selectio
 | `best_of_k_rollouts` | `src/speculative/dd_tree.rs` | Width scaling — K parallel trees |
 | `DDTreeBranchCache` | `src/speculative/types.rs` | `max_branches` = GRAM's N |
 | `SdeConfig` | `src/speculative/types.rs` | γ=1.0 = GRAM's full noise scale |
-| `BanditPruner<P>` | `src/pruners/bandit.rs` | UCB1 trajectory selection |
+| `BanditPruner<P>` | `crates/katgpt-ruliology/src/bandit.rs` | UCB1 trajectory selection |
 | `bench_elf_modelless` | `tests/bench_elf_modelless.rs` | Existing SDE benchmark pattern |
 | `bandit_02_ddtree` | `examples/bandit_02_ddtree.rs` | DDTree integration example |
 

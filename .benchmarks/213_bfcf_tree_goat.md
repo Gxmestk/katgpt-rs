@@ -1,7 +1,14 @@
 # Plan 213: BFCF Tree — GOAT Proof
 
 **Date:** 2026-06-08
-**Feature Gate:** `bfcf_tree` — OPT-IN, GOAT-gated
+**Feature Gate:** `bfcf_tree` — transitively default-on (chain: `bfcf_lsh_cms` [in `default`] → `bfcf_lfu_shard` → `bfcf_tree`, per Issue 181). Originally OPT-IN/GOAT-gated; promoted transitively when `bfcf_lsh_cms` (Plan 220) landed default-on.
+
+> **UPDATE 2026-07-18 (status sync):** the previous label said `bfcf_tree`
+> — OPT-IN, GOAT-gated. That was accurate at Plan 213 time but went stale
+> once `bfcf_lsh_cms` (Plan 220) was promoted to default-on with
+> `bfcf_lsh_cms = ["bfcf_lfu_shard", ...]` and `bfcf_lfu_shard = ["bfcf_tree", ...]`.
+> The standalone feature is still exposed so `--no-default-features`
+> consumers can disable the chain.
 
 ## GOAT Gate Matrix
 
@@ -29,13 +36,13 @@
 
 | Test | File |
 |------|------|
-| `test_complexity_low_for_simple_partition` | `src/pruners/percept_router.rs` |
-| `test_complexity_high_for_complex_partition` | `src/pruners/percept_router.rs` |
-| `test_route_fast_for_simple` | `src/pruners/percept_router.rs` |
-| `test_route_deep_for_complex` | `src/pruners/percept_router.rs` |
-| `test_route_standard_for_medium` | `src/pruners/percept_router.rs` |
-| `test_complexity_bounded_unit_interval` | `src/pruners/percept_router.rs` |
-| `test_entropy_of_uniform_labels` | `src/pruners/percept_router.rs` |
+| `test_complexity_low_for_simple_partition` | `crates/katgpt-pruners/src/percept_router.rs` |
+| `test_complexity_high_for_complex_partition` | `crates/katgpt-pruners/src/percept_router.rs` |
+| `test_route_fast_for_simple` | `crates/katgpt-pruners/src/percept_router.rs` |
+| `test_route_deep_for_complex` | `crates/katgpt-pruners/src/percept_router.rs` |
+| `test_route_standard_for_medium` | `crates/katgpt-pruners/src/percept_router.rs` |
+| `test_complexity_bounded_unit_interval` | `crates/katgpt-pruners/src/percept_router.rs` |
+| `test_entropy_of_uniform_labels` | `crates/katgpt-pruners/src/percept_router.rs` |
 
 ## Expected Gains
 

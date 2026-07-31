@@ -306,7 +306,7 @@ These utility functions are used by multiple player types:
 | `src/pruners/bomber/event_log_player.rs` | 320 | `BomberEventLog`, `BomberForkDiff` — event-log-backed replay player (feature: `event_log`) |
 | `src/pruners/bomber/wasm_pruner.rs` | 950 | `BomberWasmPruner` — WASM-based batch validation with `BatchResult` (feature: `bomber-wasm`) |
 | `src/pruners/bomber/wasm_state.rs` | 697 | `serialize_into_buffer`, `ZeroCopyStateBuffer` — efficient ECS→WASM state transfer (feature: `bomber-wasm`) |
-| `src/pruners/g_zero/bomber_templates.rs` | — | `BomberTemplate` + `BomberTemplateProposer` — 8 strategy archetypes |
+| `crates/katgpt-pruners/src/g_zero/bomber_templates.rs` | — | `BomberTemplate` + `BomberTemplateProposer` — 8 strategy archetypes |
 | `examples/bomber_01_arena.rs` | 443 | Headless 100-round tournament runner + `--replay-dir` dump |
 | `examples/bomber_02_tui.rs` | 576 | Animated ratatui TUI replay with emoji rendering |
 | `examples/bomber_03_hl_proof.rs` | 632 | 1000-round HL proof with golden traces + `--replay-dir` filtered dump |
@@ -446,7 +446,7 @@ output/replays/bomber_replay_{timestamp}.jsonl
   │  Filter: quality > 0.5 (survived/won only)
   │
   ▼
-riir-gpu/examples/train_bomber.rs
+riir-train/crates/riir-train-gpu/examples/train_bomber.rs
   │  Loads JSONL → GameSample → wgpu LoRA training
   │
   ▼

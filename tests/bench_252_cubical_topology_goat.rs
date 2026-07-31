@@ -20,7 +20,9 @@
 #[cfg(feature = "lattice_operad")]
 mod tests {
     use katgpt_core::ConstraintPruner;
-    use katgpt_pruners::lattice_operad::{ComposeOp, PrunerExpr, PrunerResult, canonicalize, compose};
+    use katgpt_pruners::lattice_operad::{
+        ComposeOp, PrunerExpr, PrunerResult, canonicalize, compose,
+    };
     use std::time::Instant;
 
     // ── Helper pruners for benchmarking ─────────────────────────────────

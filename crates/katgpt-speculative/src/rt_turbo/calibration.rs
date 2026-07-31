@@ -207,7 +207,7 @@ pub fn calibrate_from_scores(scores: &[f32], config: &RtTurboConfig) -> HeadCali
 
     // Create indexed pairs (head_idx, score), sort by score descending
     let mut indexed: Vec<(usize, f32)> = scores.iter().copied().enumerate().collect();
-    indexed.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+    indexed.sort_by(|a, b| b.1.total_cmp(&a.1));
 
     // Threshold = score of the last retrieval head
     let threshold = indexed[n_retrieval - 1].1;
@@ -349,7 +349,7 @@ pub fn calibrate_from_causal_scores(
 /// * `ov_output_norm` — per-head `||OV · attn(·, t_readout)||` norm (caller-
 ///   supplied from a real transformer forward). Same length as `attention_mass`.
 /// * `suspect_causal_scores` — per-suspect causal IE, **parallel to the suspect
-///   indices** yielded by [`suspect_indices`] (ascending head index).
+///   indices** yielded by `suspect_indices` (ascending head index).
 /// * `tau_suspect` — escalation threshold. No universal default; tune via G1.
 /// * `config` — RTPurbo config (uses `retrieval_head_ratio`).
 #[cfg(feature = "adaptive_causal_calibration")]

@@ -124,9 +124,9 @@ Our existing modelless distillation stack already produces fast approximators:
 
 Our speculative decoding infrastructure already has:
 - `src/speculative/dd_tree.rs`: DDTree branch management (analogous to thread pool W)
-- `src/speculative/verifier.rs`: Token-level verification (extend to observation-level)
-- `src/speculative/drafter_lora.rs`: Fast drafter model (analogous to speculator S)
-- `src/speculative/step.rs`: Step-by-step inference loop
+- `crates/katgpt-speculative/src/spechop/verifier.rs`: Token-level verification (extend to observation-level)
+- `crates/katgpt-forward/src/drafter_lora.rs`: Fast drafter model (analogous to speculator S)
+- `crates/katgpt-forward/src/step.rs`: Step-by-step inference loop
 
 **The gap**: Our DDTree operates at **token granularity**. SpecHop operates at **tool-call (hop) granularity**. We need to extend our speculation from "predict next tokens" to "predict next tool observation + continue reasoning."
 

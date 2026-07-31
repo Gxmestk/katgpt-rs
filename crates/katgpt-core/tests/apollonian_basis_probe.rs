@@ -23,48 +23,13 @@ use katgpt_core::funcattn::{
     FuncAttnBasis, FuncAttnConfig, FuncAttnScratch, compute_basis_into, funcattn_forward,
 };
 
-/// L2 normalize a vector in place.
-fn l2_normalize(v: &mut [f32]) {
-    let mut s = 0.0f32;
-    for &x in v.iter() {
-        s += x * x;
-    }
-    let norm = s.sqrt().max(1e-12);
-    for x in v.iter_mut() {
-        *x /= norm;
-    }
-}
-
-/// Gram-Schmidt orthogonalize the rows of `w` (k rows, d cols, row-major).
-/// Produces a row-orthogonal matrix (rows are orthonormal).
-fn gram_schmidt_rows(w: &mut [f32], k: usize, d: usize) {
-    for i in 0..k {
-        // Subtract projections onto previous rows.
-        for j in 0..i {
-            let mut dot = 0.0f32;
-            for l in 0..d {
-                dot += w[i * d + l] * w[j * d + l];
-            }
-            for l in 0..d {
-                w[i * d + l] -= dot * w[j * d + l];
-            }
-        }
-        l2_normalize(&mut w[i * d..(i + 1) * d]);
-    }
-}
-
-/// Cosine similarity between two flattened vectors.
-fn cosine(a: &[f32], b: &[f32]) -> f32 {
-    let mut dot = 0.0f32;
-    let mut na = 0.0f32;
-    let mut nb = 0.0f32;
-    for i in 0..a.len() {
-        dot += a[i] * b[i];
-        na += a[i] * a[i];
-        nb += b[i] * b[i];
-    }
-    dot / (na.sqrt() * nb.sqrt()).max(1e-12)
-}
+// Shared Plan 332 basis-harness helpers — see `common/basis_harness.rs`.
+// This test does NOT use `lcg_next` / `random_orthonormal_w` (it uses
+// inline closure RNG instead); only the three geometric primitives are
+// shared with the other Plan 332 basis tests.
+#[path = "common/basis_harness.rs"]
+mod basis_harness;
+use basis_harness::{cosine, gram_schmidt_rows, l2_normalize};
 
 /// Effective rank of Φ: exp(entropy of the average row distribution.
 /// High effective rank = Φ rows are spread across basis dims (good, expressive).

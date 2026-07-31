@@ -84,7 +84,7 @@ impl FlowGraph {
 /// # Allocation
 ///
 /// Two allocations total (`offsets` + `neighbors`), at graph-build time. This
-/// is a one-time cost; all subsequent [`can_reach`] / [`transitive_closure`]
+/// is a one-time cost; all subsequent [`can_reach`] / [`TransitiveClosure`]
 /// queries are alloc-free against the precomputed CSR.
 pub fn build_flow_graph(topology: &CanvasTopology, n_regions: usize) -> FlowGraph {
     // Collect unique arcs (dst → src), skipping out-of-bounds + absent edges.
@@ -131,7 +131,11 @@ pub fn build_flow_graph(topology: &CanvasTopology, n_regions: usize) -> FlowGrap
         neighbors[s..e].sort_unstable();
     }
 
-    FlowGraph { n_nodes: n_regions, offsets, neighbors }
+    FlowGraph {
+        n_nodes: n_regions,
+        offsets,
+        neighbors,
+    }
 }
 
 /// Returns the causal horizon: max path length reachable in `n_blocks`
@@ -203,7 +207,7 @@ pub fn can_reach(g: &FlowGraph, from: RegionId, to: RegionId, horizon: usize) ->
 /// boolean matrix of "can `from` reach `to` within `horizon` hops".
 ///
 /// Build once at schema-load time (allocates the `n²` bitset), then query
-/// alloc-free via [`reaches`]. For large region counts or frequently-changing
+/// alloc-free via [`TransitiveClosure::reaches`]. For large region counts or frequently-changing
 /// horizons, prefer direct [`can_reach`] BFS over a precomputed closure.
 #[derive(Debug, Clone)]
 pub struct TransitiveClosure {
@@ -291,7 +295,7 @@ fn set_bit(bits: &mut [u64], from: usize, to: usize, n: usize) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::canvas::{build_flow_graph_via_compile, causal_chain, isolated, RegionId};
+    use crate::canvas::{RegionId, build_flow_graph_via_compile, causal_chain, isolated};
 
     #[test]
     fn horizon_is_product() {

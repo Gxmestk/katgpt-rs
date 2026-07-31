@@ -171,11 +171,12 @@ impl SpeculativeVerifier for D2fDrafterVerifier<'_> {
             let offset = (i + 1) * vocab_size;
             let p_dist = &self.p_distributions_flat[offset..offset + vocab_size];
 
-            // Argmax of target distribution = target's preferred token
+            // Argmax of target distribution = target's preferred token.
+            // total_cmp: branch-free, NaN-deterministic.
             let target_tok = p_dist
                 .iter()
                 .enumerate()
-                .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
+                .max_by(|(_, a), (_, b)| a.total_cmp(b))
                 .map(|(idx, _)| idx)
                 .unwrap_or(0);
 

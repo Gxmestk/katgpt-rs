@@ -20,7 +20,10 @@
 
 #![allow(clippy::needless_range_loop)]
 
+use std::sync::Mutex;
+
 use crate::chiaroscuro::entropy::spectral_entropy_dct;
+use rustfft::{FftPlanner, num_complex::Complex32};
 
 /// A structurally distinct operator eligible for chiaroscuro routing.
 ///
@@ -69,7 +72,7 @@ pub trait ChiaroscuroOp: Send + Sync {
 ///
 /// # Utilization tracking
 ///
-/// Each `route()` call increments a per-op counter. [`utilization_entropy`]
+/// Each `route()` call increments a per-op counter. [`utilization_entropy`](ChiaroscuroRouter::utilization_entropy)
 /// exposes the normalized entropy for collapse detection.
 pub struct ChiaroscuroRouter {
     ops: Vec<Box<dyn ChiaroscuroOp>>,
@@ -227,6 +230,17 @@ pub struct DctMixOp {
     entropy_hi: f32,
     /// Number of low-frequency DCT coefficients to retain.
     pub n_coeffs: usize,
+    /// Cached FFT planner + scratch buffer, reused across `forward_token` calls
+    /// so the per-token path is alloc-free after the first call. Mirrors
+    /// `ChiaroscuroKvDispatcher`'s pattern (kv.rs). Uncontended in practice —
+    /// a `ChiaroscuroRouter` is driven serially by one forward pass.
+    cache: Mutex<DctFftCache>,
+}
+
+/// Reusable FFT machinery for [`DctMixOp`].
+struct DctFftCache {
+    planner: FftPlanner<f32>,
+    scratch: Vec<Complex32>,
 }
 
 impl DctMixOp {
@@ -237,6 +251,10 @@ impl DctMixOp {
         Self {
             entropy_hi,
             n_coeffs,
+            cache: Mutex::new(DctFftCache {
+                planner: FftPlanner::new(),
+                scratch: Vec::new(),
+            }),
         }
     }
 }
@@ -278,13 +296,19 @@ impl ChiaroscuroOp for DctMixOp {
             out[0] = x[0];
             return;
         }
-        // Compute H(x) (DCT already computed internally), then truncate + iDCT.
-        // For simplicity, we use the entropy function's DCT machinery and
-        // re-derive the truncated reconstruction here.
-        use rustfft::{FftPlanner, num_complex::Complex32};
-        let mut planner = FftPlanner::<f32>::new();
+        // DCT-II via the mirror-and-FFT trick, truncate to top-K low-freq
+        // coefficients, then inverse FFT. The planner + scratch are cached on
+        // `self` so this path is alloc-free after the first call (mirrors
+        // `ChiaroscuroKvDispatcher`). The mutex is uncontended — a router is
+        // driven serially by one forward pass.
         let n = if d == 2 { 2 } else { 2 * (d - 1) };
-        let mut s: Vec<Complex32> = (0..n).map(|_| Complex32::new(0.0, 0.0)).collect();
+        let mut guard = self.cache.lock().expect("DctMixOp cache poisoned");
+        let DctFftCache { planner, scratch } = &mut *guard;
+        // Reuse the scratch buffer — `resize` zero-fills new capacity and is
+        // a no-op when the length already matches (steady state).
+        scratch.clear();
+        scratch.resize(n, Complex32::new(0.0, 0.0));
+        let s = scratch.as_mut_slice();
         s[0] = Complex32::new(x[0], 0.0);
         if d == 2 {
             s[1] = Complex32::new(x[1], 0.0);
@@ -298,7 +322,7 @@ impl ChiaroscuroOp for DctMixOp {
             }
         }
         let fwd = planner.plan_fft_forward(n);
-        fwd.process(&mut s);
+        fwd.process(s);
 
         // Truncate: zero out coefficients above n_coeffs.
         let keep = self.n_coeffs.min(d);
@@ -312,7 +336,7 @@ impl ChiaroscuroOp for DctMixOp {
 
         // Inverse FFT.
         let inv = planner.plan_fft_inverse(n);
-        inv.process(&mut s);
+        inv.process(s);
 
         // Scale by 1/n (rustfft's inverse is unscaled) and extract real parts.
         let scale = 1.0 / n as f32;
@@ -326,7 +350,7 @@ impl ChiaroscuroOp for DctMixOp {
 
 /// Reference "full attention" operator placeholder.
 ///
-/// In practice this delegates to the existing [`crate::attention`] tiled
+/// In practice this delegates to the existing `crate::attention` tiled
 /// implementation. For routing purposes, it serves as the high-cost anchor
 /// that all high-entropy tokens fall back to.
 pub struct FullAttnOp {

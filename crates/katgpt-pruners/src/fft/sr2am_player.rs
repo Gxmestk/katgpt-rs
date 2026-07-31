@@ -67,32 +67,38 @@ const FFT_DOMAIN: usize = 1; // FFT domain index (bomber uses 0)
 // ── Helper Functions ───────────────────────────────────────────
 
 /// Compute Shannon entropy on softmax-normalized scores (only valid actions).
+///
+/// Stack-allocated (no heap) — fixed `[f32; NUM_ACTIONS]` working buffers.
+/// Removes the dead `scores.iter()` zip from the original (entropy only
+/// depends on `exps`, not on the raw scores).
 fn shannon_entropy(scores: &[f32; NUM_ACTIONS]) -> f32 {
-    let max_val = scores.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
-    let exps: Vec<f32> = scores
-        .iter()
-        .map(|&s| {
-            if s <= f32::NEG_INFINITY {
-                0.0
-            } else {
-                (s - max_val).exp()
-            }
-        })
-        .collect();
+    let mut max_val = f32::NEG_INFINITY;
+    for &s in scores {
+        if s > max_val {
+            max_val = s;
+        }
+    }
+    let mut exps = [0.0f32; NUM_ACTIONS];
+    for (i, &s) in scores.iter().enumerate() {
+        exps[i] = if s <= f32::NEG_INFINITY {
+            0.0
+        } else {
+            use katgpt_core::simd::fast_exp;
+            fast_exp(s - max_val)
+        };
+    }
     let sum: f32 = exps.iter().sum();
     if sum <= 0.0 {
         return 0.0;
     }
-    let entropy: f32 = exps
-        .iter()
-        .zip(scores.iter())
-        .filter(|(e, _)| **e > 0.0)
-        .map(|(e, _)| {
-            let p = *e / sum;
+    let inv_sum = 1.0 / sum;
+    exps.iter()
+        .filter(|&&e| e > 0.0)
+        .map(|&e| {
+            let p = e * inv_sum;
             -p * p.ln()
         })
-        .sum();
-    entropy
+        .sum()
 }
 
 /// Compute game-domain Hint-δ: mean delta over valid actions.

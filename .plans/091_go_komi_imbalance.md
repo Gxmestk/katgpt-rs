@@ -42,11 +42,11 @@ ensures each agent plays both sides equally for per-agent balance.
 
 | File | Change |
 |------|--------|
-| `src/pruners/go/state.rs` | T1: Add `set_komi()` setter |
-| `src/pruners/go/g_zero_player.rs` | T2-T4: Config, results, adaptive komi loop |
+| `crates/katgpt-pruners/src/go/state.rs` | T1: Add `set_komi()` setter |
+| `crates/katgpt-pruners/src/go/g_zero_player.rs` | T2-T4: Config, results, adaptive komi loop |
 | `examples/go_04_gzero.rs` | T5: Report komi in output |
 | `tests/go_komi_test.rs` | T6: Unit tests |
-| `src/pruners/go/g_zero_player.rs` | T8: Swap-colors config + proposer swap logic |
+| `crates/katgpt-pruners/src/go/g_zero_player.rs` | T8: Swap-colors config + proposer swap logic |
 | `tests/go_komi_test.rs` | T8: Swap-colors tests |
 
 ## Success Criteria

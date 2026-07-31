@@ -47,13 +47,13 @@ downstream cost.
 
 1. **Move `ThinkingMode` and `ComputeTier` to `katgpt-core::traits`.** Currently
    both have a duplicate definition: one in main crate (canonical, in
-   `src/speculative/thinking_controller.rs` and `src/trigger_gate.rs`) and one
+   `crates/katgpt-speculative/src/thinking_controller.rs` and `crates/katgpt-core/src/trigger_gate.rs`) and one
    in katgpt-pruners (`crates/katgpt-pruners/src/{collapse_detector,thicket_variance_probe}.rs`).
    The duplicates are bit-compatible via `#[repr(u8)]` and a `tier_to_kp` bridge,
    but DRY says we should consolidate. Low priority — the bridge is 7 lines.
 
 2. **Relocate the deleted residency_audit test.** `test_goat_175_fusion_residency_audit_passes`
-   was removed from `katgpt-pruners/src/bandit.rs` because it depended on the
+   was removed from `crates/katgpt-ruliology/src/bandit.rs` because it depended on the
    main crate's `crate::speculative::residency_audit` (test-only module). Should
    be re-added as an integration test in `katgpt-rs/tests/` that constructs
    `BanditPruner` via `katgpt_pruners::bandit::*` and audits via

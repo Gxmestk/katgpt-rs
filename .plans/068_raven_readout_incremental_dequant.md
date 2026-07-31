@@ -14,7 +14,7 @@ Two targeted optimizations:
 ### Current State of `raven_readout`
 
 ```rust
-// src/transformer.rs:1996 — allocates 2 Vecs per call
+// crates/katgpt-percepta/src/transformer.rs:1996 — allocates 2 Vecs per call
 pub fn raven_readout(query, keys, values, num_slots, kv_dim) -> Vec<f32> {
     let scores: Vec<f32> = ...;          // ALLOC: [num_slots]
     let mut output = vec![0.0f32; kv_dim]; // ALLOC: [kv_dim]
@@ -29,7 +29,7 @@ Plan 028 already zero-allocated the router (`raven_compute_router_into`) but lef
 ### Current State of `forward_turboquant` Dequant
 
 ```rust
-// src/transformer.rs:2260 — O(pos²) total work across full sequence
+// crates/katgpt-percepta/src/transformer.rs:2260 — O(pos²) total work across full sequence
 for t in 0..t_n {  // t_n = pos + 1
     cache.dequantize_key_into(layer_idx, t, &mut ctx.paged_flat_key[...]);
     cache.dequantize_value_into(layer_idx, t, &mut ctx.paged_flat_value[...]);
@@ -237,10 +237,10 @@ Quality gate: max_diff = 0.00e0 ✅
 
 | File | Changes | Status |
 |---|---|---|
-| `src/transformer.rs` | `raven_readout_into`, `forward_raven` zero-alloc, `ForwardContext.tq_dequant_pos`, `forward_turboquant` incremental dequant, `reset_tq_dequant()`, stack-alloc `r_t` | ✅ Done |
+| `crates/katgpt-percepta/src/transformer.rs` | `raven_readout_into`, `forward_raven` zero-alloc, `ForwardContext.tq_dequant_pos`, `forward_turboquant` incremental dequant, `reset_tq_dequant()`, stack-alloc `r_t` | ✅ Done |
 | `src/types.rs` | `#[repr(u8)]` on `HlaMode` | ✅ Done |
-| `src/speculative/step.rs` | Deprecation notice on non-`_with` rollback | ✅ Done |
-| `src/speculative/sampling.rs` | No duplicate found — no change needed | ✅ No-op |
+| `crates/katgpt-forward/src/step.rs` | Deprecation notice on non-`_with` rollback | ✅ Done |
+| `crates/katgpt-core/src/speculative/sampling.rs` | No duplicate found — no change needed | ✅ No-op |
 | `tests/bench_068_raven_readout_incremental.rs` | New: 4 benchmark tests (readout, full sequence, steady-state, quality gate) | ✅ Done |
 
 ## Success Criteria

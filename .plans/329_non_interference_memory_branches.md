@@ -4,7 +4,7 @@
 **Research:** [katgpt-rs/.research/310_RIZZ_Non_Interference_Memory_Branches.md](../.research/310_RIZZ_Non_Interference_Memory_Branches.md)
 **Source paper:** [arxiv 2606.20638](https://arxiv.org/abs/2606.20638) — RIZZ (Goel et al., Oxford, Jun 2026)
 **Target:** `katgpt-rs/crates/katgpt-core/src/branching/` (new module) + Cargo feature `non_interference_branches`
-**Status:** Active — Phase 0 (this plan). Super-GOAT fusion of BAKE × CLR × MCGS × Engram × ARG × closure-instrument × Salience.
+**Status:** ✅ COMPLETE (2026-06-26) — Phases 1–4 all done (Phase 1: 56 tests; Phase 2: 101 tests; Phase 3: gates PASS, promoted; Phase 4: 20 composition tests). `non_interference_branches` DEFAULT-ON with pure modelless gain (structural geometric orthogonality, not learned). riir-ai runtime wiring deferred to Plan 338.
 
 ---
 
@@ -54,7 +54,7 @@ GOAT gate: G1 correctness (orthogonality preserves non-interference), G2 perf (r
 
 ### Tasks
 
-- [x] **T3.1** `benches/bench_329_non_interference_branches_goat.rs` — GOAT gate. ✅ 2026-06-26
+- [x] **T3.1** `crates/katgpt-core/benches/bench_329_non_interference_branches_goat.rs` — GOAT gate. ✅ 2026-06-26
   - **G1 (correctness):** G1a — spawn N=8 branches with orthogonal directions in D=8 space; verify `interference(b_i, b_j) < 1e-6` for all 8×7=56 ordered pairs (max observed = 0.00e0). G1b — write to branch 0; verify branch 1..7's episodic/procedural/failure stores byte-for-byte unchanged (non-interference by construction). G1c — 9th direction in D=8 (normalized all-ones) correctly rejected: interferes by 0.3536 ≥ 1/sqrt(8)=0.3536 > threshold 0.1.
   - **G2 (perf):** `router.route()` on 64-branch bank = 301.5ns < 1µs target (3.3× margin) over 10,000 iters (release, `std::time::Instant`, `black_box`).
   - **G3 (no-regression):** `cargo check --all-features`, `cargo check --no-default-features`, `cargo check -p katgpt-core` (default), `cargo check` (root) — all clean.

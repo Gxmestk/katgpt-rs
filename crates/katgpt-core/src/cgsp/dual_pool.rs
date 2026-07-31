@@ -40,7 +40,7 @@
 //!   [`HintDeltaBandit::push_arm`] / [`HintDeltaBandit::is_growing`] default
 //!   methods, per-arm X-pool reward tracking, `consolidate_growing()` and the
 //!   gated variant `consolidate_growing_gated(gate)` (the
-//!   [`FaithfulnessProbe`](crate::faithfulness_probe) integration point).
+//!   [`FaithfulnessProbe`](crate::faithfulness::probe::FaithfulnessProbe) integration point).
 //! - **Phase 5 (deferred to riir-ai):** `NpcCgspRuntime` integration benchmark
 //!   (personality divergence, latency budget, E-pool persistence).
 //!
@@ -433,7 +433,7 @@ impl<B: HintDeltaBandit> DualPoolBandit<B> {
     ///
     /// Only X-pool arms where `gate(x_arm_index) == true` are promoted. This
     /// is the FaithfulnessProbe integration point (Plan 278): the caller
-    /// wraps a [`FaithfulnessProbe`] check in the closure, and items the
+    /// wraps a [`FaithfulnessProbe`](crate::faithfulness::probe::FaithfulnessProbe) check in the closure, and items the
     /// consumer structurally ignores (no behavioral delta) are rejected.
     ///
     /// The gate is a closure, not a trait object, so it stays zero-cost when
@@ -1972,7 +1972,7 @@ mod tests {
         let mut cfg = DualPoolConfig::default();
         cfg.growth_enabled = true;
         cfg.promotion_threshold = 0.05;
-        let mut dp_gated = DualPoolBandit::with_config(e_gated, x_gated, cfg.clone());
+        let mut dp_gated = DualPoolBandit::with_config(e_gated, x_gated, cfg);
 
         // Reward ALL arms (live and dead).
         dp_gated.begin_cycle();

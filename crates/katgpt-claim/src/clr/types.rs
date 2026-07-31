@@ -8,8 +8,9 @@
 /// CLR runtime configuration. All thresholds are sigmoid-bounded (in `(0, 1)`).
 ///
 /// Field naming follows Plan 284 §3.2 + Research 255 notation:
-///   - `k`                 embedding dimension per claim
+///   - `k`                 max trajectory budget per CLR cycle (paper: K)
 ///   - `m`                 number of projection directions (claims per trajectory)
+///   - `embedding_dim`     per-claim embedding dimension (== verifier `direction_dim`)
 ///   - `tau_v`             verdict threshold (sigmoid gate per claim)
 ///   - `tau_reliable`      per-trajectory reliability threshold
 ///   - `tau_curiosity`     exploration threshold (curiosity arm)
@@ -19,10 +20,18 @@
 ///   - `tiebreak_eps`      reliability tie tolerance for the brevity tiebreak
 #[derive(Clone, Copy, Debug)]
 pub struct ClrConfig {
-    /// Embedding dimension per claim (`k` in the paper).
+    /// Max trajectory budget per CLR cycle (paper: K ≤ 32).
+    ///
+    /// Used to size the `ClrScratch` verdict/reliability/cluster buffers.
+    /// `clr_vote_minimal` asserts `trajectories.len() <= k`.
     pub k: usize,
     /// Number of projection directions / claims per trajectory (`m`).
     pub m: usize,
+    /// Per-claim embedding dimension (== verifier `direction_dim`).
+    ///
+    /// Used to size the `ClrScratch.claim_embeddings` flat buffer (`m * embedding_dim`).
+    /// The `extract_embeddings_into` hot path writes rows of this width.
+    pub embedding_dim: usize,
     /// Verdict threshold `τ_v` — sigmoid gate per claim.
     pub tau_v: f32,
     /// Per-trajectory reliability threshold `τ_reliable`.
@@ -45,6 +54,7 @@ impl Default for ClrConfig {
         Self {
             k: 32,
             m: 5,
+            embedding_dim: 32, // paper default: embedding dim == K (homogeneous)
             tau_v: 0.5,
             tau_reliable: 0.5,
             tau_curiosity: 0.7,
@@ -133,6 +143,7 @@ mod tests {
         let c = ClrConfig::default();
         assert_eq!(c.k, 32, "k default");
         assert_eq!(c.m, 5, "m default");
+        assert_eq!(c.embedding_dim, 32, "embedding_dim default");
         assert!((c.tau_v - 0.5).abs() < 1e-6, "tau_v default");
         assert!((c.tau_reliable - 0.5).abs() < 1e-6, "tau_reliable default");
         assert!(

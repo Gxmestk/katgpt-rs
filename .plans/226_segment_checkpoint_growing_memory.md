@@ -1,7 +1,7 @@
 # Plan 226: SegmentCheckpoint — Inference-Time Growing Memory via Cached KV Segments
 
 **Date:** 2026-06
-**Status:** Active
+**Status:** ✅ COMPLETE, DEFAULT-ON (`segment_checkpoint` in katgpt root default) — SegmentStore + GRM sigmoid gating + SSC top-k shipped.
 **Research:** `.research/199_Memory_Caching_Growing_RNN_Memory.md`
 **Depends On:** KVarN (Plan 159), TriggerGate (Plan 176)
 **Feature Gate:** `segment_checkpoint` (ON BY DEFAULT)
@@ -42,7 +42,7 @@ Segment boundaries align with KVarN tile_size (128) for zero-copy checkpoints.
 ### Phase 1: Core SegmentCheckpoint (GRM Variant)
 
 #### Task 1: SegmentStore Struct
-- [x] Create `katgpt-rs/src/segment_checkpoint/mod.rs`
+- [x] Create `katgpt-rs/crates/katgpt-kv/src/segment_checkpoint/mod.rs`
 - [x] Define `SegmentCheckpoint` struct:
   ```rust
   pub struct SegmentCheckpoint {

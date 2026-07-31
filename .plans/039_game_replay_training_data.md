@@ -37,7 +37,7 @@ output/replays/bomber_replay_002.jsonl
   │  Filter: only HL (P4) and Validator (P3) players
   │
   ▼
-riir-gpu/examples/train_bomber.rs         (riir-ai repo)
+riir-train/crates/riir-train-gpu/examples/train_bomber.rs         (riir-ai repo)
   │  Loads JSONL → GameSample → wgpu training
   │  3-5 epochs on ~100K samples
   │
@@ -132,7 +132,7 @@ Each line is one `(board_state, action, quality)` sample:
   - Only dump winning episodes (score > threshold) or top-N by score
   - This is the primary data source for training — 1000 rounds, filtered quality
 
-- [x] **Task 6: Standalone replay generator** (`examples/bomber_04_replay_gen.rs` — NEW)
+- [x] **Task 6: Standalone replay generator** (`examples/bomber_05_replay_gen.rs` — NEW)
   - Dedicated example for generating training data
   - Runs 1000 rounds with default 4 players
   - Filters: only dump P3/P4 winning episodes
@@ -147,7 +147,7 @@ Each line is one `(board_state, action, quality)` sample:
   - Filter by `player_type` and `quality` threshold
   - Unit tests: parse a small JSONL file, verify sample count and content
 
-- [x] **Task 8: Wire `train_bomber.rs`** (`riir-ai/crates/riir-gpu/examples/train_bomber.rs`)
+- [x] **Task 8: Wire `train_bomber.rs`** (`riir-train/crates/riir-train-gpu/examples/train_bomber.rs`)
   - Replace stub with actual training loop
   - Load JSONL from `output/replays/` via `parse_replay()`
   - Convert `GameSample` → training batches for wgpu
@@ -180,14 +180,14 @@ Each line is one `(board_state, action, quality)` sample:
 | `src/pruners/bomber/mod.rs` | Edit | Add `pub mod replay;` |
 | `examples/bomber_01_arena.rs` | Edit | Add `--replay-dir` flag, optional replay dump |
 | `examples/bomber_03_hl_proof.rs` | Edit | Add `--replay-dir`, filtered P3/P4 winning episodes |
-| `examples/bomber_04_replay_gen.rs` | NEW | Dedicated replay generator, 1000 rounds, quality-filtered |
+| `examples/bomber_05_replay_gen.rs` | NEW | Dedicated replay generator, 1000 rounds, quality-filtered |
 
 ### riir-ai (secrets — training)
 
 | File | Action | Description |
 |------|--------|-------------|
-| `crates/riir-gpu/src/game/replay.rs` | Edit | Replace `parse_replay()` stub with real JSONL parser |
-| `crates/riir-gpu/examples/train_bomber.rs` | Edit | Replace stub with actual wgpu training loop |
+| `riir-ai/crates/riir-gpu/src/game/replay.rs` | Edit | Replace `parse_replay()` stub with real JSONL parser |
+| `riir-train/crates/riir-train-gpu/examples/train_bomber.rs` | Edit | Replace stub with actual wgpu training loop |
 
 ---
 

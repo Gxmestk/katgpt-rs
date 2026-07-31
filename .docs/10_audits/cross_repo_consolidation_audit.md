@@ -27,24 +27,24 @@ However, unlike katgpt-rs pre-Plan-404, the oversized code is **not pure substra
 ### Findings
 
 **Cross-crate extraction debt: LOW.** Only ONE genuine extraction candidate exists:
-- `riir-games/src/meta_router.rs` (2,449 LOC) — Vortex meta-routing bandit, depends only on `fastrand`. Pristine deps. Could move to `riir-router` (fits its "inference routing" mandate) or its own `riir-meta-router` crate.
+- `crates/katgpt-attn/src/dash_attn/meta_router.rs` (2,449 LOC) — Vortex meta-routing bandit, depends only on `fastrand`. Pristine deps. Could move to `riir-router` (fits its "inference routing" mandate) or its own `riir-meta-router` crate.
 
 **File-hygiene debt: MODERATE.** 23 files break the 2048-line rule. Notable offenders:
-- `riir-gpu/src/forward.rs` — **7,894 LOC** (workspace's largest file; 20+ WGSL param structs)
-- `riir-engine/src/latent_functor/arithmetic.rs` — 3,667 LOC (6 functor primitives)
-- `riir-games/src/civ/skill.rs` — 3,556 LOC (skill YAML schema + tiers)
+- `riir-ai/crates/riir-gpu/src/forward/mod.rs` — **7,894 LOC** (workspace's largest file; 20+ WGSL param structs)
+- `crates/katgpt-percepta/src/wasm/interpreter/arithmetic.rs` — 3,667 LOC (6 functor primitives)
+- `seal-online-remaster/crates/seal-edge-worker/src/persistence/skill.rs` — 3,556 LOC (skill YAML schema + tiers)
 
 Most are mechanical internal-splits (carve WGSL param structs into `forward_params.rs`, split 6 functors into 6 files), not cross-crate extraction.
 
 **Cohesion debt: MODERATE, concentrated in `riir-games`.** The `civ/` submodule alone is 83 files / 43K LOC — bigger than 16 of the 18 crates. 27 top-level modules span civ, quest, plasma, worms, ruliology, etc. The real opportunity is **splitting `riir-games` along domain lines** (e.g. `riir-games-civ`, `riir-games-quest`).
 
-**DRY debt: LOW.** One proven intentional fork: `FrameSampler` duplicated between `riir-engine/src/frame/sampler.rs` and `riir-games/src/combat/sampler.rs` (games version is a perf-improved fork with `sim_tick_into` buffer reuse). Other apparent duplicates (`SpatialBelief`, `KgTriple`) are coincidental name collisions with different fields/semantics — NOT true duplication.
+**DRY debt: LOW.** One proven intentional fork: `FrameSampler` duplicated between `crates/katgpt-deprecated/src/alien_sampler/sampler.rs` and `crates/katgpt-deprecated/src/alien_sampler/sampler.rs` (games version is a perf-improved fork with `sim_tick_into` buffer reuse). Other apparent duplicates (`SpatialBelief`, `KgTriple`) are coincidental name collisions with different fields/semantics — NOT true duplication.
 
 ### Blockers
 
 1. **GPU substrate coupling.** Every oversized `riir-gpu` file depends on `crate::buffer` + `crate::kernels` + `crate::lora` + `crate::speft`. Four intertwined substrates — the riir-ai equivalent of katgpt-rs's `ForwardContext` linchpin.
 2. **`riir-engine` is already the root leaf.** Zero outbound riir deps. Its 65 top-level modules are each cohesive subsystems. No "trapped substrate at root" — the substrate IS the root.
-3. **Mod-cohesion, not file-bloat.** `latent_functor/arithmetic.rs` (3,667 LOC) isn't one god-file — it's six functor primitives alongside 11 siblings in a 12K-LOC cohesive module. The fix is per-primitive file-splitting, not crate extraction.
+3. **Mod-cohesion, not file-bloat.** `crates/katgpt-percepta/src/wasm/interpreter/arithmetic.rs` (3,667 LOC) isn't one god-file — it's six functor primitives alongside 11 siblings in a 12K-LOC cohesive module. The fix is per-primitive file-splitting, not crate extraction.
 
 ### Recommended next steps (deferred)
 
@@ -60,23 +60,23 @@ Tracked in riir-ai issues (to be created):
 
 ### Executive summary
 
-**At natural endgame for crate-level consolidation.** The neuron-db spin-off (Plan 001) is exemplary: `src/neuron_db/mod.rs` is an 85-LOC shim, `catchup/merkle.rs` correctly delegates generics to the leaf crate and retains chain-specifics. Zero files over the 2048-LOC limit.
+**At natural endgame for crate-level consolidation.** The neuron-db spin-off (Plan 001) is exemplary: `riir-chain/src/neuron_db/mod.rs` is an 85-LOC shim, `riir-chain/src/catchup/merkle.rs` correctly delegates generics to the leaf crate and retains chain-specifics. Zero files over the 2048-LOC limit.
 
 **One clear DRY violation found and FIXED:** ~895 LOC of acknowledged `cold_store` boilerplate duplicated across 4 `*_commit.rs` files.
 
 ### Findings
 
 **Spin-off cleanliness: EXEMPLARY.** Verified:
-- `src/neuron_db/mod.rs` — 85-LOC shim, single `pub use riir_neuron_db::*;` + the `LatCalWalletExt` trait (legitimately stays — references chain-side `LatCalMatrix`)
-- `src/catchup/merkle.rs` — re-exports generic `MerkleTree`/`MerkleProof` from leaf, retains `DataTier`/`build_*_root` (chain block-commitment concepts)
+- `riir-chain/src/neuron_db/mod.rs` — 85-LOC shim, single `pub use riir_neuron_db::*;` + the `LatCalWalletExt` trait (legitimately stays — references chain-side `LatCalMatrix`)
+- `riir-chain/src/catchup/merkle.rs` — re-exports generic `MerkleTree`/`MerkleProof` from leaf, retains `DataTier`/`build_*_root` (chain block-commitment concepts)
 - Zero duplication between riir-chain and riir-neuron-db
 
 **DRY violation (FIXED):** Four `*_commit.rs` files each carried ~210-230 LOC of near-identical `mod cold_store` boilerplate. Code comments said: *"Verbatim from ShardStore/KarcBatchStore/... — kept local rather than shared"*. Extracted into generic `ColdBatchStore<B: ColdBatch>` (see `issues/001_cold_batch_store_dry.md`).
 
 **Largest files (all under 2048 limit):**
-- `src/consensus/guard_pruner.rs` — 1,837 LOC (watch — approaching limit)
-- `crates/riir-chaind/src/mcp.rs` — 1,633 LOC (daemon, correctly placed)
-- `src/karc_commit.rs` — 1,463 LOC (was larger pre-extraction)
+- `riir-chain/src/consensus/guard_pruner.rs` — 1,837 LOC (watch — approaching limit)
+- `riir-chain/crates/riir-chaind/src/mcp/mod.rs` — 1,633 LOC (daemon, correctly placed)
+- `riir-chain/src/karc_commit.rs` — 1,463 LOC (was larger pre-extraction)
 
 ### Action taken
 
@@ -100,7 +100,7 @@ Tracked in riir-ai issues (to be created):
 - `.proofs/NeuronDbProof/Merkle/Soundness.lean` — 4 theorems (axiom-free under injectivity hypothesis)
 - Paired Rust spec-match tests: 17 tests across 3 files
 
-**One file over 2048 limit (FIXED):** `consolidation.rs` was 2,666 LOC but ~72% was inline test blocks (~1,911 LOC tests, ~755 LOC library code). Split into `consolidation/mod.rs` (786 LOC) + 6 test files. Commit `4bea4f0`. Test parity: 233/233 (default), 478/478 (all-features).
+**One file over 2048 limit (FIXED):** `consolidation.rs` was 2,666 LOC but ~72% was inline test blocks (~1,911 LOC tests, ~755 LOC library code). Split into `riir-neuron-db/src/consolidation/mod.rs` (786 LOC) + 6 test files. Commit `4bea4f0`. Test parity: 233/233 (default), 478/478 (all-features).
 
 **Minor doc drift:** `.proofs/README.md` says "15 Lean theorems" but `Layout.lean` alone has 16; actual total is ~28. Cosmetic, doesn't affect correctness.
 

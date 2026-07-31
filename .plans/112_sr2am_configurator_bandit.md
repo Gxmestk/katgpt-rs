@@ -10,12 +10,12 @@
 
 ### Phase 1: Configurator Types & Bandit Arm (Modelless)
 
-- [x] T1: Define `PlanningDecision` enum in `katgpt-core/src/types.rs`
+- [x] T1: Define `PlanningDecision` enum in `crates/katgpt-types/src/lib.rs`
   - `PlanNew` — reset tree, full budget allocation
   - `PlanExtend` — keep tree, add one depth level
   - `PlanSkip` — early exit, direct token sampling
 - [x] T2: Define `ConfiguratorContext` struct with `domain: usize` + `entropy_bin: usize`
-- [x] T3: Add `ConfiguratorBandit` struct in `src/pruners/configurator_bandit.rs`
+- [x] T3: Add `ConfiguratorBandit` struct in `crates/katgpt-pruners/src/configurator_bandit.rs`
   - Three arms: `PlanNew`, `PlanExtend`, `PlanSkip`
   - UCB1 selection from existing bandit infrastructure
   - Q-values keyed by `(domain, entropy_bin)` — context-aware arm selection
@@ -73,12 +73,12 @@
 
 ### Phase 5: Horizon-Deepening Reward for GZeroLoop (Model-Based Bridge) ✅
 
-- [x] T19: Add `plan_depth_reward` to `GZeroLoop` reward shaping ✅ `riir-ai/crates/riir-gpu/src/loss_grpo.rs`
+- [x] T19: Add `plan_depth_reward` to `GZeroLoop` reward shaping ✅ `riir-train/crates/riir-train-gpu/src/loss_grpo.rs`
   - `plan_depth_reward(planned, actual_depth, max_depth, alpha)` — returns 0.0 when not planned
   - `grpo_reward_with_planning()` — extends `grpo_reward` with horizon bonus
   - `GrpoConfig::horizon_reward_alpha` field (default: 0.0 = disabled)
   - 10 unit tests: full/half depth, not planned, alpha=0, max_depth=0, exceeds max, integration tests
-- [x] T20: Add `ConfiguratorDecisionStats` tracking in `GZeroLoop` round metrics ✅ `riir-ai/crates/riir-gpu/src/gzero_loop.rs`
+- [x] T20: Add `ConfiguratorDecisionStats` tracking in `GZeroLoop` round metrics ✅ `riir-train/crates/riir-train-gpu/src/gzero_loop.rs`
   - `ConfiguratorDecisionStats` struct: plan_new_count, plan_extend_count, plan_skip_count, avg_plan_depth, max_plan_depth
   - `planned_count()`, `total()`, `skip_rate()` helper methods
   - `RoundMetrics::configurator_stats` field behind `#[cfg(feature = "sr2am_configurator")]`
@@ -244,13 +244,13 @@ Run GZeroLoop 100 rounds with/without reward shaping:
 
 | File | Change | Lines (est.) |
 |------|--------|-------------|
-| `crates/katgpt-core/src/types.rs` | `PlanningDecision`, `ConfiguratorContext` | +36 |
+| `crates/katgpt-types/src/lib.rs` | `PlanningDecision`, `ConfiguratorContext` | +36 |
 | `crates/katgpt-core/src/lib.rs` | Feature-gated re-exports | +3 |
 | `crates/katgpt-core/Cargo.toml` | Feature gate | +1 |
 | `src/pruners/mod.rs` | Add `configurator_bandit` module + re-exports | +6 |
-| `src/pruners/configurator_bandit.rs` | `ConfiguratorBandit` struct + impl + tests | +570 |
-| `crates/katgpt-core/src/types.rs` | `InferenceResult` addition | +3 |
-| `src/feedback.rs` | `planning_decision: None` in test structs | +6 |
+| `crates/katgpt-pruners/src/configurator_bandit.rs` | `ConfiguratorBandit` struct + impl + tests | +570 |
+| `crates/katgpt-types/src/lib.rs` | `InferenceResult` addition | +3 |
+| `crates/katgpt-deprecated/src/feedback.rs` | `planning_decision: None` in test structs | +6 |
 | `src/speculative/dd_tree.rs` | `entropy_truncate_horizon` + `build_inference_result` update | +29 |
 | `src/speculative/mod.rs` | Re-export `entropy_truncate_horizon` | +2 |
 | `Cargo.toml` | Feature gate + default/full | +3 |

@@ -6,12 +6,13 @@
 > **Related Research:** 113 (NITP representation geometry — ships `effective_rank`), 123 (sigmoid margin), 219 (DEC), 296 (Stokes vocab crosswalk), 300 (closed-unit compaction rubric)
 > **Related Plans:** 151 (NITP geometry diagnostics — ships `effective_rank`), 251/252 (DEC operators), 303 (latent_functor quality gate — ships `within_class_adjacency`), 336 (committed personality blend)
 > **Classification:** Public
+> **PASS-Redirects (synthesis):** Gong et al. [arXiv:2607.22531 "Twins: Learn to Predict Unified Representations with Focal Loss"] — PASS. The paper's PCA-under-conditioning analysis of SigLIP (condition-aligned, collapses to low-dim) vs VAE (condition-independent, high-dim) is exactly the within-class-vs-global effective-rank contrast this primitive computes; the Twins representation (channel-wise concat of ViT+VAE for image diffusion) + Focal Loss training reweighting are both training-only and require image-diffusion infrastructure (DiT/VAE/ViT/ImageNet) we do not ship. Diagnostic stage → covered here + Research 279 (intrinsic dim) + Research 409 (Two-NN); training stage → riir-train (image diffusion, out of scope).
 
 ---
 
 ## TL;DR
 
-A 73-page MITRE/NCI survey/tutorial on Graph Neural Networks. The bulk of the paper — message-passing encoders (GCN / GraphSAGE / GATv2), the encoder-decoder training framework, hyperparameter/architecture tuning, RevGNN comparison, LLM-based explainability — is **training-only** (→ riir-train, out of scope) or **already pervasive** in our codebase (the `sigmoid(z_i^T z_j)` link-prediction decoder is the CLR verifier, bridge attention, and BCKVSS affinity, all over the repo). **One genuinely novel modelless primitive survives distillation: the Within-Class Effective Rank** (entropy-based effective rank of the *within-class residual* covariance, claimed novel by the authors) — and it is a **fusion of two shipped halves** (`data_probe/geometry.rs::effective_rank` × `latent_functor/quality_gate.rs::within_class_adjacency`) that have never been combined. A second novel metric, **MSBE (Message Squeeze per Bridge Edge)**, is model-aware (Jacobian-based) and has a modelless structural analog already shipped (DEC `exterior_derivative` boundary operator), so it is a Gain for offline zone-topology analysis only.
+A 73-page MITRE/NCI survey/tutorial on Graph Neural Networks. The bulk of the paper — message-passing encoders (GCN / GraphSAGE / GATv2), the encoder-decoder training framework, hyperparameter/architecture tuning, RevGNN comparison, LLM-based explainability — is **training-only** (→ riir-train, out of scope) or **already pervasive** in our codebase (the `sigmoid(z_i^T z_j)` link-prediction decoder is the CLR verifier, bridge attention, and BCKVSS affinity, all over the repo). **One genuinely novel modelless primitive survives distillation: the Within-Class Effective Rank** (entropy-based effective rank of the *within-class residual* covariance, claimed novel by the authors) — and it is a **fusion of two shipped halves** (`crates/katgpt-core/src/data_probe/geometry.rs::effective_rank` × `riir-ai/crates/riir-engine/src/latent_functor/quality_gate.rs::within_class_adjacency`) that have never been combined. A second novel metric, **MSBE (Message Squeeze per Bridge Edge)**, is model-aware (Jacobian-based) and has a modelless structural analog already shipped (DEC `exterior_derivative` boundary operator), so it is a Gain for offline zone-topology analysis only.
 
 **Distilled for katgpt-rs (modelless, inference-time):**
 - **GOAT** — Within-Class Effective Rank: `effective_rank` applied to the within-class residual covariance matrix. Fuses `data_probe::effective_rank` with the class-conditioning machinery of `latent_functor::quality_gate`. Modelless collapse diagnostic for any class-labeled latent state (NPC personalities, HLA emotion classes, archetype blends, KG-cluster memberships).
@@ -82,7 +83,7 @@ Paper §4.2 eq. (37): `Dec(z_i, z_j) = sigmoid(z_i^T z_j)`, trained with binary 
 | Within-Class Effective Rank (entropy rank on within-class residual covariance) | `effective_rank()` ships in `crates/katgpt-core/src/data_probe/geometry.rs` (Roy & Vetterli 2007, applied to **raw** hidden states — no class conditioning). Separately, `within_class_adjacency` + `between_class_adjacency` + `score_direction` ship in `riir-ai/crates/riir-engine/src/latent_functor/quality_gate.rs` (Dirichlet energy over class-conditioned adjacency, Plan 303 T5.1). **The two halves have never been fused**: nowhere do we compute `effective_rank` of the *within-class residual* covariance matrix. | **GOAT fusion** — novel combination of two shipped primitives |
 | MSBE (Jacobian influence ÷ bridge-edge count) | None. The DEC `exterior_derivative` (in `katgpt-dec`) is a *structural* coboundary operator (counts boundary cells), not a model-aware Jacobian-influence metric. `katgpt-core::roofline` and `ane_roofline` compute compute/memory bottlenecks, a different concept. | **Gain** — novel primitive, but model-aware (needs a trained Jacobian); structural analog ships |
 | NCMq0.05 (5th-pct margin in whitened space) | `nearest_centroid_accuracy` in `bench_319_geometric_product_goat.rs` and `SchemaCentroidCache` (Plan 237) compute centroids; the *percentile margin* in whitened space is not shipped. | **Gain** — offline decision-boundary diagnostic |
-| `sigmoid(z_i^T z_j)` link decoder | Pervasive: `katgpt-claim/src/clr/verifier.rs::SigmoidProjectionVerifier` (Plan 284 T1.5), `katgpt-attn/src/rat_bridge/{bridge,fuse,vortex}.rs` (bridge gate), `katgpt-band/src/bckvss.rs::perplexity_proxy`. The paper's eq. (37) is literally our CLR verdict function. | **PASS** — already pervasive |
+| `sigmoid(z_i^T z_j)` link decoder | Pervasive: `crates/katgpt-claim/src/clr/verifier.rs::SigmoidProjectionVerifier` (Plan 284 T1.5), `katgpt-attn/src/rat_bridge/{bridge,fuse,vortex}.rs` (bridge gate), `crates/katgpt-band/src/bckvss.rs::perplexity_proxy`. The paper's eq. (37) is literally our CLR verdict function. | **PASS** — already pervasive |
 | Modularity community detection | None. | **Gain** — not shipped, but orthogonal to current pillars |
 | GCN/GraphSAGE/GATv2 message passing | Out of scope — training machinery → riir-train | **PASS** → riir-train |
 
@@ -118,7 +119,7 @@ pub fn within_class_effective_rank(
 ) -> f32 { … }
 ```
 
-Implementation is `effective_rank` with step 2 (centering) replaced by class-mean centering. The covariance is `Σ_w = (1/Σ(n_c−1)) Σ_c Σ_{i∈S_c} (x_i − μ_c)(x_i − μ_c)^T`. Reuses the existing Jacobi eigensolver in `data_probe/geometry.rs`. Zero new dependencies. ~40 lines.
+Implementation is `effective_rank` with step 2 (centering) replaced by class-mean centering. The covariance is `Σ_w = (1/Σ(n_c−1)) Σ_c Σ_{i∈S_c} (x_i − μ_c)(x_i − μ_c)^T`. Reuses the existing Jacobi eigensolver in `crates/katgpt-core/src/data_probe/geometry.rs`. Zero new dependencies. ~40 lines.
 
 **Closest cousins (across all five repos):**
 - `katgpt-rs/.research/113` (NITP) — the parent note that motivated `effective_rank`. Does not mention class conditioning.
@@ -177,7 +178,7 @@ Q2 fails → **GOAT, not Super-GOAT.** No private guide required.
 
 **Status:** COMPLETE — all gates PASS. Plan file: `katgpt-rs/.plans/415_within_class_effective_rank.md`.
 
-**Correction from the original sketch below:** `data_probe/geometry.rs` is gated `sink_aware_attn` (NOT default-on — the original sketch was wrong). The primitive inherits that gate, ships opt-in alongside its sibling `effective_rank`, and requires no Cargo.toml change. No promotion is attempted (the parent Plan 287 G2/G3 gate that would promote `sink_aware_attn` is still pending).
+**Correction from the original sketch below:** `crates/katgpt-core/src/data_probe/geometry.rs` is gated `sink_aware_attn` (NOT default-on — the original sketch was wrong). The primitive inherits that gate, ships opt-in alongside its sibling `effective_rank`, and requires no Cargo.toml change. No promotion is attempted (the parent Plan 287 G2/G3 gate that would promote `sink_aware_attn` is still pending).
 
 **Original sketch (preserved for reference):**
 
@@ -197,28 +198,30 @@ the shipped `effective_rank` (class-agnostic) with the shipped
 `within_class_adjacency` machinery (currently used for Dirichlet-energy
 scoring). Modelless collapse diagnostic for any class-labeled latent state.
 
+> **Implementation Status (2026-07-11):** All Phase 1 + Phase 2 tasks below implemented via [Plan 415](../.plans/415_within_class_effective_rank.md) — ✅ Complete (8/8 tasks done, all gates PASS). The unchecked `- [ ]` markers below are stale; see Plan 415 for completion records.
+
 ## Phase 1 — Primitive (CORE)
-- [ ] T1.1 Add `within_class_effective_rank` to `data_probe/geometry.rs`.
+- [x] T1.1 Add `within_class_effective_rank` to `crates/katgpt-core/src/data_probe/geometry.rs`.
       Reuse the Jacobi eigensolver; replace global-mean centering with
       class-mean centering. ~40 lines.
-- [ ] T1.2 Unit tests: (a) identical-class degenerate case returns ~0;
+- [x] T1.2 Unit tests: (a) identical-class degenerate case returns ~0;
       (b) two well-separated isotropic classes returns ~d; (c) two collapsed
       classes (each rank-1) returns ~1; (d) matches the shipped
       `effective_rank` when all labels are identical (degenerate single-class).
-- [ ] T1.3 Add `WithinClassGeometryReport { within_class_erank, n_classes,
+- [x] T1.3 Add `WithinClassGeometryReport { within_class_erank, n_classes,
       global_erank_for_contrast }` and a `within_class_geometry_report`
       convenience function.
 
 ## Phase 2 — GOAT gate
-- [ ] T2.1 G1 (correctness): synthetic two-class case, verify r_WC ∈ [1, d−1]
+- [x] T2.1 G1 (correctness): synthetic two-class case, verify r_WC ∈ [1, d−1]
       and monotone in within-class variance.
-- [ ] T2.2 G2 (non-redundancy vs shipped `effective_rank`): construct a case
+- [x] T2.2 G2 (non-redundancy vs shipped `effective_rank`): construct a case
       where global `effective_rank` is high but `within_class_effective_rank`
       is low (between-class variance dominates, within-class collapsed) —
       prove the two metrics disagree.
-- [ ] T2.3 G3 (latency): sub-µs per call on dim=64, n=256, C=4 (reuse the
+- [x] T2.3 G3 (latency): sub-µs per call on dim=64, n=256, C=4 (reuse the
       existing Jacobi hot path).
-- [ ] T2.4 G4 (alloc-free hot path): `within_class_effective_rank_into` with
+- [x] T2.4 G4 (alloc-free hot path): `within_class_effective_rank_into` with
       caller-supplied scratch, mirroring the existing `effective_rank` pattern.
 ```
 

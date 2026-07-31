@@ -3,9 +3,12 @@
 > **Source:** [ELT: Elastic Looped Transformers for Visual Generation](https://arxiv.org/pdf/2604.09168) — Sahil Goyal, Swayam Agrawal, Gautham Govind, Anil Prateek, Jain Sujoy Paul, Aditya Kusupati (Google), arxiv 2604.09168v2, 13 Apr 2026
 > **Date:** 2026-06-20
 > **Status:** Done
+> **Validation:** Any-Time property **empirically validated** 2026-07-16 (`tests/issue_156_anytime_lt2_poc.rs` — permanent regression guard). All 4 gate regimes exhibit monotonic KL decrease as R → R_max with random untrained weights — structural Any-Time holds WITHOUT the ILSD training ELT requires. (Issue 156 resolved and removed per noise-reduction rule; full PoC results table preserved in this note's git history + the test file.)
 > **Related Research:** 073 (LT2 — architecture we already ship), 097 (Training-Free Loop), 114 (AMUSE Anytime Muon), 148 (HydraBudget early_exit_layer), 051 (Mosaic of Small Elastic Models)
 > **Related Plans:** 108 (LT2 Looped Pipeline — ✅ shipped, GOAT 8/8, default-on), 136 (Training-Free Loop Wrapper — ✅ shipped), 212 (Collapse-Aware early exit), 231 (PathwayTracker stability early exit), 283 (Self-Advantage Gate)
-> **Cross-ref (riir-ai):** Research 128 (Zone-Density Dynamic Functor Gating — elastic budget per zone), Research 136 (Per-NPC Runtime Test-Time Scaling Guide), latent_functor/reestimation.rs (`set_active_budget`, `set_zone_gating`)
+> **PASS-Redirects (synthesis):** Loopie [arXiv:2607.16051 "Loop the Loopies!"] — training-only layer-loop ordering variant, no inference-quality evidence; we already ship elastic any-time loop counts via LT2 + ReestimationScheduler.
+> **PASS-Redirects (synthesis):** MoR — Mixture-of-Recursions [arXiv:2507.10524 "Mixture-of-Recursions: Learning Dynamic Recursive Depths for Adaptive Token-Level Computation"] (Bae et al., KAIST/Google, Jul 2025) — extends LT2's weight-shared looping with per-TOKEN adaptive recursion depth via a trained router (vs our per-DISPATCH elastic loop_count via ELT/Issue 035/GainCostHalter). The test-time scaling finding (§5.3: more recursion steps at inference improves log-likelihood) is the per-token analog of our per-dispatch Any-Time property — but requires a MoR-pretrained model with a co-trained router. §3.5 Path 0 fails (router θ is trained, not closed-form). Router training + MoR pretraining → **riir-train**; inference-time Any-Time is already shipped via LT2 + Issue 035 elastic-loop-override + GainCostLoopHalter (Plan 304).
+> **Cross-ref (riir-ai):** Research 128 (Zone-Density Dynamic Functor Gating — elastic budget per zone), Research 136 (Per-NPC Runtime Test-Time Scaling Guide), riir-ai/crates/riir-engine/src/latent_functor/reestimation/mod.rs (`set_active_budget`, `set_zone_gating`)
 > **Classification:** Public
 
 ---
@@ -28,7 +31,7 @@ A composite block `g_Θ` of N unique transformer layers is applied L times:
 F_(N,L)(x) = g_Θ^L(x)   // L loops, N unique layers, effective depth N×L
 ```
 
-Parameter count is bounded by N; depth D = N×L scales with L. This is **exactly `LoopMode::WeightShared { loop_count }`** in katgpt-rs (`crates/katgpt-core/src/types.rs`), shipped in Plan 108, default-on, GOAT 8/8. ELT adds nothing new architecturally over our LT2.
+Parameter count is bounded by N; depth D = N×L scales with L. This is **exactly `LoopMode::WeightShared { loop_count }`** in katgpt-rs (`crates/katgpt-types/src/lib.rs`), shipped in Plan 108, default-on, GOAT 8/8. ELT adds nothing new architecturally over our LT2.
 
 ### 1.2 Intra-Loop Self Distillation (ILSD) — the training contribution → riir-train
 
@@ -68,7 +71,7 @@ On UCF-101 (N=6, L_max=4), peak FVD 69.20 occurs at L=6 (not L_max=4). ILSD regu
 | Hybrid dispatch (full + linear interleave) | `HybridPattern::Interleave { full_ratio }` + AHLA | Plan 108, `forward_looped()` in transformer.rs |
 | Per-loop residual gate ρ_τ | `ResidualGate` (zero-init) | Plan 108 |
 | SDPA output gate | `SdpaOutputGate` (zero-init sigmoid) | Plan 108 |
-| Elastic budget per zone | `ReestimationScheduler::set_active_budget`, `set_zone_gating` | riir-ai/crates/riir-engine/src/latent_functor/reestimation.rs (lines 567–594) |
+| Elastic budget per zone | `ReestimationScheduler::set_active_budget`, `set_zone_gating` | riir-ai/crates/riir-engine/src/latent_functor/reestimation/mod.rs (lines 567–594) |
 | Zone-density → budget mapping | `ZoneGatingProfile { tiers }` — `I_d → (τ, β, reest_budget)` | riir-ai/.research/128 (default-on for `latent_functor`) |
 | Per-NPC compute dispatch | Per-NPC saCLR cycle, freeze/thaw per NPC | riir-ai/.research/136 |
 | Stability-based early exit | `PathwayTracker` (Plan 231, GOAT 7/7, default-on) | katgpt-rs/.benchmarks/231_pathway_tracker_goat.md |
@@ -83,7 +86,7 @@ The ELT architecture is **subsumed by LT2**. The Any-Time inference property is 
 
 ELT's strongest transferable claim is conceptual: **"intermediate loop states are themselves valid belief states, not just intermediate computations to be discarded on early exit."** In our stack, this reframes two existing kernels:
 
-- **HLA evolution** (`katgpt-rs/crates/katgpt-core/src/sense/reconstruction.rs` — `evolve_hla`): the recurrent belief-state kernel. ELT framing: any prefix of `evolve_hla` applications is a valid belief state, not just a step toward one. This justifies **elastic HLA depth** — exit early when belief stabilizes (which PathwayTracker already detects, but the framing as "belief-valid prefix" is new vocabulary).
+- **HLA evolution** (`katgpt-rs/crates/katgpt-sense/src/reconstruction.rs` — `evolve_hla`): the recurrent belief-state kernel. ELT framing: any prefix of `evolve_hla` applications is a valid belief state, not just a step toward one. This justifies **elastic HLA depth** — exit early when belief stabilizes (which PathwayTracker already detects, but the framing as "belief-valid prefix" is new vocabulary).
 - **latent_functor applications** (`riir-ai/crates/riir-engine/src/latent_functor/`): functor application is by definition weight-shared block reuse. ELT framing: any prefix of functor applications is a valid operator-valued latent state. This aligns with the `set_active_budget` mechanism but adds the claim that **the prefix-state itself is a valid functor**, not just a budget-truncated approximation.
 
 This is a **reframing**, not a new mechanism — the kernels already produce intermediate states; we just don't currently market them as "valid belief states in their own right."
@@ -144,4 +147,4 @@ The closest cousins and the proposed combination:
 
 ## TL;DR
 
-ELT = weight-shared transformer loops (architecture we already ship as LT2/Plan 108) + Intra-Loop Self Distillation (training algorithm → riir-train) → Any-Time inference (one artifact serves multiple compute budgets). Three-layer prior-art check confirms our stack already covers the architecture (LT2 GOAT 8/8 default-on), the elastic budget per zone (`latent_functor/reestimation.rs` + Research 128), and per-NPC dispatch (Research 136). The only genuinely missing piece — per-dispatch elastic `loop_count` on the LT2 forward path driven by existing budget signals — is a small coordination layer, not a new capability class. **Verdict: Gain.** Research note recorded for the Any-Time vocabulary and L_min floor concept. ILSD training method routed to riir-train (not distilled here). No plan, no riir-ai guide, no Super-GOAT claim — Q1 (no prior art) decisively fails.
+ELT = weight-shared transformer loops (architecture we already ship as LT2/Plan 108) + Intra-Loop Self Distillation (training algorithm → riir-train) → Any-Time inference (one artifact serves multiple compute budgets). Three-layer prior-art check confirms our stack already covers the architecture (LT2 GOAT 8/8 default-on), the elastic budget per zone (`riir-ai/crates/riir-engine/src/latent_functor/reestimation/mod.rs` + Research 128), and per-NPC dispatch (Research 136). The only genuinely missing piece — per-dispatch elastic `loop_count` on the LT2 forward path driven by existing budget signals — is a small coordination layer, not a new capability class. **Verdict: Gain.** Research note recorded for the Any-Time vocabulary and L_min floor concept. ILSD training method routed to riir-train (not distilled here). No plan, no riir-ai guide, no Super-GOAT claim — Q1 (no prior art) decisively fails.

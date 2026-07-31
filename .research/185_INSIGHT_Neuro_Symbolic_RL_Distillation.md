@@ -291,11 +291,11 @@ Parameter Calibration         →   RewardGatedCalibrator (formalized)
 
 | File | Action | Purpose |
 |------|--------|---------|
-| `src/pruners/symbolic_expression.rs` | Create | `SymbolicExpression`, `SymbolicExpressionFitter`, `BasisFn` |
-| `src/pruners/expression_pruner.rs` | Create | `ExpressionPruner<P>` ScreeningPruner impl |
-| `src/pruners/concept_grounding.rs` | Create | `ConceptGrounding` trait, `TemplateGrounding`, `PolicyExplanation` |
-| `src/pruners/decision_explainer.rs` | Create | `DecisionExplainer` trait, `PerturbationExplainer` |
-| `src/pruners/reward_calibrator.rs` | Create | `RewardGatedCalibrator<P>`, `CalibrationStep` |
+| `crates/katgpt-pruners/src/symbolic_expression.rs` | Create | `SymbolicExpression`, `SymbolicExpressionFitter`, `BasisFn` |
+| `crates/katgpt-pruners/src/expression_pruner.rs` | Create | `ExpressionPruner<P>` ScreeningPruner impl |
+| `crates/katgpt-pruners/src/concept_grounding.rs` | Create | `ConceptGrounding` trait, `TemplateGrounding`, `PolicyExplanation` |
+| `crates/katgpt-pruners/src/decision_explainer.rs` | Create | `DecisionExplainer` trait, `PerturbationExplainer` |
+| `crates/katgpt-pruners/src/reward_calibrator.rs` | Create | `RewardGatedCalibrator<P>`, `CalibrationStep` |
 | `src/pruners/mod.rs` | Modify | Add new modules behind `insight_explain` feature gate |
 | `Cargo.toml` | Modify | Add `insight_explain` feature with sub-gates |
 | `examples/insight_demo.rs` | Create | Demonstrates all four fusions end-to-end |
@@ -304,13 +304,13 @@ Parameter Calibration         →   RewardGatedCalibrator (formalized)
 
 | File | Relevance |
 |------|-----------|
-| `src/pruners/bandit.rs` | `BanditPruner<P>` — F1 fitting uses bandit traces |
-| `src/pruners/absorb_compress.rs` | `AbsorbCompressLayer<P>` — F4 extends to continuous params |
-| `src/pruners/hot_swap.rs` | `HotSwapPruner<P>` — F4 hot-swaps calibrated parameters |
-| `src/pruners/trial_log.rs` | `TrialLog` — F2/F3 explanations logged to JSONL |
-| `src/pruners/regression.rs` | `RegressionSuite` — F4 verification |
+| `crates/katgpt-ruliology/src/bandit.rs` | `BanditPruner<P>` — F1 fitting uses bandit traces |
+| `crates/katgpt-pruners/src/absorb_compress.rs` | `AbsorbCompressLayer<P>` — F4 extends to continuous params |
+| `crates/katgpt-pruners/src/hot_swap.rs` | `HotSwapPruner<P>` — F4 hot-swaps calibrated parameters |
+| `crates/katgpt-pruners/src/trial_log.rs` | `TrialLog` — F2/F3 explanations logged to JSONL |
+| `crates/katgpt-pruners/src/regression.rs` | `RegressionSuite` — F4 verification |
 | `src/pruners/mod.rs` | Module registration |
-| `crates/katgpt-core/src/traits.rs` | `ScreeningPruner`, `ConstraintPruner`, `SpeculativeGenerator`, `GameState`, `StateHeuristic` |
+| `crates/katgpt-core/src/traits/mod.rs` | `ScreeningPruner`, `ConstraintPruner`, `SpeculativeGenerator`, `GameState`, `StateHeuristic` |
 | `src/speculative/types.rs` | `DDTreeBranchCache` — F1/F3 trace source |
 
 ---

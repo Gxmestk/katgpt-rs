@@ -11,34 +11,34 @@
 ## Tasks
 
 ### Phase 1: α-entmax Kernel (CPU)
-- [x] **T1**: Create `src/dash_attn/mod.rs` — module index, re-exports, feature gate `#[cfg(feature = "dash_attn")]`
-- [x] **T2**: Implement `entmax_1p5()` in `src/dash_attn/entmax.rs` — α=1.5 special case: `p_i = max(0, 0.5*s_i - τ)²`. Two-pass threshold finding (sort + cumulative sum). Returns sparse weights and threshold τ. Unit tests: known inputs → exact zeros, sum=1.0, non-negative
+- [x] **T1**: Create `crates/katgpt-attn/src/dash_attn/mod.rs` — module index, re-exports, feature gate `#[cfg(feature = "dash_attn")]`
+- [x] **T2**: Implement `entmax_1p5()` in `crates/katgpt-attn/src/dash_attn/entmax.rs` — α=1.5 special case: `p_i = max(0, 0.5*s_i - τ)²`. Two-pass threshold finding (sort + cumulative sum). Returns sparse weights and threshold τ. Unit tests: known inputs → exact zeros, sum=1.0, non-negative
 - [x] **T3**: Implement `entmax_support()` — extract active indices from entmax weights. Returns `Vec<usize>` of positions where weight > 0
 - [x] **T4**: Implement `entmax_gqa_aggregate()` — average entmax probabilities across query heads in same GQA group. Input: `[n_query_heads][n_chunks]`, output: `[n_kv_heads][n_chunks]`. Zeros propagate (non-dispersive)
-- [x] **T5**: Add `DashAttnConfig` to `katgpt-core/src/types.rs` — `chunk_size: usize` (64), `alpha: f32` (1.5), `scaling_factor: f32` (1.0), `sigma: f32` (1e6), `estimate_diagonal: bool` (true)
+- [x] **T5**: Add `DashAttnConfig` to `crates/katgpt-types/src/lib.rs` — `chunk_size: usize` (64), `alpha: f32` (1.5), `scaling_factor: f32` (1.0), `sigma: f32` (1e6), `estimate_diagonal: bool` (true)
 - [x] **T6**: Register `#[cfg(feature = "dash_attn")]` gate in `Cargo.toml` features + `pub mod dash_attn` in `lib.rs`
 
 ### Phase 2: Learned Chunk Summaries
-- [x] **T7**: Create `src/dash_attn/chunk_summary.rs` — `ChunkSummaryQuery` struct with `head_cls: Vec<f32>` (shape `[n_kv_head, head_dim]`)
+- [x] **T7**: Create `crates/katgpt-attn/src/dash_attn/chunk_summary.rs` — `ChunkSummaryQuery` struct with `head_cls: Vec<f32>` (shape `[n_kv_head, head_dim]`)
 - [x] **T8**: Implement `summarize_chunk()` — local SDPA: `k̄_c = softmax(q̄ · K_chunk / √d) · K_chunk`. At zero-init: returns mean pooling. After training: weighted attention
 - [x] **T9**: Implement `ChunkSummaryCache` — stores completed chunk summaries `[n_chunks, n_kv_head, head_dim]`. Append-only during decode. `allocate()`, `append()`, `view()` methods
 - [x] **T10**: Unit tests: verify zero-init → mean pooling equivalence, trained → non-uniform weighting
 
 ### Phase 3: Entmax Block Routing
-- [x] **T11**: Create `src/dash_attn/routing.rs` — `score_blocks_entmax()` function
+- [x] **T11**: Create `crates/katgpt-attn/src/dash_attn/routing.rs` — `score_blocks_entmax()` function
 - [x] **T12**: Implement routing pipeline: (1) compute chunk logits `z = q · k̄ / √d`, (2) apply scaling factor γ, (3) α-entmax routing, (4) GQA aggregation, (5) extract support + compute routing bias `d_{i,j} = (log w - μ) / σ`
 - [x] **T13**: Implement `compute_routing_bias()` — produces additive attention bias for Stage 2. Returns (active_indices, bias_per_chunk). μ = mean of log weights on support
 - [x] **T14**: Unit tests: verify adaptive support (variable number of active chunks per query), routing bias correctness, GQA aggregation preserves sparsity
 
 ### Phase 4: Forward Integration
-- [x] **T15**: Create `src/dash_attn/forward.rs` — `forward_dash_attn_prefill()` for prefill mode
+- [x] **T15**: Create `crates/katgpt-attn/src/dash_attn/forward.rs` — `forward_dash_attn_prefill()` for prefill mode
 - [x] **T16**: Implement prefill flow: (1) chunk summarization over K, (2) entmax routing, (3) sparse attention on active chunks with routing bias, (4) store chunk summaries to cache
 - [x] **T17**: Implement `forward_dash_attn_decode()` — reuse cached chunk summaries, only score against cached summaries + current diagonal chunk
-- [x] **T18**: Add `AttentionMode::DashAttn` variant to `katgpt-core/src/types.rs` — dispatches to `forward_dash_attn_prefill` / `forward_dash_attn_decode`
+- [x] **T18**: Add `AttentionMode::DashAttn` variant to `crates/katgpt-types/src/lib.rs` — dispatches to `forward_dash_attn_prefill` / `forward_dash_attn_decode`
 - [x] **T19**: Wire into `transformer.rs` forward dispatch — `match config.attention_mode { DashAttn => ... }`
 
 ### Phase 5: PFlash Integration (Drop-in Replacement)
-- [x] **T20**: Create `block_select_entmax()` alternative to existing `block_select()` in `speculative/prefill.rs` — Feature-gated `#[cfg(feature = "dash_attn")]`, uses `entmax_1p5` + `entmax_support` for adaptive support selection, retains sink/window/causal rules
+- [x] **T20**: Create `block_select_entmax()` alternative to existing `block_select()` in `src/speculative/prefill.rs` — Feature-gated `#[cfg(feature = "dash_attn")]`, uses `entmax_1p5` + `entmax_support` for adaptive support selection, retains sink/window/causal rules
 - [x] **T21**: Benchmark: PFlash top-k vs PFlash entmax at same sparsity target — measure (a) chunk selection quality (NIAH retrieval), (b) selection time (µs), (c) adaptive support variance (min/max/mean active chunks)
 - [x] **T22**: Benchmark: learned chunk summary vs mean-K scoring — measure NIAH retrieval quality with synthetic data
 
@@ -69,14 +69,14 @@ src/dash_attn/                    — Feature-gated module: #[cfg(feature = "das
 src/speculative/
 └── prefill.rs                    — block_select_entmax() alternative (T20)
 
-katgpt-core/src/types.rs
+crates/katgpt-types/src/lib.rs
 ├── DashAttnConfig struct         — chunk_size, alpha, scaling_factor, sigma, estimate_diagonal
 └── AttentionMode::DashAttn       — new variant
 
-src/transformer.rs
+crates/katgpt-percepta/src/transformer.rs
 └── ForwardContext                 — dispatch DashAttn variant
 
-src/benchmark.rs                  — Phase 6 benchmarks
+src/benchmark/mod.rs                  — Phase 6 benchmarks
 ```
 
 ---

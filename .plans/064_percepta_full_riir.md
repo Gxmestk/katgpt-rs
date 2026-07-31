@@ -1,5 +1,11 @@
 # Plan 064: Percepta Full RIIR — transformer-vm in Rust
 
+> **Note on file paths (2026-07-18):** Some `*.rs` paths in this document
+> reference modules that were renamed, moved, or never landed under the
+> exact name shown. They are preserved as a **historical record** of the
+> original design intent; consult the current crate layout for the live
+> location.
+
 > **Status**: ✅ Core + Rust→WASM pipeline complete — TG-A through TG-K + TG-L done. K1 deferred (C examples). F6/H5/H6/I4 completed: 18 integration tests. i64→i32 lowering enables Rust WASM backend. Futamura specialization wired up (Runner::specialize). Comparison tasks (G5, J9) deferred to Percepta Docker environment.
 >
 > **MILP Solver Upgrade (Issue 003)**: Swapped `microlp` → **HiGHS** (production-grade, 30s timeout). Full WASM interpreter graph (216 dims, 189 ops, 7 layers) now solves in **1.13s** (was ∞ hang). `percepta_05_pipeline` §2 runs full graph end-to-end: d_model=152, 1.08M params, 2,233 tok/s.
@@ -7,7 +13,6 @@
 > **Final Status**: All tasks addressed. G5, J9 deferred (need Percepta Docker for C-compiled WASM comparison). K1 deferred (C examples are language-agnostic, out of RIIR scope).
 >
 > **WASM Strategy**: Rust-first — write Rust programs → `rustc --target wasm32-unknown-unknown` → feed into percepta pipeline. `compile_rust_to_wasm()` + `rust_template()` + `lower_i64_ops()` handle Rust's WASM backend differences. C→WASM comparison deferred: copy `.wasm` binaries out of Percepta's Docker environment for 1:1 reference matching later.
-
 Complete Rust port of Percepta's `transformer-vm` (Apache-2.0 © Percepta). Distill ~9K lines of Python+C++ into idiomatic Rust under MIT. Prove Rust is better. Show them what's possible.
 
 **Master plan for all Percepta distillation.** Plan 063 (CHT) is Task Group A within this plan.
@@ -24,23 +29,23 @@ Complete Rust port of Percepta's `transformer-vm` (Apache-2.0 © Percepta). Dist
 
 | Source File | Lines | What | Target Rust File |
 |-------------|-------|------|-----------------|
-| `attention/hull2d_cht.h` | 419 | CHT data structure (upper+lower hull, HullMeta) | `src/percepta/cht.rs` |
+| `attention/hull2d_cht.h` | 419 | CHT data structure (upper+lower hull, HullMeta) | `crates/katgpt-percepta/src/cht.rs` |
 | `attention/hull_cache.py` | 44 | Python wrapper for CHT | (merged into cht.rs) |
-| `attention/standard_cache.py` | 32 | O(n) softmax reference | `src/percepta/standard_cache.rs` |
+| `attention/standard_cache.py` | 32 | O(n) softmax reference | `crates/katgpt-percepta/src/standard_cache.rs` |
 | `graph/core.py` | 449 | Expression/Dimension DSL, fetch, reglu, stepglu, persist | `src/percepta/graph.rs` |
 | `wasm/interpreter.py` | 637 | 35-opcode WASM machine as computation graph | `src/percepta/wasm/interpreter.rs` |
-| `wasm/reference.py` | 667 | Reference trace generator | `src/percepta/wasm/reference.rs` |
-| `scheduler/milp.py` | 814 | MILP: 4-phase layer assignment, slot reuse, minimize d_model | `src/percepta/scheduler.rs` |
-| `model/weights.py` | 776 | Analytical weight construction: graph → weight matrices | `src/percepta/weights.rs` |
-| `model/transformer.py` | ~40 | VanillaTransformer with ReGLU FFN | `src/percepta/transformer.rs` |
+| `wasm/reference.py` | 667 | Reference trace generator | `riir-ai/crates/riir-engine/src/deltanet/reference.rs` |
+| `scheduler/milp.py` | 814 | MILP: 4-phase layer assignment, slot reuse, minimize d_model | `crates/katgpt-percepta/src/scheduler.rs` |
+| `model/weights.py` | 776 | Analytical weight construction: graph → weight matrices | `crates/katgpt-percepta/src/weights.rs` |
+| `model/transformer.py` | ~40 | VanillaTransformer with ReGLU FFN | `crates/katgpt-percepta/src/transformer.rs` |
 | `model/transformer.cpp` | 473 | Standalone C++ inference engine | (Rust native — no separate engine needed) |
-| `compilation/compile_wasm.py` | 703 | C→WASM compilation pipeline | `src/percepta/compile.rs` |
-| `compilation/decoder.py` | 664 | WASM MVP binary decoder | `src/percepta/wasm/decoder.rs` |
+| `compilation/compile_wasm.py` | 703 | C→WASM compilation pipeline | `crates/katgpt-percepta/src/compile.rs` |
+| `compilation/decoder.py` | 664 | WASM MVP binary decoder | `crates/katgpt-percepta/src/wasm/decoder.rs` |
 | `compilation/lower.py` | 1808 | Lower unsupported ops (MUL, DIV, AND, etc.) | `src/percepta/wasm/lower.rs` |
 | `compilation/runtime.h` | 155 | C runtime for WASM programs | `src/percepta/runtime.h` (keep as-is) |
-| `specialize.py` | 148 | First Futamura projection | `src/percepta/specialize.rs` |
-| `evaluator.py` | 404 | Graph evaluator (exact arithmetic) | `src/percepta/evaluator.rs` |
-| `runner.py` | 301 | CLI runner (C++ or Python inference) | `src/percepta/runner.rs` |
+| `specialize.py` | 148 | First Futamura projection | `crates/katgpt-percepta/src/specialize.rs` |
+| `evaluator.py` | 404 | Graph evaluator (exact arithmetic) | `crates/katgpt-percepta/src/evaluator.rs` |
+| `runner.py` | 301 | CLI runner (C++ or Python inference) | `crates/katgpt-percepta/src/runner.rs` |
 | `build.py` | ~50 | Build universal transformer weights | (merged into weights.rs) |
 | **Total** | **~9096** | | |
 
@@ -276,7 +281,7 @@ We proved transformers can learn to play games.
 
 3. **Granular feature flags** — incremental adoption, each level unlocks the next. See Feature Flags section below. Default off.
 
-4. **File size limit** — `lower.rs` may exceed 2048 lines (source is 1808). Split into `lower/arithmetic.rs`, `lower/logic.rs`, `lower/shift.rs` if needed.
+4. **File size limit** — `lower.rs` may exceed 2048 lines (source is 1808). Split into `crates/katgpt-percepta/src/wasm/interpreter/arithmetic.rs`, `riir-game-sdk/crates/riir-viz/src/crowd_demo/logic.rs`, `lower/shift.rs` if needed.
 
 5. **Keep runtime.h as-is** — The C runtime is injected into WASM programs at compile time. It stays as a C header file.
 

@@ -76,7 +76,7 @@ bandit learning.
 
 ## Tasks
 
-- [x] 1. Create `examples/slot_bandit_demo.rs` with Symbol enum, Display impl
+- [x] 1. Create `examples/bandit_03_slot.rs` with Symbol enum, Display impl
 - [x] 2. Add SlotReels struct with per-reel weights and marginals() method
 - [x] 3. Add PaylineRules with evaluate() returning (ComboName, f32 reward)
 - [x] 4. Add SlotScreeningPruner implementing ScreeningPruner with payline awareness
@@ -91,7 +91,7 @@ bandit learning.
 
 | File | Action | Description |
 |------|--------|-------------|
-| `examples/slot_bandit_demo.rs` | Create | Slot machine demo: Symbol, SlotReels, PaylineRules, SlotScreeningPruner, main |
+| `examples/bandit_03_slot.rs` | Create | Slot machine demo: Symbol, SlotReels, PaylineRules, SlotScreeningPruner, main |
 | `Cargo.toml` | Edit | Add `[[example]] slot_bandit_demo` gated by `bandit` |
 | `README.md` | Edit | Add slot bandit demo section |
 

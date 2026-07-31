@@ -12,7 +12,7 @@
 ### Phase 1: SIMD Infrastructure
 
 - [x] T0: Add SIMD detection and dispatch module
-  - Create `katgpt-rs/src/simd.rs` with feature-gated SIMD backends
+  - Create `katgpt-rs/crates/katgpt-dec/src/simd.rs` with feature-gated SIMD backends
   - `SimdLevel` enum: `Scalar`, `Neon`, `Avx2`
   - Runtime detection via `#[cfg(target_arch = "aarch64")]` / `#[cfg(target_arch = "x86_64")]`
   - `is_simd_available()` → `SimdLevel`
@@ -64,19 +64,19 @@
 
 ### Phase 3: SIMD HLA Kernels
 
-- [x] T6: SIMD-accelerate HLA `hla_state_update()` in `hla/kernel.rs`
+- [x] T6: SIMD-accelerate HLA `hla_state_update()` in `riir-ai/crates/riir-engine/src/hla/kernel.rs`
   - Outer product SK += kkᵀ: `simd_outer_product_acc()` on hd×hd matrix
   - Cross moment CQV += qvᵀ: `simd_outer_product_acc()`
   - Matvec kᵀ·CQV: `simd_matvec()` for tmp_k_cqv
   - For hd=4: single NEON instruction covers entire row
   - For hd=8: 2 NEON instructions per row
 
-- [x] T7: SIMD-accelerate HLA `hla_readout()` in `hla/kernel.rs`
+- [x] T7: SIMD-accelerate HLA `hla_readout()` in `riir-ai/crates/riir-engine/src/hla/kernel.rs`
   - Numerator: qᵀ(SK·CQV − G) → SIMD matvec + SIMD dot
   - Denominator: qᵀ(SK·mQ − h) + ε → SIMD matvec + SIMD dot
   - For hd=4: entire readout is ~4 NEON ops
 
-- [x] T8: SIMD-accelerate AHLA `ahla_step()` in `hla/kernel.rs`
+- [x] T8: SIMD-accelerate AHLA `ahla_step()` in `riir-ai/crates/riir-engine/src/hla/kernel.rs`
   - PKV update: `simd_outer_product_acc()`
   - E accumulation: SIMD matvec + outer product
   - Readout: qᵀE / (qᵀn + ε) → SIMD dot products
@@ -199,7 +199,7 @@ Alternative: `wide` crate (portable SIMD on stable). Adds a dependency but works
 2. **Compile-time `#[cfg]` + runtime level check** — zero-cost dispatch
 3. **Bit-identical results** — SIMD reorders operations but same float math; may have tiny ULP differences from FMA, acceptable for inference
 4. **No new dependencies** — pure `core::arch`, no `wide`/`packed_simd`/`blaze`
-5. **SIMD in `types.rs` and `hla/kernel.rs` only** — callers unchanged
+5. **SIMD in `types.rs` and `riir-ai/crates/riir-engine/src/hla/kernel.rs` only** — callers unchanged
 6. **Benchmark before/after** — must demonstrate ≥4× gain on NEON
 
 ---

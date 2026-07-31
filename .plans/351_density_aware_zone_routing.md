@@ -294,7 +294,7 @@ katgpt-rs/crates/katgpt-core/src/
     
     // Composes with:
     //   zone_manifold.rs (Plan 001)      — per-cluster density classification
-    //   dec/stokes_calculus.rs (Plan 314) — mass-divergence stampede detector
+    //   crates/katgpt-dec/src/stokes_calculus.rs (Plan 314) — mass-divergence stampede detector
     //   (riir-ai) zone_gating.rs (Plan 305) — cognitive tier (sibling, NOT replaced)
 
 katgpt-rs/benches/

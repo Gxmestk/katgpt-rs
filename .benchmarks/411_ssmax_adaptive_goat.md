@@ -37,7 +37,7 @@ per research skill §3.6.
 
 ## G1 (convergence) — max-mean proxy vs true Δ
 
-**Bench**: `benches/bench_411_ssmax_adaptive_goat.rs` → G1 section
+**Bench**: `crates/katgpt-core/benches/bench_411_ssmax_adaptive_goat.rs` → G1 section
 **Setup**: synthetic retrieval task, Δ = 0.5 (gold-distractor pre-softmax gap).
 Estimator with α = 0.3 observes 50 forward passes with varying seeds (same Δ).
 Target: `|Δ_est − 0.5| / 0.5 < 10%`.
@@ -54,7 +54,7 @@ logit inflates the mean slightly, so `max − mean < max − distractor_mean`.
 
 ## G2 (retrieval parity) — estimator vs analytical s_L=1/Δ
 
-**Bench**: `benches/bench_411_ssmax_adaptive_goat.rs` → G2 section
+**Bench**: `crates/katgpt-core/benches/bench_411_ssmax_adaptive_goat.rs` → G2 section
 **Setup**: same retrieval task, but each key has a distinct one-hot value
 vector `v_j = e_{j mod d_model}` (d_model=16). The attention output
 `o = Σ_j α_j v_j` should point toward `v_gold`. Measure cosine similarity
@@ -76,7 +76,7 @@ relationship may differ, but the parity target (95% of analytical) is met with
 
 ## G3 (latency) — observe_row + to_mode overhead
 
-**Bench**: `benches/bench_411_ssmax_adaptive_goat.rs` → G3 section
+**Bench**: `crates/katgpt-core/benches/bench_411_ssmax_adaptive_goat.rs` → G3 section
 **Setup**: 10,000 iterations of `observe_row(10k logits) + to_mode()` at N=10k.
 Target: < 100µs/call.
 
@@ -90,7 +90,7 @@ pass for max+sum dominates; the CAS loop is negligible (uncontended).
 
 ## G4 (alloc-free) — 0 allocations over 1000 calls
 
-**Bench**: `benches/bench_411_ssmax_adaptive_goat.rs` → G4 section
+**Bench**: `crates/katgpt-core/benches/bench_411_ssmax_adaptive_goat.rs` → G4 section
 **Setup**: CountingAllocator, 1000 × `observe_row(10k logits) + to_mode()`.
 
 ```
@@ -103,7 +103,7 @@ Allocations: 0
 
 ## G5 (no-regression) — warm-start matches Fixed { s_l: 1.0 }
 
-**Bench**: `benches/bench_411_ssmax_adaptive_goat.rs` → G5 section
+**Bench**: `crates/katgpt-core/benches/bench_411_ssmax_adaptive_goat.rs` → G5 section
 **Setup**: construct `RollingDeltaEstimator::default()` (no observations),
 check `to_mode().resolve_s_l()` == `Fixed { s_l: 1.0 }.resolve_s_l()`.
 

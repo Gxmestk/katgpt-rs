@@ -5,7 +5,7 @@
 > **Status:** Done
 > **Related Research:** 133 (FluxMem), 192 (NextLat belief), 196 (KG-Latent-Octree), 216 (MRAgent reconstructive memory), 242 (recurrent belief — HLA prior-art lesson), 060 (MeMo), 024 (δ-Mem)
 > **Classification:** Public
-> **Cross-ref (riir-ai):** `riir-games/src/civ/spatial_cognition.rs::SpatialMemory` (shipped prior art), `riir-games/src/game_traits/spatial.rs::GenericSpatialBelief`, `riir-engine/src/ns_csg.rs::SpatialBelief`
+> **Cross-ref (riir-ai):** `riir-ai/crates/riir-games-civ/src/civ/spatial_cognition.rs::SpatialMemory` (shipped prior art), `riir-ai/crates/riir-games-shared/src/game_traits/spatial.rs::GenericSpatialBelief`, `riir-ai/crates/riir-engine/src/ns_csg.rs::SpatialBelief`
 
 ---
 
@@ -58,14 +58,14 @@ The mandatory two-layer novelty check (notes + shipped code, per the Research 24
 
 | Paper concept | Shipped prior art | Match |
 |---|---|---|
-| Spatial cache of `(location, latent_feature)` | `riir-games/src/civ/spatial_cognition.rs::SpatialMemory` — `ArrayVec<SpatialBelief, MAX_BELIEFS>`, each belief = `(target_id, believed_zone, last_known_pos, last_observed_tick, confidence, is_threat)`; location-keyed, latent-valued | ✅ Cache exists |
+| Spatial cache of `(location, latent_feature)` | `riir-ai/crates/riir-games-civ/src/civ/spatial_cognition.rs::SpatialMemory` — `ArrayVec<SpatialBelief, MAX_BELIEFS>`, each belief = `(target_id, believed_zone, last_known_pos, last_observed_tick, confidence, is_threat)`; location-keyed, latent-valued | ✅ Cache exists |
 | Fog-of-war-gated write (only observe what's visible) | `SpatialMemory::update_from_observation` — AABB early-reject + circular fog-of-war gate | ✅ Identical pattern |
 | Latent readout, no raw bridge in hot path | `SpatialMemory::most_attractive_zone` — `score = sigmoid(dot(preference, zone_embed)) + belief_boost`; `emit_kg_triples` for high-conf beliefs. **No raw decode in the read path.** | ✅ Latent-to-latent readout already enforced |
 | Confidence decay / cache pruning | `SpatialMemory::tick_decay` + `is_expired` swap-remove + LRU eviction when full | ✅ (paper has no decay; we are richer here) |
 | Dynamic-object exclusion on write | `SpatialMemory` handles transience differently: confidence decay + prune (effect achieves the same goal — stale/transient content doesn't persist) | ✅ Equivalent goal, different mechanism |
-| Spatially-indexed latent content (generic) | `katgpt-core/src/sense/octree.rs::SenseOctreeBuilder` — KG embeddings → octree bit-planes + `TernaryDir` directions, Merkle-committed, MUX-latent bridge in `src/mux_latent/octree_bridge.rs` | ✅ Spatially-indexed latent store shipped |
+| Spatially-indexed latent content (generic) | `crates/katgpt-sense/src/octree.rs::SenseOctreeBuilder` — KG embeddings → octree bit-planes + `TernaryDir` directions, Merkle-committed, MUX-latent bridge in `crates/katgpt-core/src/mux_latent/octree_bridge.rs` | ✅ Spatially-indexed latent store shipped |
 
-Plus **four** `SpatialBelief`/`GenericSpatialBelief<T>` structs shipped (`ns_csg.rs:238`, `spatial_cognition.rs:87`, `crowd_mcgs/types.rs:333`, `game_traits/spatial.rs:68`), all implementing the AGENTS.md two-brain model (info brain raw/synced, think brain latent/local, one-way bridge, `sigmoid(-λΔt)` confidence decay).
+Plus **four** `SpatialBelief`/`GenericSpatialBelief<T>` structs shipped (`ns_csg.rs:238`, `spatial_cognition.rs:87`, `riir-ai/crates/riir-games/src/crowd_mcgs/types.rs:333`, `riir-ai/crates/riir-games-shared/src/game_traits/spatial.rs:68`), all implementing the AGENTS.md two-brain model (info brain raw/synced, think brain latent/local, one-way bridge, `sigmoid(-λΔt)` confidence decay).
 
 ### 2.3 Why the paper's signature mechanism doesn't transfer to us
 
@@ -127,7 +127,7 @@ If a future agent wants the *richer* think-brain spatial representation the user
 - `katgpt-rs/.research/216_MRAgent_Reconstructive_Memory_Graph.md` — reconstructive memory over octree (GOAT).
 - `katgpt-rs/.research/242_Topological_State_Tracking_Recurrent_Belief.md` — the prior-art-check cautionary tale (Super-GOAT→GOAT after `evolve_hla` check); same lesson applied here.
 - `riir-ai/.research/007_Four_Tier_Memory_Architecture.md` — four-tier memory.
-- **Shipped code (the decisive prior art):** `riir-ai/crates/riir-games/src/civ/spatial_cognition.rs::SpatialMemory`, `katgpt-rs/crates/katgpt-core/src/sense/octree.rs::SenseOctreeBuilder`.
+- **Shipped code (the decisive prior art):** `riir-ai/crates/riir-games-civ/src/civ/spatial_cognition.rs::SpatialMemory`, `katgpt-rs/crates/katgpt-sense/src/octree.rs::SenseOctreeBuilder`.
 
 ---
 

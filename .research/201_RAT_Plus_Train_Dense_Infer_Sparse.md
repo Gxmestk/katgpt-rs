@@ -294,30 +294,32 @@ Principle: peaked attention = knows what it needs = can afford to skip positions
 
 ## Implementation Path
 
+> **Implementation Status (2026-07-11):** All Phase 1–5 tasks below implemented via [Plan 225](../.plans/225_rat_plus_recurrence_bridge.md) — ✅ Complete (all tasks done). Feature gate: `rat_plus_bridge` (opt-in). The unchecked `- [ ]` markers below are stale; see Plan 225 for completion records.
+
 ### Phase 1: Wiring (Low Effort)
-- [ ] Add `DilationFactor` enum to types
-- [ ] Wire GDN2 state as bridge in DashAttention decode path
-- [ ] Add `DensePrefillSparseDecode` trait skeleton
+- [x] Add `DilationFactor` enum to types
+- [x] Wire GDN2 state as bridge in DashAttention decode path
+- [x] Add `DensePrefillSparseDecode` trait skeleton
 
 ### Phase 2: Adaptive Dilation (Medium Effort)
-- [ ] Add dilation D as bandit arm in MetaRouter
-- [ ] Implement entropy-based dilation selection
-- [ ] Wire TriggerGate to influence dilation choice based on QPS
+- [x] Add dilation D as bandit arm in MetaRouter
+- [x] Implement entropy-based dilation selection
+- [x] Wire TriggerGate to influence dilation choice based on QPS
 
 ### Phase 3: Hybrid Layers (Medium Effort)
-- [ ] Use River Valley diagnostics for per-layer dilation schedule
-- [ ] Implement layer-wise dilation profiling
+- [x] Use River Valley diagnostics for per-layer dilation schedule
+- [x] Implement layer-wise dilation profiling
 
 ### Phase 4: Speculation Bridge (Higher Effort)
-- [ ] Add recurrence-augmented mode to SpeculativeGenerator
-- [ ] Wire GDN2 state into DDTree branch exploration
-- [ ] Sigmoid confidence gates for draft scoring
+- [x] Add recurrence-augmented mode to SpeculativeGenerator
+- [x] Wire GDN2 state into DDTree branch exploration
+- [x] Sigmoid confidence gates for draft scoring
 
 ### Phase 5: Benchmarks
-- [ ] Measure KV cache reduction vs quality tradeoff
-- [ ] Compare with/without GDN2 bridge (ablation)
-- [ ] Profile latency impact of dilation switching
-- [ ] GOAT gate: feature flag `rat_plus_bridge`, default off until validated
+- [x] Measure KV cache reduction vs quality tradeoff
+- [x] Compare with/without GDN2 bridge (ablation)
+- [x] Profile latency impact of dilation switching
+- [x] GOAT gate: feature flag `rat_plus_bridge`, default off until validated
 
 ---
 

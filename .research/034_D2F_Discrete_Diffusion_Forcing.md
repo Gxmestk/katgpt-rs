@@ -212,7 +212,7 @@ The D2F inference pipeline is implemented in `src/speculative/d2f.rs` behind the
 
 | Component | File | Purpose |
 |-----------|------|---------|
-| `D2fContext` | `src/dllm.rs` | Pre-allocated flat buffers for zero-alloc denoising |
+| `D2fContext` | `riir-ai/crates/riir-engine/src/transformer/dllm.rs` | Pre-allocated flat buffers for zero-alloc denoising |
 | `D2fPipeline` | `src/speculative/d2f.rs` | Multi-block sequential decode with KV cache commit |
 | `D2fDecodeConfig` | `src/speculative/d2f.rs` | Thresholds, block sizes, denoising steps |
 | `D2fBlockState` | `src/speculative/d2f.rs` | SemiActivated → FullyActivated state machine |

@@ -79,7 +79,7 @@ This is the **local, spectrally-weighted, trust-bounded erasure** member of the 
 
 ### Tasks
 
-- [x] **T3.1** `benches/bench_426_manifold_erasure_goat.rs` — GOAT gate:
+- [x] **T3.1** `crates/katgpt-core/benches/bench_426_manifold_erasure_goat.rs` — GOAT gate:
   - **G1 (correctness):**
     - G1a — erasure reduces target-direction energy: `|<x̃, u>| < |<x, u>|` by ≥50% after 1 step (synthetic data, known direction).
     - G1b — preserves orthogonal directions: for directions `v ⊥ tangent basis`, `|<x̃, v> - <x, v>| < 1e-6` (bit-identical preservation).

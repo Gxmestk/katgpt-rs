@@ -5,7 +5,7 @@
 **Private guide:** [riir-ai/.research/149_Per_NPC_Gain_Cost_Reasoning_Depth_Guide.md](../../../riir-ai/.research/149_Per_NPC_Gain_Cost_Reasoning_Depth_Guide.md)
 **Source paper:** [arxiv 2606.18023](https://arxiv.org/abs/2606.18023) — LoopCoder-v2 (Yang et al., 2026)
 **Target:** `crates/katgpt-core/src/gain_cost_halt.rs` (new module) + Cargo feature `gain_cost_halt`
-**Status:** Active — Phase 1 complete (kernel + 24/24 G1 mechanics tests shipped). Phase 2 complete (forward_looped wiring: T2.1–T2.3 done; T2.4 + T2.5 done — synthetic G2/G3 bench harness shipped at `benches/gain_cost_halt_bench.rs`, both gates PASS: G2 76.7% crowd-NPC savings, G3 0-loop important-NPC waste; see `.benchmarks/304_gain_cost_halt_goat.md`). **G4 done (2026-06-23): oscillation-vs-stability bench added to the same harness — G4 PASS, halter catches cos θ=−1.0 at L=2 while PathwayTracker (stability-only) reports stability 0.881 after 10 oscillatory loops (structurally blind to activation reversal).** Phase 3 done (T3.1 architecture doc, T3.3 README entry, T3.4 demo example, T3.5 feature isolation PASS; T3.2 skipped — comparison doc out of scope for Research 282). 27/27 kernel tests + 28/28 forward_looped integration tests PASS. GOAT gate matrix now complete: G1 (mechanics) + G2 (crowd savings) + G3 (no-regression) + G4 (oscillation detection) + G5 (feature isolation) all PASS. Real-world validation deferred to riir-ai Plan 330. Phase 2.5 (TF-Loop wiring into `forward_training_free_loop`) remains deferred — different semantics (ODE sub-step endpoint refinement vs weight-shared loop).
+**Status:** COMPLETE ✅ — GOAT G1-G5 all PASS (G1 mechanics, G2 76.7% crowd savings, G3 no-regression, G4 oscillation detection, G5 feature isolation). 27/27 kernel + 28/28 forward_looped integration tests. Real-world validation deferred to riir-ai Plan 330. Phase 2.5 (TF-Loop wiring) deferred — different semantics. See `.benchmarks/304_gain_cost_halt_goat.md`.
 
 ---
 
@@ -213,7 +213,7 @@ pub fn angular_change(curr_step: &[f32], prev_step: &[f32]) -> f32 {
 - [x] **T3.5** G5 feature isolation:
   - `cargo check --no-default-features` — PASS (only pre-existing warnings).
   - `cargo check --features gain_cost_halt` — PASS.
-  - `cargo check --all-features` — 10 pre-existing errors in unrelated modules (`percepta/evaluator.rs`, `proof_cert/wasm_proof_witness.rs`, `feedback_bandit.rs`, `linoss.rs`, etc. — other agents' in-progress work); NONE in gain_cost_halt or forward_looped files.
+  - `cargo check --all-features` — 10 pre-existing errors in unrelated modules (`crates/katgpt-percepta/src/evaluator.rs`, `crates/katgpt-proof-cert/src/wasm_proof_witness.rs`, `feedback_bandit.rs`, `linoss.rs`, etc. — other agents' in-progress work); NONE in gain_cost_halt or forward_looped files.
   - `cargo check --features "gain_cost_halt,lt2_looped,sleep_consolidation,weight_shared_advantage_gate"` — PASS (full composition).
   - `cargo-hack` installed (v0.6.45); `--each-feature` not run to completion because it triggers `--all-features` combos that hit the same pre-existing unrelated failures. Scoped powerset on the 4 relevant features PASS.
   - The `Option<&mut GainCostLoopHalter>` param is zero-cost when feature is off (cfg-stripped from signature) and predicted-not-taken when feature is on but halter is `None`.

@@ -1,6 +1,6 @@
 //! VPD EM-style bomber player — co-evolutionary teacher-student distillation.
 //!
-//! Extends [`SdarPlayer`] with an explicit EM cycle:
+//! Extends `SdarPlayer` with an explicit EM cycle:
 //! - **M-step** (every round): KL-gated distillation of teacher → student
 //! - **E-step** (every F=5 rounds): BCO unpaired preference refinement of teacher
 //!
@@ -221,7 +221,7 @@ fn danger_level(pos: GridPos, grid: &ArenaGrid, bombs: &[KnownBomb]) -> f32 {
 
 /// Bomber arena player using VPD EM-style co-evolutionary distillation.
 ///
-/// Extends [`SdarPlayer`] architecture with an explicit EM cycle:
+/// Extends `SdarPlayer` architecture with an explicit EM cycle:
 /// - M-step every round: KL-gated distillation via [`SdarGatedAbsorbCompress`]
 /// - E-step every F=5 rounds: BCO teacher refinement via [`VpdEmCycle`]
 pub struct VpdPlayer {

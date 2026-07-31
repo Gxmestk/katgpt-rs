@@ -3,7 +3,7 @@
 **Date:** 2026-06-30
 **Plan:** [`.plans/340_conformal_predictive_intervals_primitive.md`](../.plans/340_conformal_predictive_intervals_primitive.md) Phase 1
 **Issue:** 010 (T1 — RESOLVED; tracker removed; floor shipped here)
-**Feature flag:** `conformal_predictive_intervals` (opt-in)
+**Feature flag:** `conformal_predictive_intervals` (**DEFAULT-ON since 2026-07-20 per Plan 468** — was opt-in at time of writing)
 **Modelless:** ✅ Yes — no training, no learned parameters, no gradient descent. Pure empirical-quantile calibration over a residual reservoir.
 
 ---
@@ -11,9 +11,13 @@
 ## TL;DR
 
 **GOAT gate: ✅ PASS (G1, G2, G3, G4 all clear).** The conformal predictive
-intervals primitive ships behind `conformal_predictive_intervals` (opt-in).
-Promotion to default-on is **deferred** per Plan 340 T1.14: the open primitive's
-gates prove the math; the runtime gates (Plan 342 riir-ai) prove the utility.
+intervals primitive was opt-in at the time of this bench (2026-06-30); the
+primitive-level gate proves the math. **Promotion to DEFAULT-ON landed
+2026-07-20 (Plan 468)** after two runtime consumers demonstrated gains over
+their simpler heuristic counterparts — Bench 564 (MCTS collapse G3 PASS) +
+Bench 565 (Salience Tri-Gate G3 PASS, ΔF1 = +0.3145 at 6.3× gate margin).
+Two additional consumers FAILED their G3 (Bench 562 curiosity + Bench 563
+sleep-time) — the Cargo.toml language required only one PASS, two landed.
 The primitive IS the canonical conformal-naive floor instance — Issue 010's
 retroactive UQ-floor comparison harness is now unblocked.
 
@@ -35,7 +39,7 @@ unchanged values" optimization rule applied at the micro-level.
 `ε ~ N(0, σ)`, empirical coverage at α=0.05 over 10,000 ticks ∈ [0.93, 0.97]
 for ALL `m ∈ {12, 24, 48}` AND on `m=1` HStep mode.
 
-**Test:** `tests/conformal_coverage.rs` (3 tests)
+**Test:** `crates/katgpt-core/tests/conformal_coverage.rs` (3 tests)
 
 ### Results (α=0.05, target coverage 0.95)
 
@@ -72,7 +76,7 @@ nominal level across all seasonal periods, noise levels, and alpha values.
 
 **Gate:** `interval_into` ≤ 1µs at H=1, ≤ 100µs at H=8×8 channels.
 
-**Bench:** `benches/conformal_interval_bench.rs` (criterion, 30 samples,
+**Bench:** `crates/katgpt-core/benches/conformal_interval_bench.rs` (criterion, 30 samples,
 0.5s measurement, release build, Apple M-series).
 
 ### Results (median)
@@ -95,7 +99,7 @@ weights-compute-once optimization.
 **Gate:** `update_residual` and `interval_into` perform zero allocations after
 warmup.
 
-**Test:** `tests/conformal_alloc_check.rs` (CountingAllocator pattern, 1000
+**Test:** `crates/katgpt-core/tests/conformal_alloc_check.rs` (CountingAllocator pattern, 1000
 calls × 8 channels after warmup).
 
 | Method | Allocs (1000 × 8 calls) | Verdict |
@@ -119,7 +123,7 @@ and `analytic_lattice_alloc_check` pattern.
 `(residual_pool, m, alpha, h, decay_config, orientation)` produce byte-
 identical `PredictiveInterval` bounds (verified via `f32::to_bits`).
 
-**Test:** `tests/conformal_reproducibility.rs` (3 tests)
+**Test:** `crates/katgpt-core/tests/conformal_reproducibility.rs` (3 tests)
 
 | Check | Variations | Verdict |
 |---|---|---|
@@ -135,7 +139,7 @@ intact.
 
 ## AirPassengers CRPS — "Report the Floor" reference ✅
 
-**Example:** `examples/conformal_airpassengers.rs` (synthetic proxy, 144
+**Example:** `crates/katgpt-core/examples/conformal_airpassengers.rs` (synthetic proxy, 144
 monthly observations, multiplicative seasonality m=12, log-linear trend).
 
 | Metric | Conformal Overlay | Seasonal-Naive ±2σ | Winner |
@@ -161,21 +165,50 @@ with `m=1` on CRPS / coverage / Winkler at their GOAT gate.
 
 | File | Role |
 |---|---|
-| `src/conformal/mod.rs` | `ConformalIntervalCalibrator<F>`, `PointForecaster` trait, `PredictiveInterval`, `ResidualMode`, `DecayUnit` |
-| `src/conformal/ring.rs` | `SortedRing`, `ResidualRingBuffer`, `RingBuffer`, `RingView` |
-| `src/conformal/seasonal.rs` | `SeasonalPoolForecaster`, `SeasonalNaiveForecaster` (type alias), `seasonal_naive_floor()` |
-| `src/conformal/metrics.rs` | `crps`, `crps_interval`, `winkler_score`, `empirical_coverage`, `mean_crps_interval`, `mean_winkler` |
-| `tests/conformal_coverage.rs` | G1 gate (3 tests) |
-| `tests/conformal_reproducibility.rs` | G4 gate (3 tests) |
-| `tests/conformal_alloc_check.rs` | G3 gate (2 tests) |
-| `benches/conformal_interval_bench.rs` | G2 gate (5 configs) |
-| `examples/conformal_airpassengers.rs` | CRPS reproduction / "Report the Floor" reference |
+| `crates/katgpt-core/src/conformal/mod.rs` | `ConformalIntervalCalibrator<F>`, `PointForecaster` trait, `PredictiveInterval`, `ResidualMode`, `DecayUnit` |
+| `crates/katgpt-core/src/conformal/ring.rs` | `SortedRing`, `ResidualRingBuffer`, `RingBuffer`, `RingView` |
+| `crates/katgpt-core/src/conformal/seasonal.rs` | `SeasonalPoolForecaster`, `SeasonalNaiveForecaster` (type alias), `seasonal_naive_floor()` |
+| `crates/katgpt-core/src/conformal/metrics.rs` | `crps`, `crps_interval`, `winkler_score`, `empirical_coverage`, `mean_crps_interval`, `mean_winkler` |
+| `crates/katgpt-core/tests/conformal_coverage.rs` | G1 gate (3 tests) |
+| `crates/katgpt-core/tests/conformal_reproducibility.rs` | G4 gate (3 tests) |
+| `crates/katgpt-core/tests/conformal_alloc_check.rs` | G3 gate (2 tests) |
+| `crates/katgpt-core/benches/conformal_interval_bench.rs` | G2 gate (5 configs) |
+| `crates/katgpt-core/examples/conformal_airpassengers.rs` | CRPS reproduction / "Report the Floor" reference |
 
 **Total:** 24 unit tests + 8 integration tests = 32 tests, all passing.
 
 ---
 
 ## Promotion decision
+
+**DEFAULT-ON as of 2026-07-20 (Plan 468).** The deferral language in Plan
+340 T1.14 — "promotion deferred until the riir-ai runtime integration confirms
+the curiosity false-positive win" — was satisfied by two runtime consumers:
+
+- **Bench 564** (MCTS collapse, 2026-07-19): G3 PASS — per-NPC calibrated τ
+  beats fixed magic number on the collapse-detection F1 axis.
+- **Bench 565** (Salience Tri-Gate, 2026-07-19): G3 PASS — interval-width
+  Delegate nudge beats KARC anticipation by ΔF1 = +0.3145 (6.3× gate margin).
+
+Two consumers FAILED (Bench 562 curiosity, Bench 563 sleep-time) — the
+Cargo.toml language required only one consumer win; two landed. Plan 513
+(2026-07-20) fixed a width-definition semantic bug in the Salience consumer's
+`KarcConformalSidecar::interval_width()` and re-verified Bench 565's G3 PASS
+bit-identically.
+
+The primitive was opt-in from 2026-06-30 (Plan 340 Phase 1) → 2026-07-20
+(Plan 468 promotion), 20 days. Consumer-level gates
+(`karc_conformal_width`, `salience_conformal_width`, the four probe features)
+STAY opt-in — the promotion only removes the katgpt-core-level re-forward
+friction, does not auto-enable any consumer.
+
+---
+
+## Pre-promotion history (preserved for context)
+
+The original Phase 1 decision (preserved below) was opt-in pending a runtime
+consumer that demonstrably beats its simpler heuristic counterpart. That
+condition is now satisfied.
 
 **Opt-in (NOT default-on).** Per Plan 340 T1.14:
 
@@ -198,7 +231,12 @@ decision).
 - **Plan 340 Phase 2** — KARC adapter can now be built on the validated
   `PointForecaster` trait + `ConformalIntervalCalibrator` substrate.
 - **Plan 342 (riir-ai)** — runtime integration (HLA overlay, curiosity,
-  sleep-time, MCTS collapse) can consume the open primitive.
+  sleep-time, MCTS collapse) can consume the open primitive. *(Historical
+  note: there is no riir-ai Plan 342 — this was the original-ship-time
+  placeholder for the future runtime integration plans. The actual runtime
+  integration work landed in July 2026 via Plans 508/509/510/511 + Benches
+  562-565 — four consumer probes, two PASSed. The primitive was promoted
+  to DEFAULT-ON by Plan 468 on 2026-07-20.)*
 
 ---
 
@@ -263,9 +301,9 @@ criterion bench, which is unchanged — see G2 table above).
 - **4 adapter unit tests** (`conformal::karc_adapter::tests::*`): channel
   extraction, `observe_and_update` write path, channel-out-of-range panic,
   empty-delay-state panic in debug.
-- **3 no-regression integration tests** (`tests/conformal_karc_no_regression.rs`):
+- **3 no-regression integration tests** (`crates/katgpt-core/tests/conformal_karc_no_regression.rs`):
   bit-identical forecasts, `wout` stability, FourierBasis smoke.
-- **1 example** (`examples/conformal_karc_overlay.rs`): Lorenz-63 coverage.
+- **1 example** (`crates/katgpt-core/examples/conformal_karc_overlay.rs`): Lorenz-63 coverage.
 - **All 24 Phase 1 tests still pass** (G1/G3/G4 gates unchanged).
 
 ### Total test count

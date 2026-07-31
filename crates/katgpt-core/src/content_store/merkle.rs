@@ -19,7 +19,7 @@
 /// 2. Otherwise, pad to the next power of two with `[0u8; 32]` sentinel leaves
 ///    (zero-padding is content-distinct from any real BLAKE3 output).
 /// 3. Build bottom-up: each internal node is `blake3::hash(left ‖ right)` via
-///    [`parent_hash`]. Root is the single remaining node.
+///    `parent_hash`. Root is the single remaining node.
 ///
 /// For `n` leaves, this is `O(n)` BLAKE3 calls (one per internal node, of which
 /// there are `n - 1` after padding).

@@ -187,18 +187,10 @@ pub fn cna_discover(
 
     // Partial sort: O(n) select top-k by |delta| descending instead of O(n log n) full sort.
     if k < candidates.len() {
-        candidates.select_nth_unstable_by(k, |a, b| {
-            b.delta
-                .partial_cmp(&a.delta)
-                .unwrap_or(std::cmp::Ordering::Equal)
-        });
+        candidates.select_nth_unstable_by(k, |a, b| b.delta.total_cmp(&a.delta));
         candidates.truncate(k);
     } else {
-        candidates.sort_unstable_by(|a, b| {
-            b.delta
-                .partial_cmp(&a.delta)
-                .unwrap_or(std::cmp::Ordering::Equal)
-        });
+        candidates.sort_unstable_by(|a, b| b.delta.total_cmp(&a.delta));
     }
 
     // Build layer → neuron-indices lookup for O(k_layer) modulation.
@@ -271,14 +263,10 @@ pub fn detect_universal_neurons(
         // select_nth_unstable_by partitions around the k-th element in O(n),
         // then we truncate to keep only the top-k.
         if top_k < scored.len() {
-            scored.select_nth_unstable_by(top_k, |a, b| {
-                b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal)
-            });
+            scored.select_nth_unstable_by(top_k, |a, b| b.1.total_cmp(&a.1));
             scored.truncate(top_k);
         } else {
-            scored.sort_unstable_by(|a, b| {
-                b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal)
-            });
+            scored.sort_unstable_by(|a, b| b.1.total_cmp(&a.1));
         }
         for &(slot, _) in &scored {
             appearance_count[slot] += 1;

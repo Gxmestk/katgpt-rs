@@ -17,7 +17,7 @@ FNO paper is a **96-page practitioner guide** for the existing Fourier Neural Op
 - **Resolution-invariant spectral transport**: project `s ∈ R^{d_src}` to k-dim spectral via frozen `Φ_src^T`, reconstruct at `R^{d_dst}` via frozen `Ψ_dst`. **SHIPPED** as `cross_resolution.rs::transport_cross_resolution_into`.
 - **Spectral differentiation**: `F{∂^m_x f}(k) = (ik)^m f̂_k` — multiply Fourier coefficients by `(ik)^m`, IFFT back. **EMBEDDED** in DEC `exterior_derivative` (where the basis is the cell incidence matrix) but not exposed as a standalone FFT-based primitive.
 - **Spectral interpolation / super-resolution**: zero-pad in frequency domain, IFFT to denser grid. **SHIPPED** as part of `cross_resolution.rs` (different mechanism — basis projection rather than zero-padding — but same capability class).
-- **Spectral downsampling / low-pass truncation**: keep first K modes, zero the rest, IFFT. **SHIPPED** as `flow/fft.rs::fft_smooth` (Nyquist cutoff for LEO potential fields) and `freq_bandit.rs::token_stream_spectrum` (DFT up to Nyquist).
+- **Spectral downsampling / low-pass truncation**: keep first K modes, zero the rest, IFFT. **SHIPPED** as `crates/katgpt-core/src/flow/fft.rs::fft_smooth` (Nyquist cutoff for LEO potential fields) and `freq_bandit.rs::token_stream_spectrum` (DFT up to Nyquist).
 - **Spectral loss**: `Σ_k |F(ĝ)(k) − F(g)(k)|²` — modelless diagnostic. **NOT shipped** as a standalone metric.
 - **Fourier continuation** (FC-Legendre, FC-Gram, spectrum-optimization): closed-form least-squares polynomial extension making non-periodic signals periodic. **NOT shipped**.
 - **Tucker / HOSVD tensor factorization** for frozen weight compression (TFNO): generalization of SVD to higher-order tensors. **PARTIAL** — `subspace_phase_gate::thin_svd_into` ships 2D SVD; full N-mode Tucker does not.
@@ -64,7 +64,7 @@ Per skill §3.5 modelless-unblock check: NONE of these can be unblocked via free
 Even where the paper adds no new mechanism, several practical lessons are worth recording for our `cross_resolution_transport` and `KarcForecaster<FourierBasis>` consumers:
 
 1. **`n_modes` must stay below Nyquist** — including the bandwidth-broadening effect of nonlinearities (σ(x)=x² doubles bandwidth). Aliasing in training folds back as spurious low-frequency energy. → applies to our `freq_bandit` Nyquist cutoff.
-2. **Spectral downsampling beats stride downsampling** for any signal where spatial correlations matter — stride introduces discontinuities, phase shifts, spurious patterns. Our `flow/fft.rs` low-pass before grid ops already does this right.
+2. **Spectral downsampling beats stride downsampling** for any signal where spatial correlations matter — stride introduces discontinuities, phase shifts, spurious patterns. Our `crates/katgpt-core/src/flow/fft.rs` low-pass before grid ops already does this right.
 3. **Non-periodic domains need Fourier continuation**, not naive FFT — Gibbs phenomenon at boundaries corrupts derivatives. **This is a real gap in our stack** (we have FFT for periodic LEO grids; non-periodic latent fields would need FC).
 4. **Sinusoidal embeddings for scalar parameters** (amplitude or frequency modulation) beat constant inputs because they activate all Fourier modes from layer 1. Relevant to `KarcForecaster` constant-parameter handling.
 5. **ChannelMLP restores high-frequency content** that SpectralConv truncates — the FNO pattern is *spectral global + channel-wise local*, not spectral-only. (Our `funcattn` ships the spectral side; the channel-MLP complement is implicit in downstream consumers.)
@@ -94,13 +94,13 @@ This is the substrate. Everything else in the paper layers trained weights on to
 | Layer | Artifact | Match to FNO primitive |
 |---|---|---|
 | Code | `katgpt-rs/crates/katgpt-core/src/cross_resolution.rs` | **`transport_cross_resolution_into` = FNO super-resolution / cross-resolution spectral transport.** Frozen BLAKE3-committed basis pair `(Φ_src, Ψ_dst)`, k-dim spectral projection, reconstruct at any dim. DEFAULT-ON. **The headline FNO inference primitive.** |
-| Code | `katgpt-rs/crates/katgpt-core/src/funcattn.rs` | FUNCATTN = spectral attention with frozen bases (Research 257/290). SpectralConv-equivalent. |
+| Code | `katgpt-rs/crates/katgpt-core/src/funcattn/mod.rs` | FUNCATTN = spectral attention with frozen bases (Research 257/290). SpectralConv-equivalent. |
 | Code | `katgpt-rs/crates/katgpt-core/src/flow/fft.rs` | `fft_smooth` with Nyquist-cutoff low-pass on potential fields. FNO spectral downsampling for periodic grids. |
-| Code | `katgpt-rs/src/freq_bandit.rs::token_stream_spectrum` | DFT up to Nyquist. FNO power-spectrum diagnostic. |
-| Code | `katgpt-rs/src/spectralquant/spectral_kv_cache.rs` | Eigenbasis KV compression (Research 039). SpectralConv applied to KV cache. |
-| Code | `katgpt-rs/crates/katgpt-core/src/dec/operators.rs` | `exterior_derivative` (d), `codifferential` (δ), `hodge_laplacian` (Δ). FNO spectral differentiation **in DEC vocabulary** — d on a periodic cell complex IS spectral differentiation. |
+| Code | `katgpt-rs/crates/katgpt-pruners/src/freq_bandit.rs::token_stream_spectrum` | DFT up to Nyquist. FNO power-spectrum diagnostic. |
+| Code | `katgpt-rs/crates/katgpt-spectral/src/spectral_kv_cache.rs` | Eigenbasis KV compression (Research 039). SpectralConv applied to KV cache. |
+| Code | `crates/katgpt-dec/src/operators.rs` | `exterior_derivative` (d), `codifferential` (δ), `hodge_laplacian` (Δ). FNO spectral differentiation **in DEC vocabulary** — d on a periodic cell complex IS spectral differentiation. |
 | Code | `katgpt-rs/crates/katgpt-core/src/subspace_phase_gate.rs::thin_svd_into` | 2D SVD (one-sided Jacobi). TFNO's Tucker is the N-mode generalization — partial coverage. |
-| Code | `katgpt-rs/src/karc.rs` (Plan 308) | `KarcForecaster<FourierBasis>` — Fourier delay-basis ridge regression. Fourier-basis forecasting already shipped. |
+| Code | `riir-ai/crates/riir-games-civ/src/civ/map_tick/karc.rs` (Plan 308) | `KarcForecaster<FourierBasis>` — Fourier delay-basis ridge regression. Fourier-basis forecasting already shipped. |
 | Code | `riir-chain/src/encoding/latcal_fixed.rs::LatCalSpectralFixed` | Fixed-point Fourier coefficients `(freq × 10^6, amp × 10^6, phase × 10^6)` for chain commitment. FNO coefficients crossing the sync boundary. |
 | Code | `riir-chain/src/catchup/shard_quorum.rs::spectral_diversification` | Cosine-based shard ensemble diversity. FNO spectral mode coverage analog. |
 | Code | `riir-chain/src/consensus/curator_bridge.rs::verify_spectral_shard` | Spectral shard condition-number bound (BLAKE3-committed integrity). |

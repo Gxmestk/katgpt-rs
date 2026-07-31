@@ -1,8 +1,16 @@
-# GOAT Gate Benchmarks — Plan 272 Chunked Content-Addressed Merkle Store
+# GOAT Gate Benchmarks — Plan 448 Chunked Content-Addressed Merkle Store
 
-**Feature:** `chunked_content_store` (opt-in)
+> **UPDATE 2026-07-18 (promotion fix-up):** `chunked_content_store` was
+> **promoted to `default`** in katgpt-core the same day this doc was originally
+> written (commit referenced in Cargo.toml as "Phase 19b (2026-07-18):
+> +chunked_content_store promotion fix-up. The bench file claimed promotion
+> was done but Cargo.toml was never updated — this lands it."). The `(opt-in)`
+> label below was stale relative to the Cargo.toml default list at the time of
+> this audit; the feature is now correctly default-on.
+
+**Feature:** `chunked_content_store` (**default-on since 2026-07-18** — see banner above)
 **Research:** [262 — Lore Chunked Asset Merkle Store Modelless](../.research/262_Lore_Chunked_Asset_Merkle_Store_Modelless.md)
-**Plan:** [272](../.plans/272_chunked_asset_merkle_store.md)
+**Plan:** [448](../.plans/448_chunked_asset_merkle_store.md)
 **Date:** 2026-06-25
 
 ## G1–G7 Gate Table (from Research 262 §6)
@@ -38,10 +46,10 @@ consumed by riir-ai Plan 319 (Executable Asset Vessel + Quorum Gitflow).
 
 | Test | Gate | File |
 |------|------|------|
-| `g1_dedup_ratio_meets_target` | G1 | `content_store/goat.rs` |
-| `test_cdc_dedup_with_variant` | G2 | `content_store/chunker.rs` (Phase 2) |
-| `g3_inclusion_proof_cost_under_10us` | G3 | `content_store/goat.rs` (`#[ignore]` — release-only; PASS after O(log n) fix) |
-| `g4_light_client_verify_no_self` | G4 | `content_store/goat.rs` |
+| `g1_dedup_ratio_meets_target` | G1 | `crates/katgpt-core/src/content_store/goat.rs` |
+| `test_cdc_dedup_with_variant` | G2 | `crates/katgpt-core/src/content_store/chunker.rs` (Phase 2) |
+| `g3_inclusion_proof_cost_under_10us` | G3 | `crates/katgpt-core/src/content_store/goat.rs` (`#[ignore]` — release-only; PASS after O(log n) fix) |
+| `g4_light_client_verify_no_self` | G4 | `crates/katgpt-core/src/content_store/goat.rs` |
 | (type-system check) | G6 | `cargo check --no-default-features` |
-| `g5_hot_path_read_p99_under_200ns` | G5 | `content_store/goat.rs` (`#[ignore]` — release-only) |
-| `g7_tamper_detection` | G7 | `content_store/goat.rs` |
+| `g5_hot_path_read_p99_under_200ns` | G5 | `crates/katgpt-core/src/content_store/goat.rs` (`#[ignore]` — release-only) |
+| `g7_tamper_detection` | G7 | `crates/katgpt-core/src/content_store/goat.rs` |

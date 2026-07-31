@@ -28,7 +28,7 @@ GPart replaces LoRA's bilinear BA factorization with a single isometric partitio
 ## Tasks
 
 - [x] Add `gpart_adapter = []` feature gate to `crates/katgpt-core/Cargo.toml` `[features]` section, not in default set
-- [x] Define `GpartAdapter` struct in `crates/katgpt-core/src/types.rs` (fields: `seed: u64`, `theta: Vec<f32>`, `d: usize`) behind `#[cfg(feature = "gpart_adapter")]`
+- [x] Define `GpartAdapter` struct in `crates/katgpt-types/src/lib.rs` (fields: `seed: u64`, `theta: Vec<f32>`, `d: usize`) behind `#[cfg(feature = "gpart_adapter")]`
 - [x] Implement `GpartAdapter::generate_partition()` — seed-based pseudorandom group assignment using `fastrand::Rng`, returning assignments and group counts; single-pass O(N) counting
 - [x] Implement `GpartAdapter::apply()` — single-pass O(N) broadcast: regenerate partition from seed, compute `1/√n_g` per group, apply `base_weights[i] += scale * theta[group]`; accept pre-allocated scratch `&mut [usize]` for assignments to avoid hot-loop allocation
 - [x] Implement SIMD-accelerated `apply_simd()` using `simd_add_scalar_inplace` / chunked broadcast — group parameters by contiguous assignment, apply `theta[g] * inv_sqrt_ng` in SIMD-width chunks; fall back to scalar for tail

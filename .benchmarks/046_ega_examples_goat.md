@@ -59,7 +59,7 @@ cargo test --features ega_attn --test test_139_ega_examples -- --nocapture
 ## Module Structure
 
 ```
-src/ega_attn.rs               # Core EGA types and helpers
+crates/katgpt-attn/src/ega_attn.rs               # Core EGA types and helpers
 tests/test_139_ega_examples.rs # 11 extended GOAT proof examples
 ```
 

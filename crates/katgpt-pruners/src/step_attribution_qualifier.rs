@@ -141,7 +141,7 @@ pub trait StepLocalizer<Dir, W> {
     /// Given a trajectory of per-tick state-deltas + CLR scores + a direction
     /// set, return the first actionable fault + responsibility weights.
     ///
-    /// - `trajectory_deltas[t]` — the state-delta at tick `t` (e.g. HLA-delta).
+    /// - `trajectory_deltas[t]` — the state-delta at tick `t` (e.g. belief-delta).
     /// - `trajectory_scores[t]` — the CLR `r_k` score at tick `t`.
     /// - `directions[j]` — the `j`-th direction to project onto (e.g. branch
     ///   direction vectors).
@@ -202,7 +202,7 @@ pub struct TickFaultSite<Dir, W> {
     pub violated: String,
     /// Per-direction responsibility weights (SkillAdaptor eq. 6 output).
     ///
-    /// `weights[j] = sigmoid(dot(hla_delta_at_t_star, direction_j))`.
+    /// `weights[j] = sigmoid(dot(belief_delta_at_t_star, direction_j))`.
     /// Higher weight = more responsible for the fault.
     pub responsibility: Vec<W>,
     /// Argmax direction index — the "responsible skill/branch".
@@ -210,7 +210,7 @@ pub struct TickFaultSite<Dir, W> {
     /// When ties occur, the consumer picks the higher-priority direction
     /// (e.g. lower branch_id per R161 §2.2 spawn order).
     pub responsible_idx: usize,
-    /// Marker for the generic direction type (e.g. HLA direction vector).
+    /// Marker for the generic direction type (e.g. belief direction vector).
     pub _marker: PhantomData<Dir>,
 }
 
@@ -223,7 +223,16 @@ impl<Dir, W> TickFaultSite<Dir, W> {
         responsibility: Vec<W>,
         responsible_idx: usize,
     ) -> Self {
-        debug_assert!(
+        // `assert!` (not `debug_assert!`): this is a documented public API
+        // contract ("`responsible_idx` MUST be a valid index into
+        // `responsibility`"). A `debug_assert!` here would let release builds
+        // construct an invalid `TickFaultSite` with an out-of-bounds index,
+        // deferring the failure to whichever consumer next indexes into
+        // `responsibility[responsible_idx]` — producing a generic panic
+        // instead of this helpful message. The paired
+        // `tick_fault_site_rejects_out_of_bounds_idx` `#[should_panic]` test
+        // relies on this firing in release mode too.
+        assert!(
             responsible_idx < responsibility.len(),
             "responsible_idx out of bounds"
         );
@@ -399,7 +408,7 @@ impl ScoreAggregator<f32> for MeanAggregator {
 ///   `∈ (0, 1)`. The argmax is the responsible direction.
 ///
 /// This is the generic consumer-facing localizer. Game-specific localizers
-/// (e.g. riir-ai's `HlaDeltaStepLocalizer`, Plan 313 T1.6) can wrap this or
+/// (e.g. riir-ai's `BeliefDeltaStepLocalizer`, Plan 313 T1.6) can wrap this or
 /// implement `StepLocalizer` directly with domain-specific fault predicates.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct DotProductLocalizer {
@@ -480,26 +489,18 @@ impl StepLocalizer<Vec<f32>, f32> for DotProductLocalizer {
     }
 }
 
-/// Dot product of two equal-length f32 slices.
+/// Dot product of two equal-length f32 slices — delegates to SIMD dispatch.
 #[inline]
 fn dot(a: &[f32], b: &[f32]) -> f32 {
     debug_assert_eq!(a.len(), b.len(), "dot: length mismatch");
-    let mut sum = 0.0_f32;
-    for i in 0..a.len() {
-        sum += a[i] * b[i];
-    }
-    sum
+    katgpt_core::simd::simd_dot_f32(a, b, a.len())
 }
 
-/// Numerically stable sigmoid. Per AGENTS.md: sigmoid not softmax.
+/// Sigmoid. Per AGENTS.md: sigmoid not softmax. Delegates to
+/// `katgpt_core::simd::fast_sigmoid` (Cephes polynomial).
 #[inline]
 fn stable_sigmoid(x: f32) -> f32 {
-    if x >= 0.0 {
-        1.0 / (1.0 + (-x).exp())
-    } else {
-        let e = x.exp();
-        e / (1.0 + e)
-    }
+    katgpt_core::simd::fast_sigmoid(x)
 }
 
 // ─────────────────────────────────────────────────────────────────────────

@@ -12,7 +12,7 @@ use std::vec::Vec;
 pub struct EdgeBanditArm {
     /// Human-readable label, e.g. "chain_identity", "diamond_go_bomber".
     pub label: String,
-    /// Topology widths (e.g., [1,1,1] or [1,2,1]).
+    /// Topology widths (e.g., `[1,1,1]` or `[1,2,1]`).
     pub widths: Vec<usize>,
     /// Indices into the edge registry for active edges.
     pub edge_indices: Vec<usize>,
@@ -65,7 +65,7 @@ impl EdgeBandit {
 
     /// Thompson sample: pick the arm with the highest Beta sample this round.
     ///
-    /// Returns the arm index. The caller must later call [`update`] with the
+    /// Returns the arm index. The caller must later call [`update`](Self::update) with the
     /// observed reward.
     pub fn sample(&mut self) -> usize {
         let mut best_idx = 0;

@@ -159,7 +159,7 @@ No game IP. No chain IP. Pure information-theoretic math + selector + EMA tracke
 
 ### Tasks
 
-- [x] **T6.1** Create `katgpt-rs/src/ict/bebop_upgrade.rs` (behind `ict_branching`):
+- [x] **T6.1** Create `katgpt-rs/crates/katgpt-core/src/ict/bebop_upgrade.rs` (behind `ict_branching`):
   - `AcceptanceForecastH2 { a: f32, b: f32, ema_beta: f32, ema_alpha: f32 }`
   - `fn observe_and_forecast(&mut self, next_token_logits: &[f32]) -> f32` — uses `β = collision_purity(softmax(logits))` instead of Bebop's H1
   - `fn adaptive_gamma(&self, target_accept_length, gamma_min, gamma_max) -> usize` — same as Bebop R243 §4 sketch
@@ -216,7 +216,7 @@ No game IP. No chain IP. Pure information-theoretic math + selector + EMA tracke
 | `katgpt-rs/crates/katgpt-core/src/ict/branching.rs` | ~120 | `is_critical_branching`, `branching_point_mask` + 6 unit tests |
 | `katgpt-rs/crates/katgpt-core/src/ict/detector.rs` | ~250 | `BranchingDetector` struct + `observe_and_detect` + 10 unit tests |
 | `katgpt-rs/crates/katgpt-core/src/ict/types.rs` | ~60 | `BranchingReport` + doc-comments |
-| `katgpt-rs/src/ict/bebop_upgrade.rs` | ~120 | `AcceptanceForecastH2` (Bebop H1→H2 drop-in) |
+| `katgpt-rs/crates/katgpt-core/src/ict/bebop_upgrade.rs` | ~120 | `AcceptanceForecastH2` (Bebop H1→H2 drop-in) |
 | `katgpt-rs/tests/bench_294_ict_g1.rs` | ~120 | G1 paper-proof test |
 | `katgpt-rs/tests/bench_294_ict_g2.rs` | ~180 | G2 inflection test |
 | `katgpt-rs/tests/bench_294_ict_g3.rs` | ~180 | G3 orthogonality test (MAKE-OR-BREAK) |
@@ -270,7 +270,7 @@ G7 (latent/raw boundary), G8 (ICT × CLR fusion), G9 (ICT × HLA fusion) → **r
 |------|-----------|
 | G3 fails (ρ ≥ 0.9) | Downgrade R270 to Gain. Keep T1-T6 (primitives + H1→H2 upgrade). Cancel Plan 324. File issue. |
 | G2 fails (no 10% inflection) | The 10% is LLM-token-specific. Sweep k% to find our inflection. May be 20-30% for NPCs. Document in T3.3. |
-| `js_divergence` SIMD autovectorization fails | Manual 4-way chunk unroll on the inner `Σ p·log(p/m)` loop. If still slow, GPU route via existing `katgpt-rs/src/device_selector.rs`. |
+| `js_divergence` SIMD autovectorization fails | Manual 4-way chunk unroll on the inner `Σ p·log(p/m)` loop. If still slow, GPU route via existing `riir-ai/crates/riir-engine/src/device_selector.rs`. |
 | Bebop H1→H2 upgrade (G10) shows no improvement | H2 unconditionally valid (proven), but practical magnitude may be small if LLM top-tokens are mostly > 0.37. Document either way in T6.3. |
 | Scope creep into riir-ai runtime | HARD LINE: nothing in this plan touches riir-ai. Plan 324 owns the runtime fusion. |
 

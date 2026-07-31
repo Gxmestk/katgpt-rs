@@ -208,7 +208,7 @@ impl ScreeningPruner for BeliefRankPruner {
         // rank > threshold → sigmoid < 0.5 → reject (uncertain)
         let k = 10.0;
         let x = -k * (rank - self.reject_threshold);
-        1.0 / (1.0 + (-x).exp())
+        katgpt_core::simd::fast_sigmoid(x)
     }
 }
 

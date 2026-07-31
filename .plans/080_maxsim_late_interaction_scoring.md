@@ -29,7 +29,7 @@ All gates validated via `core_05_maxsim` example and `bench_maxsim_score` / `ben
 | T9 | Correctness: TQ maxsim matches uncompressed within 1e-3 | ✅ PASS **0.95% error** (4-bit) | `core_05_maxsim` Section 5: 18.9444 vs 19.1255, rel_error=0.009468. At 3-bit: 27.15% error vs SQ 3.88% — SQ wins 7× |
 | T10 | Correctness: SQ maxsim streaming vs dequantized | ✅ PASS **exact match** | Streaming vs dequantized: 0.00% error. Fair head-to-head (3-bit, calibrated): SQ cosine 0.9845 > TQ 0.9715, SQ MaxSim error 3.88% < TQ 27.15%, SQ compression 9.7× > TQ 5.3× |
 | T11 | GPU dispatch | ✅ PASS **41–74×** | Plan 085 — `maxsim_score.wgsl` + size-gated `MaxSimScorer` (threshold=256). GPU ≥ 41× faster for work_size ≥ 50K. Fused SQ+MaxSim kernel (T5) also complete |
-| T12 | Quality: ≥2% better retrieval NDCG vs cosine | ✅ PASS | `bench_maxsim_rerank` — `src/rerank.rs` module, NDCG@10 MaxSim vs Cosine over 100 trials × 50 docs. Benchmark 014 |
+| T12 | Quality: ≥2% better retrieval NDCG vs cosine | ✅ PASS | `bench_maxsim_rerank` — `crates/katgpt-attn-match/src/rerank.rs` module, NDCG@10 MaxSim vs Cosine over 100 trials × 50 docs. Benchmark 014 |
 | T15 | Example demonstrates all primitives | ✅ PASS | `core_05_maxsim` — correctness ✓, packed ✓, separation ✓, speedup ✓, TQ ✓, SQ ✓, TQ-vs-SQ ✓ |
 
 ---
@@ -38,15 +38,15 @@ All gates validated via `core_05_maxsim` example and `bench_maxsim_score` / `ben
 
 ### Phase 1: Core Primitive — `maxsim_score`
 
-- [x] **T1: Add `maxsim_score` to `src/simd.rs`**
+- [x] **T1: Add `maxsim_score` to `crates/katgpt-dec/src/simd.rs`**
   - Signature: `pub fn maxsim_score(queries: &[f32], documents: &[f32], lq: usize, ld: usize, dim: usize) -> f32`
   - Computes `Σ_i max_j dot(q_i, d_j)` without allocating `[Lq × Ld]`
   - Uses running max per query token, calls `simd_dot_f32` for inner loop
   - FP32 accumulation regardless of input (matches Metal kernel design)
   - Feature-gated behind `maxsim`
-  - Location: `src/simd.rs` ~L788-822
+  - Location: `crates/katgpt-dec/src/simd.rs` ~L788-822
 
-- [x] **T2: Add `maxsim_score` tests to `src/simd.rs` mod tests**
+- [x] **T2: Add `maxsim_score` tests to `crates/katgpt-dec/src/simd.rs` mod tests**
   - 7 tests in `mod maxsim_tests` behind `#[cfg(feature = "maxsim")]`:
     - `maxsim_matches_naive` — random matrices, fused vs materialized naive
     - `maxsim_single_query_token` — Lq=1 edge case
@@ -57,7 +57,7 @@ All gates validated via `core_05_maxsim` example and `bench_maxsim_score` / `ben
     - `maxsim_packed_matches_sequential` — packed vs individual calls
   - **GOAT gate: ✅** All 7 pass, matches naive within 1e-6
 
-- [x] **T3: Add `maxsim_score_packed` to `src/simd.rs`**
+- [x] **T3: Add `maxsim_score_packed` to `crates/katgpt-dec/src/simd.rs`**
   - Packed/ragged form: score N (query, doc) pairs with offset arrays
   - Signature:
     ```rust
@@ -100,19 +100,19 @@ All gates validated via `core_05_maxsim` example and `bench_maxsim_score` / `ben
   - **GOAT gate: ✅ 4.71× better needle separation** (demonstrated in `core_05_maxsim` example: MaxSim 20× vs mean-K 4.25×)
 
 - [x] **T8: Benchmark PFlash maxsim block scoring**
-  - `bench_pflash_maxsim_block_scoring` in `src/benchmark.rs` — synthetic 1024 tokens, spike attention
+  - `bench_pflash_maxsim_block_scoring` in `src/benchmark/mod.rs` — synthetic 1024 tokens, spike attention
   - Wired into `run_all()` and `run_all_parallel()`
 
 ### Phase 3: TurboQuant/SpectralQuant `ScoreReduction::MaxSim`
 
-- [x] **T9: Add `maxsim_score_turboquant` to `src/turboquant/forward.rs`**
+- [x] **T9: Add `maxsim_score_turboquant` to `crates/katgpt-quant/src/turboquant/forward.rs`**
   - Lazy dequantize: one key vector in memory at a time, O(dim) peak
   - Streaming pattern: `cache.dequantize_key(layer, t)` → `simd_dot_f32` → running max
   - Feature-gated behind `turboquant` + `maxsim`
   - `#[allow(dead_code)]` removed — no longer a stub
   - **GOAT gate: ✅** Matches uncompressed within 0.95% (18.9444 vs 19.1255, kv_dim=16, 4-bit). At 3-bit: TQ error 27.15% vs SQ 3.88% — SQ wins 7× at same budget. Proven in `core_05_maxsim` Section 7 with `--features "maxsim,turboquant,spectral_quant"`
 
-- [x] **T10: Add `maxsim_score_spectralquant` to `src/spectralquant/forward.rs`**
+- [x] **T10: Add `maxsim_score_spectralquant` to `crates/katgpt-spectral/src/forward.rs`**
   - Reusable `key_buf` for dequantize-into — avoids per-position allocation
   - `cache.dequantize_key_into(layer, t, &mut key_buf)` → `simd_dot_f32` → running max
   - Comments document SpectralQuant's d_eff truncation implications
@@ -150,7 +150,7 @@ All gates validated via `core_05_maxsim` example and `bench_maxsim_score` / `ben
 ### Phase 4: REST Reranking Integration
 
 - [x] **T12: Add `maxsim_score` to REST retrieval reranking**
-  - Created `src/rerank.rs` module (feature-gated behind `maxsim`) with `RerankMethod` enum (`Cosine` | `MaxSim`), `RerankedDoc` struct, `rerank()` scorer/sorter, `ndcg_at()` evaluator
+  - Created `crates/katgpt-attn-match/src/rerank.rs` module (feature-gated behind `maxsim`) with `RerankMethod` enum (`Cosine` | `MaxSim`), `RerankedDoc` struct, `rerank()` scorer/sorter, `ndcg_at()` evaluator
   - `bench_maxsim_rerank` test: 100 trials × 50 docs (5 high + 15 partial + 30 irrelevant), Lq=8, Ld=16, dim=64, quantization noise 0.8-1.2×
   - **GOAT gate passed:** MaxSim NDCG@10 ≥ Cosine NDCG@10 × 1.02 (≥2% improvement)
   - Benchmark 014 — `.benchmarks/014_maxsim_rerank_ndcg.md`
@@ -205,7 +205,7 @@ If PFlash block maxsim (T7-T8) shows no improvement over mean-K, that applicatio
 
 **Current status:**
 - PFlash block maxsim: **4.71× better needle-vs-noise separation** — well above the 5% GOAT gate. Validated.
-- REST reranking (T12): `src/rerank.rs` module proven — MaxSim NDCG@10 ≥ Cosine × 1.02 (≥2% improvement). Benchmark 014.
+- REST reranking (T12): `crates/katgpt-attn-match/src/rerank.rs` module proven — MaxSim NDCG@10 ≥ Cosine × 1.02 (≥2% improvement). Benchmark 014.
 
 ---
 
@@ -224,7 +224,7 @@ If PFlash block maxsim (T7-T8) shows no improvement over mean-K, that applicatio
 | T9 (TQ maxsim) | Medium | Low (~30 LOC) | ✅ Done — no caller yet |
 | T10 (SQ maxsim) | Medium | Low (~30 LOC) | ✅ Done — no caller yet |
 | T11 (GPU dispatch) | **High** | Medium (~120 LOC) | ✅ Done — Plan 085 complete, GPU 41–74× faster at scale |
-| T12 (REST reranking) | Low | Low (~30 LOC) | ✅ Done — `src/rerank.rs`, Benchmark 014 |
+| T12 (REST reranking) | Low | Low (~30 LOC) | ✅ Done — `crates/katgpt-attn-match/src/rerank.rs`, Benchmark 014 |
 | T15 (Example) | Medium | Medium (~200 LOC) | ✅ Done |
 
 ---
@@ -234,15 +234,15 @@ If PFlash block maxsim (T7-T8) shows no improvement over mean-K, that applicatio
 | File | Changes |
 |------|---------|
 | `Cargo.toml` | `maxsim` feature flag + `core_05_maxsim` example + added to `full` |
-| `src/simd.rs` | `maxsim_score`, `maxsim_score_packed`, `maxsim_tests` module (7 tests) |
+| `crates/katgpt-dec/src/simd.rs` | `maxsim_score`, `maxsim_score_packed`, `maxsim_tests` module (7 tests) |
 | `src/speculative/types.rs` | `ScoreReduction` enum (always compiles, `MaxSim` variant feature-gated), `FlashPrefillConfig.score_reduction` field |
 | `src/speculative/prefill.rs` | `block_score_maxsim` function |
 | `src/speculative/mod.rs` | Re-export `block_score_maxsim` (feature-gated) |
-| `src/turboquant/forward.rs` | `maxsim_score_turboquant` — lazy dequantize + running max |
-| `src/spectralquant/forward.rs` | `maxsim_score_spectralquant` — reusable `key_buf` + dequantize-into |
-| `src/benchmark.rs` | `bench_maxsim_score` (6 configs), `bench_pflash_maxsim_block_scoring`, wired into `run_all`/`run_all_parallel` |
+| `crates/katgpt-quant/src/turboquant/forward.rs` | `maxsim_score_turboquant` — lazy dequantize + running max |
+| `crates/katgpt-spectral/src/forward.rs` | `maxsim_score_spectralquant` — reusable `key_buf` + dequantize-into |
+| `src/benchmark/mod.rs` | `bench_maxsim_score` (6 configs), `bench_pflash_maxsim_block_scoring`, wired into `run_all`/`run_all_parallel` |
 | `examples/core_05_maxsim.rs` | Demo: core scoring, packed batch, block vs mean-K, scale timing |
-| `src/rerank.rs` | `RerankMethod` enum, `RerankedDoc` struct, `rerank()`, `ndcg_at()`, `cosine_score()` — feature-gated behind `maxsim` |
+| `crates/katgpt-attn-match/src/rerank.rs` | `RerankMethod` enum, `RerankedDoc` struct, `rerank()`, `ndcg_at()`, `cosine_score()` — feature-gated behind `maxsim` |
 | `src/lib.rs` | `#[cfg(feature = "maxsim")] pub mod rerank;` after `pub mod simd;` |
 | `tests/bench_maxsim_rerank.rs` | T12 GOAT gate: 100 trials × 50 docs, NDCG@10 MaxSim vs Cosine |
 | `.benchmarks/014_maxsim_rerank_ndcg.md` | Benchmark documentation for reranking NDCG results |
@@ -283,4 +283,4 @@ cargo test --features "maxsim,turboquant,spectral_quant" --lib --quiet
 - `.raw/maxsim/maxsim_metal/maxsim.mm` — Metal host-side dispatch (reference only)
 - `.research/039_SpectralQuant_Calibrated_Eigenbasis_KV_Compression.md` — primary overlap
 - `riir-ai/crates/riir-gpu/src/kernels/spectralquant_attention.wgsl` — GPU kernel (T11 reference)
-- `riir-ai/crates/riir-gpu/src/spectralquant/attention.rs` — GPU host-side dispatch (T11 reference)
+- `katgpt-rs/crates/katgpt-core/src/attention.rs` — GPU host-side dispatch (T11 reference)

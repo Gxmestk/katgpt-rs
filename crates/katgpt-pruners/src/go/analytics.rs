@@ -50,7 +50,7 @@ pub struct GoGameAnalytics {
     pub coincidence_rate: f32,
     /// Normalized histogram of move categories (style vector, sums to 1.0).
     ///
-    /// Index maps to [`GoMoveCategory`] discriminant (0..8).
+    /// Index maps to `GoMoveCategory` discriminant (0..8).
     pub category_distribution: [f32; 8],
     /// Total number of moves in the replay.
     pub total_moves: usize,

@@ -3,7 +3,7 @@
 **Date:** 2026-06-25
 **Primitive:** [Plan 326](326_tucker_hosvd_factorization.md) — `katgpt-core/linalg::tucker` (DEFAULT-ON, G1–G4 PASS)
 **Research:** `.research/307_FNO_Practical_Perspective_Spectral_Primitives_Survey.md` (§3 candidate #3)
-**Status:** Active — consumer applications phase
+**Status:** ✅ COMPLETE — both consumers shipped (Chain collusion G1–G4 PASS, Game RMT anomaly G1–G4 PASS with honest caveats documented in G2 notes); T3.1–T3.4 all done; benchmark record `.benchmarks/328_tucker_consumer_applications.md`. Plan 326 primitive already DEFAULT-ON (orthogonal to `riir-neuron-db/.issues/002` wrapper soak window).
 **Motivation:** Plan 326 shipped a generic N-mode HOSVD primitive with zero consumers. Plan 328 finds the obvious-shine consumers — the ones where 3-mode tensor factorization is *self-evidently* the right tool, not a stretch.
 
 ---
@@ -71,7 +71,7 @@ V[curator, round, tier] ∈ {0,1}  (or normalized agreement score)
   - Returns `CollusionBloc { members: Vec<u64>, cohesion: f32, rounds_active: Vec<u64> }`
   *(Shipped. Design finding: `curator_rank=1` is optimal — a bloc IS a rank-1 phenomenon. Higher ranks introduce SVD null-space noise that breaks single-linkage cosine clustering. The bloc is the principal mode-0 singular direction; bloc members project strongly, honest voters ≈0.)*
 - [x] **T1.3** Wire `detect_collusion_tucker` alongside `detect_collusion` — exact-match stays the fast path; Tucker runs on the analytics cadence (e.g., every `R` rounds) and feeds `curator_slashing`.
-  *(Shipped as both a free function `detect_collusion_tucker` (one-shot) and a stateful `TuckerCollusionDetector` (reuses scratch buffers for the analytics loop). Wired into `consensus/mod.rs` behind `chain_curator` feature. No new Cargo feature needed — `tucker_factorization` is DEFAULT-ON in katgpt-core, and `katgpt-core` is an always-on dep of riir-chain.)*
+  *(Shipped as both a free function `detect_collusion_tucker` (one-shot) and a stateful `TuckerCollusionDetector` (reuses scratch buffers for the analytics loop). Wired into `riir-chain/src/consensus/mod.rs` behind `chain_curator` feature. No new Cargo feature needed — `tucker_factorization` is DEFAULT-ON in katgpt-core, and `katgpt-core` is an always-on dep of riir-chain.)*
 - [x] **T1.4** Tests: synthetic bloc injection (K curators vote together with ε noise across R rounds) → Tucker detects the bloc; exact-match misses it when ε > 0.
   *(Shipped: 8 unit tests including `t1_4_synthetic_bloc_injection`, `g1`–`g3` gates, `g4` perf gate `#[ignore]`, and edge cases.)*
 
@@ -93,9 +93,9 @@ V[curator, round, tier] ∈ {0,1}  (or normalized agreement score)
 ### Current state (the upgrade target)
 
 The MMO already has rule-based economy anomaly detection:
-- `seal-gm-tools/src/state.rs` — `EconomyDashboard { rmt_alert_count, recent_flows, ... }`, `ShopEntry { price, volume_24h, flagged }`, `ItemStat { anomaly_flag }`, `Guild { anomaly_flag }`
-- `seal-gm-tools/src/tabs/shops.rs` — `anomaly_section()` UI with suspend/flag/investigate actions on `flagged != 0` shops
-- `seal-gm-tools/src/rerun_stream.rs` — `log_economy_graph(flows)` already visualizes gold flows
+- `seal-online-remaster/crates/seal-gm-tools/src/state.rs` — `EconomyDashboard { rmt_alert_count, recent_flows, ... }`, `ShopEntry { price, volume_24h, flagged }`, `ItemStat { anomaly_flag }`, `Guild { anomaly_flag }`
+- `seal-online-remaster/crates/seal-gm-tools/src/tabs/shops.rs` — `anomaly_section()` UI with suspend/flag/investigate actions on `flagged != 0` shops
+- `seal-online-remaster/crates/seal-gm-tools/src/rerun_stream.rs` — `log_economy_graph(flows)` already visualizes gold flows
 
 **Current heuristic:** `flagged` is a hand-tuned threshold rule (e.g., price > N× median). Brittle: misses novel RMT patterns, generates false positives on legitimate event-driven price spikes.
 
@@ -124,7 +124,7 @@ The `flagged` field on `ShopEntry`/`ItemStat` gets populated from the Tucker res
 ### Tasks
 
 - [x] **T2.1** `EconomyTensor` builder in `seal-gm-tools/src/analytics/` (or `seal-container-service`) — rolls up `ShopEntry`/`GoldFlow`/`ItemStat` history into `P[item, window, zone]`. **T0 prerequisite:** confirm the persistence layer retains enough per-item-per-zone-per-window history (if not, T0 adds a retention table).
-  *(Shipped as `build_tensor_into` in `rmt_tucker.rs` + `shops_to_price_points` adapter in `analytics/mod.rs`. T0 finding: the MMO has NO per-item-per-zone-per-window price history table today — `ShopEntry` only stores current price/volume_24h. The detector takes pre-windowed `PricePoint` inputs; a future server-side collector would feed multi-window data. The `shops_to_price_points` adapter converts a single shop snapshot into 1-window `PricePoint`s as a thin shim for the current data model.)*
+  *(Shipped as `build_tensor_into` in `rmt_tucker.rs` + `shops_to_price_points` adapter in `seal-online-remaster/crates/seal-gm-tools/src/analytics/mod.rs`. T0 finding: the MMO has NO per-item-per-zone-per-window price history table today — `ShopEntry` only stores current price/volume_24h. The detector takes pre-windowed `PricePoint` inputs; a future server-side collector would feed multi-window data. The `shops_to_price_points` adapter converts a single shop snapshot into 1-window `PricePoint`s as a thin shim for the current data model.)*
 - [x] **T2.2** `detect_rmt_tucker(tensor, ranks) -> Vec<RmtAnomaly>` that:
   - Calls `katgpt_core::linalg::tucker_decompose_into` with ranks `(r_i, r_w, r_z)` (low-rank — the normal market is low-dimensional)
   - Reconstructs via `tucker_reconstruct_into`
@@ -134,7 +134,7 @@ The `flagged` field on `ShopEntry`/`ItemStat` gets populated from the Tucker res
 - [x] **T2.3** Wire into `EconomyDashboard` — populate `ShopEntry.flagged` / `ItemStat.anomaly_flag` / `rmt_alert_count` from Tucker residuals instead of (or alongside) the threshold rule.
   *(Shipped as a new `tucker_rmt_anomalies: Vec<RmtAnomaly>` field on `GmAppState` (behind `tucker_rmt` feature). The existing `ShopEntry.flagged` threshold rule is left intact — Tucker runs as a complementary factor-model detector. The dashboard renders both sections side-by-side in the shops tab.)*
 - [x] **T2.4** GM dashboard: add "Market Factor" view (the item-factor loadings as a heatmap) and "Cross-Server Divergence" view (the zone-factor), alongside the existing anomaly section.
-  *(Shipped as `tucker_rmt_section` + `tucker_anomaly_row` in `tabs/shops.rs` (behind `tucker_rmt` feature). Shows flagged (item, zone) pairs with residual and z-score. The full factor-matrix heatmap view is deferred — the current view shows the anomaly LIST, which is the actionable output. A future enhancement could expose the factor matrices for visualization.)*
+  *(Shipped as `tucker_rmt_section` + `tucker_anomaly_row` in `seal-online-remaster/crates/seal-gm-tools/src/tabs/shops.rs` (behind `tucker_rmt` feature). Shows flagged (item, zone) pairs with residual and z-score. The full factor-matrix heatmap view is deferred — the current view shows the anomaly LIST, which is the actionable output. A future enhancement could expose the factor matrices for visualization.)*
 - [x] **T2.5** Tests: synthetic RMT injection (K items with manipulated prices in 1 zone) → Tucker flags them; threshold rule misses them when the manipulation stays under the static threshold.
   *(Shipped: 13 unit tests including G1/G2/G3 gates, G4 perf gate `#[ignore]`, edge cases (empty input, missing cells, shape change, max_anomalies cap, threshold sensitivity). All 13 pass; G4 passes in release mode.)*
 
@@ -186,6 +186,6 @@ The cap only hurt the "one giant batch" framing. The factor-model-anomaly framin
 ## References
 
 - **Primitive:** [Plan 326](326_tucker_hosvd_factorization.md) — `katgpt-core/linalg::tucker` (DEFAULT-ON)
-- **Chain integration point:** `riir-chain/src/consensus/curator_slashing.rs` (`detect_collusion`), `riir-chain/src/consensus/curator.rs` (`CuratorVote`, `CuratorConsensus`)
+- **Chain integration point:** `riir-chain/src/consensus/curator_slashing.rs` (`detect_collusion`), `katgpt-rs/crates/katgpt-core/src/curator.rs` (`CuratorVote`, `CuratorConsensus`)
 - **Game integration point:** `seal-online-remaster/crates/seal-gm-tools/src/state.rs` (`EconomyDashboard`, `ShopEntry`), `seal-online-remaster/crates/seal-gm-tools/src/tabs/shops.rs` (`anomaly_section`)
 - **Benchmark record:** `.benchmarks/328_tucker_consumer_applications.md` (created in T3.4)

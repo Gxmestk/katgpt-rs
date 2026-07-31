@@ -3,7 +3,14 @@
 **Date:** 2026-06-16
 **Plan:** [276_micro_recurrent_belief_state.md](../.plans/276_micro_recurrent_belief_state.md)
 **Issue:** originally tracked in `024_micro_belief_g1_4_attractor_latency.md` (closed + removed; this benchmark is the canonical record)
-**Features:** `micro_belief` (opt-in)
+**Features:** `micro_belief` (transitively default-on: `bom_sampling` [in `default`] enables `micro_belief`. Plan 281 T2.4 promotion of `bom_sampling` on 2026-06-17 made `micro_belief` transitively default-on because `bom_sampling = ["micro_belief", ...]`. The standalone feature is still exposed for `--no-default-features` consumers. The original Plan 276 "opt-in until G1.1–G1.5" comment in `crates/katgpt-core/Cargo.toml` was stale and was updated 2026-07-18 (cargo-comment sync) to read `**DEFAULT-ON (2026-07-18 cargo-comment sync):** transitively in katgpt-core default via bom_sampling → micro_belief chain (Plan 281 T2.4 promotion); the "Opt-in until G1.1–G1.5 GOAT gate passes" caveat is stale.`)
+
+> **UPDATE 2026-07-18 (status sync):** the previous label said
+> `micro_belief` (opt-in). That label (and the matching Cargo comment) went
+> stale when `bom_sampling` was promoted to default-on (Plan 281 T2.4) —
+> `bom_sampling` requires `micro_belief`, so `micro_belief` is now compiled
+> in by default. This bench still works under `--features micro_belief`
+> (explicit) and under plain `cargo test` (via transitive promotion).
 
 ---
 
@@ -57,7 +64,7 @@ cargo build -p katgpt-core --no-default-features --features sparse_mlp,temporal_
 
 ## G2.1 Coherence Benchmark — The Actual GOAT Gate (T5.0)
 
-**Setup** (see `micro_belief/coherence_bench.rs`):
+**Setup** (see `crates/katgpt-micro-belief/src/coherence_bench.rs`):
 - `dim = 16` (smaller than the G1.* tests' `dim = 32` to keep the 1000-step × 3-kernel run fast; documented in the module).
 - Synthetic 1000-step input sequence, three phases:
   1. **Steps 0..400** — strong signal on dimension 0 (`input[0] = 0.8`, others `±0.05` noise). A good kernel settles into "dim 0 is dominant".
@@ -189,9 +196,9 @@ cargo test -p katgpt-core --no-default-features \
 - **Research:** [242_Topological_State_Tracking_Recurrent_Belief.md](../.research/242_Topological_State_Tracking_Recurrent_Belief.md)
 - **Source paper:** [arXiv:2604.17121](https://arxiv.org/abs/2604.17121) — Mozer et al., DeepMind, Jun 2026.
 - **Code:**
-  - `katgpt-rs/crates/katgpt-core/src/micro_belief/coherence_bench.rs` — G2.1 harness.
-  - `katgpt-rs/crates/katgpt-core/src/micro_belief/latent_thought.rs` — Family B + G1.6.
-  - `katgpt-rs/crates/katgpt-core/src/micro_belief/tests.rs` — G1.1–G1.5.
+  - `katgpt-rs/crates/katgpt-micro-belief/src/coherence_bench.rs` — G2.1 harness.
+  - `katgpt-rs/crates/katgpt-micro-belief/src/latent_thought.rs` — Family B + G1.6.
+  - `crates/katgpt-micro-belief/src/tests.rs` — G1.1–G1.5.
 
 ---
 

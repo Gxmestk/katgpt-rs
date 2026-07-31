@@ -96,17 +96,17 @@ Temperature: τ=3.0 for distributions, τ=1.0 for CE
 | Bidirectional attention | `dllm.rs` `forward_bidirectional_positions()` | ✅ Plan 066 |
 | Block-causal attention | `dllm.rs` `forward_block_causal_positions()` | ✅ Plan 066 |
 | Noise schedule | `dllm.rs` `NoiseSchedule` | ✅ Plan 066 |
-| D2F block decode | `speculative/d2f.rs` `d2f_decode_block()` | ✅ Plan 066 |
-| ConstraintPruner | `speculative/types.rs` trait | ✅ Production |
-| Speculative decoding (AR→AR) | `speculative/step.rs` | ✅ Production |
+| D2F block decode | `src/speculative/d2f.rs` `d2f_decode_block()` | ✅ Plan 066 |
+| ConstraintPruner | `crates/katgpt-core/src/speculative/types.rs` trait | ✅ Production |
+| Speculative decoding (AR→AR) | `crates/katgpt-forward/src/step.rs` | ✅ Production |
 | MTP drafter | `transformer.rs` mtp_activation_proj | ✅ Plan 055 |
 | LoRA training (wgpu) | `riir-gpu` full stack | ✅ Production |
-| SDAR sigmoid gating | `pruners/sdar_gate.rs` modelless | ✅ Plan 072 |
-| Gemma 2 model loading | `riir-engine/safetensors_loader.rs` | ✅ Plan 087 |
+| SDAR sigmoid gating | `crates/katgpt-pruners/src/sdar_gate.rs` modelless | ✅ Plan 072 |
+| Gemma 2 model loading | `riir-ai/crates/riir-engine/src/safetensors_loader.rs` | ✅ Plan 087 |
 | KV cache | `MultiLayerKVCache`, `PagedKVCache` | ✅ Production |
-| Draft→Verify→Accept pattern | `speculative/step.rs` `speculative_step_rollback()` | ✅ Production |
+| Draft→Verify→Accept pattern | `crates/katgpt-forward/src/step.rs` `speculative_step_rollback()` | ✅ Production |
 | `SpeculativeVerifier` trait | `verifier.rs` with `SimulatedVerifier`, `LeviathanVerifier` | ✅ Production |
-| DDTree path extraction | `speculative/dd_tree.rs` | ✅ Production |
+| DDTree path extraction | `src/speculative/dd_tree.rs` | ✅ Production |
 | KV cache snapshot/rollback | `MultiLayerKVCache::snapshot()/restore()` | ✅ Production |
 | Prefix acceptance logic | `LeviathanVerifier::speculate()` | ✅ Production |
 | **D2F Drafter Verifier** | **MISSING — new `SpeculativeVerifier` impl** | ❌ ~100 lines |

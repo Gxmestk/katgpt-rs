@@ -38,8 +38,9 @@
 //! | Plasma | [`ActionBridgeOracle`](oracles::ActionBridgeOracle) | `action_bridge` | 1.0 |
 //! | Plasma/Hot | [`FlowFieldOracle`](oracles::FlowFieldOracle) | `flow_field_nav` | 1.0 |
 //! | Hot | [`LeoHeadOracle`](oracles::LeoHeadOracle) | `leo_all_goals` | 1.0 |
+//! | Hot | [`DualLeoOracle`](oracles::DualLeoOracle) | `dual_leo` | 1.0 |
 //! | Freeze | [`BfnProxyOracle`](oracles::BfnProxyOracle) | (always) | 0.3 |
-//! | Freeze | [`NoGuidanceOracle`](crate::traits::NoGuidanceOracle) | `qgf_oracle` | 0.0 |
+//! | Freeze | [`NoGuidanceOracle`] | `qgf_oracle` | 0.0 |
 //!
 //! See `.research/236_QGF_Test_Time_Q_Guided_Flow.md` and
 //! `.plans/268_qgf_test_time_q_guided_flow.md`.

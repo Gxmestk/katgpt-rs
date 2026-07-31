@@ -1,6 +1,5 @@
 //! Shared tournament types for cross-arena competitions.
 
-use std::cmp::Ordering;
 use std::fmt;
 use std::time::Duration;
 
@@ -112,8 +111,7 @@ pub struct Leaderboard {
 impl Leaderboard {
     /// Sort rankings by ELO descending.
     pub fn sort(&mut self) {
-        self.rankings
-            .sort_by(|a, b| b.elo.partial_cmp(&a.elo).unwrap_or(Ordering::Equal));
+        self.rankings.sort_by(|a, b| b.elo.total_cmp(&a.elo));
     }
 
     /// Format as markdown table.
@@ -240,19 +238,22 @@ impl TrajectoryPruner {
         let kill_count = ((propagated_values.len() as f32 * self.kill_fraction) as usize)
             .min(propagated_values.len().saturating_sub(1));
 
-        let mut indexed: Vec<(usize, f32)> = propagated_values
-            .iter()
-            .enumerate()
-            .map(|(i, &v)| (i, v))
-            .collect();
+        if kill_count == 0 {
+            return Vec::new();
+        }
 
-        indexed.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(Ordering::Equal));
+        // Pre-allocate the exact output size — avoids Vec reallocation growth.
+        let mut indexed: Vec<(usize, f32)> = Vec::with_capacity(propagated_values.len());
+        indexed.extend(propagated_values.iter().enumerate().map(|(i, &v)| (i, v)));
 
-        indexed
-            .into_iter()
-            .take(kill_count)
-            .map(|(i, _)| i)
-            .collect()
+        // Partial sort: O(n) partition to bring the `kill_count` lowest-scoring
+        // items to the front, then sort just that prefix O(k log k). Cheaper
+        // than a full O(n log n) sort when kill_count ≪ n.
+        let prefix_len = kill_count - 1;
+        let _ = indexed.select_nth_unstable_by(prefix_len, |a, b| a.1.total_cmp(&b.1));
+        indexed[..prefix_len].sort_unstable_by(|a, b| a.1.total_cmp(&b.1));
+
+        indexed.iter().take(kill_count).map(|(i, _)| *i).collect()
     }
 }
 

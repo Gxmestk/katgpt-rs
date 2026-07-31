@@ -40,27 +40,27 @@ flowchart TD
 
 ## Tasks
 
-- [x] Add `EpisodePruner` struct implementing `ConstraintPruner` in `src/pruners/episode_pruner.rs`
+- [x] Add `EpisodePruner` struct implementing `ConstraintPruner` in `crates/katgpt-pruners/src/episode_pruner.rs`
   - Wraps inner `ConstraintPruner`
   - On `is_valid()`: delegate to inner pruner, then check synthesized constraints
   - On `batch_is_valid()`: batch episode lookup + constraint application
   - Cache synthesized constraints by pattern hash for reuse
   - ~200 LOC
 
-- [x] Add `ConstraintSynthesizer` trait in `src/pruners/episode_pruner.rs`
+- [x] Add `ConstraintSynthesizer` trait in `crates/katgpt-pruners/src/episode_pruner.rs`
   - `fn synthesize(candidate: &[usize], reference: &[usize]) -> Vec<SynthesizedConstraint>`
   - Default impl: structural diff → token-level constraints
   - Constraint = (position_range, allowed_tokens, disallowed_tokens)
   - ~100 LOC
 
-- [x] Add `EpisodeLookup` trait in `src/pruners/episode_pruner.rs`
+- [x] Add `EpisodeLookup` trait in `crates/katgpt-pruners/src/episode_pruner.rs`
   - `fn lookup(prompt_hash: u64) -> Option<Episode>`
   - `fn lookup_similar(prompt_embedding: &[f32], k: usize) -> Vec<Episode>`
   - Episode = (prompt_hash, reference_tokens, metadata)
   - Abstract over anyrag/SQLite/memory backend
   - ~50 LOC
 
-- [x] Add V-R loop wrapper `VRLoop` in `src/pruners/vr_loop.rs`
+- [x] Add V-R loop wrapper `VRLoop` in `crates/katgpt-pruners/src/vr_loop.rs`
   - Wraps `SpeculativeGenerator` + `ConstraintPruner`
   - `max_rounds: usize` config
   - Each round: generate → verify → extract failures → inject constraints → re-generate
@@ -76,7 +76,7 @@ flowchart TD
   - Shows constraint synthesis from reference diff
   - ~100 LOC
 
-- [x] Add tests in `src/pruners/episode_pruner.rs`
+- [x] Add tests in `crates/katgpt-pruners/src/episode_pruner.rs`
   - `test_episode_pruner_no_episode_fallback` — falls back to inner pruner
   - `test_episode_pruner_with_reference` — synthesizes constraints from diff
   - `test_constraint_synthesizer_basic` — token-level diff → constraints
@@ -110,8 +110,8 @@ If GOAT proof fails: feature-gated, opt-in only.
 
 | File | Action | LOC |
 |------|--------|-----|
-| `src/pruners/episode_pruner.rs` | CREATE | ~450 |
-| `src/pruners/vr_loop.rs` | CREATE | ~150 |
+| `crates/katgpt-pruners/src/episode_pruner.rs` | CREATE | ~450 |
+| `crates/katgpt-pruners/src/vr_loop.rs` | CREATE | ~150 |
 | `examples/egcs_demo.rs` | CREATE | ~100 |
 | `Cargo.toml` | MODIFY | ~5 |
 | `src/lib.rs` | MODIFY | ~3 |

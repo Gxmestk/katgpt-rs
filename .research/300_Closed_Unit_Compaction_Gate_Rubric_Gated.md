@@ -8,6 +8,8 @@
 > **Cross-ref (riir-ai):** Research 155 (per-NPC sub-goal compaction guide — the selling point)
 > **Cross-ref (riir-neuron-db):** Research 007 (`can_freeze` as CUCG instance — cross-domain isomorphism)
 > **Classification:** Public
+>
+> **PASS-Redirects (synthesis):** Fang, Nguyen-Thanh, Xu, Fang, Du [arXiv:2607.22098 "Reasoning Denoiser: Denoising Reasoning Traces for Hallucination Detection in Large Reasoning Models"] — PASS. REDE filters noisy reasoning steps (irrelevant + repetitive) before downstream hallucination detection by training a projection `f_φ` supervised by final-answer attention. This is structurally a CUCG-style trajectory-compaction gate where the rubric predicate is "step's final-answer attention rank" and the fire rule is "drop top-ζ% by kNN cosine distance". **Every piece already ships:** CUCG (this note) handles rubric-gated trajectory compaction with sigmoid projections on coherence/divergence/novelty; CLR (R255) handles the projection-direction supervision via `(mean_m v_k,m)^M` reliability gate (the modelless analog of final-answer attention as supervision); CausalHeadImportance (R362) handles the "observation is suboptimal, learn a refined projection" claim for head filtering. REDE's only delta vs. CUCG is the supervision SOURCE (final-answer attention vs. cite-verbatim rubric) — both produce a step-informativeness projection used to filter before downstream detection. The training loop (3-loss compact/disperse/separate) is one instantiation of math CUCG already encodes modellessly via Boolean fire rule over sigmoid gates. No riir-train deferral — §3.5 Path 0 decomposition: final-answer attention direction `q(a_T)` = outcome-attention projection (already in CLR), projection shape = compact/disperse/separate = sigmoid-gated clustering (already in CLR + CUCG + SalienceTriGate), kNN-outlier filter = CUCG outlier predicate. Mechanism already ships.
 
 ---
 
@@ -88,12 +90,12 @@ These four gaps are exactly where our codebase's Super-GOAT reframing lands.
 
 | Paper mechanism | Our shipped equivalent | Status |
 |---|---|---|
-| Fixed-interval compaction trigger | `OnlineCompactor::trigger_threshold()` (`src/attn_match/online.rs:86`) — fires when `current_pos >= phys_budget` | ✅ shipped — this is the **baseline the paper beats** |
-| Entropy-EMA-gated compaction trigger | `AdaptiveTraceCompactor` (`src/attn_match/adaptive_cot.rs`, Plan 238 wire-patch) — compacts when `ema_entropy < theta_low`; preserves when `> theta_high`; `FrequencyBandit` tunes thresholds | ⚠️ **scalar entropy signal, not rubric**; KV-level not trajectory-summary-level; fires on LOW entropy (compressible stretches) — **orthogonal axis** to closed-unit detection |
+| Fixed-interval compaction trigger | `OnlineCompactor::trigger_threshold()` (`crates/katgpt-attn-match/src/online.rs:86`) — fires when `current_pos >= phys_budget` | ✅ shipped — this is the **baseline the paper beats** |
+| Entropy-EMA-gated compaction trigger | `AdaptiveTraceCompactor` (`src/attn_match_adaptive_cot.rs`, Plan 238 wire-patch) — compacts when `ema_entropy < theta_low`; preserves when `> theta_high`; `FrequencyBandit` tunes thresholds | ⚠️ **scalar entropy signal, not rubric**; KV-level not trajectory-summary-level; fires on LOW entropy (compressible stretches) — **orthogonal axis** to closed-unit detection |
 | Discrete step pruning (the HOW) | `chain_fold` feature (Plan 195 ThoughtFold) — attention-importance ranking + binary search + KV rollback-replay | ⚠️ **different mechanism** — discrete pruning vs LLM summarization; attention scores vs verbatim-citation rubric |
-| Per-tick emit gate | `SalienceTriGate` (`src/salience/gate.rs`, Plan 303) — `Speak/Silent/Delegate` per tick | ✅ **different granularity** — per-tick emit, not per-interval compaction; `Delegate` is async handoff, not context compaction |
+| Per-tick emit gate | `SalienceTriGate` (`crates/katgpt-core/src/salience/gate.rs`, Plan 303) — `Speak/Silent/Delegate` per tick | ✅ **different granularity** — per-tick emit, not per-interval compaction; `Delegate` is async handoff, not context compaction |
 | Per-completion reliability | CLR `(mean_m v_k,m)^M` (Plan 284, default-on) — picks most reliable completion from K | ✅ **different axis** — reliability scoring, not compaction trigger; per-completion not per-trajectory |
-| Claim evidence ladder | `claim_rubric::checklist` (`src/claim_rubric/checklist.rs`, Plan 307) — L1/L2/L3 evidence items as code | ✅ **host for the rubric** — provides the cite-verbatim vocabulary SelfCompact's C1/C2/C3/N1 needs |
+| Claim evidence ladder | `claim_rubric::checklist` (`crates/katgpt-claim/src/claim_rubric/checklist.rs`, Plan 307) — L1/L2/L3 evidence items as code | ✅ **host for the rubric** — provides the cite-verbatim vocabulary SelfCompact's C1/C2/C3/N1 needs |
 | Branching-point detector | ICT `BranchingDetector` (Plan 294, R270) — JS-divergence-to-group-mean top-k% | ✅ **C1 signal source** — "branching moment passed" = "closed-unit reached" |
 | Entropy-driven verification tier | `llmexec_guard` (Plan 223) — `sigmoid(-steepness·(H1−0.5)+depth_bonus)` | ✅ **different signal** — scalar entropy gate, not multi-predicate rubric |
 | Rubric-vector gated absorb-compress | `RubricGatedAbsorbCompress` (Plan 071) — per-criterion gap targeting for DDTree absorb | ✅ **different domain** — arena-player pattern learning, not trajectory context compaction |
@@ -201,7 +203,7 @@ The C1/C2/C3/N1 predicates are **scalars derived from latent trajectory features
 
 | Paper predicate | Latent feature (codebase vocabulary) | Sigmoid projection |
 |---|---|---|
-| C1 closed-unit | coherence stability (from `latent_functor/quality_gate.rs`) | `σ(β_c1 · (coherence − τ_c1))` |
+| C1 closed-unit | coherence stability (from `riir-ai/crates/riir-engine/src/latent_functor/quality_gate.rs`) | `σ(β_c1 · (coherence − τ_c1))` |
 | C2 summarizable | negative intrinsic-rank (from `subspace_phase_gate`) | `σ(β_c2 · (d_eff − τ_c2))` inverted |
 | C3 progress | positive divergence since last summary (DEC `codifferential` on belief cochain) | `σ(β_c3 · (div_since_last − τ_c3))` |
 | N1 stuck | negative novelty rate (from `cgsp_runtime` derivative curiosity, or ICT `collision_purity`) | `σ(β_n1 · (novelty − τ_n1))` inverted |

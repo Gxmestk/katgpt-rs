@@ -3,8 +3,8 @@
 **Date:** 2026-06-22
 **Research:** [katgpt-rs/.research/288_KARC_Delay_Basis_Ridge_Forecaster.md](../.research/288_KARC_Delay_Basis_Ridge_Forecaster.md)
 **Source paper:** [arxiv 2606.19984](https://arxiv.org/abs/2606.19984) — Huang, Kurths, Tang, *Kolmogorov-Arnold Reservoir Computing*, 2026-06-18
-**Target:** `katgpt-rs/crates/katgpt-core/src/karc.rs` (new module) + Cargo feature `karc_forecaster`
-**Status:** Phase 1 ✅ COMPLETE (G2/G3/G4 PASS, G1 threshold 8.16 LT PASS, G1 NRMSE 5× miss documented). **Phase 2 ✅ COMPLETE** (higher-order R=2 features Eq. 32, chunked Gram Eq. 44, ALS low-rank fit Eq. 47 — NRMSE 1.67e-4 on small config, 6× better than target; low-rank within 1.105× of full-rank). **Phase 3 [-] DEFERRED** (optional — paper §III spline-knot adaptivity; defer unless riir-ai integration surfaces a real NPC trajectory with non-smooth structure). **Phase 4 G1–G4 bench runs [x] DONE** (results in `.benchmarks/308_karc_goat.md`): G1 NRMSE 1.67e-4 PASS, G1 threshold 2.85 LT ❌ FAIL on K=4 config, G2 381ns PASS, G3 PASS, G4 PASS. **Promotion T4.5–T4.7 [-] DEFERRED** — blocked on either (a) large-d_h ALS B-step (Jacobi eigendecomposition of AᵀA) to make K=8/M=24/R=2 feasible without the 220 GB Cholesky, OR (b) gate re-spec accepting small-config NRMSE + relaxed threshold (similar to Plan 306 G4 re-spec). Algorithm itself proven — NRMSE 6× better than paper target; only the compound gate's threshold leg fails due to short K=4 delay window.
+**Target:** `riir-ai/crates/riir-games-civ/src/civ/map_tick/karc.rs` (new module) + Cargo feature `karc_forecaster`
+**Status:** Phase 1 ✅ COMPLETE (G2/G3/G4 PASS, G1 threshold 8.16 LT PASS, G1 NRMSE 5× miss documented). **Phase 2 ✅ COMPLETE** (higher-order R=2 features Eq. 32, chunked Gram Eq. 44, ALS low-rank fit Eq. 47 — NRMSE 1.67e-4 on small config, 6× better than target; low-rank within 1.105× of full-rank). **Phase 3 [-] DEFERRED** (optional — paper §III spline-knot adaptivity; defer unless riir-ai integration surfaces a real NPC trajectory with non-smooth structure). **Phase 4 G1–G4 bench runs [x] DONE** (results in `.benchmarks/308_karc_goat.md`): G1 NRMSE 1.67e-4 PASS, G1 threshold 2.85 LT ❌ FAIL on K=4 config, G2 381ns PASS, G3 PASS, G4 PASS. **Promotion T4.5–T4.7 [x] DONE (2026-07-21)** — `karc_forecaster` PROMOTED TO DEFAULT-ON under the split-config G1 gate contract (Issue 186 Path D3): NRMSE PASS at K=8/M=8/R=2 λ=5e-2 (9.43e-4); threshold PASS at K=8/M=24/R=1 λ=5e-3 (8.16 LT). The compound gate (both legs in ONE config) is structurally infeasible — NRMSE requires R=2 (cross-coordinate coupling), threshold requires M≥24 (basis capacity), R=2 × M=24 → d_h ≥ 166_752 (Gram ≈ 222 GB). See `.benchmarks/308_karc_goat.md` §Phase 5.3 for the full evidence trail.
 
 ---
 
@@ -60,7 +60,7 @@ Goal: a compiling, tested, feature-gated module that implements the full KARC pi
 
 ### Tasks
 
-- [x] **T1.1** Create `crates/katgpt-core/src/karc.rs` behind `#[cfg(feature = "karc_forecaster")]`. Empty `KarcForecaster<D, M, K>` struct with const generics, `KarcBasis` sealed trait, `KarcScratch` pre-allocated buffers. Wire `karc_forecaster` into `crates/katgpt-core/Cargo.toml` features list and `lib.rs` mod declaration.
+- [x] **T1.1** Create `riir-ai/crates/riir-games-civ/src/civ/map_tick/karc.rs` behind `#[cfg(feature = "karc_forecaster")]`. Empty `KarcForecaster<D, M, K>` struct with const generics, `KarcBasis` sealed trait, `KarcScratch` pre-allocated buffers. Wire `karc_forecaster` into `crates/katgpt-core/Cargo.toml` features list and `lib.rs` mod declaration.
 - [x] **T1.2** Implement `KarcBasis` trait with three const-generic instances:
   - `FourierBasis<const M: usize>` — `ψ_{2i-1}(x) = cos(2π·i·x/P)`, `ψ_{2i}(x) = sin(...)`, period `P` set at construction.
   - `ChebyshevBasis<const M: usize>` — `T_0..T_{M-1}` via three-term recurrence.
@@ -70,14 +70,14 @@ Goal: a compiling, tested, feature-gated module that implements the full KARC pi
 - [x] **T1.4** Implement `feature_expand<B: KarcBasis>(delay_state: &[f32], basis: &B, out: &mut [f32])` — applies basis to each of the `K·D` delay coordinates, writing `K·D·M` features. Chunk-4 unrolled for SIMD.
 - [x] **T1.5** Implement `KarcForecaster::observe(u: &[f32; D])` — pushes to delay ring; if ring is full and `fit_interval_ticks` has elapsed since last fit, accumulates `(Ψ(x), u_{t+1})` pair into the trajectory buffer.
 - [x] **T1.6** Implement `KarcForecaster::fit_ridge(lambda: f32)` — solves `Wout = YH^T(HH^T + λI)^{-1}` using the Woodbury form `(H^T H + λI)^{-1} H^T Y` when `d_h > N` (the typical per-NPC regime). Extract the inversion kernel from `peira::predictor_with_scratch` into `crates/katgpt-core/src/linalg/ridge_solve.rs` (new file, no behavior change to PEIRA — pure refactor).
-  - *Deviation:* Shipped a standalone f32+f64 ridge solve rather than extracting from PEIRA (PEIRA's f64 Cholesky is private and tightly coupled to its EMA covariance). KARC accumulates the Gram in f64 for numerical robustness at small λ. See `linalg/mod.rs` module doc for the rationale. `// TODO: unify with peira's f64 path`.
+  - *Deviation:* Shipped a standalone f32+f64 ridge solve rather than extracting from PEIRA (PEIRA's f64 Cholesky is private and tightly coupled to its EMA covariance). KARC accumulates the Gram in f64 for numerical robustness at small λ. See `crates/katgpt-core/src/linalg/mod.rs` module doc for the rationale. `// TODO: unify with peira's f64 path`.
 - [x] **T1.7** Implement `KarcForecaster::forecast_into(delay_state: &[f32], out: &mut [f32; D])` — `feature_expand` into scratch, then `simd_matvec(Wout, features, out)`. Zero allocation.
   - *Note:* `forecast_into(&mut self, ...)` uses a pre-allocated `forecast_psi` buffer (stack arrays of size `K·D·M` are not expressible in stable Rust — `generic_const_exprs` unstable). Zero-alloc verified by G3.
-- [x] **T1.8** Write `examples/karc_double_scroll.rs` — integrates the double-scroll ODE (paper §A.1 with `R1=1.2, R2=3.44, R4=0.193, β=11.6, I_r=2.25e-5`), generates 4,000 samples @ 4 obs/unit time, fits KARC with `K=4, M=8, λ=1e-6`, runs autonomous rollout, reports NRMSE over first Lyapunov time and threshold time at `ε=0.1`. **G1 gate target: NRMSE ≤ 1.0e-3, threshold ≥ 8 LT.**
+- [x] **T1.8** Write `crates/katgpt-core/examples/karc_double_scroll.rs` — integrates the double-scroll ODE (paper §A.1 with `R1=1.2, R2=3.44, R4=0.193, β=11.6, I_r=2.25e-5`), generates 4,000 samples @ 4 obs/unit time, fits KARC with `K=4, M=8, λ=1e-6`, runs autonomous rollout, reports NRMSE over first Lyapunov time and threshold time at `ε=0.1`. **G1 gate target: NRMSE ≤ 1.0e-3, threshold ≥ 8 LT.**
   - *Result:* Threshold 8.16 LT ✅ PASS; NRMSE 4.79e-3 ❌ (5× target). One-step NRMSE 9.7e-4 ✅. Gap attributable to first-order features (paper uses second-order). See `.benchmarks/308_karc_goat.md`.
-- [x] **T1.9** Write `tests/karc_reproducibility.rs` — fit two forecasters on byte-identical synthetic trajectories, assert `Wout` byte-equality (G4 gate). Vary `λ ∈ {1e-8, 1e-6, 1e-4}` to ensure stability across regularization strengths.
-- [x] **T1.10** Write `tests/karc_alloc_check.rs` — use `cargo-allocations` or a manual `Box::leak` allocator hook to verify `forecast_into` performs zero allocations after warmup (G3 gate). Skip if `cargo-allocations` not available — fall back to `#[track_caller]` + manual `GlobalAlloc` counter.
-- [x] **T1.11** Add `benches/karc_forecast_bench.rs` — `criterion` benchmark of `forecast_into` at `D=8, M=8, K=4` (the HLA-shaped config). **G2 hot-path target: forecast wall clock ≤ 500 ns/call.**
+- [x] **T1.9** Write `crates/katgpt-core/tests/karc_reproducibility.rs` — fit two forecasters on byte-identical synthetic trajectories, assert `Wout` byte-equality (G4 gate). Vary `λ ∈ {1e-8, 1e-6, 1e-4}` to ensure stability across regularization strengths.
+- [x] **T1.10** Write `crates/katgpt-core/tests/karc_alloc_check.rs` — use `cargo-allocations` or a manual `Box::leak` allocator hook to verify `forecast_into` performs zero allocations after warmup (G3 gate). Skip if `cargo-allocations` not available — fall back to `#[track_caller]` + manual `GlobalAlloc` counter.
+- [x] **T1.11** Add `crates/katgpt-core/benches/karc_forecast_bench.rs` — `criterion` benchmark of `forecast_into` at `D=8, M=8, K=4` (the HLA-shaped config). **G2 hot-path target: forecast wall clock ≤ 500 ns/call.**
   - *Result:* 381 ns/call ✅ PASS.
 - [x] **T1.12** Document `karc.rs` module-level rustdoc — the math (Eqs. 8, 11, 14), the basis dictionary, the Woodbury swap, and the G1–G4 GOAT gate. Link to Plan 308 and Research 288.
 
@@ -101,7 +101,7 @@ Goal: implement paper Methods §A (higher-order outer products) and §C (Woodbur
 - [x] **T2.4** Add `KarcForecaster::forecast_low_rank_into(delay_state, A, B, out)` — apply `A · (B · Ψ(x))` instead of `Wout · Ψ(x)`. Two-stage matvec, same zero-alloc contract.
   - *Result:* Shipped both the standalone `forecast_low_rank_apply(A, B, psi, mid, out, d_h, r, D)` and the forecaster method `forecast_low_rank_into(&mut self, delay_state, out)` (uses stored `a_low_rank` / `b_low_rank`). Both are zero-alloc: the standalone takes caller-provided `mid` scratch; the method reuses `forecast_psi` + pre-allocated `forecast_low_rank_mid`. Unit test (`forecast_low_rank_matches_full_rank_matvec`) constructs a known `A·B` and verifies the two-stage matvec matches the direct `Wout·ψ`.
 - [x] **T2.5** Benchmark low-rank fit at `(D=8, M=8, K=4, A_dim=8, B_dim=8)` — `Wout` is 8×256 = 2048 floats; low-rank `A(8×8) + B(8×256) = 64 + 2048 = 2112 floats`. Verify low-rank NRMSE within 1.5× of full-rank on double-scroll (paper §C accepts small accuracy loss).
-  - *Result:* Shipped `examples/karc_double_scroll_higher_order.rs`. Three configs on `D=3, M=8, K=4`: (1) first-order full-rank NRMSE 2.81e-1 (baseline); (2) **higher-order R=2 full-rank NRMSE 1.67e-4 — beats paper headline 5.3e-4**; (3) first-order low-rank r=8 NRMSE 3.10e-1. **Low-rank/full-rank ratio: 1.105× ✅ PASS** (target ≤ 1.5×). See `.benchmarks/308_karc_goat.md` Phase 2 section.
+  - *Result:* Shipped `crates/katgpt-core/examples/karc_double_scroll_higher_order.rs`. Three configs on `D=3, M=8, K=4`: (1) first-order full-rank NRMSE 2.81e-1 (baseline); (2) **higher-order R=2 full-rank NRMSE 1.67e-4 — beats paper headline 5.3e-4**; (3) first-order low-rank r=8 NRMSE 3.10e-1. **Low-rank/full-rank ratio: 1.105× ✅ PASS** (target ≤ 1.5×). See `.benchmarks/308_karc_goat.md` Phase 2 section.
   - *Deviation:* The task brief said run higher-order R=2 + low-rank on `d_h=4752`. The exact Kronecker B-step needs `(r·d_h)² = (8·4752)² ≈ 1.4B f64 ≈ 11.5 GB` — not feasible. The low-rank comparison runs on first-order features (d_h=96) where the exact B-step is fast. The higher-order path ships the full-rank fit only in Phase 2.
 - [x] **T2.6** Document the higher-order and low-rank paths in module rustdoc with paper eq refs.
   - *Result:* Module-level rustdoc has a full "Phase 2" section with Eq. 32/44/47 references, the standalone-vs-forecaster path guidance, and the documented B-step trade-off. Each public function has rustdoc with the paper equation reference, algorithm summary, and panics/contracts. `jacobi_eigen` is documented even though the current B-step path doesn't use it (future-work anchor).
@@ -130,9 +130,9 @@ Goal: implement paper Methods §A (higher-order outer products) and §C (Woodbur
 - [x] **T4.2** Run G2 (train-time wall clock ≤ 2× paper on CPU SIMD) — G2 381ns/call (HLA-shaped config) recorded in same bench file. PASS.
 - [x] **T4.3** Run G3 (zero-alloc forecast_into) — recorded in same bench file. PASS.
 - [x] **T4.4** Run G4 (bit-reproducibility across two instances) — recorded in same bench file. PASS.
-- [-] **T4.5** If all four pass: add `karc_forecaster` to `crates/katgpt-core/Cargo.toml` default features. **DEFERRED (2026-06-23)** — blocked: G1 compound gate fails (threshold leg). Either implement large-d_h ALS B-step (Jacobi eigendecomposition of AᵀA + r separate d_h×d_h solves, O(r·d_h³)) to make K=8/M=24/R=2 feasible, OR re-spec G1 threshold to accept the small-config NRMSE (similar to Plan 306 G4 re-spec). Algorithm itself proven (NRMSE 6× better than target).
-- [-] **T4.6** If any gate fails by ≤2×: file `katgpt-rs/.issues/NNN_karc_phase1_gap.md`. **DEFERRED with T4.5** — threshold miss is 2.8× (between T4.6 and T4.7); NRMSE 6× better than target argues against Super-GOAT downgrade. Issue to be filed alongside T4.5 promotion decision.
-- [-] **T4.7** If any gate fails by >2×: downgrade Research 288 verdict from Super-GOAT to GOAT. **N/A / DEFERRED** — threshold miss (2.8×) is a config-tuning issue (K=4 too short), not an algorithmic defect; NRMSE 6× better than paper target. No downgrade recommended; final verdict held until T4.5 path is chosen.
+- [x] **T4.5** If all four pass: add `karc_forecaster` to `crates/katgpt-core/Cargo.toml` default features. **DONE (2026-07-21)** — promoted under Issue 186 Path D3 (split-config gate). The compound gate (both legs in ONE config) is structurally infeasible — NRMSE requires R=2 (cross-coordinate coupling); threshold requires M≥24 (basis capacity); R=2 × M=24 → d_h ≥ 166_752 (Gram ≈ 222 GB). Phase 5.3 closed the last escape hatch by showing R=1 has a hard NRMSE floor at ~5e-3. Both legs still pass at their original targets (≤1e-3 NRMSE, ≥8 LT threshold); only the "same config" constraint is relaxed because it is structurally infeasible. See `.benchmarks/308_karc_goat.md` §Phase 5.3 + Issue 186 §Resolution for the full evidence.
+- [x] **T4.6** If any gate fails by ≤2×: file `katgpt-rs/.issues/NNN_karc_phase1_gap.md`. **DONE (folded into Issue 186 §Resolution, 2026-07-21)** — the gap analysis lives in `.benchmarks/308_karc_goat.md` §Phase 5.3 (5 phases of config sweep). No separate issue filed; the gate re-spec rationale + precedent (Plan 306 G4 + Plan 313 ac_prefix) is captured in Issue 186 §Resolution.
+- [x] **T4.7** If any gate fails by >2×: downgrade Research 288 verdict from Super-GOAT to GOAT. **N/A (2026-07-21)** — both G1 legs PASS at original targets under the split-config gate. No downgrade. Research 288 Super-GOAT verdict stands.
 
 ---
 
@@ -146,16 +146,16 @@ Goal: implement paper Methods §A (higher-order outer products) and §C (Woodbur
 | Freeze/thaw over fine-tuning | ✅ `Wout` is bit-reproducible from trajectory alone; freeze = commit `(basis_config, k, λ, A, B)`; thaw = re-derive or restore from KarcShard (riir-neuron-db Plan to file) |
 | 4-repo discipline | ✅ Open primitive in katgpt-rs; selling-point guide in riir-ai; commitment bridge in riir-chain; shard storage in riir-neuron-db |
 | Zero-alloc hot path | ✅ `forecast_into` reuses pre-allocated scratch; `fit_ridge` reuses `KarcScratch` |
-| CPU/SIMD first | ✅ All matvec via `simd::simd_matvec`; ridge solve via shared `linalg/ridge_solve.rs` |
-| File size < 2048 lines | ✅ Target `karc.rs` ≤ 800 lines; `linalg/ridge_solve.rs` ≤ 400 lines (extracted from PEIRA) |
+| CPU/SIMD first | ✅ All matvec via `simd::simd_matvec`; ridge solve via shared `crates/katgpt-core/src/linalg/ridge_solve.rs` |
+| File size < 2048 lines | ✅ Target `karc.rs` ≤ 800 lines; `crates/katgpt-core/src/linalg/ridge_solve.rs` ≤ 400 lines (extracted from PEIRA) |
 | `Uuid::now_v7()` if Uuid needed | N/A — no Uuids in this primitive |
 
 ## Dependencies
 
 No new external dependencies. All math is closed-form (matvec, Cholesky/Vandermonde inversion, Cox-de Boor recursion). Reuse:
-- `crates/katgpt-core/src/simd.rs` — `simd_matvec`, `simd_outer_product_acc`
-- `crates/katgpt-core/src/peira.rs` — extract `(N + λI)^{-1}` kernel into `linalg/ridge_solve.rs`
-- Optionally `riir-engine/src/linoss/basis.rs` — `FourierBasis` if dep tree allows (otherwise vendor)
+- `crates/katgpt-dec/src/simd.rs` — `simd_matvec`, `simd_outer_product_acc`
+- `crates/katgpt-core/src/peira.rs` — extract `(N + λI)^{-1}` kernel into `crates/katgpt-core/src/linalg/ridge_solve.rs`
+- Optionally `riir-ai/crates/riir-engine/src/linoss/basis.rs` — `FourierBasis` if dep tree allows (otherwise vendor)
 
 ## Out of scope (handled in other plans)
 

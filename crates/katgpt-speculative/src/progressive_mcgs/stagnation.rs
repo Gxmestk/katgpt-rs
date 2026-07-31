@@ -39,7 +39,7 @@ pub struct GlobalStagnationState {
 ///
 /// Each trigger corresponds to one of the four expansion operators
 /// (paper §3.2.2, Appendix B). The consumer decides how to build the
-/// reference set + payload for each — see [`crate::operators`].
+/// reference set + payload for each — see `crate::operators`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
 pub enum StagnationTrigger {

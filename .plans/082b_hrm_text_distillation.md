@@ -21,14 +21,14 @@ HRM-Text achieves 1B-scale pretraining with ~$1000. While the hierarchical recur
 - [x] **T1: Adam-atan2 WGSL kernel** — Replace Adam update in training shaders
   - Created `crates/riir-gpu/src/kernels/adam_atan2.wgsl` with `atan2(m_hat, v_sqrt)` update
   - Struct layout matches `AdamWParams` (32 bytes with `_eps_reserved` and `_pad`)
-  - Registered in `kernels/mod.rs`: source constant, entry point, pipeline field, pipeline creation
+  - Registered in `riir-ai/crates/riir-gpu/src/kernels/mod.rs`: source constant, entry point, pipeline field, pipeline creation
   - CPU reference: `adam_atan2_step_cpu()` + `CpuAdamAtan2Step` in `optimizer.rs`
   - Bounded: |atan2(m, sqrt(v))| ≤ π/2 when v > 0, prevents LoRA weight explosion
   - No epsilon needed (atan2 handles near-zero naturally)
   - **Tests:** `test_adam_atan2_bounded_updates`, `test_adam_atan2_vs_adamw_convergence`, `test_adam_atan2_update_bounded_by_pi` — all pass
 
 - [x] **T2: Multipack LPT batch sampler (Rust)** — Smart sequence packing for training
-  - Created `crates/riir-gpu/src/sampler.rs` with `MultipackSampler`, `MultipackConfig`, `PackedSequence`
+  - Created `crates/katgpt-deprecated/src/alien_sampler/sampler.rs` with `MultipackSampler`, `MultipackConfig`, `PackedSequence`
   - LPT scheduling via min-heap: sort sequences by length descending, assign to least-full pack
   - Includes `pack_to_loss_mask()` for masked loss computation
   - Includes `pack_sequences()` convenience function and `utilization_stats()`
@@ -54,7 +54,7 @@ HRM-Text achieves 1B-scale pretraining with ~$1000. While the hierarchical recur
   - T2: 10 sampler tests — `pack_near_full_utilization` (>95%), `pack_go_game_lengths`, `pack_vs_naive_padding`
   - T3: `test_backprop_warmup_ramp` (0→1, 50→~6, 100→10, 500→10)
   - T4: `test_trunc_normal_produces_nonzero`, `test_trunc_normal_bounded` (±2·std), `test_trunc_normal_different_across_runs`
-  - Location: `crates/riir-gpu/src/optimizer.rs` (tests module), `crates/riir-gpu/src/sampler.rs` (tests module)
+  - Location: `crates/katgpt-core/src/skill_opt/optimizer.rs` (tests module), `crates/katgpt-deprecated/src/alien_sampler/sampler.rs` (tests module)
 
 - [x] **T6: Benchmark** — Measure training impact
   - T1: `test_adam_atan2_vs_adamw_convergence` — both converge on f(x)=x²; AdamW faster but atan2 bounded

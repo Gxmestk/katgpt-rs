@@ -62,12 +62,9 @@ pub fn boltzmann_sample(utilities: &[f32], temperature: f32, rng: &mut Rng) -> u
         })
         .collect();
 
-    // Exp-sum in log space
-    let mut sum_exp = 0.0f32;
-    for l in &mut logits {
-        *l = l.exp();
-        sum_exp += *l;
-    }
+    // Exp-sum in log space — fused SIMD exp+sum pass (Cephes 6th-order poly).
+    use katgpt_core::simd::simd_exp_sum_inplace;
+    let sum_exp = simd_exp_sum_inplace(&mut logits);
 
     // Fallback: all logits underflowed → uniform
     if sum_exp <= 0.0 || !sum_exp.is_finite() {
@@ -127,11 +124,12 @@ pub fn boltzmann_sample_batch(
     // Compute initial Boltzmann probabilities
     let max_u = max_safe(utilities);
     let inv_temp = 1.0 / temperature;
+    use katgpt_core::simd::fast_exp;
     let mut probs: Vec<f32> = utilities
         .iter()
         .map(|&u| {
             if u.is_finite() {
-                ((u - max_u) * inv_temp).exp()
+                fast_exp((u - max_u) * inv_temp)
             } else {
                 0.0
             }
@@ -196,11 +194,12 @@ pub fn boltzmann_probabilities(utilities: &[f32], temperature: f32) -> Vec<f32> 
 
     let max_u = max_safe(utilities);
     let inv_temp = 1.0 / temperature;
+    use katgpt_core::simd::fast_exp;
     let mut probs: Vec<f32> = utilities
         .iter()
         .map(|&u| {
             if u.is_finite() {
-                ((u - max_u) * inv_temp).exp()
+                fast_exp((u - max_u) * inv_temp)
             } else {
                 0.0
             }

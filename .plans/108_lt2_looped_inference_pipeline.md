@@ -21,10 +21,10 @@ Our specific advantage: we already have AHLA (asymmetric second-order linear att
 - [x] T2: Benchmark naive 4× looped SDPA (4 full passes, KV cache ×4) — `bench_naive_loop` — `tests/bench_108_lt2_looped.rs`
 
 ### Phase 1: Core Types & Enums (katgpt-core)
-- [x] T3: Add `LoopMode` enum to `katgpt-core/src/types.rs`
-- [x] T4: Add `HybridPattern` enum to `katgpt-core/src/types.rs`
-- [x] T5: Add `SdpaOutputGate` struct to `katgpt-core/src/types.rs`
-- [x] T6: Add `ResidualGate` struct (per-loop learned gate ρ_τ) to `katgpt-core/src/types.rs`
+- [x] T3: Add `LoopMode` enum to `crates/katgpt-types/src/lib.rs`
+- [x] T4: Add `HybridPattern` enum to `crates/katgpt-types/src/lib.rs`
+- [x] T5: Add `SdpaOutputGate` struct to `crates/katgpt-types/src/lib.rs`
+- [x] T6: Add `ResidualGate` struct (per-loop learned gate ρ_τ) to `crates/katgpt-types/src/lib.rs`
 - [x] T7: Update `Config` struct with loop/hybrid fields + defaults
 - [x] T8: Add `lt2_looped` feature gate to `katgpt-core/Cargo.toml`
 
@@ -96,7 +96,7 @@ Output: lm_head(h)
 | Residual gate ρ_τ | O(d) | O(d) × T | Zero-init learned |
 | SDPA output gate | O(n_heads·head_dim·d) | Same (shared) | Zero-init learned |
 
-### Key Enums (in `katgpt-core/src/types.rs`)
+### Key Enums (in `crates/katgpt-types/src/lib.rs`)
 
 ```rust
 /// Looped transformer mode.

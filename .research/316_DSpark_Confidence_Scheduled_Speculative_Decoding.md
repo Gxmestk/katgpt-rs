@@ -34,7 +34,7 @@ DSpark starts from the per-token latency identity `L = (T_draft + T_verify) / τ
 | **Suffix decay** (τ drops at later positions) | Parallel drafters predict each position independently → multi-modal collision ("of problem" / "no course") | Semi-autoregressive: parallel backbone + lightweight sequential head (Markov or RNN) |
 | **Verification waste** (T_verify burned on rejected suffix tokens, especially under high concurrency) | Static block-length verification ignores both data-side acceptance variance (code vs chat) and system-side load (light vs heavy batch) | Confidence head + hardware-aware prefix scheduler that dynamically prunes per-request verification length by survival probability × engine capacity |
 
-### 1.2 Semi-autoregressive generation (§3.1) — TRAINING → riir-train
+### 1.2 Semi-autoregressive generation (§3.1) — partially modelless (Markov head), partially training (RNN head, confidence head)
 
 Two-stage drafter:
 - **Parallel stage**: DFlash-style backbone, single forward pass over the block, produces base logits `U_1..U_γ`.
@@ -46,13 +46,20 @@ Training loss (Eq. 9–12): `α_ce L_ce + α_tv L_tv + α_conf L_conf` with `α_
 
 Empirical: 2-layer DSpark beats 5-layer DFlash; capacity advantage at position 1 (deeper parallel backbone possible because T_draft is O(1) not O(γ)) outweighs suffix decay.
 
+**Modelless path check (§3.5):**
+- **Markov head** `B = W₁·W₂` — low-rank bigram transition matrix. **CAN be constructed deterministically** from corpus bigram co-occurrence statistics: `W₁[x]` = token embedding, `W₂` = log-bigram-probabilities. This is §3.5 path 2 (deterministic construction, no gradient descent). The quality may be lower than a trained head (corpus bigrams ≠ task-specific transitions), but it's a modelless baseline.
+- **RNN head** — recurrent state `s_k` is genuinely learned. **NOT modelless-constructable.** → riir-train.
+- **Confidence head** `c_k = σ(w^T [h_k; W₁[x_{k-1}]])` — **circular to compute modellessly**: the analytical `c*_k = 1 − ½‖p_d − p_t‖₁` requires target `p_t`, which is the verification forward pass itself. However, a **modelless proxy** exists: drafter logits entropy `H(p_d)` — low entropy → high confidence → likely accepted. We already ship `AcceptanceForecast` (Bebop, Plan 243) which estimates acceptance from entropy via `α ≈ a − b·H(p)`.
+
+**Verdict: Markov head is modelless-constructable (bigram statistics); confidence head has a modelless entropy proxy (Bebop); RNN head needs training.** This makes a **hybrid modelless DSpark** feasible: DFlash backbone (shipped) + bigram Markov head (deterministic) + Bebop entropy confidence (shipped) + HardwareAwarePrefixScheduler (shipped, Plan 339). No training needed for the modelless variant.
+
 ### 1.3 Confidence head (§3.2.1) — math is modelless, weights are trained
 
 `c_k = σ(w⊤ [h_k; W1[x_{k-1}]])` — a single linear projection over `[backbone hidden; prev-token Markov embedding]` + sigmoid. Supervised against the analytical per-step acceptance rate `c*_k = 1 − ½‖p_d − p_t‖₁` (TV complement, Eq. 8).
 
 **Sequential Temperature Scaling (STS)** — post-hoc calibration. Because each `c_i` is a *conditional* probability and the chain rule gives joint = Π c_i, STS calibrates the joint left-to-right: for each position k, 1D grid-search the temperature minimizing ECE of Π_{i≤k} c_i, holding earlier positions fixed. Reduces ECE from 3–8% to ~1%. Order-preserving (doesn't disrupt draft token rankings).
 
-### 1.4 Hardware-Aware Prefix Scheduler (§3.2.2, Algorithm 1) — MODELLESS, NOT SHIPPED
+### 1.4 Hardware-Aware Prefix Scheduler (§3.2.2, Algorithm 1) — MODELLESS, SHIPPED (Plan 339)
 
 This is the paper's genuinely novel inference-time primitive. Given:
 - R active requests, each with confidence sequence `c_{r,1..γ}`
@@ -81,27 +88,28 @@ Results: +51–52% aggregate throughput at moderate SLA, +60–85% (Flash) / +57
 
 | DSpark mechanism | Our shipped equivalent | Status |
 |---|---|---|
-| RS acceptance = `1 − dTV(p,q)` (Eq. 8) | `LeviathanVerifier` (`src/speculative/verifier.rs`) — real p/q rejection sampling; target probs in `p_distributions_flat` (`speculative/types.rs`) | ✅ shipped |
-| Per-step acceptance forecast `α ≈ a − b·H(p)` | `AcceptanceForecast` (`src/speculative/acceptance_forecast.rs`, Bebop Plan 243); H_2 upgrade in `crates/katgpt-core/src/ict/bebop_upgrade.rs` (Plan 294 G10) | ✅ shipped |
-| Expected accepted length `τ = Σ sigmoid(k·(Π top1 − t))` | `AcceptanceSurrogate::expected_accepted_length[_at_budget[_top1]]` (`src/speculative/caddtree_budget.rs`) | ✅ shipped (sigmoid-gated variant) |
-| `cumprod(a_i)` atomic primitive | `cumprodsum_scalar/batched[_simd]` (`src/cumprodsum.rs`) — SIMD-accelerated | ✅ shipped |
+| RS acceptance = `1 − dTV(p,q)` (Eq. 8) | `LeviathanVerifier` (`crates/katgpt-speculative/src/spechop/verifier.rs`) — real p/q rejection sampling; target probs in `p_distributions_flat` (`crates/katgpt-core/src/speculative/types.rs`) | ✅ shipped |
+| Per-step acceptance forecast `α ≈ a − b·H(p)` | `AcceptanceForecast` (`crates/katgpt-speculative/src/acceptance_forecast.rs`, Bebop Plan 243); H_2 upgrade in `crates/katgpt-core/src/ict/bebop_upgrade.rs` (Plan 294 G10) | ✅ shipped |
+| Expected accepted length `τ = Σ sigmoid(k·(Π top1 − t))` | `AcceptanceSurrogate::expected_accepted_length[_at_budget[_top1]]` (`crates/katgpt-speculative/src/caddtree_budget.rs`) | ✅ shipped (sigmoid-gated variant) |
+| `cumprod(a_i)` atomic primitive | `cumprodsum_scalar/batched[_simd]` (`crates/katgpt-core/src/cumprodsum.rs`) — SIMD-accelerated | ✅ shipped |
 | Anchor-block drafting pattern | `flashar_anchor.rs` (Plan 166 — AR anchor + D2F fill), `d2f.rs` (block-parallel D2F with mask tokens) | ✅ shipped (different pattern: FlashAR is AR-stride + D2F-fill; DSpark is anchor-emit + mask-block + sequential head) |
 | Confidence head = Linear(d,1)+sigmoid | Architecturally identical to our dot-product + sigmoid direction-vector projection (constraint #2) | ✅ shipped as *shape* (Bebop `AcceptanceForecast`); the *trained weights* are training-only |
 | Block-causal attention mask with cross-block isolation | `create_dspark_attention_mask` in the paper's code; our `d2f.rs` has block-causal masks | ✅ shipped (different mask topology) |
 
 ### 2.2 What's NOT in katgpt-rs (the gaps)
 
-1. **Hardware-Aware Prefix Scheduler** (Algorithm 1). Our budget allocators (`caddtree_budget.rs`, `budget.rs`) are **per-request** tree-budget selectors. DSpark's scheduler is a **multi-request global greedy** that maximizes `Θ = τ · SPS(B)` across the whole batch using a profiled engine cost curve. The non-anticipating early-stop correctness proof (Appendix A) has no analog in our code. **This is the one genuinely new modelless primitive.**
+1. ~~**Hardware-Aware Prefix Scheduler** (Algorithm 1)~~ — **SHIPPED (Plan 339, feature `hardware_aware_scheduler`, GOAT G1-G5 PASS)**. `HardwareAwarePrefixScheduler` + `SpsCurve` + non-anticipating early-stop. Stays opt-in until a real multi-request batch caller exercises it (katgpt-rs is single-request by default).
 2. **Sequential Temperature Scaling (STS)**. Our `AcceptanceForecast::fit_from_warmup` fits the marginal `α ≈ a − b·H(p)` via linear regression on `(H, observed_acceptance)` pairs. It does NOT do chain-rule-aware left-to-right calibration of the cumulative product `Π c_i`. STS is a small but principled refinement.
-3. **Semi-autoregressive sequential head** (Markov/RNN over parallel backbone logits). The low-rank bigram bias `B = W1·W2` is trained. A modelless analog (closed-form bigram co-occurrence from a corpus) is possible but a stretch — the bias is genuinely a learned quantity. → riir-train.
+3. **Semi-autoregressive sequential head** (Markov/RNN over parallel backbone logits). **Modelless path exists for the Markov head** (§3.5 path 2: construct `W₁·W₂` from corpus bigram co-occurrence statistics — no gradient descent). The RNN head is genuinely trained → riir-train. A **hybrid modelless DSpark** is feasible: DFlash (shipped) + bigram Markov head (deterministic) + Bebop entropy confidence (shipped) + HardwareAwarePrefixScheduler (shipped). This hybrid is benchmarked against the dual-path consolidation in Plan 485 (Issue 453).
 
 ### 2.3 Fusion
 
-The Hardware-Aware Prefix Scheduler fuses with three existing katgpt-rs / riir-ai systems:
+The Hardware-Aware Prefix Scheduler fuses with four existing katgpt-rs / riir-ai systems:
 
 1. **× `AcceptanceForecast` (Bebop, Plan 243)**: Bebop produces the per-position `c_k` (via `α ≈ a − b·H_2(p)`). The scheduler consumes `a_{r,j} = Π_{i≤j} c_i` to allocate verification budget across requests. Bebop is the *producer*; the scheduler is the *consumer*. Today Bebop drives per-request adaptive γ (Issue 023); the scheduler would drive *cross-request* adaptive verification budget.
 2. **× `AcceptanceSurrogate::expected_accepted_length_at_budget` (caddtree_budget.rs)**: this already does per-request budget-vs-acceptance tradeoff. The scheduler generalizes it to multi-request with a real `SPS(B)` cost curve instead of a synthetic latency estimator.
 3. **× riir-ai crowd-scale NPC cognition**: in MMORPG-scale game AI (thousands of concurrent NPCs, 20Hz tick), each NPC's per-tick token generation is a "request". The SPS(B) curve becomes "how many NPC-verifications can the engine fit in one tick". The scheduler allocates the tick's verification budget across NPCs by survival probability × engine capacity. This is the most interesting fusion angle — a multi-NPC verification budget allocator under tick constraints. (Noted but NOT developed here — would be a riir-ai guide if pursued.)
+4. **× DDTree + FlashAR consolidation (Proposal 018 §4.7, Issue 453, Plan 485)**: DSpark's semi-AR architecture (parallel backbone + Markov head) is a **simpler alternative** to the dual-path consolidation design. Instead of running two drafters (DFlash+MTP + D2F) with ternary consensus, DSpark uses a single semi-AR drafter with confidence-scheduled verification. The **modelless hybrid** (DFlash + bigram Markov head + Bebop confidence + Plan 339 scheduler) is a benchmark competitor in Plan 485's 4-way PoC. If the modelless hybrid beats the dual-path consolidation, it's the simpler path. DSpark's production results (60-85% over MTP-1) validate the approach.
 
 ### 2.4 Why this is NOT Super-GOAT
 
@@ -175,18 +183,23 @@ impl HardwareAwarePrefixScheduler {
 
 ## 5. Cross-References
 
-- `katgpt-rs/src/speculative/acceptance_forecast.rs` — `AcceptanceForecast` (Bebop, produces `c_k`; scheduler consumes `Π c_i`)
-- `katgpt-rs/src/speculative/caddtree_budget.rs` — `AcceptanceSurrogate::expected_accepted_length_at_budget` (per-request analog of the scheduler's multi-request objective)
-- `katgpt-rs/src/speculative/verifier.rs` — `LeviathanVerifier` (RS = 1−dTV, already shipped)
-- `katgpt-rs/src/cumprodsum.rs` — `cumprodsum_*` (SIMD atomic for `Π c_i`)
-- `katgpt-rs/src/speculative/budget.rs` — per-request adaptive budget (to be generalized by the scheduler)
-- `katgpt-rs/.research/243_Bebop_Entropy_Bounded_MTP_Acceptance_Adaptive_Gamma.md` — Bebop `α ≈ a−b·H(p)` (scheduler's per-position input source)
+- **`katgpt-rs/.plans/339_hardware_aware_prefix_scheduler.md`** — SHIPPED: `HardwareAwarePrefixScheduler` + `SpsCurve` + non-anticipating early-stop (GOAT G1-G5 PASS, opt-in)
+- `katgpt-rs/crates/katgpt-speculative/src/prefix_scheduler.rs` — the shipped scheduler implementation
+- `katgpt-rs/crates/katgpt-speculative/src/acceptance_forecast.rs` — `AcceptanceForecast` (Bebop, produces `c_k`; scheduler consumes `Π c_i`)
+- `katgpt-rs/crates/katgpt-speculative/src/caddtree_budget.rs` — `AcceptanceSurrogate::expected_accepted_length_at_budget` (per-request analog of the scheduler's multi-request objective)
+- `crates/katgpt-forward/src/verifier.rs` — `LeviathanVerifier` (RS = 1−dTV, already shipped)
+- `katgpt-rs/crates/katgpt-core/src/cumprodsum.rs` — `cumprodsum_*` (SIMD atomic for `Π c_i`)
+- `crates/katgpt-speculative/src/budget.rs` — per-request adaptive budget (generalized by the scheduler)
+- `katgpt-rs/.research/243_Bebop_Entropy_Bounded_MTP_Acceptance_Adaptive_Gamma.md` — Bebop `α ≈ a−b·H(p)` (scheduler's per-position input source; modelless confidence proxy for DSpark's trained confidence head)
 - `katgpt-rs/.research/177_Domino_Decoupled_Causal_Speculative_Decoding.md` — Domino (concurrent work, CausalEncoder ≈ DSpark RNN head → riir-train)
 - `katgpt-rs/.research/295_AC_GPT_Arbitrary_Conditionals_Prefix.md` — AC-Prefix (single-pass conditional evaluation, different angle)
-- `riir-train/` — semi-autoregressive architecture + CE/TV/confidence loss + Markov/RNN head training (redirect target)
+- **`riir-ai/.proposals/018_unique_runtime_training_methodology.md` §4.7** — consolidation design (dual-path consensus + DDTree); DSpark semi-AR is the simpler alternative
+- **`riir-ai/.issues/453_consensus_tree_verify_proof.md`** — proof requirement for the consolidation; DSpark is the production-validated baseline to beat
+- **`riir-ai/.plans/485_consensus_tree_verify_poc.md`** — PoC includes DSpark modelless hybrid as 4th competitor
+- `riir-train/` — semi-autoregressive architecture + CE/TV/confidence loss + Markov/RNN head training (redirect for trained variant; modelless Markov head from bigram statistics stays in katgpt-rs)
 
 ---
 
 ## TL;DR
 
-DSpark is a production speculative-decoding paper (DeepSeek-V4, +60–85% per-user speedup). Two components: (1) **semi-autoregressive drafter** (parallel backbone + sequential Markov/RNN head) = training → riir-train; (2) **confidence-scheduled verification** = confidence head (math already shipped as `AcceptanceForecast`/`AcceptanceSurrogate`/`LeviathanVerifier`) + **Hardware-Aware Prefix Scheduler** (Algorithm 1 — NOT shipped, the one modelless gift). The scheduler is a global multi-request greedy verification-budget allocator with a non-anticipating early-stop correctness proof (Appendix A). **Gain tier** — useful, incremental, needs our own benchmark before promotion; tracked in Issue 003. Not Super-GOAT (serving-system optimization, not a new capability class; no product moat from the scheduler alone). Latent-space reframing deliberately not forced — this is correctly a token-level inference-primitive paper.
+DSpark is a production speculative-decoding paper (DeepSeek-V4, +60–85% per-user speedup). Two components: (1) **semi-autoregressive drafter** (parallel backbone + sequential Markov/RNN head) — Markov head is **modelless-constructable** from corpus bigram statistics (§3.5 path 2); RNN head needs training → riir-train; (2) **confidence-scheduled verification** — confidence head math ships as `AcceptanceForecast` (Bebop, modelless entropy proxy), and the **Hardware-Aware Prefix Scheduler SHIPPED** (Plan 339, `hardware_aware_scheduler`, GOAT G1-G5 PASS, opt-in). A **modelless hybrid DSpark** is feasible: DFlash (shipped) + bigram Markov head (deterministic) + Bebop entropy confidence (shipped) + Plan 339 scheduler (shipped) — no training needed. This hybrid is benchmarked against the dual-path consolidation design (Proposal 018 §4.7, Issue 453, Plan 485) as a 4th competitor. Not Super-GOAT (serving-system optimization, not a new capability class). Latent-space reframing deliberately not forced — this is correctly a token-level inference-primitive paper.

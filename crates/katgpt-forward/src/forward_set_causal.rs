@@ -22,7 +22,7 @@ use katgpt_types::Config;
 use katgpt_types::{kv_dim, matmul, matmul_relu, rmsnorm};
 
 /// Set-causal attention forward pass — generalizes
-/// [`forward_block_causal_positions`] to arbitrary position-set orderings.
+/// `forward_block_causal_positions` to arbitrary position-set orderings.
 ///
 /// This is the CPU reference for the SW-SetDLM (Set Diffusion) training
 /// objective (Arriola & Kuleshov, arXiv:2607.01775, Research 376). The GPU
@@ -48,7 +48,7 @@ use katgpt_types::{kv_dim, matmul, matmul_relu, rmsnorm};
 ///
 /// When `position_order[p] = p / block_size`, positions in the same block share
 /// a generation step and the eligibility rule reduces to the prefix
-/// `[0..end_of_current_block]` — exactly [`forward_block_causal_positions`]
+/// `[0..end_of_current_block]` — exactly `forward_block_causal_positions`
 /// with `causal_block_size = block_size`. The test
 /// `test_set_causal_matches_block_causal_when_block_ordered` (still in root,
 /// because it also needs `forward_block_causal_positions`) verifies
@@ -74,7 +74,7 @@ use katgpt_types::{kv_dim, matmul, matmul_relu, rmsnorm};
 /// Weights to ineligible positions (`position_order[t] > position_order[q]`)
 /// are exactly 0.0.
 ///
-/// This matches the flat layout of [`forward_bidirectional_positions`] for
+/// This matches the flat layout of `forward_bidirectional_positions` for
 /// API consistency (Plan 401 originally shipped nested; flat eliminates
 /// `seq_len` separate inner-heap allocations per output buffer).
 pub fn forward_set_causal_positions(
@@ -183,10 +183,11 @@ pub fn forward_set_causal_positions(
             // Pass 2: exp(score - max) for eligible positions, 0 for ineligible.
             // Scalar exp (not SIMD) because the eligible set is typically
             // non-contiguous and we must not feed garbage to the polynomial exp.
+            // Uses Cephes-backed `fast_exp` instead of libm `.exp()`.
             let mut sum_exp = 0.0f32;
             for t in 0..seq_len {
                 if position_order[t] <= q_gen_step {
-                    let e = (scores_buf[t] - max_score).exp();
+                    let e = simd::fast_exp(scores_buf[t] - max_score);
                     scores_buf[t] = e;
                     sum_exp += e;
                 } else {
@@ -370,7 +371,11 @@ mod tests {
         let (_, attn) = forward_set_causal_positions(&weights, &tokens, &config, &position_order);
 
         let attn_stride = config.n_head * tokens.len();
-        for (q, attn_row) in attn.chunks_exact(attn_stride).enumerate().take(tokens.len()) {
+        for (q, attn_row) in attn
+            .chunks_exact(attn_stride)
+            .enumerate()
+            .take(tokens.len())
+        {
             for h in 0..config.n_head {
                 for t in 0..tokens.len() {
                     let w = attn_row[h * tokens.len() + t];

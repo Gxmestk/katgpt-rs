@@ -15,8 +15,8 @@
 //! loader in riir-ai.
 //!
 //! - [`spectral_concentration`] — top-k energy ratio in `[0, 1]`.
-//! - [`adaptive_rank`] — sigmoid-mapped rank in `[min_rank, max_rank]`.
-//! - [`cot_budget_from_concentration`] — adaptive CoT length bonus.
+//! - `adaptive_rank` — sigmoid-mapped rank in `[min_rank, max_rank]`.
+//! - `cot_budget_from_concentration` — adaptive CoT length bonus.
 //!
 //! # Paper grounding
 //!
@@ -31,6 +31,8 @@
 //! `adaptive_rank` maps concentration through `sigmoid(8·(c − 0.5))`, which
 //! gives a smooth S-curve centered at `c = 0.5`: low-concentration spectra
 //! saturate at `min_rank`, high-concentration spectra saturate at `max_rank`.
+
+use katgpt_core::simd::fast_sigmoid;
 
 // ---------------------------------------------------------------------------
 // spectral_concentration — top-k energy ratio
@@ -194,23 +196,6 @@ pub fn cot_budget_from_concentration(c: f32, base: usize, max_extra: usize) -> u
     let s = fast_sigmoid(sigmoid_input);
     let extra = (max_extra as f32) * s;
     base + (extra.round() as usize)
-}
-
-// ---------------------------------------------------------------------------
-// Shared sigmoid helper
-// ---------------------------------------------------------------------------
-
-/// Numerically stable sigmoid in `(0, 1)`. Matches `katgpt_core::simd::fast_sigmoid`
-/// semantics; inlined to keep this module dependency-light.
-#[inline(always)]
-fn fast_sigmoid(x: f32) -> f32 {
-    if x > 40.0 {
-        return 1.0;
-    }
-    if x < -40.0 {
-        return 0.0;
-    }
-    1.0 / (1.0 + (-x).exp())
 }
 
 // ---------------------------------------------------------------------------

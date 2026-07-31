@@ -105,12 +105,7 @@ impl BtScores {
     /// Ties are broken by index (lower index first for stability).
     pub fn rank(&self) -> Vec<usize> {
         let mut ranked: Vec<usize> = (0..self.scores.len()).collect();
-        ranked.sort_by(|&a, &b| {
-            self.scores[b]
-                .partial_cmp(&self.scores[a])
-                .unwrap_or(std::cmp::Ordering::Equal)
-                .then(a.cmp(&b))
-        });
+        ranked.sort_by(|&a, &b| self.scores[b].total_cmp(&self.scores[a]).then(a.cmp(&b)));
         ranked
     }
 
@@ -142,19 +137,11 @@ impl BtScores {
 
 // ── Core Functions ──────────────────────────────────────────────
 
-/// Numerically stable logistic sigmoid: σ(z) = 1 / (1 + exp(-z)).
-///
-/// Two-branch implementation avoids overflow in `exp()`:
-/// - `z >= 0`: `1 / (1 + exp(-z))`
-/// - `z < 0`: `exp(z) / (1 + exp(z))`
+/// Logistic sigmoid: σ(z) = 1 / (1 + exp(-z)). Delegates to
+/// `katgpt_core::simd::fast_sigmoid` (Cephes polynomial).
 #[inline]
 pub fn sigmoid(z: f32) -> f32 {
-    if z >= 0.0 {
-        1.0 / (1.0 + (-z).exp())
-    } else {
-        let ez = z.exp();
-        ez / (1.0 + ez)
-    }
+    katgpt_core::simd::fast_sigmoid(z)
 }
 
 /// Fit Bradley-Terry scores from pairwise comparisons via gradient ascent.

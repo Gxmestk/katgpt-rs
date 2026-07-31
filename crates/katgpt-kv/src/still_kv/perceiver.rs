@@ -777,7 +777,7 @@ mod tests {
         };
         let config_2blocks = StillPerceiverConfig {
             num_blocks: 2,
-            ..config_1block.clone()
+            ..config_1block
         };
         let perceiver_1 = StillPerceiver::new(config_1block);
         let perceiver_2 = StillPerceiver::new(config_2blocks);

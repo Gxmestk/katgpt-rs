@@ -218,10 +218,10 @@ cargo clippy --features epiplexity_scoring --quiet --tests
 
 | File | Lines | Purpose |
 |------|-------|---------|
-| `src/pruners/epiplexity/mod.rs` | ~294 | EpiplexityEstimator, TimeBoundedEntropy, unit tests |
-| `src/pruners/epiplexity/screening.rs` | ~284 | EpiplexityScreeningPruner<P>, EpiplexityWeight |
-| `src/pruners/epiplexity/loss_curve.rs` | ~439 | LossCurveTracker, PerPositionLossTracker |
-| `src/pruners/epiplexity/factorization.rs` | ~287 | FactorizationScorer, FactorizationOrder |
+| `crates/katgpt-pruners/src/epiplexity/mod.rs` | ~294 | EpiplexityEstimator, TimeBoundedEntropy, unit tests |
+| `crates/katgpt-pruners/src/epiplexity/screening.rs` | ~284 | EpiplexityScreeningPruner<P>, EpiplexityWeight |
+| `crates/katgpt-pruners/src/epiplexity/loss_curve.rs` | ~439 | LossCurveTracker, PerPositionLossTracker |
+| `crates/katgpt-pruners/src/epiplexity/factorization.rs` | ~287 | FactorizationScorer, FactorizationOrder |
 | `tests/test_130_epiplexity_goat.rs` | ~672 | GOAT proofs (48 tests) |
 
 ### Modified Files
@@ -263,6 +263,6 @@ cargo clippy --features epiplexity_scoring --quiet --tests
 
 - Research 090: `.research/090_Epiplexity_Structural_Information_Computationally_Bounded_Observers.md`
 - Epiplexity paper: arXiv:2601.03220
-- Existing ScreeningPruner trait: `crates/katgpt-core/src/traits.rs`
-- Existing bandit: `src/pruners/bandit.rs` (Plan 030)
+- Existing ScreeningPruner trait: `crates/katgpt-core/src/traits/mod.rs`
+- Existing bandit: `crates/katgpt-ruliology/src/bandit.rs` (Plan 030)
 - Benchmark 040: `.benchmarks/040_opus_boltzmann_bandit.md`

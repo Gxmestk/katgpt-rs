@@ -1,5 +1,11 @@
 # Plan 119: EqR Convergence-Based Selection for Breadth Scaling
 
+> **Note on file paths (2026-07-18):** Some `*.rs` paths in this document
+> reference modules that were renamed, moved, or never landed under the
+> exact name shown. They are preserved as a **historical record** of the
+> original design intent; consult the current crate layout for the live
+> location.
+
 > **Status:** ✅ Complete
 > **Branch:** `develop/feature/119_eqr_convergence_selector`
 > **Depends on:** Plan 079 (ELF SDE ✅), Plan 083 (PTRM width scaling ✅), Plan 030 (BanditPruner ✅)
@@ -26,12 +32,12 @@ EqR proves that after **landscape shaping** (RI + NI training), the fixed-point 
 |-----------|----------|------|
 | `best_of_k_rollouts()` | `src/speculative/dd_tree.rs` | Width scaling — K parallel trees |
 | `inject_sde_noise()` | `src/speculative/dd_tree.rs` | Noise injection (EqR NI analog) |
-| `BanditPruner<P>` with UCB1 | `src/pruners/bandit.rs` | Q-value trajectory selection |
+| `BanditPruner<P>` with UCB1 | `crates/katgpt-ruliology/src/bandit.rs` | Q-value trajectory selection |
 | `DDTreeBranchCache` with `max_branches` | `src/speculative/types.rs` | Breadth scaling |
-| `width_rollouts` in Config | `crates/katgpt-core/src/types.rs` | Rollout count configuration |
-| `LoopMode::WeightShared` | `crates/katgpt-core/src/types.rs` | Weight-shared iteration |
-| `ResidualGate` | `crates/katgpt-core/src/types.rs` | Per-loop residual gate |
-| `SdpaOutputGate` | `crates/katgpt-core/src/types.rs` | Attention sink suppression |
+| `width_rollouts` in Config | `crates/katgpt-types/src/lib.rs` | Rollout count configuration |
+| `LoopMode::WeightShared` | `crates/katgpt-types/src/lib.rs` | Weight-shared iteration |
+| `ResidualGate` | `crates/katgpt-types/src/lib.rs` | Per-loop residual gate |
+| `SdpaOutputGate` | `crates/katgpt-types/src/lib.rs` | Attention sink suppression |
 | HLA/AHLA linear attention | `src/attention/` | Constant-state latent recursion |
 | `WidthSelectionMode` enum | `src/speculative/dd_tree.rs` | BestQ, MostFrequent selection |
 
@@ -50,8 +56,8 @@ EqR proves that after **landscape shaping** (RI + NI training), the fixed-point 
 
 ## Tasks
 
-- [x] **T1: Add `ConvergenceSelector` enum** — Selection strategy taxonomy ✅ `crates/katgpt-core/src/types.rs` (4 variants, default BestQ)
-  - Location: `crates/katgpt-core/src/types.rs` (after `ResidualGate`)
+- [x] **T1: Add `ConvergenceSelector` enum** — Selection strategy taxonomy ✅ `crates/katgpt-types/src/lib.rs` (4 variants, default BestQ)
+  - Location: `crates/katgpt-types/src/lib.rs` (after `ResidualGate`)
   - Feature gate: `#[cfg(feature = "eqr_convergence")]`
   - Variants:
     - `BestQ` — Highest cumulative relevance (current default, PTRM)
@@ -103,7 +109,7 @@ EqR proves that after **landscape shaping** (RI + NI training), the fixed-point 
     The marginal-change proxy ∥p_{depth+1} − p_{depth}∥ is a reasonable discrete analog.
 
 - [x] **T4: Add `convergence_selector` to Config** — Configuration wiring ✅ Config field + InferenceOverrides + with_overrides() + test_with_overrides_all_fields
-  - Location: `crates/katgpt-core/src/types.rs`
+  - Location: `crates/katgpt-types/src/lib.rs`
   - Feature gate: `#[cfg(feature = "eqr_convergence")]`
   - Add field: `pub convergence_selector: ConvergenceSelector` (default: `BestQ`)
   - Add to `InferenceOverrides`: `pub convergence_selector: Option<ConvergenceSelector>`
@@ -316,7 +322,7 @@ eqr_convergence = ["elf_sde"]
 
 | File | Change | Lines (est.) |
 |------|--------|-------------|
-| `crates/katgpt-core/src/types.rs` | Add `ConvergenceSelector` + Config field | ~25 |
+| `crates/katgpt-types/src/lib.rs` | Add `ConvergenceSelector` + Config field | ~25 |
 | `crates/katgpt-core/src/lib.rs` | Export `ConvergenceSelector` | ~1 |
 | `src/speculative/dd_tree.rs` | Add `ResidualTracker` + Top1Converged selection | ~70 |
 | `src/speculative/mod.rs` | Export `ResidualTracker` | ~1 |

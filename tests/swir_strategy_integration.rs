@@ -26,7 +26,9 @@
 #![cfg(feature = "swir_switch_thinking")]
 
 use katgpt_transformer::swir::{SwiRConfig, SwiRStrategyAdapter, ThinkMode};
-use katgpt_transformer::thinking_cot::{ControlTokenIds, StepContext, StepDirective, ThinkingStrategy};
+use katgpt_transformer::thinking_cot::{
+    ControlTokenIds, StepContext, StepDirective, ThinkingStrategy,
+};
 
 /// Build a flat `[vocab, dim]` embedding matrix from row vectors.
 fn mat(rows: &[Vec<f32>]) -> Vec<f32> {

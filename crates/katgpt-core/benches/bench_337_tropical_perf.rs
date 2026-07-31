@@ -11,7 +11,7 @@
 //!   - Both kernels share the same 4-wide chunked auto-vectorisation pattern.
 //!
 //! What this bench measures:
-//!   - Three matrix shapes: D=8 (HLA-scale), D=64 (shard-scale), D=128 (wide).
+//!   - Three matrix shapes: D=8 (belief-scale), D=64 (shard-scale), D=128 (wide).
 //!   - Each shape: 1000 timed iterations of each kernel, report ns/iter.
 //!   - Correctness check: outputs differ (different semirings) but both run.
 //!
@@ -90,8 +90,8 @@ fn main() {
 
     // G2 gate per Plan 337: "tropical matvec ≥ as fast as simd_matvec at D=64".
     // The D=64 and D=128 dims are the production-relevant ones (shard-scale,
-    // wide latent ops). D=8 (HLA-scale) dense matvec is a cold-path curiosity —
-    // the actual HLA use case uses sparse DEC wrappers, not dense 8×8 matvec.
+    // wide latent ops). D=8 (belief-scale) dense matvec is a cold-path curiosity —
+    // the actual belief use case uses sparse DEC wrappers, not dense 8×8 matvec.
     //
     // PASS  = within 1.20x at D=64 AND D=128 (the gate dims).
     // PASS* = within 1.20x at D=64/D=128 but materially slower at D=8
@@ -144,7 +144,7 @@ fn main() {
     println!();
 
     // G2 gate: the PLAN's threshold is specifically D=64. D=128 is the same
-    // class (wide latent). D=8 is HLA-scale but dense-8×8 isn't the HLA use
+    // class (wide latent). D=8 is belief-scale but dense-8×8 isn't the belief use
     // case (DEC wrappers are sparse). So the gate passes if D=64 AND D=128
     // are both within 1.20x, regardless of D=8.
     let d64 = results.iter().find(|r| r.0 == 64).copied().unwrap();
@@ -154,8 +154,8 @@ fn main() {
     let d8_note = if d8.2 {
         "D=8 also within 1.20x (clean sweep)."
     } else {
-        "D=8 (HLA-scale dense matvec) is slower but is NOT a production use case —\
-             the HLA path uses sparse DEC wrappers, not dense 8×8 tropical matvec."
+        "D=8 (belief-scale dense matvec) is slower but is NOT a production use case —\
+             the belief path uses sparse DEC wrappers, not dense 8×8 tropical matvec."
     };
 
     if gate_pass {

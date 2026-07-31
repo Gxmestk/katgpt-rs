@@ -3,7 +3,7 @@
 **Date:** 2026-06-26
 **Plan:** [katgpt-rs/.plans/330_analytic_lattice_encoder_decoder_primitive.md](../.plans/330_analytic_lattice_encoder_decoder_primitive.md)
 **Feature:** `analytic_lattice` (opt-in, NOT promoted to default — pending user review)
-**Test binaries:** `tests/analytic_lattice_goat.rs` (math gates) + `tests/analytic_lattice_alloc_check.rs` (G5)
+**Test binaries:** `crates/katgpt-core/tests/analytic_lattice_goat.rs` (math gates) + `crates/katgpt-core/tests/analytic_lattice_alloc_check.rs` (G5)
 
 ## Scope
 
@@ -66,7 +66,13 @@ cargo test -p katgpt-core --all-features
 The 2 failures are **pre-existing** and unrelated to `analytic_lattice`:
 - `curator::tests::test_verification_weight_thresholds` — pre-existing
 - `rtdc::tests::subtree::cg6_verify_cost_within_5x_of_depth_2` — pre-existing
-  timing-dependent perf test (5.746× vs 5.5× gate, flaky on load)
+  timing-dependent perf test (5.746× vs 5.5× gate, flaky on load).
+  **Resolved 2026-07-17** (separate commit): test marked `#[ignore]` — the
+  canonical CG6.1 measurement is the criterion bench `rtdc_subtree_bench`
+  (recorded at 4.60× in `.benchmarks/303`); the inline timing test was a
+  redundant sanity check that flaked under parallel test load in debug
+  mode. Run on-demand with `cargo test --release --features
+  rtdc_subtree_inclusion --lib -- --ignored cg6_verify_cost_within_5x_of_depth_2`.
 
 All 46 `analytic_lattice` tests pass under `--all-features`.
 

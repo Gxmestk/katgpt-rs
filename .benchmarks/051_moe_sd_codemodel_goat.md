@@ -3,8 +3,14 @@
 **Date:** 2025-06
 **Plan:** 096 (MoE+SD Co-Design Model Distillation)
 **Source:** Research 59 (MoE + Speculative Decoding Co-Design)
-**Features:** `spec_cost_model` (opt-in diagnostic)
+**Features:** `spec_cost_model` (transitively default-on: `caddtree_budget` [in `default`] enables `spec_cost_model`)
 `cargo test --features spec_cost_model --test bench_051_moe_sd_codemodel_goat -- --nocapture`
+
+> **UPDATE 2026-07-18 (status sync):** the previous label said
+> `spec_cost_model` (opt-in diagnostic). It was opt-in originally but became
+> transitively default-on when `caddtree_budget` (Plan 219, default-ON) was
+> promoted — `caddtree_budget = ["spec_cost_model", ...]`. The feature is
+> still exposed standalone for `--no-default-features` consumers.
 
 ## GOAT Proof Results
 

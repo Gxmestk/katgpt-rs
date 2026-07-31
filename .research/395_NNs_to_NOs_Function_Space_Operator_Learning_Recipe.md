@@ -110,7 +110,7 @@ This is **exactly** the FUNCATTN mechanism (Research 257, Plan 286): `Φ^T Q` (e
 | Paper concept | Shipped primitive | Match |
 |---|---|---|
 | Cross-resolution spectral transport (the headline FNO capability) | `katgpt-rs/crates/katgpt-core/src/cross_resolution.rs::transport_cross_resolution_into` (Plan 310, **DEFAULT-ON**) | **Strictly stronger** — composes cross-resolution × cross-domain transport in one 4-matrix product |
-| SpectralConv (FNO §3.3) | `katgpt-rs/crates/katgpt-core/src/funcattn.rs` (Plan 286) + `spectralquant/spectral_kv_cache.rs` (Plan 039) | FUNCATTN = SpectralConv with frozen bases |
+| SpectralConv (FNO §3.3) | `katgpt-rs/crates/katgpt-core/src/funcattn/mod.rs` (Plan 286) + `crates/katgpt-spectral/src/spectral_kv_cache.rs` (Plan 039) | FUNCATTN = SpectralConv with frozen bases |
 | Encoder-decoder inner-product operator (paper §3.6, App A.8) | `funcattn` + `cross_resolution_transport` (same machinery, different vocabulary) | **Exact** — see Research 257 §1.1, 307 §2.2 |
 | Integral operator / GNO (§3.1, §3.4) | `katgpt-rs/crates/katgpt-dec/src/operators.rs::exterior_derivative` (Plan 251) | **DEC formulation** — `d` on a cell complex IS a GNO with kernel = incidence matrix |
 | Spectral differentiation `F{∂^m f} = (ik)^m f̂` (App A.6) | `katgpt-rs/crates/katgpt-core/src/spectral/differentiation.rs` (Plan 325, **DEFAULT-ON**) + DEC `exterior_derivative` | **Shipped** as the specialized periodic-1D case where DEC is overkill |
@@ -120,7 +120,7 @@ This is **exactly** the FUNCATTN mechanism (Research 257, Plan 286): `Φ^T Q` (e
 | Fixed-radius neighborhood definition (§3.4) | `katgpt-rs/crates/katgpt-core/src/zone_density.rs` + spatial partitioning in `riir-games` | Covered |
 | Positional encoding (coordinate concatenation, §3.7) | Standard pattern across HLA / CGSP / Fourier MCTS (`encode_offset(dx,dy)` in `riir-engine::fourier`) | Covered |
 | Pointwise operators (Nemytskii, §3.2) | Trivial — all activations ship as pointwise by construction | Covered |
-| Function-space mean/variance (Eq 16) | DEC-weighted aggregations; HLA scalar projections | Covered |
+| Function-space mean/variance (Eq 16) | DEC-weighted aggregations; belief scalar projections | Covered |
 | Spectral commitment crossing sync boundary | `riir-chain/src/encoding/latcal_fixed.rs::LatCalSpectralFixed` (Plan 265) | **Shipped** — `(freq × 10⁶, amp × 10⁶, phase × 10⁶)` fixed-point Fourier coefficients for chain commitment |
 | Per-NPC HLA field over a zone grid as FNO input | `apply_field_to_crowd` (Plan 309 latent steering) | **Shipped** — crowd-scale HLA field is a 2D field of 8-ch latents, natural FNO input |
 
@@ -134,7 +134,7 @@ Re-cast the recipe against each Super-GOAT factory module:
 - **`latent_functor/`**: the encoder-decoder layer (paper §3.6) is exactly the latent-functor application. `transport_cross_resolution_into` IS the asymmetric-basis functor. **Shipped.**
 - **`cgsp_runtime/`**: spectral-band curiosity (which Fourier band is the NPC exploring?) — niche, not wired.
 - **LatCal fixed-point commitment** (`riir-chain/src/encoding/`): `LatCalSpectralFixed` already commits Fourier `(freq, amp, phase)` as i64 × 10⁶ — FNO coefficients cross the sync boundary as raw fixed-point scalars. **Shipped.**
-- **`NeuronShard` `style_weights[64]`** (`riir-neuron-db/src/shard.rs`): TFNO Tucker factorization of the 8×8 reshaped weight matrix — **shipped as Plan 326** (`linalg/tucker.rs`).
+- **`NeuronShard` `style_weights[64]`** (`riir-neuron-db/src/shard/mod.rs`): TFNO Tucker factorization of the 8×8 reshaped weight matrix — **shipped as Plan 326** (`crates/katgpt-core/src/linalg/tucker.rs`).
 - **DEC Stokes-calculus** (`katgpt-rs/crates/katgpt-dec/src/`): the paper's integral operators are DEC `exterior_derivative`/`codifferential` on a periodic grid; spectral differentiation is `d` in Fourier vocabulary. **Shipped as Plans 251, 325.**
 
 No Super-GOAT reframing emerges — every axis reduces to a shipped primitive.

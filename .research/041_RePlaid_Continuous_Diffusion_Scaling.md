@@ -142,9 +142,9 @@ RePlaid beats MDLM when trained past compute-optimal (Fig 1c):
 **Insight:** Training the noise schedule to minimize Monte-Carlo variance of the per-timestep loss yields a constant-difficulty schedule (Prop 1). This is self-supervised — no teacher needed.
 
 **Adaptation:**
-- **D2F noise schedule** (`src/dllm.rs` `NoiseSchedule`): Replace fixed monotonic ratios with variance-minimized ratios that equalize per-step reconstruction difficulty.
-- **Bandit exploration schedule** (`src/pruners/bandit.rs`): Make exploration rate adaptive based on per-episode reward variance tracking.
-- **SDAR β learning** (`src/pruners/sdar_gate.rs`): Replace fixed β=5.0 with variance-minimized β that equalizes gated signal intensity across episodes.
+- **D2F noise schedule** (`riir-ai/crates/riir-engine/src/transformer/dllm.rs` `NoiseSchedule`): Replace fixed monotonic ratios with variance-minimized ratios that equalize per-step reconstruction difficulty.
+- **Bandit exploration schedule** (`crates/katgpt-ruliology/src/bandit.rs`): Make exploration rate adaptive based on per-episode reward variance tracking.
+- **SDAR β learning** (`crates/katgpt-pruners/src/sdar_gate.rs`): Replace fixed β=5.0 with variance-minimized β that equalizes gated signal intensity across episodes.
 
 **Priority:** High. Self-contained, no model needed, directly improves existing infrastructure.
 
@@ -256,25 +256,25 @@ Prop 2 (near-linear CE) assumes a Bayes-optimal denoiser (Def 1). Our D2F models
 
 | Code Location | Current | Change | Insight Source |
 |---|---|---|---|
-| `src/dllm.rs` `NoiseSchedule` | Fixed monotonic min→max | Variance-minimized ratios (track per-step loss, equalize difficulty) | Prop 1 |
-| `src/pruners/bandit.rs` `BanditStrategy` | Fixed ε, UCB1 | Add `VarianceEpsilon` that adapts ε to equalize per-episode reward variance | Prop 1 analog |
-| `src/pruners/sdar_gate.rs` `SDAR_BETA` | Fixed 5.0 | Add `learned_beta()` that minimizes gated-signal variance across episodes | Sec 5.2 |
-| `src/pruners/sdar_gate.rs` + `ropd.rs` | Independent losses | Gate ROPD through SDAR (never add independently) | Sec 2.6, Fig 5c |
+| `riir-ai/crates/riir-engine/src/transformer/dllm.rs` `NoiseSchedule` | Fixed monotonic min→max | Variance-minimized ratios (track per-step loss, equalize difficulty) | Prop 1 |
+| `crates/katgpt-ruliology/src/bandit.rs` `BanditStrategy` | Fixed ε, UCB1 | Add `VarianceEpsilon` that adapts ε to equalize per-episode reward variance | Prop 1 analog |
+| `crates/katgpt-pruners/src/sdar_gate.rs` `SDAR_BETA` | Fixed 5.0 | Add `learned_beta()` that minimizes gated-signal variance across episodes | Sec 5.2 |
+| `crates/katgpt-pruners/src/sdar_gate.rs` + `ropd.rs` | Independent losses | Gate ROPD through SDAR (never add independently) | Sec 2.6, Fig 5c |
 
 ### 7.2 Medium-term (Model — riir-ai)
 
 | Code Location | Current | Change | Insight Source |
 |---|---|---|---|
-| `riir-gpu/src/backward.rs` | Pure CE loss | Add ELBO auxiliary loss (reconstruction + diffusion terms) | Sec 2, Eq 4 |
-| `riir-gpu/src/forward.rs` `GpuForwardPass::forward()` | Single forward pass | Add self-conditioning path (forward → estimate → forward with conditioning) | Sec 2 |
-| `riir-gpu/src/training_loop.rs` `TrainingConfig` | Fixed LR schedule | Add per-component LR (embeddings: 1e-2, backbone: 2e-4) from Tab 7 | Tab 7, 9 |
+| `riir-ai/crates/riir-engine/src/transformer/gemma2_train/backward.rs` | Pure CE loss | Add ELBO auxiliary loss (reconstruction + diffusion terms) | Sec 2, Eq 4 |
+| `riir-ai/crates/riir-gpu/src/forward/mod.rs` `GpuForwardPass::forward()` | Single forward pass | Add self-conditioning path (forward → estimate → forward with conditioning) | Sec 2 |
+| `riir-train/crates/riir-train-gpu/src/training_loop.rs` `TrainingConfig` | Fixed LR schedule | Add per-component LR (embeddings: 1e-2, backbone: 2e-4) from Tab 7 | Tab 7, 9 |
 
 ### 7.3 Medium-term (D2F Acceleration)
 
 | Code Location | Current | Change | Insight Source |
 |---|---|---|---|
 | `src/speculative/d2f.rs` `d2f_decode_block()` | Iterative DDPM-style (16 steps) | Higher-order multistep solver with cached prediction extrapolation (4 steps) | Sec 4.2, Eq 16-17 |
-| `src/dllm.rs` `D2fContext` | Single-step logit buffer | Add `prev_logits` cache for DPM-Solver++(2M) extrapolation | Appendix D |
+| `riir-ai/crates/riir-engine/src/transformer/dllm.rs` `D2fContext` | Single-step logit buffer | Add `prev_logits` cache for DPM-Solver++(2M) extrapolation | Appendix D |
 
 ### 7.4 Long-term Research
 

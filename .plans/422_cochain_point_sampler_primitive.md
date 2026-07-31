@@ -35,7 +35,7 @@ on candidate).
 
 ### Tasks
 
-- [x] **T1.1** Create `katgpt-dec/src/point_sampler.rs`. Gate behind
+- [x] **T1.1** Create `crates/katgpt-dec/src/point_sampler.rs`. Gate behind
   `cochain_point_sampler` feature in `katgpt-dec/Cargo.toml`.
 - [x] **T1.2** Define `LocalCoordEncode` enum: `CartesianSincos { n_harmonics }`
   (for quad/cube), `BarycentricSortCdf` (for tri/tet), `Raw` (no aug, just `u`).

@@ -87,7 +87,7 @@ R398 deferred the behavioral headline to riir-train after exhausting the three p
 |---|---|---|
 | "canvas" / structured latent space | **gated functor graph** over `FunctorTable` | pieces ship; the gate graph does not |
 | "region" / `RegionSpec` | a **latent_functor bridge** (region_subspace, spectral_trajectory, ...) gated as a region | **YES (bridges)**; no region-as-graph-node wrapper |
-| "topology" / `Connection` | a **reachability edge** in the gated functor graph | **NO** — `latent_functor/mod.rs` is a flat table |
+| "topology" / `Connection` | a **reachability edge** in the gated functor graph | **NO** — `riir-ai/crates/riir-engine/src/latent_functor/mod.rs` is a flat table |
 | "attention mask" | **sigmoid subspace gate** at functor boundary (NOT an attention mask) | pieces ship; the topology-of-gates does not |
 | "reachability" / d-separation | `canvas_schema::can_reach` / `TransitiveClosure` (Plan 419) applied to functor graph | **YES (Plan 419, opt-in)**; not applied to functors |
 | "compile_schema" | compile schema → gated functor graph (gate open/closed per edge) | **NO** — ships for attention masks (Plan 419), not functors |
@@ -97,10 +97,10 @@ R398 deferred the behavioral headline to riir-train after exhausting the three p
 ### 2.4 Prior-art surface — what already ships (verified grep + read this session)
 
 1. **`riir-ai/crates/riir-engine/src/latent_functor/mod.rs`** — flat `FunctorTable` (papaya HashMap), coherence-driven re-estimation scheduler, `npc_integration` composes by hardcoded call order. **No declared topology.** (R123/Plan 303)
-2. **`latent_functor/region_subspace_bridge.rs`** (Issue 424) — zone-conditioned two-mode NPC steering. **This is the affect-region producer.**
-3. **`latent_functor/spectral_trajectory_bridge.rs`** — trajectory-region producer.
+2. **`riir-ai/crates/riir-engine/src/latent_functor/region_subspace_bridge.rs`** (Issue 424) — zone-conditioned two-mode NPC steering. **This is the affect-region producer.**
+3. **`riir-ai/crates/riir-engine/src/latent_functor/spectral_trajectory_bridge.rs`** — trajectory-region producer.
 4. **`katgpt-core canvas/`** (Plan 419, opt-in) — `compile_schema`, `can_reach`, `TransitiveClosure`. **The topology/reachability primitive.**
-5. **`katgpt-core faithfulness/probe.rs`** (Plan 278, opt-in, **wired in riir-poc**) — causal-intervention attribution. `DefaultFaithfulnessProbe`, `is_faithfully_used`. **The attribution tool.** Precedent: `riir-poc/benches/jlens_concept_readout_goat.rs`.
+5. **`katgpt-core crates/katgpt-core/src/faithfulness/probe.rs`** (Plan 278, opt-in, **wired in riir-poc**) — causal-intervention attribution. `DefaultFaithfulnessProbe`, `is_faithfully_used`. **The attribution tool.** Precedent: `riir-ai/crates/riir-poc/benches/jlens_concept_readout_goat.rs`.
 6. **`riir-neuron-db/src/freeze.rs`** — `MerkleFrozenEnvelope`. **The region-swap primitive.**
 7. **Percepta** (R031/032, `katgpt-percepta` crate) — analytical weight construction for deterministic regions.
 8. **DEC** (`katgpt-core/src/dec/`, DEFAULT-ON) — geometric region producer (`codifferential`, `heat_kernel_trajectory`).
@@ -141,7 +141,7 @@ No "N LLM calls/step" structure. Compute unit is "one gated functor application 
 
 ### 3.1 Novelty gate (Q1–Q4)
 
-- **Q1 (No prior art for the gated functor graph?): YES.** `latent_functor/mod.rs` is flat; `canvas_schema` compiles to attention masks, not functor gates; no schema-keyed per-region freeze/thaw. Pieces ship; the topology-over-functors wiring does not.
+- **Q1 (No prior art for the gated functor graph?): YES.** `riir-ai/crates/riir-engine/src/latent_functor/mod.rs` is flat; `canvas_schema` compiles to attention masks, not functor gates; no schema-keyed per-region freeze/thaw. Pieces ship; the topology-over-functors wiring does not.
 - **Q2 (New class of behavior?): PARTIAL → NO at the modelless level (same as R398).** The graph enables declared topology + isolated swap + attribution, which are structural. Whether gating produces *better* NPC behavior than free composition is unproven — and the modelless PoC (FaithfulnessProbe) is the gate, not architectural reasoning.
 - **Q3 (Product selling point?): YES (structural), PARTIAL (behavioral).** "Our NPC cognitive stack has a declared causal topology with reachability guarantees, isolated region swap, and schema-keyed exchange" is a real architectural selling point. "And it improves behavior modellessly" is unproven.
 - **Q4 (Force multiplier?): YES.** latent_functor + canvas + freeze/thaw + DEC + Percepta + FaithfulnessProbe. ≥5 systems.
@@ -172,7 +172,7 @@ The orthogonal follow-up (wire `FaithfulnessProbe` as the reward signal for
 `DriftGate::tick`) was investigated in Plan 429 and found to be a mathematical
 no-op **by construction**, before any code was written.
 
-The drift kernel (`katgpt-personality/src/kernel.rs:210`) computes:
+The drift kernel (`crates/katgpt-personality/src/kernel.rs:210`) computes:
 `Δw_i = alpha × (r_observed − r_expected_i) × Σ_j recent_direction_i[j]`.
 The `sum(recent_direction)` term **is already a direction-content gate** —
 dead writes with zero cognitive directions produce `Δw = 0` automatically. The
@@ -213,7 +213,7 @@ is now wired into `cognitive_branch.rs` at the DriftGate call site. The
 `AuditRunner` is stored on `MapInstance` (all 5 construction sites). When empty
 (no probes have run), rate=1.0 → multiplier=1.0 → bit-identical reward.
 **Phase 4 T4.2 (production probe scheduling) shipped 2026-07-10**: new module
-`riir-engine/src/integrity/composition_probe.rs` defines the production
+`riir-ai/crates/riir-engine/src/integrity/composition_probe.rs` defines the production
 consumer (`CompositionActivationConsumer`) — behavior =
 `Σ_i w_i · Σ_j direction_{i,j}` (the NPC's cognitive activation). The probe is
 scheduled at audit cadence (every N=64 ticks) in `cognitive_branch.rs`, ahead
@@ -246,7 +246,7 @@ See: `riir-ai/.benchmarks/430_action_faithfulness_drift.md` (mechanism GOAT) and
 The public primitive is thin (reachability already ships in Plan 419). The novel work is the riir-ai wiring: schema → gated functor graph. Sketch:
 
 ```rust
-// riir-engine/src/latent_functor/canvas_gate.rs (new, gated canvas_functor)
+// riir-ai/crates/riir-engine/src/latent_functor/canvas_gate.rs (new, gated canvas_functor)
 //
 // A gated edge in the functor graph. Absent edge = closed gate = exact
 // marginal independence (the sigmoid gate saturates to 0 contribution).

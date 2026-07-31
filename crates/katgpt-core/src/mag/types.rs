@@ -175,6 +175,13 @@ pub enum TransferMetric {
     /// Cosine between positive-class centroids (the "benign"/comply class,
     /// `label == true`).
     ClassConditionalCosineBenign = 7,
+    /// Rearrangement-inequality cosine similarity between centroids (recos,
+    /// arXiv:2602.05266). Saturates at 1.0 under ordinal concordance — a wider
+    /// capture range than [`CentroidCosine`](Self::CentroidCosine) (which
+    /// requires linear dependence). Always `|recos| >= |cos|` in absolute
+    /// value (Corollary 2). Requires the `recos` feature; without it, falls
+    /// back to [`CentroidCosine`](Self::CentroidCosine) behavior.
+    Recos = 8,
 }
 
 // ── Errors ─────────────────────────────────────────────────────────
@@ -315,5 +322,6 @@ mod tests {
         assert_eq!(MagOperator::FewShot as u8, 7);
         assert_eq!(TransferMetric::CentroidCosine as u8, 0);
         assert_eq!(TransferMetric::ClassConditionalCosineBenign as u8, 7);
+        assert_eq!(TransferMetric::Recos as u8, 8);
     }
 }

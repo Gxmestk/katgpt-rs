@@ -35,11 +35,11 @@ where `û` is the gradient projected onto the local tangent space of the natural
 
 | Sub-gate | Target | Actual | Result |
 |---|---|---|---|
-| G2a — HLA scale (d=8, k=8, r=8) | < 10µs | 5.3µs | ✅ PASS |
+| G2a — belief scale (d=8, k=8, r=8) | < 10µs | 5.3µs | ✅ PASS |
 | G2b — Shard scale (d=64, k=16, r=16) | < 1ms | 612µs | ✅ PASS |
 | G2c — 10-round loop (d=8) | < 50µs | 44µs | ✅ PASS |
 
-**Budget adjustment rationale:** The original plan specified <500ns (HLA), <5µs (shard), <5µs (loop). These targets did not account for the one-sided Jacobi SVD cost (~4µs for 8×8, ~600µs for 16×64). The SVD is the bottleneck — the paper itself reports "~50% of runtime on local SVDs." The adjusted budgets (10µs/1ms/50µs) are realistic and still within game AI tick budgets (5ms for 1000 NPCs at HLA scale; shard-scale is offline consolidation).
+**Budget adjustment rationale:** The original plan specified <500ns (belief), <5µs (shard), <5µs (loop). These targets did not account for the one-sided Jacobi SVD cost (~4µs for 8×8, ~600µs for 16×64). The SVD is the bottleneck — the paper itself reports "~50% of runtime on local SVDs." The adjusted budgets (10µs/1ms/50µs) are realistic and still within game AI tick budgets (5ms for 1000 NPCs at belief scale; shard-scale is offline consolidation).
 
 ### G3 — No Regression (PASS)
 
@@ -71,7 +71,7 @@ where `û` is the gradient projected onto the local tangent space of the natural
 
 ### The ε=0.1 transfer property
 
-ε is **dimensionless** (ratio of displacement to local neighborhood radius). The local `r_i` absorbs the representation scale. So ε=0.1 works for both HLA (d=8) and shards (d=64) without per-setting tuning. This is why the paper's hyperparameters transfer across all 119 settings.
+ε is **dimensionless** (ratio of displacement to local neighborhood radius). The local `r_i` absorbs the representation scale. So ε=0.1 works for both belief (d=8) and shards (d=64) without per-setting tuning. This is why the paper's hyperparameters transfer across all 119 settings.
 
 ### The alpha=0.0 default for full-rank tangent
 
@@ -79,7 +79,7 @@ With `alpha=0.0` (no spectral weighting), the spectrally-weighted direction redu
 
 ### The probe is a consumer concern
 
-This primitive CONSUMES a pre-computed erasure direction. It does NOT train a probe. The caller provides the direction via MAG (Plan 418), CNA (Plan 087), or HLA EmotionDirections.
+This primitive CONSUMES a pre-computed erasure direction. It does NOT train a probe. The caller provides the direction via MAG (Plan 418), CNA (Plan 087), or belief EmotionDirections.
 
 ## Test Commands
 

@@ -51,7 +51,7 @@ Take the attention-side improvements. These directly strengthen our core product
 | **Cumulative sum** | `fetch_sum`: uniform attention × position = exact running sum | Track cursor, stack depth, call depth via attention |
 | **Parabolic key encoding** | k → (2k, −k²), q → (q, 1), score = −(k−q)² + q² | Exact key-value match, already partially implemented |
 
-**Target:** `src/percepta/cht.rs`, `src/percepta/hull.rs`
+**Target:** `crates/katgpt-percepta/src/cht.rs`, `crates/katgpt-percepta/src/hull.rs`
 
 **License:** MIT (our derivative work from Apache-2.0 source)
 
@@ -70,7 +70,7 @@ Take the FFN-side improvements. These enable programmatic weight construction:
 | **multiply(a, b)** | `a * b` — 2 neurons + persist for full multiplication | Arithmetic as FFN |
 | **persist(expr)** | Materialize expression into residual slot | State propagation across layers |
 
-**Target:** `src/percepta/gates.rs`
+**Target:** `crates/katgpt-percepta/src/gates.rs`
 
 **Why this matters for RIIR:** The constraint pruner architecture (`ConstraintPruner` trait → DDTree) could potentially be compiled into transformer FFN weights using these primitives. Instead of running validators in wasmtime at inference time, the validation logic becomes part of the model weights. This is speculative but theoretically possible.
 
@@ -193,10 +193,10 @@ For raw program execution, wasmtime is ~1000× faster than their transformer. Bu
 ## Execution Order
 
 ```
-Phase A (now):     CHT + CumSum + Parabolic → src/percepta/cht.rs, hull.rs
+Phase A (now):     CHT + CumSum + Parabolic → crates/katgpt-percepta/src/cht.rs, hull.rs
                    Plan 063 in progress
                    
-Phase B (next):    ReGLU/stepglu/persist → src/percepta/gates.rs
+Phase B (next):    ReGLU/stepglu/persist → crates/katgpt-percepta/src/gates.rs
                    New plan after 063 completes
                    
 Phase C (DO IT):   DSL → MILP → WASM interpreter → weights → Futamura
@@ -211,7 +211,7 @@ Phase C (DO IT):   DSL → MILP → WASM interpreter → weights → Futamura
 |-----------|--------|-------|-------|
 | Sudoku (hull attention vs reported numbers) | ✅ Done | ❌ Different algo/machine | `examples/sudoku_04_percepta_vs.rs` |
 | Sudoku regression tests | ✅ Done | ❌ Same | `tests/integration.rs` |
-| Sudoku (Rust transformer-vm vs C++ transformer-vm) | ❌ After Plan 064 | ✅ Same algo/machine | `src/percepta/runner.rs` |
+| Sudoku (Rust transformer-vm vs C++ transformer-vm) | ❌ After Plan 064 | ✅ Same algo/machine | `crates/katgpt-percepta/src/runner.rs` |
 | Bomberman (learning vs static) | ❌ N/A — they can't do it | N/A — capability gap | `riir-ai/crates/riir-examples/` |
 | lora.bin + validator.wasm vs percepta_wasm | ❌ After Plan 064 | Different paradigm | `riir-ai/crates/riir-examples/` |
 

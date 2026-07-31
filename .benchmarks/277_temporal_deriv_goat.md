@@ -1,7 +1,7 @@
 # Plan 277 GOAT Scorecard — Temporal Derivative Kernel
 
 > **📍 Migration note (2026-06-28, Issue 007 Phase C follow-up):** The
-> `crates/katgpt-core/benches/reconstruction_bench.rs` references below moved
+> `riir-ai/crates/riir-engine/benches/reconstruction_bench.rs` references below moved
 > to `riir-ai/crates/riir-engine/benches/reconstruction_bench.rs` (NPC runtime
 > IP — the bench constructs `NpcBrain` which is private runtime code). The
 > reproduction commands should now use `-p riir-engine` with
@@ -10,7 +10,7 @@
 
 **Date:** 2026-06-16
 **Plan:** [277_temporal_derivative_kernel.md](../.plans/277_temporal_derivative_kernel.md)
-**Research:** [243_Temporal_Derivative_Kernel_Neocortical_Learning.md](../.research/243_Temporal_Derivative_Kernel_Neocortical_Learning.md)
+**Research:** [435_Temporal_Derivative_Kernel_Neocortical_Learning.md](../.research/435_Temporal_Derivative_Kernel_Neocortical_Learning.md)
 **Source:** [arXiv:2606.08720](https://arxiv.org/abs/2606.08720) — O'Reilly, "This is how the Neocortex Learns" (Jun 2026)
 
 ---
@@ -33,8 +33,8 @@ The dual fast/slow temporal-derivative kernel (O'Reilly 2026) was distilled into
 ## G2 — HLA Surprise Companion (Fusion F1)
 
 **Commit:** `9f729711` (wiring) + `4689ef89` (G2 bench gate)
-**Target:** `crates/katgpt-core/src/sense/reconstruction.rs`
-**Bench:** `crates/katgpt-core/benches/reconstruction_bench.rs` (G2 section)
+**Target:** `crates/katgpt-sense/src/reconstruction.rs`
+**Bench:** `riir-ai/crates/riir-engine/benches/reconstruction_bench.rs` (G2 section)
 **In-crate test:** `surprise_detects_emotional_events_g2_gate`
 
 ### Setup
@@ -75,7 +75,7 @@ Argmax gap: 792 ticks (target > 10 for orthogonality)
 ## G3 — δ-Mem Temporal Write Gate (Fusion F2)
 
 **Commit:** `c07866e4`
-**Target:** `src/pruners/delta_mem/state.rs`
+**Target:** `crates/katgpt-core/src/delta_mem/state.rs`
 **Bench:** `benches/delta_mem_surprise_gate_bench.rs`
 **In-crate test:** `test_g3_gate_surprise_vs_baseline`
 
@@ -120,7 +120,7 @@ G3 Verdict:
 ## G4 — Collapse Detector Fusion (Fusion F3)
 
 **Commit:** `391eb8e2`
-**Target:** `src/pruners/collapse_detector.rs`
+**Target:** `crates/katgpt-pruners/src/collapse_detector.rs`
 **Test:** 7-test G4 gate suite in collapse_detector tests
 
 ### Setup

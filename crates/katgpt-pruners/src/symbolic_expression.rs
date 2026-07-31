@@ -65,7 +65,7 @@ pub struct Term {
 
 // ── Symbolic Expression ────────────────────────────────────────
 
-/// Compact symbolic expression: sum of basis terms + bias, wrapped in sigmoid for [0,1].
+/// Compact symbolic expression: sum of basis terms + bias, wrapped in sigmoid for `[0,1]`.
 #[derive(Clone, Debug)]
 pub struct SymbolicExpression {
     pub terms: Vec<Term>,
@@ -464,12 +464,12 @@ impl Default for SymbolicExpressionFitter {
 
 #[inline]
 fn sigmoid(x: f32) -> f32 {
-    1.0 / (1.0 + (-x).exp())
+    katgpt_core::simd::fast_sigmoid(x)
 }
 
 #[inline]
 fn dot(a: &[f32], b: &[f32]) -> f32 {
-    a.iter().zip(b.iter()).map(|(&x, &y)| x * y).sum()
+    katgpt_core::simd::simd_dot_f32(a, b, a.len().min(b.len()))
 }
 
 #[inline]

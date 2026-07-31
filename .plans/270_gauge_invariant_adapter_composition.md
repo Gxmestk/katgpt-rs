@@ -13,8 +13,8 @@
 
 Implement LoRA-Muon paper's gauge-invariance theorem as inference-time engine plumbing. Three deliverables:
 
-- **A. `ns_inv_sqrt_psd`** — missing Newton-Schulz primitive for PSD inverse square root (paper Algorithm 4). Extends `src/newton_schulz.rs`.
-- **B. `gauge_rebalance`** — scalar factor-pair rebalancing (paper Algorithm 2). New module `src/gauge_invariant.rs`.
+- **A. `ns_inv_sqrt_psd`** — missing Newton-Schulz primitive for PSD inverse square root (paper Algorithm 4). Extends `crates/katgpt-core/src/newton_schulz.rs`.
+- **B. `gauge_rebalance`** — scalar factor-pair rebalancing (paper Algorithm 2). New module `crates/katgpt-spectral/src/gauge_invariant.rs`.
 - **C. `gauge_invariant_compose`** — drop-in replacement for naive task-vector arithmetic. New module.
 
 Unblocks: Plan 094 (Memo TIES Merge), Plan 201 (Rosetta Pruner), Plan 233 (Rosetta Cross-Game), and any future "compose N adapters" feature.
@@ -24,15 +24,15 @@ Unblocks: Plan 094 (Memo TIES Merge), Plan 201 (Rosetta Pruner), Plan 233 (Roset
 ## Architecture
 
 ```
-src/newton_schulz.rs            ← extend with ns_inv_sqrt_psd (+ scratch variant)
-src/gauge_invariant.rs          ← NEW module: rebalance + compose
+crates/katgpt-core/src/newton_schulz.rs            ← extend with ns_inv_sqrt_psd (+ scratch variant)
+crates/katgpt-spectral/src/gauge_invariant.rs          ← NEW module: rebalance + compose
 tests/bench_270_gauge_invariant_goat.rs  ← GOAT proof (target ≥15 tests)
 examples/gauge_invariant_demo.rs ← before/after demo (naive vs gauge-invariant merge)
 ```
 
 Composed with existing infra (no duplication):
 - Reuses `NewtonSchulzScratch`, `simd_dot_f32`, `simd_sum_sq` from Plan 152
-- Reuses power iteration pattern from `distill/peira.rs::PowerIterationScratch`
+- Reuses power iteration pattern from `crates/katgpt-spectral/src/peira.rs::PowerIterationScratch`
 - No GPU/ANE dispatch — pure CPU SIMD (paper's PSD inv-sqrt is r×r for r ≤ 64, ~1-16KB)
 
 ---
@@ -41,7 +41,7 @@ Composed with existing infra (no duplication):
 
 ### Phase 1: Foundation — Newton-Schulz Inverse Square Root
 
-- [x] **T1:** Add `ns_inv_sqrt_psd` to `src/newton_schulz.rs`
+- [x] **T1:** Add `ns_inv_sqrt_psd` to `crates/katgpt-core/src/newton_schulz.rs`
   - Signature: `pub fn ns_inv_sqrt_psd(p: &[f32], r: usize, out: &mut [f32], n_iters: u8)`
   - Paper Algorithm 4: damping γ=1.001, ε=1e-5, 7-iter default coefficients from Table 2
   - Normalize by Frobenius norm first, apply polynomial recurrence, scale back by `t^{-1/2}`
@@ -55,7 +55,7 @@ Composed with existing infra (no duplication):
 
 ### Phase 2: Gauge Rebalance
 
-- [x] **T4:** Create `src/gauge_invariant.rs` — module root, public API, feature gate `gauge_invariant`
+- [x] **T4:** Create `crates/katgpt-spectral/src/gauge_invariant.rs` — module root, public API, feature gate `gauge_invariant`
 - [x] **T5:** Implement `power_iterate_sigma_max` — σ_max estimate via power iteration
   - Zero-alloc: recomputes `u[i] = dot(M_row_i, v)` inline in second pass to avoid `outer`-length allocation
   - 5 steps default — within 5% of true σ_max (validated by `test_power_iterate_matches_naive_sigma_max`)
@@ -157,7 +157,7 @@ Rebalanced form is **deterministic** (given power_iter tolerance) → safe for s
 
 ## Test Plan
 
-- **Unit tests** in `src/gauge_invariant.rs` (`mod tests`) — small cases, exact assertions
+- **Unit tests** in `crates/katgpt-spectral/src/gauge_invariant.rs` (`mod tests`) — small cases, exact assertions
 - **GOAT proof** in `tests/bench_270_gauge_invariant_goat.rs` — 15 tests with throughput
 - **Demo** in `examples/gauge_invariant_demo.rs` — before/after narrative
 

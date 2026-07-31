@@ -574,7 +574,8 @@ mod tests {
         let mut s1 = RoutingScratch::new(3, 2);
         let mut s2 = RoutingScratch::new(3, 2);
         let plain = score_blocks_entmax_into(&query, &summaries, &config, &mut s1);
-        let with_e = score_blocks_entmax_with_entropy_into(&query, &summaries, &[], &config, &mut s2);
+        let with_e =
+            score_blocks_entmax_with_entropy_into(&query, &summaries, &[], &config, &mut s2);
         assert_eq!(plain.active_indices, with_e.active_indices);
         assert_eq!(plain.bias, with_e.bias);
         assert_eq!(plain.probs, with_e.probs);
@@ -624,13 +625,8 @@ mod tests {
         // Boost chunk 1 with a large entropy bias → it must take more mass.
         let mut s2 = RoutingScratch::new(2, 2);
         let entropy = vec![0.0, 5.0]; // chunk 1 gets +5 logit boost
-        let boosted = score_blocks_entmax_with_entropy_into(
-            &query,
-            &summaries,
-            &entropy,
-            &config,
-            &mut s2,
-        );
+        let boosted =
+            score_blocks_entmax_with_entropy_into(&query, &summaries, &entropy, &config, &mut s2);
         assert!(
             boosted.probs[1] > boosted.probs[0],
             "boosted chunk should dominate: p0={}, p1={}",

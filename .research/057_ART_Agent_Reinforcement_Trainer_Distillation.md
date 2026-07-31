@@ -10,8 +10,8 @@
 ART is a well-engineered Python RL framework that wraps GRPO training for multi-step LLM agents. It provides: (1) a client-server training loop (inference client ↔ GPU training server), (2) Trajectory/TrajectoryGroup abstractions for multi-step rollout collection, (3) GRPO with a CISPO (Clipped Importance Sampling Policy Optimization) loss variant, (4) RULER (LLM-as-judge relative scoring), and (5) SFT warmup → RL fine-tuning pipeline.
 
 **What we already have (no action needed):**
-- GRPO loss → `riir-gpu/src/loss_grpo.rs` (565 lines, GPU-native)
-- DPO loss → `riir-gpu/src/loss_dpo.rs` (774 lines, GPU-native)
+- GRPO loss → `riir-train/crates/riir-train-gpu/src/loss_grpo.rs` (565 lines, GPU-native)
+- DPO loss → `riir-train/crates/riir-train-gpu/src/loss_dpo.rs` (774 lines, GPU-native)
 - LoRA training → `riir-gpu` (wgpu-native, WASM-first)
 - Hint-δ reward → `g_zero` module (intrinsic, no external judge needed)
 - Bradley-Terry ranking → `bt_rank` (pairwise preference, more general than RULER)
@@ -99,7 +99,7 @@ policy_loss = -torch.min(
 3. The loss is `clip(ratio) * advantage * logprob`, not `min(ratio * adv, clip(ratio) * adv)`
 4. ART found this works better for agent training than standard PPO-clip
 
-### Our Current GRPO Loss (riir-gpu/src/loss_grpo.rs)
+### Our Current GRPO Loss (riir-train/crates/riir-train-gpu/src/loss_grpo.rs)
 
 ```rust
 // Standard PPO-clip style
@@ -238,17 +238,17 @@ The one genuinely useful idea is **CISPO** — the detached-ratio loss variant. 
 **Feature gate: `cipo_loss`** (off by default, proof via GOAT benchmark)
 
 Tasks:
-- [x] T1: Add `GrpoLossVariant` enum (`PpoClip`, `Cispo`) to `loss_grpo.rs` — in `riir-gpu/src/loss_grpo.rs` L21-29 with `#[default] Cispo`
-- [x] T2: Implement CISPO loss function (detached ratio, wider clip, new_logprob multiply) — `cispo_loss()` in `riir-gpu/src/loss_grpo.rs` L262-318 + GPU shaders `cispo_loss.wgsl`, `cispo_reduce.wgsl`
-- [x] T3: Wire trajectory grouping into `GZeroLoop` (group_size rollouts → advantage) — `train_grpo_grouped()` in `riir-gpu/src/gzero_loop.rs` L663-668
-- [x] T4: GOAT benchmark: CISPO vs PPO-clip on bomber arena (1000 rounds) — `riir-gpu/tests/bench_cispo_goat.rs`
+- [x] T1: Add `GrpoLossVariant` enum (`PpoClip`, `Cispo`) to `loss_grpo.rs` — in `riir-train/crates/riir-train-gpu/src/loss_grpo.rs` L21-29 with `#[default] Cispo`
+- [x] T2: Implement CISPO loss function (detached ratio, wider clip, new_logprob multiply) — `cispo_loss()` in `riir-train/crates/riir-train-gpu/src/loss_grpo.rs` L262-318 + GPU shaders `cispo_loss.wgsl`, `cispo_reduce.wgsl`
+- [x] T3: Wire trajectory grouping into `GZeroLoop` (group_size rollouts → advantage) — `train_grpo_grouped()` in `riir-train/crates/riir-train-gpu/src/gzero_loop.rs` L663-668
+- [x] T4: GOAT benchmark: CISPO vs PPO-clip on bomber arena (1000 rounds) — `riir-train/crates/riir-train-gpu/tests/bench_cispo_goat.rs`
 - [x] T5: If GOAT passes, default to CISPO; if not, keep as opt-in feature — CISPO is `#[default]`, GOAT proved 5/6 (1473× more stable than PPO-clip)
 
 ### Plan 091 (riir-ai): SFT→RL Pipeline Config
 
 Tasks:
-- [x] T1: Add `SftWarmupConfig` to `riir-gpu` (SFT epochs → GRPO rounds) — `SftWarmupConfig` in `riir-gpu/src/config.rs` L14-24
-- [x] T2: Wire sequential SFT→GRPO in example script — `SftRlPipeline` in `riir-gpu/src/pipeline.rs`
+- [x] T1: Add `SftWarmupConfig` to `riir-gpu` (SFT epochs → GRPO rounds) — `SftWarmupConfig` in `riir-ai/crates/riir-gpu/src/config.rs` L14-24
+- [x] T2: Wire sequential SFT→GRPO in example script — `SftRlPipeline` in `riir-train/crates/riir-train-gpu/src/pipeline.rs`
 - [x] T3: Document in `.docs/` — `riir-ai/.docs/23_sft_rl_pipeline.md`
 
 ---
@@ -260,7 +260,7 @@ Tasks:
 - ART loss.py: `.raw/ART/src/art/loss.py` (CISPO implementation)
 - ART trajectories.py: `.raw/ART/src/art/trajectories.py` (TrajectoryGroup)
 - ART ruler.py: `.raw/ART/src/art/rewards/ruler.py` (LLM-as-judge)
-- Our GRPO: `riir-ai/crates/riir-gpu/src/loss_grpo.rs`
-- Our DPO: `riir-ai/crates/riir-gpu/src/loss_dpo.rs`
+- Our GRPO: `riir-train/crates/riir-train-gpu/src/loss_grpo.rs`
+- Our DPO: `riir-train/crates/riir-train-gpu/src/loss_dpo.rs`
 - Our GZero: `katgpt-rs/src/pruners/g_zero/`
 - Related research: `21_G-Zero_Self-Play_Open-Ended_Generation.md` (Hint-δ), `25_StepCodeReasoner_BiLevel_GRPO.md` (GRPO), `40_OpenDeepThink_Bradley_Terry_Pairwise_Ranking.md` (BT ranking)

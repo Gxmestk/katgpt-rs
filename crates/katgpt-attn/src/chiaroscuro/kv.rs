@@ -18,11 +18,11 @@
 //!
 //! # Why novel
 //!
-//! - [`crate::spectralquant::spectral_kv_cache`] operates per-**dimension**
+//! - `crate::spectralquant::spectral_kv_cache` operates per-**dimension**
 //!   (rotation + variable-bit). CHIAR-KV operates per-**token**.
-//! - [`crate::kvarn`] uses variance across positions. CHIAR-KV uses per-token
+//! - `crate::kvarn` uses variance across positions. CHIAR-KV uses per-token
 //!   spectral complexity.
-//! - [`crate::still_kv`] uses perceptual compaction. CHIAR-KV uses spectral
+//! - `crate::still_kv` uses perceptual compaction. CHIAR-KV uses spectral
 //!   truncation.
 //!
 //! All three compose: CHIAR-KV picks the **storage strategy** per token;
@@ -30,7 +30,7 @@
 //!
 //! # Modelless
 //!
-//! Pure inference-time computation. τ calibrated via [`StreamingTauCalibrator`].
+//! Pure inference-time computation. τ calibrated via [`StreamingTauCalibrator`](crate::chiaroscuro::tau::StreamingTauCalibrator).
 
 use crate::chiaroscuro::entropy::{spectral_entropy_dct, spectral_entropy_dct_into};
 use rustfft::{FftPlanner, num_complex::Complex32};
@@ -124,7 +124,7 @@ impl ChiaroscuroKvStrategy {
 
     /// Convenience: compute H(x) from a key embedding, then decide.
     ///
-    /// Allocates internal scratch — for hot loops, use [`decide_with_scratch`].
+    /// Allocates internal scratch — for hot loops, use `decide_with_scratch`.
     #[inline]
     pub fn decide_from_key(key: &[f32], tau_lo: f32, tau_hi: f32) -> Self {
         let h = spectral_entropy_dct(key);

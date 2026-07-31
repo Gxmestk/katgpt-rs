@@ -173,7 +173,7 @@ Re-cast UMF's "action = inference configuration" as a discrete selection over ea
 | **LatCal commitment** (riir-chain/encoding) | deterministic transitions = committable per-branch; reward-backed trajectory can be LatCal-committed at each (state, action) boundary | Medium — deterministic → raw-fixed-point bookkeeping per branch; riir-chain/.research/009 (DP) is the closest cousin |
 | **NeuronShard** (riir-neuron-db) | action = which frozen shard (`KarcShard` / `ArchetypeBlendShard` / `BranchBank` snapshot) to apply at this node; **multi-shard-as-action** is the direct analog of UMF's multi-MDLM | **Strong** — `KarcShard` is the freeze/thaw Pod substrate; multi-shard within one trajectory is UMF's "collaborative generation" mapped to crowd NPCs |
 | **DEC Stokes operators** | (N/A — DEC operators are continuous cochain algebra; UMF is discrete action selection. No direct mapping.) | Weak |
-| **MCTS substrate** (`katgpt-core/src/mcts.rs`) | action already abstract; the new piece is the *cache axis* — state-action pair vs state-only | **Direct** — this is where the primitive lands |
+| **MCTS substrate** (`crates/katgpt-core/src/mcts.rs`) | action already abstract; the new piece is the *cache axis* — state-action pair vs state-only | **Direct** — this is where the primitive lands |
 
 **Primary reframing**: UMF's "multi-model collaboration within one trajectory" generalizes to **multi-shard collaboration within one NPC's decision trajectory** — at each MCTS node, pick which frozen shard (personality snapshot) advances the belief state. Crowd scale: thousands of NPCs reuse the same `(belief-state-class, shard-id)` cache entries. The theoretical guarantee (Eq. 1) says interleaving shards per-step beats committing to one shard for the whole trajectory.
 
@@ -223,7 +223,7 @@ where `apply` is cheap.
 | Q1 — No prior art? | **YES.** 3-layer check: no `.research/` note, no shipped code, vocabulary translation found zero hits for state-action pair caching in MCTS. Closest shipped cousins (`TranspositionTable`, `ProofGoalCache`) are state-only. `dllm_solver.rs` is single-axis decode-step switching, not tree-level. `BranchRouter` is token/sample level, not MCTS-node level. |
 | Q2 — New class of behavior? | **PARTIAL.** State-action pair caching for deterministic transitions IS a new caching primitive. But MCTS-over-configurations is structurally close to existing MCTS + branch routing — it's "better numbers under fixed budget", not a capability no incumbent can match. |
 | Q3 — Product selling point? | **NO.** "Cache reuse under fixed NFE" is a perf claim, not a capability claim. Cannot finish "our NPCs do X that no competitor can" with a *caching* primitive. The dLLM substrate (D2F/DMax) carries the capability story; UMF is a search efficiency layer on top. |
-| Q4 — Force multiplier? | **YES.** Connects ≥2 pillars: foundation MCTS (`katgpt-core/src/mcts.rs`) + dLLM inference substrate (D2F Plan 066) + neuron-db shard-as-model potential (`KarcShard`/`ArchetypeBlendShard` as UMF's "multi-MDLM" axis). |
+| Q4 — Force multiplier? | **YES.** Connects ≥2 pillars: foundation MCTS (`crates/katgpt-core/src/mcts.rs`) + dLLM inference substrate (D2F Plan 066) + neuron-db shard-as-model potential (`KarcShard`/`ArchetypeBlendShard` as UMF's "multi-MDLM" axis). |
 
 3/4 → **GOAT, not Super-GOAT.** The modelless constraint is decisively satisfied (MCTS + caching + multi-config routing, no training). Theoretical guarantee (Eq. 1) is the genuine novel insight.
 

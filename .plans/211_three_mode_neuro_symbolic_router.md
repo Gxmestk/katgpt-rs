@@ -55,7 +55,7 @@ Five fusions from Research 186:
 
 ### Phase 1: Three-Mode Router Core (F1 — P0)
 
-- [x] **F1.1:** Create `src/pruners/three_mode_bandit.rs` with `NeuroSymbolicMode` enum
+- [x] **F1.1:** Create `crates/katgpt-pruners/src/three_mode_bandit.rs` with `NeuroSymbolicMode` enum
   - `#[derive(Debug, Clone, Copy, PartialEq, Eq)]` + `#[repr(u8)]` — 1 byte, 6 variants
   - Variants: `PureL4R, PureR4L, PureLR, Balanced, R4LHeavy, L4RHeavy`
 
@@ -110,7 +110,7 @@ Five fusions from Research 186:
 
 ### Phase 2: Auto Constraint Synthesis (F2 — P1)
 
-- [x] **F2.1:** Create `src/pruners/constraint_miner.rs` with `ConstraintMiner` struct
+- [x] **F2.1:** Create `crates/katgpt-pruners/src/constraint_miner.rs` with `ConstraintMiner` struct
   - `min_support: usize` — minimum episode count for a pattern (default: 10)
   - `min_acceptance: f32` — minimum acceptance rate (default: 0.90)
   - `last_mine_epoch: u64` — deduplication / scheduling
@@ -150,7 +150,7 @@ Five fusions from Research 186:
 
 ### Phase 3: Grounding Quality Metric (F4 — P1, part of F1)
 
-- [x] **F4.1:** Create `grounding_quality(pruned: &[f32], unpruned: &[f32]) -> f32` in `src/pruners/three_mode_bandit.rs`
+- [x] **F4.1:** Create `grounding_quality(pruned: &[f32], unpruned: &[f32]) -> f32` in `crates/katgpt-pruners/src/three_mode_bandit.rs`
   - KL(pruned || unpruned): `Σ p × ln(p/q)` where p=pruned, q=unpruned
   - Return `sigmoid(kl)` — bound to [0, 1]
   - Guard: skip terms where p≤0 or q≤0 (log undefined)
@@ -171,7 +171,7 @@ Five fusions from Research 186:
 
 ### Phase 4: Safe Exploration Budget (F3 — P2, opt-in)
 
-- [x] **F3.1:** Create `src/pruners/exploration_budget.rs` with `ExplorationBudget` struct
+- [x] **F3.1:** Create `crates/katgpt-pruners/src/exploration_budget.rs` with `ExplorationBudget` struct
   - `tier0_remaining: u32` — DFA bracket balance checks (default: u32::MAX)
   - `tier1_remaining: u32` — syn AST parse checks (default: 1000)
   - `tier2_remaining: u32` — cargo check in sandbox (default: 100)

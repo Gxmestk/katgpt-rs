@@ -57,7 +57,7 @@ Prompt Input
 
 ### Phase 1: T1 — Prompt→FOL Constraint Extraction
 
-- [x] **T1.1:** Create `src/pruners/fol_pruner.rs` with `FolConstraint` + `FolPruner<P>` structs
+- [x] **T1.1:** Create `crates/katgpt-pruners/src/fol_pruner.rs` with `FolConstraint` + `FolPruner<P>` structs
   - `FolConstraint { depth_range: (usize, usize), allowed: Vec<usize>, disallowed: Vec<usize>, confidence: f32 }`
   - `FolPruner<P: ConstraintPruner> { inner: P, constraints: Vec<FolConstraint> }`
   - Feature-gated behind `#[cfg(feature = "fol_constraints")]`
@@ -87,7 +87,7 @@ Prompt Input
 
 ### Phase 2: T2 — DDTree Path→Logical Rule Extraction
 
-- [x] **T2.1:** Create `src/pruners/rule_extractor.rs` with `RuleExtractor` + `ExtractedRule`
+- [x] **T2.1:** Create `crates/katgpt-pruners/src/rule_extractor.rs` with `RuleExtractor` + `ExtractedRule`
   - `ExtractedRule { conditions: Vec<(usize, usize)>, action: (usize, usize), score: f32, support: u32 }`
   - `RuleExtractor { top_k: usize, min_score: f32 }`
   - Feature-gated behind `#[cfg(feature = "rule_extraction")]` — depends on `and_or_dtree`
@@ -114,7 +114,7 @@ Prompt Input
 
 ### Phase 3: T3 — Reward-Weighted Branch Memorization
 
-- [x] **T3.1:** Create `src/pruners/reward_mem_pruner.rs` with `RewardMemPruner`
+- [x] **T3.1:** Create `crates/katgpt-pruners/src/reward_mem_pruner.rs` with `RewardMemPruner`
   - `RewardMemPruner<P: ConstraintPruner> { inner, rewarded_patterns, current_prompt_type }`
   - Feature-gated behind `#[cfg(feature = "reward_mem")]` — depends on `egcs`, `bandit`
 
@@ -151,7 +151,7 @@ Prompt Input
 
 ### Phase 4: T4 — Interpretable Decision Traces
 
-- [x] **T4.1:** Create `src/pruners/decision_trace.rs` with `DecisionTrace`
+- [x] **T4.1:** Create `crates/katgpt-pruners/src/decision_trace.rs` with `DecisionTrace`
   - `DecisionTrace { rules_applied: Vec<ExtractedRule>, alternatives_rejected: Vec<ExtractedRule>, confidence: f32 }`
   - Feature-gated behind `#[cfg(feature = "decision_trace")]` — depends on `rule_extraction`
 
@@ -262,10 +262,10 @@ fol_lnn = ["fol_constraints", "rule_extraction", "reward_mem"]
 
 | File | Action | Phase |
 |------|--------|-------|
-| `src/pruners/fol_pruner.rs` | NEW | 1 |
-| `src/pruners/rule_extractor.rs` | NEW | 2 |
-| `src/pruners/reward_mem_pruner.rs` | NEW | 3 |
-| `src/pruners/decision_trace.rs` | NEW | 4 |
+| `crates/katgpt-pruners/src/fol_pruner.rs` | NEW | 1 |
+| `crates/katgpt-pruners/src/rule_extractor.rs` | NEW | 2 |
+| `crates/katgpt-pruners/src/reward_mem_pruner.rs` | NEW | 3 |
+| `crates/katgpt-pruners/src/decision_trace.rs` | NEW | 4 |
 | `src/pruners/mod.rs` | EXTEND | 5 |
 | `Cargo.toml` | EXTEND | 5 |
 | `examples/fol_constraint_demo.rs` | NEW | 6 |

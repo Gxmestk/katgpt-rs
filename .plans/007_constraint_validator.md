@@ -1,5 +1,11 @@
 # Plan 007: Constraint Validator — Full Rust Vocabulary + Validation Pipeline
 
+> **Note on file paths (2026-07-18):** Some `*.rs` paths in this document
+> reference modules that were renamed, moved, or never landed under the
+> exact name shown. They are preserved as a **historical record** of the
+> original design intent; consult the current crate layout for the live
+> location.
+
 > **Rename Note**: The `clora` module was renamed to `validator` because it contains
 > deterministic syntax validation code (SynPruner, PartialParser), not neural LoRA weights.
 > Feature flag: `clora` → `validator` (previously `clora`). Module path: `src/clora/` → `src/validator/`.
@@ -26,7 +32,7 @@ The `parent_path` packs **5 bits per depth** (`<< 5`, `& 0x1F`). This means **ma
 
 ### Blocker 2: `TransformerWeights` scales linearly with `vocab_size`
 
-```/src/transformer.rs#L25-35
+```/crates/katgpt-percepta/src/transformer.rs#L25-35
         Self {
             wte: init(config.vocab_size * n),      // [vocab_size * n_embd]
             lm_head: init(config.vocab_size * n),  // [vocab_size * n_embd]
@@ -163,7 +169,7 @@ Current: `u64` bitfield, 5 bits per depth → max token 31, max depth 12.
 New: `u128` bitfield, 16 bits per depth → max token 65535, max depth 8.
 
 ```rust
-// speculative/types.rs — updated TreeNode
+// crates/katgpt-core/src/speculative/types.rs — updated TreeNode
 
 /// DDTree node for Best-First Search.
 ///
@@ -320,7 +326,7 @@ validator = ["syn", "proc-macro2"] # gates validator/ module (previously clora) 
 NOT a full Rust parser. A **bracket balancer + keyword acceptor**:
 
 ```rust
-// validator/partial_parser.rs (previously clora/)
+// crates/katgpt-validator/src/partial_parser.rs (previously clora/)
 
 /// Incremental bracket balancer for Rust syntax.
 /// Fast enough for per-token DDTree validation (~50ns per call).
@@ -413,7 +419,7 @@ impl PartialParser {
 ### SynPruner Implementation
 
 ```rust
-// validator/syn_pruner.rs (previously clora/)
+// crates/katgpt-validator/src/syn_pruner.rs (previously clora/)
 
 /// Compiler-in-the-Loop pruner — two-tier validation.
 ///
@@ -475,7 +481,7 @@ DDTree only uses Tier 0. Tier 1 runs on the top-K paths. Tiers 2-3 run offline o
 ### 1.1 Core Types
 
 ```rust
-// tokenizer/types.rs
+// crates/katgpt-tokenizer/src/types.rs
 
 /// BPE tokenizer for Rust source code.
 pub struct BpeTokenizer {
@@ -502,7 +508,7 @@ pub struct MergeRule {
 ### 1.2 BPE Algorithm
 
 ```rust
-// tokenizer/bpe.rs
+// crates/katgpt-tokenizer/src/bpe.rs
 impl BpeTokenizer {
     /// Encode a string into BPE token IDs.
     /// 1. Convert string to byte-level tokens
@@ -522,7 +528,7 @@ impl BpeTokenizer {
 ### 1.3 BPE Training
 
 ```rust
-// tokenizer/bpe.rs
+// crates/katgpt-tokenizer/src/bpe.rs
 impl BpeTokenizer {
     /// Train BPE from a directory of .rs files.
     ///
@@ -586,7 +592,7 @@ for path in extract_best_path(&tree) {
 ### 2.3 Error Feedback (Self-Correction Loop)
 
 ```rust
-// validator/types.rs (previously clora/types.rs)
+// crates/katgpt-validator/src/types.rs (previously crates/katgpt-validator/src/types.rs)
 
 /// Compiler error → steering context for next LLM draft.
 pub struct CompilerFeedback {
@@ -630,9 +636,9 @@ The training data pipeline (`src/data/`) is deferred to plan 009 because:
 
 Plan 008 (wgpu LoRA Training) covers GPU-accelerated forward + backward pass for `lora.bin` fine-tuning.
 
-**Module ownership**: `src/data/` is owned by Plan 009. Plan 008 places its `DataLoader` in `src/gpu/dataloader.rs` (inside the `gpu/` module) to avoid ownership conflict. The split is:
+**Module ownership**: `src/data/` is owned by Plan 009. Plan 008 places its `DataLoader` in `riir-ai/crates/riir-gpu/src/dataloader.rs` (inside the `gpu/` module) to avoid ownership conflict. The split is:
 - `src/data/ingester.rs`, `src/data/filter.rs`, `src/data/exporter.rs` → Plan 009 (corpus processing)
-- `src/gpu/dataloader.rs` → Plan 008 (batch iteration for GPU training)
+- `riir-ai/crates/riir-gpu/src/dataloader.rs` → Plan 008 (batch iteration for GPU training)
 
 Plan 009 will cover:
 - `data/ingester.rs` — walk dirs, read .rs, blake3 dedup
@@ -644,11 +650,11 @@ Plan 009 will cover:
 
 ### Phase 0: Path Encoding Fix (Prerequisite)
 
-- [x] 0.1 Change `TreeNode.parent_path` from `u64` to `u128` in `speculative/types.rs`
+- [x] 0.1 Change `TreeNode.parent_path` from `u64` to `u128` in `crates/katgpt-core/src/speculative/types.rs`
 - [x] 0.2 Update `extract_parent_tokens` to use 16-bit shifts (`<< 16`, `& 0xFFFF`)
 - [x] 0.3 Update `build_dd_tree_pruned` shift from `<< 5` to `<< 16`
 - [x] 0.4 Add `extract_parent_tokens_into(parent_path: u128, num_tokens: usize, buf: &mut [usize])` to `dd_tree.rs` — zero-alloc version that writes into pre-allocated buffer
-- [x] 0.5 Update `SpeculativeContext` in `speculative/types.rs` to include `parent_tokens_buf: Vec<usize>` (size = `draft_lookahead + 1`)
+- [x] 0.5 Update `SpeculativeContext` in `crates/katgpt-core/src/speculative/types.rs` to include `parent_tokens_buf: Vec<usize>` (size = `draft_lookahead + 1`)
 - [x] 0.6 Migrate all internal `extract_parent_tokens()` callers to `extract_parent_tokens_into()` with `SpeculativeContext::parent_tokens_buf`
 - [x] 0.7 Update all tests in `dd_tree.rs` for new encoding
 - [x] 0.8 Run `cargo test --all-features` — all 176 tests pass
@@ -659,13 +665,13 @@ Plan 009 will cover:
 ### Phase 1: BPE Tokenizer
 
 - [x] 1.1 Add `blake3`, `serde`, `serde_json` to `Cargo.toml` dependencies
-- [x] 1.2 Create `src/tokenizer/mod.rs` with re-exports
-- [x] 1.3 Create `src/tokenizer/types.rs` with `BpeTokenizer`, `MergeRule`
-- [x] 1.4 Create `src/tokenizer/bpe.rs` with `encode()`, `decode()`, `decode_single()`, `train()`
+- [x] 1.2 Create `crates/katgpt-types/src/simd/mod.rs` with re-exports
+- [x] 1.3 Create `crates/katgpt-tokenizer/src/types.rs` with `BpeTokenizer`, `MergeRule`
+- [x] 1.4 Create `crates/katgpt-tokenizer/src/bpe.rs` with `encode()`, `decode()`, `decode_single()`, `train()`
 - [x] 1.5 Add `Config::bpe()` and `Config::bpe_draft()` to `src/types.rs`
 - [x] 1.6 Add `pub mod tokenizer;` to `src/lib.rs`
 - [x] 1.7 Add tests: encode/decode roundtrip, special tokens, vocab coverage
-- [x] 1.8 Add benchmark: BPE encode/decode throughput (in `src/benchmark.rs`)
+- [x] 1.8 Add benchmark: BPE encode/decode throughput (in `src/benchmark/mod.rs`)
 - [x] 1.9 Run `cargo clippy --all-features`, `cargo test --all-features`
 - [x] 1.10 Commit with message `feat: BPE tokenizer for Rust source code`
 
@@ -673,10 +679,10 @@ Plan 009 will cover:
 
 - [x] 2.1 Add `syn` and `proc-macro2` to `Cargo.toml` under `[dependencies]` with `optional = true`
 - [x] 2.2 Add `validator = ["syn", "proc-macro2"]` to `[features]` (previously `clora`)
-- [x] 2.3 Create `src/validator/mod.rs` with re-exports (behind `#[cfg(feature = "validator")]`)
-- [x] 2.4 Create `src/validator/types.rs` with `PruneResult`, `ErrorKind`, `CompilerFeedback`
-- [x] 2.5 Create `src/validator/partial_parser.rs` with bracket balancer DFA
-- [x] 2.6 Create `src/validator/syn_pruner.rs` with `SynPruner` implementing `ConstraintPruner`
+- [x] 2.3 Create `riir-chain/src/validator/mod.rs` with re-exports (behind `#[cfg(feature = "validator")]`)
+- [x] 2.4 Create `crates/katgpt-validator/src/types.rs` with `PruneResult`, `ErrorKind`, `CompilerFeedback`
+- [x] 2.5 Create `crates/katgpt-validator/src/partial_parser.rs` with bracket balancer DFA
+- [x] 2.6 Create `crates/katgpt-validator/src/syn_pruner.rs` with `SynPruner` implementing `ConstraintPruner`
 - [x] 2.7 Add `pub mod validator;` to `src/lib.rs` (behind `#[cfg(feature = "validator")]`)
 - [x] 2.8 Add tests: partial parser accepts valid fragments, rejects unbalanced
 - [x] 2.9 Add tests: SynPruner prunes invalid Rust, accepts valid Rust
@@ -686,7 +692,7 @@ Plan 009 will cover:
 
 ### Phase 3: Integration & Validation
 
-- [x] 3.1 Create example: `examples/validator_demo.rs` (behind `validator` feature, previously `clora`)
+- [x] 3.1 Create example: `examples/core_01_validator.rs` (behind `validator` feature, previously `clora`)
 - [x] 3.2 Demo shows: BPE encode → draft → SynPruner → syn validate → output
 - [x] 3.3 Run baseline benchmark (no Deterministic Validator) → `bench/027_bench_result.png`
 - [x] 3.4 Run Deterministic Validator benchmark (with SynPruner) → `bench/030_bench_result.png`
@@ -728,17 +734,17 @@ validator = ["syn", "proc-macro2"]  # previously clora
 | `src/speculative/types.rs` | `u64` → `u128` in TreeNode; add `parent_tokens_buf` to `SpeculativeContext` | 0 | **Yes** — all tests update |
 | `src/speculative/dd_tree.rs` | shift/mask update | 0 | No (internal) |
 | `Cargo.toml` | Add deps + features | 1-2 | No |
-| `src/tokenizer/mod.rs` | New | 1 | No |
-| `src/tokenizer/types.rs` | New | 1 | No |
-| `src/tokenizer/bpe.rs` | New | 1 | No |
+| `crates/katgpt-types/src/simd/mod.rs` | New | 1 | No |
+| `crates/katgpt-tokenizer/src/types.rs` | New | 1 | No |
+| `crates/katgpt-tokenizer/src/bpe.rs` | New | 1 | No |
 | `src/types.rs` | Add Config::bpe() (`n_layer` already exists from Plan 010) | 1 | No |
 | `src/lib.rs` | Add mod tokenizer | 1 | No |
-| `src/validator/mod.rs` | New | 2 | No |
-| `src/validator/types.rs` | New | 2 | No |
-| `src/validator/partial_parser.rs` | New | 2 | No |
-| `src/validator/syn_pruner.rs` | New | 2 | No |
-| `examples/validator_demo.rs` | New | 3 | No |
-| `src/benchmark.rs` | Add BPE + validator benches | 1-3 | No |
+| `riir-chain/src/validator/mod.rs` | New | 2 | No |
+| `crates/katgpt-validator/src/types.rs` | New | 2 | No |
+| `crates/katgpt-validator/src/partial_parser.rs` | New | 2 | No |
+| `crates/katgpt-validator/src/syn_pruner.rs` | New | 2 | No |
+| `examples/core_01_validator.rs` | New | 3 | No |
+| `src/benchmark/mod.rs` | Add BPE + validator benches | 1-3 | No |
 
 ## References
 

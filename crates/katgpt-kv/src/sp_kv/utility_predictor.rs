@@ -12,29 +12,32 @@ use crate::sp_kv::types::UtilityPredictorWeights;
 
 /// SiLU activation: x * σ(x) = x / (1 + exp(-x)).
 /// Smooth, non-monotonic, self-gated. Paper uses this over ReLU for better gradient flow.
+///
+/// Delegates to `katgpt_core::simd::fast_sigmoid` (Cephes polynomial).
 #[inline(always)]
 fn silu(x: f32) -> f32 {
-    let sigmoid = 1.0 / (1.0 + (-x).exp());
-    x * sigmoid
+    x * katgpt_core::simd::fast_sigmoid(x)
 }
 
 /// Sigmoid activation: 1 / (1 + exp(-x)).
 /// Maps logits to (0, 1) range for utility scores.
+///
+/// Delegates to `katgpt_core::simd::fast_sigmoid` (Cephes polynomial).
 #[inline(always)]
 fn sigmoid(x: f32) -> f32 {
-    1.0 / (1.0 + (-x).exp())
+    katgpt_core::simd::fast_sigmoid(x)
 }
 
 /// Predict utility for each KV head from a hidden state (zero-alloc variant).
 ///
 /// # Arguments
 /// * `weights` - Predictor weights for one layer
-/// * `h` - Hidden state vector [d_model] (post-RMSNorm, pre-attention)
+/// * `h` - Hidden state vector `[d_model]` (post-RMSNorm, pre-attention)
 /// * `d_model` - Model embedding dimension
 /// * `hidden` - Predictor hidden dimension
 /// * `n_kv_heads` - Number of KV heads (GQA groups)
-/// * `buf` - Pre-allocated scratch buffer [hidden] for intermediate activations
-/// * `out` - Output buffer [n_kv_heads] for utilities
+/// * `buf` - Pre-allocated scratch buffer `[hidden]` for intermediate activations
+/// * `out` - Output buffer `[n_kv_heads]` for utilities
 ///
 /// # Layout
 /// ```text

@@ -5,7 +5,7 @@
 > **Status:** **Gain (downgraded 2026-06-20).** Both PRIMARY (stage-gated HLA subspace) and SECONDARY (shape-adaptive adapter routing) fusions have material prior art. Plan-only, feature-flagged, low priority — no primitive opened, no Super-GOAT promotion. See `.issues/034_shape_adapter_novelty_gate.md` (Issue 034 was closed + removed; downgraded to Gain, prior art) and §3 below for the verdict + citation table.
 > **Related Research:** 123 (Latent Functor Runtime Guide — Super-GOAT), 010 (KG × HLA × Role Transport), 148 (Hydra Effect → Hydra Budget), 231 (OPD per-module energy profile), 247 (Dense Latent cross-model adapters, training→riir-train pattern), 258 (Sink-Aware / compression valleys), 266 (DenseMesh adaptive width), 212 (Gemini Fourier × LatCal fusion — the canonical LatCal Super-GOAT precedent).
 > **Related Plans:** 165 (Hydra Budget — layer skip via pre-computed profiles), 258 (LatCal Fixed-Point Shell Bridge), 265 (LatCal Fixed-Point Fourier Coefficients), 276 (MicroRecurrentBeliefState — HLA kernel snapshot).
-> **Cross-ref (riir-ai):** `latent_functor/zone_gating.rs::NpcFunctorRuntime`, `hla/types.rs::MultiLayerHlaCache` (gamma decay = carry-forward), `hla/kernel.rs::evolve_hla`, `riir-chain/src/encoding/latcal*.rs`.
+> **Cross-ref (riir-ai):** `riir-ai/crates/riir-engine/src/latent_functor/zone_gating.rs::NpcFunctorRuntime`, `riir-ai/crates/riir-engine/src/hla/types.rs::MultiLayerHlaCache` (gamma decay = carry-forward), `riir-ai/crates/riir-engine/src/hla/kernel.rs::evolve_hla`, `riir-chain/src/encoding/latcal*.rs`.
 > **Classification:** Public (katgpt-rs engine note). The training recipe itself → `riir-train`.
 
 ---
@@ -16,7 +16,7 @@ The paper proposes a `×`-shaped transformer (wide early/late, narrow middle) wi
 
 **Two framings, ranked by tier:**
 
-1. **PRIMARY (Super-GOAT-tier) — Stage-Gated HLA Subspace Activation.** The ×-shape insight reframes as a latent-to-latent operation: at each decision stage (combat / dialog / economic / social), only a *subspace* of the NPC's HLA latent state needs to be active. `latent_functor/zone_gating.rs::NpcFunctorRuntime` already gates by **zone density** (spatial axis). The ×-shape adds a SECOND gating axis: **decision-stage subspace selection within HLA's 8-dim state** (valence/arousal/desperation/calm/fear + 3). Dormant subspaces **carry forward** via HLA's `gamma` decay leaky integrator — exactly the paper's carry-forward mechanism. This is modelless, latent-to-latent, batchable across thousands of NPCs at 20Hz, and the per-stage subspace profile is **LatCal-committable** for deterministic replay/anti-cheat.
+1. **PRIMARY (Super-GOAT-tier) — Stage-Gated HLA Subspace Activation.** The ×-shape insight reframes as a latent-to-latent operation: at each decision stage (combat / dialog / economic / social), only a *subspace* of the NPC's HLA latent state needs to be active. `riir-ai/crates/riir-engine/src/latent_functor/zone_gating.rs::NpcFunctorRuntime` already gates by **zone density** (spatial axis). The ×-shape adds a SECOND gating axis: **decision-stage subspace selection within HLA's 8-dim state** (valence/arousal/desperation/calm/fear + 3). Dormant subspaces **carry forward** via HLA's `gamma` decay leaky integrator — exactly the paper's carry-forward mechanism. This is modelless, latent-to-latent, batchable across thousands of NPCs at 20Hz, and the per-stage subspace profile is **LatCal-committable** for deterministic replay/anti-cheat.
 
 2. **SECONDARY (GOAT-tier fallback) — Shape-Adaptive Adapter Routing.** With on-the-fly LoRA + riir-train, train adapters with per-layer shape objectives and hot-swap by shape. Documented in rev 1 of this note; demoted to fallback after skill refinement mandated the latent reframing first.
 
@@ -43,27 +43,27 @@ The paper proposes a `×`-shaped transformer (wide early/late, narrow middle) wi
 
 | `> <former` insight | Shipped cousin | File / Plan | Granularity |
 |---|---|---|---|
-| Middle layers collapse → skip them | **Hydra Budget** `HydraSkipPlan { skip_layers: Vec<bool> }`, `HydraBudgetConfig { modelless: bool }` | `src/pruners/hydra_budget.rs`, P165, R148, default-on, GOAT 4/4 | **Layer** |
+| Middle layers collapse → skip them | **Hydra Budget** `HydraSkipPlan { skip_layers: Vec<bool> }`, `HydraBudgetConfig { modelless: bool }` | `crates/katgpt-pruners/src/hydra_budget.rs`, P165, R148, default-on, GOAT 4/4 | **Layer** |
 | MLP dead dimensions → skip them | **Sparse MLP** + **Prism** per-capability masks + **CNA** neuron discovery | P022, R191, R053 | **Dimension (within-layer)** |
-| Per-layer capacity varies → adapt compute | **DenseMesh adaptive_width** `WidthDecision::{Contract,Neutral,Expand}` driven by Collapse-Aware + BreakevenRouter | `dense_mesh/adaptive_width.rs`, P266, R234 | **Topology (across-nodes)** |
+| Per-layer capacity varies → adapt compute | **DenseMesh adaptive_width** `WidthDecision::{Contract,Neutral,Expand}` driven by Collapse-Aware + BreakevenRouter | `crates/katgpt-transformer/src/dense_mesh/adaptive_width.rs`, P266, R234 | **Topology (across-nodes)** |
 | Normalized matrix entropy per layer | **`effective_rank`** (Roy-Vetterli) — `normalized_matrix_entropy = log(effective_rank)/log(r)` | `crates/katgpt-core/src/data_probe/geometry.rs` | Metric |
 | MLP participation ratio per layer | **`participation_ratio`** `d_eff = (Σλ)²/Σ(λ²)` | SpectralQuant, P078, default-on, GOAT-proven | Metric |
 | Attention sinks / compression valleys | **Sink-Aware Attention** (targets the de Llano 2026 finding the paper cites) | P287, R258 (deferred for latency; diagnostic ships) | Head |
 | Per-module energy profile of adapter | **`ModuleEnergyProfile::PAPER_AVERAGE { ffn, attn, embed, other }`** | `src/inference_router/router_compute_target.rs`, R231 (OPD) | Module-type |
-| Per-adapter shape descriptor | **`AdapterShape { rank, in_dim, out_dim }`** | `riir-ai/crates/riir-gpu/src/optimizer_amuse.rs` | Static per-adapter |
+| Per-adapter shape descriptor | **`AdapterShape { rank, in_dim, out_dim }`** | `riir-ai/crates/riir-gpu/src/optimizer_amuse/mod.rs` | Static per-adapter |
 | Per-snapshot metadata + atomic swap | **`SnapshotMeta { blake3_hash, n_layers, ... }`**, `LoRAHotSwap`, `SenseHotSwap`, `KernelHotSwap` | `riir-ai/crates/riir-engine/src/snapshot.rs`, P276, P279 | Snapshot |
 
 **The gap:** every shipped cousin is either (a) per-module-type (OPD: FFN vs Attn), (b) per-adapter-static (`AdapterShape`: fixed rank per adapter), or (c) per-layer-intrinsic (Hydra: skip based on the *base model's* profile). **Nothing characterizes an adapter by its per-LAYER shape profile** — which layers it concentrates capacity in vs suppresses. That is the dimension `> <former` operates on, and it's orthogonal to all three shipped axes.
 
 ### 2.2 The PRIMARY fusion (Super-GOAT-tier) — Stage-Gated HLA Subspace Activation
 
-**`> <former × latent_functor/zone_gating × hla/types.rs (gamma decay) × LatCal commitment`**
+**`> <former × latent_functor/zone_gating × riir-ai/crates/riir-engine/src/hla/types.rs (gamma decay) × LatCal commitment`**
 
 The paper's variable-width insight reframes as a **latent-to-latent subspace gating** operation on HLA state. Reading the actual shipped code:
 
-- `NpcFunctorRuntime` (`latent_functor/zone_gating.rs:220`) already has stage-gated activation — but gated by **zone density** (`ZoneGatingTier { min_density, tau, beta, reest_budget }`). `on_zone_transition()` resolves the active tier and pushes to the scheduler. This is the **spatial gating axis**.
-- `MultiLayerHlaCache` (`hla/types.rs:136`) carries `gamma: f32` — the **leaky integrator decay**. Dormant HLA subspaces decay via `gamma` but do NOT zero out. This is exactly the paper's **carry-forward** mechanism: inactive dimensions bypass the layer and are restored from their last active value.
-- `ThirdOrderMoment` (`hla/types.rs:211`) captures "relations between relations" in compressed form — this is the **wide early/late, narrow middle** analog: high-order moments are the "wide" subspace where dense relational computation happens; first-order scalars are the "narrow" projection.
+- `NpcFunctorRuntime` (`riir-ai/crates/riir-engine/src/latent_functor/zone_gating.rs:220`) already has stage-gated activation — but gated by **zone density** (`ZoneGatingTier { min_density, tau, beta, reest_budget }`). `on_zone_transition()` resolves the active tier and pushes to the scheduler. This is the **spatial gating axis**.
+- `MultiLayerHlaCache` (`riir-ai/crates/riir-engine/src/hla/types.rs:136`) carries `gamma: f32` — the **leaky integrator decay**. Dormant HLA subspaces decay via `gamma` but do NOT zero out. This is exactly the paper's **carry-forward** mechanism: inactive dimensions bypass the layer and are restored from their last active value.
+- `ThirdOrderMoment` (`riir-ai/crates/riir-engine/src/hla/types.rs:211`) captures "relations between relations" in compressed form — this is the **wide early/late, narrow middle** analog: high-order moments are the "wide" subspace where dense relational computation happens; first-order scalars are the "narrow" projection.
 
 **The fusion:** add a **decision-stage gating axis** to `NpcFunctorRuntime`, orthogonal to the existing zone-density axis. The ×-shape profile becomes a **per-stage HLA subspace activation schedule**:
 
@@ -84,7 +84,7 @@ Dormant subspaces **carry forward** via `gamma` decay (no recomputation — the 
 - It connects to **freeze/thaw** (the subspace profile per NPC personality is snapshot-versioned — different NPC personalities have different ×-shapes).
 - It connects to **cgsp_runtime** (curiosity signal drives WHICH subspace to activate — high curiosity on economic axis → economic subspace widens).
 
-**The LatCal bridge (sync boundary):** the per-stage subspace activation is a latent-space operation (which HLA dims are active), but the **decision** of which stage the NPC is in crosses the sync boundary as a raw scalar (stage_id, confidence). LatCal commits this as a fixed-point value so deterministic replay reconstructs the exact subspace schedule. The HLA scalar projections (valence/arousal/desperation/calm/fear) cross the wire as raw scalars per AGENTS.md; the full 8-dim vector stays local. This respects the raw-vs-latent boundary exactly.
+**The LatCal bridge (sync boundary):** the per-stage subspace activation is a latent-space operation (which HLA dims are active), but the **decision** of which stage the NPC is in crosses the sync boundary as a raw scalar (stage_id, confidence). LatCal commits this as a fixed-point value so deterministic replay reconstructs the exact subspace schedule. The belief scalar projections (valence/arousal/desperation/calm/fear) cross the wire as raw scalars per AGENTS.md; the full 8-dim vector stays local. This respects the raw-vs-latent boundary exactly.
 
 ### 2.3 The SECONDARY fusion (GOAT-tier fallback) — Shape-Adaptive Adapter Routing
 
@@ -135,9 +135,9 @@ Closest prior art:
 ### Q1.c — adapter-driven Hydra skip plan: **feasible, novel as code, not as concept**
 
 Grep of `HydraBudgetConfig` call sites in `katgpt-rs/src/` and `katgpt-rs/crates/katgpt-core/src/` (2026-06-20):
-- `crates/katgpt-core/src/types.rs:4203` — struct definition `{ skip_threshold, cumulative_threshold, modelless: bool, skip_erasure_draft: bool }`. **No adapter-aware field.** `modelless` means "lookup vs logit-lens," not "base vs adapter."
+- `crates/katgpt-types/src/lib.rs:4203` — struct definition `{ skip_threshold, cumulative_threshold, modelless: bool, skip_erasure_draft: bool }`. **No adapter-aware field.** `modelless` means "lookup vs logit-lens," not "base vs adapter."
 - `crates/katgpt-core/src/lib.rs:184` — re-export.
-- `src/pruners/hydra_budget.rs:11,95` — `hydra_layer_skip(profiles: &[HydraLayerProfile], config: &HydraBudgetConfig)`. Profile source is the caller's responsibility; nothing prevents passing an adapter-derived profile.
+- `crates/katgpt-pruners/src/hydra_budget.rs:11,95` — `hydra_layer_skip(profiles: &[HydraLayerProfile], config: &HydraBudgetConfig)`. Profile source is the caller's responsibility; nothing prevents passing an adapter-derived profile.
 - `tests/bench_165_hydra_budget_goat.rs` — benchmarks pass synthetic profiles.
 
 **Verdict:** no adapter-aware variant exists in katgpt-rs today. The mechanism is feasible — extend `HydraBudgetConfig` with `adapter_profile: Option<HydraLayerProfile>` (or pass adapter-derived profiles into `hydra_layer_skip`). But LayerRoute already demonstrates LoRA-driven layer skip in the literature, so this is novel-as-shipped-code, not novel-as-concept.
@@ -200,7 +200,7 @@ Issue 034 closed (2026-06-20) with **both Q1.a (PRIMARY) and Q1.a' (SECONDARY) s
   - `katgpt-rs/.research/266_DenseMesh_Latent_Node_Network.md` — topology-level width adaptation; the layer-level version is the gap
   - `katgpt-rs/.research/258_Attention_Sink_Dual_Mechanism_NOP_Broadcast.md` — same compression-valley phenomenon
 - **Runtime plumbing:** `riir-ai/crates/riir-engine/src/snapshot.rs::SnapshotMeta` (extend with per-layer profile), `riir-ai/crates/riir-engine/src/episode_buffer.rs::LoRAHotSwap` (atomic swap by shape profile).
-- **Training side:** `riir-ai/crates/riir-gpu/src/optimizer_amuse.rs::AdapterShape` (currently static per-adapter; would need a per-layer variant).
+- **Training side:** `riir-ai/crates/riir-gpu/src/optimizer_amuse/mod.rs::AdapterShape` (currently static per-adapter; would need a per-layer variant).
 
 ## TL;DR
 

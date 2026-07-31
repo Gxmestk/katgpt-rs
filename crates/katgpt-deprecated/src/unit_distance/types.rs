@@ -152,7 +152,7 @@ pub struct CmFieldParams {
     /// Rational primes that split completely in K (must be ≡ 1 mod 4).
     pub split_primes: Vec<u64>,
 
-    /// Degree [L:Q] of the totally real subfield.
+    /// Degree `[L:Q]` of the totally real subfield.
     /// Total degree of K is 2·f.
     pub degree: usize,
 
@@ -164,7 +164,7 @@ pub struct CmFieldParams {
 }
 
 impl CmFieldParams {
-    /// Total field degree [K:Q] = 2·f.
+    /// Total field degree `[K:Q]` = 2·f.
     #[inline]
     pub fn total_degree(&self) -> usize {
         2 * self.degree

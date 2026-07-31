@@ -12,7 +12,7 @@
 
 parakeet.cpp implements **phrase boosting** via a token-level Context Trie that tracks active phrase-matching states during autoregressive decode. At each timestep, the trie advances all active states on the emitted token and boosts log-probs of child tokens by `boost_score` (default 5.0). This biases the decoder toward domain-specific vocabulary without modifying the model.
 
-**Verdict: MODERATE GAIN — The Context Trie pattern maps directly to our DDTree + ScreeningPruner pipeline as a lightweight `ScreeningPruner` that boosts domain-relevant tokens. Zero-model-cost bias injection. Feature-gate as `phrase_boost`. Default-OFF until GOAT proves gain on our game/inference workload.**
+**Verdict: MODERATE GAIN — The Context Trie pattern maps directly to our DDTree + ScreeningPruner pipeline as a lightweight `ScreeningPruner` that boosts domain-relevant tokens. Zero-model-cost bias injection. Feature-gate as `phrase_boost`. Default-OFF until GOAT proves gain on our game/inference workload.** *(Post-promotion update: GOAT PASS; `phrase_boost` is now DEFAULT-ON in root Cargo.toml default array.)
 
 ---
 
@@ -275,20 +275,20 @@ phrase_boost = []  # Context trie phrase boosting for DDTree (Research 147)
 
 ### Tasks
 
-- [x] T1: Implement `PhraseTrie` — compact trie for token-level phrase tracking — `src/pruners/phrase_trie.rs` with `new()`, `insert()`, `advance()`, `get_active()`, `is_match()`, `reset()`
+- [x] T1: Implement `PhraseTrie` — compact trie for token-level phrase tracking — `crates/katgpt-pruners/src/phrase_trie.rs` with `new()`, `insert()`, `advance()`, `get_active()`, `is_match()`, `reset()`
   - `nodes: Vec<PhraseTrieNode>` with `children: Vec<Option<usize>>` per node
   - `insert(token_ids: &[usize])`, `build(phrases: &[&str], tokenizer)`
   - `get_boosted_tokens(active: &FixedBitSet) -> Vec<usize>`
   - `advance(active: &mut FixedBitSet, token_id: usize)`
   - Zero allocations on lookup (Vec<Option<usize>> indexed by token_id)
-  - Target: `src/pruners/phrase_trie.rs`
+  - Target: `crates/katgpt-pruners/src/phrase_trie.rs`
 
-- [x] T2: Implement `PhraseBoostPruner<P>` — ScreeningPruner wrapper — `src/pruners/phrase_boost.rs` implementing `ScreeningPruner` with `relevance()`, `is_boosted()`, `normalized_boost()`
+- [x] T2: Implement `PhraseBoostPruner<P>` — ScreeningPruner wrapper — `crates/katgpt-pruners/src/phrase_boost.rs` implementing `ScreeningPruner` with `relevance()`, `is_boosted()`, `normalized_boost()`
   - Wraps any inner ScreeningPruner
   - Maintains `active_states: HashMap<u128, FixedBitSet>` keyed by DDTree parent_path
   - `relevance()` delegates to inner then adds normalized boost
   - `boost_score: f32` with default 0.833 (= 5.0 / 6.0 normalized to [0,1])
-  - Target: `src/pruners/phrase_boost.rs` behind `#[cfg(feature = "phrase_boost")]`
+  - Target: `crates/katgpt-pruners/src/phrase_boost.rs` behind `#[cfg(feature = "phrase_boost")]`
 
 - [x] T3: GOAT proof — Bomber arena with phrase-boosted domain vocab — `tests/bench_164_phrase_boost_goat.rs` T3
   - Boost phrases: ["bomb", "wall", "open", "block", "walk", "idle"] (6 actions)

@@ -4,7 +4,7 @@
 **Research:** [katgpt-rs/.research/324_Trajectory_Geometry_Transformer_Layers.md](../.research/324_Trajectory_Geometry_Transformer_Layers.md)
 **Source paper:** [arXiv:2606.09287](https://arxiv.org/abs/2606.09287) — Pandey, Singh, Mahdid, *Trajectory Geometry of Transformer Representations Across Layers* (Jun 2026)
 **Target:** `katgpt-rs/crates/katgpt-core/src/latent_trajectory_geometry.rs` (new file) + Cargo feature `latent_trajectory_geometry` (opt-in, NOT default)
-**Status:** Active — Phase 1 + 2 + 3 COMPLETE (2026-06-29); `latent_trajectory_geometry` stays opt-in. G3 (visible game-related gate) PASSES — primitive is a validated diagnostic, promotion candidate for a follow-up router-integration plan. See `.benchmarks/342_latent_trajectory_geometry_gate.md`.
+**Status:** ✅ COMPLETE, OPT-IN (G3 PASS; no router integration in this plan) — Phase 1 + 2 + 3 COMPLETE (2026-06-29); `latent_trajectory_geometry` stays opt-in. G3 (visible game-related gate) PASSES — primitive is a validated diagnostic, promotion candidate for a follow-up router-integration plan. See `.benchmarks/342_latent_trajectory_geometry_gate.md`.
 
 ---
 

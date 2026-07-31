@@ -4,8 +4,8 @@
 **Research:** [katgpt-rs/.research/370_manifold_bandits_latent_task_tree_hierarchical_thompson.md](../.research/370_manifold_bandits_latent_task_tree_hierarchical_thompson.md)
 **Source paper:** [arXiv:2606.19750](https://arxiv.org/abs/2606.19750) — McKenzie, Hansen, Wang, *Manifold Bandits: Bayesian Curriculum Learning over the Latent Geometry of Large Language Models*, UCSD, 2026
 **Code:** [github.com/DarrienMcKenzie/manifold-bandits](https://github.com/DarrienMcKenzie/manifold-bandits) (MIT)
-**Target:** `katgpt-rs/crates/katgpt-core/src/manifold_bandit.rs` (new module) + Cargo feature `manifold_bandit`
-**Status:** Active — Phase 1 + Phase 2 + Phase 3 + Phase 4 COMPLETE. GOAT gate PASS (G1/G3/G4/G5), G2 FAIL is plan-level expectation error. PROMOTED to default-on. Phase 3 (real PCA/UMAP-substitute/HDBSCAN-substitute construction) COMPLETE — G1-real confirms structural advantage holds with real-constructed trees (ratio 0.740 vs hand-built 0.723). Phase 4 (DEC-cochain fusion exploration) COMPLETE — Super-GOAT candidacy DROPPED (cochain-dec is 12× slower + breaks G5 reproducibility); the R279 N≥d phase gate (T4.2) is a net win (11% faster G1 convergence at d=2) and ships as an opt-in config field; the GOAT from Phase 2 stands.
+**Target:** `katgpt-rs/crates/katgpt-core/src/manifold_bandit/mod.rs` (new module) + Cargo feature `manifold_bandit`
+**Status:** ✅ COMPLETE, DEFAULT-ON (2026-07-03) — Phase 1 + Phase 2 + Phase 3 + Phase 4 COMPLETE. GOAT gate PASS (G1/G3/G4/G5), G2 FAIL is plan-level expectation error. PROMOTED to default-on. Phase 3 (real PCA/UMAP-substitute/HDBSCAN-substitute construction) COMPLETE — G1-real confirms structural advantage holds with real-constructed trees (ratio 0.740 vs hand-built 0.723). Phase 4 (DEC-cochain fusion exploration) COMPLETE — Super-GOAT candidacy DROPPED (cochain-dec is 12× slower + breaks G5 reproducibility); the R279 N≥d phase gate (T4.2) is a net win (11% faster G1 convergence at d=2) and ships as an opt-in config field; the GOAT from Phase 2 stands.
 
 ---
 
@@ -115,7 +115,7 @@ impl BayesianFilterArm {
     pub fn update(&mut self, reward: f32, current_step: u64);
 
     /// Thompson sample: draw from Beta(alpha, beta) via Jöhnk's algorithm
-    /// (reuse the existing impl from pruners/bandit.rs).
+    /// (reuse the existing impl from crates/katgpt-ruliology/src/bandit.rs).
     pub fn thompson_sample(&self, rng: &mut Rng) -> f32;
 }
 
@@ -171,8 +171,8 @@ impl LatentTaskTree {
 
 ### Tasks
 
-- [x] **T1.1** Created `katgpt-rs/crates/katgpt-core/src/manifold_bandit.rs` with the type sketch (`TreeNode`, `BayesianFilterArm`, `LatentTaskTreeConfig`, `LatentTaskTree`). No PCA/UMAP/HDBSCAN yet — `from_root()` accepts a pre-computed tree topology (for testing) and stamps the Beta priors.
-- [x] **T1.2** Implemented `BayesianFilterArm::{predict, update, thompson_sample}`. **Sampler swap:** the plan said "reuse Jöhnk's from `pruners/bandit.rs`" but (a) `katgpt-pruners` depends on `katgpt-core` (wrong direction) and (b) Jöhnk's has catastrophically low acceptance for large α, β (acceptance ≈ 0.001% for Beta(16,6) — all 256 iterations reject, returns 0.5). Replaced with the **Gamma-ratio method** (Marsaglia-Tsang gamma + Box-Muller normal) — >90% acceptance regardless of α, β. `predict` with `drift_rate=0` degenerates to stationary Beta (verified by test).
+- [x] **T1.1** Created `katgpt-rs/crates/katgpt-core/src/manifold_bandit/mod.rs` with the type sketch (`TreeNode`, `BayesianFilterArm`, `LatentTaskTreeConfig`, `LatentTaskTree`). No PCA/UMAP/HDBSCAN yet — `from_root()` accepts a pre-computed tree topology (for testing) and stamps the Beta priors.
+- [x] **T1.2** Implemented `BayesianFilterArm::{predict, update, thompson_sample}`. **Sampler swap:** the plan said "reuse Jöhnk's from `crates/katgpt-ruliology/src/bandit.rs`" but (a) `katgpt-pruners` depends on `katgpt-core` (wrong direction) and (b) Jöhnk's has catastrophically low acceptance for large α, β (acceptance ≈ 0.001% for Beta(16,6) — all 256 iterations reject, returns 0.5). Replaced with the **Gamma-ratio method** (Marsaglia-Tsang gamma + Box-Muller normal) — >90% acceptance regardless of α, β. `predict` with `drift_rate=0` degenerates to stationary Beta (verified by test).
 - [x] **T1.3** Implemented `LatentTaskTree::sample` (top-down Thompson descent) and `observe` (per-arm filter update + bottom-up Empirical Bayes propagation). O(branching × depth) per sample, O(branching × depth) per observe. Zero allocations via `ArmPath` (Copy struct, stack-allocated path lookup).
 - [x] **T1.4** Added the `manifold_bandit = []` feature flag to `katgpt-core/Cargo.toml` (opt-in, `[]` deps — no new external crates; PCA/UMAP/HDBSCAN land in Phase 3).
 - [x] **T1.5** Unit tests: (a) `sample` on a hand-built 3-level tree returns valid leaf ids; (b) `observe` updates the correct leaf's filter and propagates to parent Beta via Empirical Bayes; (c) `drift_rate=0` matches flat Thompson sample distribution (statistical test over 10K samples — empirical mean 0.7273 vs Beta(16,6) mean 0.7273); (d) `blake3_root` is stable across rebuilds with identical input. Plus: non-stationarity drift verification, single-leaf tree, mixed-reward updates, n_obs tracking, invalid-arm panic, path depth, num_arms.

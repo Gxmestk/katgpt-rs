@@ -15,6 +15,10 @@
 //! Depends only on `katgpt-types` (the leaf): SIMD kernels, ScaleBoundary,
 //! TemporalDerivativeKernel, MerkleOctree/MerkleProof, depth-invariance
 //! classifier, leaky_step. Zero katgpt-core dependency — the cycle is broken.
+//!
+//! Note: `belief` (per-NPC affect state, 8-dim) is unrelated to `katgpt-hla`
+//! (Higher-order Linear Attention, a Transformer attention layer). The
+//! shared "HLA" acronym was a naming collision resolved in Issue 195.
 
 pub mod bake;
 #[cfg(feature = "sense_lod")]

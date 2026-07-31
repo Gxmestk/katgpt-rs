@@ -266,22 +266,21 @@ where
             cdf_scratch,
         );
 
-        // ── Step 2: Guide scores each candidate ──────────────────────────
+        // ── Step 2+3: Guide scores + difficulty-filter admission (fused) ──
+        // Previously two separate loops over `0..k`; fused into one pass
+        // because the admission check only depends on the guide score just
+        // computed in the same iteration. Saves one loop's worth of bounds
+        // checks + counter updates (k=8 default).
+        //
+        // Difficulty filter context: we use the guide score as the proxy for
+        // estimated solve rate (very high guide ≈ aligned with target → easy;
+        // very low guide ≈ orthogonal → hard). This is a coarse but
+        // allocation-free stand-in for the true breakeven_complexity router;
+        // production callers should swap in their own DifficultyFilter.
         for (i, c) in candidates.iter().enumerate() {
-            guide_scores[i] = self.guide.score(target, &c.direction);
-        }
-
-        // ── Step 3: Difficulty filter (breakeven-style admission) ────────
-        // First, get an *estimate* of solve rate from the solver's perspective
-        // by probing once on a tiny budget. To stay zero-allocation we instead
-        // use the guide score as the proxy: very high guide ≈ aligned with
-        // target → easy; very low guide ≈ orthogonal → hard. This is a coarse
-        // but allocation-free stand-in for the true breakeven_complexity
-        // router; production callers should swap in their own DifficultyFilter.
-        for i in 0..k {
-            let gs = guide_scores[i];
-            let est = gs; // proxy; real impl replaces via with_difficulty_filter.
-            admitted[i] = self.difficulty_filter.admit(gs, est);
+            let gs = self.guide.score(target, &c.direction);
+            guide_scores[i] = gs;
+            admitted[i] = self.difficulty_filter.admit(gs, gs);
         }
 
         // ── Step 4: Solver attempts admitted candidates ──────────────────
@@ -613,7 +612,7 @@ pub fn staleness_weight(k_npc: u8, lambda: f32) -> f32 {
     if k_npc <= 1 || !lambda.is_finite() || lambda <= 0.0 {
         return 1.0;
     }
-    (-(lambda * (k_npc as f32 - 1.0))).exp()
+    crate::simd::cephes_exp_scalar(-(lambda * (k_npc as f32 - 1.0)))
 }
 
 // ── KnpcSelector (Issue 364 T4) ──────────────────────────────────────────
@@ -621,9 +620,9 @@ pub fn staleness_weight(k_npc: u8, lambda: f32) -> f32 {
 /// Decision returned by [`KnpcSelector::observe_cycle`].
 ///
 /// The selector runs across cycles (each CGSP cycle = one halter loop
-/// iteration). While the halter hasn't fired, it returns [`Continue`] and
+/// iteration). While the halter hasn't fired, it returns [`Continue`](Self::Continue) and
 /// the NPC runs CGSP every tick (k_npc = 1 — no staleness correction). When
-/// the halter fires, it returns [`PlanInterval`] with the planned interval
+/// the halter fires, it returns [`PlanInterval`](Self::PlanInterval) with the planned interval
 /// until the next deep cycle. The caller should:
 ///
 /// 1. Set `config.k_npc = k_npc` for the staleness weight on the next cycle.
@@ -646,7 +645,7 @@ pub enum KnpcDecision {
 
 /// Per-NPC variable-duration `k_npc` selector (Issue 364 T4).
 ///
-/// Wraps [`GainCostLoopHalter`] to produce a per-NPC planning horizon `k_npc`
+/// Wraps [`GainCostLoopHalter`](crate::gain_cost_halt::GainCostLoopHalter) to produce a per-NPC planning horizon `k_npc`
 /// from per-cycle observables. The selector accumulates evidence across cycles:
 /// each call to [`observe_cycle`](Self::observe_cycle) feeds the cycle's
 /// (gain, cost, cos_theta) to the halter. When the halter fires `Halt`, the
@@ -673,7 +672,7 @@ pub enum KnpcDecision {
 ///
 /// # Behind feature `gain_cost_halt`
 ///
-/// This primitive composes [`GainCostLoopHalter`] (Plan 304, opt-in) with
+/// This primitive composes [`GainCostLoopHalter`](crate::gain_cost_halt::GainCostLoopHalter) (Plan 304, opt-in) with
 /// the CGSP variable-duration story (Issue 365/364). It compiles only when
 /// both the `cgsp` and `gain_cost_halt` features are enabled. When
 /// `gain_cost_halt` is off, the selector is absent and `k_npc` stays at its
@@ -778,7 +777,7 @@ mod tests {
     use super::*;
     use crate::cgsp::conjecturer::PoolConjecturer;
     use crate::cgsp::filters::BreakevenDifficultyFilter;
-    use crate::cgsp::guide::{ComplexityWeights, HlaProjectionGuide};
+    use crate::cgsp::guide::{BeliefGridProjectionGuide, ComplexityWeights};
     use crate::cgsp::traits::{HintDeltaBandit, Solver};
 
     /// Simple bandit backed by a `Vec<f32>`. For unit tests only.
@@ -870,7 +869,7 @@ mod tests {
     fn cycle_produces_finite_priorities() {
         let pool = make_orthonormal_pool(8, 8);
         let conj = PoolConjecturer::new(pool.clone(), 12345);
-        let guide = HlaProjectionGuide::new(2.0, 1.0, ComplexityWeights::default());
+        let guide = BeliefGridProjectionGuide::new(2.0, 1.0, ComplexityWeights::default());
         let solver = DotSolver { sharpness: 1.0 };
         let bandit = VecBandit::uniform(8);
         let mut lp = CgspLoop::new(conj, guide, solver, bandit, CgspConfig::default());
@@ -897,7 +896,7 @@ mod tests {
         // Non-target arms get lower guide_scores so they accrue less reward.
         let pool = make_orthonormal_pool(8, 8);
         let conj = PoolConjecturer::new(pool.clone(), 42);
-        let guide = HlaProjectionGuide::new(4.0, 0.1, ComplexityWeights::default());
+        let guide = BeliefGridProjectionGuide::new(4.0, 0.1, ComplexityWeights::default());
         let solver = DotSolver { sharpness: 0.5 };
         let bandit = VecBandit::uniform(8);
         let mut lp = CgspLoop::new(conj, guide, solver, bandit, CgspConfig::default())
@@ -927,7 +926,7 @@ mod tests {
         // `DotSolver` (default `OrderOnly`) DOES drift the target arm upward.
         let pool = make_orthonormal_pool(8, 8);
         let conj = PoolConjecturer::new(pool.clone(), 42);
-        let guide = HlaProjectionGuide::new(4.0, 0.1, ComplexityWeights::default());
+        let guide = BeliefGridProjectionGuide::new(4.0, 0.1, ComplexityWeights::default());
         let solver = SkipDotSolver { sharpness: 0.5 };
         let bandit = VecBandit::uniform(8);
         let mut lp = CgspLoop::new(conj, guide, solver, bandit, CgspConfig::default())
@@ -966,7 +965,7 @@ mod tests {
         // dominated solver's behaviour even when it doesn't feed back.
         let pool = make_orthonormal_pool(8, 8);
         let conj = PoolConjecturer::new(pool.clone(), 42);
-        let guide = HlaProjectionGuide::new(4.0, 0.1, ComplexityWeights::default());
+        let guide = BeliefGridProjectionGuide::new(4.0, 0.1, ComplexityWeights::default());
         let solver = SkipDotSolver { sharpness: 0.5 };
         let bandit = VecBandit::uniform(8);
         let mut lp = CgspLoop::new(conj, guide, solver, bandit, CgspConfig::default())
@@ -989,7 +988,7 @@ mod tests {
     fn snapshot_restore_roundtrip() {
         let pool = make_orthonormal_pool(8, 8);
         let conj = PoolConjecturer::new(pool.clone(), 7);
-        let guide = HlaProjectionGuide::new(2.0, 1.0, ComplexityWeights::default());
+        let guide = BeliefGridProjectionGuide::new(2.0, 1.0, ComplexityWeights::default());
         let solver = DotSolver { sharpness: 1.0 };
         let bandit = VecBandit::uniform(8);
         let mut lp = CgspLoop::new(conj, guide, solver, bandit, CgspConfig::default());
@@ -1025,7 +1024,7 @@ mod tests {
         // across Plans 312/341/008).
         let pool = make_orthonormal_pool(8, 8);
         let conj = PoolConjecturer::new(pool.clone(), 7);
-        let guide = HlaProjectionGuide::new(2.0, 1.0, ComplexityWeights::default());
+        let guide = BeliefGridProjectionGuide::new(2.0, 1.0, ComplexityWeights::default());
         let solver = DotSolver { sharpness: 1.0 };
         // Build a bandit with MORE arms than the 8-direction pool, simulating
         // the post-consolidation E-pool state in dual-pool growth mode.
@@ -1068,7 +1067,7 @@ mod tests {
         // `restore()` only copies priorities; the directions padding has no
         // downstream effect.
         let conj2 = PoolConjecturer::new(pool.clone(), 99);
-        let guide2 = HlaProjectionGuide::new(2.0, 1.0, ComplexityWeights::default());
+        let guide2 = BeliefGridProjectionGuide::new(2.0, 1.0, ComplexityWeights::default());
         let solver2 = DotSolver { sharpness: 1.0 };
         let bandit2 = VecBandit {
             prios: vec![0.0; 16],
@@ -1087,7 +1086,7 @@ mod tests {
     fn run_with_snapshotting_emits_at_correct_intervals() {
         let pool = make_orthonormal_pool(8, 8);
         let conj = PoolConjecturer::new(pool.clone(), 99);
-        let guide = HlaProjectionGuide::new(2.0, 1.0, ComplexityWeights::default());
+        let guide = BeliefGridProjectionGuide::new(2.0, 1.0, ComplexityWeights::default());
         let solver = DotSolver { sharpness: 1.0 };
         let bandit = VecBandit::uniform(8);
         let mut lp = CgspLoop::new(conj, guide, solver, bandit, CgspConfig::default());
@@ -1107,7 +1106,7 @@ mod tests {
     fn inject_exploration_raises_entropy() {
         let pool = make_orthonormal_pool(8, 8);
         let conj = PoolConjecturer::new(pool.clone(), 5);
-        let guide = HlaProjectionGuide::new(2.0, 1.0, ComplexityWeights::default());
+        let guide = BeliefGridProjectionGuide::new(2.0, 1.0, ComplexityWeights::default());
         let solver = DotSolver { sharpness: 1.0 };
         let bandit = VecBandit::uniform(8);
         let mut lp = CgspLoop::new(conj, guide, solver, bandit, CgspConfig::default());
@@ -1172,7 +1171,7 @@ mod tests {
     fn t4_default_config_target_arm_grows() {
         let pool = make_orthonormal_pool(8, 8);
         let conj = PoolConjecturer::new(pool.clone(), 42);
-        let guide = HlaProjectionGuide::new(4.0, 0.1, ComplexityWeights::default());
+        let guide = BeliefGridProjectionGuide::new(4.0, 0.1, ComplexityWeights::default());
         let solver = DotSolver { sharpness: 0.5 };
         let bandit = VecBandit::uniform(8);
         let cfg = CgspConfig::default();
@@ -1211,7 +1210,7 @@ mod tests {
         // Helper: run `n` cycles and return (entropy, target_arm_priority).
         fn run(pool: &[Direction], n: usize, k_npc: u8) -> (f32, f32) {
             let conj = PoolConjecturer::new(pool.to_vec(), 42);
-            let guide = HlaProjectionGuide::new(4.0, 0.1, ComplexityWeights::default());
+            let guide = BeliefGridProjectionGuide::new(4.0, 0.1, ComplexityWeights::default());
             let solver = DotSolver { sharpness: 0.5 };
             let bandit = VecBandit::uniform(8);
             let cfg = CgspConfig {
@@ -1274,7 +1273,7 @@ mod tests {
 
         fn run(pool: &[Direction], k_npc: u8) -> Vec<f32> {
             let conj = PoolConjecturer::new(pool.to_vec(), 42);
-            let guide = HlaProjectionGuide::new(4.0, 0.1, ComplexityWeights::default());
+            let guide = BeliefGridProjectionGuide::new(4.0, 0.1, ComplexityWeights::default());
             let solver = DotSolver { sharpness: 0.5 };
             let bandit = VecBandit::uniform(8);
             let cfg = CgspConfig {
@@ -1423,7 +1422,7 @@ mod tests {
         fn no_regression_healthy_loop_never_fires() {
             let pool = make_orthonormal_pool(8, 8);
             let conj = PoolConjecturer::new(pool.to_vec(), 42);
-            let guide = HlaProjectionGuide::new(4.0, 0.1, ComplexityWeights::default());
+            let guide = BeliefGridProjectionGuide::new(4.0, 0.1, ComplexityWeights::default());
             let solver = DotSolver { sharpness: 0.5 };
             let bandit = VecBandit::uniform(8);
             let cfg = CgspConfig::default();

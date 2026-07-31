@@ -4,7 +4,7 @@
 **Date:** 2026-06-28
 **Research:** `.research/316_DSpark_Confidence_Scheduled_Speculative_Decoding.md`
 **Source paper:** DSpark (DeepSeek-AI, 2026) §3.2.2, Algorithm 1, Appendix A
-**Target:** `src/speculative/prefix_scheduler.rs` (new module) + Cargo feature `hardware_aware_scheduler`
+**Target:** `crates/katgpt-speculative/src/prefix_scheduler.rs` (new module) + Cargo feature `hardware_aware_scheduler`
 **Issue:** #003
 
 ---
@@ -51,11 +51,11 @@ graph TD
 
 ### Phase 1 — Core scheduler primitive
 
-- [x] T1 `src/speculative/prefix_scheduler.rs`: `HardwareAwarePrefixScheduler` struct +
+- [x] T1 `crates/katgpt-speculative/src/prefix_scheduler.rs`: `HardwareAwarePrefixScheduler` struct +
   `schedule(&self, survival_probs: &[&[f32]]) -> Vec<usize>`. The schedule output is per-request
   prefix length ℓ*_r. Caller-owned output (`Vec<usize>`); the scheduler is otherwise zero-alloc.
 - [x] T2 Helper `cumprod` (cumulative product) on `&[f32]` for `a_{r,j} = Π_{i≤j} c_{r,i}` when
-  callers pass raw `c_k`. Mirrors `cumprodsum_scalar(a, x=0, ...)` from `src/cumprodsum.rs`.
+  callers pass raw `c_k`. Mirrors `cumprodsum_scalar(a, x=0, ...)` from `crates/katgpt-core/src/cumprodsum.rs`.
 - [x] T3 Candidate materialization: for each `(r, j)`, build `(a_{r,j}, r, j)` tuples into a
   caller-supplied scratch buffer (`&mut [(f32, usize, usize); total_tokens]` — generic over total
   token count, no fixed cap). Sorted descending by `a_{r,j}` via `sort_unstable_by`.
@@ -135,7 +135,7 @@ graph TD
 
 | File | Change |
 |------|--------|
-| `src/speculative/prefix_scheduler.rs` | New: scheduler + `SpsCurve` + non-anticipating early-stop |
+| `crates/katgpt-speculative/src/prefix_scheduler.rs` | New: scheduler + `SpsCurve` + non-anticipating early-stop |
 | `Cargo.toml` | New `hardware_aware_scheduler = []` feature (default-OFF) |
 | `src/speculative/mod.rs` | New `#[cfg(feature)] pub mod` + re-exports |
 | `tests/prefix_scheduler_goat.rs` | New: G1–G5 GOAT gate |
@@ -144,9 +144,9 @@ graph TD
 
 - Issue: 003 (closed + removed, resolved — Plan 339 shipped)
 - Research: `.research/316_DSpark_Confidence_Scheduled_Speculative_Decoding.md`
-- Per-request analog: `src/speculative/caddtree_budget.rs`, `src/speculative/budget.rs`
-- Survival-prob producer: `src/speculative/acceptance_forecast.rs` (`AcceptanceForecast`, Bebop Plan 243)
-- SIMD Π c_i: `src/cumprodsum.rs::cumprodsum_scalar`
+- Per-request analog: `crates/katgpt-speculative/src/caddtree_budget.rs`, `crates/katgpt-speculative/src/budget.rs`
+- Survival-prob producer: `crates/katgpt-speculative/src/acceptance_forecast.rs` (`AcceptanceForecast`, Bebop Plan 243)
+- SIMD Π c_i: `crates/katgpt-core/src/cumprodsum.rs::cumprodsum_scalar`
 - DSpark paper §3.2.2 (Algorithm 1), §5.2 (production async variant), Appendix A (correctness proof)
 
 ## TL;DR

@@ -30,7 +30,8 @@ pub fn kernel_score(query: &[f32], candidate: &[f32], kind: KernelKind) -> f32 {
                 let d = query[i] - candidate[i];
                 dist_sq += d * d;
             }
-            (-dist_sq / sigma_sq).exp()
+            use katgpt_core::simd::fast_exp;
+            fast_exp(-dist_sq / sigma_sq)
         }
         KernelKind::Polynomial { degree, c } => {
             let mut dot = 0.0f32;
@@ -43,30 +44,16 @@ pub fn kernel_score(query: &[f32], candidate: &[f32], kind: KernelKind) -> f32 {
     }
 }
 
-/// SIMD-accelerated Gaussian kernel (chunked f32, 4 elements per iteration).
+/// SIMD-accelerated Gaussian kernel via `simd_dist_sq`.
+///
+/// Delegates to `katgpt_core::simd::simd_dist_sq` for NEON/AVX2 dispatch —
+/// replaces the manual 4-way unrolled loop with architecture-native SIMD.
 pub fn kernel_score_simd_gaussian(query: &[f32], candidate: &[f32], sigma: f32) -> f32 {
-    let sigma_sq = sigma * sigma;
-    let mut dist_sq = 0.0f32;
     let len = query.len().min(candidate.len());
-    let chunks = len / 4;
-    let remainder = len % 4;
-
-    // Process 4 elements at a time (helps LLVM auto-vectorize)
-    for i in 0..chunks {
-        let base = i * 4;
-        for j in 0..4 {
-            let d = query[base + j] - candidate[base + j];
-            dist_sq += d * d;
-        }
-    }
-
-    // Handle remainder
-    for i in (chunks * 4)..(chunks * 4 + remainder) {
-        let d = query[i] - candidate[i];
-        dist_sq += d * d;
-    }
-
-    (-dist_sq / sigma_sq).exp()
+    let sigma_sq = sigma * sigma;
+    let dist_sq = katgpt_core::simd::simd_dist_sq(query, candidate, len);
+    use katgpt_core::simd::fast_exp;
+    fast_exp(-dist_sq / sigma_sq)
 }
 
 #[cfg(test)]

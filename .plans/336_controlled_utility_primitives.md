@@ -3,7 +3,7 @@
 **Date:** 2026-06-28 (revised 2026-06-28 after corpus read — see "Revision history" below)
 **Research:** [katgpt-rs/.research/320_Red_Queen_Godel_Machine_Selective_Erasure_Best_Belief.md](../.research/320_Red_Queen_Godel_Machine_Selective_Erasure_Best_Belief.md)
 **Source paper:** [arXiv:2606.26294](https://arxiv.org/pdf/2606.26294) — Iacob et al., Red Queen Gödel Machine, §3.5 + App. F Prop. 4.
-**Target:** `katgpt-rs/crates/katgpt-core/src/best_belief.rs` (new) + trait extraction over `dec/cache.rs` + `dec/zone_cache.rs`
+**Target:** `katgpt-rs/crates/katgpt-core/src/best_belief.rs` (new) + trait extraction over `crates/katgpt-dec/src/cache.rs` + `riir-neuron-db/src/zone_cache.rs`
 **Status:** Phase 1+2 SHIPPED — `best_belief` G2-unblocked via 32×32×5 LUT and PROMOTED to default (commits `1da3fb8b`, `bf7f6971`). G1 PASS (3.099e-5 vs statrs), G2 PASS (3.38 ns score, 32.2 ns select-8 — well under targets after LUT), G3 PASS (924/924 tests green), G4 PASS (alloc-free by construction). **Phase 3 (DRY trait) BLOCKED by architectural drift** — see new "Phase 3 — Architectural Blocker" section below; tasks T3.1–T3.5 cannot proceed as written.
 
 ---
@@ -12,9 +12,9 @@
 
 **v1 (2026-06-28 initial):** Proposed two new primitives: `CriterionVersionedRecords<D>` (selective erasure) + `best_belief_score()` (ε-quantile Beta). Verdict: GOAT for both. Super-GOAT fusion tracked as Issue 004.
 
-**v2 (2026-06-28 correction, this version):** After reading the riir-ai Super-GOAT corpus (R158 Committed Personality Blend, R161 Cognitive Branch, R155 Sub-Goal Compaction) and grepping the shipped code (`dec/cache.rs` `DecCache`, Plan 335 `ZoneGeometryCache`):
+**v2 (2026-06-28 correction, this version):** After reading the riir-ai Super-GOAT corpus (R158 Committed Personality Blend, R161 Cognitive Branch, R155 Sub-Goal Compaction) and grepping the shipped code (`crates/katgpt-dec/src/cache.rs` `DecCache`, Plan 335 `ZoneGeometryCache`):
 
-- **`CriterionVersionedRecords<D>` is NOT a new primitive.** `DecCache` (katgpt-core `dec/cache.rs`) and `ZoneGeometryCache` (Plan 335 Phase 2, katgpt-core `dec/zone_cache.rs`) already ship the criterion-versioned erasure pattern. `DecCache` even includes derived-stat recomputation (`store_hodge`, `store_betti`). The value is a **DRY trait extraction**, not a new capability → **Gain**, not GOAT.
+- **`CriterionVersionedRecords<D>` is NOT a new primitive.** `DecCache` (katgpt-core `crates/katgpt-dec/src/cache.rs`) and `ZoneGeometryCache` (Plan 335 Phase 2, katgpt-core `riir-neuron-db/src/zone_cache.rs`) already ship the criterion-versioned erasure pattern. `DecCache` even includes derived-stat recomputation (`store_hodge`, `store_betti`). The value is a **DRY trait extraction**, not a new capability → **Gain**, not GOAT.
 - **`best_belief_score()` IS genuinely new.** Grep confirms `sample_beta` exists (Jöhnk's algorithm, Thompson sampling) but no inverse-CDF / Beta quantile function for conservative *selection*. → **GOAT** (standalone).
 - **Super-GOAT fusion (Issue 004) is dead.** The candidate selling point ("per-NPC selective forgetting on personality swap") is a paraphrase of Research 158 §1.3 property #3 (sampling invariance) + §2.4 (sync boundary). Issue 004 closed.
 - **LoRA vocabulary was stale.** The actual modelless erasure substrate is freeze/thaw (`MerkleFrozenEnvelope`) + geometry bins (`ZoneGeometryPod` / `ZoneGeometryCache` with `topology_version` + `SourceShardHashMismatch`). LoRA hot-swap is pre-spinoff framing. Corrected throughout.
@@ -122,7 +122,7 @@ This is pure DRY — no new behavior, no new capability. Existing impls get blan
 - [-] **T3.1** Define `CriterionVersionedCache` trait in `katgpt-core/src/cache_version.rs`.
 - [-] **T3.2** `impl CriterionVersionedCache for DecCache` (single-slot — Key = ()).
 - [-] **T3.3** `impl CriterionVersionedCache for ZoneGeometryCache` (multi-entry — Key = ZoneHash).
-- [-] **T3.4** Document the pattern in `katgpt-core/src/dec/cache.rs` doc-comment, pointing to the trait.
+- [-] **T3.4** Document the pattern in `crates/katgpt-dec/src/cache.rs` doc-comment, pointing to the trait.
 - [-] **T3.5** No GOAT gate (Gain-tier DRY refactor). Just `cargo check --all-features` + existing tests pass bit-identically.
 
 ## Phase 3 — Architectural Blocker (2026-06-28)
@@ -207,16 +207,16 @@ read as **superseded by this section**.
 
 - Super-GOAT fusion / per-NPC selective forgetting (Issue 004 — CLOSED, covered by R158/R161/R155).
 - Co-evolution training loop (LLM evaluator improvement) → riir-train.
-- Controlled-utility-evolution runtime (epoch freeze + boundary replacement + selective erasure as a unified runtime abstraction) — architectural observation only, no plan. Research 320 §2.2.3 documents the mapping to existing modules (`MerkleFrozenEnvelope`, `mape_k.rs`, `consolidation.rs`, `latent_functor/reestimation.rs`, `committed_blend/`).
+- Controlled-utility-evolution runtime (epoch freeze + boundary replacement + selective erasure as a unified runtime abstraction) — architectural observation only, no plan. Research 320 §2.2.3 documents the mapping to existing modules (`MerkleFrozenEnvelope`, `mape_k.rs`, `consolidation.rs`, `riir-ai/crates/riir-engine/src/latent_functor/reestimation/mod.rs`, `committed_blend/`).
 
 ## References
 
 - [Research 320](../.research/320_Red_Queen_Godel_Machine_Selective_Erasure_Best_Belief.md) (corrected).
 - Issue 004 (closed + removed, not novel — covered by R158/R161/R155).
 - RQGM paper §3.5 (Controlled Utility Evolution), App. F Prop. 4 (best-belief lower bound).
-- `katgpt-core/src/pruners/bandit.rs` `sample_beta` (Jöhnk's) — the existing Beta *sampler* (exploration) that `best_belief_score` complements as the Beta *quantile* (conservative selection).
-- `katgpt-core/src/dec/cache.rs` `DecCache` — existing criterion-versioned cache (single-slot, with derived stats). Phase 3 trait extraction target.
-- `katgpt-core/src/dec/zone_cache.rs` `ZoneGeometryCache` (Plan 335) — existing criterion-versioned cache (multi-entry, papaya lock-free, BLAKE3-tagged). Phase 3 trait extraction target.
+- `crates/katgpt-ruliology/src/bandit.rs` `sample_beta` (Jöhnk's) — the existing Beta *sampler* (exploration) that `best_belief_score` complements as the Beta *quantile* (conservative selection).
+- `crates/katgpt-dec/src/cache.rs` `DecCache` — existing criterion-versioned cache (single-slot, with derived stats). Phase 3 trait extraction target.
+- `riir-neuron-db/src/zone_cache.rs` `ZoneGeometryCache` (Plan 335) — existing criterion-versioned cache (multi-entry, papaya lock-free, BLAKE3-tagged). Phase 3 trait extraction target.
 - riir-ai Research 158 (Committed Personality Blend) — the already-committed Super-GOAT that ships the per-NPC committed-personality-with-survives-swap capability.
 
 ---
@@ -361,4 +361,4 @@ commit.
 - **Variable n (heteroscedastic — the real-world case): WINS 15–30%.** When candidates have different evidence weights (frozen snapshots with different deployment durations), Beta reduces selection regret by 15–30% across n_mean ∈ [4, 128].
 - **Low-data stress (one candidate n_lo=2): WINS 61–77%.** A 2/2 lucky streak has MLE=1.0 (false positive) but BB_0.05(2,0)≈0.025 (correctly discounted).
 
-`best_belief` stays DEFAULT-ON (Phase 2 promotion confirmed by the floor comparison). See `tests/conformal_floor_best_belief.rs`, `.benchmarks/010_best_belief_floor_comparison.md`.
+`best_belief` stays DEFAULT-ON (Phase 2 promotion confirmed by the floor comparison). See `crates/katgpt-core/tests/conformal_floor_best_belief.rs`, `.benchmarks/010_best_belief_floor_comparison.md`.

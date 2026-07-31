@@ -109,7 +109,7 @@ Consumer integration status:
   acceleration, Phase 6 demos all green, Plan 441 production wiring). `tilr_hla_refinement`
   feature added to riir-games (passthrough to `riir-engine/tilr_hla_refinement`).
   `tick_with_tilr` wired into `tick_cgsp_curiosity` (Phase 2e-cgsp) — calls
-  `tick_with_tilr` when NPC has calibrated `HlaTilrState`, falls back to plain
+  `tick_with_tilr` when NPC has calibrated `TilrState`, falls back to plain
   `tick` otherwise. 5 integration tests pass. GOAT G1-G5 all PASS. Zero-cost
   no-op when no TILR state set.
 - **Issue 129** — riir-neuron-db freeze/thaw shard refinement. **T1–T4 COMPLETE**.

@@ -135,7 +135,7 @@ No feature gate — generic utility used by D1 and D2.
 ## T2: Adaptive Top-p Bandit Arms (D2) — DEFAULT ON
 
 ### Location
-`katgpt-rs/src/pruners/bandit.rs` (or wherever BanditPruner arm selection lives)
+`katgpt-rs/crates/katgpt-ruliology/src/bandit.rs` (or wherever BanditPruner arm selection lives)
 
 ### Feature Gate
 `bandit_top_p` — **default ON**. GOAT proof (T3) confirms savings > overhead.

@@ -11,7 +11,7 @@ Continue the master `src/` consolidation. Plan 403's handoff named the
 **Proposal 003 endgame audit** as the natural next step:
 
 > The denoise cluster was the last large pure-inference cluster in
-> `src/dllm.rs`. What remains (~3008 LOC) is predominantly training code …
+> `riir-ai/crates/riir-engine/src/transformer/dllm.rs`. What remains (~3008 LOC) is predominantly training code …
 > not extractable to katgpt-forward without crossing the train/infer boundary.
 > A Proposal 003 endgame audit would be the natural next step — quantify how
 > much root remains, classify what's extractable vs permanently root-resident,
@@ -24,7 +24,7 @@ Surveying all remaining `src/` files classified each into:
 
 | Class | Files | Verdict |
 |---|---|---|
-| **Pure re-export shim** (DONE) | `distill/mod.rs`, `dense_mesh/mod.rs`, `speculative/{d2f,d2f_verifier,diffusion_sampler,flashar_anchor,flashar_consensus,set_diffusion}.rs` | Already extracted by Plans 398–403. Nothing to do. |
+| **Pure re-export shim** (DONE) | `crates/katgpt-speculative/src/distill/mod.rs`, `crates/katgpt-transformer/src/dense_mesh/mod.rs`, `speculative/{d2f,d2f_verifier,diffusion_sampler,flashar_anchor,flashar_consensus,set_diffusion}.rs` | Already extracted by Plans 398–403. Nothing to do. |
 | **Forward-coupled glue** (BLOCKED) | `transformer.rs`, `speculative/{types,step_paged,prefill,dd_tree}.rs`, `speculative/ppot/`, `pruners/bomber/`, `sleep/`, `sp_kv_forward_mod.rs`, `attn_match_adaptive_cot.rs`, backend files | Need `crate::transformer::{ForwardContext, forward, forward_paged}`. Root-resident until katgpt-transformer grows a forward module. |
 | **Training infrastructure** (ROOT-RESIDENT) | `dllm.rs` (3008 LOC) | Crosses train/infer boundary. Per modelless mandate, stays root. |
 | **Tooling** (ROOT-RESIDENT) | `benchmark/`, `plot.rs` | Depends on everything; tooling, not library. |
@@ -89,7 +89,7 @@ items still require the feature. No existing consumer can break.
 
 ### T1 — Convert katgpt-core `data_probe.rs` → `data_probe/` directory
 
-- `git mv crates/katgpt-core/src/data_probe.rs crates/katgpt-core/src/data_probe/sink_classify.rs`
+- `git mv crates/katgpt-core/src/data_probe/mod.rs crates/katgpt-core/src/data_probe/sink_classify.rs`
 - Create `crates/katgpt-core/src/data_probe/mod.rs` with:
   - Always-on: `pub mod {markov,nll,typical_set,claim,dirichlet_energy};`
   - Gated: `#[cfg(feature = "sink_aware_attn")] pub mod {sink_classify,geometry};`
@@ -118,12 +118,12 @@ items still require the feature. No existing consumer can break.
   block stays unchanged (the sink items are still feature-gated inside the
   module).
 
-### T4 — Root `src/data_probe/mod.rs` → re-export shims
+### T4 — Root `crates/katgpt-core/src/data_probe/mod.rs` → re-export shims
 
 Replace `pub mod X;` declarations with `pub use katgpt_core::data_probe::X;`
 for all 7 submodules. Preserve the existing re-export block at the bottom.
 
-### T5 — Root `src/data_probe/sink_classify.rs`
+### T5 — Root `crates/katgpt-core/src/data_probe/sink_classify.rs`
 
 Update the re-export path from `katgpt_core::data_probe::{...}` to
 `katgpt_core::data_probe::sink_classify::{...}` (the items moved one level
@@ -163,7 +163,7 @@ level.
 - [x] T1 Convert katgpt-core `data_probe.rs` → `data_probe/` directory
 - [x] T2 Move 6 root modules to katgpt-core `data_probe/`
 - [x] T3 Un-gate katgpt-core `data_probe` parent module in lib.rs
-- [x] T4 Root `src/data_probe/mod.rs` → re-export shims
+- [x] T4 Root `crates/katgpt-core/src/data_probe/mod.rs` → re-export shims
 - [x] T5 Verify sink_classify re-export path (works via katgpt-core mod.rs parent-level re-export)
 - [x] T6 Validate (G3 GOAT gate) — all green
 - [x] T7 Commit on `develop`
@@ -173,8 +173,8 @@ level.
 | File | Before | After | Delta |
 |---|---:|---:|---:|
 | `src/data_probe/{markov,nll,typical_set,claim,dirichlet_energy,geometry}.rs` | 1638 | 0 | **-1638** |
-| `src/data_probe/mod.rs` | 69 | 72 | +3 (re-export shim) |
-| `crates/katgpt-core/src/data_probe.rs` → `data_probe/{mod,sink_classify}.rs` | 1337 | 1440 | +103 (mod.rs + edits) |
+| `crates/katgpt-core/src/data_probe/mod.rs` | 69 | 72 | +3 (re-export shim) |
+| `crates/katgpt-core/src/data_probe/mod.rs` → `data_probe/{mod,sink_classify}.rs` | 1337 | 1440 | +103 (mod.rs + edits) |
 | `crates/katgpt-core/src/data_probe/{markov,nll,...}.rs` | 0 | 1644 | +1644 (moved) |
 
 **Net root reduction: -1635 LOC.**

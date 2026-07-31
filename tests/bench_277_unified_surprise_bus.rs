@@ -15,7 +15,7 @@
 //!
 //! | Fusion | Consumer | N | α-setter |
 //! |--------|----------|---|----------|
-//! | F1 | HLA companion (sense) | 8 | ReconstructionConfig |
+//! | F1 | belief companion (sense) | 8 | ReconstructionConfig |
 //! | F2 | δ-Mem write gate | 8 | enable_surprise_gate_with_alphas |
 //! | F3 | Collapse detector | 1 | with_temporal_deriv_alphas |
 //! | F4 | Derivative curiosity | 64 | DerivativeCuriosity::with_alphas |
@@ -65,13 +65,15 @@ fn valid_combo(af: f32, as_: f32) -> bool {
 }
 
 // ───────────────────────────────────────────────────────────────────────────
-// F1 — HLA Surprise Companion (N=8, katgpt-core/sense)
+// F1 — Belief Surprise Companion (N=8, katgpt-core/sense)
 // ───────────────────────────────────────────────────────────────────────────
 //
-// 1000-tick emotional-event trace. HLA starts at [0;8]. Events at tick 200
-// (dim 0, +0.6), 500 (dim 1, +0.4), 800 (dim 2, +0.5). Between events HLA is
+// 1000-tick emotional-event trace. Belief starts at [0;8]. Events at tick 200
+// (dim 0, +0.6), 500 (dim 1, +0.4), 800 (dim 2, +0.5). Between events belief is
 // constant. Metric: recall (events detected) and FPR (non-event peak ticks).
 // We report a single score = recall · (1 − FPR) for the Pareto comparison.
+// (Renamed per Issue 195: per-NPC HLA → belief; Transformer-attention HLA
+// is a separate concept.)
 
 const F1_TRACE_LEN: usize = 1000;
 const F1_EVENTS: [(usize, [f32; 8]); 3] = [
@@ -94,11 +96,11 @@ fn f1_metric(af: f32, as_: f32) -> f32 {
         // Inject scripted event delta at the event tick.
         for &(tick, delta) in &F1_EVENTS {
             if t == tick {
-                state.inject_hla_delta(delta);
+                state.inject_belief_delta(delta);
             }
         }
-        // No-op evolve (zero evidence) — kernel still observes the HLA.
-        state.evolve_hla();
+        // No-op evolve (zero evidence) — kernel still observes the belief.
+        state.evolve_belief();
         *surprise_t = state.surprise_norm();
     }
 
@@ -443,7 +445,7 @@ fn unified_surprise_bus_sweep() {
     );
     println!("══════════════════════════════════════════════════════════════════");
 
-    // ── F1: HLA companion ──────────────────────────────────────────────────
+    // ── F1: belief companion ──────────────────────────────────────────
     let mut f1_grid = [[INVALID; 4]; 5];
     for (i, &af) in ALPHA_FAST.iter().enumerate() {
         for (j, &as_) in ALPHA_SLOW.iter().enumerate() {
@@ -461,7 +463,7 @@ fn unified_surprise_bus_sweep() {
     let f1_paper = f1_metric(PAPER_AF, PAPER_AS);
     let (f1_p, f1_best, f1_within) = within_higher(f1_paper, &f1_flat);
 
-    println!("\n── F1: HLA Surprise Companion (N=8) ──");
+    println!("\n── F1: Belief Surprise Companion (N=8) ──");
     print_grid_f32("recall·(1−FPR)", "score", f1_metric);
     println!(
         "  paper ({},{}) = {:.4}  |  best = {:.4}  |  within ±{:.0}%: {}",
@@ -579,7 +581,7 @@ fn unified_surprise_bus_sweep() {
         WITHIN_FRAC * 100.0
     );
     println!(
-        "  F1 HLA companion   : {}",
+        "  F1 belief companion: {}",
         if f1_within { "YES ✓" } else { "NO ✗" }
     );
     println!(

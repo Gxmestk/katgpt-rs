@@ -116,7 +116,7 @@ graph TD
 #### 1. Trust-Region Speculative Verifier (extends `SpeculativeVerifier`)
 
 ```rust
-// In katgpt-rs/src/speculative/verifier.rs — extends LeviathanVerifier
+// In crates/katgpt-forward/src/verifier.rs — extends LeviathanVerifier
 
 /// Trust-aware speculative verification.
 /// Uses TrOPD's trust signal to adapt verification strategy.

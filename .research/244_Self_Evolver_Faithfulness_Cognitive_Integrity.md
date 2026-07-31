@@ -7,6 +7,8 @@
 > **Related Plans:** 054 (path-hacking detector), 212 (collapse-aware), 274 (curiosity-guided self-play), 278 (this doc — FaithfulnessProbe primitive)
 > **Cross-ref (riir-ai):** Research 129 (Cognitive Integrity Layer Guide — private selling-point doc), Plan 308 (Cognitive Integrity Layer runtime integration)
 > **Classification:** Public — generic inference-time diagnostic primitive + design discipline. No game IP, no chain IP.
+>
+> **Gain-Redirects (synthesis, verdict revised 2026-07-26):** Nikolaou & Mencattini [arXiv:2510.15511 "Language Models are Injective and Hence Invertible"] (ICLR 2026) — **Gain**, not PASS (revised up: SipIt is modelless + doesn't ship → §1.55 mandates Gain-or-higher). Theorem (decoder-only text transformers w/ real-analytic activations are almost-surely injective prompt→last-token maps, preserved under GD) + SipIt (modelless linear-time prompt recovery from layer-ℓ hidden states via per-position vocabulary search with a gradient-guided policy on a continuous proxy embedding — no backprop through weights). Connects to this note's `FaithfulnessProbe`/`ActivationExtractor` lineage by proving the encoding FaithfulnessProbe intervenes on is *lossless* for text transformers: the last-token hidden state identifies the input almost surely, so a probe that fails to find behavioral influence cannot blame "missing information". SipIt ships as the open primitive `katgpt-core::inversion` (Plan 561). **Caveat (the reason this is Gain, not GOAT):** HLA — the cognitive substrate FaithfulnessProbe intervenes on in the NPC runtime — is a sigmoid-bounded per-NPC kernel, not a decoder-only text transformer; the injectivity theorem doesn't transfer. The theoretical lens still reinforces the FaithfulnessProbe framing; the open primitive is for general text-transformer paths (which our stack has in the speculative-decode / drafter substrate, not in HLA).
 
 ---
 
@@ -16,7 +18,7 @@ The paper performs **controlled causal interventions** on the experiences fed to
 
 **Distilled for katgpt-rs (modelless, inference-time):**
 
-The paper is diagnostic, not mechanistic — but its findings imply a **generic, engine-level primitive** we currently lack: a **`FaithfulnessProbe`** that runs causal interventions on injected context (raw replays OR latent direction vectors OR condensed heuristics) and reports whether the consumer's behavior is causally bound to that segment. Today our `evolve_hla` (`katgpt-core/src/sense/reconstruction.rs:623`) updates an `[f32; 8]` HLA state via dot-product + sigmoid and feeds it into reconstruction — with **zero mechanism to verify the HLA delta actually influences downstream action selection**. We are almost certainly silently dropping memory value exactly as the paper describes.
+The paper is diagnostic, not mechanistic — but its findings imply a **generic, engine-level primitive** we currently lack: a **`FaithfulnessProbe`** that runs causal interventions on injected context (raw replays OR latent direction vectors OR condensed heuristics) and reports whether the consumer's behavior is causally bound to that segment. Today our `evolve_hla` (`crates/katgpt-sense/src/reconstruction.rs:623`) updates an `[f32; 8]` HLA state via dot-product + sigmoid and feeds it into reconstruction — with **zero mechanism to verify the HLA delta actually influences downstream action selection**. We are almost certainly silently dropping memory value exactly as the paper describes.
 
 The paper also implies a **design discipline** (not a primitive, but a rule): injected memory must be (a) **triggered** by consumer uncertainty, not statically prepended; (b) **causally bound** — emit the raw signature alongside the latent projection so the consumer has the "faithful" form; (c) **contextualized** — latents must be task-actionable, not generic heuristics.
 
@@ -115,7 +117,7 @@ Grep results across both repos, both layers (notes + code):
 | `condensed experience\|raw experience\|experience pool` | 0 hits | n/a | None |
 | `entropy gated\|triggered injection\|dynamic injection\|context dilution` | Hits for entropy-gated scheduling/exploration (Plans 217, 223, 248, 269, 272, 274) — but all gate *consumer exploration*, never *whether to inject memory* | n/a | None — entropy-gated *injection* is novel |
 
-The HLA `evolve_hla` primitive at `katgpt-core/src/sense/reconstruction.rs:623` — the canonical "shipped-without-a-note" case the skill warns about — has no faithfulness verification whatsoever. The paper's findings directly implicate it.
+The HLA `evolve_hla` primitive at `crates/katgpt-sense/src/reconstruction.rs:623` — the canonical "shipped-without-a-note" case the skill warns about — has no faithfulness verification whatsoever. The paper's findings directly implicate it.
 
 **Q2 — New class of behavior? YES (moderate-strong).**
 

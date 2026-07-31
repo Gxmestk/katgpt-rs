@@ -23,7 +23,7 @@ pub struct PrefillContext {
     /// Pre-computed attention residuals (xr) from fused Phase A, reused in Phase B.
     /// Size: [max_prompt_len × n_embd]. Eliminates redundant hidden load + first rmsnorm.
     pub residuals: Vec<f32>,
-    /// LoRA intermediate buffer. Size: [lora_rank].
+    /// LoRA intermediate buffer. Size: `[lora_rank]`.
     /// Reused for every LoRA application across all projections.
     pub lora_buf: Vec<f32>,
     // usize fields after Vec fields to eliminate inter-field padding.
@@ -132,7 +132,7 @@ impl WallPrefixState {
     }
 
     /// Update prefix sum with new gate values for a given layer and KV head.
-    /// gate: [head_dim] gate values for this head at this position.
+    /// gate: `[head_dim]` gate values for this head at this position.
     /// O(head_dim).
     #[inline]
     pub fn update_prefix(&mut self, layer_idx: usize, kv_head: usize, gate: &[f32]) {
@@ -143,7 +143,7 @@ impl WallPrefixState {
 
     /// Rescale query: q̃ = exp(P) ⊙ q for each query head.
     /// For GQA, multiple Q heads share the same KV head prefix sum.
-    /// q: [n_embd] query vector (all heads).
+    /// q: `[n_embd]` query vector (all heads).
     /// kv_group_lut: maps Q head → KV head.
     ///
     /// # GQA exp-cache
@@ -185,7 +185,7 @@ impl WallPrefixState {
     }
 
     /// Rescale key: k̃ = exp(-P) ⊙ k for each KV head.
-    /// k: [kv_dim] key vector (all KV heads).
+    /// k: `[kv_dim]` key vector (all KV heads).
     #[inline]
     pub fn rescale_key(&mut self, layer_idx: usize, k: &mut [f32]) {
         let hd = self.head_dim;
@@ -202,9 +202,9 @@ impl WallPrefixState {
     }
 
     /// Compute gate values from key projection (key-projected variant).
-    /// gate_buf: [head_dim] output gate values (log-sigmoid, clamped).
-    /// key: [head_dim] key slice for one head.
-    /// w_g: [head_dim] gate projection weights for this head.
+    /// gate_buf: `[head_dim]` output gate values (log-sigmoid, clamped).
+    /// key: `[head_dim]` key slice for one head.
+    /// w_g: `[head_dim]` gate projection weights for this head.
     /// bias: gate bias (default 6.0).
     /// gate_max: maximum clamp value (default 0.87).
     #[inline(always)]
@@ -309,10 +309,14 @@ impl WallPrefixState {
             }
             d += 4;
         }
+        // Scalar tail: handles the `hd % 4` remainder after the chunk-4 SIMD
+        // pass above. Uses the Cephes-backed `fast_exp` for consistency with
+        // the SIMD exp kernel (same ~1 ULP accuracy floor).
+        use katgpt_core::simd::fast_exp;
         while d < hd {
             let gate_accumulated = ps[offset + d];
             let gate_in_block = gate_accumulated * block_span * inv_current;
-            let retention = gate_in_block.exp();
+            let retention = fast_exp(gate_in_block);
             min_ret = min_ret.min(retention);
             d += 1;
         }

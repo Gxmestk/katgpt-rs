@@ -41,11 +41,15 @@ pub use kv_cache::{
     preload_kv_cache,
 };
 pub use mtp::{MtpProjection, load_mtp_projection, project_target_activation};
-pub use weights::{LayerWeights, TransformerWeights};
+pub use weights::{LayerWeights, LayerWeightsF16, TransformerWeights, TransformerWeightsF16};
 
 // Contiguous ternary loader (Plan 148, gated `plasma_path`).
 #[cfg(feature = "plasma_path")]
 pub use contiguous::load_ternary_bits;
+
+// Contiguous binary loader (Issue 145, gated `binary_plasma`).
+#[cfg(feature = "binary_plasma")]
+pub use contiguous::load_binary_bits;
 
 // Decode stage for specialized forward paths (Plan 102: TileRT pipeline).
 /// Different stages have different optimization opportunities:

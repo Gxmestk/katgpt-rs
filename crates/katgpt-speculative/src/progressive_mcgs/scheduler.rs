@@ -220,7 +220,8 @@ impl EntropyGatedScheduler {
     #[inline]
     #[must_use]
     pub fn effective_branch_count(selection_counts: &[u32]) -> f32 {
-        Self::branch_selection_entropy(selection_counts).exp()
+        use katgpt_core::simd::fast_exp;
+        fast_exp(Self::branch_selection_entropy(selection_counts))
     }
 }
 

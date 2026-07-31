@@ -12,9 +12,7 @@
 
 #![cfg(feature = "mag_mining")]
 
-use katgpt_core::mag::{
-    mine_direction_into, transfer_score_into, DataSet, TransferMetric,
-};
+use katgpt_core::mag::{DataSet, TransferMetric, mine_direction_into, transfer_score_into};
 use std::sync::atomic::Ordering;
 
 #[path = "common/mod.rs"]

@@ -18,14 +18,14 @@ The primary integration point is **post-DDTree rescue**: when speculative decodi
 
 ## Tasks
 
-- [x] **Task 1: TokenRule enum and support sets** (`src/speculative/ppot/types.rs`)
+- [x] **Task 1: TokenRule enum and support sets** (`crates/katgpt-speculative/src/ppot/types.rs`)
   - Define `TokenRule` enum: `Digit`, `Compare`, `Arithmetic`, `Augment`, `All`
   - Each variant maps to a `fn support(&self, vocab_size: usize) -> Vec<usize>` returning token IDs in its support
   - `TokenRule::All` returns `0..vocab_size` (unrestricted resampling)
   - Support sets are computed once from tokenizer vocabulary, cached in `PpotConfig`
   - Unit tests for each rule's support set completeness
 
-- [x] **Task 2: Per-position entropy calculation** (`src/speculative/ppot/entropy.rs`)
+- [x] **Task 2: Per-position entropy calculation** (`crates/katgpt-speculative/src/ppot/entropy.rs`)
   - `fn token_entropy(probs: &[f32]) -> f32` — Shannon entropy `H = -Σ p*log(p)`
   - `fn identify_high_entropy_positions(marginals: &[&[f32]], threshold: f32) -> Vec<usize>` — returns positions where `H(i) > threshold`
   - `fn identify_positions_by_rule(marginals: &[&[f32]], rule: TokenRule, threshold: f32) -> Vec<usize>` — filters by both entropy and rule support
@@ -47,7 +47,7 @@ The primary integration point is **post-DDTree rescue**: when speculative decodi
   - `PpotConfig` struct: `entropy_threshold: f32`, `num_samples: usize`, `rule: TokenRule`, `different_constraint: bool`
   - Wire into `src/speculative/mod.rs` with `#[cfg(feature = "ppot")]` feature gate
 
-- [x] **Task 5: Post-DDTree rescue integration** (`src/speculative/step.rs`)
+- [x] **Task 5: Post-DDTree rescue integration** (`crates/katgpt-forward/src/step.rs`)
   - Add `ppot_rescue()` function called after DDTree verification fails
   - Pipeline: extract marginals → identify high-entropy positions → resample m paths → screen each through `ScreeningPruner` → return first valid
   - Falls back to greedy only if PPoT rescue also fails
@@ -61,7 +61,7 @@ The primary integration point is **post-DDTree rescue**: when speculative decodi
   - `pub ppot_enabled: bool` — default `false` (must opt-in)
   - Parse from existing config file format, backward compatible (missing fields use defaults)
 
-- [x] **Task 7: Benchmarks** (`src/benchmark.rs`)
+- [x] **Task 7: Benchmarks** (`src/benchmark/mod.rs`)
   - Benchmark: entropy calculation overhead (should be <1% of DFlash time)
   - Benchmark: PPoT resample throughput (samples/ms on CPU)
   - Benchmark: end-to-end speculative decoding with PPoT rescue vs without
@@ -81,13 +81,13 @@ The primary integration point is **post-DDTree rescue**: when speculative decodi
 | File | Change |
 |------|--------|
 | `katgpt-rs/src/speculative/ppot/mod.rs` | New: module root, public API, `PpotConfig` |
-| `katgpt-rs/src/speculative/ppot/types.rs` | New: `TokenRule` enum with support sets |
-| `katgpt-rs/src/speculative/ppot/entropy.rs` | New: entropy calculation, position identification |
+| `katgpt-rs/crates/katgpt-speculative/src/ppot/types.rs` | New: `TokenRule` enum with support sets |
+| `katgpt-rs/crates/katgpt-speculative/src/ppot/entropy.rs` | New: entropy calculation, position identification |
 | `katgpt-rs/src/speculative/ppot/resample.rs` | New: CPU resampling core |
 | `katgpt-rs/src/speculative/mod.rs` | Add `pub mod ppot` (feature-gated) |
-| `katgpt-rs/src/speculative/step.rs` | Add `ppot_rescue()` integration |
+| `katgpt-rs/crates/katgpt-forward/src/step.rs` | Add `ppot_rescue()` integration |
 | `katgpt-rs/src/types.rs` | Add `PpotConfig` fields to `Config` |
-| `katgpt-rs/src/benchmark.rs` | Add PPoT benchmarks |
+| `katgpt-rs/src/benchmark/mod.rs` | Add PPoT benchmarks |
 | `katgpt-rs/Cargo.toml` | Add `[features] ppot = []` |
 | `katgpt-rs/README.md` | Add PPoT architecture section |
 

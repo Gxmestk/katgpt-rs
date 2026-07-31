@@ -35,7 +35,7 @@ Each piece is locally low-order, but the global composition captures high-order 
 
 | Paper Concept | Our Implementation | Location |
 |---------------|-------------------|----------|
-| Piecewise manifold Mk,i | DDTree branch (per-draft candidate) | `speculative/ddtree.rs` |
+| Piecewise manifold Mk,i | DDTree branch (per-draft candidate) | `riir-ai/crates/riir-games/src/plasma/ddtree.rs` |
 | Manifold evolution Φk,i→j | Layer transformation f(hk) | `transformer.rs` |
 | Node cover Uk,n(t) | Active token positions per layer | `types.rs` SlotState |
 | Data-transit manifold γ(x) | Forward pass trajectory h₀...hL | inference pipeline |
@@ -263,7 +263,7 @@ Each trait layer corresponds to a triangle side:
 | Fixed-point residual | HintDelta (Plan 049) | δ = log-prob shift = residual |
 | Three-stage boundaries | ROPD + SDAR + GRPO stack | Plans 071/072/059 |
 | Symmetric boundaries | BT pairwise ranking | Plan 079, .benchmarks/011 |
-| Node cover dynamics | DDTree branch activation | speculative/ddtree.rs |
+| Node cover dynamics | DDTree branch activation | riir-ai/crates/riir-games/src/plasma/ddtree.rs |
 | Model CAP distribution | BanditPruner trait composition | Plan 030, .benchmarks |
 | Propertyless activations | Validator trait | riir-validator-sdk |
 | Iterated integral forward pass | Transformer forward + speculative decode | transformer.rs |

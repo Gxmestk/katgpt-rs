@@ -544,9 +544,9 @@ impl BanditEnv for OpusRedundantEnv {
 
 // ── Helpers ─────────────────────────────────────────────────────
 
-/// Dot product of two f32 slices.
+/// Dot product of two f32 slices — delegates to SIMD dispatch.
 fn dot(a: &[f32], b: &[f32]) -> f32 {
-    a.iter().zip(b.iter()).map(|(&x, &y)| x * y).sum()
+    katgpt_core::simd::simd_dot_f32(a, b, a.len().min(b.len()))
 }
 
 // ── Tests ───────────────────────────────────────────────────────

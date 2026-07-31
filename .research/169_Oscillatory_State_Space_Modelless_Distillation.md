@@ -176,11 +176,11 @@ Per Research 003 (Commercial Open Source Strategy):
 
 | Existing Component | Location | Reuse Potential |
 |-------------------|----------|-----------------|
-| BanditPruner | `katgpt-core/traits.rs` | Direct reuse — FreqBandit is a bandit arm selector |
+| BanditPruner | `crates/katgpt-core/src/cgsp/traits.rs` | Direct reuse — FreqBandit is a bandit arm selector |
 | ThinkingBanditFrozen | `src/` (thinking_cot feature) | Pattern: bandit learns when to think → same pattern for frequency selection |
 | Blelloch parallel scan | HLA research (#28) | Reuse for LinOSS parallel rollout if we implement Fusion A/B |
 | SpectralQuant eigendecomposition | `src/spectralquant/` | Eigendecomposition of KV cache covariance → basis for frequency analysis |
-| DomainLatent | `katgpt-core/types.rs` | Per-domain learned embeddings → per-domain frequency profiles |
+| DomainLatent | `crates/katgpt-types/src/lib.rs` | Per-domain learned embeddings → per-domain frequency profiles |
 | InferenceRouter + TriggerGate | `src/` | Already routes CPU/GPU/ANE → add frequency-band routing dimension |
 
 ---

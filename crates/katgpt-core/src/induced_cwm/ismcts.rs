@@ -68,7 +68,7 @@
 //!
 //! # References
 //!
-//! - Plan: [`katgpt-rs/.plans/296_induced_cwm_kernel_primitive.md`] §Phase 2
+//! - Plan: `katgpt-rs/.plans/296_induced_cwm_kernel_primitive.md` §Phase 2
 //! - Source paper: [arxiv 2510.04542](https://arxiv.org/pdf/2510.04542) §4.3, §B
 //! - ISMCTS reference: Cowling, Powley, Whitehouse (2012), "Information Set
 //!   Monte Carlo Tree Search", IEEE TCIAIG.

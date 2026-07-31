@@ -53,7 +53,8 @@ use super::chunk_summary::{
 ///
 /// 1. Chunk summarization over K at chunk boundaries
 /// 2. Entmax routing via chunk summaries
-/// 3. Dense attention (MVP — sparse on active chunks TODO)
+/// 3. Dense attention (sparse routing lives in `EntmaxRouter` / VortexFlow,
+///    Plan 196 — not wired into this prefill function directly)
 /// 4. Store chunk summaries to cache
 #[allow(clippy::too_many_arguments)]
 pub fn forward_dash_attn_prefill(
@@ -76,12 +77,15 @@ pub fn forward_dash_attn_prefill(
     let mut summarize_scores_buf = vec![0.0f32; chunk_size];
     let mut summarize_entropy = 0.0f32;
 
-    // Per-head chunk key buffer: `chunk_keys_buf[h]` holds the last layer's K
-    // for head `h` across all tokens in the current chunk, laid out as
-    // `[chunk_size * head_dim]` (token-major within each head). Populated
-    // incrementally as each token's K is computed; summarized when the chunk
-    // completes (every `chunk_size` tokens, or at sequence end for a partial
-    // tail chunk).
+    // Per-head chunk key buffer (flat): `[n_kv_head * chunk_size * hd]`, laid
+    // out head-major — head `h`'s chunk slot `(chunk_local, d)` lives at
+    // `h * chunk_size * hd + chunk_local * hd + d`. Populated incrementally as
+    // each token's K is computed; summarized when the chunk completes (every
+    // `chunk_size` tokens, or at sequence end for a partial tail chunk).
+    //
+    // Flattened from `Vec<Vec<f32>>` to a single `Vec<f32>` so the whole
+    // buffer is one allocation (vs `n_kv_head + 1` allocations) and one
+    // contiguous memory block (friendlier to memcpy prefetch).
     //
     // This upgrades the prefill from single-token summaries (degenerate MVP)
     // to full-chunk summaries, which (a) fixes a pre-existing mean-pool bug
@@ -89,8 +93,8 @@ pub fn forward_dash_attn_prefill(
     // chunk_size, producing k/hd instead of the correct mean), and (b)
     // activates the HiLS Prop 3.1 entropy bias (Issue 044) — at zero-init,
     // b'_c = ln(chunk_size) instead of ln(1) = 0.
-    let mut chunk_keys_buf: Vec<Vec<f32>> =
-        (0..config.n_kv_head).map(|_| vec![0.0f32; chunk_size * hd]).collect();
+    let chunk_stride = chunk_size * hd;
+    let mut chunk_keys_buf: Vec<f32> = vec![0.0f32; config.n_kv_head * chunk_stride];
 
     for (pos, &token) in tokens.iter().enumerate() {
         let tok_off = token * n;
@@ -114,6 +118,26 @@ pub fn forward_dash_attn_prefill(
 
             ctx.xr2[..n].copy_from_slice(&ctx.x[..n]);
             types::rmsnorm(&mut ctx.x);
+            #[cfg(feature = "gated_mlp")]
+            {
+                // SwiGLU: SiLU(W_gate·h) ⊙ W_up·h → W_down·hidden
+                types::matmul(
+                    &mut ctx.hidden,
+                    &layer_weights.mlp_w1,
+                    &ctx.x,
+                    config.mlp_hidden,
+                    n,
+                );
+                types::matmul(
+                    &mut ctx.hidden2,
+                    &layer_weights.mlp_w_up,
+                    &ctx.x,
+                    config.mlp_hidden,
+                    n,
+                );
+                types::swiglu_inplace(&mut ctx.hidden, &ctx.hidden2);
+            }
+            #[cfg(not(feature = "gated_mlp"))]
             types::matmul_relu(
                 &mut ctx.hidden,
                 &layer_weights.mlp_w1,
@@ -134,10 +158,12 @@ pub fn forward_dash_attn_prefill(
         // After the layer loop, ctx.k holds the last layer's K for this token.
         // Buffer head h's key into the current chunk slot.
         let chunk_local = pos % chunk_size;
-        for (h, buf) in chunk_keys_buf.iter_mut().enumerate() {
+        let dst_start = chunk_local * hd;
+        for h in 0..config.n_kv_head {
             let src_start = h * hd;
-            let dst_start = chunk_local * hd;
-            buf[dst_start..dst_start + hd].copy_from_slice(&ctx.k[src_start..src_start + hd]);
+            let head_off = h * chunk_stride;
+            chunk_keys_buf[head_off + dst_start..head_off + dst_start + hd]
+                .copy_from_slice(&ctx.k[src_start..src_start + hd]);
         }
 
         // Summarize at chunk completion (full chunk or partial tail).
@@ -145,14 +171,20 @@ pub fn forward_dash_attn_prefill(
         let is_seq_end = pos == tokens.len() - 1;
         if is_chunk_end || is_seq_end {
             let chunk_idx = pos / chunk_size;
-            let actual_size = if is_chunk_end { chunk_size } else { chunk_local + 1 };
+            let actual_size = if is_chunk_end {
+                chunk_size
+            } else {
+                chunk_local + 1
+            };
+            let actual_bytes = actual_size * hd;
             if chunk_idx < summary_cache.n_chunks() {
-                for (h, buf) in chunk_keys_buf.iter().enumerate() {
+                for h in 0..config.n_kv_head {
+                    let head_off = h * chunk_stride;
                     let slot = &mut summary_cache.summaries[chunk_idx][h];
                     let entropy_slot = &mut summary_cache.entropy_biases[chunk_idx][h];
                     summarize_chunk_into_with_entropy(
                         summary_query,
-                        &buf[..actual_size * hd],
+                        &chunk_keys_buf[head_off..head_off + actual_bytes],
                         actual_size,
                         h,
                         hd,
@@ -180,13 +212,16 @@ pub fn forward_dash_attn_prefill(
 /// # Dead routing elimination (perf)
 ///
 /// The per-layer entmax routing call (`score_blocks_entmax_with_entropy_into`)
-/// was computed but its result was bound to `_routing` and never consumed —
-/// the TODO to wire `routing.active_indices` into sparse KV block selection
-/// (Plan 173 Task 6) has not been implemented. The dead call ran n_layer
-/// entmax scoring + sorting operations per decode step, all discarded.
+/// was computed but its result was bound to `_routing` and never consumed.
 /// Removed to eliminate dead compute; the `dash_config`, `summary_query`,
-/// and `summary_cache` params are retained (prefixed `_`) for API stability
-/// and future TODO wiring.
+/// and `summary_cache` params are retained (prefixed `_`) for API stability.
+///
+/// Block-level routing via `routing.active_indices` is implemented elsewhere
+/// — see `EntmaxRouter` (Plan 196 / VortexFlow feature gate), which composes
+/// `score_blocks_entmax` into a `VortexFlow` router consumed by the
+/// VortexFlow dispatcher. The Plan 173 Task 6 sparse-KV-block-selection
+/// milestone is complete via that path; this decode function does not need
+/// to re-wire routing inline.
 #[allow(clippy::too_many_arguments)]
 pub fn forward_dash_attn_decode<'a>(
     ctx: &'a mut ForwardContext,
@@ -227,11 +262,9 @@ pub fn forward_dash_attn_decode<'a>(
             n,
         );
 
-        // NOTE: Entmax routing was previously computed here but the result
-        // (_routing) was never consumed — the sparse KV block selection TODO
-        // (Plan 173 Task 6) is not yet implemented. See function-level doc
-        // comment for the full rationale. Re-add routing here when wiring
-        // routing.active_indices into the attention path.
+        // Routing lives in `EntmaxRouter` (VortexFlow feature, Plan 196) —
+        // see the function-level doc comment for the full rationale. This
+        // decode function uses dense attention directly.
 
         types::matmul(&mut ctx.attn_out, &layer_weights.attn_wo, &ctx.q, n, n);
         simd::simd_add_inplace(&mut ctx.x[..n], &ctx.attn_out[..n]);
@@ -239,6 +272,26 @@ pub fn forward_dash_attn_decode<'a>(
 
         ctx.xr2[..n].copy_from_slice(&ctx.x[..n]);
         types::rmsnorm(&mut ctx.x);
+        #[cfg(feature = "gated_mlp")]
+        {
+            // SwiGLU: SiLU(W_gate·h) ⊙ W_up·h → W_down·hidden
+            types::matmul(
+                &mut ctx.hidden,
+                &layer_weights.mlp_w1,
+                &ctx.x,
+                config.mlp_hidden,
+                n,
+            );
+            types::matmul(
+                &mut ctx.hidden2,
+                &layer_weights.mlp_w_up,
+                &ctx.x,
+                config.mlp_hidden,
+                n,
+            );
+            types::swiglu_inplace(&mut ctx.hidden, &ctx.hidden2);
+        }
+        #[cfg(not(feature = "gated_mlp"))]
         types::matmul_relu(
             &mut ctx.hidden,
             &layer_weights.mlp_w1,

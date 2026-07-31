@@ -92,8 +92,8 @@ Implemented in `riir-ai/crates/riir-gpu` (Plan 068).
 ### Task 1.3: Noise Schedule Training Kernel ✅
 - [x] `noise_corrupt.wgsl`: PCG32 per-position token masking with prompt protection
 - [x] `loss_masked.wgsl`: importance-weighted CE on masked positions only
-- [x] Feature-gated `GpuNoiseCorrupt` struct in `riir-gpu/src/dllm.rs`
-- [x] Feature-gated `GpuMaskedLoss` struct in `riir-gpu/src/dllm.rs`
+- [x] Feature-gated `GpuNoiseCorrupt` struct in `riir-ai/crates/riir-engine/src/transformer/dllm.rs`
+- [x] Feature-gated `GpuMaskedLoss` struct in `riir-ai/crates/riir-engine/src/transformer/dllm.rs`
 - [x] Test: GPU corruption throughput — `bench_dllm_kernels`
 - [x] Test: GPU masked loss vs CPU — `bench_dllm_kernels`
 
@@ -124,7 +124,7 @@ Implemented in `riir-ai/crates/riir-gpu` (Plan 068).
   - `D2fDecodeConfig` with `quality()`/`speed()`/`with_block_size()` presets ✅
   - `d2f_decode_block_with_prompt()` for prompt-context conditioning ✅
   - `d2f_decode_block_with_target()` for accuracy measurement ✅
-- [x] Re-exports in `speculative/mod.rs` behind `#[cfg(feature = "dllm")]`
+- [x] Re-exports in `crates/katgpt-core/src/speculative/mod.rs` behind `#[cfg(feature = "dllm")]`
 - [x] Integrate with `D2fContext` for zero-alloc buffer reuse — `forward_block_causal_with()` writes into pre-allocated flat buffers
 - [x] KV cache commit: `D2fContext::commit(len)` preserves KV across blocks, pipeline skips recomputation for committed positions
 
@@ -148,7 +148,7 @@ Implemented in `riir-ai/crates/riir-gpu` (Plan 068).
 ## Phase 3: Integration (If Results Are Good)
 
 ### Task 3.1: Hybrid AR-D2F Pipeline ✅
-- [x] Config option to choose decode strategy: AR, DFlash, D2F — `DecodeStrategy` enum in `speculative/types.rs`
+- [x] Config option to choose decode strategy: AR, DFlash, D2F — `DecodeStrategy` enum in `crates/katgpt-core/src/speculative/types.rs`
 - [x] Auto-switch: use D2F for block-parallel tasks, AR for sequential tasks — `DecodeStrategy::recommend()` heuristic
 - [x] Router integration: domain config can specify D2F as decode strategy — `InferenceOverrides::decode_strategy` field
 

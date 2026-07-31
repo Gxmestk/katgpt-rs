@@ -44,7 +44,11 @@ pub fn compute_phi(
     nearest_opponent: Option<(i32, i32)>,
 ) -> [f32; CONTEXT_DIM] {
     // 1. in_blast_zone (0.0 or 1.0)
-    let in_blast = if in_blast_zone(pos, grid, bombs) { 1.0 } else { 0.0 };
+    let in_blast = if in_blast_zone(pos, grid, bombs) {
+        1.0
+    } else {
+        0.0
+    };
 
     // 2. blast_proximity — sigmoid of -(Manhattan dist to nearest bomb - 3).
     let min_bomb_dist = bombs
@@ -98,7 +102,7 @@ pub fn compute_phi(
 /// Numerically stable sigmoid: `1 / (1 + e^{-x})`.
 ///
 /// Per the global rule: use sigmoid (not softmax) for any probabilistic gating
-/// or bounded [0,1] projection.
+/// or bounded `[0,1]` projection.
 #[inline]
 pub fn sigmoid(x: f32) -> f32 {
     1.0 / (1.0 + (-x).exp())

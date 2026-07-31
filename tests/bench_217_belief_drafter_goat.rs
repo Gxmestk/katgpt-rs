@@ -108,6 +108,8 @@ fn bench_217_belief_drafter_goat_proof() {
             belief_drafter_path: None,
             #[cfg(feature = "belief_drafter")]
             belief_drafter_entropy_threshold: 2.0,
+            #[cfg(feature = "loop_stability_fix")]
+            loop_stability_mode: katgpt_rs::types::LoopStabilityMode::None,
         }
     }
 
@@ -437,6 +439,8 @@ fn bench_217_belief_pruner_quality() {
             belief_drafter_path: None,
             #[cfg(feature = "belief_drafter")]
             belief_drafter_entropy_threshold: 2.0,
+            #[cfg(feature = "loop_stability_fix")]
+            loop_stability_mode: katgpt_rs::types::LoopStabilityMode::None,
         }
     }
 
@@ -895,6 +899,8 @@ fn bench_217_cached_vs_uncached_mlp() {
             belief_drafter_path: None,
             #[cfg(feature = "belief_drafter")]
             belief_drafter_entropy_threshold: 2.0,
+            #[cfg(feature = "loop_stability_fix")]
+            loop_stability_mode: katgpt_rs::types::LoopStabilityMode::None,
         }
     }
 
@@ -1082,6 +1088,8 @@ fn goat_217_acceptance_rate() {
             belief_drafter_path: None,
             #[cfg(feature = "belief_drafter")]
             belief_drafter_entropy_threshold: 2.0,
+            #[cfg(feature = "loop_stability_fix")]
+            loop_stability_mode: katgpt_rs::types::LoopStabilityMode::None,
         }
     }
 
@@ -1261,6 +1269,8 @@ fn goat_217_variable_length_speedup() {
             belief_drafter_path: None,
             #[cfg(feature = "belief_drafter")]
             belief_drafter_entropy_threshold: 2.0,
+            #[cfg(feature = "loop_stability_fix")]
+            loop_stability_mode: katgpt_rs::types::LoopStabilityMode::None,
         }
     }
 

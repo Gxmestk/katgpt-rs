@@ -67,7 +67,7 @@ fn compute_var_scales(gate_variance: &[f32], head_dim: usize) -> [f32; 256] {
     for i in 0..head_dim {
         if i < gate_variance.len() && gate_variance[i] > 0.0 {
             let v = gate_variance[i];
-            out[i] = 1.0 / (1.0 + (-v.ln_1p()).exp());
+            out[i] = katgpt_core::simd::fast_sigmoid(v.ln_1p());
         }
     }
     out

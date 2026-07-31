@@ -4,8 +4,7 @@
 > **Paper:** [arXiv:2606.04662](https://arxiv.org/abs/2606.04662) — Wang et al., Jun 2026
 > **Depends:** Plan 183 (CIAB 📋), Plan 030 (Bandit ✅), Plan 152 (Newton-Schulz ✅)
 > **Feature Gate:** `nds_proxy = ["bandit"]`
-> **Status:** Active
-> **Default-on:** Yes ✅ (GOAT 13/13 promoted) — zero perf overhead, theoretically grounded
+> **Status:** COMPLETE ✅ (GOAT 13/13 promoted, default-on) — zero perf overhead, theoretically grounded
 
 ---
 
@@ -23,8 +22,8 @@ All modelless — no Hessian, no training, no new allocations.
 
 ## Tasks
 
-- [x] T1: Implement `nds_proxy()` function in `src/pruners/nds_proxy.rs`
-- [x] T2: Implement `NdsBudgetModifier` trait + `SpectralFlatnessBudget` in `src/pruners/nds_proxy.rs`
+- [x] T1: Implement `nds_proxy()` function in `crates/katgpt-pruners/src/nds_proxy.rs`
+- [x] T2: Implement `NdsBudgetModifier` trait + `SpectralFlatnessBudget` in `crates/katgpt-pruners/src/nds_proxy.rs`
 - [x] T3: Implement `spectral_balance_score()` for DDTree branch visit counts
 - [x] T4: Implement `layer_weighted_verification_depth()` from 70/28/2 heuristic
 - [x] T5: Wire NDS proxy into DDTree budget allocation (compose with `budget_adaptation`)
@@ -39,7 +38,7 @@ All modelless — no Hessian, no training, no new allocations.
 
 ## T1: `nds_proxy()` Function
 
-**File:** `crates/katgpt-core/src/types.rs`
+**File:** `crates/katgpt-types/src/lib.rs`
 
 ```rust
 /// Inference-time NDS (Normalized Directional Sharpness) proxy.

@@ -104,7 +104,7 @@ Cost: 2 × kv_dim additions. Zero allocations, zero RNG calls.
   - Binary format: `[MAGIC: "DLAT" 4B][VERSION: 1B][KV_DIM: 4B LE][EMBEDDING: kv_dim × f32 LE][BLAKE3: 32B]`
   - Unit tests: roundtrip, invalid magic, checksum mismatch, file too small, zeros
 
-- [x] **Task 2: Mid-layer injection in forward_base** (`src/transformer.rs`) ✅
+- [x] **Task 2: Mid-layer injection in forward_base** (`crates/katgpt-percepta/src/transformer.rs`) ✅
   - Added `#[cfg(feature = "domain_latent")] domain_latent: Option<&DomainLatent>` parameter to `forward_base`
   - At `layer_idx == config.n_layer / 2`, after K/V projections + LoRA, add domain_latent to `ctx.k` and `ctx.v` before cache write
   - Gate behind `#[cfg(feature = "domain_latent")]` feature flag
@@ -123,7 +123,7 @@ Cost: 2 × kv_dim additions. Zero allocations, zero RNG calls.
     - `test_domain_latent_with_lora_prefill_pipeline` — prefill→decode pipeline with lora+dl
     - `test_domain_latent_zero_with_lora_same_as_lora_only` — zero dl is identity with lora
 
-- [x] **Task 4: Prefill integration** (`src/transformer.rs`) ✅
+- [x] **Task 4: Prefill integration** (`crates/katgpt-percepta/src/transformer.rs`) ✅
   - `forward_prefill` gained `#[cfg(feature = "domain_latent")] domain_latent` parameter
   - Injection at layer L/2 Phase A (K/V computation), same pattern as `forward_base`
   - Bidirectional prefill + domain_latent conditioning work together
@@ -144,8 +144,8 @@ Cost: 2 × kv_dim additions. Zero allocations, zero RNG calls.
   - ~~LoRA training pipeline has matured (riir-burner supports Gemma 2/4 LoRA) — but no domain_latent training path exists yet~~
   - Needs: `DomainLatentAdamWStep` equivalent added to burn pipeline (riir-gpu has it, riir-burner does not)
 
-- [x] **Task 6: Expert Registry integration** (`riir-ai/crates/riir-router/src/registry.rs`) ✅
-  - ✅ `ExpertRegistry` is fully implemented at `riir-ai/crates/riir-router/src/registry.rs` (12+ tests)
+- [x] **Task 6: Expert Registry integration** (`riir-ai/crates/katgpt-core/src/arg/registry.rs`) ✅
+  - ✅ `ExpertRegistry` is fully implemented at `riir-ai/crates/katgpt-core/src/arg/registry.rs` (12+ tests)
   - ✅ `ExpertBundle` exists at `riir-ai/crates/riir-router/src/types.rs` (has `lora_path`, `pruner`, `inference_budget`)
   - ✅ Added `domain_latent_path: Option<String>` to `DomainConfig` (feature-gated behind `domain_latent`)
   - ✅ Added `domain_latent: Option<DomainLatent>` to `ExpertBundle` (feature-gated)
@@ -163,14 +163,14 @@ Cost: 2 × kv_dim additions. Zero allocations, zero RNG calls.
 | File | Change | Status |
 |------|--------|--------|
 | `src/types.rs` | `DomainLatent` struct, `load()`, `save()`, binary format, 5 tests | ✅ Done |
-| `src/transformer.rs` | `forward_base` + `forward_prefill`: mid-layer injection, 5 tests | ✅ Done |
+| `crates/katgpt-percepta/src/transformer.rs` | `forward_base` + `forward_prefill`: mid-layer injection, 5 tests | ✅ Done |
 | `Cargo.toml` | `domain_latent` feature flag + added to `full` | ✅ Done |
-| `riir-router/src/types.rs` | `DomainConfig.domain_latent_path`, `ExpertBundle.domain_latent` | ✅ Done |
-| `riir-router/src/registry.rs` | `resolve_domain_latent()`, 2 tests | ✅ Done |
+| `riir-ai/crates/riir-router/src/types.rs` | `DomainConfig.domain_latent_path`, `ExpertBundle.domain_latent` | ✅ Done |
+| `crates/katgpt-core/src/arg/registry.rs` | `resolve_domain_latent()`, 2 tests | ✅ Done |
 | `riir-router/Cargo.toml` | `domain_latent` feature flag | ✅ Done |
-| `riir-gpu/src/domain_latent.rs` | `GpuDomainLatent`, export, CPU AdamW, 4 tests | ✅ Done |
-| `riir-gpu/src/optimizer.rs` | `step_domain_latent()` method | ✅ Done |
-| `riir-gpu/examples/train_bomber.rs` | Train LoRA + domain latent, export both | ✅ Done |
+| `riir-ai/crates/riir-gpu/src/domain_latent.rs` | `GpuDomainLatent`, export, CPU AdamW, 4 tests | ✅ Done |
+| `crates/katgpt-core/src/skill_opt/optimizer.rs` | `step_domain_latent()` method | ✅ Done |
+| `riir-train/crates/riir-train-gpu/examples/train_bomber.rs` | Train LoRA + domain latent, export both | ✅ Done |
 | `riir-burner/train_lora.py` | Language model training (future) | ⏳ Deferred |
 
 **Tests:** 260 pass (katgpt-rs with `domain_latent`), 255 pass (without). 5 domain_latent tests.

@@ -46,13 +46,13 @@ Per `.contexts/optimization.md`:
   - Add `post_norm_gamma: Vec<f32>` — post-attention RMSNorm gamma `[n_embd]` (Gemma 2 post-norm)
   - Add `final_norm_gamma: Vec<f32>` — final RMSNorm gamma `[n_embd]`
   - Init with `1.0` (identity) in `TransformerWeights::new()` — zero behavioral change
-  - **Scope:** `src/transformer.rs` `LayerWeights` struct + `TransformerWeights::new()`
+  - **Scope:** `crates/katgpt-percepta/src/transformer.rs` `LayerWeights` struct + `TransformerWeights::new()`
 
 - [x] T2: Add gamma parameter to `rmsnorm()` and `rmsnorm_with_eps()`
   - New signature: `fn rmsnorm_with_gamma(x: &mut [f32], gamma: &[f32])`
   - Implementation: `x[i] *= inv_rms * gamma[i]` (fused multiply, no separate pass)
   - Keep existing `rmsnorm()` as `rmsnorm_with_gamma(x, &[1.0; 0])` or just unchanged for backward compat
-  - **Scope:** `crates/katgpt-core/src/types.rs`
+  - **Scope:** `crates/katgpt-types/src/lib.rs`
 
 - [x] T3: Wire gamma into `forward_base()` and `forward_coda()`
   - Replace `rmsnorm(&mut ctx.x)` with `rmsnorm_with_gamma(&mut ctx.x, &layer_weights.attn_norm_gamma)`
@@ -75,7 +75,7 @@ Per `.contexts/optimization.md`:
   - Fold gamma, run `forward_base` again → capture logits
   - Assert bit-identical (or within 1e-6 FP tolerance)
   - Same for `forward_coda` path
-  - **Scope:** `src/transformer.rs` `#[cfg(test)] mod tests`
+  - **Scope:** `crates/katgpt-percepta/src/transformer.rs` `#[cfg(test)] mod tests`
 
 ### Phase 3: QKV Weight Interleaving (T6-T8)
 
@@ -84,7 +84,7 @@ Per `.contexts/optimization.md`:
   - Layout: group by head — `[Q_head0, K_head0, V_head0, Q_head1, K_head1, V_head1, ...]`
   - GQA: K/V groups shared, so interleaving is per-head-group, not per-head
   - None by default — only populated when `kog_cpu_fusion` is enabled and interleave is called
-  - **Scope:** `src/transformer.rs` `LayerWeights`
+  - **Scope:** `crates/katgpt-percepta/src/transformer.rs` `LayerWeights`
 
 - [x] T7: Implement `interleave_qkv()` in `TransformerWeights`
   - Repack `attn_wq` + `attn_wk` + `attn_wv` into `attn_qkv_fused`
@@ -104,14 +104,14 @@ Per `.contexts/optimization.md`:
   - Track bytes read from weight buffers per forward pass
   - Compare against theoretical peak memory bandwidth (CPU-specific)
   - Print MBU % in benchmark output
-  - **Scope:** `src/mbu.rs` (feature-gated `kog_cpu_fusion`)
+  - **Scope:** `crates/katgpt-transformer/src/mbu.rs` (feature-gated `kog_cpu_fusion`)
   - **API:** `MbuCounter`, `MbuReport`, `per_layer_weight_bytes()`, `per_token_weight_bytes()`, `peak_bandwidth_gbps()`
 
 - [x] T10: GOAT proof — QKV interleaving produces identical attention output
   - Generate random weights, run forward with separate Q/K/V
   - Interleave, run forward with fused QKV
   - Assert attention outputs bit-identical (within FP tolerance)
-  - **Scope:** `src/transformer.rs` `#[cfg(test)] mod tests`
+  - **Scope:** `crates/katgpt-percepta/src/transformer.rs` `#[cfg(test)] mod tests`
 
 - [x] T11: GOAT proof — full pipeline (gamma fold + QKV interleave) end-to-end
   - 128-token greedy generation with baseline weights

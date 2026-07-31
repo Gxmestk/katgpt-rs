@@ -18,11 +18,11 @@
 
 #![cfg(feature = "clr")]
 
-use katgpt_core::simd::simd_dot_f32;
 use katgpt_claim::clr::{
     Claim, ClrConfig, ClrScratch, DirectionVectorSource, FnClaimExtractor,
     SigmoidProjectionVerifier, Trajectory, VoteResult, clr_vote,
 };
+use katgpt_core::simd::simd_dot_f32;
 
 // ──────────────────────────────────────────────────────────────────────────
 // Direction source (flat row-major Vec<f32>)
@@ -136,12 +136,13 @@ fn main() {
     let config = ClrConfig {
         k: trajectories.len(), // K=6
         m: M,
+        embedding_dim: DIM,
         ..ClrConfig::default()
     };
     let extractor = FnClaimExtractor::new(M, |t: &Trajectory<u8>| t.claims.clone());
     let verifier = SigmoidProjectionVerifier::new(&directions, DIM);
     let outcome_eq = |a: &u8, b: &u8| a == b;
-    let mut scratch = ClrScratch::new(config.k, config.m);
+    let mut scratch = ClrScratch::new(config.k, config.m, DIM);
 
     let result: VoteResult<u8> = clr_vote(
         &trajectories,

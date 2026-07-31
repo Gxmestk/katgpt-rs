@@ -37,10 +37,10 @@ graph TD
 
 | Component | Trait | File | Role |
 |-----------|-------|------|------|
-| `PartialScorer` | `katgpt_core::PartialScorer` | `src/pruners/partial_scorer.rs` | Graduated [0.0, 1.0] episode reward |
-| `ProblemMutator` | `katgpt_core::ProblemMutator` | `src/pruners/problem_mutator.rs` | Config mutation → harder variants |
-| `IdeaDivergence` | Struct (no trait) | `src/pruners/idea_divergence.rs` | L2 novelty filter against arm convergence |
-| `EvolutionArena` | Struct | `src/pruners/problem_mutator.rs` | Orchestrates mutator → arena → scorer loop |
+| `PartialScorer` | `katgpt_core::PartialScorer` | `crates/katgpt-pruners/src/partial_scorer.rs` | Graduated [0.0, 1.0] episode reward |
+| `ProblemMutator` | `katgpt_core::ProblemMutator` | `crates/katgpt-pruners/src/problem_mutator.rs` | Config mutation → harder variants |
+| `IdeaDivergence` | Struct (no trait) | `crates/katgpt-pruners/src/idea_divergence.rs` | L2 novelty filter against arm convergence |
+| `EvolutionArena` | Struct | `crates/katgpt-pruners/src/problem_mutator.rs` | Orchestrates mutator → arena → scorer loop |
 
 ### Data Flow
 
@@ -156,10 +156,10 @@ All three are independent but composable. `idea_divergence` works best with `par
 
 | File | Role |
 |------|------|
-| `katgpt-core/src/traits.rs` | `PartialScorer` trait, `ProblemMutator` trait |
-| `src/pruners/partial_scorer.rs` | `WinLossScorer`, `BomberPartialScorer` |
-| `src/pruners/problem_mutator.rs` | `BomberConfigMutator`, `GoConfigMutator`, `EvolutionArena` |
-| `src/pruners/idea_divergence.rs` | `IdeaDivergence` struct, `is_scorer_novel()` |
+| `crates/katgpt-core/src/traits/mod.rs` | `PartialScorer` trait, `ProblemMutator` trait |
+| `crates/katgpt-pruners/src/partial_scorer.rs` | `WinLossScorer`, `BomberPartialScorer` |
+| `crates/katgpt-pruners/src/problem_mutator.rs` | `BomberConfigMutator`, `GoConfigMutator`, `EvolutionArena` |
+| `crates/katgpt-pruners/src/idea_divergence.rs` | `IdeaDivergence` struct, `is_scorer_novel()` |
 | `examples/partial_scoring_demo.rs` | Before/after thinking demo |
 | `examples/problem_evolution_demo.rs` | Config mutation → arena → bandit demo |
 | `examples/idea_divergence_demo.rs` | Convergence prevention demo |

@@ -1,4 +1,3 @@
-
 use super::*;
 
 #[test]
@@ -118,6 +117,66 @@ fn simd_sigmoid_inplace_handles_boundaries() {
     // σ near zero should be near 0.5.
     assert!((extremes[3] - 0.5).abs() < 1e-3);
     assert!((extremes[4] - 0.5).abs() < 1e-3);
+}
+
+#[test]
+fn simd_tanh_inplace_matches_fast_tanh_within_fma_tolerance() {
+    // The SIMD Padé kernel uses fused multiply-add (vfmaq_f32 / _mm256_fmadd_ps)
+    // for the numerator `x*(27+x²)` and denominator `27+9·x²`. FMA preserves
+    // intermediate precision (no intermediate rounding), so the SIMD result can
+    // differ from the scalar `fast_tanh` path (which uses separate mul+add) by
+    // up to 1 ULP. This is mathematically more accurate, not a bug.
+    //
+    // Tolerance: 2 ULP relative (~2e-7), well within the documented ~0.025
+    // Padé [2/2] worst-case error. Any larger drift would indicate an intrinsic
+    // translation bug (wrong constant, wrong op order, wrong mask).
+    let mut rng = fastrand::Rng::with_seed(2026);
+    for len in 0..=33usize {
+        let mut input: Vec<f32> = (0..len)
+            .map(|_| (rng.f32() * 12.0) - 6.0) // [-6, 6] — covers the |x|>3 saturation
+            .collect();
+        let reference: Vec<f32> = input.iter().map(|&x| fast_tanh(x)).collect();
+        simd_tanh_inplace(&mut input);
+        assert_eq!(input.len(), reference.len(), "length changed");
+        for (i, (got, want)) in input.iter().zip(reference.iter()).enumerate() {
+            let abs_tol = 2e-7_f32;
+            let rel_tol = 2e-7_f32 * want.abs();
+            let tol = abs_tol.max(rel_tol);
+            assert!(
+                (got - want).abs() <= tol,
+                "len={len} idx={i}: SIMD={got} != scalar={want} (diff={}, tol={tol})",
+                (got - want).abs()
+            );
+        }
+    }
+}
+
+#[test]
+fn simd_tanh_inplace_handles_boundaries() {
+    let mut empty: Vec<f32> = vec![];
+    simd_tanh_inplace(&mut empty);
+    assert!(empty.is_empty());
+
+    // Saturation: |x| > 3 → ±1.
+    let mut extremes = [10.0f32, -10.0, 5.0, -5.0, 3.5, -3.5];
+    simd_tanh_inplace(&mut extremes);
+    assert_eq!(extremes[0], 1.0, "tanh(10) saturates to 1");
+    assert_eq!(extremes[1], -1.0, "tanh(-10) saturates to -1");
+    assert_eq!(extremes[2], 1.0, "tanh(5) saturates to 1");
+    assert_eq!(extremes[3], -1.0, "tanh(-5) saturates to -1");
+
+    // Zero passes through.
+    let mut zero = [0.0f32];
+    simd_tanh_inplace(&mut zero);
+    assert_eq!(zero[0], 0.0, "tanh(0) = 0");
+
+    // Bounded: output always in [-1, 1].
+    let mut rng = fastrand::Rng::with_seed(42);
+    let mut buf: Vec<f32> = (0..100).map(|_| (rng.f32() * 20.0) - 10.0).collect();
+    simd_tanh_inplace(&mut buf);
+    for (i, &v) in buf.iter().enumerate() {
+        assert!((-1.0..=1.0).contains(&v), "idx={i}: tanh output {v} out of [-1,1]");
+    }
 }
 
 #[test]

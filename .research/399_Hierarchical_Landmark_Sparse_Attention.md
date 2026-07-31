@@ -26,7 +26,7 @@ low-rank adapter + HoPE positional encoding + 50B-token CPT). That part →
 chunk summary** (Prop 3.1): a deterministic formula proving that the optimal
 chunk summary score is `q^T k'_c / √d + b'_c` where `b'_c = -Σ p_j log p_j` is
 the entropy of the intra-chunk attention distribution. We already ship the
-attention-weighted key sum `k'_c = Σ p_j k_j` in `dash_attn/chunk_summary.rs`
+attention-weighted key sum `k'_c = Σ p_j k_j` in `crates/katgpt-attn/src/dash_attn/chunk_summary.rs`
 (Plan 106); the **entropy bias `b'_c` is the genuine gap**.
 
 **Distilled for katgpt-rs (modelless, inference-time):**
@@ -428,7 +428,7 @@ the GOAT verdict.
 HiLS-Attention's value is its **training recipe** (landmark tokens + Q-Cal +
 HoPE + 50B-token CPT) → riir-train. The modelless kernel is **Prop 3.1's
 entropy bias `b'_c = -Σ p_j log p_j`** — a deterministic, zero-alloc add-on
-to our shipped `dash_attn/chunk_summary.rs` (Plan 106) that makes the chunk
+to our shipped `crates/katgpt-attn/src/dash_attn/chunk_summary.rs` (Plan 106) that makes the chunk
 score faithful to LogSumExp mass.
 
 **Verdict: GOAT** (upgraded from Gain on 2026-07-09). The modelless GOAT

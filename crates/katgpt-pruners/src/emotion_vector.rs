@@ -113,7 +113,7 @@ impl EmotionDirections {
     /// `EmotionDirections` extracts valence / arousal / desperation / calm from
     /// contrastive *final-answer* activations (Research 144). Those directions
     /// describe behavior already realized in the text — the canonical detection-
-    /// side setup — so the explicit tag is [`FeatureClass::Detection`]. This
+    /// side setup — so the explicit tag is [`FeatureClass::Detection`](katgpt_core::FeatureClass::Detection). This
     /// overrides nothing (the trait default is also Detection); the override is
     /// here for documentation and to surface up in `grep feature_class`.
     #[inline]

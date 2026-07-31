@@ -23,9 +23,9 @@ use std::fmt;
 ///
 /// - [`Lora`](Self::Lora): Only for trivial procedures (< 10 paths).
 ///   Fast but insufficient for most real workflows.
-/// - [`FullFineTune`]: Required for procedural internalization.
+/// - [`FullFineTune`](Self::FullFineTune): Required for procedural internalization.
 ///   Paper's recommended default.
-/// - [`Qlora`]: Middle ground — 4-bit quantization + full parameter update.
+/// - [`Qlora`](Self::Qlora): Middle ground — 4-bit quantization + full parameter update.
 ///   Reduces memory at ~2% quality cost.
 ///
 /// # Example

@@ -5,7 +5,52 @@
 //! (`crate::hla`, `crate::sleep`, `crate::tf_loop`, etc.) that do not exist
 //! in this substrate crate.
 
+use half::f16;
 use katgpt_core::types::{self, Config, Rng};
+
+// ── f16 Weight Storage (Issue 200) ─────────────────────────────
+//
+// Parallel weight structs storing projection weights as `half::f16`.
+// Halves memory bandwidth for weight reads vs f32 storage, attacking the
+// GEMV bandwidth ceiling identified by the forward-pass profiling.
+//
+// Pattern mirrors riir-engine's `GemmaTransformerWeightsF16` (Plan 095):
+// separate struct + separate forward function, NOT an enum-wrapped dispatch.
+// This is additive (zero breakage to existing f32 path).
+
+/// Per-layer transformer weights with f16 storage for projection matrices.
+///
+/// Embedding / norm / gate vectors stay f32 (tiny, non-matmul, negligible
+/// bandwidth). Only the projection weights that dominate the GEMV bandwidth
+/// budget are stored as f16.
+#[derive(Clone)]
+pub struct LayerWeightsF16 {
+    pub attn_wq: Vec<f16>, // [n_embd, n_embd]
+    pub attn_wk: Vec<f16>, // [kv_dim, n_embd]
+    pub attn_wv: Vec<f16>, // [kv_dim, n_embd]
+    pub attn_wo: Vec<f16>, // [n_embd, n_embd]
+    pub mlp_w1: Vec<f16>,  // [mlp_hidden, n_embd]
+    pub mlp_w2: Vec<f16>,  // [n_embd, mlp_hidden]
+}
+
+/// Transformer weights with f16 projection storage (Issue 200).
+///
+/// Embeddings (`wte`, `wpe`) and `lm_head` stay f32 — they are accessed via
+/// random-row lookup (embedding) or benefit from f32 precision at the vocab
+/// projection (lm_head produces logits where small numerical differences
+/// could affect token sampling). The bandwidth-dominant per-layer projection
+/// matrices are f16. This captures ~95% of the bandwidth win (the per-layer
+/// projections) while keeping the logits numerically stable.
+///
+/// Construct via [`TransformerWeights::to_f16`] — a one-time conversion at
+/// model load time.
+#[derive(Clone)]
+pub struct TransformerWeightsF16 {
+    pub wte: Vec<f32>,             // [vocab_size, n_embd] — f32 (embedding lookup)
+    pub wpe: Vec<f32>,             // [block_size, n_embd] — f32 (embedding lookup)
+    pub lm_head: Vec<f32>,         // [vocab_size, n_embd] — f32 (logit precision)
+    pub layers: Vec<LayerWeightsF16>, // [n_layer]
+}
 
 /// Per-layer transformer weights.
 /// Each layer has its own attention and MLP parameters.
@@ -22,6 +67,11 @@ pub struct LayerWeights {
     pub attn_wo: Vec<f32>, // [n_embd, n_embd]
     pub mlp_w1: Vec<f32>,  // [mlp_hidden, n_embd]
     pub mlp_w2: Vec<f32>,  // [n_embd, mlp_hidden]
+    // Gated MLP (Issue 377): the "up" projection for SwiGLU.
+    // When `gated_mlp` is enabled, mlp_w1 becomes W_gate, mlp_w_up is W_up,
+    // and mlp_w2 becomes W_down. Forward: SiLU(W_gate·h) ⊙ W_up·h → W_down·.
+    #[cfg(feature = "gated_mlp")]
+    pub mlp_w_up: Vec<f32>, // [mlp_hidden, n_embd]
     // Kog CPU fusion (Plan 160): RMSNorm gamma vectors — only present when the
     // consumer enables `kog_cpu_fusion`. Consumers that don't use Kog fusion
     // (e.g. riir-engine) get the compact 6-field struct and avoid ~2×n
@@ -73,7 +123,7 @@ pub struct TransformerWeights {
     /// Cluster classifier: [num_clusters, n_embd]
     /// Only loaded when vocab_size > mtp_cluster_vocab_threshold.
     pub mtp_cluster_classifier: Option<Vec<f32>>,
-    /// Cluster membership table: [num_clusters] → Vec<usize> (token indices)
+    /// Cluster membership table: `[num_clusters]` → `Vec<usize>` (token indices)
     pub mtp_cluster_map: Option<Vec<Vec<usize>>>,
     // Delta routing weights (Plan 097: Delta Attention Residuals)
     #[cfg(feature = "delta_routing")]
@@ -140,6 +190,13 @@ impl TransformerWeights {
                     v.extend((0..len).map(|_| rng.normal() * layer_scale));
                     v
                 },
+                #[cfg(feature = "gated_mlp")]
+                mlp_w_up: {
+                    let len = config.mlp_hidden * n;
+                    let mut v = Vec::with_capacity(len);
+                    v.extend((0..len).map(|_| rng.normal() * layer_scale));
+                    v
+                },
                 #[cfg(feature = "kog_cpu_fusion")]
                 attn_norm_gamma: vec![1.0f32; n],
                 #[cfg(feature = "kog_cpu_fusion")]
@@ -183,6 +240,37 @@ impl TransformerWeights {
         }
     }
 
+    /// Convert f32 projection weights to f16 storage (Issue 200).
+    ///
+    /// One-time conversion at model load time. Embeddings (`wte`, `wpe`) and
+    /// `lm_head` stay f32 (embedding lookup + logit precision). Only per-layer
+    /// projection matrices are converted to f16 — these dominate the GEMV
+    /// bandwidth budget (~95% of per-forward weight reads).
+    ///
+    /// The returned `TransformerWeightsF16` is consumed by `forward_base_f16`,
+    /// which dispatches matmuls to `matmul_f16` (f16 weights × f32 activations,
+    /// dequant-on-load inside the dot kernel).
+    pub fn to_f16(&self) -> TransformerWeightsF16 {
+        let layers = self
+            .layers
+            .iter()
+            .map(|lw| LayerWeightsF16 {
+                attn_wq: lw.attn_wq.iter().map(|&v| f16::from_f32(v)).collect(),
+                attn_wk: lw.attn_wk.iter().map(|&v| f16::from_f32(v)).collect(),
+                attn_wv: lw.attn_wv.iter().map(|&v| f16::from_f32(v)).collect(),
+                attn_wo: lw.attn_wo.iter().map(|&v| f16::from_f32(v)).collect(),
+                mlp_w1: lw.mlp_w1.iter().map(|&v| f16::from_f32(v)).collect(),
+                mlp_w2: lw.mlp_w2.iter().map(|&v| f16::from_f32(v)).collect(),
+            })
+            .collect();
+        TransformerWeightsF16 {
+            wte: self.wte.clone(),
+            wpe: self.wpe.clone(),
+            lm_head: self.lm_head.clone(),
+            layers,
+        }
+    }
+
     /// Initialize Wall Attention gate weights with random values (Plan 173).
     /// Call when `wall_config` is `Some` — populates `attn_wg` with proper scaling.
     /// This is separate from `new()` to avoid consuming RNG when Wall is disabled.
@@ -200,7 +288,7 @@ impl TransformerWeights {
     /// Fold RMSNorm gamma into projection weights (Plan 160: Kog CPU fusion).
     ///
     /// For each projection preceded by RMSNorm with gamma:
-    ///   weight[row * n_embd + col] *= gamma[col]
+    ///   `weight[row * n_embd + col] *= gamma[col]`
     ///
     /// After folding, gamma is set to 1.0 (identity), so runtime rmsnorm_with_gamma
     /// becomes a no-op. This eliminates per-token gamma memory reads.
@@ -234,8 +322,8 @@ impl TransformerWeights {
 
     /// Repack Q/K/V weights into a single contiguous buffer (Plan 160: Kog CPU fusion).
     ///
-    /// Layout: [Q rows | K rows | V rows] × [n_embd], where:
-    ///   Q rows = [n_embd], K rows = [kv_dim], V rows = [kv_dim]
+    /// Layout: [Q rows | K rows | V rows] × `[n_embd]`, where:
+    ///   Q rows = `[n_embd]`, K rows = `[kv_dim]`, V rows = `[kv_dim]`
     ///
     /// The fused weight is stored in `attn_qkv_fused` (Some when populated).
     /// Original weights are preserved — fused is an additional allocation.

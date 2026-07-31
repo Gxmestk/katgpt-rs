@@ -31,6 +31,7 @@
 | [`monopoly_fsm.md`](monopoly_fsm.md) | Monopoly FSM Arena — 4-player board-game engine |
 | [`fft_arena.md`](fft_arena.md) | FFT Arena — 4v4 ATB tactics battle engine |
 | [`go_arena.md`](go_arena.md) | Go Arena — AI vs AI auto-play engine (Plan 065) |
+| [`moka_head_to_head.md`](moka_head_to_head.md) | Moka v1 head-to-head — complete record (Plan 563 + 565, Bench 204 + 205) |
 | [`open_ended_evolution.md`](open_ended_evolution.md) | Plan 191 — open-ended problem-evolution arena |
 | [`hl_arena_detail.md`](hl_arena_detail.md) | Cross-cutting HL & arena detail + thesis verdict |
 

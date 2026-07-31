@@ -1,6 +1,6 @@
 # KatgptProof — Lean 4 formal verification for the sigmoid ranking-preservation property
 
-Second Lean 4 formal-verification instance in the 5-repo quintet (katgpt-rs / riir-ai / riir-chain / riir-neuron-db / riir-train), and the **first in the public MIT repo** (`katgpt-rs`). The first instance is `riir-chain/.proofs/RiirChainProof` (Plan 004 — LatCal fixed-point round-trip).
+Second Lean 4 formal-verification instance in the 7-repo stack (katgpt-rs / riir-ai / riir-chain / riir-neuron-db / riir-train / riir-game-sdk / riir-armageddon), and the **first in the public MIT repo** (`katgpt-rs`). The first instance is `riir-chain/.proofs/RiirChainProof` (Plan 004 — LatCal fixed-point round-trip).
 
 ## What this proves
 
@@ -14,6 +14,8 @@ Second Lean 4 formal-verification instance in the 5-repo quintet (katgpt-rs / ri
 | `Ssmax/DilutionBound.lean` | `ssmax_dominates_base` | For `s_L · log(N) ≥ 1` and `c_base > 0`: SSMax does not decrease gold mass (threshold is `s_L·log(N)≥1`, NOT `N≥2`) |
 | `Ssmax/Asymptotic.lean` | `tendsto_leakage_zero` | For `s_L · Δ > 0`: the leakage term `(N−1)·N^(−s_L·log N·Δ) → 0` as `N → ∞` (squeeze against `0 ≤ leakage ≤ 1/N`) |
 | `Ssmax/Asymptotic.lean` | `tendsto_alphaGold_one` | **SSMax asymptotically defeats dilution**: for `s_L · Δ > 0`, `α_gold(N, s_L·log N·Δ) → 1` as `N → ∞` |
+| `Hope/Basic.lean` | (spec only) | `reluSelfKernel γ β = (γ²+β²)·Φ(β/|γ|) + β·|γ|·φ(β/|γ|)` — HOPE Eq 3; `normalCdf` modeled as constant `1/2` (spec simplification, see file doc) |
+| `Hope/SpecTests.lean` | (spec self-tests) | `reluSelfKernel(1,0) = 1/2`; `reluSelfKernel(γ,0) = γ²/2` for γ>0; `reluSelfKernel(γ,β) = reluSelfKernel(-γ,β)` (γ-sign symmetry) |
 
 The headline theorem is `action_bridge_ranking_preserved`: it proves that `ActionBridge::select_action`'s sigmoid projection preserves dot-product ordering. This is the ∀-form of the empirical `g1_3_bridge_ranking_preservation` test in `crates/katgpt-core/src/micro_belief/tests.rs` (Plan 281 G1.3), which samples only 1000 random triples. The Lean theorem holds for **every** triple.
 
@@ -74,11 +76,16 @@ No `sorry`. No `sorryAx`. Verified by `#print axioms`. These are the same axioms
 └── KatgptProof/
     ├── Bridge/
     │   ├── Basic.lean                  # Spec: dot product + sigmoid (Mathlib's Real.sigmoid)
-    │   └── RankingPreserved.lean       # Theorems: ranking + argmax preservation (Plan 293)
+    │   ├── RankingPreserved.lean        # Theorems: ranking + argmax preservation (Plan 293)
+    │   └── SpecTests.lean               # Spec self-tests on concrete dot/sigmoid instances (Plan 441)
+    ├── Hope/
+    │   ├── Basic.lean                   # Spec: ReLU self-kernel (HOPE Eq 3, Plan 469)
+    │   └── SpecTests.lean               # Spec self-tests on concrete kernel instances (Plan 441/469)
     └── Ssmax/
-        ├── Basic.lean                  # Spec: alphaGold dilution bound + monotonicity of N^c (Plan 411 S3)
-        ├── DilutionBound.lean           # Theorems: alphaGold strictMono in c + ssmax_dominates_base (Plan 411 S3)
-        └── Asymptotic.lean              # Theorem: alphaGold → 1 as N → ∞ (Plan 411 S3 asymptotic follow-up)
+        ├── Basic.lean                   # Spec: alphaGold dilution bound + monotonicity of N^c (Plan 411 S3)
+        ├── DilutionBound.lean            # Theorems: alphaGold strictMono in c + ssmax_dominates_base (Plan 411 S3)
+        ├── Asymptotic.lean               # Theorem: alphaGold → 1 as N → ∞ (Plan 411 S3 asymptotic follow-up)
+        └── SpecTests.lean                # Spec self-tests on concrete dilution-curve instances (Plan 441)
 ```
 
 ## The f32 caveat (and why it doesn't break the theorem)
@@ -146,6 +153,26 @@ cd katgpt-rs/.proofs && lake build    # → Build completed successfully (2281 j
 cd katgpt-rs && cargo test -p katgpt-core --test ssmax_spec_match  # → 8 passed
 cd katgpt-rs && cargo test -p katgpt-core --test bridge_spec_match --features action_bridge  # → 6 passed
 ```
+
+## Spec self-tests (Plan 441 — the "spec tested on vectors" convention)
+
+Each `Basic.lean` spec ships a paired `SpecTests.lean` with concrete-instance
+`example` proofs testing the spec against independently-known values. This is
+distilled from SymCrypt `feature/verifiedcrypto` §4 ("Running the Lean spec on
+test vectors") and closes the spec-authority gap in C3:
+
+- The proof theorems prove the spec against itself — they don't catch spec
+  authoring errors.
+- The Rust spec-match test tests Rust against the spec — if both have the
+  same typo (written by the same author), the test passes.
+- The spec self-test tests the spec against known-good values from the source
+  paper or mathematical definition — the independent authority.
+
+**The sign-typo case study (Plan 441 G2):** if `alphaGold`'s `N^(-c)` is
+mistranscribed as `N^c`, all 5 Ssmax spec test examples fail at `lake build`
+time. The monotonicity theorems still type-check (they prove monotonicity of
+whatever formula is transcribed); the Rust spec-match test still passes (Rust
+likely has the same typo). Only the spec self-test catches it.
 
 ## License
 

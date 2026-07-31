@@ -17,7 +17,7 @@
 //!
 //! - **G3 (latency)**: Batched-median timing, 1024 calls × 256 batches with
 //!   `black_box` anti-hoist. Targets:
-//!     - `d=8, r=3` (HLA scale): `< 50 ns`/call.
+//!     - `d=8, r=3` (belief scale): `< 50 ns`/call.
 //!     - `d=64, r=12` (shard scale): `< 200 ns`/call.
 //!
 //! - **G4 (alloc-free hot path)**: After scratch warmup, 100 steady-state calls
@@ -39,7 +39,7 @@
 
 #![cfg(feature = "tilr_invariant_subspace")]
 
-use katgpt_core::tilr::{tilr_refine_into, TilrScratch};
+use katgpt_core::tilr::{TilrScratch, tilr_refine_into};
 use std::hint::black_box;
 use std::time::Instant;
 
@@ -88,7 +88,10 @@ fn gram_schmidt_basis(d: usize, r: usize, rng: &mut Rng) -> Vec<f32> {
                 basis[i * d + x] -= dot * basis[j * d + x];
             }
         }
-        let norm: f32 = (0..d).map(|x| basis[i * d + x] * basis[i * d + x]).sum::<f32>().sqrt();
+        let norm: f32 = (0..d)
+            .map(|x| basis[i * d + x] * basis[i * d + x])
+            .sum::<f32>()
+            .sqrt();
         if norm > 1e-12 {
             for x in 0..d {
                 basis[i * d + x] /= norm;
@@ -131,10 +134,18 @@ struct GateResult {
 
 impl GateResult {
     fn pass(name: &'static str, detail: impl Into<String>) -> Self {
-        Self { name, passed: true, detail: detail.into() }
+        Self {
+            name,
+            passed: true,
+            detail: detail.into(),
+        }
     }
     fn fail(name: &'static str, detail: impl Into<String>) -> Self {
-        Self { name, passed: false, detail: detail.into() }
+        Self {
+            name,
+            passed: false,
+            detail: detail.into(),
+        }
     }
 }
 
@@ -158,8 +169,7 @@ fn gate_g1_no_harm_bit_identity() -> GateResult {
             let mut direction = vec![0.0f32; d];
             rng.fill(&mut direction);
             for k in 0..r {
-                let coeff: f32 =
-                    (0..d).map(|x| direction[x] * basis[k * d + x]).sum();
+                let coeff: f32 = (0..d).map(|x| direction[x] * basis[k * d + x]).sum();
                 for x in 0..d {
                     direction[x] -= coeff * basis[k * d + x];
                 }
@@ -297,31 +307,31 @@ fn gate_g2_full_correction_and_boundedness() -> GateResult {
 fn gate_g3_latency() -> GateResult {
     const ITERS: usize = 1024;
     const BATCHES: usize = 256;
-    const TARGET_HLA_NS: f64 = 50.0; // d=8, r=3
+    const TARGET_BELIEF_NS: f64 = 50.0; // d=8, r=3
     const TARGET_SHARD_NS: f64 = 200.0; // d=64, r=12
 
-    // HLA scale: d=8, r=3.
-    let d_hla = 8;
-    let r_hla = 3;
-    let mut rng_hla = Rng::new(0xC0DE_0008);
-    let basis_hla = gram_schmidt_basis(d_hla, r_hla, &mut rng_hla);
-    let state_hla: Vec<f32> = (0..d_hla).map(|i| (i as f32) * 0.1).collect();
-    let direction_hla: Vec<f32> = (0..d_hla).map(|i| (i as f32) * 0.05 - 0.2).collect();
-    let mut out_hla = vec![0.0f32; d_hla];
-    let mut scratch_hla = TilrScratch::with_capacity(d_hla, r_hla);
+    // belief scale: d=8, r=3.
+    let d_belief = 8;
+    let r_belief = 3;
+    let mut rng_belief = Rng::new(0xC0DE_0008);
+    let basis_belief = gram_schmidt_basis(d_belief, r_belief, &mut rng_belief);
+    let state_belief: Vec<f32> = (0..d_belief).map(|i| (i as f32) * 0.1).collect();
+    let direction_belief: Vec<f32> = (0..d_belief).map(|i| (i as f32) * 0.05 - 0.2).collect();
+    let mut out_belief = vec![0.0f32; d_belief];
+    let mut scratch_belief = TilrScratch::with_capacity(d_belief, r_belief);
 
-    let hla_ns = timed_median_ns(ITERS, BATCHES, || {
+    let belief_ns = timed_median_ns(ITERS, BATCHES, || {
         let _ = bb(tilr_refine_into(
-            bb(&state_hla),
-            bb(&direction_hla),
-            bb(&basis_hla),
-            bb(r_hla),
+            bb(&state_belief),
+            bb(&direction_belief),
+            bb(&basis_belief),
+            bb(r_belief),
             bb(0.5),
             bb(1e-12),
-            &mut scratch_hla,
-            &mut out_hla,
+            &mut scratch_belief,
+            &mut out_belief,
         ));
-        bb(out_hla[0]);
+        bb(out_belief[0]);
     });
 
     // Shard scale: d=64, r=12.
@@ -330,8 +340,9 @@ fn gate_g3_latency() -> GateResult {
     let mut rng_shard = Rng::new(0xC0DE_0040);
     let basis_shard = gram_schmidt_basis(d_shard, r_shard, &mut rng_shard);
     let state_shard: Vec<f32> = (0..d_shard).map(|i| (i as f32) * 0.01).collect();
-    let direction_shard: Vec<f32> =
-        (0..d_shard).map(|i| ((i * 7) as f32) * 0.02 - 0.5).collect();
+    let direction_shard: Vec<f32> = (0..d_shard)
+        .map(|i| ((i * 7) as f32) * 0.02 - 0.5)
+        .collect();
     let mut out_shard = vec![0.0f32; d_shard];
     let mut scratch_shard = TilrScratch::with_capacity(d_shard, r_shard);
 
@@ -349,17 +360,17 @@ fn gate_g3_latency() -> GateResult {
         bb(out_shard[0]);
     });
 
-    let hla_pass = hla_ns < TARGET_HLA_NS;
+    let belief_pass = belief_ns < TARGET_BELIEF_NS;
     let shard_pass = shard_ns < TARGET_SHARD_NS;
 
     let detail = format!(
-        "HLA (d={d_hla},r={r_hla}): {hla_ns:.1} ns (target <{TARGET_HLA_NS:.0}, {}); \
+        "Belief (d={d_belief},r={r_belief}): {belief_ns:.1} ns (target <{TARGET_BELIEF_NS:.0}, {}); \
          Shard (d={d_shard},r={r_shard}): {shard_ns:.1} ns (target <{TARGET_SHARD_NS:.0}, {})",
-        if hla_pass { "PASS" } else { "FAIL" },
+        if belief_pass { "PASS" } else { "FAIL" },
         if shard_pass { "PASS" } else { "FAIL" },
     );
 
-    if hla_pass && shard_pass {
+    if belief_pass && shard_pass {
         GateResult::pass("G3", detail)
     } else {
         GateResult::fail("G3", detail)
@@ -409,7 +420,10 @@ fn gate_g4_zero_alloc() -> GateResult {
     });
 
     if allocs == 0 {
-        GateResult::pass("G4", format!("0 allocations over {iters} steady-state calls"))
+        GateResult::pass(
+            "G4",
+            format!("0 allocations over {iters} steady-state calls"),
+        )
     } else {
         GateResult::fail(
             "G4",

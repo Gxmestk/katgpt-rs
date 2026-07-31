@@ -191,7 +191,7 @@ impl CmField {
         }
     }
 
-    /// Total field degree [K:Q] = 2·f.
+    /// Total field degree `[K:Q]` = 2·f.
     pub fn total_degree(&self) -> usize {
         self.params.total_degree()
     }

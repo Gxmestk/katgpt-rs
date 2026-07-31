@@ -20,22 +20,34 @@ use katgpt_core::types;
 /// Each KV vector is: normalized → quaternion rotated → quantized → bit-packed.
 /// Reconstruction: unpack → dequantize → inverse rotate → rescale.
 pub struct IsoQuantKVCache {
+    // ── Vec fields first (24 bytes, 8-byte aligned) ──
     /// Per-layer quaternion state.
     pub layers: Vec<IsoQuantLayer>,
     /// Key codebook (shared across layers, same kv_dim/key_bits).
     key_codebook: TurboQuantCodebook,
     /// Value codebook (shared across layers).
     val_codebook: TurboQuantCodebook,
-    /// Bit-packed key indices: layers × positions × packed_coords.
-    key_indices: Vec<Vec<Vec<u8>>>,
-    /// Per-position key norms.
-    key_norms: Vec<Vec<f32>>,
-    /// Bit-packed value indices.
-    val_indices: Vec<Vec<Vec<u8>>>,
-    /// Per-position value norms.
-    val_norms: Vec<Vec<f32>>,
+    /// Bit-packed key indices: flat `[n_layers * max_seq_len * key_packed_len]`.
+    /// Layer-major layout: element `(layer, pos)` is at
+    /// `(layer * max_seq_len + pos) * key_packed_len`.
+    key_indices: Vec<u8>,
+    /// Per-position key norms: `[n_layers * max_seq_len]`.
+    key_norms: Vec<f32>,
+    /// Bit-packed value indices: flat `[n_layers * max_seq_len * val_packed_len]`.
+    val_indices: Vec<u8>,
+    /// Per-position value norms: `[n_layers * max_seq_len]`.
+    val_norms: Vec<f32>,
+    /// Scratch: normalized input [kv_dim]. Reused across store/dequantize calls.
+    scratch_normalized: Vec<f32>,
+    /// Scratch: rotation output [kv_dim].
+    scratch_rotated: Vec<f32>,
+    /// Scratch: quantized indices [kv_dim].
+    scratch_indices: Vec<u8>,
+    // ── usize fields (8-byte aligned, contiguous after Vecs) ──
     /// Current position.
     pos: usize,
+    /// Highest position ever written (for efficient reset).
+    max_used_pos: usize,
     /// Number of layers.
     n_layers: usize,
     /// KV dimension.
@@ -43,23 +55,38 @@ pub struct IsoQuantKVCache {
     /// Maximum sequence length.
     #[allow(dead_code)] // capacity metadata; reset uses max_used_pos for efficiency
     max_seq_len: usize,
-    /// Highest position ever written (for efficient reset).
-    max_used_pos: usize,
+    /// Packed bytes per key position: `packed_len(kv_dim, key_bits)`.
+    key_packed_len: usize,
+    /// Packed bytes per value position: `packed_len(kv_dim, val_bits)`.
+    val_packed_len: usize,
+    // ── u8 fields last (packed together, no inter-field padding) ──
     /// Key bits per coordinate.
     key_bits: u8,
     /// Value bits per coordinate.
     val_bits: u8,
     /// Rotation mode: Full (6 DOF) or Fast (3 DOF).
     mode: IsoQuantMode,
-    /// Scratch: normalized input [kv_dim]. Reused across store/dequantize calls.
-    scratch_normalized: Vec<f32>,
-    /// Scratch: rotation output [kv_dim].
-    scratch_rotated: Vec<f32>,
-    /// Scratch: quantized indices [kv_dim].
-    scratch_indices: Vec<u8>,
 }
 
 impl IsoQuantKVCache {
+    /// Byte offset of key data for `(layer, pos)` in the flat `key_indices`.
+    #[inline]
+    fn key_off(&self, layer: usize, pos: usize) -> usize {
+        (layer * self.max_seq_len + pos) * self.key_packed_len
+    }
+
+    /// Byte offset of value data for `(layer, pos)` in the flat `val_indices`.
+    #[inline]
+    fn val_off(&self, layer: usize, pos: usize) -> usize {
+        (layer * self.max_seq_len + pos) * self.val_packed_len
+    }
+
+    /// Flat index of norm for `(layer, pos)`.
+    #[inline]
+    fn norm_idx(&self, layer: usize, pos: usize) -> usize {
+        layer * self.max_seq_len + pos
+    }
+
     /// Create a new compressed KV cache from config.
     pub fn new(config: &IsoQuantConfig) -> Self {
         let n_groups = config.kv_dim.div_ceil(4);
@@ -104,15 +131,17 @@ impl IsoQuantKVCache {
             layers,
             key_codebook,
             val_codebook,
-            key_indices: vec![vec![vec![0u8; packed_key_len]; config.max_seq_len]; config.n_layers],
-            key_norms: vec![vec![0.0f32; config.max_seq_len]; config.n_layers],
-            val_indices: vec![vec![vec![0u8; packed_val_len]; config.max_seq_len]; config.n_layers],
-            val_norms: vec![vec![0.0f32; config.max_seq_len]; config.n_layers],
+            key_indices: vec![0u8; config.n_layers * config.max_seq_len * packed_key_len],
+            key_norms: vec![0.0f32; config.n_layers * config.max_seq_len],
+            val_indices: vec![0u8; config.n_layers * config.max_seq_len * packed_val_len],
+            val_norms: vec![0.0f32; config.n_layers * config.max_seq_len],
             pos: 0,
+            max_used_pos: 0,
             n_layers: config.n_layers,
             kv_dim: config.kv_dim,
             max_seq_len: config.max_seq_len,
-            max_used_pos: 0,
+            key_packed_len: packed_key_len,
+            val_packed_len: packed_val_len,
             key_bits: config.key_bits,
             val_bits: config.val_bits,
             mode: config.mode,
@@ -132,7 +161,8 @@ impl IsoQuantKVCache {
 
         // Compute norm via SIMD (avoids scalar iteration)
         let norm = katgpt_core::simd::simd_sum_sq(key, key.len()).sqrt();
-        self.key_norms[layer][pos] = norm;
+        let ni = self.norm_idx(layer, pos);
+        self.key_norms[ni] = norm;
 
         if norm < 1e-8 {
             return;
@@ -159,11 +189,12 @@ impl IsoQuantKVCache {
             }
         }
 
-        // Bit-pack into storage
+        // Bit-pack into flat storage
+        let off = self.key_off(layer, pos);
         pack_indices_into(
             &self.scratch_indices,
             self.key_bits,
-            &mut self.key_indices[layer][pos],
+            &mut self.key_indices[off..off + self.key_packed_len],
         );
     }
 
@@ -176,7 +207,8 @@ impl IsoQuantKVCache {
         let layer_state = &self.layers[layer];
 
         let norm = katgpt_core::simd::simd_sum_sq(value, value.len()).sqrt();
-        self.val_norms[layer][pos] = norm;
+        let ni = self.norm_idx(layer, pos);
+        self.val_norms[ni] = norm;
 
         if norm < 1e-8 {
             return;
@@ -200,10 +232,11 @@ impl IsoQuantKVCache {
             }
         }
 
+        let off = self.val_off(layer, pos);
         pack_indices_into(
             &self.scratch_indices,
             self.val_bits,
-            &mut self.val_indices[layer][pos],
+            &mut self.val_indices[off..off + self.val_packed_len],
         );
     }
 
@@ -213,13 +246,19 @@ impl IsoQuantKVCache {
     #[cfg(test)]
     pub fn dequantize_key(&self, layer: usize, pos: usize) -> Vec<f32> {
         let layer_state = &self.layers[layer];
-        let norm = self.key_norms[layer][pos];
+        let ni = self.norm_idx(layer, pos);
+        let norm = self.key_norms[ni];
 
         if norm < 1e-8 {
             return vec![0.0; self.kv_dim];
         }
 
-        let indices = unpack_indices(&self.key_indices[layer][pos], self.key_bits, self.kv_dim);
+        let off = self.key_off(layer, pos);
+        let indices = unpack_indices(
+            &self.key_indices[off..off + self.key_packed_len],
+            self.key_bits,
+            self.kv_dim,
+        );
         let centroids = &self.key_codebook.centroids;
         let rotated: Vec<f32> = indices.iter().map(|&i| centroids[i as usize]).collect();
 
@@ -240,13 +279,19 @@ impl IsoQuantKVCache {
     #[cfg(test)]
     pub fn dequantize_value(&self, layer: usize, pos: usize) -> Vec<f32> {
         let layer_state = &self.layers[layer];
-        let norm = self.val_norms[layer][pos];
+        let ni = self.norm_idx(layer, pos);
+        let norm = self.val_norms[ni];
 
         if norm < 1e-8 {
             return vec![0.0; self.kv_dim];
         }
 
-        let indices = unpack_indices(&self.val_indices[layer][pos], self.val_bits, self.kv_dim);
+        let off = self.val_off(layer, pos);
+        let indices = unpack_indices(
+            &self.val_indices[off..off + self.val_packed_len],
+            self.val_bits,
+            self.kv_dim,
+        );
         let centroids = &self.val_codebook.centroids;
         let rotated: Vec<f32> = indices.iter().map(|&i| centroids[i as usize]).collect();
 
@@ -268,7 +313,8 @@ impl IsoQuantKVCache {
     pub fn dequantize_key_into(&mut self, layer: usize, pos: usize, out: &mut [f32]) {
         debug_assert_eq!(out.len(), self.kv_dim);
         let layer_state = &self.layers[layer];
-        let norm = self.key_norms[layer][pos];
+        let ni = self.norm_idx(layer, pos);
+        let norm = self.key_norms[ni];
 
         if norm < 1e-8 {
             out.fill(0.0);
@@ -276,8 +322,9 @@ impl IsoQuantKVCache {
         }
 
         // Unpack into scratch_indices
+        let off = self.key_off(layer, pos);
         unpack_indices_into(
-            &self.key_indices[layer][pos],
+            &self.key_indices[off..off + self.key_packed_len],
             self.key_bits,
             self.kv_dim,
             &mut self.scratch_indices,
@@ -312,15 +359,17 @@ impl IsoQuantKVCache {
     pub fn dequantize_value_into(&mut self, layer: usize, pos: usize, out: &mut [f32]) {
         debug_assert_eq!(out.len(), self.kv_dim);
         let layer_state = &self.layers[layer];
-        let norm = self.val_norms[layer][pos];
+        let ni = self.norm_idx(layer, pos);
+        let norm = self.val_norms[ni];
 
         if norm < 1e-8 {
             out.fill(0.0);
             return;
         }
 
+        let off = self.val_off(layer, pos);
         unpack_indices_into(
-            &self.val_indices[layer][pos],
+            &self.val_indices[off..off + self.val_packed_len],
             self.val_bits,
             self.kv_dim,
             &mut self.scratch_indices,
@@ -347,16 +396,16 @@ impl IsoQuantKVCache {
 
     /// Reset cache for new sequence.
     pub fn reset(&mut self) {
-        // Only clear positions that were actually used.
-        let limit = self.max_used_pos + 1;
-        for layer in 0..self.n_layers {
-            for pos in 0..limit {
-                self.key_indices[layer][pos].fill(0);
-                self.key_norms[layer][pos] = 0.0;
-                self.val_indices[layer][pos].fill(0);
-                self.val_norms[layer][pos] = 0.0;
-            }
-        }
+        // Flat buffers: the first `n_layers * used` positions are contiguous,
+        // so we can clear them with flat fills instead of a nested loop.
+        let used = self.max_used_pos + 1;
+        let key_bytes = self.n_layers * used * self.key_packed_len;
+        let val_bytes = self.n_layers * used * self.val_packed_len;
+        self.key_indices[..key_bytes].fill(0);
+        self.val_indices[..val_bytes].fill(0);
+        let norm_count = self.n_layers * used;
+        self.key_norms[..norm_count].fill(0.0);
+        self.val_norms[..norm_count].fill(0.0);
         self.pos = 0;
         self.max_used_pos = 0;
     }

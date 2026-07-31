@@ -1,7 +1,7 @@
 //! Traits for the chunked content store (Plan 272 T1.5).
 //!
 //! File named `trait.rs` (reserved keyword) — referenced from
-//! [`super::mod`] as `r#trait`. Three traits, mirroring Research 262 §2.1:
+//! `super::mod` as `r#trait`. Three traits, mirroring Research 262 §2.1:
 //!
 //! - [`ChunkingStrategy`] — pure: borrowed slice → borrowed slices, zero-alloc.
 //! - [`ChunkFetcher`] — fetcher for sparse hydration (LOD-aware reads).

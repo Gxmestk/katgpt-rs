@@ -1,8 +1,8 @@
 //! RoPE (Rotary Position Embedding) undo/reapply utilities.
 //!
 //! RoPE applies position-dependent rotation to pairs of dimensions:
-//!   For dim pair (2i, 2i+1), rotation angle = pos × inv_freq[i]
-//!   where inv_freq[i] = 1.0 / (10000^(2i/d_head))
+//!   For dim pair (2i, 2i+1), rotation angle = `pos × inv_freq[i]`
+//!   where `inv_freq[i] = 1.0 / (10000^(2i/d_head))`
 //!
 //! `undo_rope` applies the INVERSE rotation (negated angles).
 //! `reapply_rope` applies the FORWARD rotation.
@@ -51,7 +51,7 @@ impl RopeFreqs {
     /// Apply position-dependent rotation to dim pairs in-place.
     ///
     /// For each pair (2i, 2i+1):
-    ///   θ = pos × inv_freq[i]
+    ///   θ = `pos × inv_freq[i]`
     ///   [x0', x1'] = [[cos θ, -sin θ], [sin θ, cos θ]] @ [x0, x1]
     ///
     /// When `negate = true`, applies the inverse rotation (negated angle).
@@ -102,7 +102,7 @@ fn apply_rotation(x: &mut [f32], pos: usize, head_dim: usize, negate: bool) {
 
 /// Undo RoPE: apply the inverse position-dependent rotation.
 ///
-/// For dim pair (2i, 2i+1), applies rotation by -pos × inv_freq[i].
+/// For dim pair (2i, 2i+1), applies rotation by `-pos × inv_freq[i]`.
 /// This removes the position-dependent phase structure so that subsequent
 /// PCA sees spatially coherent data.
 pub fn undo_rope(x: &mut [f32], pos: usize, head_dim: usize) {

@@ -24,7 +24,7 @@ For our LLM inference engine, the transfer is: intermediate transformer layers c
 
 ### D1: EP Accuracy@k Metric — Zero-Risk Reporting Improvement (No Feature Gate)
 
-- [x] **T1**: Add `ep_accuracy_k` helper to `src/benchmark.rs`
+- [x] **T1**: Add `ep_accuracy_k` helper to `src/benchmark/mod.rs`
   ```rust
   /// Compute EP Accuracy@k: number of rounds to first reach target_accuracy.
   /// Returns None if target was never reached within the data.
@@ -46,7 +46,7 @@ For our LLM inference engine, the transfer is: intermediate transformer layers c
   mls_aggregate = []  # Multi-Layer Sum: aggregate last K layer residuals (Research 68)
   ```
 
-- [x] **T4**: Add MLS config fields to `crates/katgpt-core/src/types.rs`
+- [x] **T4**: Add MLS config fields to `crates/katgpt-types/src/lib.rs`
   ```rust
   pub struct Config {
       // ... existing fields ...
@@ -61,7 +61,7 @@ For our LLM inference engine, the transfer is: intermediate transformer layers c
   }
   ```
 
-- [x] **T5**: Add MLS accumulator buffer to `ForwardContext` in `src/transformer.rs`
+- [x] **T5**: Add MLS accumulator buffer to `ForwardContext` in `crates/katgpt-percepta/src/transformer.rs`
   ```rust
   pub struct ForwardContext {
       // ... existing fields ...
@@ -201,4 +201,4 @@ mls_aggregate = []  # Plan 104: Sum last K layer residuals before LM head (Resea
 - Research 68: `.research/068_RAEv2_Multi_Layer_Representation_Autoencoders.md`
 - RAEv2 paper: arXiv:2605.18324
 - Related: Research 26 (MTP drafter), Research 38 (SDAR), Research 61 (Delta Routing)
-- Key files: `src/transformer.rs`, `crates/katgpt-core/src/types.rs`, `src/benchmark.rs`
+- Key files: `crates/katgpt-percepta/src/transformer.rs`, `crates/katgpt-types/src/lib.rs`, `src/benchmark/mod.rs`

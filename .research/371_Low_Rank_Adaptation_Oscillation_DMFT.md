@@ -15,7 +15,7 @@ The paper proves that combining **low-rank recurrent connectivity** with **firin
 
 **Distilled for katgpt-rs (modelless, inference-time):**
 
-The paper's *theoretical machinery* (DMFT, Hermite expansion, spectral self-consistency) is heavy and largely **already shipped** under different vocabulary — LinOSS for oscillation, `subspace_phase_gate` for real-eigenvalue phase transitions, `temporal_deriv` for the dual-fast/slow leaky integrator, `MicroRecurrentBeliefState` for per-NPC attractor/leaky families, `latent_functor` for direction vectors, `ict/detector.rs` for K-trajectory population-mean aggregation (`P̄_avg`, `beta_per_step`). **~80% of the paper's algorithmic content is covered.**
+The paper's *theoretical machinery* (DMFT, Hermite expansion, spectral self-consistency) is heavy and largely **already shipped** under different vocabulary — LinOSS for oscillation, `subspace_phase_gate` for real-eigenvalue phase transitions, `temporal_deriv` for the dual-fast/slow leaky integrator, `MicroRecurrentBeliefState` for per-NPC attractor/leaky families, `latent_functor` for direction vectors, `crates/katgpt-core/src/ict/detector.rs` for K-trajectory population-mean aggregation (`P̄_avg`, `beta_per_step`). **~80% of the paper's algorithmic content is covered.**
 
 The **novel transferable primitive** is the *missing 20%*: a **mean-field order-parameter aggregator + Hopf boundary detector + regime classifier** that compose the existing per-NPC primitives into crowd-scale emergent oscillations. Concretely:
 
@@ -25,7 +25,7 @@ The **novel transferable primitive** is the *missing 20%*: a **mean-field order-
 
 The wake/sleep/anesthesia biological mapping (cholinergic modulation of β) becomes a runtime knob: **β is the per-NPC arousal scalar** (already in HLA as `arousal ∈ [0,1]`), and sweeping it across a crowd produces emergent day/night cycles, panic waves, fashion trends — population rhythms that no individual NPC was scripted to perform.
 
-**Verdict: GOAT** (not Super-GOAT). One-line reasoning: the algorithmic content is 80% covered by shipped primitives; the novel 20% (mean-field order-parameter aggregator + Hopf boundary + regime classifier) is a useful extension of existing pieces into crowd-scale emergent oscillations, but it is not a new capability class — a competitor forking `katgpt-rs` could assemble it from `ict/detector.rs` + `subspace_phase_gate.rs` + `temporal_deriv.rs` in a week. The force-multiplier claim (connects HLA + latent_functor + DEC + cgsp + MicroRecurrentBeliefState) is real but each pillar already does its part; the *combination* doesn't produce something none of them alone can do.
+**Verdict: GOAT** (not Super-GOAT). One-line reasoning: the algorithmic content is 80% covered by shipped primitives; the novel 20% (mean-field order-parameter aggregator + Hopf boundary + regime classifier) is a useful extension of existing pieces into crowd-scale emergent oscillations, but it is not a new capability class — a competitor forking `katgpt-rs` could assemble it from `crates/katgpt-core/src/ict/detector.rs` + `subspace_phase_gate.rs` + `temporal_deriv.rs` in a week. The force-multiplier claim (connects HLA + latent_functor + DEC + cgsp + MicroRecurrentBeliefState) is real but each pillar already does its part; the *combination* doesn't produce something none of them alone can do.
 
 ---
 
@@ -97,11 +97,11 @@ Cholinergic modulation suppresses SFA → smaller effective β → wake-like irr
 | **Per-NPC recurrent belief kernel** (attractor + leaky families, dim=8 HLA) | **MicroRecurrentBeliefState** (`AttractorKernel`, `LeakyIntegrator`) | Plan 276, `crates/katgpt-core/src/micro_belief/`; per-NPC HLA `riir-engine/src/hla/` |
 | **Phase transition** (real eigenvalue crossing — `N ≥ d` input sufficiency) | **`subspace_phase_gate`** (`phase_transition_gate`, `participation_ratio`, `numerical_rank`, `jacobian_svd_at`) | Plan 301, `crates/katgpt-core/src/subspace_phase_gate.rs`; neuron-db consumer `phase_gate.rs` |
 | **Population-mean aggregation** (K trajectories → `P̄_avg`, `beta_per_step`) | **`ict::BranchingDetector`** | Plan 294, `crates/katgpt-core/src/ict/detector.rs` (`last_population_mean`, `ema_beta`) |
-| **Coherence-driven re-estimation** (analog of adaptation feedback closing the loop) | **`ReestimationScheduler`** | Plan 303, `riir-engine/src/latent_functor/reestimation.rs` |
-| **KARC reservoir** (delay-embedding + ridge readout — the *reservoir* formalism the paper's RNN instantiates) | **`KarcForecaster`** | Plan 308, `crates/katgpt-core/src/karc.rs` |
+| **Coherence-driven re-estimation** (analog of adaptation feedback closing the loop) | **`ReestimationScheduler`** | Plan 303, `riir-ai/crates/riir-engine/src/latent_functor/reestimation/mod.rs` |
+| **KARC reservoir** (delay-embedding + ridge readout — the *reservoir* formalism the paper's RNN instantiates) | **`KarcForecaster`** | Plan 308, `riir-ai/crates/riir-games-civ/src/civ/map_tick/karc.rs` |
 | **Crowd-scale latent aggregation** (set attention over K NPCs' beliefs) | **`set_sigmoid_attention`** | Plan 354, `crates/katgpt-core/src/set_attention.rs`; riir-ai guide R167 |
 | **Stokes / DEC continuity equation** (Fokker-Planck framing of κ transport) | **DEC operators** (`codifferential` δ, `belief_mass_divergence`) | Plan 251/314, `crates/katgpt-core/src/dec/` |
-| **Frozen per-NPC latent state** (style_weights[64], dendritic branch) | **`NeuronShard`** | `riir-neuron-db/src/shard.rs` |
+| **Frozen per-NPC latent state** (style_weights[64], dendritic branch) | **`NeuronShard`** | `riir-neuron-db/src/shard/mod.rs` |
 
 ### 2.2 What the paper adds that none of the above does alone
 
@@ -145,7 +145,7 @@ Different NPC archetypes (per `ArchetypeBlendShard`, Plan 321) can carry differe
 
 **Verdict: GOAT.**
 
-**One-line reasoning:** the paper's algorithmic content is ~80% covered by shipped primitives (LinOSS for oscillation, `subspace_phase_gate` for real-eigenvalue phase transitions, `temporal_deriv` for the dual-fast/slow leaky integrator, `MicroRecurrentBeliefState` for per-NPC substrate, `ict::BranchingDetector` for population-mean aggregation); the novel 20% (mean-field `(κ, κ_a, Q)` aggregator over NPCs + Hopf boundary detector + four-way regime classifier) is a useful extension into crowd-scale emergent oscillations, but it is not a new capability class — a competitor forking `katgpt-rs` could assemble it from `ict/detector.rs` + `subspace_phase_gate.rs` + `temporal_deriv.rs` in a week. The force-multiplier claim (connects HLA + latent_functor + DEC + cgsp + MicroRecurrentBeliefState) is real but each pillar already does its part; the *combination* doesn't produce something none of them alone can do.
+**One-line reasoning:** the paper's algorithmic content is ~80% covered by shipped primitives (LinOSS for oscillation, `subspace_phase_gate` for real-eigenvalue phase transitions, `temporal_deriv` for the dual-fast/slow leaky integrator, `MicroRecurrentBeliefState` for per-NPC substrate, `ict::BranchingDetector` for population-mean aggregation); the novel 20% (mean-field `(κ, κ_a, Q)` aggregator over NPCs + Hopf boundary detector + four-way regime classifier) is a useful extension into crowd-scale emergent oscillations, but it is not a new capability class — a competitor forking `katgpt-rs` could assemble it from `crates/katgpt-core/src/ict/detector.rs` + `subspace_phase_gate.rs` + `temporal_deriv.rs` in a week. The force-multiplier claim (connects HLA + latent_functor + DEC + cgsp + MicroRecurrentBeliefState) is real but each pillar already does its part; the *combination* doesn't produce something none of them alone can do.
 
 ### 3.1 Novelty gate (Q1–Q4, honest)
 
@@ -273,7 +273,7 @@ graph TD
 
 ## §PoC Addendum (2026-07-03, Plan 371 Phase 5 T5.1; updated Issue 034 T1–T3 + saddle-magnitude check)
 
-The mandatory defend-wrong PoC ships at `riir-poc/benches/mean_field_regime_poc.rs`.
+The mandatory defend-wrong PoC ships at `riir-ai/crates/riir-poc/benches/mean_field_regime_poc.rs`.
 It implements the paper's reduced 3D ODE (Eq. 55), sweeps a 5×5 `(g, β)` grid,
 and compares the trajectory-classified regime against `RegimeClassifier::classify_with_g`.
 
@@ -333,10 +333,9 @@ generalizes: GLC band at g=1.40–1.45, IS at g=1.50+ (β·G_eff=8.53 < 9.0). Th
 pre-existing mismatches remain at g=1.25–1.35 (negative G_eff regime) — unrelated
 to the spinodal discriminant.
 
-**Promotion decision: GOAT gate PASSES, stays opt-in pending T4.** All 5 gates
-pass (G1 100%, G2-G5 ✓) and the spinodal discriminant is modelless. However,
-fine-grid validation reveals pre-existing saddle→IS over-detection at negative
-G_eff that warrants T4 (real-game-domain validation) before promotion.
+**Promotion decision (historical, 2026-07-03):** GOAT gate PASSES, originally stayed opt-in pending T4. All 5 gates pass (G1 100%, G2-G5 ✓) and the spinodal discriminant is modelless. Fine-grid validation revealed pre-existing saddle→IS over-detection at negative G_eff that was flagged as warranting T4 (real-game-domain validation) before promotion.
+
+**(Post-promotion update, Plan 371 Phase 6, 2026-07-03):** `mean_field_regime` was PROMOTED TO DEFAULT-ON in `crates/katgpt-core/Cargo.toml`. The T4 real-game-domain validation did NOT block promotion — the GOAT gate's load-bearing axes (G1 100%, G2-G5 ✓, modelless, zero-alloc) all PASS, and the saddle→IS over-detection at negative G_eff is a documented pre-existing edge case (Issue 034 T4: 14/17 fine-grid PASS, 3 NSO<->IS at negative G_eff), not a primitive defect. Per the AGENTS.md promotion pattern: GOAT-passes-on-load-bearing-axis + modelless + zero-cost-unless-invoked → default-on (mirrors manifold_bandit P370 G2 FAIL but default-on; set_attention P354 G8 FAIL but default-on). The primitive ships; the saddle→IS edge case is documented for downstream consumers.
 
 ---
 
@@ -353,5 +352,8 @@ regimes at 100% accuracy (NSO 11/11, IS 12/12, Static 1/1, GLC 1/1).
 Calibrated defaults: `chaos_threshold=0.90, hopf_margin=0.15, saddle_margin=0.005,
 spinodal_margin=9.0`. Fine-grid validation (17-point β=1.4 column) confirms
 spinodal generalization but reveals pre-existing saddle→IS over-detection at
-negative G_eff (g=1.25–1.35). `mean_field_regime` stays opt-in pending T4
-(real-game-domain validation), though the GOAT gate technically passes.
+negative G_eff (g=1.25–1.35). (Post-promotion update, Plan 371 Phase 6, 2026-07-03:)
+`mean_field_regime` was PROMOTED TO DEFAULT-ON in katgpt-core despite the
+saddle→IS edge case — the GOAT gate's load-bearing axes all PASS, and the
+edge case is documented (Issue 034 T4: 14/17 fine-grid PASS) rather than
+blocking promotion.

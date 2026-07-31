@@ -11,7 +11,7 @@
 //!   needless suppression of the residual stream.
 //! - **Broadcast**: sink token has `‖v_s‖ ≈ content`. The resulting update
 //!   `O ≈ a_s · v_s^T` is a rank-1 broadcast carrying load-bearing global
-//!   information (e.g. [CLS] aggregation in ViT). It should be PRESERVED, not
+//!   information (e.g. `[CLS]` aggregation in ViT). It should be PRESERVED, not
 //!   gated.
 //!
 //! The intervention: classify per-head, gate only NOPs (via existing sigmoid
@@ -92,7 +92,7 @@ pub enum SinkKind {
 /// Per-position sink diagnostic.
 ///
 /// All fields `pub` so callers can build aggregate layer summaries
-/// ([`LayerSinkSummary`] in the sibling `geometry` module) without
+/// (`LayerSinkSummary` in the sibling `geometry` module) without
 /// re-running the classifier.
 #[derive(Debug, Clone, Copy)]
 pub struct SinkDiagnostic {
@@ -849,15 +849,10 @@ pub fn apply_dual_policy_gate_cached(
 
 // ── Small helpers ───────────────────────────────────────────────
 
+/// Sigmoid via Cephes polynomial (~1.7× faster than libm on aarch64).
 #[inline]
 fn sigmoid(x: f32) -> f32 {
-    // Numerically stable sigmoid.
-    if x >= 0.0 {
-        1.0 / (1.0 + (-x).exp())
-    } else {
-        let e = x.exp();
-        e / (1.0 + e)
-    }
+    crate::simd::fast_sigmoid(x)
 }
 
 #[inline]

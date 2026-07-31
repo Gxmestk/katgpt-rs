@@ -4,7 +4,7 @@
 > **Code:** [github.com/akatsuki-neo/JLT](https://github.com/akatsuki-neo/JLT) — reviewed in `.raw/JLT/`
 > **Date:** 2026-05-31
 > **Related:** Plan 066 (D2F), Plan 089 (tri-mode), Plan 097 (training-free loop), Plan 108 (LT2), Research 034 (D2F), Research 055 (Nemotron tri-mode)
-> **Applies to:** `katgpt-rs` D2F training (`dllm.rs`), D2F decode (`speculative/d2f.rs`), LT2 loop (`tf_loop.rs`)
+> **Applies to:** `katgpt-rs` D2F training (`dllm.rs`), D2F decode (`src/speculative/d2f.rs`), LT2 loop (`tf_loop.rs`)
 
 ## Executive Summary
 

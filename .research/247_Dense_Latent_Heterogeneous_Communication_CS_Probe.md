@@ -22,8 +22,8 @@ The paper's headline mechanism (cross-model KV-cache adapter, trained via Phase-
 The CS-Lasso probe is pure inference: sample `M≈200` random binary ablation masks over `H` heads, measure task accuracy under each mask, solve a Lasso, aggregate per-KV-group. The output is a **fixed-size ranking vector** — a `ConstraintPruner`-style artifact that gates which KV groups transmit, with **sigmoid**-gated density (never softmax, per AGENTS.md). The sparse/dense duality becomes a single scalar `context_awareness ∈ [0,1]` that interpolates the K-budget between the sparse floor (~3.5%) and the dense ceiling (~87%).
 
 **Already shipped (NOT reinvented — do not overclaim novelty on these):**
-- Position-disentanglement (RoPE strip → transform → restore): `katgpt-rs/src/shard_kv/rope.rs` (`undo_rope`/`reapply_rope`, Plan 147, GOAT-proved) AND `riir-ai/crates/riir-engine/src/lora_still.rs` (Still Perceiver, Plan 213).
-- Per-KV-group sigmoid gating: `katgpt-rs/src/sp_kv/utility_predictor.rs` (`soft_gate_bias`, Plan 070) and `ega_attn.rs` (Plan 139).
+- Position-disentanglement (RoPE strip → transform → restore): `katgpt-rs/crates/katgpt-kv/src/shard_kv/rope.rs` (`undo_rope`/`reapply_rope`, Plan 147, GOAT-proved) AND `riir-ai/crates/riir-engine/src/lora_still/mod.rs` (Still Perceiver, Plan 213).
+- Per-KV-group sigmoid gating: `katgpt-rs/crates/katgpt-kv/src/sp_kv/utility_predictor.rs` (`soft_gate_bias`, Plan 070) and `ega_attn.rs` (Plan 139).
 - Layer-monotonic alignment: trivial; our GQA already maps Q-head → KV-group via `kv_group = q_head * n_kv_head / n_head`.
 
 **What's genuinely new (and drives the Super-GOAT verdict):** the fusion of {CS-probe} × {sparse/dense duality as a routing axis} × {existing HLA per-NPC belief state} × {fog-of-war context-availability signal} → **adaptive-bandwidth NPC mind-reading**. See §2.Fusion and riir-ai/.research/133 for the selling point.
@@ -95,7 +95,7 @@ K_dense  ≈ 0.87  · G_kv   // paper's context-unaware ceiling
 Apply via the existing SP-KV `soft_gate_bias` path: `bias[g] = log(rank_score[g] + ε)` for top-K, `-∞` otherwise. **Sigmoid, never softmax** (AGENTS.md rule). When `ca` is high (receiver has its own context), K shrinks to the sparse floor; when `ca` is low (receiver is blind), K expands to the dense ceiling. This is the paper's central insight distilled into one scalar + one interpolation.
 
 **Primitive 3 — Position-Disentangled Cross-Shape KV Transport**
-Reuse `undo_rope` / `reapply_rope` from `shard_kv/rope.rs`. For cross-shape transport (different `d_head` or `G_kv`), apply a **frozen** linear projection `W: R^{d_S} → R^{d_R}` (trained in riir-train, frozen-loaded here via `TrainingProvider`). The projection operates in position-free space. **This is the boundary: katgpt-rs ships the RoPE strip/restore + the projection dispatch; riir-train ships the projection weights.**
+Reuse `undo_rope` / `reapply_rope` from `crates/katgpt-kv/src/shard_kv/rope.rs`. For cross-shape transport (different `d_head` or `G_kv`), apply a **frozen** linear projection `W: R^{d_S} → R^{d_R}` (trained in riir-train, frozen-loaded here via `TrainingProvider`). The projection operates in position-free space. **This is the boundary: katgpt-rs ships the RoPE strip/restore + the projection dispatch; riir-train ships the projection weights.**
 
 ### 2.3 Fusion (the Super-GOAT claim)
 
@@ -105,14 +105,14 @@ The CS-probe alone is a GOAT diagnostic. The sparse/dense duality alone is a Gai
 |-----------|--------|---------------|
 | CS-KV-Importance Probe | this paper (§3.1) | Ranks which HLA dimensions carry signal per task family |
 | Context-awareness scalar `ca` | this paper (§3.2 duality) | Bandwidth allocation: sparse when receiver has sensors, dense when blind |
-| `HlaCacheProxy` (per-NPC 8-dim belief state) | katgpt-rs sense/reconstruction.rs + riir-games zone/mood.rs | The "cache" being transmitted between NPCs |
+| `HlaCacheProxy` (per-NPC 8-dim belief state) | katgpt-rs crates/katgpt-sense/src/reconstruction.rs + riir-games riir-ai/crates/riir-games-shared/src/zone/mood.rs | The "cache" being transmitted between NPCs |
 | Fog-of-war `visible_radius` | riir-armageddon + Plan 118 | Source of `ca`: `ca = sigmoid(coverage_overlap)` between emitter and receiver |
 | `share_trajectory` stub | riir-ai Plan 298 T3.3 (DEFERRED) | The unblocked host system — currently a trait hook with no full impl |
 | Per-KV-group sigmoid gate | katgpt-rs SP-KV (Plan 070) | The gating mechanism that applies the CS-ranked density budget |
 
 **Closest cousins across both repos (notes + code, mandatory two-layer check):**
-- `katgpt-rs/.research/109_Shard_Drop_In_10x_KV_Cache_Compression.md` + `src/shard_kv/rope.rs` — RoPE-strip primitive, single-model compression. **Same RoPE mechanism, no CS-probe, no sparse/dense routing, no cross-agent.**
-- `katgpt-rs/.research/213_Still_Perceiver_KV_Cache_Compaction.md` + `riir-ai/crates/riir-engine/src/lora_still.rs` — 3-step un-rotate/compress/re-rotate. **Same position-disentanglement, single-model, trained Perceiver (riir-train material).**
+- `katgpt-rs/.research/109_Shard_Drop_In_10x_KV_Cache_Compression.md` + `crates/katgpt-kv/src/shard_kv/rope.rs` — RoPE-strip primitive, single-model compression. **Same RoPE mechanism, no CS-probe, no sparse/dense routing, no cross-agent.**
+- `katgpt-rs/.research/213_Still_Perceiver_KV_Cache_Compaction.md` + `riir-ai/crates/riir-engine/src/lora_still/mod.rs` — 3-step un-rotate/compress/re-rotate. **Same position-disentanglement, single-model, trained Perceiver (riir-train material).**
 - `katgpt-rs/.research/238_*` MUX-Latent + `.plans/238_mux_latent_context_compression.md` — superposition fusion for context compression. **Single-model, no receiver-context-awareness axis.**
 - `katgpt-rs/.research/086_RTPurbo` + `.plans/126_rt_turbo_retrieval_head_sparse_decode.md` — retrieval head identification. **Training-time head identification, NOT post-hoc per-task CS probe.**
 - `riir-ai/.plans/298_crowd_scale_progressive_mcgs_npc_emergent_behavior.md` T3.3 — `HlaCacheProxy::share_trajectory` **stub, deferred, no bandwidth allocation.**
@@ -166,4 +166,4 @@ The CS-probe alone is a GOAT diagnostic. The sparse/dense duality alone is a Gai
 
 ## TL;DR
 
-Super-GOAT. The paper's cross-model adapter training is riir-train material, but two modelless primitives survive: (1) a compressed-sensing KV-group importance probe (training-free, post-hoc, per-task — zero prior art in our repos), and (2) the sparse-reasoning/dense-knowledge duality as a bandwidth-allocation axis (~25× density swing gated by receiver context). Fusing these with our shipped HLA + fog-of-war + the deferred `share_trajectory` stub (Plan 298 T3.3) produces **adaptive-bandwidth NPC mind-reading** — a new capability class with a one-sentence moat, connecting 5 existing pillars. Open primitive → katgpt-rs Plan 280 (`cs_kv_probe` feature). Private selling-point guide → riir-ai/.research/133. Runtime plan → riir-ai/.plans/311. Position-disentanglement (RoPE strip/restore) is ALREADY shipped in `shard_kv/rope.rs` — do not reinvent it; the novelty is the CS-probe + the duality-as-routing-axis + the NPC fusion, not the RoPE mechanism.
+Super-GOAT. The paper's cross-model adapter training is riir-train material, but two modelless primitives survive: (1) a compressed-sensing KV-group importance probe (training-free, post-hoc, per-task — zero prior art in our repos), and (2) the sparse-reasoning/dense-knowledge duality as a bandwidth-allocation axis (~25× density swing gated by receiver context). Fusing these with our shipped HLA + fog-of-war + the deferred `share_trajectory` stub (Plan 298 T3.3) produces **adaptive-bandwidth NPC mind-reading** — a new capability class with a one-sentence moat, connecting 5 existing pillars. Open primitive → katgpt-rs Plan 280 (`cs_kv_probe` feature). Private selling-point guide → riir-ai/.research/133. Runtime plan → riir-ai/.plans/311. Position-disentanglement (RoPE strip/restore) is ALREADY shipped in `crates/katgpt-kv/src/shard_kv/rope.rs` — do not reinvent it; the novelty is the CS-probe + the duality-as-routing-axis + the NPC fusion, not the RoPE mechanism.

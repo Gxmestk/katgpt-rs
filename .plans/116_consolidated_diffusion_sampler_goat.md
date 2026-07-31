@@ -43,9 +43,9 @@ Consolidate three open tasks into a single ordered plan:
 - [x] Fix any failing tests, record count in GOAT table — 20 existing + 2 new T3 integration tests
 
 ### T3: DiffusionSampler integration into D2F denoising loop ✅
-- [x] Add `d2f_decode_block_with_prompt_with_sampler()` in `speculative/d2f.rs` (tri_mode feature-gated)
+- [x] Add `d2f_decode_block_with_prompt_with_sampler()` in `src/speculative/d2f.rs` (tri_mode feature-gated)
 - [x] When sampler present: use `sampler.decide(features)` instead of fixed `chosen_prob >= tau_conf`
-- [x] Add `sampler: Option<DiffusionSampler>` field to `SelfSpecConfig` in `speculative/types.rs`
+- [x] Add `sampler: Option<DiffusionSampler>` field to `SelfSpecConfig` in `crates/katgpt-core/src/speculative/types.rs`
 - [x] Add re-exports: `d2f_decode_block_with_sampler`, `d2f_decode_block_with_prompt_with_sampler`
 - [x] Test: `test_d2f_decode_with_sampler_produces_valid_output` — all tokens in vocab range
 - [x] Test: `test_d2f_decode_sampler_differs_from_fixed_threshold` — both produce valid confidence ∈ [0,1]
@@ -178,7 +178,7 @@ crates/riir-examples/examples/
 - `src/speculative/d2f_verifier.rs` — D2fDrafterVerifier (Plan 089 T1)
 - `src/speculative/mod.rs` — Module index (needs `pub mod diffusion_sampler`)
 - `src/speculative/types.rs` — SelfSpecConfig (needs `sampler` field)
-- `crates/riir-examples/examples/go_12_analytics_validate.rs` — Natsukaze validation (exists)
+- `riir-ai/crates/riir-examples/examples/go_12_analytics_validate.rs` — Natsukaze validation (exists)
 
 ### Benchmarks
 - `.benchmarks/018_d2f_verifier_goat.md` — Plan 089 GOAT (T1-T5 baseline)

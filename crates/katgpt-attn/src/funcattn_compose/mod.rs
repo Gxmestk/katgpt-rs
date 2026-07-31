@@ -1,6 +1,6 @@
 //! Functional Attention composition layer — Plan 286 Phase 5 (T5.1–T5.3).
 //!
-//! Composes the [`crate::funcattn`] primitive (shipped in `katgpt-core`) with
+//! Composes the `crate::funcattn` primitive (shipped in `katgpt-core`) with
 //! three sibling shipped primitives, all opt-in. The FUNCATTN forward hot path
 //! lives in `katgpt-core::funcattn` (zero-alloc, G5-verified); this module only
 //! adds composition *glue* and *runtime* artifacts — it never touches the
@@ -10,7 +10,7 @@
 //!
 //! `katgpt-core` is a dependency of this crate, not the reverse. Two of the
 //! three compositions wire FUNCATTN to primitives that live in this outer
-//! crate ([`crate::spectralquant`] and [`crate::chiaroscuro`]), so the
+//! crate (`crate::spectralquant` and [`crate::chiaroscuro`]), so the
 //! composition layer must live here. The freeze/thaw snapshot (T5.3) lives
 //! here too for Phase-5 cohesion and because its atomic hot-swap is a runtime
 //! concern (the bridge to riir-ai Plan 318).

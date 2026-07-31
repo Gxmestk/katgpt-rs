@@ -146,7 +146,7 @@ allocations that a raw "0 alloc" assertion would miss. See
 
 The plan specified installing a custom `#[global_allocator]` in the G4 test
 binary. However, the `katgpt-rs` lib crate **already** installs a debug-only
-`TrackingAllocator` (`src/alloc.rs`) with a clean per-thread public API
+`TrackingAllocator` (`crates/katgpt-core/src/alloc.rs`) with a clean per-thread public API
 (`reset_alloc_stats()` / `get_alloc_stats()`). Installing a second
 `#[global_allocator]` would cause a linker conflict. This test uses the existing
 allocator instead. The separate `[[test]]` binary structure is preserved for

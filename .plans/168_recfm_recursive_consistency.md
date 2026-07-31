@@ -53,7 +53,7 @@ Implement recursive cross-scale consistency from RecFM as modelless inference im
 
 ### Task 3: Recursive SpecHop Cross-Hop Consistency
 
-- [x] T3.1: Add `CrossHopConfig` to `src/spechop/speculator.rs`
+- [x] T3.1: Add `CrossHopConfig` to `crates/katgpt-speculative/src/spechop/speculator.rs`
   - Fields: `enable: bool`, `velocity_threshold: f32`, `min_hops_for_consistency: usize` (default 2)
 - [x] T3.2: Implement `observation_velocity(obs_k: &str, obs_k1: &str) -> f32`
   - Returns normalized Levenshtein distance between consecutive observations
@@ -93,7 +93,7 @@ Implement recursive cross-scale consistency from RecFM as modelless inference im
 
 - **Recursive D2F**: Secondary denoising trajectory with cross-scale velocity blend. Requires 2× forward passes per step. Benchmark first to validate the cost-benefit tradeoff.
 - **Model-based RecFM**: Training-time velocity consistency for LoRA. Implemented in riir-ai Plan 185.
-- **Cross-Repo Integration**: Validated in `riir-examples/tests/test_recfm_cross_repo.rs` — Plan 168 modelless RecFM + Plan 185 model-based RecFM compose correctly with compound gain (smoother marginals → better velocity profiles → more effective branch pruning).
+- **Cross-Repo Integration**: Validated in `riir-ai/crates/riir-examples/tests/test_recfm_cross_repo.rs` — Plan 168 modelless RecFM + Plan 185 model-based RecFM compose correctly with compound gain (smoother marginals → better velocity profiles → more effective branch pruning).
 
 ---
 

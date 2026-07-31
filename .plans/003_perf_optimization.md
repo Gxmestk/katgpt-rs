@@ -44,7 +44,7 @@ Benchmark baseline → optimize hotpaths → verify perf gain with all tests pas
 | File | Changes |
 |------|---------|
 | `src/types.rs` | `#[inline(always)]` on matmul/softmax/rmsnorm/sample_token; `matmul_relu` fused kernel; optimized softmax with `inv_sum`; optimized rmsnorm with `inv_rms`; unsafe indexing in matmul loops |
-| `src/transformer.rs` | `#[inline(always)]` on forward; fused `attention_head` kernel; unsafe indexing in embedding/residual/KV-store; `matmul_relu` for MLP; `copy_nonoverlapping` for cache store |
+| `crates/katgpt-percepta/src/transformer.rs` | `#[inline(always)]` on forward; fused `attention_head` kernel; unsafe indexing in embedding/residual/KV-store; `matmul_relu` for MLP; `copy_nonoverlapping` for cache store |
 
 ## What We Did NOT Do (and why)
 - **Rayon parallel matmul**: At n_embd=16, mlp_hidden=64, the overhead of rayon thread pool dominates. Benchmarked and confirmed no gain at these sizes.

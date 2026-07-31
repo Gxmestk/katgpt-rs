@@ -43,7 +43,7 @@ convention already established by Plan 275 (swir) and Plan 021 (core hotpath).
 - **Cycles per target:** 1000 (plan T3.1 spec).
 - **Seeds averaged:** 4 (CGSP × baseline × 16 targets × 1000 cycles × 4 seeds
   = 256k cycles per gate — kept small for runtime).
-- **CGSP config:** `HlaProjectionGuide { λ=2.0, α=1.0 }` + `BreakevenDifficultyFilter`
+- **CGSP config:** `BeliefGridProjectionGuide { λ=2.0, α=1.0 }` + `BreakevenDifficultyFilter`
   + `ColinearityBatchGate` + `EntropyCollapse { τ_low=0.30 }`.
 - **Baseline (g_zero-only) config:** `ConstantGuide(1.0)` + `NoOpDifficultyFilter`
   + `NoOpBatchGate` + `NeverCollapse`. Identical `VecBandit`, `DotSolver { sharpness=1.0 }`,
@@ -139,7 +139,7 @@ G1b: Mean r_synth per admitted candidate (INFORMATIONAL)
 
 CGSP's mean r_synth is **80% lower** than baseline. Root cause: the baseline
 uses `ConstantGuide(1.0)`, so `r_synth = (1 − solve_rate) · 1.0`, maximising
-the reward signal. CGSP's `HlaProjectionGuide` returns scores in `[0, ~0.88]`,
+the reward signal. CGSP's `BeliefGridProjectionGuide` returns scores in `[0, ~0.88]`,
 multiplicatively attenuating the reward. This is expected — the Guide trades
 reward magnitude for reward **directionality** (toward alignment × elegance).
 
@@ -335,7 +335,7 @@ default-on for all NPCs.
 - Research notes: `.research/240_SGS_Curiosity_Guided_Self_Play.md`
 - Plan: `.plans/274_curiosity_guided_self_play.md`
 - Implementation: `crates/katgpt-core/src/cgsp/` (7 modules, 29 unit tests)
-- Re-export shim: `src/cgsp.rs` (preserves `katgpt_rs::cgsp::*` import path)
+- Re-export shim: `crates/katgpt-core/src/cgsp/mod.rs` (preserves `katgpt_rs::cgsp::*` import path)
 - Benchmark: `tests/bench_274_cgsp_goat.rs` (9 GOAT tests)
 
 ---

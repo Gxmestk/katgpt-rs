@@ -11,7 +11,7 @@
 
 ## TL;DR
 
-**Verdict: GOAT — CONFIRMED by PoC (Plan 365 Phase 6, 2026-07-03). The LOG/PLAN two-phase memory management pattern, applied via probe/draft/pruner (not LLM), is a novel per-NPC runtime wiring.** AutoMem promotes file-system memory operations to first-class actions and shows that optimizing memory management as a separable skill yields 2–4× gains on long-horizon games (Crafter/MiniHack/NetHack). The paper instantiates the LOG/PLAN pattern with LLM calls (2 per step), but the **pattern itself** is implementation-agnostic: it decomposes the per-tick memory decision into a LOG phase ("what is worth recording about what just happened?") and a PLAN phase ("what do I need to recall to act now?"). Our runtime already has the substrate to instantiate this modellessly — `SpeculativeGenerator` (draft candidate memory ops) + `ScreeningPruner` (filter by relevance) + `ConstraintPruner` (filter by validity), plus a partial prior-art instance: the `ClosureMiningHost` wake/sleep/admit cycle in `cognitive_branches_runtime/closure_bridge.rs` already does wake-phase tracing → sleep-cycle mining → MDL-gated admission, but only for closure motifs, not for general memory ops (shard writes, KG triple emission, Engram admission, AnyRAG escalation). Extending that cycle to all memory ops IS novel.
+**Verdict: GOAT — CONFIRMED by PoC (Plan 365 Phase 6, 2026-07-03). The LOG/PLAN two-phase memory management pattern, applied via probe/draft/pruner (not LLM), is a novel per-NPC runtime wiring.** AutoMem promotes file-system memory operations to first-class actions and shows that optimizing memory management as a separable skill yields 2–4× gains on long-horizon games (Crafter/MiniHack/NetHack). The paper instantiates the LOG/PLAN pattern with LLM calls (2 per step), but the **pattern itself** is implementation-agnostic: it decomposes the per-tick memory decision into a LOG phase ("what is worth recording about what just happened?") and a PLAN phase ("what do I need to recall to act now?"). Our runtime already has the substrate to instantiate this modellessly — `SpeculativeGenerator` (draft candidate memory ops) + `ScreeningPruner` (filter by relevance) + `ConstraintPruner` (filter by validity), plus a partial prior-art instance: the `ClosureMiningHost` wake/sleep/admit cycle in `riir-ai/crates/riir-engine/src/cognitive_branches_runtime/closure_bridge.rs` already does wake-phase tracing → sleep-cycle mining → MDL-gated admission, but only for closure motifs, not for general memory ops (shard writes, KG triple emission, Engram admission, AnyRAG escalation). Extending that cycle to all memory ops IS novel.
 
 **PoC result (2026-07-03):** The modelless LOG/PLAN gate produces a **50.7% write/search ratio drop** on a 1000-tick synthetic trajectory — comparable to AutoMem's 54–72% claim — with 74.0% useful-progression preservation. The consult-before-write gate is the component that produces the shift (salience + necessity gates alone produce identical metrics to the baseline). Phase 5 default-on promotion DEFENDED.
 
@@ -78,7 +78,7 @@ The distillation principle (per global AGENTS.md and the research skill): extrac
 
 ### 2.2 The modelless LOG/PLAN instantiation (the GOAT)
 
-The per-NPC tick currently runs as a **single-pass** 9-layer personality-weighted composition (`entity_cognition/mod.rs`): layers produce direction vectors → `PersonalityWeightedComposition` blends them → `DriftGate` fires on coherence change → `FreezeTrigger` snapshots when `‖Δw‖ > δ_drift`. Memory operations (shard reads/writes, KG triple emission, Engram admission, AnyRAG escalation) happen **implicitly** as side effects of layer updates and the freeze trigger. There is no explicit "what should I write to memory?" or "what should I retrieve before acting?" decision gate.
+The per-NPC tick currently runs as a **single-pass** 9-layer personality-weighted composition (`riir-ai/crates/riir-engine/src/entity_cognition/mod.rs`): layers produce direction vectors → `PersonalityWeightedComposition` blends them → `DriftGate` fires on coherence change → `FreezeTrigger` snapshots when `‖Δw‖ > δ_drift`. Memory operations (shard reads/writes, KG triple emission, Engram admission, AnyRAG escalation) happen **implicitly** as side effects of layer updates and the freeze trigger. There is no explicit "what should I write to memory?" or "what should I retrieve before acting?" decision gate.
 
 AutoMem's LOG/PLAN pattern, applied via probe/draft/pruner, makes these decisions explicit:
 
@@ -106,7 +106,7 @@ This is **not in the codebase.** The probe/draft/pruner substrate exists (`katgp
 
 | AutoMem concept | Status | Shipped equivalent |
 |-----------------|--------|--------------------|
-| File-system memory substrate | ✅ Ships | `NeuronShard` Pod + `ShardIndex` lock-free papaya (`riir-neuron-db/src/shard.rs`, `index.rs`) |
+| File-system memory substrate | ✅ Ships | `NeuronShard` Pod + `ShardIndex` lock-free papaya (`riir-neuron-db/src/shard/mod.rs`, `index.rs`) |
 | `<|UPSERT_MAP|>` coordinate-keyed dedup | ✅ Ships | `ShardIndex` papaya upsert (key → shard overwrite) |
 | Auto-synced inventory/status files | ✅ Ships | HLA raw→latent scalar bridge (5 synced affect scalars auto-derived from observation) |
 | Pre-populated strategy reference | ✅ Ships | `ZoneGeometryPod` + `LatCalEggshell` + frozen direction vectors |
@@ -156,7 +156,7 @@ The LOG/PLAN two-phase memory management decomposition, instantiated with our pr
 
 ### PoC confirmation (Plan 365 Phase 6, 2026-07-03)
 
-The quality-parity caveat below has been **resolved** by the Phase 6 PoC (`riir-engine/benches/bench_365_metamemory_poc.rs`). Three modes compared on a 1000-tick synthetic trajectory (40% engaged / 60% idle):
+The quality-parity caveat below has been **resolved** by the Phase 6 PoC (`riir-ai/crates/riir-engine/benches/bench_365_metamemory_poc.rs`). Three modes compared on a 1000-tick synthetic trajectory (40% engaged / 60% idle):
 
 | Mode | writes | searches | ratio | useless% | prog% |
 |------|--------|----------|-------|----------|-------|

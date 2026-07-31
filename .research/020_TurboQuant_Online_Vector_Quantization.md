@@ -125,7 +125,7 @@ TurboQuant achieves higher recall with **zero indexing time** vs hours for PQ/Ra
 
 Our `MultiLayerKVCache` stores f32 keys and values in growing flat arrays. For long sequences, this is the memory bottleneck. TurboQuant at 3 bits gives ~10.7× compression with near-lossless quality.
 
-Current code in `katgpt-rs/src/transformer.rs`:
+Current code in `katgpt-rs/crates/katgpt-percepta/src/transformer.rs`:
 - `MultiLayerKVCache`: flat `Vec<KVCache>` — **prime target**
 - `PagedKVCache`: page pool — TQ compresses pages for longer context
 - `RavenKVCache`: fixed slots — already conceptually compressed, less gain

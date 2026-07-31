@@ -56,15 +56,15 @@ use katgpt_types::simd::simd_sigmoid_tanh_clamp_inplace;
 /// (decision: Plan 281 T0.5).
 ///
 /// σ is per-NPC-class and freeze/thaw-able via the commitment. The paper's
-/// σ=0.02 is tuned for DINOv3 features; our [-1,1] HLA space likely needs
+/// σ=0.02 is tuned for DINOv3 features; our [-1,1] belief space likely needs
 /// σ≈0.1–0.5 (G1.2 distinctness test will catch near-identical hypotheses).
 ///
 /// # Layout
 ///
 /// Fields are ordered `k` (usize, 8B) → `sigma` (f32, 4B) → `seed_strategy`
-/// (u8, 1B) → `qmc_method` (Option<u8>, 2B) to keep the tail compact. Total:
-/// 16B (the Option<QmcMethod> fits in the padding after `seed_strategy` on
-/// 64-bit — the struct is already 8B-aligned for `k`, so the u8 + Option<u8>
+/// (u8, 1B) → `qmc_method` (`Option<u8>`, 2B) to keep the tail compact. Total:
+/// 16B (the `Option<QmcMethod>` fits in the padding after `seed_strategy` on
+/// 64-bit — the struct is already 8B-aligned for `k`, so the u8 + `Option<u8>`
 /// trio packs into the 4B tail slot).
 #[derive(Clone, Copy, Debug, serde::Serialize, serde::Deserialize)]
 pub struct NoiseQueryConfig {
@@ -417,7 +417,7 @@ impl BoMSampler for AttractorKernel {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// impl BoMSampler for LeakyIntegrator (Family C / evolve_hla family)
+// impl BoMSampler for LeakyIntegrator (Family C / evolve_belief family)
 // ─────────────────────────────────────────────────────────────────────────────
 
 use crate::leaky::LeakyIntegrator;
@@ -426,7 +426,7 @@ impl BoMSampler for LeakyIntegrator {
     /// Single-pass K-hypothesis sampling for Family C.
     ///
     /// Computes the shared normalization scalars (`total`, `scale`,
-    /// `half_total`) once — mirroring [`crate::leaky_core::leaky_step`] — then
+    /// `half_total`) once — mirroring `crate::leaky_core::leaky_step` — then
     /// perturbs the pre-clamp delta elementwise for each of K queries.
     ///
     /// # G1.3 (σ=0 degeneracy)
@@ -597,7 +597,7 @@ mod tests {
 
     #[test]
     fn bom_distinct_hypotheses() {
-        // sigma=0.3 for [-1,1] HLA space (paper's 0.02 is for DINOv3 features
+        // sigma=0.3 for [-1,1] belief space (paper's 0.02 is for DINOv3 features
         // and produces near-identical hypotheses — R3 calibration signal).
         let kernel = AttractorKernel::from_seed(42, 32);
         let dim = 32;
@@ -671,7 +671,7 @@ mod tests {
 
     #[test]
     fn bom_sigma_zero_matches_step_leaky() {
-        let kernel = LeakyIntegrator::hla_default(32);
+        let kernel = LeakyIntegrator::belief_default(32);
         let dim = 32;
         let k = 8;
         let cfg = NoiseQueryConfig::default().with_k(k);
@@ -703,7 +703,7 @@ mod tests {
     fn bom_sigma_zero_matches_step_leaky_zero_total() {
         // Edge case: zero-total input → step() is a no-op; sample_k_states
         // must copy s_prev into every row.
-        let kernel = LeakyIntegrator::hla_default(8);
+        let kernel = LeakyIntegrator::belief_default(8);
         let dim = 8;
         let k = 4;
         let cfg = NoiseQueryConfig::default().with_k(k);
@@ -754,7 +754,7 @@ mod tests {
 
     #[test]
     fn bom_leaky_state_stays_bounded() {
-        let kernel = LeakyIntegrator::hla_default(32);
+        let kernel = LeakyIntegrator::belief_default(32);
         let dim = 32;
         let k = 8;
         let cfg = NoiseQueryConfig::default().with_k(k).with_sigma(0.3);
@@ -813,7 +813,7 @@ mod tests {
     #[test]
     fn select_best_leaky_works() {
         // Verify select_best also works through the LeakyIntegrator impl.
-        let kernel = LeakyIntegrator::hla_default(4);
+        let kernel = LeakyIntegrator::belief_default(4);
         let dim = 4;
         let hypotheses: Vec<f32> = vec![
             0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0, // max norm
@@ -912,7 +912,7 @@ mod tests {
     fn bom_coherence_1000_ticks_bounded_leaky() {
         // Family C is always stable by construction (clamp to [-1,1]); this
         // test documents that property holds under BoM perturbation too.
-        let kernel = LeakyIntegrator::hla_default(32);
+        let kernel = LeakyIntegrator::belief_default(32);
         let dim = 32;
         let k = 8;
         let cfg = NoiseQueryConfig::default().with_k(k).with_sigma(0.3);
@@ -942,7 +942,7 @@ mod tests {
 
     #[test]
     fn bom_leaky_distinct_hypotheses() {
-        let kernel = LeakyIntegrator::hla_default(8);
+        let kernel = LeakyIntegrator::belief_default(8);
         let dim = 8;
         let k = 8;
         let cfg = NoiseQueryConfig::default().with_k(k).with_sigma(0.3);

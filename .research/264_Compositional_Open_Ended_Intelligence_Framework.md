@@ -5,7 +5,7 @@
 > **Status:** Active
 > **Related Research:** 172 (MUSE skill lifecycle), 191 (Prism capability substrate), 211 (Bayesian posterior skill evolution), 171 (FrontierCS open-ended arena), 116 (LLM sleep consolidation), 240 (SGS self-play), 194 (CaDDTree)
 > **Related Plans:** 215 (Regime-Transition w/ MDL gate), 274 (CGSP self-play), 282 (Dual-Pool CGSP), 191 (Open-ended arena), 094 (TIES merging)
-> **Cross-ref (riir-ai):** Research 059 (MUSE validators), Plan 299 (NPC curiosity runtime), `cgsp_runtime/cross_game_transfer.rs` (TaR — exact paper primitive already shipped)
+> **Cross-ref (riir-ai):** Research 059 (MUSE validators), Plan 299 (NPC curiosity runtime), `riir-ai/crates/riir-engine/src/cgsp_runtime/cross_game_transfer.rs` (TaR — exact paper primitive already shipped)
 > **Classification:** Public
 
 ---
@@ -85,16 +85,16 @@ This is the most important section. **A naïve direct-map of this paper would cr
 
 | Paper Concept | Shipped Cousin | Location | Status |
 |---------------|----------------|----------|--------|
-| **Algorithmic primitive** `p ∈ P` (minimal reusable unit) | `ConstraintPruner` trait (arm in BanditPruner) + `SkillSpec` (civ) + WASM validator + LoRA adapter | `katgpt-rs/src/pruners/mod.rs`, `riir-games/src/civ/skill.rs`, `riir-engine/src/adapters/` | ✅ Multiple |
-| **Composition operators `C`** (sequence/branch/recurse, type-safe) | `lattice_operad/composed_pruner.rs` (operadic AND/OR composition), `TIES merge` (task vector sign election + disjoint merge) | `katgpt-rs/src/lattice_operad/`, `katgpt-rs/.plans/094_*.md` | ✅ Production |
+| **Algorithmic primitive** `p ∈ P` (minimal reusable unit) | `ConstraintPruner` trait (arm in BanditPruner) + `SkillSpec` (civ) + WASM validator + LoRA adapter | `katgpt-rs/src/pruners/mod.rs`, `seal-online-remaster/crates/seal-edge-worker/src/persistence/skill.rs`, `riir-engine/src/adapters/` | ✅ Multiple |
+| **Composition operators `C`** (sequence/branch/recurse, type-safe) | `crates/katgpt-pruners/src/lattice_operad/composed_pruner.rs` (operadic AND/OR composition), `TIES merge` (task vector sign election + disjoint merge) | `katgpt-rs/src/lattice_operad/`, `katgpt-rs/.plans/094_*.md` | ✅ Production |
 | **Parsimony / MDL admission gate** | `RegimeTransitionGate::evaluate()` — accept iff `DL_new < DL_old - AdmissionCost` (default 32 bits/pruner) | `katgpt-rs/.plans/215_regime_transition_inference.md` T2 | ✅ **DEFAULT ON**, GOAT 8/8 |
 | **Discovery as vocabulary change** (regime collapse → new primitive admission) | `RegimeCollapseClassifier` → `Discovery` regime in Four-Regime Router | Plan 215 T1 + T5 | ✅ Shipped |
 | **Transfer-as-Recomposition (TaR)** across worlds | `AnchorProfile` (8-axis game-agnostic personality vocabulary) + `translate_priorities(source, target)` — pivots priorities through 8 canonical anchors, rebinds same personality to different game | `riir-ai/crates/riir-engine/src/cgsp_runtime/cross_game_transfer.rs` | ✅ **Super-GOAT private moat** (already classified PRIVATE, do not duplicate) |
 | **Self-play in imagined worlds** (counterfactual neighborhood expansion) | `CgspLoop` + `DualPoolBandit` (E-pool successes + X-pool fresh candidates) + `ProblemMutator` trait | `katgpt-rs/crates/katgpt-core/src/cgsp/`, Plan 274/282, Plan 191 | ✅ Production |
 | **Skill lifecycle** (create → memory → manage → eval → refine) | `skill_lifecycle` feature in `AbsorbCompress` + `BanditPruner` + `SkillCatalog` + `BomberTestGate` | `katgpt-rs/src/pruners/skill_*.rs`, `katgpt-rs/src/pruners/bomber/skill_lifecycle_player.rs` | ✅ Production |
-| **Vector-based primitive steering** (function vectors, persona vectors) | `EmotionDirections` (valence/arousal/desperation/calm direction vectors), CNA Steering (Plan 087), SubstrateGate (Plan 216), Sparse Off-Principal Task Vector (Plan 264) | `katgpt-rs/src/pruners/emotion_vector.rs`, Plan 087/216/264 | ✅ Multiple |
+| **Vector-based primitive steering** (function vectors, persona vectors) | `EmotionDirections` (valence/arousal/desperation/calm direction vectors), CNA Steering (Plan 087), SubstrateGate (Plan 216), Sparse Off-Principal Task Vector (Plan 264) | `katgpt-rs/crates/katgpt-pruners/src/emotion_vector.rs`, Plan 087/216/264 | ✅ Multiple |
 | **Collective compositionality** (primitives portable across agents) | `KnowledgePayload { skill_id, confidence, cross_zone }` in civ signals + distillation-to-server pipeline | `riir-games/src/civ/{node_sync,signal,skill}.rs` | ✅ Production |
-| **Verification primitives** (proof-gated admission) | WASM validator + `PrunerTestGate::run()` before bandit promotion | `katgpt-rs/src/pruners/skill_test.rs`, riir-ai validator pipeline | ✅ Production |
+| **Verification primitives** (proof-gated admission) | WASM validator + `PrunerTestGate::run()` before bandit promotion | `katgpt-rs/crates/katgpt-pruners/src/skill_test.rs`, riir-ai validator pipeline | ✅ Production |
 | **Provenance chain / replay** | `ProvenanceChain` (BLAKE3-hashed) + Kan-transport replay on regime change | Plan 215 T3 | ✅ Shipped |
 
 **The single most important prior-art hit:** the paper's central *runtime* mechanism — "discover new primitives when current set cannot express the answer, admit through MDL gate, replay provenance through new vocabulary" — is **Plan 215's exact architecture**, shipped and GOAT-proved 8/8 + 4/4 real, under the names "Regime-Transition", "MDL gate", "AdmissionCost", "vocabulary change", "RegimeCollapseClassifier", "ProvenanceChain", "Kan-transport". The paper provides the *theoretical framing*; we have the *implementation*.
@@ -138,7 +138,7 @@ This is a **measurement + explainability** layer, not a new capability class. So
 
 **GOAT — Closure-Expansion Instrument (CEI) is a provable-gain measurement + data-structure layer, not a new capability class.**
 
-**One-line reasoning:** The paper's *capability-class* contributions are (a) MDL-gated primitive admission → **already shipped as Plan 215 (DEFAULT ON, GOAT 8/8)**, (b) Transfer-as-Recomposition → **already shipped as private Super-GOAT `AnchorProfile` in `cgsp_runtime/cross_game_transfer.rs`**, (c) Next Primitive Prediction → **training paradigm → riir-train**. What remains genuinely novel — PTG as runtime data structure, motif mining + promotion, closure-expansion metrics (PRI/CDG/TaR) — is *measurement and data-structure* layering over what we already ship. Provably useful for explainability, transfer-quality scoring, and "open-endedness" as a selling-point metric, but does not unlock a new capability the existing stack cannot do.
+**One-line reasoning:** The paper's *capability-class* contributions are (a) MDL-gated primitive admission → **already shipped as Plan 215 (DEFAULT ON, GOAT 8/8)**, (b) Transfer-as-Recomposition → **already shipped as private Super-GOAT `AnchorProfile` in `riir-ai/crates/riir-engine/src/cgsp_runtime/cross_game_transfer.rs`**, (c) Next Primitive Prediction → **training paradigm → riir-train**. What remains genuinely novel — PTG as runtime data structure, motif mining + promotion, closure-expansion metrics (PRI/CDG/TaR) — is *measurement and data-structure* layering over what we already ship. Provably useful for explainability, transfer-quality scoring, and "open-endedness" as a selling-point metric, but does not unlock a new capability the existing stack cannot do.
 
 ### 3.1 Novelty gate (§1.5 of skill protocol)
 
@@ -162,7 +162,7 @@ The paper itself names the missing pieces explicitly (PTG, motif mining, PRI/CDG
 | Research note (this file) | `katgpt-rs/.research/264_*.md` | ✅ Created |
 | Plan: Closure-Expansion Instrument | `katgpt-rs/.plans/` | ✅ Will create as Plan 286 (next free slot) |
 | Open primitive: PTG data structure + motif miner + PRI/CDG/TaR metrics | `katgpt-rs/crates/katgpt-core/src/closure/` | Plan phase 1–4 |
-| riir-ai guide | — | **NOT created** (verdict ≠ Super-GOAT; the private selling-point doc for AnchorProfile already exists in `cgsp_runtime/cross_game_transfer.rs` doc comments) |
+| riir-ai guide | — | **NOT created** (verdict ≠ Super-GOAT; the private selling-point doc for AnchorProfile already exists in `riir-ai/crates/riir-engine/src/cgsp_runtime/cross_game_transfer.rs` doc comments) |
 | riir-train routing | `riir-train/.research/` | NPP training objective → "note redirect to riir-train", do not create in this session |
 
 ---

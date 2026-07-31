@@ -437,6 +437,28 @@ pub fn waterfill_bits(
     let mut bits = vec![min_bits; d];
     let mut allocated = d * min_bits as usize;
 
+    // Precompute 4^k for k in 0..=16 — exact in f64 (4^16 = 2^32 < 2^53).
+    // Bit widths in practice are ≤ 8; the LUT covers up to 16 with fallback
+    // beyond that. Replaces ~10-15 cycle `powi` calls with a single indexed
+    // read in the inner loop.
+    const POW4_LUT: [f64; 17] = {
+        let mut lut = [1.0f64; 17]; // lut[0] = 4^0 = 1
+        let mut i = 1;
+        while i < lut.len() {
+            lut[i] = lut[i - 1] * 4.0;
+            i += 1;
+        }
+        lut
+    };
+    #[inline]
+    fn pow4(k: u32) -> f64 {
+        if (k as usize) < POW4_LUT.len() {
+            POW4_LUT[k as usize]
+        } else {
+            4f64.powi(k as i32)
+        }
+    }
+
     while allocated < total_bits {
         // Find dim with highest marginal gain
         let mut best_idx = 0;
@@ -448,7 +470,7 @@ pub fn waterfill_bits(
             {
                 continue;
             }
-            let gain = ev / 4_f64.powi(bits[i] as i32 + 1);
+            let gain = ev / pow4(bits[i] as u32 + 1);
             if gain > best_gain || (gain == best_gain && i < best_idx) {
                 best_gain = gain;
                 best_idx = i;
@@ -467,10 +489,27 @@ pub fn waterfill_bits(
 /// Per-dim marginal gain: λ_i / 4^b_i.
 /// Exposed for diagnostics and testing.
 pub fn marginal_gain(eigenvalues: &[f64], bits: &[u8]) -> Vec<f64> {
+    const POW4_LUT: [f64; 17] = {
+        let mut lut = [1.0f64; 17]; // lut[0] = 4^0 = 1
+        let mut i = 1;
+        while i < lut.len() {
+            lut[i] = lut[i - 1] * 4.0;
+            i += 1;
+        }
+        lut
+    };
+    #[inline]
+    fn pow4(k: u32) -> f64 {
+        if (k as usize) < POW4_LUT.len() {
+            POW4_LUT[k as usize]
+        } else {
+            4f64.powi(k as i32)
+        }
+    }
     eigenvalues
         .iter()
         .zip(bits.iter())
-        .map(|(&ev, &b)| ev / 4_f64.powi(b as i32))
+        .map(|(&ev, &b)| ev / pow4(b as u32))
         .collect()
 }
 
@@ -483,7 +522,7 @@ pub fn marginal_gain(eigenvalues: &[f64], bits: &[u8]) -> Vec<f64> {
 /// 2. Update centroids as mean of assigned samples.
 /// 3. Repeat until convergence.
 ///
-/// Field order: Option<Vec> (24B, 8-aligned) → usize/u64 scalars (8B) → f32 (4B)
+/// Field order: `Option<Vec>` (24B, 8-aligned) → usize/u64 scalars (8B) → f32 (4B)
 /// → packed u8/bool tail. Saves 16 bytes/instance vs declaration order — matters
 /// because this struct is stored in `Vec<LloydMaxQuantizer>` for per-dim
 /// semantic codebooks (water-fill path).
@@ -676,6 +715,21 @@ impl LloydMaxQuantizer {
             .collect()
     }
 
+    /// Scalar quantize: single value → single index.
+    ///
+    /// Zero-allocation alternative to `quantize(&[v])[0]` for per-element hot
+    /// paths (e.g. `NonUniformQuantizer::compress`). Reuses the same sorted-
+    /// centroid binary search as the batch path — O(log n_levels).
+    ///
+    /// # Panics
+    ///
+    /// Panics if not fitted.
+    #[inline]
+    pub fn quantize_one(&self, v: f32) -> u32 {
+        let centroids = self.centroids.as_ref().expect("not fitted");
+        self.nearest_centroid(v, centroids) as u32
+    }
+
     /// Dequantize indices back to centroid values.
     ///
     /// # Panics
@@ -687,6 +741,20 @@ impl LloydMaxQuantizer {
             .iter()
             .map(|&idx| centroids.get(idx as usize).copied().unwrap_or(0.0))
             .collect()
+    }
+
+    /// Scalar dequantize: single index → single centroid value.
+    ///
+    /// Zero-allocation alternative to `dequantize(&[idx])[0]` for per-element
+    /// hot paths (e.g. `NonUniformQuantizer::decompress`). O(1) indexed read.
+    ///
+    /// # Panics
+    ///
+    /// Panics if not fitted.
+    #[inline]
+    pub fn dequantize_one(&self, idx: u32) -> f32 {
+        let centroids = self.centroids.as_ref().expect("not fitted");
+        centroids.get(idx as usize).copied().unwrap_or(0.0)
     }
 
     /// Get fitted centroids.
@@ -741,7 +809,12 @@ pub fn generate_selective_qjl_signs(qjl_dim: usize, d_eff: usize, seed: u64) -> 
     let mut rng = katgpt_core::types::Rng::new(seed);
     let mut signs = Vec::with_capacity(qjl_dim * d_eff);
     for _ in 0..(qjl_dim * d_eff) {
-        signs.push(if rng.next() & 1 == 0 { -1.0f32 } else { 1.0f32 });
+        // Branchless Rademacher ±1: 0→-1, 1→+1. Same distribution, same
+        // RNG sequence as the if/else version — just no per-element branch
+        // (helps auto-vec and is friendlier to the branch predictor when
+        // the RNG alternates unpredictably).
+        let bit = (rng.next() & 1) as f32;
+        signs.push(2.0 * bit - 1.0);
     }
     signs
 }

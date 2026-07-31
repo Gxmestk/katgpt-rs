@@ -10,11 +10,11 @@ use crate::transformer::{
     ForwardContext, MultiLayerKVCache, PagedKVCache, RavenKVCache, TransformerWeights, forward,
     forward_paged, forward_raven, raven_readout, raven_update,
 };
-#[cfg(feature = "turboquant")]
-use katgpt_quant::turboquant::TurboQuantKVCache;
 #[cfg(any(feature = "turboquant", feature = "hla_attention"))]
 use crate::types::kv_dim;
 use crate::types::{Config, Rng};
+#[cfg(feature = "turboquant")]
+use katgpt_quant::turboquant::TurboQuantKVCache;
 use std::time::Instant;
 
 pub fn bench_prefill_compression(

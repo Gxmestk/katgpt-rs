@@ -24,7 +24,7 @@ blocked on "root-only types" (`SpeculativeContext`) and `forward_decode_stage`.
    (katgpt-forward), which already hosts `ForwardContext`.
 
 2. **`forward_decode_stage`** + `forward_draft` + `forward_verify`
-   (root `src/transformer.rs:222-308`, ~87 LOC) are **fully leaf-dependent**.
+   (root `crates/katgpt-percepta/src/transformer.rs:222-308`, ~87 LOC) are **fully leaf-dependent**.
    They dispatch to `forward_base` (already in katgpt-forward since Plan 385)
    and use `DecodeStage` (katgpt-transformer). They can move to katgpt-forward's
    `forward.rs`.
@@ -77,7 +77,7 @@ Same cadence as Plans 391→392: substrate first (Plan 393), wrappers next
       (gated to avoid unused warning under default features).
 - [x] T2.3 Added `decode_specialize` feature to katgpt-forward Cargo.toml
       (forwards to katgpt-transformer + katgpt-pruners, matching root)
-- [x] T2.4 Root `src/transformer.rs`: deleted 3 functions (~94 LOC), replaced
+- [x] T2.4 Root `crates/katgpt-percepta/src/transformer.rs`: deleted 3 functions (~94 LOC), replaced
       with `#[cfg(feature = "decode_specialize")] pub use
       katgpt_forward::forward::forward_decode_stage;`
 - [x] T2.5 Root Cargo.toml: added `"katgpt-forward/decode_specialize"` to root's
@@ -112,7 +112,7 @@ Same cadence as Plans 391→392: substrate first (Plan 393), wrappers next
 | File | Plan 392 end | Plan 393 end | Delta |
 |---|---:|---:|---:|
 | `src/speculative/types.rs` | 609 | 467 | -142 (-23%)
-| `src/transformer.rs` | 5697 | 5615 | -82 (-1.4%)
+| `crates/katgpt-percepta/src/transformer.rs` | 5697 | 5615 | -82 (-1.4%)
 | `crates/katgpt-forward/src/speculative_context.rs` | 0 | 165 | +165 (new)
 | `crates/katgpt-forward/src/forward.rs` | 1097 | 1206 | +109
 | `crates/katgpt-forward/src/lib.rs` | 454 | 464 | +10 |
@@ -126,7 +126,7 @@ forward-cycle cluster (~6K LOC) root-bound.
 | File | Before | After (actual) | Delta |
 |---|---:|---:|---:|
 | `src/speculative/types.rs` | 609 | 467 | -142 LOC (-23%). SpeculativeContext struct+impl removed; re-export shim added. |
-| `src/transformer.rs` | 5697 | 5615 | -82 LOC (-1.4%). forward_decode_stage + forward_draft + forward_verify removed; re-export shim added. |
+| `crates/katgpt-percepta/src/transformer.rs` | 5697 | 5615 | -82 LOC (-1.4%). forward_decode_stage + forward_draft + forward_verify removed; re-export shim added. |
 | `crates/katgpt-forward/src/speculative_context.rs` | 0 | 165 | +165 LOC (new file: struct + impl). |
 | `crates/katgpt-forward/src/forward.rs` | 1097 | 1206 | +109 LOC (3 functions + DecodeStage import). |
 
@@ -137,7 +137,7 @@ forward-cycle cluster (~6K LOC) root-bound.
 | `crate::transformer::{ForwardContext, ...}` | `crate::{ForwardContext, ...}` (ForwardContext already in katgpt-forward) |
 | `crate::transformer::{MultiLayerKVCache, TransformerWeights}` | `katgpt_transformer::{MultiLayerKVCache, TransformerWeights}` |
 | `crate::types::Config` | `katgpt_types::Config` |
-| `super::types::SdeConfig` (from speculative/types.rs) | `katgpt_core::speculative::types::SdeConfig` |
+| `super::types::SdeConfig` (from crates/katgpt-core/src/speculative/types.rs) | `katgpt_core::speculative::types::SdeConfig` |
 | `crate::transformer::forward_base` (in forward_decode_stage) | `crate::forward::forward_base` (same crate, forward submodule) |
 
 ## GOAT Gate

@@ -241,9 +241,11 @@ fn main() {
 
     // ── Promotion gate reminder ──
     println!("  ── Promotion status ──");
-    println!("    Phase 5 (default-on promotion) is BLOCKED on riir-ai Plan 313 G6");
-    println!("    quality-parity PoC. This bench does NOT promote; it only verifies");
-    println!("    the gate-overhead budget (G4) for the opt-in primitive.");
+    println!("    PROMOTED TO DEFAULT-ON 2026-07-06 (Plan 381 Phase 5, katgpt-rs root");
+    println!("    Cargo.toml L540). G2 quality-parity verified via riir-ai Plan 313");
+    println!("    Phase 5 G6 PoC (81.6% drift reduction, 895/1000 rollbacks). This");
+    println!("    bench measures the G4 gate-overhead budget (13ns @ W=64, 76.9×");
+    println!("    under 1µs target); a regression here would warrant re-audit.");
     println!();
 
     if !g4_pass {

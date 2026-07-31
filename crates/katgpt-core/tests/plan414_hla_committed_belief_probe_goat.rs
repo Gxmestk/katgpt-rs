@@ -77,13 +77,12 @@ fn g4_zero_alloc() {
 
     // Warmup (1 call — any one-time init).
     let mut warmup_rng = fastrand::Rng::with_seed(0);
-    let _ = committed_blend_pi_sensitivity::<3, 32, 32>(&blend, &fields, &z, 0.01, 8, &mut warmup_rng);
+    let _ =
+        committed_blend_pi_sensitivity::<3, 32, 32>(&blend, &fields, &z, 0.01, 8, &mut warmup_rng);
 
     let before = ALLOC_COUNT.load(Ordering::SeqCst);
     for _ in 0..1000 {
-        let _ = committed_blend_pi_sensitivity::<3, 32, 32>(
-            &blend, &fields, &z, 0.01, 8, &mut rng,
-        );
+        let _ = committed_blend_pi_sensitivity::<3, 32, 32>(&blend, &fields, &z, 0.01, 8, &mut rng);
     }
     let after = ALLOC_COUNT.load(Ordering::SeqCst);
     let allocs = after - before;
@@ -110,9 +109,7 @@ fn g5_latency_under_5us_p50() {
 
     for latency in latencies_ns.iter_mut() {
         let start = Instant::now();
-        let _ = committed_blend_pi_sensitivity::<3, 32, 32>(
-            &blend, &fields, &z, 0.01, 8, &mut rng,
-        );
+        let _ = committed_blend_pi_sensitivity::<3, 32, 32>(&blend, &fields, &z, 0.01, 8, &mut rng);
         *latency = start.elapsed().as_nanos() as u64;
     }
 

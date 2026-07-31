@@ -17,32 +17,32 @@ Implement the modelless Speculative Reconciliation Engine. This is the core infe
 ## Task
 
 - [x] **T1: Core Types** — `TrajectoryPoint` (fixed-layout `[f32; 8]`), `ReconciliationVerdict` enum (Accept/Quarantine/Uncertain), `ReconciliationConfig` (thresholds, K, max_speed, map_bounds). All `#[repr(C)]`, zero heap.
-  - File: `katgpt-rs/src/spec_reconciliation/types.rs`
+  - File: `katgpt-rs/crates/katgpt-speculative/src/spec_reconciliation/types.rs`
   - Test: unit test for TrajectoryPoint construction, Verdict Debug/Clone
 
 - [x] **T2: `ReconciliationPruner`** — Implements `ConstraintPruner`. Hard bounds: velocity (max_speed × dt), position (map_bounds), kill_rate (Chebyshev 5σ). Returns `bool`.
-  - File: `katgpt-rs/src/spec_reconciliation/reconciliation_pruner.rs`
+  - File: `katgpt-rs/crates/katgpt-speculative/src/spec_reconciliation/reconciliation_pruner.rs`
   - Reuses: `ConstraintPruner` trait from `katgpt-core`
   - Test: G1 (velocity invariant), G2 (position invariant), G3 (kill-rate bound)
 
 - [x] **T3: `ManifoldGenerator` trait** — `fn generate(h_last, q_goals, K, dt, rng) -> [TrajectoryPoint; K]`. Default impl: LEO-weighted goal sampling + physics + Gaussian noise. No neural forward pass.
-  - File: `katgpt-rs/src/spec_reconciliation/manifold.rs`
+  - File: `katgpt-rs/crates/katgpt-speculative/src/spec_reconciliation/manifold.rs`
   - Reuses: `LeoHead` trait for Q-values, HLA hidden state format
   - Test: verify K=16 trajectories generated, verify σ grows with dt, verify goals sampled from LEO
 
 - [x] **T4: `ManifoldScorer`** — Implements `ScreeningPruner`. Computes `max_j(cosine_sim(T_client, T_spec[j]))`. SIMD-optimized cosine similarity.
-  - File: `katgpt-rs/src/spec_reconciliation/manifold_scorer.rs`
+  - File: `katgpt-rs/crates/katgpt-speculative/src/spec_reconciliation/manifold_scorer.rs`
   - Reuses: `ScreeningPruner` trait from `katgpt-core`, existing SIMD cosine similarity
   - Test: known vector pairs → expected similarity scores
 
 - [x] **T5: `SpecReconciler`** — Orchestrates T2-T4. Implements `SpeculativeVerifier` adapted for trajectories. Pipeline: hard bounds → manifold generation → soft scoring → verdict.
-  - File: `katgpt-rs/src/spec_reconciliation/reconciler.rs`
+  - File: `katgpt-rs/crates/katgpt-speculative/src/spec_reconciliation/reconciler.rs`
   - Reuses: `SpeculativeVerifier` trait pattern
   - Test: end-to-end with legitimate trajectory → Accept, hack trajectory → Quarantine
 
 - [x] **T6: `AdaptiveReconciler`** — Wraps `SpecReconciler` with `BanditPruner<ManifoldScorer>` for per-player threshold learning. Uses `ThinkingBandit` freeze/thaw for persistence across sessions.
-  - File: `katgpt-rs/src/spec_reconciliation/adaptive.rs`
-  - Reuses: `BanditPruner` from `katgpt-rs/src/pruners/bandit.rs`, `ThinkingBanditFrozen` from Plan 194
+  - File: `katgpt-rs/crates/katgpt-speculative/src/spec_reconciliation/adaptive.rs`
+  - Reuses: `BanditPruner` from `katgpt-rs/crates/katgpt-ruliology/src/bandit.rs`, `ThinkingBanditFrozen` from Plan 194
   - Test: simulate 100 reconciliations, verify bandit converges to optimal threshold
 
 - [x] **T7: GOAT Proof Suite** — 8 formal verification gates (G1-G8 from Research 156 §5.1).
@@ -57,7 +57,7 @@ Implement the modelless Speculative Reconciliation Engine. This is the core infe
   - G8: matrix soundness (determinant audit on all accepted merges)
 
 - [x] **T8: Feature Gate + Module Wiring** — `spec_reconciliation` feature gate in `katgpt-rs/Cargo.toml`. Module public API. Zero impact when disabled.
-  - File: `katgpt-rs/src/spec_reconciliation/mod.rs`, `katgpt-rs/Cargo.toml`
+  - File: `katgpt-rs/crates/katgpt-speculative/src/spec_reconciliation/mod.rs`, `katgpt-rs/Cargo.toml`
   - Test: `cargo build` without feature → no compilation. `cargo build --features spec_reconciliation` → compiles.
 
 - [x] **T9: Example Demo** — Interactive demo showing reconciliation of 4 scenarios: legitimate play, teleport hack, kill-rate hack, direction mismatch.

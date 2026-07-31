@@ -31,7 +31,7 @@ This is the **generic** (MIT) implementation. Game-specific delay configs (per-g
 
 ### Phase 1: Core Types (Modelless)
 
-- [x] T1: Add `BanditStrategy::SafePhased` variant to `src/pruners/bandit.rs`
+- [x] T1: Add `BanditStrategy::SafePhased` variant to `crates/katgpt-ruliology/src/bandit.rs`
   ```rust
   /// Phased aggression with safe baseline mixture (PrudentBanker-inspired).
   ///

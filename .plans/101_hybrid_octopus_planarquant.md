@@ -349,10 +349,10 @@ Production Stack (after GOAT 024):
 ## References
 
 - Plan 100 results: `.benchmarks/023_block_diagonal_goat.md`
-- OCTOPUS encoding: `src/octopus/encode.rs`
-- OCTOPUS KV cache: `src/octopus/kv_cache.rs`
-- PlanarQuant rotation: `src/planar_quant/rotation.rs`
-- PlanarQuant KV cache: `src/planar_quant/kv_cache.rs`
+- OCTOPUS encoding: `crates/katgpt-quant/src/octopus/encode.rs`
+- OCTOPUS KV cache: `crates/katgpt-quant/src/octopus/kv_cache.rs`
+- PlanarQuant rotation: `crates/katgpt-quant/src/planar_quant/rotation.rs`
+- PlanarQuant KV cache: `crates/katgpt-quant/src/planar_quant/kv_cache.rs`
 - GOAT MaxSim test: `tests/bench_block_diagonal_goat.rs::goat_maxsim_late_interaction`
 - RotorQuant paper: https://www.scrya.com/rotorquant.pdf
 - TurboQuant: https://arxiv.org/abs/2504.19874 (ICLR 2026)

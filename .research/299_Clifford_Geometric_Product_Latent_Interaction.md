@@ -3,9 +3,11 @@
 > **Source:** [CliffordNet: All You Need is Geometric Algebra](https://arxiv.org/abs/2601.06793) — Zhongping Ji, arXiv:2601.06793v2, Feb 2026
 > **Date:** 2026-06-25
 > **Status:** Active
-> **Related Research:** 219 (DEC parent), 296 (Stokes/DEC vocabulary crosswalk), 065 (RotorQuant — Clifford rotors for quantization), 020 (OFT — skew-symmetric Cayley, riir-ai), 024 (Neuro-Symbolic Chain — skew-symmetric role embeddings, riir-ai)
+> **Related Research:** 219 (DEC parent), 296 (Stokes/DEC vocabulary crosswalk), 065 (RotorQuant — Clifford rotors for quantization), 020 (OFT — skew-symmetric Cayley, riir-ai), 024 (Neuro-Symbolic Chain — skew-symmetric role embeddings, riir-ai), 458 (TropicalGeometricProduct PASS — see below)
 > **Related Plans:** 251 (DEC operators), 314 (Stokes wrappers), 318 (latent functor rank-k — first-order cross-product), 214 (LinOSS symplectic, riir-ai), 319 (this primitive — new)
 > **Classification:** Public
+>
+> **PASS-Redirects (synthesis, added 2026-07-25):** Research 458 §1.4 (TropicalGeometricProduct) — evaluated `max_s W_s[u,v]` (max-plus accumulation across spectral shifts of the wedge) as a potential tropical lift of this primitive. PASS: the wedge is anti-symmetric in (u,v), so replacing `Σ_s W_s[c]` with `max_s W_s[c]` is (a) information-lossy (sign cancellations destroyed), (b) non-invertible (max+anti-symmetric breaks the rotor algebra property that downstream consumers may rely on), and (c) already achievable by the consumer calling `geometric_product_wedge_into` per-shift and taking their own max if bottleneck-wedge is needed. No new primitive shipped.
 
 ---
 
@@ -236,7 +238,7 @@ The original absolute latency targets (D=8 < 50ns, D=64 < 200ns) were **structur
   - `riir-ai/.research/156_clifford_wedge_npc_emotional_complementarity_guide.md` (HLA fusion selling point — file number corrected 155→156 due to collision)
   - `riir-neuron-db/.research/008_shard_structural_retrieval_guide.md` (shard retrieval selling point — file number corrected 007→008 due to collision)
   - `riir-ai/crates/riir-engine/src/cgsp_runtime/clifford_bridge.rs` (complementarity → Sociability CGSP target, `clifford_complementarity` feature, commit `0bb4b617`)
-  - `riir-neuron-db/src/index.rs::retrieve_diverse` (greedy max-wedge-span ensemble, `diverse_retrieval` feature, commit `33e960e`)
+  - `seal-online-remaster/crates/seal-asset-explorer/src/index.rs::retrieve_diverse` (greedy max-wedge-span ensemble, `diverse_retrieval` feature, commit `33e960e`)
 
 ### What stays public vs private (if elevated to Super-GOAT later)
 

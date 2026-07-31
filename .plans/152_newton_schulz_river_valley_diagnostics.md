@@ -42,7 +42,7 @@ Newton-Schulz is a standard matrix operation. River-valley diagnostics are analy
 
 - [x] ### T1: Newton-Schulz Orthogonalization (feature: `newton_schulz`)
 
-**File:** `src/newton_schulz.rs`
+**File:** `crates/katgpt-core/src/newton_schulz.rs`
 
 Implement the 5-iteration Newton-Schulz algorithm for computing the nearest orthogonal matrix:
 
@@ -68,7 +68,7 @@ pub fn newton_schulz5(g: &[f32], rows: usize, cols: usize, out: &mut [f32])
 
 - [x] ### T2: River-Valley Diagnostic Metrics (feature: `river_valley`)
 
-**File:** `src/river_valley.rs`
+**File:** `crates/katgpt-spectral/src/river_valley.rs`
 
 ```rust
 /// Compute dominant/bulk subspace alignment ratios.
@@ -95,7 +95,7 @@ pub fn update_cosine_similarity(updates: &[[f32; D]]) -> f32
 
 - [x] ### T3: Muon Momentum Buffer (feature: `newton_schulz`)
 
-**File:** `src/newton_schulz.rs` (extend T1)
+**File:** `crates/katgpt-core/src/newton_schulz.rs` (extend T1)
 
 ```rust
 /// Muon-style momentum + orthogonalization step.
@@ -117,7 +117,7 @@ pub fn muon_update(
 
 - [x] ### T4: Wire into D2F Training (feature: `newton_schulz`)
 
-**File:** `src/dllm.rs`
+**File:** `riir-ai/crates/riir-engine/src/transformer/dllm.rs`
 
 Replace the `sgd_update` in D2F mini training with a Muon-style update for matrix parameters, keeping SGD for scalar parameters. This validates that Newton-Schulz works in our training loop.
 

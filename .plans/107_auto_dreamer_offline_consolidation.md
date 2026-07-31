@@ -71,7 +71,7 @@ Episode k completes
 
 ## T1: Feature Gate + Module Scaffold
 
-**File**: `Cargo.toml`, `src/pruners/dreamer/mod.rs`
+**File**: `Cargo.toml`, `crates/katgpt-pruners/src/dreamer/mod.rs`
 
 - Add `dreamer = ["bandit"]` to `[features]`
 - Create module with `pub mod types; pub mod scheduler;` etc.
@@ -323,11 +323,11 @@ Expected:
 ## References
 
 - Auto-Dreamer paper: arXiv:2605.20616
-- Existing `AbsorbCompress`: `src/pruners/absorb_compress.rs`
-- Existing `DeltaMemoryState`: `src/pruners/delta_mem/state.rs`
-- Existing Freeze/Thaw: `src/pruners/freeze.rs`
+- Existing `AbsorbCompress`: `crates/katgpt-pruners/src/absorb_compress.rs`
+- Existing `DeltaMemoryState`: `crates/katgpt-core/src/delta_mem/state.rs`
+- Existing Freeze/Thaw: `crates/katgpt-pruners/src/freeze.rs`
 - G-Zero self-play: `src/pruners/g_zero/`
-- MeMo Reflections: `src/pruners/reflection.rs`
+- MeMo Reflections: `crates/katgpt-pruners/src/reflection.rs`
 
 ✅ GOAT 8/8 proved: `tests/goat_107_dreamer.rs` — config presets, cadence trigger, min-visits+cap, snapshot alignment, sorted output, coverage, region exempt, counterfactual pipeline
 ✅ Dreamer GOAT proof: `tests/dreamer_goat.rs` (5 proofs, runs by default) — 2 generic + 3 Go-scale (81→57 arms, strategic preserved, monotonic consolidation)
