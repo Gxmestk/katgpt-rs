@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0](https://github.com/katopz/katgpt-rs/compare/katgpt-sense-v0.1.1...katgpt-sense-v0.2.0) - 2026-07-31
+
+### Other
+
+- rename per-NPC 'HLA' → 'belief' across katgpt-rs (Issue 195)
+- *(sense)* micro-optimizations in octree + schema_centroid
+- *(simd)* adopt fast_exp in katgpt-sense reconstruction
+- fix all 504 cargo doc warnings in remaining workspace crates
+- hoist allocations out of hot loops, eliminate redundant Vec in topo sort
+
 ## [0.1.1](https://github.com/katopz/katgpt-rs/compare/katgpt-sense-v0.1.0...katgpt-sense-v0.1.1) - 2026-07-11
 
 ### Fixed

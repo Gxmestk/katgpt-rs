@@ -7,6 +7,241 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0](https://github.com/katopz/katgpt-rs/compare/katgpt-core-v0.3.1...katgpt-core-v0.4.0) - 2026-07-31
+
+### Added
+
+- *(latent_confounder_audit)* ship CD-LAM §III-B diagnostic primitive (Issue 194)
+- *(katgpt-core/inversion)* ship Phase 4 robustness tests — Theorem 3.2 verification
+- *(katgpt-core/inversion)* ship Phase 3 GOAT bench — G2 latency + G4 alloc-free
+- *(katgpt-core)* ship SipIt Phase 2 — gradient-guided inversion policy (paper Alg 3)
+- *(katgpt-core)* ship SipIt transformer inversion Phase 1 (transformer_inversion)
+- *(core)* add se2_equivariant_lift forwarder feature (Plan 560 Phase 4 enabler)
+- *(hebbian_kernel_memory)* Plan 559 Phase 3 — promote to DEFAULT-ON
+- *(hebbian_kernel_memory)* Plan 559 Phase 1 — closed-form fact-storing MLP primitive (G1+G2+G3+G4 ALL PASS)
+- *(hope)* Plan 469 Phase 4 T4.6 promotion — hope_capacity DEFAULT-ON
+- *(hope)* Plan 469 Phase 4 T4.1 GOAT gate (G1+G2+G3+G4 ALL PASS) + zero-alloc fix
+- *(hope)* add Plan 469 Phase 1-3 HOPE primitive (Hilbert-Schmidt capacity kernel)
+- issue 189 T3+T4 — G2 monomorphization re-gate (stays opt-in)
+- variable_rank_router_static! macro — Issue 189 T2 (monomorphization escape hatch)
+- Plan 557 Phase 3 — RoVE G2 unblock via precomputed cos/sin table
+- Plan 558 — variable_rank_domain_expert primitive (G2 FAIL, stays opt-in)
+- Plan 557 Phase 2 — RoVE GOAT gate (G1/G3/G4/G5 PASS, G2 honest FAIL)
+- Plan 557 Phase 1 — RoVE rotary value embeddings skeleton
+- Research 453 — Variable-Rank Domain Expert Clusters PoC
+- *(qgf)* CommitDualLeoOracle — sigmoid-gated commit-then-fuse (Issue 188)
+- *(karc)* promote karc_forecaster to DEFAULT-ON under split-config G1 gate (Issue 186 Path D3)
+- *(karc)* Phase 5.3 R=1 K=8/M=24 λ-sweep — NRMSE floor confirmed at 4.79e-3 (R=1 capacity limit)
+- *(karc)* add K=10 λ-sweep test + document Phase 5.1 result in Issue 187
+- *(karc)* λ-sweep at d_h=18_720 — λ=5e-2 recovers NRMSE gate (Issue 187 T7)
+- *(karc)* Plan 556 Phase 3 T3.1-T3.6 — karc_lod_tier primitive
+- *(karc)* Plan 556 Phase 2 T2.1-T2.6 — karc_batched_matvec primitive
+- *(karc)* Plan 556 Phase 1 revision — KarcRegimeGate uses MSE (variance + bias²)
+- *(karc)* Plan 556 Phase 1 — KarcRegimeGate primitive (closed-form residual-variance mux)
+- *(linalg)* parallel Householder+QL eigensolver (Issue 187 T1-T5)
+- *(linalg)* ship Householder+QL symmetric eigensolver (Issue 186 Path B, T2-T5)
+- *(karc)* ship large-d_h Jacobi B-step + fix latent jacobi_eigen sign bug (Issue 185 T1+T2)
+- *(conformal)* KARC+overlay K-sweep — refutes 'K=4 too shallow' hypothesis (Issue 010 T7 follow-up)
+- *(conformal)* add KARC+overlay dedicated floor test (Issue 010 T7)
+- *(conformal)* promote conformal_predictive_intervals to DEFAULT-ON (Plan 468)
+- ship DualLeoOracle as QGF's 3rd oracle (Plan 467, Proposal 007)
+- *(flow)* Plan 460 — post-max DualLeoMixer fusion (GOAT PASS, promoted)
+- *(flow)* Plan 459 — FlowFieldCache::get_or_compute_dual (DualLeoMixer fusion)
+- *(multi_agent_path)* Issue 546 multi-step LaCAM (stuck-agent targeting)
+- *(sphere_sampling)* Issue 544 Phase 1 — modelless sphere-sampling primitives (parallel transport + Jacobian log-det + Riemannian exp map)
+- *(causal_id)* Plan 457 Phase 5 T4.7 — promote causal_identification to DEFAULT-ON
+- *(analytic_lattice)* transfer-matrix band-structure analyzer (Plan 458, Research 451)
+- *(multi_agent_path)* add Issue 546 deadlock-chain-length diagnostic
+- *(karc)* add low_rank_fit_warm_start for cross-game transfer follow-up
+- *(causal_id)* Plan 457 Phase 2 — GOAT gate G1+G2+G3 PASS, G4 deferred
+- *(causal_id)* Plan 457 Phase 1 — syntactic causal identification primitive
+- poincare GOAT gate G1-G7 PASS + promotion decision (Plan 449 Phase 2+3)
+- poincare navigator primitive (Plan 449 Phase 1)
+- *(katgpt-core)* re-export conv_temporal_step primitives from engram
+- *(katgpt-hla)* add serde feature for Issue 532 T1 de-fork
+- add conv_temporal_step_into + truncated backward primitive
+- conv_causal_dyn_into — runtime-length causal conv primitive (Issue 383 Phase 6 prep)
+- Issue 163 — GRAPE Joint Lift GL(d+2) block-diagonal composition (grape_joint_lift, opt-in)
+- Issue 161 — GRAPE-AP vector-similarity gates (grape_ap_vector, opt-in)
+- Issue 160 — unified PositionGroupAction trait (position_group_action, opt-in)
+- Issue 159 — GRAPE-M rank-2 Rodrigues exponential (grapem_rodrigues, opt-in)
+- Issue 158 — interpolation_geometry primitive (iMAUVE + intervention battery)
+- commutant_basis helper for group_invariance_probe (Issue 157)
+- Plan 453 Phase 3 — LaCAM escalation benchmark + threshold fix
+- Plan 453 Phase 2 — bounded one-step LaCAM escalation implementation
+- Issue 516 T1e+T1f+T1g — PIBT O(n²)→O(n) + A* expansion cap
+- Issue 516 T1c+T1d — flat-array BFS distance + flat A* scratch
+- 2-wide corridor detection for Guided-PIBT flow field (Issue 150)
+- Issue 516 T1a — Position::flat_index + ensure_flat_occupancy trait method
+- Guided-PIBT flow direction assignment for LLLG (Issue 149)
+- Issue 516 T1a/T1b — flat-array occupancy + pre-allocated A* scratch
+- real MovingAI maps for LLLG G1 gate (Issue 148) — ht_chantry 0.09→0.27, warehouse unchanged
+- swap technique infrastructure for LLLG MAPF (Issue 144, negative result)
+- binary plasma tier (Issue 145 Phase 0+1, GOAT gate PASSED)
+- multi_agent_path LaCAM escalation (Issue 143, Plan 440)
+- multi_agent_path per-agent alpha extension point (Plan 489 Phase 2 prep)
+- multi_agent_path full space-time A* guidance (Issue 142, Plan 440)
+- multi_agent_path Phase 2 GOAT gate (Plan 440) — G3/G4 PASS, G1 2/4 PASS
+- multi_agent_path substrate (Plan 440 Phase 1) — paper-faithful LLLG
+- FORE Plan 438 Phase 3-4 — Baird-MRP G1 gate + GOAT bench + 3 critical bug fixes
+- *(occupancy)* Plan 438 Phase 2 — FORE KL-projection fit loop (Algorithm 1 verified)
+- *(ane)* promote ane_fused_chain to default-on (Plan 439 Phase 2 GOAT G1-G5 PASS)
+- *(ane)* Plan 439 Phase 2 — fused-chain GOAT gate (G1-G5 all PASS)
+- Plan 439 Phase 1 — ANE fused-chain cost model (ane_fused_estimate)
+- occupancy_ratio Phase 1 — FORE estimator type/trait skeleton (Plan 438 T1.1-T1.7)
+- plan 437 phase 3 — recos cold-path MAG TransferMetric (opt-in diagnostic)
+- plan 437 phase 1 — recos rearrangement-bound similarity primitive
+- VFD velocity-field disagreement primitive (Plan 432 Phase 1)
+- simd_lut_dequant Phase 4 — GOAT GATE ALL PASS, promote to default-on (Plan 431 T4.1-T4.7)
+- simd_lut_dequant Phase 3 — fused DeQuant + Dot kernel (Plan 431 T3.1-T3.3)
+- simd_lut_dequant Phase 2 — NEON + AVX2 SIMD backends (Plan 431 T2.1-T2.4)
+- simd_lut_dequant Phase 1 — scalar reference LUT dequant (Plan 431 T1.1-T1.6)
+- Plan 431 — Cross-Stage Residual Relocation + Permeation-Map Diagnostic
+- Plan 430 T4.2 — G2 perf bench + pre-norm optimization
+- Plan 430 — dual-path rollback-free tree verify (GDN × HOLA fusion)
+- *(branching)* add EpisodicCodec trait + to_bytes/from_bytes for BranchBank, NonInterferenceProjection, CognitiveBranch, EpisodicEntry, FailureEntry, ProceduralRule, BranchStats (Issue 456 Phase 2)
+- bench 455 CochainFreezeEnvelope GOAT gate
+- add loop_stability_fix feature for inter-loop RMSNorm in forward_looped
+- add CODA SwiGLU fused kernel for gated MLP path
+- add CochainFreezeEnvelope for DEC cochain freeze/thaw (Issue 455)
+- error_weighted_graph_laplacian — DSOM × DEC fusion (Plan 429 Phase 5 T5.1)
+- elasticity_gated_update primitive — DSOM error-scaled neighborhood update (Plan 429 Phase 1)
+- promote smooth_min_similarity to DEFAULT-ON (Issue 041 T6 GOAT PASS)
+- production-wire HOLA cache into forward_gdn2 via HippocampalCacheDyn (Issue 038 T7)
+- smooth-min soft similarity primitive (Issue 041, Research 385)
+- promote heal_validation to DEFAULT-ON (Issue 133 GOAT gate PASS)
+- add HealConflictDetector trait + heal_validation feature (Issue 133)
+
+### Fixed
+
+- *(compaction/probe)* black_box fence prevents dead-code elimination in G3 timing test
+- *(katgpt-core/inversion)* strengthen Phase 2 A/B gate + correct plan numbers
+- *(coda)* relax MoaActivation::Tanh test tolerance for Padé fast_tanh
+- *(coda)* import fast_tanh in MoaActivation::activate (was missing)
+- *(clippy)* resolve cargo clippy warnings across workspace
+- *(clippy)* resolve cargo clippy warnings across workspace
+- *(linalg)* QL convergence on near-singular Grams + wire parallel eig into ALS B-step (Issue 187 T7)
+- *(katgpt-core)* remove unused mut flagged by clippy in conv tests
+- *(rtdc)* mark cg6_verify_cost_within_5x_of_depth_2 as #[ignore]
+- *(cargo)* declare required-features for ht_chantry examples
+- address cargo clippy warnings + broken test compile
+- deprecate Plan 230 ShardEmbedding/JlProjectionMatrix (Issue 139)
+- FlatAstarScratch OOB on goal-depth nodes (Issue 516 T4 hotfix)
+- Issue 516 T1a — bounds-safe flat-array occupancy access
+- ht_chantry map connectivity (10× throughput) + counter-flow Guided-PIBT (negative result)
+- dec_freeze test fixture -3.14 -> -3.7 to clear clippy::approx_constant
+- resolve 7 clippy warnings in katgpt-core test code
+
+### Other
+
+- *(katgpt-core)* poincare latent navigation example (Plan 449, Issue 202)
+- *(katgpt-core)* ssmax dilution-rescaling example (Plan 411, Issue 202)
+- add best_belief example harness + correct Issue 202 audit methodology
+- ship Plan 561 transformer_inversion forensics example harness
+- *(196)* close issue per noise-reduction rule — T5 done: per-NPC HLA KG → belief KG in questbench
+- *(561)* re-verify T5.1/T5.2 gates — conditions unmet, update timestamp
+- rename hla_arousal → emotion_arousal in ActiveStateTrace
+- rename 'HLA scalar(s)' prose to 'belief scalar(s)' across comments + docs
+- *(cgsp)* [**breaking**] rename HlaProjectionGuide → BeliefGridProjectionGuide
+- rename HLA_* constants → BELIEF_* (Issue 197 Family A+B)
+- rename per-NPC 'HLA' → 'belief' across katgpt-rs (Issue 195)
+- *(clippy)* use RangeInclusive::contains for [0,1] range assertions
+- feature-gate-audit fixes — karc_forecaster + hope_capacity stale promotion comments
+- *(simd)* add simd_tanh_inplace (NEON/AVX2/WASM Padé [2/2] kernel)
+- *(simd)* add fast_tanh (Padé [2/2]) + adopt in activation hot paths
+- *(simd)* consolidate last 3 missed sigmoids + edit_penalty exp in katgpt-core
+- *(simd)* consolidate root sigmoid + remaining missed sigmoids/exp in katgpt-core
+- *(simd)* adopt fast_exp/fast_sigmoid in remaining katgpt-core + leaf crates
+- *(simd)* adopt fast_exp/fast_sigmoid across katgpt-core remaining paths
+- *(simd)* add fast_exp + adopt SIMD softmax in attention hot paths
+- *(simd)* DRY consolidate sigmoid to fast_sigmoid across katgpt-core/attn/claim
+- *(cgsp)* use Cephes exp in staleness_weight for consistency
+- *(cgsp)* delegate cgsp::types::sigmoid to fast_sigmoid (Cephes)
+- *(cgsp)* 4-accumulator FMA in Direction::dot + norm_sq
+- *(cgsp)* fuse 3-pass structural_complexity into single loop
+- *(cgsp)* fuse guide-score + difficulty-admit loops in CgspLoop::cycle
+- *(feature-gate-audit)* fix 3 stale KARC Cargo.toml comments missed by doc-sync e5dfaf0f
+- *(issue-187)* G1 FAIL at d_h=18_720 — K=8/M=8/R=2 misses both legs
+- *(karc)* update Plan 556 Phase 4 T4.3 + Cargo.toml comment for KarcLodTier
+- *(karc)* re-export LOD tier API at katgpt_core::karc::
+- *(feature-gate-audit)* fix 11 sibling surfaces missed by extension VIII (extension IX)
+- *(feature-gate-audit)* fix 5 stale 'until X' surfaces missed by extension VII (extension VIII)
+- *(karc)* Bench 556 — Plan 556 GOAT gate doc + Cargo.toml comment refinement
+- *(feature-gate-audit)* fix 13 more stale 'Opt-in until GOAT passes' comments discovered in second-pass sweep (extension VII)
+- *(feature-gate-audit)* fix 3 stale GRAPE 'Opt-in until GOAT passes' comments (extension VII)
+- *(feature-gate-audit)* fix 10 stale 'Opt-in until GOAT passes' comments for PASSED-gate primitives (extension VII)
+- *(feature-gate-audit)* fix 5 stale 'Opt-in until GOAT passes' comments for FAILED-gate losers (extension VII)
+- *(feature-gate-audit)* fix stale cgsp 'Opt-in until Plan 299 Phase 3 GOAT validates' comment (extension VII)
+- *(feature-gate-audit)* fix stale cgsp_dual_pool 'Opt-in until G1-G5 GOAT passes' comment (extension VII)
+- *(feature-gate-audit)* fix stale ict_branching 'Opt-in until G3+G8 pass' comment (extension VII)
+- *(feature-gate-audit)* fix stale set_attention bench promotion hint (extension VI)
+- *(feature-gate-audit)* fix 3 more stale bench-.rs gate-output claims (extension VI)
+- sync poincare_navigator (Plan 449) + chunked_content_store (Plan 448) DEFAULT-ON promotions to README + .docs
+- *(conformal)* update KARC overlay test docstrings with measured K-sweep verdicts
+- *(feature-gate-audit)* fix stale babel_codec 'Opt-in until G1-G5 passes' comment
+- *(feature-gate-audit)* fix stale recos 'Opt-in until Phase 2 settles' comment
+- *(feature-gate-audit)* fix stale critical_interval_gate 'DEFAULT-ON in root' claim
+- *(features)* feature-gate-audit source .rs — 17 stale lib.rs surfaces
+- *(features)* feature-gate-audit wider sweep — 5 stale comment surfaces
+- *(features)* feature-gate-audit — close 6 stale comment surfaces
+- *(katgpt-core)* sync 3 stale opt-in feature comments — gdn_tree_verify / canvas_schema / paired_loss_diagnostic
+- *(katgpt-core)* sync stale feature-gate comments to DEFAULT-ON status
+- *(core)* SIMD coord_sq_sum + AXPBY in tangent_erasure_direction_into
+- *(core)* hoist per-round to_vec out of MANCE loops
+- *(core)* SIMD AXPY in tucker n-mode contract + reconstruction
+- *(conformal)* update Cargo.toml comment — Plan 508 G3 FAIL, decouple promotion from curiosity consumer
+- *(core,sparse,spectral)* zero-alloc hot paths + drop redundant shrink_to_fit
+- *(feature-gate-audit)* fix 7 stale "default-off until..." comments
+- apply rustfmt import-sorting drift pass
+- cargo comment sync — fix 12 stale feature-status comments + add cargo_comment_audit.py
+- *(causal_id)* Issue 184 P4 zero-alloc districts + fixseq refactor — allocs 198→133/call (-33%), latency -14%
+- *(causal_id)* Issue 183 G4 alloc-free Scratch refactor — allocs -30%, latency -27%
+- plan 449 G2 caveat closed by plan 317 (trained phi)
+- *(tests)* extract Plan 332 basis-harness helpers to shared module
+- Issue 176 — 5 mechanical test-extraction splits for missed soft-limit files
+- Issue 174 — split katgpt-core traits.rs (2203 lines) into module folder
+- Issue 171 — split katgpt-core manifold_bandit.rs (2196 lines) into module folder
+- Issue 170 — split katgpt-core speculative/qmc.rs (2516 lines) into module folder
+- Issue 169 — split katgpt-core karc.rs (2597 lines) into module folder
+- Issue 167 — split parallax_attn.rs (2524 lines) into module folder
+- standardize '5-repo quintet' → '7-repo stack' in skill files + code comments
+- attention — thread_local scratch for sequential tiny-batch path
+- funcattn — hoist bias branch out of row loop + SIMD dot in gram_schmidt
+- set_attention topk path — O(N) select_nth instead of O(N log N) full sort
+- eliminate per-element allocations in nonuniform quant + harden set_attention OOB guard
+- sync README + .docs with Plan 454 (grid_3d DEFAULT-ON), Issue 139 (Plan 230 deprecation), Research 442/444
+- allocation + complexity wins in katgpt-core + katgpt-pruners hot paths
+- clippy fixes across workspace
+- *(plan453)* mark Phase 4/5 DONE, close Issue 154 as fixed
+- Issue 154 — correct false 'Collision-free by construction' claim; PI is prior art
+- Issue 154 — PIBT vertex collisions on congested maps (lacks priority inheritance)
+- fix remaining stale references from numbering renumber (Issue 153)
+- fix stale .rs doc-comments after numbering collision renumber (Issue 153)
+- Issue 145 Phase 2 — binary plasma tier reclassification docs
+- multi_agent_path Phase 3 fusion hooks (Plan 440 T3.1-T3.4) — compile-checked trait examples
+- Issue 140 — PIBT PI + warm-start investigation results
+- *(core)* fuse parse_pipeline passes + drop avoidable clone in cubical_nerve
+- *(core)* pre-size mux_latent expand/eviction buffers + early-exit eviction scan
+- *(core,attn)* hoist allocations out of CCE primal-dual loop + pre-size PerGroupTopKRouter scratch
+- *(core)* hoist allocations out of hot loops in bisimulation + mag
+- branch-free entropy_nats + fused single-pass effective_neighborhood_size
+- eliminate redundant peaks.sum() on mux BFS hot path + DRY dot() in branching
+- pca_into — hoist work vectors out of power-iteration loop
+- SIMD max + thread-local scratch for hot paths
+- Plan 432 Phase 3 T3.4+T3.5 — VFD GOAT gate doc cleanup
+- VFD Phase 2 GOAT gate — G2 UQ floor FAILS, stays opt-in non-UQ (Plan 432)
+- Plan 431 Phase 3 PoC verdict — REFUTE LateEarly default
+- remove closed issues 041 (smooth_min_similarity), 136 (flashar_consensus demote)
+- Plan 429 Phase 4 complete — G2 PASS, consumer promoted to default-on
+- fix all 220 cargo doc warnings in katgpt-core (broken intra-doc links)
+- fix stale issue references (002, 024, 037, 043) in source code
+- fix stale opt-in comments for subspace_steering + region_subspace_steering
+- fix stale opt-in comments for 3 more DEFAULT-ON features in katgpt-core Cargo.toml
+- fix stale opt-in comments for 3 more DEFAULT-ON features in katgpt-core Cargo.toml
+- fix stale opt-in comments for 15 DEFAULT-ON features in katgpt-core
+- use simd_dot_f32 and simd_dist_sq in product_key_memory scoring
+- precompute v_proj, SIMD SAXPY, and reduce redundant matvecs in katgpt-core
+
 ## [0.3.1](https://github.com/katopz/katgpt-rs/compare/katgpt-core-v0.3.0...katgpt-core-v0.3.1) - 2026-07-11
 
 ### Other
