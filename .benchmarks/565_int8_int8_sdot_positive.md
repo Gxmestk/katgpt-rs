@@ -107,35 +107,81 @@ Weighted average: **~2.5–3× forward pass speedup** expected on native aarch64
 with dotprod. If the current native forward pass is ~0.50ms, int8 SDOT would
 bring it to ~0.17–0.20ms.
 
+## WASM verification (T4, 2026-07-31, Node V8 JIT)
+
+**Critical discovery:** Rust's stable `core::arch::wasm32` does NOT expose
+`i32x4_dot_i8x16_s` (the WASM `i8x16.dot_s` instruction). Even nightly Rust
+(1.94.0-nightly) lacks it — this is a stdarch gap. The WASM kernel uses the
+**extmul path** instead:
+
+1. `i16x8_extmul_low_i8x16(a, b)`  — 8 i16 products from low halves
+2. `i16x8_extmul_high_i8x16(a, b)` — 8 i16 products from high halves
+3. `i32x4_extadd_pairwise_i16x8`   — pairwise sum to i32x4
+
+This is 7 instructions per 16 multiplies (vs SDOT's 1 instruction), but still
+significantly less than f32's ~16 instructions per 16 elements (8 loads + 4 mul
++ 4 add).
+
+| size | f32 ns/dot (V8) | i8 extmul ns/dot (V8) | speedup |
+|---|---:|---:|---:|
+| 16 | 7.0 | 5.8 | 1.22× |
+| 32 | 8.6 | 6.5 | 1.33× |
+| 108 | 12.4 | 6.3 | **1.98×** |
+| 144 | 14.5 | 8.2 | **1.76×** |
+| 162 | 14.4 | 6.6 | **2.16×** |
+| 288 | 19.1 | 8.7 | **2.19×** |
+| 324 | 23.2 | 10.7 | **2.18×** |
+
+**T4: ✅ PASS (5/7).** Sizes 108-324 (the dominant conv layers) show consistent
+~2× speedup. Sizes 16+32 (tiny 1×1 convs) fail — per-call overhead dominates.
+
 ## What this means for PUCT WASM
 
 The PUCT WASM b50 latency is 29.6ms/move (Bench 205):
 - ~25ms forward passes (50 nodes × 0.50ms)
 - ~5ms tree overhead
 
-With int8 SDOT at 2.5–3× forward pass speedup:
-- Forward passes: ~8–10ms
+With int8 extmul (~2× on WASM forward pass):
+- Forward passes: ~12.5ms
 - Tree overhead: ~5ms (unchanged)
-- **Projected total: ~13–15ms/move** — below the 30ms floor
+- **Projected total: ~17.5ms/move** — well below the 30ms floor
 
-**WASM caveat:** the WASM `i8x16.dot_s` instruction maps to `sdot` on aarch64
-and `pmaddubsw`+`pmaddwd` on x86 via the V8 JIT. The native aarch64 result
-should transfer directly to WASM-on-aarch64. WASM-on-x86 needs separate
-verification (the `pmaddubsw` path is 2 instructions, not 1).
+With int8 SDOT (~3× on native aarch64 forward pass):
+- Forward passes: ~8.3ms
+- Tree overhead: ~5ms (unchanged)
+- **Projected native total: ~13.3ms/move**
 
 ## Reproduction
+
+### Native (aarch64 with dotprod)
 
 ```bash
 RUSTFLAGS="-C target-cpu=native" cargo run --release -p katgpt-types --example int8_dot_bench_206
 ```
 
+### WASM (Node V8 JIT)
+
+```bash
+./scripts/build-moka-wasm.sh --nodejs
+node crates/katgpt-moka-wasm/bench/bench_int8_dot_206.js
+```
+
 ## Next steps
 
-1. Port `dot_i8_sdot` to WASM using `i32x4_dot_i8x16_s` (`core::arch::wasm32`)
-2. Re-benchmark under Node V8 JIT to confirm the speedup transfers
-3. If WASM confirms ≥1.5×: implement `conv2d_int8_into` in `moka.rs` + full
-   `MokaWeightsInt8` struct that keeps weights as int8 (no dequantization)
-4. GOAT gate the full Moka int8 forward path (G1 accuracy vs f32, G2 latency,
+1. Implement `conv2d_int8_into` in `moka.rs` + `MokaWeightsInt8` struct that
+   keeps weights as int8 (no dequantization at load)
+2. Add `forward_int8_with_scratch` that uses the int8 dot kernel
+3. GOAT gate the full Moka int8 forward path (G1 accuracy vs f32, G2 latency,
    G3 no-regression, G4 alloc-free)
-5. If GOAT passes: promote to default (the weights are already int8 on disk —
+4. If GOAT passes: promote to default (the weights are already int8 on disk —
    this is the natural representation)
+5. Re-measure PUCT WASM b50 end-to-end latency with int8 forward path
+
+## Rust stdarch gap (action item)
+
+`i32x4_dot_i8x16_s` (the WASM `i8x16.dot_s` instruction) is NOT exposed in
+Rust's `core::arch::wasm32` — not on stable 1.93, not on nightly 1.94. This
+forces the extmul workaround (7 instrs vs 1). File an upstream issue at
+rust-lang/stdarch to request the intrinsic. If/when it lands, the WASM kernel
+can switch from extmul to the native dot instruction for an additional ~2×
+speedup (matching native SDOT performance).

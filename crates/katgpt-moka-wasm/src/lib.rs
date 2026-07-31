@@ -617,3 +617,143 @@ pub extern "C" fn wasmi_arena_reward(color: u8) -> u8 {
 pub extern "C" fn wasmi_arena_nodes_evaluated() -> usize {
     with_arena(|s| s.puct.nodes_evaluated())
 }
+
+// ── Issue 206: int8×int8 dot product benchmark exports ──────────────
+//
+// Bench 565 proved int8 SDOT is 2.5–6.3× faster per dot on native aarch64.
+// These exports test whether the WASM extmul-based int8 dot kernel delivers
+// a similar speedup under V8 JIT.
+//
+// Rust's stable `core::arch::wasm32` does NOT expose `i32x4_dot_i8x16_s`
+// (the direct i8×i8→i32x4 dot product instruction). We use the extmul path:
+//   1. i16x8_extmul_low_i8x16(a, b)  → 8 i16 products from low halves
+//   2. i16x8_extmul_high_i8x16(a, b) → 8 i16 products from high halves
+//   3. i32x4_extadd_pairwise_i16x8   → pairwise sum to i32x4
+// This is 7 instructions for 16 multiplies vs f32's ~16 instructions.
+
+/// WASM SIMD128 f32 dot product (the production kernel — separate mul+add).
+#[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
+#[target_feature(enable = "simd128")]
+#[inline]
+unsafe fn wasm_dot_f32(a: &[f32], b: &[f32], len: usize) -> f32 {
+    use core::arch::wasm32::{f32x4_add, f32x4_extract_lane, f32x4_mul, f32x4_splat, v128_load};
+    unsafe {
+        let mut acc0 = f32x4_splat(0.0);
+        let mut acc1 = f32x4_splat(0.0);
+        let mut acc2 = f32x4_splat(0.0);
+        let mut acc3 = f32x4_splat(0.0);
+        let mut i = 0usize;
+        let chunks4 = len / 16;
+        for _ in 0..chunks4 {
+            acc0 = f32x4_add(f32x4_mul(v128_load(a.as_ptr().add(i).cast()), v128_load(b.as_ptr().add(i).cast())), acc0);
+            acc1 = f32x4_add(f32x4_mul(v128_load(a.as_ptr().add(i + 4).cast()), v128_load(b.as_ptr().add(i + 4).cast())), acc1);
+            acc2 = f32x4_add(f32x4_mul(v128_load(a.as_ptr().add(i + 8).cast()), v128_load(b.as_ptr().add(i + 8).cast())), acc2);
+            acc3 = f32x4_add(f32x4_mul(v128_load(a.as_ptr().add(i + 12).cast()), v128_load(b.as_ptr().add(i + 12).cast())), acc3);
+            i += 16;
+        }
+        let s01 = f32x4_add(acc0, acc1);
+        let s23 = f32x4_add(acc2, acc3);
+        let s = f32x4_add(s01, s23);
+        let mut sum = f32x4_extract_lane::<0>(s) + f32x4_extract_lane::<1>(s) + f32x4_extract_lane::<2>(s) + f32x4_extract_lane::<3>(s);
+        let remaining = (len - i) / 4;
+        let mut acc = f32x4_splat(0.0);
+        for _ in 0..remaining {
+            acc = f32x4_add(f32x4_mul(v128_load(a.as_ptr().add(i).cast()), v128_load(b.as_ptr().add(i).cast())), acc);
+            i += 4;
+        }
+        sum += f32x4_extract_lane::<0>(acc) + f32x4_extract_lane::<1>(acc) + f32x4_extract_lane::<2>(acc) + f32x4_extract_lane::<3>(acc);
+        while i < len {
+            sum += *a.get_unchecked(i) * *b.get_unchecked(i);
+            i += 1;
+        }
+        sum
+    }
+}
+
+/// WASM SIMD128 int8 dot using extmul (stable Rust — no `i32x4_dot_i8x16_s`).
+#[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
+#[target_feature(enable = "simd128")]
+#[inline]
+unsafe fn wasm_dot_i8(a: &[i8], b: &[i8], len: usize) -> i32 {
+    use core::arch::wasm32::{
+        i16x8_extmul_high_i8x16, i16x8_extmul_low_i8x16, i32x4_add, i32x4_extadd_pairwise_i16x8,
+        i32x4_extract_lane, v128_load,
+    };
+    unsafe {
+        let mut acc0 = core::arch::wasm32::i32x4_splat(0);
+        let mut acc1 = core::arch::wasm32::i32x4_splat(0);
+        let mut i = 0usize;
+        let chunks32 = len / 32; // 2 × 16-element blocks per iteration
+        for _ in 0..chunks32 {
+            let va = v128_load(a.as_ptr().add(i).cast());
+            let vb = v128_load(b.as_ptr().add(i).cast());
+            let lo = i16x8_extmul_low_i8x16(va, vb);
+            let hi = i16x8_extmul_high_i8x16(va, vb);
+            let lo32 = i32x4_extadd_pairwise_i16x8(lo);
+            let hi32 = i32x4_extadd_pairwise_i16x8(hi);
+            acc0 = i32x4_add(acc0, lo32);
+            acc1 = i32x4_add(acc1, hi32);
+
+            let va2 = v128_load(a.as_ptr().add(i + 16).cast());
+            let vb2 = v128_load(b.as_ptr().add(i + 16).cast());
+            let lo2 = i16x8_extmul_low_i8x16(va2, vb2);
+            let hi2 = i16x8_extmul_high_i8x16(va2, vb2);
+            let lo32_2 = i32x4_extadd_pairwise_i16x8(lo2);
+            let hi32_2 = i32x4_extadd_pairwise_i16x8(hi2);
+            acc0 = i32x4_add(acc0, lo32_2);
+            acc1 = i32x4_add(acc1, hi32_2);
+            i += 32;
+        }
+        // Process remaining 16-element chunks
+        let chunks16 = (len - i) / 16;
+        for _ in 0..chunks16 {
+            let va = v128_load(a.as_ptr().add(i).cast());
+            let vb = v128_load(b.as_ptr().add(i).cast());
+            let lo = i16x8_extmul_low_i8x16(va, vb);
+            let hi = i16x8_extmul_high_i8x16(va, vb);
+            acc0 = i32x4_add(acc0, i32x4_extadd_pairwise_i16x8(lo));
+            acc1 = i32x4_add(acc1, i32x4_extadd_pairwise_i16x8(hi));
+            i += 16;
+        }
+        let s = i32x4_add(acc0, acc1);
+        let mut sum = i32x4_extract_lane::<0>(s) + i32x4_extract_lane::<1>(s) + i32x4_extract_lane::<2>(s) + i32x4_extract_lane::<3>(s);
+        while i < len {
+            sum += (*a.get_unchecked(i) as i32) * (*b.get_unchecked(i) as i32);
+            i += 1;
+        }
+        sum
+    }
+}
+
+/// Benchmark: run `iters` f32 dot products of length `len` on the data at
+/// `a_ptr` / `b_ptr`. Returns a bit-reinterpreted sink to prevent DCE.
+/// The host times this call with `performance.now()` / `hrtime`.
+#[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn bench_dot_f32(a_ptr: *const f32, b_ptr: *const f32, len: usize, iters: usize) -> u32 {
+    unsafe {
+        let a = std::slice::from_raw_parts(a_ptr, len);
+        let b = std::slice::from_raw_parts(b_ptr, len);
+        let mut sink = 0.0f32;
+        for _ in 0..iters {
+            sink = wasm_dot_f32(a, b, len);
+        }
+        sink.to_bits()
+    }
+}
+
+/// Benchmark: run `iters` int8 dot products of length `len` on the data at
+/// `a_ptr` / `b_ptr` (i8 slices reinterpreted from the raw pointers).
+#[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn bench_dot_i8(a_ptr: *const i8, b_ptr: *const i8, len: usize, iters: usize) -> i32 {
+    unsafe {
+        let a = std::slice::from_raw_parts(a_ptr, len);
+        let b = std::slice::from_raw_parts(b_ptr, len);
+        let mut sink = 0i32;
+        for _ in 0..iters {
+            sink = wasm_dot_i8(a, b, len);
+        }
+        sink
+    }
+}

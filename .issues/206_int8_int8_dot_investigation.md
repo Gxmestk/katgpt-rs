@@ -68,9 +68,10 @@ See [Bench 565](../.benchmarks/565_int8_int8_sdot_positive.md) for full results.
       4.4× at size=288/324. Only size=16 fails (1.38× — quantization overhead
       dominates at tiny sizes).
 - [x] **T3: Accuracy** — ✅ PASS (all sizes <3% rel error).
-- [ ] **T4: WASM port + V8 JIT verification** — pending. The `i8x16.dot_s`
-      WASM instruction maps to `sdot` on aarch64 V8 JIT, so the native result
-      should transfer. Needs explicit measurement.
+- [x] **T4: WASM port + V8 JIT verification** — ✅ PASS (5/7 sizes ≥1.5×).
+      The extmul approach (stable Rust — `i32x4_dot_i8x16_s` is NOT exposed
+      in Rust stdarch, even on nightly) delivers 1.76-2.19× at sizes 108-324.
+      Native SDOT is 2.5-6.3×; WASM extmul is ~2× — lower but still clears gate.
 - [ ] **T5: Full conv2d_int8 implementation** — pending T4.
 - [ ] **T6: GOAT gate** — pending T5.
 
