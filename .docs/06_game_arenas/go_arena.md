@@ -714,10 +714,12 @@ Latency scales linearly (29.6→59.8→119.6 doubles at each step) — pure per-
 |---|---|---|---|---|---|
 | Moka (real, reference) | — (baseline) | 6.4 ms | 140,850 B | — | — |
 | Ours — greedy (Table B) | ≈50% (mirror — same weights) | 0.5 ms | 273,218 B | **yes (10.7×)** | no |
-| Ours — PUCT b50 (Table C) | **100%** | 29.6 ms | 273,218 B | no (~4.6× slower) | **yes** |
-| Ours — PUCT b200 (Table C) | 98% (native) | 119.6 ms | 273,218 B | no (~18.7× slower) | **yes** |
+| Ours — PUCT b50 | **100%** (WASM, n=20) / 94% (native, n=100) | 29.6 ms (WASM V8) / ~21 ms (native) | 273,218 B | no (~4.6× slower) | **yes** |
+| Ours — PUCT b200 | 98% (native, n=100) | 119.6 ms (WASM V8) / ~81 ms (native) | 273,218 B | no (~18.7× slower) | **yes** |
 
 No single build is both faster AND stronger than Moka. The greedy build wins on speed but loses on strength; the PUCT builds win on strength but lose on speed. These are the measured numbers — not projected.
+
+**Win-rate source note:** the b50 100% is WASM-via-wasmi (n=20); the b200 98% is native (n=100). These are different experiments at different sample sizes — NOT a sign that WASM is stronger than native. Native and WASM produce **identical moves** for a given position (same weights, same forward pass, deterministic IEEE-754 execution), so their true win rates are identical. The 100% (WASM, n=20) vs 94% (native, n=100) gap at b50 is sampling variance: at true p=0.94, P(20/20) ≈ 29% — a normal high draw from the same distribution. The WASM measurement used n=20 (not 100) because wasmi is ~46× slower than V8 JIT, so 100 games would take ~73 minutes vs 14.5 minutes.
 
 ### Follow-up: does zero-copy JS↔wasm sharing help further?
 
