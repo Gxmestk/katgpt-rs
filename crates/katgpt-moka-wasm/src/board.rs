@@ -1,8 +1,14 @@
 //! Minimal 9×9 Go board — just enough for legal self-play moves to generate
 //! realistic benchmark positions. Not a general engine (no 13×13/19×19, no
-//! scoring, no replay) — this crate exists purely to give the WASM benchmark
-//! (Plan 565) a dependency-free way to drive `encode_features`, mirroring
-//! what the real Moka JS harness does with its own `game.ts`.
+//! replay) — this crate exists purely to give the WASM benchmark (Plan 565) a
+//! dependency-free way to drive `encode_features`, mirroring what the real
+//! Moka JS harness does with its own `game.ts`.
+//!
+//! Issue 204 extended this with pass-counting + a simple area-score so the
+//! PUCT search port (`puct.rs`) can detect terminals and assign rewards.
+//! The scoring is intentionally crude (stones + clear-only territory via
+//! flood fill) — it only needs to be correct enough to give the search a
+//! non-broken win/loss signal, not to match any tournament ruleset.
 
 pub const SIZE: usize = 9;
 pub const AREA: usize = SIZE * SIZE;
@@ -30,6 +36,9 @@ pub struct Board {
     pub cells: Vec<Cell>,
     pub to_play: Cell,
     pub ko_point: Option<usize>,
+    /// Consecutive pass count — reaches 2 when both players pass consecutively,
+    /// which ends the game (Issue 204: needed for PUCT terminal detection).
+    pub consecutive_passes: u8,
 }
 
 fn neighbors(idx: usize) -> Vec<usize> {
@@ -89,6 +98,7 @@ impl Board {
             cells: vec![Cell::Empty; AREA],
             to_play: Cell::Black,
             ko_point: None,
+            consecutive_passes: 0,
         }
     }
 
@@ -156,12 +166,90 @@ impl Board {
             self.ko_point = None;
         }
 
+        self.consecutive_passes = 0;
         self.to_play = opponent;
     }
 
     pub fn pass(&mut self) {
         self.ko_point = None;
+        self.consecutive_passes = self.consecutive_passes.saturating_add(1);
         self.to_play = self.to_play.opponent();
+    }
+
+    /// Game ends when both players pass consecutively (Issue 204).
+    #[inline]
+    pub fn is_game_over(&self) -> bool {
+        self.consecutive_passes >= 2
+    }
+
+    /// Crude area score for `color`: stones on the board plus exclusive
+    /// territory (empty regions reachable only by `color`'s stones). Returns
+    /// a signed reward from `color`'s perspective: +1.0 if `color` is strictly
+    /// ahead after komi (7.5 applied to White, the Moka training convention),
+    /// -1.0 if behind or tied. Sufficient for PUCT negamax terminal scoring —
+    /// not a tournament-ruleset-correct score.
+    ///
+    /// Mirrors the sign convention of `GoState::reward` in katgpt-pruners:
+    /// the search's `expand` does `2.0 * reward(to_play) - 1.0` to map
+    /// {win:1, loss:0} onto the [-1, +1] value-head range.
+    pub fn reward(&self, color: Cell) -> f32 {
+        let mut score = [0i32; 2]; // [Black, White]
+        for &c in &self.cells {
+            match c {
+                Cell::Black => score[0] += 1,
+                Cell::White => score[1] += 1,
+                Cell::Empty => {}
+            }
+        }
+        // Exclusive territory: flood each empty region, attribute it to a
+        // color only if that color is the sole bordering stone color.
+        let mut visited = [false; AREA];
+        for start in 0..AREA {
+            if visited[start] || self.cells[start] != Cell::Empty {
+                continue;
+            }
+            let mut region_size = 0i32;
+            let mut touches_black = false;
+            let mut touches_white = false;
+            let mut stack = vec![start];
+            while let Some(p) = stack.pop() {
+                if visited[p] {
+                    continue;
+                }
+                visited[p] = true;
+                region_size += 1;
+                for n in neighbors(p) {
+                    match self.cells[n] {
+                        Cell::Empty => {
+                            if !visited[n] {
+                                stack.push(n);
+                            }
+                        }
+                        Cell::Black => touches_black = true,
+                        Cell::White => touches_white = true,
+                    }
+                }
+            }
+            match (touches_black, touches_white) {
+                (true, false) => score[0] += region_size,
+                (false, true) => score[1] += region_size,
+                _ => {} // shared or empty board
+            }
+        }
+        // Komi 7.5 favors White (Moka training convention; area-style scoring
+        // with half-komi to break ties so `reward` is never exactly 0).
+        let black = score[0] as f32;
+        let white = score[1] as f32 + 7.5;
+        let color_ahead = match color {
+            Cell::Black => black > white,
+            Cell::White => white > black,
+            Cell::Empty => false,
+        };
+        if color_ahead {
+            1.0
+        } else {
+            0.0
+        }
     }
 }
 
