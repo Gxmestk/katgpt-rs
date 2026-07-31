@@ -16,4 +16,4 @@ katgpt-types = { path = "../katgpt-types" }
 wasm-bindgen = "0.2"
 
 [dev-dependencies]
-wasmi = "1.0"
+wasmi = { version = "1.0", features = ["simd"] }
