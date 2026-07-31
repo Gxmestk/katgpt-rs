@@ -167,23 +167,35 @@ flowchart LR
 
 ### Detailed results table
 
-| Player | Config | Win% vs Moka (n=100) | µs/move | Bench |
+| Player | Config | Win% vs Moka | µs/move | Bench |
 |---|---|---|---|---|
-| MokaPlayer | greedy argmax | 50.0% (self-play baseline) | ~400 | — |
-| GoGreedyPlayer | heuristic | 0% | ~100 | Plan 563 |
-| GoValidatorPlayer | safety rules | 0% | ~100 | Plan 563 |
-| GoHLPlayer | UCB1 bandit | 0% | ~241 | Plan 563 |
-| GoGZeroPlayer | template UCB1 | 0% | — | Plan 563 |
-| GoMctsPlayer | UCB1 MCTS budget=200 | 0% | ~2,400 | Plan 563 |
-| GoMctsMokaPlayer | UCB1 + value head | ~0% (negative) | — | Plan 563 |
-| **GoMokaSearchPlayer** | **alpha-beta, d=1, k=4** | **74.0%** | **2,016** | **Plan 563** |
-| GoOpeningBookSearchPlayer | star points 4 plies + search | 61.0% | 3,339 | Bench 204 |
-| GoOpeningBookSearchPlayer | star points 6 plies + search | 53.0% | 2,429 | Bench 204 |
-| GoOpeningBookSearchPlayer | star points 8 plies + search | 39.0% | 1,771 | Bench 204 |
-| **GoPuctMokaPlayer** | **PUCT, budget=50, k=8** | **94.0%** | **21,129** | **Bench 205** |
-| **GoPuctMokaPlayer** | **PUCT, budget=100, k=8** | **96.0%** | **42,936** | **Bench 205** |
-| **GoPuctMokaPlayer** | **PUCT, budget=200, k=8** | **98.0%** | **79,677** | **Bench 205** |
-| GoPuctMokaPlayer | PUCT, budget=100, k=4 | 96.0% | 40,809 | Bench 205 |
+| MokaPlayer | greedy argmax | 50.0% (self-play baseline, n=100) | ~400 | — |
+| GoGreedyPlayer | heuristic | 0% (n=100) | ~100 | Plan 563 |
+| GoValidatorPlayer | safety rules | 0% (n=100) | ~100 | Plan 563 |
+| GoHLPlayer | UCB1 bandit | 0% (n=100) | ~241 | Plan 563 |
+| GoGZeroPlayer | template UCB1 | 0% (n=100) | — | Plan 563 |
+| GoMctsPlayer | UCB1 MCTS budget=200 | 0% (n=100) | ~2,400 | Plan 563 |
+| GoMctsMokaPlayer | UCB1 + value head | ~0% (negative, n=100) | — | Plan 563 |
+| **GoMokaSearchPlayer** | **alpha-beta, d=1, k=4** | **74.0%** (n=100) | **2,016** | **Plan 563** |
+| GoOpeningBookSearchPlayer | star points 4 plies + search | 61.0% (n=100) | 3,339 | Bench 204 |
+| GoOpeningBookSearchPlayer | star points 6 plies + search | 53.0% (n=100) | 2,429 | Bench 204 |
+| GoOpeningBookSearchPlayer | star points 8 plies + search | 39.0% (n=100) | 1,771 | Bench 204 |
+| **GoPuctMokaPlayer** | **PUCT, budget=50, k=8** | **94.0%** (native, n=100) | **21,129** | **Bench 205** |
+| **GoPuctMokaPlayer** | **PUCT, budget=100, k=8** | **96.0%** (native, n=100) | **42,936** | **Bench 205** |
+| **GoPuctMokaPlayer** | **PUCT, budget=200, k=8** | **98.0%** (native, n=100) | **79,677** | **Bench 205** |
+| GoPuctMokaPlayer | PUCT, budget=100, k=4 | 96.0% (native, n=100) | 40,809 | Bench 205 |
+| **WasmPuctPlayer (f32)** | **PUCT, budget=50, k=8** | **100.0% (20/20)** (WASM-via-wasmi, n=20) | 29,600 (WASM V8 JIT) | **Issue 204** |
+| **WasmPuctPlayer (int8, DEFAULT)** | **PUCT, budget=50, k=8** | **85.0% (17/20)** (WASM-via-wasmi, n=20) | 25,800 (WASM V8 JIT) | **Issue 206/207** |
+
+The two WASM rows are measured through the shipped `.wasm` binary under
+[wasmi](https://github.com/paritytech/wasmi) (a deterministic IEEE-754
+interpreter — moves chosen are bit-identical to what Chrome's V8 JIT would
+produce for the same binary + inputs). n=20 because wasmi is ~46× slower
+than V8 JIT (a 100-game run would take ~73 min vs ~14.5 min). The f32 100%
+and int8 85% are both consistent with the native b50 rate of 94%: at true
+p=0.94, P(20/20) ≈ 29% — a normal high draw; the int8 quantization noise
+costs a few games at small n but stays within the binomial noise band
+(Wilson 95% CI on 85% at n=20 ≈ 64–95%). Both clear the 75% parity floor.
 
 ### Speed (Plan 565 — real browser measurements)
 
