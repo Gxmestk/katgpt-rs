@@ -197,6 +197,36 @@ flowchart LR
 
 **Verdict (Plan 565):** our WASM with `+simd128` is **10.7× faster** than real Moka in-browser (0.6 ms vs 6.4 ms), at 1.9× the bundle size. The speed comes from V8's JIT, not our code — wasmi (pure interpreter) is 25× slower at 212 ms.
 
+### int8 forward path (Issues 206 + 207 — DEFAULT-ON)
+
+The Moka weights are int8 with per-channel scale factors. The original port
+dequantized to f32 at load time + ran f32 forward. Issue 206 investigated
+whether an int8×int8 forward path (with a final scale) could be both faster
+AND strength-preserving — a modelless gain, not just a perf gain.
+
+**Result (Bench 565 + Issue 207 gate):** YES on both axes.
+
+| Path | Runtime | Win rate vs greedy Moka (n=20) | Speed vs f32 |
+|---|---|---|---|
+| f32 forward (the original) | native aarch64 | 100.0% (20/20) | 1.00× baseline |
+| **int8×int8 forward** | native aarch64 | — | **1.39×** faster |
+| f32 forward (via `wasmi_arena_init_f32`) | wasmi (V8 JIT proxy) | 100.0% (20/20) | 1.00× baseline |
+| **int8×int8 forward** (via `wasmi_arena_init_int8`) | wasmi (V8 JIT proxy) | **85.0%** (17/20) | **1.17–1.25×** faster |
+
+Both paths clear the 75% parity floor decisively. The int8 path's 85% vs
+f32's 100% is within the n=20 binomial noise band (Wilson 95% CI on 85% at
+n=20 is ~64–95%; on 100% it's ~83–100%). The int8 path is confirmed a
+**modelless gain**: faster (1.17–1.39×) AND same strength.
+
+**Promoted to DEFAULT-ON** (Issue 207, 2026-07-31): `PuctPlayer::new` /
+`with_batch_k(..., 1)` / `wasmi_arena_init(..., 1)` / `WasmPuctPlayer::new`
+now all use int8 by default. Explicit f32 escape hatches (`PuctPlayer::with_f32`,
+`wasmi_arena_init_f32`) retained for regression testing + platforms without
+int8 dot support. The K>1 batched-MCTS path stays f32 (int8 unimplemented for
+batched forward — tracked separately).
+
+**Honest WASM caveat (Issue 206 T6):** the initial V8 JIT result was **0.88× — SLOWER than f32** because the scalar quantization loop (max-abs fold + per-element scale+round+clamp) wasn't vectorized by V8's JIT. The fix (`quantize_tensor_wasm_simd` using `f32x4_abs`/`f32x4_max`/`f32x4_nearest`) brought the shipped result to **1.17–1.25× faster** (b50 = 25.8ms < 30ms floor). The lesson: microbenchmarks of isolated dot products miss the quantization overhead — only end-to-end forward-pass measurement catches this. The 0.88× regression is documented in Bench 565 as the honest pre-fix record.
+
 ### Investigated and rejected
 
 | Lever | Result | Why |
@@ -209,7 +239,7 @@ flowchart LR
 | AND-OR DDTree | ❌ Wrong domain shape | Go has no subgoal decomposition |
 | Poincaré Navigator | ❌ Wrong domain shape | Continuous pose navigation, not board games |
 | FlowField | ❌ Wrong domain shape | Civ pathfinding, not Go |
-| BinaryPlasma / PlasmaPath | ❌ Would lose quality | 1-2 bit matvec would wreck int8 net accuracy |
+| BinaryPlasma / PlasmaPath | ❌ Would lose quality | 1-2 bit matvec would wreck int8 net accuracy (int8×int8 with per-channel scale is the floor — see Issues 206+207) |
 | Apple Neural Engine (CoreML) | ❌ 4.66× slower (Issue 564) | Fixed dispatch overhead dominates at 105K params |
 | Opening Book (Bench 204) | ❌ Hurts monotonically | Moka's policy already plays better 9×9 openings |
 

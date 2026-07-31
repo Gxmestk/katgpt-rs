@@ -3109,6 +3109,7 @@ Docs are grouped into numbered folders by primitive class — see
 [Monopoly FSM](.docs/06_game_arenas/monopoly_fsm.md) ·
 [FFT Tactics Arena](.docs/06_game_arenas/fft_arena.md) ·
 [Go arena](.docs/06_game_arenas/go_arena.md) ·
+[Moka v1 head-to-head](.docs/06_game_arenas/moka_head_to_head.md) (int8 DEFAULT-ON, Issues 206+207) ·
 [open-ended evolution](.docs/06_game_arenas/open_ended_evolution.md) ·
 [HL & arena detail](.docs/06_game_arenas/hl_arena_detail.md)
 
