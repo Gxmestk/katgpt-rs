@@ -25,11 +25,13 @@ flowchart TD
     Stem["Stem Conv<br/>3×3, 12→32 channels<br/>+ ReLU"]
 
     subgraph Trunk["12× Nested Bottleneck Residual Blocks"]
-        B1["Block 1<br/>32→16→16→16→32<br/>+ global pooling branch"]
-        B2["Block 2"]
-        Dots["..."]
-        B12["Block 12"]
-        B1 --> B2 --> Dots --> B12
+        B1["Block 1-3<br/>32→16→16→16→32"]
+        B4["Block 4<br/>+ global pooling branch<br/>(every 4th block: 4, 8, 12)"]
+        B5["Blocks 5-7"]
+        B8["Block 8<br/>+ global pooling branch"]
+        B9["Blocks 9-11"]
+        B12["Block 12<br/>+ global pooling branch"]
+        B1 --> B4 --> B5 --> B8 --> B9 --> B12
     end
 
     subgraph PolicyHead["Policy Head"]
@@ -184,9 +186,9 @@ flowchart LR
 | **GoPuctMokaPlayer** | **PUCT, budget=100, k=8** | **96.0%** (native, n=100) | **42,936** | **Bench 205** |
 | **GoPuctMokaPlayer** | **PUCT, budget=200, k=8** | **98.0%** (native, n=100) | **79,677** | **Bench 205** |
 | GoPuctMokaPlayer | PUCT, budget=100, k=4 | 96.0% (native, n=100) | 40,809 | Bench 205 |
-| **WasmPuctPlayer (f32)** | **PUCT, budget=50, k=8** | **100.0% (20/20)** (WASM-via-wasmi, n=20) | 29,600 (WASM V8 JIT) | **Issue 204** |
-| **WasmPuctPlayer (int8, DEFAULT)** | **PUCT, budget=50, k=8** | **85.0% (17/20)** (WASM-via-wasmi, n=20) | 25,800 (WASM V8 JIT) | **Issue 206/207** |
-| **PuctPlayer (int8, native)** | **PUCT, budget=50, k=8** | **95.0% (19/20)** (native aarch64, n=20) | ~15,000 (native SDOT) | **Issue 207** |
+| **WasmPuctPlayer (f32)** | **PUCT, budget=50, k=8** | **100.0% (20/20)** (WASM-via-wasmi, n=20) | 29,600 (WASM V8 JIT) | **Bench 205** |
+| **WasmPuctPlayer (int8, DEFAULT)** | **PUCT, budget=50, k=8** | **85.0% (17/20)** (WASM-via-wasmi, n=20) | 25,800 (WASM V8 JIT) | **Bench 565** |
+| **PuctPlayer (int8, native)** | **PUCT, budget=50, k=8** | **95.0% (19/20)** (native aarch64, n=20) | ~15,000 (native SDOT) | **Bench 565** |
 
 The two WASM rows are measured through the shipped `.wasm` binary under
 [wasmi](https://github.com/paritytech/wasmi) (a deterministic IEEE-754

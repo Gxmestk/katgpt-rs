@@ -16,7 +16,7 @@
 | PUCT budget=200, c_puct=2.5, top_k=8 | **98.0%** | 79,677 | ~200 |
 | PUCT budget=100, c_puct=1.5, top_k=4 (narrow beam) | **96.0%** | 40,809 | ~100 |
 
-**Issue 204 addendum — WASM (Node V8 JIT) latency + wasmi win-rate parity for the same configs.** The
+**Issue 204 addendum — WASM (Node V8 JIT) latency + wasmi win-rate parity for the same configs.** (Issue 204 was the WASM PUCT port tracker, resolved + removed per the noise-reduction rule in commit `2a42539e`; the work + these numbers stand.) The
 `GoPuctMokaPlayer` algorithm was ported into `katgpt-moka-wasm` as
 `WasmPuctPlayer` (same weights, same feature encoder, only the board wrapper
 changed). Latency IS measured via Node.js V8 JIT (same engine as Chrome);
