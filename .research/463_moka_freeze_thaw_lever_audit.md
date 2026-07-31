@@ -413,6 +413,87 @@ and D4 averaging. The honest prediction: dense LoRA wins on SIMD hardware
 (contiguous access), sparse wins only if the error has strong outlier structure
 AND the hardware has fast gather (which ARM NEON partially does, WASM doesn't).
 
+### 2.8 CNN→Transformer Latent Bridge — the deeper gap (not covered by this note)
+
+*Identified during the Research 463 review conversation (2026-08-01). This is
+the root cause of WHY Research 463 exists: we can't load Moka's CNN into the
+transformer, so this note investigated freeze/thaw format conversion as a
+workaround. The bridge itself is a distinct research direction, tracked here
+as a gap, not a candidate.*
+
+**The architectural reality:**
+
+katgpt-rs provides TWO layers to Moka:
+
+| Layer | What | Moka uses it? |
+|---|---|---|
+| **SIMD primitives** (`katgpt_types::simd::simd_dot_f32`) | Hand-written NEON/AVX2 dot product kernel | ✅ YES — 8.7× speedup, the "katgpt primitive" in the head-to-head doc |
+| **Transformer engine** (`TransformerWeights`, `forward`, attention, KV cache) | Token-sequence inference engine | ❌ NO — Moka is a CNN, has zero attention layers |
+
+Moka's forward pass (`moka_net.rs::forward_with_scratch`) is **self-contained**:
+it borrows `simd_dot_f32` for conv/linear acceleration, but the computation
+graph (conv→relu→residual→pool→linear→tanh) has zero overlap with the
+transformer graph (embedding→attention→mlp→norm→KV cache). The CNN and
+transformer are completely disjoint code paths.
+
+**The gap:** `forward_with_scratch` returns only `[policy, value]` — the
+82-dim policy logits and 1-dim value scalar. The **intermediate feature
+maps** (e.g., the `[32, 9, 9]` activation after block 6) are computed and
+**thrown away**. These intermediate maps ARE latent vectors that COULD be
+bridged into the transformer's residual stream — but currently aren't exposed.
+
+**The bridge (LLaVA-for-Go pattern):**
+
+```
+Moka CNN intermediate feature map [32, 9, 9]
+      ↓ reshape to [81, 32]  (81 spatial positions × 32 channels = 81 "tokens")
+      ↓ project to [81, d_model]  (the bridge)
+      ↓ inject into transformer residual stream (forward_with_steering)
+Transformer/Gemma does attention + reasoning on Moka's "Go vision"
+      ↓
+Policy [82] + Value [1]  (or natural-language move reasoning)
+```
+
+This is structurally the LLaVA / Flamingo pattern: vision encoder (Moka CNN)
+→ projection → language model (Gemma/transformer). The projection has two paths:
+
+| Path | Method | Modelless? | Status |
+|---|---|---|---|
+| Trained (LLaVA-style) | Learn projection via backprop (riir-train) | ❌ → riir-train | Not started |
+| Deterministic | PCA / random projection / `cross_resolution_transport` (Plan 310, DEFAULT-ON) | ✅ modelless | Not started |
+
+**Why this is NOT a freeze/thaw mechanism (and thus out of scope for this note's PoC):**
+
+- Freeze/thaw (§2.4-2.7) operates at the WEIGHT level — correcting quantization
+  errors in Moka's conv kernels. It keeps Moka's CNN as a self-contained black box.
+- The latent bridge operates at the ACTIVATION level — tapping intermediate
+  feature maps and projecting them into a different architecture's latent space.
+  It opens the black box.
+
+These are different problems. The quant-error-LoRA PoC (Issue 565) tests the
+weight-level corrections; the latent bridge is a separate research question.
+
+**What would be needed to pursue this:**
+
+1. **Expose intermediate feature maps** — modify `moka_net.rs` to optionally
+   return block-N output alongside `[policy, value]` (gated behind a `research`
+   feature, off for production WASM build).
+2. **Projection layer** — `cross_resolution_transport` (Plan 310) projects
+   between different-dimensional latent spaces. A deterministic PCA projection
+   on a calibration set of Go positions gives a modelless initial bridge.
+3. **Consumer** — `forward_with_steering` (Proposal 006) injects vectors into
+   the residual stream. The projected Moka features become "steering fields."
+4. **Quality PoC** — does the transformer/Gemma actually produce BETTER Go
+   decisions when given Moka's intermediate features vs just the policy/value
+   output? This is the load-bearing question.
+
+**Verdict: separate research direction, not a Research 463 candidate.** This
+note's scope is weight-space freeze/thaw mechanisms. The latent bridge is an
+activation-space mechanism that requires opening Moka's black box. Tracked as
+a gap here so it's not lost; a future Research note (or Issue) should formalize
+the PoC if a consumer materializes (e.g., Proposal 008's Gemma Go Arena needs
+better Go understanding than text-based parse-fallback provides).
+
 ## 3. Verdict
 
 **Tier: Gain** (for the candidate family — 4 modelless quantization-compensation strategies).
@@ -512,6 +593,7 @@ impl QuantErrorLora {
 - **No plan.** Issue 565 tracks the PoC. If the PoC passes G1-G4, THEN open a plan for the primitive + promotion gate.
 - **No riir-train deferral.** The SVD LoRA is genuinely modelless (closed-form). The only riir-train dependency is the DEC-enriched-input angle (§2.5), which is honestly Pass for modelless.
 - **No Conv-as-Attention primitive.** Mathematical curiosity, zero modelless win (§2.3).
+- **No CNN→Transformer Latent Bridge.** The deepest unexplored direction (§2.8) — expose Moka's intermediate feature maps + project into the transformer residual stream via `cross_resolution_transport`. This is an activation-space mechanism (opening the CNN black box), not a weight-space mechanism (the scope of this note). It's the root cause of why Research 463 exists at all: we can't load the CNN into the transformer, so this note tried freeze/thaw format conversion instead. The bridge is a separate research question that needs its own PoC if a consumer materializes.
 
 ## 6. Honest Prediction (pre-PoC)
 
