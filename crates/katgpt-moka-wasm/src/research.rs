@@ -339,6 +339,73 @@ pub struct ForwardCorrections<'a> {
     pub value_output: Correction<'a>,
 }
 
+/// Owned counterpart to [`ForwardCorrections`] — owns the correction matrices
+/// so the bundle can be stored in a struct field (e.g. `PuctPlayer::corrected`)
+/// without lifetime gymnastics. The PoC's `CorrectionsBundle` pattern lifted
+/// into the crate so `PuctPlayer::with_corrected` (Issue 565 G5) can consume it.
+///
+/// Built from per-layer correction matrices (one `Vec<f32>` per layer, in
+/// `MokaWeights::iter_layers()` order). The `forward_corrections()` method
+/// borrows the matrices as a lifetime-erased `ForwardCorrections<'static>` —
+/// safe because the `OwnedCorrections` owns the matrices and outlives any
+/// `ForwardCorrections` it hands out.
+pub struct OwnedCorrections {
+    /// Per-layer correction matrices, in `iter_layers()` order: stem, then
+    /// block layers (reduce, first, [hidden, output], second, expand per block),
+    /// then policy_conv, policy_linear, value_conv, value_hidden, value_output.
+    matrices: Vec<Vec<f32>>,
+    /// Per-layer (out_dim, in_dim), aligned with `matrices`.
+    dims: Vec<(usize, usize)>,
+}
+
+impl OwnedCorrections {
+    /// Build from per-layer matrices + dims. `matrices[i]` is the correction
+    /// for layer `i` in `MokaWeights::iter_layers()` order; `dims[i]` is its
+    /// `(out_dim, in_dim)`.
+    pub fn from_layers(matrices: Vec<Vec<f32>>, dims: Vec<(usize, usize)>) -> Self {
+        debug_assert_eq!(matrices.len(), dims.len());
+        Self { matrices, dims }
+    }
+
+    /// Borrow the owned matrices as a `ForwardCorrections<'static>` for use
+    /// with [`forward_corrected_with_scratch`].
+    ///
+    /// # Safety
+    ///
+    /// The returned `ForwardCorrections` borrows from `self` with a `'static`
+    /// lifetime. This is sound as long as the caller does not move or drop
+    /// `self` while the `ForwardCorrections` is live — i.e. `self` must outlive
+    /// every `forward_corrected_with_scratch` call made using the returned
+    /// reference. `PuctPlayer::with_corrected` guarantees this by storing the
+    /// `OwnedCorrections` as a field that outlives every `forward_leaf` call.
+    pub fn forward_corrections(&self) -> ForwardCorrections<'static> {
+        let n = self.matrices.len();
+        // Layer layout: stem(1) + block_layers + 5 heads.
+        // The number of block layers depends on the architecture. We infer it
+        // from the total: n_block = n - 1 - 5.
+        let n_heads = 5usize;
+        let n_block = n.saturating_sub(1 + n_heads);
+        let full = |i: usize| -> Correction<'static> {
+            let (out_dim, in_dim) = self.dims[i];
+            // SAFETY: self.matrices[i] outlives the returned ForwardCorrections
+            // because self (OwnedCorrections) is stored in PuctPlayer and
+            // outlives every forward_corrections() call.
+            let mat: &'static [f32] =
+                unsafe { std::mem::transmute(&self.matrices[i][..]) };
+            Correction::Full { mat, out_dim, in_dim }
+        };
+        ForwardCorrections {
+            stem: full(0),
+            block_layers: (1..=n_block).map(full).collect(),
+            policy_conv: full(1 + n_block),
+            policy_linear: full(2 + n_block),
+            value_conv: full(3 + n_block),
+            value_hidden: full(4 + n_block),
+            value_output: full(5 + n_block),
+        }
+    }
+}
+
 /// Run the full Moka forward pass with quantized weights + per-layer
 /// corrections. Same arithmetic as `forward_with_scratch` but each conv/linear
 /// output gets `+= correction(patch)`.

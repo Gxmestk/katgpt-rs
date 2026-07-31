@@ -122,6 +122,16 @@ pub struct PuctPlayer {
     policy_batch_buf: Vec<f32>,
     value_batch_buf: Vec<f32>,
     nodes_evaluated: usize,
+    /// Corrected-forward state (Issue 565 G5). When present, `expand` uses
+    /// `research::forward_corrected_with_scratch` instead of the f32/int8
+    /// path. This enables the quant-error-compensating LoRA win-rate test:
+    /// the player simulates the ternary+LoRA path by running f32 weights +
+    /// a correction matrix that encodes the net (ternary + SVD_r(E)) weights.
+    /// Gated behind `research` (PoC-only — production never enables this).
+    #[cfg(feature = "research")]
+    corrected: Option<crate::research::OwnedCorrections>,
+    #[cfg(feature = "research")]
+    lora_scratch: Vec<f32>,
 }
 
 /// Virtual loss magnitude applied during batched selection (Issue 205).
@@ -193,7 +203,38 @@ impl PuctPlayer {
             policy_batch_buf: vec![0.0; k * moka::POLICY_MOVES],
             value_batch_buf: vec![0.0; k],
             nodes_evaluated: 0,
+            #[cfg(feature = "research")]
+            corrected: None,
+            #[cfg(feature = "research")]
+            lora_scratch: Vec::new(),
         }
+    }
+
+    /// Construct with the corrected-forward path enabled (Issue 565 G5).
+    /// The player runs `research::forward_corrected_with_scratch` on every
+    /// leaf evaluation, applying the supplied correction bundle. This is the
+    /// PoC vehicle for the quant-error-compensating LoRA win-rate test: the
+    /// caller builds the corrections (encoding ternary + weight-space SVD of
+    /// the error) and the player simulates the net behavior end-to-end.
+    ///
+    /// Always K=1 (sequential — the corrected path is not batched). The int8
+    /// path is disabled (the corrected path uses f32 weights + corrections).
+    /// Gated behind `research` — PoC-only, never in the WASM browser build.
+    #[cfg(feature = "research")]
+    pub fn with_corrected(
+        budget: usize,
+        c_puct: f32,
+        top_k: usize,
+        corrections: crate::research::OwnedCorrections,
+    ) -> Self {
+        let mut player = Self::with_options(budget, c_puct, top_k, 1, false);
+        // Size lora_scratch for the largest correction matrix's rank. The
+        // Correction::Full path uses out_dim×in_dim but doesn't touch
+        // lora_scratch; the Dense/Sparse paths do. A safe default: 64 (the
+        // max rank the PoC ever uses). The Full path ignores this buffer.
+        player.lora_scratch = vec![0.0f32; 64];
+        player.corrected = Some(corrections);
+        player
     }
 
     #[inline]
@@ -247,15 +288,34 @@ impl PuctPlayer {
         // no allocation happens here (Board is Copy, so parent_state was a
         // stack copy above — zero heap alloc in this hot path).
         moka::encode_features_into(&parent_state, &hist, &mut self.features_buf);
-        let (policy, value) = if let (Some(w), Some(s)) = (self.weights_i8.as_ref(), self.scratch_i8.as_mut()) {
-            crate::moka_int8::forward_int8_with_scratch(w, &self.features_buf, s)
-        } else {
-            moka::forward_with_scratch(&self.weights, &self.features_buf, &mut self.scratch)
-        };
+        let (policy, value) = self.forward_leaf();
         self.nodes_evaluated += 1;
 
         self.expand_with_policy_value(node_idx, &policy, value);
         value
+    }
+
+    /// Run the forward pass on `features_buf` using the active path (corrected /
+    /// int8 / f32). The corrected path takes priority when present (Issue 565 G5);
+    /// otherwise the int8 path is used when int8 weights are loaded; otherwise
+    /// the f32 path. Returns `(policy_logits[POLICY_MOVES], value_tanh)`.
+    #[inline]
+    fn forward_leaf(&mut self) -> ([f32; moka::POLICY_MOVES], f32) {
+        #[cfg(feature = "research")]
+        if let Some(corrections) = self.corrected.as_ref() {
+            return crate::research::forward_corrected_with_scratch(
+                &self.weights,
+                &self.features_buf,
+                &mut self.scratch,
+                &corrections.forward_corrections(),
+                &mut self.lora_scratch,
+            );
+        }
+        if let (Some(w), Some(s)) = (self.weights_i8.as_ref(), self.scratch_i8.as_mut()) {
+            crate::moka_int8::forward_int8_with_scratch(w, &self.features_buf, s)
+        } else {
+            moka::forward_with_scratch(&self.weights, &self.features_buf, &mut self.scratch)
+        }
     }
 
     /// Prepare a single leaf for batched evaluation: mark expanded, handle

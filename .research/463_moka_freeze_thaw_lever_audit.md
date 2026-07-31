@@ -3,7 +3,7 @@
 > **Source:** internal question (2026-07-31), grounded in
 > [`moka_head_to_head.md`](../.docs/06_game_arenas/moka_head_to_head.md) §"Investigated and rejected" (lines 249-264).
 > **Date:** 2026-07-31
-> **Status:** Done — verdict Gain, PoC tracked in Issue 565.
+> **Status:** Done — verdict Gain (substrate ships), PoC DECISIVELY NEGATIVE on G5 (Issue 565 CLOSED). The modelless quant-error-LoRA approach is unviable for Moka's ternary path; the primitive ships as reusable substrate for larger models.
 > **Related Research:** 110 (Ciot / PlasmaPath ternary), 132 (LoRAPrune), 202 (QAT Infusion), 229 (ProgramAsWeights F4 SpecAdapter), 062 (SHINE — context-to-LoRA hypernetwork)
 > **Related Plans:** 148 (PlasmaPath ternary SIMD matvec), 025 (LoraPair raw/lora hot-swap), 563 (Go Moka baseline PoC — native port), 565 (Moka WASM browser + wasmi comparison)
 > **Related Docs:** [`moka_head_to_head.md`](../.docs/06_game_arenas/moka_head_to_head.md) (the complete record — architecture, PUCT results, int8 path, rejection table), [`go_arena.md`](../.docs/06_game_arenas/go_arena.md) (Go Arena overview — 6 player tiers, Plan 565 real-browser results, wasmi ladder)
@@ -688,3 +688,52 @@ ternary SIMD would need a custom kernel + the rank-32 LoRA is f32 matmul);
 zero net gain. G5 is deferred — wire it only if a future consumer needs the
 ternary+LoRA path for a reason int8 doesn't satisfy (e.g., extreme model
 compression for edge deployment where ternary's 16× storage win matters).
+
+### G5 Addendum (2026-08-01) — DECISIVELY NEGATIVE
+
+G5 was run (no longer deferred). The prediction was correct: G5 FAILS, but
+harder than predicted — not just "below int8's 95%" but **0% win-rate**.
+
+| Strategy | Win-rate (n=20, b=50, vs greedy f32) |
+|---|---|
+| f32 (zero-correction harness baseline) | **100% (20/20)** |
+| B2 (ternary-only) | **0% (0/20)** |
+| A rank-32 (ternary+weight-space SVD LoRA) | **0% (0/20)** |
+
+**The prediction was right about FAIL but wrong about WHY.** The pre-PoC +
+revised predictions focused on "near-perfect cosine ≠ identical move selection
+under PUCT." The actual failure is more fundamental: the residual error after
+rank-32 LoRA correction (cosine 0.9939, 78% of error energy captured) is still
+large enough to **collapse PUCT strength entirely**, not just degrade it.
+
+**Root cause analysis:**
+1. **PUCT amplifies small policy perturbations through search.** The total abs
+diff between f32 and A32 policy is ≈45 across 82 moves (0.55/move). Greedy
+move selection can tolerate this (the argmax rarely flips for clearly-best
+moves). But PUCT runs budget=50 simulations per move, each exploring slightly
+different branches due to softmax priors on the perturbed logits. The
+perturbations compound over the search tree, leading to systematically worse
+move selection.
+2. **Value head residual error causes excessive passing.** The diagnostic shows
+the ternary PUCT player passes 26+ times per game (vs ~17 actual moves).
+This indicates the value head evaluates positions as losing, causing PUCT to
+prefer passing (the "resign" move) over playing.
+3. **Comparison to int8 (which achieves 85-95%):** int8's error is UNIFORM
+(small, symmetric, ~5% relative), so the softmax priors are only slightly
+perturbed. Ternary's error is STRUCTURED (large, biased, 145% relative), and
+the LoRA correction removes the bias but leaves residual structure. The 0.6%
+cosine gap (0.9939 vs 1.0) is the residual structure that PUCT amplifies.
+
+**The lesson, generalized:** cosine similarity ≥ 0.99 is a NECESSARY but NOT
+SUFFICIENT condition for PUCT parity. The sufficient condition is tighter
+(closer to 0.999+) because PUCT's search amplifies residual errors. This sets
+a higher bar than greedy-move parity — the int8 path (0.97 cosine, 85-95%
+win-rate) is a surprising outlier that works because its error is uniform.
+
+**Final verdict:** The modelless quant-error-compensating LoRA approach is
+unviable for the ternary path on Moka v1. Issue 565 is CLOSED. The
+`quant_error_lora` primitive ships as reusable substrate for larger models
+where the error manifold is genuinely low-rank AND the target is greedy-move
+parity (not PUCT parity) — e.g., Gemma 2 2B if ever aggressively quantized
+for edge deployment (Proposal 008). The trained-projection path (riir-train)
+is the only remaining option for Moka, same verdict as Issue 566.

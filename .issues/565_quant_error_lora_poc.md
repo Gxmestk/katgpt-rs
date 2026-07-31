@@ -4,9 +4,10 @@
 > **Updated:** 2026-07-31 (enriched with 3 additional strategies from Gemini consultation)
 > **Updated:** 2026-08-01 (T1-T7, T12 RUN — G1/T12 results recorded)
 > **Updated:** 2026-08-01 (G1-B proper-calibration Strategy B — negative result confirmed as REAL)
+> **Updated:** 2026-08-01 (G5 RUN — DECISIVELY NEGATIVE: ternary path unviable under PUCT, LoRA doesn't fix it)
 > **Research:** [463](../.research/463_moka_freeze_thaw_lever_audit.md)
 > **Type:** defend-wrong PoC (per research skill §3.6)
-> **Status:** Active (G1/T12 done; G5 deferred pending G5 wiring decision)
+> **Status:** CLOSED — all gates run, G5 DECISIVELY NEGATIVE (ternary+LoRA = 0% win-rate vs f32's 100%). The modelless quant-error-compensating LoRA approach is confirmed unviable for the ternary path; the trained-projection path (riir-train) is the only remaining option, same verdict as Issue 566.
 
 ## Context
 
@@ -62,12 +63,16 @@ The PoC's value is negative knowledge + reusable substrate regardless of outcome
 - [x] **T7** — G2 (latency) measured. The `Correction::Full` measurement vehicle
       has 1128% overhead (expected — it's full dense matvec, not rank-r LoRA).
       The production rank-8 LoRA would have 27.8% overhead per Research 463 §2.4.1.
-- [ ] **T8** — G5 (win-rate vs int8): NOT RUN. Needs PUCT integration (the
-      forward_corrected path exists but PuctPlayer doesn't call it yet). The G1
-      result (0.9939 at rank-32) is promising but the int8 baseline is already
-      at 95% win-rate — the ternary+LoRA path needs to beat that.
-- [ ] **T9** — If ALL FAIL G5: record raw numbers. Deferred pending T8.
-- [ ] **T10** — If ANY PASS G5: open plan. Deferred pending T8.
+- [x] **T8** — G5 (win-rate vs greedy f32): RUN. Both B2 (ternary-only) and
+      A rank-32 (ternary+LoRA) scored **0/20 (0%)** vs f32's **20/20 (100%)**
+      through the same corrected-forward harness. The G1 cosine gate (0.9939)
+      does NOT translate to PUCT parity — the residual 0.6% error is amplified
+      by the softmax priors into a catastrophic strength collapse. See §G5
+      Results below.
+- [x] **T9** — ALL FAILED G5: recorded. See §G5 Results below.
+- [-] **T10** — N/A (no strategy passed G5, so no plan to open). The
+      trained-projection path (riir-train) is the only remaining option,
+      same verdict as Issue 566.
 - [x] **T11** — Results recorded in this issue + the bench output.
 - [x] **T12** — Small-Kernel Paradox measured. See §PoC Results below.
 
@@ -199,20 +204,40 @@ would use rank-r LoRA (27.8% overhead at rank-8 per Research 463 §2.4.1) on
 ternary SIMD matvec. This measurement confirms the plumbing works; the
 production cost model is in Research 463 §2.4.1.
 
-### G5 — Win-rate vs int8 (NOT RUN)
+### G5 — Win-rate vs greedy f32 (RUN, DECISIVELY NEGATIVE)
 
-G5 needs PUCT integration (the `forward_corrected_with_scratch` exists but
-`PuctPlayer` doesn't call it yet — needs a corrected-forward mode added).
+The corrected-forward mode was wired into `PuctPlayer` (behind the `research`
+feature: `with_corrected` constructor + `forward_leaf` branch). The G5 test
+runs n=20 games at budget=50 vs greedy f32 Moka, same seed convention as
+`native_puct_winrate.rs` so the games are directly comparable.
 
-The G1 result (0.9939 at rank-32) is promising, but the prediction from
-Research 463 §6 stands: the int8 baseline is already at 95% win-rate (Bench
-565), within binomial noise of f32. The ternary+LoRA path needs to beat that
-bar, and even a near-perfect cosine (0.9939) doesn't guarantee the same
-MOVE SELECTION under PUCT search (tiny policy perturbations can change the
-argmax, especially for close moves). G5 remains the load-bearing gate.
+| Strategy | Win-rate (n=20) | Verdict |
+|---|---|---|
+| **f32** (zero-corr harness) | **100% (20/20)** | Harness verified correct |
+| B2 (ternary-only) | **0% (0/20)** | Ternary path catastrophically bad |
+| A rank-32 (ternary+LoRA) | **0% (0/20)** | LoRA correction does NOT help |
 
-**Decision: G5 is deferred.** The G1/T12 results are sufficient negative+
-positive knowledge to update Research 463. Wiring G5 requires adding a
-corrected-forward mode to `PuctPlayer` (analogous to `with_int8`/`with_f32`)
-+ running n=100 games — ~2 hours of additional work for a gate predicted to
-fail. If a future consumer needs the ternary+LoRA path, G5 can be wired then.
+**Root cause:** The G1 cosine gate (0.9939 at rank-32) is a NECESSARY but NOT
+SUFFICIENT condition for PUCT parity. PUCT uses softmax priors to guide search
+exploration — even tiny logit differences (total abs diff ≈ 45 across 82 moves
+= 0.55/move) change the exploration distribution. Over a budget=50 search,
+these perturbations compound: the search explores slightly different branches,
+and the value head's small errors accumulate. The ternary PUCT player passes
+excessively (26+ passes per game vs ~17 moves), indicating it evaluates its
+positions as losing — consistent with the value head's residual error.
+
+**The key lesson:** cosine similarity 0.9939 is NOT sufficient for PUCT parity.
+The bar for PUCT-usable forward-output fidelity is higher than for greedy-move
+parity (where int8's 0.97 cosine suffices for 85-95% win-rate). This is because
+PUCT amplifies small policy perturbations through search, while greedy move
+selection only depends on the single argmax.
+
+**Comparison to int8:** The int8 path achieves 85-95% win-rate with 0.97
+cosine. The ternary+LoRA path achieves 0% with 0.9939 cosine. The difference:
+int8's error is UNIFORM (small, symmetric noise) while ternary's error is
+STRUCTURED (large, biased — 145% relative error), and the LoRA correction
+removes the bias but leaves residual structure that PUCT amplifies.
+
+**Decision:** G5 FAILS. The modelless quant-error-compensating LoRA approach
+is unviable for the ternary path. Issue 565 is CLOSED. The trained-projection
+path (riir-train) is the only remaining option, same verdict as Issue 566.
