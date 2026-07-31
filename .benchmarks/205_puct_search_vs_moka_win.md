@@ -8,13 +8,32 @@
 
 **Yes, decisively. PUCT jumps the win rate from 74% to 98%.** This is the last unexplored lever identified in the prior session's primitive audit — and it works exactly as AlphaZero demonstrated: combining the policy head (as exploration prior) with the value head (as leaf evaluator) in a proper MCTS tree extracts dramatically more strength from the same 105K-param network than fixed-depth alpha-beta.
 
-| Config | Win% vs Moka (n=100) | µs/move | Forward passes/move |
+| Config | Win% vs Moka (n=100) | µs/move (native) | Forward passes/move |
 |---|---|---|---|
 | Alpha-beta (depth=1, top_k=4) — Plan 563 baseline | **74.0%** | 2,016 | ~4-8 |
 | PUCT budget=50, c_puct=1.5, top_k=8 | **94.0%** | 21,129 | ~50 |
 | PUCT budget=100, c_puct=1.5, top_k=8 | **96.0%** | 42,936 | ~100 |
 | PUCT budget=200, c_puct=2.5, top_k=8 | **98.0%** | 79,677 | ~200 |
 | PUCT budget=100, c_puct=1.5, top_k=4 (narrow beam) | **96.0%** | 40,809 | ~100 |
+
+**Issue 204 addendum — WASM (real Chrome) latency for the same configs.** The
+`GoPuctMokaPlayer` algorithm was ported into `katgpt-moka-wasm` as
+`WasmPuctPlayer` (same weights, same feature encoder, only the board wrapper
+changed). Win rates above are NATIVE (Bench 205); the WASM port is
+byte-identical in algorithm so strength parity is structural, but was NOT
+re-measured in-browser. Latency IS measured in real Chrome:
+
+| Config | Median ms/move (real Chrome) | Avg nodes/move | ms/node |
+|---|---|---|---|
+| PUCT budget=50, c=1.5, top_k=8 | **29.8** | 50 | 0.594 |
+| PUCT budget=100, c=1.5, top_k=8 | **59.4** | 100 | 0.594 |
+| PUCT budget=200, c=2.5, top_k=8 | **118.1** | 200 | 0.591 |
+
+Per-node ~0.59 ms = ~0.50 ms forward pass (Table B) + ~0.09 ms tree overhead.
+wasmi upper bound (interpreted, no JIT): b200 = 5,462 ms/move (~46× slower
+than Chrome JIT, confirms JIT is where ~98% of perf lives). Full record:
+`katgpt-rs/.docs/06_game_arenas/go_arena.md` Table C +
+`.issues/204_wasm_puct_combined_measurement.md`.
 
 All games use GO_OPENING_MOVES=4 (random prefix for variance). Board: 9×9.
 

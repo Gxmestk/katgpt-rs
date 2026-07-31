@@ -1,7 +1,7 @@
 # Issue 204: Port PUCT into `katgpt-moka-wasm` + measure the combined build
 
 **Date:** 2026-07-31
-**Status:** IN PROGRESS
+**Status:** ✅ RESOLVED (code + measurements landed)
 **Kind:** measurement gap (POC/proof task)
 **Blocks:** closes the `go_arena.md` Table-A-vs-Table-B non-combination footnote
 
@@ -57,17 +57,37 @@ Then replace the doc's footnote with a real row.
 
 ## Scope (concrete)
 
-- [ ] Extend `Board`: add `consecutive_passes: u8` (track in `play`/`pass`),
+- [x] Extend `Board`: add `consecutive_passes: u8` (track in `play`/`pass`),
       `is_game_over()`, `area_score(color)` for terminal reward.
-- [ ] Port `PuctNode` + search loop into `katgpt-moka-wasm/src/puct.rs`
+- [x] Port `PuctNode` + search loop into `katgpt-moka-wasm/src/puct.rs`
       (adapt `GoState`→`Board`, `GoAction`→`Option<usize>` action).
-- [ ] Add raw C-ABI `wasmi_puct_search` export (mirrors `wasmi_infer`).
-- [ ] Add wasm-bindgen `WasmPuctPlayer` export for the browser harness.
-- [ ] Add `wasmi_puct_latency` test (budget=50/100/200).
-- [ ] Add `bench_puct.html` browser harness; run in real Chrome via
+- [x] Add raw C-ABI `wasmi_puct_search` export (mirrors `wasmi_infer`).
+- [x] Add wasm-bindgen `WasmPuctPlayer` export for the browser harness.
+- [x] Add `wasmi_puct_latency` test (budget=50/100/200).
+- [x] Add `bench_puct.html` browser harness; run in real Chrome via
       Playwright for the headline number.
-- [ ] Update `go_arena.md` Table B footnote → real row with measured latency.
-- [ ] Update `.benchmarks/205_puct_search_vs_moka_win.md` with a WASM column.
+- [x] Update `go_arena.md` Table B footnote → real Table C with measured latency.
+- [x] Update `.benchmarks/205_puct_search_vs_moka_win.md` with a WASM column.
+
+## Results (the headline)
+
+Real Chrome via Playwright, mid-game fixture (8 stones), n=10 moves/config:
+
+| Config | Median ms/move | Avg nodes/move | ms/node |
+|---|---|---|---|
+| PUCT b50  | **29.8**  | 50  | 0.594 |
+| PUCT b100 | **59.4**  | 100 | 0.594 |
+| PUCT b200 | **118.1** | 200 | 0.591 |
+
+wasmi upper bound (interpreted, no JIT): b50=1,288 ms, b100=2,744 ms,
+b200=5,462 ms per move.
+
+**The projection was right.** Combined PUCT+WASM-200 is ~118 ms/move — ~18.5×
+slower than real Moka greedy (6.4 ms), while winning ~94–98%. The "10.7×
+faster" headline from Table B survives ONLY at greedy strength (where we
+lose to Moka). Combining the two good things inverts the speed headline;
+only the strength advantage remains. The honest framing replaces the prior
+defensive two-table split — see `go_arena.md` Table C.
 
 ## Honest scope note
 
