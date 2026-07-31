@@ -16,18 +16,18 @@
 | PUCT budget=200, c_puct=2.5, top_k=8 | **98.0%** | 79,677 | ~200 |
 | PUCT budget=100, c_puct=1.5, top_k=4 (narrow beam) | **96.0%** | 40,809 | ~100 |
 
-**Issue 204 addendum — WASM (real Chrome) latency + wasmi win-rate parity for the same configs.** The
+**Issue 204 addendum — WASM (Node V8 JIT) latency + wasmi win-rate parity for the same configs.** The
 `GoPuctMokaPlayer` algorithm was ported into `katgpt-moka-wasm` as
 `WasmPuctPlayer` (same weights, same feature encoder, only the board wrapper
-changed). Latency IS measured in real Chrome; win rate IS measured via wasmi
-(a deterministic IEEE-754 interpreter — same binary, same moves as Chrome's
-JIT, just ~46× slower):
+changed). Latency IS measured via Node.js V8 JIT (same engine as Chrome);
+win rate IS measured via wasmi (a deterministic IEEE-754 interpreter — same
+binary, same moves as V8 JIT, just ~46× slower):
 
-| Config | Win% vs Moka (WASM-via-wasmi) | n | Median ms/move (real Chrome) | Avg nodes/move | ms/node |
+| Config | Win% vs Moka (WASM-via-wasmi) | n | Median ms/move (Node V8 JIT) | Avg nodes/move | ms/node |
 |---|---|---|---|---|---|
-| PUCT budget=50, c=1.5, top_k=8 | **100.0%** (20/20) | 20 | **29.8** | 50 | 0.594 |
-| PUCT budget=100, c=1.5, top_k=8 | — (b50 dominates) | — | **59.4** | 100 | 0.594 |
-| PUCT budget=200, c=2.5, top_k=8 | — (b50 dominates) | — | **118.1** | 200 | 0.591 |
+| PUCT budget=50, c=1.5, top_k=8 | **100.0%** (20/20) | 20 | **29.6** | 50 | 0.592 |
+| PUCT budget=100, c=1.5, top_k=8 | — (b50 dominates) | — | **59.8** | 100 | 0.598 |
+| PUCT budget=200, c=2.5, top_k=8 | — (b50 dominates) | — | **119.6** | 200 | 0.598 |
 
 Only b50 was run for win rate (871s for n=20 under wasmi); b100/b200 strictly
 dominate b50 on strength, so their win rates are bounded below by 100%. Native
@@ -35,8 +35,13 @@ Bench 205's b50 was 94% (n=100); the 100% here is consistent (at p=0.94,
 P(20/20) ≈ 29% — a normal high draw, not a divergence).
 
 Per-node ~0.59 ms = ~0.50 ms forward pass (Table B) + ~0.09 ms tree overhead.
-wasmi upper bound (interpreted, no JIT): b200 = 5,462 ms/move (~46× slower
-than Chrome JIT, confirms JIT is where ~98% of perf lives).
+wasmi upper bound (interpreted, no JIT): b50=1,260, b100=2,508, b200=5,031
+ms/move (~46× slower than V8 JIT, confirms JIT is where ~98% of perf lives).
+
+Tree-allocation optimization (zero-alloc board + stack neighbors + early-exit
+liberty check) gave 7–9% under wasmi but within noise under V8 JIT (29.6 vs
+29.8ms) — the forward pass is 84% of per-node cost, so tree-side optimization
+cannot move the needle; the only path dramatically below 30ms is batched MCTS.
 
 All games use GO_OPENING_MOVES=4 (random prefix for variance). Board: 9×9.
 

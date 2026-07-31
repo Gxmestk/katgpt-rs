@@ -692,17 +692,21 @@ This measures one greedy forward pass, analogous to native `MokaPlayer` (argmax 
 
 The measurement the prior doc sidestepped. `GoPuctMokaPlayer` (from `katgpt-pruners`) ported into `katgpt-moka-wasm` as `WasmPuctPlayer`, adapted to that crate's standalone `Board` (no `katgpt-core` dep — same forward pass, same vendored weights, same feature encoder, only the board wrapper changed). Both latency and win-rate are now measured:
 
-| Config | Win% vs Moka (WASM-via-wasmi) | n | Median ms/move (real Chrome) | Avg nodes/move | ms/node |
+| Config | Win% vs Moka (WASM-via-wasmi) | n | Median ms/move (Node V8 JIT) | Avg nodes/move | ms/node |
 |---|---|---|---|---|---|
-| PUCT budget=50, c=1.5, top_k=8 | **100.0%** (20/20) | 20 | **29.8 ms** | 50 | 0.594 |
-| PUCT budget=100, c=1.5, top_k=8 | — (b50 dominates) | — | **59.4 ms** | 100 | 0.594 |
-| PUCT budget=200, c=2.5, top_k=8 | — (b50 dominates) | — | **118.1 ms** | 200 | 0.591 |
+| PUCT budget=50, c=1.5, top_k=8 | **100.0%** (20/20) | 20 | **29.6 ms** | 50 | 0.592 |
+| PUCT budget=100, c=1.5, top_k=8 | — (b50 dominates) | — | **59.8 ms** | 100 | 0.598 |
+| PUCT budget=200, c=2.5, top_k=8 | — (b50 dominates) | — | **119.6 ms** | 200 | 0.598 |
 
 Win-rate is measured via wasmi (`tests/wasmi_puct_winrate.rs`) — a deterministic IEEE-754 interpreter, so the moves chosen (and therefore the win rate) are bit-identical to what Chrome's V8 JIT would produce for the same binary + inputs. Only b50 was run (871s for n=20); b100/b200 strictly dominate b50 on strength, so their win rates are bounded below by 100% — they were not re-run. Native Bench 205's b50 was 94% (n=100); the 100% here is consistent (at p=0.94, P(20/20) ≈ 29% — a normal high draw, not a divergence). Native figures for reference: b50=94%, b100=96%, b200=98% (all n=100, Table A).
 
-Latency scales linearly (29.8→59.4→118.1 doubles at each step) — pure per-simulation cost dominates, no fixed overhead amortizing away. Per-node: **~0.59 ms**, of which the forward pass alone is ~0.5 ms (Table B's figure), so tree overhead (board clone, softmax prior, arena push, negamax backprop) is only ~0.09 ms/node — a ~18% tax on the forward pass.
+Latency scales linearly (29.6→59.8→119.6 doubles at each step) — pure per-simulation cost dominates, no fixed overhead amortizing away. Per-node: **~0.59 ms**, of which the forward pass alone is ~0.5 ms (Table B's figure), so tree overhead (board clone, softmax prior, arena push, negamax backprop) is only ~0.09 ms/node — a ~18% tax on the forward pass.
 
-**wasmi upper bound** (pure interpreter, no JIT, SIMD-on): b50=1,288 ms, b100=2,744 ms, b200=5,462 ms per move. ~46× slower than real Chrome — confirms JIT compilation is where ~98% of the performance lives.
+**Latency measured via Node.js V8 JIT** (same engine as Chrome — `node bench_puct_node.js` loads the raw `.opt.wasm` via `WebAssembly.instantiate` and times the arena C-ABI exports). Earlier Playwright/Chrome numbers (29.8/59.4/118.1) matched within noise; Node V8 is faster to drive (no browser harness setup) and re-runs cleanly on every rebuild.
+
+**wasmi upper bound** (pure interpreter, no JIT, SIMD-on): b50=1,260 ms, b100=2,508 ms, b200=5,031 ms per move. ~46× slower than V8 JIT — confirms JIT compilation is where ~98% of the performance lives.
+
+**Tree-allocation optimization (attempted, honest result):** the PUCT tree hot path was rewritten to eliminate ~800 heap allocations/move (`Board` `Vec<Cell>`→`[Cell;81]`+Copy; `neighbors()` `Vec`→stack `[usize;4]`; `would_be_suicide` uses zero-alloc early-exit `has_liberty` instead of full `flood_group`). Under wasmi this gave 7–9% (b100: 2744→2508, b200: 5462→5031). Under V8 JIT: **within noise** (29.6 vs 29.8ms original). The forward pass is 84% of per-node cost (0.5ms × 50 nodes = 25ms); tree allocations are ~0.2% of total. **Tree-side optimization cannot move the needle** — the only path dramatically below 30ms is batched MCTS (evaluate K leaves per forward pass instead of 1).
 
 **Summary matrix (each build's trade-off, one row each):**
 
@@ -710,8 +714,8 @@ Latency scales linearly (29.8→59.4→118.1 doubles at each step) — pure per-
 |---|---|---|---|---|---|
 | Moka (real, reference) | — (baseline) | 6.4 ms | 140,850 B | — | — |
 | Ours — greedy (Table B) | ≈50% (mirror — same weights) | 0.5 ms | 273,218 B | **yes (10.7×)** | no |
-| Ours — PUCT b50 (Table C) | **100%** | 29.8 ms | 273,218 B | no (~4.7× slower) | **yes** |
-| Ours — PUCT b200 (Table C) | 98% (native) | 118.1 ms | 273,218 B | no (~18.5× slower) | **yes** |
+| Ours — PUCT b50 (Table C) | **100%** | 29.6 ms | 273,218 B | no (~4.6× slower) | **yes** |
+| Ours — PUCT b200 (Table C) | 98% (native) | 119.6 ms | 273,218 B | no (~18.7× slower) | **yes** |
 
 No single build is both faster AND stronger than Moka. The greedy build wins on speed but loses on strength; the PUCT builds win on strength but lose on speed. These are the measured numbers — not projected.
 
