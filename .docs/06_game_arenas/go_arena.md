@@ -647,14 +647,16 @@ Every prior "Moka: ~0.5ms/move" figure in this document was **our own native por
 
 **Correction along the way, worth stating plainly:** Moka's actual shipped runtime is **100% hand-written TypeScript**, not WASM at all — traced every code path in the cloned repo; the only `WebAssembly` reference anywhere is ONNX Runtime running KataGo (their much bigger teacher, used as an arena opponent), unrelated to Moka itself. The comparison is therefore "our Rust→WASM vs their hand-written JS," both JIT-compiled by V8 — not "WASM vs WASM," which was the wrong initial framing.
 
-### Results (all real measurements — real Chrome via Playwright, or native wasmi — not self-benchmarked)
+### Results (all real measurements — real Chrome via Playwright, Node V8 re-bench, or native wasmi — not self-benchmarked)
 
 | Engine | Median latency/move | Total payload |
 |---|---|---|
 | **Real Moka** (their actual JS, real Chrome) | **6.4 ms** | 140,850 B (11,004 JS + 16,198 manifest + 113,648 weights) |
 | Our WASM, **no SIMD** (default `wasm32-unknown-unknown`, real Chrome) | 8.6 ms — **slower than Moka** | 267,914 B (9,847 JS glue + 258,067 wasm) |
 | **Our WASM, `+simd128`** (real Chrome) | **0.6 ms — 10.7× faster than Moka** | 269,405 B (9,847 JS glue + 259,558 wasm) |
-| Our WASM via **wasmi** (pure interpreter, no JIT, no SIMD) | 212,170 µs (212 ms) — 25× slower than our own JIT'd non-SIMD build | n/a (native test, no browser payload) |
+| Real Moka JS (Node V8 JIT, re-bench 2026-07-31) | 7.2 ms | same dist |
+| **Our WASM `+simd128`** (Node V8 JIT, re-bench 2026-07-31) | **0.59 ms — 12.2× faster than Moka** | same wasm |
+| Our WASM via **wasmi** (pure interpreter, no JIT, SIMD-on, one forward pass) | 76 ms | n/a (native test, no browser payload) |
 | Native Rust (NEON, no browser at all) | ~0.45–0.54 ms | n/a |
 
 ### What actually happened, in order
@@ -662,7 +664,7 @@ Every prior "Moka: ~0.5ms/move" figure in this document was **our own native por
 1. **First WASM attempt lost to plain JS** (8.6 ms vs 6.4 ms) — surprising, and initially looked like WASM just isn't worth it for a model this small (echoing the ANE finding from Issue 564: fixed overhead dominating a tiny workload).
 2. **Diagnosis, not resignation:** `wasm32-unknown-unknown` defaults to no SIMD. `katgpt_types::simd::simd_dot_f32`'s wasm32 SIMD path is gated on `target_feature = "simd128"`, which isn't on by default — so the WASM build was silently running the scalar fallback, throwing away the exact vectorization advantage that made the native port fast in the first place (Plan 563's 8.7× kernel work).
 3. **`RUSTFLAGS='-C target-feature=+simd128'` + `wasm-opt --enable-simd` fixed it completely**: 8.6 ms → 0.6 ms (14.3×), landing at **10.7× faster than real Moka**, confirmed in the same real browser, same self-play-generated position, same measurement methodology.
-4. **wasmi confirms JIT compilation is where nearly all the performance lives**, not the WASM format itself: the identical (non-SIMD) binary, pure-interpreted, is 212 ms/call — 25× slower than the exact same binary JIT'd by V8. A WASM interpreter alone is not viable for this workload at any point on this ladder.
+4. **wasmi confirms JIT compilation is where nearly all the performance lives**, not the WASM format itself: the identical binary, pure-interpreted, is 76 ms/call (re-bench 2026-07-31; was 212 ms in the original Plan 565 build — the wasm has been optimized since via Issues 204–207) — ~130× slower than the exact same binary JIT'd by V8. A WASM interpreter alone is not viable for this workload at any point on this ladder.
 
 ### Honest final scorecard — three tables (the combined build IS now measured)
 

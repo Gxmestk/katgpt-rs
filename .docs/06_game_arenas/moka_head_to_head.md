@@ -198,7 +198,7 @@ p=0.94, P(20/20) ≈ 29% — a normal high draw; the int8 quantization noise
 costs a few games at small n but stays within the binomial noise band
 (Wilson 95% CI on 85% at n=20 ≈ 64–95%). Both clear the 75% parity floor.
 
-### Speed (Plan 565 — real browser measurements)
+### Speed (Plan 565 — real browser measurements; Node V8 re-bench 2026-07-31)
 
 | Runtime | ms/move | Bundle size | Measured by |
 |---|---|---|---|
@@ -206,9 +206,11 @@ costs a few games at small n but stays within the binomial noise band
 | Real Moka JS (Chrome, JIT) | 6.4 ms | 140,850 B | Playwright + real Chrome |
 | Our WASM (Chrome, no simd128) | 8.6 ms | 269,405 B | Playwright + real Chrome |
 | **Our WASM (Chrome, +simd128)** | **0.6 ms** | 269,405 B (1.9× larger) | Playwright + real Chrome |
-| wasmi (pure interpreter, no JIT) | 212 ms | same .wasm | native wasmi |
+| Real Moka JS (Node V8 JIT, re-bench) | 7.2 ms | same dist | `bench/bench_moka_side_by_side.mjs` |
+| **Our WASM (Node V8 JIT, re-bench)** | **0.59 ms** | same wasm | `bench/bench_moka_side_by_side.mjs` |
+| wasmi (pure interpreter, no JIT, one forward pass) | 76 ms | same .wasm | native wasmi |
 
-**Verdict (Plan 565):** our WASM with `+simd128` is **10.7× faster** than real Moka in-browser (0.6 ms vs 6.4 ms), at 1.9× the bundle size. The speed comes from V8's JIT, not our code — wasmi (pure interpreter) is 25× slower at 212 ms.
+**Verdict:** our WASM with `+simd128` is **10.7× faster** than real Moka in real Chrome (Plan 565 Playwright measurement: 0.6 ms vs 6.4 ms). Re-bench in Node V8 JIT (same engine as Chrome) reproduces at **12.2× faster** (0.59 ms vs 7.2 ms) — the Chrome number is the conservative headline. The speed comes from V8's JIT compiling our SIMD-enabled wasm, not from our code — wasmi (pure interpreter) on the same binary is 76 ms/call.
 
 ### int8 forward path (Issues 206 + 207 — DEFAULT-ON)
 
