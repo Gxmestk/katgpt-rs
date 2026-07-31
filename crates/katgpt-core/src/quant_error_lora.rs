@@ -96,6 +96,7 @@ impl QuantErrorLora {
     ///
     /// Panics if `w_ref.len() != out_dim * in_dim` or
     /// `w_quant_dequant.len() != out_dim * in_dim`.
+    #[allow(clippy::too_many_arguments)]
     pub fn from_error(
         w_ref: &[f32],
         w_quant_dequant: &[f32],
@@ -235,6 +236,7 @@ impl QuantErrorLora {
     /// # Panics
     ///
     /// Panics on length mismatches.
+    #[allow(clippy::too_many_arguments)]
     pub fn from_error_data_aware(
         w_ref: &[f32],
         w_quant_dequant: &[f32],
@@ -362,6 +364,7 @@ impl QuantErrorLora {
 
         let r = self.rank;
         // Intermediate: A · x → scratch[r].
+        #[allow(clippy::needless_range_loop)] // stride math: k indexes scratch[k] AND k*self.in_dim offset into self.a
         for k in 0..r {
             let a_row = &self.a[k * self.in_dim..(k + 1) * self.in_dim];
             let mut acc = 0.0f32;
@@ -381,6 +384,7 @@ impl QuantErrorLora {
         }
         // Accumulate: y += alpha * B · intermediate.
         let scale = self.alpha;
+        #[allow(clippy::needless_range_loop)] // stride math: o indexes y[o] AND o*r offset into self.b
         for o in 0..self.out_dim {
             let b_row = &self.b[o * r..(o + 1) * r];
             let mut acc = 0.0f32;
@@ -400,8 +404,10 @@ impl QuantErrorLora {
         for o in 0..self.out_dim {
             let b_row = &self.b[o * r..(o + 1) * r];
             let out_row = &mut out[o * self.in_dim..(o + 1) * self.in_dim];
+            #[allow(clippy::needless_range_loop)] // stride math: i indexes out_row[i] AND k*self.in_dim+i offset into self.a
             for i in 0..self.in_dim {
                 let mut acc = 0.0f32;
+                #[allow(clippy::needless_range_loop)] // stride math: k indexes b_row[k] AND k*self.in_dim+i offset into self.a
                 for k in 0..r {
                     acc += b_row[k] * self.a[k * self.in_dim + i];
                 }
@@ -564,10 +570,10 @@ mod tests {
         let in_dim = 8;
         let rank_true = 3;
         let b_true: Vec<f32> = (0..out_dim * rank_true)
-            .map(|i| ((i as f32) * 0.1 - 1.0))
+            .map(|i| (i as f32) * 0.1 - 1.0)
             .collect();
         let a_true: Vec<f32> = (0..rank_true * in_dim)
-            .map(|i| ((i as f32) * 0.05 + 0.5))
+            .map(|i| (i as f32) * 0.05 + 0.5)
             .collect();
         let mut e = vec![0.0f32; out_dim * in_dim];
         for o in 0..out_dim {

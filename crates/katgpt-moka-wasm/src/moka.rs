@@ -453,6 +453,7 @@ impl MokaWeights {
     #[inline]
     pub fn stem_w(&self) -> (&[f32], &[f32]) { (&self.stem.w, &self.stem.b) }
     #[inline]
+    #[allow(private_interfaces)] // ResidualBlock stays pub(crate); riir-poc uses only the pub inherent methods below, never names the type
     pub fn blocks_ref(&self) -> &[ResidualBlock] { &self.blocks }
     #[inline]
     pub fn policy_conv_w(&self) -> (&[f32], &[f32]) { (&self.policy_conv.w, &self.policy_conv.b) }
@@ -496,6 +497,7 @@ impl MokaScratch {
     /// accessors. We lend all buffers at once via a tuple to keep the borrow
     /// checker happy (a single &mut borrow split into sub-slices).
     #[inline]
+    #[allow(clippy::type_complexity)] // 12-buffer scratch lease; see doc comment above
     pub fn lend_all(
         &mut self,
     ) -> (

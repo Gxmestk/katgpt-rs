@@ -173,6 +173,7 @@ impl<'a> Correction<'a> {
                 debug_assert_eq!(d.b.len(), y.len() * r);
                 // Intermediate: A · x → scratch[r].
                 let in_dim = x.len();
+                #[allow(clippy::needless_range_loop)] // stride math: k indexes scratch[k] AND k*in_dim offset into d.a
                 for k in 0..r {
                     let a_row = &d.a[k * in_dim..(k + 1) * in_dim];
                     let mut acc = 0.0f32;
@@ -183,6 +184,7 @@ impl<'a> Correction<'a> {
                 }
                 // y += alpha * B · intermediate.
                 let scale = d.alpha;
+                #[allow(clippy::needless_range_loop)] // stride math: o indexes y[o] AND o*r offset into d.b
                 for o in 0..y.len() {
                     let b_row = &d.b[o * r..(o + 1) * r];
                     let mut acc = 0.0f32;
@@ -294,6 +296,7 @@ fn conv2d_corrected_into(
 }
 
 /// Linear layer with optional correction.
+#[allow(clippy::too_many_arguments)]
 fn linear_corrected_into(
     input: &[f32],
     in_dim: usize,
