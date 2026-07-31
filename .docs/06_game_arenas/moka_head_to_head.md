@@ -262,15 +262,21 @@ f32 (int8 unimplemented for batched forward — tracked separately).
 | Apple Neural Engine (CoreML) | ❌ 4.66× slower (Issue 564) | Fixed dispatch overhead dominates at 105K params |
 | Opening Book (Bench 204) | ❌ Hurts monotonically | Moka's policy already plays better 9×9 openings |
 
-> **Follow-up audit (Research 463, 2026-07-31):** does converting Moka weights to
-> our freeze/thaw format (`NeuronShard` + `MerkleFrozenEnvelope`) unlock any of
-> these levers? **Verdict: No** — format conversion alone doesn't change any
-> rejection (they're fundamental: architecture, domain, training, quantization
-> math). BUT the freeze/thaw **ecosystem** (reader-LoRA hot-swap, Plan 025)
-> enables one modelless attempt to unblock BinaryPlasma via a deterministically
-> constructed SVD quantization-error LoRA. PoC tracked in
-> [Issue 565](../../.issues/565_quant_error_lora_poc.md); predicted to likely fail
-> G5 on this 105K-param network, worth running for negative knowledge + substrate.
+> **Follow-up audit (Research 463, 2026-07-31; G5 addendum 2026-08-01):** does
+> converting Moka weights to our freeze/thaw format (`NeuronShard` +
+> `MerkleFrozenEnvelope`) unlock any of these levers? **Verdict: No** — format
+> conversion alone doesn't change any rejection (they're fundamental:
+> architecture, domain, training, quantization math). The freeze/thaw
+> **ecosystem** (reader-LoRA hot-swap, Plan 025) enabled one modelless attempt
+> to unblock BinaryPlasma via a deterministically constructed SVD
+> quantization-error LoRA. **That PoC ran and G5 was DECISIVELY NEGATIVE**
+> (ternary+LoRA = 0% win-rate vs f32's 100%; G1 cosine 0.9939 is necessary but
+> not sufficient — PUCT search amplifies the residual ~0.6% error). The sibling
+> activation-space bridge (CNN→Transformer, modelless LLaVA-for-Go) was also
+> NEGATIVE in both phases. Both modelless paths are closed; the trained-
+> projection path (riir-train) is the only remaining option. Full analysis in
+> [Research 463](../../.research/463_moka_freeze_thaw_lever_audit.md) (G5
+> addendum) + [Research 464](../../.research/464_cnn_transformer_latent_bridge.md).
 
 ## The Bottom Line
 
