@@ -29,7 +29,6 @@
 #   node crates/katgpt-moka-wasm/bench/bench_puct.js
 set -euo pipefail
 
-TARGET="${1:-}"
 BINDGEN_TARGET="nodejs"
 SKIP_OPT=false
 while [[ $# -gt 0 ]]; do
