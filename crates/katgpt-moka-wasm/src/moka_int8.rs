@@ -154,6 +154,23 @@ fn load_int8(tensors: &HashMap<String, TensorMeta>, bytes: &[u8], prefix: &str) 
 #[inline]
 fn quantize_tensor(input: &[f32], output: &mut [i8]) -> f32 {
     debug_assert_eq!(input.len(), output.len());
+
+    // WASM SIMD128 fast path — the scalar path was the bottleneck on V8 JIT
+    // (Issue 206 T6: int8 was 0.88× — quantization overhead dominated).
+    #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
+    {
+        return unsafe { quantize_tensor_wasm_simd(input, output) };
+    }
+
+    #[allow(unreachable_code)]
+    {
+        quantize_tensor_scalar(input, output)
+    }
+}
+
+/// Scalar quantization (portable fallback + native aarch64 path).
+#[inline]
+fn quantize_tensor_scalar(input: &[f32], output: &mut [i8]) -> f32 {
     let max_abs = input.iter().fold(0.0f32, |m, &v| m.max(v.abs()));
     if max_abs < 1e-30 {
         output.fill(0);
@@ -164,6 +181,80 @@ fn quantize_tensor(input: &[f32], output: &mut [i8]) -> f32 {
         let q = (*inp * inv_scale).round();
         *out = q.clamp(-128.0, 127.0) as i8;
     }
+    max_abs / 127.0
+}
+
+/// WASM SIMD128 quantization — vectorizes the max-abs reduction + scale loop.
+///
+/// Uses `f32x4_abs` + `f32x4_pmax` for the reduction, then `f32x4_mul` +
+/// `f32x4_nearest` (round-to-nearest) + manual clamp for the scale step.
+/// The final f32x4 → i8 conversion uses extract_lane + cast (the narrow
+/// intrinsics need 8-element batches which complicate the tail handling).
+#[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
+#[target_feature(enable = "simd128")]
+unsafe fn quantize_tensor_wasm_simd(input: &[f32], output: &mut [i8]) -> f32 {
+    use core::arch::wasm32::{
+        f32x4_abs, f32x4_extract_lane, f32x4_max, f32x4_min, f32x4_mul, f32x4_nearest,
+        f32x4_splat, v128_load,
+    };
+    let len = input.len();
+
+    // Phase 1: SIMD max-abs reduction (4 elements at a time).
+    let zero = f32x4_splat(0.0);
+    let mut max_vec = zero;
+    let mut i = 0;
+    let chunks4 = len / 4;
+    for _ in 0..chunks4 {
+        let v = v128_load(input.as_ptr().add(i).cast());
+        let abs_v = f32x4_abs(v);
+        max_vec = f32x4_max(max_vec, abs_v);
+        i += 4;
+    }
+    // Horizontal reduce max_vec → scalar.
+    let mut max_abs = f32x4_extract_lane::<0>(max_vec)
+        .max(f32x4_extract_lane::<1>(max_vec))
+        .max(f32x4_extract_lane::<2>(max_vec))
+        .max(f32x4_extract_lane::<3>(max_vec));
+    // Tail (scalar).
+    while i < len {
+        max_abs = max_abs.max(input.get_unchecked(i).abs());
+        i += 1;
+    }
+
+    if max_abs < 1e-30 {
+        output.fill(0);
+        return 1.0;
+    }
+
+    // Phase 2: SIMD scale + round + clamp (f32 still, conversion is scalar).
+    let inv_scale = f32x4_splat(127.0 / max_abs);
+    let lo_f = f32x4_splat(-128.0);
+    let hi_f = f32x4_splat(127.0);
+
+    let mut i = 0;
+    let chunks4 = len / 4;
+    for _ in 0..chunks4 {
+        let v = v128_load(input.as_ptr().add(i).cast());
+        let scaled = f32x4_mul(v, inv_scale);
+        let rounded = f32x4_nearest(scaled);
+        // Clamp to [-128, 127].
+        let clamped = f32x4_max(f32x4_min(rounded, hi_f), lo_f);
+        // Extract lanes and cast to i8 (the conversion is cheap; the SIMD
+        // win was in the max-abs reduction + scale + round above).
+        *output.get_unchecked_mut(i) = f32x4_extract_lane::<0>(clamped) as i8;
+        *output.get_unchecked_mut(i + 1) = f32x4_extract_lane::<1>(clamped) as i8;
+        *output.get_unchecked_mut(i + 2) = f32x4_extract_lane::<2>(clamped) as i8;
+        *output.get_unchecked_mut(i + 3) = f32x4_extract_lane::<3>(clamped) as i8;
+        i += 4;
+    }
+    // Tail (scalar).
+    let inv_scale_scalar = 127.0 / max_abs;
+    while i < len {
+        let q = (*input.get_unchecked(i) * inv_scale_scalar).round();
+        *output.get_unchecked_mut(i) = q.clamp(-128.0, 127.0) as i8;
+        i += 1;
+    }
+
     max_abs / 127.0
 }
 
