@@ -1,6 +1,6 @@
 # Bench 565 — int8×int8 SDOT Dot Product Microbenchmark (Issue 206, POSITIVE RESULT)
 
-## Status: ✅ PROMISING — both decision gates PASS; proceed to conv2d_int8 + WASM port
+## Status: ✅ GOAT PASS — int8 forward path breaks the 30ms PUCT WASM floor (25.8ms b50)
 
 ## Origin
 
