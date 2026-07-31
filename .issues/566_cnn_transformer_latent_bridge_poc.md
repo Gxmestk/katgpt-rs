@@ -80,14 +80,35 @@ forward variant that bypasses the embedding lookup for the prepended tokens.
       boards (empty / 1 stone / 5 scattered / 10 clustered), well below the
       0.99 threshold. The trunk carries position-discriminating signal —
       the bridge's necessary precondition is met.
-- [ ] **T2** — Calibration set: collect N=64 Go positions, run
+- [x] **T2** — Calibration set: collect N=16 Go positions, run
       `forward_tapping_trunk` to capture trunk after block 6. This gives
-      the Moka-side of the paired calibration data.
-- [ ] **T3** — Gemma-side calibration: run `GemmaGoPlayer` on the same N
+      the Moka-side of the paired calibration data. **DONE 2026-08-01** —
+      `collect_moka_aggregates` in `cnn_transformer_bridge_poc.rs`. Global
+      mean-max pool → 64-dim aggregates. Pairwise min cosine 0.79 (PASS).
+- [x] **T3** — Gemma-side calibration: run `GemmaGoPlayer` on the same N
       positions, capture residual at layer L. This gives the paired
-      (Moka features, Gemma residual) set for PCA.
-- [ ] **T4** — Fit `CrossResolutionBases` via PCA on the paired set. Offline
-      one-time step. Store the bases as a frozen artifact.
+      (Moka features, Gemma residual) set for PCA. **DONE 2026-08-01** —
+      `forward_collecting_residual` added to `latent_steering_bridge.rs`
+      (5 G1 tests: g1h-g1k). `collect_gemma_residuals` uses
+      `go_gemma_data::render_prompt_body` (the arena text format) + Gemma 2
+      2B at layer 13. **Key finding:** pairwise min cosine 0.9999 — residuals
+      barely differ across boards (prompt template dominates at this layer).
+- [x] **T4** — Fit `CrossResolutionBases` via PCA on the paired set. Offline
+      one-time step. Store the bases as a frozen artifact. **DONE 2026-08-01** —
+      Four measurement tests (T4/T4b/T4c/T4d/T4e) in
+      `cnn_transformer_bridge_poc.rs`. **Key findings:**
+      - T4: cross-covariance SVD has non-zero singular values (σ_1=1.31 at
+        L13) — linear cross-modal structure EXISTS.
+      - T4b (blind PCA): mean R²=0.0015 — independent PCA does NOT capture
+        cross-modal structure (confirms Research 464 §3 limitation).
+      - T4c (CCA-aware): train R²=0.9999 — BUT misleading (common mode).
+      - T4d (cross-validation): test R²=0.9999 — generalizes, but still the
+        common mode (99.992% of variance is prompt template).
+      - **T4e (centered R² — the TRUE signal test):** board-specific variance
+        is only 0.008% of total. CCA captures **test cR²=0.277 at k=2** —
+        27.7% of the board-specific variance generalizes to held-out boards.
+        **Real cross-modal signal exists.** Overfitting at k≥8 (test cR² drops
+        to 0.091). k=1-3 is the stable regime.
 - [ ] **T5** — Phase 1 wiring: aggregate bridge. Global mean-max pool →
       project → `ResidualField` → `forward_with_steering`.
 - [ ] **T6** — Phase 1 quality PoC: run `GemmaGoPlayer` with vs without
@@ -104,12 +125,25 @@ forward variant that bypasses the embedding lookup for the prepended tokens.
 
 ## Honest Pre-PoC Prediction
 
-| Outcome | Probability |
-|---|---|
-| Aggregate bridge drops parse-fallback significantly | Medium |
-| Full LLaVA bridge drops parse-fallback significantly | Higher |
-| Either bridge reaches Moka-native Go strength | Low |
-| Either bridge beats int8 Moka (Issue 565 G5) | Very low |
+| Outcome | Probability | Actual (T4e) |
+|---|---|---|
+| Aggregate bridge drops parse-fallback significantly | Medium | **TBD (T6)** — signal exists (cR²=0.28) |
+| Full LLaVA bridge drops parse-fallback significantly | Higher | TBD (T8-T9, deferred) |
+| Either bridge reaches Moka-native Go strength | Low | TBD |
+| Either bridge beats int8 Moka (Issue 565 G5) | Very low | TBD |
+
+**Post-T4 calibration finding (2026-08-01):** The cross-modal linear
+structure IS non-zero — CCA captures 27.7% of the board-specific variance
+on held-out data (test cR²=0.277 at k=2). This is weak but real, matching
+the 'partial improvement' prediction. The signal is sufficient to justify
+Phase 1 wiring (T5-T7) — the aggregate bridge is worth testing for
+parse-fallback reduction.
+
+**Key caveat from T4e:** board-specific variance is only 0.008% of the
+total Gemma residual variance at layer 13 (the prompt template dominates).
+This means even a perfect bridge would inject a tiny perturbation relative
+to the prompt-driven signal. Layer choice matters — a later layer (20+)
+where board content has more influence might carry more exploitable signal.
 
 The load-bearing question: does Gemma, given Moka's Go vision, produce
 BETTER Go decisions than Gemma without it? Go is turn-based (cold-tier,

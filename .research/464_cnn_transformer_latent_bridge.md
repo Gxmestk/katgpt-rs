@@ -162,6 +162,28 @@ could extract position-discriminating signal). It is NOT a sufficiency
 proof — the cross-modal projection (T2-T4) still needs to carry this signal
 into Gemma's residual stream in a way Gemma can interpret.
 
+**T4 calibration results (2026-08-01):** the cross-modal correlation was
+measured on 24 Go positions (16 train + 8 test) with real Gemma 2 2B.
+Key findings:
+
+1. **Cross-covariance is non-zero** (σ_1=1.31 at layer 13) — linear
+   cross-modal structure EXISTS.
+2. **Blind PCA fails** (R²=0.0015) — independent per-modality PCA does NOT
+   capture cross-modal structure. This confirms the §3 "blind projection"
+   limitation: preserving variance in each space ≠ preserving correlation.
+3. **CCA-aware projection captures real signal:** centered test R²=0.277 at
+   k=2 — 27.7% of the board-specific variance generalizes to held-out boards.
+4. **Board-specific variance is tiny** (0.008% of total) — the prompt template
+dominates 99.992% of the residual. Even a perfect bridge injects a small
+   perturbation relative to the prompt-driven signal.
+5. **Overfitting at k≥8** (test cR² drops to 0.091, gap grows to 0.47). k=1-3
+   is the stable regime.
+
+**Verdict:** the modelless bridge carries WEAK BUT REAL cross-modal signal.
+Not enough for full Go understanding (73% of board-specific variance
+uncaptured), but sufficient to justify Phase 1 wiring (T5-T7) — the
+aggregate bridge is worth testing for parse-fallback reduction.
+
 ## 5. The Consumer: Proposal 008 (Go Gemma Arena)
 
 Proposal 008's state (as of 2026-08-01):
