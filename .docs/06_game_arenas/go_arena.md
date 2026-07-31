@@ -686,7 +686,7 @@ Both rows above re-run fresh in this session, on demand, to confirm the document
 | Latency/move | 6.4 ms | **0.5 ms** (zero-copy API) / 0.6 ms (marshalled API) |
 | Bundle size | 140,850 B | 273,218 B |
 
-This measures one greedy forward pass, analogous to native `MokaPlayer` (argmax over the raw policy), not any search player. This is the build that is 10.7× faster than Moka — but it is *also* the strength tier where we lose to Moka (no search = raw policy, same as their greedy).
+This measures one greedy forward pass, analogous to native `MokaPlayer` (argmax over the raw policy), not any search player. This is the build that is 10.7× faster than Moka — but it uses Moka's own ported weights, so greedy-vs-Moka is a mirror match (~50% win rate, no strength advantage either way). The speed win is real; the strength advantage only appears with search on top (Table C).
 
 **C. The combined build — PUCT search ported to WASM, real Chrome (Issue 204 + win-rate follow-up)**
 
@@ -709,7 +709,7 @@ Latency scales linearly (29.8→59.4→118.1 doubles at each step) — pure per-
 | Build | Win% vs Moka | Latency/move | Bundle size | Faster than Moka? | Stronger than Moka? |
 |---|---|---|---|---|---|
 | Moka (real, reference) | — (baseline) | 6.4 ms | 140,850 B | — | — |
-| Ours — greedy (Table B) | loses (raw policy) | 0.5 ms | 273,218 B | **yes (10.7×)** | no |
+| Ours — greedy (Table B) | ≈50% (mirror — same weights) | 0.5 ms | 273,218 B | **yes (10.7×)** | no |
 | Ours — PUCT b50 (Table C) | **100%** | 29.8 ms | 273,218 B | no (~4.7× slower) | **yes** |
 | Ours — PUCT b200 (Table C) | 98% (native) | 118.1 ms | 273,218 B | no (~18.5× slower) | **yes** |
 
