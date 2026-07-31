@@ -604,3 +604,12 @@ pub extern "C" fn wasmi_arena_reward(color: u8) -> u8 {
         u8::from(s.board.reward(c) > 0.5)
     })
 }
+
+/// Number of value-head forward passes the most recent `wasmi_arena_search_puct`
+/// performed. Sanity knob for the bench harness (mirrors the standalone
+/// `wasmi_puct_nodes_evaluated`, but reads the arena's PUCT player).
+#[unsafe(no_mangle)]
+#[allow(clippy::deref_addrof)]
+pub extern "C" fn wasmi_arena_nodes_evaluated() -> usize {
+    with_arena(|s| s.puct.nodes_evaluated())
+}

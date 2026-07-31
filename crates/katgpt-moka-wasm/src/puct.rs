@@ -137,23 +137,24 @@ impl PuctPlayer {
 
         // Snapshot everything we need from `node`, then drop the mutable borrow
         // before re-entering the arena (children push needs `&mut self.arena`).
-        let parent_state = node.state.clone();
-        let legal: Vec<usize> = (0..BOARD_AREA).filter(|&i| parent_state.is_legal(i)).collect();
+        // `Board` is `Copy` ([Cell; 81] not Vec) — this is now a stack copy, no alloc.
+        let parent_state = node.state;
 
         // Encode features from the parent position + reconstructed history,
         // then run ONE forward pass. Reuses the persistent `features_buf` so
-        // no allocation happens here (the dominant non-SIMD cost is the
-        // `parent_state.clone()` above, not this).
+        // no allocation happens here (Board is Copy, so parent_state was a
+        // stack copy above — zero heap alloc in this hot path).
         moka::encode_features_into(&parent_state, &hist, &mut self.features_buf);
         let (policy, value) =
             moka::forward_with_scratch(&self.weights, &self.features_buf, &mut self.scratch);
         self.nodes_evaluated += 1;
 
         // Rank moves by raw policy logit, keep top_k (always including pass as
-        // a candidate — Moka's policy index BOARD_AREA is pass).
-        let mut scored: Vec<(f32, Move)> = legal
-            .iter()
-            .map(|&i| (policy[i], Some(i)))
+        // a candidate — Moka's policy index BOARD_AREA is pass). Build `scored`
+        // directly from the legal-move iterator (no intermediate Vec allocation).
+        let mut scored: Vec<(f32, Move)> = (0..BOARD_AREA)
+            .filter(|&i| parent_state.is_legal(i))
+            .map(|i| (policy[i], Some(i)))
             .collect();
         scored.push((policy[BOARD_AREA], None));
         scored.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
@@ -168,7 +169,7 @@ impl PuctPlayer {
         let children_start = self.arena.len();
         for (logit, action) in &scored {
             let prior = (logit - max_logit).exp() * inv_exp_sum;
-            let mut child_state = parent_state.clone();
+            let mut child_state = parent_state;
             match *action {
                 Some(idx) => child_state.play(idx),
                 None => child_state.pass(),
@@ -239,7 +240,7 @@ impl PuctPlayer {
     pub fn select_move(&mut self, state: &Board) -> Move {
         // Reset arena for this move's search.
         self.arena.clear();
-        self.arena.push(PuctNode::new_root(state.clone()));
+        self.arena.push(PuctNode::new_root(*state));
         let root = 0;
 
         for _ in 0..self.budget {

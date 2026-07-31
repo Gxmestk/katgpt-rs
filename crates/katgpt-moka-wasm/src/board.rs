@@ -31,9 +31,13 @@ impl Cell {
     }
 }
 
-#[derive(Clone)]
+/// Fixed-size board — `cells` is `[Cell; AREA]` (not `Vec<Cell>`) so `clone()`
+/// is a zero-allocation stack copy. PUCT clones the board ~9× per node
+/// expansion (parent + top_k children); eliminating ~450 heap allocs/move
+/// at budget=50 is the single largest non-SIMD tree-overhead win.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Board {
-    pub cells: Vec<Cell>,
+    pub cells: [Cell; AREA],
     pub to_play: Cell,
     pub ko_point: Option<usize>,
     /// Consecutive pass count — reaches 2 when both players pass consecutively,
@@ -41,27 +45,93 @@ pub struct Board {
     pub consecutive_passes: u8,
 }
 
-fn neighbors(idx: usize) -> Vec<usize> {
-    let row = idx / SIZE;
-    let col = idx % SIZE;
-    let mut out = Vec::with_capacity(4);
-    if row > 0 {
-        out.push(idx - SIZE);
-    }
-    if row + 1 < SIZE {
-        out.push(idx + SIZE);
-    }
-    if col > 0 {
-        out.push(idx - 1);
-    }
-    if col + 1 < SIZE {
-        out.push(idx + 1);
-    }
-    out
+/// Stack-allocated neighbor list — `neighbors()` was returning `Vec<usize>`
+/// (a heap alloc per call), called from `flood_group`/`is_legal`/`play`/
+/// `reward`. At top_k=8 the PUCT expand path calls `is_legal` 81× + `play`
+/// up to 8× per node, each touching `neighbors` multiple times via flood
+/// fills — hundreds of heap allocs per expansion. This drops to zero.
+#[derive(Clone, Copy)]
+struct Neighbors {
+    idxs: [usize; 4],
+    len: u8,
 }
 
-/// Flood-fill the group containing `start`, returning (stones, liberty positions).
-/// Mirrors `katgpt_pruners::go::utils::flood_group`.
+impl Neighbors {
+    #[inline]
+    fn iter(&self) -> &[usize] {
+        &self.idxs[..self.len as usize]
+    }
+}
+
+fn neighbors(idx: usize) -> Neighbors {
+    let row = idx / SIZE;
+    let col = idx % SIZE;
+    let mut idxs = [0usize; 4];
+    let mut len = 0u8;
+    if row > 0 {
+        idxs[len as usize] = idx - SIZE;
+        len += 1;
+    }
+    if row + 1 < SIZE {
+        idxs[len as usize] = idx + SIZE;
+        len += 1;
+    }
+    if col > 0 {
+        idxs[len as usize] = idx - 1;
+        len += 1;
+    }
+    if col + 1 < SIZE {
+        idxs[len as usize] = idx + 1;
+        len += 1;
+    }
+    Neighbors { idxs, len }
+}
+
+/// Zero-allocation, early-exit liberty check: does the group at `start` have
+/// at least one liberty? Returns `true` on the FIRST liberty found — avoids
+/// the full flood_group traversal + its two Vec allocations. Called up to
+/// 81× per PUCT expansion (via `is_legal`→`would_be_suicide`), so this is a
+/// hot path where allocation elimination + early exit compound.
+///
+/// Uses a fixed `[usize; AREA]` stack (max 81 cells) — zero heap alloc.
+fn has_liberty(cells: &[Cell], start: usize) -> bool {
+    let color = cells[start];
+    if color == Cell::Empty {
+        return true; // an empty cell IS a liberty of itself (trivially)
+    }
+    let mut visited = [false; AREA];
+    let mut stack = [start; AREA];
+    let mut top = 1;
+    while top > 0 {
+        top -= 1;
+        let pos = stack[top];
+        if visited[pos] {
+            continue;
+        }
+        visited[pos] = true;
+        for &n in neighbors(pos).iter() {
+            match cells[n] {
+                c if c == color => {
+                    if !visited[n] {
+                        stack[top] = n;
+                        top += 1;
+                    }
+                }
+                Cell::Empty => return true, // found a liberty — short-circuit
+                _ => {} // opponent stone
+            }
+        }
+    }
+    false // traversed the whole group, no liberty found
+}
+
+/// Flood-fill the group containing `start`, returning (stones, liberty
+/// positions). Mirrors `katgpt_pruners::go::utils::flood_group`. Used by
+/// `play` (capture resolution needs the actual stone list) + `reward`
+/// (territory scoring) + `encode_features` (liberty counting).
+///
+/// The `would_be_suicide` hot path uses the zero-alloc early-exit `has_liberty`
+/// instead — this function is only for paths that need the actual lists.
 pub fn flood_group(cells: &[Cell], start: usize) -> (Vec<usize>, Vec<usize>) {
     let color = cells[start];
     if color == Cell::Empty {
@@ -79,7 +149,7 @@ pub fn flood_group(cells: &[Cell], start: usize) -> (Vec<usize>, Vec<usize>) {
         match cells[pos] {
             c if c == color => {
                 group.push(pos);
-                for n in neighbors(pos) {
+                for &n in neighbors(pos).iter() {
                     if !visited[n] {
                         stack.push(n);
                     }
@@ -95,7 +165,7 @@ pub fn flood_group(cells: &[Cell], start: usize) -> (Vec<usize>, Vec<usize>) {
 impl Board {
     pub fn new() -> Self {
         Self {
-            cells: vec![Cell::Empty; AREA],
+            cells: [Cell::Empty; AREA],
             to_play: Cell::Black,
             ko_point: None,
             consecutive_passes: 0,
@@ -103,20 +173,18 @@ impl Board {
     }
 
     fn would_be_suicide(&self, idx: usize, color: Cell) -> bool {
-        let mut trial = self.cells.clone();
+        let mut trial = self.cells;
         trial[idx] = color;
-        // Does placing capture any opponent group?
-        for n in neighbors(idx) {
-            if trial[n] == color.opponent() {
-                let (_, libs) = flood_group(&trial, n);
-                if libs.is_empty() {
-                    return false; // captures something — legal
-                }
+        // Does placing capture any opponent group? Early-exit `has_liberty`
+        // (zero-alloc) replaces the full flood_group — we only need the
+        // yes/no, not the stone/liberty lists.
+        for &n in neighbors(idx).iter() {
+            if trial[n] == color.opponent() && !has_liberty(&trial, n) {
+                return false; // captures an opponent group with no liberty — legal
             }
         }
         // No capture — legal only if the placed stone's own group has a liberty.
-        let (_, libs) = flood_group(&trial, idx);
-        libs.is_empty()
+        !has_liberty(&trial, idx)
     }
 
     pub fn is_legal(&self, idx: usize) -> bool {
@@ -138,7 +206,7 @@ impl Board {
 
         let mut captured = Vec::new();
         let mut visited_opp = [false; AREA];
-        for n in neighbors(idx) {
+        for &n in neighbors(idx).iter() {
             if self.cells[n] == opponent && !visited_opp[n] {
                 let (group, libs) = flood_group(&self.cells, n);
                 for &g in &group {
@@ -218,7 +286,7 @@ impl Board {
                 }
                 visited[p] = true;
                 region_size += 1;
-                for n in neighbors(p) {
+                for &n in neighbors(p).iter() {
                     match self.cells[n] {
                         Cell::Empty => {
                             if !visited[n] {
