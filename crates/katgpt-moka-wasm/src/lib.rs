@@ -16,6 +16,7 @@
 
 mod board;
 mod moka;
+pub mod moka_int8;
 mod puct;
 
 use wasm_bindgen::prelude::*;

@@ -166,16 +166,58 @@ RUSTFLAGS="-C target-cpu=native" cargo run --release -p katgpt-types --example i
 node crates/katgpt-moka-wasm/bench/bench_int8_dot_206.js
 ```
 
-## Next steps
+## End-to-end forward pass results (T5+T6, 2026-07-31)
 
-1. Implement `conv2d_int8_into` in `moka.rs` + `MokaWeightsInt8` struct that
-   keeps weights as int8 (no dequantization at load)
-2. Add `forward_int8_with_scratch` that uses the int8 dot kernel
-3. GOAT gate the full Moka int8 forward path (G1 accuracy vs f32, G2 latency,
-   G3 no-regression, G4 alloc-free)
-4. If GOAT passes: promote to default (the weights are already int8 on disk —
-   this is the natural representation)
-5. Re-measure PUCT WASM b50 end-to-end latency with int8 forward path
+The full `forward_int8_with_scratch` was implemented in `moka_int8.rs` and
+GOAT-gated against the f32 baseline.
+
+### G1: Accuracy ✅ PASS
+
+- **Argmax agreement**: 4/4 test boards produce the same top move as f32.
+- **Value diff**: max 0.053 (post-tanh). Excellent for PUCT value estimates.
+- **Policy logits**: absolute diffs of 0.4–1.9, but on logit magnitudes of
+  20–88, the relative error is ~2% — consistent with the per-dot microbench.
+  Argmax always matches.
+
+### G2: Latency ✅ PASS (1.39×, gate 1.3×)
+
+| Path | ns/forward | µs/forward |
+|---|---:|---:|
+| f32 (baseline) | 380,122 | 380 |
+| int8 SDOT | 273,351 | 273 |
+| **Speedup** | **1.39×** | |
+
+The microbenchmark projected 2.5–3× per-dot, but the end-to-end forward pass
+shows 1.39×. The gap is non-dot overhead:
+- **Patch gathering** (3×3 window copy with zero-padding): unchanged between
+  f32 and int8 paths — the bottleneck is memory access, not arithmetic.
+- **f32 scale multiplication** (`scale_a * scale_w * int_dot + bias`): adds
+  ~80K f32 ops that the f32 path doesn't have.
+- **Small dots**: the expand conv (patch_len=16) has high per-call dispatch
+  overhead relative to the 1-cycle SDOT instruction.
+
+Even at 1.39× on native aarch64, the WASM speedup is expected to be higher
+(WASM f32 has no FMA — separate mul+add — so the int8 advantage is larger).
+
+### PUCT WASM projection (revised)
+
+| Component | f32 path | int8 path (1.4× native) | int8 path (~2× WASM) |
+|---|---:|---:|---:|
+| Forward passes (b50) | 25.0 ms | 17.9 ms | 12.5 ms |
+| Tree overhead | 4.6 ms | 4.6 ms | 4.6 ms |
+| **Total** | **29.6 ms** | **22.5 ms** | **17.1 ms** |
+
+Both projections are **below the 30ms floor**. The WASM projection (17.1 ms)
+matches the original Bench 565 estimate of ~17.5 ms.
+
+### G3: No-regression ✅ PASS
+
+15/15 tests pass (3 new int8 tests + 12 existing tests).
+
+### G4: Alloc-free ✅ PASS
+
+Scratch buffer capacities stable across 100 steady-state calls.
+
 
 ## Rust stdarch gap (action item)
 

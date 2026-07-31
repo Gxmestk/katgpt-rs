@@ -15,43 +15,43 @@ use serde::Deserialize;
 
 use crate::board::{AREA as BOARD_AREA, Board, Cell, SIZE as BOARD_SIZE, flood_group};
 
-const INPUT_PLANES: usize = 12;
-const TRUNK_CHANNELS: usize = 32;
-const BOTTLENECK_CHANNELS: usize = 16;
-const NUM_BLOCKS: usize = 12;
-const GLOBAL_BLOCK_INTERVAL: usize = 4;
-const POLICY_CHANNELS: usize = 4;
+pub(crate) const INPUT_PLANES: usize = 12;
+pub(crate) const TRUNK_CHANNELS: usize = 32;
+pub(crate) const BOTTLENECK_CHANNELS: usize = 16;
+pub(crate) const NUM_BLOCKS: usize = 12;
+pub(crate) const GLOBAL_BLOCK_INTERVAL: usize = 4;
+pub(crate) const POLICY_CHANNELS: usize = 4;
 pub const POLICY_MOVES: usize = 82;
 /// Flat feature-tensor length (`9*9*12`) — the input size `wasmi_infer`'s
 /// raw FFI boundary expects.
 pub const INPUT_ELEMENT_COUNT: usize = BOARD_AREA * INPUT_PLANES;
-const VALUE_CHANNELS: usize = 2;
-const SCORE_HIDDEN_CHANNELS: usize = 32;
+pub(crate) const VALUE_CHANNELS: usize = 2;
+pub(crate) const SCORE_HIDDEN_CHANNELS: usize = 32;
 /// Moka's own training-time komi convention — not this crate's board
 /// convention, whichever that ends up being. The feature plane must match
 /// what the network was trained on.
 const MOKA_KOMI: f32 = 7.0;
 const KOMI_NORMALIZATION: f32 = 15.0;
 
-static MANIFEST_JSON: &str = include_str!("../../katgpt-pruners/assets/moka/go-model.json");
-static WEIGHTS_BIN: &[u8] = include_bytes!("../../katgpt-pruners/assets/moka/go-model.bin");
+pub(crate) static MANIFEST_JSON: &str = include_str!("../../katgpt-pruners/assets/moka/go-model.json");
+pub(crate) static WEIGHTS_BIN: &[u8] = include_bytes!("../../katgpt-pruners/assets/moka/go-model.bin");
 
 #[derive(Deserialize)]
-struct Manifest {
-    tensors: HashMap<String, TensorMeta>,
+pub(crate) struct Manifest {
+    pub(crate) tensors: HashMap<String, TensorMeta>,
 }
 
 #[derive(Deserialize)]
-struct TensorMeta {
+pub(crate) struct TensorMeta {
     #[serde(rename = "dataOffset")]
-    data_offset: usize,
-    dtype: String,
-    shape: Vec<usize>,
+    pub(crate) data_offset: usize,
+    pub(crate) dtype: String,
+    pub(crate) shape: Vec<usize>,
     #[serde(rename = "scaleOffset", default)]
-    scale_offset: Option<usize>,
+    pub(crate) scale_offset: Option<usize>,
 }
 
-fn read_f32(bytes: &[u8], offset: usize, count: usize) -> Vec<f32> {
+pub(crate) fn read_f32(bytes: &[u8], offset: usize, count: usize) -> Vec<f32> {
     (0..count)
         .map(|i| {
             let o = offset + i * 4;
@@ -78,7 +78,7 @@ fn load_dequantized(tensors: &HashMap<String, TensorMeta>, bytes: &[u8], name: &
     out
 }
 
-fn load_bias(tensors: &HashMap<String, TensorMeta>, bytes: &[u8], name: &str) -> Vec<f32> {
+pub(crate) fn load_bias(tensors: &HashMap<String, TensorMeta>, bytes: &[u8], name: &str) -> Vec<f32> {
     let meta = tensors.get(name).unwrap_or_else(|| panic!("moka manifest missing tensor {name}"));
     assert_eq!(meta.dtype, "float32", "expected float32 bias tensor {name}");
     let count: usize = meta.shape.iter().product();
@@ -375,7 +375,7 @@ fn global_mean_max_batched_into(
     }
 }
 
-fn relu_inplace(x: &mut [f32]) {
+pub(crate) fn relu_inplace(x: &mut [f32]) {
     for v in x.iter_mut() {
         if *v < 0.0 {
             *v = 0.0;
@@ -383,7 +383,7 @@ fn relu_inplace(x: &mut [f32]) {
     }
 }
 
-fn global_mean_max_into(x: &[f32], h: usize, w: usize, ch: usize, out: &mut [f32]) {
+pub(crate) fn global_mean_max_into(x: &[f32], h: usize, w: usize, ch: usize, out: &mut [f32]) {
     let (mean, max) = out[..ch * 2].split_at_mut(ch);
     mean.fill(0.0);
     max.fill(f32::MIN);
