@@ -16,7 +16,7 @@
 //! the latency measurement under WASM.
 
 use crate::board::{AREA as BOARD_AREA, Board, SIZE as BOARD_SIZE, flood_group};
-use crate::moka::{self, MokaScratch, MokaWeights};
+use crate::moka::{self, MokaBatchScratch, MokaScratch, MokaWeights};
 
 /// A move: `Some(idx)` = play at board index `idx`; `None` = pass.
 /// Replaces `GoAction` from the native crate.
@@ -42,6 +42,12 @@ struct PuctNode {
     /// Whether this node has been expanded (policy+value evaluated, children
     /// created, or flagged terminal).
     expanded: bool,
+    /// Virtual loss applied during batched selection (Issue 205). Non-zero
+    /// only while a leaf is in the current batch's queue — drives diverse
+    /// leaf selection within a single batch by temporarily penalizing the
+    /// path another in-flight simulation already chose. Cleared at backprop.
+    /// Zero in the K=1 sequential path (never touched).
+    virtual_loss: f32,
 }
 
 impl PuctNode {
@@ -55,15 +61,28 @@ impl PuctNode {
             children: Vec::new(),
             parent: None,
             expanded: false,
+            virtual_loss: 0.0,
         }
     }
 
+    /// Mean value including the virtual loss penalty. Used during batched
+    /// selection so the same path isn't picked twice in one batch: each
+    /// in-flight leaf adds `VIRTUAL_LOSS` to its ancestors' `virtual_loss`,
+    /// which makes the node look like it was visited with a WINNING result
+    /// for the child (= bad for the parent to keep exploring, since negamax
+    /// flips the sign at selection time). The parent's `q = -effective_mean_value`
+    /// therefore drops, steering the next selection within the batch to a
+    /// different sibling. Cleared at backprop.
     #[inline]
-    fn mean_value(&self) -> f32 {
-        if self.visits == 0 {
+    fn effective_mean_value(&self) -> f32 {
+        let denom = self.visits as f32 + self.virtual_loss;
+        if denom == 0.0 {
             0.0
         } else {
-            self.total_value / self.visits as f32
+            // +virtual_loss (not -): inflates the child's apparent value,
+            // which the parent's `q = -eff` then reads as a penalty
+            // (avoid this child for now).
+            (self.total_value + self.virtual_loss) / denom
         }
     }
 }
@@ -73,26 +92,61 @@ impl PuctNode {
 pub struct PuctPlayer {
     weights: MokaWeights,
     scratch: MokaScratch,
+    /// Batched scratch — only allocated if `batch_k > 1` (lazy, on first
+    /// batched `select_move`). Sized for `batch_k`.
+    batch_scratch: Option<MokaBatchScratch>,
     budget: usize,
     c_puct: f32,
     top_k: usize,
+    /// Batch size K for batched MCTS (Issue 205). K=1 disables batching and
+    /// runs the original sequential loop (the wasmi parity path — bit
+    /// identical move choices vs the pre-batch code). K>1 enables the
+    /// leaf-queue + virtual-loss + batched forward pass.
+    batch_k: usize,
     /// Reused across `select_move` calls — avoids re-allocating the arena.
     arena: Vec<PuctNode>,
     /// Reused scratch for feature encoding (avoids per-expansion alloc).
+    /// Sized `batch_k * INPUT_ELEMENT_COUNT` so the batched path can encode
+    /// K leaves in one contiguous buffer without re-allocating.
     features_buf: Vec<f32>,
+    /// Per-sample output buffers for the batched forward pass — owned by the
+    /// player so they're allocated once at construction, not per `select_move`.
+    policy_batch_buf: Vec<f32>,
+    value_batch_buf: Vec<f32>,
     nodes_evaluated: usize,
 }
 
+/// Virtual loss magnitude applied during batched selection (Issue 205).
+/// A single in-flight leaf subtracts this much from each of its ancestors'
+/// effective Q, discouraging the next selection within the same batch from
+/// walking the same path. The value is large enough to dominate the UCB
+/// exploration term (typical magnitudes ~1.0) but small enough not to
+/// permanently distort the tree — it's cleared at backprop.
+const VIRTUAL_LOSS: f32 = 1.0;
+
 impl PuctPlayer {
     pub fn new(budget: usize, c_puct: f32, top_k: usize) -> Self {
+        Self::with_batch_k(budget, c_puct, top_k, 1)
+    }
+
+    /// Construct with explicit batch size K (Issue 205). K=1 reproduces the
+    /// original sequential PUCT loop bit-identically (the wasmi parity
+    /// guarantee). K>1 enables batched MCTS (virtual loss + leaf queue +
+    /// batched forward pass).
+    pub fn with_batch_k(budget: usize, c_puct: f32, top_k: usize, batch_k: usize) -> Self {
+        let k = batch_k.max(1);
         Self {
             weights: MokaWeights::load(),
             scratch: MokaScratch::new(),
+            batch_scratch: (k > 1).then(|| MokaBatchScratch::new(k)),
             budget: budget.max(1),
             c_puct,
             top_k: top_k.max(1),
+            batch_k: k,
             arena: Vec::new(),
-            features_buf: vec![0.0; moka::INPUT_ELEMENT_COUNT],
+            features_buf: vec![0.0; k * moka::INPUT_ELEMENT_COUNT],
+            policy_batch_buf: vec![0.0; k * moka::POLICY_MOVES],
+            value_batch_buf: vec![0.0; k],
             nodes_evaluated: 0,
         }
     }
@@ -105,6 +159,9 @@ impl PuctPlayer {
     /// Expand a node: run policy+value, create children for top_k legal moves.
     /// Returns the value-head evaluation [-1,1] from this node's to_play
     /// perspective (or the exact terminal reward mapped onto the same range).
+    ///
+    /// K=1 path — the original sequential loop. The batched path uses
+    /// `prepare_leaf_for_eval` + `expand_with_policy_value` instead.
     fn expand(&mut self, node_idx: usize) -> f32 {
         // Collect parent chain BEFORE mutable borrow (Moka needs last-2-plies
         // history). Each ancestor's `action` is the move that produced it.
@@ -149,6 +206,73 @@ impl PuctPlayer {
             moka::forward_with_scratch(&self.weights, &self.features_buf, &mut self.scratch);
         self.nodes_evaluated += 1;
 
+        self.expand_with_policy_value(node_idx, &policy, value);
+        value
+    }
+
+    /// Prepare a single leaf for batched evaluation: mark expanded, handle
+    /// the terminal short-circuit, encode features into the per-sample slice
+    /// of `features_buf`. Returns `Some(())` if the leaf needs a forward pass
+    /// (the caller batches all such leaves), or `None` if the leaf is terminal
+    /// (value already known — recorded via `terminal_value_out`).
+    ///
+    /// `sample_idx` selects the slice of `features_buf` to write into
+    /// (`[sample_idx * INPUT_ELEMENT_COUNT ..]`).
+    fn prepare_leaf_for_eval(
+        &mut self,
+        node_idx: usize,
+        sample_idx: usize,
+        terminal_value_out: &mut [Option<f32>],
+    ) {
+        // Collect parent chain (last-2-plies history) BEFORE mutable borrow.
+        let mut hist: Vec<Option<(usize, usize)>> = Vec::with_capacity(2);
+        {
+            let mut chain_actions: Vec<Move> = Vec::with_capacity(2);
+            let mut cur = Some(node_idx);
+            while let Some(idx) = cur {
+                if chain_actions.len() >= 2 {
+                    break;
+                }
+                let n = &self.arena[idx];
+                if n.parent.is_some() {
+                    chain_actions.push(n.action);
+                }
+                cur = n.parent;
+            }
+            for a in chain_actions.iter().rev() {
+                hist.push((*a).map(|idx| (idx / BOARD_SIZE, idx % BOARD_SIZE)));
+            }
+        }
+
+        let node = &mut self.arena[node_idx];
+        node.expanded = true;
+
+        if node.state.is_game_over() {
+            // Terminal: value is the exact reward (no forward pass needed).
+            terminal_value_out[sample_idx] =
+                Some(2.0 * node.state.reward(node.state.to_play) - 1.0);
+            return;
+        }
+
+        let parent_state = node.state;
+        let feat_off = sample_idx * moka::INPUT_ELEMENT_COUNT;
+        moka::encode_features_into(&parent_state, &hist, &mut self.features_buf[feat_off..]);
+        terminal_value_out[sample_idx] = None;
+    }
+
+    /// Expand a node's children given its already-evaluated policy + value.
+    /// Shared between the K=1 `expand` path and the batched path — identical
+    /// child-creation logic so both paths produce bit-identical tree shapes
+    /// given the same (policy, value) inputs.
+    #[inline]
+    fn expand_with_policy_value(
+        &mut self,
+        node_idx: usize,
+        policy: &[f32],
+        _value: f32,
+    ) {
+        let parent_state = self.arena[node_idx].state;
+
         // Rank moves by raw policy logit, keep top_k (always including pass as
         // a candidate — Moka's policy index BOARD_AREA is pass). Build `scored`
         // directly from the legal-move iterator (no intermediate Vec allocation).
@@ -165,7 +289,7 @@ impl PuctPlayer {
         let exp_sum: f32 = scored.iter().map(|(l, _)| (l - max_logit).exp()).sum();
         let inv_exp_sum = if exp_sum > 0.0 { 1.0 / exp_sum } else { 1.0 };
 
-        // Mutable borrow of `node` is now over (scored is owned). Push children.
+        // Push children.
         let children_start = self.arena.len();
         for (logit, action) in &scored {
             let prior = (logit - max_logit).exp() * inv_exp_sum;
@@ -183,12 +307,11 @@ impl PuctPlayer {
                 children: Vec::new(),
                 parent: Some(node_idx),
                 expanded: false,
+                virtual_loss: 0.0,
             });
         }
         let children_end = self.arena.len();
         self.arena[node_idx].children.extend(children_start..children_end);
-
-        value
     }
 
     /// Selection: traverse from root to first unexpanded leaf using PUCT.
@@ -200,25 +323,34 @@ impl PuctPlayer {
             if !node.expanded || node.children.is_empty() {
                 return cur;
             }
-            // Pick child with highest PUCT score.
+            cur = self.pick_best_child(cur);
+        }
+    }
+
+    /// Pick the child with the highest PUCT score from node `cur`. Used by
+    /// both the K=1 `select` and the batched selection. Honors `virtual_loss`
+    /// through `effective_mean_value` — nodes penalized by an in-flight leaf
+    /// in the current batch score lower.
+    #[inline]
+    fn pick_best_child(&self, cur: usize) -> usize {
+        let node = &self.arena[cur];
+        let parent_visits = node.visits.max(1) as f32;
+        let sqrt_parent = parent_visits.sqrt();
+        let mut best_idx = node.children[0];
+        let mut best_score = f32::NEG_INFINITY;
+        for &child_idx in &node.children {
+            let child = &self.arena[child_idx];
             // Q is negated because child.total_value is from child.to_play's
             // perspective, but we're selecting from parent's perspective.
-            let parent_visits = node.visits.max(1) as f32;
-            let sqrt_parent = parent_visits.sqrt();
-            let mut best_idx = node.children[0];
-            let mut best_score = f32::NEG_INFINITY;
-            for &child_idx in &node.children {
-                let child = &self.arena[child_idx];
-                let q = -child.mean_value(); // negate: child's perspective → parent's
-                let u = self.c_puct * child.prior * sqrt_parent / (1.0 + child.visits as f32);
-                let score = q + u;
-                if score > best_score {
-                    best_score = score;
-                    best_idx = child_idx;
-                }
+            let q = -child.effective_mean_value();
+            let u = self.c_puct * child.prior * sqrt_parent / (1.0 + child.visits as f32);
+            let score = q + u;
+            if score > best_score {
+                best_score = score;
+                best_idx = child_idx;
             }
-            cur = best_idx;
         }
+        best_idx
     }
 
     /// Backpropagate value from leaf to root. Negamax: negate at each level.
@@ -233,23 +365,66 @@ impl PuctPlayer {
         }
     }
 
+    /// Batched selection: walk from root to first unexpanded leaf, applying
+    /// `VIRTUAL_LOSS` to every ancestor of the leaf as we go. The virtual
+    /// loss depresses the next selection's Q for these nodes, so the next
+    /// leaf in the batch is less likely to walk the same path. Returns the
+    /// leaf index. Caller backprops to clear the loss.
+    fn select_with_virtual_loss(&mut self, root: usize) -> usize {
+        let mut cur = root;
+        loop {
+            // Apply virtual loss to `cur` BEFORE descending (root included —
+            // a batch with all leaves under the same root child still needs
+            // the root itself penalized so the second selection diverges).
+            self.arena[cur].virtual_loss += VIRTUAL_LOSS;
+            let next = {
+                let node = &self.arena[cur];
+                if !node.expanded || node.children.is_empty() {
+                    break;
+                }
+                self.pick_best_child(cur)
+            };
+            cur = next;
+        }
+        cur
+    }
+
+    /// Backprop + clear virtual loss along the path. Used by the batched
+    /// path — each leaf's path had `VIRTUAL_LOSS` added per ancestor during
+    /// `select_with_virtual_loss`; we subtract it back here as we propagate
+    /// the real value. The real `visits` + `total_value` updates use the
+    /// evaluated value (terminal reward or value-head output).
+    fn backprop_clearing_virtual_loss(&mut self, leaf_idx: usize, mut value: f32) {
+        let mut cur = Some(leaf_idx);
+        while let Some(idx) = cur {
+            let node = &mut self.arena[idx];
+            node.virtual_loss = (node.virtual_loss - VIRTUAL_LOSS).max(0.0);
+            node.visits += 1;
+            node.total_value += value;
+            value = -value;
+            cur = node.parent;
+        }
+    }
+
     /// Run a full PUCT search from `state` and return the chosen move
     /// (`Some(idx)` or `None` for pass). Mirrors `GoPuctMokaPlayer::select_move`
     /// minus the trait plumbing. If `state` has no legal non-pass move AND pass
     /// would be pointless, returns `None` (pass).
+    ///
+    /// Dispatches on `batch_k`: K=1 runs the original sequential loop
+    /// (wasmi parity path — bit-identical move choices vs pre-batch code).
+    /// K>1 runs the batched loop (leaf queue + virtual loss + batched
+    /// forward pass).
     pub fn select_move(&mut self, state: &Board) -> Move {
         // Reset arena for this move's search.
         self.arena.clear();
         self.arena.push(PuctNode::new_root(*state));
         let root = 0;
 
-        for _ in 0..self.budget {
-            // 1. Selection
-            let leaf = self.select(root);
-            // 2. Expansion + Evaluation
-            let value = self.expand(leaf);
-            // 3. Backpropagation (negamax)
-            self.backprop(leaf, value);
+        if self.batch_k <= 1 {
+            self.select_move_sequential(root);
+        } else {
+            self.select_move_batched(root);
         }
 
         // Pick most-visited child at root (AlphaZero convention).
@@ -265,6 +440,109 @@ impl PuctPlayer {
         }
 
         best_action
+    }
+
+    /// K=1 path — the original sequential loop. Bit-identical to the
+    /// pre-batch code (wasmi parity guarantee).
+    fn select_move_sequential(&mut self, root: usize) {
+        for _ in 0..self.budget {
+            let leaf = self.select(root);
+            let value = self.expand(leaf);
+            self.backprop(leaf, value);
+        }
+    }
+
+    /// K>1 path — batched MCTS. Collects up to `batch_k` leaves (each with
+    /// virtual loss applied), runs ONE batched forward pass for all
+    /// non-terminal leaves, then expands + backprops each leaf. The batch
+    /// count is the ceiling of `budget / batch_k` rounded to fill the budget
+    /// exactly (final batch may be partial).
+    ///
+    /// **Root-first convention:** the root is expanded synchronously BEFORE
+    /// the batch loop starts (1 forward pass). This is required because an
+    /// unexpanded root would be returned by every selection in the first
+    /// batch (virtual loss has no effect — the root has no siblings to
+    /// compete with). Expanding root first means every batched leaf is at
+    /// depth >= 1, where virtual loss can drive diverse sibling selection.
+    /// This mirrors the standard AlphaZero batched-MCTS implementation.
+    fn select_move_batched(&mut self, root: usize) {
+        let k = self.batch_k;
+
+        // Phase 0: expand root synchronously. Counts as 1 budget unit.
+        let root_value = self.expand(root);
+        self.backprop(root, root_value);
+        let mut remaining = self.budget.saturating_sub(1);
+
+        // Scratch: per-sample terminal-value slot (Some = terminal short-
+        // circuit, None = needs forward pass). Sized once, reused per batch.
+        let mut terminal_values: Vec<Option<f32>> = vec![None; k];
+        // Leaf indices for this batch, paired with sample_idx.
+        let mut leaves: Vec<(usize, usize)> = Vec::with_capacity(k);
+
+        while remaining > 0 {
+            let batch = k.min(remaining);
+            remaining -= batch;
+
+            // 1. Collect `batch` leaves via virtual-loss selection. Each leaf
+            //    gets its features encoded into `features_buf` at sample_idx,
+            //    OR is marked terminal in `terminal_values`.
+            leaves.clear();
+            for sample_idx in 0..batch {
+                let leaf = self.select_with_virtual_loss(root);
+                self.prepare_leaf_for_eval(leaf, sample_idx, &mut terminal_values);
+                leaves.push((leaf, sample_idx));
+            }
+
+            // 2. Run ONE batched forward pass. Terminal samples' features
+            //    are stale (from a previous batch) but their output is
+            //    ignored — only the non-terminal samples' policy/value are
+            //    used. This wastes some FLOPs on terminal samples but keeps
+            //    the code simple; compaction is a deferred optimization.
+            let bs = self.batch_scratch.as_mut().expect("batch_scratch allocated when batch_k > 1");
+            moka::forward_batch_with_scratch(
+                &self.weights,
+                &self.features_buf,
+                batch,
+                bs,
+                &mut self.policy_batch_buf,
+                &mut self.value_batch_buf,
+            );
+            self.nodes_evaluated += batch;
+
+            // 3. Expand + backprop each leaf. If two leaves converged on the
+            //    same node (rare — virtual loss usually prevents it), the
+            //    second expansion sees `expanded == true` and skips child
+            //    creation, but still backprops the value.
+            for &(leaf_idx, sample_idx) in &leaves {
+                let value = match terminal_values[sample_idx] {
+                    Some(tv) => tv, // terminal: value is exact reward
+                    None => {
+                        // Non-terminal: use the batched policy + value.
+                        // Copy the per-sample policy into a stack array so we
+                        // can call `expand_with_policy_value` (which borrows
+                        // `&mut self.arena`) without holding an immutable
+                        // borrow of `self.policy_batch_buf`.
+                        let mut policy_buf = [0f32; moka::POLICY_MOVES];
+                        policy_buf.copy_from_slice(
+                            &self.policy_batch_buf[sample_idx * moka::POLICY_MOVES
+                                ..(sample_idx + 1) * moka::POLICY_MOVES],
+                        );
+                        let v = self.value_batch_buf[sample_idx];
+                        // Guard: if the node was already expanded by a prior
+                        // leaf in this batch (convergence), skip child creation.
+                        if !self.arena[leaf_idx].children.is_empty()
+                            || self.arena[leaf_idx].visits > 0
+                        {
+                            // Already expanded — just use the value.
+                        } else {
+                            self.expand_with_policy_value(leaf_idx, &policy_buf, v);
+                        }
+                        v
+                    }
+                };
+                self.backprop_clearing_virtual_loss(leaf_idx, value);
+            }
+        }
     }
 }
 
@@ -357,5 +635,111 @@ mod tests {
         let board = Board::new();
         assert_eq!(board.reward(Cell::White), 1.0, "empty board: White wins on komi");
         assert_eq!(board.reward(Cell::Black), 0.0, "empty board: Black loses on komi");
+    }
+
+    // ── Batched MCTS tests (Issue 205) ─────────────────────────────
+
+    #[test]
+    fn batched_puct_returns_a_legal_move_from_empty_board() {
+        // K=8 batched path must still produce a legal, non-pass move from
+        // an empty board — same invariant as the sequential test above.
+        let mut player = PuctPlayer::with_batch_k(50, 1.5, 8, 8);
+        let board = Board::new();
+        let mv = player.select_move(&board);
+        assert!(mv.is_some(), "batched PUCT on empty board should not pass");
+        assert!(board.is_legal(mv.unwrap()));
+        assert!(player.nodes_evaluated() > 0);
+    }
+
+    #[test]
+    fn batched_puct_search_is_deterministic_given_same_board() {
+        // Batched PUCT must also be deterministic — same board → same move
+        // across two runs. Virtual loss is cleared between batches, so the
+        // tree state at end-of-search is a pure function of the input.
+        let mut player = PuctPlayer::with_batch_k(50, 1.5, 8, 8);
+        let mut board = Board::new();
+        board.play(40);
+        board.play(41);
+        board.play(31);
+        board.play(50);
+        let first = player.select_move(&board);
+        let second = player.select_move(&board);
+        assert_eq!(first, second, "batched PUCT must be deterministic given fixed input");
+    }
+
+    #[test]
+    fn batched_puct_budget_scales_nodes_evaluated() {
+        // Same scaling invariant as the sequential test, but for K=8 batches.
+        // budget=100 should evaluate roughly 2× the nodes of budget=50.
+        let mut board = Board::new();
+        board.play(40);
+        board.play(41);
+
+        let mut p50 = PuctPlayer::with_batch_k(50, 1.5, 8, 8);
+        let _ = p50.select_move(&board);
+        let n50 = p50.nodes_evaluated();
+
+        let mut p100 = PuctPlayer::with_batch_k(100, 1.5, 8, 8);
+        let _ = p100.select_move(&board);
+        let n100 = p100.nodes_evaluated();
+
+        assert!(n100 > n50, "batched budget=100 ({n100}) must exceed budget=50 ({n50})");
+        assert!(n100 >= 2 * n50 - 30, "batched budget scaling off: 100→{n100}, 50→{n50}");
+    }
+
+    #[test]
+    fn batched_puct_handles_partial_final_batch() {
+        // budget=50, K=8 → 6 full batches (48 leaves) + 1 partial batch (2 leaves).
+        // The partial batch must not panic and must produce a legal move.
+        let mut player = PuctPlayer::with_batch_k(50, 1.5, 8, 8);
+        let mut board = Board::new();
+        board.play(40);
+        board.play(41);
+        let mv = player.select_move(&board);
+        assert!(mv.is_some() || board.is_game_over(),
+            "batched PUCT should return a move (or game is over)");
+    }
+
+    #[test]
+    fn batched_puct_handles_terminal_leaves_in_batch() {
+        // A position where some batched leaves hit terminals (double-pass
+        // subtrees) must not panic — the terminal short-circuit path uses
+        // the exact-reward value, the non-terminal leaves use the forward pass.
+        // We construct a near-terminal position: both players have passed once.
+        let mut player = PuctPlayer::with_batch_k(50, 1.5, 8, 8);
+        let mut board = Board::new();
+        board.play(40);
+        board.pass();
+        board.pass(); // now consecutive_passes == 2 → game over at root
+        // Root itself is terminal — the search must handle this without panic
+        // and return None (pass) since there are no children to expand.
+        let mv = player.select_move(&board);
+        assert_eq!(mv, None, "terminal root must return pass (no children)");
+    }
+
+    #[test]
+    fn batched_puct_explores_diverse_leaves_via_virtual_loss() {
+        // Virtual loss should cause the batch to explore DIFFERENT root
+        // children, not all pile onto the same one. With K=8 and budget=8
+        // (a single batch), the root should have multiple children with
+        // visits > 0 (not all 8 visits on one child).
+        //
+        // We can't assert the exact distribution (depends on priors), but
+        // we CAN assert that at least 2 root children received visits —
+        // that's the load-bearing virtual-loss invariant. Without virtual
+        // loss, all 8 leaves in the first batch would walk the same path
+        // (the highest-prior child) and only 1 root child would have visits.
+        let mut player = PuctPlayer::with_batch_k(8, 1.5, 8, 8);
+        let mut board = Board::new();
+        board.play(40);
+        board.play(41);
+        let _ = player.select_move(&board);
+
+        let root = &player.arena[0];
+        let visited_children = root.children.iter()
+            .filter(|&&idx| player.arena[idx].visits > 0)
+            .count();
+        assert!(visited_children >= 2,
+            "virtual loss must cause diverse exploration: only {visited_children} root child(ren) visited (expected ≥2)");
     }
 }

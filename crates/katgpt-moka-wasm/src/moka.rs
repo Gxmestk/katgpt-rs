@@ -223,6 +223,158 @@ fn linear_into(input: &[f32], in_dim: usize, out_dim: usize, weight: &[f32], bia
     }
 }
 
+// ── Batched primitives (Issue 205) ───────────────────────────────────
+//
+// Process K samples through the same layer in one call. The key
+// restructure vs the per-sample `conv2d_into`/`linear_into` is that the
+// weight slice for each output channel is loaded ONCE and reused across
+// all K samples in the inner loop. This is the cache-locality win that
+// makes batched MCTS faster than K sequential forward passes on a CPU:
+// the Moka trunk weight block is ~100 KB (32 out × 32 in × 3 × 3 × 4 B),
+// which spills L1 (32 KB) but fits L2 — sequential passes reload it from
+// L2 K times, batched loads it once per out_channel.
+//
+// Layout: sample-major. `inputs[s * sample_stride..]` is sample s's
+// HWC tensor; same for `outs`.
+
+/// Batched 2D convolution. `batch = K` samples, each `h×w×in_ch` HWC,
+/// written sample-major into `outs` (length `batch * h * w * out_ch`).
+/// `patches` is scratch of length `batch * k * k * in_ch`.
+///
+/// Falls back to the per-sample code structure when `batch == 1` so the
+/// K=1 path has zero overhead vs `conv2d_into` (modulo the sample stride).
+#[allow(clippy::too_many_arguments)]
+fn conv2d_batched_into(
+    inputs: &[f32],
+    batch: usize,
+    h: usize,
+    w: usize,
+    in_ch: usize,
+    out_ch: usize,
+    k: usize,
+    weight: &[f32],
+    bias: &[f32],
+    patches: &mut [f32],
+    outs: &mut [f32],
+) {
+    let patch_len = k * k * in_ch;
+    let in_sample = h * w * in_ch;
+    let out_sample = h * w * out_ch;
+
+    if k == 1 {
+        // 1×1 conv: no patch gather, input slice IS the patch.
+        for pos in 0..h * w {
+            let obase = pos * out_ch;
+            for oc in 0..out_ch {
+                let wbase = oc * in_ch;
+                let w_slice = &weight[wbase..wbase + in_ch];
+                let b = bias[oc];
+                for s in 0..batch {
+                    let pslice = &inputs[s * in_sample + pos * in_ch..][..in_ch];
+                    outs[s * out_sample + obase + oc] = dot_lanes(pslice, w_slice, b);
+                }
+            }
+        }
+        return;
+    }
+
+    let pad = k / 2;
+    for y in 0..h {
+        for x in 0..w {
+            // Gather K patches (one per sample) at this (y, x) position.
+            for s in 0..batch {
+                let input = &inputs[s * in_sample..];
+                let patch = &mut patches[s * patch_len..];
+                patch[..patch_len].fill(0.0);
+                for ky in 0..k {
+                    let iy = y + ky;
+                    if iy < pad || iy >= h + pad {
+                        continue;
+                    }
+                    let iy = iy - pad;
+                    for kx in 0..k {
+                        let ix = x + kx;
+                        if ix < pad || ix >= w + pad {
+                            continue;
+                        }
+                        let ix = ix - pad;
+                        let src = (iy * w + ix) * in_ch;
+                        let dst = (ky * k + kx) * in_ch;
+                        patch[dst..dst + in_ch].copy_from_slice(&input[src..src + in_ch]);
+                    }
+                }
+            }
+
+            // For each output channel, load its weight slice ONCE and reuse
+            // for all K samples — the cache-locality win.
+            let obase = (y * w + x) * out_ch;
+            for oc in 0..out_ch {
+                let wbase = oc * patch_len;
+                let w_slice = &weight[wbase..wbase + patch_len];
+                let b = bias[oc];
+                for s in 0..batch {
+                    let pslice = &patches[s * patch_len..][..patch_len];
+                    outs[s * out_sample + obase + oc] = dot_lanes(pslice, w_slice, b);
+                }
+            }
+        }
+    }
+}
+
+/// Batched linear (fully-connected): `out[s][o] = bias[o] + dot(weight[o], input[s])`.
+/// Weight layout is row-major `[out_dim][in_dim]`, shared across all K samples.
+fn linear_batched_into(
+    inputs: &[f32],
+    batch: usize,
+    in_dim: usize,
+    out_dim: usize,
+    weight: &[f32],
+    bias: &[f32],
+    outs: &mut [f32],
+) {
+    for o in 0..out_dim {
+        let base = o * in_dim;
+        let w_slice = &weight[base..base + in_dim];
+        let b = bias[o];
+        for s in 0..batch {
+            outs[s * out_dim + o] = dot_lanes(&inputs[s * in_dim..][..in_dim], w_slice, b);
+        }
+    }
+}
+
+/// Batched global mean+max pool over the spatial dims, leaving a per-sample
+/// `[mean(ch); ch][max(ch); ch]` vector of length `ch * 2`.
+fn global_mean_max_batched_into(
+    inputs: &[f32],
+    batch: usize,
+    h: usize,
+    w: usize,
+    ch: usize,
+    outs: &mut [f32],
+) {
+    let n = (h * w) as f32;
+    for s in 0..batch {
+        let input = &inputs[s * h * w * ch..];
+        let out = &mut outs[s * ch * 2..];
+        let (mean, max) = out[..ch * 2].split_at_mut(ch);
+        mean.fill(0.0);
+        max.fill(f32::MIN);
+        for pos in 0..h * w {
+            let row = &input[pos * ch..pos * ch + ch];
+            for c in 0..ch {
+                let v = row[c];
+                mean[c] += v;
+                if v > max[c] {
+                    max[c] = v;
+                }
+            }
+        }
+        for m in mean.iter_mut() {
+            *m /= n;
+        }
+    }
+}
+
 fn relu_inplace(x: &mut [f32]) {
     for v in x.iter_mut() {
         if *v < 0.0 {
@@ -345,6 +497,230 @@ pub fn forward_with_scratch(weights: &MokaWeights, features: &[f32], scratch: &m
     (logits, value_out[0].tanh())
 }
 
+// ── Batched forward pass (Issue 205) ────────────────────────────────
+//
+// K-wide forward pass for batched MCTS. Same arithmetic as K sequential
+// `forward_with_scratch` calls, but reuses each weight slice across all K
+// samples in the inner loop — the cache-locality win on CPU (the Moka
+// trunk block is ~100 KB, fits L2 not L1; sequential passes reload from
+// L2 K times, batched loads once per out_channel).
+//
+// Layout: all buffers are sample-major (`buffer[s * sample_len..]` is
+// sample s's data). This keeps pointer arithmetic simple + lets the K
+// inner-loop iterations walk contiguous memory for the output writes.
+
+/// K-wide scratch space for batched forward passes. Constructed once at
+/// player init with the max K; the same buffers are reused across every
+/// `select_move` call. Sample-major layout throughout.
+pub struct MokaBatchScratch {
+    pub batch: usize,
+    trunk: Vec<f32>,
+    expand: Vec<f32>,
+    hidden_a: Vec<f32>,
+    hidden_b: Vec<f32>,
+    head4: Vec<f32>,
+    head2: Vec<f32>,
+    patches_3x3_trunk: Vec<f32>,     // batch × (3·3·TRUNK_CHANNELS)  — stem
+    patches_3x3_bottleneck: Vec<f32>, // batch × (3·3·BOTTLENECK_CHANNELS) — first/second
+    pooled: Vec<f32>,                // batch × (BOTTLENECK_CHANNELS·2)
+    gh: Vec<f32>,                    // batch × 8
+    gbias: Vec<f32>,                 // batch × BOTTLENECK_CHANNELS
+    value_h: Vec<f32>,               // batch × SCORE_HIDDEN_CHANNELS
+    policy: Vec<f32>,                // batch × POLICY_MOVES
+    value_out: Vec<f32>,             // batch × 1
+}
+
+impl MokaBatchScratch {
+    pub fn new(batch: usize) -> Self {
+        Self {
+            batch,
+            trunk: vec![0.0; batch * BOARD_AREA * TRUNK_CHANNELS],
+            expand: vec![0.0; batch * BOARD_AREA * TRUNK_CHANNELS],
+            hidden_a: vec![0.0; batch * BOARD_AREA * BOTTLENECK_CHANNELS],
+            hidden_b: vec![0.0; batch * BOARD_AREA * BOTTLENECK_CHANNELS],
+            head4: vec![0.0; batch * BOARD_AREA * POLICY_CHANNELS],
+            head2: vec![0.0; batch * BOARD_AREA * VALUE_CHANNELS],
+            patches_3x3_trunk: vec![0.0; batch * 3 * 3 * TRUNK_CHANNELS],
+            patches_3x3_bottleneck: vec![0.0; batch * 3 * 3 * BOTTLENECK_CHANNELS],
+            pooled: vec![0.0; batch * BOTTLENECK_CHANNELS * 2],
+            gh: vec![0.0; batch * 8],
+            gbias: vec![0.0; batch * BOTTLENECK_CHANNELS],
+            value_h: vec![0.0; batch * SCORE_HIDDEN_CHANNELS],
+            policy: vec![0.0; batch * POLICY_MOVES],
+            value_out: vec![0.0; batch],
+        }
+    }
+}
+
+/// Batched forward pass. `features_batch` is K HWC feature tensors laid out
+/// sample-major (`features_batch[s * INPUT_ELEMENT_COUNT..]` is sample s).
+/// Writes per-sample logits into `policy_batch[s * POLICY_MOVES..]` and
+/// per-sample tanh-value into `value_batch[s]`.
+///
+/// `policy_batch` must be length `≥ batch * POLICY_MOVES`; `value_batch`
+/// must be length `≥ batch`. The caller owns these so the search loop can
+/// read them without copying out of the scratch struct.
+#[allow(clippy::too_many_arguments)]
+pub fn forward_batch_with_scratch(
+    weights: &MokaWeights,
+    features_batch: &[f32],
+    batch: usize,
+    scratch: &mut MokaBatchScratch,
+    policy_batch: &mut [f32],
+    value_batch: &mut [f32],
+) {
+    debug_assert!(scratch.batch >= batch, "scratch must be sized for at least this batch; scratch={}, batch={}", scratch.batch, batch);
+    let MokaBatchScratch {
+        trunk,
+        expand,
+        hidden_a,
+        hidden_b,
+        head4,
+        head2,
+        patches_3x3_trunk,
+        patches_3x3_bottleneck,
+        pooled,
+        gh,
+        gbias,
+        value_h,
+        policy,
+        value_out,
+        batch: _,
+    } = scratch;
+
+    let trunk_len = BOARD_AREA * TRUNK_CHANNELS;
+    let bn_len = BOARD_AREA * BOTTLENECK_CHANNELS;
+
+    // Stem: 3×3 conv, 12 → 32 channels. The patch gather happens once per
+    // (sample, position); the weight slice is reused across all K samples.
+    conv2d_batched_into(
+        features_batch, batch,
+        BOARD_SIZE, BOARD_SIZE, INPUT_PLANES, TRUNK_CHANNELS, 3,
+        &weights.stem.w, &weights.stem.b, patches_3x3_trunk, trunk,
+    );
+    for s in 0..batch {
+        relu_inplace(&mut trunk[s * trunk_len..][..trunk_len]);
+    }
+
+    for block in &weights.blocks {
+        // reduce: 1×1 conv, 32 → 16.
+        conv2d_batched_into(
+            trunk, batch,
+            BOARD_SIZE, BOARD_SIZE, TRUNK_CHANNELS, BOTTLENECK_CHANNELS, 1,
+            &block.reduce.w, &block.reduce.b, patches_3x3_trunk, hidden_a,
+        );
+        for s in 0..batch {
+            relu_inplace(&mut hidden_a[s * bn_len..][..bn_len]);
+        }
+        // first: 3×3 conv, 16 → 16.
+        conv2d_batched_into(
+            hidden_a, batch,
+            BOARD_SIZE, BOARD_SIZE, BOTTLENECK_CHANNELS, BOTTLENECK_CHANNELS, 3,
+            &block.first.w, &block.first.b, patches_3x3_bottleneck, hidden_b,
+        );
+        for s in 0..batch {
+            relu_inplace(&mut hidden_b[s * bn_len..][..bn_len]);
+        }
+
+        if let Some(g) = &block.global {
+            global_mean_max_batched_into(
+                hidden_b, batch, BOARD_SIZE, BOARD_SIZE, BOTTLENECK_CHANNELS, pooled,
+            );
+            let gh_len = g.hidden.b.len();
+            linear_batched_into(
+                pooled, batch, BOTTLENECK_CHANNELS * 2, gh_len,
+                &g.hidden.w, &g.hidden.b, gh,
+            );
+            for s in 0..batch {
+                relu_inplace(&mut gh[s * gh_len..][..gh_len]);
+            }
+            linear_batched_into(
+                gh, batch, gh_len, BOTTLENECK_CHANNELS,
+                &g.output.w, &g.output.b, gbias,
+            );
+            for s in 0..batch {
+                let row = &mut hidden_b[s * bn_len..];
+                let g_s = &gbias[s * BOTTLENECK_CHANNELS..][..BOTTLENECK_CHANNELS];
+                for pos in 0..BOARD_AREA {
+                    let slot = &mut row[pos * BOTTLENECK_CHANNELS..(pos + 1) * BOTTLENECK_CHANNELS];
+                    for c in 0..BOTTLENECK_CHANNELS {
+                        slot[c] += g_s[c];
+                    }
+                }
+            }
+        }
+
+        // second: 3×3 conv, 16 → 16.
+        conv2d_batched_into(
+            hidden_b, batch,
+            BOARD_SIZE, BOARD_SIZE, BOTTLENECK_CHANNELS, BOTTLENECK_CHANNELS, 3,
+            &block.second.w, &block.second.b, patches_3x3_bottleneck, hidden_a,
+        );
+        for s in 0..batch {
+            relu_inplace(&mut hidden_a[s * bn_len..][..bn_len]);
+        }
+        // expand: 1×1 conv, 16 → 32, then residual add into trunk.
+        conv2d_batched_into(
+            hidden_a, batch,
+            BOARD_SIZE, BOARD_SIZE, BOTTLENECK_CHANNELS, TRUNK_CHANNELS, 1,
+            &block.expand.w, &block.expand.b, patches_3x3_trunk, expand,
+        );
+        for s in 0..batch {
+            let t = &mut trunk[s * trunk_len..][..trunk_len];
+            let e = &expand[s * trunk_len..][..trunk_len];
+            for i in 0..trunk_len {
+                let v = t[i] + e[i];
+                t[i] = if v < 0.0 { 0.0 } else { v };
+            }
+        }
+    }
+
+    // Policy head.
+    let head4_len = BOARD_AREA * POLICY_CHANNELS;
+    conv2d_batched_into(
+        trunk, batch,
+        BOARD_SIZE, BOARD_SIZE, TRUNK_CHANNELS, POLICY_CHANNELS, 1,
+        &weights.policy_conv.w, &weights.policy_conv.b, patches_3x3_trunk, head4,
+    );
+    for s in 0..batch {
+        relu_inplace(&mut head4[s * head4_len..][..head4_len]);
+    }
+    linear_batched_into(
+        head4, batch, POLICY_CHANNELS * BOARD_AREA, POLICY_MOVES,
+        &weights.policy_linear.w, &weights.policy_linear.b, policy,
+    );
+
+    // Value head.
+    let head2_len = BOARD_AREA * VALUE_CHANNELS;
+    conv2d_batched_into(
+        trunk, batch,
+        BOARD_SIZE, BOARD_SIZE, TRUNK_CHANNELS, VALUE_CHANNELS, 1,
+        &weights.value_conv.w, &weights.value_conv.b, patches_3x3_trunk, head2,
+    );
+    for s in 0..batch {
+        relu_inplace(&mut head2[s * head2_len..][..head2_len]);
+    }
+    let value_hidden_dim = weights.value_hidden.b.len();
+    linear_batched_into(
+        head2, batch, VALUE_CHANNELS * BOARD_AREA, value_hidden_dim,
+        &weights.value_hidden.w, &weights.value_hidden.b, value_h,
+    );
+    for s in 0..batch {
+        relu_inplace(&mut value_h[s * value_hidden_dim..][..value_hidden_dim]);
+    }
+    linear_batched_into(
+        value_h, batch, value_hidden_dim, 1,
+        &weights.value_output.w, &weights.value_output.b, value_out,
+    );
+
+    // Copy out into the caller-owned buffers + tanh the value.
+    for s in 0..batch {
+        policy_batch[s * POLICY_MOVES..(s + 1) * POLICY_MOVES]
+            .copy_from_slice(&policy[s * POLICY_MOVES..(s + 1) * POLICY_MOVES]);
+        value_batch[s] = value_out[s].tanh();
+    }
+}
+
 /// Encode `board` + last-two-plies `history` (`None` = pass) into Moka's
 /// 12-plane `9*9*12` HWC feature tensor, written into `out` (length ≥
 /// [`INPUT_ELEMENT_COUNT`]). Logic identical to
@@ -425,5 +801,92 @@ pub fn encode_features_into(board: &Board, history: &[Option<(usize, usize)>], o
         for col in 0..size {
             feats[idx(row, col, 11)] = komi_value;
         }
+    }
+}
+
+#[cfg(test)]
+mod batch_tests {
+    use super::*;
+    use crate::board::Board;
+
+    /// G1 gate: for K random boards, the batched forward pass must produce
+    /// output within f32 epsilon of K sequential `forward_with_scratch`
+    /// calls. This is the load-bearing correctness invariant — if it fails,
+    /// the batched MCTS search is invalid (different move choices vs
+    /// sequential PUCT).
+    #[test]
+    fn g1_batched_forward_matches_sequential() {
+        let weights = MokaWeights::load();
+        let k = 8;
+        let mut seq_scratch = MokaScratch::new();
+        let mut batch_scratch = MokaBatchScratch::new(k);
+
+        // Build K distinct mid-game boards by playing different opening
+        // sequences. encode_features needs last-2-plies history, which we
+        // reconstruct per board.
+        let opening_seqs: [[usize; 6]; 8] = [
+            [40, 41, 31, 50, 32, 49],
+            [0, 1, 9, 10, 18, 19],
+            [80, 79, 71, 70, 62, 61],
+            [40, 50, 30, 60, 31, 51],
+            [4, 5, 13, 14, 22, 23],
+            [76, 77, 67, 68, 58, 59],
+            [40, 32, 48, 31, 49, 23],
+            [40, 41, 31, 50, 32, 49], // duplicate of [0] to test same-board
+        ];
+
+        let mut features = vec![0.0; k * INPUT_ELEMENT_COUNT];
+        let mut seq_policy = vec![[0f32; POLICY_MOVES]; k];
+        let mut seq_value = vec![0f32; k];
+
+        for s in 0..k {
+            let mut board = Board::new();
+            let mut hist: Vec<Option<(usize, usize)>> = Vec::new();
+            for &mv in &opening_seqs[s] {
+                if board.is_legal(mv) {
+                    board.play(mv);
+                    hist.push(Some((mv / BOARD_SIZE, mv % BOARD_SIZE)));
+                }
+            }
+            // Take last-2 for the feature encoder.
+            let last2: Vec<Option<(usize, usize)>> =
+                hist.iter().rev().take(2).copied().collect::<Vec<_>>().into_iter().rev().collect();
+            encode_features_into(&board, &last2, &mut features[s * INPUT_ELEMENT_COUNT..]);
+            let (p, v) = forward_with_scratch(&weights, &features[s * INPUT_ELEMENT_COUNT..], &mut seq_scratch);
+            seq_policy[s] = p;
+            seq_value[s] = v;
+        }
+
+        let mut batch_policy = vec![0f32; k * POLICY_MOVES];
+        let mut batch_value = vec![0f32; k];
+        forward_batch_with_scratch(&weights, &features, k, &mut batch_scratch, &mut batch_policy, &mut batch_value);
+
+        // Compare. Allow generous epsilon — f32 reassociation in the batched
+        // dot loop can accumulate slightly differently than the sequential
+        // version (different summation order is legal per IEEE-754).
+        const EPS: f32 = 1e-3;
+        let mut max_policy_diff = 0f32;
+        let mut max_value_diff = 0f32;
+        for s in 0..k {
+            for i in 0..POLICY_MOVES {
+                let diff = (seq_policy[s][i] - batch_policy[s * POLICY_MOVES + i]).abs();
+                if diff > max_policy_diff {
+                    max_policy_diff = diff;
+                }
+            }
+            let diff = (seq_value[s] - batch_value[s]).abs();
+            if diff > max_value_diff {
+                max_value_diff = diff;
+            }
+        }
+        assert!(
+            max_policy_diff < EPS,
+            "batched vs sequential policy diff {max_policy_diff:e} exceeds {EPS:e}"
+        );
+        assert!(
+            max_value_diff < EPS,
+            "batched vs sequential value diff {max_value_diff:e} exceeds {EPS:e}"
+        );
+        eprintln!("g1 PASS: max policy diff {max_policy_diff:e}, max value diff {max_value_diff:e}");
     }
 }

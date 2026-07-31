@@ -96,7 +96,7 @@ fn setup_wasmi() -> (Store<()>, wasmi::Instance) {
 /// just typed indices. Each method takes `&mut Store` explicitly, avoiding
 /// the self-referential lifetime that would arise from storing it here.
 struct Arena {
-    init: TypedFunc<(u32, u32, u32), ()>,
+    init: TypedFunc<(u32, u32, u32, u32), ()>,
     reset: TypedFunc<(), ()>,
     play: TypedFunc<u32, ()>,
     legal_count: TypedFunc<(), u32>,
@@ -180,11 +180,12 @@ impl Arena {
 fn wasmi_puct_winrate_vs_greedy() {
     let (mut store, instance) = setup_wasmi();
 
-    // budget=50, c_puct=1.5, top_k=8 — the native 94% config (Bench 205).
-    // f32 passed as bit pattern (same convention as wasmi_puct_init).
+    // budget=50, c_puct=1.5, top_k=8, batch_k=1 (sequential) — the native
+    // 94% config (Bench 205). batch_k=1 preserves the wasmi parity guarantee
+    // (bit-identical move choices vs the pre-batch code).
     let c_puct_bits = 1.5f32.to_bits();
     let arena = Arena::new(&store, &instance);
-    arena.init.call(&mut store, (50, c_puct_bits, 8)).expect("arena_init");
+    arena.init.call(&mut store, (50, c_puct_bits, 8, 1)).expect("arena_init");
 
     const NUM_GAMES: usize = 20;
     let start = Instant::now();

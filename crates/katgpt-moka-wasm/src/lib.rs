@@ -404,16 +404,20 @@ struct ArenaState {
 static mut WASMI_ARENA: Option<ArenaState> = None;
 
 /// Initialize the arena: new empty board + PUCT player configured with
-/// `(budget, c_puct_bits, top_k)`. Must be called once before any other
+/// `(budget, c_puct_bits, top_k, batch_k)`. Must be called once before any other
 /// `wasmi_arena_*` function. Resets any prior game state.
+///
+/// `batch_k`: 0 or 1 = sequential PUCT (the wasmi parity path — bit-identical
+/// move choices vs the pre-batch code). >1 = batched MCTS (virtual loss +
+/// leaf queue + batched forward pass, Issue 205).
 #[unsafe(no_mangle)]
 #[allow(clippy::deref_addrof)]
-pub extern "C" fn wasmi_arena_init(budget: usize, c_puct_bits: u32, top_k: usize) {
+pub extern "C" fn wasmi_arena_init(budget: usize, c_puct_bits: u32, top_k: usize, batch_k: usize) {
     let c_puct = f32::from_bits(c_puct_bits);
     let state = ArenaState {
         board: board::Board::new(),
         history: Vec::new(),
-        puct: puct::PuctPlayer::new(budget, c_puct, top_k),
+        puct: puct::PuctPlayer::with_batch_k(budget, c_puct, top_k, batch_k),
         weights: moka::MokaWeights::load(),
         scratch: moka::MokaScratch::new(),
         features_buf: vec![0.0; moka::INPUT_ELEMENT_COUNT],
