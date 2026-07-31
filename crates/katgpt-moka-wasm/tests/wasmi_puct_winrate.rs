@@ -96,7 +96,10 @@ fn setup_wasmi() -> (Store<()>, wasmi::Instance) {
 /// just typed indices. Each method takes `&mut Store` explicitly, avoiding
 /// the self-referential lifetime that would arise from storing it here.
 struct Arena {
-    init: TypedFunc<(u32, u32, u32, u32), ()>,
+    /// Issue 207: the f32 explicit path. After promotion, `wasmi_arena_init`
+    /// defaults to int8 at K=1, so this test routes through `wasmi_arena_init_f32`
+    /// to preserve f32 regression coverage.
+    init_f32: TypedFunc<(u32, u32, u32, u32), ()>,
     reset: TypedFunc<(), ()>,
     play: TypedFunc<u32, ()>,
     legal_count: TypedFunc<(), u32>,
@@ -111,7 +114,9 @@ struct Arena {
 impl Arena {
     fn new(store: &Store<()>, instance: &wasmi::Instance) -> Self {
         Self {
-            init: instance.get_typed_func(store, "wasmi_arena_init").expect("wasmi_arena_init"),
+            init_f32: instance
+                .get_typed_func(store, "wasmi_arena_init_f32")
+                .expect("wasmi_arena_init_f32"),
             reset: instance.get_typed_func(store, "wasmi_arena_reset").expect("wasmi_arena_reset"),
             play: instance.get_typed_func(store, "wasmi_arena_play").expect("wasmi_arena_play"),
             legal_count: instance.get_typed_func(store, "wasmi_arena_legal_count").expect("wasmi_arena_legal_count"),
@@ -183,9 +188,13 @@ fn wasmi_puct_winrate_vs_greedy() {
     // budget=50, c_puct=1.5, top_k=8, batch_k=1 (sequential) — the native
     // 94% config (Bench 205). batch_k=1 preserves the wasmi parity guarantee
     // (bit-identical move choices vs the pre-batch code).
+    //
+    // Issue 207: uses `wasmi_arena_init_f32` (not `wasmi_arena_init`) because
+    // the latter now defaults to the int8 forward path. This test is the f32
+    // regression guard — the int8 parity gate lives in `wasmi_puct_int8_winrate.rs`.
     let c_puct_bits = 1.5f32.to_bits();
     let arena = Arena::new(&store, &instance);
-    arena.init.call(&mut store, (50, c_puct_bits, 8, 1)).expect("arena_init");
+    arena.init_f32.call(&mut store, (50, c_puct_bits, 8, 1)).expect("arena_init_f32");
 
     const NUM_GAMES: usize = 20;
     let start = Instant::now();

@@ -137,15 +137,36 @@ impl PuctPlayer {
         Self::with_batch_k(budget, c_puct, top_k, 1)
     }
 
-    /// Construct with explicit batch size K (Issue 205). K=1 reproduces the
-    /// original sequential PUCT loop bit-identically (the wasmi parity
-    /// guarantee). K>1 enables batched MCTS (virtual loss + leaf queue +
-    /// batched forward pass).
+    /// Construct with explicit batch size K (Issue 205). K=1 uses the int8
+    /// forward path by default (Issue 207 promotion — GOAT-validated: 1.17–1.39×
+    /// speedup, 85% win-rate parity vs f32's 94% native reference at n=20).
+    /// K>1 enables batched MCTS (virtual loss + leaf queue + batched forward
+    /// pass, always f32 — batched int8 is not implemented).
+    ///
+    /// To force the f32 path at K=1 (regression testing, platforms without
+    /// int8 dot support), use [`with_f32`](Self::with_f32).
     pub fn with_batch_k(budget: usize, c_puct: f32, top_k: usize, batch_k: usize) -> Self {
-        Self::with_options(budget, c_puct, top_k, batch_k, false)
+        let k = batch_k.max(1);
+        // Issue 207 promotion: int8 is the default for the sequential (K=1)
+        // path. The win-rate parity gate (wasmi_puct_int8_winrate, 85% at
+        // n=20) confirmed this is a modelless gain, not a speedup of a worse
+        // result. K>1 still uses f32 (batched int8 forward is unimplemented).
+        Self::with_options(budget, c_puct, top_k, batch_k, k == 1)
     }
 
-    /// Construct with int8 forward path enabled (Issue 206 T5).
+    /// Construct with the **f32** forward path (K=1 sequential). Use this when
+    /// you need the original f32 path explicitly — regression tests against
+    /// the pre-int8 baseline, platforms without int8 dot kernels, or A/B
+    /// comparison. For normal use, prefer [`new`](Self::new) (which defaults
+    /// to int8 at K=1 per Issue 207).
+    pub fn with_f32(budget: usize, c_puct: f32, top_k: usize) -> Self {
+        Self::with_options(budget, c_puct, top_k, 1, false)
+    }
+
+    /// Construct with int8 forward path enabled explicitly. After the Issue 207
+    /// promotion this is equivalent to [`new`](Self::new) — kept as an explicit
+    /// alias for code that wants to spell out "int8 path" at the call site
+    /// (e.g. A/B test harnesses, perf benches that compare against `with_f32`).
     ///
     /// Uses platform-native int8 dot kernels (SDOT on aarch64, extmul on
     /// wasm32). Only the K=1 sequential path supports int8 — if `batch_k > 1`,
@@ -820,7 +841,11 @@ mod tests {
                 }
             }
 
-            let mut f32_player = PuctPlayer::new(50, 1.5, 8);
+            // Issue 207 promotion note: `PuctPlayer::new` now defaults to
+            // int8 at K=1, so this test must use `with_f32` explicitly to
+            // exercise the f32 path. The comparison still validates that the
+            // int8 quantization noise doesn't change move selection.
+            let mut f32_player = PuctPlayer::with_f32(50, 1.5, 8);
             let f32_mv = f32_player.select_move(&board);
 
             let mut i8_player = PuctPlayer::with_int8(50, 1.5, 8);

@@ -202,10 +202,15 @@ impl WasmPuctPlayer {
     }
 }
 
-/// PUCT player with int8 forward path (Issue 206 T5). Same API as
-/// `WasmPuctPlayer` but uses platform-native int8 dot kernels for the
-/// forward pass. On aarch64 with dotprod, this is ~1.4× faster than f32;
-/// on WASM with simd128, ~2× is expected (WASM f32 has no FMA).
+/// PUCT player with int8 forward path (Issue 206 T5, promoted to default-on
+/// in Issue 207). After promotion this is equivalent to `WasmPuctPlayer` —
+/// kept as an explicit alias so existing JS code referencing `WasmPuctPlayerInt8`
+/// continues to work. New code should prefer `WasmPuctPlayer` (the default
+/// since Issue 207).
+///
+/// On aarch64 with dotprod, the int8 path is ~1.4× faster than f32; on WASM
+/// with simd128, ~1.2× (Issue 207 measured PUCT b50 = 25.8ms, below the 30ms
+/// floor). Win-rate parity confirmed at 85% (n=20) vs f32's 94% native.
 #[wasm_bindgen]
 pub struct WasmPuctPlayerInt8 {
     inner: puct::PuctPlayer,
@@ -446,9 +451,14 @@ static mut WASMI_ARENA: Option<ArenaState> = None;
 /// `(budget, c_puct_bits, top_k, batch_k)`. Must be called once before any other
 /// `wasmi_arena_*` function. Resets any prior game state.
 ///
-/// `batch_k`: 0 or 1 = sequential PUCT (the wasmi parity path — bit-identical
-/// move choices vs the pre-batch code). >1 = batched MCTS (virtual loss +
-/// leaf queue + batched forward pass, Issue 205).
+/// `batch_k`: 0 or 1 = sequential PUCT — **uses the int8 forward path by
+/// default** (Issue 207 promotion; the wasmi parity floor was cleared at
+/// 85% win rate, n=20). >1 = batched MCTS (virtual loss + leaf queue +
+/// batched forward pass, Issue 205 — always f32 since batched int8 is
+/// unimplemented).
+///
+/// To force the f32 path at K=1 (regression testing), use
+/// [`wasmi_arena_init_f32`](fn.wasmi_arena_init_f32.html).
 #[unsafe(no_mangle)]
 #[allow(clippy::deref_addrof)]
 pub extern "C" fn wasmi_arena_init(budget: usize, c_puct_bits: u32, top_k: usize, batch_k: usize) {
@@ -460,6 +470,59 @@ pub extern "C" fn wasmi_arena_init(budget: usize, c_puct_bits: u32, top_k: usize
         weights: moka::MokaWeights::load(),
         scratch: moka::MokaScratch::new(),
         features_buf: vec![0.0; moka::INPUT_ELEMENT_COUNT],
+    };
+    unsafe {
+        *(&raw mut WASMI_ARENA) = Some(state);
+    }
+}
+
+/// Initialize the arena with the **int8 forward path** enabled explicitly.
+///
+/// After the Issue 207 promotion, this is equivalent to
+/// `wasmi_arena_init(budget, c_puct_bits, top_k, /*batch_k=*/1)` — both route
+/// through the int8 forward path. Kept as an explicit alias so test code can
+/// spell out "int8 path" at the call site (e.g. A/B benches against
+/// `wasmi_arena_init_f32`).
+///
+/// All other `wasmi_arena_*` functions (`reset`, `play`, `search_puct`, etc.)
+/// are shared with the f32 path — `PuctPlayer::select_move` dispatches
+/// internally based on whether `weights_i8` is populated.
+///
+/// Used by `tests/wasmi_puct_int8_winrate.rs` (the Issue 207 promotion gate,
+/// which confirmed 85% win rate at n=20 — clearing the 75% parity floor).
+#[unsafe(no_mangle)]
+#[allow(clippy::deref_addrof)]
+pub extern "C" fn wasmi_arena_init_int8(budget: usize, c_puct_bits: u32, top_k: usize) {
+    let c_puct = f32::from_bits(c_puct_bits);
+    let state = ArenaState {
+        board: board::Board::new(),
+        history: Vec::new(),
+        puct: puct::PuctPlayer::with_int8(budget, c_puct, top_k),
+        weights: moka::MokaWeights::load(),
+        scratch: moka::MokaScratch::new(),
+        features_buf: vec![0.0; moka::INPUT_ELEMENT_COUNT],
+    };
+    unsafe {
+        *(&raw mut WASMI_ARENA) = Some(state);
+    }
+}
+
+/// Initialize the arena with the **f32 forward path** (Issue 207 promotion
+/// adds this as the explicit f32 escape hatch). Use for regression tests
+/// against the pre-int8 baseline, or when int8 dot kernels are unavailable.
+/// For normal use, prefer `wasmi_arena_init` (which defaults to int8 at K=1).
+#[unsafe(no_mangle)]
+#[allow(clippy::deref_addrof)]
+pub extern "C" fn wasmi_arena_init_f32(budget: usize, c_puct_bits: u32, top_k: usize, batch_k: usize) {
+    let c_puct = f32::from_bits(c_puct_bits);
+    let k = batch_k.max(1);
+    let state = ArenaState {
+        board: board::Board::new(),
+        history: Vec::new(),
+        puct: puct::PuctPlayer::with_f32(budget, c_puct, top_k),
+        weights: moka::MokaWeights::load(),
+        scratch: moka::MokaScratch::new(),
+        features_buf: vec![0.0; k * moka::INPUT_ELEMENT_COUNT],
     };
     unsafe {
         *(&raw mut WASMI_ARENA) = Some(state);

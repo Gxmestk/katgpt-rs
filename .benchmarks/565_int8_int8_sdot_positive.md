@@ -2,6 +2,14 @@
 
 ## Status: ✅ GOAT PASS — int8 forward path breaks the 30ms PUCT WASM floor (25.8ms b50)
 
+> **Issue 207 update (2026-07-31):** Promoted to **default-on**. The win-rate
+> parity gate cleared: int8 PUCT won **85.0% (17/20)** vs greedy Moka under
+> wasmi (floor 75%; f32 reference scored 100% at n=20 — both well above floor,
+> within binomial noise). `PuctPlayer::new` / `with_batch_k(..., 1)` /
+> `wasmi_arena_init(..., 1)` / `WasmPuctPlayer::new` all default to int8 now.
+> Explicit f32 escape hatch: `PuctPlayer::with_f32(...)` /
+> `wasmi_arena_init_f32(...)`. See [Issue 207](../.issues/207_default_on_int8_forward_path.md).
+
 ## Origin
 
 Bench 563 (Issue 201 f16×f16 FHM negative result) explicitly identified at

@@ -1,6 +1,6 @@
 # Issue 206 — int8×int8 Dot Product Investigation (the unexplored 4th path)
 
-## Status: ✅ T1-T6 ALL PASS — int8 forward path breaks the 30ms PUCT WASM floor (26.8ms b50)
+## Status: ✅ T1-T6 ALL PASS — int8 forward path breaks the 30ms PUCT WASM floor (26.8ms b50); PROMOTED to default-on (Issue 207, 2026-07-31)
 
 ## Origin
 
@@ -89,9 +89,11 @@ See [Bench 565](../.benchmarks/565_int8_int8_sdot_positive.md) for full results.
         - Required a SIMD128 quantization fix (scalar quantization was the
           initial bottleneck — int8 was 0.88× before the fix, 1.19× after).
       - **Verdict**: int8 forward path is a GOAT on BOTH native + WASM.
-        Promoted to opt-in via `PuctPlayer::with_int8` / `WasmPuctPlayerInt8`.
-        Default-on promotion deferred to Issue 207 (needs the PUCT b50
-        win-rate parity check — int8 must WIN at the same rate as f32).
+        **Promoted to default-on in Issue 207** (win-rate parity gate cleared:
+        int8 85% vs f32 100% at n=20, both above the 75% floor). `PuctPlayer::new`
+        + `wasmi_arena_init(..., 1)` + `WasmPuctPlayer::new` all default to int8
+        now; `PuctPlayer::with_f32` + `wasmi_arena_init_f32` are the explicit f32
+        escape hatches.
 
 ## Methodology
 
