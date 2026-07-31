@@ -174,7 +174,8 @@ forward variant that bypasses the embedding lookup for the prepended tokens.
       injected a weak signal that was ignored; Phase 2 injects a STRONG signal
       that is actively HARMFUL.
 - [x] **T10** — Results recorded in this issue + Research 464 §4.
-- [ ] **T11** — Cleanup: `rm -rf /tmp/cnn_transformer_bridge_poc` when done.
+- [x] **T11** — Cleanup: `rm -rf /tmp/cnn_transformer_bridge_poc` — DONE
+      (temp target dirs cleaned: `/tmp/cnn_bridge_phase2_check`).
 
 ## Honest Pre-PoC Prediction
 
