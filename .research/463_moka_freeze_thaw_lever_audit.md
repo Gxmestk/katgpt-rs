@@ -213,6 +213,80 @@ matter more.
 
 **Verdict: Gain.** Open primitive + defend-wrong PoC. Tracked in Issue 565.
 
+#### 2.4.1 The Small-Kernel Parameter Paradox (why rank-r LoRA fails on small CNNs)
+
+*Source: Gemini consultation, 2026-07-31. The math below is verified correct.*
+
+Low-rank error compensation behaves radically differently on small CNNs vs
+LLMs because of the **parameter overhead ratio**. The rank-r LoRA adds
+`r·(out_dim + in_dim)` parameters to correct a weight matrix of
+`out_dim × in_dim` parameters. The overhead ratio is:
+
+`overhead = r·(out + in) / (out × in)`
+
+| Layer type | Weight shape | Weight params | Rank-8 LoRA params | Overhead |
+|---|---|---|---|---|
+| **LLM linear** (4096→4096) | [4096 × 4096] | 16,777,216 | 65,536 | **0.39%** |
+| **Moka conv** (32→32, 3×3 kernel) | [32 × 288] | 9,216 | 2,560 | **27.8%** |
+
+At 27.8% overhead, the rank-8 LoRA adds **two extra dense matvecs** per layer
+(`B·x` is [8×288]·[288] = 2,304 MACs, then `A·(B·x)` is [32×8]·[8] = 256 MACs
+= 2,560 total) to compensate a conv that itself costs 9,216 MACs. That's a
+**27.8% compute overhead** on top of the ternary speedup (which is ~5× per
+MAC). The net effect: ternary (5× faster) − LoRA overhead (1.28× slower) ≈
+3.9× net speedup, but with significant accuracy risk. Compare to int8 (1.39×
+faster, 95% win rate, already DEFAULT-ON) — the ternary+LoRA path needs to
+beat that bar.
+
+**This is the structural reason the PoC is predicted to fail on Moka.** The
+low-rank inductive bias ("trained weights live near a low-dimensional manifold")
+is weak on a 105K-param CNN — the error matrix `E` is likely near-full-rank
+because the network is too small to have a low-dimensional weight structure.
+
+#### 2.4.2 Output-Space SVD vs Weight-Space SVD (data-aware correction)
+
+*Source: Gemini consultation, 2026-07-31. Refinement of the §2.4 SVD-LoRA.*
+
+Naive weight-space SVD (§2.4 above) minimizes `||E - A·B||_F` — treating all
+weight errors equally. But weights with high magnitude might multiply
+activations near zero (irrelevant), while small weights might multiply huge
+activation spikes (critical). The **output-space** formulation is strictly
+better: minimize the error on actual outputs.
+
+**Data-aware reduced-rank regression** (Izenman 1975):
+
+Given a calibration set `X` [in_dim × N_cal] of N_cal=64 board positions
+(no labels needed — just inputs):
+
+1. Compute output error on calibration: `E_out = E · X` [out_dim × N_cal]
+2. SVD: `E_out = U · Σ · V^T`, take top-r: `U_r` [out_dim × r]
+3. Project the full error onto the top-r output directions:
+   - `A = U_r` [out_dim × r]
+   - `B = U_r^T · E` [r × in_dim]
+4. At inference: `correction(x) = A · (B · x) = U_r · U_r^T · E · x`
+
+This projects `E·x` onto the principal directions of output error **as measured
+on the calibration distribution**. It's the optimal rank-r correction in the
+output L2 sense, not the weight L2 sense.
+
+**Modelless compliance:** zero backprop, zero optimizer states — one matmul
+(`E·X`) + one SVD + one matmul (`U_r^T·E`), all closed-form. The calibration
+set is a one-time ~10ms linear algebra pass over 64 board states. Our codebase
+already has this pattern: `rt_turbo/calibration.rs`, `fpcg_goat_gate.rs::
+build_calibration_set`, `hydra_budget.rs::run_logit_lens_calibration`,
+`causal_head_importance` — all use offline calibration passes. This fits
+naturally.
+
+**Why it's better than weight-space SVD:** captures activation-weighted error
+spikes. If a weight error is in a direction the calibration inputs never
+activate, output-space SVD correctly assigns it zero rank budget. Weight-space
+SVD wastes rank budget on irrelevant directions.
+
+**Why it still faces the Small-Kernel Parameter Paradox (§2.4.1):** the overhead
+ratio is the same (27.8% at rank-8). Output-space SVD chooses the rank budget
+*better* but doesn't reduce the *amount* of budget needed. On a near-full-rank
+error matrix, even optimally-chosen rank-8 might not recover enough accuracy.
+
 ### 2.5 DEC-Enriched Input via Stem-Conv Reader-LoRA — honest Pass (→ riir-train)
 
 Idea: enrich Moka's 12 input planes with DEC-computed features (stone density
@@ -234,14 +308,129 @@ add capability.
 weights via riir-train) is a legitimate research direction but out of scope
 for this workflow.
 
+### 2.6 D4 Dihedral Symmetry Ensembling at PUCT Leaves — modelless alternative
+
+*Source: Gemini consultation, 2026-07-31.*
+
+The 9×9 Go board has 8-fold dihedral symmetry (`D4`: 4 rotations × 2
+reflections). A well-trained Go policy SHOULD be approximately D4-invariant:
+if you rotate the board 90°, the policy should rotate accordingly. Quantization
+noise (especially aggressive ternary/binary) breaks this invariance slightly —
+the policy becomes subtly biased toward certain orientations.
+
+**The technique (test-time symmetry averaging):**
+1. At a PUCT leaf on state `s`, pick 2 random group elements `g1, g2 ∈ D4`.
+2. Compute `π1 = g1⁻¹ · f(g1 · s)` and `π2 = g2⁻¹ · f(g2 · s)`
+   (transform board → forward → inverse-transform policy).
+3. Average: `π_leaf = (π1 + π2) / 2`.
+
+This dampens quantization jitter without adding model parameters or breaking
+the modelless mandate. It's the Go-board analog of test-time augmentation (TTA)
+in computer vision.
+
+**Grep result:** NOT shipped in our Go code. The `D4` hits in `rat_bridge/
+dilated_kv.rs` are KV-cache dilation strides (`DilationConfig::D1/D4/D16/D64`),
+NOT board dihedral symmetry. No hits for `dihedral`, `rotate.*board`,
+`reflect.*board`, `symmetry_averag`. This is genuinely novel for our stack.
+
+**Why it might work:** error-compensated quantization (PlasmaPath) has a
+DETERMINISTIC error pattern per row — it's not random noise, it's structured
+bias. D4 averaging exploits the fact that the TRUE policy is D4-symmetric while
+the quantization bias is NOT (it depends on the weight row ordering, which has
+no reason to respect board symmetry). Averaging over orientations cancels the
+asymmetric component of the bias.
+
+**Why it might NOT work (honest concerns):**
+1. **PUCT already averages.** Budget=200 does 200 leaf evaluations. If the D4
+   symmetry breaking is random across positions, PUCT's multi-leaf averaging
+   already dampens it. D4 per-leaf averaging only helps if the bias is
+   SYSTEMATIC within a single leaf evaluation (which it may be).
+2. **Cost: 2× forward passes per leaf.** Either double the total compute
+   (~80ms → ~160ms/move at budget=200) or halve the effective search depth
+   (200 leaves → 100 unique leaves). Both hurt.
+3. **Moka was trained with D4 augmentation.** The policy is already approximately
+   D4-invariant at f32 precision. Quantization adds a small perturbation, but
+   it may be within the policy's natural noise tolerance.
+
+**Verdict: Gain (alternative candidate).** Worth testing in the PoC as a
+SEPARATE strategy from LoRA — it's orthogonal (corrects symmetry breaking, not
+weight error). Could combine with LoRA (LoRA corrects weight error + D4
+averaging corrects residual symmetry breaking). The PoC should measure D4
+alone, LoRA alone, and D4+LoRA combined.
+
+### 2.7 Top-K Sparse Residual Bypass — third modelless alternative
+
+*Source: Gemini consultation, 2026-07-31.*
+
+Because 3×3 conv error matrices are small and often full-rank (per §2.4.1),
+SVD is inefficient — it spends rank budget on all directions equally. An
+alternative: store only the **top-K worst-quantized elements** explicitly and
+do a sparse matvec.
+
+**The technique:**
+1. Compute per-element error: `E[i,j] = W[i,j] - dequant(W_q)[i,j]`
+2. Select top-5% by `|E[i,j]|` (the worst quantization errors).
+3. Store as COO/CSR sparse matrix `S` [out_dim × in_dim, 5% non-zero].
+4. At inference: `y = W_q · x + S · x` (dense quantized matvec + sparse correction).
+
+**Parameter comparison (Moka 32×288 conv, rank-8 vs top-5%):**
+
+| Strategy | Params | MACs | Overhead vs conv |
+|---|---|---|---|
+| Rank-8 LoRA (dense) | 2,560 | 2,560 | 27.8% |
+| Top-5% sparse (COO) | ~460 values + 460 row/col indices = ~1,380 elements | 460 MACs + 460 gathers | 5.0% MACs |
+
+The sparse path has **5.6× fewer MACs** than the dense LoRA. BUT it has
+gather/scatter overhead that dense LoRA doesn't — on ARM SIMD and WASM,
+random-access gathers into the input vector `x` are significantly slower than
+contiguous reads. The crossover point depends on SIMD width and cache behavior.
+
+**Grep result:** NOT shipped. The `top_k` hits in our codebase are all KV-cache
+block routing (`BlockTopKRouter`, `PerGroupTopKRouter`), not sparse weight
+matvec. No COO/CSR matvec in the weight path. Genuinely novel.
+
+**Why it might work:** for small CNNs where the error is concentrated in a few
+outlier weights (the classic "activation outlier" problem in LLM quantization,
+but for weights), a sparse correction targeting just those outliers might
+recover most of the accuracy at 5% the MAC cost. This is the weight-space
+analog of GPTQ's outlier-aware quantization.
+
+**Why it might NOT work:**
+1. **Gather overhead.** On ARM NEON, a gather operation (`x[col_idx]`) costs
+   ~5-10 cycles vs 1 cycle for a contiguous read. At 460 gathers, that's
+   ~2,300-4,600 cycles of overhead, potentially exceeding the 2,100 MAC savings.
+2. **The error might not be concentrated.** If the error is uniformly spread
+   (no outlier structure), top-5% captures only 5% of the total error — not
+   enough to matter.
+3. **WASM is worse for sparse.** WASM's SIMD model has no native gather; the
+   JIT must emulate it with scalar loads, making sparse even slower relative
+   to dense.
+
+**Verdict: Gain (third candidate).** Worth testing in the PoC alongside LoRA
+and D4 averaging. The honest prediction: dense LoRA wins on SIMD hardware
+(contiguous access), sparse wins only if the error has strong outlier structure
+AND the hardware has fast gather (which ARM NEON partially does, WASM doesn't).
+
 ## 3. Verdict
 
-**Tier: Gain** (for the one strong candidate — Quantization-Compensating Reader-LoRA).
+**Tier: Gain** (for the candidate family — 4 modelless quantization-compensation strategies).
 
 The format conversion itself is **Pass** (mechanical repackaging, no new capability).
-The freeze/thaw ecosystem enables one Gain-tier research candidate that attempts
-to unblock a specifically-rejected lever (BinaryPlasma). The PoC's value is
-honest negative knowledge + reusable substrate.
+The freeze/thaw ecosystem enables a FAMILY of modelless quantization-compensation
+candidates worth a defend-wrong PoC:
+
+| # | Strategy | Corrects | Overhead | Prediction |
+|---|---|---|---|---|
+| A | Weight-space SVD-LoRA (§2.4) | Weight error | 27.8% params + 2 dense matvecs | Likely FAIL (Small-Kernel Paradox) |
+| B | Output-space SVD-LoRA (§2.4.2) | Output-weighted error | Same overhead, better rank choice | Marginal improvement over A |
+| C | D4 symmetry averaging (§2.6) | Symmetry breaking | 2× forward passes per leaf | Uncertain — PUCT already averages |
+| D | Top-K sparse bypass (§2.7) | Worst-element errors | 5% MACs + gather overhead | Uncertain — depends on outlier structure |
+
+The PoC (Issue 565, updated) tests all 4 strategies head-to-head against the
+int8 baseline. The honest prediction: none individually beats int8 on this
+105K-param network, but the COMBINATION (e.g., D4 averaging + sparse bypass)
+might surprise. Either way, the PoC's value is negative knowledge + reusable
+substrate.
 
 **One-line reasoning:** converting Moka weights to freeze/thaw format does NOT
 unlock any of the 11 rejected levers (the rejections are fundamental —
