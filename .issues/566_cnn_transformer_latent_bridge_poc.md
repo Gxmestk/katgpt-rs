@@ -72,10 +72,14 @@ forward variant that bypasses the embedding lookup for the prepended tokens.
 - [x] **T1** — Add `forward_tapping_trunk` to `katgpt-moka-wasm/src/research.rs`.
       Mirrors `forward_with_scratch` but copies the trunk buffer after a
       caller-specified block into an output slice. Gated behind `research`
-      feature (off for production WASM build). **DONE 2026-08-01** — 3 unit
+      feature (off for production WASM build). **DONE 2026-08-01** — 4 unit
       tests pass: (1) tapping forward matches production within 1e-3 epsilon,
       (2) each block index 0..11 produces non-trivial trunk, (3) out-of-range
-      tap is a no-op.
+      tap is a no-op, (4) **signal-availability check: tapped trunks
+      differentiate board positions** — cosine 0.80-0.93 across 4 diverse
+      boards (empty / 1 stone / 5 scattered / 10 clustered), well below the
+      0.99 threshold. The trunk carries position-discriminating signal —
+      the bridge's necessary precondition is met.
 - [ ] **T2** — Calibration set: collect N=64 Go positions, run
       `forward_tapping_trunk` to capture trunk after block 6. This gives
       the Moka-side of the paired calibration data.

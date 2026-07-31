@@ -1043,4 +1043,82 @@ mod tests {
         // Tapped trunk was NOT written (still NaN sentinel).
         assert!(tapped[0].is_nan(), "out-of-range tap should not write trunk");
     }
+
+    /// Signal-availability check (Research 464 precondition): do Moka's
+    /// tapped trunks DIFFERENTIATE board positions? If trunks for different
+    /// boards are nearly identical, no projection can extract position-
+    /// discriminating signal — the bridge is dead on arrival.
+    ///
+    /// This test creates 4 diverse positions (empty, 1 stone, 5 stones, 10
+    /// stones) and checks pairwise cosine similarity is < 0.99 (sufficient
+    /// discrimination). This is a NECESSARY precondition, not a sufficiency
+    /// proof — even with diverse trunks, the cross-modal projection may fail.
+    #[test]
+    fn tapped_trunks_differentiate_board_positions() {
+        let weights = MokaWeights::load();
+        let trunk_len = BOARD_AREA * TRUNK_CHANNELS;
+        let tap_block = 6; // mid-network, per Research 464 §4
+
+        // Build 4 diverse board positions.
+        let mut boards: Vec<Board> = Vec::with_capacity(4);
+        boards.push(Board::default()); // empty
+
+        let mut b1 = Board::default();
+        b1.play(40); // center stone
+        boards.push(b1);
+
+        let mut b2 = Board::default();
+        for &idx in &[0, 10, 20, 40, 60] { // scattered stones
+            if b2.is_legal(idx) { b2.play(idx); }
+        }
+        boards.push(b2);
+
+        let mut b3 = Board::default();
+        for &idx in &[0, 1, 2, 3, 4, 9, 10, 11, 12, 13] { // corner cluster
+            if b3.is_legal(idx) { b3.play(idx); }
+        }
+        boards.push(b3);
+
+        // Tap each board's trunk.
+        let mut trunks: Vec<Vec<f32>> = Vec::with_capacity(boards.len());
+        for board in &boards {
+            let mut features = vec![0f32; INPUT_ELEMENT_COUNT];
+            encode_features_into(board, &[], &mut features);
+            let mut scratch = MokaScratch::new();
+            let mut tapped = vec![0f32; trunk_len];
+            let _ = forward_tapping_trunk(&weights, &features, &mut scratch, tap_block, &mut tapped);
+            trunks.push(tapped);
+        }
+
+        // Pairwise cosine similarity.
+        let mut max_sim = 0f32;
+        let mut min_sim = 1f32;
+        for i in 0..trunks.len() {
+            for j in (i + 1)..trunks.len() {
+                let sim = cosine_similarity(&trunks[i], &trunks[j]);
+                max_sim = max_sim.max(sim);
+                min_sim = min_sim.min(sim);
+            }
+        }
+        // Trunks should be sufficiently different (cosine < 0.99 for at least
+        // one pair). If ALL pairs are > 0.99, the trunk doesn't discriminate.
+        assert!(
+            max_sim < 0.99,
+            "trunks too similar across positions: max cosine = {max_sim:.4} — bridge lacks signal"
+        );
+        // Also report for visibility.
+        println!("trunk cosine: min={min_sim:.4}, max={max_sim:.4} (lower = more discriminating)");
+    }
+
+    fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
+        let mut dot = 0f32;
+        let mut na = 0f32;
+        let mut nb = 0f32;
+        for i in 0..a.len() {
+            dot += a[i] * b[i];
+            na += a[i] * a[i];
+            nb += b[i] * b[i];
+        }
+        dot / (na.sqrt() * nb.sqrt())
+    }
 }

@@ -152,6 +152,16 @@ tap point trades detail vs abstraction:
 the "sweet spot" in CNN feature hierarchies — enough abstraction to be
 meaningful, enough spatial detail to be useful. Sweep this in the PoC.
 
+**Signal-availability check (2026-08-01):** the tapped trunk after block 6
+was measured across 4 diverse board positions (empty / 1 center stone / 5
+scattered stones / 10 clustered corner stones). Pairwise cosine similarity:
+**min=0.7988, max=0.9258** — well below the 0.99 "no signal" threshold.
+The trunk DOES differentiate board positions. This is a necessary
+precondition for the bridge (if trunks were nearly identical, no projection
+could extract position-discriminating signal). It is NOT a sufficiency
+proof — the cross-modal projection (T2-T4) still needs to carry this signal
+into Gemma's residual stream in a way Gemma can interpret.
+
 ## 5. The Consumer: Proposal 008 (Go Gemma Arena)
 
 Proposal 008's state (as of 2026-08-01):
