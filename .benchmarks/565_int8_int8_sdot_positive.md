@@ -8,7 +8,8 @@
 > within binomial noise). `PuctPlayer::new` / `with_batch_k(..., 1)` /
 > `wasmi_arena_init(..., 1)` / `WasmPuctPlayer::new` all default to int8 now.
 > Explicit f32 escape hatch: `PuctPlayer::with_f32(...)` /
-> `wasmi_arena_init_f32(...)`. See [Issue 207](../.issues/207_default_on_int8_forward_path.md).
+> `wasmi_arena_init_f32(...)`. (The tracking issue was removed per the
+> standard noise-reduction rule once resolved — see commit `7da5cf76`.)
 
 ## Origin
 

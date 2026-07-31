@@ -699,7 +699,22 @@ The measurement the prior doc sidestepped. `GoPuctMokaPlayer` (from `katgpt-prun
 | PUCT budget=100, c=1.5, top_k=8 (f32) | — (b50 dominates) | — | **59.8 ms** | 100 | 0.598 |
 | PUCT budget=200, c=2.5, top_k=8 (f32) | — (b50 dominates) | — | **119.6 ms** | 200 | 0.598 |
 
-**Issue 206/207 (2026-07-31):** the **int8 row is now the DEFAULT** path (`PuctPlayer::new` / `wasmi_arena_init(..., 1)` / `WasmPuctPlayer::new` all use int8). The f32 path is reachable via `PuctPlayer::with_f32` / `wasmi_arena_init_f32`. The int8 win-rate (85%) is below f32's 100% but within the n=20 binomial noise band (Wilson 95% CI on 85% at n=20 ≈ 64–95%; on 100% ≈ 83–100%) — both clear the 75% parity floor. See [Benchmark 565](../../.benchmarks/565_int8_int8_sdot_positive.md) + [Issue 207](../../.issues/207_default_on_int8_forward_path.md).
+**Issue 206/207 (2026-07-31):** the **int8 row is now the DEFAULT** path
+(`PuctPlayer::new` / `wasmi_arena_init(..., 1)` / `WasmPuctPlayer::new` all use
+int8 — shipped in commit `7da5cf76`; the tracking issue was removed per the
+standard noise-reduction rule once resolved). The f32 path is reachable via
+`PuctPlayer::with_f32` / `wasmi_arena_init_f32`. The int8 win-rate (85%) is
+below f32's 100% but within the n=20 binomial noise band (Wilson 95% CI on
+85% at n=20 ≈ 64–95%; on 100% ≈ 83–100%) — both clear the 75% parity floor.
+See [Benchmark 565](../../.benchmarks/565_int8_int8_sdot_positive.md).
+
+**Re-verified 2026-07-31 (post-promotion audit for public claims):**
+native f32 100% (20/20), native int8 95% (19/20), int8 forward **1.62× faster**
+than f32 (clears the 1.3× gate). `native_puct_winrate` + `moka_int8` GOAT
+tests both PASS. Native PUCT b200 vs Moka greedy: **98W/2L = 98.0%**
+(n=100, reproduced fresh — same config, same result as Bench 205).
+wasmi PUCT latency b50/b100/b200: 1224/2368/5091 ms (within ~5% of Bench
+205's documented 1260/2508/5031 ms — machine variance).
 
 Win-rate is measured via wasmi (`tests/wasmi_puct_winrate.rs` for f32, `tests/wasmi_puct_int8_winrate.rs` for int8) — a deterministic IEEE-754 interpreter, so the moves chosen (and therefore the win rate) are bit-identical to what Chrome's V8 JIT would produce for the same binary + inputs. Only b50 was run (871s for f32 n=20, 681s for int8 n=20); b100/b200 strictly dominate b50 on strength, so their win rates are bounded below by b50's — they were not re-run. Native Bench 205's b50 was 94% (n=100); the 100% f32 / 85% int8 here are consistent (at p=0.94, P(20/20) ≈ 29% — a normal high draw; the int8 quantization noise costs a few games at small n but is within noise). Native figures for reference: b50=94%, b100=96%, b200=98% (all n=100, Table A).
 
@@ -713,7 +728,7 @@ Latency scales linearly (29.6→59.8→119.6 doubles at each step) — pure per-
 
 **Batched MCTS (Issue 205, attempted, honest result):** the batched forward pass + virtual loss + leaf queueing was implemented and measured. K=8 gives **1.09× speedup** (33.7→30.8 ms/move at b50) — far below the estimated 3–5×. K=50 (single giant batch) reaches 1.19× (33.7→28.2ms) with diminishing returns. The forward pass is **compute-bound, not cache-bound**: the Moka net (~100KB weights) fits in L2 cache, so sequential passes already benefit from cache residency, and the SIMD dot kernel already saturates the 128-bit FPU per call. Batching K samples through the same weight slice doesn't reduce total FLOPs. The batched code stays opt-in via `PuctPlayer::with_batch_k(budget, c_puct, top_k, batch_k)`; K=1 (sequential) remains the default (preserves wasmi parity). Full analysis in [Benchmark 205](../../.benchmarks/205_puct_wasm_batched_mcts_latency.md).
 
-**Correction (Issue 206/207, 2026-07-31):** the "30ms floor is the real Moka-net-on-CPU floor" conclusion below was **wrong** — it held only for the f32 path. The int8×int8 forward path (Bench 565) broke the floor: PUCT b50 dropped to **25.8 ms** under V8 JIT (1.17–1.19× over f32's 30.6 ms) by routing the dot kernel through `i8x16.dot_s` (WASM SIMD128) / SDOT (aarch64 dotprod) — different execution units than the f32 FPU, which the original "FPU saturated" finding (Bench 205) was about. The int8 path is now **DEFAULT-ON** (Issue 207 promotion — win-rate parity gate cleared at 85% vs f32's 100% at n=20, both above the 75% floor). See [Benchmark 565](../../.benchmarks/565_int8_int8_sdot_positive.md) + [Issue 207](../../.issues/207_default_on_int8_forward_path.md). The original "not pursued" conclusion on im2col/GEMM/WebGPU/smaller-net stands — those remain the only paths to *dramatic* (≥2×) further improvement.
+**Correction (Issue 206/207, 2026-07-31):** the "30ms floor is the real Moka-net-on-CPU floor" conclusion below was **wrong** — it held only for the f32 path. The int8×int8 forward path (Bench 565) broke the floor: PUCT b50 dropped to **25.8 ms** under V8 JIT (1.17–1.19× over f32's 30.6 ms) by routing the dot kernel through `i8x16.dot_s` (WASM SIMD128) / SDOT (aarch64 dotprod) — different execution units than the f32 FPU, which the original "FPU saturated" finding (Bench 205) was about. The int8 path is now **DEFAULT-ON** (commit `7da5cf76`, 2026-07-31 — win-rate parity gate cleared at 85% vs f32's 100% at n=20, both above the 75% floor; the tracking issue was removed per the standard noise-reduction rule once resolved). See [Benchmark 565](../../.benchmarks/565_int8_int8_sdot_positive.md). The original "not pursued" conclusion on im2col/GEMM/WebGPU/smaller-net stands — those remain the only paths to *dramatic* (≥2×) further improvement.
 
 **Summary matrix (each build's trade-off, one row each):**
 

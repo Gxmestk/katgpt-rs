@@ -6,7 +6,7 @@
 >
 > **Benchmarks:** [204](../../.benchmarks/204_opening_book_vs_moka_negative.md) (opening book — negative), [205](../../.benchmarks/205_puct_search_vs_moka_win.md) (PUCT — massive win)
 >
-> **Issues:** [564](../../.issues/564_moka_ane_coreml_inference.md) (ANE — negative, closed)
+> **Issues:** [564](../../.issues/564_moka_ane_coreml_inference.md) (ANE — negative, closed). Issue 207 (int8 default-on promotion) was resolved + removed per the noise-reduction rule — see commit `7da5cf76` + the int8 section below.
 
 ---
 
@@ -232,12 +232,19 @@ noise band (Wilson 95% CI on 85% at n=20 is ~64–95%; on 95% ≈ 76–99%; on
 100% ≈ 83–100%). The int8 path is confirmed a **modelless gain**: faster
 (1.17–1.39×) AND same strength.
 
-**Promoted to DEFAULT-ON** (Issue 207, 2026-07-31): `PuctPlayer::new` /
-`with_batch_k(..., 1)` / `wasmi_arena_init(..., 1)` / `WasmPuctPlayer::new`
-now all use int8 by default. Explicit f32 escape hatches (`PuctPlayer::with_f32`,
-`wasmi_arena_init_f32`) retained for regression testing + platforms without
-int8 dot support. The K>1 batched-MCTS path stays f32 (int8 unimplemented for
-batched forward — tracked separately).
+**Promoted to DEFAULT-ON** (commit `7da5cf76`, 2026-07-31 — originally tracked
+in Issue 207, removed per the standard noise-reduction rule once resolved):
+`PuctPlayer::new` / `with_batch_k(..., 1)` / `wasmi_arena_init(..., 1)` /
+`WasmPuctPlayer::new` now all use int8 by default. Explicit f32 escape hatches
+(`PuctPlayer::with_f32`, `wasmi_arena_init_f32`) retained for regression
+testing + platforms without int8 dot support. The K>1 batched-MCTS path stays
+f32 (int8 unimplemented for batched forward — tracked separately).
+
+**Re-verified 2026-07-31 (post-promotion audit):** native f32 100% (20/20),
+native int8 95% (19/20), int8 forward 1.62× faster than f32 (machine variance
+— clears the 1.3× gate). `native_puct_winrate` + `moka_int8` GOAT tests both
+PASS. Native PUCT b200 vs Moka greedy: **98W/2L = 98.0%** (n=100, reproduced
+fresh — same config, same result as Bench 205).
 
 **Honest WASM caveat (Issue 206 T6):** the initial V8 JIT result was **0.88× — SLOWER than f32** because the scalar quantization loop (max-abs fold + per-element scale+round+clamp) wasn't vectorized by V8's JIT. The fix (`quantize_tensor_wasm_simd` using `f32x4_abs`/`f32x4_max`/`f32x4_nearest`) brought the shipped result to **1.17–1.25× faster** (b50 = 25.8ms < 30ms floor). The lesson: microbenchmarks of isolated dot products miss the quantization overhead — only end-to-end forward-pass measurement catches this. The 0.88× regression is documented in Bench 565 as the honest pre-fix record.
 
