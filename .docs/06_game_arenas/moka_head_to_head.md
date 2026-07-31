@@ -262,6 +262,16 @@ f32 (int8 unimplemented for batched forward — tracked separately).
 | Apple Neural Engine (CoreML) | ❌ 4.66× slower (Issue 564) | Fixed dispatch overhead dominates at 105K params |
 | Opening Book (Bench 204) | ❌ Hurts monotonically | Moka's policy already plays better 9×9 openings |
 
+> **Follow-up audit (Research 463, 2026-07-31):** does converting Moka weights to
+> our freeze/thaw format (`NeuronShard` + `MerkleFrozenEnvelope`) unlock any of
+> these levers? **Verdict: No** — format conversion alone doesn't change any
+> rejection (they're fundamental: architecture, domain, training, quantization
+> math). BUT the freeze/thaw **ecosystem** (reader-LoRA hot-swap, Plan 025)
+> enables one modelless attempt to unblock BinaryPlasma via a deterministically
+> constructed SVD quantization-error LoRA. PoC tracked in
+> [Issue 565](../../.issues/565_quant_error_lora_poc.md); predicted to likely fail
+> G5 on this 105K-param network, worth running for negative knowledge + substrate.
+
 ## The Bottom Line
 
 **The strongest player is `GoPuctMokaPlayer` (PUCT, budget=200) at 98% win rate vs Moka greedy.** It uses Moka's own weights but a better search algorithm (AlphaZero-style PUCT MCTS vs Moka's greedy argmax). This is NOT a modelless win — it requires Moka's trained weights. But it demonstrates that the AlphaZero recipe (policy prior + value head + MCTS) extracts dramatically more strength from a small network than greedy play, exactly as the original AlphaZero paper showed.

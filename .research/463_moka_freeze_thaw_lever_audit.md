@@ -4,9 +4,12 @@
 > [`moka_head_to_head.md`](../.docs/06_game_arenas/moka_head_to_head.md) §"Investigated and rejected" (lines 249-264).
 > **Date:** 2026-07-31
 > **Status:** Done — verdict Gain, PoC tracked in Issue 565.
-> **Related Research:** 110 (Ciot / PlasmaPath ternary), 132 (LoRAPrune), 202 (QAT Infusion), 229 (ProgramAsWeights F4 SpecAdapter)
-> **Related Plans:** 148 (PlasmaPath), 025 (LoraPair raw/lora hot-swap), 563 (Moka baseline)
-> **Related Issues:** 565 (defend-wrong PoC for quantization-compensating reader-LoRA)
+> **Related Research:** 110 (Ciot / PlasmaPath ternary), 132 (LoRAPrune), 202 (QAT Infusion), 229 (ProgramAsWeights F4 SpecAdapter), 062 (SHINE — context-to-LoRA hypernetwork)
+> **Related Plans:** 148 (PlasmaPath ternary SIMD matvec), 025 (LoraPair raw/lora hot-swap), 563 (Go Moka baseline PoC — native port), 565 (Moka WASM browser + wasmi comparison)
+> **Related Docs:** [`moka_head_to_head.md`](../.docs/06_game_arenas/moka_head_to_head.md) (the complete record — architecture, PUCT results, int8 path, rejection table), [`go_arena.md`](../.docs/06_game_arenas/go_arena.md) (Go Arena overview — 6 player tiers, Plan 565 real-browser results, wasmi ladder)
+> **Related Benchmarks:** 204 (Opening Book vs Moka — negative, monotone hurt), 205 (PUCT search vs Moka — 98% win at budget=200, the headline result), 044 (PlasmaPath GOAT — ternary cosine 0.77 random / ≥0.92 real NN), 565 (int8×int8 vs f32 — 95% native / 85% wasmi, 1.39× faster, DEFAULT-ON)
+> **Related Issues:** 565 (defend-wrong PoC for quantization-compensating reader-LoRA), 564 (Moka ANE/CoreML — 4.66× slower, negative), 206 (int8×int8 dot investigation), 207 (int8 default-on promotion — resolved+removed, commit `7da5cf76`)
+> **Moka weight source:** vendored at `crates/katgpt-pruners/assets/moka/` (`go-model.bin` 113,648 bytes + `go-model.json` manifest, sha256-verified, MIT license from `github.com/millionco/moka`). Native port: `crates/katgpt-pruners/src/go/moka_net.rs`. WASM port: `crates/katgpt-moka-wasm/`.
 > **PASS-Redirects (synthesis):** HyperLoRA [arXiv:2606.06154 "Amortizing Federated Adaptation: Hypernetwork Driven LoRA for Personalized Foundation Models"] — federated LoRA TRAINING method (all three components — hypernetwork generator G_φ, product-space synthesizer S_ψ, residual corrector C_ω — are LEARNED via meta-objective Eq 18). → riir-train. Does NOT apply to Moka (single network, no federation, no aggregation problem). Does NOT replace the SVD quant-error-LoRA in this note (different problem: federated aggregation bias vs single-network quantization error). The one transferable math insight (Proposition 1: factor-wise averaging produces chimeric cross-terms B_i·A_j) is already moot in our stack because our LoRA merge is ADDITIVE (`W + B·A`, confirmed in `forward_coda`), not factor-averaged. §3.5 Path 0 decomposition: G_φ has NO modelless analog (genuinely needs learning); S_ψ decomposes to SVD (= FlexLoRA baseline, which the paper beats) + learned statefulness; C_ω decomposes to least-squares residual fit + learned conditioning. Closest shipped cousin: Research 062 (SHINE — context-to-LoRA hypernetwork, also verdicted model-based/training).
 > **Classification:** Public
 
@@ -45,9 +48,11 @@ deterministically constructed (SVD-closed-form, not trained) low-rank reader
 adapter. This fuses PlasmaPath (Research 110) × LoraPair reader hot-swap
 (Plan 025) × NeuronShard freeze. **Verdict: Gain.** A defend-wrong PoC
 (Issue 565) is worth running even though the honest prediction is that it
-will NOT beat the int8 path on this specific network — the PoC's value is
-negative knowledge (confirming or refuting the quantization floor) plus the
-substrate (a reusable `quantization_error_lora` primitive).
+will NOT beat the int8 path ([Bench 565](../.benchmarks/): int8×int8 is 1.39× faster
+than f32 at 95% native win rate, DEFAULT-ON since commit `7da5cf76`) on this
+specific network — the PoC's value is negative knowledge (confirming or
+refuting the quantization floor) plus the substrate (a reusable
+`quantization_error_lora` primitive).
 
 **Distilled for katgpt-rs (modelless, inference-time):**
 The transferable insight is NOT "freeze/thaw unlocks levers" — it is "the
@@ -64,9 +69,19 @@ PoC settles: does the accuracy recovery justify the LoRA matvec overhead?
 
 ## 1. The Question, Precisely
 
+> **Full Moka record:** [`moka_head_to_head.md`](../.docs/06_game_arenas/moka_head_to_head.md)
+> (architecture diagram, all player results, int8 path, rejection table) +
+> [`go_arena.md`](../.docs/06_game_arenas/go_arena.md) (Go Arena overview, Plan 565
+> real-browser results, wasmi ladder). Native port: [Plan 563](../.plans/563_go_moka_baseline_poc.md).
+> WASM browser comparison: [Plan 565](../.plans/565_moka_wasm_browser_wasmi_comparison.md).
+> Weight source: `crates/katgpt-pruners/assets/moka/` (`go-model.bin` + `go-model.json`,
+> MIT license from `github.com/millionco/moka`). Native port code:
+> `crates/katgpt-pruners/src/go/moka_net.rs`. WASM port: `crates/katgpt-moka-wasm/`.
+
 The user observed the head-to-head rejection table
-([`moka_head_to_head.md`](../.docs/06_game_arenas/moka_head_to_head.md) L249-264)
-and asked two things:
+([`moka_head_to_head.md`](../.docs/06_game_arenas/moka_head_to_head.md) L249-264,
+also mirrored in [`go_arena.md`](../.docs/06_game_arenas/go_arena.md) §"Investigated
+and rejected") and asked two things:
 
 1. **Can we convert Moka weights to our freeze/thaw format?**
 2. **After conversion, can we somehow use all the levers?**
@@ -90,8 +105,8 @@ while being honest about what the format conversion actually enables.
 | **Poincaré Navigator** | Wrong domain shape | **No.** Continuous pose navigation, not board games. | No |
 | **FlowField** | Wrong domain shape | **No.** Civ pathfinding, not Go. | No |
 | **BinaryPlasma / PlasmaPath** | Would lose quality (1-2 bit wrecks int8) | **PARTIALLY.** The format doesn't help, but the freeze/thaw ECOSYSTEM (reader-LoRA hot-swap) might. See §2.4. | **YES — the one strong candidate** |
-| **Apple Neural Engine (CoreML)** | 4.66× slower | **No.** Hardware dispatch overhead. Storage format doesn't change silicon. | No |
-| **Opening Book** | Hurts monotonically | **No.** Moka's policy already plays better openings. | No |
+| **Apple Neural Engine (CoreML)** | 4.66× slower ([Issue 564](../.issues/564_moka_ane_coreml_inference.md)) | **No.** Hardware dispatch overhead. Storage format doesn't change silicon. | No |
+| **Opening Book** | Hurts monotonically ([Bench 204](../.benchmarks/204_opening_book_vs_moka_negative.md)) | **No.** Moka's policy already plays better 9×9 openings. | No |
 
 **Bottom line on question 2:** format conversion does NOT unlock any of the
 rejected levers. 10/11 are unchanged. The 11th (BinaryPlasma) has a PARTIAL
@@ -110,10 +125,12 @@ granularities, channel dropout, scale jitter). Deterministic perturbations of
 the same weights produce **correlated** error profiles. An ensemble of
 correlated-error networks doesn't diversify — it averages toward the mean.
 
-More importantly: **PUCT already extracts ~98% of the available strength.**
-The marginal gain from leaf-routinging between 2-3 perturbed snapshots is
-likely within noise of the single-snapshot baseline. The PUCT search itself
-IS the ensemble mechanism — it averages over 200 simulations per move.
+More importantly: **PUCT already extracts ~98% of the available strength**
+([Bench 205](../.benchmarks/205_puct_search_vs_moka_win.md): PUCT budget=200
+beats Moka greedy 98.0% native, n=100). The marginal gain from leaf-routinging
+between 2-3 perturbed snapshots is likely within noise of the single-snapshot
+baseline. The PUCT search itself IS the ensemble mechanism — it averages over
+200 simulations per move.
 
 **Verdict: Pass.** PUCT is the ensemble; adding snapshot routing is redundant.
 
@@ -184,8 +201,8 @@ this is the inductive bias behind LoRA itself). A rank-8 or rank-16 SVD
 correction might recover most of the accuracy lost to aggressive quantization.
 
 **Why it might NOT work (the honest prediction):**
-1. **At int8 (current floor):** the error is already tiny. The LoRA overhead (2 extra matvecs per layer) likely exceeds the accuracy gain. The int8×int8 path is already 1.39× faster than f32 — adding LoRA would eat that margin.
-2. **At ternary/binary (where BinaryPlasma was rejected):** the error is large. PlasmaPath measured cosine 0.77 on random weights (≥0.92 on real NN weights). A rank-r correction might recover to ~0.95, but the LoRA matvec costs real FLOPs — potentially negating the ternary speedup (ternary is ~5× faster per MAC, but the LoRA is f32 matmul).
+1. **At int8 (current floor):** the error is already tiny. The LoRA overhead (2 extra matvecs per layer) likely exceeds the accuracy gain. The int8×int8 path is already 1.39× faster than f32 at 95% native win rate ([Bench 565](../.benchmarks/), [Issues 206+207](../.issues/206_int8_int8_dot_investigation.md), DEFAULT-ON since `7da5cf76`) — adding LoRA would eat that margin.
+2. **At ternary/binary (where BinaryPlasma was rejected):** the error is large. PlasmaPath measured cosine 0.77 on random weights (≥0.92 on real NN weights, [Bench 044](../.benchmarks/044_plasma_path_goat.md)). A rank-r correction might recover to ~0.95, but the LoRA matvec costs real FLOPs — potentially negating the ternary speedup (ternary is ~5× faster per MAC, but the LoRA is f32 matmul).
 3. **The CNN is tiny (105K params).** LoRA compensation shines on large models where the error manifold is genuinely low-rank. On a 105K-param CNN, the error might be full-rank (no low-rank structure to exploit).
 
 **The PoC's value is negative knowledge either way.** If it works → BinaryPlasma
@@ -241,7 +258,8 @@ though the honest prediction is failure on this specific 105K-param network.
 - **Q2 (new capability class?):** NO — it's an optimization on an existing
   capability (int8 inference), not a new class of behavior.
 - **Q3 (product selling point?):** WEAK — "we recover quantization error
-  modellessly" is a perf claim, not a capability claim. PUCT's 98% is the
+  modellessly" is a perf claim, not a capability claim. PUCT's 98% win rate
+  ([Bench 205](../.benchmarks/205_puct_search_vs_moka_win.md)) is the
   headline; this doesn't beat it.
 - **Q4 (force multiplier?):** NO — it touches one primitive (PlasmaPath) and
   one consumer (Moka). Doesn't connect to ≥2 pillars.
@@ -295,7 +313,7 @@ impl QuantErrorLora {
 - G2: latency overhead of the LoRA matvec vs the quantized forward (target: < 20% overhead)
 - G3: no-regression (default + all-features clean)
 - G4: alloc-free hot path (pre-allocated A/B slices)
-- G5 (the load-bearing gate): win-rate of PUCT + ternary-Moka + quant-error-LoRA vs PUCT + int8-Moka (target: ≥ 90% to justify the ternary+LoRA path over the simpler int8 path)
+- G5 (the load-bearing gate): win-rate of PUCT + ternary-Moka + quant-error-LoRA vs PUCT + int8-Moka (target: ≥ 90% to justify the ternary+LoRA path over the simpler int8 path). Protocol: same as [Bench 205](../.benchmarks/205_puct_search_vs_moka_win.md) (n=100, PUCT budget=200, vs Moka greedy).
 
 ## 5. What I Did NOT Propose (and why)
 
@@ -308,8 +326,8 @@ impl QuantErrorLora {
 
 The PoC will **likely fail G5** (win-rate) on this specific 105K-param network, because:
 
-1. The int8 path is already within noise of f32 (95% native / 85% wasmi vs 100% f32 — within the n=20 binomial band).
-2. The ternary path's quality loss is too large for a rank-r LoRA to fully recover on a tiny network.
+1. The int8 path is already within noise of f32 (95% native / 85% wasmi vs 100% f32 — within the n=20 binomial band, [Bench 565](../.benchmarks/)).
+2. The ternary path's quality loss is too large for a rank-r LoRA to fully recover on a tiny network ([Bench 044](../.benchmarks/044_plasma_path_goat.md): cosine 0.77 random / ≥0.92 real NN).
 3. The LoRA matvec overhead eats the ternary speedup.
 
 **But the PoC is still worth running** because:
