@@ -4,8 +4,9 @@
 > **Date:** 2026-07-01
 > **Status:** Done — verdict locked (**PASS for katgpt-rs / riir-ai**)
 > **Classification:** Public (this note). Training recipe → riir-train.
-> **Related Research:** 138 (LeJEPA, same author Balestriero — same-domain precedent, LOW-MODERATE GAIN), 127 (EnvRL — **identical mechanism, training-only precedent**), 123 (Latent Functor Runtime — **ships the runtime version of SMWM's core insight as Super-GOAT**), 115 (PEIRA), 298 (Inverting Bellman — sibling closed-form world-model extraction), 318 (Sleep-Time — covers "offline reward-free")
+> **Related Research:** 138 (LeJEPA, same author Balestriero — same-domain precedent, LOW-MODERATE GAIN), 127 (EnvRL — **identical mechanism, training-only precedent**), 123 (Latent Functor Runtime — **ships the runtime version of SMWM's core insight as Super-GOAT**), 115 (PEIRA), 298 (Inverting Bellman — sibling closed-form world-model extraction), 318 (Sleep-Time — covers "offline reward-free"), 462 (INTACT — **extends SMWM's `L_inv` with a goal-conditioned second branch + shared operator; identical PASS verdict, same runtime-already-ships conclusion**)
 > **Domain:** katgpt-rs (this note, public). The distilled RUNTIME primitive already ships — no new public or private file.
+> **PASS-Redirects (synthesis):** Sun, Zhao, Zhang [arXiv:2607.26056 "INTACT: Isomorphic Intent-to-Action Learning for Search-Free World Models"] — extends SMWM's `L_inv` auxiliary with a stop-gradient goal-conditioned second call through the same operator (asymmetric gradient routing). Verdict: **PASS** (not Gain). Same canonical JEPA-world-model PASS class as SMWM/AdaJEPA/Temporal Straightening: the deployment primitive (`m = z_g − z_t` → `apply_functor_edge_into`) already ships modellessly; the training recipe (joint encoder + dual-call operator + forward predictor) belongs in riir-train as a multi-loss refinement of the existing JEPA-pretraining recipe. See [Research 462](462_INTACT_Isomorphic_Intent_To_Action_Search_Free_World_Models.md).
 
 ---
 
