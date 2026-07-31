@@ -20,7 +20,9 @@ use crate::types::{CellComplex, CochainField, GridDims, MAX_RANK};
 /// The actual Hodge star is a diagonal matrix; on uniform grids every
 /// diagonal entry is the same, so we return that single scalar.
 ///
-/// TODO: Non-uniform grids need actual metric tensor — see Plan 251 T10.
+/// TODO: Non-uniform grids need actual metric tensor. Plan 251 T10 shipped
+/// this identity placeholder as the deliverable for uniform grids; non-uniform
+/// support is standalone future work — file a plan before implementing.
 pub fn hodge_star(_cx: &CellComplex, _rank: u8) -> f32 {
     1.0f32
 }

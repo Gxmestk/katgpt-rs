@@ -360,7 +360,12 @@ pub fn cluster_map_round_robin(vocab_size: usize, cluster_size: usize) -> Vec<Ve
 ///
 /// Groups tokens with similar embeddings together for efficient LM head computation.
 /// Current implementation: round-robin baseline.
-/// TODO: implement actual K-means using embedding cosine similarity (Plan 056: riir-burner).
+///
+/// TODO: implement actual K-means using embedding cosine similarity. No plan
+/// exists for this yet — file one before implementing (the prior in-source
+/// reference to "Plan 056: riir-burner" was bogus: Plan 056 is the game-state
+/// forward model + MCTS for Bomber, unrelated to embedding clustering, and
+/// the `riir-burner` crate was never created).
 pub fn cluster_map_from_embeddings(
     _wte: &[f32],
     vocab_size: usize,

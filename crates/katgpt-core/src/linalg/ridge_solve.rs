@@ -6,7 +6,9 @@
 //! See the module-level note in [`super`] for the rationale.
 //!
 //! // TODO: unify with peira's f64 path once a generic-over-`T: Float` Cholesky
-//! // is verified bit-identical to PEIRA's f64 specialisation (Plan 153 G4).
+//! // is verified bit-identical to PEIRA's f64 specialisation. (Plan 153 is
+//! // complete; this unification was NOT a Plan 153 task — it's standalone
+//! // future work. File a new plan before implementing.)
 //!
 //! # Numerical contract
 //!

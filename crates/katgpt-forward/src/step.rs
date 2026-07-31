@@ -1397,7 +1397,8 @@ mod tests {
 
     // TODO: Implement embedding-conditioned speculative step functions, then uncomment these tests.
     // Requires: speculative_step_embedding_conditioned() and speculative_step_embedding_conditioned_with()
-    // See: Plan 024 (embedding_router)
+    // No plan exists for this yet — the prior reference to "Plan 024 (embedding_router)"
+    // was bogus (no Plan 024 file exists in .plans/). File a plan before implementing.
     //
     // #[cfg(feature = "embedding_router")]
     // #[test]
