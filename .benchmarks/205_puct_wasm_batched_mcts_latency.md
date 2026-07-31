@@ -17,12 +17,21 @@ through the same weight slice doesn't reduce the total FLOP count.
 
 - **Hardware:** Apple Silicon (M-series)
 - **Runtime:** Node.js v24.10.0 (V8 JIT — same engine as Chrome)
-- **Build:** `RUSTFLAGS='-C target-feature=+simd128' cargo build --release
-  --target wasm32-unknown-unknown` + `wasm-bindgen --target nodejs` +
-  `wasm-opt -Oz --enable-simd`
+- **Build:** `./scripts/build-moka-wasm.sh` (encodes the full SIMD pipeline:
+  `RUSTFLAGS='-C target-feature=+simd128'` + `cargo build --target
+  wasm32-unknown-unknown` + `wasm-bindgen --target nodejs` + `wasm-opt -Oz
+  --enable-simd`. Without the SIMD flags the scalar fallback runs ~16×
+  slower — ~500ms/move instead of ~30ms. The script exists because this
+  regression was diagnosed the hard way during Issue 205.)
 - **Method:** setup-subtracted (reset+replay outside timing), N=10 samples
   per config, mid-game position (8 stones played).
-- **Harness:** `/tmp/moka-puct-205/bench_batched.js` + `bench_k_sweep.js`.
+- **Harness:** `crates/katgpt-moka-wasm/bench/bench_puct.js` (sequential vs
+  batched at b50/b100/b200) + `bench_k_sweep.js` (K=1..50 at b50). Both
+  load the wasm-bindgen nodejs output via `require()` + V8 JIT.
+- **Harness:** `crates/katgpt-moka-wasm/bench/bench_puct.js` +
+  `bench_k_sweep.js` (committed; was `/tmp/moka-puct-205/` during the
+  initial investigation, moved in-tree by the hardening follow-up).
+  Build with `./scripts/build-moka-wasm.sh` before running.
 
 ## K sweep at b50
 
@@ -100,3 +109,23 @@ path remains the default:
 The batched code stays in-tree as opt-in via `PuctPlayer::with_batch_k(budget, c_puct, top_k, batch_k)`.
 Consumers who need the extra 10-19% (e.g., a real-time deployment at the
 edge of the tick budget) can opt in; everyone else gets the simpler path.
+
+## Reproducibility
+
+To reproduce these numbers:
+
+```bash
+./scripts/build-moka-wasm.sh                                    # build with SIMD
+node crates/katgpt-moka-wasm/bench/bench_puct.js                 # b50/b100/b200, seq vs batched
+node crates/katgpt-moka-wasm/bench/bench_k_sweep.js              # K=1..50 at b50
+```
+
+Fresh re-run on this machine (2026-07-31, after the build script landed):
+
+| Config | This doc (prior session) | Fresh re-run |
+|---|---|---|
+| b50 K=1 | 33.7 ms | 33.8 ms |
+| b50 K=8 | 30.8 ms | 30.7 ms |
+| b50 K=50 | 28.2 ms | 28.1 ms |
+
+All within run-to-run noise — the finding reproduces cleanly.

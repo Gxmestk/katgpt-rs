@@ -89,5 +89,7 @@ across the K samples in the inner loop.
 - Native PUCT parity: `katgpt_pruners::go::moka_net::GoPuctMokaPlayer`
   (Bench 205).
 - WASM PUCT port: Issue 204 (resolved + removed).
-- Bench harness: `/tmp/moka-puct-204/bench_final.js` (Node.js V8 JIT,
-  setup-subtracted).
+- Bench harness: `crates/katgpt-moka-wasm/bench/bench_puct.js` +
+  `bench_k_sweep.js` (committed in-tree by the hardening follow-up;
+  was `/tmp/moka-puct-204/bench_final.js` during the initial Issue 204
+  investigation). Build: `./scripts/build-moka-wasm.sh`.
