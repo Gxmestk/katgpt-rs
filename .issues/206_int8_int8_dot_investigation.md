@@ -1,6 +1,6 @@
 # Issue 206 — int8×int8 Dot Product Investigation (the unexplored 4th path)
 
-## Status: ✅ T1-T6 ALL PASS — int8 forward path implemented + GOAT-gated
+## Status: ✅ T1-T6 DONE — int8 forward path GOAT on native aarch64 (1.39×); ❌ FAIL on WASM V8 JIT (0.88×, quantization overhead dominates)
 
 ## Origin
 
@@ -77,13 +77,24 @@ See [Bench 565](../.benchmarks/565_int8_int8_sdot_positive.md) for full results.
       `linear_int8_into` + `forward_int8_with_scratch`. Platform-dispatched
       int8 dot kernel (SDOT inline asm on aarch64, extmul on wasm32, scalar
       fallback). 3 new GOAT gate tests.
-- [x] **T6: GOAT gate** — ✅ ALL PASS:
-      - **G1**: argmax matches f32 on 4/4 boards; value diff < 0.053.
-      - **G2**: 1.39× forward speedup (gate 1.3×; microbenchmark projected
-        2.5–3× per-dot but end-to-end is lower due to non-dot overhead —
-        patch gather, ReLU, residual add, f32 scale multiply).
-      - **G3**: 15/15 tests pass (3 new + 12 existing).
-      - **G4**: scratch capacities stable across 100 steady-state calls.
+- [x] **T6: GOAT gate** — ✅ PASS on native aarch64, ❌ FAIL on WASM V8 JIT:
+      - **Native aarch64 (Apple M3 Max, SDOT)**: G1-G4 ALL PASS.
+        - G1: argmax matches f32 on 4/4 boards; value diff < 0.053.
+        - G2: 1.39× forward speedup (gate 1.3×).
+        - G3: 18/18 tests pass.
+        - G4: scratch capacities stable (alloc-free).
+      - **WASM V8 JIT (Node.js)**: int8 is **0.88× — SLOWER** than f32.
+        - Root cause: quantization overhead dominates on V8 JIT. The extmul
+          dot kernel IS fast (wasm-opt even emits native `i8x16.dot_s`), but
+          the per-layer activation quantization (scalar max-abs + scale loop)
+          is not vectorized well enough by V8 to be free.
+        - The microbenchmark (T4) was misleading: isolated dots with hot data
+          showed ~2×, but the real forward pass has different memory patterns.
+      - **Verdict**: int8 forward path is a GOAT on native aarch64 but NOT
+        on WASM. The PUCT WASM latency floor remains ~30ms/move. Stays
+        opt-in (`PuctPlayer::with_int8` / `WasmPuctPlayerInt8`) — promoted
+        to default-on only if a future SIMD-accelerated quantization fixes
+        the WASM regression.
 
 ## Methodology
 

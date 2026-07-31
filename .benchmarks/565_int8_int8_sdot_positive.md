@@ -171,7 +171,9 @@ node crates/katgpt-moka-wasm/bench/bench_int8_dot_206.js
 The full `forward_int8_with_scratch` was implemented in `moka_int8.rs` and
 GOAT-gated against the f32 baseline.
 
-### G1: Accuracy ✅ PASS
+### Native aarch64 (Apple M3 Max, SDOT)
+
+#### G1: Accuracy ✅ PASS
 
 - **Argmax agreement**: 4/4 test boards produce the same top move as f32.
 - **Value diff**: max 0.053 (post-tanh). Excellent for PUCT value estimates.
@@ -179,7 +181,7 @@ GOAT-gated against the f32 baseline.
   20–88, the relative error is ~2% — consistent with the per-dot microbench.
   Argmax always matches.
 
-### G2: Latency ✅ PASS (1.39×, gate 1.3×)
+#### G2: Latency ✅ PASS (1.39×, gate 1.3×)
 
 | Path | ns/forward | µs/forward |
 |---|---:|---:|
@@ -187,36 +189,48 @@ GOAT-gated against the f32 baseline.
 | int8 SDOT | 273,351 | 273 |
 | **Speedup** | **1.39×** | |
 
-The microbenchmark projected 2.5–3× per-dot, but the end-to-end forward pass
-shows 1.39×. The gap is non-dot overhead:
-- **Patch gathering** (3×3 window copy with zero-padding): unchanged between
-  f32 and int8 paths — the bottleneck is memory access, not arithmetic.
-- **f32 scale multiplication** (`scale_a * scale_w * int_dot + bias`): adds
-  ~80K f32 ops that the f32 path doesn't have.
-- **Small dots**: the expand conv (patch_len=16) has high per-call dispatch
-  overhead relative to the 1-cycle SDOT instruction.
+#### G3: No-regression ✅ PASS — 18/18 tests.
+#### G4: Alloc-free ✅ PASS — scratch capacities stable.
 
-Even at 1.39× on native aarch64, the WASM speedup is expected to be higher
-(WASM f32 has no FMA — separate mul+add — so the int8 advantage is larger).
+### WASM V8 JIT (Node.js, extmul/dot_s) — HONEST NEGATIVE RESULT
 
-### PUCT WASM projection (revised)
+#### PUCT b50 latency: int8 is SLOWER (0.88×)
 
-| Component | f32 path | int8 path (1.4× native) | int8 path (~2× WASM) |
+| Budget | f32 ms/move | int8 ms/move | speedup |
 |---|---:|---:|---:|
-| Forward passes (b50) | 25.0 ms | 17.9 ms | 12.5 ms |
-| Tree overhead | 4.6 ms | 4.6 ms | 4.6 ms |
-| **Total** | **29.6 ms** | **22.5 ms** | **17.1 ms** |
+| b50 | 31.2 | 35.5 | **0.88×** |
+| b100 | 60.9 | 70.6 | **0.86×** |
+| b200 | 123.3 | 140.8 | **0.88×** |
 
-Both projections are **below the 30ms floor**. The WASM projection (17.1 ms)
-matches the original Bench 565 estimate of ~17.5 ms.
+**The int8 path is ~12% SLOWER on WASM V8 JIT**, despite the microbenchmark
+showing ~2× speedup on isolated dot products. Root cause analysis:
 
-### G3: No-regression ✅ PASS
+1. **Quantization overhead dominates**: each conv layer quantizes its input
+   tensor (max-abs reduction + per-element multiply+round+clamp). On V8 JIT,
+   this scalar quantization loop is not vectorized well enough to be free.
+2. **wasm-opt DOES emit `i8x16.dot_s`**: the optimizer recognizes the extmul
+   pattern and replaces it with the native dot instruction (4 `dot_s`
+   instructions found in the optimized binary). So the dot kernel itself is
+   optimal — the overhead is elsewhere.
+3. **f32 V8 JIT is very well optimized**: V8's turbofan JIT optimizes the
+   f32 `f32x4_mul`+`f32x4_add` pattern aggressively (SIMD register allocation,
+   loop unrolling). The int8 path's more complex inner loop (quantize + dot
+   + scale multiply) doesn't benefit as much from JIT optimization.
+4. **The microbenchmark was misleading**: it measured isolated dots with hot
+   data in a tight loop. The real forward pass has a different memory access
+   pattern (patch gathering, weight loading, activation stores) that the
+   microbenchmark didn't capture.
 
-15/15 tests pass (3 new int8 tests + 12 existing tests).
+**Conclusion**: the int8 forward path is a GOAT on native aarch64 (1.39×
+faster, correct, alloc-free) but NOT on WASM V8 JIT (0.88× — slower). The
+WASM PUCT latency floor remains at ~30ms/move. Breaking it requires either:
+- **SIMD-accelerated quantization** (NEON/v128 for the max-abs + scale loop)
+- **The upstream `i32x4_dot_i8x16_s` intrinsic** (when Rust stdarch exposes it,
+  eliminating the extmul workaround — but wasm-opt already emits dot_s, so
+  this isn't the bottleneck)
+- **WebGPU** (a fundamentally different execution model)
+- **Smaller network** (needs riir-train — model distillation)
 
-### G4: Alloc-free ✅ PASS
-
-Scratch buffer capacities stable across 100 steady-state calls.
 
 
 ## Rust stdarch gap (action item)
