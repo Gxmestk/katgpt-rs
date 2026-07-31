@@ -149,6 +149,13 @@ pub enum Correction<'a> {
     None,
     Dense(LayerCorrection<'a>),
     Sparse(SparseCorrection<'a>),
+    /// Full dense matvec correction: `y += M · x`. Used as the measurement
+    /// vehicle for G1/G2 — the correction matrix M = (W_target - W_f32) is
+    /// precomputed per strategy, and applied directly without LoRA encoding.
+    /// The production representation (compact rank-r LoRA or sparse COO) is
+    /// what the PoC measures the QUALITY of; this variant measures the exact
+    /// effect of a given correction matrix on the forward output.
+    Full { mat: &'a [f32], out_dim: usize, in_dim: usize },
 }
 
 impl<'a> Correction<'a> {
@@ -190,6 +197,19 @@ impl<'a> Correction<'a> {
                     let o = s.rows[n] as usize;
                     let i = s.cols[n] as usize;
                     y[o] += s.vals[n] * x[i];
+                }
+            }
+            Correction::Full { mat, out_dim, in_dim } => {
+                debug_assert_eq!(mat.len(), out_dim * in_dim);
+                debug_assert_eq!(y.len(), *out_dim);
+                debug_assert_eq!(x.len(), *in_dim);
+                for o in 0..*out_dim {
+                    let row = &mat[o * in_dim..(o + 1) * in_dim];
+                    let mut acc = 0.0f32;
+                    for i in 0..*in_dim {
+                        acc += row[i] * x[i];
+                    }
+                    y[o] += acc;
                 }
             }
         }
