@@ -7,8 +7,12 @@
 > strengthening the case for the activation-space bridge.
 > **Consumer:** Proposal 008 (Go Gemma Arena) — 100% parse-fallback, needs Go understanding.
 > **Type:** PoC (defend-wrong — predicted partial improvement, not full strength)
-> **Status:** Active (Phase 1 DONE — NEGATIVE result; Phase 2 deferred pending
-> signal reassessment)
+> **Status:** CLOSED — both phases NEGATIVE. Phase 1 (aggregate): signal too
+> weak (KL=0.0001, delta≈0). Phase 2 (per-position): signal actively harmful
+> (P(coord) 0.49→0.002 — out-of-distribution embeddings). The modelless bridge
+> is confirmed unviable; the cross-modal linear projection captures statistical
+> correlation but not semantic alignment. The trained projection path (riir-train)
+> is the only remaining option for the CNN→Transformer bridge.
 
 ## Context
 
@@ -144,21 +148,42 @@ forward variant that bypasses the embedding lookup for the prepended tokens.
       requires. Per-position injection (81 tokens × d_model) would give Gemma
       spatial board vision, which is what the parse-fallback problem actually
       needs.
-- [-] **T8** — Phase 2 wiring (full LLaVA): DEFERRED pending Phase 1 signal.
-      Requires new forward variant bypassing embedding lookup for prepended
-      tokens. Pursue only if Phase 1 shows the bridge carries signal.
-- [-] **T9** — Phase 2 quality PoC: DEFERRED pending T8.
-- [ ] **T10** — Results recorded in this issue + Research 464 §"PoC Addendum".
+- [x] **T8** — Phase 2 wiring (full LLaVA): DONE 2026-08-01. Prepends 81
+      per-position vision tokens to Gemma's input sequence via
+      `forward_gemma2_with_embedding` (bypasses embedding lookup). New code:
+      `collect_moka_per_position_flat`, `fit_cca_bases_per_position`,
+      `project_per_position`, `forward_with_vision_prefix`. **Result: wiring
+      works STRONGLY** — mean KL divergence 4.46 bits at scale=1.0 (44,000×
+      larger than Phase 1's 0.0001 bits). Top-token changed on 8/8 boards.
+      Scaling works monotonically (KL grows with scale, no saturation unlike
+      Phase 1). However, the top token changed FROM coordinate letters ('C')
+      TO non-coordinates ('It', 'This') — the vision prefix DOMINATES the
+      output, not nudges it.
+- [x] **T9** — Phase 2 quality PoC: DONE 2026-08-01. **Result: DECISIVELY
+      NEGATIVE — worse than Phase 1.** The vision prefix DESTROYS coordinate
+      probability at ALL scales (even scale=0.01):
+      - scale=0.01: P(coord) 0.4936 → 0.0016 (delta **-0.492**), argmax 6/8 → 0/8
+      - scale=0.1: P(coord) 0.4936 → 0.0015 (delta **-0.492**), argmax 6/8 → 0/8
+      - scale=0.5: P(coord) 0.4936 → 0.0011 (delta **-0.492**), argmax 6/8 → 0/8
+      - scale=1.0: P(coord) 0.4936 → 0.0009 (delta **-0.493**), argmax 6/8 → 0/8
+      The 81 vision tokens are out-of-distribution embeddings — they enter at
+      layer 0 as d_model vectors projected from layer-13 residual space (where
+      the CCA was calibrated). The attention mechanism treats them as strong
+      signals, but the signal is semantically WRONG — it pushes Gemma AWAY
+      from coordinate tokens. This is a deeper failure than Phase 1: Phase 1
+      injected a weak signal that was ignored; Phase 2 injects a STRONG signal
+      that is actively HARMFUL.
+- [x] **T10** — Results recorded in this issue + Research 464 §4.
 - [ ] **T11** — Cleanup: `rm -rf /tmp/cnn_transformer_bridge_poc` when done.
 
 ## Honest Pre-PoC Prediction
 
-| Outcome | Probability | Actual (T6) |
+| Outcome | Probability | Actual |
 |---|---|---|
 | Aggregate bridge drops parse-fallback significantly | Medium | **❌ NO — delta ≈ 0 across all scales; argmax coord count dropped** |
-| Full LLaVA bridge drops parse-fallback significantly | Higher | TBD (T8-T9, deferred) |
-| Either bridge reaches Moka-native Go strength | Low | TBD |
-| Either bridge beats int8 Moka (Issue 565 G5) | Very low | TBD |
+| Full LLaVA bridge drops parse-fallback significantly | Higher | **❌ NO — P(coord) DESTROYED (0.49→0.002) at all scales; vision tokens are out-of-distribution embeddings** |
+| Either bridge reaches Moka-native Go strength | Low | **❌ NO — both phases negative** |
+| Either bridge beats int8 Moka (Issue 565 G5) | Very low | **❌ NO — both phases negative** |
 
 **Post-T4 calibration finding (2026-08-01):** The cross-modal linear
 structure IS non-zero — CCA captures 27.7% of the board-specific variance
@@ -196,8 +221,42 @@ uncapped latency), so the attention overhead is acceptable.
   ~81 token attention cost for the full LLaVA path, acceptable for turn-based.
 - **G3** (no-regression): default build unaffected — all behind `research`
   feature in katgpt-moka-wasm + `latent_steering_bridge` in riir-engine.
-- **G5** (quality): **the load-bearing gate.** Parse-fallback rate drop is
-  the primary metric. Move quality (legal, non-pass, sensible) is secondary.
+- **G5** (quality): **FAILED — both phases.** Phase 1: delta ≈ 0 (no
+  improvement). Phase 2: delta = -0.49 (catastrophic regression — P(coord)
+  drops from 0.49 to 0.002). The modelless bridge cannot pass the quality
+  gate on either architecture.
+
+## Final Verdict (T8-T9, 2026-08-01)
+
+**Both phases of the modelless CNN→Transformer bridge are NEGATIVE.**
+
+| Phase | Architecture | KL (wiring) | P(coord) delta | Verdict |
+|---|---|---|---|---|
+| 1 (T5-T7) | Aggregate (64-dim → residual add @ L13) | 0.0001 bits | -0.0004 | Signal too weak |
+| 2 (T8-T9) | Per-position (81×32-dim → embedding prepend @ L0) | 4.46 bits | -0.492 | Signal actively harmful |
+
+**Root cause:** the CCA cross-modal projection captures STATISTICAL
+LINEAR correlation (27.7% of board-specific variance) but NOT SEMANTIC
+ALIGNMENT. In Phase 1, the projected signal is so weak it's drowned by
+the prompt. In Phase 2, the projected embeddings are out-of-distribution
+for Gemma's layer 0 — they have non-trivial magnitude (norm ~0.72) but
+wrong statistical properties, causing the attention mechanism to derail
+the output entirely.
+
+**The modelless bridge is confirmed unviable.** The honest pre-PoC
+prediction ("partial improvement") was wrong on both axes — neither phase
+achieves even partial improvement. The trained projection path (riir-train)
+is the only remaining option for the CNN→Transformer bridge.
+
+**Lessons learned:**
+1. Cross-modal linear correlation (CCA cR²=0.277) does NOT imply usable
+   signal for steering. Statistical correlation ≠ semantic alignment.
+2. Embedding-layer injection (Phase 2) is MORE sensitive to distributional
+   mismatch than residual-layer injection (Phase 1). A weak wrong signal
+   (Phase 1) is ignored; a strong wrong signal (Phase 2) is harmful.
+3. The aggregate bridge's failure mode (too weak) and the per-position
+   bridge's failure mode (too strong + wrong direction) bracket the space
+   of modelless injection strategies. There is no modelless "sweet spot."
 
 ## What This PoC Does NOT Prove
 

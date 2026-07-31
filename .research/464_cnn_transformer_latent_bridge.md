@@ -197,10 +197,34 @@ signal (cR²=0.277). Results:
 The signal exists but is too weak to be useful. The 0.008% board-specific
 variance fraction means even a perfect linear projection injects a tiny
 perturbation relative to the prompt-driven signal. Scaling the injection
-doesn't help because the alpha parameter saturates at 1.0. **Phase 2
-(per-position LLaVA tokens) is the only remaining modelless path** — it
-preserves spatial information and uses attention (not addition) to integrate
-board features, which may overcome the signal-to-noise problem.
+doesn't help because the alpha parameter saturates at 1.0.
+
+### Phase 2 verdict (T8-T9, 2026-08-01): DECISIVELY NEGATIVE
+
+Phase 2 (per-position LLaVA tokens) was wired and tested. The result is
+**worse than Phase 1** — not just no improvement, but active regression:
+
+| Scale | Mean P(coord) shift | Argmax coord 6/8 → |
+|---|---|---|
+| 0.01 | **-0.492** | 0/8 |
+| 0.1 | **-0.492** | 0/8 |
+| 0.5 | **-0.492** | 0/8 |
+| 1.0 | **-0.493** | 0/8 |
+
+The 81 per-position vision tokens are prepended via `forward_gemma2_with_embedding`
+(bypasses embedding lookup). They enter at layer 0 as d_model vectors projected
+from layer-13 residual space (where the CCA was calibrated). The wiring WORKS
+— KL divergence is 4.46 bits at scale=1.0 (44,000× stronger than Phase 1's
+0.0001 bits). But the signal is semantically WRONG: the out-of-distribution
+embeddings derail Gemma's output entirely, dropping P(coordinate) from 0.49 to
+0.002 at ALL scales (even scale=0.01).
+
+**Both phases are negative. The modelless bridge is confirmed unviable.**
+The CCA captures statistical linear correlation (27.7% of board-specific
+variance) but not semantic alignment. A weak wrong signal (Phase 1) is
+ignored; a strong wrong signal (Phase 2) is harmful. There is no modelless
+sweet spot. The trained projection path (riir-train) is the only remaining
+option.
 
 ## 5. The Consumer: Proposal 008 (Go Gemma Arena)
 
@@ -231,9 +255,9 @@ GOAT-quality win for Proposal 008 — it proves the bridge carries real signal.
 | Outcome | Probability | Actual |
 |---|---|---|
 | Aggregate bridge drops parse-fallback significantly | Medium | **❌ NO (T6: delta ≈ 0, argmax worsened)** |
-| Full LLaVA bridge drops parse-fallback significantly | Higher | TBD (T8-T9, deferred) |
-| Either bridge reaches Moka-native Go strength | Low | TBD |
-| Either bridge beats int8 Moka (Issue 565 G5) | Very low | TBD |
+| Full LLaVA bridge drops parse-fallback significantly | Higher | **❌ NO (T9: P(coord) 0.49→0.002 — out-of-distribution embeddings derail output)** |
+| Either bridge reaches Moka-native Go strength | Low | **❌ NO (both phases negative)** |
+| Either bridge beats int8 Moka (Issue 565 G5) | Very low | **❌ NO (both phases negative)** |
 
 **Phase 1 lesson (2026-08-01):** the cross-modal signal EXISTS (cR²=0.277)
 but is too weak to be useful via aggregate injection. The root cause is the
