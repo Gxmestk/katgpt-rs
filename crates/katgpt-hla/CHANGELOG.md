@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.2](https://github.com/katopz/katgpt-rs/compare/katgpt-hla-v0.1.1...katgpt-hla-v0.1.2) - 2026-07-31
+
+### Added
+
+- *(katgpt-hla)* add serde feature for Issue 532 T1 de-fork
+
+### Other
+
+- fix all 504 cargo doc warnings in remaining workspace crates
+
 ### Added
 
 - `serde` feature (opt-in, Issue 532 T1): gates `#[derive(Serialize, Deserialize)]`

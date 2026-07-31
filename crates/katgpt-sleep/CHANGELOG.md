@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.2](https://github.com/katopz/katgpt-rs/compare/katgpt-sleep-v0.1.1...katgpt-sleep-v0.1.2) - 2026-07-31
+
+### Other
+
+- *(sleep)* single-pass slot construction in SleepTimeAnticipator::anticipate
+- *(sleep)* use mul_add in consume() blend loop for explicit FMA hint
+- fix all 504 cargo doc warnings in remaining workspace crates
+
 ## [0.1.1](https://github.com/katopz/katgpt-rs/compare/katgpt-sleep-v0.1.0...katgpt-sleep-v0.1.1) - 2026-07-11
 
 ### Fixed
