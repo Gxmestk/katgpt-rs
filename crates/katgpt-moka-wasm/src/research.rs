@@ -724,3 +724,323 @@ pub fn forward_collecting_activations(
     logits.copy_from_slice(&policy[..POLICY_MOVES]);
     (logits, value_out[0].tanh())
 }
+
+// ─── Trunk tapping (Research 464 / Issue 566 — CNN→Transformer Latent Bridge) ─
+//
+// `forward_collecting_activations` above captures layer INPUT vectors (for
+// Strategy B calibration). `forward_tapping_trunk` captures block OUTPUT —
+// the trunk buffer after a caller-specified residual block's residual add.
+// This is the [32, 9, 9] feature map that the LLaVA-for-Go bridge projects
+// into Gemma's residual stream. See Research 464 §2 + Issue 566 T1.
+
+/// Run the full Moka forward pass, copying the trunk after a specified block.
+///
+/// Same arithmetic as `forward_with_scratch`. After processing block
+/// `tap_after_block` (0-indexed: 0 = first residual block, NUM_BLOCKS-1 = last),
+/// the trunk buffer is copied into `tapped_trunk` (length BOARD_AREA *
+/// TRUNK_CHANNELS = 81 * 32 = 2592). This is the feature map the bridge
+/// projects to d_model.
+///
+/// If `tap_after_block >= NUM_BLOCKS`, no tap occurs (the forward completes
+/// normally without copying). This lets the caller sweep tap points without
+/// branching.
+///
+/// **Note:** uses scalar arithmetic (same as `forward_collecting_activations`),
+/// not the SIMD `dot_lanes` from the production forward. The tapped trunk may
+/// differ from the production forward by floating-point summation order. For
+/// the bridge PoC (projecting to a completely different latent space), this
+/// precision difference is immaterial.
+pub fn forward_tapping_trunk(
+    weights: &MokaWeights,
+    features: &[f32],
+    scratch: &mut MokaScratch,
+    tap_after_block: usize,
+    tapped_trunk: &mut [f32],
+) -> ([f32; POLICY_MOVES], f32) {
+    let (
+        trunk, expand, hidden_a, hidden_b, head4, head2,
+        patch, pooled, gh, gbias, value_h, policy,
+    ) = scratch.lend_all();
+
+    let trunk_len = BOARD_AREA * TRUNK_CHANNELS;
+
+    // Stem conv 3×3 (scalar — matches forward_collecting_activations).
+    let (stem_w, stem_b) = weights.stem_w();
+    conv2d_scalar_into(
+        features, BOARD_SIZE, BOARD_SIZE, INPUT_PLANES, TRUNK_CHANNELS, 3,
+        stem_w, stem_b, patch, trunk,
+    );
+    relu_inplace(&mut trunk[..trunk_len]);
+
+    for (block_idx, block) in weights.blocks_ref().iter().enumerate() {
+        let (rw, rb) = block.reduce_w();
+        conv2d_scalar_into(
+            trunk, BOARD_SIZE, BOARD_SIZE, TRUNK_CHANNELS, BOTTLENECK_CHANNELS, 1,
+            rw, rb, patch, hidden_a,
+        );
+        relu_inplace(hidden_a);
+
+        let (fw, fb) = block.first_w();
+        conv2d_scalar_into(
+            hidden_a, BOARD_SIZE, BOARD_SIZE, BOTTLENECK_CHANNELS, BOTTLENECK_CHANNELS, 3,
+            fw, fb, patch, hidden_b,
+        );
+        relu_inplace(hidden_b);
+
+        if let Some(g) = block.global_ref() {
+            global_mean_max_into(hidden_b, BOARD_SIZE, BOARD_SIZE, BOTTLENECK_CHANNELS, pooled);
+            let (ghw, ghb) = g.hidden_w();
+            let g_hidden_out = ghb.len();
+            linear_scalar_into(pooled, BOTTLENECK_CHANNELS * 2, g_hidden_out, ghw, ghb, gh);
+            relu_inplace(&mut gh[..g_hidden_out]);
+            let (gow, gob) = g.output_w();
+            let g_out_out = gob.len();
+            linear_scalar_into(gh, g_hidden_out, g_out_out, gow, gob, gbias);
+            for pos in 0..BOARD_AREA {
+                let row = &mut hidden_b[pos * BOTTLENECK_CHANNELS..(pos + 1) * BOTTLENECK_CHANNELS];
+                for c in 0..BOTTLENECK_CHANNELS {
+                    row[c] += gbias[c];
+                }
+            }
+        }
+
+        let (sw, sb) = block.second_w();
+        conv2d_scalar_into(
+            hidden_b, BOARD_SIZE, BOARD_SIZE, BOTTLENECK_CHANNELS, BOTTLENECK_CHANNELS, 3,
+            sw, sb, patch, hidden_a,
+        );
+        relu_inplace(hidden_a);
+        let (ew, eb) = block.expand_w();
+        conv2d_scalar_into(
+            hidden_a, BOARD_SIZE, BOARD_SIZE, BOTTLENECK_CHANNELS, TRUNK_CHANNELS, 1,
+            ew, eb, patch, expand,
+        );
+
+        // Residual add + ReLU, in place on the trunk.
+        for i in 0..trunk_len {
+            let v = trunk[i] + expand[i];
+            trunk[i] = if v < 0.0 { 0.0 } else { v };
+        }
+
+        // Tap: copy the trunk after this block's residual add + ReLU.
+        if block_idx == tap_after_block {
+            tapped_trunk[..trunk_len].copy_from_slice(&trunk[..trunk_len]);
+        }
+    }
+
+    // Policy head.
+    let (pc_w, pc_b) = weights.policy_conv_w();
+    conv2d_scalar_into(
+        trunk, BOARD_SIZE, BOARD_SIZE, TRUNK_CHANNELS, POLICY_CHANNELS, 1,
+        pc_w, pc_b, patch, head4,
+    );
+    relu_inplace(head4);
+    let (pl_w, pl_b) = weights.policy_linear_w();
+    let policy_lin_in = pl_w.len() / pl_b.len();
+    linear_scalar_into(head4, policy_lin_in, POLICY_MOVES, pl_w, pl_b, policy);
+
+    // Value head.
+    let (vc_w, vc_b) = weights.value_conv_w();
+    conv2d_scalar_into(
+        trunk, BOARD_SIZE, BOARD_SIZE, TRUNK_CHANNELS, VALUE_CHANNELS, 1,
+        vc_w, vc_b, patch, head2,
+    );
+    relu_inplace(head2);
+    let (vh_w, vh_b) = weights.value_hidden_w();
+    let value_hidden_dim = vh_b.len();
+    let value_hidden_in = vh_w.len() / value_hidden_dim;
+    linear_scalar_into(head2, value_hidden_in, value_hidden_dim, vh_w, vh_b, value_h);
+    relu_inplace(&mut value_h[..value_hidden_dim]);
+    let (vo_w, vo_b) = weights.value_output_w();
+    let mut value_out = [0f32; 1];
+    linear_scalar_into(value_h, value_hidden_dim, 1, vo_w, vo_b, &mut value_out);
+
+    let mut logits = [0f32; POLICY_MOVES];
+    logits.copy_from_slice(&policy[..POLICY_MOVES]);
+    (logits, value_out[0].tanh())
+}
+
+/// Scalar conv2d (no SIMD dot_lanes). Same arithmetic as `conv2d_collecting_into`
+/// but without the collection side-effect. Used by `forward_tapping_trunk`.
+#[allow(clippy::too_many_arguments)]
+fn conv2d_scalar_into(
+    input: &[f32],
+    h: usize,
+    w: usize,
+    in_ch: usize,
+    out_ch: usize,
+    k: usize,
+    weight: &[f32],
+    bias: &[f32],
+    patch: &mut [f32],
+    out: &mut [f32],
+) {
+    let patch_len = k * k * in_ch;
+    if k == 1 {
+        for pos in 0..h * w {
+            let pslice = &input[pos * in_ch..pos * in_ch + in_ch];
+            let obase = pos * out_ch;
+            for oc in 0..out_ch {
+                let wbase = oc * in_ch;
+                let mut acc = bias[oc];
+                for ic in 0..in_ch {
+                    acc += weight[wbase + ic] * pslice[ic];
+                }
+                out[obase + oc] = acc;
+            }
+        }
+        return;
+    }
+
+    let pad = k / 2;
+    for y in 0..h {
+        for x in 0..w {
+            patch[..patch_len].fill(0.0);
+            for ky in 0..k {
+                let iy = y + ky;
+                if iy < pad || iy >= h + pad {
+                    continue;
+                }
+                let iy = iy - pad;
+                for kx in 0..k {
+                    let ix = x + kx;
+                    if ix < pad || ix >= w + pad {
+                        continue;
+                    }
+                    let ix = ix - pad;
+                    let src = (iy * w + ix) * in_ch;
+                    let dst = (ky * k + kx) * in_ch;
+                    patch[dst..dst + in_ch].copy_from_slice(&input[src..src + in_ch]);
+                }
+            }
+
+            let obase = (y * w + x) * out_ch;
+            let pslice = &patch[..patch_len];
+            for oc in 0..out_ch {
+                let wbase = oc * patch_len;
+                let mut acc = bias[oc];
+                for i in 0..patch_len {
+                    acc += weight[wbase + i] * pslice[i];
+                }
+                out[obase + oc] = acc;
+            }
+        }
+    }
+}
+
+/// Scalar linear (no SIMD dot_lanes). Same arithmetic as `linear_collecting_into`
+/// but without the collection side-effect.
+fn linear_scalar_into(
+    input: &[f32],
+    in_dim: usize,
+    out_dim: usize,
+    weight: &[f32],
+    bias: &[f32],
+    out: &mut [f32],
+) {
+    for o in 0..out_dim {
+        let base = o * in_dim;
+        let mut acc = bias[o];
+        for i in 0..in_dim {
+            acc += weight[base + i] * input[i];
+        }
+        out[o] = acc;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::board::{AREA as BOARD_AREA, Board};
+    use crate::moka::{
+        MokaScratch, MokaWeights, NUM_BLOCKS, POLICY_MOVES, TRUNK_CHANNELS,
+        forward_with_scratch, encode_features_into, INPUT_ELEMENT_COUNT,
+    };
+
+    /// `forward_tapping_trunk` must produce the same [policy, value] as the
+    /// production `forward_with_scratch` (modulo scalar vs SIMD summation
+    /// order — allow small epsilon). And the tapped trunk must be non-trivial
+    /// (not all zeros, not all NaN).
+    #[test]
+    fn tapping_forward_matches_production_within_epsilon() {
+        let weights = MokaWeights::load();
+        let board = Board::default();
+        let mut features = vec![0f32; INPUT_ELEMENT_COUNT];
+        encode_features_into(&board, &[], &mut features);
+
+        // Production forward.
+        let mut scratch_prod = MokaScratch::new();
+        let (prod_policy, prod_value) = forward_with_scratch(&weights, &features, &mut scratch_prod);
+
+        // Tapping forward at block 6 (mid-network, per Research 464 §4).
+        let mut scratch_tap = MokaScratch::new();
+        let trunk_len = BOARD_AREA * TRUNK_CHANNELS;
+        let mut tapped = vec![0f32; trunk_len];
+        let (tap_policy, tap_value) = forward_tapping_trunk(
+            &weights, &features, &mut scratch_tap, 6, &mut tapped,
+        );
+
+        // Policy should match within float epsilon (scalar vs SIMD).
+        let mut max_diff = 0f32;
+        for i in 0..POLICY_MOVES {
+            max_diff = max_diff.max((prod_policy[i] - tap_policy[i]).abs());
+        }
+        assert!(max_diff < 1e-3, "policy max_diff too large: {max_diff}");
+        assert!((prod_value - tap_value).abs() < 1e-3, "value diff too large");
+
+        // Tapped trunk must be non-trivial.
+        let non_zero = tapped.iter().filter(|&&v| v != 0.0).count();
+        assert!(non_zero > trunk_len / 2, "tapped trunk too sparse: {non_zero}/{trunk_len} non-zero");
+        assert!(tapped.iter().all(|&v| v.is_finite()), "tapped trunk has NaN/inf");
+    }
+
+    /// Tapping at each valid block index should not panic and should produce
+    /// a non-trivial trunk.
+    #[test]
+    fn tapping_each_block_index_works() {
+        let weights = MokaWeights::load();
+        let board = Board::default();
+        let mut features = vec![0f32; INPUT_ELEMENT_COUNT];
+        encode_features_into(&board, &[], &mut features);
+
+        let trunk_len = BOARD_AREA * TRUNK_CHANNELS;
+        let mut tapped = vec![0f32; trunk_len];
+
+        for block in 0..NUM_BLOCKS {
+            let mut scratch = MokaScratch::new();
+            tapped.fill(0.0);
+            let (policy, value) = forward_tapping_trunk(
+                &weights, &features, &mut scratch, block, &mut tapped,
+            );
+            // Sanity: policy + value are finite.
+            assert!(policy.iter().all(|&p| p.is_finite()), "block {block}: policy has NaN/inf");
+            assert!(value.is_finite(), "block {block}: value is NaN/inf");
+            // Tapped trunk changed from the zero-fill (except block 0 on an empty board
+            // might be sparse, but at least some non-zero values expected).
+            let non_zero = tapped.iter().filter(|&&v| v != 0.0).count();
+            assert!(non_zero > 0, "block {block}: tapped trunk is all zeros");
+        }
+    }
+
+    /// Tapping at an out-of-range index (>= NUM_BLOCKS) is a no-op — the
+    /// forward completes normally, the trunk is not copied.
+    #[test]
+    fn tapping_out_of_range_is_noop() {
+        let weights = MokaWeights::load();
+        let board = Board::default();
+        let mut features = vec![0f32; INPUT_ELEMENT_COUNT];
+        encode_features_into(&board, &[], &mut features);
+
+        let trunk_len = BOARD_AREA * TRUNK_CHANNELS;
+        let mut tapped = vec![f32::NAN; trunk_len]; // sentinel: if untouched, stays NaN
+        let mut scratch = MokaScratch::new();
+        let (policy, value) = forward_tapping_trunk(
+            &weights, &features, &mut scratch, NUM_BLOCKS + 5, &mut tapped,
+        );
+        // Forward still produced valid output.
+        assert!(policy.iter().all(|&p| p.is_finite()));
+        assert!(value.is_finite());
+        // Tapped trunk was NOT written (still NaN sentinel).
+        assert!(tapped[0].is_nan(), "out-of-range tap should not write trunk");
+    }
+}
