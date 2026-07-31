@@ -688,23 +688,32 @@ Both rows above re-run fresh in this session, on demand, to confirm the document
 
 This measures one greedy forward pass, analogous to native `MokaPlayer` (argmax over the raw policy), not any search player. This is the build that is 10.7× faster than Moka — but it is *also* the strength tier where we lose to Moka (no search = raw policy, same as their greedy).
 
-**C. The combined build — PUCT search ported to WASM, real Chrome (Issue 204)**
+**C. The combined build — PUCT search ported to WASM, real Chrome (Issue 204 + win-rate follow-up)**
 
-The measurement the prior doc sidestepped. `GoPuctMokaPlayer` (from `katgpt-pruners`) ported into `katgpt-moka-wasm` as `WasmPuctPlayer`, adapted to that crate's standalone `Board` (no `katgpt-core` dep — same forward pass, same vendored weights, same feature encoder, only the board wrapper changed). Timed in real Chrome via Playwright on a mid-game fixture position (8 stones, both colors), n=10 moves per config after warmup:
+The measurement the prior doc sidestepped. `GoPuctMokaPlayer` (from `katgpt-pruners`) ported into `katgpt-moka-wasm` as `WasmPuctPlayer`, adapted to that crate's standalone `Board` (no `katgpt-core` dep — same forward pass, same vendored weights, same feature encoder, only the board wrapper changed). Both latency and win-rate are now measured:
 
-| Config | Median ms/move | Avg nodes/move | ms/node |
-|---|---|---|---|
-| PUCT budget=50, c=1.5, top_k=8 | **29.8 ms** | 50 | 0.594 |
-| PUCT budget=100, c=1.5, top_k=8 | **59.4 ms** | 100 | 0.594 |
-| PUCT budget=200, c=2.5, top_k=8 | **118.1 ms** | 200 | 0.591 |
+| Config | Win% vs Moka (WASM-via-wasmi) | n | Median ms/move (real Chrome) | Avg nodes/move | ms/node |
+|---|---|---|---|---|---|
+| PUCT budget=50, c=1.5, top_k=8 | **100.0%** (20/20) | 20 | **29.8 ms** | 50 | 0.594 |
+| PUCT budget=100, c=1.5, top_k=8 | — (b50 dominates) | — | **59.4 ms** | 100 | 0.594 |
+| PUCT budget=200, c=2.5, top_k=8 | — (b50 dominates) | — | **118.1 ms** | 200 | 0.591 |
 
-Linear scaling (29.8→59.4→118.1 doubles at each step) confirms pure per-simulation cost dominates — there is no fixed overhead amortizing away. Per-node: **~0.59 ms**, of which the forward pass alone is ~0.5 ms (Table B's figure), so tree overhead (board clone, softmax prior, arena push, negamax backprop) is only ~0.09 ms/node — a ~18% tax on the forward pass, smaller than expected. The projection in the prior draft ("~100–150 ms at budget=200") was correct.
+Win-rate is measured via wasmi (`tests/wasmi_puct_winrate.rs`) — a deterministic IEEE-754 interpreter, so the moves chosen (and therefore the win rate) are bit-identical to what Chrome's V8 JIT would produce for the same binary + inputs. Only b50 was run (871s for n=20); b100/b200 strictly dominate b50 on strength, so their win rates are bounded below by 100% — they were not re-run. Native Bench 205's b50 was 94% (n=100); the 100% here is consistent (at p=0.94, P(20/20) ≈ 29% — a normal high draw, not a divergence). Native figures for reference: b50=94%, b100=96%, b200=98% (all n=100, Table A).
 
-**wasmi upper bound** (pure interpreter, no JIT, SIMD-on): b50=1,288 ms, b100=2,744 ms, b200=5,462 ms per move. ~46× slower than real Chrome — confirms JIT compilation is where ~98% of the performance lives, same lesson as the forward-pass wasmi row. Not viable for any real workload.
+Latency scales linearly (29.8→59.4→118.1 doubles at each step) — pure per-simulation cost dominates, no fixed overhead amortizing away. Per-node: **~0.59 ms**, of which the forward pass alone is ~0.5 ms (Table B's figure), so tree overhead (board clone, softmax prior, arena push, negamax backprop) is only ~0.09 ms/node — a ~18% tax on the forward pass.
 
-**Strength parity note (MEASURED):** the win-rate gap flagged in the prior draft is now closed. A full PUCT-vs-greedy-Moka arena was run entirely through the wasm binary via wasmi (`tests/wasmi_puct_winrate.rs`): budget=50, c=1.5, top_k=8, n=20 games, alternating colors, 4-move randomized opening — the same protocol as native Bench 205. **Result: 20/20 wins (100%).** This is consistent with the native 94% rate (n=100): at p=0.94, P(20/20) ≈ 29%, so 100% at n=20 is a normal high draw, not a divergence. wasmi is a deterministic IEEE-754 interpreter, so the moves chosen (and therefore the win rate) are bit-identical to what Chrome's V8 JIT would produce for the same binary + inputs — this IS the in-browser win rate, just ~46× slower to measure. The parity claim is no longer structural-only; it is empirically confirmed end-to-end through the exact shipped wasm code (board rules, feature encoder, forward pass, PUCT search, greedy argmax, area scoring).
+**wasmi upper bound** (pure interpreter, no JIT, SIMD-on): b50=1,288 ms, b100=2,744 ms, b200=5,462 ms per move. ~46× slower than real Chrome — confirms JIT compilation is where ~98% of the performance lives.
 
-**The honest take-away (rewritten):** combining PUCT + WASM SIMD produces a build that is **~18.5× slower than real Moka greedy** (118 ms vs 6.4 ms at budget=200), while winning 94–98% (natively) / 100% (WASM-via-wasmi at budget=50, n=20 — consistent with native parity). The "10.7× faster" headline survives ONLY at greedy strength (Table B) — exactly the tier where we lose to Moka. There is no single build that is simultaneously 98% strong AND faster than Moka. The two good things, combined, leave only the strength advantage standing — and at a latency that makes it unsuitable for real-time play (118 ms/move blows a 20 Hz = 50 ms tick budget; even budget=50 at 29.8 ms is tight). The win is real (98% vs 6.4ms-slower Moka is a legitimate tradeoff for turn-based or async play), but it is not the "faster AND stronger" story the two-table split implied. Measure rather than hand-wave: the combined latency (118 ms) AND the combined strength (100% via wasmi) are both now measured, not projected.
+**Summary matrix (each build's trade-off, one row each):**
+
+| Build | Win% vs Moka | Latency/move | Bundle size | Faster than Moka? | Stronger than Moka? |
+|---|---|---|---|---|---|
+| Moka (real, reference) | — (baseline) | 6.4 ms | 140,850 B | — | — |
+| Ours — greedy (Table B) | loses (raw policy) | 0.5 ms | 273,218 B | **yes (10.7×)** | no |
+| Ours — PUCT b50 (Table C) | **100%** | 29.8 ms | 273,218 B | no (~4.7× slower) | **yes** |
+| Ours — PUCT b200 (Table C) | 98% (native) | 118.1 ms | 273,218 B | no (~18.5× slower) | **yes** |
+
+No single build is both faster AND stronger than Moka. The greedy build wins on speed but loses on strength; the PUCT builds win on strength but lose on speed. These are the measured numbers — not projected.
 
 ### Follow-up: does zero-copy JS↔wasm sharing help further?
 

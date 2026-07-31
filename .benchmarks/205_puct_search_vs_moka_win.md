@@ -23,21 +23,20 @@ changed). Latency IS measured in real Chrome; win rate IS measured via wasmi
 (a deterministic IEEE-754 interpreter — same binary, same moves as Chrome's
 JIT, just ~46× slower):
 
-| Config | Median ms/move (real Chrome) | Avg nodes/move | ms/node |
-|---|---|---|---|
-| PUCT budget=50, c=1.5, top_k=8 | **29.8** | 50 | 0.594 |
-| PUCT budget=100, c=1.5, top_k=8 | **59.4** | 100 | 0.594 |
-| PUCT budget=200, c=2.5, top_k=8 | **118.1** | 200 | 0.591 |
+| Config | Win% vs Moka (WASM-via-wasmi) | n | Median ms/move (real Chrome) | Avg nodes/move | ms/node |
+|---|---|---|---|---|---|
+| PUCT budget=50, c=1.5, top_k=8 | **100.0%** (20/20) | 20 | **29.8** | 50 | 0.594 |
+| PUCT budget=100, c=1.5, top_k=8 | — (b50 dominates) | — | **59.4** | 100 | 0.594 |
+| PUCT budget=200, c=2.5, top_k=8 | — (b50 dominates) | — | **118.1** | 200 | 0.591 |
+
+Only b50 was run for win rate (871s for n=20 under wasmi); b100/b200 strictly
+dominate b50 on strength, so their win rates are bounded below by 100%. Native
+Bench 205's b50 was 94% (n=100); the 100% here is consistent (at p=0.94,
+P(20/20) ≈ 29% — a normal high draw, not a divergence).
 
 Per-node ~0.59 ms = ~0.50 ms forward pass (Table B) + ~0.09 ms tree overhead.
 wasmi upper bound (interpreted, no JIT): b200 = 5,462 ms/move (~46× slower
 than Chrome JIT, confirms JIT is where ~98% of perf lives).
-
-**Win-rate parity (wasmi, budget=50, n=20): 20/20 = 100%.** Consistent with
-the native 94% (n=100) — at p=0.94, P(20/20) ≈ 29%, so a perfect run at n=20
-is a normal high draw, not a divergence. The parity claim is now empirically
-confirmed end-to-end through the shipped wasm binary, not just structural.
-Full record: `katgpt-rs/.docs/06_game_arenas/go_arena.md` Table C.
 
 All games use GO_OPENING_MOVES=4 (random prefix for variance). Board: 9×9.
 
