@@ -1,5 +1,23 @@
 # Issue 203 — CLR `extract_embeddings_into` + `verify_embedding`: zero-alloc flat-embedding vote path
 
+## Status: CLOSED — FULLY IMPLEMENTED (2026-07-29, Session 18)
+
+All design items shipped. Retained as reference (linked from README + Bench 570 +
+riir-ai Issue 568). The Layer 1 sibling (`downcast_trajectories` outer Vec —
+riir-ai Issue 568 Opt B) remains open but deprioritized (1 alloc/NPC, not 33).
+
+**Implementing commits:**
+- katgpt-rs `cc841a2c` — `extract_embeddings_into` + `verify_embedding` trait methods
+- katgpt-rs `4c337339` — `ClrConfig.embedding_dim` + `ClrScratch::new(k, m, embedding_dim)`
+- riir-ai `3bdd43a38` — 5 production extractor overrides (Guard/Merchant/Healer/Scout/Diplomat)
+- riir-ai `df2af7f88` — G4 alloc-free test (`clr_extract_g4_alloc.rs`) + Bench 570
+- riir-ai `92332aba6` — fix false-positive G4 infra (Issue 569 `extern crate` link bug)
+
+See [Bench 570](../../riir-ai/.benchmarks/570_clr_extract_zero_alloc_g4.md) for the
+G4 gate results.
+
+---
+
 **Filed:** 2026-07-29
 **Source:** Sibling of `riir-ai/.issues/568` (CLR dispatch per-NPC allocation)
 **Severity:** Optimization (not a correctness bug)

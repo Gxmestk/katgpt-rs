@@ -1,6 +1,12 @@
 # Issue 200 — f16 Weight Quantization for `forward_base`
 
-## Status: IN PROGRESS — G2 PERF GATE FAIL (2026-07-29)
+## Status: CLOSED — G2 PERF GATE FAIL (2026-07-29, negative result, retained as reference)
+
+All tasks T1–T9 are complete. The verdict is final: G2 FAIL, DO NOT PROMOTE.
+The code ships as a `pub` opt-in path that no internal caller dispatches to.
+Retained as a negative-result reference (linked from
+`.docs/09_feature_catalog/negative_results.md` §17 + perf engineering doc).
+Mirrors Issue 201's retention pattern.
 
 ## GOAT Gate Results (2026-07-29, Apple Silicon / aarch64)
 
