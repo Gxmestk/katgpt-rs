@@ -708,14 +708,6 @@ below f32's 100% but within the n=20 binomial noise band (Wilson 95% CI on
 85% at n=20 ≈ 64–95%; on 100% ≈ 83–100%) — both clear the 75% parity floor.
 See [Benchmark 565](../../.benchmarks/565_int8_int8_sdot_positive.md).
 
-**Re-verified 2026-07-31 (post-promotion audit for public claims):**
-native f32 100% (20/20), native int8 95% (19/20), int8 forward **1.62× faster**
-than f32 (clears the 1.3× gate). `native_puct_winrate` + `moka_int8` GOAT
-tests both PASS. Native PUCT b200 vs Moka greedy: **98W/2L = 98.0%**
-(n=100, reproduced fresh — same config, same result as Bench 205).
-wasmi PUCT latency b50/b100/b200: 1224/2368/5091 ms (within ~5% of Bench
-205's documented 1260/2508/5031 ms — machine variance).
-
 Win-rate is measured via wasmi (`tests/wasmi_puct_winrate.rs` for f32, `tests/wasmi_puct_int8_winrate.rs` for int8) — a deterministic IEEE-754 interpreter, so the moves chosen (and therefore the win rate) are bit-identical to what Chrome's V8 JIT would produce for the same binary + inputs. Only b50 was run (871s for f32 n=20, 681s for int8 n=20); b100/b200 strictly dominate b50 on strength, so their win rates are bounded below by b50's — they were not re-run. Native Bench 205's b50 was 94% (n=100); the 100% f32 / 85% int8 here are consistent (at p=0.94, P(20/20) ≈ 29% — a normal high draw; the int8 quantization noise costs a few games at small n but is within noise). Native figures for reference: b50=94%, b100=96%, b200=98% (all n=100, Table A).
 
 Latency scales linearly (29.6→59.8→119.6 doubles at each step) — pure per-simulation cost dominates, no fixed overhead amortizing away. Per-node: **~0.59 ms**, of which the forward pass alone is ~0.5 ms (Table B's figure), so tree overhead (board clone, softmax prior, arena push, negamax backprop) is only ~0.09 ms/node — a ~18% tax on the forward pass.
