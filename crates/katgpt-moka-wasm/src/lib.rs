@@ -14,10 +14,10 @@
 //! `src/game.ts`) so the browser benchmark harness can drive both sides
 //! with the same self-play loop shape.
 
-mod board;
-mod moka;
+pub mod board;
+pub mod moka;
 pub mod moka_int8;
-mod puct;
+pub mod puct;
 
 use wasm_bindgen::prelude::*;
 

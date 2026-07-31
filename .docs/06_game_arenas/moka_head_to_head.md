@@ -186,6 +186,7 @@ flowchart LR
 | GoPuctMokaPlayer | PUCT, budget=100, k=4 | 96.0% (native, n=100) | 40,809 | Bench 205 |
 | **WasmPuctPlayer (f32)** | **PUCT, budget=50, k=8** | **100.0% (20/20)** (WASM-via-wasmi, n=20) | 29,600 (WASM V8 JIT) | **Issue 204** |
 | **WasmPuctPlayer (int8, DEFAULT)** | **PUCT, budget=50, k=8** | **85.0% (17/20)** (WASM-via-wasmi, n=20) | 25,800 (WASM V8 JIT) | **Issue 206/207** |
+| **PuctPlayer (int8, native)** | **PUCT, budget=50, k=8** | **95.0% (19/20)** (native aarch64, n=20) | ~15,000 (native SDOT) | **Issue 207** |
 
 The two WASM rows are measured through the shipped `.wasm` binary under
 [wasmi](https://github.com/paritytech/wasmi) (a deterministic IEEE-754
@@ -218,17 +219,18 @@ AND strength-preserving — a modelless gain, not just a perf gain.
 
 **Result (Bench 565 + Issue 207 gate):** YES on both axes.
 
-| Path | Runtime | Win rate vs greedy Moka (n=20) | Speed vs f32 |
+| Path | Runtime | Win rate vs greedy Moka | Speed vs f32 |
 |---|---|---|---|
-| f32 forward (the original) | native aarch64 | 100.0% (20/20) | 1.00× baseline |
-| **int8×int8 forward** | native aarch64 | — | **1.39×** faster |
-| f32 forward (via `wasmi_arena_init_f32`) | wasmi (V8 JIT proxy) | 100.0% (20/20) | 1.00× baseline |
-| **int8×int8 forward** (via `wasmi_arena_init_int8`) | wasmi (V8 JIT proxy) | **85.0%** (17/20) | **1.17–1.25×** faster |
+| f32 forward (the original) | native aarch64 | **100.0% (20/20)** | 1.00× baseline |
+| **int8×int8 forward** | native aarch64 | **95.0% (19/20)** | **1.39×** faster |
+| f32 forward (via `wasmi_arena_init_f32`) | wasmi (V8 JIT proxy) | **100.0% (20/20)** | 1.00× baseline |
+| **int8×int8 forward** (via `wasmi_arena_init_int8`) | wasmi (V8 JIT proxy) | **85.0% (17/20)** | **1.17–1.25×** faster |
 
-Both paths clear the 75% parity floor decisively. The int8 path's 85% vs
-f32's 100% is within the n=20 binomial noise band (Wilson 95% CI on 85% at
-n=20 is ~64–95%; on 100% it's ~83–100%). The int8 path is confirmed a
-**modelless gain**: faster (1.17–1.39×) AND same strength.
+Both paths clear the 75% parity floor decisively at both runtimes. The int8
+path's 95% (native) / 85% (wasmi) vs f32's 100% is within the n=20 binomial
+noise band (Wilson 95% CI on 85% at n=20 is ~64–95%; on 95% ≈ 76–99%; on
+100% ≈ 83–100%). The int8 path is confirmed a **modelless gain**: faster
+(1.17–1.39×) AND same strength.
 
 **Promoted to DEFAULT-ON** (Issue 207, 2026-07-31): `PuctPlayer::new` /
 `with_batch_k(..., 1)` / `wasmi_arena_init(..., 1)` / `WasmPuctPlayer::new`
