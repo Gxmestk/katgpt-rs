@@ -115,10 +115,10 @@ fn play_random_game(rng: &mut fastrand::Rng) -> Vec<(GoState, u8, GoAction)> {
         actions.push(GoAction::Pass);
 
         // Pick random move
-        let action = actions[rng.usize(..actions.len())].clone();
+        let action = actions[rng.usize(..actions.len())];
 
         // Record state before move
-        moves.push((state.clone(), player_id, action.clone()));
+        moves.push((state.clone(), player_id, action));
 
         // Apply move
         match &action {
