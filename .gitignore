@@ -1,4 +1,8 @@
 /target
+
+# katgpt-moka-wasm build output (scripts/build-moka-wasm.sh)
+# The SIMD-enabled .wasm + JS glue lands here; rebuild with the script.
+/crates/katgpt-moka-wasm/target-wasm/
 .raw
 checkpoints/
 output/

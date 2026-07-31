@@ -702,7 +702,7 @@ Win-rate is measured via wasmi (`tests/wasmi_puct_winrate.rs`) — a determinist
 
 Latency scales linearly (29.6→59.8→119.6 doubles at each step) — pure per-simulation cost dominates, no fixed overhead amortizing away. Per-node: **~0.59 ms**, of which the forward pass alone is ~0.5 ms (Table B's figure), so tree overhead (board clone, softmax prior, arena push, negamax backprop) is only ~0.09 ms/node — a ~18% tax on the forward pass.
 
-**Latency measured via Node.js V8 JIT** (same engine as Chrome — `node bench_puct_node.js` loads the raw `.opt.wasm` via `WebAssembly.instantiate` and times the arena C-ABI exports). Earlier Playwright/Chrome numbers (29.8/59.4/118.1) matched within noise; Node V8 is faster to drive (no browser harness setup) and re-runs cleanly on every rebuild.
+**Latency measured via Node.js V8 JIT** (same engine as Chrome — `node crates/katgpt-moka-wasm/bench/bench_puct.js` loads the raw `.opt.wasm` via `WebAssembly.instantiate` and times the arena C-ABI exports). Earlier Playwright/Chrome numbers (29.8/59.4/118.1) matched within noise; Node V8 is faster to drive (no browser harness setup) and re-runs cleanly on every rebuild. **Rebuilding:** `./scripts/build-moka-wasm.sh` encodes the full pipeline (`RUSTFLAGS='-C target-feature=+simd128'` + `wasm-bindgen --target nodejs` + `wasm-opt -Oz --enable-simd`) — without the SIMD flags the build silently falls back to the scalar dot kernel (~16× slower, ~500 ms/move). The K-sweep variant (`bench/bench_k_sweep.js`) reproduces the Issue 205 diminishing-returns table.
 
 **wasmi upper bound** (pure interpreter, no JIT, SIMD-on): b50=1,260 ms, b100=2,508 ms, b200=5,031 ms per move. ~46× slower than V8 JIT — confirms JIT compilation is where ~98% of the performance lives.
 
