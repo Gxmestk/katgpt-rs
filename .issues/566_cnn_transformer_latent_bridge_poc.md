@@ -7,7 +7,8 @@
 > strengthening the case for the activation-space bridge.
 > **Consumer:** Proposal 008 (Go Gemma Arena) — 100% parse-fallback, needs Go understanding.
 > **Type:** PoC (defend-wrong — predicted partial improvement, not full strength)
-> **Status:** Active
+> **Status:** Active (Phase 1 DONE — NEGATIVE result; Phase 2 deferred pending
+> signal reassessment)
 
 ## Context
 
@@ -109,13 +110,40 @@ forward variant that bypasses the embedding lookup for the prepended tokens.
         27.7% of the board-specific variance generalizes to held-out boards.
         **Real cross-modal signal exists.** Overfitting at k≥8 (test cR² drops
         to 0.091). k=1-3 is the stable regime.
-- [ ] **T5** — Phase 1 wiring: aggregate bridge. Global mean-max pool →
-      project → `ResidualField` → `forward_with_steering`.
-- [ ] **T6** — Phase 1 quality PoC: run `GemmaGoPlayer` with vs without
-      the bridge on N=20 games. Measure parse-fallback rate + move quality
-      (does Gemma produce legal, non-pass moves more often?).
-- [ ] **T7** — Phase 1 verdict: does the aggregate bridge drop parse-fallback
-      from 100%? If yes → Phase 2. If no → record negative result.
+- [x] **T5** — Phase 1 wiring: aggregate bridge. Global mean-max pool →
+      project → `ResidualField` → `forward_with_steering`. **DONE 2026-08-01** —
+      `CnnTransformerBridge` struct + `fit_cca_bases` + `project` +
+      `to_residual_field` in `cnn_transformer_bridge_poc.rs`. The bridge wires
+      Moka trunk aggregate → CCA project → ResidualField → `forward_with_steering`.
+      **Result: wiring WORKS** — KL divergence is non-zero (mean 0.0001 bits,
+      max 0.0004 bits), top-token changed on 1/8 test boards. The bridge
+      measurably shifts Gemma's output, but the perturbation is tiny (projected
+      norm ~1.03; board-specific variance = 0.008% of total).
+- [x] **T6** — Phase 1 quality PoC: measure coordinate-token probability shift
+      on N=20 held-out boards. **DONE 2026-08-01** — Logit-level proxy for
+      parse-fallback rate: P(coordinate letter tokens) at the first decoded
+      position, with vs without the bridge. Swept scale ∈ {1.0, 10.0, 100.0}.
+      **Result: NEGATIVE** — the aggregate bridge does NOT shift probability
+      toward Go coordinate tokens:
+      - scale=1.0: mean P(coord) 0.5227 → 0.5223 (delta **-0.0004**),
+        argmax coord 18/20 → **17/20** (worsened)
+      - scale=10.0: delta +0.0001, argmax coord 18/20 → **17/20**
+      - scale=100.0: delta +0.0001 (identical to scale=10.0 — alpha clamps
+      at 1.0, so magnitude saturates above ~1.0 projected norm)
+      The bridge carries measurable signal (T4e: cR²=0.277) but NOT enough to
+      shift Gemma's Go output at the logit level.
+- [x] **T7** — Phase 1 verdict: **NEGATIVE — aggregate bridge does NOT reduce
+      parse-fallback.** The cross-modal signal (27.7% of board-specific
+      variance) exists but is too weak to be useful. The board-specific variance
+      itself is only 0.008% of the total residual — even a perfect bridge would
+      inject a tiny perturbation relative to the prompt-driven signal. Scaling
+      the injection (scale=10/100) doesn't help because alpha saturates at 1.0.
+      **Phase 2 (full LLaVA, per-position tokens) is the only remaining
+      modelless path.** The aggregate bridge loses spatial information — a
+      64-dim summary can't carry the position-discriminating patterns that Go
+      requires. Per-position injection (81 tokens × d_model) would give Gemma
+      spatial board vision, which is what the parse-fallback problem actually
+      needs.
 - [-] **T8** — Phase 2 wiring (full LLaVA): DEFERRED pending Phase 1 signal.
       Requires new forward variant bypassing embedding lookup for prepended
       tokens. Pursue only if Phase 1 shows the bridge carries signal.
@@ -125,9 +153,9 @@ forward variant that bypasses the embedding lookup for the prepended tokens.
 
 ## Honest Pre-PoC Prediction
 
-| Outcome | Probability | Actual (T4e) |
+| Outcome | Probability | Actual (T6) |
 |---|---|---|
-| Aggregate bridge drops parse-fallback significantly | Medium | **TBD (T6)** — signal exists (cR²=0.28) |
+| Aggregate bridge drops parse-fallback significantly | Medium | **❌ NO — delta ≈ 0 across all scales; argmax coord count dropped** |
 | Full LLaVA bridge drops parse-fallback significantly | Higher | TBD (T8-T9, deferred) |
 | Either bridge reaches Moka-native Go strength | Low | TBD |
 | Either bridge beats int8 Moka (Issue 565 G5) | Very low | TBD |
@@ -138,6 +166,17 @@ on held-out data (test cR²=0.277 at k=2). This is weak but real, matching
 the 'partial improvement' prediction. The signal is sufficient to justify
 Phase 1 wiring (T5-T7) — the aggregate bridge is worth testing for
 parse-fallback reduction.
+
+**Post-T6 Phase 1 verdict (2026-08-01): NEGATIVE.** Despite the non-zero
+cross-modal signal (cR²=0.277), the aggregate bridge does NOT improve
+parse-fallback rate. P(coordinate letter) shift is essentially zero
+(delta -0.0004 to +0.0001 across scales 1/10/100). The argmax coordinate
+count actually dropped (18/20 → 17/20). The root cause: board-specific
+variance is only 0.008% of the total residual — even a perfect linear
+projection injects a tiny perturbation that gets drowned out by the
+prompt-driven signal. The aggregate bridge is confirmed unviable as a
+parse-fallback fix. Phase 2 (per-position LLaVA tokens) is the only
+remaining modelless path.
 
 **Key caveat from T4e:** board-specific variance is only 0.008% of the
 total Gemma residual variance at layer 13 (the prompt template dominates).

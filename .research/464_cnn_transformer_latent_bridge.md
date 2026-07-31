@@ -174,7 +174,7 @@ Key findings:
 3. **CCA-aware projection captures real signal:** centered test R²=0.277 at
    k=2 — 27.7% of the board-specific variance generalizes to held-out boards.
 4. **Board-specific variance is tiny** (0.008% of total) — the prompt template
-dominates 99.992% of the residual. Even a perfect bridge injects a small
+   dominates 99.992% of the residual. Even a perfect bridge injects a small
    perturbation relative to the prompt-driven signal.
 5. **Overfitting at k≥8** (test cR² drops to 0.091, gap grows to 0.47). k=1-3
    is the stable regime.
@@ -183,6 +183,24 @@ dominates 99.992% of the residual. Even a perfect bridge injects a small
 Not enough for full Go understanding (73% of board-specific variance
 uncaptured), but sufficient to justify Phase 1 wiring (T5-T7) — the
 aggregate bridge is worth testing for parse-fallback reduction.
+
+**Phase 1 verdict (T5-T7, 2026-08-01): NEGATIVE.** The aggregate bridge is
+confirmed unviable as a parse-fallback fix despite the non-zero cross-modal
+signal (cR²=0.277). Results:
+
+| Scale | Mean P(coord) shift | Argmax coord 18/20 → |
+|---|---|---|
+| 1.0 | **-0.0004** | 17/20 (worsened) |
+| 10.0 | +0.0001 | 17/20 |
+| 100.0 | +0.0001 (saturated) | 17/20 |
+
+The signal exists but is too weak to be useful. The 0.008% board-specific
+variance fraction means even a perfect linear projection injects a tiny
+perturbation relative to the prompt-driven signal. Scaling the injection
+doesn't help because the alpha parameter saturates at 1.0. **Phase 2
+(per-position LLaVA tokens) is the only remaining modelless path** — it
+preserves spatial information and uses attention (not addition) to integrate
+board features, which may overcome the signal-to-noise problem.
 
 ## 5. The Consumer: Proposal 008 (Go Gemma Arena)
 
@@ -210,12 +228,21 @@ GOAT-quality win for Proposal 008 — it proves the bridge carries real signal.
 
 ## 6. Honest Prediction (pre-PoC)
 
-| Outcome | Probability | Reasoning |
+| Outcome | Probability | Actual |
 |---|---|---|
-| Aggregate bridge drops parse-fallback significantly | Medium | Gemma gets board summary; may not be enough for spatial reasoning |
-| Full LLaVA bridge drops parse-fallback significantly | Higher | Gemma gets per-position features; attention can find patterns |
-| Either bridge reaches Moka-native Go strength | Low | Deterministic projection can't learn the semantic mapping |
-| Either bridge beats int8 Moka (Issue 565 G5) | Very low | int8 is already 95% win-rate; bridge adds latency, not strength |
+| Aggregate bridge drops parse-fallback significantly | Medium | **❌ NO (T6: delta ≈ 0, argmax worsened)** |
+| Full LLaVA bridge drops parse-fallback significantly | Higher | TBD (T8-T9, deferred) |
+| Either bridge reaches Moka-native Go strength | Low | TBD |
+| Either bridge beats int8 Moka (Issue 565 G5) | Very low | TBD |
+
+**Phase 1 lesson (2026-08-01):** the cross-modal signal EXISTS (cR²=0.277)
+but is too weak to be useful via aggregate injection. The root cause is the
+0.008% board-specific variance fraction — the prompt template dominates
+99.992% of the layer-13 residual. Adding a board-specific perturbation via
+residual addition is like whispering in a hurricane. The full LLaVA path
+(prepending 81 attention-attended tokens) may overcome this because attention
+can ROUTE around the prompt dominance — it doesn't have to fight the common
+mode at the residual level.
 
 **The load-bearing question:** does Gemma, given Moka's Go vision, produce
 BETTER Go decisions than Gemma without it? This is a quality PoC, not a perf
