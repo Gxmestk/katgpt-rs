@@ -482,3 +482,245 @@ pub fn forward_corrected_with_scratch(
     logits.copy_from_slice(&policy[..POLICY_MOVES]);
     (logits, value_out[0].tanh())
 }
+
+// ─── Activation collection (Strategy B proper calibration) ──────────────────
+//
+// The Issue 565 PoC's Strategy B (output-space data-aware SVD) was initially
+// calibrated with truncated board features — which is a POOR approximation of
+// the actual layer inputs (especially for conv layers where the input is a 3×3
+// patch, not the full board). `forward_collecting_activations` runs the same
+// arithmetic as `forward_with_scratch` but appends each layer's ACTUAL input
+// vectors into `layer_inputs`, so the PoC can build a proper calibration set.
+//
+// `layer_inputs` must be pre-sized to `iter_layers().len()`. For conv layers,
+// each spatial position produces one `in_dim`-length vector (the im2col patch).
+// For linear layers, each forward produces one `in_dim`-length vector.
+
+/// Conv2d that also collects the input patch for each spatial position.
+#[allow(clippy::too_many_arguments)]
+fn conv2d_collecting_into(
+    input: &[f32],
+    h: usize,
+    w: usize,
+    in_ch: usize,
+    out_ch: usize,
+    k: usize,
+    weight: &[f32],
+    bias: &[f32],
+    patch: &mut [f32],
+    out: &mut [f32],
+    collect: &mut Vec<f32>,
+) {
+    let patch_len = k * k * in_ch;
+    if k == 1 {
+        for pos in 0..h * w {
+            let pslice = &input[pos * in_ch..pos * in_ch + in_ch];
+            let obase = pos * out_ch;
+            for oc in 0..out_ch {
+                let wbase = oc * in_ch;
+                let mut acc = bias[oc];
+                for ic in 0..in_ch {
+                    acc += weight[wbase + ic] * pslice[ic];
+                }
+                out[obase + oc] = acc;
+            }
+            collect.extend_from_slice(pslice);
+        }
+        return;
+    }
+
+    let pad = k / 2;
+    for y in 0..h {
+        for x in 0..w {
+            patch[..patch_len].fill(0.0);
+            for ky in 0..k {
+                let iy = y + ky;
+                if iy < pad || iy >= h + pad {
+                    continue;
+                }
+                let iy = iy - pad;
+                for kx in 0..k {
+                    let ix = x + kx;
+                    if ix < pad || ix >= w + pad {
+                        continue;
+                    }
+                    let ix = ix - pad;
+                    let src = (iy * w + ix) * in_ch;
+                    let dst = (ky * k + kx) * in_ch;
+                    patch[dst..dst + in_ch].copy_from_slice(&input[src..src + in_ch]);
+                }
+            }
+
+            let obase = (y * w + x) * out_ch;
+            let pslice = &patch[..patch_len];
+            for oc in 0..out_ch {
+                let wbase = oc * patch_len;
+                let mut acc = bias[oc];
+                for i in 0..patch_len {
+                    acc += weight[wbase + i] * pslice[i];
+                }
+                out[obase + oc] = acc;
+            }
+            collect.extend_from_slice(pslice);
+        }
+    }
+}
+
+/// Linear layer that also collects the input vector.
+fn linear_collecting_into(
+    input: &[f32],
+    in_dim: usize,
+    out_dim: usize,
+    weight: &[f32],
+    bias: &[f32],
+    out: &mut [f32],
+    collect: &mut Vec<f32>,
+) {
+    for o in 0..out_dim {
+        let base = o * in_dim;
+        let mut acc = bias[o];
+        for i in 0..in_dim {
+            acc += weight[base + i] * input[i];
+        }
+        out[o] = acc;
+    }
+    collect.extend_from_slice(&input[..in_dim]);
+}
+
+/// Run the full Moka forward pass, collecting each layer's input vectors.
+///
+/// Same arithmetic as `forward_with_scratch`. `layer_inputs[i]` accumulates
+/// the input vectors for layer `i` (in `iter_layers()` order): for conv layers,
+/// `BOARD_AREA` vectors of length `in_dim` per call; for linear layers, 1 vector.
+/// Each slot grows by `n_positions × in_dim` f32 values per call.
+///
+/// The collected data forms a column-major `[in_dim × n_cal]` matrix suitable
+/// for `QuantErrorLora::from_error_data_aware`.
+pub fn forward_collecting_activations(
+    weights: &MokaWeights,
+    features: &[f32],
+    scratch: &mut MokaScratch,
+    layer_inputs: &mut [Vec<f32>],
+) -> ([f32; POLICY_MOVES], f32) {
+    let (
+        trunk, expand, hidden_a, hidden_b, head4, head2,
+        patch, pooled, gh, gbias, value_h, policy,
+    ) = scratch.lend_all();
+
+    let mut li = 0usize; // layer_inputs index, walks in iter_layers() order
+
+    // Stem conv 3×3.
+    let (stem_w, stem_b) = weights.stem_w();
+    conv2d_collecting_into(
+        features, BOARD_SIZE, BOARD_SIZE, INPUT_PLANES, TRUNK_CHANNELS, 3,
+        stem_w, stem_b, patch, trunk, &mut layer_inputs[li],
+    );
+    li += 1;
+    relu_inplace(&mut trunk[..BOARD_AREA * TRUNK_CHANNELS]);
+
+    for block in weights.blocks_ref() {
+        let (rw, rb) = block.reduce_w();
+        conv2d_collecting_into(
+            trunk, BOARD_SIZE, BOARD_SIZE, TRUNK_CHANNELS, BOTTLENECK_CHANNELS, 1,
+            rw, rb, patch, hidden_a, &mut layer_inputs[li],
+        );
+        li += 1;
+        relu_inplace(hidden_a);
+
+        let (fw, fb) = block.first_w();
+        conv2d_collecting_into(
+            hidden_a, BOARD_SIZE, BOARD_SIZE, BOTTLENECK_CHANNELS, BOTTLENECK_CHANNELS, 3,
+            fw, fb, patch, hidden_b, &mut layer_inputs[li],
+        );
+        li += 1;
+        relu_inplace(hidden_b);
+
+        if let Some(g) = block.global_ref() {
+            global_mean_max_into(hidden_b, BOARD_SIZE, BOARD_SIZE, BOTTLENECK_CHANNELS, pooled);
+            let (ghw, ghb) = g.hidden_w();
+            let g_hidden_out = ghb.len();
+            linear_collecting_into(
+                pooled, BOTTLENECK_CHANNELS * 2, g_hidden_out,
+                ghw, ghb, gh, &mut layer_inputs[li],
+            );
+            li += 1;
+            relu_inplace(&mut gh[..g_hidden_out]);
+            let (gow, gob) = g.output_w();
+            let g_out_out = gob.len();
+            linear_collecting_into(
+                gh, g_hidden_out, g_out_out,
+                gow, gob, gbias, &mut layer_inputs[li],
+            );
+            li += 1;
+            for pos in 0..BOARD_AREA {
+                let row = &mut hidden_b[pos * BOTTLENECK_CHANNELS..(pos + 1) * BOTTLENECK_CHANNELS];
+                for c in 0..BOTTLENECK_CHANNELS {
+                    row[c] += gbias[c];
+                }
+            }
+        }
+
+        let (sw, sb) = block.second_w();
+        conv2d_collecting_into(
+            hidden_b, BOARD_SIZE, BOARD_SIZE, BOTTLENECK_CHANNELS, BOTTLENECK_CHANNELS, 3,
+            sw, sb, patch, hidden_a, &mut layer_inputs[li],
+        );
+        li += 1;
+        relu_inplace(hidden_a);
+        let (ew, eb) = block.expand_w();
+        conv2d_collecting_into(
+            hidden_a, BOARD_SIZE, BOARD_SIZE, BOTTLENECK_CHANNELS, TRUNK_CHANNELS, 1,
+            ew, eb, patch, expand, &mut layer_inputs[li],
+        );
+        li += 1;
+
+        for i in 0..BOARD_AREA * TRUNK_CHANNELS {
+            let v = trunk[i] + expand[i];
+            trunk[i] = if v < 0.0 { 0.0 } else { v };
+        }
+    }
+
+    // Policy head.
+    let (pc_w, pc_b) = weights.policy_conv_w();
+    conv2d_collecting_into(
+        trunk, BOARD_SIZE, BOARD_SIZE, TRUNK_CHANNELS, POLICY_CHANNELS, 1,
+        pc_w, pc_b, patch, head4, &mut layer_inputs[li],
+    );
+    li += 1;
+    relu_inplace(head4);
+    let (pl_w, pl_b) = weights.policy_linear_w();
+    let policy_lin_in = pl_w.len() / pl_b.len();
+    linear_collecting_into(
+        head4, policy_lin_in, POLICY_MOVES,
+        pl_w, pl_b, policy, &mut layer_inputs[li],
+    );
+    li += 1;
+
+    // Value head.
+    let (vc_w, vc_b) = weights.value_conv_w();
+    conv2d_collecting_into(
+        trunk, BOARD_SIZE, BOARD_SIZE, TRUNK_CHANNELS, VALUE_CHANNELS, 1,
+        vc_w, vc_b, patch, head2, &mut layer_inputs[li],
+    );
+    li += 1;
+    relu_inplace(head2);
+    let (vh_w, vh_b) = weights.value_hidden_w();
+    let value_hidden_dim = vh_b.len();
+    let value_hidden_in = vh_w.len() / value_hidden_dim;
+    linear_collecting_into(
+        head2, value_hidden_in, value_hidden_dim,
+        vh_w, vh_b, value_h, &mut layer_inputs[li],
+    );
+    li += 1;
+    relu_inplace(&mut value_h[..value_hidden_dim]);
+    let (vo_w, vo_b) = weights.value_output_w();
+    let mut value_out = [0f32; 1];
+    linear_collecting_into(
+        value_h, value_hidden_dim, 1,
+        vo_w, vo_b, &mut value_out, &mut layer_inputs[li],
+    );
+
+    let mut logits = [0f32; POLICY_MOVES];
+    logits.copy_from_slice(&policy[..POLICY_MOVES]);
+    (logits, value_out[0].tanh())
+}
