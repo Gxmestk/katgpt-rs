@@ -17,6 +17,7 @@
 
 use crate::board::{AREA as BOARD_AREA, Board, SIZE as BOARD_SIZE, flood_group};
 use crate::moka::{self, MokaBatchScratch, MokaScratch, MokaWeights};
+use crate::moka_int8::{MokaScratchInt8, MokaWeightsInt8};
 
 /// A move: `Some(idx)` = play at board index `idx`; `None` = pass.
 /// Replaces `GoAction` from the native crate.
@@ -92,6 +93,13 @@ impl PuctNode {
 pub struct PuctPlayer {
     weights: MokaWeights,
     scratch: MokaScratch,
+    /// int8 weights + scratch — `None` for f32-only mode, `Some` when int8
+    /// forward path is enabled (Issue 206 T5). When present, `expand` uses
+    /// `forward_int8_with_scratch` instead of the f32 path. Only the K=1
+    /// sequential path supports int8 — batched MCTS (K>1) always uses f32
+    /// (batched int8 forward is not implemented).
+    weights_i8: Option<MokaWeightsInt8>,
+    scratch_i8: Option<MokaScratchInt8>,
     /// Batched scratch — only allocated if `batch_k > 1` (lazy, on first
     /// batched `select_move`). Sized for `batch_k`.
     batch_scratch: Option<MokaBatchScratch>,
@@ -134,10 +142,26 @@ impl PuctPlayer {
     /// guarantee). K>1 enables batched MCTS (virtual loss + leaf queue +
     /// batched forward pass).
     pub fn with_batch_k(budget: usize, c_puct: f32, top_k: usize, batch_k: usize) -> Self {
+        Self::with_options(budget, c_puct, top_k, batch_k, false)
+    }
+
+    /// Construct with int8 forward path enabled (Issue 206 T5).
+    ///
+    /// Uses platform-native int8 dot kernels (SDOT on aarch64, extmul on
+    /// wasm32). Only the K=1 sequential path supports int8 — if `batch_k > 1`,
+    /// int8 is silently ignored (batched MCTS always uses f32 forward).
+    pub fn with_int8(budget: usize, c_puct: f32, top_k: usize) -> Self {
+        Self::with_options(budget, c_puct, top_k, 1, true)
+    }
+
+    fn with_options(budget: usize, c_puct: f32, top_k: usize, batch_k: usize, use_int8: bool) -> Self {
         let k = batch_k.max(1);
+        let enable_int8 = use_int8 && k == 1;
         Self {
             weights: MokaWeights::load(),
             scratch: MokaScratch::new(),
+            weights_i8: enable_int8.then(MokaWeightsInt8::load),
+            scratch_i8: enable_int8.then(MokaScratchInt8::new),
             batch_scratch: (k > 1).then(|| MokaBatchScratch::new(k)),
             budget: budget.max(1),
             c_puct,
@@ -202,8 +226,11 @@ impl PuctPlayer {
         // no allocation happens here (Board is Copy, so parent_state was a
         // stack copy above — zero heap alloc in this hot path).
         moka::encode_features_into(&parent_state, &hist, &mut self.features_buf);
-        let (policy, value) =
-            moka::forward_with_scratch(&self.weights, &self.features_buf, &mut self.scratch);
+        let (policy, value) = if let (Some(w), Some(s)) = (self.weights_i8.as_ref(), self.scratch_i8.as_mut()) {
+            crate::moka_int8::forward_int8_with_scratch(w, &self.features_buf, s)
+        } else {
+            moka::forward_with_scratch(&self.weights, &self.features_buf, &mut self.scratch)
+        };
         self.nodes_evaluated += 1;
 
         self.expand_with_policy_value(node_idx, &policy, value);
@@ -741,5 +768,69 @@ mod tests {
             .count();
         assert!(visited_children >= 2,
             "virtual loss must cause diverse exploration: only {visited_children} root child(ren) visited (expected ≥2)");
+    }
+
+    // ── int8 PUCT tests (Issue 206 T5) ───────────────────────────────
+
+    #[test]
+    fn int8_puct_returns_a_legal_move_from_empty_board() {
+        let mut player = PuctPlayer::with_int8(50, 1.5, 8);
+        let board = Board::new();
+        let mv = player.select_move(&board);
+        assert!(mv.is_some(), "int8 PUCT on empty board should not pass");
+        assert!(board.is_legal(mv.unwrap()));
+        assert!(player.nodes_evaluated() > 0);
+    }
+
+    #[test]
+    fn int8_puct_search_is_deterministic_given_same_board() {
+        // Two searches from the same board must produce the same move —
+        // the int8 forward path is deterministic (no RNG in quantization).
+        let mut board = Board::new();
+        board.play(40);
+        board.play(41);
+
+        let mut p1 = PuctPlayer::with_int8(50, 1.5, 8);
+        let mv1 = p1.select_move(&board);
+
+        let mut p2 = PuctPlayer::with_int8(50, 1.5, 8);
+        let mv2 = p2.select_move(&board);
+
+        assert_eq!(mv1, mv2, "int8 PUCT must be deterministic");
+    }
+
+    /// G1 gate: int8 PUCT should produce the same move as f32 PUCT on
+    /// representative positions. This is the end-to-end version of
+    /// `moka_int8::g1_int8_matches_f32_baseline` — it checks that the
+    /// quantization noise doesn't change move selection through the full
+    /// MCTS search (not just the raw argmax).
+    #[test]
+    fn g1_int8_puct_matches_f32_move_selection() {
+        let positions: &[&[usize]] = &[
+            &[40, 41, 31, 50],
+            &[0, 1, 9, 10, 18],
+            &[80, 79, 71, 70],
+        ];
+
+        for &moves in positions {
+            let mut board = Board::new();
+            for &mv in moves {
+                if board.is_legal(mv) {
+                    board.play(mv);
+                }
+            }
+
+            let mut f32_player = PuctPlayer::new(50, 1.5, 8);
+            let f32_mv = f32_player.select_move(&board);
+
+            let mut i8_player = PuctPlayer::with_int8(50, 1.5, 8);
+            let i8_mv = i8_player.select_move(&board);
+
+            assert_eq!(
+                f32_mv, i8_mv,
+                "int8 PUCT move {:?} != f32 PUCT move {:?} on position after {:?}",
+                i8_mv, f32_mv, moves
+            );
+        }
     }
 }

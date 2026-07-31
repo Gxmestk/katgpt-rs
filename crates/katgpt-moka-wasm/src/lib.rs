@@ -202,6 +202,44 @@ impl WasmPuctPlayer {
     }
 }
 
+/// PUCT player with int8 forward path (Issue 206 T5). Same API as
+/// `WasmPuctPlayer` but uses platform-native int8 dot kernels for the
+/// forward pass. On aarch64 with dotprod, this is ~1.4× faster than f32;
+/// on WASM with simd128, ~2× is expected (WASM f32 has no FMA).
+#[wasm_bindgen]
+pub struct WasmPuctPlayerInt8 {
+    inner: puct::PuctPlayer,
+}
+
+#[wasm_bindgen]
+impl WasmPuctPlayerInt8 {
+    #[wasm_bindgen(constructor)]
+    pub fn new(budget: usize, c_puct: f32, top_k: usize) -> Self {
+        Self {
+            inner: puct::PuctPlayer::with_int8(budget, c_puct, top_k),
+        }
+    }
+
+    /// Run a PUCT search. See `WasmPuctPlayer::search` for the protocol.
+    pub fn search(&mut self, cells: &[u8], to_play: u8, ko_point: u32, consecutive_passes: u8) -> u32 {
+        let board = decode_board(cells, to_play, ko_point, consecutive_passes);
+        match self.inner.select_move(&board) {
+            Some(idx) => idx as u32,
+            None => 255,
+        }
+    }
+
+    pub fn nodes_evaluated(&self) -> usize {
+        self.inner.nodes_evaluated()
+    }
+}
+
+impl Default for WasmPuctPlayerInt8 {
+    fn default() -> Self {
+        Self::new(50, 1.5, 8)
+    }
+}
+
 impl Default for WasmPuctPlayer {
     fn default() -> Self {
         Self::new(50, 1.5, 8)
