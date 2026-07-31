@@ -19,6 +19,12 @@ pub mod moka;
 pub mod moka_int8;
 pub mod puct;
 
+// Issue 565 / Research 463: research hooks for the quant-error-LoRA PoC.
+// Native-only (never enabled for the WASM browser build). Exposes weight
+// accessors + a corrected forward pass for the riir-poc bench.
+#[cfg(feature = "research")]
+pub mod research;
+
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]

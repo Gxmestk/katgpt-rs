@@ -85,22 +85,22 @@ pub(crate) fn load_bias(tensors: &HashMap<String, TensorMeta>, bytes: &[u8], nam
     read_f32(bytes, meta.data_offset, count)
 }
 
-struct Wb {
-    w: Vec<f32>,
-    b: Vec<f32>,
+pub(crate) struct Wb {
+    pub(crate) w: Vec<f32>,
+    pub(crate) b: Vec<f32>,
 }
 
-struct GlobalBranch {
-    hidden: Wb,
-    output: Wb,
+pub(crate) struct GlobalBranch {
+    pub(crate) hidden: Wb,
+    pub(crate) output: Wb,
 }
 
-struct ResidualBlock {
-    reduce: Wb,
-    first: Wb,
-    global: Option<GlobalBranch>,
-    second: Wb,
-    expand: Wb,
+pub(crate) struct ResidualBlock {
+    pub(crate) reduce: Wb,
+    pub(crate) first: Wb,
+    pub(crate) global: Option<GlobalBranch>,
+    pub(crate) second: Wb,
+    pub(crate) expand: Wb,
 }
 
 pub struct MokaWeights {
@@ -440,6 +440,73 @@ impl MokaScratch {
 impl Default for MokaScratch {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+// ── Research accessors (Issue 565 / Research 463) ───────────────────────────
+// Behind the `research` feature: expose each weight+bias slice so the PoC
+// bench (in riir-poc) can build per-layer error matrices without
+// reimplementing the forward pass. The fields stay private in the default
+// build (the WASM browser path). These accessors are the minimal surface.
+#[cfg(feature = "research")]
+impl MokaWeights {
+    #[inline]
+    pub fn stem_w(&self) -> (&[f32], &[f32]) { (&self.stem.w, &self.stem.b) }
+    #[inline]
+    pub fn blocks_ref(&self) -> &[ResidualBlock] { &self.blocks }
+    #[inline]
+    pub fn policy_conv_w(&self) -> (&[f32], &[f32]) { (&self.policy_conv.w, &self.policy_conv.b) }
+    #[inline]
+    pub fn policy_linear_w(&self) -> (&[f32], &[f32]) { (&self.policy_linear.w, &self.policy_linear.b) }
+    #[inline]
+    pub fn value_conv_w(&self) -> (&[f32], &[f32]) { (&self.value_conv.w, &self.value_conv.b) }
+    #[inline]
+    pub fn value_hidden_w(&self) -> (&[f32], &[f32]) { (&self.value_hidden.w, &self.value_hidden.b) }
+    #[inline]
+    pub fn value_output_w(&self) -> (&[f32], &[f32]) { (&self.value_output.w, &self.value_output.b) }
+}
+
+#[cfg(feature = "research")]
+impl ResidualBlock {
+    #[inline]
+    pub fn reduce_w(&self) -> (&[f32], &[f32]) { (&self.reduce.w, &self.reduce.b) }
+    #[inline]
+    pub fn first_w(&self) -> (&[f32], &[f32]) { (&self.first.w, &self.first.b) }
+    #[inline]
+    pub fn second_w(&self) -> (&[f32], &[f32]) { (&self.second.w, &self.second.b) }
+    #[inline]
+    pub fn expand_w(&self) -> (&[f32], &[f32]) { (&self.expand.w, &self.expand.b) }
+    #[inline]
+    pub fn global_ref(&self) -> Option<&GlobalBranch> { self.global.as_ref() }
+}
+
+#[cfg(feature = "research")]
+impl GlobalBranch {
+    #[inline]
+    pub fn hidden_w(&self) -> (&[f32], &[f32]) { (&self.hidden.w, &self.hidden.b) }
+    #[inline]
+    pub fn output_w(&self) -> (&[f32], &[f32]) { (&self.output.w, &self.output.b) }
+}
+
+#[cfg(feature = "research")]
+impl MokaScratch {
+    /// Lend out the internal scratch buffers as mutable slices. The corrected
+    /// forward pass (`research::forward_corrected_with_scratch`) destructures
+    /// MokaScratch by field, so it needs `pub` field access OR these
+    /// accessors. We lend all buffers at once via a tuple to keep the borrow
+    /// checker happy (a single &mut borrow split into sub-slices).
+    #[inline]
+    pub fn lend_all(
+        &mut self,
+    ) -> (
+        &mut [f32], &mut [f32], &mut [f32], &mut [f32], &mut [f32], &mut [f32],
+        &mut [f32], &mut [f32], &mut [f32], &mut [f32], &mut [f32], &mut [f32],
+    ) {
+        (
+            &mut self.trunk, &mut self.expand, &mut self.hidden_a, &mut self.hidden_b,
+            &mut self.head4, &mut self.head2, &mut self.patch, &mut self.pooled,
+            &mut self.gh, &mut self.gbias, &mut self.value_h, &mut self.policy,
+        )
     }
 }
 
