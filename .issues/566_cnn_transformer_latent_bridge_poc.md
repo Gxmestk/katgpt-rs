@@ -57,6 +57,18 @@ forward variant that bypasses the embedding lookup for the prepended tokens.
 
 ## Tasks
 
+> **Design note on T2-T4 (calibration):** `CrossResolutionBases` projects
+> via a k-dim spectral intermediary using frozen PCA bases fit on PAIRED data.
+> For cross-game HLA transfer (the existing use case), both domains are HLA
+> (affect/emotion) states — comparable semantic spaces. For the CNN→Transformer
+> bridge, the source (Moka trunk = visual board patterns) and destination
+> (Gemma residual = language features) are DIFFERENT modalities. PCA finds the
+> LINEAR correlation between them, but there may be little linear correlation
+> to find across modality boundaries. T2-T4 will measure this empirically —
+> the correlation IS the signal. If it's near-zero, the modelless bridge is
+> confirmed unviable without training (the honest prediction). If it's
+> non-trivial, the PCA bridge carries real signal worth wiring.
+
 - [x] **T1** — Add `forward_tapping_trunk` to `katgpt-moka-wasm/src/research.rs`.
       Mirrors `forward_with_scratch` but copies the trunk buffer after a
       caller-specified block into an output slice. Gated behind `research`
