@@ -23,15 +23,13 @@ through the same weight slice doesn't reduce the total FLOP count.
   --enable-simd`. Without the SIMD flags the scalar fallback runs ~16×
   slower — ~500ms/move instead of ~30ms. The script exists because this
   regression was diagnosed the hard way during Issue 205.)
-- **Method:** setup-subtracted (reset+replay outside timing), N=10 samples
-  per config, mid-game position (8 stones played).
 - **Harness:** `crates/katgpt-moka-wasm/bench/bench_puct.js` (sequential vs
   batched at b50/b100/b200) + `bench_k_sweep.js` (K=1..50 at b50). Both
-  load the wasm-bindgen nodejs output via `require()` + V8 JIT.
-- **Harness:** `crates/katgpt-moka-wasm/bench/bench_puct.js` +
-  `bench_k_sweep.js` (committed; was `/tmp/moka-puct-205/` during the
-  initial investigation, moved in-tree by the hardening follow-up).
-  Build with `./scripts/build-moka-wasm.sh` before running.
+  load the wasm-bindgen nodejs output via `require()` + V8 JIT. (Was
+  `/tmp/moka-puct-205/` during the initial investigation; moved in-tree
+  by the hardening follow-up — commit `c7724491`.)
+- **Method:** setup-subtracted (reset+replay outside timing), N=10 samples
+  per config, mid-game position (8 stones played).
 
 ## K sweep at b50
 
