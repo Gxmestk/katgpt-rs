@@ -147,7 +147,7 @@ INTACT's `r = 0.954` correlation between predicted–expert **action-family kNN 
 | **Plan 341 (Sleep-Time)** | riir-ai | **DEFAULT-ON 2026-06-27** | Ships `z_i = c + dir_i` (INTACT's translation op) modellessly |
 | **Plan 296 (Induced CWM Kernel)** | katgpt-rs | **Shipped** | Frozen, BLAKE3-committed world model `advance(state, action)` — the deployment `F_ϕ` target |
 | **R168 + R359 + Plan 357 (Motor-Gated DEC)** | riir-ai / katgpt-rs | **Super-GOAT, shipped** | Offline-rehearsal policy head over a frozen spatial-field world model — the full INTACT capability (frozen model + amortized policy + optional verification) at NPC scale |
-| **Issue 565 (AdaLN-Zero + commit_window=1)** | riir-ai | **Open, blocked on R168 G7** | Already captures the actionable refinements from GC-IDM that apply to the Motor-Gated DEC consumer policy head |
+| **Issue 565 (AdaLN-Zero + commit_window=1)** | riir-ai | **✅ DONE (Plan 519, 2026-07-31; G7b PASS)** | Captured the actionable refinements from GC-IDM for the Motor-Gated DEC consumer policy head. File removed per noise-reduction rule; resolution lives in Plan 519 + R168 |
 
 ---
 
