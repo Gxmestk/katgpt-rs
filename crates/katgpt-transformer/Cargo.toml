@@ -118,3 +118,10 @@ gated_mlp = []
 # Opt-in — promotion requires Phase 6 real-model GOAT; MoE FFN is a model
 # architecture choice, not a modelless gain over existing substrate.
 transformer_moe = []
+
+# Attention Residual Block — Kimi-K3 block-residual softmax mixing.
+# Proposal 032 Phase 5 prerequisite, Research 330 §5. Implements the
+# `_apply_attn_res` mechanism that wraps around BOTH attention and MLP in
+# every decoder layer when `attn_res_block_size` is set. Opt-in —
+# promotion requires Phase 6 real-model GOAT.
+transformer_attn_res = []
