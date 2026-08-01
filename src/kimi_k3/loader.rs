@@ -212,14 +212,34 @@ fn load_mla_layer(
     let w_dkv: Vec<f32> = kv_a[..d_c * row_len].to_vec();
     let w_kr: Vec<f32> = kv_a[d_c * row_len..kv_a_rows * row_len].to_vec();
 
-    // Fused kv_b_proj: [n_h*(d_h + v_h), d_c] → split into w_uk [d_h*n_h, d_c] + w_uv [v_h*n_h, d_c]
-    // Verified shape: [1024, 128] = [8*(64+64), 128] ✓
+    // Fused kv_b_proj: [n_h*(d_h + v_h), d_c] → de-interleave into w_uk + w_uv.
+    //
+    // PyTorch nn.Linear(d_c, n_h*(d_h+v_h)) stores the weight as
+    // [n_h*(d_h+v_h), d_c]. The output features are laid out per-head:
+    //   row 0..d_h-1:           head 0 content key rows
+    //   row d_h..d_h+v_h-1:     head 0 value rows
+    //   row d_h+v_h..2d_h+v_h-1: head 1 content key rows
+    //   ...
+    //
+    // The Rust MLA forward expects w_uk [d_h*n_h, d_c] and w_uv [v_h*n_h, d_c]
+    // as BLOCK layouts (all keys first, all values second). So we must
+    // de-interleave the per-head [key, value] blocks.
     let kv_b = get_tensor!(st, &format!("{prefix}.kv_b_proj.weight"));
-    let uk_rows = d_h * n_h;
-    let uv_rows = v_h * n_h;
-    debug_assert_eq!(kv_b.len(), (uk_rows + uv_rows) * d_c, "kv_b_proj size mismatch");
-    let w_uk: Vec<f32> = kv_b[..uk_rows * d_c].to_vec();
-    let w_uv: Vec<f32> = kv_b[uk_rows * d_c..].to_vec();
+    let kv_b_row_len = d_c; // in_features
+    let kv_b_per_head_rows = d_h + v_h;
+    debug_assert_eq!(kv_b.len(), n_h * kv_b_per_head_rows * kv_b_row_len, "kv_b_proj size mismatch");
+    let mut w_uk = vec![0.0f32; d_h * n_h * d_c];
+    let mut w_uv = vec![0.0f32; v_h * n_h * d_c];
+    for head in 0..n_h {
+        let src_k_start = head * kv_b_per_head_rows * kv_b_row_len;
+        let src_v_start = src_k_start + d_h * kv_b_row_len;
+        let dst_k_start = head * d_h * d_c;
+        let dst_v_start = head * v_h * d_c;
+        w_uk[dst_k_start..dst_k_start + d_h * d_c]
+            .copy_from_slice(&kv_b[src_k_start..src_k_start + d_h * d_c]);
+        w_uv[dst_v_start..dst_v_start + v_h * d_c]
+            .copy_from_slice(&kv_b[src_v_start..src_v_start + v_h * d_c]);
+    }
 
     // q_a_proj: [d_qc, d] — verified shape [256, 1024] ✓
     let w_dq = get_tensor!(st, &format!("{prefix}.q_a_proj.weight"));
@@ -230,12 +250,28 @@ fn load_mla_layer(
     // kv_a_layernorm: [d_c] — verified shape [128] ✓
     let kv_a_norm_weight = get_tensor!(st, &format!("{prefix}.kv_a_layernorm.weight"));
 
-    // Fused q_b_proj: [n_h*(d_h + d_r), d_qc] → split into w_uq [d_h*n_h, d_qc] + w_qr [d_r*n_h, d_qc]
-    // Verified shape: [768, 256] = [8*(64+32), 256] ✓
+    // Fused q_b_proj: [n_h*(d_h + d_r), d_qc] → de-interleave into w_uq + w_qr.
+    //
+    // Same per-head interleaving as kv_b_proj:
+    //   row 0..d_h-1:        head 0 content query rows
+    //   row d_h..d_h+d_r-1:  head 0 rope query rows
+    //   ...
     let q_b = get_tensor!(st, &format!("{prefix}.q_b_proj.weight"));
-    let uq_rows = d_h * n_h;
-    let w_uq: Vec<f32> = q_b[..uq_rows * d_qc].to_vec();
-    let w_qr: Vec<f32> = q_b[uq_rows * d_qc..].to_vec();
+    let q_b_row_len = d_qc; // in_features
+    let q_b_per_head_rows = d_h + d_r;
+    debug_assert_eq!(q_b.len(), n_h * q_b_per_head_rows * q_b_row_len, "q_b_proj size mismatch");
+    let mut w_uq = vec![0.0f32; d_h * n_h * d_qc];
+    let mut w_qr = vec![0.0f32; d_r * n_h * d_qc];
+    for head in 0..n_h {
+        let src_q_start = head * q_b_per_head_rows * q_b_row_len;
+        let src_r_start = src_q_start + d_h * q_b_row_len;
+        let dst_q_start = head * d_h * d_qc;
+        let dst_r_start = head * d_r * d_qc;
+        w_uq[dst_q_start..dst_q_start + d_h * d_qc]
+            .copy_from_slice(&q_b[src_q_start..src_q_start + d_h * d_qc]);
+        w_qr[dst_r_start..dst_r_start + d_r * d_qc]
+            .copy_from_slice(&q_b[src_r_start..src_r_start + d_r * d_qc]);
+    }
 
     // o_proj: [d, v_h*n_h] — verified shape [1024, 512] ✓
     let w_o = get_tensor!(st, &format!("{prefix}.o_proj.weight"));
@@ -266,13 +302,32 @@ fn load_kda_layer(
 ) -> Result<KdaWeights, LoadError> {
     let prefix = format!("language_model.model.layers.{layer_idx}.self_attn");
 
+    // ShortConv1D weights need per-channel tap reversal.
+    //
+    // safetensors stores them as [D, 1, W] (PyTorch Conv1d format) where
+    // index W-1 is the NEWEST (current) sample tap and index 0 is the OLDEST.
+    // Rust's ShortConv1D expects weight[c*ks + 0] = newest, weight[c*ks + ks-1] = oldest.
+    //
+    // Without reversal, taps 0 and W-1 (and 1 and W-2, etc.) are swapped,
+    // causing the KDA attention output to diverge from the reference model.
+    let conv_kernel_size = 4usize; // from config: short_conv_kernel_size = 4
+
     Ok(KdaWeights {
         q_proj: get_tensor!(st, &format!("{prefix}.q_proj.weight")),
         k_proj: get_tensor!(st, &format!("{prefix}.k_proj.weight")),
         v_proj: get_tensor!(st, &format!("{prefix}.v_proj.weight")),
-        q_conv_weight: get_tensor!(st, &format!("{prefix}.q_conv1d.weight")),
-        k_conv_weight: get_tensor!(st, &format!("{prefix}.k_conv1d.weight")),
-        v_conv_weight: get_tensor!(st, &format!("{prefix}.v_conv1d.weight")),
+        q_conv_weight: reverse_conv_taps(
+            get_tensor!(st, &format!("{prefix}.q_conv1d.weight")),
+            conv_kernel_size,
+        ),
+        k_conv_weight: reverse_conv_taps(
+            get_tensor!(st, &format!("{prefix}.k_conv1d.weight")),
+            conv_kernel_size,
+        ),
+        v_conv_weight: reverse_conv_taps(
+            get_tensor!(st, &format!("{prefix}.v_conv1d.weight")),
+            conv_kernel_size,
+        ),
         a_log: get_tensor!(st, &format!("{prefix}.A_log")),
         f_a_proj: get_tensor!(st, &format!("{prefix}.f_a_proj.weight")),
         f_b_proj: get_tensor!(st, &format!("{prefix}.f_b_proj.weight")),
@@ -282,6 +337,21 @@ fn load_kda_layer(
         o_norm_weight: get_tensor!(st, &format!("{prefix}.o_norm.weight")),
         o_proj: get_tensor!(st, &format!("{prefix}.o_proj.weight")),
     })
+}
+
+/// Reverse per-channel taps in a flattened Conv1d weight tensor.
+///
+/// Input: `[n_channels * kernel_size]` stored as [D, 1, W] (oldest-to-newest per channel).
+/// Output: `[n_channels * kernel_size]` stored as newest-to-oldest per channel.
+///
+/// This converts PyTorch Conv1d weight layout to Rust ShortConv1D's expected layout.
+fn reverse_conv_taps(mut weights: Vec<f32>, kernel_size: usize) -> Vec<f32> {
+    let n_channels = weights.len() / kernel_size;
+    for c in 0..n_channels {
+        let start = c * kernel_size;
+        weights[start..start + kernel_size].reverse();
+    }
+    weights
 }
 
 /// Load dense MLP weights for layer 0.
