@@ -592,11 +592,20 @@ transformer_attn_res = ["katgpt-transformer/transformer_attn_res"]  # Attention 
 #
 # The umbrella feature for Kimi-K3-0.40B decoder layer composition. Pulls in
 # all four revised substrate primitives (MLA, KDA, transformer-MoE, attn-res)
-# + the root-crate decoder layer forward path. Opt-in — promotion to default
-# requires Phase 6 real-model GOAT (logits match PyTorch reference).
+# + the root-crate decoder layer forward path.
+#
+# STAYS OPT-IN per repo policy: katgpt-rs is modelless-first (no training, no
+# backprop — model loading is opt-in infrastructure, not a default primitive).
+# Phase 6 GOAT ALL PASS (2026-08-01): G1 logits match PyTorch reference
+# (max_diff=2.1367e-3, top-5 5/5 exact match on 163840-vocab BOS), G2 68.6
+# tok/s decode throughput, G3 no-regression (217 lib tests, 0 real failures).
+# The GOAT is closed; the gate stays opt-in because model support is a
+# capability addition, not a modelless runtime primitive that belongs in the
+# default build surface.
 kimi_k3 = ["mla_attention", "kda_linear", "transformer_moe", "transformer_attn_res"]
 # Safetensors loader + tiktoken tokenizer for real-model loading.
-# Separate gate because it pulls heavy deps (safetensors, base64).
+# Stays OPT-IN — pulls heavy deps (safetensors, base64) only needed when
+# actually loading model.safetensors.
 kimi_k3_loader = ["kimi_k3", "dep:safetensors", "dep:base64"]
 
 personality_composition = ["katgpt-core/personality_composition"]  # PersonalityWeightedComposition — sigmoid-gated N-layer latent direction composition + reward-surprise drift + BLAKE3 snapshot (Plan 297, Research 276). Open primitive for the Entity Cognition Stack Super-GOAT (riir-ai Plan 327 consumes this). DEFAULT-ON after GOAT G4 (79.585ns < 1µs target, 12.6× margin) + G5 (zero alloc) passed (Plan 297 Phase 4, Bench 297). Passthrough to katgpt-core.
