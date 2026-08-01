@@ -5,6 +5,8 @@
 **Verdict:** GOAT — Default-On for inference, high-gain for speculative decoding quality
 **Target:** Modelless (katgpt-rs) primary, Model-based (riir-ai) secondary
 
+> **PASS-Redirects (synthesis):** "World Model Anomaly Detection with a Latent Linear Prior" [TMLR openreview VLIzLK3CfR] — LP-DreamerV3 enforces a linear prior A on successive latent states z_{t+1}≈A·z_t and flags imagined states whose transition residual exceeds a threshold as delusional, suppressing their contribution to value learning. This note (NextLat) already distills the "lightweight model predicting next latent state from (h_t, x_{t+1})" artifact for inference-time use; LP-Dreamer's residual-as-anomaly-signal is the same prediction-error-as-curiosity-trigger pattern (R243/Plan 277 Temporal Deriv Kernel, DEFAULT-ON) and `ReestimationScheduler` coherence<tau_reest (R360 §3.1). PASS: inference-time anomaly detection on successive latent states ships across our stack; the value-update-suppression gate in imagined rollouts is the MBRL-training half (→ riir-train).
+
 ---
 
 ## Executive Summary

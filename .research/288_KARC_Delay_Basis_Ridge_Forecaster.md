@@ -10,6 +10,7 @@
 > **Related Plans:** katgpt-rs 308 (this research's open primitive)
 > **Classification:** Public (katgpt-rs = open math primitive); the *selling-point guide* is private in riir-ai.
 > **Verdict: Super-GOAT — the fusion (delay-embedding × basis expansion × closed-form ridge × per-NPC HLA trajectory forecaster × LatCal commitment × KarcShard freeze) is a new capability class with no shipped prior art for the COMBINATION.**
+> **PASS-Redirects (synthesis):** "World Model Anomaly Detection with a Latent Linear Prior" [TMLR openreview VLIzLK3CfR, code: anonymous.4open.science/r/lp-dreamer] — LP-DreamerV3's "linear prior A on successive latent states" is exactly the KARC forecast (this note's `Wout·φ(z_t)` linear model). The paper's residual-based anomaly detector `‖z_{t+1}−A·z_t‖>τ` is already wired as `mcts_collapse_bridge` (`‖MCTS_rollout−KARC_forecast‖>τ`, Bench 152) + `ReestimationScheduler` coherence<tau_reest. PASS: KARC is the linear prior; the imagined-rollout anomaly detection ships; only the value-update-suppression-in-MBRL-training half is new (→ riir-train if we ever ship DreamerV3-style value backups from imagination).
 
 ---
 
