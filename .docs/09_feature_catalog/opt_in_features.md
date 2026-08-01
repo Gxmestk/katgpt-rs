@@ -1991,6 +1991,9 @@ A consolidated section for standalone opt-in features with their own plans but n
 | `sphere_sampling` | Issue 544 | Sphere Sampling — modelless primitives for sampling from unnormalized densities on S^{d-1}. Opt-in pending defend-wrong PoC. |
 | `newton_schulz` | 152 | Newton-Schulz orthogonalization + Muon momentum. NOT in katgpt-core `default`; root's default-on forwarder activates it. |
 | `binary_plasma` | Issue 145 | Binary {−1,+1} plasma tier |
+| `rt_turbo` | 126 | RTPurbo retrieval head sparse decode via low-dim indexing (root-level opt-in; implies `dash_attn`) |
+| `spec_compile` | — | Full spec compilation suite — SpecAsPruner + SpecAsMarginals + SpecDFA + SpecProof + SpecChain (root-level opt-in; implies `spec_pruner`) |
+| `stokes_calculus` | 314 | Stokes Calculus Wrappers — belief_mass_divergence + boundary_flux_mass + line_integral + circulation_integral (root alias for `katgpt-core/dec_operators`). Stays opt-in — see [negative_results §35](negative_results.md#35-stokes-calculus-wrappers---g-c-structural-fail--g-a-runtime-fail-stays-opt-in) for G-C/G-A FAIL details. |
 
 ### Speculative decoding substrate markers
 

@@ -705,3 +705,27 @@ Root cause: DashAttention's entmax routing is already a strong sparse-attention 
 **Outcome.** G1 FAIL → do NOT promote. Stays opt-in as a diagnostic metric for future embeddings where ordinal concordance is the dominant signal and noise is low. NOT UQ-bearing — the "Report the Floor" rule does not apply.
 
 **Lesson.** A better *matching* metric is not necessarily a better *retrieval* metric. When a paper's headline gain is on a matching task (STS), verify the gain transfers to a discrimination task (retrieval/ranking) before promoting. The monotonic-concordance capture range that helps matching can inflate distractor scores and hurt discrimination.
+
+## 35. Stokes Calculus Wrappers — G-C STRUCTURAL FAIL + G-A Runtime FAIL (STAYS OPT-IN)
+
+**Plan:** [314](../../.plans/314_stokes_calculus_wrappers.md) · **Bench:** [314](../../.benchmarks/314_stokes_calculus_goat.md) · **Feature:** `stokes_calculus` (opt-in root alias for `katgpt-core/dec_operators`)
+
+**What it is.** Four Stokes-theorem wrappers on top of the DEC operators (§55): `belief_mass_divergence` (Fokker-Planck validator), `boundary_flux_mass` (region mass from boundary flux), `line_integral` (trajectory energy), `circulation_integral` (turn-count via rank-2 cochain). The headline claim was that line-integral smoothness would serve as a path-quality metric for NPC navigation.
+
+**Gate results (3 gates, 1 PASS + 2 FAIL):**
+
+| Gate | Target | Result | Status |
+|---|---|---|---|
+| **G-B** (boundary-flux mass) | ≥3× faster, error < 5% | **5.36× faster**, error 3.78% | ✅ **PASS** |
+| **G-C** (line integral) | ≥20% fewer reversals | discriminates paths (Δ=1.872) but **cannot encode turn penalties** | ⚠️ **STRUCTURAL FAIL** |
+| **G-A** (Fokker-Planck) | ≥1.5× earlier / ≥2× cheaper | riir-ai Plan 334: **9.5× slower, 36% lower F1** | ❌ **FAIL** |
+
+**Root cause (G-C).** Rank-1 cochains (scalar fields on edges) cannot encode turn count — the line integral along a path is independent of how many times the path turns. The `circulation_integral` was added to address this (rank-2 cochain encoding orientation), but the structural limitation holds for the rank-1 `line_integral` primitive. This was confirmed empirically: `line_integral` discriminates paths by length (Δ=1.872) but not by turn structure.
+
+**Root cause (G-A).** The Fokker-Planck validator (`belief_mass_divergence`) was measured in riir-ai Plan 334 against live HLA branching events. It was 9.5× slower than the direct event scan and produced 36% lower F1 — the divergence signal correlates with branching but doesn't improve detection quality over the simpler direct scan.
+
+**Outcome.** Stays opt-in. The 4 primitives are all correct (15 unit tests, Stokes identities hold by construction); the boundary-flux mass (G-B) is a genuine 5.36× perf win. But the headline claims (line-integral path quality, Fokker-Planck anomaly detection) don't hold empirically.
+
+**Lesson.** When the mathematical identity holds (Stokes' theorem is proven), the question is whether the *application* of that identity produces a downstream quality gain. A correct theorem ≠ a useful feature. The boundary-flux-as-region-mass trick works because it's purely computational (O(boundary) vs O(volume)); the Fokker-Planck-as-anomaly-detector fails because divergence correlation is weaker than direct event scanning.
+
+📖 Feature: `stokes_calculus` (opt-in; root alias for `katgpt-core/dec_operators`).
