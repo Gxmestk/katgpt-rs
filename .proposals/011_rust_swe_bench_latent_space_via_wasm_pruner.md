@@ -18,7 +18,9 @@ This is the **moka pattern applied to SWE**: Benchmark 205 brought the Go game I
 - **Proposal 009** (Canonical Intent Space) — projects the fix direction into any model's latent space via `ModelAdapter`.
 - **Proposal 032** (riir-ai, Kimi-K3 Native Support) — the model being validated. Phase 6 GOAT gate currently only tests "logits match PyTorch ref on a fixed prompt" — a weak numerical-correctness test. Rust-SWE-bench as a WASM pruner would provide a **functional correctness test** that exercises real Rust semantics inside the inference loop.
 
-**Honest verdict: HIGHLY SPECULATIVE — same risk class as Proposal 010.** The proposal exists to establish the architectural path so it can be evaluated and potentially rejected with reasoning, NOT because it is likely to succeed. The #1 risk is whether rubrc (WIP) can actually compile real Rust-SWE-bench test suites to WASM. The #2 risk is whether a 0.40B model has enough capability to propose patches that the WASM pruner can meaningfully validate.
+**Honest verdict: SPECULATIVE on Layer 3 (rubrc blocker), but MODELLESS-VALIDATED on Layer 4 (trajectory freeze/thaw uses shipped DEFAULT-ON substrate).** The proposal originally had three layers; a fourth was added after the modelless reframe (2026-08-01): **the test-feedback-driven inference loop's latent trajectory is itself a freezable artifact.** CUCG (Plan 333) already proved the Super-GOAT headline that "trajectory compaction and shard freeze are the same primitive" (G7 isomorphism). `committed_field_blend` (FAME, Plan 321) already computes BLAKE3-committed weights from a trajectory summary. `tf_loop` (Plan 136, DEFAULT-ON) already runs the recursive forward pass. So even if Layer 3 is blocked by rubrc AND the 0.40B model can't resolve any task, Layer 4 still produces measurable signal: the trajectory of *failed* attempts has geometry (curvature, drift, oscillation vs committed-wrong) that can be frozen and compared across snapshots. **The R463 caveat ("storage format ≠ capability") FLIPS under this reframe** — geometry is always measurable, even with zero passing patches.
+
+**riir-train fallback is explicitly allowed.** Fine-tuning/LoRA on passing patches (if any exist) is a valid fallback path — riir-train ships adapter training. The modelless Layer 4 path is the PRIMARY (no backprop, uses shipped substrate); riir-train is the FALLBACK if modelless signal extraction proves insufficient. Per the modelless-first mandate, Layer 4 must be exhausted before deferring to riir-train.
 
 ## The problem this solves
 
@@ -112,6 +114,26 @@ The moka pattern (Benchmark 205) showed that bringing the benchmark INTO the mod
 - The PUCT analogy: just as PUCT search used Moka's policy/value heads to explore + evaluate moves, the inference loop uses the WASM pruner to explore + validate patches.
 - This layer is **HIGHLY SPECULATIVE** — depends on rubrc maturity, WASM compilability of real Rust test suites, and the 0.40B model's capability.
 
+**Layer 4 — Trajectory freeze/thaw (the modelless reframe — uses SHIPPED DEFAULT-ON substrate):**
+
+The key insight: **even if Layer 3 is blocked (rubrc) and the model proposes zero valid patches, the inference loop's trajectory through patch-space is itself a freezable artifact.** The trajectory has geometry — which patches were tried, in what order, how the latent state evolved, curvature, drift, oscillation vs commitment. That geometry can be frozen and compared across snapshots. This layer is NOT speculative — it composes already-shipped, GOAT-proven, DEFAULT-ON primitives:
+
+| Step | Primitive | What it does | Status |
+|---|---|---|---|
+| 1. Run recursive forward pass | `tf_loop` (Plan 136) | ODE-motivated damped sub-stepping, K-stage RK, cache size independent of K | **DEFAULT-ON**, GOAT 034 PASS |
+| 2. Measure trajectory geometry | `latent_trajectory_geometry` (Plan 342) | Length, curvature, drift, bifurcation ratio on latent state chains | G1-G5 ALL PASS |
+| 3. Detect compaction points | `closed_unit_compaction` (CUCG, Plan 333) | Fires at structurally-safe moments (closed-unit ∧ summarizable ∧ progress ∧ ¬stuck). A test pass = a compaction candidate. | **DEFAULT-ON**, G7: trajectory compaction = shard freeze (isomorphism proven) |
+| 4. Freeze trajectory summary | `committed_field_blend` (FAME, Plan 321) | Frozen sigmoid blend computed ONCE from trajectory summary + BLAKE3-committed. Sampling-invariant (FAME Prop. 3). | **DEFAULT-ON**, G1-G5 ALL PASS |
+| (alt 4) Ridge fit from trajectory | `KarcShard` (Plan 308) | `Wout` bit-reproducible from trajectory; freeze = commit `(basis_config, k, λ, A, B)` | Plan 308 shipped |
+| 5. Store frozen artifact | `MerkleFrozenEnvelope` (riir-neuron-db) | BLAKE3-checked atomic snapshot | shipped |
+| 6. Self-healing swap | `reestimation.rs` (riir-ai latent_functor) | Coherence-driven re-estimation when coherence < tau_reest. Drift-triggered swap. | shipped |
+
+**The CUCG G7 clincher:** Plan 333 already proved "trajectory compaction and shard freeze are the same primitive" — `can_freeze` isomorphism across all 4 combos. This is *literally* the claim that "loop and save the trajectory" = "freeze/thaw". The isomorphism is proven by construction, not speculated.
+
+**The flipped R463 caveat:** The original R463 lesson ("storage format ≠ capability") said: if the model can't propose valid patches, the WASM pruner rejects everything, and there's no signal. Under the Layer 4 reframe, this FLIPS: the trajectory geometry is **always measurable**, even with zero passing patches. A trajectory of failed attempts still has shape — oscillation (high curvature, model can't commit), drift (rotating through wrong answers), committed-wrong (low curvature but wrong). That geometry is freezable and comparable across snapshots. This is strictly more information than the pass/fail-only signal.
+
+**riir-train fallback (Layer 4b):** If modelless Layer 4 proves insufficient (e.g., trajectory geometry has no discriminative signal across snapshots), the explicit fallback is riir-train: LoRA fine-tune on whatever passing patches exist. riir-train ships adapter training. This is allowed — the modelless-first mandate says exhaust modelless paths FIRST, not "never train". Layer 4 is the modelless exhaustion step; Layer 4b is the documented deferral.
+
 ### The WasmPruner ABI extension
 
 The existing `BomberWasmPruner` ABI is:
@@ -150,11 +172,11 @@ This is the SpeculativeGenerator + ConstraintPruner pattern (katgpt-rs's core ar
 
 2. **Rust-SWE-bench repos are large.** Average: 993 files, 128K lines. The largest (bevy) is 15K files, 753K lines. Compiling these to WASM may be intractable. Mitigation: the WASM pruner only needs the **test logic + the code under test**, not the entire repo. A subset extraction step (identify which files the test patch touches, compile only those) would reduce scope.
 
-3. **The 0.40B model may not have enough capability.** RustForger (with Claude-Sonnet-3.7, a much larger model) achieves only 28.6% resolution. A 0.40B distillation will be dramatically weaker. The WASM pruner may reject everything the model proposes. **This is the #2 risk.** Mitigation: the goal is NOT to match RustForger's resolution rate. The goal is to measure whether the model's latent representations are coherent on real Rust code (Layer 2) and whether the in-loop validation pattern works at all (Layer 3 — a POC on a tiny subset).
+3. **The 0.40B model may not have enough capability (DOWNGRADED — no longer a hard blocker).** RustForger (with Claude-Sonnet-3.7, a much larger model) achieves only 28.6% resolution. A 0.40B distillation will be dramatically weaker. **Under the original 3-layer design, this was the #2 risk.** Under the 4-layer modelless reframe (Layer 4), this is DOWNGRADED: even if the model proposes zero valid patches, the trajectory geometry is still measurable + freezable (see Layer 4 above). The research value holds regardless of resolution rate. **The remaining risk is whether trajectory geometry has discriminative signal across snapshots** — i.e., do different models/snapshots produce measurably different failure-trajectory shapes? This is a POC question (Plan 566 Phase 1), not a blocker. Mitigation if no signal: riir-train fallback (Layer 4b — LoRA fine-tune on whatever passing patches exist).
 
 4. **WASM compilation of test suites with external dependencies may fail.** Many Rust-SWE-bench repos use crates that don't compile to `wasm32-unknown-unknown` (e.g., crates using `std::process`, file I/O, networking). Mitigation: filter tasks to those whose test suites are WASM-compatible (no `std::process`, no networking, no filesystem). This likely reduces the 500-task corpus significantly, but even 50 WASM-compatible tasks would be a useful POC.
 
-5. **The "resolution in latent space" claim (Thread C) is unproven.** SWE resolution has no closed-form win condition like Go's territory score. The honest version of Layer 3 is "in-loop validation via WASM pruner" (the pruner gives pass/fail feedback), NOT "latent-space resolution" (the latent state magically contains the fix). The R463 lesson applies: "storage format ≠ capability" → "WASM in-loop validation ≠ resolution capability." If the model can't propose a valid patch, the pruner will reject it regardless of whether validation is in-loop or external.
+5. **The "resolution in latent space" claim (Thread C) is unproven — but Layer 4 reframes it.** SWE resolution has no closed-form win condition like Go's territory score. The honest version of Layer 3 is "in-loop validation via WASM pruner" (the pruner gives pass/fail feedback), NOT "latent-space resolution" (the latent state magically contains the fix). The R463 lesson applies to Layer 3: "storage format ≠ capability" → "WASM in-loop validation ≠ resolution capability." **BUT Layer 4 flips the R463 caveat**: the trajectory geometry is always measurable, even on failed attempts. The claim is NOT "the trajectory contains the fix" — it's "the trajectory has shape that distinguishes models/snapshots, and that shape is freezable." This is a weaker but honest claim that doesn't require resolution.
 
 6. **This is architecturally adjacent to Proposal 010's speculation level.** P010's verdict: "HIGHLY SPECULATIVE... exists because it's the ONLY remaining path, not because it's likely to succeed." This proposal inherits that risk. If P010's G5 (cross-arch agreement) fails, the source-feature directions are meaningless, and Layer 1's "fix directions" are noise. Layer 3 can still work as a pure WASM-pruner POC (independent of P010), but the fusion value collapses.
 
@@ -162,7 +184,7 @@ This is the SpeculativeGenerator + ConstraintPruner pattern (katgpt-rs's core ar
 
 ## Fusion lineage
 
-This proposal combines **five** existing substrate pieces + **one** external dependency + **one** benchmark dataset:
+This proposal combines **five** existing substrate pieces + **one** external dependency + **one** benchmark dataset + **the Layer 4 modelless reframe substrate (six additional shipped primitives)**:
 
 1. **`WasmPruner` / `BomberWasmPruner`** (`katgpt-pruners/src/hot_swap.rs`, `src/pruners/bomber/wasm_pruner.rs`) — the WASM-module-as-ConstraintPruner substrate. Fuel-limited, sandboxed, papaya instance pool, zero-copy state buffer, batch API. This is the load-bearing substrate for Layer 3.
 2. **`SpecAsPruner`** (`katgpt-pruners/src/spec_compile/`) — compiles NL specs into symbolic bitmap rules. Layer 1's "fix direction" is a symbolic rule compiled from source features, not a neural adapter. This is the ideological ancestor.
@@ -182,8 +204,10 @@ This proposal does NOT request default-on promotion. It requests **research vali
 | Layer | Feature flag | G1 correctness | G2 perf | G3 no-reg | G4 alloc | G5 (decisive) |
 |---|---|---|---|---|---|---|
 | 1 (corpus) | `swe_bench_corpus` | source-feature extraction deterministic (BLAKE3) | AST histogram on 10K-line crate < 1s (same as P010) | opt-in, no default impact | projection apply zero-alloc | **fix directions correlate with ground-truth patches** (threshold TBD) |
-| 2 (functional test) | `kimi_k3_swe_probe` | latent extraction matches PyTptorch ref attention pattern | forward pass on 500 tasks < 60s total | existing P032 tests pass | per-task latent extraction alloc-free | **attention highlights issue-relevant code regions** (measurable via attention-rollout correlation with ground-truth fix locations) |
+| 2 (functional test) | `kimi_k3_swe_probe` | latent extraction matches PyTorch ref attention pattern | forward pass on 500 tasks < 60s total | existing P032 tests pass | per-task latent extraction alloc-free | **attention highlights issue-relevant code regions** (measurable via attention-rollout correlation with ground-truth fix locations) |
 | 3 (WASM pruner) | `swe_bench_wasm_pruner` | WASM module produces same pass/fail as cargo test | WASM validation < 100ms per patch (vs seconds for cargo) | existing WasmPruner tests pass | sandbox state buffer reused | **in-loop validation prunes more invalid patches than no-validation baseline, improving resolution rate on a WASM-compatible subset** |
+| **4 (trajectory freeze)** | `swe_trajectory_freeze` | trajectory geometry extraction deterministic (BLAKE3 on summary) | geometry measurement < 5µs per trajectory (matches Bench 342) | opt-in, no default impact; composes shipped primitives only | freeze/thaw zero-alloc hot path (CUCG G4) | **trajectory geometry discriminates across snapshots/models** — different models produce measurably different failure-trajectory shapes (curvature, drift, oscillation). **The load-bearing POC**: even with zero passing patches, the geometry is freezable + comparable. |
+| **4b (riir-train fallback)** | (riir-train) | LoRA training reproducible | training run completes | N/A (separate repo) | N/A | **LoRA fine-tune on passing patches improves resolution rate** vs no-fine-tune baseline. Only if Layer 4 G5 shows insufficient signal. |
 
 **No "Report the Floor" rule applies** — this is not a UQ-bearing primitive (no probability distribution / coverage claim).
 
@@ -196,8 +220,9 @@ This proposal does NOT request default-on promotion. It requests **research vali
 - `RustSweBenchCorpus` loader (reads the 500-task dataset, filters by WASM-compatibility heuristic).
 - `source_features` extraction adapter (P010 integration — uses P010's AST histogram on buggy + fixed code to compute fix directions).
 - `SweBenchWasmPruner` (Layer 3 — extends `WasmPruner` with the `is_patch_valid` ABI). Behind `swe_bench_wasm_pruner` feature.
-- G1/G2/G4 gates on extraction + WASM validation.
-- **G5 runs in riir-ai** (needs Kimi-K3 loaded).
+- **`SweTrajectoryFreezer`** (Layer 4 — composes `tf_loop` + `latent_trajectory_geometry` + `committed_field_blend` + `MerkleFrozenEnvelope`). Behind `swe_trajectory_freeze` feature. The modelless path that works even when Layer 3 is blocked.
+- G1/G2/G4 gates on extraction + WASM validation + trajectory freeze.
+- **G5 runs in riir-ai** (needs Kimi-K3 loaded for Layers 2/3; Layer 4 can POC on synthetic trajectories first).
 
 ### Deferred — riir-ai
 - Kimi-K3 latent extraction on Rust-SWE-bench tasks (Layer 2 functional test).
@@ -209,9 +234,11 @@ This proposal does NOT request default-on promotion. It requests **research vali
 
 ### Explicitly NOT shipped by this proposal
 - **A competing SWE agent** — this is NOT "build our own RustForger." The goal is latent-space validation, not agent resolution rate competition.
-- **Training on Rust-SWE-bench** — modelless-first mandate. If the 0.40B model can't resolve tasks, the answer is "needs training" (→ riir-train), NOT "train on the benchmark."
 - **Default-on promotion** — this is research validation. Promotion (if G5 passes) requires a separate proposal.
 - **Full 500-task WASM compilation** — even if rubrc works, compiling all 500 tasks' test suites is a massive effort. The POC targets a WASM-compatible subset (estimated 50-100 tasks after filtering).
+
+### riir-train fallback (Layer 4b — ALLOWED, not blocked)
+The original draft said "Training on Rust-SWE-bench — modelless-first mandate." That was too absolute. **Fine-tuning/LoRA via riir-train is an explicit allowed fallback** (riir-train ships adapter training). The modelless-first mandate says exhaust modelless paths FIRST (Layer 4), not "never train." If Layer 4's G5 shows trajectory geometry has insufficient discriminative signal, the documented deferral is: LoRA fine-tune on whatever passing patches exist (Layer 4b). This is the §3.5 modelless-unblock protocol applied honestly — Layer 4 is the exhaustion step; Layer 4b is the deferral with explicit documentation of why modelless was insufficient.
 
 ## Phased rollout (sketch — a plan would expand this)
 
@@ -242,13 +269,26 @@ This proposal does NOT request default-on promotion. It requests **research vali
 - [ ] T4.3 PUCT-style search: combine WASM pruner feedback + policy prior + value estimate
 - [ ] T4.4 Full GOAT gate + honest negative result if it fails
 
+### Phase 5 — Layer 4 trajectory freeze (MODELLESS — runnable independently of Phase 3)
+
+> **This phase does NOT depend on rubrc.** It composes shipped DEFAULT-ON primitives. It can run on synthetic trajectories first (no Kimi-K3 needed), then on real model trajectories once P032 Phase 5 ships. This is the cheapest validation path.
+
+- [ ] T5.1 **POC (synthetic): does trajectory geometry discriminate?** Construct synthetic pass/fail trajectories (mimicking SWE attempt patterns: oscillation, drift, committed-wrong). Run `latent_trajectory_geometry` on them. Question: do different failure modes produce measurably different geometry (curvature, drift angle)? Even a NEGATIVE result (no discrimination) is valuable — it means trajectory geometry alone is insufficient signal.
+- [ ] T5.2 **POC (synthetic): does CUCG evaluate() fire on test-pass events?** Construct synthetic test-pass sequences. Run CUCG `evaluate()`. Question: does a test pass qualify as a closed unit (closed-unit ∧ summarizable ∧ progress ∧ ¬stuck)?
+- [ ] T5.3 **POC (synthetic): committed_field_blend from failure trajectory.** Run FAME on a synthetic all-fail trajectory summary. Question: does it produce a stable, BLAKE3-committable, sampling-invariant blend even with zero positive examples?
+- [ ] T5.4 **POC (real, gated on P032 Phase 5): trajectory geometry on real Kimi-K3 SWE attempts.** Run tf_loop on Rust-SWE-bench tasks with Kimi-K3. Extract trajectory geometry. Compare across model snapshots. Question: do different snapshots produce measurably different failure-trajectory shapes?
+- [ ] T5.5 `SweTrajectoryFreezer` impl — composes tf_loop + latent_trajectory_geometry + committed_field_blend + MerkleFrozenEnvelope. Behind `swe_trajectory_freeze` feature.
+- [ ] T5.6 Layer 4 G5 gate: trajectory geometry discriminates across snapshots/models.
+- [ ] T5.7 If G5 FAILS → document why modelless was insufficient, file Layer 4b (riir-train LoRA fallback) with explicit §3.5 documentation.
+- [ ] T5.8 If G5 PASSES → the modelless path is validated. Layer 3 (WASM pruner) becomes an enhancement, not a dependency.
+
 ## Risks
 
 1. **rubrc dependency/proc-macro blocker (highest, upgraded).** Verified 2026-08-01 via the rubrc README: external dependencies + procedural macros are unsupported. ALL 34 Rust-SWE-bench repos have external deps + most use proc-macros (serde/clap/tokio/bevy derives). The rubrc-compilable subset is near-zero today. Layer 3 via rubrc is blocked until rubrc adds dependency support (timeline unknown). Mitigation: Phase 3 T3.1 (hand-compiled WASM module) proves the ABI without rubrc. If the hand-compiled POC shows the pattern works, the question becomes "when does rubrc unblock deps?" not "does the architecture work?".
 
 2. **WASM-compatibility filtering reduces corpus severely.** Many Rust-SWE-bench tasks have test suites with external deps (tokio, filesystem, networking) that don't compile to wasm32. The WASM-compatible subset may be < 50 tasks. Mitigation: even a small subset proves the pattern; scaling is a follow-up.
 
-3. **0.40B model capability ceiling.** The model may not propose any valid patches, making the WASM pruner reject everything. Mitigation: Layer 2 (functional test) measures internal coherence regardless of output quality — it's the mechanistic-interpretability angle, not the resolution-rate angle.
+3. **0.40B model capability ceiling (DOWNGRADED — Layer 4 reframes this).** The model may not propose any valid patches, making the WASM pruner reject everything. Under the original 3-layer design this was the #2 risk. Under the 4-layer modelless reframe, this is DOWNGRADED: trajectory geometry is measurable even on failed attempts (Layer 4). The remaining risk is whether trajectory geometry has discriminative signal across snapshots — a POC question (Phase 5 T5.1), not a blocker. Mitigation: riir-train LoRA fallback (Layer 4b) if modelless proves insufficient.
 
 4. **Source features too coarse (inherited from P010).** If P010's G5 (cross-arch agreement) fails, the fix directions are noise. Mitigation: Layer 3 (WASM pruner) works independently of P010 — it validates patches against real test logic, regardless of whether the source-feature direction is meaningful.
 
@@ -256,14 +296,17 @@ This proposal does NOT request default-on promotion. It requests **research vali
 
 6. **Dataset licensing.** Rust-SWE-bench is CC-BY 4.0 (academic). Using it as a probe corpus in a commercial product needs license review. Mitigation: the corpus is used for adapter fitting (setup-time, not shipped), and the WASM pruner modules are derived artifacts. Legal review before any production use.
 
+7. **Layer 4 trajectory geometry may have no discriminative signal (NEW).** The core Layer 4 hypothesis is that different models/snapshots produce measurably different failure-trajectory shapes (curvature, drift, oscillation vs committed-wrong). This may be FALSE — all failure trajectories may look the same (high entropy, no structure). Mitigation: Phase 5 T5.1 tests this on synthetic data first (cheapest). If the synthetic POC shows discrimination is possible in principle, T5.4 tests on real model trajectories. If T5.1 shows NO discrimination even in principle, Layer 4 is demoted and the proposal falls back to Layer 1 + Layer 2. **A negative result here is valuable** — it documents that trajectory geometry alone is insufficient, motivating the riir-train LoRA path (Layer 4b).
+
 ## Out of scope
 
 - **Building a competing SWE agent.** This is latent-space validation, not "our RustForger."
-- **Training on Rust-SWE-bench.** Modelless-first mandate. Training → riir-train.
 - **Cross-language SWE benchmarks.** Rust-only (the source features + rubrc are Rust-specific).
 - **Full 500-task WASM compilation.** POC on a WASM-compatible subset first.
 - **Default-on promotion.** Research validation only.
 - **Production steering runtime.** The adapter fit + WASM validation is the substrate; runtime integration (riir-ai NPC cognition, seal consumer) is a separate plan.
+
+> **Note (2026-08-01):** "Training on Rust-SWE-bench" was listed here as out-of-scope. **Corrected**: fine-tuning/LoRA via riir-train is an ALLOWED fallback (Layer 4b). The modelless-first mandate requires exhausting Layer 4 first, but does not forbid training if modelless proves insufficient. See the "riir-train fallback" subsection above.
 
 ## References
 
@@ -275,9 +318,23 @@ This proposal does NOT request default-on promotion. It requests **research vali
 6. **Research 463** — [katgpt-rs/.research/463_moka_freeze_thaw_lever_audit.md](../.research/463_moka_freeze_thaw_lever_audit.md). The "storage format ≠ capability" caveat. Applies to Layer 3: WASM in-loop validation ≠ resolution capability.
 7. **rubrc** — [github.com/oligamiq/rubrc](https://github.com/oligamiq/rubrc). WASM-compiled rustc (WIP). External dependency for Layer 3.
 8. **`WasmPruner` / `BomberWasmPruner`** — `katgpt-rs/crates/katgpt-pruners/src/hot_swap.rs`, `katgpt-rs/src/pruners/bomber/wasm_pruner.rs`. The existing WASM-module-as-ConstraintPruner substrate.
-9. **`SpecAsPruner`** — `katgpt-rs/crates/katgpt-pruners/src/spec_compile/mod.rs`. Compiles NL specs into symbolic bitmap rules. The ideological ancestor (symbolic rules, not neural adapters).
+9. **`SpecAsPruner`** — `katgpt-rs/crates/katgpt-pruners/src/spec_compile/`. Compiles NL specs into symbolic bitmap rules. The ideological ancestor (symbolic rules, not neural adapters).
 10. **code2vec** — Alon et al. (ICLR 2019, [arXiv:1803.09473](https://arxiv.org/abs/1803.09473)). AST path embeddings. P010 borrows the AST→fixed-vector idea (deterministic, not learned).
+11. **`tf_loop`** (Plan 136, DEFAULT-ON, GOAT 034) — Training-Free Loop, recursive forward pass, ODE-motivated damped sub-stepping. **Layer 4 step 1.** This IS the "t-pass / recursive forward pass / loop transformer" — the modelless inference loop.
+12. **`latent_trajectory_geometry`** (Plan 342, Research 324, arxiv 2606.09287) — measures trajectory length / curvature / drift / bifurcation. **Layer 4 step 2.** G1-G5 ALL PASS.
+13. **`closed_unit_compaction` (CUCG)** (Plan 333, DEFAULT-ON) — trajectory compaction at structurally-safe moments. **Layer 4 step 3.** G7 Super-GOAT: "trajectory compaction and shard freeze are the same primitive" — `can_freeze` isomorphism proven. **The load-bearing prior art for Layer 4.**
+14. **`committed_field_blend` (FAME)** (Plan 321, DEFAULT-ON) — frozen sigmoid blend computed ONCE from trajectory summary + BLAKE3-committed. Sampling-invariant (FAME Prop. 3). **Layer 4 step 4.** This IS the modelless "fine-tune weight" — frozen trajectory summary, not GD-updated weights.
+15. **`KarcShard`** (Plan 308) — Delay-Basis-Ridge Forecaster. `Wout` bit-reproducible from trajectory. **Layer 4 alternative step 4.**
+16. **`MerkleFrozenEnvelope`** (riir-neuron-db `freeze.rs`) — BLAKE3-checked atomic snapshot. **Layer 4 step 5.**
+17. **`reestimation.rs`** (riir-ai `latent_functor/`) — coherence-driven re-estimation when coherence < tau_reest. **Layer 4 step 6 (self-healing).** Maps DiPOD's "interleave self-distillation when ELBO drifts."
 
 ## TL;DR
 
-**Verdict: HIGHLY SPECULATIVE proposal for research validation, NOT production.** This sketches the path to bring Rust-SWE-bench INTO the model's inference loop via the existing WASM-pruner substrate, using P010 source features + P009 adapters to connect code structure to latent space, validated against P032 (Kimi-K3). Layer 1 (probe corpus) is concrete + actionable today. Layer 2 (functional test) is gated on P032 Phase 5. Layer 3 (WASM pruner) is HIGHLY SPECULATIVE — gated on rubrc maturity + WASM-compilability of real Rust test suites. The proposal exists to be evaluated and potentially rejected with reasoning. Next action: if the user approves, the cheapest validation step is Phase 1 T1.1-T1.3 (download Rust-SWE-bench + run P010's AST histogram on the (buggy, fixed) pairs to compute fix directions). If those directions show no signal, Layer 1 fails early and the proposal is demoted.
+**Verdict: SPECULATIVE on Layer 3 (rubrc blocker); MODELLESS-VALIDATED on Layer 4 (trajectory freeze composes shipped DEFAULT-ON substrate).** This proposal sketches four paths to bring Rust-SWE-bench INTO the model's inference loop:
+- **Layer 1** (probe corpus) — concrete + actionable today (P010 AST histogram on buggy/fixed pairs).
+- **Layer 2** (functional test) — gated on P032 Phase 5 (Kimi-K3 loaded).
+- **Layer 3** (WASM pruner) — SPECULATIVE, gated on rubrc maturity + WASM-compilability.
+- **Layer 4** (trajectory freeze) — MODELLESS, composes shipped DEFAULT-ON primitives (`tf_loop` + `latent_trajectory_geometry` + `committed_field_blend` + `MerkleFrozenEnvelope`). The CUCG G7 isomorphism (trajectory compaction = shard freeze) is the load-bearing prior art. Works even when the model proposes zero valid patches (trajectory geometry is always measurable). **This is the cheapest validation path** — Phase 5 T5.1-T5.3 run on synthetic trajectories, no model needed.
+- **Layer 4b** (riir-train fallback) — LoRA fine-tune on passing patches if Layer 4 G5 shows insufficient signal.
+
+**The proposal exists to be evaluated and potentially rejected with reasoning.** Next action: Phase 5 T5.1 (synthetic trajectory geometry POC) is the cheapest first step — it tests the core hypothesis (trajectory geometry discriminates) without needing Rust-SWE-bench, rubrc, or Kimi-K3. If T5.1 shows no discrimination, Layer 4 is demoted and the focus shifts to Layer 1 + Layer 2.
