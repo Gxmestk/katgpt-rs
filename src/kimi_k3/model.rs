@@ -317,3 +317,122 @@ pub fn kimi_k3_forward_token<'a>(
 
     &runtime.logits
 }
+
+// ─── Instrumented forward (per-phase timing) ───────────────────────────────
+//
+// This is the same forward path as `kimi_k3_forward_token` but with timing
+// probes injected between each major phase. It exists for the hello-world
+// example + benchmarking — production callers should use the uninstrumented
+// variant (no Instant::now() overhead in the hot path).
+//
+// The phase split matches the model-level steps (embed / layers / output-res
+// / final-norm / lm_head), NOT the per-layer internal breakdown. Per-layer
+// internal breakdown (KDA vs MLA vs MoE) would require instrumenting
+// `kimi_decoder_layer_forward` — left as a future optimization target.
+
+/// Per-phase timing accumulator (microseconds).
+///
+/// All fields are `u128` microseconds. Use `Default::default()` for a zeroed
+/// instance. The example accumulates across N tokens then divides by N for
+/// the per-token average.
+#[derive(Default, Debug, Clone)]
+pub struct ForwardTiming {
+    /// Embedding lookup (row gather from the [vocab × hidden] table).
+    pub embed_us: u128,
+    /// All 8 decoder layers combined (attention + FFN + attn-res per layer).
+    pub layers_us: u128,
+    /// Output attn-res mixing (single apply_attn_res on accumulated block state).
+    pub output_attn_res_us: u128,
+    /// Final RMSNorm over the hidden state.
+    pub final_norm_us: u128,
+    /// LM head matmul: [vocab × hidden] × [hidden] → [vocab] logits.
+    pub lm_head_us: u128,
+}
+
+impl ForwardTiming {
+    /// Sum of all phases (= total forward time, minus the block_state.clear()
+    /// which is negligible).
+    pub fn total_us(&self) -> u128 {
+        self.embed_us + self.layers_us + self.output_attn_res_us + self.final_norm_us + self.lm_head_us
+    }
+}
+
+/// Forward a single token through the full Kimi-K3-0.40B model, recording
+/// per-phase timing.
+///
+/// This is the instrumented counterpart to `kimi_k3_forward_token`. It
+/// produces bit-identical logits (same operations, same order — only
+/// `Instant::now()` calls are inserted between phases).
+///
+/// The `timing` argument is mutated in place; the caller typically passes a
+/// reference into an accumulator struct that sums across N tokens.
+pub fn kimi_k3_forward_token_timed<'a>(
+    config: &KimiK3ModelConfig,
+    weights: &super::loader::KimiK3ModelWeights,
+    runtime: &'a mut KimiK3Runtime,
+    token_id: u32,
+    timing: &mut ForwardTiming,
+) -> &'a [f32] {
+    use std::time::Instant;
+
+    let d = config.hidden_size;
+
+    runtime.block_state.clear();
+
+    let t = Instant::now();
+    let embed_start = (token_id as usize) * d;
+    let embed_end = embed_start + d;
+    runtime.hidden.copy_from_slice(&weights.embed_weight[embed_start..embed_end]);
+    timing.embed_us += t.elapsed().as_micros();
+
+    let t = Instant::now();
+    for (layer_idx, layer_w) in weights.layers.iter().enumerate() {
+        let layer_cfg = config.layer_config(layer_idx);
+        let layer_rt = &mut runtime.layers[layer_idx];
+
+        kimi_decoder_layer_forward(
+            layer_idx,
+            &layer_cfg,
+            layer_w,
+            &mut layer_rt.attn_state,
+            &mut layer_rt.attn_scratch,
+            &mut layer_rt.ffn_scratch,
+            &mut layer_rt.attn_res_self_scratch,
+            &mut layer_rt.attn_res_mlp_scratch,
+            &mut runtime.block_state,
+            Some(&mut runtime.rope_freqs),
+            &mut runtime.hidden,
+            &mut runtime.scratch_hidden,
+        );
+    }
+    timing.layers_us += t.elapsed().as_micros();
+
+    let t = Instant::now();
+    if !runtime.block_state.is_empty() {
+        let mixed = apply_attn_res(
+            &config.attn_res_config,
+            &weights.output_attn_res,
+            &runtime.block_state,
+            &mut runtime.output_attn_res_scratch,
+            &runtime.hidden,
+        );
+        runtime.hidden.copy_from_slice(mixed);
+    }
+    timing.output_attn_res_us += t.elapsed().as_micros();
+
+    let t = Instant::now();
+    rmsnorm_with_gamma_eps(&mut runtime.hidden, &weights.final_norm_weight, config.rms_eps as f64);
+    timing.final_norm_us += t.elapsed().as_micros();
+
+    let t = Instant::now();
+    katgpt_core::simd::simd_matmul_rows(
+        &mut runtime.logits,
+        &weights.lm_head_weight,
+        &runtime.hidden,
+        config.vocab_size,
+        d,
+    );
+    timing.lm_head_us += t.elapsed().as_micros();
+
+    &runtime.logits
+}

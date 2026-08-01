@@ -32,7 +32,9 @@ pub use decoder_layer::{
 };
 
 #[cfg(feature = "kimi_k3_loader")]
-pub use model::{KimiK3ModelConfig, KimiK3Runtime, kimi_k3_forward_token};
+pub use model::{
+    ForwardTiming, KimiK3ModelConfig, KimiK3Runtime, kimi_k3_forward_token, kimi_k3_forward_token_timed,
+};
 
 // Safetensors loader + tiktoken tokenizer (gated by `kimi_k3_loader`).
 #[cfg(feature = "kimi_k3_loader")]

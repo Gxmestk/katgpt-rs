@@ -682,6 +682,12 @@ required-features = ["segment_checkpoint", "regime_transition"]
 name = "percepta_phase0"
 required-features = ["percepta_compile"]
 
+# ── Kimi-K3 native support (Proposal 032) ──────────────────────
+
+[[example]]
+name = "kimi_k3_hello_world"
+required-features = ["kimi_k3_loader"]
+
 # ── AND-OR DDTree Decomposition (Plan 190) ───────────────────────
 
 [[example]]

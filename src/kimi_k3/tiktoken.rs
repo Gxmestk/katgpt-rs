@@ -84,37 +84,64 @@ impl std::error::Error for TiktokenLoadError {}
 pub fn load_tiktoken_bpe(data: &[u8]) -> Result<TiktokenRanks, TiktokenLoadError> {
     let mut ranks = HashMap::new();
 
-    let mut iter = data.split(|&b| b == b'\n');
+    // The tiktoken.model file format can be either:
+    //
+    //   Format A (HuggingFace production): "<base64> <rank>\n" per line
+    //   Format B (test synthetic):          "<base64>\n<rank>\n" alternating lines
+    //
+    // We detect the format by checking if the first line contains a space.
+    let lines: Vec<&[u8]> = data
+        .split(|&b| b == b'\n')
+        .filter(|l| !l.is_empty())
+        .collect();
 
-    loop {
-        // Read base64 token
-        let b64_token = iter.next().ok_or(TiktokenLoadError::UnexpectedEof)?;
+    let format_a = lines
+        .first()
+        .map(|first_line| first_line.iter().any(|&b| b == b' ' || b == b'\t'))
+        .unwrap_or(true);
 
-        // Empty token means we've reached the end (trailing newline or EOF)
-        if b64_token.is_empty() {
-            break;
+    if format_a {
+        // Format A: each line is "<base64> <rank>"
+        for line in &lines {
+            let line_str = std::str::from_utf8(line)
+                .map_err(|e| TiktokenLoadError::InvalidBase64(format!("non-UTF8 line: {e}")))?;
+            let mut fields = line_str.split_whitespace();
+            let b64_token = fields
+                .next()
+                .ok_or_else(|| TiktokenLoadError::InvalidRank(format!("empty line: {line_str:?}")))?;
+            let rank_str = fields
+                .next()
+                .ok_or_else(|| TiktokenLoadError::InvalidRank(format!("missing rank: {line_str:?}")))?;
+
+            let token = base64::engine::general_purpose::STANDARD
+                .decode(b64_token)
+                .map_err(|e| TiktokenLoadError::InvalidBase64(format!("{e}")))?;
+            let rank: usize = rank_str
+                .parse()
+                .map_err(|e| TiktokenLoadError::InvalidRank(format!("'{rank_str}': {e}")))?;
+            ranks.insert(token, rank);
         }
-
-        // Read rank
-        let rank_bytes = iter.next().ok_or(TiktokenLoadError::UnexpectedEof)?;
-        if rank_bytes.is_empty() {
-            break;
+    } else {
+        // Format B: alternating lines <base64>\n<rank>\n...
+        let mut iter = lines.into_iter();
+        while let Some(b64_line) = iter.next() {
+            let rank_line = iter
+                .next()
+                .ok_or(TiktokenLoadError::UnexpectedEof)?;
+            if b64_line.is_empty() {
+                break;
+            }
+            let token = base64::engine::general_purpose::STANDARD
+                .decode(b64_line)
+                .map_err(|e| TiktokenLoadError::InvalidBase64(format!("{e}")))?;
+            let rank_str = std::str::from_utf8(rank_line)
+                .map_err(|e| TiktokenLoadError::InvalidRank(format!("non-UTF8 rank: {e}")))?;
+            let rank: usize = rank_str
+                .trim()
+                .parse()
+                .map_err(|e| TiktokenLoadError::InvalidRank(format!("'{rank_str}': {e}")))?;
+            ranks.insert(token, rank);
         }
-
-        // Decode base64 token
-        let token = base64::engine::general_purpose::STANDARD
-            .decode(b64_token)
-            .map_err(|e| TiktokenLoadError::InvalidBase64(format!("{e}")))?;
-
-        // Parse rank
-        let rank_str = std::str::from_utf8(rank_bytes)
-            .map_err(|e| TiktokenLoadError::InvalidRank(format!("non-UTF8 rank: {e}")))?;
-        let rank: usize = rank_str
-            .trim()
-            .parse()
-            .map_err(|e| TiktokenLoadError::InvalidRank(format!("'{rank_str}': {e}")))?;
-
-        ranks.insert(token, rank);
     }
 
     Ok(ranks)
