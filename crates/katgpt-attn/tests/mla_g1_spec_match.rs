@@ -59,11 +59,23 @@ fn dot_f64(a: &[f64], b: &[f64], len: usize) -> f64 {
     sum
 }
 
+/// f64 RMSNorm with gamma, applied in-place.
+/// Mirrors the actual model's `KimiRMSNorm` (Research 330 §2).
+fn rmsnorm_f64_inplace(x: &mut [f64], gamma: &[f64], eps: f64) {
+    let n = x.len();
+    let sum_sq = dot_f64(x, x, n);
+    let inv_rms = 1.0 / (sum_sq / n as f64 + eps).sqrt();
+    for i in 0..n {
+        x[i] = x[i] * inv_rms * gamma[i];
+    }
+}
+
 /// Independent f64 reference for the full MLA forward pass.
 ///
-/// Mirrors equations 37–47 exactly. Stores per-token up-projected k_c/v_c
-/// in Vecs (not the compressed latent — this reference prioritizes clarity
-/// over cache efficiency, since it's the correctness authority).
+/// Matches the actual `modeling_kimi_k3_linear.py` forward path (Research 330
+/// §2): applies `q_a_layernorm` to the query latent and `kv_a_layernorm` to the
+/// KV latent BEFORE up-projection + caching. The normed latent is what gets
+/// cached + up-projected.
 fn mla_forward_f64_reference(
     config: &MlaConfig,
     weights_f64: &MlaWeightsF64,
@@ -77,23 +89,26 @@ fn mla_forward_f64_reference(
     let v_h = config.v_head_dim;
     let n_h = config.n_heads;
     let theta = config.rope_theta as f64;
+    let eps = config.rms_norm_eps as f64;
     let scale = 1.0 / ((d_h + d_r) as f64).sqrt();
 
-    // Cache: store per-token up-projected k_c, v_c, and k_r (all heads).
-    let mut k_c_cache: Vec<Vec<f64>> = Vec::new();
-    let mut v_c_cache: Vec<Vec<f64>> = Vec::new();
+    // Cache: store per-token normed latent + shared rope key.
+    let mut c_kv_cache: Vec<Vec<f64>> = Vec::new();
     let mut k_r_cache: Vec<Vec<f64>> = Vec::new();
 
     let mut output = vec![0.0f64; d];
 
     for (pos, h) in tokens.iter().enumerate() {
-        // ── Step 1: Down-projections (eq 37, 41) ───────────────────────────
+        // ── Step 1: Down-projections + latent RMSNorm ───────────────────────
         let mut c_kv = vec![0.0; d_c];
         let mut c_q = vec![0.0; d_qc];
         matmul_f64(&mut c_kv, &weights_f64.w_dkv, h, d_c, d);
         matmul_f64(&mut c_q, &weights_f64.w_dq, h, d_qc, d);
+        // Apply latent RMSNorms (actual model: q_a_layernorm, kv_a_layernorm)
+        rmsnorm_f64_inplace(&mut c_q, &weights_f64.q_a_norm_weight, eps);
+        rmsnorm_f64_inplace(&mut c_kv, &weights_f64.kv_a_norm_weight, eps);
 
-        // ── Step 2: Query up-projections + decoupled RoPE (eq 38, 39, 40) ─
+        // ── Step 2: Query up-projections + decoupled RoPE ─────────────────
         let mut q_c = vec![0.0; d_h * n_h];
         let mut q_r = vec![0.0; d_r * n_h];
         matmul_f64(&mut q_c, &weights_f64.w_uq, &c_q, d_h * n_h, d_qc);
@@ -103,24 +118,18 @@ fn mla_forward_f64_reference(
             rope_f64(&mut q_r[start..start + d_r], pos, d_r, theta);
         }
 
-        // ── Step 3: Key/value up-projections (eq 42, 45) ───────────────────
-        let mut k_c = vec![0.0; d_h * n_h];
-        let mut v_c = vec![0.0; v_h * n_h];
-        matmul_f64(&mut k_c, &weights_f64.w_uk, &c_kv, d_h * n_h, d_c);
-        matmul_f64(&mut v_c, &weights_f64.w_uv, &c_kv, v_h * n_h, d_c);
-
-        // ── Step 4: Shared RoPE key (eq 43) ────────────────────────────────
+        // ── Step 3: Shared RoPE key (NOT normed — outside kv_a_layernorm) ──
         let mut k_r = vec![0.0; d_r];
         matmul_f64(&mut k_r, &weights_f64.w_kr, h, d_r, d);
         rope_f64(&mut k_r, pos, d_r, theta);
 
-        // Cache this token's up-projected k_c, v_c, k_r.
-        k_c_cache.push(k_c.clone());
-        v_c_cache.push(v_c.clone());
+        // Cache this token's normed latent + rope key.
+        c_kv_cache.push(c_kv.clone());
         k_r_cache.push(k_r.clone());
 
-        // ── Step 5: Attention per head (eq 46) ─────────────────────────────
-        let seq = k_c_cache.len();
+        // ── Step 4: Attention per head ─────────────────────────────────────
+        // Up-project k_c/v_c from the normed latent at attention time.
+        let seq = c_kv_cache.len();
         let mut attn_out = vec![0.0f64; v_h * n_h];
 
         for head in 0..n_h {
@@ -130,9 +139,17 @@ fn mla_forward_f64_reference(
             let mut scores = vec![0.0f64; seq];
             let mut max_score = f64::NEG_INFINITY;
             for j in 0..seq {
-                let k_c_j_h = &k_c_cache[j][head * d_h..(head + 1) * d_h];
+                // k_c_j_h = W_UK[head] · c_kv_j  (normed latent)
+                let mut k_c_h = vec![0.0; d_h];
+                matmul_f64(
+                    &mut k_c_h,
+                    &weights_f64.w_uk[head * d_h * d_c..(head + 1) * d_h * d_c],
+                    &c_kv_cache[j],
+                    d_h,
+                    d_c,
+                );
                 let k_r_j = &k_r_cache[j];
-                let content_dot = dot_f64(q_c_h, k_c_j_h, d_h);
+                let content_dot = dot_f64(q_c_h, &k_c_h, d_h);
                 let rope_dot = dot_f64(q_r_h, k_r_j, d_r);
                 let score = (content_dot + rope_dot) * scale;
                 scores[j] = score;
@@ -148,18 +165,26 @@ fn mla_forward_f64_reference(
             }
 
             for (j, &s) in scores.iter().enumerate().take(seq) {
-                let v_c_j_h = &v_c_cache[j][head * v_h..(head + 1) * v_h];
+                // v_c_j_h = W_UV[head] · c_kv_j  (normed latent)
+                let mut v_c_h = vec![0.0; v_h];
+                matmul_f64(
+                    &mut v_c_h,
+                    &weights_f64.w_uv[head * v_h * d_c..(head + 1) * v_h * d_c],
+                    &c_kv_cache[j],
+                    v_h,
+                    d_c,
+                );
                 let weight = s / sum_exp;
                 for vi in 0..v_h {
-                    attn_out[head * v_h + vi] += weight * v_c_j_h[vi];
+                    attn_out[head * v_h + vi] += weight * v_c_h[vi];
                 }
             }
         }
 
-        // ── Step 6: Output projection (eq 47) ──────────────────────────────
+        // ── Step 5: Output projection ──────────────────────────────────────
         matmul_f64(&mut output, &weights_f64.w_o, &attn_out, d, v_h * n_h);
 
-        // ── Step 7: Output gate (Kimi-K3 extension) ────────────────────────────
+        // ── Step 6: Output gate (Kimi-K3 extension) ────────────────────────
         if config.use_output_gate
             && let Some(ref w_g) = weights_f64.w_g
         {
@@ -184,6 +209,8 @@ struct MlaWeightsF64 {
     w_uv: Vec<f64>,
     w_kr: Vec<f64>,
     w_o: Vec<f64>,
+    q_a_norm_weight: Vec<f64>,
+    kv_a_norm_weight: Vec<f64>,
     w_g: Option<Vec<f64>>,
 }
 
@@ -199,6 +226,8 @@ fn weights_to_f64(w: &MlaWeights) -> MlaWeightsF64 {
         w_uv: conv(&w.w_uv),
         w_kr: conv(&w.w_kr),
         w_o: conv(&w.w_o),
+        q_a_norm_weight: conv(&w.q_a_norm_weight),
+        kv_a_norm_weight: conv(&w.kv_a_norm_weight),
         w_g: w.w_g.as_ref().map(|g| conv(g)),
     }
 }
@@ -216,6 +245,7 @@ fn small_config() -> MlaConfig {
         hidden_size: 16,
         use_output_gate: true,
         rope_theta: 10_000.0,
+        rms_norm_eps: 1e-5,
     }
 }
 
@@ -425,4 +455,32 @@ fn g1_kimi_k3_0_40b_full_dims_match_reference() {
         "G1 FAIL 0.40B dims: max_diff = {max_diff:.2e} (tol 1e-3)"
     );
     eprintln!("g1_kimi_k3_0_40b_full_dims: max_diff = {max_diff:.2e}");
+}
+
+#[test]
+fn g1_latent_rmsnorm_changes_output() {
+    // Verify that the q_a_layernorm + kv_a_layernorm are actually applied
+    // (not no-ops). If we replace the norm weights with all-ones (pure RMS
+    // normalization, no gamma scaling) vs random gammas, the outputs should
+    // differ.
+    let config = small_config();
+    let weights_gamma = MlaWeights::random(&config, 42);
+    // Replace norm weights with all-ones for the comparison baseline
+    let mut weights_ones = weights_gamma.clone();
+    weights_ones.q_a_norm_weight.fill(1.0);
+    weights_ones.kv_a_norm_weight.fill(1.0);
+
+    let h: Vec<f32> = (0..config.hidden_size)
+        .map(|i| (i as f32).sin() * 0.3 + 0.5)
+        .collect();
+
+    let out_gamma = run_f32(&config, &weights_gamma, std::slice::from_ref(&h));
+    let out_ones = run_f32(&config, &weights_ones, std::slice::from_ref(&h));
+
+    // With random gammas ≠ 1.0, the outputs should differ.
+    let any_diff = out_gamma
+        .iter()
+        .zip(out_ones.iter())
+        .any(|(a, b)| (a - b).abs() > 1e-6);
+    assert!(any_diff, "latent RMSNorm gammas had no effect on output");
 }

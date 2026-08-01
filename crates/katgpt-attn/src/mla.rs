@@ -1,24 +1,32 @@
 //! MLA (Multi-head Latent Attention) — DeepSeek-V2 §2.1 + Appendix C.
 //!
 //! Implements the MLA mechanism with decoupled RoPE from DeepSeek-V2, plus the
-//! Kimi-K3 output-gate extension (`mla_use_output_gate`). See Research 327 for
-//! the full mathematical distillation and Proposal 032 for the architectural
-//! context.
+//! Kimi-K3 output-gate extension (`mla_use_output_gate`) and the latent
+//! RMSNorms (`q_a_layernorm`, `kv_a_layernorm`). See Research 327 for the
+//! mathematical distillation, Research 330 §2 for the actual-model-code
+//! divergence analysis, and Proposal 032 for the architectural context.
 //!
 //! # The mechanism (single-token decode)
 //!
-//! ```text
-//! 1. Down-projections:
-//!    c_kv = W_DKV · h        (KV latent compression — CACHED, not full K/V)
-//!    c_q  = W_DQ  · h        (query latent compression)
+//! Matches the actual `modeling_kimi_k3_linear.py` forward path (Research 330
+//! §2). The latent RMSNorms were MISSING in the original Phase 2 (which followed
+//! the paper distillation); they are now applied in-place before up-projection.
 //!
-//! 2. Up-projections + decoupled RoPE split (query path):
+//! ```text
+//! 1. Down-projections + latent RMSNorm (actual model: q_a_proj → q_a_layernorm
+//!    → q_b_proj; kv_a_proj_with_mqa → kv_a_layernorm → kv_b_proj):
+//!    c_q_raw  = W_DQ  · h         (query latent compression)
+//!    c_q      = RMSNorm(c_q_raw, q_a_norm_weight, eps)    ← NORMED
+//!    c_kv_raw = W_DKV · h         (KV latent compression)
+//!    c_kv     = RMSNorm(c_kv_raw, kv_a_norm_weight, eps)  ← NORMED before cache
+//!
+//! 2. Up-projections + decoupled RoPE split (query path, from normed c_q):
 //!    q_c     = W_UQ  · c_q   (content query — NO RoPE)
 //!    q_r_raw = W_QR  · c_q   (rope query — RoPE applied per-head sub-vector)
 //!    for each head i: q_r[i] = RoPE(q_r_raw[i], pos)
 //!    q_i = [q_c[i] ; q_r[i]]  (concatenate content + rope per head)
 //!
-//! 3. Up-projections (key/value path) + shared RoPE key:
+//! 3. Up-projections (key/value path, from normed c_kv) + shared RoPE key:
 //!    k_c = W_UK · c_kv       (content key — NO RoPE, per head)
 //!    v_c = W_UV · c_kv       (value, per head)
 //!    k_r = RoPE(W_KR · h, pos)  (shared rope key — SAME for all heads — CACHED)
@@ -32,10 +40,19 @@
 //!    if use_output_gate: u *= sigmoid(W_g · h)   (Kimi-K3 extension)
 //! ```
 //!
+//! # Weight layout note (loader concern, Phase 5)
+//!
+//! The actual model stores fused projections (`q_b_proj`, `kv_a_proj_with_mqa`,
+//! `kv_b_proj`) as single tensors. This implementation keeps them as logical
+//! components (`w_uq`+`w_qr`, `w_dkv`+`w_kr`, `w_uk`+`w_uv`) because the math is
+//! identical — the fused projection is just a row-stack of the components.
+//! The Phase 5 safetensors loader will de-fuse (split) the fused tensors into
+//! these fields at load time.
+//!
 //! # KV cache contents
 //!
 //! Only TWO vectors cached per token:
-//! - `c_kv ∈ R^{d_c}` — the compressed KV latent
+//! - `c_kv ∈ R^{d_c}` — the compressed KV latent (NORMED via `kv_a_layernorm`)
 //! - `k_r  ∈ R^{d_R^h}` — the shared decoupled RoPE key
 //!
 //! For Kimi-K3-0.40B: `(128 + 32) = 160` elements/token/layer vs `1024` for MHA.
@@ -68,12 +85,20 @@ pub struct MlaConfig {
     /// Kimi-K3 output gate (`mla_use_output_gate`). When true, output is gated
     /// by `sigmoid(W_g · h)`. Kimi-K3-0.40B: true.
     pub use_output_gate: bool,
-    /// RoPE base frequency. Kimi-K3-0.40B: 1_000_000.0.
+    /// RoPE base frequency. Actual `config.json`: **10,000** (corrected from the
+    /// prior 1,000,000 assumption — Research 330 §7).
     pub rope_theta: f32,
+    /// RMSNorm epsilon. Actual `config.json`: **1e-5** (corrected from the prior
+    /// 1e-6 assumption — Research 330 §7). Used by `q_a_layernorm` and
+    /// `kv_a_layernorm`.
+    pub rms_norm_eps: f32,
 }
 
 impl MlaConfig {
     /// Kimi-K3-0.40B MLA configuration (text path, `kimi_linear` model type).
+    ///
+    /// Values match the actual `config.json` (Research 330 §7). `rope_theta`
+    /// is 10,000 (not 1,000,000 as the paper distillation suggested).
     pub fn kimi_k3_0_40b() -> Self {
         Self {
             kv_lora_rank: 128,
@@ -84,7 +109,8 @@ impl MlaConfig {
             n_heads: 8,
             hidden_size: 1024,
             use_output_gate: true,
-            rope_theta: 1_000_000.0,
+            rope_theta: 10_000.0,
+            rms_norm_eps: 1e-5,
         }
     }
 
@@ -122,6 +148,7 @@ impl MlaConfig {
 ///
 /// All matrices are stored as `[out_dim][in_dim]` (row-major), matching the
 /// `simd_matmul_rows(output, weight, input, rows=out, cols=in)` convention.
+#[derive(Clone)]
 pub struct MlaWeights {
     /// `W_DKV ∈ R^{d_c × d}` — KV down-projection.
     pub w_dkv: Vec<f32>,
@@ -139,6 +166,14 @@ pub struct MlaWeights {
     pub w_kr: Vec<f32>,
     /// `W_O ∈ R^{d × v_h·n_h}` — output projection.
     pub w_o: Vec<f32>,
+    /// `q_a_norm_weight ∈ R^{d'_c}` — RMSNorm gamma between query down/up
+    /// projections (actual model: `q_a_layernorm`). Applied to `c_q` before
+    /// `W_UQ`/`W_QR`. Added per Research 330 §2 (was missing in original Phase 2).
+    pub q_a_norm_weight: Vec<f32>,
+    /// `kv_a_norm_weight ∈ R^{d_c}` — RMSNorm gamma on the KV latent before
+    /// up-projection (actual model: `kv_a_layernorm`). Applied to `c_kv` before
+    /// caching + `W_UK`/`W_UV`. Added per Research 330 §2.
+    pub kv_a_norm_weight: Vec<f32>,
     /// `W_g ∈ R^{d × d}` — output gate projection (Kimi-K3 extension).
     /// Only present when `config.use_output_gate` is true.
     pub w_g: Option<Vec<f32>>,
@@ -166,6 +201,11 @@ impl MlaWeights {
         let w_kr = random_matrix(&mut rng, config.d_r(), d);
         let w_o =
             random_matrix(&mut rng, d, config.v_head_dim * config.n_heads);
+        // Norm weights: initialized near 1.0 (typical RMSNorm gamma init) with
+        // small random perturbation [0.9, 1.1] to exercise the scaling path in
+        // G1 tests. The actual trained weights will have drifted from 1.0.
+        let q_a_norm_weight = random_norm_weights(&mut rng, config.q_lora_rank);
+        let kv_a_norm_weight = random_norm_weights(&mut rng, config.kv_lora_rank);
         let w_g = if config.use_output_gate {
             Some(random_matrix(&mut rng, d, d))
         } else {
@@ -181,6 +221,8 @@ impl MlaWeights {
             w_uv,
             w_kr,
             w_o,
+            q_a_norm_weight,
+            kv_a_norm_weight,
             w_g,
         }
     }
@@ -219,6 +261,17 @@ fn random_matrix(rng: &mut SimpleRng, rows: usize, cols: usize) -> Vec<f32> {
     let scale = 1.0 / (cols as f32).sqrt();
     (0..rows * cols)
         .map(|_| (rng.next_f32() * 2.0 - 1.0) * scale)
+        .collect()
+}
+
+/// Generate RMSNorm gamma weights near 1.0: values in `[0.9, 1.1]`.
+///
+/// RMSNorm gammas are typically initialized to 1.0 (identity scaling) and
+/// drift slightly during training. This range exercises the scaling path
+/// without producing degenerate near-zero values.
+fn random_norm_weights(rng: &mut SimpleRng, dim: usize) -> Vec<f32> {
+    (0..dim)
+        .map(|_| 1.0 + (rng.next_f32() * 2.0 - 1.0) * 0.1)
         .collect()
 }
 
@@ -356,6 +409,25 @@ fn apply_decoupled_rope(
     }
 }
 
+/// RMSNorm with learnable gamma, applied in-place.
+///
+/// `x[i] = gamma[i] * x[i] / sqrt(mean(x²) + eps)`
+///
+/// Mirrors the actual model's `KimiRMSNorm` (Research 330 §2): a standard
+/// RMSNorm with per-channel gamma (weight) and configurable epsilon. Used for
+/// `q_a_layernorm` (on the query latent) and `kv_a_layernorm` (on the KV latent
+/// before up-projection/caching).
+#[inline]
+fn rmsnorm_inplace(x: &mut [f32], gamma: &[f32], eps: f32) {
+    debug_assert_eq!(x.len(), gamma.len(), "rmsnorm_inplace: dim mismatch");
+    let n = x.len();
+    let sum_sq = simd_dot_f32(x, x, n);
+    let inv_rms = 1.0 / (sum_sq / n as f32 + eps).sqrt();
+    for i in 0..n {
+        x[i] = x[i] * inv_rms * gamma[i];
+    }
+}
+
 /// Single-token MLA forward pass (decode path).
 ///
 /// Computes one step of MLA attention:
@@ -395,13 +467,26 @@ pub fn mla_forward_token<'s>(
     // The position of the token being processed = current cache length.
     let pos = cache.seq_len;
 
-    // ── Step 1: Down-projections ───────────────────────────────────────────
-    // c_kv = W_DKV · h   [d_c]
+    // ── Step 1: Down-projections + latent RMSNorm ──────────────────────────
+    // Actual model path (Research 330 §2):
+    //   c_q_raw  = q_a_proj(h)         → q_a_layernorm(c_q_raw)  → q_b_proj
+    //   c_kv_raw = kv_a_proj_with_mqa(h)[..d_c] → kv_a_layernorm → kv_b_proj
+    //
+    // We compute W_DKV and W_KR separately (they're the de-fused rows of
+    // kv_a_proj_with_mqa). The norm is applied in-place to the scratch latents
+    // BEFORE up-projection and caching.
+
+    // c_kv_raw = W_DKV · h   [d_c]  (KV latent compression)
     simd_matmul_rows(&mut scratch.c_kv, &weights.w_dkv, h, d_c, d);
-    // c_q = W_DQ · h     [d'_c]
+    // c_q_raw  = W_DQ  · h   [d'_c] (query latent compression)
     simd_matmul_rows(&mut scratch.c_q, &weights.w_dq, h, d_qc, d);
 
-    // ── Step 2: Query up-projections ───────────────────────────────────────
+    // Apply latent RMSNorms (actual model: q_a_layernorm, kv_a_layernorm).
+    // The normed c_kv is what gets cached + up-projected.
+    rmsnorm_inplace(&mut scratch.c_q, &weights.q_a_norm_weight, config.rms_norm_eps);
+    rmsnorm_inplace(&mut scratch.c_kv, &weights.kv_a_norm_weight, config.rms_norm_eps);
+
+    // ── Step 2: Query up-projections (from normed c_q) ──────────────────────
     // q_c = W_UQ · c_q   [d_h * n_h]  (content query — NO RoPE)
     simd_matmul_rows(&mut scratch.q_c, &weights.w_uq, &scratch.c_q, d_h * n_h, d_qc);
     // q_r_raw = W_QR · c_q   [d_r * n_h]  (rope query — RoPE applied next)
@@ -409,19 +494,21 @@ pub fn mla_forward_token<'s>(
     // Apply decoupled RoPE to each head's d_r sub-vector.
     apply_decoupled_rope(rope_freqs, &mut scratch.q_r, d_r, n_h, pos);
 
-    // ── Step 3: Key/value up-projections ───────────────────────────────────
-    // k_c = W_UK · c_kv   [d_h * n_h]  (content key — NO RoPE)
+    // ── Step 3: Key/value up-projections (from normed c_kv) ─────────────────
+    // These compute the current token's k_c/v_c (overwritten in the attention
+    // loop below — kept for structural clarity).
     simd_matmul_rows(&mut scratch.k_c, &weights.w_uk, &scratch.c_kv, d_h * n_h, d_c);
-    // v_c = W_UV · c_kv   [v_h * n_h]  (value)
     simd_matmul_rows(&mut scratch.v_c, &weights.w_uv, &scratch.c_kv, v_h * n_h, d_c);
 
     // ── Step 4: Shared decoupled RoPE key ──────────────────────────────────
-    // k_r_raw = W_KR · h   [d_r]  (shared across all heads)
+    // k_r_raw = W_KR · h   [d_r]  (shared across all heads — NOT normed;
+    // the rope key is the tail of kv_a_proj_with_mqa output, outside kv_a_norm)
     simd_matmul_rows(&mut scratch.k_r, &weights.w_kr, h, d_r, d);
     // Apply RoPE to the shared key (n_heads=1 — it's shared).
     apply_decoupled_rope(rope_freqs, &mut scratch.k_r, d_r, 1, pos);
 
-    // ── Step 5: Cache the compressed latent + shared rope key ──────────────
+    // ── Step 5: Cache the normed latent + shared rope key ───────────────────
+    // c_kv is ALREADY normed (Step 1); the attention loop up-projects directly.
     cache.append(&scratch.c_kv, &scratch.k_r);
 
     // ── Step 6: Attention (per head) ───────────────────────────────────────
@@ -659,6 +746,7 @@ mod tests {
             hidden_size: 16,
             use_output_gate: true,
             rope_theta: 10_000.0,
+            rms_norm_eps: 1e-5,
         }
     }
 }
