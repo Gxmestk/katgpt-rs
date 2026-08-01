@@ -442,7 +442,7 @@ Root cause (the durable value):
 
 **Outcome.** No plan filed. The PoC source remains in `riir-poc/` as a permanent regression check — its job was to settle the dispute, and it should keep settling it if the belief kernel is later trained/structured (the trained case is where the regime split could re-emerge as actionable).
 
-📖 Issue: 568 (removed per noise-reduction rule — resolution above), PoC source: `riir-ai/crates/riir-poc/src/loop_injection_poc.rs` + `benches/loop_injection_regime_split.rs` (cross-repo permanent regression check), Related research: [073](../../.research/073_LT2_Looped_Transformer_Distillation.md) (LT2), [097](../../.research/097_Training_Free_Loop.md), [414](../../.research/414_Fully_Looped_Transformer_Readout_Blind_Spot.md), [048](../../.research/048_HRM_Text_Additive_Injection_Cousin.md).
+📖 Issue: 568 (removed per noise-reduction rule — resolution above), PoC source: `riir-ai/crates/riir-poc/src/loop_injection_poc.rs` + `benches/loop_injection_regime_split.rs` (cross-repo permanent regression check), Related research: [073](../../.research/073_LT2_Linear_Time_Looped_Transformers.md) (LT2), [097](../../.research/097_Training_Free_Looped_Transformers.md), [414](../../.research/414_Fully_Looped_Transformer_Readout_Blind_Spot.md), [048](../../.research/048_HRM_Text_Hierarchical_Recurrent_Pretraining.md).
 
 ## 23. CompressionDrafter — Hot-Tier Modelless LZ4 Drafter (Plan 285) — G1+G2 BOTH FAIL
 
