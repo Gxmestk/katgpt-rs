@@ -3,6 +3,7 @@
 > Source: [Agentic Systems as Boosting Weak Reasoning Models](https://arxiv.org/pdf/2605.14163) by Varun Sunkaraneni (TAMU), Pierfrancesco Beneventano, Riccardo Neumarker, Tomaso Poggio, Tomer Galanti (MIT/TAMU), arXiv 2605.14163, May 2026
 > Local: N/A (paper-only distillation)
 > Date: 2026-05 (paper), distilled 2026-05
+> **PASS-Redirects (synthesis):** Xiang et al. (RustForger / Rust-SWE-bench) [arXiv:2602.22764 "Evaluating and Improving Automated Repository-Level Rust Issue Resolution with LLM-based Agents"] — introduces a 500-task Rust SWE benchmark + RustForger LLM agent (proc-macro AST `Trace` for dynamic analysis; 28.6% resolution on Claude-Sonnet-3.7). PASS: LLM-dependent semantic code generation (write test, write patch), no modelless analog. Distinct from this note (R093) which uses SWE-bench Verified as an *external validation target* for the committee-search protocol that DOES distill to our DDTree + BtRank + ScreeningPruner. The benchmark itself is a dataset, not a distillable mechanism.
 > **Verdict: STRONG VALIDATION — Our DDTree + BtRank + ScreeningPruner + ConstraintPruner stack IS the paper's committee protocol Π_{k,m,r}. The paper formalizes what we already built. Actionable items: oracle-gap recovery metric, budget sizing rules, position-swap debiasing. Feature-gate new diagnostics under `committee_boost`.**
 
 ---

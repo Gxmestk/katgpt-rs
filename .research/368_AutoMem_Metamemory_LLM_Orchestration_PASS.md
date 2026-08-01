@@ -5,6 +5,7 @@
 > **Status:** Active
 > **Related Research:** 133 (FluxMem — the contrast case), 060 (MeMo), 024 (δ-Mem); riir-ai 169 (AgentMemBench — validation signals only), 147 (Engram NPC Guide), 123 (Latent Functor Runtime), 007 (Four-Tier Memory)
 > **Related Plans:** riir-ai 365 (LOG/PLAN metamemory wiring)
+> **PASS-Redirects (contrast case):** Xiang et al. (RustForger / Rust-SWE-bench) [arXiv:2602.22764 "Evaluating and Improving Automated Repository-Level Rust Issue Resolution with LLM-based Agents"] — LLM-based Rust code-agent framework. This note (R368) is the **contrast case**: here the LOG/PLAN decision structure was implementation-agnostic and distilled modellessly via probe/draft/pruner. RustForger's decisions (generate reproduction test, write corrective patch, analyze trace → root cause) are NOT implementation-agnostic — they are genuine LLM-dependent semantic code generation with no modelless analog. PASS for RustForger; GOAT for AutoMem. The boundary: when the LLM call computes a *decision* about memory ops (distillable), it's GOAT; when it *generates novel source code* (not distillable), it's PASS.
 > **Classification:** Public
 
 ---
