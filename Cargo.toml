@@ -1007,6 +1007,18 @@ path = "benches/bench_018_sequence_trajectory.rs"
 required-features = ["kimi_k3_loader", "swe_trajectory_freeze"]
 harness = false
 
+# Bench 020 — Autoregressive generation trajectory discrimination (T5.6g).
+# Tests whether the GENERATION trajectory (hidden states during greedy
+# decoding) discriminates as well as the PROCESSING trajectory (bench_018).
+# Uses the substrate StateMagnitudeEncoder (bench_019). 32 prompts ×
+# (16 prefix + 48 generated) tokens. Compares generation vs processing.
+# Requires real model.safetensors.
+[[bench]]
+name = "bench_020_generation_trajectory"
+path = "benches/bench_020_generation_trajectory.rs"
+required-features = ["kimi_k3_loader", "swe_trajectory_freeze"]
+harness = false
+
 # Plan 381 Phase 3 T3.1 — Step-Attribution Δ-Qualifier latency bench (G4).
 # Measures `StepAttributionQualifier::qualify()` end-to-end + aggregate-only
 # at W ∈ {16,32,64,128}. Target: aggregate-only < 1µs at W=64. std::time::Instant
