@@ -1,4 +1,4 @@
-//! Proposal 011 Phase 5 — SWE Trajectory Geometry Synthetic PoC (T5.1–T5.3).
+//! Proposal 011 Phase 5 — SWE Trajectory Geometry Synthetic PoC (T5.1–T5.3b).
 //!
 //! Defend-or-refute PoC for Layer 4 of Proposal 011 (the modelless reframe):
 //! **even when the underlying model proposes zero valid patches, the inference
@@ -11,7 +11,7 @@
 //! whether the substrate itself has discriminative power, before any real-model
 //! integration.
 //!
-//! # The three sub-PoCs
+//! # The sub-PoCs
 //!
 //! - **T5.1** — Does `latent_trajectory_geometry::from_states` produce
 //!   measurably different geometry across distinct synthetic failure modes
@@ -21,18 +21,24 @@
 //!   NOT fire on surrounding churn?
 //! - **T5.3** — Does `CommittedFieldBlend::commit` produce a stable,
 //!   BLAKE3-committable, non-degenerate blend from an all-fail trajectory
-//!   summary?
+//!   summary? (Random-direction baseline — documents the concentration-of-
+//!   measure failure that T5.3b fixes.)
+//! - **T5.3b** — Do data-derived directions from cluster centroids fix the
+//!   T5.3 failure? Dual-strategy test: geometry-encoded summary (should PASS)
+//!   vs endpoint-position summary (should FAIL). The contrast documents the
+//!   design constraint for T5.5: summary encoder MUST capture geometry.
 //!
 //! # Run
 //!
 //! ```bash
-//! cargo run --release --bench bench_011_swe_trajectory_geometry_poc \
+//! cargo bench --manifest-path Cargo.toml \
 //!     --features "latent_trajectory_geometry closed_unit_compaction committed_field_blend" \
-//!     -- --nocapture
+//!     --bench bench_011_swe_trajectory_geometry_poc -- --nocapture
 //! ```
 //!
-//! See `katgpt-rs/.issues/569_swe_trajectory_geometry_synthetic_poc.md` for the
-//! full defend-or-refute protocol + outcome-action table.
+//! See `katgpt-rs/.issues/569_swe_trajectory_geometry_synthetic_poc.md` (T5.1–T5.3)
+//! and `katgpt-rs/.issues/570_data_derived_directions_fix_t53.md` (T5.3b) for the
+//! full defend-or-refute protocols + outcome-action tables.
 
 #![cfg(feature = "latent_trajectory_geometry")]
 #![allow(clippy::needless_range_loop)] // index loops used intentionally for multi-array indexing
