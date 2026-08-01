@@ -318,6 +318,97 @@ pub fn kimi_k3_forward_token<'a>(
     &runtime.logits
 }
 
+// ─── Traced forward (per-layer hidden-state snapshots) ──────────────────────
+//
+// Same decoder path as `kimi_k3_forward_token` but snapshots `runtime.hidden`
+// after embedding + after each decoder layer. Exists for trajectory geometry
+// analysis (Plan 342 / Proposal 011 Layer 4) — the depth-wise latent trajectory
+// [embed → layer0 → layer1 → ... → layer7] is the input to
+// `latent_trajectory_geometry::from_states`.
+//
+// Skips the LM head projection (returns final normalized hidden state, not
+// logits) because trajectory geometry operates on hidden states. This also
+// avoids requiring the full [vocab × hidden] lm_head weight matrix when only
+// the decoder-layer trajectory is needed — the traced variant can run with a
+// truncated embedding table (just enough rows for the test token IDs).
+//
+// **Diagnostic only** — allocates per call (`traj_out.push(runtime.hidden.clone())`
+// after each layer). Production callers should use `kimi_k3_forward_token`.
+
+/// Traced forward — captures per-layer hidden states for trajectory geometry.
+///
+/// Runs the same decoder path as [`kimi_k3_forward_token`] (embed → 8 layers →
+/// output attn-res → final norm) but snapshots `runtime.hidden` after embedding
+/// + after each decoder layer into `traj_out`.
+///
+/// After the call, `traj_out` contains `num_layers + 1` entries (embedding +
+/// 8 post-layer states), each of length `hidden_size`. This is the depth-wise
+/// latent trajectory for one token.
+///
+/// Returns `&runtime.hidden` (final normalized hidden state). The LM head is
+/// intentionally skipped — see the module comment above.
+pub fn kimi_k3_forward_token_traced<'a>(
+    config: &KimiK3ModelConfig,
+    weights: &super::loader::KimiK3ModelWeights,
+    runtime: &'a mut KimiK3Runtime,
+    token_id: u32,
+    traj_out: &mut Vec<Vec<f32>>,
+) -> &'a [f32] {
+    let d = config.hidden_size;
+
+    traj_out.clear();
+
+    // ── Step 0: Reset per-token block state ───────────────────────────────
+    runtime.block_state.clear();
+
+    // ── Step 1: Embedding lookup + snapshot ───────────────────────────────
+    let embed_start = (token_id as usize) * d;
+    let embed_end = embed_start + d;
+    runtime.hidden.copy_from_slice(&weights.embed_weight[embed_start..embed_end]);
+    traj_out.push(runtime.hidden.clone());
+
+    // ── Step 2: Decoder layers + per-layer snapshot ───────────────────────
+    for (layer_idx, layer_w) in weights.layers.iter().enumerate() {
+        let layer_cfg = config.layer_config(layer_idx);
+        let layer_rt = &mut runtime.layers[layer_idx];
+
+        kimi_decoder_layer_forward(
+            layer_idx,
+            &layer_cfg,
+            layer_w,
+            &mut layer_rt.attn_state,
+            &mut layer_rt.attn_scratch,
+            &mut layer_rt.ffn_scratch,
+            &mut layer_rt.attn_res_self_scratch,
+            &mut layer_rt.attn_res_mlp_scratch,
+            &mut runtime.block_state,
+            Some(&mut runtime.rope_freqs),
+            &mut runtime.hidden,
+            &mut runtime.scratch_hidden,
+        );
+        traj_out.push(runtime.hidden.clone());
+    }
+
+    // ── Step 3: Output attn-res (mix with accumulated block state) ────────
+    if !runtime.block_state.is_empty() {
+        let mixed = apply_attn_res(
+            &config.attn_res_config,
+            &weights.output_attn_res,
+            &runtime.block_state,
+            &mut runtime.output_attn_res_scratch,
+            &runtime.hidden,
+        );
+        runtime.hidden.copy_from_slice(mixed);
+    }
+
+    // ── Step 4: Final RMSNorm ─────────────────────────────────────────────
+    rmsnorm_with_gamma_eps(&mut runtime.hidden, &weights.final_norm_weight, config.rms_eps as f64);
+
+    // NOTE: Step 5 (LM head) is intentionally skipped — see module comment.
+
+    &runtime.hidden
+}
+
 // ─── Instrumented forward (per-phase timing) ───────────────────────────────
 //
 // This is the same forward path as `kimi_k3_forward_token` but with timing
