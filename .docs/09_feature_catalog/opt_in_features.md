@@ -1068,3 +1068,70 @@ The prediction was right about FAIL but wrong about WHY. The actual failure: res
 🔧 Feature flag: `quant_error_lora` (in katgpt-core). Stays **opt-in** — the PoC G5 DECISIVELY FAILED on the only consumer (Moka ternary path). Ships as reusable substrate for future larger-model consumers.
 
 📖 Issue: 565 (removed per noise-reduction rule — resolution above), Research: [`.research/463_moka_freeze_thaw_lever_audit.md`](../../.research/463_moka_freeze_thaw_lever_audit.md) §7 (PoC Addendum 2026-08-01), PoC bench: `riir-poc/tests/quant_error_lora_poc.rs` (cross-repo, permanent regression check), Substrate: `crates/katgpt-core/src/quant_error_lora.rs` (7 unit tests)
+
+## 33. Kimi-K3 Native Support — Model Loader + Decoder Layer Composition (Proposal 032)
+
+Native Rust implementation of the Kimi-K3-0.40B model forward path — the composition layer that fuses four substrate primitives (MLA, KDA, MoE, AttnRes) into a working model + a safetensors weight loader. This is **infrastructure, not an algorithmic primitive** — it exists to enable real-model benchmarking (benches 012–020 use it to extract per-layer hidden-state trajectories from real Kimi-K3 weights). The architecture was distilled from Research 447 (KDA + AttnRes + Stable LatentMoE) + Research 331 (safetensors header analysis, cross-repo in riir-ai).
+
+### Layer topology (verified against real `model.safetensors`)
+
+| Layer | Attention | FFN |
+|-------|-----------|-----|
+| 0 | KDA | Dense |
+| 1–2 | KDA | MoE |
+| 3 | MLA | MoE |
+| 4–6 | KDA | MoE |
+| 7 | MLA | MoE |
+
+8 layers total. KDA (Kimi Delta Attention) on 6 layers, MLA (Multi-head Latent Attention) on 2 layers. Layer 0 is the only dense-FFN layer; layers 1–7 use the Stable LatentMoE. Config: `hidden_size=1024`, `vocab_size=163840`, `n_routed_experts=8`, `num_experts_per_tok=2`.
+
+### What the feature gates
+
+| Feature | Gates | Contents |
+|---------|-------|----------|
+| `kimi_k3` | `mla_attention` + `kda_linear` + `transformer_moe` + `transformer_attn_res` | Decoder layer composition (`src/kimi_k3/decoder_layer.rs`) — fuses the four substrate primitives into `kimi_decoder_layer_forward` |
+| `kimi_k3_loader` | `kimi_k3` + `dep:safetensors` + `dep:base64` + `dep:memmap2` | Adds the model-level forward path + safetensors loader + tiktoken tokenizer (`src/kimi_k3/{model,loader,tiktoken}.rs`) |
+
+Both opt-in (default-off). The loader pulls heavy deps (safetensors tensor parsing, memmap2 for zero-copy mmap, base64 for tiktoken format).
+
+### The forward path
+
+```text
+hidden = embed_tokens(input_ids)
+block_state = AttnResBlockState::new()
+for layer in 0..8:
+    kimi_decoder_layer_forward(layer, ..., hidden, block_state)
+hidden = apply_attn_res(hidden, block_state, output_attn_res)  // output mixing
+hidden = rmsnorm(hidden, final_norm_weight)
+logits = lm_head(hidden)
+```
+
+Matches `KimiLinearModel.forward` + `KimiLinearForCausalLM.forward` from `modeling_kimi_k3_linear.py` (verified against real source, Research 331). Three entry points: `kimi_k3_forward_token` (production), `kimi_k3_forward_token_timed` (per-phase latency breakdown), `kimi_k3_forward_token_traced` (per-layer hidden-state extraction — the bench 012/014/018/020 trajectory source).
+
+### Zero-copy mmap loader
+
+`load_kimi_k3` memory-maps `model.safetensors` (1.5 GB) via `memmap2`, parses the safetensors header once, and maps tensor names to the weight structs (MLA / KDA / MoE / attn-res) with zero tensor copies — weights are read directly from the mmap'd region. Tensor name mapping verified against the real file header (Research 331): all tensor names match, including the fused projections (`kv_a_proj_with_mqa` = `w_dkv` + `w_kr` split at `d_c=128`, etc.).
+
+### GOAT gate status
+
+The Kimi-K3 loader is **infrastructure**, not a modelless primitive — it has no GOAT gate of its own. Its value is enabling the GOAT gates of the primitives it composes + the benches that consume it:
+
+- **Bench 012** (T5.4): substrate numerical stability at D=1024 on real architecture — G1+G2+G4 PASS, G3 FAIL 29% distinct across tokens (depth geometry is model-determined, not input-determined — the negative control for the sequence-trajectory breakthrough).
+- **Bench 014** (G5): 100% cross-model discrimination (real Kimi-K3 vs random weights, 40/40 held-out) via `GeometrySummaryEncoder`.
+- **Bench 018 + 020**: 100% value-level discrimination at σ≥0.1 via `StateMagnitudeEncoder` (the load-bearing result for Proposal 011 Layer 4).
+
+The substrate primitives it composes each have their own GOAT gates (GDN2/KDA Plan 105 14/14, MLA, MoE, AttnRes).
+
+### Why opt-in
+
+1. **Heavy deps.** safetensors + memmap2 + base64 are not needed by the default modelless-inference path.
+2. **1.5 GB model file.** The loader requires downloading `Kimi-K3-0.40B/model.safetensors` from HuggingFace (`inference-optimization/Kimi-K3-0.40B`) — not bundled.
+3. **Research substrate.** The loader exists to enable trajectory-geometry benches, not as a production inference path. Promotion to default would require a production consumer.
+
+### Example
+
+`cargo run --release --features kimi_k3_loader --example kimi_k3_hello_world` — loads real weights, tokenizes a prompt, decodes N tokens, reports per-phase latency + tok/s. Override prompt via `KIMI_PROMPT` + decode length via `KIMI_N_TOKENS`.
+
+🔧 Feature flags: `kimi_k3` (decoder layer composition) + `kimi_k3_loader` (model + safetensors + tiktoken). Both opt-in (default-off) at the root crate.
+
+📖 Proposal: 032 (Kimi-K3 native support — referenced in source; no standalone `.proposals/032_*.md` file). Research: [447](../../.research/447_Kimi_K3_KDA_AttnRes_LatentMoE.md) (architecture distillation) + riir-ai [331](../../riir-ai/.research/331_kimi_k3_phase6_safetensors_header_analysis.md) (tensor name verification) + [330](../../riir-ai/.research/330_kimi_k3_modeling_code_divergences.md) (modeling divergences). Substrate: `src/kimi_k3/{mod,decoder_layer,model,loader,tiktoken}.rs`. Example: `examples/kimi_k3_hello_world.rs`. Consumer benches: [012](../../.benchmarks/012_kimi_k3_trajectory_geometry.md) + [014](../../.benchmarks/014_swe_trajectory_freezer_g5.md) + [018](../../.benchmarks/018_sequence_trajectory.md) + [020](../../.benchmarks/020_generation_trajectory.md).
