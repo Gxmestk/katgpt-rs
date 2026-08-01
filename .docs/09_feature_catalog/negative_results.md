@@ -587,3 +587,34 @@ Root cause: DashAttention's entmax routing is already a strong sparse-attention 
 **The generalized lesson.** A primitive can have correct math + fast latency + clean feature isolation and STILL not be a modelless gain. The modelless mandate (katgpt-rs/AGENTS.md) requires the *gain* to be achievable without training — not just the *mechanism*. ReMax's mechanism is closed-form arithmetic (modelless); its exploration *benefit* is a training-time phenomenon (not modelless). This is the same distinction as the AC-Prefix G1 lesson (Plan 313): the algorithm's correctness is necessary but not sufficient for promotion.
 
 📖 Bench: [374](../../.benchmarks/374_remax_goat.md), Plan: [374](../../.plans/374_remax_expected_max_aggregation_primitive.md), Feature: `remax_aggregation` (opt-in), Research: [373](../../.research/373_ReMax_Expected_Max_Retry_Aggregation.md). Training algorithm: `riir-train` Plan 304 (`remax_ppo`).
+
+## 30. ShardKV — RoPE-Removal + Hadamard KV Compression (Plan 147) — CONDITIONAL: Combined Fidelity WORST of All KV Methods
+
+**Hypothesis.** RoPE removal + PCA on keys + Hadamard transform + uniform quant on values would achieve ≥8× compression with best-in-class K fidelity (the RoPE-removal insight: rotating keys to remove RoPE's position-dependent rotation concentrates the eigenvalue distribution, d_eff 5.90 → 2.00, enabling better PCA compression).
+
+**CONDITIONAL — not promoted (2026-05-26).** Per `.benchmarks/045_shard_kv_goat.md`:
+
+| Gate | Target | Result | Verdict |
+|---|---|---|---|
+| G1 (RoPE-removal d_eff ratio) | < 0.7 | 0.339 (5.90 → 2.00) | ✅ PASS |
+| G5 (compression ratio) | ≥ 8× | 9.7× at d=128 | ✅ PASS |
+| G6 (K cosine) | 0.995 | 0.9880 | ⚠️ CONDITIONAL (met min 0.985) |
+| G7 (V cosine) | 0.98 | 0.9407 | ⚠️ CONDITIONAL (met min 0.93) |
+| **Cross-method combined fidelity** | best | **1.9373 (WORST)** | ❌ **FAIL** |
+
+| Method | cos_k | cos_v | Combined | Compression |
+|---|---|---|---|---|
+| ShardKV(K=4,V=2) | **0.9957** | 0.9416 | 1.9373 | 9.0× |
+| SpectralQuant(avg=3bit) | 0.9855 | 0.9847 | 1.9703 | 9.1× |
+| TurboQuant(K=3,V=3) | 0.9646 | 0.9834 | 1.9480 | 9.1× |
+| HybridOCTPQ(K=3,V=3) | 0.9862 | 0.9866 | **1.9728** | 9.1× |
+
+**Root cause.** The V path is too lossy — Hadamard + 2-bit uniform can't match OCTOPUS's 0.99 triplet encoding. ShardKV wins on K fidelity (the RoPE-removal + PCA path works) but loses on V fidelity badly enough that combined fidelity is worst of all methods. The asymmetric K=4/V=2 allocation is also dominated by symmetric K=3/V=3 (+0.031 combined).
+
+**Outcome.** Stays opt-in (`shard_kv`). The RoPE-removal insight is validated + should be evaluated as a standalone enhancement to SpectralQuant (future work). The V path needs rework — replace Hadamard+uniform with OCTOPUS triplet encoding to close the quality gap.
+
+**Niche use case.** Long-context memory-bound workloads where K fidelity matters more than V (attention is more sensitive to key quality than value quality in some regimes). Not a general-purpose default.
+
+**Re-opens only on** (a) a V-path rework that closes the combined-fidelity gap to HybridOCTPQ, OR (b) a workload where the asymmetric K-favoring allocation demonstrably beats symmetric allocation on downstream task quality.
+
+📖 Bench: [045](../../.benchmarks/045_shard_kv_goat.md), Plan: [147](../../.plans/147_shard_asymmetric_kv_cache.md), Feature: `shard_kv` (opt-in, in `katgpt-kv`).
