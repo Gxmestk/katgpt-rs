@@ -22,11 +22,17 @@
 
 pub mod decoder_layer;
 
+#[cfg(feature = "kimi_k3_loader")]
+pub mod model;
+
 pub use decoder_layer::{
     KimiAttentionConfig, KimiAttentionState, KimiAttentionScratch, KimiAttentionWeights,
     KimiDecoderLayerConfig, KimiDecoderLayerWeights, KimiFfnConfig, KimiFfnScratch,
     KimiFfnWeights, kimi_decoder_layer_forward,
 };
+
+#[cfg(feature = "kimi_k3_loader")]
+pub use model::{KimiK3ModelConfig, KimiK3Runtime, kimi_k3_forward_token};
 
 // Safetensors loader + tiktoken tokenizer (gated by `kimi_k3_loader`).
 #[cfg(feature = "kimi_k3_loader")]

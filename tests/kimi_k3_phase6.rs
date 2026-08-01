@@ -96,3 +96,63 @@ fn t5_4_load_real_model_all_tensors_mapped() {
     eprintln!("   embed: [163840, 1024], lm_head: [163840, 1024]");
     eprintln!("   layers: 8 (MLA at 3,7; KDA at 0,1,2,4,5,6; Dense at 0)");
 }
+
+/// T6.3 — End-to-end forward pass on the real model.
+///
+/// Loads the real weights, runs a forward pass on token ID 1 (BOS), and
+/// verifies the logits are finite (no NaN/Inf from bad math).
+#[test]
+#[ignore = "requires model.safetensors (1.5GB download)"]
+fn t6_3_forward_pass_produces_finite_logits() {
+    use katgpt_rs::kimi_k3::model::{KimiK3ModelConfig, KimiK3Runtime, kimi_k3_forward_token};
+
+    if !model_exists() {
+        eprintln!("skipping: {} not found", model_path());
+        return;
+    }
+
+    let weights = load_kimi_k3(&model_path()).unwrap_or_else(|e| panic!("load failed: {e}"));
+    let config = KimiK3ModelConfig::kimi_k3_0_40b();
+    let mut runtime = KimiK3Runtime::new(&config, 64);
+
+    // Forward pass on BOS token (id=1)
+    let logits = kimi_k3_forward_token(&config, &weights, &mut runtime, 1u32);
+
+    assert_eq!(logits.len(), 163840, "logits length mismatch");
+
+    let mut nan_count = 0;
+    let mut inf_count = 0;
+    let mut max_logit = f32::NEG_INFINITY;
+    let mut min_logit = f32::INFINITY;
+    for (i, &v) in logits.iter().enumerate() {
+        if v.is_nan() {
+            nan_count += 1;
+            if nan_count <= 5 {
+                eprintln!("   NaN at logit[{i}]");
+            }
+        }
+        if v.is_infinite() {
+            inf_count += 1;
+            if inf_count <= 5 {
+                eprintln!("   Inf at logit[{i}]");
+            }
+        }
+        if v > max_logit {
+            max_logit = v;
+        }
+        if v < min_logit {
+            min_logit = v;
+        }
+    }
+
+    eprintln!("   logits: len={}, nan={}, inf={}, min={:.4}, max={:.4}",
+        logits.len(), nan_count, inf_count, min_logit, max_logit);
+
+    // Find top-5 predicted tokens
+    let mut indexed: Vec<(usize, f32)> = logits.iter().copied().enumerate().collect();
+    indexed.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+    eprintln!("   top-5 tokens: {:?}", &indexed[..5]);
+
+    assert_eq!(nan_count, 0, "NaN in logits");
+    assert_eq!(inf_count, 0, "Inf in logits");
+}
