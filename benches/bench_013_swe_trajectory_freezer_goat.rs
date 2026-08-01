@@ -266,22 +266,16 @@ fn run_g2_perf(directions: &[[f32; D]; N]) -> (u64, bool) {
     (per_call_ns, pass)
 }
 
-fn run_g4_zero_alloc(directions: &[[f32; D]; N]) -> (usize, bool) {
-    // CountingAllocator audit of the steady-state hot path
-    // (freeze_attempt after warmup).
+fn run_g4_zero_alloc(directions: &[[f32; D]; N]) -> (G4Result, G4Result) {
+    // CountingAllocator audit of the steady-state hot path.
     //
-    // HONEST target: ≤2 allocs/call. The 2 allocs are inherited from
-    // `latent_trajectory_geometry::from_states`, which allocates two `Vec<f32>`
-    // displacement buffers per call (documented in its source — "Allocated
-    // ONCE up front" means once per CALL, not once per session). The freeze
-    // pipeline itself (encode_into + FAME commit + envelope) is zero-alloc;
-    // the 2 allocs are entirely substrate-side.
+    // Two variants measured:
+    //   (1) `freeze_attempt`       — convenience wrapper, allocates 2 Vec scratch.
+    //   (2) `freeze_attempt_into`  — zero-alloc when caller reuses scratch.
     //
-    // Follow-up: add a `from_states_into` variant to the substrate that takes
-    // pre-allocated scratch buffers (matches the `simd_dot_f32` vs
-    // `simd_dot_f32_into` pattern). Tracked as a T5.5 follow-up — does not
-    // block T5.5 completion because the substrate's per-call allocation is
-    // already documented + the primitive works correctly.
+    // The freeze pipeline itself (encode_into + FAME commit + envelope) is
+    // zero-alloc in both variants; the only difference is the scratch-buffer
+    // allocation in `from_states` vs `from_states_into`.
     use std::alloc::{GlobalAlloc, Layout};
     use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -307,24 +301,45 @@ fn run_g4_zero_alloc(directions: &[[f32; D]; N]) -> (usize, bool) {
     let traj = build_trajectory_for_mode(0, 999);
     let refs = build_refs(&traj);
 
-    // Warmup — FAME commit is zero-alloc, but envelope allocates one Vec
-    // for the payload (cold path). Warmup doesn't help here because each
-    // call allocates. Instead we measure total allocs over N calls and
-    // divide.
     const N_CALLS: usize = 100;
-    let before = ALLOC_COUNT.load(Ordering::Relaxed);
+
+    // Variant 1: freeze_attempt (allocating) — target ≤2 allocs/call.
+    let before1 = ALLOC_COUNT.load(Ordering::Relaxed);
     for _ in 0..N_CALLS {
         let _ = freezer.freeze_attempt(&refs, &fields, 1);
     }
-    let after = ALLOC_COUNT.load(Ordering::Relaxed);
-    let total_allocs = after - before;
+    let after1 = ALLOC_COUNT.load(Ordering::Relaxed);
+    let total1 = after1 - before1;
+    let per_call1 = total1 / N_CALLS;
+    let pass1 = per_call1 <= 2;
 
-    // Target: ≤ 2 allocs/call (inherited from from_states substrate).
-    // The freeze pipeline itself is zero-alloc; the 2 allocs are the
-    // substrate's documented displacement-buffer allocation.
-    let per_call_allocs = total_allocs / N_CALLS;
-    let pass = per_call_allocs <= 2;
-    (per_call_allocs, pass)
+    // Variant 2: freeze_attempt_into (zero-alloc steady state) — target 0.
+    // Pre-allocate scratch once; reuse across all calls.
+    let mut disp_curr = Vec::<f32>::with_capacity(DIM);
+    let mut disp_prev = Vec::<f32>::with_capacity(DIM);
+    // Warmup the scratch buffers to their steady-state capacity (first call
+    // resizes from 0 to DIM; subsequent calls reuse).
+    let _ = freezer.freeze_attempt_into(&refs, &fields, 1, &mut disp_curr, &mut disp_prev);
+
+    let before2 = ALLOC_COUNT.load(Ordering::Relaxed);
+    for _ in 0..N_CALLS {
+        let _ = freezer.freeze_attempt_into(&refs, &fields, 1, &mut disp_curr, &mut disp_prev);
+    }
+    let after2 = ALLOC_COUNT.load(Ordering::Relaxed);
+    let total2 = after2 - before2;
+    let per_call2 = total2 / N_CALLS;
+    let pass2 = per_call2 == 0;
+
+    (
+        G4Result { per_call: per_call1, pass: pass1, variant: "freeze_attempt" },
+        G4Result { per_call: per_call2, pass: pass2, variant: "freeze_attempt_into" },
+    )
+}
+
+struct G4Result {
+    per_call: usize,
+    pass: bool,
+    variant: &'static str,
 }
 
 // ─── Main ──────────────────────────────────────────────────────────────────
@@ -411,10 +426,14 @@ fn main() {
     println!("   G2 verdict: {}", if g2_pass { "PASS" } else { "FAIL" });
     println!();
 
-    // ── G4: zero-alloc steady state ──────────────────────────────────
-    println!("── G4: alloc-free steady state (substrate-inherited budget) ──");
-    let (per_call_allocs, g4_pass) = run_g4_zero_alloc(&directions);
-    println!("   per_call allocs: {per_call_allocs} (target ≤2; from_states substrate)");
+    // ── G4: zero-alloc steady state ─────────────────────────────────
+    println!("── G4: alloc-free steady state ──");
+    let (g4_alloc, g4_into) = run_g4_zero_alloc(&directions);
+    println!("   {}: {} allocs/call (target ≤2; from_states substrate)",
+        g4_alloc.variant, g4_alloc.per_call);
+    println!("   {}: {} allocs/call (target 0; from_states_into + reused scratch)",
+        g4_into.variant, g4_into.per_call);
+    let g4_pass = g4_alloc.pass && g4_into.pass;
     println!("   G4 verdict: {}", if g4_pass { "PASS" } else { "FAIL" });
     println!();
 

@@ -118,7 +118,7 @@
 #![allow(clippy::doc_lazy_continuation)] // multi-line prose with leading words clippy misreads as list items
 
 use crate::committed_field_blend::{ArchetypeFieldSource, CommittedFieldBlend};
-use crate::latent_trajectory_geometry::{LatentTrajectoryGeometry, from_states};
+use crate::latent_trajectory_geometry::{LatentTrajectoryGeometry, from_states_into};
 
 // ─── Encoder ────────────────────────────────────────────────────────────────
 
@@ -319,6 +319,62 @@ pub fn derive_directions<const N: usize, const M: usize, const D: usize>(
         let mut norm_sq = 0.0_f32;
         for j in 0..D {
             out_directions[k][j] = centroids[k][j] - global[j];
+            norm_sq += out_directions[k][j] * out_directions[k][j];
+        }
+        let norm = norm_sq.sqrt().max(1e-9);
+        for j in 0..D {
+            out_directions[k][j] /= norm;
+        }
+    }
+}
+
+/// Derive archetype directions + the global centroid (the fit constructor's
+/// workhorse).
+///
+/// Like [`derive_directions`], but also writes the global centroid into
+/// `out_global`. The centroid is used by [`SweTrajectoryFreezer::fit`] to
+/// mean-center summaries before projection — without this, the FAME sigmoid
+/// gate's threshold at 0 may not align with the natural decision boundary.
+pub fn derive_directions_and_centroid<const N: usize, const M: usize, const D: usize>(
+    train_summaries: &[[[f32; D]; M]; N],
+    out_directions: &mut [[f32; D]; N],
+    out_global: &mut [f32; D],
+) {
+    debug_assert!(M > 0, "M (per-mode sample count) must be > 0");
+
+    // Per-mode centroids.
+    let mut centroids = [[0.0_f32; D]; N];
+    for (mode_idx, mode_sums) in train_summaries.iter().enumerate() {
+        for s in mode_sums.iter() {
+            for j in 0..D {
+                centroids[mode_idx][j] += s[j];
+            }
+        }
+        let inv = 1.0 / (M as f32);
+        for j in 0..D {
+            centroids[mode_idx][j] *= inv;
+        }
+    }
+
+    // Global centroid (mean of per-mode centroids).
+    for j in 0..D {
+        out_global[j] = 0.0;
+    }
+    for c in &centroids {
+        for j in 0..D {
+            out_global[j] += c[j];
+        }
+    }
+    let inv_n = 1.0 / (N as f32);
+    for j in 0..D {
+        out_global[j] *= inv_n;
+    }
+
+    // direction_k = normalize(centroid_k − global).
+    for k in 0..N {
+        let mut norm_sq = 0.0_f32;
+        for j in 0..D {
+            out_directions[k][j] = centroids[k][j] - out_global[j];
             norm_sq += out_directions[k][j] * out_directions[k][j];
         }
         let norm = norm_sq.sqrt().max(1e-9);
@@ -556,31 +612,89 @@ impl<const N: usize, const D: usize> FrozenAttempt<N, D> {
 pub struct SweTrajectoryFreezer<const N: usize, const D: usize> {
     /// Pre-fit archetype direction vectors (from [`derive_directions`]).
     pub directions: [[f32; D]; N],
+    /// The global centroid of the training summaries (subtracted from each
+    /// summary before projection to center the data for discriminative gates).
+    /// Defaults to all-zeros when constructed via [`new`] / [`with_encoder`]
+    /// (no centering). Set via [`fit`] / [`with_centroid`] for proper
+    /// nearest-centroid classification.
+    pub global_centroid: [f32; D],
     /// The geometry-summary encoder.
     pub encoder: GeometrySummaryEncoder,
 }
 
 impl<const N: usize, const D: usize> SweTrajectoryFreezer<N, D> {
     /// Construct a freezer with the given direction vectors + default encoder.
+    ///
+    /// The global centroid defaults to all-zeros (no mean-centering). For
+    /// proper nearest-centroid classification, use [`fit`] instead — it derives
+    /// both the directions AND the global centroid from the training corpus.
     pub fn new(directions: [[f32; D]; N]) -> Self {
         Self {
             directions,
+            global_centroid: [0.0_f32; D],
             encoder: GeometrySummaryEncoder::default(),
         }
     }
 
     /// Construct a freezer with the given direction vectors + custom encoder.
+    ///
+    /// The global centroid defaults to all-zeros (no mean-centering). See
+    /// [`new`] for why you usually want [`fit`] instead.
     pub fn with_encoder(
         directions: [[f32; D]; N],
         encoder: GeometrySummaryEncoder,
     ) -> Self {
         Self {
             directions,
+            global_centroid: [0.0_f32; D],
             encoder,
         }
     }
 
+    /// Construct a freezer with pre-computed directions + global centroid +
+    /// custom encoder. This is the full-control constructor for callers that
+    /// have pre-computed the centroid externally.
+    pub fn with_centroid(
+        directions: [[f32; D]; N],
+        global_centroid: [f32; D],
+        encoder: GeometrySummaryEncoder,
+    ) -> Self {
+        Self {
+            directions,
+            global_centroid,
+            encoder,
+        }
+    }
+
+    /// Fit the freezer from a labeled training corpus — derives directions
+    /// AND the global centroid from the data (the recommended constructor).
+    ///
+    /// This is the mathematically correct constructor for nearest-centroid
+    /// classification: it computes `direction_k = normalize(centroid_k -
+    /// global_centroid)` AND stores the global centroid so that
+    /// [`freeze_attempt_into`] can mean-center each summary before projection.
+    /// Without mean-centering, the FAME sigmoid gate's threshold at 0 may not
+    /// align with the natural decision boundary between clusters (the N=2
+    /// antiparallel degeneracy makes this especially acute).
+    pub fn fit<const M: usize>(
+        train_summaries: &[[[f32; D]; M]; N],
+    ) -> Self {
+        let mut directions = [[0.0_f32; D]; N];
+        let mut global_centroid = [0.0_f32; D];
+        derive_directions_and_centroid(train_summaries, &mut directions, &mut global_centroid);
+        Self {
+            directions,
+            global_centroid,
+            encoder: GeometrySummaryEncoder::default(),
+        }
+    }
+
     /// Freeze a single attempt's trajectory into a committed characterization.
+    ///
+    /// Convenience wrapper around [`freeze_attempt_into`] — allocates scratch
+    /// buffers internally (2 `Vec<f32>` allocations sized to `dim`). For
+    /// zero-allocation steady-state, reuse a pair of `Vec<f32>` scratch buffers
+    /// via [`freeze_attempt_into`].
     ///
     /// # Pipeline
     ///
@@ -600,25 +714,59 @@ impl<const N: usize, const D: usize> SweTrajectoryFreezer<N, D> {
     ///
     /// # Allocation
     ///
-    /// - `from_states` is zero-alloc (the substrate's documented contract).
+    /// - `from_states` allocates 2 `Vec<f32>` displacement buffers.
     /// - `encode_into` is zero-alloc.
     /// - FAME `commit` is zero-alloc (Plan 321 G4).
-    /// - The envelope construction allocates one `Vec<u8>` for the payload
-    ///   (size `N·4 + D·4 + 16`). This is a cold-path cost (one alloc per
-    ///   freeze); the steady-state hot path is the FAME `apply_blended`
-    ///   call, which is zero-alloc.
+    /// - The envelope payload uses a stack-fixed `[u8; 512]` buffer.
+    ///
+    /// Use [`freeze_attempt_into`] to eliminate the 2 `Vec` allocations by
+    /// passing caller-managed scratch buffers.
     pub fn freeze_attempt(
         &self,
         trajectory: &[&[f32]],
         fields: &[&dyn ArchetypeFieldSource<D>; N],
         version: u64,
     ) -> FrozenAttempt<N, D> {
-        // 1. Geometry.
-        let geometry = from_states(trajectory);
+        let dim = trajectory.first().map_or(0, |s| s.len());
+        let mut disp_curr = vec![0.0_f32; dim];
+        let mut disp_prev = vec![0.0_f32; dim];
+        self.freeze_attempt_into(trajectory, fields, version, &mut disp_curr, &mut disp_prev)
+    }
 
-        // 2. Summary.
+    /// Zero-allocation variant of [`freeze_attempt`] — takes caller-managed
+    /// scratch buffers for the trajectory geometry computation.
+    ///
+    /// The scratch buffers are resized to `dim` if too small (no-op when
+    /// already large enough). Callers that reuse the same pair across calls
+    /// achieve **zero allocation in steady state** — the entire freeze
+    /// pipeline (geometry → encode → FAME commit → BLAKE3 envelope) uses only
+    /// stack-fixed buffers.
+    ///
+    /// See [`freeze_attempt`] for the pipeline description + argument semantics.
+    pub fn freeze_attempt_into(
+        &self,
+        trajectory: &[&[f32]],
+        fields: &[&dyn ArchetypeFieldSource<D>; N],
+        version: u64,
+        disp_curr: &mut Vec<f32>,
+        disp_prev: &mut Vec<f32>,
+    ) -> FrozenAttempt<N, D> {
+        // 1. Geometry.
+        let geometry = from_states_into(trajectory, disp_curr, disp_prev);
+
+        // 2. Summary (mean-centered for discriminative projection).
+        //    Subtracting the global centroid centers the data so the FAME
+        //    sigmoid gate's threshold at 0 aligns with the natural decision
+        //    boundary between clusters. Without this, non-centered summaries
+        //    with positive-valued features can produce dot products that are
+        //    all on the same side of 0 (the N=2 antiparallel degeneracy makes
+        //    this especially acute). When the centroid is all-zeros (constructed
+        //    via `new` / `with_encoder`), this is a no-op.
         let mut summary = [0.0_f32; D];
         self.encoder.encode_into(&geometry, &mut summary);
+        for j in 0..D {
+            summary[j] -= self.global_centroid[j];
+        }
 
         // 3. FAME commit.
         let mut blend = CommittedFieldBlend::<N, D>::uncommitted();
@@ -809,7 +957,9 @@ mod tests {
     /// using the default synthetic encoder.
     fn encode_geom_summary(traj: &[Vec<f32>]) -> [f32; D] {
         let refs = build_refs(traj);
-        let geom = from_states(&refs);
+        let mut disp_curr = vec![0.0_f32; DIM];
+        let mut disp_prev = vec![0.0_f32; DIM];
+        let geom = from_states_into(&refs, &mut disp_curr, &mut disp_prev);
         let mut summary = [0.0_f32; D];
         GeometrySummaryEncoder::default_synthetic().encode_into(&geom, &mut summary);
         summary
@@ -1118,5 +1268,91 @@ mod tests {
             v1.envelope.commitment, v2.envelope.commitment,
             "envelope commits to trajectory, not to FAME version"
         );
+    }
+
+    /// T5.6 fix verification: `fit` (mean-centering) produces different gates
+    /// than `new` (no centering) for the same directions + trajectory.
+    ///
+    /// This is a regression guard for the mean-centering fix discovered in
+    /// Bench 014 — without it, non-centered summaries produce dot products all
+    /// on the same side of 0, yielding degenerate classification.
+    #[test]
+    fn g7_fit_mean_centering_affects_gates() {
+        // Build a synthetic training corpus with 3 modes (same as G3).
+        let train: [[[f32; D]; 3]; N] = [
+            [
+                encode_geom_summary(&build_trajectory_for_mode(0, 100)),
+                encode_geom_summary(&build_trajectory_for_mode(0, 101)),
+                encode_geom_summary(&build_trajectory_for_mode(0, 102)),
+            ],
+            [
+                encode_geom_summary(&build_trajectory_for_mode(1, 100)),
+                encode_geom_summary(&build_trajectory_for_mode(1, 101)),
+                encode_geom_summary(&build_trajectory_for_mode(1, 102)),
+            ],
+            [
+                encode_geom_summary(&build_trajectory_for_mode(2, 100)),
+                encode_geom_summary(&build_trajectory_for_mode(2, 101)),
+                encode_geom_summary(&build_trajectory_for_mode(2, 102)),
+            ],
+        ];
+
+        // Fit (with centroid) vs new (without centroid) — same directions.
+        let freezer_fit = SweTrajectoryFreezer::<N, D>::fit(&train);
+        let freezer_new = SweTrajectoryFreezer::<N, D>::new(freezer_fit.directions);
+
+        let fields = make_stub_fields();
+        let test_traj = build_trajectory_for_mode(0, 999);
+        let refs = build_refs(&test_traj);
+
+        let frozen_fit = freezer_fit.freeze_attempt(&refs, &fields, 1);
+        let frozen_new = freezer_new.freeze_attempt(&refs, &fields, 1);
+
+        // The gates SHOULD differ because mean-centering shifts the dot
+        // products. If they're identical, the centroid is zero (which means
+        // the training data is centered — not the case for our synthetic
+        // trajectories with positive-valued features).
+        let gates_fit = frozen_fit.gates();
+        let gates_new = frozen_new.gates();
+
+        // At least one gate should differ.
+        let any_diff = (0..N).any(|k| (gates_fit[k] - gates_new[k]).abs() > 1e-6);
+        assert!(any_diff, "fit (mean-centered) gates should differ from new (raw) gates");
+
+        // Both should still classify mode 0 correctly (the synthetic regime
+        // is discriminative enough that even without centering it works at
+        // N=3 — the centering fix is critical for N=2 binary classification,
+        // documented in Bench 014).
+        assert_eq!(frozen_fit.argmax_archetype(), 0);
+        assert_eq!(frozen_new.argmax_archetype(), 0);
+    }
+
+    /// `from_states_into` produces identical results to `from_states`.
+    #[test]
+    fn g8_from_states_into_matches_from_states() {
+        use crate::latent_trajectory_geometry::{from_states, from_states_into};
+
+        // Build a realistic trajectory.
+        let traj = build_trajectory_for_mode(0, 42);
+        let refs = build_refs(&traj);
+
+        // from_states (allocating).
+        let geom_alloc = from_states(&refs);
+
+        // from_states_into (zero-alloc, reused buffers).
+        let mut disp_curr = Vec::new();
+        let mut disp_prev = Vec::new();
+        let geom_into = from_states_into(&refs, &mut disp_curr, &mut disp_prev);
+
+        // Bit-identical geometry.
+        assert_eq!(geom_alloc.length, geom_into.length);
+        assert_eq!(geom_alloc.mean_curvature, geom_into.mean_curvature);
+        assert_eq!(geom_alloc.min_adjacent_cosine, geom_into.min_adjacent_cosine);
+        assert_eq!(geom_alloc.n_steps, geom_into.n_steps);
+
+        // Second call with same buffers — still identical (reuse works).
+        let geom_into2 = from_states_into(&refs, &mut disp_curr, &mut disp_prev);
+        assert_eq!(geom_alloc.length, geom_into2.length);
+        assert_eq!(geom_alloc.mean_curvature, geom_into2.mean_curvature);
     }
 }

@@ -848,12 +848,13 @@ pub use cross_stage_relocation::{
 #[cfg(feature = "latent_trajectory_geometry")]
 pub use latent_trajectory_geometry::{
     BifurcationResult, LatentTrajectoryGeometry, bifurcation_ratio, fast_acos, from_states,
+    from_states_into,
 };
 
 #[cfg(feature = "swe_trajectory_freeze")]
 pub use swe_trajectory_freeze::{
     FrozenAttempt, GeometrySummaryEncoder, SweTrajectoryFreezer, SWTF_MAGIC, SWTF_VERSION,
-    TrajectoryFreezeEnvelope, derive_directions,
+    TrajectoryFreezeEnvelope, derive_directions, derive_directions_and_centroid,
 };
 
 #[cfg(feature = "latent_confounder_audit")]

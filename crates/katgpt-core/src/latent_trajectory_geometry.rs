@@ -157,10 +157,10 @@ pub fn fast_acos(x: f32) -> f32 {
 ///
 /// # Allocation
 ///
-/// **Zero allocation in the hot path.** Two reusable displacement buffers
-/// are allocated ONCE up front (sized to `dim`), then overwritten in place
-/// each iteration via a ping-pong swap. The measured call is a pure streaming
-/// fold — no per-step `Vec` creation, no per-step drop.
+/// Allocates two `Vec<f32>` displacement buffers sized to `dim` (one
+/// allocation each). For zero-allocation steady-state, use
+/// [`from_states_into`] with caller-managed scratch buffers that are reused
+/// across calls.
 ///
 /// # Numerical note
 ///
@@ -196,6 +196,47 @@ pub fn fast_acos(x: f32) -> f32 {
 /// ```
 #[inline]
 pub fn from_states(states: &[&[f32]]) -> LatentTrajectoryGeometry {
+    let dim = states.first().map_or(0, |s| s.len());
+    let mut disp_curr = vec![0.0_f32; dim];
+    let mut disp_prev = vec![0.0_f32; dim];
+    from_states_into(states, &mut disp_curr, &mut disp_prev)
+}
+
+/// Zero-allocation variant of [`from_states`] — takes caller-managed scratch
+/// buffers for the displacement ping-pong pair.
+///
+/// The buffers are resized to `dim` if they are too small (using `Vec::resize`,
+/// which only allocates on growth — a no-op when the buffer is already large
+/// enough). Callers that reuse the same pair across calls achieve **zero
+/// allocation in steady state**.
+///
+/// After this call returns, the buffers' contents are unspecified (they have
+/// been swapped an arbitrary number of times during the ping-pong). Only their
+/// length and capacity are meaningful.
+///
+/// # Example
+///
+/// ```
+/// use katgpt_core::latent_trajectory_geometry::from_states_into;
+///
+/// let v0 = [1.0_f32, 0.0];
+/// let v1 = [2.0, 0.0];
+/// let v2 = [3.0, 0.0];
+/// let states: Vec<&[f32]> = vec![&v0, &v1, &v2];
+/// let mut a = Vec::new();
+/// let mut b = Vec::new();
+/// let geom = from_states_into(&states, &mut a, &mut b);
+/// assert_eq!(geom.length, 2.0);
+/// // Reuse across calls — no reallocation.
+/// let geom2 = from_states_into(&states, &mut a, &mut b);
+/// assert_eq!(geom2.length, 2.0);
+/// ```
+#[inline]
+pub fn from_states_into(
+    states: &[&[f32]],
+    disp_curr: &mut Vec<f32>,
+    disp_prev: &mut Vec<f32>,
+) -> LatentTrajectoryGeometry {
     if states.len() < 2 {
         return LatentTrajectoryGeometry::default();
     }
@@ -205,20 +246,26 @@ pub fn from_states(states: &[&[f32]]) -> LatentTrajectoryGeometry {
         return LatentTrajectoryGeometry::default();
     }
 
+    // Ensure scratch buffers are at least `dim`. resize is a no-op when the
+    // buffer is already large enough — steady-state callers never hit this.
+    if disp_curr.len() < dim {
+        disp_curr.resize(dim, 0.0);
+    }
+    if disp_prev.len() < dim {
+        disp_prev.resize(dim, 0.0);
+    }
+
     let mut length: f32 = 0.0;
     let mut min_adjacent_cosine: f32 = 1.0;
     let mut curvature_sum: f32 = 0.0;
     let mut curvature_count: u32 = 0;
 
-    // Reusable displacement buffers. Allocated ONCE up front; overwritten in
-    // place each iteration. This is the zero-alloc hot-path fix (Plan 342 G2).
+    // Reusable displacement buffers. Overwritten in place each iteration via
+    // a ping-pong swap. This is the zero-alloc hot-path fix (Plan 342 G2).
     //
     // Pattern: `disp_prev` holds the previous step's displacement; we write
-    // the current displacement into `disp_curr`, then `mem::swap` the two
-    // Vecs (just 3 pointer swaps — ~1ns — no element copy). Both Vecs are
-    // pre-sized to `dim` so no reallocation ever happens.
-    let mut disp_curr = vec![0.0_f32; dim];
-    let mut disp_prev = vec![0.0_f32; dim];
+    // the current displacement into `disp_curr`, then swap the two Vecs
+    // (just 3 pointer swaps — ~1ns — no element copy).
     let mut have_prev_disp = false;
 
     for i in 1..states.len() {
@@ -286,8 +333,9 @@ pub fn from_states(states: &[&[f32]]) -> LatentTrajectoryGeometry {
         }
 
         // Swap: current becomes previous for the next iteration. Vec swap is
-        // 3 pointer moves — no element copy, no allocation.
-        std::mem::swap(&mut disp_curr, &mut disp_prev);
+        // 3 pointer moves — no element copy, no allocation. Both references
+        // point to distinct Vecs, so this is sound.
+        std::mem::swap(disp_curr, disp_prev);
         have_prev_disp = true;
     }
 
