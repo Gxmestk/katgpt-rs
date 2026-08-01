@@ -2028,3 +2028,359 @@ These features are marked "DEFAULT-ON in root" but not in katgpt-core's `default
 | `memory_soup_lora` | 290 | Memory Soup LoRA — MSP0 binary format parser |
 | `skill_opt` | 144 | SkillOpt text-space skill optimization |
 | `channel_simd_align` | 227 Phase 5 | Channel SIMD Alignment — cache-line-padded weight storage |
+
+## 61. NFCoT Flow Family — Normalizing Flow Continuous CoT Drafting (Plan 229)
+
+A family of six opt-in features for modelless normalizing-flow-based speculative drafting. Distilled from the NFCoT paper (Continuous CoT via normalizing flows).
+
+### Features
+
+| Feature | Plan | Role |
+|---|---|---|
+| `nf_flow_score` | 229 T1 | FlowScore Drafter — modelless normalizing flow density scoring for draft acceptance |
+| `nf_flow_gate` | 229 T3 | FlowGate — adaptive acceptance criterion based on flow density |
+| `nf_flow_budget` | 229 T4 | FlowBudget — sigmoid-weighted speculative depth allocation |
+| `nf_flow_mux` | 229 T6 | FlowMUX — flow scoring for MUX trajectories (implies mux_pruner) |
+| `nf_flow_fold` | 229 T7 | FlowFold — confidence-gated chain folding (implies chain_fold) |
+| `nf_flow` | 229 | Parent feature — enables all flow components |
+
+### Architecture
+
+The normalizing flow provides a density estimate over the token space, which replaces the heuristic acceptance criteria in standard speculative decoding. The flow score drives three independent mechanisms: draft acceptance (FlowGate), depth budgeting (FlowBudget), and chain folding (FlowFold). FlowMUX composes with the MUX pruner family (§54) for superposition-based trajectories.
+
+All components are default-OFF pending GOAT gate validation. Phase 12 (2026-07-04): `nf_flow_generator` + `nf_flow_qgf` modules moved to `katgpt-speculative`.
+
+🔧 Feature flags: all opt-in. `nf_flow_score` + `nf_flow_budget` forward to `katgpt-speculative`; `nf_flow_gate` is root-local.
+
+📖 Plan: [229](../../.plans/229_nf_flow_score_drafter.md). Research: [204](../../.research/204_NFCoT_Normalizing_Flow_Continuous_CoT.md).
+
+## 62. FOL-LNN Rule Inference Family — DDTree→FOL Pipeline (Plan 209)
+
+A family of features for first-order logic rule inference — extracting logical constraints from prompts and decision trees, then using them as modelless pruners.
+
+### Features
+
+| Feature | Plan | Default | Role |
+|---|---|---|---|
+| `fol_constraints` | 209 T1 | opt-in | FOL constraint extraction from prompts — keyword table + FolPruner |
+| `rule_extraction` | 209 T2 | opt-in | Logical rule extraction from DDtree paths — ExtractedRule + RuleExtractor |
+| `reward_mem` | 209 T3 | **DEFAULT-ON** | Reward-Weighted Branch Memorization — blake3 pattern hashing + EMA reward tracking (GOAT 6/6) |
+| `decision_trace` | 209 T4 | **DEFAULT-ON** | Interpretable decision traces (transitively in `default` via `regex` dependency) |
+| `egcs` | 206 | **DEFAULT-ON** | Episode-Guided Constraint Synthesis — reference-based structural constraint injection (GOAT 4/4) |
+| `fol_lnn` | 209 | opt-in | Parent feature — all FOL-LNN fusions convenience |
+
+### Architecture
+
+The pipeline flows: prompt → `fol_constraints` (keyword table extraction) → `rule_extraction` (DDTree path → logical rule) → `reward_mem` (BLAKE3 pattern hash + EMA reward) → `decision_trace` (interpretable trace output). `egcs` (Episode-Guided Constraint Synthesis) provides the reference-based structural injection layer. `reward_mem` + `decision_trace` + `egcs` are all DEFAULT-ON (GOAT-proved); the constraint/rule extraction layers stay opt-in.
+
+🔧 Feature flags: `fol_constraints` + `rule_extraction` + `fol_lnn` opt-in; `reward_mem` + `decision_trace` + `egcs` DEFAULT-ON. All forward to `katgpt-pruners`.
+
+📖 Plan: [209](../../.plans/209_fol_logical_rule_inference.md). Bench: [209](../../.benchmarks/209_fol_lnn_goat.md).
+
+## 63. K-Prior Algorithmic Probability Sampler Family (Plan 305)
+
+A family of three opt-in features for algorithmic-probability-based K-prior sampling — injecting Solomonoff-style complexity priors into bandit/MCTS/speculative decision paths.
+
+### Features
+
+| Feature | Plan | Role |
+|---|---|---|
+| `complexity_prior_sampler` | 305 | Open primitive — algorithmic-probability sampler + coincidence gate |
+| `bandit_k_prior` | 305 T3.2 | Bandit K-prior wrapper (KPriorBandit<K>) exposing arm_log_prior |
+| `mcts_k_prior` | 305 T3.1 | MCTS expansion-prior adapter (MctsExpansionPrior / UniformExpansion / KPriorExpansion) |
+| `spec_k_prior` | 305 T3.3 | Speculative drafter post-drafting re-ranker (KPriorDrafter<K>::rerank) |
+
+### Architecture
+
+The `complexity_prior_sampler` open primitive computes algorithmic-probability-based priors. Three adapters inject these priors into different decision frameworks: bandit arm selection (KPriorBandit), MCTS expansion (MctsExpansionPrior), and speculative draft re-ranking (KPriorDrafter). The caller adds the adapter to their existing framework — no invasive changes.
+
+🔧 Feature flags: all opt-in. All forward to `katgpt-pruners`.
+
+📖 Plan: [305](../../.plans/305_algorithmic_probability_sampler.md).
+
+## 64. CoExplain Bidirectional Alignment — Pruner Evolution (Plan 214)
+
+A family of three opt-in features for self-refining constraint pruners with bidirectional alignment. Distilled from the CoExplain methodology.
+
+### Features
+
+| Feature | Plan | Role |
+|---|---|---|
+| `ted_lite` | 214 P1 | TED-Lite Divergence Metric — pruner drift measurement |
+| `coexplain_pruner` | 214 P2+3 | Self-Refining + Editable ConstraintPruner (implies ted_lite + bandit) |
+| `coexplain_riir` | 214 P4 | RIIR Feedback Loop — Curator marketplace enabler (implies coexplain_pruner) |
+
+### Architecture
+
+`ted_lite` measures pruner drift (how far a pruner's behavior has diverged from its baseline). `coexplain_pruner` uses this drift signal to create a self-refining constraint pruner that can be edited by a curator. `coexplain_riir` extends this with a feedback loop for a curator marketplace — pruners evolve based on external feedback.
+
+🔧 Feature flags: all opt-in. All forward to `katgpt-pruners`.
+
+📖 Plan: [214](../../.plans/214_coexplain_bidirectional_alignment.md).
+
+## 65. Cubical Category Interval Topology for Inference (Plan 252)
+
+A family of three opt-in features for cubical-category-based interval topology — applying CAT(0) cubical complex theory to inference-time token set constraints.
+
+### Features
+
+| Feature | Plan | Role |
+|---|---|---|
+| `interval_pruner` | 252 Phase 1 | IntervalPruner — interval-closure for valid token sets |
+| `cubical_nerve` | 252 Phase 3 | CubicalNerve — CAT(0) cubical complexes from zone posets |
+| `cubical_topology` | 252 | Parent feature — canonical pruner composition (implies interval_pruner + lattice_operad + cubical_nerve) |
+
+### Architecture
+
+`interval_pruner` provides interval-closure computation for valid token sets (which tokens are valid within a given interval). `cubical_nerve` constructs CAT(0) cubical complexes from zone posets — a topological structure that captures the constraint geometry. `cubical_topology` composes these with the lattice operad into a canonical pruner.
+
+Phase 12 (2026-07-04): `interval_pruner` moved to `katgpt-pruners`; `cubical_nerve` moved to `katgpt-core`. The 2026-07-18 cargo-comment sync corrected a stale "DEFAULT-ON in root" claim — both are genuinely opt-in.
+
+🔧 Feature flags: all opt-in. `interval_pruner` → `katgpt-pruners`; `cubical_nerve` → `katgpt-core`.
+
+📖 Plan: [252](../../.plans/252_cubical_category_interval_topology.md). Research: [220](../../.research/220_Convenient_Category_Cubes_Interval_Topology.md).
+
+## 66. Lean4Agent Formal Verification Fusion (Plan 223)
+
+A family of three opt-in features for formal-verification-guided inference — Hoare-logic-based predicate propagation, failure localization, and sigmoid-graded relevance.
+
+### Features
+
+| Feature | Plan | Role |
+|---|---|---|
+| `hoare_pruner` | 223 | Predicate propagation — Hoare-logic pre/post conditions as inference pruners (implies llmexec_guard) |
+| `trajectory_doctor` | 223 | Failure localization — identifies where a trajectory diverged from its specification (implies hoare_pruner) |
+| `workflow_lattice` | 223 | Sigmoid-graded relevance — lattice-structured workflow scoring (implies hoare_pruner) |
+
+### Architecture
+
+`hoare_pruner` applies Hoare-logic pre/post conditions as inference-time pruning constraints — tokens that would violate the post-condition are pruned. `trajectory_doctor` localizes failures by identifying the first point where a trajectory diverges from its formal specification. `workflow_lattice` provides sigmoid-graded relevance scoring on a lattice structure.
+
+All three depend on `hoare_pruner` which in turn depends on `llmexec_guard` (DEFAULT-ON). Phase 11 (2026-07-04): `hoare_pruner` also forwards to `katgpt-validator` so `SynPruner::propagate` resolves.
+
+🔧 Feature flags: all opt-in. All forward to `katgpt-pruners` + `katgpt-validator`.
+
+📖 Plan: [223](../../.plans/223_lean4agent_formal_verification_fusion.md).
+
+## 67. Self-Advantage Recursion Gate Family (Plan 283)
+
+A family of three opt-in features extending the Self-Advantage recursion gate (already documented in §60 as `self_advantage_gate`) — dead-compute detection via pre/post log-ratio, weight-shared loop integration, and personality fingerprinting.
+
+### Features
+
+| Feature | Plan | Role |
+|---|---|---|
+| `self_advantage_gate` | 283 | Self-advantage recursion gate for HLA reconstruction (see §60) |
+| `weight_shared_advantage_gate` | 283 T2.2 | Wire AdvantageMarginGate into forward_looped weight-shared loop — breaks early on dead-compute iterations (implies self_advantage_gate) |
+| `product_policy_sharpen` | 283 | Product-policy inference sharpening — controllable reasoning trust weight |
+| `advantage_freeze_thaw` | 283 T5.3 | AdvantageDirectionSnapshot + EMA accumulator — per-NPC personality fingerprint via BLAKE3-committed A(·) direction |
+
+### Architecture
+
+The `self_advantage_gate` (§60) detects dead compute via pre/post recursion log-ratio. `weight_shared_advantage_gate` integrates this into the weight-shared inference loop for early termination on dead iterations. `product_policy_sharpen` provides a trust-weight mechanism for sharpening inference decisions. `advantage_freeze_thaw` captures the advantage direction as a per-NPC personality fingerprint (BLAKE3-committed), enabling freeze/thaw of the agent's behavioral signature.
+
+All four distilled from arXiv:2511.16886 (Self-Advantage Recursion).
+
+🔧 Feature flags: all opt-in. `product_policy_sharpen` + `advantage_freeze_thaw` forward to `katgpt-pruners`.
+
+📖 Plan: [283](../../.plans/283_self_advantage_recursion_gate.md). Research: [250](../../.research/250_Latent_Recursion_Policy_Improvement_Advantage_Margin.md).
+
+## 68. Additional Standalone Opt-In Features (Extended)
+
+A second consolidated table for standalone opt-in features with their own plans, complementing §60.
+
+### Speculative decoding & drafters
+
+| Feature | Plan | Role |
+|---|---|---|
+| `domino_lora` | 231 | Domino LoRA causal correction adapter for speculative decoding. Plan 387: moved to `katgpt-speculative`; Plan 394: forwarded to `katgpt-forward`. |
+| `acceptance_forecast` | — | Acceptance rate forecasting for speculative draft budgeting |
+| `mtp_lora_drafter` | — | Multi-token-prediction LoRA drafter |
+| `ssc_spec_draft` | — | SSC speculative draft variant |
+
+### Attention & memory
+
+| Feature | Plan | Role |
+|---|---|---|
+| `msa_*` family | 256 | MSA blockwise sparse attention — **3× GOAT FAILED**, see [negative_results §36](negative_results.md#36-msa-blockwise-sparse-attention-family---3-goat-failed-stays-opt-in-permanently) |
+| `still_kv` | 245 | StillKV perceiver-based KV cache compaction — modelless |
+| `maxsim` | 080 | MaxSim late-interaction scoring (Research 45). Forwards to `katgpt-quant` (TurboQuant + OCTOPUS integration). |
+| `engram` | 299 | Engram — hash-addressed, sigmoid-fused static pattern memory (arXiv:2601.07372) |
+| `memory_soup_dtree` | — | Experimental DDTree branch merging |
+| `emotion_vector` | — | Emotion vector primitive |
+
+### Tokenization & vocabulary
+
+| Feature | Plan | Role |
+|---|---|---|
+| `convex_tok` | 127 | ConvexTok LP vocabulary optimizer (Research 087). Forwards to `katgpt-tokenizer`. |
+| `toast_tokenizer` | 122 | ToaST split-tree tokenization (Research 081). Forwards to `katgpt-tokenizer`. |
+| `datrie_vocab` | — | Double-array trie vocabulary lookup |
+| `fast_bpe` | — | Fast BPE tokenizer variant |
+
+### Search & graph
+
+| Feature | Plan | Role |
+|---|---|---|
+| `progressive_mcgs` | 272 | Progressive MCGS — graph search with reference edges + entropy-gated schedule (Research 239) |
+| `set_diffusion` | 401 | Set Diffusion — set-causal attention + DecodeStrategy::SetDiffusion |
+| `hlplayer` blends | 436 | `binned_blend` (HARMFUL), `kernel_blend` (RECOMMENDED), `contextual_bandit` — see [negative_results §37](negative_results.md#37-binned-blend-estimator---real-arena-strictly-harmful-stays-opt-in) |
+
+### Formal verification & proof
+
+| Feature | Plan | Role |
+|---|---|---|
+| `proof_cert` | 145 | Hierarchical GOAT Proof Certificates — formal verification methodology (Research 106) |
+| `proof_sketch_evolution` | 128 | Proof Sketch Evolution — Elo-rated population + global goal cache (Research 088) |
+| `ruliology` | 188 | Ruliology Bandit — simple program strategies as bandit arms (Research 168) |
+| `symbolic_distill` | 210 | Symbolic Expression Distillation — compact polynomial expressions for DDTree boundaries (GOAT 6/6, default-ON in root) |
+
+### Hardware & deployment
+
+| Feature | Plan | Role |
+|---|---|---|
+| `flashar_anchor` | 166 | FlashAR strided anchor-then-fill D2F (Research 149). Forwards to `katgpt-forward`. |
+| `flashar_consensus` | 166 | FlashAR Consensus Tri-Mode with Ternary Thermal Paths (Research 149) |
+| `hardware_aware_scheduler` | 339 | Hardware-Aware Prefix Scheduler — multi-request verification budget allocator (DSpark §3.2.2) |
+| `moka_ane` | — | Moka on Apple Neural Engine via CoreML |
+
+### Skill & lifecycle
+
+| Feature | Plan | Role |
+|---|---|---|
+| `skill_lifecycle` | 192 | Inference-Time Skill Evolution — per-pruner memory + test-gated registration + progressive disclosure catalog |
+| `hebbian_kernel_memory` | 559 | Closed-Form Fact-Storing MLP Construction + MLP Swap (arXiv:2607.10034). **DEFAULT-ON in katgpt-core** — see §69. |
+
+### Pruners & routing
+
+| Feature | Plan | Role |
+|---|---|---|
+| `bckvss` | — | Backward-compatible KV state sharing |
+| `bfcf_lfu_shard` | — | BFCF LFU shard variant |
+| `bfcf_tree` | — | BFCF tree variant |
+| `manifold_pruner` | — | Manifold-based pruning |
+| `spectral_budget` | — | Spectral budget allocation |
+| `expression_pruner` / `expression_pruner_dep` | — | Expression-based pruners |
+| `fpcg_selector` | — | FPCG selector |
+| `hoare_pruner` family | 223 | See §66 (Lean4Agent Formal Verification) |
+| `cubical_topology` family | 252 | See §65 (Cubical Category Interval Topology) |
+| `rv_bandit_pruning` | — | River-valley bandit pruning |
+| `rv_gated_thinking` | — | River-valley gated thinking |
+| `safe_bandit` | — | Safe exploration bandit |
+| `safe_exploration_budget` | — | Safe exploration budget allocator |
+| `sdpg_bandit` | — | SDPG bandit |
+| `selectivity_router` | — | Selectivity router |
+| `smooth_min_rerank` | — | Smooth-min re-ranking |
+
+## 69. DEFAULT-ON Undocumented Features (Cross-Reference)
+
+These features are DEFAULT-ON (in katgpt-core or root) with significant plans/GOAT benches but were not previously documented in the opt-in catalog. They are listed here for completeness — they do NOT need opt-in catalog entries, but a future default-features doc should cover them.
+
+### Significant DEFAULT-ON primitives
+
+| Feature | Plan | Default layer | Role |
+|---|---|---|---|
+| `manifold_erasure` | 426 | katgpt-core | MANCE — Manifold-Aware Concept Erasure. Local tangent + spectral weighting + trust-bounded erasure. Pure modelless linear algebra. GOAT G1–G7 ALL PASS. |
+| `dreamer` | 107 | root | Auto-Dreamer offline memory consolidation scheduler. GOAT 8/8. Full pipeline: scheduler → consolidator → decay → counterfactual. |
+| `reward_mem` | 209 T3 | root | Reward-Weighted Branch Memorization — blake3 pattern hashing + EMA reward tracking. GOAT 6/6. (See §62.) |
+| `river_valley` | 152 | root | River-valley diagnostic metrics — subspace ratios, effective rank, cosine similarity. GOAT 25/25 (Bench 050). Substrate in `katgpt-spectral`. |
+| `union_bound_confidence` | 231 | root | Union bound additive branch confidence. GOAT 6/6. |
+| `hebbian_kernel_memory` | 559 | katgpt-core | Closed-Form Fact-Storing MLP Construction + MLP Swap. GOAT G1+G2+G3+G4 ALL PASS (Bench 559). (See §68.) |
+
+### Other notable DEFAULT-ON features (substrate/utility)
+
+These are DEFAULT-ON features that form the substrate of the default build. They are listed for cross-reference — most are small utility/substrate primitives that don't warrant individual catalog entries:
+
+`sparse_mlp`, `plasma_path`, `leo_all_goals`, `dual_leo`, `sigmoid_margin`, `spectral_hierarchy`, `dual_gram_pca`, `roofline_cost`, `octree_ctc`, `sector_projection`, `action_bridge`, `triggered_injection`, `temporal_deriv`, `bom_sampling`, `personality_composition`, `depth_invariance`, `cross_resolution_transport`, `latent_field_steering`, `viable_manifold_graph`, `ac_prefix`, `geometric_product`, `fourier_continuation`, `spectral_differentiation`, `tucker_factorization`, `arg_protocol`, `indicator_probe_bank`, `indicator_similarity`, `phase_rotation_coupling`, `spherical_steering`, `closure_instrument`, `non_interference_branches`, `funcattn_structured_basis`, `best_belief`, `committed_field_blend`, `tropical_algebra`, `temp_loss_fingerprint`, `zone_density_routing`, `set_attention`, `manifold_bandit`, `mean_field_regime`, `qmc_sampling`, `velocity_field_ensemble`, `cognitive_architecture_root`, `ptg_functor_edges`, `local_branch_routing`, `ane_roofline`, `ane_fused_chain`, `cce_moderator`, `llmexec_guard`, `ssd_block`, `salience_tri_gate`, `renoise_ce`, `product_key_memory`, `linking_fold_fold`, `ssmax_temperature`, `subspace_steering`, `region_subspace_steering`, `mag_mining`, `tilr_invariant_subspace`, `manifold_erasure`, `heal_validation`, `smooth_min_similarity`, `simd_lut_dequant`, `poincare_navigator`, `chunked_content_store`, `causal_identification`, `conformal_predictive_intervals`, `karc_forecaster`, `hope_capacity`, `hebbian_kernel_memory`.
+
+The full DEFAULT-ON list lives in `crates/katgpt-core/Cargo.toml` `default = [...]` (71 features) + root `Cargo.toml` `default = [...]` (134 features). See the per-feature Cargo.toml comments for GOAT bench references.
+
+## 70. Functional Attention Family — Spectral Transport Operator (Plan 286)
+
+A family of opt-in features for Functional Attention — a closed-form Tikhonov k×k spectral transport operator that replaces standard attention with a linear-in-n variant.
+
+### Features
+
+| Feature | Plan | Default | Role |
+|---|---|---|---|
+| `funcattn` | 286 | opt-in | Core operator — closed-form Tikhonov spectral transport (arXiv:2605.31559) |
+| `funcattn_structured_basis` | 332 | **DEFAULT-ON** | Multi-scale basis constructors (DCT-log, Haar-packet) for FUNCATTN (implies funcattn) |
+| `funcattn_spectral_pre_rotate` | 286 | opt-in | FUNCATTN × SpectralQuant — pre-rotate basis weights into the calibrated eigenbasis (implies funcattn + spectral_quant) |
+| `funcattn_chiar_blend` | 286 | opt-in | FUNCATTN × CHIAR — per-token spectral-entropy sigmoid blend of FUNCATTN (low-entropy) vs fallback (implies funcattn + chiaroscuro) |
+| `funcattn_freeze_thaw` | 286 T5.3 | opt-in | FUNCATTN × BLAKE3-committed snapshot hot-swap (FuncAttnWeightsSnapshot + atomic RwLock<Arc<>>) |
+| `funcattn_compose` | 286 Phase 5 | opt-in | Parent — all three FUNCATTN compositions (spectral_pre_rotate + chiar_blend + freeze_thaw) |
+
+### Architecture
+
+The core `funcattn` replaces the standard attention matrix with a closed-form Tikhonov k×k spectral transport operator, making attention linear in sequence length. `funcattn_structured_basis` adds principled multi-scale basis constructors (DCT-log, Haar-packet). Three compositions extend it: spectral pre-rotation (align basis with SpectralQuant), chiaroscuro blend (sigmoid-mix with fallback attention based on spectral entropy), and freeze/thaw (BLAKE3-committed weight hot-swap).
+
+Note: `funcattn` is already mentioned in the DEFAULT-ON list as part of the default feature surface — the feature flag itself is opt-in in katgpt-core but the `funcattn_structured_basis` submodule is DEFAULT-ON.
+
+🔧 Feature flags: `funcattn` core opt-in; `funcattn_structured_basis` DEFAULT-ON; three compositions opt-in. Core in `katgpt-core`; compositions in `katgpt-attn`.
+
+📖 Plan: [286](../../.plans/286_functional_attention_spectral_transport.md). Research: [257](../../.research/257_Functional_Attention_Spectral_Transport_Operator.md).
+
+## 71. Sparse Off-Principal Task Vector Family (Plan 264)
+
+A family of features for modelless sparse task vector operations — OPD-grounded sparse delta format + cross-frame alignment + ranking correction.
+
+### Features
+
+| Feature | Plan | Default | Role |
+|---|---|---|---|---|
+| `sparse_task_vector` | 264 Phase 1 | opt-in | Sparse Off-Principal Task Vector storage — OPD-grounded sparse delta format (GOAT G1–G2 PASS, 2.9×) |
+| `off_principal_retrieval` | 264 Phase 2 | opt-in | Off-Principal Task Vector Retrieval — projection + index + score (GOAT G3–G4 PASS, ≥9×) |
+| `orthogonal_procrustes` | Issue 001 | opt-in | Orthogonal Procrustes — cross-frame embedding alignment via polar decomposition (GOAT 4/4 PASS, 365µs) |
+| `dynamic_rank` | 232 | opt-in | Dynamic Rank Pruner — GATv2-inspired static ranking detection & correction |
+
+### Architecture
+
+`sparse_task_vector` stores task-specific weight deltas in a sparse OPD-grounded format. `off_principal_retrieval` provides projection + indexing + scoring for retrieving relevant task vectors. `orthogonal_procrustes` aligns embeddings across frames via polar decomposition. `dynamic_rank` detects and corrects static ranking issues (GATv2-inspired).
+
+🔧 Feature flags: all opt-in. `sparse_task_vector` in `katgpt-sparse`; `off_principal_retrieval` + `orthogonal_procrustes` in `katgpt-spectral`; `dynamic_rank` in `katgpt-pruners`.
+
+📖 Plan: [264](../../.plans/264_sparse_off_principal_task_vector_modelless.md). Research: [231](../../.research/231_Sparse_Off_Principal_Task_Vector_OPD.md).
+
+## 72. Task-Relevant Identifiability Family (Plan 265)
+
+A family of features for task-relevant identifiability — band-conditioned selection + collider consistency + adaptive CoT stopping.
+
+### Features
+
+| Feature | Plan | Default | Role |
+|---|---|---|---|
+| `band_conditioner` | 265 | **DEFAULT-ON** | Band conditioning set + CI test primitives for task-relevant identifiability (arXiv:2605.12733) |
+| `bckvss` | 265 Phase 1 | opt-in | Fusion A: Band-Conditioned KV Segment Selector (GOAT G1–G3 ALL PASS) |
+| `collider_consistency` | 265 Phase 3 | **DEFAULT-ON** | Fusion C: Collider-Consistency ConstraintPruner for DDTree (GOAT G7–G9 pass) |
+| `adaptive_cot_identifiability` | 265 Phase 4 | opt-in | Theory-backed adaptive CoT stopping criterion (GOAT G10 PASS) |
+
+### Architecture
+
+The family implements three fusions of task-relevant identifiability theory. `band_conditioner` (DEFAULT-ON substrate) provides band conditioning + conditional independence tests. `bckvss` (Fusion A) selects KV segments based on band-conditioned relevance. `collider_consistency` (Fusion C, DEFAULT-ON) applies collider-consistency constraints as a DDtree pruner. `adaptive_cot_identifiability` (Phase 4) provides a theory-backed CoT stopping criterion.
+
+🔧 Feature flags: `band_conditioner` + `collider_consistency` DEFAULT-ON; `bckvss` + `adaptive_cot_identifiability` opt-in. All in `katgpt-band`.
+
+📖 Plan: [265](../../.plans/265_task_relevant_identifiability_modelless.md). Research: [232](../../.research/232_Task_Relevant_Identifiability_Specialist.md).
+
+## 73. INSIGHT Symbolic Distillation & Explanation Family (Plan 210)
+
+A family of features for the INSIGHT pipeline — modelless explore→distill→explain for symbolic expression distillation and decision explanation.
+
+### Features
+
+| Feature | Plan | Default | Role |
+|---|---|---|---|
+| `symbolic_distill` | 210 F1 | **DEFAULT-ON** | Symbolic Expression Distillation — compact polynomial expressions for DDtree boundaries (GOAT 6/6) |
+| `concept_grounding` | 210 F2 | **DEFAULT-ON** | Concept Grounding — template-based pruner rule explanation (implies symbolic_distill, GOAT 6/6) |
+| `decision_explain` | 210 Phase 4 | **DEFAULT-ON** | Perturbation-based decision explanation via sensitivity analysis (GOAT 6/6) |
+| `insight_explain` | 210 | opt-in | Parent — full INSIGHT pipeline (implies symbolic_distill + concept_grounding + decision_explain + posterior_evolution + mux_latent_context + reward_calibrator) |
+
+### Architecture
+
+The INSIGHT pipeline flows: `symbolic_distill` (compact polynomial expressions for DDtree boundaries) → `concept_grounding` (template-based rule explanation) → `decision_explain` (perturbation-based sensitivity analysis). The parent `insight_explain` combines all three plus `posterior_evolution` + `mux_latent_context` + `reward_calibrator` into the full pipeline.
+
+Three of four components are DEFAULT-ON (GOAT 6/6 each); only the parent aggregator `insight_explain` stays opt-in.
+
+🔧 Feature flags: `symbolic_distill` + `concept_grounding` + `decision_explain` DEFAULT-ON; `insight_explain` opt-in. All in `katgpt-pruners`.
+
+📖 Plan: [210](../../.plans/210_insight_symbolic_distillation_explanation.md).

@@ -729,3 +729,55 @@ Root cause: DashAttention's entmax routing is already a strong sparse-attention 
 **Lesson.** When the mathematical identity holds (Stokes' theorem is proven), the question is whether the *application* of that identity produces a downstream quality gain. A correct theorem ≠ a useful feature. The boundary-flux-as-region-mass trick works because it's purely computational (O(boundary) vs O(volume)); the Fokker-Planck-as-anomaly-detector fails because divergence correlation is weaker than direct event scanning.
 
 📖 Feature: `stokes_calculus` (opt-in; root alias for `katgpt-core/dec_operators`).
+
+## 36. MSA Blockwise Sparse Attention Family — 3× GOAT FAILED (STAYS OPT-IN PERMANENTLY)
+
+**Plan:** [256](../../.plans/256_msa_blockwise_sparse_distillation.md) · **Research:** [225](../../.research/225_MSA_Blockwise_Sparse_Attention_Distillation.md) · **Features:** `msa_sparse`, `msa_per_group`, `msa_kv_outer`, `msa_adaptive_k` (all opt-in, permanently)
+
+**What it is.** Distillation of MSA's (Blockwise Sparse Attention) key inference-time mechanisms into katgpt-rs's existing VortexFlow framework. Three trivial wins shipped (max-pool scoring, exp-free TopK, max+stddev scorer) plus three GOAT-gate experiments (per-GQA-group independent top-k, KV-outer sparse prefill, adaptive-k budget via sigmoid gate).
+
+**Gate results (3 Phase-2 GOAT gates, ALL FAILED):**
+
+| Gate | Metric | Result | Target | Status |
+|---|---|---|---|---|
+| **Per-group** | Coverage ratio | 1.003× | ≥ 1.5× | ❌ FAIL |
+| **KV-outer** | Speedup @ 128K | 1.14× | ≥ 1.5× | ❌ FAIL |
+| **KV-outer** | Speedup @ 512K | 0.83× | ≥ 1.5× | ❌ FAIL (regression) |
+| **Adaptive-k** | Recall ratio | 0.629 | ≥ 0.90 | ❌ FAIL |
+| Adaptive-k | Compute savings | 37.1% | ≥ 25% | ✅ PASS (but gate is AND) |
+
+**Root cause (per-group).** Per-GQA-group independent top-k selection produces near-identical coverage to the shared top-k path (ratio 1.003× — essentially no difference at modelless scale). The grouping benefit only materializes with trained attention patterns that diverge across groups.
+
+**Root cause (KV-outer).** KV-outer sparse prefill wins at short context (2.02× at 32K) but **regresses** at long context (0.83× at 512K — slower than dense). The overhead of the sparse selection scan grows with sequence length, eventually exceeding the savings.
+
+**Root cause (adaptive-k).** The recall is **mathematically bounded**: recall normalized by fixed k is bounded by k_adaptive/k_fixed ≈ 20.14/32 = 0.63. The two GOAT criteria (≥25% savings → avg k ≤ 24, AND ≥90% recall → requires avg k ≥ 28.8) are in direct tension — they cannot both be satisfied simultaneously. A precision/weighted-recall metric would better reflect selection quality.
+
+**Outcome.** All four `msa_*` features stay opt-in permanently. The Phase 3 arena benchmark (which would require trained weights + RULER) was deferred to Issue 014 (closed+removed) — not feasible modellessly. The three Phase 2 micro-benchmarks serve as modelless RULER proxies; their failures predict the arena would also fail.
+
+**Lesson.** Two distinct failure modes: (1) **inference-time adaptations of training-time sparse patterns produce no quality gain** without the trained attention divergence (per-group); (2) **savings/recall criteria in direct tension** (adaptive-k) cannot both pass — the GOAT gate design itself was flawed, not just the implementation. When designing a dual-criterion gate (AND of two metrics), verify the criteria aren't structurally incompatible.
+
+📖 Features: `msa_sparse` + 3 sub-features (all opt-in permanently). Phase 12 (2026-07-04): primitives moved to `katgpt-attn`.
+
+## 37. Binned Blend Estimator — REAL ARENA STRICTLY HARMFUL (STAYS OPT-IN)
+
+**Plan:** 436 / Issue 428 (removed) · **Bench:** [006](../../.benchmarks/006_shared_vs_independent_hl.md) · **Features:** `binned_blend`, `kernel_blend`, `contextual_bandit` (Plan 436 family — all opt-in)
+
+**What it is.** Three modelless blend estimators for HLPlayer (Bomberman HL Arena, Plan 033): `binned_blend` (5-bin discretization on blast_proximity, per-(bin,arm) Q-table), `kernel_blend` (Nadaraya-Watson kernel estimator, 128-entry ring buffer, σ=0.15), and `contextual_bandit` (contextual bandit baseline). The goal was to replace the n-armed bandit with a modelless nonlinear estimator.
+
+**Gate results:**
+
+| Feature | Micro-env (synthetic) | Real Arena | Verdict |
+|---|---|---|---|
+| `binned_blend` | +8.7pp over n-armed ✅ | mean delta −93.0 vs baseline −11.67 (**8× WORSE**), survival 78.7% vs 80.7% | ❌ **STRICTLY HARMFUL** |
+| `kernel_blend` | — | mean delta +78.5 (CI [+26.3, +130.8] at 99.9%), survival 81.7% (+1.2pp), Welch t=3.61 (p≈0.0003) | ✅ **RECOMMENDED** |
+| `contextual_bandit` | — | baseline | — |
+
+**Root cause (binned_blend).** The 5-bin discretization on `blast_proximity` is too coarse for real game features — the micro-env's synthetic distribution doesn't capture the real arena's feature geometry. The estimator overfits to the bin boundaries, producing catastrophic miscalibration in the real game (mean reward 8× worse than the simple n-armed baseline).
+
+**Root cause (kernel_blend success).** The Nadaraya-Watson kernel estimator adapts to the actual feature density without discretization artifacts. The 20-seed wider study (Benchmark 432 reference in Cargo.toml, actual analysis in Bench 006) confirmed the gain holds at 99.9% CI.
+
+**Outcome.** `binned_blend` stays opt-in as **documented evidence of a negative result** — do NOT use it in production. `kernel_blend` is the RECOMMENDED HLPlayer estimator (stays opt-in to preserve tournament A/B reproducibility — both n-armed and kernel paths must remain independently runnable).
+
+**Lesson.** A modelless estimator that passes a synthetic micro-env GOAT can fail catastrophically (8× worse) on the real arena. The 5-bin discretization is the smoking gun — discretization resolution must match the real feature distribution, not the synthetic one. Always validate estimator gains on the real target distribution before promoting.
+
+📖 Features: `binned_blend` (opt-in, harmful — do not use), `kernel_blend` (opt-in, recommended), `contextual_bandit` (opt-in, baseline). All gated behind `bomber`.
