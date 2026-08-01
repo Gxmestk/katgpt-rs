@@ -375,21 +375,13 @@ fn g1_5_snapshot_atomicity() {
     assert!(!alive_boxes.is_empty(), "swapper never ran");
 }
 
-// ─── G2.1 placeholder (Phase 5 T5.0 — NOT implemented here) ───────────────
-
-// TODO(Plan 276 Phase 5 T5.0): Build the G2.1 coherence benchmark — a
-// synthetic 1000-step input sequence with injected ambiguity / flip-flop
-// triggers (analog of the paper's "bank" polysemy adapted to NPC dialogue).
-// Run `LeakyIntegrator` (belief default) vs `AttractorKernel` (Family A). Measure
-// flip-flop rate + belief stability over a sliding window.
-//
-// This is the ACTUAL GOAT gate for the attractor quality claim: does attractor
-// update reduce long-horizon flip-flops vs belief's leaky integrator? If yes →
-// promote `micro_belief_attractor` as opt-in variant. If no → demote to Gain.
-//
-// Out of scope for Phase 1 — requires a longer input generator + a flip-flop
-// metric + a comparison harness. The G1 tests above gate only the *mechanics*
-// (determinism, boundedness, bridge correctness, latency, atomicity).
+// ─── G2.1 coherence benchmark ───────────────────────────────────────────
+// Plan 276 Phase 5 T5.0 SHIPPED the G2.1 benchmark in `coherence_bench.rs`
+// (not here in tests.rs). Result: G2.1 FAIL — attractor flips 569× more than
+// leaky; attractor family demoted to opt-in Gain. See `.benchmarks/276_micro_belief_goat.md`
+// §G2.1 for the full verdict + the trained-weight-future-work note.
+// This placeholder block retained as the historical "Phase 1 scope boundary"
+// marker — the actual benchmark lives in the sibling module.
 
 // ─── trait dispatch sanity ────────────────────────────────────────────────
 
