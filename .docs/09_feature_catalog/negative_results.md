@@ -618,3 +618,90 @@ Root cause: DashAttention's entmax routing is already a strong sparse-attention 
 **Re-opens only on** (a) a V-path rework that closes the combined-fidelity gap to HybridOCTPQ, OR (b) a workload where the asymmetric K-favoring allocation demonstrably beats symmetric allocation on downstream task quality.
 
 📖 Bench: [045](../../.benchmarks/045_shard_kv_goat.md), Plan: [147](../../.plans/147_shard_asymmetric_kv_cache.md), Feature: `shard_kv` (opt-in, in `katgpt-kv`).
+
+## 31. Factorized Transition Action Abstraction — G2b+G3 FAIL (STAYS OPT-IN)
+
+**Plan:** [375](../../.plans/375_factorized_transition_action_abstraction.md) · **Bench:** [375](../../.benchmarks/375_factorized_action_goat.md) · **Research:** [374](../../.research/374_OTF_LAM_Factorized_Transition_Primitives.md) · **Paper:** [arXiv:2606.30544](https://arxiv.org/abs/2606.30544) (Nam et al., Brown, 2026-06-30) · **Feature:** `factorized_action` (opt-in)
+
+**What it is.** Frozen codebook of K=128 D-dim effect primitives + Top-1 patch assignment + sigmoid relevance gate + normalized weighted average → compact action latent. The factorized/compositional cousin of the shipped monolithic `latent_functor`. Codebook constructed modellessly via Lloyd's k-means with k-means++ init.
+
+**Gate results (4/6 PASS, 2 FAIL):**
+
+| Gate | Result | Detail |
+|---|---|---|
+| G1 (factorized MSE ≤ monolithic) | ✅ PASS | 0.029 ≤ 0.140 (4.9× improvement) |
+| G2a (distractor suppression < 0.7× mono) | ✅ PASS | 0.066 < 0.126 (63% improvement) |
+| **G2b (gate adds value over uniform mean)** | ❌ **FAIL** | Gate 0.066 == Mean 0.066 (ratio 1.000 — modelless L2-norm gate is at parity with uniform) |
+| **G3 (cross-carrier transfer)** | ❌ **FAIL** | factorized drop 7.9× vs monolithic −0.05× (k-means overfits source distribution) |
+| G4 (latency + alloc-free) | ✅ PASS | p50 169–300 ns, 0 allocs/100 calls |
+| G5/G6 | ✅ PASS | sigmoid never softmax; feature isolation clean |
+
+**Root cause.** The factorization mechanism is GOAT (G1+G2a crush the monolithic baseline), but the **modelless relevance gate adds zero value** over uniform aggregation. Without FiLM conditioning, the factor token is just the raw centroid — two codes with equal L2 norm get equal gate output. The paper's `GateNetwork` is a **4-layer FiLM-conditioned MLP** that learns state-aware relevance; the modelless L2-norm can't replicate this. G3 (transfer) fails because modelless k-means overfits digit-{0–4}-specific patterns; the paper's trained VQ-VAE transfers well.
+
+**Outcome.** Stays opt-in. The modelless-unblock check (§3.5) was performed — all three paths exhausted. G2b failure is not a modelless-correctable bias but a missing capability (state-aware relevance scoring requires learned FiLM projections). Trained VQ-VAE + GateNetwork → riir-train follow-up.
+
+**Lesson.** When a paper's key component is a learned gating network, the modelless L2-norm analog is structurally insufficient — norm is not a discriminative enough proxy for state-conditioned relevance. This is a systematic failure class for factorized/VQ-VAE-style primitives.
+
+## 32. DFlare Modelless Inference Trio — 3× GOAT-FAILED (STAYS OPT-IN)
+
+**Plan:** [174](../../.plans/174_dflare_modelless_inference.md) · **Research:** [154](../../.research/154_DFlare_Layer_Wise_Fusion_Block_Diffusion.md) · **Paper:** [arXiv:2606.02091](https://arxiv.org/abs/2606.02091) (DFlare) · **Features:** `dflare_fusion`, `dflare_kv_routing`, `dflare_progressive_budget` (all opt-in)
+
+**What it is.** Three modelless inference-time adaptations of DFlare's layer-wise fusion for block diffusion: (1) Marginal Fusion — multi-source conditioning blend; (2) Pruner-Confidence KV Routing — confidence-gated KV selection between target-conditioned and unconditioned; (3) Position-Weighted DDTree Budget — exponential decay allocation biased toward early positions.
+
+**Gate results.** Status from the plan: **"Structural GOAT ✅, Improvement GOAT ❌"** — all three compile and pass structural unit tests (T1–T3, T7), but the improvement GOAT (T4–T6) failed to meet acceptance-length thresholds:
+
+| Idea | Metric | Threshold | Outcome |
+|---|---|---|---|
+| D2 Marginal Fusion | Acceptance length vs single-conditioning | ≥ 5% improvement | ❌ FAIL |
+| D3 KV Routing | Acceptance length with confidence gating | ≥ 3% improvement | ❌ FAIL |
+| D4 Progressive Budget | Acceptance length vs uniform budget | ≥ 2% improvement | ❌ FAIL |
+
+**Root cause.** On the micro-transformer test corpus, the multi-source conditioning blend, pruner-confidence routing, and position-weighted budget all produced **no measurable acceptance-length improvement** over the single-conditioning baseline. The DFlare paper's gains require the full block-diffusion training loop (the marginal fusion is trained jointly with the diffusion model); modelless application of the inference-time adaptation alone doesn't capture the trained coupling.
+
+**Outcome.** All three features stay opt-in as substrate for completeness — the Cargo.toml comments explicitly mark them "GOAT-FAILED; kept as substrate for completeness". No runtime consumer wires them.
+
+**Lesson.** Inference-time adaptations of training-time techniques (layer-wise fusion, confidence routing, budget allocation) require the trained coupling to produce acceptance-length gains. The modelless inference-only half is structurally insufficient when the paper's gains come from joint training.
+
+## 33. Linking-Fold Detector — G2 Budget FAIL (OPT-IN, AUDIT-CADENCE)
+
+**Plan:** [410](../../.plans/410_linking_fold_primitive.md) · **Research:** [391](../../.research/391_Low_Dimensional_Topology_Linking_Number.md) · **Paper:** [arXiv:2606.31856](https://arxiv.org/abs/2606.31856) (Ren & Lim, ICML 2026) · **Feature:** `linking_fold_detector` (opt-in); sibling `linking_fold_fold` is DEFAULT-ON
+
+**What it is.** Algorithm 1 (PCA-3D + ε-kNN + fundamental cycle basis via BFS spanning forest + Gauss linking integral) detects whether two point clouds are topologically linked (link≠0). The cold-path diagnostic companion to the DEFAULT-ON `linking_fold_fold` correction primitive.
+
+**Gate results:**
+
+| Gate | Status | Detail |
+|---|---|---|
+| G1 (correctness) | ✅ PASS | 9/9 unit tests (Hopf = −1, unlinked = 0, fold unlinks) |
+| **G2 (perf)** | ❌ **FAIL original budget** | Target: 50ms @ n=2×1000. Measured: 408ms @ n=2×200 (pre-opt) → 59ms @ n=2×200 (post-opt, 6.9× speedup via BB-skip + SoA auto-vec). Minutes extrapolated @ n=2×1000. |
+| G3/G4/G5 | ✅ PASS | Feature isolation clean; alloc-free on fold hot-path (not detector); bit-identical |
+
+**Root cause.** The brute-force O(β²) Gauss linking integral over cycle-basis pairs is structurally too slow at n=2×1000 point clouds. Issue 050 optimization (2026-07-07) cut 408→59ms via bounding-sphere pre-check (skips 84.5% of cycle pairs whose Gauss integral provably rounds to 0) + full-SoA segment layout for auto-vectorization. The original 50ms @ n=2×1000 target remains unreachable with brute-force.
+
+**Outcome.** **Option C split executed:** the fold correction (`linking_fold_fold`) is DEFAULT-ON (passes every gate modellessly); the detector (`linking_fold_detector`) stays opt-in. Issue 050 resolved via Option A — the audit-cadence budget of 500ms @ n=2×200 is accepted as fit-for-purpose (detector runs once per session/sleep-cycle, not per-tick; zero in-tree consumers). Option B (optimize to 50ms @ n=2×500 via batch bbox early-exit + cycle pruning) remains a non-blocking follow-up.
+
+**Lesson.** When a diagnostic primitive has a structural O(n²) scaling cliff, the right response is to split: promote the per-tick correction (closed-form, fast) and keep the per-session diagnostic (brute-force, slow) opt-in at audit cadence. Don't block the valuable primitive on the expensive diagnostic's budget.
+
+## 34. RECOS — Rearrangement-Inequality Cosine Similarity (G1 FAIL)
+
+**Plan:** [437](../../.plans/437_recos_rearrangement_bound_similarity.md) · **Bench:** [437](../../.benchmarks/437_recos_goat.md) · **Research:** [421](../../.research/421_Recos_Rearrangement_Bound_Similarity.md) · **Paper:** [arXiv:2602.05266](https://arxiv.org/abs/2602.05266) (Ai 2026, "Beyond Cosine Similarity") · **Feature:** `recos` (opt-in)
+
+**What it is.** RECOS saturates at 1.0 under ordinal concordance (monotonic relationship) — a strictly wider capture range than cosine (which needs linear dependence). Always |recos| ≥ |cos| in abs value (Corollary 2). Operates on fixed `[f32;8]` (HLA dim, stack-sort, alloc-free) for hot path + arbitrary-len slices for cold path.
+
+**Gate results:**
+
+| Gate | Result | Detail |
+|---|---|---|
+| **G1 (quality)** | ❌ **FAIL** | recall@1 cosine=0.948 vs recos=0.783 (Δ=−16.5pp); recall@5 cosine=0.997 vs recos=0.985 (Δ=−1.2pp). Win rate 0% across 12 seeds (bar ≥80%). |
+| G2 (latency) | ℹ️ informational | 40–160× slower than cosine (two d=8 sorts per call). Moot given G1 FAIL. |
+
+**Root cause.** The paper's 98.6% win rate is on **semantic textual similarity (STS)** — a *matching* task. Our use case (`ShardIndex::query`) is **retrieval** — a *discrimination* task. Two mechanisms defeat recos on retrieval:
+
+1. **Corollary 2 inflation of distractor scores.** `|recos| ≥ |cos|` holds for ALL pairs, including distractors. recos inflates both correct and distractor scores; net discrimination doesn't improve.
+2. **Noise sensitivity.** recos relies on ordinal structure (component ranking). Gaussian noise flips close-valued component orders, breaking ordinal concordance. Cosine measures linear correlation, which degrades gracefully.
+
+**Diagnostic confirmation:** With exact power-law query (no noise), recos discrimination = 0.332 vs cosine 0.321 — recos is *slightly better*. But this advantage vanishes with any realistic noise (σ ≥ 0.1).
+
+**Outcome.** G1 FAIL → do NOT promote. Stays opt-in as a diagnostic metric for future embeddings where ordinal concordance is the dominant signal and noise is low. NOT UQ-bearing — the "Report the Floor" rule does not apply.
+
+**Lesson.** A better *matching* metric is not necessarily a better *retrieval* metric. When a paper's headline gain is on a matching task (STS), verify the gain transfers to a discrimination task (retrieval/ranking) before promoting. The monotonic-concordance capture range that helps matching can inflate distractor scores and hurt discrimination.
