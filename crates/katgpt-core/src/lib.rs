@@ -853,8 +853,9 @@ pub use latent_trajectory_geometry::{
 
 #[cfg(feature = "swe_trajectory_freeze")]
 pub use swe_trajectory_freeze::{
-    FrozenAttempt, GeometrySummaryEncoder, SweTrajectoryFreezer, SWTF_MAGIC, SWTF_VERSION,
-    TrajectoryFreezeEnvelope, derive_directions, derive_directions_and_centroid,
+    FrozenAttempt, FrozenValueAttempt, GeometrySummaryEncoder, StateMagnitudeEncoder,
+    SweTrajectoryFreezer, SWTF_MAGIC, SWTF_VERSION, TrajectoryFreezeEnvelope, derive_directions,
+    derive_directions_and_centroid,
 };
 
 #[cfg(feature = "latent_confounder_audit")]

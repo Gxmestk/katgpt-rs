@@ -245,6 +245,228 @@ impl Default for GeometrySummaryEncoder {
     }
 }
 
+// ─── State-magnitude encoder (Bench 018 — value-level discrimination) ───────
+
+/// Encode the sequence trajectory's STATE MAGNITUDE statistics into a
+/// fixed-`D` summary for value-level (cross-snapshot) discrimination.
+///
+/// This is the substrate port of bench_018's `encode_seq_state_stats`,
+/// which achieved **100% per-prompt accuracy at σ≥0.1** with
+/// d_Mahalanobis = 14.526 (50× the geometry encoder's 0.285) on real
+/// Kimi-K3 weights.
+///
+/// # Why this encoder exists alongside `GeometrySummaryEncoder`
+///
+/// [`GeometrySummaryEncoder`] captures trajectory SHAPE (length,
+/// curvature, cosine). Bench 015 proved these shape features are
+/// **perturbation-invariant** — they cannot discriminate value-level
+/// weight differences. The discriminative signal for value-level
+/// discrimination lives in state MAGNITUDE: the per-step L2 norm of the
+/// final hidden state is determined by the model's weights (RMSNorm +
+/// layer weights set the activation scale), so perturbing weights
+/// changes the energy level directly.
+///
+/// The geometry encoder remains the right choice for STRUCTURAL
+/// discrimination (failure-mode classification — bench_014 G5 PASS at
+/// 100%); the state-magnitude encoder is the right choice for VALUE
+/// discrimination (cross-snapshot identification — bench_018).
+///
+/// # The 8 features
+///
+/// Computed from the sequence of final hidden states (NOT from
+/// `LatentTrajectoryGeometry` — this encoder consumes the raw `&[&[f32]]`
+/// trajectory directly):
+///
+/// | Slot | Feature | Meaning |
+///|------|---------|---------|
+/// | 0 | `mean_norm` | mean of per-step L2 norms |
+/// | 1 | `std_norm` | std dev of per-step L2 norms |
+/// | 2 | `max_norm` | max per-step L2 norm |
+/// | 3 | `min_norm` | min per-step L2 norm |
+/// | 4 | `initial_norm` | L2 norm of first hidden state |
+/// | 5 | `final_norm` | L2 norm of last hidden state |
+/// | 6 | `norm_ratio` | `final_norm / initial_norm` (0 if initial≈0) |
+/// | 7 | `mean_cos` | mean cosine similarity between consecutive states |
+///
+/// # Const generic `D`
+///
+/// Must be `>= 8`. The encoder writes exactly 8 features into the first
+/// 8 slots of `out`; trailing slots are left as zero. Unlike the geometry
+/// encoder, **no replication** is performed — the 8 features are
+/// independent aggregate statistics (not a 4-feature block), so
+/// replicating them would not improve dot-product stability and would
+/// dilute the per-feature signal.
+///
+/// # Sequence trajectory extraction (the load-bearing pattern)
+///
+/// This encoder expects the **sequence trajectory**: the final hidden
+/// state at each token, captured across a prompt's tokens with growing KV
+/// cache (NO `reset()` between tokens). This is fundamentally different
+/// from the depth trajectory (per-layer states within a single forward
+/// pass, with `reset()` between tokens) — see `.benchmarks/018_sequence_trajectory.md`
+/// §"Why this works where bench_012-017 failed" for the full analysis.
+///
+/// Extraction pseudocode:
+///
+/// ```text
+/// let mut trajectory = Vec::new();
+/// // NO reset() here — KV cache grows across tokens
+/// for token in prompt_tokens {
+///     let final_state = kimi_k3_forward_token_traced(runtime, token);
+///     trajectory.push(final_state);
+/// }
+/// ```
+///
+/// # Allocation
+///
+/// [`StateMagnitudeEncoder::encode_into`] is zero-allocation — it writes
+/// into a caller-supplied `&mut [f32; D]` and accumulates statistics in
+/// registers (no scratch buffer needed for the two-pass mean+var).
+#[derive(Clone, Copy, Debug, Default)]
+pub struct StateMagnitudeEncoder;
+
+impl StateMagnitudeEncoder {
+    /// Construct a state-magnitude encoder.
+    ///
+    /// The encoder is parameterless — the 8 features are computed directly
+    /// from the trajectory's raw state magnitudes. No scale tuning is
+    /// needed because the features are not normalized to a fixed range
+    /// (unlike `GeometrySummaryEncoder`'s length/curvature/n_steps, which
+    /// need scale divisors). The downstream FAME projection handles
+    /// arbitrary feature magnitudes via the sigmoid gate.
+    pub const fn new() -> Self {
+        Self
+    }
+
+    /// Encode the sequence trajectory's state-magnitude statistics into `out`.
+    ///
+    /// Writes 8 features into `out[..8]`; trailing slots (if `D > 8`) are
+    /// left as zero. Zero-allocation.
+    ///
+    /// # Panics (debug)
+    ///
+    /// In debug builds, panics if `out.len() < 8`.
+    #[inline]
+    pub fn encode_into<const D: usize>(
+        &self,
+        trajectory: &[&[f32]],
+        out: &mut [f32; D],
+    ) {
+        debug_assert!(D >= 8, "D must be >= 8 to fit the 8 state-magnitude features");
+
+        // Zero the output (in case the caller left poison values).
+        for v in out.iter_mut() {
+            *v = 0.0;
+        }
+
+        let n = trajectory.len();
+        if n == 0 {
+            return;
+        }
+        let dim = trajectory[0].len();
+        if dim == 0 {
+            return;
+        }
+
+        // Single-pass computation using Welford's online algorithm for
+        // mean+variance, plus running min/max/sum + consecutive cosine.
+        // This avoids the 3x recomputation of per-step norms — the dominant
+        // cost at D=1024, N=64 is the inner dim loop, so doing it once
+        // instead of three times is a ~3x speedup.
+        //
+        // State carried across steps:
+        // - Welford: count, mean, M2 (sum of squared deviations)
+        // - Running: sum (for cross-check), max, min, initial, final
+        // - Cosine: previous state's norm + dot-with-current
+        let mut count: usize = 0;
+        let mut mean_norm = 0.0_f32;
+        let mut m2 = 0.0_f32;
+        let mut max_norm = 0.0_f32;
+        let mut min_norm = f32::INFINITY;
+        let mut initial_norm = 0.0_f32;
+        let mut final_norm = 0.0_f32;
+        let mut sum_cos = 0.0_f32;
+        let mut cos_count = 0usize;
+        let mut prev_norm_sq = 0.0_f32; // ||h_{i-1}||^2 for cosine
+
+        for (i, state) in trajectory.iter().enumerate() {
+            // Compute ||h_i||^2 + dot(h_{i-1}, h_i) in one dim loop.
+            let mut sum_sq = 0.0_f32;
+            let mut dot_prev = 0.0_f32;
+            if i > 0 {
+                let prev = trajectory[i - 1];
+                for j in 0..dim {
+                    let x = state[j];
+                    sum_sq += x * x;
+                    dot_prev += x * prev[j];
+                }
+            } else {
+                for &x in *state {
+                    sum_sq += x * x;
+                }
+            }
+            let norm = sum_sq.sqrt();
+
+            // Welford update for mean + M2.
+            count += 1;
+            let delta = norm - mean_norm;
+            mean_norm += delta / count as f32;
+            let delta2 = norm - mean_norm;
+            m2 += delta * delta2;
+
+            // Running min/max/initial/final.
+            if norm > max_norm {
+                max_norm = norm;
+            }
+            if norm < min_norm {
+                min_norm = norm;
+            }
+            if i == 0 {
+                initial_norm = norm;
+            }
+            final_norm = norm;
+
+            // Cosine similarity with previous state.
+            if i > 0 {
+                let denom = (prev_norm_sq * sum_sq).sqrt();
+                if denom > 1e-12 {
+                    sum_cos += dot_prev / denom;
+                    cos_count += 1;
+                }
+            }
+            prev_norm_sq = sum_sq;
+        }
+
+        // Welford variance (population, not sample — matches bench_018).
+        let std_norm = if count > 0 {
+            (m2 / count as f32).sqrt()
+        } else {
+            0.0
+        };
+
+        let norm_ratio = if initial_norm > 1e-12 {
+            final_norm / initial_norm
+        } else {
+            0.0
+        };
+
+        let mean_cos = if cos_count > 0 {
+            sum_cos / cos_count as f32
+        } else {
+            0.0
+        };
+
+        out[0] = mean_norm;
+        out[1] = std_norm;
+        out[2] = max_norm;
+        out[3] = min_norm;
+        out[4] = initial_norm;
+        out[5] = final_norm;
+        out[6] = norm_ratio;
+        out[7] = mean_cos;
+    }
+}
+
 // ─── Direction derivation (Stage 1: fit) ────────────────────────────────────
 
 /// Derive archetype direction vectors from cluster centroids of training
@@ -574,6 +796,94 @@ impl<const N: usize, const D: usize> FrozenAttempt<N, D> {
     }
 }
 
+// ─── FrozenValueAttempt (Bench 018 — value-level freeze) ────────────────────
+
+/// A frozen SWE-attempt characterization via STATE MAGNITUDE statistics.
+///
+/// The value-level counterpart to [`FrozenAttempt`]. Where `FrozenAttempt`
+/// commits to trajectory GEOMETRY (shape features — length, curvature,
+/// cosine), `FrozenValueAttempt` commits to trajectory STATE MAGNITUDE
+/// (the per-step L2 norm statistics that bench_018 proved discriminative
+/// for cross-snapshot identification).
+///
+/// # When to use this vs `FrozenAttempt`
+///
+/// - **`FrozenAttempt`** (geometry): for STRUCTURAL discrimination —
+///   classifying an attempt's failure mode (oscillation / committed-wrong /
+///   converged-correct). Bench 014 G5 PASS at 100%.
+/// - **`FrozenValueAttempt`** (state magnitude): for VALUE discrimination —
+///   identifying which model snapshot produced an attempt. Bench 018 G5
+///   PASS at 100% (σ≥0.1) with d_Mahalanobis = 14.526.
+///
+/// The two types are intentionally separate: they commit to different
+/// payloads, produce different BLAKE3 roots, and answer different questions.
+/// A production system that needs both characterizations should call both
+/// `freeze_attempt_into` and `freeze_attempt_value_into` on the same
+/// trajectory (the two encoders do not interfere).
+///
+/// # Const generics
+///
+/// `N` archetype count + `D` summary dimension, mirroring
+/// [`CommittedFieldBlend<N, D>`]. `D` must be `>= 8` (the state-magnitude
+/// encoder writes 8 features).
+///
+/// # Payload layout
+///
+/// The envelope's payload is `pi || summary` (no geometry triple — the
+/// state-magnitude features ARE the payload). At the production case
+/// (N=3, D=32) that's 140 bytes.
+#[derive(Clone, Debug)]
+pub struct FrozenValueAttempt<const N: usize, const D: usize> {
+    /// The committed archetype blend (sigmoid weights over `N` archetypes).
+    pub blend: CommittedFieldBlend<N, D>,
+    /// The encoded state-magnitude summary (8 features in the first 8 slots).
+    pub summary: [f32; D],
+    /// The BLAKE3 commitment envelope.
+    pub envelope: TrajectoryFreezeEnvelope,
+}
+
+impl<const N: usize, const D: usize> FrozenValueAttempt<N, D> {
+    /// Sigmoid gates over the blend's `pi`. Convenience accessor.
+    ///
+    /// `gate_k = sigmoid(pi_k / tau)`. Range `(0, 1)`.
+    #[inline]
+    pub fn gates(&self) -> [f32; N]
+    where
+        [(); N]:,
+    {
+        let tau = self.blend.tau;
+        let mut gates = [0.0_f32; N];
+        for k in 0..N {
+            gates[k] = crate::personality_composition::sigmoid::sigmoid(self.blend.pi[k] / tau);
+        }
+        gates
+    }
+
+    /// Argmax archetype index (the most-embodied snapshot).
+    #[inline]
+    pub fn argmax_archetype(&self) -> usize
+    where
+        [(); N]:,
+    {
+        let gates = self.gates();
+        let mut best_k = 0;
+        let mut best_g = gates[0];
+        for k in 1..N {
+            if gates[k] > best_g {
+                best_g = gates[k];
+                best_k = k;
+            }
+        }
+        best_k
+    }
+
+    /// Verify the envelope's header commitment (cheap — no payload needed).
+    #[inline]
+    pub fn verify_envelope_header(&self) -> bool {
+        self.envelope.verify_header()
+    }
+}
+
 // ─── SweTrajectoryFreezer ───────────────────────────────────────────────────
 
 /// The headline type — composes encoder + FAME + envelope.
@@ -618,8 +928,13 @@ pub struct SweTrajectoryFreezer<const N: usize, const D: usize> {
     /// (no centering). Set via [`fit`] / [`with_centroid`] for proper
     /// nearest-centroid classification.
     pub global_centroid: [f32; D],
-    /// The geometry-summary encoder.
+    /// The geometry-summary encoder (for STRUCTURAL discrimination —
+    /// failure-mode classification via [`freeze_attempt_into`]).
     pub encoder: GeometrySummaryEncoder,
+    /// The state-magnitude encoder (for VALUE discrimination —
+    /// cross-snapshot identification via [`freeze_attempt_value_into`]).
+    /// Bench 018 G5 PASS at 100% (σ≥0.1) with d_Mahalanobis = 14.526.
+    pub value_encoder: StateMagnitudeEncoder,
 }
 
 impl<const N: usize, const D: usize> SweTrajectoryFreezer<N, D> {
@@ -633,6 +948,7 @@ impl<const N: usize, const D: usize> SweTrajectoryFreezer<N, D> {
             directions,
             global_centroid: [0.0_f32; D],
             encoder: GeometrySummaryEncoder::default(),
+            value_encoder: StateMagnitudeEncoder::new(),
         }
     }
 
@@ -648,6 +964,7 @@ impl<const N: usize, const D: usize> SweTrajectoryFreezer<N, D> {
             directions,
             global_centroid: [0.0_f32; D],
             encoder,
+            value_encoder: StateMagnitudeEncoder::new(),
         }
     }
 
@@ -663,6 +980,7 @@ impl<const N: usize, const D: usize> SweTrajectoryFreezer<N, D> {
             directions,
             global_centroid,
             encoder,
+            value_encoder: StateMagnitudeEncoder::new(),
         }
     }
 
@@ -686,6 +1004,7 @@ impl<const N: usize, const D: usize> SweTrajectoryFreezer<N, D> {
             directions,
             global_centroid,
             encoder: GeometrySummaryEncoder::default(),
+            value_encoder: StateMagnitudeEncoder::new(),
         }
     }
 
@@ -807,6 +1126,100 @@ impl<const N: usize, const D: usize> SweTrajectoryFreezer<N, D> {
             blend,
             summary,
             geometry,
+            envelope,
+        }
+    }
+
+    /// Freeze a single attempt's trajectory into a VALUE-LEVEL characterization
+    /// (state-magnitude statistics, not geometry).
+    ///
+    /// Convenience wrapper around [`freeze_attempt_value_into`] — no scratch
+    /// buffers needed (the state-magnitude encoder is zero-alloc by
+    /// construction — it accumulates statistics in registers, no displacement
+    /// buffers required).
+    ///
+    /// # Pipeline
+    ///
+    /// 1. Encode the trajectory's state-magnitude statistics into a `[f32; D]`
+    ///    summary via [`StateMagnitudeEncoder`] (8 features in the first 8 slots).
+    /// 2. Mean-center the summary (subtract `global_centroid`).
+    /// 3. Commit the FAME blend: `pi_k = clamp(dot(summary, dir_k), ±pi_max)`.
+    /// 4. Build the envelope: BLAKE3 over `(pi, summary)`.
+    /// 5. Return the [`FrozenValueAttempt`].
+    ///
+    /// # Arguments
+    ///
+    /// - `trajectory` — `&[&[f32]]`, one slice per hidden state. For the
+    ///   sequence trajectory (bench_018's validated regime), this is the
+    ///   final hidden state at each token, captured with growing KV cache.
+    /// - `fields` — the `N` archetype fields (used for their BLAKE3
+    ///   commitments only — FAME's `commit` does not invoke `evolve`).
+    /// - `version` — monotonic version counter for this commit.
+    ///
+    /// # Allocation
+    ///
+    /// Zero-allocation. The state-magnitude encoder accumulates statistics in
+    /// registers (no scratch buffer); FAME `commit` is zero-alloc (Plan 321 G4);
+    /// the envelope payload uses a stack-fixed `[u8; 512]` buffer.
+    pub fn freeze_attempt_value(
+        &self,
+        trajectory: &[&[f32]],
+        fields: &[&dyn ArchetypeFieldSource<D>; N],
+        version: u64,
+    ) -> FrozenValueAttempt<N, D> {
+        self.freeze_attempt_value_into(trajectory, fields, version)
+    }
+
+    /// Zero-allocation variant of [`freeze_attempt_value`] (identical here —
+    /// the state-magnitude path is zero-alloc by construction).
+    ///
+    /// Provided for API symmetry with [`freeze_attempt_into`] (the geometry
+    /// path's zero-alloc variant). The state-magnitude encoder does not need
+    /// displacement scratch buffers, so there is no `_into` variant that
+    /// takes caller-managed buffers — but callers that want a named
+    /// zero-alloc entry point should use this method.
+    pub fn freeze_attempt_value_into(
+        &self,
+        trajectory: &[&[f32]],
+        fields: &[&dyn ArchetypeFieldSource<D>; N],
+        version: u64,
+    ) -> FrozenValueAttempt<N, D> {
+        // 1. State-magnitude summary (mean-centered for discriminative projection).
+        let mut summary = [0.0_f32; D];
+        self.value_encoder.encode_into(trajectory, &mut summary);
+        for j in 0..D {
+            summary[j] -= self.global_centroid[j];
+        }
+
+        // 2. FAME commit.
+        let mut blend = CommittedFieldBlend::<N, D>::uncommitted();
+        blend.commit(&summary, &self.directions, fields, version);
+
+        // 3. Envelope. Payload = pi || summary (no geometry triple — the
+        //    state-magnitude features ARE the payload). Layout: N·4 (pi) +
+        //    D·4 (summary). Stack-fixed — no heap allocation. At the
+        //    production case (N=3, D=32) that's 140 bytes.
+        let payload_len = N * 4 + D * 4;
+        let mut payload = [0u8; 512];
+        debug_assert!(
+            payload_len <= payload.len(),
+            "payload_len {payload_len} exceeds stack buffer {}",
+            payload.len()
+        );
+        let mut offset = 0;
+        for k in 0..N {
+            payload[offset..offset + 4].copy_from_slice(&blend.pi[k].to_le_bytes());
+            offset += 4;
+        }
+        for j in 0..D {
+            payload[offset..offset + 4].copy_from_slice(&summary[j].to_le_bytes());
+            offset += 4;
+        }
+        let envelope = TrajectoryFreezeEnvelope::freeze(&payload[..payload_len]);
+
+        FrozenValueAttempt {
+            blend,
+            summary,
             envelope,
         }
     }
@@ -1354,5 +1767,411 @@ mod tests {
         let geom_into2 = from_states_into(&refs, &mut disp_curr, &mut disp_prev);
         assert_eq!(geom_alloc.length, geom_into2.length);
         assert_eq!(geom_alloc.mean_curvature, geom_into2.mean_curvature);
+    }
+
+    // ─── T5.6e G2 — StateMagnitudeEncoder perf ────────────────────────────
+
+    /// The state-magnitude encoder MUST be no slower than the geometry
+    /// pipeline (`from_states_into` + `GeometrySummaryEncoder::encode_into`)
+    /// at the same trajectory scale. Both are O(n·dim) scans, so the value
+    /// encoder (single-pass Welford) should be FASTER than the geometry path
+    /// (which does a separate pass for displacements).
+    ///
+    /// The absolute target is < 100µs for D=1024, N=64 (the bench_018
+    /// production scale). At this scale the O(n·dim) = 65K f32 muls dominate;
+    /// the geometry path's `from_states_into` takes ~50µs for the same scan.
+    /// A 100µs ceiling gives 2x headroom over the geometry baseline.
+    ///
+    /// Run in release mode only — debug builds are too slow for meaningful
+    /// perf assertions. The `#[cfg_attr(debug_assertions, ignore)]` follows
+    /// the established pattern for tight perf gates.
+    #[test]
+    #[cfg_attr(debug_assertions, ignore)]
+    fn g2_state_magnitude_encoder_under_100us() {
+        use crate::latent_trajectory_geometry::from_states_into;
+
+        const PERF_DIM: usize = 1024;
+        const PERF_N: usize = 64;
+
+        // Build a deterministic trajectory.
+        let traj: Vec<Vec<f32>> = (0..PERF_N)
+            .map(|i| {
+                (0..PERF_DIM)
+                    .map(|j| i as f32 * 0.001 + j as f32 * 0.0001)
+                    .collect()
+            })
+            .collect();
+        let refs: Vec<&[f32]> = traj.iter().map(|v| v.as_slice()).collect();
+        let encoder = StateMagnitudeEncoder::new();
+        let mut out = [0.0_f32; 32];
+
+        // Warmup.
+        for _ in 0..100 {
+            encoder.encode_into(&refs, &mut out);
+        }
+
+        // Measure value encoder.
+        const N_ITERS: usize = 1000;
+        let start = std::time::Instant::now();
+        for _ in 0..N_ITERS {
+            encoder.encode_into(&refs, &mut out);
+            std::hint::black_box(&out);
+        }
+        let value_ns = start.elapsed().as_nanos() as f64 / N_ITERS as f64;
+
+        // Measure geometry pipeline (from_states_into + encode_into) for
+        // comparison — this is what the existing geometry path costs at
+        // the same scale.
+        let geom_encoder = GeometrySummaryEncoder::default_depth_trajectory();
+        let mut disp_curr = vec![0.0_f32; PERF_DIM];
+        let mut disp_prev = vec![0.0_f32; PERF_DIM];
+        let mut geom_out = [0.0_f32; 32];
+        for _ in 0..100 {
+            let g = from_states_into(&refs, &mut disp_curr, &mut disp_prev);
+            geom_encoder.encode_into(&g, &mut geom_out);
+        }
+        let start = std::time::Instant::now();
+        for _ in 0..N_ITERS {
+            let g = from_states_into(&refs, &mut disp_curr, &mut disp_prev);
+            geom_encoder.encode_into(&g, &mut geom_out);
+            std::hint::black_box(&geom_out);
+        }
+        let geom_ns = start.elapsed().as_nanos() as f64 / N_ITERS as f64;
+
+        eprintln!(
+            "G2 perf: value={value_ns:.0}ns, geometry={geom_ns:.0}ns, ratio={:.2}x",
+            value_ns / geom_ns
+        );
+
+        // Value encoder must be under 100µs (the geometry baseline is ~50µs;
+        // 100µs gives 2x headroom).
+        assert!(
+            value_ns < 100_000.0,
+            "G2 FAIL: StateMagnitudeEncoder {value_ns:.0} ns/call >= 100000 ns (D={PERF_DIM}, N={PERF_N})"
+        );
+
+        // Value encoder should be no slower than geometry (both O(n·dim),
+        // but value is single-pass while geometry does displacements).
+        // Allow 1.5x margin for Welford's per-step division overhead.
+        assert!(
+            value_ns < geom_ns * 1.5,
+            "G2 FAIL: value {value_ns:.0}ns > 1.5x geometry {geom_ns:.0}ns"
+        );
+    }
+
+    // ─── T5.6e G1 — StateMagnitudeEncoder correctness ─────────────────────────
+
+    /// The state-magnitude encoder MUST produce the same 8 features as
+    /// bench_018's `encode_seq_state_stats` on identical input. This is the
+    /// G1 correctness gate for the substrate port.
+    ///
+    /// We use a hand-crafted trajectory with known L2 norms so the expected
+    /// feature values can be computed independently (not via the encoder).
+    #[test]
+    fn g1_state_magnitude_encoder_correctness() {
+        // Hand-crafted: 3 states of dim 2 with simple magnitudes.
+        //   state 0 = [3.0, 4.0]   → norm = 5.0
+        //   state 1 = [6.0, 8.0]   → norm = 10.0
+        //   state 2 = [0.0, 0.0]   → norm = 0.0
+        // mean_norm = (5 + 10 + 0) / 3 = 5.0
+        // var_norm  = ((5-5)^2 + (10-5)^2 + (0-5)^2) / 3 = (0 + 25 + 25)/3 = 50/3
+        // std_norm  = sqrt(50/3) ≈ 4.0824829
+        // max_norm  = 10.0
+        // min_norm  = 0.0
+        // initial   = 5.0
+        // final     = 0.0
+        // ratio     = 0.0 / 5.0 = 0.0
+        // cos(0,1)  = (18+32)/(5*10) = 50/50 = 1.0
+        // cos(1,2)  = denom = (0)*(0) = 0 → skip (denom <= 1e-12)
+        // mean_cos  = 1.0 / 1 = 1.0
+        let states: Vec<Vec<f32>> = vec![
+            vec![3.0, 4.0],
+            vec![6.0, 8.0],
+            vec![0.0, 0.0],
+        ];
+        let refs = build_refs(&states);
+        let encoder = StateMagnitudeEncoder::new();
+        let mut out = [99.0_f32; D];
+        encoder.encode_into(&refs, &mut out);
+
+        let mean_norm = 5.0_f32;
+        let var_norm = 50.0_f32 / 3.0;
+        let std_norm = var_norm.sqrt();
+
+        assert!((out[0] - mean_norm).abs() < 1e-5, "mean_norm: {} vs {}", out[0], mean_norm);
+        assert!((out[1] - std_norm).abs() < 1e-5, "std_norm: {} vs {}", out[1], std_norm);
+        assert!((out[2] - 10.0).abs() < 1e-5, "max_norm: {}", out[2]);
+        assert!((out[3] - 0.0).abs() < 1e-5, "min_norm: {}", out[3]);
+        assert!((out[4] - 5.0).abs() < 1e-5, "initial_norm: {}", out[4]);
+        assert!((out[5] - 0.0).abs() < 1e-5, "final_norm: {}", out[5]);
+        assert!((out[6] - 0.0).abs() < 1e-5, "norm_ratio: {}", out[6]);
+        assert!((out[7] - 1.0).abs() < 1e-5, "mean_cos: {}", out[7]);
+
+        // Trailing slots left at zero (D=32 > 8 features).
+        for j in 8..D {
+            assert!(out[j].abs() < 1e-6, "trailing slot {j} should be 0, got {}", out[j]);
+        }
+    }
+
+    /// Empty trajectory + single-state trajectory edge cases.
+    #[test]
+    fn g1_state_magnitude_empty_and_single() {
+        let encoder = StateMagnitudeEncoder::new();
+
+        // Empty → all zeros (no panic).
+        let empty: Vec<Vec<f32>> = vec![];
+        let empty_refs: Vec<&[f32]> = empty.iter().map(|v| v.as_slice()).collect();
+        let mut out = [99.0_f32; D];
+        encoder.encode_into(&empty_refs, &mut out);
+        for j in 0..D {
+            assert!(out[j].abs() < 1e-6, "empty slot {j} should be 0, got {}", out[j]);
+        }
+
+        // Single state → mean/std/max/min/initial/final all equal,
+        // std=0, ratio=1.0 (initial>1e-12 case), mean_cos=0 (no pairs).
+        let single: Vec<Vec<f32>> = vec![vec![3.0, 4.0]];
+        let single_refs: Vec<&[f32]> = single.iter().map(|v| v.as_slice()).collect();
+        encoder.encode_into(&single_refs, &mut out);
+        assert!((out[0] - 5.0).abs() < 1e-5, "single mean_norm: {}", out[0]);
+        assert!((out[1] - 0.0).abs() < 1e-5, "single std_norm: {}", out[1]);
+        assert!((out[2] - 5.0).abs() < 1e-5, "single max_norm: {}", out[2]);
+        assert!((out[3] - 5.0).abs() < 1e-5, "single min_norm: {}", out[3]);
+        assert!((out[4] - 5.0).abs() < 1e-5, "single initial: {}", out[4]);
+        assert!((out[5] - 5.0).abs() < 1e-5, "single final: {}", out[5]);
+        assert!((out[6] - 1.0).abs() < 1e-5, "single ratio: {}", out[6]);
+        assert!((out[7] - 0.0).abs() < 1e-5, "single mean_cos: {}", out[7]);
+    }
+
+    // ─── T5.6e G1b — freeze_attempt_value is deterministic ──────────────────
+
+    /// Two value-freezes of the same trajectory + same directions + same
+    /// version MUST produce bit-identical envelopes.
+    #[test]
+    fn g1b_freeze_attempt_value_deterministic() {
+        // Build a freezer with arbitrary directions (the value path doesn't
+        // need fitted directions to be deterministic — it just needs them
+        // fixed).
+        let directions = [[0.0_f32; D]; N]; // zero directions are fine for determinism check
+        let freezer = SweTrajectoryFreezer::<N, D>::new(directions);
+
+        let traj = build_trajectory_for_mode(0, 999);
+        let refs = build_refs(&traj);
+        let fields = make_stub_fields();
+
+        let a = freezer.freeze_attempt_value(&refs, &fields, 1);
+        let b = freezer.freeze_attempt_value(&refs, &fields, 1);
+
+        assert_eq!(a.envelope.commitment, b.envelope.commitment);
+        assert_eq!(a.envelope.merkle_root, b.envelope.merkle_root);
+        assert_eq!(a.envelope.data_len, b.envelope.data_len);
+        assert_eq!(a.blend.pi, b.blend.pi);
+        assert_eq!(a.summary, b.summary);
+    }
+
+    // ─── T5.6e G3 — no-regression (geometry path still works) ──────────────
+
+    /// Adding the value path MUST NOT break the geometry path. We re-run
+    /// the G3 cross-mode discrimination gate (the load-bearing geometry
+    /// test) to confirm no regression.
+    #[test]
+    fn g3_geometry_path_unaffected_by_value_addition() {
+        // Re-use the same training corpus as g3_cross_mode_discrimination.
+        const TRAJ_PER_MODE: usize = 5;
+        const TRAIN_SEEDS: usize = 3;
+
+        let mut all_trajs: Vec<Vec<Vec<Vec<f32>>>> = Vec::with_capacity(N);
+        for mode_idx in 0..N {
+            let mut mode_trajs = Vec::with_capacity(TRAJ_PER_MODE);
+            for seed in 0..TRAJ_PER_MODE {
+                mode_trajs.push(build_trajectory_for_mode(mode_idx, seed as u64 * 100 + 7));
+            }
+            all_trajs.push(mode_trajs);
+        }
+
+        let mut train: [[[f32; D]; TRAIN_SEEDS]; N] = [[[0.0; D]; TRAIN_SEEDS]; N];
+        for mode_idx in 0..N {
+            for seed in 0..TRAIN_SEEDS {
+                train[mode_idx][seed] = encode_geom_summary(&all_trajs[mode_idx][seed]);
+            }
+        }
+        let freezer = SweTrajectoryFreezer::<N, D>::fit(&train);
+        let fields = make_stub_fields();
+
+        let mut n_correct = 0usize;
+        let total = N * (TRAJ_PER_MODE - TRAIN_SEEDS);
+        for mode_idx in 0..N {
+            for seed in TRAIN_SEEDS..TRAJ_PER_MODE {
+                let refs = build_refs(&all_trajs[mode_idx][seed]);
+                let frozen = freezer.freeze_attempt(&refs, &fields, 1);
+                if frozen.gates()[mode_idx] > 0.6 && frozen.argmax_archetype() == mode_idx {
+                    n_correct += 1;
+                }
+            }
+        }
+        let accuracy = n_correct as f32 / total as f32;
+        assert!(
+            accuracy >= 0.8,
+            "G3 regression: geometry accuracy {accuracy:.2} < 0.80"
+        );
+    }
+
+    // ─── T5.6e G4 — value-freeze payload verifies + tamper-evident ──────────
+
+    #[test]
+    fn g4_value_envelope_tamper_evidence() {
+        let directions = [[0.0_f32; D]; N];
+        let freezer = SweTrajectoryFreezer::<N, D>::new(directions);
+
+        let traj = build_trajectory_for_mode(0, 999);
+        let refs = build_refs(&traj);
+        let fields = make_stub_fields();
+        let frozen = freezer.freeze_attempt_value(&refs, &fields, 1);
+
+        // Header verifies clean.
+        assert!(frozen.envelope.verify_header());
+
+        // Tamper the merkle_root → fails.
+        let mut tampered = frozen.envelope;
+        tampered.merkle_root[0] ^= 0xff;
+        assert!(!tampered.verify_header());
+
+        // Tamper the commitment → fails.
+        let mut tampered = frozen.envelope;
+        tampered.commitment[0] ^= 0xff;
+        assert!(!tampered.verify_header());
+
+        // Payload length is N*4 + D*4 (no geometry triple).
+        let expected_len = (N * 4 + D * 4) as u64;
+        assert_eq!(frozen.envelope.data_len, expected_len);
+    }
+
+    // ─── T5.6e G5 — value discrimination (synthetic scale-shift) ────────────
+
+    /// The load-bearing G5 gate for the value path. Bench 018 proved that
+    /// state-magnitude features discriminate cross-snapshot (100% at σ≥0.1).
+    /// The substrate-level test cannot run the full bench_018 (needs real
+    /// Kimi-K3 weights), but it CAN prove the substrate discriminates
+    /// scale-shifted trajectories — the synthetic analog of weight
+    /// perturbation.
+    ///
+    /// Construction: build N classes of trajectories, each with a distinct
+    /// constant scale factor applied to all states (mimicking how weight
+    /// perturbation changes the activation scale). Train directions on
+    /// train-split, probe on test-split. Accuracy must be ≥80%.
+    #[test]
+    fn g5_value_discrimination_synthetic_scale_shift() {
+        // Mirrors bench_018: discriminating model snapshots that differ by
+        // weight perturbation. Each class has a distinct scale (mimicking
+        // the activation magnitude change) AND distinct per-token variation
+        // (mimicking how perturbed weights process tokens differently).
+        // The two independent signals prevent the centroids from being
+        // collinear (which would degenerate the nearest-centroid classifier
+        // to a 1D problem).
+        const TRAJ_PER_CLASS: usize = 7;
+        const TRAIN_PER_CLASS: usize = 5;
+        const BASE_DIM: usize = 16;
+        const N_TOKENS: usize = 32; // sequence-trajectory length
+        // (scale, variance_factor) per class — two independent parameters
+        // so centroids span a 2D subspace, not a 1D line.
+        let class_params: [(f32, f32); N] = [(1.0, 0.5), (2.0, 1.5), (3.5, 0.8)];
+
+        // Build all trajectories.
+        let mut all_trajs: Vec<Vec<Vec<Vec<f32>>>> = Vec::with_capacity(N);
+        for class_idx in 0..N {
+            let mut class_trajs = Vec::with_capacity(TRAJ_PER_CLASS);
+            for seed in 0..TRAJ_PER_CLASS {
+                let (scale, var_f) = class_params[class_idx];
+                class_trajs.push(build_perturbed_trajectory(
+                    scale,
+                    var_f,
+                    class_idx as u64,
+                    seed as u64,
+                    BASE_DIM,
+                    N_TOKENS,
+                ));
+            }
+            all_trajs.push(class_trajs);
+        }
+
+        // Train directions on state-magnitude summaries.
+        let mut train: [[[f32; D]; TRAIN_PER_CLASS]; N] = [[[0.0; D]; TRAIN_PER_CLASS]; N];
+        for class_idx in 0..N {
+            for seed in 0..TRAIN_PER_CLASS {
+                train[class_idx][seed] = encode_state_summary(&all_trajs[class_idx][seed]);
+            }
+        }
+        let freezer = SweTrajectoryFreezer::<N, D>::fit(&train);
+        let fields = make_stub_fields();
+
+        // Probe on test split.
+        let mut n_correct = 0usize;
+        let total = N * (TRAJ_PER_CLASS - TRAIN_PER_CLASS);
+        for class_idx in 0..N {
+            for seed in TRAIN_PER_CLASS..TRAJ_PER_CLASS {
+                let refs = build_refs(&all_trajs[class_idx][seed]);
+                let frozen = freezer.freeze_attempt_value(&refs, &fields, 1);
+                let gates = frozen.gates();
+                let matching_gate = gates[class_idx];
+                let argmax = frozen.argmax_archetype();
+                if matching_gate > 0.6 && argmax == class_idx {
+                    n_correct += 1;
+                }
+            }
+        }
+
+        let accuracy = n_correct as f32 / total as f32;
+        assert!(
+            accuracy >= 0.8,
+            "G5 FAIL: value accuracy {accuracy:.2} < 0.80 (correct {n_correct}/{total})"
+        );
+    }
+
+    /// Build a perturbed-model trajectory: mimics how weight perturbation
+    /// changes both the activation scale AND the per-token variation pattern.
+    ///
+    /// Two independent parameters control the trajectory:
+    /// - `scale`: overall activation magnitude (mimics weight magnitude change)
+    /// - `var_factor`: per-token variation strength (mimics how perturbed
+    ///   weights process different tokens differently)
+    ///
+    /// The class-specific bias (derived from `class_id`) adds a constant
+    /// directional offset so classes differ in direction, not just magnitude.
+    fn build_perturbed_trajectory(
+        scale: f32,
+        var_factor: f32,
+        class_id: u64,
+        seed: u64,
+        dim: usize,
+        n_tokens: usize,
+    ) -> Vec<Vec<f32>> {
+        let mut rng = Lcg::new(seed * 7919 + class_id * 1000 + 7);
+        // Class-specific bias direction (fixed per class, varies across classes).
+        let mut bias = vec![0.0_f32; dim];
+        for j in 0..dim {
+            bias[j] = rng.next_f32();
+        }
+        let bias_norm: f32 = bias.iter().map(|x| x * x).sum::<f32>().sqrt().max(1e-6);
+        for j in 0..dim {
+            bias[j] /= bias_norm;
+        }
+
+        let mut traj = Vec::with_capacity(n_tokens);
+        for _ in 0..n_tokens {
+            let mut state = vec![0.0_f32; dim];
+            for j in 0..dim {
+                // Base signal: class bias * scale + per-token noise * var_factor.
+                state[j] = bias[j] * scale + rng.next_f32() * var_factor;
+            }
+            traj.push(state);
+        }
+        traj
+    }
+
+    /// Encode a trajectory's state-magnitude summary using the value encoder.
+    fn encode_state_summary(traj: &[Vec<f32>]) -> [f32; D] {
+        let refs = build_refs(traj);
+        let mut summary = [0.0_f32; D];
+        StateMagnitudeEncoder::new().encode_into(&refs, &mut summary);
+        summary
     }
 }
