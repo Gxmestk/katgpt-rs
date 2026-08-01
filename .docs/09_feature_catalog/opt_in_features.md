@@ -1635,3 +1635,35 @@ Metal GPU inference backend via [CubeCL](https://github.com/gabrielbizon/CubeCL)
 🔧 Feature flags: `gpu_inference` (opt-in; implies `kog_cpu_fusion`) + `inference_router` (opt-in; implies `gpu_inference` + `ane`).
 
 📖 Plan: [176](../../.plans/176_ane_inference_backend.md). Bench: [029](../../.benchmarks/029_cubecl_gpu_rewrite.md). Substrate: `crates/katgpt-backend/src/gpu_backend.rs`.
+
+## 50. Motor-Gated DEC Field — Amari Neural-Field Evolution (Plan 357)
+
+Distilled from [arXiv:2602.18690](https://arxiv.org/abs/2602.18690) — Amari-style motor-gated neural-field evolution. Unifies `hodge_laplacian` (Stokes DEC) + latent steering into a single grid-stencil evolution step: the motor gate `ReLU(h)` modulates which channels of the cochain field are active, then the Hodge Laplacian diffuses the gated field.
+
+### GOAT gate (G1–G5 ALL PASS, stays opt-in by design)
+
+| Gate | Metric | Result | Threshold |
+|---|---|---|---|
+| G1 (no-teleporting) | max centroid displacement / 50 ticks | **0.0009 cells** | ≤ 2.0 cells |
+| G2 (motor-gate locality) | channel isolation ratio | ∞ (no leak) | > 100× |
+| G3 (conservation) | `|Σ K[ReLU(h)]| / L1(h)` | 0.0000 | < 0.05 |
+| G4 (zero-alloc) | allocs / 1000 ticks (64×64×16) | 0 | = 0 |
+| G5 (latency) | per-call (64×64×16, release) | **~29 µs** | < 100 µs |
+
+The grid-stencil fast path (Issue 001 fix) closed the G5 gap decisively: **120 µs → 29 µs** (4.1× speedup, 3.4× margin under target). The feature stays **opt-in by design** — it's a primitive for downstream consumption (riir-ai Research 168 Phase 2), not a default-on capability.
+
+### Sibling DEC features
+
+| Feature | Status | Role |
+|---|---|---|
+| `heat_kernel_trajectory` | DEFAULT-ON | heat-kernel trajectory on cochains |
+| `sheaf_admm` | DEFAULT-ON | sheaf ADMM consensus |
+| `grid_3d` | DEFAULT-ON | 3D cell-complex NCA |
+| `se2_equivariant_lift` | DEFAULT-ON | SE(2) rotation-equivariant lift |
+| `cochain_point_sampler` (§16) | opt-in | point sampling on cochains |
+| `htno_v_cycle` (§13) | opt-in | multi-scale V-cycle |
+| **`motor_gated_field`** (this) | opt-in | motor-gated field evolution |
+
+🔧 Feature flag: `motor_gated_field` (opt-in; in `katgpt-dec`).
+
+📖 Plan: [357](../../.plans/357_motor_gated_dec_propagation_primitive.md). Bench: [357](../../.benchmarks/357_motor_gated_field_goat.md). Substrate: `crates/katgpt-dec/src/motor_gated.rs`.
