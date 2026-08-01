@@ -351,3 +351,25 @@ Root causes (full detail in Bench 563):
 **The remaining quantization path with a plausible ≥1.5× win is INT8 with INT8 activations** (different dequant path: scale + zero-point). But on Apple Silicon it hits the same bandwidth-ceiling argument — INT8 GEMV arithmetic intensity is still bandwidth-bound at L3-exceeding sizes, and the dequant overhead makes it worse. Filed as a **non-goal** in both Issues 200 and 201.
 
 📖 Issue: [`.issues/201_full_f16_forward_investigation.md`](../../.issues/201_full_f16_forward_investigation.md) (retained as negative-result reference). Benchmark: [`.benchmarks/563_issue201_f16_f16_fhm_negative.md`](../../.benchmarks/563_issue201_f16_f16_fhm_negative.md). Substrate (nightly-only WIP, not on develop): `crates/katgpt-types/src/simd/dot.rs` `simd_dot_f16_f16` (sibling-agent investigation; see git history if needed).
+
+## 19. Quant-Error LoRA G5 (Issue 565) — DECISIVELY NEGATIVE: 0% PUCT Win-Rate
+
+**Hypothesis.** A deterministically-constructed low-rank reader-LoRA (`QuantErrorLora`) compensates for ternary quantization error on the 105K-param Moka CNN, recovering enough accuracy to make the ternary path competitive with int8 for PUCT-based Go inference. Weight-space SVD (`E = W − dequant(W_q) ≈ A·B`) is modelless (closed-form, no gradient descent).
+
+**G1 PASS (surprise).** Strategy A (weight-space SVD rank-32) achieves cosine 0.9939 vs f32 (+0.023 over the ternary baseline's 0.9706). The pre-PoC prediction ("rank-8 fails on small CNNs per the Small-Kernel Parameter Paradox") was too pessimistic — the Paradox is a **cost** issue (27.8% param overhead on small convs vs 0.39% on LLM linears), not a **quality** issue at rank-16+.
+
+**G5 DECISIVELY FAIL (2026-08-01).** PUCT win-rate (n=20, budget=50, vs greedy f32):
+
+| Strategy | Win-rate |
+|---|---|
+| f32 (baseline) | 100% (20/20) |
+| B2 (ternary-only) | **0% (0/20)** |
+| A rank-32 (ternary+wSVD LoRA) | **0% (0/20)** |
+
+Not just "below int8's 95%" but **0%** — the ternary+LoRA path collapses PUCT strength entirely. Root cause: PUCT's budget=50 simulations amplify the small policy perturbations (cosine 0.9939 leaves residual structure that PUCT amplifies through search-tree exploration). The value head residual error causes excessive passing (26+ passes/game vs ~17 actual moves). int8 (0.97 cosine, 85-95% win-rate) works because its error is **uniform** (small, symmetric); ternary's error is **structured** (large, biased) and the LoRA removes the bias but leaves residual structure.
+
+**The generalized lesson (durable value).** Cosine ≥ 0.99 is **necessary but not sufficient** for PUCT parity. PUCT's search amplifies residual errors, setting a higher bar than greedy-move parity. int8 is a surprising outlier that works because its error is uniform. This lesson prevents future agents from assuming "good cosine = good PUCT" — the gate between them is PUCT amplification.
+
+**Outcome.** Modelless quant-error-compensating LoRA is unviable for the ternary path on Moka v1. Issue 565 CLOSED (removed per noise-reduction rule). The `quant_error_lora` primitive ships as reusable substrate for larger models where the error manifold is genuinely low-rank AND the target is greedy-move parity (not PUCT parity) — e.g., Gemma 2 2B (Proposal 008) if aggressively quantized for edge deployment. The trained-projection path (riir-train) is the only remaining option for Moka.
+
+📖 Issue: 565 (removed per noise-reduction rule — resolution above), Research: [`.research/463_moka_freeze_thaw_lever_audit.md`](../../.research/463_moka_freeze_thaw_lever_audit.md) §7 (PoC Addendum 2026-08-01), Cross-reference: [opt-in catalog §32](opt_in_features.md#32-quant-error-lora--quantization-error-compensating-reader-lora-issue-565-research-463), PoC bench: `riir-poc/tests/quant_error_lora_poc.rs` (cross-repo permanent regression check), Substrate: `crates/katgpt-core/src/quant_error_lora.rs`.

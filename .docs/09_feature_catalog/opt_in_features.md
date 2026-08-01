@@ -978,3 +978,93 @@ This trail is load-bearing: it documents WHY the sequence trajectory + state-mag
 🔧 Feature flag: `swe_trajectory_freeze` (in katgpt-core, default-off; implies `latent_trajectory_geometry` + `committed_field_blend`). Root forwards via `swe_trajectory_freeze = ["katgpt-core/swe_trajectory_freeze"]`.
 
 📖 Proposal: [`.proposals/011_rust_swe_bench_latent_space_via_wasm_pruner.md`](../../.proposals/011_rust_swe_bench_latent_space_via_wasm_pruner.md) (Layer 4), Issues: [569](../../.issues/569_swe_trajectory_geometry_synthetic_poc.md) + [570](../../.issues/570_data_derived_directions_fix_t53.md) + [571](../../.issues/571_state_magnitude_encoder_value_discrimination.md), Substrate: `crates/katgpt-core/src/swe_trajectory_freeze.rs`, Benches: [013](../../.benchmarks/013_swe_trajectory_freezer_goat.md) (geometry GOAT) + [014](../../.benchmarks/014_swe_trajectory_freezer_g5.md) (cross-model G5) + [018](../../.benchmarks/018_sequence_trajectory.md) (sequence POSITIVE) + [019](../../.benchmarks/019_state_magnitude_encoder_substrate_goat.md) (substrate GOAT) + [020](../../.benchmarks/020_generation_trajectory.md) (generation POSITIVE), Negative controls: [015](../../.benchmarks/015_swe_trajectory_perturbation_sensitivity.md) + [016](../../.benchmarks/016_value_sensitive_encoder.md) + [017](../../.benchmarks/017_covariance_aware_classifier.md).
+
+## 30. GDN-HOLA Dual-Path Tree Verification (Plan 430, Research 407 §2.2)
+
+Fuses two shipped opt-in primitives — Plan 424 (GDN rollback-free tree verify, catalog §18) + Plan 395 (HOLA hippocampal exact KV cache) — into a **dual-path tree verifier** that scores speculative draft tree nodes against BOTH the GDN recurrent state (masked triangular solve) AND the HOLA hippocampal cache (ancestor-masked softmax read), with **zero rollback on either path**. Residual-add complement: `O[i] = O_gdn[i] + O_hola[i]` — the hippocampal cache complements the compressive recurrent state (HOLA §3.5), not replaces it.
+
+**Why this matters:** GDN2's fixed-size recurrent state compresses context but loses exact long-range recall. HOLA's hippocampal cache recovers exact recall for high-surprise tokens but is a flat top-w set with no tree-verification story. Fusing them at the speculative tree-verify layer gives both exact-recall recovery (HOLA) AND rollback-free tree scoring (GDN masked solve) — the hippocampal complement to the compressive recurrent state, extended to branching speculative drafts.
+
+**Key design decisions:** (1) ancestor masking by construction on the HOLA path (only ancestor tokens in `block_kv`, no bitmask needed — unlike the GDN solve which needs the explicit `X` interaction matrix); (2) read-only verify, dual-write commit (both `S₀` and cache are read-only during verify; commit writes both — GDN via `commit_accepted`, HOLA via `observe`); (3) commit pipes GDN residuals to HOLA (the `(beta_t, residual_norm_t)` already computed during GDN commit are exactly what `HippocampalCache::observe` needs — "β·‖e‖ is free").
+
+| Gate | Status | Detail |
+|------|--------|--------|
+| **G1** correctness | ✅ PASS | Dual-path verify on random trees (T=16,32,64,128) within `1e-3` of per-branch sequential GDN2+HOLA reference |
+| **G2** perf | ✅ PASS per gate def | `dual/(gdn+hola) ≈ 0.91–1.07` for T≥32 — fusion is cheaper than separate. **Aspirational 1.2× sub-bar FAILED**: `dual/gdn = 1.24–1.40×` — HOLA's W=64 softmax read adds 24–40% (inherent cost of exact recall, not an implementation deficiency). Pre-normalization optimization landed (chain T=128 −8.8%) |
+| **G3** no-regression | ✅ PASS | With `hippocampal_cache` OFF, `verify_gdn_hola_tree_into` byte-identical to `verify_gdn_tree_into` (Plan 424) |
+| **G4** alloc-free | ✅ PASS | `verify_gdn_hola_tree_into` = 0 allocs steady-state; stack-local `o_hola` buffer + reuse of Plan 424 scratch |
+| **G5** retrieval | [-] deferred | Requires trained GDN2+HOLA model + multi-key retrieval harness; retrieval property inherited from Plan 395 G4 |
+
+🔧 Feature flag: `gdn_hola_tree_verify` (in katgpt-core; implies `gdn_tree_verify` + `hippocampal_cache`). Stays **opt-in** — requires both opt-in parents + a trained γ vector or modelless γ=1. riir-ai consumer wiring (T3.2) + full integration test (T3.3) deferred (cross-repo; bridge adapter `verify_gdn2_hola_tree_layer` + `commit_gdn2_hola_tree_layer` + `forward_tree_gdn2_hola` shipped).
+
+📖 Plan: [`.plans/430_dual_path_rollback_free_tree_verify_gdn_hola.md`](../../.plans/430_dual_path_rollback_free_tree_verify_gdn_hola.md), Research: [`.research/407_Trees_from_Marginals_GDN_Tree_Verify.md`](../../.research/407_Trees_from_Marginals_GDN_Tree_Verify.md) §2.2, Benchmark: [`.benchmarks/430_dual_path_verify_goat.md`](../../.benchmarks/430_dual_path_verify_goat.md), Parents: [Plan 424](../../.plans/424_gdn_tree_verification_primitive.md) (GDN tree verify, catalog §18) + [Plan 395](../../.plans/395_hippocampal_exact_kv_cache.md) (HOLA cache), Papers: [arXiv:2607.06763](https://arxiv.org/abs/2607.06763) §3.4 + [arXiv:2607.02303](https://arxiv.org/abs/2607.02303)
+
+## 31. Loop Stability Fix — Inter-Loop RMSNorm (Plan 428, Research 414)
+
+Parameter-free architectural fix for T-pass (LT2) looped inference stability: add `rmsnorm(&mut h)` between loop iterations (after the inner layer pass, before the residual gate saves `prev_h`). Byte-identical when `LoopStabilityMode::None` (default); activates only when the consumer sets `Config.loop_stability_mode = LoopStabilityMode::InterLoopNorm`. Zero-cost when off.
+
+**The Phase 1 PoC defend-wrong verdict** (6 competitors head-to-head on a d_model=256 toy looped transformer, T=12 iterations) is the load-bearing finding:
+
+| Competitor | G1 Norm Ratio | G2 KL | G3 OH | G4 Step | Verdict |
+|---|---|---|---|---|---|
+| Baseline (vanilla) | 11.19× | 0.0128 | 0% | 6.85 | Barely explodes; no convergence |
+| **InterNorm** | **3.34×** | **0.0008** | -1.2% | 2.05 | **Only fix that controls norm**; converging |
+| FLA-res | 2.2B× | 0.0000\* | 0.4% | 12.8B | **CATASTROPHIC explosion** — direct residual addition amplifies |
+| AttnInj | 11.19× | 0.0128 | -0.6% | 6.85 | **No-op** — Q irrelevant for single-position softmax(1)=1.0 |
+| Combined | 589M× | 0.0000\* | -1.0% | 3.3B | FLA-res dominates; InterNorm can't compensate |
+| DecayGate (0.8) | 1309× | 0.0046 | -0.7% | 3914 | 0.8 accumulates; norm explodes |
+
+\*KL=0.0000 for FLA-res/Combined is a **false pass** — logits so large that softmax saturates to a degenerate one-hot that doesn't change between loops.
+
+**Only Inter-loop RMSNorm works.** FLA-res (direct residual addition of `prev_h` at every layer) causes catastrophic norm explosion (~7× growth per loop). The FLA paper likely uses a gated mechanism, not direct addition. Attention Injection is a no-op for single-position attention. Both were DROPPED from Phase 2 implementation per the defend-wrong verdict.
+
+**Phase 2 GOAT gate** (implementation behind `loop_stability_fix` feature flag):
+
+| Gate | Status | Detail |
+|------|--------|--------|
+| **G1** byte-identical when `None` | ✅ PASS | 11/11 LT2 tests pass in both configs |
+| **G2** finite logits with `InterLoopNorm` at T=12 | ✅ PASS | 8 positions verified |
+| **G3** latency overhead < 5% | ✅ PASS | 2.3% on micro model |
+| **G4** norm control (InterLoopNorm ≤ baseline) | ✅ PASS | 0.88× ratio (non-worsening) |
+
+**Why opt-in:** the micro model (`Config::micro()`, n_embd=16, 6 layers) doesn't exhibit norm explosion at T=12 (0.88× — norm slightly decreased). The PoC benchmark (`examples/loop_stability_poc.rs`) with d_model=256 + gaussian init std=0.02 showed the explosion (11.19× baseline → 3.34× InterNorm). Promotion requires a real-world model that exhibits T-pass norm explosion. The fix is parameter-free and zero-cost when `None`, so opt-in has no downside.
+
+**Model-based path (riir-train):** documented in Proposal 018 §7.3 — train with FLT fixes (weights adapted to looped architecture), explicit norm penalty in training loss (Readout Blind Spot's training fix), stochastic loop count during training.
+
+🔧 Feature flag: `loop_stability_fix` (forwarded: katgpt-rs → katgpt-core → katgpt-types). `LoopStabilityMode` enum in `crates/katgpt-types/src/enums.rs`; `Config.loop_stability_mode` field behind `#[cfg(feature="loop_stability_fix")]`, initialized to `None` in all 11 constructors.
+
+📖 Plan: [`.plans/428_loop_stability_poc.md`](../../.plans/428_loop_stability_poc.md), Research: [`.research/414_Fully_Looped_Transformer_Readout_Blind_Spot.md`](../../.research/414_Fully_Looped_Transformer_Readout_Blind_Spot.md), PoC: `examples/loop_stability_poc.rs` (529 lines, std-only), Papers: [arXiv:2605.18797](https://arxiv.org/abs/2605.18797) (Fully Looped Transformer) + [arXiv:2606.24898](https://arxiv.org/abs/2606.24898) (Readout Blind Spot)
+
+## 32. Quant-Error LoRA — Quantization-Error Compensating Reader-LoRA (Issue 565, Research 463)
+
+Deterministically-constructed low-rank reader-LoRA that compensates for the quantization error of a weight matrix: given `W` (f32 reference) and `W_q` (quantized), compute `E = W − dequant(W_q)`, then `E ≈ A·B` via truncated SVD. At inference: `y = W_q·x + α·B·(A·x)`. Three variants shipped: `from_error` (weight-space SVD, calibration-free), `from_error_data_aware` (output-space SVD, calibration-conditioned), `SparseErrorBypass` (top-K COO). Pure modelless (closed-form SVD / partial-sort; no gradient descent). Gated on `subspace_phase_gate` for Plan 301's `thin_svd_into`.
+
+**The Issue 565 defend-wrong PoC (2026-08-01) is the load-bearing finding.** Four strategies tested head-to-head on the 105K-param Moka CNN:
+
+| Strategy | Cosine vs f32 | Δ vs ternary baseline | Verdict |
+|---|---|---|---|
+| B2 (ternary, no correction) | 0.9706 | — | baseline |
+| **A (wSVD rank-32)** | **0.9939** | **+0.023** | ✅ G1 PASS (≥0.02 target) |
+| A (wSVD rank-16) | 0.9888 | +0.018 | near-pass |
+| B (data-aware SVD) | ~0.90 | −0.06 | ❌ WORSE — confirmed real (not PoC artifact) |
+| D (sparse bypass) | 0.91–0.96 | −0.03 to −0.06 | ❌ WORSE — distributed error, not outlier-concentrated |
+
+**Surprise:** Strategy A at rank-16+ genuinely improves the ternary forward pass (0.9939 cosine). The pre-PoC prediction ("rank-8 fails on small CNNs") was too pessimistic — the Small-Kernel Parameter Paradox is a **cost** issue (27.8% param overhead at rank-8 on a 32×288 conv vs 0.39% on an LLM linear layer), not a **quality** issue. Strategy B (data-aware SVD) confirmed WORSE: on small networks the weight structure dominates, and calibration-conditioned output error overfits to the calibration distribution — the opposite of large LLMs (GPTQ/OBQ).
+
+**G5 (the load-bearing gate) — DECISIVELY NEGATIVE.** PUCT win-rate (n=20, b=50, vs greedy f32):
+
+| Strategy | Win-rate |
+|---|---|
+| f32 baseline | 100% (20/20) |
+| B2 (ternary-only) | **0% (0/20)** |
+| A rank-32 (ternary+wSVD LoRA) | **0% (0/20)** |
+
+The prediction was right about FAIL but wrong about WHY. The actual failure: residual error after rank-32 LoRA (cosine 0.9939, 78% error energy captured) is still large enough to **collapse PUCT strength entirely** — not just degrade it. PUCT's budget=50 simulations per move amplify the small policy perturbations (total abs diff ≈45 across 82 moves) through search-tree exploration. The value head residual error causes excessive passing (26+ passes/game vs ~17 actual moves). int8 (0.97 cosine, 85-95% win-rate) works because its error is UNIFORM (small, symmetric, ~5% relative); ternary's error is STRUCTURED (large, biased, 145% relative) and the LoRA removes the bias but leaves residual structure that PUCT amplifies.
+
+**The lesson, generalized:** cosine ≥ 0.99 is NECESSARY but NOT SUFFICIENT for PUCT parity. PUCT's search amplifies residual errors, setting a higher bar than greedy-move parity. int8 is a surprising outlier that works because its error is uniform.
+
+**Final verdict:** modelless quant-error-compensating LoRA is unviable for the ternary path on Moka v1. Issue 565 CLOSED. The primitive ships as reusable substrate for larger models where the error manifold is genuinely low-rank AND the target is greedy-move parity (not PUCT parity) — e.g., Gemma 2 2B (Proposal 008) if ever aggressively quantized for edge deployment. The trained-projection path (riir-train) is the only remaining option for Moka.
+
+🔧 Feature flag: `quant_error_lora` (in katgpt-core). Stays **opt-in** — the PoC G5 DECISIVELY FAILED on the only consumer (Moka ternary path). Ships as reusable substrate for future larger-model consumers.
+
+📖 Issue: 565 (removed per noise-reduction rule — resolution above), Research: [`.research/463_moka_freeze_thaw_lever_audit.md`](../../.research/463_moka_freeze_thaw_lever_audit.md) §7 (PoC Addendum 2026-08-01), PoC bench: `riir-poc/tests/quant_error_lora_poc.rs` (cross-repo, permanent regression check), Substrate: `crates/katgpt-core/src/quant_error_lora.rs` (7 unit tests)
