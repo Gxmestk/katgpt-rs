@@ -995,6 +995,18 @@ path = "benches/bench_017_covariance_aware_classifier.rs"
 required-features = ["kimi_k3_loader", "swe_trajectory_freeze"]
 harness = false
 
+# Proposal 011 Phase 5 follow-up — sequence trajectory discrimination probe.
+# Tests whether the SEQUENCE trajectory (64 final hidden states across a
+# prompt's tokens with growing KV cache) provides enough √N SNR boost over
+# the depth trajectory (9 steps/token, bench_012-017) for per-prompt
+# discrimination. 32 prompts × 64 tokens. 4 encoders + 3 classifiers +
+# Bayes-optimal ceiling. Self-contained — no substrate changes.
+[[bench]]
+name = "bench_018_sequence_trajectory"
+path = "benches/bench_018_sequence_trajectory.rs"
+required-features = ["kimi_k3_loader", "swe_trajectory_freeze"]
+harness = false
+
 # Plan 381 Phase 3 T3.1 — Step-Attribution Δ-Qualifier latency bench (G4).
 # Measures `StepAttributionQualifier::qualify()` end-to-end + aggregate-only
 # at W ∈ {16,32,64,128}. Target: aggregate-only < 1µs at W=64. std::time::Instant
