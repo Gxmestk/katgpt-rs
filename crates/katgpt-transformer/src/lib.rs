@@ -12,6 +12,8 @@
 mod context;
 mod contiguous;
 mod kv_cache;
+#[cfg(feature = "transformer_moe")]
+pub mod moe;
 mod mtp;
 mod weights;
 

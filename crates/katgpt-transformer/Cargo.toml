@@ -110,3 +110,11 @@ breakeven_routing = []
 # because the standard ReLU MLP is the production path; gated MLP is a
 # training-target architecture for aHLA MLP LoRA (Plan 066 Experiment E).
 gated_mlp = []
+
+# Transformer-level FFN MoE (DeepSeek-V3 fine-grained MoE + noaux_tc).
+# Proposal 032 Phase 3, Research 328. Implements the auxiliary-loss-free
+# load balancing from DeepSeek-V3 §3.3 (per-expert bias participates in
+# top-K selection only; raw sigmoid scores drive renormalization).
+# Opt-in — promotion requires Phase 6 real-model GOAT; MoE FFN is a model
+# architecture choice, not a modelless gain over existing substrate.
+transformer_moe = []
