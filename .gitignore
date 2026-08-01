@@ -26,3 +26,4 @@ __pycache__/
 
 # Local agent tool configuration (Claude Code, etc.)
 .claude/
+data/kimi-k3-0.40b/
