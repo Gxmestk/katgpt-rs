@@ -255,6 +255,14 @@ pub fn kimi_k3_forward_token<'a>(
 ) -> &'a [f32] {
     let d = config.hidden_size;
 
+    // ── Step 0: Reset per-token block state ───────────────────────────────
+    // Matches `modeling_kimi_linear.py` line 1324: `block_residual = None`
+    // is set at the start of every forward call. The block_residual
+    // accumulates WITHIN a forward pass (across the 8 layers), but is
+    // fresh for each token. Without this reset, block_state grows unboundedly
+    // across tokens → apply_attn_res scores buffer overflows on token #3+.
+    runtime.block_state.clear();
+
     // ── Step 1: Embedding lookup ──────────────────────────────────────────
     let embed_start = (token_id as usize) * d;
     let embed_end = embed_start + d;
