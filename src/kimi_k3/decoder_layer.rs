@@ -174,14 +174,35 @@ pub struct KimiFfnScratch {
 
 /// Forward a single token through one Kimi-K3 decoder layer.
 ///
-/// Implements the `KimiDecoderLayer.forward` path from
-/// `modeling_kimi_k3_linear.py` (Research 330 §5):
+/// Implements the actual `_forward_attn_residual` path from
+/// `modeling_kimi_k3_linear.py` (verified against the real source, Research 331).
 ///
-/// 1. `apply_attn_res` (self-attn block) — mix hidden with block residuals
-/// 2. `input_layernorm` → attention → residual add
-/// 3. `apply_attn_res` (MLP block) — mix again
-/// 4. `post_attention_layernorm` → FFN → residual add
-/// 5. At block boundaries, push the completed hidden state to block_state
+/// The key insight is the **prefix_sum** pattern: within an attention-residual
+/// block, a running `prefix_sum` accumulates residual contributions across
+/// layers. At block boundaries (`layer_idx % block_size == 0`), the accumulated
+/// `prefix_sum` is pushed to `block_state` and reset. Before each sub-layer
+/// (attention + FFN), `prefix_sum` is mixed with past block residuals via
+/// `apply_attn_res` to produce the input `hidden`.
+///
+/// ```text
+/// prefix_sum = hidden  (input to this layer)
+///
+/// if block_state has entries:
+///     hidden = apply_attn_res(prefix_sum, block_state, self_attn_res)
+///
+/// if layer_idx % block_size == 0:
+///     block_state.push(prefix_sum)   (push BEFORE attention — the raw input)
+///     prefix_sum = None              (reset for new block)
+///
+/// hidden = input_layernorm(hidden)
+/// hidden = attention(hidden)
+/// prefix_sum = (prefix_sum ?? 0) + hidden   (accumulate attention output)
+///
+/// hidden = apply_attn_res(prefix_sum, block_state, mlp_res)
+/// hidden = post_attention_layernorm(hidden)
+/// hidden = ffn(hidden)
+/// prefix_sum += hidden               (accumulate FFN output)
+/// ```
 ///
 /// # Arguments
 /// - `layer_idx` — 0-based layer index (for block-boundary check)
@@ -194,10 +215,11 @@ pub struct KimiFfnScratch {
 /// - `attn_res_mlp_scratch` — attn-res scratch for MLP block
 /// - `block_state` — accumulated block residuals (shared across layers)
 /// - `rope_freqs` — RoPE frequency table (MLA only; KDA doesn't use it)
-/// - `hidden` — input hidden state `[hidden_size]` (modified in-place)
-/// - `scratch_hidden` — scratch buffer `[hidden_size]` for intermediate results
+/// - `prefix_sum` — the running residual sum `[hidden_size]` (input = output)
+/// - `scratch_hidden` — scratch buffer `[hidden_size]` for norm/attention input
 ///
-/// The final hidden state is written back into `hidden`.
+/// On return, `prefix_sum` holds the updated running sum (becomes the input
+/// to the next layer). `block_state` may have a new entry if this was a boundary.
 #[allow(clippy::too_many_arguments)]
 pub fn kimi_decoder_layer_forward(
     layer_idx: usize,
@@ -210,32 +232,48 @@ pub fn kimi_decoder_layer_forward(
     attn_res_mlp_scratch: &mut AttnResScratch,
     block_state: &mut AttnResBlockState,
     rope_freqs: Option<&mut RopeFreqs>,
-    hidden: &mut [f32],
+    prefix_sum: &mut [f32],
     scratch_hidden: &mut [f32],
 ) {
     let d = config.attn_res.d();
-    debug_assert_eq!(hidden.len(), d);
+    debug_assert_eq!(prefix_sum.len(), d);
     debug_assert_eq!(scratch_hidden.len(), d);
 
     let eps = config.rms_eps;
+    let block_size = config.attn_res.block_size;
+    let is_boundary = layer_idx.is_multiple_of(block_size);
 
-    // ── Step 1: apply_attn_res (self-attention block) ────────────────────
-    // Mix the current hidden with accumulated block residuals.
-    let mixed = apply_attn_res(
-        &config.attn_res,
-        &weights.self_attn_res,
-        block_state,
-        attn_res_self_scratch,
-        hidden,
-    );
-    hidden.copy_from_slice(mixed);
+    // ── Step 1: apply_attn_res (self-attention) — mix prefix_sum with blocks ─
+    // If block_state has entries, mix. Otherwise hidden = prefix_sum (unchanged).
+    // scratch_hidden receives the mixed hidden (the input to attention).
+    if !block_state.is_empty() {
+        let mixed = apply_attn_res(
+            &config.attn_res,
+            &weights.self_attn_res,
+            block_state,
+            attn_res_self_scratch,
+            prefix_sum,
+        );
+        scratch_hidden.copy_from_slice(mixed);
+    } else {
+        scratch_hidden.copy_from_slice(prefix_sum);
+    }
 
-    // ── Step 2: input_layernorm → attention → residual add ──────────────
-    // Save residual (the mixed hidden) for later add.
-    scratch_hidden.copy_from_slice(hidden);
+    // ── Step 2: Block boundary — push prefix_sum BEFORE attention ──────────
+    // At block boundaries, push the raw input (prefix_sum) to block_state,
+    // then reset prefix_sum to zero (it will be rebuilt from attention + FFN).
+    if is_boundary {
+        block_state.push(prefix_sum);
+        // Reset prefix_sum — new block starts fresh.
+        // It will be set to attn_out below (step 4: prefix_sum was None → = hidden).
+        for x in prefix_sum.iter_mut() {
+            *x = 0.0;
+        }
+    }
 
-    // input_layernorm: RMSNorm(hidden, input_layernorm_weight, eps)
-    rmsnorm_with_gamma_eps(hidden, &weights.input_layernorm_weight, eps as f64);
+    // ── Step 3: input_layernorm → attention ───────────────────────────────
+    // Normalize the mixed hidden, then run attention.
+    rmsnorm_with_gamma_eps(scratch_hidden, &weights.input_layernorm_weight, eps as f64);
 
     // attention forward (MLA or KDA)
     let attn_out: &[f32] = match (&config.attention, &weights.attention) {
@@ -249,7 +287,7 @@ pub fn kimi_decoder_layer_forward(
             let Some(rf) = rope_freqs else {
                 panic!("MLA attention requires rope_freqs");
             };
-            mla_forward_token(mla_cfg, mla_w, cache, scratch, rf, hidden)
+            mla_forward_token(mla_cfg, mla_w, cache, scratch, rf, scratch_hidden)
         }
         (KimiAttentionConfig::Kda(kda_cfg), KimiAttentionWeights::Kda(kda_w)) => {
             let KimiAttentionState::Kda(cache) = attn_state else {
@@ -258,53 +296,45 @@ pub fn kimi_decoder_layer_forward(
             let KimiAttentionScratch::Kda(scratch) = attn_scratch else {
                 panic!("KDA attention config but non-KDA scratch");
             };
-            kda_forward_token(kda_cfg, kda_w, cache, scratch, hidden)
+            kda_forward_token(kda_cfg, kda_w, cache, scratch, scratch_hidden)
         }
         _ => panic!("attention config/weights mismatch"),
     };
 
-    // residual add: hidden = residual + attn_out
+    // ── Step 4: Accumulate attention output into prefix_sum ───────────────
+    // prefix_sum += attn_out (if boundary: prefix_sum was 0 → prefix_sum = attn_out)
     for i in 0..d {
-        hidden[i] = scratch_hidden[i] + attn_out[i];
+        prefix_sum[i] += attn_out[i];
     }
 
-    // ── Step 3: apply_attn_res (MLP block) ───────────────────────────────
+    // ── Step 5: apply_attn_res (MLP) — mix prefix_sum with blocks ─────────
     let mixed = apply_attn_res(
         &config.attn_res,
         &weights.mlp_attn_res,
         block_state,
         attn_res_mlp_scratch,
-        hidden,
+        prefix_sum,
     );
-    hidden.copy_from_slice(mixed);
+    scratch_hidden.copy_from_slice(mixed);
 
-    // ── Step 4: post_attention_layernorm → FFN → residual add ───────────
-    scratch_hidden.copy_from_slice(hidden);
-    rmsnorm_with_gamma_eps(hidden, &weights.post_attention_layernorm_weight, eps as f64);
+    // ── Step 6: post_attention_layernorm → FFN ────────────────────────────
+    rmsnorm_with_gamma_eps(scratch_hidden, &weights.post_attention_layernorm_weight, eps as f64);
 
     // FFN forward (Dense or MoE)
     let ffn_out: &[f32] = match (&config.ffn, &weights.ffn) {
         (KimiFfnConfig::Dense { situ_beta, situ_linear_beta, .. }, KimiFfnWeights::Dense(expert)) => {
-            dense_situ_ffn_forward(expert, hidden, ffn_scratch, *situ_beta, *situ_linear_beta)
+            dense_situ_ffn_forward(expert, scratch_hidden, ffn_scratch, *situ_beta, *situ_linear_beta)
         }
         (KimiFfnConfig::Moe(moe_cfg), KimiFfnWeights::Moe(moe_w)) => {
-            moe_forward_token(moe_w, moe_cfg, hidden, &mut ffn_scratch.dense_out, &mut ffn_scratch.moe);
+            moe_forward_token(moe_w, moe_cfg, scratch_hidden, &mut ffn_scratch.dense_out, &mut ffn_scratch.moe);
             &ffn_scratch.dense_out[..d]
         }
         _ => panic!("FFN config/weights mismatch"),
     };
 
-    // residual add: hidden = residual + ffn_out
+    // ── Step 7: Accumulate FFN output into prefix_sum ─────────────────────
     for i in 0..d {
-        hidden[i] = scratch_hidden[i] + ffn_out[i];
-    }
-
-    // ── Step 5: block boundary check ────────────────────────────────────
-    // At block boundaries (every `block_size` layers), push the current
-    // hidden state as the completed block sum.
-    let block_size = config.attn_res.block_size;
-    if (layer_idx + 1).is_multiple_of(block_size) {
-        block_state.push(hidden);
+        prefix_sum[i] += ffn_out[i];
     }
 }
 
@@ -370,7 +400,7 @@ mod tests {
         AttnResScratch,
         AttnResScratch,
     ) {
-        let is_mla = layer_idx == 0 || layer_idx == 4;
+        let is_mla = layer_idx == 3 || layer_idx == 7;
         let is_dense = layer_idx == 0;
 
         let (attn_cfg, attn_w, attn_state, attn_scratch) = if is_mla {
@@ -463,12 +493,35 @@ mod tests {
     }
 
     #[test]
-    fn smoke_layer_0_mla_dense() {
+    fn smoke_layer_0_kda_dense() {
+        // Layer 0: KDA + Dense MLP (the first dense layer)
         let d = 1024;
         let (cfg, w, mut attn_state, mut attn_scratch, mut ffn_scratch, mut self_res, mut mlp_res) =
             make_test_layer(0, d);
 
-        let mut hidden: Vec<f32> = (0..d).map(|i| (i as f32).sin() * 0.1).collect();
+        let mut prefix_sum: Vec<f32> = (0..d).map(|i| (i as f32).sin() * 0.1).collect();
+        let mut scratch_hidden = vec![0.0; d];
+        let mut block_state = AttnResBlockState::new(d);
+
+        kimi_decoder_layer_forward(
+            0, &cfg, &w, &mut attn_state, &mut attn_scratch, &mut ffn_scratch,
+            &mut self_res, &mut mlp_res, &mut block_state, None,
+            &mut prefix_sum, &mut scratch_hidden,
+        );
+
+        for &v in &prefix_sum {
+            assert!(v.is_finite(), "non-finite output: {v}");
+        }
+    }
+
+    #[test]
+    fn smoke_layer_3_mla_moe() {
+        // Layer 3: MLA + MoE (MLA at layers 3,7 per verified topology)
+        let d = 1024;
+        let (cfg, w, mut attn_state, mut attn_scratch, mut ffn_scratch, mut self_res, mut mlp_res) =
+            make_test_layer(3, d);
+
+        let mut prefix_sum: Vec<f32> = (0..d).map(|i| (i as f32).sin() * 0.1).collect();
         let mut scratch_hidden = vec![0.0; d];
         let mut block_state = AttnResBlockState::new(d);
 
@@ -480,97 +533,75 @@ mod tests {
         let mut rope = RopeFreqs::new_with_theta(mla_cfg.d_r(), mla_cfg.rope_theta);
 
         kimi_decoder_layer_forward(
-            0, &cfg, &w, &mut attn_state, &mut attn_scratch, &mut ffn_scratch,
+            3, &cfg, &w, &mut attn_state, &mut attn_scratch, &mut ffn_scratch,
             &mut self_res, &mut mlp_res, &mut block_state, Some(&mut rope),
-            &mut hidden, &mut scratch_hidden,
+            &mut prefix_sum, &mut scratch_hidden,
         );
 
-        for &v in &hidden {
+        for &v in &prefix_sum {
             assert!(v.is_finite(), "non-finite output: {v}");
         }
     }
 
     #[test]
-    fn smoke_layer_1_kda_moe() {
+    fn block_boundary_pushes_on_layer_0() {
+        // Block boundary: layer_idx % block_size == 0.
+        // Layer 0 is a block boundary (0 % 4 == 0) → push happens.
         let d = 1024;
         let (cfg, w, mut attn_state, mut attn_scratch, mut ffn_scratch, mut self_res, mut mlp_res) =
-            make_test_layer(1, d);
+            make_test_layer(0, d);
 
-        let mut hidden: Vec<f32> = (0..d).map(|i| (i as f32).sin() * 0.1).collect();
-        let mut scratch_hidden = vec![0.0; d];
-        let mut block_state = AttnResBlockState::new(d);
-
-        kimi_decoder_layer_forward(
-            1, &cfg, &w, &mut attn_state, &mut attn_scratch, &mut ffn_scratch,
-            &mut self_res, &mut mlp_res, &mut block_state, None,
-            &mut hidden, &mut scratch_hidden,
-        );
-
-        for &v in &hidden {
-            assert!(v.is_finite(), "non-finite output: {v}");
-        }
-    }
-
-    #[test]
-    fn block_boundary_pushes_on_layer_3() {
-        // Layer 3 is the last layer of block 0 (layers 0-3).
-        // block_size = 4, so (3+1) % 4 == 0 → push.
-        let d = 1024;
-        let (cfg, w, mut attn_state, mut attn_scratch, mut ffn_scratch, mut self_res, mut mlp_res) =
-            make_test_layer(3, d);
-
-        let mut hidden: Vec<f32> = (0..d).map(|i| (i as f32).sin() * 0.1).collect();
+        let mut prefix_sum: Vec<f32> = (0..d).map(|i| (i as f32).sin() * 0.1).collect();
         let mut scratch_hidden = vec![0.0; d];
         let mut block_state = AttnResBlockState::new(d);
 
         assert_eq!(block_state.len(), 0);
 
         kimi_decoder_layer_forward(
-            3, &cfg, &w, &mut attn_state, &mut attn_scratch, &mut ffn_scratch,
+            0, &cfg, &w, &mut attn_state, &mut attn_scratch, &mut ffn_scratch,
             &mut self_res, &mut mlp_res, &mut block_state, None,
-            &mut hidden, &mut scratch_hidden,
+            &mut prefix_sum, &mut scratch_hidden,
         );
 
-        assert_eq!(block_state.len(), 1, "block state should have 1 entry after block boundary");
+        assert_eq!(block_state.len(), 1, "block boundary layer 0 should push 1 entry");
     }
 
     #[test]
     fn non_boundary_does_not_push() {
-        // Layer 1 is NOT a block boundary ((1+1) % 4 != 0).
+        // Layer 1 is NOT a block boundary (1 % 4 != 0).
         let d = 1024;
         let (cfg, w, mut attn_state, mut attn_scratch, mut ffn_scratch, mut self_res, mut mlp_res) =
             make_test_layer(1, d);
 
-        let mut hidden: Vec<f32> = (0..d).map(|i| (i as f32).sin() * 0.1).collect();
+        let mut prefix_sum: Vec<f32> = (0..d).map(|i| (i as f32).sin() * 0.1).collect();
         let mut scratch_hidden = vec![0.0; d];
         let mut block_state = AttnResBlockState::new(d);
 
         kimi_decoder_layer_forward(
             1, &cfg, &w, &mut attn_state, &mut attn_scratch, &mut ffn_scratch,
             &mut self_res, &mut mlp_res, &mut block_state, None,
-            &mut hidden, &mut scratch_hidden,
+            &mut prefix_sum, &mut scratch_hidden,
         );
 
         assert_eq!(block_state.len(), 0, "non-boundary layer should not push");
     }
 
     #[test]
-    fn layer_0_mla_requires_rope_freqs() {
-        // This test verifies that passing None for rope_freqs on an MLA layer
-        // panics (the forward function checks for it).
+    fn layer_3_mla_requires_rope_freqs() {
+        // MLA at layer 3: passing None for rope_freqs panics.
         let d = 1024;
         let (cfg, w, mut attn_state, mut attn_scratch, mut ffn_scratch, mut self_res, mut mlp_res) =
-            make_test_layer(0, d);
+            make_test_layer(3, d);
 
-        let mut hidden: Vec<f32> = vec![0.0; d];
+        let mut prefix_sum: Vec<f32> = vec![0.0; d];
         let mut scratch_hidden = vec![0.0; d];
         let mut block_state = AttnResBlockState::new(d);
 
         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             kimi_decoder_layer_forward(
-                0, &cfg, &w, &mut attn_state, &mut attn_scratch, &mut ffn_scratch,
+                3, &cfg, &w, &mut attn_state, &mut attn_scratch, &mut ffn_scratch,
                 &mut self_res, &mut mlp_res, &mut block_state, None,
-                &mut hidden, &mut scratch_hidden,
+                &mut prefix_sum, &mut scratch_hidden,
             );
         }));
 
