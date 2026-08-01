@@ -1,7 +1,7 @@
 # Benchmark 205 — PUCT WASM Batched MCTS Latency
 
 **Date:** 2026-07-31
-**Issue:** [.issues/205](../.issues/205_puct_wasm_batched_mcts_latency.md)
+**Issue:** 205 (removed per noise-reduction rule — resolution captured in `.docs/09_feature_catalog/negative_results.md` §20)
 **Status:** Negative result (gain too small to justify promotion)
 
 ## TL;DR

@@ -1,7 +1,7 @@
 # Bench 019 — StateMagnitudeEncoder Substrate GOAT
 
 **Date:** 2026-08-02  
-**Issue:** [571](../.issues/571_state_magnitude_encoder_value_discrimination.md)  
+**Issue:** 571 (removed per noise-reduction rule — resolution captured in `.docs/09_feature_catalog/opt_in_features.md` §29)  
 **Predecessor:** [Bench 018](018_sequence_trajectory.md) — sequence trajectory value discrimination (POSITIVE)  
 **Result:** **G1-G5 ALL PASS.** Substrate-level `StateMagnitudeEncoder` ported from bench_018's `encode_seq_state_stats`. Promotion deferred (synthetic G5 + no consumer).
 

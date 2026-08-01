@@ -31,8 +31,8 @@ The plan was originally drafted as inline Phase 0-6 tasks. The actual execution 
 
 | Plan phase | Executed as | Result |
 |---|---|---|
-| Phase 0 (synthetic scaffolding) + Phase 1 (geometry discriminates?) + Phase 2 (CUCG) + Phase 3 (FAME) | [Issue 569](../.issues/569_swe_trajectory_geometry_synthetic_poc.md) (T5.1-T5.3) + Bench 011 | T5.1+T5.2 PASS, T5.3 CONDITIONAL FAIL (random directions degenerate) |
-| Phase 3 fix (data-derived directions) | [Issue 570](../.issues/570_data_derived_directions_fix_t53.md) (T5.3b) | PASS — 100% accuracy with geometry-encoded summaries + data-derived directions |
+| Phase 0 (synthetic scaffolding) + Phase 1 (geometry discriminates?) + Phase 2 (CUCG) + Phase 3 (FAME) | Issue 569 (removed per noise-reduction rule; see `docs/09_feature_catalog/opt_in_features.md` §29) (T5.1-T5.3) + Bench 011 | T5.1+T5.2 PASS, T5.3 CONDITIONAL FAIL (random directions degenerate) |
+| Phase 3 fix (data-derived directions) | Issue 570 (removed per noise-reduction rule; see `docs/09_feature_catalog/opt_in_features.md` §29) (T5.3b) | PASS — 100% accuracy with geometry-encoded summaries + data-derived directions |
 | Phase 4 (`SweTrajectoryFreezer` impl + GOAT) | Bench 013 (substrate GOAT) + Bench 014 (G5 cross-model) | G1-G5 ALL PASS — 100% accuracy on real Kimi-K3 vs random |
 | Phase 5 (real model, value discrimination) | Benches 012-020 (depth trajectory NEGATIVE, sequence trajectory POSITIVE) | Depth trajectory fails value-level discrimination (Bayes-optimal ceiling ~54%); sequence trajectory overcomes it (100% at σ≥0.1, d_M=14.526). **StateMagnitudeEncoder** ported to substrate (Bench 019, Issue 571). |
 | Phase 6 (riir-train fallback) | N/A — G5 PASSED | The modelless path is validated. riir-train LoRA remains an ALLOWED fallback if future cross-snapshot discrimination shows insufficient signal, but the primary G5 gate passed. |

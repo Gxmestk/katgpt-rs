@@ -105,8 +105,8 @@
 //! # References
 //!
 //! - Proposal: `katgpt-rs/.proposals/011_rust_swe_bench_latent_space_via_wasm_pruner.md` Phase 5
-//! - T5.1–T5.3 verdict: `katgpt-rs/.issues/569_swe_trajectory_geometry_synthetic_poc.md`
-//! - T5.3b verdict (data-derived directions): `katgpt-rs/.issues/570_data_derived_directions_fix_t53.md`
+//! - T5.1–T5.3 verdict: Issue 569 (removed per noise-reduction rule; resolution in `katgpt-rs/.docs/09_feature_catalog/opt_in_features.md` §29)
+//! - T5.3b verdict (data-derived directions): Issue 570 (removed per noise-reduction rule; resolution in §29 + Bench 013)
 //! - T5.4 PARTIAL verdict (real Kimi-K3 depth trajectory): `katgpt-rs/.benchmarks/012_kimi_k3_trajectory_geometry.md`
 //! - Substrate: Plan 342 (`latent_trajectory_geometry`), Plan 321
 //!   (`committed_field_blend`)

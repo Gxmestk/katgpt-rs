@@ -36,8 +36,8 @@
 //!     --bench bench_011_swe_trajectory_geometry_poc -- --nocapture
 //! ```
 //!
-//! See `katgpt-rs/.issues/569_swe_trajectory_geometry_synthetic_poc.md` (T5.1–T5.3)
-//! and `katgpt-rs/.issues/570_data_derived_directions_fix_t53.md` (T5.3b) for the
+//! See Issue 569 (removed per noise-reduction rule; resolution in `katgpt-rs/.docs/09_feature_catalog/opt_in_features.md` §29) (T5.1–T5.3)
+//! and Issue 570 (T5.3b, same resolution location) for the
 //! full defend-or-refute protocols + outcome-action tables.
 
 #![cfg(feature = "latent_trajectory_geometry")]

@@ -107,7 +107,7 @@ while being honest about what the format conversion actually enables.
 | **Poincaré Navigator** | Wrong domain shape | **No.** Continuous pose navigation, not board games. | No |
 | **FlowField** | Wrong domain shape | **No.** Civ pathfinding, not Go. | No |
 | **BinaryPlasma / PlasmaPath** | Would lose quality (1-2 bit wrecks int8) | **PARTIALLY.** The format doesn't help, but the freeze/thaw ECOSYSTEM (reader-LoRA hot-swap) might. See §2.4. | **YES — the one strong candidate** |
-| **Apple Neural Engine (CoreML)** | 4.66× slower ([Issue 564](../.issues/564_moka_ane_coreml_inference.md)) | **No.** Hardware dispatch overhead. Storage format doesn't change silicon. | No |
+| **Apple Neural Engine (CoreML)** | 4.66× slower (Issue 564, removed; resolution in `docs/09_feature_catalog/negative_results.md` §21) | **No.** Hardware dispatch overhead. Storage format doesn't change silicon. | No |
 | **Opening Book** | Hurts monotonically ([Bench 204](../.benchmarks/204_opening_book_vs_moka_negative.md)) | **No.** Moka's policy already plays better 9×9 openings. | No |
 
 **Bottom line on question 2:** format conversion does NOT unlock any of the
@@ -203,7 +203,7 @@ this is the inductive bias behind LoRA itself). A rank-8 or rank-16 SVD
 correction might recover most of the accuracy lost to aggressive quantization.
 
 **Why it might NOT work (the honest prediction):**
-1. **At int8 (current floor):** the error is already tiny. The LoRA overhead (2 extra matvecs per layer) likely exceeds the accuracy gain. The int8×int8 path is already 1.39× faster than f32 at 95% native win rate ([Bench 565](../.benchmarks/), [Issues 206+207](../.issues/206_int8_int8_dot_investigation.md), DEFAULT-ON since `7da5cf76`) — adding LoRA would eat that margin.
+1. **At int8 (current floor):** the error is already tiny. The LoRA overhead (2 extra matvecs per layer) likely exceeds the accuracy gain. The int8×int8 path is already 1.39× faster than f32 at 95% native win rate ([Bench 565](../.benchmarks/), Issues 206+207 (removed per noise-reduction rule; int8 resolution captured in `docs/08_performance/engineering.md`), DEFAULT-ON since `7da5cf76`) — adding LoRA would eat that margin.
 2. **At ternary/binary (where BinaryPlasma was rejected):** the error is large. PlasmaPath measured cosine 0.77 on random weights (≥0.92 on real NN weights, [Bench 044](../.benchmarks/044_plasma_path_goat.md)). A rank-r correction might recover to ~0.95, but the LoRA matvec costs real FLOPs — potentially negating the ternary speedup (ternary is ~5× faster per MAC, but the LoRA is f32 matmul).
 3. **The CNN is tiny (105K params).** LoRA compensation shines on large models where the error manifold is genuinely low-rank. On a 105K-param CNN, the error might be full-rank (no low-rank structure to exploit).
 

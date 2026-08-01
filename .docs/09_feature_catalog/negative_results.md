@@ -373,3 +373,73 @@ Not just "below int8's 95%" but **0%** — the ternary+LoRA path collapses PUCT 
 **Outcome.** Modelless quant-error-compensating LoRA is unviable for the ternary path on Moka v1. Issue 565 CLOSED (removed per noise-reduction rule). The `quant_error_lora` primitive ships as reusable substrate for larger models where the error manifold is genuinely low-rank AND the target is greedy-move parity (not PUCT parity) — e.g., Gemma 2 2B (Proposal 008) if aggressively quantized for edge deployment. The trained-projection path (riir-train) is the only remaining option for Moka.
 
 📖 Issue: 565 (removed per noise-reduction rule — resolution above), Research: [`.research/463_moka_freeze_thaw_lever_audit.md`](../../.research/463_moka_freeze_thaw_lever_audit.md) §7 (PoC Addendum 2026-08-01), Cross-reference: [opt-in catalog §32](opt_in_features.md#32-quant-error-lora--quantization-error-compensating-reader-lora-issue-565-research-463), PoC bench: `riir-poc/tests/quant_error_lora_poc.rs` (cross-repo permanent regression check), Substrate: `crates/katgpt-core/src/quant_error_lora.rs`.
+
+## 20. PUCT WASM Batched MCTS (Issue 205) — G2 FAIL: 1.09× << 3-5× estimate
+
+**Hypothesis.** Batched MCTS (the AlphaZero production technique) evaluates K leaves in ONE batched forward pass instead of K separate passes, dropping the 50-pass budget at b50 to ~7 batches. With K=8, IF the batched pass achieves weight-cache locality (each weight slice loaded once, used K times), the per-batch cost grows sub-linearly — estimated b50 from **29.8 ms → ~8-12 ms/move** (3-5× speedup).
+
+**G2 FAIL (2026-07-31, V8 JIT / wasm32).** K=8 gives **1.09×** (33.7→30.8ms/move at b50) — far below the 3-5× estimate. Even K=50 (one giant batch covering the entire budget) only reaches **1.19×** (33.7→28.2ms). The batched path is correct (G1 bit-identical to K sequential passes; 12 tests pass) but the gain doesn't justify the complexity (virtual loss, leaf queue, batched expansion/backprop).
+
+Root causes (the durable value):
+
+1. **Forward pass is compute-bound, not cache-bound.** The Moka net (~100KB weights) fits in L2 cache, so sequential passes already benefit from cache residency. The SIMD dot kernel (`wasm32_simd128_dot_f32`, 4 accumulators × 4 lanes = 16-wide unroll) saturates the FPU per call.
+2. **Batching doesn't reduce FLOPs.** K samples through the same weight slice reuse weight reads, but the total arithmetic is identical. The only savings are per-call setup overhead + cache pressure relief — both small for a 100KB net that already fits in L2.
+3. **The 84% forward-pass fraction is structural.** ~0.50 ms/pass × 50 nodes = 25 ms. Tree overhead is ~15%. Tree-side micro-optimizations cannot move the needle — the only path to dramatic improvement is reducing the per-pass cost or the pass count, and batching only helps the count if the per-batch cost is sub-linear.
+4. **wasmi parity preserves K=1 default.** The K=1 sequential path is bit-identical to pre-batch code; wasmi (the browser fallback runtime) cannot run batched code efficiently. Keeping K=1 default preserves wasmi parity.
+
+**Outcome.** Valid negative result. The batched path is **not promoted** — K=1 stays default, batched is opt-in via `PuctPlayer::with_batch_k`. The honest takeaway: for a small in-cache network, AlphaZero-style batching is not the right lever. The next lever is reducing per-pass cost (INT8 activations, Issue 206/207 — which DID succeed) or restructuring the conv2d via im2col+GEMM (filed as a non-goal, doubles the implementation surface).
+
+**Post-hoc vindication (Issue 206/207, 2026-07-31).** The INT8+INT8 dot path via WASM SDOT DID break the 30ms PUCT WASM floor (26.8ms b50) + was promoted to default-on. This confirms the root-cause diagnosis: forward-pass cost was the lever, not search-side batching. The INT8 win uses a different execution unit (`i8x16.dot_s`) than f32 FMA on V8, sidestepping the FPU saturation that blocked the batched path.
+
+📖 Issue: 205 (removed per noise-reduction rule — resolution above), Benchmark: [`.benchmarks/205_puct_wasm_batched_mcts_latency.md`](../../.benchmarks/205_puct_wasm_batched_mcts_latency.md), Substrate: `crates/katgpt-moka-wasm/src/puct.rs` (`PuctPlayer::with_batch_k`), Positive sibling (overturns the batched-path non-goal at a different lever): Issue 206/207 + [`.benchmarks/565_int8_int8_sdot_positive.md`](../../.benchmarks/565_int8_int8_sdot_positive.md).
+
+## 21. Moka v1 on Apple Neural Engine via CoreML (Issue 564) — G2 FAIL: ANE 4.66× SLOWER than CPU
+
+**Hypothesis.** `crates/katgpt-backend/src/ane.rs` is a real CoreML/Apple Neural Engine execution backend (currently transformer-only, used for one `lm_head` linear layer). Moka's conv net is unused on ANE — authoring the ~40-layer graph might unlock a latency win beyond what CPU SIMD can deliver (Plan 563 got CPU to ~2.8ms/move via kernel tuning).
+
+**G2 FAIL (2026-07-29, same day as filed — Apple Silicon / aarch64).** Direct measurement of a scoped probe (stem conv + one full non-global residual block, 9 layers: 5 convs, 3 ReLU, 1 residual add) as a real CoreML graph:
+
+| | Latency (9-layer slice) |
+|---|---|
+| CPU (`conv2d_into` + `simd_dot_f32`, Plan 563) | **56 µs** |
+| ANE (CoreML `predict()`, `ComputeUnits::All`) | **261 µs** |
+| Ratio | **ANE is 4.66× slower** |
+
+Correctness was proven (not the bottleneck): `max_abs_diff = 5.96×10⁻⁸` (f32 machine epsilon) — the CoreML output and CPU reference agree to the bit, confirming the `[out,kh,kw,in]`↔`[out,in,kh,kw]` weight transpose + HWC↔CHW activation transpose are both correct.
+
+Root cause (exactly the risk flagged before writing any code):
+
+1. **The model is too small (105K params).** CoreML's fixed per-call dispatch/marshalling overhead (FFI bridging, tensor copy in/out, Neural Engine driver handoff) dominates compute at this scale — not the conv arithmetic. That overhead is roughly constant regardless of layer count per `predict()` call.
+2. **No amortization headroom.** The *whole* CPU network only costs ~450 µs. A fixed per-call overhead of a couple hundred microseconds can't amortize away across so little total compute. Authoring all ~50 layers into one larger graph would reduce overhead-per-layer share but cannot close a 4.7× gap.
+
+**Outcome.** Valid negative result. Decision: do NOT build the remaining layers — a probe-first negative result stops the investigation rather than continuing to a full 40+-layer graph for a technique already shown to lose at this scale. The layer-mapping + transpose work in `ane_probe` is not wasted — it's a correct, reusable starting point if revisited on a much larger model or batched inference across many positions.
+
+**Re-opens only on** (a) a much larger model where compute dominates the fixed CoreML dispatch overhead, OR (b) batched inference across many positions (batch > 1 amortizes the per-call cost).
+
+📖 Issue: 564 (removed per noise-reduction rule — resolution above), Substrate: `crates/katgpt-pruners/src/go/moka_net.rs::ane_probe` (scoped probe, retained for reuse), ANE backend: `crates/katgpt-backend/src/ane.rs` (transformer-only, unchanged).
+
+## 22. Loop Injection Regime-Split PoC (Issue 568) — NO TRANSFER (planning at chance)
+
+**Hypothesis.** Paper "Towards Looped Models Done Right" (Huang et al. IFM/USC/CMU, Aug 2026) Q2 finding: persistent input injection (`z̃_t = (1-α)·z_t + α·e`, diagonal operator writing the fixed prelude into the recurrent stream each step) **helps retrieval/context/code** (MMLU +2.53, HumanEval+ +5.49, BBH-CoT +6.63) but **hurts math/reasoning** (MATH500 −3.60, GSM8K −2.51). The falsifiable prediction: this regime split transfers to a toy belief kernel (hand-designed 8-dim recurrent state, NOT a trained looped transformer) — always-inject > baseline on retrieval, < baseline on planning, regime-gated ≥ both.
+
+**Verdict: NO TRANSFER (2026-08-01, empirically validated PASS).** PoC setup: D=8, K=16, trials=500, α=0.3.
+
+| Strategy | Retrieval Cos | Planning Acc | Verdict |
+|---|---|---|---|
+| Baseline | 0.0143 | 0.5145 | ─ |
+| AlwaysInject(0.3) | 0.0246 | 0.5270 | helps_retrieval=YES  hurts_planning=HELPS |
+| RegimeGated | 0.0246 | 0.5145 | best_of_both=YES |
+
+Injection helps retrieval (+0.0103 cosine, as predicted ✓) but the planning task stays at chance (0.5145 baseline, within ±0.03 of 0.50) for ALL conditions. The "hurts planning" prediction is **untestable** on our substrate.
+
+Root cause (the durable value):
+
+1. **A fixed-random untrained kernel cannot do multi-step accumulation above chance.** tanh saturation + random `W_z` mixing destroy the signal across K=16 steps. The baseline can't plan, so there's nothing to degrade — the "injection hurts math" prediction requires a model that can actually do math first.
+2. **Two planning tasks were tried, both at chance.** Parity (XOR, hardest Boolean — baseline 0.4967, pure coin flip) AND weighted-sum-direction (linear accumulation, much easier — baseline 0.5145). Still at chance. Untestable on either.
+3. **The retrieval improvement is real but tiny** (+0.0103 cosine, both baseline + injection near-zero cosine ~0.01–0.03) — not actionable as a Gain-tier primitive.
+
+**The generalized lesson.** The regime split is irreducibly a **trained-model phenomenon**. The "injection hurts math" prediction is substrate-specific to trained looped transformers — it requires a model that can actually do math (accuracy well above chance) as the precondition for injection to measurably degrade it. This empirically validates the PASS verdict on the paper: the cautionary flag belongs in riir-train (training-time architecture decisions), not katgpt-core (modelless primitives). A modelless regime-gated injection primitive would be cargo-culting a phenomenon that doesn't exist on untrained substrates.
+
+**Outcome.** No plan filed. The PoC source remains in `riir-poc/` as a permanent regression check — its job was to settle the dispute, and it should keep settling it if the belief kernel is later trained/structured (the trained case is where the regime split could re-emerge as actionable).
+
+📖 Issue: 568 (removed per noise-reduction rule — resolution above), PoC source: `riir-ai/crates/riir-poc/src/loop_injection_poc.rs` + `benches/loop_injection_regime_split.rs` (cross-repo permanent regression check), Related research: [073](../../.research/073_LT2_Looped_Transformer_Distillation.md) (LT2), [097](../../.research/097_Training_Free_Loop.md), [414](../../.research/414_Fully_Looped_Transformer_Readout_Blind_Spot.md), [048](../../.research/048_HRM_Text_Additive_Injection_Cousin.md).

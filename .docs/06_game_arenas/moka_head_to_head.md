@@ -6,7 +6,7 @@
 >
 > **Benchmarks:** [204](../../.benchmarks/204_opening_book_vs_moka_negative.md) (opening book — negative), [205](../../.benchmarks/205_puct_search_vs_moka_win.md) (PUCT — massive win)
 >
-> **Issues:** [564](../../.issues/564_moka_ane_coreml_inference.md) (ANE — negative, closed). Issue 207 (int8 default-on promotion) was resolved + removed per the noise-reduction rule — see commit `7da5cf76` + the int8 section below.
+> **Issues:** 564 (ANE — negative, closed; removed per noise-reduction rule — resolution in `docs/09_feature_catalog/negative_results.md` §21). Issue 207 (int8 default-on promotion) + Issue 206 (int8×int8 investigation) were resolved + removed per the noise-reduction rule — see commit `7da5cf76` + the int8 section below + `docs/08_performance/engineering.md`.
 
 ---
 
