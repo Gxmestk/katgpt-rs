@@ -156,3 +156,56 @@ fn t6_3_forward_pass_produces_finite_logits() {
     assert_eq!(nan_count, 0, "NaN in logits");
     assert_eq!(inf_count, 0, "Inf in logits");
 }
+
+/// G1 — Logits match PyTorch reference.
+///
+/// **BLOCKED**: requires the `fla` library (flash-linear-attention) which
+/// depends on `triton` (CUDA-only, Linux only). The reference model cannot
+/// be run on macOS. G1 requires a cloud GPU instance (Linux + CUDA + triton)
+/// to generate reference logits.
+///
+/// See `.issues/575` for the tracking issue. When unblocked:
+/// 1. Run PyTorch model on GPU: `model(input_ids)` → reference logits
+/// 2. Save reference logits to `data/kimi-k3-0.40b/ref_logits_bos.npy`
+/// 3. Compare against Rust logits within f32 tolerance (max_diff < 1e-4).
+#[test]
+#[ignore = "BLOCKED: requires GPU + triton (CUDA-only) to run PyTorch reference"]
+fn g1_logits_match_pytorch_reference() {
+    use katgpt_rs::kimi_k3::model::{KimiK3ModelConfig, KimiK3Runtime, kimi_k3_forward_token};
+
+    let ref_path = format!("{}/ref_logits_bos.npy", model_dir());
+    if !Path::new(&ref_path).exists() {
+        eprintln!("skipping: reference logits not found at {ref_path}");
+        eprintln!("Generate with: python3 -c \"... PyTorch model forward on GPU ...\"");
+        return;
+    }
+
+    let weights = load_kimi_k3(&model_path()).unwrap_or_else(|e| panic!("load failed: {e}"));
+    let config = KimiK3ModelConfig::kimi_k3_0_40b();
+    let mut runtime = KimiK3Runtime::new(&config, 64);
+
+    let logits = kimi_k3_forward_token(&config, &weights, &mut runtime, 1u32);
+
+    // Load reference logits (simple binary format: [vocab_size] f32 LE)
+    let ref_bytes = std::fs::read(&ref_path).expect("failed to read reference logits");
+    let ref_logits: &[f32] = bytemuck::cast_slice(&ref_bytes);
+
+    assert_eq!(logits.len(), ref_logits.len(), "logits length mismatch");
+
+    let mut max_diff = 0.0f32;
+    let mut max_idx = 0;
+    for (i, (a, b)) in logits.iter().zip(ref_logits.iter()).enumerate() {
+        let diff = (a - b).abs();
+        if diff > max_diff {
+            max_diff = diff;
+            max_idx = i;
+        }
+    }
+
+    eprintln!("   max_diff = {max_diff:.2e} at logit[{max_idx}]");
+    eprintln!("   rust[{max_idx}] = {:.6}, ref[{max_idx}] = {:.6}",
+        logits[max_idx], ref_logits[max_idx]);
+
+    // G1 gate: max_diff < 1e-4 (f32 tolerance for a model with mixed attention types)
+    assert!(max_diff < 1e-4, "G1 FAIL: max_diff {max_diff:.2e} exceeds 1e-4 tolerance");
+}
