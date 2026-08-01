@@ -902,3 +902,79 @@ Ships:
 🔧 Feature flag: `event_log_query` (in katgpt-pruners, default-off; implies `event_log`). Root forwards via `event_log_query = ["katgpt-pruners/event_log_query"]`.
 
 📖 Plan: [`.plans/562_event_log_query_combinator.md`](../../.plans/562_event_log_query_combinator.md), Research (Gain): [`.research/461_PRO_LONG_Programmatic_Memory_Log_Search.md`](../../.research/461_PRO_LONG_Programmatic_Memory_Log_Search.md), Paper: [arXiv:2607.20064](https://arxiv.org/abs/2607.20064) PRO-LONG (Fox et al., Duke, 2026-07-23), Bench: [`.benchmarks/564_event_log_query_goat.md`](../../.benchmarks/564_event_log_query_goat.md) (numbered 564 not 562 — `.benchmarks/562` was already allocated to `katgpt-canon`), Substrate: `crates/katgpt-pruners/src/event_log.rs`, Example: `crates/katgpt-pruners/examples/event_log_query_basic.rs`.
+
+## 29. SWE Trajectory Freeze — Modelless Inference-Attempt Freezer (Proposal 011 Layer 4, Issues 569-571)
+
+Modelless committed freeze of an inference attempt's trajectory through patch-space — the flipped R463 insight that **even when a model proposes zero valid patches, the inference loop's trajectory has measurable geometry that is freezable and comparable across snapshots**. Composes shipped DEFAULT-ON substrate (`tf_loop` + `latent_trajectory_geometry` + `committed_field_blend`/FAME + a local BLAKE3 envelope) into a two-stage pipeline:
+
+1. **Fit** (offline) — `derive_directions` / `derive_directions_and_centroid` from cluster centroids of labeled training summaries (the T5.3b data-derived-directions fix — random directions degenerate via concentration-of-measure).
+2. **Freeze** (online, per-attempt) — encode trajectory into summary → mean-center → project onto pre-fit directions via FAME sigmoid gates → commit via BLAKE3 envelope.
+
+### Two encoders (two discrimination axes)
+
+| Encoder | Method | Discriminates | d | Gate |
+|---------|--------|---------------|---|------|
+| `GeometrySummaryEncoder` | Trajectory SHAPE (length, curvature, step-to-step cosine, n_steps) | **Structural** — failure-mode classification (oscillation vs committed-wrong vs converged) | 4 (+replicate to D) | Bench 013 G1-G4 + Bench 014 G5 |
+| `StateMagnitudeEncoder` | State MAGNITUDE (mean/std/max/min norm, initial/final norm, norm ratio, mean cosine) | **Value-level** — cross-snapshot identification (which checkpoint produced this trajectory?) | 8 | Bench 019 G1-G5 |
+
+The two encoders are **complementary, not redundant**. Shape features are perturbation-INVARIANT (the failure-mode geometry is preserved across weight perturbations — Bench 015 NEGATIVE on value-level discrimination via geometry). Magnitude features are perturbation-SENSITIVE (activation scale is weight-determined — Bench 018 POSITIVE at 100% / σ≥0.1).
+
+### Two freeze methods
+
+| Method | Encoder | Output | Use case |
+|--------|---------|--------|----------|
+| `freeze_attempt[_into]` | GeometrySummaryEncoder | `FrozenAttempt<N,D>` (commits geometry triple + π + summary) | Classify the failure MODE of an attempt |
+| `freeze_attempt_value[_into]` | StateMagnitudeEncoder | `FrozenValueAttempt<N,D>` (commits π + summary, no geometry triple) | Identify which SNAPSHOT produced an attempt |
+
+Both commit via the same local `TrajectoryFreezeEnvelope` (BLAKE3-checked header + payload, matches the `MerkleFrozenEnvelope` pattern — no cross-repo dep). At production scale (N=3, D=32): geometry = 164 bytes, value = 140 bytes.
+
+### GOAT gate results
+
+**Geometry path (Bench 013 + Bench 014):**
+
+| Gate | Status | Detail |
+|------|--------|--------|
+| G1 directions non-degenerate | ✅ PASS | All unit-norm, non-collinear (Bench 013) |
+| G2 perf | ✅ PASS | 4582 ns/call < 5000 ns (Bench 013) |
+| G3 cross-mode discrimination | ✅ PASS | 100% accuracy, oscillation 0.98 / committed_wrong 0.71 / converged 0.72 gates (Bench 013) |
+| G4 alloc-free | ✅ PASS | `freeze_attempt_into` = 0 allocs (after `from_states_into` zero-alloc fix, Bench 014) |
+| G5 cross-model | ✅ PASS | **100% accuracy** on real Kimi-K3 vs random weights (40/40 held-out, Bench 014) |
+
+**Value path (Bench 019 + Benches 018/020):**
+
+| Gate | Status | Detail |
+|------|--------|--------|
+| G1 correctness | ✅ PASS | Hand-computed 3-state dim-2 trajectory matches bit-identically (Bench 019) |
+| G2 perf | ✅ PASS | 51.8µs vs geometry 100.7µs = 0.52× (faster, single-pass Welford, Bench 019) |
+| G3 no-regression | ✅ PASS | 1851 lib tests; geometry path unaffected (Bench 019) |
+| G4 tamper-evidence | ✅ PASS | Header verification; tampered merkle_root + commitment both fail (Bench 019) |
+| G5 value discrimination | ✅ PASS | 100% on synthetic scale+variance-shift; **100% on real Kimi-K3 σ-perturbation** at σ≥0.1 (processing: Bench 018, generation: Bench 020) |
+
+**The load-bearing discrimination result (Bench 018 + Bench 020):** The SEQUENCE trajectory (final hidden states across a prompt's tokens with growing KV cache, N=48-64 steps) achieves **100% per-prompt accuracy at σ≥0.1** via `StateMagnitudeEncoder`, with d_Mahalanobis = 14.526 at σ=0.5 (50× the depth trajectory's 0.285). This holds for BOTH processing trajectories (fixed-token reading) AND generation trajectories (greedy argmax decoding) — Bench 020 confirmed generation is equally discriminative (actually BETTER at σ=0.05: 100% vs 81.2%, because argmax choices amplify weight perturbation near decision boundaries).
+
+The DEPTH trajectory (9 per-layer states per token, Benches 012-017) is the NEGATIVE control: shape features are perturbation-invariant, and the per-token Bayes-optimal ceiling for value-sensitive features is only ~54% (SNR ≈ 1.0 — token-to-token variance swamps the perturbation signal). The sequence trajectory overcomes this via the √N SNR boost (64 steps vs 9).
+
+### Why opt-in
+
+1. **Synthetic G5.** The substrate-level G5 test (Bench 019) uses synthetic scale+variance-shifted trajectories. Benches 018/020 use real Kimi-K3 weights with synthetic σ-perturbation (uniform multiplicative noise). **Real training drift may differ** (structured, non-uniform). Promotion should wait for a second real checkpoint.
+2. **No production consumer.** The primitive has no downstream caller yet. Per codebase pattern, promotion follows a consumer demonstrating the gain. The consumer is the SWE-bench pruner runtime (Proposal 011 Layer 4), which is blocked on Layer 3 (rubrc WASM compiler maturity).
+
+The substrate is READY — the remaining gap is real-checkpoint validation (an external dependency) + consumer wiring (blocked on Layer 3). Re-evaluate at the next SWE-bench integration milestone.
+
+### The honest negative-result trail (Benches 012-017)
+
+The path to the positive result was NOT linear — five benches explored + documented NEGATIVE results before the sequence-trajectory breakthrough:
+
+| Bench | Question | Result | Lesson |
+|-------|----------|--------|--------|
+| 012 | Real Kimi-K3 depth trajectory geometry | PARTIAL — G3 FAIL 29% distinct across tokens | Depth geometry is model-determined, not input-determined |
+| 015 | Geometry features + σ-perturbation | NEGATIVE — ~50% (coin flip) at all σ | Shape features are perturbation-INVARIANT |
+| 016 | Value-sensitive per-layer displacement features | NEGATIVE for per-token — centroid works, per-token SNR ≈ 1.0 | Resolution floor, not information deficit |
+| 017 | Mahalanobis/LDA covariance-aware classifier | NEGATIVE — Bayes-optimal ceiling ~54% | Per-token SNR floor is FUNDAMENTAL |
+| 018 | **Sequence trajectory state magnitude** | **POSITIVE — 100% at σ≥0.1** | √N SNR boost overcomes the floor |
+
+This trail is load-bearing: it documents WHY the sequence trajectory + state-magnitude encoder is the correct combination (not a lucky guess), and why the depth trajectory + geometry encoder is the wrong combination for value-level discrimination.
+
+🔧 Feature flag: `swe_trajectory_freeze` (in katgpt-core, default-off; implies `latent_trajectory_geometry` + `committed_field_blend`). Root forwards via `swe_trajectory_freeze = ["katgpt-core/swe_trajectory_freeze"]`.
+
+📖 Proposal: [`.proposals/011_rust_swe_bench_latent_space_via_wasm_pruner.md`](../../.proposals/011_rust_swe_bench_latent_space_via_wasm_pruner.md) (Layer 4), Issues: [569](../../.issues/569_swe_trajectory_geometry_synthetic_poc.md) + [570](../../.issues/570_data_derived_directions_fix_t53.md) + [571](../../.issues/571_state_magnitude_encoder_value_discrimination.md), Substrate: `crates/katgpt-core/src/swe_trajectory_freeze.rs`, Benches: [013](../../.benchmarks/013_swe_trajectory_freezer_goat.md) (geometry GOAT) + [014](../../.benchmarks/014_swe_trajectory_freezer_g5.md) (cross-model G5) + [018](../../.benchmarks/018_sequence_trajectory.md) (sequence POSITIVE) + [019](../../.benchmarks/019_state_magnitude_encoder_substrate_goat.md) (substrate GOAT) + [020](../../.benchmarks/020_generation_trajectory.md) (generation POSITIVE), Negative controls: [015](../../.benchmarks/015_swe_trajectory_perturbation_sensitivity.md) + [016](../../.benchmarks/016_value_sensitive_encoder.md) + [017](../../.benchmarks/017_covariance_aware_classifier.md).
