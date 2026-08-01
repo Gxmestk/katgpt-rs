@@ -134,6 +134,9 @@ toml = "0.8"
 bytemuck = { version = "1", features = ["extern_crate_alloc"] }  # extern_crate_alloc: enables pod_collect_to_vec (used by transformer.rs weight loading). On native this is unified transitively via plotters→image, but wasm32 builds skip plotters so the feature must be explicit. See Plan 316.
 half = "2"  # f16 compact KV cache storage (Plan 245 StillKV)
 rustfft = { version = "6", optional = true }  # CHIAR per-token DCT entropy (Plan 269)
+# Kimi-K3 loader deps (Proposal 032 Phase 5, gated by `kimi_k3_loader`).
+safetensors = { version = "0.4", optional = true }  # model.safetensors weight loader
+base64 = { version = "0.22", optional = true }  # tiktoken.model binary format (base64-encoded token→rank pairs)
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 # getrandom wasm32 backends — required so that transitive consumers (bevy_ecs
@@ -579,6 +582,22 @@ sleep_time_anticipation = ["katgpt-core/sleep_time_anticipation"]  # Sleep-Time 
 paired_loss_diagnostic = ["katgpt-core/paired_loss_diagnostic"]  # Paired Token-Level Loss Gap Diagnostic — generic modelless A/B measurement primitive (Plan 335, Research 319, arXiv:2606.20936 Li & Merrill AI2). PairedLossGap computes per-token Δ_i = ℓ_A − ℓ_B from two log-prob traces; tag-stratified means (Content/Function/Other/BracketOpen/BracketClose/CopyN); filtered aggregates (ALL_TOKENS / TOP-K∩NO-COPY / COPY-N-ONLY) that amplify small architecture gaps aggregate loss hides (paper §6 ~2× separation on Olmo 1B). ClassSizeBound exposes Proposition 1 (DKL ≤ log|V_τ|) — the volume-of-support bound justifying raw-vs-latent sync. Pure measurement tool, NOT an inference mechanism (not Super-GOAT). Generic math, no game/chain/shard semantics. Opt-in — Plan 335 GOAT G1/G2/G2-alloc/G3/G4 ALL PASS (.benchmarks/335_paired_loss_goat.md, 2026-06-27 — G2 from_log_probs 0.875µs + filtered_mean 1.500µs <2µs each, G2-alloc 0 allocs on scratch-reused SIMD path, G4 TopKNoCopy amplifies |gap| 13.9× vs AllTokens on characterized-bias fixture, target ≥1.5×); stays opt-in because measurement tools are opt-in by nature (audit-cadence, not every-tick). Passthrough to katgpt-core.
 transformer_inversion = ["katgpt-core/transformer_inversion"]  # SipIt Transformer Inversion (Plan 561) — forwarding shim for example/bench access. See katgpt-core/transformer_inversion for the canonical comment. Opt-in (Gain tier, parked pending consumer per Plan 561 §Phase 5).
 grad_policy = ["katgpt-core/grad_policy"]  # Gradient-guided inversion policy (Plan 561 Phase 2) — forwarding shim. Implies transformer_inversion.
+
+# ── Kimi-K3 native support (Proposal 032) ───────────────────────────────
+# Substrate primitive forwarders (each gates a leaf crate module):
+mla_attention = ["katgpt-attn/mla_attention"]  # Multi-head Latent Attention (DeepSeek-V2 §2.1 + Kimi-K3 output gate). Proposal 032 Phase 2.
+kda_linear = ["katgpt-attn/kda_linear"]  # KDA linear attention (Kimi Linear, arxiv 2510.26692). Proposal 032 Phase 4. Reuses gdn2 kernel.
+transformer_moe = ["katgpt-transformer/transformer_moe"]  # Transformer-level MoE (DeepSeek-V3 §3.3 noaux_tc + sigmoid router + latent MoE + SiTU experts). Proposal 032 Phase 3.
+transformer_attn_res = ["katgpt-transformer/transformer_attn_res"]  # Attention Residual Block (Kimi-K3 block-residual softmax mixing). Proposal 032 §5.
+#
+# The umbrella feature for Kimi-K3-0.40B decoder layer composition. Pulls in
+# all four revised substrate primitives (MLA, KDA, transformer-MoE, attn-res)
+# + the root-crate decoder layer forward path. Opt-in — promotion to default
+# requires Phase 6 real-model GOAT (logits match PyTorch reference).
+kimi_k3 = ["mla_attention", "kda_linear", "transformer_moe", "transformer_attn_res"]
+# Safetensors loader + tiktoken tokenizer for real-model loading.
+# Separate gate because it pulls heavy deps (safetensors, base64).
+kimi_k3_loader = ["kimi_k3", "dep:safetensors", "dep:base64"]
 
 personality_composition = ["katgpt-core/personality_composition"]  # PersonalityWeightedComposition — sigmoid-gated N-layer latent direction composition + reward-surprise drift + BLAKE3 snapshot (Plan 297, Research 276). Open primitive for the Entity Cognition Stack Super-GOAT (riir-ai Plan 327 consumes this). DEFAULT-ON after GOAT G4 (79.585ns < 1µs target, 12.6× margin) + G5 (zero alloc) passed (Plan 297 Phase 4, Bench 297). Passthrough to katgpt-core.
 committed_field_blend = ["katgpt-core/committed_field_blend"]  # CommittedFieldBlend — sampling-invariant per-entity MoE: frozen sigmoid blend of K archetype operator fields, weights computed ONCE from trajectory summary + BLAKE3-committed (Plan 321, Research 302, arXiv:2510.00621 FAME). Defining property: sampling invariance (FAME Prop. 3) — dense vs sparse observation of same trajectory → identical committed pi + identical dynamics. Implies personality_composition. DEFAULT-ON (2026-06-28, Issue 005 executed): Plan 321 G1–G5 ALL PASS + riir-ai Plan 336 G6a–G6e + G7a ALL PASS (2026-06-26). Modelless gain: closed-form sigmoid projection + BLAKE3 commit, no training. Zero runtime cost unless a caller invokes commit/apply_blended. Passthrough to katgpt-core.

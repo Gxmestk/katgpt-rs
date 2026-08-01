@@ -1976,6 +1976,7 @@ dependencies = [
 name = "katgpt-rs"
 version = "0.2.1"
 dependencies = [
+ "base64",
  "bevy_ecs",
  "blake3",
  "bytemuck",
@@ -2012,6 +2013,7 @@ dependencies = [
  "rayon",
  "reqwest",
  "rustfft",
+ "safetensors",
  "serde",
  "serde_json",
  "tempfile",

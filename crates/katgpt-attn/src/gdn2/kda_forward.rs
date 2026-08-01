@@ -123,6 +123,7 @@ impl KdaConfig {
 ///
 /// Mirrors the `KimiDeltaAttention.__init__` weight layout from
 /// `modeling_kimi_k3_linear.py` (Research 330 §4).
+#[derive(Clone, Debug)]
 pub struct KdaWeights {
     // ── Separate q/k/v projections (NOT shared) ──
     /// Query projection `W^q`. Shape `[proj_dim, hidden_size]`.
