@@ -461,7 +461,7 @@ Root cause: quest-grammar strings are **too short and too few** for byte-level L
 
 **Re-opens only on** a Hot-tier consumer with long-redundant text (natural-language prose, unstructured logs). For quest/KG/config structured data, this approach is dead.
 
-📖 Plan: [285](../../.plans/285_compression_drafter_quest_grammar.md), Feature: `compression_drafter` (opt-in, dep:lz4_flex), Research: [256](../../.research/256_nathan_gzip_lm.md).
+📖 Plan: [285](../../.plans/285_compression_drafter_quest_grammar.md), Feature: `compression_drafter` (opt-in, dep:lz4_flex), Research: [256](../../.research/256_GzipLM_Compression_Drafter.md).
 
 ## 24. BabelCodec — Readability-Relaxed Semantic Codec (Plan 331) — G2 FAIL: 1.14× << 2× target
 

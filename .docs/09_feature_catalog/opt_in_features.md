@@ -1216,7 +1216,7 @@ G1/G2/G5/G6/G7 ALL PASS (Bench 334, 2026-06-27) on synthetic fixtures. The quali
 
 🔧 Feature flag: `sleep_time_anticipation` (opt-in, `dep:katgpt-sleep`).
 
-📖 Plan: [334](../../.plans/334_sleep_time_query_anticipator_primitive.md). Bench: [334](../../.benchmarks/334_sleep_time_goat.md). Research: [318](../../.research/318_Sleep_Time_Compute_Anticipation.md). Substrate: `katgpt-sleep` crate (Issue 007 Phase E Tier 2 #6).
+📖 Plan: [334](../../.plans/334_sleep_time_query_anticipator_primitive.md). Bench: [334](../../.benchmarks/334_sleep_time_goat.md). Research: [318](../../.research/318_Sleep_Time_Compute_Offline_Query_Anticipation.md). Substrate: `katgpt-sleep` crate (Issue 007 Phase E Tier 2 #6).
 
 ## 36. HOLA Hippocampal Exact KV Cache (Plan 395)
 
@@ -1252,7 +1252,7 @@ G1–G4 GOAT ALL PASS + consumer wiring PASS (modelless gain). Production wiring
 
 🔧 Feature flag: `hippocampal_cache` (opt-in). Implied by `gdn_hola_tree_verify`.
 
-📖 Plan: [395](../../.plans/395_hippocampal_exact_kv_cache.md). Bench: `hippocampal_cache_goat` + `hippocampal_cache_retrieval`. Research: [378](../../.research/378_HOLA_Hippocampal_Exact_KV_Cache.md). Substrate: `crates/katgpt-core/src/hippocampal_cache.rs`.
+📖 Plan: [395](../../.plans/395_hippocampal_exact_kv_cache.md). Bench: `hippocampal_cache_goat` + `hippocampal_cache_retrieval`. Research: [378](../../.research/378_HOLA_Hippocampal_Exact_KV_for_Linear_Attention.md). Substrate: `crates/katgpt-core/src/hippocampal_cache.rs`.
 
 ## 37. Analytic Lattice + Transfer Matrix Band Structure (Plan 330 + Plan 458)
 
@@ -1278,7 +1278,7 @@ The ML anchor is Bai/Koltun/Kolter DEQ Jacobian Regularization (arXiv:2106.14342
 
 🔧 Feature flags: `analytic_lattice` (opt-in) + `transfer_matrix_band_structure` (opt-in, implies `analytic_lattice` for `compose_chain`).
 
-📖 Plans: [330](../../.plans/330_analytic_lattice_encoder_decoder_primitive.md) + [458](../../.plans/458_transfer_matrix_band_structure.md). Benches: [330](../../.benchmarks/330_analytic_lattice_goat.md) + [458](../../.benchmarks/458_transfer_matrix_band_structure_goat.md). Research: [311](../../.research/311_Analytic_Lattice_Encoder.md) + [451](../../.research/451_Transfer_Matrix_Band_Structure.md). Substrate: `crates/katgpt-core/src/analytic_lattice/`.
+📖 Plans: [330](../../.plans/330_analytic_lattice_encoder_decoder_primitive.md) + [458](../../.plans/458_transfer_matrix_band_structure.md). Benches: [330](../../.benchmarks/330_analytic_lattice_goat.md) + [458](../../.benchmarks/458_transfer_matrix_band_structure_goat.md). Research: [311](../../.research/311_Analytic_Lattice_Encoder_Decoder_Primitive.md) + [451](../../.research/451_Delta_Lattice_Tunneling_Transfer_Matrix_Band_Structure.md). Substrate: `crates/katgpt-core/src/analytic_lattice/`.
 
 ## 38. Paired Loss Gap Diagnostic (Plan 335)
 
@@ -1307,7 +1307,7 @@ ALL PASS (Bench 335, 2026-06-27). **Not promoted to default** — measurement to
 
 🔧 Feature flag: `paired_loss_diagnostic` (opt-in). Pure measurement tool, NOT an inference mechanism (Research 319 §3: not Super-GOAT).
 
-📖 Plan: [335](../../.plans/335_paired_loss_gap_diagnostic_primitive.md). Bench: [335](../../.benchmarks/335_paired_loss_diagnostic_goat.md). Research: [319](../../.research/319_Paired_Token_Level_Loss_Gap_Diagnostic.md). Substrate: `crates/katgpt-core/src/paired_loss_diagnostic.rs`.
+📖 Plan: [335](../../.plans/335_paired_loss_gap_diagnostic_primitive.md). Bench: [335](../../.benchmarks/335_paired_loss_goat.md). Research: [319](../../.research/319_Paired_Token_Loss_Gap_Discourse_State_Diagnostic.md). Substrate: `crates/katgpt-core/src/paired_loss_diagnostic.rs`.
 
 ## 39. Bisimulation Operator Inference (Plan 324)
 
