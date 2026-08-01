@@ -7,6 +7,8 @@
 > **Related Plans:** 162 (Emotion Vector — read-only), 087 (CNA — neuron-level mutation), 292 (FPCG — sample-level, no mutation), 309 (this primitive)
 > **Cross-ref (riir-ai):** Research 153 (Latent Field Steering Game Runtime Guide)
 > **Classification:** Public
+>
+> **PASS-Redirects (synthesis):** Huang et al. [arXiv:2607.17524 "Token-Level Off-Policy Learning for Faithful Generation Under Distribution Shift" (TOPL, COLM 2026)] — PASS. TOPL's §5 mechanistic analysis shows LoRA-B = steering vector (`h' = h + α·v`) — this note's `apply_latent_steering` is the modelless analog, BLAKE3-committed + DEFAULT-ON. TOPL's LoRA-A (concept classifier direction, AUROC predicts OOD) ships modellessly as MAG `mine_contrast_direction` (R397, AUC 0.925 > paper's trained 0.7541) + FPCG `FutureBehaviorProbe` (R267, AUC 1.000 on Gemma 2 2B). Rank-r decomposition `Σ v_i(c_i^T h)` = PersonalityWeightedComposition `Σ sigmoid(w_i/τ)·d_i` (R276) + `LoraPair { reader, writer }` (Plan 025). The BCE+LoRA training loop → riir-train; modelless mean-difference directions are Bayes-optimal for Gaussian classes.
 
 ---
 

@@ -7,6 +7,8 @@
 > **Related Plans:** 162 (EmotionDirections — supervised), 297 (PersonalityWeightedComposition), 309 (Latent Field Steering), 321 (CommittedFieldBlend), 405 (Spherical Steering), 412 (Subspace Steering), 418 (this primitive — open MAG)
 > **Cross-ref (riir-ai):** Research 316 — *MAG Unsupervised Direction Mining Game Runtime Guide* (private Super-GOAT selling-point doc)
 > **Classification:** Public
+>
+> **PASS-Redirects (synthesis):** Huang et al. [arXiv:2607.17524 "Token-Level Off-Policy Learning for Faithful Generation Under Distribution Shift" (TOPL, COLM 2026)] — PASS. TOPL trains a LoRA-A (concept classifier direction) + LoRA-B (steering vector) + binary reward head via BCE on token-level factual/non-factual labels; §5 shows LoRA-A AUROC separability predicts OOD generalization (Table 1: TOPL 0.7541 → 0.8706 OOD; SFT 0.6272 → 0.8530). This note's `mine_contrast_direction` (mean-difference = Fisher LDA optimal for Gaussian classes) IS the modelless LoRA-A analog — and is strictly stronger: MAG achieves LOO acc 0.925 (> Bayes-optimal 0.908); FPCG (R267/Plan 292) achieves AUC 1.000 on Gemma 2 2B vs TOPL's trained AUROC 0.7541. The LoRA-B steering vector ships as Latent Field Steering (R290/Plan 309); the rank-r conditional decomposition `v_i(c_i^T h)` ships as PersonalityWeightedComposition `Σ_i sigmoid(w_i/τ)·d_i` (R276/Plan 297) + `LoraPair { reader, writer }` (Plan 025). The BCE+LoRA training loop → riir-train. AUROC-as-OOD-indicator ships as Benchmark 292 + 320 + LatentConfounderAudit (Issue 194).
 
 ---
 

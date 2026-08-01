@@ -8,6 +8,8 @@
 > **Related Plans:** 162 (Emotion Vector Inference), 087 (CNA Steering), 239 (Posterior-Guided Pruner), 277 (Temporal Derivative), 274 (CGSP)
 > **Related Issues:** 023 (Adaptive γ from entropy-linear acceptance forecast — closest cousin in spirit)
 > **Classification:** Public — generic math, no game semantics
+>
+> **PASS-Redirects (synthesis):** Huang et al. [arXiv:2607.17524 "Token-Level Off-Policy Learning for Faithful Generation Under Distribution Shift" (TOPL, COLM 2026)] — PASS. TOPL's reward head `P(zk=1) = σ(h(H_k))` (token-level correctness prediction via sigmoid) IS this note's `FutureBehaviorProbe` sigmoid future-behavior forecast — same math, same shape. TOPL trains the probe via BCE+LoRA; FPCG constructs it modellessly (mean-difference direction, Benchmark 292: AUC 1.000 separability + causal steering +5.81 logit on Gemma 2 2B vs TOPL's trained AUROC 0.7541). TOPL's §5 LoRA-A=classifier / LoRA-B=steering decomposition = MAG (R397) + Latent Field Steering (R290) + PersonalityWeightedComposition (R276). TOPL's key finding (token-level > sequence-level for OOD) validates per-position residual reads; the BCE+LoRA training loop → riir-train. AUROC-as-OOD-indicator already ships as Benchmark 292 separability sweep + LatentConfounderAudit (Issue 194).
 
 ---
 
