@@ -1308,3 +1308,73 @@ ALL PASS (Bench 335, 2026-06-27). **Not promoted to default** — measurement to
 🔧 Feature flag: `paired_loss_diagnostic` (opt-in). Pure measurement tool, NOT an inference mechanism (Research 319 §3: not Super-GOAT).
 
 📖 Plan: [335](../../.plans/335_paired_loss_gap_diagnostic_primitive.md). Bench: [335](../../.benchmarks/335_paired_loss_diagnostic_goat.md). Research: [319](../../.research/319_Paired_Token_Level_Loss_Gap_Diagnostic.md). Substrate: `crates/katgpt-core/src/paired_loss_diagnostic.rs`.
+
+## 39. Bisimulation Operator Inference (Plan 324)
+
+Distilled from [arXiv:2602.19260](https://arxiv.org/abs/2602.19260) — Duggan, Lorang, Lu, Scheutz (Tufts), *The Price Is Not Right* (underlying NSM method: [arXiv:2508.21501](https://arxiv.org/abs/2508.21501)). Generic modelless primitive that quotients an observed transition graph into bisimulation-equivalent state classes and infers an abstract PDDL-like operator schema.
+
+### What it produces
+
+Given a stream of observed state transitions `(s, a, s′, label)`:
+
+1. **Minimal bisimulation quotient** — partition of observed states into equivalence classes such that two states are equivalent iff their outgoing labeled transitions lead to equivalent successor classes. Paige-Tarjan O((S+E) log S) partition refinement.
+2. **Inferred operator schema** — one abstract operator per edge-label in the quotient graph, with preconditions (src class membership) + effects (dst class membership).
+3. **Chain-committable canonical form** — BLAKE3 hash of the quotient graph `(classes, edges, operator_labels)`, suitable for LatCal-style commitment + anti-cheat replay.
+
+### PDDL-side counterpart to Induced CWM (Plan 296 / §10)
+
+Where CWM induces *executable code* from trajectories via an LLM refinement loop (riir-ai Plan 326, private), this primitive induces a *symbolic operator schema* via a deterministic graph algorithm. The runtime picks per task: code induction for rich domains, operator-schema induction for structured/combinatorial domains.
+
+### GOAT gate
+
+ALL PASS (Bench 324, 2026-06-25). Opt-in by design — downstream pipelines opt in; the primitive is not a default-on capability.
+
+| Gate | Result |
+|---|---|
+| G1 (bisimulation correctness) | Known graph → known minimal quotient, bit-identical across re-runs |
+| G2 (operator inference soundness) | Every observed transition covered; no spurious operators |
+| G3 (plan validity) | Planner on inferred schema produces executable plans (no precondition violations) |
+| G4 (latency) | Partition refinement ≤ 1 ms for N=1024 nodes |
+| G5 (zero-alloc hot path) | `class_id(state) -> u32` is O(1), no heap alloc across 10⁶ queries |
+
+### Example
+
+`bisimulation_demo` — Towers-of-Hanoi transition graph: build, refine, infer operators, plan, print quotient + schema.
+
+🔧 Feature flag: `bisimulation_operator_inference` (opt-in). Sibling sub-features: `induced_cwm_ismcts` (Phase 2 IS-MCTS search) + `induced_cwm_tournament` (Phase 3 value-function tournament).
+
+📖 Plan: [324](../../.plans/324_bisimulation_operator_inference.md). Bench: [324](../../.benchmarks/324_bisimulation_goat.md). Research: [308](../../.research/308_NSM_VLA_Price_Is_Not_Right_Bisimulation_Operator_Inference.md). Substrate: `crates/katgpt-core/src/bisimulation/`.
+
+## 40. Lifelong LaCAM Multi-Agent Pathfinding Substrate (Plan 440)
+
+Distilled from [arXiv:2605.16855](https://arxiv.org/abs/2605.16855) — Arita & Okumura, *Lifelong LaCAM with Local Guidance for Lifelong MAPF*, AAAI 2026. Generic modelless receding-horizon windowed multi-agent pathfinder. Scales to 10,000 agents at real-time per-step planning (paper-reported). **Entirely heuristic** — no training, no backprop.
+
+### Four pluggable seams
+
+| Seam | Role |
+|---|---|
+| `CostFn` | Collision-count cost on space-time A* guidance |
+| `LocalGuidanceSource` | PIBT one-step generator |
+| `WarmStartScheme` | LLLG_Π / LLLG_Φ / LLLG_∅ warm-start schemes |
+| `HindranceEstimator` | Congestion-based hindrance scoring |
+
+These seams enable the riir-ai Super-GOAT fusion (riir-ai/318: HLA × Crowd MCGS × P350) without forking the substrate.
+
+### GOAT gate (honest partial FAIL)
+
+| Gate | Result |
+|---|---|
+| G3 (no-regression) | ✅ PASS |
+| G4 (latency) | ✅ PASS |
+| G1 (paper reproduction) | ⚠️ **2/4 real maps PASS** (empty + random), warehouse 0.41 + ht_chantry 0.27 FAIL on real MovingAI maps (Issue 148) |
+| G2 (congestion mitigation) | ❌ **FAIL** (warm-start non-consumable) |
+
+**Stays opt-in** per Plan 440 Phase 5 verdict. The G1 partial fail on real MovingAI maps is documented — the substrate works on structured maps but struggles on real-world warehouse/labyrinth topologies. The Super-GOAT promotion requires riir-ai fusion gates G5–G7.
+
+### Sibling: LaCAM Escalation (Plan 453)
+
+`lacam_escalation` (bounded one-step LaCAM) replaces the fake "LaCAM escalation" (shuffled-priority retries) with the real constraint-tree search from Okumura 2023. The critical insight: LaCAM DOES use recursive PIBT, but it works because the constraint tree bounds the recursion. Issues 140/143 collapsed throughput because they used recursive PI WITHOUT the constraint tree. This feature ships the constraint tree — the missing half. All 5 phases DONE; stays opt-in.
+
+🔧 Feature flags: `multi_agent_path` (opt-in) + `lacam_escalation` (opt-in, implies `multi_agent_path`).
+
+📖 Plans: [440](../../.plans/440_lifelong_lacam_multi_agent_pathfinding_substrate.md) + [453](../../.plans/453_bounded_one_step_lacam_escalation.md). Benches: [440](../../.benchmarks/440_lllg_paper_repro_goat.md) + [453](../../.benchmarks/453_lacam_escalation_goat.md). Research: [424](../../.research/424_Lifelong_LaCAM_Local_Guidance_Multi_Agent_Pathfinding.md). Substrate: `crates/katgpt-core/src/multi_agent_path/`.
