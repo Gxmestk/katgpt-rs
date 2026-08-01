@@ -525,3 +525,65 @@ Root cause: DashAttention's entmax routing is already a strong sparse-attention 
 **Re-opens only on** a long-context task where chunk-level routing is insufficient AND sub-chunk group routing demonstrably helps — the NIAH benchmark didn't surface this. A different benchmark (multi-document QA, code understanding) might, but that's speculative.
 
 📖 Plan: [397](../../.plans/397_hierarchical_global_attention.md), Feature: `hga` (opt-in), Research: [379](../../.research/379_Hierarchical_Global_Attention_Chunk_Group_Routing.md).
+
+## 27. VFD Velocity-Field Disagreement — G2 FAIL: UQ Floor (Issue 010) NOT Met
+
+**Hypothesis.** The VFD estimator from Römer et al. (arXiv:2606.18043 §4, Theorem 4.1) — consuming M frozen velocity fields, integrating each member trajectory independently, accumulating pairwise disagreement weighted by `κ_s = s/(1−s)` — could ship as a calibrated epistemic-UQ primitive that upgrades `velocity_field_ensemble`'s UQ.
+
+**G2 FAIL (2026-07-13).** Per `.benchmarks/432_vfd_goat.md` — the UQ-bearing primitive GOAT gate extension (the "Report the Floor" rule, Issue 010) requires VFD-calibrated intervals to beat `ConformalIntervalCalibrator<SeasonalNaiveForecaster>` m=1 on CRPS/coverage/Winkler. **VFD does NOT meet the conformal-naive floor** — `λ*=0` on both AR(1) + 1D Bimodal corpora (the optimal calibration weight on the VFD disagreement signal is zero, meaning the floor's raw residuals dominate).
+
+| Gate | Result |
+|---|---|
+| G1 (mechanics) — exact analytic match for constant-disagreement fields | ✅ PASS |
+| **G2 (UQ floor per Issue 010)** | ❌ **FAIL** (λ*=0 on both corpora) |
+| G3 (no-regression) | ✅ PASS |
+| G4 (latency) — `vfd_score_into` ≤ 50µs at M=2 D=8 N_s=10 B=5 | ✅ PASS — 10.43µs (4.8× margin) |
+| G5 (QGF integration) — `VfdVarianceSignal: QgfVarianceSignal` | ✅ PASS |
+
+**Outcome.** `velocity_field_disagreement` stays **opt-in**. VFD ships as a **non-UQ disagreement score** — useful for CLR L1 gating, sleep-time prioritization, runtime failure detection (paper §6.4), but with **no calibrated-UQ claim**. The velocity-field ensemble (Plan 376) remains the UQ-bearing primitive; VFD does not upgrade it.
+
+**The generalized lesson (Issue 010 pattern).** This is the same failure mode as the conformal floor catches in other UQ primitives: a disagreement signal that *correlates* with error is not the same as a calibrated predictive interval. The floor's `SeasonalNaiveForecaster` with split conformal is a surprisingly strong baseline; beating it requires the UQ signal to add information the naive residuals don't already carry. VFD's disagreement signal, on the test corpora, did not.
+
+**Re-opens only on** a corpus where the velocity-field disagreement genuinely carries calibrated-UQ information that the conformal-naive floor misses — e.g. a regime where ensemble member disagreement is the *only* available error signal (no historical residuals). The test corpora (AR(1) + Bimodal) had historical residuals available, which is the floor's strength.
+
+📖 Bench: [432 GOAT](../../.benchmarks/432_vfd_goat.md) + [432 UQ floor](../../.benchmarks/432_vfd_uq_floor.md), Plan: [432](../../.plans/432_vfd_velocity_field_disagreement_primitive.md), Feature: `velocity_field_disagreement` (opt-in), Research: [420](../../.research/420_VFD_Velocity_Field_Disagreement_Epistemic_UQ.md).
+
+## 28. FlowField × DualLeoMixer Pre-Max Fusion (Plan 459) — G5 FAIL: Nonlinearity Washes Out α-Mix
+
+**Hypothesis.** Mixing LEO teacher + UVFA student Q-slices via `DualLeoMixer::combine_into` before the `max-over-actions` step would produce a better flow-field navigation potential than the LEO-only baseline (≥30% stuck-NPC reduction).
+
+**G5 FAIL (2026-07-18).** Per `.benchmarks/459_flow_field_dual_leo_mixer_goat.md` — no α in {0.1..0.9} meets the 30% gate. Best α=0.10 achieves only 25.9% reduction; the paper's default α=0.3 achieves only 3.7%.
+
+| Gate | Result |
+|---|---|
+| G1 (bit-identity — LeoOnly matches single-head) | ✅ PASS |
+| G2 (perf — cache-miss ≤ 1.5×) | ✅ PASS — 1.11× |
+| **G5 (≥30% stuck-NPC reduction at some α)** | ❌ **FAIL** — best 25.9% at α=0.10 |
+
+**Root cause.** `max_a (α·Q_leo[a] + (1−α)·Q_uvfa[a]) ≠ α·max_a Q_leo[a] + (1−α)·max_a Q_uvfa[a]`. The pre-max α-mix is washed out by the nonlinear max-pool *before* the FFT smoothing sees it. The LEO decoy peak survives the max even at low α because the mix is per-action, pre-max.
+
+**Outcome + the correction.** Plan 459's pre-max `get_or_compute_dual` stays landed (G1+G2 pass, opt-in callers unaffected) but is demoted to "compatibility / parity with QGF pre-max mix". **Plan 460 is the correction** — it moves the blend to *post-max* potentials (`α·potential_leo + (1−α)·potential_uvfa`), which is linear in the FFT's input. Plan 460's postmax path G5' PASSES at α=0.10 (31.5% reduction, +5.6pp over pre-max). The pipeline-stage change is the difference between FAIL and PASS at essentially identical perf cost.
+
+**The real-network caveat (Issue 549).** Plan 460's synthetic G5' PASS did NOT survive contact with untrained CivLeoNet + CivLeoUVFA — drops to 3.3% at α=0.10. The postmax mechanism is correct (G1 bit-identity holds on both synthetic + untrained real); the gain requires **trained** networks. Tracked in `riir-ai/.issues/552`.
+
+📖 Catalog entry: [opt_in_features.md §41](opt_in_features.md#41-flowfield--dualleomixer-fusion---post-max-potential-blending-plan-459--plan-460). Benches: [459](../../.benchmarks/459_flow_field_dual_leo_mixer_goat.md) + [460](../../.benchmarks/460_flow_field_dual_leo_postmax_goat.md). Plans: [459](../../.plans/459_flow_field_dual_leo_mixer_fusion.md) + [460](../../.plans/460_flow_field_dual_leo_postmax_fusion.md). Features: `flow_field_nav` + `dual_leo` (both DEFAULT-ON; dual methods opt-in via API choice).
+
+## 29. ReMax Expected-Max Aggregation (Plan 374) — NOT A MODELLESS EXPLORATION MECHANISM
+
+**Hypothesis.** The ReMax Expected Improvement operator (Nishimori et al. ICML 2026, arXiv:2606.00151) — `expected_max_over_m(q)` + `expected_improvement(q, current_best)` — could ship as a per-arm deterministic selection score that provides modelless exploration at inference time.
+
+**G2 PASS-but-not-modelless (2026-07-03).** Per `.benchmarks/374_remax_goat.md` — the primitive is correct + fast (G1 MC validation + analytic recurrence; G4 max=603ns at K=128). But the headline finding: **argmax EI = argmax q, by monotonicity**. The ReMax Expected Improvement operator, when used as a per-arm deterministic selection score, is **provably equivalent to greedy selection**. ReMax's exploration is a *training-time* phenomenon — it emerges from policy gradient on `J_m(π, q)` (the RePPO algorithm), not from inference-time action selection.
+
+| Gate | Result |
+|---|---|
+| G1 (correctness — MC validation + analytic recurrence) | ✅ PASS |
+| G2 (bandit regret) | ⚠️ PASS (theorem) — ReMax = Greedy, by proof + empirical confirmation |
+| G3 (no-regression) | ✅ N/A (opt-in, no existing code depends) |
+| G4 (latency — max=603ns K=128, per_action=11.7µs O(K²)) | ✅ PASS |
+| G5 (feature isolation) | ✅ PASS |
+
+**Outcome.** Keep `remax_aggregation` as **opt-in**. The primitive is a correct building block for RePPO training (riir-train Plan 304, feature `remax_ppo`), NOT a standalone modelless exploration mechanism. Per AGENTS.md §"Promotion requires modelless gain": the exploration gain requires training (policy gradient on `J_m`), so this primitive stays opt-in and is not promoted to default-on.
+
+**The generalized lesson.** A primitive can have correct math + fast latency + clean feature isolation and STILL not be a modelless gain. The modelless mandate (katgpt-rs/AGENTS.md) requires the *gain* to be achievable without training — not just the *mechanism*. ReMax's mechanism is closed-form arithmetic (modelless); its exploration *benefit* is a training-time phenomenon (not modelless). This is the same distinction as the AC-Prefix G1 lesson (Plan 313): the algorithm's correctness is necessary but not sufficient for promotion.
+
+📖 Bench: [374](../../.benchmarks/374_remax_goat.md), Plan: [374](../../.plans/374_remax_expected_max_aggregation_primitive.md), Feature: `remax_aggregation` (opt-in), Research: [373](../../.research/373_ReMax_Expected_Max_Retry_Aggregation.md). Training algorithm: `riir-train` Plan 304 (`remax_ppo`).

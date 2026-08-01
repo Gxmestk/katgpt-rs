@@ -1378,3 +1378,163 @@ These seams enable the riir-ai Super-GOAT fusion (riir-ai/318: HLA × Crowd MCGS
 🔧 Feature flags: `multi_agent_path` (opt-in) + `lacam_escalation` (opt-in, implies `multi_agent_path`).
 
 📖 Plans: [440](../../.plans/440_lifelong_lacam_multi_agent_pathfinding_substrate.md) + [453](../../.plans/453_bounded_one_step_lacam_escalation.md). Benches: [440](../../.benchmarks/440_lllg_paper_repro_goat.md) + [453](../../.benchmarks/453_lacam_escalation_goat.md). Research: [424](../../.research/424_Lifelong_LaCAM_Local_Guidance_Multi_Agent_Pathfinding.md). Substrate: `crates/katgpt-core/src/multi_agent_path/`.
+
+## 41. FlowField × DualLeoMixer Fusion — Post-Max Potential Blending (Plan 459 + Plan 460)
+
+Composes two DEFAULT-ON primitives — `LeoHead` (Plan 155) + `DualLeoMixer` (Plan 155) + `FlowFieldCache` (Plan 242 Fourier flow fields) — to answer a focused question: does mixing LEO teacher Q-values with UVFA student Q-values produce a better navigation field than the LEO-only baseline? No new feature flag (composition of `flow_field_nav` + `dual_leo`); the API surface is the two new `FlowFieldCache` methods.
+
+### Two fusion points, one decisive lesson
+
+| Plan | Fusion point | Method | G5 (≥30% stuck-NPC reduction) | Verdict |
+|---|---|---|---|---|
+| **459** | **pre-max** raw Q-slices | `α·Q_leo[a] + (1−α)·Q_uvfa[a]` per action, then `max-over-actions` | ❌ FAIL (best 25.9% at α=0.1) | demoted to compat |
+| **460** | **post-max** potentials | `α·potential_leo[x,y] + (1−α)·potential_uvfa[x,y]` after max-pool | ✅ PASS (31.5% at α=0.10) | **recommended path** |
+
+The lesson is the load-bearing finding: **the nonlinear `max-over-actions` step washes out the pre-max α-mix**. `max_a (α·Q_leo + (1−α)·Q_uvfa) ≠ α·max_a Q_leo + (1−α)·max_a Q_uvfa`. Moving the blend to *after* the max-pool makes the blend linear in the FFT's input, so the α-ratio transfers cleanly to the smoothed gradient. The 5.6-percentage-point gain (25.9% → 31.5%) is exactly the size of the nonlinearity that was being washed out.
+
+### Two-stage honest stop rule
+
+1. **Plan 460 G5' PASS on synthetic adversarial heads** (broad multimodal LEO + sharp unimodal UVFA).
+2. **Issue 549 real-network follow-up (2026-07-18): G5' FAIL on untrained CivLeoNet + CivLeoUVFA** — stuck-NPC reduction drops from 31.5% (synthetic, α=0.10) to 3.3% (untrained real, α=0.10). The postmax mechanism is correct (G1 bit-identity holds on both synthetic + untrained real) but the gain requires **trained** networks. Tracked in `riir-ai/.issues/552`.
+
+The postmax API stays shipped — the mechanism is sound and `DualLeoMixer` now has a 4th consumer via Plan 467 `DualLeoOracle` (QGF test-time fusion, orthogonal axis). But reading Plan 460 as "the postmax mechanism works on civ" without the untrained-network caveat is misleading.
+
+### The perf measurement honesty footnote
+
+Plan 460's first bench run reported a 3.10× cache-miss overhead (would have failed G2's 1.5× gate). Five subsequent runs showed 0.72×–1.53× — the baseline itself swung 1.91ms→5.47ms. The bench was updated to take 3 trials and report the **median** (stable 1.22–1.26×). Lesson: single-shot `std::time::Instant` on macOS is unreliable for sub-10ms code; median-of-N is the pragmatic middle ground when Criterion (the crate convention) is avoided for cold-cache benches.
+
+### API surface
+
+- `FlowFieldCache::get_or_compute_dual` (Plan 459, pre-max) — compat/parity with QGF pre-max mix. NOT recommended for new flow-field consumers.
+- `FlowFieldCache::get_or_compute_dual_postmax` (Plan 460, post-max) — **recommended** dual path.
+- `LeoPotentialGrid::blend_into` (Plan 460) — linear affine combination of two post-max grids.
+
+All 5 `ActingMode`s honored (Lc / LeoOnly / UvfaOnly / Max / Min). `LeoOnly` is bit-identical to the single-head path (G1).
+
+🔧 Feature flags: `flow_field_nav` + `dual_leo` (both DEFAULT-ON; the dual methods are opt-in via API choice).
+
+📖 Plans: [459](../../.plans/459_flow_field_dual_leo_mixer_fusion.md) + [460](../../.plans/460_flow_field_dual_leo_postmax_fusion.md). Benches: [459](../../.benchmarks/459_flow_field_dual_leo_mixer_goat.md) + [460](../../.benchmarks/460_flow_field_dual_leo_postmax_goat.md). Substrate: `crates/katgpt-core/src/flow/cache.rs`.
+
+## 42. ICT Distributional Branching-Point Detector (Plan 294)
+
+Distilled from [arXiv:2606.19771](https://arxiv.org/abs/2606.19771) — *Information-Coupling Theory for Multi-Agent Branching*. Detects distributional branching points in agent action distributions: `collision_purity β(π)`, Rényi entropy H₂, JS-divergence-to-group-mean, plus a `BranchingDetector` that flags top-k% outliers via stable sort.
+
+### GOAT gate (G1–G10, ALL PASS)
+
+| Gate | Target | Result |
+|---|---|---|
+| G1 (mechanics) | analytic anchors on synthetic distributions | ✅ PASS |
+| G2 (synthetic) | branching-point recovery | ✅ PASS |
+| G3 (no-regression) | feature combos clean | ✅ PASS |
+| G4 (latency) | ≤ 50µs/call at K=8 D=32 | ✅ PASS — **1.96µs mean, p99 2.00µs** (25× headroom) |
+| G5 (alloc-free) | 0 allocs after warmup | ✅ PASS — 0 allocs / 1000 calls |
+| G6 (feature isolation) | cargo + nm verify | ✅ PASS |
+| G7–G10 (Plan 324 T9.4 follow-ups) | integration + composition | ✅ ALL PASS (2026-06-20+) |
+
+The hot path is 1.96µs because the inner loops are chunked-4 (per AGENTS.md "write chunked 4-wide loops so LLVM autovectorizes"): K × action_dim = 256 f32 adds autovectorize to NEON/AVX2, K × JS-divergence uses chunked-4 m-buffer + scalar log accumulator.
+
+### Sibling: Bisimulation Operator Inference (Plan 324)
+
+Plan 324 (§39) ships the PDDL-side operator inference; ICT (Plan 294) ships the action-distribution branching detector. The two together cover the action-side + state-side of multi-agent branching-point discovery.
+
+🔧 Feature flag: `ict_branching` (opt-in).
+
+📖 Plan: [294](../../.plans/294_ict_branching_detector.md). Benches: [G1](../../.benchmarks/294_ict_g1.md), [G2](../../.benchmarks/294_ict_g2.md), [G3](../../.benchmarks/294_ict_g3.md), [G4-G6 aggregate](../../.benchmarks/294_ict_goat_gates.md), [G10](../../.benchmarks/294_ict_g10.md), [promotion](../../.benchmarks/294_ict_promotion.md). Research: [270](../../.research/270_Beyond_Entropy_ICT_Distributional_Branching_Detector.md). Substrate: `crates/katgpt-core/src/ict/`.
+
+## 43. FORE — Fitted Occupancy-Ratio Estimator (Plan 438)
+
+Distilled from [arXiv:2607.05375](https://arxiv.org/abs/2607.05375) — van der Laan & Kallus, *Fitted Occupancy-Ratio Evaluation without Bellman Completeness*, 2026. Generic modelless fitted-iteration estimator for the discounted occupancy ratio `ω_{π,γ} = d^π,γ / d^ν` in offline policy evaluation.
+
+### The substrate-independent contribution
+
+The **adjoint Bellman KL contraction** (Lemma 3.1): `B^γ_π ω = (1−γ)ω_0 + γ·d((ων)P_π)/dν` contracts relative entropy by factor γ per iteration. FORE converges under realizability alone — **no Bellman completeness needed**. This is the load-bearing theoretical contribution distilled into the primitive.
+
+### GOAT gate (G1–G5 ALL PASS, stays opt-in pending consumer)
+
+| Gate | Target | Result |
+|---|---|---|
+| G1 (correctness) | Baird-MRP anchors within 2% rel err | ✅ PASS — 0.31% (upper), 0.74% (lower) at n=100k K=50 γ=0.95 |
+| G2 (perf) | FORE fit n=10000 D=8 K=20 < 100ms | ✅ PASS — 48.63ms median |
+| G3 (no-regression) | clippy + lib tests clean | ✅ PASS |
+| G4 (alloc-free) | KL-projection loop 0 allocs after warmup | ✅ PASS — 0 allocs/100 calls |
+| G5 (modelless) | no GD through base weights | ✅ PASS — only mutable state is `θ: Vec<f32>` |
+
+**Stays opt-in** — promotion to default-on requires a downstream consumer (Fusion A CLR stabilization in `riir-poc`) to validate the gain empirically. The primitive is correct + fast + alloc-free, but has zero in-tree consumers today.
+
+### Softmax carve-out
+
+FORE's normalized exponential class is density-ratio normalization, not direction-vector projection — the sigmoid rule does not apply (same carve-out as `product_key_memory`).
+
+🔧 Feature flag: `occupancy_ratio` (opt-in).
+
+📖 Plan: [438](../../.plans/438_occupancy_ratio_estimator_primitive.md). Bench: [438](../../.benchmarks/438_occupancy_ratio_goat.md). Research: [423](../../.research/423_Adjoint_Bellman_KL_Contraction_Occupancy_Ratio.md). Substrate: `crates/katgpt-core/src/occupancy_ratio.rs`.
+
+## 44. Group Invariance Probe — Lie Subgroup Discovery (Plan 356)
+
+Distilled from [arXiv:2512.20043](https://arxiv.org/abs/2512.20043) — LieFlow symmetry discovery. The modelless residue: generalizes `subspace_phase_gate` from "subspace of `ℝᵈ`" to "subgroup of `G`" via direct invariance testing `σ(β·(1−d(q,g·q)))` + a dual-signal discrete-vs-continuous classifier.
+
+### The dual-signal classifier (key design finding)
+
+The discrete-vs-continuous classification needs **two complementary signals** because no single measure handles both regimes:
+
+| Regime | Variance | Concentration | Correct signal |
+|---|---|---|---|
+| Large-fraction discrete (C₄ ⊂ C₈, 50%) | ≈ 0.25 (bimodal) | ≈ 0.5 (indistinguishable) | **Variance** |
+| Small-fraction discrete (C₄ ⊂ C₆₄, 6%) | ≈ 0.06 (low) | ≈ 0.06 (peaked) | **Concentration** |
+| Continuous (SO(2) ⊂ SO(3)) | low | high | Neither → Continuous |
+| No symmetry (uniform low) | ≈ 0 | low | support < min → None |
+
+`classify_subgroup` fires `Discrete` if EITHER signal triggers — the OR of two complementary detectors.
+
+### GOAT gate (8/8 ALL PASS, stays opt-in)
+
+| Gate | Target | Result |
+|---|---|---|
+| G1 (correctness) | C₈→C₄ recovers Discrete, n_support≥100, max_score>0.95 | ✅ PASS — n_support=131, max_score≈1.0 |
+| G2a (no symmetry) | uniform low → None | ✅ PASS |
+| G2b (continuous) | uniform high → Continuous | ✅ PASS |
+| G2c (small-fraction discrete) | 4 peaks/64 → Discrete | ✅ PASS (via concentration) |
+| G3a/b (no-regression) | `--all-features` + `--no-default-features` clean | ✅ PASS |
+| G4a/b (alloc-free) | `discover_subgroup_into` + `classify_subgroup` 0 allocs | ✅ PASS |
+
+**Stays opt-in** — no in-tree consumer today. Ships as the open primitive layer; the IP-bearing consumer-side fusion lives in riir-ai.
+
+🔧 Feature flag: `group_invariance_probe` (opt-in).
+
+📖 Plan: [356](../../.plans/356_group_invariance_probe.md). Bench: [356](../../.benchmarks/356_group_invariance_probe_goat.md). Research: [355](../../.research/355_LieFlow_Symmetry_Discovery_Group_Orbit_Support.md). Substrate: `crates/katgpt-core/src/group_invariance_probe.rs`.
+
+## 45. FaithfulnessProbe — Causal Intervention Diagnostic for Injected Memory (Plan 278)
+
+Distilled from the Self-Evolver cognitive integrity line (Research 244). Audit-cadence diagnostic: detects whether an injected memory vector is *faithfully consumed* by a downstream consumer, via causal intervention (perturb the injection, measure the consumer's output delta). Not a per-tick primitive — invoked at audit cadence (sleep cycle, GM inspection, drift detection).
+
+### Four perturbation strategies
+
+| Strategy | What it tests |
+|---|---|
+| `Empty` | Does the consumer behave identically with a zeroed injection? (faithful consumers diverge) |
+| `Shuffle` | Does within-vector permutation matter? (position-sensitive consumers diverge) |
+| `Corrupt` | Does Gaussian noise injection flip the output? (robustness probe) |
+| `Irrelevant` / `Filler` | Does a semantically-unrelated injection change behavior? (specificity probe) |
+
+### Composition with TriggeredInjectionGate
+
+The probe ships alongside `TriggeredInjectionGate` (gated by `triggered_injection`) — a sigmoid-gated injection controller that decides per-tick whether to inject. The probe validates the gate's decisions at audit cadence: a gate that injects but the consumer doesn't faithfully use the injection is a wasted injection.
+
+### GOAT gate (G1 + G1b + G2 + perf, ALL PASS)
+
+| Gate | Target | Result |
+|---|---|---|
+| G1 (faithful consumer detected) | linear consumer passes | ✅ PASS |
+| G1b (unfaithful consumer detected) | copy-ignoring consumer fails | ✅ PASS |
+| G2 (attribution ranking, simplified) | Spearman ρ ≥ 0.8 vs reference IG on linear consumer | ✅ PASS (full IG deferred to Phase 3) |
+| Perf (TriggeredInjectionGate latency) | ≤ target | ✅ PASS |
+
+**Stays opt-in** — audit-cadence diagnostic, not every-tick. 24/24 Phase 1 unit tests; `ProfilePod` is 16 bytes (Copy); `Intervention` enum is `#[repr(u8)]` (1 byte).
+
+### Layer split
+
+The open primitive (katgpt-core `faithfulness_probe`) is the generic IP-free diagnostic substrate. The IP-bearing private consumer-side guide lives at `riir-ai/.research/129_Cognitive_Integrity_Layer_Guide.md` (the cognitive integrity layer composition).
+
+🔧 Feature flags: `faithfulness_probe` (opt-in) + `triggered_injection` (opt-in, for the gate).
+
+📖 Plan: [278](../../.plans/278_faithfulness_probe_modelless.md). Bench: [278](../../.benchmarks/278_faithfulness_probe_goat.md). Research: [244](../../.research/244_Self_Evolver_Faithfulness_Cognitive_Integrity.md). Private guide: [riir-ai 129](../../../riir-ai/.research/129_Cognitive_Integrity_Layer_Guide.md). Substrate: `crates/katgpt-core/src/faithfulness/`.
