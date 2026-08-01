@@ -204,7 +204,7 @@ impl KimiK3Runtime {
 
         Self {
             layers,
-            block_state: AttnResBlockState::new(d),
+            block_state: AttnResBlockState::new_with_capacity(d, max_block_entries),
             output_attn_res_scratch: AttnResScratch::new(&config.attn_res_config, max_block_entries),
             rope_freqs: RopeFreqs::new_with_theta(
                 config.mla_config.qk_rope_head_dim,

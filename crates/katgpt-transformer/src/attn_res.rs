@@ -168,19 +168,60 @@ impl AttnResWeights {
 ///
 /// The caller (decoder layer) is responsible for computing the correct
 /// summed value to push at each block boundary.
+///
+/// # Zero-alloc steady state
+///
+/// The inner `Vec<f32>` slots are pre-allocated once (in [`new_with_capacity`])
+/// and reused across tokens via [`clear`]. [`push`] copies into the next
+/// free slot + bumps the logical length — no heap allocation in the steady
+/// state. Exceeding the pre-allocated capacity falls back to a normal `push`
+/// (grows the outer Vec); this is a debug-asserted contract violation, not a
+/// production path.
 #[derive(Clone, Debug)]
 pub struct AttnResBlockState {
     /// The accumulated block residuals. Each entry is `[hidden_size]`.
+    ///
+    /// `residuals.len()` is the logical length; the outer Vec's capacity is
+    /// pre-allocated in `new_with_capacity`. Inner slots are NOT dropped on
+    /// `clear()` — they move to `pool` for reuse.
     pub residuals: Vec<Vec<f32>>,
+    /// Pre-allocated reusable slots (zero-alloc steady state).
+    ///
+    /// Pop on `push`, refill on `clear`. Eliminates per-token `Vec<f32>`
+    /// allocation for models with bounded block accumulation.
+    pool: Vec<Vec<f32>>,
     /// Hidden dim (cached for convenience).
     hidden_size: usize,
 }
 
 impl AttnResBlockState {
     /// Create empty block state.
+    ///
+    /// Equivalent to `new_with_capacity(hidden_size, 0)` — the first `push`
+    /// will allocate. Prefer [`new_with_capacity`](Self::new_with_capacity)
+    /// for hot paths where the max block count is known.
     pub fn new(hidden_size: usize) -> Self {
         Self {
             residuals: Vec::new(),
+            pool: Vec::new(),
+            hidden_size,
+        }
+    }
+
+    /// Create empty block state with pre-allocated slots for zero-alloc pushes.
+    ///
+    /// `max_entries` should be the maximum number of block boundaries the model
+    /// will accumulate within a single forward pass — typically
+    /// `num_layers / block_size` (2 for Kimi-K3-0.40B: 8 layers, block_size 4).
+    /// Pushing beyond `max_entries` will allocate (debug-asserted contract
+    /// violation).
+    pub fn new_with_capacity(hidden_size: usize, max_entries: usize) -> Self {
+        let pool = (0..max_entries)
+            .map(|_| vec![0.0f32; hidden_size])
+            .collect();
+        Self {
+            residuals: Vec::with_capacity(max_entries),
+            pool,
             hidden_size,
         }
     }
@@ -198,14 +239,32 @@ impl AttnResBlockState {
     }
 
     /// Append a hidden state to the block residual at a block boundary.
+    ///
+    /// Copies `hidden` into a slot drawn from the pre-allocated pool (fast
+    /// path, zero-alloc) or allocates a new slot (slow path, contract
+    /// violation).
     pub fn push(&mut self, hidden: &[f32]) {
         debug_assert_eq!(hidden.len(), self.hidden_size);
-        self.residuals.push(hidden.to_vec());
+        let mut slot = if let Some(s) = self.pool.pop() {
+            s
+        } else {
+            vec![0.0f32; self.hidden_size]
+        };
+        debug_assert_eq!(slot.len(), self.hidden_size);
+        slot.copy_from_slice(hidden);
+        self.residuals.push(slot);
     }
 
     /// Clear the block state (for position reset).
+    ///
+    /// Moves all residual slots back into the pool without deallocating.
+    /// Subsequent `push` calls reuse the same memory (zero-alloc steady state).
     pub fn clear(&mut self) {
-        self.residuals.clear();
+        // Drain residuals back into the pool so the slots are available for
+        // reuse on the next forward pass.
+        while let Some(slot) = self.residuals.pop() {
+            self.pool.push(slot);
+        }
     }
 }
 

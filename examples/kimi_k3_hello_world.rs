@@ -226,8 +226,28 @@ fn main() {
     let mut phase_total = ForwardTiming::default();
     let mut decode_latencies_ms: Vec<f64> = Vec::with_capacity(n_decode);
 
+    // ── Alloc-free verification (debug builds only) ───────────────────────
+    // The `TrackingAllocator` is installed under `cfg(debug_assertions)` in
+    // `katgpt-rs/src/lib.rs`. In release builds, the alloc counters are
+    // unavailable — the zero-alloc claim is verified by code review of the
+    // hot path instead (no `to_vec()`, no `Vec::with_capacity` inside loops).
+    //
+    // We measure ONLY the `kimi_k3_forward_token_timed` call itself — the
+    // surrounding `argmax` + `tokenizer.decode` + `generated_tokens.push` are
+    // example bookkeeping (String allocs, Vec growth) and are NOT part of the
+    // forward hot path. The dedicated `tests/kimi_k3_g4_alloc_free.rs` test
+    // provides the formal gate (it runs the forward loop with zero bookkeeping).
+    #[cfg(debug_assertions)]
+    let mut forward_alloc_count: usize = 0;
+    #[cfg(debug_assertions)]
+    let mut forward_alloc_bytes: usize = 0;
+
     for i in 0..n_decode {
         let t_token = Instant::now();
+
+        #[cfg(debug_assertions)]
+        katgpt_core::alloc::reset_alloc_stats();
+
         let logits = kimi_k3_forward_token_timed(
             &config,
             &weights,
@@ -235,6 +255,14 @@ fn main() {
             current_tok,
             &mut phase_total,
         );
+
+        #[cfg(debug_assertions)]
+        {
+            let (c, b) = katgpt_core::alloc::get_alloc_stats();
+            forward_alloc_count += c;
+            forward_alloc_bytes += b;
+        }
+
         let elapsed = t_token.elapsed();
         decode_latencies_ms.push(elapsed.as_secs_f64() * 1000.0);
 
@@ -286,5 +314,31 @@ fn main() {
          Model load: {load_ms:.0} ms ({:.2} GB/s effective).",
         weight_bytes as f64 / 1e9 / load_s,
     );
+
+    // ── Alloc-free report ─────────────────────────────────────────────────
+    #[cfg(debug_assertions)]
+    {
+        if forward_alloc_count == 0 {
+            println!(
+                "   ✅ ZERO-ALLOC decode hot path: 0 allocations across {n} forward calls (debug build verification)."
+            );
+        } else {
+            println!(
+                "   ⚠️  forward hot path allocated {forward_alloc_count} times ({forward_alloc_bytes} bytes) across {n} forward calls."
+            );
+            println!(
+                "      → {:.1} allocs/forward (target: 0). Review `to_vec()` / `Vec::new()` in `kimi_k3_forward_token`.",
+                forward_alloc_count as f64 / n as f64
+            );
+        }
+    }
+    #[cfg(not(debug_assertions))]
+    {
+        println!();
+        println!("   ℹ️  Alloc count not measured in release build (TrackingAllocator is debug-only).");
+        println!("      Run `cargo run --features kimi_k3_loader --example kimi_k3_hello_world` (debug)");
+        println!("      to verify the zero-alloc decode hot path.");
+    }
+
     let _ = weights; // keep the weights alive for the summary
 }

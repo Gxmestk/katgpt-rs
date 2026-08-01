@@ -137,6 +137,10 @@ rustfft = { version = "6", optional = true }  # CHIAR per-token DCT entropy (Pla
 # Kimi-K3 loader deps (Proposal 032 Phase 5, gated by `kimi_k3_loader`).
 safetensors = { version = "0.4", optional = true }  # model.safetensors weight loader
 base64 = { version = "0.22", optional = true }  # tiktoken.model binary format (base64-encoded token→rank pairs)
+# mmap loader for zero-copy weight access (Phase 7 — eliminates the 1.5 GB
+# `read_to_end` buffer copy). Native only: memmap2 needs a real OS file.
+# wasm32 falls back to the in-memory path.
+memmap2 = { version = "0.9", optional = true }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 # getrandom wasm32 backends — required so that transitive consumers (bevy_ecs
@@ -606,7 +610,7 @@ kimi_k3 = ["mla_attention", "kda_linear", "transformer_moe", "transformer_attn_r
 # Safetensors loader + tiktoken tokenizer for real-model loading.
 # Stays OPT-IN — pulls heavy deps (safetensors, base64) only needed when
 # actually loading model.safetensors.
-kimi_k3_loader = ["kimi_k3", "dep:safetensors", "dep:base64"]
+kimi_k3_loader = ["kimi_k3", "dep:safetensors", "dep:base64", "dep:memmap2"]
 
 personality_composition = ["katgpt-core/personality_composition"]  # PersonalityWeightedComposition — sigmoid-gated N-layer latent direction composition + reward-surprise drift + BLAKE3 snapshot (Plan 297, Research 276). Open primitive for the Entity Cognition Stack Super-GOAT (riir-ai Plan 327 consumes this). DEFAULT-ON after GOAT G4 (79.585ns < 1µs target, 12.6× margin) + G5 (zero alloc) passed (Plan 297 Phase 4, Bench 297). Passthrough to katgpt-core.
 committed_field_blend = ["katgpt-core/committed_field_blend"]  # CommittedFieldBlend — sampling-invariant per-entity MoE: frozen sigmoid blend of K archetype operator fields, weights computed ONCE from trajectory summary + BLAKE3-committed (Plan 321, Research 302, arXiv:2510.00621 FAME). Defining property: sampling invariance (FAME Prop. 3) — dense vs sparse observation of same trajectory → identical committed pi + identical dynamics. Implies personality_composition. DEFAULT-ON (2026-06-28, Issue 005 executed): Plan 321 G1–G5 ALL PASS + riir-ai Plan 336 G6a–G6e + G7a ALL PASS (2026-06-26). Modelless gain: closed-form sigmoid projection + BLAKE3 commit, no training. Zero runtime cost unless a caller invokes commit/apply_blended. Passthrough to katgpt-core.

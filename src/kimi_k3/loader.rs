@@ -486,6 +486,23 @@ fn load_decoder_layer(
 
 /// Load the full Kimi-K3-0.40B model from a safetensors file.
 ///
+/// # Zero-copy mmap (native)
+///
+/// On native targets, the file is memory-mapped via `memmap2` — the 1.5 GB
+/// safetensors data section is read directly from the OS page cache, with
+/// no intermediate `Vec<u8>` buffer. This eliminates the largest copy in
+/// the original `read_to_end` path (255 ms at ~6 GB/s on Apple Silicon).
+///
+/// Per-tensor `Vec<f32>` materialization still happens (the forward path
+/// takes `&[f32]` slices, and MLA de-interleaving needs writable storage).
+/// That copy is necessary + bounded — total weight bytes are still 1.5 GB
+/// of f32, just owned by the weight structs instead of by a transient
+/// file-read buffer.
+///
+/// On `wasm32-unknown-unknown`, `memmap2` is unavailable → falls back to
+/// `read_to_end`. (The wasm32 peer doesn't load real model weights today;
+/// this path exists for completeness.)
+///
 /// # Arguments
 /// - `path` — path to `model.safetensors`
 ///
@@ -503,14 +520,42 @@ fn load_decoder_layer(
 /// - MLA layers: 3, 7 (config `full_attn_layers: [4,8]` = 1-indexed)
 /// - KDA layers: 0, 1, 2, 4, 5, 6
 pub fn load_kimi_k3(path: &str) -> Result<KimiK3ModelWeights, LoadError> {
-    // Read the safetensors file
-    let file = std::fs::File::open(path).map_err(LoadError::Io)?;
-    let mut reader = std::io::BufReader::new(file);
-    let mut buffer = Vec::new();
-    std::io::Read::read_to_end(&mut reader, &mut buffer).map_err(LoadError::Io)?;
+    // ── Native: mmap the safetensors file (zero-copy file buffer) ──────────
+    // The mmap stays alive for the duration of `load_kimi_k3_from_bytes`;
+    // SafeTensors borrows from it via the `&[u8]` slice. After the function
+    // returns, the weight structs own their materialized `Vec<f32>` storage
+    // + the mmap is dropped. The OS reclaims the page cache lazily.
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        use memmap2::MmapOptions;
+        let file = std::fs::File::open(path).map_err(LoadError::Io)?;
+        // Safety: model files are write-once artifacts. Concurrent writes
+        // from another process are a deployment-error condition, not a
+        // runtime hazard. We map read-only.
+        let mmap = unsafe { MmapOptions::new().map(&file) }.map_err(LoadError::Io)?;
+        load_kimi_k3_from_bytes(&mmap)
+    }
 
-    // Parse safetensors
-    let st = safetensors::SafeTensors::deserialize(&buffer)
+    // ── wasm32: no mmap available, fall back to read_to_end ───────────────
+    #[cfg(target_arch = "wasm32")]
+    {
+        let file = std::fs::File::open(path).map_err(LoadError::Io)?;
+        let mut reader = std::io::BufReader::new(file);
+        let mut buf = Vec::new();
+        std::io::Read::read_to_end(&mut reader, &mut buf).map_err(LoadError::Io)?;
+        load_kimi_k3_from_bytes(&buf)
+    }
+}
+
+/// Parse + materialize Kimi-K3 weights from in-memory safetensors bytes.
+///
+/// This is the pure deserialization step, separated from the file-reading step
+/// so the same code path serves both the mmap (native) + `read_to_end` (wasm32)
+/// front-ends. Tests can construct a synthetic safetensors blob + call this
+/// directly without touching the filesystem.
+pub fn load_kimi_k3_from_bytes(bytes: &[u8]) -> Result<KimiK3ModelWeights, LoadError> {
+    // Parse safetensors from the in-memory bytes (mmap'd on native).
+    let st = safetensors::SafeTensors::deserialize(bytes)
         .map_err(|e| LoadError::Safetensors(e.to_string()))?;
 
     // Kimi-K3-0.40B config values
