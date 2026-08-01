@@ -2272,6 +2272,35 @@ A second consolidated table for standalone opt-in features with their own plans,
 | `selectivity_router` | — | Selectivity router |
 | `smooth_min_rerank` | — | Smooth-min re-ranking |
 
+### Extended pruners, routing & decision (second batch)
+
+These are additional standalone features with their own plans that were not covered by the family sections above:
+
+| Feature | Plan | Role |
+|---|---|---|
+| `bandit_mcts` | 067 | Bandit-guided MCTS rollout policy — NFSP/MCTS duality |
+| `budget_adaptation` | 167 | Compression-adaptive decode budget — PFlash complexity signal |
+| `caddtree_budget` | 219 | CaDDTree — Cost-Aware Adaptive DDtree Budget Selection (GOAT 7/7, **DEFAULT-ON**) |
+| `cgsp_dual_pool` | 282 | Dual-Pool Reachable Memory Router — DecentMem distillation (arXiv:2605.22721) |
+| `deep_manifold` | 085 | Deep Manifold fixed-point residual scoring (Research 51) |
+| `federation` | 085 | Deep Manifold federated boundary alignment — KL coupling (Research 51) |
+| `federation_composer` | 231 | Explicit Model→Agent→Tool pipeline with residual checking (GOAT 7/7, **DEFAULT-ON**) |
+| `lodestar` | 207 | Lodestar Completion-Distance Pruning — shortest-accepting-distance powers budget-aware masking |
+| `nexus_elo` | 143 | Nexus Elo — Plackett-Luce + P-UCB + goal cache for DDtree/SR²AM (Research 104) |
+| `ppot` | 026 | PPoT logit-parameterized CPU resampling. Forwards to `katgpt-speculative`. |
+| `thinking_cot` | 194 | Adaptive CoT thinking — self-learning when to think |
+| `thinking_prune` | 171 | Thinking Prune — FrozenBaseGuard for SpecHop/LT2 intermediate steps (Research 153) |
+| `wealth_pruner` | 187 | WealthPruner — economic bandit arms via Hayek market selection (Research 167) |
+| `adaptive_cot_compaction` | 271 | Entropy-thresholded bandit-tuned online compaction |
+| `data_gate` | 111 | Task-level data gating for self-play training stability (Research 075) |
+| `vortex_flow` | — | VortexFlow attention substrate (parent of MSA family) |
+
+### Remaining smaller primitives (cross-reference)
+
+These are opt-in substrate/utility features without dedicated plans or with minimal documentation. Listed for completeness:
+
+`adaptive_gamma_forecast`, `async_qdq_overlap`, `attn_match`, `auto_constraint_synthesis`, `bandit_top_p`, `best_buddies`, `bfcf_lsh_cms`, `chiaroscuro`, `cna_steering`, `corr_budget`, `cs_kv_probe`, `cumprodsum`, `curvature_alloc`, `data_probe`, `dense_mesh`, `directional_credit`, `dmax_spd`, `domino_correction`, `eqr_convergence`, `fastrand`, `feature_class`, `four_regime_router_dep`, `freq_bandit`, `frozen_base_guard`, `functional_substitution_gate`, `future_probe`, `game_domain`, `game_state`, `gated_mlp`, `gauge_invariant`, `gepa_reflective`, `hla_attention`, `hybrid_oct_pq`, `ilc_distill`, `iso_quant`, `kv_share`, `kvarn`, `manifold_power_iter_router`, `mech_attribution`, `memo_reflections`, `micro_belief`, `mls_aggregate`, `module_energy_route`, `nds_proxy`, `nexus_elo_proxy`, `opus_selection`, `osc_kv`, `outlier_guard`, `pathway_tracker`, `percept_route`, `phrase_boost`, `planar_quant`, `precision_aware_draft`, `quantile_balance_router`, `randopt_weight`, `recfm`, `regime_transition`, `replaid_schedules`, `reward_calibrator`, `rosetta_pruner`, `segment_checkpoint`, `self_distilling_bandit`, `sigmoid_graded_reject`, `sleep_consolidation`, `sp_kv`, `spec_reconciliation`, `spectral_pruner`, `spectral_quant`, `spectral_rank`, `ss_pruner`, `state_source`, `static_cal_tables`, `step_attribution_qualifier`, `stiff_anomaly`, `swir_switch_thinking`, `targeted_precision`, `thicket_variance_probe`, `three_mode_router`, `trd_refined_draft`, `trust_region_spec`, `unit_distance`, `vocab_channel_pruner`, `vocab_coreset`, `wealth_pruner`.
+
 ## 69. DEFAULT-ON Undocumented Features (Cross-Reference)
 
 These features are DEFAULT-ON (in katgpt-core or root) with significant plans/GOAT benches but were not previously documented in the opt-in catalog. They are listed here for completeness — they do NOT need opt-in catalog entries, but a future default-features doc should cover them.
