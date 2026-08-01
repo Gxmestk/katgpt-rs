@@ -221,6 +221,55 @@ pub fn swiglu_inplace(hidden: &mut [f32], up: &[f32]) {
     swiglu(hidden, gate, up);
 }
 
+/// SiTU (SiLU-with-Tail) gated activation from Kimi-K3.
+///
+/// Formula (reference: `SituAndMul` in `modeling_kimi_k3_linear.py`):
+/// ```text
+/// situ_a = beta * tanh(gate / beta) * sigmoid(gate)
+/// up_t   = linear_beta * tanh(up / linear_beta)   (when linear_beta is Some)
+/// up_t   = up                                      (when linear_beta is None)
+/// hidden = situ_a * up_t
+/// ```
+///
+/// The `beta` parameter bounds the gate's contribution (tanh saturates at
+/// ±beta), while `linear_beta` applies a soft clamp on the up-path to prevent
+/// explosion at large magnitudes. For Kimi-K3-0.40B: beta=4.0, linear_beta=25.0.
+///
+/// Uses exact `.exp()` / `.tanh()` (not the approximate `fast_*` intrinsics) to
+/// match the PyTorch reference within f32 precision. SIMD-vectorization via
+/// `simd_exp_inplace` is deferred to Phase 6 when end-to-end perf becomes a
+/// gate (Proposal 032).
+#[inline(always)]
+pub fn situ(
+    hidden: &mut [f32],
+    gate: &[f32],
+    up: &[f32],
+    beta: f32,
+    linear_beta: Option<f32>,
+) {
+    debug_assert!(beta > 0.0, "situ beta must be positive");
+    let inv_beta = 1.0 / beta;
+    if let Some(lb) = linear_beta {
+        debug_assert!(lb > 0.0, "situ linear_beta must be positive");
+        let inv_lb = 1.0 / lb;
+        for i in 0..hidden.len() {
+            let g = gate[i];
+            // Exact sigmoid: 1 / (1 + exp(-g)) — handles large |g| via exp saturation
+            let gate_sigmoid = 1.0 / (1.0 + (-g).exp());
+            let gate_tanh = (g * inv_beta).tanh();
+            let up_t = lb * (up[i] * inv_lb).tanh();
+            hidden[i] = beta * gate_tanh * gate_sigmoid * up_t;
+        }
+    } else {
+        for i in 0..hidden.len() {
+            let g = gate[i];
+            let gate_sigmoid = 1.0 / (1.0 + (-g).exp());
+            let gate_tanh = (g * inv_beta).tanh();
+            hidden[i] = beta * gate_tanh * gate_sigmoid * up[i];
+        }
+    }
+}
+
 /// RMSNorm with learnable gamma (gain) vector.
 /// Gemma 2 stores gamma as (gamma-1), so +1 is added during load.
 /// `x` is normalized in-place then scaled by `gamma[i]`:
