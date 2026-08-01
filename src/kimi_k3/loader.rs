@@ -139,6 +139,7 @@ impl std::error::Error for LoadError {}
 /// - Final norm weight
 /// - LM head weight (untied — `tie_word_embeddings: false`)
 /// - Output-level attn-res weights
+#[derive(Clone)]
 pub struct KimiK3ModelWeights {
     /// Token embedding `[vocab_size, hidden_size]`.
     pub embed_weight: Vec<f32>,
