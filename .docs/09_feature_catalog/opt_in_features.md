@@ -1667,3 +1667,361 @@ The grid-stencil fast path (Issue 001 fix) closed the G5 gap decisively: **120 �
 🔧 Feature flag: `motor_gated_field` (opt-in; in `katgpt-dec`).
 
 📖 Plan: [357](../../.plans/357_motor_gated_dec_propagation_primitive.md). Bench: [357](../../.benchmarks/357_motor_gated_field_goat.md). Substrate: `crates/katgpt-dec/src/motor_gated.rs`.
+
+## 51. Flow Field Navigation — Fourier-Smoothed LEO Crowd Flow (Plan 242)
+
+Distilled from Treuille et al. *Continuum Crowds* (2006) + the LEO Q-value framework. When 100+ NPCs share the same goal (e.g., "go to town square"), running individual LEO Q-value lookups per NPC per tick is wasteful. A shared 2D flow field computed once per tick, FFT-smoothed to eliminate local minima, lets all NPCs read their gradient direction via O(1) lookup.
+
+**Key insight:** LEO already computes Q-values per goal. `LeoHead::all_goals_q()` produces `[goals × actions]`. For spatial goals, the max-Q action per cell IS a flow vector. FFT smoothing the resulting potential field removes discretization noise and local minima.
+
+### Why opt-in
+
+Only helps for crowd scenarios (many entities, shared goals). Individual explorers or small groups (<20) won't benefit. The FFT compute cost must amortize over enough NPCs.
+
+### Dependencies
+
+- `leo_all_goals` (DEFAULT-ON) — LeoHead + all_goals_q
+- `dep:rustfft` — FFT for smoothing
+- `spectral_hierarchy` (DEFAULT-ON) — Jacobi/Haar FFT pipeline
+
+This feature is the **substrate dependency** of §41 (FlowField × DualLeoMixer Fusion). The dual-LEO mixing experiments compose on top of `FlowFieldCache`.
+
+🔧 Feature flag: `flow_field_nav` (opt-in). Implies `leo_all_goals` + `dep:rustfft`.
+
+📖 Plan: [242](../../.plans/242_Fourier_Smoothed_Potential_Fields_LEO.md).
+
+## 52. Wall Attention — Diagonal Forget Gates Replacing RoPE (Plan 173)
+
+Wall Attention replaces RoPE with diagonal forget gates. Each token accumulates a per-head per-dim prefix sum `P_t = Σ_{i≤t} log(f_i)` where `f_i` is a learned forget gate. The factorized form `q̃_i = exp(P_i) ⊙ q_i`, `k̃_j = exp(−P_j) ⊙ k_j` means standard attention kernels work unchanged after Q/K rescaling.
+
+### Key design decisions
+
+1. Wall **replaces** RoPE entirely when enabled (not additive — paper confirms Wall(NoPE) > Wall+RoPE).
+2. Key-projected gate variant (derive gate from K) is preferred for zero KV cache overhead.
+3. Gate bias initialized to 6.0 (open-gate init matching vanilla attention).
+4. KV-head gate tying by default in GQA configs (one gate per KV head).
+5. Algorithmically identical to standard attention after Q/K rescaling — no attention kernel changes.
+
+### Decode vs prefill
+
+- **Decode:** maintain running `P_t` prefix sum (O(1) update per token), rescale only the current query.
+- **Prefill:** compute prefix sum once over all positions, rescale Q and K in one pass.
+- **Per-layer isolation:** prefix sums indexed by `[layer_idx × n_kv_head × head_dim + kv_head × head_dim + d]`.
+
+### Sibling position-encoding features
+
+| Feature | Status | Role |
+|---|---|---|
+| `wall_attention` (this) | opt-in | diagonal forget gates replacing RoPE |
+| `position_group_action` (§21) | opt-in | unified position-encoding trait |
+| `grapem_rodrigues` (§20) | opt-in | rank-2 Rodrigues exponential |
+| `rotary_value_embedding` | opt-in | RoVE — rotary on V projection |
+
+🔧 Feature flag: `wall_attention` (opt-in; forwards to `katgpt-types/wall_attention`).
+
+📖 Plan: [173](../../.plans/173_wall_attention_diagonal_gate.md).
+
+## 53. Sense Composition Family — KG Latent Octree + Children (Plan 221 + children)
+
+A family of six opt-in features implementing modelless inference-time sense composition. The core idea: compress game domain knowledge into fixed-type ternary bit-plane sense modules (~232B each). Each module encodes a KG latent octree + direction vectors. NPCs compose modules at spawn time and query at ~45ns/tick via bitwise dot-product.
+
+### Features
+
+| Feature | Plan | Role |
+|---|---|---|
+| `sense_composition` | 221 | KG Latent Octree — modelless sense module composition |
+| `merkle_octree` | 221-M | Merkle octree hierarchical commitment for SenseModule |
+| `schema_centroid` | 237 | Schema-Centroid Informed KG Embedding Initialization |
+| `bake_precision` | 236 | BAKE Precision-Gated Bayesian Embedding Update |
+| `spectral_threat` | 241 | LinOSS Modal Threat Prediction |
+| `sense_lod` | 240 | Spectral NPC Perception Compression |
+
+### Architecture
+
+- **Substrate lives in** `katgpt-sense` crate (Issue 007 Phase E Tier 2). `katgpt-core` forwards the feature + re-exports.
+- `sense_composition` enables the re-export + forwards the flag.
+- Each child feature gates a specific submodule.
+- **GM override always wins** over autonomous behavior — every autonomous path has a manual override.
+- **Fail-safe defaults:** if a sense module returns garbage, NPC falls back to rule-based behavior.
+
+### Dependencies
+
+`sense_composition` implies `plasma_path` (TernaryWeights) + `domain_latent` (DomainLatent). The octree + direction vectors live in fixed-type ternary bit-planes.
+
+### Companion plans
+
+- **riir-ai Plan 249:** model-based training counterpart (sense module learning via GD).
+- **seal-online-remaster Plan 036:** Brain Annotation — KG/HLA schema metadata for GameComponent derive.
+
+🔧 Feature flags: `sense_composition` (parent, implies plasma_path + domain_latent), `merkle_octree` (implies sense_composition), `schema_centroid` (implies sense_composition), `bake_precision` (implies sense_composition), `spectral_threat` (implies sense_composition + modal_spec), `sense_lod` (implies sense_composition + slod).
+
+📖 Plan: [221](../../.plans/221_kg_latent_octree_sense_composition.md). Research: [196](../../.research/196_KG_Latent_Octree_WASM_Composition.md).
+
+## 54. MUX Superposition Family — Vocabulary-Simplex Pruning + Tree Search (Research 158)
+
+A family of seven opt-in features implementing superposition-based tree search. The core idea: instead of pruning vocabulary branches deterministically, maintain a superposition over multiple branches and collapse only when needed.
+
+### Features
+
+| Feature | Role |
+|---|---|
+| `mux_pruner` | MuxSpanPruner — vocabulary simplex pruning |
+| `mux_ddtree` | MuxDdTree — superposition branch DDtree nodes (implies mux_pruner) |
+| `mux_bandit_width` | MuxBanditWidth — adaptive superposition width |
+| `mux_bfs` | MUX BFS — superposition-guided parallel tree search (implies mux_ddtree) |
+| `mux_freeze_thaw` | MUX Freeze/Thaw — persistent superposition patterns (implies mux_pruner) |
+| `comp_width` | Compositional DDTree partner-entropy width — continuous replacement for PEAK_DOMINANCE_RATIO (Plan 205) |
+| `mux_demux` | MuxDemux Verifier — deterministic superposition recovery |
+
+### Related MUX-latent features (Phase 12 absorption)
+
+| Feature | Role |
+|---|---|
+| `mux_latent_context` | MUX-Latent Context Compression — inference-time context compression via vocabulary superposition (DEFAULT-ON in root) |
+| `mux_latent_wire` | MUX-Latent Wire Patch — latent-to-latent patching without decompress/recompress (implies mux_latent_context) |
+| `lclm_adaptive_lod` | LCLM Adaptive LOD — spectral energy-based adaptive compression ratio (implies mux_latent_context) |
+
+### Architecture
+
+The MUX family operates on the speculative decoding tree substrate. `mux_pruner` provides the vocabulary simplex pruning kernel; `mux_ddtree` extends DDtree nodes to carry superposition branches; `mux_bfs` performs parallel tree search guided by superposition; `mux_bandit_width` adaptively controls how many branches to maintain; `mux_freeze_thaw` persists patterns across sessions; `mux_demux` provides deterministic verification of the collapsed result.
+
+🔧 Feature flags: all opt-in in `katgpt-core`. Root forwards them.
+
+📖 Research: [158](../../.research/158_MUX_Multiplexed_Latent_Reasoning.md).
+
+## 55. DEC Operator Substrate — Cell Complexes + Cochain Fields (Plan 251)
+
+The foundational Discrete Exterior Calculus (DEC) substrate: cell complexes, cochain fields, and the d/δ/Δ operators (exterior derivative, codifferential, Hodge Laplacian). This is the substrate that §13 (htno_v_cycle), §16 (cochain_point_sampler), §50 (motor_gated_field), and the AGENTS.md Stokes Calculus vocabulary all build on.
+
+### Key insight
+
+Topology determines WHERE information flows (fixed); learning determines HOW features are mixed. For modelless inference, we only need the fixed part. DEC operators provide structured, conservation-guaranteed alternatives to ad-hoc gradient/flow computations.
+
+### What ships
+
+- `CellComplex` struct (vertices, edges, faces, volumes with incidence)
+- `CochainField` typed cochain on cell complex
+- `BoundaryMatrix` (sparse signed incidence matrix Bₖ as triplets)
+- `exterior_derivative` (d = boundary operator)
+- `codifferential` (δ = discrete divergence)
+- `hodge_laplacian` (Δ = δd + dδ)
+- `hodge_decompose` (exact ⊕ harmonic ⊕ coexact = Helmholtz)
+- Tests enforce `BₖBₖ₊₁ = 0` (boundary-of-boundary is zero) by construction
+
+### Layer split
+
+The substrate now spins in the `katgpt-dec` crate and re-exports as `katgpt_core::dec` (Issue 007 Phase E Tier 1). The `dec_operators` feature in `katgpt-core` gates the re-export.
+
+### Why opt-in at katgpt-core level
+
+The `katgpt-dec` crate is always compiled; the `dec_operators` feature in `katgpt-core` gates only the re-export path. Consumer features (`motor_gated_field`, `heat_kernel_trajectory`, `sheaf_admm`, `se2_equivariant_lift`, `cochain_point_sampler`, `htno_v_cycle`, `tropical_algebra`) each imply `dec_operators` when needed.
+
+### Vocabulary translation (AGENTS.md §Manifold Geometry)
+
+| Paper term | Code primitive |
+|---|---|
+| divergence / flux / ∇·F | `codifferential`, δ |
+| boundary / ∂M / frontier | `exterior_derivative`, d |
+| line integral / trajectory energy | rank-1 `CochainField` sum along path |
+| Stokes / divergence theorem | DEC identity d∘d=0, `hodge_decompose` |
+| Hodge decomposition / Helmholtz | `hodge_decompose`, `DecFlowField` |
+| Fokker-Planck / continuity equation | `codifferential` on belief cochain |
+
+🔧 Feature flag: `dec_operators` (opt-in; gates `dep:katgpt-dec`).
+
+📖 Plan: [251](../../.plans/251_dec_operators_cell_complex.md). Research: [219](../../.research/219_Topological_Neural_Operators_DEC_Inference.md).
+
+## 56. Causal Head Importance Family — Activation Patching + Relocation (Plan 358 + Proposal 004 + Plan 431)
+
+A family of three opt-in features for modelless causal intervention diagnostics on attention heads. Distilled from HydraHead (arXiv:2606.20097) + the Knowing-Using Gap paper (arXiv:2607.08393).
+
+### Features
+
+| Feature | Plan | Role |
+|---|---|---|
+| `causal_head_importance` | 358 | CausalHeadImportance + ScaleNormalizedFusion — activation patching (Eq 10) + path patching (Eq 11) + span-level logit-diff readout (Eq 9) + cross-capability fusion (Eq 12) |
+| `adaptive_causal_calibration` | Proposal 004 | AdaptiveCausal calibration — cheap OV-circuit proxy escalates to Plan 358's causal patching only on k suspects instead of all n_heads. OUR INVENTION, not from HydraHead. |
+| `cross_stage_relocation` | 431 | Cross-Stage Residual Relocation Operator + Permeation-Map Diagnostic (arXiv:2607.08393). Two primitives: `permeation_scan_into` (2D intervention heatmap) + `RelocateOp` (snapshot residual at one stage, overwrite at another). |
+
+### Key findings
+
+- **causal_head_importance (Plan 358):** GOAT G1-G4 ALL PASS. Stays opt-in — `causal_necessity` loses the RTPurbo calibration slot competition to `attention_mass` on most workloads (no quality gain).
+- **adaptive_causal_calibration (Proposal 004):** The proxy (attention_mass / ||OV_out||) is an UNVALIDATED hypothesis — promotion blocked on G1 (proxy precision) + G2 (cost reduction), both deferred to riir-engine. Ships the open primitive leaf-clean.
+- **cross_stage_relocation (Plan 431):** Phase 3 defend-wrong PoC DONE — verdict: REFUTE `LateEarly` default (CLOBBERS in 2/4 clean configs because op_b overwrites op_a's recovery). The mechanism itself works (single-op relocation recovers in all configs). Production path: permeation-map diagnostic + `RelocatePair::Custom`.
+
+### Pure numeric substrate
+
+All three operate on `&[f32]` + a caller-supplied patched-forward-pass closure. Zero deps. The patched forward pass itself is riir-engine/riir-games territory; these are the scorers/operators.
+
+🔧 Feature flags: `causal_head_importance` (opt-in), `adaptive_causal_calibration` (implies causal_head_importance), `cross_stage_relocation` (implies causal_head_importance).
+
+📖 Plans: [358](../../.plans/358_causal_head_importance_calibration.md), [431](../../.plans/431_cross_stage_residual_relocation_primitive.md).
+
+## 57. Thinking/Cognition Substrate — Collapse Detection + Capability Routing + Belief Drafting (Plan 212 + 216 + 217)
+
+A family of three opt-in features forming the thinking/cognition inference-time substrate.
+
+### Features
+
+| Feature | Plan | Role |
+|---|---|---|
+| `collapse_aware_thinking` | 212 | Collapse-Aware Adaptive Thinking — `CollapseDetector` trait for detecting reasoning collapse. Forwards to `katgpt-types/collapse_aware_thinking`. |
+| `substrate_gate` | 216 | SubstrateGate passthrough — inference-time capability substrate routing. Empty feature gate; gates the module in `katgpt-core/src/`. |
+| `belief_drafter` | 217 | NextLat Belief-State Speculative Drafter — entropy threshold config for belief-state speculative generation. Forwards to `katgpt-types/belief_drafter`. |
+
+### Architecture
+
+`collapse_aware_thinking` provides the `CollapseDetector` trait that consumers implement to detect when a reasoning chain has collapsed (repetition, divergence, etc.). `substrate_gate` routes inference requests to the appropriate capability substrate. `belief_drafter` provides the entropy threshold configuration for speculative belief-state generation.
+
+These three are substrate primitives consumed by the CGSP (Curiosity-Guided Self-Play, Plan 274) runtime and other cognition pipelines.
+
+🔧 Feature flags: all opt-in. `collapse_aware_thinking` + `belief_drafter` forward to `katgpt-types`; `substrate_gate` is a `katgpt-core`-local module gate.
+
+📖 Plans: [212](../../.plans/212_collapse_aware_adaptive_thinking.md), [216](../../.plans/216_substrate_gate_capability_routing.md), [217](../../.plans/217_nextlat_belief_state_drafter.md).
+
+## 58. Game Episode Evolution — Hierarchical Decomposition + Self-Play (Plan 190 + 191)
+
+A family of four opt-in features for game-episode evolution and self-play curriculum.
+
+### Features
+
+| Feature | Plan | Role |
+|---|---|---|
+| `and_or_dtree` | 190 | AND-OR DDTree — generic AND-OR tree for hierarchical goal decomposition |
+| `partial_scoring` | 191 | PartialScorer — graduated reward for game episodes |
+| `problem_mutator` | 191 | ProblemMutator — game config evolution |
+| `idea_divergence` | 191 | IdeaDivergence — strategic novelty filter (implies partial_scoring) |
+
+### Architecture
+
+`and_or_dtree` provides the generic hierarchical goal decomposition tree (AND nodes require all children, OR nodes require one). `partial_scoring` provides graduated reward signals for partial episode completion. `problem_mutator` evolves game configurations to generate curriculum. `idea_divergence` filters for strategic novelty in generated ideas.
+
+These compose with CGSP (Plan 274, `cgsp` feature) and the speculative generator substrate (`speculative_generator`, Plan 193).
+
+🔧 Feature flags: all opt-in in `katgpt-core`.
+
+📖 Plans: [190](../../.plans/190_and_or_dtree_blueprint_decomposition.md), [191](../../.plans/191_open_ended_problem_evolution_arena.md).
+
+## 59. RTDC Family — Resolution-Tiered Deterministic Commitment (Plan 302 + Issue 002)
+
+A family of two opt-in features for multi-resolution Merkle commitment of game state.
+
+### Features
+
+| Feature | Plan | Role |
+|---|---|---|
+| `rtdc` | 302 | Resolution-Tiered Deterministic Commitment — multi-resolution Merkle roots per SLoD σ-boundary. Phase 1: open primitive only; LatCal-backed encoding + chain quorum live in riir-chain (Plan 003). Implies `slod` + `merkle_octree` + `sense_composition`. |
+| `rtdc_subtree_inclusion` | Issue 002 | RTDC Phase 3 Candidate C — probabilistic cross-depth consistency proof. Curator publishes 73-hash octree + seed; verifier samples K leaves and checks parent reconstruction. Implies `rtdc`. |
+
+### GOAT gate (rtdc_subtree_inclusion)
+
+Bench 303 CG6 PASS (2026-06-22): cost gate PASSES at 4.60× vs 5.0× target (8% headroom). Detection sub-criteria verified. Stays opt-in per Bench 303 verdict — promote to candidate-default once `chain_rtdc_subtree` wiring lands.
+
+### Architecture
+
+RTDC composes the SLoD spectral pruner (Plan 235) + Merkle octree (Plan 221-M) + sense composition (Plan 221) into a multi-resolution commitment scheme. Each SLoD σ-boundary gets its own Merkle root; light clients can verify at the resolution tier they care about.
+
+🔧 Feature flags: `rtdc` (opt-in; implies slod + merkle_octree + sense_composition), `rtdc_subtree_inclusion` (opt-in; implies rtdc).
+
+📖 Plan: [302](../../.plans/302_rtdc_open_primitive.md). Bench: [303](../../.benchmarks/303_rtdc_subtree_inclusion_goat.md).
+
+## 60. Additional Significant Opt-In Features
+
+A consolidated section for standalone opt-in features with their own plans but not large enough for a dedicated section.
+
+### Attention & inference variants
+
+| Feature | Plan | Role |
+|---|---|---|
+| `tiled_attention` | 115 | Tiled online-softmax flash attention for CPU SIMD |
+| `parallax_attn` | 135 | Parallax parameterized local linear attention (implies tiled_attention) |
+| `moa_inference` | 158 | MoA Mixture of Activations — token-adaptive activation mixing |
+| `deltanet_inference` | 182 | DeltaNet GPU inference — hybrid DeltaNet/Attention decode |
+| `lt2_looped` | 108 | LT2 looped inference types — LoopMode, HybridPattern, SdpaOutputGate, ResidualGate |
+| `tf_loop` | 136 | Training-free loop wrapper — ODE-refined sub-stepping (implies lt2_looped) |
+
+### KV cache & memory
+
+| Feature | Plan | Role |
+|---|---|---|
+| `rim_slots` | 172 | RiM Reasoning Buffer Slots — fixed latent workspace for DDTree |
+| `product_key_memory_freeze` | 408 Phase 4 | FrozenProductKeyMemory — freeze/thaw wrapper with BLAKE3 commitment |
+| `product_key_memory_episodic` | 408 Phase 5 | PkmEpisodicStore — δ-rule write gate (PKM × δ-Mem fusion) |
+| `chunked_net_fetch` | 272 T3.3 | NetChunkFetcher — network chunk fetcher stub for ChunkedContentStore |
+
+### Direction & steering diagnostics
+
+| Feature | Plan | Role |
+|---|---|---|
+| `dirichlet_energy` | 149 | Dirichlet Energy structural alignment diagnostic |
+| `gain_cost_halt` | 304 | Gain/Cost Loop Halting Primitive — per-loop halting kernel. GOAT G1-G5 ALL PASS. Stays opt-in at katgpt-core leaf; production wiring is riir-ai civ-side. |
+| `smear_classifier` | 298 | SmearClassifier — ternary latent-mass distribution classifier. GOAT G1/G2/G3 ALL PASS. Stays opt-in (G2 evidence synthetic). |
+| `self_advantage_gate` | 283 | Self-advantage recursion gate for HLA reconstruction |
+| `recursion_logits` | 283 | RecursionLogits opt-in trait — pre/post recursion logits exposure |
+
+### Routing & gating
+
+| Feature | Plan | Role |
+|---|---|---|
+| `rv_gated_routing` | 202 | RV-Gated Compute Routing — AcceptanceVarianceTracker integration + TriggerGate::rv_tier_boost |
+| `ssmax_adaptive` | 411 S2 | SSMax built-in rolling-Δ estimator. GOAT G1-G5 ALL PASS. Stays opt-in pending real-attention PoC. |
+| `gold_share_probe` | 411 | GoldShare — content-specific output-fraction diagnostic |
+| `indicator_cascade` | 320 Phase 3 | IndicatorCascade — two-stage verifier escalation. Stays OPT-IN permanently (implies stage-2 verifier impl, consumer-crate territory). |
+
+### GPU & quantization
+
+| Feature | Plan | Role |
+|---|---|---|
+| `binary_plasma` | Issue 145 | Binary {−1,+1} plasma tier — single bit-plane, group-wise FP16 scale. The fastest Plasma tier; ternary (plasma_path) moved to Hot. |
+| `gpart_adapter` | 257 | GPart isometric partition adapter loading |
+| `gpart_pruning` | Issue 008 | GPart top-k group pruning — zero out low-magnitude groups at apply time (implies gpart_adapter) |
+| `simd_sigmoid` | Issues 024/025 | SIMD-vectorized sigmoid→tanh→clamp fused pass for AttractorKernel::step() + BoMSampler |
+
+### Smaller primitives
+
+| Feature | Plan | Role |
+|---|---|---|
+| `questbench` | 110 | QuestBench underspecification scoring for modelless architecture |
+| `peira_distill` | 153 | PEIRA inter-view regressor alignment |
+| `rat_plus_bridge` | 225 | RAT+ Recurrence Bridge — modelless dilated inference via GDN2 state |
+| `dendritic_gate` | 260 | DendriticGate NMDA-inspired adaptive branching types |
+| `hydra_budget` | 165 | Hydra-Aware Adaptive Layer Budget types |
+| `review_metrics` | 054 | ReviewMetrics — inference-time path-consistency / reward-hacking counter |
+| `elasticity_gated_update` | 429 | Elasticity-Gated Update — DSOM error-scaled neighborhood update. Consumer GOAT PASS in riir-neuron-db; `elasticity_gated_heal` PROMOTED to default-on there. |
+| `sphere_sampling` | Issue 544 | Sphere Sampling — modelless primitives for sampling from unnormalized densities on S^{d-1}. Opt-in pending defend-wrong PoC. |
+| `newton_schulz` | 152 | Newton-Schulz orthogonalization + Muon momentum. NOT in katgpt-core `default`; root's default-on forwarder activates it. |
+| `binary_plasma` | Issue 145 | Binary {−1,+1} plasma tier |
+
+### Speculative decoding substrate markers
+
+These are tracking flags that gate substrate types in `speculative/types.rs`. Root forwards them so the gated items resolve:
+
+| Feature | Plan | Role |
+|---|---|---|
+| `stability_metrics` | 102 | StabilitySnapshot + DraftResult.stability field |
+| `spec_cost_model` | 096 | SpecCostSnapshot + DraftResult.cost_snapshot field |
+| `kurtosis_gate` | 203 | RejectionReason::KurtosisRejection variant |
+| `elf_sde` | 079 | EarlyStopGate<P> depth-aware screening wrapper |
+| `tes_loop` | 086 | TesNode + TrajectoryCredit |
+| `lattice_deduction` | 088 | LDT conflict detector + LdtPruneConfig substrate |
+| `echo_env_predictor` | 247 | BudgetAdaptation::EchoConsistency variant |
+| `q_sample_solver` | — | q-sampling for critical steps (implies critical_interval_gate) |
+| `self_cond_draft` | — | 2-pass self-conditioned speculative draft |
+| `mbr_tree_select` | — | MBR selection from DDTree |
+| `d2f_3sr_warm_start` | 291 | D2F 3SR warm-start config |
+| `rcd_residual` | 258 | Residual Context Diffusion — entropy-weighted residual injection (implies critical_interval_gate) |
+
+### Phase 12 absorption (DEFAULT-ON in root, opt-in here)
+
+These features are marked "DEFAULT-ON in root" but not in katgpt-core's `default`. The root crate's default-on forwarder activates them:
+
+| Feature | Plan | Role |
+|---|---|---|
+| `critical_interval_gate` | 222 | Discrete Critical Interval Solver Switching. Transitively DEFAULT-ON via root's `rcd_residual`/`closure_instrument`. |
+| `modality_pruned_load` | 227 Phase 3 | Modality-Pruned Context Loading — query classifier + pipeline selection |
+| `mux_latent_context` | 238 | MUX-Latent Context Compression (DEFAULT-ON in root) |
+| `closed_unit_compaction` | 333 | Closed-Unit Compaction Gate — rubric-gated trajectory compaction (DEFAULT-ON in root) |
+| `breakeven_routing` | 250 | Breakeven complexity cost-aware inference routing (DEFAULT-ON in root) |
+| `memory_soup_lora` | 290 | Memory Soup LoRA — MSP0 binary format parser |
+| `skill_opt` | 144 | SkillOpt text-space skill optimization |
+| `channel_simd_align` | 227 Phase 5 | Channel SIMD Alignment — cache-line-padded weight storage |
