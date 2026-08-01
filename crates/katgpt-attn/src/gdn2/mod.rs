@@ -13,6 +13,17 @@ pub mod types;
 // here from root `src/gdn2/forward.rs` now that ForwardContext lives in
 // katgpt-forward. Gated by the parent `gdn2_attention` feature in lib.rs.
 pub mod forward;
+// ShortConv1D — causal depthwise 1D conv with ring buffer. Used by KDA
+// (Kimi Delta Attention) for the q/k/v pre-activation short conv. Gated by
+// the `kda_linear` feature (sibling).
+#[cfg(feature = "kda_linear")]
+pub mod short_conv;
+// KDA (Kimi Delta Attention) forward layer — wires the KDA-specific projections
+// + ShortConv + Swish + L2Norm + low-rank α + sigmoid β around the existing
+// gdn2_recurrent_step kernel (with Gdn2GateConfig::Kda). Proposal 032 Phase 4,
+// Research 329.
+#[cfg(feature = "kda_linear")]
+pub mod kda_forward;
 // Plan 424 T4.2: GDN2 cache ↔ tree verify bridge. Gated by the parent
 // `gdn_tree_verify` feature (which implies `gdn2_attention` + forwards to
 // `katgpt-core/gdn_tree_verify`).

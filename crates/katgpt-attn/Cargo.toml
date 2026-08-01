@@ -115,3 +115,10 @@ gated_mlp = ["katgpt-forward/gated_mlp", "katgpt-transformer/gated_mlp"]
 # katgpt-kv for RopeFreqs (the cached sin/cos RoPE substrate). Opt-in,
 # default-off until Phase 6 real-model GOAT.
 mla_attention = ["dep:katgpt-kv", "katgpt-kv/shard_kv"]
+# KDA (Kimi Delta Attention) — Kimi Linear (arxiv 2510.26692) §3-4.
+# Implements the per-token decode forward for KDA linear attention. The
+# recurrent kernel is REUSED from `gdn2_attention` (Gdn2GateConfig::Kda);
+# this feature adds the KDA-specific forward layer (projections + ShortConv1D
+# + Swish + L2Norm + low-rank α + sigmoid β + output gate + head-wise RMSNorm).
+# Proposal 032 Phase 4, Research 329. Opt-in, default-off until Phase 6 GOAT.
+kda_linear = ["gdn2_attention"]

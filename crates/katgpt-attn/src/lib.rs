@@ -17,6 +17,7 @@
 //! | [`static_cal`] | `static_cal_tables` | Pre-computed per-head attention scales. |
 //! | [`funcattn_compose`] | `funcattn_freeze_thaw` / `funcattn_spectral_pre_rotate` / `funcattn_chiar_blend` | FuncAttn composition layer (Plan 286 Phase 5). |
 //! | [`mla`] | `mla_attention` | Multi-head Latent Attention (DeepSeek-V2 §2.1) with Kimi-K3 output gate (Proposal 032 Phase 2). |
+//! | [`gdn2::kda_forward`] | `kda_linear` | KDA (Kimi Delta Attention) linear attention forward layer (Kimi Linear, Proposal 032 Phase 4, Research 329). Reuses the gdn2 kernel with `Gdn2GateConfig::Kda`. |
 //!
 //! # Relationship to katgpt-core
 //!
