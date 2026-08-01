@@ -917,6 +917,21 @@ path = "benches/cucg_goat.rs"
 required-features = ["closed_unit_compaction"]
 harness = false
 
+# Proposal 011 Phase 5 / Issue 569 — SWE Trajectory Geometry Synthetic PoC.
+# Defend-or-refute Layer 4 (the modelless reframe): does the inference loop's
+# trajectory through patch-space have measurable geometry that differs across
+# failure modes, and is that geometry freezable via shipped substrate? Three
+# sub-PoCs (T5.1 geometry discrimination, T5.2 CUCG test-pass firing, T5.3 FAME
+# blend stability from failure summary) over synthetic trajectories — no
+# Rust-SWE-bench, no rubrc, no Kimi-K3 needed. std::time::Instant-free (the
+# PoC prints a verdict table, not a latency sweep); harness=false matches the
+# crate convention.
+[[bench]]
+name = "bench_011_swe_trajectory_geometry_poc"
+path = "benches/bench_011_swe_trajectory_geometry_poc.rs"
+required-features = ["latent_trajectory_geometry", "closed_unit_compaction", "committed_field_blend"]
+harness = false
+
 # Plan 381 Phase 3 T3.1 — Step-Attribution Δ-Qualifier latency bench (G4).
 # Measures `StepAttributionQualifier::qualify()` end-to-end + aggregate-only
 # at W ∈ {16,32,64,128}. Target: aggregate-only < 1µs at W=64. std::time::Instant

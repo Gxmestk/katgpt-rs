@@ -272,12 +272,20 @@ The original draft said "Training on Rust-SWE-bench — modelless-first mandate.
 ### Phase 5 — Layer 4 trajectory freeze (MODELLESS — runnable independently of Phase 3)
 
 > **This phase does NOT depend on rubrc.** It composes shipped DEFAULT-ON primitives. It can run on synthetic trajectories first (no Kimi-K3 needed), then on real model trajectories once P032 Phase 5 ships. This is the cheapest validation path.
+>
+> **T5.1–T5.3 ran 2026-08-02 (Issue 569).** Verdict: Partial Gain — T5.1 + T5.2
+> PASS (geometry discriminates failure modes + CUCG fires on test-pass events);
+> T5.3 FAIL (FAME commit is deterministic but produces degenerate blends from
+> random direction vectors — concentration-of-measure artifact; real freezer
+> needs data-derived directions, not random). See
+> [Issue 569](../.issues/569_swe_trajectory_geometry_synthetic_poc.md) for the
+> full verdict table + design-constraint analysis.
 
-- [ ] T5.1 **POC (synthetic): does trajectory geometry discriminate?** Construct synthetic pass/fail trajectories (mimicking SWE attempt patterns: oscillation, drift, committed-wrong). Run `latent_trajectory_geometry` on them. Question: do different failure modes produce measurably different geometry (curvature, drift angle)? Even a NEGATIVE result (no discrimination) is valuable — it means trajectory geometry alone is insufficient signal.
-- [ ] T5.2 **POC (synthetic): does CUCG evaluate() fire on test-pass events?** Construct synthetic test-pass sequences. Run CUCG `evaluate()`. Question: does a test pass qualify as a closed unit (closed-unit ∧ summarizable ∧ progress ∧ ¬stuck)?
-- [ ] T5.3 **POC (synthetic): committed_field_blend from failure trajectory.** Run FAME on a synthetic all-fail trajectory summary. Question: does it produce a stable, BLAKE3-committable, sampling-invariant blend even with zero positive examples?
+- [x] T5.1 **POC (synthetic): does trajectory geometry discriminate?** Construct synthetic pass/fail trajectories (mimicking SWE attempt patterns: oscillation, drift, committed-wrong). Run `latent_trajectory_geometry` on them. Question: do different failure modes produce measurably different geometry (curvature, drift angle)? Even a NEGATIVE result (no discrimination) is valuable — it means trajectory geometry alone is insufficient signal. **RESULT (Issue 569): PASS — 5 modes produce 5 distinct `(curvature, length)` signatures; oscillation hits exactly π (the ping-pong signature).**
+- [x] T5.2 **POC (synthetic): does CUCG evaluate() fire on test-pass events?** Construct synthetic test-pass sequences. Run CUCG `evaluate()`. Question: does a test pass qualify as a closed unit (closed-unit ∧ summarizable ∧ progress ∧ ¬stuck)? **RESULT (Issue 569): PASS — fires Compress at exactly the test-pass events, nowhere else.**
+- [x] T5.3 **POC (synthetic): committed_field_blend from failure trajectory.** Run FAME on a synthetic all-fail trajectory summary. Question: does it produce a stable, BLAKE3-committable, sampling-invariant blend even with zero positive examples? **RESULT (Issue 569): CONDITIONAL FAIL — FAME is deterministic + stable, but random direction vectors produce near-zero dots → degenerate blend. Real freezer needs data-derived directions (T5.4, gated on P032 Phase 5).**
 - [ ] T5.4 **POC (real, gated on P032 Phase 5): trajectory geometry on real Kimi-K3 SWE attempts.** Run tf_loop on Rust-SWE-bench tasks with Kimi-K3. Extract trajectory geometry. Compare across model snapshots. Question: do different snapshots produce measurably different failure-trajectory shapes?
-- [ ] T5.5 `SweTrajectoryFreezer` impl — composes tf_loop + latent_trajectory_geometry + committed_field_blend + MerkleFrozenEnvelope. Behind `swe_trajectory_freeze` feature.
+- [ ] T5.5 `SweTrajectoryFreezer` impl — composes tf_loop + latent_trajectory_geometry + committed_field_blend + MerkleFrozenEnvelope. Behind `swe_trajectory_freeze` feature. **Design constraint (from T5.3): archetype directions MUST be data-derived from clustering real failure trajectories, not random.**
 - [ ] T5.6 Layer 4 G5 gate: trajectory geometry discriminates across snapshots/models.
 - [ ] T5.7 If G5 FAILS → document why modelless was insufficient, file Layer 4b (riir-train LoRA fallback) with explicit §3.5 documentation.
 - [ ] T5.8 If G5 PASSES → the modelless path is validated. Layer 3 (WASM pruner) becomes an enhancement, not a dependency.
