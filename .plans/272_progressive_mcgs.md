@@ -191,7 +191,7 @@ Goal: prove the three GOAT criteria. Hard pass/fail, no tuning excuses.
 - **Research:** [katgpt-rs/.research/239_MLEvolve_Progressive_MCGS_Entropy_Schedule.md](../.research/239_MLEvolve_Progressive_MCGS_Entropy_Schedule.md)
 - **Source paper:** [arxiv 2606.06473](https://arxiv.org/abs/2606.06473)
 - **Public code:** https://github.com/InternScience/MLEvolve (Python reference; we re-implement in Rust, modelless)
-- **Downstream consumer:** [riir-ai/.plans/298_crowd_scale_progressive_mcgs_npc_emergent_behavior.md](../../../riir-ai/.plans/298_crowd_scale_progressive_mcgs_npc_emergent_behavior.md) — blocked on this plan's Phase 1 completion
+- **Downstream consumer:** [riir-ai/.plans/298_crowd_scale_progressive_mcgs_npc_emergent_behavior.md](../../riir-ai/.plans/298_crowd_scale_progressive_mcgs_npc_emergent_behavior.md) — blocked on this plan's Phase 1 completion
 - **Adjacent research (katgpt-rs):** 134 (BES entropy shell), 172 (MUSE skill lifecycle), 190 (regime-transition MDL gate), 075 (Survive-or-Collapse), 218 (BreakevenComplexityRouter — composes, doesn't conflict)
 - **Canonical format example:** [katgpt-rs/.plans/271_attention_matching_compaction.md](271_attention_matching_compaction.md)
 

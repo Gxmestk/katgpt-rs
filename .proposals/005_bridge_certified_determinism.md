@@ -5,8 +5,8 @@ Branch: `develop` (per global rule — no feature branches)
 Owner: unassigned
 Fusion of: Plan 385 T3.4 (`CogSlashEvidence` / `NonDeterminism` slashing) × `katgpt-core/src/closure/bridge.rs`
 (raw↔latent bridge substrate) × `katgpt-core/src/engram/architecture_root.rs` (commitment pattern)
-Related: [Plan 385 — Think-Brain-as-WASM Sidecar GOAT Gate](../../../riir-ai/.benchmarks/385_think_brain_wasm_goat.md),
-[Research 148 — Think-Brain WASM Vessel](../../../riir-ai/.research/148_think_brain_wasm_vessel.md)
+Related: [Plan 385 — Think-Brain-as-WASM Sidecar GOAT Gate](../../riir-ai/.benchmarks/385_think_brain_wasm_goat.md),
+[Research 148 — Think-Brain WASM Vessel](../../riir-ai/.research/148_think_brain_wasm_vessel.md)
 
 ## TL;DR
 

@@ -2,7 +2,7 @@
 
 **Date:** 2026-06-23 (G2/G3), 2026-06-23 (G4)
 **Plan:** 304 (Gain/Cost Loop Halting Primitive) — Phase 2 T2.4 + T2.5 + Research 149 §5 G4
-**Research:** [282 — LoopCoder-v2 Gain/Cost Loop Halting](../.research/282_LoopCoder_V2_Gain_Cost_Loop_Halting.md) • [149 — Per-NPC Gain/Cost Reasoning Depth Guide §5](../../../riir-ai/.research/149_Per_NPC_Gain_Cost_Reasoning_Depth_Guide.md)
+**Research:** [282 — LoopCoder-v2 Gain/Cost Loop Halting](../.research/282_LoopCoder_V2_Gain_Cost_Loop_Halting.md) • [149 — Per-NPC Gain/Cost Reasoning Depth Guide §5](../../riir-ai/.research/149_Per_NPC_Gain_Cost_Reasoning_Depth_Guide.md)
 **Source paper:** [arxiv 2606.18023](https://arxiv.org/abs/2606.18023) — LoopCoder-v2 (Yang et al., 2026)
 **Feature gate:** `gain_cost_halt` (opt-in)
 **Status:** ✅ G2 + G3 + G4 PASS — kernel savings/regression/oscillation-detection contract met on synthetic regimes; keep opt-in until riir-ai Plan 330 wires real game loops.

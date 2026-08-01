@@ -8,7 +8,7 @@
 | Date | Runtime | Notes |
 |---|---|---|
 | 2025-05-12 | wasmtime (JIT) | Original Plan 034 gate — kept below as the historical record. |
-| 2026-07-04 | wasmi (interpreter) | **Current.** Plan 167 migrated runtime to wasmi for dependency/reproducibility; numbers re-verified on a clean release build (post-Issue-016 fix, ~1.2s total runtime — not thermal-throttled). See [Issue 017](../../riir-ai/.issues/017_wasm_validator_perf_regression_wasmi.md). |
+| 2026-07-04 | wasmi (interpreter) | **Current.** Plan 167 migrated runtime to wasmi for dependency/reproducibility; numbers re-verified on a clean release build (post-Issue-016 fix, ~1.2s total runtime — not thermal-throttled). See Issue 017 (riir-ai, removed per noise-reduction rule). |
 
 ## Setup
 

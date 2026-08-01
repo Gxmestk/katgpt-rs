@@ -3,7 +3,7 @@
 > **Source:** Research 096 — HL-ImageNet Symbolic Pipeline Overfitting
 > **Status:** ✅ Complete (T1–T3 ✓)
 > **Priority:** Low — infrastructure quality assurance
-> **GOAT Pillar:** ❌ Not a pillar — see [MMO GOAT Pillars Decision Matrix](../../riir-ai/.docs/27_mmo_goat_pillars_decision_matrix.md). General HL design principles, not game-specific. Stays in `katgpt-rs` domain.
+> **GOAT Pillar:** ❌ Not a pillar — see [MMO GOAT Pillars Decision Matrix](../../riir-ai/.docs/03_pillars/README.md). General HL design principles, not game-specific. Stays in `katgpt-rs` domain.
 > **Domain:** `katgpt-rs` — no game IP, no secret, no selling point. The regularization principles are public knowledge from the HL-ImageNet experiment.
 
 ## Context

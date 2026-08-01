@@ -120,7 +120,7 @@ the Vessel *projection* path (Model B) needed the getrandom + bytemuck fixes.
   lines above without the caveat that the *scheduling* half (not the
   wasm32-compiles-clean half this plan is actually about) has a real,
   measured question mark. See
-  [riir-mmorpg-examples Issue 030](../../riir-mmorpg-examples/.issues/030_cloudflare_workers_deployability.md)
+  riir-mmorpg-examples Issue 030 (removed per noise-reduction rule)
   for the full methodology + numbers.
 
 ### Known latent issues NOT fixed by this plan

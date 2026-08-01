@@ -2,7 +2,7 @@
 
 **Date:** 2026-06-25
 **Research:** [katgpt-rs/.research/305_Phase_Modulated_Cross_Domain_Coupling.md](../.research/305_Phase_Modulated_Cross_Domain_Coupling.md)
-**Private guide:** [riir-ai/.research/159_phase_rotation_subspace_gate_guide.md](../../../riir-ai/.research/159_phase_rotation_subspace_gate_guide.md)
+**Private guide:** [riir-ai/.research/159_phase_rotation_subspace_gate_guide.md](../../riir-ai/.research/159_phase_rotation_subspace_gate_guide.md)
 **Source paper:** [arxiv 2605.12700](https://arxiv.org/abs/2605.12700) — UFO: Domain-Unification-Free Operator Framework (Qiao, Karniadakis, Muniruzzaman, May 2026)
 **Target:** `katgpt-rs/crates/katgpt-core/src/phase_rotation.rs` (new module) + Cargo feature `phase_rotation_coupling`
 **Status:** ✅ Phase 1 + Phase 2 COMPLETE (2026-06-25). **PROMOTED to DEFAULT-ON** — all 5 GOAT gates PASS with comfortable headroom (G1 drift 5.96e-8 <1e-4 [1677× headroom], G2 0 reversals/100 steps, G3 D=8 scalar+mix 18.9ns<50ns + D=8 mix-only 5.0ns<20ns + D=64 per-channel+mix 355.7ns<1500ns, G4 0 allocs/100 calls, G6 sigmoid(0)=0.5→cos=sin=1/√2). Pure modelless (closed-form cos/sin/sigmoid/dot, no training). Design pivot: independent-Padé cos/sin was replaced with `phase_safe_cos_sin` (libm sin + Pythagorean sqrt recovery) because independent Padé drifts in cos²+sin²=1 by ~5e-3 (50× G1 budget). Phase 3 SIMD/LUT optimization is unnecessary (355.7ns ≪ 1500ns budget); would only matter if a future hot-path caller needed <600ns. Phase 4 fusion guides remain deferred to riir-ai (HLA runtime) / riir-chain (LatCal committed phase) / katgpt-rs (DEC Hodge mixer) — those repos' responsibility.

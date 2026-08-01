@@ -10,8 +10,8 @@
 
 ## Update (2026-07-18, post-Plan-500)
 
-riir-ai [Plan 500](../riir-ai/.plans/500_dual_leo_trainer_backprop_fix.md) fixed
-[Issue 554](../riir-ai/.issues/554_dual_leo_trainer_backprop_noop.md) — LEO
+riir-ai [Plan 500](../../riir-ai/.plans/500_dual_leo_trainer_backprop_fix.md) fixed
+Issue 554 (riir-ai, removed per noise-reduction rule) — LEO
 last-layer now does real per-sample SGD. The G5 re-run on synthetic data
 (riir-ai Bench 553) reports the SAME 0.00% / 0.50% numbers, but with a
 critical meaning shift: pre-fix the numbers were frozen-noise LEO behavior
@@ -19,7 +19,7 @@ critical meaning shift: pre-fix the numbers were frozen-noise LEO behavior
 train, T12 proves 32% loss reduction on a learnable task). The synthetic
 task is too weak for LEO's signal to escape α-mixing with UVFA's noise.
 
-Real-network G5 verdict NOW LANDED (riir-ai [Bench 558](../riir-ai/.benchmarks/558_civ_qgf_dual_leo_oracle_g5_real_network.md), 2026-07-19): dual +2.69% vs single on civ action-prediction (35.68% → 36.64%), missing ≥3% gate by 0.31pp — fourth-axis stop rule triggered. The civ dual-LEO investigation is fully closed per [Research 322](../riir-ai/.research/322_civ_alternative_critic_post_stop_rule_verdict.md) (the "alternative critic" escape hatch was category-confused). See [Proposal 007 addendum](../.proposals/007_qgf_dual_leo_oracle.md) for the four-time opt-in vindication.
+Real-network G5 verdict NOW LANDED (riir-ai [Bench 558](../../riir-ai/.benchmarks/558_civ_qgf_dual_leo_oracle_g5_real_network.md), 2026-07-19): dual +2.69% vs single on civ action-prediction (35.68% → 36.64%), missing ≥3% gate by 0.31pp — fourth-axis stop rule triggered. The civ dual-LEO investigation is fully closed per [Research 322](../../riir-ai/.research/322_civ_alternative_critic_post_stop_rule_verdict.md) (the "alternative critic" escape hatch was category-confused). See [Proposal 007 addendum](../.proposals/007_qgf_dual_leo_oracle.md) for the four-time opt-in vindication.
 
 ---
 

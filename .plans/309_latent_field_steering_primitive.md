@@ -28,7 +28,7 @@ leakage (uncontrolled propagation) **OR** G4 >1ms (too slow for 20Hz tick).
 ## Phase 0 — Design (COMPLETE)
 
 - [x] T0.1 Research note created ([Research 290](../.research/290_latent_field_steering_open_primitive.md))
-- [x] T0.2 Private guide created ([riir-ai/.research/153](../../../riir-ai/.research/153_latent_field_steering_game_runtime_guide.md))
+- [x] T0.2 Private guide created ([riir-ai/.research/153](../../riir-ai/.research/153_latent_field_steering_game_runtime_guide.md))
 - [x] T0.3 Plan created (this file)
 - [x] T0.4 Fusion grep complete: zero codebase hits for residual-stream steering on hot path; closest cousins are CNA (neuron-level), EmotionDirections (read-only), FPCG (explicit non-mutation)
 
@@ -200,7 +200,7 @@ Changes:
 ## Phase 5 — Game Integration (DEFERRED to riir-ai)
 
 **Status (2026-06-23):** Phase 2 G1–G2 PASS — primitive proven and promoted to default in katgpt-rs. Game-side wiring deferred to riir-ai Plan 330. See
-[riir-ai/.research/153](../../../riir-ai/.research/153_latent_field_steering_game_runtime_guide.md)
+[riir-ai/.research/153](../../riir-ai/.research/153_latent_field_steering_game_runtime_guide.md)
 for the integration guide.
 
 - [x] T5.1 HLA post-evolve wiring. **DONE (riir-ai):** `ReconstructionState::hla_mut()` accessor added to katgpt-core (commit `094854e9`); `FieldRegistry` + post-`evolve_hla` steering pass landed in `riir-ai/crates/riir-engine/src/latent_field_wiring.rs` behind `latent_field_wiring` feature (papaya-backed zone→field registry, `apply_to_reconstruction` runs the additive overlay after evolve). 10/10 tests pass.
@@ -213,7 +213,7 @@ for the integration guide.
 ## Cross-Refs
 
 - [katgpt-rs/.research/290_latent_field_steering_open_primitive.md](../.research/290_latent_field_steering_open_primitive.md) — research note
-- [riir-ai/.research/153_latent_field_steering_game_runtime_guide.md](../../../riir-ai/.research/153_latent_field_steering_game_runtime_guide.md) — private guide
+- [riir-ai/.research/153_latent_field_steering_game_runtime_guide.md](../../riir-ai/.research/153_latent_field_steering_game_runtime_guide.md) — private guide
 - [katgpt-rs/.plans/162_emotion_vector_inference_control.md](162_emotion_vector_inference_control.md) — read-only counterpart
 - [katgpt-rs/.plans/087_cna_contrastive_neuron_attribution.md](087_cna_contrastive_neuron_attribution.md) — neuron-level mutation counterpart
 - [katgpt-rs/.plans/286_functional_attention_spectral_transport.md](286_functional_attention_spectral_transport.md) — F2 fusion target (cross-domain steering)

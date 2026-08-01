@@ -4,7 +4,7 @@
 > **Reference:** Weng, J. (2026). *Learning Beyond Gradients*. (Research 014)
 > **Date:** 2026-05 (paper), distilled 2026-05
 > **Verdict:** ⚠️ **Partial distill — conceptual validation + regularization framework only. No new code.**
-> **GOAT Pillar:** ❌ Not a pillar — perception-domain HL insights, not game-specific. Evaluated against [MMO GOAT Pillars](../../riir-ai/.docs/27_mmo_goat_pillars_decision_matrix.md): fails MMO-product (required), fails LoRA-independent (high — conclusions apply to both model-based and modelless, but the paper itself is about image classification, not games). Stays in `katgpt-rs` domain.
+> **GOAT Pillar:** ❌ Not a pillar — perception-domain HL insights, not game-specific. Evaluated against [MMO GOAT Pillars](../../riir-ai/.docs/03_pillars/README.md): fails MMO-product (required), fails LoRA-independent (high — conclusions apply to both model-based and modelless, but the paper itself is about image classification, not games). Stays in `katgpt-rs` domain.
 > **Domain:** `katgpt-rs` — validates our existing heuristic learning infrastructure (Plan 032, bandit feature). The key insight (code-as-model overfitting + patch regularization) is a **design principle** for our existing `AbsorbCompress` + `BanditPruner` loop, not a new feature.
 
 ---

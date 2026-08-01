@@ -222,7 +222,7 @@ The latent reframing confirms: the algorithm is genuinely orthogonal to our late
 
 ### 3.3 §3.6 defend-wrong PoC — DONE 2026-07-18 (Issue 545)
 
-**PoC landed:** [`riir-ai/crates/riir-poc/benches/causal_id_defend_wrong_poc.rs`](../../../riir-ai/crates/riir-poc/benches/causal_id_defend_wrong_poc.rs) (commit `253406d9`, riir-ai). Three competitors (S0 no-intervention, S1 Canvas FlowGraph reachability, S2 Cakiqi-Little) on four scenarios (A front-door, B back-door, C realistic 13-node game KG with `NPC1 ↔ NPC2` bidirected confounder, D bow-arc negative control).
+**PoC landed:** [`riir-ai/crates/riir-poc/benches/causal_id_defend_wrong_poc.rs`](../../riir-ai/crates/riir-poc/benches/causal_id_defend_wrong_poc.rs) (commit `253406d9`, riir-ai). Three competitors (S0 no-intervention, S1 Canvas FlowGraph reachability, S2 Cakiqi-Little) on four scenarios (A front-door, B back-door, C realistic 13-node game KG with `NPC1 ↔ NPC2` bidirected confounder, D bow-arc negative control).
 
 **Verdict: GAIN PROVEN.** See §8 PoC Addendum for the full numbers + honest caveats. The Gain verdict is **upheld and strengthened** — S2 produces a 5-node interventional signature on Scenario C that excludes the confounder path Canvas would mis-attribute, and correctly returns `Err(NotIdentifiable)` on Scenario D. The PoC's positive findings unblock the consumer plan (`katgpt-rs/.plans/457_*`); its three honest caveats become design constraints in that plan.
 
@@ -382,14 +382,14 @@ The Issue 545 PoC (§8) proved the gain on Scenario C (realistic 13-node game KG
 - **Tropical (max,+):** Plan 337, Research 321 — the min-plus interpretation the paper mentions in §3.1.
 - **Claim Rubric:** Plan 307 — L1/L2/L3 evidence ladder, potential consumer for interventional signatures.
 - **LatCal commitment:** `riir-chain/src/encoding/latcal*.rs` — sync-boundary bridge angle for committed causal claims.
-- **PoC:** [`riir-ai/crates/riir-poc/benches/causal_id_defend_wrong_poc.rs`](../../../riir-ai/crates/riir-poc/benches/causal_id_defend_wrong_poc.rs) (Issue 545, commit `253406d9`)
+- **PoC:** [`riir-ai/crates/riir-poc/benches/causal_id_defend_wrong_poc.rs`](../../riir-ai/crates/riir-poc/benches/causal_id_defend_wrong_poc.rs) (Issue 545, commit `253406d9`)
 - **Consumer plan:** [Plan 457](../.plans/457_causal_id_counterfactual_npc_reasoning.md) (opened 2026-07-18)
 
 ---
 
 ## 8. PoC Addendum (Issue 545, 2026-07-18)
 
-**PoC file:** [`riir-ai/crates/riir-poc/benches/causal_id_defend_wrong_poc.rs`](../../../riir-ai/crates/riir-poc/benches/causal_id_defend_wrong_poc.rs) (909 lines, commit `253406d9`).
+**PoC file:** [`riir-ai/crates/riir-poc/benches/causal_id_defend_wrong_poc.rs`](../../riir-ai/crates/riir-poc/benches/causal_id_defend_wrong_poc.rs) (909 lines, commit `253406d9`).
 
 **Setup:** Three competitors — S0 no-intervention (collapses to S1 — Canvas can't distinguish observe from intervene, documented honestly as a PoC finding), S1 Canvas FlowGraph reachability (Plan 419, feature `canvas_schema`), S2 Cakiqi-Little Theorem 1 syntactic ID (modelless, implemented in the bench). Four scenarios: A classic front-door (3 nodes), B classic back-door (3 nodes), C realistic game-world KG (13 nodes, `NPC1 ↔ NPC2` bidirected confounder), D bow-arc negative control (2 nodes).
 

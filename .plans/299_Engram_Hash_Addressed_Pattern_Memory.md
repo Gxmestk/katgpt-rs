@@ -2,7 +2,7 @@
 
 **Date:** 2026-06-21
 **Research:** [katgpt-rs/.research/278_Engram_Conditional_Memory_Latent_Lookup_Fusion.md](../.research/278_Engram_Conditional_Memory_Latent_Lookup_Fusion.md)
-**Private guide:** [riir-ai/.research/147_Engram_Conditional_Memory_NPC_Guide.md](../../../riir-ai/.research/147_Engram_Conditional_Memory_NPC_Guide.md)
+**Private guide:** [riir-ai/.research/147_Engram_Conditional_Memory_NPC_Guide.md](../../riir-ai/.research/147_Engram_Conditional_Memory_NPC_Guide.md)
 **Source paper:** [arXiv:2601.07372](https://arxiv.org/pdf/2601.07372) — Engram, Cheng et al. 2026 (DeepSeek-AI / Peking U.)
 **Target:** `katgpt-rs/crates/katgpt-core/src/engram/` (new module)
 **Cargo feature:** `engram` (opt-in, default OFF — promote to default-on after G1–G7 GOAT gate passes; per AGENTS.md GOAT gate rule)

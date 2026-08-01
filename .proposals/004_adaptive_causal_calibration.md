@@ -228,8 +228,8 @@ pattern: the primitive is the *rule*, the caller supplies the *measurement*.
 - **Do NOT change `CalibrationMode::default()`** — stays `AttentionMass`.
 
 ### Phase 3 — G1 + G2 validation (riir-engine)
-- **COMPLETE — see [Plan 360](../riir-ai/.plans/360_proposal_004_phase3_ov_extraction_g1_g2_validation.md)**
-  and [.benchmarks/360_g1_real_model_gemma2.md](../riir-ai/.benchmarks/360_g1_real_model_gemma2.md).**
+- **COMPLETE — see [Plan 360](../../riir-ai/.plans/360_proposal_004_phase3_ov_extraction_g1_g2_validation.md)**
+  and [.benchmarks/360_g1_real_model_gemma2.md](../../riir-ai/.benchmarks/360_g1_real_model_gemma2.md).**
 - **G1: FAIL** on Gemma 2 2B (F16, 13 layers × 3 pairs × 8 heads = 312 heads).
   Best operating point: tau=0.10 → precision=0.939, recall=0.463. No tau achieves
   precision ≥ 0.8 @ recall ≥ 0.9. The OV-circuit cheap proxy is correlated with

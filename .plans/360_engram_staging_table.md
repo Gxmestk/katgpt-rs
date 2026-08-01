@@ -1,7 +1,7 @@
 # Plan 360: Engram Staging Table — First-Class Per-Slot C/U/D
 
 **Date:** 2026-07-03
-**Proposal:** [riir-ai/.proposals/003_engram_crud_table_tier_access_matrix.md](../../../riir-ai/.proposals/003_engram_crud_table_tier_access_matrix.md) (P1)
+**Proposal:** [riir-ai/.proposals/003_engram_crud_table_tier_access_matrix.md](../../riir-ai/.proposals/003_engram_crud_table_tier_access_matrix.md) (P1)
 **Parent plan:** [katgpt-rs/.plans/299_Engram_Hash_Addressed_Pattern_Memory.md](299_Engram_Hash_Addressed_Pattern_Memory.md) (Phase 2 — `InMemoryEngramTable`, `EngramTableBuilder`)
 **Target:** `katgpt-rs/crates/katgpt-core/src/engram/staging.rs` (new module)
 **Cargo feature:** `engram` (existing — no new feature flag; sibling to `table.rs`)

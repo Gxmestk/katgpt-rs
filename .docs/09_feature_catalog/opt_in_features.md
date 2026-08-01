@@ -741,7 +741,7 @@ Two `WelfordMse` accumulators + sigmoid confidence + cold-start floor. **Revised
 
 🔧 Feature flag: `karc_regime_gate` (implies `karc_forecaster` + `conformal_predictive_intervals`) — **opt-in**.
 
-📖 Plan: [`.plans/556_karc_mitigations_open_primitives.md`](../../.plans/556_karc_mitigations_open_primitives.md), Benchmark: [`.benchmarks/556_karc_mitigations_goat.md`](../../.benchmarks/556_karc_mitigations_goat.md), Companion runtime: [`riir-ai/.plans/514_karc_mitigations_runtime.md`](../../riir-ai/.plans/514_karc_mitigations_runtime.md).
+📖 Plan: [`.plans/556_karc_mitigations_open_primitives.md`](../../.plans/556_karc_mitigations_open_primitives.md), Benchmark: [`.benchmarks/556_karc_mitigations_goat.md`](../../.benchmarks/556_karc_mitigations_goat.md), Companion runtime: [`riir-ai/.plans/514_karc_mitigations_runtime.md`](../../../riir-ai/.plans/514_karc_mitigations_runtime.md).
 
 ### 24.4 Batched MatVec — `karc_batched_matvec` (Plan 556 Phase 2)
 
@@ -761,7 +761,7 @@ The original G2 target (5.3× full-forecast amortization at N=8) assumed the mat
 
 🔧 Feature flag: `karc_batched_matvec` (implies `karc_forecaster`) — **opt-in**.
 
-📖 Plan: [`.plans/556_karc_mitigations_open_primitives.md`](../../.plans/556_karc_mitigations_open_primitives.md), Benchmark: [`.benchmarks/556_karc_mitigations_goat.md`](../../.benchmarks/556_karc_mitigations_goat.md), Companion runtime: [`riir-ai/.plans/514_karc_mitigations_runtime.md`](../../riir-ai/.plans/514_karc_mitigations_runtime.md).
+📖 Plan: [`.plans/556_karc_mitigations_open_primitives.md`](../../.plans/556_karc_mitigations_open_primitives.md), Benchmark: [`.benchmarks/556_karc_mitigations_goat.md`](../../.benchmarks/556_karc_mitigations_goat.md), Companion runtime: [`riir-ai/.plans/514_karc_mitigations_runtime.md`](../../../riir-ai/.plans/514_karc_mitigations_runtime.md).
 
 ### 24.5 LOD Tier — `karc_lod_tier` (Plan 556 Phase 3)
 
@@ -789,7 +789,7 @@ Config tag + tier-promotion Wout projection. Three nested tiers (LOD0 background
 
 🔧 Feature flag: `karc_lod_tier` (implies `karc_forecaster`) — **opt-in**.
 
-📖 Plan: [`.plans/556_karc_mitigations_open_primitives.md`](../../.plans/556_karc_mitigations_open_primitives.md), Benchmark: [`.benchmarks/556_karc_mitigations_goat.md`](../../.benchmarks/556_karc_mitigations_goat.md), Runtime bench: [`riir-ai/.benchmarks/514_karc_lod_dispatch_goat.md`](../../riir-ai/.benchmarks/514_karc_lod_dispatch_goat.md), Sharding substrate + POC verdict: [`riir-ai/.benchmarks/556_npc_shard_goat.md`](../../riir-ai/.benchmarks/556_npc_shard_goat.md) (`riir-engine/src/npc_shard.rs`, feature `npc_shard`).
+📖 Plan: [`.plans/556_karc_mitigations_open_primitives.md`](../../.plans/556_karc_mitigations_open_primitives.md), Benchmark: [`.benchmarks/556_karc_mitigations_goat.md`](../../.benchmarks/556_karc_mitigations_goat.md), Runtime bench: [`riir-ai/.benchmarks/514_karc_lod_dispatch_goat.md`](../../../riir-ai/.benchmarks/514_karc_lod_dispatch_goat.md), Sharding substrate + POC verdict: [`riir-ai/.benchmarks/556_npc_shard_goat.md`](../../../riir-ai/.benchmarks/556_npc_shard_goat.md) (`riir-engine/src/npc_shard.rs`, feature `npc_shard`).
 
 ## 25. katgpt-canon — Canonical Intent Space Substrate (Proposal 009, Research 459)
 
@@ -1134,7 +1134,7 @@ The substrate primitives it composes each have their own GOAT gates (GDN2/KDA Pl
 
 🔧 Feature flags: `kimi_k3` (decoder layer composition) + `kimi_k3_loader` (model + safetensors + tiktoken). Both opt-in (default-off) at the root crate.
 
-📖 Proposal: 032 (Kimi-K3 native support — referenced in source; no standalone `.proposals/032_*.md` file). Research: [447](../../.research/447_Kimi_K3_KDA_AttnRes_LatentMoE.md) (architecture distillation) + riir-ai [331](../../riir-ai/.research/331_kimi_k3_phase6_safetensors_header_analysis.md) (tensor name verification) + [330](../../riir-ai/.research/330_kimi_k3_modeling_code_divergences.md) (modeling divergences). Substrate: `src/kimi_k3/{mod,decoder_layer,model,loader,tiktoken}.rs`. Example: `examples/kimi_k3_hello_world.rs`. Consumer benches: [012](../../.benchmarks/012_kimi_k3_trajectory_geometry.md) + [014](../../.benchmarks/014_swe_trajectory_freezer_g5.md) + [018](../../.benchmarks/018_sequence_trajectory.md) + [020](../../.benchmarks/020_generation_trajectory.md).
+📖 Proposal: 032 (Kimi-K3 native support — referenced in source; no standalone `.proposals/032_*.md` file). Research: [447](../../.research/447_Kimi_K3_KDA_AttnRes_LatentMoE.md) (architecture distillation) + riir-ai [331](../../../riir-ai/.research/331_kimi_k3_phase6_safetensors_header_analysis.md) (tensor name verification) + [330](../../../riir-ai/.research/330_kimi_k3_modeling_code_divergences.md) (modeling divergences). Substrate: `src/kimi_k3/{mod,decoder_layer,model,loader,tiktoken}.rs`. Example: `examples/kimi_k3_hello_world.rs`. Consumer benches: [012](../../.benchmarks/012_kimi_k3_trajectory_geometry.md) + [014](../../.benchmarks/014_swe_trajectory_freezer_g5.md) + [018](../../.benchmarks/018_sequence_trajectory.md) + [020](../../.benchmarks/020_generation_trajectory.md).
 
 ## 34. QGF — Q-Guided Flow Test-Time Gradient Guidance (Plan 268)
 

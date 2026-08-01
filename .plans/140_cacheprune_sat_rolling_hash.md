@@ -4,7 +4,7 @@
 > **Paper:** [arXiv:2605.23640](https://arxiv.org/abs/2605.23640) — Token-granularity KV cache sharing with SAT attention analysis
 > **Feature Gate:** `cache_prune` (opt-in, NOT default-on)
 > **Status:** ✅ Phase 1–3 complete (SAT + rolling hash + sensitivity trait + examples)
-> **GOAT Pillar:** ❌ Not a pillar — infrastructure optimization supporting future MMO serving. See [MMO GOAT Pillars Decision Matrix](../../riir-ai/.docs/27_mmo_goat_pillars_decision_matrix.md).
+> **GOAT Pillar:** ❌ Not a pillar — infrastructure optimization supporting future MMO serving. See [MMO GOAT Pillars Decision Matrix](../../riir-ai/.docs/03_pillars/README.md).
 > **Domain:** `katgpt-rs` — generic SAT + rolling hash + SensitivityDetector trait. Game-specific sensitivity patterns and per-domain ρ thresholds stay in `riir-ai`.
 > **Blocks:** None. Enables future MMO backbone (Issue 015) optimization.
 

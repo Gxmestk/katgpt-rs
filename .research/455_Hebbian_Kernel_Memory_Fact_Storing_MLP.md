@@ -186,7 +186,7 @@ The construction algorithm + the swap mechanism + the commitment envelope produc
 
 The paper reports 0.999 edit score at 10% edits on synthetic SSFR (d=128, F=2048). **Our shard scale is different** (`NeuronShard` has `style_weights[64]`, F=dozens-to-hundreds). Before claiming quality parity on our shard scale, a PoC was mandatory in `riir-poc/`.
 
-**PoC RESULT: ✅ PASS.** See [riir-neuron-db/.benchmarks/462](../../riir-neuron-db/.benchmarks/462_hebbian_construction_quality_poc.md) + [riir-neuron-db/.issues/027](../../riir-neuron-db/.issues/027_hebbian_construction_quality_poc.md).
+**PoC RESULT: ✅ PASS.** See [riir-neuron-db/.benchmarks/462](../../riir-neuron-db/.benchmarks/462_hebbian_construction_quality_poc.md) + [riir-neuron-db/.issues/027](../../riir-neuron-db/.benchmarks/462_hebbian_construction_quality_poc.md).
 
 - **Three competitors**: (a) constructed Hebbian shard (this primitive, DataDependent variant), (b) GD-trained B at matched param count (Adam, 2000 epochs, same A/G; isolates "B construction method"), (c) frozen baseline (memory from pre-edit fact set).
 - **Toy task**: fact-set edit at 2/5/10% on a `d=64, F=128, m=512` synthetic fact set modeled on paper §A.1.1 isotropic-Gaussian-on-sphere setup.
@@ -195,7 +195,7 @@ The paper reports 0.999 edit score at 10% edits on synthetic SSFR (d=128, F=2048
 - **Honest caveat (easy regime)**: the perfect 1.000 scores across BOTH Constructed and GD indicate the test config (`m·d = 32,768` vs capacity bound `F·log(F) ≈ 896`, ~36× headroom) is in the easy-capacity regime. At this ratio, the closed-form construction achieves `γ_min > 0` by Plan 559 Phase 1 G1, so perfect retrieval follows by paper Thm 4.3. The GD-trained variant converges to the same B (convex MSE surface in B with A/G fixed). A harder PoC (smaller m, structured values) would be more discriminating but is out of Issue 027 scope. The harder regime remains unproven.
 - **Honest reporting**: per §3.6, the PoC defended (not rubber-stamped). The construction works at d=64, F=128, m=512; it does NOT fail while GD succeeds. The harder regime is non-blocking for the Super-GOAT claim (production shards operate in the easy regime by design).
 
-The PoC is tracked as [riir-neuron-db/.issues/027](../../riir-neuron-db/.issues/027_hebbian_construction_quality_poc.md) (closed). The bench is permanent in `riir-poc/benches/hebbian_quality_poc.rs` as a regression check.
+The PoC is tracked as [riir-neuron-db/.issues/027](../../riir-neuron-db/.benchmarks/462_hebbian_construction_quality_poc.md) (closed). The bench is permanent in `riir-poc/benches/hebbian_quality_poc.rs` as a regression check.
 
 ### 3.4 Honest risks (recorded before validation)
 
@@ -367,4 +367,4 @@ The moat: the **closed-form construction math** ships open in katgpt-rs (adoptio
 - **Private Super-GOAT guide:** [riir-neuron-db/.research/303](../../riir-neuron-db/.research/303_Hebbian_Fact_Storing_Shard_SuperGOAT_Guide.md) — the selling-point doc (Pillar 2 amplifier: shard construction + fact-edit swapping).
 - **Open primitive plan:** [katgpt-rs/.plans/559](../.plans/559_hebbian_kernel_memory_primitive.md).
 - **Shard bridge plan:** [riir-neuron-db/.plans/322](../../riir-neuron-db/.plans/322_hebbian_fact_storing_shard_bridge.md).
-- **Defend-wrong PoC issue:** [riir-neuron-db/.issues/027](../../riir-neuron-db/.issues/027_hebbian_construction_quality_poc.md).
+- **Defend-wrong PoC issue:** [riir-neuron-db/.issues/027](../../riir-neuron-db/.benchmarks/462_hebbian_construction_quality_poc.md).

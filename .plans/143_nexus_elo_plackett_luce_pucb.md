@@ -4,7 +4,7 @@
 > **Paper:** [arXiv:2605.22763](https://arxiv.org/abs/2605.22763) — AI-Driven Formal Proof Search (Google DeepMind, 2026)
 > **Feature Gate:** `nexus_elo` (opt-in, NOT default-on, super-GOAT candidate)
 > **Status:** ✅ COMPLETE
-> **GOAT Pillar:** ❌ Not a pillar — search infrastructure enhancement. See [MMO GOAT Pillars Decision Matrix](../../riir-ai/.docs/27_mmo_goat_pillars_decision_matrix.md).
+> **GOAT Pillar:** ❌ Not a pillar — search infrastructure enhancement. See [MMO GOAT Pillars Decision Matrix](../../riir-ai/.docs/03_pillars/README.md).
 > **Domain:** `katgpt-rs` — generic Plackett-Luce ranking + P-UCB sampling + goal cache. No game-specific code.
 > **Blocks:** None. Enhances existing DDTree + SR²AM + Bandit.
 
@@ -289,7 +289,7 @@ nexus_elo = []  # Plackett-Luce + P-UCB + goal cache (Phases 1-3)
 ## What This Is NOT
 
 - ❌ Not a new game feature
-- ❌ Not a GOAT pillar (per [decision matrix](../../riir-ai/.docs/27_mmo_goat_pillars_decision_matrix.md))
+- ❌ Not a GOAT pillar (per [decision matrix](../../riir-ai/.docs/03_pillars/README.md))
 - ❌ Not model-based — entirely modelless search infrastructure
 - ❌ Not Lean/Math-specific — generic ranking + caching primitives
 
@@ -324,4 +324,4 @@ katgpt-rs-core/src/
 
 - Research: [104 — AlphaProof Nexus](../.research/104_AlphaProof_Nexus_Formal_Proof_Search.md)
 - Related: Plan 040 (Bradley-Terry), Plan 049 (G-Zero modelless), Plan 061 (Fourier MCTS transposition), Plan 064 (Percepta), Plan 112 (SR²AM), Research 088 (AlphaProof Nexus — existing)
-- [MMO GOAT Pillars Decision Matrix](../../riir-ai/.docs/27_mmo_goat_pillars_decision_matrix.md)
+- [MMO GOAT Pillars Decision Matrix](../../riir-ai/.docs/03_pillars/README.md)

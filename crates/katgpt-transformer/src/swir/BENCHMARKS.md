@@ -7,7 +7,7 @@
 **Hardware:** Apple Silicon arm64 (NEON SIMD), Rust 1.93.0
 **Model dependency:** None — all gates run on synthetic entropy streams + synthetic embedding matrices. Real-model gates (G1 accuracy, G2 efficiency, T3.9 accuracy ablations) are deferred to riir-ai Plan 313 (SwiR Real-Model Validation), which has the model loader + MATH500 harness. The **benchmark harness** (`src/swir/bench.rs`) ships in katgpt-rs with `ProblemSource` + `DecodeBackend` traits — riir-ai implements them over Gemma 2 2B IT + MATH500.
 
-> **Real-model update (riir-ai Plan 313, 2026-06-19):** G2 = **1.37× (GATE PASS)** at `w_e_to_l=32, c_max=64` (n=5); G1 = 0% (blocked by Gemma 2 2B capability — T4.2e ruled out prompt/checker bugs). See [`riir-ai/.benchmarks/313_swir_real_model_goat.md`](../../../riir-ai/.benchmarks/313_swir_real_model_goat.md).
+> **Real-model update (riir-ai Plan 313, 2026-06-19):** G2 = **1.37× (GATE PASS)** at `w_e_to_l=32, c_max=64` (n=5); G1 = 0% (blocked by Gemma 2 2B capability — T4.2e ruled out prompt/checker bugs). See [`riir-ai/.benchmarks/313_swir_real_model_goat.md`](../../../../../riir-ai/.benchmarks/313_swir_real_model_goat.md).
 
 ## Reproduce
 

@@ -3,7 +3,7 @@
 **Date:** 2026-07-18
 **Research:** [`katgpt-rs/.research/450_Algorithmic_Syntactic_Causal_Identification.md`](../.research/450_Algorithmic_Syntactic_Causal_Identification.md) (Super-GOAT, upgraded from Gain 2026-07-18 Plan 457 Phase 5)
 **Source paper:** [arXiv:2403.09580](https://arxiv.org/abs/2403.09580) — Cakiqi & Little, *Algorithmic syntactic causal identification* (2024)
-**PoC:** [`riir-ai/crates/riir-poc/benches/causal_id_defend_wrong_poc.rs`](../../../riir-ai/crates/riir-poc/benches/causal_id_defend_wrong_poc.rs) (Issue 545, commit `253406d9`) — GAIN PROVEN on Scenario C
+**PoC:** [`riir-ai/crates/riir-poc/benches/causal_id_defend_wrong_poc.rs`](../../riir-ai/crates/riir-poc/benches/causal_id_defend_wrong_poc.rs) (Issue 545, commit `253406d9`) — GAIN PROVEN on Scenario C
 **Target:**
 - Open primitive → `katgpt-rs/crates/katgpt-core/src/causal_id/` (feature `causal_identification`, **DEFAULT-ON** as of Plan 457 Phase 5 promotion)
 - Offline consumer → `riir-ai/crates/riir-engine/src/causal_id/` (offline-only, GM "what-if" + sleep-cycle claim verification)
@@ -227,7 +227,7 @@ If Phase 4 T4.7 returns "no consumer pulls its weight": leave as opt-in, do NOT 
 
 - **Research note:** [`katgpt-rs/.research/450_Algorithmic_Syntactic_Causal_Identification.md`](../.research/450_Algorithmic_Syntactic_Causal_Identification.md) (Gain → PoC-confirmed)
 - **Issue (PoC):** Issue 545 removed 2026-07-18 per noise-reduction rule — full PoC content preserved in [Research 450 §8 PoC Addendum](../.research/450_Algorithmic_Syntactic_Causal_Identification.md) (DONE — GAIN PROVEN)
-- **PoC bench:** [`riir-ai/crates/riir-poc/benches/causal_id_defend_wrong_poc.rs`](../../../riir-ai/crates/riir-poc/benches/causal_id_defend_wrong_poc.rs) (commit `253406d9`)
+- **PoC bench:** [`riir-ai/crates/riir-poc/benches/causal_id_defend_wrong_poc.rs`](../../riir-ai/crates/riir-poc/benches/causal_id_defend_wrong_poc.rs) (commit `253406d9`)
 - **Closest cousin:** [Research 398](../.research/398_Canvas_Engineering_Declared_Causal_Topology_Compiler.md) — Canvas schema compiler (the directed-only baseline)
 - **Canvas shipped primitive:** `katgpt-core::canvas` (feature `canvas_schema`, Plan 419) — the S1 baseline
 - **KG triples source:** `riir-ai/crates/riir-engine/src/kg/` + `riir-neuron-db/src/vibe.rs`
