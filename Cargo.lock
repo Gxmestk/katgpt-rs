@@ -1893,11 +1893,19 @@ dependencies = [
 name = "katgpt-moka-wasm"
 version = "0.1.0"
 dependencies = [
+ "katgpt-nn",
  "katgpt-types",
  "serde",
  "serde_json",
  "wasm-bindgen",
  "wasmi",
+]
+
+[[package]]
+name = "katgpt-nn"
+version = "0.1.0"
+dependencies = [
+ "katgpt-types",
 ]
 
 [[package]]
