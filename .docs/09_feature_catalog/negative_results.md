@@ -443,3 +443,85 @@ Root cause (the durable value):
 **Outcome.** No plan filed. The PoC source remains in `riir-poc/` as a permanent regression check — its job was to settle the dispute, and it should keep settling it if the belief kernel is later trained/structured (the trained case is where the regime split could re-emerge as actionable).
 
 📖 Issue: 568 (removed per noise-reduction rule — resolution above), PoC source: `riir-ai/crates/riir-poc/src/loop_injection_poc.rs` + `benches/loop_injection_regime_split.rs` (cross-repo permanent regression check), Related research: [073](../../.research/073_LT2_Looped_Transformer_Distillation.md) (LT2), [097](../../.research/097_Training_Free_Loop.md), [414](../../.research/414_Fully_Looped_Transformer_Readout_Blind_Spot.md), [048](../../.research/048_HRM_Text_Additive_Injection_Cousin.md).
+
+## 23. CompressionDrafter — Hot-Tier Modelless LZ4 Drafter (Plan 285) — G1+G2 BOTH FAIL
+
+**Hypothesis.** A Hot-tier drafter that uses LZ4-compressed corpus as a model (nathan.rs/gzip-lm pattern) could provide a modelless quest-grammar drafter for the Hot tier — zero model weights, deterministic, training-free.
+
+**G1+G2 FAIL (two independent runs, both failed).** Per `.plans/285_compression_drafter_quest_grammar.md`:
+
+| Run | G1 (speedup ≥3×) | G2 (overhead ≤2×) | Verdict |
+|---|---|---|---|
+| Phase 3 | **0.12×** (8× SLOWER) | 407× over target | FAIL |
+| Phase 7 | **1.50×** | 1077× over target | FAIL |
+
+Root cause: quest-grammar strings are **too short and too few** for byte-level LZ4 compression to find meaningful matches. The compressor needs long-redundant text to shine (web crawl, log files); quest records are 50–200 byte structured items with minimal byte-level redundancy across entries.
+
+**Outcome.** Stays opt-in, demoted per Plan 285 verdict. `TernaryDraftModel` remains default-on for Hot-tier quest grammar. The failure mirrors BabelCodec (§24) — both hit the wall that **Hot-tier quest/KG text is structurally compact**, and neither byte-level nor rule-level compression finds 2× on already-compact data.
+
+**Re-opens only on** a Hot-tier consumer with long-redundant text (natural-language prose, unstructured logs). For quest/KG/config structured data, this approach is dead.
+
+📖 Plan: [285](../../.plans/285_compression_drafter_quest_grammar.md), Feature: `compression_drafter` (opt-in, dep:lz4_flex), Research: [256](../../.research/256_nathan_gzip_lm.md).
+
+## 24. BabelCodec — Readability-Relaxed Semantic Codec (Plan 331) — G2 FAIL: 1.14× << 2× target
+
+**Hypothesis.** The deterministic BT-P8 fixed-rule subset of BabelTele (arXiv:2606.19857) could compress structured KG/config/quest text to 2×+ — the modelless subset of a paper claiming 3.6× compression.
+
+**G2 FAIL (2026-06-26).** Same wall as CompressionDrafter (§23), mirror-image reason:
+
+| Gate | Target | Result | Verdict |
+|---|---|---|---|
+| G1 (fidelity) | bit-identical round-trip | 1500/1500 | ✅ PASS |
+| **G2 (compression)** | **≥ 2× (ratio ≤ 0.5)** | **1.14× (ratio 0.8805)** | ❌ **FAIL** |
+| G3 (latency) | < 200 ns/msg | 125 ns | ✅ PASS |
+| G4 (alloc-free) | 0 allocs | 0/1000 | ✅ PASS |
+| G5 (determinism) | BLAKE3 reproducible | 0 mismatches | ✅ PASS |
+
+Root cause: structured canonical forms are **already too dense** for symbolic rewrite. The verbose form `Config[negotiation]: patience_required = 10(turns)` compresses to `Config[negotiation]:patience_required=10(turns)` — saving 2 spaces around `=` ≈ 4%. The paper's 3.6× requires **LLM-prompted omnilingual lexical selection** (riir-train territory, not modelless).
+
+**Outcome.** Stays opt-in. Ships as a correct, tested, bijective codec useful for deterministic BT-P8 ↔ verbose round-tripping with BLAKE3 commitment. But it does not promote — G2 failed, matching the CompressionDrafter precedent.
+
+**The generalized lesson (the §23 + §24 wall).** Hot-tier quest/KG text is structurally compact. Neither byte-level (LZ4) nor rule-level (BT-P8) compression finds 2× on already-compact data. The 2×+ opportunity lives in verbose natural-language prose, which neither codec handles deterministically. Stop filing modelless Hot-tier text compression plans on structured data.
+
+📖 Bench: [331](../../.benchmarks/331_babel_codec_goat.md), Plan: [331](../../.plans/331_babel_codec_readability_relaxed_semantic_codec.md), Feature: `babel_codec` (opt-in), Research: [312](../../.research/312_BabelTele_Readability_Relaxed_Semantic_Codec.md).
+
+## 25. Sink-Aware Attention Per-Call Gate (Plan 287) — G3 STRUCTURAL FAIL: 1671% overhead
+
+**Hypothesis.** The dual-mechanism sink classifier from Fesser et al. (arXiv:2606.08105) — classifying each attention sink as NOP (gate it) or Broadcast (preserve it) — could ship as a per-call production attention policy that beats the default Uniform gate.
+
+**G3 STRUCTURAL FAIL (2026-06-17).** Per `.benchmarks/059_sink_aware_goat.md`:
+
+| Gate | Target | Result | Verdict |
+|---|---|---|---|
+| G1 (correctness) | 8/8 unit tests | 8/8 | ✅ PASS |
+| G2 (synthetic) | Broadcast preservation | 2/2 | ✅ PASS |
+| **G3 (per-call latency)** | **≤ 5% overhead** | **1000–3000% overhead** at n=128/512 d_h=64 | ❌ **STRUCTURAL FAIL** |
+| G3 (cached cadence=16) | ≤ 5% overhead | ≤ 5% steady-state | ✅ PASS |
+| G3-flat (Plan 288) | flat ≥ Vec<Vec> | 1.8–5.1× faster | ✅ PASS |
+| G2 (real-ViT) | effective_rank preserved | — | ⏸ DEFERRED |
+
+Root cause: the classifier is **memory-bandwidth bound**. It reads the full attention matrix (n²) + values (n·d) to classify each sink, while the default Uniform policy is just an n·d memcpy. The classifier fundamentally cannot beat a memcpy — it reads strictly more memory. Issue 001 optimizations brought the standalone `classify_sink_at` from 3.125µs → 0.625µs at n=128, but `apply_dual_policy_gate` still has the col_sums scan + value_norm scan.
+
+**Outcome.** Per-call G3 structurally infeasible → NOT promoted to default. The cached variant (`apply_dual_policy_gate_cached`, audit cadence=16) meets the latency target in steady state. Default `SinkAwarePolicy::Uniform` stays; `DualPolicy` remains a research-grade opt-in diagnostic. Ships as opt-in `sink_aware_attn`.
+
+**Re-opens only on** (a) a real-ViT G2 gate that demonstrates the dual-policy preserves `effective_rank` better than Uniform on a trained model (currently DEFERRED), AND (b) the consumer uses the cached variant (not per-call).
+
+📖 Bench: [059](../../.benchmarks/059_sink_aware_goat.md), Plan: [287](../../.plans/287_sink_aware_attention.md), Feature: `sink_aware_attn` (opt-in), Research: [258](../../.research/258_Attention_Sink_Dual_Mechanism_NOP_Broadcast.md).
+
+## 26. Hierarchical Global Attention vs DashAttention (Plan 397) — G2 FAIL: loses to default-on
+
+**Hypothesis.** HGA's chunk→group→token routing with RoPE-aware mixed-frequency summaries (arXiv:2606.30709, BMW Group) could beat the default-on DashAttention primitive on long-context NIAH retrieval at 32K–64K context.
+
+**G2-proxy FAIL (2026-07-05).** Per `.plans/397_hierarchical_global_attention.md`:
+
+The head-to-head G2 gate against DashAttention on a synthetic NIAH (Needle-in-a-Haystack) routing comparison — **HGA LOSES to the default-on DashAttention**. The group tier + mixed-RoPE summary construction does not improve retrieval routing over DashAttention's entmax chunk-level routing.
+
+G5 latency PASS at 1.12× (the routing summary construction is cheap), but G2 is the load-bearing gate and it lost. Per Plan 397 T3.3, this is a documented negative result — HGA stays opt-in.
+
+Root cause: DashAttention's entmax routing is already a strong sparse-attention summary. Adding a sub-chunk group tier with mixed-RoPE summaries does not improve routing quality on the NIAH benchmark — the chunk-level summary captures the needle-vs-haystack signal adequately. The group tier adds hierarchy without improving the retrieval decision.
+
+**Outcome.** Stays opt-in as documented negative result. The forward path (needs entmax) lives in `katgpt-attn/hga_forward.rs`; the katgpt-core half ships the routing summary construction primitives. DashAttention remains the default-on long-context routing primitive.
+
+**Re-opens only on** a long-context task where chunk-level routing is insufficient AND sub-chunk group routing demonstrably helps — the NIAH benchmark didn't surface this. A different benchmark (multi-document QA, code understanding) might, but that's speculative.
+
+📖 Plan: [397](../../.plans/397_hierarchical_global_attention.md), Feature: `hga` (opt-in), Research: [379](../../.research/379_Hierarchical_Global_Attention_Chunk_Group_Routing.md).

@@ -1135,3 +1135,176 @@ The substrate primitives it composes each have their own GOAT gates (GDN2/KDA Pl
 🔧 Feature flags: `kimi_k3` (decoder layer composition) + `kimi_k3_loader` (model + safetensors + tiktoken). Both opt-in (default-off) at the root crate.
 
 📖 Proposal: 032 (Kimi-K3 native support — referenced in source; no standalone `.proposals/032_*.md` file). Research: [447](../../.research/447_Kimi_K3_KDA_AttnRes_LatentMoE.md) (architecture distillation) + riir-ai [331](../../riir-ai/.research/331_kimi_k3_phase6_safetensors_header_analysis.md) (tensor name verification) + [330](../../riir-ai/.research/330_kimi_k3_modeling_code_divergences.md) (modeling divergences). Substrate: `src/kimi_k3/{mod,decoder_layer,model,loader,tiktoken}.rs`. Example: `examples/kimi_k3_hello_world.rs`. Consumer benches: [012](../../.benchmarks/012_kimi_k3_trajectory_geometry.md) + [014](../../.benchmarks/014_swe_trajectory_freezer_g5.md) + [018](../../.benchmarks/018_sequence_trajectory.md) + [020](../../.benchmarks/020_generation_trajectory.md).
+
+## 34. QGF — Q-Guided Flow Test-Time Gradient Guidance (Plan 268)
+
+Distilled from [arXiv:2606.11087](https://arxiv.org/abs/2606.11087) — Zhou et al., *Q-Guided Flow*. Test-time Q-gradient guidance for any `SpeculativeGenerator`: steers discrete generation toward higher expected Q by tilting logits `p' = p_t + (1/β)·∇Q`. No continuous diffusion, no flow-matching training, no BPTT — pure inference-time steering.
+
+### Five-tier routing (Plasma/Hot/Warm/Cold/Freeze)
+
+| Tier | Oracle | Latency | Use case |
+|---|---|---|---|
+| **Plasma** | ternary `ActionBridge` i8 directions + f32 Q dot | < 100 ns | cheapest, deterministic |
+| **Hot** | cached `LeoHead::all_goals_q` f32 values | < 1 µs | cached Q-table |
+| **Warm** | GPU batched Q-critic forward | ~1 ms | real neural critic |
+| **Cold** | Turso-encrypted Q-table snapshots | ~10 ms | encrypted archival |
+| **Freeze** | `NoGuidanceOracle` (zero gradient) | 0 ns | pure BC fallback |
+
+The Freeze tier is always available as graceful degradation — QGF with `guidance_weight = 0.0` is byte-identical to the unguided generator (G2 regression-safety gate).
+
+### Feature gate split
+
+| Feature | Role |
+|---|---|
+| `qgf` | Parent feature — enables the `qgf` module compilation |
+| `qgf_projector` | F2 — `FirstOrderProjector`: one Euler-step lookahead projection |
+| `qgf_oracle` | F3 — `QGradientOracle` trait: ∇_a Q(s,â_1), Jacobian dropped per paper §5 |
+| `qgf_drafter` | F1 — `QGuidedDrafter`: wraps any `SpeculativeGenerator` + oracle; implies `qgf_projector` + `qgf_oracle` |
+| `qgf_adaptive` | F4 — `VarianceAdaptiveGuidance`: sigmoid-gated `1/β = sigmoid(k·(conf−τ))`; implies `qgf_drafter` |
+
+### GOAT gate status (katgpt-core mechanism: ALL PASS)
+
+The katgpt-core mechanism gates (G1 correctness, G2 regression-safety, G3 no-regression, G4 overhead + alloc-free, G5 stability) **ALL PASS** (Bench 268, 2026-07-01):
+
+- **G1** — `tilt_logits` shifts distribution toward higher Q by >10% relative. Includes 2 negative controls (anti-gradient decreases E[Q]; 200 random gradients don't systematically help).
+- **G2** — `guidance_weight = 0.0` → byte-identical logits + `applied = false`. Freeze tier is pure BC.
+- **G3** — feature combos clean; 42/42 lib tests pass.
+- **G4** — tilt overhead ~33 ns (AXPAY + sample), zero hot-path allocation.
+- **G5** — sigmoid-bounded weights; no NaN; no off-manifold collapse.
+
+**Stays OPT-IN** — the downstream task-quality gates (Sudoku solve rate +3–8%, DDTree spec acceptance +5–12%, Bomber win rate +2–5%) require real generators + task harnesses that live **outside katgpt-core** (riir-ai integration). This is the katgpt-core → riir-ai scope split (same pattern as Plan 354 SetAttention: core proves the mechanism, riir-ai proves the selling point).
+
+### Sibling: DualLeoOracle (Plan 467)
+
+QGF's 3rd `QGradientOracle` impl (2026-07-18) fuses a LEO teacher head + UVFA student head via `DualLeoMixer::combine_into` at the gradient level. G1–G4 PASS mechanistically; **G5 measured FAIL** on both synthetic (riir-ai Bench 553: dual 0.00% vs single 0.50%) and civ real networks (Bench 558: dual +2.69% vs single 35.68% → 36.64%, <3% gate). The correctness invariant held bit-identically. Stays opt-in (`qgf_oracle + dual_leo`) with documented unproven G5.
+
+### Examples
+
+- `qgf_01_guided_drafter` — minimal walkthrough: KnownLandscapeOracle + UnitGen drafter, `tilt_logits` hot path, ≥10% E[Q] gain.
+- `qgf_02_adaptive_weight` — F4 sigmoid `1/β`: low critic confidence collapses guidance, high confidence activates it.
+- `qgf_03_tier_routing` — backend route (CpuSimd/GpuBatch/AneCritic) + oracle tier (Plasma/Hot/Warm/Cold/Freeze).
+
+🔧 Feature flags: `qgf` + `qgf_projector` + `qgf_oracle` + `qgf_drafter` + `qgf_adaptive` (all opt-in, default-off).
+
+📖 Plan: [268](../../.plans/268_qgf_test_time_q_guided_flow.md). Bench: [268](../../.benchmarks/268_qgf_goat.md) (mechanism gates). Sibling Plan: [467](../../.plans/467_qgf_dual_leo_oracle.md). Research: [236](../../.research/236_QGF_Test_Time_Q_Guided_Flow.md). Substrate: `crates/katgpt-core/src/qgf/` (2031 LoC, 6 files).
+
+## 35. Sleep-Time Query Anticipator (Plan 334)
+
+Distilled from [arXiv:2504.13171](https://arxiv.org/abs/2504.13171) — Lin et al. (Letta/Berkeley), *Sleep-Time Compute*. Offline query anticipation primitive: orchestrates per-direction sleep-time compute → emits reusable `AnticipatedQuerySet` (c' artifact, BLAKE3-committed) → wake-time `consume()` does cheap dot-product + sigmoid-gated lookup, falling through to fresh compute on low-predictibility queries.
+
+### The curiosity↔predictability inversion
+
+The load-bearing theoretical contribution: **low-curiosity contexts (on the manifold) → high predictability → should pre-compute; high-curiosity contexts (off the manifold) → low predictability → compute fresh.** A synthetic KARC-like ridge forecaster models context as evolving on a low-dim manifold; the curiosity residual = `||x − forecast(x)||`. The `PredictabilityScorer` trait-swap mechanism lets consumers supply their own predictability model.
+
+### Layer split (katgpt-core leaf → riir-engine runtime)
+
+| Layer | What |
+|---|---|
+| **katgpt-core** (`sleep_time_anticipation`) | Open primitive: `SleepTimeAnticipator`, `PredictabilityScorer` trait, `DotPredictabilityScorer` default, `AmortizationCostModel`, `IdentityFunctorOp` (synthetic default). Opt-in — re-exports `katgpt-sleep` crate. |
+| **riir-engine** (`npc_sleep_time`) | Production runtime: game-specific direction-vector catalogs, NPC tiering, HLA wiring, chain commitment. DEFAULT-ON (Plan 341 Phase 7 GOAT G1–G4 PASS on real corpus). |
+
+The katgpt-core leaf stays opt-in as layer split — the production runtime is riir-engine-side. This mirrors the `zone_affective_manifold` pattern.
+
+### GOAT gate (katgpt-core synthetic gates)
+
+G1/G2/G5/G6/G7 ALL PASS (Bench 334, 2026-06-27) on synthetic fixtures. The quality gates G2/G3/G4 (predictability correlation, cross-player amortization economics, wake-time latency under load) require a real predictability-labeled corpus — those are the riir-ai Plan 341 gates (which PASSed).
+
+### Examples
+
+- `sleep_time_01_basic` — K=4 hardcoded directions, `anticipate()` → c' artifact (BLAKE3-committed), `consume()` → sigmoid-gated blend, amortization cost model at N=1 vs N=10 (~2.5× gain regime).
+- `sleep_time_02_curiosity_inversion` — the load-bearing theoretical demo: PredictabilityScorer trait-swap with a custom forecaster.
+
+🔧 Feature flag: `sleep_time_anticipation` (opt-in, `dep:katgpt-sleep`).
+
+📖 Plan: [334](../../.plans/334_sleep_time_query_anticipator_primitive.md). Bench: [334](../../.benchmarks/334_sleep_time_goat.md). Research: [318](../../.research/318_Sleep_Time_Compute_Anticipation.md). Substrate: `katgpt-sleep` crate (Issue 007 Phase E Tier 2 #6).
+
+## 36. HOLA Hippocampal Exact KV Cache (Plan 395)
+
+Distilled from [arXiv:2607.02303](https://arxiv.org/abs/2607.02303) — HOLA (Hippocampal Ontological Long-context Attention). Surprise-evicted (β·‖e‖) bounded KV cache with decoupled RMSNorm-γ read. The hippocampus-inspired exact-retrieval complement to approximate KV compression: high-surprise tokens get evicted from the main cache but retained in the hippocampal store for exact ancestor-masked softmax recall.
+
+### Architecture
+
+```
+Main KV cache (approximate, bounded)
+    ↑ surprise signal (β·‖e‖)
+    ↓ evict on high surprise
+Hippocampal cache (exact, bounded W=64 window)
+    ↑ read via ancestor-masked softmax
+    ↓ decoupled RMSNorm-γ projection
+Output = main_cache_output + hippocampal_complement
+```
+
+### GOAT gate
+
+G1–G4 GOAT ALL PASS + consumer wiring PASS (modelless gain). Production wiring in `forward_gdn2` via `HippocampalCacheDyn` (Issue 038). **Opt-in until G5 riir-train gate** (perplexity on real text). Pure stdlib + katgpt-types (no extra deps).
+
+| Gate | Result |
+|---|---|
+| G1 (correctness) | exact retrieval within window W=64 |
+| G2 (synthetic retrieval) | surprise-evicted tokens recalled via ancestor-masked softmax |
+| G3 (no-regression) | feature combos clean |
+| G4 (alloc-free) | zero hot-path allocation |
+| G5 (perplexity on real text) | ⏸ DEFERRED to riir-train |
+
+### GDN-HOLA fusion (Plan 430, §30 in this catalog)
+
+`gdn_hola_tree_verify` fuses the GDN masked triangular solve + HOLA ancestor-masked softmax read for speculative draft tree verification with zero rollback on either path. See §30 for the dual-path GOAT gate.
+
+🔧 Feature flag: `hippocampal_cache` (opt-in). Implied by `gdn_hola_tree_verify`.
+
+📖 Plan: [395](../../.plans/395_hippocampal_exact_kv_cache.md). Bench: `hippocampal_cache_goat` + `hippocampal_cache_retrieval`. Research: [378](../../.research/378_HOLA_Hippocampal_Exact_KV_Cache.md). Substrate: `crates/katgpt-core/src/hippocampal_cache.rs`.
+
+## 37. Analytic Lattice + Transfer Matrix Band Structure (Plan 330 + Plan 458)
+
+### Analytic Lattice (Plan 330)
+
+Distilled from a fusion of Functional Attention × PJ-RoPE × Gyrocalculus (Research 311). k×k transport operator chain composer + ASOC trait shapes + direction-vector SIMD decoder + spectral audit. The katgpt-core half: pure math primitives (`compose_chain`, `batch_compose_chain`, `direction_vector_decode`, `spectral_audit`) + generic trait shapes (`PlasmaDraft`, `RederiveOp`, `ComposerCtx`) — NO `GpuFuture` import (leaf-clean).
+
+**Layer split:** the `ComposerTick: GpuFuture` impl + `Join3` combinator ship in riir-engine under the `analytic_lattice_runtime` feature (Phase 1b — separate task). The katgpt-core half is opt-in; the runtime gates need a real GPU executor.
+
+**GOAT gate (katgpt-core half):** G1+G2+G3+G5+G6 ALL PASS (10 GOAT tests + 36 unit tests = 46 tests, Bench 330, 2026-06-26). G4 latency + G1b/G1c/G1d non-blocking contract DEFERRED to riir-engine Phase 1b (need GpuFuture).
+
+### Transfer Matrix Band-Structure Analyzer (Plan 458)
+
+Sits on top of `analytic_lattice::compose_chain`: given a sequence of k×k TransportOperators or a periodic stack, compute the composite's eigenvalues, per-mode Bloch factor μ = λ^(1/N), and classify each mode as:
+
+- **Propagating** (|μ|≈1, allowed band)
+- **Decaying** (|μ|<1−ε, evanescent)
+- **Growing** (|μ|>1+ε, unstable)
+
+The ML anchor is Bai/Koltun/Kolter DEQ Jacobian Regularization (arXiv:2106.14342 ICML 2021): their `ρ(J_*)<1` stability condition is the scalar spectral-radius version of this primitive's per-mode band classifier. Zero-alloc hot paths (`band_classify_into`, `analyze_chain_into`, `analyze_periodic_into`).
+
+**GOAT gate:** G1–G4 ALL PASS (Bench 458, 2026-07-18). G5 (cross-arch bit-identity) deferred to CI. Symmetric-matrix-only Jacobi eigensolver is a documented v1 limitation — non-symmetric chains need a QR-based eigensolver (deferred if a concrete consumer needs it).
+
+🔧 Feature flags: `analytic_lattice` (opt-in) + `transfer_matrix_band_structure` (opt-in, implies `analytic_lattice` for `compose_chain`).
+
+📖 Plans: [330](../../.plans/330_analytic_lattice_encoder_decoder_primitive.md) + [458](../../.plans/458_transfer_matrix_band_structure.md). Benches: [330](../../.benchmarks/330_analytic_lattice_goat.md) + [458](../../.benchmarks/458_transfer_matrix_band_structure_goat.md). Research: [311](../../.research/311_Analytic_Lattice_Encoder.md) + [451](../../.research/451_Transfer_Matrix_Band_Structure.md). Substrate: `crates/katgpt-core/src/analytic_lattice/`.
+
+## 38. Paired Loss Gap Diagnostic (Plan 335)
+
+Distilled from [arXiv:2606.20936](https://arxiv.org/abs/2606.20936) — Li & Merrill (AI2), *Paired Token-Level Loss Gap*. Generic modelless A/B measurement primitive: `PairedLossGap` computes per-token `Δ_i = ℓ_A − ℓ_B` from two log-prob traces; tag-stratified means (Content/Function/Other/BracketOpen/BracketClose/CopyN); filtered aggregates (`ALL_TOKENS` / `TOP-K∩NO-COPY` / `COPY-N-ONLY`) that amplify small architecture gaps aggregate loss hides (paper §6 shows ~2× separation on Olmo 1B).
+
+### ClassSizeBound — the raw-vs-latent sync justification
+
+`ClassSizeBound` exposes Proposition 1: `DKL(p⋆_τ ‖ p_ϕ,τ) ≤ log|V_τ|` — the volume-of-support bound justifying the codebase's raw-vs-latent sync rule (physical small V_τ → raw sufficient; semantic large V_τ → latent earns its keep). This is the theoretical-validation-of-raw-vs-latent artifact documented in Research 319 §2.2.
+
+### GOAT gate
+
+ALL PASS (Bench 335, 2026-06-27). **Not promoted to default** — measurement tool by nature, opt-in is the right shape (you run it when you have two models to compare, not every tick).
+
+| Gate | Result |
+|---|---|
+| G1 (35 unit tests + bench sanity) | ✅ PASS |
+| G2 (`from_log_probs` 0.875µs + `filtered_mean` 1.500µs at L=8192) | ✅ PASS (original 1µs combined target re-spec'd as structurally impossible for 2 memory-bound passes) |
+| G2-alloc (scratch-reused SIMD path) | ✅ 0 allocs |
+| G3 (feature matrix clean) | ✅ PASS |
+| G4 (TopKNoCopy amplifies \|gap\| 13.9× vs AllTokens) | ✅ PASS (target ≥1.5×) |
+
+### Examples
+
+- `paired_loss_01_micro_gpt_ab` — runnable micro-GPT A/B diagnostic: two log-prob traces → PairedLossGap → tag-stratified means table → filtered aggregates table → Proposition 1 annotation.
+- `paired_loss_02_class_size_bound` — the raw-vs-latent sync-boundary decision demonstration with a worked annotation.
+
+🔧 Feature flag: `paired_loss_diagnostic` (opt-in). Pure measurement tool, NOT an inference mechanism (Research 319 §3: not Super-GOAT).
+
+📖 Plan: [335](../../.plans/335_paired_loss_gap_diagnostic_primitive.md). Bench: [335](../../.benchmarks/335_paired_loss_diagnostic_goat.md). Research: [319](../../.research/319_Paired_Token_Level_Loss_Gap_Diagnostic.md). Substrate: `crates/katgpt-core/src/paired_loss_diagnostic.rs`.
