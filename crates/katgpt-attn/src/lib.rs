@@ -16,6 +16,7 @@
 //! | [`diagonal_gate`] | `diagonal_gate` | Shared DiagonalGate abstraction (GDN2 + Wall). |
 //! | [`static_cal`] | `static_cal_tables` | Pre-computed per-head attention scales. |
 //! | [`funcattn_compose`] | `funcattn_freeze_thaw` / `funcattn_spectral_pre_rotate` / `funcattn_chiar_blend` | FuncAttn composition layer (Plan 286 Phase 5). |
+//! | [`mla`] | `mla_attention` | Multi-head Latent Attention (DeepSeek-V2 §2.1) with Kimi-K3 output gate (Proposal 032 Phase 2). |
 //!
 //! # Relationship to katgpt-core
 //!
@@ -59,3 +60,9 @@ pub mod funcattn_compose;
 // katgpt-core; this module only owns the forward composition that needs entmax.
 #[cfg(all(feature = "hga", feature = "dash_attn"))]
 pub mod hga_forward;
+
+// MLA (Multi-head Latent Attention) — DeepSeek-V2 §2.1 + Appendix C.
+// Decoupled-RoPE latent attention with Kimi-K3 output-gate extension.
+// Proposal 032 Phase 2, Research 327.
+#[cfg(feature = "mla_attention")]
+pub mod mla;

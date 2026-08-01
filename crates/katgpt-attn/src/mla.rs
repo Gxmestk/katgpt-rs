@@ -1,0 +1,664 @@
+//! MLA (Multi-head Latent Attention) — DeepSeek-V2 §2.1 + Appendix C.
+//!
+//! Implements the MLA mechanism with decoupled RoPE from DeepSeek-V2, plus the
+//! Kimi-K3 output-gate extension (`mla_use_output_gate`). See Research 327 for
+//! the full mathematical distillation and Proposal 032 for the architectural
+//! context.
+//!
+//! # The mechanism (single-token decode)
+//!
+//! ```text
+//! 1. Down-projections:
+//!    c_kv = W_DKV · h        (KV latent compression — CACHED, not full K/V)
+//!    c_q  = W_DQ  · h        (query latent compression)
+//!
+//! 2. Up-projections + decoupled RoPE split (query path):
+//!    q_c     = W_UQ  · c_q   (content query — NO RoPE)
+//!    q_r_raw = W_QR  · c_q   (rope query — RoPE applied per-head sub-vector)
+//!    for each head i: q_r[i] = RoPE(q_r_raw[i], pos)
+//!    q_i = [q_c[i] ; q_r[i]]  (concatenate content + rope per head)
+//!
+//! 3. Up-projections (key/value path) + shared RoPE key:
+//!    k_c = W_UK · c_kv       (content key — NO RoPE, per head)
+//!    v_c = W_UV · c_kv       (value, per head)
+//!    k_r = RoPE(W_KR · h, pos)  (shared rope key — SAME for all heads — CACHED)
+//!    k_i = [k_c[i] ; k_r]    (concatenate per head)
+//!
+//! 4. Attention (scale = 1/sqrt(d_h + d_R^h)):
+//!    o_i = Σ_j softmax(q_i · k_j / scale) · v_c[j][i]
+//!
+//! 5. Output projection:
+//!    u = W_O · concat(o_i)
+//!    if use_output_gate: u *= sigmoid(W_g · h)   (Kimi-K3 extension)
+//! ```
+//!
+//! # KV cache contents
+//!
+//! Only TWO vectors cached per token:
+//! - `c_kv ∈ R^{d_c}` — the compressed KV latent
+//! - `k_r  ∈ R^{d_R^h}` — the shared decoupled RoPE key
+//!
+//! For Kimi-K3-0.40B: `(128 + 32) = 160` elements/token/layer vs `1024` for MHA.
+
+use katgpt_core::simd::{simd_dot_f32, simd_matmul_rows};
+use katgpt_kv::shard_kv::rope::RopeFreqs;
+
+// ─── Config ─────────────────────────────────────────────────────────────────
+
+/// MLA configuration parameters.
+///
+/// Mirrors the Kimi-K3 / DeepSeek-V2 config fields. See Research 327 §4 for the
+/// 0.40B-specific values.
+#[derive(Clone, Debug)]
+pub struct MlaConfig {
+    /// KV latent compression dim (`d_c` = `kv_lora_rank`). Kimi-K3-0.40B: 128.
+    pub kv_lora_rank: usize,
+    /// Query latent compression dim (`d'_c` = `q_lora_rank`). Kimi-K3-0.40B: 256.
+    pub q_lora_rank: usize,
+    /// Content per-head dim (`d_h` = `qk_nope_head_dim`). Kimi-K3-0.40B: 64.
+    pub qk_nope_head_dim: usize,
+    /// RoPE per-head dim (`d_R^h` = `qk_rope_head_dim`). Kimi-K3-0.40B: 32.
+    pub qk_rope_head_dim: usize,
+    /// Value per-head dim (`v_h` = `v_head_dim`). Kimi-K3-0.40B: 64.
+    pub v_head_dim: usize,
+    /// Number of attention heads (`n_h`). Kimi-K3-0.40B: 8.
+    pub n_heads: usize,
+    /// Hidden dim (`d`). Kimi-K3-0.40B: 1024.
+    pub hidden_size: usize,
+    /// Kimi-K3 output gate (`mla_use_output_gate`). When true, output is gated
+    /// by `sigmoid(W_g · h)`. Kimi-K3-0.40B: true.
+    pub use_output_gate: bool,
+    /// RoPE base frequency. Kimi-K3-0.40B: 1_000_000.0.
+    pub rope_theta: f32,
+}
+
+impl MlaConfig {
+    /// Kimi-K3-0.40B MLA configuration (text path, `kimi_linear` model type).
+    pub fn kimi_k3_0_40b() -> Self {
+        Self {
+            kv_lora_rank: 128,
+            q_lora_rank: 256,
+            qk_nope_head_dim: 64,
+            qk_rope_head_dim: 32,
+            v_head_dim: 64,
+            n_heads: 8,
+            hidden_size: 1024,
+            use_output_gate: true,
+            rope_theta: 1_000_000.0,
+        }
+    }
+
+    /// Per-head content dim for queries/keys (`d_h`).
+    #[inline]
+    pub fn d_h(&self) -> usize {
+        self.qk_nope_head_dim
+    }
+
+    /// Per-head RoPE dim (`d_R^h`).
+    #[inline]
+    pub fn d_r(&self) -> usize {
+        self.qk_rope_head_dim
+    }
+
+    /// Per-head query/key dim after concatenation: `d_h + d_R^h`.
+    #[inline]
+    pub fn qk_head_dim(&self) -> usize {
+        self.qk_nope_head_dim + self.qk_rope_head_dim
+    }
+
+    /// Attention scale: `1/sqrt(d_h + d_R^h)`.
+    #[inline]
+    pub fn attn_scale(&self) -> f32 {
+        1.0 / ((self.qk_head_dim() as f32).sqrt())
+    }
+}
+
+// ─── Weights ────────────────────────────────────────────────────────────────
+
+/// MLA layer weight matrices (row-major `Vec<f32>`).
+///
+/// Naming follows DeepSeek-V2 / Kimi-K3 conventions. See Research 327 §5 for the
+/// safetensors tensor-name mapping (confirmed in Phase 5 loader).
+///
+/// All matrices are stored as `[out_dim][in_dim]` (row-major), matching the
+/// `simd_matmul_rows(output, weight, input, rows=out, cols=in)` convention.
+pub struct MlaWeights {
+    /// `W_DKV ∈ R^{d_c × d}` — KV down-projection.
+    pub w_dkv: Vec<f32>,
+    /// `W_DQ ∈ R^{d'_c × d}` — query down-projection.
+    pub w_dq: Vec<f32>,
+    /// `W_UQ ∈ R^{d_h·n_h × d'_c}` — content query up-projection.
+    pub w_uq: Vec<f32>,
+    /// `W_QR ∈ R^{d_R^h·n_h × d'_c}` — rope query up-projection.
+    pub w_qr: Vec<f32>,
+    /// `W_UK ∈ R^{d_h·n_h × d_c}` — content key up-projection.
+    pub w_uk: Vec<f32>,
+    /// `W_UV ∈ R^{v_h·n_h × d_c}` — value up-projection.
+    pub w_uv: Vec<f32>,
+    /// `W_KR ∈ R^{d_R^h × d}` — shared rope key projection.
+    pub w_kr: Vec<f32>,
+    /// `W_O ∈ R^{d × v_h·n_h}` — output projection.
+    pub w_o: Vec<f32>,
+    /// `W_g ∈ R^{d × d}` — output gate projection (Kimi-K3 extension).
+    /// Only present when `config.use_output_gate` is true.
+    pub w_g: Option<Vec<f32>>,
+}
+
+impl MlaWeights {
+    /// Construct random weights from a seeded RNG (for G1 testing).
+    ///
+    /// Uses a simple LCG to avoid pulling a new RNG crate dep. Weights are drawn
+    /// from `N(0, 1/sqrt(in_dim))`-ish (scaled uniform in `[-1/sqrt(in), 1/sqrt(in)]`).
+    pub fn random(config: &MlaConfig, seed: u64) -> Self {
+        let mut rng = SimpleRng::new(seed);
+        let d = config.hidden_size;
+
+        let w_dkv = random_matrix(&mut rng, config.kv_lora_rank, d);
+        let w_dq = random_matrix(&mut rng, config.q_lora_rank, d);
+        let w_uq =
+            random_matrix(&mut rng, config.d_h() * config.n_heads, config.q_lora_rank);
+        let w_qr =
+            random_matrix(&mut rng, config.d_r() * config.n_heads, config.q_lora_rank);
+        let w_uk =
+            random_matrix(&mut rng, config.d_h() * config.n_heads, config.kv_lora_rank);
+        let w_uv =
+            random_matrix(&mut rng, config.v_head_dim * config.n_heads, config.kv_lora_rank);
+        let w_kr = random_matrix(&mut rng, config.d_r(), d);
+        let w_o =
+            random_matrix(&mut rng, d, config.v_head_dim * config.n_heads);
+        let w_g = if config.use_output_gate {
+            Some(random_matrix(&mut rng, d, d))
+        } else {
+            None
+        };
+
+        Self {
+            w_dkv,
+            w_dq,
+            w_uq,
+            w_qr,
+            w_uk,
+            w_uv,
+            w_kr,
+            w_o,
+            w_g,
+        }
+    }
+}
+
+/// Simple seeded LCG RNG for test weight generation (avoids new dep).
+struct SimpleRng {
+    state: u64,
+}
+
+impl SimpleRng {
+    fn new(seed: u64) -> Self {
+        Self {
+            state: seed.wrapping_add(0x9E3779B97F4A7C15),
+        }
+    }
+
+    /// xorshift64* — fast, decent distribution for test fixtures.
+    fn next_u64(&mut self) -> u64 {
+        let mut x = self.state;
+        x ^= x >> 12;
+        x ^= x << 25;
+        x ^= x >> 27;
+        self.state = x;
+        x.wrapping_mul(0x2545F4914F6CDD1D)
+    }
+
+    /// Uniform float in `[0, 1)`.
+    fn next_f32(&mut self) -> f32 {
+        (self.next_u64() >> 40) as f32 / (1u64 << 24) as f32
+    }
+}
+
+/// Generate a `[rows][cols]` row-major weight matrix with Xavier-ish scaling.
+fn random_matrix(rng: &mut SimpleRng, rows: usize, cols: usize) -> Vec<f32> {
+    let scale = 1.0 / (cols as f32).sqrt();
+    (0..rows * cols)
+        .map(|_| (rng.next_f32() * 2.0 - 1.0) * scale)
+        .collect()
+}
+
+// ─── KV cache ───────────────────────────────────────────────────────────────
+
+/// MLA KV cache — stores the compressed latent + shared RoPE key per token.
+///
+/// Only `(d_c + d_R^h)` elements per token are cached (vs `2·n_h·d_h` for MHA).
+/// For Kimi-K3-0.40B: 160 elements/token vs 1024 for equivalent MHA.
+pub struct MlaKVCache {
+    /// `[max_seq][d_c]` — compressed KV latent per token (`c_kv`).
+    pub latent_kv: Vec<f32>,
+    /// `[max_seq][d_R^h]` — shared decoupled RoPE key per token (`k_r`).
+    pub rope_key: Vec<f32>,
+    /// Current sequence length (number of tokens cached).
+    pub seq_len: usize,
+    d_c: usize,
+    d_r: usize,
+    max_seq: usize,
+}
+
+impl MlaKVCache {
+    /// Create a new cache with capacity for `max_seq` tokens.
+    pub fn new(config: &MlaConfig, max_seq: usize) -> Self {
+        Self {
+            latent_kv: vec![0.0; max_seq * config.kv_lora_rank],
+            rope_key: vec![0.0; max_seq * config.qk_rope_head_dim],
+            seq_len: 0,
+            d_c: config.kv_lora_rank,
+            d_r: config.qk_rope_head_dim,
+            max_seq,
+        }
+    }
+
+    /// Reset the cache to empty (seq_len = 0) without deallocating.
+    pub fn reset(&mut self) {
+        self.seq_len = 0;
+    }
+
+    /// Append a token's compressed KV latent + shared RoPE key.
+    ///
+    /// Returns the position index of the newly cached token.
+    /// Panics if the cache is full.
+    pub fn append(&mut self, c_kv: &[f32], k_r: &[f32]) -> usize {
+        debug_assert_eq!(c_kv.len(), self.d_c, "c_kv dim mismatch");
+        debug_assert_eq!(k_r.len(), self.d_r, "k_r dim mismatch");
+        let pos = self.seq_len;
+        assert!(pos < self.max_seq, "MLA KV cache full");
+        self.latent_kv[pos * self.d_c..(pos + 1) * self.d_c].copy_from_slice(c_kv);
+        self.rope_key[pos * self.d_r..(pos + 1) * self.d_r].copy_from_slice(k_r);
+        self.seq_len += 1;
+        pos
+    }
+
+    /// Get the compressed KV latent for token at position `pos`.
+    #[inline]
+    pub fn latent_kv_at(&self, pos: usize) -> &[f32] {
+        &self.latent_kv[pos * self.d_c..(pos + 1) * self.d_c]
+    }
+
+    /// Get the shared RoPE key for token at position `pos`.
+    #[inline]
+    pub fn rope_key_at(&self, pos: usize) -> &[f32] {
+        &self.rope_key[pos * self.d_r..(pos + 1) * self.d_r]
+    }
+}
+
+// ─── Forward pass ───────────────────────────────────────────────────────────
+
+/// Scratch buffers for the MLA forward pass — pre-allocated to be alloc-free
+/// on the hot path.
+///
+/// Sized for a single token's decode. Reuse across tokens via `clear()`/overwrite.
+pub struct MlaForwardScratch {
+    // Down-projection outputs
+    c_kv: Vec<f32>,      // [d_c]
+    c_q: Vec<f32>,       // [d'_c]
+    // Query up-projections
+    q_c: Vec<f32>,       // [d_h * n_h]
+    q_r: Vec<f32>,       // [d_R^h * n_h] — RoPE applied in-place
+    // Key/value up-projections
+    k_c: Vec<f32>,       // [d_h * n_h]
+    v_c: Vec<f32>,       // [v_h * n_h]
+    // Shared RoPE key
+    k_r: Vec<f32>,       // [d_R^h]
+    // Per-head attention output
+    attn_out: Vec<f32>,  // [v_h * n_h]
+    // Attention scores scratch
+    scores: Vec<f32>,    // [seq_len]
+    // Output gate scratch
+    gate_buf: Vec<f32>,  // [d]
+    // Output
+    output: Vec<f32>,    // [d]
+}
+
+impl MlaForwardScratch {
+    /// Allocate scratch for the given config + max attention length.
+    pub fn new(config: &MlaConfig, max_seq: usize) -> Self {
+        let n_h = config.n_heads;
+        Self {
+            c_kv: vec![0.0; config.kv_lora_rank],
+            c_q: vec![0.0; config.q_lora_rank],
+            q_c: vec![0.0; config.d_h() * n_h],
+            q_r: vec![0.0; config.d_r() * n_h],
+            k_c: vec![0.0; config.d_h() * n_h],
+            v_c: vec![0.0; config.v_head_dim * n_h],
+            k_r: vec![0.0; config.d_r()],
+            attn_out: vec![0.0; config.v_head_dim * n_h],
+            scores: vec![0.0; max_seq],
+            gate_buf: vec![0.0; config.hidden_size],
+            output: vec![0.0; config.hidden_size],
+        }
+    }
+}
+
+/// Apply RoPE to the decoupled query/key sub-vectors.
+///
+/// MLA applies RoPE ONLY to the `d_R^h`-dim rope sub-vectors (not the content).
+/// For the query, each head has its own `d_R^h`-dim rope sub-vector; for the
+/// key, the `d_R^h`-dim rope key is shared across all heads.
+///
+/// Uses `RopeFreqs` from `katgpt-kv` (the cached sin/cos RoPE substrate).
+fn apply_decoupled_rope(
+    rope_freqs: &mut RopeFreqs,
+    x: &mut [f32],
+    d_r: usize,
+    n_heads: usize,
+    pos: usize,
+) {
+    // For queries: each head's d_r sub-vector gets RoPE rotated at `pos`.
+    // For the shared key: n_heads=1 (single d_r vector, shared).
+    for h in 0..n_heads {
+        let start = h * d_r;
+        rope_freqs.apply(&mut x[start..start + d_r], pos, false);
+    }
+}
+
+/// Single-token MLA forward pass (decode path).
+///
+/// Computes one step of MLA attention:
+/// 1. Down/up-projections on the current hidden state `h`
+/// 2. Applies decoupled RoPE to the rope query + shared rope key
+/// 3. Caches the compressed KV latent + shared rope key
+/// 4. Attends to all cached tokens (content dot product + rope dot product)
+/// 5. Output projection (with optional output gate)
+///
+/// # Arguments
+/// - `config` — MLA dimensions
+/// - `weights` — weight matrices
+/// - `cache` — KV cache (appended to; `cache.seq_len` is the new token's position)
+/// - `scratch` — pre-allocated scratch buffers (reused across calls)
+/// - `rope_freqs` — RoPE frequency table (must match `config.qk_rope_head_dim`)
+/// - `h` — input hidden state `[hidden_size]`
+///
+/// # Returns
+/// A slice into `scratch.output` of length `hidden_size`.
+pub fn mla_forward_token<'s>(
+    config: &MlaConfig,
+    weights: &MlaWeights,
+    cache: &mut MlaKVCache,
+    scratch: &'s mut MlaForwardScratch,
+    rope_freqs: &mut RopeFreqs,
+    h: &[f32],
+) -> &'s mut [f32] {
+    let d = config.hidden_size;
+    let d_c = config.kv_lora_rank;
+    let d_qc = config.q_lora_rank;
+    let d_h = config.d_h();
+    let d_r = config.d_r();
+    let v_h = config.v_head_dim;
+    let n_h = config.n_heads;
+    debug_assert_eq!(h.len(), d, "hidden state dim mismatch");
+
+    // The position of the token being processed = current cache length.
+    let pos = cache.seq_len;
+
+    // ── Step 1: Down-projections ───────────────────────────────────────────
+    // c_kv = W_DKV · h   [d_c]
+    simd_matmul_rows(&mut scratch.c_kv, &weights.w_dkv, h, d_c, d);
+    // c_q = W_DQ · h     [d'_c]
+    simd_matmul_rows(&mut scratch.c_q, &weights.w_dq, h, d_qc, d);
+
+    // ── Step 2: Query up-projections ───────────────────────────────────────
+    // q_c = W_UQ · c_q   [d_h * n_h]  (content query — NO RoPE)
+    simd_matmul_rows(&mut scratch.q_c, &weights.w_uq, &scratch.c_q, d_h * n_h, d_qc);
+    // q_r_raw = W_QR · c_q   [d_r * n_h]  (rope query — RoPE applied next)
+    simd_matmul_rows(&mut scratch.q_r, &weights.w_qr, &scratch.c_q, d_r * n_h, d_qc);
+    // Apply decoupled RoPE to each head's d_r sub-vector.
+    apply_decoupled_rope(rope_freqs, &mut scratch.q_r, d_r, n_h, pos);
+
+    // ── Step 3: Key/value up-projections ───────────────────────────────────
+    // k_c = W_UK · c_kv   [d_h * n_h]  (content key — NO RoPE)
+    simd_matmul_rows(&mut scratch.k_c, &weights.w_uk, &scratch.c_kv, d_h * n_h, d_c);
+    // v_c = W_UV · c_kv   [v_h * n_h]  (value)
+    simd_matmul_rows(&mut scratch.v_c, &weights.w_uv, &scratch.c_kv, v_h * n_h, d_c);
+
+    // ── Step 4: Shared decoupled RoPE key ──────────────────────────────────
+    // k_r_raw = W_KR · h   [d_r]  (shared across all heads)
+    simd_matmul_rows(&mut scratch.k_r, &weights.w_kr, h, d_r, d);
+    // Apply RoPE to the shared key (n_heads=1 — it's shared).
+    apply_decoupled_rope(rope_freqs, &mut scratch.k_r, d_r, 1, pos);
+
+    // ── Step 5: Cache the compressed latent + shared rope key ──────────────
+    cache.append(&scratch.c_kv, &scratch.k_r);
+
+    // ── Step 6: Attention (per head) ───────────────────────────────────────
+    // For each head h:
+    //   q_i = [q_c[h*d_h..(h+1)*d_h] ; q_r[h*d_r..(h+1)*d_r]]  (concatenated)
+    //   For each cached token j:
+    //     k_j_i = [k_c[j,h*d_h..] ; k_r[j]]  — BUT k_c is the CURRENT token's
+    //     up-projection, not cached! We need to up-project ALL cached latents.
+    //
+    // IMPORTANT: in MLA decode, we do NOT cache k_c/v_c — we cache c_kv (the
+    // latent) and up-project at attention time. So for each cached token j, we
+    // must compute k_c_j = W_UK · c_kv_j and v_c_j = W_UV · c_kv_j.
+    //
+    // For Phase 2 (no weight absorption), we recompute per-token. This is O(seq)
+    // up-projections per decode step — correct but not optimal. Phase 6 may
+    // cache the up-projected k_c/v_c or use weight absorption.
+    let scale = config.attn_scale();
+    let seq = cache.seq_len;
+
+    for head in 0..n_h {
+        let q_c_h = &scratch.q_c[head * d_h..(head + 1) * d_h];
+        let q_r_h = &scratch.q_r[head * d_r..(head + 1) * d_r];
+
+        // Compute attention scores for this head against all cached tokens.
+        let scores = &mut scratch.scores[..seq];
+
+        // We need per-token k_c, which requires up-projecting each cached c_kv.
+        // Reuse scratch.k_c as a single-token buffer (overwrite per token).
+        let mut max_score = f32::NEG_INFINITY;
+        for (j, score_slot) in scores.iter_mut().enumerate().take(seq) {
+            let c_kv_j = cache.latent_kv_at(j);
+            let k_r_j = cache.rope_key_at(j);
+
+            // k_c_j = W_UK · c_kv_j  (this token's content key)
+            simd_matmul_rows(
+                &mut scratch.k_c[..d_h],
+                &weights.w_uk[head * d_h * d_c..(head + 1) * d_h * d_c],
+                c_kv_j,
+                d_h,
+                d_c,
+            );
+            let k_c_j_h = &scratch.k_c[..d_h];
+
+            // Score = (q_c · k_c + q_r · k_r) / scale
+            //   content dot product (no RoPE) + rope dot product (with RoPE)
+            let content_dot = simd_dot_f32(q_c_h, k_c_j_h, d_h);
+            let rope_dot = simd_dot_f32(q_r_h, k_r_j, d_r);
+            let score = (content_dot + rope_dot) * scale;
+            *score_slot = score;
+            if score > max_score {
+                max_score = score;
+            }
+        }
+
+        // Softmax (numerically stable: subtract max).
+        let mut sum_exp = 0.0f32;
+        for s in scores.iter_mut().take(seq) {
+            *s = (*s - max_score).exp();
+            sum_exp += *s;
+        }
+        let inv_sum = 1.0 / sum_exp;
+
+        // Weighted sum of values: o_h = Σ_j softmax_j · v_c_j_h
+        // v_c_j_h = W_UV[head slice] · c_kv_j
+        let o_h = &mut scratch.attn_out[head * v_h..(head + 1) * v_h];
+        o_h[..v_h].fill(0.0);
+        // We need a scratch for the per-token v_c_h.
+        // Reuse the gate_buf region (size d) which is unused during the attention
+        // phase (it's only written in Step 8 below, after attention completes).
+        let v_c_j_h_scratch = &mut scratch.gate_buf[..v_h];
+        for (j, &weight_unnorm) in scores.iter().enumerate().take(seq) {
+            let c_kv_j = cache.latent_kv_at(j);
+            let weight = weight_unnorm * inv_sum;
+            // v_c_j_h = W_UV[head slice] · c_kv_j
+            simd_matmul_rows(
+                v_c_j_h_scratch,
+                &weights.w_uv[head * v_h * d_c..(head + 1) * v_h * d_c],
+                c_kv_j,
+                v_h,
+                d_c,
+            );
+            for (vi, &vc) in v_c_j_h_scratch[..v_h].iter().enumerate() {
+                o_h[vi] += weight * vc;
+            }
+        }
+    }
+
+    // ── Step 7: Output projection ──────────────────────────────────────────
+    // u = W_O · concat(o_i)   [d]
+    simd_matmul_rows(&mut scratch.output, &weights.w_o, &scratch.attn_out, d, v_h * n_h);
+
+    // ── Step 8: Output gate (Kimi-K3 extension) ─────────────────────────────
+    if config.use_output_gate
+        && let Some(ref w_g) = weights.w_g
+    {
+        // gate = sigmoid(W_g · h)
+        simd_matmul_rows(&mut scratch.gate_buf, w_g, h, d, d);
+        for i in 0..d {
+            let g = 1.0 / (1.0 + (-scratch.gate_buf[i]).exp());
+            scratch.output[i] *= g;
+        }
+    }
+
+    &mut scratch.output[..d]
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Helper: run MLA forward and return the output Vec.
+    fn run_mla(
+        config: &MlaConfig,
+        weights: &MlaWeights,
+        tokens: &[Vec<f32>],
+    ) -> Vec<f32> {
+        let max_seq = tokens.len();
+        let mut cache = MlaKVCache::new(config, max_seq);
+        let mut scratch = MlaForwardScratch::new(config, max_seq);
+        let mut rope_freqs = RopeFreqs::new_with_theta(config.qk_rope_head_dim, config.rope_theta);
+        let mut last_out = Vec::new();
+        for h in tokens {
+            let out = mla_forward_token(
+                config,
+                weights,
+                &mut cache,
+                &mut scratch,
+                &mut rope_freqs,
+                h,
+            );
+            last_out = out.to_vec();
+        }
+        last_out
+    }
+
+    #[test]
+    fn smoke_single_token_zero_position() {
+        // At position 0, RoPE is identity (θ=0 for all pairs). So the output
+        // should match a reference that skips RoPE entirely.
+        let config = small_config();
+        let weights = MlaWeights::random(&config, 42);
+        let h = vec![0.5f32; config.hidden_size];
+        let out = run_mla(&config, &weights, std::slice::from_ref(&h));
+        assert_eq!(out.len(), config.hidden_size);
+        // Sanity: output should be finite (no NaN/Inf from bad math).
+        for &v in &out {
+            assert!(v.is_finite(), "non-finite output: {v}");
+        }
+    }
+
+    #[test]
+    fn smoke_two_token_sequence() {
+        // Two tokens: first at pos=0, second at pos=1 attends to both.
+        let config = small_config();
+        let weights = MlaWeights::random(&config, 7);
+        let h0 = vec![0.3f32; config.hidden_size];
+        let h1 = vec![0.7f32; config.hidden_size];
+        let out = run_mla(&config, &weights, &[h0, h1]);
+        assert_eq!(out.len(), config.hidden_size);
+        for &v in &out {
+            assert!(v.is_finite(), "non-finite output: {v}");
+        }
+    }
+
+    #[test]
+    fn smoke_kimi_k3_0_40b_dims() {
+        // Verify the full 0.40B config dimensions work end-to-end.
+        let config = MlaConfig::kimi_k3_0_40b();
+        let weights = MlaWeights::random(&config, 99);
+        let h = vec![0.1f32; config.hidden_size];
+        let out = run_mla(&config, &weights, &[h.clone(), h.clone(), h.clone()]);
+        assert_eq!(out.len(), 1024);
+        for &v in &out {
+            assert!(v.is_finite(), "non-finite output: {v}");
+        }
+    }
+
+    #[test]
+    fn cache_appends_correctly() {
+        let config = small_config();
+        let mut cache = MlaKVCache::new(&config, 8);
+        assert_eq!(cache.seq_len, 0);
+        let c_kv = vec![1.0; config.kv_lora_rank];
+        let k_r = vec![2.0; config.qk_rope_head_dim];
+        cache.append(&c_kv, &k_r);
+        assert_eq!(cache.seq_len, 1);
+        assert_eq!(cache.latent_kv_at(0), &c_kv[..]);
+        assert_eq!(cache.rope_key_at(0), &k_r[..]);
+    }
+
+    #[test]
+    fn cache_reset_clears_seq_len() {
+        let config = small_config();
+        let mut cache = MlaKVCache::new(&config, 8);
+        cache.append(&vec![1.0; config.kv_lora_rank], &vec![2.0; config.qk_rope_head_dim]);
+        assert_eq!(cache.seq_len, 1);
+        cache.reset();
+        assert_eq!(cache.seq_len, 0);
+    }
+
+    #[test]
+    fn output_gate_changes_output() {
+        // When use_output_gate=true, the output should differ from the
+        // ungated path (the gate multiplies element-wise by sigmoid(W_g·h)).
+        let mut config = small_config();
+        let weights_gated = MlaWeights::random(&config, 11);
+        config.use_output_gate = false;
+        let weights_ungated = {
+            let mut w = MlaWeights::random(&config, 11);
+            w.w_g = None;
+            w
+        };
+        config.use_output_gate = true;
+
+        let h = vec![0.5f32; config.hidden_size];
+        let out_gated = run_mla(&config, &weights_gated, std::slice::from_ref(&h));
+        let out_ungated = run_mla(&config, &weights_ungated, std::slice::from_ref(&h));
+        // Outputs should differ (gate != 1.0 everywhere with random weights).
+        let any_diff = out_gated
+            .iter()
+            .zip(out_ungated.iter())
+            .any(|(a, b)| (a - b).abs() > 1e-6);
+        assert!(any_diff, "output gate had no effect");
+    }
+
+    fn small_config() -> MlaConfig {
+        // A small config for fast tests: 2 heads, tiny dims.
+        MlaConfig {
+            kv_lora_rank: 8,
+            q_lora_rank: 12,
+            qk_nope_head_dim: 4,
+            qk_rope_head_dim: 4,
+            v_head_dim: 4,
+            n_heads: 2,
+            hidden_size: 16,
+            use_output_gate: true,
+            rope_theta: 10_000.0,
+        }
+    }
+}

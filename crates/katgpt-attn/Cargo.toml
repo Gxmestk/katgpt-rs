@@ -109,3 +109,9 @@ hga = ["katgpt-core/hga"]
 # katgpt-transformer so LayerWeights.mlp_w_up resolves. Gates the SwiGLU
 # MLP path in gdn2/forward.rs, gdn2/tree_forward.rs, and dash_attn/forward.rs.
 gated_mlp = ["katgpt-forward/gated_mlp", "katgpt-transformer/gated_mlp"]
+# MLA (Multi-head Latent Attention) — DeepSeek-V2 §2.1 + Appendix C.
+# Implements the decoupled-RoPE latent attention from DeepSeek-V2 with the
+# Kimi-K3 output-gate extension (Proposal 032 Phase 2, Research 327). Pulls
+# katgpt-kv for RopeFreqs (the cached sin/cos RoPE substrate). Opt-in,
+# default-off until Phase 6 real-model GOAT.
+mla_attention = ["dep:katgpt-kv", "katgpt-kv/shard_kv"]
