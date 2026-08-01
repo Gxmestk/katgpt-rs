@@ -1,46 +1,66 @@
 //! Safetensors loader for Kimi-K3-0.40B.
 //!
 //! This module loads `model.safetensors` and maps tensor names to the
-//! corrected weight structs (MLA, KDA, MoE, attn-res) per Research 330.
+//! weight structs (MLA, KDA, MoE, attn-res).
 //!
-//! # Tensor name mapping (from HF naming convention)
+//! # Tensor name mapping (VERIFIED against actual safetensors header)
 //!
-//! The safetensors file uses HuggingFace naming conventions. The exact tensor
-//! names were not verified against the actual file header (Phase 6 concern).
-//! The mapping below follows the DeepSeek-V2 + Kimi-K3 convention documented
-//! in Research 327 §5 + Research 330 §2-5.
+//! Verified 2026-08-01 via HTTP Range request on the real file header
+//! (Research 331). All tensor names below match the actual file. See
+//! `_ref_kimi_k3_tensors.json` in riir-ai `.research/` for the full dump.
+//!
+//! ## Top-level prefix: `language_model.`
+//!
+//! All language-model tensors are prefixed with `language_model.` (the model
+//! is a `KimiK3ForConditionalGeneration` with a vision tower + mm_projector
+//! that share the safetensors file). The vision tower (`vision_tower.*`) and
+//! mm_projector (`mm_projector.*`) tensors are out of scope (text-only path).
+//!
+//! ## Layer topology (VERIFIED)
+//!
+//! | Layer | Attention | FFN   |
+//! |-------|-----------|-------|
+//! | 0     | KDA       | Dense |
+//! | 1-2   | KDA       | MoE   |
+//! | 3     | MLA       | MoE   |
+//! | 4-6   | KDA       | MoE   |
+//! | 7     | MLA       | MoE   |
+//!
+//! Config says `full_attn_layers: [4, 8]` (1-indexed) → MLA at 0-indexed 3,7.
+//! KDA layers: `kda_layers: [1, 2, 3, 5, 6, 7]` (1-indexed) → 0-indexed
+//! [0, 1, 2, 4, 5, 6]. Layer 0 is the only dense layer (`first_k_dense_replace: 1`).
 //!
 //! ## Model-level tensors
 //!
 //! | Tensor name | Field | Shape |
 //! |-------------|-------|-------|
-//! | `model.embed_tokens.weight` | `embed_weight` | `[vocab_size, hidden_size]` |
-//! | `model.norm.weight` | `final_norm_weight` | `[hidden_size]` |
-//! | `lm_head.weight` | `lm_head_weight` | `[vocab_size, hidden_size]` |
-//! | `model.output_attn_res_norm.weight` | `output_attn_res.norm` | `[hidden_size]` |
-//! | `model.output_attn_res_proj.weight` | `output_attn_res.proj` | `[hidden_size]` |
+//! | `language_model.model.embed_tokens.weight` | `embed_weight` | `[163840, 1024]` |
+//! | `language_model.model.norm.weight` | `final_norm_weight` | `[1024]` |
+//! | `language_model.lm_head.weight` | `lm_head_weight` | `[163840, 1024]` |
+//! | `language_model.model.output_attn_res_norm.weight` | `output_attn_res.norm` | `[1024]` |
+//! | `language_model.model.output_attn_res_proj.weight` | `output_attn_res.proj` | `[1, 1024]` |
 //!
 //! ## Per-layer tensors (layer index `N`)
 //!
 //! Common (all layers):
-//! - `model.layers.N.input_layernorm.weight` → `input_layernorm_weight`
-//! - `model.layers.N.post_attention_layernorm.weight` → `post_attention_layernorm_weight`
-//! - `model.layers.N.self_attention_res_norm.weight` → `self_attn_res.norm`
-//! - `model.layers.N.self_attention_res_proj.weight` → `self_attn_res.proj`
-//! - `model.layers.N.mlp_res_norm.weight` → `mlp_attn_res.norm`
-//! - `model.layers.N.mlp_res_proj.weight` → `mlp_attn_res.proj`
+//! - `language_model.model.layers.N.input_layernorm.weight` → `input_layernorm_weight`
+//! - `language_model.model.layers.N.post_attention_layernorm.weight` → `post_attention_layernorm_weight`
+//! - `language_model.model.layers.N.self_attention_res_norm.weight` → `self_attn_res.norm`
+//! - `language_model.model.layers.N.self_attention_res_proj.weight` → `self_attn_res.proj`
+//! - `language_model.model.layers.N.mlp_res_norm.weight` → `mlp_attn_res.norm`
+//! - `language_model.model.layers.N.mlp_res_proj.weight` → `mlp_attn_res.proj`
 //!
-//! MLA layers (0, 4) — `model.layers.N.attention.*`:
-//! - `.kv_a_proj_with_mqa.weight` → fused `w_dkv` + `w_kr` (split at `d_c`)
-//! - `.kv_b_proj.weight` → fused `w_uk` + `w_uv` (split at `d_h·n_h`)
+//! MLA layers (3, 7) — `language_model.model.layers.N.self_attn.*`:
+//! - `.kv_a_proj_with_mqa.weight` → fused `w_dkv` + `w_kr` (split at `d_c=128`)
+//! - `.kv_b_proj.weight` → fused `w_uk` + `w_uv` (split at `d_h·n_h=512`)
 //! - `.q_a_proj.weight` → `w_dq`
 //! - `.q_a_layernorm.weight` → `q_a_norm_weight`
 //! - `.kv_a_layernorm.weight` → `kv_a_norm_weight`
-//! - `.q_b_proj.weight` → fused `w_uq` + `w_qr` (split at `d_h·n_h`)
-//! - `.o_proj.weight` → `w_o`
-//! - `.g_proj.weight` → `w_g` (output gate)
+//! - `.q_b_proj.weight` → fused `w_uq` + `w_qr` (split at `d_h·n_h=512`)
+//! - `.o_proj.weight` → `w_o`  (shape `[1024, 512]`)
+//! - `.g_proj.weight` → `w_g`  (shape `[512, 1024]` — gate BEFORE o_proj)
 //!
-//! KDA layers (1,2,3,5,6,7) — `model.layers.N.attention.*`:
+//! KDA layers (0,1,2,4,5,6) — `language_model.model.layers.N.self_attn.*`:
 //! - `.q_proj.weight` → `q_proj`
 //! - `.k_proj.weight` → `k_proj`
 //! - `.v_proj.weight` → `v_proj`
@@ -52,24 +72,24 @@
 //! - `.f_b_proj.weight` → `f_b_proj`
 //! - `.dt_bias` → `dt_bias`
 //! - `.b_proj.weight` → `beta_proj`
-//! - `.g_proj.weight` → `g_proj` (output gate)
+//! - `.g_proj.weight` → `g_proj` (output gate, shape `[256, 1024]`)
 //! - `.o_norm.weight` → `o_norm_weight`
-//! - `.o_proj.weight` → `o_proj`
+//! - `.o_proj.weight` → `o_proj` (shape `[1024, 256]`)
 //!
-//! Dense MLP (layer 0) — `model.layers.N.mlp.*`:
-//! - `.w1.weight` → `gate_proj`
-//! - `.w2.weight` → `down_proj`
-//! - `.w3.weight` → `up_proj`
+//! Dense MLP (layer 0) — `language_model.model.layers.N.mlp.*`:
+//! - `.gate_proj.weight` → `gate_proj`
+//! - `.up_proj.weight` → `up_proj`
+//! - `.down_proj.weight` → `down_proj`
 //!
-//! MoE (layers 1-7) — `model.layers.N.mlp.*`:
+//! MoE (layers 1-7) — `language_model.model.layers.N.block_sparse_moe.*`:
 //! - `.gate.weight` → `router_weight`
-//! - `.e_score_correction_bias` → `e_score_correction_bias`
+//! - `.gate.e_score_correction_bias` → `e_score_correction_bias`
 //! - `.experts.N.w1.weight` → `experts[N].gate_proj`
 //! - `.experts.N.w2.weight` → `experts[N].down_proj`
 //! - `.experts.N.w3.weight` → `experts[N].up_proj`
-//! - `.shared_experts.w1.weight` → `shared_experts[0].gate_proj`
-//! - `.shared_experts.w2.weight` → `shared_experts[0].down_proj`
-//! - `.shared_experts.w3.weight` → `shared_experts[0].up_proj`
+//! - `.shared_experts.gate_proj.weight` → `shared_experts[0].gate_proj`
+//! - `.shared_experts.up_proj.weight` → `shared_experts[0].up_proj`
+//! - `.shared_experts.down_proj.weight` → `shared_experts[0].down_proj`
 //! - `.routed_expert_down_proj.weight` → `routed_expert_down_proj`
 //! - `.routed_expert_up_proj.weight` → `routed_expert_up_proj`
 //! - `.routed_expert_norm.weight` → `routed_expert_norm_weight`
@@ -179,49 +199,49 @@ fn load_mla_layer(
     d_qc: usize,
     d_h: usize,
     d_r: usize,
-    _v_h: usize,
+    v_h: usize,
     n_h: usize,
 ) -> Result<MlaWeights, LoadError> {
-    let prefix = format!("model.layers.{layer_idx}.attention");
+    let prefix = format!("language_model.model.layers.{layer_idx}.self_attn");
 
     // Fused kv_a_proj_with_mqa: [d_c + d_r, d] → split into w_dkv [d_c, d] + w_kr [d_r, d]
+    // Verified shape: [160, 1024] = [(128+32), 1024] ✓
     let kv_a = get_tensor!(st, &format!("{prefix}.kv_a_proj_with_mqa.weight"));
     let kv_a_rows = d_c + d_r;
     let row_len = d;
     let w_dkv: Vec<f32> = kv_a[..d_c * row_len].to_vec();
     let w_kr: Vec<f32> = kv_a[d_c * row_len..kv_a_rows * row_len].to_vec();
 
-    // Fused kv_b_proj: [(d_h + v_h) * n_h... wait, actually kv_b_proj is [d_h*n_h + v_h*n_h, d_c]
-    // Wait — let me reconsider. DeepSeek-V2's kv_b_proj produces both UK and UV:
-    //   output shape = [(d_h*n_h) + (v_h*n_h), d_c] but it's actually uk then uv
-    // No — the standard DeepSeek-V2 layout: kv_b_proj has output dim = n_h * (d_h + v_h)?
-    // Actually: UK is [d_h*n_h, d_c] and UV is [v_h*n_h, d_c], and kv_b_proj is
-    // [d_h*n_h + v_h*n_h, d_c] concatenated row-wise.
-    // But d_h == v_h for Kimi-K3 (both 64), so total = 2 * 64 * 8 = 1024 rows.
+    // Fused kv_b_proj: [n_h*(d_h + v_h), d_c] → split into w_uk [d_h*n_h, d_c] + w_uv [v_h*n_h, d_c]
+    // Verified shape: [1024, 128] = [8*(64+64), 128] ✓
     let kv_b = get_tensor!(st, &format!("{prefix}.kv_b_proj.weight"));
     let uk_rows = d_h * n_h;
+    let uv_rows = v_h * n_h;
+    debug_assert_eq!(kv_b.len(), (uk_rows + uv_rows) * d_c, "kv_b_proj size mismatch");
     let w_uk: Vec<f32> = kv_b[..uk_rows * d_c].to_vec();
     let w_uv: Vec<f32> = kv_b[uk_rows * d_c..].to_vec();
 
-    // q_a_proj: [d_qc, d]
+    // q_a_proj: [d_qc, d] — verified shape [256, 1024] ✓
     let w_dq = get_tensor!(st, &format!("{prefix}.q_a_proj.weight"));
 
-    // q_a_layernorm: [d_qc]
+    // q_a_layernorm: [d_qc] — verified shape [256] ✓
     let q_a_norm_weight = get_tensor!(st, &format!("{prefix}.q_a_layernorm.weight"));
 
-    // kv_a_layernorm: [d_c]
+    // kv_a_layernorm: [d_c] — verified shape [128] ✓
     let kv_a_norm_weight = get_tensor!(st, &format!("{prefix}.kv_a_layernorm.weight"));
 
-    // Fused q_b_proj: [(d_h + d_r)*n_h, d_qc] → split into w_uq [d_h*n_h, d_qc] + w_qr [d_r*n_h, d_qc]
+    // Fused q_b_proj: [n_h*(d_h + d_r), d_qc] → split into w_uq [d_h*n_h, d_qc] + w_qr [d_r*n_h, d_qc]
+    // Verified shape: [768, 256] = [8*(64+32), 256] ✓
     let q_b = get_tensor!(st, &format!("{prefix}.q_b_proj.weight"));
     let uq_rows = d_h * n_h;
     let w_uq: Vec<f32> = q_b[..uq_rows * d_qc].to_vec();
     let w_qr: Vec<f32> = q_b[uq_rows * d_qc..].to_vec();
 
-    // o_proj: [d, v_h*n_h]
+    // o_proj: [d, v_h*n_h] — verified shape [1024, 512] ✓
     let w_o = get_tensor!(st, &format!("{prefix}.o_proj.weight"));
 
-    // g_proj (output gate): [d, d]
+    // g_proj (output gate): [v_h*n_h, d] — verified shape [512, 1024] ✓
+    // Applied BEFORE o_proj in the actual model (gate on attn_output, not on final output).
     let w_g = get_tensor!(st, &format!("{prefix}.g_proj.weight"));
 
     Ok(MlaWeights {
@@ -244,7 +264,7 @@ fn load_kda_layer(
     st: &safetensors::SafeTensors,
     layer_idx: usize,
 ) -> Result<KdaWeights, LoadError> {
-    let prefix = format!("model.layers.{layer_idx}.attention");
+    let prefix = format!("language_model.model.layers.{layer_idx}.self_attn");
 
     Ok(KdaWeights {
         q_proj: get_tensor!(st, &format!("{prefix}.q_proj.weight")),
@@ -269,12 +289,12 @@ fn load_dense_mlp(
     st: &safetensors::SafeTensors,
     layer_idx: usize,
 ) -> Result<SwiGluExpertWeights, LoadError> {
-    let prefix = format!("model.layers.{layer_idx}.mlp");
+    let prefix = format!("language_model.model.layers.{layer_idx}.mlp");
 
     Ok(SwiGluExpertWeights {
-        gate_proj: get_tensor!(st, &format!("{prefix}.w1.weight")),
-        down_proj: get_tensor!(st, &format!("{prefix}.w2.weight")),
-        up_proj: get_tensor!(st, &format!("{prefix}.w3.weight")),
+        gate_proj: get_tensor!(st, &format!("{prefix}.gate_proj.weight")),
+        down_proj: get_tensor!(st, &format!("{prefix}.down_proj.weight")),
+        up_proj: get_tensor!(st, &format!("{prefix}.up_proj.weight")),
     })
 }
 
@@ -285,14 +305,14 @@ fn load_moe_layer(
     num_experts: usize,
     num_shared_experts: usize,
 ) -> Result<MoeWeights, LoadError> {
-    let prefix = format!("model.layers.{layer_idx}.mlp");
+    let prefix = format!("language_model.model.layers.{layer_idx}.block_sparse_moe");
 
-    // Router centroid: [N_r, d]
+    // Router centroid: [N_r, d] — `.gate.weight`
     let router_weight = get_tensor!(st, &format!("{prefix}.gate.weight"));
-    // noaux_tc bias: [N_r]
-    let e_score_correction_bias = get_tensor!(st, &format!("{prefix}.e_score_correction_bias"));
+    // noaux_tc bias: [N_r] — `.gate.e_score_correction_bias`
+    let e_score_correction_bias = get_tensor!(st, &format!("{prefix}.gate.e_score_correction_bias"));
 
-    // Routed experts
+    // Routed experts — `.experts.N.w1/w2/w3`
     let mut experts = Vec::with_capacity(num_experts);
     for e in 0..num_experts {
         let eprefix = format!("{prefix}.experts.{e}");
@@ -303,18 +323,17 @@ fn load_moe_layer(
         });
     }
 
-    // Shared experts
+    // Shared experts — `.shared_experts.gate_proj/up_proj/down_proj`
     let mut shared_experts = Vec::with_capacity(num_shared_experts);
-    for s in 0..num_shared_experts {
-        let sprefix = format!("{prefix}.shared_experts.{s}");
+    for _s in 0..num_shared_experts {
         shared_experts.push(SwiGluExpertWeights {
-            gate_proj: get_tensor!(st, &format!("{sprefix}.w1.weight")),
-            down_proj: get_tensor!(st, &format!("{sprefix}.w2.weight")),
-            up_proj: get_tensor!(st, &format!("{sprefix}.w3.weight")),
+            gate_proj: get_tensor!(st, &format!("{prefix}.shared_experts.gate_proj.weight")),
+            down_proj: get_tensor!(st, &format!("{prefix}.shared_experts.down_proj.weight")),
+            up_proj: get_tensor!(st, &format!("{prefix}.shared_experts.up_proj.weight")),
         });
     }
 
-    // Latent MoE wrapper (optional but present for Kimi-K3)
+    // Latent MoE wrapper — `.routed_expert_*`
     let routed_expert_down_proj = Some(get_tensor!(st, &format!("{prefix}.routed_expert_down_proj.weight")));
     let routed_expert_up_proj = Some(get_tensor!(st, &format!("{prefix}.routed_expert_up_proj.weight")));
     let routed_expert_norm_weight = Some(get_tensor!(st, &format!("{prefix}.routed_expert_norm.weight")));
@@ -349,7 +368,11 @@ fn load_decoder_layer(
     v_h: usize,
     n_h: usize,
 ) -> Result<KimiDecoderLayerWeights, LoadError> {
-    let is_mla = layer_idx == 0 || layer_idx == 4;
+    // Topology (VERIFIED against safetensors header + config.json):
+    //   MLA at layers 3, 7  (config full_attn_layers [4,8] = 1-indexed)
+    //   KDA at layers 0,1,2,4,5,6
+    //   Dense MLP at layer 0 only  (first_k_dense_replace: 1)
+    let is_mla = layer_idx == 3 || layer_idx == 7;
     let is_dense = layer_idx == 0;
 
     let attention = if is_mla {
@@ -365,19 +388,20 @@ fn load_decoder_layer(
     };
 
     // Common layer norm + attn-res weights
+    let lpfx = format!("language_model.model.layers.{layer_idx}");
     let input_layernorm_weight =
-        get_tensor!(st, &format!("model.layers.{layer_idx}.input_layernorm.weight"));
+        get_tensor!(st, &format!("{lpfx}.input_layernorm.weight"));
     let post_attention_layernorm_weight =
-        get_tensor!(st, &format!("model.layers.{layer_idx}.post_attention_layernorm.weight"));
+        get_tensor!(st, &format!("{lpfx}.post_attention_layernorm.weight"));
 
     let self_attn_res = AttnResWeights {
-        norm_weight: get_tensor!(st, &format!("model.layers.{layer_idx}.self_attention_res_norm.weight")),
-        proj_weight: get_tensor!(st, &format!("model.layers.{layer_idx}.self_attention_res_proj.weight")),
+        norm_weight: get_tensor!(st, &format!("{lpfx}.self_attention_res_norm.weight")),
+        proj_weight: get_tensor!(st, &format!("{lpfx}.self_attention_res_proj.weight")),
     };
 
     let mlp_attn_res = AttnResWeights {
-        norm_weight: get_tensor!(st, &format!("model.layers.{layer_idx}.mlp_res_norm.weight")),
-        proj_weight: get_tensor!(st, &format!("model.layers.{layer_idx}.mlp_res_proj.weight")),
+        norm_weight: get_tensor!(st, &format!("{lpfx}.mlp_res_norm.weight")),
+        proj_weight: get_tensor!(st, &format!("{lpfx}.mlp_res_proj.weight")),
     };
 
     Ok(KimiDecoderLayerWeights {
@@ -400,13 +424,14 @@ fn load_decoder_layer(
 ///
 /// # Configuration
 ///
-/// Uses the Kimi-K3-0.40B config values from Research 330 §7:
+/// Uses the Kimi-K3-0.40B config values from config.json (Research 331):
 /// - `hidden_size: 1024`, `num_hidden_layers: 8`, `vocab_size: 163840`
 /// - MLA: `kv_lora_rank=128, q_lora_rank=256, qk_nope=64, qk_rope=32, v_head=64, n_heads=8`
 /// - KDA: `head_dim=32, n_heads=8`
 /// - MoE: `num_experts=8, num_shared_experts=1`
-/// - Layer 0: dense MLP; layers 1-7: MoE
-/// - MLA layers: 0, 4; KDA layers: 1,2,3,5,6,7
+/// - Dense MLP layer: 0 only (`first_k_dense_replace: 1`)
+/// - MLA layers: 3, 7 (config `full_attn_layers: [4,8]` = 1-indexed)
+/// - KDA layers: 0, 1, 2, 4, 5, 6
 pub fn load_kimi_k3(path: &str) -> Result<KimiK3ModelWeights, LoadError> {
     // Read the safetensors file
     let file = std::fs::File::open(path).map_err(LoadError::Io)?;
@@ -431,15 +456,16 @@ pub fn load_kimi_k3(path: &str) -> Result<KimiK3ModelWeights, LoadError> {
     let v_h = 64;
     let n_h = 8;
 
-    // Model-level tensors
-    let embed_weight = get_tensor!(st, "model.embed_tokens.weight");
-    let final_norm_weight = get_tensor!(st, "model.norm.weight");
+    // Model-level tensors — all prefixed with `language_model.` (the model is
+    // KimiK3ForConditionalGeneration; vision tower + mm_projector share the file).
+    let embed_weight = get_tensor!(st, "language_model.model.embed_tokens.weight");
+    let final_norm_weight = get_tensor!(st, "language_model.model.norm.weight");
     // tie_word_embeddings: false → lm_head is separate
-    let lm_head_weight = get_tensor!(st, "lm_head.weight");
+    let lm_head_weight = get_tensor!(st, "language_model.lm_head.weight");
 
     let output_attn_res = AttnResWeights {
-        norm_weight: get_tensor!(st, "model.output_attn_res_norm.weight"),
-        proj_weight: get_tensor!(st, "model.output_attn_res_proj.weight"),
+        norm_weight: get_tensor!(st, "language_model.model.output_attn_res_norm.weight"),
+        proj_weight: get_tensor!(st, "language_model.model.output_attn_res_proj.weight"),
     };
 
     // Per-layer weights

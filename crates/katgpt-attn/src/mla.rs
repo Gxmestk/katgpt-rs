@@ -35,9 +35,13 @@
 //! 4. Attention (scale = 1/sqrt(d_h + d_R^h)):
 //!    o_i = Σ_j softmax(q_i · k_j / scale) · v_c[j][i]
 //!
-//! 5. Output projection:
-//!    u = W_O · concat(o_i)
-//!    if use_output_gate: u *= sigmoid(W_g · h)   (Kimi-K3 extension)
+//! 5. Output gate + projection (Kimi-K3 extension — gate BEFORE o_proj):
+//!    if use_output_gate: attn_out *= sigmoid(W_g · h)   (W_g ∈ R^{v_h·n_h × d})
+//!    u = W_O · gated_attn_out
+//!
+//! When `use_nope = true` (Kimi-K3-0.40B), no RoPE is applied — the decoupled
+//! "rope" components are concatenated without rotation. The model relies on
+//! KDA layers + attn-res for position information.
 //! ```
 //!
 //! # Weight layout note (loader concern, Phase 5)
@@ -85,6 +89,10 @@ pub struct MlaConfig {
     /// Kimi-K3 output gate (`mla_use_output_gate`). When true, output is gated
     /// by `sigmoid(W_g · h)`. Kimi-K3-0.40B: true.
     pub use_output_gate: bool,
+    /// Kimi-K3 no-RoPE mode (`mla_use_nope`). When true, the decoupled RoPE
+    /// components (`qk_rope_head_dim`) are concatenated WITHOUT rotation — the
+    /// model uses no positional encoding in MLA. Kimi-K3-0.40B: true.
+    pub use_nope: bool,
     /// RoPE base frequency. Actual `config.json`: **10,000** (corrected from the
     /// prior 1,000,000 assumption — Research 330 §7).
     pub rope_theta: f32,
@@ -109,6 +117,7 @@ impl MlaConfig {
             n_heads: 8,
             hidden_size: 1024,
             use_output_gate: true,
+            use_nope: true,
             rope_theta: 10_000.0,
             rms_norm_eps: 1e-5,
         }
@@ -174,7 +183,9 @@ pub struct MlaWeights {
     /// up-projection (actual model: `kv_a_layernorm`). Applied to `c_kv` before
     /// caching + `W_UK`/`W_UV`. Added per Research 330 §2.
     pub kv_a_norm_weight: Vec<f32>,
-    /// `W_g ∈ R^{d × d}` — output gate projection (Kimi-K3 extension).
+    /// `W_g ∈ R^{v_h·n_h × d}` — output gate projection (Kimi-K3 extension).
+    /// Applied to `attn_out` BEFORE `o_proj` (not after). Shape verified against
+    /// actual safetensors: `[512, 1024]` = `[v_h·n_h, d]`.
     /// Only present when `config.use_output_gate` is true.
     pub w_g: Option<Vec<f32>>,
 }
@@ -207,7 +218,8 @@ impl MlaWeights {
         let q_a_norm_weight = random_norm_weights(&mut rng, config.q_lora_rank);
         let kv_a_norm_weight = random_norm_weights(&mut rng, config.kv_lora_rank);
         let w_g = if config.use_output_gate {
-            Some(random_matrix(&mut rng, d, d))
+            // g_proj shape: [v_h*n_h, d] — gate applied to attn_out BEFORE o_proj
+            Some(random_matrix(&mut rng, config.v_head_dim * config.n_heads, d))
         } else {
             None
         };
@@ -489,10 +501,12 @@ pub fn mla_forward_token<'s>(
     // ── Step 2: Query up-projections (from normed c_q) ──────────────────────
     // q_c = W_UQ · c_q   [d_h * n_h]  (content query — NO RoPE)
     simd_matmul_rows(&mut scratch.q_c, &weights.w_uq, &scratch.c_q, d_h * n_h, d_qc);
-    // q_r_raw = W_QR · c_q   [d_r * n_h]  (rope query — RoPE applied next)
+    // q_r_raw = W_QR · c_q   [d_r * n_h]  (rope query — RoPE applied next, unless use_nope)
     simd_matmul_rows(&mut scratch.q_r, &weights.w_qr, &scratch.c_q, d_r * n_h, d_qc);
-    // Apply decoupled RoPE to each head's d_r sub-vector.
-    apply_decoupled_rope(rope_freqs, &mut scratch.q_r, d_r, n_h, pos);
+    // Apply decoupled RoPE to each head's d_r sub-vector (unless use_nope).
+    if !config.use_nope {
+        apply_decoupled_rope(rope_freqs, &mut scratch.q_r, d_r, n_h, pos);
+    }
 
     // ── Step 3: Key/value up-projections (from normed c_kv) ─────────────────
     // These compute the current token's k_c/v_c (overwritten in the attention
@@ -504,8 +518,10 @@ pub fn mla_forward_token<'s>(
     // k_r_raw = W_KR · h   [d_r]  (shared across all heads — NOT normed;
     // the rope key is the tail of kv_a_proj_with_mqa output, outside kv_a_norm)
     simd_matmul_rows(&mut scratch.k_r, &weights.w_kr, h, d_r, d);
-    // Apply RoPE to the shared key (n_heads=1 — it's shared).
-    apply_decoupled_rope(rope_freqs, &mut scratch.k_r, d_r, 1, pos);
+    // Apply RoPE to the shared key (n_heads=1 — it's shared), unless use_nope.
+    if !config.use_nope {
+        apply_decoupled_rope(rope_freqs, &mut scratch.k_r, d_r, 1, pos);
+    }
 
     // ── Step 5: Cache the normed latent + shared rope key ───────────────────
     // c_kv is ALREADY normed (Step 1); the attention loop up-projects directly.
@@ -596,21 +612,27 @@ pub fn mla_forward_token<'s>(
         }
     }
 
-    // ── Step 7: Output projection ──────────────────────────────────────────
-    // u = W_O · concat(o_i)   [d]
-    simd_matmul_rows(&mut scratch.output, &weights.w_o, &scratch.attn_out, d, v_h * n_h);
-
-    // ── Step 8: Output gate (Kimi-K3 extension) ─────────────────────────────
+    // ── Step 7: Output gate (Kimi-K3 extension) — BEFORE o_proj ───────────
+    // The actual model applies the gate to attn_output (shape [v_h*n_h]) BEFORE
+    // the output projection, not after. g_proj has shape [v_h*n_h, d].
+    //   g = sigmoid(g_proj · h)   [v_h*n_h]
+    //   attn_output *= g
+    // Then o_proj maps the gated attn_output back to [d].
+    let proj_size = v_h * n_h;
     if config.use_output_gate
         && let Some(ref w_g) = weights.w_g
     {
-        // gate = sigmoid(W_g · h)
-        simd_matmul_rows(&mut scratch.gate_buf, w_g, h, d, d);
-        for i in 0..d {
+        // gate = sigmoid(g_proj · h)  [v_h*n_h]
+        simd_matmul_rows(&mut scratch.gate_buf, w_g, h, proj_size, d);
+        for i in 0..proj_size {
             let g = 1.0 / (1.0 + (-scratch.gate_buf[i]).exp());
-            scratch.output[i] *= g;
+            scratch.attn_out[i] *= g;
         }
     }
+
+    // ── Step 8: Output projection ──────────────────────────────────────────
+    // u = W_O · gated_attn_out   [d]
+    simd_matmul_rows(&mut scratch.output, &weights.w_o, &scratch.attn_out, d, proj_size);
 
     &mut scratch.output[..d]
 }
@@ -745,6 +767,7 @@ mod tests {
             n_heads: 2,
             hidden_size: 16,
             use_output_gate: true,
+            use_nope: false,
             rope_theta: 10_000.0,
             rms_norm_eps: 1e-5,
         }

@@ -113,15 +113,19 @@ fn mla_forward_f64_reference(
         let mut q_r = vec![0.0; d_r * n_h];
         matmul_f64(&mut q_c, &weights_f64.w_uq, &c_q, d_h * n_h, d_qc);
         matmul_f64(&mut q_r, &weights_f64.w_qr, &c_q, d_r * n_h, d_qc);
-        for head in 0..n_h {
-            let start = head * d_r;
-            rope_f64(&mut q_r[start..start + d_r], pos, d_r, theta);
+        if !config.use_nope {
+            for head in 0..n_h {
+                let start = head * d_r;
+                rope_f64(&mut q_r[start..start + d_r], pos, d_r, theta);
+            }
         }
 
         // ── Step 3: Shared RoPE key (NOT normed — outside kv_a_layernorm) ──
         let mut k_r = vec![0.0; d_r];
         matmul_f64(&mut k_r, &weights_f64.w_kr, h, d_r, d);
-        rope_f64(&mut k_r, pos, d_r, theta);
+        if !config.use_nope {
+            rope_f64(&mut k_r, pos, d_r, theta);
+        }
 
         // Cache this token's normed latent + rope key.
         c_kv_cache.push(c_kv.clone());
@@ -181,19 +185,22 @@ fn mla_forward_f64_reference(
             }
         }
 
-        // ── Step 5: Output projection ──────────────────────────────────────
-        matmul_f64(&mut output, &weights_f64.w_o, &attn_out, d, v_h * n_h);
-
-        // ── Step 6: Output gate (Kimi-K3 extension) ────────────────────────
+        // ── Step 5: Output gate (Kimi-K3 extension) — BEFORE o_proj ────────
+        // Gate applied to attn_out (shape [v_h*n_h]) BEFORE output projection.
+        // g_proj shape: [v_h*n_h, d].
+        let proj_size = v_h * n_h;
         if config.use_output_gate
             && let Some(ref w_g) = weights_f64.w_g
         {
-            let mut gate = vec![0.0; d];
-            matmul_f64(&mut gate, w_g, h, d, d);
-            for i in 0..d {
-                output[i] *= 1.0 / (1.0 + (-gate[i]).exp());
+            let mut gate = vec![0.0; proj_size];
+            matmul_f64(&mut gate, w_g, h, proj_size, d);
+            for i in 0..proj_size {
+                attn_out[i] *= 1.0 / (1.0 + (-gate[i]).exp());
             }
         }
+
+        // ── Step 6: Output projection ──────────────────────────────────────
+        matmul_f64(&mut output, &weights_f64.w_o, &attn_out, d, proj_size);
     }
 
     output
@@ -244,6 +251,7 @@ fn small_config() -> MlaConfig {
         n_heads: 2,
         hidden_size: 16,
         use_output_gate: true,
+        use_nope: false,
         rope_theta: 10_000.0,
         rms_norm_eps: 1e-5,
     }

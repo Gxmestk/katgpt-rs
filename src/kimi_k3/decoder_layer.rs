@@ -8,15 +8,17 @@
 //! The root crate depends on both leaf crates, so it's the natural composition
 //! point (mirrors `tf_loop.rs`, `forward_hla`, etc.).
 //!
-//! # Layer topology (Research 330 §8)
+//! # Layer topology (VERIFIED against safetensors header, Research 331)
 //!
 //! | Layer | Attention | FFN     | Notes                          |
 //! |-------|-----------|---------|--------------------------------|
-//! | 0     | MLA       | Dense   | `first_k_dense_replace: 1`     |
-//! | 1-3   | KDA       | MoE     |                                |
-//! | 4     | MLA       | MoE     | Every 4th layer is full attn   |
-//! | 5-7   | KDA       | MoE     |                                |
+//! | 0     | KDA       | Dense   | `first_k_dense_replace: 1`     |
+//! | 1-2   | KDA       | MoE     |                                |
+//! | 3     | MLA       | MoE     | Every 4th layer is full attn   |
+//! | 4-6   | KDA       | MoE     |                                |
+//! | 7     | MLA       | MoE     | Every 4th layer is full attn   |
 //!
+//! Config `full_attn_layers: [4, 8]` is 1-indexed → MLA at 0-indexed 3, 7.
 //! All 8 layers use the attention residual block (`attn_res_block_size: 4`).
 //!
 //! # Forward path (single-token decode)
