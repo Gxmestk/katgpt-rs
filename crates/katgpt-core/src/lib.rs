@@ -663,6 +663,16 @@ pub mod group_invariance_probe;
 #[cfg(feature = "latent_trajectory_geometry")]
 pub mod latent_trajectory_geometry;
 
+// SWE Trajectory Freezer — modelless committed freeze of an inference
+// attempt's trajectory geometry (Proposal 011 Phase 5, Task T5.5). Composes
+// latent_trajectory_geometry + committed_field_blend + a local BLAKE3
+// envelope. Opt-in — research-validation primitive; promotion requires the
+// T5.6 G5 gate (cross-snapshot discrimination) to pass on real-model
+// trajectories (currently PARTIAL — T5.4 G3 FAIL at 29% on Kimi-K3 depth
+// trajectories; see .benchmarks/012_kimi_k3_trajectory_geometry.md).
+#[cfg(feature = "swe_trajectory_freeze")]
+pub mod swe_trajectory_freeze;
+
 // Latent Confounder Audit — three modelless forward-pass diagnostics
 // (R₀ zero-transition response + R_shift shift-invariance response + L
 // shortcut leakage) auditing a conditioning latent for action-irrelevant
@@ -838,6 +848,12 @@ pub use cross_stage_relocation::{
 #[cfg(feature = "latent_trajectory_geometry")]
 pub use latent_trajectory_geometry::{
     BifurcationResult, LatentTrajectoryGeometry, bifurcation_ratio, fast_acos, from_states,
+};
+
+#[cfg(feature = "swe_trajectory_freeze")]
+pub use swe_trajectory_freeze::{
+    FrozenAttempt, GeometrySummaryEncoder, SweTrajectoryFreezer, SWTF_MAGIC, SWTF_VERSION,
+    TrajectoryFreezeEnvelope, derive_directions,
 };
 
 #[cfg(feature = "latent_confounder_audit")]

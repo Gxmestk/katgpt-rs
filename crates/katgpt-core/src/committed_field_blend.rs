@@ -146,6 +146,7 @@ pub trait ArchetypeFieldSource<const D: usize>: Send + Sync {
 ///
 /// `pi` (N·4) + `tau` (4) + `pi_max` (4) + `blake3` (32) + `version` (8).
 /// At `N = 3` that's `12 + 4 + 4 + 32 + 8 = 60` bytes — one cache line.
+#[derive(Clone, Debug)]
 pub struct CommittedFieldBlend<const N: usize, const D: usize> {
     /// Committed blend weights (pre-sigmoid logits). Signed; clamped to
     /// `[-pi_max, +pi_max]`. Computed ONCE from trajectory summary at
