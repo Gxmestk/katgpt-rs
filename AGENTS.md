@@ -83,6 +83,27 @@ See `.agents/skills/research/SKILL.md` for the full research workflow:
 paper classification, 7-repo routing, fusion-first distillation, novelty gate,
 GOAT gate, and the mandatory modelless-unblock protocol (§3.5).
 
+## Substrate-First Gate (MANDATORY before implementing)
+
+Before implementing ANY new System impl, trait, perception/cognition/emotion
+pipeline, state management, spatial query, or vocabulary type, run the
+`.agents/skills/substrate-first/SKILL.md` skill. It enforces:
+
+1. **Vocabulary translation** — grep 3+ name variants (concepts ship under
+   operator names like `GenericSpatialBelief`, not English names like "threat
+   field"). A single-vocabulary grep returns ZERO hits even when substrate
+   fully exists.
+2. **Codebase grep** — search `*.rs` source across all 7 repos, not just
+   `.plans`/`.docs`/`.issues`.
+3. **Architectural rule check** — domain classification, two-brain model, sync
+   boundary, bridge pattern.
+4. **Consume vs. build decision** — if substrate exists, consume it; if not,
+   file an issue in the right repo FIRST.
+
+This prevents the recurring drift pattern where an agent builds a parallel
+system that duplicates already-shipped substrate under a different name
+(canonical failures: ThreatField Issue 047, orchard/motivation Issues 490/493).
+
 > **Repo count:** 7 repos total — `katgpt-rs` (public) + `riir-ai`, `riir-chain`,
 > `riir-neuron-db`, `riir-train`, `riir-game-sdk`, `riir-armageddon` (private).
 > The historical "5-repo quintet" terminology referred to the 5 distillation
