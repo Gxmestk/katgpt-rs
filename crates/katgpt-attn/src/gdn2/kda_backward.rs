@@ -1,4 +1,4 @@
-//! KDA analytic backward pass (Issue 389 T4 implementation).
+//! KDA analytic backward pass (Issue 389 T4 + Plan 318 Phase C C5 implementation).
 //!
 //! Implements the analytic gradient of `kda_forward_token` w.r.t. all
 //! trainable parameters (`KdaWeights`) and the input hidden state `h`.
@@ -7,26 +7,27 @@
 //!
 //! # Scope
 //!
-//! Single-token backward (the BPTT building block). Given:
-//! - `dL/doutput` — upstream gradient `[hidden_size]`
-//! - `dL/dS_t` — gradient flowing in from the *next* BPTT step (init 0 at t=L)
+//! Two entry points:
+//! - [`kda_backward_token`] — single-token backward (the BPTT building block).
+//!   Propagates the k=0 ShortConv tap only (current-token contribution). Correct
+//!   for L=1 or as the composition primitive where the caller handles multi-token
+//!   conv threading externally.
+//! - [`kda_backward_sequence`] — multi-token BPTT with conv-ring cross-token
+//!   gradient propagation (Plan 318 Phase C C5). Distributes all K ShortConv
+//!   taps across past tokens. This is the training-loop entry point.
 //!
-//! Produces:
-//! - `dL/dθ` for every weight θ in `KdaWeights` (accumulated into `KdaGradients`)
-//! - `dL/dh` — gradient w.r.t. the input hidden state `[hidden_size]`
-//! - `dL/dS_{t-1}` — gradient to propagate to the *previous* BPTT step
-//!
-//! The full BPTT-over-a-sequence loop is Plan 318 Phase C C5 work; this module
-//! provides the per-token primitive that the loop composes.
+//! Both share [`kda_core_backward`] (steps 5→2: output proj + RMSNorm gate +
+//! recurrence + gates/decay/L2Norm), which is DRY-extracted so the two entry
+//! points cannot diverge on the recurrence/norm math.
 //!
 //! # Why this lives here
 //!
 //! katgpt-rs is modelless-by-mandate (no training at runtime), BUT this module
 //! is the **CPU reference** for the GPU backward (C5). It belongs alongside the
 //! forward for two reasons: (1) the CPU primitive stays public so riir-train can
-//! consume it; (2) the finite-difference gradient check (T4) needs it in-tree.
-//! Production inference never calls this — it's gated behind `kda_linear`
-//! (same as the forward) and only consumed by riir-train-gpu.
+//! consume it; (2) the finite-difference gradient check (T4 + C5) needs it
+//! in-tree. Production inference never calls this — it's gated behind
+//! `kda_backward` (implies `kda_linear`) and only consumed by riir-train-gpu.
 
 use crate::gdn2::kda_forward::{KdaConfig, KdaForwardScratch, KdaLayerCache, KdaWeights};
 use crate::gdn2::kda_forward::kda_forward_token;
@@ -310,32 +311,50 @@ pub fn kda_forward_token_with_saved(
     (output, saved)
 }
 
-// ─── Backward ───────────────────────────────────────────────────────────────
+// ─── Core backward (steps 5→2) ──────────────────────────────────────────────
+//
+// Extracted so both the single-token [`kda_backward_token`] and the multi-token
+// [`kda_backward_sequence`] share the same recurrence/norm/gate backward math
+// (DRY: the only divergence is in the conv backward — single-token propagates
+// the k=0 tap only; multi-token distributes all K taps across past tokens).
 
-/// Analytic backward of `kda_forward_token` for a single token.
+/// Output of the core backward (steps 5→2).
 ///
-/// Consumes the [`KdaSavedActivations`] (from [`kda_forward_token_with_saved`])
-/// + upstream `d_output` (= dL/doutput, `[hidden_size]`) + incoming state grad
-/// `ds_next` (= dL/dS_t from the future BPTT step, `[n_heads][dk*dk]`).
+/// These are the per-token intermediate gradients the caller needs to drive the
+/// conv backward (step 1) + projection backward (step 0). The core itself
+/// accumulates into `grads`: `o_proj`, `o_norm_weight`, `a_log`, `dt_bias`.
+#[derive(Clone)]
+struct KdaCoreBackwardOutput {
+    /// dL/dz_q_conv `[proj]` — grad w.r.t. post-conv post-SiLU q.
+    dz_q_conv: Vec<f32>,
+    /// dL/dz_k_conv `[proj]`.
+    dz_k_conv: Vec<f32>,
+    /// dL/dz_v_conv `[proj]`.
+    dz_v_conv: Vec<f32>,
+    /// dL/dg_out `[proj]` — grad w.r.t. the output gate g_out = W^g · h.
+    dg_out_full: Vec<f32>,
+    /// dL/dbeta_pre `[n_heads]` — grad w.r.t. the pre-sigmoid beta projection.
+    dbeta_pre: Vec<f32>,
+    /// dL/dg_raw `[proj]` — grad w.r.t. the raw gate g_raw = W^{f_b} · f_a_hidden.
+    dg_raw: Vec<f32>,
+}
+
+/// Core backward: steps 5 (output proj) → 4 (RMSNorm gate) → 3 (recurrence) →
+/// 2 (gates + decay + L2Norm).
 ///
-/// Produces:
-/// - `grads` — weight gradients (accumulated `+=`).
-/// - `dh_out` — dL/dh (`[hidden_size]`, **overwritten**).
-/// - `ds_prev_out` — dL/dS_{t-1} (`[n_heads][dk*dk]`, **overwritten**).
-///
-/// `dh_scratch` and `ds_prev_scratch` are caller-allocated work buffers (sized
-/// `[hidden_size]` and `[n_heads * dk * dk]` respectively). The caller threads
-/// `ds_prev_out` from step t into `ds_next` of step t-1 for BPTT.
-pub fn kda_backward_token(
+/// Accumulates into `grads`: `o_proj`, `o_norm_weight`, `a_log`, `dt_bias`.
+/// Writes `dL/dS_{t-1}` into `ds_prev_out` (caller-allocated, `[n_heads][dk*dk]`).
+/// Returns the intermediate gradients the conv + projection backward need.
+#[allow(clippy::too_many_arguments)]
+fn kda_core_backward(
     config: &KdaConfig,
     weights: &KdaWeights,
     saved: &KdaSavedActivations,
     d_output: &[f32],
-    dh_out: &mut [f32],
-    grads: &mut KdaGradients,
     ds_next: &[Vec<f32>],
+    grads: &mut KdaGradients,
     ds_prev_out: &mut [Vec<f32>],
-) {
+) -> KdaCoreBackwardOutput {
     let d = config.hidden_size;
     let dk = config.head_dim;
     let n_h = config.n_heads;
@@ -343,11 +362,8 @@ pub fn kda_backward_token(
     let scale = config.q_scale();
 
     debug_assert_eq!(d_output.len(), d);
-    debug_assert_eq!(dh_out.len(), d);
     debug_assert_eq!(ds_next.len(), n_h);
     debug_assert_eq!(ds_prev_out.len(), n_h);
-
-    dh_out.fill(0.0);
 
     // ── Step 5 backward: output projection ─────────────────────────────────
     // output = W^o · o_concat.
@@ -370,12 +386,12 @@ pub fn kda_backward_token(
     let mut da_decay = vec![0.0f32; dk];
     let mut dgk = vec![0.0f32; dk];
     let mut dg_plus = vec![0.0f32; dk];
-    let mut dg_out_h = vec![0.0f32; dk];
     let mut dz_q_conv = vec![0.0f32; proj];
     let mut dz_k_conv = vec![0.0f32; proj];
     let mut dz_v_conv = vec![0.0f32; proj];
     let mut dg_raw = vec![0.0f32; proj];
     let mut dbeta_pre = vec![0.0f32; n_h];
+    let mut dg_out_full = vec![0.0f32; proj];
 
     for head in 0..n_h {
         let off = head * dk;
@@ -392,7 +408,8 @@ pub fn kda_backward_token(
             let y_i = ha.out_raw[i] * inv_rms;
             dy[i] = d_oc_i * gamma[i] * sig_gout;
             grads.o_norm_weight[i] += d_oc_i * y_i * sig_gout;
-            dg_out_h[i] = d_oc_i * y_i * gamma[i] * sig_gout * (1.0 - sig_gout);
+            let dg_out_i = d_oc_i * y_i * gamma[i] * sig_gout * (1.0 - sig_gout);
+            dg_out_full[off + i] = dg_out_i;
         }
         // RMSNorm backward: dL/dout_raw_j = dy_j·inv_rms − out_raw_j · Σ_i(dy_i·out_raw_i) / (dk · rms³)
         let rms = 1.0 / inv_rms;
@@ -464,12 +481,8 @@ pub fn kda_backward_token(
         }
 
         // ── Step 2 backward: gates + decay derivation ─────────────────────
-        // dbeta_h total = dbeta_from_delta + Σ_i derase_b[i]
-        //   (derase_b[i] above already accumulated dr[j]·S'[i,j]·k_h[i]; summing
-        //    over i gives the erase_b broadcast reduction. But dbeta_from_read
-        //    double-counts the same thing — let's reconcile.)
-        // Actually dbeta_from_read = Σ_i derase_b[i] (since erase_b[i]=beta_h).
-        // So dbeta_h_total = dbeta_from_delta + dbeta_from_read.
+        // dbeta_h total = dbeta_from_delta + dbeta_from_read
+        //   (= dbeta_from_delta + Σ_i derase_b[i], since erase_b[i] = beta_h).
         let dbeta_h_total = dbeta_from_delta + dbeta_from_read;
         dbeta_pre[head] = dbeta_h_total * ha.beta_h * (1.0 - ha.beta_h);
 
@@ -527,20 +540,61 @@ pub fn kda_backward_token(
         for i in 0..dk {
             dz_v_conv[off + i] = dv_h[i];
         }
-
-        // dg_out scatter (for W^g backward below)
-        for _i in 0..dk {
-            // dg_out_h already holds the head slice; we'll use it in the projection backward
-        }
     }
 
-    // ── Step 1 backward: ShortConv + SiLU ──────────────────────────────────
+    KdaCoreBackwardOutput {
+        dz_q_conv,
+        dz_k_conv,
+        dz_v_conv,
+        dg_out_full,
+        dbeta_pre,
+        dg_raw,
+    }
+}
+
+// ─── Backward ───────────────────────────────────────────────────────────────
+
+/// Analytic backward of `kda_forward_token` for a single token.
+///
+/// Consumes the [`KdaSavedActivations`] (from [`kda_forward_token_with_saved`])
+/// + upstream `d_output` (= dL/doutput, `[hidden_size]`) + incoming state grad
+/// `ds_next` (= dL/dS_t from the future BPTT step, `[n_heads][dk*dk]`).
+///
+/// Produces:
+/// - `grads` — weight gradients (accumulated `+=`).
+/// - `dh_out` — dL/dh (`[hidden_size]`, **overwritten**).
+/// - `ds_prev_out` — dL/dS_{t-1} (`[n_heads][dk*dk]`, **overwritten**).
+///
+/// The caller threads `ds_prev_out` from step t into `ds_next` of step t-1 for
+/// BPTT. The conv backward propagates ONLY the k=0 tap (current-token
+/// contribution) — for multi-token sequences with conv cross-token propagation,
+/// use [`kda_backward_sequence`] instead.
+pub fn kda_backward_token(
+    config: &KdaConfig,
+    weights: &KdaWeights,
+    saved: &KdaSavedActivations,
+    d_output: &[f32],
+    dh_out: &mut [f32],
+    grads: &mut KdaGradients,
+    ds_next: &[Vec<f32>],
+    ds_prev_out: &mut [Vec<f32>],
+) {
+    let d = config.hidden_size;
+    let dk = config.head_dim;
+    let n_h = config.n_heads;
+    let proj = dk * n_h;
+
+    debug_assert_eq!(d_output.len(), d);
+    debug_assert_eq!(dh_out.len(), d);
+
+    dh_out.fill(0.0);
+
+    // ── Steps 5→2: core backward (recurrence + norm + gates). ─────────────
+    let core = kda_core_backward(config, weights, saved, d_output, ds_next, grads, ds_prev_out);
+
+    // ── Step 1 backward: ShortConv + SiLU (k=0 tap only — single-token scope).
     // Forward: z_q_conv[c] = silu( Σ_k weight[c,k] · buf_q[c, slot(k)] )
-    // The forward saved z_q_conv as POST-SiLU. We need pre-SiLU for silu'.
-    // We recover pre-SiLU by inverting silu numerically (Newton, ~5 iters).
-    // Then: dL/d(conv_out) = dL/dz_q_conv · silu'(conv_out)
-    //       dL/dweight[c,k] += dL/d(conv_out[c]) · buf_q[c, slot(k)]
-    //       dL/dz_q[c] = dL/d(conv_out[c]) · weight[c,0]  (current-token only)
+    // We recover pre-SiLU via Newton inversion, then propagate the k=0 tap.
     //
     // IMPORTANT: the saved conv_buf_* snapshots were taken BEFORE the forward
     // wrote the current input. The conv forward reads the buffer AFTER writing
@@ -556,6 +610,9 @@ pub fn kda_backward_token(
         conv_buf_v_patched[c * ks + saved.conv_buf_idx] = saved.z_v[c];
     }
 
+    let mut dz_q_conv = core.dz_q_conv;
+    let mut dz_k_conv = core.dz_k_conv;
+    let mut dz_v_conv = core.dz_v_conv;
     backward_conv_silu(
         &saved.z_q_conv,
         &mut dz_q_conv,
@@ -592,34 +649,168 @@ pub fn kda_backward_token(
     proj_backward(&mut grads.q_proj, dh_out, &dz_q_conv, &saved.h, &weights.q_proj, proj, d);
     proj_backward(&mut grads.k_proj, dh_out, &dz_k_conv, &saved.h, &weights.k_proj, proj, d);
     proj_backward(&mut grads.v_proj, dh_out, &dz_v_conv, &saved.h, &weights.v_proj, proj, d);
-
-    // g_out: dg_out assembled from per-head dg_out_h values.
-    let mut dg_out_full = vec![0.0f32; proj];
-    for head in 0..n_h {
-        let off = head * dk;
-        // Recompute dg_out_h for this head (we didn't save it across iterations).
-        // Actually we need to redo the RMSNorm step 4 backward to get dg_out...
-        // Simpler: the forward gate path is g_out = W^g · h (proj-wide), and
-        // dg_out comes from the sigmoid'(g_out) · y · gamma in step 4 backward.
-        // We computed dg_out_h inside the loop but didn't save it. Let's recompute
-        // the per-head dg_out here by re-reading do_concat.
-        let ha = &saved.heads[head];
-        let inv_rms = ha.inv_rms;
-        let gamma = &weights.o_norm_weight;
-        for i in 0..dk {
-            let sig_gout = sigmoid(saved.g_out[off + i]);
-            let d_oc_i = do_concat[off + i];
-            let y_i = ha.out_raw[i] * inv_rms;
-            dg_out_full[off + i] = d_oc_i * y_i * gamma[i] * sig_gout * (1.0 - sig_gout);
-        }
-    }
-    proj_backward(&mut grads.g_proj, dh_out, &dg_out_full, &saved.h, &weights.g_proj, proj, d);
-    proj_backward(&mut grads.beta_proj, dh_out, &dbeta_pre, &saved.h, &weights.beta_proj, n_h, d);
+    proj_backward(&mut grads.g_proj, dh_out, &core.dg_out_full, &saved.h, &weights.g_proj, proj, d);
+    proj_backward(&mut grads.beta_proj, dh_out, &core.dbeta_pre, &saved.h, &weights.beta_proj, n_h, d);
 
     // Two-stage gate: f_a_hid = W^{f_a} · h, then g_raw = W^{f_b} · f_a_hid.
     let mut df_a_hidden = vec![0.0f32; dk];
-    proj_backward(&mut grads.f_b_proj, &mut df_a_hidden, &dg_raw, &saved.f_a_hidden, &weights.f_b_proj, proj, dk);
+    proj_backward(&mut grads.f_b_proj, &mut df_a_hidden, &core.dg_raw, &saved.f_a_hidden, &weights.f_b_proj, proj, dk);
     proj_backward(&mut grads.f_a_proj, dh_out, &df_a_hidden, &saved.h, &weights.f_a_proj, dk, d);
+}
+
+// ─── Multi-token backward (Plan 318 Phase C C5) ─────────────────────────────
+
+/// Analytic backward over a sequence of `L` tokens with conv-ring cross-token
+/// gradient propagation.
+///
+/// This is the full BPTT loop that composes the per-token core backward
+/// ([`kda_core_backward`]) with cross-token conv distribution. Unlike calling
+/// [`kda_backward_token`] in a manual reverse loop, this propagates the k>0
+/// ShortConv taps — past-token contributions through the conv ring buffer —
+/// which the single-token primitive intentionally omits (Issue 389 T4 scope).
+///
+/// # Algorithm
+///
+/// Forward (per token t): `conv_out_t[c] = Σ_{k=0}^{K-1} weight[c,k] · z_{t-k}[c]`.
+/// So `dL/dz_{t'}[c] = Σ_{t : t'∈[t-K+1,t]} dL/d(conv_out_t[c]) · weight[c, t-t']`.
+///
+/// Process tokens in reverse (t = L-1 .. 0). When processing token t:
+/// 1. Core backward → `dz_q_conv_t`, etc. + `ds_prev_t` + non-conv/non-proj grads.
+/// 2. SiLU backward → `dconv_out_t`.
+/// 3. Distribute conv: for each tap k, add `dconv_out_t[c] · weight[c,k]` to
+///    `dz_accum[t-k][c]` (skip if `t-k < 0` — the ring buffer started at zeros),
+///    and accumulate `grads.conv_weight[c,k] += dconv_out_t[c] · saved[t-k].z[c]`.
+/// 4. `dz_accum[t]` is now complete (all contributions from tokens t, t+1, ...,
+///    min(t+K-1, L-1) have arrived) → run the projection backward for token t.
+/// 5. Thread `ds_prev_t` → `ds_next` for the next (t-1) iteration.
+///
+/// # Arguments
+/// * `saved_tokens` — per-token saved activations (from a forward pass over the
+///   sequence with a freshly-reset cache).
+/// * `d_outputs` — per-token upstream gradients `dL/doutput[t]`, `[hidden_size]` each.
+/// * `dh_outs` — per-token output gradients `dL/dh[t]`, `[hidden_size]` each
+///   (**overwritten**).
+/// * `grads` — weight gradients (accumulated `+=` across all tokens).
+pub fn kda_backward_sequence(
+    config: &KdaConfig,
+    weights: &KdaWeights,
+    saved_tokens: &[KdaSavedActivations],
+    d_outputs: &[Vec<f32>],
+    dh_outs: &mut [Vec<f32>],
+    grads: &mut KdaGradients,
+) {
+    let l = saved_tokens.len();
+    debug_assert_eq!(d_outputs.len(), l);
+    debug_assert_eq!(dh_outs.len(), l);
+    if l == 0 {
+        return;
+    }
+
+    let dk = config.head_dim;
+    let n_h = config.n_heads;
+    let proj = dk * n_h;
+    let d = config.hidden_size;
+    let ks = config.conv_kernel_size;
+    let state_sz = dk * dk;
+
+    // Cross-token conv accumulators for dz_q, dz_k, dz_v (pre-conv projection outputs).
+    let mut dz_q_accum: Vec<Vec<f32>> = (0..l).map(|_| vec![0.0f32; proj]).collect();
+    let mut dz_k_accum: Vec<Vec<f32>> = (0..l).map(|_| vec![0.0f32; proj]).collect();
+    let mut dz_v_accum: Vec<Vec<f32>> = (0..l).map(|_| vec![0.0f32; proj]).collect();
+
+    // BPTT state gradient. Init to zeros at t=L (no future contribution).
+    let mut ds_next: Vec<Vec<f32>> = (0..n_h).map(|_| vec![0.0f32; state_sz]).collect();
+    let mut ds_prev: Vec<Vec<f32>> = (0..n_h).map(|_| vec![0.0f32; state_sz]).collect();
+
+    for t in (0..l).rev() {
+        // ── Steps 5→2: core backward for token t. ─────────────────────────
+        let core = kda_core_backward(
+            config,
+            weights,
+            &saved_tokens[t],
+            &d_outputs[t],
+            &ds_next,
+            grads,
+            &mut ds_prev,
+        );
+
+        // ── Step 1: SiLU backward → dconv_out, then conv distribution. ─────
+        // SiLU backward: dL/d(conv_out) = dL/dz_conv · silu'(pre_silu)
+        // where pre_silu is recovered via Newton inversion from the saved
+        // post-SiLU value (same as backward_conv_silu phase 1).
+        let mut dconv_out_q = vec![0.0f32; proj];
+        let mut dconv_out_k = vec![0.0f32; proj];
+        let mut dconv_out_v = vec![0.0f32; proj];
+        for c in 0..proj {
+            let y_q = saved_tokens[t].z_q_conv[c];
+            let x_q = silu_inverse(y_q);
+            let sig_q = sigmoid(x_q);
+            dconv_out_q[c] = core.dz_q_conv[c] * sig_q * (1.0 + x_q * (1.0 - sig_q));
+
+            let y_k = saved_tokens[t].z_k_conv[c];
+            let x_k = silu_inverse(y_k);
+            let sig_k = sigmoid(x_k);
+            dconv_out_k[c] = core.dz_k_conv[c] * sig_k * (1.0 + x_k * (1.0 - sig_k));
+
+            let y_v = saved_tokens[t].z_v_conv[c];
+            let x_v = silu_inverse(y_v);
+            let sig_v = sigmoid(x_v);
+            dconv_out_v[c] = core.dz_v_conv[c] * sig_v * (1.0 + x_v * (1.0 - sig_v));
+        }
+
+        // Conv distribution: for each tap k, contribute to token t-k.
+        // Forward: conv_out_t[c] = Σ_k weight[c,k] · z_{t-k}[c].
+        // Backward: dz_{t-k}[c] += dconv_out_t[c] · weight[c,k]
+        //           dweight[c,k] += dconv_out_t[c] · z_{t-k}[c]
+        for k in 0..ks {
+            let t_past = t as isize - k as isize;
+            if t_past < 0 {
+                break; // Ring buffer was zero before the sequence start; those
+                       // contributions are zero (z=0 → dweight term = 0; and
+                       // there's no dz accumulator for t < 0).
+            }
+            let tp = t_past as usize;
+            let z_q_tp = &saved_tokens[tp].z_q;
+            let z_k_tp = &saved_tokens[tp].z_k;
+            let z_v_tp = &saved_tokens[tp].z_v;
+            let dz_q_tp = &mut dz_q_accum[tp];
+            let dz_k_tp = &mut dz_k_accum[tp];
+            let dz_v_tp = &mut dz_v_accum[tp];
+            for c in 0..proj {
+                let w_off = c * ks + k;
+                let wq = weights.q_conv_weight[w_off];
+                let wk = weights.k_conv_weight[w_off];
+                let wv = weights.v_conv_weight[w_off];
+                let dq = dconv_out_q[c];
+                let dk_val = dconv_out_k[c];
+                let dv = dconv_out_v[c];
+                dz_q_tp[c] += dq * wq;
+                dz_k_tp[c] += dk_val * wk;
+                dz_v_tp[c] += dv * wv;
+                grads.q_conv_weight[w_off] += dq * z_q_tp[c];
+                grads.k_conv_weight[w_off] += dk_val * z_k_tp[c];
+                grads.v_conv_weight[w_off] += dv * z_v_tp[c];
+            }
+        }
+
+        // ── Step 0: projection backward for token t (dz_*_accum[t] is complete).
+        // Each: y = W · h.  dL/dW += outer(dL/dy, h).  dL/dh += Wᵀ · dL/dy.
+        let dh_t = &mut dh_outs[t];
+        dh_t.fill(0.0);
+        proj_backward(&mut grads.q_proj, dh_t, &dz_q_accum[t], &saved_tokens[t].h, &weights.q_proj, proj, d);
+        proj_backward(&mut grads.k_proj, dh_t, &dz_k_accum[t], &saved_tokens[t].h, &weights.k_proj, proj, d);
+        proj_backward(&mut grads.v_proj, dh_t, &dz_v_accum[t], &saved_tokens[t].h, &weights.v_proj, proj, d);
+        proj_backward(&mut grads.g_proj, dh_t, &core.dg_out_full, &saved_tokens[t].h, &weights.g_proj, proj, d);
+        proj_backward(&mut grads.beta_proj, dh_t, &core.dbeta_pre, &saved_tokens[t].h, &weights.beta_proj, n_h, d);
+
+        // Two-stage gate: f_a_hid = W^{f_a} · h, then g_raw = W^{f_b} · f_a_hid.
+        let mut df_a_hidden = vec![0.0f32; dk];
+        proj_backward(&mut grads.f_b_proj, &mut df_a_hidden, &core.dg_raw, &saved_tokens[t].f_a_hidden, &weights.f_b_proj, proj, dk);
+        proj_backward(&mut grads.f_a_proj, dh_t, &df_a_hidden, &saved_tokens[t].h, &weights.f_a_proj, dk, d);
+
+        // ── Thread ds_prev → ds_next for the next (t-1) iteration. ─────────
+        core::mem::swap(&mut ds_next, &mut ds_prev);
+    }
 }
 
 // ─── Backward helpers ───────────────────────────────────────────────────────
