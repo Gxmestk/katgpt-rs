@@ -359,24 +359,24 @@ impl MlaKVCache {
 /// Sized for a single token's decode. Reuse across tokens via `clear()`/overwrite.
 pub struct MlaForwardScratch {
     // Down-projection outputs
-    c_kv: Vec<f32>,      // [d_c]
-    c_q: Vec<f32>,       // [d'_c]
+    pub(crate) c_kv: Vec<f32>,      // [d_c]
+    pub(crate) c_q: Vec<f32>,       // [d'_c]
     // Query up-projections
-    q_c: Vec<f32>,       // [d_h * n_h]
-    q_r: Vec<f32>,       // [d_R^h * n_h] — RoPE applied in-place
+    pub(crate) q_c: Vec<f32>,       // [d_h * n_h]
+    pub(crate) q_r: Vec<f32>,       // [d_R^h * n_h] — RoPE applied in-place
     // Key/value up-projections
-    k_c: Vec<f32>,       // [d_h * n_h]
-    v_c: Vec<f32>,       // [v_h * n_h]
+    pub(crate) k_c: Vec<f32>,       // [d_h * n_h]
+    pub(crate) v_c: Vec<f32>,       // [v_h * n_h]
     // Shared RoPE key
-    k_r: Vec<f32>,       // [d_R^h]
+    pub(crate) k_r: Vec<f32>,       // [d_R^h]
     // Per-head attention output
-    attn_out: Vec<f32>,  // [v_h * n_h]
+    pub(crate) attn_out: Vec<f32>,  // [v_h * n_h]
     // Attention scores scratch
-    scores: Vec<f32>,    // [seq_len]
+    pub(crate) scores: Vec<f32>,    // [seq_len]
     // Output gate scratch
-    gate_buf: Vec<f32>,  // [d]
+    pub(crate) gate_buf: Vec<f32>,  // [d]
     // Output
-    output: Vec<f32>,    // [d]
+    pub(crate) output: Vec<f32>,    // [d]
 }
 
 impl MlaForwardScratch {
@@ -430,7 +430,7 @@ fn apply_decoupled_rope(
 /// `q_a_layernorm` (on the query latent) and `kv_a_layernorm` (on the KV latent
 /// before up-projection/caching).
 #[inline]
-fn rmsnorm_inplace(x: &mut [f32], gamma: &[f32], eps: f32) {
+pub(crate) fn rmsnorm_inplace(x: &mut [f32], gamma: &[f32], eps: f32) {
     debug_assert_eq!(x.len(), gamma.len(), "rmsnorm_inplace: dim mismatch");
     let n = x.len();
     let sum_sq = simd_dot_f32(x, x, n);

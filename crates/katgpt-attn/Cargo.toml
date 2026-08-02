@@ -115,6 +115,11 @@ gated_mlp = ["katgpt-forward/gated_mlp", "katgpt-transformer/gated_mlp"]
 # katgpt-kv for RopeFreqs (the cached sin/cos RoPE substrate). Opt-in,
 # default-off until Phase 6 real-model GOAT.
 mla_attention = ["dep:katgpt-kv", "katgpt-kv/shard_kv"]
+# MLA analytic backward pass (Plan 318 Phase C C4). The CPU reference for
+# the GPU backward. Implies `mla_attention`. katgpt-rs is
+# modelless-by-mandate — this is the training-time reference consumed by
+# riir-train, never on the production inference path. Opt-in, default-off.
+mla_backward = ["mla_attention"]
 # KDA (Kimi Delta Attention) — Kimi Linear (arxiv 2510.26692) §3-4.
 # Implements the per-token decode forward for KDA linear attention. The
 # recurrent kernel is REUSED from `gdn2_attention` (Gdn2GateConfig::Kda);

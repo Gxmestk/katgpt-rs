@@ -67,3 +67,10 @@ pub mod hga_forward;
 // Proposal 032 Phase 2, Research 327.
 #[cfg(feature = "mla_attention")]
 pub mod mla;
+
+// MLA analytic backward pass (Plan 318 Phase C C4). CPU reference for the
+// GPU backward. Gated behind `mla_backward` (implies `mla_attention`).
+// katgpt-rs is modelless-by-mandate; this is the training-time reference
+// consumed by riir-train, never on the production inference path.
+#[cfg(feature = "mla_backward")]
+pub mod mla_backward;
