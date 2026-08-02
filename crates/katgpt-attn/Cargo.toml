@@ -122,3 +122,8 @@ mla_attention = ["dep:katgpt-kv", "katgpt-kv/shard_kv"]
 # + Swish + L2Norm + low-rank α + sigmoid β + output gate + head-wise RMSNorm).
 # Proposal 032 Phase 4, Research 329. Opt-in, default-off until Phase 6 GOAT.
 kda_linear = ["gdn2_attention"]
+# KDA analytic backward pass (Issue 389 T4). The CPU reference for the GPU
+# backward (Plan 318 Phase C C5). Implies `kda_linear`. katgpt-rs is
+# modelless-by-mandate — this is the training-time reference consumed by
+# riir-train, never on the production inference path. Opt-in, default-off.
+kda_backward = ["kda_linear"]

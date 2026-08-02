@@ -24,6 +24,13 @@ pub mod short_conv;
 // Research 329.
 #[cfg(feature = "kda_linear")]
 pub mod kda_forward;
+// KDA analytic backward pass (Issue 389 T4). CPU reference for the GPU
+// backward (Plan 318 Phase C C5). Gated behind `kda_backward` (implies
+// `kda_linear`). katgpt-rs is modelless-by-mandate; this is the training-time
+// reference consumed by riir-train, never on the production inference path.
+#[cfg(feature = "kda_backward")]
+pub mod kda_backward;
+
 // Plan 424 T4.2: GDN2 cache ↔ tree verify bridge. Gated by the parent
 // `gdn_tree_verify` feature (which implies `gdn2_attention` + forwards to
 // `katgpt-core/gdn_tree_verify`).
