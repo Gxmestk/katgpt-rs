@@ -31,7 +31,9 @@
 
 use crate::gdn2::kda_forward::{KdaConfig, KdaForwardScratch, KdaLayerCache, KdaWeights};
 use crate::gdn2::kda_forward::kda_forward_token;
-use katgpt_core::simd::{simd_outer_product_acc, simd_sum_sq};
+use katgpt_core::simd::{
+    simd_outer_product_acc, simd_sum_sq, simd_transpose_matvec_acc, simd_transpose_matvec_into,
+};
 
 // ─── Saved activations ──────────────────────────────────────────────────────
 
@@ -371,7 +373,7 @@ fn kda_core_backward(
     // do_concat = W^oᵀ · d_output
     simd_outer_product_acc(&mut grads.o_proj, d_output, &saved.o_concat, d, proj);
     let mut do_concat = vec![0.0f32; proj];
-    transpose_matvec(&mut do_concat, &weights.o_proj, d_output, d, proj);
+    simd_transpose_matvec_into(&mut do_concat, &weights.o_proj, d_output, d, proj);
 
     // Per-head work buffers (reused across heads).
     let mut dout_raw = vec![0.0f32; dk];
@@ -882,33 +884,8 @@ fn proj_backward(
     rows: usize,
     cols: usize,
 ) {
-    // grad_W += outer(grad_y, h)
-    for r in 0..rows {
-        let gy = grad_y[r];
-        let row_off = r * cols;
-        for c in 0..cols {
-            grad_w[row_off + c] += gy * h[c];
-        }
-    }
-    // grad_h += Wᵀ · grad_y
-    for c in 0..cols {
-        let mut acc = 0.0f32;
-        for r in 0..rows {
-            acc += w[r * cols + c] * grad_y[r];
-        }
-        grad_h[c] += acc;
-    }
-}
-
-/// `out = Wᵀ · v` for row-major `[rows, cols]` W. Overwrites `out`.
-fn transpose_matvec(out: &mut [f32], w: &[f32], v: &[f32], rows: usize, cols: usize) {
-    for c in 0..cols {
-        let mut acc = 0.0f32;
-        for r in 0..rows {
-            acc += w[r * cols + c] * v[r];
-        }
-        out[c] = acc;
-    }
+    simd_outer_product_acc(grad_w, grad_y, h, rows, cols);
+    simd_transpose_matvec_acc(grad_h, w, grad_y, rows, cols);
 }
 
 /// L2-normalize with eps outside the sqrt (mirrors kda_forward.rs).

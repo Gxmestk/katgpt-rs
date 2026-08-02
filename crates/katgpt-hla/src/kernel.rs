@@ -33,9 +33,10 @@ use katgpt_types::simd;
 /// Transpose-matvec: `out[j] = Σ_i vec[i] · mat[i*hd + j]`.
 ///
 /// This is the `qᵀ · SK` / `qᵀ · PKV` / `qᵀ · E` kernel that appears at the
-/// heart of every HLA readout and cross-term. The loop is interchanged to
-/// i-outer / j-inner so the inner loop reads `mat_row[j]` sequentially
-/// (row-major contiguous) instead of strided `mat[i*hd + j]` column access.
+/// heart of every HLA readout and cross-term. Delegates to
+/// [`simd::simd_transpose_matvec_into`] — the same cache-friendly i-outer /
+/// j-inner loop interchange this function used to do by hand, now with real
+/// NEON/AVX2/WASM SIMD dispatch instead of relying on auto-vectorization.
 ///
 /// Previously this exact pattern was hand-rolled at 6+ call sites with the
 /// same `unsafe get_unchecked` dance and the same TODO(T6) comment. Hoisting
@@ -55,17 +56,7 @@ fn transpose_matvec_into(out: &mut [f32], vec: &[f32], mat: &[f32], hd: usize) {
         hd * hd
     );
     debug_assert!(out.len() >= hd, "out too short: {} < {hd}", out.len());
-    // Zero the output prefix (callers expect accumulation from zero).
-    out[..hd].fill(0.0);
-    for i in 0..hd {
-        let vi = unsafe { *vec.get_unchecked(i) };
-        let row = unsafe { mat.get_unchecked(i * hd..i * hd + hd) };
-        for j in 0..hd {
-            unsafe {
-                *out.get_unchecked_mut(j) += vi * *row.get_unchecked(j);
-            }
-        }
-    }
+    simd::simd_transpose_matvec_into(&mut out[..hd], &mat[..hd * hd], &vec[..hd], hd, hd);
 }
 
 // ── Symmetric Second-Order HLA Kernels ─────────────────────────

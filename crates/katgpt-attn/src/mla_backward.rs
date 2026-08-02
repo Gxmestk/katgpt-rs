@@ -17,7 +17,10 @@
 //! forward. Gated behind `mla_backward` (implies `mla_attention`).
 
 use crate::mla::{MlaConfig, MlaForwardScratch, MlaKVCache, MlaWeights, mla_forward_token};
-use katgpt_core::simd::{simd_dot_f32, simd_outer_product_acc, simd_sum_sq};
+use katgpt_core::simd::{
+    simd_dot_f32, simd_outer_product_acc, simd_sum_sq, simd_transpose_matvec_acc,
+    simd_transpose_matvec_into,
+};
 use katgpt_kv::shard_kv::rope::RopeFreqs;
 
 // ─── Saved activations ──────────────────────────────────────────────────────
@@ -380,7 +383,7 @@ pub fn mla_backward_token(
     // dL/d(gated_attn_out) = W_O^T · d_output
     // dL/d(W_O) += outer(d_output, gated_attn_out)
     let mut d_gated_attn = vec![0.0f32; proj_size];
-    transpose_matvec_into(&mut d_gated_attn, &weights.w_o, d_output, d, proj_size);
+    simd_transpose_matvec_into(&mut d_gated_attn, &weights.w_o, d_output, d, proj_size);
     simd_outer_product_acc(&mut grads.w_o, d_output, &saved.attn_out_gated, d, proj_size);
 
     // ── Step 11 backward: output gate ──
@@ -401,7 +404,7 @@ pub fn mla_backward_token(
         }
         // dh_out += W_g^T · d_gate_pre
         if let Some(ref w_g) = weights.w_g {
-            transpose_matvec_acc(&mut all_dh[pos], w_g, &d_gate_pre, proj_size, d);
+            simd_transpose_matvec_acc(&mut all_dh[pos], w_g, &d_gate_pre, proj_size, d);
         }
         d_attn
     } else {
@@ -471,7 +474,7 @@ pub fn mla_backward_token(
             // dL/d(c_kv_j) += W_UV[head slice]^T · d_v_c_j_h
             // Accumulate for ALL positions — each position's c_kv flows back
             // through its own rmsnorm + W_DKV.
-            transpose_matvec_acc(
+            simd_transpose_matvec_acc(
                 &mut d_c_kv_normed_all[j],
                 &weights.w_uv[head * v_h * d_c..(head + 1) * v_h * d_c],
                 &d_v_c_j_h,
@@ -529,7 +532,7 @@ pub fn mla_backward_token(
 
             // dL/d(c_kv_j) += W_UK[head slice]^T · d_k_c_j_h
             // Accumulate for ALL positions.
-            transpose_matvec_acc(
+            simd_transpose_matvec_acc(
                 &mut d_c_kv_normed_all[j],
                 &weights.w_uk[head * d_h * d_c..(head + 1) * d_h * d_c],
                 &d_k_c_j_h,
@@ -570,13 +573,13 @@ pub fn mla_backward_token(
     // dL/d(c_q_normed) = W_UQ^T · dL/d(q_c)
     // dL/d(W_UQ) += outer(d_q_c, c_q_normed)
     let mut d_c_q_normed = vec![0.0f32; d_qc];
-    transpose_matvec_into(&mut d_c_q_normed, &weights.w_uq, &d_q_c, d_h * n_h, d_qc);
+    simd_transpose_matvec_into(&mut d_c_q_normed, &weights.w_uq, &d_q_c, d_h * n_h, d_qc);
     simd_outer_product_acc(&mut grads.w_uq, &d_q_c, &saved.c_q_normed, d_h * n_h, d_qc);
 
     // ── Step 5b backward: q_r_raw = W_QR · c_q_normed ──
     // dL/d(c_q_normed) += W_QR^T · dL/d(q_r_raw)
     // dL/d(W_QR) += outer(d_q_r_raw, c_q_normed)
-    transpose_matvec_acc(&mut d_c_q_normed, &weights.w_qr, &d_q_r_raw, d_r * n_h, d_qc);
+    simd_transpose_matvec_acc(&mut d_c_q_normed, &weights.w_qr, &d_q_r_raw, d_r * n_h, d_qc);
     simd_outer_product_acc(&mut grads.w_qr, &d_q_r_raw, &saved.c_q_normed, d_r * n_h, d_qc);
 
     // ── Step 3 backward: c_q_normed = rmsnorm(c_q_raw, q_a_norm_weight) ──
@@ -594,7 +597,7 @@ pub fn mla_backward_token(
     // dL/d(W_DQ) += outer(d_c_q_raw, h)
     // dh_out += W_DQ^T · d_c_q_raw
     simd_outer_product_acc(&mut grads.w_dq, &d_c_q_raw, &saved.h, d_qc, d);
-    transpose_matvec_acc(&mut all_dh[pos], &weights.w_dq, &d_c_q_raw, d_qc, d);
+    simd_transpose_matvec_acc(&mut all_dh[pos], &weights.w_dq, &d_c_q_raw, d_qc, d);
 
     // ── k_r gradient: propagate d_k_r_all[j] for ALL positions ──
     // For each j in 0..seq: k_r_j = RoPE(W_KR · h_j) at position j.
@@ -611,7 +614,7 @@ pub fn mla_backward_token(
             d_k_r_j.to_vec()
         };
         simd_outer_product_acc(&mut grads.w_kr, &d_k_r_j_raw, &all_saved[j].h, d_r, d);
-        transpose_matvec_acc(&mut all_dh[j], &weights.w_kr, &d_k_r_j_raw, d_r, d);
+        simd_transpose_matvec_acc(&mut all_dh[j], &weights.w_kr, &d_k_r_j_raw, d_r, d);
     }
 
     // ── Step 1 backward: c_kv_normed = rmsnorm(c_kv_raw, kv_a_norm_weight) ──
@@ -630,7 +633,7 @@ pub fn mla_backward_token(
         // dL/d(W_DKV) += outer(d_c_kv_j_raw, h_j)
         // all_dh[j] += W_DKV^T · d_c_kv_j_raw
         simd_outer_product_acc(&mut grads.w_dkv, &d_c_kv_j_raw, &all_saved[j].h, d_c, d);
-        transpose_matvec_acc(&mut all_dh[j], &weights.w_dkv, &d_c_kv_j_raw, d_c, d);
+        simd_transpose_matvec_acc(&mut all_dh[j], &weights.w_dkv, &d_c_kv_j_raw, d_c, d);
     }
 
     let _ = (d_h, d_r, v_h, proj_size);
@@ -685,28 +688,3 @@ pub fn rmsnorm_backward(
     dx
 }
 
-// ─── Math helpers ───────────────────────────────────────────────────────────
-
-/// `out = W^T · v` for row-major `[rows, cols]` W. Overwrites `out` `[cols]`.
-#[allow(clippy::needless_range_loop)]
-fn transpose_matvec_into(out: &mut [f32], w: &[f32], v: &[f32], rows: usize, cols: usize) {
-    for c in 0..cols {
-        let mut acc = 0.0f32;
-        for r in 0..rows {
-            acc += w[r * cols + c] * v[r];
-        }
-        out[c] = acc;
-    }
-}
-
-/// `acc += W^T · v` for row-major `[rows, cols]` W. Accumulates into `acc` `[cols]`.
-#[allow(clippy::needless_range_loop)]
-fn transpose_matvec_acc(acc: &mut [f32], w: &[f32], v: &[f32], rows: usize, cols: usize) {
-    for c in 0..cols {
-        let mut sum = 0.0f32;
-        for r in 0..rows {
-            sum += w[r * cols + c] * v[r];
-        }
-        acc[c] += sum;
-    }
-}

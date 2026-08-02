@@ -26,7 +26,10 @@
 use crate::moe::{
     MoeConfig, MoeForwardScratch, MoeWeights, select_topk_indices, situ_inplace,
 };
-use katgpt_core::simd::{simd_matmul_rows, simd_outer_product_acc, simd_sum_sq};
+use katgpt_core::simd::{
+    simd_dot_f32, simd_matmul_rows, simd_outer_product_acc, simd_sum_sq, simd_transpose_matvec_acc,
+    simd_transpose_matvec_into,
+};
 use katgpt_core::types::math::rmsnorm_with_gamma_eps;
 
 // ─── Saved activations ──────────────────────────────────────────────────────
@@ -492,7 +495,7 @@ pub fn moe_backward_token(
 
         // dL/d(act_out) = down_proj^T · d_output  [d_ffn_shared]
         let mut d_act = vec![0.0f32; d_ffn_shared];
-        transpose_matvec_into(&mut d_act, &shared.down_proj, d_output, d, d_ffn_shared);
+        simd_transpose_matvec_into(&mut d_act, &shared.down_proj, d_output, d, d_ffn_shared);
 
         // dL/d(down_proj) += outer(d_output, act_out)
         simd_outer_product_acc(&mut shared_grads.down_proj, d_output, act_out, d, d_ffn_shared);
@@ -517,8 +520,8 @@ pub fn moe_backward_token(
         simd_outer_product_acc(&mut shared_grads.up_proj, &d_up, &saved.h, d_ffn_shared, d);
 
         // dh_out += gate_proj^T · d_gate + up_proj^T · d_up
-        transpose_matvec_acc(dh_out, &shared.gate_proj, &d_gate, d_ffn_shared, d);
-        transpose_matvec_acc(dh_out, &shared.up_proj, &d_up, d_ffn_shared, d);
+        simd_transpose_matvec_acc(dh_out, &shared.gate_proj, &d_gate, d_ffn_shared, d);
+        simd_transpose_matvec_acc(dh_out, &shared.up_proj, &d_up, d_ffn_shared, d);
     }
 
     // Remaining shared experts (s > 0) — for Kimi-K3 N_s=1 so this loop is empty.
@@ -574,7 +577,7 @@ fn moe_backward_latent(
     }
 
     let mut d_latent_postnorm = vec![0.0f32; d_moe];
-    transpose_matvec_into(
+    simd_transpose_matvec_into(
         &mut d_latent_postnorm,
         weights.routed_expert_up_proj.as_ref().unwrap(),
         d_output,
@@ -650,7 +653,7 @@ fn moe_backward_latent(
         let expert_out_k = &saved.expert_outputs[k * d_expert..(k + 1) * d_expert];
 
         // dL/d(topk_weights[k]) = dot(d_latent_prenorm, expert_out_k)
-        d_topk_weights[k] = simd_dot(d_latent_prenorm.as_slice(), expert_out_k, d_expert);
+        d_topk_weights[k] = simd_dot_f32(d_latent_prenorm.as_slice(), expert_out_k, d_expert);
 
         // dL/d(expert_out_k) = topk_weights[k] * d_latent_prenorm
         let d_expert_out: Vec<f32> =
@@ -663,7 +666,7 @@ fn moe_backward_latent(
 
         // dL/d(act_out) = down_proj^T · d_expert_out
         let mut d_act = vec![0.0f32; d_ffn];
-        transpose_matvec_into(&mut d_act, &expert.down_proj, &d_expert_out, d_expert, d_ffn);
+        simd_transpose_matvec_into(&mut d_act, &expert.down_proj, &d_expert_out, d_expert, d_ffn);
 
         // dL/d(down_proj) += outer(d_expert_out, act_out)
         simd_outer_product_acc(&mut expert_grad.down_proj, &d_expert_out, act_out, d_expert, d_ffn);
@@ -700,8 +703,8 @@ fn moe_backward_latent(
         );
 
         // d_h_latent += gate_proj^T · d_gate + up_proj^T · d_up
-        transpose_matvec_acc(&mut d_h_latent, &expert.gate_proj, &d_gate, d_ffn, d_moe);
-        transpose_matvec_acc(&mut d_h_latent, &expert.up_proj, &d_up, d_ffn, d_moe);
+        simd_transpose_matvec_acc(&mut d_h_latent, &expert.gate_proj, &d_gate, d_ffn, d_moe);
+        simd_transpose_matvec_acc(&mut d_h_latent, &expert.up_proj, &d_up, d_ffn, d_moe);
     }
 
     // ── Step 6 backward: h_latent = routed_expert_down_proj · h ──
@@ -714,7 +717,7 @@ fn moe_backward_latent(
         d,
     );
     // dh_out += down_proj^T · d_h_latent
-    transpose_matvec_acc(
+    simd_transpose_matvec_acc(
         dh_out,
         weights.routed_expert_down_proj.as_ref().unwrap(),
         &d_h_latent,
@@ -754,7 +757,7 @@ fn moe_backward_nonlatent(
         let expert_out_k = &saved.expert_outputs[k * d_expert..(k + 1) * d_expert];
 
         // dL/d(topk_weights[k]) = dot(d_output, expert_out_k)
-        d_topk_weights[k] = simd_dot(d_output, expert_out_k, d_expert);
+        d_topk_weights[k] = simd_dot_f32(d_output, expert_out_k, d_expert);
 
         // dL/d(expert_out_k) = topk_weights[k] * d_output
         let d_expert_out: Vec<f32> = (0..d_expert).map(|i| w * d_output[i]).collect();
@@ -765,7 +768,7 @@ fn moe_backward_nonlatent(
         let up_inter = &saved.expert_up_inter[k * d_ffn..(k + 1) * d_ffn];
 
         let mut d_act = vec![0.0f32; d_ffn];
-        transpose_matvec_into(&mut d_act, &expert.down_proj, &d_expert_out, d_expert, d_ffn);
+        simd_transpose_matvec_into(&mut d_act, &expert.down_proj, &d_expert_out, d_expert, d_ffn);
 
         simd_outer_product_acc(&mut expert_grad.down_proj, &d_expert_out, act_out, d_expert, d_ffn);
 
@@ -785,8 +788,8 @@ fn moe_backward_nonlatent(
         simd_outer_product_acc(&mut expert_grad.gate_proj, &d_gate, &saved.h, d_ffn, d);
         simd_outer_product_acc(&mut expert_grad.up_proj, &d_up, &saved.h, d_ffn, d);
 
-        transpose_matvec_acc(dh_out, &expert.gate_proj, &d_gate, d_ffn, d);
-        transpose_matvec_acc(dh_out, &expert.up_proj, &d_up, d_ffn, d);
+        simd_transpose_matvec_acc(dh_out, &expert.gate_proj, &d_gate, d_ffn, d);
+        simd_transpose_matvec_acc(dh_out, &expert.up_proj, &d_up, d_ffn, d);
     }
 
     // Router backward
@@ -991,38 +994,3 @@ fn situ_backward(
     }
 }
 
-// ─── Math helpers ───────────────────────────────────────────────────────────
-
-/// `out = W^T · v` for row-major `[rows, cols]` W. Overwrites `out` `[cols]`.
-#[allow(clippy::needless_range_loop)]
-fn transpose_matvec_into(out: &mut [f32], w: &[f32], v: &[f32], rows: usize, cols: usize) {
-    for c in 0..cols {
-        let mut acc = 0.0f32;
-        for r in 0..rows {
-            acc += w[r * cols + c] * v[r];
-        }
-        out[c] = acc;
-    }
-}
-
-/// `acc += W^T · v` for row-major `[rows, cols]` W. Accumulates into `acc` `[cols]`.
-#[allow(clippy::needless_range_loop)]
-fn transpose_matvec_acc(acc: &mut [f32], w: &[f32], v: &[f32], rows: usize, cols: usize) {
-    for c in 0..cols {
-        let mut sum = 0.0f32;
-        for r in 0..rows {
-            sum += w[r * cols + c] * v[r];
-        }
-        acc[c] += sum;
-    }
-}
-
-/// Dot product (scalar fallback — no SIMD needed for small vectors in tests).
-#[inline]
-fn simd_dot(a: &[f32], b: &[f32], len: usize) -> f32 {
-    let mut sum = 0.0f32;
-    for i in 0..len {
-        sum += a[i] * b[i];
-    }
-    sum
-}

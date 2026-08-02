@@ -636,6 +636,177 @@ pub fn simd_matvec(acc: &mut [f32], mat: &[f32], vec: &[f32], rows: usize, cols:
     }
 }
 
+// ── Transpose Matrix-Vector Multiply (Wᵀ · v) ─────────────────
+
+/// SIMD-accelerated transpose matvec: `out[j] = Σ_i mat[i*cols + j] * v[i]`.
+///
+/// I.e. computes `out = matᵀ · v` for row-major `[rows × cols]` mat — the
+/// access pattern needed by `dL/dh = Wᵀ · dL/dy` in analytic backward passes
+/// (MLA/MoE/KDA). This is NOT [`simd_matvec`] (`M·v`, independent per-row dot
+/// products) — the transpose product accumulates across ALL rows into every
+/// output element, so the loop order is inverted: outer loop over rows
+/// (broadcast `v[i]`), inner loop over cols (contiguous FMA into `out`). A
+/// naive column-outer loop (`for j { for i { acc += mat[i*cols+j] * v[i] } }`)
+/// has stride-`cols` reads and defeats auto-vectorization; this loop keeps
+/// both the `mat` row read and the `out` accumulation contiguous (mirrors
+/// the loop-interchange already used by `katgpt_hla::kernel::transpose_matvec_into`).
+///
+/// Zeroes `out` first. Use [`simd_transpose_matvec_acc`] to accumulate into
+/// an existing buffer.
+#[inline(always)]
+pub fn simd_transpose_matvec_into(out: &mut [f32], mat: &[f32], v: &[f32], rows: usize, cols: usize) {
+    out[..cols].fill(0.0);
+    simd_transpose_matvec_acc(out, mat, v, rows, cols);
+}
+
+/// Accumulating variant of [`simd_transpose_matvec_into`]:
+/// `out[j] += Σ_i mat[i*cols + j] * v[i]`.
+#[inline(always)]
+pub fn simd_transpose_matvec_acc(out: &mut [f32], mat: &[f32], v: &[f32], rows: usize, cols: usize) {
+    #[cfg(target_arch = "aarch64")]
+    {
+        unsafe { neon_transpose_matvec_acc(out, mat, v, rows, cols) }
+    }
+    #[cfg(target_arch = "x86_64")]
+    {
+        if is_avx2_fma_available() {
+            unsafe { avx2_transpose_matvec_acc(out, mat, v, rows, cols) }
+        } else {
+            scalar_transpose_matvec_acc(out, mat, v, rows, cols)
+        }
+    }
+    #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
+    {
+        unsafe { wasm32_simd128_transpose_matvec_acc(out, mat, v, rows, cols) }
+    }
+    #[cfg(not(any(
+        target_arch = "aarch64",
+        target_arch = "x86_64",
+        all(target_arch = "wasm32", target_feature = "simd128")
+    )))]
+    {
+        scalar_transpose_matvec_acc(out, mat, v, rows, cols)
+    }
+}
+
+#[inline(always)]
+#[allow(dead_code)]
+pub(super) fn scalar_transpose_matvec_acc(
+    out: &mut [f32],
+    mat: &[f32],
+    v: &[f32],
+    rows: usize,
+    cols: usize,
+) {
+    for i in 0..rows {
+        let vi = unsafe { *v.get_unchecked(i) };
+        let row = &mat[i * cols..i * cols + cols];
+        for j in 0..cols {
+            unsafe {
+                let mj = *row.get_unchecked(j);
+                // FMA: single-rounding, matches the SIMD paths' broadcast+FMA.
+                *out.get_unchecked_mut(j) = vi.mul_add(mj, *out.get_unchecked(j));
+            }
+        }
+    }
+}
+
+#[cfg(target_arch = "aarch64")]
+#[inline]
+unsafe fn neon_transpose_matvec_acc(out: &mut [f32], mat: &[f32], v: &[f32], rows: usize, cols: usize) {
+    use core::arch::aarch64::{vfmaq_f32, vld1q_dup_f32, vld1q_f32, vst1q_f32};
+
+    unsafe {
+        let n_chunks = cols / 4;
+
+        for i in 0..rows {
+            let vi = *v.get_unchecked(i);
+            let va = vld1q_dup_f32(&vi);
+            let row = &mat[i * cols..i * cols + cols];
+
+            let mut j = 0;
+            for _ in 0..n_chunks {
+                let vacc = vld1q_f32(out.as_ptr().add(j));
+                let vm = vld1q_f32(row.as_ptr().add(j));
+                let vresult = vfmaq_f32(vacc, va, vm);
+                vst1q_f32(out.as_mut_ptr().add(j), vresult);
+                j += 4;
+            }
+
+            while j < cols {
+                *out.get_unchecked_mut(j) += vi * *row.get_unchecked(j);
+                j += 1;
+            }
+        }
+    }
+}
+
+#[cfg(target_arch = "x86_64")]
+#[target_feature(enable = "avx2,fma")]
+#[inline]
+unsafe fn avx2_transpose_matvec_acc(out: &mut [f32], mat: &[f32], v: &[f32], rows: usize, cols: usize) {
+    use core::arch::x86_64::{
+        _mm256_broadcast_ss, _mm256_fmadd_ps, _mm256_loadu_ps, _mm256_storeu_ps,
+    };
+
+    unsafe {
+        let n_chunks8 = cols / 8;
+
+        for i in 0..rows {
+            let vi = *v.get_unchecked(i);
+            let va = _mm256_broadcast_ss(&vi);
+            let row = &mat[i * cols..i * cols + cols];
+
+            let mut j = 0;
+            for _ in 0..n_chunks8 {
+                let vacc = _mm256_loadu_ps(out.as_ptr().add(j));
+                let vm = _mm256_loadu_ps(row.as_ptr().add(j));
+                let vresult = _mm256_fmadd_ps(va, vm, vacc);
+                _mm256_storeu_ps(out.as_mut_ptr().add(j), vresult);
+                j += 8;
+            }
+
+            while j < cols {
+                *out.get_unchecked_mut(j) += vi * *row.get_unchecked(j);
+                j += 1;
+            }
+        }
+    }
+}
+
+#[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
+#[inline]
+unsafe fn wasm32_simd128_transpose_matvec_acc(
+    out: &mut [f32],
+    mat: &[f32],
+    v: &[f32],
+    rows: usize,
+    cols: usize,
+) {
+    use core::arch::wasm32::{f32x4_add, f32x4_mul, f32x4_splat, v128_load, v128_store};
+
+    unsafe {
+        let simd_cols = cols / 4 * 4;
+        for i in 0..rows {
+            let vi = *v.get_unchecked(i);
+            let va = f32x4_splat(vi);
+            let row = &mat[i * cols..i * cols + cols];
+
+            let mut j = 0;
+            while j < simd_cols {
+                let vacc = v128_load(out.as_ptr().add(j) as *const _);
+                let vm = v128_load(row.as_ptr().add(j) as *const _);
+                let r = f32x4_add(vacc, f32x4_mul(va, vm));
+                v128_store(out.as_mut_ptr().add(j) as *mut _, r);
+                j += 4;
+            }
+            for jj in simd_cols..cols {
+                *out.get_unchecked_mut(jj) += vi * *row.get_unchecked(jj);
+            }
+        }
+    }
+}
+
 // ── Matmul Row Dispatch ───────────────────────────────────────
 
 /// SIMD-accelerated matmul dispatch: `output[r] = dot(weight_row_r, input)`.
