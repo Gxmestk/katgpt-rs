@@ -399,7 +399,14 @@ pub fn bifurcation_ratio(a: &[&[f32]], b: &[&[f32]]) -> BifurcationResult {
     };
 
     // Onset step: first i where separation exceeds 1.5× initial.
-    let threshold = 1.5 * initial_sep;
+    // rust-optimize: compare squared separations (`sep_sq > threshold_sq`)
+    // instead of paying a `sqrt` per step. Mathematically equivalent when
+    // both sides are non-negative (which they are by construction) — saves
+    // one `sqrt` per step until onset is found. At 100-step trajectories
+    // this is ~100 sqrts per call; the bench path runs this on every
+    // NPC pair every tick.
+    // `threshold_sq = (1.5 × initial_sep)² = 2.25 × initial_sep²`.
+    let threshold_sq = 2.25 * initial_sep_sq;
     let mut onset_step: Option<u16> = None;
     if initial_sep > epsilon {
         for i in 1..a.len() {
@@ -408,8 +415,7 @@ pub fn bifurcation_ratio(a: &[&[f32]], b: &[&[f32]]) -> BifurcationResult {
                 let d = a[i][j] - b[i][j];
                 sep_sq += d * d;
             }
-            let sep = sep_sq.sqrt();
-            if sep > threshold {
+            if sep_sq > threshold_sq {
                 onset_step = Some(i as u16);
                 break;
             }
