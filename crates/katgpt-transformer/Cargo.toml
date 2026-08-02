@@ -119,6 +119,12 @@ gated_mlp = []
 # architecture choice, not a modelless gain over existing substrate.
 transformer_moe = []
 
+# MoE analytic backward pass (Plan 318 Phase C C4). The CPU reference for
+# the GPU backward. Implies `transformer_moe`. katgpt-rs is
+# modelless-by-mandate — this is the training-time reference consumed by
+# riir-train, never on the production inference path. Opt-in, default-off.
+moe_backward = ["transformer_moe"]
+
 # Attention Residual Block — Kimi-K3 block-residual softmax mixing.
 # Proposal 032 Phase 5 prerequisite, Research 330 §5. Implements the
 # `_apply_attn_res` mechanism that wraps around BOTH attention and MLP in

@@ -635,7 +635,7 @@ fn situ_expert_forward(
 /// In-place SiTU: `gate[i]` is read + overwritten element-wise. Equivalent to
 /// `situ(gate, gate, up, beta, linear_beta)` but avoids the aliasing borrow.
 #[inline]
-fn situ_inplace(gate: &mut [f32], up: &[f32], beta: f32, linear_beta: Option<f32>) {
+pub(crate) fn situ_inplace(gate: &mut [f32], up: &[f32], beta: f32, linear_beta: Option<f32>) {
     debug_assert!(beta > 0.0, "situ beta must be positive");
     let inv_beta = 1.0 / beta;
     if let Some(lb) = linear_beta {
@@ -671,7 +671,7 @@ fn situ_inplace(gate: &mut [f32], up: &[f32], beta: f32, linear_beta: Option<f32
 /// For larger n the `katgpt-attn::dash_attn::block_topk::argtopk_with_scratch`
 /// SIMD primitive would be preferred, but the dep isn't worth pulling for
 /// this small-n case.
-fn select_topk_indices(scores: &[f32], k: usize, out_idx: &mut [usize]) {
+pub(crate) fn select_topk_indices(scores: &[f32], k: usize, out_idx: &mut [usize]) {
     debug_assert!(k <= scores.len());
     debug_assert_eq!(out_idx.len(), k);
 
