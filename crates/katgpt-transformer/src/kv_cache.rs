@@ -61,6 +61,30 @@ impl MultiLayerKVCache {
         }
     }
 
+    /// Construct with per-layer KV dimensions. Used by models where each layer
+    /// has a different kv_dim (e.g. Gemma 4's alternating sliding/full layers —
+    // Issue 577). The vec length MUST equal `config.n_layer`.
+    ///
+    /// Each cache layer is allocated as `[block_size * per_layer_kv_dim[i]]`.
+    pub fn new_with_per_layer_kv_dim(config: &Config, per_layer_kv_dim: &[usize]) -> Self {
+        debug_assert_eq!(
+            per_layer_kv_dim.len(),
+            config.n_layer,
+            "per_layer_kv_dim length must equal n_layer"
+        );
+        let layers = per_layer_kv_dim
+            .iter()
+            .map(|&kvd| KVCache {
+                key: vec![0.0; config.block_size * kvd],
+                value: vec![0.0; config.block_size * kvd],
+            })
+            .collect();
+        Self {
+            layers,
+            fill_pos: 0,
+        }
+    }
+
     pub fn reset(&mut self) {
         for layer in &mut self.layers {
             layer.reset();
