@@ -153,6 +153,107 @@ pub struct KimiK3ModelWeights {
     pub output_attn_res: AttnResWeights,
 }
 
+impl KimiK3ModelWeights {
+    /// Construct random weights for ANY `KimiK3ModelConfig` (Plan 318 Phase A3).
+    ///
+    /// This is the config-parameterized random-init constructor used to verify
+    /// the forward pass on the 4B-A2B config without needing real safetensors.
+    /// It delegates to the existing substrate `.random()` constructors
+    /// (`MlaWeights::random`, `KdaWeights::random`, `MoeWeights::random`,
+    /// `AttnResWeights::random`, `SwiGluExpertWeights::random`) and threads a
+    /// single seeded `katgpt_core::Rng` through the whole tree so the result is
+    /// deterministic for a given `(config, seed)`.
+    ///
+    /// Weights are drawn from `[-1/sqrt(in_dim), 1/sqrt(in_dim)]` (Xavier-ish)
+    /// to keep forward passes stable on random init. Norm gammas are initialized
+    /// near 1.0 (typical RMSNorm gamma init) so RMSNorm doesn't collapse.
+    ///
+    /// # Memory
+    ///
+    /// Total memory scales with param count. For the 4B-A2B config this is
+    /// ~17.7 GB of `f32` — fits comfortably in M3 Max 64GB unified memory.
+    pub fn random(config: &super::model::KimiK3ModelConfig, seed: u64) -> Self {
+        use katgpt_core::Rng;
+
+        let mut rng = Rng::new(seed);
+        let d = config.hidden_size;
+        let v = config.vocab_size;
+
+        // Embedding + LM head: Xavier-ish on the hidden dim (input dim = d).
+        let scale = 1.0 / (d as f32).sqrt();
+        let xavier = |rng: &mut Rng| (rng.uniform() * 2.0 - 1.0) * scale;
+        let embed_weight: Vec<f32> = (0..v * d).map(|_| xavier(&mut rng)).collect();
+        let lm_head_weight: Vec<f32> = (0..v * d).map(|_| xavier(&mut rng)).collect();
+
+        // Final norm gamma: near 1.0.
+        let final_norm_weight: Vec<f32> =
+            (0..d).map(|_| 1.0 + (rng.uniform() * 2.0 - 1.0) * 0.1).collect();
+
+        // Output attn-res.
+        let output_attn_res = AttnResWeights::random(d, rng.next());
+
+        // Per-layer weights.
+        let mut layers = Vec::with_capacity(config.num_layers);
+        for layer_idx in 0..config.num_layers {
+            let is_mla = config.is_mla_layer(layer_idx);
+            let layer_seed = rng.next();
+
+            // Input + post-attention norm gammas (near 1.0).
+            let input_layernorm_weight: Vec<f32> =
+                (0..d).map(|_| 1.0 + (rng.uniform() * 2.0 - 1.0) * 0.1).collect();
+            let post_attention_layernorm_weight: Vec<f32> =
+                (0..d).map(|_| 1.0 + (rng.uniform() * 2.0 - 1.0) * 0.1).collect();
+
+            // Attention (MLA or KDA) — delegate to substrate random.
+            let attention = if is_mla {
+                KimiAttentionWeights::Mla(MlaWeights::random(&config.mla_config, layer_seed))
+            } else {
+                KimiAttentionWeights::Kda(KdaWeights::random(&config.kda_config, layer_seed))
+            };
+
+            // FFN (Dense or MoE) — delegate to substrate random.
+            let ffn = match config.ffn_config(layer_idx) {
+                super::decoder_layer::KimiFfnConfig::Dense { intermediate_size, hidden_size, .. } => {
+                    // Dense SiTU MLP — structurally identical to one SwiGlu expert.
+                    // Note: SwiGluExpertWeights::random takes the transformer crate's
+                    // own Rng (distinct type from katgpt_core::Rng).
+                    let mut expert_rng = katgpt_transformer::moe::Rng::new(rng.next());
+                    let expert = SwiGluExpertWeights::random(
+                        &mut expert_rng,
+                        hidden_size,
+                        intermediate_size,
+                    );
+                    KimiFfnWeights::Dense(expert)
+                }
+                super::decoder_layer::KimiFfnConfig::Moe(moe_cfg) => {
+                    KimiFfnWeights::Moe(MoeWeights::random(&moe_cfg, rng.next()))
+                }
+            };
+
+            // Two attn-res weight sets (self + MLP).
+            let self_attn_res = AttnResWeights::random(d, rng.next());
+            let mlp_attn_res = AttnResWeights::random(d, rng.next());
+
+            layers.push(KimiDecoderLayerWeights {
+                input_layernorm_weight,
+                post_attention_layernorm_weight,
+                attention,
+                ffn,
+                self_attn_res,
+                mlp_attn_res,
+            });
+        }
+
+        Self {
+            embed_weight,
+            layers,
+            final_norm_weight,
+            lm_head_weight,
+            output_attn_res,
+        }
+    }
+}
+
 /// Load a tensor from the safetensors view as f32.
 ///
 /// Safetensors stores tensors in their original dtype (f32 for Kimi-K3-0.40B).
