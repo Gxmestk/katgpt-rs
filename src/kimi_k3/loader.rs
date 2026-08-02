@@ -422,12 +422,14 @@ fn load_moe_layer(
 
 /// Load one decoder layer.
 ///
-/// Determines attention type (MLA for layers 0,4; KDA for 1,2,3,5,6,7) and
-/// FFN type (Dense for layer 0; MoE for 1-7) from the layer index.
+/// Determines attention type (MLA vs KDA) and FFN type (Dense vs MoE)
+/// from the `is_mla` flag + layer index. The caller computes `is_mla` from
+/// the model config's `mla_layer_indices`.
 #[allow(clippy::too_many_arguments)]
 fn load_decoder_layer(
     st: &safetensors::SafeTensors,
     layer_idx: usize,
+    is_mla: bool,
     d: usize,
     num_experts: usize,
     num_shared_experts: usize,
@@ -439,11 +441,8 @@ fn load_decoder_layer(
     v_h: usize,
     n_h: usize,
 ) -> Result<KimiDecoderLayerWeights, LoadError> {
-    // Topology (VERIFIED against safetensors header + config.json):
-    //   MLA at layers 3, 7  (config full_attn_layers [4,8] = 1-indexed)
-    //   KDA at layers 0,1,2,4,5,6
-    //   Dense MLP at layer 0 only  (first_k_dense_replace: 1)
-    let is_mla = layer_idx == 3 || layer_idx == 7;
+    // Topology: MLA layers use full attention; others use KDA (linear/delta).
+    // Dense MLP at layer 0 only (first_k_dense_replace: 1).
     let is_dense = layer_idx == 0;
 
     let attention = if is_mla {
@@ -585,11 +584,15 @@ pub fn load_kimi_k3_from_bytes(bytes: &[u8]) -> Result<KimiK3ModelWeights, LoadE
     };
 
     // Per-layer weights
+    // TODO(388): parameterize by config for 4B model loading (Phase B).
+    // Currently hardcoded for the 0.40B fixture.
+    let mla_layer_indices = [3usize, 7];
     let mut layers = Vec::with_capacity(num_layers);
     for layer_idx in 0..num_layers {
         layers.push(load_decoder_layer(
             &st,
             layer_idx,
+            mla_layer_indices.contains(&layer_idx),
             d,
             num_experts,
             num_shared_experts,

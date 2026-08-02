@@ -31,26 +31,30 @@ use super::decoder_layer::{
 
 // ─── Config ────────────────────────────────────────────────────────────────
 
-/// Full model configuration for Kimi-K3-0.40B.
+/// Full model configuration for Kimi-K3 models.
 ///
-/// Contains the per-layer configs + model-level parameters.
+/// Contains the per-layer configs + model-level parameters. Supports both
+/// the 0.40B fixture and scaled-up variants (4B/2B etc) via `mla_layer_indices`.
 #[derive(Clone, Debug)]
 pub struct KimiK3ModelConfig {
-    /// Hidden size (1024).
+    /// Hidden size (1024 for 0.40B).
     pub hidden_size: usize,
     /// Vocab size (163840).
     pub vocab_size: usize,
-    /// Number of layers (8).
+    /// Number of layers (8 for 0.40B).
     pub num_layers: usize,
     /// RMSNorm epsilon (1e-5).
     pub rms_eps: f32,
-    /// MLA config (for layers 3, 7).
+    /// Which layers use MLA (full multi-latent attention). All others use KDA.
+    /// 0.40B: [3, 7]. Scaled variants use a different pattern (e.g. every 4th layer).
+    pub mla_layer_indices: Vec<usize>,
+    /// MLA config (for layers in `mla_layer_indices`).
     pub mla_config: MlaConfig,
-    /// KDA config (for layers 0,1,2,4,5,6).
+    /// KDA config (for layers NOT in `mla_layer_indices`).
     pub kda_config: KdaConfig,
-    /// Dense MLP config (for layer 0).
+    /// Dense MLP config (for layer 0 — the first layer is always dense).
     pub dense_ffn_config: KimiFfnConfig,
-    /// MoE config (for layers 1-7).
+    /// MoE config (for layers 1..num_layers).
     pub moe_config: MoeConfig,
     /// Attention residual config.
     pub attn_res_config: AttnResConfig,
@@ -64,6 +68,7 @@ impl KimiK3ModelConfig {
             vocab_size: 163840,
             num_layers: 8,
             rms_eps: 1e-5,
+            mla_layer_indices: vec![3, 7],
             mla_config: MlaConfig::kimi_k3_0_40b(),
             kda_config: KdaConfig::kimi_k3_0_40b(),
             dense_ffn_config: KimiFfnConfig::Dense {
@@ -77,10 +82,78 @@ impl KimiK3ModelConfig {
         }
     }
 
+    /// Kimi-K3-4B-A2B model configuration (Issue 388 / Plan 318).
+    ///
+    /// Scaled-up MLA-MoE architecture targeting ~4.43B total / ~1.99B active
+    /// params, with 256K context support via MLA KV compression.
+    ///
+    /// Architecture: 12 layers (9 KDA + 3 MLA, 3:1 ratio), hidden=3072,
+    /// 12 routed experts (top-4), 2 shared experts, kv_lora_rank=512.
+    /// MLA layers at indices [3, 7, 11] (every 4th layer from layer 3).
+    ///
+    /// KV cache at 256K: ~1.81 GB (3 MLA layers × 576 bytes/token).
+    /// 4-bit quantized size: ~2.22 GB.
+    pub fn kimi_k3_4b_a2b() -> Self {
+        Self {
+            hidden_size: 3072,
+            vocab_size: 163840,
+            num_layers: 12,
+            rms_eps: 1e-5,
+            // 3:1 KDA:MLA ratio — MLA at layers 3, 7, 11 (every 4th from 3)
+            mla_layer_indices: vec![3, 7, 11],
+            mla_config: MlaConfig {
+                kv_lora_rank: 512,
+                q_lora_rank: 768,
+                qk_nope_head_dim: 128,
+                qk_rope_head_dim: 64,
+                v_head_dim: 128,
+                n_heads: 16,
+                hidden_size: 3072,
+                use_output_gate: true,
+                use_nope: true,
+                rope_theta: 10_000.0,
+                rms_norm_eps: 1e-5,
+            },
+            kda_config: KdaConfig {
+                hidden_size: 3072,
+                n_heads: 16,
+                head_dim: 128,
+                conv_kernel_size: 4,
+                ..KdaConfig::kimi_k3_0_40b()
+            },
+            dense_ffn_config: KimiFfnConfig::Dense {
+                intermediate_size: 2816, // 2 × moe_intermediate
+                hidden_size: 3072,
+                situ_beta: 4.0,
+                situ_linear_beta: Some(25.0),
+            },
+            moe_config: MoeConfig {
+                num_experts: 12,
+                num_experts_per_token: 4,
+                num_shared_experts: 2,
+                moe_intermediate_size: 1408,
+                hidden_size: 3072,
+                routed_expert_hidden_size: Some(1024),
+                ..MoeConfig::kimi_k3_0_40b()
+            },
+            attn_res_config: AttnResConfig {
+                block_size: 4,
+                hidden_size: 3072,
+                ..AttnResConfig::kimi_k3_0_40b()
+            },
+        }
+    }
+
+    /// Returns true if the given layer uses MLA (full multi-latent attention).
+    /// All other layers use KDA (linear/delta attention).
+    #[inline]
+    pub fn is_mla_layer(&self, layer_idx: usize) -> bool {
+        self.mla_layer_indices.contains(&layer_idx)
+    }
+
     /// Get the attention config for a given layer.
     pub fn attention_config(&self, layer_idx: usize) -> KimiAttentionConfig {
-        let is_mla = layer_idx == 3 || layer_idx == 7;
-        if is_mla {
+        if self.is_mla_layer(layer_idx) {
             KimiAttentionConfig::Mla(self.mla_config.clone())
         } else {
             KimiAttentionConfig::Kda(self.kda_config.clone())
@@ -144,7 +217,7 @@ impl KimiK3Runtime {
 
         let layers: Vec<KimiLayerRuntime> = (0..config.num_layers)
             .map(|layer_idx| {
-                let is_mla = layer_idx == 3 || layer_idx == 7;
+                let is_mla = config.is_mla_layer(layer_idx);
                 let is_dense = layer_idx == 0;
 
                 let (attn_state, attn_scratch) = if is_mla {
