@@ -100,6 +100,8 @@ pub use enums::DeltaNetLayerType;
 pub use enums::ThinkingBudget;
 #[cfg(feature = "wall_attention")]
 pub use enums::WallConfig;
+#[cfg(feature = "gemma4_inference")]
+pub use enums::Gemma4LayerType;
 pub use enums::{
     AttentionMode, AttentionProjection, CacheLayout, CalibrationMode, ConvergenceSelector,
     DashAttnConfig, DepthTier, HlaMode, HybridPattern, LoopMode, LoopStabilityMode,

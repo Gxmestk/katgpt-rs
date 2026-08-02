@@ -187,6 +187,36 @@ pub struct Config {
     /// Default: 2.0. Only used when `belief_drafter` feature is enabled.
     #[cfg(feature = "belief_drafter")]
     pub belief_drafter_entropy_threshold: f32,
+
+    // --- Gemma 4 (Issue 577) ---
+    /// Per-layer attention type (Sliding vs Full). Length MUST equal `n_layer`
+    /// when `model_arch == ModelArchitecture::Gemma4`. Empty for non-Gemma-4
+    /// models. Built by `Config::gemma4_12b()` using the 5-sliding + 1-full
+    /// repeating pattern; loaders read `layer_types` from GGUF metadata.
+    #[cfg(feature = "gemma4_inference")]
+    pub gemma4_layer_types: Vec<super::Gemma4LayerType>,
+    /// Sliding-window size for `Gemma4LayerType::Sliding` layers (Gemma-4 = 1024).
+    /// 0 = no sliding window (treated as full-attention).
+    #[cfg(feature = "gemma4_inference")]
+    pub sliding_window: usize,
+    /// Head dimension for full-attention layers (Gemma-4-12B = 512).
+    /// Only meaningful when `gemma4_layer_types` contains `Full` entries;
+    /// `head_dim` continues to specify the sliding-layer head dim (256).
+    #[cfg(feature = "gemma4_inference")]
+    pub global_head_dim: usize,
+    /// Number of KV heads for full-attention layers (Gemma-4 = 1, i.e. MQA).
+    /// Only meaningful when `gemma4_layer_types` contains `Full` entries.
+    #[cfg(feature = "gemma4_inference")]
+    pub n_global_kv_head: usize,
+    /// Fraction of head_dim rotated by RoPE on full-attention layers
+    /// (Gemma-4 = 0.25 → only the first 25% of dims are rotated).
+    /// 1.0 = full rotation (sliding layers and pre-Gemma-4 behavior).
+    #[cfg(feature = "gemma4_inference")]
+    pub partial_rotary_factor: f32,
+    /// RoPE base frequency for full-attention layers (Gemma-4 = 1_000_000).
+    /// Sliding layers continue to use `rope_theta` (Gemma-4 = 10_000).
+    #[cfg(feature = "gemma4_inference")]
+    pub rope_theta_full: f32,
 }
 
 impl Config {
@@ -332,6 +362,18 @@ impl Config {
             belief_drafter_path: None,
             #[cfg(feature = "belief_drafter")]
             belief_drafter_entropy_threshold: 2.0,
+            #[cfg(feature = "gemma4_inference")]
+            gemma4_layer_types: Vec::new(),
+            #[cfg(feature = "gemma4_inference")]
+            sliding_window: 0,
+            #[cfg(feature = "gemma4_inference")]
+            global_head_dim: 0,
+            #[cfg(feature = "gemma4_inference")]
+            n_global_kv_head: 0,
+            #[cfg(feature = "gemma4_inference")]
+            partial_rotary_factor: 1.0,
+            #[cfg(feature = "gemma4_inference")]
+            rope_theta_full: 0.0,
         }
     }
 
@@ -466,6 +508,18 @@ impl Config {
             belief_drafter_path: None,
             #[cfg(feature = "belief_drafter")]
             belief_drafter_entropy_threshold: 2.0,
+            #[cfg(feature = "gemma4_inference")]
+            gemma4_layer_types: Vec::new(),
+            #[cfg(feature = "gemma4_inference")]
+            sliding_window: 0,
+            #[cfg(feature = "gemma4_inference")]
+            global_head_dim: 0,
+            #[cfg(feature = "gemma4_inference")]
+            n_global_kv_head: 0,
+            #[cfg(feature = "gemma4_inference")]
+            partial_rotary_factor: 1.0,
+            #[cfg(feature = "gemma4_inference")]
+            rope_theta_full: 0.0,
         }
     }
 
@@ -572,6 +626,18 @@ impl Config {
             belief_drafter_path: None,
             #[cfg(feature = "belief_drafter")]
             belief_drafter_entropy_threshold: 2.0,
+            #[cfg(feature = "gemma4_inference")]
+            gemma4_layer_types: Vec::new(),
+            #[cfg(feature = "gemma4_inference")]
+            sliding_window: 0,
+            #[cfg(feature = "gemma4_inference")]
+            global_head_dim: 0,
+            #[cfg(feature = "gemma4_inference")]
+            n_global_kv_head: 0,
+            #[cfg(feature = "gemma4_inference")]
+            partial_rotary_factor: 1.0,
+            #[cfg(feature = "gemma4_inference")]
+            rope_theta_full: 0.0,
         }
     }
 
@@ -688,6 +754,18 @@ impl Config {
             belief_drafter_path: None,
             #[cfg(feature = "belief_drafter")]
             belief_drafter_entropy_threshold: 2.0,
+            #[cfg(feature = "gemma4_inference")]
+            gemma4_layer_types: Vec::new(),
+            #[cfg(feature = "gemma4_inference")]
+            sliding_window: 0,
+            #[cfg(feature = "gemma4_inference")]
+            global_head_dim: 0,
+            #[cfg(feature = "gemma4_inference")]
+            n_global_kv_head: 0,
+            #[cfg(feature = "gemma4_inference")]
+            partial_rotary_factor: 1.0,
+            #[cfg(feature = "gemma4_inference")]
+            rope_theta_full: 0.0,
         }
     }
 
@@ -784,6 +862,18 @@ impl Config {
             belief_drafter_path: None,
             #[cfg(feature = "belief_drafter")]
             belief_drafter_entropy_threshold: 2.0,
+            #[cfg(feature = "gemma4_inference")]
+            gemma4_layer_types: Vec::new(),
+            #[cfg(feature = "gemma4_inference")]
+            sliding_window: 0,
+            #[cfg(feature = "gemma4_inference")]
+            global_head_dim: 0,
+            #[cfg(feature = "gemma4_inference")]
+            n_global_kv_head: 0,
+            #[cfg(feature = "gemma4_inference")]
+            partial_rotary_factor: 1.0,
+            #[cfg(feature = "gemma4_inference")]
+            rope_theta_full: 0.0,
         }
     }
 
@@ -881,6 +971,18 @@ impl Config {
             belief_drafter_path: None,
             #[cfg(feature = "belief_drafter")]
             belief_drafter_entropy_threshold: 2.0,
+            #[cfg(feature = "gemma4_inference")]
+            gemma4_layer_types: Vec::new(),
+            #[cfg(feature = "gemma4_inference")]
+            sliding_window: 0,
+            #[cfg(feature = "gemma4_inference")]
+            global_head_dim: 0,
+            #[cfg(feature = "gemma4_inference")]
+            n_global_kv_head: 0,
+            #[cfg(feature = "gemma4_inference")]
+            partial_rotary_factor: 1.0,
+            #[cfg(feature = "gemma4_inference")]
+            rope_theta_full: 0.0,
         }
     }
 
@@ -976,6 +1078,18 @@ impl Config {
             belief_drafter_path: None,
             #[cfg(feature = "belief_drafter")]
             belief_drafter_entropy_threshold: 2.0,
+            #[cfg(feature = "gemma4_inference")]
+            gemma4_layer_types: Vec::new(),
+            #[cfg(feature = "gemma4_inference")]
+            sliding_window: 0,
+            #[cfg(feature = "gemma4_inference")]
+            global_head_dim: 0,
+            #[cfg(feature = "gemma4_inference")]
+            n_global_kv_head: 0,
+            #[cfg(feature = "gemma4_inference")]
+            partial_rotary_factor: 1.0,
+            #[cfg(feature = "gemma4_inference")]
+            rope_theta_full: 0.0,
         }
     }
 
@@ -1073,6 +1187,18 @@ impl Config {
             belief_drafter_path: None,
             #[cfg(feature = "belief_drafter")]
             belief_drafter_entropy_threshold: 2.0,
+            #[cfg(feature = "gemma4_inference")]
+            gemma4_layer_types: Vec::new(),
+            #[cfg(feature = "gemma4_inference")]
+            sliding_window: 0,
+            #[cfg(feature = "gemma4_inference")]
+            global_head_dim: 0,
+            #[cfg(feature = "gemma4_inference")]
+            n_global_kv_head: 0,
+            #[cfg(feature = "gemma4_inference")]
+            partial_rotary_factor: 1.0,
+            #[cfg(feature = "gemma4_inference")]
+            rope_theta_full: 0.0,
         }
     }
 
@@ -1169,6 +1295,18 @@ impl Config {
             belief_drafter_path: None,
             #[cfg(feature = "belief_drafter")]
             belief_drafter_entropy_threshold: 2.0,
+            #[cfg(feature = "gemma4_inference")]
+            gemma4_layer_types: Vec::new(),
+            #[cfg(feature = "gemma4_inference")]
+            sliding_window: 0,
+            #[cfg(feature = "gemma4_inference")]
+            global_head_dim: 0,
+            #[cfg(feature = "gemma4_inference")]
+            n_global_kv_head: 0,
+            #[cfg(feature = "gemma4_inference")]
+            partial_rotary_factor: 1.0,
+            #[cfg(feature = "gemma4_inference")]
+            rope_theta_full: 0.0,
         }
     }
 
@@ -1267,10 +1405,150 @@ impl Config {
             belief_drafter_path: None,
             #[cfg(feature = "belief_drafter")]
             belief_drafter_entropy_threshold: 2.0,
+            #[cfg(feature = "gemma4_inference")]
+            gemma4_layer_types: Vec::new(),
+            #[cfg(feature = "gemma4_inference")]
+            sliding_window: 0,
+            #[cfg(feature = "gemma4_inference")]
+            global_head_dim: 0,
+            #[cfg(feature = "gemma4_inference")]
+            n_global_kv_head: 0,
+            #[cfg(feature = "gemma4_inference")]
+            partial_rotary_factor: 1.0,
+            #[cfg(feature = "gemma4_inference")]
+            rope_theta_full: 0.0,
         }
     }
 
-    /// Config for Qwen 3.5-0.8B hybrid DeltaNet/Attention model (Plan 182).
+    /// Gemma 4 12B-it config (Issue 577 — baseline loader for Plan 318).
+    ///
+    /// Source: `google/gemma-4-12B-it` config.json `text_config` block:
+    /// - hidden=3840, layers=48, intermediate=15360, vocab=262144
+    /// - 16 Q heads; sliding layers use 8 KV heads + head_dim=256 (GQA 2:1),
+    ///   full-attention layers use 1 KV head + head_dim=512 (MQA)
+    /// - sliding_window=1024, layer pattern = 5 sliding + 1 full repeating
+    /// - rope_theta=10_000 (sliding) / 1_000_000 (full, partial_rotary=0.25)
+    /// - final_logit_softcapping=30.0, rms_norm_eps=1e-6, tied embeddings
+    /// - max_position_embeddings=262_144 (256K native context)
+    /// - attention_scale=1.0 (NO pre-attn 1/sqrt(head_dim) scaling — per llama.cpp)
+    /// - hidden_activation=gelu_pytorch_tanh (tanh-approx GELU; matches `gegelu_tanh`)
+    ///
+    /// The two RoPE thetas are stored separately: `rope_theta` (sliding) and
+    /// `rope_theta_full` (full). The layer pattern lives in `gemma4_layer_types`.
+    #[cfg(feature = "gemma4_inference")]
+    pub fn gemma4_12b() -> Self {
+        // 48 layers: every 6th (index % 6 == 5) is Full, the rest are Sliding.
+        // Matches llama.cpp `set_swa_pattern(n_pattern=6, dense_first=false)`.
+        let n_layer = 48usize;
+        let gemma4_layer_types: Vec<super::Gemma4LayerType> = (0..n_layer)
+            .map(|i| {
+                if i % 6 == 5 {
+                    super::Gemma4LayerType::Full
+                } else {
+                    super::Gemma4LayerType::Sliding
+                }
+            })
+            .collect();
+
+        Self {
+            vocab_size: 262_144,
+            block_size: 262_144, // 256K native context
+            n_embd: 3840,
+            n_head: 16,
+            head_dim: 256, // sliding-layer head dim
+            mlp_hidden: 15360,
+            n_layer,
+            n_kv_head: 8, // sliding-layer KV heads (GQA 2:1)
+            bos_token: 2,
+            temperature: 1.0,
+            draft_lookahead: 0,
+            tree_budget: 0,
+            parallel_threshold: 4096,
+            lora_rank: 0,
+            lora_alpha: 1.0,
+            lora_dropout: 0.0,
+            lora_targets: Vec::new(),
+            screening_threshold: 0.0,
+            sparse_threshold: 0.0,
+            early_exit_patience: 0,
+            early_exit_gap: 0.0,
+            mtp_activation_threshold: 0,
+            mtp_cluster_vocab_threshold: 262_144,
+            mtp_shared_kv_prompt_threshold: 262_144,
+            mtp_cluster_size: 1024,
+            mtp_min_output_tokens: 16,
+            mtp_cluster_topk: 1,
+            hla_mode: HlaMode::Standard,
+            hla_normalize: false,
+            hla_decay: 1.0,
+            model_arch: ModelArchitecture::Gemma4,
+            rms_norm_eps: 1e-6,
+            rms_norm_offset: true, // GGUF converter pre-applies the +1
+            tied_embeddings: true,
+            use_rope: true,
+            rope_theta: 10_000.0, // sliding layers
+            post_norm: true,
+            attn_logit_softcapping: 50.0,
+            final_logit_softcapping: 30.0,
+            weight_dtype: WeightDtype::BF16,
+            mask_token: 0,
+            attention_mode: AttentionMode::Causal,
+            sp_kv_window: 1024,
+            sp_kv_threshold: 0.5,
+            sp_kv_predictor_hidden: 0,
+            sp_kv_predictor_lr_mult: 5.0,
+            width_rollouts: 1,
+            early_stop_threshold: 0.0,
+            convergence_selector: ConvergenceSelector::default(),
+            d2f_block_size: 16,
+            mls_layers: 0,
+            loop_mode: LoopMode::None,
+            hybrid_pattern: HybridPattern::Uniform,
+            loop_min: 0,
+            loop_max: 0,
+            gated_attn: false,
+            parallax_gate_scale: 0.0,
+            emotion_desperation_threshold: 0.5,
+            parallax_zero_init: true,
+            #[cfg(feature = "loop_stability_fix")]
+            loop_stability_mode: super::LoopStabilityMode::None,
+            #[cfg(feature = "hydra_budget")]
+            hydra_profiles: Vec::new(),
+            #[cfg(feature = "deltanet_inference")]
+            layer_types: Vec::new(),
+            #[cfg(feature = "deltanet_inference")]
+            deltanet_conv_kernel_size: 0,
+            #[cfg(feature = "deltanet_inference")]
+            deltanet_state_dim: 0,
+            #[cfg(feature = "deltanet_inference")]
+            deltanet_linear_head_dim: 0,
+            #[cfg(feature = "deltanet_inference")]
+            deltanet_linear_n_heads: 0,
+            #[cfg(feature = "deltanet_inference")]
+            deltanet_linear_n_value_heads: 0,
+            #[cfg(feature = "rim_slots")]
+            rim_block_count: 0,
+            #[cfg(feature = "rim_slots")]
+            rim_tokens_per_block: 2,
+            #[cfg(feature = "rim_slots")]
+            rim_buffer_token: 0,
+            #[cfg(feature = "wall_attention")]
+            wall_config: None,
+            #[cfg(feature = "collapse_aware_thinking")]
+            collapse_budget: ThinkingBudget::default(),
+            #[cfg(feature = "belief_drafter")]
+            belief_drafter_path: None,
+            #[cfg(feature = "belief_drafter")]
+            belief_drafter_entropy_threshold: 2.0,
+            // --- Gemma 4 specific ---
+            gemma4_layer_types,
+            sliding_window: 1024,
+            global_head_dim: 512,
+            n_global_kv_head: 1,
+            partial_rotary_factor: 0.25,
+            rope_theta_full: 1_000_000.0,
+        }
+    }
     ///
     /// Typical layout: early layers use DeltaNet (linear recurrence, no KV cache),
     /// later layers use standard attention. The `layer_types` vec specifies per-layer.
@@ -1367,6 +1645,18 @@ impl Config {
             belief_drafter_path: None,
             #[cfg(feature = "belief_drafter")]
             belief_drafter_entropy_threshold: 2.0,
+            #[cfg(feature = "gemma4_inference")]
+            gemma4_layer_types: Vec::new(),
+            #[cfg(feature = "gemma4_inference")]
+            sliding_window: 0,
+            #[cfg(feature = "gemma4_inference")]
+            global_head_dim: 0,
+            #[cfg(feature = "gemma4_inference")]
+            n_global_kv_head: 0,
+            #[cfg(feature = "gemma4_inference")]
+            partial_rotary_factor: 1.0,
+            #[cfg(feature = "gemma4_inference")]
+            rope_theta_full: 0.0,
         }
     }
 

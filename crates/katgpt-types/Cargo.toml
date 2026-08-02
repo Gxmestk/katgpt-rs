@@ -47,6 +47,11 @@ hydra_budget = []
 # DeltaNet layer type enum (Plan 182).
 deltanet_inference = []
 
+# Gemma 4 unified text model: ModelArchitecture::Gemma4 variant +
+# Gemma4LayerType enum + Config::gemma4_12b() preset (Issue 577).
+# Opt-in — gates the loader + forward pass in riir-engine.
+gemma4_inference = []
+
 # Collapse-aware ThinkingBudget enum (Plan 212).
 collapse_aware_thinking = []
 

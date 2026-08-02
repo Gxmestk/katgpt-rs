@@ -100,6 +100,31 @@ pub enum ModelArchitecture {
     /// Plan 182: Luce Megakernel Distill — DeltaNet GPU Inference.
     #[cfg(feature = "deltanet_inference")]
     QwenDeltaNet,
+    /// Gemma 4 unified text model (Issue 577 — baseline loader for Plan 318).
+    /// Alternating sliding-window attention (5 layers, window=1024) +
+    /// full attention (1 layer) repeating; per-layer head_dim and KV-head
+    /// count vary. Native 256K context. GGUF-loaded; opt-in `gemma4_inference`.
+    #[cfg(feature = "gemma4_inference")]
+    Gemma4,
+}
+
+/// Per-layer attention type for Gemma 4 (Issue 577).
+///
+/// Gemma 4 alternates between sliding-window attention layers (5 of every 6)
+/// and full-attention layers (1 of every 6, at index `% 6 == 5`). The two layer
+/// kinds differ in head_dim, n_kv_head, RoPE base, and whether sliding-window
+/// masking applies — see `Config::gemma4_12b` for the concrete shape.
+#[cfg(feature = "gemma4_inference")]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[repr(u8)]
+pub enum Gemma4LayerType {
+    /// Sliding-window attention: head_dim=256, n_kv_head=8 (GQA 2:1),
+    /// rope_theta=10000, sliding_window=1024, full RoPE rotation.
+    #[default]
+    Sliding,
+    /// Full attention: head_dim=512, n_kv_head=1 (MQA),
+    /// rope_theta=1_000_000, partial_rotary_factor=0.25, no sliding window.
+    Full,
 }
 
 /// Attention projection configuration.
