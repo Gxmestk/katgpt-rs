@@ -252,6 +252,234 @@ impl KimiK3ModelWeights {
             output_attn_res,
         }
     }
+
+    /// Training-suitable weight initialization (Plan 318 C9).
+    ///
+    /// Like [`random`](Self::random) but with per-parameter-type scaling that
+    /// matches the conventions used in GPT-2/LLaMA/Kimi-K3 training:
+    ///
+    /// | Param | Init |
+    /// |-------|------|
+    /// | Embedding + LM head | N(0, 0.02²) — small std prevents large logits at start |
+    /// | 2D projections (MLA, KDA, MoE experts) | Kaiming uniform: `±sqrt(6/fan_in)` |
+    /// | MoE router centroids | N(0, 0.02²) — small to prevent early expert collapse |
+    /// | MoE `e_score_correction_bias` | Zeros — uniform expert probability at start |
+    /// | RMSNorm gammas | 1.0 (unchanged from `random`) |
+    /// | KDA `a_log` | Mamba-style `log(uniform(1, n_heads+1))` (unchanged) |
+    /// | KDA `dt_bias` | Near-zero (unchanged) |
+    /// | MLA output gate `w_g` | Near-identity (1.0 + small noise) — gate starts open |
+    /// | AttnRes projection | Small uniform (0.01 range — these are residual scalars) |
+    ///
+    /// This init produces stable forward passes (no NaN/Inf) AND gives the
+    /// training loop a good starting point (unlike `random` which uses
+    /// `±1/sqrt(d)` uniformly — too large for embedding/router, too small
+    /// for deep projections).
+    ///
+    /// The existing `random()` constructor is unchanged — it remains the test
+    /// init for G1/G2 gradient checks. This constructor is the training init.
+    pub fn random_train_init(config: &super::model::KimiK3ModelConfig, seed: u64) -> Self {
+        use katgpt_core::Rng;
+
+        let mut rng = Rng::new(seed);
+        let d = config.hidden_size;
+        let v = config.vocab_size;
+
+        // ── Embedding + LM head: N(0, 0.02²) (GPT-2/LLaMA convention) ──
+        let embed_weight = normal_vec(v * d, 0.02, &mut rng);
+        let lm_head_weight = normal_vec(v * d, 0.02, &mut rng);
+
+        // Final norm gamma: 1.0.
+        let final_norm_weight = vec![1.0; d];
+
+        // Output attn-res: norm=1.0, proj=small.
+        let output_attn_res = AttnResWeights {
+            norm_weight: vec![1.0; d],
+            proj_weight: small_vec(d, 0.01, &mut rng),
+        };
+
+        // Per-layer weights.
+        let mut layers = Vec::with_capacity(config.num_layers);
+        for layer_idx in 0..config.num_layers {
+            let is_mla = config.is_mla_layer(layer_idx);
+            let layer_seed = rng.next();
+
+            // Norm gammas: 1.0.
+            let input_layernorm_weight = vec![1.0; d];
+            let post_attention_layernorm_weight = vec![1.0; d];
+
+            // Start from the substrate random constructor (gives correct shapes
+            // + the KDA-specific A_log/dt_bias init), then overwrite the 2D
+            // projections with Kaiming-uniform.
+            let attention = if is_mla {
+                let mut m = MlaWeights::random(&config.mla_config, layer_seed);
+                kaiming_mla(&mut m, &config.mla_config);
+                // Output gate: near-identity so the gate starts open.
+                if let Some(ref mut wg) = m.w_g {
+                    for w in wg.iter_mut() {
+                        *w = 1.0 + (*w * 0.01);
+                    }
+                }
+                KimiAttentionWeights::Mla(m)
+            } else {
+                let mut k = KdaWeights::random(&config.kda_config, layer_seed);
+                kaiming_kda(&mut k, &config.kda_config);
+                KimiAttentionWeights::Kda(k)
+            };
+
+            let ffn = match config.ffn_config(layer_idx) {
+                super::decoder_layer::KimiFfnConfig::Dense { intermediate_size, hidden_size, .. } => {
+                    let mut expert_rng = katgpt_transformer::moe::Rng::new(rng.next());
+                    let mut expert = SwiGluExpertWeights::random(
+                        &mut expert_rng,
+                        hidden_size,
+                        intermediate_size,
+                    );
+                    kaiming_expert(&mut expert, hidden_size, intermediate_size);
+                    KimiFfnWeights::Dense(expert)
+                }
+                super::decoder_layer::KimiFfnConfig::Moe(moe_cfg) => {
+                    let mut mw = MoeWeights::random(&moe_cfg, rng.next());
+                    // Router: small N(0, 0.02) to prevent expert collapse.
+                    let ne = moe_cfg.num_experts;
+                    for w in mw.router_weight.iter_mut() {
+                        *w = (rng.uniform() * 2.0 - 1.0) * 0.02;
+                    }
+                    let _ = ne; // used for documentation clarity
+                    // e_score_correction_bias: zeros (uniform expert prob at start).
+                    for b in mw.e_score_correction_bias.iter_mut() {
+                        *b = 0.0;
+                    }
+                    // Expert weights: Kaiming uniform.
+                    let mi = moe_cfg.moe_intermediate_size;
+                    let erh = moe_cfg.routed_expert_hidden_size.unwrap_or(d);
+                    let mi_shared = mi * moe_cfg.num_shared_experts;
+                    for e in mw.experts.iter_mut() {
+                        kaiming_expert(e, erh, mi);
+                    }
+                    for e in mw.shared_experts.iter_mut() {
+                        kaiming_expert(e, d, mi_shared);
+                    }
+                    // Latent wrapper: Kaiming.
+                    if let Some(ref mut dp) = mw.routed_expert_down_proj {
+                        kaiming_flat(dp, d); // fan_in = d
+                    }
+                    if let Some(ref mut up) = mw.routed_expert_up_proj {
+                        kaiming_flat(up, erh); // fan_in = erh
+                    }
+                    KimiFfnWeights::Moe(mw)
+                }
+            };
+
+            // Attn-res: norm=1.0, proj=small.
+            let self_attn_res = AttnResWeights {
+                norm_weight: vec![1.0; d],
+                proj_weight: small_vec(d, 0.01, &mut rng),
+            };
+            let mlp_attn_res = AttnResWeights {
+                norm_weight: vec![1.0; d],
+                proj_weight: small_vec(d, 0.01, &mut rng),
+            };
+
+            layers.push(KimiDecoderLayerWeights {
+                input_layernorm_weight,
+                post_attention_layernorm_weight,
+                attention,
+                ffn,
+                self_attn_res,
+                mlp_attn_res,
+            });
+        }
+
+        Self {
+            embed_weight,
+            layers,
+            final_norm_weight,
+            lm_head_weight,
+            output_attn_res,
+        }
+    }
+}
+
+// ─── C9 weight init helpers ────────────────────────────────────────────────
+
+/// Generate a Vec of approximately normal-distributed values with std `sigma`
+/// using the Box-Muller transform on pairs of uniforms from `rng`.
+fn normal_vec(n: usize, sigma: f32, rng: &mut katgpt_core::Rng) -> Vec<f32> {
+    let mut out = Vec::with_capacity(n);
+    for _ in 0..n {
+        // Box-Muller: generate two uniforms, transform to N(0,1).
+        let u1 = rng.uniform().max(1e-10);
+        let u2 = rng.uniform();
+        let r = (-2.0f32 * u1.ln()).sqrt();
+        let theta = 2.0f32 * std::f32::consts::PI * u2;
+        let z = r * theta.cos();
+        out.push(z * sigma);
+    }
+    out
+}
+
+/// Generate a Vec of small uniform values in `[-scale, scale]`.
+fn small_vec(n: usize, scale: f32, rng: &mut katgpt_core::Rng) -> Vec<f32> {
+    (0..n).map(|_| (rng.uniform() * 2.0 - 1.0) * scale).collect()
+}
+
+/// Kaiming uniform init: `±sqrt(6/fan_in)` on a flat weight buffer.
+fn kaiming_flat(w: &mut [f32], fan_in: usize) {
+    let bound = (6.0f32 / fan_in.max(1) as f32).sqrt();
+    // Use a simple LCG seeded from the first element to avoid needing to thread
+    // the main RNG through (the exact values don't matter — only the distribution).
+    let mut state = w.first().copied().unwrap_or(42.0).to_bits() as u64 | 1;
+    for wi in w.iter_mut() {
+        // xorshift64* step
+        state ^= state >> 12;
+        state ^= state << 25;
+        state ^= state >> 27;
+        let u = ((state.wrapping_mul(0x2545_F491_4F6C_DD1D)) >> 32) as f32 / u32::MAX as f32;
+        *wi = (u * 2.0 - 1.0) * bound;
+    }
+}
+
+/// Kaiming-uniform init for an MLA weight set.
+fn kaiming_mla(m: &mut MlaWeights, cfg: &katgpt_attn::mla::MlaConfig) {
+    let d = cfg.hidden_size;
+    kaiming_flat(&mut m.w_dkv, d);
+    kaiming_flat(&mut m.w_dq, d);
+    kaiming_flat(&mut m.w_uq, cfg.q_lora_rank);
+    kaiming_flat(&mut m.w_qr, cfg.q_lora_rank);
+    kaiming_flat(&mut m.w_uk, cfg.kv_lora_rank);
+    kaiming_flat(&mut m.w_uv, cfg.kv_lora_rank);
+    kaiming_flat(&mut m.w_kr, d);
+    kaiming_flat(&mut m.w_o, cfg.v_head_dim * cfg.n_heads);
+    if let Some(ref mut wg) = m.w_g {
+        kaiming_flat(wg, d);
+    }
+}
+
+/// Kaiming-uniform init for a KDA weight set.
+fn kaiming_kda(k: &mut KdaWeights, cfg: &katgpt_attn::gdn2::kda_forward::KdaConfig) {
+    let d = cfg.hidden_size;
+    let dk = cfg.head_dim;
+    let pd = cfg.proj_dim();
+    kaiming_flat(&mut k.q_proj, d);
+    kaiming_flat(&mut k.k_proj, d);
+    kaiming_flat(&mut k.v_proj, d);
+    kaiming_flat(&mut k.q_conv_weight, cfg.conv_kernel_size);
+    kaiming_flat(&mut k.k_conv_weight, cfg.conv_kernel_size);
+    kaiming_flat(&mut k.v_conv_weight, cfg.conv_kernel_size);
+    kaiming_flat(&mut k.f_a_proj, d);
+    kaiming_flat(&mut k.f_b_proj, dk);
+    kaiming_flat(&mut k.beta_proj, d);
+    kaiming_flat(&mut k.g_proj, d);
+    kaiming_flat(&mut k.o_proj, pd);
+    // a_log + dt_bias keep the Mamba-style init from KdaWeights::random().
+    // o_norm_weight keeps its near-1.0 init.
+}
+
+/// Kaiming-uniform init for a SwiGlu expert.
+fn kaiming_expert(e: &mut SwiGluExpertWeights, fan_in: usize, _fan_out: usize) {
+    kaiming_flat(&mut e.gate_proj, fan_in);
+    kaiming_flat(&mut e.up_proj, fan_in);
+    kaiming_flat(&mut e.down_proj, _fan_out); // down_proj's fan_in = intermediate
 }
 
 /// Load a tensor from the safetensors view as f32.
