@@ -29,6 +29,28 @@
 //! in-tree. Production inference never calls this — it's gated behind
 //! `kda_backward` (implies `kda_linear`) and only consumed by riir-train-gpu.
 
+/// Clamp an f64 value to the f32-safe range before casting. Prevents
+/// overflow-to-inf when the KDA backward's intermediate gradient values
+/// exceed f32::MAX (3.4e38). The clamp threshold 1e35 leaves room for
+/// downstream multiplications without overflow. NaN → 0.
+///
+/// This is the numerical stabilization for the exploding-gradient problem
+/// in the KDA state-space backward: the dk×dk state matrix operations can
+/// amplify gradients by ~1e6 per layer, and after 6 KDA layers the products
+/// exceed f32 range. The clamp preserves gradient direction; only magnitude
+/// is bounded.
+#[inline]
+fn clamp_f64_to_f32(val: f64) -> f32 {
+    const F32_SAFE_MAX: f64 = 1e35;
+    if !val.is_finite() {
+        0.0
+    } else if val.abs() > F32_SAFE_MAX {
+        (val.signum() * F32_SAFE_MAX) as f32
+    } else {
+        val as f32
+    }
+}
+
 use crate::gdn2::kda_forward::{KdaConfig, KdaForwardScratch, KdaLayerCache, KdaWeights};
 use crate::gdn2::kda_forward::kda_forward_token;
 use katgpt_core::simd::{
@@ -437,10 +459,22 @@ pub fn kda_core_backward(
             .map(|i| (dy[i] as f64) * (ha.out_raw[i] as f64))
             .sum();
         let correction_f64 = sum_dy_out_f64 / (dk as f64 * rms_cubed_f64);
+        // Clamp threshold for f32-safe cast: f32::MAX / 10 to leave room for
+        // downstream multiplications without overflow. The clamp preserves
+        // gradient direction; only the magnitude is bounded.
+        const DOUT_RAW_CLAMP: f64 = 1e35;
         for j in 0..dk {
             let direct = (dy[j] as f64) * inv_rms_f64;
             let corr = (ha.out_raw[j] as f64) * correction_f64;
-            dout_raw[j] = (direct - corr) as f32;
+            let val = direct - corr;
+            let clamped = if !val.is_finite() {
+                0.0
+            } else if val.abs() > DOUT_RAW_CLAMP {
+                val.signum() * DOUT_RAW_CLAMP
+            } else {
+                val
+            };
+            dout_raw[j] = clamped as f32;
         }
 
         // ── Step 3 backward: gdn2_recurrent_step ──────────────────────────
@@ -456,45 +490,74 @@ pub fn kda_core_backward(
             let qi = ha.q_normed[i];
             let mut dq_i_f64 = 0.0f64;
             for j in 0..dk {
-                ds_post[i * dk + j] += dout_raw[j] * qi;
+                // f64 for the accumulation, then clamp to f32-safe range.
+                let ds_contrib = (dout_raw[j] as f64) * (qi as f64);
+                let ds_prev_val = ds_post[i * dk + j] as f64;
+                let ds_new = ds_prev_val + ds_contrib;
+                ds_post[i * dk + j] = if !ds_new.is_finite() {
+                    0.0
+                } else if ds_new.abs() > 1e35 {
+                    ds_new.signum() as f32 * 1e35
+                } else {
+                    ds_new as f32
+                };
                 dq_i_f64 += (dout_raw[j] as f64) * (ha.s_post[i * dk + j] as f64);
             }
-            dq_normed[i] = dq_i_f64 as f32;
+            let dq = if !dq_i_f64.is_finite() {
+                0.0
+            } else if dq_i_f64.abs() > 1e35 {
+                dq_i_f64.signum() * 1e35
+            } else {
+                dq_i_f64
+            };
+            dq_normed[i] = dq as f32;
         }
         // Update: S''[i,j] = S'[i,j] + k_h[i] · delta[j]
         for i in 0..dk {
-            let mut dk_i = 0.0f32;
+            let mut dk_i_f64 = 0.0f64;
             for j in 0..dk {
                 ds_prime[i * dk + j] = ds_post[i * dk + j]; // passthrough
-                dk_i += ds_post[i * dk + j] * ha.delta[j];
+                dk_i_f64 += (ds_post[i * dk + j] as f64) * (ha.delta[j] as f64);
             }
-            dk_normed[i] = dk_i;
+            dk_normed[i] = clamp_f64_to_f32(dk_i_f64);
         }
         for j in 0..dk {
-            let mut dd_j = 0.0f32;
+            let mut dd_j_f64 = 0.0f64;
             for i in 0..dk {
-                dd_j += ds_post[i * dk + j] * ha.k_normed[i];
+                dd_j_f64 += (ds_post[i * dk + j] as f64) * (ha.k_normed[i] as f64);
             }
-            ddelta[j] = dd_j;
+            ddelta[j] = clamp_f64_to_f32(dd_j_f64);
         }
         // delta: delta[j] = beta_h · v_h[j] − r[j]
-        let mut dbeta_from_delta = 0.0f32;
+        let mut dbeta_from_delta_f64 = 0.0f64;
         for j in 0..dk {
-            dv_h[j] = ddelta[j] * ha.beta_h;
-            dr[j] = -ddelta[j];
-            dbeta_from_delta += ddelta[j] * ha.v[j];
+            dv_h[j] = clamp_f64_to_f32(ddelta[j] as f64 * ha.beta_h as f64);
+            dr[j] = clamp_f64_to_f32(-(ddelta[j] as f64));
+            dbeta_from_delta_f64 += (ddelta[j] as f64) * (ha.v[j] as f64);
         }
         // Read: r[j] = Σ_i S'[i,j] · beta_h · k_h[i]  (erase_b = beta_h broadcast)
-        let mut dbeta_from_read = 0.0f32;
+        let mut dbeta_from_read_f64 = 0.0f64;
         for i in 0..dk {
-            let mut dk_from_read = 0.0f32;
+            let mut dk_from_read_f64 = 0.0f64;
             for j in 0..dk {
-                ds_prime[i * dk + j] += dr[j] * ha.beta_h * ha.k_normed[i];
-                derase_b[i] += dr[j] * ha.s_prime[i * dk + j] * ha.k_normed[i]; // = dL/derase_b[i]
-                dk_from_read += dr[j] * ha.s_prime[i * dk + j] * ha.beta_h;
-                dbeta_from_read += dr[j] * ha.s_prime[i * dk + j] * ha.k_normed[i];
+                let dr_j = dr[j] as f64;
+                let beta = ha.beta_h as f64;
+                let kn = ha.k_normed[i] as f64;
+                let sp = ha.s_prime[i * dk + j] as f64;
+                // ds_prime update
+                let contrib = dr_j * beta * kn;
+                let curr = ds_prime[i * dk + j] as f64;
+                ds_prime[i * dk + j] = clamp_f64_to_f32(curr + contrib);
+                // derase_b accumulation
+                let de = dr_j * sp * kn;
+                let curr_er = derase_b[i] as f64;
+                derase_b[i] = clamp_f64_to_f32(curr_er + de);
+                // dk_from_read
+                dk_from_read_f64 += dr_j * sp * beta;
+                // dbeta_from_read
+                dbeta_from_read_f64 += dr_j * sp * kn;
             }
-            dk_normed[i] += dk_from_read;
+            dk_normed[i] = clamp_f64_to_f32(dk_normed[i] as f64 + dk_from_read_f64);
         }
         // Decay: S'[i,j] = S_{t-1}[i,j] · a[i]
         // f64 accumulation: ds_prime (BPTT-accumulated) × s_prev (forward state)
@@ -503,28 +566,31 @@ pub fn kda_core_backward(
         for i in 0..dk {
             let mut da_i_f64 = 0.0f64;
             for j in 0..dk {
-                ds_prev_out[head][i * dk + j] = ds_prime[i * dk + j] * ha.a_decay[i];
+                ds_prev_out[head][i * dk + j] =
+                    clamp_f64_to_f32((ds_prime[i * dk + j] as f64) * (ha.a_decay[i] as f64));
                 da_i_f64 += (ds_prime[i * dk + j] as f64) * (ha.s_prev[i * dk + j] as f64);
             }
-            da_decay[i] = da_i_f64 as f32;
+            da_decay[i] = clamp_f64_to_f32(da_i_f64);
         }
 
         // ── Step 2 backward: gates + decay derivation ─────────────────────
         // dbeta_h total = dbeta_from_delta + dbeta_from_read
         //   (= dbeta_from_delta + Σ_i derase_b[i], since erase_b[i] = beta_h).
-        let dbeta_h_total = dbeta_from_delta + dbeta_from_read;
-        dbeta_pre[head] = dbeta_h_total * ha.beta_h * (1.0 - ha.beta_h);
+        let dbeta_h_total = clamp_f64_to_f32(dbeta_from_delta_f64 + dbeta_from_read_f64);
+        dbeta_pre[head] = clamp_f64_to_f32(dbeta_h_total as f64 * ha.beta_h as f64 * (1.0 - ha.beta_h as f64));
 
         // a[i] = max(exp(gk[i]), alpha_eps) — relu-clamp
-        let mut dalpha_head = 0.0f32;
+        let mut dalpha_head_f64 = 0.0f64;
         for i in 0..dk {
             let exp_gk = ha.gk[i].exp();
             let mask = if ha.a_decay[i] > config.alpha_eps { 1.0 } else { 0.0 };
-            dgk[i] = da_decay[i] * exp_gk * mask;
-            dalpha_head += dgk[i] * (-softplus(ha.g_plus[i]));
-            dg_plus[i] = dgk[i] * (-ha.alpha_head * sigmoid(ha.g_plus[i]));
+            dgk[i] = clamp_f64_to_f32((da_decay[i] as f64) * (exp_gk as f64) * (mask as f64));
+            dalpha_head_f64 += (dgk[i] as f64) * (-softplus(ha.g_plus[i]) as f64);
+            dg_plus[i] = clamp_f64_to_f32(
+                (dgk[i] as f64) * (-(ha.alpha_head as f64) * sigmoid(ha.g_plus[i]) as f64),
+            );
         }
-        grads.a_log[head] += dalpha_head * ha.alpha_head;
+        grads.a_log[head] += clamp_f64_to_f32(dalpha_head_f64 * (ha.alpha_head as f64));
 
         // g_plus → g_raw + dt_bias
         for i in 0..dk {
