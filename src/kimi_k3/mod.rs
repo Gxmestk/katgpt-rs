@@ -22,6 +22,15 @@
 
 pub mod decoder_layer;
 
+/// Full-model analytic backward (Plan 318 Phase C C6).
+///
+/// Composes the three per-primitive backward modules (MLA + MoE + KDA from
+/// C4/C5) with the model-level composition backward (attn-res + RMSNorm +
+/// dense SiTU FFN + LM head + embedding) into a full-model gradient pass.
+/// CPU reference for the GPU training loop (C10).
+#[cfg(feature = "kimi_k3_backward")]
+pub mod backward;
+
 #[cfg(feature = "kimi_k3_loader")]
 pub mod model;
 
