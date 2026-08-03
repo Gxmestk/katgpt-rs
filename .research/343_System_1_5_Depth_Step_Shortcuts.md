@@ -5,6 +5,7 @@
 > **Status:** Done
 > **Related Research:** 194 (DDTree), 218 (Breakeven Router), 241 (SwiR switch), 266 (FPRM damped halting), 282 (LoopCoder-V2 gain/cost halting), 286 (depth-invariance diagnostic), 325 §7.2 row G1 (survey gap candidate — **misclassified**, see §4 below)
 > **Related Plans:** none (training-only, no plan created)
+> **PASS-Redirects (synthesis):** Ouro [arXiv:2510.25741 "Scaling Latent Reasoning via Looped Language Models"] (Zhu et al., Bengio/Eshraghian, v5 Jul 2026) — same verdict pattern as this note (training-only depth routing → PASS). Ouro pre-trains Looped LMs (1.4B/2.6B) with iterative latent computation + entropy-regularized learned depth allocation, scaled to 7.7T tokens, matching 12B SOTA. §3.5 Path 0 fails (depth allocator IS the trained objective); Paths 1-3 fail (gain is structural). Pre-training recipe + scaling → **riir-train**. Modelless cousin (runtime adaptive depth) already shipped under the same vocabulary as this note's §2.5: LoopCoder-V2 GainCostLoopHalter (282), FPRM (266), depth-invariance (286), Breakeven (218/250), SwiR (241). Ouro is the pre-training-recipe sibling of this note's System-1.5 (both train depth allocation via gradient descent; neither offers a modelless primitive we don't already ship).
 > **Classification:** Public
 
 ---
