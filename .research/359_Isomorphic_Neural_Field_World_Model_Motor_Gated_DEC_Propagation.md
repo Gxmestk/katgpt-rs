@@ -7,6 +7,7 @@
 > **Related Plans:** 251 (DEC operators), 309 (latent field steering), 314 (Stokes wrappers), 296 (InducedCwmKernel), 341 (sleep-time), 357 (NEW — Motor-Gated DEC Propagation primitive)
 > **Cross-ref (riir-ai):** Research 168 (NEW — *Motor-Gated Isomorphic World Model Game-Runtime Guide*), the private selling-point doc
 > **Classification:** Public — open primitive (the math + the generic "action-conditional Hodge-Laplacian propagation" wrapper). Game integration + per-NPC HLA wiring + frozen-world-model offline learning pipeline stay private in riir-ai.
+> **PASS-Redirects (synthesis):** Liu, Niu, Cheng, Gao, Kang, Teng, Sreenath, Zhan [arXiv:2607.27924 "ODEWorld: A Continuous Predictive Architecture via Physical-Time Flow"] — ODEWorld's continuous-time latent ODE world model is the *non-motor-gated, non-action-conditioned* special case of this note's motor-gated DEC propagation Super-GOAT. ODEWorld's `v_θ(z_t, t; z_0, c)` is `evolve_motor_gated_field`'s velocity field without the motor-gain channel; ODEWorld explicitly does NOT incorporate action conditioning (App. E limitation), which is the exact capability this note ships as the action-conditional Hodge-Laplacian propagation. The dynamical-representation decoupling IS `hodge_decompose` extracting the harmonic component. Verdict: **PASS** (ODEWorld is strictly narrower than shipped substrate). See [Research 465](465_ODEWorld_PT_Flow_Continuous_Latent_ODE_Velocity.md).
 
 ---
 

@@ -1,4 +1,6 @@
-# Research 365: PhysiFormer → Single-Shot Trajectory Prediction via DEC Heat Kernel
+# Research 365: PhysiFormer → Single-Shot Trajectory Prediction via DEC Heat Kernel [L1-265]
+
+> **PASS-Redirects (synthesis):** Liu, Niu, Cheng, Gao, Kang, Teng, Sreenath, Zhan [arXiv:2607.27924 "ODEWorld: A Continuous Predictive Architecture via Physical-Time Flow"] — ODEWorld's PT-Flow `dz_t/dt = v_θ(z_t, t)` + RK4 integration IS this note's heat-kernel trajectory primitive (`h(t) = exp(t·A)·h₀` linear, Duhamel+Gauss-Legendre nonlinear) under a different name; ODEWorld's bidirectional + any-resolution "headline features" are immediate mathematical consequences of `exp(t·A)` being defined for any real `t`, not separate capabilities. The two genuinely training-only pieces (JVP first-order supervision + Savitzky-Golay target smoothing) → riir-train. Verdict: **PASS**. See [Research 465](465_ODEWorld_PT_Flow_Continuous_Latent_ODE_Velocity.md).
 
 > **Source:** Yiming Chen, Yushi Lan, Andrea Vedaldi, *PhysiFormer: Learning to Simulate Mechanics in World Space* — [arXiv:2606.27364](https://arxiv.org/abs/2606.27364) (VGG Oxford, 25 Jun 2026). Code: [github.com/yimingc9/PhysiFormer](https://github.com/yimingc9/PhysiFormer).
 > **Date:** 2026-07-02
