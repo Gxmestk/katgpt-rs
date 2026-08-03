@@ -862,7 +862,7 @@ pub(crate) fn ffn_backward(
 /// - `d_prefix_sum` — accumulator for prefix_sum gradient (mutated, += )
 /// - `d_norm_weight`, `d_proj_weight` — weight gradient accumulators
 #[allow(clippy::too_many_arguments)]
-pub(crate) fn attn_res_backward(
+pub fn attn_res_backward(
     config: &AttnResConfig,
     weights: &AttnResWeights,
     block_values: &[Vec<f32>],
