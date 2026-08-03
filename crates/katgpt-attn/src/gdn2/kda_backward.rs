@@ -325,20 +325,27 @@ pub fn kda_forward_token_with_saved(
 /// These are the per-token intermediate gradients the caller needs to drive the
 /// conv backward (step 1) + projection backward (step 0). The core itself
 /// accumulates into `grads`: `o_proj`, `o_norm_weight`, `a_log`, `dt_bias`.
+///
+/// Core backward: steps 5 (output proj) → 4 (RMSNorm gate) → 3 (recurrence) →
+/// 2 (gates + decay + L2Norm).
+///
+/// Accumulates into `grads`: `o_proj`, `o_norm_weight`, `a_log`, `dt_bias`.
+/// Writes `dL/dS_{t-1}` into `ds_prev_out` (caller-allocated, `[n_heads][dk*dk]`).
+/// Returns the intermediate gradients the conv + projection backward need.
 #[derive(Clone)]
-struct KdaCoreBackwardOutput {
+pub struct KdaCoreBackwardOutput {
     /// dL/dz_q_conv `[proj]` — grad w.r.t. post-conv post-SiLU q.
-    dz_q_conv: Vec<f32>,
+    pub dz_q_conv: Vec<f32>,
     /// dL/dz_k_conv `[proj]`.
-    dz_k_conv: Vec<f32>,
+    pub dz_k_conv: Vec<f32>,
     /// dL/dz_v_conv `[proj]`.
-    dz_v_conv: Vec<f32>,
+    pub dz_v_conv: Vec<f32>,
     /// dL/dg_out `[proj]` — grad w.r.t. the output gate g_out = W^g · h.
-    dg_out_full: Vec<f32>,
+    pub dg_out_full: Vec<f32>,
     /// dL/dbeta_pre `[n_heads]` — grad w.r.t. the pre-sigmoid beta projection.
-    dbeta_pre: Vec<f32>,
+    pub dbeta_pre: Vec<f32>,
     /// dL/dg_raw `[proj]` — grad w.r.t. the raw gate g_raw = W^{f_b} · f_a_hidden.
-    dg_raw: Vec<f32>,
+    pub dg_raw: Vec<f32>,
 }
 
 /// Core backward: steps 5 (output proj) → 4 (RMSNorm gate) → 3 (recurrence) →
@@ -348,7 +355,7 @@ struct KdaCoreBackwardOutput {
 /// Writes `dL/dS_{t-1}` into `ds_prev_out` (caller-allocated, `[n_heads][dk*dk]`).
 /// Returns the intermediate gradients the conv + projection backward need.
 #[allow(clippy::too_many_arguments)]
-fn kda_core_backward(
+pub fn kda_core_backward(
     config: &KdaConfig,
     weights: &KdaWeights,
     saved: &KdaSavedActivations,
@@ -828,7 +835,7 @@ pub fn kda_backward_sequence(
  *   input).
  */
 #[allow(clippy::too_many_arguments)]
-fn backward_conv_silu(
+pub fn backward_conv_silu(
     z_conv_saved: &[f32],      // post-SiLU values [proj]
     dz_conv: &mut [f32],        // IN: grad w.r.t. post-SiLU; OUT: dL/dz_preconv [proj]
     conv_buf: &[f32],          // ring buffer snapshot (pre-forward) [proj*ks]
