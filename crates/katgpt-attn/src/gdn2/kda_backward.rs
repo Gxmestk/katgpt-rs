@@ -421,12 +421,26 @@ pub fn kda_core_backward(
             dg_out_full[off + i] = dg_out_i;
         }
         // RMSNorm backward: dL/dout_raw_j = dy_j·inv_rms − out_raw_j · Σ_i(dy_i·out_raw_i) / (dk · rms³)
-        let rms = 1.0 / inv_rms;
-        let rms_cubed = rms * rms * rms;
-        let sum_dy_out: f32 = (0..dk).map(|i| dy[i] * ha.out_raw[i]).sum();
-        let correction = sum_dy_out / (dk as f32 * rms_cubed);
+        //
+        // f64 guard: the product dy[i] · out_raw[i] can overflow f32 when the
+        // upstream gradient has been amplified across multiple KDA layers AND
+        // the forward state values (→ out_raw) are large. The individual
+        // products fit in f64, and the subsequent correction term partially
+        // cancels the direct term — f64 preserves that cancellation. Computing
+        // in f32 overflows the sum to inf, making correction = inf, and
+        // dout_raw = finite − inf = ∓inf, which cascades to NaN through
+        // +inf + (−inf) in the state-matrix readout backward (line ~443).
+        // See: katgpt-rs/.issues/ NaN-investigation (seq 31/34 backward pass).
+        let inv_rms_f64 = inv_rms as f64;
+        let rms_cubed_f64 = inv_rms_f64.powi(-3); // = (1/inv_rms)^3 = 1/inv_rms^3
+        let sum_dy_out_f64: f64 = (0..dk)
+            .map(|i| (dy[i] as f64) * (ha.out_raw[i] as f64))
+            .sum();
+        let correction_f64 = sum_dy_out_f64 / (dk as f64 * rms_cubed_f64);
         for j in 0..dk {
-            dout_raw[j] = dy[j] * inv_rms - ha.out_raw[j] * correction;
+            let direct = (dy[j] as f64) * inv_rms_f64;
+            let corr = (ha.out_raw[j] as f64) * correction_f64;
+            dout_raw[j] = (direct - corr) as f32;
         }
 
         // ── Step 3 backward: gdn2_recurrent_step ──────────────────────────
@@ -435,14 +449,17 @@ pub fn kda_core_backward(
             ds_post[idx] = ds_next[head][idx];
         }
         // Readout: out[j] = Σ_i S''[i,j] · q_h[i]
+        // f64 accumulation for dq_i: dout_raw × s_post products are the primary
+        // cross-layer amplification path; f64 prevents overflow when both are
+        // large (deep backward + large forward state).
         for i in 0..dk {
             let qi = ha.q_normed[i];
-            let mut dq_i = 0.0f32;
+            let mut dq_i_f64 = 0.0f64;
             for j in 0..dk {
                 ds_post[i * dk + j] += dout_raw[j] * qi;
-                dq_i += dout_raw[j] * ha.s_post[i * dk + j];
+                dq_i_f64 += (dout_raw[j] as f64) * (ha.s_post[i * dk + j] as f64);
             }
-            dq_normed[i] = dq_i;
+            dq_normed[i] = dq_i_f64 as f32;
         }
         // Update: S''[i,j] = S'[i,j] + k_h[i] · delta[j]
         for i in 0..dk {
@@ -480,13 +497,16 @@ pub fn kda_core_backward(
             dk_normed[i] += dk_from_read;
         }
         // Decay: S'[i,j] = S_{t-1}[i,j] · a[i]
+        // f64 accumulation: ds_prime (BPTT-accumulated) × s_prev (forward state)
+        // products can overflow f32 in deep multi-layer backprop. See comment
+        // at the RMSNorm backward above for the overflow mechanism.
         for i in 0..dk {
-            let mut da_i = 0.0f32;
+            let mut da_i_f64 = 0.0f64;
             for j in 0..dk {
                 ds_prev_out[head][i * dk + j] = ds_prime[i * dk + j] * ha.a_decay[i];
-                da_i += ds_prime[i * dk + j] * ha.s_prev[i * dk + j];
+                da_i_f64 += (ds_prime[i * dk + j] as f64) * (ha.s_prev[i * dk + j] as f64);
             }
-            da_decay[i] = da_i;
+            da_decay[i] = da_i_f64 as f32;
         }
 
         // ── Step 2 backward: gates + decay derivation ─────────────────────
