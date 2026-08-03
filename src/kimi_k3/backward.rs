@@ -477,7 +477,7 @@ fn forward_layer_saved(
     }
 }
 
-fn dense_situ_ffn_forward_saved(
+pub(crate) fn dense_situ_ffn_forward_saved(
     expert: &SwiGluExpertWeights,
     hidden: &[f32],
     scratch: &mut KimiFfnScratch,
@@ -815,7 +815,7 @@ pub fn kimi_k3_backward_sequence(
 }
 
 /// FFN backward (MoE or Dense). Returns dL/d(normed_mlp) and accumulates weight grads.
-fn ffn_backward(
+pub(crate) fn ffn_backward(
     ffn_config: &KimiFfnConfig,
     ffn_weights: &KimiFfnWeights,
     saved: &LayerSavedActivations,
@@ -862,7 +862,7 @@ fn ffn_backward(
 /// - `d_prefix_sum` — accumulator for prefix_sum gradient (mutated, += )
 /// - `d_norm_weight`, `d_proj_weight` — weight gradient accumulators
 #[allow(clippy::too_many_arguments)]
-fn attn_res_backward(
+pub(crate) fn attn_res_backward(
     config: &AttnResConfig,
     weights: &AttnResWeights,
     block_values: &[Vec<f32>],

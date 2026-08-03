@@ -31,6 +31,14 @@ pub mod decoder_layer;
 #[cfg(feature = "kimi_k3_backward")]
 pub mod backward;
 
+/// Gradient checkpointing backward (Plan 318 Phase C C7).
+///
+/// Recompute-activations variant of the full-model backward — cuts activation
+/// memory from ~24 GB to ~5 GB at the cost of one extra forward pass during
+/// backward. Same gradient output as `backward::kimi_k3_backward_sequence`.
+#[cfg(feature = "kimi_k3_backward")]
+pub mod checkpoint;
+
 #[cfg(feature = "kimi_k3_loader")]
 pub mod model;
 
