@@ -139,7 +139,34 @@ impl<const D: usize, const D2: usize> CpHopfieldRecaller<D, D2> {
     /// [`CpHopfieldRecaller::project_to_manifold`] pulls it back to the *exact*
     /// closest on-manifold point rather than to an approximation of it.
     pub fn llg_step_neuron(&mut self, neuron_idx: usize, cfg: &LlgConfig) -> f32 {
-        let b = self.mean_field(neuron_idx);
+        self.llg_step_neuron_driven(neuron_idx, cfg, None)
+    }
+
+    /// One LLG step for neuron `i` with an optional external driving field added
+    /// to the self-consistent mean field.
+    ///
+    /// The undriven flow is autoassociative: the only field is the one the stored
+    /// memories generate, so the state relaxes into whichever memory basin it
+    /// starts nearest. A driven flow is what a *perception-coupled* consumer needs
+    /// — the observation biases the field, and the memory term supplies the
+    /// hysteresis that keeps a weak or ambiguous observation from dislodging an
+    /// established belief. This is the Fusion D shape from Research 466: belief
+    /// updates as LLG flow on `CP²` under a perception-derived field.
+    ///
+    /// Note that `Ė ≤ 0` is a property of the *undriven* flow. Driving injects
+    /// energy by construction, so the monotonicity guarantee does not apply here.
+    pub fn llg_step_neuron_driven(
+        &mut self,
+        neuron_idx: usize,
+        cfg: &LlgConfig,
+        bias: Option<&[f32; D2]>,
+    ) -> f32 {
+        let mut b = self.mean_field(neuron_idx);
+        if let Some(bias) = bias {
+            for a in 0..D2 {
+                b[a] += bias[a];
+            }
+        }
         let s = *self.state(neuron_idx);
         let sc = self.structure();
 
@@ -164,6 +191,28 @@ impl<const D: usize, const D2: usize> CpHopfieldRecaller<D, D2> {
         let mut total = 0.0f32;
         for i in 0..self.n_neurons() {
             total += self.llg_step_neuron(i, cfg);
+        }
+        total / self.n_neurons() as f32
+    }
+
+    /// One full LLG sweep with a per-neuron external driving field.
+    ///
+    /// See [`Self::llg_step_neuron_driven`] for what driving means and why the
+    /// energy-monotonicity guarantee does not extend to it.
+    ///
+    /// # Panics
+    /// Panics if `bias.len() != n_neurons`.
+    pub fn llg_step_driven(&mut self, cfg: &LlgConfig, bias: &[[f32; D2]]) -> f32 {
+        assert_eq!(
+            bias.len(),
+            self.n_neurons(),
+            "cp_hopfield: driving field must cover all {} neurons",
+            self.n_neurons()
+        );
+        let mut total = 0.0f32;
+        for i in 0..self.n_neurons() {
+            let b = bias[i];
+            total += self.llg_step_neuron_driven(i, cfg, Some(&b));
         }
         total / self.n_neurons() as f32
     }
