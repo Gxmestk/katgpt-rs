@@ -207,11 +207,11 @@ gate measures recall capacity, not preprocessing quality.
 > preserved as-is (they're dimension-agnostic). The task list below is the
 > original text; the corrected scope lives in Issue 033.
 
-- [ ] **T6.1** Implement `NeuronShard` CP^(d-1) view — re-parameterize `style_weights[64]` as CP⁷ (d=8) Bloch vectors. Enforce non-linear constraint on read/write.
-- [ ] **T6.2** Add `ItemEmbedIndex::query_cp` — top-eigenvector recall path alongside the existing cosine ANN path. Feature-gated.
-- [ ] **T6.3** Add `vibe.rs` KG triple emission via top-eigenvector — feature-gated.
-- [ ] **T6.4** G6 benchmark: per-shard KG triple capacity, cosine ANN vs CP^(d-1) recall, on correlated triples. PASS criterion: CP^(d-1) maintains precision@1 ≥ 0.9 at ≥ 3× the triple count where cosine ANN drops below 0.9.
-- [ ] **T6.5** `MerkleFrozenEnvelope` commitment of CP^(d-1) memory sets + K_i kernels.
+- [-] **T6.1** ~~Implement `NeuronShard` CP^(d-1) view — re-parameterize `style_weights[64]` as CP⁷ (d=8) Bloch vectors.~~ **SUPERSEDED + MEASURED FAIL** (Issue 033, 2026-08-04). Scope corrected to CP² (d=3, D2=8) additive view; `query_cp` + `query_cp_llg` both measured — CP² recall consistently WORSE than cosine ANN at every N (capacity ratio 1.00×, criterion ≥3×). LLG unblock refuted (bit-identical to single-step). Projected-cosine diagnostic showed projection HELPS 3–9× but associative recall destroys angular precision — fundamental property, not a bug.
+- [-] **T6.2** ~~Add `ItemEmbedIndex::query_cp`~~ **DONE + G6 FAIL** (Issue 033 T1, commit `0408663`). The path exists but measured worse than cosine; kept as opt-in `cp_recall` feature for research, not production.
+- [-] **T6.3** `vibe.rs` KG triple emission via top-eigenvector — **NOT PURSUED** (G6 FAIL). No value wiring KG emission through a recall path that underperforms cosine ANN.
+- [-] **T6.4** ~~G6 benchmark~~ **DONE + FAIL** (Issue 033 T2, commit `32c35b9`). CP² precision 0.00–0.25 vs cosine 0.03–0.50 at N=4–256. Capacity ratio 1.00× (criterion ≥3×). Decisively closed.
+- [-] **T6.5** `MerkleFrozenEnvelope` commitment of CP^(d-1) memory sets — **NOT PURSUED** (G6 FAIL). No production value committing a recall path that underperforms.
 
 ---
 
