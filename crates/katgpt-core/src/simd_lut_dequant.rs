@@ -376,13 +376,18 @@ unsafe fn dequant_via_lut_avx2(
 ) {
     use core::arch::x86_64::{
         _mm_cvtepu8_epi32, _mm_loadl_epi64, _mm256_and_si256, _mm256_castsi128_si256,
-        _mm256_i32gather_ps, _mm256_set1_epi32, _mm256_srli_epi32, _mm256_storeu_ps,
+        _mm256_i32gather_ps, _mm256_set1_epi32, _mm256_srlv_epi32, _mm256_storeu_ps,
     };
 
     unsafe {
         let n = codes.len().min(out.len());
         let lut_ptr = lut_slice.as_ptr();
         let mask_vec = _mm256_set1_epi32(mask as i32);
+        // `_mm256_srli_epi32` requires a const immediate; `shift` is a runtime
+        // arg, so use the variable per-lane shift `vpsrlvd` instead. Broadcast
+        // once (loop-invariant) — same latency/throughput as the immediate form
+        // on Intel AVX2 cores (including the i7-13700K).
+        let shift_vec = _mm256_set1_epi32(shift as i32);
 
         // Process 8 bytes at a time using AVX2 gather.
         let mut i = 0;
@@ -391,7 +396,7 @@ unsafe fn dequant_via_lut_avx2(
             let raw_bytes = _mm_cvtepu8_epi32(_mm_loadl_epi64(codes.as_ptr().add(i) as *const _));
             // Widen to 256-bit, shift right + mask on i32 lanes.
             let idx256 = _mm256_castsi128_si256(raw_bytes);
-            let shifted = _mm256_srli_epi32(idx256, shift as i32);
+            let shifted = _mm256_srlv_epi32(idx256, shift_vec);
             let masked = _mm256_and_si256(shifted, mask_vec);
             // Gather 8× f32 from LUT base using the masked indices.
             // Scale = 4 (sizeof(f32)); indices are byte offsets = idx * 4.
@@ -632,13 +637,18 @@ unsafe fn dequant_dot_via_lut_avx2(
     use core::arch::x86_64::{
         _mm_cvtepu8_epi32, _mm_loadl_epi64, _mm256_add_ps, _mm256_and_si256,
         _mm256_castsi128_si256, _mm256_fmadd_ps, _mm256_i32gather_ps, _mm256_loadu_ps,
-        _mm256_set1_epi32, _mm256_setzero_ps, _mm256_srli_epi32,
+        _mm256_set1_epi32, _mm256_setzero_ps, _mm256_srlv_epi32,
     };
 
     unsafe {
         let n = codes.len().min(x.len());
         let lut_ptr = lut_slice.as_ptr();
         let mask_vec = _mm256_set1_epi32(mask as i32);
+        // `_mm256_srli_epi32` requires a const immediate; `shift` is a runtime
+        // arg, so use the variable per-lane shift `vpsrlvd` instead. Broadcast
+        // once (loop-invariant) — same latency/throughput as the immediate form
+        // on Intel AVX2 cores (including the i7-13700K).
+        let shift_vec = _mm256_set1_epi32(shift as i32);
 
         // 2 independent accumulators (float32x8_t each) to hide FMA latency.
         let mut acc0 = _mm256_setzero_ps();
@@ -651,7 +661,7 @@ unsafe fn dequant_dot_via_lut_avx2(
                 let raw =
                     _mm_cvtepu8_epi32(_mm_loadl_epi64(codes.as_ptr().add(i + off) as *const _));
                 let idx256 = _mm256_castsi128_si256(raw);
-                let shifted = _mm256_srli_epi32(idx256, shift as i32);
+                let shifted = _mm256_srlv_epi32(idx256, shift_vec);
                 let masked = _mm256_and_si256(shifted, mask_vec);
                 let gathered = _mm256_i32gather_ps(lut_ptr, masked, 4);
                 let x_vec = _mm256_loadu_ps(x.as_ptr().add(i + off));
@@ -669,7 +679,7 @@ unsafe fn dequant_dot_via_lut_avx2(
         if i + 8 <= n {
             let raw = _mm_cvtepu8_epi32(_mm_loadl_epi64(codes.as_ptr().add(i) as *const _));
             let idx256 = _mm256_castsi128_si256(raw);
-            let shifted = _mm256_srli_epi32(idx256, shift as i32);
+            let shifted = _mm256_srlv_epi32(idx256, shift_vec);
             let masked = _mm256_and_si256(shifted, mask_vec);
             let gathered = _mm256_i32gather_ps(lut_ptr, masked, 4);
             let x_vec = _mm256_loadu_ps(x.as_ptr().add(i));
