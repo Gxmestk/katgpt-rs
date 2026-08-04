@@ -167,6 +167,11 @@ migration. See Issue 033 for the full substrate-first analysis.
 
 ### Tasks (moved to Issue 033)
 
+> **Scope corrected** — see Issue 033. T6.1's CP⁷ re-parameterization is
+> superseded by the CP² (d=3) additive-view approach. T6.2–T6.5 are
+> preserved as-is (they're dimension-agnostic). The task list below is the
+> original text; the corrected scope lives in Issue 033.
+
 - [ ] **T6.1** Implement `NeuronShard` CP^(d-1) view — re-parameterize `style_weights[64]` as CP⁷ (d=8) Bloch vectors. Enforce non-linear constraint on read/write.
 - [ ] **T6.2** Add `ItemEmbedIndex::query_cp` — top-eigenvector recall path alongside the existing cosine ANN path. Feature-gated.
 - [ ] **T6.3** Add `vibe.rs` KG triple emission via top-eigenvector — feature-gated.
