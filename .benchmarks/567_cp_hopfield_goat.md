@@ -226,10 +226,17 @@ CARGO_TARGET_DIR=/tmp/plan567 cargo bench -p riir-poc \
    mixes correlated memories, and the top eigenvector points at the cluster
    centroid, not the individual memory.
 
-   **Potential new G6 variant (not pursued):** projected-cosine ANN (project
-   embeddings + query to CP² before cosine matching) as a preprocessing
-   step. The 239 ns projection cost is negligible per-query. This is a
-   different Fusion B path than recall dynamics. The promotion decision
+   **Potential new G6 variant (VALIDATED + CLOSED 2026-08-04):** projected-cosine
+   ANN (project embeddings + query to CP² before cosine matching) was tested
+   against the production `item_embedding()` block layout in
+   `bench_033b_projected_cosine_real_structure`. The denoising gain HOLDS and
+   is STRONGER on production structure (15–22× at N=256–4096) — but it does NOT
+   apply to the production RETRIEVE use case. Every call site queries with
+   `ITEM_TYPE_CENTROIDS[type_code]` (a clean centroid), where raw cosine
+   already achieves 1.0 type-hit. The 15–22× gain only manifests on
+   corrupted-item queries, which no production code path uses. **Verdict: not
+   actionable.** No denoising issue filed. See Issue 033 §"Projected-cosine ANN
+   as a new G6 strategy" for the full measured data. The promotion decision
    (STAYS OPT-IN) is unaffected.
 2. **Snap sensitivity** — the non-monotone sweep needs either a principled snap
    setting or a reformulation that removes the hyperparameter (the driven LLG flow,
