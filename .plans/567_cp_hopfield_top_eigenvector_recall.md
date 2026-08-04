@@ -155,9 +155,17 @@ memories.
 
 ---
 
-## Phase 6 — Fusion B / G6 (KG Capacity, in riir-neuron-db follow-up)
+## Phase 6 — Fusion B / G6 (KG Capacity) — scoped to [riir-neuron-db Issue 033](../../riir-neuron-db/.issues/033_cp_hopfield_phase6_g6_kg_capacity_cp2.md)
 
-### Tasks (deferred to a riir-neuron-db plan after Phase 5)
+### Scope correction (2026-08-04)
+
+**T6.1's original scope was wrong.** It said "re-parameterize `style_weights[64]`
+as CP⁷ (d=8) Bloch vectors" — but the retrieval layer operates on 8-dim vectors
+(`ITEM_EMBED_DIM = 8`, `BELIEF_DIM = 8`), not 64-dim shard storage. CP² (d=3,
+D2=8) is the correct dimension. This eliminates the invasive `NeuronShard`
+migration. See Issue 033 for the full substrate-first analysis.
+
+### Tasks (moved to Issue 033)
 
 - [ ] **T6.1** Implement `NeuronShard` CP^(d-1) view — re-parameterize `style_weights[64]` as CP⁷ (d=8) Bloch vectors. Enforce non-linear constraint on read/write.
 - [ ] **T6.2** Add `ItemEmbedIndex::query_cp` — top-eigenvector recall path alongside the existing cosine ANN path. Feature-gated.
