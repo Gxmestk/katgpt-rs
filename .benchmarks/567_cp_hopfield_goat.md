@@ -206,7 +206,8 @@ CARGO_TARGET_DIR=/tmp/plan567 cargo bench -p riir-poc \
 ## Follow-ups
 
 1. **G6 / Phase 6 — MEASURED, FAIL (2026-08-04; LLG unblock + projected-cosine
-   diagnostic 2026-08-04).** [Issue 033](../../riir-neuron-db/.issues/033_cp_hopfield_phase6_g6_kg_capacity_cp2.md)
+   diagnostic 2026-08-04).** Issue 033 (resolved + removed per noise-reduction
+   rule — this benchmark + the in-tree benches are the canonical record).
    bench `bench_033_g6_kg_capacity` measured CP² recall vs cosine ANN on
    correlated 8-dim embeddings. CP² is consistently WORSE than cosine at
    every N (capacity ratio 1.00×, criterion ≥ 3×).
@@ -235,8 +236,8 @@ CARGO_TARGET_DIR=/tmp/plan567 cargo bench -p riir-poc \
    `ITEM_TYPE_CENTROIDS[type_code]` (a clean centroid), where raw cosine
    already achieves 1.0 type-hit. The 15–22× gain only manifests on
    corrupted-item queries, which no production code path uses. **Verdict: not
-   actionable.** No denoising issue filed. See Issue 033 §"Projected-cosine ANN
-   as a new G6 strategy" for the full measured data. The promotion decision
+   actionable.** No denoising issue filed. The full per-N measured data lives
+   in `riir-neuron-db/benches/bench_033b_projected_cosine_real_structure.rs` (the in-tree evidence). The promotion decision
    (STAYS OPT-IN) is unaffected.
 2. **Snap sensitivity** — the non-monotone sweep needs either a principled snap
    setting or a reformulation that removes the hyperparameter (the driven LLG flow,
