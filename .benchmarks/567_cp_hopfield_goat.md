@@ -21,13 +21,13 @@ Benches:
 | G3 no-regression | opt-in, default-off; `--all-features` clean | **PASS** |
 | G4 perf | `O(d³)` paths sub-µs at `d ≤ 4`, alloc-free | **PASS** (after fixing a plan cost-model error) |
 | G5 Plan 276 unblock | flips ≤ 10× leaky **and** tracking ≥ leaky − 0.05 | **PASS, narrowly** — see §G5 |
-| G6 Fusion B (KG capacity) | ≥ 3× cosine-ANN triple capacity | **NOT MEASURED** — Phase 6 deferred |
+| G6 Fusion B (KG capacity) | ≥ 3× cosine-ANN triple capacity | **FAIL** — CP² worse than cosine at every N; single-step recall insufficient (Issue 033 bench) |
 | G7 BBP gap | relative gap > 0.1 at finite `N` | **PASS** — strongest result |
 
 **Promotion decision: keep `cp_hopfield` opt-in.** Per the Plan 567 T7.2 decision
-table, default-on requires G5 **and** G6 **and** G7. G6 is unmeasured (Phase 6
-deferred to riir-neuron-db), and G5 passes only in the narrow sense, so the
-promotion precondition is not met.
+table, default-on requires G5 **and** G6 **and** G7. G6 FAILS (CP² recall is
+worse than cosine ANN on the KG capacity benchmark — Issue 033), and G5 passes
+only in the narrow sense, so the promotion precondition is not met.
 
 ---
 
@@ -205,8 +205,16 @@ CARGO_TARGET_DIR=/tmp/plan567 cargo bench -p riir-poc \
 
 ## Follow-ups
 
-1. **G6 / Phase 6** — Fusion B KG-triple capacity in riir-neuron-db. The blocker
-   for promotion to default-on.
+1. **G6 / Phase 6 — MEASURED, FAIL (2026-08-04).** [Issue 033](../../riir-neuron-db/.issues/033_cp_hopfield_phase6_g6_kg_capacity_cp2.md)
+   bench `bench_033_g6_kg_capacity` measured CP² recall vs cosine ANN on
+   correlated 8-dim embeddings. CP² is consistently WORSE than cosine at
+   every N (capacity ratio 1.00×, criterion ≥ 3×). Root causes: single-step
+   recall insufficient, manifold projection loses information, clustered
+   benchmark is hard (SNR ≈ 1:1). Fusion B refuted with the current
+   single-step `query_cp` design. Iterative LLG recall to convergence is a
+   potential follow-up (not pursued). The promotion decision (STAYS OPT-IN)
+   is unaffected — G6 was already unmeasured; measuring it and getting FAIL
+   closes the open question without changing the verdict.
 2. **Snap sensitivity** — the non-monotone sweep needs either a principled snap
    setting or a reformulation that removes the hyperparameter (the driven LLG flow,
    `llg_step_driven`, is the natural candidate: it couples input into the field

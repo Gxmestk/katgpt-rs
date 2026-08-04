@@ -5,7 +5,7 @@
 **Private guide:** [riir-neuron-db/.research/304](../../riir-neuron-db/.research/304_Symmetric_Space_Hopfield_Super_GOAT_Guide.md)
 **Source paper:** Victor Galitski — "High-Capacity Generalized Hopfield Networks" — [alphaXiv 2607.hopfield-networks](https://www.alphaxiv.org/abs/2607.hopfield-networks) (2026-07-31)
 **Target:** `katgpt-rs/crates/katgpt-core/src/cp_hopfield/` (new module) + Cargo feature `cp_hopfield`
-**Status:** Phases 1–5 + 7 COMPLETE. Phase 6 (Fusion B / riir-neuron-db) deferred to a follow-up plan. **Promotion decision: `cp_hopfield` STAYS OPT-IN** — G1–G4 + G7 PASS, G5 passes only in the narrow sense (see Phase 5), G6 unmeasured. Benchmark: [.benchmarks/567](../.benchmarks/567_cp_hopfield_goat.md).
+**Status:** Phases 1–5 + 6 + 7 COMPLETE. **Promotion decision: `cp_hopfield` STAYS OPT-IN** — G1–G4 + G7 PASS, G5 passes only in the narrow sense (see Phase 5), G6 FAIL (CP² recall worse than cosine ANN on KG capacity, see Issue 033). Benchmark: [.benchmarks/567](../.benchmarks/567_cp_hopfield_goat.md).
 
 ---
 
@@ -155,7 +155,7 @@ memories.
 
 ---
 
-## Phase 6 — Fusion B / G6 (KG Capacity) — scoped to [riir-neuron-db Issue 033](../../riir-neuron-db/.issues/033_cp_hopfield_phase6_g6_kg_capacity_cp2.md)
+## Phase 6 — Fusion B / G6 (KG Capacity) — MEASURED, FAIL — [Issue 033](../../riir-neuron-db/.issues/033_cp_hopfield_phase6_g6_kg_capacity_cp2.md)
 
 ### Scope correction (2026-08-04)
 
@@ -199,7 +199,7 @@ migration. See Issue 033 for the full substrate-first analysis.
 | G3 no-regression | **PASS** — opt-in, default-off |
 | G4 perf | **PASS** — recall 331 ns / project 239 ns / LLG 589 ns, 0 allocs |
 | G5 Plan 276 unblock | **PASS, narrowly** — 3 flips at tracking 1.000; Haar control fails |
-| G6 Fusion B (KG capacity) | **NOT MEASURED** — Phase 6 deferred |
+| G6 Fusion B (KG capacity) | **FAIL** — CP² worse than cosine at every N; single-step recall insufficient (Issue 033) |
 | G7 BBP gap | **PASS** — 0.73–0.95 vs a 0.1 bar, at N ∈ {8, 64} |
 
 ### Decision: STAYS OPT-IN
