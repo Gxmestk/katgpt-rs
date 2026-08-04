@@ -327,6 +327,31 @@ fn recall_is_deterministic() {
     assert_eq!(a, b, "recall must be bit-reproducible");
 }
 
+/// The incremental `T_μ` cache must stay bit-close to a full recomputation across
+/// many state writes. This guards the `O(P·N·D2)` -> `O(P·D2)` optimization: if the
+/// cache drifted, every Mattis overlap — and therefore every recall — would be
+/// silently wrong in a way no other test would catch.
+#[test]
+fn overlap_cache_matches_full_recompute() {
+    let mut rec = haar_fixture::<3, 8>(32, 6, 0.4, 0xCAC4E);
+    for _ in 0..5 {
+        rec.sweep();
+    }
+    let incremental: Vec<f32> = (0..rec.n_memories())
+        .map(|mu| rec.mattis_overlap_excluding(3, mu))
+        .collect();
+    rec.refresh_overlap_totals();
+    let recomputed: Vec<f32> = (0..rec.n_memories())
+        .map(|mu| rec.mattis_overlap_excluding(3, mu))
+        .collect();
+    for (mu, (a, b)) in incremental.iter().zip(recomputed.iter()).enumerate() {
+        assert!(
+            (a - b).abs() < 1e-4,
+            "overlap cache drifted at memory {mu}: incremental {a} vs recomputed {b}"
+        );
+    }
+}
+
 // ── G7: BBP gap ──────────────────────────────────────────────────────────
 
 /// At low load the memory kernel must show a clear spectral gap — the mechanism

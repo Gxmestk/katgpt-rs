@@ -78,23 +78,54 @@ impl CapacityCurve {
     /// Estimated `α_c`: the load at which `mean_overlap` crosses below
     /// [`Self::threshold`], linearly interpolated between the bracketing points.
     ///
+    /// # Interpolates on realized load, not requested `α`
+    ///
+    /// `P = round(α·N)` is an integer, so at small `N` many distinct requested `α`
+    /// values collapse onto the same `P`. At `N = 8`, requested `α ∈ {0.02, 0.04,
+    /// 0.06, 0.1}` all yield `P = 1`, i.e. a realized load of `0.125`. Interpolating
+    /// against the requested `α` would report a crossing at an `α` the sweep never
+    /// actually tested. So the interpolation runs against `n_memories / N`, and
+    /// consecutive points sharing a `P` are skipped as duplicates.
+    ///
     /// Returns `None` if the curve never crosses — either because every load
     /// recalled successfully (`α_c` is above the swept range) or because none did
-    /// (`α_c` is below it). A `None` is informative, not an error: it says the
-    /// sweep range was wrong, and reporting it as a number would be a fabrication.
+    /// (`α_c` is below it). A `None` is informative, not an error: it says the sweep
+    /// range was wrong, and reporting a number anyway would be a fabrication.
     pub fn alpha_c(&self) -> Option<f32> {
-        for w in self.points.windows(2) {
-            let (lo, hi) = (&w[0], &w[1]);
-            if lo.mean_overlap >= self.threshold && hi.mean_overlap < self.threshold {
-                let span = lo.mean_overlap - hi.mean_overlap;
-                if span.abs() < 1e-9 {
-                    return Some(lo.alpha);
+        let inv_n = 1.0 / self.n_neurons as f32;
+        let mut prev: Option<&CapacityPoint> = None;
+        for pt in &self.points {
+            if let Some(lo) = prev {
+                if lo.n_memories != pt.n_memories
+                    && lo.mean_overlap >= self.threshold
+                    && pt.mean_overlap < self.threshold
+                {
+                    let lo_load = lo.n_memories as f32 * inv_n;
+                    let hi_load = pt.n_memories as f32 * inv_n;
+                    let span = lo.mean_overlap - pt.mean_overlap;
+                    if span.abs() < 1e-9 {
+                        return Some(lo_load);
+                    }
+                    let t = (lo.mean_overlap - self.threshold) / span;
+                    return Some(lo_load + t * (hi_load - lo_load));
                 }
-                let t = (lo.mean_overlap - self.threshold) / span;
-                return Some(lo.alpha + t * (hi.alpha - lo.alpha));
             }
+            prev = Some(pt);
         }
         None
+    }
+
+    /// Smallest realized load `P/N` actually exercised by the sweep.
+    ///
+    /// At small `N` this can be far above the smallest requested `α` (`P ≥ 1`
+    /// forces `P/N ≥ 1/N`), which bounds how low a measured `α_c` can possibly be.
+    pub fn min_realized_load(&self) -> f32 {
+        self.points
+            .iter()
+            .map(|p| p.n_memories)
+            .min()
+            .map(|p| p as f32 / self.n_neurons as f32)
+            .unwrap_or(0.0)
     }
 }
 

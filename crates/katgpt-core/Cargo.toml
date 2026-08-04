@@ -1661,3 +1661,18 @@ required-features = ["hebbian_kernel_memory"]
 name = "bench_561_inversion_goat"
 harness = false
 required-features = ["grad_policy"]
+
+# Plan 567 — CP^(d-1) Symmetric-Space Hopfield GOAT gate (G2 capacity, G4 perf,
+# G7 BBP gap). G2 measures the finite-N alpha_c against the paper's asymptotic
+# values (0.05/0.62/2.41 at d=2/3/4) — the point is to quantify the finite-N
+# correction at the N we actually use (8, 64), not to reproduce the asymptote.
+# G7 measures the BBP relative gap at the operating point and is load-bearing:
+# the whole capacity claim is a statement about that gap surviving at finite N.
+# G1 is the 26-test cp_hopfield::tests suite; G3 is the feature-flag matrix.
+# G5 (the Plan 276 modelless unblock) is NOT decidable here — it lives in
+# riir-ai/crates/riir-poc/benches/cp_hopfield_plan276_unblock.rs.
+# std::time::Instant + CountingAllocator + harness = false (mirrors bench_559).
+[[bench]]
+name = "bench_567_cp_hopfield_goat"
+harness = false
+required-features = ["cp_hopfield"]
