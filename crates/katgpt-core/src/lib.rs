@@ -250,6 +250,13 @@ pub use set_diffusion_schedule::{
 pub use katgpt_types::simd;
 pub mod speculative;
 pub mod traits;
+
+// Prompt-backend trait — generic prompt→string inference contract (Issue 580).
+// Hoisted from riir-game-sdk::gm::prompt so multiple consumers (riir-agents
+// Phase 2, the SDK's gm::prompt module, future callers) share one trait.
+// Always-on: pure trait + zero-dep mock, no feature gate needed.
+pub mod prompt_backend;
+pub use prompt_backend::InferenceBackend;
 // Shared configuration, RNG, math utilities, LoRA, domain embeddings, and
 // inference types. Spun out to the `katgpt-types` crate (Issue 007 Phase E
 // Tier 1 #2) and re-exported here as `katgpt_core::types` for backwards
