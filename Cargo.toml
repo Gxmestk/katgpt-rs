@@ -711,6 +711,10 @@ required-features = ["percepta_compile"]
 name = "kimi_k3_hello_world"
 required-features = ["kimi_k3_loader"]
 
+[[example]]
+name = "kimi_k3_4b_hello_world"
+required-features = ["kimi_k3_loader"]
+
 # ── AND-OR DDTree Decomposition (Plan 190) ───────────────────────
 
 [[example]]
@@ -1185,6 +1189,10 @@ required-features = ["monopoly"]
 # ── DendriticGate Adaptive Thinking (Plan 260) ────────────────
 [[example]]
 name = "dendritic_thinking_demo"
+required-features = ["dendritic_gate"]
+
+[[example]]
+name = "dendritic_goat_bench"
 required-features = ["dendritic_gate"]
 
 # ── GameState Forward Model (Plan 056) ────────────────────────
