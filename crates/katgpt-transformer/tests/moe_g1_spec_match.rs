@@ -15,6 +15,8 @@
 //! reference, then asserts the f32 impl matches the CORRECT reference. This
 //! catches the §2.2 misreading bit-identically.
 
+#![cfg(feature = "transformer_moe")]
+
 use katgpt_transformer::moe::{MoeConfig, MoeForwardScratch, MoeWeights, moe_forward_token};
 
 // ─── Independent f64 reference implementation ───────────────────────────────
