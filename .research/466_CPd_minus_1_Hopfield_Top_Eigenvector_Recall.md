@@ -277,72 +277,99 @@ Our 8-dim `katgpt-sense` belief state has the *exact* dimension of a CP² Bloch 
 
 ## 3.6. PoC Addendum (Plan 567 Phase 5, 2026-08-04)
 
-**G5 GATE: PASS.** The §3.5 modelless-unblock claim is empirically validated.
+**G5 GATE: PASS — but in the narrow sense only.** CP^(d-1) recall does unblock
+Plan 276 modellessly, and it beats the random-init `AttractorKernel` decisively on
+both axes. What it does *not* do is supply hysteresis from arbitrary memories, so
+the headline must be stated as **"modelless given a frozen memory set"**, not
+"for free".
+
+> **Revision note.** An earlier draft of this section reported an unqualified PASS
+> and concluded "the hysteresis is free". That draft measured flip count only. Two
+> controls were then added ([`riir-poc` commit `ab23ba375`](../../riir-ai)) and
+> they narrow the claim materially. The corrected result is below. Recording the
+> correction rather than quietly deleting the earlier claim is the §3.6 discipline
+> applied in the direction it more often needs to go — downward.
 
 ### What was measured
 
 The G5 PoC ([`riir-poc/benches/cp_hopfield_plan276_unblock.rs`](../../riir-ai/crates/riir-poc/benches/cp_hopfield_plan276_unblock.rs))
-runs the Plan 276 G2.1 belief-tracking protocol (1000-step input sequence,
-3 phases: dim-0 strong → ambiguous noise → dim-1 strong) on three competitors:
+runs the Plan 276 G2.1 belief-tracking protocol (1000 steps, three phases: dim-0
+strong -> ambiguous noise -> dim-1 strong) on four arms.
 
-| Kernel | Flip-flops | vs LeakyIntegrator | vs random Attractor |
+**Flip count alone is not a sufficient metric.** It rewards stability, and a
+kernel that ignores its input entirely is perfectly stable — its argmax never
+moves, so it scores 0 flips, *better* than `LeakyIntegrator`, whose single flip is
+the **correct** phase-1 -> phase-3 transition. So the PoC also scores
+**tracking**: the fraction of settled phase-1 ticks (300..400) whose argmax is
+dim 0, and of settled phase-3 ticks (900..1000) whose argmax is dim 1. Hysteresis
+means resisting *noise*, not resisting *evidence*.
+
+| Kernel | Flips | Tracking | Verdict |
 |---|---|---|---|
-| LeakyIntegrator (Plan 276 winner) | 1 | 1× | — |
-| AttractorKernel (random init, seed=42) | 347 | 347× | 1× |
-| **CpHopfield (CP², snap=0.5)** | **3** | **3×** | **116× better** |
-| CpHopfield (CP², snap=0.25) | 1 | 1× (exact parity) | 347× better |
+| `LeakyIntegrator` (Plan 276 winner) | 1 | 1.000 | reference |
+| `AttractorKernel` (random init, seed=42) | 347 | **0.000** | fails both axes |
+| **`CpHopfield` (CP², task-aligned memories, snap=0.5)** | **3** | **1.000** | **G5 PASS** |
+| `CpHopfield` (CP², Haar-random memories, best of 5 seeds x 4 snaps) | 0 | **0.000** | degenerate FAIL |
 
-**G5 PASS criterion** (≤ 10× leaky = ≤ 10 flips): **3 flips at snap=0.5, 1 flip at snap=0.25. PASS.**
+**G5 criterion:** flips <= 10 (10x leaky) **AND** tracking >= leaky - 0.05.
+Task-aligned CP² scores 3 flips at tracking 1.000 — **PASS**.
 
-The CP^(d-1) recaller reduces flip-flops by **116×** vs the random-init
-AttractorKernel (347 → 3), confirming the BBP-protection mechanism works
-modellessly. The snap=0.25 variant achieves exact leaky parity (1 flip) while
-providing BBP-protected memory basins — the hysteresis is free.
+Two results are worth stating precisely:
+
+1. **CP^(d-1) beats the random attractor on both axes, not just stability.**
+   `AttractorKernel` scores tracking 0.000 — it is not merely flip-floppy, it
+   never represents the correct belief at all. CP² takes flips 347 -> 3 *and*
+   tracking 0.000 -> 1.000, with no gradient descent anywhere.
+2. **The Haar-random control fails degenerately.** Its 0 flips look like the best
+   score in the table and are worthless: at tracking 0.000 the state is pinned in
+   a random memory basin and never follows the evidence. This held across all 20
+   (seed, snap) cells, so it is not an unlucky draw.
 
 ### What was confirmed vs refuted
 
 | Claim (from §3) | Verdict | Evidence |
 |---|---|---|
-| BBP-protected top-eigenvector recall provides modelless hysteresis | **CONFIRMED** | 116× flip-count reduction vs random attractor |
-| Plan 276 "needs training" blocker is refuted | **CONFIRMED** | CP² recall with deterministic Hebbian construction (no GD) beats random-init attractor by 116× |
-| CP^(d-1) is a drop-in AttractorKernel replacement | **NUANCED** | The adapter is a leaky+CP-snap hybrid, not a direct replacement. The architectural mismatch (CAM vs belief tracking) requires an adapter layer. |
-| Exact leaky parity is achievable | **CONFIRMED** | snap=0.25 achieves 1 flip (identical to LeakyIntegrator) |
+| CP^(d-1) recall gives a correct, stable belief tracker with **no gradient descent** | **CONFIRMED** | 3 flips / tracking 1.000 from `push_memory` alone |
+| It beats random-init `AttractorKernel` | **CONFIRMED** | flips 347 -> 3; tracking 0.000 -> 1.000 |
+| Plan 276's "needs training" blocker is refuted | **CONFIRMED, NARROWLY** | No training is needed — but the blocker's own wording allowed "trained **or hand-set**" weights, and this result uses hand-set (task-aligned) memories. What is refuted is the *training* requirement, not the *alignment* requirement. |
+| BBP protection yields modelless hysteresis from arbitrary memories | **REFUTED** | Haar-random memories: tracking 0.000 across 20 cells |
+| Hysteresis is free (no belief-tracking cost) | **REFUTED** | snap=0.0 (projection only, no snap) scores 48 flips — worse than leaky's 1. The manifold projection alone *costs* stability; the memory term has to pay it back. |
+| CP^(d-1) is a drop-in `AttractorKernel` replacement | **NO** | The adapter is a leaky + CP-snap hybrid. CP^(d-1) recall is CAM with no external input path; G2.1 is streaming belief tracking. An adapter layer is required. |
 
-### Architectural honesty
+### Robustness caveat
 
-The adapter is a **leaky + CP-snap hybrid**: the leaky integrator tracks the
-input stream (for belief tracking), then the CP² recaller snaps the state
-toward the closest stored memory (for BBP-protected hysteresis). This is the
-most charitable interpretation of "CP^(d-1) unblocks Plan 276" — a direct
-replacement would not work because CP^(d-1) recall is CAM (no external input
-path), while Plan 276 is streaming belief tracking.
-
-The memories are 2 canonical belief patterns ("dim 0 dominant" / "dim 1
-dominant") constructed as eigenstates of the Gell-Mann generators λ₁ and λ₂,
-loaded at construction via `push_memory` — the freeze/thaw Path 1 (no training).
+Flip count is **non-monotone** in snap strength: `[48, 1, 3, 21, 9]` across snap
+0.00–1.00. The gate result therefore depends on a hyperparameter with no
+principled setting, and the margin should not be read as clean. A mechanism whose
+benefit appears at snap=0.25–0.5 and degrades at 0.75 is tuned, not robust.
 
 ### What this does NOT prove
 
-1. **G6 (Fusion B — KG capacity) remains unmeasured.** The Super-GOAT's
-   capacity-scaling claim (α_c ∝ d²) is tested only indirectly via the flip-
-   count reduction. A direct KG-triple-capacity benchmark in riir-neuron-db
-   is still needed (Phase 6, deferred).
-2. **Finite-N capacity at production scale is unmeasured.** The G5 PoC uses
-   N=2 neurons (the mirror trick) with P=2 memories. Production use would
-   involve larger N and P. The existing `measure_capacity` module (Phase 4)
-   provides this measurement, but it was not exercised in the G5 gate.
-3. **The adapter uses dim=8 (CP²'s Bloch dimension), not dim=16 (Plan 276's
-   original BENCH_DIM).** The relative ordering of kernels is not sensitive
-   to dim in the 8–32 range (per the coherence_bench.rs module docs), but
-   this is a protocol deviation documented for honesty.
+1. **G6 (Fusion B — KG capacity) remains unmeasured.** Phase 6 is deferred to a
+   riir-neuron-db follow-up. The capacity claim is supported by G2/G7 (below), not
+   by this PoC.
+2. **The G5 adapter runs at N=2 neurons, P=2 memories** (the mirror trick, so the
+   Mattis overlap excluding neuron 0 has exactly one term). This is a degenerate
+   Hopfield network. Production use would be larger N and P; Phase 4's
+   `measure_capacity` covers that regime separately.
+3. **Protocol deviation:** the adapter uses dim=8 (CP²'s Bloch dimension), not
+   Plan 276's dim=16. All four arms were re-measured at dim=8, so the comparison
+   is internally consistent, but `AttractorKernel` scores 347 here vs 569 in
+   Bench 276 — these are not the same numbers.
 
 ### Verdict after PoC
 
-**Super-GOAT stands.** The load-bearing G5 gate PASSES. The §3.5 modelless-
-unblock claim is validated empirically. Fusion A (Plan 276 unblock) is
-confirmed. The primitive is eligible for promotion to default-on pending
-Phase 7 (full GOAT gate G1–G7 + promotion decision).
+**Super-GOAT stands on a narrower base than §3 claimed.** The load-bearing G5 gate
+passes and Fusion A is real: a modelless, GD-free belief kernel that dominates the
+demoted `AttractorKernel` on both stability and correctness. The mechanism claim
+must be stated as *"CP^(d-1) turns a frozen, task-aligned memory set into stable
+fixed points without gradient descent"* — which is exactly freeze/thaw Path 1 and
+exactly what T5.1 intended (load `NeuronShard::style_weights` as memories). The
+stronger reading, that the BBP gap confers hysteresis independent of what is
+stored, is refuted by the Haar control.
 
+Promotion to default-on is **not** justified on this evidence: G6 is unmeasured and
+the snap sensitivity is unresolved. The primitive stays **opt-in**.
 ---
 
 - **Quantum extension (§VI-VII).** Negative result — Hebbian data lost in chaotic spectra. Out of scope.

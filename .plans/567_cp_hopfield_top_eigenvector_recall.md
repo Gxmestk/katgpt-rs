@@ -5,7 +5,7 @@
 **Private guide:** [riir-neuron-db/.research/304](../../riir-neuron-db/.research/304_Symmetric_Space_Hopfield_Super_GOAT_Guide.md)
 **Source paper:** Victor Galitski — "High-Capacity Generalized Hopfield Networks" — [alphaXiv 2607.hopfield-networks](https://www.alphaxiv.org/abs/2607.hopfield-networks) (2026-07-31)
 **Target:** `katgpt-rs/crates/katgpt-core/src/cp_hopfield/` (new module) + Cargo feature `cp_hopfield`
-**Status:** Phases 1–5 COMPLETE. Phase 6 (Fusion B / riir-neuron-db) deferred to a follow-up plan. Phase 7 (GOAT gate + promotion) pending — G5 PASS unblocks promotion consideration, but G6 (Fusion B KG capacity) remains unmeasured.
+**Status:** Phases 1–5 + 7 COMPLETE. Phase 6 (Fusion B / riir-neuron-db) deferred to a follow-up plan. **Promotion decision: `cp_hopfield` STAYS OPT-IN** — G1–G4 + G7 PASS, G5 passes only in the narrow sense (see Phase 5), G6 unmeasured. Benchmark: [.benchmarks/567](../.benchmarks/567_cp_hopfield_goat.md).
 
 ---
 
@@ -23,17 +23,17 @@ Ship the **open primitive** for CP^(d-1) symmetric-space Hopfield associative me
 
 ### Tasks
 
-- [ ] **T1.1** Create module `crates/katgpt-core/src/cp_hopfield/` with `mod.rs` declaring the public API surface. Add `cp_hopfield` feature to `katgpt-core/Cargo.toml` default-off.
-- [ ] **T1.2** Implement `CpHopfieldRecaller<D>` struct (research note §2.1). Generic over `const D: usize` (complex dimension = `d` in CP^(d-1)). Fields: `memories: Vec<[Complex<f32>; D]>`, `structure_constants: &'static [[[f32; D2]; D2]; D2]` where `D2 = D*D - 1`.
-- [ ] **T1.3** Implement SU(d) structure constants for d=2 (Pauli, `f_{abc} = ε_{abc}`), d=3 (Gell-Mann, Eq. 43 of paper), d=4, d=8. Hardcoded lookup tables — O(1) init.
-- [ ] **T1.4** Implement `mattis_overlap_excluding(neuron_idx, mu) -> f32` — the `O_μ^(i)` computation. O(N) per call.
-- [ ] **T1.5** Implement `build_memory_kernel(neuron_idx) -> [[Complex<f32>; D]; D]` — the `K_i = Σ_μ O_μ^(i) |ξ^μ_i⟩⟨ξ^μ_i|` construction. O(P·D²) per call.
-- [ ] **T1.6** Implement `hermitian_top_eigenvector(k: &[[Complex<f32>; D]; D]) -> [Complex<f32>; D]` — power iteration (5–10 iters suffice for d ≤ 8). For d=2 use closed-form (Pauli matrix analytic roots); for d=3 use closed-form (cubic characteristic polynomial). O(D³) per call.
-- [ ] **T1.7** Implement `bloch_projection(state: &[Complex<f32>; D]) -> [f32; D2]` — convert qudit to generalized Bloch vector via `s_a = ⟨ξ|λ_a|ξ⟩`. O(D·D2) per call.
-- [ ] **T1.8** Implement `recall_step(neuron_idx, current_bloch: &[f32; D2]) -> [f32; D2]` — the full top-eigenvector recall step (build K_i → top evec → Bloch projection).
-- [ ] **T1.9** Add G1 unit test: store 1 Haar-random memory on CP² (d=3), corrupt it 40%, recall → assert `m̄ ≥ 0.9` after 1 sweep.
-- [ ] **T1.10** Add G1 unit test: store 10 Haar-random memories on CP² at α=0.1 (< α_c=0.62), corrupt memory 0, recall → assert `m̄_0 ≥ 0.9` after 1 sweep.
-- [ ] **T1.11** Commit Phase 1 skeleton. Tag for the G5 PoC (Phase 5) to consume.
+- [x] **T1.1** Create module `crates/katgpt-core/src/cp_hopfield/` with `mod.rs` declaring the public API surface. Add `cp_hopfield` feature to `katgpt-core/Cargo.toml` default-off.
+- [x] **T1.2** Implement `CpHopfieldRecaller<D>` struct (research note §2.1). Generic over `const D: usize` (complex dimension = `d` in CP^(d-1)). Fields: `memories: Vec<[Complex<f32>; D]>`, `structure_constants: &'static [[[f32; D2]; D2]; D2]` where `D2 = D*D - 1`.
+- [x] **T1.3** Implement SU(d) structure constants for d=2 (Pauli, `f_{abc} = ε_{abc}`), d=3 (Gell-Mann, Eq. 43 of paper), d=4, d=8. Hardcoded lookup tables — O(1) init.
+- [x] **T1.4** Implement `mattis_overlap_excluding(neuron_idx, mu) -> f32` — the `O_μ^(i)` computation. O(N) per call.
+- [x] **T1.5** Implement `build_memory_kernel(neuron_idx) -> [[Complex<f32>; D]; D]` — the `K_i = Σ_μ O_μ^(i) |ξ^μ_i⟩⟨ξ^μ_i|` construction. O(P·D²) per call.
+- [x] **T1.6** Implement `hermitian_top_eigenvector(k: &[[Complex<f32>; D]; D]) -> [Complex<f32>; D]` — power iteration (5–10 iters suffice for d ≤ 8). For d=2 use closed-form (Pauli matrix analytic roots); for d=3 use closed-form (cubic characteristic polynomial). O(D³) per call.
+- [x] **T1.7** Implement `bloch_projection(state: &[Complex<f32>; D]) -> [f32; D2]` — convert qudit to generalized Bloch vector via `s_a = ⟨ξ|λ_a|ξ⟩`. O(D·D2) per call.
+- [x] **T1.8** Implement `recall_step(neuron_idx, current_bloch: &[f32; D2]) -> [f32; D2]` — the full top-eigenvector recall step (build K_i → top evec → Bloch projection).
+- [x] **T1.9** Add G1 unit test: store 1 Haar-random memory on CP² (d=3), corrupt it 40%, recall → assert `m̄ ≥ 0.9` after 1 sweep.
+- [x] **T1.10** Add G1 unit test: store 10 Haar-random memories on CP² at α=0.1 (< α_c=0.62), corrupt memory 0, recall → assert `m̄_0 ≥ 0.9` after 1 sweep.
+- [x] **T1.11** Commit Phase 1 skeleton. Tag for the G5 PoC (Phase 5) to consume.
 
 ---
 
@@ -41,10 +41,10 @@ Ship the **open primitive** for CP^(d-1) symmetric-space Hopfield associative me
 
 ### Tasks
 
-- [ ] **T2.1** Implement `project_to_manifold(bloch: &mut [f32; D2])` — enforce the non-linear CP^(d-1) constraint `d_{abc} s_b s_c = (2/3) s_a` via projected gradient (alternate normalization + constraint projection until convergence). O(D²) per call.
-- [ ] **T2.2** Implement the symmetric `d_{abc}` tensor for d=3 (paper §VIII.C gives the explicit non-zero components). For d=2 all `d_{abc}=0` (no constraint beyond norm). For d=4, d=8 — derive from generalized Gell-Mann anticommutators.
-- [ ] **T2.3** Add G4 unit test: `project_to_manifold` converges in ≤ 5 iterations for d=3; produces Bloch vector satisfying the constraint to `|d_{abc} s_b s_c − (2/3) s_a| < 1e-5` for all a.
-- [ ] **T2.4** Add G4 unit test: `project_to_manifold` is sub-μs for d=3 (D=8) at criterion bench.
+- [x] **T2.1** Implement `project_to_manifold(bloch: &mut [f32; D2])` — enforce the non-linear CP^(d-1) constraint `d_{abc} s_b s_c = (2/3) s_a` via projected gradient (alternate normalization + constraint projection until convergence). O(D²) per call.
+- [x] **T2.2** Implement the symmetric `d_{abc}` tensor for d=3 (paper §VIII.C gives the explicit non-zero components). For d=2 all `d_{abc}=0` (no constraint beyond norm). For d=4, d=8 — derive from generalized Gell-Mann anticommutators.
+- [x] **T2.3** Add G4 unit test: `project_to_manifold` converges in ≤ 5 iterations for d=3; produces Bloch vector satisfying the constraint to `|d_{abc} s_b s_c − (2/3) s_a| < 1e-5` for all a.
+- [x] **T2.4** Add G4 unit test: `project_to_manifold` is sub-μs for d=3 (D=8) at criterion bench.
 
 ---
 
@@ -52,13 +52,13 @@ Ship the **open primitive** for CP^(d-1) symmetric-space Hopfield associative me
 
 ### Tasks
 
-- [ ] **T3.1** Implement `lie_bracket(s: &[f32; D2], b: &[f32; D2], f: &StructureConstants) -> [f32; D2]` — the `[s ×_f B]_c = f_{cab} s_a B_b` computation. O(D2²) per call.
-- [ ] **T3.2** Implement `mean_field(neuron_idx, states: &[[f32; D2]; N]) -> [f32; D2]` — the `B_i = Σ_{j≠i} J_{ij} s_j = Σ_μ ξ^μ_i O_μ^(i)` computation. O(N·D2) per call.
-- [ ] **T3.3** Implement `llg_flow_step(s: &mut [f32; D2], b: &[f32; D2], damping: f32, dt: f32)` — the generalized Landau-Lifshitz-Gilbert step: `ṡ = s ×_f B − λ [s ×_f [s ×_f B]]`. O(D2²) per call. Calls `project_to_manifold` after the step.
-- [ ] **T3.4** Implement `llg_recall(recaller: &CpHopfieldRecaller, initial: &mut [f32; D2], damping: f32, dt: f32, max_steps: usize) -> RecallResult` — runs the LLG flow to fixed point, returns final state + energy trajectory + convergence step count.
-- [ ] **T3.5** Add G1 unit test: LLG recall on CP² with 1 corrupted memory converges to `m̄ ≥ 0.99` within 10 damping times (paper Fig 9 shows ~3 damping times at λ=1).
-- [ ] **T3.6** Add G1 unit test: LLG recall energy trajectory is monotonically non-increasing (`Ė = −λ Σ |s_i ×_f B_i|² ≤ 0`).
-- [ ] **T3.7** Add G4 unit test: one LLG step is sub-μs for d=3 (D2=8) at criterion bench.
+- [x] **T3.1** Implement `lie_bracket(s: &[f32; D2], b: &[f32; D2], f: &StructureConstants) -> [f32; D2]` — the `[s ×_f B]_c = f_{cab} s_a B_b` computation. O(D2²) per call.
+- [x] **T3.2** Implement `mean_field(neuron_idx, states: &[[f32; D2]; N]) -> [f32; D2]` — the `B_i = Σ_{j≠i} J_{ij} s_j = Σ_μ ξ^μ_i O_μ^(i)` computation. O(N·D2) per call.
+- [x] **T3.3** Implement `llg_flow_step(s: &mut [f32; D2], b: &[f32; D2], damping: f32, dt: f32)` — the generalized Landau-Lifshitz-Gilbert step: `ṡ = s ×_f B − λ [s ×_f [s ×_f B]]`. O(D2²) per call. Calls `project_to_manifold` after the step.
+- [x] **T3.4** Implement `llg_recall(recaller: &CpHopfieldRecaller, initial: &mut [f32; D2], damping: f32, dt: f32, max_steps: usize) -> RecallResult` — runs the LLG flow to fixed point, returns final state + energy trajectory + convergence step count.
+- [x] **T3.5** Add G1 unit test: LLG recall on CP² with 1 corrupted memory converges to `m̄ ≥ 0.99` within 10 damping times (paper Fig 9 shows ~3 damping times at λ=1).
+- [x] **T3.6** Add G1 unit test: LLG recall energy trajectory is monotonically non-increasing (`Ė = −λ Σ |s_i ×_f B_i|² ≤ 0`).
+- [x] **T3.7** Add G4 unit test: one LLG step is sub-μs for d=3 (D2=8) at criterion bench.
 
 ---
 
@@ -66,10 +66,10 @@ Ship the **open primitive** for CP^(d-1) symmetric-space Hopfield associative me
 
 ### Tasks
 
-- [ ] **T4.1** Implement `measure_capacity(d: usize, n: usize, alpha_range: &[f32], realizations: usize) -> CapacityCurve` — for each α in `alpha_range`, generate P=α·N Haar-random memories, corrupt a random target, recall, measure `m̄_0`. Average over `realizations`. Return α_c (where `m̄_0` crosses threshold 0.5).
-- [ ] **T4.2** Add G2 benchmark: measure α_c for d=2, 3, 4 at N=64, 256, 1024. Compare to paper's asymptotic α_c (0.05, 0.62, 2.41). Document finite-N corrections.
-- [ ] **T4.3** Add G2 benchmark: measure α_c at N=8 (our belief dim) for d=3. This is the critical finite-N test for Fusion A — if α_c(N=8, d=3) is much lower than the asymptotic 0.62, the Plan 276 unblock is at risk.
-- [ ] **T4.4** Add G2 benchmark: measure α_c on CORRELATED memories (not Haar-random). Generate memories as `ξ^μ = cos(θ_μ) · v_base + sin(θ_μ) · v_orth` with varying `θ_μ` spread. Document how correlation reduces α_c.
+- [x] **T4.1** Implement `measure_capacity(d: usize, n: usize, alpha_range: &[f32], realizations: usize) -> CapacityCurve` — for each α in `alpha_range`, generate P=α·N Haar-random memories, corrupt a random target, recall, measure `m̄_0`. Average over `realizations`. Return α_c (where `m̄_0` crosses threshold 0.5).
+- [x] **T4.2** Add G2 benchmark: measure α_c for d=2, 3, 4 at N=64, 256, 1024. Compare to paper's asymptotic α_c (0.05, 0.62, 2.41). Document finite-N corrections.
+- [x] **T4.3** Add G2 benchmark: measure α_c at N=8 (our belief dim) for d=3. This is the critical finite-N test for Fusion A — if α_c(N=8, d=3) is much lower than the asymptotic 0.62, the Plan 276 unblock is at risk.
+- [x] **T4.4** Add G2 benchmark: measure α_c on CORRELATED memories (not Haar-random). Generate memories as `ξ^μ = cos(θ_μ) · v_base + sin(θ_μ) · v_orth` with varying `θ_μ` spread. Document how correlation reduces α_c.
 
 ---
 
@@ -77,19 +77,34 @@ Ship the **open primitive** for CP^(d-1) symmetric-space Hopfield associative me
 
 ### Results
 
-| Kernel | Flip-flops (lower=better) | Ambig-window var | Diverged? |
-|---|---|---|---|
-| **LeakyIntegrator** (baseline) | **1** | 0.0000 | no |
-| AttractorKernel (random init, seed=42) | 347 | 5.6616 | no |
-| **CpHopfield** (CP², snap=0.5) | **3** | 0.0099 | no |
+| Kernel | Flips | Tracking | Ambig var | Verdict |
+|---|---|---|---|---|
+| **LeakyIntegrator** (baseline) | **1** | 1.000 | 0.0000 | reference |
+| AttractorKernel (random init, seed=42) | 347 | **0.000** | 5.6616 | fails both axes |
+| **CpHopfield** (CP², task-aligned memories, snap=0.5) | **3** | **1.000** | 0.0099 | **PASS** |
+| CpHopfield (CP², Haar-random memories, best of 5 seeds × 4 snaps) | 0 | **0.000** | 0.0000 | degenerate FAIL |
 
-**G5 GATE: PASS** (criterion: cp_hopfield ≤ 10× leaky = ≤ 10 flips; measured 3).
+**G5 GATE: PASS, narrowly** (criterion: flips ≤ 10× leaky **AND** tracking ≥
+leaky − 0.05; measured 3 flips at tracking 1.000).
 
-**CP^(d-1) recall reduces flip-flops from 347× (random attractor) to 3× (3× over
-leaky baseline)** — a 116× improvement over the random AttractorKernel. The
-§3.5 modelless-unblock claim is validated: BBP-protected top-eigenvector
-recall provides hysteresis modellessly, refuting Plan 276's "needs training"
-blocker.
+**Flip count alone is not a sufficient criterion.** It rewards stability, and a
+kernel that ignores its input entirely is perfectly stable — 0 flips, *better*
+than LeakyIntegrator, whose single flip is the **correct** phase-1 → phase-3
+transition. The gate therefore also scores **tracking** (argmax correct in the
+settled tail of each driven phase). Hysteresis means resisting *noise*, not
+resisting *evidence*.
+
+What passes: CP² recall with task-aligned memories beats the demoted
+AttractorKernel on **both** axes — flips 347 → 3 *and* tracking 0.000 → 1.000 —
+with no gradient descent anywhere.
+
+What does not: the Haar-random control (strict parity with the random-init
+attractor) fails at tracking 0.000 across all 20 (seed, snap) cells. Its 0 flips
+are degenerate — the state is pinned in a random basin and never follows the
+evidence. **So the BBP gap does not confer hysteresis from arbitrary memories.**
+Plan 276's blocker allowed "trained **or hand-set**" weights, so what is refuted
+is the *training* requirement, not the *alignment* requirement — i.e. exactly
+freeze/thaw Path 1, exactly what T5.1 intended.
 
 Snap-strength sweep (how much the CP recall pulls toward the closest memory):
 
@@ -101,9 +116,11 @@ Snap-strength sweep (how much the CP recall pulls toward the closest memory):
 | 0.75 | 21 | Too aggressive — snap overpowers input tracking |
 | 1.00 | 9 | Hard snap — still ≤10, but no input tracking |
 
-The snap=0.25 result is notable: CP^(d-1) recall matches the leaky baseline
-exactly (1 flip) while providing BBP-protected memory basins. This means the
-hysteresis is free — no belief-tracking quality cost.
+**Robustness caveat:** the sweep is **non-monotone** (48 → 1 → 3 → 21 → 9), so the
+result depends on a hyperparameter with no principled setting and the margin is not
+clean. Note especially snap=0.00: manifold projection *without* the memory snap
+scores 48 flips, worse than leaky's 1 — the projection alone costs stability and
+the memory term has to pay it back. Hysteresis is therefore **not** free.
 
 ### Architectural honesty note
 
@@ -150,16 +167,65 @@ AND the integration as a snap layer works.
 
 ### Tasks
 
-- [ ] **T7.1** Run G1–G7 full gate. Document results in `.benchmarks/567_*.md`.
-- [ ] **T7.2** **Promotion decision:**
+- [x] **T7.1** Run G1–G7 full gate. Document results in `.benchmarks/567_*.md`.
+- [x] **T7.2** **Promotion decision:**
   - If G5 PASS AND G6 PASS AND G7 PASS → promote `cp_hopfield` to default-on. File riir-ai follow-up plan for Plan 276 AttractorKernel re-promotion under CP^(d-1) parameterization.
   - If G5 FAIL but G6 PASS → keep `cp_hopfield` opt-in. Verdict drops to GOAT. Document in research note 466 §3 that Fusion A was refuted; Fusion B (shard capacity) is the surviving value.
   - If G5 FAIL AND G6 FAIL → demote to experimental. Verdict drops to Gain. Document honestly.
-- [ ] **T7.3** Update per-stack promote/demote ledger in research note 466 §3.
-- [ ] **T7.4** Update `.docs/09_feature_catalog/` if promoted to default-on; update negative_results.md if demoted.
-- [ ] **T7.5** Update Plan 276 benchmark note with the G5 PoC results (whether Fusion A unblocked it or not).
+- [x] **T7.3** Update per-stack promote/demote ledger in research note 466 §3.
+- [x] **T7.4** Update `.docs/09_feature_catalog/` if promoted to default-on; update negative_results.md if demoted.
+- [x] **T7.5** Update Plan 276 benchmark note with the G5 PoC results (whether Fusion A unblocked it or not).
 
 ---
+
+## Phase 7 — GOAT Gate + Promotion Decision — DONE 2026-08-04
+
+Full results: [.benchmarks/567](../.benchmarks/567_cp_hopfield_goat.md).
+
+| Gate | Result |
+|---|---|
+| G1 correctness | **PASS** — 27 unit tests |
+| G2 capacity | **PASS** — `α_c(d=3)/α_c(d=2) = 7.4×` at N=64; d-scaling holds at every N |
+| G3 no-regression | **PASS** — opt-in, default-off |
+| G4 perf | **PASS** — recall 331 ns / project 239 ns / LLG 589 ns, 0 allocs |
+| G5 Plan 276 unblock | **PASS, narrowly** — 3 flips at tracking 1.000; Haar control fails |
+| G6 Fusion B (KG capacity) | **NOT MEASURED** — Phase 6 deferred |
+| G7 BBP gap | **PASS** — 0.73–0.95 vs a 0.1 bar, at N ∈ {8, 64} |
+
+### Decision: STAYS OPT-IN
+
+T7.2's table requires G5 **and** G6 **and** G7 for default-on. G6 is unmeasured, so
+the precondition is not met regardless of anything else. Two further reasons not to
+force it:
+
+1. **G5 passes only in the narrow sense.** The Haar-random control fails
+   degenerately, so the mechanism needs a task-aligned frozen memory set. That is a
+   legitimate freeze/thaw Path 1 story, but it is a weaker claim than §3 made and it
+   means the value depends on a consumer supplying aligned memories.
+2. **The G5 margin is hyperparameter-sensitive.** Non-monotone snap sweep
+   (48 → 1 → 3 → 21 → 9) with no principled setting.
+
+Per Research 466 §3, the verdict stands on the axes that were confirmed — capacity
+(G2) and BBP protection at finite N (G7), both strong — with Fusion A confirmed in
+its narrow form. Nothing was silently revised; the earlier unqualified "hysteresis
+is free" claim is corrected in place with the measurement that refuted it.
+
+### Corrections to this plan's own premises, found by measuring
+
+- **Risk Register's finite-N concern is REFUTED.** `α_c` is *higher* at small N and
+  decreases toward the asymptote as N grows (d=3: 1.696 → 1.295 → 0.909 at
+  N = 8 → 64 → 256). Small N is favorable.
+- **T4.4's expectation was wrong.** Correlated memories recall the *cued* memory
+  better, not worse. The cost of correlation is discriminability (the shadow
+  phenomenon), not `α_c`.
+- **Research 466's `O(d³)` cost model is wrong.** Recall is
+  `O(P·N·D2 + d³)` and the omitted Mattis term dominates by ~100× at
+  `P=16, N=64`. Fixed via an exact global-sum cache.
+- **T1.3 (hardcoded structure-constant tables) was not viable** at d=8 (63³
+  entries); constants are contracted from the closed-form basis instead.
+- **T2.1 (iterative projected gradient) was unnecessary** — the manifold projection
+  has a closed form, because the Bloch map is a Euclidean similarity and the closest
+  pure state is the top eigenvector of `ρ`.
 
 ## Risk Register
 
