@@ -28,7 +28,18 @@ lz4_flex = { version = "0.13", optional = true }
 # ahash is used by `closure_instrument` (Plan 290 G1 hot-path optimization).
 # Already a transitive dep via hashbrown 0.14 / bevy_utils — listing it here only
 # promotes it to a direct dependency for the `closure_instrument` feature.
-ahash = { version = "0.8", optional = true }
+#
+# `default-features = false` + a per-target RNG source (see the two [target.*]
+# sections at the bottom of this file): ahash's default `runtime-rng` pulls
+# `getrandom`, which has no working backend on wasm32-unknown-unknown and
+# fails the build outright. Native keeps `runtime-rng` (OS entropy, full
+# HashDoS resistance); wasm32 gets `compile-time-rng` (seed baked in per
+# build). Declaring the feature per-target rather than swapping it globally
+# means native behavior is unchanged. Note `default-features = false` must
+# appear on EVERY declaration — Cargo unions features across all applicable
+# sections, so a single defaulted declaration would re-enable `runtime-rng`
+# on wasm32 and undo this.
+ahash = { version = "0.8", optional = true, default-features = false, features = ["std"] }
 # katgpt-dec houses the Discrete Exterior Calculus substrate spun out of
 # katgpt-core::dec (Issue 007 Phase E Tier 1). Optional — pulled in by the
 # `dec_operators` feature and re-exported as `katgpt_core::dec` for backwards
@@ -75,6 +86,15 @@ katgpt-sense = { path = "../katgpt-sense", version = "0.2.0", optional = true }
 # Plan 299 T4.3: tokenizer compression (NFKC + lowercase collapse) for the
 # `engram` feature. Small dep, only compiled when `engram` is on.
 unicode-normalization = { version = "0.1", optional = true }
+
+# ahash RNG source, per target — see the `ahash` comment in [dependencies].
+# Native: OS entropy (ahash's own default). wasm32: build-time constant seed,
+# because `getrandom` has no wasm32-unknown-unknown backend.
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+ahash = { version = "0.8", optional = true, default-features = false, features = ["runtime-rng"] }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+ahash = { version = "0.8", optional = true, default-features = false, features = ["compile-time-rng"] }
 
 [dev-dependencies]
 serde_json = "1"

@@ -88,7 +88,16 @@ plotters = { version = "0.3", optional = true }  # Issue 355 Phase 2a: optional 
 rayon = "1.10"
 log = "0.4"
 blake3 = "1"
-uuid = { version = "1", features = ["v7"] }  # Uuid::now_v7() for per-entity provenance ids (Issue 001 HLA eigenbasis)
+# NOTE: no `uuid` dep here on purpose. It was declared for "Issue 001 HLA
+# eigenbasis" provenance ids, but that code lives in `katgpt-spectral`, which
+# carries its own `uuid` dep — this crate never referenced it (only a doc
+# comment in benches/hla_eigenbasis_bench.rs mentions `Uuid::now_v7`).
+# Beyond being dead weight, `uuid`'s `v7` feature hard-fails the
+# wasm32-unknown-unknown build ("specify a source of randomness using one of
+# the `js`, `rng-getrandom`, or `rng-rand` features"), which broke
+# riir-mmorpg-examples' wasm modules downstream. If something here ever needs
+# UUIDs, target-gate the `v7` feature to non-wasm32 like riir-engine /
+# riir-games-shared / riir-games-civ do.
 fastrand = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
