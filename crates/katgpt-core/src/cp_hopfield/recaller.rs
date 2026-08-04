@@ -220,6 +220,37 @@ impl<const D: usize, const D2: usize> CpHopfieldRecaller<D, D2> {
         self.overlap_totals.push(total);
     }
 
+    /// Store one memory from Bloch vectors, projecting each onto the CP^(d-1)
+    /// manifold first. This is the Bloch-vector sibling of [`push_memory`] —
+    /// the same store path, but the input is a Bloch vector per neuron instead
+    /// of a qudit.
+    ///
+    /// The projection is the Bloch→ρ→top-eigenvector round-trip
+    /// ([`GellMannBasis::density_from_bloch`] + [`hermitian_top_eigenvector`]),
+    /// which maps any point in R^(d²−1) to the closest on-manifold qudit. This
+    /// is the natural entry point when the memories come from a source that
+    /// produces raw vectors (e.g. `ItemEmbedIndex`'s `[f32; 8]` embeddings).
+    ///
+    /// # Panics
+    /// Panics if `pattern.len() != n_neurons`.
+    pub fn push_memory_bloch(&mut self, pattern: &[[f32; D2]]) {
+        assert_eq!(
+            pattern.len(),
+            self.n_neurons,
+            "cp_hopfield: bloch memory pattern must cover all {} neurons",
+            self.n_neurons
+        );
+        let qudits: Vec<[C32; D]> = pattern
+            .iter()
+            .map(|bloch| {
+                let rho = self.basis.density_from_bloch(bloch);
+                let (evec, _) = hermitian_top_eigenvector(&rho);
+                evec
+            })
+            .collect();
+        self.push_memory(&qudits);
+    }
+
     /// Write neuron `i`'s Bloch state, keeping [`Self::overlap_totals`] exact.
     ///
     /// Every state mutation funnels through here so the cache cannot drift out of
