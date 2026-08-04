@@ -5,6 +5,8 @@
 **arXiv**: 2305.18403v5
 **Venue**: Preprint (Aug 2024)
 
+> **PASS-Redirects (synthesis):** Xu et al. [arXiv:2606.14150 "Small LLMs: Pruning vs. Training from Scratch"] — empirical study of 6 pruning methods (Minitron-D/W, FLAP, Sheared LLaMA, Wanda, SparseGPT) at 50–81% ratios on Llama-3.1-8B, comparing prune-then-retrain vs scratch under matched token budgets. Confirms the scale-mismatch verdict of this note: our micro-models (5K–524K params, game LoRA rank 4) have nothing to meaningfully structurally prune. The paper's pruning criteria (Wanda `|W|·||X||`, FLAP `Var(X)·||W||²`, Minitron activation norm) are modelless scoring functions but were not invented by this paper and are irrelevant at our scale. → riir-train (training pipeline recipe decision, not inference primitive). Closest shipped cousin: riir-ai/.research/098 (lottery ticket init diversification for chain shards).
+
 ---
 
 ## TL;DR
