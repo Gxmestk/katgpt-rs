@@ -6,6 +6,8 @@
 **Modelless:** ✅ (core engine)
 **Model-based:** ✅ (riir-ai games)
 
+> **PASS-Redirects (NOT ruliology — category distinction):** Scofield [arXiv:2601.15077 "Multi-Agent Constraint Factorization Reveals Latent Invariant Solution Structure"] + Yun et al. [arXiv:2604.17148 "Graph-of-Agents"] — both proposed (then rejected) as "new ruliology". They are NOT ruliology: ruliology = exhaustive FSM/CA/TM enumeration as bandit arms (combinatorial program-space search). These papers = operator composition + graph message passing (convex-analysis / distributed-optimization lineage). Different math, different mechanism, different purpose. Do NOT merge into katgpt-ruliology. The substrate for MAS orchestration ships elsewhere (Sheaf-ADMM in katgpt-dec, FederationComposer + HyperplanePruner in katgpt-pruners).
+
 ---
 
 ## Distillation
