@@ -21,7 +21,7 @@ Benches:
 | G3 no-regression | opt-in, default-off; `--all-features` clean | **PASS** |
 | G4 perf | `O(d³)` paths sub-µs at `d ≤ 4`, alloc-free | **PASS** (after fixing a plan cost-model error) |
 | G5 Plan 276 unblock | flips ≤ 10× leaky **and** tracking ≥ leaky − 0.05 | **PASS, narrowly** — see §G5 |
-| G6 Fusion B (KG capacity) | ≥ 3× cosine-ANN triple capacity | **FAIL** — CP² worse than cosine at every N; single-step recall insufficient (Issue 033 bench) |
+| G6 Fusion B (KG capacity) | ≥ 3× cosine-ANN triple capacity | **FAIL** — CP² recall worse than cosine at every N; LLG follow-up produces bit-identical precision to single-step (refutes the "iterative recall" unblock); projected-cosine diagnostic shows projection HELPS 3–9× but associative recall destroys angular precision (Issue 033 bench) |
 | G7 BBP gap | relative gap > 0.1 at finite `N` | **PASS** — strongest result |
 
 **Promotion decision: keep `cp_hopfield` opt-in.** Per the Plan 567 T7.2 decision
@@ -205,16 +205,32 @@ CARGO_TARGET_DIR=/tmp/plan567 cargo bench -p riir-poc \
 
 ## Follow-ups
 
-1. **G6 / Phase 6 — MEASURED, FAIL (2026-08-04).** [Issue 033](../../riir-neuron-db/.issues/033_cp_hopfield_phase6_g6_kg_capacity_cp2.md)
+1. **G6 / Phase 6 — MEASURED, FAIL (2026-08-04; LLG unblock + projected-cosine
+   diagnostic 2026-08-04).** [Issue 033](../../riir-neuron-db/.issues/033_cp_hopfield_phase6_g6_kg_capacity_cp2.md)
    bench `bench_033_g6_kg_capacity` measured CP² recall vs cosine ANN on
    correlated 8-dim embeddings. CP² is consistently WORSE than cosine at
-   every N (capacity ratio 1.00×, criterion ≥ 3×). Root causes: single-step
-   recall insufficient, manifold projection loses information, clustered
-   benchmark is hard (SNR ≈ 1:1). Fusion B refuted with the current
-   single-step `query_cp` design. Iterative LLG recall to convergence is a
-   potential follow-up (not pursued). The promotion decision (STAYS OPT-IN)
-   is unaffected — G6 was already unmeasured; measuring it and getting FAIL
-   closes the open question without changing the verdict.
+   every N (capacity ratio 1.00×, criterion ≥ 3×).
+
+   **LLG unblock follow-up (REFUTED):** `query_cp_llg` runs the full LLG
+   flow to convergence and produces **bit-identical precision** to the
+   single-step `query_cp` at every N. Both methods arrive at the same basin —
+   the LLG converges to the top eigenvector's attractor, which is exactly
+   what `recall_step` returns in one step. The "iterative recall" unblock
+   hypothesis is refuted.
+
+   **Projected-cosine diagnostic (SURPRISING FINDING):** cosine ANN on
+   CP²-projected embeddings beats raw-cosine by 3–9× at every N (e.g.
+   0.516 vs 0.156 at N=64). The CP² manifold projection is a **denoising**
+   operation, not a lossy one. The real bottleneck is that associative
+   recall trades angular precision for basin robustness — the Hebbian kernel
+   mixes correlated memories, and the top eigenvector points at the cluster
+   centroid, not the individual memory.
+
+   **Potential new G6 variant (not pursued):** projected-cosine ANN (project
+   embeddings + query to CP² before cosine matching) as a preprocessing
+   step. The 239 ns projection cost is negligible per-query. This is a
+   different Fusion B path than recall dynamics. The promotion decision
+   (STAYS OPT-IN) is unaffected.
 2. **Snap sensitivity** — the non-monotone sweep needs either a principled snap
    setting or a reformulation that removes the hyperparameter (the driven LLG flow,
    `llg_step_driven`, is the natural candidate: it couples input into the field

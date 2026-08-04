@@ -155,7 +155,7 @@ memories.
 
 ---
 
-## Phase 6 — Fusion B / G6 (KG Capacity) — MEASURED, FAIL — [Issue 033](../../riir-neuron-db/.issues/033_cp_hopfield_phase6_g6_kg_capacity_cp2.md)
+## Phase 6 — Fusion B / G6 (KG Capacity) — MEASURED, FAIL (LLG unblock refuted + projected-cosine diagnostic) — [Issue 033](../../riir-neuron-db/.issues/033_cp_hopfield_phase6_g6_kg_capacity_cp2.md)
 
 ### Scope correction (2026-08-04)
 
@@ -164,6 +164,41 @@ as CP⁷ (d=8) Bloch vectors" — but the retrieval layer operates on 8-dim vect
 (`ITEM_EMBED_DIM = 8`, `BELIEF_DIM = 8`), not 64-dim shard storage. CP² (d=3,
 D2=8) is the correct dimension. This eliminates the invasive `NeuronShard`
 migration. See Issue 033 for the full substrate-first analysis.
+
+### G6 result + follow-ups (2026-08-04)
+
+**Initial measurement (single-step `query_cp`):** CP² recall is consistently
+WORSE than cosine ANN at every N (capacity ratio 1.00×, criterion ≥ 3×).
+
+**LLG unblock follow-up — REFUTED.** Added `query_cp_llg` which runs the full
+LLG flow to convergence (via `llg_recall`). Result: **bit-identical precision**
+to the single-step `query_cp` at every N. Both methods arrive at the same
+basin — the LLG converges to the top eigenvector's attractor, which is exactly
+what `recall_step` returns in one step. The "iterative recall" unblock
+hypothesis (listed as the most promising follow-up in the prior session) is
+refuted.
+
+**Projected-cosine diagnostic — SURPRISING FINDING.** Added a diagnostic arm
+that projects embeddings to CP² then does cosine matching (no recall
+dynamics). Result: projected-cosine beats raw-cosine by 3–9× at every N:
+
+| N | raw cosine | projected cosine | CP² recall (1-step = LLG) |
+|---|---|---|---|
+| 4 | 0.500 | 0.750 | 0.250 |
+| 32 | 0.219 | 0.719 | 0.031 |
+| 64 | 0.156 | 0.516 | 0.000 |
+| 256 | 0.027 | 0.234 | 0.004 |
+
+The CP² manifold projection is a **denoising** operation, not a lossy one.
+The real bottleneck is that associative recall trades angular precision for
+basin robustness — the Hebbian kernel mixes correlated memories, and the top
+eigenvector points at the cluster centroid, not the individual memory.
+
+**Potential new G6 variant (not pursued):** projected-cosine ANN as a
+preprocessing step (project embeddings + query to CP² before cosine matching).
+The 239 ns projection cost is negligible per-query. This is a different Fusion
+B path than recall dynamics. Filed as a finding, not pursued — the current G6
+gate measures recall capacity, not preprocessing quality.
 
 ### Tasks (moved to Issue 033)
 
@@ -199,7 +234,7 @@ migration. See Issue 033 for the full substrate-first analysis.
 | G3 no-regression | **PASS** — opt-in, default-off |
 | G4 perf | **PASS** — recall 331 ns / project 239 ns / LLG 589 ns, 0 allocs |
 | G5 Plan 276 unblock | **PASS, narrowly** — 3 flips at tracking 1.000; Haar control fails |
-| G6 Fusion B (KG capacity) | **FAIL** — CP² worse than cosine at every N; single-step recall insufficient (Issue 033) |
+| G6 Fusion B (KG capacity) | **FAIL** — CP² worse than cosine at every N; LLG follow-up produces bit-identical precision to single-step (refutes "iterative recall" unblock); projected-cosine diagnostic shows projection HELPS 3–9× but associative recall destroys angular precision (Issue 033) |
 | G7 BBP gap | **PASS** — 0.73–0.95 vs a 0.1 bar, at N ∈ {8, 64} |
 
 ### Decision: STAYS OPT-IN
