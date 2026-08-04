@@ -132,22 +132,26 @@ memory (for hysteresis). The memories are 2 canonical belief patterns ("dim 0
 dominant" / "dim 1 dominant") loaded at construction via `push_memory` — the
 freeze/thaw path, no training.
 
-This is the most charitable interpretation of "CP^(d-1) unblocks Plan 276".
-A negative result here would NOT have refuted the BBP-protection claim (tested
-separately by G1/G2 unit tests); it would have refuted only the integration
-claim. The positive result validates BOTH: the BBP-protection mechanism works
-AND the integration as a snap layer works.
+A sibling agent (commit `ab23ba375`, riir-ai) added two controls missing from
+the original PoC: a Haar-random memory arm (strict parity with
+`AttractorKernel::from_seed`) and a tracking-score responsiveness floor. These
+narrow the verdict — see Research 466 §3.6 for the full addendum. The
+BBP-protection mechanism works (G1/G2/G7 confirm it independently), and the
+snap-layer integration works with task-aligned memories — but the Haar control
+refutes the claim that BBP protection alone confers hysteresis from arbitrary
+memories.
 
 ### Tasks
 
-- [x] **T5.1** Three-competitor comparison in `riir-poc/benches/cp_hopfield_plan276_unblock.rs`:
-  - **Baseline A:** random-init `AttractorKernel` (Plan 276 demoted; 347 flips at dim=8)
-  - **Baseline B:** `LeakyIntegrator` (Plan 276 winner; 1 flip)
-  - **Candidate:** CP^(d=3) top-eigenvector recaller with 2 stored belief-pattern memories (3 flips at snap=0.5; 1 flip at snap=0.25)
-- [x] **T5.2** All three ran on the G2.1 belief-flip benchmark (1000-step protocol, dim=8 matching CP²'s Bloch dimension). Flip counts recorded above.
-- [x] **T5.3** **G5 PASS:** Candidate flip count (3) ≤ 10× LeakyIntegrator's (10). **Fusion A VALIDATED → Super-GOAT confirmed.** The snap=0.25 variant achieves 1 flip (exact leaky parity).
-- [x] **T5.4** **G7 measurement:** the BBP gap is implicitly confirmed by the flip-count reduction (347 → 3). A random-init attractor's kernel is gapless (no BBP protection); the CP² Hebbian kernel's gap protects the top eigenvector. Formal `(λ_max − λ_2) / λ_max` measurement at various loads is covered by the existing `bbp_gap_shrinks_with_load` unit test in `cp_hopfield/tests.rs`.
-- [x] **T5.5** PoC addendum written to research note 466 §"PoC Addendum" (below). Verdict: architectural + quality claims CONFIRMED. Super-GOAT stands.
+- [x] **T5.1** Four-arm comparison in `riir-poc/benches/cp_hopfield_plan276_unblock.rs` (original 3-arm in commit `37d1c259b`; Haar control + tracking floor added in `ab23ba375`):
+  - **Baseline A:** random-init `AttractorKernel` (347 flips, tracking 0.000)
+  - **Baseline B:** `LeakyIntegrator` (1 flip, tracking 1.000)
+  - **Candidate (task-aligned):** CP² recaller with 2 belief-pattern memories (3 flips, tracking 1.000)
+  - **Control (Haar-random):** CP² recaller, Haar memories, 5 seeds × 4 snaps (0 flips but tracking 0.000 → degenerate FAIL)
+- [x] **T5.2** All arms ran on the G2.1 belief benchmark (1000-step protocol, dim=8). Flip counts + tracking scores recorded above.
+- [x] **T5.3** **G5 PASS, narrowly:** Task-aligned arm: 3 flips, tracking 1.000 (criterion: flips ≤ 10 AND tracking ≥ 0.95). Haar control: FAIL (tracking 0.000). Fusion A validated in the narrow sense — "modelless given a frozen memory set", not "for free".
+- [x] **T5.4** **G7 measurement:** the BBP gap is confirmed by `bbp_gap_shrinks_with_load` in `cp_hopfield/tests.rs` AND by the G7 GOAT bench (relative gap 0.73–0.95 at N ∈ {8, 64}, see Benchmark 567). The task-aligned arm's flip reduction (347 → 3) is consistent with a gapped kernel; the Haar arm's degenerate failure shows the gap alone is insufficient — alignment is also required.
+- [x] **T5.5** PoC addendum in Research 466 §3.6 (revision note + corrected table + confirmed/refuted table). Super-GOAT stands on a narrower base than §3 claimed — see the confirmed/refuted table above.
 
 ---
 
@@ -163,24 +167,17 @@ AND the integration as a snap layer works.
 
 ---
 
-## Phase 7 — GOAT Gate + Promotion Decision
+## Phase 7 — GOAT Gate + Promotion Decision — DONE 2026-08-04
 
 ### Tasks
 
-- [x] **T7.1** Run G1–G7 full gate. Document results in `.benchmarks/567_*.md`.
-- [x] **T7.2** **Promotion decision:**
-  - If G5 PASS AND G6 PASS AND G7 PASS → promote `cp_hopfield` to default-on. File riir-ai follow-up plan for Plan 276 AttractorKernel re-promotion under CP^(d-1) parameterization.
-  - If G5 FAIL but G6 PASS → keep `cp_hopfield` opt-in. Verdict drops to GOAT. Document in research note 466 §3 that Fusion A was refuted; Fusion B (shard capacity) is the surviving value.
-  - If G5 FAIL AND G6 FAIL → demote to experimental. Verdict drops to Gain. Document honestly.
+- [x] **T7.1** Run G1–G7 full gate. Document results in [.benchmarks/567](../.benchmarks/567_cp_hopfield_goat.md).
+- [x] **T7.2** **Promotion decision: STAYS OPT-IN.** Default-on requires G5 + G6 + G7. G6 is unmeasured (Phase 6 deferred) and G5 passes only narrowly, so the precondition is not met. See Decision below.
 - [x] **T7.3** Update per-stack promote/demote ledger in research note 466 §3.
-- [x] **T7.4** Update `.docs/09_feature_catalog/` if promoted to default-on; update negative_results.md if demoted.
-- [x] **T7.5** Update Plan 276 benchmark note with the G5 PoC results (whether Fusion A unblocked it or not).
+- [x] **T7.4** Stays opt-in — no `.docs/09_feature_catalog/` update needed.
+- [x] **T7.5** Plan 276 benchmark note: Fusion A unblocked in the narrow sense (modelless given frozen memory set). AttractorKernel re-promotion deferred pending G6 + a consumer with aligned memories.
 
----
-
-## Phase 7 — GOAT Gate + Promotion Decision — DONE 2026-08-04
-
-Full results: [.benchmarks/567](../.benchmarks/567_cp_hopfield_goat.md).
+### Results
 
 | Gate | Result |
 |---|---|
